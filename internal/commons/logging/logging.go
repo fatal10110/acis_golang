@@ -1,10 +1,8 @@
 package logging
 
 import (
-	"context"
 	"fmt"
 	"io"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
@@ -12,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/fatal10110/acis_golang/internal/config"
+	"github.com/sirupsen/logrus"
 )
 
 // Sink names an output stream with its own file.
@@ -27,17 +26,17 @@ const (
 
 // Config is the logging setup derived from logging.properties.
 type Config struct {
-	Level           slog.Level
+	Level           logrus.Level
 	Patterns        map[Sink]string
 	UnsupportedKeys []string
 }
 
 // Runtime owns open log files and logger instances.
 type Runtime struct {
-	Logger  *slog.Logger
-	Chat    *slog.Logger
-	GMAudit *slog.Logger
-	Item    *slog.Logger
+	Logger  *logrus.Logger
+	Chat    *logrus.Logger
+	GMAudit *logrus.Logger
+	Item    *logrus.Logger
 
 	paths map[Sink]string
 	files []*os.File
@@ -95,7 +94,7 @@ var supportedKeys = map[string]bool{
 // DefaultConfig returns the logging setup used when logging.properties is not loaded yet.
 func DefaultConfig() Config {
 	return Config{
-		Level: slog.LevelInfo,
+		Level: logrus.InfoLevel,
 		Patterns: map[Sink]string{
 			SinkConsole: "log/console/console_%g.txt",
 			SinkError:   "log/error/error_%g.txt",
@@ -136,9 +135,7 @@ func Setup(root string, cfg Config, stderr io.Writer) (*Runtime, error) {
 		stderr = io.Discard
 	}
 
-	opts := &slog.HandlerOptions{Level: cfg.Level}
 	rt := &Runtime{paths: make(map[Sink]string)}
-
 	open := func(sink Sink) (*os.File, error) {
 		pattern := cfg.Patterns[sink]
 		if pattern == "" {
@@ -182,22 +179,32 @@ func Setup(root string, cfg Config, stderr io.Writer) (*Runtime, error) {
 		return nil, err
 	}
 
-	console := fanoutHandler{
-		slog.NewTextHandler(stderr, opts),
-		slog.NewJSONHandler(consoleFile, opts),
-		filterHandler{next: slog.NewJSONHandler(errorFile, opts), min: slog.LevelError},
-	}
-	rt.Logger = slog.New(console)
-	rt.Chat = slog.New(slog.NewJSONHandler(chatFile, opts)).With("sink", string(SinkChat))
-	rt.GMAudit = slog.New(slog.NewJSONHandler(gmFile, opts)).With("sink", string(SinkGMAudit))
-	rt.Item = slog.New(slog.NewJSONHandler(itemFile, opts)).With("sink", string(SinkItem))
+	formatter := &logrus.JSONFormatter{}
+	rt.Logger = newLogger(cfg.Level, io.MultiWriter(stderr, consoleFile), formatter)
+	rt.Logger.AddHook(writerHook{
+		writer:    errorFile,
+		formatter: formatter,
+		levels:    []logrus.Level{logrus.PanicLevel, logrus.FatalLevel, logrus.ErrorLevel},
+	})
+	rt.Chat = newLogger(cfg.Level, chatFile, formatter)
+	rt.GMAudit = newLogger(cfg.Level, gmFile, formatter)
+	rt.Item = newLogger(cfg.Level, itemFile, formatter)
 
 	return rt, nil
 }
 
-// InstallDefault makes runtime.Logger the package-wide slog default.
+// InstallDefault makes runtime.Logger the package-wide logrus default.
 func InstallDefault(runtime *Runtime) {
-	slog.SetDefault(runtime.Logger)
+	std := logrus.StandardLogger()
+	std.SetOutput(runtime.Logger.Out)
+	std.SetFormatter(runtime.Logger.Formatter)
+	std.SetLevel(runtime.Logger.Level)
+	std.ReplaceHooks(logrus.LevelHooks{})
+	for _, hooks := range runtime.Logger.Hooks {
+		for _, hook := range hooks {
+			std.AddHook(hook)
+		}
+	}
 }
 
 // Path returns the opened file path for sink.
@@ -217,20 +224,30 @@ func (r *Runtime) Close() error {
 	return r.err
 }
 
-func parseLevel(s string) (slog.Level, error) {
+func newLogger(level logrus.Level, out io.Writer, formatter logrus.Formatter) *logrus.Logger {
+	logger := logrus.New()
+	logger.SetLevel(level)
+	logger.SetOutput(out)
+	logger.SetFormatter(formatter)
+	return logger
+}
+
+func parseLevel(s string) (logrus.Level, error) {
 	switch strings.ToUpper(strings.TrimSpace(s)) {
-	case "ALL", "FINEST", "FINER", "FINE", "CONFIG":
-		return slog.LevelDebug, nil
+	case "ALL", "FINEST", "FINER":
+		return logrus.TraceLevel, nil
+	case "FINE", "CONFIG":
+		return logrus.DebugLevel, nil
 	case "INFO":
-		return slog.LevelInfo, nil
+		return logrus.InfoLevel, nil
 	case "WARNING":
-		return slog.LevelWarn, nil
+		return logrus.WarnLevel, nil
 	case "SEVERE":
-		return slog.LevelError, nil
+		return logrus.ErrorLevel, nil
 	case "OFF":
-		return slog.LevelError + 1000, nil
+		return logrus.PanicLevel, nil
 	default:
-		return 0, fmt.Errorf("unsupported log level %q", s)
+		return logrus.InfoLevel, fmt.Errorf("unsupported log level %q", s)
 	}
 }
 
@@ -240,65 +257,21 @@ func expandPattern(pattern string) string {
 	return pattern
 }
 
-type fanoutHandler []slog.Handler
+type writerHook struct {
+	writer    io.Writer
+	formatter logrus.Formatter
+	levels    []logrus.Level
+}
 
-func (h fanoutHandler) Enabled(ctx context.Context, level slog.Level) bool {
-	for _, next := range h {
-		if next.Enabled(ctx, level) {
-			return true
-		}
+func (h writerHook) Levels() []logrus.Level {
+	return h.levels
+}
+
+func (h writerHook) Fire(entry *logrus.Entry) error {
+	line, err := h.formatter.Format(entry)
+	if err != nil {
+		return err
 	}
-	return false
-}
-
-func (h fanoutHandler) Handle(ctx context.Context, record slog.Record) error {
-	for _, next := range h {
-		if !next.Enabled(ctx, record.Level) {
-			continue
-		}
-		if err := next.Handle(ctx, record.Clone()); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (h fanoutHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
-	out := make(fanoutHandler, len(h))
-	for i, next := range h {
-		out[i] = next.WithAttrs(attrs)
-	}
-	return out
-}
-
-func (h fanoutHandler) WithGroup(name string) slog.Handler {
-	out := make(fanoutHandler, len(h))
-	for i, next := range h {
-		out[i] = next.WithGroup(name)
-	}
-	return out
-}
-
-type filterHandler struct {
-	next slog.Handler
-	min  slog.Level
-}
-
-func (h filterHandler) Enabled(ctx context.Context, level slog.Level) bool {
-	return level >= h.min && h.next.Enabled(ctx, level)
-}
-
-func (h filterHandler) Handle(ctx context.Context, record slog.Record) error {
-	if !h.Enabled(ctx, record.Level) {
-		return nil
-	}
-	return h.next.Handle(ctx, record)
-}
-
-func (h filterHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
-	return filterHandler{next: h.next.WithAttrs(attrs), min: h.min}
-}
-
-func (h filterHandler) WithGroup(name string) slog.Handler {
-	return filterHandler{next: h.next.WithGroup(name), min: h.min}
+	_, err = h.writer.Write(line)
+	return err
 }

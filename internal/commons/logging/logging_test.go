@@ -2,7 +2,6 @@ package logging
 
 import (
 	"bytes"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -10,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/config"
+	"github.com/sirupsen/logrus"
 )
 
 func TestConfigFromProperties(t *testing.T) {
@@ -30,7 +30,7 @@ unknown = value
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Level != slog.LevelInfo {
+	if cfg.Level != logrus.InfoLevel {
 		t.Fatalf("Level = %s, want info", cfg.Level)
 	}
 	if got := cfg.Patterns[SinkConsole]; got != "log/console/console_%g.txt" {
@@ -65,11 +65,11 @@ net.sf.l2j.commons.logging.handler.ItemLogHandler.pattern = log/item/item_%g.txt
 	}
 	defer runtime.Close()
 
-	runtime.Logger.Info("server started", "port", 7777)
+	runtime.Logger.WithField("port", 7777).Info("server started")
 	runtime.Logger.Error("boot failed")
-	runtime.Chat.Info("hello", "from", "player")
-	runtime.GMAudit.Info("teleport", "gm", "admin")
-	runtime.Item.Info("add", "item", 57)
+	runtime.Chat.WithField("from", "player").Info("hello")
+	runtime.GMAudit.WithField("gm", "admin").Info("teleport")
+	runtime.Item.WithField("item", 57).Info("add")
 
 	if err := runtime.Close(); err != nil {
 		t.Fatal(err)
@@ -93,11 +93,20 @@ func TestInstallDefault(t *testing.T) {
 	}
 	defer runtime.Close()
 
-	old := slog.Default()
+	std := logrus.StandardLogger()
+	oldOut := std.Out
+	oldFormatter := std.Formatter
+	oldLevel := std.Level
+	oldHooks := std.Hooks
 	InstallDefault(runtime)
-	t.Cleanup(func() { slog.SetDefault(old) })
+	t.Cleanup(func() {
+		std.SetOutput(oldOut)
+		std.SetFormatter(oldFormatter)
+		std.SetLevel(oldLevel)
+		std.ReplaceHooks(oldHooks)
+	})
 
-	slog.Info("installed")
+	logrus.Info("installed")
 	if err := runtime.Close(); err != nil {
 		t.Fatal(err)
 	}
