@@ -67,6 +67,11 @@ by the Go standard library or by a small, focused package, use that instead of r
 framework by hand. Cross-cutting behavior such as logging belongs in one Go package with a narrow API
 and tests, not scattered ad hoc calls or a copy of another runtime's logging architecture.
 
+Optimize for the least custom code we must own, not for the fewest dependencies at any cost. If the
+standard library covers only the primitive and the change would require us to build levels, hooks,
+formatters, routing, rotation, retries, parsing, pooling, or other subsystem machinery, stop and use a
+small proven package unless there is a concrete incompatibility.
+
 **Absolute rule on references:** the Go source you write — its identifiers, comments, and commit
 messages — describes Go code and the behavior it implements, nothing else. Do not name or allude to
 any reference implementation, its language, its types, its methods, or its packages in the code you
@@ -232,14 +237,16 @@ emits a canonical transcript of packets, visible state, and saved rows.
 Follow the ladder — stop at the first rung that works:
 
 1. Does this need to exist at all? If speculative, don't write it.
-2. Standard library? Use it. (`encoding/binary`, `encoding/xml`, `database/sql`, `crypto/*`,
-   `container/heap`, `context`, `sync`, `log/slog`, `math/rand/v2`, `time`.)
+2. Standard library fully covers the behavior without building a mini-framework? Use it.
+   (`encoding/binary`, `encoding/xml`, `database/sql`, `crypto/*`, `container/heap`, `context`,
+   `sync`, `math/rand/v2`, `time`.)
 3. A dependency already in `go.mod`? Use it.
-4. Can it be a few lines of our own code? Write the few lines.
-5. Only then add a focused module or package — and justify it in one line in the PR.
+4. A small, established package clearly owns the subsystem better than we should? Add/use it.
+5. Can it be a few lines of our own code? Write the few lines.
 
 Keep the dependency set tiny, but do not hand-roll a subsystem when a standard Go package or a small,
-well-scoped dependency is the simpler, safer implementation.
+well-scoped dependency is the simpler, safer implementation. For logging in this repo, use Logrus and
+write only the glue needed to map existing config and route project-specific sinks.
 
 ## 10. Tooling gates (every change)
 
