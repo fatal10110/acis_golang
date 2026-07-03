@@ -166,8 +166,9 @@ This is a concurrent server. Concurrency is a first-class design concern, not an
   cancels the root context; every goroutine has a clear exit path. No leaks.
 - **`go test -race ./...` must stay green.** It runs in CI from the first package. A data race is a
   bug, full stop.
-- **No global mutable state without synchronization.** Prefer passing dependencies explicitly. A
-  package-level registry is fine when it owns its own mutex and that's documented.
+- **No globals by default.** Prefer passing dependencies explicitly. Package-level constants and pure
+  functions are fine; mutable package-level state is a last resort and must own its synchronization and
+  document why constructor injection was not enough.
 - Scheduled/periodic work uses a ticker goroutine or `time.AfterFunc`; keep the callback body short
   and non-blocking, offloading heavy or blocking work (DB, I/O) to its own goroutine.
 
@@ -203,6 +204,10 @@ internal/<area>/       all implementation (unimportable outside this module — 
 - **`main` owns composition.** Construct and connect dependencies in `cmd/.../main.go` in explicit
   order. Do not rely on hidden package `init()` side effects to build the object graph; `init()` is for
   trivial, self-contained setup only.
+- **Dependency injection by default.** Packages expose constructors that accept the stores, clocks,
+  loggers, config, schedulers, and collaborators they need. Keep manual wiring for tiny binaries; when
+  the server graph grows beyond simple wiring or needs lifecycle hooks, prefer Uber Fx
+  (`go.uber.org/fx`) over globals, service locators, or a custom DI container.
 - No cyclic imports — they mean two packages are really one, or a boundary is wrong. Fix the boundary.
 - One concern per file; split large packages into focused files rather than one giant file.
 
@@ -231,7 +236,8 @@ Follow the ladder — stop at the first rung that works:
 
 Keep the dependency set tiny, but do not hand-roll a subsystem when a standard Go package or a small,
 well-scoped dependency is the simpler, safer implementation. For logging in this repo, use Logrus and
-write only the glue needed to map existing config and route project-specific sinks.
+write only the glue needed to map existing config and route project-specific sinks. For non-trivial
+application composition, use Uber Fx instead of inventing a DI/lifecycle framework.
 
 ## 10. Tooling gates (every change)
 
