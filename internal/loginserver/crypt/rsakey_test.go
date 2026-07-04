@@ -2,6 +2,7 @@ package crypt
 
 import (
 	"bytes"
+	"crypto/rsa"
 	"math/big"
 	"testing"
 )
@@ -51,6 +52,28 @@ func TestScrambleModulus(t *testing.T) {
 func TestScrambleModulusRejectsWrongSize(t *testing.T) {
 	if _, err := scrambleModulus(big.NewInt(12345)); err == nil {
 		t.Fatal("expected error for non-1024-bit modulus, got nil")
+	}
+}
+
+func TestModulusBytes(t *testing.T) {
+	tests := []struct {
+		name string
+		n    string // hex modulus
+		want string // hex expected wire bytes
+	}{
+		{name: "top bit clear needs no padding", n: "7f00ff", want: "7f00ff"},
+		{name: "top bit set gets a leading zero", n: "ff00ff", want: "00ff00ff"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			n := new(big.Int).SetBytes(mustHex(t, tt.n))
+			got := ModulusBytes(&rsa.PublicKey{N: n})
+			want := mustHex(t, tt.want)
+			if !bytes.Equal(got, want) {
+				t.Fatalf("ModulusBytes() = %x, want %x", got, want)
+			}
+		})
 	}
 }
 

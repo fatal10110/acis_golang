@@ -35,6 +35,21 @@ func NewLoginKeyPair() (*LoginKeyPair, error) {
 	}, nil
 }
 
+// ModulusBytes returns pub's modulus as a big-endian byte slice compatible
+// with a reader that treats the bytes as signed two's-complement (as the L2
+// game server does when reconstructing this login server's public key from
+// InitLS): since an RSA modulus is always positive, this is pub.N's
+// big-endian bytes with a leading 0x00 prepended whenever the top bit of the
+// first byte is set, so a signed reader never mistakes the value for
+// negative.
+func ModulusBytes(pub *rsa.PublicKey) []byte {
+	b := pub.N.Bytes()
+	if len(b) > 0 && b[0]&0x80 != 0 {
+		return append([]byte{0x00}, b...)
+	}
+	return b
+}
+
 // scrambleModulus obfuscates a 1024-bit RSA public modulus the way the L2
 // client expects before it is sent over the wire: swap the first and last
 // 4 bytes of the buffer, XOR the first half against the second half, XOR
