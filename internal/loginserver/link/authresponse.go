@@ -8,7 +8,7 @@ const OpcodeAuthResponse = 0x02
 // server id the game server was assigned and its registered name.
 func EncodeAuthResponse(serverID byte, serverName string) []byte {
 	w := newWriter(OpcodeAuthResponse)
-	w.writeByte(serverID)
-	w.writeString(serverName)
-	return w.bytes()
+	w.WriteUint8(serverID)
+	w.WriteString(serverName)
+	return w.Bytes()
 }

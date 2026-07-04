@@ -25,17 +25,17 @@ type GameServerAuth struct {
 func DecodeGameServerAuth(payload []byte) (GameServerAuth, error) {
 	r := newReader(payload)
 	auth := GameServerAuth{
-		DesiredID:         r.readByte(),
-		AcceptAlternateID: r.readByte() != 0,
-		HostReserved:      r.readByte() != 0,
-		HostName:          r.readString(),
-		Port:              r.readUint16(),
-		MaxPlayers:        r.readInt32(),
+		DesiredID:         r.ReadUint8(),
+		AcceptAlternateID: r.ReadUint8() != 0,
+		HostReserved:      r.ReadUint8() != 0,
+		HostName:          r.ReadString(),
+		Port:              r.ReadInt16(),
+		MaxPlayers:        r.ReadInt32(),
 	}
-	size := int(r.readInt32())
-	auth.HexID = r.readBytes(size)
-	if r.err != nil {
-		return GameServerAuth{}, fmt.Errorf("link: GameServerAuth: %w", r.err)
+	size := int(r.ReadInt32())
+	auth.HexID = r.ReadBytes(size)
+	if r.Err() != nil {
+		return GameServerAuth{}, fmt.Errorf("link: GameServerAuth: %w", r.Err())
 	}
 	return auth, nil
 }

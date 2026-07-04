@@ -27,17 +27,17 @@ type ServerEntry struct {
 // lastServer marking the entry the client last played on.
 func EncodeServerList(lastServer byte, servers []ServerEntry) []byte {
 	w := newWriter(OpcodeServerList)
-	w.writeByte(byte(len(servers)))
-	w.writeByte(lastServer)
+	w.WriteUint8(byte(len(servers)))
+	w.WriteUint8(lastServer)
 	for _, s := range servers {
-		w.writeByte(s.ID)
-		w.writeBytes(s.IP[:])
-		w.writeInt32(s.Port)
-		w.writeByte(s.AgeLimit)
-		w.writeByte(boolByte(s.PvP))
-		w.writeInt16(s.CurrentPlayers)
-		w.writeInt16(s.MaxPlayers)
-		w.writeByte(boolByte(s.Online))
+		w.WriteUint8(s.ID)
+		w.WriteBytes(s.IP[:])
+		w.WriteInt32(s.Port)
+		w.WriteUint8(s.AgeLimit)
+		w.WriteUint8(boolByte(s.PvP))
+		w.WriteInt16(s.CurrentPlayers)
+		w.WriteInt16(s.MaxPlayers)
+		w.WriteUint8(boolByte(s.Online))
 
 		var bits int32
 		if s.TestServer {
@@ -46,10 +46,10 @@ func EncodeServerList(lastServer byte, servers []ServerEntry) []byte {
 		if s.ShowClock {
 			bits |= 0x02
 		}
-		w.writeInt32(bits)
-		w.writeByte(boolByte(s.ShowBrackets))
+		w.WriteInt32(bits)
+		w.WriteUint8(boolByte(s.ShowBrackets))
 	}
-	return w.bytes()
+	return w.Bytes()
 }
 
 func boolByte(b bool) byte {
