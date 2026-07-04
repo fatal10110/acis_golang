@@ -25,9 +25,13 @@ func NewLoginKeyPair() (*LoginKeyPair, error) {
 	if err != nil {
 		return nil, fmt.Errorf("generate RSA key: %w", err)
 	}
+	scrambled, err := scrambleModulus(priv.PublicKey.N)
+	if err != nil {
+		return nil, fmt.Errorf("scramble RSA modulus: %w", err)
+	}
 	return &LoginKeyPair{
 		Private:          priv,
-		ScrambledModulus: scrambleModulus(priv.PublicKey.N),
+		ScrambledModulus: scrambled,
 	}, nil
 }
 
@@ -35,11 +39,12 @@ func NewLoginKeyPair() (*LoginKeyPair, error) {
 // client expects before it is sent over the wire: swap the first and last
 // 4 bytes of the buffer, XOR the first half against the second half, XOR
 // 4 bytes at offset 0x0d against 4 bytes at offset 0x34, then XOR the
-// second half against the (now-modified) first half.
-func scrambleModulus(modulus *big.Int) []byte {
+// second half against the (now-modified) first half. Returns an error if
+// modulus is not a 1024-bit RSA modulus.
+func scrambleModulus(modulus *big.Int) ([]byte, error) {
 	b := modulus.Bytes()
 	if len(b) != modulusSize {
-		panic(fmt.Sprintf("scrambleModulus: modulus is %d bytes, want %d (not a 1024-bit RSA modulus)", len(b), modulusSize))
+		return nil, fmt.Errorf("modulus is %d bytes, want %d (not a 1024-bit RSA modulus)", len(b), modulusSize)
 	}
 
 	scrambled := make([]byte, modulusSize)
@@ -57,5 +62,5 @@ func scrambleModulus(modulus *big.Int) []byte {
 	for i := 0; i < 0x40; i++ {
 		scrambled[0x40+i] ^= scrambled[i]
 	}
-	return scrambled
+	return scrambled, nil
 }

@@ -36,7 +36,10 @@ func TestScrambleModulus(t *testing.T) {
 			modulus := mustHex(t, tt.modulus)
 			mod := new(big.Int).SetBytes(modulus)
 
-			got := scrambleModulus(mod)
+			got, err := scrambleModulus(mod)
+			if err != nil {
+				t.Fatalf("scrambleModulus: %v", err)
+			}
 			want := mustHex(t, tt.scrambled)
 			if !bytes.Equal(got, want) {
 				t.Fatalf("scrambleModulus() = %x, want %x", got, want)
@@ -45,13 +48,10 @@ func TestScrambleModulus(t *testing.T) {
 	}
 }
 
-func TestScrambleModulusPanicsOnWrongSize(t *testing.T) {
-	defer func() {
-		if recover() == nil {
-			t.Fatal("expected panic for non-1024-bit modulus, got none")
-		}
-	}()
-	scrambleModulus(big.NewInt(12345))
+func TestScrambleModulusRejectsWrongSize(t *testing.T) {
+	if _, err := scrambleModulus(big.NewInt(12345)); err == nil {
+		t.Fatal("expected error for non-1024-bit modulus, got nil")
+	}
 }
 
 func TestNewLoginKeyPair(t *testing.T) {
