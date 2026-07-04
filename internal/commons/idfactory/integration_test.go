@@ -74,7 +74,10 @@ func TestNew_SkipsIDsAlreadyUsedAcrossAllTables(t *testing.T) {
 		t.Fatalf("New() error: %v", err)
 	}
 
-	got := alloc.NextID()
+	got, err := alloc.NextID()
+	if err != nil {
+		t.Fatalf("NextID() unexpected error: %v", err)
+	}
 	want := int32(idfactory.FirstObjectID + 6)
 	if got != want {
 		t.Fatalf("NextID() = %d, want %d (ids 0-5 already used across characters/items/clan_data/items_on_ground/mods_wedding/petition)", got, want)
@@ -95,7 +98,11 @@ func TestNew_ReclaimsIDOnRestartAfterRowDeleted(t *testing.T) {
 		t.Fatalf("New() error: %v", err)
 	}
 	for i := 0; i < 11; i++ {
-		if got := first.NextID(); got == id {
+		got, err := first.NextID()
+		if err != nil {
+			t.Fatalf("NextID() unexpected error: %v", err)
+		}
+		if got == id {
 			t.Fatalf("NextID() returned %d while its row still exists", id)
 		}
 	}
@@ -109,7 +116,11 @@ func TestNew_ReclaimsIDOnRestartAfterRowDeleted(t *testing.T) {
 		t.Fatalf("New() on reload error: %v", err)
 	}
 	for i := 0; i < 11; i++ {
-		if got := reloaded.NextID(); got == id {
+		got, err := reloaded.NextID()
+		if err != nil {
+			t.Fatalf("NextID() unexpected error: %v", err)
+		}
+		if got == id {
 			return // id reclaimed after its row was deleted and the factory reloaded
 		}
 	}

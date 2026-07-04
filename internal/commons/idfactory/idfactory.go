@@ -3,6 +3,7 @@ package idfactory
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -14,6 +15,9 @@ const (
 	FirstObjectID = 0x10000000
 	LastObjectID  = 0x7FFFFFFF
 )
+
+// ErrIDSpaceExhausted is returned by NextID when every id in range is in use.
+var ErrIDSpaceExhausted = errors.New("idfactory: id space exhausted")
 
 // usedObjectIDQueries lists, for every table that persists an object id
 // handed out by this allocator, the query that reads those ids back.
@@ -65,7 +69,7 @@ func New(ctx context.Context, db *sql.DB, log *logrus.Logger) (*Allocator, error
 		}
 	}
 
-	a.next = a.nextFreeFrom(a.first)
+	a.next = a.first
 	log.Infof("idfactory: initialized with %d used object ids", len(a.used))
 	return a, nil
 }
@@ -91,15 +95,19 @@ func (a *Allocator) loadUsedIDs(ctx context.Context, db *sql.DB, query string) e
 	return rows.Err()
 }
 
-// NextID returns the next available object id and marks it used.
-func (a *Allocator) NextID() int32 {
+// NextID returns the next available object id and marks it used, or
+// ErrIDSpaceExhausted if every id in range is already in use.
+func (a *Allocator) NextID() (int32, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	id := a.next
+	id, err := a.nextFreeFrom(a.next)
+	if err != nil {
+		return 0, err
+	}
 	a.used[id] = struct{}{}
-	a.next = a.nextFreeFrom(id + 1)
-	return id
+	a.next = id + 1
+	return id, nil
 }
 
 // ReleaseID returns id to the pool so a later NextID call can hand it out
@@ -116,14 +124,13 @@ func (a *Allocator) ReleaseID(id int32) {
 	delete(a.used, id)
 }
 
-// nextFreeFrom returns the first id >= from that isn't marked used. Callers
-// hold mu. Panics if the id space is exhausted, mirroring how the caller
-// would otherwise silently corrupt or duplicate an object id.
-func (a *Allocator) nextFreeFrom(from int32) int32 {
+// nextFreeFrom returns the first id >= from that isn't marked used, or
+// ErrIDSpaceExhausted if none remains up to last. Callers hold mu.
+func (a *Allocator) nextFreeFrom(from int32) (int32, error) {
 	for id := from; id <= a.last; id++ {
 		if _, used := a.used[id]; !used {
-			return id
+			return id, nil
 		}
 	}
-	panic(fmt.Sprintf("idfactory: ran out of object ids in [%d, %d]", a.first, a.last))
+	return 0, fmt.Errorf("%w: range [%d, %d]", ErrIDSpaceExhausted, a.first, a.last)
 }
