@@ -201,6 +201,11 @@ internal/<area>/       all implementation (unimportable outside this module — 
 
 - Organize packages **by responsibility/domain**, not by layer-type. `player`, `world`, `skill`,
   `item`, `geo`, `packet`, `db` — each a cohesive unit with a small surface.
+- **Place a helper by what it operates on, not by who first needed it.** An encoding/parsing/rendering
+  function for a type belongs beside that type's definition, even if the first caller was a DB store or
+  a network codec. A `sql` package reaching for a byte<->text codec for a domain type should call it
+  from `model`, never own it — otherwise every other caller of that codec (a CLI, a second store) ends
+  up importing the DB package just to get a text encoder.
 - **`main` owns composition.** Construct and connect dependencies in `cmd/.../main.go` in explicit
   order. Do not rely on hidden package `init()` side effects to build the object graph; `init()` is for
   trivial, self-contained setup only.
@@ -275,6 +280,7 @@ Seeing the left column in a diff means stop and rewrite as the right column.
 | reflection-driven registration | explicit registration in `main` or a package var |
 | shared map mutated from many goroutines, unguarded | documented mutex, or channel-owned state |
 | `Util`/`Helper` grab-bag package | put the function next to the type it serves |
+| a type's codec/formatter living in the package of its first caller (e.g. a hex encoder for a game-server key defined in the `sql` package) | move it beside the type's own definition (`model`); every caller depends on it equally |
 
 ## 13. Worked example — the same behavior, two ways
 
