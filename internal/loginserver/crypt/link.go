@@ -1,6 +1,10 @@
 package crypt
 
-import "fmt"
+import (
+	"crypto/rsa"
+	"fmt"
+	"math/big"
+)
 
 // linkBootstrapKey is the fixed Blowfish key that protects the login-to-
 // game-server link before the game server supplies its own session key.
@@ -23,6 +27,17 @@ type LinkCrypt struct {
 func NewLinkCrypt() *LinkCrypt {
 	cipher, _ := NewBlowfishCipher(linkBootstrapKey) // fixed-length constant key, always valid
 	return &LinkCrypt{cipher: cipher}
+}
+
+// DecryptDynamicKey RSA-decrypts an encrypted dynamic link key with no
+// padding scheme (m = c^d mod n): the game server encrypts its chosen
+// Blowfish key, zero-padded to the RSA modulus size, with the link's public
+// key. big.Int.Bytes() drops that leading zero padding, yielding the raw
+// key ready for SetKey.
+func DecryptDynamicKey(priv *rsa.PrivateKey, ciphertext []byte) []byte {
+	c := new(big.Int).SetBytes(ciphertext)
+	m := new(big.Int).Exp(c, priv.D, priv.N)
+	return m.Bytes()
 }
 
 // SetKey switches the link to a new Blowfish key (1-56 bytes), used once the
