@@ -30,7 +30,7 @@ func TestServeEchoesThroughSend(t *testing.T) {
 				return
 			}
 			conn.Send(buf)
-		})
+		}, nil)
 	}()
 
 	client, err := net.Dial("tcp", ln.Addr().String())
@@ -64,7 +64,7 @@ func TestServeStopsOnContextCancel(t *testing.T) {
 
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- Serve(ctx, ln, func(context.Context, *Conn) {})
+		errCh <- Serve(ctx, ln, func(context.Context, *Conn) {}, nil)
 	}()
 
 	cancel()
@@ -94,7 +94,7 @@ func TestServeHandlesConnectionsConcurrently(t *testing.T) {
 	go Serve(ctx, ln, func(ctx context.Context, conn *Conn) {
 		handled <- struct{}{}
 		<-ctx.Done()
-	})
+	}, nil)
 
 	conns := make([]net.Conn, clients)
 	for i := 0; i < clients; i++ {
@@ -128,7 +128,7 @@ func TestConnSendAfterCloseReturnsFalse(t *testing.T) {
 	go Serve(ctx, ln, func(ctx context.Context, conn *Conn) {
 		conn.Close()
 		closed <- conn
-	})
+	}, nil)
 
 	client, err := net.Dial("tcp", ln.Addr().String())
 	if err != nil {
@@ -145,5 +145,48 @@ func TestConnSendAfterCloseReturnsFalse(t *testing.T) {
 
 	if conn.Send([]byte("late")) {
 		t.Fatal("Send on closed connection returned true, want false")
+	}
+}
+
+func TestServeSurvivesHandlerPanic(t *testing.T) {
+	ln := listen(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- Serve(ctx, ln, func(ctx context.Context, conn *Conn) {
+			panic("boom")
+		}, nil)
+	}()
+
+	bad, err := net.Dial("tcp", ln.Addr().String())
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	defer bad.Close()
+
+	// The panicking connection must be closed (proving the deferred
+	// recover ran) without Serve itself returning/crashing.
+	bad.SetReadDeadline(time.Now().Add(5 * time.Second))
+	if _, err := bad.Read(make([]byte, 1)); err == nil {
+		t.Fatal("expected panicking connection to be closed")
+	}
+
+	// Serve must still be accepting for other clients.
+	good, err := net.Dial("tcp", ln.Addr().String())
+	if err != nil {
+		t.Fatalf("dial after panic: %v", err)
+	}
+	defer good.Close()
+
+	cancel()
+	select {
+	case err := <-errCh:
+		if err != nil {
+			t.Fatalf("Serve returned error: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("Serve did not return after context cancel")
 	}
 }

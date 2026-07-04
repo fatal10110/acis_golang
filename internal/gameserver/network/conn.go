@@ -3,6 +3,8 @@ package network
 import (
 	"net"
 	"sync"
+
+	"github.com/sirupsen/logrus"
 )
 
 // outboundBuffer is how many pending writes a Conn queues before Send
@@ -15,6 +17,7 @@ const outboundBuffer = 64
 // net.Conn. The read side belongs to whatever handler Serve invokes.
 type Conn struct {
 	net.Conn
+	log      *logrus.Logger
 	mu       sync.Mutex
 	out      chan []byte
 	closed   bool
@@ -22,9 +25,13 @@ type Conn struct {
 	closeErr error
 }
 
-func newConn(c net.Conn) *Conn {
+func newConn(c net.Conn, log *logrus.Logger) *Conn {
+	if log == nil {
+		log = logrus.StandardLogger()
+	}
 	conn := &Conn{
 		Conn:    c,
+		log:     log,
 		out:     make(chan []byte, outboundBuffer),
 		stopped: make(chan struct{}),
 	}
@@ -34,13 +41,21 @@ func newConn(c net.Conn) *Conn {
 
 // writeLoop drains queued sends in order and only closes the
 // underlying connection once the queue is empty and Close has been
-// called, so a Send queued right before Close is never dropped.
+// called, so a Send queued right before Close is never dropped. A
+// panic while writing is recovered and logged so it disconnects only
+// this client, never the process; the deferred cleanup still runs so
+// Close never blocks forever waiting on stopped.
 func (c *Conn) writeLoop() {
+	defer func() {
+		if r := recover(); r != nil {
+			c.log.Errorf("game connection writer panic: %v", r)
+		}
+		c.closeErr = c.Conn.Close()
+		close(c.stopped)
+	}()
 	for payload := range c.out {
 		c.Conn.Write(payload)
 	}
-	c.closeErr = c.Conn.Close()
-	close(c.stopped)
 }
 
 // Send queues payload to be written by this connection's writer
