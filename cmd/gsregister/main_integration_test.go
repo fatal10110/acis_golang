@@ -17,6 +17,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/loginserver/data/manager"
 	"github.com/fatal10110/acis_golang/internal/loginserver/data/sql"
+	"github.com/fatal10110/acis_golang/internal/loginserver/model"
 )
 
 // gameserversSchema mirrors aCis_datapack/sql/gameservers.sql verbatim.
@@ -121,7 +122,7 @@ func TestRegisterCleanLifecycle(t *testing.T) {
 	if fileHex == "" {
 		t.Fatalf("hexid file has no HexID line:\n%s", data)
 	}
-	if got := sql.HexIDText(row.HexID); got != fileHex {
+	if got := model.HexKeyText(row.HexID); got != fileHex {
 		t.Errorf("database key %q does not match hexid file key %q", got, fileHex)
 	}
 

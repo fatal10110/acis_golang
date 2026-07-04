@@ -191,7 +191,7 @@ func run(in io.Reader, out io.Writer, names *manager.ServerNames, store *sql.Gam
 			}
 
 			filename := fmt.Sprintf("hexid(server %d).txt", id)
-			if err := writeHexID(filepath.Join(dir, filename), id, sql.HexIDText(key)); err != nil {
+			if err := writeHexID(filepath.Join(dir, filename), id, model.HexKeyText(key)); err != nil {
 				fmt.Fprintf(out, "Failed to save hex ID to '%s' file: %v\n", filename, err)
 				continue
 			}

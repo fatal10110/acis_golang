@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"math/big"
 
 	"github.com/fatal10110/acis_golang/internal/loginserver/model"
 )
@@ -33,7 +32,7 @@ func (s *GameServerStore) GameServer(id int) (model.GameServer, error) {
 		return model.GameServer{}, fmt.Errorf("query game server %d: %w", id, err)
 	}
 
-	key, err := parseHexID(hexID)
+	key, err := model.ParseHexKey(hexID)
 	if err != nil {
 		return model.GameServer{}, fmt.Errorf("parse game server %d hex id: %w", id, err)
 	}
@@ -55,7 +54,7 @@ func (s *GameServerStore) GameServers() (map[int]model.GameServer, error) {
 		if err := rows.Scan(&id, &hexID, &host); err != nil {
 			return nil, fmt.Errorf("scan game server: %w", err)
 		}
-		key, err := parseHexID(hexID)
+		key, err := model.ParseHexKey(hexID)
 		if err != nil {
 			return nil, fmt.Errorf("parse game server %d hex id: %w", id, err)
 		}
@@ -71,7 +70,7 @@ func (s *GameServerStore) GameServers() (map[int]model.GameServer, error) {
 func (s *GameServerStore) CreateGameServer(server model.GameServer) error {
 	if _, err := s.db.Exec(
 		"INSERT INTO gameservers (hexid, server_id, host) VALUES (?, ?, ?)",
-		HexIDText(server.HexID),
+		model.HexKeyText(server.HexID),
 		server.ID,
 		server.Host,
 	); err != nil {
@@ -108,69 +107,4 @@ func (s *GameServerStore) SetGameServerHost(id int, host string) error {
 		return ErrGameServerNotFound
 	}
 	return nil
-}
-
-func parseHexID(text string) ([]byte, error) {
-	n, ok := new(big.Int).SetString(text, 16)
-	if !ok {
-		return nil, fmt.Errorf("invalid hex id %q", text)
-	}
-	return signedBigIntBytes(n), nil
-}
-
-// HexIDText renders a game server auth key in the signed big-integer hex
-// form used by the gameservers table's hexid column and by hexid files.
-// Keys whose top bit is set render as a negative hex string; a leading zero
-// byte is dropped on the way through, so text -> bytes round-trips to the
-// minimal two's-complement form, not necessarily the original length.
-func HexIDText(id []byte) string {
-	if id == nil {
-		return "null"
-	}
-	return signedBytesInt(id).Text(16)
-}
-
-func signedBytesInt(b []byte) *big.Int {
-	n := new(big.Int).SetBytes(b)
-	if len(b) == 0 || b[0]&0x80 == 0 {
-		return n
-	}
-
-	mod := new(big.Int).Lsh(big.NewInt(1), uint(len(b)*8))
-	return n.Sub(n, mod)
-}
-
-func signedBigIntBytes(n *big.Int) []byte {
-	if n.Sign() == 0 {
-		return []byte{0}
-	}
-	if n.Sign() > 0 {
-		b := n.Bytes()
-		if b[0]&0x80 == 0 {
-			return b
-		}
-		return append([]byte{0}, b...)
-	}
-
-	length := 1
-	for {
-		min := new(big.Int).Lsh(big.NewInt(1), uint(8*length-1))
-		min.Neg(min)
-		if n.Cmp(min) >= 0 {
-			break
-		}
-		length++
-	}
-
-	mod := new(big.Int).Lsh(big.NewInt(1), uint(8*length))
-	b := new(big.Int).Add(mod, n).Bytes()
-	if len(b) >= length {
-		return b
-	}
-	out := make([]byte, length)
-	for i := 0; i < length-len(b); i++ {
-		out[i] = 0xff
-	}
-	copy(out[length-len(b):], b)
-	return out
 }
