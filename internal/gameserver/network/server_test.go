@@ -1,0 +1,149 @@
+package network
+
+import (
+	"bufio"
+	"context"
+	"net"
+	"testing"
+	"time"
+)
+
+func listen(t *testing.T) net.Listener {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	return ln
+}
+
+func TestServeEchoesThroughSend(t *testing.T) {
+	ln := listen(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- Serve(ctx, ln, func(ctx context.Context, conn *Conn) {
+			buf := make([]byte, 5)
+			if _, err := conn.Read(buf); err != nil {
+				return
+			}
+			conn.Send(buf)
+		})
+	}()
+
+	client, err := net.Dial("tcp", ln.Addr().String())
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	defer client.Close()
+
+	if _, err := client.Write([]byte("hello")); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	client.SetReadDeadline(time.Now().Add(5 * time.Second))
+	got := make([]byte, 5)
+	if _, err := bufio.NewReader(client).Read(got); err != nil {
+		t.Fatalf("read echo: %v", err)
+	}
+	if string(got) != "hello" {
+		t.Fatalf("echo = %q, want %q", got, "hello")
+	}
+
+	cancel()
+	if err := <-errCh; err != nil {
+		t.Fatalf("Serve returned error after cancel: %v", err)
+	}
+}
+
+func TestServeStopsOnContextCancel(t *testing.T) {
+	ln := listen(t)
+	ctx, cancel := context.WithCancel(context.Background())
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- Serve(ctx, ln, func(context.Context, *Conn) {})
+	}()
+
+	cancel()
+
+	select {
+	case err := <-errCh:
+		if err != nil {
+			t.Fatalf("Serve returned error: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("Serve did not return after context cancel")
+	}
+
+	if _, err := net.Dial("tcp", ln.Addr().String()); err == nil {
+		t.Fatal("listener still accepting connections after cancel")
+	}
+}
+
+func TestServeHandlesConnectionsConcurrently(t *testing.T) {
+	ln := listen(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	const clients = 8
+	handled := make(chan struct{}, clients)
+
+	go Serve(ctx, ln, func(ctx context.Context, conn *Conn) {
+		handled <- struct{}{}
+		<-ctx.Done()
+	})
+
+	conns := make([]net.Conn, clients)
+	for i := 0; i < clients; i++ {
+		c, err := net.Dial("tcp", ln.Addr().String())
+		if err != nil {
+			t.Fatalf("dial %d: %v", i, err)
+		}
+		conns[i] = c
+	}
+	defer func() {
+		for _, c := range conns {
+			c.Close()
+		}
+	}()
+
+	for i := 0; i < clients; i++ {
+		select {
+		case <-handled:
+		case <-time.After(5 * time.Second):
+			t.Fatalf("only %d/%d connections handled", i, clients)
+		}
+	}
+}
+
+func TestConnSendAfterCloseReturnsFalse(t *testing.T) {
+	ln := listen(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	closed := make(chan *Conn, 1)
+	go Serve(ctx, ln, func(ctx context.Context, conn *Conn) {
+		conn.Close()
+		closed <- conn
+	})
+
+	client, err := net.Dial("tcp", ln.Addr().String())
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	defer client.Close()
+
+	var conn *Conn
+	select {
+	case conn = <-closed:
+	case <-time.After(5 * time.Second):
+		t.Fatal("connection was not handled")
+	}
+
+	if conn.Send([]byte("late")) {
+		t.Fatal("Send on closed connection returned true, want false")
+	}
+}
