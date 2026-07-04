@@ -79,3 +79,101 @@ func (s *AccountStore) SetLastServer(login string, serverID int) error {
 	}
 	return nil
 }
+
+// UpsertAccount creates the account if login is new, or updates its password
+// and access level if it already exists. It reports whether the row was
+// created or changed.
+func (s *AccountStore) UpsertAccount(login, hashedPassword string, accessLevel int) (bool, error) {
+	res, err := s.db.Exec(
+		"INSERT INTO accounts (login, password, access_level) VALUES (?, ?, ?) "+
+			"ON DUPLICATE KEY UPDATE password = VALUES(password), access_level = VALUES(access_level)",
+		login, hashedPassword, accessLevel,
+	)
+	if err != nil {
+		return false, fmt.Errorf("upsert account %q: %w", login, err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("upsert account %q: %w", login, err)
+	}
+	return n > 0, nil
+}
+
+// ChangeAccessLevel updates an existing account's access level. It reports
+// whether a row was changed.
+func (s *AccountStore) ChangeAccessLevel(login string, level int) (bool, error) {
+	res, err := s.db.Exec("UPDATE accounts SET access_level = ? WHERE login = ?", level, login)
+	if err != nil {
+		return false, fmt.Errorf("change access level for %q: %w", login, err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("change access level for %q: %w", login, err)
+	}
+	return n > 0, nil
+}
+
+// DeleteAccount removes the account row for login. It reports whether a row
+// was deleted.
+func (s *AccountStore) DeleteAccount(login string) (bool, error) {
+	res, err := s.db.Exec("DELETE FROM accounts WHERE login = ?", login)
+	if err != nil {
+		return false, fmt.Errorf("delete account %q: %w", login, err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("delete account %q: %w", login, err)
+	}
+	return n > 0, nil
+}
+
+// AccountFilter selects which accounts ListAccounts returns, by access
+// level.
+type AccountFilter int
+
+const (
+	AllAccounts AccountFilter = iota
+	BannedAccounts
+	PrivilegedAccounts
+	RegularAccounts
+)
+
+// AccountSummary is one row of a login/access-level listing.
+type AccountSummary struct {
+	Login       string
+	AccessLevel int
+}
+
+// ListAccounts returns login/access-level pairs ordered by login, narrowed
+// by filter.
+func (s *AccountStore) ListAccounts(filter AccountFilter) ([]AccountSummary, error) {
+	query := "SELECT login, access_level FROM accounts"
+	switch filter {
+	case BannedAccounts:
+		query += " WHERE access_level < 0"
+	case PrivilegedAccounts:
+		query += " WHERE access_level > 0"
+	case RegularAccounts:
+		query += " WHERE access_level = 0"
+	}
+	query += " ORDER BY login ASC"
+
+	rows, err := s.db.Query(query)
+	if err != nil {
+		return nil, fmt.Errorf("list accounts: %w", err)
+	}
+	defer rows.Close()
+
+	var out []AccountSummary
+	for rows.Next() {
+		var a AccountSummary
+		if err := rows.Scan(&a.Login, &a.AccessLevel); err != nil {
+			return nil, fmt.Errorf("list accounts: %w", err)
+		}
+		out = append(out, a)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("list accounts: %w", err)
+	}
+	return out, nil
+}
