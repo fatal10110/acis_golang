@@ -16,11 +16,11 @@ var gameGuardPlaceholder [16]byte
 // session's Blowfish key.
 func EncodeInit(sessionID int32, scrambledModulus, blowfishKey []byte) []byte {
 	w := newWriter(OpcodeInit)
-	w.writeInt32(sessionID)
-	w.writeInt32(protocolVersion)
-	w.writeBytes(scrambledModulus)
-	w.writeBytes(gameGuardPlaceholder[:])
-	w.writeBytes(blowfishKey)
-	w.writeByte(0x00)
-	return w.bytes()
+	w.WriteInt32(sessionID)
+	w.WriteInt32(protocolVersion)
+	w.WriteBytes(scrambledModulus)
+	w.WriteBytes(gameGuardPlaceholder[:])
+	w.WriteBytes(blowfishKey)
+	w.WriteUint8(0x00)
+	return w.Bytes()
 }

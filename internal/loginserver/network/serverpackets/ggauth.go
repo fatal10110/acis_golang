@@ -11,10 +11,10 @@ const GGAuthSkipRequest int32 = 0x0b
 // EncodeGGAuth builds the GGAuth packet for response.
 func EncodeGGAuth(response int32) []byte {
 	w := newWriter(OpcodeGGAuth)
-	w.writeInt32(response)
-	w.writeInt32(0)
-	w.writeInt32(0)
-	w.writeInt32(0)
-	w.writeInt32(0)
-	return w.bytes()
+	w.WriteInt32(response)
+	w.WriteInt32(0)
+	w.WriteInt32(0)
+	w.WriteInt32(0)
+	w.WriteInt32(0)
+	return w.Bytes()
 }

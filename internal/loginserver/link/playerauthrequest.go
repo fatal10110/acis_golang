@@ -24,14 +24,14 @@ type PlayerAuthRequest struct {
 func DecodePlayerAuthRequest(payload []byte) (PlayerAuthRequest, error) {
 	r := newReader(payload)
 	req := PlayerAuthRequest{
-		Account:   r.readString(),
-		PlayKey1:  r.readInt32(),
-		PlayKey2:  r.readInt32(),
-		LoginKey1: r.readInt32(),
-		LoginKey2: r.readInt32(),
+		Account:   r.ReadString(),
+		PlayKey1:  r.ReadInt32(),
+		PlayKey2:  r.ReadInt32(),
+		LoginKey1: r.ReadInt32(),
+		LoginKey2: r.ReadInt32(),
 	}
-	if r.err != nil {
-		return PlayerAuthRequest{}, fmt.Errorf("link: PlayerAuthRequest: %w", r.err)
+	if r.Err() != nil {
+		return PlayerAuthRequest{}, fmt.Errorf("link: PlayerAuthRequest: %w", r.Err())
 	}
 	return req, nil
 }
