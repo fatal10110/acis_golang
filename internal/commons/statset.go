@@ -3,21 +3,27 @@
 package commons
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 )
+
+// ErrValueRequired is returned by a mandatory StatSet accessor when key is
+// absent or its stored value cannot be coerced to the requested type.
+var ErrValueRequired = errors.New("commons: value required")
 
 // StatSet is a typed attribute bag: values are stored as heterogeneous
 // key/value pairs and read back through typed accessors that coerce between
 // the stored representation and the requested type (e.g. a value stored as
 // the string "1;2;3" can be read back via GetIntArray).
 //
-// The plain accessors (GetInt, GetString, ...) panic if key is absent or the
-// stored value cannot be coerced to the requested type, so a caller reading
-// a key it considers mandatory gets a loud failure instead of a zero value
-// masquerading as real data. Callers that can tolerate a missing or
-// malformed value use the *Default variant instead.
+// The plain accessors (GetInt, GetString, ...) return ErrValueRequired if
+// key is absent or the stored value cannot be coerced to the requested
+// type, so a caller can decide how to handle a mandatory key it can't read
+// instead of getting a zero value masquerading as real data. Callers that
+// can tolerate a missing or malformed value use the *Default variant
+// instead.
 //
 // Accessors are added alongside the types they return: there are currently
 // no accessors for composite domain types (e.g. a game position), because
@@ -62,32 +68,31 @@ func (s *StatSet) Has(key string) bool {
 	return ok
 }
 
-// panicRequired panics because key was read through a mandatory accessor but
-// held no value coercible to wanted.
-func panicRequired(key, wanted string, val any) {
-	panic(fmt.Sprintf("commons: StatSet key %q requires a %s value, got %v", key, wanted, val))
+// errValueRequired reports that key was read through a mandatory accessor
+// but held no value coercible to wanted.
+func errValueRequired(key, wanted string, val any) error {
+	return fmt.Errorf("commons: StatSet key %q requires a %s value, got %v: %w", key, wanted, val, ErrValueRequired)
 }
 
 // GetBool returns the value at key as a bool, coercing a string ("true",
-// case-insensitive) or numeric (nonzero) representation. Panics if key is
-// absent or the value cannot be coerced.
-func (s *StatSet) GetBool(key string) bool {
+// case-insensitive) or numeric (nonzero) representation. Returns
+// ErrValueRequired if key is absent or the value cannot be coerced.
+func (s *StatSet) GetBool(key string) (bool, error) {
 	val := s.values[key]
 	if b, ok := val.(bool); ok {
-		return b
+		return b, nil
 	}
 	if str, ok := val.(string); ok {
-		return strings.EqualFold(str, "true")
+		return strings.EqualFold(str, "true"), nil
 	}
 	if n, ok := asNumber(val); ok {
-		return n != 0
+		return n != 0, nil
 	}
-	panicRequired(key, "bool", val)
-	return false
+	return false, errValueRequired(key, "bool", val)
 }
 
-// GetBoolDefault is like GetBool but returns defaultValue instead of
-// panicking when key is absent or cannot be coerced.
+// GetBoolDefault is like GetBool but returns defaultValue instead of an
+// error when key is absent or cannot be coerced.
 func (s *StatSet) GetBoolDefault(key string, defaultValue bool) bool {
 	val := s.values[key]
 	if b, ok := val.(bool); ok {
@@ -131,26 +136,25 @@ func asNumber(val any) (float64, bool) {
 }
 
 // GetByte returns the value at key as a byte, coercing a numeric or numeric
-// string representation. Panics if key is absent or the value cannot be
-// coerced.
-func (s *StatSet) GetByte(key string) byte {
+// string representation. Returns ErrValueRequired if key is absent or the
+// value cannot be coerced.
+func (s *StatSet) GetByte(key string) (byte, error) {
 	val := s.values[key]
 	if n, ok := asNumber(val); ok {
-		return byte(int64(n))
+		return byte(int64(n)), nil
 	}
 	if str, ok := val.(string); ok {
 		n, err := strconv.ParseInt(str, 10, 8)
 		if err != nil {
-			panic(err)
+			return 0, fmt.Errorf("commons: StatSet key %q: %w", key, err)
 		}
-		return byte(n)
+		return byte(n), nil
 	}
-	panicRequired(key, "byte", val)
-	return 0
+	return 0, errValueRequired(key, "byte", val)
 }
 
-// GetByteDefault is like GetByte but returns defaultValue instead of
-// panicking when key is absent or cannot be coerced.
+// GetByteDefault is like GetByte but returns defaultValue instead of an
+// error when key is absent or cannot be coerced.
 func (s *StatSet) GetByteDefault(key string, defaultValue byte) byte {
 	val := s.values[key]
 	if n, ok := asNumber(val); ok {
@@ -165,32 +169,31 @@ func (s *StatSet) GetByteDefault(key string, defaultValue byte) byte {
 }
 
 // GetDouble returns the value at key as a float64, coercing a numeric,
-// numeric string, or bool (1/0) representation. Panics if key is absent or
-// the value cannot be coerced.
-func (s *StatSet) GetDouble(key string) float64 {
+// numeric string, or bool (1/0) representation. Returns ErrValueRequired if
+// key is absent or the value cannot be coerced.
+func (s *StatSet) GetDouble(key string) (float64, error) {
 	val := s.values[key]
 	if n, ok := asNumber(val); ok {
-		return n
+		return n, nil
 	}
 	if str, ok := val.(string); ok {
 		n, err := strconv.ParseFloat(str, 64)
 		if err != nil {
-			panic(err)
+			return 0, fmt.Errorf("commons: StatSet key %q: %w", key, err)
 		}
-		return n
+		return n, nil
 	}
 	if b, ok := val.(bool); ok {
 		if b {
-			return 1
+			return 1, nil
 		}
-		return 0
+		return 0, nil
 	}
-	panicRequired(key, "double", val)
-	return 0
+	return 0, errValueRequired(key, "double", val)
 }
 
-// GetDoubleDefault is like GetDouble but returns defaultValue instead of
-// panicking when key is absent or cannot be coerced.
+// GetDoubleDefault is like GetDouble but returns defaultValue instead of an
+// error when key is absent or cannot be coerced.
 func (s *StatSet) GetDoubleDefault(key string, defaultValue float64) float64 {
 	val := s.values[key]
 	if n, ok := asNumber(val); ok {
@@ -212,15 +215,15 @@ func (s *StatSet) GetDoubleDefault(key string, defaultValue float64) float64 {
 
 // GetDoubleArray returns the value at key as a []float64. A single number
 // coerces to a one-element slice; a string coerces by splitting on ";" and
-// parsing each part. Panics if key is absent or the value cannot be
-// coerced.
-func (s *StatSet) GetDoubleArray(key string) []float64 {
+// parsing each part. Returns ErrValueRequired if key is absent or the value
+// cannot be coerced.
+func (s *StatSet) GetDoubleArray(key string) ([]float64, error) {
 	val := s.values[key]
 	if arr, ok := val.([]float64); ok {
-		return arr
+		return arr, nil
 	}
 	if n, ok := asNumber(val); ok {
-		return []float64{n}
+		return []float64{n}, nil
 	}
 	if str, ok := val.(string); ok {
 		parts := strings.Split(str, ";")
@@ -228,43 +231,41 @@ func (s *StatSet) GetDoubleArray(key string) []float64 {
 		for i, p := range parts {
 			n, err := strconv.ParseFloat(p, 64)
 			if err != nil {
-				panic(err)
+				return nil, fmt.Errorf("commons: StatSet key %q: %w", key, err)
 			}
 			out[i] = n
 		}
-		return out
+		return out, nil
 	}
-	panicRequired(key, "double array", val)
-	return nil
+	return nil, errValueRequired(key, "double array", val)
 }
 
 // GetFloat32 returns the value at key as a float32, coercing a numeric,
-// numeric string, or bool (1/0) representation. Panics if key is absent or
-// the value cannot be coerced.
-func (s *StatSet) GetFloat32(key string) float32 {
+// numeric string, or bool (1/0) representation. Returns ErrValueRequired if
+// key is absent or the value cannot be coerced.
+func (s *StatSet) GetFloat32(key string) (float32, error) {
 	val := s.values[key]
 	if n, ok := asNumber(val); ok {
-		return float32(n)
+		return float32(n), nil
 	}
 	if str, ok := val.(string); ok {
 		n, err := strconv.ParseFloat(str, 32)
 		if err != nil {
-			panic(err)
+			return 0, fmt.Errorf("commons: StatSet key %q: %w", key, err)
 		}
-		return float32(n)
+		return float32(n), nil
 	}
 	if b, ok := val.(bool); ok {
 		if b {
-			return 1
+			return 1, nil
 		}
-		return 0
+		return 0, nil
 	}
-	panicRequired(key, "float", val)
-	return 0
+	return 0, errValueRequired(key, "float", val)
 }
 
 // GetFloat32Default is like GetFloat32 but returns defaultValue instead of
-// panicking when key is absent or cannot be coerced.
+// an error when key is absent or cannot be coerced.
 func (s *StatSet) GetFloat32Default(key string, defaultValue float32) float32 {
 	val := s.values[key]
 	if n, ok := asNumber(val); ok {
@@ -285,32 +286,31 @@ func (s *StatSet) GetFloat32Default(key string, defaultValue float32) float32 {
 }
 
 // GetInt returns the value at key as an int, coercing a numeric, numeric
-// string, or bool (1/0) representation. Panics if key is absent or the
-// value cannot be coerced.
-func (s *StatSet) GetInt(key string) int {
+// string, or bool (1/0) representation. Returns ErrValueRequired if key is
+// absent or the value cannot be coerced.
+func (s *StatSet) GetInt(key string) (int, error) {
 	val := s.values[key]
 	if n, ok := asNumber(val); ok {
-		return int(n)
+		return int(n), nil
 	}
 	if str, ok := val.(string); ok {
 		n, err := strconv.Atoi(str)
 		if err != nil {
-			panic(err)
+			return 0, fmt.Errorf("commons: StatSet key %q: %w", key, err)
 		}
-		return n
+		return n, nil
 	}
 	if b, ok := val.(bool); ok {
 		if b {
-			return 1
+			return 1, nil
 		}
-		return 0
+		return 0, nil
 	}
-	panicRequired(key, "int", val)
-	return 0
+	return 0, errValueRequired(key, "int", val)
 }
 
-// GetIntDefault is like GetInt but returns defaultValue instead of
-// panicking when key is absent or cannot be coerced.
+// GetIntDefault is like GetInt but returns defaultValue instead of an error
+// when key is absent or cannot be coerced.
 func (s *StatSet) GetIntDefault(key string, defaultValue int) int {
 	val := s.values[key]
 	if n, ok := asNumber(val); ok {
@@ -332,14 +332,15 @@ func (s *StatSet) GetIntDefault(key string, defaultValue int) int {
 
 // GetIntArray returns the value at key as a []int. A single number coerces
 // to a one-element slice; a string coerces by splitting on ";" and parsing
-// each part. Panics if key is absent or the value cannot be coerced.
-func (s *StatSet) GetIntArray(key string) []int {
+// each part. Returns ErrValueRequired if key is absent or the value cannot
+// be coerced.
+func (s *StatSet) GetIntArray(key string) ([]int, error) {
 	val := s.values[key]
 	if arr, ok := val.([]int); ok {
-		return arr
+		return arr, nil
 	}
 	if n, ok := asNumber(val); ok {
-		return []int{int(n)}
+		return []int{int(n)}, nil
 	}
 	if str, ok := val.(string); ok {
 		parts := strings.Split(str, ";")
@@ -347,18 +348,17 @@ func (s *StatSet) GetIntArray(key string) []int {
 		for i, p := range parts {
 			n, err := strconv.Atoi(p)
 			if err != nil {
-				panic(err)
+				return nil, fmt.Errorf("commons: StatSet key %q: %w", key, err)
 			}
 			out[i] = n
 		}
-		return out
+		return out, nil
 	}
-	panicRequired(key, "int array", val)
-	return nil
+	return nil, errValueRequired(key, "int array", val)
 }
 
 // GetIntArrayDefault is like GetIntArray but returns defaultArray instead of
-// panicking when key is absent or cannot be coerced.
+// an error when key is absent or cannot be coerced.
 func (s *StatSet) GetIntArrayDefault(key string, defaultArray []int) []int {
 	val := s.values[key]
 	if arr, ok := val.([]int); ok {
@@ -382,43 +382,46 @@ func (s *StatSet) GetIntArrayDefault(key string, defaultArray []int) []int {
 	return defaultArray
 }
 
-// GetList returns the slice stored at key, or nil if key is absent. Panics
-// if the stored value is not a []T.
-func GetList[T any](s *StatSet, key string) []T {
+// GetList returns the slice stored at key, or nil if key is absent. Returns
+// ErrValueRequired if the stored value is not a []T.
+func GetList[T any](s *StatSet, key string) ([]T, error) {
 	val := s.values[key]
 	if val == nil {
-		return nil
+		return nil, nil
 	}
-	return val.([]T)
+	arr, ok := val.([]T)
+	if !ok {
+		return nil, errValueRequired(key, "list", val)
+	}
+	return arr, nil
 }
 
 // GetLong returns the value at key as an int64, coercing a numeric, numeric
-// string, or bool (1/0) representation. Panics if key is absent or the
-// value cannot be coerced.
-func (s *StatSet) GetLong(key string) int64 {
+// string, or bool (1/0) representation. Returns ErrValueRequired if key is
+// absent or the value cannot be coerced.
+func (s *StatSet) GetLong(key string) (int64, error) {
 	val := s.values[key]
 	if n, ok := asNumber(val); ok {
-		return int64(n)
+		return int64(n), nil
 	}
 	if str, ok := val.(string); ok {
 		n, err := strconv.ParseInt(str, 10, 64)
 		if err != nil {
-			panic(err)
+			return 0, fmt.Errorf("commons: StatSet key %q: %w", key, err)
 		}
-		return n
+		return n, nil
 	}
 	if b, ok := val.(bool); ok {
 		if b {
-			return 1
+			return 1, nil
 		}
-		return 0
+		return 0, nil
 	}
-	panicRequired(key, "long", val)
-	return 0
+	return 0, errValueRequired(key, "long", val)
 }
 
-// GetLongDefault is like GetLong but returns defaultValue instead of
-// panicking when key is absent or cannot be coerced.
+// GetLongDefault is like GetLong but returns defaultValue instead of an
+// error when key is absent or cannot be coerced.
 func (s *StatSet) GetLongDefault(key string, defaultValue int64) int64 {
 	val := s.values[key]
 	if n, ok := asNumber(val); ok {
@@ -440,15 +443,15 @@ func (s *StatSet) GetLongDefault(key string, defaultValue int64) int64 {
 
 // GetLongArray returns the value at key as a []int64. A single number
 // coerces to a one-element slice; a string coerces by splitting on ";" and
-// parsing each part. Panics if key is absent or the value cannot be
-// coerced.
-func (s *StatSet) GetLongArray(key string) []int64 {
+// parsing each part. Returns ErrValueRequired if key is absent or the value
+// cannot be coerced.
+func (s *StatSet) GetLongArray(key string) ([]int64, error) {
 	val := s.values[key]
 	if arr, ok := val.([]int64); ok {
-		return arr
+		return arr, nil
 	}
 	if n, ok := asNumber(val); ok {
-		return []int64{int64(n)}
+		return []int64{int64(n)}, nil
 	}
 	if str, ok := val.(string); ok {
 		parts := strings.Split(str, ";")
@@ -456,38 +459,41 @@ func (s *StatSet) GetLongArray(key string) []int64 {
 		for i, p := range parts {
 			n, err := strconv.ParseInt(p, 10, 64)
 			if err != nil {
-				panic(err)
+				return nil, fmt.Errorf("commons: StatSet key %q: %w", key, err)
 			}
 			out[i] = n
 		}
-		return out
+		return out, nil
 	}
-	panicRequired(key, "long array", val)
-	return nil
+	return nil, errValueRequired(key, "long array", val)
 }
 
-// GetMap returns the map stored at key, or nil if key is absent. Panics if
-// the stored value is not a map[K]V.
-func GetMap[K comparable, V any](s *StatSet, key string) map[K]V {
+// GetMap returns the map stored at key, or nil if key is absent. Returns
+// ErrValueRequired if the stored value is not a map[K]V.
+func GetMap[K comparable, V any](s *StatSet, key string) (map[K]V, error) {
 	val := s.values[key]
 	if val == nil {
-		return nil
+		return nil, nil
 	}
-	return val.(map[K]V)
+	m, ok := val.(map[K]V)
+	if !ok {
+		return nil, errValueRequired(key, "map", val)
+	}
+	return m, nil
 }
 
-// GetString returns the value at key formatted as a string. Panics if key
-// is absent.
-func (s *StatSet) GetString(key string) string {
+// GetString returns the value at key formatted as a string. Returns
+// ErrValueRequired if key is absent.
+func (s *StatSet) GetString(key string) (string, error) {
 	val, ok := s.values[key]
 	if !ok || val == nil {
-		panic(fmt.Sprintf("commons: StatSet key %q requires a string value, but is unset", key))
+		return "", errValueRequired(key, "string", val)
 	}
-	return toString(val)
+	return toString(val), nil
 }
 
-// GetStringDefault is like GetString but returns defaultValue instead of
-// panicking when key is absent.
+// GetStringDefault is like GetString but returns defaultValue instead of an
+// error when key is absent.
 func (s *StatSet) GetStringDefault(key string, defaultValue string) string {
 	val, ok := s.values[key]
 	if !ok || val == nil {
@@ -505,22 +511,21 @@ func toString(val any) string {
 }
 
 // GetStringArray returns the value at key as a []string, splitting a string
-// value on ";". Panics if key is absent or the value is neither a []string
-// nor a string.
-func (s *StatSet) GetStringArray(key string) []string {
+// value on ";". Returns ErrValueRequired if key is absent or the value is
+// neither a []string nor a string.
+func (s *StatSet) GetStringArray(key string) ([]string, error) {
 	val := s.values[key]
 	if arr, ok := val.([]string); ok {
-		return arr
+		return arr, nil
 	}
 	if str, ok := val.(string); ok {
-		return strings.Split(str, ";")
+		return strings.Split(str, ";"), nil
 	}
-	panicRequired(key, "string array", val)
-	return nil
+	return nil, errValueRequired(key, "string array", val)
 }
 
 // GetStringArrayDefault is like GetStringArray but returns defaultArray
-// instead of panicking when key is absent or cannot be coerced.
+// instead of an error when key is absent or cannot be coerced.
 func (s *StatSet) GetStringArrayDefault(key string, defaultArray []string) []string {
 	val := s.values[key]
 	if arr, ok := val.([]string); ok {

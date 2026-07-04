@@ -1,6 +1,7 @@
 package commons
 
 import (
+	"errors"
 	"reflect"
 	"testing"
 )
@@ -15,26 +16,26 @@ func TestStatSetGettersFromTypedValues(t *testing.T) {
 	s.Set("long", int64(9000000000))
 	s.Set("string", "hi")
 
-	if !s.GetBool("bool") {
-		t.Errorf("GetBool = false, want true")
+	if got, err := s.GetBool("bool"); err != nil || !got {
+		t.Errorf("GetBool = (%v, %v), want (true, nil)", got, err)
 	}
-	if got := s.GetByte("byte"); got != 5 {
-		t.Errorf("GetByte = %d, want 5", got)
+	if got, err := s.GetByte("byte"); err != nil || got != 5 {
+		t.Errorf("GetByte = (%v, %v), want (5, nil)", got, err)
 	}
-	if got := s.GetDouble("double"); got != 3.14 {
-		t.Errorf("GetDouble = %v, want 3.14", got)
+	if got, err := s.GetDouble("double"); err != nil || got != 3.14 {
+		t.Errorf("GetDouble = (%v, %v), want (3.14, nil)", got, err)
 	}
-	if got := s.GetFloat32("float"); got != 2.5 {
-		t.Errorf("GetFloat32 = %v, want 2.5", got)
+	if got, err := s.GetFloat32("float"); err != nil || got != 2.5 {
+		t.Errorf("GetFloat32 = (%v, %v), want (2.5, nil)", got, err)
 	}
-	if got := s.GetInt("int"); got != 42 {
-		t.Errorf("GetInt = %d, want 42", got)
+	if got, err := s.GetInt("int"); err != nil || got != 42 {
+		t.Errorf("GetInt = (%v, %v), want (42, nil)", got, err)
 	}
-	if got := s.GetLong("long"); got != 9000000000 {
-		t.Errorf("GetLong = %d, want 9000000000", got)
+	if got, err := s.GetLong("long"); err != nil || got != 9000000000 {
+		t.Errorf("GetLong = (%v, %v), want (9000000000, nil)", got, err)
 	}
-	if got := s.GetString("string"); got != "hi" {
-		t.Errorf("GetString = %q, want hi", got)
+	if got, err := s.GetString("string"); err != nil || got != "hi" {
+		t.Errorf("GetString = (%v, %v), want (hi, nil)", got, err)
 	}
 }
 
@@ -49,29 +50,29 @@ func TestStatSetGettersFromStringCoercion(t *testing.T) {
 	s.Set("doubleArray", "1.5;2.5")
 	s.Set("longArray", "10;20")
 
-	if !s.GetBool("bool") {
-		t.Errorf("GetBool = false, want true")
+	if got, err := s.GetBool("bool"); err != nil || !got {
+		t.Errorf("GetBool = (%v, %v), want (true, nil)", got, err)
 	}
-	if got := s.GetInt("int"); got != 42 {
-		t.Errorf("GetInt = %d, want 42", got)
+	if got, err := s.GetInt("int"); err != nil || got != 42 {
+		t.Errorf("GetInt = (%v, %v), want (42, nil)", got, err)
 	}
-	if got := s.GetLong("long"); got != 9000000000 {
-		t.Errorf("GetLong = %d, want 9000000000", got)
+	if got, err := s.GetLong("long"); err != nil || got != 9000000000 {
+		t.Errorf("GetLong = (%v, %v), want (9000000000, nil)", got, err)
 	}
-	if got := s.GetDouble("double"); got != 3.14 {
-		t.Errorf("GetDouble = %v, want 3.14", got)
+	if got, err := s.GetDouble("double"); err != nil || got != 3.14 {
+		t.Errorf("GetDouble = (%v, %v), want (3.14, nil)", got, err)
 	}
-	if got := s.GetIntArray("intArray"); !reflect.DeepEqual(got, []int{1, 2, 3}) {
-		t.Errorf("GetIntArray = %v, want [1 2 3]", got)
+	if got, err := s.GetIntArray("intArray"); err != nil || !reflect.DeepEqual(got, []int{1, 2, 3}) {
+		t.Errorf("GetIntArray = (%v, %v), want ([1 2 3], nil)", got, err)
 	}
-	if got := s.GetStringArray("stringArray"); !reflect.DeepEqual(got, []string{"a", "b", "c"}) {
-		t.Errorf("GetStringArray = %v, want [a b c]", got)
+	if got, err := s.GetStringArray("stringArray"); err != nil || !reflect.DeepEqual(got, []string{"a", "b", "c"}) {
+		t.Errorf("GetStringArray = (%v, %v), want ([a b c], nil)", got, err)
 	}
-	if got := s.GetDoubleArray("doubleArray"); !reflect.DeepEqual(got, []float64{1.5, 2.5}) {
-		t.Errorf("GetDoubleArray = %v, want [1.5 2.5]", got)
+	if got, err := s.GetDoubleArray("doubleArray"); err != nil || !reflect.DeepEqual(got, []float64{1.5, 2.5}) {
+		t.Errorf("GetDoubleArray = (%v, %v), want ([1.5 2.5], nil)", got, err)
 	}
-	if got := s.GetLongArray("longArray"); !reflect.DeepEqual(got, []int64{10, 20}) {
-		t.Errorf("GetLongArray = %v, want [10 20]", got)
+	if got, err := s.GetLongArray("longArray"); err != nil || !reflect.DeepEqual(got, []int64{10, 20}) {
+		t.Errorf("GetLongArray = (%v, %v), want ([10 20], nil)", got, err)
 	}
 }
 
@@ -95,24 +96,28 @@ func TestStatSetDefaults(t *testing.T) {
 	}
 }
 
-func TestStatSetGetIntPanicsWhenMissing(t *testing.T) {
+func TestStatSetGetIntErrorsWhenMissing(t *testing.T) {
 	s := NewStatSet()
-	defer func() {
-		if recover() == nil {
-			t.Errorf("GetInt on missing key: expected panic, got none")
-		}
-	}()
-	s.GetInt("missing")
+	_, err := s.GetInt("missing")
+	if !errors.Is(err, ErrValueRequired) {
+		t.Errorf("GetInt(missing) err = %v, want ErrValueRequired", err)
+	}
 }
 
-func TestStatSetGetStringPanicsWhenMissing(t *testing.T) {
+func TestStatSetGetStringErrorsWhenMissing(t *testing.T) {
 	s := NewStatSet()
-	defer func() {
-		if recover() == nil {
-			t.Errorf("GetString on missing key: expected panic, got none")
-		}
-	}()
-	s.GetString("missing")
+	_, err := s.GetString("missing")
+	if !errors.Is(err, ErrValueRequired) {
+		t.Errorf("GetString(missing) err = %v, want ErrValueRequired", err)
+	}
+}
+
+func TestStatSetGetIntErrorsOnUnparsableString(t *testing.T) {
+	s := NewStatSet()
+	s.Set("k", "not-a-number")
+	if _, err := s.GetInt("k"); err == nil {
+		t.Errorf("GetInt(unparsable) err = nil, want error")
+	}
 }
 
 func TestStatSetUnsetAndHas(t *testing.T) {
@@ -134,11 +139,11 @@ func TestNewStatSetFromCopies(t *testing.T) {
 	copySet := NewStatSetFrom(s)
 	copySet.Set("k", 2)
 
-	if got := s.GetInt("k"); got != 1 {
-		t.Errorf("original mutated: GetInt(k) = %d, want 1", got)
+	if got, err := s.GetInt("k"); err != nil || got != 1 {
+		t.Errorf("original mutated: GetInt(k) = (%v, %v), want (1, nil)", got, err)
 	}
-	if got := copySet.GetInt("k"); got != 2 {
-		t.Errorf("copy GetInt(k) = %d, want 2", got)
+	if got, err := copySet.GetInt("k"); err != nil || got != 2 {
+		t.Errorf("copy GetInt(k) = (%v, %v), want (2, nil)", got, err)
 	}
 }
 
@@ -147,18 +152,21 @@ func TestStatSetGetListAndGetMap(t *testing.T) {
 	s.Set("list", []int{1, 2, 3})
 	s.Set("map", map[string]int{"a": 1})
 
-	if got := GetList[int](s, "list"); !reflect.DeepEqual(got, []int{1, 2, 3}) {
-		t.Errorf("GetList = %v, want [1 2 3]", got)
+	if got, err := GetList[int](s, "list"); err != nil || !reflect.DeepEqual(got, []int{1, 2, 3}) {
+		t.Errorf("GetList = (%v, %v), want ([1 2 3], nil)", got, err)
 	}
-	if got := GetList[int](s, "missing"); got != nil {
-		t.Errorf("GetList(missing) = %v, want nil", got)
+	if got, err := GetList[int](s, "missing"); err != nil || got != nil {
+		t.Errorf("GetList(missing) = (%v, %v), want (nil, nil)", got, err)
+	}
+	if _, err := GetList[string](s, "list"); err == nil {
+		t.Errorf("GetList[string](list) err = nil, want error (wrong element type)")
 	}
 
-	if got := GetMap[string, int](s, "map"); !reflect.DeepEqual(got, map[string]int{"a": 1}) {
-		t.Errorf("GetMap = %v, want map[a:1]", got)
+	if got, err := GetMap[string, int](s, "map"); err != nil || !reflect.DeepEqual(got, map[string]int{"a": 1}) {
+		t.Errorf("GetMap = (%v, %v), want (map[a:1], nil)", got, err)
 	}
-	if got := GetMap[string, int](s, "missing"); got != nil {
-		t.Errorf("GetMap(missing) = %v, want nil", got)
+	if got, err := GetMap[string, int](s, "missing"); err != nil || got != nil {
+		t.Errorf("GetMap(missing) = (%v, %v), want (nil, nil)", got, err)
 	}
 }
 
