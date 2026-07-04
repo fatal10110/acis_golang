@@ -170,6 +170,55 @@ func TestStatSetGetListAndGetMap(t *testing.T) {
 	}
 }
 
+type testColor int
+
+const (
+	colorRed testColor = iota
+	colorGreen
+	colorBlue
+)
+
+var testColorNames = map[string]testColor{
+	"RED":   colorRed,
+	"GREEN": colorGreen,
+	"BLUE":  colorBlue,
+}
+
+func TestStatSetGetEnum(t *testing.T) {
+	s := NewStatSet()
+	s.Set("fromString", "GREEN")
+	s.Set("fromTyped", colorBlue)
+	s.Set("bad", "PURPLE")
+
+	if got, err := GetEnum(s, "fromString", testColorNames); err != nil || got != colorGreen {
+		t.Errorf("GetEnum(fromString) = (%v, %v), want (%v, nil)", got, err, colorGreen)
+	}
+	if got, err := GetEnum(s, "fromTyped", testColorNames); err != nil || got != colorBlue {
+		t.Errorf("GetEnum(fromTyped) = (%v, %v), want (%v, nil)", got, err, colorBlue)
+	}
+	if _, err := GetEnum(s, "bad", testColorNames); !errors.Is(err, ErrValueRequired) {
+		t.Errorf("GetEnum(bad) err = %v, want ErrValueRequired", err)
+	}
+	if _, err := GetEnum(s, "missing", testColorNames); !errors.Is(err, ErrValueRequired) {
+		t.Errorf("GetEnum(missing) err = %v, want ErrValueRequired", err)
+	}
+}
+
+func TestStatSetGetEnumDefault(t *testing.T) {
+	s := NewStatSet()
+	s.Set("fromString", "BLUE")
+
+	if got := GetEnumDefault(s, "fromString", testColorNames, colorRed); got != colorBlue {
+		t.Errorf("GetEnumDefault(fromString) = %v, want %v", got, colorBlue)
+	}
+	if got := GetEnumDefault(s, "missing", testColorNames, colorRed); got != colorRed {
+		t.Errorf("GetEnumDefault(missing) = %v, want %v", got, colorRed)
+	}
+	if got := GetEnumDefault(s, "bad-not-set", testColorNames, colorGreen); got != colorGreen {
+		t.Errorf("GetEnumDefault(bad-not-set) = %v, want %v", got, colorGreen)
+	}
+}
+
 func TestStatSetGetObject(t *testing.T) {
 	s := NewStatSet()
 	s.Set("k", 42)
