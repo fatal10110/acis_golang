@@ -551,3 +551,37 @@ func GetObject[T any](s *StatSet, key string) (T, bool) {
 	}
 	return t, true
 }
+
+// GetEnum returns the value at key as E. A value already stored as E is
+// returned directly; a string value is looked up in names, keyed by the
+// enum's canonical name. Returns ErrValueRequired if key is absent, the
+// stored value is neither E nor a string, or the string matches no entry in
+// names.
+func GetEnum[E any](s *StatSet, key string, names map[string]E) (E, error) {
+	var zero E
+	val := s.values[key]
+	if e, ok := val.(E); ok {
+		return e, nil
+	}
+	if str, ok := val.(string); ok {
+		if e, ok := names[str]; ok {
+			return e, nil
+		}
+	}
+	return zero, errValueRequired(key, "enum", val)
+}
+
+// GetEnumDefault is like GetEnum but returns defaultValue instead of an
+// error when key is absent or cannot be resolved to E.
+func GetEnumDefault[E any](s *StatSet, key string, names map[string]E, defaultValue E) E {
+	val := s.values[key]
+	if e, ok := val.(E); ok {
+		return e
+	}
+	if str, ok := val.(string); ok {
+		if e, ok := names[str]; ok {
+			return e
+		}
+	}
+	return defaultValue
+}
