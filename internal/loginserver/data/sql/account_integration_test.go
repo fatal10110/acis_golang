@@ -139,6 +139,128 @@ func TestAccountStore_SetAccessLevel(t *testing.T) {
 	}
 }
 
+func TestAccountStore_UpsertAccount(t *testing.T) {
+	store := newIntegrationStore(t)
+
+	changed, err := store.UpsertAccount("player1", "hash1", 2)
+	if err != nil {
+		t.Fatalf("UpsertAccount() create unexpected error: %v", err)
+	}
+	if !changed {
+		t.Error("UpsertAccount() create changed = false, want true")
+	}
+	got, err := store.Account("player1")
+	if err != nil {
+		t.Fatalf("Account() after create: %v", err)
+	}
+	if got.Password != "hash1" || got.AccessLevel != 2 {
+		t.Fatalf("Account() after create = %+v, want password=hash1 accessLevel=2", got)
+	}
+
+	changed, err = store.UpsertAccount("player1", "hash2", 3)
+	if err != nil {
+		t.Fatalf("UpsertAccount() update unexpected error: %v", err)
+	}
+	if !changed {
+		t.Error("UpsertAccount() update changed = false, want true")
+	}
+	got, err = store.Account("player1")
+	if err != nil {
+		t.Fatalf("Account() after update: %v", err)
+	}
+	if got.Password != "hash2" || got.AccessLevel != 3 {
+		t.Fatalf("Account() after update = %+v, want password=hash2 accessLevel=3", got)
+	}
+}
+
+func TestAccountStore_ChangeAccessLevel(t *testing.T) {
+	store := newIntegrationStore(t)
+	createdAt := time.UnixMilli(1_700_000_000_000)
+	if _, err := store.CreateAccount("player1", "hash", createdAt); err != nil {
+		t.Fatalf("CreateAccount() unexpected error: %v", err)
+	}
+
+	changed, err := store.ChangeAccessLevel("player1", 4)
+	if err != nil {
+		t.Fatalf("ChangeAccessLevel() unexpected error: %v", err)
+	}
+	if !changed {
+		t.Error("ChangeAccessLevel() on existing account changed = false, want true")
+	}
+
+	changed, err = store.ChangeAccessLevel("ghost", 4)
+	if err != nil {
+		t.Fatalf("ChangeAccessLevel() on missing account unexpected error: %v", err)
+	}
+	if changed {
+		t.Error("ChangeAccessLevel() on missing account changed = true, want false")
+	}
+}
+
+func TestAccountStore_DeleteAccount(t *testing.T) {
+	store := newIntegrationStore(t)
+	createdAt := time.UnixMilli(1_700_000_000_000)
+	if _, err := store.CreateAccount("player1", "hash", createdAt); err != nil {
+		t.Fatalf("CreateAccount() unexpected error: %v", err)
+	}
+
+	deleted, err := store.DeleteAccount("player1")
+	if err != nil {
+		t.Fatalf("DeleteAccount() unexpected error: %v", err)
+	}
+	if !deleted {
+		t.Error("DeleteAccount() on existing account deleted = false, want true")
+	}
+	if _, err := store.Account("player1"); !errors.Is(err, ErrAccountNotFound) {
+		t.Fatalf("Account() after delete: got err %v, want ErrAccountNotFound", err)
+	}
+
+	deleted, err = store.DeleteAccount("player1")
+	if err != nil {
+		t.Fatalf("DeleteAccount() second call unexpected error: %v", err)
+	}
+	if deleted {
+		t.Error("DeleteAccount() on missing account deleted = true, want false")
+	}
+}
+
+func TestAccountStore_ListAccounts(t *testing.T) {
+	store := newIntegrationStore(t)
+	createdAt := time.UnixMilli(1_700_000_000_000)
+	for login, level := range map[string]int{"banned1": -1, "regular1": 0, "gm1": 1} {
+		if _, err := store.CreateAccount(login, "hash", createdAt); err != nil {
+			t.Fatalf("CreateAccount(%s) unexpected error: %v", login, err)
+		}
+		if _, err := store.ChangeAccessLevel(login, level); err != nil {
+			t.Fatalf("ChangeAccessLevel(%s) unexpected error: %v", login, err)
+		}
+	}
+
+	tests := []struct {
+		filter AccountFilter
+		want   []string
+	}{
+		{AllAccounts, []string{"banned1", "gm1", "regular1"}},
+		{BannedAccounts, []string{"banned1"}},
+		{PrivilegedAccounts, []string{"gm1"}},
+		{RegularAccounts, []string{"regular1"}},
+	}
+	for _, tt := range tests {
+		got, err := store.ListAccounts(tt.filter)
+		if err != nil {
+			t.Fatalf("ListAccounts(%v) unexpected error: %v", tt.filter, err)
+		}
+		if len(got) != len(tt.want) {
+			t.Fatalf("ListAccounts(%v) = %v, want logins %v", tt.filter, got, tt.want)
+		}
+		for i, login := range tt.want {
+			if got[i].Login != login {
+				t.Errorf("ListAccounts(%v)[%d].Login = %q, want %q", tt.filter, i, got[i].Login, login)
+			}
+		}
+	}
+}
+
 func TestAccountStore_SetLastServer(t *testing.T) {
 	store := newIntegrationStore(t)
 	createdAt := time.UnixMilli(1_700_000_000_000)
