@@ -71,11 +71,28 @@ func (s *GameServerStore) GameServers() (map[int]model.GameServer, error) {
 func (s *GameServerStore) CreateGameServer(server model.GameServer) error {
 	if _, err := s.db.Exec(
 		"INSERT INTO gameservers (hexid, server_id, host) VALUES (?, ?, ?)",
-		hexIDString(server.HexID),
+		HexIDText(server.HexID),
 		server.ID,
 		server.Host,
 	); err != nil {
 		return fmt.Errorf("create game server %d: %w", server.ID, err)
+	}
+	return nil
+}
+
+// DeleteGameServer removes the registered game server row for id. Deleting
+// an id with no row is not an error.
+func (s *GameServerStore) DeleteGameServer(id int) error {
+	if _, err := s.db.Exec("DELETE FROM gameservers WHERE server_id = ?", id); err != nil {
+		return fmt.Errorf("delete game server %d: %w", id, err)
+	}
+	return nil
+}
+
+// DeleteAllGameServers removes every registered game server row.
+func (s *GameServerStore) DeleteAllGameServers() error {
+	if _, err := s.db.Exec("TRUNCATE gameservers"); err != nil {
+		return fmt.Errorf("delete all game servers: %w", err)
 	}
 	return nil
 }
@@ -101,7 +118,12 @@ func parseHexID(text string) ([]byte, error) {
 	return signedBigIntBytes(n), nil
 }
 
-func hexIDString(id []byte) string {
+// HexIDText renders a game server auth key in the signed big-integer hex
+// form used by the gameservers table's hexid column and by hexid files.
+// Keys whose top bit is set render as a negative hex string; a leading zero
+// byte is dropped on the way through, so text -> bytes round-trips to the
+// minimal two's-complement form, not necessarily the original length.
+func HexIDText(id []byte) string {
 	if id == nil {
 		return "null"
 	}

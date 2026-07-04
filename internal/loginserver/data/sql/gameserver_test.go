@@ -19,9 +19,9 @@ func TestGameServerHexIDStringRoundTrip(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := hexIDString(tt.id)
+			got := HexIDText(tt.id)
 			if got != tt.want {
-				t.Fatalf("hexIDString(%x) = %q, want %q", tt.id, got, tt.want)
+				t.Fatalf("HexIDText(%x) = %q, want %q", tt.id, got, tt.want)
 			}
 
 			roundTrip, err := parseHexID(got)
