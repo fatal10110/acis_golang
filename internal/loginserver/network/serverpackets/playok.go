@@ -8,7 +8,7 @@ const OpcodePlayOk = 0x07
 // client presents to the chosen game server at EnterWorld.
 func EncodePlayOk(sessionKey1, sessionKey2 int32) []byte {
 	w := newWriter(OpcodePlayOk)
-	w.writeInt32(sessionKey1)
-	w.writeInt32(sessionKey2)
-	return w.bytes()
+	w.WriteInt32(sessionKey1)
+	w.WriteInt32(sessionKey2)
+	return w.Bytes()
 }

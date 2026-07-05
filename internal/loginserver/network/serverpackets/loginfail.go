@@ -23,6 +23,6 @@ const (
 // EncodeLoginFail builds the LoginFail packet for reason.
 func EncodeLoginFail(reason LoginFailReason) []byte {
 	w := newWriter(OpcodeLoginFail)
-	w.writeInt32(int32(reason))
-	return w.bytes()
+	w.WriteInt32(int32(reason))
+	return w.Bytes()
 }

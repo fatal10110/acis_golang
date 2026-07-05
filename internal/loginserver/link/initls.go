@@ -13,8 +13,8 @@ const linkProtocolRevision = 0x0102
 // on its static bootstrap key at this point).
 func EncodeInitLS(publicKey []byte) []byte {
 	w := newWriter(OpcodeInitLS)
-	w.writeInt32(linkProtocolRevision)
-	w.writeInt32(int32(len(publicKey)))
-	w.writeBytes(publicKey)
-	return w.bytes()
+	w.WriteInt32(linkProtocolRevision)
+	w.WriteInt32(int32(len(publicKey)))
+	w.WriteBytes(publicKey)
+	return w.Bytes()
 }
