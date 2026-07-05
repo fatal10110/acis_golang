@@ -22,6 +22,9 @@ func datapackPath(t *testing.T, rel string) string {
 
 func TestLoadPlayerLevelTable(t *testing.T) {
 	path := datapackPath(t, filepath.Join("data", "xml", "playerLevels.xml"))
+	if _, err := os.Stat(path); err != nil {
+		t.Skipf("aCis_datapack not checked out next to the module root, skipping oracle comparison: %v", err)
+	}
 
 	table, err := LoadPlayerLevelTable(path)
 	if err != nil {
