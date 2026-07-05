@@ -10,13 +10,13 @@ const OpcodePlayerInGame = 0x02
 // included) into the list of accounts that entered the game.
 func DecodePlayerInGame(payload []byte) ([]string, error) {
 	r := newReader(payload)
-	count := int(r.readUint16())
+	count := int(r.ReadInt16())
 	accounts := make([]string, 0, count)
 	for i := 0; i < count; i++ {
-		accounts = append(accounts, r.readString())
+		accounts = append(accounts, r.ReadString())
 	}
-	if r.err != nil {
-		return nil, fmt.Errorf("link: PlayerInGame: %w", r.err)
+	if r.Err() != nil {
+		return nil, fmt.Errorf("link: PlayerInGame: %w", r.Err())
 	}
 	return accounts, nil
 }

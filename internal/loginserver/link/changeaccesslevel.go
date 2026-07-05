@@ -18,11 +18,11 @@ type ChangeAccessLevel struct {
 func DecodeChangeAccessLevel(payload []byte) (ChangeAccessLevel, error) {
 	r := newReader(payload)
 	c := ChangeAccessLevel{
-		Level:   r.readInt32(),
-		Account: r.readString(),
+		Level:   r.ReadInt32(),
+		Account: r.ReadString(),
 	}
-	if r.err != nil {
-		return ChangeAccessLevel{}, fmt.Errorf("link: ChangeAccessLevel: %w", r.err)
+	if r.Err() != nil {
+		return ChangeAccessLevel{}, fmt.Errorf("link: ChangeAccessLevel: %w", r.Err())
 	}
 	return c, nil
 }

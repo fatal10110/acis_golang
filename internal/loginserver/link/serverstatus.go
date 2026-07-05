@@ -58,13 +58,13 @@ type ServerStatus struct {
 // included): a count-prefixed list of (attribute, value) pairs.
 func DecodeServerStatus(payload []byte) (ServerStatus, error) {
 	r := newReader(payload)
-	count := int(r.readInt32())
+	count := int(r.ReadInt32())
 
 	var status ServerStatus
-	for i := 0; i < count && r.err == nil; i++ {
-		attr := r.readInt32()
-		value := r.readInt32()
-		if r.err != nil {
+	for i := 0; i < count && r.Err() == nil; i++ {
+		attr := r.ReadInt32()
+		value := r.ReadInt32()
+		if r.Err() != nil {
 			break
 		}
 		switch attr {
@@ -89,8 +89,8 @@ func DecodeServerStatus(payload []byte) (ServerStatus, error) {
 			status.MaxPlayers = &value
 		}
 	}
-	if r.err != nil {
-		return ServerStatus{}, fmt.Errorf("link: ServerStatus: %w", r.err)
+	if r.Err() != nil {
+		return ServerStatus{}, fmt.Errorf("link: ServerStatus: %w", r.Err())
 	}
 	return status, nil
 }
