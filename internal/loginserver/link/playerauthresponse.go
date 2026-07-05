@@ -8,7 +8,7 @@ const OpcodePlayerAuthResponse = 0x03
 // the game server whether account's presented session keys were valid.
 func EncodePlayerAuthResponse(account string, ok bool) []byte {
 	w := newWriter(OpcodePlayerAuthResponse)
-	w.writeString(account)
-	w.writeByte(boolByte(ok))
-	return w.bytes()
+	w.WriteString(account)
+	w.WriteUint8(boolByte(ok))
+	return w.Bytes()
 }

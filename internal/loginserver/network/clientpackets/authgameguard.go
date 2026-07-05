@@ -22,14 +22,14 @@ type AuthGameGuard struct {
 // included).
 func DecodeAuthGameGuard(payload []byte) (AuthGameGuard, error) {
 	r := newReader(payload)
-	if r.remaining() < authGameGuardSize {
-		return AuthGameGuard{}, fmt.Errorf("clientpackets: AuthGameGuard: need %d bytes, got %d", authGameGuardSize, r.remaining())
+	if r.Remaining() < authGameGuardSize {
+		return AuthGameGuard{}, fmt.Errorf("clientpackets: AuthGameGuard: need %d bytes, got %d", authGameGuardSize, r.Remaining())
 	}
 	return AuthGameGuard{
-		SessionID: r.readInt32(),
-		Data1:     r.readInt32(),
-		Data2:     r.readInt32(),
-		Data3:     r.readInt32(),
-		Data4:     r.readInt32(),
+		SessionID: r.ReadInt32(),
+		Data1:     r.ReadInt32(),
+		Data2:     r.ReadInt32(),
+		Data3:     r.ReadInt32(),
+		Data4:     r.ReadInt32(),
 	}, nil
 }

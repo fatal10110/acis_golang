@@ -32,10 +32,10 @@ type RequestAuthLogin struct {
 // offsets in the decrypted block.
 func DecodeRequestAuthLogin(payload []byte, key *rsa.PrivateKey) (RequestAuthLogin, error) {
 	r := newReader(payload)
-	if r.remaining() < credentialBlockSize {
-		return RequestAuthLogin{}, fmt.Errorf("clientpackets: RequestAuthLogin: need %d bytes, got %d", credentialBlockSize, r.remaining())
+	if r.Remaining() < credentialBlockSize {
+		return RequestAuthLogin{}, fmt.Errorf("clientpackets: RequestAuthLogin: need %d bytes, got %d", credentialBlockSize, r.Remaining())
 	}
-	block := decryptCredentialBlock(key, r.readBytes(credentialBlockSize))
+	block := decryptCredentialBlock(key, r.ReadBytes(credentialBlockSize))
 	return RequestAuthLogin{
 		Username: strings.ToLower(trimControlBytes(block[usernameOffset : usernameOffset+usernameSize])),
 		Password: trimControlBytes(block[passwordOffset : passwordOffset+passwordSize]),

@@ -10,9 +10,9 @@ const OpcodePlayerLogout = 0x03
 // included) into the account that logged out.
 func DecodePlayerLogout(payload []byte) (string, error) {
 	r := newReader(payload)
-	account := r.readString()
-	if r.err != nil {
-		return "", fmt.Errorf("link: PlayerLogout: %w", r.err)
+	account := r.ReadString()
+	if r.Err() != nil {
+		return "", fmt.Errorf("link: PlayerLogout: %w", r.Err())
 	}
 	return account, nil
 }

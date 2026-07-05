@@ -16,10 +16,10 @@ const OpcodeBlowFishKey = 0x00
 // a key ready for LinkCrypt.SetKey.
 func DecodeBlowFishKey(payload []byte, priv *rsa.PrivateKey) ([]byte, error) {
 	r := newReader(payload)
-	size := int(r.readInt32())
-	ciphertext := r.readBytes(size)
-	if r.err != nil {
-		return nil, fmt.Errorf("link: BlowFishKey: %w", r.err)
+	size := int(r.ReadInt32())
+	ciphertext := r.ReadBytes(size)
+	if r.Err() != nil {
+		return nil, fmt.Errorf("link: BlowFishKey: %w", r.Err())
 	}
 	return crypt.DecryptDynamicKey(priv, ciphertext), nil
 }
