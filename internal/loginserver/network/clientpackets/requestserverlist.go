@@ -19,11 +19,11 @@ type RequestServerList struct {
 // byte included).
 func DecodeRequestServerList(payload []byte) (RequestServerList, error) {
 	r := newReader(payload)
-	if r.remaining() < requestServerListSize {
-		return RequestServerList{}, fmt.Errorf("clientpackets: RequestServerList: need %d bytes, got %d", requestServerListSize, r.remaining())
+	if r.Remaining() < requestServerListSize {
+		return RequestServerList{}, fmt.Errorf("clientpackets: RequestServerList: need %d bytes, got %d", requestServerListSize, r.Remaining())
 	}
 	return RequestServerList{
-		SessionKey1: r.readInt32(),
-		SessionKey2: r.readInt32(),
+		SessionKey1: r.ReadInt32(),
+		SessionKey2: r.ReadInt32(),
 	}, nil
 }
