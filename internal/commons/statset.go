@@ -22,8 +22,10 @@ var ErrValueRequired = errors.New("commons: value required")
 // key is absent or the stored value cannot be coerced to the requested
 // type, so a caller can decide how to handle a mandatory key it can't read
 // instead of getting a zero value masquerading as real data. Callers that
-// can tolerate a missing or malformed value use the *Default variant
-// instead.
+// can tolerate a missing value use the *Default variant instead — but a
+// *present* value that fails to parse is still an error there: an optional
+// attribute being absent is normal, a mangled number in a data file is
+// corruption and must not silently become the default.
 //
 // Accessors are added alongside the types they return: there are currently
 // no accessors for composite domain types (e.g. a game position), because
@@ -153,19 +155,22 @@ func (s *StatSet) GetByte(key string) (byte, error) {
 	return 0, errValueRequired(key, "byte", val)
 }
 
-// GetByteDefault is like GetByte but returns defaultValue instead of an
-// error when key is absent or cannot be coerced.
-func (s *StatSet) GetByteDefault(key string, defaultValue byte) byte {
+// GetByteDefault is like GetByte but returns defaultValue when key is
+// absent (or holds a value of a kind bytes don't coerce from). A string
+// value that fails to parse is still an error.
+func (s *StatSet) GetByteDefault(key string, defaultValue byte) (byte, error) {
 	val := s.values[key]
 	if n, ok := asNumber(val); ok {
-		return byte(int64(n))
+		return byte(int64(n)), nil
 	}
 	if str, ok := val.(string); ok {
-		if n, err := strconv.ParseInt(str, 10, 8); err == nil {
-			return byte(n)
+		n, err := strconv.ParseInt(str, 10, 8)
+		if err != nil {
+			return 0, fmt.Errorf("commons: StatSet key %q: %w", key, err)
 		}
+		return byte(n), nil
 	}
-	return defaultValue
+	return defaultValue, nil
 }
 
 // GetDouble returns the value at key as a float64, coercing a numeric,
@@ -192,25 +197,28 @@ func (s *StatSet) GetDouble(key string) (float64, error) {
 	return 0, errValueRequired(key, "double", val)
 }
 
-// GetDoubleDefault is like GetDouble but returns defaultValue instead of an
-// error when key is absent or cannot be coerced.
-func (s *StatSet) GetDoubleDefault(key string, defaultValue float64) float64 {
+// GetDoubleDefault is like GetDouble but returns defaultValue when key is
+// absent (or holds a value of a kind float64 doesn't coerce from). A string
+// value that fails to parse is still an error.
+func (s *StatSet) GetDoubleDefault(key string, defaultValue float64) (float64, error) {
 	val := s.values[key]
 	if n, ok := asNumber(val); ok {
-		return n
+		return n, nil
 	}
 	if str, ok := val.(string); ok {
-		if n, err := strconv.ParseFloat(str, 64); err == nil {
-			return n
+		n, err := strconv.ParseFloat(str, 64)
+		if err != nil {
+			return 0, fmt.Errorf("commons: StatSet key %q: %w", key, err)
 		}
+		return n, nil
 	}
 	if b, ok := val.(bool); ok {
 		if b {
-			return 1
+			return 1, nil
 		}
-		return 0
+		return 0, nil
 	}
-	return defaultValue
+	return defaultValue, nil
 }
 
 // GetDoubleArray returns the value at key as a []float64. A single number
@@ -264,25 +272,28 @@ func (s *StatSet) GetFloat32(key string) (float32, error) {
 	return 0, errValueRequired(key, "float", val)
 }
 
-// GetFloat32Default is like GetFloat32 but returns defaultValue instead of
-// an error when key is absent or cannot be coerced.
-func (s *StatSet) GetFloat32Default(key string, defaultValue float32) float32 {
+// GetFloat32Default is like GetFloat32 but returns defaultValue when key is
+// absent (or holds a value of a kind float32 doesn't coerce from). A string
+// value that fails to parse is still an error.
+func (s *StatSet) GetFloat32Default(key string, defaultValue float32) (float32, error) {
 	val := s.values[key]
 	if n, ok := asNumber(val); ok {
-		return float32(n)
+		return float32(n), nil
 	}
 	if str, ok := val.(string); ok {
-		if n, err := strconv.ParseFloat(str, 32); err == nil {
-			return float32(n)
+		n, err := strconv.ParseFloat(str, 32)
+		if err != nil {
+			return 0, fmt.Errorf("commons: StatSet key %q: %w", key, err)
 		}
+		return float32(n), nil
 	}
 	if b, ok := val.(bool); ok {
 		if b {
-			return 1
+			return 1, nil
 		}
-		return 0
+		return 0, nil
 	}
-	return defaultValue
+	return defaultValue, nil
 }
 
 // GetInt returns the value at key as an int, coercing a numeric, numeric
@@ -309,25 +320,28 @@ func (s *StatSet) GetInt(key string) (int, error) {
 	return 0, errValueRequired(key, "int", val)
 }
 
-// GetIntDefault is like GetInt but returns defaultValue instead of an error
-// when key is absent or cannot be coerced.
-func (s *StatSet) GetIntDefault(key string, defaultValue int) int {
+// GetIntDefault is like GetInt but returns defaultValue when key is absent
+// (or holds a value of a kind int doesn't coerce from). A string value that
+// fails to parse is still an error.
+func (s *StatSet) GetIntDefault(key string, defaultValue int) (int, error) {
 	val := s.values[key]
 	if n, ok := asNumber(val); ok {
-		return int(n)
+		return int(n), nil
 	}
 	if str, ok := val.(string); ok {
-		if n, err := strconv.Atoi(str); err == nil {
-			return n
+		n, err := strconv.Atoi(str)
+		if err != nil {
+			return 0, fmt.Errorf("commons: StatSet key %q: %w", key, err)
 		}
+		return n, nil
 	}
 	if b, ok := val.(bool); ok {
 		if b {
-			return 1
+			return 1, nil
 		}
-		return 0
+		return 0, nil
 	}
-	return defaultValue
+	return defaultValue, nil
 }
 
 // GetIntArray returns the value at key as a []int. A single number coerces
@@ -357,15 +371,16 @@ func (s *StatSet) GetIntArray(key string) ([]int, error) {
 	return nil, errValueRequired(key, "int array", val)
 }
 
-// GetIntArrayDefault is like GetIntArray but returns defaultArray instead of
-// an error when key is absent or cannot be coerced.
-func (s *StatSet) GetIntArrayDefault(key string, defaultArray []int) []int {
+// GetIntArrayDefault is like GetIntArray but returns defaultArray when key
+// is absent (or holds a value of a kind an int slice doesn't coerce from).
+// A string value with an element that fails to parse is still an error.
+func (s *StatSet) GetIntArrayDefault(key string, defaultArray []int) ([]int, error) {
 	val := s.values[key]
 	if arr, ok := val.([]int); ok {
-		return arr
+		return arr, nil
 	}
 	if n, ok := asNumber(val); ok {
-		return []int{int(n)}
+		return []int{int(n)}, nil
 	}
 	if str, ok := val.(string); ok {
 		parts := strings.Split(str, ";")
@@ -373,13 +388,13 @@ func (s *StatSet) GetIntArrayDefault(key string, defaultArray []int) []int {
 		for i, p := range parts {
 			n, err := strconv.Atoi(p)
 			if err != nil {
-				return defaultArray
+				return nil, fmt.Errorf("commons: StatSet key %q: %w", key, err)
 			}
 			out[i] = n
 		}
-		return out
+		return out, nil
 	}
-	return defaultArray
+	return defaultArray, nil
 }
 
 // GetList returns the slice stored at key, or nil if key is absent. Returns
@@ -420,25 +435,28 @@ func (s *StatSet) GetLong(key string) (int64, error) {
 	return 0, errValueRequired(key, "long", val)
 }
 
-// GetLongDefault is like GetLong but returns defaultValue instead of an
-// error when key is absent or cannot be coerced.
-func (s *StatSet) GetLongDefault(key string, defaultValue int64) int64 {
+// GetLongDefault is like GetLong but returns defaultValue when key is
+// absent (or holds a value of a kind int64 doesn't coerce from). A string
+// value that fails to parse is still an error.
+func (s *StatSet) GetLongDefault(key string, defaultValue int64) (int64, error) {
 	val := s.values[key]
 	if n, ok := asNumber(val); ok {
-		return int64(n)
+		return int64(n), nil
 	}
 	if str, ok := val.(string); ok {
-		if n, err := strconv.ParseInt(str, 10, 64); err == nil {
-			return n
+		n, err := strconv.ParseInt(str, 10, 64)
+		if err != nil {
+			return 0, fmt.Errorf("commons: StatSet key %q: %w", key, err)
 		}
+		return n, nil
 	}
 	if b, ok := val.(bool); ok {
 		if b {
-			return 1
+			return 1, nil
 		}
-		return 0
+		return 0, nil
 	}
-	return defaultValue
+	return defaultValue, nil
 }
 
 // GetLongArray returns the value at key as a []int64. A single number
@@ -571,17 +589,21 @@ func GetEnum[E any](s *StatSet, key string, names map[string]E) (E, error) {
 	return zero, errValueRequired(key, "enum", val)
 }
 
-// GetEnumDefault is like GetEnum but returns defaultValue instead of an
-// error when key is absent or cannot be resolved to E.
-func GetEnumDefault[E any](s *StatSet, key string, names map[string]E, defaultValue E) E {
+// GetEnumDefault is like GetEnum but returns defaultValue when key is
+// absent (or holds a value of a kind E doesn't coerce from). A string value
+// that matches no entry in names is still an error.
+func GetEnumDefault[E any](s *StatSet, key string, names map[string]E, defaultValue E) (E, error) {
+	var zero E
 	val := s.values[key]
 	if e, ok := val.(E); ok {
-		return e
+		return e, nil
 	}
 	if str, ok := val.(string); ok {
-		if e, ok := names[str]; ok {
-			return e
+		e, ok := names[str]
+		if !ok {
+			return zero, errValueRequired(key, "enum", val)
 		}
+		return e, nil
 	}
-	return defaultValue
+	return defaultValue, nil
 }

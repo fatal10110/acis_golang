@@ -79,8 +79,8 @@ func TestStatSetGettersFromStringCoercion(t *testing.T) {
 func TestStatSetDefaults(t *testing.T) {
 	s := NewStatSet()
 
-	if got := s.GetIntDefault("missing", 7); got != 7 {
-		t.Errorf("GetIntDefault = %d, want 7", got)
+	if got, err := s.GetIntDefault("missing", 7); err != nil || got != 7 {
+		t.Errorf("GetIntDefault = (%d, %v), want (7, nil)", got, err)
 	}
 	if got := s.GetStringDefault("missing", "fallback"); got != "fallback" {
 		t.Errorf("GetStringDefault = %q, want fallback", got)
@@ -88,11 +88,59 @@ func TestStatSetDefaults(t *testing.T) {
 	if got := s.GetBoolDefault("missing", true); !got {
 		t.Errorf("GetBoolDefault = false, want true")
 	}
-	if got := s.GetIntArrayDefault("missing", []int{1, 2}); !reflect.DeepEqual(got, []int{1, 2}) {
-		t.Errorf("GetIntArrayDefault = %v, want [1 2]", got)
+	if got, err := s.GetIntArrayDefault("missing", []int{1, 2}); err != nil || !reflect.DeepEqual(got, []int{1, 2}) {
+		t.Errorf("GetIntArrayDefault = (%v, %v), want ([1 2], nil)", got, err)
 	}
 	if got := s.GetStringArrayDefault("missing", []string{"x"}); !reflect.DeepEqual(got, []string{"x"}) {
 		t.Errorf("GetStringArrayDefault = %v, want [x]", got)
+	}
+	if got, err := s.GetByteDefault("missing", 3); err != nil || got != 3 {
+		t.Errorf("GetByteDefault = (%d, %v), want (3, nil)", got, err)
+	}
+	if got, err := s.GetLongDefault("missing", 9); err != nil || got != 9 {
+		t.Errorf("GetLongDefault = (%d, %v), want (9, nil)", got, err)
+	}
+	if got, err := s.GetDoubleDefault("missing", 1.5); err != nil || got != 1.5 {
+		t.Errorf("GetDoubleDefault = (%v, %v), want (1.5, nil)", got, err)
+	}
+	if got, err := s.GetFloat32Default("missing", 2.5); err != nil || got != 2.5 {
+		t.Errorf("GetFloat32Default = (%v, %v), want (2.5, nil)", got, err)
+	}
+}
+
+// TestStatSetDefaultsRejectMalformedValues pins the boundary between "key
+// absent" (the default substitutes) and "value present but unparsable" (an
+// error): a mangled number in a data file must never silently read back as
+// the default.
+func TestStatSetDefaultsRejectMalformedValues(t *testing.T) {
+	s := NewStatSet()
+	s.Set("bad", "not-a-number")
+
+	if _, err := s.GetIntDefault("bad", 7); err == nil {
+		t.Errorf("GetIntDefault(bad) err = nil, want error")
+	}
+	if _, err := s.GetByteDefault("bad", 7); err == nil {
+		t.Errorf("GetByteDefault(bad) err = nil, want error")
+	}
+	if _, err := s.GetLongDefault("bad", 7); err == nil {
+		t.Errorf("GetLongDefault(bad) err = nil, want error")
+	}
+	if _, err := s.GetDoubleDefault("bad", 7); err == nil {
+		t.Errorf("GetDoubleDefault(bad) err = nil, want error")
+	}
+	if _, err := s.GetFloat32Default("bad", 7); err == nil {
+		t.Errorf("GetFloat32Default(bad) err = nil, want error")
+	}
+	s.Set("badArray", "1;x;3")
+	if _, err := s.GetIntArrayDefault("badArray", []int{1}); err == nil {
+		t.Errorf("GetIntArrayDefault(badArray) err = nil, want error")
+	}
+
+	// Values of a kind the accessor doesn't coerce from still take the
+	// default: only a failed parse of a present string is an error.
+	s.Set("otherKind", struct{}{})
+	if got, err := s.GetIntDefault("otherKind", 7); err != nil || got != 7 {
+		t.Errorf("GetIntDefault(otherKind) = (%d, %v), want (7, nil)", got, err)
 	}
 }
 
@@ -207,15 +255,16 @@ func TestStatSetGetEnum(t *testing.T) {
 func TestStatSetGetEnumDefault(t *testing.T) {
 	s := NewStatSet()
 	s.Set("fromString", "BLUE")
+	s.Set("unknownName", "PURPLE")
 
-	if got := GetEnumDefault(s, "fromString", testColorNames, colorRed); got != colorBlue {
-		t.Errorf("GetEnumDefault(fromString) = %v, want %v", got, colorBlue)
+	if got, err := GetEnumDefault(s, "fromString", testColorNames, colorRed); err != nil || got != colorBlue {
+		t.Errorf("GetEnumDefault(fromString) = (%v, %v), want (%v, nil)", got, err, colorBlue)
 	}
-	if got := GetEnumDefault(s, "missing", testColorNames, colorRed); got != colorRed {
-		t.Errorf("GetEnumDefault(missing) = %v, want %v", got, colorRed)
+	if got, err := GetEnumDefault(s, "missing", testColorNames, colorRed); err != nil || got != colorRed {
+		t.Errorf("GetEnumDefault(missing) = (%v, %v), want (%v, nil)", got, err, colorRed)
 	}
-	if got := GetEnumDefault(s, "bad-not-set", testColorNames, colorGreen); got != colorGreen {
-		t.Errorf("GetEnumDefault(bad-not-set) = %v, want %v", got, colorGreen)
+	if _, err := GetEnumDefault(s, "unknownName", testColorNames, colorGreen); !errors.Is(err, ErrValueRequired) {
+		t.Errorf("GetEnumDefault(unknownName) err = %v, want ErrValueRequired", err)
 	}
 }
 
