@@ -20,12 +20,12 @@ type RequestServerLogin struct {
 // byte included).
 func DecodeRequestServerLogin(payload []byte) (RequestServerLogin, error) {
 	r := newReader(payload)
-	if r.remaining() < requestServerLoginSize {
-		return RequestServerLogin{}, fmt.Errorf("clientpackets: RequestServerLogin: need %d bytes, got %d", requestServerLoginSize, r.remaining())
+	if r.Remaining() < requestServerLoginSize {
+		return RequestServerLogin{}, fmt.Errorf("clientpackets: RequestServerLogin: need %d bytes, got %d", requestServerLoginSize, r.Remaining())
 	}
 	return RequestServerLogin{
-		SessionKey1: r.readInt32(),
-		SessionKey2: r.readInt32(),
-		ServerID:    r.readByte(),
+		SessionKey1: r.ReadInt32(),
+		SessionKey2: r.ReadInt32(),
+		ServerID:    r.ReadUint8(),
 	}, nil
 }

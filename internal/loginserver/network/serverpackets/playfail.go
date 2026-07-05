@@ -20,6 +20,6 @@ const (
 // EncodePlayFail builds the PlayFail packet for reason.
 func EncodePlayFail(reason PlayFailReason) []byte {
 	w := newWriter(OpcodePlayFail)
-	w.writeByte(byte(reason))
-	return w.bytes()
+	w.WriteUint8(byte(reason))
+	return w.Bytes()
 }

@@ -18,6 +18,6 @@ const (
 // EncodeAccountKicked builds the AccountKicked packet for reason.
 func EncodeAccountKicked(reason AccountKickedReason) []byte {
 	w := newWriter(OpcodeAccountKicked)
-	w.writeInt32(int32(reason))
-	return w.bytes()
+	w.WriteInt32(int32(reason))
+	return w.Bytes()
 }
