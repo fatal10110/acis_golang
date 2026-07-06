@@ -47,3 +47,30 @@ func TestSlot_PaperdollIndex_PairedSlotsUnresolved(t *testing.T) {
 		}
 	}
 }
+
+func TestTemplate_Category(t *testing.T) {
+	tests := []struct {
+		name    string
+		tmpl    Template
+		wantCat Category
+		wantSub SubCategory
+	}{
+		{"weapon", Template{Kind: KindWeapon, Slot: SlotRHand}, CategoryWeaponOrJewelry, SubCategoryWeapon},
+		{"two-handed weapon", Template{Kind: KindWeapon, Slot: SlotLRHand}, CategoryWeaponOrJewelry, SubCategoryWeapon},
+		{"chest armor", Template{Kind: KindArmor, Slot: SlotChest}, CategoryArmor, SubCategoryArmor},
+		{"shield", Template{Kind: KindArmor, Slot: SlotLHand}, CategoryArmor, SubCategoryArmor},
+		{"necklace", Template{Kind: KindArmor, Slot: SlotNeck}, CategoryWeaponOrJewelry, SubCategoryAccessory},
+		{"paired earring", Template{Kind: KindArmor, Slot: SlotLREar}, CategoryWeaponOrJewelry, SubCategoryAccessory},
+		{"paired ring", Template{Kind: KindArmor, Slot: SlotLRFinger}, CategoryWeaponOrJewelry, SubCategoryAccessory},
+		{"cloak", Template{Kind: KindArmor, Slot: SlotBack}, CategoryWeaponOrJewelry, SubCategoryAccessory},
+		{"adena", Template{ID: AdenaID, Kind: KindEtcItem, Slot: SlotNone}, CategoryMoneyOrEtcItem, SubCategoryMoney},
+		{"ancient adena", Template{ID: AncientAdenaID, Kind: KindEtcItem, Slot: SlotNone}, CategoryMoneyOrEtcItem, SubCategoryMoney},
+		{"generic etc item", Template{ID: 5588, Kind: KindEtcItem, Slot: SlotNone}, CategoryMoneyOrEtcItem, SubCategoryOther},
+	}
+	for _, tt := range tests {
+		gotCat, gotSub := tt.tmpl.Category()
+		if gotCat != tt.wantCat || gotSub != tt.wantSub {
+			t.Errorf("%s: Category() = (%d, %d), want (%d, %d)", tt.name, gotCat, gotSub, tt.wantCat, tt.wantSub)
+		}
+	}
+}
