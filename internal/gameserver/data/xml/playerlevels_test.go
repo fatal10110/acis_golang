@@ -4,15 +4,15 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/records"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 )
 
-func TestLoadPlayerLevelData(t *testing.T) {
+func TestLoadPlayerLevels(t *testing.T) {
 	path := datapackPath(t, filepath.Join("data", "xml", "playerLevels.xml"))
 
-	table, err := LoadPlayerLevelData(path)
+	table, err := LoadPlayerLevels(path)
 	if err != nil {
-		t.Fatalf("LoadPlayerLevelData(%q) error: %v", path, err)
+		t.Fatalf("LoadPlayerLevels(%q) error: %v", path, err)
 	}
 
 	const wantCount = 81
@@ -35,12 +35,12 @@ func TestLoadPlayerLevelData(t *testing.T) {
 	cases := []struct {
 		name  string
 		level int
-		want  records.PlayerLevel
+		want  player.Level
 	}{
 		{
 			name:  "level 1 (boundary, requires no exp)",
 			level: 1,
-			want: records.PlayerLevel{
+			want: player.Level{
 				RequiredExpToLevelUp: 0,
 				KarmaModifier:        0.772184315,
 				ExpLossAtDeath:       10.0,
@@ -49,7 +49,7 @@ func TestLoadPlayerLevelData(t *testing.T) {
 		{
 			name:  "level 50 (mid-range)",
 			level: 50,
-			want: records.PlayerLevel{
+			want: player.Level{
 				RequiredExpToLevelUp: 40153995,
 				KarmaModifier:        17.18356182,
 				ExpLossAtDeath:       4.0,
@@ -58,7 +58,7 @@ func TestLoadPlayerLevelData(t *testing.T) {
 		{
 			name:  "level 80 (highest attainable level)",
 			level: 80,
-			want: records.PlayerLevel{
+			want: player.Level{
 				RequiredExpToLevelUp: 4200000000,
 				KarmaModifier:        29.77769028,
 				ExpLossAtDeath:       1.0,
@@ -67,7 +67,7 @@ func TestLoadPlayerLevelData(t *testing.T) {
 		{
 			name:  "level 81 (sentinel, missing optional attributes default to 0)",
 			level: 81,
-			want: records.PlayerLevel{
+			want: player.Level{
 				RequiredExpToLevelUp: 6299994999,
 				KarmaModifier:        0,
 				ExpLossAtDeath:       0,
@@ -95,7 +95,7 @@ func TestLoadPlayerLevelData(t *testing.T) {
 	}
 }
 
-func TestLoadPlayerLevelDataErrors(t *testing.T) {
+func TestLoadPlayerLevelsErrors(t *testing.T) {
 	dir := t.TempDir()
 
 	cases := []struct {
@@ -128,14 +128,14 @@ func TestLoadPlayerLevelDataErrors(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			path := filepath.Join(dir, "fixture.xml")
 			writeXMLFixture(t, path, c.content)
-			if _, err := LoadPlayerLevelData(path); err == nil {
+			if _, err := LoadPlayerLevels(path); err == nil {
 				t.Fatalf("expected an error for %s, got nil", c.name)
 			}
 		})
 	}
 
 	t.Run("missing file", func(t *testing.T) {
-		if _, err := LoadPlayerLevelData(filepath.Join(dir, "does-not-exist.xml")); err == nil {
+		if _, err := LoadPlayerLevels(filepath.Join(dir, "does-not-exist.xml")); err == nil {
 			t.Fatal("expected an error for a missing file, got nil")
 		}
 	})
