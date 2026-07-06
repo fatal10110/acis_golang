@@ -1,0 +1,167 @@
+package item
+
+import "fmt"
+
+// Kind distinguishes the three item template categories a data file can
+// define. A Template's other fields are interpreted the same way regardless
+// of Kind; only construction (which XML element produced it) differs.
+type Kind uint8
+
+const (
+	KindEtcItem Kind = iota
+	KindArmor
+	KindWeapon
+)
+
+// String returns the canonical XML spelling for k.
+func (k Kind) String() string {
+	switch k {
+	case KindEtcItem:
+		return "EtcItem"
+	case KindArmor:
+		return "Armor"
+	case KindWeapon:
+		return "Weapon"
+	default:
+		return fmt.Sprintf("Kind(%d)", uint8(k))
+	}
+}
+
+// kindNames maps a template's XML type attribute to the Kind it selects.
+var kindNames = map[string]Kind{
+	"EtcItem": KindEtcItem,
+	"Armor":   KindArmor,
+	"Weapon":  KindWeapon,
+}
+
+// ParseKind resolves the XML type attribute of an <item> element (one of
+// "EtcItem", "Armor", "Weapon") to a Kind. It returns an error for any other
+// value rather than guessing.
+func ParseKind(s string) (Kind, error) {
+	k, ok := kindNames[s]
+	if !ok {
+		return 0, fmt.Errorf("item: unknown template kind %q", s)
+	}
+	return k, nil
+}
+
+// Slot identifies which equipment position (or combination of positions,
+// for paired slots) an item occupies. SlotNone means the item cannot be
+// equipped. The pet slots are negative sentinels rather than bitmask bits.
+type Slot int32
+
+const (
+	SlotNone      Slot = 0x0000
+	SlotUnderwear Slot = 0x0001
+	SlotREar      Slot = 0x0002
+	SlotLEar      Slot = 0x0004
+	SlotLREar     Slot = SlotREar | SlotLEar
+	SlotNeck      Slot = 0x0008
+	SlotRFinger   Slot = 0x0010
+	SlotLFinger   Slot = 0x0020
+	SlotLRFinger  Slot = SlotRFinger | SlotLFinger
+	SlotHead      Slot = 0x0040
+	SlotRHand     Slot = 0x0080
+	SlotLHand     Slot = 0x0100
+	SlotGloves    Slot = 0x0200
+	SlotChest     Slot = 0x0400
+	SlotLegs      Slot = 0x0800
+	SlotFeet      Slot = 0x1000
+	SlotBack      Slot = 0x2000
+	SlotLRHand    Slot = 0x4000
+	SlotFullArmor Slot = 0x8000
+	SlotFace      Slot = 0x010000
+	SlotAllDress  Slot = 0x020000
+	SlotHair      Slot = 0x040000
+	SlotHairAll   Slot = 0x080000
+
+	SlotWolf      Slot = -100
+	SlotHatchling Slot = -101
+	SlotStrider   Slot = -102
+	SlotBabyPet   Slot = -103
+)
+
+// slotNames maps a template's "bodypart" attribute to the Slot it selects.
+var slotNames = map[string]Slot{
+	"chest":           SlotChest,
+	"fullarmor":       SlotFullArmor,
+	"alldress":        SlotAllDress,
+	"head":            SlotHead,
+	"hair":            SlotHair,
+	"face":            SlotFace,
+	"hairall":         SlotHairAll,
+	"underwear":       SlotUnderwear,
+	"back":            SlotBack,
+	"neck":            SlotNeck,
+	"legs":            SlotLegs,
+	"feet":            SlotFeet,
+	"gloves":          SlotGloves,
+	"chest,legs":      SlotChest | SlotLegs,
+	"rhand":           SlotRHand,
+	"lhand":           SlotLHand,
+	"lrhand":          SlotLRHand,
+	"rear;lear":       SlotREar | SlotLEar,
+	"rfinger;lfinger": SlotRFinger | SlotLFinger,
+	"none":            SlotNone,
+	"wolf":            SlotWolf,
+	"hatchling":       SlotHatchling,
+	"strider":         SlotStrider,
+	"babypet":         SlotBabyPet,
+}
+
+// ParseSlot resolves the "bodypart" attribute of an <item> element to a
+// Slot. It returns an error for any value outside the shipped set rather
+// than guessing.
+func ParseSlot(s string) (Slot, error) {
+	slot, ok := slotNames[s]
+	if !ok {
+		return 0, fmt.Errorf("item: unknown equip slot %q", s)
+	}
+	return slot, nil
+}
+
+// Template is the starter-gear-relevant subset of a shipped item template:
+// enough to identify an item, grant it, and decide whether and where it
+// equips. It intentionally omits combat stat bonuses, use conditions,
+// attached skills, and every other field the full item grammar carries,
+// none of which character creation or world entry reads.
+type Template struct {
+	ID        int32
+	Name      string
+	Kind      Kind
+	Slot      Slot
+	Stackable bool
+}
+
+// Equipable reports whether the template can occupy an equipment slot.
+func (t *Template) Equipable() bool {
+	return t.Slot != SlotNone && t.Kind != KindEtcItem
+}
+
+// Table is an in-memory lookup of item templates keyed by id, built once at
+// boot and read for the remainder of the process lifetime. The zero value
+// is not usable; construct with NewTable.
+type Table struct {
+	templates map[int32]*Template
+}
+
+// NewTable returns a Table backed by templates, keyed by each template's ID.
+// A later entry silently overwrites an earlier one with the same ID.
+func NewTable(templates []*Template) *Table {
+	t := &Table{templates: make(map[int32]*Template, len(templates))}
+	for _, tpl := range templates {
+		t.templates[tpl.ID] = tpl
+	}
+	return t
+}
+
+// Get returns the template with the given id, or false if none was loaded.
+func (t *Table) Get(id int32) (*Template, bool) {
+	tpl, ok := t.templates[id]
+	return tpl, ok
+}
+
+// Len returns the number of templates in the table.
+func (t *Table) Len() int {
+	return len(t.templates)
+}
