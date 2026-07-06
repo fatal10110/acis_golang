@@ -4,22 +4,24 @@ import "sync"
 
 // AuthFunc validates a login attempt for accountName, reporting whether the
 // session is authorized to move a client from StateConnected to
-// StateAuthed. The real check runs over the gameserver-to-login-server
-// link (tracked separately); callers without that link wired up yet inject
-// a stub.
+// StateAuthed. SessionValidator.Validate is the real check, run over the
+// gameserver-to-login-server link; a caller that only needs to drive the
+// state machine (tests, a stubbed-out path) can inject a fixed predicate
+// instead.
 type AuthFunc func(accountName string) bool
 
 // Client is one connected game client: its framed, encrypted session plus
 // its position in the connect-to-in-world state machine described by
-// State. state and accountName are guarded by mu, since a login-server
-// reply or a scheduled callback can reach them from a goroutine other than
-// the one reading the connection.
+// State. state, accountName, and sessionKey are guarded by mu, since a
+// login-server reply or a scheduled callback can reach them from a
+// goroutine other than the one reading the connection.
 type Client struct {
 	Session *Session
 
 	mu          sync.Mutex
 	state       State
 	accountName string
+	sessionKey  SessionKey
 }
 
 // NewClient returns a Client wrapping session, starting in StateConnected.
@@ -49,17 +51,26 @@ func (c *Client) AccountName() string {
 	return c.accountName
 }
 
+// SessionKey returns the session key recorded by a successful Authenticate
+// call, or the zero value before that.
+func (c *Client) SessionKey() SessionKey {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.sessionKey
+}
+
 // Authenticate validates accountName with auth and, on success, records the
-// account name and advances the client to StateAuthed. It reports whether
-// authentication succeeded; on failure the client's state and account name
-// are left unchanged.
-func (c *Client) Authenticate(accountName string, auth AuthFunc) bool {
+// account name and session key and advances the client to StateAuthed. It
+// reports whether authentication succeeded; on failure the client's state,
+// account name, and session key are left unchanged.
+func (c *Client) Authenticate(accountName string, key SessionKey, auth AuthFunc) bool {
 	if !auth(accountName) {
 		return false
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.accountName = accountName
+	c.sessionKey = key
 	c.state = StateAuthed
 	return true
 }
