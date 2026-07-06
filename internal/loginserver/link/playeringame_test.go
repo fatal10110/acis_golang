@@ -38,3 +38,25 @@ func TestDecodePlayerInGameShort(t *testing.T) {
 		t.Error("DecodePlayerInGame: want error on truncated payload, got nil")
 	}
 }
+
+func TestEncodePlayerInGameRoundTrip(t *testing.T) {
+	want := []string{"alice", "bob"}
+	got, err := DecodePlayerInGame(EncodePlayerInGame(want))
+	if err != nil {
+		t.Fatalf("DecodePlayerInGame(EncodePlayerInGame()): %v", err)
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("round trip = %v, want %v", got, want)
+	}
+}
+
+func TestEncodePlayerInGameSingle(t *testing.T) {
+	want := []string{"alice"}
+	got, err := DecodePlayerInGame(EncodePlayerInGame(want))
+	if err != nil {
+		t.Fatalf("DecodePlayerInGame(EncodePlayerInGame()): %v", err)
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("round trip = %v, want %v", got, want)
+	}
+}

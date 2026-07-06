@@ -24,3 +24,14 @@ func TestDecodeChangeAccessLevelShort(t *testing.T) {
 		t.Error("DecodeChangeAccessLevel: want error on short payload, got nil")
 	}
 }
+
+func TestEncodeChangeAccessLevelRoundTrip(t *testing.T) {
+	want := ChangeAccessLevel{Level: -1, Account: "alice"}
+	got, err := DecodeChangeAccessLevel(EncodeChangeAccessLevel(want))
+	if err != nil {
+		t.Fatalf("DecodeChangeAccessLevel(EncodeChangeAccessLevel()): %v", err)
+	}
+	if got != want {
+		t.Fatalf("round trip = %+v, want %+v", got, want)
+	}
+}

@@ -16,3 +16,11 @@ func DecodePlayerLogout(payload []byte) (string, error) {
 	}
 	return account, nil
 }
+
+// EncodePlayerLogout builds the PlayerLogout packet reporting account as
+// having just logged out of this server.
+func EncodePlayerLogout(account string) []byte {
+	w := newWriter(OpcodePlayerLogout)
+	w.WriteString(account)
+	return w.Bytes()
+}

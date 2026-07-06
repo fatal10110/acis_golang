@@ -41,3 +41,25 @@ func TestDecodeGameServerAuthShort(t *testing.T) {
 		t.Error("DecodeGameServerAuth: want error on short payload, got nil")
 	}
 }
+
+func TestEncodeGameServerAuthRoundTrip(t *testing.T) {
+	want := GameServerAuth{
+		DesiredID:         3,
+		AcceptAlternateID: true,
+		HostReserved:      false,
+		HostName:          "gs.example.com",
+		Port:              7777,
+		MaxPlayers:        500,
+		HexID:             []byte{0xde, 0xad, 0xbe, 0xef},
+	}
+
+	got, err := DecodeGameServerAuth(EncodeGameServerAuth(want))
+	if err != nil {
+		t.Fatalf("DecodeGameServerAuth(EncodeGameServerAuth()): %v", err)
+	}
+	if got.DesiredID != want.DesiredID || got.AcceptAlternateID != want.AcceptAlternateID ||
+		got.HostReserved != want.HostReserved || got.HostName != want.HostName ||
+		got.Port != want.Port || got.MaxPlayers != want.MaxPlayers || !bytes.Equal(got.HexID, want.HexID) {
+		t.Fatalf("round trip = %+v, want %+v", got, want)
+	}
+}

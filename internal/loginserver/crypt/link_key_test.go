@@ -4,20 +4,8 @@ import (
 	"bytes"
 	"crypto/rand"
 	"crypto/rsa"
-	"math/big"
 	"testing"
 )
-
-// encryptRaw RSA-encrypts plaintext with no padding scheme, mirroring how
-// the game server encrypts its dynamic key: c = m^e mod n.
-func encryptRaw(t *testing.T, pub *rsa.PublicKey, plaintext []byte) []byte {
-	t.Helper()
-	m := new(big.Int).SetBytes(plaintext)
-	c := new(big.Int).Exp(m, big.NewInt(int64(pub.E)), pub.N)
-	out := make([]byte, (pub.N.BitLen()+7)/8)
-	c.FillBytes(out)
-	return out
-}
 
 func TestDecryptDynamicKey(t *testing.T) {
 	key, err := rsa.GenerateKey(rand.Reader, modulusSize*8)
@@ -45,7 +33,7 @@ func TestDecryptDynamicKey(t *testing.T) {
 			if want == nil {
 				want = tt.plaintext
 			}
-			ciphertext := encryptRaw(t, &key.PublicKey, tt.plaintext)
+			ciphertext := EncryptDynamicKey(&key.PublicKey, tt.plaintext)
 			got := DecryptDynamicKey(key, ciphertext)
 			if !bytes.Equal(got, want) {
 				t.Fatalf("DecryptDynamicKey() = %x, want %x", got, want)
@@ -59,7 +47,7 @@ func TestDecryptDynamicKeyEmptyPlaintext(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateKey: %v", err)
 	}
-	ciphertext := encryptRaw(t, &key.PublicKey, nil)
+	ciphertext := EncryptDynamicKey(&key.PublicKey, nil)
 	got := DecryptDynamicKey(key, ciphertext)
 	if len(got) != 0 {
 		t.Fatalf("DecryptDynamicKey() = %x, want empty", got)
@@ -72,7 +60,7 @@ func TestDecryptDynamicKeyIntoSetKey(t *testing.T) {
 		t.Fatalf("GenerateKey: %v", err)
 	}
 	dynamicKey := mustHex(t, "030a11181f262d343b424950575e656c")
-	ciphertext := encryptRaw(t, &key.PublicKey, dynamicKey)
+	ciphertext := EncryptDynamicKey(&key.PublicKey, dynamicKey)
 
 	enc := NewLinkCrypt()
 	if err := enc.SetKey(DecryptDynamicKey(key, ciphertext)); err != nil {

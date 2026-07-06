@@ -28,3 +28,14 @@ func TestDecodePlayerAuthRequestShort(t *testing.T) {
 		t.Error("DecodePlayerAuthRequest: want error on short payload, got nil")
 	}
 }
+
+func TestEncodePlayerAuthRequestRoundTrip(t *testing.T) {
+	want := PlayerAuthRequest{Account: "alice", PlayKey1: 11, PlayKey2: 22, LoginKey1: 33, LoginKey2: 44}
+	got, err := DecodePlayerAuthRequest(EncodePlayerAuthRequest(want))
+	if err != nil {
+		t.Fatalf("DecodePlayerAuthRequest(EncodePlayerAuthRequest()): %v", err)
+	}
+	if got != want {
+		t.Fatalf("round trip = %+v, want %+v", got, want)
+	}
+}

@@ -71,3 +71,42 @@ func TestServerTypeString(t *testing.T) {
 		}
 	}
 }
+
+func TestEncodeServerStatusRoundTrip(t *testing.T) {
+	normal := ServerTypeNormal
+	trueVal := true
+	age := int32(18)
+	maxPlayers := int32(300)
+	want := ServerStatus{
+		Status:     &normal,
+		ShowClock:  &trueVal,
+		AgeLimit:   &age,
+		MaxPlayers: &maxPlayers,
+	}
+
+	got, err := DecodeServerStatus(EncodeServerStatus(want))
+	if err != nil {
+		t.Fatalf("DecodeServerStatus(EncodeServerStatus()): %v", err)
+	}
+	if got.Status == nil || *got.Status != *want.Status ||
+		got.ShowClock == nil || *got.ShowClock != *want.ShowClock ||
+		got.ShowBrackets != nil ||
+		got.AgeLimit == nil || *got.AgeLimit != *want.AgeLimit ||
+		got.TestServer != nil || got.Pvp != nil ||
+		got.MaxPlayers == nil || *got.MaxPlayers != *want.MaxPlayers {
+		t.Fatalf("round trip = %+v, want %+v", got, want)
+	}
+}
+
+func TestEncodeServerStatusEmpty(t *testing.T) {
+	want := []byte{OpcodeServerStatus, 0, 0, 0, 0}
+	got := EncodeServerStatus(ServerStatus{})
+	if len(got) != len(want) {
+		t.Fatalf("EncodeServerStatus(zero) = %x, want %x", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("EncodeServerStatus(zero) = %x, want %x", got, want)
+		}
+	}
+}

@@ -35,3 +35,15 @@ func DecodePlayerAuthRequest(payload []byte) (PlayerAuthRequest, error) {
 	}
 	return req, nil
 }
+
+// EncodePlayerAuthRequest builds the PlayerAuthRequest packet asking the
+// login server to validate req.Account's presented session keys.
+func EncodePlayerAuthRequest(req PlayerAuthRequest) []byte {
+	w := newWriter(OpcodePlayerAuthRequest)
+	w.WriteString(req.Account)
+	w.WriteInt32(req.PlayKey1)
+	w.WriteInt32(req.PlayKey2)
+	w.WriteInt32(req.LoginKey1)
+	w.WriteInt32(req.LoginKey2)
+	return w.Bytes()
+}
