@@ -19,7 +19,7 @@ type SessionKey struct {
 //
 // mu guards sessions.
 type SessionStore struct {
-	mu       sync.Mutex
+	mu       sync.RWMutex
 	sessions map[string]SessionKey
 }
 
@@ -37,8 +37,8 @@ func (s *SessionStore) Put(account string, key SessionKey) {
 
 // Get returns account's current session key, if any.
 func (s *SessionStore) Get(account string) (SessionKey, bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	key, ok := s.sessions[account]
 	return key, ok
 }

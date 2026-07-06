@@ -30,7 +30,7 @@ type ServerEntry struct {
 //
 // mu guards servers and online.
 type ServerRegistry struct {
-	mu      sync.Mutex
+	mu      sync.RWMutex
 	servers map[int]ServerEntry
 	online  map[int]map[string]struct{}
 }
@@ -55,8 +55,8 @@ func (r *ServerRegistry) Load(known map[int][]byte) {
 
 // Get returns a snapshot of the entry at id.
 func (r *ServerRegistry) Get(id int) (ServerEntry, bool) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	e, ok := r.servers[id]
 	return e, ok
 }
@@ -178,7 +178,7 @@ func (r *ServerRegistry) RemoveOnlineAccount(id int, account string) {
 // OnlineAccountCount returns how many accounts server id currently reports
 // online.
 func (r *ServerRegistry) OnlineAccountCount(id int) int {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	return len(r.online[id])
 }

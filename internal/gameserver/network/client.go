@@ -18,7 +18,7 @@ type AuthFunc func(accountName string) bool
 type Client struct {
 	Session *Session
 
-	mu          sync.Mutex
+	mu          sync.RWMutex
 	state       State
 	accountName string
 	sessionKey  SessionKey
@@ -31,8 +31,8 @@ func NewClient(session *Session) *Client {
 
 // State returns the client's current state.
 func (c *Client) State() State {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	return c.state
 }
 
@@ -46,16 +46,16 @@ func (c *Client) SetState(s State) {
 // AccountName returns the account name recorded by a successful
 // Authenticate call, or "" before that.
 func (c *Client) AccountName() string {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	return c.accountName
 }
 
 // SessionKey returns the session key recorded by a successful Authenticate
 // call, or the zero value before that.
 func (c *Client) SessionKey() SessionKey {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	return c.sessionKey
 }
 
