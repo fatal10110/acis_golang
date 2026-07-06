@@ -18,7 +18,7 @@ const outboundBuffer = 64
 type Conn struct {
 	net.Conn
 	log      *logrus.Logger
-	mu       sync.Mutex
+	mu       sync.RWMutex
 	out      chan []byte
 	closed   bool
 	stopped  chan struct{}
@@ -62,8 +62,8 @@ func (c *Conn) writeLoop() {
 // goroutine. It returns false without blocking if the connection is
 // already closed.
 func (c *Conn) Send(payload []byte) bool {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	if c.closed {
 		return false
 	}

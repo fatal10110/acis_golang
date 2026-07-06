@@ -160,6 +160,11 @@ This is a concurrent server. Concurrency is a first-class design concern, not an
 - **Channels to transfer ownership and coordinate; mutexes to guard state.** Use whichever is simpler
   for the case. Don't force a channel where a short `sync.Mutex` around a map is clearer, and don't
   share a map across goroutines with no guard at all.
+- **`sync.RWMutex` once reads and writes coexist.** If a type has even one read-only accessor
+  (a getter, a lookup) alongside methods that mutate, default to `sync.RWMutex`: `RLock`/`RUnlock` in
+  the read-only methods, `Lock`/`Unlock` in the writers. Plain `sync.Mutex` is only for types with no
+  read-only accessor at all (every method mutates). A read path that also mutates as a side effect
+  (e.g. lazily evicting an expired entry) is a writer, not a reader — it keeps `Lock`, not `RLock`.
 - **One goroutine writes a given connection.** Per connection: a read goroutine and a write goroutine
   draining a channel. Never write the same socket from two goroutines.
 - **Context for lifecycle.** Long-running loops take `context.Context` and stop on cancel. Shutdown
