@@ -26,6 +26,16 @@ const (
 	dwarfInventoryLimit    = 100
 )
 
+// weaponEquippedBonusSlots and noWeaponBonusSlots are the two values the
+// client's per-character bonus-slot field takes, gated on whether a weapon
+// is equipped. The client-side meaning of "bonus slots" here (commonly
+// documented elsewhere as a talisman-slot count) isn't stated anywhere in
+// this behavior's own source — only the 20/40 branch on weapon presence is.
+const (
+	noWeaponBonusSlots       = 20
+	weaponEquippedBonusSlots = 40
+)
+
 // UserInfoSnapshot is everything UserInfo needs about one character at the
 // moment of encoding. It is deliberately narrower than the client's full
 // field list: systems this server hasn't built yet (clans, cubics,
@@ -46,9 +56,9 @@ func EncodeUserInfo(s UserInfoSnapshot) []byte {
 	paperdoll := item.Paperdoll(s.Items)
 	rhand := paperdoll[rhandPaperdollIndex]
 
-	talismanSlots := int32(20)
+	bonusSlots := int32(noWeaponBonusSlots)
 	if rhand.ObjectID != 0 {
-		talismanSlots = 40
+		bonusSlots = weaponEquippedBonusSlots
 	}
 
 	collisionRadius, collisionHeight := t.CollisionRadius, t.CollisionHeight
@@ -62,8 +72,8 @@ func EncodeUserInfo(s UserInfoSnapshot) []byte {
 	}
 
 	enchantEffect := rhand.EnchantLevel
-	if enchantEffect > 127 {
-		enchantEffect = 127
+	if enchantEffect > maxDisplayedEnchant {
+		enchantEffect = maxDisplayedEnchant
 	}
 
 	w := newWriter(OpcodeUserInfo)
@@ -92,7 +102,7 @@ func EncodeUserInfo(s UserInfoSnapshot) []byte {
 	w.WriteInt32(int32(c.SP))
 	w.WriteInt32(0) // current weight: encumbrance is not modeled
 	w.WriteInt32(0) // weight limit: encumbrance is not modeled
-	w.WriteInt32(talismanSlots)
+	w.WriteInt32(bonusSlots)
 
 	for _, pos := range paperdollWriteOrder {
 		w.WriteInt32(paperdoll[pos].ObjectID)

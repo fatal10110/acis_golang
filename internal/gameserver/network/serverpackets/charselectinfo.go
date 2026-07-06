@@ -15,6 +15,11 @@ const OpcodeCharSelectInfo = 0x13
 // resolves a right-hand (or two-handed) weapon to.
 const rhandPaperdollIndex = 7
 
+// maxDisplayedEnchant is the highest enchant level the client's enchant-level
+// byte field can carry: the field is a signed byte, so a value above this
+// would wrap negative on the wire.
+const maxDisplayedEnchant = 127
+
 // paperdollWriteOrder is the equip-array position CharSelectInfo writes at
 // each of its 17 paperdoll fields, in the client's expected order. Position
 // 7 (the weapon hand) appears twice; that duplication is the client's own
@@ -154,8 +159,8 @@ func EncodeCharSelectInfo(loginName string, sessionID int32, slots []CharacterSl
 		w.WriteInt32(boolInt32(int32(i) == activeID))
 
 		enchant := s.Paperdoll[rhandPaperdollIndex].EnchantLevel
-		if enchant > 127 {
-			enchant = 127
+		if enchant > maxDisplayedEnchant {
+			enchant = maxDisplayedEnchant
 		}
 		w.WriteUint8(byte(enchant))
 		w.WriteInt32(0) // augmentation id: item augmentation is not modeled
