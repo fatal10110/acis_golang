@@ -30,15 +30,11 @@ func NewLevel(set *commons.StatSet) (Level, error) {
 	}
 
 	l := Level{RequiredExpToLevelUp: exp}
-	if set.Has("karmaModifier") {
-		if l.KarmaModifier, err = set.GetDouble("karmaModifier"); err != nil {
-			return Level{}, err
-		}
+	if l.KarmaModifier, err = set.GetDoubleDefault("karmaModifier", 0); err != nil {
+		return Level{}, err
 	}
-	if set.Has("expLossAtDeath") {
-		if l.ExpLossAtDeath, err = set.GetDouble("expLossAtDeath"); err != nil {
-			return Level{}, err
-		}
+	if l.ExpLossAtDeath, err = set.GetDoubleDefault("expLossAtDeath", 0); err != nil {
+		return Level{}, err
 	}
 	return l, nil
 }

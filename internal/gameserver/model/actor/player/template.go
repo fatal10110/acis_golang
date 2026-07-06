@@ -168,13 +168,8 @@ func NewTemplate(set *commons.StatSet) (*Template, error) {
 		return nil, wrap(err)
 	}
 
-	// swimSpd is optional, but a present value that fails to parse must
-	// still surface: the default substitutes only for an absent key.
-	t.SwimSpeed = 1
-	if set.Has("swimSpd") {
-		if t.SwimSpeed, err = set.GetInt("swimSpd"); err != nil {
-			return nil, wrap(err)
-		}
+	if t.SwimSpeed, err = set.GetIntDefault("swimSpd", 1); err != nil {
+		return nil, wrap(err)
 	}
 
 	if t.CollisionRadius, err = set.GetDouble("radius"); err != nil {
