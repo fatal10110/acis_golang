@@ -23,3 +23,15 @@ func DecodeBlowFishKey(payload []byte, priv *rsa.PrivateKey) ([]byte, error) {
 	}
 	return crypt.DecryptDynamicKey(priv, ciphertext), nil
 }
+
+// EncodeBlowFishKey builds the BlowFishKey packet: key RSA-encrypted with
+// the login server's public key (recovered from InitLS), the dynamic
+// Blowfish key the game server proposes for the rest of the link.
+func EncodeBlowFishKey(pub *rsa.PublicKey, key []byte) []byte {
+	ciphertext := crypt.EncryptDynamicKey(pub, key)
+
+	w := newWriter(OpcodeBlowFishKey)
+	w.WriteInt32(int32(len(ciphertext)))
+	w.WriteBytes(ciphertext)
+	return w.Bytes()
+}

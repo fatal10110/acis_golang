@@ -1,5 +1,7 @@
 package link
 
+import "fmt"
+
 // OpcodePlayerAuthResponse is the wire opcode for PlayerAuthResponse,
 // answering a game server's PlayerAuthRequest.
 const OpcodePlayerAuthResponse = 0x03
@@ -11,4 +13,17 @@ func EncodePlayerAuthResponse(account string, ok bool) []byte {
 	w.WriteString(account)
 	w.WriteUint8(boolByte(ok))
 	return w.Bytes()
+}
+
+// DecodePlayerAuthResponse parses a raw PlayerAuthResponse payload (opcode
+// byte included) into the account it answers for and whether its session
+// keys were valid.
+func DecodePlayerAuthResponse(payload []byte) (account string, ok bool, err error) {
+	r := newReader(payload)
+	account = r.ReadString()
+	ok = r.ReadUint8() != 0
+	if r.Err() != nil {
+		return "", false, fmt.Errorf("link: PlayerAuthResponse: %w", r.Err())
+	}
+	return account, ok, nil
 }

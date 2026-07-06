@@ -40,6 +40,20 @@ func DecryptDynamicKey(priv *rsa.PrivateKey, ciphertext []byte) []byte {
 	return m.Bytes()
 }
 
+// EncryptDynamicKey RSA-encrypts a dynamic link key with no padding scheme
+// (c = m^e mod n), the reverse of DecryptDynamicKey: the game server calls
+// this to propose key, encrypted with the login server's public key
+// (recovered from InitLS), as the BlowFishKey packet's payload. The result
+// is always the modulus's full byte size, zero-padded on the left as
+// needed, matching what a raw "RSA, no padding" cipher produces.
+func EncryptDynamicKey(pub *rsa.PublicKey, key []byte) []byte {
+	m := new(big.Int).SetBytes(key)
+	c := new(big.Int).Exp(m, big.NewInt(int64(pub.E)), pub.N)
+	out := make([]byte, (pub.N.BitLen()+7)/8)
+	c.FillBytes(out)
+	return out
+}
+
 // SetKey switches the link to a new Blowfish key (1-56 bytes), used once the
 // game server supplies its own session key.
 func (c *LinkCrypt) SetKey(key []byte) error {

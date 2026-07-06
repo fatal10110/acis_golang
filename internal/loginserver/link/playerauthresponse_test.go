@@ -22,3 +22,21 @@ func TestEncodePlayerAuthResponse(t *testing.T) {
 		}
 	}
 }
+
+func TestDecodePlayerAuthResponse(t *testing.T) {
+	for _, ok := range []bool{true, false} {
+		account, got, err := DecodePlayerAuthResponse(EncodePlayerAuthResponse("alice", ok))
+		if err != nil {
+			t.Fatalf("DecodePlayerAuthResponse: %v", err)
+		}
+		if account != "alice" || got != ok {
+			t.Fatalf("DecodePlayerAuthResponse() = %q, %v, want alice, %v", account, got, ok)
+		}
+	}
+}
+
+func TestDecodePlayerAuthResponseShort(t *testing.T) {
+	if _, _, err := DecodePlayerAuthResponse([]byte{OpcodePlayerAuthResponse, 'a'}); err == nil {
+		t.Error("DecodePlayerAuthResponse: want error on unterminated string, got nil")
+	}
+}

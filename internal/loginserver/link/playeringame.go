@@ -20,3 +20,14 @@ func DecodePlayerInGame(payload []byte) ([]string, error) {
 	}
 	return accounts, nil
 }
+
+// EncodePlayerInGame builds the PlayerInGame packet reporting accounts that
+// just entered the game on this server.
+func EncodePlayerInGame(accounts []string) []byte {
+	w := newWriter(OpcodePlayerInGame)
+	w.WriteInt16(uint16(len(accounts)))
+	for _, account := range accounts {
+		w.WriteString(account)
+	}
+	return w.Bytes()
+}

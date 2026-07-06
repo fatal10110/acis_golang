@@ -39,3 +39,18 @@ func DecodeGameServerAuth(payload []byte) (GameServerAuth, error) {
 	}
 	return auth, nil
 }
+
+// EncodeGameServerAuth builds the GameServerAuth packet a game server sends
+// to register (or re-authenticate) on this login server.
+func EncodeGameServerAuth(auth GameServerAuth) []byte {
+	w := newWriter(OpcodeGameServerAuth)
+	w.WriteUint8(auth.DesiredID)
+	w.WriteUint8(boolByte(auth.AcceptAlternateID))
+	w.WriteUint8(boolByte(auth.HostReserved))
+	w.WriteString(auth.HostName)
+	w.WriteInt16(auth.Port)
+	w.WriteInt32(auth.MaxPlayers)
+	w.WriteInt32(int32(len(auth.HexID)))
+	w.WriteBytes(auth.HexID)
+	return w.Bytes()
+}

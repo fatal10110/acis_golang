@@ -26,3 +26,12 @@ func DecodeChangeAccessLevel(payload []byte) (ChangeAccessLevel, error) {
 	}
 	return c, nil
 }
+
+// EncodeChangeAccessLevel builds the ChangeAccessLevel packet requesting
+// c.Account's access level be changed to c.Level.
+func EncodeChangeAccessLevel(c ChangeAccessLevel) []byte {
+	w := newWriter(OpcodeChangeAccessLevel)
+	w.WriteInt32(c.Level)
+	w.WriteString(c.Account)
+	return w.Bytes()
+}

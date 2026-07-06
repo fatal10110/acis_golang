@@ -19,3 +19,13 @@ func TestDecodePlayerLogoutShort(t *testing.T) {
 		t.Error("DecodePlayerLogout: want error on unterminated string, got nil")
 	}
 }
+
+func TestEncodePlayerLogoutRoundTrip(t *testing.T) {
+	got, err := DecodePlayerLogout(EncodePlayerLogout("alice"))
+	if err != nil {
+		t.Fatalf("DecodePlayerLogout(EncodePlayerLogout()): %v", err)
+	}
+	if got != "alice" {
+		t.Fatalf("round trip = %q, want %q", got, "alice")
+	}
+}

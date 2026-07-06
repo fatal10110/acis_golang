@@ -5,19 +5,10 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/binary"
-	"math/big"
 	"testing"
-)
 
-// encryptRaw RSA-encrypts plaintext with no padding scheme: c = m^e mod n.
-func encryptRaw(t *testing.T, pub *rsa.PublicKey, plaintext []byte) []byte {
-	t.Helper()
-	m := new(big.Int).SetBytes(plaintext)
-	c := new(big.Int).Exp(m, big.NewInt(int64(pub.E)), pub.N)
-	out := make([]byte, (pub.N.BitLen()+7)/8)
-	c.FillBytes(out)
-	return out
-}
+	"github.com/fatal10110/acis_golang/internal/loginserver/crypt"
+)
 
 func TestDecodeBlowFishKey(t *testing.T) {
 	priv, err := rsa.GenerateKey(rand.Reader, 1024)
@@ -25,7 +16,7 @@ func TestDecodeBlowFishKey(t *testing.T) {
 		t.Fatalf("GenerateKey: %v", err)
 	}
 	dynamicKey := []byte{0x03, 0x0a, 0x11, 0x18, 0x1f, 0x26, 0x2d, 0x34, 0x3b, 0x42, 0x49, 0x50, 0x57, 0x5e, 0x65, 0x6c}
-	ciphertext := encryptRaw(t, &priv.PublicKey, dynamicKey)
+	ciphertext := crypt.EncryptDynamicKey(&priv.PublicKey, dynamicKey)
 
 	var payload []byte
 	payload = append(payload, OpcodeBlowFishKey)
@@ -49,5 +40,22 @@ func TestDecodeBlowFishKeyShort(t *testing.T) {
 	payload := []byte{OpcodeBlowFishKey, 0xff, 0xff, 0xff, 0x7f} // claims ~2GB of ciphertext
 	if _, err := DecodeBlowFishKey(payload, priv); err == nil {
 		t.Error("DecodeBlowFishKey: want error on truncated payload, got nil")
+	}
+}
+
+func TestEncodeBlowFishKeyRoundTrip(t *testing.T) {
+	priv, err := rsa.GenerateKey(rand.Reader, 1024)
+	if err != nil {
+		t.Fatalf("GenerateKey: %v", err)
+	}
+	dynamicKey := []byte{0x03, 0x0a, 0x11, 0x18, 0x1f, 0x26, 0x2d, 0x34, 0x3b, 0x42, 0x49, 0x50, 0x57, 0x5e, 0x65, 0x6c}
+
+	payload := EncodeBlowFishKey(&priv.PublicKey, dynamicKey)
+	got, err := DecodeBlowFishKey(payload, priv)
+	if err != nil {
+		t.Fatalf("DecodeBlowFishKey(EncodeBlowFishKey()): %v", err)
+	}
+	if !bytes.Equal(got, dynamicKey) {
+		t.Fatalf("round trip = %x, want %x", got, dynamicKey)
 	}
 }
