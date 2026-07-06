@@ -4,40 +4,39 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/records"
 )
 
-// TestLoadPlayerData compares load counts and field-level values against
-// the aCis_datapack classes/*.xml data, which is the same data the Java
-// PlayerData loader reads. Expected values below are copied verbatim from
-// the XML attributes (id 0, id 1) or computed independently by walking the
-// same files with a throwaway script that counts <skill> elements per
-// <class> block and follows the documented profession parent chain (id 2,
-// id 88) - not re-derived from this package's own code.
-func TestLoadPlayerData(t *testing.T) {
+// TestLoadPlayerTemplates compares load counts and field-level values
+// against the datapack's class template files. Expected values below are
+// copied verbatim from the XML attributes (id 0) or computed independently
+// by walking the same files with a throwaway script that counts <skill>
+// elements per <class> block and follows the profession parent chain
+// (ids 1, 2, 88) — not re-derived from this package's own code.
+func TestLoadPlayerTemplates(t *testing.T) {
 	dir := datapackPath(t, filepath.Join("data", "xml", "classes"))
 
-	data, err := LoadPlayerData(dir)
+	table, err := LoadPlayerTemplates(dir)
 	if err != nil {
-		t.Fatalf("LoadPlayerData(%q) error: %v", dir, err)
+		t.Fatalf("LoadPlayerTemplates(%q) error: %v", dir, err)
 	}
 
 	const wantCount = 89
-	if got := data.Count(); got != wantCount {
+	if got := table.Count(); got != wantCount {
 		t.Fatalf("Count() = %d, want %d", got, wantCount)
 	}
 
-	// Ids 58-87 are reserved by the enum layout and never assigned to a
-	// profession in the data; they must not appear as loaded templates.
+	// Ids 58-87 are reserved by the data format and never assigned to a
+	// profession; they must not appear as loaded templates.
 	for _, reserved := range []int{58, 60, 75, 87} {
-		if _, ok := data.Template(reserved); ok {
+		if _, ok := table.Get(reserved); ok {
 			t.Errorf("template %d: reserved id must not be loaded", reserved)
 		}
 	}
 
 	t.Run("HumanFighter base class (id 0)", func(t *testing.T) {
-		tmpl, ok := data.Template(0)
+		tmpl, ok := table.Get(0)
 		if !ok {
 			t.Fatal("template 0 not loaded")
 		}
@@ -92,12 +91,12 @@ func TestLoadPlayerData(t *testing.T) {
 			}
 		}
 
-		wantItems := []records.NewbieItem{
-			{ID: 1147, Count: 1, IsEquipped: true},
-			{ID: 1146, Count: 1, IsEquipped: true},
-			{ID: 10, Count: 1, IsEquipped: false},
-			{ID: 2369, Count: 1, IsEquipped: true},
-			{ID: 5588, Count: 1, IsEquipped: true},
+		wantItems := []player.StarterItem{
+			{ItemID: 1147, Count: 1, Equipped: true},
+			{ItemID: 1146, Count: 1, Equipped: true},
+			{ItemID: 10, Count: 1, Equipped: false},
+			{ItemID: 2369, Count: 1, Equipped: true},
+			{ItemID: 5588, Count: 1, Equipped: true},
 		}
 		if len(tmpl.Items) != len(wantItems) {
 			t.Fatalf("Items = %+v, want %+v", tmpl.Items, wantItems)
@@ -114,12 +113,12 @@ func TestLoadPlayerData(t *testing.T) {
 			{X: -71453, Y: 258305, Z: -3104},
 			{X: -71467, Y: 258378, Z: -3104},
 		}
-		if len(tmpl.SpawnLocations) != len(wantSpawns) {
-			t.Fatalf("SpawnLocations = %+v, want %+v", tmpl.SpawnLocations, wantSpawns)
+		if len(tmpl.Spawns) != len(wantSpawns) {
+			t.Fatalf("Spawns = %+v, want %+v", tmpl.Spawns, wantSpawns)
 		}
 		for i, want := range wantSpawns {
-			if tmpl.SpawnLocations[i] != want {
-				t.Errorf("SpawnLocations[%d] = %+v, want %+v", i, tmpl.SpawnLocations[i], want)
+			if tmpl.Spawns[i] != want {
+				t.Errorf("Spawns[%d] = %+v, want %+v", i, tmpl.Spawns[i], want)
 			}
 		}
 
@@ -130,8 +129,8 @@ func TestLoadPlayerData(t *testing.T) {
 
 	// Skill counts below (own / merged) were computed by an independent
 	// script that counts <skill> elements per <class> block and walks the
-	// documented parent chain, cross-checked against every id present in
-	// the data matching the known profession ids exactly.
+	// profession parent chain, cross-checked against every id present in
+	// the data.
 	for _, tc := range []struct {
 		name           string
 		id             int
@@ -144,15 +143,15 @@ func TestLoadPlayerData(t *testing.T) {
 		{"Duelist, tier 3, own+Gladiator+Warrior+HumanFighter", 88, 0, 0, 639},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			tmpl, ok := data.Template(tc.id)
+			tmpl, ok := table.Get(tc.id)
 			if !ok {
 				t.Fatalf("template %d not loaded", tc.id)
 			}
 			if len(tmpl.Items) != tc.wantItems {
 				t.Errorf("len(Items) = %d, want %d", len(tmpl.Items), tc.wantItems)
 			}
-			if len(tmpl.SpawnLocations) != tc.wantSpawns {
-				t.Errorf("len(SpawnLocations) = %d, want %d", len(tmpl.SpawnLocations), tc.wantSpawns)
+			if len(tmpl.Spawns) != tc.wantSpawns {
+				t.Errorf("len(Spawns) = %d, want %d", len(tmpl.Spawns), tc.wantSpawns)
 			}
 			if len(tmpl.Skills) != tc.wantSkillCount {
 				t.Errorf("len(Skills) = %d, want %d", len(tmpl.Skills), tc.wantSkillCount)
@@ -161,18 +160,18 @@ func TestLoadPlayerData(t *testing.T) {
 	}
 }
 
-func TestLoadPlayerDataMissingDir(t *testing.T) {
-	_, err := LoadPlayerData(filepath.Join(t.TempDir(), "does-not-exist"))
+func TestLoadPlayerTemplatesMissingDir(t *testing.T) {
+	_, err := LoadPlayerTemplates(filepath.Join(t.TempDir(), "does-not-exist"))
 	if err == nil {
 		t.Fatal("expected an error for a directory with no *.xml files, got nil")
 	}
 }
 
-// TestLoadPlayerDataDefaults exercises attribute defaults the real data
-// never triggers (every real class line sets swimSpd, and isEquipped is
-// only ever set to override the default): swimSpd defaults to 1 and a
+// TestLoadPlayerTemplatesDefaults exercises attribute defaults the shipped
+// data never triggers (every real class line sets swimSpd, and isEquipped
+// is only ever set to override the default): swimSpd defaults to 1 and a
 // starter item with no isEquipped attribute defaults to equipped.
-func TestLoadPlayerDataDefaults(t *testing.T) {
+func TestLoadPlayerTemplatesDefaults(t *testing.T) {
 	const doc = `<?xml version='1.0' encoding='utf-8'?>
 <list>
 	<class>
@@ -193,32 +192,32 @@ func TestLoadPlayerDataDefaults(t *testing.T) {
 	dir := t.TempDir()
 	writeXMLFixture(t, filepath.Join(dir, "test.xml"), doc)
 
-	data, err := LoadPlayerData(dir)
+	table, err := LoadPlayerTemplates(dir)
 	if err != nil {
-		t.Fatalf("LoadPlayerData error: %v", err)
+		t.Fatalf("LoadPlayerTemplates error: %v", err)
 	}
 
-	tmpl, ok := data.Template(0)
+	tmpl, ok := table.Get(0)
 	if !ok {
 		t.Fatal("template 0 not loaded")
 	}
 	if tmpl.SwimSpeed != 1 {
 		t.Errorf("SwimSpeed = %d, want default 1", tmpl.SwimSpeed)
 	}
-	if len(tmpl.Items) != 1 || !tmpl.Items[0].IsEquipped {
+	if len(tmpl.Items) != 1 || !tmpl.Items[0].Equipped {
 		t.Errorf("Items = %+v, want a single equipped-by-default item", tmpl.Items)
 	}
 }
 
-func TestLoadPlayerDataErrors(t *testing.T) {
+func TestLoadPlayerTemplatesErrors(t *testing.T) {
 	cases := []struct {
 		name string
 		doc  string
 	}{
 		{
-			// A class id absent from the ClassId parent table must be
+			// A class id absent from the profession parent table must be
 			// rejected rather than silently carried without inheritance.
-			name: "unknown parent mapping",
+			name: "unknown profession id",
 			doc: `<?xml version='1.0' encoding='utf-8'?>
 <list>
 	<class>
@@ -247,7 +246,7 @@ func TestLoadPlayerDataErrors(t *testing.T) {
 		{
 			// swimSpd is optional, but a present-and-malformed value must
 			// fail like any other attribute, not silently fall back to the
-			// default (mirrors Java's StatSet.getInteger(key, default)).
+			// default.
 			name: "malformed optional swimSpd",
 			doc: `<?xml version='1.0' encoding='utf-8'?>
 <list>
@@ -269,7 +268,7 @@ func TestLoadPlayerDataErrors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
 			writeXMLFixture(t, filepath.Join(dir, "test.xml"), tc.doc)
-			if _, err := LoadPlayerData(dir); err == nil {
+			if _, err := LoadPlayerTemplates(dir); err == nil {
 				t.Fatalf("expected an error for %s, got nil", tc.name)
 			}
 		})

@@ -1,18 +1,15 @@
-// Package actors contains player-actor enums.
-package actors
+package player
 
 // classParent maps a profession id to the id of the profession it upgrades
-// from, or -1 for one of the 9 base professions. Partial port of
-// ClassId.java, which owns the profession tree: the full enum also carries
-// race, fighter/mage type and class names — those come with the character
-// creation work. Ids cover exactly the professions defined in the
-// datapack's classes/*.xml: 0-57 for the base, first and second tier
-// professions across the 9 lines, and 88-118 for the third tier. The 30 ids
-// in between are reserved by the data format and never assigned.
+// from, or -1 for one of the 9 base professions. Ids cover exactly the
+// professions the class template data defines: 0-57 for the base, first and
+// second tier professions across the 9 lines, and 88-118 for the third
+// tier. The 30 ids in between are reserved by the data format and never
+// assigned to a profession. Race, class names and the rest of the
+// profession enumeration arrive with the character-creation work.
 //
 // Every parent id is numerically smaller than all of its children's ids;
-// the class-template loader's single ascending skill-merge pass relies on
-// that.
+// NewTemplateTable's single ascending skill-merge pass relies on that.
 var classParent = map[int]int{
 	0: -1, 1: 0, 2: 1, 3: 1, 4: 0, 5: 4, 6: 4, 7: 0, 8: 7, 9: 7,
 	10: -1, 11: 10, 12: 11, 13: 11, 14: 11, 15: 10, 16: 15, 17: 15,
