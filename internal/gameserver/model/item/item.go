@@ -178,6 +178,68 @@ func (t *Template) Equipable() bool {
 	return t.Slot != SlotNone && t.Kind != KindEtcItem
 }
 
+// AdenaID and AncientAdenaID are the two currency item ids the inventory
+// list classifies as money rather than a generic etc-item.
+const (
+	AdenaID        int32 = 57
+	AncientAdenaID int32 = 5575
+)
+
+// Category values group items the way the client's inventory list does:
+// which icon set and sort bucket an item belongs to.
+type Category int32
+
+const (
+	CategoryWeaponOrJewelry Category = 0
+	CategoryArmor           Category = 1
+	CategoryMoneyOrEtcItem  Category = 4
+)
+
+// SubCategory further splits Category into the client's inventory-list
+// sub-groups.
+type SubCategory int32
+
+const (
+	SubCategoryWeapon    SubCategory = 0
+	SubCategoryArmor     SubCategory = 1
+	SubCategoryAccessory SubCategory = 2
+	SubCategoryMoney     SubCategory = 4
+	SubCategoryOther     SubCategory = 5
+)
+
+// isJewelrySlot reports whether s is an equip slot whose item displays as
+// an accessory rather than as armor, regardless of Kind.
+func isJewelrySlot(s Slot) bool {
+	switch s {
+	case SlotNeck, SlotFace, SlotHair, SlotHairAll:
+		return true
+	}
+	return s&(SlotLEar|SlotLFinger|SlotBack) != 0
+}
+
+// Category classifies t the way the inventory list groups items: by Kind,
+// with armor-shaped jewelry (rings, earrings, necklaces, and similar
+// accessory slots) reported as an accessory rather than as armor. An
+// etc-item that isn't currency always reports SubCategoryOther: quest-item
+// classification needs the etc-item type detail this template doesn't carry
+// yet, and no starter grant is a quest item.
+func (t *Template) Category() (Category, SubCategory) {
+	switch t.Kind {
+	case KindWeapon:
+		return CategoryWeaponOrJewelry, SubCategoryWeapon
+	case KindArmor:
+		if isJewelrySlot(t.Slot) {
+			return CategoryWeaponOrJewelry, SubCategoryAccessory
+		}
+		return CategoryArmor, SubCategoryArmor
+	default: // KindEtcItem
+		if t.ID == AdenaID || t.ID == AncientAdenaID {
+			return CategoryMoneyOrEtcItem, SubCategoryMoney
+		}
+		return CategoryMoneyOrEtcItem, SubCategoryOther
+	}
+}
+
 // Table is an in-memory lookup of item templates keyed by id, built once at
 // boot and read for the remainder of the process lifetime. The zero value
 // is not usable; construct with NewTable.

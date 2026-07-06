@@ -43,6 +43,13 @@ func (w *Writer) WriteFloat64(v float64) {
 	w.WriteInt64(int64(math.Float64bits(v)))
 }
 
+// WriteFloat32 appends a little-endian IEEE-754 single-precision float.
+func (w *Writer) WriteFloat32(v float32) {
+	var b [4]byte
+	binary.LittleEndian.PutUint32(b[:], math.Float32bits(v))
+	w.buf = append(w.buf, b[:]...)
+}
+
 // WriteBytes appends raw bytes verbatim.
 func (w *Writer) WriteBytes(b []byte) {
 	w.buf = append(w.buf, b...)
