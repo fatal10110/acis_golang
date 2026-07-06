@@ -120,6 +120,46 @@ func ParseSlot(s string) (Slot, error) {
 	return slot, nil
 }
 
+// paperdollIndex maps a Slot to the equip-array position an item occupying
+// it is actually stored at. Several slots share a position: a two-handed
+// weapon (SlotLRHand) shows in the same position as a one-handed weapon
+// (SlotRHand), and full-body armor (SlotFullArmor, SlotAllDress) shows in
+// the same position as a chest piece. A face accessory and a full-hair
+// accessory also share one position; the equip array has a further,
+// separate position for full-hair display that no single Slot resolves to
+// here, since nothing character creation grants ever occupies it.
+var paperdollIndex = map[Slot]int{
+	SlotUnderwear: 0,
+	SlotLEar:      1,
+	SlotREar:      2,
+	SlotNeck:      3,
+	SlotLFinger:   4,
+	SlotRFinger:   5,
+	SlotHead:      6,
+	SlotRHand:     7,
+	SlotLRHand:    7,
+	SlotLHand:     8,
+	SlotGloves:    9,
+	SlotChest:     10,
+	SlotFullArmor: 10,
+	SlotAllDress:  10,
+	SlotLegs:      11,
+	SlotFeet:      12,
+	SlotBack:      13,
+	SlotFace:      14,
+	SlotHairAll:   14,
+	SlotHair:      15,
+}
+
+// PaperdollIndex returns the equip-array position an item occupying s is
+// stored at, and whether s resolves to one at all (paired slots such as
+// SlotLREar and the pet slots don't; a caller equipping into one of those
+// must resolve the specific side itself).
+func (s Slot) PaperdollIndex() (int, bool) {
+	idx, ok := paperdollIndex[s]
+	return idx, ok
+}
+
 // Template is the starter-gear-relevant subset of a shipped item template:
 // enough to identify an item, grant it, and decide whether and where it
 // equips. It intentionally omits combat stat bonuses, use conditions,
