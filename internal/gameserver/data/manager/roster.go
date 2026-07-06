@@ -5,7 +5,6 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 )
@@ -58,14 +57,32 @@ type idAllocator interface {
 	NextID() (int32, error)
 }
 
+// characterStore is the persistence Roster needs for the characters table.
+// Satisfied by *sql.CharacterStore.
+type characterStore interface {
+	Create(c *player.Character) error
+	ListByAccount(accountName string) ([]*player.Character, error)
+	CountByAccount(accountName string) (int, error)
+	NameTaken(name string) (bool, error)
+	SetDeleteAt(objectID int32, at int64) error
+	Delete(objectID int32) (bool, error)
+}
+
+// itemStore is the persistence Roster needs for the items table. Satisfied
+// by *sql.ItemStore.
+type itemStore interface {
+	Create(ownerID int32, inst item.Instance) error
+	DeleteByOwner(ownerID int32) (int64, error)
+}
+
 // Roster creates, lists, deletes and restores the characters on an
 // account, keeping the characters and items tables consistent with each
 // other. A Roster holds no mutable state of its own beyond its
 // dependencies, so it is safe for concurrent use exactly to the extent its
 // stores and id allocator are.
 type Roster struct {
-	characters *sql.CharacterStore
-	items      *sql.ItemStore
+	characters characterStore
+	items      itemStore
 	templates  *player.TemplateTable
 	itemTable  *item.Table
 	ids        idAllocator
@@ -78,7 +95,7 @@ type Roster struct {
 // deleteAfter is the grace period MarkForDeletion schedules (see
 // DefaultDeleteAfter); a zero value means deletion is immediate. now
 // defaults to time.Now when nil.
-func NewRoster(characters *sql.CharacterStore, items *sql.ItemStore, templates *player.TemplateTable, itemTable *item.Table, ids idAllocator, deleteAfter time.Duration, now func() time.Time) *Roster {
+func NewRoster(characters characterStore, items itemStore, templates *player.TemplateTable, itemTable *item.Table, ids idAllocator, deleteAfter time.Duration, now func() time.Time) *Roster {
 	if now == nil {
 		now = time.Now
 	}
