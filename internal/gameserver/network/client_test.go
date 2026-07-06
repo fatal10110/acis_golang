@@ -77,7 +77,7 @@ func TestClientAcceptRejectsCreateCharacterBeforeAuth(t *testing.T) {
 		t.Fatal("Accept(create character) = true before auth, want false")
 	}
 
-	if !c.Authenticate("player1", func(string) bool { return true }) {
+	if !c.Authenticate("player1", SessionKey{}, func(string) bool { return true }) {
 		t.Fatal("Authenticate returned false, want true")
 	}
 
@@ -88,8 +88,9 @@ func TestClientAcceptRejectsCreateCharacterBeforeAuth(t *testing.T) {
 
 func TestClientAuthenticateAdvancesStateOnSuccess(t *testing.T) {
 	c := NewClient(nil)
+	key := SessionKey{LoginKey1: 1, LoginKey2: 2, PlayKey1: 3, PlayKey2: 4}
 
-	ok := c.Authenticate("player1", func(account string) bool {
+	ok := c.Authenticate("player1", key, func(account string) bool {
 		return account == "player1"
 	})
 	if !ok {
@@ -101,12 +102,15 @@ func TestClientAuthenticateAdvancesStateOnSuccess(t *testing.T) {
 	if got := c.AccountName(); got != "player1" {
 		t.Fatalf("account name after successful auth = %q, want %q", got, "player1")
 	}
+	if got := c.SessionKey(); got != key {
+		t.Fatalf("session key after successful auth = %+v, want %+v", got, key)
+	}
 }
 
 func TestClientAuthenticateLeavesStateUnchangedOnFailure(t *testing.T) {
 	c := NewClient(nil)
 
-	ok := c.Authenticate("player1", func(string) bool { return false })
+	ok := c.Authenticate("player1", SessionKey{LoginKey1: 1}, func(string) bool { return false })
 	if ok {
 		t.Fatal("Authenticate() = true, want false")
 	}
@@ -115,6 +119,9 @@ func TestClientAuthenticateLeavesStateUnchangedOnFailure(t *testing.T) {
 	}
 	if got := c.AccountName(); got != "" {
 		t.Fatalf("account name after failed auth = %q, want empty", got)
+	}
+	if got := c.SessionKey(); got != (SessionKey{}) {
+		t.Fatalf("session key after failed auth = %+v, want zero value", got)
 	}
 }
 
