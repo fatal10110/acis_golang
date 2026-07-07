@@ -3,9 +3,6 @@ package xml
 import (
 	"encoding/xml"
 	"fmt"
-	"os"
-	"path/filepath"
-	"sort"
 
 	"github.com/sirupsen/logrus"
 
@@ -66,31 +63,16 @@ func LoadNPCTemplates(dir string, items *item.Table, log *logrus.Logger) (*npc.T
 		log = logrus.StandardLogger()
 	}
 
-	paths, err := filepath.Glob(filepath.Join(dir, "*.xml"))
+	docs, err := loadXMLDocuments[npcFile](dir, "npc template")
 	if err != nil {
-		return nil, fmt.Errorf("xml: list npc template files in %s: %w", dir, err)
+		return nil, err
 	}
-	if len(paths) == 0 {
-		return nil, fmt.Errorf("xml: no npc template files found in %s", dir)
-	}
-	sort.Strings(paths)
-
 	var templates []*npc.Template
-	for _, path := range paths {
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return nil, fmt.Errorf("xml: read %s: %w", path, err)
-		}
-
-		var doc npcFile
-		if err := xml.Unmarshal(data, &doc); err != nil {
-			return nil, fmt.Errorf("xml: parse %s: %w", path, err)
-		}
-
-		for _, el := range doc.Npcs {
+	for _, doc := range docs {
+		for _, el := range doc.Data.Npcs {
 			tpl, err := buildNPCTemplate(el, items, log)
 			if err != nil {
-				return nil, fmt.Errorf("xml: %s: %w", path, err)
+				return nil, fmt.Errorf("xml: %s: %w", doc.Path, err)
 			}
 			templates = append(templates, tpl)
 		}

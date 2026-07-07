@@ -79,6 +79,23 @@ func TestLoadItemTemplates(t *testing.T) {
 				<player sex="1" />
 			</and>
 		</cond>
+	</item>
+	<item id="16" type="Weapon" name="Table Item">
+		<table name="#weight"> 321 </table>
+		<table name="#pAtk"> 7 8 </table>
+		<set name="bodypart" val="rhand" />
+		<set name="weight" val="#weight" />
+		<for>
+			<set stat="pAtk" val="#pAtk" />
+		</for>
+	</item>
+	<item id="17" type="Weapon" name="Conditional Modifier Item">
+		<set name="bodypart" val="rhand" />
+		<for>
+			<add stat="pDef" val="2">
+				<player level="20" />
+			</add>
+		</for>
 	</item>`)
 
 	writeItemFile(t, dir, "1400-1499.xml", `
@@ -100,7 +117,7 @@ func TestLoadItemTemplates(t *testing.T) {
 		t.Fatalf("LoadItemTemplates: %v", err)
 	}
 
-	if got, want := table.Len(), 9; got != want {
+	if got, want := table.Len(), 11; got != want {
 		t.Fatalf("table.Len() = %d, want %d", got, want)
 	}
 
@@ -264,6 +281,37 @@ func TestLoadItemTemplates(t *testing.T) {
 		}
 		if root.Children[1].Kind != "player" || root.Children[1].Attrs["sex"] != "1" {
 			t.Fatalf("item 15 UseConditions[0].Root.Children[1] = %+v", root.Children[1])
+		}
+	})
+
+	t.Run("table references resolve in sets and stat modifiers", func(t *testing.T) {
+		tpl, ok := table.Get(16)
+		if !ok {
+			t.Fatal("item 16 not loaded")
+		}
+		if tpl.Weight != 321 {
+			t.Fatalf("item 16 Weight = %d, want 321", tpl.Weight)
+		}
+		if len(tpl.Modifiers) != 1 {
+			t.Fatalf("item 16 Modifiers = %+v, want 1 entry", tpl.Modifiers)
+		}
+		mod := tpl.Modifiers[0]
+		if mod.Op != item.FuncSet || mod.Stat != "pAtk" || mod.Value != 7 {
+			t.Fatalf("item 16 Modifiers[0] = %+v", mod)
+		}
+	})
+
+	t.Run("stat modifier preserves its own nested condition", func(t *testing.T) {
+		tpl, ok := table.Get(17)
+		if !ok {
+			t.Fatal("item 17 not loaded")
+		}
+		if len(tpl.Modifiers) != 1 {
+			t.Fatalf("item 17 Modifiers = %+v, want 1 entry", tpl.Modifiers)
+		}
+		cond := tpl.Modifiers[0].Condition
+		if cond == nil || cond.Kind != "player" || cond.Attrs["level"] != "20" {
+			t.Fatalf("item 17 modifier condition = %+v", cond)
 		}
 	})
 }
