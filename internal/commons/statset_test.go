@@ -2,6 +2,7 @@ package commons
 
 import (
 	"errors"
+	"math"
 	"reflect"
 	"testing"
 )
@@ -165,6 +166,26 @@ func TestStatSetGetIntErrorsOnUnparsableString(t *testing.T) {
 	s.Set("k", "not-a-number")
 	if _, err := s.GetInt("k"); err == nil {
 		t.Errorf("GetInt(unparsable) err = nil, want error")
+	}
+}
+
+func TestStatSetGetInt32(t *testing.T) {
+	s := NewStatSet()
+	s.Set("ok", "42")
+	s.Set("overflow", int64(math.MaxInt32)+1)
+	s.Set("underflow", int64(math.MinInt32)-1)
+
+	if got, err := s.GetInt32("ok"); err != nil || got != 42 {
+		t.Errorf("GetInt32(ok) = (%v, %v), want (42, nil)", got, err)
+	}
+	if _, err := s.GetInt32("overflow"); err == nil {
+		t.Error("GetInt32(overflow) err = nil, want error")
+	}
+	if _, err := s.GetInt32("underflow"); err == nil {
+		t.Error("GetInt32(underflow) err = nil, want error")
+	}
+	if _, err := s.GetInt32("missing"); !errors.Is(err, ErrValueRequired) {
+		t.Errorf("GetInt32(missing) err = %v, want ErrValueRequired", err)
 	}
 }
 
