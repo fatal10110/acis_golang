@@ -107,6 +107,9 @@ func TestStatSetDefaults(t *testing.T) {
 	if got, err := s.GetFloat32Default("missing", 2.5); err != nil || got != 2.5 {
 		t.Errorf("GetFloat32Default = (%v, %v), want (2.5, nil)", got, err)
 	}
+	if got, err := s.GetInt32Default("missing", 11); err != nil || got != 11 {
+		t.Errorf("GetInt32Default = (%v, %v), want (11, nil)", got, err)
+	}
 }
 
 // TestStatSetDefaultsRejectMalformedValues pins the boundary between "key
@@ -131,6 +134,13 @@ func TestStatSetDefaultsRejectMalformedValues(t *testing.T) {
 	}
 	if _, err := s.GetFloat32Default("bad", 7); err == nil {
 		t.Errorf("GetFloat32Default(bad) err = nil, want error")
+	}
+	if _, err := s.GetInt32Default("bad", 7); err == nil {
+		t.Errorf("GetInt32Default(bad) err = nil, want error")
+	}
+	s.Set("overflow", int64(math.MaxInt32)+1)
+	if _, err := s.GetInt32Default("overflow", 7); err == nil {
+		t.Errorf("GetInt32Default(overflow) err = nil, want error")
 	}
 	s.Set("badArray", "1;x;3")
 	if _, err := s.GetIntArrayDefault("badArray", []int{1}); err == nil {

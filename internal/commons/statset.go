@@ -336,6 +336,21 @@ func (s *StatSet) GetInt32(key string) (int32, error) {
 	return int32(v), nil
 }
 
+// GetInt32Default is like GetInt32 but returns defaultValue when key is
+// absent (or holds a value of a kind int doesn't coerce from). A string
+// value that fails to parse, or a present value out of int32 range, is
+// still an error.
+func (s *StatSet) GetInt32Default(key string, defaultValue int32) (int32, error) {
+	v, err := s.GetIntDefault(key, int(defaultValue))
+	if err != nil {
+		return 0, err
+	}
+	if v < math.MinInt32 || v > math.MaxInt32 {
+		return 0, fmt.Errorf("commons: StatSet key %q: value %d overflows int32", key, v)
+	}
+	return int32(v), nil
+}
+
 // GetIntDefault is like GetInt but returns defaultValue when key is absent
 // (or holds a value of a kind int doesn't coerce from). A string value that
 // fails to parse is still an error.
