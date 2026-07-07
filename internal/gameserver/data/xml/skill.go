@@ -1,13 +1,8 @@
 package xml
 
 import (
-	"encoding/xml"
 	"fmt"
-	"os"
-	"path/filepath"
-	"sort"
 	"strconv"
-	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -35,13 +30,6 @@ type skillElement struct {
 	Enchant2 []setElem      `xml:"enchant2"`
 }
 
-// tableElement is one <table> element: a named, whitespace-separated row of
-// per-level substitution values.
-type tableElement struct {
-	Name string `xml:"name,attr"`
-	Text string `xml:",chardata"`
-}
-
 // LoadSkillDefinitions parses every ".xml" skill definition file directly
 // under dir and returns a lookup table of the resulting definitions, keyed
 // by id and level. A directory that can't be listed, a file whose XML is
@@ -49,31 +37,17 @@ type tableElement struct {
 // out-of-range attribute fails the whole load: the caller gets an error
 // rather than a partially populated table.
 func LoadSkillDefinitions(dir string) (*skill.Table, error) {
-	paths, err := filepath.Glob(filepath.Join(dir, "*.xml"))
+	docs, err := loadXMLDocuments[skillFile](dir, "skill definition")
 	if err != nil {
-		return nil, fmt.Errorf("xml: list skill definition files in %s: %w", dir, err)
+		return nil, err
 	}
-	if len(paths) == 0 {
-		return nil, fmt.Errorf("xml: no skill definition files found in %s", dir)
-	}
-	sort.Strings(paths)
 
 	var defs []skill.Definition
-	for _, path := range paths {
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return nil, fmt.Errorf("xml: read %s: %w", path, err)
-		}
-
-		var doc skillFile
-		if err := xml.Unmarshal(data, &doc); err != nil {
-			return nil, fmt.Errorf("xml: parse %s: %w", path, err)
-		}
-
-		for _, el := range doc.Skills {
+	for _, doc := range docs {
+		for _, el := range doc.Data.Skills {
 			parsed, err := buildSkillDefinitions(el)
 			if err != nil {
-				return nil, fmt.Errorf("xml: %s: %w", path, err)
+				return nil, fmt.Errorf("xml: %s: %w", doc.Path, err)
 			}
 			defs = append(defs, parsed...)
 		}
@@ -105,7 +79,7 @@ func buildSkillDefinitions(el skillElement) ([]skill.Definition, error) {
 		return nil, fmt.Errorf("skill %d: enchantLevels2: %w", id, err)
 	}
 
-	tables, err := buildSkillTables(el.Tables)
+	tables, err := buildValueTables(el.Tables)
 	if err != nil {
 		return nil, fmt.Errorf("skill %d: %w", id, err)
 	}
@@ -161,20 +135,6 @@ func buildSkillDefinitions(el skillElement) ([]skill.Definition, error) {
 	return defs, nil
 }
 
-// buildSkillTables folds a <skill> element's <table> children into a
-// name-to-row lookup. A table name must start with '#', matching the
-// convention every <set>/<enchantN> value uses to reference one.
-func buildSkillTables(elems []tableElement) (map[string][]string, error) {
-	tables := make(map[string][]string, len(elems))
-	for _, tbl := range elems {
-		if !strings.HasPrefix(tbl.Name, "#") {
-			return nil, fmt.Errorf("table name %q must start with '#'", tbl.Name)
-		}
-		tables[tbl.Name] = strings.Fields(tbl.Text)
-	}
-	return tables, nil
-}
-
 // resolveSkillLevel builds the StatSet for one level by applying attrs in
 // order, resolving any table-referencing value against row tableIndex (the
 // level within the referenced table, 1-based).
@@ -191,30 +151,13 @@ func resolveSkillLevel(tables map[string][]string, attrs []setElem, tableIndex i
 // whatever the same attribute name already held.
 func applySkillAttrs(set *commons.StatSet, tables map[string][]string, attrs []setElem, tableIndex int) error {
 	for _, a := range attrs {
-		v, err := resolveSkillValue(tables, a.Name, a.Val, tableIndex)
+		v, err := resolveTableValue(tables, a.Name, a.Val, tableIndex)
 		if err != nil {
 			return err
 		}
 		set.Set(a.Name, v)
 	}
 	return nil
-}
-
-// resolveSkillValue resolves one attribute's value: a literal is returned
-// unchanged, a "#name" reference is replaced with row tableIndex (1-based)
-// of the named table.
-func resolveSkillValue(tables map[string][]string, name, val string, tableIndex int) (string, error) {
-	if !strings.HasPrefix(val, "#") {
-		return val, nil
-	}
-	row, ok := tables[val]
-	if !ok {
-		return "", fmt.Errorf("attribute %q references undefined table %q", name, val)
-	}
-	if tableIndex < 1 || tableIndex > len(row) {
-		return "", fmt.Errorf("attribute %q: table %q has no row %d (has %d)", name, val, tableIndex, len(row))
-	}
-	return row[tableIndex-1], nil
 }
 
 // parseCountAttr parses an optional level-count attribute ("enchantLevels1",
