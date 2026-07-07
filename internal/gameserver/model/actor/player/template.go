@@ -282,3 +282,13 @@ func (t *TemplateTable) Get(id int) (*Template, bool) {
 func (t *TemplateTable) Count() int {
 	return len(t.templates)
 }
+
+// All returns every loaded template, ordered ascending by class ID.
+func (t *TemplateTable) All() []*Template {
+	templates := make([]*Template, 0, len(t.templates))
+	for _, tmpl := range t.templates {
+		templates = append(templates, tmpl)
+	}
+	sort.Slice(templates, func(i, j int) bool { return templates[i].ID < templates[j].ID })
+	return templates
+}
