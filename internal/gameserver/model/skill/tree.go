@@ -25,7 +25,7 @@ type FishingSkill struct {
 // one <fishingSkill> element. id, lvl, minLvl, itemId and itemCount are all
 // required; isDwarven defaults to false.
 func NewFishingSkill(set *commons.StatSet) (FishingSkill, error) {
-	id, err := set.GetInt("id")
+	id, err := set.GetInt32("id")
 	if err != nil {
 		return FishingSkill{}, fmt.Errorf("skill: fishing skill: %w", err)
 	}
@@ -70,7 +70,7 @@ type ClanSkill struct {
 // NewClanSkill builds a ClanSkill from set, the folded attributes of one
 // <clanSkill> element. Every attribute is required.
 func NewClanSkill(set *commons.StatSet) (ClanSkill, error) {
-	id, err := set.GetInt("id")
+	id, err := set.GetInt32("id")
 	if err != nil {
 		return ClanSkill{}, fmt.Errorf("skill: clan skill: %w", err)
 	}
@@ -120,7 +120,7 @@ type EnchantSkill struct {
 // one <enchantSkill> element. id, lvl, exp, sp and the five rate attributes
 // are all required; itemNeeded ("itemId-count") is optional.
 func NewEnchantSkill(set *commons.StatSet) (EnchantSkill, error) {
-	id, err := set.GetInt("id")
+	id, err := set.GetInt32("id")
 	if err != nil {
 		return EnchantSkill{}, fmt.Errorf("skill: enchant skill: %w", err)
 	}
@@ -169,11 +169,7 @@ func NewEnchantSkill(set *commons.StatSet) (EnchantSkill, error) {
 
 // parseItemNeeded parses an "itemNeeded" attribute's "itemId-count" form.
 func parseItemNeeded(raw string) (itemID int32, count int, err error) {
-	id, n, err := parseDashPair(raw)
-	if err != nil {
-		return 0, 0, err
-	}
-	return int32(id), n, nil
+	return parseDashPair(raw)
 }
 
 // Trees holds every skill tree a character or clan learns from: the three

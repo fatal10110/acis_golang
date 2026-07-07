@@ -412,13 +412,14 @@ func defaultBaseCritRate(skillType string) int {
 
 // parseDashPair parses a "left-right" pair of integers, the shape a few
 // unrelated attributes across this package share (a shared-reuse skill
-// reference, a required-item id and count).
-func parseDashPair(raw string) (int, int, error) {
+// reference, a required-item id and count). left is always an id and so is
+// parsed with a 32-bit bound; right is a plain count/level.
+func parseDashPair(raw string) (int32, int, error) {
 	parts := strings.Split(raw, "-")
 	if len(parts) != 2 {
 		return 0, 0, fmt.Errorf("want \"left-right\"")
 	}
-	left, err := strconv.Atoi(parts[0])
+	left, err := strconv.ParseInt(parts[0], 10, 32)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -426,7 +427,7 @@ func parseDashPair(raw string) (int, int, error) {
 	if err != nil {
 		return 0, 0, err
 	}
-	return left, right, nil
+	return int32(left), right, nil
 }
 
 // parseSharedReuse parses a "sharedReuse" attribute's "skillId-level" form.

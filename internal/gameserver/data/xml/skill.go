@@ -86,7 +86,7 @@ func LoadSkillDefinitions(dir string) (*skill.Table, error) {
 // regular level (1..levels) and per enchant level (101.. and 141.. when the
 // element declares enchantLevels1/2).
 func buildSkillDefinitions(el skillElement) ([]skill.Definition, error) {
-	rawID, err := strconv.Atoi(el.ID)
+	rawID, err := strconv.ParseInt(el.ID, 10, 32)
 	if err != nil {
 		return nil, fmt.Errorf("skill id %q: %w", el.ID, err)
 	}
