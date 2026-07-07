@@ -3,10 +3,8 @@ package xml
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
-
-	"github.com/sirupsen/logrus"
-	"github.com/sirupsen/logrus/hooks/test"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 )
@@ -95,33 +93,15 @@ func TestLoadItemTemplates(t *testing.T) {
 	</item>
 	<item id="57" type="EtcItem" name="Adena">
 		<set name="is_stackable" val="true" />
-	</item>
-	<item id="99" type="Potato" name="Bad Kind Item">
-	</item>
-	<item id="98" type="Weapon" name="Bad Slot Item">
-		<set name="bodypart" val="tail" />
-	</item>
-	<item id="notanumber" type="Weapon" name="Bad Id Item">
 	</item>`)
 
-	log, hook := test.NewNullLogger()
-	log.SetLevel(logrus.WarnLevel)
-
-	table, err := LoadItemTemplates(dir, log)
+	table, err := LoadItemTemplates(dir)
 	if err != nil {
 		t.Fatalf("LoadItemTemplates: %v", err)
 	}
 
 	if got, want := table.Len(), 9; got != want {
 		t.Fatalf("table.Len() = %d, want %d", got, want)
-	}
-	if got := len(hook.Entries); got != 3 {
-		t.Fatalf("skipped-item warnings logged = %d, want 3", got)
-	}
-	for _, badID := range []int32{99, 98} {
-		if _, ok := table.Get(badID); ok {
-			t.Errorf("Get(%d): expected the malformed entry to be skipped", badID)
-		}
 	}
 
 	t.Run("base fields and defaults", func(t *testing.T) {
@@ -289,7 +269,7 @@ func TestLoadItemTemplates(t *testing.T) {
 }
 
 func TestLoadItemTemplatesMissingDirectory(t *testing.T) {
-	if _, err := LoadItemTemplates(filepath.Join(t.TempDir(), "does-not-exist"), nil); err == nil {
+	if _, err := LoadItemTemplates(filepath.Join(t.TempDir(), "does-not-exist")); err == nil {
 		t.Fatal("LoadItemTemplates with missing directory: expected error")
 	}
 }
@@ -300,16 +280,15 @@ func TestLoadItemTemplatesMalformedXML(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := LoadItemTemplates(dir, nil); err == nil {
+	if _, err := LoadItemTemplates(dir); err == nil {
 		t.Fatal("LoadItemTemplates with malformed XML: expected error")
 	}
 }
 
-// TestLoadItemTemplatesSkipsMalformedItems checks that a single <item>
-// element with a data problem is logged and skipped rather than aborting
-// the whole file's load, for every kind of problem this loader can detect
-// beyond id/kind/slot (already covered by TestLoadItemTemplates).
-func TestLoadItemTemplatesSkipsMalformedItems(t *testing.T) {
+// TestLoadItemTemplatesFailsMalformedItems checks that a single <item>
+// element with a data problem aborts the load with an actionable error
+// instead of silently returning a partial table.
+func TestLoadItemTemplatesFailsMalformedItems(t *testing.T) {
 	cases := []struct {
 		name    string
 		content string
@@ -338,6 +317,14 @@ func TestLoadItemTemplatesSkipsMalformedItems(t *testing.T) {
 			name:    "malformed enchant4_skill reference",
 			content: `<item id="1" type="Weapon" name="x"><set name="bodypart" val="rhand"/><set name="enchant4_skill" val="notapair"/></item>`,
 		},
+		{
+			name:    "unrecognized kind",
+			content: `<item id="1" type="Potato" name="x"></item>`,
+		},
+		{
+			name:    "unrecognized slot",
+			content: `<item id="1" type="Weapon" name="x"><set name="bodypart" val="tail"/></item>`,
+		},
 	}
 
 	for _, c := range cases {
@@ -345,18 +332,12 @@ func TestLoadItemTemplatesSkipsMalformedItems(t *testing.T) {
 			dir := t.TempDir()
 			writeItemFile(t, dir, "fixture.xml", c.content)
 
-			log, hook := test.NewNullLogger()
-			log.SetLevel(logrus.WarnLevel)
-
-			table, err := LoadItemTemplates(dir, log)
-			if err != nil {
-				t.Fatalf("LoadItemTemplates: %v", err)
+			_, err := LoadItemTemplates(dir)
+			if err == nil {
+				t.Fatal("LoadItemTemplates: expected malformed item error")
 			}
-			if table.Len() != 0 {
-				t.Fatalf("table.Len() = %d, want 0", table.Len())
-			}
-			if len(hook.Entries) != 1 {
-				t.Fatalf("warnings logged = %d, want 1", len(hook.Entries))
+			if !strings.Contains(err.Error(), "fixture.xml") || !strings.Contains(err.Error(), "item") || !strings.Contains(err.Error(), "1") {
+				t.Fatalf("LoadItemTemplates error = %q, want file and item id", err)
 			}
 		})
 	}
@@ -374,10 +355,7 @@ func TestLoadItemTemplatesSkipsMalformedItems(t *testing.T) {
 func TestLoadItemTemplatesAgainstDatapack(t *testing.T) {
 	dir := datapackPath(t, filepath.Join("data", "xml", "items"))
 
-	log, hook := test.NewNullLogger()
-	log.SetLevel(logrus.WarnLevel)
-
-	table, err := LoadItemTemplates(dir, log)
+	table, err := LoadItemTemplates(dir)
 	if err != nil {
 		t.Fatalf("LoadItemTemplates(%q) error: %v", dir, err)
 	}
@@ -386,10 +364,6 @@ func TestLoadItemTemplatesAgainstDatapack(t *testing.T) {
 	if got := table.Len(); got != wantTotal {
 		t.Fatalf("table.Len() = %d, want %d", got, wantTotal)
 	}
-	if len(hook.Entries) != 0 {
-		t.Fatalf("skipped-item warnings logged = %d, want 0: %v", len(hook.Entries), hook.Entries)
-	}
-
 	t.Run("Dagger (10): weapon fields and stat modifiers", func(t *testing.T) {
 		tpl, ok := table.Get(10)
 		if !ok {
@@ -535,7 +509,7 @@ func TestLoadItemTemplatesAgainstDatapack(t *testing.T) {
 func TestLoadItemTemplatesNoDuplicateIDsInDatapack(t *testing.T) {
 	dir := datapackPath(t, filepath.Join("data", "xml", "items"))
 
-	table, err := LoadItemTemplates(dir, nil)
+	table, err := LoadItemTemplates(dir)
 	if err != nil {
 		t.Fatalf("LoadItemTemplates(%q) error: %v", dir, err)
 	}
