@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/datadiff"
@@ -60,6 +61,42 @@ func TestLoadRecords_RealDatapack(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestLoadItemRecordsIncludesModeledFields(t *testing.T) {
+	records, err := loadItemRecords(datapackRoot(t))
+	if err != nil {
+		t.Fatalf("loadItemRecords error: %v", err)
+	}
+
+	item10 := recordByID(t, records, "10")
+	for _, field := range []string{"referencePrice", "material", "defaultAction", "modifiers", "weapon.type", "weapon.soulshots"} {
+		if _, ok := item10.Fields[field]; !ok {
+			t.Fatalf("item 10 field %q missing from dump fields: %#v", field, item10.Fields)
+		}
+	}
+	if item10.Fields["referencePrice"] != "138" || item10.Fields["weapon.type"] != "DAGGER" {
+		t.Fatalf("item 10 fields = %#v", item10.Fields)
+	}
+	if !strings.Contains(item10.Fields["modifiers"], "set:pAtk:5") {
+		t.Fatalf("item 10 modifiers dump = %q, want pAtk modifier", item10.Fields["modifiers"])
+	}
+
+	item1060 := recordByID(t, records, "1060")
+	if item1060.Fields["etcItem.type"] != "POTION" || item1060.Fields["etcItem.reuseDelay"] != "10000" {
+		t.Fatalf("item 1060 fields = %#v", item1060.Fields)
+	}
+}
+
+func recordByID(t *testing.T, records []datadiff.Record, id string) datadiff.Record {
+	t.Helper()
+	for _, r := range records {
+		if r.ID == id {
+			return r
+		}
+	}
+	t.Fatalf("record %s not found", id)
+	return datadiff.Record{}
 }
 
 // TestDumpRoundTrip_RealDatapack proves a real loaded record set survives

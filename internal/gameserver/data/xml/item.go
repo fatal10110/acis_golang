@@ -7,8 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 )
@@ -75,20 +73,11 @@ type condNode struct {
 // "data/xml/items" directory: one flat list of files, each holding a flat
 // list of <item> elements.
 //
-// A directory that can't be listed, or a file whose XML is not
-// well-formed, fails the whole load: the caller gets an error rather than a
-// partially populated table. An individual <item> element that can't be
-// turned into a Template (an unresolvable id, kind, equip slot, stat
-// modifier, or use condition) is logged and skipped, so one bad entry
-// doesn't take down every other template in the same file.
-//
-// log receives skipped-item diagnostics; a nil log defaults to
-// logrus.StandardLogger().
-func LoadItemTemplates(dir string, log *logrus.Logger) (*item.Table, error) {
-	if log == nil {
-		log = logrus.StandardLogger()
-	}
-
+// A directory that can't be listed, a file whose XML is not well-formed, or
+// an individual <item> that can't be turned into a Template fails the whole
+// load: the caller gets an actionable error rather than a partially
+// populated table.
+func LoadItemTemplates(dir string) (*item.Table, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, fmt.Errorf("data/xml: read item template dir %s: %w", dir, err)
@@ -109,8 +98,7 @@ func LoadItemTemplates(dir string, log *logrus.Logger) (*item.Table, error) {
 		for _, el := range parsed.Items {
 			tpl, err := buildItemTemplate(el)
 			if err != nil {
-				log.Warnf("data/xml: skipping item in %s: %v", path, err)
-				continue
+				return nil, fmt.Errorf("data/xml: parse item in %s: %w", path, err)
 			}
 			templates = append(templates, tpl)
 		}
