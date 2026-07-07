@@ -2,6 +2,7 @@ package npc
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -479,4 +480,14 @@ func (t *Table) GetByName(name string) (*Template, bool) {
 // Len returns the number of templates in the table.
 func (t *Table) Len() int {
 	return len(t.templates)
+}
+
+// All returns every loaded template, ordered ascending by ID.
+func (t *Table) All() []*Template {
+	templates := make([]*Template, 0, len(t.templates))
+	for _, tpl := range t.templates {
+		templates = append(templates, tpl)
+	}
+	sort.Slice(templates, func(i, j int) bool { return templates[i].ID < templates[j].ID })
+	return templates
 }

@@ -2,6 +2,7 @@ package player
 
 import (
 	"errors"
+	"sort"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 )
@@ -73,6 +74,16 @@ func (t *LevelTable) Level(level int) (Level, bool) {
 // Count returns the number of levels loaded.
 func (t *LevelTable) Count() int {
 	return len(t.levels)
+}
+
+// Levels returns every level number loaded, ordered ascending.
+func (t *LevelTable) Levels() []int {
+	levels := make([]int, 0, len(t.levels))
+	for level := range t.levels {
+		levels = append(levels, level)
+	}
+	sort.Ints(levels)
+	return levels
 }
 
 // MaxLevel returns the first unreachable level: a sentinel entry present
