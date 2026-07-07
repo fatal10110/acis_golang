@@ -5,34 +5,68 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 )
 
 // itemFile is the root element of one item template XML file: a flat list
-// of <item> elements, each optionally carrying <set name="..." val="..."/>
-// attribute children. Only the elements and attributes this loader reads
-// are declared; every other element a shipped file may contain (stat bonus
-// blocks, use conditions, per-level tables) is left undeclared and is
-// therefore skipped by the decoder rather than rejected.
+// of <item> elements.
 type itemFile struct {
 	Items []itemElement `xml:"item"`
 }
 
+// itemElement is one <item> element: its own attributes (id, type, name)
+// fold in directly; <set> children flatten alongside them; <for> and <cond>
+// are distinctly shaped child blocks handled by their own types. A <table>
+// child (a named, whitespace-tokenized value list referenced elsewhere as
+// "#name") is left undeclared and skipped by the decoder: no shipped item
+// file defines one.
 type itemElement struct {
-	ID   string    `xml:"id,attr"`
-	Type string    `xml:"type,attr"`
-	Name string    `xml:"name,attr"`
-	Sets []setElem `xml:"set"`
+	Attrs []xml.Attr    `xml:",any,attr"`
+	Sets  []setElem     `xml:"set"`
+	For   []forElement  `xml:"for"`
+	Cond  []condElement `xml:"cond"`
 }
 
+// setElem is one <set name="..." val="..."/> attribute-style element.
 type setElem struct {
 	Name string `xml:"name,attr"`
 	Val  string `xml:"val,attr"`
+}
+
+// forElement is one <for> block: a flat list of stat-modifier elements
+// (<add>, <sub>, <set stat="..." .../>, ...), each captured generically
+// since they share one attribute shape and differ only by tag name.
+type forElement struct {
+	Ops []funcElement `xml:",any"`
+}
+
+// funcElement is one stat-modifier element inside a <for> block; XMLName
+// carries which operation it applies (see item.ParseFuncOp).
+type funcElement struct {
+	XMLName xml.Name
+	Attrs   []xml.Attr `xml:",any,attr"`
+}
+
+// condElement is one <cond> block: its own message attributes plus the
+// nested predicate tree that must hold for the item to be usable.
+type condElement struct {
+	Attrs    []xml.Attr `xml:",any,attr"`
+	Children []condNode `xml:",any"`
+}
+
+// condNode is one node of a <cond> block's predicate tree (a combinator
+// such as <and>, or a leaf predicate such as <player .../>), captured
+// generically and recursively since this loader doesn't interpret
+// condition semantics — see item.Condition.
+type condNode struct {
+	XMLName  xml.Name
+	Attrs    []xml.Attr `xml:",any,attr"`
+	Children []condNode `xml:",any"`
 }
 
 // LoadItemTemplates parses every ".xml" item template file directly under
@@ -41,18 +75,12 @@ type setElem struct {
 // "data/xml/items" directory: one flat list of files, each holding a flat
 // list of <item> elements.
 //
-// Only the fields character creation and world entry need to grant and
-// equip starter gear are extracted (id, name, kind, equip slot,
-// stackability, per the Template documentation) — combat stat bonuses, use
-// conditions, and skill/effect wiring present in the shipped files are not
-// modeled.
-//
 // A directory that can't be listed, or a file whose XML is not
 // well-formed, fails the whole load: the caller gets an error rather than a
 // partially populated table. An individual <item> element that can't be
-// turned into a Template (an unresolvable id, kind, or equip slot) is
-// logged and skipped, so one bad entry doesn't take down every other
-// template in the same file.
+// turned into a Template (an unresolvable id, kind, equip slot, stat
+// modifier, or use condition) is logged and skipped, so one bad entry
+// doesn't take down every other template in the same file.
 //
 // log receives skipped-item diagnostics; a nil log defaults to
 // logrus.StandardLogger().
@@ -105,38 +133,71 @@ func parseItemFile(path string) (*itemFile, error) {
 	return &parsed, nil
 }
 
-// buildItemTemplate turns one decoded <item> element into a Template,
-// reading only the <set> attributes the minimal Template needs.
+// buildItemTemplate packs one parsed <item> element into the StatSet shape
+// item.NewTemplate consumes: its own attributes and <set> children merged
+// flat, plus the "modifiers" and "useConditions" values built from its
+// <for> and <cond> children.
 func buildItemTemplate(el itemElement) (*item.Template, error) {
-	id, err := strconv.ParseInt(el.ID, 10, 32)
-	if err != nil {
-		return nil, fmt.Errorf("id %q: %w", el.ID, err)
-	}
-
-	kind, err := item.ParseKind(el.Type)
-	if err != nil {
-		return nil, fmt.Errorf("item %d: %w", id, err)
-	}
-
-	sets := make(map[string]string, len(el.Sets))
+	set := commons.StatSetFromXMLAttrs(el.Attrs)
 	for _, s := range el.Sets {
-		sets[s.Name] = s.Val
+		set.Set(s.Name, s.Val)
+	}
+	id := set.GetStringDefault("id", "?")
+
+	var modifiers []item.StatModifier
+	for _, forEl := range el.For {
+		for _, opEl := range forEl.Ops {
+			op, err := item.ParseFuncOp(opEl.XMLName.Local)
+			if err != nil {
+				return nil, fmt.Errorf("item %s: %w", id, err)
+			}
+			mod, err := item.NewStatModifier(op, commons.StatSetFromXMLAttrs(opEl.Attrs))
+			if err != nil {
+				return nil, fmt.Errorf("item %s: %w", id, err)
+			}
+			modifiers = append(modifiers, mod)
+		}
+	}
+	if modifiers != nil {
+		set.Set("modifiers", modifiers)
 	}
 
-	bodyPart, ok := sets["bodypart"]
-	if !ok {
-		bodyPart = "none"
+	var useConditions []item.UseCondition
+	for _, condEl := range el.Cond {
+		if len(condEl.Children) == 0 {
+			return nil, fmt.Errorf("item %s: cond: no predicate defined", id)
+		}
+		// Only the first child predicate is meaningful: a <cond> block
+		// wraps exactly one root expression (a leaf predicate or a single
+		// and/or/not combinator), the same shape every shipped file uses.
+		root := buildCondition(condEl.Children[0])
+		uc, err := item.NewUseCondition(root, commons.StatSetFromXMLAttrs(condEl.Attrs))
+		if err != nil {
+			return nil, fmt.Errorf("item %s: %w", id, err)
+		}
+		useConditions = append(useConditions, uc)
 	}
-	slot, err := item.ParseSlot(bodyPart)
-	if err != nil {
-		return nil, fmt.Errorf("item %d: %w", id, err)
+	if useConditions != nil {
+		set.Set("useConditions", useConditions)
 	}
 
-	return &item.Template{
-		ID:        int32(id),
-		Name:      el.Name,
-		Kind:      kind,
-		Slot:      slot,
-		Stackable: sets["is_stackable"] == "true",
-	}, nil
+	return item.NewTemplate(set)
+}
+
+// buildCondition converts one decoded condition node into an item.Condition,
+// recursively converting its children.
+func buildCondition(n condNode) item.Condition {
+	attrs := make(map[string]string, len(n.Attrs))
+	for _, a := range n.Attrs {
+		attrs[a.Name.Local] = a.Value
+	}
+	var children []item.Condition
+	for _, c := range n.Children {
+		children = append(children, buildCondition(c))
+	}
+	return item.Condition{
+		Kind:     strings.ToLower(n.XMLName.Local),
+		Attrs:    attrs,
+		Children: children,
+	}
 }

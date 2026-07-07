@@ -3,6 +3,8 @@ package item
 import (
 	"fmt"
 	"sort"
+
+	"github.com/fatal10110/acis_golang/internal/commons"
 )
 
 // Kind distinguishes the three item template categories a data file can
@@ -163,22 +165,155 @@ func (s Slot) PaperdollIndex() (int, bool) {
 	return idx, ok
 }
 
-// Template is the starter-gear-relevant subset of a shipped item template:
-// enough to identify an item, grant it, and decide whether and where it
-// equips. It intentionally omits combat stat bonuses, use conditions,
-// attached skills, and every other field the full item grammar carries,
-// none of which character creation or world entry reads.
+// Template is one item's static definition as read from a shipped item data
+// file: identity, equip/trade/drop flags, passive stat bonuses, a use
+// precondition, and — depending on Kind — the weapon, armor, or etc-item
+// detail specific to that category.
 type Template struct {
-	ID        int32
-	Name      string
-	Kind      Kind
-	Slot      Slot
-	Stackable bool
+	ID   int32
+	Name string
+	Kind Kind
+	Slot Slot
+
+	Weight         int32
+	Material       MaterialType
+	Duration       int32 // seconds the item lasts once used; -1 means unlimited
+	ReferencePrice int32
+	Crystal        CrystalType
+	CrystalCount   int32
+
+	Stackable     bool
+	Sellable      bool
+	Dropable      bool
+	Destroyable   bool
+	Tradable      bool
+	Depositable   bool
+	OlyRestricted bool
+
+	DefaultAction ActionType
+
+	// AttachedSkills are passive skills granted merely by holding or
+	// wearing the item; nil when the template attaches none.
+	AttachedSkills []SkillRef
+
+	// Modifiers are the item's passive stat bonuses while equipped.
+	Modifiers []StatModifier
+
+	// UseConditions must all hold for the item to be usable; nil means the
+	// template defines no precondition.
+	UseConditions []UseCondition
+
+	// Weapon, Armor and EtcItem carry the fields specific to their Kind.
+	// Exactly one is non-nil, selected by Kind.
+	Weapon  *WeaponDetail
+	Armor   *ArmorDetail
+	EtcItem *EtcItemDetail
+}
+
+// NewTemplate builds a Template from set, the merged attributes and <set>
+// children of one <item> element plus the "modifiers" and "useConditions"
+// values the loader packed in.
+func NewTemplate(set *commons.StatSet) (*Template, error) {
+	id, err := set.GetInt32("id")
+	if err != nil {
+		return nil, fmt.Errorf("item template: %w", err)
+	}
+	wrap := func(err error) error { return fmt.Errorf("item template %d: %w", id, err) }
+
+	t := &Template{ID: id}
+
+	if t.Name, err = set.GetString("name"); err != nil {
+		return nil, wrap(err)
+	}
+
+	kindStr, err := set.GetString("type")
+	if err != nil {
+		return nil, wrap(err)
+	}
+	if t.Kind, err = ParseKind(kindStr); err != nil {
+		return nil, wrap(err)
+	}
+
+	if t.Slot, err = ParseSlot(set.GetStringDefault("bodypart", "none")); err != nil {
+		return nil, wrap(err)
+	}
+
+	if t.Weight, err = set.GetInt32Default("weight", 0); err != nil {
+		return nil, wrap(err)
+	}
+	if t.Material, err = commons.GetEnumDefault(set, "material", materialTypeNames, MaterialSteel); err != nil {
+		return nil, wrap(err)
+	}
+	if t.Duration, err = set.GetInt32Default("duration", -1); err != nil {
+		return nil, wrap(err)
+	}
+	if t.ReferencePrice, err = set.GetInt32Default("price", 0); err != nil {
+		return nil, wrap(err)
+	}
+	if t.Crystal, err = commons.GetEnumDefault(set, "crystal_type", crystalTypeNames, CrystalNone); err != nil {
+		return nil, wrap(err)
+	}
+	if t.CrystalCount, err = set.GetInt32Default("crystal_count", 0); err != nil {
+		return nil, wrap(err)
+	}
+
+	t.Stackable = set.GetBoolDefault("is_stackable", false)
+	t.Sellable = set.GetBoolDefault("is_sellable", true)
+	t.Dropable = set.GetBoolDefault("is_dropable", true)
+	t.Destroyable = set.GetBoolDefault("is_destroyable", true)
+	t.Tradable = set.GetBoolDefault("is_tradable", true)
+	t.Depositable = set.GetBoolDefault("is_depositable", true)
+	t.OlyRestricted = set.GetBoolDefault("is_oly_restricted", false)
+
+	if t.DefaultAction, err = commons.GetEnumDefault(set, "default_action", actionTypeNames, ActionNone); err != nil {
+		return nil, wrap(err)
+	}
+
+	if set.Has("item_skill") {
+		raw, err := set.GetString("item_skill")
+		if err != nil {
+			return nil, wrap(err)
+		}
+		if t.AttachedSkills, err = ParseSkillRefs(raw); err != nil {
+			return nil, wrap(err)
+		}
+	}
+
+	if t.Modifiers, err = commons.GetList[StatModifier](set, "modifiers"); err != nil {
+		return nil, wrap(err)
+	}
+	if t.UseConditions, err = commons.GetList[UseCondition](set, "useConditions"); err != nil {
+		return nil, wrap(err)
+	}
+
+	switch t.Kind {
+	case KindWeapon:
+		if t.Weapon, err = NewWeaponDetail(set); err != nil {
+			return nil, wrap(err)
+		}
+	case KindArmor:
+		if t.Armor, err = NewArmorDetail(set, t.Slot); err != nil {
+			return nil, wrap(err)
+		}
+	case KindEtcItem:
+		if t.EtcItem, err = NewEtcItemDetail(set, t.DefaultAction); err != nil {
+			return nil, wrap(err)
+		}
+	}
+
+	return t, nil
 }
 
 // Equipable reports whether the template can occupy an equipment slot.
 func (t *Template) Equipable() bool {
 	return t.Slot != SlotNone && t.Kind != KindEtcItem
+}
+
+// HeroItem reports whether the template is one of the fixed hero-only
+// weapon ids, or the hero circlet. This range is a client-side constant, not
+// something any shipped data file flags.
+func (t *Template) HeroItem() bool {
+	return (t.ID >= 6611 && t.ID <= 6621) || t.ID == 6842
 }
 
 // AdenaID and AncientAdenaID are the two currency item ids the inventory
@@ -223,9 +358,10 @@ func isJewelrySlot(s Slot) bool {
 // Category classifies t the way the inventory list groups items: by Kind,
 // with armor-shaped jewelry (rings, earrings, necklaces, and similar
 // accessory slots) reported as an accessory rather than as armor. An
-// etc-item that isn't currency always reports SubCategoryOther: quest-item
-// classification needs the etc-item type detail this template doesn't carry
-// yet, and no starter grant is a quest item.
+// etc-item that isn't currency always reports SubCategoryOther: this method
+// doesn't split out quest items into their own sub-category (see
+// EtcItemDetail.IsQuestItem for that classification), since no inventory
+// list caller needs the distinction yet.
 func (t *Template) Category() (Category, SubCategory) {
 	switch t.Kind {
 	case KindWeapon:
