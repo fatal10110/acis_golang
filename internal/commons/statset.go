@@ -5,6 +5,7 @@ package commons
 import (
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 )
@@ -318,6 +319,21 @@ func (s *StatSet) GetInt(key string) (int, error) {
 		return 0, nil
 	}
 	return 0, errValueRequired(key, "int", val)
+}
+
+// GetInt32 returns the value at key as an int32, coercing a numeric, numeric
+// string, or bool (1/0) representation. Returns ErrValueRequired if key is
+// absent or the value cannot be coerced, and an error if the value is out
+// of int32 range.
+func (s *StatSet) GetInt32(key string) (int32, error) {
+	v, err := s.GetInt(key)
+	if err != nil {
+		return 0, err
+	}
+	if v < math.MinInt32 || v > math.MaxInt32 {
+		return 0, fmt.Errorf("commons: StatSet key %q: value %d overflows int32", key, v)
+	}
+	return int32(v), nil
 }
 
 // GetIntDefault is like GetInt but returns defaultValue when key is absent

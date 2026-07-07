@@ -64,15 +64,15 @@ type Drop struct {
 // NewDrop builds a Drop from set, the folded attributes of one <drop>
 // element. itemid, min, max and chance are all required.
 func NewDrop(set *commons.StatSet) (Drop, error) {
-	itemID, err := set.GetInt("itemid")
+	itemID, err := set.GetInt32("itemid")
 	if err != nil {
 		return Drop{}, fmt.Errorf("item: drop: %w", err)
 	}
-	min, err := set.GetInt("min")
+	min, err := set.GetInt32("min")
 	if err != nil {
 		return Drop{}, fmt.Errorf("item: drop %d: %w", itemID, err)
 	}
-	max, err := set.GetInt("max")
+	max, err := set.GetInt32("max")
 	if err != nil {
 		return Drop{}, fmt.Errorf("item: drop %d: %w", itemID, err)
 	}
@@ -80,7 +80,7 @@ func NewDrop(set *commons.StatSet) (Drop, error) {
 	if err != nil {
 		return Drop{}, fmt.Errorf("item: drop %d: %w", itemID, err)
 	}
-	return Drop{ItemID: int32(itemID), Min: int32(min), Max: int32(max), Chance: chance}, nil
+	return Drop{ItemID: itemID, Min: min, Max: max, Chance: chance}, nil
 }
 
 // DropCategory is one weighted group of possible drops an NPC template
