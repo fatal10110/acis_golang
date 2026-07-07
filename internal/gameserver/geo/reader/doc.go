@@ -1,2 +1,2 @@
-// Package reader decodes geodata region files into block models.
+// Package reader loads geodata region files.
 package reader

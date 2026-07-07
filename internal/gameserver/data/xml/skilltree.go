@@ -1,11 +1,7 @@
 package xml
 
 import (
-	"encoding/xml"
 	"fmt"
-	"os"
-	"path/filepath"
-	"sort"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -26,45 +22,30 @@ type skillTreeFile struct {
 // whose XML is not well-formed, or an element with a missing or mangled
 // attribute fails the whole load.
 func LoadSkillTrees(dir string) (*skill.Trees, error) {
-	paths, err := filepath.Glob(filepath.Join(dir, "*.xml"))
+	docs, err := loadXMLDocuments[skillTreeFile](dir, "skill tree")
 	if err != nil {
-		return nil, fmt.Errorf("xml: list skill tree files in %s: %w", dir, err)
+		return nil, err
 	}
-	if len(paths) == 0 {
-		return nil, fmt.Errorf("xml: no skill tree files found in %s", dir)
-	}
-	sort.Strings(paths)
-
 	var trees skill.Trees
-	for _, path := range paths {
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return nil, fmt.Errorf("xml: read %s: %w", path, err)
-		}
-
-		var doc skillTreeFile
-		if err := xml.Unmarshal(data, &doc); err != nil {
-			return nil, fmt.Errorf("xml: parse %s: %w", path, err)
-		}
-
-		for _, el := range doc.Fishing {
+	for _, doc := range docs {
+		for _, el := range doc.Data.Fishing {
 			fs, err := skill.NewFishingSkill(commons.StatSetFromXMLAttrs(el.Attrs))
 			if err != nil {
-				return nil, fmt.Errorf("xml: %s: %w", path, err)
+				return nil, fmt.Errorf("xml: %s: %w", doc.Path, err)
 			}
 			trees.Fishing = append(trees.Fishing, fs)
 		}
-		for _, el := range doc.Clan {
+		for _, el := range doc.Data.Clan {
 			cs, err := skill.NewClanSkill(commons.StatSetFromXMLAttrs(el.Attrs))
 			if err != nil {
-				return nil, fmt.Errorf("xml: %s: %w", path, err)
+				return nil, fmt.Errorf("xml: %s: %w", doc.Path, err)
 			}
 			trees.Clan = append(trees.Clan, cs)
 		}
-		for _, el := range doc.Enchant {
+		for _, el := range doc.Data.Enchant {
 			es, err := skill.NewEnchantSkill(commons.StatSetFromXMLAttrs(el.Attrs))
 			if err != nil {
-				return nil, fmt.Errorf("xml: %s: %w", path, err)
+				return nil, fmt.Errorf("xml: %s: %w", doc.Path, err)
 			}
 			trees.Enchant = append(trees.Enchant, es)
 		}

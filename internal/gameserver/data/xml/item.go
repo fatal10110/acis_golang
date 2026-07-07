@@ -3,8 +3,6 @@ package xml
 import (
 	"encoding/xml"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
@@ -18,16 +16,14 @@ type itemFile struct {
 }
 
 // itemElement is one <item> element: its own attributes (id, type, name)
-// fold in directly; <set> children flatten alongside them; <for> and <cond>
-// are distinctly shaped child blocks handled by their own types. A <table>
-// child (a named, whitespace-tokenized value list referenced elsewhere as
-// "#name") is left undeclared and skipped by the decoder: no shipped item
-// file defines one.
+// fold in directly; <set> children flatten alongside them; <table>, <for>
+// and <cond> are distinctly shaped child blocks handled by their own types.
 type itemElement struct {
-	Attrs []xml.Attr    `xml:",any,attr"`
-	Sets  []setElem     `xml:"set"`
-	For   []forElement  `xml:"for"`
-	Cond  []condElement `xml:"cond"`
+	Attrs  []xml.Attr     `xml:",any,attr"`
+	Tables []tableElement `xml:"table"`
+	Sets   []setElem      `xml:"set"`
+	For    []forElement   `xml:"for"`
+	Cond   []condElement  `xml:"cond"`
 }
 
 // setElem is one <set name="..." val="..."/> attribute-style element.
@@ -46,8 +42,9 @@ type forElement struct {
 // funcElement is one stat-modifier element inside a <for> block; XMLName
 // carries which operation it applies (see item.ParseFuncOp).
 type funcElement struct {
-	XMLName xml.Name
-	Attrs   []xml.Attr `xml:",any,attr"`
+	XMLName  xml.Name
+	Attrs    []xml.Attr `xml:",any,attr"`
+	Children []condNode `xml:",any"`
 }
 
 // condElement is one <cond> block: its own message attributes plus the
@@ -78,27 +75,17 @@ type condNode struct {
 // load: the caller gets an actionable error rather than a partially
 // populated table.
 func LoadItemTemplates(dir string) (*item.Table, error) {
-	entries, err := os.ReadDir(dir)
+	docs, err := loadXMLDocuments[itemFile](dir, "item template")
 	if err != nil {
-		return nil, fmt.Errorf("data/xml: read item template dir %s: %w", dir, err)
+		return nil, err
 	}
 
 	var templates []*item.Template
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".xml") {
-			continue
-		}
-
-		path := filepath.Join(dir, entry.Name())
-		parsed, err := parseItemFile(path)
-		if err != nil {
-			return nil, err
-		}
-
-		for _, el := range parsed.Items {
+	for _, doc := range docs {
+		for _, el := range doc.Data.Items {
 			tpl, err := buildItemTemplate(el)
 			if err != nil {
-				return nil, fmt.Errorf("data/xml: parse item in %s: %w", path, err)
+				return nil, fmt.Errorf("data/xml: parse item in %s: %w", doc.Path, err)
 			}
 			templates = append(templates, tpl)
 		}
@@ -109,14 +96,9 @@ func LoadItemTemplates(dir string) (*item.Table, error) {
 
 // parseItemFile decodes one item template XML file.
 func parseItemFile(path string) (*itemFile, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("data/xml: read %s: %w", path, err)
-	}
-
 	var parsed itemFile
-	if err := xml.Unmarshal(data, &parsed); err != nil {
-		return nil, fmt.Errorf("data/xml: parse %s: %w", path, err)
+	if err := readXML(path, &parsed); err != nil {
+		return nil, err
 	}
 	return &parsed, nil
 }
@@ -127,21 +109,50 @@ func parseItemFile(path string) (*itemFile, error) {
 // <for> and <cond> children.
 func buildItemTemplate(el itemElement) (*item.Template, error) {
 	set := commons.StatSetFromXMLAttrs(el.Attrs)
+	tables, err := buildValueTables(el.Tables)
+	if err != nil {
+		return nil, err
+	}
 	for _, s := range el.Sets {
-		set.Set(s.Name, s.Val)
+		val, err := resolveTableValue(tables, s.Name, s.Val, 1)
+		if err != nil {
+			return nil, err
+		}
+		set.Set(s.Name, val)
 	}
 	id := set.GetStringDefault("id", "?")
 
 	var modifiers []item.StatModifier
 	for _, forEl := range el.For {
+		var attachCond *item.UseCondition
 		for _, opEl := range forEl.Ops {
+			if strings.EqualFold(opEl.XMLName.Local, "cond") {
+				uc, err := buildUseCondition(id, opEl.Attrs, opEl.Children)
+				if err != nil {
+					return nil, err
+				}
+				attachCond = &uc
+				continue
+			}
+
 			op, err := item.ParseFuncOp(opEl.XMLName.Local)
 			if err != nil {
 				return nil, fmt.Errorf("item %s: %w", id, err)
 			}
-			mod, err := item.NewStatModifier(op, commons.StatSetFromXMLAttrs(opEl.Attrs))
+			attrs, err := resolveModifierAttrs(tables, opEl.Attrs)
 			if err != nil {
 				return nil, fmt.Errorf("item %s: %w", id, err)
+			}
+			mod, err := item.NewStatModifier(op, commons.StatSetFromXMLAttrs(attrs))
+			if err != nil {
+				return nil, fmt.Errorf("item %s: %w", id, err)
+			}
+			if attachCond != nil {
+				mod.AttachCondition = attachCond
+			}
+			if len(opEl.Children) > 0 {
+				cond := buildCondition(opEl.Children[0])
+				mod.Condition = &cond
 			}
 			modifiers = append(modifiers, mod)
 		}
@@ -152,16 +163,9 @@ func buildItemTemplate(el itemElement) (*item.Template, error) {
 
 	var useConditions []item.UseCondition
 	for _, condEl := range el.Cond {
-		if len(condEl.Children) == 0 {
-			return nil, fmt.Errorf("item %s: cond: no predicate defined", id)
-		}
-		// Only the first child predicate is meaningful: a <cond> block
-		// wraps exactly one root expression (a leaf predicate or a single
-		// and/or/not combinator), the same shape every shipped file uses.
-		root := buildCondition(condEl.Children[0])
-		uc, err := item.NewUseCondition(root, commons.StatSetFromXMLAttrs(condEl.Attrs))
+		uc, err := buildUseCondition(id, condEl.Attrs, condEl.Children)
 		if err != nil {
-			return nil, fmt.Errorf("item %s: %w", id, err)
+			return nil, err
 		}
 		useConditions = append(useConditions, uc)
 	}
@@ -170,6 +174,36 @@ func buildItemTemplate(el itemElement) (*item.Template, error) {
 	}
 
 	return item.NewTemplate(set)
+}
+
+func resolveModifierAttrs(tables map[string][]string, attrs []xml.Attr) ([]xml.Attr, error) {
+	resolved := attrs
+	for i, a := range attrs {
+		if a.Name.Local != "val" {
+			continue
+		}
+		val, err := resolveTableValue(tables, a.Name.Local, a.Value, 1)
+		if err != nil {
+			return nil, err
+		}
+		if val != a.Value {
+			resolved = append([]xml.Attr(nil), attrs...)
+			resolved[i].Value = val
+		}
+	}
+	return resolved, nil
+}
+
+func buildUseCondition(id string, attrs []xml.Attr, children []condNode) (item.UseCondition, error) {
+	if len(children) == 0 {
+		return item.UseCondition{}, fmt.Errorf("item %s: cond: no predicate defined", id)
+	}
+	root := buildCondition(children[0])
+	uc, err := item.NewUseCondition(root, commons.StatSetFromXMLAttrs(attrs))
+	if err != nil {
+		return item.UseCondition{}, fmt.Errorf("item %s: %w", id, err)
+	}
+	return uc, nil
 }
 
 // buildCondition converts one decoded condition node into an item.Condition,

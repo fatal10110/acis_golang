@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"path/filepath"
@@ -9,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/datadiff"
+	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 )
@@ -34,6 +36,7 @@ var categories = map[string]category{
 	"npc":           {load: loadNPCRecords},
 	"classtemplate": {load: loadClassTemplateRecords},
 	"playerlevels":  {load: loadPlayerLevelRecords},
+	"html":          {load: loadHTMLRecords},
 }
 
 // sortedCategoryNames returns every registered category name, sorted.
@@ -142,6 +145,28 @@ func formatItemModifiers(modifiers []item.StatModifier) string {
 		parts[i] = m.Op.String() + ":" + m.Stat + ":" + datadiff.FormatFloat(m.Value)
 	}
 	return strings.Join(parts, ";")
+}
+
+func loadHTMLRecords(root string) ([]datadiff.Record, error) {
+	html, err := datacache.LoadHTML(filepath.Join(root, "data", "html"))
+	if err != nil {
+		return nil, err
+	}
+
+	paths := html.Paths()
+	records := make([]datadiff.Record, len(paths))
+	for i, path := range paths {
+		content, _ := html.Get(path)
+		sum := sha256.Sum256([]byte(content))
+		records[i] = datadiff.Record{
+			ID: path,
+			Fields: map[string]string{
+				"bytes":  strconv.Itoa(len(content)),
+				"sha256": fmt.Sprintf("%x", sum),
+			},
+		}
+	}
+	return records, nil
 }
 
 // loadNPCRecords reduces every loaded NPC template to a representative
