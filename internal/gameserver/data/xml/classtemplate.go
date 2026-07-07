@@ -3,9 +3,6 @@ package xml
 import (
 	"encoding/xml"
 	"fmt"
-	"os"
-	"path/filepath"
-	"sort"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -40,18 +37,14 @@ type attrsElement struct {
 // line's ancestors. A file that can't be read or parsed, a duplicated class
 // id, or a class with a missing or mangled attribute fails the whole load.
 func LoadPlayerTemplates(dir string) (*player.TemplateTable, error) {
-	paths, err := filepath.Glob(filepath.Join(dir, "*.xml"))
+	docs, err := loadXMLDocuments[classFile](dir, "class template")
 	if err != nil {
-		return nil, fmt.Errorf("xml: list class template files in %s: %w", dir, err)
+		return nil, err
 	}
-	if len(paths) == 0 {
-		return nil, fmt.Errorf("xml: no class template files found in %s", dir)
-	}
-	sort.Strings(paths)
 
 	templates := make(map[int]*player.Template)
-	for _, path := range paths {
-		if err := loadClassFile(path, templates); err != nil {
+	for _, doc := range docs {
+		if err := loadClassFile(doc.Path, doc.Data, templates); err != nil {
 			return nil, err
 		}
 	}
@@ -65,17 +58,7 @@ func LoadPlayerTemplates(dir string) (*player.TemplateTable, error) {
 
 // loadClassFile parses one class template file and adds its templates to
 // templates, keyed by class id.
-func loadClassFile(path string, templates map[int]*player.Template) error {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return fmt.Errorf("xml: read %s: %w", path, err)
-	}
-
-	var doc classFile
-	if err := xml.Unmarshal(data, &doc); err != nil {
-		return fmt.Errorf("xml: parse %s: %w", path, err)
-	}
-
+func loadClassFile(path string, doc classFile, templates map[int]*player.Template) error {
 	for _, c := range doc.Classes {
 		tmpl, err := buildTemplate(c)
 		if err != nil {

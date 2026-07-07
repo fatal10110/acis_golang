@@ -1,9 +1,12 @@
 package main
 
 import (
+	"crypto/sha256"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -85,6 +88,28 @@ func TestLoadItemRecordsIncludesModeledFields(t *testing.T) {
 	item1060 := recordByID(t, records, "1060")
 	if item1060.Fields["etcItem.type"] != "POTION" || item1060.Fields["etcItem.reuseDelay"] != "10000" {
 		t.Fatalf("item 1060 fields = %#v", item1060.Fields)
+	}
+}
+
+func TestLoadHTMLRecordsIncludesContentIdentity(t *testing.T) {
+	root := datapackRoot(t)
+
+	records, err := loadHTMLRecords(root)
+	if err != nil {
+		t.Fatalf("loadHTMLRecords error: %v", err)
+	}
+	if got, want := len(records), 15320; got != want {
+		t.Fatalf("len(records) = %d, want %d", got, want)
+	}
+
+	rec := recordByID(t, records, "territorynoclan.htm")
+	data, err := os.ReadFile(filepath.Join(root, "data", "html", "territorynoclan.htm"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sum := sha256.Sum256(data)
+	if rec.Fields["bytes"] != strconv.Itoa(len(data)) || rec.Fields["sha256"] != fmt.Sprintf("%x", sum) {
+		t.Fatalf("territorynoclan.htm fields = %#v", rec.Fields)
 	}
 }
 

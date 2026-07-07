@@ -83,9 +83,11 @@ func ParseFuncOp(tag string) (FuncOp, error) {
 // file: resolving it against the engine's stat catalog is that engine's
 // job, not this loader's.
 type StatModifier struct {
-	Op    FuncOp
-	Stat  string
-	Value float64
+	Op              FuncOp
+	Stat            string
+	Value           float64
+	AttachCondition *UseCondition
+	Condition       *Condition
 }
 
 // NewStatModifier builds a StatModifier of the given op from set, the
