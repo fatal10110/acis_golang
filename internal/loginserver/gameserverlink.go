@@ -9,6 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/fatal10110/acis_golang/internal/commons/crypt"
+	"github.com/fatal10110/acis_golang/internal/commons/netutil"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/link"
 	"github.com/fatal10110/acis_golang/internal/loginserver/data/manager"
@@ -67,35 +68,9 @@ func NewGameServerLink(
 // it, so tests can bind an ephemeral port and callers can control the
 // listen address/network.
 func (l *GameServerLink) Serve(ctx context.Context, ln net.Listener) error {
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				l.log.Errorf("gameserver link shutdown watcher panic: %v", r)
-			}
-		}()
-		<-ctx.Done()
-		ln.Close()
-	}()
-
-	for {
-		conn, err := ln.Accept()
-		if err != nil {
-			select {
-			case <-ctx.Done():
-				return nil
-			default:
-				return err
-			}
-		}
-		go func() {
-			defer func() {
-				if r := recover(); r != nil {
-					l.log.Errorf("gameserver link connection handler panic: %v", r)
-				}
-			}()
-			l.handleConnection(ctx, conn)
-		}()
-	}
+	return netutil.AcceptLoop(ctx, ln, func(conn net.Conn) {
+		l.handleConnection(ctx, conn)
+	}, l.log)
 }
 
 // gameServerConn is one game server's link connection. It is owned
