@@ -4,6 +4,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math/rand/v2"
+
+	"github.com/fatal10110/acis_golang/internal/commons/crypt"
 )
 
 // staticBootstrapKey is the fixed Blowfish key that encrypts the very first
@@ -21,19 +23,19 @@ var staticBootstrapKey = []byte{
 // key. Inbound packets are always decrypted with the dynamic key and their
 // checksum verified.
 type LoginCrypt struct {
-	static  *BlowfishCipher
-	dynamic *BlowfishCipher
+	static  *crypt.BlowfishCipher
+	dynamic *crypt.BlowfishCipher
 	first   bool
 }
 
 // NewLoginCrypt builds a LoginCrypt for one client session using its dynamic
 // Blowfish key (1-56 bytes).
 func NewLoginCrypt(dynamicKey []byte) (*LoginCrypt, error) {
-	static, err := NewBlowfishCipher(staticBootstrapKey)
+	static, err := crypt.NewBlowfishCipher(staticBootstrapKey)
 	if err != nil {
 		return nil, fmt.Errorf("static bootstrap cipher: %w", err)
 	}
-	dynamic, err := NewBlowfishCipher(dynamicKey)
+	dynamic, err := crypt.NewBlowfishCipher(dynamicKey)
 	if err != nil {
 		return nil, fmt.Errorf("dynamic session cipher: %w", err)
 	}
@@ -53,18 +55,18 @@ func (c *LoginCrypt) Encrypt(payload []byte) []byte {
 }
 
 func (c *LoginCrypt) encryptFirst(payload []byte) []byte {
-	buf := make([]byte, paddedSize(len(payload)+4+4))
+	buf := make([]byte, crypt.PaddedSize(len(payload)+4+4))
 	copy(buf, payload)
 	xorPass(buf, rand.Uint32())
-	encryptBlocks(c.static, buf)
+	crypt.EncryptBlocks(c.static, buf)
 	return buf
 }
 
 func (c *LoginCrypt) encryptDynamic(payload []byte) []byte {
-	buf := make([]byte, paddedSize(len(payload)+4))
+	buf := make([]byte, crypt.PaddedSize(len(payload)+4))
 	copy(buf, payload)
-	appendChecksum(buf)
-	encryptBlocks(c.dynamic, buf)
+	crypt.AppendChecksum(buf)
+	crypt.EncryptBlocks(c.dynamic, buf)
 	return buf
 }
 
@@ -72,58 +74,14 @@ func (c *LoginCrypt) encryptDynamic(payload []byte) []byte {
 // verifies its checksum, returning an error if payload's length is not a
 // whole number of Blowfish blocks or the checksum does not match.
 func (c *LoginCrypt) Decrypt(payload []byte) error {
-	if len(payload) == 0 || len(payload)%BlockSize != 0 {
-		return fmt.Errorf("login packet length %d is not a positive multiple of %d", len(payload), BlockSize)
+	if len(payload) == 0 || len(payload)%crypt.BlockSize != 0 {
+		return fmt.Errorf("login packet length %d is not a positive multiple of %d", len(payload), crypt.BlockSize)
 	}
-	decryptBlocks(c.dynamic, payload)
-	if !verifyChecksum(payload) {
+	crypt.DecryptBlocks(c.dynamic, payload)
+	if !crypt.VerifyChecksum(payload) {
 		return fmt.Errorf("login packet checksum verification failed")
 	}
 	return nil
-}
-
-// paddedSize rounds size up to the next Blowfish block boundary, always
-// adding at least one byte of padding — even when size already sits on a
-// boundary — to match the login protocol's packet sizing exactly.
-func paddedSize(size int) int {
-	return size + (BlockSize - size%BlockSize)
-}
-
-func encryptBlocks(c *BlowfishCipher, buf []byte) {
-	for i := 0; i+BlockSize <= len(buf); i += BlockSize {
-		c.Encrypt(buf[i:i+BlockSize], buf[i:i+BlockSize])
-	}
-}
-
-func decryptBlocks(c *BlowfishCipher, buf []byte) {
-	for i := 0; i+BlockSize <= len(buf); i += BlockSize {
-		c.Decrypt(buf[i:i+BlockSize], buf[i:i+BlockSize])
-	}
-}
-
-// appendChecksum XOR-folds every 4-byte little-endian word in buf except the
-// last into the last word, so verifyChecksum on the same buf succeeds.
-// Requires len(buf) to be a positive multiple of 4 greater than 4.
-func appendChecksum(buf []byte) {
-	var chksum uint32
-	for i := 0; i < len(buf)-4; i += 4 {
-		chksum ^= binary.LittleEndian.Uint32(buf[i : i+4])
-	}
-	binary.LittleEndian.PutUint32(buf[len(buf)-4:], chksum)
-}
-
-// verifyChecksum reports whether the last 4-byte little-endian word in buf
-// equals the XOR-fold of every word before it. Returns false if len(buf) is
-// not a multiple of 4 or is 4 or less.
-func verifyChecksum(buf []byte) bool {
-	if len(buf)%4 != 0 || len(buf) <= 4 {
-		return false
-	}
-	var chksum uint32
-	for i := 0; i < len(buf)-4; i += 4 {
-		chksum ^= binary.LittleEndian.Uint32(buf[i : i+4])
-	}
-	return binary.LittleEndian.Uint32(buf[len(buf)-4:]) == chksum
 }
 
 // xorPass runs the rolling XOR pass the login server applies to the very

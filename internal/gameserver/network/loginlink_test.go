@@ -16,10 +16,11 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/fatal10110/acis_golang/internal/commons/crypt"
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/link"
 	"github.com/fatal10110/acis_golang/internal/loginserver"
-	"github.com/fatal10110/acis_golang/internal/loginserver/crypt"
 	"github.com/fatal10110/acis_golang/internal/loginserver/data/manager"
-	"github.com/fatal10110/acis_golang/internal/loginserver/link"
 )
 
 // newTestLoginServer starts a real login-server-side GS-LS link acceptor on
@@ -184,15 +185,12 @@ func TestDialLoginLinkPlayerAuthRequestRoundTrip(t *testing.T) {
 	}
 	defer l.Close()
 
-	key := manager.SessionKey{PlayKey1: 1, PlayKey2: 2, LoginKey1: 3, LoginKey2: 4}
+	key := link.SessionKey{PlayKey1: 1, PlayKey2: 2, LoginKey1: 3, LoginKey2: 4}
 	sessions.Put("acc1", key)
 
 	if err := l.SendPlayerAuthRequest(link.PlayerAuthRequest{
-		Account:   "acc1",
-		PlayKey1:  key.PlayKey1,
-		PlayKey2:  key.PlayKey2,
-		LoginKey1: key.LoginKey1,
-		LoginKey2: key.LoginKey2,
+		Account:    "acc1",
+		SessionKey: key,
 	}); err != nil {
 		t.Fatalf("SendPlayerAuthRequest: %v", err)
 	}
@@ -287,7 +285,7 @@ func (f *fakeLoginServer) acceptAndSendInitLS(rawInitLS []byte) {
 		defer conn.Close()
 
 		bootstrap := crypt.NewLinkCrypt()
-		link.WriteFrame(conn, bootstrap.Encrypt(rawInitLS))
+		wire.WriteFrame(conn, bootstrap.Encrypt(rawInitLS))
 	}()
 }
 

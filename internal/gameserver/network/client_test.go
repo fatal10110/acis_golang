@@ -3,6 +3,8 @@ package network
 import (
 	"sync"
 	"testing"
+
+	"github.com/fatal10110/acis_golang/internal/link"
 )
 
 func TestStateStringNamesEachState(t *testing.T) {
@@ -77,7 +79,7 @@ func TestClientAcceptRejectsCreateCharacterBeforeAuth(t *testing.T) {
 		t.Fatal("Accept(create character) = true before auth, want false")
 	}
 
-	if !c.Authenticate("player1", SessionKey{}, func(string) bool { return true }) {
+	if !c.Authenticate("player1", link.SessionKey{}, func(string) bool { return true }) {
 		t.Fatal("Authenticate returned false, want true")
 	}
 
@@ -88,7 +90,7 @@ func TestClientAcceptRejectsCreateCharacterBeforeAuth(t *testing.T) {
 
 func TestClientAuthenticateAdvancesStateOnSuccess(t *testing.T) {
 	c := NewClient(nil)
-	key := SessionKey{LoginKey1: 1, LoginKey2: 2, PlayKey1: 3, PlayKey2: 4}
+	key := link.SessionKey{LoginKey1: 1, LoginKey2: 2, PlayKey1: 3, PlayKey2: 4}
 
 	ok := c.Authenticate("player1", key, func(account string) bool {
 		return account == "player1"
@@ -110,7 +112,7 @@ func TestClientAuthenticateAdvancesStateOnSuccess(t *testing.T) {
 func TestClientAuthenticateLeavesStateUnchangedOnFailure(t *testing.T) {
 	c := NewClient(nil)
 
-	ok := c.Authenticate("player1", SessionKey{LoginKey1: 1}, func(string) bool { return false })
+	ok := c.Authenticate("player1", link.SessionKey{LoginKey1: 1}, func(string) bool { return false })
 	if ok {
 		t.Fatal("Authenticate() = true, want false")
 	}
@@ -120,7 +122,7 @@ func TestClientAuthenticateLeavesStateUnchangedOnFailure(t *testing.T) {
 	if got := c.AccountName(); got != "" {
 		t.Fatalf("account name after failed auth = %q, want empty", got)
 	}
-	if got := c.SessionKey(); got != (SessionKey{}) {
+	if got := c.SessionKey(); got != (link.SessionKey{}) {
 		t.Fatalf("session key after failed auth = %+v, want zero value", got)
 	}
 }

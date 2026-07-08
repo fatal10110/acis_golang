@@ -1,17 +1,16 @@
 package network
 
 import (
-	"encoding/binary"
-	"fmt"
-	"io"
 	"sync"
+
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
 )
 
 // frameHeaderSize is the length of a frame's little-endian size prefix,
 // which itself counts toward the length it encodes. Because the prefix is
 // a uint16, a frame can never exceed 65535 bytes — the wire format itself
 // bounds the allocation ReadFrame makes for a frame's payload.
-const frameHeaderSize = 2
+const frameHeaderSize = wire.FrameHeaderSize
 
 // Session pairs a connection with the rolling cipher securing it. Encrypting
 // a frame and queueing it for send must happen as one step in send order —
@@ -36,10 +35,8 @@ func (s *Session) Send(payload []byte) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	frame := make([]byte, frameHeaderSize+len(payload))
-	copy(frame[frameHeaderSize:], payload)
+	frame := wire.FrameBytes(payload)
 	s.cipher.Encrypt(frame[frameHeaderSize:])
-	binary.LittleEndian.PutUint16(frame, uint16(len(frame)))
 	return s.conn.Send(frame)
 }
 
@@ -47,18 +44,8 @@ func (s *Session) Send(payload []byte) bool {
 // payload with the length header stripped. A network or EOF error from the
 // underlying connection propagates as-is.
 func (s *Session) ReadFrame() ([]byte, error) {
-	var header [frameHeaderSize]byte
-	if _, err := io.ReadFull(s.conn, header[:]); err != nil {
-		return nil, err
-	}
-
-	size := binary.LittleEndian.Uint16(header[:])
-	if int(size) < frameHeaderSize {
-		return nil, fmt.Errorf("network: frame length %d shorter than header", size)
-	}
-
-	payload := make([]byte, int(size)-frameHeaderSize)
-	if _, err := io.ReadFull(s.conn, payload); err != nil {
+	payload, err := wire.ReadFrame(s.conn)
+	if err != nil {
 		return nil, err
 	}
 	s.cipher.Decrypt(payload)

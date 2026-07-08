@@ -10,6 +10,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/link"
 	"github.com/fatal10110/acis_golang/internal/loginserver/data/manager"
 )
 
@@ -38,7 +39,7 @@ func TestSessionValidatorValidateAdvancesClientOnMatch(t *testing.T) {
 	validator := NewSessionValidator()
 	loginLink, sessions := dialTestLoginLink(t, validator)
 
-	sessions.Put("player1", manager.SessionKey{LoginKey1: 33, LoginKey2: 44, PlayKey1: 22, PlayKey2: 11})
+	sessions.Put("player1", link.SessionKey{LoginKey1: 33, LoginKey2: 44, PlayKey1: 22, PlayKey2: 11})
 
 	client := NewClient(nil)
 	req := clientpackets.AuthLogin{LoginName: "player1", PlayKey1: 22, PlayKey2: 11, LoginKey1: 33, LoginKey2: 44}
@@ -59,7 +60,7 @@ func TestSessionValidatorValidateAdvancesClientOnMatch(t *testing.T) {
 	if got := client.AccountName(); got != "player1" {
 		t.Fatalf("client account name = %q, want %q", got, "player1")
 	}
-	want := SessionKey{LoginKey1: 33, LoginKey2: 44, PlayKey1: 22, PlayKey2: 11}
+	want := link.SessionKey{LoginKey1: 33, LoginKey2: 44, PlayKey1: 22, PlayKey2: 11}
 	if got := client.SessionKey(); got != want {
 		t.Fatalf("client session key = %+v, want %+v", got, want)
 	}
@@ -71,7 +72,7 @@ func TestSessionValidatorValidateRejectsMismatchAndNotifiesClient(t *testing.T) 
 
 	// A session is stored, but under different key values than the client
 	// presents, so the login server reports a mismatch.
-	sessions.Put("player1", manager.SessionKey{LoginKey1: 1, LoginKey2: 2, PlayKey1: 3, PlayKey2: 4})
+	sessions.Put("player1", link.SessionKey{LoginKey1: 1, LoginKey2: 2, PlayKey1: 3, PlayKey2: 4})
 
 	session, rawClientConn := pipeSessions(t)
 	client := NewClient(session)

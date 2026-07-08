@@ -16,7 +16,7 @@ func TestDecodePlayerAuthRequest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DecodePlayerAuthRequest: %v", err)
 	}
-	want := PlayerAuthRequest{Account: "alice", PlayKey1: 11, PlayKey2: 22, LoginKey1: 33, LoginKey2: 44}
+	want := PlayerAuthRequest{Account: "alice", SessionKey: SessionKey{PlayKey1: 11, PlayKey2: 22, LoginKey1: 33, LoginKey2: 44}}
 	if got != want {
 		t.Fatalf("DecodePlayerAuthRequest() = %+v, want %+v", got, want)
 	}
@@ -30,7 +30,7 @@ func TestDecodePlayerAuthRequestShort(t *testing.T) {
 }
 
 func TestEncodePlayerAuthRequestRoundTrip(t *testing.T) {
-	want := PlayerAuthRequest{Account: "alice", PlayKey1: 11, PlayKey2: 22, LoginKey1: 33, LoginKey2: 44}
+	want := PlayerAuthRequest{Account: "alice", SessionKey: SessionKey{PlayKey1: 11, PlayKey2: 22, LoginKey1: 33, LoginKey2: 44}}
 	got, err := DecodePlayerAuthRequest(EncodePlayerAuthRequest(want))
 	if err != nil {
 		t.Fatalf("DecodePlayerAuthRequest(EncodePlayerAuthRequest()): %v", err)

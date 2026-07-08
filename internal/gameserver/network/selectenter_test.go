@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/link"
 )
 
 // TestSelectCharacterAdvancesToEntering exercises the packet sequence
@@ -18,7 +19,7 @@ import (
 // confirmed session key).
 func TestSelectCharacterAdvancesToEntering(t *testing.T) {
 	client := NewClient(nil)
-	if !client.Authenticate("player1", SessionKey{PlayKey1: 999, PlayKey2: 888}, func(string) bool { return true }) {
+	if !client.Authenticate("player1", link.SessionKey{PlayKey1: 999, PlayKey2: 888}, func(string) bool { return true }) {
 		t.Fatal("Authenticate: want success")
 	}
 

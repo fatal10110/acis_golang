@@ -13,8 +13,9 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/fatal10110/acis_golang/internal/loginserver/crypt"
-	"github.com/fatal10110/acis_golang/internal/loginserver/link"
+	"github.com/fatal10110/acis_golang/internal/commons/crypt"
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/link"
 )
 
 // dynamicKeySize is the length in bytes of the Blowfish key this game
@@ -243,7 +244,7 @@ func (l *LoginLink) readLoop(handlers LoginLinkHandlers) {
 }
 
 func (l *LoginLink) readFrame() ([]byte, error) {
-	payload, err := link.ReadFrame(l.conn)
+	payload, err := wire.ReadFrame(l.conn)
 	if err != nil {
 		return nil, err
 	}
@@ -256,7 +257,7 @@ func (l *LoginLink) readFrame() ([]byte, error) {
 func (l *LoginLink) send(payload []byte) error {
 	l.sendMu.Lock()
 	defer l.sendMu.Unlock()
-	return link.WriteFrame(l.conn, l.crypt.Encrypt(payload))
+	return wire.WriteFrame(l.conn, l.crypt.Encrypt(payload))
 }
 
 func firstByte(payload []byte) byte {
