@@ -1,6 +1,7 @@
 package sql
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 
@@ -18,8 +19,8 @@ func NewItemStore(db *sql.DB) *ItemStore {
 }
 
 // Create inserts inst as a new items row owned by ownerID.
-func (s *ItemStore) Create(ownerID int32, inst item.Instance) error {
-	_, err := s.db.Exec(
+func (s *ItemStore) Create(ctx context.Context, ownerID int32, inst item.Instance) error {
+	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO items
 			(owner_id, object_id, item_id, count, enchant_level, loc, loc_data, custom_type1, custom_type2, mana_left, time)
 		 VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
@@ -33,8 +34,8 @@ func (s *ItemStore) Create(ownerID int32, inst item.Instance) error {
 }
 
 // ListByOwner returns every item ownerID owns, in no particular order.
-func (s *ItemStore) ListByOwner(ownerID int32) ([]*item.Instance, error) {
-	rows, err := s.db.Query(
+func (s *ItemStore) ListByOwner(ctx context.Context, ownerID int32) ([]*item.Instance, error) {
+	rows, err := s.db.QueryContext(ctx,
 		`SELECT object_id, item_id, count, enchant_level, loc, loc_data, custom_type1, custom_type2, mana_left, time
 		 FROM items WHERE owner_id = ?`, ownerID)
 	if err != nil {
@@ -66,8 +67,8 @@ func (s *ItemStore) ListByOwner(ownerID int32) ([]*item.Instance, error) {
 
 // DeleteByOwner removes every items row owned by ownerID and reports how
 // many rows were deleted.
-func (s *ItemStore) DeleteByOwner(ownerID int32) (int64, error) {
-	res, err := s.db.Exec("DELETE FROM items WHERE owner_id = ?", ownerID)
+func (s *ItemStore) DeleteByOwner(ctx context.Context, ownerID int32) (int64, error) {
+	res, err := s.db.ExecContext(ctx, "DELETE FROM items WHERE owner_id = ?", ownerID)
 	if err != nil {
 		return 0, fmt.Errorf("delete items for owner %d: %w", ownerID, err)
 	}

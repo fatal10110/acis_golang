@@ -3,6 +3,7 @@
 package manager
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -67,9 +68,10 @@ func newTestRoster(t *testing.T, deleteAfter time.Duration, now func() time.Time
 }
 
 func TestRoster_Create(t *testing.T) {
+	ctx := context.Background()
 	roster, _, items := newTestRoster(t, DefaultDeleteAfter, nil)
 
-	c, outcome, err := roster.Create("acct1", CreateRequest{
+	c, outcome, err := roster.Create(ctx, "acct1", CreateRequest{
 		Name: "Newbie", ClassID: 0, Race: 0, Sex: player.SexMale,
 		HairStyle: 1, HairColor: 0, Face: 0,
 	})
@@ -86,7 +88,7 @@ func TestRoster_Create(t *testing.T) {
 		t.Errorf("Position = %+v, want template spawn", c.Position)
 	}
 
-	granted, err := items.ListByOwner(c.ObjectID)
+	granted, err := items.ListByOwner(ctx, c.ObjectID)
 	if err != nil {
 		t.Fatalf("ListByOwner() unexpected error: %v", err)
 	}
@@ -113,9 +115,10 @@ func TestRoster_Create(t *testing.T) {
 }
 
 func TestRoster_Create_InvalidName(t *testing.T) {
+	ctx := context.Background()
 	roster, _, _ := newTestRoster(t, DefaultDeleteAfter, nil)
 
-	_, outcome, err := roster.Create("acct1", CreateRequest{
+	_, outcome, err := roster.Create(ctx, "acct1", CreateRequest{
 		Name: "bad name!", ClassID: 0, Race: 0, Sex: player.SexMale,
 	})
 	if err != nil {
@@ -127,14 +130,15 @@ func TestRoster_Create_InvalidName(t *testing.T) {
 }
 
 func TestRoster_Create_NameTaken(t *testing.T) {
+	ctx := context.Background()
 	roster, _, _ := newTestRoster(t, DefaultDeleteAfter, nil)
 
 	req := CreateRequest{Name: "Newbie", ClassID: 0, Race: 0, Sex: player.SexMale}
-	if _, outcome, err := roster.Create("acct1", req); err != nil || outcome != CreateOK {
+	if _, outcome, err := roster.Create(ctx, "acct1", req); err != nil || outcome != CreateOK {
 		t.Fatalf("first Create() = outcome %v, err %v", outcome, err)
 	}
 
-	_, outcome, err := roster.Create("acct2", CreateRequest{Name: "newbie", ClassID: 0, Race: 0, Sex: player.SexMale})
+	_, outcome, err := roster.Create(ctx, "acct2", CreateRequest{Name: "newbie", ClassID: 0, Race: 0, Sex: player.SexMale})
 	if err != nil {
 		t.Fatalf("Create() unexpected error: %v", err)
 	}
@@ -144,16 +148,17 @@ func TestRoster_Create_NameTaken(t *testing.T) {
 }
 
 func TestRoster_Create_TooManyCharacters(t *testing.T) {
+	ctx := context.Background()
 	roster, _, _ := newTestRoster(t, DefaultDeleteAfter, nil)
 
 	for i := 0; i < MaxCharactersPerAccount; i++ {
 		name := string(rune('A'+i)) + "char"
-		if _, outcome, err := roster.Create("acct1", CreateRequest{Name: name, ClassID: 0, Race: 0, Sex: player.SexMale}); err != nil || outcome != CreateOK {
+		if _, outcome, err := roster.Create(ctx, "acct1", CreateRequest{Name: name, ClassID: 0, Race: 0, Sex: player.SexMale}); err != nil || outcome != CreateOK {
 			t.Fatalf("Create(%q) = outcome %v, err %v", name, outcome, err)
 		}
 	}
 
-	_, outcome, err := roster.Create("acct1", CreateRequest{Name: "OneTooMany", ClassID: 0, Race: 0, Sex: player.SexMale})
+	_, outcome, err := roster.Create(ctx, "acct1", CreateRequest{Name: "OneTooMany", ClassID: 0, Race: 0, Sex: player.SexMale})
 	if err != nil {
 		t.Fatalf("Create() unexpected error: %v", err)
 	}
@@ -163,9 +168,10 @@ func TestRoster_Create_TooManyCharacters(t *testing.T) {
 }
 
 func TestRoster_Create_NonRootClassRejected(t *testing.T) {
+	ctx := context.Background()
 	roster, _, _ := newTestRoster(t, DefaultDeleteAfter, nil)
 
-	_, outcome, err := roster.Create("acct1", CreateRequest{Name: "Newbie", ClassID: 999, Race: 0, Sex: player.SexMale})
+	_, outcome, err := roster.Create(ctx, "acct1", CreateRequest{Name: "Newbie", ClassID: 999, Race: 0, Sex: player.SexMale})
 	if err != nil {
 		t.Fatalf("Create() unexpected error: %v", err)
 	}
@@ -175,20 +181,21 @@ func TestRoster_Create_NonRootClassRejected(t *testing.T) {
 }
 
 func TestRoster_List_ExpiresPastDeadline(t *testing.T) {
+	ctx := context.Background()
 	fixedNow := time.UnixMilli(2_000_000_000_000)
 	roster, characters, items := newTestRoster(t, DefaultDeleteAfter, func() time.Time { return fixedNow })
 
-	c, outcome, err := roster.Create("acct1", CreateRequest{Name: "Newbie", ClassID: 0, Race: 0, Sex: player.SexMale})
+	c, outcome, err := roster.Create(ctx, "acct1", CreateRequest{Name: "Newbie", ClassID: 0, Race: 0, Sex: player.SexMale})
 	if err != nil || outcome != CreateOK {
 		t.Fatalf("Create() = outcome %v, err %v", outcome, err)
 	}
 
 	// Schedule deletion in the past relative to fixedNow.
-	if err := characters.SetDeleteAt(c.ObjectID, fixedNow.UnixMilli()-1000); err != nil {
+	if err := characters.SetDeleteAt(ctx, c.ObjectID, fixedNow.UnixMilli()-1000); err != nil {
 		t.Fatalf("SetDeleteAt() unexpected error: %v", err)
 	}
 
-	got, err := roster.List("acct1")
+	got, err := roster.List(ctx, "acct1")
 	if err != nil {
 		t.Fatalf("List() unexpected error: %v", err)
 	}
@@ -196,10 +203,10 @@ func TestRoster_List_ExpiresPastDeadline(t *testing.T) {
 		t.Fatalf("List() = %v, want empty (expired character purged)", got)
 	}
 
-	if _, err := characters.Get(c.ObjectID); err == nil {
+	if _, err := characters.Get(ctx, c.ObjectID); err == nil {
 		t.Error("Get() after expiry: want ErrCharacterNotFound, got nil error")
 	}
-	remainingItems, err := items.ListByOwner(c.ObjectID)
+	remainingItems, err := items.ListByOwner(ctx, c.ObjectID)
 	if err != nil {
 		t.Fatalf("ListByOwner() unexpected error: %v", err)
 	}
@@ -209,18 +216,19 @@ func TestRoster_List_ExpiresPastDeadline(t *testing.T) {
 }
 
 func TestRoster_List_NotYetExpired(t *testing.T) {
+	ctx := context.Background()
 	fixedNow := time.UnixMilli(2_000_000_000_000)
 	roster, characters, _ := newTestRoster(t, DefaultDeleteAfter, func() time.Time { return fixedNow })
 
-	c, _, err := roster.Create("acct1", CreateRequest{Name: "Newbie", ClassID: 0, Race: 0, Sex: player.SexMale})
+	c, _, err := roster.Create(ctx, "acct1", CreateRequest{Name: "Newbie", ClassID: 0, Race: 0, Sex: player.SexMale})
 	if err != nil {
 		t.Fatalf("Create() unexpected error: %v", err)
 	}
-	if err := characters.SetDeleteAt(c.ObjectID, fixedNow.UnixMilli()+1000); err != nil {
+	if err := characters.SetDeleteAt(ctx, c.ObjectID, fixedNow.UnixMilli()+1000); err != nil {
 		t.Fatalf("SetDeleteAt() unexpected error: %v", err)
 	}
 
-	got, err := roster.List("acct1")
+	got, err := roster.List(ctx, "acct1")
 	if err != nil {
 		t.Fatalf("List() unexpected error: %v", err)
 	}
@@ -230,18 +238,19 @@ func TestRoster_List_NotYetExpired(t *testing.T) {
 }
 
 func TestRoster_MarkForDeletion_AndRestore(t *testing.T) {
+	ctx := context.Background()
 	fixedNow := time.UnixMilli(1_700_000_000_000)
 	roster, characters, _ := newTestRoster(t, DefaultDeleteAfter, func() time.Time { return fixedNow })
 
-	c, _, err := roster.Create("acct1", CreateRequest{Name: "Newbie", ClassID: 0, Race: 0, Sex: player.SexMale})
+	c, _, err := roster.Create(ctx, "acct1", CreateRequest{Name: "Newbie", ClassID: 0, Race: 0, Sex: player.SexMale})
 	if err != nil {
 		t.Fatalf("Create() unexpected error: %v", err)
 	}
 
-	if err := roster.MarkForDeletion(c.ObjectID); err != nil {
+	if err := roster.MarkForDeletion(ctx, c.ObjectID); err != nil {
 		t.Fatalf("MarkForDeletion() unexpected error: %v", err)
 	}
-	got, err := characters.Get(c.ObjectID)
+	got, err := characters.Get(ctx, c.ObjectID)
 	if err != nil {
 		t.Fatalf("Get() unexpected error: %v", err)
 	}
@@ -250,10 +259,10 @@ func TestRoster_MarkForDeletion_AndRestore(t *testing.T) {
 		t.Errorf("DeleteAt = %d, want %d", got.DeleteAt, want)
 	}
 
-	if err := roster.Restore(c.ObjectID); err != nil {
+	if err := roster.Restore(ctx, c.ObjectID); err != nil {
 		t.Fatalf("Restore() unexpected error: %v", err)
 	}
-	got, err = characters.Get(c.ObjectID)
+	got, err = characters.Get(ctx, c.ObjectID)
 	if err != nil {
 		t.Fatalf("Get() unexpected error: %v", err)
 	}
@@ -263,21 +272,22 @@ func TestRoster_MarkForDeletion_AndRestore(t *testing.T) {
 }
 
 func TestRoster_MarkForDeletion_Immediate(t *testing.T) {
+	ctx := context.Background()
 	roster, characters, items := newTestRoster(t, 0, nil)
 
-	c, _, err := roster.Create("acct1", CreateRequest{Name: "Newbie", ClassID: 0, Race: 0, Sex: player.SexMale})
+	c, _, err := roster.Create(ctx, "acct1", CreateRequest{Name: "Newbie", ClassID: 0, Race: 0, Sex: player.SexMale})
 	if err != nil {
 		t.Fatalf("Create() unexpected error: %v", err)
 	}
 
-	if err := roster.MarkForDeletion(c.ObjectID); err != nil {
+	if err := roster.MarkForDeletion(ctx, c.ObjectID); err != nil {
 		t.Fatalf("MarkForDeletion() unexpected error: %v", err)
 	}
 
-	if _, err := characters.Get(c.ObjectID); err == nil {
+	if _, err := characters.Get(ctx, c.ObjectID); err == nil {
 		t.Error("Get() after immediate deletion: want ErrCharacterNotFound, got nil error")
 	}
-	remaining, err := items.ListByOwner(c.ObjectID)
+	remaining, err := items.ListByOwner(ctx, c.ObjectID)
 	if err != nil {
 		t.Fatalf("ListByOwner() unexpected error: %v", err)
 	}

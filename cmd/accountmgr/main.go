@@ -4,6 +4,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"flag"
 	"fmt"
 	"io"
@@ -38,7 +39,7 @@ func main() {
 	}
 	defer pool.Close()
 
-	if err := run(os.Stdin, os.Stdout, sql.NewAccountStore(pool)); err != nil {
+	if err := run(context.Background(), os.Stdin, os.Stdout, sql.NewAccountStore(pool)); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
@@ -46,7 +47,7 @@ func main() {
 
 // run drives the interactive command loop, reading whitespace-separated
 // tokens from in.
-func run(in io.Reader, out io.Writer, store *sql.AccountStore) error {
+func run(ctx context.Context, in io.Reader, out io.Writer, store *sql.AccountStore) error {
 	sc := bufio.NewScanner(in)
 	sc.Split(bufio.ScanWords)
 	next := func() (string, bool) {
@@ -117,7 +118,7 @@ func run(in io.Reader, out io.Writer, store *sql.AccountStore) error {
 				fmt.Fprintln(out, "Type a valid access level.")
 				break
 			}
-			addOrUpdateAccount(out, store, login, password, level)
+			addOrUpdateAccount(ctx, out, store, login, password, level)
 
 		case "2":
 			level, err := strconv.Atoi(levelText)
@@ -125,7 +126,7 @@ func run(in io.Reader, out io.Writer, store *sql.AccountStore) error {
 				fmt.Fprintln(out, "Type a valid access level.")
 				break
 			}
-			changeAccountLevel(out, store, login, level)
+			changeAccountLevel(ctx, out, store, login, level)
 
 		case "3":
 			fmt.Fprintln(out, "WARNING: This will not delete the gameserver data (characters, items, etc..) it will only delete the account login server data.")
@@ -134,7 +135,7 @@ func run(in io.Reader, out io.Writer, store *sql.AccountStore) error {
 				return sc.Err()
 			}
 			if strings.EqualFold(v, "y") {
-				deleteAccount(out, store, login)
+				deleteAccount(ctx, out, store, login)
 			} else {
 				fmt.Fprintln(out, "Deletion cancelled.")
 			}
@@ -153,7 +154,7 @@ func run(in io.Reader, out io.Writer, store *sql.AccountStore) error {
 				return sc.Err()
 			}
 			fmt.Fprintln(out)
-			printAccountInfo(out, store, listMode)
+			printAccountInfo(ctx, out, store, listMode)
 
 		case "5":
 			return nil
@@ -176,8 +177,8 @@ func listFilter(mode string) sql.AccountFilter {
 	}
 }
 
-func printAccountInfo(out io.Writer, store *sql.AccountStore, mode string) {
-	accounts, err := store.ListAccounts(listFilter(mode))
+func printAccountInfo(ctx context.Context, out io.Writer, store *sql.AccountStore, mode string) {
+	accounts, err := store.ListAccounts(ctx, listFilter(mode))
 	if err != nil {
 		fmt.Fprintln(out, "There was error while displaying accounts:")
 		fmt.Fprintln(out, err)
@@ -189,14 +190,14 @@ func printAccountInfo(out io.Writer, store *sql.AccountStore, mode string) {
 	fmt.Fprintf(out, "Displayed accounts: %d\n", len(accounts))
 }
 
-func addOrUpdateAccount(out io.Writer, store *sql.AccountStore, login, password string, level int) {
+func addOrUpdateAccount(ctx context.Context, out io.Writer, store *sql.AccountStore, login, password string, level int) {
 	hashed, err := model.HashPassword(password)
 	if err != nil {
 		fmt.Fprintln(out, "There was error while adding/updating account:")
 		fmt.Fprintln(out, err)
 		return
 	}
-	changed, err := store.UpsertAccount(login, hashed, level)
+	changed, err := store.UpsertAccount(ctx, login, hashed, level)
 	if err != nil {
 		fmt.Fprintln(out, "There was error while adding/updating account:")
 		fmt.Fprintln(out, err)
@@ -209,8 +210,8 @@ func addOrUpdateAccount(out io.Writer, store *sql.AccountStore, login, password 
 	}
 }
 
-func changeAccountLevel(out io.Writer, store *sql.AccountStore, login string, level int) {
-	changed, err := store.ChangeAccessLevel(login, level)
+func changeAccountLevel(ctx context.Context, out io.Writer, store *sql.AccountStore, login string, level int) {
+	changed, err := store.ChangeAccessLevel(ctx, login, level)
 	if err != nil {
 		fmt.Fprintln(out, "There was error while updating account:")
 		fmt.Fprintln(out, err)
@@ -223,8 +224,8 @@ func changeAccountLevel(out io.Writer, store *sql.AccountStore, login string, le
 	}
 }
 
-func deleteAccount(out io.Writer, store *sql.AccountStore, login string) {
-	deleted, err := store.DeleteAccount(login)
+func deleteAccount(ctx context.Context, out io.Writer, store *sql.AccountStore, login string) {
+	deleted, err := store.DeleteAccount(ctx, login)
 	if err != nil {
 		fmt.Fprintln(out, "There was error while deleting account:")
 		fmt.Fprintln(out, err)

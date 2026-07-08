@@ -6,6 +6,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"crypto/rand"
 	"flag"
 	"fmt"
@@ -59,7 +60,7 @@ func main() {
 		names = &manager.ServerNames{}
 	}
 
-	if err := run(os.Stdin, os.Stdout, names, sql.NewGameServerStore(pool), "."); err != nil {
+	if err := run(context.Background(), os.Stdin, os.Stdout, names, sql.NewGameServerStore(pool), "."); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
@@ -69,8 +70,8 @@ func main() {
 // tokens from in. Registered servers are loaded from the store once at
 // start and kept in step with the store as commands mutate it. Hexid files
 // are written into dir.
-func run(in io.Reader, out io.Writer, names *manager.ServerNames, store *sql.GameServerStore, dir string) error {
-	registered, err := store.GameServers()
+func run(ctx context.Context, in io.Reader, out io.Writer, names *manager.ServerNames, store *sql.GameServerStore, dir string) error {
+	registered, err := store.GameServers(ctx)
 	if err != nil {
 		return err
 	}
@@ -135,7 +136,7 @@ func run(in io.Reader, out io.Writer, names *manager.ServerNames, store *sql.Gam
 				fmt.Fprintln(out, "This server id isn't used.")
 				continue
 			}
-			if err := store.DeleteGameServer(id); err != nil {
+			if err := store.DeleteGameServer(ctx, id); err != nil {
 				fmt.Fprintln(out, "SQL error while cleaning registered server:", err)
 			}
 			delete(registered, id)
@@ -151,7 +152,7 @@ func run(in io.Reader, out io.Writer, names *manager.ServerNames, store *sql.Gam
 				fmt.Fprintln(out, "'cleanall' processus has been aborted.")
 				continue
 			}
-			if err := store.DeleteAllGameServers(); err != nil {
+			if err := store.DeleteAllGameServers(ctx); err != nil {
 				fmt.Fprintln(out, "SQL error while cleaning registered servers:", err)
 			}
 			clear(registered)
@@ -186,7 +187,7 @@ func run(in io.Reader, out io.Writer, names *manager.ServerNames, store *sql.Gam
 			}
 			server := model.NewGameServer(id, key, "")
 			registered[id] = server
-			if err := store.CreateGameServer(server); err != nil {
+			if err := store.CreateGameServer(ctx, server); err != nil {
 				fmt.Fprintln(out, "SQL error while saving gameserver data:", err)
 			}
 

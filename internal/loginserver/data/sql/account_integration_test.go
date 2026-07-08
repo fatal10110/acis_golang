@@ -58,8 +58,9 @@ func newIntegrationStore(t *testing.T) *AccountStore {
 
 func TestAccountStore_Account_NotFound(t *testing.T) {
 	store := newIntegrationStore(t)
+	ctx := context.Background()
 
-	_, err := store.Account("ghost")
+	_, err := store.Account(ctx, "ghost")
 	if !errors.Is(err, ErrAccountNotFound) {
 		t.Fatalf("Account() error = %v, want ErrAccountNotFound", err)
 	}
@@ -67,9 +68,10 @@ func TestAccountStore_Account_NotFound(t *testing.T) {
 
 func TestAccountStore_CreateAndReadBack(t *testing.T) {
 	store := newIntegrationStore(t)
+	ctx := context.Background()
 
 	createdAt := time.UnixMilli(1_700_000_000_000)
-	created, err := store.CreateAccount("player1", "hashedpw", createdAt)
+	created, err := store.CreateAccount(ctx, "player1", "hashedpw", createdAt)
 	if err != nil {
 		t.Fatalf("CreateAccount() unexpected error: %v", err)
 	}
@@ -77,7 +79,7 @@ func TestAccountStore_CreateAndReadBack(t *testing.T) {
 		t.Fatalf("CreateAccount() = %+v, want login=player1 password=hashedpw accessLevel=0 lastServer=1", created)
 	}
 
-	got, err := store.Account("player1")
+	got, err := store.Account(ctx, "player1")
 	if err != nil {
 		t.Fatalf("Account() unexpected error: %v", err)
 	}
@@ -88,12 +90,13 @@ func TestAccountStore_CreateAndReadBack(t *testing.T) {
 
 func TestAccountStore_CreateAccount_DuplicateLoginFails(t *testing.T) {
 	store := newIntegrationStore(t)
+	ctx := context.Background()
 
 	createdAt := time.UnixMilli(1_700_000_000_000)
-	if _, err := store.CreateAccount("dupe", "hash1", createdAt); err != nil {
+	if _, err := store.CreateAccount(ctx, "dupe", "hash1", createdAt); err != nil {
 		t.Fatalf("first CreateAccount() unexpected error: %v", err)
 	}
-	if _, err := store.CreateAccount("dupe", "hash2", createdAt); err == nil {
+	if _, err := store.CreateAccount(ctx, "dupe", "hash2", createdAt); err == nil {
 		t.Fatal("second CreateAccount() with same login: want error (primary key violation), got nil")
 	}
 }
@@ -101,12 +104,13 @@ func TestAccountStore_CreateAccount_DuplicateLoginFails(t *testing.T) {
 func TestAccountStore_SetLastActive(t *testing.T) {
 	store := newIntegrationStore(t)
 	createdAt := time.UnixMilli(1_700_000_000_000)
-	if _, err := store.CreateAccount("player1", "hash", createdAt); err != nil {
+	ctx := context.Background()
+	if _, err := store.CreateAccount(ctx, "player1", "hash", createdAt); err != nil {
 		t.Fatalf("CreateAccount() unexpected error: %v", err)
 	}
 
 	updatedAt := time.UnixMilli(1_800_000_000_000)
-	if err := store.SetLastActive("player1", updatedAt); err != nil {
+	if err := store.SetLastActive(ctx, "player1", updatedAt); err != nil {
 		t.Fatalf("SetLastActive() unexpected error: %v", err)
 	}
 
@@ -122,15 +126,16 @@ func TestAccountStore_SetLastActive(t *testing.T) {
 func TestAccountStore_SetAccessLevel(t *testing.T) {
 	store := newIntegrationStore(t)
 	createdAt := time.UnixMilli(1_700_000_000_000)
-	if _, err := store.CreateAccount("player1", "hash", createdAt); err != nil {
+	ctx := context.Background()
+	if _, err := store.CreateAccount(ctx, "player1", "hash", createdAt); err != nil {
 		t.Fatalf("CreateAccount() unexpected error: %v", err)
 	}
 
-	if err := store.SetAccessLevel("player1", -1); err != nil {
+	if err := store.SetAccessLevel(ctx, "player1", -1); err != nil {
 		t.Fatalf("SetAccessLevel() unexpected error: %v", err)
 	}
 
-	got, err := store.Account("player1")
+	got, err := store.Account(ctx, "player1")
 	if err != nil {
 		t.Fatalf("Account() unexpected error: %v", err)
 	}
@@ -141,15 +146,16 @@ func TestAccountStore_SetAccessLevel(t *testing.T) {
 
 func TestAccountStore_UpsertAccount(t *testing.T) {
 	store := newIntegrationStore(t)
+	ctx := context.Background()
 
-	changed, err := store.UpsertAccount("player1", "hash1", 2)
+	changed, err := store.UpsertAccount(ctx, "player1", "hash1", 2)
 	if err != nil {
 		t.Fatalf("UpsertAccount() create unexpected error: %v", err)
 	}
 	if !changed {
 		t.Error("UpsertAccount() create changed = false, want true")
 	}
-	got, err := store.Account("player1")
+	got, err := store.Account(ctx, "player1")
 	if err != nil {
 		t.Fatalf("Account() after create: %v", err)
 	}
@@ -157,14 +163,14 @@ func TestAccountStore_UpsertAccount(t *testing.T) {
 		t.Fatalf("Account() after create = %+v, want password=hash1 accessLevel=2", got)
 	}
 
-	changed, err = store.UpsertAccount("player1", "hash2", 3)
+	changed, err = store.UpsertAccount(ctx, "player1", "hash2", 3)
 	if err != nil {
 		t.Fatalf("UpsertAccount() update unexpected error: %v", err)
 	}
 	if !changed {
 		t.Error("UpsertAccount() update changed = false, want true")
 	}
-	got, err = store.Account("player1")
+	got, err = store.Account(ctx, "player1")
 	if err != nil {
 		t.Fatalf("Account() after update: %v", err)
 	}
@@ -176,11 +182,12 @@ func TestAccountStore_UpsertAccount(t *testing.T) {
 func TestAccountStore_ChangeAccessLevel(t *testing.T) {
 	store := newIntegrationStore(t)
 	createdAt := time.UnixMilli(1_700_000_000_000)
-	if _, err := store.CreateAccount("player1", "hash", createdAt); err != nil {
+	ctx := context.Background()
+	if _, err := store.CreateAccount(ctx, "player1", "hash", createdAt); err != nil {
 		t.Fatalf("CreateAccount() unexpected error: %v", err)
 	}
 
-	changed, err := store.ChangeAccessLevel("player1", 4)
+	changed, err := store.ChangeAccessLevel(ctx, "player1", 4)
 	if err != nil {
 		t.Fatalf("ChangeAccessLevel() unexpected error: %v", err)
 	}
@@ -188,7 +195,7 @@ func TestAccountStore_ChangeAccessLevel(t *testing.T) {
 		t.Error("ChangeAccessLevel() on existing account changed = false, want true")
 	}
 
-	changed, err = store.ChangeAccessLevel("ghost", 4)
+	changed, err = store.ChangeAccessLevel(ctx, "ghost", 4)
 	if err != nil {
 		t.Fatalf("ChangeAccessLevel() on missing account unexpected error: %v", err)
 	}
@@ -200,22 +207,23 @@ func TestAccountStore_ChangeAccessLevel(t *testing.T) {
 func TestAccountStore_DeleteAccount(t *testing.T) {
 	store := newIntegrationStore(t)
 	createdAt := time.UnixMilli(1_700_000_000_000)
-	if _, err := store.CreateAccount("player1", "hash", createdAt); err != nil {
+	ctx := context.Background()
+	if _, err := store.CreateAccount(ctx, "player1", "hash", createdAt); err != nil {
 		t.Fatalf("CreateAccount() unexpected error: %v", err)
 	}
 
-	deleted, err := store.DeleteAccount("player1")
+	deleted, err := store.DeleteAccount(ctx, "player1")
 	if err != nil {
 		t.Fatalf("DeleteAccount() unexpected error: %v", err)
 	}
 	if !deleted {
 		t.Error("DeleteAccount() on existing account deleted = false, want true")
 	}
-	if _, err := store.Account("player1"); !errors.Is(err, ErrAccountNotFound) {
+	if _, err := store.Account(ctx, "player1"); !errors.Is(err, ErrAccountNotFound) {
 		t.Fatalf("Account() after delete: got err %v, want ErrAccountNotFound", err)
 	}
 
-	deleted, err = store.DeleteAccount("player1")
+	deleted, err = store.DeleteAccount(ctx, "player1")
 	if err != nil {
 		t.Fatalf("DeleteAccount() second call unexpected error: %v", err)
 	}
@@ -227,11 +235,12 @@ func TestAccountStore_DeleteAccount(t *testing.T) {
 func TestAccountStore_ListAccounts(t *testing.T) {
 	store := newIntegrationStore(t)
 	createdAt := time.UnixMilli(1_700_000_000_000)
+	ctx := context.Background()
 	for login, level := range map[string]int{"banned1": -1, "regular1": 0, "gm1": 1} {
-		if _, err := store.CreateAccount(login, "hash", createdAt); err != nil {
+		if _, err := store.CreateAccount(ctx, login, "hash", createdAt); err != nil {
 			t.Fatalf("CreateAccount(%s) unexpected error: %v", login, err)
 		}
-		if _, err := store.ChangeAccessLevel(login, level); err != nil {
+		if _, err := store.ChangeAccessLevel(ctx, login, level); err != nil {
 			t.Fatalf("ChangeAccessLevel(%s) unexpected error: %v", login, err)
 		}
 	}
@@ -246,7 +255,7 @@ func TestAccountStore_ListAccounts(t *testing.T) {
 		{RegularAccounts, []string{"regular1"}},
 	}
 	for _, tt := range tests {
-		got, err := store.ListAccounts(tt.filter)
+		got, err := store.ListAccounts(ctx, tt.filter)
 		if err != nil {
 			t.Fatalf("ListAccounts(%v) unexpected error: %v", tt.filter, err)
 		}
@@ -264,15 +273,16 @@ func TestAccountStore_ListAccounts(t *testing.T) {
 func TestAccountStore_SetLastServer(t *testing.T) {
 	store := newIntegrationStore(t)
 	createdAt := time.UnixMilli(1_700_000_000_000)
-	if _, err := store.CreateAccount("player1", "hash", createdAt); err != nil {
+	ctx := context.Background()
+	if _, err := store.CreateAccount(ctx, "player1", "hash", createdAt); err != nil {
 		t.Fatalf("CreateAccount() unexpected error: %v", err)
 	}
 
-	if err := store.SetLastServer("player1", 3); err != nil {
+	if err := store.SetLastServer(ctx, "player1", 3); err != nil {
 		t.Fatalf("SetLastServer() unexpected error: %v", err)
 	}
 
-	got, err := store.Account("player1")
+	got, err := store.Account(ctx, "player1")
 	if err != nil {
 		t.Fatalf("Account() unexpected error: %v", err)
 	}
