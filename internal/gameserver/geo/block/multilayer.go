@@ -110,6 +110,12 @@ func (b *Multilayer) NSWE(layer int) NSWE {
 	return b.cells[ci][li].NSWE
 }
 
+// CellLayers returns a copy of the local cell's stored layers, ordered
+// from lowest to highest.
+func (b *Multilayer) CellLayers(cellX, cellY int) []Cell {
+	return append([]Cell(nil), b.cells[cellIndex(cellX, cellY)]...)
+}
+
 func abs32(v int32) int32 {
 	if v < 0 {
 		return -v
