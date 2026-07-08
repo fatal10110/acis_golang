@@ -148,6 +148,28 @@ func TestConnSendAfterCloseReturnsFalse(t *testing.T) {
 	}
 }
 
+func TestConnWriteLoopExitsOnWriteErrorAndCloseCompletes(t *testing.T) {
+	server, client := net.Pipe()
+	conn := newConn(server, nil)
+
+	// Closing the read side makes the next write on server fail
+	// synchronously, exercising writeLoop's error path.
+	client.Close()
+	conn.Send([]byte("payload"))
+
+	done := make(chan struct{})
+	go func() {
+		conn.Close()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Close did not complete after writeLoop exited on a write error")
+	}
+}
+
 func TestServeSurvivesHandlerPanic(t *testing.T) {
 	ln := listen(t)
 	ctx, cancel := context.WithCancel(context.Background())

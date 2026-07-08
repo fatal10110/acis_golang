@@ -38,8 +38,7 @@ type Character struct {
 	// Position and Heading are the character's last known world location.
 	// A freshly created character carries the template's chosen spawn point
 	// only in memory: the characters table leaves these columns at their
-	// NULL default until the character is actually saved, the same as the
-	// reference behavior this ports.
+	// NULL default until the character is actually saved.
 	Position location.Location
 	Heading  int
 

@@ -8,14 +8,14 @@ import (
 )
 
 // gsKeyPoolSize is how many RSA key pairs are cached for the GS-LS link
-// handshake, matching the reference server's fixed pool size.
+// handshake.
 const gsKeyPoolSize = 10
 
 // gsKeyBits is the RSA modulus size used for the GS-LS link handshake. The
-// reference server uses 512 bits, but the pair is regenerated fresh every
-// boot with no cross-version wire contract on its size (InitLS carries the
-// modulus length explicitly), and Go's crypto/rsa refuses to generate keys
-// below 1024 bits — so this uses the minimum Go allows instead.
+// pair is regenerated fresh every boot with no cross-version wire contract
+// on its size (InitLS carries the modulus length explicitly), and Go's
+// crypto/rsa refuses to generate keys below 1024 bits — so this uses the
+// minimum Go allows.
 const gsKeyBits = 1024
 
 // RSAKeyPool is a fixed set of RSA key pairs generated at boot, one of

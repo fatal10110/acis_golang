@@ -44,8 +44,8 @@ type CreateRequest struct {
 	ClassID int
 	// Race is validated for range but never stored: a character's actual
 	// race always follows from ClassID (see player.ClassRace). The wire
-	// protocol carries it anyway, so an out-of-range value still has to be
-	// rejected the same way the reference client-facing check rejects it.
+	// protocol carries it anyway, so an out-of-range value is still rejected
+	// as the client-facing creation check requires.
 	Race                       int
 	Sex                        player.Sex
 	HairStyle, HairColor, Face byte
@@ -117,13 +117,13 @@ func NewRoster(characters characterStore, items itemStore, templates *player.Tem
 // rejection (a fault always comes back as err, never as CreateRejected).
 //
 // A character row and its granted items are written as separate
-// statements, not one transaction, matching the reference this ports: an
-// error partway through Create can leave a character row with only some of
-// its starter items granted. Reconciling that is a job for whatever boot
-// or maintenance pass eventually audits character/item consistency, not
-// for Create to guess at by retrying or rolling back.
+// statements, not one transaction: an error partway through Create can
+// leave a character row with only some of its starter items granted.
+// Reconciling that is a job for whatever boot or maintenance pass
+// eventually audits character/item consistency, not for Create to guess
+// at by retrying or rolling back.
 //
-// One reference check is intentionally not reproduced: rejecting a name
+// One validation is intentionally not implemented yet: rejecting a name
 // that collides with an NPC's name. That check reads a data table this
 // port hasn't built yet; a name collision with an NPC is merely cosmetic
 // (chat/targeting ambiguity), not a correctness risk, so it is deferred
@@ -254,9 +254,9 @@ func (r *Roster) purge(objectID int32) error {
 // MarkForDeletion schedules objectID for deletion after the Roster's grace
 // period, or purges it immediately when that period is zero.
 //
-// The reference behavior also blocks deletion for a clan's leader or
-// member; without a clan system yet, every character is treated as
-// clan-free and deletion always proceeds.
+// Deletion should also be blocked for a clan's leader or member; without a
+// clan system yet, every character is treated as clan-free and deletion
+// always proceeds.
 func (r *Roster) MarkForDeletion(objectID int32) error {
 	if r.deleteAfter <= 0 {
 		return r.purge(objectID)

@@ -18,9 +18,9 @@ import (
 	"github.com/fatal10110/acis_golang/internal/link"
 )
 
-// dynamicKeySize is the length in bytes of the Blowfish key this game
+// dynamicKeySize is the fixed length in bytes of the Blowfish key this game
 // server generates for the GS-LS link once the bootstrap handshake
-// completes, matching the reference server's link key size.
+// completes.
 const dynamicKeySize = 40
 
 // linkPublicExponent is the RSA public exponent the login server always
@@ -30,16 +30,15 @@ const dynamicKeySize = 40
 const linkPublicExponent = 65537
 
 // DefaultReconnectDelay is the reconnect delay a caller would normally pass
-// to Maintain, matching the reference server's fixed retry interval.
+// to Maintain between failed or ended link attempts.
 const DefaultReconnectDelay = 10 * time.Second
 
 // generateDynamicKey reads a dynamicKeySize-byte Blowfish key from src,
 // redrawing if the first byte is zero. The login server recovers this key by
 // RSA-decrypting it with no padding and stripping leading zero bytes from
-// the result (matching the reference server); a leading zero byte here
-// would make it strip a byte we didn't intend to lose, leaving the two
-// sides with different-length keys. Redrawing is cheap: the odds of it
-// triggering are 1 in 256.
+// the result; a leading zero byte here would make it strip a byte we didn't
+// intend to lose, leaving the two sides with different-length keys.
+// Redrawing is cheap: the odds of it triggering are 1 in 256.
 func generateDynamicKey(src io.Reader) ([]byte, error) {
 	key := make([]byte, dynamicKeySize)
 	for {
@@ -126,7 +125,14 @@ func DialLoginLink(ctx context.Context, address string, auth LoginServerAuth, ha
 		return nil, err
 	}
 
-	go l.readLoop(handlers)
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				l.log.Errorf("login link reader panic: %v", r)
+			}
+		}()
+		l.readLoop(handlers)
+	}()
 	return l, nil
 }
 

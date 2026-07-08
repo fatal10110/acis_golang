@@ -41,10 +41,16 @@ func newConn(c net.Conn, log *logrus.Logger) *Conn {
 
 // writeLoop drains queued sends in order and only closes the
 // underlying connection once the queue is empty and Close has been
-// called, so a Send queued right before Close is never dropped. A
-// panic while writing is recovered and logged so it disconnects only
-// this client, never the process; the deferred cleanup still runs so
-// Close never blocks forever waiting on stopped.
+// called (or a write fails), so a Send queued right before Close is
+// never dropped. A panic while writing is recovered and logged so it
+// disconnects only this client, never the process; the deferred
+// cleanup still runs so Close never blocks forever waiting on stopped.
+//
+// Once this loop exits early on a write error, nothing drains c.out
+// any more: Send still succeeds (it only checks c.closed) until the
+// buffered channel fills, then blocks. That resolves itself once Close
+// is called, since Close closes c.out regardless of whether this loop
+// is still draining it.
 func (c *Conn) writeLoop() {
 	defer func() {
 		if r := recover(); r != nil {
@@ -54,7 +60,10 @@ func (c *Conn) writeLoop() {
 		close(c.stopped)
 	}()
 	for payload := range c.out {
-		c.Conn.Write(payload)
+		if _, err := c.Conn.Write(payload); err != nil {
+			c.log.Warnf("game connection write failed, closing: %v", err)
+			return
+		}
 	}
 }
 
