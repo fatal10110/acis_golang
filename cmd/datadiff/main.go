@@ -5,10 +5,13 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
+	"runtime"
 
 	"github.com/fatal10110/acis_golang/internal/datadiff"
 )
@@ -38,9 +41,10 @@ func run(args []string, stdout, stderr io.Writer) int {
 	list := fs.Bool("list", false, "list registered categories and exit")
 
 	fs.Usage = func() {
-		fmt.Fprintf(stderr, "Usage: %s -category=<name> {-datapack=<dir> | -dump=<file>} [-expected-dump=<file>]\n\n", fs.Name())
+		fmt.Fprintf(stderr, "Usage: %s -category=<name> {[-datapack=<dir>] | -dump=<file>} [-expected-dump=<file>]\n\n", fs.Name())
 		fmt.Fprintln(stderr, "Without -expected-dump, writes the category's dump to stdout.")
 		fmt.Fprintln(stderr, "With -expected-dump, compares it against that file and reports the diff.")
+		fmt.Fprintln(stderr, "If -datapack is omitted, datadiff uses $ACIS_DATAPACK or auto-discovers a nearby aCis_datapack checkout.")
 		fmt.Fprintln(stderr)
 		fs.PrintDefaults()
 	}
@@ -114,8 +118,13 @@ func loadRecords(stderr io.Writer, categoryName, datapackDir, dumpPath string) (
 		fmt.Fprintln(stderr, "datadiff: only one of -datapack or -dump may be given")
 		return nil, exitError
 
-	case datapackDir != "":
-		records, err := cat.load(datapackDir)
+	case datapackDir != "" || dumpPath == "":
+		resolvedDatapack, err := resolveDatapackDir(datapackDir)
+		if err != nil {
+			fmt.Fprintf(stderr, "datadiff: %v\n", err)
+			return nil, exitError
+		}
+		records, err := cat.load(resolvedDatapack)
 		if err != nil {
 			fmt.Fprintf(stderr, "datadiff: load %s: %v\n", categoryName, err)
 			return nil, exitError
@@ -141,6 +150,64 @@ func loadRecords(stderr io.Writer, categoryName, datapackDir, dumpPath string) (
 		fmt.Fprintln(stderr, "datadiff: one of -datapack or -dump is required")
 		return nil, exitError
 	}
+}
+
+func resolveDatapackDir(explicit string) (string, error) {
+	if explicit != "" {
+		return explicit, nil
+	}
+	if env := os.Getenv("ACIS_DATAPACK"); env != "" {
+		return env, nil
+	}
+
+	var starts []string
+	if cwd, err := os.Getwd(); err == nil {
+		starts = append(starts, cwd)
+	}
+	if sourceDir := sourceRoot(); sourceDir != "" {
+		starts = append(starts, sourceDir)
+	}
+
+	if path, ok := findDatapackDir(starts...); ok {
+		return path, nil
+	}
+	return "", errors.New("could not find aCis_datapack; pass -datapack or set ACIS_DATAPACK")
+}
+
+var sourceRoot = func() string {
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		return ""
+	}
+	return filepath.Dir(file)
+}
+
+func findDatapackDir(starts ...string) (string, bool) {
+	seen := make(map[string]bool)
+	for _, start := range starts {
+		for dir := filepath.Clean(start); ; dir = filepath.Dir(dir) {
+			if seen[dir] {
+				break
+			}
+			seen[dir] = true
+
+			for _, candidate := range []string{
+				filepath.Join(dir, "aCis_datapack"),
+				filepath.Join(dir, "acis_public", "aCis_datapack"),
+			} {
+				info, err := os.Stat(candidate)
+				if err == nil && info.IsDir() {
+					return candidate, true
+				}
+			}
+
+			parent := filepath.Dir(dir)
+			if parent == dir {
+				break
+			}
+		}
+	}
+	return "", false
 }
 
 // printReport writes a human-readable summary of report for category to w.

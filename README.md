@@ -29,3 +29,15 @@ This is **not** an official project. It is a standalone educational demonstratio
 ## Disclaimer
 
 This codebase is provided as-is for educational and research purposes. Users are solely responsible for ensuring their use complies with all applicable laws and regulations.
+
+## Oracle diff tooling
+
+`cmd/datadiff` writes stable, field-level dumps for the M3 loader categories currently wired into the Go port and can compare them against an expected dump:
+
+```bash
+go run ./cmd/datadiff -list
+go run ./cmd/datadiff -category=skill > skill.dump
+go run ./cmd/datadiff -category=skill -expected-dump=skill.dump
+```
+
+`-datapack` is optional when `aCis_datapack/` sits next to the checkout or `ACIS_DATAPACK` is set. Current category coverage is the output of `-list`.

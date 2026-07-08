@@ -37,14 +37,6 @@ func TestRun_UnknownCategory(t *testing.T) {
 	}
 }
 
-func TestRun_NoSourceGiven(t *testing.T) {
-	var stdout, stderr bytes.Buffer
-	code := run([]string{"-category", "item"}, &stdout, &stderr)
-	if code != exitError {
-		t.Fatalf("exit = %d, want %d", code, exitError)
-	}
-}
-
 func TestRun_BothSourcesGiven(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := run([]string{"-category", "item", "-datapack", t.TempDir(), "-dump", t.TempDir()}, &stdout, &stderr)
@@ -114,5 +106,73 @@ func TestRun_LoadFromMissingDatapackDirIsAnError(t *testing.T) {
 	code := run([]string{"-category", "item", "-datapack", filepath.Join(t.TempDir(), "does-not-exist")}, &stdout, &stderr)
 	if code != exitError {
 		t.Fatalf("exit = %d, want %d", code, exitError)
+	}
+}
+
+func TestFindDatapackDir_FindsSiblingCheckout(t *testing.T) {
+	root := t.TempDir()
+	module := filepath.Join(root, "acis_public", "acis_golang")
+	if err := os.MkdirAll(module, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	want := filepath.Join(root, "acis_public", "aCis_datapack")
+	if err := os.MkdirAll(want, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	got, ok := findDatapackDir(module)
+	if !ok {
+		t.Fatal("findDatapackDir() = not found, want datapack path")
+	}
+	if got != want {
+		t.Fatalf("findDatapackDir() = %q, want %q", got, want)
+	}
+}
+
+func TestResolveDatapackDir_AutoDiscoversFromSourceRoot(t *testing.T) {
+	root := t.TempDir()
+	module := filepath.Join(root, "acis_public", "acis_golang")
+	if err := os.MkdirAll(module, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	want := filepath.Join(root, "acis_public", "aCis_datapack")
+	if err := os.MkdirAll(want, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cwd := filepath.Join(root, "elsewhere")
+	if err := os.MkdirAll(cwd, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(cwd); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(oldwd); err != nil {
+			t.Errorf("restore cwd: %v", err)
+		}
+	})
+
+	oldSourceRoot := sourceRoot
+	sourceRoot = func() string { return module }
+	t.Cleanup(func() { sourceRoot = oldSourceRoot })
+
+	got, err := resolveDatapackDir("")
+	if err != nil {
+		t.Fatalf("resolveDatapackDir() error: %v", err)
+	}
+	got, err = filepath.EvalSymlinks(got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err = filepath.EvalSymlinks(want)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != want {
+		t.Fatalf("resolveDatapackDir() = %q, want %q", got, want)
 	}
 }
