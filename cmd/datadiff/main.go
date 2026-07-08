@@ -164,14 +164,22 @@ func resolveDatapackDir(explicit string) (string, error) {
 	if cwd, err := os.Getwd(); err == nil {
 		starts = append(starts, cwd)
 	}
-	if _, file, _, ok := runtime.Caller(0); ok {
-		starts = append(starts, filepath.Dir(file))
+	if sourceDir := sourceRoot(); sourceDir != "" {
+		starts = append(starts, sourceDir)
 	}
 
 	if path, ok := findDatapackDir(starts...); ok {
 		return path, nil
 	}
 	return "", errors.New("could not find aCis_datapack; pass -datapack or set ACIS_DATAPACK")
+}
+
+var sourceRoot = func() string {
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		return ""
+	}
+	return filepath.Dir(file)
 }
 
 func findDatapackDir(starts ...string) (string, bool) {
