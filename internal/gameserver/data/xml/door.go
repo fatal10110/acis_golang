@@ -47,9 +47,9 @@ func LoadDoors(path string) (*door.Table, error) {
 
 func buildDoorTemplate(el doorElement) (*door.Template, error) {
 	set := commons.StatSetFromXMLAttrs(el.Attrs)
-	mergeXMLAttrs(set, el.Position.Attrs)
-	mergeXMLAttrs(set, el.Stats.Attrs)
-	mergeXMLAttrs(set, el.Function.Attrs)
+	set.MergeXMLAttrs(el.Position.Attrs)
+	set.MergeXMLAttrs(el.Stats.Attrs)
+	set.MergeXMLAttrs(el.Function.Attrs)
 
 	coords := make([]location.Point, 0, len(el.Coordinates))
 	for _, coord := range el.Coordinates {

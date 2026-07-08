@@ -127,7 +127,9 @@ func buildCastle(el castleElement) (*castle.Castle, error) {
 	set := commons.StatSetFromXMLAttrs(el.Attrs)
 	mergeSingleValue(set, "gates", el.Gates)
 	mergeSingleValue(set, "npcs", el.NPCs)
-	mergeAttrs(set, el.Taxes)
+	for _, taxEl := range el.Taxes {
+		set.MergeXMLAttrs(taxEl.Attrs)
+	}
 
 	artifacts := make([]castle.Artifact, 0, len(el.Artifacts))
 	for _, artifactEl := range el.Artifacts {
@@ -141,8 +143,12 @@ func buildCastle(el castleElement) (*castle.Castle, error) {
 	towers := make([]castle.ControlTower, 0, len(el.ControlTowers))
 	for _, towerEl := range el.ControlTowers {
 		towerSet := commons.StatSetFromXMLAttrs(towerEl.Attrs)
-		mergeAttrs(towerSet, towerEl.Position)
-		mergeAttrs(towerSet, towerEl.Stats)
+		for _, posEl := range towerEl.Position {
+			towerSet.MergeXMLAttrs(posEl.Attrs)
+		}
+		for _, statEl := range towerEl.Stats {
+			towerSet.MergeXMLAttrs(statEl.Attrs)
+		}
 		mergeSingleValue(towerSet, "zones", towerEl.Zones)
 		entry, err := castle.NewControlTower(towerSet)
 		if err != nil {
@@ -173,10 +179,14 @@ func buildCastle(el castleElement) (*castle.Castle, error) {
 
 func buildClanHall(el clanHallElement) (*clanhall.Hall, error) {
 	set := commons.StatSetFromXMLAttrs(el.Attrs)
-	mergeAttrs(set, el.Agits)
+	for _, agitEl := range el.Agits {
+		set.MergeXMLAttrs(agitEl.Attrs)
+	}
 	mergeSingleValue(set, "gates", el.Gates)
 	mergeSingleValue(set, "npcs", el.NPCs)
-	mergeAttrs(set, el.Taxes)
+	for _, taxEl := range el.Taxes {
+		set.MergeXMLAttrs(taxEl.Attrs)
+	}
 
 	zones, err := buildResidenceZones(el.Zones)
 	if err != nil {
@@ -241,14 +251,6 @@ func buildResidenceSpawns(elems []attrsElement) (map[residence.SpawnType][]locat
 		out[kind] = append(out[kind], loc)
 	}
 	return out, nil
-}
-
-func mergeAttrs(dst *commons.StatSet, elems []attrsElement) {
-	for _, el := range elems {
-		for _, attr := range el.Attrs {
-			dst.Set(attr.Name.Local, attr.Value)
-		}
-	}
 }
 
 func mergeSingleValue(dst *commons.StatSet, key string, elems []attrsElement) {
