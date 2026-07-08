@@ -2,7 +2,6 @@ package item
 
 import (
 	"fmt"
-	"sort"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 )
@@ -383,36 +382,11 @@ func (t *Template) Category() (Category, SubCategory) {
 // boot and read for the remainder of the process lifetime. The zero value
 // is not usable; construct with NewTable.
 type Table struct {
-	templates map[int32]*Template
+	*commons.Lookup[int32, *Template]
 }
 
 // NewTable returns a Table backed by templates, keyed by each template's ID.
 // A later entry silently overwrites an earlier one with the same ID.
 func NewTable(templates []*Template) *Table {
-	t := &Table{templates: make(map[int32]*Template, len(templates))}
-	for _, tpl := range templates {
-		t.templates[tpl.ID] = tpl
-	}
-	return t
-}
-
-// Get returns the template with the given id, or false if none was loaded.
-func (t *Table) Get(id int32) (*Template, bool) {
-	tpl, ok := t.templates[id]
-	return tpl, ok
-}
-
-// Len returns the number of templates in the table.
-func (t *Table) Len() int {
-	return len(t.templates)
-}
-
-// All returns every loaded template, ordered ascending by ID.
-func (t *Table) All() []*Template {
-	templates := make([]*Template, 0, len(t.templates))
-	for _, tpl := range t.templates {
-		templates = append(templates, tpl)
-	}
-	sort.Slice(templates, func(i, j int) bool { return templates[i].ID < templates[j].ID })
-	return templates
+	return &Table{commons.NewLookup(templates, func(tpl *Template) int32 { return tpl.ID })}
 }
