@@ -18,12 +18,19 @@ func datapackPath(t *testing.T, rel string) string {
 	if !ok {
 		t.Fatal("runtime.Caller failed to resolve test file path")
 	}
-	// this file lives at <workspace>/<checkout>/internal/gameserver/data/xml
-	path := filepath.Join(filepath.Dir(thisFile), "..", "..", "..", "..", "..", "aCis_datapack", rel)
-	if _, err := os.Stat(path); err != nil {
-		t.Skipf("aCis_datapack not checked out next to the module root, skipping oracle comparison: %v", err)
+	// this file lives at <checkout>/internal/gameserver/data/xml
+	checkout := filepath.Join(filepath.Dir(thisFile), "..", "..", "..", "..")
+	candidates := []string{
+		filepath.Join(checkout, "..", "aCis_datapack", rel),
+		filepath.Join(checkout, "..", "..", "acis_public", "aCis_datapack", rel),
 	}
-	return path
+	for _, path := range candidates {
+		if _, err := os.Stat(path); err == nil {
+			return path
+		}
+	}
+	t.Skipf("aCis_datapack not checked out near the module root, skipping oracle comparison")
+	return ""
 }
 
 // writeXMLFixture writes a small XML fixture for parser error-path tests.
