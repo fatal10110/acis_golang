@@ -77,37 +77,43 @@ func errValueRequired(key, wanted string, val any) error {
 	return fmt.Errorf("commons: StatSet key %q requires a %s value, got %v: %w", key, wanted, val, ErrValueRequired)
 }
 
+// coerceBool coerces val to a bool from a bool, string ("true",
+// case-insensitive), or numeric (nonzero) representation. ok reports whether
+// val was a recognized kind; bool has no present-but-malformed case.
+func coerceBool(val any) (v bool, ok bool) {
+	if b, ok := val.(bool); ok {
+		return b, true
+	}
+	if str, ok := val.(string); ok {
+		return strings.EqualFold(str, "true"), true
+	}
+	if n, ok := asNumber(val); ok {
+		return n != 0, true
+	}
+	return false, false
+}
+
 // GetBool returns the value at key as a bool, coercing a string ("true",
 // case-insensitive) or numeric (nonzero) representation. Returns
 // ErrValueRequired if key is absent or the value cannot be coerced.
 func (s *StatSet) GetBool(key string) (bool, error) {
 	val := s.values[key]
-	if b, ok := val.(bool); ok {
-		return b, nil
+	v, ok := coerceBool(val)
+	if !ok {
+		return false, errValueRequired(key, "bool", val)
 	}
-	if str, ok := val.(string); ok {
-		return strings.EqualFold(str, "true"), nil
-	}
-	if n, ok := asNumber(val); ok {
-		return n != 0, nil
-	}
-	return false, errValueRequired(key, "bool", val)
+	return v, nil
 }
 
 // GetBoolDefault is like GetBool but returns defaultValue instead of an
 // error when key is absent or cannot be coerced.
 func (s *StatSet) GetBoolDefault(key string, defaultValue bool) bool {
 	val := s.values[key]
-	if b, ok := val.(bool); ok {
-		return b
+	v, ok := coerceBool(val)
+	if !ok {
+		return defaultValue
 	}
-	if str, ok := val.(string); ok {
-		return strings.EqualFold(str, "true")
-	}
-	if n, ok := asNumber(val); ok {
-		return n != 0
-	}
-	return defaultValue
+	return v
 }
 
 // asNumber coerces any of the numeric representations StatSet stores
@@ -138,22 +144,36 @@ func asNumber(val any) (float64, bool) {
 	return 0, false
 }
 
+// coerceByte coerces val to a byte from a numeric or numeric string
+// representation. ok reports whether val was a recognized kind; err reports
+// a recognized-but-malformed numeric string.
+func coerceByte(val any) (v byte, ok bool, err error) {
+	if n, ok := asNumber(val); ok {
+		return byte(int64(n)), true, nil
+	}
+	if str, ok := val.(string); ok {
+		n, err := strconv.ParseInt(str, 10, 8)
+		if err != nil {
+			return 0, true, err
+		}
+		return byte(n), true, nil
+	}
+	return 0, false, nil
+}
+
 // GetByte returns the value at key as a byte, coercing a numeric or numeric
 // string representation. Returns ErrValueRequired if key is absent or the
 // value cannot be coerced.
 func (s *StatSet) GetByte(key string) (byte, error) {
 	val := s.values[key]
-	if n, ok := asNumber(val); ok {
-		return byte(int64(n)), nil
+	v, ok, err := coerceByte(val)
+	if err != nil {
+		return 0, fmt.Errorf("commons: StatSet key %q: %w", key, err)
 	}
-	if str, ok := val.(string); ok {
-		n, err := strconv.ParseInt(str, 10, 8)
-		if err != nil {
-			return 0, fmt.Errorf("commons: StatSet key %q: %w", key, err)
-		}
-		return byte(n), nil
+	if !ok {
+		return 0, errValueRequired(key, "byte", val)
 	}
-	return 0, errValueRequired(key, "byte", val)
+	return v, nil
 }
 
 // GetByteDefault is like GetByte but returns defaultValue when key is
@@ -161,17 +181,37 @@ func (s *StatSet) GetByte(key string) (byte, error) {
 // value that fails to parse is still an error.
 func (s *StatSet) GetByteDefault(key string, defaultValue byte) (byte, error) {
 	val := s.values[key]
+	v, ok, err := coerceByte(val)
+	if err != nil {
+		return 0, fmt.Errorf("commons: StatSet key %q: %w", key, err)
+	}
+	if !ok {
+		return defaultValue, nil
+	}
+	return v, nil
+}
+
+// coerceDouble coerces val to a float64 from a numeric, numeric string, or
+// bool (1/0) representation. ok reports whether val was a recognized kind;
+// err reports a recognized-but-malformed numeric string.
+func coerceDouble(val any) (v float64, ok bool, err error) {
 	if n, ok := asNumber(val); ok {
-		return byte(int64(n)), nil
+		return n, true, nil
 	}
 	if str, ok := val.(string); ok {
-		n, err := strconv.ParseInt(str, 10, 8)
+		n, err := strconv.ParseFloat(str, 64)
 		if err != nil {
-			return 0, fmt.Errorf("commons: StatSet key %q: %w", key, err)
+			return 0, true, err
 		}
-		return byte(n), nil
+		return n, true, nil
 	}
-	return defaultValue, nil
+	if b, ok := val.(bool); ok {
+		if b {
+			return 1, true, nil
+		}
+		return 0, true, nil
+	}
+	return 0, false, nil
 }
 
 // GetDouble returns the value at key as a float64, coercing a numeric,
@@ -179,23 +219,14 @@ func (s *StatSet) GetByteDefault(key string, defaultValue byte) (byte, error) {
 // key is absent or the value cannot be coerced.
 func (s *StatSet) GetDouble(key string) (float64, error) {
 	val := s.values[key]
-	if n, ok := asNumber(val); ok {
-		return n, nil
+	v, ok, err := coerceDouble(val)
+	if err != nil {
+		return 0, fmt.Errorf("commons: StatSet key %q: %w", key, err)
 	}
-	if str, ok := val.(string); ok {
-		n, err := strconv.ParseFloat(str, 64)
-		if err != nil {
-			return 0, fmt.Errorf("commons: StatSet key %q: %w", key, err)
-		}
-		return n, nil
+	if !ok {
+		return 0, errValueRequired(key, "double", val)
 	}
-	if b, ok := val.(bool); ok {
-		if b {
-			return 1, nil
-		}
-		return 0, nil
-	}
-	return 0, errValueRequired(key, "double", val)
+	return v, nil
 }
 
 // GetDoubleDefault is like GetDouble but returns defaultValue when key is
@@ -203,23 +234,14 @@ func (s *StatSet) GetDouble(key string) (float64, error) {
 // value that fails to parse is still an error.
 func (s *StatSet) GetDoubleDefault(key string, defaultValue float64) (float64, error) {
 	val := s.values[key]
-	if n, ok := asNumber(val); ok {
-		return n, nil
+	v, ok, err := coerceDouble(val)
+	if err != nil {
+		return 0, fmt.Errorf("commons: StatSet key %q: %w", key, err)
 	}
-	if str, ok := val.(string); ok {
-		n, err := strconv.ParseFloat(str, 64)
-		if err != nil {
-			return 0, fmt.Errorf("commons: StatSet key %q: %w", key, err)
-		}
-		return n, nil
+	if !ok {
+		return defaultValue, nil
 	}
-	if b, ok := val.(bool); ok {
-		if b {
-			return 1, nil
-		}
-		return 0, nil
-	}
-	return defaultValue, nil
+	return v, nil
 }
 
 // GetDoubleArray returns the value at key as a []float64. A single number
@@ -249,28 +271,42 @@ func (s *StatSet) GetDoubleArray(key string) ([]float64, error) {
 	return nil, errValueRequired(key, "double array", val)
 }
 
+// coerceFloat32 coerces val to a float32 from a numeric, numeric string, or
+// bool (1/0) representation. ok reports whether val was a recognized kind;
+// err reports a recognized-but-malformed numeric string.
+func coerceFloat32(val any) (v float32, ok bool, err error) {
+	if n, ok := asNumber(val); ok {
+		return float32(n), true, nil
+	}
+	if str, ok := val.(string); ok {
+		n, err := strconv.ParseFloat(str, 32)
+		if err != nil {
+			return 0, true, err
+		}
+		return float32(n), true, nil
+	}
+	if b, ok := val.(bool); ok {
+		if b {
+			return 1, true, nil
+		}
+		return 0, true, nil
+	}
+	return 0, false, nil
+}
+
 // GetFloat32 returns the value at key as a float32, coercing a numeric,
 // numeric string, or bool (1/0) representation. Returns ErrValueRequired if
 // key is absent or the value cannot be coerced.
 func (s *StatSet) GetFloat32(key string) (float32, error) {
 	val := s.values[key]
-	if n, ok := asNumber(val); ok {
-		return float32(n), nil
+	v, ok, err := coerceFloat32(val)
+	if err != nil {
+		return 0, fmt.Errorf("commons: StatSet key %q: %w", key, err)
 	}
-	if str, ok := val.(string); ok {
-		n, err := strconv.ParseFloat(str, 32)
-		if err != nil {
-			return 0, fmt.Errorf("commons: StatSet key %q: %w", key, err)
-		}
-		return float32(n), nil
+	if !ok {
+		return 0, errValueRequired(key, "float", val)
 	}
-	if b, ok := val.(bool); ok {
-		if b {
-			return 1, nil
-		}
-		return 0, nil
-	}
-	return 0, errValueRequired(key, "float", val)
+	return v, nil
 }
 
 // GetFloat32Default is like GetFloat32 but returns defaultValue when key is
@@ -278,23 +314,37 @@ func (s *StatSet) GetFloat32(key string) (float32, error) {
 // value that fails to parse is still an error.
 func (s *StatSet) GetFloat32Default(key string, defaultValue float32) (float32, error) {
 	val := s.values[key]
+	v, ok, err := coerceFloat32(val)
+	if err != nil {
+		return 0, fmt.Errorf("commons: StatSet key %q: %w", key, err)
+	}
+	if !ok {
+		return defaultValue, nil
+	}
+	return v, nil
+}
+
+// coerceInt coerces val to an int from a numeric, numeric string, or bool
+// (1/0) representation. ok reports whether val was a recognized kind; err
+// reports a recognized-but-malformed numeric string.
+func coerceInt(val any) (v int, ok bool, err error) {
 	if n, ok := asNumber(val); ok {
-		return float32(n), nil
+		return int(n), true, nil
 	}
 	if str, ok := val.(string); ok {
-		n, err := strconv.ParseFloat(str, 32)
+		n, err := strconv.Atoi(str)
 		if err != nil {
-			return 0, fmt.Errorf("commons: StatSet key %q: %w", key, err)
+			return 0, true, err
 		}
-		return float32(n), nil
+		return n, true, nil
 	}
 	if b, ok := val.(bool); ok {
 		if b {
-			return 1, nil
+			return 1, true, nil
 		}
-		return 0, nil
+		return 0, true, nil
 	}
-	return defaultValue, nil
+	return 0, false, nil
 }
 
 // GetInt returns the value at key as an int, coercing a numeric, numeric
@@ -302,23 +352,14 @@ func (s *StatSet) GetFloat32Default(key string, defaultValue float32) (float32, 
 // absent or the value cannot be coerced.
 func (s *StatSet) GetInt(key string) (int, error) {
 	val := s.values[key]
-	if n, ok := asNumber(val); ok {
-		return int(n), nil
+	v, ok, err := coerceInt(val)
+	if err != nil {
+		return 0, fmt.Errorf("commons: StatSet key %q: %w", key, err)
 	}
-	if str, ok := val.(string); ok {
-		n, err := strconv.Atoi(str)
-		if err != nil {
-			return 0, fmt.Errorf("commons: StatSet key %q: %w", key, err)
-		}
-		return n, nil
+	if !ok {
+		return 0, errValueRequired(key, "int", val)
 	}
-	if b, ok := val.(bool); ok {
-		if b {
-			return 1, nil
-		}
-		return 0, nil
-	}
-	return 0, errValueRequired(key, "int", val)
+	return v, nil
 }
 
 // GetInt32 returns the value at key as an int32, coercing a numeric, numeric
@@ -356,23 +397,14 @@ func (s *StatSet) GetInt32Default(key string, defaultValue int32) (int32, error)
 // fails to parse is still an error.
 func (s *StatSet) GetIntDefault(key string, defaultValue int) (int, error) {
 	val := s.values[key]
-	if n, ok := asNumber(val); ok {
-		return int(n), nil
+	v, ok, err := coerceInt(val)
+	if err != nil {
+		return 0, fmt.Errorf("commons: StatSet key %q: %w", key, err)
 	}
-	if str, ok := val.(string); ok {
-		n, err := strconv.Atoi(str)
-		if err != nil {
-			return 0, fmt.Errorf("commons: StatSet key %q: %w", key, err)
-		}
-		return n, nil
+	if !ok {
+		return defaultValue, nil
 	}
-	if b, ok := val.(bool); ok {
-		if b {
-			return 1, nil
-		}
-		return 0, nil
-	}
-	return defaultValue, nil
+	return v, nil
 }
 
 // GetIntArray returns the value at key as a []int. A single number coerces
@@ -381,25 +413,14 @@ func (s *StatSet) GetIntDefault(key string, defaultValue int) (int, error) {
 // be coerced.
 func (s *StatSet) GetIntArray(key string) ([]int, error) {
 	val := s.values[key]
-	if arr, ok := val.([]int); ok {
-		return arr, nil
+	v, ok, err := coerceIntArray(val)
+	if err != nil {
+		return nil, fmt.Errorf("commons: StatSet key %q: %w", key, err)
 	}
-	if n, ok := asNumber(val); ok {
-		return []int{int(n)}, nil
+	if !ok {
+		return nil, errValueRequired(key, "int array", val)
 	}
-	if str, ok := val.(string); ok {
-		parts := strings.Split(str, ";")
-		out := make([]int, len(parts))
-		for i, p := range parts {
-			n, err := strconv.Atoi(p)
-			if err != nil {
-				return nil, fmt.Errorf("commons: StatSet key %q: %w", key, err)
-			}
-			out[i] = n
-		}
-		return out, nil
-	}
-	return nil, errValueRequired(key, "int array", val)
+	return v, nil
 }
 
 // GetIntArrayDefault is like GetIntArray but returns defaultArray when key
@@ -407,11 +428,26 @@ func (s *StatSet) GetIntArray(key string) ([]int, error) {
 // A string value with an element that fails to parse is still an error.
 func (s *StatSet) GetIntArrayDefault(key string, defaultArray []int) ([]int, error) {
 	val := s.values[key]
+	v, ok, err := coerceIntArray(val)
+	if err != nil {
+		return nil, fmt.Errorf("commons: StatSet key %q: %w", key, err)
+	}
+	if !ok {
+		return defaultArray, nil
+	}
+	return v, nil
+}
+
+// coerceIntArray coerces val to a []int from a []int, a single number
+// (one-element slice), or a ";"-separated numeric string. ok reports
+// whether val was a recognized kind; err reports a recognized-but-malformed
+// element.
+func coerceIntArray(val any) (v []int, ok bool, err error) {
 	if arr, ok := val.([]int); ok {
-		return arr, nil
+		return arr, true, nil
 	}
 	if n, ok := asNumber(val); ok {
-		return []int{int(n)}, nil
+		return []int{int(n)}, true, nil
 	}
 	if str, ok := val.(string); ok {
 		parts := strings.Split(str, ";")
@@ -419,13 +455,13 @@ func (s *StatSet) GetIntArrayDefault(key string, defaultArray []int) ([]int, err
 		for i, p := range parts {
 			n, err := strconv.Atoi(p)
 			if err != nil {
-				return nil, fmt.Errorf("commons: StatSet key %q: %w", key, err)
+				return nil, true, err
 			}
 			out[i] = n
 		}
-		return out, nil
+		return out, true, nil
 	}
-	return defaultArray, nil
+	return nil, false, nil
 }
 
 // GetList returns the slice stored at key, or nil if key is absent. Returns
@@ -447,23 +483,14 @@ func GetList[T any](s *StatSet, key string) ([]T, error) {
 // absent or the value cannot be coerced.
 func (s *StatSet) GetLong(key string) (int64, error) {
 	val := s.values[key]
-	if n, ok := asNumber(val); ok {
-		return int64(n), nil
+	v, ok, err := coerceLong(val)
+	if err != nil {
+		return 0, fmt.Errorf("commons: StatSet key %q: %w", key, err)
 	}
-	if str, ok := val.(string); ok {
-		n, err := strconv.ParseInt(str, 10, 64)
-		if err != nil {
-			return 0, fmt.Errorf("commons: StatSet key %q: %w", key, err)
-		}
-		return n, nil
+	if !ok {
+		return 0, errValueRequired(key, "long", val)
 	}
-	if b, ok := val.(bool); ok {
-		if b {
-			return 1, nil
-		}
-		return 0, nil
-	}
-	return 0, errValueRequired(key, "long", val)
+	return v, nil
 }
 
 // GetLongDefault is like GetLong but returns defaultValue when key is
@@ -471,23 +498,37 @@ func (s *StatSet) GetLong(key string) (int64, error) {
 // value that fails to parse is still an error.
 func (s *StatSet) GetLongDefault(key string, defaultValue int64) (int64, error) {
 	val := s.values[key]
+	v, ok, err := coerceLong(val)
+	if err != nil {
+		return 0, fmt.Errorf("commons: StatSet key %q: %w", key, err)
+	}
+	if !ok {
+		return defaultValue, nil
+	}
+	return v, nil
+}
+
+// coerceLong coerces val to an int64 from a numeric, numeric string, or
+// bool (1/0) representation. ok reports whether val was a recognized kind;
+// err reports a recognized-but-malformed numeric string.
+func coerceLong(val any) (v int64, ok bool, err error) {
 	if n, ok := asNumber(val); ok {
-		return int64(n), nil
+		return int64(n), true, nil
 	}
 	if str, ok := val.(string); ok {
 		n, err := strconv.ParseInt(str, 10, 64)
 		if err != nil {
-			return 0, fmt.Errorf("commons: StatSet key %q: %w", key, err)
+			return 0, true, err
 		}
-		return n, nil
+		return n, true, nil
 	}
 	if b, ok := val.(bool); ok {
 		if b {
-			return 1, nil
+			return 1, true, nil
 		}
-		return 0, nil
+		return 0, true, nil
 	}
-	return defaultValue, nil
+	return 0, false, nil
 }
 
 // GetLongArray returns the value at key as a []int64. A single number
