@@ -6,8 +6,11 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/observer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
 )
 
 type soulCrystalFile struct {
@@ -194,4 +197,117 @@ func LoadAnnouncements(path string) ([]admin.Announcement, error) {
 		out = append(out, entry)
 	}
 	return out, nil
+}
+
+type observerGroupFile struct {
+	Groups []observerGroupElement `xml:"groups>group"`
+	Spawns []attrsElement         `xml:"spawns>spawn"`
+}
+
+type observerGroupElement struct {
+	ID      int            `xml:"id,attr"`
+	Entries []attrsElement `xml:"entry"`
+}
+
+func LoadObserverGroups(path string) (*observer.Table, error) {
+	var doc observerGroupFile
+	if err := readXML(path, &doc); err != nil {
+		return nil, fmt.Errorf("xml: observer groups %q: %w", path, err)
+	}
+
+	groups := make(map[int][]observer.Location, len(doc.Groups))
+	for _, groupEl := range doc.Groups {
+		entries := groups[groupEl.ID]
+		for _, el := range groupEl.Entries {
+			entry, err := observer.NewLocation(commons.StatSetFromXMLAttrs(el.Attrs))
+			if err != nil {
+				return nil, fmt.Errorf("xml: %s: group %d: %w", path, groupEl.ID, err)
+			}
+			entries = append(entries, entry)
+		}
+		groups[groupEl.ID] = entries
+	}
+
+	spawns := make([]observer.Spawn, 0, len(doc.Spawns))
+	for _, el := range doc.Spawns {
+		entry, err := observer.NewSpawn(commons.StatSetFromXMLAttrs(el.Attrs))
+		if err != nil {
+			return nil, fmt.Errorf("xml: %s: %w", path, err)
+		}
+		spawns = append(spawns, entry)
+	}
+	return observer.NewTable(groups, spawns), nil
+}
+
+type staticObjectFile struct {
+	Objects []attrsElement `xml:"object"`
+}
+
+func LoadStaticObjects(path string) (*staticobject.Table, error) {
+	var doc staticObjectFile
+	if err := readXML(path, &doc); err != nil {
+		return nil, fmt.Errorf("xml: static objects %q: %w", path, err)
+	}
+
+	templates := make([]*staticobject.Template, 0, len(doc.Objects))
+	for _, el := range doc.Objects {
+		tmpl, err := staticobject.NewTemplate(commons.StatSetFromXMLAttrs(el.Attrs))
+		if err != nil {
+			return nil, fmt.Errorf("xml: %s: %w", path, err)
+		}
+		templates = append(templates, tmpl)
+	}
+	return staticobject.NewTable(templates)
+}
+
+type cursedWeaponFile struct {
+	Items []attrsElement `xml:"item"`
+}
+
+func LoadCursedWeapons(path string, skills *skill.Table) (*entity.CursedWeaponTable, error) {
+	var doc cursedWeaponFile
+	if err := readXML(path, &doc); err != nil {
+		return nil, fmt.Errorf("xml: cursed weapons %q: %w", path, err)
+	}
+
+	weapons := make([]entity.CursedWeapon, 0, len(doc.Items))
+	for _, el := range doc.Items {
+		weapon, err := entity.NewCursedWeapon(commons.StatSetFromXMLAttrs(el.Attrs), skills)
+		if err != nil {
+			return nil, fmt.Errorf("xml: %s: %w", path, err)
+		}
+		weapons = append(weapons, weapon)
+	}
+	return entity.NewCursedWeaponTable(weapons)
+}
+
+type bufferSkillFile struct {
+	Categories []bufferSkillCategory `xml:"category"`
+}
+
+type bufferSkillCategory struct {
+	Type  string         `xml:"type,attr"`
+	Buffs []attrsElement `xml:"buff"`
+}
+
+func LoadBufferSkills(path string, skills *skill.Table) (*skill.BufferTable, error) {
+	var doc bufferSkillFile
+	if err := readXML(path, &doc); err != nil {
+		return nil, fmt.Errorf("xml: buffer skills %q: %w", path, err)
+	}
+
+	entries := make([]skill.BufferSkill, 0)
+	for _, category := range doc.Categories {
+		for _, el := range category.Buffs {
+			set := commons.StatSetFromXMLAttrs(el.Attrs)
+			set.Set("type", category.Type)
+
+			entry, err := skill.NewBufferSkill(set, skills)
+			if err != nil {
+				return nil, fmt.Errorf("xml: %s: %w", path, err)
+			}
+			entries = append(entries, entry)
+		}
+	}
+	return skill.NewBufferTable(entries)
 }

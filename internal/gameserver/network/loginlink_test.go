@@ -1,10 +1,12 @@
 package network
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/binary"
+	"io"
 	"net"
 	"os"
 	"path/filepath"
@@ -60,6 +62,32 @@ func newTestLoginServer(t *testing.T, allowNewServers bool) (addr string, server
 	go gsLink.Serve(ctx, ln)
 
 	return ln.Addr().String(), servers, sessions
+}
+
+func TestGenerateDynamicKeyRedrawsOnLeadingZeroByte(t *testing.T) {
+	badDraw := append([]byte{0x00}, bytes.Repeat([]byte{0xaa}, dynamicKeySize-1)...)
+	goodDraw := bytes.Repeat([]byte{0xbb}, dynamicKeySize)
+	src := io.MultiReader(bytes.NewReader(badDraw), bytes.NewReader(goodDraw))
+
+	key, err := generateDynamicKey(src)
+	if err != nil {
+		t.Fatalf("generateDynamicKey: %v", err)
+	}
+	if !bytes.Equal(key, goodDraw) {
+		t.Fatalf("generateDynamicKey() = %x, want the redrawn key %x (a leading zero byte draw must be rejected)", key, goodDraw)
+	}
+}
+
+func TestGenerateDynamicKeyAcceptsNonZeroLeadingDraw(t *testing.T) {
+	goodDraw := bytes.Repeat([]byte{0xcc}, dynamicKeySize)
+
+	key, err := generateDynamicKey(bytes.NewReader(goodDraw))
+	if err != nil {
+		t.Fatalf("generateDynamicKey: %v", err)
+	}
+	if !bytes.Equal(key, goodDraw) {
+		t.Fatalf("generateDynamicKey() = %x, want %x", key, goodDraw)
+	}
 }
 
 var testHexID = []byte{0x01, 0x02, 0x03, 0x04}
