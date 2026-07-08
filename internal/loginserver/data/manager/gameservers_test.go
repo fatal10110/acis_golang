@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/fatal10110/acis_golang/internal/loginserver/link"
+	"github.com/fatal10110/acis_golang/internal/link"
 )
 
 func TestServerRegistryRegisterRejectsDuplicateID(t *testing.T) {

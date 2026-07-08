@@ -8,10 +8,11 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/fatal10110/acis_golang/internal/loginserver/crypt"
+	"github.com/fatal10110/acis_golang/internal/commons/crypt"
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/link"
 	"github.com/fatal10110/acis_golang/internal/loginserver/data/manager"
 	"github.com/fatal10110/acis_golang/internal/loginserver/data/sql"
-	"github.com/fatal10110/acis_golang/internal/loginserver/link"
 	"github.com/fatal10110/acis_golang/internal/loginserver/model"
 )
 
@@ -98,7 +99,7 @@ type gameServerConn struct {
 }
 
 func (c *gameServerConn) send(payload []byte) error {
-	return link.WriteFrame(c.conn, c.crypt.Encrypt(payload))
+	return wire.WriteFrame(c.conn, c.crypt.Encrypt(payload))
 }
 
 // forceClose sends a LoginServerFail with reason; the caller closes conn.
@@ -133,7 +134,7 @@ func (l *GameServerLink) handleConnection(conn net.Conn) {
 	}
 
 	for {
-		payload, err := link.ReadFrame(conn)
+		payload, err := wire.ReadFrame(conn)
 		if err != nil {
 			return
 		}
@@ -307,12 +308,7 @@ func (l *GameServerLink) onPlayerAuthRequest(c *gameServerConn, payload []byte) 
 	}
 
 	key, ok := l.sessions.Get(req.Account)
-	valid := ok && key == manager.SessionKey{
-		PlayKey1:  req.PlayKey1,
-		PlayKey2:  req.PlayKey2,
-		LoginKey1: req.LoginKey1,
-		LoginKey2: req.LoginKey2,
-	}
+	valid := ok && key == req.SessionKey
 	if valid {
 		l.sessions.Delete(req.Account)
 	}

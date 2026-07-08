@@ -69,10 +69,10 @@ func (c *LinkCrypt) SetKey(key []byte) error {
 // encrypts it with the link's current key, returning the (longer) encrypted
 // packet body.
 func (c *LinkCrypt) Encrypt(payload []byte) []byte {
-	buf := make([]byte, paddedSize(len(payload)+4))
+	buf := make([]byte, PaddedSize(len(payload)+4))
 	copy(buf, payload)
-	appendChecksum(buf)
-	encryptBlocks(c.cipher, buf)
+	AppendChecksum(buf)
+	EncryptBlocks(c.cipher, buf)
 	return buf
 }
 
@@ -84,8 +84,8 @@ func (c *LinkCrypt) Decrypt(payload []byte) error {
 	if len(payload) == 0 || len(payload)%BlockSize != 0 {
 		return fmt.Errorf("link packet length %d is not a positive multiple of %d", len(payload), BlockSize)
 	}
-	decryptBlocks(c.cipher, payload)
-	if !verifyChecksum(payload) {
+	DecryptBlocks(c.cipher, payload)
+	if !VerifyChecksum(payload) {
 		return fmt.Errorf("link packet checksum verification failed")
 	}
 	return nil

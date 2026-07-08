@@ -1,4 +1,4 @@
-package link
+package wire
 
 import (
 	"bytes"
@@ -14,7 +14,7 @@ func TestWriteReadFrameRoundTrip(t *testing.T) {
 	}{
 		{"empty payload", nil},
 		{"short payload", []byte{0x01, 0x02, 0x03}},
-		{"payload near 16-bit boundary", bytes.Repeat([]byte{0xaa}, 1<<16-headerSize-1)},
+		{"payload near 16-bit boundary", bytes.Repeat([]byte{0xaa}, 1<<16-FrameHeaderSize-1)},
 	}
 
 	for _, tt := range tests {

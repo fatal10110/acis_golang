@@ -7,7 +7,7 @@ import (
 	"encoding/binary"
 	"testing"
 
-	"github.com/fatal10110/acis_golang/internal/loginserver/crypt"
+	"github.com/fatal10110/acis_golang/internal/commons/crypt"
 )
 
 func TestDecodeBlowFishKey(t *testing.T) {

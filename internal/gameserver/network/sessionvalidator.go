@@ -6,7 +6,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
-	"github.com/fatal10110/acis_golang/internal/loginserver/link"
+	"github.com/fatal10110/acis_golang/internal/link"
 )
 
 // SessionValidator confirms game clients' presented session keys with the
@@ -69,11 +69,13 @@ func (v *SessionValidator) Validate(ctx context.Context, client *Client, req cli
 	result := v.register(req.LoginName)
 
 	err := loginLink.SendPlayerAuthRequest(link.PlayerAuthRequest{
-		Account:   req.LoginName,
-		PlayKey1:  req.PlayKey1,
-		PlayKey2:  req.PlayKey2,
-		LoginKey1: req.LoginKey1,
-		LoginKey2: req.LoginKey2,
+		Account: req.LoginName,
+		SessionKey: link.SessionKey{
+			PlayKey1:  req.PlayKey1,
+			PlayKey2:  req.PlayKey2,
+			LoginKey1: req.LoginKey1,
+			LoginKey2: req.LoginKey2,
+		},
 	})
 	if err != nil {
 		v.forget(req.LoginName)
@@ -86,7 +88,7 @@ func (v *SessionValidator) Validate(ctx context.Context, client *Client, req cli
 			client.Session.Send(serverpackets.EncodeAuthLoginFail(serverpackets.LoginFailSystemErrorTryLater))
 			return false, nil
 		}
-		client.Authenticate(req.LoginName, SessionKey{
+		client.Authenticate(req.LoginName, link.SessionKey{
 			LoginKey1: req.LoginKey1,
 			LoginKey2: req.LoginKey2,
 			PlayKey1:  req.PlayKey1,

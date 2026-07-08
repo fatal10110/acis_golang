@@ -1,6 +1,10 @@
 package network
 
-import "sync"
+import (
+	"sync"
+
+	"github.com/fatal10110/acis_golang/internal/link"
+)
 
 // AuthFunc validates a login attempt for accountName, reporting whether the
 // session is authorized to move a client from StateConnected to
@@ -21,7 +25,7 @@ type Client struct {
 	mu          sync.RWMutex
 	state       State
 	accountName string
-	sessionKey  SessionKey
+	sessionKey  link.SessionKey
 }
 
 // NewClient returns a Client wrapping session, starting in StateConnected.
@@ -53,7 +57,7 @@ func (c *Client) AccountName() string {
 
 // SessionKey returns the session key recorded by a successful Authenticate
 // call, or the zero value before that.
-func (c *Client) SessionKey() SessionKey {
+func (c *Client) SessionKey() link.SessionKey {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.sessionKey
@@ -63,7 +67,7 @@ func (c *Client) SessionKey() SessionKey {
 // account name and session key and advances the client to StateAuthed. It
 // reports whether authentication succeeded; on failure the client's state,
 // account name, and session key are left unchanged.
-func (c *Client) Authenticate(accountName string, key SessionKey, auth AuthFunc) bool {
+func (c *Client) Authenticate(accountName string, key link.SessionKey, auth AuthFunc) bool {
 	if !auth(accountName) {
 		return false
 	}

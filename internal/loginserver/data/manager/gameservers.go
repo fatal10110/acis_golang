@@ -3,7 +3,7 @@ package manager
 import (
 	"sync"
 
-	"github.com/fatal10110/acis_golang/internal/loginserver/link"
+	"github.com/fatal10110/acis_golang/internal/link"
 )
 
 // ServerEntry is a game server's registration state: its auth key, whether

@@ -4,7 +4,7 @@ import (
 	"crypto/rsa"
 	"fmt"
 
-	"github.com/fatal10110/acis_golang/internal/loginserver/crypt"
+	"github.com/fatal10110/acis_golang/internal/commons/crypt"
 )
 
 // OpcodeBlowFishKey is the wire opcode for BlowFishKey, the game server's

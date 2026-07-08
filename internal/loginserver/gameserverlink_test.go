@@ -12,10 +12,11 @@ import (
 	"time"
 	"unicode/utf16"
 
-	"github.com/fatal10110/acis_golang/internal/loginserver/crypt"
+	"github.com/fatal10110/acis_golang/internal/commons/crypt"
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/link"
 	"github.com/fatal10110/acis_golang/internal/loginserver/data/manager"
 	"github.com/fatal10110/acis_golang/internal/loginserver/data/sql"
-	"github.com/fatal10110/acis_golang/internal/loginserver/link"
 	"github.com/sirupsen/logrus"
 )
 
@@ -41,7 +42,7 @@ func dialGameServer(t *testing.T, addr string) *fakeGameServer {
 func (f *fakeGameServer) readFrame() []byte {
 	f.t.Helper()
 	f.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-	payload, err := link.ReadFrame(f.conn)
+	payload, err := wire.ReadFrame(f.conn)
 	if err != nil {
 		f.t.Fatalf("ReadFrame: %v", err)
 	}
@@ -53,7 +54,7 @@ func (f *fakeGameServer) readFrame() []byte {
 
 func (f *fakeGameServer) sendFrame(payload []byte) {
 	f.t.Helper()
-	if err := link.WriteFrame(f.conn, f.crypt.Encrypt(payload)); err != nil {
+	if err := wire.WriteFrame(f.conn, f.crypt.Encrypt(payload)); err != nil {
 		f.t.Fatalf("WriteFrame: %v", err)
 	}
 }
@@ -234,7 +235,7 @@ func (f *fakeGameServer) sendChangeAccessLevel(level int32, account string) {
 	f.sendFrame(payload)
 }
 
-func (f *fakeGameServer) sendPlayerAuthRequest(account string, key manager.SessionKey) {
+func (f *fakeGameServer) sendPlayerAuthRequest(account string, key link.SessionKey) {
 	f.t.Helper()
 	payload := []byte{link.OpcodePlayerAuthRequest}
 	payload = writeUTF16String(payload, account)
@@ -452,7 +453,7 @@ func TestGameServerLinkPlayerAuthRequest(t *testing.T) {
 		t.Fatal("registration failed, want success")
 	}
 
-	key := manager.SessionKey{PlayKey1: 1, PlayKey2: 2, LoginKey1: 3, LoginKey2: 4}
+	key := link.SessionKey{PlayKey1: 1, PlayKey2: 2, LoginKey1: 3, LoginKey2: 4}
 
 	// No session stored yet: must fail.
 	gs.sendPlayerAuthRequest("acc1", key)
