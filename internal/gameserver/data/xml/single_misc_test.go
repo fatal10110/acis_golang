@@ -134,6 +134,78 @@ func TestLoadAnnouncements(t *testing.T) {
 	}
 }
 
+func TestLoadObserverGroups(t *testing.T) {
+	path := datapackPath(t, filepath.Join("data", "xml", "observerGroups.xml"))
+
+	table, err := LoadObserverGroups(path)
+	if err != nil {
+		t.Fatalf("LoadObserverGroups(%q) error: %v", path, err)
+	}
+
+	if got := table.GroupCount(); got != 13 {
+		t.Fatalf("GroupCount() = %d, want 13", got)
+	}
+	if got := table.SpawnCount(); got != 25 {
+		t.Fatalf("SpawnCount() = %d, want 25", got)
+	}
+
+	group, ok := table.Group(619)
+	if !ok {
+		t.Fatal("Group(619) not loaded")
+	}
+	if len(group) != 3 {
+		t.Fatalf("len(Group(619)) = %d, want 3", len(group))
+	}
+	if group[0].ID != 634 || group[0].Location.X != 148416 || group[0].Cost != 80 || group[0].CastleID != 0 {
+		t.Fatalf("Group(619)[0] = %+v", group[0])
+	}
+
+	spawns := table.Spawns()
+	if spawns[0].NPCID != 31031 || spawns[0].Location.X != -82795 || len(spawns[0].Groups) != 11 {
+		t.Fatalf("first spawn = %+v", spawns[0])
+	}
+	if spawns[24].Location.Y != 111968 || len(spawns[24].Groups) != 2 || spawns[24].Groups[1] != 930 {
+		t.Fatalf("last spawn = %+v", spawns[24])
+	}
+}
+
+func TestLoadStaticObjects(t *testing.T) {
+	path := datapackPath(t, filepath.Join("data", "xml", "staticObjects.xml"))
+
+	table, err := LoadStaticObjects(path)
+	if err != nil {
+		t.Fatalf("LoadStaticObjects(%q) error: %v", path, err)
+	}
+
+	if got := table.Len(); got != 29 {
+		t.Fatalf("Len() = %d, want 29", got)
+	}
+
+	first, ok := table.Get(20180001)
+	if !ok {
+		t.Fatal("Get(20180001) = missing")
+	}
+	if first.Type != 0 || first.Texture != "town_map_darkelf_t00" || first.MapX != 339 || first.MapY != 170 {
+		t.Fatalf("Get(20180001) = %+v", first)
+	}
+
+	throne, ok := table.Get(24180017)
+	if !ok {
+		t.Fatal("Get(24180017) = missing")
+	}
+	if throne.Type != 1 || throne.Texture != "none" || throne.Location.Z != -42 {
+		t.Fatalf("Get(24180017) = %+v", throne)
+	}
+
+	sign, ok := table.Get(20230001)
+	if !ok {
+		t.Fatal("Get(20230001) = missing")
+	}
+	if sign.Type != 2 || sign.Location.X != 12110 || sign.Location.Y != 182770 {
+		t.Fatalf("Get(20230001) = %+v", sign)
+	}
+}
+
 func TestSingleMiscLoadersErrors(t *testing.T) {
 	dir := t.TempDir()
 
@@ -194,6 +266,24 @@ func TestSingleMiscLoadersErrors(t *testing.T) {
 			content: `<list><announcement message="" /></list>`,
 			load: func(path string) error {
 				_, err := LoadAnnouncements(path)
+				return err
+			},
+		},
+		{
+			name:    "observer spawn bad groups",
+			path:    filepath.Join(dir, "observerGroups.xml"),
+			content: `<list><groups><group id="1"><entry locId="2" x="1" y="2" z="3" yaw="4" pitch="5" cost="6" castle="0"/></group></groups><spawns><spawn id="31031" x="1" y="2" z="3" groups="1;bad"/></spawns></list>`,
+			load: func(path string) error {
+				_, err := LoadObserverGroups(path)
+				return err
+			},
+		},
+		{
+			name:    "static object missing texture",
+			path:    filepath.Join(dir, "staticObjects.xml"),
+			content: `<list><object id="1" x="1" y="2" z="3" type="0" mapX="4" mapY="5"/></list>`,
+			load: func(path string) error {
+				_, err := LoadStaticObjects(path)
 				return err
 			},
 		},
