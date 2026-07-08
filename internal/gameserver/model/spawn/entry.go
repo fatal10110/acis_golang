@@ -110,6 +110,10 @@ func ParsePositions(raw string) ([]Position, error) {
 	if raw == "" {
 		return nil, nil
 	}
+	raw = strings.TrimRight(raw, ";")
+	if raw == "" {
+		return nil, nil
+	}
 
 	parts := strings.Split(raw, ";")
 	if len(parts) == 4 {

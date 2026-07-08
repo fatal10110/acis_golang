@@ -7,9 +7,10 @@ import (
 
 // Table is the full in-memory result of loading spawnlist XML files.
 type Table struct {
-	territories map[string]*Territory
-	makers      map[string]*Maker
-	order       []*Maker
+	territories    map[string]*Territory
+	territoryCount int
+	makers         map[string]*Maker
+	order          []*Maker
 }
 
 // NewTable builds a Table from already-validated territories and makers.
@@ -23,10 +24,9 @@ func NewTable(territories []*Territory, makers []*Maker) (*Table, error) {
 
 	territoryMap := make(map[string]*Territory, len(territories))
 	for _, territory := range territories {
-		if _, exists := territoryMap[territory.Name]; exists {
-			return nil, errors.New("spawn: duplicate territory " + territory.Name)
+		if _, exists := territoryMap[territory.Name]; !exists {
+			territoryMap[territory.Name] = territory
 		}
-		territoryMap[territory.Name] = territory
 	}
 
 	makerMap := make(map[string]*Maker, len(makers))
@@ -41,9 +41,10 @@ func NewTable(territories []*Territory, makers []*Maker) (*Table, error) {
 	sort.Slice(order, func(i, j int) bool { return order[i].Name < order[j].Name })
 
 	return &Table{
-		territories: territoryMap,
-		makers:      makerMap,
-		order:       order,
+		territories:    territoryMap,
+		territoryCount: len(territories),
+		makers:         makerMap,
+		order:          order,
 	}, nil
 }
 
@@ -61,7 +62,7 @@ func (t *Table) Maker(name string) (*Maker, bool) {
 
 // TerritoryCount returns the number of territories loaded.
 func (t *Table) TerritoryCount() int {
-	return len(t.territories)
+	return t.territoryCount
 }
 
 // MakerCount returns the number of makers loaded.

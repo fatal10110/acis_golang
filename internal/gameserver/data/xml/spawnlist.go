@@ -66,10 +66,13 @@ func LoadSpawnlist(dir string) (*spawn.Table, error) {
 			if err != nil {
 				return nil, fmt.Errorf("data/xml: parse territory in %s: %w", doc.Path, err)
 			}
-			if _, exists := territoryMap[territory.Name]; exists {
-				return nil, fmt.Errorf("data/xml: parse territory in %s: duplicate territory %q", doc.Path, territory.Name)
+			if existing, exists := territoryMap[territory.Name]; exists {
+				if !sameSpawnTerritory(existing, territory) {
+					return nil, fmt.Errorf("data/xml: parse territory in %s: conflicting duplicate territory %q", doc.Path, territory.Name)
+				}
+			} else {
+				territoryMap[territory.Name] = territory
 			}
-			territoryMap[territory.Name] = territory
 			territories = append(territories, territory)
 		}
 	}
@@ -102,6 +105,18 @@ func buildTerritory(el territoryElement) (*spawn.Territory, error) {
 		nodes = append(nodes, spawn.Node{X: x, Y: y})
 	}
 	return spawn.NewTerritory(commons.StatSetFromXMLAttrs(el.Attrs), nodes)
+}
+
+func sameSpawnTerritory(a, b *spawn.Territory) bool {
+	if a.Name != b.Name || a.MinZ != b.MinZ || a.MaxZ != b.MaxZ || len(a.Nodes) != len(b.Nodes) {
+		return false
+	}
+	for i, node := range a.Nodes {
+		if node != b.Nodes[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func buildMaker(el makerElement, territories map[string]*spawn.Territory) (*spawn.Maker, error) {
