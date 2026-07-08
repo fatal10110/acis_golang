@@ -65,15 +65,16 @@ type StarterItem struct {
 // NewStarterItem builds a StarterItem from set. id and count are required;
 // isEquipped defaults to true when absent.
 func NewStarterItem(set *commons.StatSet) (StarterItem, error) {
-	id, err := set.GetInt("id")
-	if err != nil {
+	f := commons.NewFields(set, "player starter item")
+	item := StarterItem{
+		ItemID:   f.Int("id"),
+		Count:    f.Int("count"),
+		Equipped: f.BoolDefault("isEquipped", true),
+	}
+	if err := f.Err(); err != nil {
 		return StarterItem{}, err
 	}
-	count, err := set.GetInt("count")
-	if err != nil {
-		return StarterItem{}, err
-	}
-	return StarterItem{ItemID: id, Count: count, Equipped: set.GetBoolDefault("isEquipped", true)}, nil
+	return item, nil
 }
 
 // SkillGrant is one skill/level combination a character may learn, along
@@ -92,137 +93,78 @@ type SkillGrant struct {
 // NewSkillGrant builds a SkillGrant from set; id, lvl, minLvl and cost are
 // all required.
 func NewSkillGrant(set *commons.StatSet) (SkillGrant, error) {
-	id, err := set.GetInt("id")
-	if err != nil {
+	f := commons.NewFields(set, "player skill grant")
+	grant := SkillGrant{
+		SkillID:  f.Int("id"),
+		Level:    f.Int("lvl"),
+		MinLevel: f.Int("minLvl"),
+		Cost:     f.Int("cost"),
+	}
+	if err := f.Err(); err != nil {
 		return SkillGrant{}, err
 	}
-	level, err := set.GetInt("lvl")
-	if err != nil {
-		return SkillGrant{}, err
-	}
-	minLevel, err := set.GetInt("minLvl")
-	if err != nil {
-		return SkillGrant{}, err
-	}
-	cost, err := set.GetInt("cost")
-	if err != nil {
-		return SkillGrant{}, err
-	}
-	return SkillGrant{SkillID: id, Level: level, MinLevel: minLevel, Cost: cost}, nil
+	return grant, nil
 }
 
 // NewTemplate builds a Template from set, which carries the merged <set>
 // attributes of one <class> element plus the "items", "skills" and "spawns"
 // lists the loader packed in.
 func NewTemplate(set *commons.StatSet) (*Template, error) {
-	id, err := set.GetInt("id")
-	if err != nil {
-		return nil, fmt.Errorf("player template: %w", err)
-	}
-	wrap := func(err error) error { return fmt.Errorf("player template %d: %w", id, err) }
-
-	t := &Template{ID: id}
-
-	if t.BaseLevel, err = set.GetInt("baseLvl"); err != nil {
-		return nil, wrap(err)
-	}
-	if t.FistsItemID, err = set.GetInt("fists"); err != nil {
-		return nil, wrap(err)
+	idf := commons.NewFields(set, "player template")
+	id := idf.Int("id")
+	if err := idf.Err(); err != nil {
+		return nil, err
 	}
 
-	if t.STR, err = set.GetInt("str"); err != nil {
-		return nil, wrap(err)
-	}
-	if t.CON, err = set.GetInt("con"); err != nil {
-		return nil, wrap(err)
-	}
-	if t.DEX, err = set.GetInt("dex"); err != nil {
-		return nil, wrap(err)
-	}
-	if t.INT, err = set.GetInt("int"); err != nil {
-		return nil, wrap(err)
-	}
-	if t.WIT, err = set.GetInt("wit"); err != nil {
-		return nil, wrap(err)
-	}
-	if t.MEN, err = set.GetInt("men"); err != nil {
-		return nil, wrap(err)
+	f := commons.NewFields(set, fmt.Sprintf("player template %d", id))
+	t := &Template{
+		ID:          id,
+		BaseLevel:   f.Int("baseLvl"),
+		FistsItemID: f.Int("fists"),
+
+		STR: f.Int("str"),
+		CON: f.Int("con"),
+		DEX: f.Int("dex"),
+		INT: f.Int("int"),
+		WIT: f.Int("wit"),
+		MEN: f.Int("men"),
+
+		PAtk:      f.Double("pAtk"),
+		PDef:      f.Double("pDef"),
+		MAtk:      f.Double("mAtk"),
+		MDef:      f.Double("mDef"),
+		RunSpeed:  f.Double("runSpd"),
+		WalkSpeed: f.Double("walkSpd"),
+
+		SwimSpeed: f.IntDefault("swimSpd", 1),
+
+		CollisionRadius:       f.Double("radius"),
+		CollisionHeight:       f.Double("height"),
+		CollisionRadiusFemale: f.Double("radiusFemale"),
+		CollisionHeightFemale: f.Double("heightFemale"),
+
+		HPTable:      f.DoubleArray("hpTable"),
+		MPTable:      f.DoubleArray("mpTable"),
+		CPTable:      f.DoubleArray("cpTable"),
+		HPRegenTable: f.DoubleArray("hpRegenTable"),
+		MPRegenTable: f.DoubleArray("mpRegenTable"),
+		CPRegenTable: f.DoubleArray("cpRegenTable"),
+
+		Items:  commons.FieldList[StarterItem](f, "items"),
+		Skills: commons.FieldList[SkillGrant](f, "skills"),
+		Spawns: commons.FieldList[location.Location](f, "spawns"),
 	}
 
-	if t.PAtk, err = set.GetDouble("pAtk"); err != nil {
-		return nil, wrap(err)
-	}
-	if t.PDef, err = set.GetDouble("pDef"); err != nil {
-		return nil, wrap(err)
-	}
-	if t.MAtk, err = set.GetDouble("mAtk"); err != nil {
-		return nil, wrap(err)
-	}
-	if t.MDef, err = set.GetDouble("mDef"); err != nil {
-		return nil, wrap(err)
-	}
-	if t.RunSpeed, err = set.GetDouble("runSpd"); err != nil {
-		return nil, wrap(err)
-	}
-	if t.WalkSpeed, err = set.GetDouble("walkSpd"); err != nil {
-		return nil, wrap(err)
-	}
-
-	if t.SwimSpeed, err = set.GetIntDefault("swimSpd", 1); err != nil {
-		return nil, wrap(err)
-	}
-
-	if t.CollisionRadius, err = set.GetDouble("radius"); err != nil {
-		return nil, wrap(err)
-	}
-	if t.CollisionHeight, err = set.GetDouble("height"); err != nil {
-		return nil, wrap(err)
-	}
-	if t.CollisionRadiusFemale, err = set.GetDouble("radiusFemale"); err != nil {
-		return nil, wrap(err)
-	}
-	if t.CollisionHeightFemale, err = set.GetDouble("heightFemale"); err != nil {
-		return nil, wrap(err)
-	}
-
-	safeFall, err := set.GetIntArray("safeFallHeight")
-	if err != nil {
-		return nil, wrap(err)
-	}
+	safeFall := f.IntArray("safeFallHeight")
 	if len(safeFall) != 2 {
-		return nil, wrap(fmt.Errorf("attribute %q: want 2 values, got %d", "safeFallHeight", len(safeFall)))
-	}
-	t.SafeFallHeightFemale, t.SafeFallHeightMale = safeFall[0], safeFall[1]
-
-	if t.HPTable, err = set.GetDoubleArray("hpTable"); err != nil {
-		return nil, wrap(err)
-	}
-	if t.MPTable, err = set.GetDoubleArray("mpTable"); err != nil {
-		return nil, wrap(err)
-	}
-	if t.CPTable, err = set.GetDoubleArray("cpTable"); err != nil {
-		return nil, wrap(err)
-	}
-	if t.HPRegenTable, err = set.GetDoubleArray("hpRegenTable"); err != nil {
-		return nil, wrap(err)
-	}
-	if t.MPRegenTable, err = set.GetDoubleArray("mpRegenTable"); err != nil {
-		return nil, wrap(err)
-	}
-	if t.CPRegenTable, err = set.GetDoubleArray("cpRegenTable"); err != nil {
-		return nil, wrap(err)
+		f.Fail(fmt.Errorf("attribute %q: want 2 values, got %d", "safeFallHeight", len(safeFall)))
+	} else {
+		t.SafeFallHeightFemale, t.SafeFallHeightMale = safeFall[0], safeFall[1]
 	}
 
-	if t.Items, err = commons.GetList[StarterItem](set, "items"); err != nil {
-		return nil, wrap(err)
+	if err := f.Err(); err != nil {
+		return nil, err
 	}
-	if t.Skills, err = commons.GetList[SkillGrant](set, "skills"); err != nil {
-		return nil, wrap(err)
-	}
-	if t.Spawns, err = commons.GetList[location.Location](set, "spawns"); err != nil {
-		return nil, wrap(err)
-	}
-
 	return t, nil
 }
 

@@ -100,17 +100,12 @@ type PrivateEntry struct {
 // NewPrivateEntry builds a PrivateEntry from set, the folded attributes of
 // one <private> element. id, weight and respawn are all required.
 func NewPrivateEntry(set *commons.StatSet) (PrivateEntry, error) {
-	id, err := set.GetInt("id")
-	if err != nil {
-		return PrivateEntry{}, fmt.Errorf("npc: private entry: %w", err)
-	}
-	weight, err := set.GetInt("weight")
-	if err != nil {
-		return PrivateEntry{}, fmt.Errorf("npc: private entry %d: %w", id, err)
-	}
-	respawnStr, err := set.GetString("respawn")
-	if err != nil {
-		return PrivateEntry{}, fmt.Errorf("npc: private entry %d: %w", id, err)
+	f := commons.NewFields(set, "npc: private entry")
+	id := f.Int("id")
+	weight := f.Int("weight")
+	respawnStr := f.String("respawn")
+	if err := f.Err(); err != nil {
+		return PrivateEntry{}, err
 	}
 	respawn, err := commons.ParseGameDuration(respawnStr)
 	if err != nil {
@@ -131,31 +126,19 @@ type PetData struct {
 // <petdata> element, and its already-parsed per-level stat rows. Every
 // attribute is required.
 func NewPetData(set *commons.StatSet, levels map[int]PetLevelStats) (*PetData, error) {
-	food1, err := set.GetInt("food1")
-	if err != nil {
-		return nil, fmt.Errorf("npc: pet data: %w", err)
+	f := commons.NewFields(set, "npc: pet data")
+	p := &PetData{
+		Food1:         f.Int("food1"),
+		Food2:         f.Int("food2"),
+		AutoFeedLimit: f.Double("autoFeedLimit"),
+		HungryLimit:   f.Double("hungryLimit"),
+		UnsummonLimit: f.Double("unsummonLimit"),
+		Levels:        levels,
 	}
-	food2, err := set.GetInt("food2")
-	if err != nil {
-		return nil, fmt.Errorf("npc: pet data: %w", err)
+	if err := f.Err(); err != nil {
+		return nil, err
 	}
-	autoFeedLimit, err := set.GetDouble("autoFeedLimit")
-	if err != nil {
-		return nil, fmt.Errorf("npc: pet data: %w", err)
-	}
-	hungryLimit, err := set.GetDouble("hungryLimit")
-	if err != nil {
-		return nil, fmt.Errorf("npc: pet data: %w", err)
-	}
-	unsummonLimit, err := set.GetDouble("unsummonLimit")
-	if err != nil {
-		return nil, fmt.Errorf("npc: pet data: %w", err)
-	}
-	return &PetData{
-		Food1: food1, Food2: food2,
-		AutoFeedLimit: autoFeedLimit, HungryLimit: hungryLimit, UnsummonLimit: unsummonLimit,
-		Levels: levels,
-	}, nil
+	return p, nil
 }
 
 // PetLevelStats is one level's row of a pet's growth table: its stats
@@ -183,82 +166,43 @@ type PetLevelStats struct {
 // defines no "*OnRide"/"speedOnRide" attributes at all, matching a pet that
 // cannot be ridden at this level.
 func NewPetLevelStats(set *commons.StatSet) (PetLevelStats, error) {
-	s := PetLevelStats{}
-	var err error
+	f := commons.NewFields(set, "npc: pet level stats")
+	s := PetLevelStats{
+		MaxExp:       f.Long("exp"),
+		MaxMeal:      f.Int("maxMeal"),
+		ExpType:      f.Int("expType"),
+		MealInBattle: f.Int("mealInBattle"),
+		MealInNormal: f.Int("mealInNormal"),
+		PAtk:         f.Double("pAtk"),
+		PDef:         f.Double("pDef"),
+		MAtk:         f.Double("mAtk"),
+		MDef:         f.Double("mDef"),
+		MaxHP:        f.Double("hp"),
+		MaxMP:        f.Double("mp"),
+		HPRegen:      f.Double("hpRegen"),
+		MPRegen:      f.Double("mpRegen"),
+		SSCount:      f.Int("ssCount"),
+		SPSCount:     f.Int("spsCount"),
 
-	if s.MaxExp, err = set.GetLong("exp"); err != nil {
-		return PetLevelStats{}, fmt.Errorf("npc: pet level stats: %w", err)
-	}
-	if s.MaxMeal, err = set.GetInt("maxMeal"); err != nil {
-		return PetLevelStats{}, fmt.Errorf("npc: pet level stats: %w", err)
-	}
-	if s.ExpType, err = set.GetInt("expType"); err != nil {
-		return PetLevelStats{}, fmt.Errorf("npc: pet level stats: %w", err)
-	}
-	if s.MealInBattle, err = set.GetInt("mealInBattle"); err != nil {
-		return PetLevelStats{}, fmt.Errorf("npc: pet level stats: %w", err)
-	}
-	if s.MealInNormal, err = set.GetInt("mealInNormal"); err != nil {
-		return PetLevelStats{}, fmt.Errorf("npc: pet level stats: %w", err)
-	}
-	if s.PAtk, err = set.GetDouble("pAtk"); err != nil {
-		return PetLevelStats{}, fmt.Errorf("npc: pet level stats: %w", err)
-	}
-	if s.PDef, err = set.GetDouble("pDef"); err != nil {
-		return PetLevelStats{}, fmt.Errorf("npc: pet level stats: %w", err)
-	}
-	if s.MAtk, err = set.GetDouble("mAtk"); err != nil {
-		return PetLevelStats{}, fmt.Errorf("npc: pet level stats: %w", err)
-	}
-	if s.MDef, err = set.GetDouble("mDef"); err != nil {
-		return PetLevelStats{}, fmt.Errorf("npc: pet level stats: %w", err)
-	}
-	if s.MaxHP, err = set.GetDouble("hp"); err != nil {
-		return PetLevelStats{}, fmt.Errorf("npc: pet level stats: %w", err)
-	}
-	if s.MaxMP, err = set.GetDouble("mp"); err != nil {
-		return PetLevelStats{}, fmt.Errorf("npc: pet level stats: %w", err)
-	}
-	if s.HPRegen, err = set.GetDouble("hpRegen"); err != nil {
-		return PetLevelStats{}, fmt.Errorf("npc: pet level stats: %w", err)
-	}
-	if s.MPRegen, err = set.GetDouble("mpRegen"); err != nil {
-		return PetLevelStats{}, fmt.Errorf("npc: pet level stats: %w", err)
-	}
-	if s.SSCount, err = set.GetInt("ssCount"); err != nil {
-		return PetLevelStats{}, fmt.Errorf("npc: pet level stats: %w", err)
-	}
-	if s.SPSCount, err = set.GetInt("spsCount"); err != nil {
-		return PetLevelStats{}, fmt.Errorf("npc: pet level stats: %w", err)
+		MountMealInBattle: f.IntDefault("mealInBattleOnRide", 0),
+		MountMealInNormal: f.IntDefault("mealInNormalOnRide", 0),
+		MountAtkSpd:       f.DoubleDefault("atkSpdOnRide", 0),
+		MountPAtk:         f.DoubleDefault("pAtkOnRide", 0),
+		MountMAtk:         f.DoubleDefault("mAtkOnRide", 0),
 	}
 
-	if s.MountMealInBattle, err = set.GetIntDefault("mealInBattleOnRide", 0); err != nil {
-		return PetLevelStats{}, fmt.Errorf("npc: pet level stats: %w", err)
-	}
-	if s.MountMealInNormal, err = set.GetIntDefault("mealInNormalOnRide", 0); err != nil {
-		return PetLevelStats{}, fmt.Errorf("npc: pet level stats: %w", err)
-	}
-	if s.MountAtkSpd, err = set.GetDoubleDefault("atkSpdOnRide", 0); err != nil {
-		return PetLevelStats{}, fmt.Errorf("npc: pet level stats: %w", err)
-	}
-	if s.MountPAtk, err = set.GetDoubleDefault("pAtkOnRide", 0); err != nil {
-		return PetLevelStats{}, fmt.Errorf("npc: pet level stats: %w", err)
-	}
-	if s.MountMAtk, err = set.GetDoubleDefault("mAtkOnRide", 0); err != nil {
-		return PetLevelStats{}, fmt.Errorf("npc: pet level stats: %w", err)
-	}
-
-	if set.Has("speedOnRide") {
-		speeds, err := set.GetIntArray("speedOnRide")
-		if err != nil {
-			return PetLevelStats{}, fmt.Errorf("npc: pet level stats: %w", err)
-		}
+	if f.Has("speedOnRide") {
+		speeds := f.IntArray("speedOnRide")
 		if len(speeds) < 5 {
-			return PetLevelStats{}, fmt.Errorf("npc: pet level stats: attribute %q: want at least 5 values, got %d", "speedOnRide", len(speeds))
+			f.Fail(fmt.Errorf("attribute %q: want at least 5 values, got %d", "speedOnRide", len(speeds)))
+		} else {
+			s.MountBaseSpeed, s.MountWaterSpeed, s.MountFlySpeed = speeds[0], speeds[2], speeds[4]
 		}
-		s.MountBaseSpeed, s.MountWaterSpeed, s.MountFlySpeed = speeds[0], speeds[2], speeds[4]
 	}
 
+	if err := f.Err(); err != nil {
+		return PetLevelStats{}, err
+	}
 	return s, nil
 }
 
@@ -266,180 +210,105 @@ func NewPetLevelStats(set *commons.StatSet) (PetLevelStats, error) {
 // one <npc> element plus the "aiParams", "drops", "privates", "teachTo" and
 // "pet" values the loader packed in.
 func NewTemplate(set *commons.StatSet) (*Template, error) {
-	id, err := set.GetInt("id")
-	if err != nil {
-		return nil, fmt.Errorf("npc template: %w", err)
-	}
-	wrap := func(err error) error { return fmt.Errorf("npc template %d: %w", id, err) }
-
-	t := &Template{ID: id}
-
-	if t.TemplateID, err = set.GetIntDefault("idTemplate", id); err != nil {
-		return nil, wrap(err)
-	}
-	if t.Name, err = set.GetString("name"); err != nil {
-		return nil, wrap(err)
-	}
-	t.Title = set.GetStringDefault("title", "")
-	t.Alias = set.GetStringDefault("alias", "")
-	t.UsingServerSideName = set.GetBoolDefault("usingServerSideName", false)
-	t.UsingServerSideTitle = set.GetBoolDefault("usingServerSideTitle", false)
-
-	if t.Type, err = set.GetString("type"); err != nil {
-		return nil, wrap(err)
-	}
-	if t.Level, err = set.GetIntDefault("level", 1); err != nil {
-		return nil, wrap(err)
-	}
-	if t.HitTimeFactor, err = set.GetDoubleDefault("hitTimeFactor", 0); err != nil {
-		return nil, wrap(err)
-	}
-	if t.RightHand, err = set.GetIntDefault("rHand", 0); err != nil {
-		return nil, wrap(err)
-	}
-	if t.LeftHand, err = set.GetIntDefault("lHand", 0); err != nil {
-		return nil, wrap(err)
-	}
-	if t.RewardExp, err = set.GetDoubleDefault("exp", 0); err != nil {
-		return nil, wrap(err)
-	}
-	if t.RewardSp, err = set.GetDoubleDefault("sp", 0); err != nil {
-		return nil, wrap(err)
+	idf := commons.NewFields(set, "npc template")
+	id := idf.Int("id")
+	if err := idf.Err(); err != nil {
+		return nil, err
 	}
 
-	if t.BaseAttackRange, err = set.GetIntDefault("baseAttackRange", 0); err != nil {
-		return nil, wrap(err)
-	}
-	if t.BaseDamageRange, err = set.GetIntArray("baseDamageRange"); err != nil {
-		return nil, wrap(err)
-	}
-	if t.BaseRandomDamage, err = set.GetIntDefault("baseRandomDamage", 0); err != nil {
-		return nil, wrap(err)
+	f := commons.NewFields(set, fmt.Sprintf("npc template %d", id))
+	t := &Template{
+		ID:         id,
+		TemplateID: f.IntDefault("idTemplate", id),
+		Name:       f.String("name"),
+
+		Title: f.StringDefault("title", ""),
+		Alias: f.StringDefault("alias", ""),
+
+		UsingServerSideName:  f.BoolDefault("usingServerSideName", false),
+		UsingServerSideTitle: f.BoolDefault("usingServerSideTitle", false),
+
+		Type:          f.String("type"),
+		Level:         f.IntDefault("level", 1),
+		HitTimeFactor: f.DoubleDefault("hitTimeFactor", 0),
+		RightHand:     f.IntDefault("rHand", 0),
+		LeftHand:      f.IntDefault("lHand", 0),
+		RewardExp:     f.DoubleDefault("exp", 0),
+		RewardSp:      f.DoubleDefault("sp", 0),
+
+		BaseAttackRange:  f.IntDefault("baseAttackRange", 0),
+		BaseDamageRange:  f.IntArray("baseDamageRange"),
+		BaseRandomDamage: f.IntDefault("baseRandomDamage", 0),
+
+		STR: f.IntDefault("str", 40),
+		CON: f.IntDefault("con", 21),
+		DEX: f.IntDefault("dex", 30),
+		INT: f.IntDefault("int", 20),
+		WIT: f.IntDefault("wit", 43),
+		MEN: f.IntDefault("men", 20),
+
+		HPMax:   f.DoubleDefault("hp", 0),
+		MPMax:   f.DoubleDefault("mp", 0),
+		HPRegen: f.DoubleDefault("hpRegen", 1.5),
+		MPRegen: f.DoubleDefault("mpRegen", 0.9),
+		PAtk:    f.Double("pAtk"),
+		MAtk:    f.Double("mAtk"),
+		PDef:    f.Double("pDef"),
+		MDef:    f.Double("mDef"),
+
+		AtkSpd:    f.DoubleDefault("atkSpd", 300),
+		CritRate:  f.DoubleDefault("crit", 4),
+		WalkSpeed: f.DoubleDefault("walkSpd", 0),
+		RunSpeed:  f.DoubleDefault("runSpd", 1),
+
+		CollisionRadius: f.Double("radius"),
+		CollisionHeight: f.Double("height"),
+
+		SSCount:  f.IntDefault("ssCount", 0),
+		SPSCount: f.IntDefault("spsCount", 0),
+
+		Undying:       f.BoolDefault("undying", false),
+		CanBeAttacked: f.BoolDefault("canBeAttacked", true),
+		CorpseTime:    f.IntDefault("corpseTime", 7),
+		NoSleepMode:   f.BoolDefault("noSleepMode", false),
+		AggroRange:    f.IntDefault("aggroRange", 0),
+		CanMove:       f.BoolDefault("canMove", true),
+		Seedable:      f.BoolDefault("seedable", false),
+		CanSeeThrough: f.BoolDefault("canSeeThrough", false),
+
+		Drops:    commons.FieldList[item.DropCategory](f, "drops"),
+		Privates: commons.FieldList[PrivateEntry](f, "privates"),
 	}
 
-	if race, ok := commons.GetObject[Race](set, "race"); ok {
+	if race, ok := commons.FieldObject[Race](f, "race"); ok {
 		t.Race = race
 	}
 
-	if t.STR, err = set.GetIntDefault("str", 40); err != nil {
-		return nil, wrap(err)
-	}
-	if t.CON, err = set.GetIntDefault("con", 21); err != nil {
-		return nil, wrap(err)
-	}
-	if t.DEX, err = set.GetIntDefault("dex", 30); err != nil {
-		return nil, wrap(err)
-	}
-	if t.INT, err = set.GetIntDefault("int", 20); err != nil {
-		return nil, wrap(err)
-	}
-	if t.WIT, err = set.GetIntDefault("wit", 43); err != nil {
-		return nil, wrap(err)
-	}
-	if t.MEN, err = set.GetIntDefault("men", 20); err != nil {
-		return nil, wrap(err)
-	}
-
-	if t.HPMax, err = set.GetDoubleDefault("hp", 0); err != nil {
-		return nil, wrap(err)
-	}
-	if t.MPMax, err = set.GetDoubleDefault("mp", 0); err != nil {
-		return nil, wrap(err)
-	}
-	if t.HPRegen, err = set.GetDoubleDefault("hpRegen", 1.5); err != nil {
-		return nil, wrap(err)
-	}
-	if t.MPRegen, err = set.GetDoubleDefault("mpRegen", 0.9); err != nil {
-		return nil, wrap(err)
-	}
-	if t.PAtk, err = set.GetDouble("pAtk"); err != nil {
-		return nil, wrap(err)
-	}
-	if t.MAtk, err = set.GetDouble("mAtk"); err != nil {
-		return nil, wrap(err)
-	}
-	if t.PDef, err = set.GetDouble("pDef"); err != nil {
-		return nil, wrap(err)
-	}
-	if t.MDef, err = set.GetDouble("mDef"); err != nil {
-		return nil, wrap(err)
-	}
-	if t.AtkSpd, err = set.GetDoubleDefault("atkSpd", 300); err != nil {
-		return nil, wrap(err)
-	}
-	if t.CritRate, err = set.GetDoubleDefault("crit", 4); err != nil {
-		return nil, wrap(err)
-	}
-	if t.WalkSpeed, err = set.GetDoubleDefault("walkSpd", 0); err != nil {
-		return nil, wrap(err)
-	}
-	if t.RunSpeed, err = set.GetDoubleDefault("runSpd", 1); err != nil {
-		return nil, wrap(err)
-	}
-	if t.CollisionRadius, err = set.GetDouble("radius"); err != nil {
-		return nil, wrap(err)
-	}
-	if t.CollisionHeight, err = set.GetDouble("height"); err != nil {
-		return nil, wrap(err)
-	}
-
-	if t.SSCount, err = set.GetIntDefault("ssCount", 0); err != nil {
-		return nil, wrap(err)
-	}
-	if t.SPSCount, err = set.GetIntDefault("spsCount", 0); err != nil {
-		return nil, wrap(err)
-	}
-
-	t.Undying = set.GetBoolDefault("undying", false)
-	t.CanBeAttacked = set.GetBoolDefault("canBeAttacked", true)
-	if t.CorpseTime, err = set.GetIntDefault("corpseTime", 7); err != nil {
-		return nil, wrap(err)
-	}
-	t.NoSleepMode = set.GetBoolDefault("noSleepMode", false)
-	if t.AggroRange, err = set.GetIntDefault("aggroRange", 0); err != nil {
-		return nil, wrap(err)
-	}
-	t.CanMove = set.GetBoolDefault("canMove", true)
-	t.Seedable = set.GetBoolDefault("seedable", false)
-	t.CanSeeThrough = set.GetBoolDefault("canSeeThrough", false)
-
-	if aiParams, ok := commons.GetObject[*commons.StatSet](set, "aiParams"); ok {
+	if aiParams, ok := commons.FieldObject[*commons.StatSet](f, "aiParams"); ok {
 		t.AIParams = aiParams
 	} else {
 		t.AIParams = commons.NewStatSet()
 	}
 
-	if t.Drops, err = commons.GetList[item.DropCategory](set, "drops"); err != nil {
-		return nil, wrap(err)
-	}
-	if t.Privates, err = commons.GetList[PrivateEntry](set, "privates"); err != nil {
-		return nil, wrap(err)
-	}
-
-	if set.Has("clan") {
-		if t.Clans, err = set.GetStringArray("clan"); err != nil {
-			return nil, wrap(err)
-		}
-		if t.ClanRange, err = set.GetInt("clanRange"); err != nil {
-			return nil, wrap(err)
-		}
-		if set.Has("ignoredIds") {
-			if t.IgnoredIDs, err = set.GetIntArray("ignoredIds"); err != nil {
-				return nil, wrap(err)
-			}
+	if f.Has("clan") {
+		t.Clans = f.StringArray("clan")
+		t.ClanRange = f.Int("clanRange")
+		if f.Has("ignoredIds") {
+			t.IgnoredIDs = f.IntArray("ignoredIds")
 		}
 	}
 
-	if set.Has("teachTo") {
-		if t.TeachTo, err = set.GetIntArray("teachTo"); err != nil {
-			return nil, wrap(err)
-		}
+	if f.Has("teachTo") {
+		t.TeachTo = f.IntArray("teachTo")
 	}
 
-	if pet, ok := commons.GetObject[*PetData](set, "pet"); ok {
+	if pet, ok := commons.FieldObject[*PetData](f, "pet"); ok {
 		t.Pet = pet
 	}
 
+	if err := f.Err(); err != nil {
+		return nil, err
+	}
 	return t, nil
 }
 
