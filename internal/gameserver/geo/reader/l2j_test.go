@@ -14,16 +14,16 @@ func TestReadL2JDecodesRegionBlocks(t *testing.T) {
 	}
 
 	var complexCells [block.CellCount]uint16
-	complexCells[cellIndex(2, 3)] = cellCode(64, block.North|block.East)
+	complexCells[cellIndex(2, 3)] = l2jCellCode(64, block.North|block.East)
 	blocks[1] = complexBlock(complexCells)
 
 	var multilayerCells [block.CellCount][]uint16
 	for i := range multilayerCells {
-		multilayerCells[i] = []uint16{cellCode(0, block.AllDirections)}
+		multilayerCells[i] = []uint16{l2jCellCode(0, block.AllDirections)}
 	}
 	multilayerCells[cellIndex(4, 5)] = []uint16{
-		cellCode(-16, block.West),
-		cellCode(48, block.South|block.East),
+		l2jCellCode(-16, block.West),
+		l2jCellCode(48, block.South|block.East),
 	}
 	blocks[2] = multilayerBlock(multilayerCells)
 
@@ -134,7 +134,7 @@ func multilayerBlock(cells [block.CellCount][]uint16) []byte {
 	return data
 }
 
-func cellCode(height int16, nswe block.NSWE) uint16 {
+func l2jCellCode(height int16, nswe block.NSWE) uint16 {
 	return uint16(int16(height<<1))&0xfff0 | uint16(nswe)
 }
 
