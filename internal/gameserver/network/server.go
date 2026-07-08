@@ -5,6 +5,8 @@ import (
 	"net"
 
 	"github.com/sirupsen/logrus"
+
+	"github.com/fatal10110/acis_golang/internal/commons/netutil"
 )
 
 // Serve accepts game-client connections on ln until ctx is canceled or
@@ -17,40 +19,12 @@ func Serve(ctx context.Context, ln net.Listener, handle func(ctx context.Context
 		log = logrus.StandardLogger()
 	}
 
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				log.Errorf("game listener shutdown watcher panic: %v", r)
-			}
-		}()
-		<-ctx.Done()
-		ln.Close()
-	}()
-
-	for {
-		raw, err := ln.Accept()
-		if err != nil {
-			select {
-			case <-ctx.Done():
-				return nil
-			default:
-				return err
-			}
-		}
-
+	return netutil.AcceptLoop(ctx, ln, func(raw net.Conn) {
 		if tcp, ok := raw.(*net.TCPConn); ok {
 			tcp.SetNoDelay(true)
 		}
-
 		conn := newConn(raw, log)
-		go func() {
-			defer func() {
-				if r := recover(); r != nil {
-					log.Errorf("game connection handler panic: %v", r)
-				}
-				conn.Close()
-			}()
-			handle(ctx, conn)
-		}()
-	}
+		defer conn.Close()
+		handle(ctx, conn)
+	}, log)
 }
