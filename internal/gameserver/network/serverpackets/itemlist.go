@@ -16,8 +16,8 @@ const OpcodeItemList = 0x1b
 // paperdoll. Items in any other container (warehouse, freight, a pet's own
 // hold) are a different list and don't belong here. templates must have an
 // entry for every item's template id; a carried item with no loaded
-// template is an invariant violation, not a case to encode around.
-func EncodeItemList(items []*item.Instance, templates *item.Table, showWindow bool) []byte {
+// template is reported as an error rather than encoded around.
+func EncodeItemList(items []*item.Instance, templates *item.Table, showWindow bool) ([]byte, error) {
 	owned := make([]*item.Instance, 0, len(items))
 	for _, it := range items {
 		if it.Location == item.LocationInventory || it.Location == item.LocationPaperdoll {
@@ -32,7 +32,7 @@ func EncodeItemList(items []*item.Instance, templates *item.Table, showWindow bo
 	for _, it := range owned {
 		tmpl, ok := templates.Get(it.TemplateID)
 		if !ok {
-			panic(fmt.Sprintf("serverpackets: EncodeItemList: no template loaded for item template %d", it.TemplateID))
+			return nil, fmt.Errorf("serverpackets: EncodeItemList: no template loaded for item template %d", it.TemplateID)
 		}
 		category, subCategory := tmpl.Category()
 
@@ -49,5 +49,5 @@ func EncodeItemList(items []*item.Instance, templates *item.Table, showWindow bo
 		w.WriteInt32(0)  // augmentation id: item augmentation is not modeled
 		w.WriteInt32(-1) // displayed mana left: shadow-item duration is not modeled
 	}
-	return w.Bytes()
+	return w.Bytes(), nil
 }
