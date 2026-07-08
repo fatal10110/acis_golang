@@ -24,22 +24,14 @@ func LoadSoulCrystalData(path string) (*item.SoulCrystalTable, error) {
 		return nil, fmt.Errorf("xml: soul crystals %q: %w", path, err)
 	}
 
-	crystals := make([]item.SoulCrystal, 0, len(doc.Crystals))
-	for _, el := range doc.Crystals {
-		entry, err := item.NewSoulCrystal(commons.StatSetFromXMLAttrs(el.Attrs))
-		if err != nil {
-			return nil, fmt.Errorf("xml: %s: %w", path, err)
-		}
-		crystals = append(crystals, entry)
+	crystals, err := buildAll(path, doc.Crystals, item.NewSoulCrystal)
+	if err != nil {
+		return nil, err
 	}
 
-	infos := make([]item.SoulCrystalLevelingInfo, 0, len(doc.NPCs))
-	for _, el := range doc.NPCs {
-		entry, err := item.NewSoulCrystalLevelingInfo(commons.StatSetFromXMLAttrs(el.Attrs))
-		if err != nil {
-			return nil, fmt.Errorf("xml: %s: %w", path, err)
-		}
-		infos = append(infos, entry)
+	infos, err := buildAll(path, doc.NPCs, item.NewSoulCrystalLevelingInfo)
+	if err != nil {
+		return nil, err
 	}
 
 	table, err := item.NewSoulCrystalTable(crystals, infos)
@@ -59,13 +51,9 @@ func LoadSpellbooks(path string) (*skill.SpellbookTable, error) {
 		return nil, fmt.Errorf("xml: spellbooks %q: %w", path, err)
 	}
 
-	books := make([]skill.Spellbook, 0, len(doc.Books))
-	for _, el := range doc.Books {
-		book, err := skill.NewSpellbook(commons.StatSetFromXMLAttrs(el.Attrs))
-		if err != nil {
-			return nil, fmt.Errorf("xml: %s: %w", path, err)
-		}
-		books = append(books, book)
+	books, err := buildAll(path, doc.Books, skill.NewSpellbook)
+	if err != nil {
+		return nil, err
 	}
 	return skill.NewSpellbookTable(books)
 }
@@ -80,13 +68,9 @@ func LoadSummonItems(path string) (*item.SummonItemTable, error) {
 		return nil, fmt.Errorf("xml: summon items %q: %w", path, err)
 	}
 
-	items := make([]item.SummonItem, 0, len(doc.Items))
-	for _, el := range doc.Items {
-		entry, err := item.NewSummonItem(commons.StatSetFromXMLAttrs(el.Attrs))
-		if err != nil {
-			return nil, fmt.Errorf("xml: %s: %w", path, err)
-		}
-		items = append(items, entry)
+	items, err := buildAll(path, doc.Items, item.NewSummonItem)
+	if err != nil {
+		return nil, err
 	}
 	return item.NewSummonItemTable(items)
 }
@@ -101,13 +85,9 @@ func LoadHealSps(path string) (*skill.HealSpsTable, error) {
 		return nil, fmt.Errorf("xml: heal sps %q: %w", path, err)
 	}
 
-	entries := make([]skill.HealSps, 0, len(doc.Entries))
-	for _, el := range doc.Entries {
-		entry, err := skill.NewHealSps(commons.StatSetFromXMLAttrs(el.Attrs))
-		if err != nil {
-			return nil, fmt.Errorf("xml: %s: %w", path, err)
-		}
-		entries = append(entries, entry)
+	entries, err := buildAll(path, doc.Entries, skill.NewHealSps)
+	if err != nil {
+		return nil, err
 	}
 	return skill.NewHealSpsTable(entries)
 }
@@ -122,13 +102,9 @@ func LoadNewbieBuffs(path string) (*skill.NewbieBuffTable, error) {
 		return nil, fmt.Errorf("xml: newbie buffs %q: %w", path, err)
 	}
 
-	buffs := make([]skill.NewbieBuff, 0, len(doc.Buffs))
-	for _, el := range doc.Buffs {
-		entry, err := skill.NewNewbieBuff(commons.StatSetFromXMLAttrs(el.Attrs))
-		if err != nil {
-			return nil, fmt.Errorf("xml: %s: %w", path, err)
-		}
-		buffs = append(buffs, entry)
+	buffs, err := buildAll(path, doc.Buffs, skill.NewNewbieBuff)
+	if err != nil {
+		return nil, err
 	}
 	return skill.NewNewbieBuffTable(buffs), nil
 }
@@ -149,26 +125,18 @@ func LoadAdminData(dir string) (*admin.Data, error) {
 	if err := readXML(accessPath, &accessDoc); err != nil {
 		return nil, fmt.Errorf("xml: admin access levels %q: %w", accessPath, err)
 	}
-	levels := make([]admin.AccessLevel, 0, len(accessDoc.Entries))
-	for _, el := range accessDoc.Entries {
-		entry, err := admin.NewAccessLevel(commons.StatSetFromXMLAttrs(el.Attrs))
-		if err != nil {
-			return nil, fmt.Errorf("xml: %s: %w", accessPath, err)
-		}
-		levels = append(levels, entry)
+	levels, err := buildAll(accessPath, accessDoc.Entries, admin.NewAccessLevel)
+	if err != nil {
+		return nil, err
 	}
 
 	var commandDoc adminCommandFile
 	if err := readXML(commandPath, &commandDoc); err != nil {
 		return nil, fmt.Errorf("xml: admin commands %q: %w", commandPath, err)
 	}
-	commands := make([]admin.Command, 0, len(commandDoc.Entries))
-	for _, el := range commandDoc.Entries {
-		entry, err := admin.NewCommand(commons.StatSetFromXMLAttrs(el.Attrs))
-		if err != nil {
-			return nil, fmt.Errorf("xml: %s: %w", commandPath, err)
-		}
-		commands = append(commands, entry)
+	commands, err := buildAll(commandPath, commandDoc.Entries, admin.NewCommand)
+	if err != nil {
+		return nil, err
 	}
 
 	data, err := admin.NewData(levels, commands)
@@ -188,15 +156,7 @@ func LoadAnnouncements(path string) ([]admin.Announcement, error) {
 		return nil, fmt.Errorf("xml: announcements %q: %w", path, err)
 	}
 
-	out := make([]admin.Announcement, 0, len(doc.Entries))
-	for _, el := range doc.Entries {
-		entry, err := admin.NewAnnouncement(commons.StatSetFromXMLAttrs(el.Attrs))
-		if err != nil {
-			return nil, fmt.Errorf("xml: %s: %w", path, err)
-		}
-		out = append(out, entry)
-	}
-	return out, nil
+	return buildAll(path, doc.Entries, admin.NewAnnouncement)
 }
 
 type observerGroupFile struct {
@@ -249,13 +209,9 @@ func LoadStaticObjects(path string) (*staticobject.Table, error) {
 		return nil, fmt.Errorf("xml: static objects %q: %w", path, err)
 	}
 
-	templates := make([]*staticobject.Template, 0, len(doc.Objects))
-	for _, el := range doc.Objects {
-		tmpl, err := staticobject.NewTemplate(commons.StatSetFromXMLAttrs(el.Attrs))
-		if err != nil {
-			return nil, fmt.Errorf("xml: %s: %w", path, err)
-		}
-		templates = append(templates, tmpl)
+	templates, err := buildAll(path, doc.Objects, staticobject.NewTemplate)
+	if err != nil {
+		return nil, err
 	}
 	return staticobject.NewTable(templates)
 }
@@ -270,13 +226,11 @@ func LoadCursedWeapons(path string, skills *skill.Table) (*entity.CursedWeaponTa
 		return nil, fmt.Errorf("xml: cursed weapons %q: %w", path, err)
 	}
 
-	weapons := make([]entity.CursedWeapon, 0, len(doc.Items))
-	for _, el := range doc.Items {
-		weapon, err := entity.NewCursedWeapon(commons.StatSetFromXMLAttrs(el.Attrs), skills)
-		if err != nil {
-			return nil, fmt.Errorf("xml: %s: %w", path, err)
-		}
-		weapons = append(weapons, weapon)
+	weapons, err := buildAll(path, doc.Items, func(set *commons.StatSet) (entity.CursedWeapon, error) {
+		return entity.NewCursedWeapon(set, skills)
+	})
+	if err != nil {
+		return nil, err
 	}
 	return entity.NewCursedWeaponTable(weapons)
 }
