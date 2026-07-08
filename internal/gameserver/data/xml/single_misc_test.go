@@ -134,6 +134,59 @@ func TestLoadAnnouncements(t *testing.T) {
 	}
 }
 
+func TestLoadCursedWeapons(t *testing.T) {
+	skillsPath := datapackPath(t, filepath.Join("data", "xml", "skills"))
+	skills, err := LoadSkillDefinitions(skillsPath)
+	if err != nil {
+		t.Fatalf("LoadSkillDefinitions(%q) error: %v", skillsPath, err)
+	}
+
+	path := datapackPath(t, filepath.Join("data", "xml", "cursedWeapons.xml"))
+	table, err := LoadCursedWeapons(path, skills)
+	if err != nil {
+		t.Fatalf("LoadCursedWeapons(%q) error: %v", path, err)
+	}
+
+	if got := table.Count(); got != 2 {
+		t.Fatalf("Count() = %d, want 2", got)
+	}
+	weapon, ok := table.Weapon(8190)
+	if !ok {
+		t.Fatal("Weapon(8190) missing")
+	}
+	if weapon.Name != "Demonic Sword Zariche" || weapon.Skill.Level != skills.MaxLevel(3603) || weapon.StageKills != 10 {
+		t.Fatalf("Weapon(8190) = %+v", weapon)
+	}
+}
+
+func TestLoadBufferSkills(t *testing.T) {
+	skillsPath := datapackPath(t, filepath.Join("data", "xml", "skills"))
+	skills, err := LoadSkillDefinitions(skillsPath)
+	if err != nil {
+		t.Fatalf("LoadSkillDefinitions(%q) error: %v", skillsPath, err)
+	}
+
+	path := datapackPath(t, filepath.Join("data", "xml", "bufferSkills.xml"))
+	table, err := LoadBufferSkills(path, skills)
+	if err != nil {
+		t.Fatalf("LoadBufferSkills(%q) error: %v", path, err)
+	}
+
+	if got := table.Count(); got != 60 {
+		t.Fatalf("Count() = %d, want 60", got)
+	}
+	if got := table.Categories(); len(got) != 3 || got[0] != "Buffs" || got[1] != "Dances" || got[2] != "Songs" {
+		t.Fatalf("Categories() = %#v, want [Buffs Dances Songs]", got)
+	}
+	entry, ok := table.Skill(1035)
+	if !ok {
+		t.Fatal("Skill(1035) missing")
+	}
+	if entry.Skill.Level != skills.MaxLevel(1035) || entry.Category != "Buffs" || entry.Description != "Increases resistance to mental attacks." {
+		t.Fatalf("Skill(1035) = %+v", entry)
+	}
+}
+
 func TestSingleMiscLoadersErrors(t *testing.T) {
 	dir := t.TempDir()
 
@@ -197,6 +250,15 @@ func TestSingleMiscLoadersErrors(t *testing.T) {
 				return err
 			},
 		},
+		{
+			name:    "cursed weapon missing skillId",
+			path:    filepath.Join(dir, "cursedWeapons.xml"),
+			content: `<list><item id="8190" name="Zariche" dropRate="1" duration="72" durationLost="24" dissapearChance="50" stageKills="10"/></list>`,
+			load: func(path string) error {
+				_, err := LoadCursedWeapons(path, nil)
+				return err
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -216,6 +278,14 @@ func TestSingleMiscLoadersErrors(t *testing.T) {
 		writeXMLFixture(t, filepath.Join(adminDir, "accessLevels.xml"), `<list></list>`)
 		if _, err := LoadAdminData(adminDir); err == nil {
 			t.Fatal("expected an error for missing adminCommands.xml, got nil")
+		}
+	})
+
+	t.Run("buffer skills missing skill definition for default level", func(t *testing.T) {
+		path := filepath.Join(dir, "bufferSkills.xml")
+		writeXMLFixture(t, path, `<list><category type="Buffs"><buff id="1035" desc="desc"/></category></list>`)
+		if _, err := LoadBufferSkills(path, nil); err == nil {
+			t.Fatal("expected an error for missing skill table, got nil")
 		}
 	})
 }

@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"fmt"
+	"io"
 	"math/big"
 	"net"
 	"sync"
@@ -30,6 +31,25 @@ const linkPublicExponent = 65537
 // DefaultReconnectDelay is the reconnect delay a caller would normally pass
 // to Maintain, matching the reference server's fixed retry interval.
 const DefaultReconnectDelay = 10 * time.Second
+
+// generateDynamicKey reads a dynamicKeySize-byte Blowfish key from src,
+// redrawing if the first byte is zero. The login server recovers this key by
+// RSA-decrypting it with no padding and stripping leading zero bytes from
+// the result (matching the reference server); a leading zero byte here
+// would make it strip a byte we didn't intend to lose, leaving the two
+// sides with different-length keys. Redrawing is cheap: the odds of it
+// triggering are 1 in 256.
+func generateDynamicKey(src io.Reader) ([]byte, error) {
+	key := make([]byte, dynamicKeySize)
+	for {
+		if _, err := io.ReadFull(src, key); err != nil {
+			return nil, err
+		}
+		if key[0] != 0 {
+			return key, nil
+		}
+	}
+}
 
 // LoginServerAuth is the identity a game server presents when registering
 // on the login server's GS-LS link: the server id it wants, its hex auth
@@ -132,8 +152,8 @@ func (l *LoginLink) handshake(auth LoginServerAuth) error {
 	// as unsigned magnitude, so a leading zero byte is harmless either way.
 	pub := &rsa.PublicKey{N: new(big.Int).SetBytes(modulus), E: linkPublicExponent}
 
-	dynamicKey := make([]byte, dynamicKeySize)
-	if _, err := rand.Read(dynamicKey); err != nil {
+	dynamicKey, err := generateDynamicKey(rand.Reader)
+	if err != nil {
 		return fmt.Errorf("generate dynamic link key: %w", err)
 	}
 
