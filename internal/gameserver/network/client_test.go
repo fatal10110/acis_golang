@@ -79,51 +79,27 @@ func TestClientAcceptRejectsCreateCharacterBeforeAuth(t *testing.T) {
 		t.Fatal("Accept(create character) = true before auth, want false")
 	}
 
-	if !c.Authenticate("player1", link.SessionKey{}, func(string) bool { return true }) {
-		t.Fatal("Authenticate returned false, want true")
-	}
+	c.SetAuthenticated("player1", link.SessionKey{})
 
 	if !c.Accept(0x0b) {
 		t.Fatal("Accept(create character) = false after auth, want true")
 	}
 }
 
-func TestClientAuthenticateAdvancesStateOnSuccess(t *testing.T) {
+func TestClientSetAuthenticatedAdvancesState(t *testing.T) {
 	c := NewClient(nil)
 	key := link.SessionKey{LoginKey1: 1, LoginKey2: 2, PlayKey1: 3, PlayKey2: 4}
 
-	ok := c.Authenticate("player1", key, func(account string) bool {
-		return account == "player1"
-	})
-	if !ok {
-		t.Fatal("Authenticate() = false, want true")
-	}
+	c.SetAuthenticated("player1", key)
+
 	if got := c.State(); got != StateAuthed {
-		t.Fatalf("state after successful auth = %s, want %s", got, StateAuthed)
+		t.Fatalf("state after SetAuthenticated = %s, want %s", got, StateAuthed)
 	}
 	if got := c.AccountName(); got != "player1" {
-		t.Fatalf("account name after successful auth = %q, want %q", got, "player1")
+		t.Fatalf("account name after SetAuthenticated = %q, want %q", got, "player1")
 	}
 	if got := c.SessionKey(); got != key {
-		t.Fatalf("session key after successful auth = %+v, want %+v", got, key)
-	}
-}
-
-func TestClientAuthenticateLeavesStateUnchangedOnFailure(t *testing.T) {
-	c := NewClient(nil)
-
-	ok := c.Authenticate("player1", link.SessionKey{LoginKey1: 1}, func(string) bool { return false })
-	if ok {
-		t.Fatal("Authenticate() = true, want false")
-	}
-	if got := c.State(); got != StateConnected {
-		t.Fatalf("state after failed auth = %s, want %s", got, StateConnected)
-	}
-	if got := c.AccountName(); got != "" {
-		t.Fatalf("account name after failed auth = %q, want empty", got)
-	}
-	if got := c.SessionKey(); got != (link.SessionKey{}) {
-		t.Fatalf("session key after failed auth = %+v, want zero value", got)
+		t.Fatalf("session key after SetAuthenticated = %+v, want %+v", got, key)
 	}
 }
 
