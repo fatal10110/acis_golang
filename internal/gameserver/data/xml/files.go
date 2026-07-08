@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+
+	"github.com/fatal10110/acis_golang/internal/commons"
 )
 
 type xmlDocument[T any] struct {
@@ -32,6 +34,22 @@ func loadXMLDocuments[T any](dir, kind string) ([]xmlDocument[T], error) {
 		docs = append(docs, xmlDocument[T]{Path: path, Data: doc})
 	}
 	return docs, nil
+}
+
+// buildAll parses each element in els into a T via ctor, wrapping any
+// constructor error with path. It is the shared shape for a flat XML list:
+// element attributes fold into a StatSet, then the domain constructor
+// validates and builds the model value.
+func buildAll[T any](path string, els []attrsElement, ctor func(*commons.StatSet) (T, error)) ([]T, error) {
+	out := make([]T, 0, len(els))
+	for _, el := range els {
+		v, err := ctor(commons.StatSetFromXMLAttrs(el.Attrs))
+		if err != nil {
+			return nil, fmt.Errorf("xml: %s: %w", path, err)
+		}
+		out = append(out, v)
+	}
+	return out, nil
 }
 
 func readXML(path string, dst any) error {

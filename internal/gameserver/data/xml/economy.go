@@ -67,13 +67,9 @@ func LoadRecipes(path string) (*recipe.Table, error) {
 	if err := readXML(path, &file); err != nil {
 		return nil, err
 	}
-	recipes := make([]recipe.Recipe, 0, len(file.Recipes))
-	for _, el := range file.Recipes {
-		r, err := recipe.New(commons.StatSetFromXMLAttrs(el.Attrs))
-		if err != nil {
-			return nil, fmt.Errorf("xml: %s: %w", path, err)
-		}
-		recipes = append(recipes, r)
+	recipes, err := buildAll(path, file.Recipes, recipe.New)
+	if err != nil {
+		return nil, err
 	}
 	return recipe.NewTable(recipes), nil
 }
@@ -91,13 +87,11 @@ func LoadBuyLists(path string) (*buylist.Table, error) {
 		if err != nil {
 			return nil, fmt.Errorf("xml: %s: %w", path, err)
 		}
-		products := make([]buylist.Product, 0, len(el.Products))
-		for _, productEl := range el.Products {
-			product, err := buylist.NewProduct(id, commons.StatSetFromXMLAttrs(productEl.Attrs))
-			if err != nil {
-				return nil, fmt.Errorf("xml: %s: %w", path, err)
-			}
-			products = append(products, product)
+		products, err := buildAll(path, el.Products, func(set *commons.StatSet) (buylist.Product, error) {
+			return buylist.NewProduct(id, set)
+		})
+		if err != nil {
+			return nil, err
 		}
 		list, err := buylist.NewList(set, products)
 		if err != nil {
@@ -114,13 +108,9 @@ func LoadHennas(path string) (*henna.Table, error) {
 	if err := readXML(path, &file); err != nil {
 		return nil, err
 	}
-	hennas := make([]henna.Henna, 0, len(file.Hennas))
-	for _, el := range file.Hennas {
-		h, err := henna.New(commons.StatSetFromXMLAttrs(el.Attrs))
-		if err != nil {
-			return nil, fmt.Errorf("xml: %s: %w", path, err)
-		}
-		hennas = append(hennas, h)
+	hennas, err := buildAll(path, file.Hennas, henna.New)
+	if err != nil {
+		return nil, err
 	}
 	return henna.NewTable(hennas), nil
 }
@@ -131,13 +121,9 @@ func LoadArmorSets(path string) (*armorset.Table, error) {
 	if err := readXML(path, &file); err != nil {
 		return nil, err
 	}
-	sets := make([]armorset.Set, 0, len(file.Sets))
-	for _, el := range file.Sets {
-		set, err := armorset.New(commons.StatSetFromXMLAttrs(el.Attrs))
-		if err != nil {
-			return nil, fmt.Errorf("xml: %s: %w", path, err)
-		}
-		sets = append(sets, set)
+	sets, err := buildAll(path, file.Sets, armorset.New)
+	if err != nil {
+		return nil, err
 	}
 	return armorset.NewTable(sets), nil
 }
@@ -148,13 +134,9 @@ func LoadFish(path string) (*fish.Table, error) {
 	if err := readXML(path, &file); err != nil {
 		return nil, err
 	}
-	rows := make([]fish.Fish, 0, len(file.Fish))
-	for _, el := range file.Fish {
-		row, err := fish.New(commons.StatSetFromXMLAttrs(el.Attrs))
-		if err != nil {
-			return nil, fmt.Errorf("xml: %s: %w", path, err)
-		}
-		rows = append(rows, row)
+	rows, err := buildAll(path, file.Fish, fish.New)
+	if err != nil {
+		return nil, err
 	}
 	return fish.NewTable(rows), nil
 }
