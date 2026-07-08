@@ -68,3 +68,10 @@ func (w *Writer) WriteString(s string) {
 func (w *Writer) Bytes() []byte {
 	return w.buf
 }
+
+// NewPacketWriter starts an outbound packet with its leading opcode byte.
+func NewPacketWriter(opcode byte) *Writer {
+	w := &Writer{}
+	w.WriteUint8(opcode)
+	return w
+}
