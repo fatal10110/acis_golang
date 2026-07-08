@@ -1,6 +1,7 @@
 package sql
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -22,9 +23,9 @@ func NewGameServerStore(db *sql.DB) *GameServerStore {
 }
 
 // GameServer returns the registered game server for id.
-func (s *GameServerStore) GameServer(id int) (model.GameServer, error) {
+func (s *GameServerStore) GameServer(ctx context.Context, id int) (model.GameServer, error) {
 	var hexID, host string
-	err := s.db.QueryRow("SELECT hexid, host FROM gameservers WHERE server_id = ?", id).Scan(&hexID, &host)
+	err := s.db.QueryRowContext(ctx, "SELECT hexid, host FROM gameservers WHERE server_id = ?", id).Scan(&hexID, &host)
 	if errors.Is(err, sql.ErrNoRows) {
 		return model.GameServer{}, ErrGameServerNotFound
 	}
@@ -40,8 +41,8 @@ func (s *GameServerStore) GameServer(id int) (model.GameServer, error) {
 }
 
 // GameServers returns all registered game servers keyed by server id.
-func (s *GameServerStore) GameServers() (map[int]model.GameServer, error) {
-	rows, err := s.db.Query("SELECT server_id, hexid, host FROM gameservers")
+func (s *GameServerStore) GameServers(ctx context.Context) (map[int]model.GameServer, error) {
+	rows, err := s.db.QueryContext(ctx, "SELECT server_id, hexid, host FROM gameservers")
 	if err != nil {
 		return nil, fmt.Errorf("query game servers: %w", err)
 	}
@@ -67,8 +68,8 @@ func (s *GameServerStore) GameServers() (map[int]model.GameServer, error) {
 }
 
 // CreateGameServer inserts a registered game server row.
-func (s *GameServerStore) CreateGameServer(server model.GameServer) error {
-	if _, err := s.db.Exec(
+func (s *GameServerStore) CreateGameServer(ctx context.Context, server model.GameServer) error {
+	if _, err := s.db.ExecContext(ctx,
 		"INSERT INTO gameservers (hexid, server_id, host) VALUES (?, ?, ?)",
 		model.HexKeyText(server.HexID),
 		server.ID,
@@ -81,24 +82,24 @@ func (s *GameServerStore) CreateGameServer(server model.GameServer) error {
 
 // DeleteGameServer removes the registered game server row for id. Deleting
 // an id with no row is not an error.
-func (s *GameServerStore) DeleteGameServer(id int) error {
-	if _, err := s.db.Exec("DELETE FROM gameservers WHERE server_id = ?", id); err != nil {
+func (s *GameServerStore) DeleteGameServer(ctx context.Context, id int) error {
+	if _, err := s.db.ExecContext(ctx, "DELETE FROM gameservers WHERE server_id = ?", id); err != nil {
 		return fmt.Errorf("delete game server %d: %w", id, err)
 	}
 	return nil
 }
 
 // DeleteAllGameServers removes every registered game server row.
-func (s *GameServerStore) DeleteAllGameServers() error {
-	if _, err := s.db.Exec("TRUNCATE gameservers"); err != nil {
+func (s *GameServerStore) DeleteAllGameServers(ctx context.Context) error {
+	if _, err := s.db.ExecContext(ctx, "TRUNCATE gameservers"); err != nil {
 		return fmt.Errorf("delete all game servers: %w", err)
 	}
 	return nil
 }
 
 // SetGameServerHost updates a registered game server host.
-func (s *GameServerStore) SetGameServerHost(id int, host string) error {
-	res, err := s.db.Exec("UPDATE gameservers SET host = ? WHERE server_id = ?", host, id)
+func (s *GameServerStore) SetGameServerHost(ctx context.Context, id int, host string) error {
+	res, err := s.db.ExecContext(ctx, "UPDATE gameservers SET host = ? WHERE server_id = ?", host, id)
 	if err != nil {
 		return fmt.Errorf("set game server %d host: %w", id, err)
 	}

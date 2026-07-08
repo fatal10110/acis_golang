@@ -67,6 +67,7 @@ func newIntegrationDB(t *testing.T) *sql.DB {
 
 func TestGameServerLinkFreshRegistrationPersistsToDB(t *testing.T) {
 	db := newIntegrationDB(t)
+	ctx := context.Background()
 	gameServers := loginsql.NewGameServerStore(db)
 
 	addr, _, servers, _, _ := newTestLinkCommon(t, true, loginsql.NewAccountStore(db), gameServers)
@@ -85,7 +86,7 @@ func TestGameServerLinkFreshRegistrationPersistsToDB(t *testing.T) {
 		t.Fatalf("registry entry after auth = %+v", entry)
 	}
 
-	stored, err := gameServers.GameServer(1)
+	stored, err := gameServers.GameServer(ctx, 1)
 	if err != nil {
 		t.Fatalf("GameServer(1): %v", err)
 	}
@@ -96,8 +97,9 @@ func TestGameServerLinkFreshRegistrationPersistsToDB(t *testing.T) {
 
 func TestGameServerLinkChangeAccessLevelUpdatesDB(t *testing.T) {
 	db := newIntegrationDB(t)
+	ctx := context.Background()
 	accounts := loginsql.NewAccountStore(db)
-	if _, err := accounts.CreateAccount("player1", "hash", time.UnixMilli(1_700_000_000_000)); err != nil {
+	if _, err := accounts.CreateAccount(ctx, "player1", "hash", time.UnixMilli(1_700_000_000_000)); err != nil {
 		t.Fatalf("CreateAccount: %v", err)
 	}
 
@@ -114,7 +116,7 @@ func TestGameServerLinkChangeAccessLevelUpdatesDB(t *testing.T) {
 	gs.sendChangeAccessLevel(-1, "player1")
 	time.Sleep(100 * time.Millisecond)
 
-	got, err := accounts.Account("player1")
+	got, err := accounts.Account(ctx, "player1")
 	if err != nil {
 		t.Fatalf("Account: %v", err)
 	}

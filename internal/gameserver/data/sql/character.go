@@ -1,6 +1,7 @@
 package sql
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -41,8 +42,8 @@ func NewCharacterStore(db *sql.DB) *CharacterStore {
 // freshly created character has values for; position, clan, and every other
 // column a character only gains once it is actually played keep the
 // schema's own default until something (not this store) sets them.
-func (s *CharacterStore) Create(c *player.Character) error {
-	_, err := s.db.Exec(
+func (s *CharacterStore) Create(ctx context.Context, c *player.Character) error {
+	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO characters
 			(account_name, obj_Id, char_name, level, maxHp, curHp, maxCp, curCp, maxMp, curMp,
 			 face, hairStyle, hairColor, sex, exp, sp, race, classid, base_class, title, accesslevel)
@@ -58,8 +59,8 @@ func (s *CharacterStore) Create(c *player.Character) error {
 
 // Get returns the character with the given object id, or
 // ErrCharacterNotFound if no such row exists.
-func (s *CharacterStore) Get(objectID int32) (*player.Character, error) {
-	row := s.db.QueryRow("SELECT "+characterColumns+" FROM characters WHERE obj_Id = ?", objectID)
+func (s *CharacterStore) Get(ctx context.Context, objectID int32) (*player.Character, error) {
+	row := s.db.QueryRowContext(ctx, "SELECT "+characterColumns+" FROM characters WHERE obj_Id = ?", objectID)
 	c, err := scanCharacter(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrCharacterNotFound
@@ -73,8 +74,8 @@ func (s *CharacterStore) Get(objectID int32) (*player.Character, error) {
 // ListByAccount returns every character on accountName, ordered by object
 // id for a stable, repeatable result. A character whose account has none
 // returns an empty, non-nil slice.
-func (s *CharacterStore) ListByAccount(accountName string) ([]*player.Character, error) {
-	rows, err := s.db.Query("SELECT "+characterColumns+" FROM characters WHERE account_name = ? ORDER BY obj_Id ASC", accountName)
+func (s *CharacterStore) ListByAccount(ctx context.Context, accountName string) ([]*player.Character, error) {
+	rows, err := s.db.QueryContext(ctx, "SELECT "+characterColumns+" FROM characters WHERE account_name = ? ORDER BY obj_Id ASC", accountName)
 	if err != nil {
 		return nil, fmt.Errorf("list characters for %q: %w", accountName, err)
 	}
@@ -124,9 +125,9 @@ func scanCharacter(row rowScanner) (*player.Character, error) {
 
 // CountByAccount returns how many characters exist on accountName. Matching
 // is case-insensitive, since account names are.
-func (s *CharacterStore) CountByAccount(accountName string) (int, error) {
+func (s *CharacterStore) CountByAccount(ctx context.Context, accountName string) (int, error) {
 	var n int
-	err := s.db.QueryRow("SELECT COUNT(*) FROM characters WHERE LOWER(account_name) = LOWER(?)", accountName).Scan(&n)
+	err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM characters WHERE LOWER(account_name) = LOWER(?)", accountName).Scan(&n)
 	if err != nil {
 		return 0, fmt.Errorf("count characters for %q: %w", accountName, err)
 	}
@@ -135,9 +136,9 @@ func (s *CharacterStore) CountByAccount(accountName string) (int, error) {
 
 // NameTaken reports whether a character named name already exists.
 // Matching is case-insensitive, since character names are.
-func (s *CharacterStore) NameTaken(name string) (bool, error) {
+func (s *CharacterStore) NameTaken(ctx context.Context, name string) (bool, error) {
 	var n int
-	err := s.db.QueryRow("SELECT COUNT(*) FROM characters WHERE LOWER(char_name) = LOWER(?)", name).Scan(&n)
+	err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM characters WHERE LOWER(char_name) = LOWER(?)", name).Scan(&n)
 	if err != nil {
 		return false, fmt.Errorf("check name %q: %w", name, err)
 	}
@@ -146,8 +147,8 @@ func (s *CharacterStore) NameTaken(name string) (bool, error) {
 
 // SetDeleteAt updates the character's persisted deletion deadline (epoch
 // milliseconds; 0 clears it, un-scheduling the deletion).
-func (s *CharacterStore) SetDeleteAt(objectID int32, at int64) error {
-	if _, err := s.db.Exec("UPDATE characters SET deletetime = ? WHERE obj_Id = ?", at, objectID); err != nil {
+func (s *CharacterStore) SetDeleteAt(ctx context.Context, objectID int32, at int64) error {
+	if _, err := s.db.ExecContext(ctx, "UPDATE characters SET deletetime = ? WHERE obj_Id = ?", at, objectID); err != nil {
 		return fmt.Errorf("set delete time for %d: %w", objectID, err)
 	}
 	return nil
@@ -155,8 +156,8 @@ func (s *CharacterStore) SetDeleteAt(objectID int32, at int64) error {
 
 // Delete removes the character row for objectID. It reports whether a row
 // was deleted.
-func (s *CharacterStore) Delete(objectID int32) (bool, error) {
-	res, err := s.db.Exec("DELETE FROM characters WHERE obj_Id = ?", objectID)
+func (s *CharacterStore) Delete(ctx context.Context, objectID int32) (bool, error) {
+	res, err := s.db.ExecContext(ctx, "DELETE FROM characters WHERE obj_Id = ?", objectID)
 	if err != nil {
 		return false, fmt.Errorf("delete character %d: %w", objectID, err)
 	}

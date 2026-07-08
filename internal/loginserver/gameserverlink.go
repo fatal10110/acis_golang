@@ -93,7 +93,7 @@ func (l *GameServerLink) Serve(ctx context.Context, ln net.Listener) error {
 					l.log.Errorf("gameserver link connection handler panic: %v", r)
 				}
 			}()
-			l.handleConnection(conn)
+			l.handleConnection(ctx, conn)
 		}()
 	}
 }
@@ -119,7 +119,7 @@ func (c *gameServerConn) forceClose(reason link.LoginServerFailReason) {
 	_ = c.send(link.EncodeLoginServerFail(reason))
 }
 
-func (l *GameServerLink) handleConnection(conn net.Conn) {
+func (l *GameServerLink) handleConnection(ctx context.Context, conn net.Conn) {
 	defer conn.Close()
 
 	c := &gameServerConn{
@@ -162,7 +162,7 @@ func (l *GameServerLink) handleConnection(conn net.Conn) {
 		case link.OpcodeBlowFishKey:
 			l.onBlowFishKey(c, payload)
 		case link.OpcodeGameServerAuth:
-			if !l.onGameServerAuth(c, payload) {
+			if !l.onGameServerAuth(ctx, c, payload) {
 				return
 			}
 		default:
@@ -176,7 +176,7 @@ func (l *GameServerLink) handleConnection(conn net.Conn) {
 			case link.OpcodePlayerLogout:
 				l.onPlayerLogout(c, payload)
 			case link.OpcodeChangeAccessLevel:
-				l.onChangeAccessLevel(c, payload)
+				l.onChangeAccessLevel(ctx, c, payload)
 			case link.OpcodePlayerAuthRequest:
 				l.onPlayerAuthRequest(c, payload)
 			case link.OpcodeServerStatus:
@@ -204,7 +204,7 @@ func (l *GameServerLink) onBlowFishKey(c *gameServerConn, payload []byte) {
 // a matching entry, allocate an alternate id when the desired one is taken
 // by a different key and that is permitted, or create a fresh entry.
 // Returns false if the connection must close.
-func (l *GameServerLink) onGameServerAuth(c *gameServerConn, payload []byte) bool {
+func (l *GameServerLink) onGameServerAuth(ctx context.Context, c *gameServerConn, payload []byte) bool {
 	auth, err := link.DecodeGameServerAuth(payload)
 	if err != nil {
 		l.log.Warnf("gameserver link %s: %v", c.remoteIP, err)
@@ -232,7 +232,7 @@ func (l *GameServerLink) onGameServerAuth(c *gameServerConn, payload []byte) boo
 			return false
 		}
 		id = created.ID
-		l.persistRegistration(id, auth.HexID)
+		l.persistRegistration(ctx, id, auth.HexID)
 
 	default:
 		if !l.allowNewServers {
@@ -243,7 +243,7 @@ func (l *GameServerLink) onGameServerAuth(c *gameServerConn, payload []byte) boo
 			c.forceClose(link.ReasonIDReserved)
 			return false
 		}
-		l.persistRegistration(id, auth.HexID)
+		l.persistRegistration(ctx, id, auth.HexID)
 	}
 
 	host := auth.HostName
@@ -268,8 +268,8 @@ func (l *GameServerLink) onGameServerAuth(c *gameServerConn, payload []byte) boo
 	return true
 }
 
-func (l *GameServerLink) persistRegistration(id int, hexID []byte) {
-	if err := l.registrations.CreateGameServer(model.NewGameServer(id, hexID, "")); err != nil {
+func (l *GameServerLink) persistRegistration(ctx context.Context, id int, hexID []byte) {
+	if err := l.registrations.CreateGameServer(ctx, model.NewGameServer(id, hexID, "")); err != nil {
 		l.log.Errorf("persist gameserver %d registration: %v", id, err)
 	}
 }
@@ -294,13 +294,13 @@ func (l *GameServerLink) onPlayerLogout(c *gameServerConn, payload []byte) {
 	l.servers.RemoveOnlineAccount(c.id, account)
 }
 
-func (l *GameServerLink) onChangeAccessLevel(c *gameServerConn, payload []byte) {
+func (l *GameServerLink) onChangeAccessLevel(ctx context.Context, c *gameServerConn, payload []byte) {
 	cal, err := link.DecodeChangeAccessLevel(payload)
 	if err != nil {
 		l.log.Warnf("gameserver link %s: %v", c.remoteIP, err)
 		return
 	}
-	if err := l.accounts.SetAccessLevel(cal.Account, int(cal.Level)); err != nil {
+	if err := l.accounts.SetAccessLevel(ctx, cal.Account, int(cal.Level)); err != nil {
 		l.log.Errorf("change access level for %s: %v", cal.Account, err)
 	}
 }

@@ -3,6 +3,7 @@
 package sql
 
 import (
+	"context"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
@@ -10,6 +11,7 @@ import (
 )
 
 func TestItemStore_CreateAndListByOwner(t *testing.T) {
+	ctx := context.Background()
 	store := NewItemStore(sqltest.NewDB(t))
 
 	chest := item.Instance{
@@ -21,14 +23,14 @@ func TestItemStore_CreateAndListByOwner(t *testing.T) {
 		Location: item.LocationInventory, ManaLeft: -1,
 	}
 
-	if err := store.Create(0x10000001, chest); err != nil {
+	if err := store.Create(ctx, 0x10000001, chest); err != nil {
 		t.Fatalf("Create(chest) unexpected error: %v", err)
 	}
-	if err := store.Create(0x10000001, dagger); err != nil {
+	if err := store.Create(ctx, 0x10000001, dagger); err != nil {
 		t.Fatalf("Create(dagger) unexpected error: %v", err)
 	}
 
-	got, err := store.ListByOwner(0x10000001)
+	got, err := store.ListByOwner(ctx, 0x10000001)
 	if err != nil {
 		t.Fatalf("ListByOwner() unexpected error: %v", err)
 	}
@@ -50,9 +52,10 @@ func TestItemStore_CreateAndListByOwner(t *testing.T) {
 }
 
 func TestItemStore_ListByOwner_Empty(t *testing.T) {
+	ctx := context.Background()
 	store := NewItemStore(sqltest.NewDB(t))
 
-	got, err := store.ListByOwner(0x10000999)
+	got, err := store.ListByOwner(ctx, 0x10000999)
 	if err != nil {
 		t.Fatalf("ListByOwner() unexpected error: %v", err)
 	}
@@ -62,18 +65,19 @@ func TestItemStore_ListByOwner_Empty(t *testing.T) {
 }
 
 func TestItemStore_DeleteByOwner(t *testing.T) {
+	ctx := context.Background()
 	store := NewItemStore(sqltest.NewDB(t))
 
 	for _, inst := range []item.Instance{
 		{ObjectID: 0x10000101, TemplateID: 1146, Count: 1, Location: item.LocationInventory, ManaLeft: -1},
 		{ObjectID: 0x10000102, TemplateID: 10, Count: 1, Location: item.LocationInventory, ManaLeft: -1},
 	} {
-		if err := store.Create(0x10000001, inst); err != nil {
+		if err := store.Create(ctx, 0x10000001, inst); err != nil {
 			t.Fatalf("Create() unexpected error: %v", err)
 		}
 	}
 
-	n, err := store.DeleteByOwner(0x10000001)
+	n, err := store.DeleteByOwner(ctx, 0x10000001)
 	if err != nil {
 		t.Fatalf("DeleteByOwner() unexpected error: %v", err)
 	}
@@ -81,7 +85,7 @@ func TestItemStore_DeleteByOwner(t *testing.T) {
 		t.Errorf("DeleteByOwner() deleted %d rows, want 2", n)
 	}
 
-	got, err := store.ListByOwner(0x10000001)
+	got, err := store.ListByOwner(ctx, 0x10000001)
 	if err != nil {
 		t.Fatalf("ListByOwner() after delete unexpected error: %v", err)
 	}

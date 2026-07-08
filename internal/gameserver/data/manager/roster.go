@@ -1,6 +1,7 @@
 package manager
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"time"
@@ -60,19 +61,19 @@ type idAllocator interface {
 // characterStore is the persistence Roster needs for the characters table.
 // Satisfied by *sql.CharacterStore.
 type characterStore interface {
-	Create(c *player.Character) error
-	ListByAccount(accountName string) ([]*player.Character, error)
-	CountByAccount(accountName string) (int, error)
-	NameTaken(name string) (bool, error)
-	SetDeleteAt(objectID int32, at int64) error
-	Delete(objectID int32) (bool, error)
+	Create(ctx context.Context, c *player.Character) error
+	ListByAccount(ctx context.Context, accountName string) ([]*player.Character, error)
+	CountByAccount(ctx context.Context, accountName string) (int, error)
+	NameTaken(ctx context.Context, name string) (bool, error)
+	SetDeleteAt(ctx context.Context, objectID int32, at int64) error
+	Delete(ctx context.Context, objectID int32) (bool, error)
 }
 
 // itemStore is the persistence Roster needs for the items table. Satisfied
 // by *sql.ItemStore.
 type itemStore interface {
-	Create(ownerID int32, inst item.Instance) error
-	DeleteByOwner(ownerID int32) (int64, error)
+	Create(ctx context.Context, ownerID int32, inst item.Instance) error
+	DeleteByOwner(ctx context.Context, ownerID int32) (int64, error)
 }
 
 // Roster creates, lists, deletes and restores the characters on an
@@ -128,7 +129,7 @@ func NewRoster(characters characterStore, items itemStore, templates *player.Tem
 // port hasn't built yet; a name collision with an NPC is merely cosmetic
 // (chat/targeting ambiguity), not a correctness risk, so it is deferred
 // rather than pulled in early.
-func (r *Roster) Create(accountName string, req CreateRequest) (*player.Character, CreateOutcome, error) {
+func (r *Roster) Create(ctx context.Context, accountName string, req CreateRequest) (*player.Character, CreateOutcome, error) {
 	if req.Race < 0 || req.Race > 4 {
 		return nil, CreateRejected, nil
 	}
@@ -145,7 +146,7 @@ func (r *Roster) Create(accountName string, req CreateRequest) (*player.Characte
 		return nil, CreateInvalidName, nil
 	}
 
-	count, err := r.characters.CountByAccount(accountName)
+	count, err := r.characters.CountByAccount(ctx, accountName)
 	if err != nil {
 		return nil, CreateRejected, err
 	}
@@ -153,7 +154,7 @@ func (r *Roster) Create(accountName string, req CreateRequest) (*player.Characte
 		return nil, CreateTooManyCharacters, nil
 	}
 
-	taken, err := r.characters.NameTaken(req.Name)
+	taken, err := r.characters.NameTaken(ctx, req.Name)
 	if err != nil {
 		return nil, CreateRejected, err
 	}
@@ -179,12 +180,12 @@ func (r *Roster) Create(accountName string, req CreateRequest) (*player.Characte
 		return nil, CreateRejected, fmt.Errorf("player roster: create %q: %w", req.Name, err)
 	}
 
-	if err := r.characters.Create(c); err != nil {
+	if err := r.characters.Create(ctx, c); err != nil {
 		return nil, CreateRejected, err
 	}
 
 	for _, grant := range tmpl.Items {
-		if err := r.grantItem(c.ObjectID, grant); err != nil {
+		if err := r.grantItem(ctx, c.ObjectID, grant); err != nil {
 			return nil, CreateRejected, err
 		}
 	}
@@ -192,7 +193,7 @@ func (r *Roster) Create(accountName string, req CreateRequest) (*player.Characte
 	return c, CreateOK, nil
 }
 
-func (r *Roster) grantItem(ownerID int32, grant player.StarterItem) error {
+func (r *Roster) grantItem(ctx context.Context, ownerID int32, grant player.StarterItem) error {
 	tmpl, ok := r.itemTable.Get(int32(grant.ItemID))
 	if !ok {
 		return fmt.Errorf("player roster: starter item %d has no template", grant.ItemID)
@@ -204,7 +205,7 @@ func (r *Roster) grantItem(ownerID int32, grant player.StarterItem) error {
 	}
 
 	inst := item.NewStackOrEquip(itemID, tmpl, grant.Count, grant.Equipped)
-	if err := r.items.Create(ownerID, inst); err != nil {
+	if err := r.items.Create(ctx, ownerID, inst); err != nil {
 		return err
 	}
 	return nil
@@ -221,8 +222,8 @@ func hairStyleLimit(sex player.Sex) byte {
 
 // List returns the characters on accountName, purging (and excluding) any
 // whose scheduled deletion deadline has already passed.
-func (r *Roster) List(accountName string) ([]*player.Character, error) {
-	chars, err := r.characters.ListByAccount(accountName)
+func (r *Roster) List(ctx context.Context, accountName string) ([]*player.Character, error) {
+	chars, err := r.characters.ListByAccount(ctx, accountName)
 	if err != nil {
 		return nil, err
 	}
@@ -231,7 +232,7 @@ func (r *Roster) List(accountName string) ([]*player.Character, error) {
 	live := chars[:0]
 	for _, c := range chars {
 		if c.DeleteAt > 0 && now > c.DeleteAt {
-			if err := r.purge(c.ObjectID); err != nil {
+			if err := r.purge(ctx, c.ObjectID); err != nil {
 				return nil, err
 			}
 			continue
@@ -241,11 +242,11 @@ func (r *Roster) List(accountName string) ([]*player.Character, error) {
 	return live, nil
 }
 
-func (r *Roster) purge(objectID int32) error {
-	if _, err := r.characters.Delete(objectID); err != nil {
+func (r *Roster) purge(ctx context.Context, objectID int32) error {
+	if _, err := r.characters.Delete(ctx, objectID); err != nil {
 		return err
 	}
-	if _, err := r.items.DeleteByOwner(objectID); err != nil {
+	if _, err := r.items.DeleteByOwner(ctx, objectID); err != nil {
 		return err
 	}
 	return nil
@@ -257,14 +258,14 @@ func (r *Roster) purge(objectID int32) error {
 // Deletion should also be blocked for a clan's leader or member; without a
 // clan system yet, every character is treated as clan-free and deletion
 // always proceeds.
-func (r *Roster) MarkForDeletion(objectID int32) error {
+func (r *Roster) MarkForDeletion(ctx context.Context, objectID int32) error {
 	if r.deleteAfter <= 0 {
-		return r.purge(objectID)
+		return r.purge(ctx, objectID)
 	}
-	return r.characters.SetDeleteAt(objectID, r.now().Add(r.deleteAfter).UnixMilli())
+	return r.characters.SetDeleteAt(ctx, objectID, r.now().Add(r.deleteAfter).UnixMilli())
 }
 
 // Restore clears objectID's scheduled deletion.
-func (r *Roster) Restore(objectID int32) error {
-	return r.characters.SetDeleteAt(objectID, 0)
+func (r *Roster) Restore(ctx context.Context, objectID int32) error {
+	return r.characters.SetDeleteAt(ctx, objectID, 0)
 }

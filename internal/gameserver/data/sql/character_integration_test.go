@@ -3,6 +3,7 @@
 package sql
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -30,23 +31,25 @@ func testCharacter(objectID int32, name string) *player.Character {
 }
 
 func TestCharacterStore_Get_NotFound(t *testing.T) {
+	ctx := context.Background()
 	store := NewCharacterStore(sqltest.NewDB(t))
 
-	_, err := store.Get(0x10000001)
+	_, err := store.Get(ctx, 0x10000001)
 	if !errors.Is(err, ErrCharacterNotFound) {
 		t.Fatalf("Get() error = %v, want ErrCharacterNotFound", err)
 	}
 }
 
 func TestCharacterStore_CreateAndReadBack(t *testing.T) {
+	ctx := context.Background()
 	store := NewCharacterStore(sqltest.NewDB(t))
 
 	c := testCharacter(0x10000001, "Newbie")
-	if err := store.Create(c); err != nil {
+	if err := store.Create(ctx, c); err != nil {
 		t.Fatalf("Create() unexpected error: %v", err)
 	}
 
-	got, err := store.Get(c.ObjectID)
+	got, err := store.Get(ctx, c.ObjectID)
 	if err != nil {
 		t.Fatalf("Get() unexpected error: %v", err)
 	}
@@ -70,16 +73,17 @@ func TestCharacterStore_CreateAndReadBack(t *testing.T) {
 // store instance, opened against the same database, must see exactly what
 // the first one wrote.
 func TestCharacterStore_RestartReload(t *testing.T) {
+	ctx := context.Background()
 	db := sqltest.NewDB(t)
 	first := NewCharacterStore(db)
 
 	c := testCharacter(0x10000001, "Newbie")
-	if err := first.Create(c); err != nil {
+	if err := first.Create(ctx, c); err != nil {
 		t.Fatalf("Create() unexpected error: %v", err)
 	}
 
 	second := NewCharacterStore(db)
-	got, err := second.Get(c.ObjectID)
+	got, err := second.Get(ctx, c.ObjectID)
 	if err != nil {
 		t.Fatalf("Get() after reload unexpected error: %v", err)
 	}
@@ -89,6 +93,7 @@ func TestCharacterStore_RestartReload(t *testing.T) {
 }
 
 func TestCharacterStore_ListByAccount(t *testing.T) {
+	ctx := context.Background()
 	store := NewCharacterStore(sqltest.NewDB(t))
 
 	a1 := testCharacter(0x10000001, "Alpha")
@@ -98,12 +103,12 @@ func TestCharacterStore_ListByAccount(t *testing.T) {
 	other.AccountName = "acct2"
 
 	for _, c := range []*player.Character{a1, a2, other} {
-		if err := store.Create(c); err != nil {
+		if err := store.Create(ctx, c); err != nil {
 			t.Fatalf("Create(%q) unexpected error: %v", c.Name, err)
 		}
 	}
 
-	got, err := store.ListByAccount("acct1")
+	got, err := store.ListByAccount(ctx, "acct1")
 	if err != nil {
 		t.Fatalf("ListByAccount() unexpected error: %v", err)
 	}
@@ -116,9 +121,10 @@ func TestCharacterStore_ListByAccount(t *testing.T) {
 }
 
 func TestCharacterStore_ListByAccount_Empty(t *testing.T) {
+	ctx := context.Background()
 	store := NewCharacterStore(sqltest.NewDB(t))
 
-	got, err := store.ListByAccount("ghost")
+	got, err := store.ListByAccount(ctx, "ghost")
 	if err != nil {
 		t.Fatalf("ListByAccount() unexpected error: %v", err)
 	}
@@ -128,15 +134,16 @@ func TestCharacterStore_ListByAccount_Empty(t *testing.T) {
 }
 
 func TestCharacterStore_CountByAccount_CaseInsensitive(t *testing.T) {
+	ctx := context.Background()
 	store := NewCharacterStore(sqltest.NewDB(t))
 
 	c := testCharacter(0x10000001, "Newbie")
 	c.AccountName = "Player1"
-	if err := store.Create(c); err != nil {
+	if err := store.Create(ctx, c); err != nil {
 		t.Fatalf("Create() unexpected error: %v", err)
 	}
 
-	n, err := store.CountByAccount("player1")
+	n, err := store.CountByAccount(ctx, "player1")
 	if err != nil {
 		t.Fatalf("CountByAccount() unexpected error: %v", err)
 	}
@@ -146,14 +153,15 @@ func TestCharacterStore_CountByAccount_CaseInsensitive(t *testing.T) {
 }
 
 func TestCharacterStore_NameTaken_CaseInsensitive(t *testing.T) {
+	ctx := context.Background()
 	store := NewCharacterStore(sqltest.NewDB(t))
 
 	c := testCharacter(0x10000001, "Newbie")
-	if err := store.Create(c); err != nil {
+	if err := store.Create(ctx, c); err != nil {
 		t.Fatalf("Create() unexpected error: %v", err)
 	}
 
-	taken, err := store.NameTaken("newBIE")
+	taken, err := store.NameTaken(ctx, "newBIE")
 	if err != nil {
 		t.Fatalf("NameTaken() unexpected error: %v", err)
 	}
@@ -161,7 +169,7 @@ func TestCharacterStore_NameTaken_CaseInsensitive(t *testing.T) {
 		t.Error("NameTaken(\"newBIE\") = false, want true")
 	}
 
-	taken, err = store.NameTaken("someoneElse")
+	taken, err = store.NameTaken(ctx, "someoneElse")
 	if err != nil {
 		t.Fatalf("NameTaken() unexpected error: %v", err)
 	}
@@ -171,17 +179,18 @@ func TestCharacterStore_NameTaken_CaseInsensitive(t *testing.T) {
 }
 
 func TestCharacterStore_SetDeleteAt(t *testing.T) {
+	ctx := context.Background()
 	store := NewCharacterStore(sqltest.NewDB(t))
 
 	c := testCharacter(0x10000001, "Newbie")
-	if err := store.Create(c); err != nil {
+	if err := store.Create(ctx, c); err != nil {
 		t.Fatalf("Create() unexpected error: %v", err)
 	}
 
-	if err := store.SetDeleteAt(c.ObjectID, 1_800_000_000_000); err != nil {
+	if err := store.SetDeleteAt(ctx, c.ObjectID, 1_800_000_000_000); err != nil {
 		t.Fatalf("SetDeleteAt() unexpected error: %v", err)
 	}
-	got, err := store.Get(c.ObjectID)
+	got, err := store.Get(ctx, c.ObjectID)
 	if err != nil {
 		t.Fatalf("Get() unexpected error: %v", err)
 	}
@@ -189,10 +198,10 @@ func TestCharacterStore_SetDeleteAt(t *testing.T) {
 		t.Errorf("DeleteAt = %d, want 1800000000000", got.DeleteAt)
 	}
 
-	if err := store.SetDeleteAt(c.ObjectID, 0); err != nil {
+	if err := store.SetDeleteAt(ctx, c.ObjectID, 0); err != nil {
 		t.Fatalf("SetDeleteAt(restore) unexpected error: %v", err)
 	}
-	got, err = store.Get(c.ObjectID)
+	got, err = store.Get(ctx, c.ObjectID)
 	if err != nil {
 		t.Fatalf("Get() unexpected error: %v", err)
 	}
@@ -202,25 +211,26 @@ func TestCharacterStore_SetDeleteAt(t *testing.T) {
 }
 
 func TestCharacterStore_Delete(t *testing.T) {
+	ctx := context.Background()
 	store := NewCharacterStore(sqltest.NewDB(t))
 
 	c := testCharacter(0x10000001, "Newbie")
-	if err := store.Create(c); err != nil {
+	if err := store.Create(ctx, c); err != nil {
 		t.Fatalf("Create() unexpected error: %v", err)
 	}
 
-	deleted, err := store.Delete(c.ObjectID)
+	deleted, err := store.Delete(ctx, c.ObjectID)
 	if err != nil {
 		t.Fatalf("Delete() unexpected error: %v", err)
 	}
 	if !deleted {
 		t.Error("Delete() on existing character deleted = false, want true")
 	}
-	if _, err := store.Get(c.ObjectID); !errors.Is(err, ErrCharacterNotFound) {
+	if _, err := store.Get(ctx, c.ObjectID); !errors.Is(err, ErrCharacterNotFound) {
 		t.Fatalf("Get() after delete: got err %v, want ErrCharacterNotFound", err)
 	}
 
-	deleted, err = store.Delete(c.ObjectID)
+	deleted, err = store.Delete(ctx, c.ObjectID)
 	if err != nil {
 		t.Fatalf("Delete() second call unexpected error: %v", err)
 	}

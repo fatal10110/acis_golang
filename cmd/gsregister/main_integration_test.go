@@ -84,7 +84,7 @@ func loadTestNames(t *testing.T) *manager.ServerNames {
 func runScript(t *testing.T, store *sql.GameServerStore, names *manager.ServerNames, dir, input string) string {
 	t.Helper()
 	var out bytes.Buffer
-	if err := run(strings.NewReader(input), &out, names, store, dir); err != nil {
+	if err := run(context.Background(), strings.NewReader(input), &out, names, store, dir); err != nil {
 		t.Fatalf("run() unexpected error: %v\noutput:\n%s", err, out.String())
 	}
 	return out.String()
@@ -92,6 +92,7 @@ func runScript(t *testing.T, store *sql.GameServerStore, names *manager.ServerNa
 
 func TestRegisterCleanLifecycle(t *testing.T) {
 	store := newIntegrationStore(t)
+	ctx := context.Background()
 	names := loadTestNames(t)
 	dir := t.TempDir()
 
@@ -101,7 +102,7 @@ func TestRegisterCleanLifecycle(t *testing.T) {
 		t.Fatalf("register output missing confirmation:\n%s", out)
 	}
 
-	row, err := store.GameServer(1)
+	row, err := store.GameServer(ctx, 1)
 	if err != nil {
 		t.Fatalf("GameServer(1) after register: %v", err)
 	}
@@ -155,7 +156,7 @@ func TestRegisterCleanLifecycle(t *testing.T) {
 	if !strings.Contains(out, "This server id isn't used.") {
 		t.Errorf("second clean not rejected:\n%s", out)
 	}
-	if _, err := store.GameServer(1); !errors.Is(err, sql.ErrGameServerNotFound) {
+	if _, err := store.GameServer(ctx, 1); !errors.Is(err, sql.ErrGameServerNotFound) {
 		t.Fatalf("GameServer(1) after clean: got err %v, want ErrGameServerNotFound", err)
 	}
 
@@ -167,7 +168,7 @@ func TestRegisterCleanLifecycle(t *testing.T) {
 	if !strings.Contains(out, "You successfully dropped all registered gameservers.") {
 		t.Errorf("cleanall missing confirmation:\n%s", out)
 	}
-	rows, err := store.GameServers()
+	rows, err := store.GameServers(ctx)
 	if err != nil {
 		t.Fatalf("GameServers() after cleanall: %v", err)
 	}

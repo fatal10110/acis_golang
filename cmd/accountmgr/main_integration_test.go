@@ -61,7 +61,7 @@ func newIntegrationStore(t *testing.T) *sql.AccountStore {
 func runScript(t *testing.T, store *sql.AccountStore, input string) string {
 	t.Helper()
 	var out bytes.Buffer
-	if err := run(strings.NewReader(input), &out, store); err != nil {
+	if err := run(context.Background(), strings.NewReader(input), &out, store); err != nil {
 		t.Fatalf("run() unexpected error: %v\noutput:\n%s", err, out.String())
 	}
 	return out.String()
@@ -69,13 +69,14 @@ func runScript(t *testing.T, store *sql.AccountStore, input string) string {
 
 func TestAccountLifecycle(t *testing.T) {
 	store := newIntegrationStore(t)
+	ctx := context.Background()
 
 	// Create: account row persisted with a bcrypt-hashed password.
 	out := runScript(t, store, "1 Player1 s3cret 5 5")
 	if !strings.Contains(out, "Account player1 has been created or updated") {
 		t.Fatalf("create output missing confirmation:\n%s", out)
 	}
-	acc, err := store.Account("player1")
+	acc, err := store.Account(ctx, "player1")
 	if err != nil {
 		t.Fatalf("Account(player1) after create: %v", err)
 	}

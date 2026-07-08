@@ -2,6 +2,7 @@
 package sql
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -25,11 +26,11 @@ func NewAccountStore(db *sql.DB) *AccountStore {
 
 // Account returns the account registered under login, or ErrAccountNotFound
 // if no such row exists.
-func (s *AccountStore) Account(login string) (model.Account, error) {
+func (s *AccountStore) Account(ctx context.Context, login string) (model.Account, error) {
 	var password string
 	var accessLevel, lastServer int
 
-	err := s.db.QueryRow(
+	err := s.db.QueryRowContext(ctx,
 		"SELECT password, access_level, last_server FROM accounts WHERE login = ?",
 		login,
 	).Scan(&password, &accessLevel, &lastServer)
@@ -45,8 +46,8 @@ func (s *AccountStore) Account(login string) (model.Account, error) {
 // CreateAccount inserts a new account row with the given pre-hashed password
 // and creation time, and returns the resulting Account. New accounts start at
 // access level 0 and last server 1, matching the table's column defaults.
-func (s *AccountStore) CreateAccount(login, hashedPassword string, createdAt time.Time) (model.Account, error) {
-	_, err := s.db.Exec(
+func (s *AccountStore) CreateAccount(ctx context.Context, login, hashedPassword string, createdAt time.Time) (model.Account, error) {
+	_, err := s.db.ExecContext(ctx,
 		"INSERT INTO accounts (login, password, last_active) VALUES (?, ?, ?)",
 		login, hashedPassword, createdAt.UnixMilli(),
 	)
@@ -57,24 +58,24 @@ func (s *AccountStore) CreateAccount(login, hashedPassword string, createdAt tim
 }
 
 // SetLastActive updates the account's last-active timestamp.
-func (s *AccountStore) SetLastActive(login string, at time.Time) error {
-	if _, err := s.db.Exec("UPDATE accounts SET last_active = ? WHERE login = ?", at.UnixMilli(), login); err != nil {
+func (s *AccountStore) SetLastActive(ctx context.Context, login string, at time.Time) error {
+	if _, err := s.db.ExecContext(ctx, "UPDATE accounts SET last_active = ? WHERE login = ?", at.UnixMilli(), login); err != nil {
 		return fmt.Errorf("set last active for %q: %w", login, err)
 	}
 	return nil
 }
 
 // SetAccessLevel updates the account's access level.
-func (s *AccountStore) SetAccessLevel(login string, level int) error {
-	if _, err := s.db.Exec("UPDATE accounts SET access_level = ? WHERE login = ?", level, login); err != nil {
+func (s *AccountStore) SetAccessLevel(ctx context.Context, login string, level int) error {
+	if _, err := s.db.ExecContext(ctx, "UPDATE accounts SET access_level = ? WHERE login = ?", level, login); err != nil {
 		return fmt.Errorf("set access level for %q: %w", login, err)
 	}
 	return nil
 }
 
 // SetLastServer updates the account's last-server id.
-func (s *AccountStore) SetLastServer(login string, serverID int) error {
-	if _, err := s.db.Exec("UPDATE accounts SET last_server = ? WHERE login = ?", serverID, login); err != nil {
+func (s *AccountStore) SetLastServer(ctx context.Context, login string, serverID int) error {
+	if _, err := s.db.ExecContext(ctx, "UPDATE accounts SET last_server = ? WHERE login = ?", serverID, login); err != nil {
 		return fmt.Errorf("set last server for %q: %w", login, err)
 	}
 	return nil
@@ -83,8 +84,8 @@ func (s *AccountStore) SetLastServer(login string, serverID int) error {
 // UpsertAccount creates the account if login is new, or updates its password
 // and access level if it already exists. It reports whether the row was
 // created or changed.
-func (s *AccountStore) UpsertAccount(login, hashedPassword string, accessLevel int) (bool, error) {
-	res, err := s.db.Exec(
+func (s *AccountStore) UpsertAccount(ctx context.Context, login, hashedPassword string, accessLevel int) (bool, error) {
+	res, err := s.db.ExecContext(ctx,
 		"INSERT INTO accounts (login, password, access_level) VALUES (?, ?, ?) "+
 			"ON DUPLICATE KEY UPDATE password = VALUES(password), access_level = VALUES(access_level)",
 		login, hashedPassword, accessLevel,
@@ -101,8 +102,8 @@ func (s *AccountStore) UpsertAccount(login, hashedPassword string, accessLevel i
 
 // ChangeAccessLevel updates an existing account's access level. It reports
 // whether a row was changed.
-func (s *AccountStore) ChangeAccessLevel(login string, level int) (bool, error) {
-	res, err := s.db.Exec("UPDATE accounts SET access_level = ? WHERE login = ?", level, login)
+func (s *AccountStore) ChangeAccessLevel(ctx context.Context, login string, level int) (bool, error) {
+	res, err := s.db.ExecContext(ctx, "UPDATE accounts SET access_level = ? WHERE login = ?", level, login)
 	if err != nil {
 		return false, fmt.Errorf("change access level for %q: %w", login, err)
 	}
@@ -115,8 +116,8 @@ func (s *AccountStore) ChangeAccessLevel(login string, level int) (bool, error) 
 
 // DeleteAccount removes the account row for login. It reports whether a row
 // was deleted.
-func (s *AccountStore) DeleteAccount(login string) (bool, error) {
-	res, err := s.db.Exec("DELETE FROM accounts WHERE login = ?", login)
+func (s *AccountStore) DeleteAccount(ctx context.Context, login string) (bool, error) {
+	res, err := s.db.ExecContext(ctx, "DELETE FROM accounts WHERE login = ?", login)
 	if err != nil {
 		return false, fmt.Errorf("delete account %q: %w", login, err)
 	}
@@ -146,7 +147,7 @@ type AccountSummary struct {
 
 // ListAccounts returns login/access-level pairs ordered by login, narrowed
 // by filter.
-func (s *AccountStore) ListAccounts(filter AccountFilter) ([]AccountSummary, error) {
+func (s *AccountStore) ListAccounts(ctx context.Context, filter AccountFilter) ([]AccountSummary, error) {
 	query := "SELECT login, access_level FROM accounts"
 	switch filter {
 	case BannedAccounts:
@@ -158,7 +159,7 @@ func (s *AccountStore) ListAccounts(filter AccountFilter) ([]AccountSummary, err
 	}
 	query += " ORDER BY login ASC"
 
-	rows, err := s.db.Query(query)
+	rows, err := s.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("list accounts: %w", err)
 	}
