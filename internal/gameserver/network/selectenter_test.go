@@ -19,9 +19,7 @@ import (
 // confirmed session key).
 func TestSelectCharacterAdvancesToEntering(t *testing.T) {
 	client := NewClient(nil)
-	if !client.Authenticate("player1", link.SessionKey{PlayKey1: 999, PlayKey2: 888}, func(string) bool { return true }) {
-		t.Fatal("Authenticate: want success")
-	}
+	client.SetAuthenticated("player1", link.SessionKey{PlayKey1: 999, PlayKey2: 888})
 
 	var payload []byte
 	payload = append(payload, clientpackets.OpcodeRequestGameStart)

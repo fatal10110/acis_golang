@@ -88,12 +88,12 @@ func (v *SessionValidator) Validate(ctx context.Context, client *Client, req cli
 			client.Session.Send(serverpackets.EncodeAuthLoginFail(serverpackets.LoginFailSystemErrorTryLater))
 			return false, nil
 		}
-		client.Authenticate(req.LoginName, link.SessionKey{
+		client.SetAuthenticated(req.LoginName, link.SessionKey{
 			LoginKey1: req.LoginKey1,
 			LoginKey2: req.LoginKey2,
 			PlayKey1:  req.PlayKey1,
 			PlayKey2:  req.PlayKey2,
-		}, func(string) bool { return true })
+		})
 		return true, nil
 	case <-ctx.Done():
 		v.forget(req.LoginName)
