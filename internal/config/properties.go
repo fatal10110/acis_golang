@@ -59,7 +59,10 @@ type IntPair struct {
 	Second int
 }
 
-// Parse reads Java-style .properties content.
+// Parse reads .properties content: key=value lines (also accepting ':' or
+// whitespace as the separator), '#'/'!' comment lines, backslash line
+// continuations, and '\t'/'\n'/'\r'/'\f'/'\uXXXX' escapes in keys and
+// values.
 func Parse(r io.Reader) (*Properties, error) {
 	data, err := io.ReadAll(r)
 	if err != nil {
@@ -81,7 +84,7 @@ func Parse(r io.Reader) (*Properties, error) {
 	return p, nil
 }
 
-// ParseString reads Java-style .properties content from a string.
+// ParseString reads .properties content (see Parse) from a string.
 func ParseString(s string) (*Properties, error) {
 	return Parse(strings.NewReader(s))
 }
@@ -244,7 +247,7 @@ func (p *Properties) Float64(key string, def float64) (float64, error) {
 // Strings returns a string slice split with DefaultDelimiters, or def when key is missing.
 func (p *Properties) Strings(key string, def []string) []string {
 	if value, ok := p.Lookup(key); ok {
-		return javaSplit(defaultDelimitersRE, value)
+		return splitTrimTrailingEmpty(defaultDelimitersRE, value)
 	}
 	return def
 }
@@ -252,7 +255,7 @@ func (p *Properties) Strings(key string, def []string) []string {
 // Bools returns a bool slice split with DefaultDelimiters, or def when key is missing.
 func (p *Properties) Bools(key string, def []bool) []bool {
 	if value, ok := p.Lookup(key); ok {
-		parts := javaSplit(defaultDelimitersRE, value)
+		parts := splitTrimTrailingEmpty(defaultDelimitersRE, value)
 		out := make([]bool, len(parts))
 		for i, part := range parts {
 			out[i] = strings.EqualFold(part, "true")
@@ -265,7 +268,7 @@ func (p *Properties) Bools(key string, def []bool) []bool {
 // Ints returns an int slice split with DefaultDelimiters, or def when key is missing.
 func (p *Properties) Ints(key string, def []int) ([]int, error) {
 	if value, ok := p.Lookup(key); ok {
-		parts := javaSplit(defaultDelimitersRE, value)
+		parts := splitTrimTrailingEmpty(defaultDelimitersRE, value)
 		out := make([]int, len(parts))
 		for i, part := range parts {
 			n, err := strconv.Atoi(part)
@@ -282,7 +285,7 @@ func (p *Properties) Ints(key string, def []int) ([]int, error) {
 // Int64s returns an int64 slice split with DefaultDelimiters, or def when key is missing.
 func (p *Properties) Int64s(key string, def []int64) ([]int64, error) {
 	if value, ok := p.Lookup(key); ok {
-		parts := javaSplit(defaultDelimitersRE, value)
+		parts := splitTrimTrailingEmpty(defaultDelimitersRE, value)
 		out := make([]int64, len(parts))
 		for i, part := range parts {
 			n, err := strconv.ParseInt(part, 10, 64)
@@ -299,7 +302,7 @@ func (p *Properties) Int64s(key string, def []int64) ([]int64, error) {
 // Float64s returns a float64 slice split with DefaultDelimiters, or def when key is missing.
 func (p *Properties) Float64s(key string, def []float64) ([]float64, error) {
 	if value, ok := p.Lookup(key); ok {
-		parts := javaSplit(defaultDelimitersRE, value)
+		parts := splitTrimTrailingEmpty(defaultDelimitersRE, value)
 		out := make([]float64, len(parts))
 		for i, part := range parts {
 			n, err := strconv.ParseFloat(part, 64)
@@ -323,10 +326,10 @@ func (p *Properties) IntPairs(key, def string) ([]IntPair, error) {
 		return nil, nil
 	}
 
-	parts := javaSplit(regexp.MustCompile(";"), value)
+	parts := splitTrimTrailingEmpty(regexp.MustCompile(";"), value)
 	out := make([]IntPair, len(parts))
 	for i, part := range parts {
-		bounds := javaSplit(regexp.MustCompile("-"), part)
+		bounds := splitTrimTrailingEmpty(regexp.MustCompile("-"), part)
 		if len(bounds) != 2 {
 			return nil, fmt.Errorf("parse %s[%d]: want first-second", key, i)
 		}
@@ -473,7 +476,7 @@ func unescape(s string) (string, error) {
 	return out.String(), nil
 }
 
-func javaSplit(re *regexp.Regexp, s string) []string {
+func splitTrimTrailingEmpty(re *regexp.Regexp, s string) []string {
 	parts := re.Split(s, -1)
 	for len(parts) > 1 && parts[len(parts)-1] == "" {
 		parts = parts[:len(parts)-1]

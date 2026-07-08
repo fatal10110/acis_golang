@@ -423,6 +423,42 @@ func TestGameServerLinkBannedIPRejected(t *testing.T) {
 	gs.expectClosed()
 }
 
+// TestGameServerLinkRecoversFromConnectionHandlerPanic sends a
+// GameServerAuth payload with a negative HexID length. wire.Reader's bounds
+// check lets a negative n through (n > Remaining is false), so it slices
+// with a high index below the low index and panics — this is a genuine
+// malformed-payload panic, not a synthetic one, and it must disconnect only
+// the offending link, not the whole login server.
+func TestGameServerLinkRecoversFromConnectionHandlerPanic(t *testing.T) {
+	addr, _, servers, _, _ := newTestLink(t, true)
+	// Pre-seed id 2 (as if from a prior boot's DB load) so the second
+	// connection's registration never touches the nil DB stores newTestLink
+	// wires up for speed.
+	servers.Register(2, testHexID)
+
+	bad := dialGameServer(t, addr)
+	bad.handshake()
+	payload := []byte{link.OpcodeGameServerAuth, 1, 0, 0}
+	payload = writeUTF16String(payload, "*")
+	payload = binary.LittleEndian.AppendUint16(payload, 7777)
+	payload = binary.LittleEndian.AppendUint32(payload, 300)
+	negativeSize := int32(-1)
+	payload = binary.LittleEndian.AppendUint32(payload, uint32(negativeSize))
+	bad.sendFrame(payload)
+	bad.expectClosed()
+
+	gs := dialGameServer(t, addr)
+	gs.handshake()
+	gs.sendGameServerAuth(2, false, false, "*", 7778, 300, testHexID)
+	ok, id, _, _ := gs.readAuthResult()
+	if !ok || id != 2 {
+		t.Fatalf("readAuthResult() after recovering from panic = ok=%v id=%d, want ok=true id=2", ok, id)
+	}
+	if _, exists := servers.Get(2); !exists {
+		t.Fatal("server 2 not registered after recovering from panic on a different connection")
+	}
+}
+
 func TestGameServerLinkUnknownOpcodeAfterAuthCloses(t *testing.T) {
 	addr, _, servers, _, _ := newTestLink(t, false)
 	servers.Register(1, testHexID)

@@ -23,7 +23,8 @@ type Sampler interface {
 }
 
 // NewDoorObject converts one static door template into a toggleable
-// geodata object using the same footprint scan the Java loader applies.
+// geodata object by scanning a grid of sample points around the door's
+// polygon footprint and marking which cells fall inside it.
 func NewDoorObject(tmpl *door.Template, sampler Sampler) (Object, error) {
 	if tmpl == nil {
 		return nil, fmt.Errorf("geo/dynamic: nil door template")

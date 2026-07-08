@@ -68,6 +68,11 @@ func NewGameServerLink(
 // listen address/network.
 func (l *GameServerLink) Serve(ctx context.Context, ln net.Listener) error {
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				l.log.Errorf("gameserver link shutdown watcher panic: %v", r)
+			}
+		}()
 		<-ctx.Done()
 		ln.Close()
 	}()
@@ -82,7 +87,14 @@ func (l *GameServerLink) Serve(ctx context.Context, ln net.Listener) error {
 				return err
 			}
 		}
-		go l.handleConnection(conn)
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					l.log.Errorf("gameserver link connection handler panic: %v", r)
+				}
+			}()
+			l.handleConnection(conn)
+		}()
 	}
 }
 
@@ -188,11 +200,10 @@ func (l *GameServerLink) onBlowFishKey(c *gameServerConn, payload []byte) {
 	}
 }
 
-// onGameServerAuth handles a registration/re-authentication request,
-// mirroring the reference decision tree: reuse a matching entry, allocate
-// an alternate id when the desired one is taken by a different key and
-// that is permitted, or create a fresh entry. Returns false if the
-// connection must close.
+// onGameServerAuth handles a registration/re-authentication request: reuse
+// a matching entry, allocate an alternate id when the desired one is taken
+// by a different key and that is permitted, or create a fresh entry.
+// Returns false if the connection must close.
 func (l *GameServerLink) onGameServerAuth(c *gameServerConn, payload []byte) bool {
 	auth, err := link.DecodeGameServerAuth(payload)
 	if err != nil {
