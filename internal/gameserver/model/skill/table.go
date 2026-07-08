@@ -1,5 +1,7 @@
 package skill
 
+import "sort"
+
 // enchantLevelFloor is the first enchant-level number a Definition can carry
 // (levels below it are regular, non-enchanted levels). It is used to keep
 // enchant levels out of MaxLevel, which reports a skill's highest regular
@@ -56,4 +58,24 @@ func (t *Table) Len() int {
 		n += len(levels)
 	}
 	return n
+}
+
+// All returns every loaded definition ordered by skill id, then level.
+func (t *Table) All() []Definition {
+	if t == nil {
+		return nil
+	}
+	defs := make([]Definition, 0, t.Len())
+	for _, levels := range t.byID {
+		for _, def := range levels {
+			defs = append(defs, def)
+		}
+	}
+	sort.Slice(defs, func(i, j int) bool {
+		if defs[i].ID != defs[j].ID {
+			return defs[i].ID < defs[j].ID
+		}
+		return defs[i].Level < defs[j].Level
+	})
+	return defs
 }

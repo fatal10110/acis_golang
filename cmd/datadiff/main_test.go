@@ -37,11 +37,14 @@ func TestRun_UnknownCategory(t *testing.T) {
 	}
 }
 
-func TestRun_NoSourceGiven(t *testing.T) {
+func TestRun_AutoDiscoversDatapack(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := run([]string{"-category", "item"}, &stdout, &stderr)
-	if code != exitError {
-		t.Fatalf("exit = %d, want %d", code, exitError)
+	if code != exitOK {
+		t.Fatalf("exit = %d, want %d; stderr=%s", code, exitOK, stderr.String())
+	}
+	if stdout.Len() == 0 {
+		t.Fatal("run() wrote no dump output")
 	}
 }
 
@@ -114,5 +117,25 @@ func TestRun_LoadFromMissingDatapackDirIsAnError(t *testing.T) {
 	code := run([]string{"-category", "item", "-datapack", filepath.Join(t.TempDir(), "does-not-exist")}, &stdout, &stderr)
 	if code != exitError {
 		t.Fatalf("exit = %d, want %d", code, exitError)
+	}
+}
+
+func TestFindDatapackDir_FindsSiblingCheckout(t *testing.T) {
+	root := t.TempDir()
+	module := filepath.Join(root, "acis_public", "acis_golang")
+	if err := os.MkdirAll(module, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	want := filepath.Join(root, "acis_public", "aCis_datapack")
+	if err := os.MkdirAll(want, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	got, ok := findDatapackDir(module)
+	if !ok {
+		t.Fatal("findDatapackDir() = not found, want datapack path")
+	}
+	if got != want {
+		t.Fatalf("findDatapackDir() = %q, want %q", got, want)
 	}
 }
