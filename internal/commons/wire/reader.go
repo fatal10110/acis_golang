@@ -39,7 +39,7 @@ func (r *Reader) Remaining() int {
 }
 
 func (r *Reader) take(n int) []byte {
-	if r.err != nil || n > r.Remaining() {
+	if r.err != nil || n < 0 || n > r.Remaining() {
 		r.err = ErrShortPacket
 		return nil
 	}
