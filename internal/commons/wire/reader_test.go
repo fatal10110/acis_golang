@@ -60,6 +60,20 @@ func TestReaderShortPacketSetsErrInsteadOfPanicking(t *testing.T) {
 	}
 }
 
+func TestReaderNegativeByteCountSetsErrInsteadOfPanicking(t *testing.T) {
+	r := NewReader([]byte{0x01, 0x02, 0x03})
+
+	if got := r.ReadBytes(-1); got != nil {
+		t.Fatalf("ReadBytes(-1) = % X, want nil", got)
+	}
+	if r.Err() != ErrShortPacket {
+		t.Fatalf("Err() = %v, want %v", r.Err(), ErrShortPacket)
+	}
+	if rem := r.Remaining(); rem != 3 {
+		t.Fatalf("Remaining() = %d, want 3", rem)
+	}
+}
+
 func TestReaderReadStringWithoutTerminatorIsShort(t *testing.T) {
 	r := NewReader([]byte{'a', 0}) // one code unit, no null terminator
 
