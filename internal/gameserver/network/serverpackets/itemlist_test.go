@@ -27,7 +27,10 @@ func TestEncodeItemList(t *testing.T) {
 		{ObjectID: 103, TemplateID: 1146, Count: 1, Location: item.LocationWarehouse}, // excluded: not carried
 	}
 
-	got := EncodeItemList(items, templates, true)
+	got, err := EncodeItemList(items, templates, true)
+	if err != nil {
+		t.Fatalf("EncodeItemList: %v", err)
+	}
 
 	want := []byte{OpcodeItemList}
 	want = binary.LittleEndian.AppendUint16(want, 1) // show window
@@ -78,7 +81,10 @@ func TestEncodeItemList(t *testing.T) {
 }
 
 func TestEncodeItemList_HideWindow(t *testing.T) {
-	got := EncodeItemList(nil, item.NewTable(nil), false)
+	got, err := EncodeItemList(nil, item.NewTable(nil), false)
+	if err != nil {
+		t.Fatalf("EncodeItemList: %v", err)
+	}
 	want := []byte{OpcodeItemList, 0, 0, 0, 0}
 	if !bytes.Equal(got, want) {
 		t.Errorf("EncodeItemList (empty, hidden) = %x, want %x", got, want)
