@@ -110,9 +110,9 @@ func (b *Multilayer) NSWE(layer int) NSWE {
 	return b.cells[ci][li].NSWE
 }
 
-// CellLayers returns a copy of the local cell's stored layers, ordered
-// from lowest to highest.
-func (b *Multilayer) CellLayers(cellX, cellY int) []Cell {
+// Cells returns a copy of the local cell's stored layers, ordered from
+// lowest to highest.
+func (b *Multilayer) Cells(cellX, cellY int) []Cell {
 	return append([]Cell(nil), b.cells[cellIndex(cellX, cellY)]...)
 }
 

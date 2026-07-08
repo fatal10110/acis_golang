@@ -77,4 +77,10 @@ type Block interface {
 
 	// NSWE resolves a layer handle, from Nearest, Above, or Below, to its passability mask.
 	NSWE(layer int) NSWE
+
+	// Cells returns a copy of the local cell's stored layers, ordered from
+	// lowest to highest. Callers that need to build their own view over a
+	// Block's raw data (e.g. a dynamic overlay) use this instead of type-
+	// switching on the concrete implementation.
+	Cells(cellX, cellY int) []Cell
 }

@@ -1,6 +1,7 @@
 package dynamic
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
@@ -139,6 +140,68 @@ func TestBlockAddMultilayerClampsToAboveLayer(t *testing.T) {
 	if got := b.NSWENearest(0, 0, 0); got != block.NoDirections {
 		t.Fatalf("inside multilayer nswe = %v, want none", got)
 	}
+}
+
+func TestBlockDelegatesToBaseWhenUntouched(t *testing.T) {
+	b := NewBlock(0, 0, &block.Null{})
+
+	if b.HasGeodata() {
+		t.Fatalf("HasGeodata = true, want false (delegated from Null)")
+	}
+	if got := b.HeightNearest(3, 4, 500); got != 500 {
+		t.Fatalf("untouched height = %d, want 500 (delegated to Null's worldZ passthrough)", got)
+	}
+
+	obj := &stubObject{
+		x:      0,
+		y:      0,
+		z:      0,
+		height: 32,
+		data:   [][]block.NSWE{{block.NoDirections}},
+	}
+	b.Add(obj)
+
+	if got := b.HeightNearest(0, 0, 0); got != 32 {
+		t.Fatalf("touched height = %d, want 32", got)
+	}
+
+	b.Remove(obj)
+
+	if got := b.HeightNearest(0, 0, 777); got != 777 {
+		t.Fatalf("height after remove = %d, want 777 (delegation restored, not stuck at the placeholder baseline)", got)
+	}
+}
+
+func TestBlockConcurrentAddRemoveAndReads(t *testing.T) {
+	b := NewBlock(0, 0, block.NewFlat(0))
+	obj := &stubObject{
+		x:      0,
+		y:      0,
+		z:      0,
+		height: 32,
+		data:   [][]block.NSWE{{block.NoDirections}},
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < 4; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < 200; j++ {
+				b.HeightNearest(0, 0, 0)
+				b.NSWENearest(0, 0, 0)
+			}
+		}()
+	}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for j := 0; j < 200; j++ {
+			b.Add(obj)
+			b.Remove(obj)
+		}
+	}()
+	wg.Wait()
 }
 
 func TestDoorObjectFromTemplate(t *testing.T) {
