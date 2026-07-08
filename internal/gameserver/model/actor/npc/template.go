@@ -2,7 +2,6 @@ package npc
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 	"time"
 
@@ -316,47 +315,22 @@ func NewTemplate(set *commons.StatSet) (*Template, error) {
 // boot and read for the remainder of the process lifetime. The zero value
 // is not usable; construct with NewTable.
 type Table struct {
-	templates map[int]*Template
+	*commons.Lookup[int, *Template]
 }
 
 // NewTable returns a Table backed by templates, keyed by each template's
 // ID. A later entry silently overwrites an earlier one with the same ID.
 func NewTable(templates []*Template) *Table {
-	t := &Table{templates: make(map[int]*Template, len(templates))}
-	for _, tpl := range templates {
-		t.templates[tpl.ID] = tpl
-	}
-	return t
-}
-
-// Get returns the template with the given id, or false if none was loaded.
-func (t *Table) Get(id int) (*Template, bool) {
-	tpl, ok := t.templates[id]
-	return tpl, ok
+	return &Table{commons.NewLookup(templates, func(tpl *Template) int { return tpl.ID })}
 }
 
 // GetByName returns the first template whose name matches name
 // case-insensitively, or false if none does.
 func (t *Table) GetByName(name string) (*Template, bool) {
-	for _, tpl := range t.templates {
+	for _, tpl := range t.All() {
 		if strings.EqualFold(tpl.Name, name) {
 			return tpl, true
 		}
 	}
 	return nil, false
-}
-
-// Len returns the number of templates in the table.
-func (t *Table) Len() int {
-	return len(t.templates)
-}
-
-// All returns every loaded template, ordered ascending by ID.
-func (t *Table) All() []*Template {
-	templates := make([]*Template, 0, len(t.templates))
-	for _, tpl := range t.templates {
-		templates = append(templates, tpl)
-	}
-	sort.Slice(templates, func(i, j int) bool { return templates[i].ID < templates[j].ID })
-	return templates
 }

@@ -172,7 +172,7 @@ func NewTemplate(set *commons.StatSet) (*Template, error) {
 // by class id, built once at boot and read for the remainder of the process
 // lifetime. The zero value is not usable; construct with NewTemplateTable.
 type TemplateTable struct {
-	templates map[int]*Template
+	*commons.Lookup[int, *Template]
 }
 
 // NewTemplateTable returns a TemplateTable backed by templates, keyed by
@@ -211,26 +211,10 @@ func NewTemplateTable(templates map[int]*Template) (*TemplateTable, error) {
 		tmpl.Skills = merged
 	}
 
-	return &TemplateTable{templates: templates}, nil
-}
-
-// Get returns the template for class id, or false if none was loaded.
-func (t *TemplateTable) Get(id int) (*Template, bool) {
-	tmpl, ok := t.templates[id]
-	return tmpl, ok
+	return &TemplateTable{commons.NewLookupFromMap(templates)}, nil
 }
 
 // Count returns the number of templates loaded.
 func (t *TemplateTable) Count() int {
-	return len(t.templates)
-}
-
-// All returns every loaded template, ordered ascending by class ID.
-func (t *TemplateTable) All() []*Template {
-	templates := make([]*Template, 0, len(t.templates))
-	for _, tmpl := range t.templates {
-		templates = append(templates, tmpl)
-	}
-	sort.Slice(templates, func(i, j int) bool { return templates[i].ID < templates[j].ID })
-	return templates
+	return t.Len()
 }
