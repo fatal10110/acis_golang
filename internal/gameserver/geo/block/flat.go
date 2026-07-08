@@ -55,3 +55,8 @@ func (b *Flat) Height(layer int) int16 { return b.height }
 
 // NSWE always returns AllDirections, regardless of layer handle.
 func (b *Flat) NSWE(layer int) NSWE { return AllDirections }
+
+// Cells returns the block's single layer data for any local cell.
+func (b *Flat) Cells(cellX, cellY int) []Cell {
+	return []Cell{{Height: b.height, NSWE: AllDirections}}
+}

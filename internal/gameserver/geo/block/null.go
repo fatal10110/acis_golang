@@ -38,3 +38,12 @@ func (b *Null) Height(layer int) int16 { return 0 }
 
 // NSWE always returns AllDirections, regardless of layer handle.
 func (b *Null) NSWE(layer int) NSWE { return AllDirections }
+
+// Cells returns a single nominal open layer at height 0. Unlike
+// HeightNearest, which answers relative to the queried worldZ, this has
+// no query to answer relative to — it exists only so a caller building
+// its own overlay on top of a Null block (which by definition has no
+// real geodata) has some baseline layer to start from.
+func (b *Null) Cells(cellX, cellY int) []Cell {
+	return []Cell{{Height: 0, NSWE: AllDirections}}
+}

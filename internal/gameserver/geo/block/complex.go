@@ -66,3 +66,8 @@ func (b *Complex) Height(layer int) int16 { return b.cells[layer].Height }
 
 // NSWE resolves a layer handle to its passability mask.
 func (b *Complex) NSWE(layer int) NSWE { return b.cells[layer].NSWE }
+
+// Cells returns the local cell's single stored layer.
+func (b *Complex) Cells(cellX, cellY int) []Cell {
+	return []Cell{b.cells[cellIndex(cellX, cellY)]}
+}
