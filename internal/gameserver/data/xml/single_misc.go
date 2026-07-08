@@ -1,0 +1,197 @@
+package xml
+
+import (
+	"fmt"
+	"path/filepath"
+
+	"github.com/fatal10110/acis_golang/internal/commons"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+)
+
+type soulCrystalFile struct {
+	Crystals []attrsElement `xml:"crystals>crystal"`
+	NPCs     []attrsElement `xml:"npcs>npc"`
+}
+
+func LoadSoulCrystalData(path string) (*item.SoulCrystalTable, error) {
+	var doc soulCrystalFile
+	if err := readXML(path, &doc); err != nil {
+		return nil, fmt.Errorf("xml: soul crystals %q: %w", path, err)
+	}
+
+	crystals := make([]item.SoulCrystal, 0, len(doc.Crystals))
+	for _, el := range doc.Crystals {
+		entry, err := item.NewSoulCrystal(commons.StatSetFromXMLAttrs(el.Attrs))
+		if err != nil {
+			return nil, fmt.Errorf("xml: %s: %w", path, err)
+		}
+		crystals = append(crystals, entry)
+	}
+
+	infos := make([]item.SoulCrystalLevelingInfo, 0, len(doc.NPCs))
+	for _, el := range doc.NPCs {
+		entry, err := item.NewSoulCrystalLevelingInfo(commons.StatSetFromXMLAttrs(el.Attrs))
+		if err != nil {
+			return nil, fmt.Errorf("xml: %s: %w", path, err)
+		}
+		infos = append(infos, entry)
+	}
+
+	table, err := item.NewSoulCrystalTable(crystals, infos)
+	if err != nil {
+		return nil, fmt.Errorf("xml: %s: %w", path, err)
+	}
+	return table, nil
+}
+
+type spellbookFile struct {
+	Books []attrsElement `xml:"book"`
+}
+
+func LoadSpellbooks(path string) (*skill.SpellbookTable, error) {
+	var doc spellbookFile
+	if err := readXML(path, &doc); err != nil {
+		return nil, fmt.Errorf("xml: spellbooks %q: %w", path, err)
+	}
+
+	books := make([]skill.Spellbook, 0, len(doc.Books))
+	for _, el := range doc.Books {
+		book, err := skill.NewSpellbook(commons.StatSetFromXMLAttrs(el.Attrs))
+		if err != nil {
+			return nil, fmt.Errorf("xml: %s: %w", path, err)
+		}
+		books = append(books, book)
+	}
+	return skill.NewSpellbookTable(books)
+}
+
+type summonItemFile struct {
+	Items []attrsElement `xml:"item"`
+}
+
+func LoadSummonItems(path string) (*item.SummonItemTable, error) {
+	var doc summonItemFile
+	if err := readXML(path, &doc); err != nil {
+		return nil, fmt.Errorf("xml: summon items %q: %w", path, err)
+	}
+
+	items := make([]item.SummonItem, 0, len(doc.Items))
+	for _, el := range doc.Items {
+		entry, err := item.NewSummonItem(commons.StatSetFromXMLAttrs(el.Attrs))
+		if err != nil {
+			return nil, fmt.Errorf("xml: %s: %w", path, err)
+		}
+		items = append(items, entry)
+	}
+	return item.NewSummonItemTable(items)
+}
+
+type healSpsFile struct {
+	Entries []attrsElement `xml:"healSps"`
+}
+
+func LoadHealSps(path string) (*skill.HealSpsTable, error) {
+	var doc healSpsFile
+	if err := readXML(path, &doc); err != nil {
+		return nil, fmt.Errorf("xml: heal sps %q: %w", path, err)
+	}
+
+	entries := make([]skill.HealSps, 0, len(doc.Entries))
+	for _, el := range doc.Entries {
+		entry, err := skill.NewHealSps(commons.StatSetFromXMLAttrs(el.Attrs))
+		if err != nil {
+			return nil, fmt.Errorf("xml: %s: %w", path, err)
+		}
+		entries = append(entries, entry)
+	}
+	return skill.NewHealSpsTable(entries)
+}
+
+type newbieBuffFile struct {
+	Buffs []attrsElement `xml:"buff"`
+}
+
+func LoadNewbieBuffs(path string) (*skill.NewbieBuffTable, error) {
+	var doc newbieBuffFile
+	if err := readXML(path, &doc); err != nil {
+		return nil, fmt.Errorf("xml: newbie buffs %q: %w", path, err)
+	}
+
+	buffs := make([]skill.NewbieBuff, 0, len(doc.Buffs))
+	for _, el := range doc.Buffs {
+		entry, err := skill.NewNewbieBuff(commons.StatSetFromXMLAttrs(el.Attrs))
+		if err != nil {
+			return nil, fmt.Errorf("xml: %s: %w", path, err)
+		}
+		buffs = append(buffs, entry)
+	}
+	return skill.NewNewbieBuffTable(buffs), nil
+}
+
+type adminAccessFile struct {
+	Entries []attrsElement `xml:"access"`
+}
+
+type adminCommandFile struct {
+	Entries []attrsElement `xml:"aCar"`
+}
+
+func LoadAdminData(dir string) (*admin.Data, error) {
+	accessPath := filepath.Join(dir, "accessLevels.xml")
+	commandPath := filepath.Join(dir, "adminCommands.xml")
+
+	var accessDoc adminAccessFile
+	if err := readXML(accessPath, &accessDoc); err != nil {
+		return nil, fmt.Errorf("xml: admin access levels %q: %w", accessPath, err)
+	}
+	levels := make([]admin.AccessLevel, 0, len(accessDoc.Entries))
+	for _, el := range accessDoc.Entries {
+		entry, err := admin.NewAccessLevel(commons.StatSetFromXMLAttrs(el.Attrs))
+		if err != nil {
+			return nil, fmt.Errorf("xml: %s: %w", accessPath, err)
+		}
+		levels = append(levels, entry)
+	}
+
+	var commandDoc adminCommandFile
+	if err := readXML(commandPath, &commandDoc); err != nil {
+		return nil, fmt.Errorf("xml: admin commands %q: %w", commandPath, err)
+	}
+	commands := make([]admin.Command, 0, len(commandDoc.Entries))
+	for _, el := range commandDoc.Entries {
+		entry, err := admin.NewCommand(commons.StatSetFromXMLAttrs(el.Attrs))
+		if err != nil {
+			return nil, fmt.Errorf("xml: %s: %w", commandPath, err)
+		}
+		commands = append(commands, entry)
+	}
+
+	data, err := admin.NewData(levels, commands)
+	if err != nil {
+		return nil, fmt.Errorf("xml: admin data in %s: %w", dir, err)
+	}
+	return data, nil
+}
+
+type announcementFile struct {
+	Entries []attrsElement `xml:"announcement"`
+}
+
+func LoadAnnouncements(path string) ([]admin.Announcement, error) {
+	var doc announcementFile
+	if err := readXML(path, &doc); err != nil {
+		return nil, fmt.Errorf("xml: announcements %q: %w", path, err)
+	}
+
+	out := make([]admin.Announcement, 0, len(doc.Entries))
+	for _, el := range doc.Entries {
+		entry, err := admin.NewAnnouncement(commons.StatSetFromXMLAttrs(el.Attrs))
+		if err != nil {
+			return nil, fmt.Errorf("xml: %s: %w", path, err)
+		}
+		out = append(out, entry)
+	}
+	return out, nil
+}
