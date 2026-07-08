@@ -9,8 +9,17 @@ import "encoding/xml"
 // fields.
 func StatSetFromXMLAttrs(attrs []xml.Attr) *StatSet {
 	set := NewStatSetWithCapacity(len(attrs))
-	for _, a := range attrs {
-		set.Set(a.Name.Local, a.Value)
-	}
+	set.MergeXMLAttrs(attrs)
 	return set
+}
+
+// MergeXMLAttrs folds attrs into s, keyed by local attribute name,
+// overwriting any existing values for the same key. Callers building a
+// StatSet from more than one XML element (e.g. an element split across
+// several child tags) call this once per element to merge them all into
+// one set.
+func (s *StatSet) MergeXMLAttrs(attrs []xml.Attr) {
+	for _, a := range attrs {
+		s.Set(a.Name.Local, a.Value)
+	}
 }
