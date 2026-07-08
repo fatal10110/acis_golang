@@ -25,6 +25,15 @@ func NewReader(payload []byte) *Reader {
 	return &Reader{buf: payload}
 }
 
+// NewPacketReader wraps payload for decoding, discarding the leading opcode
+// byte every inbound packet carries. A payload shorter than one byte leaves
+// the reader's Err() set rather than panicking.
+func NewPacketReader(payload []byte) *Reader {
+	r := NewReader(payload)
+	r.ReadUint8() // opcode
+	return r
+}
+
 // Err reports the first short-read error encountered, if any. Once set,
 // every subsequent read returns the type's zero value instead of panicking
 // or reading out of bounds, so a decoder can perform a run of reads and
