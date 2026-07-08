@@ -175,221 +175,140 @@ type Definition struct {
 // operateType are required; every other attribute defaults the way an
 // absent one does in the shipped data.
 func NewDefinition(id ID, level int, name string, set *commons.StatSet) (Definition, error) {
-	wrap := func(err error) error { return fmt.Errorf("skill %d level %d: %w", id, level, err) }
+	f := commons.NewFields(set, fmt.Sprintf("skill %d level %d", id, level))
 
-	d := Definition{ID: id, Level: level, Name: name, HeroSkill: heroSkillIDs[id]}
+	d := Definition{
+		ID: id, Level: level, Name: name, HeroSkill: heroSkillIDs[id],
 
-	var err error
-	if d.Activation, err = commons.GetEnum[Activation](set, "operateType", activationNames); err != nil {
-		return Definition{}, wrap(err)
-	}
-	d.Magic = set.GetBoolDefault("isMagic", false)
-	d.Potion = set.GetBoolDefault("isPotion", false)
+		Activation: commons.FieldEnum[Activation](f, "operateType", activationNames),
+		Magic:      f.BoolDefault("isMagic", false),
+		Potion:     f.BoolDefault("isPotion", false),
 
-	if d.MPConsume, err = set.GetIntDefault("mpConsume", 0); err != nil {
-		return Definition{}, wrap(err)
-	}
-	if d.MPInitialConsume, err = set.GetIntDefault("mpInitialConsume", 0); err != nil {
-		return Definition{}, wrap(err)
-	}
-	if d.HPConsume, err = set.GetIntDefault("hpConsume", 0); err != nil {
-		return Definition{}, wrap(err)
-	}
-	if d.TargetConsumeCount, err = set.GetIntDefault("targetConsumeCount", 0); err != nil {
-		return Definition{}, wrap(err)
-	}
-	if d.TargetConsumeID, err = set.GetIntDefault("targetConsumeId", 0); err != nil {
-		return Definition{}, wrap(err)
-	}
-	if d.ItemConsumeCount, err = set.GetIntDefault("itemConsumeCount", 0); err != nil {
-		return Definition{}, wrap(err)
-	}
-	if d.ItemConsumeID, err = set.GetIntDefault("itemConsumeId", 0); err != nil {
-		return Definition{}, wrap(err)
-	}
-	if d.CastRange, err = set.GetIntDefault("castRange", 0); err != nil {
-		return Definition{}, wrap(err)
-	}
-	if d.EffectRange, err = set.GetIntDefault("effectRange", -1); err != nil {
-		return Definition{}, wrap(err)
-	}
-	if d.AbnormalLevel, err = set.GetIntDefault("abnormalLvl", -1); err != nil {
-		return Definition{}, wrap(err)
-	}
-	if d.EffectAbnormalLevel, err = set.GetIntDefault("effectAbnormalLvl", -1); err != nil {
-		return Definition{}, wrap(err)
-	}
-	if d.NegateLevel, err = set.GetIntDefault("negateLvl", -1); err != nil {
-		return Definition{}, wrap(err)
-	}
-	if d.HitTime, err = set.GetIntDefault("hitTime", 0); err != nil {
-		return Definition{}, wrap(err)
-	}
-	if d.CoolTime, err = set.GetIntDefault("coolTime", 0); err != nil {
-		return Definition{}, wrap(err)
-	}
-	if d.ReuseDelay, err = set.GetIntDefault("reuseDelay", 0); err != nil {
-		return Definition{}, wrap(err)
-	}
-	if d.EquipDelay, err = set.GetIntDefault("equipDelay", 0); err != nil {
-		return Definition{}, wrap(err)
-	}
-	if set.Has("sharedReuse") {
-		raw, err := set.GetString("sharedReuse")
-		if err != nil {
-			return Definition{}, wrap(err)
-		}
-		ref, err := parseSharedReuse(raw)
-		if err != nil {
-			return Definition{}, wrap(fmt.Errorf("sharedReuse %q: %w", raw, err))
-		}
-		d.SharedReuse = &ref
-	}
-	if d.Radius, err = set.GetIntDefault("skillRadius", 80); err != nil {
-		return Definition{}, wrap(err)
+		MPConsume:        f.IntDefault("mpConsume", 0),
+		MPInitialConsume: f.IntDefault("mpInitialConsume", 0),
+		HPConsume:        f.IntDefault("hpConsume", 0),
+
+		TargetConsumeCount: f.IntDefault("targetConsumeCount", 0),
+		TargetConsumeID:    f.IntDefault("targetConsumeId", 0),
+		ItemConsumeCount:   f.IntDefault("itemConsumeCount", 0),
+		ItemConsumeID:      f.IntDefault("itemConsumeId", 0),
+
+		CastRange:           f.IntDefault("castRange", 0),
+		EffectRange:         f.IntDefault("effectRange", -1),
+		AbnormalLevel:       f.IntDefault("abnormalLvl", -1),
+		EffectAbnormalLevel: f.IntDefault("effectAbnormalLvl", -1),
+		NegateLevel:         f.IntDefault("negateLvl", -1),
+
+		HitTime:    f.IntDefault("hitTime", 0),
+		CoolTime:   f.IntDefault("coolTime", 0),
+		ReuseDelay: f.IntDefault("reuseDelay", 0),
+		EquipDelay: f.IntDefault("equipDelay", 0),
+
+		Radius: f.IntDefault("skillRadius", 80),
+
+		Target: commons.FieldEnum[Target](f, "target", targetNames),
+		Power:  f.Float32Default("power", 0),
+
+		Attribute: f.StringDefault("attribute", ""),
+
+		MaxNegatedEffects: f.IntDefault("maxNegated", 0),
+		MagicLevel:        f.IntDefault("magicLvl", 0),
+		LevelDepend:       f.IntDefault("lvlDepend", 0),
+		IgnoreResists:     f.BoolDefault("ignoreResists", false),
+		StaticReuse:       f.BoolDefault("staticReuse", false),
+		StaticHitTime:     f.BoolDefault("staticHitTime", false),
+
+		Stat:         f.StringDefault("stat", ""),
+		IgnoreShield: f.BoolDefault("ignoreShld", false),
+
+		SkillType:  f.String("skillType"),
+		EffectType: f.StringDefault("effectType", ""),
+
+		EffectID:    f.IntDefault("effectId", 0),
+		EffectPower: f.IntDefault("effectPower", 0),
+		EffectLevel: f.IntDefault("effectLevel", 0),
+
+		Element:      commons.FieldEnumDefault[Element](f, "element", elementNames, ElementNone),
+		BaseLandRate: f.IntDefault("baseLandRate", 0),
+
+		Overhit:          f.BoolDefault("overHit", false),
+		KillByDOT:        f.BoolDefault("killByDOT", false),
+		SuicideAttack:    f.BoolDefault("isSuicideAttack", false),
+		SiegeSummonSkill: f.BoolDefault("isSiegeSummonSkill", false),
+
+		WeaponsAllowed: f.StringDefault("weaponsAllowed", ""),
+
+		NextActionIsAttack: f.BoolDefault("nextActionAttack", false),
+		MinPledgeClass:     f.IntDefault("minPledgeClass", 0),
+
+		TriggeredID:      f.IntDefault("triggeredId", 0),
+		TriggeredLevel:   f.IntDefault("triggeredLevel", 0),
+		ChanceType:       f.StringDefault("chanceType", ""),
+		ActivationChance: f.IntDefault("activationChance", -1),
+
+		Debuff:     f.BoolDefault("isDebuff", false),
+		MaxCharges: f.IntDefault("maxCharges", 0),
+		NumCharges: f.IntDefault("numCharges", 0),
+
+		LethalChance1: f.IntDefault("lethal1", 0),
+		LethalChance2: f.IntDefault("lethal2", 0),
+
+		DirectHPDamage: f.BoolDefault("dmgDirectlyToHp", false),
+		Dance:          f.BoolDefault("isDance", false),
+		NextDanceCost:  f.IntDefault("nextDanceCost", 0),
+		SoulShotBoost:  f.Float32Default("SSBoost", 0),
+		AggroPoints:    f.IntDefault("aggroPoints", 0),
+
+		StayAfterDeath: f.BoolDefault("stayAfterDeath", false),
+
+		FlyRadius: f.IntDefault("flyRadius", 0),
+		FlyCourse: f.Float32Default("flyCourse", 0),
+
+		Feed: f.IntDefault("feed", 0),
+
+		CanBeReflected:   f.BoolDefault("canBeReflected", true),
+		CanBeDispelled:   f.BoolDefault("canBeDispeled", true),
+		ClanSkill:        f.BoolDefault("isClanSkill", false),
+		SimultaneousCast: f.BoolDefault("simultaneousCast", false),
+
+		ExtractableItems: f.StringDefault("capsuled_items_skill", ""),
 	}
 
-	if d.Target, err = commons.GetEnum[Target](set, "target", targetNames); err != nil {
-		return Definition{}, wrap(err)
-	}
-	if d.Power, err = set.GetFloat32Default("power", 0); err != nil {
-		return Definition{}, wrap(err)
-	}
-
-	d.Attribute = set.GetStringDefault("attribute", "")
-	if negate := set.GetStringDefault("negateStats", ""); negate != "" {
+	if negate := f.StringDefault("negateStats", ""); negate != "" {
 		d.NegateTypes = strings.Fields(negate)
 	}
-	if set.Has("negateId") {
-		raw, err := set.GetString("negateId")
+
+	if f.Has("sharedReuse") {
+		raw := f.String("sharedReuse")
+		ref, err := parseSharedReuse(raw)
 		if err != nil {
-			return Definition{}, wrap(err)
+			f.Fail(fmt.Errorf("sharedReuse %q: %w", raw, err))
+		} else {
+			d.SharedReuse = &ref
 		}
-		d.NegateIDs, err = parseCommaInts(raw)
+	}
+
+	if f.Has("negateId") {
+		raw := f.String("negateId")
+		ids, err := parseCommaInts(raw)
 		if err != nil {
-			return Definition{}, wrap(fmt.Errorf("negateId %q: %w", raw, err))
+			f.Fail(fmt.Errorf("negateId %q: %w", raw, err))
+		} else {
+			d.NegateIDs = ids
 		}
 	}
 
-	if d.MaxNegatedEffects, err = set.GetIntDefault("maxNegated", 0); err != nil {
-		return Definition{}, wrap(err)
-	}
-	if d.MagicLevel, err = set.GetIntDefault("magicLvl", 0); err != nil {
-		return Definition{}, wrap(err)
-	}
-	if d.LevelDepend, err = set.GetIntDefault("lvlDepend", 0); err != nil {
-		return Definition{}, wrap(err)
-	}
-	d.IgnoreResists = set.GetBoolDefault("ignoreResists", false)
-	d.StaticReuse = set.GetBoolDefault("staticReuse", false)
-	d.StaticHitTime = set.GetBoolDefault("staticHitTime", false)
+	d.Offensive = f.BoolDefault("offensive", isTypeOffensive(d.SkillType) || d.Debuff || d.Target == TargetCorpseMob)
+	d.BaseCritRate = f.IntDefault("baseCritRate", defaultBaseCritRate(d.SkillType))
 
-	d.Stat = set.GetStringDefault("stat", "")
-	d.IgnoreShield = set.GetBoolDefault("ignoreShld", false)
-
-	if d.SkillType, err = set.GetString("skillType"); err != nil {
-		return Definition{}, wrap(err)
-	}
-	d.EffectType = set.GetStringDefault("effectType", "")
-
-	if d.EffectID, err = set.GetIntDefault("effectId", 0); err != nil {
-		return Definition{}, wrap(err)
-	}
-	if d.EffectPower, err = set.GetIntDefault("effectPower", 0); err != nil {
-		return Definition{}, wrap(err)
-	}
-	if d.EffectLevel, err = set.GetIntDefault("effectLevel", 0); err != nil {
-		return Definition{}, wrap(err)
+	if f.Has("flyType") {
+		flight := commons.FieldEnum[Flight](f, "flyType", flightNames)
+		d.Flight = &flight
 	}
 
-	if d.Element, err = commons.GetEnumDefault[Element](set, "element", elementNames, ElementNone); err != nil {
-		return Definition{}, wrap(err)
+	if err := f.Err(); err != nil {
+		return Definition{}, err
 	}
-	if d.BaseLandRate, err = set.GetIntDefault("baseLandRate", 0); err != nil {
-		return Definition{}, wrap(err)
-	}
-
-	d.Overhit = set.GetBoolDefault("overHit", false)
-	d.KillByDOT = set.GetBoolDefault("killByDOT", false)
-	d.SuicideAttack = set.GetBoolDefault("isSuicideAttack", false)
-	d.SiegeSummonSkill = set.GetBoolDefault("isSiegeSummonSkill", false)
-
-	d.WeaponsAllowed = set.GetStringDefault("weaponsAllowed", "")
-
-	d.NextActionIsAttack = set.GetBoolDefault("nextActionAttack", false)
-	if d.MinPledgeClass, err = set.GetIntDefault("minPledgeClass", 0); err != nil {
-		return Definition{}, wrap(err)
-	}
-
-	if d.TriggeredID, err = set.GetIntDefault("triggeredId", 0); err != nil {
-		return Definition{}, wrap(err)
-	}
-	if d.TriggeredLevel, err = set.GetIntDefault("triggeredLevel", 0); err != nil {
-		return Definition{}, wrap(err)
-	}
-	d.ChanceType = set.GetStringDefault("chanceType", "")
-	if d.ActivationChance, err = set.GetIntDefault("activationChance", -1); err != nil {
-		return Definition{}, wrap(err)
-	}
-
-	d.Debuff = set.GetBoolDefault("isDebuff", false)
-	d.Offensive = set.GetBoolDefault("offensive", isTypeOffensive(d.SkillType) || d.Debuff || d.Target == TargetCorpseMob)
-	if d.MaxCharges, err = set.GetIntDefault("maxCharges", 0); err != nil {
-		return Definition{}, wrap(err)
-	}
-	if d.NumCharges, err = set.GetIntDefault("numCharges", 0); err != nil {
-		return Definition{}, wrap(err)
-	}
-
-	if d.BaseCritRate, err = set.GetIntDefault("baseCritRate", defaultBaseCritRate(d.SkillType)); err != nil {
-		return Definition{}, wrap(err)
-	}
-	if d.LethalChance1, err = set.GetIntDefault("lethal1", 0); err != nil {
-		return Definition{}, wrap(err)
-	}
-	if d.LethalChance2, err = set.GetIntDefault("lethal2", 0); err != nil {
-		return Definition{}, wrap(err)
-	}
-
-	d.DirectHPDamage = set.GetBoolDefault("dmgDirectlyToHp", false)
-	d.Dance = set.GetBoolDefault("isDance", false)
-	if d.NextDanceCost, err = set.GetIntDefault("nextDanceCost", 0); err != nil {
-		return Definition{}, wrap(err)
-	}
-	if d.SoulShotBoost, err = set.GetFloat32Default("SSBoost", 0); err != nil {
-		return Definition{}, wrap(err)
-	}
-	if d.AggroPoints, err = set.GetIntDefault("aggroPoints", 0); err != nil {
-		return Definition{}, wrap(err)
-	}
-
-	d.StayAfterDeath = set.GetBoolDefault("stayAfterDeath", false)
-
-	if set.Has("flyType") {
-		f, err := commons.GetEnum[Flight](set, "flyType", flightNames)
-		if err != nil {
-			return Definition{}, wrap(err)
-		}
-		d.Flight = &f
-	}
-	if d.FlyRadius, err = set.GetIntDefault("flyRadius", 0); err != nil {
-		return Definition{}, wrap(err)
-	}
-	if d.FlyCourse, err = set.GetFloat32Default("flyCourse", 0); err != nil {
-		return Definition{}, wrap(err)
-	}
-
-	if d.Feed, err = set.GetIntDefault("feed", 0); err != nil {
-		return Definition{}, wrap(err)
-	}
-
-	d.CanBeReflected = set.GetBoolDefault("canBeReflected", true)
-	d.CanBeDispelled = set.GetBoolDefault("canBeDispeled", true)
-	d.ClanSkill = set.GetBoolDefault("isClanSkill", false)
-	d.SimultaneousCast = set.GetBoolDefault("simultaneousCast", false)
-
-	d.ExtractableItems = set.GetStringDefault("capsuled_items_skill", "")
-
 	return d, nil
 }
 
