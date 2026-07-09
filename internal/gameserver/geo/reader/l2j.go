@@ -14,25 +14,23 @@ const (
 )
 
 // ReadL2J decodes one .l2j geodata region.
-func ReadL2J(r io.Reader) ([]block.Block, error) {
+func ReadL2J(r io.Reader) (*block.Region, error) {
 	data, err := io.ReadAll(r)
 	if err != nil {
 		return nil, fmt.Errorf("geo/reader: read l2j region: %w", err)
 	}
 
 	p := l2jParser{data: data}
-	blocks := make([]block.Block, block.RegionBlockCount)
-	for i := range blocks {
-		b, err := p.block(i)
-		if err != nil {
+	region := block.NewRegion()
+	for i := 0; i < block.RegionBlockCount; i++ {
+		if err := p.block(region, i); err != nil {
 			return nil, err
 		}
-		blocks[i] = b
 	}
 	if p.off != len(data) {
 		return nil, fmt.Errorf("geo/reader: l2j region has %d trailing bytes", len(data)-p.off)
 	}
-	return blocks, nil
+	return region, nil
 }
 
 type l2jParser struct {
@@ -40,56 +38,57 @@ type l2jParser struct {
 	off  int
 }
 
-func (p *l2jParser) block(i int) (block.Block, error) {
+func (p *l2jParser) block(region *block.Region, i int) error {
 	typ, err := p.u8()
 	if err != nil {
-		return nil, fmt.Errorf("geo/reader: block %d: read type: %w", i, err)
+		return fmt.Errorf("geo/reader: block %d: read type: %w", i, err)
 	}
 
 	switch typ {
 	case l2jFlat:
 		height, err := p.i16()
 		if err != nil {
-			return nil, fmt.Errorf("geo/reader: block %d flat: read height: %w", i, err)
+			return fmt.Errorf("geo/reader: block %d flat: read height: %w", i, err)
 		}
-		return block.NewFlat(height), nil
+		region.SetFlat(i, height)
+		return nil
 	case l2jComplex:
-		var cells [block.CellCount]block.Cell
+		var cells [block.CellCount]uint16
 		for c := range cells {
 			code, err := p.u16()
 			if err != nil {
-				return nil, fmt.Errorf("geo/reader: block %d complex: cell %d: %w", i, c, err)
+				return fmt.Errorf("geo/reader: block %d complex: cell %d: %w", i, c, err)
 			}
-			cells[c] = block.DecodeCell(code)
+			cells[c] = code
 		}
-		return block.NewComplex(cells), nil
+		region.SetComplexEncoded(i, cells)
+		return nil
 	case l2jMultilayer:
-		var cells [block.CellCount][]block.Cell
-		for c := range cells {
+		var counts [block.CellCount]uint8
+		cells := make([]uint16, 0, block.CellCount)
+		for c := range counts {
 			count, err := p.u8()
 			if err != nil {
-				return nil, fmt.Errorf("geo/reader: block %d multilayer: cell %d: read layer count: %w", i, c, err)
+				return fmt.Errorf("geo/reader: block %d multilayer: cell %d: read layer count: %w", i, c, err)
 			}
 			if count == 0 || int(count) > block.MaxLayers {
-				return nil, fmt.Errorf("geo/reader: block %d multilayer: cell %d: invalid layer count %d", i, c, count)
+				return fmt.Errorf("geo/reader: block %d multilayer: cell %d: invalid layer count %d", i, c, count)
 			}
-			layers := make([]block.Cell, count)
-			for l := range layers {
+			counts[c] = count
+			for l := 0; l < int(count); l++ {
 				code, err := p.u16()
 				if err != nil {
-					return nil, fmt.Errorf("geo/reader: block %d multilayer: cell %d layer %d: %w", i, c, l, err)
+					return fmt.Errorf("geo/reader: block %d multilayer: cell %d layer %d: %w", i, c, l, err)
 				}
-				layers[l] = block.DecodeCell(code)
+				cells = append(cells, code)
 			}
-			cells[c] = layers
 		}
-		b, err := block.NewMultilayer(cells)
-		if err != nil {
-			return nil, fmt.Errorf("geo/reader: block %d multilayer: %w", i, err)
+		if err := region.SetMultilayerEncoded(i, counts, cells); err != nil {
+			return fmt.Errorf("geo/reader: block %d multilayer: %w", i, err)
 		}
-		return b, nil
+		return nil
 	default:
-		return nil, fmt.Errorf("geo/reader: block %d: unknown l2j block type %#x", i, typ)
+		return fmt.Errorf("geo/reader: block %d: unknown l2j block type %#x", i, typ)
 	}
 }
 

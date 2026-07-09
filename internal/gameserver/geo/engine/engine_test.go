@@ -73,19 +73,51 @@ func TestCanSee(t *testing.T) {
 	})
 }
 
-func newTestEngine(t *testing.T, first block.Block) *Engine {
+type testHelper interface {
+	Helper()
+	Fatalf(string, ...any)
+}
+
+func newTestEngine(t testHelper, first block.Block) *Engine {
 	t.Helper()
 
 	e := New()
-	region := make([]block.Block, block.RegionBlockCount)
-	for i := range region {
-		region[i] = &block.Null{}
+	region, err := block.NewRegionFromBlocks([]block.Block{first})
+	if err != nil {
+		t.Fatalf("NewRegionFromBlocks(): %v", err)
 	}
-	region[0] = first
 	if err := e.SetRegion(TileXMin, TileYMin, region); err != nil {
 		t.Fatalf("SetRegion(): %v", err)
 	}
 	return e
+}
+
+func TestQueryPathDoesNotAllocate(t *testing.T) {
+	e := newTestEngine(t, complexBlock(func(x, y int) block.Cell {
+		return block.Cell{Height: 0, NSWE: block.AllDirections}
+	}))
+
+	allocs := testing.AllocsPerRun(1000, func() {
+		_ = e.Height(worldX(0), worldY(0), 0)
+		_ = e.CanMove(worldX(0), worldY(0), 0, worldX(1), worldY(0), 0)
+		_ = e.CanSee(worldX(0), worldY(0), 0, worldX(3), worldY(0), 0)
+	})
+	if allocs != 0 {
+		t.Fatalf("query allocations = %.0f, want 0", allocs)
+	}
+}
+
+func BenchmarkQueries(b *testing.B) {
+	e := newTestEngine(b, complexBlock(func(x, y int) block.Cell {
+		return block.Cell{Height: 0, NSWE: block.AllDirections}
+	}))
+
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = e.Height(worldX(0), worldY(0), 0)
+		_ = e.CanMove(worldX(0), worldY(0), 0, worldX(1), worldY(0), 0)
+		_ = e.CanSee(worldX(0), worldY(0), 0, worldX(3), worldY(0), 0)
+	}
 }
 
 func complexBlock(cell func(x, y int) block.Cell) block.Block {

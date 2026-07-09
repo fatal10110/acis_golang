@@ -15,7 +15,7 @@ const (
 )
 
 // ReadL2OFF loads a little-endian L2OFF _conv.dat geodata region.
-func ReadL2OFF(path string) ([]block.Block, error) {
+func ReadL2OFF(path string) (*block.Region, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read L2OFF region %s: %w", path, err)
@@ -27,37 +27,33 @@ func ReadL2OFF(path string) ([]block.Block, error) {
 	return blocks, nil
 }
 
-func decodeL2OFF(data []byte) ([]block.Block, error) {
+func decodeL2OFF(data []byte) (*block.Region, error) {
 	r := l2offReader{data: data}
 	if !r.skip(l2offHeaderSize) {
 		return nil, shortL2OFF(-1, "header", r.pos)
 	}
 
-	blocks := make([]block.Block, block.RegionBlockCount)
+	region := block.NewRegion()
 	for i := 0; i < block.RegionBlockCount; i++ {
 		typ, ok := r.u16()
 		if !ok {
 			return nil, shortL2OFF(i, "block type", r.pos)
 		}
 
-		var (
-			b   block.Block
-			err error
-		)
+		var err error
 		switch typ {
 		case l2offTypeFlat:
-			b, err = r.flat(i)
+			err = r.flat(region, i)
 		case l2offTypeComplex:
-			b, err = r.complex(i)
+			err = r.complex(region, i)
 		default:
-			b, err = r.multilayer(i)
+			err = r.multilayer(region, i)
 		}
 		if err != nil {
 			return nil, err
 		}
-		blocks[i] = b
 	}
-	return blocks, nil
+	return region, nil
 }
 
 type l2offReader struct {
@@ -82,56 +78,57 @@ func (r *l2offReader) u16() (uint16, bool) {
 	return v, true
 }
 
-func (r *l2offReader) flat(blockIndex int) (block.Block, error) {
+func (r *l2offReader) flat(region *block.Region, blockIndex int) error {
 	height, ok := r.u16()
 	if !ok {
-		return nil, shortL2OFF(blockIndex, "flat height", r.pos)
+		return shortL2OFF(blockIndex, "flat height", r.pos)
 	}
 	if _, ok := r.u16(); !ok {
-		return nil, shortL2OFF(blockIndex, "flat dummy", r.pos)
+		return shortL2OFF(blockIndex, "flat dummy", r.pos)
 	}
-	return block.NewFlat(int16(height)), nil
+	region.SetFlat(blockIndex, int16(height))
+	return nil
 }
 
-func (r *l2offReader) complex(blockIndex int) (block.Block, error) {
-	var cells [block.CellCount]block.Cell
+func (r *l2offReader) complex(region *block.Region, blockIndex int) error {
+	var cells [block.CellCount]uint16
 	for i := range cells {
 		code, ok := r.u16()
 		if !ok {
-			return nil, shortL2OFF(blockIndex, "complex cell", r.pos)
+			return shortL2OFF(blockIndex, "complex cell", r.pos)
 		}
-		cells[i] = block.DecodeCell(code)
+		cells[i] = code
 	}
-	return block.NewComplex(cells), nil
+	region.SetComplexEncoded(blockIndex, cells)
+	return nil
 }
 
-func (r *l2offReader) multilayer(blockIndex int) (block.Block, error) {
-	var cells [block.CellCount][]block.Cell
-	for cell := range cells {
+func (r *l2offReader) multilayer(region *block.Region, blockIndex int) error {
+	var counts [block.CellCount]uint8
+	cells := make([]uint16, 0, block.CellCount)
+	for cell := range counts {
 		count, ok := r.u16()
 		if !ok {
-			return nil, shortL2OFF(blockIndex, "layer count", r.pos)
+			return shortL2OFF(blockIndex, "layer count", r.pos)
 		}
 		if count == 0 || count > block.MaxLayers {
-			return nil, fmt.Errorf("geo/reader: block %d cell %d: invalid layer count %d", blockIndex, cell, count)
+			return fmt.Errorf("geo/reader: block %d cell %d: invalid layer count %d", blockIndex, cell, count)
 		}
 
-		layers := make([]block.Cell, int(count))
-		for layer := range layers {
+		counts[cell] = uint8(count)
+		for layer := 0; layer < int(count); layer++ {
 			code, ok := r.u16()
 			if !ok {
-				return nil, shortL2OFF(blockIndex, "layer data", r.pos)
+				return shortL2OFF(blockIndex, "layer data", r.pos)
 			}
-			layers[layer] = block.DecodeCell(code)
+			cells = append(cells, code)
 		}
-		cells[cell] = layers
 	}
 
-	b, err := block.NewMultilayer(cells)
-	if err != nil {
-		return nil, fmt.Errorf("geo/reader: block %d: %w", blockIndex, err)
+	if err := region.SetMultilayerEncoded(blockIndex, counts, cells); err != nil {
+		return fmt.Errorf("geo/reader: block %d: %w", blockIndex, err)
 	}
-	return b, nil
+	return nil
 }
 
 func shortL2OFF(blockIndex int, field string, offset int) error {
