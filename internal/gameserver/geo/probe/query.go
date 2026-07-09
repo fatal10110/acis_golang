@@ -91,11 +91,14 @@ func parsePoint(s string) (location.Location, error) {
 	}
 	var coords [3]int
 	for i, p := range parts {
-		v, err := strconv.Atoi(p)
+		// World coordinates are int32-range; parse at that width instead of
+		// strconv.Atoi so an out-of-range dump value fails here rather than
+		// silently truncating wherever the geo engine later narrows it.
+		v, err := strconv.ParseInt(p, 10, 32)
 		if err != nil {
 			return location.Location{}, fmt.Errorf("point %q: %w", s, err)
 		}
-		coords[i] = v
+		coords[i] = int(v)
 	}
 	return location.Location{X: coords[0], Y: coords[1], Z: coords[2]}, nil
 }

@@ -62,6 +62,7 @@ func TestParseQueryErrors(t *testing.T) {
 		"canmove:1,2,3",
 		"canmove:1,2,3->4,5",
 		"bogus:1,2,3->4,5,6",
+		"height:1,2,99999999999",
 	}
 	for _, id := range tests {
 		if _, err := ParseQuery(id); err == nil {
