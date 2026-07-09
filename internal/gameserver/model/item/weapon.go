@@ -55,7 +55,7 @@ var weaponTypeStrings = map[WeaponType]string{
 	WeaponPet:        "PET",
 }
 
-var weaponTypeNames = reverseStringMap(weaponTypeStrings)
+var weaponTypeNames = commons.ReverseMap(weaponTypeStrings)
 
 // WeaponDetail is the weapon-specific data a KindWeapon Template carries;
 // nil for every other Kind.

@@ -80,7 +80,7 @@ var etcItemTypeStrings = map[EtcItemType]string{
 	EtcItemQuest:                      "QUEST",
 }
 
-var etcItemTypeNames = reverseStringMap(etcItemTypeStrings)
+var etcItemTypeNames = commons.ReverseMap(etcItemTypeStrings)
 
 // shotActions is the set of default actions that reclassify a template as
 // EtcItemShot regardless of its own declared etcitem_type.

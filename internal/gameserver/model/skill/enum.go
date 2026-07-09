@@ -1,6 +1,10 @@
 package skill
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/fatal10110/acis_golang/internal/commons"
+)
 
 // Activation classifies how a skill turns on: cast on demand, always in
 // effect, or switched on and off like a stance.
@@ -12,13 +16,9 @@ const (
 	ActivationToggle
 )
 
-var activationNames = map[string]Activation{
-	"PASSIVE": ActivationPassive,
-	"ACTIVE":  ActivationActive,
-	"TOGGLE":  ActivationToggle,
-}
-
 var activationStrings = [...]string{"PASSIVE", "ACTIVE", "TOGGLE"}
+
+var activationNames = commons.NameIndex[Activation](activationStrings[:])
 
 // String returns a's canonical XML spelling.
 func (a Activation) String() string {
@@ -70,13 +70,7 @@ var targetStrings = [...]string{
 	"SUMMON", "AREA_SUMMON", "ENEMY_SUMMON", "OWNER_PET", "GROUND",
 }
 
-var targetNames = func() map[string]Target {
-	m := make(map[string]Target, len(targetStrings))
-	for i, name := range targetStrings {
-		m[name] = Target(i)
-	}
-	return m
-}()
+var targetNames = commons.NameIndex[Target](targetStrings[:])
 
 // String returns t's canonical XML spelling.
 func (t Target) String() string {
@@ -102,13 +96,7 @@ const (
 
 var elementStrings = [...]string{"NONE", "WIND", "FIRE", "WATER", "EARTH", "HOLY", "DARK", "VALAKAS"}
 
-var elementNames = func() map[string]Element {
-	m := make(map[string]Element, len(elementStrings))
-	for i, name := range elementStrings {
-		m[name] = Element(i)
-	}
-	return m
-}()
+var elementNames = commons.NameIndex[Element](elementStrings[:])
 
 // String returns e's canonical XML spelling.
 func (e Element) String() string {
@@ -130,13 +118,7 @@ const (
 
 var flightStrings = [...]string{"THROW_UP", "THROW_HORIZONTAL", "DUMMY", "CHARGE"}
 
-var flightNames = func() map[string]Flight {
-	m := make(map[string]Flight, len(flightStrings))
-	for i, name := range flightStrings {
-		m[name] = Flight(i)
-	}
-	return m
-}()
+var flightNames = commons.NameIndex[Flight](flightStrings[:])
 
 // String returns f's canonical XML spelling.
 func (f Flight) String() string {
