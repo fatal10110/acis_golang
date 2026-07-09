@@ -111,10 +111,12 @@ func TestSessionValidatorValidateReturnsErrorOnContextCancel(t *testing.T) {
 	validator := NewSessionValidator()
 	loginLink, _ := dialTestLoginLink(t, validator)
 
-	// No PlayerAuthResponse ever arrives for this account, since the login
-	// server only answers requests it actually received; canceling ctx
-	// must still return promptly instead of blocking forever.
-	client := NewClient(nil)
+	// The login server answers every request, including for unregistered
+	// accounts (a mismatch), so client needs a real Session: if ctx's
+	// priority over an already-arrived result ever regresses, Validate
+	// would try to notify client instead of erroring out.
+	session, _ := pipeSessions(t)
+	client := NewClient(session)
 	req := clientpackets.AuthLogin{LoginName: "nobody"}
 
 	ctx, cancel := context.WithCancel(context.Background())
