@@ -572,8 +572,8 @@ func TestLoadItemTemplatesNoDuplicateIDsInDatapack(t *testing.T) {
 		if e.IsDir() {
 			continue
 		}
-		parsed, err := parseItemFile(filepath.Join(dir, e.Name()))
-		if err != nil {
+		var parsed itemFile
+		if err := readXML(filepath.Join(dir, e.Name()), &parsed); err != nil {
 			t.Fatalf("parse %s: %v", e.Name(), err)
 		}
 		total += len(parsed.Items)
