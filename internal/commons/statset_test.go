@@ -40,6 +40,39 @@ func TestStatSetGettersFromTypedValues(t *testing.T) {
 	}
 }
 
+func TestStatSetGetLongPreservesInt64PrecisionBeyondFloat64Mantissa(t *testing.T) {
+	s := NewStatSet()
+	want := int64(1) << 60
+	s.Set("k", want)
+
+	if got, err := s.GetLong("k"); err != nil || got != want {
+		t.Errorf("GetLong = (%v, %v), want (%v, nil)", got, err, want)
+	}
+	if got, err := s.GetLongDefault("k", 0); err != nil || got != want {
+		t.Errorf("GetLongDefault = (%v, %v), want (%v, nil)", got, err, want)
+	}
+	if got, err := s.GetLongArray("k"); err != nil || len(got) != 1 || got[0] != want {
+		t.Errorf("GetLongArray = (%v, %v), want ([%v], nil)", got, err, want)
+	}
+}
+
+func TestStatSetIntegerAccessorsRecognizeUnsignedKinds(t *testing.T) {
+	s := NewStatSet()
+	s.Set("uint", uint(5))
+	s.Set("uint32", uint32(6))
+	s.Set("uint64", uint64(7))
+
+	if got, err := s.GetInt("uint"); err != nil || got != 5 {
+		t.Errorf("GetInt(uint) = (%v, %v), want (5, nil)", got, err)
+	}
+	if got, err := s.GetInt("uint32"); err != nil || got != 6 {
+		t.Errorf("GetInt(uint32) = (%v, %v), want (6, nil)", got, err)
+	}
+	if got, err := s.GetLong("uint64"); err != nil || got != 7 {
+		t.Errorf("GetLong(uint64) = (%v, %v), want (7, nil)", got, err)
+	}
+}
+
 func TestStatSetGettersFromStringCoercion(t *testing.T) {
 	s := NewStatSet()
 	s.Set("bool", "true")
