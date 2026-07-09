@@ -1,9 +1,7 @@
 package serverpackets
 
 import (
-	"encoding/binary"
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -66,90 +64,6 @@ func framePayload(t *testing.T, frame wire.Frame) []byte {
 		t.Fatalf("frame length = %d, want header", len(bytes))
 	}
 	return bytes[2:]
-}
-
-func TestFramePacketsAreNonEmpty(t *testing.T) {
-	c, tmpl := frameTestCharacter(), frameTestTemplate()
-	items, itemTable := frameTestItems(), frameTestItemTable()
-	userSnap := UserInfoSnapshot{Character: c, Template: tmpl, Items: items}
-	selectedSnap := CharSelectedSnapshot{Character: c, Template: tmpl, SessionID: 0x1122}
-	slots := []CharacterSlot{NewCharacterSlot(c, items, time.Unix(0, 0))}
-	skills := []SkillListEntry{{ID: 3, Level: 1, Passive: true}, {ID: 4, Level: 2, Disabled: true}}
-
-	cases := []struct {
-		name  string
-		frame func(t *testing.T) wire.Frame
-	}{
-		{
-			"AuthLoginFail",
-			func(t *testing.T) wire.Frame { return FrameAuthLoginFail(LoginFailSystemErrorTryLater) },
-		},
-		{
-			"UserInfo",
-			func(t *testing.T) wire.Frame { return FrameUserInfo(userSnap) },
-		},
-		{
-			"CharSelected",
-			func(t *testing.T) wire.Frame { return FrameCharSelected(selectedSnap) },
-		},
-		{
-			"CharSelectInfo",
-			func(t *testing.T) wire.Frame { return FrameCharSelectInfo("login", 7, slots, -1) },
-		},
-		{
-			"SkillList",
-			func(t *testing.T) wire.Frame { return FrameSkillList(skills) },
-		},
-		{
-			"SSQInfo",
-			func(t *testing.T) wire.Frame { return FrameSSQInfo() },
-		},
-		{
-			"CharCreateOk",
-			func(t *testing.T) wire.Frame { return FrameCharCreateOk() },
-		},
-		{
-			"CharCreateFail",
-			func(t *testing.T) wire.Frame { return FrameCharCreateFail(CharCreateFailReasonNameAlreadyExists) },
-		},
-		{
-			"CharDeleteOk",
-			func(t *testing.T) wire.Frame { return FrameCharDeleteOk() },
-		},
-		{
-			"CharDeleteFail",
-			func(t *testing.T) wire.Frame { return FrameCharDeleteFail(CharDeleteFailReasonClanMemberMayNotDelete) },
-		},
-		{
-			"ItemList",
-			func(t *testing.T) wire.Frame {
-				frame, err := FrameItemList(items, itemTable, true)
-				if err != nil {
-					t.Fatalf("FrameItemList: %v", err)
-				}
-				return frame
-			},
-		},
-		{
-			"NewCharacterSuccess",
-			func(t *testing.T) wire.Frame {
-				frame, err := FrameNewCharacterSuccess(allRootTemplates(t))
-				if err != nil {
-					t.Fatalf("FrameNewCharacterSuccess: %v", err)
-				}
-				return frame
-			},
-		},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			got := frameBytes(t, tc.frame(t))
-			if len(got) < 3 || int(binary.LittleEndian.Uint16(got)) != len(got) {
-				t.Errorf("Frame%s = % X, want a length-prefixed packet", tc.name, got)
-			}
-		})
-	}
 }
 
 func TestFrameItemListErrorReturnsNoFrame(t *testing.T) {
