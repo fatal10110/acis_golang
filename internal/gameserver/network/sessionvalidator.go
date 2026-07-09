@@ -82,6 +82,16 @@ func (v *SessionValidator) Validate(ctx context.Context, client *Client, req cli
 		return false, err
 	}
 
+	// ctx takes priority over an already-available result: once the caller
+	// has given up, Validate must not act on a late answer, since the
+	// caller may already be tearing down client's connection.
+	select {
+	case <-ctx.Done():
+		v.forget(req.LoginName)
+		return false, ctx.Err()
+	default:
+	}
+
 	select {
 	case ok := <-result:
 		if !ok {
