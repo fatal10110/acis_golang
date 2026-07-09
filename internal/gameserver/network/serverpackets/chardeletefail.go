@@ -17,13 +17,6 @@ const (
 	CharDeleteFailReasonClanLeaderMayNotDelete
 )
 
-// EncodeCharDeleteFail builds the CharDeleteFail packet reporting reason.
-func EncodeCharDeleteFail(reason CharDeleteFailReason) []byte {
-	w := newWriter(OpcodeCharDeleteFail)
-	w.WriteInt32(int32(reason))
-	return w.Bytes()
-}
-
 // FrameCharDeleteFail builds the CharDeleteFail packet as an owned frame.
 func FrameCharDeleteFail(reason CharDeleteFailReason) wire.Frame {
 	w := newFrameWriter(OpcodeCharDeleteFail)

@@ -6,20 +6,20 @@ import (
 	"testing"
 )
 
-func TestEncodeSkillList_Empty(t *testing.T) {
-	got := EncodeSkillList(nil)
+func TestFrameSkillList_Empty(t *testing.T) {
+	got := framePayload(t, FrameSkillList(nil))
 	want := []byte{OpcodeSkillList, 0, 0, 0, 0}
 	if !bytes.Equal(got, want) {
-		t.Errorf("EncodeSkillList(nil) = %x, want %x", got, want)
+		t.Errorf("FrameSkillList(nil) = %x, want %x", got, want)
 	}
 }
 
-func TestEncodeSkillList_Entries(t *testing.T) {
+func TestFrameSkillList_Entries(t *testing.T) {
 	skills := []SkillListEntry{
 		{ID: 1001, Level: 3, Passive: false, Disabled: false},
 		{ID: 1002, Level: 1, Passive: true, Disabled: true},
 	}
-	got := EncodeSkillList(skills)
+	got := framePayload(t, FrameSkillList(skills))
 
 	want := []byte{OpcodeSkillList}
 	want = binary.LittleEndian.AppendUint32(want, 2)
@@ -33,6 +33,6 @@ func TestEncodeSkillList_Entries(t *testing.T) {
 	want = append(want, 1) // disabled
 
 	if !bytes.Equal(got, want) {
-		t.Errorf("EncodeSkillList() = %x, want %x", got, want)
+		t.Errorf("FrameSkillList() = %x, want %x", got, want)
 	}
 }

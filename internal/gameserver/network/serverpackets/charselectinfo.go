@@ -91,16 +91,10 @@ func NewCharacterSlot(c *player.Character, items []*item.Instance, now time.Time
 	return slot
 }
 
-// EncodeCharSelectInfo builds the CharSelectInfo packet listing slots for
-// loginName's session. activeID selects which slot the client highlights
-// as the active one; -1 means "whichever was played most recently."
-func EncodeCharSelectInfo(loginName string, sessionID int32, slots []CharacterSlot, activeID int32) []byte {
-	w := newWriter(OpcodeCharSelectInfo)
-	writeCharSelectInfo(w, loginName, sessionID, slots, activeID)
-	return w.Bytes()
-}
-
-// FrameCharSelectInfo builds the CharSelectInfo packet as an owned frame.
+// FrameCharSelectInfo builds the CharSelectInfo packet listing slots for
+// loginName's session as an owned frame. activeID selects which slot the
+// client highlights as the active one; -1 means "whichever was played most
+// recently."
 func FrameCharSelectInfo(loginName string, sessionID int32, slots []CharacterSlot, activeID int32) wire.Frame {
 	w := newFrameWriter(OpcodeCharSelectInfo)
 	writeCharSelectInfo(w, loginName, sessionID, slots, activeID)

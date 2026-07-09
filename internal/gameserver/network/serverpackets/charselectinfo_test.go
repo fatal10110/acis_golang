@@ -72,7 +72,7 @@ func TestNewCharacterSlot_Paperdoll(t *testing.T) {
 	}
 }
 
-func TestEncodeCharSelectInfo(t *testing.T) {
+func TestFrameCharSelectInfo(t *testing.T) {
 	slot := CharacterSlot{
 		Name: "Newbie", ObjectID: 0x10000001, ClanID: 0,
 		Sex: player.SexMale, Race: player.RaceHuman, ClassID: 0,
@@ -86,7 +86,7 @@ func TestEncodeCharSelectInfo(t *testing.T) {
 	slot.Paperdoll[rhandPaperdollIndex] = item.PaperdollEntry{ObjectID: 100, TemplateID: 2369, EnchantLevel: 5}
 	slot.Paperdoll[10] = item.PaperdollEntry{ObjectID: 101, TemplateID: 1146}
 
-	got := EncodeCharSelectInfo("acct1", 999, []CharacterSlot{slot}, 0)
+	got := framePayload(t, FrameCharSelectInfo("acct1", 999, []CharacterSlot{slot}, 0))
 
 	want := []byte{OpcodeCharSelectInfo}
 	want = binary.LittleEndian.AppendUint32(want, 1) // slot count
@@ -145,15 +145,15 @@ func TestEncodeCharSelectInfo(t *testing.T) {
 	want = binary.LittleEndian.AppendUint32(want, 0) // augmentation id
 
 	if !bytes.Equal(got, want) {
-		t.Errorf("EncodeCharSelectInfo mismatch:\n got  %x\n want %x", got, want)
+		t.Errorf("FrameCharSelectInfo mismatch:\n got  %x\n want %x", got, want)
 	}
 }
 
-func TestEncodeCharSelectInfo_AutoPicksMostRecentlyAccessed(t *testing.T) {
+func TestFrameCharSelectInfo_AutoPicksMostRecentlyAccessed(t *testing.T) {
 	older := CharacterSlot{Name: "Older", ObjectID: 1, LastAccess: 100}
 	newer := CharacterSlot{Name: "Newer", ObjectID: 2, LastAccess: 200}
 
-	payload := EncodeCharSelectInfo("acct1", 1, []CharacterSlot{older, newer}, -1)
+	payload := framePayload(t, FrameCharSelectInfo("acct1", 1, []CharacterSlot{older, newer}, -1))
 
 	// The active flag sits right after the (name, objectId, loginName,
 	// sessionId, clanId, builderLevel, sex, race, classId, 0x01, x, y, z,
@@ -162,9 +162,9 @@ func TestEncodeCharSelectInfo_AutoPicksMostRecentlyAccessed(t *testing.T) {
 	// deleteTimer, classId) run for each slot; rather than compute that
 	// offset by hand, decode both slots back out using known-good sibling
 	// behavior: re-encode with an explicit activeID and compare.
-	wantOlderActive := EncodeCharSelectInfo("acct1", 1, []CharacterSlot{older, newer}, 1)
+	wantOlderActive := framePayload(t, FrameCharSelectInfo("acct1", 1, []CharacterSlot{older, newer}, 1))
 	if !bytes.Equal(payload, wantOlderActive) {
-		t.Error("EncodeCharSelectInfo with activeID=-1 did not pick the slot with the highest LastAccess")
+		t.Error("FrameCharSelectInfo with activeID=-1 did not pick the slot with the highest LastAccess")
 	}
 }
 

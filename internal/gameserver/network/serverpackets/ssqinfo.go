@@ -11,15 +11,8 @@ const OpcodeSSQInfo = 0xf8
 // server ever reports.
 const regularSkyState = 256
 
-// EncodeSSQInfo builds the SSQInfo packet. The seven-signs event is not
-// modeled, so it always reports the regular (no-cabal) sky.
-func EncodeSSQInfo() []byte {
-	w := newWriter(OpcodeSSQInfo)
-	writeSSQInfo(w)
-	return w.Bytes()
-}
-
-// FrameSSQInfo builds the SSQInfo packet as an owned frame.
+// FrameSSQInfo builds the SSQInfo packet as an owned frame. The seven-signs
+// event is not modeled, so it always reports the regular (no-cabal) sky.
 func FrameSSQInfo() wire.Frame {
 	w := newFrameWriter(OpcodeSSQInfo)
 	writeSSQInfo(w)

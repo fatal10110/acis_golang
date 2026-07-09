@@ -51,13 +51,6 @@ type UserInfoSnapshot struct {
 	Items     []*item.Instance
 }
 
-// EncodeUserInfo builds the UserInfo packet for s.
-func EncodeUserInfo(s UserInfoSnapshot) []byte {
-	w := newWriter(OpcodeUserInfo)
-	writeUserInfo(w, s)
-	return w.Bytes()
-}
-
 // FrameUserInfo builds the UserInfo packet for s as an owned frame.
 func FrameUserInfo(s UserInfoSnapshot) wire.Frame {
 	w := newFrameWriter(OpcodeUserInfo)

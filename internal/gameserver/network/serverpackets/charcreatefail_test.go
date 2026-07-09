@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestEncodeCharCreateFail(t *testing.T) {
+func TestFrameCharCreateFail(t *testing.T) {
 	tests := []struct {
 		reason CharCreateFailReason
 		want   int32
@@ -20,13 +20,13 @@ func TestEncodeCharCreateFail(t *testing.T) {
 		{CharCreateFailReasonChooseAnotherServer, 6},
 	}
 	for _, tt := range tests {
-		got := EncodeCharCreateFail(tt.reason)
+		got := framePayload(t, FrameCharCreateFail(tt.reason))
 
 		want := []byte{OpcodeCharCreateFail}
 		want = binary.LittleEndian.AppendUint32(want, uint32(tt.want))
 
 		if !bytes.Equal(got, want) {
-			t.Errorf("EncodeCharCreateFail(%v) = %x, want %x", tt.reason, got, want)
+			t.Errorf("FrameCharCreateFail(%v) = %x, want %x", tt.reason, got, want)
 		}
 	}
 }

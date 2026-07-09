@@ -10,7 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
 
-func TestEncodeCharSelected(t *testing.T) {
+func TestFrameCharSelected(t *testing.T) {
 	c := &player.Character{
 		ObjectID: 0x10000001,
 		Name:     "Newbie",
@@ -26,7 +26,7 @@ func TestEncodeCharSelected(t *testing.T) {
 	}
 	tmpl := &player.Template{STR: 40, CON: 43, DEX: 30, INT: 21, WIT: 11, MEN: 25}
 
-	got := EncodeCharSelected(CharSelectedSnapshot{Character: c, Template: tmpl, SessionID: 999})
+	got := framePayload(t, FrameCharSelected(CharSelectedSnapshot{Character: c, Template: tmpl, SessionID: 999}))
 
 	want := []byte{OpcodeCharSelected}
 	want = append(want, encodeUTF16Z(c.Name)...)
@@ -70,6 +70,6 @@ func TestEncodeCharSelected(t *testing.T) {
 	}
 
 	if !bytes.Equal(got, want) {
-		t.Errorf("EncodeCharSelected mismatch:\n got  % x\n want % x", got, want)
+		t.Errorf("FrameCharSelected mismatch:\n got  % x\n want % x", got, want)
 	}
 }

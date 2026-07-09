@@ -35,11 +35,12 @@ func allRootTemplates(t *testing.T) *player.TemplateTable {
 	return table
 }
 
-func TestEncodeNewCharacterSuccess(t *testing.T) {
-	got, err := EncodeNewCharacterSuccess(allRootTemplates(t))
+func TestFrameNewCharacterSuccess(t *testing.T) {
+	frame, err := FrameNewCharacterSuccess(allRootTemplates(t))
 	if err != nil {
-		t.Fatalf("EncodeNewCharacterSuccess: %v", err)
+		t.Fatalf("FrameNewCharacterSuccess: %v", err)
 	}
+	got := framePayload(t, frame)
 
 	want := []byte{OpcodeNewCharacterSuccess}
 	want = binary.LittleEndian.AppendUint32(want, uint32(len(creationScreenClassIDs)))
@@ -67,16 +68,18 @@ func TestEncodeNewCharacterSuccess(t *testing.T) {
 	}
 
 	if !bytes.Equal(got, want) {
-		t.Errorf("EncodeNewCharacterSuccess mismatch:\n got  %x\n want %x", got, want)
+		t.Errorf("FrameNewCharacterSuccess mismatch:\n got  %x\n want %x", got, want)
 	}
 }
 
-func TestEncodeNewCharacterSuccess_MissingTemplate(t *testing.T) {
+func TestFrameNewCharacterSuccess_MissingTemplate(t *testing.T) {
 	table, err := player.NewTemplateTable(map[int]*player.Template{0: rootTemplate(0, 1, 1, 1, 1, 1, 1)})
 	if err != nil {
 		t.Fatalf("build template table: %v", err)
 	}
-	if _, err := EncodeNewCharacterSuccess(table); err == nil {
-		t.Error("EncodeNewCharacterSuccess: want error for missing profession, got nil")
+	frame, err := FrameNewCharacterSuccess(table)
+	frame.Release()
+	if err == nil {
+		t.Error("FrameNewCharacterSuccess: want error for missing profession, got nil")
 	}
 }

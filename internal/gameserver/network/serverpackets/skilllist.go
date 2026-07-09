@@ -16,16 +16,9 @@ type SkillListEntry struct {
 	Disabled bool
 }
 
-// EncodeSkillList builds the SkillList packet for skills. A character with
-// no skill data loaded yet (the skill system isn't modeled) encodes as an
-// empty list, which is a valid, client-accepted skill window.
-func EncodeSkillList(skills []SkillListEntry) []byte {
-	w := newWriter(OpcodeSkillList)
-	writeSkillList(w, skills)
-	return w.Bytes()
-}
-
-// FrameSkillList builds the SkillList packet for skills as an owned frame.
+// FrameSkillList builds the SkillList packet for skills as an owned frame. A
+// character with no skill data loaded yet (the skill system isn't modeled)
+// encodes as an empty list, which is a valid, client-accepted skill window.
 func FrameSkillList(skills []SkillListEntry) wire.Frame {
 	w := newFrameWriter(OpcodeSkillList)
 	writeSkillList(w, skills)

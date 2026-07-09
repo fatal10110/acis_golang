@@ -17,19 +17,10 @@ const OpcodeNewCharacterSuccess = 0x17
 // duplication is the client's own contract, not a mistake introduced here.
 var creationScreenClassIDs = [...]int{0, 0, 10, 18, 25, 31, 38, 44, 49, 53}
 
-// EncodeNewCharacterSuccess builds the NewCharacterSuccess packet, looking
-// up each creation-screen profession in templates. It returns an error if
-// templates is missing one of them or can't resolve its race.
-func EncodeNewCharacterSuccess(templates *player.TemplateTable) ([]byte, error) {
-	w := newWriter(OpcodeNewCharacterSuccess)
-	if err := writeNewCharacterSuccess(w, templates); err != nil {
-		return nil, err
-	}
-	return w.Bytes(), nil
-}
-
 // FrameNewCharacterSuccess builds the NewCharacterSuccess packet as an owned
-// frame. On error no frame is returned and nothing needs releasing.
+// frame, looking up each creation-screen profession in templates. It returns
+// an error if templates is missing one of them or can't resolve its race. On
+// error no frame is returned and nothing needs releasing.
 func FrameNewCharacterSuccess(templates *player.TemplateTable) (wire.Frame, error) {
 	w := newFrameWriter(OpcodeNewCharacterSuccess)
 	if err := writeNewCharacterSuccess(w, templates); err != nil {

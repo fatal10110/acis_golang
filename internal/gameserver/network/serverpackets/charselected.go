@@ -22,14 +22,6 @@ type CharSelectedSnapshot struct {
 	SessionID int32
 }
 
-// EncodeCharSelected builds the CharSelected packet for s. The day/night
-// cycle is not modeled, so the game-time field always reports 0.
-func EncodeCharSelected(s CharSelectedSnapshot) []byte {
-	w := newWriter(OpcodeCharSelected)
-	writeCharSelected(w, s)
-	return w.Bytes()
-}
-
 // FrameCharSelected builds the CharSelected packet for s as an owned frame.
 func FrameCharSelected(s CharSelectedSnapshot) wire.Frame {
 	w := newFrameWriter(OpcodeCharSelected)

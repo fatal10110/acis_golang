@@ -12,21 +12,12 @@ import (
 // wholesale.
 const OpcodeItemList = 0x1b
 
-// EncodeItemList builds the ItemList packet for everything a character is
+// FrameItemList builds the ItemList packet for everything a character is
 // carrying: inventory items and, marked equipped, whatever sits on the
 // paperdoll. Items in any other container (warehouse, freight, a pet's own
 // hold) are a different list and don't belong here. templates must have an
 // entry for every item's template id; a carried item with no loaded
-// template is reported as an error rather than encoded around.
-func EncodeItemList(items []*item.Instance, templates *item.Table, showWindow bool) ([]byte, error) {
-	w := newWriter(OpcodeItemList)
-	if err := writeItemList(w, items, templates, showWindow); err != nil {
-		return nil, err
-	}
-	return w.Bytes(), nil
-}
-
-// FrameItemList builds the ItemList packet as an owned frame. On error no
+// template is reported as an error rather than encoded around. On error no
 // frame is returned and nothing needs releasing.
 func FrameItemList(items []*item.Instance, templates *item.Table, showWindow bool) (wire.Frame, error) {
 	w := newFrameWriter(OpcodeItemList)

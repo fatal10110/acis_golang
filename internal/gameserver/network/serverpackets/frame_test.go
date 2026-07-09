@@ -1,7 +1,7 @@
 package serverpackets
 
 import (
-	"bytes"
+	"encoding/binary"
 	"testing"
 	"time"
 
@@ -53,9 +53,22 @@ func frameTestItemTable() *item.Table {
 	})
 }
 
-// TestFramePacketsMatchEncoders pins every pooled-frame builder to its
-// encoder: same input, byte-identical wire frame.
-func TestFramePacketsMatchEncoders(t *testing.T) {
+func frameBytes(t *testing.T, frame wire.Frame) []byte {
+	t.Helper()
+	t.Cleanup(frame.Release)
+	return frame.Bytes()
+}
+
+func framePayload(t *testing.T, frame wire.Frame) []byte {
+	t.Helper()
+	bytes := frameBytes(t, frame)
+	if len(bytes) < 2 {
+		t.Fatalf("frame length = %d, want header", len(bytes))
+	}
+	return bytes[2:]
+}
+
+func TestFramePacketsAreNonEmpty(t *testing.T) {
 	c, tmpl := frameTestCharacter(), frameTestTemplate()
 	items, itemTable := frameTestItems(), frameTestItemTable()
 	userSnap := UserInfoSnapshot{Character: c, Template: tmpl, Items: items}
@@ -64,59 +77,48 @@ func TestFramePacketsMatchEncoders(t *testing.T) {
 	skills := []SkillListEntry{{ID: 3, Level: 1, Passive: true}, {ID: 4, Level: 2, Disabled: true}}
 
 	cases := []struct {
-		name    string
-		frame   func(t *testing.T) wire.Frame
-		payload func(t *testing.T) []byte
+		name  string
+		frame func(t *testing.T) wire.Frame
 	}{
 		{
 			"AuthLoginFail",
 			func(t *testing.T) wire.Frame { return FrameAuthLoginFail(LoginFailSystemErrorTryLater) },
-			func(t *testing.T) []byte { return EncodeAuthLoginFail(LoginFailSystemErrorTryLater) },
 		},
 		{
 			"UserInfo",
 			func(t *testing.T) wire.Frame { return FrameUserInfo(userSnap) },
-			func(t *testing.T) []byte { return EncodeUserInfo(userSnap) },
 		},
 		{
 			"CharSelected",
 			func(t *testing.T) wire.Frame { return FrameCharSelected(selectedSnap) },
-			func(t *testing.T) []byte { return EncodeCharSelected(selectedSnap) },
 		},
 		{
 			"CharSelectInfo",
 			func(t *testing.T) wire.Frame { return FrameCharSelectInfo("login", 7, slots, -1) },
-			func(t *testing.T) []byte { return EncodeCharSelectInfo("login", 7, slots, -1) },
 		},
 		{
 			"SkillList",
 			func(t *testing.T) wire.Frame { return FrameSkillList(skills) },
-			func(t *testing.T) []byte { return EncodeSkillList(skills) },
 		},
 		{
 			"SSQInfo",
 			func(t *testing.T) wire.Frame { return FrameSSQInfo() },
-			func(t *testing.T) []byte { return EncodeSSQInfo() },
 		},
 		{
 			"CharCreateOk",
 			func(t *testing.T) wire.Frame { return FrameCharCreateOk() },
-			func(t *testing.T) []byte { return EncodeCharCreateOk() },
 		},
 		{
 			"CharCreateFail",
 			func(t *testing.T) wire.Frame { return FrameCharCreateFail(CharCreateFailReasonNameAlreadyExists) },
-			func(t *testing.T) []byte { return EncodeCharCreateFail(CharCreateFailReasonNameAlreadyExists) },
 		},
 		{
 			"CharDeleteOk",
 			func(t *testing.T) wire.Frame { return FrameCharDeleteOk() },
-			func(t *testing.T) []byte { return EncodeCharDeleteOk() },
 		},
 		{
 			"CharDeleteFail",
 			func(t *testing.T) wire.Frame { return FrameCharDeleteFail(CharDeleteFailReasonClanMemberMayNotDelete) },
-			func(t *testing.T) []byte { return EncodeCharDeleteFail(CharDeleteFailReasonClanMemberMayNotDelete) },
 		},
 		{
 			"ItemList",
@@ -126,13 +128,6 @@ func TestFramePacketsMatchEncoders(t *testing.T) {
 					t.Fatalf("FrameItemList: %v", err)
 				}
 				return frame
-			},
-			func(t *testing.T) []byte {
-				payload, err := EncodeItemList(items, itemTable, true)
-				if err != nil {
-					t.Fatalf("EncodeItemList: %v", err)
-				}
-				return payload
 			},
 		},
 		{
@@ -144,24 +139,14 @@ func TestFramePacketsMatchEncoders(t *testing.T) {
 				}
 				return frame
 			},
-			func(t *testing.T) []byte {
-				payload, err := EncodeNewCharacterSuccess(allRootTemplates(t))
-				if err != nil {
-					t.Fatalf("EncodeNewCharacterSuccess: %v", err)
-				}
-				return payload
-			},
 		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			frame := tc.frame(t)
-			defer frame.Release()
-
-			want := wire.FrameBytes(tc.payload(t))
-			if !bytes.Equal(frame.Bytes(), want) {
-				t.Errorf("Frame%s = % X, want % X", tc.name, frame.Bytes(), want)
+			got := frameBytes(t, tc.frame(t))
+			if len(got) < 3 || int(binary.LittleEndian.Uint16(got)) != len(got) {
+				t.Errorf("Frame%s = % X, want a length-prefixed packet", tc.name, got)
 			}
 		})
 	}
@@ -193,17 +178,6 @@ func TestFrameNewCharacterSuccessErrorReturnsNoFrame(t *testing.T) {
 	frame.Release()
 	if frame.Bytes() != nil {
 		t.Errorf("frame.Bytes() = % X, want nil", frame.Bytes())
-	}
-}
-
-// BenchmarkUserInfoUnpooled measures the pre-pool send shape: encode into a
-// fresh writer, then copy behind a fresh frame header.
-func BenchmarkUserInfoUnpooled(b *testing.B) {
-	snap := UserInfoSnapshot{Character: frameTestCharacter(), Template: frameTestTemplate(), Items: frameTestItems()}
-	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
-		frame := wire.BorrowedFrame(wire.FrameBytes(EncodeUserInfo(snap)))
-		frame.Release()
 	}
 }
 

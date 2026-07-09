@@ -20,13 +20,6 @@ const (
 	CharCreateFailReasonChooseAnotherServer
 )
 
-// EncodeCharCreateFail builds the CharCreateFail packet reporting reason.
-func EncodeCharCreateFail(reason CharCreateFailReason) []byte {
-	w := newWriter(OpcodeCharCreateFail)
-	w.WriteInt32(int32(reason))
-	return w.Bytes()
-}
-
 // FrameCharCreateFail builds the CharCreateFail packet as an owned frame.
 func FrameCharCreateFail(reason CharCreateFailReason) wire.Frame {
 	w := newFrameWriter(OpcodeCharCreateFail)
