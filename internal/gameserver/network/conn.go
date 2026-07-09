@@ -4,6 +4,7 @@ import (
 	"net"
 	"sync"
 
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/sirupsen/logrus"
 )
 
@@ -19,10 +20,14 @@ type Conn struct {
 	net.Conn
 	log      *logrus.Logger
 	mu       sync.RWMutex
-	out      chan []byte
+	out      chan queuedWrite
 	closed   bool
 	stopped  chan struct{}
 	closeErr error
+}
+
+type queuedWrite struct {
+	frame wire.Frame
 }
 
 func newConn(c net.Conn, log *logrus.Logger) *Conn {
@@ -32,7 +37,7 @@ func newConn(c net.Conn, log *logrus.Logger) *Conn {
 	conn := &Conn{
 		Conn:    c,
 		log:     log,
-		out:     make(chan []byte, outboundBuffer),
+		out:     make(chan queuedWrite, outboundBuffer),
 		stopped: make(chan struct{}),
 	}
 	go conn.writeLoop()
@@ -56,27 +61,59 @@ func (c *Conn) writeLoop() {
 		if r := recover(); r != nil {
 			c.log.Errorf("game connection writer panic: %v", r)
 		}
+		c.releaseQueued()
 		c.closeErr = c.Conn.Close()
 		close(c.stopped)
 	}()
-	for payload := range c.out {
-		if _, err := c.Conn.Write(payload); err != nil {
+	for queued := range c.out {
+		if _, err := c.Conn.Write(queued.frame.Bytes()); err != nil {
+			queued.frame.Release()
 			c.log.Warnf("game connection write failed, closing: %v", err)
+			return
+		}
+		queued.frame.Release()
+	}
+}
+
+func (c *Conn) releaseQueued() {
+	for {
+		select {
+		case queued, ok := <-c.out:
+			if !ok {
+				return
+			}
+			queued.frame.Release()
+		default:
 			return
 		}
 	}
 }
 
-// Send queues payload to be written by this connection's writer
-// goroutine. It returns false without blocking if the connection is
+// Send queues payload to be written by this connection's writer goroutine.
+// If Send returns true, the caller has handed off ownership and must not
+// mutate payload. It returns false without blocking if the connection is
 // already closed.
 func (c *Conn) Send(payload []byte) bool {
+	return c.send(queuedWrite{frame: wire.BorrowedFrame(payload)})
+}
+
+// SendFrame queues an owned frame and calls release exactly once after the
+// frame is written or dropped because the connection is closed.
+func (c *Conn) SendFrame(frame wire.Frame) bool {
+	if c.send(queuedWrite{frame: frame}) {
+		return true
+	}
+	frame.Release()
+	return false
+}
+
+func (c *Conn) send(queued queuedWrite) bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	if c.closed {
 		return false
 	}
-	c.out <- payload
+	c.out <- queued
 	return true
 }
 

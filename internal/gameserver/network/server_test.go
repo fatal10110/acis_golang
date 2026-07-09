@@ -6,6 +6,8 @@ import (
 	"net"
 	"testing"
 	"time"
+
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
 )
 
 func listen(t *testing.T) net.Listener {
@@ -145,6 +147,27 @@ func TestConnSendAfterCloseReturnsFalse(t *testing.T) {
 
 	if conn.Send([]byte("late")) {
 		t.Fatal("Send on closed connection returned true, want false")
+	}
+}
+
+func TestConnSendFrameAfterCloseReleasesFrame(t *testing.T) {
+	server, client := net.Pipe()
+	defer client.Close()
+
+	conn := newConn(server, nil)
+	if err := conn.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	released := make(chan struct{}, 1)
+	frame := wire.OwnedFrame([]byte{0x02, 0x00}, nil, func(*wire.Writer) { released <- struct{}{} })
+	if conn.SendFrame(frame) {
+		t.Fatal("SendFrame on closed connection returned true, want false")
+	}
+	select {
+	case <-released:
+	case <-time.After(5 * time.Second):
+		t.Fatal("owned frame was not released after rejected send")
 	}
 }
 

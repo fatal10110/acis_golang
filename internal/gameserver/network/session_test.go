@@ -7,6 +7,9 @@ import (
 	"net"
 	"sync"
 	"testing"
+	"time"
+
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
 )
 
 func pipeSessions(t *testing.T) (server *Session, client net.Conn) {
@@ -35,6 +38,30 @@ func TestSessionSendFramesWithLittleEndianLengthHeader(t *testing.T) {
 	}
 	if got := binary.LittleEndian.Uint16(frame); got != uint16(len(frame)) {
 		t.Fatalf("length header = %d, want %d", got, len(frame))
+	}
+}
+
+func TestSessionSendFrameWritesAndReleasesOwnedFrame(t *testing.T) {
+	s, client := pipeSessions(t)
+
+	released := make(chan struct{}, 1)
+	frameBytes := []byte{0x05, 0x00, 0xAA, 0xBB, 0xCC}
+	frame := wire.OwnedFrame(frameBytes, nil, func(*wire.Writer) { released <- struct{}{} })
+	if !s.SendFrame(frame) {
+		t.Fatal("SendFrame returned false")
+	}
+
+	got := make([]byte, len(frameBytes))
+	if _, err := io.ReadFull(client, got); err != nil {
+		t.Fatalf("read frame: %v", err)
+	}
+	if !bytes.Equal(got, frameBytes) {
+		t.Fatalf("frame = % X, want % X", got, frameBytes)
+	}
+	select {
+	case <-released:
+	case <-time.After(5 * time.Second):
+		t.Fatal("owned frame was not released after write")
 	}
 }
 

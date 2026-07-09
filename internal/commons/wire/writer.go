@@ -9,7 +9,30 @@ import (
 // Writer assembles little-endian primitives into a packet payload. The zero
 // value is ready to use.
 type Writer struct {
-	buf []byte
+	buf           []byte
+	payloadOffset int
+}
+
+// NewFrameWriter returns a Writer with space reserved for a frame length
+// header before the packet payload.
+func NewFrameWriter(capacity int) *Writer {
+	w := &Writer{}
+	w.ResetFrame(capacity)
+	return w
+}
+
+// ResetFrame clears w and reserves a frame length header before the payload.
+func (w *Writer) ResetFrame(capacity int) {
+	if capacity < FrameHeaderSize {
+		capacity = FrameHeaderSize
+	}
+	if cap(w.buf) < capacity {
+		w.buf = make([]byte, FrameHeaderSize, capacity)
+	} else {
+		w.buf = w.buf[:FrameHeaderSize]
+		w.buf[0], w.buf[1] = 0, 0
+	}
+	w.payloadOffset = FrameHeaderSize
 }
 
 // WriteUint8 appends a single byte.
@@ -66,6 +89,16 @@ func (w *Writer) WriteString(s string) {
 
 // Bytes returns the assembled payload.
 func (w *Writer) Bytes() []byte {
+	return w.buf[w.payloadOffset:]
+}
+
+// Frame returns the assembled payload behind a little-endian frame length
+// header. Writers built with NewFrameWriter backfill that header in place.
+func (w *Writer) Frame() []byte {
+	if w.payloadOffset != FrameHeaderSize {
+		return FrameBytes(w.buf)
+	}
+	binary.LittleEndian.PutUint16(w.buf[:FrameHeaderSize], uint16(len(w.buf)))
 	return w.buf
 }
 
