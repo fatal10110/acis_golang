@@ -55,6 +55,12 @@ func newConn(c net.Conn, log *logrus.Logger) *Conn {
 //
 // Once this loop exits early on a write error, later Send calls fail
 // without queueing because nothing drains c.out any more.
+//
+// Each iteration greedily drains c.out (bounded by outboundBuffer) after
+// its first queued frame so a burst coalesces into one vectored
+// net.Buffers write instead of one Write syscall per frame. Idle
+// behavior is unchanged: with nothing queued, the loop blocks on the
+// range receive.
 func (c *Conn) writeLoop() {
 	defer func() {
 		if r := recover(); r != nil {
@@ -66,13 +72,49 @@ func (c *Conn) writeLoop() {
 		close(c.stopped)
 	}()
 	for queued := range c.out {
-		if _, err := c.Conn.Write(queued.frame.Bytes()); err != nil {
-			queued.frame.Release()
+		batch := c.drainBatch(queued)
+		if err := c.writeBatch(batch); err != nil {
 			c.log.Warnf("game connection write failed, closing: %v", err)
 			return
 		}
-		queued.frame.Release()
 	}
+}
+
+// drainBatch collects first plus any further queued frames already
+// sitting in c.out, without blocking, up to outboundBuffer total so one
+// slow reader can't build an unbounded batch.
+func (c *Conn) drainBatch(first queuedWrite) []queuedWrite {
+	batch := make([]queuedWrite, 1, outboundBuffer)
+	batch[0] = first
+	for len(batch) < outboundBuffer {
+		select {
+		case queued, ok := <-c.out:
+			if !ok {
+				return batch
+			}
+			batch = append(batch, queued)
+		default:
+			return batch
+		}
+	}
+	return batch
+}
+
+// writeBatch writes every frame in batch as a single vectored
+// net.Buffers write and releases all of them (win or lose) once the
+// write attempt finishes.
+func (c *Conn) writeBatch(batch []queuedWrite) (err error) {
+	defer func() {
+		for _, queued := range batch {
+			queued.frame.Release()
+		}
+	}()
+	bufs := make(net.Buffers, len(batch))
+	for i, queued := range batch {
+		bufs[i] = queued.frame.Bytes()
+	}
+	_, err = bufs.WriteTo(c.Conn)
+	return err
 }
 
 func (c *Conn) releaseQueued() {
