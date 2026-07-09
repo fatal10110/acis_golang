@@ -40,41 +40,38 @@ func TestReadL2OFF(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadL2OFF: %v", err)
 	}
-	if len(blocks) != block.RegionBlockCount {
-		t.Fatalf("len(blocks) = %d, want %d", len(blocks), block.RegionBlockCount)
-	}
 
-	if got := blocks[0].HeightNearest(7, 7, 0); got != 112 {
+	if got := blocks.HeightNearest(0, 0, 7, 7, 0); got != 112 {
 		t.Errorf("flat height = %d, want 112", got)
 	}
-	if got := blocks[0].NSWENearest(0, 0, 0); got != block.AllDirections {
+	if got := blocks.NSWENearest(0, 0, 0, 0, 0); got != block.AllDirections {
 		t.Errorf("flat nswe = %v, want all", got)
 	}
 
-	if got := blocks[1].Kind(); got != block.KindComplex {
+	if got := blocks.KindAt(0, 1); got != block.KindComplex {
 		t.Fatalf("block 1 kind = %v, want complex", got)
 	}
-	if got := blocks[1].HeightNearest(1, 1, 0); got != -16 {
+	if got := blocks.HeightNearest(0, 1, 1, 1, 0); got != -16 {
 		t.Errorf("complex cell height = %d, want -16", got)
 	}
-	if got := blocks[1].NSWENearest(1, 1, 0); got != block.North|block.West {
+	if got := blocks.NSWENearest(0, 1, 1, 1, 0); got != block.North|block.West {
 		t.Errorf("complex cell nswe = %v, want NW", got)
 	}
 
-	if got := blocks[2].Kind(); got != block.KindMultilayer {
+	if got := blocks.KindAt(0, 2); got != block.KindMultilayer {
 		t.Fatalf("block 2 kind = %v, want multilayer", got)
 	}
-	if got := blocks[2].Layers(1, 2); got != 3 {
+	if got := blocks.Layers(0, 2, 1, 2); got != 3 {
 		t.Errorf("multilayer layer count = %d, want 3", got)
 	}
-	if got := blocks[2].HeightNearest(1, 2, 7); got != 8 {
+	if got := blocks.HeightNearest(0, 2, 1, 2, 7); got != 8 {
 		t.Errorf("multilayer nearest height = %d, want 8", got)
 	}
-	if got := blocks[2].NSWENearest(1, 2, 7); got != block.East|block.West {
+	if got := blocks.NSWENearest(0, 2, 1, 2, 7); got != block.East|block.West {
 		t.Errorf("multilayer nearest nswe = %v, want EW", got)
 	}
 
-	if got := blocks[3].Kind(); got != block.KindFlat {
+	if got := blocks.KindAt(0, 3); got != block.KindFlat {
 		t.Errorf("default fixture block kind = %v, want flat", got)
 	}
 }

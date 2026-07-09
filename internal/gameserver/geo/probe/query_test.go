@@ -20,11 +20,10 @@ func openLoadedEngine(t *testing.T) (*engine.Engine, *pathfind.Finder) {
 	for i := range cells {
 		cells[i] = block.Cell{Height: 0, NSWE: block.AllDirections}
 	}
-	region := make([]block.Block, block.RegionBlockCount)
-	for i := range region {
-		region[i] = &block.Null{}
+	region, err := block.NewRegionFromBlocks([]block.Block{block.NewComplex(cells)})
+	if err != nil {
+		t.Fatalf("NewRegionFromBlocks(): %v", err)
 	}
-	region[0] = block.NewComplex(cells)
 
 	e := engine.New()
 	if err := e.SetRegion(engine.TileXMin, engine.TileYMin, region); err != nil {

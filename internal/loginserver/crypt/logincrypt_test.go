@@ -3,6 +3,7 @@ package crypt
 import (
 	"bytes"
 	"encoding/hex"
+	"sync"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/commons/crypt"
@@ -19,7 +20,7 @@ func testPattern(n int) []byte {
 	return b
 }
 
-func mustHex(t *testing.T, s string) []byte {
+func mustHex(t testing.TB, s string) []byte {
 	t.Helper()
 	b, err := hex.DecodeString(s)
 	if err != nil {
@@ -153,8 +154,61 @@ func TestLoginCryptRoundTrip(t *testing.T) {
 	}
 }
 
+func TestNewLoginCryptSharesStaticBootstrapCipher(t *testing.T) {
+	first, err := NewLoginCrypt(mustHex(t, "0011223344556677"))
+	if err != nil {
+		t.Fatalf("NewLoginCrypt first: %v", err)
+	}
+	second, err := NewLoginCrypt(mustHex(t, "8899aabbccddeeff"))
+	if err != nil {
+		t.Fatalf("NewLoginCrypt second: %v", err)
+	}
+
+	if first.static != second.static {
+		t.Fatal("NewLoginCrypt built separate static bootstrap ciphers")
+	}
+}
+
+func TestSharedStaticBootstrapCipherEncryptsFirstPacketsConcurrently(t *testing.T) {
+	badLengths := make(chan int, 32)
+	var wg sync.WaitGroup
+	for i := range 32 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			lc, err := NewLoginCrypt(bytes.Repeat([]byte{byte(i + 1)}, 8))
+			if err != nil {
+				t.Errorf("NewLoginCrypt: %v", err)
+				return
+			}
+			if got := len(lc.Encrypt(testPattern(11))); got%crypt.BlockSize != 0 {
+				badLengths <- got
+			}
+		}()
+	}
+	wg.Wait()
+	close(badLengths)
+	for got := range badLengths {
+		t.Errorf("encrypted length %d is not block-aligned", got)
+	}
+}
+
 func TestNewLoginCryptRejectsOversizedKey(t *testing.T) {
 	if _, err := NewLoginCrypt(make([]byte, 57)); err == nil {
 		t.Fatal("expected error for 57-byte key, got nil")
+	}
+}
+
+func BenchmarkNewLoginCrypt(b *testing.B) {
+	dynamicKey := mustHex(b, "00112233445566778899aabbccddeeff")
+	b.ReportAllocs()
+	for b.Loop() {
+		lc, err := NewLoginCrypt(dynamicKey)
+		if err != nil {
+			b.Fatalf("NewLoginCrypt: %v", err)
+		}
+		if lc.static == nil || lc.dynamic == nil {
+			b.Fatal("NewLoginCrypt returned nil cipher")
+		}
 	}
 }

@@ -53,7 +53,7 @@ func regionPath(dir string, geoType GeoType, x, y int) string {
 	return filepath.Join(dir, fmt.Sprintf("%d_%d_conv.dat", x, y))
 }
 
-func readRegion(path string, geoType GeoType) ([]block.Block, error) {
+func readRegion(path string, geoType GeoType) (*block.Region, error) {
 	if geoType == L2J {
 		f, err := os.Open(path)
 		if err != nil {
