@@ -98,7 +98,7 @@ func LoadItemTemplates(dir string) (*item.Table, error) {
 func parseItemFile(path string) (*itemFile, error) {
 	var parsed itemFile
 	if err := readXML(path, &parsed); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("item templates: %w", err)
 	}
 	return &parsed, nil
 }

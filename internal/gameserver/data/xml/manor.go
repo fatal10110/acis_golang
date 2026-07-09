@@ -22,7 +22,7 @@ type manorElement struct {
 func LoadManors(path string) (*manor.Table, error) {
 	var doc manorFile
 	if err := readXML(path, &doc); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("manors: %w", err)
 	}
 
 	manors := make([]manor.Manor, 0, len(doc.Manors))
@@ -62,7 +62,7 @@ type manorAreaElement struct {
 func LoadManorAreas(path string) (manor.AreaTable, error) {
 	var doc manorAreaFile
 	if err := readXML(path, &doc); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("manor areas: %w", err)
 	}
 
 	areas := make(manor.AreaTable, 0, len(doc.Areas))

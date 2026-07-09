@@ -65,7 +65,7 @@ type augmentationTableElement struct {
 func LoadRecipes(path string) (*recipe.Table, error) {
 	var file recipeFile
 	if err := readXML(path, &file); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("recipes: %w", err)
 	}
 	recipes, err := buildAll(path, file.Recipes, recipe.New)
 	if err != nil {
@@ -78,7 +78,7 @@ func LoadRecipes(path string) (*recipe.Table, error) {
 func LoadBuyLists(path string) (*buylist.Table, error) {
 	var file buyListFile
 	if err := readXML(path, &file); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("buy lists: %w", err)
 	}
 	lists := make([]buylist.List, 0, len(file.BuyLists))
 	for _, el := range file.BuyLists {
@@ -106,7 +106,7 @@ func LoadBuyLists(path string) (*buylist.Table, error) {
 func LoadHennas(path string) (*henna.Table, error) {
 	var file hennaFile
 	if err := readXML(path, &file); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("hennas: %w", err)
 	}
 	hennas, err := buildAll(path, file.Hennas, henna.New)
 	if err != nil {
@@ -119,7 +119,7 @@ func LoadHennas(path string) (*henna.Table, error) {
 func LoadArmorSets(path string) (*armorset.Table, error) {
 	var file armorSetFile
 	if err := readXML(path, &file); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("armor sets: %w", err)
 	}
 	sets, err := buildAll(path, file.Sets, armorset.New)
 	if err != nil {
@@ -132,7 +132,7 @@ func LoadArmorSets(path string) (*armorset.Table, error) {
 func LoadFish(path string) (*fish.Table, error) {
 	var file fishFile
 	if err := readXML(path, &file); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fish: %w", err)
 	}
 	rows, err := buildAll(path, file.Fish, fish.New)
 	if err != nil {

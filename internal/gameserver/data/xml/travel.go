@@ -21,7 +21,7 @@ type teleportListElement struct {
 func LoadTeleports(path string) (travel.TeleportTable, error) {
 	var doc teleportFile
 	if err := readXML(path, &doc); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("teleports: %w", err)
 	}
 
 	table := make(travel.TeleportTable, len(doc.Lists))
@@ -46,7 +46,7 @@ func LoadTeleports(path string) (travel.TeleportTable, error) {
 func LoadInstantTeleports(path string) (travel.InstantTable, error) {
 	var doc teleportFile
 	if err := readXML(path, &doc); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("instant teleports: %w", err)
 	}
 
 	table := make(travel.InstantTable, len(doc.Lists))

@@ -39,7 +39,7 @@ type restartSetElement struct {
 func LoadRestartPoints(path string) (*restart.Table, error) {
 	var doc restartFile
 	if err := readXML(path, &doc); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("restart points: %w", err)
 	}
 
 	areas := make([]restart.Area, 0, len(doc.Areas))
