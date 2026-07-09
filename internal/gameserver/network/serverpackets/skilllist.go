@@ -1,5 +1,7 @@
 package serverpackets
 
+import "github.com/fatal10110/acis_golang/internal/commons/wire"
+
 // OpcodeSkillList is the wire opcode for SkillList, the character's known
 // skills sent on world entry and after any change to that set.
 const OpcodeSkillList = 0x58
@@ -19,6 +21,18 @@ type SkillListEntry struct {
 // empty list, which is a valid, client-accepted skill window.
 func EncodeSkillList(skills []SkillListEntry) []byte {
 	w := newWriter(OpcodeSkillList)
+	writeSkillList(w, skills)
+	return w.Bytes()
+}
+
+// FrameSkillList builds the SkillList packet for skills as an owned frame.
+func FrameSkillList(skills []SkillListEntry) wire.Frame {
+	w := newFrameWriter(OpcodeSkillList)
+	writeSkillList(w, skills)
+	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
+}
+
+func writeSkillList(w *wire.Writer, skills []SkillListEntry) {
 	w.WriteInt32(int32(len(skills)))
 	for _, s := range skills {
 		w.WriteInt32(boolInt32(s.Passive))
@@ -26,5 +40,4 @@ func EncodeSkillList(skills []SkillListEntry) []byte {
 		w.WriteInt32(s.ID)
 		w.WriteUint8(byte(boolInt32(s.Disabled)))
 	}
-	return w.Bytes()
 }

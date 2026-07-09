@@ -3,6 +3,7 @@ package serverpackets
 import (
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 )
@@ -94,6 +95,19 @@ func NewCharacterSlot(c *player.Character, items []*item.Instance, now time.Time
 // loginName's session. activeID selects which slot the client highlights
 // as the active one; -1 means "whichever was played most recently."
 func EncodeCharSelectInfo(loginName string, sessionID int32, slots []CharacterSlot, activeID int32) []byte {
+	w := newWriter(OpcodeCharSelectInfo)
+	writeCharSelectInfo(w, loginName, sessionID, slots, activeID)
+	return w.Bytes()
+}
+
+// FrameCharSelectInfo builds the CharSelectInfo packet as an owned frame.
+func FrameCharSelectInfo(loginName string, sessionID int32, slots []CharacterSlot, activeID int32) wire.Frame {
+	w := newFrameWriter(OpcodeCharSelectInfo)
+	writeCharSelectInfo(w, loginName, sessionID, slots, activeID)
+	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
+}
+
+func writeCharSelectInfo(w *wire.Writer, loginName string, sessionID int32, slots []CharacterSlot, activeID int32) {
 	if activeID == -1 {
 		var lastAccess int64
 		for i, s := range slots {
@@ -104,7 +118,6 @@ func EncodeCharSelectInfo(loginName string, sessionID int32, slots []CharacterSl
 		}
 	}
 
-	w := newWriter(OpcodeCharSelectInfo)
 	w.WriteInt32(int32(len(slots)))
 
 	for i, s := range slots {
@@ -165,7 +178,6 @@ func EncodeCharSelectInfo(loginName string, sessionID int32, slots []CharacterSl
 		w.WriteUint8(byte(enchant))
 		w.WriteInt32(0) // augmentation id: item augmentation is not modeled
 	}
-	return w.Bytes()
 }
 
 func boolInt32(b bool) int32 {

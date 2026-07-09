@@ -1,6 +1,7 @@
 package serverpackets
 
 import (
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 )
@@ -52,6 +53,19 @@ type UserInfoSnapshot struct {
 
 // EncodeUserInfo builds the UserInfo packet for s.
 func EncodeUserInfo(s UserInfoSnapshot) []byte {
+	w := newWriter(OpcodeUserInfo)
+	writeUserInfo(w, s)
+	return w.Bytes()
+}
+
+// FrameUserInfo builds the UserInfo packet for s as an owned frame.
+func FrameUserInfo(s UserInfoSnapshot) wire.Frame {
+	w := newFrameWriter(OpcodeUserInfo)
+	writeUserInfo(w, s)
+	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
+}
+
+func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) {
 	c, t := s.Character, s.Template
 	paperdoll := item.Paperdoll(s.Items)
 	rhand := paperdoll[rhandPaperdollIndex]
@@ -75,8 +89,6 @@ func EncodeUserInfo(s UserInfoSnapshot) []byte {
 	if enchantEffect > maxDisplayedEnchant {
 		enchantEffect = maxDisplayedEnchant
 	}
-
-	w := newWriter(OpcodeUserInfo)
 
 	w.WriteInt32(int32(c.Position.X))
 	w.WriteInt32(int32(c.Position.Y))
@@ -204,6 +216,4 @@ func EncodeUserInfo(s UserInfoSnapshot) []byte {
 	w.WriteInt32(0) // pledge type: clans are not modeled
 	w.WriteInt32(defaultTitleColor)
 	w.WriteInt32(0) // cursed weapon stage: cursed weapons are not modeled
-
-	return w.Bytes()
 }

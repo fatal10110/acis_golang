@@ -1,6 +1,9 @@
 package serverpackets
 
-import "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+import (
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+)
 
 // OpcodeCharSelected is the wire opcode for CharSelected, sent once a
 // character slot is chosen and its state has moved to entering. It echoes
@@ -22,9 +25,20 @@ type CharSelectedSnapshot struct {
 // EncodeCharSelected builds the CharSelected packet for s. The day/night
 // cycle is not modeled, so the game-time field always reports 0.
 func EncodeCharSelected(s CharSelectedSnapshot) []byte {
-	c, t := s.Character, s.Template
-
 	w := newWriter(OpcodeCharSelected)
+	writeCharSelected(w, s)
+	return w.Bytes()
+}
+
+// FrameCharSelected builds the CharSelected packet for s as an owned frame.
+func FrameCharSelected(s CharSelectedSnapshot) wire.Frame {
+	w := newFrameWriter(OpcodeCharSelected)
+	writeCharSelected(w, s)
+	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
+}
+
+func writeCharSelected(w *wire.Writer, s CharSelectedSnapshot) {
+	c, t := s.Character, s.Template
 	w.WriteString(c.Name)
 	w.WriteInt32(c.ObjectID)
 	w.WriteString(c.Title)
@@ -71,6 +85,4 @@ func EncodeCharSelected(s CharSelectedSnapshot) []byte {
 	w.WriteInt32(0) // reserved
 	w.WriteInt32(0) // reserved
 	w.WriteInt32(0) // reserved
-
-	return w.Bytes()
 }
