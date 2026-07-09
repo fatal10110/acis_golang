@@ -22,6 +22,7 @@ type Conn struct {
 	mu       sync.RWMutex
 	out      chan queuedWrite
 	closed   bool
+	stopping chan struct{}
 	stopped  chan struct{}
 	closeErr error
 }
@@ -35,10 +36,11 @@ func newConn(c net.Conn, log *logrus.Logger) *Conn {
 		log = logrus.StandardLogger()
 	}
 	conn := &Conn{
-		Conn:    c,
-		log:     log,
-		out:     make(chan queuedWrite, outboundBuffer),
-		stopped: make(chan struct{}),
+		Conn:     c,
+		log:      log,
+		out:      make(chan queuedWrite, outboundBuffer),
+		stopping: make(chan struct{}),
+		stopped:  make(chan struct{}),
 	}
 	go conn.writeLoop()
 	return conn
@@ -51,16 +53,14 @@ func newConn(c net.Conn, log *logrus.Logger) *Conn {
 // disconnects only this client, never the process; the deferred
 // cleanup still runs so Close never blocks forever waiting on stopped.
 //
-// Once this loop exits early on a write error, nothing drains c.out
-// any more: Send still succeeds (it only checks c.closed) until the
-// buffered channel fills, then blocks. That resolves itself once Close
-// is called, since Close closes c.out regardless of whether this loop
-// is still draining it.
+// Once this loop exits early on a write error, later Send calls fail
+// without queueing because nothing drains c.out any more.
 func (c *Conn) writeLoop() {
 	defer func() {
 		if r := recover(); r != nil {
 			c.log.Errorf("game connection writer panic: %v", r)
 		}
+		close(c.stopping)
 		c.releaseQueued()
 		c.closeErr = c.Conn.Close()
 		close(c.stopped)
@@ -92,7 +92,7 @@ func (c *Conn) releaseQueued() {
 // Send queues payload to be written by this connection's writer goroutine.
 // If Send returns true, the caller has handed off ownership and must not
 // mutate payload. It returns false without blocking if the connection is
-// already closed.
+// already closed or its writer has stopped.
 func (c *Conn) Send(payload []byte) bool {
 	return c.send(queuedWrite{frame: wire.BorrowedFrame(payload)})
 }
@@ -113,8 +113,17 @@ func (c *Conn) send(queued queuedWrite) bool {
 	if c.closed {
 		return false
 	}
-	c.out <- queued
-	return true
+	select {
+	case <-c.stopping:
+		return false
+	default:
+	}
+	select {
+	case c.out <- queued:
+		return true
+	case <-c.stopping:
+		return false
+	}
 }
 
 // Close stops accepting new sends, flushes any already queued, then
