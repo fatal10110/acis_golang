@@ -62,7 +62,9 @@ func (b *Block) HeightNearest(x, y int, z int32) int16 {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 	if ov, ok := b.overrides[cellIndex(x, y)]; ok {
-		return ov.current[nearestLayerIndex(ov.current, z)].Height
+		if i, ok := nearestLayerIndex(ov.current, z); ok {
+			return ov.current[i].Height
+		}
 	}
 	return b.base.HeightNearest(x, y, z)
 }
@@ -71,7 +73,9 @@ func (b *Block) NSWENearest(x, y int, z int32) block.NSWE {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 	if ov, ok := b.overrides[cellIndex(x, y)]; ok {
-		return ov.current[nearestLayerIndex(ov.current, z)].NSWE
+		if i, ok := nearestLayerIndex(ov.current, z); ok {
+			return ov.current[i].NSWE
+		}
 	}
 	return b.base.NSWENearest(x, y, z)
 }
@@ -81,7 +85,9 @@ func (b *Block) Nearest(x, y int, z int32) int {
 	defer b.mu.RUnlock()
 	ci := cellIndex(x, y)
 	if ov, ok := b.overrides[ci]; ok {
-		return ci*layerSlot + nearestLayerIndex(ov.current, z)
+		if i, ok := nearestLayerIndex(ov.current, z); ok {
+			return ci*layerSlot + i
+		}
 	}
 	return encodeDelegated(b.base.Nearest(x, y, z))
 }
@@ -150,7 +156,10 @@ func (b *Block) HeightNearestIgnore(x, y int, z int32, ignore Object) int16 {
 	if b.hasObject(ignore) {
 		cells = ov.original
 	}
-	return cells[nearestLayerIndex(cells, z)].Height
+	if i, ok := nearestLayerIndex(cells, z); ok {
+		return cells[i].Height
+	}
+	return b.base.HeightNearest(x, y, z)
 }
 
 func (b *Block) NSWENearestIgnore(x, y int, z int32, ignore Object) block.NSWE {
@@ -164,7 +173,10 @@ func (b *Block) NSWENearestIgnore(x, y int, z int32, ignore Object) block.NSWE {
 	if b.hasObject(ignore) {
 		cells = ov.original
 	}
-	return cells[nearestLayerIndex(cells, z)].NSWE
+	if i, ok := nearestLayerIndex(cells, z); ok {
+		return cells[i].NSWE
+	}
+	return b.base.NSWENearest(x, y, z)
 }
 
 // Add applies obj to the block if it overlaps.
@@ -255,9 +267,9 @@ func (b *Block) rebuild() {
 				ov := b.override(lx, ly)
 				touched[cellIndex(lx, ly)] = true
 
-				currentIndex := nearestLayerIndex(ov.current, int32(minOZ))
-				originalIndex := nearestLayerIndex(ov.original, int32(minOZ))
-				if currentIndex < 0 || originalIndex < 0 {
+				currentIndex, ok1 := nearestLayerIndex(ov.current, int32(minOZ))
+				originalIndex, ok2 := nearestLayerIndex(ov.original, int32(minOZ))
+				if !ok1 || !ok2 {
 					continue
 				}
 				if ov.current[currentIndex].Height != ov.original[originalIndex].Height {
@@ -315,7 +327,12 @@ func decodeDelegated(h int) int {
 	return -2 - h
 }
 
-func nearestLayerIndex(layers []block.Cell, z int32) int {
+// nearestLayerIndex returns the index into layers whose Height is closest
+// to z, or false if layers is empty.
+func nearestLayerIndex(layers []block.Cell, z int32) (int, bool) {
+	if len(layers) == 0 {
+		return 0, false
+	}
 	best := 0
 	limit := int32(^uint32(0) >> 1)
 	for i, c := range layers {
@@ -326,7 +343,7 @@ func nearestLayerIndex(layers []block.Cell, z int32) int {
 		limit = d
 		best = i
 	}
-	return best
+	return best, true
 }
 
 func firstAboveIndex(layers []block.Cell, z int32) int {

@@ -94,15 +94,6 @@ func LoadItemTemplates(dir string) (*item.Table, error) {
 	return item.NewTable(templates), nil
 }
 
-// parseItemFile decodes one item template XML file.
-func parseItemFile(path string) (*itemFile, error) {
-	var parsed itemFile
-	if err := readXML(path, &parsed); err != nil {
-		return nil, err
-	}
-	return &parsed, nil
-}
-
 // buildItemTemplate packs one parsed <item> element into the StatSet shape
 // item.NewTemplate consumes: its own attributes and <set> children merged
 // flat, plus the "modifiers" and "useConditions" values built from its
