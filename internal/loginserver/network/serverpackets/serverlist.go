@@ -35,8 +35,8 @@ func EncodeServerList(lastServer byte, servers []ServerEntry) []byte {
 		w.WriteInt32(s.Port)
 		w.WriteUint8(s.AgeLimit)
 		w.WriteUint8(boolByte(s.PvP))
-		w.WriteInt16(s.CurrentPlayers)
-		w.WriteInt16(s.MaxPlayers)
+		w.WriteUint16(s.CurrentPlayers)
+		w.WriteUint16(s.MaxPlayers)
 		w.WriteUint8(boolByte(s.Online))
 
 		var bits int32

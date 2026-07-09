@@ -115,15 +115,15 @@ func EncodeUserInfo(s UserInfoSnapshot) []byte {
 	// weapon-hand slots, since only a weapon can be augmented and
 	// augmentation is not modeled here.
 	for i := 0; i < 14; i++ {
-		w.WriteInt16(0)
+		w.WriteUint16(0)
 	}
 	w.WriteInt32(0) // right-hand augmentation id
 	for i := 0; i < 12; i++ {
-		w.WriteInt16(0)
+		w.WriteUint16(0)
 	}
 	w.WriteInt32(0) // left-hand augmentation id
 	for i := 0; i < 4; i++ {
-		w.WriteInt16(0)
+		w.WriteUint16(0)
 	}
 
 	w.WriteInt32(int32(t.PAtk))
@@ -175,16 +175,16 @@ func EncodeUserInfo(s UserInfoSnapshot) []byte {
 	w.WriteInt32(int32(c.PKKills))
 	w.WriteInt32(int32(c.PvPKills))
 
-	w.WriteInt16(0) // cubic count: cubics are not modeled
+	w.WriteUint16(0) // cubic count: cubics are not modeled
 
 	w.WriteUint8(0) // in party-match room: party matching is not modeled
 	w.WriteInt32(0) // abnormal effect mask: status effects are not modeled
 	w.WriteUint8(0)
-	w.WriteInt32(0) // clan privileges: clans are not modeled
-	w.WriteInt16(0) // recommendations left: recommendations are not modeled
-	w.WriteInt16(0) // recommendations received: recommendations are not modeled
-	w.WriteInt32(0) // mount npc id: mounts are not modeled
-	w.WriteInt16(uint16(inventoryLimit))
+	w.WriteInt32(0)  // clan privileges: clans are not modeled
+	w.WriteUint16(0) // recommendations left: recommendations are not modeled
+	w.WriteUint16(0) // recommendations received: recommendations are not modeled
+	w.WriteInt32(0)  // mount npc id: mounts are not modeled
+	w.WriteUint16(uint16(inventoryLimit))
 	w.WriteInt32(int32(c.ClassID))
 	w.WriteInt32(0)
 	w.WriteInt32(int32(c.MaxCP))
