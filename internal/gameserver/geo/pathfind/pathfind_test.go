@@ -163,11 +163,10 @@ func newTestEngine(t *testing.T, first block.Block) *engine.Engine {
 	t.Helper()
 
 	e := engine.New()
-	region := make([]block.Block, block.RegionBlockCount)
-	for i := range region {
-		region[i] = &block.Null{}
+	region, err := block.NewRegionFromBlocks([]block.Block{first})
+	if err != nil {
+		t.Fatalf("NewRegionFromBlocks(): %v", err)
 	}
-	region[0] = first
 	if err := e.SetRegion(engine.TileXMin, engine.TileYMin, region); err != nil {
 		t.Fatalf("SetRegion(): %v", err)
 	}

@@ -21,39 +21,32 @@ const (
 
 	regionCellsX = block.RegionBlocksX * block.CellsX
 	regionCellsY = block.RegionBlocksY * block.CellsY
+	regionTilesX = TileXMax - TileXMin + 1
+	regionTilesY = TileYMax - TileYMin + 1
 
 	// ponytail: keep the shipped default until geoengine.properties lands.
 	maxObstacleHeight = 32
 )
 
-type regionKey struct {
-	x int
-	y int
-}
-
 // Engine serves geodata height, movement, and line-of-sight queries.
 type Engine struct {
-	null    *block.Null
-	regions map[regionKey][]block.Block
+	regions [regionTilesX][regionTilesY]*block.Region
 }
 
 // New returns an empty engine that answers unloaded regions with null geodata.
 func New() *Engine {
-	return &Engine{
-		null:    &block.Null{},
-		regions: make(map[regionKey][]block.Block),
-	}
+	return &Engine{}
 }
 
 // SetRegion installs one decoded geodata region at the given tile coordinates.
-func (e *Engine) SetRegion(regionX, regionY int, blocks []block.Block) error {
+func (e *Engine) SetRegion(regionX, regionY int, region *block.Region) error {
 	if regionX < TileXMin || regionX > TileXMax || regionY < TileYMin || regionY > TileYMax {
 		return fmt.Errorf("geo/engine: region %d_%d out of range", regionX, regionY)
 	}
-	if len(blocks) != block.RegionBlockCount {
-		return fmt.Errorf("geo/engine: region %d_%d has %d blocks, want %d", regionX, regionY, len(blocks), block.RegionBlockCount)
+	if region == nil {
+		return fmt.Errorf("geo/engine: region %d_%d is nil", regionX, regionY)
 	}
-	e.regions[regionKey{x: regionX, y: regionY}] = blocks
+	e.regions[regionX-TileXMin][regionY-TileYMin] = region
 	return nil
 }
 
@@ -243,23 +236,74 @@ func (e *Engine) nsweNearest(geoX, geoY, worldZ int) block.NSWE {
 	return e.blockAtGeo(geoX, geoY).NSWENearest(localCell(geoX), localCell(geoY), int32(worldZ))
 }
 
-func (e *Engine) blockAtGeo(geoX, geoY int) block.Block {
+func (e *Engine) blockAtGeo(geoX, geoY int) regionBlock {
 	regionX := TileXMin + geoX/regionCellsX
 	regionY := TileYMin + geoY/regionCellsY
-	blocks := e.regions[regionKey{x: regionX, y: regionY}]
-	if len(blocks) == 0 {
-		return e.null
+	if geoX < 0 || geoY < 0 || regionX < TileXMin || regionX > TileXMax || regionY < TileYMin || regionY > TileYMax {
+		return regionBlock{}
+	}
+	region := e.regions[regionX-TileXMin][regionY-TileYMin]
+	if region == nil {
+		return regionBlock{}
 	}
 
 	localGeoX := geoX % regionCellsX
 	localGeoY := geoY % regionCellsY
 	blockX := localGeoX / block.CellsX
 	blockY := localGeoY / block.CellsY
-	b := blocks[blockX*block.RegionBlocksY+blockY]
-	if b == nil {
-		return e.null
+	return regionBlock{region: region, blockX: blockX, blockY: blockY}
+}
+
+type regionBlock struct {
+	region *block.Region
+	blockX int
+	blockY int
+}
+
+func (b regionBlock) HasGeodata() bool {
+	return b.region != nil && b.region.HasGeodata(b.blockX, b.blockY)
+}
+
+func (b regionBlock) HeightNearest(cellX, cellY int, worldZ int32) int16 {
+	if b.region == nil {
+		return block.NullHeight(worldZ)
 	}
-	return b
+	return b.region.HeightNearest(b.blockX, b.blockY, cellX, cellY, worldZ)
+}
+
+func (b regionBlock) NSWENearest(cellX, cellY int, worldZ int32) block.NSWE {
+	if b.region == nil {
+		return block.AllDirections
+	}
+	return b.region.NSWENearest(b.blockX, b.blockY, cellX, cellY, worldZ)
+}
+
+func (b regionBlock) Above(cellX, cellY int, worldZ int32) int {
+	if b.region == nil {
+		return 0
+	}
+	return b.region.Above(b.blockX, b.blockY, cellX, cellY, worldZ)
+}
+
+func (b regionBlock) Below(cellX, cellY int, worldZ int32) int {
+	if b.region == nil {
+		return 0
+	}
+	return b.region.Below(b.blockX, b.blockY, cellX, cellY, worldZ)
+}
+
+func (b regionBlock) Height(layer int) int16 {
+	if b.region == nil {
+		return 0
+	}
+	return b.region.Height(b.blockX, b.blockY, layer)
+}
+
+func (b regionBlock) NSWE(layer int) block.NSWE {
+	if b.region == nil {
+		return block.AllDirections
+	}
+	return b.region.NSWE(b.blockX, b.blockY, layer)
 }
 
 func localCell(geo int) int {
