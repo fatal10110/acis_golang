@@ -3,8 +3,10 @@ package network
 import (
 	"bufio"
 	"context"
+	"errors"
 	"io"
 	"net"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -272,6 +274,151 @@ func TestConnReleasesAlreadyQueuedFramesAfterWriteError(t *testing.T) {
 	}
 }
 
+// TestConnDrainBatchCoalescesBurst is the drainBatch analogue of the
+// issue's acceptance test ("N queued payloads -> 1 vectored write"): it
+// checks the part writeLoop actually controls, that a burst already
+// sitting in c.out is collected into one ordered batch instead of being
+// handed to writeBatch one frame at a time.
+func TestConnDrainBatchCoalescesBurst(t *testing.T) {
+	conn := &Conn{
+		out:      make(chan queuedWrite, outboundBuffer),
+		stopping: make(chan struct{}),
+		stopped:  make(chan struct{}),
+	}
+
+	const n = 5
+	for i := 0; i < n; i++ {
+		if !conn.send(queuedWrite{frame: wire.BorrowedFrame([]byte{byte(i)})}) {
+			t.Fatalf("send %d failed", i)
+		}
+	}
+
+	first := <-conn.out
+	batch := conn.drainBatch(first)
+	if len(batch) != n {
+		t.Fatalf("batch len = %d, want %d", len(batch), n)
+	}
+	for i, queued := range batch {
+		if queued.frame.Bytes()[0] != byte(i) {
+			t.Fatalf("batch[%d] = %v, want order preserved", i, queued.frame.Bytes())
+		}
+	}
+}
+
+// TestConnDrainBatchBoundedByOutboundBuffer checks the batch cap the
+// issue calls for ("bound the batch...so one slow reader can't build an
+// unbounded batch"): even with more already queued, drainBatch stops at
+// outboundBuffer and leaves the rest in the channel.
+func TestConnDrainBatchBoundedByOutboundBuffer(t *testing.T) {
+	conn := &Conn{
+		out:      make(chan queuedWrite, outboundBuffer+10),
+		stopping: make(chan struct{}),
+		stopped:  make(chan struct{}),
+	}
+
+	for i := 0; i < outboundBuffer+10; i++ {
+		conn.out <- queuedWrite{frame: wire.BorrowedFrame([]byte{byte(i)})}
+	}
+
+	first := <-conn.out
+	batch := conn.drainBatch(first)
+	if len(batch) != outboundBuffer {
+		t.Fatalf("batch len = %d, want %d (bounded)", len(batch), outboundBuffer)
+	}
+	if remaining := len(conn.out); remaining != 10 {
+		t.Fatalf("remaining queued = %d, want 10 left undrained", remaining)
+	}
+}
+
+// TestConnWriteBatchReleasesAllOnError covers the issue's pool-return
+// requirement on failure: net.Buffers.WriteTo stops at the first write
+// error and never attempts the rest of the batch, but every frame in
+// the batch - written or not - must still be released back to the pool.
+func TestConnWriteBatchReleasesAllOnError(t *testing.T) {
+	conn := &Conn{Conn: alwaysFailConn{}}
+
+	var released [2]int32
+	batch := []queuedWrite{
+		{frame: wire.OwnedFrame([]byte("a"), nil, func(*wire.Writer) { atomic.AddInt32(&released[0], 1) })},
+		{frame: wire.OwnedFrame([]byte("b"), nil, func(*wire.Writer) { atomic.AddInt32(&released[1], 1) })},
+	}
+
+	if err := conn.writeBatch(batch); err == nil {
+		t.Fatal("writeBatch returned nil error, want write failure")
+	}
+	if atomic.LoadInt32(&released[0]) != 1 || atomic.LoadInt32(&released[1]) != 1 {
+		t.Fatalf("released = %v, want both released once", released)
+	}
+}
+
+// TestConnBurstArrivesInOrderAndReleases exercises the real writeLoop
+// goroutine (not just drainBatch/writeBatch in isolation) with a burst
+// of sends, confirming the byte stream the peer sees is unchanged and
+// every frame is eventually released, regardless of how the burst gets
+// split into batches.
+func TestConnBurstArrivesInOrderAndReleases(t *testing.T) {
+	server, client := net.Pipe()
+	conn := newConn(server, nil)
+	defer client.Close()
+
+	const want = "abcde"
+	var released int32
+	for i := 0; i < len(want); i++ {
+		b := want[i]
+		frame := wire.OwnedFrame([]byte{b}, nil, func(*wire.Writer) { atomic.AddInt32(&released, 1) })
+		if !conn.SendFrame(frame) {
+			t.Fatalf("SendFrame %q failed", b)
+		}
+	}
+
+	got := make([]byte, len(want))
+	if _, err := io.ReadFull(client, got); err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if string(got) != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+
+	if err := conn.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	if atomic.LoadInt32(&released) != int32(len(want)) {
+		t.Fatalf("released = %d, want %d", released, len(want))
+	}
+}
+
+// TestConnCloseFlushesBurst confirms Close's documented contract still
+// holds once writes are batched: a burst queued right before Close is
+// still delivered in full, not dropped by the batching change.
+func TestConnCloseFlushesBurst(t *testing.T) {
+	ln := listen(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	const want = "flush-me"
+	go Serve(ctx, ln, func(ctx context.Context, conn *Conn) {
+		for i := 0; i < len(want); i++ {
+			conn.Send([]byte{want[i]})
+		}
+		conn.Close()
+	}, nil)
+
+	client, err := net.Dial("tcp", ln.Addr().String())
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	defer client.Close()
+
+	client.SetReadDeadline(time.Now().Add(5 * time.Second))
+	got := make([]byte, len(want))
+	if _, err := io.ReadFull(client, got); err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if string(got) != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+}
+
 func TestServeSurvivesHandlerPanic(t *testing.T) {
 	ln := listen(t)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -332,6 +479,20 @@ func (c *blockingErrorConn) RemoteAddr() net.Addr             { return testAddr(
 func (c *blockingErrorConn) SetDeadline(time.Time) error      { return nil }
 func (c *blockingErrorConn) SetReadDeadline(time.Time) error  { return nil }
 func (c *blockingErrorConn) SetWriteDeadline(time.Time) error { return nil }
+
+// alwaysFailConn is a net.Conn stub whose every Write fails, used to
+// verify writeBatch's release-on-error behavior without depending on
+// net.Buffers' internal dispatch to a real *net.TCPConn.
+type alwaysFailConn struct{}
+
+func (alwaysFailConn) Read([]byte) (int, error)         { return 0, io.EOF }
+func (alwaysFailConn) Write([]byte) (int, error)        { return 0, errors.New("write failed") }
+func (alwaysFailConn) Close() error                     { return nil }
+func (alwaysFailConn) LocalAddr() net.Addr              { return testAddr("local") }
+func (alwaysFailConn) RemoteAddr() net.Addr             { return testAddr("remote") }
+func (alwaysFailConn) SetDeadline(time.Time) error      { return nil }
+func (alwaysFailConn) SetReadDeadline(time.Time) error  { return nil }
+func (alwaysFailConn) SetWriteDeadline(time.Time) error { return nil }
 
 type testAddr string
 
