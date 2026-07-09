@@ -1,6 +1,9 @@
 package block
 
-import "testing"
+import (
+	"math"
+	"testing"
+)
 
 func TestNull(t *testing.T) {
 	b := &Null{}
@@ -21,6 +24,15 @@ func TestNull(t *testing.T) {
 		if got := b.HeightNearest(0, 0, z); got != int16(z) {
 			t.Errorf("HeightNearest(0,0,%d) = %d, want %d", z, got, int16(z))
 		}
+	}
+
+	// Out-of-int16-range queries clamp instead of wrapping: every real
+	// stored height fits in int16, so a Null block's answer should too.
+	if got := b.HeightNearest(0, 0, math.MaxInt32); got != math.MaxInt16 {
+		t.Errorf("HeightNearest(0,0,MaxInt32) = %d, want %d", got, int16(math.MaxInt16))
+	}
+	if got := b.HeightNearest(0, 0, math.MinInt32); got != math.MinInt16 {
+		t.Errorf("HeightNearest(0,0,MinInt32) = %d, want %d", got, int16(math.MinInt16))
 	}
 
 	if got := b.NSWENearest(0, 0, 0); got != AllDirections {
