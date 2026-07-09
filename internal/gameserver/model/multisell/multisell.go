@@ -4,7 +4,6 @@ package multisell
 import (
 	"errors"
 	"fmt"
-	"sort"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -145,7 +144,7 @@ func (l *List) NPCOnly() bool {
 // Table is an in-memory lookup of multisell lists keyed by list id, built
 // once at boot and read for the remainder of the process lifetime.
 type Table struct {
-	lists map[int32]*List
+	*commons.Lookup[int32, *List]
 }
 
 // NewTable returns a Table backed by lists. An empty slice is an error: a
@@ -154,30 +153,10 @@ func NewTable(lists []*List) (*Table, error) {
 	if len(lists) == 0 {
 		return nil, errors.New("multisell: table has no lists")
 	}
-	t := &Table{lists: make(map[int32]*List, len(lists))}
-	for _, list := range lists {
-		t.lists[list.ID] = list
-	}
-	return t, nil
-}
-
-// Get returns the list with id, or false if none was loaded.
-func (t *Table) Get(id int32) (*List, bool) {
-	list, ok := t.lists[id]
-	return list, ok
+	return &Table{commons.NewLookup(lists, func(l *List) int32 { return l.ID })}, nil
 }
 
 // Count returns the number of lists loaded.
 func (t *Table) Count() int {
-	return len(t.lists)
-}
-
-// All returns every loaded list, ordered ascending by id.
-func (t *Table) All() []*List {
-	lists := make([]*List, 0, len(t.lists))
-	for _, list := range t.lists {
-		lists = append(lists, list)
-	}
-	sort.Slice(lists, func(i, j int) bool { return lists[i].ID < lists[j].ID })
-	return lists
+	return t.Len()
 }
