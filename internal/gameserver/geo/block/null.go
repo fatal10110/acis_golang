@@ -23,6 +23,12 @@ func (b *Null) Layers(cellX, cellY int) int { return 1 }
 // real stored height uses: with no geodata to consult, the queried height
 // is assumed to already be valid ground.
 func (b *Null) HeightNearest(cellX, cellY int, worldZ int32) int16 {
+	return NullHeight(worldZ)
+}
+
+// NullHeight returns worldZ clamped to the int16 range used by stored
+// geodata heights.
+func NullHeight(worldZ int32) int16 {
 	switch {
 	case worldZ > math.MaxInt16:
 		return math.MaxInt16

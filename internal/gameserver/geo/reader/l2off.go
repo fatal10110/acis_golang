@@ -99,7 +99,9 @@ func (r *l2offReader) complex(region *block.Region, blockIndex int) error {
 		}
 		cells[i] = code
 	}
-	region.SetComplexEncoded(blockIndex, cells)
+	if err := region.SetComplexEncoded(blockIndex, cells); err != nil {
+		return fmt.Errorf("geo/reader: block %d complex: %w", blockIndex, err)
+	}
 	return nil
 }
 

@@ -61,7 +61,9 @@ func (p *l2jParser) block(region *block.Region, i int) error {
 			}
 			cells[c] = code
 		}
-		region.SetComplexEncoded(i, cells)
+		if err := region.SetComplexEncoded(i, cells); err != nil {
+			return fmt.Errorf("geo/reader: block %d complex: %w", i, err)
+		}
 		return nil
 	case l2jMultilayer:
 		var counts [block.CellCount]uint8

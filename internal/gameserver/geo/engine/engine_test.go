@@ -73,12 +73,7 @@ func TestCanSee(t *testing.T) {
 	})
 }
 
-type testHelper interface {
-	Helper()
-	Fatalf(string, ...any)
-}
-
-func newTestEngine(t testHelper, first block.Block) *Engine {
+func newTestEngine(t testing.TB, first block.Block) *Engine {
 	t.Helper()
 
 	e := New()

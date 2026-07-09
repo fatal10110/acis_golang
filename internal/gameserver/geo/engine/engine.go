@@ -266,7 +266,7 @@ func (b regionBlock) HasGeodata() bool {
 
 func (b regionBlock) HeightNearest(cellX, cellY int, worldZ int32) int16 {
 	if b.region == nil {
-		return nullHeight(worldZ)
+		return block.NullHeight(worldZ)
 	}
 	return b.region.HeightNearest(b.blockX, b.blockY, cellX, cellY, worldZ)
 }
@@ -304,17 +304,6 @@ func (b regionBlock) NSWE(layer int) block.NSWE {
 		return block.AllDirections
 	}
 	return b.region.NSWE(b.blockX, b.blockY, layer)
-}
-
-func nullHeight(worldZ int32) int16 {
-	switch {
-	case worldZ > math.MaxInt16:
-		return math.MaxInt16
-	case worldZ < math.MinInt16:
-		return math.MinInt16
-	default:
-		return int16(worldZ)
-	}
 }
 
 func localCell(geo int) int {

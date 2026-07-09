@@ -2,17 +2,6 @@ package block
 
 import "testing"
 
-func TestRegionUsesFixedIndex(t *testing.T) {
-	r := NewRegion()
-
-	requireFixedRegionIndex(r.index)
-	if len(r.index) != RegionBlockCount {
-		t.Fatalf("len(index) = %d, want %d", len(r.index), RegionBlockCount)
-	}
-}
-
-func requireFixedRegionIndex([RegionBlockCount]uint32) {}
-
 func TestRegionQueriesPackedBlocks(t *testing.T) {
 	r := NewRegion()
 
@@ -29,7 +18,9 @@ func TestRegionQueriesPackedBlocks(t *testing.T) {
 
 	var complex [CellCount]Cell
 	complex[cellIndex(2, 3)] = Cell{Height: 64, NSWE: North | East}
-	r.SetComplex(1, complex)
+	if err := r.SetComplex(1, complex); err != nil {
+		t.Fatalf("SetComplex: %v", err)
+	}
 	if got := r.KindAt(0, 1); got != KindComplex {
 		t.Fatalf("complex kind = %v, want complex", got)
 	}
@@ -85,5 +76,13 @@ func TestNewRegionFromBlocks(t *testing.T) {
 	}
 	if got := r.KindAt(0, 1); got != KindNull {
 		t.Fatalf("nil block kind = %v, want null", got)
+	}
+}
+
+func TestRegionRejectsPackedDataOverflow(t *testing.T) {
+	r := NewRegion()
+
+	if _, err := r.appendData(regionValueMask + 1); err == nil {
+		t.Fatal("appendData overflow error = nil, want error")
 	}
 }

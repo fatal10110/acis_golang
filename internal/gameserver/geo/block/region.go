@@ -52,7 +52,9 @@ func NewRegionFromBlocks(blocks []Block) (*Region, error) {
 					cells[cellIndex(x, y)] = b.Cells(x, y)[0]
 				}
 			}
-			r.SetComplex(i, cells)
+			if err := r.SetComplex(i, cells); err != nil {
+				return nil, err
+			}
 		case KindMultilayer:
 			var cells [CellCount][]Cell
 			for x := 0; x < CellsX; x++ {
@@ -75,25 +77,33 @@ func (r *Region) SetFlat(blockIndex int, height int16) {
 	r.index[blockIndex] = regionEntry(regionFlat, uint32(uint16(height)))
 }
 
-// SetComplex stores a complex block at blockIndex.
-func (r *Region) SetComplex(blockIndex int, cells [CellCount]Cell) {
+// SetComplex stores a complex block at blockIndex. Heights are encoded in
+// the on-disk cell format, so non-flat block heights are quantized to
+// CellHeight units; SetFlat stores its height exactly.
+func (r *Region) SetComplex(blockIndex int, cells [CellCount]Cell) error {
 	var encoded [CellCount]uint16
 	for i, c := range cells {
 		encoded[i] = encodeCell(c)
 	}
-	r.SetComplexEncoded(blockIndex, encoded)
+	return r.SetComplexEncoded(blockIndex, encoded)
 }
 
 // SetComplexEncoded stores a complex block from raw little-endian cell codes.
-func (r *Region) SetComplexEncoded(blockIndex int, cells [CellCount]uint16) {
-	offset := r.appendData(CellCount * 2)
+func (r *Region) SetComplexEncoded(blockIndex int, cells [CellCount]uint16) error {
+	offset, err := r.appendData(CellCount * 2)
+	if err != nil {
+		return err
+	}
 	for i, code := range cells {
 		binary.LittleEndian.PutUint16(r.data[offset+i*2:], code)
 	}
 	r.index[blockIndex] = regionEntry(regionComplex, uint32(offset))
+	return nil
 }
 
-// SetMultilayer stores a multilayer block at blockIndex.
+// SetMultilayer stores a multilayer block at blockIndex. Heights are encoded
+// in the on-disk cell format, so non-flat block heights are quantized to
+// CellHeight units; SetFlat stores its height exactly.
 func (r *Region) SetMultilayer(blockIndex int, cells [CellCount][]Cell) error {
 	var counts [CellCount]uint8
 	codes := make([]uint16, 0, CellCount)
@@ -122,7 +132,10 @@ func (r *Region) SetMultilayerEncoded(blockIndex int, counts [CellCount]uint8, c
 		return fmt.Errorf("geo/block: multilayer has %d cells, want %d", len(cells), total)
 	}
 
-	offset := r.appendData(multilayerHeaderSize + total*2)
+	offset, err := r.appendData(multilayerHeaderSize + total*2)
+	if err != nil {
+		return err
+	}
 	cellOffset := multilayerHeaderSize
 	next := 0
 	for i, count := range counts {
@@ -177,7 +190,7 @@ func (r *Region) HeightNearest(blockX, blockY, cellX, cellY int, worldZ int32) i
 	case regionMultilayer:
 		return r.Height(blockX, blockY, r.Nearest(blockX, blockY, cellX, cellY, worldZ))
 	default:
-		return nullHeight(worldZ)
+		return NullHeight(worldZ)
 	}
 }
 
@@ -324,10 +337,13 @@ func (r *Region) Cells(blockX, blockY, cellX, cellY int) []Cell {
 	}
 }
 
-func (r *Region) appendData(n int) int {
+func (r *Region) appendData(n int) (int, error) {
+	if n < 0 || len(r.data) > regionValueMask-n {
+		return 0, fmt.Errorf("geo/block: packed region data exceeds %d bytes", regionValueMask)
+	}
 	offset := len(r.data)
 	r.data = append(r.data, make([]byte, n)...)
-	return offset
+	return offset, nil
 }
 
 func (r *Region) entry(blockX, blockY int) uint32 {
@@ -366,15 +382,4 @@ func (r *Region) multilayerCodeAt(entry uint32, cell, layer int) uint16 {
 
 func encodeCell(c Cell) uint16 {
 	return uint16(c.Height)<<1&0xfff0 | uint16(c.NSWE)&0x000f
-}
-
-func nullHeight(worldZ int32) int16 {
-	switch {
-	case worldZ > math.MaxInt16:
-		return math.MaxInt16
-	case worldZ < math.MinInt16:
-		return math.MinInt16
-	default:
-		return int16(worldZ)
-	}
 }
