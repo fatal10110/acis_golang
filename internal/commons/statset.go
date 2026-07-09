@@ -28,6 +28,20 @@ var ErrValueRequired = errors.New("commons: value required")
 // attribute being absent is normal, a mangled number in a data file is
 // corruption and must not silently become the default.
 //
+// That "present but malformed is still an error" rule applies to every
+// accessor whose target type has a genuine parse failure mode: the numeric
+// accessors (GetByte, GetInt, GetInt32, GetLong, GetDouble, GetFloat32 and
+// their array/Default variants) reject a present string that doesn't parse
+// as that number. GetBool, GetString, GetStringArray and their Default
+// variants have no such failure mode by design: a string coerces to bool
+// by a deliberately forgiving rule (case-insensitive "true" is true,
+// anything else — "false", "yes", garbage — is false, never an error), and
+// GetString/GetStringArray format or split whatever is present rather than
+// validating it against a grammar. The shipped datapack's boolean
+// attributes are exclusively "true"/"false" today, but a value outside
+// that set must keep silently reading as false to match the required
+// behavior, not start erroring.
+//
 // Accessors are added alongside the types they return: there are currently
 // no accessors for composite domain types (e.g. a game position), because
 // those types don't exist in this package yet.
