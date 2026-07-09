@@ -10,7 +10,7 @@ const OpcodePlayerInGame = 0x02
 // included) into the list of accounts that entered the game.
 func DecodePlayerInGame(payload []byte) ([]string, error) {
 	r := newReader(payload)
-	count := int(r.ReadInt16())
+	count := int(r.ReadUint16())
 	accounts := make([]string, 0, count)
 	for i := 0; i < count; i++ {
 		accounts = append(accounts, r.ReadString())
@@ -25,7 +25,7 @@ func DecodePlayerInGame(payload []byte) ([]string, error) {
 // just entered the game on this server.
 func EncodePlayerInGame(accounts []string) []byte {
 	w := newWriter(OpcodePlayerInGame)
-	w.WriteInt16(uint16(len(accounts)))
+	w.WriteUint16(uint16(len(accounts)))
 	for _, account := range accounts {
 		w.WriteString(account)
 	}

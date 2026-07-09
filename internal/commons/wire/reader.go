@@ -66,8 +66,8 @@ func (r *Reader) ReadUint8() byte {
 	return b[0]
 }
 
-// ReadInt16 reads a little-endian 16-bit integer.
-func (r *Reader) ReadInt16() uint16 {
+// ReadUint16 reads a little-endian 16-bit integer.
+func (r *Reader) ReadUint16() uint16 {
 	b := r.take(2)
 	if b == nil {
 		return 0
@@ -114,7 +114,7 @@ func (r *Reader) ReadBytes(n int) []byte {
 func (r *Reader) ReadString() string {
 	var units []uint16
 	for {
-		u := r.ReadInt16()
+		u := r.ReadUint16()
 		if r.err != nil || u == 0 {
 			break
 		}

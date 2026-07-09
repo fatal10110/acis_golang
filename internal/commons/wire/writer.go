@@ -17,8 +17,8 @@ func (w *Writer) WriteUint8(b byte) {
 	w.buf = append(w.buf, b)
 }
 
-// WriteInt16 appends a little-endian 16-bit integer.
-func (w *Writer) WriteInt16(v uint16) {
+// WriteUint16 appends a little-endian 16-bit integer.
+func (w *Writer) WriteUint16(v uint16) {
 	var b [2]byte
 	binary.LittleEndian.PutUint16(b[:], v)
 	w.buf = append(w.buf, b[:]...)
@@ -59,9 +59,9 @@ func (w *Writer) WriteBytes(b []byte) {
 // 16-bit code units, followed by a trailing 0x0000 unit.
 func (w *Writer) WriteString(s string) {
 	for _, unit := range utf16.Encode([]rune(s)) {
-		w.WriteInt16(unit)
+		w.WriteUint16(unit)
 	}
-	w.WriteInt16(0)
+	w.WriteUint16(0)
 }
 
 // Bytes returns the assembled payload.
