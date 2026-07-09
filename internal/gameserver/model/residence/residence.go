@@ -5,6 +5,7 @@ package residence
 import (
 	"fmt"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
 
@@ -18,14 +19,9 @@ const (
 	SpawnBanish
 )
 
-var SpawnTypeNames = map[string]SpawnType{
-	"OWNER":   SpawnOwner,
-	"OTHER":   SpawnOther,
-	"CHAOTIC": SpawnChaotic,
-	"BANISH":  SpawnBanish,
-}
-
 var spawnTypeStrings = [...]string{"OWNER", "OTHER", "CHAOTIC", "BANISH"}
+
+var SpawnTypeNames = commons.NameIndex[SpawnType](spawnTypeStrings[:])
 
 // String returns the canonical XML spelling for s.
 func (s SpawnType) String() string {
@@ -44,13 +40,9 @@ const (
 	ZoneHeadquarter
 )
 
-var ZoneTypeNames = map[string]ZoneType{
-	"RESIDENCE":   ZoneResidence,
-	"BATTLEFIELD": ZoneBattlefield,
-	"HEADQUARTER": ZoneHeadquarter,
-}
-
 var zoneTypeStrings = [...]string{"RESIDENCE", "BATTLEFIELD", "HEADQUARTER"}
+
+var ZoneTypeNames = commons.NameIndex[ZoneType](zoneTypeStrings[:])
 
 // String returns the canonical XML spelling for z.
 func (z ZoneType) String() string {
