@@ -132,8 +132,10 @@ func (s *StatSet) GetBoolDefault(key string, defaultValue bool) bool {
 
 // asNumber coerces any of the numeric representations StatSet stores
 // (signed/unsigned integers of any width, float32, float64) into a float64,
-// so a single coercion path serves every numeric accessor regardless of how
-// the value was originally stored.
+// so a single coercion path serves every float-targeted accessor (GetBool,
+// GetDouble, GetFloat32) regardless of how the value was originally stored.
+// Integer-targeted accessors use asInt64 instead, since routing an int64
+// through float64's 53-bit mantissa loses precision on large values.
 func asNumber(val any) (float64, bool) {
 	switch v := val.(type) {
 	case int:
@@ -146,9 +148,15 @@ func asNumber(val any) (float64, bool) {
 		return float64(v), true
 	case int64:
 		return float64(v), true
+	case uint:
+		return float64(v), true
 	case uint8:
 		return float64(v), true
 	case uint16:
+		return float64(v), true
+	case uint32:
+		return float64(v), true
+	case uint64:
 		return float64(v), true
 	case float32:
 		return float64(v), true
@@ -158,12 +166,48 @@ func asNumber(val any) (float64, bool) {
 	return 0, false
 }
 
+// asInt64 coerces any of the numeric representations StatSet stores
+// (signed/unsigned integers of any width, float32, float64) into an int64
+// by converting each kind directly, never routing through float64 — so an
+// int64 value beyond float64's 53-bit mantissa round-trips exactly through
+// the integer accessors (GetByte, GetInt, GetLong, and their array/Default
+// variants).
+func asInt64(val any) (int64, bool) {
+	switch v := val.(type) {
+	case int:
+		return int64(v), true
+	case int8:
+		return int64(v), true
+	case int16:
+		return int64(v), true
+	case int32:
+		return int64(v), true
+	case int64:
+		return v, true
+	case uint:
+		return int64(v), true
+	case uint8:
+		return int64(v), true
+	case uint16:
+		return int64(v), true
+	case uint32:
+		return int64(v), true
+	case uint64:
+		return int64(v), true
+	case float32:
+		return int64(v), true
+	case float64:
+		return int64(v), true
+	}
+	return 0, false
+}
+
 // coerceByte coerces val to a byte from a numeric or numeric string
 // representation. ok reports whether val was a recognized kind; err reports
 // a recognized-but-malformed numeric string.
 func coerceByte(val any) (v byte, ok bool, err error) {
-	if n, ok := asNumber(val); ok {
-		return byte(int64(n)), true, nil
+	if n, ok := asInt64(val); ok {
+		return byte(n), true, nil
 	}
 	if str, ok := val.(string); ok {
 		n, err := strconv.ParseInt(str, 10, 8)
@@ -342,7 +386,7 @@ func (s *StatSet) GetFloat32Default(key string, defaultValue float32) (float32, 
 // (1/0) representation. ok reports whether val was a recognized kind; err
 // reports a recognized-but-malformed numeric string.
 func coerceInt(val any) (v int, ok bool, err error) {
-	if n, ok := asNumber(val); ok {
+	if n, ok := asInt64(val); ok {
 		return int(n), true, nil
 	}
 	if str, ok := val.(string); ok {
@@ -460,7 +504,7 @@ func coerceIntArray(val any) (v []int, ok bool, err error) {
 	if arr, ok := val.([]int); ok {
 		return arr, true, nil
 	}
-	if n, ok := asNumber(val); ok {
+	if n, ok := asInt64(val); ok {
 		return []int{int(n)}, true, nil
 	}
 	if str, ok := val.(string); ok {
@@ -526,8 +570,8 @@ func (s *StatSet) GetLongDefault(key string, defaultValue int64) (int64, error) 
 // bool (1/0) representation. ok reports whether val was a recognized kind;
 // err reports a recognized-but-malformed numeric string.
 func coerceLong(val any) (v int64, ok bool, err error) {
-	if n, ok := asNumber(val); ok {
-		return int64(n), true, nil
+	if n, ok := asInt64(val); ok {
+		return n, true, nil
 	}
 	if str, ok := val.(string); ok {
 		n, err := strconv.ParseInt(str, 10, 64)
@@ -554,8 +598,8 @@ func (s *StatSet) GetLongArray(key string) ([]int64, error) {
 	if arr, ok := val.([]int64); ok {
 		return arr, nil
 	}
-	if n, ok := asNumber(val); ok {
-		return []int64{int64(n)}, nil
+	if n, ok := asInt64(val); ok {
+		return []int64{n}, nil
 	}
 	if str, ok := val.(string); ok {
 		parts := strings.Split(str, ";")
