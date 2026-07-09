@@ -15,7 +15,7 @@ func TestFind(t *testing.T) {
 			return block.Cell{Height: 0, NSWE: block.AllDirections}
 		})), DefaultOptions())
 
-		path, ok := finder.Find(at(0, 0, 0), at(3, 0, 0))
+		path, cost, ok := finder.Find(at(0, 0, 0), at(3, 0, 0))
 		if !ok {
 			t.Fatal("Find() = no path, want path")
 		}
@@ -24,6 +24,9 @@ func TestFind(t *testing.T) {
 		}
 		if got := path[len(path)-1]; got != at(3, 0, 0) {
 			t.Fatalf("Find() last = %#v, want %#v", got, at(3, 0, 0))
+		}
+		if cost <= 0 {
+			t.Fatalf("Find() cost = %d, want a positive cost for a 3-cell path", cost)
 		}
 	})
 
@@ -37,7 +40,7 @@ func TestFind(t *testing.T) {
 			}
 		})), DefaultOptions())
 
-		path, ok := finder.Find(at(0, 0, 0), at(2, 0, 0))
+		path, _, ok := finder.Find(at(0, 0, 0), at(2, 0, 0))
 		if ok {
 			t.Fatalf("Find() = %#v, want no path", path)
 		}
@@ -64,7 +67,7 @@ func TestFind(t *testing.T) {
 			MaxIterations:   100,
 		})
 
-		path, ok := finder.Find(at(0, 0, 0), at(2, 0, 0))
+		path, _, ok := finder.Find(at(0, 0, 0), at(2, 0, 0))
 		if !ok {
 			t.Fatal("Find() = no path, want path")
 		}
@@ -92,7 +95,7 @@ func TestFind(t *testing.T) {
 			MaxIterations:   1,
 		})
 
-		path, ok := finder.Find(at(0, 0, 0), at(7, 7, 0))
+		path, _, ok := finder.Find(at(0, 0, 0), at(7, 7, 0))
 		if ok {
 			t.Fatalf("Find() = %#v, want no path", path)
 		}

@@ -20,11 +20,12 @@ func New(e *engine.Engine, options Options) *Finder {
 	return &Finder{engine: e, options: options}
 }
 
-// Find returns a path from origin to target as corner points plus the final target cell.
-// The returned slice omits the origin. ok is false when no path was found within MaxIterations.
-func (f *Finder) Find(origin, target location.Location) ([]location.Location, bool) {
+// Find returns a path from origin to target as corner points plus the final target cell,
+// and the path's total weighted cost. The returned slice omits the origin. ok is false
+// when no path was found within MaxIterations, in which case the other results are zero.
+func (f *Finder) Find(origin, target location.Location) ([]location.Location, int, bool) {
 	if f == nil || f.engine == nil || engine.OutOfWorld(origin.X, origin.Y) || engine.OutOfWorld(target.X, target.Y) {
-		return nil, false
+		return nil, 0, false
 	}
 
 	start := newNode(origin.X, origin.Y, int(f.engine.Height(origin.X, origin.Y, origin.Z)))
@@ -46,7 +47,7 @@ func (f *Finder) Find(origin, target location.Location) ([]location.Location, bo
 		delete(openSet, current.key())
 
 		if current.gx == goal.gx && current.gy == goal.gy && current.z == goal.z {
-			return buildPath(current), true
+			return buildPath(current), current.g, true
 		}
 
 		closed[current.key()] = struct{}{}
@@ -66,7 +67,7 @@ func (f *Finder) Find(origin, target location.Location) ([]location.Location, bo
 		iterations++
 	}
 
-	return nil, false
+	return nil, 0, false
 }
 
 type node struct {
