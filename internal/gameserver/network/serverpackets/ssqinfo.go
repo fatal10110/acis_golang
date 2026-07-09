@@ -13,6 +13,6 @@ const regularSkyState = 256
 // modeled, so it always reports the regular (no-cabal) sky.
 func EncodeSSQInfo() []byte {
 	w := newWriter(OpcodeSSQInfo)
-	w.WriteInt16(regularSkyState)
+	w.WriteUint16(regularSkyState)
 	return w.Bytes()
 }

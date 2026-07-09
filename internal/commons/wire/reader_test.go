@@ -5,7 +5,7 @@ import "testing"
 func TestReaderPrimitivesRoundTripWriter(t *testing.T) {
 	var w Writer
 	w.WriteUint8(0x7F)
-	w.WriteInt16(0xBEEF)
+	w.WriteUint16(0xBEEF)
 	w.WriteInt32(-1)
 	w.WriteInt64(-2)
 	w.WriteBytes([]byte{1, 2, 3})
@@ -15,8 +15,8 @@ func TestReaderPrimitivesRoundTripWriter(t *testing.T) {
 	if got := r.ReadUint8(); got != 0x7F {
 		t.Fatalf("ReadUint8() = %#x, want 0x7F", got)
 	}
-	if got := r.ReadInt16(); got != 0xBEEF {
-		t.Fatalf("ReadInt16() = %#x, want 0xBEEF", got)
+	if got := r.ReadUint16(); got != 0xBEEF {
+		t.Fatalf("ReadUint16() = %#x, want 0xBEEF", got)
 	}
 	if got := r.ReadInt32(); got != -1 {
 		t.Fatalf("ReadInt32() = %d, want -1", got)
