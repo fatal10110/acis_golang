@@ -38,7 +38,7 @@ var armorTypeStrings = map[ArmorType]string{
 	ArmorShield: "SHIELD",
 }
 
-var armorTypeNames = reverseStringMap(armorTypeStrings)
+var armorTypeNames = commons.ReverseMap(armorTypeStrings)
 
 // ArmorDetail is the armor-specific data a KindArmor Template carries; nil
 // for every other Kind.

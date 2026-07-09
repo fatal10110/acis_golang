@@ -1,6 +1,10 @@
 package item
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/fatal10110/acis_golang/internal/commons"
+)
 
 // MaterialType is the substance an item is made of, used for on-hit sound
 // and visual effects.
@@ -69,7 +73,7 @@ var materialTypeStrings = map[MaterialType]string{
 
 // materialTypeNames maps a template's "material" attribute to the
 // MaterialType it selects.
-var materialTypeNames = reverseStringMap(materialTypeStrings)
+var materialTypeNames = commons.ReverseMap(materialTypeStrings)
 
 // CrystalType is the enchant-crystallization grade an item belongs to; NONE
 // means the item cannot be crystallized.
@@ -102,7 +106,7 @@ var crystalTypeStrings = map[CrystalType]string{
 	CrystalS:    "S",
 }
 
-var crystalTypeNames = reverseStringMap(crystalTypeStrings)
+var crystalTypeNames = commons.ReverseMap(crystalTypeStrings)
 
 // ActionType is the client-side action bound to double-clicking or using an
 // item, selecting the icon and default handler the client offers for it.
@@ -175,15 +179,4 @@ var actionTypeStrings = map[ActionType]string{
 	ActionXmasOpen:                "xmas_open",
 }
 
-var actionTypeNames = reverseStringMap(actionTypeStrings)
-
-// reverseStringMap builds the string->E lookup table for an E->string
-// table declared next to an enum's constants, so the two stay in sync by
-// construction instead of being maintained as two separate literals.
-func reverseStringMap[E comparable](strings map[E]string) map[string]E {
-	names := make(map[string]E, len(strings))
-	for e, s := range strings {
-		names[s] = e
-	}
-	return names
-}
+var actionTypeNames = commons.ReverseMap(actionTypeStrings)
