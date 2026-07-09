@@ -326,10 +326,10 @@ func (p *Properties) IntPairs(key, def string) ([]IntPair, error) {
 		return nil, nil
 	}
 
-	parts := splitTrimTrailingEmpty(regexp.MustCompile(";"), value)
+	parts := splitLiteralTrimTrailingEmpty(value, ";")
 	out := make([]IntPair, len(parts))
 	for i, part := range parts {
-		bounds := splitTrimTrailingEmpty(regexp.MustCompile("-"), part)
+		bounds := splitLiteralTrimTrailingEmpty(part, "-")
 		if len(bounds) != 2 {
 			return nil, fmt.Errorf("parse %s[%d]: want first-second", key, i)
 		}
@@ -477,7 +477,16 @@ func unescape(s string) (string, error) {
 }
 
 func splitTrimTrailingEmpty(re *regexp.Regexp, s string) []string {
-	parts := re.Split(s, -1)
+	return trimTrailingEmpty(re.Split(s, -1))
+}
+
+// splitLiteralTrimTrailingEmpty is splitTrimTrailingEmpty for a plain,
+// literal-character separator that doesn't need a regex.
+func splitLiteralTrimTrailingEmpty(s, sep string) []string {
+	return trimTrailingEmpty(strings.Split(s, sep))
+}
+
+func trimTrailingEmpty(parts []string) []string {
 	for len(parts) > 1 && parts[len(parts)-1] == "" {
 		parts = parts[:len(parts)-1]
 	}
