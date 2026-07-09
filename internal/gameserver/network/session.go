@@ -40,6 +40,23 @@ func (s *Session) Send(payload []byte) bool {
 	return s.conn.Send(frame)
 }
 
+// SendFrame encrypts and queues frame, which must already include the
+// little-endian length header. It takes ownership of frame and releases it
+// once the connection writer is done with it.
+func (s *Session) SendFrame(frame wire.Frame) bool {
+	frameBytes := frame.Bytes()
+	if len(frameBytes) < frameHeaderSize {
+		frame.Release()
+		return false
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.cipher.Encrypt(frameBytes[frameHeaderSize:])
+	return s.conn.SendFrame(frame)
+}
+
 // ReadFrame blocks for the next inbound frame, decrypts it, and returns its
 // payload with the length header stripped. A network or EOF error from the
 // underlying connection propagates as-is.

@@ -10,6 +10,36 @@ import (
 // which itself counts toward the length it encodes.
 const FrameHeaderSize = 2
 
+// Frame is an outbound byte slice plus an optional release hook for pooled
+// backing storage.
+type Frame struct {
+	bytes   []byte
+	writer  *Writer
+	release func(*Writer)
+}
+
+// BorrowedFrame returns a frame whose storage is not owned by a pool.
+func BorrowedFrame(bytes []byte) Frame {
+	return Frame{bytes: bytes}
+}
+
+// OwnedFrame returns a frame whose writer must be released after use.
+func OwnedFrame(bytes []byte, writer *Writer, release func(*Writer)) Frame {
+	return Frame{bytes: bytes, writer: writer, release: release}
+}
+
+// Bytes returns the frame bytes.
+func (f Frame) Bytes() []byte {
+	return f.bytes
+}
+
+// Release returns owned backing storage to its pool, if any.
+func (f Frame) Release() {
+	if f.release != nil {
+		f.release(f.writer)
+	}
+}
+
 // FrameBytes returns payload framed behind a little-endian uint16 length
 // header (header included in the count), ready to write or encrypt in
 // place.

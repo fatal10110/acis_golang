@@ -95,7 +95,7 @@ func (v *SessionValidator) Validate(ctx context.Context, client *Client, req cli
 	select {
 	case ok := <-result:
 		if !ok {
-			client.Session.Send(serverpackets.EncodeAuthLoginFail(serverpackets.LoginFailSystemErrorTryLater))
+			client.Session.SendFrame(serverpackets.FrameAuthLoginFail(serverpackets.LoginFailSystemErrorTryLater))
 			return false, nil
 		}
 		client.SetAuthenticated(req.LoginName, link.SessionKey{

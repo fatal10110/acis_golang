@@ -54,3 +54,19 @@ func TestWriterStringEncodesSurrogatePairs(t *testing.T) {
 		t.Fatalf("round-trip = %q, want %q", got, "\U0001F600")
 	}
 }
+
+func TestFrameWriterBackfillsHeaderWithoutChangingBytes(t *testing.T) {
+	w := NewFrameWriter(16)
+	w.WriteUint8(0x14)
+	w.WriteInt32(1)
+
+	wantPayload := []byte{0x14, 0x01, 0x00, 0x00, 0x00}
+	if got := w.Bytes(); !bytes.Equal(got, wantPayload) {
+		t.Fatalf("Bytes() = % X, want % X", got, wantPayload)
+	}
+
+	wantFrame := []byte{0x07, 0x00, 0x14, 0x01, 0x00, 0x00, 0x00}
+	if got := w.Frame(); !bytes.Equal(got, wantFrame) {
+		t.Fatalf("Frame() = % X, want % X", got, wantFrame)
+	}
+}

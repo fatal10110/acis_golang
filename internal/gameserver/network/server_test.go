@@ -3,9 +3,12 @@ package network
 import (
 	"bufio"
 	"context"
+	"io"
 	"net"
 	"testing"
 	"time"
+
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
 )
 
 func listen(t *testing.T) net.Listener {
@@ -148,6 +151,27 @@ func TestConnSendAfterCloseReturnsFalse(t *testing.T) {
 	}
 }
 
+func TestConnSendFrameAfterCloseReleasesFrame(t *testing.T) {
+	server, client := net.Pipe()
+	defer client.Close()
+
+	conn := newConn(server, nil)
+	if err := conn.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	released := make(chan struct{}, 1)
+	frame := wire.OwnedFrame([]byte{0x02, 0x00}, nil, func(*wire.Writer) { released <- struct{}{} })
+	if conn.SendFrame(frame) {
+		t.Fatal("SendFrame on closed connection returned true, want false")
+	}
+	select {
+	case <-released:
+	case <-time.After(5 * time.Second):
+		t.Fatal("owned frame was not released after rejected send")
+	}
+}
+
 func TestConnWriteLoopExitsOnWriteErrorAndCloseCompletes(t *testing.T) {
 	server, client := net.Pipe()
 	conn := newConn(server, nil)
@@ -167,6 +191,84 @@ func TestConnWriteLoopExitsOnWriteErrorAndCloseCompletes(t *testing.T) {
 	case <-done:
 	case <-time.After(5 * time.Second):
 		t.Fatal("Close did not complete after writeLoop exited on a write error")
+	}
+}
+
+func TestConnSendFrameAfterWriteLoopExitReturnsFalseAndReleasesFrame(t *testing.T) {
+	server, client := net.Pipe()
+	conn := newConn(server, nil)
+
+	client.Close()
+	conn.Send([]byte("payload"))
+
+	select {
+	case <-conn.stopped:
+	case <-time.After(5 * time.Second):
+		t.Fatal("writeLoop did not stop after write error")
+	}
+
+	released := make(chan struct{}, 1)
+	frame := wire.OwnedFrame([]byte{0x02, 0x00}, nil, func(*wire.Writer) { released <- struct{}{} })
+	if conn.SendFrame(frame) {
+		t.Fatal("SendFrame after writeLoop exit returned true, want false")
+	}
+
+	select {
+	case <-released:
+	case <-time.After(5 * time.Second):
+		t.Fatal("owned frame was not released after stopped writer rejected send")
+	}
+
+	if err := conn.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+}
+
+func TestConnReleasesAlreadyQueuedFramesAfterWriteError(t *testing.T) {
+	raw := &blockingErrorConn{
+		writeStarted: make(chan struct{}),
+		fail:         make(chan struct{}),
+	}
+	conn := newConn(raw, nil)
+
+	firstReleased := make(chan struct{}, 1)
+	first := wire.OwnedFrame([]byte{0x02, 0x00}, nil, func(*wire.Writer) { firstReleased <- struct{}{} })
+	if !conn.SendFrame(first) {
+		t.Fatal("first SendFrame returned false")
+	}
+
+	select {
+	case <-raw.writeStarted:
+	case <-time.After(5 * time.Second):
+		t.Fatal("write did not start")
+	}
+
+	secondReleased := make(chan struct{}, 1)
+	second := wire.OwnedFrame([]byte{0x02, 0x00}, nil, func(*wire.Writer) { secondReleased <- struct{}{} })
+	if !conn.SendFrame(second) {
+		t.Fatal("second SendFrame returned false")
+	}
+
+	close(raw.fail)
+
+	select {
+	case <-firstReleased:
+	case <-time.After(5 * time.Second):
+		t.Fatal("failed write frame was not released")
+	}
+	select {
+	case <-conn.stopped:
+	case <-time.After(5 * time.Second):
+		t.Fatal("writeLoop did not stop after write error")
+	}
+	select {
+	case <-secondReleased:
+	case <-time.After(5 * time.Second):
+		t.Fatal("already queued frame was not released after write error")
+	}
+
+	if err := conn.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
 	}
 }
 
@@ -212,3 +314,26 @@ func TestServeSurvivesHandlerPanic(t *testing.T) {
 		t.Fatal("Serve did not return after context cancel")
 	}
 }
+
+type blockingErrorConn struct {
+	writeStarted chan struct{}
+	fail         chan struct{}
+}
+
+func (c *blockingErrorConn) Read([]byte) (int, error) { return 0, io.EOF }
+func (c *blockingErrorConn) Write([]byte) (int, error) {
+	close(c.writeStarted)
+	<-c.fail
+	return 0, io.ErrClosedPipe
+}
+func (c *blockingErrorConn) Close() error                     { return nil }
+func (c *blockingErrorConn) LocalAddr() net.Addr              { return testAddr("local") }
+func (c *blockingErrorConn) RemoteAddr() net.Addr             { return testAddr("remote") }
+func (c *blockingErrorConn) SetDeadline(time.Time) error      { return nil }
+func (c *blockingErrorConn) SetReadDeadline(time.Time) error  { return nil }
+func (c *blockingErrorConn) SetWriteDeadline(time.Time) error { return nil }
+
+type testAddr string
+
+func (a testAddr) Network() string { return string(a) }
+func (a testAddr) String() string  { return string(a) }
