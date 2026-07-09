@@ -40,6 +40,18 @@ func (s *Session) Send(payload []byte) bool {
 	return s.conn.Send(frame)
 }
 
+// SendFrame encrypts and queues w's complete frame. If it returns true,
+// ownership of w transfers to the connection writer until the write attempt
+// finishes.
+func (s *Session) SendFrame(w *wire.Writer) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	frame := w.Frame()
+	s.cipher.Encrypt(frame[frameHeaderSize:])
+	return s.conn.send(frame, w.Release)
+}
+
 // ReadFrame blocks for the next inbound frame, decrypts it, and returns its
 // payload with the length header stripped. A network or EOF error from the
 // underlying connection propagates as-is.

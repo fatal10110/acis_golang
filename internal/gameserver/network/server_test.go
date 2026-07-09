@@ -3,6 +3,8 @@ package network
 import (
 	"bufio"
 	"context"
+	"errors"
+	"io"
 	"net"
 	"testing"
 	"time"
@@ -170,6 +172,116 @@ func TestConnWriteLoopExitsOnWriteErrorAndCloseCompletes(t *testing.T) {
 	}
 }
 
+func TestConnReleasesQueuedBufferAfterWrite(t *testing.T) {
+	server, client := net.Pipe()
+	conn := newConn(server, nil)
+	defer client.Close()
+
+	released := make(chan struct{})
+	if !conn.send([]byte("payload"), func() { close(released) }) {
+		t.Fatal("send returned false")
+	}
+
+	got := make([]byte, len("payload"))
+	if _, err := io.ReadFull(client, got); err != nil {
+		t.Fatalf("read payload: %v", err)
+	}
+
+	select {
+	case <-released:
+	case <-time.After(5 * time.Second):
+		t.Fatal("queued buffer was not released after write")
+	}
+
+	if err := conn.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+}
+
+func TestConnReleasesQueuedBuffersAfterWriteError(t *testing.T) {
+	server, client := net.Pipe()
+	conn := newConn(server, nil)
+	client.Close()
+
+	firstReleased := make(chan struct{})
+	if !conn.send([]byte("first"), func() { close(firstReleased) }) {
+		t.Fatal("first send returned false")
+	}
+
+	select {
+	case <-firstReleased:
+	case <-time.After(5 * time.Second):
+		t.Fatal("failed write buffer was not released")
+	}
+
+	select {
+	case <-conn.stopped:
+	case <-time.After(5 * time.Second):
+		t.Fatal("writeLoop did not stop after write error")
+	}
+
+	secondReleased := make(chan struct{})
+	if conn.send([]byte("second"), func() { close(secondReleased) }) {
+		t.Fatal("send after writeLoop exit returned true")
+	}
+
+	select {
+	case <-secondReleased:
+	case <-time.After(5 * time.Second):
+		t.Fatal("buffer was not released after send failed")
+	}
+
+	if err := conn.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+}
+
+func TestConnReleasesAlreadyQueuedBuffersAfterWriteError(t *testing.T) {
+	raw := &blockingErrorConn{
+		writeStarted: make(chan struct{}),
+		fail:         make(chan struct{}),
+	}
+	conn := newConn(raw, nil)
+
+	firstReleased := make(chan struct{})
+	if !conn.send([]byte("first"), func() { close(firstReleased) }) {
+		t.Fatal("first send returned false")
+	}
+
+	select {
+	case <-raw.writeStarted:
+	case <-time.After(5 * time.Second):
+		t.Fatal("write did not start")
+	}
+
+	secondReleased := make(chan struct{})
+	if !conn.send([]byte("second"), func() { close(secondReleased) }) {
+		t.Fatal("second send returned false")
+	}
+
+	close(raw.fail)
+
+	select {
+	case <-firstReleased:
+	case <-time.After(5 * time.Second):
+		t.Fatal("failed write buffer was not released")
+	}
+	select {
+	case <-conn.stopped:
+	case <-time.After(5 * time.Second):
+		t.Fatal("writeLoop did not stop after write error")
+	}
+	select {
+	case <-secondReleased:
+	case <-time.After(5 * time.Second):
+		t.Fatal("already queued buffer was not released after write error")
+	}
+
+	if err := conn.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+}
+
 func TestServeSurvivesHandlerPanic(t *testing.T) {
 	ln := listen(t)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -212,3 +324,26 @@ func TestServeSurvivesHandlerPanic(t *testing.T) {
 		t.Fatal("Serve did not return after context cancel")
 	}
 }
+
+type blockingErrorConn struct {
+	writeStarted chan struct{}
+	fail         chan struct{}
+}
+
+func (c *blockingErrorConn) Read([]byte) (int, error) { return 0, io.EOF }
+func (c *blockingErrorConn) Write([]byte) (int, error) {
+	close(c.writeStarted)
+	<-c.fail
+	return 0, errors.New("write failed")
+}
+func (c *blockingErrorConn) Close() error                     { return nil }
+func (c *blockingErrorConn) LocalAddr() net.Addr              { return testAddr("local") }
+func (c *blockingErrorConn) RemoteAddr() net.Addr             { return testAddr("remote") }
+func (c *blockingErrorConn) SetDeadline(time.Time) error      { return nil }
+func (c *blockingErrorConn) SetReadDeadline(time.Time) error  { return nil }
+func (c *blockingErrorConn) SetWriteDeadline(time.Time) error { return nil }
+
+type testAddr string
+
+func (a testAddr) Network() string { return string(a) }
+func (a testAddr) String() string  { return string(a) }

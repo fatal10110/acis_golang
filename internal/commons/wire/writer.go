@@ -3,13 +3,22 @@ package wire
 import (
 	"encoding/binary"
 	"math"
+	"sync"
 	"unicode/utf16"
 )
+
+const defaultFrameCapacity = 256
+
+var frameWriterPool = sync.Pool{
+	New: func() any { return &Writer{} },
+}
 
 // Writer assembles little-endian primitives into a packet payload. The zero
 // value is ready to use.
 type Writer struct {
-	buf []byte
+	buf       []byte
+	bodyStart int
+	pooled    bool
 }
 
 // WriteUint8 appends a single byte.
@@ -66,7 +75,7 @@ func (w *Writer) WriteString(s string) {
 
 // Bytes returns the assembled payload.
 func (w *Writer) Bytes() []byte {
-	return w.buf
+	return w.buf[w.bodyStart:]
 }
 
 // NewPacketWriter starts an outbound packet with its leading opcode byte.
@@ -74,4 +83,40 @@ func NewPacketWriter(opcode byte) *Writer {
 	w := &Writer{}
 	w.WriteUint8(opcode)
 	return w
+}
+
+// NewFramePacketWriter starts an outbound packet with room reserved for the
+// frame header.
+func NewFramePacketWriter(opcode byte) *Writer {
+	w := frameWriterPool.Get().(*Writer)
+	w.pooled = true
+	w.bodyStart = FrameHeaderSize
+	if cap(w.buf) < defaultFrameCapacity {
+		w.buf = make([]byte, FrameHeaderSize, defaultFrameCapacity)
+	} else {
+		w.buf = w.buf[:FrameHeaderSize]
+	}
+	w.WriteUint8(opcode)
+	return w
+}
+
+// Frame returns the complete length-prefixed frame.
+func (w *Writer) Frame() []byte {
+	if w.bodyStart != FrameHeaderSize {
+		return FrameBytes(w.Bytes())
+	}
+	binary.LittleEndian.PutUint16(w.buf[:FrameHeaderSize], uint16(len(w.buf)))
+	return w.buf
+}
+
+// Release returns a pooled frame writer to the pool. Callers must not use w
+// or any bytes returned by it after Release.
+func (w *Writer) Release() {
+	if w == nil || !w.pooled {
+		return
+	}
+	w.buf = w.buf[:0]
+	w.bodyStart = 0
+	w.pooled = false
+	frameWriterPool.Put(w)
 }

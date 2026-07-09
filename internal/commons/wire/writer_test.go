@@ -25,6 +25,20 @@ func TestWriterPrimitives(t *testing.T) {
 	}
 }
 
+func TestFramePacketWriterKeepsPayloadBytesAndBackfillsHeader(t *testing.T) {
+	w := NewFramePacketWriter(0x01)
+	defer w.Release()
+	w.WriteBytes([]byte{0xAA, 0xBB})
+
+	if got, want := w.Bytes(), []byte{0x01, 0xAA, 0xBB}; !bytes.Equal(got, want) {
+		t.Fatalf("Bytes() = % X, want % X", got, want)
+	}
+
+	if got, want := w.Frame(), []byte{0x05, 0x00, 0x01, 0xAA, 0xBB}; !bytes.Equal(got, want) {
+		t.Fatalf("Frame() = % X, want % X", got, want)
+	}
+}
+
 func TestWriterFloat64RoundTrips(t *testing.T) {
 	var w Writer
 	w.WriteFloat64(3.5)

@@ -6,3 +6,7 @@ import "github.com/fatal10110/acis_golang/internal/commons/wire"
 func newWriter(opcode byte) *wire.Writer {
 	return wire.NewPacketWriter(opcode)
 }
+
+func newFrameWriter(opcode byte) *wire.Writer {
+	return wire.NewFramePacketWriter(opcode)
+}
