@@ -32,41 +32,38 @@ func TestReadL2JDecodesRegionBlocks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadL2J: %v", err)
 	}
-	if got := len(region); got != block.RegionBlockCount {
-		t.Fatalf("len(blocks) = %d, want %d", got, block.RegionBlockCount)
-	}
 
-	if got := region[0].Kind(); got != block.KindFlat {
+	if got := region.KindAt(0, 0); got != block.KindFlat {
 		t.Fatalf("block 0 kind = %v, want flat", got)
 	}
-	if got := region[0].HeightNearest(7, 7, 123); got != -32 {
+	if got := region.HeightNearest(0, 0, 7, 7, 123); got != -32 {
 		t.Errorf("flat height = %d, want -32", got)
 	}
 
-	if got := region[1].Kind(); got != block.KindComplex {
+	if got := region.KindAt(0, 1); got != block.KindComplex {
 		t.Fatalf("block 1 kind = %v, want complex", got)
 	}
-	if got := region[1].HeightNearest(2, 3, 0); got != 64 {
+	if got := region.HeightNearest(0, 1, 2, 3, 0); got != 64 {
 		t.Errorf("complex height = %d, want 64", got)
 	}
-	if got := region[1].NSWENearest(2, 3, 0); got != block.North|block.East {
+	if got := region.NSWENearest(0, 1, 2, 3, 0); got != block.North|block.East {
 		t.Errorf("complex nswe = %v, want NE", got)
 	}
 
-	if got := region[2].Kind(); got != block.KindMultilayer {
+	if got := region.KindAt(0, 2); got != block.KindMultilayer {
 		t.Fatalf("block 2 kind = %v, want multilayer", got)
 	}
-	if got := region[2].Layers(4, 5); got != 2 {
+	if got := region.Layers(0, 2, 4, 5); got != 2 {
 		t.Errorf("multilayer layers = %d, want 2", got)
 	}
-	if got := region[2].HeightNearest(4, 5, 40); got != 48 {
+	if got := region.HeightNearest(0, 2, 4, 5, 40); got != 48 {
 		t.Errorf("multilayer nearest height = %d, want 48", got)
 	}
-	if got := region[2].NSWENearest(4, 5, 40); got != block.South|block.East {
+	if got := region.NSWENearest(0, 2, 4, 5, 40); got != block.South|block.East {
 		t.Errorf("multilayer nearest nswe = %v, want SE", got)
 	}
 
-	if got := region[3].Kind(); got != block.KindFlat {
+	if got := region.KindAt(0, 3); got != block.KindFlat {
 		t.Errorf("block 3 kind = %v, want default flat", got)
 	}
 }

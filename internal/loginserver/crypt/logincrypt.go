@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math/rand/v2"
+	"sync"
 
 	"github.com/fatal10110/acis_golang/internal/commons/crypt"
 )
@@ -15,6 +16,14 @@ var staticBootstrapKey = []byte{
 	0x6b, 0x60, 0xcb, 0x5b, 0x82, 0xce, 0x90, 0xb1,
 	0xcc, 0x2b, 0x6c, 0x55, 0x6c, 0x6c, 0x6c, 0x6c,
 }
+
+var staticBootstrapCipher = sync.OnceValue(func() *crypt.BlowfishCipher {
+	cipher, err := crypt.NewBlowfishCipher(staticBootstrapKey)
+	if err != nil {
+		panic(err)
+	}
+	return cipher
+})
 
 // LoginCrypt encrypts and decrypts the login server's client-facing packets.
 // The very first outbound packet is padded, obfuscated with a rolling XOR
@@ -31,15 +40,12 @@ type LoginCrypt struct {
 // NewLoginCrypt builds a LoginCrypt for one client session using its dynamic
 // Blowfish key (1-56 bytes).
 func NewLoginCrypt(dynamicKey []byte) (*LoginCrypt, error) {
-	static, err := crypt.NewBlowfishCipher(staticBootstrapKey)
-	if err != nil {
-		return nil, fmt.Errorf("static bootstrap cipher: %w", err)
-	}
 	dynamic, err := crypt.NewBlowfishCipher(dynamicKey)
 	if err != nil {
 		return nil, fmt.Errorf("dynamic session cipher: %w", err)
 	}
-	return &LoginCrypt{static: static, dynamic: dynamic, first: true}, nil
+	// BlowfishCipher is immutable after construction, so the static first-packet cipher is safe to share.
+	return &LoginCrypt{static: staticBootstrapCipher(), dynamic: dynamic, first: true}, nil
 }
 
 // Encrypt pads payload to a Blowfish block boundary and encrypts it,
