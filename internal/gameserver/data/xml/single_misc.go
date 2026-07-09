@@ -21,7 +21,7 @@ type soulCrystalFile struct {
 func LoadSoulCrystalData(path string) (*item.SoulCrystalTable, error) {
 	var doc soulCrystalFile
 	if err := readXML(path, &doc); err != nil {
-		return nil, fmt.Errorf("xml: soul crystals %q: %w", path, err)
+		return nil, fmt.Errorf("soul crystals: %w", err)
 	}
 
 	crystals, err := buildAll(path, doc.Crystals, item.NewSoulCrystal)
@@ -48,7 +48,7 @@ type spellbookFile struct {
 func LoadSpellbooks(path string) (*skill.SpellbookTable, error) {
 	var doc spellbookFile
 	if err := readXML(path, &doc); err != nil {
-		return nil, fmt.Errorf("xml: spellbooks %q: %w", path, err)
+		return nil, fmt.Errorf("spellbooks: %w", err)
 	}
 
 	books, err := buildAll(path, doc.Books, skill.NewSpellbook)
@@ -65,7 +65,7 @@ type summonItemFile struct {
 func LoadSummonItems(path string) (*item.SummonItemTable, error) {
 	var doc summonItemFile
 	if err := readXML(path, &doc); err != nil {
-		return nil, fmt.Errorf("xml: summon items %q: %w", path, err)
+		return nil, fmt.Errorf("summon items: %w", err)
 	}
 
 	items, err := buildAll(path, doc.Items, item.NewSummonItem)
@@ -82,7 +82,7 @@ type healSpsFile struct {
 func LoadHealSps(path string) (*skill.HealSpsTable, error) {
 	var doc healSpsFile
 	if err := readXML(path, &doc); err != nil {
-		return nil, fmt.Errorf("xml: heal sps %q: %w", path, err)
+		return nil, fmt.Errorf("heal sps: %w", err)
 	}
 
 	entries, err := buildAll(path, doc.Entries, skill.NewHealSps)
@@ -99,7 +99,7 @@ type newbieBuffFile struct {
 func LoadNewbieBuffs(path string) (*skill.NewbieBuffTable, error) {
 	var doc newbieBuffFile
 	if err := readXML(path, &doc); err != nil {
-		return nil, fmt.Errorf("xml: newbie buffs %q: %w", path, err)
+		return nil, fmt.Errorf("newbie buffs: %w", err)
 	}
 
 	buffs, err := buildAll(path, doc.Buffs, skill.NewNewbieBuff)
@@ -123,7 +123,7 @@ func LoadAdminData(dir string) (*admin.Data, error) {
 
 	var accessDoc adminAccessFile
 	if err := readXML(accessPath, &accessDoc); err != nil {
-		return nil, fmt.Errorf("xml: admin access levels %q: %w", accessPath, err)
+		return nil, fmt.Errorf("admin access levels: %w", err)
 	}
 	levels, err := buildAll(accessPath, accessDoc.Entries, admin.NewAccessLevel)
 	if err != nil {
@@ -132,7 +132,7 @@ func LoadAdminData(dir string) (*admin.Data, error) {
 
 	var commandDoc adminCommandFile
 	if err := readXML(commandPath, &commandDoc); err != nil {
-		return nil, fmt.Errorf("xml: admin commands %q: %w", commandPath, err)
+		return nil, fmt.Errorf("admin commands: %w", err)
 	}
 	commands, err := buildAll(commandPath, commandDoc.Entries, admin.NewCommand)
 	if err != nil {
@@ -153,7 +153,7 @@ type announcementFile struct {
 func LoadAnnouncements(path string) ([]admin.Announcement, error) {
 	var doc announcementFile
 	if err := readXML(path, &doc); err != nil {
-		return nil, fmt.Errorf("xml: announcements %q: %w", path, err)
+		return nil, fmt.Errorf("announcements: %w", err)
 	}
 
 	return buildAll(path, doc.Entries, admin.NewAnnouncement)
@@ -172,7 +172,7 @@ type observerGroupElement struct {
 func LoadObserverGroups(path string) (*observer.Table, error) {
 	var doc observerGroupFile
 	if err := readXML(path, &doc); err != nil {
-		return nil, fmt.Errorf("xml: observer groups %q: %w", path, err)
+		return nil, fmt.Errorf("observer groups: %w", err)
 	}
 
 	groups := make(map[int][]observer.Location, len(doc.Groups))
@@ -206,7 +206,7 @@ type staticObjectFile struct {
 func LoadStaticObjects(path string) (*staticobject.Table, error) {
 	var doc staticObjectFile
 	if err := readXML(path, &doc); err != nil {
-		return nil, fmt.Errorf("xml: static objects %q: %w", path, err)
+		return nil, fmt.Errorf("static objects: %w", err)
 	}
 
 	templates, err := buildAll(path, doc.Objects, staticobject.NewTemplate)
@@ -223,7 +223,7 @@ type cursedWeaponFile struct {
 func LoadCursedWeapons(path string, skills *skill.Table) (*entity.CursedWeaponTable, error) {
 	var doc cursedWeaponFile
 	if err := readXML(path, &doc); err != nil {
-		return nil, fmt.Errorf("xml: cursed weapons %q: %w", path, err)
+		return nil, fmt.Errorf("cursed weapons: %w", err)
 	}
 
 	weapons, err := buildAll(path, doc.Items, func(set *commons.StatSet) (entity.CursedWeapon, error) {
@@ -247,7 +247,7 @@ type bufferSkillCategory struct {
 func LoadBufferSkills(path string, skills *skill.Table) (*skill.BufferTable, error) {
 	var doc bufferSkillFile
 	if err := readXML(path, &doc); err != nil {
-		return nil, fmt.Errorf("xml: buffer skills %q: %w", path, err)
+		return nil, fmt.Errorf("buffer skills: %w", err)
 	}
 
 	entries := make([]skill.BufferSkill, 0)

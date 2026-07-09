@@ -28,7 +28,7 @@ type boatRouteElement struct {
 func LoadBoatRoutes(path string) ([]route.BoatItinerary, error) {
 	var doc boatRouteFile
 	if err := readXML(path, &doc); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("boat routes: %w", err)
 	}
 
 	itineraries := make([]route.BoatItinerary, 0, len(doc.Itineraries))
@@ -96,7 +96,7 @@ type walkerNPCElement struct {
 func LoadWalkerRoutes(path string) (route.WalkerRoutes, error) {
 	var doc walkerRouteFile
 	if err := readXML(path, &doc); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("walker routes: %w", err)
 	}
 
 	routes := make(route.WalkerRoutes, len(doc.Routes))

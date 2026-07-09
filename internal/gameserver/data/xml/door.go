@@ -27,7 +27,7 @@ type doorElement struct {
 func LoadDoors(path string) (*door.Table, error) {
 	var doc doorFile
 	if err := readXML(path, &doc); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("doors: %w", err)
 	}
 
 	templates := make([]*door.Template, 0, len(doc.Doors))

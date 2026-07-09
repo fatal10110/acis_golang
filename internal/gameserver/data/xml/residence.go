@@ -61,7 +61,7 @@ type residenceZoneElement struct {
 func LoadCastles(path string) (*castle.Table, error) {
 	var doc castleFile
 	if err := readXML(path, &doc); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("castles: %w", err)
 	}
 
 	castles := make([]*castle.Castle, 0, len(doc.Castles))
@@ -83,7 +83,7 @@ func LoadCastles(path string) (*castle.Table, error) {
 func LoadClanHalls(path string) (*clanhall.Table, error) {
 	var doc clanHallFile
 	if err := readXML(path, &doc); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("clan halls: %w", err)
 	}
 
 	halls := make([]*clanhall.Hall, 0, len(doc.Halls))
@@ -105,7 +105,7 @@ func LoadClanHalls(path string) (*clanhall.Table, error) {
 func LoadClanHallDeco(path string) (*clanhall.DecoTable, error) {
 	var doc clanHallDecoFile
 	if err := readXML(path, &doc); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("clan hall deco: %w", err)
 	}
 
 	decos := make([]clanhall.Deco, 0, len(doc.Decos))

@@ -29,7 +29,7 @@ func loadXMLDocuments[T any](dir, kind string) ([]xmlDocument[T], error) {
 	for _, path := range paths {
 		var doc T
 		if err := readXML(path, &doc); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%s: %w", kind, err)
 		}
 		docs = append(docs, xmlDocument[T]{Path: path, Data: doc})
 	}
