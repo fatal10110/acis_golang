@@ -40,6 +40,21 @@ func (s stubSampler) Above(gx, gy, worldZ int) (int16, bool) {
 	return h, true
 }
 
+func TestNearestLayerIndexReportsNotFoundOnEmptySlice(t *testing.T) {
+	if _, ok := nearestLayerIndex(nil, 0); ok {
+		t.Error("nearestLayerIndex(nil) ok = true, want false")
+	}
+	if _, ok := nearestLayerIndex([]block.Cell{}, 0); ok {
+		t.Error("nearestLayerIndex(empty) ok = true, want false")
+	}
+
+	layers := []block.Cell{{Height: 10}, {Height: 20}}
+	i, ok := nearestLayerIndex(layers, 19)
+	if !ok || i != 1 {
+		t.Errorf("nearestLayerIndex(non-empty) = (%d, %v), want (1, true)", i, ok)
+	}
+}
+
 func TestCalculateGeoObject(t *testing.T) {
 	inside := [][]bool{
 		{false, false, false},

@@ -8,7 +8,7 @@ import (
 func TestWriterPrimitives(t *testing.T) {
 	var w Writer
 	w.WriteUint8(0x01)
-	w.WriteInt16(0x0203)
+	w.WriteUint16(0x0203)
 	w.WriteInt32(0x04050607)
 	w.WriteInt64(0x08090A0B0C0D0E0F)
 	w.WriteBytes([]byte{0xAA, 0xBB})

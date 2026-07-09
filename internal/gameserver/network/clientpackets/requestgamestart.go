@@ -25,7 +25,7 @@ func DecodeRequestGameStart(payload []byte) (RequestGameStart, error) {
 		return RequestGameStart{}, fmt.Errorf("clientpackets: RequestGameStart: need %d bytes, got %d", requestGameStartSize, r.Remaining())
 	}
 	slot := r.ReadInt32()
-	r.ReadInt16()
+	r.ReadUint16()
 	r.ReadInt32()
 	r.ReadInt32()
 	r.ReadInt32()

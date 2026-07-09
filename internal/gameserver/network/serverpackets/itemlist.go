@@ -26,8 +26,8 @@ func EncodeItemList(items []*item.Instance, templates *item.Table, showWindow bo
 	}
 
 	w := newWriter(OpcodeItemList)
-	w.WriteInt16(uint16(boolInt32(showWindow)))
-	w.WriteInt16(uint16(len(owned)))
+	w.WriteUint16(uint16(boolInt32(showWindow)))
+	w.WriteUint16(uint16(len(owned)))
 
 	for _, it := range owned {
 		tmpl, ok := templates.Get(it.TemplateID)
@@ -36,16 +36,16 @@ func EncodeItemList(items []*item.Instance, templates *item.Table, showWindow bo
 		}
 		category, subCategory := tmpl.Category()
 
-		w.WriteInt16(uint16(category))
+		w.WriteUint16(uint16(category))
 		w.WriteInt32(it.ObjectID)
 		w.WriteInt32(it.TemplateID)
 		w.WriteInt32(int32(it.Count))
-		w.WriteInt16(uint16(subCategory))
-		w.WriteInt16(uint16(it.CustomType1))
-		w.WriteInt16(uint16(boolInt32(it.Location == item.LocationPaperdoll)))
+		w.WriteUint16(uint16(subCategory))
+		w.WriteUint16(uint16(it.CustomType1))
+		w.WriteUint16(uint16(boolInt32(it.Location == item.LocationPaperdoll)))
 		w.WriteInt32(int32(tmpl.Slot))
-		w.WriteInt16(uint16(it.EnchantLevel))
-		w.WriteInt16(uint16(it.CustomType2))
+		w.WriteUint16(uint16(it.EnchantLevel))
+		w.WriteUint16(uint16(it.CustomType2))
 		w.WriteInt32(0)  // augmentation id: item augmentation is not modeled
 		w.WriteInt32(-1) // displayed mana left: shadow-item duration is not modeled
 	}

@@ -29,7 +29,7 @@ func DecodeGameServerAuth(payload []byte) (GameServerAuth, error) {
 		AcceptAlternateID: r.ReadUint8() != 0,
 		HostReserved:      r.ReadUint8() != 0,
 		HostName:          r.ReadString(),
-		Port:              r.ReadInt16(),
+		Port:              r.ReadUint16(),
 		MaxPlayers:        r.ReadInt32(),
 	}
 	size := int(r.ReadInt32())
@@ -48,7 +48,7 @@ func EncodeGameServerAuth(auth GameServerAuth) []byte {
 	w.WriteUint8(boolByte(auth.AcceptAlternateID))
 	w.WriteUint8(boolByte(auth.HostReserved))
 	w.WriteString(auth.HostName)
-	w.WriteInt16(auth.Port)
+	w.WriteUint16(auth.Port)
 	w.WriteInt32(auth.MaxPlayers)
 	w.WriteInt32(int32(len(auth.HexID)))
 	w.WriteBytes(auth.HexID)
