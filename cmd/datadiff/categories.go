@@ -459,7 +459,7 @@ func loadWalkerRouteRecords(root string) ([]datadiff.Record, error) {
 }
 
 func loadRestartRecords(root string) ([]datadiff.Record, error) {
-	table, err := xml.LoadRestartPoints(xmlPath(root, "mapRegions.xml"))
+	table, err := xml.LoadRestartPoints(xmlPath(root, "restartPointAreas.xml"))
 	if err != nil {
 		return nil, err
 	}
