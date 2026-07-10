@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 )
 
 // Ticker calls a callback on a fixed period, on its own goroutine, until
@@ -21,19 +21,16 @@ type Ticker struct {
 // Start launches a goroutine that calls fn every period, starting after the
 // first period elapses. A panic inside fn is recovered and logged so one bad
 // tick never stops later ticks or crashes the process. If log is nil,
-// logrus.StandardLogger() is used. Callers must call Stop to release the
+// The zero logger disables logging. Callers must call Stop to release the
 // goroutine.
-func Start(period time.Duration, fn func(), log *logrus.Logger) *Ticker {
-	if log == nil {
-		log = logrus.StandardLogger()
-	}
+func Start(period time.Duration, fn func(), log zerolog.Logger) *Ticker {
 
 	t := &Ticker{stop: make(chan struct{}), done: make(chan struct{})}
 	go t.run(period, fn, log)
 	return t
 }
 
-func (t *Ticker) run(period time.Duration, fn func(), log *logrus.Logger) {
+func (t *Ticker) run(period time.Duration, fn func(), log zerolog.Logger) {
 	defer close(t.done)
 
 	ticker := time.NewTicker(period)
@@ -49,10 +46,10 @@ func (t *Ticker) run(period time.Duration, fn func(), log *logrus.Logger) {
 	}
 }
 
-func tick(fn func(), log *logrus.Logger) {
+func tick(fn func(), log zerolog.Logger) {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Errorf("scheduler: recovered panic in ticked callback: %v", r)
+			log.Error().Interface("panic", r).Msg("scheduler: recovered panic in ticked callback")
 		}
 	}()
 	fn()

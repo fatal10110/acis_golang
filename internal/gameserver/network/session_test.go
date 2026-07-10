@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/rs/zerolog"
 )
 
 func pipeSessions(t *testing.T) (server *Session, client net.Conn) {
@@ -22,7 +23,7 @@ func pipeSessions(t *testing.T) (server *Session, client net.Conn) {
 	if err != nil {
 		t.Fatalf("NewCipher: %v", err)
 	}
-	return NewSession(newConn(serverRaw, nil), cipher), clientRaw
+	return NewSession(newConn(serverRaw, zerolog.Nop()), cipher), clientRaw
 }
 
 func TestSessionSendFramesWithLittleEndianLengthHeader(t *testing.T) {

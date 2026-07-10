@@ -21,6 +21,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/travel"
+	"github.com/rs/zerolog"
 )
 
 // category wires one loader's output into the dump format.
@@ -217,7 +218,7 @@ func loadNPCRecords(root string) ([]datadiff.Record, error) {
 		return nil, fmt.Errorf("npc: load item table for drop validation: %w", err)
 	}
 
-	table, err := xml.LoadNPCTemplates(xmlPath(root, "npcs"), items, nil)
+	table, err := xml.LoadNPCTemplates(xmlPath(root, "npcs"), items, zerolog.Nop())
 	if err != nil {
 		return nil, err
 	}
@@ -459,7 +460,7 @@ func loadWalkerRouteRecords(root string) ([]datadiff.Record, error) {
 }
 
 func loadRestartRecords(root string) ([]datadiff.Record, error) {
-	table, err := xml.LoadRestartPoints(xmlPath(root, "mapRegions.xml"))
+	table, err := xml.LoadRestartPoints(xmlPath(root, "restartPointAreas.xml"))
 	if err != nil {
 		return nil, err
 	}

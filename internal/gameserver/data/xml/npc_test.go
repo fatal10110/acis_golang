@@ -4,6 +4,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/rs/zerolog"
+
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	itemmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 )
@@ -27,11 +29,11 @@ func TestLoadNPCTemplates(t *testing.T) {
 	// The full 16-file datapack takes a few seconds to parse; load it once
 	// per item-table variant and share the result across subtests instead
 	// of reloading it for every assertion.
-	withGremlinItems, err := LoadNPCTemplates(dir, itemTableWithIDs(gremlinDropItemIDs), nil)
+	withGremlinItems, err := LoadNPCTemplates(dir, itemTableWithIDs(gremlinDropItemIDs), zerolog.Nop())
 	if err != nil {
 		t.Fatalf("LoadNPCTemplates(%q) error: %v", dir, err)
 	}
-	withNoItems, err := LoadNPCTemplates(dir, itemTableWithIDs(nil), nil)
+	withNoItems, err := LoadNPCTemplates(dir, itemTableWithIDs(nil), zerolog.Nop())
 	if err != nil {
 		t.Fatalf("LoadNPCTemplates(%q) error: %v", dir, err)
 	}
@@ -307,7 +309,7 @@ func TestLoadNPCTemplatesErrors(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			path := filepath.Join(dir, "fixture.xml")
 			writeXMLFixture(t, path, c.content)
-			if _, err := LoadNPCTemplates(dir, itemTableWithIDs([]int32{1}), nil); err == nil {
+			if _, err := LoadNPCTemplates(dir, itemTableWithIDs([]int32{1}), zerolog.Nop()); err == nil {
 				t.Fatalf("expected an error for %s, got nil", c.name)
 			}
 		})
@@ -315,13 +317,13 @@ func TestLoadNPCTemplatesErrors(t *testing.T) {
 
 	t.Run("empty directory", func(t *testing.T) {
 		empty := t.TempDir()
-		if _, err := LoadNPCTemplates(empty, itemTableWithIDs(nil), nil); err == nil {
+		if _, err := LoadNPCTemplates(empty, itemTableWithIDs(nil), zerolog.Nop()); err == nil {
 			t.Fatal("expected an error for an empty directory, got nil")
 		}
 	})
 
 	t.Run("missing directory", func(t *testing.T) {
-		if _, err := LoadNPCTemplates(filepath.Join(dir, "does-not-exist"), itemTableWithIDs(nil), nil); err == nil {
+		if _, err := LoadNPCTemplates(filepath.Join(dir, "does-not-exist"), itemTableWithIDs(nil), zerolog.Nop()); err == nil {
 			t.Fatal("expected an error for a missing directory, got nil")
 		}
 	})
