@@ -3,8 +3,20 @@ package wire
 import (
 	"bytes"
 	"io"
+	"net"
 	"testing"
 )
+
+type countingConn struct {
+	net.Conn
+	r     *bytes.Reader
+	reads int
+}
+
+func (c *countingConn) Read(p []byte) (int, error) {
+	c.reads++
+	return c.r.Read(p)
+}
 
 func TestFrameReaderReadsSequentialFrames(t *testing.T) {
 	var stream []byte
@@ -31,6 +43,25 @@ func TestFrameReaderReadsSequentialFrames(t *testing.T) {
 
 	if _, err := fr.ReadFrame(); err != io.EOF {
 		t.Fatalf("ReadFrame at end = %v, want io.EOF", err)
+	}
+}
+
+func TestFrameReaderBuffersConsecutiveFrames(t *testing.T) {
+	stream := append(FrameBytes([]byte{1, 2, 3}), FrameBytes([]byte{4, 5})...)
+	conn := &countingConn{r: bytes.NewReader(stream)}
+	fr := NewFrameReader(conn)
+
+	for _, want := range [][]byte{{1, 2, 3}, {4, 5}} {
+		got, err := fr.ReadFrame()
+		if err != nil {
+			t.Fatalf("ReadFrame: %v", err)
+		}
+		if !bytes.Equal(got, want) {
+			t.Fatalf("payload = % X, want % X", got, want)
+		}
+	}
+	if conn.reads != 1 {
+		t.Fatalf("underlying reads = %d, want 1", conn.reads)
 	}
 }
 
