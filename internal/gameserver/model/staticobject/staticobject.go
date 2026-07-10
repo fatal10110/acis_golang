@@ -6,6 +6,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // Template is one static object entry from staticObjects.xml.
@@ -17,6 +18,28 @@ type Template struct {
 	MapX     int
 	MapY     int
 }
+
+// Object is one live static object spawned into the world.
+type Object struct {
+	world.Presence
+
+	objectID int32
+	Template *Template
+}
+
+// NewObject creates a live static object from a static template.
+func NewObject(objectID int32, tmpl *Template) (*Object, error) {
+	if tmpl == nil {
+		return nil, fmt.Errorf("static object: nil template")
+	}
+	return &Object{objectID: objectID, Template: tmpl}, nil
+}
+
+// ObjectID returns the world object id assigned to this static object.
+func (o *Object) ObjectID() int32 { return o.objectID }
+
+// StaticObjectID returns the static object id from staticObjects.xml.
+func (o *Object) StaticObjectID() int { return o.Template.ID }
 
 // NewTemplate builds a static object template from XML attributes.
 func NewTemplate(set *commons.StatSet) (*Template, error) {
