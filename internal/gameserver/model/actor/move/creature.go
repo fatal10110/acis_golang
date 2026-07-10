@@ -20,6 +20,29 @@ type Event struct {
 	Origin, Destination location.Location
 	Speed               float64
 	Duration            time.Duration
+	FollowTarget        int32
+	FollowOffset        int
+}
+
+// FollowMode identifies the active follow task flavor.
+type FollowMode uint8
+
+const (
+	// FollowNone means no follow task is active.
+	FollowNone FollowMode = iota
+	// FollowFriendly reevaluates a non-combat follow target every second.
+	FollowFriendly
+	// FollowOffensive reevaluates a combat follow target twice per second.
+	FollowOffensive
+)
+
+// TargetSnapshot is the target state a follow tick needs. Build Known from
+// the current known-list relationship before calling FollowTick.
+type TargetSnapshot struct {
+	ObjectID        int32
+	Position        location.Location
+	CollisionRadius float64
+	Known, InBoat   bool
 }
 
 // CreatureMove holds movement state owned and updated by one caller.
@@ -28,6 +51,9 @@ type CreatureMove struct {
 	speed               float64
 	geo                 Geo
 	moving              bool
+	followTarget        int32
+	followOffset        int
+	followMode          FollowMode
 }
 
 // NewCreatureMove builds movement state at origin with a positive ground speed.
@@ -79,4 +105,81 @@ func (m *CreatureMove) Moving() bool {
 // Destination returns the target of the last accepted movement request.
 func (m *CreatureMove) Destination() location.Location {
 	return m.destination
+}
+
+// StartFriendlyFollow starts a friendly follow task for targetID.
+func (m *CreatureMove) StartFriendlyFollow(targetID int32, offset int) {
+	m.followMode = FollowFriendly
+	m.followTarget = targetID
+	m.followOffset = offset
+}
+
+// StartOffensiveFollow starts an offensive follow task for targetID.
+func (m *CreatureMove) StartOffensiveFollow(targetID int32, offset int) {
+	m.followMode = FollowOffensive
+	m.followTarget = targetID
+	m.followOffset = offset
+}
+
+// CancelFollow clears any active follow task.
+func (m *CreatureMove) CancelFollow() {
+	m.followMode = FollowNone
+	m.followTarget = 0
+	m.followOffset = 0
+}
+
+// Following reports whether a follow task is active.
+func (m *CreatureMove) Following() bool {
+	return m.followMode != FollowNone
+}
+
+// FollowMode returns the active follow mode.
+func (m *CreatureMove) FollowMode() FollowMode {
+	return m.followMode
+}
+
+// FollowInterval returns how often the active follow task should be ticked.
+func (m *CreatureMove) FollowInterval() time.Duration {
+	switch m.followMode {
+	case FollowFriendly:
+		return time.Second
+	case FollowOffensive:
+		return 500 * time.Millisecond
+	default:
+		return 0
+	}
+}
+
+// FollowTick reevaluates the active follow target and starts movement when
+// the target is still known and outside the collision-adjusted follow range.
+func (m *CreatureMove) FollowTick(target TargetSnapshot, actorRadius float64) (Event, bool, error) {
+	if m.followMode == FollowNone || target.ObjectID != m.followTarget || !target.Known {
+		return Event{}, false, nil
+	}
+	if m.followMode == FollowFriendly && target.InBoat {
+		return Event{}, false, nil
+	}
+
+	if in2DRange(m.origin, target.Position, followRange(m.followOffset, actorRadius, target.CollisionRadius)) {
+		return Event{}, false, nil
+	}
+
+	event, err := m.MoveToLocation(target.Position)
+	if err != nil {
+		return Event{}, false, err
+	}
+	event.FollowTarget = target.ObjectID
+	event.FollowOffset = m.followOffset
+	return event, true, nil
+}
+
+func followRange(offset int, actorRadius, targetRadius float64) int {
+	return int(float64(offset) + actorRadius + targetRadius)
+}
+
+func in2DRange(origin, target location.Location, radius int) bool {
+	if radius < 0 {
+		return false
+	}
+	return math.Hypot(float64(target.X)-float64(origin.X), float64(target.Y)-float64(origin.Y)) <= float64(radius)
 }
