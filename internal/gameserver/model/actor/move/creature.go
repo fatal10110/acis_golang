@@ -33,8 +33,15 @@ type CreatureMove struct {
 
 // NewCreatureMove builds movement state at origin with a positive ground speed.
 func NewCreatureMove(origin location.Location, speed float64, geo Geo) (*CreatureMove, error) {
-	if geo == nil || (reflect.ValueOf(geo).Kind() == reflect.Ptr && reflect.ValueOf(geo).IsNil()) {
+	if geo == nil {
 		return nil, errors.New("move: nil geodata")
+	}
+	value := reflect.ValueOf(geo)
+	switch value.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Ptr, reflect.Slice:
+		if value.IsNil() {
+			return nil, errors.New("move: nil geodata")
+		}
 	}
 	if speed <= 0 {
 		return nil, errors.New("move: speed must be positive")
