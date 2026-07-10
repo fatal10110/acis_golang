@@ -3,6 +3,7 @@ package serverpackets
 import (
 	"fmt"
 
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 )
 
@@ -11,13 +12,23 @@ import (
 // wholesale.
 const OpcodeItemList = 0x1b
 
-// EncodeItemList builds the ItemList packet for everything a character is
+// FrameItemList builds the ItemList packet for everything a character is
 // carrying: inventory items and, marked equipped, whatever sits on the
 // paperdoll. Items in any other container (warehouse, freight, a pet's own
 // hold) are a different list and don't belong here. templates must have an
 // entry for every item's template id; a carried item with no loaded
-// template is reported as an error rather than encoded around.
-func EncodeItemList(items []*item.Instance, templates *item.Table, showWindow bool) ([]byte, error) {
+// template is reported as an error rather than encoded around. On error no
+// frame is returned and nothing needs releasing.
+func FrameItemList(items []*item.Instance, templates *item.Table, showWindow bool) (wire.Frame, error) {
+	w := newFrameWriter(OpcodeItemList)
+	if err := writeItemList(w, items, templates, showWindow); err != nil {
+		releaseFrameWriter(w)
+		return wire.Frame{}, err
+	}
+	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter), nil
+}
+
+func writeItemList(w *wire.Writer, items []*item.Instance, templates *item.Table, showWindow bool) error {
 	owned := make([]*item.Instance, 0, len(items))
 	for _, it := range items {
 		if it.Location == item.LocationInventory || it.Location == item.LocationPaperdoll {
@@ -25,14 +36,13 @@ func EncodeItemList(items []*item.Instance, templates *item.Table, showWindow bo
 		}
 	}
 
-	w := newWriter(OpcodeItemList)
 	w.WriteUint16(uint16(boolInt32(showWindow)))
 	w.WriteUint16(uint16(len(owned)))
 
 	for _, it := range owned {
 		tmpl, ok := templates.Get(it.TemplateID)
 		if !ok {
-			return nil, fmt.Errorf("serverpackets: EncodeItemList: no template loaded for item template %d", it.TemplateID)
+			return fmt.Errorf("serverpackets: ItemList: no template loaded for item template %d", it.TemplateID)
 		}
 		category, subCategory := tmpl.Category()
 
@@ -49,5 +59,5 @@ func EncodeItemList(items []*item.Instance, templates *item.Table, showWindow bo
 		w.WriteInt32(0)  // augmentation id: item augmentation is not modeled
 		w.WriteInt32(-1) // displayed mana left: shadow-item duration is not modeled
 	}
-	return w.Bytes(), nil
+	return nil
 }

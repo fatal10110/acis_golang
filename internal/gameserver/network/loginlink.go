@@ -92,6 +92,10 @@ type LoginLink struct {
 	log   *logrus.Logger
 	done  chan struct{}
 
+	// frames reuses one payload buffer across inbound frames; it belongs to
+	// the single reader goroutine.
+	frames *wire.FrameReader
+
 	sendMu sync.Mutex
 
 	// ServerID and ServerName are the identity the login server confirmed
@@ -119,7 +123,7 @@ func DialLoginLink(ctx context.Context, address string, auth LoginServerAuth, ha
 		return nil, fmt.Errorf("dial login server: %w", err)
 	}
 
-	l := &LoginLink{conn: conn, crypt: crypt.NewLinkCrypt(), log: log, done: make(chan struct{})}
+	l := &LoginLink{conn: conn, crypt: crypt.NewLinkCrypt(), log: log, done: make(chan struct{}), frames: wire.NewFrameReader(conn)}
 	if err := l.handshake(auth); err != nil {
 		conn.Close()
 		return nil, err
@@ -249,8 +253,11 @@ func (l *LoginLink) readLoop(handlers LoginLinkHandlers) {
 	}
 }
 
+// readFrame returns the next decrypted inbound payload. It reuses a
+// per-link buffer, so the payload is only valid until the next readFrame
+// call; only the single reader goroutine may call it.
 func (l *LoginLink) readFrame() ([]byte, error) {
-	payload, err := wire.ReadFrame(l.conn)
+	payload, err := l.frames.ReadFrame()
 	if err != nil {
 		return nil, err
 	}

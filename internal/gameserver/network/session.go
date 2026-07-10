@@ -21,11 +21,15 @@ type Session struct {
 	conn   *Conn
 	cipher *Cipher
 	mu     sync.Mutex
+
+	// frames reuses one payload buffer across inbound frames; it belongs to
+	// the single goroutine calling ReadFrame.
+	frames *wire.FrameReader
 }
 
 // NewSession pairs conn with cipher for framed, encrypted read/write.
 func NewSession(conn *Conn, cipher *Cipher) *Session {
-	return &Session{conn: conn, cipher: cipher}
+	return &Session{conn: conn, cipher: cipher, frames: wire.NewFrameReader(conn)}
 }
 
 // Send frames payload behind a little-endian length header (header included
@@ -60,8 +64,12 @@ func (s *Session) SendFrame(frame wire.Frame) bool {
 // ReadFrame blocks for the next inbound frame, decrypts it, and returns its
 // payload with the length header stripped. A network or EOF error from the
 // underlying connection propagates as-is.
+//
+// The payload reuses a per-session buffer and is only valid until the next
+// ReadFrame call: decode it before reading again, or copy it. Only one
+// goroutine may call ReadFrame.
 func (s *Session) ReadFrame() ([]byte, error) {
-	payload, err := wire.ReadFrame(s.conn)
+	payload, err := s.frames.ReadFrame()
 	if err != nil {
 		return nil, err
 	}

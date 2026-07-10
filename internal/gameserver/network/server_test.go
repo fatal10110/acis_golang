@@ -294,7 +294,7 @@ func TestConnDrainBatchCoalescesBurst(t *testing.T) {
 	}
 
 	first := <-conn.out
-	batch := conn.drainBatch(first)
+	batch := conn.drainBatch(nil, first)
 	if len(batch) != n {
 		t.Fatalf("batch len = %d, want %d", len(batch), n)
 	}
@@ -321,7 +321,7 @@ func TestConnDrainBatchBoundedByOutboundBuffer(t *testing.T) {
 	}
 
 	first := <-conn.out
-	batch := conn.drainBatch(first)
+	batch := conn.drainBatch(nil, first)
 	if len(batch) != outboundBuffer {
 		t.Fatalf("batch len = %d, want %d (bounded)", len(batch), outboundBuffer)
 	}
@@ -343,7 +343,7 @@ func TestConnWriteBatchReleasesAllOnError(t *testing.T) {
 		{frame: wire.OwnedFrame([]byte("b"), nil, func(*wire.Writer) { atomic.AddInt32(&released[1], 1) })},
 	}
 
-	if err := conn.writeBatch(batch); err == nil {
+	if _, err := conn.writeBatch(batch, nil); err == nil {
 		t.Fatal("writeBatch returned nil error, want write failure")
 	}
 	if atomic.LoadInt32(&released[0]) != 1 || atomic.LoadInt32(&released[1]) != 1 {

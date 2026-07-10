@@ -1,5 +1,7 @@
 package serverpackets
 
+import "github.com/fatal10110/acis_golang/internal/commons/wire"
+
 // OpcodeSSQInfo is the wire opcode for SSQInfo, the seven-signs sky state
 // sent right after a character slot is chosen.
 const OpcodeSSQInfo = 0xf8
@@ -9,10 +11,14 @@ const OpcodeSSQInfo = 0xf8
 // server ever reports.
 const regularSkyState = 256
 
-// EncodeSSQInfo builds the SSQInfo packet. The seven-signs event is not
-// modeled, so it always reports the regular (no-cabal) sky.
-func EncodeSSQInfo() []byte {
-	w := newWriter(OpcodeSSQInfo)
+// FrameSSQInfo builds the SSQInfo packet as an owned frame. The seven-signs
+// event is not modeled, so it always reports the regular (no-cabal) sky.
+func FrameSSQInfo() wire.Frame {
+	w := newFrameWriter(OpcodeSSQInfo)
+	writeSSQInfo(w)
+	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
+}
+
+func writeSSQInfo(w *wire.Writer) {
 	w.WriteUint16(regularSkyState)
-	return w.Bytes()
 }

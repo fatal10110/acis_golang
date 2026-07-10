@@ -5,10 +5,10 @@ import (
 	"testing"
 )
 
-func TestEncodeCharDeleteOk(t *testing.T) {
-	got := EncodeCharDeleteOk()
+func TestFrameCharDeleteOk(t *testing.T) {
+	got := framePayload(t, FrameCharDeleteOk())
 	want := []byte{OpcodeCharDeleteOk}
 	if !bytes.Equal(got, want) {
-		t.Errorf("EncodeCharDeleteOk = %x, want %x", got, want)
+		t.Errorf("FrameCharDeleteOk = %x, want %x", got, want)
 	}
 }
