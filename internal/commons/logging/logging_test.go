@@ -2,6 +2,7 @@ package logging
 
 import (
 	"bytes"
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -9,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/config"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 )
 
 func TestConfigFromProperties(t *testing.T) {
@@ -30,7 +31,7 @@ unknown = value
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Level != logrus.InfoLevel {
+	if cfg.Level != zerolog.InfoLevel {
 		t.Fatalf("Level = %s, want info", cfg.Level)
 	}
 	if got := cfg.Patterns[SinkConsole]; got != "log/console/console_%g.txt" {
@@ -65,11 +66,11 @@ net.sf.l2j.commons.logging.handler.ItemLogHandler.pattern = log/item/item_%g.txt
 	}
 	defer runtime.Close()
 
-	runtime.Logger.WithField("port", 7777).Info("server started")
-	runtime.Logger.Error("boot failed")
-	runtime.Chat.WithField("from", "player").Info("hello")
-	runtime.GMAudit.WithField("gm", "admin").Info("teleport")
-	runtime.Item.WithField("item", 57).Info("add")
+	runtime.Logger.Info().Int("port", 7777).Msg("server started")
+	runtime.Logger.Error().Msg("boot failed")
+	runtime.Chat.Info().Str("from", "player").Msg("hello")
+	runtime.GMAudit.Info().Str("gm", "admin").Msg("teleport")
+	runtime.Item.Info().Int("item", 57).Msg("add")
 
 	if err := runtime.Close(); err != nil {
 		t.Fatal(err)
@@ -85,32 +86,21 @@ net.sf.l2j.commons.logging.handler.ItemLogHandler.pattern = log/item/item_%g.txt
 	}
 }
 
-func TestInstallDefault(t *testing.T) {
-	var stderr bytes.Buffer
-	runtime, err := Setup(t.TempDir(), DefaultConfig(), &stderr)
+func TestSetupSuppressesDebugBelowInfo(t *testing.T) {
+	runtime, err := Setup(t.TempDir(), DefaultConfig(), io.Discard)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer runtime.Close()
 
-	std := logrus.StandardLogger()
-	oldOut := std.Out
-	oldFormatter := std.Formatter
-	oldLevel := std.Level
-	oldHooks := std.Hooks
-	InstallDefault(runtime)
-	t.Cleanup(func() {
-		std.SetOutput(oldOut)
-		std.SetFormatter(oldFormatter)
-		std.SetLevel(oldLevel)
-		std.ReplaceHooks(oldHooks)
-	})
-
-	logrus.Info("installed")
-	if err := runtime.Close(); err != nil {
+	runtime.Logger.Debug().Msg("hidden")
+	data, err := os.ReadFile(runtime.Path(SinkConsole))
+	if err != nil {
 		t.Fatal(err)
 	}
-	assertFileContains(t, runtime.Path(SinkConsole), "installed")
+	if strings.Contains(string(data), "hidden") {
+		t.Fatalf("console = %q, debug record was written", data)
+	}
 }
 
 func TestBadLevelFails(t *testing.T) {
@@ -146,10 +136,29 @@ func TestLoggingPropertiesFromEnvironment(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer runtime.Close()
-	runtime.Logger.Info("smoke")
-	runtime.Chat.Info("smoke chat")
-	runtime.GMAudit.Info("smoke audit")
-	runtime.Item.Info("smoke item")
+	runtime.Logger.Info().Msg("smoke")
+	runtime.Chat.Info().Msg("smoke chat")
+	runtime.GMAudit.Info().Msg("smoke audit")
+	runtime.Item.Info().Msg("smoke item")
+}
+
+func BenchmarkLoggerLevels(b *testing.B) {
+	logger := zerolog.New(io.Discard).Level(zerolog.InfoLevel)
+	b.Run("info", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			logger.Info().Msg("accepted connection")
+		}
+	})
+	b.Run("error", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			logger.Error().Msg("connection failed")
+		}
+	})
+	b.Run("debug suppressed", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			logger.Debug().Msg("packet received")
+		}
+	})
 }
 
 func assertFileContains(t *testing.T, name, want string) {
