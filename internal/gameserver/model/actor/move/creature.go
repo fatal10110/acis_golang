@@ -43,7 +43,7 @@ func NewCreatureMove(origin location.Location, speed float64, geo Geo) (*Creatur
 			return nil, errors.New("move: nil geodata")
 		}
 	}
-	if speed <= 0 {
+	if speed <= 0 || math.IsNaN(speed) || math.IsInf(speed, 0) {
 		return nil, errors.New("move: speed must be positive")
 	}
 	return &CreatureMove{origin: origin, destination: origin, speed: speed, geo: geo}, nil
@@ -57,7 +57,12 @@ func (m *CreatureMove) MoveToLocation(target location.Location) (Event, error) {
 	}
 
 	distance := math.Hypot(float64(target.X-m.origin.X), float64(target.Y-m.origin.Y))
-	duration := time.Duration(math.Ceil(distance/(m.speed/10))) * 100 * time.Millisecond
+	ticks := math.Ceil(distance / (m.speed / 10))
+	const tickDuration = 100 * time.Millisecond
+	if math.IsNaN(ticks) || ticks > float64(time.Duration(1<<63-1)/tickDuration) {
+		return Event{}, errors.New("move: duration exceeds limit")
+	}
+	duration := time.Duration(ticks) * tickDuration
 	m.destination = target
 	m.moving = duration > 0
 

@@ -1,22 +1,34 @@
 package move
 
 import (
+	"math"
 	"testing"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
 
-type stubGeo struct {
-	canMove bool
-	height  int16
+type geoCall struct {
+	origin, target location.Location
 }
 
-func (g stubGeo) CanMove(ox, oy, oz, tx, ty, tz int) bool {
+type recordingGeo struct {
+	canMove     bool
+	height      int16
+	heightCalls []location.Location
+	moveCalls   []geoCall
+}
+
+func (g *recordingGeo) CanMove(ox, oy, oz, tx, ty, tz int) bool {
+	g.moveCalls = append(g.moveCalls, geoCall{
+		origin: location.Location{X: ox, Y: oy, Z: oz},
+		target: location.Location{X: tx, Y: ty, Z: tz},
+	})
 	return g.canMove
 }
 
-func (g stubGeo) Height(x, y, z int) int16 {
+func (g *recordingGeo) Height(x, y, z int) int16 {
+	g.heightCalls = append(g.heightCalls, location.Location{X: x, Y: y, Z: z})
 	return g.height
 }
 
@@ -27,7 +39,7 @@ func (nilMapGeo) CanMove(int, int, int, int, int, int) bool { return false }
 func (nilMapGeo) Height(int, int, int) int16 { return 0 }
 
 func TestNewCreatureMoveRejectsInvalidDependencies(t *testing.T) {
-	var typedNil *stubGeo
+	var typedNil *recordingGeo
 	var typedNilMap nilMapGeo
 	tests := []struct {
 		name  string
@@ -37,8 +49,11 @@ func TestNewCreatureMoveRejectsInvalidDependencies(t *testing.T) {
 		{name: "nil geodata", speed: 1},
 		{name: "typed-nil geodata", speed: 1, geo: typedNil},
 		{name: "typed-nil map geodata", speed: 1, geo: typedNilMap},
-		{name: "zero speed", geo: stubGeo{}, speed: 0},
-		{name: "negative speed", geo: stubGeo{}, speed: -1},
+		{name: "zero speed", geo: &recordingGeo{}, speed: 0},
+		{name: "negative speed", geo: &recordingGeo{}, speed: -1},
+		{name: "not a number speed", geo: &recordingGeo{}, speed: math.NaN()},
+		{name: "positive infinite speed", geo: &recordingGeo{}, speed: math.Inf(1)},
+		{name: "negative infinite speed", geo: &recordingGeo{}, speed: math.Inf(-1)},
 	}
 
 	for _, test := range tests {
@@ -73,6 +88,22 @@ func TestCreatureMove_MoveToLocationScenarios(t *testing.T) {
 			wantMoving:      true,
 		},
 		{
+			name:            "rounds one unit up to one tick",
+			canMove:         true,
+			target:          location.Location{X: 11, Y: 20, Z: 999},
+			wantEvent:       Event{Origin: origin, Destination: location.Location{X: 11, Y: 20, Z: 30}, Speed: 50, Duration: 100 * time.Millisecond},
+			wantDestination: location.Location{X: 11, Y: 20, Z: 30},
+			wantMoving:      true,
+		},
+		{
+			name:            "rounds fifty-one units up to eleven ticks",
+			canMove:         true,
+			target:          location.Location{X: 61, Y: 20, Z: 999},
+			wantEvent:       Event{Origin: origin, Destination: location.Location{X: 61, Y: 20, Z: 30}, Speed: 50, Duration: 1100 * time.Millisecond},
+			wantDestination: location.Location{X: 61, Y: 20, Z: 30},
+			wantMoving:      true,
+		},
+		{
 			name:            "rejects blocked route",
 			target:          location.Location{X: 60, Y: 20},
 			wantErr:         true,
@@ -99,7 +130,7 @@ func TestCreatureMove_MoveToLocationScenarios(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			geo := &stubGeo{canMove: test.canMove, height: 30}
+			geo := &recordingGeo{canMove: test.canMove, height: 30}
 			mover, err := NewCreatureMove(origin, 50, geo)
 			if err != nil {
 				t.Fatal(err)
@@ -127,5 +158,46 @@ func TestCreatureMove_MoveToLocationScenarios(t *testing.T) {
 				t.Fatalf("Moving() = %v, want %v", got, test.wantMoving)
 			}
 		})
+	}
+}
+
+func TestCreatureMove_MoveToLocationPassesGeodataCoordinates(t *testing.T) {
+	origin := location.Location{X: 10, Y: 20, Z: 30}
+	target := location.Location{X: 60, Y: 70, Z: 999}
+	geo := &recordingGeo{canMove: true, height: 42}
+	mover, err := NewCreatureMove(origin, 50, geo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := mover.MoveToLocation(target); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(geo.heightCalls) != 1 || geo.heightCalls[0] != target {
+		t.Fatalf("Height() calls = %+v, want [%+v]", geo.heightCalls, target)
+	}
+	wantMove := geoCall{origin: origin, target: location.Location{X: target.X, Y: target.Y, Z: 42}}
+	if len(geo.moveCalls) != 1 || geo.moveCalls[0] != wantMove {
+		t.Fatalf("CanMove() calls = %+v, want [%+v]", geo.moveCalls, wantMove)
+	}
+}
+
+func TestCreatureMove_MoveToLocationRejectsUnrepresentableDuration(t *testing.T) {
+	origin := location.Location{X: 10, Y: 20, Z: 30}
+	geo := &recordingGeo{canMove: true, height: 30}
+	mover, err := NewCreatureMove(origin, math.SmallestNonzeroFloat64, geo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := mover.MoveToLocation(location.Location{X: 11, Y: 20, Z: 999}); err == nil {
+		t.Fatal("MoveToLocation() error = nil")
+	}
+	if got := mover.Destination(); got != origin {
+		t.Fatalf("Destination() = %+v, want %+v", got, origin)
+	}
+	if mover.Moving() {
+		t.Fatal("Moving() = true, want false")
 	}
 }
