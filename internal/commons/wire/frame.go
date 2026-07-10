@@ -1,6 +1,7 @@
 package wire
 
 import (
+	"bufio"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -73,7 +74,7 @@ type FrameReader struct {
 
 // NewFrameReader returns a FrameReader reading frames from r.
 func NewFrameReader(r io.Reader) *FrameReader {
-	return &FrameReader{r: r}
+	return &FrameReader{r: bufio.NewReader(r)}
 }
 
 // ReadFrame reads one length-prefixed frame and returns its payload. The
