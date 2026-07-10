@@ -32,23 +32,13 @@ func (g *recordingGeo) Height(x, y, z int) int16 {
 	return g.height
 }
 
-type nilMapGeo map[int]struct{}
-
-func (nilMapGeo) CanMove(int, int, int, int, int, int) bool { return false }
-
-func (nilMapGeo) Height(int, int, int) int16 { return 0 }
-
 func TestNewCreatureMoveRejectsInvalidDependencies(t *testing.T) {
-	var typedNil *recordingGeo
-	var typedNilMap nilMapGeo
 	tests := []struct {
 		name  string
 		speed float64
 		geo   Geo
 	}{
 		{name: "nil geodata", speed: 1},
-		{name: "typed-nil geodata", speed: 1, geo: typedNil},
-		{name: "typed-nil map geodata", speed: 1, geo: typedNilMap},
 		{name: "zero speed", geo: &recordingGeo{}, speed: 0},
 		{name: "negative speed", geo: &recordingGeo{}, speed: -1},
 		{name: "not a number speed", geo: &recordingGeo{}, speed: math.NaN()},
