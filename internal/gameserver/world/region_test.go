@@ -1,0 +1,57 @@
+package world
+
+import (
+	"sync"
+	"testing"
+)
+
+type stubObject struct{ id int32 }
+
+func (s stubObject) ObjectID() int32 { return s.id }
+
+func TestRegion_AddRemoveObjects(t *testing.T) {
+	r := newRegion(0, 0)
+
+	if got := r.Objects(); len(got) != 0 {
+		t.Fatalf("new region has %d objects, want 0", len(got))
+	}
+
+	r.Add(stubObject{id: 1})
+	r.Add(stubObject{id: 2})
+
+	got := r.Objects()
+	if len(got) != 2 {
+		t.Fatalf("Objects() returned %d entries, want 2", len(got))
+	}
+
+	r.Remove(1)
+	got = r.Objects()
+	if len(got) != 1 || got[0].ObjectID() != 2 {
+		t.Fatalf("Objects() after Remove(1) = %+v, want only id 2", got)
+	}
+
+	r.Remove(2)
+	if got := r.Objects(); len(got) != 0 {
+		t.Fatalf("Objects() after removing everything has %d entries, want 0", len(got))
+	}
+}
+
+func TestRegion_Concurrent(t *testing.T) {
+	r := newRegion(0, 0)
+
+	var wg sync.WaitGroup
+	for i := int32(0); i < 100; i++ {
+		wg.Add(1)
+		go func(id int32) {
+			defer wg.Done()
+			r.Add(stubObject{id: id})
+			r.Objects()
+			r.Remove(id)
+		}(i)
+	}
+	wg.Wait()
+
+	if got := r.Objects(); len(got) != 0 {
+		t.Fatalf("Objects() after concurrent add/remove has %d entries, want 0", len(got))
+	}
+}
