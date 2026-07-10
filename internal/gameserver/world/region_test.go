@@ -18,8 +18,8 @@ func TestRegion_AddRemoveObjects(t *testing.T) {
 		t.Fatalf("new region has %d objects, want 0", len(got))
 	}
 
-	r.Add(stubObject{id: 1})
-	r.Add(stubObject{id: 2})
+	r.Add(&trackedStub{id: 1})
+	r.Add(&trackedStub{id: 2})
 
 	got := r.Objects()
 	if len(got) != 2 {
@@ -46,7 +46,7 @@ func TestRegion_Concurrent(t *testing.T) {
 		wg.Add(1)
 		go func(id int32) {
 			defer wg.Done()
-			r.Add(stubObject{id: id})
+			r.Add(&trackedStub{id: id})
 			r.Objects()
 			r.Remove(id)
 		}(i)
