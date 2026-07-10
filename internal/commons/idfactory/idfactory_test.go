@@ -3,8 +3,6 @@ package idfactory
 import (
 	"errors"
 	"testing"
-
-	"github.com/sirupsen/logrus"
 )
 
 // newForTest builds an Allocator over a small id range so exhaustion and
@@ -15,7 +13,6 @@ func newForTest(first, last int32, preUsed ...int32) *Allocator {
 		first: first,
 		last:  last,
 		next:  first,
-		log:   logrus.StandardLogger(),
 	}
 	for _, id := range preUsed {
 		a.used[id] = struct{}{}

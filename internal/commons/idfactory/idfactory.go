@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 )
 
 // FirstObjectID and LastObjectID bound the range of ids Allocator hands out.
@@ -45,16 +45,13 @@ type Allocator struct {
 	next int32
 
 	first, last int32 // id range; always FirstObjectID/LastObjectID outside tests
-	log         *logrus.Logger
+	log         zerolog.Logger
 }
 
 // New scans db for object ids already in use and returns an Allocator seeded
 // with them, ready to hand out ids that don't collide with existing rows. It
 // fails loudly on a query error rather than booting with a partial id set.
-func New(ctx context.Context, db *sql.DB, log *logrus.Logger) (*Allocator, error) {
-	if log == nil {
-		log = logrus.StandardLogger()
-	}
+func New(ctx context.Context, db *sql.DB, log zerolog.Logger) (*Allocator, error) {
 
 	a := &Allocator{
 		used:  make(map[int32]struct{}),
@@ -70,7 +67,7 @@ func New(ctx context.Context, db *sql.DB, log *logrus.Logger) (*Allocator, error
 	}
 
 	a.next = a.first
-	log.Infof("idfactory: initialized with %d used object ids", len(a.used))
+	log.Info().Int("used_object_ids", len(a.used)).Msg("idfactory: initialized")
 	return a, nil
 }
 
@@ -87,7 +84,7 @@ func (a *Allocator) loadUsedIDs(ctx context.Context, db *sql.DB, query string) e
 			return fmt.Errorf("scan used object id (%s): %w", query, err)
 		}
 		if id < int64(a.first) {
-			a.log.Warnf("idfactory: found object id %d below minimum %d, skipping", id, a.first)
+			a.log.Warn().Int64("object_id", id).Int32("minimum_id", a.first).Msg("idfactory: skipping object id below minimum")
 			continue
 		}
 		a.used[int32(id)] = struct{}{}
@@ -115,7 +112,7 @@ func (a *Allocator) NextID() (int32, error) {
 // one is logged and ignored rather than corrupting allocator state.
 func (a *Allocator) ReleaseID(id int32) {
 	if id < a.first {
-		a.log.Warnf("idfactory: release of invalid object id %d (< %d) ignored", id, a.first)
+		a.log.Warn().Int32("object_id", id).Int32("minimum_id", a.first).Msg("idfactory: ignored invalid object id release")
 		return
 	}
 

@@ -4,7 +4,7 @@ import (
 	"encoding/xml"
 	"fmt"
 
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -57,11 +57,8 @@ type petDataElement struct {
 // load: the caller gets an error rather than a partially populated table.
 //
 // log receives skipped-drop diagnostics; a nil log defaults to
-// logrus.StandardLogger().
-func LoadNPCTemplates(dir string, items *item.Table, log *logrus.Logger) (*npc.Table, error) {
-	if log == nil {
-		log = logrus.StandardLogger()
-	}
+// the zero logger disables logging.
+func LoadNPCTemplates(dir string, items *item.Table, log zerolog.Logger) (*npc.Table, error) {
 
 	docs, err := loadXMLDocuments[npcFile](dir, "npc template")
 	if err != nil {
@@ -85,7 +82,7 @@ func LoadNPCTemplates(dir string, items *item.Table, log *logrus.Logger) (*npc.T
 // npc.NewTemplate consumes: its own attributes and <set> children merged
 // flat, plus the "aiParams", "drops", "privates", "race", "teachTo" and
 // "pet" values built from its other child blocks.
-func buildNPCTemplate(el npcElement, items *item.Table, log *logrus.Logger) (*npc.Template, error) {
+func buildNPCTemplate(el npcElement, items *item.Table, log zerolog.Logger) (*npc.Template, error) {
 	set := commons.StatSetFromXMLAttrs(el.Attrs)
 	for _, s := range el.Sets {
 		set.Set(s.Name, s.Val)
@@ -110,7 +107,7 @@ func buildNPCTemplate(el npcElement, items *item.Table, log *logrus.Logger) (*np
 					return nil, fmt.Errorf("npc %d: %w", npcID, err)
 				}
 				if _, ok := items.Get(drop.ItemID); !ok {
-					log.Warnf("data/xml: npc %d: drop references undefined item %d, skipping", npcID, drop.ItemID)
+					log.Warn().Int("npc_id", npcID).Int32("item_id", drop.ItemID).Msg("data/xml: skipping drop with undefined item")
 					continue
 				}
 				drops = append(drops, drop)

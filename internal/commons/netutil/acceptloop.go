@@ -6,7 +6,7 @@ import (
 	"context"
 	"net"
 
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 )
 
 // AcceptLoop accepts connections on ln until ctx is canceled or accepting
@@ -14,16 +14,13 @@ import (
 // either the shutdown watcher or a connection's handle is recovered and
 // logged rather than taking down the caller. The caller owns ln: AcceptLoop
 // closes it on ctx cancellation but does not create it. log may be nil, in
-// which case logrus.StandardLogger() is used.
-func AcceptLoop(ctx context.Context, ln net.Listener, handle func(conn net.Conn), log *logrus.Logger) error {
-	if log == nil {
-		log = logrus.StandardLogger()
-	}
+// The zero logger disables logging.
+func AcceptLoop(ctx context.Context, ln net.Listener, handle func(conn net.Conn), log zerolog.Logger) error {
 
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				log.Errorf("accept loop shutdown watcher panic: %v", r)
+				log.Error().Interface("panic", r).Msg("accept loop shutdown watcher panic")
 			}
 		}()
 		<-ctx.Done()
@@ -43,7 +40,7 @@ func AcceptLoop(ctx context.Context, ln net.Listener, handle func(conn net.Conn)
 		go func() {
 			defer func() {
 				if r := recover(); r != nil {
-					log.Errorf("accept loop connection handler panic: %v", r)
+					log.Error().Interface("panic", r).Msg("accept loop connection handler panic")
 				}
 			}()
 			handle(conn)

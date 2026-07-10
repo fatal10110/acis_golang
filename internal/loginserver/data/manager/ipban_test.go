@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/rs/zerolog"
 )
 
 func writeBanFile(t *testing.T, content string) string {
@@ -19,7 +21,7 @@ func writeBanFile(t *testing.T, content string) string {
 
 func TestLoadIPBanList_SkipsCommentsAndBadLines(t *testing.T) {
 	path := writeBanFile(t, "# comment line\n1.2.3.4\nnot-an-ip-and-no-dns\n::1\n")
-	l := LoadIPBanList(path, nil)
+	l := LoadIPBanList(path, zerolog.Nop())
 
 	if got := len(l.bans); got != 2 {
 		t.Fatalf("loaded %d bans, want 2", got)
@@ -33,7 +35,7 @@ func TestLoadIPBanList_SkipsCommentsAndBadLines(t *testing.T) {
 }
 
 func TestLoadIPBanList_MissingFile(t *testing.T) {
-	l := LoadIPBanList(filepath.Join(t.TempDir(), "does-not-exist.properties"), nil)
+	l := LoadIPBanList(filepath.Join(t.TempDir(), "does-not-exist.properties"), zerolog.Nop())
 	if got := len(l.bans); got != 0 {
 		t.Fatalf("loaded %d bans from missing file, want 0", got)
 	}
@@ -43,7 +45,7 @@ func TestLoadIPBanList_MissingFile(t *testing.T) {
 }
 
 func TestIPBanList_BanPermanent(t *testing.T) {
-	l := NewIPBanList(nil)
+	l := NewIPBanList(zerolog.Nop())
 	addr := net.ParseIP("10.0.0.1")
 
 	l.Ban(addr, 0)
@@ -53,7 +55,7 @@ func TestIPBanList_BanPermanent(t *testing.T) {
 }
 
 func TestIPBanList_BanExpires(t *testing.T) {
-	l := NewIPBanList(nil)
+	l := NewIPBanList(zerolog.Nop())
 	addr := net.ParseIP("10.0.0.2")
 
 	l.Ban(addr, 10*time.Millisecond)
@@ -71,7 +73,7 @@ func TestIPBanList_BanExpires(t *testing.T) {
 }
 
 func TestIPBanList_BanKeepsExistingExpiry(t *testing.T) {
-	l := NewIPBanList(nil)
+	l := NewIPBanList(zerolog.Nop())
 	addr := net.ParseIP("10.0.0.3")
 
 	l.Ban(addr, 0)           // permanent first
@@ -83,7 +85,7 @@ func TestIPBanList_BanKeepsExistingExpiry(t *testing.T) {
 }
 
 func TestIPBanList_IsBanned_NilAddress(t *testing.T) {
-	l := NewIPBanList(nil)
+	l := NewIPBanList(zerolog.Nop())
 	if !l.IsBanned(nil) {
 		t.Fatal("nil address should be treated as banned")
 	}
