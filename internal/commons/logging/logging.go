@@ -10,7 +10,7 @@ import (
 	"sync"
 
 	"github.com/fatal10110/acis_golang/internal/config"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 )
 
 // Sink names an output stream with its own file.
@@ -26,17 +26,17 @@ const (
 
 // Config is the logging setup derived from logging.properties.
 type Config struct {
-	Level           logrus.Level
+	Level           zerolog.Level
 	Patterns        map[Sink]string
 	UnsupportedKeys []string
 }
 
 // Runtime owns open log files and logger instances.
 type Runtime struct {
-	Logger  *logrus.Logger
-	Chat    *logrus.Logger
-	GMAudit *logrus.Logger
-	Item    *logrus.Logger
+	Logger  zerolog.Logger
+	Chat    zerolog.Logger
+	GMAudit zerolog.Logger
+	Item    zerolog.Logger
 
 	paths map[Sink]string
 	files []*os.File
@@ -94,7 +94,7 @@ var supportedKeys = map[string]bool{
 // DefaultConfig returns the logging setup used when logging.properties is not loaded yet.
 func DefaultConfig() Config {
 	return Config{
-		Level: logrus.InfoLevel,
+		Level: zerolog.InfoLevel,
 		Patterns: map[Sink]string{
 			SinkConsole: "log/console/console_%g.txt",
 			SinkError:   "log/error/error_%g.txt",
@@ -179,32 +179,17 @@ func Setup(root string, cfg Config, stderr io.Writer) (*Runtime, error) {
 		return nil, err
 	}
 
-	formatter := &logrus.JSONFormatter{}
-	rt.Logger = newLogger(cfg.Level, io.MultiWriter(stderr, consoleFile), formatter)
-	rt.Logger.AddHook(writerHook{
-		writer:    errorFile,
-		formatter: formatter,
-		levels:    []logrus.Level{logrus.PanicLevel, logrus.FatalLevel, logrus.ErrorLevel},
-	})
-	rt.Chat = newLogger(cfg.Level, chatFile, formatter)
-	rt.GMAudit = newLogger(cfg.Level, gmFile, formatter)
-	rt.Item = newLogger(cfg.Level, itemFile, formatter)
+	console := zerolog.MultiLevelWriter(
+		zerolog.LevelWriterAdapter{Writer: stderr},
+		zerolog.LevelWriterAdapter{Writer: consoleFile},
+		errorWriter{Writer: errorFile},
+	)
+	rt.Logger = newLogger(cfg.Level, console)
+	rt.Chat = newLogger(cfg.Level, chatFile)
+	rt.GMAudit = newLogger(cfg.Level, gmFile)
+	rt.Item = newLogger(cfg.Level, itemFile)
 
 	return rt, nil
-}
-
-// InstallDefault makes runtime.Logger the package-wide logrus default.
-func InstallDefault(runtime *Runtime) {
-	std := logrus.StandardLogger()
-	std.SetOutput(runtime.Logger.Out)
-	std.SetFormatter(runtime.Logger.Formatter)
-	std.SetLevel(runtime.Logger.Level)
-	std.ReplaceHooks(logrus.LevelHooks{})
-	for _, hooks := range runtime.Logger.Hooks {
-		for _, hook := range hooks {
-			std.AddHook(hook)
-		}
-	}
 }
 
 // Path returns the opened file path for sink.
@@ -224,30 +209,27 @@ func (r *Runtime) Close() error {
 	return r.err
 }
 
-func newLogger(level logrus.Level, out io.Writer, formatter logrus.Formatter) *logrus.Logger {
-	logger := logrus.New()
-	logger.SetLevel(level)
-	logger.SetOutput(out)
-	logger.SetFormatter(formatter)
-	return logger
+// Per-packet callers should use Debug so a disabled event stops before field allocation.
+func newLogger(level zerolog.Level, out io.Writer) zerolog.Logger {
+	return zerolog.New(out).With().Timestamp().Logger().Level(level)
 }
 
-func parseLevel(s string) (logrus.Level, error) {
+func parseLevel(s string) (zerolog.Level, error) {
 	switch strings.ToUpper(strings.TrimSpace(s)) {
 	case "ALL", "FINEST", "FINER":
-		return logrus.TraceLevel, nil
+		return zerolog.TraceLevel, nil
 	case "FINE", "CONFIG":
-		return logrus.DebugLevel, nil
+		return zerolog.DebugLevel, nil
 	case "INFO":
-		return logrus.InfoLevel, nil
+		return zerolog.InfoLevel, nil
 	case "WARNING":
-		return logrus.WarnLevel, nil
+		return zerolog.WarnLevel, nil
 	case "SEVERE":
-		return logrus.ErrorLevel, nil
+		return zerolog.ErrorLevel, nil
 	case "OFF":
-		return logrus.PanicLevel, nil
+		return zerolog.Disabled, nil
 	default:
-		return logrus.InfoLevel, fmt.Errorf("unsupported log level %q", s)
+		return zerolog.InfoLevel, fmt.Errorf("unsupported log level %q", s)
 	}
 }
 
@@ -257,21 +239,11 @@ func expandPattern(pattern string) string {
 	return pattern
 }
 
-type writerHook struct {
-	writer    io.Writer
-	formatter logrus.Formatter
-	levels    []logrus.Level
-}
+type errorWriter struct{ io.Writer }
 
-func (h writerHook) Levels() []logrus.Level {
-	return h.levels
-}
-
-func (h writerHook) Fire(entry *logrus.Entry) error {
-	line, err := h.formatter.Format(entry)
-	if err != nil {
-		return err
+func (w errorWriter) WriteLevel(level zerolog.Level, p []byte) (int, error) {
+	if level < zerolog.ErrorLevel {
+		return len(p), nil
 	}
-	_, err = h.writer.Write(line)
-	return err
+	return w.Writer.Write(p)
 }
