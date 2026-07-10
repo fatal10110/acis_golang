@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/rs/zerolog"
 )
 
 func listen(t *testing.T) net.Listener {
@@ -35,7 +36,7 @@ func TestServeEchoesThroughSend(t *testing.T) {
 				return
 			}
 			conn.Send(buf)
-		}, nil)
+		}, zerolog.Nop())
 	}()
 
 	client, err := net.Dial("tcp", ln.Addr().String())
@@ -69,7 +70,7 @@ func TestServeStopsOnContextCancel(t *testing.T) {
 
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- Serve(ctx, ln, func(context.Context, *Conn) {}, nil)
+		errCh <- Serve(ctx, ln, func(context.Context, *Conn) {}, zerolog.Nop())
 	}()
 
 	cancel()
@@ -99,7 +100,7 @@ func TestServeHandlesConnectionsConcurrently(t *testing.T) {
 	go Serve(ctx, ln, func(ctx context.Context, conn *Conn) {
 		handled <- struct{}{}
 		<-ctx.Done()
-	}, nil)
+	}, zerolog.Nop())
 
 	conns := make([]net.Conn, clients)
 	for i := 0; i < clients; i++ {
@@ -133,7 +134,7 @@ func TestConnSendAfterCloseReturnsFalse(t *testing.T) {
 	go Serve(ctx, ln, func(ctx context.Context, conn *Conn) {
 		conn.Close()
 		closed <- conn
-	}, nil)
+	}, zerolog.Nop())
 
 	client, err := net.Dial("tcp", ln.Addr().String())
 	if err != nil {
@@ -157,7 +158,7 @@ func TestConnSendFrameAfterCloseReleasesFrame(t *testing.T) {
 	server, client := net.Pipe()
 	defer client.Close()
 
-	conn := newConn(server, nil)
+	conn := newConn(server, zerolog.Nop())
 	if err := conn.Close(); err != nil {
 		t.Fatalf("Close: %v", err)
 	}
@@ -176,7 +177,7 @@ func TestConnSendFrameAfterCloseReleasesFrame(t *testing.T) {
 
 func TestConnWriteLoopExitsOnWriteErrorAndCloseCompletes(t *testing.T) {
 	server, client := net.Pipe()
-	conn := newConn(server, nil)
+	conn := newConn(server, zerolog.Nop())
 
 	// Closing the read side makes the next write on server fail
 	// synchronously, exercising writeLoop's error path.
@@ -198,7 +199,7 @@ func TestConnWriteLoopExitsOnWriteErrorAndCloseCompletes(t *testing.T) {
 
 func TestConnSendFrameAfterWriteLoopExitReturnsFalseAndReleasesFrame(t *testing.T) {
 	server, client := net.Pipe()
-	conn := newConn(server, nil)
+	conn := newConn(server, zerolog.Nop())
 
 	client.Close()
 	conn.Send([]byte("payload"))
@@ -231,7 +232,7 @@ func TestConnReleasesAlreadyQueuedFramesAfterWriteError(t *testing.T) {
 		writeStarted: make(chan struct{}),
 		fail:         make(chan struct{}),
 	}
-	conn := newConn(raw, nil)
+	conn := newConn(raw, zerolog.Nop())
 
 	firstReleased := make(chan struct{}, 1)
 	first := wire.OwnedFrame([]byte{0x02, 0x00}, nil, func(*wire.Writer) { firstReleased <- struct{}{} })
@@ -358,7 +359,7 @@ func TestConnWriteBatchReleasesAllOnError(t *testing.T) {
 // split into batches.
 func TestConnBurstArrivesInOrderAndReleases(t *testing.T) {
 	server, client := net.Pipe()
-	conn := newConn(server, nil)
+	conn := newConn(server, zerolog.Nop())
 	defer client.Close()
 
 	const want = "abcde"
@@ -401,7 +402,7 @@ func TestConnCloseFlushesBurst(t *testing.T) {
 			conn.Send([]byte{want[i]})
 		}
 		conn.Close()
-	}, nil)
+	}, zerolog.Nop())
 
 	client, err := net.Dial("tcp", ln.Addr().String())
 	if err != nil {
@@ -428,7 +429,7 @@ func TestServeSurvivesHandlerPanic(t *testing.T) {
 	go func() {
 		errCh <- Serve(ctx, ln, func(ctx context.Context, conn *Conn) {
 			panic("boom")
-		}, nil)
+		}, zerolog.Nop())
 	}()
 
 	bad, err := net.Dial("tcp", ln.Addr().String())

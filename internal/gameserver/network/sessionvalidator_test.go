@@ -12,6 +12,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/link"
 	"github.com/fatal10110/acis_golang/internal/loginserver/data/manager"
+	"github.com/rs/zerolog"
 )
 
 // dialTestLoginLink establishes a real LoginLink against a freshly started
@@ -26,7 +27,7 @@ func dialTestLoginLink(t *testing.T, validator *SessionValidator) (link *LoginLi
 	auth := LoginServerAuth{ServerID: 1, HexID: testHexID, HostName: "*", Port: 7777, MaxPlayers: 300}
 	handlers := LoginLinkHandlers{PlayerAuthResponse: validator.Resolve}
 
-	l, err := DialLoginLink(context.Background(), addr, auth, handlers, nil)
+	l, err := DialLoginLink(context.Background(), addr, auth, handlers, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("DialLoginLink: %v", err)
 	}

@@ -8,6 +8,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/db"
 	"github.com/fatal10110/acis_golang/internal/commons/idfactory"
+	"github.com/rs/zerolog"
 )
 
 // Round-trip persistence tests against a real MariaDB, covering the
@@ -69,7 +70,7 @@ func TestNew_SkipsIDsAlreadyUsedAcrossAllTables(t *testing.T) {
 		}
 	}
 
-	alloc, err := idfactory.New(ctx, pool, nil)
+	alloc, err := idfactory.New(ctx, pool, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("New() error: %v", err)
 	}
@@ -93,7 +94,7 @@ func TestNew_ReclaimsIDOnRestartAfterRowDeleted(t *testing.T) {
 		t.Fatalf("seed: %v", err)
 	}
 
-	first, err := idfactory.New(ctx, pool, nil)
+	first, err := idfactory.New(ctx, pool, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("New() error: %v", err)
 	}
@@ -111,7 +112,7 @@ func TestNew_ReclaimsIDOnRestartAfterRowDeleted(t *testing.T) {
 		t.Fatalf("delete row: %v", err)
 	}
 
-	reloaded, err := idfactory.New(ctx, pool, nil)
+	reloaded, err := idfactory.New(ctx, pool, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("New() on reload error: %v", err)
 	}

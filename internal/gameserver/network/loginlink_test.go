@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 
 	"github.com/fatal10110/acis_golang/internal/commons/crypt"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
@@ -50,9 +50,9 @@ func newTestLoginServer(t *testing.T, allowNewServers bool) (addr string, server
 
 	servers = manager.NewServerRegistry()
 	sessions = manager.NewSessionStore()
-	bans := manager.NewIPBanList(logrus.StandardLogger())
+	bans := manager.NewIPBanList(zerolog.Nop())
 
-	gsLink := loginserver.NewGameServerLink(servers, names, keys, sessions, bans, nil, nil, allowNewServers, logrus.StandardLogger())
+	gsLink := loginserver.NewGameServerLink(servers, names, keys, sessions, bans, nil, nil, allowNewServers, zerolog.Nop())
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -109,7 +109,7 @@ func TestDialLoginLinkRegistersAndAuths(t *testing.T) {
 		MaxPlayers:        300,
 	}
 
-	l, err := DialLoginLink(context.Background(), addr, auth, LoginLinkHandlers{}, nil)
+	l, err := DialLoginLink(context.Background(), addr, auth, LoginLinkHandlers{}, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("DialLoginLink: %v", err)
 	}
@@ -131,7 +131,7 @@ func TestDialLoginLinkWrongHexIDRejected(t *testing.T) {
 
 	auth := LoginServerAuth{ServerID: 1, HexID: []byte{0xff, 0xff}, HostName: "*", Port: 7777, MaxPlayers: 300}
 
-	_, err := DialLoginLink(context.Background(), addr, auth, LoginLinkHandlers{}, nil)
+	_, err := DialLoginLink(context.Background(), addr, auth, LoginLinkHandlers{}, zerolog.Nop())
 	if err == nil {
 		t.Fatal("DialLoginLink: want error for mismatched hex id, got nil")
 	}
@@ -146,13 +146,13 @@ func TestDialLoginLinkAlreadyLoggedInRejected(t *testing.T) {
 
 	auth := LoginServerAuth{ServerID: 1, HexID: testHexID, HostName: "*", Port: 7777, MaxPlayers: 300}
 
-	first, err := DialLoginLink(context.Background(), addr, auth, LoginLinkHandlers{}, nil)
+	first, err := DialLoginLink(context.Background(), addr, auth, LoginLinkHandlers{}, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("first DialLoginLink: %v", err)
 	}
 	defer first.Close()
 
-	_, err = DialLoginLink(context.Background(), addr, auth, LoginLinkHandlers{}, nil)
+	_, err = DialLoginLink(context.Background(), addr, auth, LoginLinkHandlers{}, zerolog.Nop())
 	if err == nil {
 		t.Fatal("second DialLoginLink: want error for already-logged-in server, got nil")
 	}
@@ -179,7 +179,7 @@ func TestDialLoginLinkPlayerAuthRequestRoundTrip(t *testing.T) {
 	}
 
 	auth := LoginServerAuth{ServerID: 1, HexID: testHexID, HostName: "*", Port: 7777, MaxPlayers: 300}
-	l, err := DialLoginLink(context.Background(), addr, auth, handlers, nil)
+	l, err := DialLoginLink(context.Background(), addr, auth, handlers, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("DialLoginLink: %v", err)
 	}
@@ -210,7 +210,7 @@ func TestDialLoginLinkPlayerInGameAndStatus(t *testing.T) {
 	servers.Register(1, testHexID)
 
 	auth := LoginServerAuth{ServerID: 1, HexID: testHexID, HostName: "*", Port: 7777, MaxPlayers: 300}
-	l, err := DialLoginLink(context.Background(), addr, auth, LoginLinkHandlers{}, nil)
+	l, err := DialLoginLink(context.Background(), addr, auth, LoginLinkHandlers{}, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("DialLoginLink: %v", err)
 	}
@@ -302,7 +302,7 @@ func TestDialLoginLinkRevisionMismatch(t *testing.T) {
 	fake.acceptAndSendInitLS(badInitLS)
 
 	auth := LoginServerAuth{ServerID: 1, HexID: testHexID, HostName: "*", Port: 7777, MaxPlayers: 300}
-	_, err := DialLoginLink(context.Background(), fake.addr(), auth, LoginLinkHandlers{}, nil)
+	_, err := DialLoginLink(context.Background(), fake.addr(), auth, LoginLinkHandlers{}, zerolog.Nop())
 	if err == nil {
 		t.Fatal("DialLoginLink: want error for protocol revision mismatch, got nil")
 	}

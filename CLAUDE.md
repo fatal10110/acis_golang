@@ -245,7 +245,7 @@ Follow the ladder — stop at the first rung that works:
 5. Can it be a few lines of our own code? Write the few lines.
 
 Keep the dependency set tiny, but do not hand-roll a subsystem when a standard Go package or a small,
-well-scoped dependency is the simpler, safer implementation. For logging in this repo, use Logrus and
+well-scoped dependency is the simpler, safer implementation. For logging in this repo, use zerolog and
 write only the glue needed to map existing config and route project-specific sinks. For non-trivial
 application composition, use Uber Fx instead of inventing a DI/lifecycle framework.
 

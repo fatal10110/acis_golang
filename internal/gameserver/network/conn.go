@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 )
 
 // outboundBuffer is how many pending writes a Conn queues before Send
@@ -18,7 +18,7 @@ const outboundBuffer = 64
 // net.Conn. The read side belongs to whatever handler Serve invokes.
 type Conn struct {
 	net.Conn
-	log      *logrus.Logger
+	log      zerolog.Logger
 	mu       sync.RWMutex
 	out      chan queuedWrite
 	closed   bool
@@ -31,10 +31,7 @@ type queuedWrite struct {
 	frame wire.Frame
 }
 
-func newConn(c net.Conn, log *logrus.Logger) *Conn {
-	if log == nil {
-		log = logrus.StandardLogger()
-	}
+func newConn(c net.Conn, log zerolog.Logger) *Conn {
 	conn := &Conn{
 		Conn:     c,
 		log:      log,
@@ -64,7 +61,7 @@ func newConn(c net.Conn, log *logrus.Logger) *Conn {
 func (c *Conn) writeLoop() {
 	defer func() {
 		if r := recover(); r != nil {
-			c.log.Errorf("game connection writer panic: %v", r)
+			c.log.Error().Interface("panic", r).Msg("game connection writer panic")
 		}
 		close(c.stopping)
 		c.releaseQueued()
@@ -79,7 +76,7 @@ func (c *Conn) writeLoop() {
 		batch = c.drainBatch(batch[:0], queued)
 		var err error
 		if bufs, err = c.writeBatch(batch, bufs); err != nil {
-			c.log.Warnf("game connection write failed, closing: %v", err)
+			c.log.Warn().Err(err).Msg("game connection write failed, closing")
 			return
 		}
 	}
