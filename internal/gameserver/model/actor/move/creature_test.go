@@ -20,39 +20,15 @@ func (g stubGeo) Height(x, y, z int) int16 {
 	return g.height
 }
 
-func TestCreatureMove_MoveToLocation(t *testing.T) {
-	geo := stubGeo{canMove: true, height: 30}
-	mover, err := NewCreatureMove(location.Location{X: 10, Y: 20, Z: 30}, 50, geo)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	event, err := mover.MoveToLocation(location.Location{X: 60, Y: 20, Z: 999})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if event.Origin != (location.Location{X: 10, Y: 20, Z: 30}) || event.Destination != (location.Location{X: 60, Y: 20, Z: 30}) {
-		t.Fatalf("event = %+v", event)
-	}
-	if event.Duration != time.Second || !mover.Moving() {
-		t.Fatalf("event = %+v, moving = %v", event, mover.Moving())
-	}
-}
-
-func TestCreatureMove_MoveToLocationRejectsBlockedRoute(t *testing.T) {
-	mover, _ := NewCreatureMove(location.Location{}, 1, stubGeo{canMove: false})
-	if _, err := mover.MoveToLocation(location.Location{X: 1}); err == nil {
-		t.Fatal("MoveToLocation() error = nil")
-	}
-}
-
 func TestNewCreatureMoveRejectsInvalidDependencies(t *testing.T) {
+	var typedNil *stubGeo
 	tests := []struct {
 		name  string
 		speed float64
 		geo   Geo
 	}{
 		{name: "nil geodata", speed: 1},
+		{name: "typed-nil geodata", speed: 1, geo: typedNil},
 		{name: "zero speed", geo: stubGeo{}, speed: 0},
 		{name: "negative speed", geo: stubGeo{}, speed: -1},
 	}
@@ -66,45 +42,82 @@ func TestNewCreatureMoveRejectsInvalidDependencies(t *testing.T) {
 	}
 }
 
-func TestCreatureMove_MoveToLocationSamePosition(t *testing.T) {
+func TestCreatureMove_MoveToLocationScenarios(t *testing.T) {
 	origin := location.Location{X: 10, Y: 20, Z: 30}
-	mover, err := NewCreatureMove(origin, 50, stubGeo{canMove: true, height: 30})
-	if err != nil {
-		t.Fatal(err)
+	previous := location.Location{X: 60, Y: 20, Z: 30}
+	tests := []struct {
+		name              string
+		canMove           bool
+		target            location.Location
+		initialTarget     *location.Location
+		blockAfterInitial bool
+		wantEvent         Event
+		wantErr           bool
+		wantDestination   location.Location
+		wantMoving        bool
+	}{
+		{
+			name:            "normalizes height and uses Java tick duration",
+			canMove:         true,
+			target:          location.Location{X: 60, Y: 20, Z: 999},
+			wantEvent:       Event{Origin: origin, Destination: previous, Speed: 50, Duration: time.Second},
+			wantDestination: previous,
+			wantMoving:      true,
+		},
+		{
+			name:            "rejects blocked route",
+			target:          location.Location{X: 60, Y: 20},
+			wantErr:         true,
+			wantDestination: origin,
+		},
+		{
+			name:            "same position has zero duration",
+			canMove:         true,
+			target:          origin,
+			wantEvent:       Event{Origin: origin, Destination: origin, Speed: 50},
+			wantDestination: origin,
+		},
+		{
+			name:              "blocked follow-up preserves state",
+			canMove:           true,
+			initialTarget:     &location.Location{X: 60, Y: 20},
+			blockAfterInitial: true,
+			target:            location.Location{X: 70, Y: 20},
+			wantErr:           true,
+			wantDestination:   previous,
+			wantMoving:        true,
+		},
 	}
 
-	event, err := mover.MoveToLocation(origin)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if event.Duration != 0 || mover.Moving() {
-		t.Fatalf("event = %+v, moving = %v", event, mover.Moving())
-	}
-	if mover.Destination() != origin {
-		t.Fatalf("Destination() = %+v, want %+v", mover.Destination(), origin)
-	}
-}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			geo := &stubGeo{canMove: test.canMove, height: 30}
+			mover, err := NewCreatureMove(origin, 50, geo)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if test.initialTarget != nil {
+				if _, err := mover.MoveToLocation(*test.initialTarget); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if test.blockAfterInitial {
+				geo.canMove = false
+			}
 
-func TestCreatureMove_MoveToLocationBlockedRoutePreservesState(t *testing.T) {
-	geo := &stubGeo{canMove: true, height: 30}
-	mover, err := NewCreatureMove(location.Location{X: 10, Y: 20, Z: 30}, 50, geo)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := mover.MoveToLocation(location.Location{X: 60, Y: 20}); err != nil {
-		t.Fatal(err)
-	}
-	wantDestination := mover.Destination()
-	wantMoving := mover.Moving()
-
-	geo.canMove = false
-	if _, err := mover.MoveToLocation(location.Location{X: 70, Y: 20}); err == nil {
-		t.Fatal("MoveToLocation() error = nil")
-	}
-	if got := mover.Destination(); got != wantDestination {
-		t.Fatalf("Destination() = %+v, want %+v", got, wantDestination)
-	}
-	if got := mover.Moving(); got != wantMoving {
-		t.Fatalf("Moving() = %v, want %v", got, wantMoving)
+			event, err := mover.MoveToLocation(test.target)
+			if (err != nil) != test.wantErr {
+				t.Fatalf("MoveToLocation() error = %v, want error = %v", err, test.wantErr)
+			}
+			if !test.wantErr && event != test.wantEvent {
+				t.Fatalf("event = %+v, want %+v", event, test.wantEvent)
+			}
+			if got := mover.Destination(); got != test.wantDestination {
+				t.Fatalf("Destination() = %+v, want %+v", got, test.wantDestination)
+			}
+			if got := mover.Moving(); got != test.wantMoving {
+				t.Fatalf("Moving() = %v, want %v", got, test.wantMoving)
+			}
+		})
 	}
 }

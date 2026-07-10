@@ -4,6 +4,7 @@ package move
 import (
 	"errors"
 	"math"
+	"reflect"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -32,7 +33,7 @@ type CreatureMove struct {
 
 // NewCreatureMove builds movement state at origin with a positive ground speed.
 func NewCreatureMove(origin location.Location, speed float64, geo Geo) (*CreatureMove, error) {
-	if geo == nil {
+	if geo == nil || (reflect.ValueOf(geo).Kind() == reflect.Ptr && reflect.ValueOf(geo).IsNil()) {
 		return nil, errors.New("move: nil geodata")
 	}
 	if speed <= 0 {
