@@ -1,5 +1,7 @@
 package serverpackets
 
+import "github.com/fatal10110/acis_golang/internal/commons/wire"
+
 // OpcodeCharDeleteFail is the wire opcode for CharDeleteFail, reporting why
 // a character deletion request was rejected.
 const OpcodeCharDeleteFail = 0x24
@@ -15,9 +17,9 @@ const (
 	CharDeleteFailReasonClanLeaderMayNotDelete
 )
 
-// EncodeCharDeleteFail builds the CharDeleteFail packet reporting reason.
-func EncodeCharDeleteFail(reason CharDeleteFailReason) []byte {
-	w := newWriter(OpcodeCharDeleteFail)
+// FrameCharDeleteFail builds the CharDeleteFail packet as an owned frame.
+func FrameCharDeleteFail(reason CharDeleteFailReason) wire.Frame {
+	w := newFrameWriter(OpcodeCharDeleteFail)
 	w.WriteInt32(int32(reason))
-	return w.Bytes()
+	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
 }

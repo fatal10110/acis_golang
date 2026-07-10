@@ -17,21 +17,30 @@ const OpcodeNewCharacterSuccess = 0x17
 // duplication is the client's own contract, not a mistake introduced here.
 var creationScreenClassIDs = [...]int{0, 0, 10, 18, 25, 31, 38, 44, 49, 53}
 
-// EncodeNewCharacterSuccess builds the NewCharacterSuccess packet, looking
-// up each creation-screen profession in templates. It returns an error if
-// templates is missing one of them or can't resolve its race.
-func EncodeNewCharacterSuccess(templates *player.TemplateTable) ([]byte, error) {
-	w := newWriter(OpcodeNewCharacterSuccess)
+// FrameNewCharacterSuccess builds the NewCharacterSuccess packet as an owned
+// frame, looking up each creation-screen profession in templates. It returns
+// an error if templates is missing one of them or can't resolve its race. On
+// error no frame is returned and nothing needs releasing.
+func FrameNewCharacterSuccess(templates *player.TemplateTable) (wire.Frame, error) {
+	w := newFrameWriter(OpcodeNewCharacterSuccess)
+	if err := writeNewCharacterSuccess(w, templates); err != nil {
+		releaseFrameWriter(w)
+		return wire.Frame{}, err
+	}
+	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter), nil
+}
+
+func writeNewCharacterSuccess(w *wire.Writer, templates *player.TemplateTable) error {
 	w.WriteInt32(int32(len(creationScreenClassIDs)))
 
 	for _, id := range creationScreenClassIDs {
 		tmpl, ok := templates.Get(id)
 		if !ok {
-			return nil, fmt.Errorf("serverpackets: NewCharacterSuccess: profession %d not loaded", id)
+			return fmt.Errorf("serverpackets: NewCharacterSuccess: profession %d not loaded", id)
 		}
 		race, ok := player.ClassRace(tmpl.ID)
 		if !ok {
-			return nil, fmt.Errorf("serverpackets: NewCharacterSuccess: profession %d has no known race", tmpl.ID)
+			return fmt.Errorf("serverpackets: NewCharacterSuccess: profession %d has no known race", tmpl.ID)
 		}
 
 		w.WriteInt32(int32(race))
@@ -43,7 +52,7 @@ func EncodeNewCharacterSuccess(templates *player.TemplateTable) ([]byte, error) 
 		writeBaseStat(w, tmpl.WIT)
 		writeBaseStat(w, tmpl.MEN)
 	}
-	return w.Bytes(), nil
+	return nil
 }
 
 // writeBaseStat writes one profession-picker stat row: the profession's

@@ -71,21 +71,25 @@ func (c *Conn) writeLoop() {
 		c.closeErr = c.Conn.Close()
 		close(c.stopped)
 	}()
+	// batch and bufs are reused across iterations — this loop is their only
+	// owner, so no other goroutine ever sees them.
+	var batch []queuedWrite
+	var bufs net.Buffers
 	for queued := range c.out {
-		batch := c.drainBatch(queued)
-		if err := c.writeBatch(batch); err != nil {
+		batch = c.drainBatch(batch[:0], queued)
+		var err error
+		if bufs, err = c.writeBatch(batch, bufs); err != nil {
 			c.log.Warnf("game connection write failed, closing: %v", err)
 			return
 		}
 	}
 }
 
-// drainBatch collects first plus any further queued frames already
+// drainBatch appends first plus any further queued frames already
 // sitting in c.out, without blocking, up to outboundBuffer total so one
 // slow reader can't build an unbounded batch.
-func (c *Conn) drainBatch(first queuedWrite) []queuedWrite {
-	batch := make([]queuedWrite, 1, outboundBuffer)
-	batch[0] = first
+func (c *Conn) drainBatch(batch []queuedWrite, first queuedWrite) []queuedWrite {
+	batch = append(batch, first)
 	for len(batch) < outboundBuffer {
 		select {
 		case queued, ok := <-c.out:
@@ -102,19 +106,22 @@ func (c *Conn) drainBatch(first queuedWrite) []queuedWrite {
 
 // writeBatch writes every frame in batch as a single vectored
 // net.Buffers write and releases all of them (win or lose) once the
-// write attempt finishes.
-func (c *Conn) writeBatch(batch []queuedWrite) (err error) {
+// write attempt finishes. It reuses bufs' storage and returns it, possibly
+// grown, for the next batch; WriteTo consumes a separate slice header, so
+// the returned one keeps the whole backing array.
+func (c *Conn) writeBatch(batch []queuedWrite, bufs net.Buffers) (net.Buffers, error) {
 	defer func() {
 		for _, queued := range batch {
 			queued.frame.Release()
 		}
 	}()
-	bufs := make(net.Buffers, len(batch))
-	for i, queued := range batch {
-		bufs[i] = queued.frame.Bytes()
+	bufs = bufs[:0]
+	for _, queued := range batch {
+		bufs = append(bufs, queued.frame.Bytes())
 	}
-	_, err = bufs.WriteTo(c.Conn)
-	return err
+	send := bufs
+	_, err := send.WriteTo(c.Conn)
+	return bufs, err
 }
 
 func (c *Conn) releaseQueued() {

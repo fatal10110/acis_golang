@@ -1,5 +1,7 @@
 package serverpackets
 
+import "github.com/fatal10110/acis_golang/internal/commons/wire"
+
 // OpcodeCharCreateFail is the wire opcode for CharCreateFail, reporting why
 // a character creation attempt was rejected.
 const OpcodeCharCreateFail = 0x1a
@@ -18,9 +20,9 @@ const (
 	CharCreateFailReasonChooseAnotherServer
 )
 
-// EncodeCharCreateFail builds the CharCreateFail packet reporting reason.
-func EncodeCharCreateFail(reason CharCreateFailReason) []byte {
-	w := newWriter(OpcodeCharCreateFail)
+// FrameCharCreateFail builds the CharCreateFail packet as an owned frame.
+func FrameCharCreateFail(reason CharCreateFailReason) wire.Frame {
+	w := newFrameWriter(OpcodeCharCreateFail)
 	w.WriteInt32(int32(reason))
-	return w.Bytes()
+	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
 }

@@ -8,13 +8,13 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 )
 
-// noManaLeft is the displayed-mana-left placeholder EncodeItemList always
+// noManaLeft is the displayed-mana-left placeholder FrameItemList always
 // writes (item.Instance carries no shadow-item duration state), kept as a
 // variable so converting it to uint32 below is a runtime, not constant,
 // conversion.
 var noManaLeft int32 = -1
 
-func TestEncodeItemList(t *testing.T) {
+func TestFrameItemList(t *testing.T) {
 	templates := item.NewTable([]*item.Template{
 		{ID: 2368, Kind: item.KindWeapon, Slot: item.SlotLRHand},
 		{ID: 1146, Kind: item.KindArmor, Slot: item.SlotChest},
@@ -27,10 +27,11 @@ func TestEncodeItemList(t *testing.T) {
 		{ObjectID: 103, TemplateID: 1146, Count: 1, Location: item.LocationWarehouse}, // excluded: not carried
 	}
 
-	got, err := EncodeItemList(items, templates, true)
+	frame, err := FrameItemList(items, templates, true)
 	if err != nil {
-		t.Fatalf("EncodeItemList: %v", err)
+		t.Fatalf("FrameItemList: %v", err)
 	}
+	got := framePayload(t, frame)
 
 	want := []byte{OpcodeItemList}
 	want = binary.LittleEndian.AppendUint16(want, 1) // show window
@@ -76,17 +77,18 @@ func TestEncodeItemList(t *testing.T) {
 	want = binary.LittleEndian.AppendUint32(want, uint32(noManaLeft))
 
 	if !bytes.Equal(got, want) {
-		t.Errorf("EncodeItemList mismatch:\n got  %x\n want %x", got, want)
+		t.Errorf("FrameItemList mismatch:\n got  %x\n want %x", got, want)
 	}
 }
 
-func TestEncodeItemList_HideWindow(t *testing.T) {
-	got, err := EncodeItemList(nil, item.NewTable(nil), false)
+func TestFrameItemList_HideWindow(t *testing.T) {
+	frame, err := FrameItemList(nil, item.NewTable(nil), false)
 	if err != nil {
-		t.Fatalf("EncodeItemList: %v", err)
+		t.Fatalf("FrameItemList: %v", err)
 	}
+	got := framePayload(t, frame)
 	want := []byte{OpcodeItemList, 0, 0, 0, 0}
 	if !bytes.Equal(got, want) {
-		t.Errorf("EncodeItemList (empty, hidden) = %x, want %x", got, want)
+		t.Errorf("FrameItemList (empty, hidden) = %x, want %x", got, want)
 	}
 }

@@ -15,7 +15,7 @@ func appendF32(b []byte, v float32) []byte {
 	return binary.LittleEndian.AppendUint32(b, math.Float32bits(v))
 }
 
-func TestEncodeUserInfo(t *testing.T) {
+func TestFrameUserInfo(t *testing.T) {
 	c := &player.Character{
 		ObjectID: 0x10000001,
 		Name:     "Newbie",
@@ -44,7 +44,7 @@ func TestEncodeUserInfo(t *testing.T) {
 		{ObjectID: 100, TemplateID: 2369, Location: item.LocationPaperdoll, LocationData: rhandPaperdollIndex, EnchantLevel: 200},
 	}
 
-	got := EncodeUserInfo(UserInfoSnapshot{Character: c, Template: tmpl, Items: items})
+	got := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: c, Template: tmpl, Items: items}))
 
 	want := []byte{OpcodeUserInfo}
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.Position.X))
@@ -175,17 +175,17 @@ func TestEncodeUserInfo(t *testing.T) {
 	want = binary.LittleEndian.AppendUint32(want, 0) // cursed weapon stage
 
 	if !bytes.Equal(got, want) {
-		t.Errorf("EncodeUserInfo mismatch:\n got  %x\n want %x", got, want)
+		t.Errorf("FrameUserInfo mismatch:\n got  %x\n want %x", got, want)
 	}
 }
 
-func TestEncodeUserInfo_FemaleUsesFemaleCollision(t *testing.T) {
+func TestFrameUserInfo_FemaleUsesFemaleCollision(t *testing.T) {
 	tmpl := &player.Template{
 		CollisionRadius: 9, CollisionHeight: 23,
 		CollisionRadiusFemale: 17.5, CollisionHeightFemale: 42.25,
 	}
-	male := EncodeUserInfo(UserInfoSnapshot{Character: &player.Character{Sex: player.SexMale, Name: "M"}, Template: tmpl})
-	female := EncodeUserInfo(UserInfoSnapshot{Character: &player.Character{Sex: player.SexFemale, Name: "M"}, Template: tmpl})
+	male := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: &player.Character{Sex: player.SexMale, Name: "M"}, Template: tmpl}))
+	female := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: &player.Character{Sex: player.SexFemale, Name: "M"}, Template: tmpl}))
 
 	if bytes.Equal(male, female) {
 		t.Fatal("male and female encodings are identical, want different collision fields")
@@ -198,10 +198,10 @@ func TestEncodeUserInfo_FemaleUsesFemaleCollision(t *testing.T) {
 	}
 }
 
-func TestEncodeUserInfo_DwarfUsesDwarfInventoryLimit(t *testing.T) {
+func TestFrameUserInfo_DwarfUsesDwarfInventoryLimit(t *testing.T) {
 	tmpl := &player.Template{}
-	human := EncodeUserInfo(UserInfoSnapshot{Character: &player.Character{Race: player.RaceHuman, Name: "H"}, Template: tmpl})
-	dwarf := EncodeUserInfo(UserInfoSnapshot{Character: &player.Character{Race: player.RaceDwarf, Name: "H"}, Template: tmpl})
+	human := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: &player.Character{Race: player.RaceHuman, Name: "H"}, Template: tmpl}))
+	dwarf := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: &player.Character{Race: player.RaceDwarf, Name: "H"}, Template: tmpl}))
 
 	if len(human) != len(dwarf) {
 		t.Fatalf("human and dwarf encodings differ in length: %d vs %d", len(human), len(dwarf))

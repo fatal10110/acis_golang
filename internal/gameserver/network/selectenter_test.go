@@ -45,17 +45,20 @@ func TestSelectCharacterAdvancesToEntering(t *testing.T) {
 	c := &player.Character{ObjectID: 1, Name: "Newbie", Position: location.Location{X: 1, Y: 2, Z: 3}}
 	tmpl := &player.Template{}
 
-	if len(serverpackets.EncodeSSQInfo()) == 0 {
-		t.Fatal("EncodeSSQInfo: want non-empty packet")
+	ssqInfo := serverpackets.FrameSSQInfo()
+	defer ssqInfo.Release()
+	if len(ssqInfo.Bytes()) == 0 {
+		t.Fatal("FrameSSQInfo: want non-empty packet")
 	}
 
 	client.SetState(StateEntering)
 
-	charSelected := serverpackets.EncodeCharSelected(serverpackets.CharSelectedSnapshot{
+	charSelected := serverpackets.FrameCharSelected(serverpackets.CharSelectedSnapshot{
 		Character: c, Template: tmpl, SessionID: client.SessionKey().PlayKey1,
 	})
-	if len(charSelected) == 0 {
-		t.Fatal("EncodeCharSelected: want non-empty packet")
+	defer charSelected.Release()
+	if len(charSelected.Bytes()) == 0 {
+		t.Fatal("FrameCharSelected: want non-empty packet")
 	}
 
 	if !client.Accept(clientpackets.OpcodeEnterWorld) {

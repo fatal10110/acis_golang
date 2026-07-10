@@ -120,8 +120,11 @@ func (l *GameServerLink) handleConnection(ctx context.Context, conn net.Conn) {
 		return
 	}
 
+	// frames reuses one payload buffer across this connection's inbound
+	// frames; every payload is decoded within its loop iteration.
+	frames := wire.NewFrameReader(conn)
 	for {
-		payload, err := wire.ReadFrame(conn)
+		payload, err := frames.ReadFrame()
 		if err != nil {
 			return
 		}
