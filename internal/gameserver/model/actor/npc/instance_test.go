@@ -1,9 +1,6 @@
 package npc
 
-import (
-	"slices"
-	"testing"
-)
+import "testing"
 
 var supportedKindsOracle = []InstanceKind{
 	"Adventurer", "Auctioneer", "BabyPet", "CastleBlacksmith", "CastleChamberlain",
@@ -42,20 +39,5 @@ func TestNewInstance_RejectsInvalidTemplate(t *testing.T) {
 		if _, err := NewInstance(1, tpl); err == nil {
 			t.Fatalf("NewInstance(%+v) error = nil", tpl)
 		}
-	}
-}
-
-func TestSupportedInstanceKinds(t *testing.T) {
-	got := SupportedInstanceKinds()
-	if !slices.IsSorted(got) {
-		t.Fatalf("SupportedInstanceKinds() = %v, want sorted kinds", got)
-	}
-	if !slices.Equal(got, supportedKindsOracle) {
-		t.Fatalf("SupportedInstanceKinds() = %v, want %v", got, supportedKindsOracle)
-	}
-
-	got[0] = "mutated"
-	if SupportedInstanceKinds()[0] != supportedKindsOracle[0] {
-		t.Fatal("SupportedInstanceKinds() returned a mutable registry slice")
 	}
 }

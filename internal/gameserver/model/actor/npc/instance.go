@@ -3,7 +3,6 @@ package npc
 import (
 	"errors"
 	"fmt"
-	"slices"
 )
 
 // InstanceKind identifies the behavior category selected by an NPC template.
@@ -96,14 +95,4 @@ func NewInstance(objectID int32, template *Template) (*Instance, error) {
 	}
 
 	return &Instance{ObjectID: objectID, Template: template, Kind: kind}, nil
-}
-
-// SupportedInstanceKinds returns the supported template types in sorted order.
-func SupportedInstanceKinds() []InstanceKind {
-	kinds := make([]InstanceKind, 0, len(supportedInstanceKinds))
-	for kind := range supportedInstanceKinds {
-		kinds = append(kinds, kind)
-	}
-	slices.Sort(kinds)
-	return kinds
 }
