@@ -8,8 +8,8 @@ import (
 func TestRegistry_AddIsNoopIfPresent(t *testing.T) {
 	r := newRegistry()
 
-	first := stubObject{id: 1}
-	second := stubObject{id: 1}
+	first := stubObject{id: 1, gen: 1}
+	second := stubObject{id: 1, gen: 2}
 
 	r.add(first.id, first)
 	r.add(second.id, second)

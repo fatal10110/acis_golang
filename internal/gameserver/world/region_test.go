@@ -5,7 +5,9 @@ import (
 	"testing"
 )
 
-type stubObject struct{ id int32 }
+// gen distinguishes two stubs registered under the same id, so tests can
+// tell which registration a lookup returned.
+type stubObject struct{ id, gen int32 }
 
 func (s stubObject) ObjectID() int32 { return s.id }
 
