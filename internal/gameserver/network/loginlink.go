@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 
 	"github.com/fatal10110/acis_golang/internal/commons/crypt"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
@@ -89,7 +89,7 @@ type LoginLinkHandlers struct {
 type LoginLink struct {
 	conn  net.Conn
 	crypt *crypt.LinkCrypt
-	log   *logrus.Logger
+	log   zerolog.Logger
 	done  chan struct{}
 
 	// frames reuses one payload buffer across inbound frames; it belongs to
@@ -112,10 +112,7 @@ type LoginLink struct {
 // accepted or refused the registration; on acceptance, a background
 // goroutine starts dispatching further inbound messages to handlers until
 // the connection closes.
-func DialLoginLink(ctx context.Context, address string, auth LoginServerAuth, handlers LoginLinkHandlers, log *logrus.Logger) (*LoginLink, error) {
-	if log == nil {
-		log = logrus.StandardLogger()
-	}
+func DialLoginLink(ctx context.Context, address string, auth LoginServerAuth, handlers LoginLinkHandlers, log zerolog.Logger) (*LoginLink, error) {
 
 	var d net.Dialer
 	conn, err := d.DialContext(ctx, "tcp", address)
@@ -132,7 +129,7 @@ func DialLoginLink(ctx context.Context, address string, auth LoginServerAuth, ha
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				l.log.Errorf("login link reader panic: %v", r)
+				l.log.Error().Interface("panic", r).Msg("login link reader panic")
 			}
 		}()
 		l.readLoop(handlers)
@@ -226,7 +223,7 @@ func (l *LoginLink) readLoop(handlers LoginLinkHandlers) {
 		case link.OpcodePlayerAuthResponse:
 			account, ok, err := link.DecodePlayerAuthResponse(payload)
 			if err != nil {
-				l.log.Warnf("login link: %v", err)
+				l.log.Warn().Err(err).Msg("login link")
 				continue
 			}
 			if handlers.PlayerAuthResponse != nil {
@@ -235,7 +232,7 @@ func (l *LoginLink) readLoop(handlers LoginLinkHandlers) {
 		case link.OpcodeKickPlayer:
 			account, err := link.DecodeKickPlayer(payload)
 			if err != nil {
-				l.log.Warnf("login link: %v", err)
+				l.log.Warn().Err(err).Msg("login link")
 				continue
 			}
 			if handlers.KickPlayer != nil {
@@ -243,11 +240,11 @@ func (l *LoginLink) readLoop(handlers LoginLinkHandlers) {
 			}
 		case link.OpcodeLoginServerFail:
 			if reason, err := link.DecodeLoginServerFail(payload); err == nil {
-				l.log.Warnf("login server closed the link: %s", reason)
+				l.log.Warn().Str("reason", reason.String()).Msg("login server closed the link")
 			}
 			return
 		default:
-			l.log.Warnf("login link: unexpected opcode %#x", firstByte(payload))
+			l.log.Warn().Uint8("opcode", firstByte(payload)).Msg("login link: unexpected opcode")
 			return
 		}
 	}
@@ -326,15 +323,12 @@ func (l *LoginLink) Close() error {
 // passes the established LoginLink to onLink, then blocks until the link
 // ends and dials again after retryDelay. A failed dial or handshake is
 // logged and retried the same way. onLink may be nil.
-func Maintain(ctx context.Context, address string, auth LoginServerAuth, handlers LoginLinkHandlers, retryDelay time.Duration, onLink func(*LoginLink), log *logrus.Logger) {
-	if log == nil {
-		log = logrus.StandardLogger()
-	}
+func Maintain(ctx context.Context, address string, auth LoginServerAuth, handlers LoginLinkHandlers, retryDelay time.Duration, onLink func(*LoginLink), log zerolog.Logger) {
 
 	for ctx.Err() == nil {
 		l, err := DialLoginLink(ctx, address, auth, handlers, log)
 		if err != nil {
-			log.Errorf("login link: %v", err)
+			log.Error().Err(err).Msg("login link")
 		} else {
 			if onLink != nil {
 				onLink(l)

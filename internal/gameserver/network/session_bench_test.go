@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/rs/zerolog"
 )
 
 type discardConn struct{}
@@ -35,7 +36,7 @@ func benchmarkSession(b *testing.B) *Session {
 	if err != nil {
 		b.Fatalf("NewCipher: %v", err)
 	}
-	conn := newConn(discardConn{}, nil)
+	conn := newConn(discardConn{}, zerolog.Nop())
 	b.Cleanup(func() { conn.Close() })
 	return NewSession(conn, cipher)
 }

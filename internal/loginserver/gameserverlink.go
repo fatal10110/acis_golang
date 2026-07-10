@@ -6,7 +6,7 @@ import (
 	"crypto/rsa"
 	"net"
 
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 
 	"github.com/fatal10110/acis_golang/internal/commons/crypt"
 	"github.com/fatal10110/acis_golang/internal/commons/netutil"
@@ -30,7 +30,7 @@ type GameServerLink struct {
 	accounts        *sql.AccountStore
 	registrations   *sql.GameServerStore
 	allowNewServers bool
-	log             *logrus.Logger
+	log             zerolog.Logger
 }
 
 // NewGameServerLink builds a GameServerLink from its collaborators.
@@ -44,11 +44,8 @@ func NewGameServerLink(
 	accounts *sql.AccountStore,
 	registrations *sql.GameServerStore,
 	allowNewServers bool,
-	log *logrus.Logger,
+	log zerolog.Logger,
 ) *GameServerLink {
-	if log == nil {
-		log = logrus.StandardLogger()
-	}
 	return &GameServerLink{
 		servers:         servers,
 		names:           names,
@@ -106,12 +103,12 @@ func (l *GameServerLink) handleConnection(ctx context.Context, conn net.Conn) {
 	defer func() {
 		if c.authed {
 			l.servers.MarkOffline(c.id)
-			l.log.Infof("gameserver [%d] disconnected from the link", c.id)
+			l.log.Info().Int("server_id", c.id).Msg("gameserver disconnected from the link")
 		}
 	}()
 
 	if l.bans.IsBanned(c.remoteIP) {
-		l.log.Infof("banned gameserver with ip %s tried to link", c.remoteIP)
+		l.log.Info().Str("ip", c.remoteIP.String()).Msg("banned gameserver tried to link")
 		c.forceClose(link.ReasonIPBanned)
 		return
 	}
@@ -129,7 +126,7 @@ func (l *GameServerLink) handleConnection(ctx context.Context, conn net.Conn) {
 			return
 		}
 		if err := c.crypt.Decrypt(payload); err != nil {
-			l.log.Warnf("gameserver link %s: %v", c.remoteIP, err)
+			l.log.Warn().Str("ip", c.remoteIP.String()).Err(err).Msg("gameserver link")
 			return
 		}
 		if len(payload) == 0 {
@@ -170,11 +167,11 @@ func (l *GameServerLink) handleConnection(ctx context.Context, conn net.Conn) {
 func (l *GameServerLink) onBlowFishKey(c *gameServerConn, payload []byte) {
 	key, err := link.DecodeBlowFishKey(payload, c.key)
 	if err != nil {
-		l.log.Warnf("gameserver link %s: %v", c.remoteIP, err)
+		l.log.Warn().Str("ip", c.remoteIP.String()).Err(err).Msg("gameserver link")
 		return
 	}
 	if err := c.crypt.SetKey(key); err != nil {
-		l.log.Warnf("gameserver link %s: %v", c.remoteIP, err)
+		l.log.Warn().Str("ip", c.remoteIP.String()).Err(err).Msg("gameserver link")
 	}
 }
 
@@ -185,7 +182,7 @@ func (l *GameServerLink) onBlowFishKey(c *gameServerConn, payload []byte) {
 func (l *GameServerLink) onGameServerAuth(ctx context.Context, c *gameServerConn, payload []byte) bool {
 	auth, err := link.DecodeGameServerAuth(payload)
 	if err != nil {
-		l.log.Warnf("gameserver link %s: %v", c.remoteIP, err)
+		l.log.Warn().Str("ip", c.remoteIP.String()).Err(err).Msg("gameserver link")
 		return false
 	}
 
@@ -248,14 +245,14 @@ func (l *GameServerLink) onGameServerAuth(ctx context.Context, c *gameServerConn
 
 func (l *GameServerLink) persistRegistration(ctx context.Context, id int, hexID []byte) {
 	if err := l.registrations.CreateGameServer(ctx, model.NewGameServer(id, hexID, "")); err != nil {
-		l.log.Errorf("persist gameserver %d registration: %v", id, err)
+		l.log.Error().Int("server_id", id).Err(err).Msg("persist gameserver registration")
 	}
 }
 
 func (l *GameServerLink) onPlayerInGame(c *gameServerConn, payload []byte) {
 	accounts, err := link.DecodePlayerInGame(payload)
 	if err != nil {
-		l.log.Warnf("gameserver link %s: %v", c.remoteIP, err)
+		l.log.Warn().Str("ip", c.remoteIP.String()).Err(err).Msg("gameserver link")
 		return
 	}
 	for _, account := range accounts {
@@ -266,7 +263,7 @@ func (l *GameServerLink) onPlayerInGame(c *gameServerConn, payload []byte) {
 func (l *GameServerLink) onPlayerLogout(c *gameServerConn, payload []byte) {
 	account, err := link.DecodePlayerLogout(payload)
 	if err != nil {
-		l.log.Warnf("gameserver link %s: %v", c.remoteIP, err)
+		l.log.Warn().Str("ip", c.remoteIP.String()).Err(err).Msg("gameserver link")
 		return
 	}
 	l.servers.RemoveOnlineAccount(c.id, account)
@@ -275,11 +272,11 @@ func (l *GameServerLink) onPlayerLogout(c *gameServerConn, payload []byte) {
 func (l *GameServerLink) onChangeAccessLevel(ctx context.Context, c *gameServerConn, payload []byte) {
 	cal, err := link.DecodeChangeAccessLevel(payload)
 	if err != nil {
-		l.log.Warnf("gameserver link %s: %v", c.remoteIP, err)
+		l.log.Warn().Str("ip", c.remoteIP.String()).Err(err).Msg("gameserver link")
 		return
 	}
 	if err := l.accounts.SetAccessLevel(ctx, cal.Account, int(cal.Level)); err != nil {
-		l.log.Errorf("change access level for %s: %v", cal.Account, err)
+		l.log.Error().Str("account", cal.Account).Err(err).Msg("change access level")
 	}
 }
 
@@ -292,7 +289,7 @@ func (l *GameServerLink) onChangeAccessLevel(ctx context.Context, c *gameServerC
 func (l *GameServerLink) onPlayerAuthRequest(c *gameServerConn, payload []byte) {
 	req, err := link.DecodePlayerAuthRequest(payload)
 	if err != nil {
-		l.log.Warnf("gameserver link %s: %v", c.remoteIP, err)
+		l.log.Warn().Str("ip", c.remoteIP.String()).Err(err).Msg("gameserver link")
 		return
 	}
 
@@ -310,7 +307,7 @@ func (l *GameServerLink) onPlayerAuthRequest(c *gameServerConn, payload []byte) 
 func (l *GameServerLink) onServerStatus(c *gameServerConn, payload []byte) {
 	status, err := link.DecodeServerStatus(payload)
 	if err != nil {
-		l.log.Warnf("gameserver link %s: %v", c.remoteIP, err)
+		l.log.Warn().Str("ip", c.remoteIP.String()).Err(err).Msg("gameserver link")
 		return
 	}
 	l.servers.ApplyStatus(c.id, status)

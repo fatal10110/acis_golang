@@ -17,7 +17,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/link"
 	"github.com/fatal10110/acis_golang/internal/loginserver/data/manager"
 	"github.com/fatal10110/acis_golang/internal/loginserver/data/sql"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 )
 
 // --- fake game-server client, driving the wire protocol from the other side ---
@@ -291,9 +291,9 @@ func newTestLinkCommon(t *testing.T, allowNewServers bool, accounts *sql.Account
 
 	servers = manager.NewServerRegistry()
 	sessions = manager.NewSessionStore()
-	bans = manager.NewIPBanList(logrus.StandardLogger())
+	bans = manager.NewIPBanList(zerolog.Nop())
 
-	l = NewGameServerLink(servers, names, keys, sessions, bans, accounts, registrations, allowNewServers, logrus.StandardLogger())
+	l = NewGameServerLink(servers, names, keys, sessions, bans, accounts, registrations, allowNewServers, zerolog.Nop())
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {

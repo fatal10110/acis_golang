@@ -4,6 +4,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/rs/zerolog"
 )
 
 func TestTickerTicksAndRecoversPanics(t *testing.T) {
@@ -16,7 +18,7 @@ func TestTickerTicksAndRecoversPanics(t *testing.T) {
 		if n == 2 {
 			panic("boom")
 		}
-	}, nil)
+	}, zerolog.Nop())
 	defer tk.Stop()
 
 	for i := 0; i < 4; i++ {
@@ -36,7 +38,7 @@ func TestTickerStopStopsFutureTicks(t *testing.T) {
 	var calls int32
 	tk := Start(5*time.Millisecond, func() {
 		atomic.AddInt32(&calls, 1)
-	}, nil)
+	}, zerolog.Nop())
 
 	time.Sleep(20 * time.Millisecond)
 	tk.Stop()

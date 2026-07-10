@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 )
 
 // IPBanList tracks banned addresses and, for temporary bans, when the ban
@@ -22,14 +22,11 @@ type IPBanList struct {
 	mu   sync.Mutex
 	bans map[string]time.Time // key: addr.String(); zero Time means the ban never expires
 
-	log *logrus.Logger
+	log zerolog.Logger
 }
 
 // NewIPBanList returns an empty IPBanList.
-func NewIPBanList(log *logrus.Logger) *IPBanList {
-	if log == nil {
-		log = logrus.StandardLogger()
-	}
+func NewIPBanList(log zerolog.Logger) *IPBanList {
 	return &IPBanList{bans: make(map[string]time.Time), log: log}
 }
 
@@ -41,12 +38,12 @@ func NewIPBanList(log *logrus.Logger) *IPBanList {
 //
 // A missing or unreadable file yields an empty list rather than an error:
 // IP ban listing is optional infrastructure that must not block boot.
-func LoadIPBanList(path string, log *logrus.Logger) *IPBanList {
+func LoadIPBanList(path string, log zerolog.Logger) *IPBanList {
 	l := NewIPBanList(log)
 
 	f, err := os.Open(path)
 	if err != nil {
-		l.log.Warnf("%s is missing or unreadable, ip ban listing is skipped", path)
+		l.log.Warn().Str("path", path).Msg("ip ban listing is missing or unreadable, skipping")
 		return l
 	}
 	defer f.Close()
@@ -60,13 +57,13 @@ func LoadIPBanList(path string, log *logrus.Logger) *IPBanList {
 
 		addr, err := resolveAddress(line)
 		if err != nil {
-			l.log.Errorf("invalid ban address (%s)", line)
+			l.log.Error().Str("address", line).Msg("invalid ban address")
 			continue
 		}
 		l.set(addr, time.Time{})
 	}
 
-	l.log.Infof("loaded %d banned ip(s)", len(l.bans))
+	l.log.Info().Int("count", len(l.bans)).Msg("loaded banned IPs")
 	return l
 }
 
@@ -97,7 +94,7 @@ func (l *IPBanList) IsBanned(addr net.IP) bool {
 	}
 	if !until.IsZero() && time.Now().After(until) {
 		delete(l.bans, key)
-		l.log.Infof("removed expired ip address ban %s", key)
+		l.log.Info().Str("address", key).Msg("removed expired IP address ban")
 		return false
 	}
 	return true
