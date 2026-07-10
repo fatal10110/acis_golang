@@ -6,7 +6,7 @@ require (
 	github.com/go-sql-driver/mysql v1.10.0
 	github.com/rs/zerolog v1.35.1
 	github.com/testcontainers/testcontainers-go/modules/mariadb v0.43.0
-	golang.org/x/crypto v0.51.0
+	golang.org/x/crypto v0.52.0
 )
 
 require (
