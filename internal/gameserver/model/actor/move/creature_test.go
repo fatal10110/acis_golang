@@ -68,8 +68,14 @@ func TestNewCreatureMoveRejectsInvalidDependencies(t *testing.T) {
 func TestCreatureMove_MoveToLocationScenarios(t *testing.T) {
 	origin := location.Location{X: 10, Y: 20, Z: 30}
 	previous := location.Location{X: 60, Y: 20, Z: 30}
+	minInt := -int(^uint(0)>>1) - 1
+	maxInt := int(^uint(0) >> 1)
+	extremeOrigin := location.Location{X: minInt, Y: minInt, Z: 30}
+	extremeTarget := location.Location{X: maxInt, Y: maxInt, Z: 999}
 	tests := []struct {
 		name              string
+		origin            *location.Location
+		speed             float64
 		canMove           bool
 		target            location.Location
 		initialTarget     *location.Location
@@ -117,6 +123,23 @@ func TestCreatureMove_MoveToLocationScenarios(t *testing.T) {
 			wantDestination: origin,
 		},
 		{
+			name:            "same position accepts the smallest finite speed",
+			speed:           math.SmallestNonzeroFloat64,
+			canMove:         true,
+			target:          location.Location{X: origin.X, Y: origin.Y, Z: 999},
+			wantEvent:       Event{Origin: origin, Destination: origin, Speed: math.SmallestNonzeroFloat64},
+			wantDestination: origin,
+		},
+		{
+			name:            "rejects extreme coordinates without changing state",
+			origin:          &extremeOrigin,
+			speed:           0.01,
+			canMove:         true,
+			target:          extremeTarget,
+			wantErr:         true,
+			wantDestination: extremeOrigin,
+		},
+		{
 			name:              "blocked follow-up preserves state",
 			canMove:           true,
 			initialTarget:     &location.Location{X: 60, Y: 20},
@@ -130,8 +153,16 @@ func TestCreatureMove_MoveToLocationScenarios(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			moverOrigin := origin
+			if test.origin != nil {
+				moverOrigin = *test.origin
+			}
+			speed := 50.0
+			if test.speed != 0 {
+				speed = test.speed
+			}
 			geo := &recordingGeo{canMove: test.canMove, height: 30}
-			mover, err := NewCreatureMove(origin, 50, geo)
+			mover, err := NewCreatureMove(moverOrigin, speed, geo)
 			if err != nil {
 				t.Fatal(err)
 			}

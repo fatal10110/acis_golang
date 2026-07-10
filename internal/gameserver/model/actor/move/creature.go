@@ -55,8 +55,13 @@ func (m *CreatureMove) MoveToLocation(target location.Location) (Event, error) {
 	if !m.geo.CanMove(m.origin.X, m.origin.Y, m.origin.Z, target.X, target.Y, target.Z) {
 		return Event{}, errors.New("move: route is blocked")
 	}
+	if target.X == m.origin.X && target.Y == m.origin.Y {
+		m.destination = target
+		m.moving = false
+		return Event{Origin: m.origin, Destination: target, Speed: m.speed}, nil
+	}
 
-	distance := math.Hypot(float64(target.X-m.origin.X), float64(target.Y-m.origin.Y))
+	distance := math.Hypot(float64(target.X)-float64(m.origin.X), float64(target.Y)-float64(m.origin.Y))
 	ticks := math.Ceil(distance / (m.speed / 10))
 	const tickDuration = 100 * time.Millisecond
 	if math.IsNaN(ticks) || ticks > float64(time.Duration(1<<63-1)/tickDuration) {
