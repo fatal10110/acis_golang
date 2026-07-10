@@ -3,8 +3,10 @@ package engine
 import (
 	"fmt"
 	"math"
+	"sync"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
+	"github.com/fatal10110/acis_golang/internal/gameserver/geo/dynamic"
 )
 
 const (
@@ -29,8 +31,13 @@ const (
 )
 
 // Engine serves geodata height, movement, and line-of-sight queries.
+//
+// mu guards regions and dynamicBlocks. Dynamic block contents are guarded by
+// each dynamic.Block.
 type Engine struct {
-	regions [regionTilesX][regionTilesY]*block.Region
+	mu            sync.RWMutex
+	regions       [regionTilesX][regionTilesY]*block.Region
+	dynamicBlocks map[blockKey]*dynamic.Block
 }
 
 // New returns an empty engine that answers unloaded regions with null geodata.
@@ -46,8 +53,20 @@ func (e *Engine) SetRegion(regionX, regionY int, region *block.Region) error {
 	if region == nil {
 		return fmt.Errorf("geo/engine: region %d_%d is nil", regionX, regionY)
 	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	e.regions[regionX-TileXMin][regionY-TileYMin] = region
 	return nil
+}
+
+// AddObject applies obj's geodata changes to every loaded block it touches.
+func (e *Engine) AddObject(obj dynamic.Object) {
+	e.toggleObject(obj, true)
+}
+
+// RemoveObject removes obj's geodata changes from every dynamic block it touched.
+func (e *Engine) RemoveObject(obj dynamic.Object) {
+	e.toggleObject(obj, false)
 }
 
 // HasGeo reports whether the world position belongs to a loaded non-null block.
@@ -58,6 +77,24 @@ func (e *Engine) HasGeo(worldX, worldY int) bool {
 // Height returns the geodata height nearest to the given world position.
 func (e *Engine) Height(worldX, worldY, worldZ int) int16 {
 	return e.heightNearest(GeoX(worldX), GeoY(worldY), worldZ)
+}
+
+// HeightNearest returns the nearest height at geodata cell coordinates.
+func (e *Engine) HeightNearest(geoX, geoY, worldZ int) int16 {
+	return e.heightNearest(geoX, geoY, worldZ)
+}
+
+// Above returns the first layer above worldZ at geodata cell coordinates.
+func (e *Engine) Above(geoX, geoY, worldZ int) (int16, bool) {
+	b := e.blockAtGeo(geoX, geoY)
+	if !b.HasGeodata() {
+		return 0, false
+	}
+	layer := b.Above(localCell(geoX), localCell(geoY), int32(worldZ))
+	if layer == -1 {
+		return 0, false
+	}
+	return b.Height(layer), true
 }
 
 // CanMove reports whether a straight move from origin to target crosses no blocked edge
@@ -107,7 +144,7 @@ func (e *Engine) CanMove(ox, oy, oz, tx, ty, tz int) bool {
 
 		next := e.blockAtGeo(nx, ny)
 		layer := next.Below(localCell(nx), localCell(ny), int32(goz+block.CellIgnoreHeight))
-		if layer < 0 {
+		if layer == -1 {
 			return false
 		}
 
@@ -169,7 +206,7 @@ func (e *Engine) canSee(ox, oy, oz int, oheight float64, tx, ty, tz int, theight
 
 	current := e.blockAtGeo(gox, goy)
 	layer := current.Below(localCell(gox), localCell(goy), int32(oz+block.CellHeight))
-	if layer < 0 {
+	if layer == -1 {
 		return false
 	}
 	if gox == gtx && goy == gty {
@@ -212,7 +249,7 @@ func (e *Engine) canSee(ox, oy, oz int, oheight float64, tx, ty, tz int, theight
 		} else {
 			layer = current.Above(localCell(gox), localCell(goy), int32(groundZ-2*block.CellHeight))
 		}
-		if layer < 0 {
+		if layer == -1 {
 			return false
 		}
 
@@ -236,22 +273,158 @@ func (e *Engine) nsweNearest(geoX, geoY, worldZ int) block.NSWE {
 	return e.blockAtGeo(geoX, geoY).NSWENearest(localCell(geoX), localCell(geoY), int32(worldZ))
 }
 
-func (e *Engine) blockAtGeo(geoX, geoY int) regionBlock {
+func (e *Engine) blockAtGeo(geoX, geoY int) engineBlock {
 	regionX := TileXMin + geoX/regionCellsX
 	regionY := TileYMin + geoY/regionCellsY
 	if geoX < 0 || geoY < 0 || regionX < TileXMin || regionX > TileXMax || regionY < TileYMin || regionY > TileYMax {
+		return engineBlock{}
+	}
+	blockX := geoX / block.CellsX
+	blockY := geoY / block.CellsY
+
+	e.mu.RLock()
+	if b := e.dynamicBlocks[blockKey{blockX, blockY}]; b != nil {
+		e.mu.RUnlock()
+		return engineBlock{dyn: b}
+	}
+	region := e.regions[regionX-TileXMin][regionY-TileYMin]
+	if region == nil {
+		e.mu.RUnlock()
+		return engineBlock{}
+	}
+
+	localGeoX := geoX % regionCellsX
+	localGeoY := geoY % regionCellsY
+	rb := engineBlock{region: region, blockX: localGeoX / block.CellsX, blockY: localGeoY / block.CellsY}
+	e.mu.RUnlock()
+	return rb
+}
+
+type engineBlock struct {
+	dyn    *dynamic.Block
+	region *block.Region
+	blockX int
+	blockY int
+}
+
+func (b engineBlock) static() regionBlock {
+	return regionBlock{region: b.region, blockX: b.blockX, blockY: b.blockY}
+}
+
+func (b engineBlock) HasGeodata() bool {
+	if b.dyn != nil {
+		return b.dyn.HasGeodata()
+	}
+	return b.static().HasGeodata()
+}
+
+func (b engineBlock) HeightNearest(cellX, cellY int, worldZ int32) int16 {
+	if b.dyn != nil {
+		return b.dyn.HeightNearest(cellX, cellY, worldZ)
+	}
+	return b.static().HeightNearest(cellX, cellY, worldZ)
+}
+
+func (b engineBlock) NSWENearest(cellX, cellY int, worldZ int32) block.NSWE {
+	if b.dyn != nil {
+		return b.dyn.NSWENearest(cellX, cellY, worldZ)
+	}
+	return b.static().NSWENearest(cellX, cellY, worldZ)
+}
+
+func (b engineBlock) Above(cellX, cellY int, worldZ int32) int {
+	if b.dyn != nil {
+		return b.dyn.Above(cellX, cellY, worldZ)
+	}
+	return b.static().Above(cellX, cellY, worldZ)
+}
+
+func (b engineBlock) Below(cellX, cellY int, worldZ int32) int {
+	if b.dyn != nil {
+		return b.dyn.Below(cellX, cellY, worldZ)
+	}
+	return b.static().Below(cellX, cellY, worldZ)
+}
+
+func (b engineBlock) Height(layer int) int16 {
+	if b.dyn != nil {
+		return b.dyn.Height(layer)
+	}
+	return b.static().Height(layer)
+}
+
+func (b engineBlock) NSWE(layer int) block.NSWE {
+	if b.dyn != nil {
+		return b.dyn.NSWE(layer)
+	}
+	return b.static().NSWE(layer)
+}
+
+type blockKey struct {
+	x, y int
+}
+
+func (e *Engine) toggleObject(obj dynamic.Object, add bool) {
+	if obj == nil {
+		return
+	}
+	data := obj.GeoData()
+	if len(data) == 0 || len(data[0]) == 0 {
+		return
+	}
+
+	minBX := obj.GeoX() / block.CellsX
+	maxBX := (obj.GeoX() + len(data) - 1) / block.CellsX
+	minBY := obj.GeoY() / block.CellsY
+	maxBY := (obj.GeoY() + len(data[0]) - 1) / block.CellsY
+
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	for bx := minBX; bx <= maxBX; bx++ {
+		for by := minBY; by <= maxBY; by++ {
+			key := blockKey{bx, by}
+			b := e.dynamicBlocks[key]
+			if b == nil {
+				if !add {
+					continue
+				}
+				base := e.blockAtBlockLocked(bx, by)
+				if !base.HasGeodata() {
+					continue
+				}
+				if e.dynamicBlocks == nil {
+					e.dynamicBlocks = make(map[blockKey]*dynamic.Block)
+				}
+				b = dynamic.NewBlock(bx, by, base)
+				e.dynamicBlocks[key] = b
+			}
+			if add {
+				b.Add(obj)
+			} else {
+				b.Remove(obj)
+			}
+		}
+	}
+}
+
+func (e *Engine) blockAtBlockLocked(blockX, blockY int) regionBlock {
+	if blockX < 0 || blockY < 0 {
+		return regionBlock{}
+	}
+	regionX := TileXMin + blockX/block.RegionBlocksX
+	regionY := TileYMin + blockY/block.RegionBlocksY
+	if regionX < TileXMin || regionX > TileXMax || regionY < TileYMin || regionY > TileYMax {
 		return regionBlock{}
 	}
 	region := e.regions[regionX-TileXMin][regionY-TileYMin]
 	if region == nil {
 		return regionBlock{}
 	}
-
-	localGeoX := geoX % regionCellsX
-	localGeoY := geoY % regionCellsY
-	blockX := localGeoX / block.CellsX
-	blockY := localGeoY / block.CellsY
-	return regionBlock{region: region, blockX: blockX, blockY: blockY}
+	return regionBlock{
+		region: region,
+		blockX: blockX % block.RegionBlocksX,
+		blockY: blockY % block.RegionBlocksY,
+	}
 }
 
 type regionBlock struct {
@@ -260,8 +433,22 @@ type regionBlock struct {
 	blockY int
 }
 
+func (b regionBlock) Kind() block.Kind {
+	if b.region == nil {
+		return block.KindNull
+	}
+	return b.region.KindAt(b.blockX, b.blockY)
+}
+
 func (b regionBlock) HasGeodata() bool {
 	return b.region != nil && b.region.HasGeodata(b.blockX, b.blockY)
+}
+
+func (b regionBlock) Layers(cellX, cellY int) int {
+	if b.region == nil {
+		return 1
+	}
+	return b.region.Layers(b.blockX, b.blockY, cellX, cellY)
 }
 
 func (b regionBlock) HeightNearest(cellX, cellY int, worldZ int32) int16 {
@@ -276,6 +463,13 @@ func (b regionBlock) NSWENearest(cellX, cellY int, worldZ int32) block.NSWE {
 		return block.AllDirections
 	}
 	return b.region.NSWENearest(b.blockX, b.blockY, cellX, cellY, worldZ)
+}
+
+func (b regionBlock) Nearest(cellX, cellY int, worldZ int32) int {
+	if b.region == nil {
+		return 0
+	}
+	return b.region.Nearest(b.blockX, b.blockY, cellX, cellY, worldZ)
 }
 
 func (b regionBlock) Above(cellX, cellY int, worldZ int32) int {
@@ -304,6 +498,13 @@ func (b regionBlock) NSWE(layer int) block.NSWE {
 		return block.AllDirections
 	}
 	return b.region.NSWE(b.blockX, b.blockY, layer)
+}
+
+func (b regionBlock) Cells(cellX, cellY int) []block.Cell {
+	if b.region == nil {
+		return []block.Cell{{Height: 0, NSWE: block.AllDirections}}
+	}
+	return b.region.Cells(b.blockX, b.blockY, cellX, cellY)
 }
 
 func localCell(geo int) int {

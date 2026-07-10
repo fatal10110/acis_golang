@@ -2,9 +2,12 @@ package door
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
+	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // Kind classifies a door template as a regular door or a wall.
@@ -73,6 +76,115 @@ type Template struct {
 	Opened                            bool
 	OpenKind                          OpenKind
 	OpenTime, RandomTime, CloseTime   int
+}
+
+// GeoShape is the geodata footprint calculated for a door.
+type GeoShape interface {
+	GeoX() int
+	GeoY() int
+	GeoZ() int
+	Height() int
+	GeoData() [][]block.NSWE
+}
+
+// Object is one live door spawned into the world.
+//
+// mu guards opened. Position and visibility are guarded by the embedded
+// world.Presence.
+type Object struct {
+	world.Presence
+
+	objectID int32
+	Template *Template
+
+	geoX, geoY, geoZ int
+	height           int
+	geoData          [][]block.NSWE
+
+	mu     sync.RWMutex
+	opened bool
+}
+
+// NewObject creates a live door object from a static template and geodata shape.
+func NewObject(objectID int32, tmpl *Template, shape GeoShape) (*Object, error) {
+	if tmpl == nil {
+		return nil, fmt.Errorf("door: nil template")
+	}
+	if shape == nil {
+		return nil, fmt.Errorf("door %d: nil geo shape", tmpl.ID)
+	}
+	data := shape.GeoData()
+	if len(data) == 0 || len(data[0]) == 0 {
+		return nil, fmt.Errorf("door %d: empty geo shape", tmpl.ID)
+	}
+
+	return &Object{
+		objectID: objectID,
+		Template: tmpl,
+		geoX:     shape.GeoX(),
+		geoY:     shape.GeoY(),
+		geoZ:     shape.GeoZ(),
+		height:   shape.Height(),
+		geoData:  cloneGeoData(data),
+		opened:   tmpl.Opened,
+	}, nil
+}
+
+// ObjectID returns the world object id assigned to this door.
+func (o *Object) ObjectID() int32 { return o.objectID }
+
+// DoorID returns the static door id from doors.xml.
+func (o *Object) DoorID() int { return o.Template.ID }
+
+// MaxHP returns the door's maximum HP.
+func (o *Object) MaxHP() int { return o.Template.HP }
+
+// HP returns the door's current HP. Door damage is not modeled yet, so live
+// doors currently stay at full HP.
+func (o *Object) HP() int { return o.Template.HP }
+
+// Damage returns the visual damage stage sent in door status packets.
+func (o *Object) Damage() int { return 0 }
+
+// Opened reports whether this door is currently open.
+func (o *Object) Opened() bool {
+	o.mu.RLock()
+	defer o.mu.RUnlock()
+	return o.opened
+}
+
+// SetOpened updates the door's open state and reports whether it changed.
+func (o *Object) SetOpened(open bool) bool {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if o.opened == open {
+		return false
+	}
+	o.opened = open
+	return true
+}
+
+// GeoX returns the door footprint's starting geodata X coordinate.
+func (o *Object) GeoX() int { return o.geoX }
+
+// GeoY returns the door footprint's starting geodata Y coordinate.
+func (o *Object) GeoY() int { return o.geoY }
+
+// GeoZ returns the door footprint's baseline geodata Z coordinate.
+func (o *Object) GeoZ() int { return o.geoZ }
+
+// Height returns the vertical span the door blocks.
+func (o *Object) Height() int { return o.height }
+
+// GeoData returns the door footprint's NSWE edits.
+func (o *Object) GeoData() [][]block.NSWE { return cloneGeoData(o.geoData) }
+
+func cloneGeoData(data [][]block.NSWE) [][]block.NSWE {
+	out := make([][]block.NSWE, len(data))
+	for i := range data {
+		out[i] = append([]block.NSWE(nil), data[i]...)
+	}
+	return out
 }
 
 // NewTemplate builds a Template from set. The XML attributes, position,
