@@ -2,19 +2,42 @@ package restart
 
 import (
 	"fmt"
+	"math/rand/v2"
 	"strconv"
 	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // Area is a polygon that overrides region-scale restart data by race.
 type Area struct {
-	MinZ, MaxZ   int
-	Nodes        []location.Point
+	shape        zone.Polygon
 	Restrictions map[player.Race]string
+}
+
+// NewArea builds an Area from a polygon boundary spanning minZ..maxZ.
+func NewArea(nodes []location.Point, minZ, maxZ int, restrictions map[player.Race]string) (Area, error) {
+	shape, err := zone.NewPolygon(nodes, minZ, maxZ)
+	if err != nil {
+		return Area{}, fmt.Errorf("restart: area: %w", err)
+	}
+	return Area{shape: shape, Restrictions: restrictions}, nil
+}
+
+// Contains reports whether loc falls inside the area's boundary.
+func (a Area) Contains(loc location.Location) bool {
+	return a.shape.Contains(loc.X, loc.Y, loc.Z)
+}
+
+// ClassRestriction returns the restart point name overridden for race within
+// this area, if any.
+func (a Area) ClassRestriction(race player.Race) (string, bool) {
+	name, ok := a.Restrictions[race]
+	return name, ok
 }
 
 // Point is a region-scale restart point.
@@ -68,6 +91,91 @@ func NewPoint(set *commons.StatSet) (Point, error) {
 type Table struct {
 	Areas  []Area
 	Points []Point
+}
+
+// AreaAt returns the first restart area containing loc, if any.
+func (t *Table) AreaAt(loc location.Location) (Area, bool) {
+	for _, a := range t.Areas {
+		if a.Contains(loc) {
+			return a, true
+		}
+	}
+	return Area{}, false
+}
+
+// PointByName returns the restart point with the given name, if any.
+func (t *Table) PointByName(name string) (Point, bool) {
+	for _, p := range t.Points {
+		if strings.EqualFold(p.Name, name) {
+			return p, true
+		}
+	}
+	return Point{}, false
+}
+
+// mapRegion converts a world position to its region-scale map coordinate,
+// the same coarse grid restart points are grouped by (independent of the
+// world's visibility grid).
+func mapRegion(loc location.Location) location.Point {
+	return location.Point{
+		X: (loc.X-world.MinX)/world.TileSize + world.TileXMin,
+		Y: (loc.Y-world.MinY)/world.TileSize + world.TileYMin,
+	}
+}
+
+// PointAt returns the restart point whose map region contains loc, if any.
+func (t *Table) PointAt(loc location.Location) (Point, bool) {
+	region := mapRegion(loc)
+	for _, p := range t.Points {
+		for _, r := range p.MapRegions {
+			if r == region {
+				return p, true
+			}
+		}
+	}
+	return Point{}, false
+}
+
+// CalculatedPoint resolves the restart point that applies to a creature of
+// the given race standing at loc: an area's class restriction takes
+// priority over the region's general restart point, and a point banning
+// race redirects to its alternate point.
+func (t *Table) CalculatedPoint(loc location.Location, race player.Race) (Point, bool) {
+	if area, ok := t.AreaAt(loc); ok {
+		name, ok := area.ClassRestriction(race)
+		if !ok {
+			return Point{}, false
+		}
+		return t.PointByName(name)
+	}
+
+	point, ok := t.PointAt(loc)
+	if !ok {
+		return Point{}, false
+	}
+	if point.HasBannedRace && point.BannedRace == race {
+		return t.PointByName(point.BannedPoint)
+	}
+	return point, true
+}
+
+// NearestLocation resolves the destination a creature of the given race and
+// karma lands on when restarting at loc: a random point from the resolved
+// restart point's chaotic list when karma is positive, otherwise from its
+// regular list.
+func (t *Table) NearestLocation(loc location.Location, race player.Race, karma int) (location.Location, bool) {
+	point, ok := t.CalculatedPoint(loc, race)
+	if !ok {
+		return location.Location{}, false
+	}
+	list := point.Points
+	if karma > 0 {
+		list = point.ChaoPoints
+	}
+	if len(list) == 0 {
+		return location.Location{}, false
+	}
+	return list[rand.IntN(len(list))], true
 }
 
 // ParseRace resolves a restart XML race name.

@@ -79,7 +79,7 @@ func buildRestartArea(el restartAreaElement) (restart.Area, error) {
 		}
 		restrictions[race] = r.Zone
 	}
-	return restart.Area{MinZ: el.MinZ, MaxZ: el.MaxZ, Nodes: nodes, Restrictions: restrictions}, nil
+	return restart.NewArea(nodes, el.MinZ, el.MaxZ, restrictions)
 }
 
 func buildRestartPoint(el restartPointElement) (restart.Point, error) {

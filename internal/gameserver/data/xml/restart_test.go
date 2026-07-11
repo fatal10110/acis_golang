@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
 
 func TestLoadRestartPoints(t *testing.T) {
@@ -23,11 +24,14 @@ func TestLoadRestartPoints(t *testing.T) {
 	}
 
 	area := table.Areas[0]
-	if area.MinZ != -3596 || area.MaxZ != -3396 || len(area.Nodes) != 4 {
-		t.Fatalf("first area = %+v", area)
+	if !area.Contains(location.Location{X: 13000, Y: 182000, Z: -3500}) {
+		t.Fatalf("first area should contain a point inside its bounds")
 	}
-	if got := area.Restrictions[player.RaceHuman]; got != "monster_race" {
-		t.Fatalf("first area human restriction = %q, want monster_race", got)
+	if area.Contains(location.Location{X: 0, Y: 0, Z: 0}) {
+		t.Fatalf("first area should not contain the world origin")
+	}
+	if got, ok := area.ClassRestriction(player.RaceHuman); !ok || got != "monster_race" {
+		t.Fatalf("first area human restriction = (%q, %v), want (monster_race, true)", got, ok)
 	}
 
 	point := table.Points[0]
@@ -55,5 +59,14 @@ func TestLoadRestartPointsErrors(t *testing.T) {
 
 	if _, err := LoadRestartPoints(path); err == nil {
 		t.Fatal("LoadRestartPoints() error = nil, want error")
+	}
+}
+
+func TestLoadRestartPointsAreaTooFewVertices(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "restartPointAreas.xml")
+	writeXMLFixture(t, path, `<list><area minZ="0" maxZ="1"><node x="1" y="2"/><node x="3" y="4"/></area></list>`)
+
+	if _, err := LoadRestartPoints(path); err == nil {
+		t.Fatal("LoadRestartPoints() error = nil, want error for a 2-vertex area")
 	}
 }

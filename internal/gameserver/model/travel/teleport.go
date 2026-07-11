@@ -2,6 +2,7 @@ package travel
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -79,6 +80,29 @@ func NewTeleport(set *commons.StatSet) (Teleport, error) {
 		return Teleport{}, err
 	}
 	return teleport, nil
+}
+
+// CalculatedPrice returns t's price at the given instant: standard
+// destinations are half price (rounded down, minimum 1) during weekend core
+// time, 20:00 through 23:59. Any per-player discount tied to event/seal
+// state is not applied here and stays the caller's responsibility once that
+// state exists.
+func (t Teleport) CalculatedPrice(now time.Time) int {
+	if t.Kind == KindStandard && isCoreTime(now) {
+		return max(t.PriceCount>>1, 1)
+	}
+	return t.PriceCount
+}
+
+// isCoreTime reports whether now falls in weekend core time (Saturday or
+// Sunday, 20:00 through 23:59), in now's own location.
+func isCoreTime(now time.Time) bool {
+	switch now.Weekday() {
+	case time.Saturday, time.Sunday:
+		return now.Hour() >= 20
+	default:
+		return false
+	}
 }
 
 // TeleportTable stores regular gatekeeper destinations keyed by npc id.
