@@ -12,6 +12,8 @@ mysql -uroot acis < ../aCis_datapack/tools/full_install.sql
 
 - `../aCis_gameserver/config/loginserver.properties` and `../aCis_gameserver/config/server.properties` point at that database with the `URL`, `Login`, and `Password` keys.
 - `server.properties` has `LoginHost = 127.0.0.1` and `LoginPort = 9014`, matching `loginserver.properties`.
+- XML datapack files stay on disk under `../aCis_datapack`; do not import them into the database.
+- Geodata files stay on disk under `../aCis_datapack/data/geodata`. The shipped `GeoDataPath = ./data/geodata/` is resolved against `-data-root`, so L2OFF files should be named like `16_10_conv.dat` and L2J files like `16_10.l2j`.
 
 ## Build
 
@@ -55,12 +57,13 @@ go run ./cmd/gameserver \
   -config ../aCis_gameserver/config/server.properties \
   -logging ../aCis_gameserver/config/logging.properties \
   -hexid ../aCis_gameserver/config/hexid.txt \
+  -geo-config ../aCis_gameserver/config/geoengine.properties \
   -data-root ../aCis_datapack \
   -log-root .
 ```
 
-The gameserver loads the minimal XML tables, links to the loginserver, and binds the game-client listener from `GameserverHostname/GameserverPort`.
+The gameserver loads the minimal XML tables, loads geodata from `geoengine.properties`, links to the loginserver, and binds the game-client listener from `GameserverHostname/GameserverPort`. Missing geodata region files use the null-region fallback; malformed region files that exist fail boot.
 
 ## Current Limit
 
-This boot wiring starts the processes, database pool, data loaders, TCP listeners, and GS-LS link. The login-client and game-client packet dispatchers are still not wired, so a real Interlude client smoke test will connect but cannot complete login or enter world until those dispatchers are added.
+This boot wiring starts the processes, database pool, XML and geodata loaders, TCP listeners, and GS-LS link. The login-client and game-client packet dispatchers are still not wired, so a real Interlude client smoke test will connect but cannot complete login or enter world until those dispatchers are added.

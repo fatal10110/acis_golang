@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -24,6 +25,9 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	gamexml "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
+	"github.com/fatal10110/acis_golang/internal/gameserver/geo/engine"
+	"github.com/fatal10110/acis_golang/internal/gameserver/geo/pathfind"
+	"github.com/fatal10110/acis_golang/internal/gameserver/geo/probe"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
@@ -33,11 +37,12 @@ import (
 const generatedHexIDSize = 16
 
 type gameServerPaths struct {
-	ConfigPath  string
-	LoggingPath string
-	HexIDPath   string
-	DataRoot    string
-	LogRoot     string
+	ConfigPath    string
+	LoggingPath   string
+	HexIDPath     string
+	GeoConfigPath string
+	DataRoot      string
+	LogRoot       string
 }
 
 type gameServerConfig struct {
@@ -51,6 +56,16 @@ type gameData struct {
 	Players *player.TemplateTable
 	Levels  *player.LevelTable
 	Items   *item.Table
+	Geo     *engine.Engine
+	Finder  *pathfind.Finder
+}
+
+type geodata struct {
+	Engine   *engine.Engine
+	Finder   *pathfind.Finder
+	Dir      string
+	Type     probe.GeoType
+	Pathfind pathfind.Options
 }
 
 func main() {
@@ -63,6 +78,7 @@ func parseGameServerFlags() gameServerPaths {
 	flag.StringVar(&paths.ConfigPath, "config", "config/server.properties", "game server properties file")
 	flag.StringVar(&paths.LoggingPath, "logging", "config/logging.properties", "logging properties file")
 	flag.StringVar(&paths.HexIDPath, "hexid", "config/hexid.txt", "game server hexid properties file")
+	flag.StringVar(&paths.GeoConfigPath, "geo-config", "config/geoengine.properties", "geoengine properties file")
 	flag.StringVar(&paths.DataRoot, "data-root", ".", "datapack root containing data/xml")
 	flag.StringVar(&paths.LogRoot, "log-root", ".", "root directory for log files")
 	flag.Parse()
@@ -225,8 +241,52 @@ func loadGameData(paths gameServerPaths, log zerolog.Logger) (*gameData, error) 
 	if err != nil {
 		return nil, err
 	}
-	log.Info().Msg("minimal game data loaded")
-	return &gameData{Players: players, Levels: levels, Items: items}, nil
+	geo, err := loadGeodata(paths)
+	if err != nil {
+		return nil, err
+	}
+	log.Info().Str("geodata_dir", geo.Dir).Str("geodata_type", string(geo.Type)).Msg("game data loaded")
+	return &gameData{Players: players, Levels: levels, Items: items, Geo: geo.Engine, Finder: geo.Finder}, nil
+}
+
+func loadGeodata(paths gameServerPaths) (*geodata, error) {
+	props, err := config.LoadFile(paths.GeoConfigPath)
+	if err != nil {
+		return nil, err
+	}
+
+	options, err := pathfind.OptionsFromProperties(props)
+	if err != nil {
+		return nil, err
+	}
+
+	geo := &geodata{
+		Dir:      resolveGeodataDir(paths.DataRoot, props.String("GeoDataPath", "")),
+		Type:     probe.GeoType(props.String("GeoDataType", string(probe.L2OFF))),
+		Pathfind: options,
+	}
+	geo.Engine, err = probe.LoadEngine(geo.Dir, geo.Type)
+	if err != nil {
+		return nil, err
+	}
+	geo.Finder = pathfind.New(geo.Engine, geo.Pathfind)
+	return geo, nil
+}
+
+func resolveGeodataDir(dataRoot, configured string) string {
+	configured = strings.TrimSpace(configured)
+	if configured == "" {
+		return filepath.Join(dataRoot, "data", "geodata")
+	}
+	if filepath.IsAbs(configured) {
+		return configured
+	}
+
+	clean := filepath.Clean(configured)
+	if clean == "data" || strings.HasPrefix(clean, "data"+string(os.PathSeparator)) {
+		return filepath.Join(dataRoot, clean)
+	}
+	return clean
 }
 
 func provideIDAllocator(pool *sql.DB, log zerolog.Logger) (*idfactory.Allocator, error) {

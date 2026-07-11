@@ -2,9 +2,13 @@ package main
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/config"
+	"github.com/fatal10110/acis_golang/internal/gameserver/geo/pathfind"
+	"github.com/fatal10110/acis_golang/internal/gameserver/geo/probe"
 	"github.com/fatal10110/acis_golang/internal/loginserver/model"
 )
 
@@ -90,5 +94,75 @@ RequestServerID = 9
 	}
 	if len(cfg.Auth.HexID) != generatedHexIDSize {
 		t.Errorf("generated HexID length = %d, want %d", len(cfg.Auth.HexID), generatedHexIDSize)
+	}
+}
+
+func TestLoadGeodataUsesGeoengineProperties(t *testing.T) {
+	dataRoot := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dataRoot, "data", "geodata"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	configPath := filepath.Join(t.TempDir(), "geoengine.properties")
+	if err := os.WriteFile(configPath, []byte(`
+GeoDataPath = ./data/geodata/
+GeoDataType = L2J
+MoveWeight = 11
+MoveWeightDiag = 15
+ObstacleWeight = 33
+HeuristicWeight = 17
+MaxIterations = 1234
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	geo, err := loadGeodata(gameServerPaths{DataRoot: dataRoot, GeoConfigPath: configPath})
+	if err != nil {
+		t.Fatalf("loadGeodata: %v", err)
+	}
+
+	if geo.Engine == nil {
+		t.Fatal("Engine = nil, want loaded geodata engine")
+	}
+	if geo.Finder == nil {
+		t.Fatal("Finder = nil, want pathfinder over loaded engine")
+	}
+	if got, want := filepath.Clean(geo.Dir), filepath.Join(dataRoot, "data", "geodata"); got != want {
+		t.Errorf("Dir = %q, want %q", got, want)
+	}
+	if geo.Type != probe.L2J {
+		t.Errorf("Type = %q, want %q", geo.Type, probe.L2J)
+	}
+	wantOptions := pathfind.Options{
+		MoveWeight:      11,
+		MoveWeightDiag:  15,
+		ObstacleWeight:  33,
+		HeuristicWeight: 17,
+		MaxIterations:   1234,
+	}
+	if geo.Pathfind != wantOptions {
+		t.Errorf("Pathfind = %#v, want %#v", geo.Pathfind, wantOptions)
+	}
+}
+
+func TestLoadGeodataDefaultsToDatapackGeodata(t *testing.T) {
+	dataRoot := t.TempDir()
+	configPath := filepath.Join(t.TempDir(), "geoengine.properties")
+	if err := os.WriteFile(configPath, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	geo, err := loadGeodata(gameServerPaths{DataRoot: dataRoot, GeoConfigPath: configPath})
+	if err != nil {
+		t.Fatalf("loadGeodata: %v", err)
+	}
+
+	if got, want := filepath.Clean(geo.Dir), filepath.Join(dataRoot, "data", "geodata"); got != want {
+		t.Errorf("Dir = %q, want %q", got, want)
+	}
+	if geo.Type != probe.L2OFF {
+		t.Errorf("Type = %q, want %q", geo.Type, probe.L2OFF)
+	}
+	if geo.Pathfind != pathfind.DefaultOptions() {
+		t.Errorf("Pathfind = %#v, want defaults %#v", geo.Pathfind, pathfind.DefaultOptions())
 	}
 }
