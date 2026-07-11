@@ -6,11 +6,15 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 )
 
-const freightTestItemID int32 = 100
+const (
+	freightTestItemID      int32 = 100
+	freightTestStackableID int32 = 101
+)
 
 func freightTestTemplates() *item.Table {
 	return item.NewTable([]*item.Template{
 		{ID: freightTestItemID, Kind: item.KindWeapon, Slot: item.SlotRHand, Weapon: &item.WeaponDetail{}},
+		{ID: freightTestStackableID, Kind: item.KindEtcItem, Stackable: true, EtcItem: &item.EtcItemDetail{}},
 	})
 }
 
@@ -26,6 +30,48 @@ func TestFreight_AddNew_TagsCurrentTown(t *testing.T) {
 	tagged := f.AddNew(freightTestItemID, 1, 0x20000002)
 	if tagged.LocationData != 5 {
 		t.Errorf("AddNew() with active town 5 set LocationData = %d, want 5", tagged.LocationData)
+	}
+}
+
+func TestFreight_AddNew_MergesOnlyVisibleStacks(t *testing.T) {
+	f := NewFreight(0x10000001, freightTestTemplates())
+
+	f.ActiveLocation = 1
+	townOne := f.AddNew(freightTestStackableID, 10, 0x20000001)
+	f.ActiveLocation = 2
+	townTwo := f.AddNew(freightTestStackableID, 5, 0x20000002)
+
+	if townTwo == townOne {
+		t.Fatalf("AddNew() merged a town-2 stack into a hidden town-1 stack")
+	}
+	if townOne.Count != 10 || townOne.LocationData != 1 {
+		t.Errorf("town-1 stack = count %d location %d, want count 10 location 1", townOne.Count, townOne.LocationData)
+	}
+	if townTwo.Count != 5 || townTwo.LocationData != 2 {
+		t.Errorf("town-2 stack = count %d location %d, want count 5 location 2", townTwo.Count, townTwo.LocationData)
+	}
+
+	merged := f.AddNew(freightTestStackableID, 3, 0x20000003)
+	if merged != townTwo {
+		t.Fatalf("AddNew() with the same active town returned %+v, want the town-2 stack", merged)
+	}
+	if townTwo.Count != 8 || townTwo.LocationData != 2 {
+		t.Errorf("merged town-2 stack = count %d location %d, want count 8 location 2", townTwo.Count, townTwo.LocationData)
+	}
+}
+
+func TestFreight_AddNew_MergesUntaggedStackWithoutRetagging(t *testing.T) {
+	f := NewFreight(0x10000001, freightTestTemplates())
+
+	untagged := f.AddNew(freightTestStackableID, 10, 0x20000001)
+	f.ActiveLocation = 2
+	merged := f.AddNew(freightTestStackableID, 5, 0x20000002)
+
+	if merged != untagged {
+		t.Fatalf("AddNew() should merge into a visible untagged stack")
+	}
+	if untagged.Count != 15 || untagged.LocationData != 0 {
+		t.Errorf("untagged stack = count %d location %d, want count 15 location 0", untagged.Count, untagged.LocationData)
 	}
 }
 

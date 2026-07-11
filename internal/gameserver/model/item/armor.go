@@ -44,7 +44,7 @@ var armorTypeNames = commons.ReverseMap(armorTypeStrings)
 // mask. ArmorType's bits sit immediately above WeaponType's so the two
 // families share one bitmask space without colliding.
 func (a ArmorType) Mask() int32 {
-	return 1 << (uint(a) + weaponTypeCount)
+	return 1 << (uint(a) + uint(weaponTypeCount))
 }
 
 // ArmorDetail is the armor-specific data a KindArmor Template carries; nil

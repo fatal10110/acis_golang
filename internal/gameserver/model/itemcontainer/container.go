@@ -19,7 +19,9 @@ import (
 // comes from (player status, clan config, ...) — this package doesn't load
 // config itself.
 //
-// mu guards items.
+// mu guards the membership map. It does not make returned *item.Instance
+// values independently thread-safe; the owning actor/runtime must serialize
+// instance field access.
 type Container struct {
 	ownerID   int32
 	location  item.Location
@@ -273,7 +275,13 @@ func (c *Container) Remove(inst *item.Instance) bool {
 // removing it from the world registry once this returns inst with a
 // now-zero count.
 func (c *Container) DestroyItem(inst *item.Instance, count int) *item.Instance {
-	if inst == nil {
+	if inst == nil || count <= 0 {
+		return nil
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.items[inst.ObjectID] != inst {
 		return nil
 	}
 	if inst.Count > count {
@@ -283,9 +291,7 @@ func (c *Container) DestroyItem(inst *item.Instance, count int) *item.Instance {
 	if inst.Count < count {
 		return nil
 	}
-	if !c.Remove(inst) {
-		return nil
-	}
+	delete(c.items, inst.ObjectID)
 	inst.Count = 0
 	inst.OwnerID = 0
 	inst.Location = item.LocationVoid
@@ -319,6 +325,12 @@ func (c *Container) DestroyAllItems() {
 	}
 }
 
+type transferTarget interface {
+	Add(inst *item.Instance) (result *item.Instance, absorbed bool)
+	AddNew(templateID int32, count int, objectID int32) *item.Instance
+	ItemByTemplateID(templateID int32) *item.Instance
+}
+
 // Transfer moves count units of the instance identified by objectID from
 // c into target, merging into an existing stack in target when the item
 // is stackable and target already holds one. newObjectID supplies the
@@ -334,26 +346,43 @@ func (c *Container) DestroyAllItems() {
 // The caller remains responsible for undoing any life-stone augmentation
 // bonus a transferred instance was granting its previous owner — that's
 // stat-engine behavior this package doesn't own.
-func (c *Container) Transfer(objectID int32, count int, target *Container, newObjectID int32) (result *item.Instance, freedObjectID int32, freed bool) {
-	src := c.ItemByObjectID(objectID)
-	if src == nil {
+func (c *Container) Transfer(objectID int32, count int, target transferTarget, newObjectID int32) (result *item.Instance, freedObjectID int32, freed bool) {
+	if target == nil || count <= 0 {
 		return nil, 0, false
 	}
 
-	tmpl, _ := c.templates.Get(src.TemplateID)
-	stackable := tmpl != nil && tmpl.Stackable
-
-	var targetItem *item.Instance
-	if stackable {
-		targetItem = target.ItemByTemplateID(src.TemplateID)
+	c.mu.Lock()
+	src := c.items[objectID]
+	if src == nil {
+		c.mu.Unlock()
+		return nil, 0, false
 	}
-
+	templateID := src.TemplateID
+	tmpl, _ := c.templates.Get(templateID)
+	stackable := tmpl != nil && tmpl.Stackable
 	if count > src.Count {
 		count = src.Count
 	}
+	sourceCount := src.Count
+	c.mu.Unlock()
 
+	var targetItem *item.Instance
+	if stackable {
+		targetItem = target.ItemByTemplateID(templateID)
+	}
+
+	c.mu.Lock()
+	src = c.items[objectID]
+	if src == nil || src.TemplateID != templateID || src.Count != sourceCount {
+		c.mu.Unlock()
+		return nil, 0, false
+	}
+	if count > src.Count {
+		count = src.Count
+	}
 	if src.Count == count && targetItem == nil {
-		c.Remove(src)
+		delete(c.items, objectID)
+		c.mu.Unlock()
 		result, _ = target.Add(src)
 		return result, 0, false
 	}
@@ -361,19 +390,20 @@ func (c *Container) Transfer(objectID int32, count int, target *Container, newOb
 	if src.Count > count {
 		src.Count -= count
 	} else {
-		c.Remove(src)
+		delete(c.items, objectID)
 		src.Count = 0
 		src.OwnerID = 0
 		src.Location = item.LocationVoid
 		freedObjectID, freed = objectID, true
 	}
+	c.mu.Unlock()
 
 	if targetItem != nil {
-		targetItem.Count += count
-		return targetItem, freedObjectID, freed
+		result, _ = target.Add(&item.Instance{TemplateID: templateID, Count: count, ManaLeft: -1})
+		return result, freedObjectID, freed
 	}
 
-	return target.AddNew(src.TemplateID, count, newObjectID), freedObjectID, freed
+	return target.AddNew(templateID, count, newObjectID), freedObjectID, freed
 }
 
 // ValidateCapacity reports whether adding slotCount more stacks/instances

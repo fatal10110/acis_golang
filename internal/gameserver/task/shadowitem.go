@@ -43,7 +43,8 @@ type shadowItemEntry struct {
 // non-negative mana value, so it never actually fires there either — this
 // port simply doesn't reproduce that dead branch.
 //
-// mu guards entries.
+// mu guards entries. The owning actor/runtime must serialize access to the
+// tracked item instances themselves; this manager only owns the decay schedule.
 type ShadowItems struct {
 	effects ShadowItemEffects
 

@@ -57,7 +57,9 @@ type Update struct {
 // unlimited, sourced the same way Container.SlotLimit is: this package
 // doesn't load config or read owner stats itself.
 //
-// mu guards paperdoll, wornMask, totalWeight and updates.
+// mu guards paperdoll, wornMask, totalWeight and updates. It does not make
+// the *item.Instance values themselves thread-safe; those follow Container's
+// owner-serialized access rule.
 type Inventory struct {
 	*Container
 

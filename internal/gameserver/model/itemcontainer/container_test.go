@@ -176,6 +176,54 @@ func TestContainer_Transfer_FullyMovesNonStackableWithoutNewID(t *testing.T) {
 	}
 }
 
+func TestContainer_Transfer_UsesInventoryAddHooks(t *testing.T) {
+	src := newTestContainer()
+	dst := NewPlayerInventory(0x10000002, testTemplates())
+
+	dst.AddNew(adenaTemplateID, 5, 0x20000002)
+	dst.DrainUpdates()
+	inst := src.AddNew(adenaTemplateID, 100, 0x20000001)
+
+	result, freedID, freed := src.Transfer(inst.ObjectID, 40, dst, 0)
+	if result == nil || result.Count != 45 {
+		t.Fatalf("Transfer() result = %+v, want destination count 45", result)
+	}
+	if freed {
+		t.Errorf("partial transfer reported freed id %d", freedID)
+	}
+	updates := dst.DrainUpdates()
+	if len(updates) != 1 || updates[0].ObjectID != result.ObjectID || updates[0].State != UpdateModified || updates[0].Count != 45 {
+		t.Fatalf("destination updates = %+v, want one MODIFIED update with count 45", updates)
+	}
+}
+
+func TestContainer_Transfer_UsesFreightVisibleTownHooks(t *testing.T) {
+	src := NewContainer(0x10000001, item.LocationWarehouse, freightTestTemplates())
+	dst := NewFreight(0x10000002, freightTestTemplates())
+
+	dst.ActiveLocation = 1
+	townOne := dst.AddNew(freightTestStackableID, 10, 0x20000002)
+	dst.ActiveLocation = 2
+	inst := src.AddNew(freightTestStackableID, 5, 0x20000001)
+
+	result, _, freed := src.Transfer(inst.ObjectID, 5, dst, 0)
+	if result == nil {
+		t.Fatalf("Transfer() returned nil")
+	}
+	if result == townOne {
+		t.Fatalf("Transfer() merged into a hidden town-1 stack")
+	}
+	if result.LocationData != 2 || result.Count != 5 {
+		t.Errorf("transferred stack = count %d location %d, want count 5 location 2", result.Count, result.LocationData)
+	}
+	if freed {
+		t.Errorf("whole-instance transfer should move the source instance, not free its object id")
+	}
+	if townOne.Count != 10 || townOne.LocationData != 1 {
+		t.Errorf("hidden town-1 stack = count %d location %d, want count 10 location 1", townOne.Count, townOne.LocationData)
+	}
+}
+
 func TestContainer_ValidateCapacity(t *testing.T) {
 	c := newTestContainer()
 	if !c.ValidateCapacity(1000) {

@@ -31,6 +31,9 @@ type Instance struct {
 // DecreaseMana reduces a shadow item's remaining mana by amount, floored at
 // zero.
 func (inst *Instance) DecreaseMana(amount int) {
+	if inst.ManaLeft < 0 || amount <= 0 {
+		return
+	}
 	if amount > inst.ManaLeft {
 		amount = inst.ManaLeft
 	}

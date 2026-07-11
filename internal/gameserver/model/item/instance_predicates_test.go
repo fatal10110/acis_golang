@@ -91,6 +91,19 @@ func TestInstance_DecreaseMana(t *testing.T) {
 	if inst.ManaLeft != 0 {
 		t.Errorf("DecreaseMana should floor at zero, got %d", inst.ManaLeft)
 	}
+
+	inst.ManaLeft = -1
+	inst.DecreaseMana(1)
+	if inst.ManaLeft != -1 {
+		t.Errorf("DecreaseMana on an untracked item changed ManaLeft to %d, want -1", inst.ManaLeft)
+	}
+
+	inst.ManaLeft = 5
+	inst.DecreaseMana(0)
+	inst.DecreaseMana(-3)
+	if inst.ManaLeft != 5 {
+		t.Errorf("DecreaseMana with non-positive amounts changed ManaLeft to %d, want 5", inst.ManaLeft)
+	}
 }
 
 func TestInstance_Equipped(t *testing.T) {
