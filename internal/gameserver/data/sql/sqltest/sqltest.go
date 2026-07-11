@@ -102,6 +102,19 @@ const spawnDataSchema = "CREATE TABLE IF NOT EXISTS `spawn_data` (\n" +
 	"  PRIMARY KEY (`name`)\n" +
 	")"
 
+// itemsOnGroundSchema mirrors the shipped items_on_ground table definition verbatim.
+const itemsOnGroundSchema = "CREATE TABLE IF NOT EXISTS `items_on_ground` (\n" +
+	"  `object_id` int(11) NOT NULL default '0',\n" +
+	"  `item_id` int(11) default NULL,\n" +
+	"  `count` int(11) default NULL,\n" +
+	"  `enchant_level` int(11) default NULL,\n" +
+	"  `x` int(11) default NULL,\n" +
+	"  `y` int(11) default NULL,\n" +
+	"  `z` int(11) default NULL,\n" +
+	"  `time` decimal(20,0) default NULL,\n" +
+	"  PRIMARY KEY  (`object_id`)\n" +
+	")"
+
 // NewDB starts a real MariaDB container, creates the gameserver tables used
 // by integration tests, and returns a pool connected to it. The container is
 // terminated and the pool closed when the test completes.
@@ -138,6 +151,9 @@ func NewDB(t *testing.T) *sql.DB {
 	}
 	if _, err := db.ExecContext(ctx, spawnDataSchema); err != nil {
 		t.Fatalf("create spawn_data table: %v", err)
+	}
+	if _, err := db.ExecContext(ctx, itemsOnGroundSchema); err != nil {
+		t.Fatalf("create items_on_ground table: %v", err)
 	}
 	return db
 }
