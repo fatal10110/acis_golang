@@ -54,16 +54,7 @@ func (s *SpawnStore) LoadStates(ctx context.Context) (map[string]*spawn.State, e
 
 // SaveStates replaces spawn_data with initialized rows from states.
 func (s *SpawnStore) SaveStates(ctx context.Context, states map[string]*spawn.State) error {
-	if _, err := s.db.ExecContext(ctx, "TRUNCATE spawn_data"); err != nil {
-		return fmt.Errorf("clear spawn data: %w", err)
-	}
-
-	stmt, err := s.db.PrepareContext(ctx, `INSERT INTO spawn_data (name, status, current_hp, current_mp, loc_x, loc_y, loc_z, heading, db_value, respawn_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-	if err != nil {
-		return fmt.Errorf("save spawn data: %w", err)
-	}
-	defer stmt.Close()
-
+	rows := make([]*spawn.State, 0, len(states))
 	for _, state := range states {
 		if state == nil || state.Status < 0 {
 			continue
@@ -71,6 +62,31 @@ func (s *SpawnStore) SaveStates(ctx context.Context, states map[string]*spawn.St
 		if state.Name == "" {
 			return fmt.Errorf("save spawn data: empty name")
 		}
+		rows = append(rows, state)
+	}
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("save spawn data: %w", err)
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+
+	if _, err := tx.ExecContext(ctx, "DELETE FROM spawn_data"); err != nil {
+		return fmt.Errorf("clear spawn data: %w", err)
+	}
+
+	stmt, err := tx.PrepareContext(ctx, `INSERT INTO spawn_data (name, status, current_hp, current_mp, loc_x, loc_y, loc_z, heading, db_value, respawn_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	if err != nil {
+		return fmt.Errorf("save spawn data: %w", err)
+	}
+	defer stmt.Close()
+
+	for _, state := range rows {
 		if _, err := stmt.ExecContext(ctx,
 			state.Name,
 			state.Status,
@@ -86,5 +102,9 @@ func (s *SpawnStore) SaveStates(ctx context.Context, states map[string]*spawn.St
 			return fmt.Errorf("save spawn data %q: %w", state.Name, err)
 		}
 	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("save spawn data: %w", err)
+	}
+	committed = true
 	return nil
 }
