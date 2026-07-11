@@ -31,6 +31,30 @@ func TestAugmentationStore_CreateAndGet(t *testing.T) {
 	}
 }
 
+func TestAugmentationStore_SaveUpserts(t *testing.T) {
+	ctx := context.Background()
+	store := NewAugmentationStore(sqltest.NewDB(t))
+
+	if err := store.Save(ctx, 0x10000101, item.Augmentation{Attributes: 12345, SkillID: 2621, SkillLevel: 1}); err != nil {
+		t.Fatalf("Save(insert) unexpected error: %v", err)
+	}
+	if err := store.Save(ctx, 0x10000101, item.Augmentation{Attributes: 54321, SkillID: 0, SkillLevel: 0}); err != nil {
+		t.Fatalf("Save(update) unexpected error: %v", err)
+	}
+
+	got, ok, err := store.Get(ctx, 0x10000101)
+	if err != nil {
+		t.Fatalf("Get() unexpected error: %v", err)
+	}
+	if !ok {
+		t.Fatalf("Get() reported not found, want found")
+	}
+	want := item.Augmentation{Attributes: 54321, SkillID: 0, SkillLevel: 0}
+	if got != want {
+		t.Errorf("Get() = %+v, want %+v", got, want)
+	}
+}
+
 func TestAugmentationStore_Get_NotFound(t *testing.T) {
 	ctx := context.Background()
 	store := NewAugmentationStore(sqltest.NewDB(t))
