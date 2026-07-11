@@ -40,6 +40,13 @@ var armorTypeStrings = map[ArmorType]string{
 
 var armorTypeNames = commons.ReverseMap(armorTypeStrings)
 
+// Mask returns the worn-item bit a occupies in an inventory's worn-type
+// mask. ArmorType's bits sit immediately above WeaponType's so the two
+// families share one bitmask space without colliding.
+func (a ArmorType) Mask() int32 {
+	return 1 << (uint(a) + uint(weaponTypeCount))
+}
+
 // ArmorDetail is the armor-specific data a KindArmor Template carries; nil
 // for every other Kind.
 type ArmorDetail struct {

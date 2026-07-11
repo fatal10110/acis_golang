@@ -27,6 +27,7 @@ const (
 	WeaponFishingRod
 	WeaponBigBlunt
 	WeaponPet
+	weaponTypeEnd
 )
 
 // String returns the canonical XML spelling for w.
@@ -56,6 +57,17 @@ var weaponTypeStrings = map[WeaponType]string{
 }
 
 var weaponTypeNames = commons.ReverseMap(weaponTypeStrings)
+
+// weaponTypeCount is the number of WeaponType members; ArmorType's worn-mask
+// bits start immediately above the bits WeaponType occupies, so the two
+// families share one bitmask space without colliding.
+const weaponTypeCount = int(weaponTypeEnd)
+
+// Mask returns the worn-item bit w occupies in an inventory's worn-type
+// mask.
+func (w WeaponType) Mask() int32 {
+	return 1 << uint(w)
+}
 
 // WeaponDetail is the weapon-specific data a KindWeapon Template carries;
 // nil for every other Kind.

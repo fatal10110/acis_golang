@@ -75,6 +75,28 @@ func TestTable_All(t *testing.T) {
 	}
 }
 
+func TestWeaponAndArmorMasksDoNotCollide(t *testing.T) {
+	if len(weaponTypeStrings) != weaponTypeCount {
+		t.Fatalf("weaponTypeCount = %d, but weaponTypeStrings has %d entries", weaponTypeCount, len(weaponTypeStrings))
+	}
+
+	seen := make(map[int32]string)
+	for w := WeaponType(0); w < weaponTypeEnd; w++ {
+		mask := w.Mask()
+		if owner, ok := seen[mask]; ok {
+			t.Fatalf("%s and %s share mask %d", owner, w, mask)
+		}
+		seen[mask] = w.String()
+	}
+	for a := ArmorType(0); a <= ArmorShield; a++ {
+		mask := a.Mask()
+		if owner, ok := seen[mask]; ok {
+			t.Fatalf("%s and %s share mask %d", owner, a, mask)
+		}
+		seen[mask] = a.String()
+	}
+}
+
 func TestTemplate_Category(t *testing.T) {
 	tests := []struct {
 		name    string
