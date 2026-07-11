@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/config"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/pathfind"
@@ -66,6 +67,28 @@ HexID = -7fff
 	}
 	if cfg.Database.URL != "jdbc:mariadb://db.example/acis" || cfg.Database.Login != "acis" || cfg.Database.Password != "secret" {
 		t.Errorf("Database = %+v, want parsed database credentials", cfg.Database)
+	}
+}
+
+func TestLoadPvPFlagOptionsUsesPlayersProperties(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "players.properties")
+	if err := os.WriteFile(configPath, []byte(`
+PvPVsNormalTime = 1234
+PvPVsPvPTime = 5678
+KarmaPlayerCanShop = False
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	opts, err := loadPvPFlagOptions(gameServerPaths{PlayersConfigPath: configPath})
+	if err != nil {
+		t.Fatalf("loadPvPFlagOptions() error = %v", err)
+	}
+	if opts.Normal != 1234*time.Millisecond || opts.Flagged != 5678*time.Millisecond {
+		t.Fatalf("durations = normal %s flagged %s, want 1234ms/5678ms", opts.Normal, opts.Flagged)
+	}
+	if len(opts.UnsupportedKeys) != 1 || opts.UnsupportedKeys[0] != "KarmaPlayerCanShop" {
+		t.Fatalf("UnsupportedKeys = %v, want [KarmaPlayerCanShop]", opts.UnsupportedKeys)
 	}
 }
 

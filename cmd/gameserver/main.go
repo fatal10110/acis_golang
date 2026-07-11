@@ -21,6 +21,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/db"
 	"github.com/fatal10110/acis_golang/internal/commons/idfactory"
 	"github.com/fatal10110/acis_golang/internal/commons/logging"
+	"github.com/fatal10110/acis_golang/internal/commons/scheduler"
 	"github.com/fatal10110/acis_golang/internal/config"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
@@ -31,18 +32,20 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/loginserver/model"
 )
 
 const generatedHexIDSize = 16
 
 type gameServerPaths struct {
-	ConfigPath    string
-	LoggingPath   string
-	HexIDPath     string
-	GeoConfigPath string
-	DataRoot      string
-	LogRoot       string
+	ConfigPath        string
+	LoggingPath       string
+	PlayersConfigPath string
+	HexIDPath         string
+	GeoConfigPath     string
+	DataRoot          string
+	LogRoot           string
 }
 
 type gameServerConfig struct {
@@ -77,6 +80,7 @@ func parseGameServerFlags() gameServerPaths {
 	var paths gameServerPaths
 	flag.StringVar(&paths.ConfigPath, "config", "config/server.properties", "game server properties file")
 	flag.StringVar(&paths.LoggingPath, "logging", "config/logging.properties", "logging properties file")
+	flag.StringVar(&paths.PlayersConfigPath, "players-config", "config/players.properties", "player properties file")
 	flag.StringVar(&paths.HexIDPath, "hexid", "config/hexid.txt", "game server hexid properties file")
 	flag.StringVar(&paths.GeoConfigPath, "geo-config", "config/geoengine.properties", "geoengine properties file")
 	flag.StringVar(&paths.DataRoot, "data-root", ".", "datapack root containing data/xml")
@@ -90,6 +94,7 @@ func newGameServerApp(paths gameServerPaths) *fx.App {
 		fx.Supply(paths),
 		fx.Provide(
 			loadGameServerProperties,
+			loadPvPFlagOptions,
 			loadHexIDProperties,
 			gameServerConfigFromLoadedProperties,
 			provideGameServerLogger,
@@ -99,15 +104,24 @@ func newGameServerApp(paths gameServerPaths) *fx.App {
 			gamesql.NewItemStore,
 			provideIDAllocator,
 			provideRoster,
+			providePvPFlags,
 			network.NewSessionValidator,
 			provideLoginLinkState,
 		),
-		fx.Invoke(startGameServer),
+		fx.Invoke(startPvPFlags, startGameServer),
 	)
 }
 
 func loadGameServerProperties(paths gameServerPaths) (*config.Properties, error) {
 	return config.LoadFile(paths.ConfigPath)
+}
+
+func loadPvPFlagOptions(paths gameServerPaths) (task.PvPFlagOptions, error) {
+	props, err := config.LoadFile(paths.PlayersConfigPath)
+	if err != nil {
+		return task.PvPFlagOptions{}, err
+	}
+	return task.PvPFlagOptionsFromProperties(props)
 }
 
 type hexIDProperties struct {
@@ -295,6 +309,29 @@ func provideIDAllocator(pool *sql.DB, log zerolog.Logger) (*idfactory.Allocator,
 
 func provideRoster(cfg gameServerConfig, data *gameData, characters *gamesql.CharacterStore, items *gamesql.ItemStore, ids *idfactory.Allocator) *manager.Roster {
 	return manager.NewRoster(characters, items, data.Players, data.Items, ids, manager.DefaultDeleteAfter, time.Now)
+}
+
+func providePvPFlags(opts task.PvPFlagOptions) *task.PvPFlags {
+	return task.NewPvPFlags(opts, time.Now)
+}
+
+func startPvPFlags(lc fx.Lifecycle, flags *task.PvPFlags, opts task.PvPFlagOptions, log zerolog.Logger) {
+	var ticker *scheduler.Ticker
+	lc.Append(fx.Hook{
+		OnStart: func(context.Context) error {
+			for _, key := range opts.UnsupportedKeys {
+				log.Warn().Str("file", "players.properties").Str("key", key).Msg("unsupported Karma/PvP config option")
+			}
+			ticker = flags.Start(log)
+			return nil
+		},
+		OnStop: func(context.Context) error {
+			if ticker != nil {
+				ticker.Stop()
+			}
+			return nil
+		},
+	})
 }
 
 type loginLinkState struct {
