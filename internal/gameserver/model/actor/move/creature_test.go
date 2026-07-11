@@ -247,12 +247,10 @@ func TestCreatureMove_FriendlyFollowTick(t *testing.T) {
 	}
 
 	want := Event{
-		Origin:       origin,
-		Destination:  location.Location{X: 111, Y: 20, Z: 30},
-		Speed:        50,
-		Duration:     2100 * time.Millisecond,
-		FollowTarget: target.ObjectID,
-		FollowOffset: 70,
+		Origin:      origin,
+		Destination: location.Location{X: 111, Y: 20, Z: 30},
+		Speed:       50,
+		Duration:    2100 * time.Millisecond,
 	}
 	if event != want {
 		t.Fatalf("FollowTick() event = %+v, want %+v", event, want)

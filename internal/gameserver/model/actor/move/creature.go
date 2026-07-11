@@ -168,8 +168,10 @@ func (m *CreatureMove) FollowTick(target TargetSnapshot, actorRadius float64) (E
 	if err != nil {
 		return Event{}, false, err
 	}
-	event.FollowTarget = target.ObjectID
-	event.FollowOffset = m.followOffset
+	if m.followMode == FollowOffensive {
+		event.FollowTarget = target.ObjectID
+		event.FollowOffset = m.followOffset
+	}
 	return event, true, nil
 }
 
