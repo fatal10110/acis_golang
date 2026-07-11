@@ -125,6 +125,19 @@ const itemsOnGroundSchema = "CREATE TABLE IF NOT EXISTS `items_on_ground` (\n" +
 	"  PRIMARY KEY  (`object_id`)\n" +
 	")"
 
+// petsSchema mirrors the shipped pets table definition verbatim.
+const petsSchema = "CREATE TABLE IF NOT EXISTS `pets` (\n" +
+	"  `item_obj_id` decimal(11) NOT NULL default 0,\n" +
+	"  `name` varchar(16),\n" +
+	"  `level` decimal(11),\n" +
+	"  `curHp` decimal(18,0),\n" +
+	"  `curMp` decimal(18,0),\n" +
+	"  `exp` decimal(20, 0),\n" +
+	"  `sp` decimal(11),\n" +
+	"  `fed` decimal(11),\n" +
+	"  PRIMARY KEY (`item_obj_id`)\n" +
+	")"
+
 // NewDB starts a real MariaDB container, creates the gameserver tables used
 // by integration tests, and returns a pool connected to it. The container is
 // terminated and the pool closed when the test completes.
@@ -167,6 +180,9 @@ func NewDB(t *testing.T) *sql.DB {
 	}
 	if _, err := db.ExecContext(ctx, itemsOnGroundSchema); err != nil {
 		t.Fatalf("create items_on_ground table: %v", err)
+	}
+	if _, err := db.ExecContext(ctx, petsSchema); err != nil {
+		t.Fatalf("create pets table: %v", err)
 	}
 	return db
 }

@@ -34,6 +34,25 @@ func (s *ItemStore) Create(ctx context.Context, ownerID int32, inst item.Instanc
 	return nil
 }
 
+// Save inserts or updates inst in the items table.
+func (s *ItemStore) Save(ctx context.Context, inst *item.Instance) error {
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO items
+			(owner_id, object_id, item_id, count, enchant_level, loc, loc_data, custom_type1, custom_type2, mana_left, time)
+		 VALUES (?,?,?,?,?,?,?,?,?,?,?)
+		 ON DUPLICATE KEY UPDATE
+			owner_id=VALUES(owner_id), count=VALUES(count), loc=VALUES(loc), loc_data=VALUES(loc_data),
+			enchant_level=VALUES(enchant_level), custom_type1=VALUES(custom_type1), custom_type2=VALUES(custom_type2),
+			mana_left=VALUES(mana_left), time=VALUES(time)`,
+		inst.OwnerID, inst.ObjectID, inst.TemplateID, inst.Count, inst.EnchantLevel,
+		inst.Location.String(), inst.LocationData, inst.CustomType1, inst.CustomType2, inst.ManaLeft, inst.Time,
+	)
+	if err != nil {
+		return fmt.Errorf("save item %d: %w", inst.ObjectID, err)
+	}
+	return nil
+}
+
 // ListByOwner returns every item ownerID owns, in no particular order.
 func (s *ItemStore) ListByOwner(ctx context.Context, ownerID int32) ([]*item.Instance, error) {
 	rows, err := s.db.QueryContext(ctx,

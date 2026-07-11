@@ -34,6 +34,19 @@ func (s *AugmentationStore) Create(ctx context.Context, itemObjectID int32, aug 
 	return nil
 }
 
+// Save inserts or updates the augmentation applied to itemObjectID.
+func (s *AugmentationStore) Save(ctx context.Context, itemObjectID int32, aug item.Augmentation) error {
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO augmentations (item_oid, attributes, skill_id, skill_level) VALUES (?,?,?,?)
+		 ON DUPLICATE KEY UPDATE attributes=VALUES(attributes), skill_id=VALUES(skill_id), skill_level=VALUES(skill_level)`,
+		itemObjectID, aug.Attributes, aug.SkillID, aug.SkillLevel,
+	)
+	if err != nil {
+		return fmt.Errorf("save augmentation for item %d: %w", itemObjectID, err)
+	}
+	return nil
+}
+
 // Get returns the augmentation applied to the item identified by
 // itemObjectID, or (Augmentation{}, false) if it carries none.
 func (s *AugmentationStore) Get(ctx context.Context, itemObjectID int32) (item.Augmentation, bool, error) {
