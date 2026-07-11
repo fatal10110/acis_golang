@@ -22,9 +22,10 @@ type Location struct {
 
 // NewLocation builds one observer location from XML attributes.
 func NewLocation(set *commons.StatSet) (Location, error) {
-	id, err := set.GetInt("locId")
-	if err != nil {
-		return Location{}, fmt.Errorf("observer location: %w", err)
+	idf := commons.NewFields(set, "observer location")
+	id := idf.Int("locId")
+	if err := idf.Err(); err != nil {
+		return Location{}, err
 	}
 	wrap := func(err error) error { return fmt.Errorf("observer location %d: %w", id, err) }
 
@@ -32,30 +33,20 @@ func NewLocation(set *commons.StatSet) (Location, error) {
 	if err != nil {
 		return Location{}, wrap(err)
 	}
-	yaw, err := set.GetInt("yaw")
-	if err != nil {
-		return Location{}, wrap(err)
-	}
-	pitch, err := set.GetInt("pitch")
-	if err != nil {
-		return Location{}, wrap(err)
-	}
-	cost, err := set.GetInt("cost")
-	if err != nil {
-		return Location{}, wrap(err)
-	}
-	castleID, err := set.GetInt("castle")
-	if err != nil {
-		return Location{}, wrap(err)
-	}
-	return Location{
+
+	f := commons.NewFields(set, fmt.Sprintf("observer location %d", id))
+	location := Location{
 		ID:       id,
 		Location: loc,
-		Yaw:      yaw,
-		Pitch:    pitch,
-		Cost:     cost,
-		CastleID: castleID,
-	}, nil
+		Yaw:      f.Int("yaw"),
+		Pitch:    f.Int("pitch"),
+		Cost:     f.Int("cost"),
+		CastleID: f.Int("castle"),
+	}
+	if err := f.Err(); err != nil {
+		return Location{}, err
+	}
+	return location, nil
 }
 
 // Spawn is one observer NPC spawn entry with its allowed group ids.

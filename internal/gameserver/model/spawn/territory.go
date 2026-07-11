@@ -2,6 +2,7 @@ package spawn
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 )
@@ -23,16 +24,15 @@ type Territory struct {
 
 // NewTerritory builds a Territory from set plus its decoded polygon nodes.
 func NewTerritory(set *commons.StatSet, nodes []Node) (*Territory, error) {
-	name, err := set.GetString("name")
-	if err != nil {
+	idf := commons.NewFields(set, "spawn territory")
+	name := idf.String("name")
+	if err := idf.Err(); err != nil {
 		return nil, err
 	}
-	minZ, err := set.GetInt("minZ")
-	if err != nil {
-		return nil, err
-	}
-	maxZ, err := set.GetInt("maxZ")
-	if err != nil {
+	f := commons.NewFields(set, fmt.Sprintf("spawn territory %q", name))
+	minZ := f.Int("minZ")
+	maxZ := f.Int("maxZ")
+	if err := f.Err(); err != nil {
 		return nil, err
 	}
 	if len(nodes) < 3 {

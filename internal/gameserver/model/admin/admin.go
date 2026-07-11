@@ -21,41 +21,29 @@ type AccessLevel struct {
 }
 
 func NewAccessLevel(set *commons.StatSet) (AccessLevel, error) {
-	level, err := set.GetInt("level")
-	if err != nil {
-		return AccessLevel{}, fmt.Errorf("admin: access level: %w", err)
-	}
-	wrap := func(err error) error { return fmt.Errorf("admin: access level %d: %w", level, err) }
-
-	name, err := set.GetString("name")
-	if err != nil {
-		return AccessLevel{}, wrap(err)
-	}
-	nameColor, err := set.GetString("nameColor")
-	if err != nil {
-		return AccessLevel{}, wrap(err)
-	}
-	titleColor, err := set.GetString("titleColor")
-	if err != nil {
-		return AccessLevel{}, wrap(err)
-	}
-	childLevel, err := set.GetIntDefault("childLevel", 0)
-	if err != nil {
-		return AccessLevel{}, wrap(err)
+	idf := commons.NewFields(set, "admin: access level")
+	level := idf.Int("level")
+	if err := idf.Err(); err != nil {
+		return AccessLevel{}, err
 	}
 
-	return AccessLevel{
+	f := commons.NewFields(set, fmt.Sprintf("admin: access level %d", level))
+	accessLevel := AccessLevel{
 		Level:            level,
-		Name:             name,
-		NameColor:        nameColor,
-		TitleColor:       titleColor,
-		ChildLevel:       childLevel,
-		IsGM:             set.GetBoolDefault("isGM", false),
-		AllowFixedRes:    set.GetBoolDefault("allowFixedRes", false),
-		AllowTransaction: set.GetBoolDefault("allowTransaction", false),
-		AllowAltG:        set.GetBoolDefault("allowAltg", false),
-		GiveDamage:       set.GetBoolDefault("giveDamage", false),
-	}, nil
+		Name:             f.String("name"),
+		NameColor:        f.String("nameColor"),
+		TitleColor:       f.String("titleColor"),
+		ChildLevel:       f.IntDefault("childLevel", 0),
+		IsGM:             f.BoolDefault("isGM", false),
+		AllowFixedRes:    f.BoolDefault("allowFixedRes", false),
+		AllowTransaction: f.BoolDefault("allowTransaction", false),
+		AllowAltG:        f.BoolDefault("allowAltg", false),
+		GiveDamage:       f.BoolDefault("giveDamage", false),
+	}
+	if err := f.Err(); err != nil {
+		return AccessLevel{}, err
+	}
+	return accessLevel, nil
 }
 
 type Command struct {
@@ -66,17 +54,22 @@ type Command struct {
 }
 
 func NewCommand(set *commons.StatSet) (Command, error) {
-	name, err := set.GetString("name")
-	if err != nil {
-		return Command{}, fmt.Errorf("admin: command: %w", err)
+	idf := commons.NewFields(set, "admin: command")
+	name := idf.String("name")
+	if err := idf.Err(); err != nil {
+		return Command{}, err
 	}
-	level, err := set.GetInt("accessLevel")
-	if err != nil {
-		return Command{}, fmt.Errorf("admin: command %q: %w", name, err)
+	f := commons.NewFields(set, fmt.Sprintf("admin: command %q", name))
+	command := Command{
+		Name:        name,
+		AccessLevel: f.Int("accessLevel"),
+		Params:      f.StringDefault("params", ""),
+		Description: f.StringDefault("desc", ""),
 	}
-	params := set.GetStringDefault("params", "")
-	desc := set.GetStringDefault("desc", "")
-	return Command{Name: name, AccessLevel: level, Params: params, Description: desc}, nil
+	if err := f.Err(); err != nil {
+		return Command{}, err
+	}
+	return command, nil
 }
 
 type Announcement struct {
@@ -89,9 +82,12 @@ type Announcement struct {
 }
 
 func NewAnnouncement(set *commons.StatSet) (Announcement, error) {
-	message, err := set.GetString("message")
-	if err != nil {
-		return Announcement{}, fmt.Errorf("admin: announcement: %w", err)
+	f := commons.NewFields(set, "admin: announcement")
+	message := f.String("message")
+	critical := f.BoolDefault("critical", false)
+	auto := f.BoolDefault("auto", false)
+	if err := f.Err(); err != nil {
+		return Announcement{}, err
 	}
 	if strings.TrimSpace(message) == "" {
 		return Announcement{}, fmt.Errorf("admin: announcement: empty message")
@@ -99,21 +95,19 @@ func NewAnnouncement(set *commons.StatSet) (Announcement, error) {
 
 	a := Announcement{
 		Message:  message,
-		Critical: set.GetBoolDefault("critical", false),
-		Auto:     set.GetBoolDefault("auto", false),
+		Critical: critical,
+		Auto:     auto,
 	}
 	if !a.Auto {
 		return a, nil
 	}
 
-	if a.InitialDelay, err = set.GetInt("initial_delay"); err != nil {
-		return Announcement{}, fmt.Errorf("admin: announcement %q: %w", message, err)
-	}
-	if a.Delay, err = set.GetInt("delay"); err != nil {
-		return Announcement{}, fmt.Errorf("admin: announcement %q: %w", message, err)
-	}
-	if a.Limit, err = set.GetIntDefault("limit", 0); err != nil {
-		return Announcement{}, fmt.Errorf("admin: announcement %q: %w", message, err)
+	af := commons.NewFields(set, fmt.Sprintf("admin: announcement %q", message))
+	a.InitialDelay = af.Int("initial_delay")
+	a.Delay = af.Int("delay")
+	a.Limit = af.IntDefault("limit", 0)
+	if err := af.Err(); err != nil {
+		return Announcement{}, err
 	}
 	if a.Limit < 0 {
 		a.Limit = 0

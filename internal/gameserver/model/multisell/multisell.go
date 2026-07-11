@@ -26,27 +26,22 @@ type Ingredient struct {
 // weight queries; otherwise those queries fall back to the same defaults the
 // source behavior uses for unknown items.
 func NewIngredient(set *commons.StatSet, items *item.Table) (Ingredient, error) {
-	itemID, err := set.GetInt32("id")
-	if err != nil {
-		return Ingredient{}, fmt.Errorf("multisell ingredient: %w", err)
-	}
-	wrap := func(err error) error { return fmt.Errorf("multisell ingredient %d: %w", itemID, err) }
-
-	count, err := set.GetInt("count")
-	if err != nil {
-		return Ingredient{}, wrap(err)
-	}
-	enchantLevel, err := set.GetIntDefault("enchantLevel", 0)
-	if err != nil {
-		return Ingredient{}, wrap(err)
+	idf := commons.NewFields(set, "multisell ingredient")
+	itemID := idf.Int32("id")
+	if err := idf.Err(); err != nil {
+		return Ingredient{}, err
 	}
 
+	f := commons.NewFields(set, fmt.Sprintf("multisell ingredient %d", itemID))
 	in := Ingredient{
 		ItemID:             itemID,
-		Count:              count,
-		EnchantLevel:       enchantLevel,
-		TaxIngredient:      set.GetBoolDefault("isTaxIngredient", false),
-		MaintainIngredient: set.GetBoolDefault("maintainIngredient", false),
+		Count:              f.Int("count"),
+		EnchantLevel:       f.IntDefault("enchantLevel", 0),
+		TaxIngredient:      f.BoolDefault("isTaxIngredient", false),
+		MaintainIngredient: f.BoolDefault("maintainIngredient", false),
+	}
+	if err := f.Err(); err != nil {
+		return Ingredient{}, err
 	}
 	if items != nil && itemID > 0 {
 		in.template, _ = items.Get(itemID)

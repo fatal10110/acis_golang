@@ -34,30 +34,26 @@ type Skill struct {
 
 // NewSkill builds a Skill from one folded <augmentation> element.
 func NewSkill(set *commons.StatSet) (Skill, error) {
-	id, err := set.GetInt("id")
-	if err != nil {
-		return Skill{}, fmt.Errorf("augmentation skill: %w", err)
+	idf := commons.NewFields(set, "augmentation skill")
+	id := idf.Int("id")
+	if err := idf.Err(); err != nil {
+		return Skill{}, err
 	}
-	wrap := func(err error) error { return fmt.Errorf("augmentation skill %d: %w", id, err) }
-	skillID, err := set.GetInt32("skillId")
-	if err != nil {
-		return Skill{}, wrap(err)
-	}
-	skillLevel, err := set.GetInt("skillLevel")
-	if err != nil {
-		return Skill{}, wrap(err)
-	}
-	rawColor, err := set.GetString("type")
-	if err != nil {
-		return Skill{}, wrap(err)
+
+	f := commons.NewFields(set, fmt.Sprintf("augmentation skill %d", id))
+	skillID := f.Int32("skillId")
+	skillLevel := f.Int("skillLevel")
+	rawColor := f.String("type")
+	if err := f.Err(); err != nil {
+		return Skill{}, err
 	}
 	color := Color(rawColor)
 	if color != Blue && color != Purple && color != Red {
-		return Skill{}, wrap(fmt.Errorf("unknown color %q", rawColor))
+		return Skill{}, fmt.Errorf("augmentation skill %d: unknown color %q", id, rawColor)
 	}
 	level := (id - skillStart) / skillBlockSize
 	if level < 0 || level >= skillLevels {
-		return Skill{}, wrap(fmt.Errorf("id outside skill blocks"))
+		return Skill{}, fmt.Errorf("augmentation skill %d: id outside skill blocks", id)
 	}
 	return Skill{ID: id, SkillID: skillID, SkillLevel: skillLevel, Color: color, Level: level}, nil
 }

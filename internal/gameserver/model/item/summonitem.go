@@ -13,21 +13,22 @@ type SummonItem struct {
 }
 
 func NewSummonItem(set *commons.StatSet) (SummonItem, error) {
-	itemID, err := set.GetInt32("id")
-	if err != nil {
-		return SummonItem{}, fmt.Errorf("item: summon item: %w", err)
+	idf := commons.NewFields(set, "item: summon item")
+	itemID := idf.Int32("id")
+	if err := idf.Err(); err != nil {
+		return SummonItem{}, err
 	}
-	wrap := func(err error) error { return fmt.Errorf("item: summon item %d: %w", itemID, err) }
 
-	npcID, err := set.GetInt32("npcId")
-	if err != nil {
-		return SummonItem{}, wrap(err)
+	f := commons.NewFields(set, fmt.Sprintf("item: summon item %d", itemID))
+	item := SummonItem{
+		ItemID:     itemID,
+		NPCID:      f.Int32("npcId"),
+		SummonType: f.Int("summonType"),
 	}
-	summonType, err := set.GetInt("summonType")
-	if err != nil {
-		return SummonItem{}, wrap(err)
+	if err := f.Err(); err != nil {
+		return SummonItem{}, err
 	}
-	return SummonItem{ItemID: itemID, NPCID: npcID, SummonType: summonType}, nil
+	return item, nil
 }
 
 type SummonItemTable struct {

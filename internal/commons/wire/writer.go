@@ -61,7 +61,7 @@ func (w *Writer) WriteInt64(v int64) {
 	w.buf = append(w.buf, b[:]...)
 }
 
-// WriteFloat64 appends a little-endian IEEE-754 double.
+// WriteFloat64 appends a little-endian IEEE-754 float64 value.
 func (w *Writer) WriteFloat64(v float64) {
 	w.WriteInt64(int64(math.Float64bits(v)))
 }

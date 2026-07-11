@@ -64,23 +64,23 @@ type Drop struct {
 // NewDrop builds a Drop from set, the folded attributes of one <drop>
 // element. itemid, min, max and chance are all required.
 func NewDrop(set *commons.StatSet) (Drop, error) {
-	itemID, err := set.GetInt32("itemid")
-	if err != nil {
-		return Drop{}, fmt.Errorf("item: drop: %w", err)
+	idf := commons.NewFields(set, "item: drop")
+	itemID := idf.Int32("itemid")
+	if err := idf.Err(); err != nil {
+		return Drop{}, err
 	}
-	min, err := set.GetInt32("min")
-	if err != nil {
-		return Drop{}, fmt.Errorf("item: drop %d: %w", itemID, err)
+
+	f := commons.NewFields(set, fmt.Sprintf("item: drop %d", itemID))
+	drop := Drop{
+		ItemID: itemID,
+		Min:    f.Int32("min"),
+		Max:    f.Int32("max"),
+		Chance: f.Float64("chance"),
 	}
-	max, err := set.GetInt32("max")
-	if err != nil {
-		return Drop{}, fmt.Errorf("item: drop %d: %w", itemID, err)
+	if err := f.Err(); err != nil {
+		return Drop{}, err
 	}
-	chance, err := set.GetDouble("chance")
-	if err != nil {
-		return Drop{}, fmt.Errorf("item: drop %d: %w", itemID, err)
-	}
-	return Drop{ItemID: itemID, Min: min, Max: max, Chance: chance}, nil
+	return drop, nil
 }
 
 // DropCategory is one weighted group of possible drops an NPC template
@@ -106,7 +106,7 @@ func NewDropCategory(set *commons.StatSet, drops []Drop) (DropCategory, error) {
 	if err != nil {
 		return DropCategory{}, fmt.Errorf("item: drop category: %w", err)
 	}
-	chance, err := set.GetDoubleDefault("chance", 100.0)
+	chance, err := set.GetFloat64Default("chance", 100.0)
 	if err != nil {
 		return DropCategory{}, fmt.Errorf("item: drop category: %w", err)
 	}
