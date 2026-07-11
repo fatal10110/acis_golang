@@ -145,16 +145,11 @@ func buildZone(build func(int, zone.Form, *commons.StatSet) (zone.Kind, error), 
 }
 
 func buildZoneForm(attrs *commons.StatSet, nodeEls []attrsElement) (zone.Form, error) {
-	shape, err := attrs.GetString("shape")
-	if err != nil {
-		return nil, err
-	}
-	minZ, err := attrs.GetInt("minZ")
-	if err != nil {
-		return nil, err
-	}
-	maxZ, err := attrs.GetInt("maxZ")
-	if err != nil {
+	f := commons.NewFields(attrs, "zone form")
+	shape := f.String("shape")
+	minZ := f.Int("minZ")
+	maxZ := f.Int("maxZ")
+	if err := f.Err(); err != nil {
 		return nil, err
 	}
 
@@ -182,12 +177,12 @@ func buildZoneForm(attrs *commons.StatSet, nodeEls []attrsElement) (zone.Form, e
 		}
 		return zone.NewPolygon(nodes, minZ, maxZ)
 	case "Cylinder":
-		rad, err := attrs.GetInt("rad")
-		if err != nil {
-			return nil, err
-		}
 		if len(nodes) != 1 {
 			return nil, fmt.Errorf("cylinder zone wants 1 node, has %d", len(nodes))
+		}
+		rad := f.Int("rad")
+		if err := f.Err(); err != nil {
+			return nil, err
 		}
 		return zone.NewCylinder(nodes[0].X, nodes[0].Y, minZ, maxZ, rad)
 	default:

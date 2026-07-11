@@ -324,24 +324,13 @@ type MotherTree struct {
 
 // NewMotherTree builds a regeneration zone from its data settings.
 func NewMotherTree(id int, form Form, set *commons.StatSet) (*MotherTree, error) {
-	enterMsg, err := set.GetIntDefault("enterMsgId", 0)
-	if err != nil {
-		return nil, err
-	}
-	leaveMsg, err := set.GetIntDefault("leaveMsgId", 0)
-	if err != nil {
-		return nil, err
-	}
-	mp, err := set.GetIntDefault("MpRegenBonus", 1)
-	if err != nil {
-		return nil, err
-	}
-	hp, err := set.GetIntDefault("HpRegenBonus", 1)
-	if err != nil {
-		return nil, err
-	}
-	race, err := set.GetIntDefault("affectedRace", -1)
-	if err != nil {
+	f := commons.NewFields(set, "zone: mother tree")
+	enterMsg := f.IntDefault("enterMsgId", 0)
+	leaveMsg := f.IntDefault("leaveMsgId", 0)
+	mp := f.IntDefault("MpRegenBonus", 1)
+	hp := f.IntDefault("HpRegenBonus", 1)
+	race := f.IntDefault("affectedRace", -1)
+	if err := f.Err(); err != nil {
 		return nil, err
 	}
 	return &MotherTree{
@@ -406,15 +395,13 @@ type Town struct {
 
 // NewTown builds a town zone from its data settings.
 func NewTown(id int, form Form, set *commons.StatSet) (*Town, error) {
-	townID, err := set.GetIntDefault("townId", 0)
-	if err != nil {
+	f := commons.NewFields(set, "zone: town")
+	townID := f.IntDefault("townId", 0)
+	castleID := f.IntDefault("castleId", 0)
+	peaceful := f.BoolDefault("isPeaceZone", true)
+	if err := f.Err(); err != nil {
 		return nil, err
 	}
-	castleID, err := set.GetIntDefault("castleId", 0)
-	if err != nil {
-		return nil, err
-	}
-	peaceful := set.GetBoolDefault("isPeaceZone", true)
 	return &Town{Zone: newZone(id, form), TownID: townID, CastleID: castleID, Peaceful: peaceful}, nil
 }
 

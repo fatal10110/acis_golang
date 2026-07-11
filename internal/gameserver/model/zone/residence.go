@@ -19,8 +19,9 @@ type Castle struct {
 
 // NewCastle builds a castle zone from its data settings.
 func NewCastle(id int, form Form, set *commons.StatSet) (*Castle, error) {
-	castleID, err := set.GetIntDefault("castleId", 0)
-	if err != nil {
+	f := commons.NewFields(set, "zone: castle")
+	castleID := f.IntDefault("castleId", 0)
+	if err := f.Err(); err != nil {
 		return nil, err
 	}
 	return &Castle{Zone: newZone(id, form), ResidenceID: castleID}, nil
@@ -62,8 +63,9 @@ type ClanHall struct {
 
 // NewClanHall builds a clan hall zone from its data settings.
 func NewClanHall(id int, form Form, set *commons.StatSet) (*ClanHall, error) {
-	hallID, err := set.GetIntDefault("clanHallId", 0)
-	if err != nil {
+	f := commons.NewFields(set, "zone: clan hall")
+	hallID := f.IntDefault("clanHallId", 0)
+	if err := f.Err(); err != nil {
 		return nil, err
 	}
 	return &ClanHall{Zone: newZone(id, form), ResidenceID: hallID}, nil
@@ -122,27 +124,25 @@ type CastleTeleport struct {
 
 // NewCastleTeleport builds a mass-gatekeeper zone from its data settings.
 func NewCastleTeleport(id int, form Form, set *commons.StatSet) (*CastleTeleport, error) {
-	z := &CastleTeleport{Zone: newZone(id, form)}
-	var err error
-	if z.CastleID, err = set.GetIntDefault("castleId", 0); err != nil {
+	f := commons.NewFields(set, "zone: castle teleport")
+	castleID := f.IntDefault("castleId", 0)
+	minX := f.IntDefault("spawnMinX", 0)
+	maxX := f.IntDefault("spawnMaxX", 0)
+	minY := f.IntDefault("spawnMinY", 0)
+	maxY := f.IntDefault("spawnMaxY", 0)
+	exitZ := f.IntDefault("spawnZ", 0)
+	if err := f.Err(); err != nil {
 		return nil, err
 	}
-	if z.ExitMinX, err = set.GetIntDefault("spawnMinX", 0); err != nil {
-		return nil, err
-	}
-	if z.ExitMaxX, err = set.GetIntDefault("spawnMaxX", 0); err != nil {
-		return nil, err
-	}
-	if z.ExitMinY, err = set.GetIntDefault("spawnMinY", 0); err != nil {
-		return nil, err
-	}
-	if z.ExitMaxY, err = set.GetIntDefault("spawnMaxY", 0); err != nil {
-		return nil, err
-	}
-	if z.ExitZ, err = set.GetIntDefault("spawnZ", 0); err != nil {
-		return nil, err
-	}
-	return z, nil
+	return &CastleTeleport{
+		Zone:     newZone(id, form),
+		CastleID: castleID,
+		ExitMinX: minX,
+		ExitMaxX: maxX,
+		ExitMinY: minY,
+		ExitMaxY: maxY,
+		ExitZ:    exitZ,
+	}, nil
 }
 
 // Core exposes the shared zone state.

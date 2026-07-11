@@ -46,27 +46,22 @@ type Boss struct {
 
 // NewBoss builds a boss lair zone from its data settings.
 func NewBoss(id int, form Form, set *commons.StatSet) (*Boss, error) {
-	invade, err := set.GetIntDefault("InvadeTime", 0)
-	if err != nil {
+	f := commons.NewFields(set, "zone: boss")
+	invade := f.IntDefault("InvadeTime", 0)
+	oustX := f.IntDefault("oustX", 0)
+	oustY := f.IntDefault("oustY", 0)
+	oustZ := f.IntDefault("oustZ", 0)
+	if err := f.Err(); err != nil {
 		return nil, err
 	}
-	z := &Boss{
+	return &Boss{
 		Zone:         newZone(id, form),
 		InvadeWindow: time.Duration(invade) * time.Millisecond,
+		OustLoc:      location.Location{X: oustX, Y: oustY, Z: oustZ},
 		now:          time.Now,
 		allowed:      make(map[int32]struct{}),
 		deadlines:    make(map[int32]time.Time),
-	}
-	if z.OustLoc.X, err = set.GetIntDefault("oustX", 0); err != nil {
-		return nil, err
-	}
-	if z.OustLoc.Y, err = set.GetIntDefault("oustY", 0); err != nil {
-		return nil, err
-	}
-	if z.OustLoc.Z, err = set.GetIntDefault("oustZ", 0); err != nil {
-		return nil, err
-	}
-	return z, nil
+	}, nil
 }
 
 // Core exposes the shared zone state.

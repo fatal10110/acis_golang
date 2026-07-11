@@ -24,12 +24,12 @@ type Trap struct {
 }
 
 func newTrap(set *commons.StatSet) (Trap, error) {
-	var t Trap
-	var err error
-	if t.CastleID, err = set.GetIntDefault("castleId", 0); err != nil {
-		return Trap{}, err
+	f := commons.NewFields(set, "zone: trap")
+	t := Trap{
+		CastleID: f.IntDefault("castleId", 0),
+		EventID:  f.IntDefault("eventId", 0),
 	}
-	if t.EventID, err = set.GetIntDefault("eventId", 0); err != nil {
+	if err := f.Err(); err != nil {
 		return Trap{}, err
 	}
 	return t, nil
@@ -73,16 +73,11 @@ func NewDamage(id int, form Form, set *commons.StatSet) (*Damage, error) {
 	if err != nil {
 		return nil, err
 	}
-	hp, err := set.GetIntDefault("hpDamage", 200)
-	if err != nil {
-		return nil, err
-	}
-	initial, err := set.GetIntDefault("initialDelay", 1000)
-	if err != nil {
-		return nil, err
-	}
-	reuse, err := set.GetIntDefault("reuseDelay", 5000)
-	if err != nil {
+	f := commons.NewFields(set, "zone: damage trap")
+	hp := f.IntDefault("hpDamage", 200)
+	initial := f.IntDefault("initialDelay", 1000)
+	reuse := f.IntDefault("reuseDelay", 5000)
+	if err := f.Err(); err != nil {
 		return nil, err
 	}
 	return &Damage{

@@ -100,28 +100,25 @@ type Effect struct {
 
 // NewEffect builds an effect zone from its data settings.
 func NewEffect(id int, form Form, set *commons.StatSet) (*Effect, error) {
-	chance, err := set.GetIntDefault("chance", 100)
+	f := commons.NewFields(set, "zone: effect")
+	chance := f.IntDefault("chance", 100)
+	initial := f.IntDefault("initialDelay", 0)
+	reuse := f.IntDefault("reuseDelay", 30000)
+	enabled := f.BoolDefault("defaultStatus", true)
+	skills, err := parseSkillRefs(f.StringDefault("skill", ""))
 	if err != nil {
-		return nil, err
-	}
-	initial, err := set.GetIntDefault("initialDelay", 0)
-	if err != nil {
-		return nil, err
-	}
-	reuse, err := set.GetIntDefault("reuseDelay", 30000)
-	if err != nil {
-		return nil, err
-	}
-	enabled := set.GetBoolDefault("defaultStatus", true)
-	skills, err := parseSkillRefs(set.GetStringDefault("skill", ""))
-	if err != nil {
-		return nil, err
+		f.Fail(err)
 	}
 	target := ScopePlayer
-	if raw := set.GetStringDefault("targetType", ""); raw != "" {
-		if target, err = ParseTargetScope(raw); err != nil {
-			return nil, err
+	if raw := f.StringDefault("targetType", ""); raw != "" {
+		if t, err := ParseTargetScope(raw); err != nil {
+			f.Fail(err)
+		} else {
+			target = t
 		}
+	}
+	if err := f.Err(); err != nil {
+		return nil, err
 	}
 	return &Effect{
 		Zone:         newZone(id, form),

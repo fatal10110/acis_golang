@@ -39,16 +39,15 @@ type Siege struct {
 
 // NewSiege builds a siege battlefield zone from its data settings.
 func NewSiege(id int, form Form, set *commons.StatSet) (*Siege, error) {
+	f := commons.NewFields(set, "zone: siege")
 	residence := -1
 	for _, key := range []string{"castleId", "clanHallId"} {
-		if !set.Has(key) {
-			continue
+		if f.Has(key) {
+			residence = f.Int(key)
 		}
-		v, err := set.GetInt(key)
-		if err != nil {
-			return nil, err
-		}
-		residence = v
+	}
+	if err := f.Err(); err != nil {
+		return nil, err
 	}
 	return &Siege{Zone: newZone(id, form), ResidenceID: residence}, nil
 }
