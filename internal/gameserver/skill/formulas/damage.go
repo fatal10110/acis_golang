@@ -127,11 +127,13 @@ type BlowInput struct {
 	CritDamagePosMul  float64
 	CritVulnMul       float64
 	DaggerVulnMul     float64
-	CritDamageAddBase float64 // raw CRITICAL_DAMAGE_ADD stat, unscaled
+	CritDamageAddBase float64 // raw CRITICAL_DAMAGE_ADD stat, pre ×6 scaling
 }
 
 // BlowDamage computes a blow-type skill's damage. Unlike the other damage
-// formulas, a successful PvP blow divides by 70 instead of 77.
+// formulas, a successful PvP blow divides by 70 instead of 77, and the
+// CRITICAL_DAMAGE_ADD contribution is scaled by a flat ×6 instead of by
+// 77/Defence.
 func BlowDamage(in BlowInput) float64 {
 	attackPower := in.AttackPower
 	if in.SoulShot {
@@ -145,7 +147,9 @@ func BlowDamage(in BlowInput) float64 {
 		divisor = 70.
 	}
 
-	damage := ((attackPower+in.SkillPower)*in.CritDamageMul*in.RandomMul*in.CritDamagePosMul*in.PosMul*pvpMul*in.CritVulnMul*in.DaggerVulnMul + in.CritDamageAddBase) * divisor / in.Defence
+	addCritPower := in.CritDamageAddBase * 6
+
+	damage := ((attackPower+in.SkillPower)*in.CritDamageMul*in.RandomMul*in.CritDamagePosMul*in.PosMul*pvpMul*in.CritVulnMul*in.DaggerVulnMul + addCritPower) * divisor / in.Defence
 
 	return math.Max(1, damage)
 }

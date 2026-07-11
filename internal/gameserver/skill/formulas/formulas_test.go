@@ -204,8 +204,8 @@ func TestBlowDamage(t *testing.T) {
 		RandomMul: 1, PosMul: 1.2,
 		CritDamageMul: 1.5, CritDamagePosMul: 1, CritVulnMul: 1, DaggerVulnMul: 1, CritDamageAddBase: 5,
 	}
-	if got := BlowDamage(pve); !almostEqual(got, 529.375) {
-		t.Errorf("pve: BlowDamage() = %v, want 529.375", got)
+	if got := BlowDamage(pve); !almostEqual(got, 577.5) {
+		t.Errorf("pve: BlowDamage() = %v, want 577.5", got)
 	}
 
 	pvpSS := BlowInput{
@@ -214,8 +214,8 @@ func TestBlowDamage(t *testing.T) {
 		RandomMul: 1, PosMul: 1.2, PvPMul: 0.9,
 		CritDamageMul: 1.5, CritDamagePosMul: 1, CritVulnMul: 1, DaggerVulnMul: 1, CritDamageAddBase: 5,
 	}
-	if got := BlowDamage(pvpSS); !almostEqual(got, 717.5) {
-		t.Errorf("pvp+ss: BlowDamage() = %v, want 717.5", got)
+	if got := BlowDamage(pvpSS); !almostEqual(got, 761.25) {
+		t.Errorf("pvp+ss: BlowDamage() = %v, want 761.25", got)
 	}
 }
 

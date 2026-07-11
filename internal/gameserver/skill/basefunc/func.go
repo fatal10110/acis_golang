@@ -7,6 +7,11 @@
 // opaque to every op here except through its optional Condition gate. Ops
 // that need real combat data (attribute-driven attack/defense/regen
 // modifiers) are a different package built on top of this one.
+//
+// Not covered here: a reflection-style factory for building a Func from a
+// name string and attaching it with a per-attachment owner/value/condition.
+// That's XML-skill/item-data wiring, not arithmetic, and belongs with
+// whichever loader ends up parsing skill/item function definitions.
 package basefunc
 
 import "github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
