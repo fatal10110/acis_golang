@@ -64,6 +64,90 @@ func TestItemStore_ListByOwner_Empty(t *testing.T) {
 	}
 }
 
+func TestItemStore_Update(t *testing.T) {
+	ctx := context.Background()
+	store := NewItemStore(sqltest.NewDB(t))
+
+	inst := item.Instance{
+		ObjectID: 0x10000101, TemplateID: 1146, Count: 1,
+		Location: item.LocationInventory, ManaLeft: -1,
+	}
+	if err := store.Create(ctx, 0x10000001, inst); err != nil {
+		t.Fatalf("Create() unexpected error: %v", err)
+	}
+
+	inst.OwnerID = 0x10000001
+	inst.Count = 5
+	inst.EnchantLevel = 7
+	inst.Location = item.LocationPaperdoll
+	inst.LocationData = 10
+	inst.ManaLeft = 42
+	if err := store.Update(ctx, &inst); err != nil {
+		t.Fatalf("Update() unexpected error: %v", err)
+	}
+
+	got, err := store.ListByOwner(ctx, 0x10000001)
+	if err != nil {
+		t.Fatalf("ListByOwner() unexpected error: %v", err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("ListByOwner() returned %d items, want 1", len(got))
+	}
+	if got[0].Count != 5 || got[0].EnchantLevel != 7 || got[0].Location != item.LocationPaperdoll || got[0].LocationData != 10 || got[0].ManaLeft != 42 {
+		t.Errorf("updated instance = %+v, want Count=5 EnchantLevel=7 Location=PAPERDOLL LocationData=10 ManaLeft=42", got[0])
+	}
+}
+
+func TestItemStore_Delete(t *testing.T) {
+	ctx := context.Background()
+	store := NewItemStore(sqltest.NewDB(t))
+
+	inst := item.Instance{ObjectID: 0x10000101, TemplateID: 1146, Count: 1, Location: item.LocationInventory, ManaLeft: -1}
+	if err := store.Create(ctx, 0x10000001, inst); err != nil {
+		t.Fatalf("Create() unexpected error: %v", err)
+	}
+
+	if err := store.Delete(ctx, inst.ObjectID); err != nil {
+		t.Fatalf("Delete() unexpected error: %v", err)
+	}
+
+	got, err := store.ListByOwner(ctx, 0x10000001)
+	if err != nil {
+		t.Fatalf("ListByOwner() unexpected error: %v", err)
+	}
+	if len(got) != 0 {
+		t.Errorf("ListByOwner() after delete = %v, want empty", got)
+	}
+}
+
+func TestItemStore_ListByOwnerAndLocations(t *testing.T) {
+	ctx := context.Background()
+	store := NewItemStore(sqltest.NewDB(t))
+
+	for _, inst := range []item.Instance{
+		{ObjectID: 0x10000101, TemplateID: 1146, Count: 1, Location: item.LocationPaperdoll, LocationData: 10, ManaLeft: -1},
+		{ObjectID: 0x10000102, TemplateID: 10, Count: 1, Location: item.LocationInventory, ManaLeft: -1},
+		{ObjectID: 0x10000103, TemplateID: 20, Count: 1, Location: item.LocationWarehouse, ManaLeft: -1},
+	} {
+		if err := store.Create(ctx, 0x10000001, inst); err != nil {
+			t.Fatalf("Create() unexpected error: %v", err)
+		}
+	}
+
+	got, err := store.ListByOwnerAndLocations(ctx, 0x10000001, item.LocationInventory, item.LocationPaperdoll)
+	if err != nil {
+		t.Fatalf("ListByOwnerAndLocations() unexpected error: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("ListByOwnerAndLocations() returned %d items, want 2 (warehouse item excluded)", len(got))
+	}
+	for _, inst := range got {
+		if inst.Location == item.LocationWarehouse {
+			t.Errorf("ListByOwnerAndLocations() should not return a warehouse item when only INVENTORY/PAPERDOLL were requested")
+		}
+	}
+}
+
 func TestItemStore_DeleteByOwner(t *testing.T) {
 	ctx := context.Background()
 	store := NewItemStore(sqltest.NewDB(t))

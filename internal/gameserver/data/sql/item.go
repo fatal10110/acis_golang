@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 )
@@ -43,6 +44,49 @@ func (s *ItemStore) ListByOwner(ctx context.Context, ownerID int32) ([]*item.Ins
 	}
 	defer rows.Close()
 
+	out, err := scanItems(rows, ownerID)
+	if err != nil {
+		return nil, fmt.Errorf("list items for owner %d: %w", ownerID, err)
+	}
+	return out, nil
+}
+
+// ListByOwnerAndLocations returns every item ownerID owns sitting at one of
+// locs, ordered by loc_data — the shape a container restores itself from: a
+// plain container passes its one base location, an equip-capable inventory
+// passes its base and equip locations together so paperdoll items come
+// back ordered by paperdoll position.
+func (s *ItemStore) ListByOwnerAndLocations(ctx context.Context, ownerID int32, locs ...item.Location) ([]*item.Instance, error) {
+	if len(locs) == 0 {
+		return nil, nil
+	}
+
+	placeholders := strings.Repeat("?,", len(locs))
+	placeholders = placeholders[:len(placeholders)-1]
+
+	args := make([]any, 0, len(locs)+1)
+	args = append(args, ownerID)
+	for _, loc := range locs {
+		args = append(args, loc.String())
+	}
+
+	rows, err := s.db.QueryContext(ctx,
+		fmt.Sprintf(`SELECT object_id, item_id, count, enchant_level, loc, loc_data, custom_type1, custom_type2, mana_left, time
+		 FROM items WHERE owner_id = ? AND loc IN (%s) ORDER BY loc_data`, placeholders),
+		args...)
+	if err != nil {
+		return nil, fmt.Errorf("list items for owner %d: %w", ownerID, err)
+	}
+	defer rows.Close()
+
+	out, err := scanItems(rows, ownerID)
+	if err != nil {
+		return nil, fmt.Errorf("list items for owner %d: %w", ownerID, err)
+	}
+	return out, nil
+}
+
+func scanItems(rows *sql.Rows, ownerID int32) ([]*item.Instance, error) {
 	out := []*item.Instance{}
 	for rows.Next() {
 		var inst item.Instance
@@ -51,18 +95,43 @@ func (s *ItemStore) ListByOwner(ctx context.Context, ownerID int32) ([]*item.Ins
 
 		if err := rows.Scan(&inst.ObjectID, &inst.TemplateID, &inst.Count, &inst.EnchantLevel,
 			&loc, &inst.LocationData, &inst.CustomType1, &inst.CustomType2, &inst.ManaLeft, &inst.Time); err != nil {
-			return nil, fmt.Errorf("list items for owner %d: %w", ownerID, err)
+			return nil, err
 		}
-		inst.Location, err = item.ParseLocation(loc)
+		parsed, err := item.ParseLocation(loc)
 		if err != nil {
-			return nil, fmt.Errorf("list items for owner %d: %w", ownerID, err)
+			return nil, err
 		}
+		inst.Location = parsed
 		out = append(out, &inst)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("list items for owner %d: %w", ownerID, err)
+		return nil, err
 	}
 	return out, nil
+}
+
+// Update overwrites the persisted state of inst's row.
+func (s *ItemStore) Update(ctx context.Context, inst *item.Instance) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE items SET owner_id=?, item_id=?, count=?, enchant_level=?, loc=?, loc_data=?,
+			custom_type1=?, custom_type2=?, mana_left=?, time=?
+		 WHERE object_id=?`,
+		inst.OwnerID, inst.TemplateID, inst.Count, inst.EnchantLevel, inst.Location.String(), inst.LocationData,
+		inst.CustomType1, inst.CustomType2, inst.ManaLeft, inst.Time, inst.ObjectID,
+	)
+	if err != nil {
+		return fmt.Errorf("update item %d: %w", inst.ObjectID, err)
+	}
+	return nil
+}
+
+// Delete removes the items row identified by objectID, if any.
+func (s *ItemStore) Delete(ctx context.Context, objectID int32) error {
+	_, err := s.db.ExecContext(ctx, "DELETE FROM items WHERE object_id = ?", objectID)
+	if err != nil {
+		return fmt.Errorf("delete item %d: %w", objectID, err)
+	}
+	return nil
 }
 
 // DeleteByOwner removes every items row owned by ownerID and reports how

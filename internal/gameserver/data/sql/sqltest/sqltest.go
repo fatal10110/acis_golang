@@ -87,6 +87,16 @@ const itemsSchema = "CREATE TABLE IF NOT EXISTS `items` (\n" +
 	"	PRIMARY KEY (`object_id`)\n" +
 	")"
 
+// augmentationsSchema mirrors the shipped augmentations table definition
+// verbatim.
+const augmentationsSchema = "CREATE TABLE IF NOT EXISTS `augmentations` (\n" +
+	"	`item_oid` INT UNSIGNED NOT NULL DEFAULT 0,\n" +
+	"	`attributes` INT NOT NULL DEFAULT -1,\n" +
+	"	`skill_id` INT NOT NULL DEFAULT -1,\n" +
+	"	`skill_level` INT NOT NULL DEFAULT -1,\n" +
+	"	PRIMARY KEY (`item_oid`)\n" +
+	")"
+
 // spawnDataSchema mirrors the shipped spawn_data table definition verbatim.
 const spawnDataSchema = "CREATE TABLE IF NOT EXISTS `spawn_data` (\n" +
 	"  `name` VARCHAR(80) NOT NULL,\n" +
@@ -148,6 +158,9 @@ func NewDB(t *testing.T) *sql.DB {
 	}
 	if _, err := db.ExecContext(ctx, itemsSchema); err != nil {
 		t.Fatalf("create items table: %v", err)
+	}
+	if _, err := db.ExecContext(ctx, augmentationsSchema); err != nil {
+		t.Fatalf("create augmentations table: %v", err)
 	}
 	if _, err := db.ExecContext(ctx, spawnDataSchema); err != nil {
 		t.Fatalf("create spawn_data table: %v", err)
