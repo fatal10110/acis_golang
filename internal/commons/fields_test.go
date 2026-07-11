@@ -9,23 +9,23 @@ import (
 func TestFieldsMandatoryAccessors(t *testing.T) {
 	s := NewStatSet()
 	s.Set("int", 42)
-	s.Set("long", int64(9000000000))
-	s.Set("double", 3.14)
+	s.Set("int64", int64(9000000000))
+	s.Set("float64", 3.14)
 	s.Set("float", float32(2.5))
 	s.Set("string", "hi")
 	s.Set("intArray", []int{1, 2, 3})
-	s.Set("doubleArray", []float64{1.5, 2.5})
+	s.Set("float64Array", []float64{1.5, 2.5})
 	s.Set("stringArray", []string{"a", "b"})
 
 	f := NewFields(s, "test")
 	if got := f.Int("int"); got != 42 {
 		t.Errorf("Int() = %v, want 42", got)
 	}
-	if got := f.Long("long"); got != 9000000000 {
-		t.Errorf("Long() = %v, want 9000000000", got)
+	if got := f.Int64("int64"); got != 9000000000 {
+		t.Errorf("Int64() = %v, want 9000000000", got)
 	}
-	if got := f.Double("double"); got != 3.14 {
-		t.Errorf("Double() = %v, want 3.14", got)
+	if got := f.Float64("float64"); got != 3.14 {
+		t.Errorf("Float64() = %v, want 3.14", got)
 	}
 	if got := f.Float32("float"); got != 2.5 {
 		t.Errorf("Float32() = %v, want 2.5", got)
@@ -36,8 +36,8 @@ func TestFieldsMandatoryAccessors(t *testing.T) {
 	if got := f.IntArray("intArray"); !reflect.DeepEqual(got, []int{1, 2, 3}) {
 		t.Errorf("IntArray() = %v, want [1 2 3]", got)
 	}
-	if got := f.DoubleArray("doubleArray"); !reflect.DeepEqual(got, []float64{1.5, 2.5}) {
-		t.Errorf("DoubleArray() = %v, want [1.5 2.5]", got)
+	if got := f.Float64Array("float64Array"); !reflect.DeepEqual(got, []float64{1.5, 2.5}) {
+		t.Errorf("Float64Array() = %v, want [1.5 2.5]", got)
 	}
 	if got := f.StringArray("stringArray"); !reflect.DeepEqual(got, []string{"a", "b"}) {
 		t.Errorf("StringArray() = %v, want [a b]", got)

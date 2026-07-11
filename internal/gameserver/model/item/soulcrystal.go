@@ -14,25 +14,23 @@ type SoulCrystal struct {
 }
 
 func NewSoulCrystal(set *commons.StatSet) (SoulCrystal, error) {
-	initial, err := set.GetInt32("initial")
-	if err != nil {
-		return SoulCrystal{}, fmt.Errorf("item: soul crystal: %w", err)
+	idf := commons.NewFields(set, "item: soul crystal")
+	initial := idf.Int32("initial")
+	if err := idf.Err(); err != nil {
+		return SoulCrystal{}, err
 	}
-	wrap := func(err error) error { return fmt.Errorf("item: soul crystal %d: %w", initial, err) }
 
-	level, err := set.GetInt("level")
-	if err != nil {
-		return SoulCrystal{}, wrap(err)
+	f := commons.NewFields(set, fmt.Sprintf("item: soul crystal %d", initial))
+	crystal := SoulCrystal{
+		Level:         f.Int("level"),
+		InitialItemID: initial,
+		StagedItemID:  f.Int32("staged"),
+		BrokenItemID:  f.Int32("broken"),
 	}
-	staged, err := set.GetInt32("staged")
-	if err != nil {
-		return SoulCrystal{}, wrap(err)
+	if err := f.Err(); err != nil {
+		return SoulCrystal{}, err
 	}
-	broken, err := set.GetInt32("broken")
-	if err != nil {
-		return SoulCrystal{}, wrap(err)
-	}
-	return SoulCrystal{Level: level, InitialItemID: initial, StagedItemID: staged, BrokenItemID: broken}, nil
+	return crystal, nil
 }
 
 type SoulCrystalLevelingInfo struct {
@@ -45,37 +43,25 @@ type SoulCrystalLevelingInfo struct {
 }
 
 func NewSoulCrystalLevelingInfo(set *commons.StatSet) (SoulCrystalLevelingInfo, error) {
-	npcID, err := set.GetInt32("id")
-	if err != nil {
-		return SoulCrystalLevelingInfo{}, fmt.Errorf("item: soul crystal npc info: %w", err)
-	}
-	wrap := func(err error) error { return fmt.Errorf("item: soul crystal npc %d: %w", npcID, err) }
-
-	stage, err := set.GetInt("chanceStage")
-	if err != nil {
-		return SoulCrystalLevelingInfo{}, wrap(err)
-	}
-	breakChance, err := set.GetInt("chanceBreak")
-	if err != nil {
-		return SoulCrystalLevelingInfo{}, wrap(err)
-	}
-	absorbType, err := set.GetString("absorbType")
-	if err != nil {
-		return SoulCrystalLevelingInfo{}, wrap(err)
-	}
-	levels, err := set.GetIntArray("levelList")
-	if err != nil {
-		return SoulCrystalLevelingInfo{}, wrap(err)
+	idf := commons.NewFields(set, "item: soul crystal npc info")
+	npcID := idf.Int32("id")
+	if err := idf.Err(); err != nil {
+		return SoulCrystalLevelingInfo{}, err
 	}
 
-	return SoulCrystalLevelingInfo{
+	f := commons.NewFields(set, fmt.Sprintf("item: soul crystal npc %d", npcID))
+	info := SoulCrystalLevelingInfo{
 		NPCID:         npcID,
-		ChanceStage:   stage,
-		ChanceBreak:   breakChance,
-		SkillRequired: set.GetBoolDefault("skill", false),
-		AbsorbType:    absorbType,
-		Levels:        levels,
-	}, nil
+		ChanceStage:   f.Int("chanceStage"),
+		ChanceBreak:   f.Int("chanceBreak"),
+		SkillRequired: f.BoolDefault("skill", false),
+		AbsorbType:    f.String("absorbType"),
+		Levels:        f.IntArray("levelList"),
+	}
+	if err := f.Err(); err != nil {
+		return SoulCrystalLevelingInfo{}, err
+	}
+	return info, nil
 }
 
 type SoulCrystalTable struct {

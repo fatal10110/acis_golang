@@ -121,14 +121,16 @@ func sameSpawnTerritory(a, b *spawn.Territory) bool {
 
 func buildMaker(el makerElement, territories map[string]*spawn.Territory) (*spawn.Maker, error) {
 	set := commons.StatSetFromXMLAttrs(el.Attrs)
+	f := commons.NewFields(set, "spawn maker loader")
+	name := f.StringDefault("name", "?")
 
-	refs, err := resolveTerritories(set.GetStringDefault("territory", ""), territories)
+	refs, err := resolveTerritories(f.StringDefault("territory", ""), territories)
 	if err != nil {
-		return nil, fmt.Errorf("maker %q: %w", set.GetStringDefault("name", "?"), err)
+		return nil, fmt.Errorf("maker %q: %w", name, err)
 	}
-	banned, err := resolveTerritories(set.GetStringDefault("ban", ""), territories)
+	banned, err := resolveTerritories(f.StringDefault("ban", ""), territories)
 	if err != nil {
-		return nil, fmt.Errorf("maker %q: %w", set.GetStringDefault("name", "?"), err)
+		return nil, fmt.Errorf("maker %q: %w", name, err)
 	}
 
 	aiType, aiParams := flattenAI(el.AI)
@@ -140,7 +142,7 @@ func buildMaker(el makerElement, territories map[string]*spawn.Territory) (*spaw
 	for _, npcEl := range el.NPCs {
 		entry, err := buildEntry(npcEl)
 		if err != nil {
-			return nil, fmt.Errorf("maker %q: %w", set.GetStringDefault("name", "?"), err)
+			return nil, fmt.Errorf("maker %q: %w", name, err)
 		}
 		entries = append(entries, entry)
 	}
@@ -150,27 +152,29 @@ func buildMaker(el makerElement, territories map[string]*spawn.Territory) (*spaw
 
 func buildEntry(el spawnNPCElement) (spawn.Entry, error) {
 	set := commons.StatSetFromXMLAttrs(el.Attrs)
+	f := commons.NewFields(set, "spawn entry loader")
+	npcID := f.StringDefault("id", "?")
 
 	privates := make([]spawn.Private, 0)
 	for _, group := range el.Privates {
 		for _, privateEl := range group.Entries {
 			privateSpawn, err := spawn.NewPrivate(commons.StatSetFromXMLAttrs(privateEl.Attrs))
 			if err != nil {
-				return spawn.Entry{}, fmt.Errorf("npc %q private: %w", set.GetStringDefault("id", "?"), err)
+				return spawn.Entry{}, fmt.Errorf("npc %q private: %w", npcID, err)
 			}
 			privates = append(privates, privateSpawn)
 		}
 	}
 
 	_, aiParams := flattenAI(el.AI)
-	positions, err := spawn.ParsePositions(set.GetStringDefault("pos", ""))
+	positions, err := spawn.ParsePositions(f.StringDefault("pos", ""))
 	if err != nil {
-		return spawn.Entry{}, fmt.Errorf("npc %q: %w", set.GetStringDefault("id", "?"), err)
+		return spawn.Entry{}, fmt.Errorf("npc %q: %w", npcID, err)
 	}
 
 	entry, err := spawn.NewEntry(set, positions, privates, aiParams)
 	if err != nil {
-		return spawn.Entry{}, fmt.Errorf("npc %q: %w", set.GetStringDefault("id", "?"), err)
+		return spawn.Entry{}, fmt.Errorf("npc %q: %w", npcID, err)
 	}
 	return entry, nil
 }

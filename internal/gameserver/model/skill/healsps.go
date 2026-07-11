@@ -15,32 +15,33 @@ type HealSps struct {
 }
 
 func NewHealSps(set *commons.StatSet) (HealSps, error) {
-	correction, err := set.GetDouble("correction")
-	if err != nil {
-		return HealSps{}, fmt.Errorf("skill: heal sps: %w", err)
+	f := commons.NewFields(set, "skill: heal sps")
+	entry := HealSps{
+		Correction: f.Float64("correction"),
+		NeededMAtk: f.Int("neededMatk"),
 	}
-	neededMAtk, err := set.GetInt("neededMatk")
-	if err != nil {
-		return HealSps{}, fmt.Errorf("skill: heal sps: %w", err)
+	if err := f.Err(); err != nil {
+		return HealSps{}, err
 	}
 
-	entry := HealSps{Correction: correction, NeededMAtk: neededMAtk}
-	if set.Has("skillId") {
-		skillID, err := set.GetInt32("skillId")
-		if err != nil {
-			return HealSps{}, fmt.Errorf("skill: heal sps skill selector: %w", err)
+	if f.Has("skillId") {
+		sf := commons.NewFields(set, "skill: heal sps skill selector")
+		skillID := sf.Int32("skillId")
+		if err := sf.Err(); err != nil {
+			return HealSps{}, err
 		}
-		level, err := set.GetInt("skillLevel")
-		if err != nil {
-			return HealSps{}, fmt.Errorf("skill: heal sps %d: %w", skillID, err)
-		}
+		lf := commons.NewFields(set, fmt.Sprintf("skill: heal sps %d", skillID))
 		entry.SkillID = ID(skillID)
-		entry.SkillLevel = level
+		entry.SkillLevel = lf.Int("skillLevel")
+		if err := lf.Err(); err != nil {
+			return HealSps{}, err
+		}
 	}
-	if set.Has("magicLevel") {
-		entry.MagicLevel, err = set.GetInt("magicLevel")
-		if err != nil {
-			return HealSps{}, fmt.Errorf("skill: heal sps magic selector: %w", err)
+	if f.Has("magicLevel") {
+		mf := commons.NewFields(set, "skill: heal sps magic selector")
+		entry.MagicLevel = mf.Int("magicLevel")
+		if err := mf.Err(); err != nil {
+			return HealSps{}, err
 		}
 	}
 	if entry.SkillID == 0 && entry.MagicLevel == 0 {

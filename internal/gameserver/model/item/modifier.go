@@ -98,7 +98,7 @@ func NewStatModifier(op FuncOp, set *commons.StatSet) (StatModifier, error) {
 	if err != nil {
 		return StatModifier{}, fmt.Errorf("item: stat modifier: %w", err)
 	}
-	val, err := set.GetDouble("val")
+	val, err := set.GetFloat64("val")
 	if err != nil {
 		return StatModifier{}, fmt.Errorf("item: stat modifier %q: %w", stat, err)
 	}

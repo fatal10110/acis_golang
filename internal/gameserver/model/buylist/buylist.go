@@ -18,21 +18,18 @@ type Product struct {
 
 // NewProduct builds a Product from one folded <product> element.
 func NewProduct(buyListID int, set *commons.StatSet) (Product, error) {
-	itemID, err := set.GetInt32("id")
-	if err != nil {
-		return Product{}, fmt.Errorf("buylist %d product: %w", buyListID, err)
+	idf := commons.NewFields(set, fmt.Sprintf("buylist %d product", buyListID))
+	itemID := idf.Int32("id")
+	if err := idf.Err(); err != nil {
+		return Product{}, err
 	}
-	price, err := set.GetIntDefault("price", 0)
-	if err != nil {
-		return Product{}, fmt.Errorf("buylist %d product %d: %w", buyListID, itemID, err)
-	}
-	restockDelay, err := set.GetLongDefault("restockDelay", -1)
-	if err != nil {
-		return Product{}, fmt.Errorf("buylist %d product %d: %w", buyListID, itemID, err)
-	}
-	maxCount, err := set.GetIntDefault("count", -1)
-	if err != nil {
-		return Product{}, fmt.Errorf("buylist %d product %d: %w", buyListID, itemID, err)
+
+	f := commons.NewFields(set, fmt.Sprintf("buylist %d product %d", buyListID, itemID))
+	price := f.IntDefault("price", 0)
+	restockDelay := f.Int64Default("restockDelay", -1)
+	maxCount := f.IntDefault("count", -1)
+	if err := f.Err(); err != nil {
+		return Product{}, err
 	}
 	return Product{
 		BuyListID: buyListID, ItemID: itemID, Price: price,

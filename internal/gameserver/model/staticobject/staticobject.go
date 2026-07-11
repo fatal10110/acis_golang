@@ -43,9 +43,10 @@ func (o *Object) StaticObjectID() int { return o.Template.ID }
 
 // NewTemplate builds a static object template from XML attributes.
 func NewTemplate(set *commons.StatSet) (*Template, error) {
-	id, err := set.GetInt("id")
-	if err != nil {
-		return nil, fmt.Errorf("static object: %w", err)
+	idf := commons.NewFields(set, "static object")
+	id := idf.Int("id")
+	if err := idf.Err(); err != nil {
+		return nil, err
 	}
 	wrap := func(err error) error { return fmt.Errorf("static object %d: %w", id, err) }
 
@@ -53,30 +54,19 @@ func NewTemplate(set *commons.StatSet) (*Template, error) {
 	if err != nil {
 		return nil, wrap(err)
 	}
-	kind, err := set.GetInt("type")
-	if err != nil {
-		return nil, wrap(err)
-	}
-	texture, err := set.GetString("texture")
-	if err != nil {
-		return nil, wrap(err)
-	}
-	mapX, err := set.GetInt("mapX")
-	if err != nil {
-		return nil, wrap(err)
-	}
-	mapY, err := set.GetInt("mapY")
-	if err != nil {
-		return nil, wrap(err)
-	}
-	return &Template{
+	f := commons.NewFields(set, fmt.Sprintf("static object %d", id))
+	t := &Template{
 		ID:       id,
 		Location: loc,
-		Type:     kind,
-		Texture:  texture,
-		MapX:     mapX,
-		MapY:     mapY,
-	}, nil
+		Type:     f.Int("type"),
+		Texture:  f.String("texture"),
+		MapX:     f.Int("mapX"),
+		MapY:     f.Int("mapY"),
+	}
+	if err := f.Err(); err != nil {
+		return nil, err
+	}
+	return t, nil
 }
 
 // Table stores static object templates keyed by static object id.

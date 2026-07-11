@@ -30,7 +30,7 @@ var ErrValueRequired = errors.New("commons: value required")
 //
 // That "present but malformed is still an error" rule applies to every
 // accessor whose target type has a genuine parse failure mode: the numeric
-// accessors (GetByte, GetInt, GetInt32, GetLong, GetDouble, GetFloat32 and
+// accessors (GetByte, GetInt, GetInt32, GetInt64, GetFloat64, GetFloat32 and
 // their array/Default variants) reject a present string that doesn't parse
 // as that number. GetBool, GetString, GetStringArray and their Default
 // variants have no such failure mode by design: a string coerces to bool
@@ -133,7 +133,7 @@ func (s *StatSet) GetBoolDefault(key string, defaultValue bool) bool {
 // asNumber coerces any of the numeric representations StatSet stores
 // (signed/unsigned integers of any width, float32, float64) into a float64,
 // so a single coercion path serves every float-targeted accessor (GetBool,
-// GetDouble, GetFloat32) regardless of how the value was originally stored.
+// GetFloat64, GetFloat32) regardless of how the value was originally stored.
 // Integer-targeted accessors use asInt64 instead, since routing an int64
 // through float64's 53-bit mantissa loses precision on large values.
 func asNumber(val any) (float64, bool) {
@@ -170,7 +170,7 @@ func asNumber(val any) (float64, bool) {
 // (signed/unsigned integers of any width, float32, float64) into an int64
 // by converting each kind directly, never routing through float64 — so an
 // int64 value beyond float64's 53-bit mantissa round-trips exactly through
-// the integer accessors (GetByte, GetInt, GetLong, and their array/Default
+// the integer accessors (GetByte, GetInt, GetInt64, and their array/Default
 // variants).
 func asInt64(val any) (int64, bool) {
 	switch v := val.(type) {
@@ -249,10 +249,10 @@ func (s *StatSet) GetByteDefault(key string, defaultValue byte) (byte, error) {
 	return v, nil
 }
 
-// coerceDouble coerces val to a float64 from a numeric, numeric string, or
+// coerceFloat64 coerces val to a float64 from a numeric, numeric string, or
 // bool (1/0) representation. ok reports whether val was a recognized kind;
 // err reports a recognized-but-malformed numeric string.
-func coerceDouble(val any) (v float64, ok bool, err error) {
+func coerceFloat64(val any) (v float64, ok bool, err error) {
 	if n, ok := asNumber(val); ok {
 		return n, true, nil
 	}
@@ -272,27 +272,27 @@ func coerceDouble(val any) (v float64, ok bool, err error) {
 	return 0, false, nil
 }
 
-// GetDouble returns the value at key as a float64, coercing a numeric,
+// GetFloat64 returns the value at key as a float64, coercing a numeric,
 // numeric string, or bool (1/0) representation. Returns ErrValueRequired if
 // key is absent or the value cannot be coerced.
-func (s *StatSet) GetDouble(key string) (float64, error) {
+func (s *StatSet) GetFloat64(key string) (float64, error) {
 	val := s.values[key]
-	v, ok, err := coerceDouble(val)
+	v, ok, err := coerceFloat64(val)
 	if err != nil {
 		return 0, fmt.Errorf("commons: StatSet key %q: %w", key, err)
 	}
 	if !ok {
-		return 0, errValueRequired(key, "double", val)
+		return 0, errValueRequired(key, "float64", val)
 	}
 	return v, nil
 }
 
-// GetDoubleDefault is like GetDouble but returns defaultValue when key is
+// GetFloat64Default is like GetFloat64 but returns defaultValue when key is
 // absent (or holds a value of a kind float64 doesn't coerce from). A string
 // value that fails to parse is still an error.
-func (s *StatSet) GetDoubleDefault(key string, defaultValue float64) (float64, error) {
+func (s *StatSet) GetFloat64Default(key string, defaultValue float64) (float64, error) {
 	val := s.values[key]
-	v, ok, err := coerceDouble(val)
+	v, ok, err := coerceFloat64(val)
 	if err != nil {
 		return 0, fmt.Errorf("commons: StatSet key %q: %w", key, err)
 	}
@@ -302,11 +302,11 @@ func (s *StatSet) GetDoubleDefault(key string, defaultValue float64) (float64, e
 	return v, nil
 }
 
-// GetDoubleArray returns the value at key as a []float64. A single number
+// GetFloat64Array returns the value at key as a []float64. A single number
 // coerces to a one-element slice; a string coerces by splitting on ";" and
 // parsing each part. Returns ErrValueRequired if key is absent or the value
 // cannot be coerced.
-func (s *StatSet) GetDoubleArray(key string) ([]float64, error) {
+func (s *StatSet) GetFloat64Array(key string) ([]float64, error) {
 	val := s.values[key]
 	if arr, ok := val.([]float64); ok {
 		return arr, nil
@@ -326,7 +326,7 @@ func (s *StatSet) GetDoubleArray(key string) ([]float64, error) {
 		}
 		return out, nil
 	}
-	return nil, errValueRequired(key, "double array", val)
+	return nil, errValueRequired(key, "float64 array", val)
 }
 
 // coerceFloat32 coerces val to a float32 from a numeric, numeric string, or
@@ -536,27 +536,27 @@ func GetList[T any](s *StatSet, key string) ([]T, error) {
 	return arr, nil
 }
 
-// GetLong returns the value at key as an int64, coercing a numeric, numeric
+// GetInt64 returns the value at key as an int64, coercing a numeric, numeric
 // string, or bool (1/0) representation. Returns ErrValueRequired if key is
 // absent or the value cannot be coerced.
-func (s *StatSet) GetLong(key string) (int64, error) {
+func (s *StatSet) GetInt64(key string) (int64, error) {
 	val := s.values[key]
-	v, ok, err := coerceLong(val)
+	v, ok, err := coerceInt64(val)
 	if err != nil {
 		return 0, fmt.Errorf("commons: StatSet key %q: %w", key, err)
 	}
 	if !ok {
-		return 0, errValueRequired(key, "long", val)
+		return 0, errValueRequired(key, "int64", val)
 	}
 	return v, nil
 }
 
-// GetLongDefault is like GetLong but returns defaultValue when key is
+// GetInt64Default is like GetInt64 but returns defaultValue when key is
 // absent (or holds a value of a kind int64 doesn't coerce from). A string
 // value that fails to parse is still an error.
-func (s *StatSet) GetLongDefault(key string, defaultValue int64) (int64, error) {
+func (s *StatSet) GetInt64Default(key string, defaultValue int64) (int64, error) {
 	val := s.values[key]
-	v, ok, err := coerceLong(val)
+	v, ok, err := coerceInt64(val)
 	if err != nil {
 		return 0, fmt.Errorf("commons: StatSet key %q: %w", key, err)
 	}
@@ -566,10 +566,10 @@ func (s *StatSet) GetLongDefault(key string, defaultValue int64) (int64, error) 
 	return v, nil
 }
 
-// coerceLong coerces val to an int64 from a numeric, numeric string, or
+// coerceInt64 coerces val to an int64 from a numeric, numeric string, or
 // bool (1/0) representation. ok reports whether val was a recognized kind;
 // err reports a recognized-but-malformed numeric string.
-func coerceLong(val any) (v int64, ok bool, err error) {
+func coerceInt64(val any) (v int64, ok bool, err error) {
 	if n, ok := asInt64(val); ok {
 		return n, true, nil
 	}
@@ -589,11 +589,11 @@ func coerceLong(val any) (v int64, ok bool, err error) {
 	return 0, false, nil
 }
 
-// GetLongArray returns the value at key as a []int64. A single number
+// GetInt64Array returns the value at key as a []int64. A single number
 // coerces to a one-element slice; a string coerces by splitting on ";" and
 // parsing each part. Returns ErrValueRequired if key is absent or the value
 // cannot be coerced.
-func (s *StatSet) GetLongArray(key string) ([]int64, error) {
+func (s *StatSet) GetInt64Array(key string) ([]int64, error) {
 	val := s.values[key]
 	if arr, ok := val.([]int64); ok {
 		return arr, nil
@@ -613,7 +613,7 @@ func (s *StatSet) GetLongArray(key string) ([]int64, error) {
 		}
 		return out, nil
 	}
-	return nil, errValueRequired(key, "long array", val)
+	return nil, errValueRequired(key, "int64 array", val)
 }
 
 // GetMap returns the map stored at key, or nil if key is absent. Returns

@@ -93,7 +93,7 @@ func (r *Reader) ReadInt64() int64 {
 	return int64(binary.LittleEndian.Uint64(b))
 }
 
-// ReadFloat64 reads a little-endian IEEE-754 double.
+// ReadFloat64 reads a little-endian IEEE-754 float64 value.
 func (r *Reader) ReadFloat64() float64 {
 	return math.Float64frombits(uint64(r.ReadInt64()))
 }

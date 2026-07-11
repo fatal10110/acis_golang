@@ -30,57 +30,46 @@ type Recipe struct {
 
 // New builds a Recipe from one folded <recipe> element.
 func New(set *commons.StatSet) (Recipe, error) {
-	id, err := set.GetInt("id")
-	if err != nil {
-		return Recipe{}, fmt.Errorf("recipe: %w", err)
+	idf := commons.NewFields(set, "recipe")
+	id := idf.Int("id")
+	if err := idf.Err(); err != nil {
+		return Recipe{}, err
 	}
-	wrap := func(err error) error { return fmt.Errorf("recipe %d: %w", id, err) }
 
-	rawMaterials, err := set.GetString("material")
-	if err != nil {
-		return Recipe{}, wrap(err)
-	}
+	f := commons.NewFields(set, fmt.Sprintf("recipe %d", id))
+	rawMaterials := f.String("material")
 	materials, err := parseIngredients(rawMaterials)
 	if err != nil {
-		return Recipe{}, wrap(fmt.Errorf("material %q: %w", rawMaterials, err))
+		f.Fail(fmt.Errorf("material %q: %w", rawMaterials, err))
 	}
-	rawProduct, err := set.GetString("product")
-	if err != nil {
-		return Recipe{}, wrap(err)
-	}
+	rawProduct := f.String("product")
 	product, err := parseIngredient(rawProduct)
 	if err != nil {
-		return Recipe{}, wrap(fmt.Errorf("product %q: %w", rawProduct, err))
-	}
-	itemID, err := set.GetInt32("itemId")
-	if err != nil {
-		return Recipe{}, wrap(err)
-	}
-	level, err := set.GetInt("level")
-	if err != nil {
-		return Recipe{}, wrap(err)
-	}
-	mpCost, err := set.GetInt("mpConsume")
-	if err != nil {
-		return Recipe{}, wrap(err)
-	}
-	successRate, err := set.GetInt("successRate")
-	if err != nil {
-		return Recipe{}, wrap(err)
-	}
-	dwarven, err := set.GetBool("isDwarven")
-	if err != nil {
-		return Recipe{}, wrap(err)
-	}
-	alias, err := set.GetString("alias")
-	if err != nil {
-		return Recipe{}, wrap(err)
+		f.Fail(fmt.Errorf("product %q: %w", rawProduct, err))
 	}
 
-	return Recipe{
-		Materials: materials, Product: product, ID: id, Level: level, ItemID: itemID,
-		Alias: alias, SuccessRate: successRate, MPCost: mpCost, Dwarven: dwarven,
-	}, nil
+	itemID := f.Int32("itemId")
+	level := f.Int("level")
+	mpCost := f.Int("mpConsume")
+	successRate := f.Int("successRate")
+	dwarven := f.Bool("isDwarven")
+	alias := f.String("alias")
+
+	recipe := Recipe{
+		Materials:   materials,
+		Product:     product,
+		ID:          id,
+		Level:       level,
+		ItemID:      itemID,
+		Alias:       alias,
+		SuccessRate: successRate,
+		MPCost:      mpCost,
+		Dwarven:     dwarven,
+	}
+	if err := f.Err(); err != nil {
+		return Recipe{}, err
+	}
+	return recipe, nil
 }
 
 func parseIngredients(raw string) ([]Ingredient, error) {
