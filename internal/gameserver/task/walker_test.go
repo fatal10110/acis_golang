@@ -192,6 +192,43 @@ func TestWalkerMoveErrorsAreReturned(t *testing.T) {
 	}
 }
 
+func TestWalkerTickRetriesRejectedMove(t *testing.T) {
+	wantErr := errors.New("move failed")
+	routes := route.WalkerRoutes{
+		"patrol": {
+			"guard": {
+				walkerNode(0, withDelay(1000)),
+				walkerNode(100),
+			},
+		},
+	}
+	now := time.Unix(100, 0)
+	actor := &walkerActorStub{id: 1, pos: loc(0)}
+	w := newTestWalker(t, routes, &walkerPathStub{canMove: true}, func() time.Time { return now })
+
+	if err := w.StartRoute(actor, "patrol", "guard"); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Arrived(actor); err != nil {
+		t.Fatal(err)
+	}
+
+	actor.moveErr = wantErr
+	now = now.Add(time.Second)
+	errs := w.Tick()
+	if len(errs) != 1 || !errors.Is(errs[0], wantErr) {
+		t.Fatalf("Tick() errors = %v, want %v", errs, wantErr)
+	}
+	assertMoves(t, actor, loc(0))
+
+	actor.moveErr = nil
+	now = now.Add(WalkerTick)
+	if errs := w.Tick(); len(errs) != 0 {
+		t.Fatalf("Tick() errors = %v", errs)
+	}
+	assertMoves(t, actor, loc(0), loc(100))
+}
+
 func TestGeoPathAdaptsEngineAndFinder(t *testing.T) {
 	origin := loc(0)
 	target := loc(100)

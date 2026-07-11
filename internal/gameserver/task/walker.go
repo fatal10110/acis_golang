@@ -235,6 +235,7 @@ func (w *Walker) moveToNextPoint(entry *walkerEntry) error {
 		return err
 	}
 
+	previousIndex, previousOnRoute, previousReverse := entry.index, entry.onRoute, entry.reverse
 	if !entry.onRoute {
 		entry.index = nearestNode(entry.actor.Position(), nodes)
 	} else {
@@ -272,6 +273,10 @@ func (w *Walker) moveToNextPoint(entry *walkerEntry) error {
 	}
 
 	if _, err := entry.actor.MoveToLocation(node.Location); err != nil {
+		entry.index = previousIndex
+		entry.onRoute = previousOnRoute
+		entry.reverse = previousReverse
+		entry.wakeTime = w.now().Add(WalkerTick)
 		return err
 	}
 	entry.onRoute = true
