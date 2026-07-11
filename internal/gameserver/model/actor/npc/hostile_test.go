@@ -5,6 +5,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -66,6 +67,30 @@ func TestHostileRunsFromAITask(t *testing.T) {
 
 	if strike.target != target {
 		t.Fatalf("attack target = %v, want target after AI task tick", strike.target)
+	}
+}
+
+func TestHostileReturnHomeMovesTowardHomeAndClearsThreat(t *testing.T) {
+	state := world.New()
+	move := &hostileMove{}
+	hostile := newTestHostile(t, move, &hostileAttack{})
+	hostile.Instance.HasHome = true
+	hostile.Instance.Home = location.Location{X: 100, Y: 100, Z: 0}
+	state.Spawn(hostile, 500, 100, 0, 0)
+	target := &hostileTarget{id: 200}
+	hostile.AddDamageHate(target, 0, 100)
+
+	hostile.AI().SetWander()
+	hostile.Think()
+
+	if got := hostile.AI().Threats().Hate(target); got != 0 {
+		t.Fatalf("threat hate after return home = %v, want 0", got)
+	}
+	if move.home != hostile.Instance.Home {
+		t.Fatalf("home move = %+v, want %+v", move.home, hostile.Instance.Home)
+	}
+	if got := hostile.AI().CurrentIntention(); got != ai.IntentionWander {
+		t.Fatalf("current intention = %v, want wander while returning home", got)
 	}
 }
 
@@ -136,12 +161,17 @@ func (t *hostileTarget) AlikeDead() bool  { return false }
 type hostileMove struct {
 	followTarget attackable.Combatant
 	followRange  int
+	home         location.Location
 }
 
 func (m *hostileMove) MaybeStartOffensiveFollow(target attackable.Combatant, attackRange int) bool {
 	m.followTarget = target
 	m.followRange = attackRange
 	return false
+}
+
+func (m *hostileMove) MoveHome(home location.Location) {
+	m.home = home
 }
 
 func (m *hostileMove) Stop() {}

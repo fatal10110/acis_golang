@@ -98,6 +98,39 @@ func TestItemStore_Update(t *testing.T) {
 	}
 }
 
+func TestItemStore_SaveUpserts(t *testing.T) {
+	ctx := context.Background()
+	store := NewItemStore(sqltest.NewDB(t))
+
+	inst := &item.Instance{
+		ObjectID: 0x10000101, TemplateID: 1146, OwnerID: 0x10000001, Count: 1,
+		Location: item.LocationInventory, ManaLeft: -1,
+	}
+	if err := store.Save(ctx, inst); err != nil {
+		t.Fatalf("Save(insert) unexpected error: %v", err)
+	}
+
+	inst.Count = 5
+	inst.EnchantLevel = 7
+	inst.Location = item.LocationPaperdoll
+	inst.LocationData = 10
+	inst.ManaLeft = 42
+	if err := store.Save(ctx, inst); err != nil {
+		t.Fatalf("Save(update) unexpected error: %v", err)
+	}
+
+	got, err := store.ListByOwner(ctx, 0x10000001)
+	if err != nil {
+		t.Fatalf("ListByOwner() unexpected error: %v", err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("ListByOwner() returned %d items, want 1", len(got))
+	}
+	if got[0].Count != 5 || got[0].EnchantLevel != 7 || got[0].Location != item.LocationPaperdoll || got[0].LocationData != 10 || got[0].ManaLeft != 42 {
+		t.Errorf("saved instance = %+v, want updated state", got[0])
+	}
+}
+
 func TestItemStore_Delete(t *testing.T) {
 	ctx := context.Background()
 	store := NewItemStore(sqltest.NewDB(t))
