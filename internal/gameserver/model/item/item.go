@@ -290,6 +290,20 @@ func (t *Template) Equipable() bool {
 	return t.Slot != SlotNone && t.Kind != KindEtcItem
 }
 
+// Mask returns the worn-item bit an equipped instance of t contributes to
+// an inventory's worn-type mask: the weapon or armor type's bit, or 0 for
+// an etc-item (etc-items never contribute to the mask).
+func (t *Template) Mask() int32 {
+	switch t.Kind {
+	case KindWeapon:
+		return t.Weapon.Type.Mask()
+	case KindArmor:
+		return t.Armor.Type.Mask()
+	default:
+		return 0
+	}
+}
+
 // HeroItem reports whether the template is one of the fixed hero-only
 // weapon ids, or the hero circlet. This range is a client-side constant, not
 // something any shipped data file flags.
