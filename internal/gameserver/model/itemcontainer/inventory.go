@@ -560,6 +560,13 @@ func (inv *Inventory) DrainUpdates() []Update {
 	return out
 }
 
+// HasUpdates reports whether any inventory-change notifications are queued.
+func (inv *Inventory) HasUpdates() bool {
+	inv.mu.Lock()
+	defer inv.mu.Unlock()
+	return len(inv.updates) != 0
+}
+
 func (inv *Inventory) queueUpdate(inst *item.Instance, state UpdateState) {
 	inv.mu.Lock()
 	defer inv.mu.Unlock()
