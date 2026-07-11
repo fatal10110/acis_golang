@@ -2,6 +2,7 @@ package zone
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
@@ -225,10 +226,27 @@ func NewPolygon(nodes []location.Point, z1, z2 int) (Polygon, error) {
 	xs := make([]int32, len(nodes))
 	ys := make([]int32, len(nodes))
 	for i, n := range nodes {
-		xs[i] = int32(n.X)
-		ys[i] = int32(n.Y)
+		x, err := vertexInt32(n.X)
+		if err != nil {
+			return Polygon{}, fmt.Errorf("zone: polygon vertex %d: x: %w", i, err)
+		}
+		y, err := vertexInt32(n.Y)
+		if err != nil {
+			return Polygon{}, fmt.Errorf("zone: polygon vertex %d: y: %w", i, err)
+		}
+		xs[i], ys[i] = x, y
 	}
 	return Polygon{xs: xs, ys: ys, z1: z1, z2: z2}, nil
+}
+
+// vertexInt32 narrows v to int32, failing if it overflows. World
+// coordinates always fit in 32 bits, so an out-of-range value marks
+// malformed input rather than a legitimate vertex.
+func vertexInt32(v int) (int32, error) {
+	if v < math.MinInt32 || v > math.MaxInt32 {
+		return 0, fmt.Errorf("value %d overflows int32", v)
+	}
+	return int32(v), nil
 }
 
 // Contains reports whether (x, y, z) lies inside the prism, using an
