@@ -1,6 +1,9 @@
 package ai
 
-import "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+)
 
 const attackHateDecay = 6.6
 
@@ -17,6 +20,7 @@ type AttackableActor interface {
 // MoveController controls movement requests emitted by the AI loop.
 type MoveController interface {
 	MaybeStartOffensiveFollow(target attackable.Combatant, attackRange int) bool
+	MoveHome(location.Location)
 	Stop()
 }
 

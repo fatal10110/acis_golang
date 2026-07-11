@@ -3,6 +3,8 @@ package npc
 import (
 	"errors"
 	"fmt"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
 
 // InstanceKind identifies the behavior category selected by an NPC template.
@@ -13,6 +15,13 @@ type Instance struct {
 	ObjectID int32
 	Template *Template
 	Kind     InstanceKind
+
+	// Home is the spawn point this NPC returns to when it leashes.
+	Home location.Location
+	// HasHome reports whether Home was populated by the spawn runtime.
+	HasHome bool
+	// DriftRange overrides the default home radius when positive.
+	DriftRange int
 }
 
 var supportedInstanceKinds = map[InstanceKind]struct{}{
