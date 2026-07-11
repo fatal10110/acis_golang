@@ -11,10 +11,10 @@ func TestStatSetGettersFromTypedValues(t *testing.T) {
 	s := NewStatSet()
 	s.Set("bool", true)
 	s.Set("byte", byte(5))
-	s.Set("double", 3.14)
+	s.Set("float64", 3.14)
 	s.Set("float", float32(2.5))
 	s.Set("int", 42)
-	s.Set("long", int64(9000000000))
+	s.Set("int64", int64(9000000000))
 	s.Set("string", "hi")
 
 	if got, err := s.GetBool("bool"); err != nil || !got {
@@ -23,8 +23,8 @@ func TestStatSetGettersFromTypedValues(t *testing.T) {
 	if got, err := s.GetByte("byte"); err != nil || got != 5 {
 		t.Errorf("GetByte = (%v, %v), want (5, nil)", got, err)
 	}
-	if got, err := s.GetDouble("double"); err != nil || got != 3.14 {
-		t.Errorf("GetDouble = (%v, %v), want (3.14, nil)", got, err)
+	if got, err := s.GetFloat64("float64"); err != nil || got != 3.14 {
+		t.Errorf("GetFloat64 = (%v, %v), want (3.14, nil)", got, err)
 	}
 	if got, err := s.GetFloat32("float"); err != nil || got != 2.5 {
 		t.Errorf("GetFloat32 = (%v, %v), want (2.5, nil)", got, err)
@@ -32,27 +32,27 @@ func TestStatSetGettersFromTypedValues(t *testing.T) {
 	if got, err := s.GetInt("int"); err != nil || got != 42 {
 		t.Errorf("GetInt = (%v, %v), want (42, nil)", got, err)
 	}
-	if got, err := s.GetLong("long"); err != nil || got != 9000000000 {
-		t.Errorf("GetLong = (%v, %v), want (9000000000, nil)", got, err)
+	if got, err := s.GetInt64("int64"); err != nil || got != 9000000000 {
+		t.Errorf("GetInt64 = (%v, %v), want (9000000000, nil)", got, err)
 	}
 	if got, err := s.GetString("string"); err != nil || got != "hi" {
 		t.Errorf("GetString = (%v, %v), want (hi, nil)", got, err)
 	}
 }
 
-func TestStatSetGetLongPreservesInt64PrecisionBeyondFloat64Mantissa(t *testing.T) {
+func TestStatSetGetInt64PreservesInt64PrecisionBeyondFloat64Mantissa(t *testing.T) {
 	s := NewStatSet()
 	want := int64(1) << 60
 	s.Set("k", want)
 
-	if got, err := s.GetLong("k"); err != nil || got != want {
-		t.Errorf("GetLong = (%v, %v), want (%v, nil)", got, err, want)
+	if got, err := s.GetInt64("k"); err != nil || got != want {
+		t.Errorf("GetInt64 = (%v, %v), want (%v, nil)", got, err, want)
 	}
-	if got, err := s.GetLongDefault("k", 0); err != nil || got != want {
-		t.Errorf("GetLongDefault = (%v, %v), want (%v, nil)", got, err, want)
+	if got, err := s.GetInt64Default("k", 0); err != nil || got != want {
+		t.Errorf("GetInt64Default = (%v, %v), want (%v, nil)", got, err, want)
 	}
-	if got, err := s.GetLongArray("k"); err != nil || len(got) != 1 || got[0] != want {
-		t.Errorf("GetLongArray = (%v, %v), want ([%v], nil)", got, err, want)
+	if got, err := s.GetInt64Array("k"); err != nil || len(got) != 1 || got[0] != want {
+		t.Errorf("GetInt64Array = (%v, %v), want ([%v], nil)", got, err, want)
 	}
 }
 
@@ -68,8 +68,8 @@ func TestStatSetIntegerAccessorsRecognizeUnsignedKinds(t *testing.T) {
 	if got, err := s.GetInt("uint32"); err != nil || got != 6 {
 		t.Errorf("GetInt(uint32) = (%v, %v), want (6, nil)", got, err)
 	}
-	if got, err := s.GetLong("uint64"); err != nil || got != 7 {
-		t.Errorf("GetLong(uint64) = (%v, %v), want (7, nil)", got, err)
+	if got, err := s.GetInt64("uint64"); err != nil || got != 7 {
+		t.Errorf("GetInt64(uint64) = (%v, %v), want (7, nil)", got, err)
 	}
 }
 
@@ -77,12 +77,12 @@ func TestStatSetGettersFromStringCoercion(t *testing.T) {
 	s := NewStatSet()
 	s.Set("bool", "true")
 	s.Set("int", "42")
-	s.Set("long", "9000000000")
-	s.Set("double", "3.14")
+	s.Set("int64", "9000000000")
+	s.Set("float64", "3.14")
 	s.Set("intArray", "1;2;3")
 	s.Set("stringArray", "a;b;c")
-	s.Set("doubleArray", "1.5;2.5")
-	s.Set("longArray", "10;20")
+	s.Set("float64Array", "1.5;2.5")
+	s.Set("int64Array", "10;20")
 
 	if got, err := s.GetBool("bool"); err != nil || !got {
 		t.Errorf("GetBool = (%v, %v), want (true, nil)", got, err)
@@ -90,11 +90,11 @@ func TestStatSetGettersFromStringCoercion(t *testing.T) {
 	if got, err := s.GetInt("int"); err != nil || got != 42 {
 		t.Errorf("GetInt = (%v, %v), want (42, nil)", got, err)
 	}
-	if got, err := s.GetLong("long"); err != nil || got != 9000000000 {
-		t.Errorf("GetLong = (%v, %v), want (9000000000, nil)", got, err)
+	if got, err := s.GetInt64("int64"); err != nil || got != 9000000000 {
+		t.Errorf("GetInt64 = (%v, %v), want (9000000000, nil)", got, err)
 	}
-	if got, err := s.GetDouble("double"); err != nil || got != 3.14 {
-		t.Errorf("GetDouble = (%v, %v), want (3.14, nil)", got, err)
+	if got, err := s.GetFloat64("float64"); err != nil || got != 3.14 {
+		t.Errorf("GetFloat64 = (%v, %v), want (3.14, nil)", got, err)
 	}
 	if got, err := s.GetIntArray("intArray"); err != nil || !reflect.DeepEqual(got, []int{1, 2, 3}) {
 		t.Errorf("GetIntArray = (%v, %v), want ([1 2 3], nil)", got, err)
@@ -102,11 +102,11 @@ func TestStatSetGettersFromStringCoercion(t *testing.T) {
 	if got, err := s.GetStringArray("stringArray"); err != nil || !reflect.DeepEqual(got, []string{"a", "b", "c"}) {
 		t.Errorf("GetStringArray = (%v, %v), want ([a b c], nil)", got, err)
 	}
-	if got, err := s.GetDoubleArray("doubleArray"); err != nil || !reflect.DeepEqual(got, []float64{1.5, 2.5}) {
-		t.Errorf("GetDoubleArray = (%v, %v), want ([1.5 2.5], nil)", got, err)
+	if got, err := s.GetFloat64Array("float64Array"); err != nil || !reflect.DeepEqual(got, []float64{1.5, 2.5}) {
+		t.Errorf("GetFloat64Array = (%v, %v), want ([1.5 2.5], nil)", got, err)
 	}
-	if got, err := s.GetLongArray("longArray"); err != nil || !reflect.DeepEqual(got, []int64{10, 20}) {
-		t.Errorf("GetLongArray = (%v, %v), want ([10 20], nil)", got, err)
+	if got, err := s.GetInt64Array("int64Array"); err != nil || !reflect.DeepEqual(got, []int64{10, 20}) {
+		t.Errorf("GetInt64Array = (%v, %v), want ([10 20], nil)", got, err)
 	}
 }
 
@@ -131,11 +131,11 @@ func TestStatSetDefaults(t *testing.T) {
 	if got, err := s.GetByteDefault("missing", 3); err != nil || got != 3 {
 		t.Errorf("GetByteDefault = (%d, %v), want (3, nil)", got, err)
 	}
-	if got, err := s.GetLongDefault("missing", 9); err != nil || got != 9 {
-		t.Errorf("GetLongDefault = (%d, %v), want (9, nil)", got, err)
+	if got, err := s.GetInt64Default("missing", 9); err != nil || got != 9 {
+		t.Errorf("GetInt64Default = (%d, %v), want (9, nil)", got, err)
 	}
-	if got, err := s.GetDoubleDefault("missing", 1.5); err != nil || got != 1.5 {
-		t.Errorf("GetDoubleDefault = (%v, %v), want (1.5, nil)", got, err)
+	if got, err := s.GetFloat64Default("missing", 1.5); err != nil || got != 1.5 {
+		t.Errorf("GetFloat64Default = (%v, %v), want (1.5, nil)", got, err)
 	}
 	if got, err := s.GetFloat32Default("missing", 2.5); err != nil || got != 2.5 {
 		t.Errorf("GetFloat32Default = (%v, %v), want (2.5, nil)", got, err)
@@ -159,11 +159,11 @@ func TestStatSetDefaultsRejectMalformedValues(t *testing.T) {
 	if _, err := s.GetByteDefault("bad", 7); err == nil {
 		t.Errorf("GetByteDefault(bad) err = nil, want error")
 	}
-	if _, err := s.GetLongDefault("bad", 7); err == nil {
-		t.Errorf("GetLongDefault(bad) err = nil, want error")
+	if _, err := s.GetInt64Default("bad", 7); err == nil {
+		t.Errorf("GetInt64Default(bad) err = nil, want error")
 	}
-	if _, err := s.GetDoubleDefault("bad", 7); err == nil {
-		t.Errorf("GetDoubleDefault(bad) err = nil, want error")
+	if _, err := s.GetFloat64Default("bad", 7); err == nil {
+		t.Errorf("GetFloat64Default(bad) err = nil, want error")
 	}
 	if _, err := s.GetFloat32Default("bad", 7); err == nil {
 		t.Errorf("GetFloat32Default(bad) err = nil, want error")

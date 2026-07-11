@@ -60,34 +60,25 @@ func NewTeleport(set *commons.StatSet) (Teleport, error) {
 	if err != nil {
 		return Teleport{}, fmt.Errorf("travel: teleport: %w", err)
 	}
-	desc, err := set.GetString("desc")
-	if err != nil {
-		return Teleport{}, fmt.Errorf("travel: teleport: %w", err)
+	df := commons.NewFields(set, "travel: teleport")
+	desc := df.String("desc")
+	if err := df.Err(); err != nil {
+		return Teleport{}, err
 	}
-	kind, err := commons.GetEnumDefault(set, "type", kindNames, KindStandard)
-	if err != nil {
-		return Teleport{}, fmt.Errorf("travel: teleport %q: %w", desc, err)
-	}
-	priceID, err := set.GetInt("priceId")
-	if err != nil {
-		return Teleport{}, fmt.Errorf("travel: teleport %q: %w", desc, err)
-	}
-	priceCount, err := set.GetInt("priceCount")
-	if err != nil {
-		return Teleport{}, fmt.Errorf("travel: teleport %q: %w", desc, err)
-	}
-	castleID, err := set.GetIntDefault("castleId", 0)
-	if err != nil {
-		return Teleport{}, fmt.Errorf("travel: teleport %q: %w", desc, err)
-	}
-	return Teleport{
+
+	f := commons.NewFields(set, fmt.Sprintf("travel: teleport %q", desc))
+	teleport := Teleport{
 		Location:    loc,
 		Description: desc,
-		Kind:        kind,
-		PriceID:     priceID,
-		PriceCount:  priceCount,
-		CastleID:    castleID,
-	}, nil
+		Kind:        commons.FieldEnumDefault[Kind](f, "type", kindNames, KindStandard),
+		PriceID:     f.Int("priceId"),
+		PriceCount:  f.Int("priceCount"),
+		CastleID:    f.IntDefault("castleId", 0),
+	}
+	if err := f.Err(); err != nil {
+		return Teleport{}, err
+	}
+	return teleport, nil
 }
 
 // TeleportTable stores regular gatekeeper destinations keyed by npc id.

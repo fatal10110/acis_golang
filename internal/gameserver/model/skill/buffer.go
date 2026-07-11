@@ -17,43 +17,43 @@ type BufferSkill struct {
 
 // NewBufferSkill builds a BufferSkill from one folded XML buff element.
 func NewBufferSkill(set *commons.StatSet, skills *Table) (BufferSkill, error) {
-	skillID, err := set.GetInt32("id")
-	if err != nil {
-		return BufferSkill{}, fmt.Errorf("skill: buffer skill: %w", err)
+	idf := commons.NewFields(set, "skill: buffer skill")
+	skillID := idf.Int32("id")
+	if err := idf.Err(); err != nil {
+		return BufferSkill{}, err
 	}
-	wrap := func(err error) error { return fmt.Errorf("skill: buffer skill %d: %w", skillID, err) }
 
-	category, err := set.GetString("type")
-	if err != nil {
-		return BufferSkill{}, wrap(err)
+	f := commons.NewFields(set, fmt.Sprintf("skill: buffer skill %d", skillID))
+	category := f.String("type")
+	if err := f.Err(); err != nil {
+		return BufferSkill{}, err
 	}
 	level := 0
-	if set.Has("level") {
-		level, err = set.GetInt("level")
-		if err != nil {
-			return BufferSkill{}, wrap(err)
+	if f.Has("level") {
+		level = f.Int("level")
+		if err := f.Err(); err != nil {
+			return BufferSkill{}, err
 		}
 	} else {
 		if skills == nil {
-			return BufferSkill{}, wrap(fmt.Errorf("missing skill table"))
+			return BufferSkill{}, fmt.Errorf("skill: buffer skill %d: missing skill table", skillID)
 		}
 		level = skills.MaxLevel(ID(skillID))
 		if level <= 0 {
-			return BufferSkill{}, wrap(fmt.Errorf("skill not found"))
+			return BufferSkill{}, fmt.Errorf("skill: buffer skill %d: skill not found", skillID)
 		}
 	}
 
-	price, err := set.GetIntDefault("price", 0)
-	if err != nil {
-		return BufferSkill{}, wrap(err)
-	}
-
-	return BufferSkill{
+	entry := BufferSkill{
 		Skill:       Ref{ID: ID(skillID), Level: level},
-		Price:       price,
+		Price:       f.IntDefault("price", 0),
 		Category:    category,
-		Description: set.GetStringDefault("desc", ""),
-	}, nil
+		Description: f.StringDefault("desc", ""),
+	}
+	if err := f.Err(); err != nil {
+		return BufferSkill{}, err
+	}
+	return entry, nil
 }
 
 // BufferTable is an in-memory lookup of scheme-buffer skills by id.

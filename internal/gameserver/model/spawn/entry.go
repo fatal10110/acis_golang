@@ -38,68 +38,56 @@ type Entry struct {
 
 // NewPrivate builds one private spawn row from its XML attributes.
 func NewPrivate(set *commons.StatSet) (Private, error) {
-	npcID, err := set.GetInt32("id")
-	if err != nil {
+	f := commons.NewFields(set, "spawn private")
+	private := Private{
+		NPCID:        f.Int32("id"),
+		Weight:       f.Int("weight"),
+		RespawnDelay: parseDuration(f, "respawn"),
+	}
+	if err := f.Err(); err != nil {
 		return Private{}, err
 	}
-	weight, err := set.GetInt("weight")
-	if err != nil {
-		return Private{}, err
-	}
-	respawn, err := parseDuration(set, "respawn")
-	if err != nil {
-		return Private{}, err
-	}
-	return Private{
-		NPCID:        npcID,
-		Weight:       weight,
-		RespawnDelay: respawn,
-	}, nil
+	return private, nil
 }
 
 // NewEntry builds one spawn entry from its XML attributes and already-parsed
 // child blocks.
 func NewEntry(set *commons.StatSet, positions []Position, privates []Private, aiParams map[string]string) (Entry, error) {
-	npcID, err := set.GetInt32("id")
-	if err != nil {
-		return Entry{}, err
-	}
-	total, err := set.GetInt("total")
-	if err != nil {
-		return Entry{}, err
-	}
-	respawnDelay, err := parseDuration(set, "respawn")
-	if err != nil {
-		return Entry{}, err
-	}
-	respawnRandom, err := parseDuration(set, "respawnRand")
-	if err != nil {
+	idf := commons.NewFields(set, "spawn entry")
+	npcID := idf.Int32("id")
+	if err := idf.Err(); err != nil {
 		return Entry{}, err
 	}
 
-	return Entry{
+	f := commons.NewFields(set, fmt.Sprintf("spawn entry %d", npcID))
+	entry := Entry{
 		NPCID:         npcID,
-		Total:         total,
-		RespawnDelay:  respawnDelay,
-		RespawnRandom: respawnRandom,
+		Total:         f.Int("total"),
+		RespawnDelay:  parseDuration(f, "respawn"),
+		RespawnRandom: parseDuration(f, "respawnRand"),
 		Positions:     append([]Position(nil), positions...),
 		Privates:      append([]Private(nil), privates...),
 		AIParams:      copyStringMap(aiParams),
-		DBName:        set.GetStringDefault("dbName", ""),
-		DBSaving:      cleanStrings(set.GetStringArrayDefault("dbSaving", nil)),
-	}, nil
+		DBName:        f.StringDefault("dbName", ""),
+		DBSaving:      cleanStrings(f.StringArrayDefault("dbSaving", nil)),
+	}
+	if err := f.Err(); err != nil {
+		return Entry{}, err
+	}
+	return entry, nil
 }
 
-func parseDuration(set *commons.StatSet, key string) (time.Duration, error) {
-	raw := set.GetStringDefault(key, "")
+func parseDuration(f *commons.Fields, key string) time.Duration {
+	raw := f.StringDefault(key, "")
 	if raw == "" {
-		return 0, nil
+		return 0
 	}
 	d, err := commons.ParseGameDuration(raw)
 	if err != nil {
-		return 0, fmt.Errorf("%s: %w", key, err)
+		f.Fail(fmt.Errorf("%s: %w", key, err))
+		return 0
 	}
-	return d, nil
+	return d
 }
 
 // ParsePositions decodes the semicolon-separated "pos" attribute shape used

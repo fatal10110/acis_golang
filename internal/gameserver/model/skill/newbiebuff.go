@@ -14,31 +14,23 @@ type NewbieBuff struct {
 }
 
 func NewNewbieBuff(set *commons.StatSet) (NewbieBuff, error) {
-	skillID, err := set.GetInt32("skillId")
-	if err != nil {
-		return NewbieBuff{}, fmt.Errorf("skill: newbie buff: %w", err)
-	}
-	wrap := func(err error) error { return fmt.Errorf("skill: newbie buff %d: %w", skillID, err) }
-
-	skillLevel, err := set.GetInt("skillLevel")
-	if err != nil {
-		return NewbieBuff{}, wrap(err)
-	}
-	lowerLevel, err := set.GetInt("lowerLevel")
-	if err != nil {
-		return NewbieBuff{}, wrap(err)
-	}
-	upperLevel, err := set.GetInt("upperLevel")
-	if err != nil {
-		return NewbieBuff{}, wrap(err)
+	idf := commons.NewFields(set, "skill: newbie buff")
+	skillID := idf.Int32("skillId")
+	if err := idf.Err(); err != nil {
+		return NewbieBuff{}, err
 	}
 
-	return NewbieBuff{
-		Skill:        Ref{ID: ID(skillID), Level: skillLevel},
-		LowerLevel:   lowerLevel,
-		UpperLevel:   upperLevel,
-		IsMagicClass: set.GetBoolDefault("isMagicClass", false),
-	}, nil
+	f := commons.NewFields(set, fmt.Sprintf("skill: newbie buff %d", skillID))
+	buff := NewbieBuff{
+		Skill:        Ref{ID: ID(skillID), Level: f.Int("skillLevel")},
+		LowerLevel:   f.Int("lowerLevel"),
+		UpperLevel:   f.Int("upperLevel"),
+		IsMagicClass: f.BoolDefault("isMagicClass", false),
+	}
+	if err := f.Err(); err != nil {
+		return NewbieBuff{}, err
+	}
+	return buff, nil
 }
 
 type NewbieBuffTable struct {

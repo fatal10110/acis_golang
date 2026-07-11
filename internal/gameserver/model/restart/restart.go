@@ -32,50 +32,34 @@ type Point struct {
 
 // NewPoint builds a Point from set.
 func NewPoint(set *commons.StatSet) (Point, error) {
-	name, err := set.GetString("name")
-	if err != nil {
-		return Point{}, fmt.Errorf("restart: point: %w", err)
+	idf := commons.NewFields(set, "restart: point")
+	name := idf.String("name")
+	if err := idf.Err(); err != nil {
+		return Point{}, err
 	}
-	wrap := func(err error) error { return fmt.Errorf("restart: point %q: %w", name, err) }
 
-	points, err := commons.GetList[location.Location](set, "points")
-	if err != nil {
-		return Point{}, wrap(err)
-	}
-	chaoPoints, err := commons.GetList[location.Location](set, "chaoPoints")
-	if err != nil {
-		return Point{}, wrap(err)
-	}
-	mapRegions, err := commons.GetList[location.Point](set, "mapRegions")
-	if err != nil {
-		return Point{}, wrap(err)
-	}
-	bbs, err := set.GetInt("bbs")
-	if err != nil {
-		return Point{}, wrap(err)
-	}
-	locName, err := set.GetInt("locName")
-	if err != nil {
-		return Point{}, wrap(err)
-	}
+	f := commons.NewFields(set, fmt.Sprintf("restart: point %q", name))
+	points := commons.FieldList[location.Location](f, "points")
+	chaoPoints := commons.FieldList[location.Location](f, "chaoPoints")
+	mapRegions := commons.FieldList[location.Point](f, "mapRegions")
 	p := Point{
 		Name:       name,
 		Points:     append([]location.Location(nil), points...),
 		ChaoPoints: append([]location.Location(nil), chaoPoints...),
 		MapRegions: append([]location.Point(nil), mapRegions...),
-		BBS:        bbs,
-		LocName:    locName,
+		BBS:        f.Int("bbs"),
+		LocName:    f.Int("locName"),
 	}
-	if set.Has("bannedRace") {
-		raw, err := set.GetString("bannedRace")
-		if err != nil {
-			return Point{}, wrap(err)
+	if f.Has("bannedRace") {
+		raw := f.String("bannedRace")
+		if race, bannedPoint, err := ParseBannedRace(raw); err != nil {
+			f.Fail(err)
+		} else {
+			p.BannedRace, p.BannedPoint, p.HasBannedRace = race, bannedPoint, true
 		}
-		race, bannedPoint, err := ParseBannedRace(raw)
-		if err != nil {
-			return Point{}, wrap(err)
-		}
-		p.BannedRace, p.BannedPoint, p.HasBannedRace = race, bannedPoint, true
+	}
+	if err := f.Err(); err != nil {
+		return Point{}, err
 	}
 	return p, nil
 }
