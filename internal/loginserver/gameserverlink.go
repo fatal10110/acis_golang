@@ -282,10 +282,7 @@ func (l *GameServerLink) onChangeAccessLevel(ctx context.Context, c *gameServerC
 
 // onPlayerAuthRequest validates a client's session keys, presented by the
 // game server the client is entering, against the session this login
-// server issued. Nothing currently calls SessionStore.Put, since the
-// client-facing login flow that issues sessions is not built yet — until
-// it is, every request here correctly fails validation for lack of a
-// stored session.
+// server issued (ClientLink.onRequestAuthLogin/onRequestServerLogin).
 func (l *GameServerLink) onPlayerAuthRequest(c *gameServerConn, payload []byte) {
 	req, err := link.DecodePlayerAuthRequest(payload)
 	if err != nil {
