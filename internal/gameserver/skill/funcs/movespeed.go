@@ -8,8 +8,8 @@ import (
 // moveSpeed finalizes run speed from DEX.
 type moveSpeed struct{ fixed }
 
-var MoveSpeed = moveSpeed{fixed{stat.RunSpeed}}
+var MoveSpeed = &moveSpeed{fixed{stat.RunSpeed}}
 
-func (moveSpeed) Calc(effector, effected, skill any, base, value float64) float64 {
+func (*moveSpeed) Calc(effector, effected, skill any, base, value float64) float64 {
 	return value * statbonus.DEXBonus[actorOf(effector).DEX()]
 }

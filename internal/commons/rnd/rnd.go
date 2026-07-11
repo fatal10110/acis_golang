@@ -1,9 +1,7 @@
 // Package rnd is the server's central randomness provider — gameplay
 // dice-rolling, not cryptographic or protocol-level randomness (those have
-// their own dedicated code). It does not reproduce any particular reference
-// PRNG bit-for-bit: the reference implementation itself only ever wraps its
-// platform's non-deterministic thread-local random source, so there is no
-// fixed sequence to match — only the same uniform distributions.
+// their own dedicated code). Gameplay randomness has no fixed bit-for-bit
+// sequence contract; callers rely on uniform distributions.
 package rnd
 
 import "math/rand/v2"

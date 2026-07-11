@@ -18,8 +18,7 @@ func clampDamage(damage float64) float64 {
 // already-resolved inputs. Defence must already include the target's
 // shield bonus when the block succeeded; a caller whose shield roll came
 // back ShieldPerfect should return a flat 1 damage without calling
-// PhysicalAttackDamage at all (matching how the reference implementation
-// short-circuits before touching any of these multipliers).
+// PhysicalAttackDamage at all.
 //
 // The Crit* fields are only read when Crit is true; a non-critical attack
 // can leave them at their zero value.
@@ -40,7 +39,7 @@ type PhysicalAttackInput struct {
 	CritDamageMul     float64
 	CritDamagePosMul  float64
 	CritVulnMul       float64
-	CritDamageAddBase float64 // raw CRITICAL_DAMAGE_ADD stat, pre 77/Defence scaling
+	CritDamageAddBase float64 // raw critical-damage-add stat, pre 77/Defence scaling
 }
 
 // PhysicalAttackDamage computes a normal physical attack's damage.
@@ -73,15 +72,14 @@ func PhysicalAttackDamage(in PhysicalAttackInput) float64 {
 // PhysicalAttackInput.
 type PhysicalSkillInput struct {
 	AttackPower float64
-	SkillPower  float64
+	SkillPower  float64 // includes any per-skill SoulShot power boost when SoulShot is true
 	Defence     float64
 
 	Crit     bool
 	SoulShot bool
 
 	// RandomMul is the attacker's random damage multiplier; leave it at 1
-	// for a CHARGEDAM-type skill, which the reference implementation
-	// exempts from random variance.
+	// for a charge-damage skill, which does not use random variance.
 	RandomMul float64
 
 	ElementalMul  float64
@@ -110,7 +108,7 @@ func PhysicalSkillDamage(in PhysicalSkillInput) float64 {
 // multipliers here are always read.
 type BlowInput struct {
 	AttackPower float64
-	SkillPower  float64
+	SkillPower  float64 // includes any per-skill SoulShot power boost when SoulShot is true
 	Defence     float64
 
 	SoulShot bool
@@ -124,15 +122,15 @@ type BlowInput struct {
 
 	PvPMul            float64 // only meaningful when IsPvP
 	CritDamageMul     float64
-	CritDamagePosMul  float64
+	CritDamagePosMul  float64 // caller passes the blow-adjusted crit-position multiplier, not the raw stat
 	CritVulnMul       float64
 	DaggerVulnMul     float64
-	CritDamageAddBase float64 // raw CRITICAL_DAMAGE_ADD stat, pre ×6 scaling
+	CritDamageAddBase float64 // raw critical-damage-add stat, pre ×6 scaling
 }
 
 // BlowDamage computes a blow-type skill's damage. Unlike the other damage
 // formulas, a successful PvP blow divides by 70 instead of 77, and the
-// CRITICAL_DAMAGE_ADD contribution is scaled by a flat ×6 instead of by
+// critical-damage-add contribution is scaled by a flat ×6 instead of by
 // 77/Defence.
 func BlowDamage(in BlowInput) float64 {
 	attackPower := in.AttackPower
@@ -166,7 +164,7 @@ type MagicDamageInput struct {
 
 	SoulShot        bool
 	BlessedSoulShot bool
-	MagicCrit       bool
+	MagicCrit       bool // callers must pass false for resisted casts
 
 	PvPMul       float64
 	ElementalMul float64

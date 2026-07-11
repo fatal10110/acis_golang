@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
@@ -51,6 +52,43 @@ func TestCalculatorRemoveFunc(t *testing.T) {
 	}
 	if got := c.Calc(nil, nil, nil, 0); got != 7 {
 		t.Errorf("Calc() = %v, want 7", got)
+	}
+}
+
+func TestCalculatorRemoveFuncUsesIdentity(t *testing.T) {
+	var c Calculator
+	fn1 := basefunc.NewAdd(nil, stat.PowerAttack, 5, nil)
+	fn2 := basefunc.NewAdd(nil, stat.PowerAttack, 5, nil)
+	c.AddFunc(fn1)
+	c.AddFunc(fn2)
+
+	c.RemoveFunc(fn2)
+	c.RemoveFunc(fn2)
+
+	if c.Size() != 1 {
+		t.Fatalf("Size() = %d, want 1", c.Size())
+	}
+	if got := c.Calc(nil, nil, nil, 0); got != 5 {
+		t.Errorf("Calc() = %v, want 5", got)
+	}
+}
+
+func TestCalculatorRemoveFuncWithUncomparableCondition(t *testing.T) {
+	var c Calculator
+	owner1, owner2 := new(int), new(int)
+	fn1 := basefunc.NewAdd(owner1, stat.PowerAttack, 10, conditions.TargetNpcID{IDs: []int{1}})
+	fn2 := basefunc.NewAdd(owner2, stat.PowerAttack, 20, conditions.TargetNpcID{IDs: []int{2}})
+	c.AddFunc(fn1)
+	c.AddFunc(fn2)
+
+	c.RemoveFunc(fn2)
+
+	if c.Size() != 1 {
+		t.Fatalf("Size() = %d, want 1", c.Size())
+	}
+	c.RemoveFunc(fn1)
+	if c.Size() != 0 {
+		t.Fatalf("Size() after removing remaining func = %d, want 0", c.Size())
 	}
 }
 

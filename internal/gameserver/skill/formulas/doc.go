@@ -8,7 +8,7 @@
 // a creature and target — deriving those numbers from a live creature's
 // gear, buffs and target is the calculation chain's job (see skill/funcs
 // and skill.Calculator), not this package's. This keeps the fidelity-
-// critical arithmetic testable in isolation against oracle-generated
+// critical arithmetic testable in isolation with committed expected
 // values, and defers wiring it to real actors until that actor exists.
 //
 // Not covered here, left for whoever wires up per-skill data: the land

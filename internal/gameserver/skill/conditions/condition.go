@@ -6,11 +6,9 @@ package conditions
 // model/item.UseCondition, which already owns it. Nothing in this package
 // duplicates that.
 
-// asPlayer asserts effector to PlayerActor, reporting ok=false (rather than
-// panicking) when it doesn't — the Go equivalent of the reference
-// implementation's "instanceof Player player" pattern, which is itself a
-// normal, expected outcome (most player-only conditions simply fail for a
-// non-player effector) rather than a wiring bug.
+// asPlayer asserts effector to PlayerActor, reporting ok=false rather than
+// panicking. A non-player effector is a normal condition result: most
+// player-only conditions simply fail instead of treating it as a wiring bug.
 func asPlayer(effector any) (PlayerActor, bool) {
 	p, ok := effector.(PlayerActor)
 	return p, ok

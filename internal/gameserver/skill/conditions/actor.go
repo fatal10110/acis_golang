@@ -12,10 +12,9 @@ import (
 )
 
 // Actor is the live combat/identity data every condition in this package
-// can read from either side (effector or effected) of a test — a creature,
-// in the reference implementation's terms. It stands in for the not-yet-
-// built creature runtime; a future concrete actor type satisfies it
-// structurally.
+// can read from either side (effector or effected) of a test. It stands in
+// for the not-yet-built creature runtime; a future concrete actor type
+// satisfies it structurally.
 type Actor interface {
 	Level() int
 	HPRatio() float64 // current HP / max HP, in [0,1]
@@ -42,9 +41,8 @@ type Actor interface {
 }
 
 // PlayerActor narrows Actor to the extra identity/state data only a
-// player-controlled actor carries. A condition type-asserts effector or
-// effected to this interface exactly where the reference implementation
-// checks "instanceof Player".
+// player-controlled actor carries. Conditions that need player-only data
+// fail their player branch when the actor does not satisfy this interface.
 type PlayerActor interface {
 	Actor
 

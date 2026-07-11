@@ -68,16 +68,16 @@ func PosMul(behind, inFront, crit bool) float64 {
 	return 1.
 }
 
-// CritSucceeds reports whether a critical-hit roll succeeds, given rate (the
-// attacker's already-computed CRITICAL_RATE stat, per-mille) and roll, a
-// uniform random draw in [0, 1000).
+// CritSucceeds reports whether a critical-hit roll succeeds, given rate
+// (the attacker's already-computed critical-rate stat, per-mille) and roll,
+// a uniform random draw in [0, 1000).
 func CritSucceeds(rate float64, roll int) bool {
 	return rate > float64(roll)
 }
 
 // MCritSucceeds reports whether a magic-critical-hit roll succeeds, given
-// mRate (the attacker's already-computed MCRITICAL_RATE stat, per-mille)
-// and roll, a uniform random draw in [0, 1000).
+// mRate (the attacker's already-computed magic-critical-rate stat,
+// per-mille) and roll, a uniform random draw in [0, 1000).
 func MCritSucceeds(mRate, roll int) bool {
 	return mRate > roll
 }

@@ -11,9 +11,9 @@ type atkAccuracy struct{ fixed }
 
 // AtkAccuracy is the shared instance every creature's calculation chain
 // attaches for stat.AccuracyCombat.
-var AtkAccuracy = atkAccuracy{fixed{stat.AccuracyCombat}}
+var AtkAccuracy = &atkAccuracy{fixed{stat.AccuracyCombat}}
 
-func (atkAccuracy) Calc(effector, effected, skill any, base, value float64) float64 {
+func (*atkAccuracy) Calc(effector, effected, skill any, base, value float64) float64 {
 	a := actorOf(effector)
 	level := a.Level()
 
@@ -32,9 +32,9 @@ func (atkAccuracy) Calc(effector, effected, skill any, base, value float64) floa
 // per-mille value (multiplied by 10 to convert from percent).
 type atkCritical struct{ fixed }
 
-var AtkCritical = atkCritical{fixed{stat.CriticalRate}}
+var AtkCritical = &atkCritical{fixed{stat.CriticalRate}}
 
-func (atkCritical) Calc(effector, effected, skill any, base, value float64) float64 {
+func (*atkCritical) Calc(effector, effected, skill any, base, value float64) float64 {
 	a := actorOf(effector)
 	if !a.IsSummon() {
 		value *= statbonus.DEXBonus[a.DEX()]
@@ -45,9 +45,9 @@ func (atkCritical) Calc(effector, effected, skill any, base, value float64) floa
 // atkEvasion finalizes evasion rate from DEX and level.
 type atkEvasion struct{ fixed }
 
-var AtkEvasion = atkEvasion{fixed{stat.EvasionRate}}
+var AtkEvasion = &atkEvasion{fixed{stat.EvasionRate}}
 
-func (atkEvasion) Calc(effector, effected, skill any, base, value float64) float64 {
+func (*atkEvasion) Calc(effector, effected, skill any, base, value float64) float64 {
 	a := actorOf(effector)
 	return value + statbonus.BaseEvasionAccuracy[a.DEX()] + float64(a.Level())
 }
@@ -56,9 +56,9 @@ func (atkEvasion) Calc(effector, effected, skill any, base, value float64) float
 // empty-handed player (who gets none).
 type mAtkCritical struct{ fixed }
 
-var MAtkCritical = mAtkCritical{fixed{stat.MCriticalRate}}
+var MAtkCritical = &mAtkCritical{fixed{stat.MCriticalRate}}
 
-func (mAtkCritical) Calc(effector, effected, skill any, base, value float64) float64 {
+func (*mAtkCritical) Calc(effector, effected, skill any, base, value float64) float64 {
 	a := actorOf(effector)
 	p, isPlayer := effector.(PlayerActor)
 	if !isPlayer || p.HasWeaponEquipped() {
@@ -71,9 +71,9 @@ func (mAtkCritical) Calc(effector, effected, skill any, base, value float64) flo
 // both multipliers.
 type mAtkMod struct{ fixed }
 
-var MAtkMod = mAtkMod{fixed{stat.MagicAttack}}
+var MAtkMod = &mAtkMod{fixed{stat.MagicAttack}}
 
-func (mAtkMod) Calc(effector, effected, skill any, base, value float64) float64 {
+func (*mAtkMod) Calc(effector, effected, skill any, base, value float64) float64 {
 	a := actorOf(effector)
 	intMod := statbonus.INTBonus[a.INT()]
 	lvlMod := a.LevelMod()
@@ -83,21 +83,20 @@ func (mAtkMod) Calc(effector, effected, skill any, base, value float64) float64 
 // mAtkSpeed finalizes magic attack speed from WIT.
 type mAtkSpeed struct{ fixed }
 
-var MAtkSpeed = mAtkSpeed{fixed{stat.MagicAttackSpeed}}
+var MAtkSpeed = &mAtkSpeed{fixed{stat.MagicAttackSpeed}}
 
-func (mAtkSpeed) Calc(effector, effected, skill any, base, value float64) float64 {
+func (*mAtkSpeed) Calc(effector, effected, skill any, base, value float64) float64 {
 	return value * statbonus.WITBonus[actorOf(effector).WIT()]
 }
 
 // mDefMod finalizes M.Def from MEN and the level-scaling factor, with flat
 // penalties for a player's worn accessories (fewer accessory slots equipped
-// means less magic defense, matching a bare-handed dodge/parry intuition
-// the reference server encodes as a direct subtraction per slot).
+// means less magic defense by direct subtraction per slot).
 type mDefMod struct{ fixed }
 
-var MDefMod = mDefMod{fixed{stat.MagicDefence}}
+var MDefMod = &mDefMod{fixed{stat.MagicDefence}}
 
-func (mDefMod) Calc(effector, effected, skill any, base, value float64) float64 {
+func (*mDefMod) Calc(effector, effected, skill any, base, value float64) float64 {
 	a := actorOf(effector)
 	if p, ok := effector.(PlayerActor); ok {
 		if p.HasEquipped(SlotLFinger) {
@@ -122,9 +121,9 @@ func (mDefMod) Calc(effector, effected, skill any, base, value float64) float64 
 // pAtkMod finalizes P.Atk from STR and the level-scaling factor.
 type pAtkMod struct{ fixed }
 
-var PAtkMod = pAtkMod{fixed{stat.PowerAttack}}
+var PAtkMod = &pAtkMod{fixed{stat.PowerAttack}}
 
-func (pAtkMod) Calc(effector, effected, skill any, base, value float64) float64 {
+func (*pAtkMod) Calc(effector, effected, skill any, base, value float64) float64 {
 	a := actorOf(effector)
 	return value * statbonus.STRBonus[a.STR()] * a.LevelMod()
 }
@@ -132,22 +131,21 @@ func (pAtkMod) Calc(effector, effected, skill any, base, value float64) float64 
 // pAtkSpeed finalizes physical attack speed from DEX.
 type pAtkSpeed struct{ fixed }
 
-var PAtkSpeed = pAtkSpeed{fixed{stat.PowerAttackSpeed}}
+var PAtkSpeed = &pAtkSpeed{fixed{stat.PowerAttackSpeed}}
 
-func (pAtkSpeed) Calc(effector, effected, skill any, base, value float64) float64 {
+func (*pAtkSpeed) Calc(effector, effected, skill any, base, value float64) float64 {
 	return value * statbonus.DEXBonus[actorOf(effector).DEX()]
 }
 
 // pDefMod finalizes P.Def from the level-scaling factor, with flat
 // penalties for a player's worn armor pieces (an unarmored player has
-// higher P.Def than one wearing gear that reduces this value — matching
-// the reference server's per-slot subtraction, where a mage's chest/legs
-// penalty is smaller than a fighter's).
+// higher P.Def than one wearing gear that reduces this value; mage
+// chest/legs penalties are smaller than fighter penalties).
 type pDefMod struct{ fixed }
 
-var PDefMod = pDefMod{fixed{stat.PowerDefence}}
+var PDefMod = &pDefMod{fixed{stat.PowerDefence}}
 
-func (pDefMod) Calc(effector, effected, skill any, base, value float64) float64 {
+func (*pDefMod) Calc(effector, effected, skill any, base, value float64) float64 {
 	a := actorOf(effector)
 	if p, ok := effector.(PlayerActor); ok {
 		if p.HasEquipped(SlotHead) {

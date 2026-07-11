@@ -15,8 +15,7 @@ const (
 // attempt can't possibly succeed — the attacking skill ignores shields
 // entirely, the target has no shield equipped, or the target isn't facing
 // the attacker closely enough — should short-circuit to ShieldFailed
-// without calling this at all, matching how those checks gate entry to the
-// reference calculation rather than feeding into it.
+// without calling this at all.
 //
 // baseRate is the target's already-computed SHIELD_RATE stat (0 always
 // fails); dex is the target's DEX; isBow reports whether the attacker

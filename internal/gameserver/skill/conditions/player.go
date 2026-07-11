@@ -152,7 +152,7 @@ const (
 // PlayerState requires the effector's named State to match Required. Every
 // case but Moving/Riding/Flying/Behind/Front is player-only; a non-player
 // effector fails Resting/Olympiad by reporting the opposite of Required
-// (matching the reference implementation's "not a player" fallback).
+// instead of panicking.
 type PlayerState struct {
 	Check    State
 	Required bool

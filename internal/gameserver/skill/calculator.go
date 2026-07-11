@@ -2,42 +2,65 @@
 package skill
 
 import (
+	"sync"
+
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
 // Calculator dynamically computes the effect of a Stat: a slice of
 // basefunc.Func kept sorted by Order, lowest first, with same-order Funcs
-// applied in unspecified relative order (matching the reference chain,
-// which offers no ordering guarantee among equal-order entries either).
+// applied in unspecified relative order.
 //
-// A Calculator's zero value is ready to use as an empty chain.
+// A Calculator's zero value is ready to use as an empty chain. mu guards
+// funcs; mutators publish fresh slices so Calc can use a stable snapshot
+// while another goroutine attaches or detaches funcs. A Calculator must
+// not be copied after first use.
 type Calculator struct {
+	mu    sync.RWMutex
 	funcs []basefunc.Func
 }
 
 // Size returns the number of Funcs currently attached.
-func (c *Calculator) Size() int { return len(c.funcs) }
+func (c *Calculator) Size() int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return len(c.funcs)
+}
 
 // AddFunc inserts fn into the chain, keeping it sorted by Order: fn lands
 // after every existing Func whose Order is <= fn.Order(), preserving the
 // relative order of Funcs already at that Order.
 func (c *Calculator) AddFunc(fn basefunc.Func) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	order := fn.Order()
+	funcs := c.funcs
 	i := 0
-	for i < len(c.funcs) && order >= c.funcs[i].Order() {
+	for i < len(funcs) && order >= funcs[i].Order() {
 		i++
 	}
-	c.funcs = append(c.funcs, nil)
-	copy(c.funcs[i+1:], c.funcs[i:])
-	c.funcs[i] = fn
+
+	next := make([]basefunc.Func, len(funcs)+1)
+	copy(next, funcs[:i])
+	next[i] = fn
+	copy(next[i+1:], funcs[i:])
+	c.funcs = next
 }
 
 // RemoveFunc removes fn from the chain. It is a no-op if fn is not present.
 func (c *Calculator) RemoveFunc(fn basefunc.Func) {
-	for i, f := range c.funcs {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	funcs := c.funcs
+	for i, f := range funcs {
 		if f == fn {
-			c.funcs = append(c.funcs[:i], c.funcs[i+1:]...)
+			next := make([]basefunc.Func, len(funcs)-1)
+			copy(next, funcs[:i])
+			copy(next[i:], funcs[i+1:])
+			c.funcs = next
 			return
 		}
 	}
@@ -46,8 +69,11 @@ func (c *Calculator) RemoveFunc(fn basefunc.Func) {
 // RemoveOwner removes every Func whose Owner equals owner, returning the
 // Stat each removed Func targeted.
 func (c *Calculator) RemoveOwner(owner any) []stat.Stat {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	var modified []stat.Stat
-	kept := c.funcs[:0]
+	kept := make([]basefunc.Func, 0, len(c.funcs))
 	for _, f := range c.funcs {
 		if f.Owner() == owner {
 			modified = append(modified, f.Stat())
@@ -64,10 +90,14 @@ func (c *Calculator) RemoveOwner(owner any) []stat.Stat {
 // Func, mirroring how a template override (e.g. a weapon's flat P.Atk)
 // replaces rather than augments the starting point for what follows.
 func (c *Calculator) Calc(effector, effected, skill any, base float64) float64 {
+	c.mu.RLock()
+	funcs := c.funcs
+	c.mu.RUnlock()
+
 	value := base
-	for _, f := range c.funcs {
+	for _, f := range funcs {
 		value = f.Calc(effector, effected, skill, base, value)
-		if _, ok := f.(basefunc.Set); ok {
+		if _, ok := f.(*basefunc.Set); ok {
 			base = value
 		}
 	}

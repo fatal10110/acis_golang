@@ -1,5 +1,7 @@
 package conditions
 
+import "slices"
+
 // npcTarget and doorTarget are the two identifiable-by-id target shapes
 // TargetNpcID checks against — an NPC (keyed by its template id) or a door
 // (keyed by its static door id). door.Object already exposes DoorID();
@@ -38,19 +40,11 @@ func (c TargetHpMinMax) Test(effector, effected, skill any) bool {
 type TargetNpcID struct{ IDs []int }
 
 func (c TargetNpcID) Test(effector, effected, skill any) bool {
-	contains := func(id int) bool {
-		for _, want := range c.IDs {
-			if want == id {
-				return true
-			}
-		}
-		return false
-	}
 	if npc, ok := effected.(npcTarget); ok {
-		return contains(int(npc.NpcID()))
+		return slices.Contains(c.IDs, int(npc.NpcID()))
 	}
 	if door, ok := effected.(doorTarget); ok {
-		return contains(door.DoorID())
+		return slices.Contains(c.IDs, door.DoorID())
 	}
 	return false
 }
@@ -64,11 +58,5 @@ func (c TargetRaceID) Test(effector, effected, skill any) bool {
 	if !ok {
 		return false
 	}
-	race := npc.RaceOrdinal()
-	for _, want := range c.IDs {
-		if want == race {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(c.IDs, npc.RaceOrdinal())
 }

@@ -126,6 +126,9 @@ func TestNoDuplicateNames(t *testing.T) {
 	seen := make(map[string]Stat, numStats)
 	for i := Stat(0); i < numStats; i++ {
 		name := i.Name()
+		if name == "" {
+			t.Errorf("Stat %v has no table entry", i)
+		}
 		if prev, ok := seen[name]; ok {
 			t.Errorf("duplicate name %q for %v and %v", name, prev, i)
 		}

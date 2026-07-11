@@ -35,9 +35,8 @@ type Actor interface {
 
 // PlayerActor narrows Actor to the extra data only a player-controlled
 // actor carries: henna stat bonuses, worn-equipment checks, and whether the
-// player's class is a mage class. A func type-asserts effector to this
-// interface exactly where the reference implementation checks
-// "effector instanceof Player".
+// player's class is a mage class. Funcs that need player-only data simply
+// skip their player branch when effector does not satisfy this interface.
 type PlayerActor interface {
 	Actor
 
@@ -49,8 +48,7 @@ type PlayerActor interface {
 	HennaBonus(s stat.Stat) float64
 
 	// HasEquipped reports whether some item currently occupies any of the
-	// given paperdoll slot bits (a caller ORs slot bits together the same
-	// way the reference Paperdoll enum groups a paired slot).
+	// given equipment slot bits. Callers may OR paired slots together.
 	HasEquipped(slotMask int) bool
 
 	// HasWeaponEquipped reports whether the player currently wields a
@@ -59,11 +57,10 @@ type PlayerActor interface {
 	HasWeaponEquipped() bool
 }
 
-// Paperdoll slot bits, matching the reference Paperdoll enum's ordinal
-// positions that FuncMDefMod/FuncPDefMod key off of. These intentionally
-// duplicate model/item's Slot bit values rather than importing that
-// package, since this package only ever needs to pass a slot identity
-// through PlayerActor.HasEquipped, never interpret one itself.
+// Equipment slot bits used by the armor and accessory defense penalties.
+// These intentionally duplicate model/item's Slot bit values rather than
+// importing that package, since this package only ever needs to pass a slot
+// identity through PlayerActor.HasEquipped, never interpret one itself.
 const (
 	SlotLFinger = 1 << iota
 	SlotRFinger
@@ -85,10 +82,8 @@ const (
 )
 
 // fixed is the embeddable state shared by every Func in this package: they
-// all run at basefunc.OrderFinalize, are attached with no owner, no
-// configured value, and no gating Condition — matching the reference
-// classes, which are all constructed as
-// super(null, <stat>, 10, 0, null).
+// all run at basefunc.OrderFinalize and are attached with no owner,
+// configured value, or gating Condition.
 type fixed struct{ s stat.Stat }
 
 func (f fixed) Stat() stat.Stat          { return f.s }
@@ -99,9 +94,7 @@ func (f fixed) Cond() basefunc.Condition { return nil }
 
 // actorOf asserts effector to Actor. Every func in this package is only
 // ever attached to a real creature's calculation chain, so a failed
-// assertion indicates a wiring bug, not a legitimate runtime case — it
-// panics, matching how the reference implementation would throw a
-// ClassCastException/NullPointerException from the equivalent misuse.
+// assertion indicates a wiring bug, not a legitimate runtime case.
 func actorOf(effector any) Actor {
 	return effector.(Actor)
 }

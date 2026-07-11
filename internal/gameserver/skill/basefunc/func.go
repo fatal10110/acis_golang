@@ -66,14 +66,14 @@ type base struct {
 	cond  Condition
 }
 
-func (b base) Stat() stat.Stat { return b.stat }
-func (b base) Order() int      { return b.order }
-func (b base) Owner() any      { return b.owner }
-func (b base) Value() float64  { return b.value }
-func (b base) Cond() Condition { return b.cond }
+func (b *base) Stat() stat.Stat { return b.stat }
+func (b *base) Order() int      { return b.order }
+func (b *base) Owner() any      { return b.owner }
+func (b *base) Value() float64  { return b.value }
+func (b *base) Cond() Condition { return b.cond }
 
 // passes reports whether b's Condition (if any) allows the calculation to
 // proceed; an absent Condition always passes.
-func (b base) passes(effector, effected, skill any) bool {
+func (b *base) passes(effector, effected, skill any) bool {
 	return b.cond == nil || b.cond.Test(effector, effected, skill)
 }

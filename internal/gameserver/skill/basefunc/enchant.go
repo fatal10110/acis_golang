@@ -22,11 +22,11 @@ type EnchantedItem interface {
 // runs at OrderEnchant, and its Owner must satisfy EnchantedItem.
 type Enchant struct{ base }
 
-func NewEnchant(owner any, s stat.Stat, value float64, cond Condition) Enchant {
-	return Enchant{base{owner, s, OrderEnchant, value, cond}}
+func NewEnchant(owner any, s stat.Stat, value float64, cond Condition) *Enchant {
+	return &Enchant{base{owner, s, OrderEnchant, value, cond}}
 }
 
-func (f Enchant) Calc(effector, effected, skill any, calcBase, value float64) float64 {
+func (f *Enchant) Calc(effector, effected, skill any, calcBase, value float64) float64 {
 	if !f.passes(effector, effected, skill) {
 		return value
 	}

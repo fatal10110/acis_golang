@@ -8,11 +8,11 @@ type Set struct{ base }
 
 // NewSet builds a Set targeting s with the given value, gated by the
 // optional cond (nil for none).
-func NewSet(owner any, s stat.Stat, value float64, cond Condition) Set {
-	return Set{base{owner, s, OrderSet, value, cond}}
+func NewSet(owner any, s stat.Stat, value float64, cond Condition) *Set {
+	return &Set{base{owner, s, OrderSet, value, cond}}
 }
 
-func (f Set) Calc(effector, effected, skill any, base, value float64) float64 {
+func (f *Set) Calc(effector, effected, skill any, base, value float64) float64 {
 	if !f.passes(effector, effected, skill) {
 		return value
 	}
@@ -23,11 +23,11 @@ func (f Set) Calc(effector, effected, skill any, base, value float64) float64 {
 // skill's flat critical-chance bonus). It runs at OrderBaseMul.
 type BaseMul struct{ base }
 
-func NewBaseMul(owner any, s stat.Stat, value float64, cond Condition) BaseMul {
-	return BaseMul{base{owner, s, OrderBaseMul, value, cond}}
+func NewBaseMul(owner any, s stat.Stat, value float64, cond Condition) *BaseMul {
+	return &BaseMul{base{owner, s, OrderBaseMul, value, cond}}
 }
 
-func (f BaseMul) Calc(effector, effected, skill any, base, value float64) float64 {
+func (f *BaseMul) Calc(effector, effected, skill any, base, value float64) float64 {
 	if !f.passes(effector, effected, skill) {
 		return value
 	}
@@ -38,11 +38,11 @@ func (f BaseMul) Calc(effector, effected, skill any, base, value float64) float6
 // M.Def bonus). It runs at OrderBaseAdd.
 type BaseAdd struct{ base }
 
-func NewBaseAdd(owner any, s stat.Stat, value float64, cond Condition) BaseAdd {
-	return BaseAdd{base{owner, s, OrderBaseAdd, value, cond}}
+func NewBaseAdd(owner any, s stat.Stat, value float64, cond Condition) *BaseAdd {
+	return &BaseAdd{base{owner, s, OrderBaseAdd, value, cond}}
 }
 
-func (f BaseAdd) Calc(effector, effected, skill any, base, value float64) float64 {
+func (f *BaseAdd) Calc(effector, effected, skill any, base, value float64) float64 {
 	if !f.passes(effector, effected, skill) {
 		return value
 	}
@@ -53,11 +53,11 @@ func (f BaseAdd) Calc(effector, effected, skill any, base, value float64) float6
 // runs at OrderMulDiv.
 type Mul struct{ base }
 
-func NewMul(owner any, s stat.Stat, value float64, cond Condition) Mul {
-	return Mul{base{owner, s, OrderMulDiv, value, cond}}
+func NewMul(owner any, s stat.Stat, value float64, cond Condition) *Mul {
+	return &Mul{base{owner, s, OrderMulDiv, value, cond}}
 }
 
-func (f Mul) Calc(effector, effected, skill any, base, value float64) float64 {
+func (f *Mul) Calc(effector, effected, skill any, base, value float64) float64 {
 	if !f.passes(effector, effected, skill) {
 		return value
 	}
@@ -67,11 +67,11 @@ func (f Mul) Calc(effector, effected, skill any, base, value float64) float64 {
 // Div divides the running value. It runs at OrderMulDiv.
 type Div struct{ base }
 
-func NewDiv(owner any, s stat.Stat, value float64, cond Condition) Div {
-	return Div{base{owner, s, OrderMulDiv, value, cond}}
+func NewDiv(owner any, s stat.Stat, value float64, cond Condition) *Div {
+	return &Div{base{owner, s, OrderMulDiv, value, cond}}
 }
 
-func (f Div) Calc(effector, effected, skill any, base, value float64) float64 {
+func (f *Div) Calc(effector, effected, skill any, base, value float64) float64 {
 	if !f.passes(effector, effected, skill) {
 		return value
 	}
@@ -82,11 +82,11 @@ func (f Div) Calc(effector, effected, skill any, base, value float64) float64 {
 // It runs at OrderAddSub.
 type Add struct{ base }
 
-func NewAdd(owner any, s stat.Stat, value float64, cond Condition) Add {
-	return Add{base{owner, s, OrderAddSub, value, cond}}
+func NewAdd(owner any, s stat.Stat, value float64, cond Condition) *Add {
+	return &Add{base{owner, s, OrderAddSub, value, cond}}
 }
 
-func (f Add) Calc(effector, effected, skill any, base, value float64) float64 {
+func (f *Add) Calc(effector, effected, skill any, base, value float64) float64 {
 	if !f.passes(effector, effected, skill) {
 		return value
 	}
@@ -97,11 +97,11 @@ func (f Add) Calc(effector, effected, skill any, base, value float64) float64 {
 // OrderAddSub.
 type Sub struct{ base }
 
-func NewSub(owner any, s stat.Stat, value float64, cond Condition) Sub {
-	return Sub{base{owner, s, OrderAddSub, value, cond}}
+func NewSub(owner any, s stat.Stat, value float64, cond Condition) *Sub {
+	return &Sub{base{owner, s, OrderAddSub, value, cond}}
 }
 
-func (f Sub) Calc(effector, effected, skill any, base, value float64) float64 {
+func (f *Sub) Calc(effector, effected, skill any, base, value float64) float64 {
 	if !f.passes(effector, effected, skill) {
 		return value
 	}
@@ -112,11 +112,11 @@ func (f Sub) Calc(effector, effected, skill any, base, value float64) float64 {
 // a resistance). It runs at OrderAddMul, last of every op.
 type AddMul struct{ base }
 
-func NewAddMul(owner any, s stat.Stat, value float64, cond Condition) AddMul {
-	return AddMul{base{owner, s, OrderAddMul, value, cond}}
+func NewAddMul(owner any, s stat.Stat, value float64, cond Condition) *AddMul {
+	return &AddMul{base{owner, s, OrderAddMul, value, cond}}
 }
 
-func (f AddMul) Calc(effector, effected, skill any, base, value float64) float64 {
+func (f *AddMul) Calc(effector, effected, skill any, base, value float64) float64 {
 	if !f.passes(effector, effected, skill) {
 		return value
 	}
@@ -127,11 +127,11 @@ func (f AddMul) Calc(effector, effected, skill any, base, value float64) float64
 // complement of a percentage. It runs at OrderAddMul.
 type SubDiv struct{ base }
 
-func NewSubDiv(owner any, s stat.Stat, value float64, cond Condition) SubDiv {
-	return SubDiv{base{owner, s, OrderAddMul, value, cond}}
+func NewSubDiv(owner any, s stat.Stat, value float64, cond Condition) *SubDiv {
+	return &SubDiv{base{owner, s, OrderAddMul, value, cond}}
 }
 
-func (f SubDiv) Calc(effector, effected, skill any, base, value float64) float64 {
+func (f *SubDiv) Calc(effector, effected, skill any, base, value float64) float64 {
 	if !f.passes(effector, effected, skill) {
 		return value
 	}

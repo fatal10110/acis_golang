@@ -17,9 +17,7 @@ type NightSource interface {
 }
 
 // GameTime requires the current in-game time of day to match Night.
-// Clock supplies "is it night right now" — the reference implementation
-// reads this from a process-wide singleton task manager; this package takes
-// it as an explicit dependency instead.
+// Clock supplies "is it night right now" as an explicit dependency.
 type GameTime struct {
 	Clock NightSource
 	Night bool
