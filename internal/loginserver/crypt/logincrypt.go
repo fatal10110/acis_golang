@@ -17,12 +17,8 @@ var staticBootstrapKey = []byte{
 	0xcc, 0x2b, 0x6c, 0x55, 0x6c, 0x6c, 0x6c, 0x6c,
 }
 
-var staticBootstrapCipher = sync.OnceValue(func() *crypt.BlowfishCipher {
-	cipher, err := crypt.NewBlowfishCipher(staticBootstrapKey)
-	if err != nil {
-		panic(err)
-	}
-	return cipher
+var staticBootstrapCipher = sync.OnceValues(func() (*crypt.BlowfishCipher, error) {
+	return crypt.NewBlowfishCipher(staticBootstrapKey)
 })
 
 // LoginCrypt encrypts and decrypts the login server's client-facing packets.
@@ -44,8 +40,12 @@ func NewLoginCrypt(dynamicKey []byte) (*LoginCrypt, error) {
 	if err != nil {
 		return nil, fmt.Errorf("dynamic session cipher: %w", err)
 	}
+	static, err := staticBootstrapCipher()
+	if err != nil {
+		return nil, fmt.Errorf("static bootstrap cipher: %w", err)
+	}
 	// BlowfishCipher is immutable after construction, so the static first-packet cipher is safe to share.
-	return &LoginCrypt{static: staticBootstrapCipher(), dynamic: dynamic, first: true}, nil
+	return &LoginCrypt{static: static, dynamic: dynamic, first: true}, nil
 }
 
 // Encrypt pads payload to a Blowfish block boundary and encrypts it,
