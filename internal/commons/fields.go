@@ -69,13 +69,13 @@ func (f *Fields) IntDefault(key string, def int) int {
 	return v
 }
 
-// Long returns the value at key as an int64, recording an error if key is
-// absent or cannot be coerced.
-func (f *Fields) Long(key string) int64 {
+// Int32 returns the value at key as an int32, recording an error if key is
+// absent, cannot be coerced or overflows int32.
+func (f *Fields) Int32(key string) int32 {
 	if f.err != nil {
 		return 0
 	}
-	v, err := f.set.GetLong(key)
+	v, err := f.set.GetInt32(key)
 	if err != nil {
 		f.Fail(err)
 		return 0
@@ -83,27 +83,69 @@ func (f *Fields) Long(key string) int64 {
 	return v
 }
 
-// Double returns the value at key as a float64, recording an error if key is
-// absent or cannot be coerced.
-func (f *Fields) Double(key string) float64 {
-	if f.err != nil {
-		return 0
-	}
-	v, err := f.set.GetDouble(key)
-	if err != nil {
-		f.Fail(err)
-		return 0
-	}
-	return v
-}
-
-// DoubleDefault returns the value at key as a float64, or def if key is
-// absent. A present-but-malformed value still records an error.
-func (f *Fields) DoubleDefault(key string, def float64) float64 {
+// Int32Default returns the value at key as an int32, or def if key is
+// absent. A present-but-malformed or overflowing value still records an error.
+func (f *Fields) Int32Default(key string, def int32) int32 {
 	if f.err != nil {
 		return def
 	}
-	v, err := f.set.GetDoubleDefault(key, def)
+	v, err := f.set.GetInt32Default(key, def)
+	if err != nil {
+		f.Fail(err)
+		return def
+	}
+	return v
+}
+
+// Int64 returns the value at key as an int64, recording an error if key is
+// absent or cannot be coerced.
+func (f *Fields) Int64(key string) int64 {
+	if f.err != nil {
+		return 0
+	}
+	v, err := f.set.GetInt64(key)
+	if err != nil {
+		f.Fail(err)
+		return 0
+	}
+	return v
+}
+
+// Int64Default returns the value at key as an int64, or def if key is absent.
+// A present-but-malformed value still records an error.
+func (f *Fields) Int64Default(key string, def int64) int64 {
+	if f.err != nil {
+		return def
+	}
+	v, err := f.set.GetInt64Default(key, def)
+	if err != nil {
+		f.Fail(err)
+		return def
+	}
+	return v
+}
+
+// Float64 returns the value at key as a float64, recording an error if key is
+// absent or cannot be coerced.
+func (f *Fields) Float64(key string) float64 {
+	if f.err != nil {
+		return 0
+	}
+	v, err := f.set.GetFloat64(key)
+	if err != nil {
+		f.Fail(err)
+		return 0
+	}
+	return v
+}
+
+// Float64Default returns the value at key as a float64, or def if key is
+// absent. A present-but-malformed value still records an error.
+func (f *Fields) Float64Default(key string, def float64) float64 {
+	if f.err != nil {
+		return def
+	}
+	v, err := f.set.GetFloat64Default(key, def)
 	if err != nil {
 		f.Fail(err)
 		return def
@@ -162,6 +204,20 @@ func (f *Fields) StringDefault(key string, def string) string {
 	return f.set.GetStringDefault(key, def)
 }
 
+// Bool returns the value at key as a bool, recording an error if key is
+// absent or cannot be coerced.
+func (f *Fields) Bool(key string) bool {
+	if f.err != nil {
+		return false
+	}
+	v, err := f.set.GetBool(key)
+	if err != nil {
+		f.Fail(err)
+		return false
+	}
+	return v
+}
+
 // BoolDefault returns the value at key as a bool, or def if key is absent or
 // cannot be coerced.
 func (f *Fields) BoolDefault(key string, def bool) bool {
@@ -185,13 +241,27 @@ func (f *Fields) IntArray(key string) []int {
 	return v
 }
 
-// DoubleArray returns the value at key as a []float64, recording an error if
+// IntArrayDefault returns the value at key as a []int, or def if key is
+// absent. A present-but-malformed value still records an error.
+func (f *Fields) IntArrayDefault(key string, def []int) []int {
+	if f.err != nil {
+		return def
+	}
+	v, err := f.set.GetIntArrayDefault(key, def)
+	if err != nil {
+		f.Fail(err)
+		return def
+	}
+	return v
+}
+
+// Float64Array returns the value at key as a []float64, recording an error if
 // key is absent or cannot be coerced.
-func (f *Fields) DoubleArray(key string) []float64 {
+func (f *Fields) Float64Array(key string) []float64 {
 	if f.err != nil {
 		return nil
 	}
-	v, err := f.set.GetDoubleArray(key)
+	v, err := f.set.GetFloat64Array(key)
 	if err != nil {
 		f.Fail(err)
 		return nil
@@ -211,6 +281,15 @@ func (f *Fields) StringArray(key string) []string {
 		return nil
 	}
 	return v
+}
+
+// StringArrayDefault returns the value at key as a []string, or def if key is
+// absent or cannot be coerced.
+func (f *Fields) StringArrayDefault(key string, def []string) []string {
+	if f.err != nil {
+		return def
+	}
+	return f.set.GetStringArrayDefault(key, def)
 }
 
 // FieldObject returns the value stored at key in f's underlying StatSet as T

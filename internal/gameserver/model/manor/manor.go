@@ -19,55 +19,29 @@ type Seed struct {
 
 // NewSeed builds a Seed from set.
 func NewSeed(set *commons.StatSet) (Seed, error) {
-	cropID, err := set.GetInt("id")
-	if err != nil {
-		return Seed{}, fmt.Errorf("manor: seed: %w", err)
+	idf := commons.NewFields(set, "manor: seed")
+	cropID := idf.Int("id")
+	if err := idf.Err(); err != nil {
+		return Seed{}, err
 	}
-	wrap := func(err error) error { return fmt.Errorf("manor: seed crop %d: %w", cropID, err) }
-	seedID, err := set.GetInt("seedId")
-	if err != nil {
-		return Seed{}, wrap(err)
-	}
-	matureID, err := set.GetInt("matureId")
-	if err != nil {
-		return Seed{}, wrap(err)
-	}
-	level, err := set.GetInt("level")
-	if err != nil {
-		return Seed{}, wrap(err)
-	}
-	reward1, err := set.GetInt("reward1")
-	if err != nil {
-		return Seed{}, wrap(err)
-	}
-	reward2, err := set.GetInt("reward2")
-	if err != nil {
-		return Seed{}, wrap(err)
-	}
-	castleID, err := set.GetInt("castleId")
-	if err != nil {
-		return Seed{}, wrap(err)
-	}
-	seedsLimit, err := set.GetInt("seedsLimit")
-	if err != nil {
-		return Seed{}, wrap(err)
-	}
-	cropsLimit, err := set.GetInt("cropsLimit")
-	if err != nil {
-		return Seed{}, wrap(err)
-	}
-	return Seed{
+
+	f := commons.NewFields(set, fmt.Sprintf("manor: seed crop %d", cropID))
+	seed := Seed{
 		CropID:      cropID,
-		SeedID:      seedID,
-		MatureID:    matureID,
-		Level:       level,
-		Reward1:     reward1,
-		Reward2:     reward2,
-		CastleID:    castleID,
-		Alternative: set.GetBoolDefault("isAlternative", false),
-		SeedsLimit:  seedsLimit,
-		CropsLimit:  cropsLimit,
-	}, nil
+		SeedID:      f.Int("seedId"),
+		MatureID:    f.Int("matureId"),
+		Level:       f.Int("level"),
+		Reward1:     f.Int("reward1"),
+		Reward2:     f.Int("reward2"),
+		CastleID:    f.Int("castleId"),
+		Alternative: f.BoolDefault("isAlternative", false),
+		SeedsLimit:  f.Int("seedsLimit"),
+		CropsLimit:  f.Int("cropsLimit"),
+	}
+	if err := f.Err(); err != nil {
+		return Seed{}, err
+	}
+	return seed, nil
 }
 
 // Manor is one castle's seed list.

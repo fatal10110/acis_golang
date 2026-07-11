@@ -29,54 +29,29 @@ type Henna struct {
 
 // New builds a Henna from one folded <henna> element.
 func New(set *commons.StatSet) (Henna, error) {
-	symbolID, err := set.GetInt("symbolId")
-	if err != nil {
-		return Henna{}, fmt.Errorf("henna: %w", err)
-	}
-	wrap := func(err error) error { return fmt.Errorf("henna %d: %w", symbolID, err) }
-
-	dyeID, err := set.GetInt32("dyeId")
-	if err != nil {
-		return Henna{}, wrap(err)
-	}
-	classes, err := set.GetIntArray("classes")
-	if err != nil {
-		return Henna{}, wrap(err)
-	}
-	price, err := set.GetIntDefault("price", 0)
-	if err != nil {
-		return Henna{}, wrap(err)
-	}
-	intStat, err := set.GetIntDefault("INT", 0)
-	if err != nil {
-		return Henna{}, wrap(err)
-	}
-	strStat, err := set.GetIntDefault("STR", 0)
-	if err != nil {
-		return Henna{}, wrap(err)
-	}
-	conStat, err := set.GetIntDefault("CON", 0)
-	if err != nil {
-		return Henna{}, wrap(err)
-	}
-	menStat, err := set.GetIntDefault("MEN", 0)
-	if err != nil {
-		return Henna{}, wrap(err)
-	}
-	dexStat, err := set.GetIntDefault("DEX", 0)
-	if err != nil {
-		return Henna{}, wrap(err)
-	}
-	witStat, err := set.GetIntDefault("WIT", 0)
-	if err != nil {
-		return Henna{}, wrap(err)
+	idf := commons.NewFields(set, "henna")
+	symbolID := idf.Int("symbolId")
+	if err := idf.Err(); err != nil {
+		return Henna{}, err
 	}
 
-	return Henna{
-		SymbolID: symbolID, DyeID: dyeID, DrawPrice: price,
-		INT: intStat, STR: strStat, CON: conStat, MEN: menStat, DEX: dexStat, WIT: witStat,
-		Classes: classes,
-	}, nil
+	f := commons.NewFields(set, fmt.Sprintf("henna %d", symbolID))
+	henna := Henna{
+		SymbolID:  symbolID,
+		DyeID:     f.Int32("dyeId"),
+		DrawPrice: f.IntDefault("price", 0),
+		INT:       f.IntDefault("INT", 0),
+		STR:       f.IntDefault("STR", 0),
+		CON:       f.IntDefault("CON", 0),
+		MEN:       f.IntDefault("MEN", 0),
+		DEX:       f.IntDefault("DEX", 0),
+		WIT:       f.IntDefault("WIT", 0),
+		Classes:   f.IntArray("classes"),
+	}
+	if err := f.Err(); err != nil {
+		return Henna{}, err
+	}
+	return henna, nil
 }
 
 // RemovePrice returns the adena cost to remove this symbol.

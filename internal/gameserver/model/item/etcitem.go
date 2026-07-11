@@ -109,29 +109,22 @@ type EtcItemDetail struct {
 // action. A soulshot/spiritshot default action always reports EtcItemShot,
 // overriding whatever etcitem_type the data declares.
 func NewEtcItemDetail(set *commons.StatSet, defaultAction ActionType) (*EtcItemDetail, error) {
-	etcType, err := commons.GetEnumDefault(set, "etcitem_type", etcItemTypeNames, EtcItemNone)
-	if err != nil {
-		return nil, fmt.Errorf("item: etc item: %w", err)
-	}
+	f := commons.NewFields(set, "item: etc item")
+	etcType := commons.FieldEnumDefault[EtcItemType](f, "etcitem_type", etcItemTypeNames, EtcItemNone)
 	if shotActions[defaultAction] {
 		etcType = EtcItemShot
 	}
 
-	sharedReuseGroup, err := set.GetInt32Default("shared_reuse_group", -1)
-	if err != nil {
-		return nil, fmt.Errorf("item: etc item: %w", err)
-	}
-	reuseDelay, err := set.GetInt32Default("reuse_delay", 0)
-	if err != nil {
-		return nil, fmt.Errorf("item: etc item: %w", err)
-	}
-
-	return &EtcItemDetail{
+	detail := &EtcItemDetail{
 		Type:             etcType,
-		Handler:          set.GetStringDefault("handler", ""),
-		SharedReuseGroup: sharedReuseGroup,
-		ReuseDelay:       reuseDelay,
-	}, nil
+		Handler:          f.StringDefault("handler", ""),
+		SharedReuseGroup: f.Int32Default("shared_reuse_group", -1),
+		ReuseDelay:       f.Int32Default("reuse_delay", 0),
+	}
+	if err := f.Err(); err != nil {
+		return nil, err
+	}
+	return detail, nil
 }
 
 // IsQuestItem reports whether d classifies its item as a quest item.

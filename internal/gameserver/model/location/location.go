@@ -10,17 +10,14 @@ type Location struct {
 
 // NewLocation builds a Location from set; x, y and z are all required.
 func NewLocation(set *commons.StatSet) (Location, error) {
-	x, err := set.GetInt("x")
-	if err != nil {
+	f := commons.NewFields(set, "location")
+	loc := Location{
+		X: f.Int("x"),
+		Y: f.Int("y"),
+		Z: f.Int("z"),
+	}
+	if err := f.Err(); err != nil {
 		return Location{}, err
 	}
-	y, err := set.GetInt("y")
-	if err != nil {
-		return Location{}, err
-	}
-	z, err := set.GetInt("z")
-	if err != nil {
-		return Location{}, err
-	}
-	return Location{X: x, Y: y, Z: z}, nil
+	return loc, nil
 }

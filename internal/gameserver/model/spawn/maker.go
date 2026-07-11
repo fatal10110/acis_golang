@@ -2,6 +2,7 @@ package spawn
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 )
@@ -21,12 +22,14 @@ type Maker struct {
 // NewMaker builds a Maker from set plus already-resolved references and
 // decoded child entries.
 func NewMaker(set *commons.StatSet, territories []*Territory, banned []*Territory, entries []Entry, aiParams map[string]string) (*Maker, error) {
-	name, err := set.GetString("name")
-	if err != nil {
+	idf := commons.NewFields(set, "spawn maker")
+	name := idf.String("name")
+	if err := idf.Err(); err != nil {
 		return nil, err
 	}
-	maximum, err := set.GetInt("maximumNpcs")
-	if err != nil {
+	f := commons.NewFields(set, fmt.Sprintf("spawn maker %q", name))
+	maximum := f.Int("maximumNpcs")
+	if err := f.Err(); err != nil {
 		return nil, err
 	}
 	if len(territories) == 0 {
@@ -37,10 +40,10 @@ func NewMaker(set *commons.StatSet, territories []*Territory, banned []*Territor
 		Name:              name,
 		Territories:       append([]*Territory(nil), territories...),
 		BannedTerritories: append([]*Territory(nil), banned...),
-		AIType:            set.GetStringDefault("maker", ""),
+		AIType:            f.StringDefault("maker", ""),
 		AIParams:          copyStringMap(aiParams),
 		MaximumNPCs:       maximum,
-		Event:             set.GetStringDefault("event", ""),
+		Event:             f.StringDefault("event", ""),
 		Entries:           append([]Entry(nil), entries...),
 	}, nil
 }

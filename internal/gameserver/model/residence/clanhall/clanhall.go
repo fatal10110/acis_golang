@@ -55,57 +55,39 @@ func (h Hall) IsSiegable() bool {
 
 // NewHall builds a Hall from its XML attrs plus already-decoded child data.
 func NewHall(set *commons.StatSet, zones []residence.Zone, spawns map[residence.SpawnType][]location.Location) (*Hall, error) {
-	id, err := set.GetInt("id")
-	if err != nil {
-		return nil, fmt.Errorf("clanhall: %w", err)
-	}
-	wrap := func(err error) error { return fmt.Errorf("clanhall %d: %w", id, err) }
-
-	parentID, err := set.GetInt("parentId")
-	if err != nil {
-		return nil, wrap(err)
-	}
-	taxRate, err := set.GetInt("taxRate")
-	if err != nil {
-		return nil, wrap(err)
-	}
-	taxSysgetRate, err := set.GetInt("taxSysgetRate")
-	if err != nil {
-		return nil, wrap(err)
-	}
-	tributeRate, err := set.GetInt("tributeRate")
-	if err != nil {
-		return nil, wrap(err)
-	}
-	npcs, err := set.GetIntArray("npcs")
-	if err != nil {
-		return nil, wrap(err)
+	idf := commons.NewFields(set, "clanhall")
+	id := idf.Int("id")
+	if err := idf.Err(); err != nil {
+		return nil, err
 	}
 
-	alias := set.GetStringDefault("alias", "")
+	f := commons.NewFields(set, fmt.Sprintf("clanhall %d", id))
+	parentID := f.Int("parentId")
+	taxRate := f.Int("taxRate")
+	taxSysgetRate := f.Int("taxSysgetRate")
+	tributeRate := f.Int("tributeRate")
+	npcs := f.IntArray("npcs")
+	alias := f.StringDefault("alias", "")
 	if alias == "" {
-		return nil, wrap(fmt.Errorf("alias is required"))
+		f.Fail(fmt.Errorf("alias is required"))
 	}
-	name := set.GetStringDefault("name", "")
+	name := f.StringDefault("name", "")
 	if name == "" {
-		return nil, wrap(fmt.Errorf("name is required"))
+		f.Fail(fmt.Errorf("name is required"))
 	}
-	desc := set.GetStringDefault("desc", "")
+	desc := f.StringDefault("desc", "")
 	if desc == "" {
-		return nil, wrap(fmt.Errorf("desc is required"))
+		f.Fail(fmt.Errorf("desc is required"))
 	}
-	town := set.GetStringDefault("loc", "")
+	town := f.StringDefault("loc", "")
 	if town == "" {
-		return nil, wrap(fmt.Errorf("loc is required"))
+		f.Fail(fmt.Errorf("loc is required"))
 	}
-
-	siegeLength, err := set.GetLongDefault("siegeLength", 0)
-	if err != nil {
-		return nil, wrap(err)
-	}
-	scheduleConfig, err := set.GetIntArrayDefault("scheduleConfig", nil)
-	if err != nil {
-		return nil, wrap(err)
+	siegeLength := f.Int64Default("siegeLength", 0)
+	scheduleConfig := f.IntArrayDefault("scheduleConfig", nil)
+	gates := cleanStrings(f.StringArrayDefault("gates", nil))
+	if err := f.Err(); err != nil {
+		return nil, err
 	}
 
 	return &Hall{
@@ -127,7 +109,7 @@ func NewHall(set *commons.StatSet, zones []residence.Zone, spawns map[residence.
 			SysgetRate:  taxSysgetRate,
 			TributeRate: tributeRate,
 		},
-		Gates:  cleanStrings(set.GetStringArrayDefault("gates", nil)),
+		Gates:  gates,
 		NPCs:   append([]int(nil), npcs...),
 		Spawns: copySpawns(spawns),
 		Zones:  append([]residence.Zone(nil), zones...),
@@ -212,38 +194,23 @@ type Deco struct {
 
 // NewDeco builds a Deco from set.
 func NewDeco(set *commons.StatSet) (Deco, error) {
-	name := set.GetStringDefault("name", "")
+	name := commons.NewFields(set, "clanhall: deco").StringDefault("name", "")
 	if name == "" {
 		return Deco{}, fmt.Errorf("clanhall: deco: name is required")
 	}
-	decoType, err := set.GetInt("type")
-	if err != nil {
-		return Deco{}, fmt.Errorf("clanhall: deco %q: %w", name, err)
-	}
-	level, err := set.GetInt("level")
-	if err != nil {
-		return Deco{}, fmt.Errorf("clanhall: deco %q: %w", name, err)
-	}
-	depth, err := set.GetInt("depth")
-	if err != nil {
-		return Deco{}, fmt.Errorf("clanhall: deco %q: %w", name, err)
-	}
-	days, err := set.GetInt("days")
-	if err != nil {
-		return Deco{}, fmt.Errorf("clanhall: deco %q: %w", name, err)
-	}
-	price, err := set.GetInt("price")
-	if err != nil {
-		return Deco{}, fmt.Errorf("clanhall: deco %q: %w", name, err)
-	}
-	return Deco{
+	f := commons.NewFields(set, fmt.Sprintf("clanhall: deco %q", name))
+	deco := Deco{
 		Name:  name,
-		Type:  decoType,
-		Level: level,
-		Depth: depth,
-		Days:  days,
-		Price: price,
-	}, nil
+		Type:  f.Int("type"),
+		Level: f.Int("level"),
+		Depth: f.Int("depth"),
+		Days:  f.Int("days"),
+		Price: f.Int("price"),
+	}
+	if err := f.Err(); err != nil {
+		return Deco{}, err
+	}
+	return deco, nil
 }
 
 // DecoTable stores clan hall decorations keyed by (type, level).

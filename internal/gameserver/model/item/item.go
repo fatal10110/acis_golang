@@ -213,78 +213,60 @@ type Template struct {
 // children of one <item> element plus the "modifiers" and "useConditions"
 // values the loader packed in.
 func NewTemplate(set *commons.StatSet) (*Template, error) {
-	id, err := set.GetInt32("id")
-	if err != nil {
-		return nil, fmt.Errorf("item template: %w", err)
+	idf := commons.NewFields(set, "item template")
+	id := idf.Int32("id")
+	if err := idf.Err(); err != nil {
+		return nil, err
 	}
 	wrap := func(err error) error { return fmt.Errorf("item template %d: %w", id, err) }
 
+	f := commons.NewFields(set, fmt.Sprintf("item template %d", id))
 	t := &Template{ID: id}
-
-	if t.Name, err = set.GetString("name"); err != nil {
-		return nil, wrap(err)
+	t.Name = f.String("name")
+	kindStr := f.String("type")
+	if kind, err := ParseKind(kindStr); err != nil {
+		f.Fail(err)
+	} else {
+		t.Kind = kind
+	}
+	if slot, err := ParseSlot(f.StringDefault("bodypart", "none")); err != nil {
+		f.Fail(err)
+	} else {
+		t.Slot = slot
 	}
 
-	kindStr, err := set.GetString("type")
-	if err != nil {
-		return nil, wrap(err)
-	}
-	if t.Kind, err = ParseKind(kindStr); err != nil {
-		return nil, wrap(err)
-	}
+	t.Weight = f.Int32Default("weight", 0)
+	t.Material = commons.FieldEnumDefault[MaterialType](f, "material", materialTypeNames, MaterialSteel)
+	t.Duration = f.Int32Default("duration", -1)
+	t.ReferencePrice = f.Int32Default("price", 0)
+	t.Crystal = commons.FieldEnumDefault[CrystalType](f, "crystal_type", crystalTypeNames, CrystalNone)
+	t.CrystalCount = f.Int32Default("crystal_count", 0)
+	t.Stackable = f.BoolDefault("is_stackable", false)
+	t.Sellable = f.BoolDefault("is_sellable", true)
+	t.Dropable = f.BoolDefault("is_dropable", true)
+	t.Destroyable = f.BoolDefault("is_destroyable", true)
+	t.Tradable = f.BoolDefault("is_tradable", true)
+	t.Depositable = f.BoolDefault("is_depositable", true)
+	t.OlyRestricted = f.BoolDefault("is_oly_restricted", false)
+	t.DefaultAction = commons.FieldEnumDefault[ActionType](f, "default_action", actionTypeNames, ActionNone)
 
-	if t.Slot, err = ParseSlot(set.GetStringDefault("bodypart", "none")); err != nil {
-		return nil, wrap(err)
-	}
-
-	if t.Weight, err = set.GetInt32Default("weight", 0); err != nil {
-		return nil, wrap(err)
-	}
-	if t.Material, err = commons.GetEnumDefault(set, "material", materialTypeNames, MaterialSteel); err != nil {
-		return nil, wrap(err)
-	}
-	if t.Duration, err = set.GetInt32Default("duration", -1); err != nil {
-		return nil, wrap(err)
-	}
-	if t.ReferencePrice, err = set.GetInt32Default("price", 0); err != nil {
-		return nil, wrap(err)
-	}
-	if t.Crystal, err = commons.GetEnumDefault(set, "crystal_type", crystalTypeNames, CrystalNone); err != nil {
-		return nil, wrap(err)
-	}
-	if t.CrystalCount, err = set.GetInt32Default("crystal_count", 0); err != nil {
-		return nil, wrap(err)
-	}
-
-	t.Stackable = set.GetBoolDefault("is_stackable", false)
-	t.Sellable = set.GetBoolDefault("is_sellable", true)
-	t.Dropable = set.GetBoolDefault("is_dropable", true)
-	t.Destroyable = set.GetBoolDefault("is_destroyable", true)
-	t.Tradable = set.GetBoolDefault("is_tradable", true)
-	t.Depositable = set.GetBoolDefault("is_depositable", true)
-	t.OlyRestricted = set.GetBoolDefault("is_oly_restricted", false)
-
-	if t.DefaultAction, err = commons.GetEnumDefault(set, "default_action", actionTypeNames, ActionNone); err != nil {
-		return nil, wrap(err)
-	}
-
-	if set.Has("item_skill") {
-		raw, err := set.GetString("item_skill")
-		if err != nil {
-			return nil, wrap(err)
-		}
-		if t.AttachedSkills, err = ParseSkillRefs(raw); err != nil {
-			return nil, wrap(err)
+	if f.Has("item_skill") {
+		raw := f.String("item_skill")
+		if skills, err := ParseSkillRefs(raw); err != nil {
+			f.Fail(err)
+		} else {
+			t.AttachedSkills = skills
 		}
 	}
 
-	if t.Modifiers, err = commons.GetList[StatModifier](set, "modifiers"); err != nil {
-		return nil, wrap(err)
-	}
-	if t.UseConditions, err = commons.GetList[UseCondition](set, "useConditions"); err != nil {
-		return nil, wrap(err)
+	t.Modifiers = commons.FieldList[StatModifier](f, "modifiers")
+	t.UseConditions = commons.FieldList[UseCondition](f, "useConditions")
+
+	if err := f.Err(); err != nil {
+		return nil, err
 	}
 
+	var err error
 	switch t.Kind {
 	case KindWeapon:
 		if t.Weapon, err = NewWeaponDetail(set); err != nil {

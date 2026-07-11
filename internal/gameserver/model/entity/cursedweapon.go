@@ -21,47 +21,33 @@ type CursedWeapon struct {
 
 // NewCursedWeapon builds a CursedWeapon from one XML item attribute set.
 func NewCursedWeapon(set *commons.StatSet, skills *skill.Table) (CursedWeapon, error) {
-	itemID, err := set.GetInt32("id")
-	if err != nil {
-		return CursedWeapon{}, fmt.Errorf("entity: cursed weapon: %w", err)
+	idf := commons.NewFields(set, "entity: cursed weapon")
+	itemID := idf.Int32("id")
+	if err := idf.Err(); err != nil {
+		return CursedWeapon{}, err
 	}
-	wrap := func(err error) error { return fmt.Errorf("entity: cursed weapon %d: %w", itemID, err) }
 
-	skillID, err := set.GetInt32("skillId")
-	if err != nil {
-		return CursedWeapon{}, wrap(err)
+	f := commons.NewFields(set, fmt.Sprintf("entity: cursed weapon %d", itemID))
+	skillID := f.Int32("skillId")
+	if err := f.Err(); err != nil {
+		return CursedWeapon{}, err
 	}
 	if skills == nil {
-		return CursedWeapon{}, wrap(fmt.Errorf("missing skill table"))
+		return CursedWeapon{}, fmt.Errorf("entity: cursed weapon %d: missing skill table", itemID)
 	}
 	skillLevel := skills.MaxLevel(skill.ID(skillID))
 	if skillLevel <= 0 {
-		return CursedWeapon{}, wrap(fmt.Errorf("skill %d not found", skillID))
+		return CursedWeapon{}, fmt.Errorf("entity: cursed weapon %d: skill %d not found", itemID, skillID)
 	}
 
-	name, err := set.GetString("name")
-	if err != nil {
-		return CursedWeapon{}, wrap(err)
-	}
-	dropRate, err := set.GetInt("dropRate")
-	if err != nil {
-		return CursedWeapon{}, wrap(err)
-	}
-	duration, err := set.GetInt("duration")
-	if err != nil {
-		return CursedWeapon{}, wrap(err)
-	}
-	durationLost, err := set.GetInt("durationLost")
-	if err != nil {
-		return CursedWeapon{}, wrap(err)
-	}
-	disappearChance, err := set.GetInt("dissapearChance")
-	if err != nil {
-		return CursedWeapon{}, wrap(err)
-	}
-	stageKills, err := set.GetInt("stageKills")
-	if err != nil {
-		return CursedWeapon{}, wrap(err)
+	name := f.String("name")
+	dropRate := f.Int("dropRate")
+	duration := f.Int("duration")
+	durationLost := f.Int("durationLost")
+	disappearChance := f.Int("dissapearChance")
+	stageKills := f.Int("stageKills")
+	if err := f.Err(); err != nil {
+		return CursedWeapon{}, err
 	}
 
 	return CursedWeapon{
