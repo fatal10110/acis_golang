@@ -3,11 +3,15 @@ package npc
 import (
 	"errors"
 	"fmt"
+	"math"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
+
+const defaultDriftRange = 200
 
 var hostileInstanceKinds = map[InstanceKind]struct{}{
 	"Chest":           {},
@@ -29,6 +33,7 @@ type Hostile struct {
 	Instance *Instance
 
 	brain *ai.Attackable
+	move  ai.MoveController
 }
 
 // NewHostile creates a live attackable NPC wrapper for inst.
@@ -50,7 +55,7 @@ func NewHostile(inst *Instance, movement ai.MoveController, attack ai.AttackCont
 		return nil, errors.New("npc: nil hostile attack")
 	}
 
-	h := &Hostile{Instance: inst}
+	h := &Hostile{Instance: inst, move: movement}
 	h.brain = ai.NewAttackable(h, movement, attack)
 	return h, nil
 }
@@ -113,12 +118,24 @@ func (h *Hostile) PhysicalAttackRange() int {
 
 // ReturnHome reports whether this NPC started returning to its spawn.
 func (h *Hostile) ReturnHome() bool {
-	return false
+	if h.InTerritory() || !h.brain.Hates().IsEmpty() {
+		return false
+	}
+	if in2DRange(h.location(), h.Instance.Home, h.driftRange()) {
+		return false
+	}
+
+	h.brain.Threats().ZeroHate()
+	h.move.MoveHome(h.Instance.Home)
+	return true
 }
 
 // InTerritory reports whether this NPC is inside its spawn territory.
 func (h *Hostile) InTerritory() bool {
-	return true
+	if !h.Instance.HasHome {
+		return true
+	}
+	return in3DRange(h.location(), h.Instance.Home, h.driftRange())
 }
 
 func hostileKind(inst *Instance) InstanceKind {
@@ -126,4 +143,27 @@ func hostileKind(inst *Instance) InstanceKind {
 		return inst.Kind
 	}
 	return InstanceKind(inst.Template.Type)
+}
+
+func (h *Hostile) location() location.Location {
+	x, y, z := h.Position()
+	return location.Location{X: x, Y: y, Z: z}
+}
+
+func (h *Hostile) driftRange() int {
+	if h.Instance.DriftRange > 0 {
+		return h.Instance.DriftRange
+	}
+	return defaultDriftRange
+}
+
+func in2DRange(a, b location.Location, radius int) bool {
+	return math.Hypot(float64(a.X-b.X), float64(a.Y-b.Y)) <= float64(radius)
+}
+
+func in3DRange(a, b location.Location, radius int) bool {
+	dx := float64(a.X - b.X)
+	dy := float64(a.Y - b.Y)
+	dz := float64(a.Z - b.Z)
+	return math.Sqrt(dx*dx+dy*dy+dz*dz) <= float64(radius)
 }

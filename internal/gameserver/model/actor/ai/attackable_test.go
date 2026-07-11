@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
 
 func TestAttackableAIChoosesMostHatedTargetToAttack(t *testing.T) {
@@ -192,6 +193,8 @@ func (m *recordingMove) MaybeStartOffensiveFollow(target attackable.Combatant, a
 	m.followRange = attackRange
 	return m.followStarted
 }
+
+func (m *recordingMove) MoveHome(location.Location) {}
 
 func (m *recordingMove) Stop() {
 	m.stopCount++
