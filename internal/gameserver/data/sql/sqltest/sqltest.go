@@ -87,8 +87,23 @@ const itemsSchema = "CREATE TABLE IF NOT EXISTS `items` (\n" +
 	"	PRIMARY KEY (`object_id`)\n" +
 	")"
 
-// NewDB starts a real MariaDB container, creates the characters and items
-// tables in it, and returns a pool connected to it. The container is
+// spawnDataSchema mirrors the shipped spawn_data table definition verbatim.
+const spawnDataSchema = "CREATE TABLE IF NOT EXISTS `spawn_data` (\n" +
+	"  `name` VARCHAR(80) NOT NULL,\n" +
+	"  `status` SMALLINT NOT NULL,\n" +
+	"  `current_hp` INT unsigned NOT NULL,\n" +
+	"  `current_mp` INT unsigned NOT NULL,\n" +
+	"  `loc_x` INT NOT NULL DEFAULT 0,\n" +
+	"  `loc_y` INT NOT NULL DEFAULT 0,\n" +
+	"  `loc_z` INT NOT NULL DEFAULT 0,\n" +
+	"  `heading` MEDIUMINT NOT NULL DEFAULT 0,\n" +
+	"  `db_value` SMALLINT NOT NULL DEFAULT 0,\n" +
+	"  `respawn_time` BIGINT unsigned NOT NULL default 0,\n" +
+	"  PRIMARY KEY (`name`)\n" +
+	")"
+
+// NewDB starts a real MariaDB container, creates the gameserver tables used
+// by integration tests, and returns a pool connected to it. The container is
 // terminated and the pool closed when the test completes.
 func NewDB(t *testing.T) *sql.DB {
 	t.Helper()
@@ -120,6 +135,9 @@ func NewDB(t *testing.T) *sql.DB {
 	}
 	if _, err := db.ExecContext(ctx, itemsSchema); err != nil {
 		t.Fatalf("create items table: %v", err)
+	}
+	if _, err := db.ExecContext(ctx, spawnDataSchema); err != nil {
+		t.Fatalf("create spawn_data table: %v", err)
 	}
 	return db
 }
