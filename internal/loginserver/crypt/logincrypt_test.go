@@ -3,6 +3,8 @@ package crypt
 import (
 	"bytes"
 	"encoding/hex"
+	"errors"
+	"strings"
 	"sync"
 	"testing"
 
@@ -196,6 +198,22 @@ func TestSharedStaticBootstrapCipherEncryptsFirstPacketsConcurrently(t *testing.
 func TestNewLoginCryptRejectsOversizedKey(t *testing.T) {
 	if _, err := NewLoginCrypt(make([]byte, 57)); err == nil {
 		t.Fatal("expected error for 57-byte key, got nil")
+	}
+}
+
+func TestNewLoginCryptReturnsStaticBootstrapCipherError(t *testing.T) {
+	original := staticBootstrapCipher
+	staticBootstrapCipher = func() (*crypt.BlowfishCipher, error) {
+		return nil, errors.New("static key unavailable")
+	}
+	t.Cleanup(func() {
+		staticBootstrapCipher = original
+	})
+
+	if _, err := NewLoginCrypt(mustHex(t, "0011223344556677")); err == nil {
+		t.Fatal("NewLoginCrypt() error = nil, want static bootstrap cipher error")
+	} else if !strings.Contains(err.Error(), "static bootstrap cipher") {
+		t.Fatalf("NewLoginCrypt() error = %v, want static bootstrap context", err)
 	}
 }
 
