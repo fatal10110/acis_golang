@@ -23,51 +23,29 @@ type Fish struct {
 
 // New builds a Fish from one folded <fish> element.
 func New(set *commons.StatSet) (Fish, error) {
-	id, err := set.GetInt32("id")
-	if err != nil {
-		return Fish{}, fmt.Errorf("fish: %w", err)
+	idf := commons.NewFields(set, "fish")
+	id := idf.Int32("id")
+	if err := idf.Err(); err != nil {
+		return Fish{}, err
 	}
-	wrap := func(err error) error { return fmt.Errorf("fish %d: %w", id, err) }
-	level, err := set.GetInt("level")
-	if err != nil {
-		return Fish{}, wrap(err)
+
+	f := commons.NewFields(set, fmt.Sprintf("fish %d", id))
+	fish := Fish{
+		ID:            id,
+		Level:         f.Int("level"),
+		HP:            f.Int("hp"),
+		HPRegen:       f.Int("hpRegen"),
+		Type:          f.Int("type"),
+		Group:         f.Int("group"),
+		Guts:          f.Int("guts"),
+		GutsCheckTime: f.Int("gutsCheckTime"),
+		WaitTime:      f.Int("waitTime"),
+		CombatTime:    f.Int("combatTime"),
 	}
-	hp, err := set.GetInt("hp")
-	if err != nil {
-		return Fish{}, wrap(err)
+	if err := f.Err(); err != nil {
+		return Fish{}, err
 	}
-	hpRegen, err := set.GetInt("hpRegen")
-	if err != nil {
-		return Fish{}, wrap(err)
-	}
-	fishType, err := set.GetInt("type")
-	if err != nil {
-		return Fish{}, wrap(err)
-	}
-	group, err := set.GetInt("group")
-	if err != nil {
-		return Fish{}, wrap(err)
-	}
-	guts, err := set.GetInt("guts")
-	if err != nil {
-		return Fish{}, wrap(err)
-	}
-	gutsCheckTime, err := set.GetInt("gutsCheckTime")
-	if err != nil {
-		return Fish{}, wrap(err)
-	}
-	waitTime, err := set.GetInt("waitTime")
-	if err != nil {
-		return Fish{}, wrap(err)
-	}
-	combatTime, err := set.GetInt("combatTime")
-	if err != nil {
-		return Fish{}, wrap(err)
-	}
-	return Fish{
-		ID: id, Level: level, HP: hp, HPRegen: hpRegen, Type: fishType, Group: group,
-		Guts: guts, GutsCheckTime: gutsCheckTime, WaitTime: waitTime, CombatTime: combatTime,
-	}, nil
+	return fish, nil
 }
 
 // Table stores fish rows.

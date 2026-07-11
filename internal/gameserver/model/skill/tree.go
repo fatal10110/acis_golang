@@ -25,34 +25,25 @@ type FishingSkill struct {
 // one <fishingSkill> element. id, lvl, minLvl, itemId and itemCount are all
 // required; isDwarven defaults to false.
 func NewFishingSkill(set *commons.StatSet) (FishingSkill, error) {
-	id, err := set.GetInt32("id")
-	if err != nil {
-		return FishingSkill{}, fmt.Errorf("skill: fishing skill: %w", err)
+	idf := commons.NewFields(set, "skill: fishing skill")
+	id := idf.Int32("id")
+	if err := idf.Err(); err != nil {
+		return FishingSkill{}, err
 	}
-	wrap := func(err error) error { return fmt.Errorf("skill: fishing skill %d: %w", id, err) }
 
-	level, err := set.GetInt("lvl")
-	if err != nil {
-		return FishingSkill{}, wrap(err)
+	f := commons.NewFields(set, fmt.Sprintf("skill: fishing skill %d", id))
+	entry := FishingSkill{
+		ID:        ID(id),
+		Level:     f.Int("lvl"),
+		MinLevel:  f.Int("minLvl"),
+		ItemID:    f.Int32("itemId"),
+		ItemCount: f.Int("itemCount"),
+		Dwarven:   f.BoolDefault("isDwarven", false),
 	}
-	minLevel, err := set.GetInt("minLvl")
-	if err != nil {
-		return FishingSkill{}, wrap(err)
+	if err := f.Err(); err != nil {
+		return FishingSkill{}, err
 	}
-	itemID, err := set.GetInt32("itemId")
-	if err != nil {
-		return FishingSkill{}, wrap(err)
-	}
-	itemCount, err := set.GetInt("itemCount")
-	if err != nil {
-		return FishingSkill{}, wrap(err)
-	}
-	dwarven := set.GetBoolDefault("isDwarven", false)
-
-	return FishingSkill{
-		ID: ID(id), Level: level, MinLevel: minLevel,
-		ItemID: itemID, ItemCount: itemCount, Dwarven: dwarven,
-	}, nil
+	return entry, nil
 }
 
 // ClanSkill is one entry in the clan skill tree: the level of a clan skill a
@@ -70,30 +61,24 @@ type ClanSkill struct {
 // NewClanSkill builds a ClanSkill from set, the folded attributes of one
 // <clanSkill> element. Every attribute is required.
 func NewClanSkill(set *commons.StatSet) (ClanSkill, error) {
-	id, err := set.GetInt32("id")
-	if err != nil {
-		return ClanSkill{}, fmt.Errorf("skill: clan skill: %w", err)
-	}
-	wrap := func(err error) error { return fmt.Errorf("skill: clan skill %d: %w", id, err) }
-
-	level, err := set.GetInt("lvl")
-	if err != nil {
-		return ClanSkill{}, wrap(err)
-	}
-	minLevel, err := set.GetInt("minLvl")
-	if err != nil {
-		return ClanSkill{}, wrap(err)
-	}
-	cost, err := set.GetInt("cost")
-	if err != nil {
-		return ClanSkill{}, wrap(err)
-	}
-	itemID, err := set.GetInt32("itemId")
-	if err != nil {
-		return ClanSkill{}, wrap(err)
+	idf := commons.NewFields(set, "skill: clan skill")
+	id := idf.Int32("id")
+	if err := idf.Err(); err != nil {
+		return ClanSkill{}, err
 	}
 
-	return ClanSkill{ID: ID(id), Level: level, MinLevel: minLevel, Cost: cost, ItemID: itemID}, nil
+	f := commons.NewFields(set, fmt.Sprintf("skill: clan skill %d", id))
+	entry := ClanSkill{
+		ID:       ID(id),
+		Level:    f.Int("lvl"),
+		MinLevel: f.Int("minLvl"),
+		Cost:     f.Int("cost"),
+		ItemID:   f.Int32("itemId"),
+	}
+	if err := f.Err(); err != nil {
+		return ClanSkill{}, err
+	}
+	return entry, nil
 }
 
 // EnchantSkill is one entry in the enchant skill tree: the exp/sp cost and
@@ -120,31 +105,20 @@ type EnchantSkill struct {
 // one <enchantSkill> element. id, lvl, exp, sp and the five rate attributes
 // are all required; itemNeeded ("itemId-count") is optional.
 func NewEnchantSkill(set *commons.StatSet) (EnchantSkill, error) {
-	id, err := set.GetInt32("id")
-	if err != nil {
-		return EnchantSkill{}, fmt.Errorf("skill: enchant skill: %w", err)
+	idf := commons.NewFields(set, "skill: enchant skill")
+	id := idf.Int32("id")
+	if err := idf.Err(); err != nil {
+		return EnchantSkill{}, err
 	}
-	wrap := func(err error) error { return fmt.Errorf("skill: enchant skill %d: %w", id, err) }
 
-	level, err := set.GetInt("lvl")
-	if err != nil {
-		return EnchantSkill{}, wrap(err)
-	}
-	exp, err := set.GetInt("exp")
-	if err != nil {
-		return EnchantSkill{}, wrap(err)
-	}
-	sp, err := set.GetInt("sp")
-	if err != nil {
-		return EnchantSkill{}, wrap(err)
-	}
+	f := commons.NewFields(set, fmt.Sprintf("skill: enchant skill %d", id))
+	level := f.Int("lvl")
+	exp := f.Int("exp")
+	sp := f.Int("sp")
 
 	rates := make([]int, 5)
 	for i, key := range [...]string{"rate76", "rate77", "rate78", "rate79", "rate80"} {
-		rates[i], err = set.GetInt(key)
-		if err != nil {
-			return EnchantSkill{}, wrap(err)
-		}
+		rates[i] = f.Int(key)
 	}
 
 	e := EnchantSkill{
@@ -152,18 +126,18 @@ func NewEnchantSkill(set *commons.StatSet) (EnchantSkill, error) {
 		Rate76: rates[0], Rate77: rates[1], Rate78: rates[2], Rate79: rates[3], Rate80: rates[4],
 	}
 
-	if set.Has("itemNeeded") {
-		raw, err := set.GetString("itemNeeded")
-		if err != nil {
-			return EnchantSkill{}, wrap(err)
+	if f.Has("itemNeeded") {
+		raw := f.String("itemNeeded")
+		if itemID, count, err := parseItemNeeded(raw); err != nil {
+			f.Fail(fmt.Errorf("itemNeeded %q: %w", raw, err))
+		} else {
+			e.ItemID, e.ItemCount = itemID, count
 		}
-		itemID, count, err := parseItemNeeded(raw)
-		if err != nil {
-			return EnchantSkill{}, wrap(fmt.Errorf("itemNeeded %q: %w", raw, err))
-		}
-		e.ItemID, e.ItemCount = itemID, count
 	}
 
+	if err := f.Err(); err != nil {
+		return EnchantSkill{}, err
+	}
 	return e, nil
 }
 

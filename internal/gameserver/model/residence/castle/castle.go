@@ -99,109 +99,87 @@ func NewArtifact(set *commons.StatSet) (Artifact, error) {
 
 // NewControlTower builds a ControlTower from set.
 func NewControlTower(set *commons.StatSet) (ControlTower, error) {
-	alias := set.GetStringDefault("alias", "")
+	alias := commons.NewFields(set, "castle: control tower").StringDefault("alias", "")
 	if alias == "" {
 		return ControlTower{}, fmt.Errorf("castle: control tower: alias is required")
 	}
-	towerType, err := commons.GetEnum(set, "type", towerTypeNames)
-	if err != nil {
-		return ControlTower{}, fmt.Errorf("castle: control tower %q: %w", alias, err)
+	f := commons.NewFields(set, fmt.Sprintf("castle: control tower %q", alias))
+	towerType := commons.FieldEnum[TowerType](f, "type", towerTypeNames)
+	if err := f.Err(); err != nil {
+		return ControlTower{}, err
 	}
 	pos, err := location.NewLocation(commons.NewStatSetFrom(set))
 	if err != nil {
 		return ControlTower{}, fmt.Errorf("castle: control tower %q: %w", alias, err)
 	}
-	hp, err := set.GetDouble("hp")
-	if err != nil {
-		return ControlTower{}, fmt.Errorf("castle: control tower %q: %w", alias, err)
-	}
-	pDef, err := set.GetDouble("pDef")
-	if err != nil {
-		return ControlTower{}, fmt.Errorf("castle: control tower %q: %w", alias, err)
-	}
-	mDef, err := set.GetDouble("mDef")
-	if err != nil {
-		return ControlTower{}, fmt.Errorf("castle: control tower %q: %w", alias, err)
-	}
-	return ControlTower{
+	tower := ControlTower{
 		Alias:    alias,
 		Type:     towerType,
 		Position: pos,
-		HP:       hp,
-		PDef:     pDef,
-		MDef:     mDef,
-		Zones:    cleanStrings(set.GetStringArrayDefault("zones", nil)),
-	}, nil
+		HP:       f.Float64("hp"),
+		PDef:     f.Float64("pDef"),
+		MDef:     f.Float64("mDef"),
+		Zones:    cleanStrings(f.StringArrayDefault("zones", nil)),
+	}
+	if err := f.Err(); err != nil {
+		return ControlTower{}, err
+	}
+	return tower, nil
 }
 
 // NewTicket builds a Ticket from set.
 func NewTicket(set *commons.StatSet) (Ticket, error) {
-	itemID, err := set.GetInt("itemId")
-	if err != nil {
-		return Ticket{}, fmt.Errorf("castle: ticket: %w", err)
+	idf := commons.NewFields(set, "castle: ticket")
+	itemID := idf.Int("itemId")
+	if err := idf.Err(); err != nil {
+		return Ticket{}, err
 	}
-	wrap := func(err error) error { return fmt.Errorf("castle: ticket %d: %w", itemID, err) }
-	kind := set.GetStringDefault("type", "")
+
+	f := commons.NewFields(set, fmt.Sprintf("castle: ticket %d", itemID))
+	kind := f.StringDefault("type", "")
 	if kind == "" {
-		return Ticket{}, wrap(fmt.Errorf("type is required"))
+		f.Fail(fmt.Errorf("type is required"))
 	}
-	npcID, err := set.GetInt("npcId")
-	if err != nil {
-		return Ticket{}, wrap(err)
-	}
-	maxAmount, err := set.GetInt("maxAmount")
-	if err != nil {
-		return Ticket{}, wrap(err)
-	}
-	return Ticket{
+	ticket := Ticket{
 		ItemID:     itemID,
 		Kind:       kind,
-		Stationary: set.GetBoolDefault("stationary", false),
-		NPCID:      npcID,
-		MaxAmount:  maxAmount,
-		SSQ:        cleanStrings(set.GetStringArrayDefault("ssq", nil)),
-	}, nil
+		Stationary: f.BoolDefault("stationary", false),
+		NPCID:      f.Int("npcId"),
+		MaxAmount:  f.Int("maxAmount"),
+		SSQ:        cleanStrings(f.StringArrayDefault("ssq", nil)),
+	}
+	if err := f.Err(); err != nil {
+		return Ticket{}, err
+	}
+	return ticket, nil
 }
 
 // NewCastle builds a Castle from its XML attrs plus already-decoded child data.
 func NewCastle(set *commons.StatSet, artifacts []Artifact, towers []ControlTower, tickets []Ticket, zones []residence.Zone, spawns map[residence.SpawnType][]location.Location) (*Castle, error) {
-	id, err := set.GetInt("id")
-	if err != nil {
-		return nil, fmt.Errorf("castle: %w", err)
+	idf := commons.NewFields(set, "castle")
+	id := idf.Int("id")
+	if err := idf.Err(); err != nil {
+		return nil, err
 	}
-	wrap := func(err error) error { return fmt.Errorf("castle %d: %w", id, err) }
 
-	parentID, err := set.GetInt("parentId")
-	if err != nil {
-		return nil, wrap(err)
-	}
-	circletID, err := set.GetInt("circletId")
-	if err != nil {
-		return nil, wrap(err)
-	}
-	taxRate, err := set.GetInt("taxRate")
-	if err != nil {
-		return nil, wrap(err)
-	}
-	taxSysgetRate, err := set.GetInt("taxSysgetRate")
-	if err != nil {
-		return nil, wrap(err)
-	}
-	tributeRate, err := set.GetInt("tributeRate")
-	if err != nil {
-		return nil, wrap(err)
-	}
-	alias := set.GetStringDefault("alias", "")
+	f := commons.NewFields(set, fmt.Sprintf("castle %d", id))
+	parentID := f.Int("parentId")
+	circletID := f.Int("circletId")
+	taxRate := f.Int("taxRate")
+	taxSysgetRate := f.Int("taxSysgetRate")
+	tributeRate := f.Int("tributeRate")
+	alias := f.StringDefault("alias", "")
 	if alias == "" {
-		return nil, wrap(fmt.Errorf("alias is required"))
+		f.Fail(fmt.Errorf("alias is required"))
 	}
-	name := set.GetStringDefault("name", "")
+	name := f.StringDefault("name", "")
 	if name == "" {
-		return nil, wrap(fmt.Errorf("name is required"))
+		f.Fail(fmt.Errorf("name is required"))
 	}
-	npcs, err := set.GetIntArray("npcs")
-	if err != nil {
-		return nil, wrap(err)
+	npcs := f.IntArray("npcs")
+	gates := cleanStrings(f.StringArrayDefault("gates", nil))
+	if err := f.Err(); err != nil {
+		return nil, err
 	}
 
 	return &Castle{
@@ -215,7 +193,7 @@ func NewCastle(set *commons.StatSet, artifacts []Artifact, towers []ControlTower
 			SysgetRate:  taxSysgetRate,
 			TributeRate: tributeRate,
 		},
-		Gates:         cleanStrings(set.GetStringArrayDefault("gates", nil)),
+		Gates:         gates,
 		NPCs:          append([]int(nil), npcs...),
 		Spawns:        copySpawns(spawns),
 		Zones:         append([]residence.Zone(nil), zones...),

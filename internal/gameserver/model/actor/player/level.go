@@ -25,16 +25,13 @@ type Level struct {
 // entry above the level cap carries neither), but a present value that
 // fails to parse is still an error.
 func NewLevel(set *commons.StatSet) (Level, error) {
-	exp, err := set.GetLong("requiredExpToLevelUp")
-	if err != nil {
-		return Level{}, err
+	f := commons.NewFields(set, "player level")
+	l := Level{
+		RequiredExpToLevelUp: f.Int64("requiredExpToLevelUp"),
+		KarmaModifier:        f.Float64Default("karmaModifier", 0),
+		ExpLossAtDeath:       f.Float64Default("expLossAtDeath", 0),
 	}
-
-	l := Level{RequiredExpToLevelUp: exp}
-	if l.KarmaModifier, err = set.GetDoubleDefault("karmaModifier", 0); err != nil {
-		return Level{}, err
-	}
-	if l.ExpLossAtDeath, err = set.GetDoubleDefault("expLossAtDeath", 0); err != nil {
+	if err := f.Err(); err != nil {
 		return Level{}, err
 	}
 	return l, nil

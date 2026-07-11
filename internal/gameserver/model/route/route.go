@@ -62,29 +62,25 @@ func NewBoatLocation(set *commons.StatSet) (BoatLocation, error) {
 	if err != nil {
 		return BoatLocation{}, fmt.Errorf("route: boat location: %w", err)
 	}
-	speed, err := set.GetIntDefault("speed", 350)
+
+	f := commons.NewFields(set, "route: boat location")
+	speed := f.IntDefault("speed", 350)
+	rotation := f.IntDefault("rotation", 4000)
+	busy := f.IntDefault("busy", 0)
+	arrival, err := parseMessageList(f.StringArrayDefault("arrival", nil))
 	if err != nil {
-		return BoatLocation{}, fmt.Errorf("route: boat location: %w", err)
+		f.Fail(fmt.Errorf("arrival: %w", err))
 	}
-	rotation, err := set.GetIntDefault("rotation", 4000)
+	departure, err := parseMessageList(f.StringArrayDefault("departure", nil))
 	if err != nil {
-		return BoatLocation{}, fmt.Errorf("route: boat location: %w", err)
+		f.Fail(fmt.Errorf("departure: %w", err))
 	}
-	busy, err := set.GetIntDefault("busy", 0)
+	scheduled, err := parseScheduled(f.StringDefault("scheduled", ""))
 	if err != nil {
-		return BoatLocation{}, fmt.Errorf("route: boat location: %w", err)
+		f.Fail(fmt.Errorf("scheduled: %w", err))
 	}
-	arrival, err := parseMessageList(set.GetStringArrayDefault("arrival", nil))
-	if err != nil {
-		return BoatLocation{}, fmt.Errorf("route: boat location arrival: %w", err)
-	}
-	departure, err := parseMessageList(set.GetStringArrayDefault("departure", nil))
-	if err != nil {
-		return BoatLocation{}, fmt.Errorf("route: boat location departure: %w", err)
-	}
-	scheduled, err := parseScheduled(set.GetStringDefault("scheduled", ""))
-	if err != nil {
-		return BoatLocation{}, fmt.Errorf("route: boat location scheduled: %w", err)
+	if err := f.Err(); err != nil {
+		return BoatLocation{}, err
 	}
 	return BoatLocation{
 		Location:          loc,
@@ -176,24 +172,17 @@ func NewWalkerLocation(set *commons.StatSet) (WalkerLocation, error) {
 	if err != nil {
 		return WalkerLocation{}, fmt.Errorf("route: walker location: %w", err)
 	}
-	delay, err := set.GetIntDefault("delay", 0)
-	if err != nil {
-		return WalkerLocation{}, fmt.Errorf("route: walker location: %w", err)
-	}
-	fstring, err := set.GetIntDefault("fstring", 0)
-	if err != nil {
-		return WalkerLocation{}, fmt.Errorf("route: walker location: %w", err)
-	}
-	socialID, err := set.GetIntDefault("socialId", 0)
-	if err != nil {
-		return WalkerLocation{}, fmt.Errorf("route: walker location: %w", err)
-	}
-	return WalkerLocation{
+	f := commons.NewFields(set, "route: walker location")
+	walker := WalkerLocation{
 		Location:    loc,
-		DelayMillis: delay * 1000,
-		NPCStringID: fstring,
-		SocialID:    socialID,
-	}, nil
+		DelayMillis: f.IntDefault("delay", 0) * 1000,
+		NPCStringID: f.IntDefault("fstring", 0),
+		SocialID:    f.IntDefault("socialId", 0),
+	}
+	if err := f.Err(); err != nil {
+		return WalkerLocation{}, err
+	}
+	return walker, nil
 }
 
 // WalkerRoutes stores walking routes keyed by route name then npc name.

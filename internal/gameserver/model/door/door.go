@@ -191,76 +191,53 @@ func cloneGeoData(data [][]block.NSWE) [][]block.NSWE {
 // coordinates, and stats are required; function attributes use the shipped
 // defaults when absent.
 func NewTemplate(set *commons.StatSet) (*Template, error) {
-	id, err := set.GetInt("id")
-	if err != nil {
-		return nil, fmt.Errorf("door: template: %w", err)
+	idf := commons.NewFields(set, "door: template")
+	id := idf.Int("id")
+	if err := idf.Err(); err != nil {
+		return nil, err
 	}
 	wrap := func(err error) error { return fmt.Errorf("door: template %d: %w", id, err) }
 
-	kind, err := commons.GetEnum(set, "type", kindNames)
-	if err != nil {
-		return nil, wrap(err)
-	}
-	level, err := set.GetInt("level")
-	if err != nil {
-		return nil, wrap(err)
+	f := commons.NewFields(set, fmt.Sprintf("door: template %d", id))
+	kind := commons.FieldEnum[Kind](f, "type", kindNames)
+	level := f.Int("level")
+	if err := f.Err(); err != nil {
+		return nil, err
 	}
 	position, err := location.NewLocation(commons.NewStatSetFrom(set))
 	if err != nil {
 		return nil, wrap(err)
 	}
-	coords, err := commons.GetList[location.Point](set, "coords")
-	if err != nil {
-		return nil, wrap(err)
-	}
+	coords := commons.FieldList[location.Point](f, "coords")
 	if len(coords) < 3 {
-		return nil, wrap(fmt.Errorf("coords requires at least 3 points"))
+		f.Fail(fmt.Errorf("coords requires at least 3 points"))
 	}
 
 	t := &Template{
 		ID:          id,
-		Name:        set.GetStringDefault("name", ""),
+		Name:        f.StringDefault("name", ""),
 		Kind:        kind,
 		Level:       level,
 		Position:    position,
 		Coordinates: append([]location.Point(nil), coords...),
 	}
 	if t.Name == "" {
-		return nil, wrap(fmt.Errorf("name is required"))
+		f.Fail(fmt.Errorf("name is required"))
 	}
-	if t.HP, err = set.GetInt("hp"); err != nil {
-		return nil, wrap(err)
-	}
-	if t.PDef, err = set.GetInt("pDef"); err != nil {
-		return nil, wrap(err)
-	}
-	if t.MDef, err = set.GetInt("mDef"); err != nil {
-		return nil, wrap(err)
-	}
-	if t.Height, err = set.GetInt("height"); err != nil {
-		return nil, wrap(err)
-	}
-	if t.CastleID, err = set.GetIntDefault("castle", 0); err != nil {
-		return nil, wrap(err)
-	}
-	if t.ClanHallID, err = set.GetIntDefault("clanHall", 0); err != nil {
-		return nil, wrap(err)
-	}
-	if t.TriggeredID, err = set.GetIntDefault("triggeredId", 0); err != nil {
-		return nil, wrap(err)
-	}
-	t.Opened = set.GetBoolDefault("opened", false)
-	if t.OpenKind, err = commons.GetEnumDefault(set, "openType", openKindNames, OpenNPC); err != nil {
-		return nil, wrap(err)
-	}
-	if t.OpenTime, err = set.GetIntDefault("openTime", 0); err != nil {
-		return nil, wrap(err)
-	}
-	if t.RandomTime, err = set.GetIntDefault("randomTime", 0); err != nil {
-		return nil, wrap(err)
-	}
-	if t.CloseTime, err = set.GetIntDefault("closeTime", 0); err != nil {
-		return nil, wrap(err)
+	t.HP = f.Int("hp")
+	t.PDef = f.Int("pDef")
+	t.MDef = f.Int("mDef")
+	t.Height = f.Int("height")
+	t.CastleID = f.IntDefault("castle", 0)
+	t.ClanHallID = f.IntDefault("clanHall", 0)
+	t.TriggeredID = f.IntDefault("triggeredId", 0)
+	t.Opened = f.BoolDefault("opened", false)
+	t.OpenKind = commons.FieldEnumDefault[OpenKind](f, "openType", openKindNames, OpenNPC)
+	t.OpenTime = f.IntDefault("openTime", 0)
+	t.RandomTime = f.IntDefault("randomTime", 0)
+	t.CloseTime = f.IntDefault("closeTime", 0)
+	if err := f.Err(); err != nil {
+		return nil, err
 	}
 	return t, nil
 }
