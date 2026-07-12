@@ -115,8 +115,43 @@ RequestServerID = 9
 	if cfg.Auth.ServerID != 9 {
 		t.Errorf("Auth.ServerID = %d, want RequestServerID 9", cfg.Auth.ServerID)
 	}
+	if !cfg.GeneratedHexID {
+		t.Error("GeneratedHexID = false, want true when hexid file is missing")
+	}
 	if len(cfg.Auth.HexID) != generatedHexIDSize {
 		t.Errorf("generated HexID length = %d, want %d", len(cfg.Auth.HexID), generatedHexIDSize)
+	}
+}
+
+func TestWriteHexIDFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config", "hexid.txt")
+	key := []byte{0x80, 0x01}
+
+	if err := writeHexIDFile(path, 3, key); err != nil {
+		t.Fatalf("writeHexIDFile: %v", err)
+	}
+
+	props, err := config.LoadFile(path)
+	if err != nil {
+		t.Fatalf("LoadFile: %v", err)
+	}
+	serverID, err := props.Int("ServerID", 0)
+	if err != nil {
+		t.Fatalf("ServerID: %v", err)
+	}
+	if serverID != 3 {
+		t.Fatalf("ServerID = %d, want 3", serverID)
+	}
+	gotHex := props.String("HexID", "")
+	if want := model.HexKeyText(key); gotHex != want {
+		t.Fatalf("HexID = %q, want %q", gotHex, want)
+	}
+	roundTrip, err := model.ParseHexKey(gotHex)
+	if err != nil {
+		t.Fatalf("ParseHexKey: %v", err)
+	}
+	if !bytes.Equal(roundTrip, key) {
+		t.Fatalf("round-trip key = %x, want %x", roundTrip, key)
 	}
 }
 

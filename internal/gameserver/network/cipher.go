@@ -8,6 +8,8 @@ import (
 // keySize is the fixed length of both the inbound and outbound rolling keys.
 const keySize = 16
 
+var gameCipherStaticKey = [8]byte{0xc8, 0x27, 0x93, 0x01, 0xa1, 0x6c, 0x31, 0x97}
+
 // Cipher is the XOR rolling-stream cipher used for game client<->server
 // packets. Encrypt and Decrypt use separate keys seeded from the same
 // initial bytes, each rolled forward by the size of every packet processed.

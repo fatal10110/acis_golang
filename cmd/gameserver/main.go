@@ -53,10 +53,12 @@ type gameServerPaths struct {
 }
 
 type gameServerConfig struct {
-	ListenAddr string
-	LoginAddr  string
-	Auth       network.LoginServerAuth
-	Database   db.Config
+	ListenAddr     string
+	LoginAddr      string
+	Auth           network.LoginServerAuth
+	GeneratedHexID bool
+	HexIDPath      string
+	Database       db.Config
 }
 
 type gameData struct {
@@ -161,7 +163,7 @@ func gameServerConfigFromLoadedProperties(paths gameServerPaths, serverProps *co
 	return gameServerConfigFromProperties(paths, serverProps, hexProps.Props)
 }
 
-func gameServerConfigFromProperties(_ gameServerPaths, serverProps, hexProps *config.Properties) (gameServerConfig, error) {
+func gameServerConfigFromProperties(paths gameServerPaths, serverProps, hexProps *config.Properties) (gameServerConfig, error) {
 	listenPort, err := serverProps.Int("GameserverPort", 7777)
 	if err != nil {
 		return gameServerConfig{}, err
@@ -180,6 +182,7 @@ func gameServerConfigFromProperties(_ gameServerPaths, serverProps, hexProps *co
 	}
 
 	serverID := requestID
+	generated := hexProps == nil
 	hexID, err := generatedHexID()
 	if err != nil {
 		return gameServerConfig{}, err
@@ -207,6 +210,8 @@ func gameServerConfigFromProperties(_ gameServerPaths, serverProps, hexProps *co
 			Port:              uint16(listenPort),
 			MaxPlayers:        int32(maxPlayers),
 		},
+		GeneratedHexID: generated,
+		HexIDPath:      paths.HexIDPath,
 		Database: db.Config{
 			URL:      serverProps.String("URL", "jdbc:mariadb://localhost/acis"),
 			Login:    serverProps.String("Login", "root"),
@@ -228,6 +233,17 @@ func generatedHexID() ([]byte, error) {
 		return nil, fmt.Errorf("generate hexid: %w", err)
 	}
 	return key, nil
+}
+
+func writeHexIDFile(path string, serverID int, hexID []byte) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return fmt.Errorf("create hexid directory: %w", err)
+	}
+	data := fmt.Sprintf("#the hexID to auth into login\nServerID=%d\nHexID=%s\n", serverID, model.HexKeyText(hexID))
+	if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
+		return fmt.Errorf("write hexid file: %w", err)
+	}
+	return nil
 }
 
 func provideGameServerLogger(lc fx.Lifecycle, paths gameServerPaths) (zerolog.Logger, error) {
@@ -643,6 +659,7 @@ func provideGameClientLink(
 func startGameServer(lc fx.Lifecycle, cfg gameServerConfig, _ *gameData, _ *manager.Roster, validator *network.SessionValidator, links *loginLinkState, clients *network.GameClientLink, log zerolog.Logger) {
 	var cancel context.CancelFunc
 	var wg sync.WaitGroup
+	wroteGeneratedHexID := false
 
 	lc.Append(fx.Hook{
 		OnStart: func(context.Context) error {
@@ -656,6 +673,14 @@ func startGameServer(lc fx.Lifecycle, cfg gameServerConfig, _ *gameData, _ *mana
 					PlayerAuthResponse: validator.Resolve,
 				}, network.DefaultReconnectDelay, func(link *network.LoginLink) {
 					links.set(link)
+					if cfg.GeneratedHexID && !wroteGeneratedHexID {
+						if err := writeHexIDFile(cfg.HexIDPath, int(link.ServerID), cfg.Auth.HexID); err != nil {
+							log.Error().Err(err).Str("path", cfg.HexIDPath).Msg("write generated hexid")
+						} else {
+							wroteGeneratedHexID = true
+							log.Info().Str("path", cfg.HexIDPath).Int("server_id", int(link.ServerID)).Msg("generated hexid saved")
+						}
+					}
 					go func() {
 						<-link.Done()
 						links.clear(link)

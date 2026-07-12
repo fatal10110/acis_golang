@@ -70,10 +70,20 @@ func NewGameClientLink(
 
 func randomCipherKey() ([]byte, error) {
 	key := make([]byte, keySize)
-	if _, err := rand.Read(key); err != nil {
+	if _, err := rand.Read(key[:8]); err != nil {
 		return nil, fmt.Errorf("generate game cipher key: %w", err)
 	}
+	copy(key[8:], gameCipherStaticKey[:])
 	return key, nil
+}
+
+func validProtocolRevision(revision int32) bool {
+	switch revision {
+	case 737, 740, 744, 746:
+		return true
+	default:
+		return false
+	}
 }
 
 // Handle drives one game-client connection end to end. It matches Serve's
@@ -93,16 +103,13 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 	session := NewSession(conn, cipher)
 	client := NewClient(session)
 
-	if !session.SendFrame(serverpackets.FrameVersionCheck(key)) {
-		return
-	}
-
 	// chars and entering are read entirely by this goroutine: they resolve
 	// the character-list slot indices RequestCharacterDelete,
 	// CharacterRestore and RequestGameStart address, and the character
 	// RequestGameStart selected for EnterWorld to finish spawning.
 	var chars []*player.Character
 	var entering *player.Character
+	protocolReady := false
 
 	for {
 		payload, err := session.ReadFrame()
@@ -113,18 +120,27 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			return
 		}
 		opcode := payload[0]
+		if !protocolReady && opcode != clientpackets.OpcodeProtocolVersion {
+			return
+		}
 		if !client.Accept(opcode) {
 			return
 		}
 
 		switch opcode {
 		case clientpackets.OpcodeProtocolVersion:
-			// No allowed-revision list is configured yet; accept any
-			// syntactically valid report.
-			if _, err := clientpackets.DecodeProtocolVersion(payload); err != nil {
+			req, err := clientpackets.DecodeProtocolVersion(payload)
+			if err != nil {
 				l.log.Warn().Err(err).Msg("game client")
 				return
 			}
+			if !validProtocolRevision(req.Revision) {
+				return
+			}
+			if !session.SendFrame(serverpackets.FrameVersionCheck(key)) {
+				return
+			}
+			protocolReady = true
 
 		case clientpackets.OpcodeAuthLogin:
 			req, err := clientpackets.DecodeAuthLogin(payload)

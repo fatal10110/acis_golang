@@ -161,12 +161,9 @@ func testItemTemplates() *item.Table {
 
 // --- fake game client, driving the wire protocol from the other side ---
 //
-// VersionCheck carries its key in cleartext, so unlike the login server's
-// Init packet, no static-key puzzle needs solving here: the fake client
-// just reads the key and arms its own Cipher instance the same way the
-// server's armed at the moment it sent VersionCheck (one throwaway Encrypt
-// call, whose only effect is flipping the cipher's internal "enabled" gate)
-// so both sides' XOR streams start rolling in lockstep from packet zero.
+// A real game client speaks first: it sends ProtocolVersion cleartext,
+// receives VersionCheck cleartext, then arms the rolling XOR cipher from
+// VersionCheck's 8 random bytes plus the fixed static key half.
 
 type fakeGameClient struct {
 	t      *testing.T
@@ -182,27 +179,43 @@ func dialGameClient(t *testing.T, addr string) *fakeGameClient {
 	}
 	t.Cleanup(func() { conn.Close() })
 
-	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-	raw, err := wire.ReadFrame(conn)
+	return &fakeGameClient{t: t, conn: conn}
+}
+
+func (f *fakeGameClient) sendProtocolVersion(revision int32) {
+	f.t.Helper()
+	if err := wire.WriteFrame(f.conn, encodeProtocolVersion(revision)); err != nil {
+		f.t.Fatalf("write ProtocolVersion: %v", err)
+	}
+
+	f.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	raw, err := wire.ReadFrame(f.conn)
 	if err != nil {
-		t.Fatalf("read VersionCheck: %v", err)
+		f.t.Fatalf("read VersionCheck: %v", err)
 	}
 	if raw[0] != serverpackets.OpcodeVersionCheck {
-		t.Fatalf("first packet opcode = %#x, want VersionCheck (%#x)", raw[0], serverpackets.OpcodeVersionCheck)
+		f.t.Fatalf("first packet opcode = %#x, want VersionCheck (%#x)", raw[0], serverpackets.OpcodeVersionCheck)
 	}
-	key := append([]byte(nil), raw[2:2+keySize]...)
+	if len(raw) != 18 {
+		f.t.Fatalf("VersionCheck payload size = %d, want 18", len(raw))
+	}
+	key := make([]byte, keySize)
+	copy(key[:8], raw[2:10])
+	copy(key[8:], gameCipherStaticKey[:])
 
 	cipher, err := NewCipher(key)
 	if err != nil {
-		t.Fatalf("NewCipher: %v", err)
+		f.t.Fatalf("NewCipher: %v", err)
 	}
 	cipher.Encrypt(nil)
-
-	return &fakeGameClient{t: t, conn: conn, cipher: cipher}
+	f.cipher = cipher
 }
 
 func (f *fakeGameClient) send(payload []byte) {
 	f.t.Helper()
+	if f.cipher == nil {
+		f.t.Fatal("send called before ProtocolVersion/VersionCheck handshake")
+	}
 	buf := append([]byte(nil), payload...)
 	f.cipher.Encrypt(buf)
 	if err := wire.WriteFrame(f.conn, buf); err != nil {
@@ -212,6 +225,9 @@ func (f *fakeGameClient) send(payload []byte) {
 
 func (f *fakeGameClient) read() []byte {
 	f.t.Helper()
+	if f.cipher == nil {
+		f.t.Fatal("read called before ProtocolVersion/VersionCheck handshake")
+	}
 	f.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 	payload, err := wire.ReadFrame(f.conn)
 	if err != nil {
@@ -331,7 +347,7 @@ func newLinkedGameClient(t *testing.T) (c *fakeGameClient, chars *fakeCharStore,
 	addr, chars, items := newTestGameClientLink(t, func() *LoginLink { return loginLink }, validator)
 
 	c = dialGameClient(t, addr)
-	c.send(encodeProtocolVersion(0xc621))
+	c.sendProtocolVersion(746)
 
 	key := link.SessionKey{LoginKey1: 11, LoginKey2: 22, PlayKey1: 33, PlayKey2: 44}
 	sessions.Put("player1", key)
@@ -347,14 +363,37 @@ func newLinkedGameClient(t *testing.T) (c *fakeGameClient, chars *fakeCharStore,
 	return c, chars, items
 }
 
-func TestGameClientLinkSendsVersionCheckOnConnect(t *testing.T) {
+func TestGameClientLinkWaitsForProtocolVersion(t *testing.T) {
 	addr, _, _ := newTestGameClientLink(t, func() *LoginLink { return nil }, NewSessionValidator())
-	dialGameClient(t, addr) // dial fails the test itself if VersionCheck never arrives
+	c := dialGameClient(t, addr)
+
+	c.conn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
+	if _, err := wire.ReadFrame(c.conn); err == nil {
+		t.Fatal("server sent data before ProtocolVersion")
+	} else if ne, ok := err.(net.Error); !ok || !ne.Timeout() {
+		t.Fatalf("read before ProtocolVersion error = %v, want timeout", err)
+	}
+}
+
+func TestGameClientLinkSendsVersionCheckAfterProtocolVersion(t *testing.T) {
+	addr, _, _ := newTestGameClientLink(t, func() *LoginLink { return nil }, NewSessionValidator())
+	c := dialGameClient(t, addr)
+	c.sendProtocolVersion(746)
+}
+
+func TestGameClientLinkBadProtocolVersionClosesSilently(t *testing.T) {
+	addr, _, _ := newTestGameClientLink(t, func() *LoginLink { return nil }, NewSessionValidator())
+	c := dialGameClient(t, addr)
+	if err := wire.WriteFrame(c.conn, encodeProtocolVersion(1)); err != nil {
+		t.Fatalf("write ProtocolVersion: %v", err)
+	}
+	c.expectClosed()
 }
 
 func TestGameClientLinkOpcodeBeforeAuthCloses(t *testing.T) {
 	addr, _, _ := newTestGameClientLink(t, func() *LoginLink { return nil }, NewSessionValidator())
 	c := dialGameClient(t, addr)
+	c.sendProtocolVersion(746)
 
 	c.send(encodeEnterWorld())
 	c.expectClosed()
@@ -363,6 +402,7 @@ func TestGameClientLinkOpcodeBeforeAuthCloses(t *testing.T) {
 func TestGameClientLinkAuthLoginServerDownFails(t *testing.T) {
 	addr, _, _ := newTestGameClientLink(t, func() *LoginLink { return nil }, NewSessionValidator())
 	c := dialGameClient(t, addr)
+	c.sendProtocolVersion(746)
 
 	c.send(encodeAuthLogin("player1", link.SessionKey{}))
 	reply := c.read()
