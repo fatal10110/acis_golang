@@ -55,6 +55,30 @@ type OwnedCreature interface {
 	Owner() (Creature, bool)
 }
 
+// HolyTarget is implemented by creatures that can receive artifact-targeted
+// skills.
+type HolyTarget interface {
+	Holy() bool
+}
+
+// UnlockableTarget is implemented by creatures that can receive unlock
+// skills.
+type UnlockableTarget interface {
+	Unlockable() bool
+}
+
+// UndeadTarget is implemented by creatures that expose undead race state to
+// skill targeting.
+type UndeadTarget interface {
+	Undead() bool
+}
+
+// PeaceZoner is implemented by creatures that can report whether hostilities
+// are blocked by their current zone.
+type PeaceZoner interface {
+	InPeaceZone() bool
+}
+
 // Known enumerates nearby creatures for radius-based target handlers.
 type Known interface {
 	ForEachKnownCreatureInRadius(anchor Creature, radius int, fn func(Creature))
@@ -106,6 +130,10 @@ func NewRegistry(known Known) *Registry {
 	r.Register(auraHandler{known: known})
 	r.Register(frontAuraHandler{known: known})
 	r.Register(behindAuraHandler{known: known})
+	r.Register(undeadHandler{})
+	r.Register(auraUndeadHandler{known: known})
+	r.Register(unlockableHandler{})
+	r.Register(holyHandler{})
 	r.Register(summonHandler{})
 	r.Register(areaSummonHandler{known: known})
 	r.Register(ownerPetHandler{})
@@ -163,6 +191,56 @@ func (oneHandler) CanCast(caster, target Creature, skill *modelskill.Definition,
 		return false
 	}
 	return true
+}
+
+type holyHandler struct{}
+
+func (holyHandler) Target() modelskill.Target { return modelskill.TargetHoly }
+
+func (holyHandler) Targets(_, target Creature, _ *modelskill.Definition) []Creature {
+	return []Creature{target}
+}
+
+func (holyHandler) FinalTarget(_, target Creature, _ *modelskill.Definition) Creature {
+	return target
+}
+
+func (holyHandler) CanCast(_, target Creature, _ *modelskill.Definition, _ bool) bool {
+	holy, ok := target.(HolyTarget)
+	return ok && holy.Holy()
+}
+
+type unlockableHandler struct{}
+
+func (unlockableHandler) Target() modelskill.Target { return modelskill.TargetUnlockable }
+
+func (unlockableHandler) Targets(_, target Creature, _ *modelskill.Definition) []Creature {
+	return []Creature{target}
+}
+
+func (unlockableHandler) FinalTarget(_, target Creature, _ *modelskill.Definition) Creature {
+	return target
+}
+
+func (unlockableHandler) CanCast(_, target Creature, _ *modelskill.Definition, _ bool) bool {
+	unlockable, ok := target.(UnlockableTarget)
+	return ok && unlockable.Unlockable()
+}
+
+type undeadHandler struct{}
+
+func (undeadHandler) Target() modelskill.Target { return modelskill.TargetUndead }
+
+func (undeadHandler) Targets(_, target Creature, _ *modelskill.Definition) []Creature {
+	return []Creature{target}
+}
+
+func (undeadHandler) FinalTarget(_, target Creature, _ *modelskill.Definition) Creature {
+	return target
+}
+
+func (undeadHandler) CanCast(_, target Creature, _ *modelskill.Definition, _ bool) bool {
+	return validUndeadSingleTarget(target)
 }
 
 type areaHandler struct {
@@ -324,6 +402,36 @@ func (behindAuraHandler) CanCast(Creature, Creature, *modelskill.Definition, boo
 	return true
 }
 
+type auraUndeadHandler struct {
+	known Known
+}
+
+func (auraUndeadHandler) Target() modelskill.Target { return modelskill.TargetAuraUndead }
+
+func (h auraUndeadHandler) Targets(caster, _ Creature, skill *modelskill.Definition) []Creature {
+	if h.known == nil {
+		return nil
+	}
+	var out []Creature
+	h.known.ForEachKnownCreatureInRadius(caster, skillRadius(skill), func(creature Creature) {
+		if creature.Dead() || !isUndead(creature) || !canSee(caster, creature) {
+			return
+		}
+		if areaCanAffect(caster, creature) {
+			out = append(out, creature)
+		}
+	})
+	return out
+}
+
+func (auraUndeadHandler) FinalTarget(caster, _ Creature, _ *modelskill.Definition) Creature {
+	return caster
+}
+
+func (auraUndeadHandler) CanCast(caster, _ Creature, skill *modelskill.Definition, _ bool) bool {
+	return skill == nil || !skill.Offensive || !inPeaceZone(caster)
+}
+
 type summonHandler struct{}
 
 func (summonHandler) Target() modelskill.Target { return modelskill.TargetSummon }
@@ -444,6 +552,30 @@ func attackableBy(creature, caster Creature) bool {
 func attackableWithoutForceBy(creature, caster Creature) bool {
 	rules, ok := creature.(AttackRules)
 	return ok && rules.AttackableWithoutForceBy(caster)
+}
+
+func validUndeadSingleTarget(creature Creature) bool {
+	if creature == nil || creature.Dead() || !isUndead(creature) {
+		return false
+	}
+	if creature.Category().Has(CategoryAttackable) {
+		return true
+	}
+	if creature.Category().Has(CategoryPlayable) {
+		_, ok := ownerOf(creature)
+		return ok
+	}
+	return false
+}
+
+func isUndead(creature Creature) bool {
+	undead, ok := creature.(UndeadTarget)
+	return ok && undead.Undead()
+}
+
+func inPeaceZone(creature Creature) bool {
+	zoner, ok := creature.(PeaceZoner)
+	return ok && zoner.InPeaceZone()
 }
 
 func summonOf(creature Creature) (Creature, bool) {
