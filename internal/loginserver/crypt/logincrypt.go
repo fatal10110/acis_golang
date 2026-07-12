@@ -1,6 +1,7 @@
 package crypt
 
 import (
+	cryptorand "crypto/rand"
 	"encoding/binary"
 	"fmt"
 	"math/rand/v2"
@@ -8,6 +9,20 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/crypt"
 )
+
+// sessionKeySize is the length of the per-connection dynamic Blowfish key
+// NewSessionKey generates.
+const sessionKeySize = 16
+
+// NewSessionKey returns a fresh random Blowfish key for one client
+// connection's dynamic (post-Init) encryption.
+func NewSessionKey() ([]byte, error) {
+	key := make([]byte, sessionKeySize)
+	if _, err := cryptorand.Read(key); err != nil {
+		return nil, fmt.Errorf("generate session Blowfish key: %w", err)
+	}
+	return key, nil
+}
 
 // staticBootstrapKey is the fixed Blowfish key that encrypts the very first
 // server-to-client login packet. That packet itself delivers the session's

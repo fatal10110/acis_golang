@@ -107,6 +107,7 @@ func newGameServerApp(paths gameServerPaths) *fx.App {
 			providePvPFlags,
 			network.NewSessionValidator,
 			provideLoginLinkState,
+			provideGameClientLink,
 		),
 		fx.Invoke(startPvPFlags, startGameServer),
 	)
@@ -357,7 +358,24 @@ func (s *loginLinkState) clear(link *network.LoginLink) {
 	}
 }
 
-func startGameServer(lc fx.Lifecycle, cfg gameServerConfig, _ *gameData, _ *manager.Roster, validator *network.SessionValidator, links *loginLinkState, log zerolog.Logger) {
+func (s *loginLinkState) get() *network.LoginLink {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.link
+}
+
+func provideGameClientLink(
+	data *gameData,
+	roster *manager.Roster,
+	items *gamesql.ItemStore,
+	validator *network.SessionValidator,
+	links *loginLinkState,
+	log zerolog.Logger,
+) *network.GameClientLink {
+	return network.NewGameClientLink(validator, links.get, roster, items, data.Players, data.Items, log)
+}
+
+func startGameServer(lc fx.Lifecycle, cfg gameServerConfig, _ *gameData, _ *manager.Roster, validator *network.SessionValidator, links *loginLinkState, clients *network.GameClientLink, log zerolog.Logger) {
 	var cancel context.CancelFunc
 	var wg sync.WaitGroup
 
@@ -389,9 +407,7 @@ func startGameServer(lc fx.Lifecycle, cfg gameServerConfig, _ *gameData, _ *mana
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				if err := network.Serve(runCtx, ln, func(ctx context.Context, conn *network.Conn) {
-					handleGameClient(ctx, conn, log)
-				}, log); err != nil {
+				if err := network.Serve(runCtx, ln, clients.Handle, log); err != nil {
 					log.Error().Err(err).Str("addr", cfg.ListenAddr).Msg("game client listener stopped")
 				}
 			}()
@@ -415,9 +431,4 @@ func startGameServer(lc fx.Lifecycle, cfg gameServerConfig, _ *gameData, _ *mana
 			}
 		},
 	})
-}
-
-func handleGameClient(_ context.Context, conn *network.Conn, log zerolog.Logger) {
-	defer conn.Close()
-	log.Warn().Msg("game client dispatcher is not wired yet")
 }
