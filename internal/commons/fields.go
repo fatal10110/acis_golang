@@ -1,6 +1,9 @@
 package commons
 
-import "fmt"
+import (
+	"fmt"
+	"strconv"
+)
 
 // Fields is a sticky-error view over a StatSet: each accessor reads freely
 // and records the first failure internally instead of returning it, so a
@@ -88,6 +91,30 @@ func (f *Fields) Int32(key string) int32 {
 func (f *Fields) Int32Default(key string, def int32) int32 {
 	if f.err != nil {
 		return def
+	}
+	v, err := f.set.GetInt32Default(key, def)
+	if err != nil {
+		f.Fail(err)
+		return def
+	}
+	return v
+}
+
+// Int32LiteralDefault returns the value at key as an int32, or def if key is
+// absent. String values are parsed as integer literals, so base prefixes such
+// as 0x are accepted. A present-but-malformed or overflowing value still
+// records an error.
+func (f *Fields) Int32LiteralDefault(key string, def int32) int32 {
+	if f.err != nil {
+		return def
+	}
+	if raw, ok := f.set.values[key].(string); ok {
+		n, err := strconv.ParseInt(raw, 0, 32)
+		if err != nil {
+			f.Fail(fmt.Errorf("commons: StatSet key %q: %w", key, err))
+			return def
+		}
+		return int32(n)
 	}
 	v, err := f.set.GetInt32Default(key, def)
 	if err != nil {

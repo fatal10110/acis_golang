@@ -266,66 +266,41 @@ func buildSkillEffect(tables map[string][]string, op funcElement, attachCond *sk
 		return skill.EffectTemplate{}, err
 	}
 	set := commons.StatSetFromXMLAttrs(attrs)
-	name, err := set.GetString("name")
-	if err != nil {
-		return skill.EffectTemplate{}, fmt.Errorf("effect: %w", err)
+	base := commons.NewFields(set, "effect")
+	name := base.String("name")
+	if err := base.Err(); err != nil {
+		return skill.EffectTemplate{}, err
 	}
-	value, err := set.GetFloat64("val")
-	if err != nil {
-		return skill.EffectTemplate{}, fmt.Errorf("effect %s: %w", name, err)
-	}
-	count, err := intDefault(set, "count", 1)
-	if err != nil {
-		return skill.EffectTemplate{}, fmt.Errorf("effect %s: %w", name, err)
-	}
-	time, err := intDefault(set, "time", 1)
-	if err != nil {
-		return skill.EffectTemplate{}, fmt.Errorf("effect %s: %w", name, err)
-	}
-	self, err := intDefault(set, "self", 0)
-	if err != nil {
-		return skill.EffectTemplate{}, fmt.Errorf("effect %s: %w", name, err)
-	}
-	noIcon, err := intDefault(set, "noicon", 0)
-	if err != nil {
-		return skill.EffectTemplate{}, fmt.Errorf("effect %s: %w", name, err)
-	}
-	stackOrder, err := floatDefault(set, "stackOrder", 0)
-	if err != nil {
-		return skill.EffectTemplate{}, fmt.Errorf("effect %s: %w", name, err)
-	}
-	effectPower, err := floatDefault(set, "effectPower", -1)
-	if err != nil {
-		return skill.EffectTemplate{}, fmt.Errorf("effect %s: %w", name, err)
-	}
-	triggeredID, err := intDefault(set, "triggeredId", 0)
-	if err != nil {
-		return skill.EffectTemplate{}, fmt.Errorf("effect %s: %w", name, err)
-	}
-	triggeredLevel, err := intDefault(set, "triggeredLevel", 1)
-	if err != nil {
-		return skill.EffectTemplate{}, fmt.Errorf("effect %s: %w", name, err)
-	}
-	activationChance, err := intDefault(set, "activationChance", -1)
-	if err != nil {
-		return skill.EffectTemplate{}, fmt.Errorf("effect %s: %w", name, err)
+	f := commons.NewFields(set, "effect "+name)
+	value := f.Float64("val")
+	count := f.Int32LiteralDefault("count", 1)
+	time := f.Int32LiteralDefault("time", 1)
+	self := f.Int32LiteralDefault("self", 0)
+	noIcon := f.Int32LiteralDefault("noicon", 0)
+	stackOrder := f.Float64Default("stackOrder", 0)
+	effectPower := f.Float64Default("effectPower", -1)
+	triggeredID := f.Int32LiteralDefault("triggeredId", 0)
+	triggeredLevel := f.Int32LiteralDefault("triggeredLevel", 1)
+	activationChance := f.Int32LiteralDefault("activationChance", -1)
+	if err := f.Err(); err != nil {
+		return skill.EffectTemplate{}, err
 	}
 	eff := skill.EffectTemplate{
 		Name:             name,
 		Value:            value,
-		Count:            count,
-		Time:             time,
+		Count:            int(count),
+		Time:             int(time),
 		Self:             self == 1,
 		Icon:             noIcon != 1,
-		Abnormal:         set.GetStringDefault("abnormal", "NULL"),
-		StackType:        set.GetStringDefault("stackType", "none"),
+		Abnormal:         f.StringDefault("abnormal", "NULL"),
+		StackType:        f.StringDefault("stackType", "none"),
 		StackOrder:       stackOrder,
 		EffectPower:      effectPower,
-		EffectType:       set.GetStringDefault("effectType", ""),
-		TriggeredID:      triggeredID,
-		TriggeredLevel:   triggeredLevel,
-		ChanceType:       set.GetStringDefault("chanceType", ""),
-		ActivationChance: activationChance,
+		EffectType:       f.StringDefault("effectType", ""),
+		TriggeredID:      int(triggeredID),
+		TriggeredLevel:   int(triggeredLevel),
+		ChanceType:       f.StringDefault("chanceType", ""),
+		ActivationChance: int(activationChance),
 		AttachCondition:  attachCond,
 	}
 	if err := buildNestedEffectTemplates(&eff, tables, op.Children, tableIndex); err != nil {
@@ -400,12 +375,8 @@ func buildSkillConditionClause(tables map[string][]string, attrs []xml.Attr, chi
 	clause := skill.ConditionClause{Root: root}
 	f := commons.NewFields(set, "cond")
 	clause.Message = f.StringDefault("msg", "")
-	msgID, err := intDefault(set, "msgId", 0)
-	if err != nil {
-		return skill.ConditionClause{}, fmt.Errorf("cond: %w", err)
-	}
-	clause.MessageID = int32(msgID)
-	clause.AddName = set.Has("addName") && clause.MessageID > 0
+	clause.MessageID = f.Int32LiteralDefault("msgId", 0)
+	clause.AddName = f.Has("addName") && clause.MessageID > 0
 	if err := f.Err(); err != nil {
 		return skill.ConditionClause{}, err
 	}
@@ -453,34 +424,4 @@ func resolvedAttrs(tables map[string][]string, attrs []xml.Attr, tableIndex int)
 		}
 	}
 	return resolved, nil
-}
-
-func intDefault(set *commons.StatSet, key string, def int) (int, error) {
-	if !set.Has(key) {
-		return def, nil
-	}
-	raw, err := set.GetString(key)
-	if err != nil {
-		return 0, err
-	}
-	n, err := strconv.ParseInt(raw, 0, 32)
-	if err != nil {
-		return 0, fmt.Errorf("%s %q: %w", key, raw, err)
-	}
-	return int(n), nil
-}
-
-func floatDefault(set *commons.StatSet, key string, def float64) (float64, error) {
-	if !set.Has(key) {
-		return def, nil
-	}
-	raw, err := set.GetString(key)
-	if err != nil {
-		return 0, err
-	}
-	n, err := strconv.ParseFloat(raw, 64)
-	if err != nil {
-		return 0, fmt.Errorf("%s %q: %w", key, raw, err)
-	}
-	return n, nil
 }
