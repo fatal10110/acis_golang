@@ -1,0 +1,370 @@
+package target
+
+import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+)
+
+// Category classifies the runtime shape a target handler needs for
+// selection rules.
+type Category uint8
+
+const (
+	// CategoryPlayable marks player-controlled actors and summons.
+	CategoryPlayable Category = 1 << iota
+	// CategoryAttackable marks hostile or otherwise attackable NPC actors.
+	CategoryAttackable
+	// CategoryFolk marks NPC actors that can affect nearby playable actors.
+	CategoryFolk
+)
+
+// Has reports whether c includes all bits in want.
+func (c Category) Has(want Category) bool { return c&want == want }
+
+// Creature is the actor surface target handlers need to resolve affected
+// skill targets.
+type Creature interface {
+	ObjectID() int32
+	Position() (x, y, z int)
+	Heading() int
+	Dead() bool
+	Category() Category
+}
+
+// AttackRules is implemented by creatures that can answer whether a caster
+// may affect them offensively.
+type AttackRules interface {
+	AttackableBy(caster Creature) bool
+	AttackableWithoutForceBy(caster Creature) bool
+}
+
+// SightChecker is implemented by creatures that can answer line-of-sight
+// checks against another creature.
+type SightChecker interface {
+	CanSeeTarget(target Creature) bool
+}
+
+// Known enumerates nearby creatures for radius-based target handlers.
+type Known interface {
+	ForEachKnownCreatureInRadius(anchor Creature, radius int, fn func(Creature))
+}
+
+// WorldKnown adapts the world grid to target-handler radius scans.
+type WorldKnown struct {
+	State *world.State
+}
+
+// ForEachKnownCreatureInRadius calls fn for every known creature within
+// radius of anchor.
+func (w WorldKnown) ForEachKnownCreatureInRadius(anchor Creature, radius int, fn func(Creature)) {
+	if w.State == nil {
+		return
+	}
+	tracked, ok := anchor.(world.Tracked)
+	if !ok {
+		return
+	}
+	w.State.ForEachKnownInRadius(tracked, radius, func(obj world.Tracked) {
+		creature, ok := obj.(Creature)
+		if ok {
+			fn(creature)
+		}
+	})
+}
+
+// Handler resolves a skill's final target and affected target list.
+type Handler interface {
+	Target() modelskill.Target
+	Targets(caster, target Creature, skill *modelskill.Definition) []Creature
+	FinalTarget(caster, target Creature, skill *modelskill.Definition) Creature
+	CanCast(caster, target Creature, skill *modelskill.Definition, ctrl bool) bool
+}
+
+// Registry owns the target handlers available to the cast pipeline.
+type Registry struct {
+	handlers map[modelskill.Target]Handler
+}
+
+// NewRegistry returns a registry with the currently ported target handlers.
+func NewRegistry(known Known) *Registry {
+	r := &Registry{handlers: make(map[modelskill.Target]Handler)}
+	r.Register(selfHandler{})
+	r.Register(oneHandler{})
+	r.Register(areaHandler{known: known})
+	r.Register(frontAreaHandler{known: known})
+	r.Register(auraHandler{known: known})
+	r.Register(frontAuraHandler{known: known})
+	r.Register(behindAuraHandler{known: known})
+	return r
+}
+
+// Register adds or replaces a handler by target type.
+func (r *Registry) Register(handler Handler) {
+	if r.handlers == nil {
+		r.handlers = make(map[modelskill.Target]Handler)
+	}
+	r.handlers[handler.Target()] = handler
+}
+
+// Handler returns the handler for typ, if one is registered.
+func (r *Registry) Handler(typ modelskill.Target) (Handler, bool) {
+	if r == nil {
+		return nil, false
+	}
+	handler, ok := r.handlers[typ]
+	return handler, ok
+}
+
+type selfHandler struct{}
+
+func (selfHandler) Target() modelskill.Target { return modelskill.TargetSelf }
+
+func (selfHandler) Targets(caster, _ Creature, _ *modelskill.Definition) []Creature {
+	return []Creature{caster}
+}
+
+func (selfHandler) FinalTarget(caster, _ Creature, _ *modelskill.Definition) Creature {
+	return caster
+}
+
+func (selfHandler) CanCast(Creature, Creature, *modelskill.Definition, bool) bool { return true }
+
+type oneHandler struct{}
+
+func (oneHandler) Target() modelskill.Target { return modelskill.TargetOne }
+
+func (oneHandler) Targets(_, target Creature, _ *modelskill.Definition) []Creature {
+	return []Creature{target}
+}
+
+func (oneHandler) FinalTarget(_, target Creature, _ *modelskill.Definition) Creature {
+	return target
+}
+
+func (oneHandler) CanCast(caster, target Creature, skill *modelskill.Definition, _ bool) bool {
+	if target == nil {
+		return false
+	}
+	if skill != nil && skill.Offensive && (sameCreature(caster, target) || target.Dead()) {
+		return false
+	}
+	return true
+}
+
+type areaHandler struct {
+	known Known
+}
+
+func (areaHandler) Target() modelskill.Target { return modelskill.TargetArea }
+
+func (h areaHandler) Targets(caster, target Creature, skill *modelskill.Definition) []Creature {
+	if target == nil {
+		return nil
+	}
+	out := []Creature{target}
+	h.forEachAreaTarget(caster, target, skillRadius(skill), nil, func(creature Creature) {
+		out = append(out, creature)
+	})
+	return out
+}
+
+func (areaHandler) FinalTarget(caster, target Creature, _ *modelskill.Definition) Creature {
+	if target == nil || sameCreature(caster, target) || target.Dead() {
+		return nil
+	}
+	return target
+}
+
+func (h areaHandler) CanCast(caster, target Creature, skill *modelskill.Definition, ctrl bool) bool {
+	if skill == nil || !skill.Offensive {
+		return true
+	}
+	if h.FinalTarget(caster, target, skill) == nil {
+		return false
+	}
+	if !attackableBy(target, caster) {
+		return false
+	}
+	return ctrl || attackableWithoutForceBy(target, caster)
+}
+
+func (h areaHandler) forEachAreaTarget(caster, anchor Creature, radius int, keep func(Creature) bool, fn func(Creature)) {
+	if h.known == nil {
+		return
+	}
+	h.known.ForEachKnownCreatureInRadius(anchor, radius, func(creature Creature) {
+		if sameCreature(caster, creature) || creature.Dead() || !canSee(anchor, creature) {
+			return
+		}
+		if keep != nil && !keep(creature) {
+			return
+		}
+		if areaCanAffect(caster, creature) {
+			fn(creature)
+		}
+	})
+}
+
+type frontAreaHandler struct {
+	known Known
+}
+
+func (frontAreaHandler) Target() modelskill.Target { return modelskill.TargetFrontArea }
+
+func (h frontAreaHandler) Targets(caster, target Creature, skill *modelskill.Definition) []Creature {
+	if target == nil {
+		return nil
+	}
+	out := []Creature{target}
+	areaHandler{known: h.known}.forEachAreaTarget(caster, target, skillRadius(skill), func(creature Creature) bool {
+		return creatureOrientedLocation(caster).IsInFrontOf(creatureLocation(creature))
+	}, func(creature Creature) {
+		out = append(out, creature)
+	})
+	return out
+}
+
+func (frontAreaHandler) FinalTarget(caster, target Creature, _ *modelskill.Definition) Creature {
+	if target == nil || sameCreature(caster, target) || target.Dead() {
+		return nil
+	}
+	return target
+}
+
+func (h frontAreaHandler) CanCast(caster, target Creature, skill *modelskill.Definition, ctrl bool) bool {
+	return areaHandler{known: h.known}.CanCast(caster, target, skill, ctrl)
+}
+
+type auraHandler struct {
+	known Known
+}
+
+func (auraHandler) Target() modelskill.Target { return modelskill.TargetAura }
+
+func (h auraHandler) Targets(caster, _ Creature, skill *modelskill.Definition) []Creature {
+	return h.collect(caster, skillRadius(skill), nil)
+}
+
+func (auraHandler) FinalTarget(caster, _ Creature, _ *modelskill.Definition) Creature {
+	return caster
+}
+
+func (auraHandler) CanCast(Creature, Creature, *modelskill.Definition, bool) bool { return true }
+
+func (h auraHandler) collect(caster Creature, radius int, keep func(Creature) bool) []Creature {
+	if h.known == nil {
+		return nil
+	}
+	var out []Creature
+	h.known.ForEachKnownCreatureInRadius(caster, radius, func(creature Creature) {
+		if creature.Dead() || !canSee(caster, creature) {
+			return
+		}
+		if keep != nil && !keep(creature) {
+			return
+		}
+		if auraCanAffect(caster, creature) {
+			out = append(out, creature)
+		}
+	})
+	return out
+}
+
+type frontAuraHandler struct {
+	known Known
+}
+
+func (frontAuraHandler) Target() modelskill.Target { return modelskill.TargetFrontAura }
+
+func (h frontAuraHandler) Targets(caster, _ Creature, skill *modelskill.Definition) []Creature {
+	return auraHandler{known: h.known}.collect(caster, skillRadius(skill), func(creature Creature) bool {
+		return creatureOrientedLocation(caster).IsInFrontOf(creatureLocation(creature))
+	})
+}
+
+func (frontAuraHandler) FinalTarget(caster, _ Creature, _ *modelskill.Definition) Creature {
+	return caster
+}
+
+func (frontAuraHandler) CanCast(Creature, Creature, *modelskill.Definition, bool) bool {
+	return true
+}
+
+type behindAuraHandler struct {
+	known Known
+}
+
+func (behindAuraHandler) Target() modelskill.Target { return modelskill.TargetBehindAura }
+
+func (h behindAuraHandler) Targets(caster, _ Creature, skill *modelskill.Definition) []Creature {
+	return auraHandler{known: h.known}.collect(caster, skillRadius(skill), func(creature Creature) bool {
+		return creatureOrientedLocation(caster).IsBehind(creatureLocation(creature))
+	})
+}
+
+func (behindAuraHandler) FinalTarget(caster, _ Creature, _ *modelskill.Definition) Creature {
+	return caster
+}
+
+func (behindAuraHandler) CanCast(Creature, Creature, *modelskill.Definition, bool) bool {
+	return true
+}
+
+func skillRadius(skill *modelskill.Definition) int {
+	if skill == nil {
+		return 0
+	}
+	return skill.Radius
+}
+
+func sameCreature(a, b Creature) bool {
+	return a != nil && b != nil && a.ObjectID() == b.ObjectID()
+}
+
+func canSee(origin, target Creature) bool {
+	checker, ok := origin.(SightChecker)
+	return !ok || checker.CanSeeTarget(target)
+}
+
+func areaCanAffect(caster, creature Creature) bool {
+	if caster.Category().Has(CategoryPlayable) && creature.Category()&(CategoryAttackable|CategoryPlayable) != 0 {
+		return attackableWithoutForceBy(creature, caster)
+	}
+	if caster.Category().Has(CategoryAttackable) && creature.Category().Has(CategoryPlayable) {
+		return attackableBy(creature, caster)
+	}
+	return false
+}
+
+func auraCanAffect(caster, creature Creature) bool {
+	if areaCanAffect(caster, creature) {
+		return true
+	}
+	return caster.Category().Has(CategoryFolk) && creature.Category().Has(CategoryPlayable)
+}
+
+func attackableBy(creature, caster Creature) bool {
+	rules, ok := creature.(AttackRules)
+	return ok && rules.AttackableBy(caster)
+}
+
+func attackableWithoutForceBy(creature, caster Creature) bool {
+	rules, ok := creature.(AttackRules)
+	return ok && rules.AttackableWithoutForceBy(caster)
+}
+
+func creatureLocation(creature Creature) location.Location {
+	if creature == nil {
+		return location.Location{}
+	}
+	x, y, z := creature.Position()
+	return location.Location{X: x, Y: y, Z: z}
+}
+
+func creatureOrientedLocation(creature Creature) location.OrientedLocation {
+	if creature == nil {
+		return location.OrientedLocation{}
+	}
+	return location.OrientedLocation{Location: creatureLocation(creature), Heading: creature.Heading()}
+}
