@@ -125,6 +125,18 @@ func TestLoadPlayerTemplates(t *testing.T) {
 		if len(tmpl.Skills) != 52 {
 			t.Errorf("len(Skills) = %d, want 52 (own skills only, no parent)", len(tmpl.Skills))
 		}
+
+		grant, status := tmpl.CheckSkillLearn(5, 49, player.SkillLevels{}, 3, 1)
+		if status != player.LearnNeedsSP || grant.CorrectedCost() != 50 {
+			t.Fatalf("CheckSkillLearn(skill 3 level 1, 49 SP) = %+v, %v; want cost 50 and LearnNeedsSP", grant, status)
+		}
+		grant, status = tmpl.CheckSkillLearn(5, 50, player.SkillLevels{}, 3, 1)
+		if status != player.LearnAllowed || grant.SkillID != 3 || grant.Level != 1 {
+			t.Fatalf("CheckSkillLearn(skill 3 level 1, 50 SP) = %+v, %v; want LearnAllowed", grant, status)
+		}
+		if _, status = tmpl.CheckSkillLearn(5, 500, player.SkillLevels{}, 3, 2); status != player.LearnUnavailable {
+			t.Fatalf("CheckSkillLearn(skill 3 level 2 without level 1) = %v, want LearnUnavailable", status)
+		}
 	})
 
 	// Skill counts below (own / merged) were computed by an independent

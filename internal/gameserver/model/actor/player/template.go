@@ -90,6 +90,14 @@ type SkillGrant struct {
 	Cost int
 }
 
+// CorrectedCost returns the SP cost shown and checked for learning.
+func (g SkillGrant) CorrectedCost() int {
+	if g.Cost < 0 {
+		return 0
+	}
+	return g.Cost
+}
+
 // NewSkillGrant builds a SkillGrant from set; id, lvl, minLvl and cost are
 // all required.
 func NewSkillGrant(set *commons.StatSet) (SkillGrant, error) {
@@ -105,6 +113,28 @@ func NewSkillGrant(set *commons.StatSet) (SkillGrant, error) {
 	}
 	return grant, nil
 }
+
+// SkillLevels maps a known skill id to the character's current level for it.
+type SkillLevels map[int]int
+
+// Level returns the known level for skillID, or 0 when it is not known.
+func (l SkillLevels) Level(skillID int) int {
+	return l[skillID]
+}
+
+// LearnStatus describes the result of checking a skill-learning request.
+type LearnStatus uint8
+
+const (
+	// LearnAllowed means the requested skill can be learned now.
+	LearnAllowed LearnStatus = iota
+	// LearnUnavailable means the requested skill is not the next learnable
+	// level for the character's template, level, and known skills.
+	LearnUnavailable
+	// LearnNeedsSP means the skill is otherwise learnable but the character
+	// does not have enough SP to pay the corrected cost.
+	LearnNeedsSP
+)
 
 // NewTemplate builds a Template from set, which carries the merged <set>
 // attributes of one <class> element plus the "items", "skills" and "spawns"
@@ -217,4 +247,63 @@ func NewTemplateTable(templates map[int]*Template) (*TemplateTable, error) {
 // Count returns the number of templates loaded.
 func (t *TemplateTable) Count() int {
 	return t.Len()
+}
+
+// FindSkillGrant returns the exact grant for skillID at level.
+func (t *Template) FindSkillGrant(skillID, level int) (SkillGrant, bool) {
+	if t == nil || skillID <= 0 || level <= 0 {
+		return SkillGrant{}, false
+	}
+	for _, grant := range t.Skills {
+		if grant.SkillID == skillID && grant.Level == level {
+			return grant, true
+		}
+	}
+	return SkillGrant{}, false
+}
+
+// AvailableSkillGrants returns manual skill grants the character can learn
+// at characterLevel, preserving template order.
+func (t *Template) AvailableSkillGrants(characterLevel int, known SkillLevels) []SkillGrant {
+	if t == nil {
+		return nil
+	}
+	var grants []SkillGrant
+	for _, grant := range t.Skills {
+		if grant.MinLevel <= characterLevel && grant.Cost != 0 && known.Level(grant.SkillID) == grant.Level-1 {
+			grants = append(grants, grant)
+		}
+	}
+	return grants
+}
+
+// RequiredLevelForNextSkillGrant returns the lowest future character level
+// with a manual skill grant, or 0 when there is none.
+func (t *Template) RequiredLevelForNextSkillGrant(characterLevel int) int {
+	if t == nil {
+		return 0
+	}
+	next := 0
+	for _, grant := range t.Skills {
+		if grant.MinLevel <= characterLevel || grant.Cost == 0 {
+			continue
+		}
+		if next == 0 || grant.MinLevel < next {
+			next = grant.MinLevel
+		}
+	}
+	return next
+}
+
+// CheckSkillLearn checks whether a manual skill grant can be learned now and
+// whether availableSP covers its corrected cost.
+func (t *Template) CheckSkillLearn(characterLevel, availableSP int, known SkillLevels, skillID, level int) (SkillGrant, LearnStatus) {
+	grant, ok := t.FindSkillGrant(skillID, level)
+	if !ok || grant.MinLevel > characterLevel || grant.Cost == 0 || known.Level(skillID) != level-1 {
+		return SkillGrant{}, LearnUnavailable
+	}
+	if availableSP < grant.CorrectedCost() {
+		return grant, LearnNeedsSP
+	}
+	return grant, LearnAllowed
 }
