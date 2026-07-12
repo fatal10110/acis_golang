@@ -14,12 +14,22 @@ func (h *Hostile) CurrentHP() int {
 	return h.hp
 }
 
+// SetCurrentHP overrides this NPC's live hit points, e.g. to restore a
+// persisted value at spawn time instead of starting at MaxHP. It has no
+// effect once this NPC has already died.
+func (h *Hostile) SetCurrentHP(hp int) {
+	h.hpMu.Lock()
+	defer h.hpMu.Unlock()
+	if h.hp <= 0 {
+		return
+	}
+	h.hp = hp
+}
+
 // TakeDamage applies dmg physical damage from attacker, clamping at zero,
-// and — the first time it reaches zero — runs this NPC's death sequence
-// with a nil reward hook (see Die's own doc comment: reward calculation is
-// the kill-reward system's job, wired in by whatever calls Die with a real
-// Rewarder once this NPC is spawned live). It reports whether this call
-// newly killed the NPC.
+// and — the first time it reaches zero — runs this NPC's death sequence,
+// passing the reward hook set via SetRewarder (nil if none was set). It
+// reports whether this call newly killed the NPC.
 func (h *Hostile) TakeDamage(dmg int, attacker creature.DeathActor) bool {
 	if dmg < 0 {
 		dmg = 0
@@ -37,5 +47,5 @@ func (h *Hostile) TakeDamage(dmg int, attacker creature.DeathActor) bool {
 	if !dead {
 		return false
 	}
-	return h.Die(attacker, nil)
+	return h.Die(attacker, h.rewards)
 }
