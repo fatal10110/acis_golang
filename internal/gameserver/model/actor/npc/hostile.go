@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"math/rand"
 	"sync"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
@@ -36,10 +37,22 @@ type Hostile struct {
 
 	brain *ai.Attackable
 	move  ai.MoveController
+	world *world.State
 
 	deathMu sync.Mutex
 	dead    bool
 	decayed bool
+
+	// hpMu guards hp, kept separate from deathMu: hp bookkeeping (and a
+	// future regen tick) shouldn't need the death latch, and the death
+	// latch shouldn't need to know how HP got to zero.
+	hpMu sync.Mutex
+	hp   int
+
+	// roll draws a uniform integer in [0, n) for MakeAttackHit's hit/crit/
+	// damage-spread rolls. It defaults to math/rand's global source; tests
+	// substitute a fixed function for deterministic combat outcomes.
+	roll func(n int) int
 }
 
 // NewHostile creates a live attackable NPC wrapper for inst.
@@ -61,9 +74,29 @@ func NewHostile(inst *Instance, movement ai.MoveController, attack ai.AttackCont
 		return nil, errors.New("npc: nil hostile attack")
 	}
 
-	h := &Hostile{Instance: inst, move: movement}
+	h := &Hostile{
+		Instance: inst,
+		move:     movement,
+		hp:       int(inst.Template.HPMax),
+		roll:     rand.Intn,
+	}
 	h.brain = ai.NewAttackable(h, movement, attack)
 	return h, nil
+}
+
+// SetWorld records the world registry BroadcastAttack reaches nearby
+// observers through. Call it once, after placing this NPC on the grid —
+// BroadcastAttack is a no-op until then. This mirrors Decay's worldState
+// parameter, which BroadcastAttack has no room for since attack.CreatureActor
+// fixes its signature to the snapshot alone.
+func (h *Hostile) SetWorld(state *world.State) {
+	h.world = state
+}
+
+// SetRollSource overrides the random source MakeAttackHit uses for its
+// hit/crit/damage-spread rolls, for deterministic tests.
+func (h *Hostile) SetRollSource(f func(n int) int) {
+	h.roll = f
 }
 
 // ObjectID returns the world object id assigned to this NPC.

@@ -38,6 +38,13 @@ func (p *Presence) Heading() int {
 	return p.heading
 }
 
+// SetHeading updates the direction the object faces without moving it.
+func (p *Presence) SetHeading(heading int) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.heading = heading
+}
+
 // Visible reports whether the object currently sits in a grid region with
 // its visibility flag raised, i.e. other objects can see it.
 func (p *Presence) Visible() bool {
