@@ -3,6 +3,8 @@ package xml
 import (
 	"path/filepath"
 	"testing"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
 func TestLoadSkillTrees(t *testing.T) {
@@ -49,6 +51,21 @@ func TestLoadSkillTrees(t *testing.T) {
 		t.Fatal("fishing skill 1368 level 1 not loaded")
 	})
 
+	t.Run("fishing skill learning checks", func(t *testing.T) {
+		if fs, ok := trees.FishingSkillFor(1, false, skill.SkillLevels{}, 1312, 1); !ok || fs.ItemID != 57 || fs.ItemCount != 1000 {
+			t.Fatalf("FishingSkillFor(1312 level 1) = %+v, %v; want item 57 count 1000", fs, ok)
+		}
+		if _, ok := trees.FishingSkillFor(1, false, skill.SkillLevels{}, 1368, 1); ok {
+			t.Fatal("FishingSkillFor(dwarven skill, non-dwarf) found a skill")
+		}
+		if fs, ok := trees.FishingSkillFor(4, false, skill.SkillLevels{1313: 1}, 1313, 2); !ok || fs.ItemCount != 50 {
+			t.Fatalf("FishingSkillFor(1313 level 2) = %+v, %v; want item count 50", fs, ok)
+		}
+		if got := trees.RequiredLevelForNextFishingSkill(1, false); got != 4 {
+			t.Fatalf("RequiredLevelForNextFishingSkill(level 1) = %d, want 4", got)
+		}
+	})
+
 	t.Run("clan skill", func(t *testing.T) {
 		for _, cs := range trees.Clan {
 			if cs.ID != 370 || cs.Level != 1 {
@@ -60,6 +77,18 @@ func TestLoadSkillTrees(t *testing.T) {
 			return
 		}
 		t.Fatal("clan skill 370 level 1 not loaded")
+	})
+
+	t.Run("clan skill learning checks", func(t *testing.T) {
+		if cs, ok := trees.ClanSkillFor(5, skill.SkillLevels{}, 370, 1); !ok || cs.Cost != 500 || cs.ItemID != 8166 {
+			t.Fatalf("ClanSkillFor(370 level 1) = %+v, %v; want cost 500 item 8166", cs, ok)
+		}
+		if cs, status := trees.CheckClanSkillLearn(5, 499, skill.SkillLevels{}, 370, 1); status != skill.LearnNeedsCost || cs.Cost != 500 {
+			t.Fatalf("CheckClanSkillLearn(370 level 1, 499 reputation) = %+v, %v; want LearnNeedsCost", cs, status)
+		}
+		if cs, status := trees.CheckClanSkillLearn(5, 500, skill.SkillLevels{}, 370, 1); status != skill.LearnAllowed || cs.ID != 370 || cs.Level != 1 {
+			t.Fatalf("CheckClanSkillLearn(370 level 1, 500 reputation) = %+v, %v; want LearnAllowed", cs, status)
+		}
 	})
 
 	t.Run("enchant skill with an item requirement", func(t *testing.T) {

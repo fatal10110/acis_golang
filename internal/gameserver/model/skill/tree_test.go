@@ -139,3 +139,90 @@ func TestNewEnchantSkill(t *testing.T) {
 		}
 	})
 }
+
+func TestFishingSkillQueries(t *testing.T) {
+	trees := &Trees{Fishing: []FishingSkill{
+		{ID: 1312, Level: 1, MinLevel: 1, ItemID: 57, ItemCount: 1000},
+		{ID: 1313, Level: 1, MinLevel: 1, ItemID: 57, ItemCount: 10},
+		{ID: 1313, Level: 2, MinLevel: 4, ItemID: 57, ItemCount: 50},
+		{ID: 1368, Level: 1, MinLevel: 1, ItemID: 57, ItemCount: 100, Dwarven: true},
+	}}
+
+	available := trees.FishingSkillsFor(1, false, SkillLevels{1312: 0, 1313: 0, 1368: 0})
+	want := []FishingSkill{
+		{ID: 1312, Level: 1, MinLevel: 1, ItemID: 57, ItemCount: 1000},
+		{ID: 1313, Level: 1, MinLevel: 1, ItemID: 57, ItemCount: 10},
+	}
+	if !equalFishingSkills(available, want) {
+		t.Fatalf("FishingSkillsFor(level 1, non-dwarf) = %+v, want %+v", available, want)
+	}
+
+	if _, ok := trees.FishingSkillFor(1, false, SkillLevels{}, 1368, 1); ok {
+		t.Fatal("FishingSkillFor(dwarven, non-dwarf) found a skill")
+	}
+
+	grant, ok := trees.FishingSkillFor(4, true, SkillLevels{1313: 1}, 1313, 2)
+	if !ok || grant.Level != 2 || grant.ItemCount != 50 {
+		t.Fatalf("FishingSkillFor(level 4, known 1313:1) = %+v, %v; want level 2", grant, ok)
+	}
+
+	if _, ok := trees.FishingSkillFor(4, true, SkillLevels{1313: 0}, 1313, 2); ok {
+		t.Fatal("FishingSkillFor(skipped previous level) found a skill")
+	}
+
+	if got := trees.RequiredLevelForNextFishingSkill(1, false); got != 4 {
+		t.Fatalf("RequiredLevelForNextFishingSkill(level 1, non-dwarf) = %d, want 4", got)
+	}
+}
+
+func TestClanSkillQueries(t *testing.T) {
+	trees := &Trees{Clan: []ClanSkill{
+		{ID: 370, Level: 1, MinLevel: 5, Cost: 500, ItemID: 8166},
+		{ID: 370, Level: 2, MinLevel: 5, Cost: 500, ItemID: 8166},
+		{ID: 371, Level: 1, MinLevel: 6, Cost: 800, ItemID: 8169},
+	}}
+
+	available := trees.ClanSkillsFor(5, SkillLevels{})
+	want := []ClanSkill{{ID: 370, Level: 1, MinLevel: 5, Cost: 500, ItemID: 8166}}
+	if !equalClanSkills(available, want) {
+		t.Fatalf("ClanSkillsFor(level 5, none known) = %+v, want %+v", available, want)
+	}
+
+	grant, status := trees.CheckClanSkillLearn(5, 499, SkillLevels{}, 370, 1)
+	if status != LearnNeedsCost || grant.Cost != 500 {
+		t.Fatalf("CheckClanSkillLearn(not enough reputation) = %+v, %v; want cost 500 and LearnNeedsCost", grant, status)
+	}
+
+	grant, status = trees.CheckClanSkillLearn(5, 500, SkillLevels{}, 370, 1)
+	if status != LearnAllowed || grant.ID != 370 || grant.Level != 1 {
+		t.Fatalf("CheckClanSkillLearn(enough reputation) = %+v, %v; want skill 370 level 1 and LearnAllowed", grant, status)
+	}
+
+	if _, status = trees.CheckClanSkillLearn(5, 500, SkillLevels{370: 0}, 370, 2); status != LearnUnavailable {
+		t.Fatalf("CheckClanSkillLearn(skipped previous level) = %v, want LearnUnavailable", status)
+	}
+}
+
+func equalFishingSkills(a, b []FishingSkill) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func equalClanSkills(a, b []ClanSkill) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}

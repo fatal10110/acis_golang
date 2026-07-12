@@ -81,6 +81,28 @@ func NewClanSkill(set *commons.StatSet) (ClanSkill, error) {
 	return entry, nil
 }
 
+// SkillLevels maps a known skill id to its current level.
+type SkillLevels map[ID]int
+
+// Level returns the known level for id, or 0 when it is not known.
+func (l SkillLevels) Level(id ID) int {
+	return l[id]
+}
+
+// LearnStatus describes the result of checking a tree-learning request.
+type LearnStatus uint8
+
+const (
+	// LearnAllowed means the requested skill can be learned now.
+	LearnAllowed LearnStatus = iota
+	// LearnUnavailable means the requested skill is not the next learnable
+	// level for the current tree state.
+	LearnUnavailable
+	// LearnNeedsCost means the skill is otherwise learnable but the caller
+	// does not have enough points to pay its cost.
+	LearnNeedsCost
+)
+
 // EnchantSkill is one entry in the enchant skill tree: the exp/sp cost and
 // per-caster-magic-level success rates for reaching one enchant level (101+
 // or 141+) of a skill, and the item optionally consumed to attempt it (zero
@@ -154,4 +176,101 @@ type Trees struct {
 	Fishing []FishingSkill
 	Clan    []ClanSkill
 	Enchant []EnchantSkill
+}
+
+// FishingSkillsFor returns fishing skill nodes learnable by the player now.
+func (t *Trees) FishingSkillsFor(playerLevel int, hasDwarvenCraft bool, known SkillLevels) []FishingSkill {
+	if t == nil {
+		return nil
+	}
+	var skills []FishingSkill
+	for _, skill := range t.Fishing {
+		if skill.MinLevel <= playerLevel && fishingAllowed(skill, hasDwarvenCraft) && known.Level(skill.ID) == skill.Level-1 {
+			skills = append(skills, skill)
+		}
+	}
+	return skills
+}
+
+// FishingSkillFor returns the requested fishing skill when it is learnable.
+func (t *Trees) FishingSkillFor(playerLevel int, hasDwarvenCraft bool, known SkillLevels, skillID ID, level int) (FishingSkill, bool) {
+	if t == nil || skillID <= 0 || level <= 0 {
+		return FishingSkill{}, false
+	}
+	for _, skill := range t.Fishing {
+		if skill.ID != skillID || skill.Level != level || !fishingAllowed(skill, hasDwarvenCraft) {
+			continue
+		}
+		if skill.MinLevel <= playerLevel && known.Level(skillID) == level-1 {
+			return skill, true
+		}
+		return FishingSkill{}, false
+	}
+	return FishingSkill{}, false
+}
+
+// RequiredLevelForNextFishingSkill returns the lowest future player level
+// with an eligible fishing skill, or 0 when there is none.
+func (t *Trees) RequiredLevelForNextFishingSkill(playerLevel int, hasDwarvenCraft bool) int {
+	if t == nil {
+		return 0
+	}
+	next := 0
+	for _, skill := range t.Fishing {
+		if skill.MinLevel <= playerLevel || !fishingAllowed(skill, hasDwarvenCraft) {
+			continue
+		}
+		if next == 0 || skill.MinLevel < next {
+			next = skill.MinLevel
+		}
+	}
+	return next
+}
+
+func fishingAllowed(skill FishingSkill, hasDwarvenCraft bool) bool {
+	return !skill.Dwarven || hasDwarvenCraft
+}
+
+// ClanSkillsFor returns clan skill nodes learnable by the clan now.
+func (t *Trees) ClanSkillsFor(clanLevel int, known SkillLevels) []ClanSkill {
+	if t == nil {
+		return nil
+	}
+	var skills []ClanSkill
+	for _, skill := range t.Clan {
+		if skill.MinLevel <= clanLevel && known.Level(skill.ID) == skill.Level-1 {
+			skills = append(skills, skill)
+		}
+	}
+	return skills
+}
+
+// ClanSkillFor returns the requested clan skill when it is learnable.
+func (t *Trees) ClanSkillFor(clanLevel int, known SkillLevels, skillID ID, level int) (ClanSkill, bool) {
+	if t == nil || skillID <= 0 || level <= 0 {
+		return ClanSkill{}, false
+	}
+	for _, skill := range t.Clan {
+		if skill.ID != skillID || skill.Level != level {
+			continue
+		}
+		if skill.MinLevel <= clanLevel && known.Level(skillID) == level-1 {
+			return skill, true
+		}
+		return ClanSkill{}, false
+	}
+	return ClanSkill{}, false
+}
+
+// CheckClanSkillLearn checks whether a clan skill can be learned now and
+// whether reputation covers its cost.
+func (t *Trees) CheckClanSkillLearn(clanLevel, reputation int, known SkillLevels, skillID ID, level int) (ClanSkill, LearnStatus) {
+	skill, ok := t.ClanSkillFor(clanLevel, known, skillID, level)
+	if !ok {
+		return ClanSkill{}, LearnUnavailable
+	}
+	if reputation < skill.Cost {
+		return skill, LearnNeedsCost
+	}
+	return skill, LearnAllowed
 }
