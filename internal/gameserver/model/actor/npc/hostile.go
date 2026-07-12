@@ -39,6 +39,12 @@ type Hostile struct {
 	move  ai.MoveController
 	world *world.State
 
+	// rewards computes this NPC's drop/experience payout when TakeDamage
+	// kills it. It is nil until SetRewarder is called, in which case death
+	// still latches but grants nothing — matching Die's own "rewards may be
+	// nil" contract.
+	rewards creature.Rewarder
+
 	deathMu sync.Mutex
 	dead    bool
 	decayed bool
@@ -97,6 +103,15 @@ func (h *Hostile) SetWorld(state *world.State) {
 // hit/crit/damage-spread rolls, for deterministic tests.
 func (h *Hostile) SetRollSource(f func(n int) int) {
 	h.roll = f
+}
+
+// SetRewarder records the reward hook TakeDamage passes to Die when its
+// damage newly kills this NPC. Call it once, before exposing this NPC to
+// other goroutines — same constraint as SetWorld. Leaving it unset keeps
+// TakeDamage's kill path reward-free, matching Die's own "rewards may be
+// nil" contract.
+func (h *Hostile) SetRewarder(rewards creature.Rewarder) {
+	h.rewards = rewards
 }
 
 // ObjectID returns the world object id assigned to this NPC.
