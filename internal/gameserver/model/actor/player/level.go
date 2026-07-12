@@ -102,3 +102,35 @@ func (t *LevelTable) RealMaxLevel() int {
 func (t *LevelTable) RequiredExpForHighestLevel() int64 {
 	return t.levels[t.maxLevel].RequiredExpToLevelUp
 }
+
+// RequiredExpForLevel returns the experience required to reach level, or 0
+// if the table has no entry for it.
+func (t *LevelTable) RequiredExpForLevel(level int) int64 {
+	return t.levels[level].RequiredExpToLevelUp
+}
+
+// ExpSpanAtLevel returns the width of level's experience band: the
+// experience needed to reach level+1 minus the experience needed to reach
+// level. At or above the level cap it instead returns the width of the top
+// band (RealMaxLevel to MaxLevel), so a caller computing an experience loss
+// at the level cap still gets a meaningful span.
+func (t *LevelTable) ExpSpanAtLevel(level int) int64 {
+	if level < t.maxLevel {
+		return t.RequiredExpForLevel(level+1) - t.RequiredExpForLevel(level)
+	}
+	return t.RequiredExpForLevel(t.maxLevel) - t.RequiredExpForLevel(t.maxLevel-1)
+}
+
+// levelForExp returns the highest level whose experience threshold exp has
+// reached, per t. It never returns above t.maxLevel.
+func (t *LevelTable) levelForExp(exp int64) int {
+	level := 1
+	for ; level <= t.maxLevel; level++ {
+		if exp >= t.RequiredExpForLevel(level) {
+			continue
+		}
+		level--
+		break
+	}
+	return level
+}

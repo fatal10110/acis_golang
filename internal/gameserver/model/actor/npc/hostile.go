@@ -4,9 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"sync"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -34,6 +36,10 @@ type Hostile struct {
 
 	brain *ai.Attackable
 	move  ai.MoveController
+
+	deathMu sync.Mutex
+	dead    bool
+	decayed bool
 }
 
 // NewHostile creates a live attackable NPC wrapper for inst.
@@ -97,7 +103,75 @@ func (h *Hostile) SiegeGuard() bool {
 
 // AlikeDead reports whether this NPC should be ignored as a live target.
 func (h *Hostile) AlikeDead() bool {
-	return false
+	return h.Dead()
+}
+
+// Dead reports whether this NPC has died and not yet been revived.
+func (h *Hostile) Dead() bool {
+	h.deathMu.Lock()
+	defer h.deathMu.Unlock()
+	return h.dead
+}
+
+// MarkDead transitions this NPC into its dead state. It reports false when
+// the NPC was already dead, so a repeated or concurrent kill is a no-op.
+func (h *Hostile) MarkDead() bool {
+	h.deathMu.Lock()
+	defer h.deathMu.Unlock()
+	if h.dead {
+		return false
+	}
+	h.dead = true
+	return true
+}
+
+// Die runs this NPC's death sequence: the shared once-only dead-state
+// transition, then its reward hook. rewards may be nil — the drop and
+// experience/SP systems land separately and plug in here once ready. It
+// reports whether the death was newly applied by this call.
+//
+// The caller is responsible for registering the corpse with the decay
+// task afterwards (using Instance.Template.CorpseTime as the display
+// interval) — Hostile does not hold a reference to that task, so the
+// scheduling stays at the orchestration layer that owns it.
+func (h *Hostile) Die(killer creature.DeathActor, rewards creature.Rewarder) bool {
+	return creature.Die(h, killer, rewards)
+}
+
+// Decayed reports whether this NPC's corpse has already been removed from
+// the world.
+func (h *Hostile) Decayed() bool {
+	h.deathMu.Lock()
+	defer h.deathMu.Unlock()
+	return h.decayed
+}
+
+// Decay removes this NPC's corpse from the world and runs the respawn
+// hook, if any. It is idempotent: a repeat call is a no-op, matching the
+// once-only guarantee the corpse decay task relies on.
+//
+// worldState may be nil in tests that do not track live world placement.
+// respawn is called after the world removal when non-nil; a live spawn
+// runtime is expected to close over its own spawn.State/spawn.Entry
+// linkage and call spawn.CalculateRespawnDelay plus spawn.State.SetRespawn
+// there, since Hostile itself carries no spawn linkage yet.
+func (h *Hostile) Decay(worldState *world.State, respawn func()) bool {
+	h.deathMu.Lock()
+	if h.decayed {
+		h.deathMu.Unlock()
+		return false
+	}
+	h.decayed = true
+	h.dead = true
+	h.deathMu.Unlock()
+
+	if worldState != nil {
+		worldState.Despawn(h)
+	}
+	if respawn != nil {
+		respawn()
+	}
+	return true
 }
 
 // DenyAIAction reports whether this NPC is unable to act.

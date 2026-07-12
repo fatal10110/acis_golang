@@ -1,10 +1,12 @@
 package npc
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -91,6 +93,106 @@ func TestHostileReturnHomeMovesTowardHomeAndClearsThreat(t *testing.T) {
 	}
 	if got := hostile.AI().CurrentIntention(); got != ai.IntentionWander {
 		t.Fatalf("current intention = %v, want wander while returning home", got)
+	}
+}
+
+type hostileRewarder struct {
+	calls []creature.DeathActor
+}
+
+func (r *hostileRewarder) CalculateRewards(killer creature.DeathActor) {
+	r.calls = append(r.calls, killer)
+}
+
+func TestHostileDieAppliesOnceAndRunsRewardHook(t *testing.T) {
+	hostile := newTestHostile(t, &hostileMove{}, &hostileAttack{})
+	killer := &hostileTarget{id: 200}
+	rewards := &hostileRewarder{}
+
+	if hostile.AlikeDead() {
+		t.Fatal("AlikeDead() = true before death, want false")
+	}
+
+	if !hostile.Die(killer, rewards) {
+		t.Fatal("Die() = false, want true on first kill")
+	}
+	if !hostile.AlikeDead() {
+		t.Fatal("AlikeDead() = false after death, want true")
+	}
+	if len(rewards.calls) != 1 || rewards.calls[0] != killer {
+		t.Fatalf("rewards.calls = %v, want one call with killer", rewards.calls)
+	}
+
+	if hostile.Die(killer, rewards) {
+		t.Fatal("Die() = true on repeat kill, want false")
+	}
+	if len(rewards.calls) != 1 {
+		t.Fatalf("rewards.calls after repeat kill = %v, want unchanged", rewards.calls)
+	}
+}
+
+func TestHostileDieConcurrentOnlyOneWinner(t *testing.T) {
+	hostile := newTestHostile(t, &hostileMove{}, &hostileAttack{})
+
+	const attempts = 50
+	results := make(chan bool, attempts)
+	var wg sync.WaitGroup
+	for i := 0; i < attempts; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			results <- hostile.Die(nil, nil)
+		}()
+	}
+	wg.Wait()
+	close(results)
+
+	wins := 0
+	for r := range results {
+		if r {
+			wins++
+		}
+	}
+	if wins != 1 {
+		t.Fatalf("wins = %d, want exactly 1", wins)
+	}
+}
+
+func TestHostileDecayRemovesFromWorldAndRunsRespawnHook(t *testing.T) {
+	state := world.New()
+	hostile := newTestHostile(t, &hostileMove{}, &hostileAttack{})
+	state.Spawn(hostile, 100, 100, 0, 0)
+	hostile.Die(nil, nil)
+
+	respawned := false
+	if !hostile.Decay(state, func() { respawned = true }) {
+		t.Fatal("Decay() = false, want true on first decay")
+	}
+	if !hostile.Decayed() {
+		t.Fatal("Decayed() = false after Decay, want true")
+	}
+	if !respawned {
+		t.Fatal("respawn hook was not called")
+	}
+	if _, ok := state.Object(hostile.ObjectID()); ok {
+		t.Fatal("hostile is still tracked in the world after Decay")
+	}
+
+	respawned = false
+	if hostile.Decay(state, func() { respawned = true }) {
+		t.Fatal("Decay() = true on repeat call, want false")
+	}
+	if respawned {
+		t.Fatal("respawn hook ran again on repeat Decay call")
+	}
+}
+
+func TestHostileDecayToleratesNilWorldAndRespawnHook(t *testing.T) {
+	hostile := newTestHostile(t, &hostileMove{}, &hostileAttack{})
+	hostile.Die(nil, nil)
+
+	if !hostile.Decay(nil, nil) {
+		t.Fatal("Decay() = false with nil world/respawn, want true")
 	}
 }
 

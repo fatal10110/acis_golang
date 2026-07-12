@@ -36,6 +36,7 @@ func TestEncodeServerList(t *testing.T) {
 	for i, s := range servers {
 		want = append(want, s.ID)
 		want = append(want, s.IP[:]...)
+		want = append(want, 127, 0, 0, 1)
 		want = binary.LittleEndian.AppendUint32(want, uint32(s.Port))
 		want = append(want, s.AgeLimit)
 		if s.PvP {

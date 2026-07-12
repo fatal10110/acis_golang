@@ -16,7 +16,6 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/db"
 	"github.com/fatal10110/acis_golang/internal/commons/logging"
-	"github.com/fatal10110/acis_golang/internal/commons/netutil"
 	"github.com/fatal10110/acis_golang/internal/config"
 	"github.com/fatal10110/acis_golang/internal/loginserver"
 	"github.com/fatal10110/acis_golang/internal/loginserver/data/manager"
@@ -35,6 +34,7 @@ type loginServerConfig struct {
 	ClientAddr          string
 	GameServerAddr      string
 	AllowNewGameServers bool
+	AutoCreateAccounts  bool
 	Database            db.Config
 }
 
@@ -68,8 +68,10 @@ func newLoginServerApp(paths loginServerPaths) *fx.App {
 			provideServerRegistry,
 			manager.NewSessionStore,
 			manager.NewRSAKeyPool,
+			manager.NewLoginKeyPool,
 			provideIPBanList,
 			provideGameServerLink,
+			provideClientLink,
 		),
 		fx.Invoke(startLoginServer),
 	)
@@ -97,6 +99,7 @@ func loginServerConfigFromProperties(_ loginServerPaths, props *config.Propertie
 		ClientAddr:          listenAddress(props.String("LoginserverHostname", "*"), clientPort),
 		GameServerAddr:      listenAddress(props.String("LoginHostname", "*"), linkPort),
 		AllowNewGameServers: props.Bool("AcceptNewGameServer", false),
+		AutoCreateAccounts:  props.Bool("AutoCreateAccounts", false),
 		Database: db.Config{
 			URL:      props.String("URL", "jdbc:mariadb://localhost/acis"),
 			Login:    props.String("Login", "root"),
@@ -181,7 +184,19 @@ func provideGameServerLink(
 	return loginserver.NewGameServerLink(servers, names, keys, sessions, bans, accounts, registrations, cfg.AllowNewGameServers, log)
 }
 
-func startLoginServer(lc fx.Lifecycle, cfg loginServerConfig, link *loginserver.GameServerLink, log zerolog.Logger) {
+func provideClientLink(
+	cfg loginServerConfig,
+	accounts *loginsql.AccountStore,
+	servers *manager.ServerRegistry,
+	sessions *manager.SessionStore,
+	bans *manager.IPBanList,
+	keys *manager.LoginKeyPool,
+	log zerolog.Logger,
+) *loginserver.ClientLink {
+	return loginserver.NewClientLink(accounts, servers, sessions, bans, keys, cfg.AutoCreateAccounts, log)
+}
+
+func startLoginServer(lc fx.Lifecycle, cfg loginServerConfig, link *loginserver.GameServerLink, clients *loginserver.ClientLink, log zerolog.Logger) {
 	var cancel context.CancelFunc
 	var wg sync.WaitGroup
 
@@ -212,9 +227,7 @@ func startLoginServer(lc fx.Lifecycle, cfg loginServerConfig, link *loginserver.
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				if err := netutil.AcceptLoop(runCtx, clientLn, func(conn net.Conn) {
-					handleLoginClient(conn, log)
-				}, log); err != nil {
+				if err := clients.Serve(runCtx, clientLn); err != nil {
 					log.Error().Err(err).Str("addr", cfg.ClientAddr).Msg("login client listener stopped")
 				}
 			}()
@@ -238,9 +251,4 @@ func startLoginServer(lc fx.Lifecycle, cfg loginServerConfig, link *loginserver.
 			}
 		},
 	})
-}
-
-func handleLoginClient(conn net.Conn, log zerolog.Logger) {
-	defer conn.Close()
-	log.Warn().Str("remote", conn.RemoteAddr().String()).Msg("login client dispatcher is not wired yet")
 }
