@@ -1,6 +1,8 @@
 package ai
 
 import (
+	"time"
+
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
@@ -39,15 +41,16 @@ type intention struct {
 
 // Attackable drives one hostile NPC's combat and wander intentions.
 //
-// One AI loop owns the current and next intentions. Threat and hate tables
-// are internally synchronized so combat code can raise hate while the loop
-// reads target selection.
+// One AI loop owns the current and next intentions. Threat and hate tables,
+// and the attack desire queue, are internally synchronized so combat code
+// can raise hate while the loop reads target selection.
 type Attackable struct {
 	actor   AttackableActor
 	move    MoveController
 	attack  AttackController
 	threats *attackable.ThreatTable
 	hates   *attackable.HateTable
+	desires *DesireQueue
 
 	current intention
 	next    intention
@@ -62,6 +65,7 @@ func NewAttackable(actor AttackableActor, move MoveController, attack AttackCont
 		attack:  attack,
 		threats: attackable.NewThreatTable(actor),
 		hates:   attackable.NewHateTable(actor),
+		desires: NewDesireQueue(),
 		current: intention{kind: IntentionIdle},
 	}
 }
@@ -81,9 +85,26 @@ func (a *Attackable) Hates() *attackable.HateTable {
 	return a.hates
 }
 
-// AddDamageHate records an attacker in the physical threat table.
+// Desires returns the queue of weighted candidate intentions, currently
+// populated by attack threat and drained by Think's target selection.
+func (a *Attackable) Desires() *DesireQueue {
+	return a.desires
+}
+
+// AddDamageHate records an attacker in the physical threat table and raises
+// its attack Desire's weight to match, queueing that Desire if this is the
+// first hate recorded against the attacker.
 func (a *Attackable) AddDamageHate(attacker attackable.Combatant, damage, hate float64) {
 	a.threats.AddDamage(attacker, damage, hate)
+	if attacker == nil || (a.actor.SiegeGuard() && attacker.SiegeGuard()) {
+		return
+	}
+	a.desires.AddOrUpdate(&Desire{
+		Kind:        IntentionAttack,
+		FinalTarget: attacker,
+		Weight:      hate,
+		QueuedAt:    time.Now(),
+	})
 }
 
 // AddHate records an attacker in the skill-cast hate table.
@@ -112,8 +133,8 @@ func (a *Attackable) NextIntention() (Intention, attackable.Combatant, bool) {
 // Think advances the current intention once.
 func (a *Attackable) Think() {
 	if a.current.kind == IntentionIdle {
-		if threat, ok := a.threats.MostHated(); ok {
-			a.current = intention{kind: IntentionAttack, target: threat.Attacker}
+		if desire, ok := a.desires.Peek(); ok && desire.Kind == IntentionAttack {
+			a.current = intention{kind: IntentionAttack, target: desire.FinalTarget}
 		}
 	}
 
@@ -133,6 +154,7 @@ func (a *Attackable) Tick() {
 	}
 	a.threats.ReduceAllHate(attackHateDecay)
 	a.hates.ReduceAllHate(66000)
+	a.desires.DecreaseWeightByType(IntentionAttack, attackHateDecay)
 	a.step = 0
 }
 
