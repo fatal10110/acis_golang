@@ -145,6 +145,83 @@ func TestLoadSkillDefinitions(t *testing.T) {
 			t.Fatal("skill 4 level 1 Offensive = true, want false")
 		}
 	})
+
+	t.Run("for block preserves effect templates and nested stat funcs", func(t *testing.T) {
+		d, ok := table.Get(4, 1)
+		if !ok {
+			t.Fatal("skill 4 level 1 not loaded")
+		}
+		if len(d.Effects) != 1 {
+			t.Fatalf("skill 4 level 1 Effects = %+v, want 1 entry", d.Effects)
+		}
+		e := d.Effects[0]
+		if e.Name != "Buff" || e.Time != 15 || e.Count != 1 || e.Value != 0 || e.StackType != "speed_up_special" || e.StackOrder != 1 || !e.Icon {
+			t.Fatalf("skill 4 level 1 effect = %+v", e)
+		}
+		if len(e.Funcs) != 1 {
+			t.Fatalf("skill 4 level 1 effect funcs = %+v, want 1 entry", e.Funcs)
+		}
+		fn := e.Funcs[0]
+		if fn.Op != skill.FuncAdd || fn.Stat != "runSpd" || fn.Value != 40 {
+			t.Fatalf("skill 4 level 1 effect func = %+v", fn)
+		}
+
+		level2, ok := table.Get(4, 2)
+		if !ok {
+			t.Fatal("skill 4 level 2 not loaded")
+		}
+		if got := level2.Effects[0].StackOrder; got != 2 {
+			t.Fatalf("skill 4 level 2 StackOrder = %v, want 2", got)
+		}
+		if got := level2.Effects[0].Funcs[0].Value; got != 66 {
+			t.Fatalf("skill 4 level 2 runSpd func value = %v, want 66", got)
+		}
+	})
+
+	t.Run("conditions preserve message attributes and resolved predicate tables", func(t *testing.T) {
+		d, ok := table.Get(8, 7)
+		if !ok {
+			t.Fatal("skill 8 level 7 not loaded")
+		}
+		if len(d.Conditions) != 1 {
+			t.Fatalf("skill 8 level 7 Conditions = %+v, want 1 entry", d.Conditions)
+		}
+		cond := d.Conditions[0]
+		if cond.MessageID != 113 || !cond.AddName {
+			t.Fatalf("skill 8 level 7 condition message = %+v", cond)
+		}
+		if cond.Root.Kind != "not" || len(cond.Root.Children) != 1 {
+			t.Fatalf("skill 8 level 7 condition root = %+v", cond.Root)
+		}
+		player := cond.Root.Children[0]
+		if player.Kind != "player" || player.Attrs["Charges"] != "7" {
+			t.Fatalf("skill 8 level 7 nested player condition = %+v", player)
+		}
+	})
+
+	t.Run("enchant for blocks override regular effects per enchant route", func(t *testing.T) {
+		ench1, ok := table.Get(42, 101)
+		if !ok {
+			t.Fatal("skill 42 level 101 not loaded")
+		}
+		if len(ench1.SelfEffects) != 1 || len(ench1.Effects) != 0 {
+			t.Fatalf("skill 42 level 101 effects = normal %+v self %+v", ench1.Effects, ench1.SelfEffects)
+		}
+		if e := ench1.SelfEffects[0]; e.Name != "Heal" || e.Value != 3 || e.Icon || e.Time != 1 || e.Count != 1 {
+			t.Fatalf("skill 42 level 101 self effect = %+v", e)
+		}
+
+		ench2, ok := table.Get(42, 141)
+		if !ok {
+			t.Fatal("skill 42 level 141 not loaded")
+		}
+		if len(ench2.SelfEffects) != 1 {
+			t.Fatalf("skill 42 level 141 SelfEffects = %+v, want 1 entry", ench2.SelfEffects)
+		}
+		if e := ench2.SelfEffects[0]; e.Name != "ManaHeal" || e.Value != 1 || e.Icon {
+			t.Fatalf("skill 42 level 141 self effect = %+v", e)
+		}
+	})
 }
 
 func TestLoadSkillDefinitionsErrors(t *testing.T) {
@@ -173,6 +250,10 @@ func TestLoadSkillDefinitionsErrors(t *testing.T) {
 		{
 			name:    "value references an undefined table",
 			content: `<list><skill id="1" name="x" levels="1"><set name="target" val="ONE"/><set name="skillType" val="PDAM"/><set name="operateType" val="ACTIVE"/><set name="power" val="#missing"/></skill></list>`,
+		},
+		{
+			name:    "condition references an undefined table",
+			content: `<list><skill id="1" name="x" levels="1"><set name="target" val="ONE"/><set name="skillType" val="PDAM"/><set name="operateType" val="ACTIVE"/><cond><player Charges="#missing"/></cond></skill></list>`,
 		},
 		{
 			name:    "table name missing the '#' prefix",

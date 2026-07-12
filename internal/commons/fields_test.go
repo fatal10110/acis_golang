@@ -96,6 +96,52 @@ func TestFieldsDefaultAccessorStillErrorsOnMalformedValue(t *testing.T) {
 	}
 }
 
+func TestFieldsInt32LiteralDefault(t *testing.T) {
+	s := NewStatSet()
+	s.Set("decimal", "42")
+	s.Set("hex", "0x7fffffff")
+	f := NewFields(s, "test")
+
+	if got := f.Int32LiteralDefault("decimal", 99); got != 42 {
+		t.Errorf("Int32LiteralDefault(decimal) = %v, want 42", got)
+	}
+	if got := f.Int32LiteralDefault("hex", 99); got != 1<<31-1 {
+		t.Errorf("Int32LiteralDefault(hex) = %v, want %v", got, int32(1<<31-1))
+	}
+	if got := f.Int32LiteralDefault("absent", 99); got != 99 {
+		t.Errorf("Int32LiteralDefault(absent) = %v, want 99", got)
+	}
+	if err := f.Err(); err != nil {
+		t.Fatalf("Err() = %v, want nil", err)
+	}
+}
+
+func TestFieldsInt32LiteralDefaultRejectsMalformedValue(t *testing.T) {
+	s := NewStatSet()
+	s.Set("bad", "not-a-number")
+	f := NewFields(s, "test")
+
+	if got := f.Int32LiteralDefault("bad", 99); got != 99 {
+		t.Errorf("Int32LiteralDefault(bad) = %v, want default 99", got)
+	}
+	if f.Err() == nil {
+		t.Fatal("Err() = nil, want error for present-but-malformed value")
+	}
+}
+
+func TestFieldsInt32LiteralDefaultRejectsOverflow(t *testing.T) {
+	s := NewStatSet()
+	s.Set("overflow", "0x80000000")
+	f := NewFields(s, "test")
+
+	if got := f.Int32LiteralDefault("overflow", 99); got != 99 {
+		t.Errorf("Int32LiteralDefault(overflow) = %v, want default 99", got)
+	}
+	if f.Err() == nil {
+		t.Fatal("Err() = nil, want error for overflowing value")
+	}
+}
+
 func TestFieldsStickyAfterFirstError(t *testing.T) {
 	s := NewStatSet()
 	s.Set("second", 5)
