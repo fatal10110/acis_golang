@@ -16,6 +16,16 @@ const (
 	TypeBuff Type = "BUFF"
 	// TypeDebuff is a harmful persistent effect.
 	TypeDebuff Type = "DEBUFF"
+	// TypeDamOverTime is a periodic HP damage effect.
+	TypeDamOverTime Type = "DMG_OVER_TIME"
+	// TypeFear is a forced flee disabler.
+	TypeFear Type = "FEAR"
+	// TypeRoot is a movement disabler.
+	TypeRoot Type = "ROOT"
+	// TypeSleep is an action disabler.
+	TypeSleep Type = "SLEEP"
+	// TypeStun is an attack, cast, and movement disabler.
+	TypeStun Type = "STUN"
 )
 
 // Skill carries the skill fields the effect container needs for ordering and
@@ -36,10 +46,12 @@ type Effect struct {
 	Skill    Skill
 	Template modelskill.EffectTemplate
 	Type     Type
+	Flag     Flag
 	Funcs    []basefunc.Func
 	Herb     bool
 
 	OnStart    func(*Effect) bool
+	OnAction   func(*Effect) bool
 	OnExit     func(*Effect)
 	OnStopTask func(*Effect)
 
@@ -52,6 +64,15 @@ func (e *Effect) InUse() bool {
 		return false
 	}
 	return e.inUse
+}
+
+// ActionTime runs e's periodic hook. Effects without periodic behavior stop
+// after one action tick.
+func (e *Effect) ActionTime() bool {
+	if e == nil || e.OnAction == nil {
+		return false
+	}
+	return e.OnAction(e)
 }
 
 func (e *Effect) setInUse(inUse bool) bool {
