@@ -17,9 +17,10 @@ type groundPlacer interface {
 // rewards for one NPC template's death, at a fixed drop location.
 //
 // Experience and SP are not granted here. The per-kill formula (damage-share
-// split across attackers, then a level-difference penalty) has not been
-// ported yet, and there is no live player actor to credit until it lands —
-// see the kill-reward-distribution follow-up.
+// split across attackers, then a level-difference penalty) exists as
+// player.KillRewardExpAndSp, but there is no live player actor or
+// killer/victim resolution to drive it with yet — see the
+// kill-reward-distribution follow-up.
 type KillReward struct {
 	categories      []item.DropCategory
 	pool            *item.SpoilPool
