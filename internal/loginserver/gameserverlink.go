@@ -28,9 +28,13 @@ type GameServerLink struct {
 	sessions        *manager.SessionStore
 	bans            *manager.IPBanList
 	accounts        *sql.AccountStore
-	registrations   *sql.GameServerStore
+	registrations   registrationStore
 	allowNewServers bool
 	log             zerolog.Logger
+}
+
+type registrationStore interface {
+	CreateGameServer(ctx context.Context, server model.GameServer) error
 }
 
 // NewGameServerLink builds a GameServerLink from its collaborators.
@@ -42,7 +46,7 @@ func NewGameServerLink(
 	sessions *manager.SessionStore,
 	bans *manager.IPBanList,
 	accounts *sql.AccountStore,
-	registrations *sql.GameServerStore,
+	registrations registrationStore,
 	allowNewServers bool,
 	log zerolog.Logger,
 ) *GameServerLink {
@@ -244,6 +248,10 @@ func (l *GameServerLink) onGameServerAuth(ctx context.Context, c *gameServerConn
 }
 
 func (l *GameServerLink) persistRegistration(ctx context.Context, id int, hexID []byte) {
+	if l.registrations == nil {
+		l.log.Error().Int("server_id", id).Msg("persist gameserver registration")
+		return
+	}
 	if err := l.registrations.CreateGameServer(ctx, model.NewGameServer(id, hexID, "")); err != nil {
 		l.log.Error().Int("server_id", id).Err(err).Msg("persist gameserver registration")
 	}
