@@ -340,13 +340,15 @@ func buildSkillFunc(tables map[string][]string, tag string, attrs []xml.Attr, ch
 		return skill.FuncTemplate{}, err
 	}
 	set := commons.StatSetFromXMLAttrs(resolved)
-	stat, err := set.GetString("stat")
-	if err != nil {
-		return skill.FuncTemplate{}, fmt.Errorf("%s: %w", tag, err)
+	base := commons.NewFields(set, tag)
+	stat := base.String("stat")
+	if err := base.Err(); err != nil {
+		return skill.FuncTemplate{}, err
 	}
-	value, err := set.GetFloat64("val")
-	if err != nil {
-		return skill.FuncTemplate{}, fmt.Errorf("%s %s: %w", tag, stat, err)
+	f := commons.NewFields(set, tag+" "+stat)
+	value := f.Float64("val")
+	if err := f.Err(); err != nil {
+		return skill.FuncTemplate{}, err
 	}
 	fn := skill.FuncTemplate{Op: op, Stat: stat, Value: value, AttachCondition: attachCond}
 	if len(children) > 0 {
