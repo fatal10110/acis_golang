@@ -262,7 +262,16 @@ func (l *ClientLink) onRequestServerList(c *clientConn, payload []byte) {
 	if req.SessionKey1 != c.loginKey1 || req.SessionKey2 != c.loginKey2 {
 		return
 	}
-	_ = c.send(serverpackets.EncodeServerList(byte(c.lastServer), l.serverEntries()))
+	entries := l.serverEntries()
+	for _, e := range entries {
+		l.log.Info().
+			Uint8("id", e.ID).
+			Str("ip", net.IP(e.IP[:]).String()).
+			Int32("port", e.Port).
+			Bool("online", e.Online).
+			Msg("serving ServerList entry")
+	}
+	_ = c.send(serverpackets.EncodeServerList(byte(c.lastServer), entries))
 }
 
 // serverEntries projects the registry's live server state into the wire
