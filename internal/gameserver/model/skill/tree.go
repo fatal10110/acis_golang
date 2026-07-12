@@ -81,9 +81,31 @@ func NewClanSkill(set *commons.StatSet) (ClanSkill, error) {
 	return entry, nil
 }
 
+// SkillLevels maps a known skill id to its current level.
+type SkillLevels map[ID]int
+
+// Level returns the known level for id, or 0 when it is not known.
+func (l SkillLevels) Level(id ID) int {
+	return l[id]
+}
+
+// LearnStatus describes the result of checking a tree-learning request.
+type LearnStatus uint8
+
+const (
+	// LearnAllowed means the requested skill can be learned now.
+	LearnAllowed LearnStatus = iota
+	// LearnUnavailable means the requested skill is not the next learnable
+	// level for the current tree state.
+	LearnUnavailable
+	// LearnNeedsCost means the skill is otherwise learnable but the caller
+	// does not have enough points to pay its cost.
+	LearnNeedsCost
+)
+
 // EnchantSkill is one entry in the enchant skill tree: the exp/sp cost and
-// per-caster-magic-level success rates for reaching one enchant level (101+
-// or 141+) of a skill, and the item optionally consumed to attempt it (zero
+// per-character-level success rates for reaching one enchant level (101+ or
+// 141+) of a skill, and the item optionally consumed to attempt it (zero
 // ItemID means none). Deciding whether a specific character currently
 // qualifies, and rolling the actual success rate, is that enchant system's
 // job, not this loader's.
@@ -100,6 +122,12 @@ type EnchantSkill struct {
 	ItemID    int32
 	ItemCount int
 }
+
+const (
+	enchantRoute1Start = 101
+	enchantRoute2Start = 141
+	enchantRouteLength = 30
+)
 
 // NewEnchantSkill builds an EnchantSkill from set, the folded attributes of
 // one <enchantSkill> element. id, lvl, exp, sp and the five rate attributes
@@ -141,6 +169,51 @@ func NewEnchantSkill(set *commons.StatSet) (EnchantSkill, error) {
 	return e, nil
 }
 
+// SuccessRateForLevel returns the success-rate percentage for a character
+// level from 76 through 80.
+func (e EnchantSkill) SuccessRateForLevel(level int) (int, bool) {
+	switch level {
+	case 76:
+		return e.Rate76, true
+	case 77:
+		return e.Rate77, true
+	case 78:
+		return e.Rate78, true
+	case 79:
+		return e.Rate79, true
+	case 80:
+		return e.Rate80, true
+	default:
+		return 0, false
+	}
+}
+
+// Route reports which enchant branch this level belongs to, or 0 when the
+// level is outside the two shipped enchant ranges.
+func (e EnchantSkill) Route() int {
+	switch {
+	case e.Level >= enchantRoute1Start && e.Level < enchantRoute1Start+enchantRouteLength:
+		return 1
+	case e.Level >= enchantRoute2Start && e.Level < enchantRoute2Start+enchantRouteLength:
+		return 2
+	default:
+		return 0
+	}
+}
+
+// RouteStep reports the one-based step inside an enchant branch, or 0 when
+// the level is outside the two shipped enchant ranges.
+func (e EnchantSkill) RouteStep() int {
+	switch e.Route() {
+	case 1:
+		return e.Level - enchantRoute1Start + 1
+	case 2:
+		return e.Level - enchantRoute2Start + 1
+	default:
+		return 0
+	}
+}
+
 // parseItemNeeded parses an "itemNeeded" attribute's "itemId-count" form.
 func parseItemNeeded(raw string) (itemID int32, count int, err error) {
 	return parseDashPair(raw)
@@ -154,4 +227,145 @@ type Trees struct {
 	Fishing []FishingSkill
 	Clan    []ClanSkill
 	Enchant []EnchantSkill
+}
+
+// FishingSkillsFor returns fishing skill nodes learnable by the player now.
+func (t *Trees) FishingSkillsFor(playerLevel int, hasDwarvenCraft bool, known SkillLevels) []FishingSkill {
+	if t == nil {
+		return nil
+	}
+	var skills []FishingSkill
+	for _, skill := range t.Fishing {
+		if skill.MinLevel <= playerLevel && fishingAllowed(skill, hasDwarvenCraft) && known.Level(skill.ID) == skill.Level-1 {
+			skills = append(skills, skill)
+		}
+	}
+	return skills
+}
+
+// FishingSkillFor returns the requested fishing skill when it is learnable.
+func (t *Trees) FishingSkillFor(playerLevel int, hasDwarvenCraft bool, known SkillLevels, skillID ID, level int) (FishingSkill, bool) {
+	if t == nil || skillID <= 0 || level <= 0 {
+		return FishingSkill{}, false
+	}
+	for _, skill := range t.Fishing {
+		if skill.ID != skillID || skill.Level != level || !fishingAllowed(skill, hasDwarvenCraft) {
+			continue
+		}
+		if skill.MinLevel <= playerLevel && known.Level(skillID) == level-1 {
+			return skill, true
+		}
+		return FishingSkill{}, false
+	}
+	return FishingSkill{}, false
+}
+
+// RequiredLevelForNextFishingSkill returns the lowest future player level
+// with an eligible fishing skill, or 0 when there is none.
+func (t *Trees) RequiredLevelForNextFishingSkill(playerLevel int, hasDwarvenCraft bool) int {
+	if t == nil {
+		return 0
+	}
+	next := 0
+	for _, skill := range t.Fishing {
+		if skill.MinLevel <= playerLevel || !fishingAllowed(skill, hasDwarvenCraft) {
+			continue
+		}
+		if next == 0 || skill.MinLevel < next {
+			next = skill.MinLevel
+		}
+	}
+	return next
+}
+
+func fishingAllowed(skill FishingSkill, hasDwarvenCraft bool) bool {
+	return !skill.Dwarven || hasDwarvenCraft
+}
+
+// ClanSkillsFor returns clan skill nodes learnable by the clan now.
+func (t *Trees) ClanSkillsFor(clanLevel int, known SkillLevels) []ClanSkill {
+	if t == nil {
+		return nil
+	}
+	var skills []ClanSkill
+	for _, skill := range t.Clan {
+		if skill.MinLevel <= clanLevel && known.Level(skill.ID) == skill.Level-1 {
+			skills = append(skills, skill)
+		}
+	}
+	return skills
+}
+
+// ClanSkillFor returns the requested clan skill when it is learnable.
+func (t *Trees) ClanSkillFor(clanLevel int, known SkillLevels, skillID ID, level int) (ClanSkill, bool) {
+	if t == nil || skillID <= 0 || level <= 0 {
+		return ClanSkill{}, false
+	}
+	for _, skill := range t.Clan {
+		if skill.ID != skillID || skill.Level != level {
+			continue
+		}
+		if skill.MinLevel <= clanLevel && known.Level(skillID) == level-1 {
+			return skill, true
+		}
+		return ClanSkill{}, false
+	}
+	return ClanSkill{}, false
+}
+
+// CheckClanSkillLearn checks whether a clan skill can be learned now and
+// whether reputation covers its cost.
+func (t *Trees) CheckClanSkillLearn(clanLevel, reputation int, known SkillLevels, skillID ID, level int) (ClanSkill, LearnStatus) {
+	skill, ok := t.ClanSkillFor(clanLevel, known, skillID, level)
+	if !ok {
+		return ClanSkill{}, LearnUnavailable
+	}
+	if reputation < skill.Cost {
+		return skill, LearnNeedsCost
+	}
+	return skill, LearnAllowed
+}
+
+// EnchantSkillsFor returns enchant skill nodes available for the known
+// current skill levels, preserving tree order.
+func (t *Trees) EnchantSkillsFor(defs *Table, known SkillLevels) []EnchantSkill {
+	if t == nil || defs == nil {
+		return nil
+	}
+	var skills []EnchantSkill
+	for _, skill := range t.Enchant {
+		if enchantSkillAllowed(defs, known, skill.ID, skill.Level) {
+			skills = append(skills, skill)
+		}
+	}
+	return skills
+}
+
+// EnchantSkillFor returns the requested enchant skill when it is the next
+// valid enchant level for the known current skill level.
+func (t *Trees) EnchantSkillFor(defs *Table, known SkillLevels, skillID ID, level int) (EnchantSkill, bool) {
+	if t == nil || defs == nil || skillID <= 0 || level <= 0 {
+		return EnchantSkill{}, false
+	}
+	for _, skill := range t.Enchant {
+		if skill.ID != skillID || skill.Level != level {
+			continue
+		}
+		if enchantSkillAllowed(defs, known, skillID, level) {
+			return skill, true
+		}
+		return EnchantSkill{}, false
+	}
+	return EnchantSkill{}, false
+}
+
+func enchantSkillAllowed(defs *Table, known SkillLevels, skillID ID, level int) bool {
+	current := known.Level(skillID)
+	if current <= 0 {
+		return false
+	}
+	if current == level-1 {
+		return true
+	}
+	return (level == enchantRoute1Start || level == enchantRoute2Start) && current == defs.MaxLevel(skillID)
 }

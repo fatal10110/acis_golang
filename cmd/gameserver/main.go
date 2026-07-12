@@ -118,11 +118,15 @@ func newGameServerApp(paths gameServerPaths) *fx.App {
 			provideDecay,
 			provideAttackStance,
 			provideWorldObjects,
+			provideSpawns,
+			provideRespawnTask,
+			provideAI,
+			provideNpcs,
 			network.NewSessionValidator,
 			provideLoginLinkState,
 			provideGameClientLink,
 		),
-		fx.Invoke(startPvPFlags, startGroundItems, startDecay, startAttackStance, startWorldObjects, startGameServer),
+		fx.Invoke(startPvPFlags, startGroundItems, startDecay, startAttackStance, startWorldObjects, startRespawnTask, startAI, startNpcs, startNpcPersistence, startGameServer),
 	)
 }
 
@@ -397,31 +401,105 @@ func startGroundItems(lc fx.Lifecycle, items *task.GroundItems, log zerolog.Logg
 }
 
 // worldDecayEffects removes a decayed actor from the world once its corpse
-// display interval elapses. Actors without a decay hook are left alone —
-// nothing outside the corpse-decay task itself is expected to register an
-// actor that can't decay.
-type worldDecayEffects struct{ state *world.State }
+// display interval elapses, and — once a spawn population has wired its own
+// respawn resolution in via SetRespawnHook — arms that actor's next
+// respawn. Actors without a decay hook are left alone: nothing outside the
+// corpse-decay task itself is expected to register an actor that can't
+// decay.
+//
+// The respawn hook is set after construction (manager.Npcs needs *task.Decay
+// itself to register newly spawned actors, so it can't be built first), so
+// it's guarded by its own lock separate from anything task.Decay holds.
+type worldDecayEffects struct {
+	state *world.State
+
+	mu          sync.RWMutex
+	respawnHook func(id int32) func()
+}
 
 type decayableActor interface {
 	Decay(*world.State, func()) bool
 }
 
-func (w worldDecayEffects) Decay(actor task.DecayActor) {
+func (w *worldDecayEffects) Decay(actor task.DecayActor) {
 	obj, ok := w.state.Object(actor.ObjectID())
 	if !ok {
 		return
 	}
+
+	var respawn func()
+	w.mu.RLock()
+	hook := w.respawnHook
+	w.mu.RUnlock()
+	if hook != nil {
+		respawn = hook(actor.ObjectID())
+	}
+
 	if d, ok := obj.(decayableActor); ok {
-		d.Decay(w.state, nil)
+		d.Decay(w.state, respawn)
 	}
 }
 
-func provideDecay(state *world.State) (*task.Decay, error) {
-	return task.NewDecay(worldDecayEffects{state: state}, time.Now)
+// SetRespawnHook records the callback used to arm a decayed actor's next
+// respawn. Call it once, before fx starts the decay ticker.
+func (w *worldDecayEffects) SetRespawnHook(f func(id int32) func()) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.respawnHook = f
+}
+
+func provideDecay(state *world.State) (*task.Decay, *worldDecayEffects, error) {
+	effects := &worldDecayEffects{state: state}
+	d, err := task.NewDecay(effects, time.Now)
+	return d, effects, err
 }
 
 func startDecay(lc fx.Lifecycle, d *task.Decay, log zerolog.Logger) {
 	startTicker(lc, log, d.Start)
+}
+
+// npcRespawnEffects re-instantiates one spawn slot once its respawn
+// deadline elapses. Like worldDecayEffects, its real resolution
+// (manager.Npcs.Respawn) is wired in after construction, since Npcs itself
+// needs *task.Respawn to schedule respawns in the first place.
+type npcRespawnEffects struct {
+	mu   sync.RWMutex
+	hook func(key string)
+}
+
+func (e *npcRespawnEffects) Respawn(key string) {
+	e.mu.RLock()
+	hook := e.hook
+	e.mu.RUnlock()
+	if hook != nil {
+		hook(key)
+	}
+}
+
+// SetHook records the callback that re-instantiates a due spawn slot. Call
+// it once, before fx starts the respawn ticker.
+func (e *npcRespawnEffects) SetHook(f func(key string)) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.hook = f
+}
+
+func provideRespawnTask() (*task.Respawn, *npcRespawnEffects, error) {
+	effects := &npcRespawnEffects{}
+	r, err := task.NewRespawn(effects, time.Now)
+	return r, effects, err
+}
+
+func startRespawnTask(lc fx.Lifecycle, r *task.Respawn, log zerolog.Logger) {
+	startTicker(lc, log, r.Start)
+}
+
+func provideAI() *task.AI {
+	return task.NewAI()
+}
+
+func startAI(lc fx.Lifecycle, ai *task.AI, log zerolog.Logger) {
+	startTicker(lc, log, ai.Start)
 }
 
 // worldAttackStanceEffects stops an actor's attack animation once its
@@ -459,6 +537,67 @@ func provideWorldObjects(data *gameData, ids *idfactory.Allocator, state *world.
 
 func startWorldObjects(objs *manager.WorldObjects, log zerolog.Logger) {
 	log.Info().Int("doors", len(objs.Doors())).Int("static_objects", len(objs.StaticObjects())).Msg("world objects spawned")
+}
+
+// provideSpawns loads the spawnlist XML and restores dynamic spawn_data
+// rows, returning the store alongside so it can be reused to persist state
+// back at shutdown.
+func provideSpawns(paths gameServerPaths, pool *sql.DB, log zerolog.Logger) (*manager.Spawns, *gamesql.SpawnStore, error) {
+	store := gamesql.NewSpawnStore(pool)
+	dir := filepath.Join(paths.DataRoot, "data", "xml", "spawnlist")
+	spawns, err := manager.LoadSpawns(context.Background(), dir, store)
+	if err != nil {
+		return nil, nil, err
+	}
+	log.Info().
+		Int("spawn_makers", spawns.Table().MakerCount()).
+		Int("spawn_entries", spawns.Table().SpawnCount()).
+		Int("persisted_spawn_rows", spawns.StateCount()).
+		Msg("spawn list loaded")
+	return spawns, store, nil
+}
+
+// spawnDropRates are the drop-rate multipliers manager.Npcs applies to kill
+// rewards. The server's actual RateDropAdena/RateDropItems/... config
+// surface isn't loaded anywhere yet, so every rate is neutral (1x) until
+// that's wired up.
+var spawnDropRates = item.Rates{Spoil: 1, Currency: 1, Item: 1, ItemRaid: 1, Herb: 1}
+
+// provideNpcs instantiates every "on start" spawn entry into state at boot,
+// then wires the decay/respawn tasks' late-bound hooks to it — manager.Npcs
+// needs *task.Decay and *task.Respawn to register actors with, so those
+// tasks' own effects can only point back at Npcs after it exists.
+func provideNpcs(spawns *manager.Spawns, data *gameData, state *world.State, ids *idfactory.Allocator, decay *task.Decay, decayHooks *worldDecayEffects, respawnTask *task.Respawn, respawnHooks *npcRespawnEffects, ai *task.AI, ground *task.GroundItems, log zerolog.Logger) (*manager.Npcs, error) {
+	npcs, err := manager.NewNpcs(spawns, data.NPCs, data.Geo, state, ids, decay, respawnTask, ai, data.Items, ground, spawnDropRates, time.Now, log)
+	if err != nil {
+		return nil, err
+	}
+	decayHooks.SetRespawnHook(npcs.RespawnHook)
+	respawnHooks.SetHook(npcs.Respawn)
+	return npcs, nil
+}
+
+func startNpcs(npcs *manager.Npcs, log zerolog.Logger) {
+	log.Info().
+		Int("live_npcs", npcs.LiveCount()).
+		Int("deferred_territory_spawns", npcs.DeferredCount()).
+		Int("restored_dead_spawns", npcs.RestoredDeadCount()).
+		Msg("npc spawns loaded")
+}
+
+// startNpcPersistence syncs every live database-tracked spawn's current
+// HP/position into its spawn.State row and saves spawn_data at shutdown,
+// mirroring the reference server's own save-on-shutdown behavior.
+func startNpcPersistence(lc fx.Lifecycle, npcs *manager.Npcs, spawns *manager.Spawns, store *gamesql.SpawnStore, log zerolog.Logger) {
+	lc.Append(fx.Hook{
+		OnStop: func(ctx context.Context) error {
+			npcs.SyncPersistedState()
+			if err := spawns.Save(ctx, store); err != nil {
+				log.Warn().Err(err).Msg("save spawn data")
+			}
+			return nil
+		},
+	})
 }
 
 type loginLinkState struct {
