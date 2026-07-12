@@ -19,6 +19,10 @@ func TestRegistryRegistersRepresentativeHandlers(t *testing.T) {
 		modelskill.TargetAura,
 		modelskill.TargetFrontAura,
 		modelskill.TargetBehindAura,
+		modelskill.TargetUndead,
+		modelskill.TargetAuraUndead,
+		modelskill.TargetUnlockable,
+		modelskill.TargetHoly,
 		modelskill.TargetSummon,
 		modelskill.TargetAreaSummon,
 		modelskill.TargetOwnerPet,
@@ -59,6 +63,67 @@ func TestSelfAndOneHandlers(t *testing.T) {
 	}
 }
 
+func TestSingleTargetKindHandlersValidateCastTargets(t *testing.T) {
+	caster := &targetActor{id: 1, category: CategoryPlayable}
+	holyThing := &targetActor{id: 2, category: CategoryFolk, holy: true}
+	lockedDoor := &targetActor{id: 3, category: CategoryFolk}
+	unlockableDoor := &targetActor{id: 4, category: CategoryFolk, unlockable: true}
+	undeadMonster := &targetActor{id: 5, category: CategoryAttackable, undead: true}
+	livingMonster := &targetActor{id: 6, category: CategoryAttackable}
+	deadUndead := &targetActor{id: 7, category: CategoryAttackable, dead: true, undead: true}
+	undeadServitor := &targetActor{id: 8, category: CategoryPlayable, owner: caster, undead: true}
+	registry := NewRegistry(knownList{caster, holyThing, lockedDoor, unlockableDoor, undeadMonster, livingMonster, deadUndead, undeadServitor})
+	skill := &modelskill.Definition{}
+
+	holy := mustHandler(t, registry, modelskill.TargetHoly)
+	if got := holy.FinalTarget(caster, holyThing, skill); got != holyThing {
+		t.Fatalf("holy final target = %v, want holy thing", got)
+	}
+	if got := ids(holy.Targets(caster, holyThing, skill)); !slices.Equal(got, []int32{2}) {
+		t.Fatalf("holy targets = %v, want [2]", got)
+	}
+	if !holy.CanCast(caster, holyThing, skill, false) {
+		t.Fatal("holy CanCast on holy target = false, want true")
+	}
+	if holy.CanCast(caster, lockedDoor, skill, false) {
+		t.Fatal("holy CanCast on non-holy target = true, want false")
+	}
+
+	unlockable := mustHandler(t, registry, modelskill.TargetUnlockable)
+	if got := unlockable.FinalTarget(caster, unlockableDoor, skill); got != unlockableDoor {
+		t.Fatalf("unlockable final target = %v, want unlockable door", got)
+	}
+	if got := ids(unlockable.Targets(caster, unlockableDoor, skill)); !slices.Equal(got, []int32{4}) {
+		t.Fatalf("unlockable targets = %v, want [4]", got)
+	}
+	if !unlockable.CanCast(caster, unlockableDoor, skill, false) {
+		t.Fatal("unlockable CanCast on unlockable target = false, want true")
+	}
+	if unlockable.CanCast(caster, lockedDoor, skill, false) {
+		t.Fatal("unlockable CanCast on locked target = true, want false")
+	}
+
+	undead := mustHandler(t, registry, modelskill.TargetUndead)
+	if got := undead.FinalTarget(caster, undeadMonster, skill); got != undeadMonster {
+		t.Fatalf("undead final target = %v, want undead monster", got)
+	}
+	if got := ids(undead.Targets(caster, undeadMonster, skill)); !slices.Equal(got, []int32{5}) {
+		t.Fatalf("undead targets = %v, want [5]", got)
+	}
+	if !undead.CanCast(caster, undeadMonster, skill, false) {
+		t.Fatal("undead CanCast on undead monster = false, want true")
+	}
+	if !undead.CanCast(caster, undeadServitor, skill, false) {
+		t.Fatal("undead CanCast on undead servitor = false, want true")
+	}
+	if undead.CanCast(caster, livingMonster, skill, false) {
+		t.Fatal("undead CanCast on living monster = true, want false")
+	}
+	if undead.CanCast(caster, deadUndead, skill, false) {
+		t.Fatal("undead CanCast on dead undead = true, want false")
+	}
+}
+
 func TestAreaTargetsAnchorOnAimedTarget(t *testing.T) {
 	caster := &targetActor{id: 1, category: CategoryPlayable, x: 0, y: 0, attackableWithoutForce: true}
 	aimed := &targetActor{id: 2, category: CategoryAttackable, x: 100, y: 0, attackableWithoutForce: true}
@@ -96,6 +161,39 @@ func TestAuraTargetsFilterBySightAndAttackability(t *testing.T) {
 	got := ids(aura.Targets(caster, nil, &modelskill.Definition{Radius: 100}))
 	if want := []int32{2, 3}; !slices.Equal(got, want) {
 		t.Fatalf("aura targets = %v, want %v", got, want)
+	}
+}
+
+func TestAuraUndeadTargetsFilterByUndeadSightAndAttackability(t *testing.T) {
+	caster := &targetActor{id: 1, category: CategoryPlayable}
+	undeadMonster := &targetActor{id: 2, category: CategoryAttackable, x: 80, undead: true, attackableWithoutForce: true}
+	undeadPlayable := &targetActor{id: 3, category: CategoryPlayable, x: 90, undead: true, attackableWithoutForce: true}
+	living := &targetActor{id: 4, category: CategoryAttackable, x: 70, attackableWithoutForce: true}
+	dead := &targetActor{id: 5, category: CategoryAttackable, x: 60, dead: true, undead: true, attackableWithoutForce: true}
+	blocked := &targetActor{id: 6, category: CategoryAttackable, x: 50, undead: true, attackableWithoutForce: true}
+	passive := &targetActor{id: 7, category: CategoryAttackable, x: 40, undead: true}
+	caster.see = map[int32]bool{6: false}
+
+	registry := NewRegistry(knownList{caster, undeadMonster, undeadPlayable, living, dead, blocked, passive})
+	auraUndead := mustHandler(t, registry, modelskill.TargetAuraUndead)
+
+	if got := auraUndead.FinalTarget(caster, nil, &modelskill.Definition{}); got != caster {
+		t.Fatalf("aura undead final target = %v, want caster", got)
+	}
+	got := ids(auraUndead.Targets(caster, nil, &modelskill.Definition{Radius: 100}))
+	if want := []int32{2, 3}; !slices.Equal(got, want) {
+		t.Fatalf("aura undead targets = %v, want %v", got, want)
+	}
+
+	if !auraUndead.CanCast(caster, nil, &modelskill.Definition{Offensive: true}, false) {
+		t.Fatal("aura undead CanCast outside peace zone = false, want true")
+	}
+	caster.peace = true
+	if auraUndead.CanCast(caster, nil, &modelskill.Definition{Offensive: true}, false) {
+		t.Fatal("aura undead CanCast in peace zone with offensive skill = true, want false")
+	}
+	if !auraUndead.CanCast(caster, nil, &modelskill.Definition{}, false) {
+		t.Fatal("aura undead CanCast in peace zone with non-offensive skill = false, want true")
 	}
 }
 
@@ -237,6 +335,10 @@ type targetActor struct {
 	attackableWithoutForce bool
 	summon                 Creature
 	owner                  Creature
+	holy                   bool
+	unlockable             bool
+	undead                 bool
+	peace                  bool
 }
 
 func (a *targetActor) ObjectID() int32 { return a.id }
@@ -264,6 +366,14 @@ func (a *targetActor) AttackableWithoutForceBy(Creature) bool { return a.attacka
 func (a *targetActor) Summon() (Creature, bool) { return a.summon, a.summon != nil }
 
 func (a *targetActor) Owner() (Creature, bool) { return a.owner, a.owner != nil }
+
+func (a *targetActor) Holy() bool { return a.holy }
+
+func (a *targetActor) Unlockable() bool { return a.unlockable }
+
+func (a *targetActor) Undead() bool { return a.undead }
+
+func (a *targetActor) InPeaceZone() bool { return a.peace }
 
 type knownList []*targetActor
 
