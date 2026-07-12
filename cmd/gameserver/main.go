@@ -29,10 +29,12 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/engine"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/pathfind"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/probe"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/fatal10110/acis_golang/internal/loginserver/model"
 )
 
@@ -59,6 +61,7 @@ type gameData struct {
 	Players *player.TemplateTable
 	Levels  *player.LevelTable
 	Items   *item.Table
+	NPCs    *npc.Table
 	Geo     *engine.Engine
 	Finder  *pathfind.Finder
 }
@@ -105,11 +108,16 @@ func newGameServerApp(paths gameServerPaths) *fx.App {
 			provideIDAllocator,
 			provideRoster,
 			providePvPFlags,
+			provideWorldState,
+			provideGroundItemOptions,
+			provideGroundItems,
+			provideDecay,
+			provideAttackStance,
 			network.NewSessionValidator,
 			provideLoginLinkState,
 			provideGameClientLink,
 		),
-		fx.Invoke(startPvPFlags, startGameServer),
+		fx.Invoke(startPvPFlags, startGroundItems, startDecay, startAttackStance, startGameServer),
 	)
 }
 
@@ -256,12 +264,16 @@ func loadGameData(paths gameServerPaths, log zerolog.Logger) (*gameData, error) 
 	if err != nil {
 		return nil, err
 	}
+	npcs, err := gamexml.LoadNPCTemplates(filepath.Join(xmlRoot, "npcs"), items, log)
+	if err != nil {
+		return nil, err
+	}
 	geo, err := loadGeodata(paths)
 	if err != nil {
 		return nil, err
 	}
-	log.Info().Str("geodata_dir", geo.Dir).Str("geodata_type", string(geo.Type)).Msg("game data loaded")
-	return &gameData{Players: players, Levels: levels, Items: items, Geo: geo.Engine, Finder: geo.Finder}, nil
+	log.Info().Str("geodata_dir", geo.Dir).Str("geodata_type", string(geo.Type)).Int("npc_templates", npcs.Len()).Msg("game data loaded")
+	return &gameData{Players: players, Levels: levels, Items: items, NPCs: npcs, Geo: geo.Engine, Finder: geo.Finder}, nil
 }
 
 func loadGeodata(paths gameServerPaths) (*geodata, error) {
@@ -317,13 +329,24 @@ func providePvPFlags(opts task.PvPFlagOptions) *task.PvPFlags {
 }
 
 func startPvPFlags(lc fx.Lifecycle, flags *task.PvPFlags, opts task.PvPFlagOptions, log zerolog.Logger) {
-	var ticker *scheduler.Ticker
 	lc.Append(fx.Hook{
 		OnStart: func(context.Context) error {
 			for _, key := range opts.UnsupportedKeys {
 				log.Warn().Str("file", "players.properties").Str("key", key).Msg("unsupported Karma/PvP config option")
 			}
-			ticker = flags.Start(log)
+			return nil
+		},
+	})
+	startTicker(lc, log, flags.Start)
+}
+
+// startTicker wires a component's fixed-interval task into the fx
+// lifecycle: started once fx starts, stopped once fx stops.
+func startTicker(lc fx.Lifecycle, log zerolog.Logger, start func(zerolog.Logger) *scheduler.Ticker) {
+	var ticker *scheduler.Ticker
+	lc.Append(fx.Hook{
+		OnStart: func(context.Context) error {
+			ticker = start(log)
 			return nil
 		},
 		OnStop: func(context.Context) error {
@@ -333,6 +356,77 @@ func startPvPFlags(lc fx.Lifecycle, flags *task.PvPFlags, opts task.PvPFlagOptio
 			return nil
 		},
 	})
+}
+
+func provideWorldState() *world.State {
+	return world.New()
+}
+
+func provideGroundItemOptions(props *config.Properties) (task.GroundItemOptions, error) {
+	return task.GroundItemOptionsFromProperties(props)
+}
+
+func provideGroundItems(state *world.State, opts task.GroundItemOptions) *task.GroundItems {
+	return task.NewGroundItems(state, opts, time.Now)
+}
+
+func startGroundItems(lc fx.Lifecycle, items *task.GroundItems, log zerolog.Logger) {
+	startTicker(lc, log, items.Start)
+}
+
+// worldDecayEffects removes a decayed actor from the world once its corpse
+// display interval elapses. Actors without a decay hook are left alone —
+// nothing outside the corpse-decay task itself is expected to register an
+// actor that can't decay.
+type worldDecayEffects struct{ state *world.State }
+
+type decayableActor interface {
+	Decay(*world.State, func()) bool
+}
+
+func (w worldDecayEffects) Decay(actor task.DecayActor) {
+	obj, ok := w.state.Object(actor.ObjectID())
+	if !ok {
+		return
+	}
+	if d, ok := obj.(decayableActor); ok {
+		d.Decay(w.state, nil)
+	}
+}
+
+func provideDecay(state *world.State) (*task.Decay, error) {
+	return task.NewDecay(worldDecayEffects{state: state}, time.Now)
+}
+
+func startDecay(lc fx.Lifecycle, d *task.Decay, log zerolog.Logger) {
+	startTicker(lc, log, d.Start)
+}
+
+// worldAttackStanceEffects stops an actor's attack animation once its
+// combat-stance inactivity period elapses. Actors that don't expose a
+// physical-attack controller are left alone.
+type worldAttackStanceEffects struct{ state *world.State }
+
+type attackStoppableActor interface {
+	Stop()
+}
+
+func (w worldAttackStanceEffects) AutoAttackStop(actor task.AttackStanceActor) {
+	obj, ok := w.state.Object(actor.ObjectID())
+	if !ok {
+		return
+	}
+	if s, ok := obj.(attackStoppableActor); ok {
+		s.Stop()
+	}
+}
+
+func provideAttackStance(state *world.State) (*task.AttackStance, error) {
+	return task.NewAttackStance(worldAttackStanceEffects{state: state}, time.Now)
+}
+
+func startAttackStance(lc fx.Lifecycle, a *task.AttackStance, log zerolog.Logger) {
+	startTicker(lc, log, a.Start)
 }
 
 type loginLinkState struct {
