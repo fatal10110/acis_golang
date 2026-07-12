@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/engine"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/pathfind"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/probe"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/loginserver/model"
 )
 
@@ -91,6 +92,27 @@ KarmaPlayerCanShop = False
 	if len(opts.UnsupportedKeys) != 1 || opts.UnsupportedKeys[0] != "KarmaPlayerCanShop" {
 		t.Fatalf("UnsupportedKeys = %v, want [KarmaPlayerCanShop]", opts.UnsupportedKeys)
 	}
+}
+
+func TestProvideAdditionalLifecycleTasks(t *testing.T) {
+	water, err := provideWater()
+	if err != nil {
+		t.Fatalf("provideWater() error = %v", err)
+	}
+	if water == nil {
+		t.Fatal("provideWater() = nil")
+	}
+
+	shadowItems, err := provideShadowItems()
+	if err != nil {
+		t.Fatalf("provideShadowItems() error = %v", err)
+	}
+	if shadowItems == nil {
+		t.Fatal("provideShadowItems() = nil")
+	}
+
+	var _ *task.Water = water
+	var _ *task.ShadowItems = shadowItems
 }
 
 func TestGameServerConfigUsesRequestIDWithoutHexID(t *testing.T) {

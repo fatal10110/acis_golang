@@ -127,6 +127,8 @@ func newGameServerApp(paths gameServerPaths) *fx.App {
 			provideGroundItems,
 			provideGameClock,
 			provideWalker,
+			provideWater,
+			provideShadowItems,
 			provideDecay,
 			provideAttackStance,
 			provideWorldObjects,
@@ -138,7 +140,7 @@ func newGameServerApp(paths gameServerPaths) *fx.App {
 			provideLoginLinkState,
 			provideGameClientLink,
 		),
-		fx.Invoke(startPvPFlags, startGroundItems, startGameClock, startWalker, startDecay, startAttackStance, startWorldObjects, startRespawnTask, startAI, startNpcs, startNpcPersistence, startGameServer),
+		fx.Invoke(startPvPFlags, startGroundItems, startGameClock, startWalker, startWater, startShadowItems, startDecay, startAttackStance, startWorldObjects, startRespawnTask, startAI, startNpcs, startNpcPersistence, startGameServer),
 	)
 }
 
@@ -467,6 +469,29 @@ func provideWalker(data *gameData) (*task.Walker, error) {
 
 func startWalker(lc fx.Lifecycle, walker *task.Walker, log zerolog.Logger) {
 	startTicker(lc, log, walker.Start)
+}
+
+type gameTaskEffects struct{}
+
+func (gameTaskEffects) GaugeSet(task.WaterActor, time.Duration)  {}
+func (gameTaskEffects) Drown(task.WaterActor)                    {}
+func (gameTaskEffects) ManaThreshold(int32, *item.Instance, int) {}
+func (gameTaskEffects) Expire(int32, *item.Instance)             {}
+
+func provideWater() (*task.Water, error) {
+	return task.NewWater(gameTaskEffects{}, time.Now)
+}
+
+func startWater(lc fx.Lifecycle, water *task.Water, log zerolog.Logger) {
+	startTicker(lc, log, water.Start)
+}
+
+func provideShadowItems() (*task.ShadowItems, error) {
+	return task.NewShadowItems(gameTaskEffects{})
+}
+
+func startShadowItems(lc fx.Lifecycle, items *task.ShadowItems, log zerolog.Logger) {
+	startTicker(lc, log, items.Start)
 }
 
 // worldDecayEffects removes a decayed actor from the world once its corpse
