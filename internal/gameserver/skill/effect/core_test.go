@@ -1,6 +1,7 @@
 package effect
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -102,6 +103,113 @@ func TestNewBuildsCoreEffectMetadata(t *testing.T) {
 	}
 }
 
+func TestDisablerEffectsRunLiveStartExitHooks(t *testing.T) {
+	tests := []struct {
+		name      string
+		wantStart []string
+		wantExit  []string
+	}{
+		{
+			name:      "Stun",
+			wantStart: []string{"abort:false", "idle", "abnormal"},
+			wantExit:  []string{"abnormal"},
+		},
+		{
+			name:      "Root",
+			wantStart: []string{"stop-move", "abnormal"},
+			wantExit:  []string{"think", "abnormal"},
+		},
+		{
+			name:      "Sleep",
+			wantStart: []string{"abort:false", "abnormal"},
+			wantExit:  []string{"think", "abnormal"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			target := &liveEffectTarget{}
+			e, err := New(Skill{ID: 1}, modelskill.EffectTemplate{Name: tt.name})
+			if err != nil {
+				t.Fatalf("New() error: %v", err)
+			}
+			e.Effected = target
+			list := NewList(nil)
+
+			list.Add(e)
+			if !reflect.DeepEqual(target.events, tt.wantStart) {
+				t.Fatalf("start events = %#v, want %#v", target.events, tt.wantStart)
+			}
+
+			target.events = nil
+			list.Remove(e)
+			if !reflect.DeepEqual(target.events, tt.wantExit) {
+				t.Fatalf("exit events = %#v, want %#v", target.events, tt.wantExit)
+			}
+		})
+	}
+}
+
+func TestFearEffectHooksFleeAndRejectImmuneTargets(t *testing.T) {
+	target := &liveEffectTarget{}
+	e, err := New(Skill{ID: 1092}, modelskill.EffectTemplate{Name: "Fear"})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e.Effector = "caster"
+	e.Effected = target
+
+	list := NewList(nil)
+	list.Add(e)
+	if want := []string{"abort:false", "abnormal", "flee:caster:500"}; !reflect.DeepEqual(target.events, want) {
+		t.Fatalf("fear start events = %#v, want %#v", target.events, want)
+	}
+
+	target.events = nil
+	if !e.ActionTime() {
+		t.Fatal("fear action hook stopped, want continuing flee ticks")
+	}
+	if want := []string{"flee:caster:500"}; !reflect.DeepEqual(target.events, want) {
+		t.Fatalf("fear action events = %#v, want %#v", target.events, want)
+	}
+
+	target.events = nil
+	list.Remove(e)
+	if want := []string{"stop-effects:FEAR", "abnormal"}; !reflect.DeepEqual(target.events, want) {
+		t.Fatalf("fear exit events = %#v, want %#v", target.events, want)
+	}
+
+	immune := &liveEffectTarget{fearImmune: true}
+	blocked, err := New(Skill{ID: 1092}, modelskill.EffectTemplate{Name: "Fear"})
+	if err != nil {
+		t.Fatalf("New() immune error: %v", err)
+	}
+	blocked.Effected = immune
+	blockedList := NewList(nil)
+	blockedList.Add(blocked)
+	if blocked.InUse() {
+		t.Fatal("blocked fear effect is in use")
+	}
+	if got := len(blockedList.All()); got != 0 {
+		t.Fatalf("blocked fear effects in list = %d, want 0", got)
+	}
+
+	playable := &liveEffectTarget{playable: true}
+	skipped, err := New(Skill{ID: 98}, modelskill.EffectTemplate{Name: "Fear", StackType: "turn_flee", StackOrder: 1})
+	if err != nil {
+		t.Fatalf("New() playable skip error: %v", err)
+	}
+	skipped.Effected = playable
+	skippedList := NewList(nil)
+	skippedList.Add(skipped)
+	if skipped.InUse() {
+		t.Fatal("playable-skipped fear effect is in use")
+	}
+	if got := len(skippedList.All()); got != 0 {
+		t.Fatalf("playable-skipped fear effects in list = %d, want 0", got)
+	}
+}
+
 func TestDamageOverTimeTick(t *testing.T) {
 	tests := []struct {
 		name string
@@ -147,4 +255,113 @@ func TestDamageOverTimeTick(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDamageOverTimeHookMutatesLiveTarget(t *testing.T) {
+	target := &liveEffectTarget{hp: 10}
+	e, err := New(Skill{ID: 4082}, modelskill.EffectTemplate{Name: "DamOverTime", Value: 4})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e.Effector = "caster"
+	e.Effected = target
+
+	if !e.ActionTime() {
+		t.Fatal("DoT action hook stopped on live target")
+	}
+	if target.hp != 6 {
+		t.Fatalf("target hp = %v, want 6", target.hp)
+	}
+	if want := []string{"dot:4:caster:4082"}; !reflect.DeepEqual(target.events, want) {
+		t.Fatalf("DoT events = %#v, want %#v", target.events, want)
+	}
+
+	target.hp = 3
+	target.events = nil
+	e.Template.Value = 5
+	if !e.ActionTime() {
+		t.Fatal("non-lethal DoT action stopped at low hp")
+	}
+	if target.hp != 1 {
+		t.Fatalf("low-hp target hp = %v, want 1", target.hp)
+	}
+	if want := []string{"dot:2:caster:4082"}; !reflect.DeepEqual(target.events, want) {
+		t.Fatalf("low-hp DoT events = %#v, want %#v", target.events, want)
+	}
+
+	target.hp = 1
+	target.events = nil
+	if !e.ActionTime() {
+		t.Fatal("DoT at one hp stopped, want continuing without damage")
+	}
+	if len(target.events) != 0 {
+		t.Fatalf("one-hp DoT events = %#v, want none", target.events)
+	}
+
+	target.hp = 10
+	target.events = nil
+	e.Template.Value = 10
+	e.Skill.Toggle = true
+	if e.ActionTime() {
+		t.Fatal("toggle DoT action continued after lethal tick, want stop")
+	}
+	if want := []string{"lack-hp"}; !reflect.DeepEqual(target.events, want) {
+		t.Fatalf("toggle DoT events = %#v, want %#v", target.events, want)
+	}
+}
+
+type liveEffectTarget struct {
+	events     []string
+	hp         float64
+	dead       bool
+	afraid     bool
+	fearImmune bool
+	playable   bool
+}
+
+func (t *liveEffectTarget) Dead() bool { return t.dead }
+
+func (t *liveEffectTarget) HP() float64 { return t.hp }
+
+func (t *liveEffectTarget) ReduceHPByDOT(damage float64, effector any, skill Skill) {
+	t.hp -= damage
+	t.events = append(t.events, fmt.Sprintf("dot:%g:%v:%d", damage, effector, skill.ID))
+}
+
+func (t *liveEffectTarget) NotifyEffectRemovedDueLackHP(*Effect) {
+	t.events = append(t.events, "lack-hp")
+}
+
+func (t *liveEffectTarget) AbortAll(force bool) {
+	t.events = append(t.events, fmt.Sprintf("abort:%v", force))
+}
+
+func (t *liveEffectTarget) TryToIdle() {
+	t.events = append(t.events, "idle")
+}
+
+func (t *liveEffectTarget) StopMove() {
+	t.events = append(t.events, "stop-move")
+}
+
+func (t *liveEffectTarget) UpdateAbnormalEffect() {
+	t.events = append(t.events, "abnormal")
+}
+
+func (t *liveEffectTarget) Think() {
+	t.events = append(t.events, "think")
+}
+
+func (t *liveEffectTarget) Afraid() bool { return t.afraid }
+
+func (t *liveEffectTarget) FearImmune() bool { return t.fearImmune }
+
+func (t *liveEffectTarget) Playable() bool { return t.playable }
+
+func (t *liveEffectTarget) FleeFrom(effector any, distance int) {
+	t.events = append(t.events, fmt.Sprintf("flee:%v:%d", effector, distance))
+}
+
+func (t *liveEffectTarget) StopEffects(typ Type) {
+	t.events = append(t.events, "stop-effects:"+string(typ))
 }

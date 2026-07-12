@@ -31,9 +31,10 @@ const (
 // Skill carries the skill fields the effect container needs for ordering and
 // duplicate handling.
 type Skill struct {
-	ID     modelskill.ID
-	Debuff bool
-	Toggle bool
+	ID        modelskill.ID
+	Debuff    bool
+	Toggle    bool
+	KillByDOT bool
 }
 
 func (s Skill) sevenSigns() bool {
@@ -49,6 +50,8 @@ type Effect struct {
 	Flag     Flag
 	Funcs    []basefunc.Func
 	Herb     bool
+	Effector any
+	Effected any
 
 	OnStart    func(*Effect) bool
 	OnAction   func(*Effect) bool
@@ -76,13 +79,17 @@ func (e *Effect) ActionTime() bool {
 }
 
 func (e *Effect) setInUse(inUse bool) bool {
-	e.inUse = inUse
 	if inUse {
-		if e.OnStart != nil {
-			return e.OnStart(e)
+		if e.OnStart != nil && !e.OnStart(e) {
+			return false
 		}
+		e.inUse = true
 		return true
 	}
+	if !e.inUse {
+		return true
+	}
+	e.inUse = false
 	if e.OnExit != nil {
 		e.OnExit(e)
 	}
@@ -212,6 +219,8 @@ func (l *List) add(e *Effect) {
 	if e.stackType() == "none" {
 		if e.setInUse(true) {
 			l.addStatFuncs(e)
+		} else {
+			l.removeFromVisible(e)
 		}
 		return
 	}
@@ -269,9 +278,27 @@ func (l *List) addStacked(e *Effect) {
 		l.removeStats(deactivate)
 		deactivate.setInUse(false)
 	}
-	if activate != nil && activate.setInUse(true) {
-		l.addStatFuncs(activate)
+	if activate != nil {
+		if activate.setInUse(true) {
+			l.addStatFuncs(activate)
+		} else {
+			l.removeRejectedStacked(activate)
+		}
 	}
+}
+
+func (l *List) removeRejectedStacked(e *Effect) {
+	stackType := e.stackType()
+	queue := l.stacks[stackType]
+	if index := slices.Index(queue, e); index >= 0 {
+		queue = slices.Delete(queue, index, index+1)
+	}
+	if len(queue) == 0 {
+		delete(l.stacks, stackType)
+	} else {
+		l.stacks[stackType] = queue
+	}
+	l.removeFromVisible(e)
 }
 
 func (l *List) remove(e *Effect) {
