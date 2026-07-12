@@ -2,9 +2,8 @@ package world
 
 import (
 	"bytes"
+	"encoding/binary"
 	"testing"
-
-	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
 // clientStub is an observer that encodes a despawn packet for every object
@@ -17,11 +16,9 @@ type clientStub struct {
 func (c *clientStub) Discover(obj Tracked) {}
 
 func (c *clientStub) Forget(obj Tracked) {
-	frame := serverpackets.FrameDeleteObject(obj.ObjectID(), false)
-	defer frame.Release()
-	raw := frame.Bytes()
-	payload := make([]byte, len(raw)-2)
-	copy(payload, raw[2:])
+	payload := []byte{0x12}
+	payload = binary.LittleEndian.AppendUint32(payload, uint32(obj.ObjectID()))
+	payload = binary.LittleEndian.AppendUint32(payload, 1)
 	c.sent = append(c.sent, payload)
 }
 

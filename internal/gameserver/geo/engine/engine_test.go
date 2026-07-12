@@ -71,12 +71,34 @@ func TestCanSee(t *testing.T) {
 			t.Fatal("CanSee() = true, want false")
 		}
 	})
+
+	t.Run("uses configured obstacle height", func(t *testing.T) {
+		makeBlock := func(x, y int) block.Cell {
+			if x == 1 && y == 0 {
+				return block.Cell{Height: 40, NSWE: block.AllDirections}
+			}
+			return block.Cell{Height: 0, NSWE: block.AllDirections}
+		}
+
+		if newTestEngine(t, complexBlock(makeBlock)).CanSee(worldX(0), worldY(0), 0, worldX(2), worldY(0), 0) {
+			t.Fatal("default CanSee() = true over 40-height obstacle, want false")
+		}
+
+		e := newTestEngineWithOptions(t, Options{MaxObstacleHeight: 48}, complexBlock(makeBlock))
+		if !e.CanSee(worldX(0), worldY(0), 0, worldX(2), worldY(0), 0) {
+			t.Fatal("configured CanSee() = false over 40-height obstacle, want true")
+		}
+	})
 }
 
 func newTestEngine(t testing.TB, first block.Block) *Engine {
+	return newTestEngineWithOptions(t, DefaultOptions(), first)
+}
+
+func newTestEngineWithOptions(t testing.TB, options Options, first block.Block) *Engine {
 	t.Helper()
 
-	e := New()
+	e := New(options)
 	region, err := block.NewRegionFromBlocks([]block.Block{first})
 	if err != nil {
 		t.Fatalf("NewRegionFromBlocks(): %v", err)

@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
@@ -26,13 +25,12 @@ func newCombatHostile(t *testing.T, id int32, tpl *Template) *Hostile {
 	return h
 }
 
-func TestHostileMakeAttackHitDealsDamageAndAppliesIt(t *testing.T) {
+func TestHostileMakeAttackHitResolvesDamage(t *testing.T) {
 	attacker := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", PAtk: 100, DEX: 30, Level: 1, CritRate: 4})
 	attacker.SetRollSource(zeroRoll)
 	defender := newCombatHostile(t, 2, &Template{ID: 2, Type: "Monster", PDef: 50, DEX: 30, Level: 1, HPMax: 1000})
 
-	controller := attack.NewAttackable(attacker)
-	controller.DoAttack(defender)
+	hit := attacker.MakeAttackHit(defender, false)
 
 	// With attacker.PAtk=100, defender.PDef=50, an even accuracy/evasion
 	// match (same DEX/level on both sides) and a guaranteed critical hit
@@ -40,8 +38,11 @@ func TestHostileMakeAttackHitDealsDamageAndAppliesIt(t *testing.T) {
 	// the reference implementation) resolves to:
 	//   (100*2 * 1(posMul) * 1(randomMul) + 0) * 77/50 = 308
 	const wantDamage = 308
-	if got := defender.CurrentHP(); got != defender.MaxHP()-wantDamage {
-		t.Fatalf("defender HP = %d, want %d", got, defender.MaxHP()-wantDamage)
+	if hit.Miss || hit.Damage != wantDamage {
+		t.Fatalf("MakeAttackHit() = %+v, want %d damage", hit, wantDamage)
+	}
+	if got := defender.CurrentHP(); got != defender.MaxHP() {
+		t.Fatalf("defender HP = %d, want unchanged %d", got, defender.MaxHP())
 	}
 }
 
@@ -67,8 +68,8 @@ func TestHostileTakeDamageReachingZeroTriggersDieAndDecayChain(t *testing.T) {
 		t.Fatal("defender.Dead() = true before any damage, want false")
 	}
 
-	controller := attack.NewAttackable(attacker)
-	controller.DoAttack(defender) // 308 damage vs 100 HP: lethal in one hit.
+	hit := attacker.MakeAttackHit(defender, false) // 308 damage vs 100 HP: lethal in one hit.
+	defender.TakeDamage(hit.Damage, attacker)
 
 	if !defender.Dead() {
 		t.Fatal("defender.Dead() = false after a lethal hit, want true")

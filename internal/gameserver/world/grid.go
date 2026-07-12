@@ -51,7 +51,14 @@ func (g *Grid) RegionAt(x, y int) (region *Region, ok bool) {
 // Neighbors returns every Region within depth grid steps of r, including r
 // itself, clipped to the grid's edges.
 func (g *Grid) Neighbors(r *Region, depth int) []*Region {
-	var out []*Region
+	return g.AppendNeighbors(nil, r, depth)
+}
+
+// AppendNeighbors appends every Region within depth grid steps of r,
+// including r itself, clipped to the grid's edges. Passing a caller-owned
+// buffer lets hot visibility paths avoid allocating a fresh slice for the
+// common depth=1 scan.
+func (g *Grid) AppendNeighbors(out []*Region, r *Region, depth int) []*Region {
 	for ix := -depth; ix <= depth; ix++ {
 		x := r.tileX + ix
 		if x < 0 || x >= RegionsX {

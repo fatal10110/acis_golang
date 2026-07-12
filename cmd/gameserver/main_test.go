@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/config"
+	"github.com/fatal10110/acis_golang/internal/gameserver/geo/engine"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/pathfind"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/probe"
 	"github.com/fatal10110/acis_golang/internal/loginserver/model"
@@ -169,6 +170,7 @@ MoveWeightDiag = 15
 ObstacleWeight = 33
 HeuristicWeight = 17
 MaxIterations = 1234
+MaxObstacleHeight = 48
 `), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -189,6 +191,13 @@ MaxIterations = 1234
 	}
 	if geo.Type != probe.L2J {
 		t.Errorf("Type = %q, want %q", geo.Type, probe.L2J)
+	}
+	wantEngineOptions := engine.Options{MaxObstacleHeight: 48}
+	if geo.EngineOptions != wantEngineOptions {
+		t.Errorf("EngineOptions = %#v, want %#v", geo.EngineOptions, wantEngineOptions)
+	}
+	if got := geo.Engine.MaxObstacleHeight(); got != 48 {
+		t.Errorf("Engine.MaxObstacleHeight() = %d, want 48", got)
 	}
 	wantOptions := pathfind.Options{
 		MoveWeight:      11,
@@ -219,6 +228,12 @@ func TestLoadGeodataDefaultsToDatapackGeodata(t *testing.T) {
 	}
 	if geo.Type != probe.L2OFF {
 		t.Errorf("Type = %q, want %q", geo.Type, probe.L2OFF)
+	}
+	if geo.EngineOptions != engine.DefaultOptions() {
+		t.Errorf("EngineOptions = %#v, want defaults %#v", geo.EngineOptions, engine.DefaultOptions())
+	}
+	if got := geo.Engine.MaxObstacleHeight(); got != engine.DefaultOptions().MaxObstacleHeight {
+		t.Errorf("Engine.MaxObstacleHeight() = %d, want default", got)
 	}
 	if geo.Pathfind != pathfind.DefaultOptions() {
 		t.Errorf("Pathfind = %#v, want defaults %#v", geo.Pathfind, pathfind.DefaultOptions())

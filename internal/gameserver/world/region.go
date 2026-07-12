@@ -37,11 +37,27 @@ func (r *Region) Remove(id int32) {
 
 // Objects returns a snapshot of every object currently visible within r.
 func (r *Region) Objects() []Tracked {
+	return r.AppendObjects(nil)
+}
+
+// AppendObjects appends a snapshot of every object currently visible within
+// r to out and returns the extended slice. Callers that repeatedly scan
+// regions can reuse out to avoid one allocation per region.
+func (r *Region) AppendObjects(out []Tracked) []Tracked {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	out := make([]Tracked, 0, len(r.objects))
 	for _, o := range r.objects {
 		out = append(out, o)
 	}
 	return out
+}
+
+// Each calls fn for every object currently visible within r while holding
+// r's read lock. Use AppendObjects instead when fn can re-enter world state.
+func (r *Region) Each(fn func(Tracked)) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	for _, o := range r.objects {
+		fn(o)
+	}
 }

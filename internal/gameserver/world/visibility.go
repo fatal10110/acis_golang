@@ -98,23 +98,27 @@ func (s *State) relocate(t Tracked, next *Region) {
 	prev := p.region
 	p.mu.RUnlock()
 
+	var oldAreaBuf, newAreaBuf [9]*Region
 	var oldAreas, newAreas []*Region
 	if prev != nil {
 		prev.Remove(t.ObjectID())
-		oldAreas = s.Neighbors(prev, 1)
+		oldAreas = s.AppendNeighbors(oldAreaBuf[:0], prev, 1)
 	}
 	if next != nil {
 		next.Add(t)
-		newAreas = s.Neighbors(next, 1)
+		newAreas = s.AppendNeighbors(newAreaBuf[:0], next, 1)
 	}
 
 	tObs, tObserves := t.(Observer)
+	var objectBuf [32]Tracked
+	objects := objectBuf[:0]
 
 	for _, r := range oldAreas {
 		if containsRegion(newAreas, r) {
 			continue
 		}
-		for _, o := range r.Objects() {
+		objects = r.AppendObjects(objects[:0])
+		for _, o := range objects {
 			if o.ObjectID() == t.ObjectID() {
 				continue
 			}
@@ -131,7 +135,8 @@ func (s *State) relocate(t Tracked, next *Region) {
 		if containsRegion(oldAreas, r) {
 			continue
 		}
-		for _, o := range r.Objects() {
+		objects = r.AppendObjects(objects[:0])
+		for _, o := range objects {
 			if o.ObjectID() == t.ObjectID() {
 				continue
 			}
@@ -181,8 +186,12 @@ func (s *State) ForEachKnown(t Tracked, fn func(Tracked)) {
 	if r == nil {
 		return
 	}
-	for _, region := range s.Neighbors(r, 1) {
-		for _, o := range region.Objects() {
+	var regionBuf [9]*Region
+	var objectBuf [32]Tracked
+	objects := objectBuf[:0]
+	for _, region := range s.AppendNeighbors(regionBuf[:0], r, 1) {
+		objects = region.AppendObjects(objects[:0])
+		for _, o := range objects {
 			if o.ObjectID() == t.ObjectID() {
 				continue
 			}
@@ -201,8 +210,12 @@ func (s *State) ForEachKnownInRadius(t Tracked, radius int, fn func(Tracked)) {
 		return
 	}
 
-	for _, region := range s.Neighbors(r, searchDepth(radius)) {
-		for _, o := range region.Objects() {
+	var regionBuf [9]*Region
+	var objectBuf [32]Tracked
+	objects := objectBuf[:0]
+	for _, region := range s.AppendNeighbors(regionBuf[:0], r, searchDepth(radius)) {
+		objects = region.AppendObjects(objects[:0])
+		for _, o := range objects {
 			if o.ObjectID() == t.ObjectID() || !inRange(radius, t, o) {
 				continue
 			}

@@ -1,34 +1,29 @@
 package serverpackets
 
-import "github.com/fatal10110/acis_golang/internal/commons/wire"
+import (
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
+)
 
 const (
 	// OpcodeAttack is the wire opcode for a physical attack animation.
 	OpcodeAttack = 0x05
 
 	// AttackHitSoulshot marks a hit using a soulshot charge.
-	AttackHitSoulshot = 0x10
+	AttackHitSoulshot = attack.HitSoulshot
 	// AttackHitCritical marks a critical hit.
-	AttackHitCritical = 0x20
+	AttackHitCritical = attack.HitCritical
 	// AttackHitShield marks a shield-blocked hit.
-	AttackHitShield = 0x40
+	AttackHitShield = attack.HitShield
 	// AttackHitMiss marks an evaded hit.
-	AttackHitMiss = 0x80
+	AttackHitMiss = attack.HitMiss
 )
 
 // AttackHit is one target entry in an Attack packet.
-type AttackHit struct {
-	TargetID int32
-	Damage   int
-	Flags    uint8
-}
+type AttackHit = attack.SnapshotHit
 
 // AttackSnapshot is the immutable data needed to broadcast one attack.
-type AttackSnapshot struct {
-	AttackerID int32
-	X, Y, Z    int
-	Hits       []AttackHit
-}
+type AttackSnapshot = attack.Snapshot
 
 // FrameAttack builds an Attack packet as an owned frame.
 func FrameAttack(s AttackSnapshot) wire.Frame {

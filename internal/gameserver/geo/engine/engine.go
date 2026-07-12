@@ -25,9 +25,6 @@ const (
 	regionCellsY = block.RegionBlocksY * block.CellsY
 	regionTilesX = TileXMax - TileXMin + 1
 	regionTilesY = TileYMax - TileYMin + 1
-
-	// ponytail: keep the shipped default until geoengine.properties lands.
-	maxObstacleHeight = 32
 )
 
 // Engine serves geodata height, movement, and line-of-sight queries.
@@ -38,11 +35,22 @@ type Engine struct {
 	mu            sync.RWMutex
 	regions       [regionTilesX][regionTilesY]*block.Region
 	dynamicBlocks map[blockKey]*dynamic.Block
+
+	maxObstacleHeight int
 }
 
 // New returns an empty engine that answers unloaded regions with null geodata.
-func New() *Engine {
-	return &Engine{}
+func New(options ...Options) *Engine {
+	opts := DefaultOptions()
+	if len(options) > 0 {
+		opts = options[0]
+	}
+	return &Engine{maxObstacleHeight: opts.MaxObstacleHeight}
+}
+
+// MaxObstacleHeight returns the line-of-sight obstacle allowance.
+func (e *Engine) MaxObstacleHeight() int {
+	return e.maxObstacleHeight
 }
 
 // SetRegion installs one decoded geodata region at the given tile coordinates.
@@ -241,7 +249,7 @@ func (e *Engine) canSee(ox, oy, oz int, oheight float64, tx, ty, tz int, theight
 		}
 
 		current = e.blockAtGeo(gox, goy)
-		losZ := float64(oz) + oheight + maxObstacleHeight
+		losZ := float64(oz) + oheight + float64(e.maxObstacleHeight)
 		losZ += mz * math.Sqrt(float64((checkX-ox)*(checkX-ox)+(checkY-oy)*(checkY-oy)))
 
 		if nswe.Allows(step) {

@@ -32,6 +32,9 @@ func TestKillRewardExpAndSp(t *testing.T) {
 		{"exp-only reward is zero, sp zeroed with it", 0, 100, 0, 100, 100, 0, 0},
 		{"tiny share far past threshold", 1000, 100, 100, 1, 1, 0, 0},
 		{"large reward one level past threshold", 123456, 7654, 6, 999, 1000, 102777, 6371},
+		{"exp just below int32 ceiling", 2147483646, 100, 0, 100, 100, 2147483646, 100},
+		{"exp just above int32 ceiling saturates", 2147483648, 100, 0, 100, 100, 2147483647, 100},
+		{"sp just above int32 ceiling saturates", 1000, 2147483648, 0, 100, 100, 1000, 2147483647},
 		{"zero total damage yields no reward", 1000, 100, 0, 0, 0, 0, 0},
 		{"negative total damage yields no reward", 1000, 100, 0, 0, -1, 0, 0},
 	}

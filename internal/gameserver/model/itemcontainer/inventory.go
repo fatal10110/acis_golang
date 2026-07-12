@@ -90,6 +90,16 @@ func NewPlayerInventory(ownerID int32, templates *item.Table) *Inventory {
 	return NewInventory(ownerID, item.LocationInventory, item.LocationPaperdoll, templates)
 }
 
+// RestorePlayerInventory rebuilds a player inventory from persisted item
+// rows without queuing client update notifications. Items outside the
+// inventory/paperdoll locations are ignored; those belong to warehouses,
+// freight, pets, or ground state rather than the carried player inventory.
+func RestorePlayerInventory(ownerID int32, templates *item.Table, items []*item.Instance) *Inventory {
+	inv := NewPlayerInventory(ownerID, templates)
+	inv.Restore(items)
+	return inv
+}
+
 // NewPetInventory returns an empty pet inventory for ownerID (the pet's
 // own world object id, not its owner's).
 func NewPetInventory(ownerID int32, templates *item.Table) *Inventory {
@@ -123,6 +133,47 @@ func (inv *Inventory) AddNew(templateID int32, count int, objectID int32) *item.
 	inst := &item.Instance{ObjectID: objectID, TemplateID: templateID, Count: count, ManaLeft: tmpl.InitialManaLeft()}
 	result, _ := inv.Add(inst)
 	return result
+}
+
+// Restore replaces inv's current contents with persisted item rows without
+// changing their locations and without queuing inventory updates.
+func (inv *Inventory) Restore(items []*item.Instance) {
+	inv.Container.mu.Lock()
+	defer inv.Container.mu.Unlock()
+	inv.mu.Lock()
+	defer inv.mu.Unlock()
+
+	clear(inv.Container.items)
+	clear(inv.paperdoll[:])
+	inv.wornMask = 0
+	inv.totalWeight = 0
+	inv.updates = nil
+
+	for _, inst := range items {
+		if inst == nil {
+			continue
+		}
+		switch inst.Location {
+		case inv.Location(), inv.equipLocation:
+		default:
+			continue
+		}
+
+		inst.OwnerID = inv.OwnerID()
+		inv.Container.items[inst.ObjectID] = inst
+
+		tmpl, _ := inv.Templates().Get(inst.TemplateID)
+		if tmpl != nil {
+			inv.totalWeight += int(tmpl.Weight) * inst.Count
+		}
+		if inst.Location != inv.equipLocation || inst.LocationData < 0 || inst.LocationData >= item.PaperdollSlots {
+			continue
+		}
+		inv.paperdoll[inst.LocationData] = inst
+		if tmpl != nil {
+			inv.wornMask |= tmpl.Mask()
+		}
+	}
 }
 
 // Remove removes inst from the inventory: unequipping it first if it was

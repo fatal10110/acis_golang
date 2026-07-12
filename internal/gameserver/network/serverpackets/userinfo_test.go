@@ -17,19 +17,19 @@ func appendF32(b []byte, v float32) []byte {
 
 func TestFrameUserInfo(t *testing.T) {
 	c := &player.Character{
-		ObjectID: 0x10000001,
-		Name:     "Newbie",
-		ClassID:  0,
-		Race:     player.RaceHuman,
-		Sex:      player.SexMale,
-		Level:    1,
-		Exp:      0,
-		SP:       0,
-		MaxHP:    80, CurHP: 75,
+		ID:      0x10000001,
+		Name:    "Newbie",
+		ClassID: 0,
+		Race:    player.RaceHuman,
+		Sex:     player.SexMale,
+		Level:   1,
+		Exp:     0,
+		SP:      0,
+		MaxHP:   80, CurHP: 75,
 		MaxMP: 30, CurMP: 30,
 		MaxCP: 40, CurCP: 40,
 		Face: 0, HairStyle: 1, HairColor: 2,
-		Position: location.Location{X: 10, Y: 20, Z: 30},
+		Location: location.Location{X: 10, Y: 20, Z: 30},
 		Heading:  100,
 		Karma:    0, PKKills: 1, PvPKills: 2,
 		ClanID: 5, Title: "Hero", AccessLevel: 1,
@@ -47,11 +47,12 @@ func TestFrameUserInfo(t *testing.T) {
 	got := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: c, Template: tmpl, Items: items}))
 
 	want := []byte{OpcodeUserInfo}
-	want = binary.LittleEndian.AppendUint32(want, uint32(c.Position.X))
-	want = binary.LittleEndian.AppendUint32(want, uint32(c.Position.Y))
-	want = binary.LittleEndian.AppendUint32(want, uint32(c.Position.Z))
+	x, y, z := c.Position()
+	want = binary.LittleEndian.AppendUint32(want, uint32(x))
+	want = binary.LittleEndian.AppendUint32(want, uint32(y))
+	want = binary.LittleEndian.AppendUint32(want, uint32(z))
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.Heading))
-	want = binary.LittleEndian.AppendUint32(want, uint32(c.ObjectID))
+	want = binary.LittleEndian.AppendUint32(want, uint32(c.ObjectID()))
 	want = append(want, encodeUTF16Z(c.Name)...)
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.Race))
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.Sex))

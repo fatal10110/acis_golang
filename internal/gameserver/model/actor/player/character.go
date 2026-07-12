@@ -3,20 +3,25 @@ package player
 import (
 	"fmt"
 	"math/rand/v2"
+	"sync"
 
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // defaultAccessLevel is the access level a freshly created character starts
 // at, matching the shipped server default.
 const defaultAccessLevel = 0
 
-// Character is one persisted characters-table row: the identity, appearance
-// and progress state needed to create, list, delete and restore a
-// character. It is not the live in-world actor — combat, AI and other
-// runtime-only concerns arrive with the systems that need them.
+// Character is one persisted characters-table row plus the runtime state
+// needed once that row enters the live world.
 type Character struct {
-	ObjectID    int32
+	world.Presence
+
+	ID          int32
 	AccountName string
 	Name        string
 
@@ -35,11 +40,11 @@ type Character struct {
 
 	Face, HairStyle, HairColor int
 
-	// Position and Heading are the character's last known world location.
+	// Location and Heading are the character's last known world location.
 	// A freshly created character carries the template's chosen spawn point
 	// only in memory: the characters table leaves these columns at their
 	// NULL default until the character is actually saved.
-	Position location.Location
+	Location location.Location
 	Heading  int
 
 	Karma             int
@@ -53,6 +58,17 @@ type Character struct {
 	// zero means the character is not scheduled for deletion.
 	DeleteAt   int64
 	LastAccess int64
+
+	runtimeTemplate *Template
+	inventory       *itemcontainer.Inventory
+	world           *world.State
+	sendFrame       func(wire.Frame) bool
+	broadcastAttack func(attack.Snapshot)
+	roll            func(int) int
+
+	deathMu sync.Mutex
+	dead    bool
+	hpMu    sync.Mutex
 }
 
 // NewCharacter builds a freshly created Character of profession tmpl for
@@ -78,7 +94,7 @@ func NewCharacter(objectID int32, tmpl *Template, accountName, name string, hair
 	}
 
 	c := &Character{
-		ObjectID:    objectID,
+		ID:          objectID,
 		AccountName: accountName,
 		Name:        name,
 
@@ -99,7 +115,7 @@ func NewCharacter(objectID int32, tmpl *Template, accountName, name string, hair
 	}
 
 	if len(tmpl.Spawns) > 0 {
-		c.Position = tmpl.Spawns[rand.IntN(len(tmpl.Spawns))]
+		c.Location = tmpl.Spawns[rand.IntN(len(tmpl.Spawns))]
 	}
 
 	return c, nil

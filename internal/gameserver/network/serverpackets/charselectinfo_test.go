@@ -170,7 +170,7 @@ func TestFrameCharSelectInfo_AutoPicksMostRecentlyAccessed(t *testing.T) {
 
 func TestNewCharacterSlot_PositionAndAppearance(t *testing.T) {
 	c := &player.Character{
-		Position: location.Location{X: 1, Y: 2, Z: 3},
+		Location: location.Location{X: 1, Y: 2, Z: 3},
 	}
 	slot := NewCharacterSlot(c, nil, time.Now())
 	if slot.X != 1 || slot.Y != 2 || slot.Z != 3 {

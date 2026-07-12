@@ -6,7 +6,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -25,7 +24,6 @@ type physicalTarget interface {
 	Position() (int, int, int)
 	PDef() float64
 	Evasion() int
-	TakeDamage(dmg int, attacker creature.DeathActor) bool
 }
 
 // AttackDisabled reports whether this NPC is unable to start an attack. No
@@ -134,9 +132,9 @@ func (h *Hostile) Evasion() int {
 }
 
 // MakeAttackHit resolves one physical attack against target: a hit/miss
-// roll, a critical roll, a damage roll through the shared physical-damage
-// formula, and delivery of the resulting damage. A target that can't
-// exchange physical damage (no physicalTarget surface) always misses.
+// roll, a critical roll, and a damage roll through the shared
+// physical-damage formula. A target that can't exchange physical damage (no
+// physicalTarget surface) always misses.
 //
 // Accuracy, evasion, critical rate and attack power are derived directly
 // from base template stats (DEX/level/STR-independent PAtk); the full
@@ -204,16 +202,13 @@ func (h *Hostile) MakeAttackHit(target attackable.Combatant, split bool) attack.
 
 	hit.Damage = int(damage)
 	hit.Crit = crit
-
-	other.TakeDamage(hit.Damage, h)
-
 	return hit
 }
 
 // BroadcastAttack sends the attack packet to every currently known
 // observer capable of receiving one (i.e. a connected player session). It
 // is a no-op until SetWorld has been called.
-func (h *Hostile) BroadcastAttack(snapshot serverpackets.AttackSnapshot) {
+func (h *Hostile) BroadcastAttack(snapshot attack.Snapshot) {
 	if h.world == nil {
 		return
 	}
