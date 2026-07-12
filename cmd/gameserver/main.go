@@ -31,7 +31,9 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/probe"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -62,6 +64,8 @@ type gameData struct {
 	Levels  *player.LevelTable
 	Items   *item.Table
 	NPCs    *npc.Table
+	Doors   *door.Table
+	Statics *staticobject.Table
 	Geo     *engine.Engine
 	Finder  *pathfind.Finder
 }
@@ -113,11 +117,12 @@ func newGameServerApp(paths gameServerPaths) *fx.App {
 			provideGroundItems,
 			provideDecay,
 			provideAttackStance,
+			provideWorldObjects,
 			network.NewSessionValidator,
 			provideLoginLinkState,
 			provideGameClientLink,
 		),
-		fx.Invoke(startPvPFlags, startGroundItems, startDecay, startAttackStance, startGameServer),
+		fx.Invoke(startPvPFlags, startGroundItems, startDecay, startAttackStance, startWorldObjects, startGameServer),
 	)
 }
 
@@ -268,12 +273,29 @@ func loadGameData(paths gameServerPaths, log zerolog.Logger) (*gameData, error) 
 	if err != nil {
 		return nil, err
 	}
+	doors, err := gamexml.LoadDoors(filepath.Join(xmlRoot, "doors.xml"))
+	if err != nil {
+		return nil, err
+	}
+	statics, err := gamexml.LoadStaticObjects(filepath.Join(xmlRoot, "staticObjects.xml"))
+	if err != nil {
+		return nil, err
+	}
 	geo, err := loadGeodata(paths)
 	if err != nil {
 		return nil, err
 	}
 	log.Info().Str("geodata_dir", geo.Dir).Str("geodata_type", string(geo.Type)).Int("npc_templates", npcs.Len()).Msg("game data loaded")
-	return &gameData{Players: players, Levels: levels, Items: items, NPCs: npcs, Geo: geo.Engine, Finder: geo.Finder}, nil
+	return &gameData{
+		Players: players,
+		Levels:  levels,
+		Items:   items,
+		NPCs:    npcs,
+		Doors:   doors,
+		Statics: statics,
+		Geo:     geo.Engine,
+		Finder:  geo.Finder,
+	}, nil
 }
 
 func loadGeodata(paths gameServerPaths) (*geodata, error) {
@@ -427,6 +449,16 @@ func provideAttackStance(state *world.State) (*task.AttackStance, error) {
 
 func startAttackStance(lc fx.Lifecycle, a *task.AttackStance, log zerolog.Logger) {
 	startTicker(lc, log, a.Start)
+}
+
+// provideWorldObjects spawns every door and static object template into
+// state at boot, applying closed doors to geodata immediately.
+func provideWorldObjects(data *gameData, ids *idfactory.Allocator, state *world.State) (*manager.WorldObjects, error) {
+	return manager.NewWorldObjects(data.Doors, data.Statics, ids, data.Geo, state)
+}
+
+func startWorldObjects(objs *manager.WorldObjects, log zerolog.Logger) {
+	log.Info().Int("doors", len(objs.Doors())).Int("static_objects", len(objs.StaticObjects())).Msg("world objects spawned")
 }
 
 type loginLinkState struct {
