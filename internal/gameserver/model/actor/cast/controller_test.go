@@ -159,6 +159,40 @@ func TestHitConsumesFinalCostsAndAllowsExactHP(t *testing.T) {
 	}
 }
 
+func TestHitStopsCastWhenFinalCostsCannotBePaid(t *testing.T) {
+	t.Run("mp", func(t *testing.T) {
+		actor := &testActor{mp: 30, hp: 100, hitCost: 20}
+		ctrl := NewController(actor)
+		if _, err := ctrl.Start(time.Unix(1000, 0), testTarget{}, modelskill.Definition{ID: 1, Level: 1}); err != nil {
+			t.Fatalf("Start() error: %v", err)
+		}
+		actor.mp = 10
+
+		if err := ctrl.Hit(); !errors.Is(err, ErrNotEnoughMP) {
+			t.Fatalf("Hit() error = %v, want ErrNotEnoughMP", err)
+		}
+		if ctrl.CastingNow() {
+			t.Fatal("CastingNow() = true after final MP failure, want stopped")
+		}
+	})
+
+	t.Run("hp", func(t *testing.T) {
+		actor := &testActor{mp: 30, hp: 30}
+		ctrl := NewController(actor)
+		if _, err := ctrl.Start(time.Unix(1000, 0), testTarget{}, modelskill.Definition{ID: 1, Level: 1, HPConsume: 20}); err != nil {
+			t.Fatalf("Start() error: %v", err)
+		}
+		actor.hp = 10
+
+		if err := ctrl.Hit(); !errors.Is(err, ErrNotEnoughHP) {
+			t.Fatalf("Hit() error = %v, want ErrNotEnoughHP", err)
+		}
+		if ctrl.CastingNow() {
+			t.Fatal("CastingNow() = true after final HP failure, want stopped")
+		}
+	})
+}
+
 func TestInterruptOnDamageHonorsWindowAndMagicOnlyRule(t *testing.T) {
 	now := time.Unix(1000, 0)
 	actor := &testActor{mp: 100, hp: 100, mAtkSpd: 333, pAtkSpd: 333, magicReuseRate: 1, physicalReuseRate: 1}
