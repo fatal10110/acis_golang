@@ -40,9 +40,9 @@ func TestDefaultRegistryHasRepresentativeHandlers(t *testing.T) {
 
 	for _, skillType := range []string{
 		"PDAM", "FATAL", "MDAM", "DEATHLINK", "BLOW", "MANADAM",
-		"HEAL_PERCENT", "MANAHEAL_PERCENT", "MANAHEAL", "MANARECHARGE",
+		"HEAL", "HEAL_STATIC", "HEAL_PERCENT", "MANAHEAL_PERCENT", "MANAHEAL", "MANARECHARGE",
 		"COMBATPOINTHEAL", "BALANCE_LIFE", "REAL_DAMAGE", "GIVE_SP",
-		"DUMMY", "BEAST_FEED",
+		"CPDAMPERCENT", "DUMMY", "BEAST_FEED",
 	} {
 		if _, ok := registry.Handler(skillType); !ok {
 			t.Fatalf("default registry missing %s", skillType)
@@ -63,6 +63,10 @@ type skillTarget struct {
 	diedBy   any
 	recharge float64
 
+	healAmount        float64
+	healEffectiveness float64
+	healOK            bool
+
 	physicalInput formulas.PhysicalSkillInput
 	physicalOK    bool
 	magicInput    formulas.MagicDamageInput
@@ -82,6 +86,17 @@ func (t *skillTarget) CursedWeaponEquipped() bool { return t.cursed }
 
 func (t *skillTarget) CanBeHealed() bool {
 	return !t.dead && !t.invulnerable && !t.cursed
+}
+
+func (t *skillTarget) HealAmount(skill modelskill.Definition) (float64, bool) {
+	return t.healAmount, t.healOK
+}
+
+func (t *skillTarget) HealEffectiveness() float64 {
+	if t.healEffectiveness == 0 {
+		return 100
+	}
+	return t.healEffectiveness
 }
 
 func (t *skillTarget) HP() float64    { return t.hp }
@@ -193,6 +208,37 @@ func TestHealPercentRestoresHPOrMP(t *testing.T) {
 	}
 }
 
+func TestHealRestoresResolvedAmount(t *testing.T) {
+	registry := NewDefaultRegistry()
+	caster := &skillTarget{healAmount: 80, healOK: true}
+	target := &skillTarget{hp: 50, maxHP: 200, healEffectiveness: 125}
+	dead := &skillTarget{hp: 10, maxHP: 100, dead: true}
+
+	if !registry.Use(Cast{
+		Caster:  caster,
+		Skill:   modelskill.Definition{SkillType: "HEAL", Power: 30},
+		Targets: []any{target, dead, "not a creature"},
+	}) {
+		t.Fatal("Use() returned false for HEAL")
+	}
+	if target.hp != 150 {
+		t.Fatalf("HEAL hp = %v, want 150", target.hp)
+	}
+	if dead.hp != 10 {
+		t.Fatalf("dead target hp = %v, want unchanged 10", dead.hp)
+	}
+
+	caster.healAmount = 500
+	registry.Use(Cast{
+		Caster:  caster,
+		Skill:   modelskill.Definition{SkillType: "HEAL_STATIC", Power: 30},
+		Targets: []any{target},
+	})
+	if target.hp != 200 {
+		t.Fatalf("HEAL_STATIC hp = %v, want clamped to 200", target.hp)
+	}
+}
+
 func TestManaHealAndRecharge(t *testing.T) {
 	registry := NewDefaultRegistry()
 	target := &skillTarget{mp: 70, maxMP: 100, recharge: 0.5}
@@ -229,6 +275,28 @@ func TestCombatPointHealClampsAndSkipsInvalidTargets(t *testing.T) {
 		t.Fatalf("cp = %v, want clamped to 100", target.cp)
 	}
 	if dead.cp != 1 || invulnerable.cp != 1 {
+		t.Fatalf("invalid target cp changed: dead=%v invulnerable=%v", dead.cp, invulnerable.cp)
+	}
+}
+
+func TestCPDamagePercentReducesCurrentCP(t *testing.T) {
+	registry := NewDefaultRegistry()
+	caster := &skillTarget{}
+	target := &skillTarget{cp: 80, maxCP: 100}
+	dead := &skillTarget{cp: 80, maxCP: 100, dead: true}
+	invulnerable := &skillTarget{cp: 80, maxCP: 100, invulnerable: true}
+
+	if !registry.Use(Cast{
+		Caster:  caster,
+		Skill:   modelskill.Definition{SkillType: "CPDAMPERCENT", Power: 35},
+		Targets: []any{target, dead, invulnerable, "not a player"},
+	}) {
+		t.Fatal("Use() returned false for CPDAMPERCENT")
+	}
+	if target.cp != 52 {
+		t.Fatalf("CPDAMPERCENT cp = %v, want 52", target.cp)
+	}
+	if dead.cp != 80 || invulnerable.cp != 80 {
 		t.Fatalf("invalid target cp changed: dead=%v invulnerable=%v", dead.cp, invulnerable.cp)
 	}
 }

@@ -1,5 +1,20 @@
 package skill
 
+import modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+
+type healAmountSource interface {
+	HealAmount(modelskill.Definition) (float64, bool)
+}
+
+type healTarget interface {
+	CanBeHealed() bool
+	AddHP(float64) float64
+}
+
+type healEffectivenessTarget interface {
+	HealEffectiveness() float64
+}
+
 type hpPercentTarget interface {
 	CanBeHealed() bool
 	MaxHP() float64
@@ -29,6 +44,13 @@ type cpHealTarget interface {
 	SetCP(float64)
 }
 
+type cpDamagePercentTarget interface {
+	Dead() bool
+	Invulnerable() bool
+	CP() float64
+	SetCP(float64)
+}
+
 type balanceLifeTarget interface {
 	Dead() bool
 	HP() float64
@@ -45,6 +67,33 @@ type realDamageTarget interface {
 	HP() float64
 	SetHP(float64)
 	Die(killer any)
+}
+
+type healHandler struct{}
+
+func (healHandler) Types() []string { return []string{"HEAL", "HEAL_STATIC"} }
+
+func (healHandler) Use(cast Cast) {
+	source, ok := cast.Caster.(healAmountSource)
+	if !ok {
+		return
+	}
+	amount, ok := source.HealAmount(cast.Skill)
+	if !ok {
+		return
+	}
+
+	for _, obj := range cast.Targets {
+		target, ok := obj.(healTarget)
+		if !ok || !target.CanBeHealed() {
+			continue
+		}
+		effectiveness := 100.0
+		if eff, ok := obj.(healEffectivenessTarget); ok {
+			effectiveness = eff.HealEffectiveness()
+		}
+		target.AddHP(amount * effectiveness / 100)
+	}
 }
 
 type healPercentHandler struct{}
@@ -107,6 +156,26 @@ func (combatPointHealHandler) Use(cast Cast) {
 			amount = target.MaxCP() - target.CP()
 		}
 		target.SetCP(target.CP() + amount)
+	}
+}
+
+type cpDamagePercentHandler struct{}
+
+func (cpDamagePercentHandler) Types() []string { return []string{"CPDAMPERCENT"} }
+
+func (cpDamagePercentHandler) Use(cast Cast) {
+	if alikeDead(cast.Caster) {
+		return
+	}
+	for _, obj := range cast.Targets {
+		target, ok := obj.(cpDamagePercentTarget)
+		if !ok || target.Dead() || target.Invulnerable() {
+			continue
+		}
+		damage := int(target.CP() * float64(cast.Skill.Power) / 100)
+		if damage > 0 {
+			target.SetCP(target.CP() - float64(damage))
+		}
 	}
 }
 
