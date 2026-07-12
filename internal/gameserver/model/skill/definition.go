@@ -167,6 +167,11 @@ type Definition struct {
 	// isn't one. Structuring it into item/quantity/chance rows is deferred
 	// until something consumes it.
 	ExtractableItems string
+
+	Conditions  []ConditionClause
+	Funcs       []FuncTemplate
+	Effects     []EffectTemplate
+	SelfEffects []EffectTemplate
 }
 
 // NewDefinition builds one level's Definition from id, level, name (the

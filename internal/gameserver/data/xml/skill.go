@@ -1,8 +1,10 @@
 package xml
 
 import (
+	"encoding/xml"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -28,6 +30,13 @@ type skillElement struct {
 	Sets     []setElem      `xml:"set"`
 	Enchant1 []setElem      `xml:"enchant1"`
 	Enchant2 []setElem      `xml:"enchant2"`
+
+	Cond         []condElement `xml:"cond"`
+	For          []forElement  `xml:"for"`
+	Enchant1Cond []condElement `xml:"enchant1cond"`
+	Enchant1For  []forElement  `xml:"enchant1for"`
+	Enchant2Cond []condElement `xml:"enchant2cond"`
+	Enchant2For  []forElement  `xml:"enchant2for"`
 }
 
 // LoadSkillDefinitions parses every ".xml" skill definition file directly
@@ -95,6 +104,9 @@ func buildSkillDefinitions(el skillElement) ([]skill.Definition, error) {
 		if err != nil {
 			return nil, fmt.Errorf("skill %d level %d: %w", id, i, err)
 		}
+		if err := applySkillTemplates(&def, tables, el.Cond, el.For, i, i); err != nil {
+			return nil, fmt.Errorf("skill %d level %d: %w", id, i, err)
+		}
 		defs = append(defs, def)
 	}
 
@@ -113,6 +125,21 @@ func buildSkillDefinitions(el skillElement) ([]skill.Definition, error) {
 		if err != nil {
 			return nil, fmt.Errorf("skill %d level %d: %w", id, level, err)
 		}
+		condIndex := i + 1
+		conds := el.Enchant1Cond
+		if len(conds) == 0 {
+			condIndex = levels
+			conds = el.Cond
+		}
+		forIndex := i + 1
+		fors := el.Enchant1For
+		if len(fors) == 0 {
+			forIndex = levels
+			fors = el.For
+		}
+		if err := applySkillTemplates(&def, tables, conds, fors, condIndex, forIndex); err != nil {
+			return nil, fmt.Errorf("skill %d level %d: %w", id, level, err)
+		}
 		defs = append(defs, def)
 	}
 
@@ -127,6 +154,21 @@ func buildSkillDefinitions(el skillElement) ([]skill.Definition, error) {
 		}
 		def, err := skill.NewDefinition(id, level, el.Name, set)
 		if err != nil {
+			return nil, fmt.Errorf("skill %d level %d: %w", id, level, err)
+		}
+		condIndex := i + 1
+		conds := el.Enchant2Cond
+		if len(conds) == 0 {
+			condIndex = levels
+			conds = el.Cond
+		}
+		forIndex := i + 1
+		fors := el.Enchant2For
+		if len(fors) == 0 {
+			forIndex = levels
+			fors = el.For
+		}
+		if err := applySkillTemplates(&def, tables, conds, fors, condIndex, forIndex); err != nil {
 			return nil, fmt.Errorf("skill %d level %d: %w", id, level, err)
 		}
 		defs = append(defs, def)
@@ -167,4 +209,278 @@ func parseCountAttr(s string) (int, error) {
 		return 0, nil
 	}
 	return strconv.Atoi(s)
+}
+
+func applySkillTemplates(def *skill.Definition, tables map[string][]string, conds []condElement, fors []forElement, condIndex, forIndex int) error {
+	for _, c := range conds {
+		clause, err := buildSkillConditionClause(tables, c.Attrs, c.Children, condIndex)
+		if err != nil {
+			return err
+		}
+		def.Conditions = append(def.Conditions, clause)
+	}
+	for _, f := range fors {
+		if err := applyTemplateNodes(def, tables, f.Ops, forIndex); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func applyTemplateNodes(def *skill.Definition, tables map[string][]string, ops []funcElement, tableIndex int) error {
+	var attachCond *skill.ConditionClause
+	for _, op := range ops {
+		if strings.EqualFold(op.XMLName.Local, "cond") {
+			clause, err := buildSkillConditionClause(tables, op.Attrs, op.Children, tableIndex)
+			if err != nil {
+				return err
+			}
+			attachCond = &clause
+			continue
+		}
+		if strings.EqualFold(op.XMLName.Local, "effect") {
+			eff, err := buildSkillEffect(tables, op, attachCond, tableIndex)
+			if err != nil {
+				return err
+			}
+			if eff.Self {
+				def.SelfEffects = append(def.SelfEffects, eff)
+			} else {
+				def.Effects = append(def.Effects, eff)
+			}
+			continue
+		}
+
+		fn, err := buildSkillFunc(tables, op.XMLName.Local, op.Attrs, op.Children, attachCond, tableIndex)
+		if err != nil {
+			return err
+		}
+		def.Funcs = append(def.Funcs, fn)
+	}
+	return nil
+}
+
+func buildSkillEffect(tables map[string][]string, op funcElement, attachCond *skill.ConditionClause, tableIndex int) (skill.EffectTemplate, error) {
+	attrs, err := resolvedAttrs(tables, op.Attrs, tableIndex)
+	if err != nil {
+		return skill.EffectTemplate{}, err
+	}
+	set := commons.StatSetFromXMLAttrs(attrs)
+	name, err := set.GetString("name")
+	if err != nil {
+		return skill.EffectTemplate{}, fmt.Errorf("effect: %w", err)
+	}
+	value, err := set.GetFloat64("val")
+	if err != nil {
+		return skill.EffectTemplate{}, fmt.Errorf("effect %s: %w", name, err)
+	}
+	count, err := intDefault(set, "count", 1)
+	if err != nil {
+		return skill.EffectTemplate{}, fmt.Errorf("effect %s: %w", name, err)
+	}
+	time, err := intDefault(set, "time", 1)
+	if err != nil {
+		return skill.EffectTemplate{}, fmt.Errorf("effect %s: %w", name, err)
+	}
+	self, err := intDefault(set, "self", 0)
+	if err != nil {
+		return skill.EffectTemplate{}, fmt.Errorf("effect %s: %w", name, err)
+	}
+	noIcon, err := intDefault(set, "noicon", 0)
+	if err != nil {
+		return skill.EffectTemplate{}, fmt.Errorf("effect %s: %w", name, err)
+	}
+	stackOrder, err := floatDefault(set, "stackOrder", 0)
+	if err != nil {
+		return skill.EffectTemplate{}, fmt.Errorf("effect %s: %w", name, err)
+	}
+	effectPower, err := floatDefault(set, "effectPower", -1)
+	if err != nil {
+		return skill.EffectTemplate{}, fmt.Errorf("effect %s: %w", name, err)
+	}
+	triggeredID, err := intDefault(set, "triggeredId", 0)
+	if err != nil {
+		return skill.EffectTemplate{}, fmt.Errorf("effect %s: %w", name, err)
+	}
+	triggeredLevel, err := intDefault(set, "triggeredLevel", 1)
+	if err != nil {
+		return skill.EffectTemplate{}, fmt.Errorf("effect %s: %w", name, err)
+	}
+	activationChance, err := intDefault(set, "activationChance", -1)
+	if err != nil {
+		return skill.EffectTemplate{}, fmt.Errorf("effect %s: %w", name, err)
+	}
+	eff := skill.EffectTemplate{
+		Name:             name,
+		Value:            value,
+		Count:            count,
+		Time:             time,
+		Self:             self == 1,
+		Icon:             noIcon != 1,
+		Abnormal:         set.GetStringDefault("abnormal", "NULL"),
+		StackType:        set.GetStringDefault("stackType", "none"),
+		StackOrder:       stackOrder,
+		EffectPower:      effectPower,
+		EffectType:       set.GetStringDefault("effectType", ""),
+		TriggeredID:      triggeredID,
+		TriggeredLevel:   triggeredLevel,
+		ChanceType:       set.GetStringDefault("chanceType", ""),
+		ActivationChance: activationChance,
+		AttachCondition:  attachCond,
+	}
+	if err := buildNestedEffectTemplates(&eff, tables, op.Children, tableIndex); err != nil {
+		return skill.EffectTemplate{}, fmt.Errorf("effect %s: %w", name, err)
+	}
+	return eff, nil
+}
+
+func buildNestedEffectTemplates(eff *skill.EffectTemplate, tables map[string][]string, nodes []condNode, tableIndex int) error {
+	var attachCond *skill.ConditionClause
+	for _, n := range nodes {
+		if strings.EqualFold(n.XMLName.Local, "cond") {
+			clause, err := buildSkillConditionClause(tables, n.Attrs, n.Children, tableIndex)
+			if err != nil {
+				return err
+			}
+			attachCond = &clause
+			continue
+		}
+		fnEl := funcElement{XMLName: n.XMLName, Attrs: n.Attrs, Children: n.Children}
+		fn, err := buildSkillFunc(tables, n.XMLName.Local, fnEl.Attrs, fnEl.Children, attachCond, tableIndex)
+		if err != nil {
+			return err
+		}
+		eff.Funcs = append(eff.Funcs, fn)
+	}
+	return nil
+}
+
+func buildSkillFunc(tables map[string][]string, tag string, attrs []xml.Attr, children []condNode, attachCond *skill.ConditionClause, tableIndex int) (skill.FuncTemplate, error) {
+	op, err := skill.ParseFuncOp(tag)
+	if err != nil {
+		return skill.FuncTemplate{}, err
+	}
+	resolved, err := resolvedAttrs(tables, attrs, tableIndex)
+	if err != nil {
+		return skill.FuncTemplate{}, err
+	}
+	set := commons.StatSetFromXMLAttrs(resolved)
+	stat, err := set.GetString("stat")
+	if err != nil {
+		return skill.FuncTemplate{}, fmt.Errorf("%s: %w", tag, err)
+	}
+	value, err := set.GetFloat64("val")
+	if err != nil {
+		return skill.FuncTemplate{}, fmt.Errorf("%s %s: %w", tag, stat, err)
+	}
+	fn := skill.FuncTemplate{Op: op, Stat: stat, Value: value, AttachCondition: attachCond}
+	if len(children) > 0 {
+		cond, err := buildSkillCondition(tables, children[0], tableIndex)
+		if err != nil {
+			return skill.FuncTemplate{}, err
+		}
+		fn.Condition = &cond
+	}
+	return fn, nil
+}
+
+func buildSkillConditionClause(tables map[string][]string, attrs []xml.Attr, children []condNode, tableIndex int) (skill.ConditionClause, error) {
+	if len(children) == 0 {
+		return skill.ConditionClause{}, fmt.Errorf("cond: no predicate defined")
+	}
+	resolved, err := resolvedAttrs(tables, attrs, tableIndex)
+	if err != nil {
+		return skill.ConditionClause{}, err
+	}
+	set := commons.StatSetFromXMLAttrs(resolved)
+	root, err := buildSkillCondition(tables, children[0], tableIndex)
+	if err != nil {
+		return skill.ConditionClause{}, err
+	}
+	clause := skill.ConditionClause{Root: root}
+	f := commons.NewFields(set, "cond")
+	clause.Message = f.StringDefault("msg", "")
+	msgID, err := intDefault(set, "msgId", 0)
+	if err != nil {
+		return skill.ConditionClause{}, fmt.Errorf("cond: %w", err)
+	}
+	clause.MessageID = int32(msgID)
+	clause.AddName = set.Has("addName") && clause.MessageID > 0
+	if err := f.Err(); err != nil {
+		return skill.ConditionClause{}, err
+	}
+	return clause, nil
+}
+
+func buildSkillCondition(tables map[string][]string, n condNode, tableIndex int) (skill.Condition, error) {
+	attrs := make(map[string]string, len(n.Attrs))
+	for _, a := range n.Attrs {
+		v, err := resolveTableValue(tables, a.Name.Local, a.Value, tableIndex)
+		if err != nil {
+			return skill.Condition{}, err
+		}
+		attrs[a.Name.Local] = v
+	}
+	var children []skill.Condition
+	for _, c := range n.Children {
+		child, err := buildSkillCondition(tables, c, tableIndex)
+		if err != nil {
+			return skill.Condition{}, err
+		}
+		children = append(children, child)
+	}
+	return skill.Condition{
+		Kind:     strings.ToLower(n.XMLName.Local),
+		Attrs:    attrs,
+		Children: children,
+	}, nil
+}
+
+func resolvedAttrs(tables map[string][]string, attrs []xml.Attr, tableIndex int) ([]xml.Attr, error) {
+	resolved := attrs
+	copied := false
+	for i, a := range attrs {
+		v, err := resolveTableValue(tables, a.Name.Local, a.Value, tableIndex)
+		if err != nil {
+			return nil, err
+		}
+		if v != a.Value {
+			if !copied {
+				resolved = append([]xml.Attr(nil), attrs...)
+				copied = true
+			}
+			resolved[i].Value = v
+		}
+	}
+	return resolved, nil
+}
+
+func intDefault(set *commons.StatSet, key string, def int) (int, error) {
+	if !set.Has(key) {
+		return def, nil
+	}
+	raw, err := set.GetString(key)
+	if err != nil {
+		return 0, err
+	}
+	n, err := strconv.ParseInt(raw, 0, 32)
+	if err != nil {
+		return 0, fmt.Errorf("%s %q: %w", key, raw, err)
+	}
+	return int(n), nil
+}
+
+func floatDefault(set *commons.StatSet, key string, def float64) (float64, error) {
+	if !set.Has(key) {
+		return def, nil
+	}
+	raw, err := set.GetString(key)
+	if err != nil {
+		return 0, err
+	}
+	n, err := strconv.ParseFloat(raw, 64)
+	if err != nil {
+		return 0, fmt.Errorf("%s %q: %w", key, raw, err)
+	}
+	return n, nil
 }
