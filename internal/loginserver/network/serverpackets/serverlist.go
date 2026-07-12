@@ -4,6 +4,11 @@ package serverpackets
 // servers a client may choose from.
 const OpcodeServerList = 0x04
 
+// reservedLoopback is a fixed, always-127.0.0.1 field every ServerList
+// entry carries immediately after its real IP. The client expects it
+// unconditionally; it is not derived from any server state.
+var reservedLoopback = [4]byte{127, 0, 0, 1}
+
 // ServerEntry is one game server row encoded into a ServerList packet.
 // Callers assemble these from registered-gameserver and account state once
 // that layer is ported (account/ban persistence and the gameserver
@@ -32,6 +37,7 @@ func EncodeServerList(lastServer byte, servers []ServerEntry) []byte {
 	for _, s := range servers {
 		w.WriteUint8(s.ID)
 		w.WriteBytes(s.IP[:])
+		w.WriteBytes(reservedLoopback[:]) // fixed legacy second-IP field every server entry carries
 		w.WriteInt32(s.Port)
 		w.WriteUint8(s.AgeLimit)
 		w.WriteUint8(boolByte(s.PvP))

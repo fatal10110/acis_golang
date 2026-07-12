@@ -61,6 +61,18 @@ func (r *ServerRegistry) Get(id int) (ServerEntry, bool) {
 	return e, ok
 }
 
+// All returns a snapshot of every registered server, in no particular
+// order.
+func (r *ServerRegistry) All() []ServerEntry {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	out := make([]ServerEntry, 0, len(r.servers))
+	for _, e := range r.servers {
+		out = append(out, e)
+	}
+	return out
+}
+
 // Register creates an offline entry at id with hexID, failing if id is
 // already registered.
 func (r *ServerRegistry) Register(id int, hexID []byte) (ServerEntry, bool) {
