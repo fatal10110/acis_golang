@@ -1,13 +1,10 @@
 package target
 
 import (
-	"math"
-
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
-
-const headingToDegrees = 182.04444444444444
 
 // Category classifies the runtime shape a target handler needs for
 // selection rules.
@@ -221,7 +218,7 @@ func (h frontAreaHandler) Targets(caster, target Creature, skill *modelskill.Def
 	}
 	out := []Creature{target}
 	areaHandler{known: h.known}.forEachAreaTarget(caster, target, skillRadius(skill), func(creature Creature) bool {
-		return IsInFrontOf(creature, caster)
+		return creatureOrientedLocation(caster).IsInFrontOf(creatureLocation(creature))
 	}, func(creature Creature) {
 		out = append(out, creature)
 	})
@@ -282,7 +279,7 @@ func (frontAuraHandler) Target() modelskill.Target { return modelskill.TargetFro
 
 func (h frontAuraHandler) Targets(caster, _ Creature, skill *modelskill.Definition) []Creature {
 	return auraHandler{known: h.known}.collect(caster, skillRadius(skill), func(creature Creature) bool {
-		return IsInFrontOf(creature, caster)
+		return creatureOrientedLocation(caster).IsInFrontOf(creatureLocation(creature))
 	})
 }
 
@@ -302,7 +299,7 @@ func (behindAuraHandler) Target() modelskill.Target { return modelskill.TargetBe
 
 func (h behindAuraHandler) Targets(caster, _ Creature, skill *modelskill.Definition) []Creature {
 	return auraHandler{known: h.known}.collect(caster, skillRadius(skill), func(creature Creature) bool {
-		return IsBehind(creature, caster)
+		return creatureOrientedLocation(caster).IsBehind(creatureLocation(creature))
 	})
 }
 
@@ -357,49 +354,17 @@ func attackableWithoutForceBy(creature, caster Creature) bool {
 	return ok && rules.AttackableWithoutForceBy(caster)
 }
 
-// IsBehind reports whether actor is behind target, using target's heading.
-func IsBehind(actor, target Creature) bool {
-	if actor == nil || target == nil {
-		return false
+func creatureLocation(creature Creature) location.Location {
+	if creature == nil {
+		return location.Location{}
 	}
-	ax, ay, _ := actor.Position()
-	tx, ty, _ := target.Position()
-	angleActor := angleFrom(ax, ay, tx, ty)
-	angleTarget := headingDegrees(target.Heading())
-	return angleClose(angleActor-angleTarget, 60)
+	x, y, z := creature.Position()
+	return location.Location{X: x, Y: y, Z: z}
 }
 
-// IsInFrontOf reports whether actor is in front of target, using target's
-// heading.
-func IsInFrontOf(actor, target Creature) bool {
-	if actor == nil || target == nil {
-		return false
+func creatureOrientedLocation(creature Creature) location.OrientedLocation {
+	if creature == nil {
+		return location.OrientedLocation{}
 	}
-	ax, ay, _ := actor.Position()
-	tx, ty, _ := target.Position()
-	angleTarget := angleFrom(tx, ty, ax, ay)
-	angleActor := headingDegrees(target.Heading())
-	return angleClose(angleActor-angleTarget, 60)
-}
-
-func angleFrom(x1, y1, x2, y2 int) float64 {
-	angle := math.Atan2(float64(y2-y1), float64(x2-x1)) * 180 / math.Pi
-	if angle < 0 {
-		angle += 360
-	}
-	return angle
-}
-
-func headingDegrees(heading int) float64 {
-	return float64(heading) / headingToDegrees
-}
-
-func angleClose(diff, max float64) bool {
-	if diff <= -360+max {
-		diff += 360
-	}
-	if diff >= 360-max {
-		diff -= 360
-	}
-	return math.Abs(diff) <= max
+	return location.OrientedLocation{Location: creatureLocation(creature), Heading: creature.Heading()}
 }
