@@ -104,8 +104,8 @@ const (
 )
 
 // EnchantSkill is one entry in the enchant skill tree: the exp/sp cost and
-// per-caster-magic-level success rates for reaching one enchant level (101+
-// or 141+) of a skill, and the item optionally consumed to attempt it (zero
+// per-character-level success rates for reaching one enchant level (101+ or
+// 141+) of a skill, and the item optionally consumed to attempt it (zero
 // ItemID means none). Deciding whether a specific character currently
 // qualifies, and rolling the actual success rate, is that enchant system's
 // job, not this loader's.
@@ -122,6 +122,12 @@ type EnchantSkill struct {
 	ItemID    int32
 	ItemCount int
 }
+
+const (
+	enchantRoute1Start = 101
+	enchantRoute2Start = 141
+	enchantRouteLength = 30
+)
 
 // NewEnchantSkill builds an EnchantSkill from set, the folded attributes of
 // one <enchantSkill> element. id, lvl, exp, sp and the five rate attributes
@@ -161,6 +167,51 @@ func NewEnchantSkill(set *commons.StatSet) (EnchantSkill, error) {
 		return EnchantSkill{}, err
 	}
 	return e, nil
+}
+
+// SuccessRateForLevel returns the success-rate percentage for a character
+// level from 76 through 80.
+func (e EnchantSkill) SuccessRateForLevel(level int) (int, bool) {
+	switch level {
+	case 76:
+		return e.Rate76, true
+	case 77:
+		return e.Rate77, true
+	case 78:
+		return e.Rate78, true
+	case 79:
+		return e.Rate79, true
+	case 80:
+		return e.Rate80, true
+	default:
+		return 0, false
+	}
+}
+
+// Route reports which enchant branch this level belongs to, or 0 when the
+// level is outside the two shipped enchant ranges.
+func (e EnchantSkill) Route() int {
+	switch {
+	case e.Level >= enchantRoute1Start && e.Level < enchantRoute1Start+enchantRouteLength:
+		return 1
+	case e.Level >= enchantRoute2Start && e.Level < enchantRoute2Start+enchantRouteLength:
+		return 2
+	default:
+		return 0
+	}
+}
+
+// RouteStep reports the one-based step inside an enchant branch, or 0 when
+// the level is outside the two shipped enchant ranges.
+func (e EnchantSkill) RouteStep() int {
+	switch e.Route() {
+	case 1:
+		return e.Level - enchantRoute1Start + 1
+	case 2:
+		return e.Level - enchantRoute2Start + 1
+	default:
+		return 0
+	}
 }
 
 // parseItemNeeded parses an "itemNeeded" attribute's "itemId-count" form.
@@ -273,4 +324,48 @@ func (t *Trees) CheckClanSkillLearn(clanLevel, reputation int, known SkillLevels
 		return skill, LearnNeedsCost
 	}
 	return skill, LearnAllowed
+}
+
+// EnchantSkillsFor returns enchant skill nodes available for the known
+// current skill levels, preserving tree order.
+func (t *Trees) EnchantSkillsFor(defs *Table, known SkillLevels) []EnchantSkill {
+	if t == nil || defs == nil {
+		return nil
+	}
+	var skills []EnchantSkill
+	for _, skill := range t.Enchant {
+		if enchantSkillAllowed(defs, known, skill.ID, skill.Level) {
+			skills = append(skills, skill)
+		}
+	}
+	return skills
+}
+
+// EnchantSkillFor returns the requested enchant skill when it is the next
+// valid enchant level for the known current skill level.
+func (t *Trees) EnchantSkillFor(defs *Table, known SkillLevels, skillID ID, level int) (EnchantSkill, bool) {
+	if t == nil || defs == nil || skillID <= 0 || level <= 0 {
+		return EnchantSkill{}, false
+	}
+	for _, skill := range t.Enchant {
+		if skill.ID != skillID || skill.Level != level {
+			continue
+		}
+		if enchantSkillAllowed(defs, known, skillID, level) {
+			return skill, true
+		}
+		return EnchantSkill{}, false
+	}
+	return EnchantSkill{}, false
+}
+
+func enchantSkillAllowed(defs *Table, known SkillLevels, skillID ID, level int) bool {
+	current := known.Level(skillID)
+	if current <= 0 {
+		return false
+	}
+	if current == level-1 {
+		return true
+	}
+	return (level == enchantRoute1Start || level == enchantRoute2Start) && current == defs.MaxLevel(skillID)
 }
