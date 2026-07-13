@@ -222,10 +222,11 @@ func (c *Controller) DoAttack(target attackable.Combatant) {
 
 	attackTime := time.Duration(formulas.TimeBetweenAttacks(max(1, c.actor.AttackSpeed()))) * time.Millisecond
 	c.actor.SetHeadingTo(target)
+	attackType := c.actor.AttackType()
 
 	var hits []Hit
 	var landings []scheduledHit
-	switch c.actor.AttackType() {
+	switch attackType {
 	case item.WeaponDual, item.WeaponDualFist:
 		hits = []Hit{c.makeHit(target, true), c.makeHit(target, true)}
 		landings = []scheduledHit{
@@ -243,7 +244,7 @@ func (c *Controller) DoAttack(target attackable.Combatant) {
 		landings = []scheduledHit{{hit: hits[0], delay: attackTime / 2}}
 	}
 
-	c.start(c.actor.AttackType(), attackTime, landings)
+	c.start(attackType, attackTime, landings)
 	c.actor.BroadcastAttack(c.snapshot(hits))
 
 	if c.player != nil {
@@ -356,7 +357,7 @@ type damageReceiver interface {
 
 func (c *Controller) deliverHit(seq uint64, hit Hit) {
 	c.mu.RLock()
-	active := seq == c.attackSeq && c.attacking
+	active := seq == c.attackSeq
 	c.mu.RUnlock()
 	if !active || hit.Target == nil || hit.Miss || hit.Damage <= 0 {
 		return

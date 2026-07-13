@@ -232,6 +232,29 @@ func TestCreatureAttackBowLandsAtFullSwingAndScalesReuse(t *testing.T) {
 	}
 }
 
+func TestCreatureAttackBowHitStillLandsWhenFinishTimerRunsFirst(t *testing.T) {
+	clock := &fakeAttackClock{}
+	actor := attackActor{
+		id:          100,
+		known:       map[int32]bool{200: true},
+		canSee:      true,
+		canReach:    true,
+		attackType:  item.WeaponBow,
+		attackSpeed: 500,
+		hit:         Hit{TargetID: 200, Damage: 37},
+	}
+	target := attackTarget{id: 200, attackable: true}
+	ctrl := NewCreature(&actor)
+	ctrl.afterFunc = clock.AfterFunc
+
+	ctrl.DoAttack(&target)
+	clock.fireReverse(time.Second)
+
+	if target.damageTaken != 37 {
+		t.Fatalf("bow damage when finish timer wins = %d, want 37", target.damageTaken)
+	}
+}
+
 func TestPlayableAttackRejectsPeaceZoneForPlayableTargets(t *testing.T) {
 	actor := attackActor{known: map[int32]bool{200: true}, canSee: true, canReach: true, playable: true, peace: true}
 	target := attackTarget{id: 200, attackable: true, playable: true}
@@ -442,6 +465,16 @@ func (c *fakeAttackClock) AfterFunc(delay time.Duration, f func()) scheduledTime
 
 func (c *fakeAttackClock) fire(delay time.Duration) {
 	for _, timer := range c.timers {
+		if timer.delay == delay && !timer.stopped {
+			timer.stopped = true
+			timer.f()
+		}
+	}
+}
+
+func (c *fakeAttackClock) fireReverse(delay time.Duration) {
+	for i := len(c.timers) - 1; i >= 0; i-- {
+		timer := c.timers[i]
 		if timer.delay == delay && !timer.stopped {
 			timer.stopped = true
 			timer.f()

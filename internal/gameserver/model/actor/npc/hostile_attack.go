@@ -128,7 +128,7 @@ func (h *Hostile) PDef() float64 {
 // actor.
 func (h *Hostile) Evasion() int {
 	tpl := h.Instance.Template
-	return int(statbonus.BaseEvasionAccuracy[clampStatIndex(tpl.DEX)]) + tpl.Level
+	return int(statbonus.BaseEvasionAccuracy[statbonus.ClampIndex(tpl.DEX)]) + tpl.Level
 }
 
 // MakeAttackHit resolves one physical attack against target: a hit/miss
@@ -151,7 +151,7 @@ func (h *Hostile) MakeAttackHit(target attackable.Combatant, split bool) attack.
 	}
 
 	tpl := h.Instance.Template
-	dexIdx := clampStatIndex(tpl.DEX)
+	dexIdx := statbonus.ClampIndex(tpl.DEX)
 
 	accuracy := int(statbonus.BaseEvasionAccuracy[dexIdx]) + tpl.Level
 	evasion := other.Evasion()
@@ -219,15 +219,4 @@ func (h *Hostile) BroadcastAttack(snapshot attack.Snapshot) {
 		}
 		receiver.SendFrame(serverpackets.FrameAttack(snapshot))
 	})
-}
-
-// clampStatIndex restricts v to a valid statbonus table index.
-func clampStatIndex(v int) int {
-	if v < 0 {
-		return 0
-	}
-	if v >= statbonus.MaxStatValue {
-		return statbonus.MaxStatValue - 1
-	}
-	return v
 }

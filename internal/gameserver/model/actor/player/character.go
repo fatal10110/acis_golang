@@ -7,6 +7,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -65,7 +66,7 @@ type Character struct {
 
 	deathMu sync.Mutex
 	dead    bool
-	hpMu    sync.Mutex
+	health  creature.Health
 }
 
 // NewCharacter builds a freshly created Character of profession tmpl for
@@ -114,6 +115,7 @@ func NewCharacter(objectID int32, tmpl *Template, accountName, name string, hair
 	if len(tmpl.Spawns) > 0 {
 		c.Location = tmpl.Spawns[rand.IntN(len(tmpl.Spawns))]
 	}
+	c.health = creature.NewHealth(&c.CurHP)
 
 	return c, nil
 }

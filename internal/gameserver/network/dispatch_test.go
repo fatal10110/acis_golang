@@ -14,6 +14,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	gamemanager "github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
@@ -633,6 +634,21 @@ func TestLivePlayerVisibilityRendersSupportedWorldObjectsSymmetrically(t *testin
 	}
 }
 
+func TestLivePlayerForgetSkipsObjectsItWouldNotDiscover(t *testing.T) {
+	state := world.New()
+	frames := &frameCapture{}
+	player := newTestLivePlayer(t, 1, frames)
+	obj := &invisibleTracked{id: 2}
+
+	state.Spawn(player, 0, 0, 0, 0)
+	state.Spawn(obj, 100, 0, 0, 0)
+	state.Despawn(obj)
+
+	if len(frames.frames) != 0 {
+		t.Fatalf("frames for non-live tracked object = %x, want none", frames.frames)
+	}
+}
+
 func TestMoveLivePlayerRelocatesWorldVisibility(t *testing.T) {
 	state := world.New()
 	movingFrames := &frameCapture{}
@@ -708,6 +724,35 @@ func TestDetachLivePlayerSavesWithUncancelledBoundedContext(t *testing.T) {
 	}
 	if pos.location != savedAt || pos.heading != 32768 {
 		t.Fatalf("saved position = %+v/%d, want %+v/32768", pos.location, pos.heading, savedAt)
+	}
+}
+
+func TestGameClientLinkAttackBroadcastSendsToSelfAndObservers(t *testing.T) {
+	state := world.New()
+	link := &GameClientLink{world: state}
+	attackerFrames := &frameCapture{}
+	observerFrames := &frameCapture{}
+	attacker := newTestLivePlayer(t, 1, attackerFrames)
+	observer := newTestLivePlayer(t, 2, observerFrames)
+
+	state.Spawn(attacker, 0, 0, 0, 0)
+	state.Spawn(observer, 100, 0, 0, 0)
+	attackerFrames.frames = nil
+	observerFrames.frames = nil
+
+	link.broadcastAttack(attacker, attack.Snapshot{
+		AttackerID: attacker.ObjectID(),
+		X:          10,
+		Y:          20,
+		Z:          30,
+		Hits:       []attack.SnapshotHit{{TargetID: observer.ObjectID(), Damage: 7}},
+	})
+
+	if len(attackerFrames.frames) != 1 || attackerFrames.frames[0][0] != serverpackets.OpcodeAttack {
+		t.Fatalf("attacker frames = %x, want one Attack", attackerFrames.frames)
+	}
+	if len(observerFrames.frames) != 1 || observerFrames.frames[0][0] != serverpackets.OpcodeAttack {
+		t.Fatalf("observer frames = %x, want one Attack", observerFrames.frames)
 	}
 }
 
