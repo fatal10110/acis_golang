@@ -40,6 +40,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+	"github.com/fatal10110/acis_golang/internal/link"
 	"github.com/fatal10110/acis_golang/internal/loginserver/model"
 )
 
@@ -211,6 +212,19 @@ func gameServerConfigFromProperties(paths gameServerPaths, serverProps, hexProps
 	}
 
 	host := serverProps.String("Hostname", "*")
+	statusType := link.ServerTypeAuto
+	if serverProps.Bool("ServerGMOnly", false) {
+		statusType = link.ServerTypeGMOnly
+	}
+	showClock := serverProps.Bool("ServerListClock", false)
+	showBrackets := serverProps.Bool("ServerListBrackets", false)
+	serverListAgeLimit, err := serverProps.Int("ServerListAgeLimit", 0)
+	if err != nil {
+		return gameServerConfig{}, err
+	}
+	ageLimit := int32(serverListAgeLimit)
+	testServer := serverProps.Bool("TestServer", false)
+	pvpServer := serverProps.Bool("PvpServer", true)
 	return gameServerConfig{
 		ListenAddr: listenAddress(serverProps.String("GameserverHostname", "*"), listenPort),
 		LoginAddr:  net.JoinHostPort(serverProps.String("LoginHost", "127.0.0.1"), strconv.Itoa(loginPort)),
@@ -221,6 +235,14 @@ func gameServerConfigFromProperties(paths gameServerPaths, serverProps, hexProps
 			HostName:          host,
 			Port:              uint16(listenPort),
 			MaxPlayers:        int32(maxPlayers),
+			InitialStatus: link.ServerStatus{
+				Status:       &statusType,
+				ShowClock:    &showClock,
+				ShowBrackets: &showBrackets,
+				AgeLimit:     &ageLimit,
+				TestServer:   &testServer,
+				Pvp:          &pvpServer,
+			},
 		},
 		GeneratedHexID: generated,
 		HexIDPath:      paths.HexIDPath,

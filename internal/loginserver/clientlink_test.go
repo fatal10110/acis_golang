@@ -389,6 +389,29 @@ func TestClientLinkServerList(t *testing.T) {
 	}
 }
 
+func TestClientLinkServerEntriesUseAdvertisedStatusForOnlineByte(t *testing.T) {
+	servers := manager.NewServerRegistry()
+	servers.Register(7, []byte{0x01})
+	servers.MarkOnline(7, "127.0.0.1", 7777, 100)
+
+	l := &ClientLink{servers: servers}
+	entries := l.serverEntries()
+	if len(entries) != 1 {
+		t.Fatalf("serverEntries length = %d, want 1", len(entries))
+	}
+	if entries[0].Online {
+		t.Fatal("Online = true while status is Down")
+	}
+
+	auto := link.ServerTypeAuto
+	servers.ApplyStatus(7, link.ServerStatus{Status: &auto})
+
+	entries = l.serverEntries()
+	if len(entries) != 1 || !entries[0].Online {
+		t.Fatalf("serverEntries = %+v, want one online entry after Status=Auto", entries)
+	}
+}
+
 func TestClientLinkPlayLoginSuccess(t *testing.T) {
 	accounts := newFakeAccountStore(model.NewAccount("player1", mustHashPassword(t, "s3cret"), 0, 1))
 	addr, l, servers, sessions, _ := newTestClientLink(t, accounts, false)

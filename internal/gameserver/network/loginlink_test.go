@@ -125,6 +125,30 @@ func TestDialLoginLinkRegistersAndAuths(t *testing.T) {
 	}
 }
 
+func TestDialLoginLinkSendsInitialServerStatus(t *testing.T) {
+	addr, servers, _ := newTestLoginServer(t, false)
+	servers.Register(1, testHexID)
+
+	auth := LoginServerAuth{ServerID: 1, HexID: testHexID, HostName: "*", Port: 7777, MaxPlayers: 300}
+	l, err := DialLoginLink(context.Background(), addr, auth, LoginLinkHandlers{}, zerolog.Nop())
+	if err != nil {
+		t.Fatalf("DialLoginLink: %v", err)
+	}
+	defer l.Close()
+
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		entry, _ := servers.Get(1)
+		if entry.Status != link.ServerTypeDown {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("server status = %s, want not Down", entry.Status)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
 func TestDialLoginLinkWrongHexIDRejected(t *testing.T) {
 	addr, servers, _ := newTestLoginServer(t, false)
 	servers.Register(1, testHexID)

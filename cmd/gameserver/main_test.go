@@ -12,6 +12,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/pathfind"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/probe"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
+	"github.com/fatal10110/acis_golang/internal/link"
 	"github.com/fatal10110/acis_golang/internal/loginserver/model"
 )
 
@@ -28,6 +29,12 @@ MaximumOnlineUsers = 123
 URL = jdbc:mariadb://db.example/acis
 Login = acis
 Password = secret
+ServerGMOnly = True
+ServerListClock = True
+ServerListBrackets = True
+ServerListAgeLimit = 18
+TestServer = True
+PvpServer = False
 `)
 	if err != nil {
 		t.Fatalf("ParseString server: %v", err)
@@ -59,6 +66,15 @@ HexID = -7fff
 	}
 	if cfg.Auth.HostName != "games.example.com" || cfg.Auth.Port != 17777 || cfg.Auth.MaxPlayers != 123 {
 		t.Errorf("Auth advertised endpoint/capacity = %+v, want host games.example.com port 17777 max 123", cfg.Auth)
+	}
+	status := cfg.Auth.InitialStatus
+	if status.Status == nil || *status.Status != link.ServerTypeGMOnly ||
+		status.ShowClock == nil || !*status.ShowClock ||
+		status.ShowBrackets == nil || !*status.ShowBrackets ||
+		status.AgeLimit == nil || *status.AgeLimit != 18 ||
+		status.TestServer == nil || !*status.TestServer ||
+		status.Pvp == nil || *status.Pvp {
+		t.Errorf("Auth.InitialStatus = %+v, want GMOnly clock/brackets age/test on and pvp off", status)
 	}
 	wantHex, err := model.ParseHexKey("-7fff")
 	if err != nil {

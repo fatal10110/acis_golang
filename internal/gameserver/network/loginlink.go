@@ -63,6 +63,7 @@ type LoginServerAuth struct {
 	Port              uint16
 	ReserveHost       bool
 	MaxPlayers        int32
+	InitialStatus     link.ServerStatus
 }
 
 // LoginLinkHandlers are a game server's callbacks for messages the login
@@ -195,6 +196,9 @@ func (l *LoginLink) handshake(auth LoginServerAuth) error {
 			return err
 		}
 		l.ServerID, l.ServerName = id, name
+		if err := l.SendServerStatus(initialServerStatus(auth.InitialStatus)); err != nil {
+			return fmt.Errorf("send ServerStatus: %w", err)
+		}
 		return nil
 	case link.OpcodeLoginServerFail:
 		reason, err := link.DecodeLoginServerFail(payload)
@@ -205,6 +209,14 @@ func (l *LoginLink) handshake(auth LoginServerAuth) error {
 	default:
 		return fmt.Errorf("registration result opcode = %#x, want AuthResponse or LoginServerFail", firstByte(payload))
 	}
+}
+
+func initialServerStatus(status link.ServerStatus) link.ServerStatus {
+	if status.Status == nil {
+		st := link.ServerTypeAuto
+		status.Status = &st
+	}
+	return status
 }
 
 // readLoop dispatches inbound messages to handlers until the connection

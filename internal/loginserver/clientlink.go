@@ -292,7 +292,7 @@ func (l *ClientLink) serverEntries() []serverpackets.ServerEntry {
 			PvP:            e.Pvp,
 			CurrentPlayers: uint16(l.servers.OnlineAccountCount(e.ID)),
 			MaxPlayers:     uint16(e.MaxPlayers),
-			Online:         e.Authed,
+			Online:         e.Status != link.ServerTypeDown,
 			TestServer:     e.TestServer,
 			ShowClock:      e.ShowClock,
 			ShowBrackets:   e.Brackets,
