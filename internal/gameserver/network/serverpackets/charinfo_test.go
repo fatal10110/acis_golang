@@ -1,6 +1,7 @@
 package serverpackets
 
 import (
+	"bytes"
 	"encoding/binary"
 	"testing"
 
@@ -40,5 +41,26 @@ func TestFrameCharInfoCoreFields(t *testing.T) {
 	offset += 2 + 4 + 4 + 4
 	if v := binary.LittleEndian.Uint32(got[offset+2*4:]); v != 2369 {
 		t.Fatalf("right-hand template id = %d, want 2369", v)
+	}
+}
+
+func TestFrameCharInfoUsesDoublePrecisionFloatFields(t *testing.T) {
+	c := &player.Character{
+		ID: 0x10000001, Name: "Observer", ClassID: 0,
+		Race: player.RaceHuman, Sex: player.SexMale,
+		Location: location.Location{X: 10, Y: 20, Z: 30},
+	}
+	tmpl := &player.Template{
+		CollisionRadius: 9, CollisionHeight: 23,
+		RunSpeed: 120, WalkSpeed: 80, SwimSpeed: 50,
+	}
+
+	got := framePayload(t, FrameCharInfo(CharInfoSnapshot{Character: c, Template: tmpl}))
+	want := appendF64(nil, 1)
+	want = appendF64(want, 1)
+	want = appendF64(want, tmpl.CollisionRadius)
+	want = appendF64(want, tmpl.CollisionHeight)
+	if !bytes.Contains(got, want) {
+		t.Fatalf("CharInfo missing double-width movement/collision block %x", want)
 	}
 }

@@ -81,10 +81,10 @@ func writeCharInfo(w *wire.Writer, s CharInfoSnapshot) {
 	w.WriteInt32(0) // flying run speed
 	w.WriteInt32(0) // flying walk speed
 
-	w.WriteFloat32(1)
-	w.WriteFloat32(1)
-	w.WriteFloat32(float32(collisionRadius))
-	w.WriteFloat32(float32(collisionHeight))
+	w.WriteFloat64(1)
+	w.WriteFloat64(1)
+	w.WriteFloat64(collisionRadius)
+	w.WriteFloat64(collisionHeight)
 
 	w.WriteInt32(int32(c.HairStyle))
 	w.WriteInt32(int32(c.HairColor))
