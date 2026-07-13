@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
 
 // ErrCharacterNotFound is returned when no characters row matches the given
@@ -39,17 +40,18 @@ func NewCharacterStore(db *sql.DB) *CharacterStore {
 }
 
 // Create inserts c as a new characters row. It writes exactly the columns a
-// freshly created character has values for; position, clan, and every other
-// column a character only gains once it is actually played keep the
-// schema's own default until something (not this store) sets them.
+// freshly created character has values for; clan and every other column a
+// character only gains once it is actually played keep the schema's own
+// default until something sets them.
 func (s *CharacterStore) Create(ctx context.Context, c *player.Character) error {
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO characters
 			(account_name, obj_Id, char_name, level, maxHp, curHp, maxCp, curCp, maxMp, curMp,
-			 face, hairStyle, hairColor, sex, exp, sp, race, classid, base_class, title, accesslevel)
-		 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		c.AccountName, c.ObjectID, c.Name, c.Level, c.MaxHP, c.CurHP, c.MaxCP, c.CurCP, c.MaxMP, c.CurMP,
-		c.Face, c.HairStyle, c.HairColor, byte(c.Sex), c.Exp, c.SP, int(c.Race), c.ClassID, c.BaseClassID, c.Title, c.AccessLevel,
+			 face, hairStyle, hairColor, sex, heading, x, y, z, exp, sp, race, classid, base_class, title, accesslevel)
+		 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		c.AccountName, c.ID, c.Name, c.Level, c.MaxHP, c.CurHP, c.MaxCP, c.CurCP, c.MaxMP, c.CurMP,
+		c.Face, c.HairStyle, c.HairColor, byte(c.Sex), c.Heading, c.Location.X, c.Location.Y, c.Location.Z,
+		c.Exp, c.SP, int(c.Race), c.ClassID, c.BaseClassID, c.Title, c.AccessLevel,
 	)
 	if err != nil {
 		return fmt.Errorf("create character %q: %w", c.Name, err)
@@ -106,10 +108,10 @@ func scanCharacter(row rowScanner) (*player.Character, error) {
 	var race, classID int
 
 	err := row.Scan(
-		&c.ObjectID, &c.AccountName, &c.Name,
+		&c.ID, &c.AccountName, &c.Name,
 		&c.Level, &c.MaxHP, &c.CurHP, &c.MaxCP, &c.CurCP, &c.MaxMP, &c.CurMP,
 		&c.Face, &c.HairStyle, &c.HairColor, &sex,
-		&c.Heading, &c.Position.X, &c.Position.Y, &c.Position.Z,
+		&c.Heading, &c.Location.X, &c.Location.Y, &c.Location.Z,
 		&c.Exp, &c.SP, &c.Karma, &c.PvPKills, &c.PKKills, &c.ClanID,
 		&race, &classID, &c.BaseClassID,
 		&c.DeleteAt, &c.Title, &c.AccessLevel, &c.LastAccess,
@@ -150,6 +152,14 @@ func (s *CharacterStore) NameTaken(ctx context.Context, name string) (bool, erro
 func (s *CharacterStore) SetDeleteAt(ctx context.Context, objectID int32, at int64) error {
 	if _, err := s.db.ExecContext(ctx, "UPDATE characters SET deletetime = ? WHERE obj_Id = ?", at, objectID); err != nil {
 		return fmt.Errorf("set delete time for %d: %w", objectID, err)
+	}
+	return nil
+}
+
+// SetPosition updates the character's persisted world position and facing.
+func (s *CharacterStore) SetPosition(ctx context.Context, objectID int32, loc location.Location, heading int) error {
+	if _, err := s.db.ExecContext(ctx, "UPDATE characters SET heading = ?, x = ?, y = ?, z = ? WHERE obj_Id = ?", heading, loc.X, loc.Y, loc.Z, objectID); err != nil {
+		return fmt.Errorf("set position for %d: %w", objectID, err)
 	}
 	return nil
 }

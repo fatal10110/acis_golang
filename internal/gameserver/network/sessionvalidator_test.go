@@ -4,10 +4,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"errors"
 	"io"
+	"net"
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons/crypt"
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/link"
@@ -129,5 +133,87 @@ func TestSessionValidatorValidateReturnsErrorOnContextCancel(t *testing.T) {
 	}
 	if ok {
 		t.Fatal("Validate() = true, want false on canceled context")
+	}
+}
+
+func TestSessionValidatorValidateReturnsWhenLinkDies(t *testing.T) {
+	validator := NewSessionValidator()
+	clientConn, serverConn := net.Pipe()
+	defer clientConn.Close()
+	defer serverConn.Close()
+
+	linkDone := make(chan struct{})
+	loginLink := &LoginLink{conn: clientConn, crypt: crypt.NewLinkCrypt(), done: linkDone}
+	readRequest := make(chan struct{})
+	go func() {
+		defer close(readRequest)
+		_, _ = wire.ReadFrame(serverConn)
+		close(linkDone)
+	}()
+
+	req := clientpackets.AuthLogin{LoginName: "player1", PlayKey1: 1, PlayKey2: 2, LoginKey1: 3, LoginKey2: 4}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	result := make(chan error, 1)
+	go func() {
+		_, err := validator.Validate(ctx, NewClient(nil), req, loginLink)
+		result <- err
+	}()
+
+	select {
+	case <-readRequest:
+	case <-time.After(time.Second):
+		t.Fatal("Validate did not send PlayerAuthRequest")
+	}
+
+	select {
+	case err := <-result:
+		if err == nil {
+			t.Fatal("Validate error = nil, want link-closed error")
+		}
+	case <-time.After(200 * time.Millisecond):
+		cancel()
+		t.Fatal("Validate did not return after login link died")
+	}
+}
+
+func TestSessionValidatorRejectsDuplicateOutstandingValidation(t *testing.T) {
+	validator := NewSessionValidator()
+	clientConn, serverConn := net.Pipe()
+	defer clientConn.Close()
+	defer serverConn.Close()
+
+	loginLink := &LoginLink{conn: clientConn, crypt: crypt.NewLinkCrypt(), done: make(chan struct{})}
+	readRequest := make(chan struct{})
+	go func() {
+		_, _ = wire.ReadFrame(serverConn)
+		close(readRequest)
+	}()
+
+	req := clientpackets.AuthLogin{LoginName: "player1", PlayKey1: 1, PlayKey2: 2, LoginKey1: 3, LoginKey2: 4}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	first := make(chan error, 1)
+	go func() {
+		_, err := validator.Validate(ctx, NewClient(nil), req, loginLink)
+		first <- err
+	}()
+
+	select {
+	case <-readRequest:
+	case <-time.After(time.Second):
+		t.Fatal("first Validate did not send PlayerAuthRequest")
+	}
+
+	_, err := validator.Validate(context.Background(), NewClient(nil), req, loginLink)
+	if !errors.Is(err, errValidationPending) {
+		t.Fatalf("second Validate error = %v, want %v", err, errValidationPending)
+	}
+
+	cancel()
+	select {
+	case <-first:
+	case <-time.After(time.Second):
+		t.Fatal("first Validate did not return after context cancel")
 	}
 }

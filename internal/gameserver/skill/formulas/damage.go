@@ -50,6 +50,9 @@ func PhysicalAttackDamage(in PhysicalAttackInput) float64 {
 		critDamMul = in.CritDamageMul
 		critDamPosMul = in.CritDamagePosMul
 		critVuln = in.CritVulnMul
+		// The additive critical-damage stat is intentionally scaled by
+		// defence here, then scaled again with the full critical bracket
+		// below; that double scaling is part of the damage contract.
 		addCritPower = in.CritDamageAddBase * 77. / in.Defence
 	}
 
@@ -61,6 +64,8 @@ func PhysicalAttackDamage(in PhysicalAttackInput) float64 {
 	}
 
 	if in.SoulShot {
+		// Soulshot doubles the finished physical-hit damage after all
+		// bracket multipliers and defence scaling have already applied.
 		damage *= 2.
 	}
 

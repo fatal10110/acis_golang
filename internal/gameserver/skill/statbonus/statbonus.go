@@ -12,6 +12,17 @@ import "math"
 // cover; a value here is used as a direct index into every table below.
 const MaxStatValue = 100
 
+// ClampIndex restricts v to a valid stat bonus table index.
+func ClampIndex(v int) int {
+	if v < 0 {
+		return 0
+	}
+	if v >= MaxStatValue {
+		return MaxStatValue - 1
+	}
+	return v
+}
+
 // curve is the (base, offset) pair the closed form
 // floor(base^(i-offset) * 100 + 0.5) / 100 uses to build one attribute's
 // bonus table.

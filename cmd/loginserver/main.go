@@ -99,7 +99,7 @@ func loginServerConfigFromProperties(_ loginServerPaths, props *config.Propertie
 		ClientAddr:          listenAddress(props.String("LoginserverHostname", "*"), clientPort),
 		GameServerAddr:      listenAddress(props.String("LoginHostname", "*"), linkPort),
 		AllowNewGameServers: props.Bool("AcceptNewGameServer", false),
-		AutoCreateAccounts:  props.Bool("AutoCreateAccounts", false),
+		AutoCreateAccounts:  props.Bool("AutoCreateAccounts", true),
 		Database: db.Config{
 			URL:      props.String("URL", "jdbc:mariadb://localhost/acis"),
 			Login:    props.String("Login", "root"),

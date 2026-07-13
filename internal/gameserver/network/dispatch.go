@@ -3,16 +3,25 @@ package network
 import (
 	"context"
 	"crypto/rand"
+	"encoding/hex"
+	"errors"
 	"fmt"
+	"io"
+	"net"
 	"time"
 
 	"github.com/rs/zerolog"
 
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // itemStore is the persistence GameClientLink needs to list a character's
@@ -24,11 +33,7 @@ type itemStore interface {
 // GameClientLink accepts and drives connections from Interlude game
 // clients: the VersionCheck/cipher handshake, session-key validation
 // against the login server, character list/create/delete/restore, and
-// character select through to a minimal EnterWorld packet burst.
-//
-// Visibility to other players (the world registry/known-list broadcast) is
-// deliberately not wired here yet — that belongs to the world-registry
-// milestone, not to getting one client connected and in-world.
+// character select through to world entry.
 type GameClientLink struct {
 	validator     *SessionValidator
 	loginLink     func() *LoginLink
@@ -36,6 +41,7 @@ type GameClientLink struct {
 	items         itemStore
 	templates     *player.TemplateTable
 	itemTemplates *item.Table
+	world         *world.State
 	log           zerolog.Logger
 
 	// newCipherKey supplies each connection's XOR cipher key; overridden in
@@ -54,6 +60,7 @@ func NewGameClientLink(
 	items itemStore,
 	templates *player.TemplateTable,
 	itemTemplates *item.Table,
+	worldState *world.State,
 	log zerolog.Logger,
 ) *GameClientLink {
 	return &GameClientLink{
@@ -63,18 +70,96 @@ func NewGameClientLink(
 		items:         items,
 		templates:     templates,
 		itemTemplates: itemTemplates,
+		world:         worldState,
 		log:           log,
 		newCipherKey:  randomCipherKey,
 	}
 }
 
+type livePlayer struct {
+	*player.Character
+	template *player.Template
+	items    []*item.Instance
+}
+
+func (p *livePlayer) SendFrame(frame wire.Frame) bool {
+	return p.Character.SendFrame(frame)
+}
+
+func (p *livePlayer) Discover(obj world.Tracked) {
+	switch o := obj.(type) {
+	case *livePlayer:
+		p.SendFrame(serverpackets.FrameCharInfo(serverpackets.CharInfoSnapshot{
+			Character: o.Character,
+			Template:  o.template,
+			Items:     o.items,
+		}))
+	case groundItemObject:
+		p.SendFrame(serverpackets.FrameSpawnItem(o))
+	case doorObject:
+		p.SendFrame(serverpackets.FrameDoorInfo(o, false))
+	case staticObject:
+		p.SendFrame(serverpackets.FrameStaticObjectInfo(o))
+	}
+}
+
+func (p *livePlayer) Forget(obj world.Tracked) {
+	if !rendersObject(obj) {
+		return
+	}
+	p.SendFrame(serverpackets.FrameDeleteObject(obj.ObjectID(), false))
+}
+
+type groundItemObject interface {
+	ObjectID() int32
+	ItemID() int32
+	Count() int
+	Stackable() bool
+	Position() (int, int, int)
+}
+
+type doorObject interface {
+	ObjectID() int32
+	DoorID() int
+	Opened() bool
+	MaxHP() int
+	HP() int
+	Damage() int
+}
+
+type staticObject interface {
+	ObjectID() int32
+	StaticObjectID() int
+}
+
+func rendersObject(obj world.Tracked) bool {
+	switch obj.(type) {
+	case *livePlayer, groundItemObject, doorObject, staticObject:
+		return true
+	default:
+		return false
+	}
+}
+
 func randomCipherKey() ([]byte, error) {
 	key := make([]byte, keySize)
-	if _, err := rand.Read(key); err != nil {
+	if _, err := rand.Read(key[:8]); err != nil {
 		return nil, fmt.Errorf("generate game cipher key: %w", err)
 	}
+	copy(key[8:], gameCipherStaticKey[:])
 	return key, nil
 }
+
+func validProtocolRevision(revision int32) bool {
+	switch revision {
+	case 737, 740, 744, 746:
+		return true
+	default:
+		return false
+	}
+}
+
+const livePlayerDetachSaveTimeout = 2 * time.Second
 
 // Handle drives one game-client connection end to end. It matches Serve's
 // handle signature, so a caller wires it in directly:
@@ -93,38 +178,55 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 	session := NewSession(conn, cipher)
 	client := NewClient(session)
 
-	if !session.SendFrame(serverpackets.FrameVersionCheck(key)) {
-		return
-	}
-
 	// chars and entering are read entirely by this goroutine: they resolve
 	// the character-list slot indices RequestCharacterDelete,
 	// CharacterRestore and RequestGameStart address, and the character
 	// RequestGameStart selected for EnterWorld to finish spawning.
 	var chars []*player.Character
 	var entering *player.Character
+	var live *livePlayer
+	protocolReady := false
+	defer func() {
+		l.detachLivePlayer(ctx, live)
+		l.notifyPlayerLogout(client.AccountName())
+	}()
 
 	for {
 		payload, err := session.ReadFrame()
 		if err != nil {
+			if normalReadFrameError(err) {
+				l.log.Debug().Err(err).Msg("Read frame")
+			} else {
+				l.log.Error().Err(err).Msg("Read frame")
+			}
 			return
 		}
 		if len(payload) == 0 {
 			return
 		}
 		opcode := payload[0]
+		if !protocolReady && opcode != clientpackets.OpcodeProtocolVersion {
+			return
+		}
 		if !client.Accept(opcode) {
+			l.log.Warn().Str("state", client.State().String()).Str("opcode", hex.EncodeToString(payload)).Msg("Accept opcode")
 			return
 		}
 
 		switch opcode {
 		case clientpackets.OpcodeProtocolVersion:
-			// No allowed-revision list is configured yet; accept any
-			// syntactically valid report.
-			if _, err := clientpackets.DecodeProtocolVersion(payload); err != nil {
+			req, err := clientpackets.DecodeProtocolVersion(payload)
+			if err != nil {
 				l.log.Warn().Err(err).Msg("game client")
 				return
 			}
+			if !validProtocolRevision(req.Revision) {
+				return
+			}
+			if !session.SendFrame(serverpackets.FrameVersionCheck(key)) {
+				return
+			}
+			protocolReady = true
 
 		case clientpackets.OpcodeAuthLogin:
 			req, err := clientpackets.DecodeAuthLogin(payload)
@@ -185,7 +287,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				session.SendFrame(serverpackets.FrameCharDeleteFail(serverpackets.CharDeleteFailReasonDeletionFailed))
 				continue
 			}
-			if err := l.roster.MarkForDeletion(ctx, c.ObjectID); err != nil {
+			if err := l.roster.MarkForDeletion(ctx, c.ID); err != nil {
 				l.log.Error().Err(err).Msg("mark character for deletion")
 				session.SendFrame(serverpackets.FrameCharDeleteFail(serverpackets.CharDeleteFailReasonDeletionFailed))
 				continue
@@ -205,7 +307,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				return
 			}
 			if c, ok := slotCharacter(chars, req.Slot); ok {
-				if err := l.roster.Restore(ctx, c.ObjectID); err != nil {
+				if err := l.roster.Restore(ctx, c.ID); err != nil {
 					l.log.Error().Err(err).Msg("restore character")
 				}
 			}
@@ -250,16 +352,160 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			if entering == nil {
 				return
 			}
-			if !l.enterWorld(ctx, client, entering) {
+			entered, ok := l.enterWorld(ctx, client, entering)
+			if !ok {
 				return
 			}
+			live = entered
 			client.SetState(StateInGame)
+
+		case clientpackets.OpcodeExtended:
+			r := wire.NewReader(payload[1:])
+			switch second := r.ReadUint16(); {
+			case r.Err() != nil:
+				l.log.Warn().Str("state", client.State().String()).Msg("game client: extended opcode missing")
+				continue
+			case second == clientpackets.OpcodeRequestManorList:
+				session.SendFrame(serverpackets.FrameExSendManorList())
+			default:
+				l.log.Info().
+					Uint16("opcode2", second).
+					Str("state", client.State().String()).
+					Msg("game client: accepted extended opcode not implemented yet")
+			}
+
+		case clientpackets.OpcodeRequestSkillCoolTime:
+			continue
+
+		case clientpackets.OpcodeLogout:
+			if live != nil {
+				session.SendFrame(serverpackets.FrameLeaveWorld())
+				return
+			}
+			return
+
+		case clientpackets.OpcodeMoveBackwardToLocation:
+			req, err := clientpackets.DecodeMoveBackwardToLocation(payload)
+			if err != nil {
+				l.log.Warn().Err(err).Msg("game client")
+				return
+			}
+			if live == nil {
+				continue
+			}
+			if req.MoveMovement == 0 {
+				session.SendFrame(serverpackets.FrameActionFailed())
+				continue
+			}
+			l.moveLivePlayer(live,
+				location.Location{X: int(req.OriginX), Y: int(req.OriginY), Z: int(req.OriginZ)},
+				location.Location{X: int(req.TargetX), Y: int(req.TargetY), Z: int(req.TargetZ)},
+			)
+
+		case clientpackets.OpcodeValidatePosition:
+			req, err := clientpackets.DecodeValidatePosition(payload)
+			if err != nil {
+				l.log.Warn().Err(err).Msg("game client")
+				return
+			}
+			if live != nil {
+				l.updateLivePlayerPosition(live, location.Location{X: int(req.X), Y: int(req.Y), Z: int(req.Z)}, int(req.Heading))
+			}
+
+		case clientpackets.OpcodeRequestItemList:
+			if live == nil {
+				continue
+			}
+			frame, err := serverpackets.FrameItemList(live.items, l.itemTemplates, false)
+			if err != nil {
+				l.log.Error().Err(err).Msg("build ItemList")
+				return
+			}
+			session.SendFrame(frame)
+
+		case clientpackets.OpcodeRequestSkillList:
+			session.SendFrame(serverpackets.FrameSkillList(nil))
+
+		case clientpackets.OpcodeRequestRestart:
+			if live == nil {
+				continue
+			}
+			l.detachLivePlayer(ctx, live)
+			live = nil
+			entering = nil
+			client.SetState(StateAuthed)
+			session.SendFrame(serverpackets.FrameRestartResponse(true))
+			list, err := l.sendCharSelectInfo(ctx, client)
+			if err != nil {
+				l.log.Error().Err(err).Msg("list characters")
+				return
+			}
+			chars = list
+
+		case clientpackets.OpcodeAction,
+			clientpackets.OpcodeAttackRequest,
+			clientpackets.OpcodeRequestUnEquipItem,
+			clientpackets.OpcodeRequestDropItem,
+			clientpackets.OpcodeUseItem,
+			clientpackets.OpcodeTradeRequest,
+			clientpackets.OpcodeAddTradeItem,
+			clientpackets.OpcodeTradeDone,
+			clientpackets.OpcodeDummy1A,
+			clientpackets.OpcodeRequestSocialAction,
+			clientpackets.OpcodeRequestChangeMoveType,
+			clientpackets.OpcodeRequestChangeWaitType,
+			clientpackets.OpcodeRequestSellItem,
+			clientpackets.OpcodeRequestBuyItem,
+			clientpackets.OpcodeDummy23,
+			clientpackets.OpcodeDummy2E,
+			clientpackets.OpcodeRequestMagicSkillUse,
+			clientpackets.OpcodeAppearing,
+			clientpackets.OpcodeSendWarehouseDeposit,
+			clientpackets.OpcodeSendWarehouseWithdraw,
+			clientpackets.OpcodeRequestShortCutReg,
+			clientpackets.OpcodeDummy34,
+			clientpackets.OpcodeRequestShortCutDel,
+			clientpackets.OpcodeCannotMoveAnymore,
+			clientpackets.OpcodeRequestTargetCancel,
+			clientpackets.OpcodeDummy3E,
+			clientpackets.OpcodeRequestGetOnVehicle,
+			clientpackets.OpcodeRequestGetOffVehicle,
+			clientpackets.OpcodeAnswerTradeRequest,
+			clientpackets.OpcodeRequestActionUse,
+			clientpackets.OpcodeStartRotating,
+			clientpackets.OpcodeFinishRotating,
+			clientpackets.OpcodeRequestEnchantItem,
+			clientpackets.OpcodeRequestDestroyItem,
+			clientpackets.OpcodeRequestMoveInVehicle,
+			clientpackets.OpcodeCannotMoveInVehicle,
+			clientpackets.OpcodeRequestQuestListInGame,
+			clientpackets.OpcodeRequestQuestAbort,
+			clientpackets.OpcodeRequestAcquireSkillInfo,
+			clientpackets.OpcodeRequestAcquireSkill,
+			clientpackets.OpcodeRequestRestartPoint,
+			clientpackets.OpcodeRequestCrystallizeItem,
+			clientpackets.OpcodeRequestChangePetName,
+			clientpackets.OpcodeRequestPetUseItem,
+			clientpackets.OpcodeRequestGiveItemToPet,
+			clientpackets.OpcodeRequestGetItemFromPet,
+			clientpackets.OpcodeRequestPetGetItem,
+			clientpackets.OpcodeSendTimeCheck,
+			clientpackets.OpcodeRequestPackageItemList,
+			clientpackets.OpcodeRequestPackageSend,
+			clientpackets.OpcodeDlgAnswer,
+			clientpackets.OpcodeGameGuardReply,
+			clientpackets.OpcodeRequestShowMiniMap:
+			continue
 
 		default:
 			l.log.Info().Str("opcode", fmt.Sprintf("%#x", opcode)).Str("state", client.State().String()).
 				Msg("game client: accepted opcode not implemented yet")
 		}
 	}
+}
+
+func normalReadFrameError(err error) bool {
+	return errors.Is(err, io.EOF) || errors.Is(err, net.ErrClosed)
 }
 
 // authenticate validates req against the login server over the game
@@ -289,7 +535,7 @@ func (l *GameClientLink) sendCharSelectInfo(ctx context.Context, client *Client)
 	slots := make([]serverpackets.CharacterSlot, len(chars))
 	now := time.Now()
 	for i, c := range chars {
-		items, err := l.items.ListByOwner(ctx, c.ObjectID)
+		items, err := l.items.ListByOwner(ctx, c.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -300,31 +546,131 @@ func (l *GameClientLink) sendCharSelectInfo(ctx context.Context, client *Client)
 	return chars, nil
 }
 
-// enterWorld sends the minimal EnterWorld packet burst for c: UserInfo,
-// ItemList, and an empty SkillList (the skill system isn't modeled yet).
-func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *player.Character) bool {
+// enterWorld sends the EnterWorld packet burst for c and registers it in the
+// live world state.
+func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *player.Character) (*livePlayer, bool) {
 	tmpl, ok := l.templates.Get(c.ClassID)
 	if !ok {
 		l.log.Error().Int("class_id", c.ClassID).Msg("enter world: no template loaded")
-		return false
+		return nil, false
 	}
-	items, err := l.items.ListByOwner(ctx, c.ObjectID)
+	items, err := l.items.ListByOwner(ctx, c.ID)
 	if err != nil {
 		l.log.Error().Err(err).Msg("enter world: list items")
-		return false
+		return nil, false
 	}
 
+	client.Session.SendFrame(serverpackets.FrameSkillList(nil))
 	client.Session.SendFrame(serverpackets.FrameUserInfo(serverpackets.UserInfoSnapshot{Character: c, Template: tmpl, Items: items}))
 
 	itemListFrame, err := serverpackets.FrameItemList(items, l.itemTemplates, false)
 	if err != nil {
 		l.log.Error().Err(err).Msg("enter world: build ItemList")
-		return false
+		return nil, false
 	}
 	client.Session.SendFrame(itemListFrame)
+	live := l.attachLivePlayer(client, c, tmpl, items)
+	if l.world != nil {
+		x, y, z := c.Position()
+		l.world.Spawn(live, x, y, z, c.Heading)
+		l.world.AddPlayer(live)
+	}
+	return live, true
+}
 
-	client.Session.SendFrame(serverpackets.FrameSkillList(nil))
-	return true
+func (l *GameClientLink) attachLivePlayer(client *Client, c *player.Character, tmpl *player.Template, items []*item.Instance) *livePlayer {
+	c.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventory(c.ID, l.itemTemplates, items))
+	c.SetWorld(l.world)
+	c.SetFrameSender(client.Session.SendFrame)
+	live := &livePlayer{Character: c, template: tmpl, items: items}
+	c.SetAttackBroadcaster(func(snapshot attack.Snapshot) {
+		l.broadcastAttack(live, snapshot)
+	})
+	return live
+}
+
+func (l *GameClientLink) broadcastAttack(attacker *livePlayer, snapshot attack.Snapshot) {
+	if attacker == nil {
+		return
+	}
+
+	frame := serverpackets.FrameAttack(snapshot)
+	encoded := append([]byte(nil), frame.Bytes()...)
+	frame.Release()
+
+	send := func(receiver interface{ SendFrame(wire.Frame) bool }) {
+		receiver.SendFrame(wire.BorrowedFrame(append([]byte(nil), encoded...)))
+	}
+	send(attacker)
+
+	if l.world == nil {
+		return
+	}
+	l.world.ForEachKnown(attacker, func(o world.Tracked) {
+		receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
+		if !ok {
+			return
+		}
+		send(receiver)
+	})
+}
+
+func (l *GameClientLink) moveLivePlayer(live *livePlayer, origin, target location.Location) {
+	heading := origin.HeadingTo(target)
+	l.updateLivePlayerPosition(live, origin, heading)
+	live.SendFrame(serverpackets.FrameMoveToLocation(live.ObjectID(), target, origin))
+
+	if l.world == nil {
+		return
+	}
+	l.world.ForEachKnown(live, func(o world.Tracked) {
+		receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
+		if !ok {
+			return
+		}
+		receiver.SendFrame(serverpackets.FrameMoveToLocation(live.ObjectID(), target, origin))
+	})
+}
+
+func (l *GameClientLink) detachLivePlayer(ctx context.Context, live *livePlayer) {
+	if live == nil {
+		return
+	}
+	if l.roster != nil {
+		saveCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), livePlayerDetachSaveTimeout)
+		defer cancel()
+		if err := l.roster.SavePosition(saveCtx, live.Character); err != nil {
+			l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("save player position")
+		}
+	}
+	if l.world != nil {
+		l.world.Despawn(live)
+		l.world.RemovePlayer(live.ObjectID())
+	}
+	live.Character.SetFrameSender(nil)
+	live.Character.SetAttackBroadcaster(nil)
+}
+
+func (l *GameClientLink) notifyPlayerLogout(account string) {
+	loginLink := l.loginLink()
+	if account == "" || loginLink == nil {
+		return
+	}
+	if err := loginLink.SendPlayerLogout(account); err != nil {
+		l.log.Debug().Err(err).Str("account", account).Msg("notify player logout")
+	}
+}
+
+func (l *GameClientLink) updateLivePlayerPosition(live *livePlayer, position location.Location, heading int) {
+	live.Character.Location = position
+	live.Character.Heading = heading
+	live.Character.SetHeading(heading)
+	if l.world == nil {
+		return
+	}
+	if err := l.world.Move(live, position.X, position.Y, position.Z); err != nil {
+		l.log.Debug().Err(err).Int32("object_id", live.ObjectID()).Msg("move player")
+	}
 }
 
 func slotCharacter(chars []*player.Character, slot int32) (*player.Character, bool) {

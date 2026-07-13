@@ -1,0 +1,37 @@
+package serverpackets
+
+import "github.com/fatal10110/acis_golang/internal/commons/wire"
+
+// OpcodeExtended is the first byte for game server packets with a
+// little-endian uint16 sub-opcode.
+const OpcodeExtended = 0xfe
+
+// Extended server packet opcodes.
+const (
+	OpcodeExSendManorList uint16 = 0x001b
+)
+
+var manorNames = [...]string{
+	"gludio",
+	"dion",
+	"giran",
+	"oren",
+	"aden",
+	"innadril",
+	"goddard",
+	"rune",
+	"schuttgart",
+}
+
+// FrameExSendManorList builds the static manor list packet requested while
+// the client loads into the world.
+func FrameExSendManorList() wire.Frame {
+	w := newFrameWriter(OpcodeExtended)
+	w.WriteUint16(OpcodeExSendManorList)
+	w.WriteInt32(int32(len(manorNames)))
+	for i, name := range manorNames {
+		w.WriteInt32(int32(i + 1))
+		w.WriteString(name)
+	}
+	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
+}

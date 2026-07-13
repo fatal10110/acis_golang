@@ -7,10 +7,35 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
-	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 )
+
+const (
+	// HitSoulshot marks a hit using a soulshot charge.
+	HitSoulshot = 0x10
+	// HitCritical marks a critical hit.
+	HitCritical = 0x20
+	// HitShield marks a shield-blocked hit.
+	HitShield = 0x40
+	// HitMiss marks an evaded hit.
+	HitMiss = 0x80
+)
+
+// SnapshotHit is one target entry in an attack animation broadcast.
+type SnapshotHit struct {
+	TargetID int32
+	Damage   int
+	Flags    uint8
+}
+
+// Snapshot is the immutable data needed to broadcast one attack.
+type Snapshot struct {
+	AttackerID int32
+	X, Y, Z    int
+	Hits       []SnapshotHit
+}
 
 // CreatureActor is the owner state a physical attack controller reads and
 // updates while starting attacks.
@@ -32,7 +57,7 @@ type CreatureActor interface {
 	Position() (int, int, int)
 	SetHeadingTo(attackable.Combatant)
 	MakeAttackHit(target attackable.Combatant, split bool) Hit
-	BroadcastAttack(serverpackets.AttackSnapshot)
+	BroadcastAttack(Snapshot)
 }
 
 // PlayableActor is a creature controlled by a player or owned by one.
@@ -64,6 +89,12 @@ type Hit struct {
 	Shield   formulas.ShieldDefense
 }
 
+type scheduledTimer interface {
+	Stop() bool
+}
+
+type afterFunc func(time.Duration, func()) scheduledTimer
+
 // Controller coordinates attack validation, animation state and packet
 // broadcast for one creature.
 //
@@ -80,7 +111,9 @@ type Controller struct {
 	attacking      bool
 	bowCooling     bool
 	inHitAnimation bool
-	timer          *time.Timer
+	timers         []scheduledTimer
+	attackSeq      uint64
+	afterFunc      afterFunc
 }
 
 // NewCreature returns a base creature attack controller.
@@ -189,23 +222,29 @@ func (c *Controller) DoAttack(target attackable.Combatant) {
 
 	attackTime := time.Duration(formulas.TimeBetweenAttacks(max(1, c.actor.AttackSpeed()))) * time.Millisecond
 	c.actor.SetHeadingTo(target)
+	attackType := c.actor.AttackType()
 
 	var hits []Hit
-	switch c.actor.AttackType() {
+	var landings []scheduledHit
+	switch attackType {
 	case item.WeaponDual, item.WeaponDualFist:
 		hits = []Hit{c.makeHit(target, true), c.makeHit(target, true)}
-		c.start(c.actor.AttackType(), attackTime/2)
+		landings = []scheduledHit{
+			{hit: hits[0], delay: attackTime / 4},
+			{hit: hits[1], delay: attackTime * 3 / 4},
+		}
 	case item.WeaponBow:
 		hits = []Hit{c.makeHit(target, false)}
-		c.start(item.WeaponBow, attackTime)
+		landings = []scheduledHit{{hit: hits[0], delay: attackTime}}
 	case item.WeaponPole:
 		hits = []Hit{c.makeHit(target, false)}
-		c.start(item.WeaponPole, attackTime)
+		landings = []scheduledHit{{hit: hits[0], delay: attackTime / 2}}
 	default:
 		hits = []Hit{c.makeHit(target, false)}
-		c.start(c.actor.AttackType(), attackTime)
+		landings = []scheduledHit{{hit: hits[0], delay: attackTime / 2}}
 	}
 
+	c.start(attackType, attackTime, landings)
 	c.actor.BroadcastAttack(c.snapshot(hits))
 
 	if c.player != nil {
@@ -217,6 +256,7 @@ func (c *Controller) DoAttack(target attackable.Combatant) {
 func (c *Controller) Stop() {
 	c.mu.Lock()
 	c.stopTimerLocked()
+	c.attackSeq++
 	c.attacking = false
 	c.inHitAnimation = false
 	c.bowCooling = false
@@ -241,35 +281,50 @@ func (c *Controller) makeHit(target attackable.Combatant, split bool) Hit {
 	return hit
 }
 
-func (c *Controller) start(weapon item.WeaponType, delay time.Duration) {
+type scheduledHit struct {
+	hit   Hit
+	delay time.Duration
+}
+
+func (c *Controller) start(weapon item.WeaponType, attackTime time.Duration, hits []scheduledHit) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	c.stopTimerLocked()
+	c.attackSeq++
+	seq := c.attackSeq
 	c.attacking = true
 	c.bowCooling = weapon == item.WeaponBow
 	c.inHitAnimation = true
 
-	c.timer = time.AfterFunc(delay, func() {
-		if weapon == item.WeaponBow {
-			c.finishBow()
-			return
+	lastLanding := time.Duration(0)
+	for _, hit := range hits {
+		hit := hit
+		if hit.delay > lastLanding {
+			lastLanding = hit.delay
 		}
-		c.finishAttack()
-	})
+		c.scheduleLocked(hit.delay, func() { c.deliverHit(seq, hit.hit) })
+	}
+	c.scheduleLocked(lastLanding+300*time.Millisecond, func() { c.clearHitAnimation(seq) })
+
+	if weapon == item.WeaponBow {
+		c.scheduleLocked(attackTime, func() { c.finishBow(seq) })
+		return
+	}
+	c.scheduleLocked(attackTime, func() { c.finishAttack(seq) })
 }
 
-func (c *Controller) snapshot(hits []Hit) serverpackets.AttackSnapshot {
+func (c *Controller) snapshot(hits []Hit) Snapshot {
 	x, y, z := c.actor.Position()
-	s := serverpackets.AttackSnapshot{
+	s := Snapshot{
 		AttackerID: c.actor.ObjectID(),
 		X:          x,
 		Y:          y,
 		Z:          z,
-		Hits:       make([]serverpackets.AttackHit, 0, len(hits)),
+		Hits:       make([]SnapshotHit, 0, len(hits)),
 	}
 	for _, hit := range hits {
-		s.Hits = append(s.Hits, serverpackets.AttackHit{
+		s.Hits = append(s.Hits, SnapshotHit{
 			TargetID: hit.TargetID,
 			Damage:   hit.Damage,
 			Flags:    c.hitFlags(hit),
@@ -280,55 +335,107 @@ func (c *Controller) snapshot(hits []Hit) serverpackets.AttackSnapshot {
 
 func (c *Controller) hitFlags(hit Hit) uint8 {
 	if hit.Miss {
-		return serverpackets.AttackHitMiss
+		return HitMiss
 	}
 
 	var flags uint8
 	if c.actor.SoulshotCharged() {
-		flags |= serverpackets.AttackHitSoulshot | uint8(c.actor.WeaponGrade())
+		flags |= HitSoulshot | uint8(c.actor.WeaponGrade())
 	}
 	if hit.Crit {
-		flags |= serverpackets.AttackHitCritical
+		flags |= HitCritical
 	}
 	if hit.Shield != formulas.ShieldFailed {
-		flags |= serverpackets.AttackHitShield
+		flags |= HitShield
 	}
 	return flags
 }
 
-func (c *Controller) finishBow() {
+type damageReceiver interface {
+	TakeDamage(int, creature.DeathActor) bool
+}
+
+func (c *Controller) deliverHit(seq uint64, hit Hit) {
+	c.mu.RLock()
+	active := seq == c.attackSeq
+	c.mu.RUnlock()
+	if !active || hit.Target == nil || hit.Miss || hit.Damage <= 0 {
+		return
+	}
+	if c.actor.AlikeDead() || !c.actor.Knows(hit.Target) || hit.Target.AlikeDead() {
+		return
+	}
+	target, ok := hit.Target.(damageReceiver)
+	if !ok {
+		return
+	}
+	target.TakeDamage(hit.Damage, c.actor)
+}
+
+func (c *Controller) finishBow(seq uint64) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-
-	c.attacking = false
-	c.inHitAnimation = false
-
-	reuse := c.actor.WeaponReuseDelay()
-	if reuse <= 0 {
-		c.bowCooling = false
-		c.timer = nil
+	if seq != c.attackSeq {
 		return
 	}
 
-	c.timer = time.AfterFunc(reuse, func() {
-		c.mu.Lock()
+	c.attacking = false
+
+	reuse := c.scaledBowReuse()
+	if reuse <= 0 {
 		c.bowCooling = false
-		c.timer = nil
-		c.mu.Unlock()
-	})
+		return
+	}
+
+	c.scheduleLocked(reuse, func() { c.clearBowCooldown(seq) })
 }
 
-func (c *Controller) finishAttack() {
+func (c *Controller) finishAttack(seq uint64) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	if seq != c.attackSeq {
+		return
+	}
 	c.attacking = false
-	c.inHitAnimation = false
-	c.timer = nil
+}
+
+func (c *Controller) clearHitAnimation(seq uint64) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if seq == c.attackSeq {
+		c.inHitAnimation = false
+	}
+}
+
+func (c *Controller) clearBowCooldown(seq uint64) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if seq == c.attackSeq {
+		c.bowCooling = false
+	}
+}
+
+func (c *Controller) scaledBowReuse() time.Duration {
+	reuse := c.actor.WeaponReuseDelay()
+	if reuse <= 0 {
+		return 0
+	}
+	return time.Duration(int64(reuse) * 345 / int64(max(1, c.actor.AttackSpeed())))
+}
+
+func (c *Controller) scheduleLocked(delay time.Duration, f func()) {
+	source := c.afterFunc
+	if source == nil {
+		source = func(delay time.Duration, f func()) scheduledTimer {
+			return time.AfterFunc(delay, f)
+		}
+	}
+	c.timers = append(c.timers, source(delay, f))
 }
 
 func (c *Controller) stopTimerLocked() {
-	if c.timer != nil {
-		c.timer.Stop()
-		c.timer = nil
+	for _, timer := range c.timers {
+		timer.Stop()
 	}
+	c.timers = nil
 }

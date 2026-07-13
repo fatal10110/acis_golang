@@ -3,7 +3,6 @@ package serverpackets
 import (
 	"bytes"
 	"encoding/binary"
-	"math"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -11,25 +10,21 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
 
-func appendF32(b []byte, v float32) []byte {
-	return binary.LittleEndian.AppendUint32(b, math.Float32bits(v))
-}
-
 func TestFrameUserInfo(t *testing.T) {
 	c := &player.Character{
-		ObjectID: 0x10000001,
-		Name:     "Newbie",
-		ClassID:  0,
-		Race:     player.RaceHuman,
-		Sex:      player.SexMale,
-		Level:    1,
-		Exp:      0,
-		SP:       0,
-		MaxHP:    80, CurHP: 75,
+		ID:      0x10000001,
+		Name:    "Newbie",
+		ClassID: 0,
+		Race:    player.RaceHuman,
+		Sex:     player.SexMale,
+		Level:   1,
+		Exp:     0,
+		SP:      0,
+		MaxHP:   80, CurHP: 75,
 		MaxMP: 30, CurMP: 30,
 		MaxCP: 40, CurCP: 40,
 		Face: 0, HairStyle: 1, HairColor: 2,
-		Position: location.Location{X: 10, Y: 20, Z: 30},
+		Location: location.Location{X: 10, Y: 20, Z: 30},
 		Heading:  100,
 		Karma:    0, PKKills: 1, PvPKills: 2,
 		ClanID: 5, Title: "Hero", AccessLevel: 1,
@@ -47,11 +42,12 @@ func TestFrameUserInfo(t *testing.T) {
 	got := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: c, Template: tmpl, Items: items}))
 
 	want := []byte{OpcodeUserInfo}
-	want = binary.LittleEndian.AppendUint32(want, uint32(c.Position.X))
-	want = binary.LittleEndian.AppendUint32(want, uint32(c.Position.Y))
-	want = binary.LittleEndian.AppendUint32(want, uint32(c.Position.Z))
+	x, y, z := c.Position()
+	want = binary.LittleEndian.AppendUint32(want, uint32(x))
+	want = binary.LittleEndian.AppendUint32(want, uint32(y))
+	want = binary.LittleEndian.AppendUint32(want, uint32(z))
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.Heading))
-	want = binary.LittleEndian.AppendUint32(want, uint32(c.ObjectID))
+	want = binary.LittleEndian.AppendUint32(want, uint32(c.ObjectID()))
 	want = append(want, encodeUTF16Z(c.Name)...)
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.Race))
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.Sex))
@@ -115,10 +111,10 @@ func TestFrameUserInfo(t *testing.T) {
 	want = binary.LittleEndian.AppendUint32(want, 0) // flying run speed
 	want = binary.LittleEndian.AppendUint32(want, 0) // flying walk speed
 
-	want = appendF32(want, 1) // movement speed multiplier
-	want = appendF32(want, 1) // attack speed multiplier
-	want = appendF32(want, float32(tmpl.CollisionRadius))
-	want = appendF32(want, float32(tmpl.CollisionHeight))
+	want = appendF64(want, 1) // movement speed multiplier
+	want = appendF64(want, 1) // attack speed multiplier
+	want = appendF64(want, tmpl.CollisionRadius)
+	want = appendF64(want, tmpl.CollisionHeight)
 
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.HairStyle))
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.HairColor))
@@ -190,10 +186,10 @@ func TestFrameUserInfo_FemaleUsesFemaleCollision(t *testing.T) {
 	if bytes.Equal(male, female) {
 		t.Fatal("male and female encodings are identical, want different collision fields")
 	}
-	if !bytes.Contains(female, appendF32(nil, float32(tmpl.CollisionRadiusFemale))) {
+	if !bytes.Contains(female, appendF64(nil, tmpl.CollisionRadiusFemale)) {
 		t.Errorf("female encoding did not contain the female collision radius %v", tmpl.CollisionRadiusFemale)
 	}
-	if bytes.Contains(male, appendF32(nil, float32(tmpl.CollisionRadiusFemale))) {
+	if bytes.Contains(male, appendF64(nil, tmpl.CollisionRadiusFemale)) {
 		t.Errorf("male encoding unexpectedly contained the female collision radius %v", tmpl.CollisionRadiusFemale)
 	}
 }

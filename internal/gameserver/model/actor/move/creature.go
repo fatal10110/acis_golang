@@ -46,6 +46,12 @@ type TargetSnapshot struct {
 }
 
 // CreatureMove holds movement state owned and updated by one caller.
+//
+// origin is the actor's current server-authoritative position. The current
+// MoveToLocation result still precomputes Duration for packet-facing callers;
+// a movement task should advance position with SetPosition after each
+// accepted geo step, report blocked-arrival events from that task, and feed
+// pathfinding waypoints into MoveToLocation when a straight step cannot move.
 type CreatureMove struct {
 	origin, destination location.Location
 	speed               float64
@@ -56,15 +62,30 @@ type CreatureMove struct {
 	followMode          FollowMode
 }
 
-// NewCreatureMove builds movement state at origin with a positive ground speed.
+// NewCreatureMove builds movement state at origin with a non-negative ground
+// speed. Zero is a valid, stationary speed (e.g. an immobile scripted NPC) —
+// MoveToLocation rejects any actual movement request once speed is zero.
 func NewCreatureMove(origin location.Location, speed float64, geo Geo) (*CreatureMove, error) {
 	if geo == nil {
 		return nil, errors.New("move: nil geodata")
 	}
-	if speed <= 0 || math.IsNaN(speed) || math.IsInf(speed, 0) {
-		return nil, errors.New("move: speed must be positive")
+	if speed < 0 || math.IsNaN(speed) || math.IsInf(speed, 0) {
+		return nil, errors.New("move: speed must not be negative")
 	}
 	return &CreatureMove{origin: origin, destination: origin, speed: speed, geo: geo}, nil
+}
+
+// Position returns the actor's current server-authoritative position.
+func (m *CreatureMove) Position() location.Location {
+	return m.origin
+}
+
+// SetPosition records the actor's current server-authoritative position.
+func (m *CreatureMove) SetPosition(position location.Location) {
+	m.origin = position
+	if m.destination == position {
+		m.moving = false
+	}
 }
 
 // MoveToLocation records an accepted, height-normalized ground-movement request.
@@ -77,6 +98,10 @@ func (m *CreatureMove) MoveToLocation(target location.Location) (Event, error) {
 		m.destination = target
 		m.moving = false
 		return Event{Origin: m.origin, Destination: target, Speed: m.speed}, nil
+	}
+
+	if m.speed == 0 {
+		return Event{}, errors.New("move: actor cannot move at zero speed")
 	}
 
 	distance := math.Hypot(float64(target.X)-float64(m.origin.X), float64(target.Y)-float64(m.origin.Y))

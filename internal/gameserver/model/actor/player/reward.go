@@ -24,7 +24,8 @@ const killLevelPenaltyBase = 5.0 / 6.0
 // enough gap yields zero reward. A non-positive resulting exp also zeroes
 // sp, matching the reward always granting sp alongside a nonzero exp only.
 //
-// The returned values are shaped to feed Character.AddExpAndSp directly.
+// The returned values are narrowed through the legacy signed 32-bit reward
+// contract before being widened to this package's public return types.
 func KillRewardExpAndSp(expReward, spReward float64, damage, totalDamage float64, levelDiff int) (exp int64, sp int) {
 	if totalDamage <= 0 {
 		return 0, 0
@@ -45,5 +46,18 @@ func KillRewardExpAndSp(expReward, spReward float64, damage, totalDamage float64
 	if spF <= 0 {
 		spF = 0
 	}
-	return int64(xp), int(spF)
+	return int64(rewardInt32(xp)), int(rewardInt32(spF))
+}
+
+func rewardInt32(v float64) int32 {
+	if math.IsNaN(v) {
+		return 0
+	}
+	if v > math.MaxInt32 {
+		return math.MaxInt32
+	}
+	if v < math.MinInt32 {
+		return math.MinInt32
+	}
+	return int32(v)
 }

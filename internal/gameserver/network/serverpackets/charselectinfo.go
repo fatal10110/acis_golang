@@ -65,10 +65,11 @@ type CharacterSlot struct {
 // NewCharacterSlot builds a CharacterSlot from a persisted character and
 // its items, resolving the deletion countdown display as of now.
 func NewCharacterSlot(c *player.Character, items []*item.Instance, now time.Time) CharacterSlot {
+	x, y, z := c.Position()
 	slot := CharacterSlot{
-		Name: c.Name, ObjectID: c.ObjectID, ClanID: int32(c.ClanID),
+		Name: c.Name, ObjectID: c.ObjectID(), ClanID: int32(c.ClanID),
 		Sex: c.Sex, Race: c.Race, ClassID: int32(c.ClassID),
-		X: int32(c.Position.X), Y: int32(c.Position.Y), Z: int32(c.Position.Z),
+		X: int32(x), Y: int32(y), Z: int32(z),
 		CurHP: c.CurHP, CurMP: c.CurMP, MaxHP: c.MaxHP, MaxMP: c.MaxMP,
 		SP: int32(c.SP), Exp: c.Exp, Level: int32(c.Level),
 		Karma: int32(c.Karma), PKKills: int32(c.PKKills), PvPKills: int32(c.PvPKills),

@@ -84,11 +84,11 @@ func TestRoster_Create(t *testing.T) {
 	if c.Name != "Newbie" || c.ClassID != 0 || c.Race != player.RaceHuman {
 		t.Fatalf("Create() character = %+v", c)
 	}
-	if c.Position != (location.Location{X: 10, Y: 20, Z: 30}) {
-		t.Errorf("Position = %+v, want template spawn", c.Position)
+	if c.Location != (location.Location{X: 10, Y: 20, Z: 30}) {
+		t.Errorf("Location = %+v, want template spawn", c.Location)
 	}
 
-	granted, err := items.ListByOwner(ctx, c.ObjectID)
+	granted, err := items.ListByOwner(ctx, c.ID)
 	if err != nil {
 		t.Fatalf("ListByOwner() unexpected error: %v", err)
 	}
@@ -191,7 +191,7 @@ func TestRoster_List_ExpiresPastDeadline(t *testing.T) {
 	}
 
 	// Schedule deletion in the past relative to fixedNow.
-	if err := characters.SetDeleteAt(ctx, c.ObjectID, fixedNow.UnixMilli()-1000); err != nil {
+	if err := characters.SetDeleteAt(ctx, c.ID, fixedNow.UnixMilli()-1000); err != nil {
 		t.Fatalf("SetDeleteAt() unexpected error: %v", err)
 	}
 
@@ -203,10 +203,10 @@ func TestRoster_List_ExpiresPastDeadline(t *testing.T) {
 		t.Fatalf("List() = %v, want empty (expired character purged)", got)
 	}
 
-	if _, err := characters.Get(ctx, c.ObjectID); err == nil {
+	if _, err := characters.Get(ctx, c.ID); err == nil {
 		t.Error("Get() after expiry: want ErrCharacterNotFound, got nil error")
 	}
-	remainingItems, err := items.ListByOwner(ctx, c.ObjectID)
+	remainingItems, err := items.ListByOwner(ctx, c.ID)
 	if err != nil {
 		t.Fatalf("ListByOwner() unexpected error: %v", err)
 	}
@@ -224,7 +224,7 @@ func TestRoster_List_NotYetExpired(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Create() unexpected error: %v", err)
 	}
-	if err := characters.SetDeleteAt(ctx, c.ObjectID, fixedNow.UnixMilli()+1000); err != nil {
+	if err := characters.SetDeleteAt(ctx, c.ID, fixedNow.UnixMilli()+1000); err != nil {
 		t.Fatalf("SetDeleteAt() unexpected error: %v", err)
 	}
 
@@ -247,10 +247,10 @@ func TestRoster_MarkForDeletion_AndRestore(t *testing.T) {
 		t.Fatalf("Create() unexpected error: %v", err)
 	}
 
-	if err := roster.MarkForDeletion(ctx, c.ObjectID); err != nil {
+	if err := roster.MarkForDeletion(ctx, c.ID); err != nil {
 		t.Fatalf("MarkForDeletion() unexpected error: %v", err)
 	}
-	got, err := characters.Get(ctx, c.ObjectID)
+	got, err := characters.Get(ctx, c.ID)
 	if err != nil {
 		t.Fatalf("Get() unexpected error: %v", err)
 	}
@@ -259,10 +259,10 @@ func TestRoster_MarkForDeletion_AndRestore(t *testing.T) {
 		t.Errorf("DeleteAt = %d, want %d", got.DeleteAt, want)
 	}
 
-	if err := roster.Restore(ctx, c.ObjectID); err != nil {
+	if err := roster.Restore(ctx, c.ID); err != nil {
 		t.Fatalf("Restore() unexpected error: %v", err)
 	}
-	got, err = characters.Get(ctx, c.ObjectID)
+	got, err = characters.Get(ctx, c.ID)
 	if err != nil {
 		t.Fatalf("Get() unexpected error: %v", err)
 	}
@@ -280,14 +280,14 @@ func TestRoster_MarkForDeletion_Immediate(t *testing.T) {
 		t.Fatalf("Create() unexpected error: %v", err)
 	}
 
-	if err := roster.MarkForDeletion(ctx, c.ObjectID); err != nil {
+	if err := roster.MarkForDeletion(ctx, c.ID); err != nil {
 		t.Fatalf("MarkForDeletion() unexpected error: %v", err)
 	}
 
-	if _, err := characters.Get(ctx, c.ObjectID); err == nil {
+	if _, err := characters.Get(ctx, c.ID); err == nil {
 		t.Error("Get() after immediate deletion: want ErrCharacterNotFound, got nil error")
 	}
-	remaining, err := items.ListByOwner(ctx, c.ObjectID)
+	remaining, err := items.ListByOwner(ctx, c.ID)
 	if err != nil {
 		t.Fatalf("ListByOwner() unexpected error: %v", err)
 	}

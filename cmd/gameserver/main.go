@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"flag"
 	"fmt"
+	"math"
 	"net"
 	"os"
 	"path/filepath"
@@ -33,10 +34,14 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/route"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+	"github.com/fatal10110/acis_golang/internal/link"
 	"github.com/fatal10110/acis_golang/internal/loginserver/model"
 )
 
@@ -53,16 +58,22 @@ type gameServerPaths struct {
 }
 
 type gameServerConfig struct {
-	ListenAddr string
-	LoginAddr  string
-	Auth       network.LoginServerAuth
-	Database   db.Config
+	ListenAddr     string
+	LoginAddr      string
+	Auth           network.LoginServerAuth
+	GeneratedHexID bool
+	HexIDPath      string
+	Database       db.Config
 }
 
 type gameData struct {
 	Players *player.TemplateTable
 	Levels  *player.LevelTable
 	Items   *item.Table
+	Skills  *skill.Table
+	Trees   *skill.Trees
+	Zones   *zone.Index
+	Routes  route.WalkerRoutes
 	NPCs    *npc.Table
 	Doors   *door.Table
 	Statics *staticobject.Table
@@ -71,11 +82,12 @@ type gameData struct {
 }
 
 type geodata struct {
-	Engine   *engine.Engine
-	Finder   *pathfind.Finder
-	Dir      string
-	Type     probe.GeoType
-	Pathfind pathfind.Options
+	Engine        *engine.Engine
+	Finder        *pathfind.Finder
+	Dir           string
+	Type          probe.GeoType
+	EngineOptions engine.Options
+	Pathfind      pathfind.Options
 }
 
 func main() {
@@ -115,6 +127,10 @@ func newGameServerApp(paths gameServerPaths) *fx.App {
 			provideWorldState,
 			provideGroundItemOptions,
 			provideGroundItems,
+			provideGameClock,
+			provideWalker,
+			provideWater,
+			provideShadowItems,
 			provideDecay,
 			provideAttackStance,
 			provideWorldObjects,
@@ -126,7 +142,7 @@ func newGameServerApp(paths gameServerPaths) *fx.App {
 			provideLoginLinkState,
 			provideGameClientLink,
 		),
-		fx.Invoke(startPvPFlags, startGroundItems, startDecay, startAttackStance, startWorldObjects, startRespawnTask, startAI, startNpcs, startNpcPersistence, startGameServer),
+		fx.Invoke(startPvPFlags, startGroundItems, startGameClock, startWalker, startWater, startShadowItems, startDecay, startAttackStance, startWorldObjects, startRespawnTask, startAI, startNpcs, startNpcPersistence, startGameServer),
 	)
 }
 
@@ -161,7 +177,7 @@ func gameServerConfigFromLoadedProperties(paths gameServerPaths, serverProps *co
 	return gameServerConfigFromProperties(paths, serverProps, hexProps.Props)
 }
 
-func gameServerConfigFromProperties(_ gameServerPaths, serverProps, hexProps *config.Properties) (gameServerConfig, error) {
+func gameServerConfigFromProperties(paths gameServerPaths, serverProps, hexProps *config.Properties) (gameServerConfig, error) {
 	listenPort, err := serverProps.Int("GameserverPort", 7777)
 	if err != nil {
 		return gameServerConfig{}, err
@@ -174,12 +190,16 @@ func gameServerConfigFromProperties(_ gameServerPaths, serverProps, hexProps *co
 	if err != nil {
 		return gameServerConfig{}, err
 	}
-	maxPlayers, err := serverProps.Int("MaximumOnlineUsers", 100)
+	maxPlayers, err := serverProps.Int64("MaximumOnlineUsers", 100)
 	if err != nil {
 		return gameServerConfig{}, err
 	}
+	if maxPlayers < math.MinInt32 || maxPlayers > math.MaxInt32 {
+		return gameServerConfig{}, fmt.Errorf("MaximumOnlineUsers %d outside int32 range", maxPlayers)
+	}
 
 	serverID := requestID
+	generated := hexProps == nil
 	hexID, err := generatedHexID()
 	if err != nil {
 		return gameServerConfig{}, err
@@ -196,6 +216,19 @@ func gameServerConfigFromProperties(_ gameServerPaths, serverProps, hexProps *co
 	}
 
 	host := serverProps.String("Hostname", "*")
+	statusType := link.ServerTypeAuto
+	if serverProps.Bool("ServerGMOnly", false) {
+		statusType = link.ServerTypeGMOnly
+	}
+	showClock := serverProps.Bool("ServerListClock", false)
+	showBrackets := serverProps.Bool("ServerListBrackets", false)
+	serverListAgeLimit, err := serverProps.Int("ServerListAgeLimit", 0)
+	if err != nil {
+		return gameServerConfig{}, err
+	}
+	ageLimit := int32(serverListAgeLimit)
+	testServer := serverProps.Bool("TestServer", false)
+	pvpServer := serverProps.Bool("PvpServer", true)
 	return gameServerConfig{
 		ListenAddr: listenAddress(serverProps.String("GameserverHostname", "*"), listenPort),
 		LoginAddr:  net.JoinHostPort(serverProps.String("LoginHost", "127.0.0.1"), strconv.Itoa(loginPort)),
@@ -206,7 +239,17 @@ func gameServerConfigFromProperties(_ gameServerPaths, serverProps, hexProps *co
 			HostName:          host,
 			Port:              uint16(listenPort),
 			MaxPlayers:        int32(maxPlayers),
+			InitialStatus: link.ServerStatus{
+				Status:       &statusType,
+				ShowClock:    &showClock,
+				ShowBrackets: &showBrackets,
+				AgeLimit:     &ageLimit,
+				TestServer:   &testServer,
+				Pvp:          &pvpServer,
+			},
 		},
+		GeneratedHexID: generated,
+		HexIDPath:      paths.HexIDPath,
 		Database: db.Config{
 			URL:      serverProps.String("URL", "jdbc:mariadb://localhost/acis"),
 			Login:    serverProps.String("Login", "root"),
@@ -228,6 +271,17 @@ func generatedHexID() ([]byte, error) {
 		return nil, fmt.Errorf("generate hexid: %w", err)
 	}
 	return key, nil
+}
+
+func writeHexIDFile(path string, serverID int, hexID []byte) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return fmt.Errorf("create hexid directory: %w", err)
+	}
+	data := fmt.Sprintf("#the hexID to auth into login\nServerID=%d\nHexID=%s\n", serverID, model.HexKeyText(hexID))
+	if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
+		return fmt.Errorf("write hexid file: %w", err)
+	}
+	return nil
 }
 
 func provideGameServerLogger(lc fx.Lifecycle, paths gameServerPaths) (zerolog.Logger, error) {
@@ -273,6 +327,22 @@ func loadGameData(paths gameServerPaths, log zerolog.Logger) (*gameData, error) 
 	if err != nil {
 		return nil, err
 	}
+	skills, err := gamexml.LoadSkillDefinitions(filepath.Join(xmlRoot, "skills"))
+	if err != nil {
+		return nil, err
+	}
+	trees, err := gamexml.LoadSkillTrees(filepath.Join(xmlRoot, "skillstrees"))
+	if err != nil {
+		return nil, err
+	}
+	zones, err := gamexml.LoadZones(filepath.Join(xmlRoot, "zones"))
+	if err != nil {
+		return nil, err
+	}
+	routes, err := gamexml.LoadWalkerRoutes(filepath.Join(xmlRoot, "walkerRoutes.xml"))
+	if err != nil {
+		return nil, err
+	}
 	npcs, err := gamexml.LoadNPCTemplates(filepath.Join(xmlRoot, "npcs"), items, log)
 	if err != nil {
 		return nil, err
@@ -289,11 +359,15 @@ func loadGameData(paths gameServerPaths, log zerolog.Logger) (*gameData, error) 
 	if err != nil {
 		return nil, err
 	}
-	log.Info().Str("geodata_dir", geo.Dir).Str("geodata_type", string(geo.Type)).Int("npc_templates", npcs.Len()).Msg("game data loaded")
+	log.Info().Str("geodata_dir", geo.Dir).Str("geodata_type", string(geo.Type)).Int("npc_templates", npcs.Len()).Int("skills", skills.Len()).Msg("game data loaded")
 	return &gameData{
 		Players: players,
 		Levels:  levels,
 		Items:   items,
+		Skills:  skills,
+		Trees:   trees,
+		Zones:   zones,
+		Routes:  routes,
 		NPCs:    npcs,
 		Doors:   doors,
 		Statics: statics,
@@ -308,17 +382,22 @@ func loadGeodata(paths gameServerPaths) (*geodata, error) {
 		return nil, err
 	}
 
-	options, err := pathfind.OptionsFromProperties(props)
+	engineOptions, err := engine.OptionsFromProperties(props)
+	if err != nil {
+		return nil, err
+	}
+	pathOptions, err := pathfind.OptionsFromProperties(props)
 	if err != nil {
 		return nil, err
 	}
 
 	geo := &geodata{
-		Dir:      resolveGeodataDir(paths.DataRoot, props.String("GeoDataPath", "")),
-		Type:     probe.GeoType(props.String("GeoDataType", string(probe.L2OFF))),
-		Pathfind: options,
+		Dir:           resolveGeodataDir(paths.DataRoot, props.String("GeoDataPath", "")),
+		Type:          probe.GeoType(props.String("GeoDataType", string(probe.L2OFF))),
+		EngineOptions: engineOptions,
+		Pathfind:      pathOptions,
 	}
-	geo.Engine, err = probe.LoadEngine(geo.Dir, geo.Type)
+	geo.Engine, err = probe.LoadEngine(geo.Dir, geo.Type, geo.EngineOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -397,6 +476,47 @@ func provideGroundItems(state *world.State, opts task.GroundItemOptions) *task.G
 }
 
 func startGroundItems(lc fx.Lifecycle, items *task.GroundItems, log zerolog.Logger) {
+	startTicker(lc, log, items.Start)
+}
+
+func provideGameClock() *task.GameClock {
+	return task.NewGameClock(time.Now)
+}
+
+func startGameClock(lc fx.Lifecycle, clock *task.GameClock, log zerolog.Logger) {
+	startTicker(lc, log, func(log zerolog.Logger) *scheduler.Ticker {
+		return scheduler.Start(task.GameMinute, clock.Tick, log)
+	})
+}
+
+func provideWalker(data *gameData) (*task.Walker, error) {
+	return task.NewWalker(data.Routes, task.GeoPath{Geo: data.Geo, Finder: data.Finder}, time.Now)
+}
+
+func startWalker(lc fx.Lifecycle, walker *task.Walker, log zerolog.Logger) {
+	startTicker(lc, log, walker.Start)
+}
+
+type gameTaskEffects struct{}
+
+func (gameTaskEffects) GaugeSet(task.WaterActor, time.Duration)  {}
+func (gameTaskEffects) Drown(task.WaterActor)                    {}
+func (gameTaskEffects) ManaThreshold(int32, *item.Instance, int) {}
+func (gameTaskEffects) Expire(int32, *item.Instance)             {}
+
+func provideWater() (*task.Water, error) {
+	return task.NewWater(gameTaskEffects{}, time.Now)
+}
+
+func startWater(lc fx.Lifecycle, water *task.Water, log zerolog.Logger) {
+	startTicker(lc, log, water.Start)
+}
+
+func provideShadowItems() (*task.ShadowItems, error) {
+	return task.NewShadowItems(gameTaskEffects{})
+}
+
+func startShadowItems(lc fx.Lifecycle, items *task.ShadowItems, log zerolog.Logger) {
 	startTicker(lc, log, items.Start)
 }
 
@@ -582,6 +702,7 @@ func startNpcs(npcs *manager.Npcs, log zerolog.Logger) {
 		Int("live_npcs", npcs.LiveCount()).
 		Int("deferred_territory_spawns", npcs.DeferredCount()).
 		Int("restored_dead_spawns", npcs.RestoredDeadCount()).
+		Int("skipped_non_combat_spawns", npcs.SkippedNonCombatCount()).
 		Msg("npc spawns loaded")
 }
 
@@ -635,14 +756,16 @@ func provideGameClientLink(
 	items *gamesql.ItemStore,
 	validator *network.SessionValidator,
 	links *loginLinkState,
+	state *world.State,
 	log zerolog.Logger,
 ) *network.GameClientLink {
-	return network.NewGameClientLink(validator, links.get, roster, items, data.Players, data.Items, log)
+	return network.NewGameClientLink(validator, links.get, roster, items, data.Players, data.Items, state, log)
 }
 
 func startGameServer(lc fx.Lifecycle, cfg gameServerConfig, _ *gameData, _ *manager.Roster, validator *network.SessionValidator, links *loginLinkState, clients *network.GameClientLink, log zerolog.Logger) {
 	var cancel context.CancelFunc
 	var wg sync.WaitGroup
+	wroteGeneratedHexID := false
 
 	lc.Append(fx.Hook{
 		OnStart: func(context.Context) error {
@@ -656,6 +779,14 @@ func startGameServer(lc fx.Lifecycle, cfg gameServerConfig, _ *gameData, _ *mana
 					PlayerAuthResponse: validator.Resolve,
 				}, network.DefaultReconnectDelay, func(link *network.LoginLink) {
 					links.set(link)
+					if cfg.GeneratedHexID && !wroteGeneratedHexID {
+						if err := writeHexIDFile(cfg.HexIDPath, int(link.ServerID), cfg.Auth.HexID); err != nil {
+							log.Error().Err(err).Str("path", cfg.HexIDPath).Msg("write generated hexid")
+						} else {
+							wroteGeneratedHexID = true
+							log.Info().Str("path", cfg.HexIDPath).Int("server_id", int(link.ServerID)).Msg("generated hexid saved")
+						}
+					}
 					go func() {
 						<-link.Done()
 						links.clear(link)

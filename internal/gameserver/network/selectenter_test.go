@@ -42,7 +42,7 @@ func TestSelectCharacterAdvancesToEntering(t *testing.T) {
 
 	// Resolving the slot to a persisted character is the character store's
 	// job, not this sequence's; a fixed character stands in for it here.
-	c := &player.Character{ObjectID: 1, Name: "Newbie", Position: location.Location{X: 1, Y: 2, Z: 3}}
+	c := &player.Character{ID: 1, Name: "Newbie", Location: location.Location{X: 1, Y: 2, Z: 3}}
 	tmpl := &player.Template{}
 
 	ssqInfo := serverpackets.FrameSSQInfo()

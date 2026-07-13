@@ -8,18 +8,18 @@ import "github.com/fatal10110/acis_golang/internal/commons/wire"
 // packet after it in both directions.
 const OpcodeVersionCheck = 0x00
 
-// versionCheckKeySize is the length of the XOR cipher key VersionCheck
-// carries; must match network.Cipher's key size.
-const versionCheckKeySize = 16
+// versionCheckKeySize is the random half of the XOR cipher key VersionCheck
+// carries. The client appends the fixed static half itself.
+const versionCheckKeySize = 8
 
 // FrameVersionCheck builds the VersionCheck packet as an owned frame,
-// carrying key (the connection's cipher key) to the client. key must be
-// exactly versionCheckKeySize (16) bytes.
+// carrying the random half of key to the client. key must contain at least
+// versionCheckKeySize bytes.
 func FrameVersionCheck(key []byte) wire.Frame {
 	w := newFrameWriter(OpcodeVersionCheck)
 	w.WriteUint8(0x01)
-	w.WriteBytes(key)
-	w.WriteInt32(0) // Blowfish-over-XOR wrapper: not modeled, always off
+	w.WriteBytes(key[:versionCheckKeySize])
+	w.WriteInt32(1)
 	w.WriteInt32(1)
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
 }

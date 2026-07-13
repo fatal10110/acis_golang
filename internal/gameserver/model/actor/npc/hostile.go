@@ -49,16 +49,22 @@ type Hostile struct {
 	dead    bool
 	decayed bool
 
-	// hpMu guards hp, kept separate from deathMu: hp bookkeeping (and a
-	// future regen tick) shouldn't need the death latch, and the death
-	// latch shouldn't need to know how HP got to zero.
-	hpMu sync.Mutex
-	hp   int
+	health creature.Health
+	hp     float64
 
 	// roll draws a uniform integer in [0, n) for MakeAttackHit's hit/crit/
 	// damage-spread rolls. It defaults to math/rand's global source; tests
 	// substitute a fixed function for deterministic combat outcomes.
 	roll func(n int) int
+}
+
+// Attackable reports whether inst's instance type belongs to the set of
+// combat-capable NPC kinds NewHostile accepts. Callers deciding whether to
+// build a live Hostile at all (rather than handling NewHostile's error)
+// should check this first.
+func Attackable(inst *Instance) bool {
+	_, ok := hostileInstanceKinds[hostileKind(inst)]
+	return ok
 }
 
 // NewHostile creates a live attackable NPC wrapper for inst.
@@ -83,9 +89,10 @@ func NewHostile(inst *Instance, movement ai.MoveController, attack ai.AttackCont
 	h := &Hostile{
 		Instance: inst,
 		move:     movement,
-		hp:       int(inst.Template.HPMax),
+		hp:       inst.Template.HPMax,
 		roll:     rand.Intn,
 	}
+	h.health = creature.NewHealth(&h.hp)
 	h.brain = ai.NewAttackable(h, movement, attack)
 	return h, nil
 }

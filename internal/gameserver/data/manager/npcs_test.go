@@ -7,7 +7,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -381,8 +380,8 @@ func TestSpawnedNpcKillRewardDecayRespawnChainFiresEndToEnd(t *testing.T) {
 	defenderID := defender.ObjectID()
 
 	attacker.SetRollSource(func(int) int { return 0 }) // guarantee a hit for a deterministic test
-	controller := attack.NewAttackable(attacker)
-	controller.DoAttack(defender)
+	hit := attacker.MakeAttackHit(defender, false)
+	defender.TakeDamage(hit.Damage, attacker)
 
 	if !defender.Dead() {
 		t.Fatal("defender.Dead() = false after a lethal hit, want true")

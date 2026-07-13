@@ -2,7 +2,7 @@ package serverpackets
 
 import (
 	"bytes"
-	"encoding/binary"
+	"encoding/hex"
 	"testing"
 )
 
@@ -28,42 +28,18 @@ func TestEncodeServerList(t *testing.T) {
 		},
 	}
 
-	got := EncodeServerList(1, servers)
-
-	var want []byte
-	want = append(want, OpcodeServerList)
-	want = append(want, byte(len(servers)), 1)
-	for i, s := range servers {
-		want = append(want, s.ID)
-		want = append(want, s.IP[:]...)
-		want = append(want, 127, 0, 0, 1)
-		want = binary.LittleEndian.AppendUint32(want, uint32(s.Port))
-		want = append(want, s.AgeLimit)
-		if s.PvP {
-			want = append(want, 1)
-		} else {
-			want = append(want, 0)
-		}
-		want = binary.LittleEndian.AppendUint16(want, s.CurrentPlayers)
-		want = binary.LittleEndian.AppendUint16(want, s.MaxPlayers)
-		if s.Online {
-			want = append(want, 1)
-		} else {
-			want = append(want, 0)
-		}
-
-		var bits uint32
-		if i == 0 {
-			bits = 0x04 | 0x02
-		}
-		want = binary.LittleEndian.AppendUint32(want, bits)
-
-		if s.ShowBrackets {
-			want = append(want, 1)
-		} else {
-			want = append(want, 0)
-		}
+	// Known-good vector: 3-byte header, then one 21-byte block per server
+	// (id 1, ip 4, port 4, age 1, pvp 1, current 2, max 2, online 1,
+	// flag bits 4, brackets 1).
+	want, err := hex.DecodeString(
+		"040201" +
+			"017f000001611e00000f010a006400010600000001" +
+			"020a000002621e0000000000000000000000000000")
+	if err != nil {
+		t.Fatalf("decode vector: %v", err)
 	}
+
+	got := EncodeServerList(1, servers)
 
 	if !bytes.Equal(got, want) {
 		t.Errorf("EncodeServerList = %x, want %x", got, want)

@@ -9,11 +9,12 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
 
 func testCharacter(objectID int32, name string) *player.Character {
 	return &player.Character{
-		ObjectID:    objectID,
+		ID:          objectID,
 		AccountName: "acct1",
 		Name:        name,
 		ClassID:     0,
@@ -27,6 +28,8 @@ func testCharacter(objectID int32, name string) *player.Character {
 		Face: 1, HairStyle: 2, HairColor: 3,
 		Exp: 0, SP: 0,
 		AccessLevel: 0,
+		Location:    location.Location{X: -56733, Y: -113459, Z: -690},
+		Heading:     32768,
 	}
 }
 
@@ -49,7 +52,7 @@ func TestCharacterStore_CreateAndReadBack(t *testing.T) {
 		t.Fatalf("Create() unexpected error: %v", err)
 	}
 
-	got, err := store.Get(ctx, c.ObjectID)
+	got, err := store.Get(ctx, c.ID)
 	if err != nil {
 		t.Fatalf("Get() unexpected error: %v", err)
 	}
@@ -59,10 +62,8 @@ func TestCharacterStore_CreateAndReadBack(t *testing.T) {
 		got.Face != c.Face || got.HairStyle != c.HairStyle || got.HairColor != c.HairColor {
 		t.Fatalf("Get() after create = %+v, want match to %+v", got, c)
 	}
-	// Columns not part of the initial insert keep the schema's own
-	// defaults until something else sets them.
-	if got.Position.X != 0 || got.Position.Y != 0 || got.Position.Z != 0 || got.Heading != 0 {
-		t.Errorf("Get() after create has non-zero position/heading: %+v", got)
+	if got.Location != c.Location || got.Heading != c.Heading {
+		t.Errorf("Get() after create position/heading = %v/%d, want %v/%d", got.Location, got.Heading, c.Location, c.Heading)
 	}
 	if got.DeleteAt != 0 {
 		t.Errorf("Get() after create DeleteAt = %d, want 0", got.DeleteAt)
@@ -83,7 +84,7 @@ func TestCharacterStore_RestartReload(t *testing.T) {
 	}
 
 	second := NewCharacterStore(db)
-	got, err := second.Get(ctx, c.ObjectID)
+	got, err := second.Get(ctx, c.ID)
 	if err != nil {
 		t.Fatalf("Get() after reload unexpected error: %v", err)
 	}
@@ -115,8 +116,8 @@ func TestCharacterStore_ListByAccount(t *testing.T) {
 	if len(got) != 2 {
 		t.Fatalf("ListByAccount() returned %d characters, want 2", len(got))
 	}
-	if got[0].ObjectID != a1.ObjectID || got[1].ObjectID != a2.ObjectID {
-		t.Fatalf("ListByAccount() order = [%d,%d], want [%d,%d]", got[0].ObjectID, got[1].ObjectID, a1.ObjectID, a2.ObjectID)
+	if got[0].ID != a1.ID || got[1].ID != a2.ID {
+		t.Fatalf("ListByAccount() order = [%d,%d], want [%d,%d]", got[0].ID, got[1].ID, a1.ID, a2.ID)
 	}
 }
 
@@ -187,10 +188,10 @@ func TestCharacterStore_SetDeleteAt(t *testing.T) {
 		t.Fatalf("Create() unexpected error: %v", err)
 	}
 
-	if err := store.SetDeleteAt(ctx, c.ObjectID, 1_800_000_000_000); err != nil {
+	if err := store.SetDeleteAt(ctx, c.ID, 1_800_000_000_000); err != nil {
 		t.Fatalf("SetDeleteAt() unexpected error: %v", err)
 	}
-	got, err := store.Get(ctx, c.ObjectID)
+	got, err := store.Get(ctx, c.ID)
 	if err != nil {
 		t.Fatalf("Get() unexpected error: %v", err)
 	}
@@ -198,10 +199,10 @@ func TestCharacterStore_SetDeleteAt(t *testing.T) {
 		t.Errorf("DeleteAt = %d, want 1800000000000", got.DeleteAt)
 	}
 
-	if err := store.SetDeleteAt(ctx, c.ObjectID, 0); err != nil {
+	if err := store.SetDeleteAt(ctx, c.ID, 0); err != nil {
 		t.Fatalf("SetDeleteAt(restore) unexpected error: %v", err)
 	}
-	got, err = store.Get(ctx, c.ObjectID)
+	got, err = store.Get(ctx, c.ID)
 	if err != nil {
 		t.Fatalf("Get() unexpected error: %v", err)
 	}
@@ -219,18 +220,18 @@ func TestCharacterStore_Delete(t *testing.T) {
 		t.Fatalf("Create() unexpected error: %v", err)
 	}
 
-	deleted, err := store.Delete(ctx, c.ObjectID)
+	deleted, err := store.Delete(ctx, c.ID)
 	if err != nil {
 		t.Fatalf("Delete() unexpected error: %v", err)
 	}
 	if !deleted {
 		t.Error("Delete() on existing character deleted = false, want true")
 	}
-	if _, err := store.Get(ctx, c.ObjectID); !errors.Is(err, ErrCharacterNotFound) {
+	if _, err := store.Get(ctx, c.ID); !errors.Is(err, ErrCharacterNotFound) {
 		t.Fatalf("Get() after delete: got err %v, want ErrCharacterNotFound", err)
 	}
 
-	deleted, err = store.Delete(ctx, c.ObjectID)
+	deleted, err = store.Delete(ctx, c.ID)
 	if err != nil {
 		t.Fatalf("Delete() second call unexpected error: %v", err)
 	}

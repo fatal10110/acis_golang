@@ -23,12 +23,12 @@ const (
 // named per geoType's convention (L2OFF: "x_y_conv.dat"; L2J: "x_y.l2j").
 // A region tile with no file on disk is left unloaded, answered by the
 // engine's Null-block fallback, the same as any never-configured region.
-func LoadEngine(dir string, geoType GeoType) (*engine.Engine, error) {
+func LoadEngine(dir string, geoType GeoType, options ...engine.Options) (*engine.Engine, error) {
 	if geoType != L2OFF && geoType != L2J {
 		return nil, fmt.Errorf("probe: unknown geodata type %q", geoType)
 	}
 
-	e := engine.New()
+	e := engine.New(options...)
 	for x := engine.TileXMin; x <= engine.TileXMax; x++ {
 		for y := engine.TileYMin; y <= engine.TileYMax; y++ {
 			blocks, err := readRegion(regionPath(dir, geoType, x, y), geoType)

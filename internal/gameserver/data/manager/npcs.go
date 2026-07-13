@@ -3,6 +3,7 @@ package manager
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -48,10 +49,10 @@ type slotInfo struct {
 // Every instantiated NPC becomes a npc.Hostile: an entry whose template
 // resolves to a non-combat instance type (a shop, trainer, gatekeeper,
 // village master, and similar service NPCs — confirmed against the full
-// shipped spawn list, roughly a quarter of positioned entries) is skipped
-// with a warning rather than given some other live representation. Those
-// NPCs need dialog/HTML/shop interaction, not combat, which is its own
-// later system (the dialog pipeline epic) — this type only builds the
+// shipped spawn list, roughly a quarter of positioned entries) is counted
+// and skipped rather than given some other live representation. Those NPCs
+// need dialog/HTML/shop interaction, not combat, which is its own later
+// system (the dialog pipeline epic) — this type only builds the
 // combat-capable half of "every spawn entry becomes a live NPC".
 //
 // All exported methods are safe for concurrent use; mu guards slots/live.
@@ -74,9 +75,16 @@ type Npcs struct {
 	slot map[string]slotInfo
 	live map[int32]string
 
-	liveCount         int
-	deferredCount     int
-	restoredDeadCount int
+	// liveCount is guarded by mu, not atomic: every update pairs it with a
+	// live map write/delete that must stay consistent with the count.
+	liveCount int
+
+	// deferredCount/restoredDeadCount/skippedNonCombatCount are lone
+	// increments with no other state to keep in sync, so they're atomic
+	// rather than sharing mu.
+	deferredCount         atomic.Int64
+	restoredDeadCount     atomic.Int64
+	skippedNonCombatCount atomic.Int64
 }
 
 // NewNpcs walks spawns' loaded table and instantiates every "on start"
@@ -170,9 +178,7 @@ func isOnStartMaker(maker *spawn.Maker) bool {
 // per instance placed and left untouched for a skipped/deferred entry.
 func (n *Npcs) bootSpawnEntry(makerName string, entryIndex int, entry spawn.Entry, remaining *int) {
 	if len(entry.Positions) == 0 {
-		n.mu.Lock()
-		n.deferredCount++
-		n.mu.Unlock()
+		n.deferredCount.Add(1)
 		return
 	}
 
@@ -227,9 +233,7 @@ func (n *Npcs) bootSpawnPersisted(dbName string, entry spawn.Entry, tmpl *npc.Te
 			remaining = 0
 		}
 		n.respawn.Add(dbName, now.Add(remaining))
-		n.mu.Lock()
-		n.restoredDeadCount++
-		n.mu.Unlock()
+		n.restoredDeadCount.Add(1)
 		return
 	}
 
@@ -275,6 +279,11 @@ func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, lo
 	}
 	inst.Home = loc
 	inst.HasHome = true
+
+	if !npc.Attackable(inst) {
+		n.skippedNonCombatCount.Add(1)
+		return
+	}
 
 	hostile, err := newLiveHostile(inst, tmpl.RunSpeed, n.geo)
 	if err != nil {
@@ -442,17 +451,20 @@ func (n *Npcs) LiveCount() int {
 // DeferredCount returns the number of spawn entries skipped at boot for
 // lacking an explicit position (territory-random placement).
 func (n *Npcs) DeferredCount() int {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-	return n.deferredCount
+	return int(n.deferredCount.Load())
 }
 
 // RestoredDeadCount returns the number of database-tracked entries that
 // were still dead with a pending respawn deadline at boot.
 func (n *Npcs) RestoredDeadCount() int {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-	return n.restoredDeadCount
+	return int(n.restoredDeadCount.Load())
+}
+
+// SkippedNonCombatCount returns the number of spawn entries skipped at boot
+// for resolving to a non-combat instance type (shops, trainers, and similar
+// service NPCs the dialog pipeline doesn't support yet).
+func (n *Npcs) SkippedNonCombatCount() int {
+	return int(n.skippedNonCombatCount.Load())
 }
 
 // pickPosition selects one spawn position from positions. A single entry

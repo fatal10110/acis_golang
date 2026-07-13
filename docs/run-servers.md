@@ -64,6 +64,9 @@ go run ./cmd/gameserver \
 
 The gameserver loads the minimal XML tables, loads geodata from `geoengine.properties`, links to the loginserver, and binds the game-client listener from `GameserverHostname/GameserverPort`. Missing geodata region files use the null-region fallback; malformed region files that exist fail boot.
 
-## Current Limit
+## Smoke Checks
 
-This boot wiring starts the processes, database pool, XML and geodata loaders, TCP listeners, and GS-LS link. The login-client and game-client packet dispatchers are still not wired, so a real Interlude client smoke test will connect but cannot complete login or enter world until those dispatchers are added.
+- Loginserver should log both listeners: one for game clients from `LoginserverHostname/LoginserverPort`, and one for game servers from `LoginHostname/LoginPort`.
+- Gameserver should link to the loginserver and then log its game-client listener from `GameserverHostname/GameserverPort`.
+- With `AutoCreateAccounts = True` or the key omitted, a fresh client login creates the account and reaches the server list.
+- After selecting the linked gameserver, the client can create/select a character and enter the empty world.
