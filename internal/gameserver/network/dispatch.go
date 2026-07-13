@@ -330,6 +330,9 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 					Msg("game client: accepted extended opcode not implemented yet")
 			}
 
+		case clientpackets.OpcodeRequestSkillCoolTime:
+			continue
+
 		default:
 			l.log.Info().Str("opcode", fmt.Sprintf("%#x", opcode)).Str("state", client.State().String()).
 				Msg("game client: accepted opcode not implemented yet")

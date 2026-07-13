@@ -65,6 +65,7 @@ var allowedOpcodes = map[State]map[byte]bool{
 	},
 	StateInGame: {
 		0x09: true, // logout (also valid pre-game; see StateAuthed)
+		0x9d: true, // request skill reuse timers
 		0xd0: true, // extended packets
 	},
 }

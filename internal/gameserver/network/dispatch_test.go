@@ -319,6 +319,10 @@ func encodeRequestManorList() []byte {
 	return w.Bytes()
 }
 
+func encodeRequestSkillCoolTime() []byte {
+	return wire.NewPacketWriter(clientpackets.OpcodeRequestSkillCoolTime).Bytes()
+}
+
 // --- test server setup ---
 
 func newTestGameClientLink(t *testing.T, loginLink func() *LoginLink, validator *SessionValidator) (addr string, chars *fakeCharStore, items *fakeItemStore, state *world.State) {
@@ -536,6 +540,31 @@ func TestGameClientLinkFullFlow(t *testing.T) {
 	}
 	if _, ok := state.Object(objID); !ok {
 		t.Fatalf("world.Object(%d) missing after EnterWorld", objID)
+	}
+}
+
+func TestGameClientLinkIgnoresRequestSkillCoolTimeInGame(t *testing.T) {
+	c, _, _, _ := newLinkedGameClient(t)
+
+	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.read() // CharCreateOk
+	c.read() // CharSelectInfo
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	c.read() // UserInfo
+	c.read() // ItemList
+	c.read() // SkillList
+
+	c.send(encodeRequestSkillCoolTime())
+	c.send(encodeRequestManorList())
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeExtended {
+		t.Fatalf("opcode = %#x, want extended packet (%#x)", reply[0], serverpackets.OpcodeExtended)
+	}
+	if second := wire.NewReader(reply[1:]).ReadUint16(); second != serverpackets.OpcodeExSendManorList {
+		t.Fatalf("extended opcode = %#x, want ExSendManorList (%#x)", second, serverpackets.OpcodeExSendManorList)
 	}
 }
 
