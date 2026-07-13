@@ -412,6 +412,21 @@ func TestClientLinkServerEntriesUseAdvertisedStatusForOnlineByte(t *testing.T) {
 	}
 }
 
+func TestClientLinkServerEntriesFallbackToLoopbackForNonIPv4Host(t *testing.T) {
+	servers := manager.NewServerRegistry()
+	servers.Register(7, []byte{0x01})
+	servers.MarkOnline(7, "not-an-ip", 7777, 100)
+
+	l := &ClientLink{servers: servers}
+	entries := l.serverEntries()
+	if len(entries) != 1 {
+		t.Fatalf("serverEntries length = %d, want 1", len(entries))
+	}
+	if want := [4]byte{127, 0, 0, 1}; entries[0].IP != want {
+		t.Fatalf("server entry IP = %v, want %v", entries[0].IP, want)
+	}
+}
+
 func TestClientLinkPlayLoginSuccess(t *testing.T) {
 	accounts := newFakeAccountStore(model.NewAccount("player1", mustHashPassword(t, "s3cret"), 0, 1))
 	addr, l, servers, sessions, _ := newTestClientLink(t, accounts, false)

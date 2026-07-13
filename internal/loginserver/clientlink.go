@@ -287,7 +287,7 @@ func (l *ClientLink) serverEntries() []serverpackets.ServerEntry {
 	all := l.servers.All()
 	out := make([]serverpackets.ServerEntry, 0, len(all))
 	for _, e := range all {
-		var ip [4]byte
+		ip := [4]byte{127, 0, 0, 1}
 		if parsed := net.ParseIP(e.Host).To4(); parsed != nil {
 			copy(ip[:], parsed)
 		}

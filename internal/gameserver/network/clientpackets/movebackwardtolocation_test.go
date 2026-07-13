@@ -6,27 +6,54 @@ import (
 )
 
 func TestDecodeMoveBackwardToLocation(t *testing.T) {
-	payload, err := hex.DecodeString("0150b4000015a1000032f2ffff25b400001fa1000034f2ffff01000000")
-	if err != nil {
-		t.Fatalf("decode test payload: %v", err)
+	tests := []struct {
+		name string
+		hex  string
+		want MoveBackwardToLocation
+	}{
+		{
+			name: "with movement mode",
+			hex:  "0150b4000015a1000032f2ffff25b400001fa1000034f2ffff01000000",
+			want: MoveBackwardToLocation{
+				TargetX:      46160,
+				TargetY:      41237,
+				TargetZ:      -3534,
+				OriginX:      46117,
+				OriginY:      41247,
+				OriginZ:      -3532,
+				MoveMovement: 1,
+			},
+		},
+		{
+			name: "without movement mode",
+			hex:  "0150b4000015a1000032f2ffff25b400001fa1000034f2ffff",
+			want: MoveBackwardToLocation{
+				TargetX:      46160,
+				TargetY:      41237,
+				TargetZ:      -3534,
+				OriginX:      46117,
+				OriginY:      41247,
+				OriginZ:      -3532,
+				MoveMovement: 0,
+			},
+		},
 	}
 
-	got, err := DecodeMoveBackwardToLocation(payload)
-	if err != nil {
-		t.Fatalf("DecodeMoveBackwardToLocation: %v", err)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			payload, err := hex.DecodeString(tt.hex)
+			if err != nil {
+				t.Fatalf("decode test payload: %v", err)
+			}
 
-	want := MoveBackwardToLocation{
-		TargetX:      46160,
-		TargetY:      41237,
-		TargetZ:      -3534,
-		OriginX:      46117,
-		OriginY:      41247,
-		OriginZ:      -3532,
-		MoveMovement: 1,
-	}
-	if got != want {
-		t.Fatalf("DecodeMoveBackwardToLocation = %+v, want %+v", got, want)
+			got, err := DecodeMoveBackwardToLocation(payload)
+			if err != nil {
+				t.Fatalf("DecodeMoveBackwardToLocation: %v", err)
+			}
+			if got != tt.want {
+				t.Fatalf("DecodeMoveBackwardToLocation = %+v, want %+v", got, tt.want)
+			}
+		})
 	}
 }
 

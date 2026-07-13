@@ -6,7 +6,7 @@ import "fmt"
 // movement request.
 const OpcodeMoveBackwardToLocation = 0x01
 
-const moveBackwardToLocationSize = 7 * 4
+const moveBackwardToLocationSize = 6 * 4
 
 // MoveBackwardToLocation asks the server to move the active character toward
 // Target from Origin. MoveMovement is 0 for keyboard movement and 1 for mouse
@@ -25,13 +25,15 @@ func DecodeMoveBackwardToLocation(payload []byte) (MoveBackwardToLocation, error
 		return MoveBackwardToLocation{}, fmt.Errorf("clientpackets: MoveBackwardToLocation: need %d bytes, got %d", moveBackwardToLocationSize, r.Remaining())
 	}
 	req := MoveBackwardToLocation{
-		TargetX:      r.ReadInt32(),
-		TargetY:      r.ReadInt32(),
-		TargetZ:      r.ReadInt32(),
-		OriginX:      r.ReadInt32(),
-		OriginY:      r.ReadInt32(),
-		OriginZ:      r.ReadInt32(),
-		MoveMovement: r.ReadInt32(),
+		TargetX: r.ReadInt32(),
+		TargetY: r.ReadInt32(),
+		TargetZ: r.ReadInt32(),
+		OriginX: r.ReadInt32(),
+		OriginY: r.ReadInt32(),
+		OriginZ: r.ReadInt32(),
+	}
+	if r.Remaining() >= 4 {
+		req.MoveMovement = r.ReadInt32()
 	}
 	if err := r.Err(); err != nil {
 		return MoveBackwardToLocation{}, fmt.Errorf("clientpackets: MoveBackwardToLocation: %w", err)
