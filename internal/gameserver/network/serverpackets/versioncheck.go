@@ -19,7 +19,7 @@ func FrameVersionCheck(key []byte) wire.Frame {
 	w := newFrameWriter(OpcodeVersionCheck)
 	w.WriteUint8(0x01)
 	w.WriteBytes(key[:versionCheckKeySize])
-	w.WriteInt32(0) // Blowfish-over-XOR wrapper: not modeled, always off
+	w.WriteInt32(1)
 	w.WriteInt32(1)
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
 }

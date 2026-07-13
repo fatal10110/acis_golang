@@ -17,7 +17,7 @@ func TestFrameVersionCheck(t *testing.T) {
 	want = append(want, OpcodeVersionCheck)
 	want = append(want, 0x01)
 	want = append(want, key[:versionCheckKeySize]...)
-	want = binary.LittleEndian.AppendUint32(want, 0)
+	want = binary.LittleEndian.AppendUint32(want, 1)
 	want = binary.LittleEndian.AppendUint32(want, 1)
 
 	if !bytes.Equal(frame.Bytes(), want) {

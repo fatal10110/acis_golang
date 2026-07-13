@@ -168,9 +168,10 @@ func testItemTemplates() *item.Table {
 // VersionCheck's 8 random bytes plus the fixed static key half.
 
 type fakeGameClient struct {
-	t      *testing.T
-	conn   net.Conn
-	cipher *Cipher
+	t          *testing.T
+	conn       net.Conn
+	handshaken bool
+	cipher     *Cipher
 }
 
 func dialGameClient(t *testing.T, addr string) *fakeGameClient {
@@ -201,25 +202,30 @@ func (f *fakeGameClient) sendProtocolVersion(revision int32) {
 	if len(raw) != 18 {
 		f.t.Fatalf("VersionCheck payload size = %d, want 18", len(raw))
 	}
-	key := make([]byte, keySize)
-	copy(key[:8], raw[2:10])
-	copy(key[8:], gameCipherStaticKey[:])
+	if enabled := wire.NewReader(raw[10:14]).ReadInt32(); enabled != 0 {
+		key := make([]byte, keySize)
+		copy(key[:8], raw[2:10])
+		copy(key[8:], gameCipherStaticKey[:])
 
-	cipher, err := NewCipher(key)
-	if err != nil {
-		f.t.Fatalf("NewCipher: %v", err)
+		cipher, err := NewCipher(key)
+		if err != nil {
+			f.t.Fatalf("NewCipher: %v", err)
+		}
+		cipher.Encrypt(nil)
+		f.cipher = cipher
 	}
-	cipher.Encrypt(nil)
-	f.cipher = cipher
+	f.handshaken = true
 }
 
 func (f *fakeGameClient) send(payload []byte) {
 	f.t.Helper()
-	if f.cipher == nil {
+	if !f.handshaken {
 		f.t.Fatal("send called before ProtocolVersion/VersionCheck handshake")
 	}
 	buf := append([]byte(nil), payload...)
-	f.cipher.Encrypt(buf)
+	if f.cipher != nil {
+		f.cipher.Encrypt(buf)
+	}
 	if err := wire.WriteFrame(f.conn, buf); err != nil {
 		f.t.Fatalf("WriteFrame: %v", err)
 	}
@@ -227,7 +233,7 @@ func (f *fakeGameClient) send(payload []byte) {
 
 func (f *fakeGameClient) read() []byte {
 	f.t.Helper()
-	if f.cipher == nil {
+	if !f.handshaken {
 		f.t.Fatal("read called before ProtocolVersion/VersionCheck handshake")
 	}
 	f.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
@@ -235,7 +241,9 @@ func (f *fakeGameClient) read() []byte {
 	if err != nil {
 		f.t.Fatalf("ReadFrame: %v", err)
 	}
-	f.cipher.Decrypt(payload)
+	if f.cipher != nil {
+		f.cipher.Decrypt(payload)
+	}
 	return payload
 }
 
