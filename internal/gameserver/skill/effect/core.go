@@ -50,6 +50,12 @@ var coreKinds = map[string]kind{
 	"Stun":        {typ: TypeStun, flag: FlagStunned, debuff: true},
 }
 
+var fearSkippedPlayableSkillIDs = map[modelskill.ID]bool{
+	98:   true,
+	1272: true,
+	1381: true,
+}
+
 // New builds a runtime effect from a parsed core effect template.
 func New(skill Skill, tmpl modelskill.EffectTemplate) (*Effect, error) {
 	k, ok := coreKinds[tmpl.Name]
@@ -76,7 +82,192 @@ func New(skill Skill, tmpl modelskill.EffectTemplate) (*Effect, error) {
 		return nil, fmt.Errorf("effect %s: %w", tmpl.Name, err)
 	}
 	e.Funcs = funcs
+	wireHooks(e)
 	return e, nil
+}
+
+func wireHooks(e *Effect) {
+	switch e.Type {
+	case TypeDamOverTime:
+		e.OnAction = damageOverTimeAction
+	case TypeFear:
+		e.OnStart = fearStart
+		e.OnAction = fearAction
+		e.OnExit = fearExit
+	case TypeRoot:
+		e.OnStart = rootStart
+		e.OnExit = thinkAndRefreshExit
+	case TypeSleep:
+		e.OnStart = sleepStart
+		e.OnExit = thinkAndRefreshExit
+	case TypeStun:
+		e.OnStart = stunStart
+		e.OnExit = refreshExit
+	}
+}
+
+type dotTarget interface {
+	Dead() bool
+	HP() float64
+	ReduceHPByDOT(damage float64, effector any, skill Skill)
+}
+
+type lackHPNotifier interface {
+	NotifyEffectRemovedDueLackHP(*Effect)
+}
+
+type aborter interface {
+	AbortAll(force bool)
+}
+
+type idleTarget interface {
+	TryToIdle()
+}
+
+type moveStopper interface {
+	StopMove()
+}
+
+type abnormalUpdater interface {
+	UpdateAbnormalEffect()
+}
+
+type thinkTarget interface {
+	Think()
+}
+
+type afraidTarget interface {
+	Afraid() bool
+}
+
+type fearImmuneTarget interface {
+	FearImmune() bool
+}
+
+type playableTarget interface {
+	Playable() bool
+}
+
+type fleeTarget interface {
+	FleeFrom(effector any, distance int)
+}
+
+type effectStopper interface {
+	StopEffects(Type)
+}
+
+func damageOverTimeAction(e *Effect) bool {
+	target, ok := e.Effected.(dotTarget)
+	if !ok {
+		return false
+	}
+
+	result := DamageOverTimeTick(DamageOverTimeInput{
+		Dead:      target.Dead(),
+		HP:        target.HP(),
+		Damage:    e.Template.Value,
+		KillByDOT: e.Skill.KillByDOT,
+		Toggle:    e.Skill.Toggle,
+	})
+	if result.RemovedForLackHP {
+		if notifier, ok := e.Effected.(lackHPNotifier); ok {
+			notifier.NotifyEffectRemovedDueLackHP(e)
+		}
+	}
+	if result.Damage > 0 {
+		target.ReduceHPByDOT(result.Damage, e.Effector, e.Skill)
+	}
+	return result.Continue
+}
+
+func stunStart(e *Effect) bool {
+	abortAll(e.Effected)
+	if target, ok := e.Effected.(idleTarget); ok {
+		target.TryToIdle()
+	}
+	refresh(e.Effected)
+	return true
+}
+
+func rootStart(e *Effect) bool {
+	if target, ok := e.Effected.(moveStopper); ok {
+		target.StopMove()
+	}
+	refresh(e.Effected)
+	return true
+}
+
+func sleepStart(e *Effect) bool {
+	abortAll(e.Effected)
+	refresh(e.Effected)
+	return true
+}
+
+func fearStart(e *Effect) bool {
+	if fearImmune(e.Effected) || isAfraid(e.Effected) {
+		return false
+	}
+	if isPlayable(e.Effected) && fearSkippedPlayableSkillIDs[e.Skill.ID] {
+		return false
+	}
+
+	abortAll(e.Effected)
+	refresh(e.Effected)
+	return fearAction(e)
+}
+
+func fearAction(e *Effect) bool {
+	target, ok := e.Effected.(fleeTarget)
+	if !ok {
+		return false
+	}
+	target.FleeFrom(e.Effector, 500)
+	return true
+}
+
+func fearExit(e *Effect) {
+	if target, ok := e.Effected.(effectStopper); ok {
+		target.StopEffects(TypeFear)
+	}
+	refresh(e.Effected)
+}
+
+func thinkAndRefreshExit(e *Effect) {
+	if target, ok := e.Effected.(thinkTarget); ok {
+		target.Think()
+	}
+	refresh(e.Effected)
+}
+
+func refreshExit(e *Effect) {
+	refresh(e.Effected)
+}
+
+func abortAll(target any) {
+	if target, ok := target.(aborter); ok {
+		target.AbortAll(false)
+	}
+}
+
+func refresh(target any) {
+	if target, ok := target.(abnormalUpdater); ok {
+		target.UpdateAbnormalEffect()
+	}
+}
+
+func fearImmune(target any) bool {
+	t, ok := target.(fearImmuneTarget)
+	return ok && t.FearImmune()
+}
+
+func isAfraid(target any) bool {
+	t, ok := target.(afraidTarget)
+	return ok && t.Afraid()
+}
+
+func isPlayable(target any) bool {
+	t, ok := target.(playableTarget)
+	return ok && t.Playable()
 }
 
 func statFuncs(owner *Effect, templates []modelskill.FuncTemplate) ([]basefunc.Func, error) {
