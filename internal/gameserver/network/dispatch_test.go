@@ -634,8 +634,8 @@ func TestGameClientLinkWireSafeMovementAndRefreshPacketsInGame(t *testing.T) {
 		t.Fatalf("world.Player(%d) has no Position method", objID)
 	}
 	x, y, z := positioned.Position()
-	if x != target.X || y != target.Y || z != target.Z {
-		t.Fatalf("player position = (%d,%d,%d), want (%d,%d,%d)", x, y, z, target.X, target.Y, target.Z)
+	if x != origin.X || y != origin.Y || z != origin.Z {
+		t.Fatalf("player position after MoveBackwardToLocation = (%d,%d,%d), want origin (%d,%d,%d)", x, y, z, origin.X, origin.Y, origin.Z)
 	}
 
 	c.send(encodeValidatePosition(target, 32768))
@@ -643,6 +643,10 @@ func TestGameClientLinkWireSafeMovementAndRefreshPacketsInGame(t *testing.T) {
 	reply = c.read()
 	if reply[0] != serverpackets.OpcodeItemList {
 		t.Fatalf("item refresh opcode = %#x, want ItemList (%#x)", reply[0], serverpackets.OpcodeItemList)
+	}
+	x, y, z = positioned.Position()
+	if x != target.X || y != target.Y || z != target.Z {
+		t.Fatalf("player position after ValidatePosition = (%d,%d,%d), want (%d,%d,%d)", x, y, z, target.X, target.Y, target.Z)
 	}
 
 	c.send(encodeSingleOpcode(clientpackets.OpcodeRequestSkillList))

@@ -356,8 +356,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				return
 			}
 			if live != nil {
-				live.Character.Heading = int(req.Heading)
-				live.Character.SetHeading(int(req.Heading))
+				l.updateLivePlayerPosition(live, location.Location{X: int(req.X), Y: int(req.Y), Z: int(req.Z)}, int(req.Heading))
 			}
 
 		case clientpackets.OpcodeRequestItemList:
@@ -531,7 +530,6 @@ func (l *GameClientLink) moveLivePlayer(live *livePlayer, target location.Locati
 	x, y, z := live.Position()
 	origin := location.Location{X: x, Y: y, Z: z}
 	heading := origin.HeadingTo(target)
-	live.Character.Location = target
 	live.Character.Heading = heading
 	live.SetHeading(heading)
 	live.SendFrame(serverpackets.FrameMoveToLocation(live.ObjectID(), target, origin))
@@ -546,7 +544,16 @@ func (l *GameClientLink) moveLivePlayer(live *livePlayer, target location.Locati
 		}
 		receiver.SendFrame(serverpackets.FrameMoveToLocation(live.ObjectID(), target, origin))
 	})
-	if err := l.world.Move(live, target.X, target.Y, target.Z); err != nil {
+}
+
+func (l *GameClientLink) updateLivePlayerPosition(live *livePlayer, position location.Location, heading int) {
+	live.Character.Location = position
+	live.Character.Heading = heading
+	live.Character.SetHeading(heading)
+	if l.world == nil {
+		return
+	}
+	if err := l.world.Move(live, position.X, position.Y, position.Z); err != nil {
 		l.log.Debug().Err(err).Int32("object_id", live.ObjectID()).Msg("move player")
 	}
 }
