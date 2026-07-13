@@ -60,6 +60,7 @@ func FrameUserInfo(s UserInfoSnapshot) wire.Frame {
 
 func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) {
 	c, t := s.Character, s.Template
+	x, y, z := c.Position()
 	paperdoll := item.Paperdoll(s.Items)
 	rhand := paperdoll[rhandPaperdollIndex]
 
@@ -83,11 +84,11 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) {
 		enchantEffect = maxDisplayedEnchant
 	}
 
-	w.WriteInt32(int32(c.Position.X))
-	w.WriteInt32(int32(c.Position.Y))
-	w.WriteInt32(int32(c.Position.Z))
+	w.WriteInt32(int32(x))
+	w.WriteInt32(int32(y))
+	w.WriteInt32(int32(z))
 	w.WriteInt32(int32(c.Heading))
-	w.WriteInt32(c.ObjectID)
+	w.WriteInt32(c.ObjectID())
 	w.WriteString(c.Name)
 	w.WriteInt32(int32(c.Race))
 	w.WriteInt32(int32(c.Sex))

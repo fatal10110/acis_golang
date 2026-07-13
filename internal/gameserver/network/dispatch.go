@@ -9,11 +9,15 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // itemStore is the persistence GameClientLink needs to list a character's
@@ -25,11 +29,7 @@ type itemStore interface {
 // GameClientLink accepts and drives connections from Interlude game
 // clients: the VersionCheck/cipher handshake, session-key validation
 // against the login server, character list/create/delete/restore, and
-// character select through to a minimal EnterWorld packet burst.
-//
-// Visibility to other players (the world registry/known-list broadcast) is
-// deliberately not wired here yet — that belongs to the world-registry
-// milestone, not to getting one client connected and in-world.
+// character select through to world entry.
 type GameClientLink struct {
 	validator     *SessionValidator
 	loginLink     func() *LoginLink
@@ -37,6 +37,7 @@ type GameClientLink struct {
 	items         itemStore
 	templates     *player.TemplateTable
 	itemTemplates *item.Table
+	world         *world.State
 	log           zerolog.Logger
 
 	// newCipherKey supplies each connection's XOR cipher key; overridden in
@@ -55,6 +56,7 @@ func NewGameClientLink(
 	items itemStore,
 	templates *player.TemplateTable,
 	itemTemplates *item.Table,
+	worldState *world.State,
 	log zerolog.Logger,
 ) *GameClientLink {
 	return &GameClientLink{
@@ -64,17 +66,54 @@ func NewGameClientLink(
 		items:         items,
 		templates:     templates,
 		itemTemplates: itemTemplates,
+		world:         worldState,
 		log:           log,
 		newCipherKey:  randomCipherKey,
 	}
 }
 
+type livePlayer struct {
+	*player.Character
+	template *player.Template
+	items    []*item.Instance
+}
+
+func (p *livePlayer) SendFrame(frame wire.Frame) bool {
+	return p.Character.SendFrame(frame)
+}
+
+func (p *livePlayer) Discover(obj world.Tracked) {
+	other, ok := obj.(*livePlayer)
+	if !ok {
+		return
+	}
+	p.SendFrame(serverpackets.FrameCharInfo(serverpackets.CharInfoSnapshot{
+		Character: other.Character,
+		Template:  other.template,
+		Items:     other.items,
+	}))
+}
+
+func (p *livePlayer) Forget(obj world.Tracked) {
+	p.SendFrame(serverpackets.FrameDeleteObject(obj.ObjectID(), false))
+}
+
 func randomCipherKey() ([]byte, error) {
 	key := make([]byte, keySize)
-	if _, err := rand.Read(key); err != nil {
+	if _, err := rand.Read(key[:8]); err != nil {
 		return nil, fmt.Errorf("generate game cipher key: %w", err)
 	}
+	copy(key[8:], gameCipherStaticKey[:])
 	return key, nil
+}
+
+func validProtocolRevision(revision int32) bool {
+	switch revision {
+	case 737, 740, 744, 746:
+		return true
+	default:
+		return false
+	}
 }
 
 // Handle drives one game-client connection end to end. It matches Serve's
@@ -94,16 +133,23 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 	session := NewSession(conn, cipher)
 	client := NewClient(session)
 
-	if !session.SendFrame(serverpackets.FrameVersionCheck(key)) {
-		return
-	}
-
 	// chars and entering are read entirely by this goroutine: they resolve
 	// the character-list slot indices RequestCharacterDelete,
 	// CharacterRestore and RequestGameStart address, and the character
 	// RequestGameStart selected for EnterWorld to finish spawning.
 	var chars []*player.Character
 	var entering *player.Character
+	var live *livePlayer
+	protocolReady := false
+	defer func() {
+		if live == nil || l.world == nil {
+			return
+		}
+		l.world.Despawn(live)
+		l.world.RemovePlayer(live.ObjectID())
+		live.Character.SetFrameSender(nil)
+		live.Character.SetAttackBroadcaster(nil)
+	}()
 
 	for {
 		payload, err := session.ReadFrame()
@@ -115,6 +161,9 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			return
 		}
 		opcode := payload[0]
+		if !protocolReady && opcode != clientpackets.OpcodeProtocolVersion {
+			return
+		}
 		if !client.Accept(opcode) {
 			l.log.Warn().Str("state", client.State().String()).Str("opcode", hex.EncodeToString(payload)).Msg("Accept opcode")
 			return
@@ -122,12 +171,18 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 
 		switch opcode {
 		case clientpackets.OpcodeProtocolVersion:
-			// No allowed-revision list is configured yet; accept any
-			// syntactically valid report.
-			if _, err := clientpackets.DecodeProtocolVersion(payload); err != nil {
+			req, err := clientpackets.DecodeProtocolVersion(payload)
+			if err != nil {
 				l.log.Warn().Err(err).Msg("game client")
 				return
 			}
+			if !validProtocolRevision(req.Revision) {
+				return
+			}
+			if !session.SendFrame(serverpackets.FrameVersionCheck(key)) {
+				return
+			}
+			protocolReady = true
 
 		case clientpackets.OpcodeAuthLogin:
 			req, err := clientpackets.DecodeAuthLogin(payload)
@@ -188,7 +243,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				session.SendFrame(serverpackets.FrameCharDeleteFail(serverpackets.CharDeleteFailReasonDeletionFailed))
 				continue
 			}
-			if err := l.roster.MarkForDeletion(ctx, c.ObjectID); err != nil {
+			if err := l.roster.MarkForDeletion(ctx, c.ID); err != nil {
 				l.log.Error().Err(err).Msg("mark character for deletion")
 				session.SendFrame(serverpackets.FrameCharDeleteFail(serverpackets.CharDeleteFailReasonDeletionFailed))
 				continue
@@ -208,7 +263,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				return
 			}
 			if c, ok := slotCharacter(chars, req.Slot); ok {
-				if err := l.roster.Restore(ctx, c.ObjectID); err != nil {
+				if err := l.roster.Restore(ctx, c.ID); err != nil {
 					l.log.Error().Err(err).Msg("restore character")
 				}
 			}
@@ -253,9 +308,11 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			if entering == nil {
 				return
 			}
-			if !l.enterWorld(ctx, client, entering) {
+			entered, ok := l.enterWorld(ctx, client, entering)
+			if !ok {
 				return
 			}
+			live = entered
 			client.SetState(StateInGame)
 
 		default:
@@ -292,7 +349,7 @@ func (l *GameClientLink) sendCharSelectInfo(ctx context.Context, client *Client)
 	slots := make([]serverpackets.CharacterSlot, len(chars))
 	now := time.Now()
 	for i, c := range chars {
-		items, err := l.items.ListByOwner(ctx, c.ObjectID)
+		items, err := l.items.ListByOwner(ctx, c.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -303,18 +360,18 @@ func (l *GameClientLink) sendCharSelectInfo(ctx context.Context, client *Client)
 	return chars, nil
 }
 
-// enterWorld sends the minimal EnterWorld packet burst for c: UserInfo,
-// ItemList, and an empty SkillList (the skill system isn't modeled yet).
-func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *player.Character) bool {
+// enterWorld sends the EnterWorld packet burst for c and registers it in the
+// live world state.
+func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *player.Character) (*livePlayer, bool) {
 	tmpl, ok := l.templates.Get(c.ClassID)
 	if !ok {
 		l.log.Error().Int("class_id", c.ClassID).Msg("enter world: no template loaded")
-		return false
+		return nil, false
 	}
-	items, err := l.items.ListByOwner(ctx, c.ObjectID)
+	items, err := l.items.ListByOwner(ctx, c.ID)
 	if err != nil {
 		l.log.Error().Err(err).Msg("enter world: list items")
-		return false
+		return nil, false
 	}
 
 	client.Session.SendFrame(serverpackets.FrameUserInfo(serverpackets.UserInfoSnapshot{Character: c, Template: tmpl, Items: items}))
@@ -322,12 +379,37 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 	itemListFrame, err := serverpackets.FrameItemList(items, l.itemTemplates, false)
 	if err != nil {
 		l.log.Error().Err(err).Msg("enter world: build ItemList")
-		return false
+		return nil, false
 	}
 	client.Session.SendFrame(itemListFrame)
 
 	client.Session.SendFrame(serverpackets.FrameSkillList(nil))
-	return true
+	live := l.attachLivePlayer(client, c, tmpl, items)
+	if l.world != nil {
+		x, y, z := c.Position()
+		l.world.Spawn(live, x, y, z, c.Heading)
+		l.world.AddPlayer(live)
+	}
+	return live, true
+}
+
+func (l *GameClientLink) attachLivePlayer(client *Client, c *player.Character, tmpl *player.Template, items []*item.Instance) *livePlayer {
+	c.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventory(c.ID, l.itemTemplates, items))
+	c.SetWorld(l.world)
+	c.SetFrameSender(client.Session.SendFrame)
+	c.SetAttackBroadcaster(func(snapshot attack.Snapshot) {
+		if l.world == nil {
+			return
+		}
+		l.world.ForEachKnown(c, func(o world.Tracked) {
+			receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
+			if !ok {
+				return
+			}
+			receiver.SendFrame(serverpackets.FrameAttack(snapshot))
+		})
+	})
+	return &livePlayer{Character: c, template: tmpl, items: items}
 }
 
 func slotCharacter(chars []*player.Character, slot int32) (*player.Character, bool) {

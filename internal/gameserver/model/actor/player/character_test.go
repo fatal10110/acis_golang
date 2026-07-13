@@ -27,7 +27,7 @@ func TestNewCharacter(t *testing.T) {
 		t.Fatalf("NewCharacter() unexpected error: %v", err)
 	}
 
-	if c.ObjectID != 0x10000001 || c.AccountName != "acct1" || c.Name != "Newbie" {
+	if c.ID != 0x10000001 || c.AccountName != "acct1" || c.Name != "Newbie" {
 		t.Fatalf("NewCharacter() identity = %+v", c)
 	}
 	if c.ClassID != 0 || c.BaseClassID != 0 {
@@ -51,8 +51,8 @@ func TestNewCharacter(t *testing.T) {
 	if c.HairStyle != 1 || c.HairColor != 2 || c.Face != 0 {
 		t.Errorf("appearance = hairStyle=%d hairColor=%d face=%d, want 1/2/0", c.HairStyle, c.HairColor, c.Face)
 	}
-	if c.Position != tmpl.Spawns[0] {
-		t.Errorf("Position = %+v, want %+v", c.Position, tmpl.Spawns[0])
+	if c.Location != tmpl.Spawns[0] {
+		t.Errorf("Location = %+v, want %+v", c.Location, tmpl.Spawns[0])
 	}
 	if c.AccessLevel != defaultAccessLevel {
 		t.Errorf("AccessLevel = %d, want %d", c.AccessLevel, defaultAccessLevel)
@@ -89,7 +89,7 @@ func TestNewCharacter_NoSpawnsLeavesZeroPosition(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewCharacter() unexpected error: %v", err)
 	}
-	if c.Position != (location.Location{}) {
-		t.Errorf("Position = %+v, want zero value", c.Position)
+	if c.Location != (location.Location{}) {
+		t.Errorf("Location = %+v, want zero value", c.Location)
 	}
 }

@@ -48,7 +48,7 @@ func (s *CharacterStore) Create(ctx context.Context, c *player.Character) error 
 			(account_name, obj_Id, char_name, level, maxHp, curHp, maxCp, curCp, maxMp, curMp,
 			 face, hairStyle, hairColor, sex, exp, sp, race, classid, base_class, title, accesslevel)
 		 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		c.AccountName, c.ObjectID, c.Name, c.Level, c.MaxHP, c.CurHP, c.MaxCP, c.CurCP, c.MaxMP, c.CurMP,
+		c.AccountName, c.ID, c.Name, c.Level, c.MaxHP, c.CurHP, c.MaxCP, c.CurCP, c.MaxMP, c.CurMP,
 		c.Face, c.HairStyle, c.HairColor, byte(c.Sex), c.Exp, c.SP, int(c.Race), c.ClassID, c.BaseClassID, c.Title, c.AccessLevel,
 	)
 	if err != nil {
@@ -106,10 +106,10 @@ func scanCharacter(row rowScanner) (*player.Character, error) {
 	var race, classID int
 
 	err := row.Scan(
-		&c.ObjectID, &c.AccountName, &c.Name,
+		&c.ID, &c.AccountName, &c.Name,
 		&c.Level, &c.MaxHP, &c.CurHP, &c.MaxCP, &c.CurCP, &c.MaxMP, &c.CurMP,
 		&c.Face, &c.HairStyle, &c.HairColor, &sex,
-		&c.Heading, &c.Position.X, &c.Position.Y, &c.Position.Z,
+		&c.Heading, &c.Location.X, &c.Location.Y, &c.Location.Z,
 		&c.Exp, &c.SP, &c.Karma, &c.PvPKills, &c.PKKills, &c.ClanID,
 		&race, &classID, &c.BaseClassID,
 		&c.DeleteAt, &c.Title, &c.AccessLevel, &c.LastAccess,

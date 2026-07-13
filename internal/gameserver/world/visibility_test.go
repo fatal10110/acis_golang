@@ -450,3 +450,68 @@ func TestVisibilityConcurrent(t *testing.T) {
 		}
 	}
 }
+
+func TestAppendNeighborsDepthOneUsesCallerBuffer(t *testing.T) {
+	s := New()
+	r, ok := s.RegionAt(0, 0)
+	if !ok {
+		t.Fatal("RegionAt(0, 0) failed")
+	}
+
+	var buf [9]*Region
+	allocs := testing.AllocsPerRun(100, func() {
+		out := s.AppendNeighbors(buf[:0], r, 1)
+		if len(out) != 9 {
+			t.Fatalf("AppendNeighbors depth 1 returned %d regions, want 9", len(out))
+		}
+	})
+	if allocs != 0 {
+		t.Fatalf("AppendNeighbors depth 1 allocations/run = %v, want 0", allocs)
+	}
+}
+
+func TestForEachKnownCommonScanUsesStackBuffers(t *testing.T) {
+	s := New()
+	center := &trackedStub{id: 1}
+	s.Spawn(center, 0, 0, 0, 0)
+	for i := int32(2); i <= 18; i++ {
+		s.Spawn(&trackedStub{id: i}, int(i%3)*300, int(i/3)*300, 0, 0)
+	}
+
+	var seen int
+	visit := func(Tracked) { seen++ }
+	allocs := testing.AllocsPerRun(100, func() {
+		seen = 0
+		s.ForEachKnown(center, visit)
+		if seen != 17 {
+			t.Fatalf("ForEachKnown visited %d objects, want 17", seen)
+		}
+	})
+	if allocs != 0 {
+		t.Fatalf("ForEachKnown allocations/run = %v, want 0 for common region density", allocs)
+	}
+}
+
+func BenchmarkRelocate(b *testing.B) {
+	s := New()
+	for i := 0; i < 54; i++ {
+		x := (i % 9) * 256
+		y := (i / 9) * 256
+		s.Spawn(&trackedStub{id: int32(i + 2)}, x, y, 0, 0)
+	}
+	mover := &trackedStub{id: 1}
+	s.Spawn(mover, 0, 0, 0, 0)
+
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		if i%2 == 0 {
+			if err := s.Move(mover, 4096, 0, 0); err != nil {
+				b.Fatal(err)
+			}
+			continue
+		}
+		if err := s.Move(mover, 0, 0, 0); err != nil {
+			b.Fatal(err)
+		}
+	}
+}

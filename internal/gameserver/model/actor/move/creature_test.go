@@ -220,6 +220,43 @@ func TestCreatureMove_MoveToLocationPassesGeodataCoordinates(t *testing.T) {
 	}
 }
 
+func TestCreatureMove_MoveToLocationUsesCurrentPosition(t *testing.T) {
+	origin := location.Location{X: 10, Y: 20, Z: 30}
+	current := location.Location{X: 60, Y: 20, Z: 30}
+	geo := &recordingGeo{canMove: true, height: 30}
+	mover, err := NewCreatureMove(origin, 50, geo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := mover.MoveToLocation(current); err != nil {
+		t.Fatal(err)
+	}
+	mover.SetPosition(current)
+
+	event, err := mover.MoveToLocation(location.Location{X: 70, Y: 20, Z: 999})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := Event{
+		Origin:      current,
+		Destination: location.Location{X: 70, Y: 20, Z: 30},
+		Speed:       50,
+		Duration:    200 * time.Millisecond,
+	}
+	if event != want {
+		t.Fatalf("MoveToLocation() event = %+v, want %+v", event, want)
+	}
+	wantMove := geoCall{origin: current, target: want.Destination}
+	if got := geo.moveCalls[len(geo.moveCalls)-1]; got != wantMove {
+		t.Fatalf("last CanMove() call = %+v, want %+v", got, wantMove)
+	}
+	if got := mover.Position(); got != current {
+		t.Fatalf("Position() = %+v, want %+v", got, current)
+	}
+}
+
 func TestCreatureMove_MoveToLocationRejectsUnrepresentableDuration(t *testing.T) {
 	origin := location.Location{X: 10, Y: 20, Z: 30}
 	geo := &recordingGeo{canMove: true, height: 30}
@@ -236,6 +273,35 @@ func TestCreatureMove_MoveToLocationRejectsUnrepresentableDuration(t *testing.T)
 	}
 	if mover.Moving() {
 		t.Fatal("Moving() = true, want false")
+	}
+}
+
+func TestCreatureMove_FollowTickUsesCurrentPosition(t *testing.T) {
+	spawn := location.Location{X: 0, Y: 0, Z: 0}
+	current := location.Location{X: 100, Y: 0, Z: 0}
+	target := TargetSnapshot{
+		ObjectID:        2,
+		Known:           true,
+		Position:        location.Location{X: 130, Y: 0, Z: 0},
+		CollisionRadius: 5,
+	}
+	geo := &recordingGeo{canMove: true, height: 0}
+	mover, err := NewCreatureMove(spawn, 100, geo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mover.SetPosition(current)
+	mover.StartFriendlyFollow(target.ObjectID, 20)
+
+	event, moved, err := mover.FollowTick(target, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if moved {
+		t.Fatalf("FollowTick() moved = true with event %+v", event)
+	}
+	if len(geo.moveCalls) != 0 {
+		t.Fatalf("CanMove() calls = %+v, want none", geo.moveCalls)
 	}
 }
 

@@ -14,9 +14,11 @@ import (
 	gamemanager "github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/fatal10110/acis_golang/internal/link"
 )
 
@@ -35,7 +37,7 @@ func newFakeCharStore() *fakeCharStore {
 func (s *fakeCharStore) Create(_ context.Context, c *player.Character) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.byID[c.ObjectID] = c
+	s.byID[c.ID] = c
 	s.names[c.Name] = true
 	return nil
 }
@@ -49,7 +51,7 @@ func (s *fakeCharStore) ListByAccount(_ context.Context, account string) ([]*pla
 			out = append(out, c)
 		}
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].ObjectID < out[j].ObjectID })
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
 	return out, nil
 }
 
@@ -161,12 +163,9 @@ func testItemTemplates() *item.Table {
 
 // --- fake game client, driving the wire protocol from the other side ---
 //
-// VersionCheck carries its key in cleartext, so unlike the login server's
-// Init packet, no static-key puzzle needs solving here: the fake client
-// just reads the key and arms its own Cipher instance the same way the
-// server's armed at the moment it sent VersionCheck (one throwaway Encrypt
-// call, whose only effect is flipping the cipher's internal "enabled" gate)
-// so both sides' XOR streams start rolling in lockstep from packet zero.
+// A real game client speaks first: it sends ProtocolVersion cleartext,
+// receives VersionCheck cleartext, then arms the rolling XOR cipher from
+// VersionCheck's 8 random bytes plus the fixed static key half.
 
 type fakeGameClient struct {
 	t      *testing.T
@@ -182,27 +181,43 @@ func dialGameClient(t *testing.T, addr string) *fakeGameClient {
 	}
 	t.Cleanup(func() { conn.Close() })
 
-	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-	raw, err := wire.ReadFrame(conn)
+	return &fakeGameClient{t: t, conn: conn}
+}
+
+func (f *fakeGameClient) sendProtocolVersion(revision int32) {
+	f.t.Helper()
+	if err := wire.WriteFrame(f.conn, encodeProtocolVersion(revision)); err != nil {
+		f.t.Fatalf("write ProtocolVersion: %v", err)
+	}
+
+	f.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	raw, err := wire.ReadFrame(f.conn)
 	if err != nil {
-		t.Fatalf("read VersionCheck: %v", err)
+		f.t.Fatalf("read VersionCheck: %v", err)
 	}
 	if raw[0] != serverpackets.OpcodeVersionCheck {
-		t.Fatalf("first packet opcode = %#x, want VersionCheck (%#x)", raw[0], serverpackets.OpcodeVersionCheck)
+		f.t.Fatalf("first packet opcode = %#x, want VersionCheck (%#x)", raw[0], serverpackets.OpcodeVersionCheck)
 	}
-	key := append([]byte(nil), raw[2:2+keySize]...)
+	if len(raw) != 18 {
+		f.t.Fatalf("VersionCheck payload size = %d, want 18", len(raw))
+	}
+	key := make([]byte, keySize)
+	copy(key[:8], raw[2:10])
+	copy(key[8:], gameCipherStaticKey[:])
 
 	cipher, err := NewCipher(key)
 	if err != nil {
-		t.Fatalf("NewCipher: %v", err)
+		f.t.Fatalf("NewCipher: %v", err)
 	}
 	cipher.Encrypt(nil)
-
-	return &fakeGameClient{t: t, conn: conn, cipher: cipher}
+	f.cipher = cipher
 }
 
 func (f *fakeGameClient) send(payload []byte) {
 	f.t.Helper()
+	if f.cipher == nil {
+		f.t.Fatal("send called before ProtocolVersion/VersionCheck handshake")
+	}
 	buf := append([]byte(nil), payload...)
 	f.cipher.Encrypt(buf)
 	if err := wire.WriteFrame(f.conn, buf); err != nil {
@@ -212,6 +227,9 @@ func (f *fakeGameClient) send(payload []byte) {
 
 func (f *fakeGameClient) read() []byte {
 	f.t.Helper()
+	if f.cipher == nil {
+		f.t.Fatal("read called before ProtocolVersion/VersionCheck handshake")
+	}
 	f.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 	payload, err := wire.ReadFrame(f.conn)
 	if err != nil {
@@ -289,15 +307,16 @@ func encodeEnterWorld() []byte {
 
 // --- test server setup ---
 
-func newTestGameClientLink(t *testing.T, loginLink func() *LoginLink, validator *SessionValidator) (addr string, chars *fakeCharStore, items *fakeItemStore) {
+func newTestGameClientLink(t *testing.T, loginLink func() *LoginLink, validator *SessionValidator) (addr string, chars *fakeCharStore, items *fakeItemStore, state *world.State) {
 	t.Helper()
 
 	chars = newFakeCharStore()
 	items = newFakeItemStore()
+	state = world.New()
 	templates := testTemplates(t)
 	itemTemplates := testItemTemplates()
 	roster := gamemanager.NewRoster(chars, items, templates, itemTemplates, &sequentialIDs{next: 100}, gamemanager.DefaultDeleteAfter, time.Now)
-	gcl := NewGameClientLink(validator, loginLink, roster, items, templates, itemTemplates, zerolog.Nop())
+	gcl := NewGameClientLink(validator, loginLink, roster, items, templates, itemTemplates, state, zerolog.Nop())
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -307,14 +326,14 @@ func newTestGameClientLink(t *testing.T, loginLink func() *LoginLink, validator 
 	t.Cleanup(cancel)
 	go Serve(ctx, ln, gcl.Handle, zerolog.Nop())
 
-	return ln.Addr().String(), chars, items
+	return ln.Addr().String(), chars, items, state
 }
 
 // newLinkedGameClient wires a GameClientLink to a real login-server-side
 // GS-LS link (the same infrastructure loginlink_test.go uses), dials a fake
 // game client through VersionCheck and a successful AuthLogin, and returns
 // it positioned right after the initial (empty) CharSelectInfo.
-func newLinkedGameClient(t *testing.T) (c *fakeGameClient, chars *fakeCharStore, items *fakeItemStore) {
+func newLinkedGameClient(t *testing.T) (c *fakeGameClient, chars *fakeCharStore, items *fakeItemStore, state *world.State) {
 	t.Helper()
 
 	loginAddr, servers, sessions := newTestLoginServer(t, false)
@@ -328,10 +347,10 @@ func newLinkedGameClient(t *testing.T) (c *fakeGameClient, chars *fakeCharStore,
 	}
 	t.Cleanup(func() { loginLink.Close() })
 
-	addr, chars, items := newTestGameClientLink(t, func() *LoginLink { return loginLink }, validator)
+	addr, chars, items, state := newTestGameClientLink(t, func() *LoginLink { return loginLink }, validator)
 
 	c = dialGameClient(t, addr)
-	c.send(encodeProtocolVersion(0xc621))
+	c.sendProtocolVersion(746)
 
 	key := link.SessionKey{LoginKey1: 11, LoginKey2: 22, PlayKey1: 33, PlayKey2: 44}
 	sessions.Put("player1", key)
@@ -344,25 +363,102 @@ func newLinkedGameClient(t *testing.T) (c *fakeGameClient, chars *fakeCharStore,
 	if count := wire.NewReader(reply[1:]).ReadInt32(); count != 0 {
 		t.Fatalf("initial char count = %d, want 0", count)
 	}
-	return c, chars, items
+	return c, chars, items, state
 }
 
-func TestGameClientLinkSendsVersionCheckOnConnect(t *testing.T) {
-	addr, _, _ := newTestGameClientLink(t, func() *LoginLink { return nil }, NewSessionValidator())
-	dialGameClient(t, addr) // dial fails the test itself if VersionCheck never arrives
+type frameCapture struct {
+	frames [][]byte
+}
+
+func (c *frameCapture) send(frame wire.Frame) bool {
+	defer frame.Release()
+	raw := frame.Bytes()
+	payload := make([]byte, len(raw)-2)
+	copy(payload, raw[2:])
+	c.frames = append(c.frames, payload)
+	return true
+}
+
+func newTestLivePlayer(t *testing.T, id int32, capture *frameCapture) *livePlayer {
+	t.Helper()
+	tmpl, ok := testTemplates(t).Get(0)
+	if !ok {
+		t.Fatal("missing test class template")
+	}
+	ch := &player.Character{
+		ID: id, Name: "Player", ClassID: 0, BaseClassID: 0,
+		Race: player.RaceHuman, Sex: player.SexMale,
+		Level: 1, MaxHP: 80, CurHP: 80, MaxMP: 30, CurMP: 30,
+		Location: location.Location{X: int(id) * 100, Y: 0, Z: 0},
+	}
+	ch.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventory(ch.ID, testItemTemplates(), nil))
+	ch.SetFrameSender(capture.send)
+	return &livePlayer{Character: ch, template: tmpl}
+}
+
+func TestLivePlayerVisibilitySendsCharInfoAndDeleteObject(t *testing.T) {
+	state := world.New()
+	firstFrames := &frameCapture{}
+	secondFrames := &frameCapture{}
+	first := newTestLivePlayer(t, 1, firstFrames)
+	second := newTestLivePlayer(t, 2, secondFrames)
+
+	state.Spawn(first, 0, 0, 0, 0)
+	state.Spawn(second, 100, 0, 0, 0)
+
+	if len(firstFrames.frames) != 1 || firstFrames.frames[0][0] != serverpackets.OpcodeCharInfo {
+		t.Fatalf("first player frames = %x, want one CharInfo", firstFrames.frames)
+	}
+	if len(secondFrames.frames) != 1 || secondFrames.frames[0][0] != serverpackets.OpcodeCharInfo {
+		t.Fatalf("second player frames = %x, want one CharInfo", secondFrames.frames)
+	}
+
+	state.Despawn(second)
+	if got := firstFrames.frames[len(firstFrames.frames)-1][0]; got != serverpackets.OpcodeDeleteObject {
+		t.Fatalf("last first-player frame opcode = %#x, want DeleteObject (%#x)", got, serverpackets.OpcodeDeleteObject)
+	}
+}
+
+func TestGameClientLinkWaitsForProtocolVersion(t *testing.T) {
+	addr, _, _, _ := newTestGameClientLink(t, func() *LoginLink { return nil }, NewSessionValidator())
+	c := dialGameClient(t, addr)
+
+	c.conn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
+	if _, err := wire.ReadFrame(c.conn); err == nil {
+		t.Fatal("server sent data before ProtocolVersion")
+	} else if ne, ok := err.(net.Error); !ok || !ne.Timeout() {
+		t.Fatalf("read before ProtocolVersion error = %v, want timeout", err)
+	}
+}
+
+func TestGameClientLinkSendsVersionCheckAfterProtocolVersion(t *testing.T) {
+	addr, _, _, _ := newTestGameClientLink(t, func() *LoginLink { return nil }, NewSessionValidator())
+	c := dialGameClient(t, addr)
+	c.sendProtocolVersion(746)
+}
+
+func TestGameClientLinkBadProtocolVersionClosesSilently(t *testing.T) {
+	addr, _, _, _ := newTestGameClientLink(t, func() *LoginLink { return nil }, NewSessionValidator())
+	c := dialGameClient(t, addr)
+	if err := wire.WriteFrame(c.conn, encodeProtocolVersion(1)); err != nil {
+		t.Fatalf("write ProtocolVersion: %v", err)
+	}
+	c.expectClosed()
 }
 
 func TestGameClientLinkOpcodeBeforeAuthCloses(t *testing.T) {
-	addr, _, _ := newTestGameClientLink(t, func() *LoginLink { return nil }, NewSessionValidator())
+	addr, _, _, _ := newTestGameClientLink(t, func() *LoginLink { return nil }, NewSessionValidator())
 	c := dialGameClient(t, addr)
+	c.sendProtocolVersion(746)
 
 	c.send(encodeEnterWorld())
 	c.expectClosed()
 }
 
 func TestGameClientLinkAuthLoginServerDownFails(t *testing.T) {
-	addr, _, _ := newTestGameClientLink(t, func() *LoginLink { return nil }, NewSessionValidator())
+	addr, _, _, _ := newTestGameClientLink(t, func() *LoginLink { return nil }, NewSessionValidator())
 	c := dialGameClient(t, addr)
+	c.sendProtocolVersion(746)
 
 	c.send(encodeAuthLogin("player1", link.SessionKey{}))
 	reply := c.read()
@@ -373,7 +469,7 @@ func TestGameClientLinkAuthLoginServerDownFails(t *testing.T) {
 }
 
 func TestGameClientLinkFullFlow(t *testing.T) {
-	c, _, _ := newLinkedGameClient(t)
+	c, chars, _, state := newLinkedGameClient(t)
 
 	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
 	reply := c.read()
@@ -387,6 +483,7 @@ func TestGameClientLinkFullFlow(t *testing.T) {
 	if count := wire.NewReader(reply[1:]).ReadInt32(); count != 1 {
 		t.Fatalf("char count = %d, want 1", count)
 	}
+	objID := chars.soleObjectID(t)
 
 	c.send(encodeRequestGameStart(0))
 	reply = c.read()
@@ -411,10 +508,16 @@ func TestGameClientLinkFullFlow(t *testing.T) {
 	if reply[0] != serverpackets.OpcodeSkillList {
 		t.Fatalf("opcode = %#x, want SkillList (%#x)", reply[0], serverpackets.OpcodeSkillList)
 	}
+	if _, ok := state.Player(objID); !ok {
+		t.Fatalf("world.Player(%d) missing after EnterWorld", objID)
+	}
+	if _, ok := state.Object(objID); !ok {
+		t.Fatalf("world.Object(%d) missing after EnterWorld", objID)
+	}
 }
 
 func TestGameClientLinkCreateInvalidNameKeepsConnectionOpen(t *testing.T) {
-	c, _, _ := newLinkedGameClient(t)
+	c, _, _, _ := newLinkedGameClient(t)
 
 	c.send(encodeRequestCharacterCreate("bad name!", 0, 0, 0, 1, 0, 0))
 	reply := c.read()
@@ -431,7 +534,7 @@ func TestGameClientLinkCreateInvalidNameKeepsConnectionOpen(t *testing.T) {
 }
 
 func TestGameClientLinkDeleteAndRestore(t *testing.T) {
-	c, chars, _ := newLinkedGameClient(t)
+	c, chars, _, _ := newLinkedGameClient(t)
 
 	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
 	c.read() // CharCreateOk

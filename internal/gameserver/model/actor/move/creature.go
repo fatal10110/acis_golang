@@ -46,6 +46,12 @@ type TargetSnapshot struct {
 }
 
 // CreatureMove holds movement state owned and updated by one caller.
+//
+// origin is the actor's current server-authoritative position. The current
+// MoveToLocation result still precomputes Duration for packet-facing callers;
+// a movement task should advance position with SetPosition after each
+// accepted geo step, report blocked-arrival events from that task, and feed
+// pathfinding waypoints into MoveToLocation when a straight step cannot move.
 type CreatureMove struct {
 	origin, destination location.Location
 	speed               float64
@@ -67,6 +73,19 @@ func NewCreatureMove(origin location.Location, speed float64, geo Geo) (*Creatur
 		return nil, errors.New("move: speed must not be negative")
 	}
 	return &CreatureMove{origin: origin, destination: origin, speed: speed, geo: geo}, nil
+}
+
+// Position returns the actor's current server-authoritative position.
+func (m *CreatureMove) Position() location.Location {
+	return m.origin
+}
+
+// SetPosition records the actor's current server-authoritative position.
+func (m *CreatureMove) SetPosition(position location.Location) {
+	m.origin = position
+	if m.destination == position {
+		m.moving = false
+	}
 }
 
 // MoveToLocation records an accepted, height-normalized ground-movement request.

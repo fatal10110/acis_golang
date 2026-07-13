@@ -185,7 +185,7 @@ func (r *Roster) Create(ctx context.Context, accountName string, req CreateReque
 	}
 
 	for _, grant := range tmpl.Items {
-		if err := r.grantItem(ctx, c.ObjectID, grant); err != nil {
+		if err := r.grantItem(ctx, c.ID, grant); err != nil {
 			return nil, CreateRejected, err
 		}
 	}
@@ -232,7 +232,7 @@ func (r *Roster) List(ctx context.Context, accountName string) ([]*player.Charac
 	live := chars[:0]
 	for _, c := range chars {
 		if c.DeleteAt > 0 && now > c.DeleteAt {
-			if err := r.purge(ctx, c.ObjectID); err != nil {
+			if err := r.purge(ctx, c.ID); err != nil {
 				return nil, err
 			}
 			continue

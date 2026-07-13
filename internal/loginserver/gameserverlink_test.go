@@ -17,6 +17,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/link"
 	"github.com/fatal10110/acis_golang/internal/loginserver/data/manager"
 	"github.com/fatal10110/acis_golang/internal/loginserver/data/sql"
+	"github.com/fatal10110/acis_golang/internal/loginserver/model"
 	"github.com/rs/zerolog"
 )
 
@@ -257,6 +258,15 @@ func (f *fakeGameServer) readPlayerAuthResponse() (account string, ok bool) {
 	return account, r.readByte() != 0
 }
 
+type fakeRegistrationStore struct {
+	created []model.GameServer
+}
+
+func (s *fakeRegistrationStore) CreateGameServer(_ context.Context, server model.GameServer) error {
+	s.created = append(s.created, server)
+	return nil
+}
+
 // --- test server setup ---
 
 func newTestLink(t *testing.T, allowNewServers bool) (addr string, l *GameServerLink, servers *manager.ServerRegistry, sessions *manager.SessionStore, bans *manager.IPBanList) {
@@ -269,6 +279,15 @@ func newTestLink(t *testing.T, allowNewServers bool) (addr string, l *GameServer
 }
 
 func newTestLinkCommon(t *testing.T, allowNewServers bool, accounts *sql.AccountStore, registrations *sql.GameServerStore) (addr string, l *GameServerLink, servers *manager.ServerRegistry, sessions *manager.SessionStore, bans *manager.IPBanList) {
+	t.Helper()
+	var store registrationStore
+	if registrations != nil {
+		store = registrations
+	}
+	return newTestLinkWithRegistrationStore(t, allowNewServers, accounts, store)
+}
+
+func newTestLinkWithRegistrationStore(t *testing.T, allowNewServers bool, accounts *sql.AccountStore, registrations registrationStore) (addr string, l *GameServerLink, servers *manager.ServerRegistry, sessions *manager.SessionStore, bans *manager.IPBanList) {
 	t.Helper()
 
 	dir := t.TempDir()
@@ -368,6 +387,111 @@ func TestGameServerLinkWrongHexIDRejected(t *testing.T) {
 	ok, _, _, reason := gs.readAuthResult()
 	if ok || reason != byte(link.ReasonWrongHexID) {
 		t.Fatalf("readAuthResult() = ok=%v reason=%d, want ok=false reason=%d", ok, reason, link.ReasonWrongHexID)
+	}
+}
+
+func TestGameServerLinkRegistrationGates(t *testing.T) {
+	otherHexID := []byte{0xff, 0xff}
+	tests := []struct {
+		name            string
+		allowNewServers bool
+		acceptAlternate bool
+		seed            map[int][]byte
+		wantOK          bool
+		wantID          byte
+		wantReason      link.LoginServerFailReason
+		wantPersistID   int
+	}{
+		{
+			name:            "free id rejected when new servers disabled",
+			allowNewServers: false,
+			wantReason:      link.ReasonWrongHexID,
+		},
+		{
+			name:            "free id accepted when new servers enabled",
+			allowNewServers: true,
+			wantOK:          true,
+			wantID:          1,
+			wantPersistID:   1,
+		},
+		{
+			name:            "same key accepted even when new servers disabled",
+			allowNewServers: false,
+			seed:            map[int][]byte{1: testHexID},
+			wantOK:          true,
+			wantID:          1,
+		},
+		{
+			name:            "same key accepted when new servers enabled",
+			allowNewServers: true,
+			acceptAlternate: true,
+			seed:            map[int][]byte{1: testHexID},
+			wantOK:          true,
+			wantID:          1,
+		},
+		{
+			name:            "mismatched key rejected when alternate denied by game server",
+			allowNewServers: true,
+			seed:            map[int][]byte{1: otherHexID},
+			wantReason:      link.ReasonWrongHexID,
+		},
+		{
+			name:            "mismatched key rejected when new servers disabled",
+			acceptAlternate: true,
+			seed:            map[int][]byte{1: otherHexID},
+			wantReason:      link.ReasonWrongHexID,
+		},
+		{
+			name:            "mismatched key gets first free alternate when both gates allow it",
+			allowNewServers: true,
+			acceptAlternate: true,
+			seed:            map[int][]byte{1: otherHexID},
+			wantOK:          true,
+			wantID:          2,
+			wantPersistID:   2,
+		},
+		{
+			name:            "mismatched key fails when no alternate id is free",
+			allowNewServers: true,
+			acceptAlternate: true,
+			seed:            map[int][]byte{1: otherHexID, 2: []byte{0xaa}},
+			wantReason:      link.ReasonNoFreeID,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store := &fakeRegistrationStore{}
+			addr, _, servers, _, _ := newTestLinkWithRegistrationStore(t, tt.allowNewServers, nil, store)
+			for id, key := range tt.seed {
+				servers.Register(id, key)
+			}
+
+			gs := dialGameServer(t, addr)
+			gs.handshake()
+			gs.sendGameServerAuth(1, tt.acceptAlternate, false, "*", 7777, 300, testHexID)
+
+			ok, id, _, reason := gs.readAuthResult()
+			if ok != tt.wantOK {
+				t.Fatalf("ok = %v, want %v", ok, tt.wantOK)
+			}
+			if tt.wantOK {
+				if id != tt.wantID {
+					t.Fatalf("server id = %d, want %d", id, tt.wantID)
+				}
+			} else if reason != byte(tt.wantReason) {
+				t.Fatalf("reason = %d, want %d", reason, tt.wantReason)
+			}
+			if tt.wantPersistID == 0 {
+				if len(store.created) != 0 {
+					t.Fatalf("persisted registrations = %+v, want none", store.created)
+				}
+				return
+			}
+			if len(store.created) != 1 || store.created[0].ID != tt.wantPersistID {
+				t.Fatalf("persisted registrations = %+v, want one id %d", store.created, tt.wantPersistID)
+			}
+		})
 	}
 }
 

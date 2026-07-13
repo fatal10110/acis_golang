@@ -13,6 +13,7 @@ LoginserverPort = 12106
 LoginHostname = 127.0.0.2
 LoginPort = 19014
 AcceptNewGameServer = True
+AutoCreateAccounts = False
 URL = jdbc:mariadb://db.example/acis
 Login = acis
 Password = secret
@@ -35,8 +36,27 @@ Password = secret
 	if !cfg.AllowNewGameServers {
 		t.Error("AllowNewGameServers = false, want true")
 	}
+	if cfg.AutoCreateAccounts {
+		t.Error("AutoCreateAccounts = true, want explicit false")
+	}
 	if cfg.Database.URL != "jdbc:mariadb://db.example/acis" || cfg.Database.Login != "acis" || cfg.Database.Password != "secret" {
 		t.Errorf("Database = %+v, want parsed database credentials", cfg.Database)
+	}
+}
+
+func TestLoginServerConfigDefaultsAutoCreateAccounts(t *testing.T) {
+	props, err := config.ParseString(``)
+	if err != nil {
+		t.Fatalf("ParseString: %v", err)
+	}
+
+	cfg, err := loginServerConfigFromProperties(loginServerPaths{}, props)
+	if err != nil {
+		t.Fatalf("loginServerConfigFromProperties: %v", err)
+	}
+
+	if !cfg.AutoCreateAccounts {
+		t.Error("AutoCreateAccounts = false, want default true")
 	}
 }
 

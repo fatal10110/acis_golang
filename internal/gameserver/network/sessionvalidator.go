@@ -2,11 +2,22 @@ package network
 
 import (
 	"context"
+	"errors"
 	"sync"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/link"
+)
+
+// DefaultValidationTimeout bounds how long a game-client goroutine waits
+// for the login server to answer a session validation request.
+const DefaultValidationTimeout = 5 * time.Second
+
+var (
+	errValidationPending = errors.New("session validation already pending")
+	errLoginLinkClosed   = errors.New("login link closed during session validation")
 )
 
 // SessionValidator confirms game clients' presented session keys with the
@@ -19,12 +30,17 @@ import (
 type SessionValidator struct {
 	mu      sync.Mutex
 	waiting map[string]chan bool
+	timeout time.Duration
 }
 
 // NewSessionValidator returns a SessionValidator with no requests
 // outstanding.
 func NewSessionValidator() *SessionValidator {
-	return &SessionValidator{waiting: make(map[string]chan bool)}
+	return newSessionValidator(DefaultValidationTimeout)
+}
+
+func newSessionValidator(timeout time.Duration) *SessionValidator {
+	return &SessionValidator{waiting: make(map[string]chan bool), timeout: timeout}
 }
 
 // Resolve delivers ok as the login server's answer for accountName's
@@ -41,12 +57,15 @@ func (v *SessionValidator) Resolve(accountName string, ok bool) {
 	}
 }
 
-func (v *SessionValidator) register(accountName string) <-chan bool {
+func (v *SessionValidator) register(accountName string) (<-chan bool, bool) {
 	ch := make(chan bool, 1)
 	v.mu.Lock()
+	defer v.mu.Unlock()
+	if _, exists := v.waiting[accountName]; exists {
+		return nil, false
+	}
 	v.waiting[accountName] = ch
-	v.mu.Unlock()
-	return ch
+	return ch, true
 }
 
 func (v *SessionValidator) forget(accountName string) {
@@ -66,7 +85,15 @@ func (v *SessionValidator) forget(accountName string) {
 // (false, err) without notifying client, since no definitive answer came
 // back.
 func (v *SessionValidator) Validate(ctx context.Context, client *Client, req clientpackets.AuthLogin, loginLink *LoginLink) (bool, error) {
-	result := v.register(req.LoginName)
+	if err := ctx.Err(); err != nil {
+		return false, err
+	}
+
+	result, ok := v.register(req.LoginName)
+	if !ok {
+		return false, errValidationPending
+	}
+	defer v.forget(req.LoginName)
 
 	err := loginLink.SendPlayerAuthRequest(link.PlayerAuthRequest{
 		Account: req.LoginName,
@@ -78,17 +105,22 @@ func (v *SessionValidator) Validate(ctx context.Context, client *Client, req cli
 		},
 	})
 	if err != nil {
-		v.forget(req.LoginName)
 		return false, err
 	}
 
-	// ctx takes priority over an already-available result: once the caller
+	waitCtx := ctx
+	cancel := func() {}
+	if v.timeout > 0 {
+		waitCtx, cancel = context.WithTimeout(ctx, v.timeout)
+	}
+	defer cancel()
+
+	// waitCtx takes priority over an already-available result: once the caller
 	// has given up, Validate must not act on a late answer, since the
 	// caller may already be tearing down client's connection.
 	select {
-	case <-ctx.Done():
-		v.forget(req.LoginName)
-		return false, ctx.Err()
+	case <-waitCtx.Done():
+		return false, waitCtx.Err()
 	default:
 	}
 
@@ -105,8 +137,9 @@ func (v *SessionValidator) Validate(ctx context.Context, client *Client, req cli
 			PlayKey2:  req.PlayKey2,
 		})
 		return true, nil
-	case <-ctx.Done():
-		v.forget(req.LoginName)
-		return false, ctx.Err()
+	case <-loginLink.Done():
+		return false, errLoginLinkClosed
+	case <-waitCtx.Done():
+		return false, waitCtx.Err()
 	}
 }

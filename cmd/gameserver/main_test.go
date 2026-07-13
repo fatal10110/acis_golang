@@ -8,8 +8,10 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/config"
+	"github.com/fatal10110/acis_golang/internal/gameserver/geo/engine"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/pathfind"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/probe"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/loginserver/model"
 )
 
@@ -92,6 +94,27 @@ KarmaPlayerCanShop = False
 	}
 }
 
+func TestProvideAdditionalLifecycleTasks(t *testing.T) {
+	water, err := provideWater()
+	if err != nil {
+		t.Fatalf("provideWater() error = %v", err)
+	}
+	if water == nil {
+		t.Fatal("provideWater() = nil")
+	}
+
+	shadowItems, err := provideShadowItems()
+	if err != nil {
+		t.Fatalf("provideShadowItems() error = %v", err)
+	}
+	if shadowItems == nil {
+		t.Fatal("provideShadowItems() = nil")
+	}
+
+	var _ *task.Water = water
+	var _ *task.ShadowItems = shadowItems
+}
+
 func TestGameServerConfigUsesRequestIDWithoutHexID(t *testing.T) {
 	serverProps, err := config.ParseString(`
 GameserverHostname = *
@@ -115,8 +138,43 @@ RequestServerID = 9
 	if cfg.Auth.ServerID != 9 {
 		t.Errorf("Auth.ServerID = %d, want RequestServerID 9", cfg.Auth.ServerID)
 	}
+	if !cfg.GeneratedHexID {
+		t.Error("GeneratedHexID = false, want true when hexid file is missing")
+	}
 	if len(cfg.Auth.HexID) != generatedHexIDSize {
 		t.Errorf("generated HexID length = %d, want %d", len(cfg.Auth.HexID), generatedHexIDSize)
+	}
+}
+
+func TestWriteHexIDFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config", "hexid.txt")
+	key := []byte{0x80, 0x01}
+
+	if err := writeHexIDFile(path, 3, key); err != nil {
+		t.Fatalf("writeHexIDFile: %v", err)
+	}
+
+	props, err := config.LoadFile(path)
+	if err != nil {
+		t.Fatalf("LoadFile: %v", err)
+	}
+	serverID, err := props.Int("ServerID", 0)
+	if err != nil {
+		t.Fatalf("ServerID: %v", err)
+	}
+	if serverID != 3 {
+		t.Fatalf("ServerID = %d, want 3", serverID)
+	}
+	gotHex := props.String("HexID", "")
+	if want := model.HexKeyText(key); gotHex != want {
+		t.Fatalf("HexID = %q, want %q", gotHex, want)
+	}
+	roundTrip, err := model.ParseHexKey(gotHex)
+	if err != nil {
+		t.Fatalf("ParseHexKey: %v", err)
+	}
+	if !bytes.Equal(roundTrip, key) {
+		t.Fatalf("round-trip key = %x, want %x", roundTrip, key)
 	}
 }
 
@@ -134,6 +192,7 @@ MoveWeightDiag = 15
 ObstacleWeight = 33
 HeuristicWeight = 17
 MaxIterations = 1234
+MaxObstacleHeight = 48
 `), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -154,6 +213,13 @@ MaxIterations = 1234
 	}
 	if geo.Type != probe.L2J {
 		t.Errorf("Type = %q, want %q", geo.Type, probe.L2J)
+	}
+	wantEngineOptions := engine.Options{MaxObstacleHeight: 48}
+	if geo.EngineOptions != wantEngineOptions {
+		t.Errorf("EngineOptions = %#v, want %#v", geo.EngineOptions, wantEngineOptions)
+	}
+	if got := geo.Engine.MaxObstacleHeight(); got != 48 {
+		t.Errorf("Engine.MaxObstacleHeight() = %d, want 48", got)
 	}
 	wantOptions := pathfind.Options{
 		MoveWeight:      11,
@@ -184,6 +250,12 @@ func TestLoadGeodataDefaultsToDatapackGeodata(t *testing.T) {
 	}
 	if geo.Type != probe.L2OFF {
 		t.Errorf("Type = %q, want %q", geo.Type, probe.L2OFF)
+	}
+	if geo.EngineOptions != engine.DefaultOptions() {
+		t.Errorf("EngineOptions = %#v, want defaults %#v", geo.EngineOptions, engine.DefaultOptions())
+	}
+	if got := geo.Engine.MaxObstacleHeight(); got != engine.DefaultOptions().MaxObstacleHeight {
+		t.Errorf("Engine.MaxObstacleHeight() = %d, want default", got)
 	}
 	if geo.Pathfind != pathfind.DefaultOptions() {
 		t.Errorf("Pathfind = %#v, want defaults %#v", geo.Pathfind, pathfind.DefaultOptions())
