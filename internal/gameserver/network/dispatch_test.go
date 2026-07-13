@@ -38,8 +38,11 @@ func newFakeCharStore() *fakeCharStore {
 }
 
 type savedPosition struct {
-	location location.Location
-	heading  int
+	location    location.Location
+	heading     int
+	ctxErr      error
+	hasDeadline bool
+	deadline    time.Time
 }
 
 func (s *fakeCharStore) Create(_ context.Context, c *player.Character) error {
@@ -83,15 +86,22 @@ func (s *fakeCharStore) SetDeleteAt(_ context.Context, id int32, at int64) error
 	return nil
 }
 
-func (s *fakeCharStore) SetPosition(_ context.Context, id int32, loc location.Location, heading int) error {
+func (s *fakeCharStore) SetPosition(ctx context.Context, id int32, loc location.Location, heading int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if c, ok := s.byID[id]; ok {
 		c.Location = loc
 		c.Heading = heading
 	}
-	s.savedPositions[id] = savedPosition{location: loc, heading: heading}
-	return nil
+	deadline, hasDeadline := ctx.Deadline()
+	s.savedPositions[id] = savedPosition{
+		location:    loc,
+		heading:     heading,
+		ctxErr:      ctx.Err(),
+		hasDeadline: hasDeadline,
+		deadline:    deadline,
+	}
+	return ctx.Err()
 }
 
 func (s *fakeCharStore) Delete(_ context.Context, id int32) (bool, error) {
@@ -666,6 +676,38 @@ func TestGameClientLinkNormalDisconnectLogsDebug(t *testing.T) {
 	}
 	if !strings.Contains(got, `"level":"debug"`) {
 		t.Fatalf("normal disconnect log level = %s, want debug", got)
+	}
+}
+
+func TestDetachLivePlayerSavesWithUncancelledBoundedContext(t *testing.T) {
+	chars := newFakeCharStore()
+	items := newFakeItemStore()
+	roster := gamemanager.NewRoster(chars, items, testTemplates(t), testItemTemplates(), &sequentialIDs{next: 100}, gamemanager.DefaultDeleteAfter, time.Now)
+	live := newTestLivePlayer(t, 101, &frameCapture{})
+	savedAt := location.Location{X: 46160, Y: 41237, Z: -3534}
+	live.Character.Location = savedAt
+	live.Character.Heading = 32768
+	if err := chars.Create(context.Background(), live.Character); err != nil {
+		t.Fatalf("Create() unexpected error: %v", err)
+	}
+
+	parent, cancel := context.WithCancel(context.Background())
+	cancel()
+	gcl := &GameClientLink{roster: roster, log: zerolog.Nop()}
+	gcl.detachLivePlayer(parent, live)
+
+	pos := chars.savedPosition(t, live.ObjectID())
+	if pos.ctxErr != nil {
+		t.Fatalf("save context error = %v, want nil despite canceled parent", pos.ctxErr)
+	}
+	if !pos.hasDeadline {
+		t.Fatal("save context has no deadline")
+	}
+	if ttl := time.Until(pos.deadline); ttl <= 0 || ttl > 3*time.Second {
+		t.Fatalf("save context deadline in %s, want a short future timeout", ttl)
+	}
+	if pos.location != savedAt || pos.heading != 32768 {
+		t.Fatalf("saved position = %+v/%d, want %+v/32768", pos.location, pos.heading, savedAt)
 	}
 }
 

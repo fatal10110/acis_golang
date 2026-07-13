@@ -159,6 +159,8 @@ func validProtocolRevision(revision int32) bool {
 	}
 }
 
+const livePlayerDetachSaveTimeout = 2 * time.Second
+
 // Handle drives one game-client connection end to end. It matches Serve's
 // handle signature, so a caller wires it in directly:
 // network.Serve(ctx, ln, link.Handle, log).
@@ -617,7 +619,9 @@ func (l *GameClientLink) detachLivePlayer(ctx context.Context, live *livePlayer)
 		return
 	}
 	if l.roster != nil {
-		if err := l.roster.SavePosition(ctx, live.Character); err != nil {
+		saveCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), livePlayerDetachSaveTimeout)
+		defer cancel()
+		if err := l.roster.SavePosition(saveCtx, live.Character); err != nil {
 			l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("save player position")
 		}
 	}
