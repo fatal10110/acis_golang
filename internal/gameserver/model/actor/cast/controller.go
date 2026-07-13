@@ -208,6 +208,7 @@ func (c *Controller) Hit() error {
 
 	if mp := c.actor.MPCost(c.current); mp > 0 {
 		if mp > c.actor.MP() {
+			c.clearLocked()
 			return ErrNotEnoughMP
 		}
 		c.actor.ReduceMP(mp)
@@ -215,6 +216,7 @@ func (c *Controller) Hit() error {
 
 	if hp := c.current.HPConsume; hp > 0 {
 		if hp > c.actor.HP() {
+			c.clearLocked()
 			return ErrNotEnoughHP
 		}
 		c.actor.ReduceHP(hp)
