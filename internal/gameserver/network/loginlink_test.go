@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -272,6 +273,37 @@ func TestDialLoginLinkPlayerInGameAndStatus(t *testing.T) {
 	}
 }
 
+func TestLoginLinkSendFailureEndsLink(t *testing.T) {
+	conn := newWriteFailBlockingReadConn()
+	l := &LoginLink{
+		conn:   conn,
+		crypt:  crypt.NewLinkCrypt(),
+		log:    zerolog.Nop(),
+		done:   make(chan struct{}),
+		frames: wire.NewFrameReader(conn),
+	}
+	go l.readLoop(LoginLinkHandlers{})
+
+	err := l.SendPlayerAuthRequest(link.PlayerAuthRequest{
+		Account: "acc1",
+		SessionKey: link.SessionKey{
+			PlayKey1:  1,
+			PlayKey2:  2,
+			LoginKey1: 3,
+			LoginKey2: 4,
+		},
+	})
+	if err == nil {
+		t.Fatal("SendPlayerAuthRequest: want write error, got nil")
+	}
+
+	select {
+	case <-l.Done():
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("link stayed open after send failure")
+	}
+}
+
 // fakeLoginServer is a bare-bones GS-LS link peer for handshake edge cases
 // the real login server's acceptor never produces on its own (a revision
 // mismatch, a malformed frame).
@@ -334,3 +366,37 @@ func TestDialLoginLinkRevisionMismatch(t *testing.T) {
 		t.Fatalf("DialLoginLink error = %v, want it to mention revision", err)
 	}
 }
+
+type writeFailBlockingReadConn struct {
+	closed chan struct{}
+	once   sync.Once
+}
+
+func newWriteFailBlockingReadConn() *writeFailBlockingReadConn {
+	return &writeFailBlockingReadConn{closed: make(chan struct{})}
+}
+
+func (c *writeFailBlockingReadConn) Read([]byte) (int, error) {
+	<-c.closed
+	return 0, io.ErrClosedPipe
+}
+
+func (c *writeFailBlockingReadConn) Write([]byte) (int, error) {
+	return 0, io.ErrClosedPipe
+}
+
+func (c *writeFailBlockingReadConn) Close() error {
+	c.once.Do(func() { close(c.closed) })
+	return nil
+}
+
+func (c *writeFailBlockingReadConn) LocalAddr() net.Addr              { return linkTestAddr("local") }
+func (c *writeFailBlockingReadConn) RemoteAddr() net.Addr             { return linkTestAddr("remote") }
+func (c *writeFailBlockingReadConn) SetDeadline(time.Time) error      { return nil }
+func (c *writeFailBlockingReadConn) SetReadDeadline(time.Time) error  { return nil }
+func (c *writeFailBlockingReadConn) SetWriteDeadline(time.Time) error { return nil }
+
+type linkTestAddr string
+
+func (a linkTestAddr) Network() string { return string(a) }
+func (a linkTestAddr) String() string  { return string(a) }

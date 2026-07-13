@@ -279,7 +279,11 @@ func (l *LoginLink) readFrame() ([]byte, error) {
 func (l *LoginLink) send(payload []byte) error {
 	l.sendMu.Lock()
 	defer l.sendMu.Unlock()
-	return wire.WriteFrame(l.conn, l.crypt.Encrypt(payload))
+	if err := wire.WriteFrame(l.conn, l.crypt.Encrypt(payload)); err != nil {
+		_ = l.conn.Close()
+		return err
+	}
+	return nil
 }
 
 func firstByte(payload []byte) byte {
