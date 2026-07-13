@@ -15,6 +15,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -333,6 +334,102 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 		case clientpackets.OpcodeRequestSkillCoolTime:
 			continue
 
+		case clientpackets.OpcodeMoveBackwardToLocation:
+			req, err := clientpackets.DecodeMoveBackwardToLocation(payload)
+			if err != nil {
+				l.log.Warn().Err(err).Msg("game client")
+				return
+			}
+			if live == nil {
+				continue
+			}
+			if req.MoveMovement == 0 {
+				session.SendFrame(serverpackets.FrameActionFailed())
+				continue
+			}
+			l.moveLivePlayer(live, location.Location{X: int(req.TargetX), Y: int(req.TargetY), Z: int(req.TargetZ)})
+
+		case clientpackets.OpcodeValidatePosition:
+			req, err := clientpackets.DecodeValidatePosition(payload)
+			if err != nil {
+				l.log.Warn().Err(err).Msg("game client")
+				return
+			}
+			if live != nil {
+				live.Character.Heading = int(req.Heading)
+				live.Character.SetHeading(int(req.Heading))
+			}
+
+		case clientpackets.OpcodeRequestItemList:
+			if live == nil {
+				continue
+			}
+			frame, err := serverpackets.FrameItemList(live.items, l.itemTemplates, false)
+			if err != nil {
+				l.log.Error().Err(err).Msg("build ItemList")
+				return
+			}
+			session.SendFrame(frame)
+
+		case clientpackets.OpcodeRequestSkillList:
+			session.SendFrame(serverpackets.FrameSkillList(nil))
+
+		case clientpackets.OpcodeAction,
+			clientpackets.OpcodeAttackRequest,
+			clientpackets.OpcodeRequestUnEquipItem,
+			clientpackets.OpcodeRequestDropItem,
+			clientpackets.OpcodeUseItem,
+			clientpackets.OpcodeTradeRequest,
+			clientpackets.OpcodeAddTradeItem,
+			clientpackets.OpcodeTradeDone,
+			clientpackets.OpcodeDummy1A,
+			clientpackets.OpcodeRequestSocialAction,
+			clientpackets.OpcodeRequestChangeMoveType,
+			clientpackets.OpcodeRequestChangeWaitType,
+			clientpackets.OpcodeRequestSellItem,
+			clientpackets.OpcodeRequestBuyItem,
+			clientpackets.OpcodeDummy23,
+			clientpackets.OpcodeDummy2E,
+			clientpackets.OpcodeRequestMagicSkillUse,
+			clientpackets.OpcodeAppearing,
+			clientpackets.OpcodeSendWarehouseDeposit,
+			clientpackets.OpcodeSendWarehouseWithdraw,
+			clientpackets.OpcodeRequestShortCutReg,
+			clientpackets.OpcodeDummy34,
+			clientpackets.OpcodeRequestShortCutDel,
+			clientpackets.OpcodeCannotMoveAnymore,
+			clientpackets.OpcodeRequestTargetCancel,
+			clientpackets.OpcodeDummy3E,
+			clientpackets.OpcodeRequestGetOnVehicle,
+			clientpackets.OpcodeRequestGetOffVehicle,
+			clientpackets.OpcodeAnswerTradeRequest,
+			clientpackets.OpcodeRequestActionUse,
+			clientpackets.OpcodeRequestRestart,
+			clientpackets.OpcodeStartRotating,
+			clientpackets.OpcodeFinishRotating,
+			clientpackets.OpcodeRequestEnchantItem,
+			clientpackets.OpcodeRequestDestroyItem,
+			clientpackets.OpcodeRequestMoveInVehicle,
+			clientpackets.OpcodeCannotMoveInVehicle,
+			clientpackets.OpcodeRequestQuestListInGame,
+			clientpackets.OpcodeRequestQuestAbort,
+			clientpackets.OpcodeRequestAcquireSkillInfo,
+			clientpackets.OpcodeRequestAcquireSkill,
+			clientpackets.OpcodeRequestRestartPoint,
+			clientpackets.OpcodeRequestCrystallizeItem,
+			clientpackets.OpcodeRequestChangePetName,
+			clientpackets.OpcodeRequestPetUseItem,
+			clientpackets.OpcodeRequestGiveItemToPet,
+			clientpackets.OpcodeRequestGetItemFromPet,
+			clientpackets.OpcodeRequestPetGetItem,
+			clientpackets.OpcodeSendTimeCheck,
+			clientpackets.OpcodeRequestPackageItemList,
+			clientpackets.OpcodeRequestPackageSend,
+			clientpackets.OpcodeDlgAnswer,
+			clientpackets.OpcodeGameGuardReply,
+			clientpackets.OpcodeRequestShowMiniMap:
+			continue
+
 		default:
 			l.log.Info().Str("opcode", fmt.Sprintf("%#x", opcode)).Str("state", client.State().String()).
 				Msg("game client: accepted opcode not implemented yet")
@@ -428,6 +525,30 @@ func (l *GameClientLink) attachLivePlayer(client *Client, c *player.Character, t
 		})
 	})
 	return &livePlayer{Character: c, template: tmpl, items: items}
+}
+
+func (l *GameClientLink) moveLivePlayer(live *livePlayer, target location.Location) {
+	x, y, z := live.Position()
+	origin := location.Location{X: x, Y: y, Z: z}
+	heading := origin.HeadingTo(target)
+	live.Character.Location = target
+	live.Character.Heading = heading
+	live.SetHeading(heading)
+	live.SendFrame(serverpackets.FrameMoveToLocation(live.ObjectID(), target, origin))
+
+	if l.world == nil {
+		return
+	}
+	l.world.ForEachKnown(live, func(o world.Tracked) {
+		receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
+		if !ok {
+			return
+		}
+		receiver.SendFrame(serverpackets.FrameMoveToLocation(live.ObjectID(), target, origin))
+	})
+	if err := l.world.Move(live, target.X, target.Y, target.Z); err != nil {
+		l.log.Debug().Err(err).Int32("object_id", live.ObjectID()).Msg("move player")
+	}
 }
 
 func slotCharacter(chars []*player.Character, slot int32) (*player.Character, bool) {

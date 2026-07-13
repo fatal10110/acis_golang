@@ -4,6 +4,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/link"
 )
 
@@ -48,6 +49,15 @@ func TestAllowedGatesOpcodesByState(t *testing.T) {
 		{"entering rejects create character", StateEntering, 0x0b, false},
 
 		{"in-game accepts logout", StateInGame, 0x09, true},
+		{"in-game accepts click movement", StateInGame, 0x01, true},
+		{"in-game accepts validate position", StateInGame, 0x48, true},
+		{"in-game accepts action", StateInGame, 0x04, true},
+		{"in-game accepts attack request", StateInGame, 0x0a, true},
+		{"in-game accepts item list refresh", StateInGame, 0x0f, true},
+		{"in-game accepts skill list refresh", StateInGame, 0x3f, true},
+		{"in-game accepts use item", StateInGame, 0x14, true},
+		{"in-game accepts enchant item", StateInGame, 0x58, true},
+		{"in-game accepts pet item use", StateInGame, 0x8a, true},
 		{"in-game rejects create character", StateInGame, 0x0b, false},
 		{"in-game rejects enter world replay", StateInGame, 0x03, false},
 
@@ -59,6 +69,76 @@ func TestAllowedGatesOpcodesByState(t *testing.T) {
 				t.Errorf("Allowed(%s, 0x%02x) = %v, want %v", tt.state, tt.opcode, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestAllowedAcceptsWireSafeInGameOpcodes(t *testing.T) {
+	opcodes := []byte{
+		clientpackets.OpcodeMoveBackwardToLocation,
+		clientpackets.OpcodeAction,
+		clientpackets.OpcodeAttackRequest,
+		clientpackets.OpcodeRequestItemList,
+		clientpackets.OpcodeRequestUnEquipItem,
+		clientpackets.OpcodeRequestDropItem,
+		clientpackets.OpcodeUseItem,
+		clientpackets.OpcodeTradeRequest,
+		clientpackets.OpcodeAddTradeItem,
+		clientpackets.OpcodeTradeDone,
+		clientpackets.OpcodeDummy1A,
+		clientpackets.OpcodeRequestSocialAction,
+		clientpackets.OpcodeRequestChangeMoveType,
+		clientpackets.OpcodeRequestChangeWaitType,
+		clientpackets.OpcodeRequestSellItem,
+		clientpackets.OpcodeRequestBuyItem,
+		clientpackets.OpcodeDummy23,
+		clientpackets.OpcodeDummy2E,
+		clientpackets.OpcodeRequestMagicSkillUse,
+		clientpackets.OpcodeAppearing,
+		clientpackets.OpcodeSendWarehouseDeposit,
+		clientpackets.OpcodeSendWarehouseWithdraw,
+		clientpackets.OpcodeRequestShortCutReg,
+		clientpackets.OpcodeDummy34,
+		clientpackets.OpcodeRequestShortCutDel,
+		clientpackets.OpcodeCannotMoveAnymore,
+		clientpackets.OpcodeRequestTargetCancel,
+		clientpackets.OpcodeDummy3E,
+		clientpackets.OpcodeRequestSkillList,
+		clientpackets.OpcodeRequestGetOnVehicle,
+		clientpackets.OpcodeRequestGetOffVehicle,
+		clientpackets.OpcodeAnswerTradeRequest,
+		clientpackets.OpcodeRequestActionUse,
+		clientpackets.OpcodeRequestRestart,
+		clientpackets.OpcodeValidatePosition,
+		clientpackets.OpcodeStartRotating,
+		clientpackets.OpcodeFinishRotating,
+		clientpackets.OpcodeRequestEnchantItem,
+		clientpackets.OpcodeRequestDestroyItem,
+		clientpackets.OpcodeRequestMoveInVehicle,
+		clientpackets.OpcodeCannotMoveInVehicle,
+		clientpackets.OpcodeRequestQuestListInGame,
+		clientpackets.OpcodeRequestQuestAbort,
+		clientpackets.OpcodeRequestAcquireSkillInfo,
+		clientpackets.OpcodeRequestAcquireSkill,
+		clientpackets.OpcodeRequestRestartPoint,
+		clientpackets.OpcodeRequestCrystallizeItem,
+		clientpackets.OpcodeRequestChangePetName,
+		clientpackets.OpcodeRequestPetUseItem,
+		clientpackets.OpcodeRequestGiveItemToPet,
+		clientpackets.OpcodeRequestGetItemFromPet,
+		clientpackets.OpcodeRequestPetGetItem,
+		clientpackets.OpcodeSendTimeCheck,
+		clientpackets.OpcodeRequestSkillCoolTime,
+		clientpackets.OpcodeRequestPackageItemList,
+		clientpackets.OpcodeRequestPackageSend,
+		clientpackets.OpcodeDlgAnswer,
+		clientpackets.OpcodeGameGuardReply,
+		clientpackets.OpcodeRequestShowMiniMap,
+		clientpackets.OpcodeExtended,
+	}
+	for _, opcode := range opcodes {
+		if !Allowed(StateInGame, opcode) {
+			t.Fatalf("Allowed(in-game, 0x%02x) = false, want true", opcode)
+		}
 	}
 }
 

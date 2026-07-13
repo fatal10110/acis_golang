@@ -323,6 +323,32 @@ func encodeRequestSkillCoolTime() []byte {
 	return wire.NewPacketWriter(clientpackets.OpcodeRequestSkillCoolTime).Bytes()
 }
 
+func encodeMoveBackwardToLocation(target, origin location.Location, moveMovement int32) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeMoveBackwardToLocation)
+	w.WriteInt32(int32(target.X))
+	w.WriteInt32(int32(target.Y))
+	w.WriteInt32(int32(target.Z))
+	w.WriteInt32(int32(origin.X))
+	w.WriteInt32(int32(origin.Y))
+	w.WriteInt32(int32(origin.Z))
+	w.WriteInt32(moveMovement)
+	return w.Bytes()
+}
+
+func encodeValidatePosition(at location.Location, heading int32) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeValidatePosition)
+	w.WriteInt32(int32(at.X))
+	w.WriteInt32(int32(at.Y))
+	w.WriteInt32(int32(at.Z))
+	w.WriteInt32(heading)
+	w.WriteInt32(0)
+	return w.Bytes()
+}
+
+func encodeSingleOpcode(opcode byte) []byte {
+	return wire.NewPacketWriter(opcode).Bytes()
+}
+
 // --- test server setup ---
 
 func newTestGameClientLink(t *testing.T, loginLink func() *LoginLink, validator *SessionValidator) (addr string, chars *fakeCharStore, items *fakeItemStore, state *world.State) {
@@ -565,6 +591,82 @@ func TestGameClientLinkIgnoresRequestSkillCoolTimeInGame(t *testing.T) {
 	}
 	if second := wire.NewReader(reply[1:]).ReadUint16(); second != serverpackets.OpcodeExSendManorList {
 		t.Fatalf("extended opcode = %#x, want ExSendManorList (%#x)", second, serverpackets.OpcodeExSendManorList)
+	}
+}
+
+func TestGameClientLinkWireSafeMovementAndRefreshPacketsInGame(t *testing.T) {
+	c, chars, _, state := newLinkedGameClient(t)
+
+	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.read() // CharCreateOk
+	c.read() // CharSelectInfo
+	objID := chars.soleObjectID(t)
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	c.read() // UserInfo
+	c.read() // ItemList
+	c.read() // SkillList
+
+	target := location.Location{X: 46160, Y: 41237, Z: -3534}
+	origin := location.Location{X: 10, Y: 20, Z: 30}
+	c.send(encodeMoveBackwardToLocation(target, origin, 1))
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeMoveToLocation {
+		t.Fatalf("move reply opcode = %#x, want MoveToLocation (%#x)", reply[0], serverpackets.OpcodeMoveToLocation)
+	}
+	r := wire.NewReader(reply[1:])
+	if got := r.ReadInt32(); got != objID {
+		t.Fatalf("MoveToLocation object id = %d, want %d", got, objID)
+	}
+	gotTarget := location.Location{X: int(r.ReadInt32()), Y: int(r.ReadInt32()), Z: int(r.ReadInt32())}
+	if gotTarget != target {
+		t.Fatalf("MoveToLocation target = %+v, want %+v", gotTarget, target)
+	}
+	obj, ok := state.Player(objID)
+	if !ok {
+		t.Fatalf("world.Player(%d) missing", objID)
+	}
+	positioned, ok := obj.(interface{ Position() (int, int, int) })
+	if !ok {
+		t.Fatalf("world.Player(%d) has no Position method", objID)
+	}
+	x, y, z := positioned.Position()
+	if x != target.X || y != target.Y || z != target.Z {
+		t.Fatalf("player position = (%d,%d,%d), want (%d,%d,%d)", x, y, z, target.X, target.Y, target.Z)
+	}
+
+	c.send(encodeValidatePosition(target, 32768))
+	c.send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeItemList {
+		t.Fatalf("item refresh opcode = %#x, want ItemList (%#x)", reply[0], serverpackets.OpcodeItemList)
+	}
+
+	c.send(encodeSingleOpcode(clientpackets.OpcodeRequestSkillList))
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeSkillList {
+		t.Fatalf("skill refresh opcode = %#x, want SkillList (%#x)", reply[0], serverpackets.OpcodeSkillList)
+	}
+
+	for _, opcode := range []byte{
+		clientpackets.OpcodeUseItem,
+		clientpackets.OpcodeTradeRequest,
+		clientpackets.OpcodeSendWarehouseDeposit,
+		clientpackets.OpcodeRequestQuestListInGame,
+		clientpackets.OpcodeRequestPackageItemList,
+		clientpackets.OpcodeDlgAnswer,
+		clientpackets.OpcodeGameGuardReply,
+		clientpackets.OpcodeRequestShowMiniMap,
+	} {
+		c.send(encodeSingleOpcode(opcode))
+	}
+	c.send(encodeRequestManorList())
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeExtended {
+		t.Fatalf("post-stub opcode = %#x, want extended packet (%#x)", reply[0], serverpackets.OpcodeExtended)
 	}
 }
 
