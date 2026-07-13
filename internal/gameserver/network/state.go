@@ -44,7 +44,6 @@ func (s State) String() string {
 // send. It starts out covering only the connect-to-in-world handshake
 // sequence; every additional packet registers its opcode here as it gets
 // ported, the same way the full dispatch table grows one packet at a time.
-// Extended (second-opcode) packet families are not modeled yet.
 var allowedOpcodes = map[State]map[byte]bool{
 	StateConnected: {
 		0x00: true, // protocol version negotiation
@@ -62,9 +61,11 @@ var allowedOpcodes = map[State]map[byte]bool{
 	StateEntering: {
 		0x03: true, // enter world
 		0x3f: true, // request quest list
+		0xd0: true, // extended packets used during loading
 	},
 	StateInGame: {
 		0x09: true, // logout (also valid pre-game; see StateAuthed)
+		0xd0: true, // extended packets
 	},
 }
 

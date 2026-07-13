@@ -313,6 +313,12 @@ func encodeEnterWorld() []byte {
 	return wire.NewPacketWriter(clientpackets.OpcodeEnterWorld).Bytes()
 }
 
+func encodeRequestManorList() []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeExtended)
+	w.WriteUint16(clientpackets.OpcodeRequestManorList)
+	return w.Bytes()
+}
+
 // --- test server setup ---
 
 func newTestGameClientLink(t *testing.T, loginLink func() *LoginLink, validator *SessionValidator) (addr string, chars *fakeCharStore, items *fakeItemStore, state *world.State) {
@@ -501,6 +507,15 @@ func TestGameClientLinkFullFlow(t *testing.T) {
 	reply = c.read()
 	if reply[0] != serverpackets.OpcodeCharSelected {
 		t.Fatalf("opcode = %#x, want CharSelected (%#x)", reply[0], serverpackets.OpcodeCharSelected)
+	}
+
+	c.send(encodeRequestManorList())
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeExtended {
+		t.Fatalf("opcode = %#x, want extended packet (%#x)", reply[0], serverpackets.OpcodeExtended)
+	}
+	if second := wire.NewReader(reply[1:]).ReadUint16(); second != serverpackets.OpcodeExSendManorList {
+		t.Fatalf("extended opcode = %#x, want ExSendManorList (%#x)", second, serverpackets.OpcodeExSendManorList)
 	}
 
 	c.send(encodeEnterWorld())

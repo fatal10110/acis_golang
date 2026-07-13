@@ -315,6 +315,21 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			live = entered
 			client.SetState(StateInGame)
 
+		case clientpackets.OpcodeExtended:
+			r := wire.NewReader(payload[1:])
+			switch second := r.ReadUint16(); {
+			case r.Err() != nil:
+				l.log.Warn().Str("state", client.State().String()).Msg("game client: extended opcode missing")
+				continue
+			case second == clientpackets.OpcodeRequestManorList:
+				session.SendFrame(serverpackets.FrameExSendManorList())
+			default:
+				l.log.Info().
+					Uint16("opcode2", second).
+					Str("state", client.State().String()).
+					Msg("game client: accepted extended opcode not implemented yet")
+			}
+
 		default:
 			l.log.Info().Str("opcode", fmt.Sprintf("%#x", opcode)).Str("state", client.State().String()).
 				Msg("game client: accepted opcode not implemented yet")
