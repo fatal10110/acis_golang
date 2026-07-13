@@ -157,10 +157,10 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) {
 	w.WriteInt32(0) // flying run speed: flight is not modeled
 	w.WriteInt32(0) // flying walk speed: flight is not modeled
 
-	w.WriteFloat32(1) // movement speed multiplier: no active haste/slow effect
-	w.WriteFloat32(1) // attack speed multiplier: no active haste/slow effect
-	w.WriteFloat32(float32(collisionRadius))
-	w.WriteFloat32(float32(collisionHeight))
+	w.WriteFloat64(1) // movement speed multiplier: no active haste/slow effect
+	w.WriteFloat64(1) // attack speed multiplier: no active haste/slow effect
+	w.WriteFloat64(collisionRadius)
+	w.WriteFloat64(collisionHeight)
 
 	w.WriteInt32(int32(c.HairStyle))
 	w.WriteInt32(int32(c.HairColor))

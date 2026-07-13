@@ -95,6 +95,7 @@ type clientConn struct {
 
 	account    string
 	authed     bool
+	joinedGame bool
 	lastServer int
 	loginKey1  int32
 	loginKey2  int32
@@ -105,7 +106,13 @@ func (c *clientConn) send(payload []byte) error {
 }
 
 func (l *ClientLink) handleConnection(ctx context.Context, conn net.Conn) {
-	defer conn.Close()
+	var c *clientConn
+	defer func() {
+		if c != nil && c.account != "" && !c.joinedGame {
+			l.sessions.Delete(c.account)
+		}
+		conn.Close()
+	}()
 
 	ip := remoteIP(conn)
 	if l.bans.IsBanned(ip) {
@@ -124,7 +131,7 @@ func (l *ClientLink) handleConnection(ctx context.Context, conn net.Conn) {
 		return
 	}
 
-	c := &clientConn{
+	c = &clientConn{
 		conn:     conn,
 		remoteIP: ip,
 		crypt:    cr,
@@ -262,7 +269,16 @@ func (l *ClientLink) onRequestServerList(c *clientConn, payload []byte) {
 	if req.SessionKey1 != c.loginKey1 || req.SessionKey2 != c.loginKey2 {
 		return
 	}
-	_ = c.send(serverpackets.EncodeServerList(byte(c.lastServer), l.serverEntries()))
+	entries := l.serverEntries()
+	for _, e := range entries {
+		l.log.Info().
+			Uint8("id", e.ID).
+			Str("ip", net.IP(e.IP[:]).String()).
+			Int32("port", e.Port).
+			Bool("online", e.Online).
+			Msg("serving ServerList entry")
+	}
+	_ = c.send(serverpackets.EncodeServerList(byte(c.lastServer), entries))
 }
 
 // serverEntries projects the registry's live server state into the wire
@@ -271,7 +287,7 @@ func (l *ClientLink) serverEntries() []serverpackets.ServerEntry {
 	all := l.servers.All()
 	out := make([]serverpackets.ServerEntry, 0, len(all))
 	for _, e := range all {
-		var ip [4]byte
+		ip := [4]byte{127, 0, 0, 1}
 		if parsed := net.ParseIP(e.Host).To4(); parsed != nil {
 			copy(ip[:], parsed)
 		}
@@ -283,7 +299,7 @@ func (l *ClientLink) serverEntries() []serverpackets.ServerEntry {
 			PvP:            e.Pvp,
 			CurrentPlayers: uint16(l.servers.OnlineAccountCount(e.ID)),
 			MaxPlayers:     uint16(e.MaxPlayers),
-			Online:         e.Authed,
+			Online:         e.Status != link.ServerTypeDown,
 			TestServer:     e.TestServer,
 			ShowClock:      e.ShowClock,
 			ShowBrackets:   e.Brackets,
@@ -316,6 +332,7 @@ func (l *ClientLink) onRequestServerLogin(ctx context.Context, c *clientConn, pa
 		PlayKey1:  playKey1,
 		PlayKey2:  playKey2,
 	})
+	c.joinedGame = true
 	if err := l.accounts.SetLastServer(ctx, c.account, int(req.ServerID)); err != nil {
 		l.log.Error().Str("account", c.account).Err(err).Msg("set last server")
 	}

@@ -1,0 +1,15 @@
+package clientpackets
+
+// OpcodeExtended is the first byte for game client packets with a
+// little-endian uint16 sub-opcode.
+const OpcodeExtended = 0xd0
+
+// OpcodeRequestSkillCoolTime asks for remaining skill reuse timers. The
+// skill reuse model is not active yet, so the game server accepts and
+// ignores it.
+const OpcodeRequestSkillCoolTime = 0x9d
+
+// Extended client packet opcodes.
+const (
+	OpcodeRequestManorList uint16 = 0x0008
+)

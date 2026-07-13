@@ -1,9 +1,11 @@
 package network
 
 import (
+	"bytes"
 	"context"
 	"net"
 	"sort"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -26,13 +28,22 @@ import (
 // --- fake character/item stores: Roster's own persistence seam, no DB needed ---
 
 type fakeCharStore struct {
-	mu    sync.Mutex
-	byID  map[int32]*player.Character
-	names map[string]bool
+	mu             sync.Mutex
+	byID           map[int32]*player.Character
+	names          map[string]bool
+	savedPositions map[int32]savedPosition
 }
 
 func newFakeCharStore() *fakeCharStore {
-	return &fakeCharStore{byID: map[int32]*player.Character{}, names: map[string]bool{}}
+	return &fakeCharStore{byID: map[int32]*player.Character{}, names: map[string]bool{}, savedPositions: map[int32]savedPosition{}}
+}
+
+type savedPosition struct {
+	location    location.Location
+	heading     int
+	ctxErr      error
+	hasDeadline bool
+	deadline    time.Time
 }
 
 func (s *fakeCharStore) Create(_ context.Context, c *player.Character) error {
@@ -76,6 +87,24 @@ func (s *fakeCharStore) SetDeleteAt(_ context.Context, id int32, at int64) error
 	return nil
 }
 
+func (s *fakeCharStore) SetPosition(ctx context.Context, id int32, loc location.Location, heading int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if c, ok := s.byID[id]; ok {
+		c.Location = loc
+		c.Heading = heading
+	}
+	deadline, hasDeadline := ctx.Deadline()
+	s.savedPositions[id] = savedPosition{
+		location:    loc,
+		heading:     heading,
+		ctxErr:      ctx.Err(),
+		hasDeadline: hasDeadline,
+		deadline:    deadline,
+	}
+	return ctx.Err()
+}
+
 func (s *fakeCharStore) Delete(_ context.Context, id int32) (bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -101,6 +130,17 @@ func (s *fakeCharStore) soleObjectID(t *testing.T) int32 {
 		return id
 	}
 	return 0
+}
+
+func (s *fakeCharStore) savedPosition(t *testing.T, id int32) savedPosition {
+	t.Helper()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	pos, ok := s.savedPositions[id]
+	if !ok {
+		t.Fatalf("character %d position was not saved", id)
+	}
+	return pos
 }
 
 type fakeItemStore struct {
@@ -169,9 +209,10 @@ func testItemTemplates() *item.Table {
 // VersionCheck's 8 random bytes plus the fixed static key half.
 
 type fakeGameClient struct {
-	t      *testing.T
-	conn   net.Conn
-	cipher *Cipher
+	t          *testing.T
+	conn       net.Conn
+	handshaken bool
+	cipher     *Cipher
 }
 
 func dialGameClient(t *testing.T, addr string) *fakeGameClient {
@@ -202,25 +243,30 @@ func (f *fakeGameClient) sendProtocolVersion(revision int32) {
 	if len(raw) != 18 {
 		f.t.Fatalf("VersionCheck payload size = %d, want 18", len(raw))
 	}
-	key := make([]byte, keySize)
-	copy(key[:8], raw[2:10])
-	copy(key[8:], gameCipherStaticKey[:])
+	if enabled := wire.NewReader(raw[10:14]).ReadInt32(); enabled != 0 {
+		key := make([]byte, keySize)
+		copy(key[:8], raw[2:10])
+		copy(key[8:], gameCipherStaticKey[:])
 
-	cipher, err := NewCipher(key)
-	if err != nil {
-		f.t.Fatalf("NewCipher: %v", err)
+		cipher, err := NewCipher(key)
+		if err != nil {
+			f.t.Fatalf("NewCipher: %v", err)
+		}
+		cipher.Encrypt(nil)
+		f.cipher = cipher
 	}
-	cipher.Encrypt(nil)
-	f.cipher = cipher
+	f.handshaken = true
 }
 
 func (f *fakeGameClient) send(payload []byte) {
 	f.t.Helper()
-	if f.cipher == nil {
+	if !f.handshaken {
 		f.t.Fatal("send called before ProtocolVersion/VersionCheck handshake")
 	}
 	buf := append([]byte(nil), payload...)
-	f.cipher.Encrypt(buf)
+	if f.cipher != nil {
+		f.cipher.Encrypt(buf)
+	}
 	if err := wire.WriteFrame(f.conn, buf); err != nil {
 		f.t.Fatalf("WriteFrame: %v", err)
 	}
@@ -228,7 +274,7 @@ func (f *fakeGameClient) send(payload []byte) {
 
 func (f *fakeGameClient) read() []byte {
 	f.t.Helper()
-	if f.cipher == nil {
+	if !f.handshaken {
 		f.t.Fatal("read called before ProtocolVersion/VersionCheck handshake")
 	}
 	f.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
@@ -236,7 +282,9 @@ func (f *fakeGameClient) read() []byte {
 	if err != nil {
 		f.t.Fatalf("ReadFrame: %v", err)
 	}
-	f.cipher.Decrypt(payload)
+	if f.cipher != nil {
+		f.cipher.Decrypt(payload)
+	}
 	return payload
 }
 
@@ -306,18 +354,58 @@ func encodeEnterWorld() []byte {
 	return wire.NewPacketWriter(clientpackets.OpcodeEnterWorld).Bytes()
 }
 
+func encodeRequestManorList() []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeExtended)
+	w.WriteUint16(clientpackets.OpcodeRequestManorList)
+	return w.Bytes()
+}
+
+func encodeRequestSkillCoolTime() []byte {
+	return wire.NewPacketWriter(clientpackets.OpcodeRequestSkillCoolTime).Bytes()
+}
+
+func encodeMoveBackwardToLocation(target, origin location.Location, moveMovement int32) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeMoveBackwardToLocation)
+	w.WriteInt32(int32(target.X))
+	w.WriteInt32(int32(target.Y))
+	w.WriteInt32(int32(target.Z))
+	w.WriteInt32(int32(origin.X))
+	w.WriteInt32(int32(origin.Y))
+	w.WriteInt32(int32(origin.Z))
+	w.WriteInt32(moveMovement)
+	return w.Bytes()
+}
+
+func encodeValidatePosition(at location.Location, heading int32) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeValidatePosition)
+	w.WriteInt32(int32(at.X))
+	w.WriteInt32(int32(at.Y))
+	w.WriteInt32(int32(at.Z))
+	w.WriteInt32(heading)
+	w.WriteInt32(0)
+	return w.Bytes()
+}
+
+func encodeSingleOpcode(opcode byte) []byte {
+	return wire.NewPacketWriter(opcode).Bytes()
+}
+
 // --- test server setup ---
 
 func newTestGameClientLink(t *testing.T, loginLink func() *LoginLink, validator *SessionValidator) (addr string, chars *fakeCharStore, items *fakeItemStore, state *world.State) {
 	t.Helper()
+	return newTestGameClientLinkWithLog(t, loginLink, validator, zerolog.Nop())
+}
 
+func newTestGameClientLinkWithLog(t *testing.T, loginLink func() *LoginLink, validator *SessionValidator, log zerolog.Logger) (addr string, chars *fakeCharStore, items *fakeItemStore, state *world.State) {
+	t.Helper()
 	chars = newFakeCharStore()
 	items = newFakeItemStore()
 	state = world.New()
 	templates := testTemplates(t)
 	itemTemplates := testItemTemplates()
 	roster := gamemanager.NewRoster(chars, items, templates, itemTemplates, &sequentialIDs{next: 100}, gamemanager.DefaultDeleteAfter, time.Now)
-	gcl := NewGameClientLink(validator, loginLink, roster, items, templates, itemTemplates, state, zerolog.Nop())
+	gcl := NewGameClientLink(validator, loginLink, roster, items, templates, itemTemplates, state, log)
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -380,6 +468,16 @@ func (c *frameCapture) send(frame wire.Frame) bool {
 	return true
 }
 
+func frameOpcodes(frames [][]byte) []byte {
+	out := make([]byte, 0, len(frames))
+	for _, frame := range frames {
+		if len(frame) > 0 {
+			out = append(out, frame[0])
+		}
+	}
+	return out
+}
+
 func newTestLivePlayer(t *testing.T, id int32, capture *frameCapture) *livePlayer {
 	t.Helper()
 	tmpl, ok := testTemplates(t).Get(0)
@@ -395,6 +493,79 @@ func newTestLivePlayer(t *testing.T, id int32, capture *frameCapture) *livePlaye
 	ch.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventory(ch.ID, testItemTemplates(), nil))
 	ch.SetFrameSender(capture.send)
 	return &livePlayer{Character: ch, template: tmpl}
+}
+
+type visibleGroundItem struct {
+	world.Presence
+	id        int32
+	itemID    int32
+	count     int
+	stackable bool
+}
+
+func (g *visibleGroundItem) ObjectID() int32 { return g.id }
+func (g *visibleGroundItem) ItemID() int32   { return g.itemID }
+func (g *visibleGroundItem) Count() int      { return g.count }
+func (g *visibleGroundItem) Stackable() bool { return g.stackable }
+
+type visibleDoor struct {
+	world.Presence
+	id     int32
+	doorID int
+}
+
+func (d *visibleDoor) ObjectID() int32 { return d.id }
+func (d *visibleDoor) DoorID() int     { return d.doorID }
+func (d *visibleDoor) Opened() bool    { return false }
+func (d *visibleDoor) MaxHP() int      { return 100 }
+func (d *visibleDoor) HP() int         { return 100 }
+func (d *visibleDoor) Damage() int     { return 0 }
+
+type visibleStaticObject struct {
+	world.Presence
+	id       int32
+	staticID int
+}
+
+func (o *visibleStaticObject) ObjectID() int32     { return o.id }
+func (o *visibleStaticObject) StaticObjectID() int { return o.staticID }
+
+type invisibleTracked struct {
+	world.Presence
+	id int32
+}
+
+func (o *invisibleTracked) ObjectID() int32 { return o.id }
+
+type safeLogBuffer struct {
+	mu sync.Mutex
+	bytes.Buffer
+}
+
+func (b *safeLogBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.Buffer.Write(p)
+}
+
+func (b *safeLogBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.Buffer.String()
+}
+
+func waitForLog(t *testing.T, logs *safeLogBuffer, needle string) string {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		got := logs.String()
+		if strings.Contains(got, needle) {
+			return got
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("timed out waiting for log containing %q; logs=%s", needle, logs.String())
+	return ""
 }
 
 func TestLivePlayerVisibilitySendsCharInfoAndDeleteObject(t *testing.T) {
@@ -420,11 +591,54 @@ func TestLivePlayerVisibilitySendsCharInfoAndDeleteObject(t *testing.T) {
 	}
 }
 
+func TestLivePlayerVisibilityRendersSupportedWorldObjectsSymmetrically(t *testing.T) {
+	state := world.New()
+	frames := &frameCapture{}
+	viewer := newTestLivePlayer(t, 1, frames)
+	state.Spawn(viewer, 0, 0, 0, 0)
+
+	ground := &visibleGroundItem{id: 10, itemID: 57, count: 3, stackable: true}
+	door := &visibleDoor{id: 11, doorID: 100}
+	static := &visibleStaticObject{id: 12, staticID: 200}
+	invisible := &invisibleTracked{id: 13}
+
+	state.Spawn(ground, 100, 0, 0, 0)
+	state.Spawn(door, 200, 0, 0, 0)
+	state.Spawn(static, 300, 0, 0, 0)
+	state.Spawn(invisible, 400, 0, 0, 0)
+
+	want := []byte{
+		serverpackets.OpcodeSpawnItem,
+		serverpackets.OpcodeDoorInfo,
+		serverpackets.OpcodeStaticObjectInfo,
+	}
+	if got := frameOpcodes(frames.frames); string(got) != string(want) {
+		t.Fatalf("spawn opcodes = %x, want %x", got, want)
+	}
+
+	state.Despawn(invisible)
+	if got := frameOpcodes(frames.frames); string(got) != string(want) {
+		t.Fatalf("opcodes after despawning unsupported object = %x, want still %x", got, want)
+	}
+
+	state.Despawn(static)
+	state.Despawn(door)
+	state.Despawn(ground)
+	want = append(want,
+		serverpackets.OpcodeDeleteObject,
+		serverpackets.OpcodeDeleteObject,
+		serverpackets.OpcodeDeleteObject,
+	)
+	if got := frameOpcodes(frames.frames); string(got) != string(want) {
+		t.Fatalf("despawn opcodes = %x, want %x", got, want)
+	}
+}
+
 func TestLivePlayerForgetSkipsObjectsItWouldNotDiscover(t *testing.T) {
 	state := world.New()
 	frames := &frameCapture{}
 	player := newTestLivePlayer(t, 1, frames)
-	obj := &testTracked{id: 2}
+	obj := &invisibleTracked{id: 2}
 
 	state.Spawn(player, 0, 0, 0, 0)
 	state.Spawn(obj, 100, 0, 0, 0)
@@ -432,6 +646,84 @@ func TestLivePlayerForgetSkipsObjectsItWouldNotDiscover(t *testing.T) {
 
 	if len(frames.frames) != 0 {
 		t.Fatalf("frames for non-live tracked object = %x, want none", frames.frames)
+	}
+}
+
+func TestMoveLivePlayerRelocatesWorldVisibility(t *testing.T) {
+	state := world.New()
+	movingFrames := &frameCapture{}
+	watcherFrames := &frameCapture{}
+	moving := newTestLivePlayer(t, 1, movingFrames)
+	watcher := newTestLivePlayer(t, 2, watcherFrames)
+
+	state.Spawn(moving, 0, 0, 0, 0)
+	state.Spawn(watcher, 8192, 0, 0, 0)
+	if world.Knows(moving, watcher) {
+		t.Fatal("players unexpectedly know each other before movement")
+	}
+
+	gcl := &GameClientLink{world: state, log: zerolog.Nop()}
+	gcl.updateLivePlayerPosition(moving, location.Location{X: 6144, Y: 0, Z: 0}, 123)
+
+	if !world.Knows(moving, watcher) {
+		t.Fatal("players do not know each other after movement into visibility range")
+	}
+	if got := frameOpcodes(movingFrames.frames); string(got) != string([]byte{serverpackets.OpcodeCharInfo}) {
+		t.Fatalf("moving player opcodes = %x, want CharInfo", got)
+	}
+	if got := frameOpcodes(watcherFrames.frames); string(got) != string([]byte{serverpackets.OpcodeCharInfo}) {
+		t.Fatalf("watcher opcodes = %x, want CharInfo", got)
+	}
+}
+
+func TestGameClientLinkNormalDisconnectLogsDebug(t *testing.T) {
+	logs := &safeLogBuffer{}
+	logger := zerolog.New(logs).Level(zerolog.DebugLevel)
+	addr, _, _, _ := newTestGameClientLinkWithLog(t, func() *LoginLink { return nil }, NewSessionValidator(), logger)
+	c := dialGameClient(t, addr)
+	c.sendProtocolVersion(746)
+
+	if err := c.conn.Close(); err != nil {
+		t.Fatalf("close client conn: %v", err)
+	}
+	got := waitForLog(t, logs, `"message":"Read frame"`)
+	if strings.Contains(got, `"level":"error"`) {
+		t.Fatalf("normal disconnect logged as error: %s", got)
+	}
+	if !strings.Contains(got, `"level":"debug"`) {
+		t.Fatalf("normal disconnect log level = %s, want debug", got)
+	}
+}
+
+func TestDetachLivePlayerSavesWithUncancelledBoundedContext(t *testing.T) {
+	chars := newFakeCharStore()
+	items := newFakeItemStore()
+	roster := gamemanager.NewRoster(chars, items, testTemplates(t), testItemTemplates(), &sequentialIDs{next: 100}, gamemanager.DefaultDeleteAfter, time.Now)
+	live := newTestLivePlayer(t, 101, &frameCapture{})
+	savedAt := location.Location{X: 46160, Y: 41237, Z: -3534}
+	live.Character.Location = savedAt
+	live.Character.Heading = 32768
+	if err := chars.Create(context.Background(), live.Character); err != nil {
+		t.Fatalf("Create() unexpected error: %v", err)
+	}
+
+	parent, cancel := context.WithCancel(context.Background())
+	cancel()
+	gcl := &GameClientLink{roster: roster, log: zerolog.Nop()}
+	gcl.detachLivePlayer(parent, live)
+
+	pos := chars.savedPosition(t, live.ObjectID())
+	if pos.ctxErr != nil {
+		t.Fatalf("save context error = %v, want nil despite canceled parent", pos.ctxErr)
+	}
+	if !pos.hasDeadline {
+		t.Fatal("save context has no deadline")
+	}
+	if ttl := time.Until(pos.deadline); ttl <= 0 || ttl > 3*time.Second {
+		t.Fatalf("save context deadline in %s, want a short future timeout", ttl)
+	}
+	if pos.location != savedAt || pos.heading != 32768 {
+		t.Fatalf("saved position = %+v/%d, want %+v/32768", pos.location, pos.heading, savedAt)
 	}
 }
 
@@ -463,13 +755,6 @@ func TestGameClientLinkAttackBroadcastSendsToSelfAndObservers(t *testing.T) {
 		t.Fatalf("observer frames = %x, want one Attack", observerFrames.frames)
 	}
 }
-
-type testTracked struct {
-	world.Presence
-	id int32
-}
-
-func (t *testTracked) ObjectID() int32 { return t.id }
 
 func TestGameClientLinkWaitsForProtocolVersion(t *testing.T) {
 	addr, _, _, _ := newTestGameClientLink(t, func() *LoginLink { return nil }, NewSessionValidator())
@@ -547,7 +832,20 @@ func TestGameClientLinkFullFlow(t *testing.T) {
 		t.Fatalf("opcode = %#x, want CharSelected (%#x)", reply[0], serverpackets.OpcodeCharSelected)
 	}
 
+	c.send(encodeRequestManorList())
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeExtended {
+		t.Fatalf("opcode = %#x, want extended packet (%#x)", reply[0], serverpackets.OpcodeExtended)
+	}
+	if second := wire.NewReader(reply[1:]).ReadUint16(); second != serverpackets.OpcodeExSendManorList {
+		t.Fatalf("extended opcode = %#x, want ExSendManorList (%#x)", second, serverpackets.OpcodeExSendManorList)
+	}
+
 	c.send(encodeEnterWorld())
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeSkillList {
+		t.Fatalf("opcode = %#x, want SkillList (%#x)", reply[0], serverpackets.OpcodeSkillList)
+	}
 	reply = c.read()
 	if reply[0] != serverpackets.OpcodeUserInfo {
 		t.Fatalf("opcode = %#x, want UserInfo (%#x)", reply[0], serverpackets.OpcodeUserInfo)
@@ -556,15 +854,196 @@ func TestGameClientLinkFullFlow(t *testing.T) {
 	if reply[0] != serverpackets.OpcodeItemList {
 		t.Fatalf("opcode = %#x, want ItemList (%#x)", reply[0], serverpackets.OpcodeItemList)
 	}
-	reply = c.read()
-	if reply[0] != serverpackets.OpcodeSkillList {
-		t.Fatalf("opcode = %#x, want SkillList (%#x)", reply[0], serverpackets.OpcodeSkillList)
-	}
 	if _, ok := state.Player(objID); !ok {
 		t.Fatalf("world.Player(%d) missing after EnterWorld", objID)
 	}
 	if _, ok := state.Object(objID); !ok {
 		t.Fatalf("world.Object(%d) missing after EnterWorld", objID)
+	}
+}
+
+func TestGameClientLinkIgnoresRequestSkillCoolTimeInGame(t *testing.T) {
+	c, _, _, _ := newLinkedGameClient(t)
+
+	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.read() // CharCreateOk
+	c.read() // CharSelectInfo
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	c.read() // SkillList
+	c.read() // UserInfo
+	c.read() // ItemList
+
+	c.send(encodeRequestSkillCoolTime())
+	c.send(encodeRequestManorList())
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeExtended {
+		t.Fatalf("opcode = %#x, want extended packet (%#x)", reply[0], serverpackets.OpcodeExtended)
+	}
+	if second := wire.NewReader(reply[1:]).ReadUint16(); second != serverpackets.OpcodeExSendManorList {
+		t.Fatalf("extended opcode = %#x, want ExSendManorList (%#x)", second, serverpackets.OpcodeExSendManorList)
+	}
+}
+
+func TestGameClientLinkWireSafeMovementAndRefreshPacketsInGame(t *testing.T) {
+	c, chars, _, state := newLinkedGameClient(t)
+
+	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.read() // CharCreateOk
+	c.read() // CharSelectInfo
+	objID := chars.soleObjectID(t)
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	c.read() // SkillList
+	c.read() // UserInfo
+	c.read() // ItemList
+
+	target := location.Location{X: 46160, Y: 41237, Z: -3534}
+	origin := location.Location{X: 46117, Y: 41247, Z: -3532}
+	c.send(encodeMoveBackwardToLocation(target, origin, 1))
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeMoveToLocation {
+		t.Fatalf("move reply opcode = %#x, want MoveToLocation (%#x)", reply[0], serverpackets.OpcodeMoveToLocation)
+	}
+	r := wire.NewReader(reply[1:])
+	if got := r.ReadInt32(); got != objID {
+		t.Fatalf("MoveToLocation object id = %d, want %d", got, objID)
+	}
+	gotTarget := location.Location{X: int(r.ReadInt32()), Y: int(r.ReadInt32()), Z: int(r.ReadInt32())}
+	if gotTarget != target {
+		t.Fatalf("MoveToLocation target = %+v, want %+v", gotTarget, target)
+	}
+	gotOrigin := location.Location{X: int(r.ReadInt32()), Y: int(r.ReadInt32()), Z: int(r.ReadInt32())}
+	if gotOrigin != origin {
+		t.Fatalf("MoveToLocation origin = %+v, want %+v", gotOrigin, origin)
+	}
+	obj, ok := state.Player(objID)
+	if !ok {
+		t.Fatalf("world.Player(%d) missing", objID)
+	}
+	positioned, ok := obj.(interface{ Position() (int, int, int) })
+	if !ok {
+		t.Fatalf("world.Player(%d) has no Position method", objID)
+	}
+	x, y, z := positioned.Position()
+	if x != origin.X || y != origin.Y || z != origin.Z {
+		t.Fatalf("player position after MoveBackwardToLocation = (%d,%d,%d), want origin (%d,%d,%d)", x, y, z, origin.X, origin.Y, origin.Z)
+	}
+
+	c.send(encodeValidatePosition(target, 32768))
+	c.send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeItemList {
+		t.Fatalf("item refresh opcode = %#x, want ItemList (%#x)", reply[0], serverpackets.OpcodeItemList)
+	}
+	x, y, z = positioned.Position()
+	if x != target.X || y != target.Y || z != target.Z {
+		t.Fatalf("player position after ValidatePosition = (%d,%d,%d), want (%d,%d,%d)", x, y, z, target.X, target.Y, target.Z)
+	}
+
+	c.send(encodeSingleOpcode(clientpackets.OpcodeRequestSkillList))
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeSkillList {
+		t.Fatalf("skill refresh opcode = %#x, want SkillList (%#x)", reply[0], serverpackets.OpcodeSkillList)
+	}
+
+	for _, opcode := range []byte{
+		clientpackets.OpcodeUseItem,
+		clientpackets.OpcodeTradeRequest,
+		clientpackets.OpcodeSendWarehouseDeposit,
+		clientpackets.OpcodeRequestQuestListInGame,
+		clientpackets.OpcodeRequestPackageItemList,
+		clientpackets.OpcodeDlgAnswer,
+		clientpackets.OpcodeGameGuardReply,
+		clientpackets.OpcodeRequestShowMiniMap,
+	} {
+		c.send(encodeSingleOpcode(opcode))
+	}
+	c.send(encodeRequestManorList())
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeExtended {
+		t.Fatalf("post-stub opcode = %#x, want extended packet (%#x)", reply[0], serverpackets.OpcodeExtended)
+	}
+}
+
+func TestGameClientLinkLogoutLeavesWorld(t *testing.T) {
+	c, chars, _, state := newLinkedGameClient(t)
+
+	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.read() // CharCreateOk
+	c.read() // CharSelectInfo
+	objID := chars.soleObjectID(t)
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	c.read() // SkillList
+	c.read() // UserInfo
+	c.read() // ItemList
+
+	savedAt := location.Location{X: 46160, Y: 41237, Z: -3534}
+	c.send(encodeValidatePosition(savedAt, 32768))
+	c.send(encodeSingleOpcode(clientpackets.OpcodeLogout))
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeLeaveWorld {
+		t.Fatalf("logout opcode = %#x, want LeaveWorld (%#x)", reply[0], serverpackets.OpcodeLeaveWorld)
+	}
+	c.expectClosed()
+	if _, ok := state.Player(objID); ok {
+		t.Fatalf("world.Player(%d) still present after logout", objID)
+	}
+	pos := chars.savedPosition(t, objID)
+	if pos.location != savedAt || pos.heading != 32768 {
+		t.Fatalf("saved position after logout = %+v/%d, want %+v/32768", pos.location, pos.heading, savedAt)
+	}
+}
+
+func TestGameClientLinkRestartReturnsToCharacterSelect(t *testing.T) {
+	c, chars, _, state := newLinkedGameClient(t)
+
+	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.read() // CharCreateOk
+	c.read() // CharSelectInfo
+	objID := chars.soleObjectID(t)
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	c.read() // SkillList
+	c.read() // UserInfo
+	c.read() // ItemList
+
+	savedAt := location.Location{X: 46160, Y: 41237, Z: -3534}
+	c.send(encodeValidatePosition(savedAt, 32768))
+	c.send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeRestartResponse {
+		t.Fatalf("restart opcode = %#x, want RestartResponse (%#x)", reply[0], serverpackets.OpcodeRestartResponse)
+	}
+	if ok := wire.NewReader(reply[1:]).ReadInt32(); ok != 1 {
+		t.Fatalf("RestartResponse result = %d, want 1", ok)
+	}
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeCharSelectInfo {
+		t.Fatalf("post-restart opcode = %#x, want CharSelectInfo (%#x)", reply[0], serverpackets.OpcodeCharSelectInfo)
+	}
+	if _, ok := state.Player(objID); ok {
+		t.Fatalf("world.Player(%d) still present after restart", objID)
+	}
+	pos := chars.savedPosition(t, objID)
+	if pos.location != savedAt || pos.heading != 32768 {
+		t.Fatalf("saved position after restart = %+v/%d, want %+v/32768", pos.location, pos.heading, savedAt)
+	}
+
+	c.send(encodeRequestGameStart(0))
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeSSQInfo {
+		t.Fatalf("second select opcode = %#x, want SSQInfo (%#x)", reply[0], serverpackets.OpcodeSSQInfo)
 	}
 }
 

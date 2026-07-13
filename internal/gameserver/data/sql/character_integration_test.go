@@ -9,6 +9,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
 
 func testCharacter(objectID int32, name string) *player.Character {
@@ -27,6 +28,8 @@ func testCharacter(objectID int32, name string) *player.Character {
 		Face: 1, HairStyle: 2, HairColor: 3,
 		Exp: 0, SP: 0,
 		AccessLevel: 0,
+		Location:    location.Location{X: -56733, Y: -113459, Z: -690},
+		Heading:     32768,
 	}
 }
 
@@ -59,10 +62,8 @@ func TestCharacterStore_CreateAndReadBack(t *testing.T) {
 		got.Face != c.Face || got.HairStyle != c.HairStyle || got.HairColor != c.HairColor {
 		t.Fatalf("Get() after create = %+v, want match to %+v", got, c)
 	}
-	// Columns not part of the initial insert keep the schema's own
-	// defaults until something else sets them.
-	if got.Location.X != 0 || got.Location.Y != 0 || got.Location.Z != 0 || got.Heading != 0 {
-		t.Errorf("Get() after create has non-zero position/heading: %+v", got)
+	if got.Location != c.Location || got.Heading != c.Heading {
+		t.Errorf("Get() after create position/heading = %v/%d, want %v/%d", got.Location, got.Heading, c.Location, c.Heading)
 	}
 	if got.DeleteAt != 0 {
 		t.Errorf("Get() after create DeleteAt = %d, want 0", got.DeleteAt)
