@@ -95,6 +95,7 @@ type clientConn struct {
 
 	account    string
 	authed     bool
+	joinedGame bool
 	lastServer int
 	loginKey1  int32
 	loginKey2  int32
@@ -105,7 +106,13 @@ func (c *clientConn) send(payload []byte) error {
 }
 
 func (l *ClientLink) handleConnection(ctx context.Context, conn net.Conn) {
-	defer conn.Close()
+	var c *clientConn
+	defer func() {
+		if c != nil && c.account != "" && !c.joinedGame {
+			l.sessions.Delete(c.account)
+		}
+		conn.Close()
+	}()
 
 	ip := remoteIP(conn)
 	if l.bans.IsBanned(ip) {
@@ -124,7 +131,7 @@ func (l *ClientLink) handleConnection(ctx context.Context, conn net.Conn) {
 		return
 	}
 
-	c := &clientConn{
+	c = &clientConn{
 		conn:     conn,
 		remoteIP: ip,
 		crypt:    cr,
@@ -325,6 +332,7 @@ func (l *ClientLink) onRequestServerLogin(ctx context.Context, c *clientConn, pa
 		PlayKey1:  playKey1,
 		PlayKey2:  playKey2,
 	})
+	c.joinedGame = true
 	if err := l.accounts.SetLastServer(ctx, c.account, int(req.ServerID)); err != nil {
 		l.log.Error().Str("account", c.account).Err(err).Msg("set last server")
 	}

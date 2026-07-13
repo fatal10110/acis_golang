@@ -444,6 +444,60 @@ func TestClientLinkPlayLoginSuccess(t *testing.T) {
 	}
 }
 
+func TestClientLinkDisconnectBeforeGameServerJoinReleasesSession(t *testing.T) {
+	accounts := newFakeAccountStore(model.NewAccount("player1", mustHashPassword(t, "s3cret"), 0, 1))
+	addr, l, _, sessions, _ := newTestClientLink(t, accounts, false)
+
+	c := dialLoginClient(t, addr)
+	c.login(l, "player1", "s3cret")
+	if _, ok := sessions.Get("player1"); !ok {
+		t.Fatal("expected session to be stored after LoginOk")
+	}
+
+	if err := c.conn.Close(); err != nil {
+		t.Fatalf("close login client: %v", err)
+	}
+	waitSessionMissing(t, sessions, "player1")
+
+	c = dialLoginClient(t, addr)
+	c.login(l, "player1", "s3cret")
+}
+
+func TestClientLinkDisconnectAfterPlayOkKeepsSessionForGameServer(t *testing.T) {
+	accounts := newFakeAccountStore(model.NewAccount("player1", mustHashPassword(t, "s3cret"), 0, 1))
+	addr, l, servers, sessions, _ := newTestClientLink(t, accounts, false)
+	servers.Register(7, []byte{0x01})
+	servers.MarkOnline(7, "127.0.0.1", 7777, 100)
+
+	c := dialLoginClient(t, addr)
+	key1, key2 := c.login(l, "player1", "s3cret")
+	c.send(encodeRequestServerLogin(key1, key2, 7))
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodePlayOk {
+		t.Fatalf("opcode = %#x, want PlayOk (%#x)", reply[0], serverpackets.OpcodePlayOk)
+	}
+	r := wire.NewReader(reply[1:])
+	want := link.SessionKey{
+		LoginKey1: key1,
+		LoginKey2: key2,
+		PlayKey1:  r.ReadInt32(),
+		PlayKey2:  r.ReadInt32(),
+	}
+
+	if err := c.conn.Close(); err != nil {
+		t.Fatalf("close login client: %v", err)
+	}
+	time.Sleep(50 * time.Millisecond)
+
+	got, ok := sessions.Get("player1")
+	if !ok {
+		t.Fatal("expected session to remain after PlayOk")
+	}
+	if got != want {
+		t.Fatalf("stored session = %+v, want %+v", got, want)
+	}
+}
+
 func TestClientLinkPlayLoginUnknownServerFails(t *testing.T) {
 	accounts := newFakeAccountStore(model.NewAccount("player1", mustHashPassword(t, "s3cret"), 0, 1))
 	addr, l, _, _, _ := newTestClientLink(t, accounts, false)
@@ -481,4 +535,16 @@ func TestClientLinkOpcodeBeforeAuthCloses(t *testing.T) {
 
 	c.send(encodeRequestServerList(1, 2))
 	c.expectClosed()
+}
+
+func waitSessionMissing(t *testing.T, sessions *manager.SessionStore, account string) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if _, ok := sessions.Get(account); !ok {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("session for %q remained stored", account)
 }
