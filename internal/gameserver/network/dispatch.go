@@ -4,7 +4,10 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
+	"io"
+	"net"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -84,19 +87,58 @@ func (p *livePlayer) SendFrame(frame wire.Frame) bool {
 }
 
 func (p *livePlayer) Discover(obj world.Tracked) {
-	other, ok := obj.(*livePlayer)
-	if !ok {
-		return
+	switch o := obj.(type) {
+	case *livePlayer:
+		p.SendFrame(serverpackets.FrameCharInfo(serverpackets.CharInfoSnapshot{
+			Character: o.Character,
+			Template:  o.template,
+			Items:     o.items,
+		}))
+	case groundItemObject:
+		p.SendFrame(serverpackets.FrameSpawnItem(o))
+	case doorObject:
+		p.SendFrame(serverpackets.FrameDoorInfo(o, false))
+	case staticObject:
+		p.SendFrame(serverpackets.FrameStaticObjectInfo(o))
 	}
-	p.SendFrame(serverpackets.FrameCharInfo(serverpackets.CharInfoSnapshot{
-		Character: other.Character,
-		Template:  other.template,
-		Items:     other.items,
-	}))
 }
 
 func (p *livePlayer) Forget(obj world.Tracked) {
+	if !rendersObject(obj) {
+		return
+	}
 	p.SendFrame(serverpackets.FrameDeleteObject(obj.ObjectID(), false))
+}
+
+type groundItemObject interface {
+	ObjectID() int32
+	ItemID() int32
+	Count() int
+	Stackable() bool
+	Position() (int, int, int)
+}
+
+type doorObject interface {
+	ObjectID() int32
+	DoorID() int
+	Opened() bool
+	MaxHP() int
+	HP() int
+	Damage() int
+}
+
+type staticObject interface {
+	ObjectID() int32
+	StaticObjectID() int
+}
+
+func rendersObject(obj world.Tracked) bool {
+	switch obj.(type) {
+	case *livePlayer, groundItemObject, doorObject, staticObject:
+		return true
+	default:
+		return false
+	}
 }
 
 func randomCipherKey() ([]byte, error) {
@@ -143,14 +185,18 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 	var live *livePlayer
 	protocolReady := false
 	defer func() {
-		l.detachLivePlayer(live)
+		l.detachLivePlayer(ctx, live)
 		l.notifyPlayerLogout(client.AccountName())
 	}()
 
 	for {
 		payload, err := session.ReadFrame()
 		if err != nil {
-			l.log.Error().Err(err).Msg("Read frame")
+			if normalReadFrameError(err) {
+				l.log.Debug().Err(err).Msg("Read frame")
+			} else {
+				l.log.Error().Err(err).Msg("Read frame")
+			}
 			return
 		}
 		if len(payload) == 0 {
@@ -382,7 +428,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			if live == nil {
 				continue
 			}
-			l.detachLivePlayer(live)
+			l.detachLivePlayer(ctx, live)
 			live = nil
 			entering = nil
 			client.SetState(StateAuthed)
@@ -454,6 +500,10 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				Msg("game client: accepted opcode not implemented yet")
 		}
 	}
+}
+
+func normalReadFrameError(err error) bool {
+	return errors.Is(err, io.EOF) || errors.Is(err, net.ErrClosed)
 }
 
 // authenticate validates req against the login server over the game
@@ -562,9 +612,14 @@ func (l *GameClientLink) moveLivePlayer(live *livePlayer, origin, target locatio
 	})
 }
 
-func (l *GameClientLink) detachLivePlayer(live *livePlayer) {
+func (l *GameClientLink) detachLivePlayer(ctx context.Context, live *livePlayer) {
 	if live == nil {
 		return
+	}
+	if l.roster != nil {
+		if err := l.roster.SavePosition(ctx, live.Character); err != nil {
+			l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("save player position")
+		}
 	}
 	if l.world != nil {
 		l.world.Despawn(live)

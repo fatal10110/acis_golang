@@ -1,9 +1,11 @@
 package network
 
 import (
+	"bytes"
 	"context"
 	"net"
 	"sort"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -25,13 +27,19 @@ import (
 // --- fake character/item stores: Roster's own persistence seam, no DB needed ---
 
 type fakeCharStore struct {
-	mu    sync.Mutex
-	byID  map[int32]*player.Character
-	names map[string]bool
+	mu             sync.Mutex
+	byID           map[int32]*player.Character
+	names          map[string]bool
+	savedPositions map[int32]savedPosition
 }
 
 func newFakeCharStore() *fakeCharStore {
-	return &fakeCharStore{byID: map[int32]*player.Character{}, names: map[string]bool{}}
+	return &fakeCharStore{byID: map[int32]*player.Character{}, names: map[string]bool{}, savedPositions: map[int32]savedPosition{}}
+}
+
+type savedPosition struct {
+	location location.Location
+	heading  int
 }
 
 func (s *fakeCharStore) Create(_ context.Context, c *player.Character) error {
@@ -75,6 +83,17 @@ func (s *fakeCharStore) SetDeleteAt(_ context.Context, id int32, at int64) error
 	return nil
 }
 
+func (s *fakeCharStore) SetPosition(_ context.Context, id int32, loc location.Location, heading int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if c, ok := s.byID[id]; ok {
+		c.Location = loc
+		c.Heading = heading
+	}
+	s.savedPositions[id] = savedPosition{location: loc, heading: heading}
+	return nil
+}
+
 func (s *fakeCharStore) Delete(_ context.Context, id int32) (bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -100,6 +119,17 @@ func (s *fakeCharStore) soleObjectID(t *testing.T) int32 {
 		return id
 	}
 	return 0
+}
+
+func (s *fakeCharStore) savedPosition(t *testing.T, id int32) savedPosition {
+	t.Helper()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	pos, ok := s.savedPositions[id]
+	if !ok {
+		t.Fatalf("character %d position was not saved", id)
+	}
+	return pos
 }
 
 type fakeItemStore struct {
@@ -353,14 +383,18 @@ func encodeSingleOpcode(opcode byte) []byte {
 
 func newTestGameClientLink(t *testing.T, loginLink func() *LoginLink, validator *SessionValidator) (addr string, chars *fakeCharStore, items *fakeItemStore, state *world.State) {
 	t.Helper()
+	return newTestGameClientLinkWithLog(t, loginLink, validator, zerolog.Nop())
+}
 
+func newTestGameClientLinkWithLog(t *testing.T, loginLink func() *LoginLink, validator *SessionValidator, log zerolog.Logger) (addr string, chars *fakeCharStore, items *fakeItemStore, state *world.State) {
+	t.Helper()
 	chars = newFakeCharStore()
 	items = newFakeItemStore()
 	state = world.New()
 	templates := testTemplates(t)
 	itemTemplates := testItemTemplates()
 	roster := gamemanager.NewRoster(chars, items, templates, itemTemplates, &sequentialIDs{next: 100}, gamemanager.DefaultDeleteAfter, time.Now)
-	gcl := NewGameClientLink(validator, loginLink, roster, items, templates, itemTemplates, state, zerolog.Nop())
+	gcl := NewGameClientLink(validator, loginLink, roster, items, templates, itemTemplates, state, log)
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -423,6 +457,16 @@ func (c *frameCapture) send(frame wire.Frame) bool {
 	return true
 }
 
+func frameOpcodes(frames [][]byte) []byte {
+	out := make([]byte, 0, len(frames))
+	for _, frame := range frames {
+		if len(frame) > 0 {
+			out = append(out, frame[0])
+		}
+	}
+	return out
+}
+
 func newTestLivePlayer(t *testing.T, id int32, capture *frameCapture) *livePlayer {
 	t.Helper()
 	tmpl, ok := testTemplates(t).Get(0)
@@ -438,6 +482,79 @@ func newTestLivePlayer(t *testing.T, id int32, capture *frameCapture) *livePlaye
 	ch.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventory(ch.ID, testItemTemplates(), nil))
 	ch.SetFrameSender(capture.send)
 	return &livePlayer{Character: ch, template: tmpl}
+}
+
+type visibleGroundItem struct {
+	world.Presence
+	id        int32
+	itemID    int32
+	count     int
+	stackable bool
+}
+
+func (g *visibleGroundItem) ObjectID() int32 { return g.id }
+func (g *visibleGroundItem) ItemID() int32   { return g.itemID }
+func (g *visibleGroundItem) Count() int      { return g.count }
+func (g *visibleGroundItem) Stackable() bool { return g.stackable }
+
+type visibleDoor struct {
+	world.Presence
+	id     int32
+	doorID int
+}
+
+func (d *visibleDoor) ObjectID() int32 { return d.id }
+func (d *visibleDoor) DoorID() int     { return d.doorID }
+func (d *visibleDoor) Opened() bool    { return false }
+func (d *visibleDoor) MaxHP() int      { return 100 }
+func (d *visibleDoor) HP() int         { return 100 }
+func (d *visibleDoor) Damage() int     { return 0 }
+
+type visibleStaticObject struct {
+	world.Presence
+	id       int32
+	staticID int
+}
+
+func (o *visibleStaticObject) ObjectID() int32     { return o.id }
+func (o *visibleStaticObject) StaticObjectID() int { return o.staticID }
+
+type invisibleTracked struct {
+	world.Presence
+	id int32
+}
+
+func (o *invisibleTracked) ObjectID() int32 { return o.id }
+
+type safeLogBuffer struct {
+	mu sync.Mutex
+	bytes.Buffer
+}
+
+func (b *safeLogBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.Buffer.Write(p)
+}
+
+func (b *safeLogBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.Buffer.String()
+}
+
+func waitForLog(t *testing.T, logs *safeLogBuffer, needle string) string {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		got := logs.String()
+		if strings.Contains(got, needle) {
+			return got
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("timed out waiting for log containing %q; logs=%s", needle, logs.String())
+	return ""
 }
 
 func TestLivePlayerVisibilitySendsCharInfoAndDeleteObject(t *testing.T) {
@@ -460,6 +577,95 @@ func TestLivePlayerVisibilitySendsCharInfoAndDeleteObject(t *testing.T) {
 	state.Despawn(second)
 	if got := firstFrames.frames[len(firstFrames.frames)-1][0]; got != serverpackets.OpcodeDeleteObject {
 		t.Fatalf("last first-player frame opcode = %#x, want DeleteObject (%#x)", got, serverpackets.OpcodeDeleteObject)
+	}
+}
+
+func TestLivePlayerVisibilityRendersSupportedWorldObjectsSymmetrically(t *testing.T) {
+	state := world.New()
+	frames := &frameCapture{}
+	viewer := newTestLivePlayer(t, 1, frames)
+	state.Spawn(viewer, 0, 0, 0, 0)
+
+	ground := &visibleGroundItem{id: 10, itemID: 57, count: 3, stackable: true}
+	door := &visibleDoor{id: 11, doorID: 100}
+	static := &visibleStaticObject{id: 12, staticID: 200}
+	invisible := &invisibleTracked{id: 13}
+
+	state.Spawn(ground, 100, 0, 0, 0)
+	state.Spawn(door, 200, 0, 0, 0)
+	state.Spawn(static, 300, 0, 0, 0)
+	state.Spawn(invisible, 400, 0, 0, 0)
+
+	want := []byte{
+		serverpackets.OpcodeSpawnItem,
+		serverpackets.OpcodeDoorInfo,
+		serverpackets.OpcodeStaticObjectInfo,
+	}
+	if got := frameOpcodes(frames.frames); string(got) != string(want) {
+		t.Fatalf("spawn opcodes = %x, want %x", got, want)
+	}
+
+	state.Despawn(invisible)
+	if got := frameOpcodes(frames.frames); string(got) != string(want) {
+		t.Fatalf("opcodes after despawning unsupported object = %x, want still %x", got, want)
+	}
+
+	state.Despawn(static)
+	state.Despawn(door)
+	state.Despawn(ground)
+	want = append(want,
+		serverpackets.OpcodeDeleteObject,
+		serverpackets.OpcodeDeleteObject,
+		serverpackets.OpcodeDeleteObject,
+	)
+	if got := frameOpcodes(frames.frames); string(got) != string(want) {
+		t.Fatalf("despawn opcodes = %x, want %x", got, want)
+	}
+}
+
+func TestMoveLivePlayerRelocatesWorldVisibility(t *testing.T) {
+	state := world.New()
+	movingFrames := &frameCapture{}
+	watcherFrames := &frameCapture{}
+	moving := newTestLivePlayer(t, 1, movingFrames)
+	watcher := newTestLivePlayer(t, 2, watcherFrames)
+
+	state.Spawn(moving, 0, 0, 0, 0)
+	state.Spawn(watcher, 8192, 0, 0, 0)
+	if world.Knows(moving, watcher) {
+		t.Fatal("players unexpectedly know each other before movement")
+	}
+
+	gcl := &GameClientLink{world: state, log: zerolog.Nop()}
+	gcl.updateLivePlayerPosition(moving, location.Location{X: 6144, Y: 0, Z: 0}, 123)
+
+	if !world.Knows(moving, watcher) {
+		t.Fatal("players do not know each other after movement into visibility range")
+	}
+	if got := frameOpcodes(movingFrames.frames); string(got) != string([]byte{serverpackets.OpcodeCharInfo}) {
+		t.Fatalf("moving player opcodes = %x, want CharInfo", got)
+	}
+	if got := frameOpcodes(watcherFrames.frames); string(got) != string([]byte{serverpackets.OpcodeCharInfo}) {
+		t.Fatalf("watcher opcodes = %x, want CharInfo", got)
+	}
+}
+
+func TestGameClientLinkNormalDisconnectLogsDebug(t *testing.T) {
+	logs := &safeLogBuffer{}
+	logger := zerolog.New(logs).Level(zerolog.DebugLevel)
+	addr, _, _, _ := newTestGameClientLinkWithLog(t, func() *LoginLink { return nil }, NewSessionValidator(), logger)
+	c := dialGameClient(t, addr)
+	c.sendProtocolVersion(746)
+
+	if err := c.conn.Close(); err != nil {
+		t.Fatalf("close client conn: %v", err)
+	}
+	got := waitForLog(t, logs, `"message":"Read frame"`)
+	if strings.Contains(got, `"level":"error"`) {
+		t.Fatalf("normal disconnect logged as error: %s", got)
+	}
+	if !strings.Contains(got, `"level":"debug"`) {
+		t.Fatalf("normal disconnect log level = %s, want debug", got)
 	}
 }
 
@@ -693,6 +899,8 @@ func TestGameClientLinkLogoutLeavesWorld(t *testing.T) {
 	c.read() // UserInfo
 	c.read() // ItemList
 
+	savedAt := location.Location{X: 46160, Y: 41237, Z: -3534}
+	c.send(encodeValidatePosition(savedAt, 32768))
 	c.send(encodeSingleOpcode(clientpackets.OpcodeLogout))
 	reply := c.read()
 	if reply[0] != serverpackets.OpcodeLeaveWorld {
@@ -701,6 +909,10 @@ func TestGameClientLinkLogoutLeavesWorld(t *testing.T) {
 	c.expectClosed()
 	if _, ok := state.Player(objID); ok {
 		t.Fatalf("world.Player(%d) still present after logout", objID)
+	}
+	pos := chars.savedPosition(t, objID)
+	if pos.location != savedAt || pos.heading != 32768 {
+		t.Fatalf("saved position after logout = %+v/%d, want %+v/32768", pos.location, pos.heading, savedAt)
 	}
 }
 
@@ -719,6 +931,8 @@ func TestGameClientLinkRestartReturnsToCharacterSelect(t *testing.T) {
 	c.read() // UserInfo
 	c.read() // ItemList
 
+	savedAt := location.Location{X: 46160, Y: 41237, Z: -3534}
+	c.send(encodeValidatePosition(savedAt, 32768))
 	c.send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
 	reply := c.read()
 	if reply[0] != serverpackets.OpcodeRestartResponse {
@@ -733,6 +947,10 @@ func TestGameClientLinkRestartReturnsToCharacterSelect(t *testing.T) {
 	}
 	if _, ok := state.Player(objID); ok {
 		t.Fatalf("world.Player(%d) still present after restart", objID)
+	}
+	pos := chars.savedPosition(t, objID)
+	if pos.location != savedAt || pos.heading != 32768 {
+		t.Fatalf("saved position after restart = %+v/%d, want %+v/32768", pos.location, pos.heading, savedAt)
 	}
 
 	c.send(encodeRequestGameStart(0))

@@ -52,6 +52,32 @@ func TestCharacterStoreCreatePersistsInitialPosition(t *testing.T) {
 	}
 }
 
+func TestCharacterStoreSetPositionPersistsCoordinates(t *testing.T) {
+	rec := &characterStoreRecorder{}
+	db := sql.OpenDB(characterStoreConnector{rec: rec})
+	t.Cleanup(func() { _ = db.Close() })
+	store := NewCharacterStore(db)
+
+	loc := location.Location{X: 46160, Y: 41237, Z: -3534}
+	if err := store.SetPosition(context.Background(), 0x10000001, loc, 32768); err != nil {
+		t.Fatalf("SetPosition() error = %v", err)
+	}
+
+	if !strings.Contains(rec.query, "SET heading = ?, x = ?, y = ?, z = ?") {
+		t.Fatalf("SetPosition() query = %q, missing position columns", rec.query)
+	}
+
+	want := []any{int64(32768), int64(loc.X), int64(loc.Y), int64(loc.Z), int64(0x10000001)}
+	if len(rec.args) != len(want) {
+		t.Fatalf("SetPosition() args = %#v, want %d args", rec.args, len(want))
+	}
+	for i, arg := range rec.args {
+		if arg.Value != want[i] {
+			t.Fatalf("SetPosition() arg %d = %v, want %v; args=%#v", i, arg.Value, want[i], rec.args)
+		}
+	}
+}
+
 type characterStoreRecorder struct {
 	query string
 	args  []driver.NamedValue

@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
 
 // ErrCharacterNotFound is returned when no characters row matches the given
@@ -151,6 +152,14 @@ func (s *CharacterStore) NameTaken(ctx context.Context, name string) (bool, erro
 func (s *CharacterStore) SetDeleteAt(ctx context.Context, objectID int32, at int64) error {
 	if _, err := s.db.ExecContext(ctx, "UPDATE characters SET deletetime = ? WHERE obj_Id = ?", at, objectID); err != nil {
 		return fmt.Errorf("set delete time for %d: %w", objectID, err)
+	}
+	return nil
+}
+
+// SetPosition updates the character's persisted world position and facing.
+func (s *CharacterStore) SetPosition(ctx context.Context, objectID int32, loc location.Location, heading int) error {
+	if _, err := s.db.ExecContext(ctx, "UPDATE characters SET heading = ?, x = ?, y = ?, z = ? WHERE obj_Id = ?", heading, loc.X, loc.Y, loc.Z, objectID); err != nil {
+		return fmt.Errorf("set position for %d: %w", objectID, err)
 	}
 	return nil
 }

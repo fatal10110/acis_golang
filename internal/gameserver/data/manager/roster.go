@@ -8,6 +8,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
 
 // DefaultDeleteAfter is the grace period between scheduling a character for
@@ -66,6 +67,7 @@ type characterStore interface {
 	CountByAccount(ctx context.Context, accountName string) (int, error)
 	NameTaken(ctx context.Context, name string) (bool, error)
 	SetDeleteAt(ctx context.Context, objectID int32, at int64) error
+	SetPosition(ctx context.Context, objectID int32, loc location.Location, heading int) error
 	Delete(ctx context.Context, objectID int32) (bool, error)
 }
 
@@ -268,4 +270,10 @@ func (r *Roster) MarkForDeletion(ctx context.Context, objectID int32) error {
 // Restore clears objectID's scheduled deletion.
 func (r *Roster) Restore(ctx context.Context, objectID int32) error {
 	return r.characters.SetDeleteAt(ctx, objectID, 0)
+}
+
+// SavePosition persists the live character's latest world position and
+// heading for the next character-list, relog, or server restart load.
+func (r *Roster) SavePosition(ctx context.Context, c *player.Character) error {
+	return r.characters.SetPosition(ctx, c.ID, c.Location, c.Heading)
 }
