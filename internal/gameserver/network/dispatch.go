@@ -508,6 +508,7 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 		return nil, false
 	}
 
+	client.Session.SendFrame(serverpackets.FrameSkillList(nil))
 	client.Session.SendFrame(serverpackets.FrameUserInfo(serverpackets.UserInfoSnapshot{Character: c, Template: tmpl, Items: items}))
 
 	itemListFrame, err := serverpackets.FrameItemList(items, l.itemTemplates, false)
@@ -516,8 +517,6 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 		return nil, false
 	}
 	client.Session.SendFrame(itemListFrame)
-
-	client.Session.SendFrame(serverpackets.FrameSkillList(nil))
 	live := l.attachLivePlayer(client, c, tmpl, items)
 	if l.world != nil {
 		x, y, z := c.Position()

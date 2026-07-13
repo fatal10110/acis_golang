@@ -550,16 +550,16 @@ func TestGameClientLinkFullFlow(t *testing.T) {
 
 	c.send(encodeEnterWorld())
 	reply = c.read()
+	if reply[0] != serverpackets.OpcodeSkillList {
+		t.Fatalf("opcode = %#x, want SkillList (%#x)", reply[0], serverpackets.OpcodeSkillList)
+	}
+	reply = c.read()
 	if reply[0] != serverpackets.OpcodeUserInfo {
 		t.Fatalf("opcode = %#x, want UserInfo (%#x)", reply[0], serverpackets.OpcodeUserInfo)
 	}
 	reply = c.read()
 	if reply[0] != serverpackets.OpcodeItemList {
 		t.Fatalf("opcode = %#x, want ItemList (%#x)", reply[0], serverpackets.OpcodeItemList)
-	}
-	reply = c.read()
-	if reply[0] != serverpackets.OpcodeSkillList {
-		t.Fatalf("opcode = %#x, want SkillList (%#x)", reply[0], serverpackets.OpcodeSkillList)
 	}
 	if _, ok := state.Player(objID); !ok {
 		t.Fatalf("world.Player(%d) missing after EnterWorld", objID)
@@ -579,9 +579,9 @@ func TestGameClientLinkIgnoresRequestSkillCoolTimeInGame(t *testing.T) {
 	c.read() // SSQInfo
 	c.read() // CharSelected
 	c.send(encodeEnterWorld())
+	c.read() // SkillList
 	c.read() // UserInfo
 	c.read() // ItemList
-	c.read() // SkillList
 
 	c.send(encodeRequestSkillCoolTime())
 	c.send(encodeRequestManorList())
@@ -606,9 +606,9 @@ func TestGameClientLinkWireSafeMovementAndRefreshPacketsInGame(t *testing.T) {
 	c.read() // SSQInfo
 	c.read() // CharSelected
 	c.send(encodeEnterWorld())
+	c.read() // SkillList
 	c.read() // UserInfo
 	c.read() // ItemList
-	c.read() // SkillList
 
 	target := location.Location{X: 46160, Y: 41237, Z: -3534}
 	origin := location.Location{X: 46117, Y: 41247, Z: -3532}
@@ -689,9 +689,9 @@ func TestGameClientLinkLogoutLeavesWorld(t *testing.T) {
 	c.read() // SSQInfo
 	c.read() // CharSelected
 	c.send(encodeEnterWorld())
+	c.read() // SkillList
 	c.read() // UserInfo
 	c.read() // ItemList
-	c.read() // SkillList
 
 	c.send(encodeSingleOpcode(clientpackets.OpcodeLogout))
 	reply := c.read()
@@ -715,9 +715,9 @@ func TestGameClientLinkRestartReturnsToCharacterSelect(t *testing.T) {
 	c.read() // SSQInfo
 	c.read() // CharSelected
 	c.send(encodeEnterWorld())
+	c.read() // SkillList
 	c.read() // UserInfo
 	c.read() // ItemList
-	c.read() // SkillList
 
 	c.send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
 	reply := c.read()
