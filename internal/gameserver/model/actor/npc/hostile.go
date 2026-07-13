@@ -61,6 +61,15 @@ type Hostile struct {
 	roll func(n int) int
 }
 
+// Attackable reports whether inst's instance type belongs to the set of
+// combat-capable NPC kinds NewHostile accepts. Callers deciding whether to
+// build a live Hostile at all (rather than handling NewHostile's error)
+// should check this first.
+func Attackable(inst *Instance) bool {
+	_, ok := hostileInstanceKinds[hostileKind(inst)]
+	return ok
+}
+
 // NewHostile creates a live attackable NPC wrapper for inst.
 func NewHostile(inst *Instance, movement ai.MoveController, attack ai.AttackController) (*Hostile, error) {
 	if inst == nil {

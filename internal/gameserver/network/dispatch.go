@@ -3,6 +3,7 @@ package network
 import (
 	"context"
 	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"time"
 
@@ -107,6 +108,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 	for {
 		payload, err := session.ReadFrame()
 		if err != nil {
+			l.log.Error().Err(err).Msg("Read frame")
 			return
 		}
 		if len(payload) == 0 {
@@ -114,6 +116,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 		}
 		opcode := payload[0]
 		if !client.Accept(opcode) {
+			l.log.Warn().Str("state", client.State().String()).Str("opcode", hex.EncodeToString(payload)).Msg("Accept opcode")
 			return
 		}
 

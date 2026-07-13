@@ -39,7 +39,6 @@ func TestNewCreatureMoveRejectsInvalidDependencies(t *testing.T) {
 		geo   Geo
 	}{
 		{name: "nil geodata", speed: 1},
-		{name: "zero speed", geo: &recordingGeo{}, speed: 0},
 		{name: "negative speed", geo: &recordingGeo{}, speed: -1},
 		{name: "not a number speed", geo: &recordingGeo{}, speed: math.NaN()},
 		{name: "positive infinite speed", geo: &recordingGeo{}, speed: math.Inf(1)},
@@ -52,6 +51,23 @@ func TestNewCreatureMoveRejectsInvalidDependencies(t *testing.T) {
 				t.Fatal("NewCreatureMove() error = nil")
 			}
 		})
+	}
+}
+
+// TestNewCreatureMoveAcceptsZeroSpeed covers an immobile scripted NPC: zero
+// speed is a valid stationary state, and MoveToLocation must reject any
+// actual movement request rather than the constructor rejecting the actor.
+func TestNewCreatureMoveAcceptsZeroSpeed(t *testing.T) {
+	geo := &recordingGeo{canMove: true}
+	origin := location.Location{X: 10, Y: 20, Z: 30}
+
+	m, err := NewCreatureMove(origin, 0, geo)
+	if err != nil {
+		t.Fatalf("NewCreatureMove() error = %v, want nil", err)
+	}
+
+	if _, err := m.MoveToLocation(location.Location{X: 100, Y: 20, Z: 30}); err == nil {
+		t.Fatal("MoveToLocation() error = nil, want error for zero-speed actor")
 	}
 }
 

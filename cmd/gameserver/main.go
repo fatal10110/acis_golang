@@ -582,6 +582,7 @@ func startNpcs(npcs *manager.Npcs, log zerolog.Logger) {
 		Int("live_npcs", npcs.LiveCount()).
 		Int("deferred_territory_spawns", npcs.DeferredCount()).
 		Int("restored_dead_spawns", npcs.RestoredDeadCount()).
+		Int("skipped_non_combat_spawns", npcs.SkippedNonCombatCount()).
 		Msg("npc spawns loaded")
 }
 
