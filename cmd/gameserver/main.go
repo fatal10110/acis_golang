@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"database/sql"
+	"errors"
 	"flag"
 	"fmt"
 	"math"
@@ -165,7 +166,7 @@ type hexIDProperties struct {
 func loadHexIDProperties(paths gameServerPaths) (hexIDProperties, error) {
 	props, err := config.LoadFile(paths.HexIDPath)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, os.ErrNotExist) {
 			return hexIDProperties{}, nil
 		}
 		return hexIDProperties{}, err
