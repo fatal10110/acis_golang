@@ -38,7 +38,6 @@ func writeCharInfo(w *wire.Writer, s CharInfoSnapshot) {
 	w.WriteInt32(int32(x))
 	w.WriteInt32(int32(y))
 	w.WriteInt32(int32(z))
-	w.WriteInt32(int32(c.Heading))
 	w.WriteInt32(0) // boat object id
 	w.WriteInt32(c.ObjectID())
 	w.WriteString(c.Name)

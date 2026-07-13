@@ -26,7 +26,7 @@ func TestFrameCharInfoCoreFields(t *testing.T) {
 	}
 
 	offset := 1
-	for _, want := range []uint32{10, 20, 30, 123, 0, uint32(c.ObjectID())} {
+	for _, want := range []uint32{10, 20, 30, 0, uint32(c.ObjectID())} {
 		if v := binary.LittleEndian.Uint32(got[offset:]); v != want {
 			t.Fatalf("field at offset %d = %d, want %d", offset, v, want)
 		}
