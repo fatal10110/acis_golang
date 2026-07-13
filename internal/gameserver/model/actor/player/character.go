@@ -41,9 +41,6 @@ type Character struct {
 	Face, HairStyle, HairColor int
 
 	// Location and Heading are the character's last known world location.
-	// A freshly created character carries the template's chosen spawn point
-	// only in memory: the characters table leaves these columns at their
-	// NULL default until the character is actually saved.
 	Location location.Location
 	Heading  int
 

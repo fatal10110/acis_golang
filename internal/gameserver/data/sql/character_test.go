@@ -1,0 +1,96 @@
+package sql
+
+import (
+	"context"
+	"database/sql"
+	"database/sql/driver"
+	"strings"
+	"testing"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+)
+
+func TestCharacterStoreCreatePersistsInitialPosition(t *testing.T) {
+	rec := &characterStoreRecorder{}
+	db := sql.OpenDB(characterStoreConnector{rec: rec})
+	t.Cleanup(func() { _ = db.Close() })
+	store := NewCharacterStore(db)
+
+	c := &player.Character{
+		ID:          0x10000001,
+		AccountName: "acct1",
+		Name:        "Newbie",
+		ClassID:     44,
+		BaseClassID: 44,
+		Race:        player.RaceOrc,
+		Sex:         player.SexMale,
+		Level:       1,
+		MaxHP:       80, CurHP: 80,
+		MaxCP: 32, CurCP: 32,
+		MaxMP: 30, CurMP: 30,
+		Location: location.Location{X: -56733, Y: -113459, Z: -690},
+		Heading:  32768,
+	}
+
+	if err := store.Create(context.Background(), c); err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+
+	if !strings.Contains(rec.query, "heading, x, y, z") {
+		t.Fatalf("Create() query = %q, missing initial position columns", rec.query)
+	}
+
+	values := map[any]bool{}
+	for _, arg := range rec.args {
+		values[arg.Value] = true
+	}
+	for _, want := range []any{int64(c.Heading), int64(c.Location.X), int64(c.Location.Y), int64(c.Location.Z)} {
+		if !values[want] {
+			t.Fatalf("Create() args = %#v, missing %v", rec.args, want)
+		}
+	}
+}
+
+type characterStoreRecorder struct {
+	query string
+	args  []driver.NamedValue
+}
+
+type characterStoreConnector struct {
+	rec *characterStoreRecorder
+}
+
+func (c characterStoreConnector) Connect(context.Context) (driver.Conn, error) {
+	return &characterStoreConn{rec: c.rec}, nil
+}
+
+func (c characterStoreConnector) Driver() driver.Driver {
+	return characterStoreDriver{}
+}
+
+type characterStoreDriver struct{}
+
+func (characterStoreDriver) Open(string) (driver.Conn, error) {
+	return nil, driver.ErrSkip
+}
+
+type characterStoreConn struct {
+	rec *characterStoreRecorder
+}
+
+func (c *characterStoreConn) Prepare(query string) (driver.Stmt, error) {
+	return nil, driver.ErrSkip
+}
+
+func (c *characterStoreConn) Close() error { return nil }
+
+func (c *characterStoreConn) Begin() (driver.Tx, error) {
+	return nil, driver.ErrSkip
+}
+
+func (c *characterStoreConn) ExecContext(_ context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
+	c.rec.query = query
+	c.rec.args = append([]driver.NamedValue(nil), args...)
+	return driver.RowsAffected(1), nil
+}

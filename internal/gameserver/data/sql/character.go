@@ -39,17 +39,18 @@ func NewCharacterStore(db *sql.DB) *CharacterStore {
 }
 
 // Create inserts c as a new characters row. It writes exactly the columns a
-// freshly created character has values for; position, clan, and every other
-// column a character only gains once it is actually played keep the
-// schema's own default until something (not this store) sets them.
+// freshly created character has values for; clan and every other column a
+// character only gains once it is actually played keep the schema's own
+// default until something sets them.
 func (s *CharacterStore) Create(ctx context.Context, c *player.Character) error {
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO characters
 			(account_name, obj_Id, char_name, level, maxHp, curHp, maxCp, curCp, maxMp, curMp,
-			 face, hairStyle, hairColor, sex, exp, sp, race, classid, base_class, title, accesslevel)
-		 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			 face, hairStyle, hairColor, sex, heading, x, y, z, exp, sp, race, classid, base_class, title, accesslevel)
+		 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		c.AccountName, c.ID, c.Name, c.Level, c.MaxHP, c.CurHP, c.MaxCP, c.CurCP, c.MaxMP, c.CurMP,
-		c.Face, c.HairStyle, c.HairColor, byte(c.Sex), c.Exp, c.SP, int(c.Race), c.ClassID, c.BaseClassID, c.Title, c.AccessLevel,
+		c.Face, c.HairStyle, c.HairColor, byte(c.Sex), c.Heading, c.Location.X, c.Location.Y, c.Location.Z,
+		c.Exp, c.SP, int(c.Race), c.ClassID, c.BaseClassID, c.Title, c.AccessLevel,
 	)
 	if err != nil {
 		return fmt.Errorf("create character %q: %w", c.Name, err)
