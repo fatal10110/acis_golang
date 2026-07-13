@@ -611,7 +611,7 @@ func TestGameClientLinkWireSafeMovementAndRefreshPacketsInGame(t *testing.T) {
 	c.read() // SkillList
 
 	target := location.Location{X: 46160, Y: 41237, Z: -3534}
-	origin := location.Location{X: 10, Y: 20, Z: 30}
+	origin := location.Location{X: 46117, Y: 41247, Z: -3532}
 	c.send(encodeMoveBackwardToLocation(target, origin, 1))
 	reply := c.read()
 	if reply[0] != serverpackets.OpcodeMoveToLocation {
@@ -624,6 +624,10 @@ func TestGameClientLinkWireSafeMovementAndRefreshPacketsInGame(t *testing.T) {
 	gotTarget := location.Location{X: int(r.ReadInt32()), Y: int(r.ReadInt32()), Z: int(r.ReadInt32())}
 	if gotTarget != target {
 		t.Fatalf("MoveToLocation target = %+v, want %+v", gotTarget, target)
+	}
+	gotOrigin := location.Location{X: int(r.ReadInt32()), Y: int(r.ReadInt32()), Z: int(r.ReadInt32())}
+	if gotOrigin != origin {
+		t.Fatalf("MoveToLocation origin = %+v, want %+v", gotOrigin, origin)
 	}
 	obj, ok := state.Player(objID)
 	if !ok {
@@ -671,6 +675,70 @@ func TestGameClientLinkWireSafeMovementAndRefreshPacketsInGame(t *testing.T) {
 	reply = c.read()
 	if reply[0] != serverpackets.OpcodeExtended {
 		t.Fatalf("post-stub opcode = %#x, want extended packet (%#x)", reply[0], serverpackets.OpcodeExtended)
+	}
+}
+
+func TestGameClientLinkLogoutLeavesWorld(t *testing.T) {
+	c, chars, _, state := newLinkedGameClient(t)
+
+	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.read() // CharCreateOk
+	c.read() // CharSelectInfo
+	objID := chars.soleObjectID(t)
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	c.read() // UserInfo
+	c.read() // ItemList
+	c.read() // SkillList
+
+	c.send(encodeSingleOpcode(clientpackets.OpcodeLogout))
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeLeaveWorld {
+		t.Fatalf("logout opcode = %#x, want LeaveWorld (%#x)", reply[0], serverpackets.OpcodeLeaveWorld)
+	}
+	c.expectClosed()
+	if _, ok := state.Player(objID); ok {
+		t.Fatalf("world.Player(%d) still present after logout", objID)
+	}
+}
+
+func TestGameClientLinkRestartReturnsToCharacterSelect(t *testing.T) {
+	c, chars, _, state := newLinkedGameClient(t)
+
+	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.read() // CharCreateOk
+	c.read() // CharSelectInfo
+	objID := chars.soleObjectID(t)
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	c.read() // UserInfo
+	c.read() // ItemList
+	c.read() // SkillList
+
+	c.send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeRestartResponse {
+		t.Fatalf("restart opcode = %#x, want RestartResponse (%#x)", reply[0], serverpackets.OpcodeRestartResponse)
+	}
+	if ok := wire.NewReader(reply[1:]).ReadInt32(); ok != 1 {
+		t.Fatalf("RestartResponse result = %d, want 1", ok)
+	}
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeCharSelectInfo {
+		t.Fatalf("post-restart opcode = %#x, want CharSelectInfo (%#x)", reply[0], serverpackets.OpcodeCharSelectInfo)
+	}
+	if _, ok := state.Player(objID); ok {
+		t.Fatalf("world.Player(%d) still present after restart", objID)
+	}
+
+	c.send(encodeRequestGameStart(0))
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeSSQInfo {
+		t.Fatalf("second select opcode = %#x, want SSQInfo (%#x)", reply[0], serverpackets.OpcodeSSQInfo)
 	}
 }
 

@@ -143,13 +143,8 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 	var live *livePlayer
 	protocolReady := false
 	defer func() {
-		if live == nil || l.world == nil {
-			return
-		}
-		l.world.Despawn(live)
-		l.world.RemovePlayer(live.ObjectID())
-		live.Character.SetFrameSender(nil)
-		live.Character.SetAttackBroadcaster(nil)
+		l.detachLivePlayer(live)
+		l.notifyPlayerLogout(client.AccountName())
 	}()
 
 	for {
@@ -334,6 +329,13 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 		case clientpackets.OpcodeRequestSkillCoolTime:
 			continue
 
+		case clientpackets.OpcodeLogout:
+			if live != nil {
+				session.SendFrame(serverpackets.FrameLeaveWorld())
+				return
+			}
+			return
+
 		case clientpackets.OpcodeMoveBackwardToLocation:
 			req, err := clientpackets.DecodeMoveBackwardToLocation(payload)
 			if err != nil {
@@ -347,7 +349,10 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				session.SendFrame(serverpackets.FrameActionFailed())
 				continue
 			}
-			l.moveLivePlayer(live, location.Location{X: int(req.TargetX), Y: int(req.TargetY), Z: int(req.TargetZ)})
+			l.moveLivePlayer(live,
+				location.Location{X: int(req.OriginX), Y: int(req.OriginY), Z: int(req.OriginZ)},
+				location.Location{X: int(req.TargetX), Y: int(req.TargetY), Z: int(req.TargetZ)},
+			)
 
 		case clientpackets.OpcodeValidatePosition:
 			req, err := clientpackets.DecodeValidatePosition(payload)
@@ -372,6 +377,22 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 
 		case clientpackets.OpcodeRequestSkillList:
 			session.SendFrame(serverpackets.FrameSkillList(nil))
+
+		case clientpackets.OpcodeRequestRestart:
+			if live == nil {
+				continue
+			}
+			l.detachLivePlayer(live)
+			live = nil
+			entering = nil
+			client.SetState(StateAuthed)
+			session.SendFrame(serverpackets.FrameRestartResponse(true))
+			list, err := l.sendCharSelectInfo(ctx, client)
+			if err != nil {
+				l.log.Error().Err(err).Msg("list characters")
+				return
+			}
+			chars = list
 
 		case clientpackets.OpcodeAction,
 			clientpackets.OpcodeAttackRequest,
@@ -403,7 +424,6 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			clientpackets.OpcodeRequestGetOffVehicle,
 			clientpackets.OpcodeAnswerTradeRequest,
 			clientpackets.OpcodeRequestActionUse,
-			clientpackets.OpcodeRequestRestart,
 			clientpackets.OpcodeStartRotating,
 			clientpackets.OpcodeFinishRotating,
 			clientpackets.OpcodeRequestEnchantItem,
@@ -526,12 +546,9 @@ func (l *GameClientLink) attachLivePlayer(client *Client, c *player.Character, t
 	return &livePlayer{Character: c, template: tmpl, items: items}
 }
 
-func (l *GameClientLink) moveLivePlayer(live *livePlayer, target location.Location) {
-	x, y, z := live.Position()
-	origin := location.Location{X: x, Y: y, Z: z}
+func (l *GameClientLink) moveLivePlayer(live *livePlayer, origin, target location.Location) {
 	heading := origin.HeadingTo(target)
-	live.Character.Heading = heading
-	live.SetHeading(heading)
+	l.updateLivePlayerPosition(live, origin, heading)
 	live.SendFrame(serverpackets.FrameMoveToLocation(live.ObjectID(), target, origin))
 
 	if l.world == nil {
@@ -544,6 +561,28 @@ func (l *GameClientLink) moveLivePlayer(live *livePlayer, target location.Locati
 		}
 		receiver.SendFrame(serverpackets.FrameMoveToLocation(live.ObjectID(), target, origin))
 	})
+}
+
+func (l *GameClientLink) detachLivePlayer(live *livePlayer) {
+	if live == nil {
+		return
+	}
+	if l.world != nil {
+		l.world.Despawn(live)
+		l.world.RemovePlayer(live.ObjectID())
+	}
+	live.Character.SetFrameSender(nil)
+	live.Character.SetAttackBroadcaster(nil)
+}
+
+func (l *GameClientLink) notifyPlayerLogout(account string) {
+	loginLink := l.loginLink()
+	if account == "" || loginLink == nil {
+		return
+	}
+	if err := loginLink.SendPlayerLogout(account); err != nil {
+		l.log.Debug().Err(err).Str("account", account).Msg("notify player logout")
+	}
 }
 
 func (l *GameClientLink) updateLivePlayerPosition(live *livePlayer, position location.Location, heading int) {
