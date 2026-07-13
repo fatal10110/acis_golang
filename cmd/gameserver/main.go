@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"flag"
 	"fmt"
+	"math"
 	"net"
 	"os"
 	"path/filepath"
@@ -189,9 +190,12 @@ func gameServerConfigFromProperties(paths gameServerPaths, serverProps, hexProps
 	if err != nil {
 		return gameServerConfig{}, err
 	}
-	maxPlayers, err := serverProps.Int("MaximumOnlineUsers", 100)
+	maxPlayers, err := serverProps.Int64("MaximumOnlineUsers", 100)
 	if err != nil {
 		return gameServerConfig{}, err
+	}
+	if maxPlayers < math.MinInt32 || maxPlayers > math.MaxInt32 {
+		return gameServerConfig{}, fmt.Errorf("MaximumOnlineUsers %d outside int32 range", maxPlayers)
 	}
 
 	serverID := requestID

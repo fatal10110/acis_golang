@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"math"
 	"os"
 	"path/filepath"
 	"testing"
@@ -159,6 +160,19 @@ RequestServerID = 9
 	}
 	if len(cfg.Auth.HexID) != generatedHexIDSize {
 		t.Errorf("generated HexID length = %d, want %d", len(cfg.Auth.HexID), generatedHexIDSize)
+	}
+}
+
+func TestGameServerConfigRejectsMaxPlayersOutsideInt32(t *testing.T) {
+	serverProps, err := config.ParseString(`
+MaximumOnlineUsers = 2147483648
+`)
+	if err != nil {
+		t.Fatalf("ParseString server: %v", err)
+	}
+
+	if _, err := gameServerConfigFromProperties(gameServerPaths{}, serverProps, nil); err == nil {
+		t.Fatalf("gameServerConfigFromProperties() error = nil, want range error above %d", int64(math.MaxInt32))
 	}
 }
 
