@@ -51,13 +51,3 @@ func (r *Region) AppendObjects(out []Tracked) []Tracked {
 	}
 	return out
 }
-
-// Each calls fn for every object currently visible within r while holding
-// r's read lock. Use AppendObjects instead when fn can re-enter world state.
-func (r *Region) Each(fn func(Tracked)) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	for _, o := range r.objects {
-		fn(o)
-	}
-}

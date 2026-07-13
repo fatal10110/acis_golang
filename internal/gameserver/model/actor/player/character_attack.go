@@ -24,6 +24,43 @@ var weaponRange = map[item.WeaponType]int{
 	item.WeaponPole: 66,
 }
 
+type activeWeapon struct {
+	tmpl *item.Template
+}
+
+func (w activeWeapon) stat(stat string, fallback float64) float64 {
+	if w.tmpl == nil {
+		return fallback
+	}
+	for _, mod := range w.tmpl.Modifiers {
+		if mod.Stat == stat && mod.Op == item.FuncSet {
+			return mod.Value
+		}
+	}
+	return fallback
+}
+
+func (w activeWeapon) attackType() item.WeaponType {
+	if w.tmpl == nil || w.tmpl.Weapon == nil {
+		return item.WeaponFist
+	}
+	return w.tmpl.Weapon.Type
+}
+
+func (w activeWeapon) reuseDelay() time.Duration {
+	if w.tmpl == nil || w.tmpl.Weapon == nil {
+		return 0
+	}
+	return time.Duration(w.tmpl.Weapon.ReuseDelay) * time.Millisecond
+}
+
+func (w activeWeapon) grade() int {
+	if w.tmpl == nil {
+		return 0
+	}
+	return int(w.tmpl.Crystal)
+}
+
 type physicalTarget interface {
 	attackable.Combatant
 	Position() (int, int, int)
@@ -36,6 +73,7 @@ type physicalTarget interface {
 func (c *Character) AttachRuntime(tmpl *Template, inv *itemcontainer.Inventory) {
 	c.runtimeTemplate = tmpl
 	c.inventory = inv
+	c.health.Bind(&c.CurHP)
 	if c.roll == nil {
 		c.roll = rand.IntN
 	}
@@ -91,18 +129,18 @@ func (c *Character) template() *Template {
 	return c.runtimeTemplate
 }
 
-func (c *Character) activeWeaponTemplate() *item.Template {
+func (c *Character) activeWeapon() activeWeapon {
 	if c.inventory == nil {
-		return c.fistTemplate()
+		return activeWeapon{tmpl: c.fistTemplate()}
 	}
 	inst := c.inventory.ItemAt(itemcontainer.RHand)
 	if inst == nil {
-		return c.fistTemplate()
+		return activeWeapon{tmpl: c.fistTemplate()}
 	}
 	if tmpl, ok := c.inventory.Templates().Get(inst.TemplateID); ok && tmpl != nil && tmpl.Weapon != nil {
-		return tmpl
+		return activeWeapon{tmpl: tmpl}
 	}
-	return c.fistTemplate()
+	return activeWeapon{tmpl: c.fistTemplate()}
 }
 
 func (c *Character) fistTemplate() *item.Template {
@@ -112,19 +150,6 @@ func (c *Character) fistTemplate() *item.Template {
 	}
 	fists, _ := c.inventory.Templates().Get(int32(tmpl.FistsItemID))
 	return fists
-}
-
-func (c *Character) weaponStat(stat string, fallback float64) float64 {
-	weapon := c.activeWeaponTemplate()
-	if weapon == nil {
-		return fallback
-	}
-	for _, mod := range weapon.Modifiers {
-		if mod.Stat == stat && mod.Op == item.FuncSet {
-			return mod.Value
-		}
-	}
-	return fallback
 }
 
 // AttackDisabled reports whether this player can start a physical attack.
@@ -167,20 +192,16 @@ func (c *Character) CanSee(attackable.Combatant) bool {
 // AttackType resolves from the equipped right-hand weapon, falling back to
 // the character template's fist weapon.
 func (c *Character) AttackType() item.WeaponType {
-	weapon := c.activeWeaponTemplate()
-	if weapon == nil || weapon.Weapon == nil {
-		return item.WeaponFist
-	}
-	return weapon.Weapon.Type
+	return c.activeWeapon().attackType()
 }
 
 // AttackSpeed resolves the equipped weapon's pAtkSpd stat-set value.
 func (c *Character) AttackSpeed() int {
-	return int(c.weaponStat("pAtkSpd", defaultPlayerAttackSpeed))
+	return int(c.activeWeapon().stat("pAtkSpd", defaultPlayerAttackSpeed))
 }
 
-// PhysicalAttackRange returns the Java WeaponType range for the active
-// weapon family.
+// PhysicalAttackRange returns the attack range for the active weapon
+// family.
 func (c *Character) PhysicalAttackRange() int {
 	if rng, ok := weaponRange[c.AttackType()]; ok {
 		return rng
@@ -190,20 +211,12 @@ func (c *Character) PhysicalAttackRange() int {
 
 // WeaponReuseDelay returns the active weapon reuse delay, used for bows.
 func (c *Character) WeaponReuseDelay() time.Duration {
-	weapon := c.activeWeaponTemplate()
-	if weapon == nil || weapon.Weapon == nil {
-		return 0
-	}
-	return time.Duration(weapon.Weapon.ReuseDelay) * time.Millisecond
+	return c.activeWeapon().reuseDelay()
 }
 
 // WeaponGrade returns the active weapon crystal grade for attack packets.
 func (c *Character) WeaponGrade() int {
-	weapon := c.activeWeaponTemplate()
-	if weapon == nil {
-		return 0
-	}
-	return int(weapon.Crystal)
+	return c.activeWeapon().grade()
 }
 
 // SoulshotCharged reports whether a soulshot charge is currently active.
@@ -236,8 +249,9 @@ func (c *Character) MakeAttackHit(target attackable.Combatant, split bool) attac
 		hit.Miss = true
 		return hit
 	}
+	weapon := c.activeWeapon()
 
-	dexIdx := clampStatIndex(tmpl.DEX)
+	dexIdx := statbonus.ClampIndex(tmpl.DEX)
 	accuracy := int(statbonus.BaseEvasionAccuracy[dexIdx]) + c.Level
 	evasion := other.Evasion()
 
@@ -249,12 +263,12 @@ func (c *Character) MakeAttackHit(target attackable.Combatant, split bool) attac
 		return hit
 	}
 
-	critRate := c.weaponStat("rCrit", 4) * statbonus.DEXBonus[dexIdx] * 10
+	critRate := weapon.stat("rCrit", 4) * statbonus.DEXBonus[dexIdx] * 10
 	crit := formulas.CritSucceeds(critRate, c.rollValue(1000))
 
 	randomMul := 1.0
-	if weapon := c.activeWeaponTemplate(); weapon != nil && weapon.Weapon != nil {
-		if spread := int(weapon.Weapon.RandomDamage); spread > 0 {
+	if weapon.tmpl != nil && weapon.tmpl.Weapon != nil {
+		if spread := int(weapon.tmpl.Weapon.RandomDamage); spread > 0 {
 			randomMul = 1 + float64(c.rollValue(2*spread+1)-spread)/100
 		}
 	}
@@ -264,7 +278,7 @@ func (c *Character) MakeAttackHit(target attackable.Combatant, split bool) attac
 		defence = 1
 	}
 	damage := formulas.PhysicalAttackDamage(formulas.PhysicalAttackInput{
-		AttackPower:       c.PAtk(),
+		AttackPower:       c.pAtk(weapon),
 		Defence:           defence,
 		Crit:              crit,
 		PosMul:            formulas.PosMul(false, true, crit),
@@ -305,11 +319,11 @@ func (c *Character) CheckAndEquipArrows() bool {
 	if c.inventory == nil {
 		return false
 	}
-	weapon := c.activeWeaponTemplate()
-	if weapon == nil {
+	weapon := c.activeWeapon()
+	if weapon.tmpl == nil {
 		return false
 	}
-	arrows := c.inventory.FindArrowForBow(weapon.Crystal)
+	arrows := c.inventory.FindArrowForBow(weapon.tmpl.Crystal)
 	if arrows == nil {
 		return false
 	}
@@ -326,11 +340,11 @@ func (c *Character) CheckAndEquipArrows() bool {
 
 // WeaponMPConsume returns the active weapon's MP cost per attack.
 func (c *Character) WeaponMPConsume() int {
-	weapon := c.activeWeaponTemplate()
-	if weapon == nil || weapon.Weapon == nil {
+	weapon := c.activeWeapon()
+	if weapon.tmpl == nil || weapon.tmpl.Weapon == nil {
 		return 0
 	}
-	return int(weapon.Weapon.MPConsume)
+	return int(weapon.tmpl.Weapon.MPConsume)
 }
 
 // MP returns current MP as an integer for attack gating.
@@ -349,12 +363,16 @@ func (c *Character) ClientActionFailed() {}
 // PAtk returns the physical attack value used by the current minimal combat
 // pipeline.
 func (c *Character) PAtk() float64 {
+	return c.pAtk(c.activeWeapon())
+}
+
+func (c *Character) pAtk(weapon activeWeapon) float64 {
 	tmpl := c.template()
 	base := 1.0
 	if tmpl != nil && tmpl.PAtk > 0 {
 		base = tmpl.PAtk
 	}
-	return c.weaponStat("pAtk", base)
+	return weapon.stat("pAtk", base)
 }
 
 // PDef returns the current physical defence value.
@@ -372,7 +390,7 @@ func (c *Character) Evasion() int {
 	if tmpl == nil {
 		return c.Level
 	}
-	return int(statbonus.BaseEvasionAccuracy[clampStatIndex(tmpl.DEX)]) + c.Level
+	return int(statbonus.BaseEvasionAccuracy[statbonus.ClampIndex(tmpl.DEX)]) + c.Level
 }
 
 // CollisionRadius returns this player's body radius.
@@ -390,23 +408,8 @@ func (c *Character) CollisionRadius() float64 {
 // TakeDamage applies physical damage and runs the once-only death path when
 // HP reaches zero.
 func (c *Character) TakeDamage(dmg int, attacker creature.DeathActor) bool {
-	if dmg < 0 {
-		dmg = 0
-	}
-
-	c.hpMu.Lock()
-	if c.CurHP <= 0 {
-		c.hpMu.Unlock()
-		return false
-	}
-	c.CurHP -= float64(dmg)
-	dead := c.CurHP <= 0
-	if dead {
-		c.CurHP = 0
-	}
-	c.hpMu.Unlock()
-
-	if !dead {
+	c.health.Bind(&c.CurHP)
+	if !c.health.Damage(dmg) {
 		return false
 	}
 	return c.Die(attacker)
@@ -464,16 +467,6 @@ func (c *Character) rollValue(n int) int {
 		return c.roll(n)
 	}
 	return rand.IntN(n)
-}
-
-func clampStatIndex(v int) int {
-	if v < 0 {
-		return 0
-	}
-	if v >= statbonus.MaxStatValue {
-		return statbonus.MaxStatValue - 1
-	}
-	return v
 }
 
 func in3DRange(a, b location.Location, radius int) bool {

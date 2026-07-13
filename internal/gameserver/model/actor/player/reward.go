@@ -10,11 +10,6 @@ const killLevelPenaltyThreshold = 5
 // attacker exceeds killLevelPenaltyThreshold.
 const killLevelPenaltyBase = 5.0 / 6.0
 
-const (
-	maxRewardInt32 = 2147483647
-	minRewardInt32 = -2147483648
-)
-
 // KillRewardExpAndSp returns one attacker's exp and sp share of a kill.
 //
 // expReward and spReward are the victim's full reward at the current server
@@ -58,11 +53,11 @@ func rewardInt32(v float64) int32 {
 	if math.IsNaN(v) {
 		return 0
 	}
-	if v > maxRewardInt32 {
-		return maxRewardInt32
+	if v > math.MaxInt32 {
+		return math.MaxInt32
 	}
-	if v < minRewardInt32 {
-		return minRewardInt32
+	if v < math.MinInt32 {
+		return math.MinInt32
 	}
 	return int32(v)
 }

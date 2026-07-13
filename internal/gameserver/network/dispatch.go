@@ -94,6 +94,9 @@ func (p *livePlayer) Discover(obj world.Tracked) {
 }
 
 func (p *livePlayer) Forget(obj world.Tracked) {
+	if _, ok := obj.(*livePlayer); !ok {
+		return
+	}
 	p.SendFrame(serverpackets.FrameDeleteObject(obj.ObjectID(), false))
 }
 
@@ -394,19 +397,37 @@ func (l *GameClientLink) attachLivePlayer(client *Client, c *player.Character, t
 	c.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventory(c.ID, l.itemTemplates, items))
 	c.SetWorld(l.world)
 	c.SetFrameSender(client.Session.SendFrame)
+	live := &livePlayer{Character: c, template: tmpl, items: items}
 	c.SetAttackBroadcaster(func(snapshot attack.Snapshot) {
-		if l.world == nil {
+		l.broadcastAttack(live, snapshot)
+	})
+	return live
+}
+
+func (l *GameClientLink) broadcastAttack(attacker *livePlayer, snapshot attack.Snapshot) {
+	if attacker == nil {
+		return
+	}
+
+	frame := serverpackets.FrameAttack(snapshot)
+	encoded := append([]byte(nil), frame.Bytes()...)
+	frame.Release()
+
+	send := func(receiver interface{ SendFrame(wire.Frame) bool }) {
+		receiver.SendFrame(wire.BorrowedFrame(append([]byte(nil), encoded...)))
+	}
+	send(attacker)
+
+	if l.world == nil {
+		return
+	}
+	l.world.ForEachKnown(attacker, func(o world.Tracked) {
+		receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
+		if !ok {
 			return
 		}
-		l.world.ForEachKnown(c, func(o world.Tracked) {
-			receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
-			if !ok {
-				return
-			}
-			receiver.SendFrame(serverpackets.FrameAttack(snapshot))
-		})
+		send(receiver)
 	})
-	return &livePlayer{Character: c, template: tmpl, items: items}
 }
 
 func slotCharacter(chars []*player.Character, slot int32) (*player.Character, bool) {
