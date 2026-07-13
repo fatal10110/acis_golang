@@ -163,6 +163,16 @@ RequestServerID = 9
 	}
 }
 
+func TestLoadHexIDPropertiesAllowsMissingFile(t *testing.T) {
+	props, err := loadHexIDProperties(gameServerPaths{HexIDPath: filepath.Join(t.TempDir(), "hexid.txt")})
+	if err != nil {
+		t.Fatalf("loadHexIDProperties() error = %v, want nil for missing file", err)
+	}
+	if props.Props != nil {
+		t.Fatalf("Props = %v, want nil for missing file", props.Props)
+	}
+}
+
 func TestGameServerConfigRejectsMaxPlayersOutsideInt32(t *testing.T) {
 	serverProps, err := config.ParseString(`
 MaximumOnlineUsers = 2147483648

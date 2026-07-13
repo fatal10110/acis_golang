@@ -8,6 +8,7 @@ Run these commands from `/Users/arturkoshtei/workspace/acis_public/acis_golang`.
 
 ```bash
 mysql -uroot acis < ../aCis_datapack/tools/full_install.sql
+for f in ../aCis_datapack/sql/*.sql; do mysql -uroot acis < "$f"; done
 ```
 
 - `../aCis_gameserver/config/loginserver.properties` and `../aCis_gameserver/config/server.properties` point at that database with the `URL`, `Login`, and `Password` keys.
