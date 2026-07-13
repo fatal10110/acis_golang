@@ -3,6 +3,7 @@ package network
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"net"
 	"sort"
 	"strings"
@@ -15,6 +16,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	gamemanager "github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
@@ -495,6 +498,44 @@ func newTestLivePlayer(t *testing.T, id int32, capture *frameCapture) *livePlaye
 	return &livePlayer{Character: ch, template: tmpl}
 }
 
+func newTestHostileNPC(t *testing.T, id int32) *npc.Hostile {
+	t.Helper()
+	tmpl := &npc.Template{
+		ID:              100,
+		TemplateID:      100,
+		Type:            "Monster",
+		Level:           1,
+		HPMax:           100,
+		AtkSpd:          300,
+		RunSpeed:        120,
+		WalkSpeed:       60,
+		CollisionRadius: 8,
+		CollisionHeight: 20,
+	}
+	inst, err := npc.NewInstance(id, tmpl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hostile, err := npc.NewHostile(inst, testHostileMove{}, testHostileAttack{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return hostile
+}
+
+type testHostileMove struct{}
+
+func (testHostileMove) MaybeStartOffensiveFollow(attackable.Combatant, int) bool { return false }
+func (testHostileMove) MoveHome(location.Location)                               {}
+func (testHostileMove) Stop()                                                    {}
+
+type testHostileAttack struct{}
+
+func (testHostileAttack) BowCoolingDown() bool                { return false }
+func (testHostileAttack) AttackingNow() bool                  { return false }
+func (testHostileAttack) CanAttack(attackable.Combatant) bool { return false }
+func (testHostileAttack) DoAttack(attackable.Combatant)       {}
+
 type visibleGroundItem struct {
 	world.Presence
 	id        int32
@@ -631,6 +672,41 @@ func TestLivePlayerVisibilityRendersSupportedWorldObjectsSymmetrically(t *testin
 	)
 	if got := frameOpcodes(frames.frames); string(got) != string(want) {
 		t.Fatalf("despawn opcodes = %x, want %x", got, want)
+	}
+}
+
+func TestLivePlayerVisibilityRendersHostileNPC(t *testing.T) {
+	state := world.New()
+	frames := &frameCapture{}
+	viewer := newTestLivePlayer(t, 1, frames)
+	state.Spawn(viewer, 0, 0, 0, 0)
+
+	hostile := newTestHostileNPC(t, 20)
+	state.Spawn(hostile, 100, 0, -50, 123)
+
+	const opcodeNPCInfo = 0x16
+	if len(frames.frames) != 1 {
+		t.Fatalf("frames = %x, want one NPCInfo frame", frames.frames)
+	}
+	got := frames.frames[0]
+	appendInt32 := func(b []byte, v int32) []byte {
+		return binary.LittleEndian.AppendUint32(b, uint32(v))
+	}
+	wantPrefix := []byte{opcodeNPCInfo}
+	wantPrefix = appendInt32(wantPrefix, 20)
+	wantPrefix = appendInt32(wantPrefix, 1000100)
+	wantPrefix = appendInt32(wantPrefix, 1)
+	wantPrefix = appendInt32(wantPrefix, 100)
+	wantPrefix = appendInt32(wantPrefix, 0)
+	wantPrefix = appendInt32(wantPrefix, -50)
+	wantPrefix = appendInt32(wantPrefix, 123)
+	if len(got) < len(wantPrefix) || string(got[:len(wantPrefix)]) != string(wantPrefix) {
+		t.Fatalf("NPCInfo prefix = % x, want % x", got[:min(len(got), len(wantPrefix))], wantPrefix)
+	}
+
+	state.Despawn(hostile)
+	if len(frames.frames) != 2 || frames.frames[1][0] != serverpackets.OpcodeDeleteObject {
+		t.Fatalf("frames after NPC despawn = %x, want DeleteObject after NPCInfo", frames.frames)
 	}
 }
 
