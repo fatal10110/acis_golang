@@ -29,7 +29,7 @@ Sources checked:
 
 - Original game client appendix: 206 concrete dispatcher targets.
 - Original game server appendix: 282 packet classes, including base/composite classes.
-- Classified M2-M5 required game client packets: 93. Missing in Go: 64.
+- Classified M2-M5 required game client packets: 93. Missing in Go: 63.
 - Classified M2-M5 required game server packets: 128. Missing in Go: 81.
 - M1 login client/server packets are implemented.
 - M1 GS-LS link packets are implemented under `internal/link/`.
@@ -158,6 +158,7 @@ Implemented and wired M5 target/combat/item/stance/social client packets in Go:
 
 - `Action`
 - `AttackRequest`
+- `RequestCrystallizeItem`
 - `RequestDestroyItem`
 - `RequestDropItem`
 - `RequestChangeMoveType`
@@ -168,7 +169,6 @@ Implemented and wired M5 target/combat/item/stance/social client packets in Go:
 Missing M5 stats/combat/items/progression client packets:
 
 - `RequestMagicSkillUse`
-- `RequestCrystallizeItem`
 - `RequestAutoSoulShot`
 - `RequestPetUseItem`
 - `RequestGiveItemToPet`
@@ -341,7 +341,8 @@ Implemented and wired M5 target/combat server packets in Go:
 - `Action` and `AttackRequest` now wire the target-selection/onAction subset needed for attacking mobs: first request selects and sends target HP status, second `AttackRequest` against the selected target emits `AutoAttackStart` then `Attack`; the existing attack-stance timeout emits `AutoAttackStop`. NPC dialog/interact routing remains deferred to the M7 NPC work, and skill/cast targeting remains deferred to M6.
 - `RequestChangeMoveType`, `RequestChangeWaitType`, and `RequestSocialAction` now wire the current run/walk, sit/stand, and social-animation state available in Go. Missing higher-level gates such as mount state, fishing, requester/trade state, and full AI intention are still owned by the systems that introduce those states.
 - `RequestDropItem`, `RequestDestroyItem`, and `SendTimeCheck` are wired. Drop/destroy currently cover the inventory/template/count gates available in Go and emit `InventoryUpdate`; player drops also place a ground item through the ground-item task and emit the animated `DropItem` frame during the transient dropper-id window.
+- `RequestCrystallizeItem` is wired for runtime-known Crystallize skill levels, crystallizable item gates, crystal reward grants, `SystemMessage` feedback, and `InventoryUpdate`. Durable learned-skill loading and skill acquisition remain with the `RequestAcquireSkillInfo`/`RequestAcquireSkill` burst.
 - `StatusUpdate` is implemented and wired for target max/current HP during selection. Broader status/stat recalculation broadcasts still need owner flows as those systems are ported.
-- The unique missing counts deduplicate those overlaps: 64 missing game client packets and 81 missing game server packets after the EnterWorld, movement/rotation, inventory, target/action, stance/social, and item-operation packet-wiring passes.
+- The unique missing counts deduplicate those overlaps: 63 missing game client packets and 81 missing game server packets after the EnterWorld, movement/rotation, inventory, target/action, stance/social, and item-operation packet-wiring passes.
 - Existing Go code accepts several M4/M5 client opcodes in `clientpackets/wiresafe.go`, but many of them still log "Opcode not wired" or have no decode/run implementation.
 - This audit uses original Java class names. Go may keep a slightly different helper shape, such as `Frame...` functions instead of packet structs, but the required client-visible packet behavior is still one original packet at a time.

@@ -35,6 +35,19 @@ func TestDecodeRequestDestroyItem(t *testing.T) {
 	}
 }
 
+func TestDecodeRequestCrystallizeItem(t *testing.T) {
+	payload := []byte{OpcodeRequestCrystallizeItem, 0xf6, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00}
+
+	got, err := DecodeRequestCrystallizeItem(payload)
+	if err != nil {
+		t.Fatalf("DecodeRequestCrystallizeItem: %v", err)
+	}
+	want := RequestCrystallizeItem{ObjectID: 502, Count: 1}
+	if got != want {
+		t.Fatalf("DecodeRequestCrystallizeItem = %+v, want %+v", got, want)
+	}
+}
+
 func TestDecodeSendTimeCheck(t *testing.T) {
 	payload := []byte{OpcodeSendTimeCheck, 0x11, 0x00, 0x00, 0x00, 0x22, 0x00, 0x00, 0x00}
 
@@ -54,6 +67,9 @@ func TestDecodeItemOpsShort(t *testing.T) {
 	}
 	if _, err := DecodeRequestDestroyItem([]byte{OpcodeRequestDestroyItem, 1}); err == nil {
 		t.Fatal("DecodeRequestDestroyItem: want error on short payload")
+	}
+	if _, err := DecodeRequestCrystallizeItem([]byte{OpcodeRequestCrystallizeItem, 1}); err == nil {
+		t.Fatal("DecodeRequestCrystallizeItem: want error on short payload")
 	}
 	if _, err := DecodeSendTimeCheck([]byte{OpcodeSendTimeCheck, 1}); err == nil {
 		t.Fatal("DecodeSendTimeCheck: want error on short payload")

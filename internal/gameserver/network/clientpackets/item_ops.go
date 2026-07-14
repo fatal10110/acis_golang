@@ -5,6 +5,7 @@ import "fmt"
 const (
 	requestDropItemSize    = 5 * 4
 	requestDestroyItemSize = 2 * 4
+	requestCrystallizeSize = 2 * 4
 	sendTimeCheckSize      = 2 * 4
 )
 
@@ -57,6 +58,30 @@ func DecodeRequestDestroyItem(payload []byte) (RequestDestroyItem, error) {
 	}
 	if err := r.Err(); err != nil {
 		return RequestDestroyItem{}, fmt.Errorf("clientpackets: RequestDestroyItem: %w", err)
+	}
+	return req, nil
+}
+
+// RequestCrystallizeItem asks the server to destroy an inventory item and
+// grant its crystal reward.
+type RequestCrystallizeItem struct {
+	ObjectID int32
+	Count    int32
+}
+
+// DecodeRequestCrystallizeItem parses a raw RequestCrystallizeItem payload
+// (opcode byte included).
+func DecodeRequestCrystallizeItem(payload []byte) (RequestCrystallizeItem, error) {
+	r := newReader(payload)
+	if r.Remaining() < requestCrystallizeSize {
+		return RequestCrystallizeItem{}, fmt.Errorf("clientpackets: RequestCrystallizeItem: need %d bytes, got %d", requestCrystallizeSize, r.Remaining())
+	}
+	req := RequestCrystallizeItem{
+		ObjectID: r.ReadInt32(),
+		Count:    r.ReadInt32(),
+	}
+	if err := r.Err(); err != nil {
+		return RequestCrystallizeItem{}, fmt.Errorf("clientpackets: RequestCrystallizeItem: %w", err)
 	}
 	return req, nil
 }

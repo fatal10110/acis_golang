@@ -148,6 +148,17 @@ func (s *fakeCharStore) savedPosition(t *testing.T, id int32) savedPosition {
 	return pos
 }
 
+func (s *fakeCharStore) updateCharacter(t *testing.T, id int32, update func(*player.Character)) {
+	t.Helper()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	ch, ok := s.byID[id]
+	if !ok {
+		t.Fatalf("character %d missing", id)
+	}
+	update(ch)
+}
+
 type fakeItemStore struct {
 	mu    sync.Mutex
 	items map[int32][]*item.Instance
@@ -209,6 +220,7 @@ func testItemTemplates() *item.Table {
 			ID:          item.AdenaID,
 			Name:        "Adena",
 			Kind:        item.KindEtcItem,
+			Duration:    -1,
 			Stackable:   true,
 			Dropable:    true,
 			Destroyable: true,
@@ -218,19 +230,31 @@ func testItemTemplates() *item.Table {
 			ID:          20,
 			Name:        "Potion",
 			Kind:        item.KindEtcItem,
+			Duration:    -1,
 			Stackable:   true,
 			Dropable:    true,
 			Destroyable: true,
 			EtcItem:     &item.EtcItemDetail{Type: item.EtcItemPotion},
 		},
 		{
-			ID:          30,
-			Name:        "Sword",
-			Kind:        item.KindWeapon,
-			Slot:        item.SlotRHand,
-			Dropable:    true,
-			Destroyable: true,
-			Weapon:      &item.WeaponDetail{Type: item.WeaponSword},
+			ID:           30,
+			Name:         "Sword",
+			Kind:         item.KindWeapon,
+			Slot:         item.SlotRHand,
+			Duration:     -1,
+			Crystal:      item.CrystalD,
+			CrystalCount: 10,
+			Dropable:     true,
+			Destroyable:  true,
+			Weapon:       &item.WeaponDetail{Type: item.WeaponSword},
+		},
+		{
+			ID:        item.CrystalD.ItemID(),
+			Name:      "D-grade Crystal",
+			Kind:      item.KindEtcItem,
+			Duration:  -1,
+			Stackable: true,
+			EtcItem:   &item.EtcItemDetail{},
 		},
 	})
 }
@@ -554,6 +578,13 @@ func encodeRequestDestroyItem(objectID, count int32) []byte {
 	return w.Bytes()
 }
 
+func encodeRequestCrystallizeItem(objectID, count int32) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeRequestCrystallizeItem)
+	w.WriteInt32(objectID)
+	w.WriteInt32(count)
+	return w.Bytes()
+}
+
 func encodeSendTimeCheck(requestID, responseID int32) []byte {
 	w := wire.NewPacketWriter(clientpackets.OpcodeSendTimeCheck)
 	w.WriteInt32(requestID)
@@ -663,6 +694,17 @@ func frameOpcodes(frames [][]byte) []byte {
 		}
 	}
 	return out
+}
+
+func skipInventoryRemainder(r *wire.Reader) {
+	r.ReadUint16()
+	r.ReadUint16()
+	r.ReadUint16()
+	r.ReadInt32()
+	r.ReadUint16()
+	r.ReadUint16()
+	r.ReadInt32()
+	r.ReadInt32()
 }
 
 func boolUint8(v bool) uint8 {
@@ -1574,6 +1616,132 @@ func TestGameClientLinkDestroyItemInGame(t *testing.T) {
 	r.ReadInt32()
 	if got := r.ReadInt32(); got != 3 {
 		t.Fatalf("InventoryUpdate count = %d, want 3", got)
+	}
+}
+
+func TestGameClientLinkCrystallizeItemInGame(t *testing.T) {
+	c, chars, items, _ := newLinkedGameClient(t)
+
+	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.read() // CharCreateOk
+	c.read() // CharSelectInfo
+	objID := chars.soleObjectID(t)
+	chars.updateCharacter(t, objID, func(ch *player.Character) {
+		ch.SetSkillLevel(248, 1)
+	})
+	if err := items.Create(context.Background(), objID, item.Instance{
+		ObjectID:   502,
+		TemplateID: 30,
+		OwnerID:    objID,
+		Count:      1,
+		Location:   item.LocationInventory,
+	}); err != nil {
+		t.Fatalf("seed item: %v", err)
+	}
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	c.send(encodeRequestCrystallizeItem(502, 1))
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeSystemMessage {
+		t.Fatalf("crystallize message opcode = %#x, want SystemMessage (%#x)", reply[0], serverpackets.OpcodeSystemMessage)
+	}
+	r := wire.NewReader(reply[1:])
+	if id := r.ReadInt32(); id != serverpackets.SystemMessageItemCrystallized {
+		t.Fatalf("SystemMessage id = %d, want crystallized", id)
+	}
+	if params := r.ReadInt32(); params != 1 {
+		t.Fatalf("SystemMessage params = %d, want 1", params)
+	}
+	if typ := r.ReadInt32(); typ != serverpackets.SystemMessageParamItemName {
+		t.Fatalf("SystemMessage param type = %d, want item name", typ)
+	}
+	if got := r.ReadInt32(); got != 30 {
+		t.Fatalf("SystemMessage item id = %d, want 30", got)
+	}
+
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeInventoryUpdate {
+		t.Fatalf("crystallize inventory opcode = %#x, want InventoryUpdate (%#x)", reply[0], serverpackets.OpcodeInventoryUpdate)
+	}
+	r = wire.NewReader(reply[1:])
+	if count := r.ReadUint16(); count != 2 {
+		t.Fatalf("InventoryUpdate count = %d, want 2", count)
+	}
+	if state := r.ReadUint16(); state != uint16(itemcontainer.UpdateRemoved) {
+		t.Fatalf("source update state = %d, want removed", state)
+	}
+	r.ReadUint16()
+	if got := r.ReadInt32(); got != 502 {
+		t.Fatalf("source update object id = %d, want 502", got)
+	}
+	if got := r.ReadInt32(); got != 30 {
+		t.Fatalf("source update item id = %d, want 30", got)
+	}
+	if got := r.ReadInt32(); got != 1 {
+		t.Fatalf("source update count = %d, want 1", got)
+	}
+	skipInventoryRemainder(r)
+
+	if state := r.ReadUint16(); state != uint16(itemcontainer.UpdateAdded) {
+		t.Fatalf("crystal update state = %d, want added", state)
+	}
+	r.ReadUint16()
+	if got := r.ReadInt32(); got == 0 {
+		t.Fatal("crystal update object id = 0, want allocated id")
+	}
+	if got := r.ReadInt32(); got != item.CrystalD.ItemID() {
+		t.Fatalf("crystal update item id = %d, want D crystal", got)
+	}
+	if got := r.ReadInt32(); got != 10 {
+		t.Fatalf("crystal update count = %d, want 10", got)
+	}
+}
+
+func TestGameClientLinkCrystallizeItemSkillTooLow(t *testing.T) {
+	c, chars, items, _ := newLinkedGameClient(t)
+
+	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.read() // CharCreateOk
+	c.read() // CharSelectInfo
+	objID := chars.soleObjectID(t)
+	if err := items.Create(context.Background(), objID, item.Instance{
+		ObjectID:   503,
+		TemplateID: 30,
+		OwnerID:    objID,
+		Count:      1,
+		Location:   item.LocationInventory,
+	}); err != nil {
+		t.Fatalf("seed item: %v", err)
+	}
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	c.send(encodeRequestCrystallizeItem(503, 1))
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeSystemMessage {
+		t.Fatalf("skill-low opcode = %#x, want SystemMessage (%#x)", reply[0], serverpackets.OpcodeSystemMessage)
+	}
+	r := wire.NewReader(reply[1:])
+	if id := r.ReadInt32(); id != serverpackets.SystemMessageCrystallizeLevelTooLow {
+		t.Fatalf("SystemMessage id = %d, want crystallize level too low", id)
+	}
+	if params := r.ReadInt32(); params != 0 {
+		t.Fatalf("SystemMessage params = %d, want 0", params)
+	}
+
+	c.send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeItemList {
+		t.Fatalf("post-skill-low opcode = %#x, want ItemList (%#x)", reply[0], serverpackets.OpcodeItemList)
 	}
 }
 

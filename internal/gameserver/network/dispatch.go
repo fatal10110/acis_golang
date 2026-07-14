@@ -48,6 +48,8 @@ type groundItemDropper interface {
 	Drop(*grounditem.Item, task.DropOptions)
 }
 
+const crystallizeSkillID = 248
+
 // GameClientLink accepts and drives connections from Interlude game
 // clients: the VersionCheck/cipher handshake, session-key validation
 // against the login server, character list/create/delete/restore, and
@@ -586,6 +588,17 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 			l.destroyLiveItem(live, req.ObjectID, int(req.Count))
 
+		case clientpackets.OpcodeRequestCrystallizeItem:
+			req, err := clientpackets.DecodeRequestCrystallizeItem(payload)
+			if err != nil {
+				l.log.Warn().Err(err).Msg("game client")
+				return
+			}
+			if live == nil {
+				continue
+			}
+			l.crystallizeLiveItem(live, req)
+
 		case clientpackets.OpcodeRequestSkillList:
 			session.SendFrame(serverpackets.FrameSkillList(nil))
 
@@ -715,7 +728,6 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			clientpackets.OpcodeRequestAcquireSkillInfo,
 			clientpackets.OpcodeRequestAcquireSkill,
 			clientpackets.OpcodeRequestRestartPoint,
-			clientpackets.OpcodeRequestCrystallizeItem,
 			clientpackets.OpcodeRequestChangePetName,
 			clientpackets.OpcodeRequestPetUseItem,
 			clientpackets.OpcodeRequestGiveItemToPet,
@@ -1034,12 +1046,74 @@ func (l *GameClientLink) destroyLiveItem(live *livePlayer, objectID int32, count
 	}
 }
 
+func (l *GameClientLink) crystallizeLiveItem(live *livePlayer, req clientpackets.RequestCrystallizeItem) {
+	if req.Count <= 0 {
+		return
+	}
+	skillLevel := live.SkillLevel(crystallizeSkillID)
+	if skillLevel <= 0 {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCrystallizeLevelTooLow))
+		return
+	}
+
+	inv := live.Inventory()
+	if inv == nil {
+		return
+	}
+	inst := inv.ItemByObjectID(req.ObjectID)
+	if inst == nil {
+		return
+	}
+	tmpl, ok := inv.Templates().Get(inst.TemplateID)
+	if !ok || tmpl.HeroItem() || inst.ShadowItem(tmpl) {
+		return
+	}
+	crystalItemID, crystalCount, ok := tmpl.CrystalReward(inst.EnchantLevel)
+	if !ok {
+		return
+	}
+	if !item.CanCrystallize(tmpl.Crystal, skillLevel) {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCrystallizeLevelTooLow))
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return
+	}
+	if _, ok := inv.Templates().Get(crystalItemID); !ok || l.ids == nil {
+		return
+	}
+	crystalObjectID, err := l.ids.NextID()
+	if err != nil {
+		l.log.Error().Err(err).Msg("allocate crystal item id")
+		return
+	}
+
+	count := int(req.Count)
+	if count > inst.Count {
+		count = inst.Count
+	}
+	wasEquipped := inst.Equipped() && inst.Count <= count
+	sourceItemID := inst.TemplateID
+	if inv.DestroyItem(inst, count) == nil {
+		return
+	}
+	if inv.AddNew(crystalItemID, int(crystalCount), crystalObjectID) == nil {
+		return
+	}
+
+	live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageItemCrystallized, sourceItemID))
+	l.sendInventoryUpdate(live, inv)
+	if wasEquipped {
+		l.broadcastEquipmentChange(live)
+	}
+}
+
 func (l *GameClientLink) sendInventoryUpdate(live *livePlayer, inv *itemcontainer.Inventory) {
 	updates := inv.DrainUpdates()
 	if len(updates) == 0 {
 		return
 	}
-	frame, err := serverpackets.FrameInventoryUpdate(updates, inv.Items(), inv.Templates())
+	items := inv.Items()
+	live.items = items
+	frame, err := serverpackets.FrameInventoryUpdate(updates, items, inv.Templates())
 	if err != nil {
 		l.log.Error().Err(err).Msg("build InventoryUpdate")
 		return
