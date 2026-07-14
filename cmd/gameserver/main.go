@@ -427,7 +427,7 @@ func provideIDAllocator(pool *sql.DB, log zerolog.Logger) (*idfactory.Allocator,
 }
 
 func provideRoster(cfg gameServerConfig, data *gameData, characters *gamesql.CharacterStore, items *gamesql.ItemStore, ids *idfactory.Allocator) *manager.Roster {
-	return manager.NewRoster(characters, items, data.Players, data.Items, ids, manager.DefaultDeleteAfter, time.Now)
+	return manager.NewRoster(characters, items, data.Players, data.Items, data.NPCs, ids, manager.DefaultDeleteAfter, time.Now)
 }
 
 func providePvPFlags(opts task.PvPFlagOptions) *task.PvPFlags {

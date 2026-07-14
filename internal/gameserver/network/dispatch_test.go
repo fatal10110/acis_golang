@@ -407,7 +407,7 @@ func newTestGameClientLinkWithLog(t *testing.T, loginLink func() *LoginLink, val
 	state = world.New()
 	templates := testTemplates(t)
 	itemTemplates := testItemTemplates()
-	roster := gamemanager.NewRoster(chars, items, templates, itemTemplates, &sequentialIDs{next: 100}, gamemanager.DefaultDeleteAfter, time.Now)
+	roster := gamemanager.NewRoster(chars, items, templates, itemTemplates, npc.NewTable(nil), &sequentialIDs{next: 100}, gamemanager.DefaultDeleteAfter, time.Now)
 	gcl := NewGameClientLink(validator, loginLink, roster, items, templates, itemTemplates, state, log)
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
@@ -774,7 +774,7 @@ func TestGameClientLinkNormalDisconnectLogsDebug(t *testing.T) {
 func TestDetachLivePlayerSavesWithUncancelledBoundedContext(t *testing.T) {
 	chars := newFakeCharStore()
 	items := newFakeItemStore()
-	roster := gamemanager.NewRoster(chars, items, testTemplates(t), testItemTemplates(), &sequentialIDs{next: 100}, gamemanager.DefaultDeleteAfter, time.Now)
+	roster := gamemanager.NewRoster(chars, items, testTemplates(t), testItemTemplates(), npc.NewTable(nil), &sequentialIDs{next: 100}, gamemanager.DefaultDeleteAfter, time.Now)
 	live := newTestLivePlayer(t, 101, &frameCapture{})
 	savedAt := location.Location{X: 46160, Y: 41237, Z: -3534}
 	live.Character.Location = savedAt

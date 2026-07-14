@@ -4,13 +4,16 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 
 	"github.com/fatal10110/acis_golang/internal/config"
 	"github.com/fatal10110/acis_golang/internal/datadiff"
+	"github.com/fatal10110/acis_golang/internal/gameserver/geo/engine"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/pathfind"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/probe"
 )
@@ -41,9 +44,10 @@ func run(args []string, stdout, stderr io.Writer) int {
 	seed := fs.Uint64("seed", 1, "seed for the random query generator, for a reproducible sample")
 	dumpPath := fs.String("dump", "", "path to write the evaluated queries and Go's answers to; defaults to stdout when generating")
 	expectedDumpPath := fs.String("expected-dump", "", "path to a captured oracle dump; re-evaluates its queries against Go and reports agreement, instead of generating a random sample")
+	allowEmptyGeodata := fs.Bool("allow-empty-geodata", false, "allow an empty geodata directory and run against the null engine")
 
 	fs.Usage = func() {
-		fmt.Fprintf(stderr, "Usage: %s -geodata=<dir> [-geotype=L2OFF|L2J] [-config=<geoengine.properties>] {[-queries=N] [-seed=S] | -expected-dump=<file>} [-dump=<file>]\n\n", fs.Name())
+		fmt.Fprintf(stderr, "Usage: %s -geodata=<dir> [-geotype=L2OFF|L2J] [-config=<geoengine.properties>] [-allow-empty-geodata] {[-queries=N] [-seed=S] | -expected-dump=<file>} [-dump=<file>]\n\n", fs.Name())
 		fmt.Fprintln(stderr, "Without -expected-dump, evaluates -queries random queries against the Go geo engine and writes them, with Go's answers, to -dump or stdout.")
 		fmt.Fprintln(stderr, "With -expected-dump, re-evaluates that file's queries against the Go geo engine and reports agreement with its recorded answers.")
 		fmt.Fprintln(stderr)
@@ -79,6 +83,22 @@ func run(args []string, stdout, stderr io.Writer) int {
 	if dir == "" {
 		fmt.Fprintln(stderr, "geoprobe: -geodata is required (or set GeoDataPath in -config)")
 		return exitError
+	}
+
+	if !validGeoType(geoType) {
+		fmt.Fprintf(stderr, "geoprobe: probe: unknown geodata type %q\n", geoType)
+		return exitError
+	}
+	if !*allowEmptyGeodata {
+		ok, err := hasLoadableGeodataFile(dir, geoType)
+		if err != nil {
+			fmt.Fprintf(stderr, "geoprobe: inspect geodata: %v\n", err)
+			return exitError
+		}
+		if !ok {
+			fmt.Fprintf(stderr, "geoprobe: no %s geodata files found in %s\n", geoType, dir)
+			return exitError
+		}
 	}
 
 	e, err := probe.LoadEngine(dir, geoType)
@@ -131,6 +151,39 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return exitDiffFound
 	}
 	return exitOK
+}
+
+func validGeoType(geoType probe.GeoType) bool {
+	return geoType == probe.L2OFF || geoType == probe.L2J
+}
+
+func hasLoadableGeodataFile(dir string, geoType probe.GeoType) (bool, error) {
+	for x := engine.TileXMin; x <= engine.TileXMax; x++ {
+		for y := engine.TileYMin; y <= engine.TileYMax; y++ {
+			if ok, err := fileExists(geodataRegionPath(dir, geoType, x, y)); ok || err != nil {
+				return ok, err
+			}
+		}
+	}
+	return false, nil
+}
+
+func fileExists(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, nil
+	}
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+	return false, err
+}
+
+func geodataRegionPath(dir string, geoType probe.GeoType, x, y int) string {
+	if geoType == probe.L2J {
+		return filepath.Join(dir, fmt.Sprintf("%d_%d.l2j", x, y))
+	}
+	return filepath.Join(dir, fmt.Sprintf("%d_%d_conv.dat", x, y))
 }
 
 // resolveQueries returns the queries to evaluate: parsed from
