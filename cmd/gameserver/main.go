@@ -141,6 +141,7 @@ func newGameServerApp(paths gameServerPaths) *fx.App {
 			provideNpcs,
 			network.NewSessionValidator,
 			provideLoginLinkState,
+			provideSkillPersistence,
 			provideGameClientLink,
 		),
 		fx.Invoke(startPvPFlags, startGroundItems, startGameClock, startWalker, startWater, startShadowItems, startDecay, startAttackStance, startWorldObjects, startRespawnTask, startAI, startNpcs, startNpcPersistence, startGameServer),
@@ -757,10 +758,15 @@ func provideGameClientLink(
 	items *gamesql.ItemStore,
 	validator *network.SessionValidator,
 	links *loginLinkState,
+	skills *network.SkillPersistence,
 	state *world.State,
 	log zerolog.Logger,
 ) *network.GameClientLink {
-	return network.NewGameClientLink(validator, links.get, roster, items, data.Players, data.Items, state, log)
+	return network.NewGameClientLink(validator, links.get, roster, items, data.Players, data.Items, skills, state, log)
+}
+
+func provideSkillPersistence(pool *sql.DB, data *gameData) *network.SkillPersistence {
+	return network.NewSkillPersistence(gamesql.NewSkillSaveStore(pool), data.Skills)
 }
 
 func startGameServer(lc fx.Lifecycle, cfg gameServerConfig, _ *gameData, _ *manager.Roster, validator *network.SessionValidator, links *loginLinkState, clients *network.GameClientLink, log zerolog.Logger) {
