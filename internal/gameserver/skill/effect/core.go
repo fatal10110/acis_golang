@@ -34,6 +34,12 @@ const (
 	FlagStunned
 )
 
+// TypeManaDamOverTime is a periodic MP-drain effect: a toggle skill's
+// upkeep tick, or a plain continuous mana-drain buff. Declared here rather
+// than alongside the other Type constants so this file's additions stay
+// out of the effect list's stacking logic.
+const TypeManaDamOverTime Type = "MANA_DMG_OVER_TIME"
+
 type kind struct {
 	typ    Type
 	flag   Flag
@@ -41,13 +47,14 @@ type kind struct {
 }
 
 var coreKinds = map[string]kind{
-	"Buff":        {typ: TypeBuff},
-	"Debuff":      {typ: TypeDebuff, debuff: true},
-	"DamOverTime": {typ: TypeDamOverTime, debuff: true},
-	"Fear":        {typ: TypeFear, flag: FlagFear, debuff: true},
-	"Root":        {typ: TypeRoot, flag: FlagRooted, debuff: true},
-	"Sleep":       {typ: TypeSleep, flag: FlagSleep, debuff: true},
-	"Stun":        {typ: TypeStun, flag: FlagStunned, debuff: true},
+	"Buff":            {typ: TypeBuff},
+	"Debuff":          {typ: TypeDebuff, debuff: true},
+	"DamOverTime":     {typ: TypeDamOverTime, debuff: true},
+	"ManaDamOverTime": {typ: TypeManaDamOverTime},
+	"Fear":            {typ: TypeFear, flag: FlagFear, debuff: true},
+	"Root":            {typ: TypeRoot, flag: FlagRooted, debuff: true},
+	"Sleep":           {typ: TypeSleep, flag: FlagSleep, debuff: true},
+	"Stun":            {typ: TypeStun, flag: FlagStunned, debuff: true},
 }
 
 var fearSkippedPlayableSkillIDs = map[modelskill.ID]bool{
@@ -90,6 +97,8 @@ func wireHooks(e *Effect) {
 	switch e.Type {
 	case TypeDamOverTime:
 		e.OnAction = damageOverTimeAction
+	case TypeManaDamOverTime:
+		e.OnAction = manaDamageOverTimeAction
 	case TypeFear:
 		e.OnStart = fearStart
 		e.OnAction = fearAction
@@ -114,6 +123,16 @@ type dotTarget interface {
 
 type lackHPNotifier interface {
 	NotifyEffectRemovedDueLackHP(*Effect)
+}
+
+type mpDotTarget interface {
+	Dead() bool
+	MP() float64
+	ReduceMP(amount float64)
+}
+
+type lackMPNotifier interface {
+	NotifyEffectRemovedDueLackMP(*Effect)
 }
 
 type aborter interface {
@@ -176,6 +195,29 @@ func damageOverTimeAction(e *Effect) bool {
 	}
 	if result.Damage > 0 {
 		target.ReduceHPByDOT(result.Damage, e.Effector, e.Skill)
+	}
+	return result.Continue
+}
+
+func manaDamageOverTimeAction(e *Effect) bool {
+	target, ok := e.Effected.(mpDotTarget)
+	if !ok {
+		return false
+	}
+
+	result := ManaDamageOverTimeTick(ManaDamageOverTimeInput{
+		Dead:   target.Dead(),
+		MP:     target.MP(),
+		Damage: e.Template.Value,
+		Toggle: e.Skill.Toggle,
+	})
+	if result.RemovedForLackMP {
+		if notifier, ok := e.Effected.(lackMPNotifier); ok {
+			notifier.NotifyEffectRemovedDueLackMP(e)
+		}
+	}
+	if result.Damage > 0 {
+		target.ReduceMP(result.Damage)
 	}
 	return result.Continue
 }
@@ -270,7 +312,11 @@ func isPlayable(target any) bool {
 	return ok && t.Playable()
 }
 
-func statFuncs(owner *Effect, templates []modelskill.FuncTemplate) ([]basefunc.Func, error) {
+// statFuncs builds the stat functions templates describes, attributed to
+// owner. owner is opaque here (see basefunc.Func.Owner): a running buff
+// passes itself, a passive skill passes an identity stable for as long as
+// it stays learned.
+func statFuncs(owner any, templates []modelskill.FuncTemplate) ([]basefunc.Func, error) {
 	funcs := make([]basefunc.Func, 0, len(templates))
 	for _, tmpl := range templates {
 		if tmpl.AttachCondition != nil || tmpl.Condition != nil {
@@ -289,7 +335,7 @@ func statFuncs(owner *Effect, templates []modelskill.FuncTemplate) ([]basefunc.F
 	return funcs, nil
 }
 
-func statFunc(owner *Effect, s stat.Stat, tmpl modelskill.FuncTemplate) (basefunc.Func, error) {
+func statFunc(owner any, s stat.Stat, tmpl modelskill.FuncTemplate) (basefunc.Func, error) {
 	switch tmpl.Op {
 	case modelskill.FuncAdd:
 		return basefunc.NewAdd(owner, s, tmpl.Value, nil), nil
@@ -352,4 +398,36 @@ func DamageOverTimeTick(in DamageOverTimeInput) DamageOverTimeResult {
 		}
 	}
 	return DamageOverTimeResult{Damage: damage, Continue: true}
+}
+
+// ManaDamageOverTimeInput is the state a periodic MP upkeep tick needs.
+type ManaDamageOverTimeInput struct {
+	Dead   bool
+	MP     float64
+	Damage float64
+	Toggle bool
+}
+
+// ManaDamageOverTimeResult reports the effect of one periodic MP upkeep
+// tick.
+type ManaDamageOverTimeResult struct {
+	Damage           float64
+	Continue         bool
+	RemovedForLackMP bool
+}
+
+// ManaDamageOverTimeTick computes one periodic MP upkeep tick without
+// mutating actor state. A toggle skill whose upkeep strictly exceeds the
+// available MP drops instead of draining below zero; every other
+// mana-drain effect always pays its cost, however low that leaves MP.
+// The strict inequality (not "at least") matters: a toggle whose upkeep
+// exactly equals the remaining MP still pays it and keeps running.
+func ManaDamageOverTimeTick(in ManaDamageOverTimeInput) ManaDamageOverTimeResult {
+	if in.Dead {
+		return ManaDamageOverTimeResult{}
+	}
+	if in.Toggle && in.Damage > in.MP {
+		return ManaDamageOverTimeResult{RemovedForLackMP: true}
+	}
+	return ManaDamageOverTimeResult{Damage: in.Damage, Continue: true}
 }
