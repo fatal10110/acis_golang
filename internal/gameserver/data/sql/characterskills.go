@@ -42,3 +42,17 @@ func (s *CharacterSkillStore) ListKnownSkills(ctx context.Context, charObjID int
 	}
 	return levels, nil
 }
+
+// SetKnownSkill persists one learned skill level for one character class.
+func (s *CharacterSkillStore) SetKnownSkill(ctx context.Context, charObjID int32, classIndex int32, skillID int, level int) error {
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO character_skills (char_obj_id, skill_id, skill_level, class_index)
+		 VALUES (?, ?, ?, ?)
+		 ON DUPLICATE KEY UPDATE skill_level = VALUES(skill_level)`,
+		charObjID, skillID, level, classIndex,
+	)
+	if err != nil {
+		return fmt.Errorf("set known skill %d level %d for character %d class %d: %w", skillID, level, charObjID, classIndex, err)
+	}
+	return nil
+}

@@ -20,6 +20,10 @@ type skillLevelStore interface {
 	ListKnownSkills(ctx context.Context, charObjID int32, classIndex int32) (player.SkillLevels, error)
 }
 
+type skillLevelWriter interface {
+	SetKnownSkill(ctx context.Context, charObjID int32, classIndex int32, skillID int, level int) error
+}
+
 // SkillPersistence saves and restores a live player's buff and skill-reuse
 // state at the game-client lifecycle boundary.
 type SkillPersistence struct {
@@ -91,6 +95,24 @@ func (p *SkillPersistence) Restore(ctx context.Context, c *player.Character) err
 	return nil
 }
 
+// SetKnownSkill records one learned skill on the character and, when the
+// backing store can write character_skills, persists it first.
+func (p *SkillPersistence) SetKnownSkill(ctx context.Context, c *player.Character, skillID, level int) error {
+	if c == nil {
+		return nil
+	}
+	classIndex := c.SkillSaveClassIndex()
+	if p != nil && p.levels != nil {
+		if writer, ok := p.levels.(skillLevelWriter); ok {
+			if err := writer.SetKnownSkill(ctx, c.ID, classIndex, skillID, level); err != nil {
+				return fmt.Errorf("set known skill for character %d: %w", c.ID, err)
+			}
+		}
+	}
+	c.SetSkillLevel(skillID, level)
+	return nil
+}
+
 func (p *SkillPersistence) restoreKnownSkills(ctx context.Context, c *player.Character, classIndex int32) error {
 	if p.levels == nil {
 		return nil
@@ -126,6 +148,11 @@ func (p *SkillPersistence) definition(ref modelskill.Ref) (modelskill.Definition
 		return modelskill.Definition{}, false
 	}
 	return p.skills.Get(ref.ID, ref.Level)
+}
+
+func (p *SkillPersistence) hasDefinition(ref modelskill.Ref) bool {
+	_, ok := p.definition(ref)
+	return ok
 }
 
 func reuseGroup(def modelskill.Definition) int32 {

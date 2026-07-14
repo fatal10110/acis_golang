@@ -387,6 +387,26 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 			session.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
 
+		case clientpackets.OpcodeRequestAcquireSkillInfo:
+			req, err := clientpackets.DecodeRequestAcquireSkillInfo(payload)
+			if err != nil {
+				l.log.Warn().Err(err).Msg("game client")
+				continue
+			}
+			if live != nil {
+				l.sendAcquireSkillInfo(live, req)
+			}
+
+		case clientpackets.OpcodeRequestAcquireSkill:
+			req, err := clientpackets.DecodeRequestAcquireSkill(payload)
+			if err != nil {
+				l.log.Warn().Err(err).Msg("game client")
+				continue
+			}
+			if live != nil {
+				l.learnAcquireSkill(ctx, live, req)
+			}
+
 		case clientpackets.OpcodeRequestActionUse:
 			req, err := clientpackets.DecodeRequestActionUse(payload)
 			if err != nil {
@@ -510,8 +530,6 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			clientpackets.OpcodeCannotMoveInVehicle,
 			clientpackets.OpcodeRequestQuestListInGame,
 			clientpackets.OpcodeRequestQuestAbort,
-			clientpackets.OpcodeRequestAcquireSkillInfo,
-			clientpackets.OpcodeRequestAcquireSkill,
 			clientpackets.OpcodeRequestRestartPoint,
 			clientpackets.OpcodeRequestChangePetName,
 			clientpackets.OpcodeRequestPetUseItem,
