@@ -205,7 +205,7 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) {
 	w.WriteInt32(0) // fishing stance y: fishing is not modeled
 	w.WriteInt32(0) // fishing stance z: fishing is not modeled
 	w.WriteInt32(defaultNameColor)
-	w.WriteUint8(1) // running: the walk/run toggle is not persisted yet, so a character always enters running
+	w.WriteUint8(boolUint8(c.Running()))
 	w.WriteInt32(0) // pledge class: clans are not modeled
 	w.WriteInt32(0) // pledge type: clans are not modeled
 	w.WriteInt32(defaultTitleColor)

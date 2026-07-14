@@ -68,6 +68,13 @@ type Character struct {
 	dead    bool
 	health  creature.Health
 
+	// stateMu guards transient live stance flags.
+	stateMu   sync.RWMutex
+	stateInit bool
+	running   bool
+	standing  bool
+	inCombat  bool
+
 	skills skillState
 }
 
@@ -112,6 +119,10 @@ func NewCharacter(objectID int32, tmpl *Template, accountName, name string, hair
 		Face: int(face), HairStyle: int(hairStyle), HairColor: int(hairColor),
 
 		AccessLevel: defaultAccessLevel,
+
+		stateInit: true,
+		running:   true,
+		standing:  true,
 	}
 
 	if len(tmpl.Spawns) > 0 {

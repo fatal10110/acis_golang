@@ -25,6 +25,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/fatal10110/acis_golang/internal/link"
 )
@@ -490,6 +491,24 @@ func encodeRequestTargetCancel(unselect uint16) []byte {
 	return w.Bytes()
 }
 
+func encodeRequestChangeMoveType(run bool) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeRequestChangeMoveType)
+	w.WriteInt32(int32(boolInt32(run)))
+	return w.Bytes()
+}
+
+func encodeRequestChangeWaitType(stand bool) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeRequestChangeWaitType)
+	w.WriteInt32(int32(boolInt32(stand)))
+	return w.Bytes()
+}
+
+func encodeRequestSocialAction(actionID int32) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeRequestSocialAction)
+	w.WriteInt32(actionID)
+	return w.Bytes()
+}
+
 func encodeSingleOpcode(opcode byte) []byte {
 	return wire.NewPacketWriter(opcode).Bytes()
 }
@@ -514,7 +533,7 @@ func newTestGameClientLinkWithSkillsAndLog(t *testing.T, loginLink func() *Login
 	templates := testTemplates(t)
 	itemTemplates := testItemTemplates()
 	roster := gamemanager.NewRoster(chars, items, templates, itemTemplates, npc.NewTable(nil), &sequentialIDs{next: 100}, gamemanager.DefaultDeleteAfter, time.Now)
-	gcl := NewGameClientLink(validator, loginLink, roster, items, templates, itemTemplates, skills, state, log)
+	gcl := NewGameClientLink(validator, loginLink, roster, items, templates, itemTemplates, skills, state, nil, log)
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -599,6 +618,13 @@ func boolUint8(v bool) uint8 {
 	return 0
 }
 
+func boolInt32(v bool) int32 {
+	if v {
+		return 1
+	}
+	return 0
+}
+
 func newTestLivePlayer(t *testing.T, id int32, capture *frameCapture) *livePlayer {
 	t.Helper()
 	tmpl, ok := testTemplates(t).Get(0)
@@ -653,6 +679,14 @@ func (testHostileAttack) BowCoolingDown() bool                { return false }
 func (testHostileAttack) AttackingNow() bool                  { return false }
 func (testHostileAttack) CanAttack(attackable.Combatant) bool { return false }
 func (testHostileAttack) DoAttack(attackable.Combatant)       {}
+
+type attackStanceRecorder struct {
+	actors []task.AttackStanceActor
+}
+
+func (r *attackStanceRecorder) Add(actor task.AttackStanceActor) {
+	r.actors = append(r.actors, actor)
+}
 
 type visibleGroundItem struct {
 	world.Presence
@@ -947,10 +981,18 @@ func TestGameClientLinkActionAttackAndTargetCancel(t *testing.T) {
 
 	c.send(encodeAttackRequest(target.ObjectID(), origin, false))
 	reply = c.read()
+	if reply[0] != serverpackets.OpcodeAutoAttackStart {
+		t.Fatalf("AttackRequest first opcode = %#x, want AutoAttackStart (%#x)", reply[0], serverpackets.OpcodeAutoAttackStart)
+	}
+	r := wire.NewReader(reply[1:])
+	if attackerID := r.ReadInt32(); attackerID != objID {
+		t.Fatalf("AutoAttackStart object id = %d, want %d", attackerID, objID)
+	}
+	reply = c.read()
 	if reply[0] != serverpackets.OpcodeAttack {
 		t.Fatalf("AttackRequest opcode = %#x, want Attack (%#x)", reply[0], serverpackets.OpcodeAttack)
 	}
-	r := wire.NewReader(reply[1:])
+	r = wire.NewReader(reply[1:])
 	if attackerID := r.ReadInt32(); attackerID != objID {
 		t.Fatalf("Attack attacker id = %d, want %d", attackerID, objID)
 	}
@@ -994,6 +1036,82 @@ func TestGameClientLinkAttackRequestFirstSelectsOnly(t *testing.T) {
 	reply = c.read()
 	if reply[0] != serverpackets.OpcodeActionFailed {
 		t.Fatalf("RequestTargetCancel after first AttackRequest opcode = %#x, want ActionFailed (%#x)", reply[0], serverpackets.OpcodeActionFailed)
+	}
+}
+
+func TestGameClientLinkStanceAndSocialPacketsInGame(t *testing.T) {
+	c, chars, _, _ := newLinkedGameClient(t)
+
+	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.read() // CharCreateOk
+	c.read() // CharSelectInfo
+	objID := chars.soleObjectID(t)
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	c.send(encodeRequestChangeMoveType(false))
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeChangeMoveType {
+		t.Fatalf("walk opcode = %#x, want ChangeMoveType (%#x)", reply[0], serverpackets.OpcodeChangeMoveType)
+	}
+	r := wire.NewReader(reply[1:])
+	if got := r.ReadInt32(); got != objID {
+		t.Fatalf("ChangeMoveType object id = %d, want %d", got, objID)
+	}
+	if running, swimming := r.ReadInt32(), r.ReadInt32(); running != 0 || swimming != 0 {
+		t.Fatalf("ChangeMoveType flags = (%d,%d), want (0,0)", running, swimming)
+	}
+
+	c.send(encodeRequestChangeMoveType(true))
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeChangeMoveType {
+		t.Fatalf("run opcode = %#x, want ChangeMoveType (%#x)", reply[0], serverpackets.OpcodeChangeMoveType)
+	}
+	r = wire.NewReader(reply[1:])
+	r.ReadInt32()
+	if running := r.ReadInt32(); running != 1 {
+		t.Fatalf("ChangeMoveType running = %d, want 1", running)
+	}
+
+	c.send(encodeRequestChangeWaitType(false))
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeChangeWaitType {
+		t.Fatalf("sit opcode = %#x, want ChangeWaitType (%#x)", reply[0], serverpackets.OpcodeChangeWaitType)
+	}
+	r = wire.NewReader(reply[1:])
+	if got := r.ReadInt32(); got != objID {
+		t.Fatalf("ChangeWaitType object id = %d, want %d", got, objID)
+	}
+	if waitType := r.ReadInt32(); waitType != int32(serverpackets.WaitSitting) {
+		t.Fatalf("ChangeWaitType type = %d, want sitting", waitType)
+	}
+
+	c.send(encodeRequestChangeWaitType(true))
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeChangeWaitType {
+		t.Fatalf("stand opcode = %#x, want ChangeWaitType (%#x)", reply[0], serverpackets.OpcodeChangeWaitType)
+	}
+	r = wire.NewReader(reply[1:])
+	r.ReadInt32()
+	if waitType := r.ReadInt32(); waitType != int32(serverpackets.WaitStanding) {
+		t.Fatalf("ChangeWaitType type = %d, want standing", waitType)
+	}
+
+	c.send(encodeRequestSocialAction(13))
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeSocialAction {
+		t.Fatalf("social opcode = %#x, want SocialAction (%#x)", reply[0], serverpackets.OpcodeSocialAction)
+	}
+	r = wire.NewReader(reply[1:])
+	if got := r.ReadInt32(); got != objID {
+		t.Fatalf("SocialAction object id = %d, want %d", got, objID)
+	}
+	if actionID := r.ReadInt32(); actionID != 13 {
+		t.Fatalf("SocialAction action id = %d, want 13", actionID)
 	}
 }
 
@@ -1097,6 +1215,45 @@ func TestGameClientLinkAttackBroadcastSendsToSelfAndObservers(t *testing.T) {
 	}
 	if len(observerFrames.frames) != 1 || observerFrames.frames[0][0] != serverpackets.OpcodeAttack {
 		t.Fatalf("observer frames = %x, want one Attack", observerFrames.frames)
+	}
+}
+
+func TestGameClientLinkAutoAttackStanceRefreshAndStop(t *testing.T) {
+	capture := &frameCapture{}
+	live := newTestLivePlayer(t, 1, capture)
+	tracker := &attackStanceRecorder{}
+	link := &GameClientLink{attackStance: tracker}
+
+	link.startLiveAutoAttack(live)
+	if len(tracker.actors) != 1 || tracker.actors[0].ObjectID() != live.ObjectID() {
+		t.Fatalf("attack stance actors = %+v, want live player", tracker.actors)
+	}
+	if !live.InCombat() {
+		t.Fatal("live player not marked in combat after AutoAttackStart")
+	}
+	if len(capture.frames) != 1 || capture.frames[0][0] != serverpackets.OpcodeAutoAttackStart {
+		t.Fatalf("start frames = %x, want one AutoAttackStart", capture.frames)
+	}
+
+	link.startLiveAutoAttack(live)
+	if len(tracker.actors) != 2 {
+		t.Fatalf("attack stance refresh count = %d, want 2", len(tracker.actors))
+	}
+	if len(capture.frames) != 1 {
+		t.Fatalf("second start emitted %d frames, want no duplicate AutoAttackStart", len(capture.frames)-1)
+	}
+
+	link.stopLiveAutoAttack(live)
+	if live.InCombat() {
+		t.Fatal("live player still marked in combat after AutoAttackStop")
+	}
+	if len(capture.frames) != 2 || capture.frames[1][0] != serverpackets.OpcodeAutoAttackStop {
+		t.Fatalf("stop frames = %x, want AutoAttackStop", capture.frames)
+	}
+
+	link.stopLiveAutoAttack(live)
+	if len(capture.frames) != 2 {
+		t.Fatalf("second stop emitted %d frames, want no duplicate AutoAttackStop", len(capture.frames)-2)
 	}
 }
 

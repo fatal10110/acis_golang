@@ -25,6 +25,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -32,6 +33,10 @@ import (
 // items. Satisfied by *sql.ItemStore.
 type itemStore interface {
 	ListByOwner(ctx context.Context, ownerID int32) ([]*item.Instance, error)
+}
+
+type attackStanceTracker interface {
+	Add(task.AttackStanceActor)
 }
 
 // GameClientLink accepts and drives connections from Interlude game
@@ -47,6 +52,7 @@ type GameClientLink struct {
 	itemTemplates *item.Table
 	skills        *SkillPersistence
 	world         *world.State
+	attackStance  attackStanceTracker
 	log           zerolog.Logger
 
 	// newCipherKey supplies each connection's XOR cipher key; overridden in
@@ -67,6 +73,7 @@ func NewGameClientLink(
 	itemTemplates *item.Table,
 	skills *SkillPersistence,
 	worldState *world.State,
+	attackStance attackStanceTracker,
 	log zerolog.Logger,
 ) *GameClientLink {
 	return &GameClientLink{
@@ -78,6 +85,7 @@ func NewGameClientLink(
 		itemTemplates: itemTemplates,
 		skills:        skills,
 		world:         worldState,
+		attackStance:  attackStance,
 		log:           log,
 		newCipherKey:  randomCipherKey,
 	}
@@ -88,10 +96,18 @@ type livePlayer struct {
 	template *player.Template
 	items    []*item.Instance
 	target   world.Tracked
+
+	stopAttack func(*livePlayer)
 }
 
 func (p *livePlayer) SendFrame(frame wire.Frame) bool {
 	return p.Character.SendFrame(frame)
+}
+
+func (p *livePlayer) Stop() {
+	if p.stopAttack != nil {
+		p.stopAttack(p)
+	}
 }
 
 func (p *livePlayer) Discover(obj world.Tracked) {
@@ -540,6 +556,36 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				l.handleSummonActionUse(live, req)
 			}
 
+		case clientpackets.OpcodeRequestSocialAction:
+			req, err := clientpackets.DecodeRequestSocialAction(payload)
+			if err != nil {
+				l.log.Warn().Err(err).Msg("game client")
+				return
+			}
+			if live != nil {
+				l.broadcastLiveSocialAction(live, req.ActionID)
+			}
+
+		case clientpackets.OpcodeRequestChangeMoveType:
+			req, err := clientpackets.DecodeRequestChangeMoveType(payload)
+			if err != nil {
+				l.log.Warn().Err(err).Msg("game client")
+				return
+			}
+			if live != nil {
+				l.changeLiveMoveType(live, req.Run)
+			}
+
+		case clientpackets.OpcodeRequestChangeWaitType:
+			req, err := clientpackets.DecodeRequestChangeWaitType(payload)
+			if err != nil {
+				l.log.Warn().Err(err).Msg("game client")
+				return
+			}
+			if live != nil {
+				l.changeLiveWaitType(live, req.Stand)
+			}
+
 		case clientpackets.OpcodeRequestTargetCancel:
 			if _, err := clientpackets.DecodeRequestTargetCancel(payload); err != nil {
 				l.log.Warn().Err(err).Msg("game client")
@@ -597,9 +643,6 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			clientpackets.OpcodeAddTradeItem,
 			clientpackets.OpcodeTradeDone,
 			clientpackets.OpcodeDummy1A,
-			clientpackets.OpcodeRequestSocialAction,
-			clientpackets.OpcodeRequestChangeMoveType,
-			clientpackets.OpcodeRequestChangeWaitType,
 			clientpackets.OpcodeRequestSellItem,
 			clientpackets.OpcodeRequestBuyItem,
 			clientpackets.OpcodeDummy23,
@@ -769,7 +812,7 @@ func (l *GameClientLink) attachLivePlayer(client *Client, c *player.Character, t
 	c.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventory(c.ID, l.itemTemplates, items))
 	c.SetWorld(l.world)
 	c.SetFrameSender(client.Session.SendFrame)
-	live := &livePlayer{Character: c, template: tmpl, items: items}
+	live := &livePlayer{Character: c, template: tmpl, items: items, stopAttack: l.stopLiveAutoAttack}
 	c.SetAttackBroadcaster(func(snapshot attack.Snapshot) {
 		l.broadcastAttack(live, snapshot)
 	})
@@ -912,6 +955,38 @@ func (l *GameClientLink) stopLivePlayer(live *livePlayer, at location.Location, 
 	})
 }
 
+func (l *GameClientLink) changeLiveMoveType(live *livePlayer, run bool) {
+	if !live.SetRunning(run) {
+		return
+	}
+	l.broadcastLiveFrame(live, func() wire.Frame {
+		return serverpackets.FrameChangeMoveType(live.ObjectID(), live.Running(), false)
+	})
+}
+
+func (l *GameClientLink) changeLiveWaitType(live *livePlayer, stand bool) {
+	if live.AlikeDead() || !live.SetStanding(stand) {
+		return
+	}
+	x, y, z := live.Position()
+	waitType := serverpackets.WaitSitting
+	if stand {
+		waitType = serverpackets.WaitStanding
+	}
+	l.broadcastLiveFrame(live, func() wire.Frame {
+		return serverpackets.FrameChangeWaitType(live.ObjectID(), waitType, location.Location{X: x, Y: y, Z: z})
+	})
+}
+
+func (l *GameClientLink) broadcastLiveSocialAction(live *livePlayer, actionID int32) {
+	if actionID < 2 || actionID > 13 || live.AlikeDead() || !live.Standing() || live.InCombat() {
+		return
+	}
+	l.broadcastLiveFrame(live, func() wire.Frame {
+		return serverpackets.FrameSocialAction(live.ObjectID(), actionID)
+	})
+}
+
 func (l *GameClientLink) broadcastLiveFrame(live *livePlayer, frame func() wire.Frame) {
 	live.SendFrame(frame())
 	if l.world == nil {
@@ -995,8 +1070,33 @@ func (l *GameClientLink) attackLiveTarget(live *livePlayer, target world.Tracked
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return false
 	}
+	l.startLiveAutoAttack(live)
 	controller.DoAttack(combatant)
 	return true
+}
+
+func (l *GameClientLink) startLiveAutoAttack(live *livePlayer) {
+	if live == nil {
+		return
+	}
+	if l.attackStance != nil {
+		l.attackStance.Add(live)
+	}
+	if !live.SetInCombat(true) {
+		return
+	}
+	l.broadcastLiveFrame(live, func() wire.Frame {
+		return serverpackets.FrameAutoAttackStart(live.ObjectID())
+	})
+}
+
+func (l *GameClientLink) stopLiveAutoAttack(live *livePlayer) {
+	if live == nil || !live.SetInCombat(false) {
+		return
+	}
+	l.broadcastLiveFrame(live, func() wire.Frame {
+		return serverpackets.FrameAutoAttackStop(live.ObjectID())
+	})
 }
 
 func (l *GameClientLink) broadcastTargetSelected(live *livePlayer, target world.Tracked) {
