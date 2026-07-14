@@ -19,6 +19,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -39,6 +40,14 @@ type attackStanceTracker interface {
 	Add(task.AttackStanceActor)
 }
 
+type idAllocator interface {
+	NextID() (int32, error)
+}
+
+type groundItemDropper interface {
+	Drop(*grounditem.Item, task.DropOptions)
+}
+
 // GameClientLink accepts and drives connections from Interlude game
 // clients: the VersionCheck/cipher handshake, session-key validation
 // against the login server, character list/create/delete/restore, and
@@ -52,6 +61,8 @@ type GameClientLink struct {
 	itemTemplates *item.Table
 	skills        *SkillPersistence
 	world         *world.State
+	ids           idAllocator
+	groundItems   groundItemDropper
 	attackStance  attackStanceTracker
 	log           zerolog.Logger
 
@@ -73,6 +84,8 @@ func NewGameClientLink(
 	itemTemplates *item.Table,
 	skills *SkillPersistence,
 	worldState *world.State,
+	ids idAllocator,
+	groundItems groundItemDropper,
 	attackStance attackStanceTracker,
 	log zerolog.Logger,
 ) *GameClientLink {
@@ -85,6 +98,8 @@ func NewGameClientLink(
 		itemTemplates: itemTemplates,
 		skills:        skills,
 		world:         worldState,
+		ids:           ids,
+		groundItems:   groundItems,
 		attackStance:  attackStance,
 		log:           log,
 		newCipherKey:  randomCipherKey,
@@ -121,6 +136,12 @@ func (p *livePlayer) Discover(obj world.Tracked) {
 	case *npc.Hostile:
 		p.SendFrame(serverpackets.FrameNPCInfo(npcInfoSnapshot(o)))
 	case groundItemObject:
+		if dropped, ok := o.(interface{ DropperID() int32 }); ok {
+			if dropperID := dropped.DropperID(); dropperID != 0 {
+				p.SendFrame(serverpackets.FrameDropItem(o, dropperID))
+				return
+			}
+		}
 		p.SendFrame(serverpackets.FrameSpawnItem(o))
 	case doorObject:
 		p.SendFrame(serverpackets.FrameDoorInfo(o, false))
@@ -543,6 +564,28 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 			l.unequipItem(live, req.BodySlot)
 
+		case clientpackets.OpcodeRequestDropItem:
+			req, err := clientpackets.DecodeRequestDropItem(payload)
+			if err != nil {
+				l.log.Warn().Err(err).Msg("game client")
+				return
+			}
+			if live == nil {
+				continue
+			}
+			l.dropLiveItem(live, req)
+
+		case clientpackets.OpcodeRequestDestroyItem:
+			req, err := clientpackets.DecodeRequestDestroyItem(payload)
+			if err != nil {
+				l.log.Warn().Err(err).Msg("game client")
+				return
+			}
+			if live == nil {
+				continue
+			}
+			l.destroyLiveItem(live, req.ObjectID, int(req.Count))
+
 		case clientpackets.OpcodeRequestSkillList:
 			session.SendFrame(serverpackets.FrameSkillList(nil))
 
@@ -638,8 +681,14 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 			chars = list
 
-		case clientpackets.OpcodeRequestDropItem,
-			clientpackets.OpcodeTradeRequest,
+		case clientpackets.OpcodeSendTimeCheck:
+			if _, err := clientpackets.DecodeSendTimeCheck(payload); err != nil {
+				l.log.Warn().Err(err).Msg("game client")
+				return
+			}
+			continue
+
+		case clientpackets.OpcodeTradeRequest,
 			clientpackets.OpcodeAddTradeItem,
 			clientpackets.OpcodeTradeDone,
 			clientpackets.OpcodeDummy1A,
@@ -659,7 +708,6 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			clientpackets.OpcodeRequestGetOffVehicle,
 			clientpackets.OpcodeAnswerTradeRequest,
 			clientpackets.OpcodeRequestEnchantItem,
-			clientpackets.OpcodeRequestDestroyItem,
 			clientpackets.OpcodeRequestMoveInVehicle,
 			clientpackets.OpcodeCannotMoveInVehicle,
 			clientpackets.OpcodeRequestQuestListInGame,
@@ -673,7 +721,6 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			clientpackets.OpcodeRequestGiveItemToPet,
 			clientpackets.OpcodeRequestGetItemFromPet,
 			clientpackets.OpcodeRequestPetGetItem,
-			clientpackets.OpcodeSendTimeCheck,
 			clientpackets.OpcodeRequestPackageItemList,
 			clientpackets.OpcodeRequestPackageSend,
 			clientpackets.OpcodeDlgAnswer,
@@ -895,6 +942,96 @@ func (l *GameClientLink) unequipItem(live *livePlayer, bodySlot int32) {
 	}
 	l.sendInventoryUpdate(live, inv)
 	l.broadcastEquipmentChange(live)
+}
+
+func (l *GameClientLink) dropLiveItem(live *livePlayer, req clientpackets.RequestDropItem) {
+	if live.AlikeDead() || l.groundItems == nil || req.Count <= 0 {
+		return
+	}
+	inv := live.Inventory()
+	if inv == nil {
+		return
+	}
+	inst := inv.ItemByObjectID(req.ObjectID)
+	if inst == nil {
+		return
+	}
+	count := int(req.Count)
+	tmpl, ok := inv.Templates().Get(inst.TemplateID)
+	if !ok || !inst.Dropable(tmpl) || inst.QuestItem(tmpl) || inst.Count < count {
+		return
+	}
+	if !tmpl.Stackable && count > 1 {
+		return
+	}
+
+	newObjectID := int32(0)
+	if inst.Count > count {
+		if l.ids == nil {
+			return
+		}
+		var err error
+		newObjectID, err = l.ids.NextID()
+		if err != nil {
+			l.log.Error().Err(err).Msg("allocate dropped item id")
+			return
+		}
+	}
+	wasEquipped := inst.Equipped() && inst.Count <= count
+	dropped := inv.DropItem(req.ObjectID, count, newObjectID)
+	if dropped == nil {
+		return
+	}
+	ground, err := grounditem.New(*dropped, tmpl)
+	if err != nil {
+		l.log.Error().Err(err).Msg("build dropped ground item")
+		return
+	}
+
+	l.sendInventoryUpdate(live, inv)
+	if wasEquipped {
+		l.broadcastEquipmentChange(live)
+	}
+
+	ground.SetDropperID(live.ObjectID())
+	l.groundItems.Drop(ground, task.DropOptions{
+		X:             int(req.X),
+		Y:             int(req.Y),
+		Z:             int(req.Z),
+		Heading:       live.CurrentHeading(),
+		PlayerDropped: true,
+	})
+	ground.SetDropperID(0)
+}
+
+func (l *GameClientLink) destroyLiveItem(live *livePlayer, objectID int32, count int) {
+	if count <= 0 {
+		return
+	}
+	inv := live.Inventory()
+	if inv == nil {
+		return
+	}
+	inst := inv.ItemByObjectID(objectID)
+	if inst == nil {
+		return
+	}
+	tmpl, ok := inv.Templates().Get(inst.TemplateID)
+	if !ok || !inst.Destroyable(tmpl) || tmpl.HeroItem() || inst.Count < count {
+		return
+	}
+	if !tmpl.Stackable && count > 1 {
+		return
+	}
+
+	wasEquipped := inst.Equipped() && inst.Count <= count
+	if inv.DestroyItem(inst, count) == nil {
+		return
+	}
+	l.sendInventoryUpdate(live, inv)
+	if wasEquipped {
+		l.broadcastEquipmentChange(live)
+	}
 }
 
 func (l *GameClientLink) sendInventoryUpdate(live *livePlayer, inv *itemcontainer.Inventory) {

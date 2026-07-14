@@ -802,10 +802,12 @@ func provideGameClientLink(
 	links *loginLinkState,
 	skills *network.SkillPersistence,
 	state *world.State,
+	ids *idfactory.Allocator,
+	ground *task.GroundItems,
 	attackStance *task.AttackStance,
 	log zerolog.Logger,
 ) *network.GameClientLink {
-	return network.NewGameClientLink(validator, links.get, roster, items, data.Players, data.Items, skills, state, attackStance, log)
+	return network.NewGameClientLink(validator, links.get, roster, items, data.Players, data.Items, skills, state, ids, ground, attackStance, log)
 }
 
 func provideSkillPersistence(pool *sql.DB, data *gameData) *network.SkillPersistence {

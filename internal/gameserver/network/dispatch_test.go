@@ -204,7 +204,35 @@ func testTemplates(t *testing.T) *player.TemplateTable {
 }
 
 func testItemTemplates() *item.Table {
-	return item.NewTable(nil)
+	return item.NewTable([]*item.Template{
+		{
+			ID:          item.AdenaID,
+			Name:        "Adena",
+			Kind:        item.KindEtcItem,
+			Stackable:   true,
+			Dropable:    true,
+			Destroyable: true,
+			EtcItem:     &item.EtcItemDetail{},
+		},
+		{
+			ID:          20,
+			Name:        "Potion",
+			Kind:        item.KindEtcItem,
+			Stackable:   true,
+			Dropable:    true,
+			Destroyable: true,
+			EtcItem:     &item.EtcItemDetail{Type: item.EtcItemPotion},
+		},
+		{
+			ID:          30,
+			Name:        "Sword",
+			Kind:        item.KindWeapon,
+			Slot:        item.SlotRHand,
+			Dropable:    true,
+			Destroyable: true,
+			Weapon:      &item.WeaponDetail{Type: item.WeaponSword},
+		},
+	})
 }
 
 // --- fake game client, driving the wire protocol from the other side ---
@@ -509,6 +537,30 @@ func encodeRequestSocialAction(actionID int32) []byte {
 	return w.Bytes()
 }
 
+func encodeRequestDropItem(objectID, count int32, at location.Location) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeRequestDropItem)
+	w.WriteInt32(objectID)
+	w.WriteInt32(count)
+	w.WriteInt32(int32(at.X))
+	w.WriteInt32(int32(at.Y))
+	w.WriteInt32(int32(at.Z))
+	return w.Bytes()
+}
+
+func encodeRequestDestroyItem(objectID, count int32) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeRequestDestroyItem)
+	w.WriteInt32(objectID)
+	w.WriteInt32(count)
+	return w.Bytes()
+}
+
+func encodeSendTimeCheck(requestID, responseID int32) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeSendTimeCheck)
+	w.WriteInt32(requestID)
+	w.WriteInt32(responseID)
+	return w.Bytes()
+}
+
 func encodeSingleOpcode(opcode byte) []byte {
 	return wire.NewPacketWriter(opcode).Bytes()
 }
@@ -532,8 +584,10 @@ func newTestGameClientLinkWithSkillsAndLog(t *testing.T, loginLink func() *Login
 	state = world.New()
 	templates := testTemplates(t)
 	itemTemplates := testItemTemplates()
-	roster := gamemanager.NewRoster(chars, items, templates, itemTemplates, npc.NewTable(nil), &sequentialIDs{next: 100}, gamemanager.DefaultDeleteAfter, time.Now)
-	gcl := NewGameClientLink(validator, loginLink, roster, items, templates, itemTemplates, skills, state, nil, log)
+	ids := &sequentialIDs{next: 100}
+	groundItems := task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour, PlayerDroppedMultiplier: 1}, time.Now)
+	roster := gamemanager.NewRoster(chars, items, templates, itemTemplates, npc.NewTable(nil), ids, gamemanager.DefaultDeleteAfter, time.Now)
+	gcl := NewGameClientLink(validator, loginLink, roster, items, templates, itemTemplates, skills, state, ids, groundItems, nil, log)
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -1380,6 +1434,146 @@ func TestGameClientLinkSendsSkillCoolTimeInGame(t *testing.T) {
 	}
 	if second := wire.NewReader(reply[1:]).ReadUint16(); second != serverpackets.OpcodeExSendManorList {
 		t.Fatalf("extended opcode = %#x, want ExSendManorList (%#x)", second, serverpackets.OpcodeExSendManorList)
+	}
+}
+
+func TestGameClientLinkSendTimeCheckIsNoOpInGame(t *testing.T) {
+	c, _, _, _ := newLinkedGameClient(t)
+
+	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.read() // CharCreateOk
+	c.read() // CharSelectInfo
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	c.send(encodeSendTimeCheck(17, 34))
+	c.send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeItemList {
+		t.Fatalf("post-SendTimeCheck opcode = %#x, want ItemList (%#x)", reply[0], serverpackets.OpcodeItemList)
+	}
+}
+
+func TestGameClientLinkDropItemInGame(t *testing.T) {
+	c, chars, items, state := newLinkedGameClient(t)
+
+	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.read() // CharCreateOk
+	c.read() // CharSelectInfo
+	objID := chars.soleObjectID(t)
+	if err := items.Create(context.Background(), objID, item.Instance{
+		ObjectID:   500,
+		TemplateID: item.AdenaID,
+		OwnerID:    objID,
+		Count:      100,
+		Location:   item.LocationInventory,
+	}); err != nil {
+		t.Fatalf("seed item: %v", err)
+	}
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	c.send(encodeRequestDropItem(500, 40, location.Location{X: 10, Y: 20, Z: 30}))
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeInventoryUpdate {
+		t.Fatalf("drop inventory opcode = %#x, want InventoryUpdate (%#x)", reply[0], serverpackets.OpcodeInventoryUpdate)
+	}
+	r := wire.NewReader(reply[1:])
+	if count := r.ReadUint16(); count != 1 {
+		t.Fatalf("InventoryUpdate count = %d, want 1", count)
+	}
+	if state := r.ReadUint16(); state != uint16(itemcontainer.UpdateModified) {
+		t.Fatalf("InventoryUpdate state = %d, want modified", state)
+	}
+	r.ReadUint16()
+	if got := r.ReadInt32(); got != 500 {
+		t.Fatalf("InventoryUpdate object id = %d, want 500", got)
+	}
+	r.ReadInt32()
+	if got := r.ReadInt32(); got != 60 {
+		t.Fatalf("InventoryUpdate count = %d, want 60", got)
+	}
+
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeDropItem {
+		t.Fatalf("drop broadcast opcode = %#x, want DropItem (%#x)", reply[0], serverpackets.OpcodeDropItem)
+	}
+	r = wire.NewReader(reply[1:])
+	if got := r.ReadInt32(); got != objID {
+		t.Fatalf("DropItem dropper id = %d, want %d", got, objID)
+	}
+	groundID := r.ReadInt32()
+	if groundID == 500 {
+		t.Fatalf("DropItem ground object id reused source stack id %d", groundID)
+	}
+	if got := r.ReadInt32(); got != item.AdenaID {
+		t.Fatalf("DropItem item id = %d, want adena", got)
+	}
+	x, y, z := r.ReadInt32(), r.ReadInt32(), r.ReadInt32()
+	if x != 10 || y != 20 || z != 30 {
+		t.Fatalf("DropItem location = (%d,%d,%d), want (10,20,30)", x, y, z)
+	}
+	if stackable := r.ReadInt32(); stackable != 1 {
+		t.Fatalf("DropItem stackable = %d, want 1", stackable)
+	}
+	if got := r.ReadInt32(); got != 40 {
+		t.Fatalf("DropItem count = %d, want 40", got)
+	}
+
+	if _, ok := state.Object(groundID); !ok {
+		t.Fatalf("world.Object(%d) missing for dropped item", groundID)
+	}
+}
+
+func TestGameClientLinkDestroyItemInGame(t *testing.T) {
+	c, chars, items, _ := newLinkedGameClient(t)
+
+	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.read() // CharCreateOk
+	c.read() // CharSelectInfo
+	objID := chars.soleObjectID(t)
+	if err := items.Create(context.Background(), objID, item.Instance{
+		ObjectID:   501,
+		TemplateID: 20,
+		OwnerID:    objID,
+		Count:      5,
+		Location:   item.LocationInventory,
+	}); err != nil {
+		t.Fatalf("seed item: %v", err)
+	}
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	c.send(encodeRequestDestroyItem(501, 2))
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeInventoryUpdate {
+		t.Fatalf("destroy inventory opcode = %#x, want InventoryUpdate (%#x)", reply[0], serverpackets.OpcodeInventoryUpdate)
+	}
+	r := wire.NewReader(reply[1:])
+	if count := r.ReadUint16(); count != 1 {
+		t.Fatalf("InventoryUpdate count = %d, want 1", count)
+	}
+	if state := r.ReadUint16(); state != uint16(itemcontainer.UpdateModified) {
+		t.Fatalf("InventoryUpdate state = %d, want modified", state)
+	}
+	r.ReadUint16()
+	if got := r.ReadInt32(); got != 501 {
+		t.Fatalf("InventoryUpdate object id = %d, want 501", got)
+	}
+	r.ReadInt32()
+	if got := r.ReadInt32(); got != 3 {
+		t.Fatalf("InventoryUpdate count = %d, want 3", got)
 	}
 }
 
