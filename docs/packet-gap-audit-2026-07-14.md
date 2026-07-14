@@ -165,6 +165,7 @@ Implemented and wired M5 target/combat/item/stance/social client packets in Go:
 - `RequestChangeMoveType`
 - `RequestChangeWaitType`
 - `RequestSocialAction`
+- `RequestPackageSendableItemList`
 - `SendTimeCheck`
 
 Missing M5 stats/combat/items/progression client packets:
@@ -176,12 +177,17 @@ Missing M5 stats/combat/items/progression client packets:
 - `RequestPetGetItem`
 - `SendWarehouseDepositList`
 - `SendWarehouseWithdrawList`
-- `RequestPackageSendableItemList`
 - `RequestPackageSend`
 - `RequestAcquireSkillInfo`
 - `RequestAcquireSkill`
 - `RequestRestartPoint`
 - `RequestEnchantItem`
+
+Warehouse/freight transaction packets remain deferred:
+
+- `SendWarehouseDepositList` and `SendWarehouseWithdrawList` need dialog/bypass routing to establish the current warehouse NPC and active warehouse before the client request arrives.
+- `RequestPackageSend` needs same-account freight ownership, freight restore/persistence, fee charging, and active warehouse/session validation.
+- `RequestPackageSendableItemList` is wired for the preview step and returns `PackageSendableList` for carried, tradable, non-quest inventory items.
 
 ## Game Server Packet Gaps
 
@@ -320,6 +326,7 @@ Implemented and wired M5 item server packets in Go:
 - `DropItem`
 - `ExAutoSoulShot`
 - `InventoryUpdate`
+- `PackageSendableList`
 
 Implemented and wired M5 target/combat server packets in Go:
 
