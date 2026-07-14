@@ -43,6 +43,7 @@ func TestDefaultRegistryHasRepresentativeHandlers(t *testing.T) {
 		"HEAL", "HEAL_STATIC", "HEAL_PERCENT", "MANAHEAL_PERCENT", "MANAHEAL", "MANARECHARGE",
 		"COMBATPOINTHEAL", "BALANCE_LIFE", "REAL_DAMAGE", "GIVE_SP",
 		"CPDAMPERCENT", "DUMMY", "BEAST_FEED",
+		"SUMMON_CREATURE", "SUMMON_FRIEND", "SUMMON_PARTY", "ERASE",
 	} {
 		if _, ok := registry.Handler(skillType); !ok {
 			t.Fatalf("default registry missing %s", skillType)
