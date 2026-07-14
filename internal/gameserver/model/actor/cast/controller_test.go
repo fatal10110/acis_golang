@@ -226,6 +226,174 @@ func TestInterruptOnDamageHonorsWindowAndMagicOnlyRule(t *testing.T) {
 	}
 }
 
+func TestStartSkillMasterySkipsReuseInstallation(t *testing.T) {
+	actor := &testActor{mp: 100, hp: 100, mastery: true}
+	ctrl := NewController(actor)
+	def := modelskill.Definition{
+		ID:            5,
+		Level:         1,
+		StaticHitTime: true,
+		HitTime:       1000,
+		StaticReuse:   true,
+		ReuseDelay:    50000,
+	}
+
+	plan, err := ctrl.Start(time.Unix(1000, 0), testTarget{}, def)
+	if err != nil {
+		t.Fatalf("Start() error: %v", err)
+	}
+	if !plan.SkillMastery {
+		t.Fatal("plan.SkillMastery = false, want true")
+	}
+	if plan.ReuseDelay != 50*time.Second {
+		t.Fatalf("ReuseDelay = %s, want 50s (static, unscaled)", plan.ReuseDelay)
+	}
+	if len(actor.disabled) != 0 {
+		t.Fatalf("disabled cooldowns = %+v, want none: skill mastery bypasses reuse installation even above both thresholds", actor.disabled)
+	}
+	if len(actor.reuses) != 0 {
+		t.Fatalf("stored reuses = %+v, want none: skill mastery bypasses reuse installation even above both thresholds", actor.reuses)
+	}
+}
+
+func TestStartRejectsSecondCastWhileActive(t *testing.T) {
+	actor := &testActor{mp: 100, hp: 100}
+	ctrl := NewController(actor)
+	def := modelskill.Definition{ID: 1, Level: 1}
+
+	if _, err := ctrl.Start(time.Unix(1000, 0), testTarget{}, def); err != nil {
+		t.Fatalf("first Start() error: %v", err)
+	}
+	if _, err := ctrl.Start(time.Unix(1000, 0), testTarget{}, def); !errors.Is(err, ErrAlreadyCasting) {
+		t.Fatalf("second Start() error = %v, want ErrAlreadyCasting", err)
+	}
+}
+
+func TestCanCastRejectsNilTarget(t *testing.T) {
+	actor := &testActor{mp: 100, hp: 100}
+	if err := NewController(actor).CanCast(nil, modelskill.Definition{ID: 1, Level: 1}); !errors.Is(err, ErrInvalidTarget) {
+		t.Fatalf("CanCast(nil target) error = %v, want ErrInvalidTarget", err)
+	}
+}
+
+func TestBuildPlanFloorsShortHitTimeToFiveHundred(t *testing.T) {
+	// A physical skill with a configured hitTime of exactly 500 (the floor's
+	// own threshold) whose attack speed scales it down under 500 gets
+	// clamped back up, but only because the configured hitTime was already
+	// >= 500; coolTime has no such floor.
+	actor := &testActor{mp: 100, hp: 100, pAtkSpd: 1000}
+	ctrl := NewController(actor)
+	def := modelskill.Definition{ID: 1, Level: 1, Magic: false, HitTime: 500, CoolTime: 0, StaticReuse: true}
+
+	plan, err := ctrl.Start(time.Unix(1000, 0), testTarget{}, def)
+	if err != nil {
+		t.Fatalf("Start() error: %v", err)
+	}
+	// Unfloored: int(500*333/1000) = 166.
+	if plan.HitTime != 500*time.Millisecond {
+		t.Fatalf("HitTime = %s, want 500ms (floored from a scaled 166ms)", plan.HitTime)
+	}
+	if plan.InterruptAfter != 300*time.Millisecond {
+		t.Fatalf("InterruptAfter = %s, want 300ms (floored hitTime - 200ms)", plan.InterruptAfter)
+	}
+	if plan.LaunchDelay != 100*time.Millisecond || plan.HitDelay != 400*time.Millisecond || plan.GaugeDuration != 500*time.Millisecond {
+		t.Fatalf("phase delays = launch %s hit %s gauge %s, want 100ms/400ms/500ms", plan.LaunchDelay, plan.HitDelay, plan.GaugeDuration)
+	}
+	if plan.FinalDelay != 0 {
+		t.Fatalf("FinalDelay = %s, want 0: coolTime is 0 even though hitTime cleared the 410ms gauge threshold", plan.FinalDelay)
+	}
+}
+
+func TestBuildPlanZeroesPhaseDelaysBelowGaugeThreshold(t *testing.T) {
+	// A short static-hitTime skill (<=410ms) never crosses the gauge/launch
+	// threshold, so every phase delay collapses to its zero value.
+	actor := &testActor{mp: 100, hp: 100}
+	ctrl := NewController(actor)
+	def := modelskill.Definition{ID: 1, Level: 1, StaticHitTime: true, HitTime: 300, CoolTime: 50, StaticReuse: true}
+
+	plan, err := ctrl.Start(time.Unix(1000, 0), testTarget{}, def)
+	if err != nil {
+		t.Fatalf("Start() error: %v", err)
+	}
+	if plan.HitTime != 300*time.Millisecond || plan.CoolTime != 50*time.Millisecond {
+		t.Fatalf("timing = hit %s cool %s, want 300ms/50ms (static, unscaled)", plan.HitTime, plan.CoolTime)
+	}
+	if plan.InterruptAfter != 100*time.Millisecond {
+		t.Fatalf("InterruptAfter = %s, want 100ms (hitTime - 200ms, unconditional)", plan.InterruptAfter)
+	}
+	if plan.LaunchDelay != 0 || plan.HitDelay != 0 || plan.GaugeDuration != 0 || plan.FinalDelay != 0 {
+		t.Fatalf("phase delays = launch %s hit %s gauge %s final %s, want all zero below the 410ms threshold",
+			plan.LaunchDelay, plan.HitDelay, plan.GaugeDuration, plan.FinalDelay)
+	}
+}
+
+func TestInterruptOnDamageImmuneNeverBreaks(t *testing.T) {
+	actor := &testActor{mp: 100, hp: 100, mAtkSpd: 333, pAtkSpd: 333, magicReuseRate: 1, physicalReuseRate: 1}
+	ctrl := NewController(actor)
+	now := time.Unix(1000, 0)
+	if _, err := ctrl.Start(now, testTarget{}, modelskill.Definition{ID: 1, Level: 1, Magic: true, HitTime: 1000}); err != nil {
+		t.Fatalf("Start() error: %v", err)
+	}
+
+	if ctrl.InterruptOnDamage(now.Add(100*time.Millisecond), DamageInterrupt{Damage: 1e9, MEN: 30, Roll: 0, Immune: true}) {
+		t.Fatal("InterruptOnDamage() = true for an immune target, want false")
+	}
+	if !ctrl.CastingNow() {
+		t.Fatal("CastingNow() = false after an immune-blocked hit, want still casting")
+	}
+}
+
+func TestInterruptOnDamageFusionBypassesMagicAndRollRules(t *testing.T) {
+	actor := &testActor{mp: 100, hp: 100, mAtkSpd: 333, pAtkSpd: 333, magicReuseRate: 1, physicalReuseRate: 1}
+	ctrl := NewController(actor)
+	now := time.Unix(1000, 0)
+
+	// Fusion breaks a cast unconditionally within the interrupt window, even
+	// for a physical skill and even with a roll that would otherwise fail
+	// the magic-only cast-break rate check.
+	physical := modelskill.Definition{ID: 1, Level: 1, Magic: false, HitTime: 1000}
+	if _, err := ctrl.Start(now, testTarget{}, physical); err != nil {
+		t.Fatalf("Start() error: %v", err)
+	}
+	if !ctrl.InterruptOnDamage(now.Add(100*time.Millisecond), DamageInterrupt{Damage: 1, MEN: 99, Roll: 99, Fusion: true}) {
+		t.Fatal("InterruptOnDamage() = false for a fusion break on a physical skill inside the window, want true")
+	}
+
+	// Outside the interrupt window, fusion still respects the abort window.
+	magic := modelskill.Definition{ID: 2, Level: 1, Magic: true, HitTime: 1000}
+	if _, err := ctrl.Start(now, testTarget{}, magic); err != nil {
+		t.Fatalf("second Start() error: %v", err)
+	}
+	if ctrl.InterruptOnDamage(now.Add(900*time.Millisecond), DamageInterrupt{Damage: 1, MEN: 0, Roll: 0, Fusion: true}) {
+		t.Fatal("InterruptOnDamage() = true for a fusion break after the abort window, want false")
+	}
+}
+
+func TestCanAbort(t *testing.T) {
+	actor := &testActor{mp: 100, hp: 100, mAtkSpd: 333, pAtkSpd: 333, magicReuseRate: 1, physicalReuseRate: 1}
+	ctrl := NewController(actor)
+	now := time.Unix(1000, 0)
+
+	if ctrl.CanAbort(now) {
+		t.Fatal("CanAbort() = true with no active cast, want false")
+	}
+
+	if _, err := ctrl.Start(now, testTarget{}, modelskill.Definition{ID: 1, Level: 1, Magic: true, HitTime: 1000}); err != nil {
+		t.Fatalf("Start() error: %v", err)
+	}
+	if !ctrl.CanAbort(now.Add(100 * time.Millisecond)) {
+		t.Fatal("CanAbort() = false inside the interrupt window, want true")
+	}
+	if ctrl.CanAbort(now.Add(900 * time.Millisecond)) {
+		t.Fatal("CanAbort() = true after the interrupt window, want false")
+	}
+
+	ctrl.Finish()
+	if ctrl.CastingNow() {
+		t.Fatal("CastingNow() = true after Finish(), want false")
+	}
+}
+
 type testTarget struct{}
 
 type testActor struct {
