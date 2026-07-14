@@ -210,6 +210,8 @@ func newTestClientLink(t *testing.T, accounts *fakeAccountStore, autoCreate bool
 		sessions:           sessions,
 		bans:               bans,
 		autoCreateAccounts: autoCreate,
+		loginTryBeforeBan:  DefaultLoginTryBeforeBan,
+		loginBlockAfterBan: DefaultLoginBlockAfterBan,
 		log:                zerolog.Nop(),
 		newKeyPair:         func() *commoncrypt.LoginKeyPair { return keyPair },
 		newSessionKey:      func() ([]byte, error) { return testSessionKey, nil },
@@ -284,6 +286,65 @@ func TestClientLinkLoginWrongPassword(t *testing.T) {
 	c.expectClosed()
 }
 
+func TestClientLinkFailedPasswordsBanIPAtThreshold(t *testing.T) {
+	accounts := newFakeAccountStore(model.NewAccount("player1", mustHashPassword(t, "s3cret"), 0, 1))
+	addr, l, _, _, bans := newTestClientLink(t, accounts, false)
+	ip := net.ParseIP("127.0.0.1")
+
+	for i := 1; i <= 3; i++ {
+		c := dialLoginClient(t, addr)
+		c.send(encodeRequestAuthLogin(&l.loginKeyPair().Private.PublicKey, "player1", "wrong"))
+		reply := c.read()
+		if reply[0] != serverpackets.OpcodeLoginFail {
+			t.Fatalf("attempt %d opcode = %#x, want LoginFail (%#x)", i, reply[0], serverpackets.OpcodeLoginFail)
+		}
+		c.expectClosed()
+
+		if i < 3 && bans.IsBanned(ip) {
+			t.Fatalf("attempt %d banned IP before threshold", i)
+		}
+	}
+
+	if !bans.IsBanned(ip) {
+		t.Fatal("IP was not banned after failed login threshold")
+	}
+}
+
+func TestClientLinkFailedPasswordAttemptsResetOnSuccess(t *testing.T) {
+	accounts := newFakeAccountStore(model.NewAccount("player1", mustHashPassword(t, "s3cret"), 0, 1))
+	addr, l, _, sessions, bans := newTestClientLink(t, accounts, false)
+	ip := net.ParseIP("127.0.0.1")
+
+	for i := 1; i <= 2; i++ {
+		c := dialLoginClient(t, addr)
+		c.send(encodeRequestAuthLogin(&l.loginKeyPair().Private.PublicKey, "player1", "wrong"))
+		reply := c.read()
+		if reply[0] != serverpackets.OpcodeLoginFail {
+			t.Fatalf("attempt %d opcode = %#x, want LoginFail (%#x)", i, reply[0], serverpackets.OpcodeLoginFail)
+		}
+		c.expectClosed()
+	}
+
+	c := dialLoginClient(t, addr)
+	c.login(l, "player1", "s3cret")
+	if err := c.conn.Close(); err != nil {
+		t.Fatalf("close login client: %v", err)
+	}
+	waitSessionMissing(t, sessions, "player1")
+
+	c = dialLoginClient(t, addr)
+	c.send(encodeRequestAuthLogin(&l.loginKeyPair().Private.PublicKey, "player1", "wrong"))
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeLoginFail {
+		t.Fatalf("opcode = %#x, want LoginFail (%#x)", reply[0], serverpackets.OpcodeLoginFail)
+	}
+	c.expectClosed()
+
+	if bans.IsBanned(ip) {
+		t.Fatal("IP was banned after a successful login reset failed attempts")
+	}
+}
+
 func TestClientLinkLoginUnknownAccountAutoCreateOff(t *testing.T) {
 	accounts := newFakeAccountStore()
 	addr, l, _, _, _ := newTestClientLink(t, accounts, false)
@@ -298,6 +359,26 @@ func TestClientLinkLoginUnknownAccountAutoCreateOff(t *testing.T) {
 
 	if _, ok := accounts.get("newplayer"); ok {
 		t.Fatal("account should not have been created")
+	}
+}
+
+func TestClientLinkUnknownAccountAutoCreateOffCountsFailedAttempts(t *testing.T) {
+	accounts := newFakeAccountStore()
+	addr, l, _, _, bans := newTestClientLink(t, accounts, false)
+	ip := net.ParseIP("127.0.0.1")
+
+	for i := 1; i <= 3; i++ {
+		c := dialLoginClient(t, addr)
+		c.send(encodeRequestAuthLogin(&l.loginKeyPair().Private.PublicKey, "missing", "s3cret"))
+		reply := c.read()
+		if reply[0] != serverpackets.OpcodeLoginFail {
+			t.Fatalf("attempt %d opcode = %#x, want LoginFail (%#x)", i, reply[0], serverpackets.OpcodeLoginFail)
+		}
+		c.expectClosed()
+	}
+
+	if !bans.IsBanned(ip) {
+		t.Fatal("IP was not banned after unknown-account failed login threshold")
 	}
 }
 

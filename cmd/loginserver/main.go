@@ -10,6 +10,7 @@ import (
 	"os"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/rs/zerolog"
 	"go.uber.org/fx"
@@ -35,6 +36,8 @@ type loginServerConfig struct {
 	GameServerAddr      string
 	AllowNewGameServers bool
 	AutoCreateAccounts  bool
+	LoginTryBeforeBan   int
+	LoginBlockAfterBan  time.Duration
 	Database            db.Config
 }
 
@@ -94,12 +97,22 @@ func loginServerConfigFromProperties(_ loginServerPaths, props *config.Propertie
 	if err != nil {
 		return loginServerConfig{}, err
 	}
+	loginTryBeforeBan, err := props.Int("LoginTryBeforeBan", loginserver.DefaultLoginTryBeforeBan)
+	if err != nil {
+		return loginServerConfig{}, err
+	}
+	loginBlockAfterBan, err := props.Int("LoginBlockAfterBan", int(loginserver.DefaultLoginBlockAfterBan/time.Second))
+	if err != nil {
+		return loginServerConfig{}, err
+	}
 
 	return loginServerConfig{
 		ClientAddr:          listenAddress(props.String("LoginserverHostname", "*"), clientPort),
 		GameServerAddr:      listenAddress(props.String("LoginHostname", "*"), linkPort),
 		AllowNewGameServers: props.Bool("AcceptNewGameServer", false),
 		AutoCreateAccounts:  props.Bool("AutoCreateAccounts", true),
+		LoginTryBeforeBan:   loginTryBeforeBan,
+		LoginBlockAfterBan:  time.Duration(loginBlockAfterBan) * time.Second,
 		Database: db.Config{
 			URL:      props.String("URL", "jdbc:mariadb://localhost/acis"),
 			Login:    props.String("Login", "root"),
@@ -193,7 +206,7 @@ func provideClientLink(
 	keys *manager.LoginKeyPool,
 	log zerolog.Logger,
 ) *loginserver.ClientLink {
-	return loginserver.NewClientLink(accounts, servers, sessions, bans, keys, cfg.AutoCreateAccounts, log)
+	return loginserver.NewClientLink(accounts, servers, sessions, bans, keys, cfg.AutoCreateAccounts, cfg.LoginTryBeforeBan, cfg.LoginBlockAfterBan, log)
 }
 
 func startLoginServer(lc fx.Lifecycle, cfg loginServerConfig, link *loginserver.GameServerLink, clients *loginserver.ClientLink, log zerolog.Logger) {

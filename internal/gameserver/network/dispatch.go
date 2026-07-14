@@ -607,21 +607,22 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 		return nil, false
 	}
 
-	client.Session.SendFrame(serverpackets.FrameSkillList(nil))
-	client.Session.SendFrame(serverpackets.FrameUserInfo(serverpackets.UserInfoSnapshot{Character: c, Template: tmpl, Items: items}))
-
 	itemListFrame, err := serverpackets.FrameItemList(items, l.itemTemplates, false)
 	if err != nil {
 		l.log.Error().Err(err).Msg("enter world: build ItemList")
 		return nil, false
 	}
-	client.Session.SendFrame(itemListFrame)
+
 	live := l.attachLivePlayer(client, c, tmpl, items)
 	if l.world != nil {
 		x, y, z := c.Position()
 		l.world.Spawn(live, x, y, z, c.Heading)
 		l.world.AddPlayer(live)
 	}
+
+	client.Session.SendFrame(serverpackets.FrameSkillList(nil))
+	client.Session.SendFrame(serverpackets.FrameUserInfo(serverpackets.UserInfoSnapshot{Character: c, Template: tmpl, Items: items}))
+	client.Session.SendFrame(itemListFrame)
 	return live, true
 }
 

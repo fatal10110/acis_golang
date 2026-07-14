@@ -5,6 +5,7 @@ import (
 	"errors"
 	"math/rand/v2"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -20,6 +21,14 @@ import (
 	"github.com/fatal10110/acis_golang/internal/loginserver/model"
 	"github.com/fatal10110/acis_golang/internal/loginserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/loginserver/network/serverpackets"
+)
+
+const (
+	// DefaultLoginTryBeforeBan is the default number of failed credential
+	// attempts allowed from one IP before it is banned.
+	DefaultLoginTryBeforeBan = 3
+	// DefaultLoginBlockAfterBan is the default temporary IP ban duration.
+	DefaultLoginBlockAfterBan = 10 * time.Minute
 )
 
 // accountStore is the account persistence ClientLink needs. *sql.AccountStore
@@ -41,7 +50,13 @@ type ClientLink struct {
 	sessions           *manager.SessionStore
 	bans               *manager.IPBanList
 	autoCreateAccounts bool
+	loginTryBeforeBan  int
+	loginBlockAfterBan time.Duration
 	log                zerolog.Logger
+
+	// failedMu guards failedAttempts.
+	failedMu       sync.Mutex
+	failedAttempts map[string]int
 
 	// newKeyPair and newSessionKey supply each connection's RSA key pair and
 	// dynamic Blowfish key; overridden in tests for a deterministic
@@ -60,6 +75,8 @@ func NewClientLink(
 	bans *manager.IPBanList,
 	keys *manager.LoginKeyPool,
 	autoCreateAccounts bool,
+	loginTryBeforeBan int,
+	loginBlockAfterBan time.Duration,
 	log zerolog.Logger,
 ) *ClientLink {
 	return &ClientLink{
@@ -68,7 +85,10 @@ func NewClientLink(
 		sessions:           sessions,
 		bans:               bans,
 		autoCreateAccounts: autoCreateAccounts,
+		loginTryBeforeBan:  loginTryBeforeBan,
+		loginBlockAfterBan: loginBlockAfterBan,
 		log:                log,
+		failedAttempts:     make(map[string]int),
 		newKeyPair:         keys.Random,
 		newSessionKey:      logincrypt.NewSessionKey,
 	}
@@ -229,6 +249,7 @@ func (l *ClientLink) authenticate(ctx context.Context, c *clientConn, req client
 	switch {
 	case errors.Is(err, loginsql.ErrAccountNotFound):
 		if !l.autoCreateAccounts {
+			l.recordFailedAttempt(c.remoteIP)
 			_ = c.send(serverpackets.EncodeLoginFail(serverpackets.LoginFailUserOrPassWrong))
 			return model.Account{}, false
 		}
@@ -253,11 +274,41 @@ func (l *ClientLink) authenticate(ctx context.Context, c *clientConn, req client
 
 	default:
 		if bcrypt.CompareHashAndPassword([]byte(account.Password), []byte(req.Password)) != nil {
+			l.recordFailedAttempt(c.remoteIP)
 			_ = c.send(serverpackets.EncodeLoginFail(serverpackets.LoginFailUserOrPassWrong))
 			return model.Account{}, false
 		}
+		l.clearFailedAttempts(c.remoteIP)
 		return account, true
 	}
+}
+
+func (l *ClientLink) recordFailedAttempt(ip net.IP) {
+	key := ip.String()
+
+	l.failedMu.Lock()
+	if l.failedAttempts == nil {
+		l.failedAttempts = make(map[string]int)
+	}
+	attempts := l.failedAttempts[key] + 1
+	if attempts < l.loginTryBeforeBan {
+		l.failedAttempts[key] = attempts
+		l.failedMu.Unlock()
+		return
+	}
+	delete(l.failedAttempts, key)
+	l.failedMu.Unlock()
+
+	l.bans.Ban(ip, l.loginBlockAfterBan)
+	l.log.Info().Str("ip", key).Msg("IP address banned due to too many login attempts")
+}
+
+func (l *ClientLink) clearFailedAttempts(ip net.IP) {
+	key := ip.String()
+
+	l.failedMu.Lock()
+	delete(l.failedAttempts, key)
+	l.failedMu.Unlock()
 }
 
 func (l *ClientLink) onRequestServerList(c *clientConn, payload []byte) {
