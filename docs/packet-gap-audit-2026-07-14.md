@@ -138,6 +138,10 @@ Missing M3 data/UI client packets:
 - `RequestConfirmGemStone`
 - `RequestConfirmCancelItem`
 
+`RequestBuyItem` and `RequestSellItem` currently have Go decoders and byte-layout tests only. They
+are still counted as gaps because merchant NPC context, buylist loading/restock wiring, buy/sell
+inventory mutation, adena persistence, and the NPC dialog/bypass owner flow are not implemented.
+
 Implemented and wired M4 movement/rotation/target client packets in Go:
 
 - `CannotMoveAnymore`
@@ -222,7 +226,9 @@ Remaining EnterWorld burst packet gaps:
 - `PlaySound` ([#719](https://github.com/fatal10110/acis_golang/issues/719))
 - `NpcHtmlMessage` ([#720](https://github.com/fatal10110/acis_golang/issues/720))
 
-`PledgeSkillList`, `ExMailArrived`, `PlaySound`, and `NpcHtmlMessage` currently have Go frame builders only. They are still counted as gaps because no production owner flow can emit them truthfully yet.
+`PledgeSkillList`, `ExMailArrived`, `PlaySound`, `NpcHtmlMessage`, `BuyList`, and `SellList`
+currently have Go frame builders only. They are still counted as gaps because no production owner
+flow can emit them truthfully yet.
 
 Missing M3 data/UI server packets:
 
