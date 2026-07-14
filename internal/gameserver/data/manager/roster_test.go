@@ -9,6 +9,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -63,7 +64,7 @@ func newTestRoster(t *testing.T, deleteAfter time.Duration, now func() time.Time
 	db := sqltest.NewDB(t)
 	characters := sql.NewCharacterStore(db)
 	items := sql.NewItemStore(db)
-	roster := NewRoster(characters, items, humanFighterTemplate(t), starterItemTable(), &sequentialIDs{next: 0x10000000}, deleteAfter, now)
+	roster := NewRoster(characters, items, humanFighterTemplate(t), starterItemTable(), npc.NewTable(nil), &sequentialIDs{next: 0x10000000}, deleteAfter, now)
 	return roster, characters, items
 }
 
