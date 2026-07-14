@@ -227,7 +227,9 @@ func testItemTemplates() *item.Table {
 			Duration:    -1,
 			Stackable:   true,
 			Dropable:    true,
+			Tradable:    true,
 			Destroyable: true,
+			Depositable: true,
 			EtcItem:     &item.EtcItemDetail{},
 		},
 		{
@@ -237,7 +239,9 @@ func testItemTemplates() *item.Table {
 			Duration:    -1,
 			Stackable:   true,
 			Dropable:    true,
+			Tradable:    true,
 			Destroyable: true,
+			Depositable: true,
 			EtcItem:     &item.EtcItemDetail{Type: item.EtcItemPotion},
 		},
 		{
@@ -258,7 +262,9 @@ func testItemTemplates() *item.Table {
 			Crystal:      item.CrystalD,
 			CrystalCount: 10,
 			Dropable:     true,
+			Tradable:     true,
 			Destroyable:  true,
+			Depositable:  true,
 			Weapon:       &item.WeaponDetail{Type: item.WeaponSword},
 		},
 		{
@@ -486,6 +492,12 @@ func encodeRequestAcquireSkill(skillID, level, skillType int32) []byte {
 	w.WriteInt32(skillID)
 	w.WriteInt32(level)
 	w.WriteInt32(skillType)
+	return w.Bytes()
+}
+
+func encodeRequestPackageSendableItemList(objectID int32) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeRequestPackageItemList)
+	w.WriteInt32(objectID)
 	return w.Bytes()
 }
 
@@ -767,6 +779,16 @@ func skipInventoryRemainder(r *wire.Reader) {
 	r.ReadUint16()
 	r.ReadUint16()
 	r.ReadInt32()
+	r.ReadInt32()
+}
+
+func skipPackageSendableRemainder(r *wire.Reader) {
+	r.ReadUint16()
+	r.ReadUint16()
+	r.ReadInt32()
+	r.ReadUint16()
+	r.ReadUint16()
+	r.ReadUint16()
 	r.ReadInt32()
 }
 
@@ -2099,6 +2121,54 @@ func TestGameClientLinkAcquireSkillNeedsSP(t *testing.T) {
 	}
 	if known := store.knownFor(objID, 0); len(known) != 0 {
 		t.Fatalf("persisted skills = %+v, want none", known)
+	}
+}
+
+func TestGameClientLinkRequestPackageItemListSendsSendableInventory(t *testing.T) {
+	c, _, _, _ := newLinkedGameClientWithSkillsSeed(t, nil, func(chars *fakeCharStore, items *fakeItemStore) {
+		objID := seedSelectableCharacter(t, chars, "player1", "Newbie", 5, 0)
+		for _, inst := range []item.Instance{
+			{ObjectID: 500, TemplateID: item.AdenaID, OwnerID: objID, Count: 100, Location: item.LocationInventory, ManaLeft: -1},
+			{ObjectID: 501, TemplateID: 20, OwnerID: objID, Count: 3, Location: item.LocationInventory, ManaLeft: -1},
+			{ObjectID: 502, TemplateID: 30, OwnerID: objID, Count: 1, Location: item.LocationPaperdoll, LocationData: 7, ManaLeft: -1},
+			{ObjectID: 503, TemplateID: 20, OwnerID: objID, Count: 9, Location: item.LocationWarehouse, ManaLeft: -1},
+		} {
+			if err := items.Create(context.Background(), objID, inst); err != nil {
+				t.Fatalf("seed item %d: %v", inst.ObjectID, err)
+			}
+		}
+	}, 1)
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	c.send(encodeRequestPackageSendableItemList(200))
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodePackageSendableList {
+		t.Fatalf("package item list opcode = %#x, want PackageSendableList (%#x)", reply[0], serverpackets.OpcodePackageSendableList)
+	}
+	r := wire.NewReader(reply[1:])
+	if objectID := r.ReadInt32(); objectID != 200 {
+		t.Fatalf("PackageSendableList object id = %d, want 200", objectID)
+	}
+	if adena := r.ReadInt32(); adena != 100 {
+		t.Fatalf("PackageSendableList adena = %d, want 100", adena)
+	}
+	if count := r.ReadInt32(); count != 2 {
+		t.Fatalf("PackageSendableList count = %d, want 2 sendable carried items", count)
+	}
+	if category, objectID, itemID, count := r.ReadUint16(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32(); category != uint16(item.CategoryMoneyOrEtcItem) || objectID != 500 || itemID != item.AdenaID || count != 100 {
+		t.Fatalf("first package item = (%d,%d,%d,%d), want adena object 500 count 100", category, objectID, itemID, count)
+	}
+	skipPackageSendableRemainder(r)
+	if category, objectID, itemID, count := r.ReadUint16(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32(); category != uint16(item.CategoryMoneyOrEtcItem) || objectID != 501 || itemID != 20 || count != 3 {
+		t.Fatalf("second package item = (%d,%d,%d,%d), want potion object 501 count 3", category, objectID, itemID, count)
+	}
+	if r.Err() != nil {
+		t.Fatalf("parse PackageSendableList: %v", r.Err())
 	}
 }
 

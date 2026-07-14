@@ -506,6 +506,14 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 			continue
 
+		case clientpackets.OpcodeRequestPackageItemList:
+			req, err := clientpackets.DecodeRequestPackageSendableItemList(payload)
+			if err != nil {
+				l.log.Warn().Err(err).Msg("game client")
+				continue
+			}
+			l.sendPackageSendableItemList(live, req.ObjectID)
+
 		case clientpackets.OpcodeTradeRequest,
 			clientpackets.OpcodeAddTradeItem,
 			clientpackets.OpcodeTradeDone,
@@ -536,7 +544,6 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			clientpackets.OpcodeRequestGiveItemToPet,
 			clientpackets.OpcodeRequestGetItemFromPet,
 			clientpackets.OpcodeRequestPetGetItem,
-			clientpackets.OpcodeRequestPackageItemList,
 			clientpackets.OpcodeRequestPackageSend,
 			clientpackets.OpcodeDlgAnswer,
 			clientpackets.OpcodeGameGuardReply,
