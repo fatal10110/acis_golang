@@ -7,9 +7,12 @@ const (
 	SystemMessageWelcomeToLineage              = 34
 	SystemMessageCrystallizeLevelTooLow        = 562
 	SystemMessageItemCrystallized              = 1258
+	SystemMessageUseOfItemWillBeAuto           = 1433
+	SystemMessageAutoUseOfItemCancelled        = 1434
 	SystemMessagePetCannotSentBackDuringBattle = 579
 	SystemMessageDeadPetCannotBeReturned       = 589
 	SystemMessageYouCannotRestoreHungryPets    = 594
+	SystemMessageNoServitorCannotAutomateUse   = 1676
 	SystemMessagePetRefusingOrder              = 1864
 	SystemMessagePetTooHighToControl           = 1918
 )

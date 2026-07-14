@@ -161,6 +161,7 @@ Implemented and wired M5 target/combat/item/stance/social client packets in Go:
 - `RequestCrystallizeItem`
 - `RequestDestroyItem`
 - `RequestDropItem`
+- `RequestAutoSoulShot`
 - `RequestChangeMoveType`
 - `RequestChangeWaitType`
 - `RequestSocialAction`
@@ -169,7 +170,6 @@ Implemented and wired M5 target/combat/item/stance/social client packets in Go:
 Missing M5 stats/combat/items/progression client packets:
 
 - `RequestMagicSkillUse`
-- `RequestAutoSoulShot`
 - `RequestPetUseItem`
 - `RequestGiveItemToPet`
 - `RequestGetItemFromPet`
@@ -307,7 +307,6 @@ Missing M5 stats/combat/items/progression server packets:
 - `AcquireSkillDone`
 - `ShortCutRegister`
 - `ShortCutDelete`
-- `ExAutoSoulShot`
 - `ExUseSharedGroupItem`
 - `WarehouseDepositList`
 - `WarehouseWithdrawList`
@@ -319,6 +318,7 @@ Missing M5 stats/combat/items/progression server packets:
 Implemented and wired M5 item server packets in Go:
 
 - `DropItem`
+- `ExAutoSoulShot`
 - `InventoryUpdate`
 
 Implemented and wired M5 target/combat server packets in Go:
@@ -342,7 +342,8 @@ Implemented and wired M5 target/combat server packets in Go:
 - `RequestChangeMoveType`, `RequestChangeWaitType`, and `RequestSocialAction` now wire the current run/walk, sit/stand, and social-animation state available in Go. Missing higher-level gates such as mount state, fishing, requester/trade state, and full AI intention are still owned by the systems that introduce those states.
 - `RequestDropItem`, `RequestDestroyItem`, and `SendTimeCheck` are wired. Drop/destroy currently cover the inventory/template/count gates available in Go and emit `InventoryUpdate`; player drops also place a ground item through the ground-item task and emit the animated `DropItem` frame during the transient dropper-id window.
 - `RequestCrystallizeItem` is wired for runtime-known Crystallize skill levels, crystallizable item gates, crystal reward grants, `SystemMessage` feedback, and `InventoryUpdate`. Durable learned-skill loading and skill acquisition remain with the `RequestAcquireSkillInfo`/`RequestAcquireSkill` burst.
+- `RequestAutoSoulShot` is wired as extended client opcode `0x0005` with per-player auto-shot toggle state, `ExAutoSoulShot`, and item-name `SystemMessage` feedback. First-shot recharge, recurring shot consumption, and `ExUseSharedGroupItem` reuse display remain deferred to the item-use/handler burst because the shared item handler/reuse pipeline is not ported yet.
 - `StatusUpdate` is implemented and wired for target max/current HP during selection. Broader status/stat recalculation broadcasts still need owner flows as those systems are ported.
-- The unique missing counts deduplicate those overlaps: 63 missing game client packets and 81 missing game server packets after the EnterWorld, movement/rotation, inventory, target/action, stance/social, and item-operation packet-wiring passes.
+- The unique missing counts deduplicate those overlaps: 62 missing game client packets and 80 missing game server packets after the EnterWorld, movement/rotation, inventory, target/action, stance/social, item-operation, and auto-shot packet-wiring passes.
 - Existing Go code accepts several M4/M5 client opcodes in `clientpackets/wiresafe.go`, but many of them still log "Opcode not wired" or have no decode/run implementation.
 - This audit uses original Java class names. Go may keep a slightly different helper shape, such as `Frame...` functions instead of packet structs, but the required client-visible packet behavior is still one original packet at a time.

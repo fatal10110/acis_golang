@@ -3,10 +3,11 @@ package clientpackets
 import "fmt"
 
 const (
-	requestDropItemSize    = 5 * 4
-	requestDestroyItemSize = 2 * 4
-	requestCrystallizeSize = 2 * 4
-	sendTimeCheckSize      = 2 * 4
+	requestDropItemSize     = 5 * 4
+	requestDestroyItemSize  = 2 * 4
+	requestCrystallizeSize  = 2 * 4
+	sendTimeCheckSize       = 2 * 4
+	requestAutoSoulShotSize = 2 + 2*4
 )
 
 // RequestDropItem asks the server to drop an inventory item stack into the
@@ -106,6 +107,33 @@ func DecodeSendTimeCheck(payload []byte) (SendTimeCheck, error) {
 	}
 	if err := r.Err(); err != nil {
 		return SendTimeCheck{}, fmt.Errorf("clientpackets: SendTimeCheck: %w", err)
+	}
+	return req, nil
+}
+
+// RequestAutoSoulShot asks the server to toggle automatic use for a shot
+// item. Type is 1 to enable and 0 to disable.
+type RequestAutoSoulShot struct {
+	ItemID int32
+	Type   int32
+}
+
+// DecodeRequestAutoSoulShot parses a raw extended RequestAutoSoulShot payload
+// (opcode byte included).
+func DecodeRequestAutoSoulShot(payload []byte) (RequestAutoSoulShot, error) {
+	r := newReader(payload)
+	if r.Remaining() < requestAutoSoulShotSize {
+		return RequestAutoSoulShot{}, fmt.Errorf("clientpackets: RequestAutoSoulShot: need %d bytes, got %d", requestAutoSoulShotSize, r.Remaining())
+	}
+	if second := r.ReadUint16(); second != OpcodeRequestAutoSoulShot {
+		return RequestAutoSoulShot{}, fmt.Errorf("clientpackets: RequestAutoSoulShot: extended opcode %#x", second)
+	}
+	req := RequestAutoSoulShot{
+		ItemID: r.ReadInt32(),
+		Type:   r.ReadInt32(),
+	}
+	if err := r.Err(); err != nil {
+		return RequestAutoSoulShot{}, fmt.Errorf("clientpackets: RequestAutoSoulShot: %w", err)
 	}
 	return req, nil
 }

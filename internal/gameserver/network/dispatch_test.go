@@ -237,6 +237,15 @@ func testItemTemplates() *item.Table {
 			EtcItem:     &item.EtcItemDetail{Type: item.EtcItemPotion},
 		},
 		{
+			ID:            1463,
+			Name:          "Soulshot: No Grade",
+			Kind:          item.KindEtcItem,
+			Duration:      -1,
+			Stackable:     true,
+			DefaultAction: item.ActionSoulshot,
+			EtcItem:       &item.EtcItemDetail{Type: item.EtcItemShot},
+		},
+		{
 			ID:           30,
 			Name:         "Sword",
 			Kind:         item.KindWeapon,
@@ -449,6 +458,14 @@ func encodeEnterWorld() []byte {
 func encodeRequestManorList() []byte {
 	w := wire.NewPacketWriter(clientpackets.OpcodeExtended)
 	w.WriteUint16(clientpackets.OpcodeRequestManorList)
+	return w.Bytes()
+}
+
+func encodeRequestAutoSoulShot(itemID, typ int32) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeExtended)
+	w.WriteUint16(clientpackets.OpcodeRequestAutoSoulShot)
+	w.WriteInt32(itemID)
+	w.WriteInt32(typ)
 	return w.Bytes()
 }
 
@@ -1477,6 +1494,43 @@ func TestGameClientLinkSendsSkillCoolTimeInGame(t *testing.T) {
 	if second := wire.NewReader(reply[1:]).ReadUint16(); second != serverpackets.OpcodeExSendManorList {
 		t.Fatalf("extended opcode = %#x, want ExSendManorList (%#x)", second, serverpackets.OpcodeExSendManorList)
 	}
+}
+
+func TestGameClientLinkAutoSoulShotInGame(t *testing.T) {
+	const soulshotID int32 = 1463
+	c, chars, items, _ := newLinkedGameClient(t)
+
+	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.read() // CharCreateOk
+	c.read() // CharSelectInfo
+	objID := chars.soleObjectID(t)
+	if err := items.Create(context.Background(), objID, item.Instance{
+		ObjectID:   510,
+		TemplateID: soulshotID,
+		OwnerID:    objID,
+		Count:      100,
+		Location:   item.LocationInventory,
+	}); err != nil {
+		t.Fatalf("seed item: %v", err)
+	}
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	c.send(encodeRequestAutoSoulShot(soulshotID, 1))
+	reply := c.read()
+	assertExAutoSoulShotFrame(t, reply, soulshotID, true)
+	reply = c.read()
+	assertSystemMessageItemFrame(t, reply, serverpackets.SystemMessageUseOfItemWillBeAuto, soulshotID)
+
+	c.send(encodeRequestAutoSoulShot(soulshotID, 0))
+	reply = c.read()
+	assertExAutoSoulShotFrame(t, reply, soulshotID, false)
+	reply = c.read()
+	assertSystemMessageItemFrame(t, reply, serverpackets.SystemMessageAutoUseOfItemCancelled, soulshotID)
 }
 
 func TestGameClientLinkSendTimeCheckIsNoOpInGame(t *testing.T) {

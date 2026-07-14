@@ -61,6 +61,24 @@ func TestDecodeSendTimeCheck(t *testing.T) {
 	}
 }
 
+func TestDecodeRequestAutoSoulShot(t *testing.T) {
+	payload := []byte{
+		OpcodeExtended,
+		0x05, 0x00,
+		0xb7, 0x05, 0x00, 0x00,
+		0x01, 0x00, 0x00, 0x00,
+	}
+
+	got, err := DecodeRequestAutoSoulShot(payload)
+	if err != nil {
+		t.Fatalf("DecodeRequestAutoSoulShot: %v", err)
+	}
+	want := RequestAutoSoulShot{ItemID: 1463, Type: 1}
+	if got != want {
+		t.Fatalf("DecodeRequestAutoSoulShot = %+v, want %+v", got, want)
+	}
+}
+
 func TestDecodeItemOpsShort(t *testing.T) {
 	if _, err := DecodeRequestDropItem([]byte{OpcodeRequestDropItem, 1}); err == nil {
 		t.Fatal("DecodeRequestDropItem: want error on short payload")
@@ -73,5 +91,11 @@ func TestDecodeItemOpsShort(t *testing.T) {
 	}
 	if _, err := DecodeSendTimeCheck([]byte{OpcodeSendTimeCheck, 1}); err == nil {
 		t.Fatal("DecodeSendTimeCheck: want error on short payload")
+	}
+	if _, err := DecodeRequestAutoSoulShot([]byte{OpcodeExtended, 0x05, 0x00, 1}); err == nil {
+		t.Fatal("DecodeRequestAutoSoulShot: want error on short payload")
+	}
+	if _, err := DecodeRequestAutoSoulShot([]byte{OpcodeExtended, 0x08, 0x00, 0, 0, 0, 0, 0, 0, 0, 0}); err == nil {
+		t.Fatal("DecodeRequestAutoSoulShot: want error on wrong extended opcode")
 	}
 }

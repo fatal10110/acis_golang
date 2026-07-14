@@ -448,6 +448,15 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			case r.Err() != nil:
 				l.log.Warn().Str("state", client.State().String()).Msg("game client: extended opcode missing")
 				continue
+			case second == clientpackets.OpcodeRequestAutoSoulShot:
+				req, err := clientpackets.DecodeRequestAutoSoulShot(payload)
+				if err != nil {
+					l.log.Warn().Err(err).Msg("game client")
+					return
+				}
+				if live != nil {
+					l.handleAutoSoulShot(live, req)
+				}
 			case second == clientpackets.OpcodeRequestManorList:
 				session.SendFrame(serverpackets.FrameExSendManorList())
 			default:
@@ -935,6 +944,48 @@ func (l *GameClientLink) useItem(live *livePlayer, objectID int32) {
 	}
 	l.sendInventoryUpdate(live, inv)
 	l.broadcastEquipmentChange(live)
+}
+
+func (l *GameClientLink) handleAutoSoulShot(live *livePlayer, req clientpackets.RequestAutoSoulShot) {
+	if live == nil || live.AlikeDead() {
+		return
+	}
+	inv := live.Inventory()
+	if inv == nil || inv.ItemByTemplateID(req.ItemID) == nil {
+		return
+	}
+
+	switch req.Type {
+	case 1:
+		if fishingShot(req.ItemID) {
+			return
+		}
+		if summonShot(req.ItemID) {
+			if l.world == nil {
+				live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNoServitorCannotAutomateUse))
+				return
+			}
+			if _, hasSummon := l.world.Summon(live.ObjectID()); !hasSummon {
+				live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNoServitorCannotAutomateUse))
+				return
+			}
+		}
+		live.SetAutoSoulShot(req.ItemID, true)
+		live.SendFrame(serverpackets.FrameExAutoSoulShot(req.ItemID, true))
+		live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageUseOfItemWillBeAuto, req.ItemID))
+	case 0:
+		live.SetAutoSoulShot(req.ItemID, false)
+		live.SendFrame(serverpackets.FrameExAutoSoulShot(req.ItemID, false))
+		live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageAutoUseOfItemCancelled, req.ItemID))
+	}
+}
+
+func fishingShot(itemID int32) bool {
+	return itemID >= 6535 && itemID <= 6540
+}
+
+func summonShot(itemID int32) bool {
+	return itemID >= 6645 && itemID <= 6647
 }
 
 // unequipItem clears whatever item occupies the paperdoll position that

@@ -68,12 +68,13 @@ type Character struct {
 	dead    bool
 	health  creature.Health
 
-	// stateMu guards transient live stance flags.
-	stateMu   sync.RWMutex
-	stateInit bool
-	running   bool
-	standing  bool
-	inCombat  bool
+	// stateMu guards transient live flags.
+	stateMu       sync.RWMutex
+	stateInit     bool
+	running       bool
+	standing      bool
+	inCombat      bool
+	autoSoulShots map[int32]bool
 
 	skills skillState
 }
