@@ -88,6 +88,12 @@ func (c *Character) AddRewardItem(itemID int32, count int, objectID int32) bool 
 	return c.inventory.AddNew(itemID, count, objectID) != nil
 }
 
+// Inventory returns the carried item collection attached by AttachRuntime,
+// or nil if the character has none yet.
+func (c *Character) Inventory() *itemcontainer.Inventory {
+	return c.inventory
+}
+
 // SetWorld records the world registry BroadcastAttack reaches through.
 func (c *Character) SetWorld(state *world.State) {
 	c.world = state

@@ -292,6 +292,41 @@ func (f *fakeGameClient) read() []byte {
 	return payload
 }
 
+func readEnterWorldBurst(t *testing.T, c *fakeGameClient, wantDie bool) [][]byte {
+	t.Helper()
+	want := []byte{
+		serverpackets.OpcodeExtended,
+		serverpackets.OpcodeHennaInfo,
+		serverpackets.OpcodeEtcStatusUpdate,
+		serverpackets.OpcodeSystemMessage,
+		serverpackets.OpcodeQuestList,
+		serverpackets.OpcodeSkillList,
+		serverpackets.OpcodeFriendList,
+		serverpackets.OpcodeUserInfo,
+		serverpackets.OpcodeItemList,
+		serverpackets.OpcodeShortCutInit,
+	}
+	if wantDie {
+		want = append(want, serverpackets.OpcodeDie)
+	}
+	want = append(want, serverpackets.OpcodeSkillCoolTime, serverpackets.OpcodeActionFailed)
+
+	frames := make([][]byte, 0, len(want))
+	for i, opcode := range want {
+		frame := c.read()
+		if frame[0] != opcode {
+			t.Fatalf("EnterWorld frame %d opcode = %#x, want %#x", i, frame[0], opcode)
+		}
+		if i == 0 {
+			if second := wire.NewReader(frame[1:]).ReadUint16(); second != serverpackets.OpcodeExStorageMaxCount {
+				t.Fatalf("EnterWorld first extended opcode = %#x, want ExStorageMaxCount (%#x)", second, serverpackets.OpcodeExStorageMaxCount)
+			}
+		}
+		frames = append(frames, frame)
+	}
+	return frames
+}
+
 func (f *fakeGameClient) expectClosed() {
 	f.t.Helper()
 	f.conn.SetReadDeadline(time.Now().Add(2 * time.Second))
@@ -403,6 +438,29 @@ func encodeValidatePosition(at location.Location, heading int32) []byte {
 	w.WriteInt32(int32(at.Z))
 	w.WriteInt32(heading)
 	w.WriteInt32(0)
+	return w.Bytes()
+}
+
+func encodeCannotMoveAnymore(at location.Location, heading int32) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeCannotMoveAnymore)
+	w.WriteInt32(int32(at.X))
+	w.WriteInt32(int32(at.Y))
+	w.WriteInt32(int32(at.Z))
+	w.WriteInt32(heading)
+	return w.Bytes()
+}
+
+func encodeStartRotating(degree, side int32) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeStartRotating)
+	w.WriteInt32(degree)
+	w.WriteInt32(side)
+	return w.Bytes()
+}
+
+func encodeFinishRotating(degree, side int32) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeFinishRotating)
+	w.WriteInt32(degree)
+	w.WriteInt32(side)
 	return w.Bytes()
 }
 
@@ -945,18 +1003,7 @@ func TestGameClientLinkFullFlow(t *testing.T) {
 	}
 
 	c.send(encodeEnterWorld())
-	reply = c.read()
-	if reply[0] != serverpackets.OpcodeSkillList {
-		t.Fatalf("opcode = %#x, want SkillList (%#x)", reply[0], serverpackets.OpcodeSkillList)
-	}
-	reply = c.read()
-	if reply[0] != serverpackets.OpcodeUserInfo {
-		t.Fatalf("opcode = %#x, want UserInfo (%#x)", reply[0], serverpackets.OpcodeUserInfo)
-	}
-	reply = c.read()
-	if reply[0] != serverpackets.OpcodeItemList {
-		t.Fatalf("opcode = %#x, want ItemList (%#x)", reply[0], serverpackets.OpcodeItemList)
-	}
+	readEnterWorldBurst(t, c, false)
 	if _, ok := state.Player(objID); !ok {
 		t.Fatalf("world.Player(%d) missing after EnterWorld", objID)
 	}
@@ -965,7 +1012,7 @@ func TestGameClientLinkFullFlow(t *testing.T) {
 	}
 }
 
-func TestGameClientLinkIgnoresRequestSkillCoolTimeInGame(t *testing.T) {
+func TestGameClientLinkSendsSkillCoolTimeInGame(t *testing.T) {
 	c, _, _, _ := newLinkedGameClient(t)
 
 	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
@@ -975,13 +1022,19 @@ func TestGameClientLinkIgnoresRequestSkillCoolTimeInGame(t *testing.T) {
 	c.read() // SSQInfo
 	c.read() // CharSelected
 	c.send(encodeEnterWorld())
-	c.read() // SkillList
-	c.read() // UserInfo
-	c.read() // ItemList
+	readEnterWorldBurst(t, c, false)
 
 	c.send(encodeRequestSkillCoolTime())
-	c.send(encodeRequestManorList())
 	reply := c.read()
+	if reply[0] != serverpackets.OpcodeSkillCoolTime {
+		t.Fatalf("opcode = %#x, want SkillCoolTime (%#x)", reply[0], serverpackets.OpcodeSkillCoolTime)
+	}
+	if count := wire.NewReader(reply[1:]).ReadInt32(); count != 0 {
+		t.Fatalf("SkillCoolTime count = %d, want 0", count)
+	}
+
+	c.send(encodeRequestManorList())
+	reply = c.read()
 	if reply[0] != serverpackets.OpcodeExtended {
 		t.Fatalf("opcode = %#x, want extended packet (%#x)", reply[0], serverpackets.OpcodeExtended)
 	}
@@ -1002,9 +1055,7 @@ func TestGameClientLinkWireSafeMovementAndRefreshPacketsInGame(t *testing.T) {
 	c.read() // SSQInfo
 	c.read() // CharSelected
 	c.send(encodeEnterWorld())
-	c.read() // SkillList
-	c.read() // UserInfo
-	c.read() // ItemList
+	readEnterWorldBurst(t, c, false)
 
 	target := location.Location{X: 46160, Y: 41237, Z: -3534}
 	origin := location.Location{X: 46117, Y: 41247, Z: -3532}
@@ -1049,6 +1100,58 @@ func TestGameClientLinkWireSafeMovementAndRefreshPacketsInGame(t *testing.T) {
 		t.Fatalf("player position after ValidatePosition = (%d,%d,%d), want (%d,%d,%d)", x, y, z, target.X, target.Y, target.Z)
 	}
 
+	stoppedAt := location.Location{X: 46155, Y: 41240, Z: -3534}
+	c.send(encodeCannotMoveAnymore(stoppedAt, 12345))
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeStopMove {
+		t.Fatalf("stop reply opcode = %#x, want StopMove (%#x)", reply[0], serverpackets.OpcodeStopMove)
+	}
+	r = wire.NewReader(reply[1:])
+	if got := r.ReadInt32(); got != objID {
+		t.Fatalf("StopMove object id = %d, want %d", got, objID)
+	}
+	gotStoppedAt := location.Location{X: int(r.ReadInt32()), Y: int(r.ReadInt32()), Z: int(r.ReadInt32())}
+	if gotStoppedAt != stoppedAt {
+		t.Fatalf("StopMove location = %+v, want %+v", gotStoppedAt, stoppedAt)
+	}
+	if heading := r.ReadInt32(); heading != 12345 {
+		t.Fatalf("StopMove heading = %d, want 12345", heading)
+	}
+	x, y, z = positioned.Position()
+	if x != stoppedAt.X || y != stoppedAt.Y || z != stoppedAt.Z {
+		t.Fatalf("player position after CannotMoveAnymore = (%d,%d,%d), want (%d,%d,%d)", x, y, z, stoppedAt.X, stoppedAt.Y, stoppedAt.Z)
+	}
+
+	c.send(encodeStartRotating(32768, 1))
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeStartRotation {
+		t.Fatalf("start rotation opcode = %#x, want StartRotation (%#x)", reply[0], serverpackets.OpcodeStartRotation)
+	}
+	r = wire.NewReader(reply[1:])
+	if got := r.ReadInt32(); got != objID {
+		t.Fatalf("StartRotation object id = %d, want %d", got, objID)
+	}
+	if degree, side, speed := r.ReadInt32(), r.ReadInt32(), r.ReadInt32(); degree != 32768 || side != 1 || speed != 0 {
+		t.Fatalf("StartRotation fields = (%d,%d,%d), want (32768,1,0)", degree, side, speed)
+	}
+
+	c.send(encodeFinishRotating(22222, 1))
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeStopRotation {
+		t.Fatalf("stop rotation opcode = %#x, want StopRotation (%#x)", reply[0], serverpackets.OpcodeStopRotation)
+	}
+	r = wire.NewReader(reply[1:])
+	if got := r.ReadInt32(); got != objID {
+		t.Fatalf("StopRotation object id = %d, want %d", got, objID)
+	}
+	wantLowDegree := uint8(22222 & 0xff)
+	if degree, speed, lowDegree := r.ReadInt32(), r.ReadInt32(), r.ReadUint8(); degree != 22222 || speed != 0 || lowDegree != wantLowDegree {
+		t.Fatalf("StopRotation fields = (%d,%d,%d), want (22222,0,%d)", degree, speed, lowDegree, wantLowDegree)
+	}
+	if heading := obj.(*livePlayer).Character.Heading; heading != 22222 {
+		t.Fatalf("live player heading = %d, want 22222", heading)
+	}
+
 	c.send(encodeSingleOpcode(clientpackets.OpcodeRequestSkillList))
 	reply = c.read()
 	if reply[0] != serverpackets.OpcodeSkillList {
@@ -1056,7 +1159,6 @@ func TestGameClientLinkWireSafeMovementAndRefreshPacketsInGame(t *testing.T) {
 	}
 
 	for _, opcode := range []byte{
-		clientpackets.OpcodeUseItem,
 		clientpackets.OpcodeTradeRequest,
 		clientpackets.OpcodeSendWarehouseDeposit,
 		clientpackets.OpcodeRequestQuestListInGame,
@@ -1085,9 +1187,7 @@ func TestGameClientLinkRoutesSummonActionUseToLiveSummon(t *testing.T) {
 	c.read() // SSQInfo
 	c.read() // CharSelected
 	c.send(encodeEnterWorld())
-	c.read() // SkillList
-	c.read() // UserInfo
-	c.read() // ItemList
+	readEnterWorldBurst(t, c, false)
 
 	ownerObject, ok := state.Player(objID)
 	if !ok {
@@ -1126,9 +1226,7 @@ func TestGameClientLinkLogoutLeavesWorld(t *testing.T) {
 	c.read() // SSQInfo
 	c.read() // CharSelected
 	c.send(encodeEnterWorld())
-	c.read() // SkillList
-	c.read() // UserInfo
-	c.read() // ItemList
+	readEnterWorldBurst(t, c, false)
 
 	savedAt := location.Location{X: 46160, Y: 41237, Z: -3534}
 	c.send(encodeValidatePosition(savedAt, 32768))
@@ -1158,9 +1256,7 @@ func TestGameClientLinkRestartReturnsToCharacterSelect(t *testing.T) {
 	c.read() // SSQInfo
 	c.read() // CharSelected
 	c.send(encodeEnterWorld())
-	c.read() // SkillList
-	c.read() // UserInfo
-	c.read() // ItemList
+	readEnterWorldBurst(t, c, false)
 
 	savedAt := location.Location{X: 46160, Y: 41237, Z: -3534}
 	c.send(encodeValidatePosition(savedAt, 32768))

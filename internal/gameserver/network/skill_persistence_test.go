@@ -203,9 +203,7 @@ func TestGameClientLinkEnterWorldRestoresPersistedSkillState(t *testing.T) {
 	c.read() // SSQInfo
 	c.read() // CharSelected
 	c.send(encodeEnterWorld())
-	c.read() // SkillList
-	c.read() // UserInfo
-	c.read() // ItemList
+	readEnterWorldBurst(t, c, false)
 
 	char := chars.character(t, objID)
 	if !char.SkillDisabled(1040*256 + 3) {
@@ -238,9 +236,7 @@ func TestGameClientLinkLogoutPersistsSkillState(t *testing.T) {
 	c.read() // SSQInfo
 	c.read() // CharSelected
 	c.send(encodeEnterWorld())
-	c.read() // SkillList
-	c.read() // UserInfo
-	c.read() // ItemList
+	readEnterWorldBurst(t, c, false)
 
 	char := chars.character(t, objID)
 	char.AddActiveSkillEffect(effect.ActiveEffect{Skill: skillRef(1204, 2), ReuseGroup: 1204*256 + 2, Count: 3, Time: 20})

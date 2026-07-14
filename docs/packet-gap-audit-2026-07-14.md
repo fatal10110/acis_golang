@@ -1,0 +1,334 @@
+# Packet gap audit - 2026-07-14
+
+Scope correction: packets owned by M0, M1, M2, M3, M4, and M5 are treated as required now.
+
+The original game packet appendices do not label packets by milestone, so this audit maps packets to closed milestone scope:
+
+- M0: no concrete protocol packets.
+- M1: login client/server packets and GS-LS link packets.
+- M2: game client connect, character create/delete/restore/select, and EnterWorld baseline.
+- M3: data-backed UI/content packets for HTML, crests, multisell, buylists, hennas, recipes, skill trees, manor, cursed weapons, augmentation, fish data, and related screens.
+- M4: world, visibility, spawn, doors/static objects, movement, vehicles, time/day-night, and teleport/restart movement packets.
+- M5: stats, combat, item/inventory/container, shots, pet inventory/status, skill acquisition/progression, death/respawn, and related update packets.
+
+Sources checked:
+
+- `../aCis_gameserver/docs/go-rewrite/90-appendix-game-client-packets.md`
+- `../aCis_gameserver/docs/go-rewrite/91-appendix-game-server-packets.md`
+- `../aCis_gameserver/docs/go-rewrite/92-appendix-login-packets.md`
+- `../aCis_gameserver/docs/go-rewrite/16-connection-flow.md`
+- `../aCis_gameserver/GO_REWRITE_PLAN.md`
+- `../aCis_gameserver/java/net/sf/l2j/gameserver/network/clientpackets/EnterWorld.java`
+- `internal/gameserver/network/clientpackets/`
+- `internal/gameserver/network/serverpackets/`
+- `internal/link/`
+- `internal/loginserver/network/clientpackets/`
+- `internal/loginserver/network/serverpackets/`
+
+## Summary
+
+- Original game client appendix: 206 concrete dispatcher targets.
+- Original game server appendix: 282 packet classes, including base/composite classes.
+- Classified M2-M5 required game client packets: 93. Missing in Go: 73.
+- Classified M2-M5 required game server packets: 128. Missing in Go: 86.
+- M1 login client/server packets are implemented.
+- M1 GS-LS link packets are implemented under `internal/link/`.
+- M2 base game connect/create/select packet set is implemented.
+- The big gaps now start at clan-specific EnterWorld packets plus M3-M5 data/world/item/combat packet surfaces.
+
+GitHub backlog parents opened for packets still not implemented:
+
+- Client packets: [#553 Packet backlog: remaining M3-M5 client packets](https://github.com/fatal10110/acis_golang/issues/553)
+- Server packets: [#630 Packet backlog: remaining M2-M5 server packets](https://github.com/fatal10110/acis_golang/issues/630)
+
+## M1 Login/Link
+
+No concrete M1 packet gap found.
+
+Login client packets present in Go:
+
+- `AuthGameGuard`
+- `RequestAuthLogin`
+- `RequestServerList`
+- `RequestServerLogin`
+
+Login server packets present in Go:
+
+- `AccountKicked`
+- `GGAuth`
+- `Init`
+- `LoginFail`
+- `LoginOk`
+- `PlayFail`
+- `PlayOk`
+- `ServerList`
+
+GS-LS link packets present in Go under `internal/link/`:
+
+- `AuthResponse`
+- `BlowFishKey`
+- `ChangeAccessLevel`
+- `GameServerAuth`
+- `InitLS`
+- `KickPlayer`
+- `LoginServerFail`
+- `PlayerAuthRequest`
+- `PlayerAuthResponse`
+- `PlayerInGame`
+- `PlayerLogout`
+- `ServerStatus`
+
+## Game Client Packet Gaps
+
+M2 required client packets are complete:
+
+- `SendProtocolVersion`
+- `AuthLogin`
+- `Logout`
+- `RequestCharacterCreate`
+- `RequestCharacterDelete`
+- `RequestGameStart`
+- `RequestNewCharacter`
+- `CharacterRestore`
+- `EnterWorld`
+
+Missing M3 data/UI client packets:
+
+- `RequestLinkHtml`
+- `RequestBypassToServer`
+- `RequestBBSwrite`
+- `RequestPledgeCrest`
+- `RequestSetPledgeCrest`
+- `RequestAllyCrest`
+- `RequestSetAllyCrest`
+- `RequestExPledgeCrestLarge`
+- `RequestExSetPledgeCrestLarge`
+- `MultiSellChoose`
+- `RequestBuyItem`
+- `RequestSellItem`
+- `RequestPreviewItem`
+- `RequestBuyProcure`
+- `RequestBuySeed`
+- `RequestProcureCropList`
+- `RequestSetSeed`
+- `RequestSetCrop`
+- `RequestHennaItemList`
+- `RequestHennaItemInfo`
+- `RequestHennaEquip`
+- `RequestHennaUnequipList`
+- `RequestHennaUnequipInfo`
+- `RequestHennaUnequip`
+- `RequestRecipeBookOpen`
+- `RequestRecipeBookDestroy`
+- `RequestRecipeItemMakeInfo`
+- `RequestRecipeItemMakeSelf`
+- `RequestRecipeShopMessageSet`
+- `RequestRecipeShopListSet`
+- `RequestRecipeShopManageQuit`
+- `RequestRecipeShopMakeInfo`
+- `RequestRecipeShopMakeItem`
+- `RequestRecipeShopManagePrev`
+- `RequestExEnchantSkillInfo`
+- `RequestExEnchantSkill`
+- `RequestExFishRanking`
+- `RequestCursedWeaponList`
+- `RequestCursedWeaponLocation`
+- `RequestConfirmTargetItem`
+- `RequestConfirmRefinerItem`
+- `RequestConfirmGemStone`
+- `RequestConfirmCancelItem`
+
+Implemented and wired M4 movement/rotation client packets in Go:
+
+- `CannotMoveAnymore`
+- `StartRotating`
+- `FinishRotating`
+
+Missing M4 world/movement client packets:
+
+- `RequestMoveToLocationInVehicle`
+- `CannotMoveAnymoreInVehicle`
+- `RequestGetOnVehicle`
+- `RequestGetOffVehicle`
+- `Appearing`
+- `ObserverReturn`
+- `RequestTargetCancel`
+
+Missing M5 stats/combat/items/progression client packets:
+
+- `Action`
+- `AttackRequest`
+- `RequestChangeMoveType`
+- `RequestChangeWaitType`
+- `RequestSocialAction`
+- `RequestMagicSkillUse`
+- `RequestDropItem`
+- `RequestDestroyItem`
+- `RequestCrystallizeItem`
+- `RequestAutoSoulShot`
+- `RequestPetUseItem`
+- `RequestGiveItemToPet`
+- `RequestGetItemFromPet`
+- `RequestPetGetItem`
+- `SendWarehouseDepositList`
+- `SendWarehouseWithdrawList`
+- `RequestPackageSendableItemList`
+- `RequestPackageSend`
+- `RequestAcquireSkillInfo`
+- `RequestAcquireSkill`
+- `RequestRestartPoint`
+- `RequestEnchantItem`
+- `SendTimeCheck`
+
+`AttackRequest` remains a gap because the original flow resolves the target object, applies observer/out-of-control gates, uses current selected-target state, dispatches `onAction`, and may emit target-selection packets before an attack is attempted. The Go port has attack controllers and `Attack` server packets, but not the client-selected target/onAction routing required to wire this opcode truthfully.
+
+## Game Server Packet Gaps
+
+M2 base server packets are complete:
+
+- `VersionCheck`
+- `AuthLoginFail`
+- `CharSelectInfo`
+- `CharCreateOk`
+- `CharCreateFail`
+- `CharDeleteOk`
+- `CharDeleteFail`
+- `NewCharacterSuccess`
+- `SSQInfo`
+- `CharSelected`
+- `SkillList`
+- `UserInfo`
+- `ItemList`
+- `ActionFailed`
+
+Implemented and wired EnterWorld burst packets in Go:
+
+- `ExStorageMaxCount`
+- `HennaInfo`
+- `EtcStatusUpdate`
+- `QuestList`
+- `FriendList`
+- `ShortCutInit`
+- `Die`
+- `SkillCoolTime`
+
+Remaining EnterWorld burst packet gaps:
+
+- `PledgeShowMemberListUpdate` ([#631](https://github.com/fatal10110/acis_golang/issues/631))
+- `PledgeShowMemberListAll` ([#632](https://github.com/fatal10110/acis_golang/issues/632))
+- `PledgeSkillList` ([#717](https://github.com/fatal10110/acis_golang/issues/717))
+- `ExMailArrived` ([#718](https://github.com/fatal10110/acis_golang/issues/718))
+- `PlaySound` ([#719](https://github.com/fatal10110/acis_golang/issues/719))
+- `NpcHtmlMessage` ([#720](https://github.com/fatal10110/acis_golang/issues/720))
+
+`PledgeSkillList`, `ExMailArrived`, `PlaySound`, and `NpcHtmlMessage` currently have Go frame builders only. They are still counted as gaps because no production owner flow can emit them truthfully yet.
+
+Missing M3 data/UI server packets:
+
+- `NpcHtmlMessage`
+- `PledgeCrest`
+- `AllyCrest`
+- `ExPledgeCrestLarge`
+- `MultiSellList`
+- `BuyList`
+- `SellList`
+- `SellListProcure`
+- `BuyListSeed`
+- `HennaEquipList`
+- `HennaItemInfo`
+- `HennaUnequipList`
+- `HennaItemUnequipInfo`
+- `RecipeBookItemList`
+- `RecipeItemMakeInfo`
+- `RecipeShopItemInfo`
+- `RecipeShopManageList`
+- `RecipeShopMsg`
+- `RecipeShopSellList`
+- `ExShowSeedInfo`
+- `ExShowCropInfo`
+- `ExShowManorDefaultInfo`
+- `ExShowSeedSetting`
+- `ExShowCropSetting`
+- `ExShowSellCropList`
+- `ExShowProcureCropDetail`
+- `ExEnchantSkillList`
+- `ExEnchantSkillInfo`
+- `ExCursedWeaponList`
+- `ExCursedWeaponLocation`
+- `ExShowVariationMakeWindow`
+- `ExShowVariationCancelWindow`
+- `ExConfirmVariationItem`
+- `ExConfirmVariationRefiner`
+- `ExConfirmVariationGemstone`
+- `ExVariationResult`
+- `ExVariationCancelResult`
+
+Implemented and wired M4 movement/rotation server packets in Go:
+
+- `StopMove`
+- `StartRotation`
+- `StopRotation`
+
+Missing M4 world/movement server packets:
+
+- `ValidateLocation`
+- `GetOnVehicle`
+- `GetOffVehicle`
+- `VehicleDeparture`
+- `VehicleInfo`
+- `OnVehicleCheckLocation`
+- `MoveToLocationInVehicle`
+- `StopMoveInVehicle`
+- `ValidateLocationInVehicle`
+- `VehicleStarted`
+- `SunRise`
+- `SunSet`
+- `ChairSit`
+
+Missing M5 stats/combat/items/progression server packets:
+
+- `PlaySound`
+- `StatusUpdate`
+- `PetInventoryUpdate`
+- `PetItemList`
+- `PetStatusShow`
+- `PetInfo`
+- `PetStatusUpdate`
+- `PetDelete`
+- `AutoAttackStart`
+- `Revive`
+- `ChangeWaitType`
+- `ChangeMoveType`
+- `SocialAction`
+- `MagicSkillUse`
+- `MagicSkillLaunched`
+- `MagicSkillCanceled`
+- `SetupGauge`
+- `AbnormalStatusUpdate`
+- `ShortBuffStatusUpdate`
+- `AcquireSkillList`
+- `AcquireSkillInfo`
+- `AcquireSkillDone`
+- `ShortCutRegister`
+- `ShortCutDelete`
+- `ExAutoSoulShot`
+- `ExUseSharedGroupItem`
+- `WarehouseDepositList`
+- `WarehouseWithdrawList`
+- `PackageToList`
+- `PackageSendableList`
+- `ChooseInventoryItem`
+- `EnchantResult`
+
+Implemented and wired M5 item server packets in Go:
+
+- `InventoryUpdate`
+
+## Notes
+
+- Duplicate names across sections are intentional. For example `NpcHtmlMessage`, `HennaInfo`, `ExStorageMaxCount`, `Die`, `PlaySound`, `ShortCutInit`, and `SkillCoolTime` are required by more than one closed milestone surface.
+- `StartRotation` was also classified into M4 during the movement/rotation pass; it is implemented and wired with `StartRotating`.
+- `StatusUpdate` remains a gap after the inventory burst. Equip/unequip emits `InventoryUpdate`, but it does not change carried load, and the broader stat/status recalculation broadcast path is not wired yet.
+- The unique missing counts deduplicate those overlaps: 73 missing game client packets and 86 missing game server packets after the EnterWorld, movement/rotation, and inventory packet-wiring passes.
+- Existing Go code accepts several M4/M5 client opcodes in `clientpackets/wiresafe.go`, but many of them still log "Opcode not wired" or have no decode/run implementation.
+- This audit uses original Java class names. Go may keep a slightly different helper shape, such as `Frame...` functions instead of packet structs, but the required client-visible packet behavior is still one original packet at a time.

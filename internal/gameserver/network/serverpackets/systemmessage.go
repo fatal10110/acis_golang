@@ -4,6 +4,7 @@ import "github.com/fatal10110/acis_golang/internal/commons/wire"
 
 // Static system message ids used by live summon command feedback.
 const (
+	SystemMessageWelcomeToLineage             = 34
 	SystemMessagePetCannotSentBackDuringBattle = 579
 	SystemMessageDeadPetCannotBeReturned       = 589
 	SystemMessageYouCannotRestoreHungryPets    = 594
