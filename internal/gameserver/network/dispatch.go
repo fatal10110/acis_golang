@@ -43,6 +43,7 @@ type GameClientLink struct {
 	items         itemStore
 	templates     *player.TemplateTable
 	itemTemplates *item.Table
+	skills        *SkillPersistence
 	world         *world.State
 	log           zerolog.Logger
 
@@ -62,6 +63,7 @@ func NewGameClientLink(
 	items itemStore,
 	templates *player.TemplateTable,
 	itemTemplates *item.Table,
+	skills *SkillPersistence,
 	worldState *world.State,
 	log zerolog.Logger,
 ) *GameClientLink {
@@ -72,6 +74,7 @@ func NewGameClientLink(
 		items:         items,
 		templates:     templates,
 		itemTemplates: itemTemplates,
+		skills:        skills,
 		world:         worldState,
 		log:           log,
 		newCipherKey:  randomCipherKey,
@@ -606,6 +609,12 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 		l.log.Error().Err(err).Msg("enter world: list items")
 		return nil, false
 	}
+	if l.skills != nil {
+		if err := l.skills.Restore(ctx, c); err != nil {
+			l.log.Error().Err(err).Int32("object_id", c.ID).Msg("enter world: restore skill state")
+			return nil, false
+		}
+	}
 
 	itemListFrame, err := serverpackets.FrameItemList(items, l.itemTemplates, false)
 	if err != nil {
@@ -740,11 +749,18 @@ func (l *GameClientLink) detachLivePlayer(ctx context.Context, live *livePlayer)
 	if live == nil {
 		return
 	}
-	if l.roster != nil {
+	if l.roster != nil || l.skills != nil {
 		saveCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), livePlayerDetachSaveTimeout)
 		defer cancel()
-		if err := l.roster.SavePosition(saveCtx, live.Character); err != nil {
-			l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("save player position")
+		if l.roster != nil {
+			if err := l.roster.SavePosition(saveCtx, live.Character); err != nil {
+				l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("save player position")
+			}
+		}
+		if l.skills != nil {
+			if err := l.skills.Save(saveCtx, live.Character, true); err != nil {
+				l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("save player skill state")
+			}
 		}
 	}
 	if l.world != nil {
