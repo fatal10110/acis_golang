@@ -3,6 +3,7 @@ package network
 import (
 	"context"
 	"reflect"
+	"sync"
 	"testing"
 	"time"
 
@@ -278,6 +279,7 @@ func skillTable(defs ...modelskill.Definition) *modelskill.Table {
 }
 
 type memorySkillSaveStore struct {
+	mu      sync.Mutex
 	rows    map[skillSaveKey][]effect.SaveRow
 	deleted int
 }
@@ -292,15 +294,21 @@ func newMemorySkillSaveStore() *memorySkillSaveStore {
 }
 
 func (s *memorySkillSaveStore) Replace(_ context.Context, charObjID int32, classIndex int32, rows []effect.SaveRow) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.rows[skillSaveKey{charObjID: charObjID, classIndex: classIndex}] = append([]effect.SaveRow(nil), rows...)
 	return nil
 }
 
 func (s *memorySkillSaveStore) ListByCharacter(_ context.Context, charObjID int32, classIndex int32) ([]effect.SaveRow, error) {
-	return s.rowsFor(charObjID, classIndex), nil
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.rowsForLocked(charObjID, classIndex), nil
 }
 
 func (s *memorySkillSaveStore) DeleteByCharacter(_ context.Context, charObjID int32, classIndex int32) (int64, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	key := skillSaveKey{charObjID: charObjID, classIndex: classIndex}
 	n := int64(len(s.rows[key]))
 	delete(s.rows, key)
@@ -309,10 +317,18 @@ func (s *memorySkillSaveStore) DeleteByCharacter(_ context.Context, charObjID in
 }
 
 func (s *memorySkillSaveStore) seed(charObjID int32, classIndex int32, rows []effect.SaveRow) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.rows[skillSaveKey{charObjID: charObjID, classIndex: classIndex}] = append([]effect.SaveRow(nil), rows...)
 }
 
 func (s *memorySkillSaveStore) rowsFor(charObjID int32, classIndex int32) []effect.SaveRow {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.rowsForLocked(charObjID, classIndex)
+}
+
+func (s *memorySkillSaveStore) rowsForLocked(charObjID int32, classIndex int32) []effect.SaveRow {
 	return append([]effect.SaveRow(nil), s.rows[skillSaveKey{charObjID: charObjID, classIndex: classIndex}]...)
 }
 
