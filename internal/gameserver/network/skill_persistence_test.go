@@ -397,6 +397,28 @@ func (s *memorySkillSaveStore) ListKnownSkills(_ context.Context, charObjID int3
 	return out, nil
 }
 
+func (s *memorySkillSaveStore) SetKnownSkill(_ context.Context, charObjID int32, classIndex int32, skillID int, level int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key := skillSaveKey{charObjID: charObjID, classIndex: classIndex}
+	if s.known[key] == nil {
+		s.known[key] = make(player.SkillLevels)
+	}
+	s.known[key][skillID] = level
+	return nil
+}
+
+func (s *memorySkillSaveStore) knownFor(charObjID int32, classIndex int32) player.SkillLevels {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	levels := s.known[skillSaveKey{charObjID: charObjID, classIndex: classIndex}]
+	out := make(player.SkillLevels, len(levels))
+	for id, level := range levels {
+		out[id] = level
+	}
+	return out
+}
+
 func (s *memorySkillSaveStore) seedKnown(charObjID int32, classIndex int32, levels player.SkillLevels) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

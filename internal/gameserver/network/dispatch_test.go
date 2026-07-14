@@ -25,6 +25,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
@@ -208,6 +209,7 @@ func testTemplates(t *testing.T) *player.TemplateTable {
 		MPTable:   []float64{30},
 		CPTable:   []float64{32},
 		Spawns:    []location.Location{{X: 10, Y: 20, Z: 30}},
+		Skills:    []player.SkillGrant{{SkillID: 3, Level: 1, MinLevel: 5, Cost: 50}},
 	}
 	table, err := player.NewTemplateTable(map[int]*player.Template{0: tmpl})
 	if err != nil {
@@ -471,6 +473,22 @@ func encodeRequestAutoSoulShot(itemID, typ int32) []byte {
 	return w.Bytes()
 }
 
+func encodeRequestAcquireSkillInfo(skillID, level, skillType int32) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeRequestAcquireSkillInfo)
+	w.WriteInt32(skillID)
+	w.WriteInt32(level)
+	w.WriteInt32(skillType)
+	return w.Bytes()
+}
+
+func encodeRequestAcquireSkill(skillID, level, skillType int32) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeRequestAcquireSkill)
+	w.WriteInt32(skillID)
+	w.WriteInt32(level)
+	w.WriteInt32(skillType)
+	return w.Bytes()
+}
+
 func encodeRequestSkillCoolTime() []byte {
 	return wire.NewPacketWriter(clientpackets.OpcodeRequestSkillCoolTime).Bytes()
 }
@@ -661,6 +679,11 @@ func newLinkedGameClient(t *testing.T) (c *fakeGameClient, chars *fakeCharStore,
 
 func newLinkedGameClientWithSkills(t *testing.T, skills *SkillPersistence) (c *fakeGameClient, chars *fakeCharStore, items *fakeItemStore, state *world.State) {
 	t.Helper()
+	return newLinkedGameClientWithSkillsSeed(t, skills, nil, 0)
+}
+
+func newLinkedGameClientWithSkillsSeed(t *testing.T, skills *SkillPersistence, seed func(*fakeCharStore, *fakeItemStore), wantChars int) (c *fakeGameClient, chars *fakeCharStore, items *fakeItemStore, state *world.State) {
+	t.Helper()
 
 	loginAddr, servers, sessions := newTestLoginServer(t, false)
 	servers.Register(1, testHexID)
@@ -674,6 +697,9 @@ func newLinkedGameClientWithSkills(t *testing.T, skills *SkillPersistence) (c *f
 	t.Cleanup(func() { loginLink.Close() })
 
 	addr, chars, items, state := newTestGameClientLinkWithSkillsAndLog(t, func() *LoginLink { return loginLink }, validator, skills, zerolog.Nop())
+	if seed != nil {
+		seed(chars, items)
+	}
 
 	c = dialGameClient(t, addr)
 	c.sendProtocolVersion(746)
@@ -686,10 +712,28 @@ func newLinkedGameClientWithSkills(t *testing.T, skills *SkillPersistence) (c *f
 	if reply[0] != serverpackets.OpcodeCharSelectInfo {
 		t.Fatalf("opcode = %#x, want CharSelectInfo (%#x)", reply[0], serverpackets.OpcodeCharSelectInfo)
 	}
-	if count := wire.NewReader(reply[1:]).ReadInt32(); count != 0 {
-		t.Fatalf("initial char count = %d, want 0", count)
+	if count := wire.NewReader(reply[1:]).ReadInt32(); count != int32(wantChars) {
+		t.Fatalf("initial char count = %d, want %d", count, wantChars)
 	}
 	return c, chars, items, state
+}
+
+func seedSelectableCharacter(t *testing.T, chars *fakeCharStore, account, name string, level, sp int) int32 {
+	t.Helper()
+	tmpl, ok := testTemplates(t).Get(0)
+	if !ok {
+		t.Fatal("missing test class template")
+	}
+	ch, err := player.NewCharacter(100, tmpl, account, name, 1, 0, 0, player.SexMale)
+	if err != nil {
+		t.Fatalf("seed character: %v", err)
+	}
+	ch.Level = level
+	ch.SP = sp
+	if err := chars.Create(context.Background(), ch); err != nil {
+		t.Fatalf("seed character store: %v", err)
+	}
+	return ch.ID
 }
 
 type frameCapture struct {
@@ -1325,6 +1369,55 @@ func assertTargetHPStatus(t *testing.T, frame []byte, objectID int32, maxHP, cur
 	}
 }
 
+func assertSystemMessageSkillFrame(t *testing.T, frame []byte, messageID int, skillID, level int32) {
+	t.Helper()
+	if frame[0] != serverpackets.OpcodeSystemMessage {
+		t.Fatalf("SystemMessage opcode = %#x, want %#x", frame[0], serverpackets.OpcodeSystemMessage)
+	}
+	r := wire.NewReader(frame[1:])
+	if id := r.ReadInt32(); id != int32(messageID) {
+		t.Fatalf("SystemMessage id = %d, want %d", id, messageID)
+	}
+	if params := r.ReadInt32(); params != 1 {
+		t.Fatalf("SystemMessage params = %d, want 1", params)
+	}
+	if typ := r.ReadInt32(); typ != serverpackets.SystemMessageParamSkillName {
+		t.Fatalf("SystemMessage param type = %d, want skill name", typ)
+	}
+	if id := r.ReadInt32(); id != skillID {
+		t.Fatalf("SystemMessage skill id = %d, want %d", id, skillID)
+	}
+	if got := r.ReadInt32(); got != level {
+		t.Fatalf("SystemMessage skill level = %d, want %d", got, level)
+	}
+	if err := r.Err(); err != nil {
+		t.Fatalf("read SystemMessage: %v", err)
+	}
+}
+
+func assertSPStatus(t *testing.T, frame []byte, objectID int32, sp int) {
+	t.Helper()
+	if frame[0] != serverpackets.OpcodeStatusUpdate {
+		t.Fatalf("StatusUpdate opcode = %#x, want %#x", frame[0], serverpackets.OpcodeStatusUpdate)
+	}
+	r := wire.NewReader(frame[1:])
+	if id := r.ReadInt32(); id != objectID {
+		t.Fatalf("StatusUpdate object id = %d, want %d", id, objectID)
+	}
+	if count := r.ReadInt32(); count != 1 {
+		t.Fatalf("StatusUpdate count = %d, want 1", count)
+	}
+	if typ := r.ReadInt32(); typ != int32(serverpackets.StatusSP) {
+		t.Fatalf("StatusUpdate type = %d, want SP", typ)
+	}
+	if got := r.ReadInt32(); got != int32(sp) {
+		t.Fatalf("StatusUpdate SP = %d, want %d", got, sp)
+	}
+	if err := r.Err(); err != nil {
+		t.Fatalf("read StatusUpdate: %v", err)
+	}
+}
+
 func TestGameClientLinkNormalDisconnectLogsDebug(t *testing.T) {
 	logs := &safeLogBuffer{}
 	logger := zerolog.New(logs).Level(zerolog.DebugLevel)
@@ -1897,6 +1990,115 @@ func TestGameClientLinkCrystallizeItemSkillTooLow(t *testing.T) {
 	reply = c.read()
 	if reply[0] != serverpackets.OpcodeItemList {
 		t.Fatalf("post-skill-low opcode = %#x, want ItemList (%#x)", reply[0], serverpackets.OpcodeItemList)
+	}
+}
+
+func TestGameClientLinkAcquireSkillInfoAndLearnGeneralSkill(t *testing.T) {
+	store := newMemorySkillSaveStore()
+	skills := NewSkillPersistence(store, modelskill.NewTable([]modelskill.Definition{
+		{ID: 3, Level: 1, Activation: modelskill.ActivationActive},
+	}), store)
+	var objID int32
+	c, _, _, _ := newLinkedGameClientWithSkillsSeed(t, skills, func(chars *fakeCharStore, _ *fakeItemStore) {
+		objID = seedSelectableCharacter(t, chars, "player1", "Newbie", 5, 50)
+	}, 1)
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	c.send(encodeRequestAcquireSkillInfo(3, 1, 0))
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeAcquireSkillInfo {
+		t.Fatalf("skill info opcode = %#x, want AcquireSkillInfo (%#x)", reply[0], serverpackets.OpcodeAcquireSkillInfo)
+	}
+	r := wire.NewReader(reply[1:])
+	if id, level, cost, mode := r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32(); id != 3 || level != 1 || cost != 50 || mode != 0 {
+		t.Fatalf("AcquireSkillInfo header = id %d level %d cost %d mode %d, want 3/1/50/0", id, level, cost, mode)
+	}
+	if reqs := r.ReadInt32(); reqs != 0 {
+		t.Fatalf("AcquireSkillInfo requirements = %d, want 0", reqs)
+	}
+
+	c.send(encodeRequestAcquireSkill(3, 1, 0))
+	reply = c.read()
+	assertSystemMessageSkillFrame(t, reply, serverpackets.SystemMessageLearnedSkill, 3, 1)
+
+	reply = c.read()
+	assertSPStatus(t, reply, objID, 0)
+
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeSkillList {
+		t.Fatalf("learn SkillList opcode = %#x, want SkillList (%#x)", reply[0], serverpackets.OpcodeSkillList)
+	}
+	r = wire.NewReader(reply[1:])
+	if count := r.ReadInt32(); count != 1 {
+		t.Fatalf("SkillList count = %d, want 1", count)
+	}
+	if passive, level, id := r.ReadInt32(), r.ReadInt32(), r.ReadInt32(); passive != 0 || level != 1 || id != 3 {
+		t.Fatalf("SkillList entry = passive %d level %d id %d, want 0/1/3", passive, level, id)
+	}
+	r.ReadUint8()
+	if err := r.Err(); err != nil {
+		t.Fatalf("read SkillList: %v", err)
+	}
+
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeAcquireSkillList {
+		t.Fatalf("learn AcquireSkillList opcode = %#x, want AcquireSkillList (%#x)", reply[0], serverpackets.OpcodeAcquireSkillList)
+	}
+	r = wire.NewReader(reply[1:])
+	if skillType, count := r.ReadInt32(), r.ReadInt32(); skillType != int32(serverpackets.AcquireSkillTypeUsual) || count != 0 {
+		t.Fatalf("AcquireSkillList = type %d count %d, want usual empty", skillType, count)
+	}
+
+	known := store.knownFor(objID, 0)
+	if known[3] != 1 {
+		t.Fatalf("persisted skill 3 = %d, want 1", known[3])
+	}
+}
+
+func TestGameClientLinkAcquireSkillNeedsSP(t *testing.T) {
+	store := newMemorySkillSaveStore()
+	skills := NewSkillPersistence(store, modelskill.NewTable([]modelskill.Definition{
+		{ID: 3, Level: 1, Activation: modelskill.ActivationActive},
+	}), store)
+	var objID int32
+	c, _, _, _ := newLinkedGameClientWithSkillsSeed(t, skills, func(chars *fakeCharStore, _ *fakeItemStore) {
+		objID = seedSelectableCharacter(t, chars, "player1", "Newbie", 5, 49)
+	}, 1)
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	c.send(encodeRequestAcquireSkill(3, 1, 0))
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeSystemMessage {
+		t.Fatalf("needs-sp opcode = %#x, want SystemMessage (%#x)", reply[0], serverpackets.OpcodeSystemMessage)
+	}
+	r := wire.NewReader(reply[1:])
+	if id := r.ReadInt32(); id != serverpackets.SystemMessageNotEnoughSPToLearnSkill {
+		t.Fatalf("SystemMessage id = %d, want not enough SP", id)
+	}
+
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeAcquireSkillList {
+		t.Fatalf("needs-sp list opcode = %#x, want AcquireSkillList (%#x)", reply[0], serverpackets.OpcodeAcquireSkillList)
+	}
+	r = wire.NewReader(reply[1:])
+	if skillType, count := r.ReadInt32(), r.ReadInt32(); skillType != int32(serverpackets.AcquireSkillTypeUsual) || count != 1 {
+		t.Fatalf("AcquireSkillList = type %d count %d, want usual with 1 entry", skillType, count)
+	}
+	if id, level, shownLevel, cost, unknown := r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32(); id != 3 || level != 1 || shownLevel != 1 || cost != 50 || unknown != 0 {
+		t.Fatalf("AcquireSkillList entry = %d/%d/%d/%d/%d, want 3/1/1/50/0", id, level, shownLevel, cost, unknown)
+	}
+	if known := store.knownFor(objID, 0); len(known) != 0 {
+		t.Fatalf("persisted skills = %+v, want none", known)
 	}
 }
 
