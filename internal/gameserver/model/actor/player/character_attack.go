@@ -372,6 +372,12 @@ func (c *Character) MP() int {
 	return int(c.CurMP)
 }
 
+// CurrentHP returns current HP through the health component guard.
+func (c *Character) CurrentHP() int {
+	c.health.Bind(&c.CurHP)
+	return int(c.health.Current())
+}
+
 // ClearRecentFakeDeath clears the recent fake-death state. Fake death is not
 // modeled yet, so this is a no-op.
 func (c *Character) ClearRecentFakeDeath() {}

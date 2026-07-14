@@ -3,10 +3,12 @@ package network
 import (
 	"testing"
 
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -126,5 +128,91 @@ func TestUseItemBroadcastsCharInfoToObservers(t *testing.T) {
 	}
 	if len(observerFrames.frames) != 1 || observerFrames.frames[0][0] != serverpackets.OpcodeCharInfo {
 		t.Fatalf("observer frames = %x, want one CharInfo", observerFrames.frames)
+	}
+}
+
+func TestDeadPlayerItemOpsAreNoops(t *testing.T) {
+	t.Run("use item", func(t *testing.T) {
+		templates := testItemTemplates()
+		weapon := &item.Instance{ObjectID: 500, TemplateID: 30, Location: item.LocationInventory}
+		capture := &frameCapture{}
+		live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{weapon})
+		live.MarkDead()
+
+		(&GameClientLink{}).useItem(live, weapon.ObjectID)
+
+		if weapon.Equipped() || len(capture.frames) != 0 {
+			t.Fatalf("dead UseItem mutated item=%+v frames=%x", weapon, capture.frames)
+		}
+	})
+
+	t.Run("unequip item", func(t *testing.T) {
+		templates := item.NewTable([]*item.Template{{ID: 20, Kind: item.KindArmor, Slot: item.SlotChest, Armor: &item.ArmorDetail{Type: item.ArmorLight}}})
+		chest := &item.Instance{ObjectID: 501, TemplateID: 20, Location: item.LocationPaperdoll, LocationData: itemcontainer.Chest}
+		capture := &frameCapture{}
+		live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{chest})
+		live.MarkDead()
+
+		(&GameClientLink{}).unequipItem(live, int32(item.SlotChest))
+
+		if !chest.Equipped() || len(capture.frames) != 0 {
+			t.Fatalf("dead RequestUnEquipItem mutated item=%+v frames=%x", chest, capture.frames)
+		}
+	})
+
+	t.Run("destroy item", func(t *testing.T) {
+		templates := testItemTemplates()
+		stack := &item.Instance{ObjectID: 502, TemplateID: 20, Count: 5, Location: item.LocationInventory}
+		capture := &frameCapture{}
+		live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{stack})
+		live.MarkDead()
+
+		(&GameClientLink{}).destroyLiveItem(live, stack.ObjectID, 2)
+
+		if stack.Count != 5 || len(capture.frames) != 0 {
+			t.Fatalf("dead RequestDestroyItem mutated item=%+v frames=%x", stack, capture.frames)
+		}
+	})
+
+	t.Run("crystallize item", func(t *testing.T) {
+		templates := testItemTemplates()
+		weapon := &item.Instance{ObjectID: 503, TemplateID: 30, Count: 1, Location: item.LocationInventory}
+		capture := &frameCapture{}
+		live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{weapon})
+		live.SetSkillLevel(248, 1)
+		live.MarkDead()
+
+		(&GameClientLink{ids: &sequentialIDs{next: 100}}).crystallizeLiveItem(live, clientpackets.RequestCrystallizeItem{ObjectID: weapon.ObjectID, Count: 1})
+
+		if live.Inventory().ItemByObjectID(weapon.ObjectID) == nil || len(capture.frames) != 0 {
+			t.Fatalf("dead RequestCrystallizeItem mutated inventory frames=%x", capture.frames)
+		}
+	})
+}
+
+func TestDropLiveItemRejectsFarCoordinatesBeforeInventoryMutation(t *testing.T) {
+	templates := testItemTemplates()
+	stack := &item.Instance{ObjectID: 504, TemplateID: item.AdenaID, Count: 100, Location: item.LocationInventory}
+	capture := &frameCapture{}
+	live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{stack})
+	drops := &recordingGroundDropper{}
+
+	(&GameClientLink{ids: &sequentialIDs{next: 200}, groundItems: drops}).dropLiveItem(live, clientpackets.RequestDropItem{
+		ObjectID: stack.ObjectID,
+		Count:    40,
+		X:        10000,
+		Y:        0,
+		Z:        0,
+	})
+
+	if stack.Count != 100 || len(drops.drops) != 0 {
+		t.Fatalf("far drop mutated count=%d drops=%d", stack.Count, len(drops.drops))
+	}
+	if got := frameOpcodes(capture.frames); string(got) != string([]byte{serverpackets.OpcodeSystemMessage}) {
+		t.Fatalf("far drop opcodes = %x, want SystemMessage", got)
+	}
+	r := wire.NewReader(capture.frames[0][1:])
+	if id := r.ReadInt32(); id != 151 {
+		t.Fatalf("far drop system message id = %d, want 151", id)
 	}
 }

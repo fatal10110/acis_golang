@@ -167,6 +167,12 @@ func (c *Controller) CanAttack(target attackable.Combatant) bool {
 	if c.actor.AttackDisabled() {
 		return false
 	}
+	c.mu.RLock()
+	busy := c.attacking || c.bowCooling
+	c.mu.RUnlock()
+	if busy {
+		return false
+	}
 	if c.actor.MovementDisabled() && !c.actor.InAttackRange(target) {
 		return false
 	}

@@ -5,6 +5,7 @@ import "github.com/fatal10110/acis_golang/internal/commons/wire"
 // Static system message ids used by live summon command feedback.
 const (
 	SystemMessageWelcomeToLineage              = 34
+	SystemMessageCannotDiscardDistanceTooFar   = 151
 	SystemMessageCrystallizeLevelTooLow        = 562
 	SystemMessageItemCrystallized              = 1258
 	SystemMessageUseOfItemWillBeAuto           = 1433

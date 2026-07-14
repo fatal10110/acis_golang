@@ -637,7 +637,10 @@ type attackStoppableActor interface {
 func (w worldAttackStanceEffects) AutoAttackStop(actor task.AttackStanceActor) {
 	obj, ok := w.state.Object(actor.ObjectID())
 	if !ok {
-		return
+		obj, ok = w.state.Player(actor.ObjectID())
+		if !ok {
+			return
+		}
 	}
 	if s, ok := obj.(attackStoppableActor); ok {
 		s.Stop()
@@ -811,7 +814,7 @@ func provideGameClientLink(
 }
 
 func provideSkillPersistence(pool *sql.DB, data *gameData) *network.SkillPersistence {
-	return network.NewSkillPersistence(gamesql.NewSkillSaveStore(pool), data.Skills)
+	return network.NewSkillPersistence(gamesql.NewSkillSaveStore(pool), data.Skills, gamesql.NewCharacterSkillStore(pool))
 }
 
 func startGameServer(lc fx.Lifecycle, cfg gameServerConfig, _ *gameData, _ *manager.Roster, validator *network.SessionValidator, links *loginLinkState, clients *network.GameClientLink, log zerolog.Logger) {

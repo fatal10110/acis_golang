@@ -125,6 +125,16 @@ const itemsOnGroundSchema = "CREATE TABLE IF NOT EXISTS `items_on_ground` (\n" +
 	"  PRIMARY KEY  (`object_id`)\n" +
 	")"
 
+// characterSkillsSchema mirrors the shipped character_skills table
+// definition verbatim.
+const characterSkillsSchema = "CREATE TABLE IF NOT EXISTS `character_skills` (\n" +
+	"  `char_obj_id` INT UNSIGNED NOT NULL default 0,\n" +
+	"  `skill_id` INT NOT NULL default 0,\n" +
+	"  `skill_level` INT(3) NOT NULL default 1,\n" +
+	"  `class_index` INT(1) NOT NULL DEFAULT 0,\n" +
+	"  PRIMARY KEY (`char_obj_id`,`skill_id`,`class_index`)\n" +
+	")"
+
 // petsSchema mirrors the shipped pets table definition verbatim.
 const petsSchema = "CREATE TABLE IF NOT EXISTS `pets` (\n" +
 	"  `item_obj_id` decimal(11) NOT NULL default 0,\n" +
@@ -196,6 +206,9 @@ func NewDB(t *testing.T) *sql.DB {
 	}
 	if _, err := db.ExecContext(ctx, itemsOnGroundSchema); err != nil {
 		t.Fatalf("create items_on_ground table: %v", err)
+	}
+	if _, err := db.ExecContext(ctx, characterSkillsSchema); err != nil {
+		t.Fatalf("create character_skills table: %v", err)
 	}
 	if _, err := db.ExecContext(ctx, petsSchema); err != nil {
 		t.Fatalf("create pets table: %v", err)

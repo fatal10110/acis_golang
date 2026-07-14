@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"fmt"
 	"net"
 	"sort"
 	"strings"
@@ -20,6 +21,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -801,6 +803,19 @@ func (r *attackStanceRecorder) Add(actor task.AttackStanceActor) {
 	r.actors = append(r.actors, actor)
 }
 
+type recordedGroundDrop struct {
+	ground *grounditem.Item
+	opts   task.DropOptions
+}
+
+type recordingGroundDropper struct {
+	drops []recordedGroundDrop
+}
+
+func (r *recordingGroundDropper) Drop(ground *grounditem.Item, opts task.DropOptions) {
+	r.drops = append(r.drops, recordedGroundDrop{ground: ground, opts: opts})
+}
+
 type visibleGroundItem struct {
 	world.Presence
 	id        int32
@@ -1053,6 +1068,18 @@ func TestSelectAndClearLiveTargetSendsTargetPackets(t *testing.T) {
 	}
 }
 
+func TestGameClientLinkResolveTargetFallsBackToPlayerRegistry(t *testing.T) {
+	state := world.New()
+	targetFrames := &frameCapture{}
+	target := newTestLivePlayer(t, 42, targetFrames)
+	state.AddPlayer(target)
+
+	gcl := &GameClientLink{world: state, log: zerolog.Nop()}
+	if got := gcl.resolveTarget(target.ObjectID()); got != target {
+		t.Fatalf("resolveTarget(player) = %v, want player registry target", got)
+	}
+}
+
 func TestGameClientLinkActionAttackAndTargetCancel(t *testing.T) {
 	c, chars, _, state := newLinkedGameClient(t)
 
@@ -1114,6 +1141,53 @@ func TestGameClientLinkActionAttackAndTargetCancel(t *testing.T) {
 	reply = c.read()
 	if reply[0] != serverpackets.OpcodeActionFailed {
 		t.Fatalf("RequestTargetCancel opcode = %#x, want ActionFailed (%#x)", reply[0], serverpackets.OpcodeActionFailed)
+	}
+}
+
+func TestGameClientLinkAttackLiveTargetReusesController(t *testing.T) {
+	state := world.New()
+	attackerFrames := &frameCapture{}
+	attacker := newTestLivePlayer(t, 1, attackerFrames)
+	attacker.Character.SetWorld(state)
+	attacker.Character.SetRollSource(func(int) int { return 0 })
+	gcl := &GameClientLink{world: state, log: zerolog.Nop()}
+	attacker.stopAttack = gcl.stopLiveAutoAttack
+	attacker.Character.SetAttackBroadcaster(func(snapshot attack.Snapshot) {
+		gcl.broadcastAttack(attacker, snapshot)
+	})
+	target := newTestHostileNPC(t, 3002)
+	target.Instance.Template.PDef = 1
+	target.Instance.Template.DEX = 30
+	target.SetRollSource(func(int) int { return 0 })
+
+	state.Spawn(attacker, 0, 0, 0, 0)
+	state.Spawn(target, 30, 0, 0, 0)
+	attackerFrames.frames = nil
+
+	if !gcl.attackLiveTarget(attacker, target) {
+		t.Fatal("first attackLiveTarget returned false")
+	}
+	if got := frameOpcodes(attackerFrames.frames); string(got) != string([]byte{serverpackets.OpcodeAutoAttackStart, serverpackets.OpcodeAttack}) {
+		t.Fatalf("first attack opcodes = %x, want AutoAttackStart, Attack", got)
+	}
+	if attacker.attack == nil || !attacker.attack.AttackingNow() {
+		t.Fatal("live player attack controller is not tracking the active attack")
+	}
+
+	attackerFrames.frames = nil
+	if gcl.attackLiveTarget(attacker, target) {
+		t.Fatal("second attackLiveTarget returned true while the first swing is active")
+	}
+	if got := frameOpcodes(attackerFrames.frames); string(got) != string([]byte{serverpackets.OpcodeActionFailed}) {
+		t.Fatalf("second attack opcodes = %x, want ActionFailed only", got)
+	}
+
+	attacker.Stop()
+	if attacker.attack.AttackingNow() {
+		t.Fatal("live player Stop did not cancel the active attack controller")
+	}
+	if attacker.InCombat() {
+		t.Fatal("live player Stop did not clear combat stance")
 	}
 }
 
@@ -1550,6 +1624,33 @@ func TestGameClientLinkSendTimeCheckIsNoOpInGame(t *testing.T) {
 	reply := c.read()
 	if reply[0] != serverpackets.OpcodeItemList {
 		t.Fatalf("post-SendTimeCheck opcode = %#x, want ItemList (%#x)", reply[0], serverpackets.OpcodeItemList)
+	}
+}
+
+func TestGameClientLinkMalformedLivePacketsDoNotDisconnect(t *testing.T) {
+	for _, opcode := range []byte{
+		clientpackets.OpcodeUseItem,
+		clientpackets.OpcodeAction,
+		clientpackets.OpcodeSendTimeCheck,
+	} {
+		t.Run(fmt.Sprintf("opcode_%02x", opcode), func(t *testing.T) {
+			c, _, _, _ := newLinkedGameClient(t)
+			c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+			c.read() // CharCreateOk
+			c.read() // CharSelectInfo
+			c.send(encodeRequestGameStart(0))
+			c.read() // SSQInfo
+			c.read() // CharSelected
+			c.send(encodeEnterWorld())
+			readEnterWorldBurst(t, c, false)
+
+			c.send(encodeSingleOpcode(opcode))
+			c.send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
+			reply := c.read()
+			if reply[0] != serverpackets.OpcodeItemList {
+				t.Fatalf("post-malformed opcode = %#x, want ItemList (%#x)", reply[0], serverpackets.OpcodeItemList)
+			}
+		})
 	}
 }
 
