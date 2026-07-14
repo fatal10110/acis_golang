@@ -56,8 +56,17 @@ func (s *State) Players() []worldobject.Object { return s.players.all() }
 // one tracked.
 func (s *State) AddPet(ownerID int32, pet worldobject.Object) { s.pets.add(ownerID, pet) }
 
+// AddSummon marks summon as ownerID's active pet or servitor.
+func (s *State) AddSummon(ownerID int32, summon worldobject.Object) { s.AddPet(ownerID, summon) }
+
 // RemovePet clears ownerID's active pet, if any.
 func (s *State) RemovePet(ownerID int32) { s.pets.remove(ownerID) }
 
+// RemoveSummon clears ownerID's active pet or servitor, if any.
+func (s *State) RemoveSummon(ownerID int32) { s.RemovePet(ownerID) }
+
 // Pet returns ownerID's active pet, if any.
 func (s *State) Pet(ownerID int32) (worldobject.Object, bool) { return s.pets.get(ownerID) }
+
+// Summon returns ownerID's active pet or servitor, if any.
+func (s *State) Summon(ownerID int32) (worldobject.Object, bool) { return s.Pet(ownerID) }
