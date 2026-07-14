@@ -29,6 +29,7 @@ import (
 // instance" rule.
 type slotInfo struct {
 	key    string
+	maker  *spawn.Maker
 	entry  spawn.Entry
 	dbName string
 }
@@ -46,15 +47,11 @@ type KillRewardConfig struct {
 // Npcs owns every live NPC instantiated from the spawn table at boot,
 // indexed by object id, and drives their decay/respawn/AI lifecycle.
 //
-// Only spawn entries with an explicit "pos" attribute (fixed or
-// chance-weighted) are placed. Entries with no declared positions rely on
-// picking a random point inside their maker's territory polygon, which
-// needs a triangulation/random-point-in-polygon routine and a geodata
-// height query that don't exist in this codebase yet (tracked under the
-// geometry/Territory epic) — those entries are counted and skipped rather
-// than guessed at. Entry.Privates (child minion spawns declared under one
-// spawn position) are likewise not instantiated here; the base spawn loop
-// is already a large unit on its own, and minion fan-out has its own
+// Spawn entries with an explicit "pos" attribute are placed at that fixed
+// or chance-weighted coordinate. Entries with no declared positions roll a
+// random point inside their maker's territory polygon and resolve the Z
+// through geodata. Entry.Privates (child minion spawns declared under one
+// spawn position) are not instantiated here; minion fan-out has its own
 // master/minion linking concerns.
 //
 // Every instantiated NPC becomes a npc.Hostile: an entry whose template
@@ -160,7 +157,7 @@ func NewNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.St
 		}
 		remaining := maker.MaximumNPCs
 		for entryIndex, entry := range maker.Entries {
-			n.bootSpawnEntry(maker.Name, entryIndex, entry, &remaining)
+			n.bootSpawnEntry(maker, entryIndex, entry, &remaining)
 		}
 	}
 
@@ -187,15 +184,10 @@ func isOnStartMaker(maker *spawn.Maker) bool {
 // persisted slot for a database-tracked entry, or up to entry.Total fresh
 // slots otherwise. remaining is the maker's shared spawn budget, decremented
 // per instance placed and left untouched for a skipped/deferred entry.
-func (n *Npcs) bootSpawnEntry(makerName string, entryIndex int, entry spawn.Entry, remaining *int) {
-	if len(entry.Positions) == 0 {
-		n.deferredCount.Add(1)
-		return
-	}
-
+func (n *Npcs) bootSpawnEntry(maker *spawn.Maker, entryIndex int, entry spawn.Entry, remaining *int) {
 	tmpl, ok := n.templates.Get(int(entry.NPCID))
 	if !ok {
-		n.log.Warn().Int32("npc_id", entry.NPCID).Str("maker", makerName).Msg("spawn entry references unknown npc template")
+		n.log.Warn().Int32("npc_id", entry.NPCID).Str("maker", maker.Name).Msg("spawn entry references unknown npc template")
 		return
 	}
 
@@ -204,7 +196,7 @@ func (n *Npcs) bootSpawnEntry(makerName string, entryIndex int, entry spawn.Entr
 			return
 		}
 		*remaining--
-		n.bootSpawnPersisted(entry.DBName, entry, tmpl)
+		n.bootSpawnPersisted(maker, entry.DBName, entry, tmpl)
 		return
 	}
 
@@ -212,16 +204,21 @@ func (n *Npcs) bootSpawnEntry(makerName string, entryIndex int, entry spawn.Entr
 		if *remaining <= 0 {
 			return
 		}
+		pos, ok := n.pickSpawnPosition(maker, entry)
+		if !ok {
+			n.deferredCount.Add(1)
+			return
+		}
 		*remaining--
-		key := fmt.Sprintf("%s#%d#%d", makerName, entryIndex, i)
-		n.registerSlot(key, entry, "")
-		n.spawnFresh(key, entry, tmpl)
+		key := fmt.Sprintf("%s#%d#%d", maker.Name, entryIndex, i)
+		n.registerSlot(key, maker, entry, "")
+		n.spawnFresh(key, entry, tmpl, pos)
 	}
 }
 
-func (n *Npcs) registerSlot(key string, entry spawn.Entry, dbName string) {
+func (n *Npcs) registerSlot(key string, maker *spawn.Maker, entry spawn.Entry, dbName string) {
 	n.mu.Lock()
-	n.slot[key] = slotInfo{key: key, entry: entry, dbName: dbName}
+	n.slot[key] = slotInfo{key: key, maker: maker, entry: entry, dbName: dbName}
 	n.mu.Unlock()
 }
 
@@ -229,8 +226,8 @@ func (n *Npcs) registerSlot(key string, entry spawn.Entry, dbName string) {
 // single slot at boot. A spawn still dead with a pending respawn deadline
 // is not instantiated: only its respawn timer is (re)armed, matching the
 // persisted-state restore rule.
-func (n *Npcs) bootSpawnPersisted(dbName string, entry spawn.Entry, tmpl *npc.Template) {
-	n.registerSlot(dbName, entry, dbName)
+func (n *Npcs) bootSpawnPersisted(maker *spawn.Maker, dbName string, entry spawn.Entry, tmpl *npc.Template) {
+	n.registerSlot(dbName, maker, entry, dbName)
 
 	state, ok := n.spawns.State(dbName)
 	if !ok {
@@ -248,15 +245,19 @@ func (n *Npcs) bootSpawnPersisted(dbName string, entry spawn.Entry, tmpl *npc.Te
 		return
 	}
 
-	n.spawnPersisted(dbName, entry, tmpl, state)
+	n.spawnPersisted(dbName, maker, entry, tmpl, state)
 }
 
 // spawnPersisted places one instance of a database-tracked entry, reusing
 // persisted HP and position when the row was still alive, or a freshly
 // rolled position at full HP otherwise (CheckAlive's own restore rule).
-func (n *Npcs) spawnPersisted(key string, entry spawn.Entry, tmpl *npc.Template, state *spawn.State) {
+func (n *Npcs) spawnPersisted(key string, maker *spawn.Maker, entry spawn.Entry, tmpl *npc.Template, state *spawn.State) {
 	now := n.now()
-	pos := pickPosition(entry.Positions)
+	pos, ok := n.pickSpawnPosition(maker, entry)
+	if !ok {
+		n.deferredCount.Add(1)
+		return
+	}
 
 	loc, heading, hp := pos.Location, pos.Heading, int(tmpl.HPMax)
 	if state.CheckAlive(pos.Location, pos.Heading, int(tmpl.HPMax), 0, now) {
@@ -268,8 +269,7 @@ func (n *Npcs) spawnPersisted(key string, entry spawn.Entry, tmpl *npc.Template,
 // spawnFresh places one non-persisted instance of entry at a freshly rolled
 // position, always alive at full HP — the reference server never restores
 // HP/position across restarts for a spawn without a database name.
-func (n *Npcs) spawnFresh(key string, entry spawn.Entry, tmpl *npc.Template) {
-	pos := pickPosition(entry.Positions)
+func (n *Npcs) spawnFresh(key string, entry spawn.Entry, tmpl *npc.Template, pos spawn.Position) {
 	n.instantiate(key, entry, tmpl, pos.Location, pos.Heading, int(tmpl.HPMax))
 }
 
@@ -402,10 +402,15 @@ func (n *Npcs) Respawn(key string) {
 		if !ok {
 			state = spawn.NewState(slot.dbName)
 		}
-		n.spawnPersisted(key, slot.entry, tmpl, state)
+		n.spawnPersisted(key, slot.maker, slot.entry, tmpl, state)
 		return
 	}
-	n.spawnFresh(key, slot.entry, tmpl)
+	pos, ok := n.pickSpawnPosition(slot.maker, slot.entry)
+	if !ok {
+		n.deferredCount.Add(1)
+		return
+	}
+	n.spawnFresh(key, slot.entry, tmpl, pos)
 }
 
 // SyncPersistedState writes every live database-tracked slot's current HP
@@ -450,8 +455,8 @@ func (n *Npcs) LiveCount() int {
 	return n.liveCount
 }
 
-// DeferredCount returns the number of spawn entries skipped at boot for
-// lacking an explicit position (territory-random placement).
+// DeferredCount returns the number of spawn entries skipped at boot because
+// no usable explicit or territory-random position could be chosen.
 func (n *Npcs) DeferredCount() int {
 	return int(n.deferredCount.Load())
 }
@@ -493,6 +498,132 @@ func pickPosition(positions []spawn.Position) spawn.Position {
 	last := positions[len(positions)-1]
 	last.Heading = rnd.Get(65536)
 	return last
+}
+
+func (n *Npcs) pickSpawnPosition(maker *spawn.Maker, entry spawn.Entry) (spawn.Position, bool) {
+	if len(entry.Positions) > 0 {
+		return pickPosition(entry.Positions), true
+	}
+	return randomTerritoryPosition(maker, n.geo)
+}
+
+const territorySpawnAttempts = 10
+const territoryPointAttempts = 64
+
+func randomTerritoryPosition(maker *spawn.Maker, geo move.Geo) (spawn.Position, bool) {
+	if maker == nil || len(maker.Territories) == 0 {
+		return spawn.Position{}, false
+	}
+
+	var last spawn.Position
+	haveLast := false
+	for i := 0; i < territorySpawnAttempts; i++ {
+		territory := maker.Territories[rnd.Get(len(maker.Territories))]
+		x, y, ok := randomPointInTerritory(territory)
+		if !ok {
+			continue
+		}
+
+		z := int(geo.Height(x, y, averageZ(territory)))
+		pos := spawn.Position{
+			Location: location.Location{X: x, Y: y, Z: z},
+			Heading:  rnd.Get(65536),
+		}
+		last, haveLast = pos, true
+
+		if z < territory.MinZ || z > territory.MaxZ || insideAnyTerritory(maker.BannedTerritories, pos.Location) {
+			continue
+		}
+		return pos, true
+	}
+	return last, haveLast
+}
+
+func randomPointInTerritory(territory *spawn.Territory) (int, int, bool) {
+	if territory == nil || len(territory.Nodes) == 0 {
+		return 0, 0, false
+	}
+
+	minX, maxX := territory.Nodes[0].X, territory.Nodes[0].X
+	minY, maxY := territory.Nodes[0].Y, territory.Nodes[0].Y
+	for _, node := range territory.Nodes[1:] {
+		minX = min(minX, node.X)
+		maxX = max(maxX, node.X)
+		minY = min(minY, node.Y)
+		maxY = max(maxY, node.Y)
+	}
+
+	for i := 0; i < territoryPointAttempts; i++ {
+		x := rnd.GetRange(minX, maxX)
+		y := rnd.GetRange(minY, maxY)
+		if territoryContains2D(territory, x, y) {
+			return x, y, true
+		}
+	}
+
+	x, y := territoryCentroid(territory)
+	if territoryContains2D(territory, x, y) {
+		return x, y, true
+	}
+	return 0, 0, false
+}
+
+func insideAnyTerritory(territories []*spawn.Territory, loc location.Location) bool {
+	for _, territory := range territories {
+		if territoryContainsLocation(territory, loc) {
+			return true
+		}
+	}
+	return false
+}
+
+func territoryContainsLocation(territory *spawn.Territory, loc location.Location) bool {
+	return territory != nil &&
+		loc.Z >= territory.MinZ &&
+		loc.Z <= territory.MaxZ &&
+		territoryContains2D(territory, loc.X, loc.Y)
+}
+
+func territoryContains2D(territory *spawn.Territory, x, y int) bool {
+	nodes := territory.Nodes
+	inside := false
+	j := len(nodes) - 1
+	for i := range nodes {
+		a, b := nodes[i], nodes[j]
+		if pointOnSegment(x, y, a, b) {
+			return true
+		}
+		if (a.Y > y) != (b.Y > y) {
+			crossX := float64(b.X-a.X)*float64(y-a.Y)/float64(b.Y-a.Y) + float64(a.X)
+			if float64(x) < crossX {
+				inside = !inside
+			}
+		}
+		j = i
+	}
+	return inside
+}
+
+func pointOnSegment(x, y int, a, b spawn.Node) bool {
+	cross := (x-a.X)*(b.Y-a.Y) - (y-a.Y)*(b.X-a.X)
+	if cross != 0 {
+		return false
+	}
+	return x >= min(a.X, b.X) && x <= max(a.X, b.X) &&
+		y >= min(a.Y, b.Y) && y <= max(a.Y, b.Y)
+}
+
+func territoryCentroid(territory *spawn.Territory) (int, int) {
+	var x, y int
+	for _, node := range territory.Nodes {
+		x += node.X
+		y += node.Y
+	}
+	return x / len(territory.Nodes), y / len(territory.Nodes)
+}
+
+func averageZ(territory *spawn.Territory) int {
+	return (territory.MinZ + territory.MaxZ) / 2
 }
 
 // locatedRef and creatureActorRef are forward references that break the

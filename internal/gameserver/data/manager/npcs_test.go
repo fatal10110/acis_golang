@@ -239,16 +239,17 @@ func TestNewNpcsSpawnsFixedTotalIntoWorldState(t *testing.T) {
 	}
 }
 
-func TestNewNpcsSkipsEntryWithoutExplicitPositions(t *testing.T) {
-	tmpl := monsterTemplate(101)
+func TestNewNpcsSpawnsTerritoryRandomEntries(t *testing.T) {
+	tmpl := monsterTemplate(102)
 	templates := npc.NewTable([]*npc.Template{tmpl})
 
-	entry := spawn.Entry{NPCID: 101, Total: 5} // no Positions: territory-random, out of scope
-	maker, err := spawn.NewMaker(testMakerSet("maker1", 100), []*spawn.Territory{testTerritory()}, nil, []spawn.Entry{entry}, nil)
+	entry := spawn.Entry{NPCID: 102, Total: 2}
+	territory := testTerritory()
+	maker, err := spawn.NewMaker(testMakerSet("maker1", 2), []*spawn.Territory{territory}, nil, []spawn.Entry{entry}, nil)
 	if err != nil {
 		t.Fatalf("NewMaker: %v", err)
 	}
-	table, err := spawn.NewTable([]*spawn.Territory{testTerritory()}, []*spawn.Maker{maker})
+	table, err := spawn.NewTable([]*spawn.Territory{territory}, []*spawn.Maker{maker})
 	if err != nil {
 		t.Fatalf("NewTable: %v", err)
 	}
@@ -256,11 +257,33 @@ func TestNewNpcsSkipsEntryWithoutExplicitPositions(t *testing.T) {
 
 	h := newHarness(t, spawns, templates)
 
-	if got := h.npcs.LiveCount(); got != 0 {
-		t.Fatalf("LiveCount() = %d, want 0 for a positionless entry", got)
+	if got := h.npcs.LiveCount(); got != 2 {
+		t.Fatalf("LiveCount() = %d, want 2 territory-random NPCs", got)
 	}
-	if got := h.npcs.DeferredCount(); got != 1 {
-		t.Fatalf("DeferredCount() = %d, want 1", got)
+	if got := h.npcs.DeferredCount(); got != 0 {
+		t.Fatalf("DeferredCount() = %d, want 0", got)
+	}
+
+	found := 0
+	for _, obj := range h.state.Objects() {
+		hostile, ok := obj.(*npc.Hostile)
+		if !ok {
+			continue
+		}
+		x, y, z := hostile.Position()
+		if z < territory.MinZ || z > territory.MaxZ {
+			t.Fatalf("territory-random hostile z = %d, want within [%d,%d]", z, territory.MinZ, territory.MaxZ)
+		}
+		if x < 0 || y < 0 || x+y > 100 {
+			t.Fatalf("territory-random hostile position = (%d,%d,%d), want inside test triangle", x, y, z)
+		}
+		if heading := hostile.Heading(); heading < 0 || heading >= 65536 {
+			t.Fatalf("territory-random hostile heading = %d, want [0,65535]", heading)
+		}
+		found++
+	}
+	if found != 2 {
+		t.Fatalf("found %d live hostiles tracked in world state, want 2", found)
 	}
 }
 
