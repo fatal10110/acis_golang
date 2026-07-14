@@ -67,6 +67,8 @@ type Character struct {
 	deathMu sync.Mutex
 	dead    bool
 	health  creature.Health
+
+	skills skillState
 }
 
 // NewCharacter builds a freshly created Character of profession tmpl for

@@ -419,13 +419,18 @@ func newTestGameClientLink(t *testing.T, loginLink func() *LoginLink, validator 
 
 func newTestGameClientLinkWithLog(t *testing.T, loginLink func() *LoginLink, validator *SessionValidator, log zerolog.Logger) (addr string, chars *fakeCharStore, items *fakeItemStore, state *world.State) {
 	t.Helper()
+	return newTestGameClientLinkWithSkillsAndLog(t, loginLink, validator, nil, log)
+}
+
+func newTestGameClientLinkWithSkillsAndLog(t *testing.T, loginLink func() *LoginLink, validator *SessionValidator, skills *SkillPersistence, log zerolog.Logger) (addr string, chars *fakeCharStore, items *fakeItemStore, state *world.State) {
+	t.Helper()
 	chars = newFakeCharStore()
 	items = newFakeItemStore()
 	state = world.New()
 	templates := testTemplates(t)
 	itemTemplates := testItemTemplates()
 	roster := gamemanager.NewRoster(chars, items, templates, itemTemplates, npc.NewTable(nil), &sequentialIDs{next: 100}, gamemanager.DefaultDeleteAfter, time.Now)
-	gcl := NewGameClientLink(validator, loginLink, roster, items, templates, itemTemplates, state, log)
+	gcl := NewGameClientLink(validator, loginLink, roster, items, templates, itemTemplates, skills, state, log)
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -444,6 +449,11 @@ func newTestGameClientLinkWithLog(t *testing.T, loginLink func() *LoginLink, val
 // it positioned right after the initial (empty) CharSelectInfo.
 func newLinkedGameClient(t *testing.T) (c *fakeGameClient, chars *fakeCharStore, items *fakeItemStore, state *world.State) {
 	t.Helper()
+	return newLinkedGameClientWithSkills(t, nil)
+}
+
+func newLinkedGameClientWithSkills(t *testing.T, skills *SkillPersistence) (c *fakeGameClient, chars *fakeCharStore, items *fakeItemStore, state *world.State) {
+	t.Helper()
 
 	loginAddr, servers, sessions := newTestLoginServer(t, false)
 	servers.Register(1, testHexID)
@@ -456,7 +466,7 @@ func newLinkedGameClient(t *testing.T) (c *fakeGameClient, chars *fakeCharStore,
 	}
 	t.Cleanup(func() { loginLink.Close() })
 
-	addr, chars, items, state := newTestGameClientLink(t, func() *LoginLink { return loginLink }, validator)
+	addr, chars, items, state := newTestGameClientLinkWithSkillsAndLog(t, func() *LoginLink { return loginLink }, validator, skills, zerolog.Nop())
 
 	c = dialGameClient(t, addr)
 	c.sendProtocolVersion(746)
