@@ -79,6 +79,7 @@ func TestNewBuildsCoreEffectMetadata(t *testing.T) {
 		{"Sleep", TypeSleep, FlagSleep, true},
 		{"Fear", TypeFear, FlagFear, true},
 		{"DamOverTime", TypeDamOverTime, FlagNone, true},
+		{"ManaDamOverTime", TypeManaDamOverTime, FlagNone, false},
 	}
 
 	for _, tt := range tests {
@@ -310,9 +311,85 @@ func TestDamageOverTimeHookMutatesLiveTarget(t *testing.T) {
 	}
 }
 
+func TestManaDamageOverTimeTick(t *testing.T) {
+	tests := []struct {
+		name string
+		in   ManaDamageOverTimeInput
+		want ManaDamageOverTimeResult
+	}{
+		{
+			name: "dead target stops",
+			in:   ManaDamageOverTimeInput{Dead: true, MP: 10, Damage: 3},
+			want: ManaDamageOverTimeResult{Continue: false},
+		},
+		{
+			name: "damage below mp applies",
+			in:   ManaDamageOverTimeInput{MP: 10, Damage: 3},
+			want: ManaDamageOverTimeResult{Damage: 3, Continue: true},
+		},
+		{
+			name: "non-toggle drain always pays even past mp",
+			in:   ManaDamageOverTimeInput{MP: 5, Damage: 10},
+			want: ManaDamageOverTimeResult{Damage: 10, Continue: true},
+		},
+		{
+			name: "toggle upkeep exactly matching mp still pays",
+			in:   ManaDamageOverTimeInput{MP: 10, Damage: 10, Toggle: true},
+			want: ManaDamageOverTimeResult{Damage: 10, Continue: true},
+		},
+		{
+			name: "toggle upkeep exceeding mp drops instead of paying",
+			in:   ManaDamageOverTimeInput{MP: 9, Damage: 10, Toggle: true},
+			want: ManaDamageOverTimeResult{Continue: false, RemovedForLackMP: true},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := ManaDamageOverTimeTick(tt.in); got != tt.want {
+				t.Fatalf("ManaDamageOverTimeTick() = %+v, want %+v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestManaDamageOverTimeHookMutatesLiveTarget(t *testing.T) {
+	target := &liveEffectTarget{mp: 20}
+	e, err := New(Skill{ID: 288}, modelskill.EffectTemplate{Name: "ManaDamOverTime", Value: 8})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e.Effected = target
+
+	if !e.ActionTime() {
+		t.Fatal("mana DoT action hook stopped on live target")
+	}
+	if target.mp != 12 {
+		t.Fatalf("target mp = %v, want 12", target.mp)
+	}
+	if want := []string{"mpdot:8"}; !reflect.DeepEqual(target.events, want) {
+		t.Fatalf("mana DoT events = %#v, want %#v", target.events, want)
+	}
+
+	target.mp = 9
+	target.events = nil
+	e.Skill.Toggle = true
+	e.Template.Value = 10
+	if e.ActionTime() {
+		t.Fatal("toggle mana DoT action continued past available mp, want stop")
+	}
+	if want := []string{"lack-mp"}; !reflect.DeepEqual(target.events, want) {
+		t.Fatalf("toggle mana DoT events = %#v, want %#v", target.events, want)
+	}
+	if target.mp != 9 {
+		t.Fatalf("target mp after lack-mp drop = %v, want unchanged 9", target.mp)
+	}
+}
+
 type liveEffectTarget struct {
 	events     []string
 	hp         float64
+	mp         float64
 	dead       bool
 	afraid     bool
 	fearImmune bool
@@ -323,13 +400,24 @@ func (t *liveEffectTarget) Dead() bool { return t.dead }
 
 func (t *liveEffectTarget) HP() float64 { return t.hp }
 
+func (t *liveEffectTarget) MP() float64 { return t.mp }
+
 func (t *liveEffectTarget) ReduceHPByDOT(damage float64, effector any, skill Skill) {
 	t.hp -= damage
 	t.events = append(t.events, fmt.Sprintf("dot:%g:%v:%d", damage, effector, skill.ID))
 }
 
+func (t *liveEffectTarget) ReduceMP(damage float64) {
+	t.mp -= damage
+	t.events = append(t.events, fmt.Sprintf("mpdot:%g", damage))
+}
+
 func (t *liveEffectTarget) NotifyEffectRemovedDueLackHP(*Effect) {
 	t.events = append(t.events, "lack-hp")
+}
+
+func (t *liveEffectTarget) NotifyEffectRemovedDueLackMP(*Effect) {
+	t.events = append(t.events, "lack-mp")
 }
 
 func (t *liveEffectTarget) AbortAll(force bool) {
