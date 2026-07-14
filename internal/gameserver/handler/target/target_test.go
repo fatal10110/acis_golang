@@ -26,6 +26,11 @@ func TestRegistryRegistersRepresentativeHandlers(t *testing.T) {
 		modelskill.TargetSummon,
 		modelskill.TargetAreaSummon,
 		modelskill.TargetOwnerPet,
+		modelskill.TargetCorpseMob,
+		modelskill.TargetAreaCorpseMob,
+		modelskill.TargetCorpsePlayer,
+		modelskill.TargetCorpsePet,
+		modelskill.TargetGround,
 	} {
 		if _, ok := registry.Handler(typ); !ok {
 			t.Fatalf("Handler(%s) missing", typ)
@@ -306,6 +311,129 @@ func TestAreaSummonUsesSummonAsAnchor(t *testing.T) {
 	}
 }
 
+func TestCorpseMobHandlerCastConditions(t *testing.T) {
+	caster := &targetActor{id: 1, category: CategoryPlayable}
+	handler := mustHandler(t, NewRegistry(knownList{}), modelskill.TargetCorpseMob)
+
+	tests := []struct {
+		name   string
+		target *targetActor
+		skill  *modelskill.Definition
+		want   bool
+	}{
+		{"no corpse", &targetActor{id: 2, category: CategoryAttackable}, &modelskill.Definition{}, false},
+		{"playable corpse", &targetActor{id: 3, category: CategoryPlayable, corpse: true}, &modelskill.Definition{}, false},
+		{"mob corpse, default skill", &targetActor{id: 4, category: CategoryAttackable, corpse: true}, &modelskill.Definition{}, true},
+		{"harvest on monster corpse", &targetActor{id: 5, category: CategoryAttackable, corpse: true}, &modelskill.Definition{SkillType: "HARVEST"}, true},
+		{"harvest on non-monster corpse", &targetActor{id: 6, category: CategoryFolk, corpse: true}, &modelskill.Definition{SkillType: "HARVEST"}, false},
+		{"sweep on monster corpse", &targetActor{id: 7, category: CategoryAttackable, corpse: true}, &modelskill.Definition{SkillType: "SWEEP"}, true},
+		{"sweep on non-monster corpse", &targetActor{id: 8, category: CategoryFolk, corpse: true}, &modelskill.Definition{SkillType: "SWEEP"}, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := handler.CanCast(caster, tt.target, tt.skill, false); got != tt.want {
+				t.Fatalf("CanCast = %v, want %v", got, tt.want)
+			}
+		})
+	}
+
+	mobCorpse := &targetActor{id: 9, category: CategoryAttackable, corpse: true}
+	if got := handler.FinalTarget(caster, mobCorpse, &modelskill.Definition{}); got != mobCorpse {
+		t.Fatalf("corpse mob final target = %v, want target", got)
+	}
+	if got := ids(handler.Targets(caster, mobCorpse, &modelskill.Definition{})); !slices.Equal(got, []int32{9}) {
+		t.Fatalf("corpse mob targets = %v, want [9]", got)
+	}
+}
+
+func TestAreaCorpseMobTargetsSplashAndSpecialSkill(t *testing.T) {
+	caster := &targetActor{id: 1, category: CategoryPlayable, x: 0, attackableWithoutForce: true}
+	corpse := &targetActor{id: 2, category: CategoryAttackable, corpse: true, x: 100}
+	live := &targetActor{id: 3, category: CategoryAttackable, x: 130, attackableWithoutForce: true}
+	blocked := &targetActor{id: 4, category: CategoryAttackable, x: 110, attackableWithoutForce: true}
+	deadNearby := &targetActor{id: 5, category: CategoryAttackable, x: 120, dead: true, attackableWithoutForce: true}
+	corpse.see = map[int32]bool{4: false}
+
+	registry := NewRegistry(knownList{caster, corpse, live, blocked, deadNearby})
+	handler := mustHandler(t, registry, modelskill.TargetAreaCorpseMob)
+
+	got := ids(handler.Targets(caster, corpse, &modelskill.Definition{Radius: 100}))
+	if want := []int32{2, 3}; !slices.Equal(got, want) {
+		t.Fatalf("area corpse mob targets = %v, want %v", got, want)
+	}
+
+	got444 := ids(handler.Targets(caster, corpse, &modelskill.Definition{Radius: 100, ID: harvestGrandBoxSkillID}))
+	if want := []int32{2, 5}; !slices.Equal(got444, want) {
+		t.Fatalf("area corpse mob targets (id 444) = %v, want %v", got444, want)
+	}
+
+	if got := handler.FinalTarget(caster, corpse, &modelskill.Definition{}); got != corpse {
+		t.Fatalf("area corpse mob final target = %v, want corpse", got)
+	}
+	if !handler.CanCast(caster, corpse, &modelskill.Definition{}, false) {
+		t.Fatal("area corpse mob CanCast on mob corpse = false, want true")
+	}
+}
+
+func TestCorpsePlayerAndCorpsePetHandlers(t *testing.T) {
+	caster := &targetActor{id: 1, category: CategoryPlayable}
+	owner := &targetActor{id: 2, category: CategoryPlayable}
+	alivePlayer := &targetActor{id: 3, category: CategoryPlayable}
+	deadPlayer := &targetActor{id: 4, category: CategoryPlayable, dead: true}
+	deadMob := &targetActor{id: 5, category: CategoryAttackable, dead: true}
+	deadOwnedSummon := &targetActor{id: 6, category: CategoryPlayable, dead: true, owner: owner}
+	deadUnownedPlayable := &targetActor{id: 7, category: CategoryPlayable, dead: true}
+
+	registry := NewRegistry(knownList{})
+
+	corpsePlayer := mustHandler(t, registry, modelskill.TargetCorpsePlayer)
+	if got := corpsePlayer.FinalTarget(caster, deadPlayer, &modelskill.Definition{}); got != deadPlayer {
+		t.Fatalf("corpse player final target = %v, want target", got)
+	}
+	if got := ids(corpsePlayer.Targets(caster, deadPlayer, &modelskill.Definition{})); !slices.Equal(got, []int32{4}) {
+		t.Fatalf("corpse player targets = %v, want [4]", got)
+	}
+	if !corpsePlayer.CanCast(caster, deadPlayer, &modelskill.Definition{}, false) {
+		t.Fatal("corpse player CanCast on dead player = false, want true")
+	}
+	if corpsePlayer.CanCast(caster, alivePlayer, &modelskill.Definition{}, false) {
+		t.Fatal("corpse player CanCast on living player = true, want false")
+	}
+	if corpsePlayer.CanCast(caster, deadMob, &modelskill.Definition{}, false) {
+		t.Fatal("corpse player CanCast on dead mob = true, want false")
+	}
+
+	corpsePet := mustHandler(t, registry, modelskill.TargetCorpsePet)
+	if got := corpsePet.FinalTarget(caster, deadOwnedSummon, &modelskill.Definition{}); got != deadOwnedSummon {
+		t.Fatalf("corpse pet final target = %v, want target", got)
+	}
+	if !corpsePet.CanCast(caster, deadOwnedSummon, &modelskill.Definition{}, false) {
+		t.Fatal("corpse pet CanCast on dead owned summon = false, want true")
+	}
+	if corpsePet.CanCast(caster, deadUnownedPlayable, &modelskill.Definition{}, false) {
+		t.Fatal("corpse pet CanCast on dead unowned playable = true, want false")
+	}
+	if corpsePet.CanCast(caster, deadMob, &modelskill.Definition{}, false) {
+		t.Fatal("corpse pet CanCast on dead mob = true, want false")
+	}
+}
+
+func TestGroundHandlerTargetsCaster(t *testing.T) {
+	caster := &targetActor{id: 1, category: CategoryPlayable}
+	handler := mustHandler(t, NewRegistry(knownList{}), modelskill.TargetGround)
+
+	if got := handler.FinalTarget(caster, nil, &modelskill.Definition{}); got != caster {
+		t.Fatalf("ground final target = %v, want caster", got)
+	}
+	if got := ids(handler.Targets(caster, nil, &modelskill.Definition{})); !slices.Equal(got, []int32{1}) {
+		t.Fatalf("ground targets = %v, want [1]", got)
+	}
+	if !handler.CanCast(caster, nil, &modelskill.Definition{}, false) {
+		t.Fatal("ground CanCast = false, want true")
+	}
+}
+
 func mustHandler(t *testing.T, r *Registry, target modelskill.Target) Handler {
 	t.Helper()
 	h, ok := r.Handler(target)
@@ -339,6 +467,7 @@ type targetActor struct {
 	unlockable             bool
 	undead                 bool
 	peace                  bool
+	corpse                 bool
 }
 
 func (a *targetActor) ObjectID() int32 { return a.id }
@@ -374,6 +503,8 @@ func (a *targetActor) Unlockable() bool { return a.unlockable }
 func (a *targetActor) Undead() bool { return a.undead }
 
 func (a *targetActor) InPeaceZone() bool { return a.peace }
+
+func (a *targetActor) HasCorpse() bool { return a.corpse }
 
 type knownList []*targetActor
 
