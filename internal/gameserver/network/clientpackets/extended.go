@@ -11,5 +11,6 @@ const OpcodeRequestSkillCoolTime = 0x9d
 
 // Extended client packet opcodes.
 const (
-	OpcodeRequestManorList uint16 = 0x0008
+	OpcodeRequestAutoSoulShot uint16 = 0x0005
+	OpcodeRequestManorList    uint16 = 0x0008
 )

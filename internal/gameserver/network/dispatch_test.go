@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"fmt"
 	"net"
 	"sort"
 	"strings"
@@ -20,11 +21,13 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/fatal10110/acis_golang/internal/link"
 )
@@ -147,6 +150,17 @@ func (s *fakeCharStore) savedPosition(t *testing.T, id int32) savedPosition {
 	return pos
 }
 
+func (s *fakeCharStore) updateCharacter(t *testing.T, id int32, update func(*player.Character)) {
+	t.Helper()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	ch, ok := s.byID[id]
+	if !ok {
+		t.Fatalf("character %d missing", id)
+	}
+	update(ch)
+}
+
 type fakeItemStore struct {
 	mu    sync.Mutex
 	items map[int32][]*item.Instance
@@ -203,7 +217,57 @@ func testTemplates(t *testing.T) *player.TemplateTable {
 }
 
 func testItemTemplates() *item.Table {
-	return item.NewTable(nil)
+	return item.NewTable([]*item.Template{
+		{
+			ID:          item.AdenaID,
+			Name:        "Adena",
+			Kind:        item.KindEtcItem,
+			Duration:    -1,
+			Stackable:   true,
+			Dropable:    true,
+			Destroyable: true,
+			EtcItem:     &item.EtcItemDetail{},
+		},
+		{
+			ID:          20,
+			Name:        "Potion",
+			Kind:        item.KindEtcItem,
+			Duration:    -1,
+			Stackable:   true,
+			Dropable:    true,
+			Destroyable: true,
+			EtcItem:     &item.EtcItemDetail{Type: item.EtcItemPotion},
+		},
+		{
+			ID:            1463,
+			Name:          "Soulshot: No Grade",
+			Kind:          item.KindEtcItem,
+			Duration:      -1,
+			Stackable:     true,
+			DefaultAction: item.ActionSoulshot,
+			EtcItem:       &item.EtcItemDetail{Type: item.EtcItemShot},
+		},
+		{
+			ID:           30,
+			Name:         "Sword",
+			Kind:         item.KindWeapon,
+			Slot:         item.SlotRHand,
+			Duration:     -1,
+			Crystal:      item.CrystalD,
+			CrystalCount: 10,
+			Dropable:     true,
+			Destroyable:  true,
+			Weapon:       &item.WeaponDetail{Type: item.WeaponSword},
+		},
+		{
+			ID:        item.CrystalD.ItemID(),
+			Name:      "D-grade Crystal",
+			Kind:      item.KindEtcItem,
+			Duration:  -1,
+			Stackable: true,
+			EtcItem:   &item.EtcItemDetail{},
+		},
+	})
 }
 
 // --- fake game client, driving the wire protocol from the other side ---
@@ -292,6 +356,41 @@ func (f *fakeGameClient) read() []byte {
 	return payload
 }
 
+func readEnterWorldBurst(t *testing.T, c *fakeGameClient, wantDie bool) [][]byte {
+	t.Helper()
+	want := []byte{
+		serverpackets.OpcodeExtended,
+		serverpackets.OpcodeHennaInfo,
+		serverpackets.OpcodeEtcStatusUpdate,
+		serverpackets.OpcodeSystemMessage,
+		serverpackets.OpcodeQuestList,
+		serverpackets.OpcodeSkillList,
+		serverpackets.OpcodeFriendList,
+		serverpackets.OpcodeUserInfo,
+		serverpackets.OpcodeItemList,
+		serverpackets.OpcodeShortCutInit,
+	}
+	if wantDie {
+		want = append(want, serverpackets.OpcodeDie)
+	}
+	want = append(want, serverpackets.OpcodeSkillCoolTime, serverpackets.OpcodeActionFailed)
+
+	frames := make([][]byte, 0, len(want))
+	for i, opcode := range want {
+		frame := c.read()
+		if frame[0] != opcode {
+			t.Fatalf("EnterWorld frame %d opcode = %#x, want %#x", i, frame[0], opcode)
+		}
+		if i == 0 {
+			if second := wire.NewReader(frame[1:]).ReadUint16(); second != serverpackets.OpcodeExStorageMaxCount {
+				t.Fatalf("EnterWorld first extended opcode = %#x, want ExStorageMaxCount (%#x)", second, serverpackets.OpcodeExStorageMaxCount)
+			}
+		}
+		frames = append(frames, frame)
+	}
+	return frames
+}
+
 func (f *fakeGameClient) expectClosed() {
 	f.t.Helper()
 	f.conn.SetReadDeadline(time.Now().Add(2 * time.Second))
@@ -364,6 +463,14 @@ func encodeRequestManorList() []byte {
 	return w.Bytes()
 }
 
+func encodeRequestAutoSoulShot(itemID, typ int32) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeExtended)
+	w.WriteUint16(clientpackets.OpcodeRequestAutoSoulShot)
+	w.WriteInt32(itemID)
+	w.WriteInt32(typ)
+	return w.Bytes()
+}
+
 func encodeRequestSkillCoolTime() []byte {
 	return wire.NewPacketWriter(clientpackets.OpcodeRequestSkillCoolTime).Bytes()
 }
@@ -406,6 +513,104 @@ func encodeValidatePosition(at location.Location, heading int32) []byte {
 	return w.Bytes()
 }
 
+func encodeCannotMoveAnymore(at location.Location, heading int32) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeCannotMoveAnymore)
+	w.WriteInt32(int32(at.X))
+	w.WriteInt32(int32(at.Y))
+	w.WriteInt32(int32(at.Z))
+	w.WriteInt32(heading)
+	return w.Bytes()
+}
+
+func encodeStartRotating(degree, side int32) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeStartRotating)
+	w.WriteInt32(degree)
+	w.WriteInt32(side)
+	return w.Bytes()
+}
+
+func encodeFinishRotating(degree, side int32) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeFinishRotating)
+	w.WriteInt32(degree)
+	w.WriteInt32(side)
+	return w.Bytes()
+}
+
+func encodeAction(objectID int32, origin location.Location, shift bool) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeAction)
+	w.WriteInt32(objectID)
+	w.WriteInt32(int32(origin.X))
+	w.WriteInt32(int32(origin.Y))
+	w.WriteInt32(int32(origin.Z))
+	w.WriteUint8(boolUint8(shift))
+	return w.Bytes()
+}
+
+func encodeAttackRequest(objectID int32, origin location.Location, shift bool) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeAttackRequest)
+	w.WriteInt32(objectID)
+	w.WriteInt32(int32(origin.X))
+	w.WriteInt32(int32(origin.Y))
+	w.WriteInt32(int32(origin.Z))
+	w.WriteUint8(boolUint8(shift))
+	return w.Bytes()
+}
+
+func encodeRequestTargetCancel(unselect uint16) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeRequestTargetCancel)
+	w.WriteUint16(unselect)
+	return w.Bytes()
+}
+
+func encodeRequestChangeMoveType(run bool) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeRequestChangeMoveType)
+	w.WriteInt32(int32(boolInt32(run)))
+	return w.Bytes()
+}
+
+func encodeRequestChangeWaitType(stand bool) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeRequestChangeWaitType)
+	w.WriteInt32(int32(boolInt32(stand)))
+	return w.Bytes()
+}
+
+func encodeRequestSocialAction(actionID int32) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeRequestSocialAction)
+	w.WriteInt32(actionID)
+	return w.Bytes()
+}
+
+func encodeRequestDropItem(objectID, count int32, at location.Location) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeRequestDropItem)
+	w.WriteInt32(objectID)
+	w.WriteInt32(count)
+	w.WriteInt32(int32(at.X))
+	w.WriteInt32(int32(at.Y))
+	w.WriteInt32(int32(at.Z))
+	return w.Bytes()
+}
+
+func encodeRequestDestroyItem(objectID, count int32) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeRequestDestroyItem)
+	w.WriteInt32(objectID)
+	w.WriteInt32(count)
+	return w.Bytes()
+}
+
+func encodeRequestCrystallizeItem(objectID, count int32) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeRequestCrystallizeItem)
+	w.WriteInt32(objectID)
+	w.WriteInt32(count)
+	return w.Bytes()
+}
+
+func encodeSendTimeCheck(requestID, responseID int32) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeSendTimeCheck)
+	w.WriteInt32(requestID)
+	w.WriteInt32(responseID)
+	return w.Bytes()
+}
+
 func encodeSingleOpcode(opcode byte) []byte {
 	return wire.NewPacketWriter(opcode).Bytes()
 }
@@ -429,8 +634,10 @@ func newTestGameClientLinkWithSkillsAndLog(t *testing.T, loginLink func() *Login
 	state = world.New()
 	templates := testTemplates(t)
 	itemTemplates := testItemTemplates()
-	roster := gamemanager.NewRoster(chars, items, templates, itemTemplates, npc.NewTable(nil), &sequentialIDs{next: 100}, gamemanager.DefaultDeleteAfter, time.Now)
-	gcl := NewGameClientLink(validator, loginLink, roster, items, templates, itemTemplates, skills, state, log)
+	ids := &sequentialIDs{next: 100}
+	groundItems := task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour, PlayerDroppedMultiplier: 1}, time.Now)
+	roster := gamemanager.NewRoster(chars, items, templates, itemTemplates, npc.NewTable(nil), ids, gamemanager.DefaultDeleteAfter, time.Now)
+	gcl := NewGameClientLink(validator, loginLink, roster, items, templates, itemTemplates, skills, state, ids, groundItems, nil, log)
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -508,6 +715,31 @@ func frameOpcodes(frames [][]byte) []byte {
 	return out
 }
 
+func skipInventoryRemainder(r *wire.Reader) {
+	r.ReadUint16()
+	r.ReadUint16()
+	r.ReadUint16()
+	r.ReadInt32()
+	r.ReadUint16()
+	r.ReadUint16()
+	r.ReadInt32()
+	r.ReadInt32()
+}
+
+func boolUint8(v bool) uint8 {
+	if v {
+		return 1
+	}
+	return 0
+}
+
+func boolInt32(v bool) int32 {
+	if v {
+		return 1
+	}
+	return 0
+}
+
 func newTestLivePlayer(t *testing.T, id int32, capture *frameCapture) *livePlayer {
 	t.Helper()
 	tmpl, ok := testTemplates(t).Get(0)
@@ -562,6 +794,27 @@ func (testHostileAttack) BowCoolingDown() bool                { return false }
 func (testHostileAttack) AttackingNow() bool                  { return false }
 func (testHostileAttack) CanAttack(attackable.Combatant) bool { return false }
 func (testHostileAttack) DoAttack(attackable.Combatant)       {}
+
+type attackStanceRecorder struct {
+	actors []task.AttackStanceActor
+}
+
+func (r *attackStanceRecorder) Add(actor task.AttackStanceActor) {
+	r.actors = append(r.actors, actor)
+}
+
+type recordedGroundDrop struct {
+	ground *grounditem.Item
+	opts   task.DropOptions
+}
+
+type recordingGroundDropper struct {
+	drops []recordedGroundDrop
+}
+
+func (r *recordingGroundDropper) Drop(ground *grounditem.Item, opts task.DropOptions) {
+	r.drops = append(r.drops, recordedGroundDrop{ground: ground, opts: opts})
+}
 
 type visibleGroundItem struct {
 	world.Presence
@@ -779,6 +1032,299 @@ func TestMoveLivePlayerRelocatesWorldVisibility(t *testing.T) {
 	}
 }
 
+func TestSelectAndClearLiveTargetSendsTargetPackets(t *testing.T) {
+	state := world.New()
+	attackerFrames := &frameCapture{}
+	observerFrames := &frameCapture{}
+	attacker := newTestLivePlayer(t, 1, attackerFrames)
+	observer := newTestLivePlayer(t, 2, observerFrames)
+	target := newTestHostileNPC(t, 3)
+
+	state.Spawn(attacker, 0, 0, 0, 0)
+	state.Spawn(observer, 100, 0, 0, 0)
+	state.Spawn(target, 150, 0, 0, 0)
+	attackerFrames.frames = nil
+	observerFrames.frames = nil
+
+	gcl := &GameClientLink{world: state, log: zerolog.Nop()}
+	if !gcl.selectLiveTarget(attacker, target) {
+		t.Fatal("selectLiveTarget returned false")
+	}
+	if got := frameOpcodes(attackerFrames.frames); string(got) != string([]byte{serverpackets.OpcodeMyTargetSelected, serverpackets.OpcodeStatusUpdate}) {
+		t.Fatalf("attacker select opcodes = %x, want MyTargetSelected, StatusUpdate", got)
+	}
+	if got := frameOpcodes(observerFrames.frames); string(got) != string([]byte{serverpackets.OpcodeTargetSelected}) {
+		t.Fatalf("observer select opcodes = %x, want TargetSelected", got)
+	}
+
+	attackerFrames.frames = nil
+	observerFrames.frames = nil
+	gcl.clearLiveTarget(attacker)
+	if got := frameOpcodes(attackerFrames.frames); string(got) != string([]byte{serverpackets.OpcodeActionFailed}) {
+		t.Fatalf("attacker clear opcodes = %x, want ActionFailed", got)
+	}
+	if got := frameOpcodes(observerFrames.frames); string(got) != string([]byte{serverpackets.OpcodeTargetUnselected}) {
+		t.Fatalf("observer clear opcodes = %x, want TargetUnselected", got)
+	}
+}
+
+func TestGameClientLinkResolveTargetFallsBackToPlayerRegistry(t *testing.T) {
+	state := world.New()
+	targetFrames := &frameCapture{}
+	target := newTestLivePlayer(t, 42, targetFrames)
+	state.AddPlayer(target)
+
+	gcl := &GameClientLink{world: state, log: zerolog.Nop()}
+	if got := gcl.resolveTarget(target.ObjectID()); got != target {
+		t.Fatalf("resolveTarget(player) = %v, want player registry target", got)
+	}
+}
+
+func TestGameClientLinkActionAttackAndTargetCancel(t *testing.T) {
+	c, chars, _, state := newLinkedGameClient(t)
+
+	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.read() // CharCreateOk
+	c.read() // CharSelectInfo
+	objID := chars.soleObjectID(t)
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	playerObj, ok := state.Player(objID)
+	if !ok {
+		t.Fatalf("world.Player(%d) missing", objID)
+	}
+	live := playerObj.(*livePlayer)
+	live.Character.SetRollSource(func(int) int { return 0 })
+
+	target := newTestHostileNPC(t, 3000)
+	target.Instance.Template.PDef = 1
+	target.Instance.Template.DEX = 30
+	target.SetRollSource(func(int) int { return 0 })
+	state.Spawn(target, 120, 20, 30, 0)
+	if reply := c.read(); reply[0] != serverpackets.OpcodeNPCInfo {
+		t.Fatalf("visible target opcode = %#x, want NPCInfo (%#x)", reply[0], serverpackets.OpcodeNPCInfo)
+	}
+
+	origin := location.Location{X: 10, Y: 20, Z: 30}
+	c.send(encodeAction(target.ObjectID(), origin, false))
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeMyTargetSelected {
+		t.Fatalf("Action first opcode = %#x, want MyTargetSelected (%#x)", reply[0], serverpackets.OpcodeMyTargetSelected)
+	}
+	reply = c.read()
+	assertTargetHPStatus(t, reply, target.ObjectID(), target.MaxHP(), target.CurrentHP())
+
+	c.send(encodeAttackRequest(target.ObjectID(), origin, false))
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeAutoAttackStart {
+		t.Fatalf("AttackRequest first opcode = %#x, want AutoAttackStart (%#x)", reply[0], serverpackets.OpcodeAutoAttackStart)
+	}
+	r := wire.NewReader(reply[1:])
+	if attackerID := r.ReadInt32(); attackerID != objID {
+		t.Fatalf("AutoAttackStart object id = %d, want %d", attackerID, objID)
+	}
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeAttack {
+		t.Fatalf("AttackRequest opcode = %#x, want Attack (%#x)", reply[0], serverpackets.OpcodeAttack)
+	}
+	r = wire.NewReader(reply[1:])
+	if attackerID := r.ReadInt32(); attackerID != objID {
+		t.Fatalf("Attack attacker id = %d, want %d", attackerID, objID)
+	}
+
+	c.send(encodeRequestTargetCancel(1))
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeActionFailed {
+		t.Fatalf("RequestTargetCancel opcode = %#x, want ActionFailed (%#x)", reply[0], serverpackets.OpcodeActionFailed)
+	}
+}
+
+func TestGameClientLinkAttackLiveTargetReusesController(t *testing.T) {
+	state := world.New()
+	attackerFrames := &frameCapture{}
+	attacker := newTestLivePlayer(t, 1, attackerFrames)
+	attacker.Character.SetWorld(state)
+	attacker.Character.SetRollSource(func(int) int { return 0 })
+	gcl := &GameClientLink{world: state, log: zerolog.Nop()}
+	attacker.stopAttack = gcl.stopLiveAutoAttack
+	attacker.Character.SetAttackBroadcaster(func(snapshot attack.Snapshot) {
+		gcl.broadcastAttack(attacker, snapshot)
+	})
+	target := newTestHostileNPC(t, 3002)
+	target.Instance.Template.PDef = 1
+	target.Instance.Template.DEX = 30
+	target.SetRollSource(func(int) int { return 0 })
+
+	state.Spawn(attacker, 0, 0, 0, 0)
+	state.Spawn(target, 30, 0, 0, 0)
+	attackerFrames.frames = nil
+
+	if !gcl.attackLiveTarget(attacker, target) {
+		t.Fatal("first attackLiveTarget returned false")
+	}
+	if got := frameOpcodes(attackerFrames.frames); string(got) != string([]byte{serverpackets.OpcodeAutoAttackStart, serverpackets.OpcodeAttack}) {
+		t.Fatalf("first attack opcodes = %x, want AutoAttackStart, Attack", got)
+	}
+	if attacker.attack == nil || !attacker.attack.AttackingNow() {
+		t.Fatal("live player attack controller is not tracking the active attack")
+	}
+
+	attackerFrames.frames = nil
+	if gcl.attackLiveTarget(attacker, target) {
+		t.Fatal("second attackLiveTarget returned true while the first swing is active")
+	}
+	if got := frameOpcodes(attackerFrames.frames); string(got) != string([]byte{serverpackets.OpcodeActionFailed}) {
+		t.Fatalf("second attack opcodes = %x, want ActionFailed only", got)
+	}
+
+	attacker.Stop()
+	if attacker.attack.AttackingNow() {
+		t.Fatal("live player Stop did not cancel the active attack controller")
+	}
+	if attacker.InCombat() {
+		t.Fatal("live player Stop did not clear combat stance")
+	}
+}
+
+func TestGameClientLinkAttackRequestFirstSelectsOnly(t *testing.T) {
+	c, _, _, state := newLinkedGameClient(t)
+
+	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.read() // CharCreateOk
+	c.read() // CharSelectInfo
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	target := newTestHostileNPC(t, 3001)
+	state.Spawn(target, 120, 20, 30, 0)
+	if reply := c.read(); reply[0] != serverpackets.OpcodeNPCInfo {
+		t.Fatalf("visible target opcode = %#x, want NPCInfo (%#x)", reply[0], serverpackets.OpcodeNPCInfo)
+	}
+
+	origin := location.Location{X: 10, Y: 20, Z: 30}
+	c.send(encodeAttackRequest(target.ObjectID(), origin, false))
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeMyTargetSelected {
+		t.Fatalf("first AttackRequest opcode = %#x, want MyTargetSelected (%#x)", reply[0], serverpackets.OpcodeMyTargetSelected)
+	}
+	reply = c.read()
+	assertTargetHPStatus(t, reply, target.ObjectID(), target.MaxHP(), target.CurrentHP())
+
+	c.send(encodeRequestTargetCancel(1))
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeActionFailed {
+		t.Fatalf("RequestTargetCancel after first AttackRequest opcode = %#x, want ActionFailed (%#x)", reply[0], serverpackets.OpcodeActionFailed)
+	}
+}
+
+func TestGameClientLinkStanceAndSocialPacketsInGame(t *testing.T) {
+	c, chars, _, _ := newLinkedGameClient(t)
+
+	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.read() // CharCreateOk
+	c.read() // CharSelectInfo
+	objID := chars.soleObjectID(t)
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	c.send(encodeRequestChangeMoveType(false))
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeChangeMoveType {
+		t.Fatalf("walk opcode = %#x, want ChangeMoveType (%#x)", reply[0], serverpackets.OpcodeChangeMoveType)
+	}
+	r := wire.NewReader(reply[1:])
+	if got := r.ReadInt32(); got != objID {
+		t.Fatalf("ChangeMoveType object id = %d, want %d", got, objID)
+	}
+	if running, swimming := r.ReadInt32(), r.ReadInt32(); running != 0 || swimming != 0 {
+		t.Fatalf("ChangeMoveType flags = (%d,%d), want (0,0)", running, swimming)
+	}
+
+	c.send(encodeRequestChangeMoveType(true))
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeChangeMoveType {
+		t.Fatalf("run opcode = %#x, want ChangeMoveType (%#x)", reply[0], serverpackets.OpcodeChangeMoveType)
+	}
+	r = wire.NewReader(reply[1:])
+	r.ReadInt32()
+	if running := r.ReadInt32(); running != 1 {
+		t.Fatalf("ChangeMoveType running = %d, want 1", running)
+	}
+
+	c.send(encodeRequestChangeWaitType(false))
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeChangeWaitType {
+		t.Fatalf("sit opcode = %#x, want ChangeWaitType (%#x)", reply[0], serverpackets.OpcodeChangeWaitType)
+	}
+	r = wire.NewReader(reply[1:])
+	if got := r.ReadInt32(); got != objID {
+		t.Fatalf("ChangeWaitType object id = %d, want %d", got, objID)
+	}
+	if waitType := r.ReadInt32(); waitType != int32(serverpackets.WaitSitting) {
+		t.Fatalf("ChangeWaitType type = %d, want sitting", waitType)
+	}
+
+	c.send(encodeRequestChangeWaitType(true))
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeChangeWaitType {
+		t.Fatalf("stand opcode = %#x, want ChangeWaitType (%#x)", reply[0], serverpackets.OpcodeChangeWaitType)
+	}
+	r = wire.NewReader(reply[1:])
+	r.ReadInt32()
+	if waitType := r.ReadInt32(); waitType != int32(serverpackets.WaitStanding) {
+		t.Fatalf("ChangeWaitType type = %d, want standing", waitType)
+	}
+
+	c.send(encodeRequestSocialAction(13))
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeSocialAction {
+		t.Fatalf("social opcode = %#x, want SocialAction (%#x)", reply[0], serverpackets.OpcodeSocialAction)
+	}
+	r = wire.NewReader(reply[1:])
+	if got := r.ReadInt32(); got != objID {
+		t.Fatalf("SocialAction object id = %d, want %d", got, objID)
+	}
+	if actionID := r.ReadInt32(); actionID != 13 {
+		t.Fatalf("SocialAction action id = %d, want 13", actionID)
+	}
+}
+
+func assertTargetHPStatus(t *testing.T, frame []byte, objectID int32, maxHP, curHP int) {
+	t.Helper()
+	if frame[0] != serverpackets.OpcodeStatusUpdate {
+		t.Fatalf("status opcode = %#x, want StatusUpdate (%#x)", frame[0], serverpackets.OpcodeStatusUpdate)
+	}
+	r := wire.NewReader(frame[1:])
+	if got := r.ReadInt32(); got != objectID {
+		t.Fatalf("StatusUpdate object id = %d, want %d", got, objectID)
+	}
+	if count := r.ReadInt32(); count != 2 {
+		t.Fatalf("StatusUpdate attribute count = %d, want 2", count)
+	}
+	if typ, val := r.ReadInt32(), r.ReadInt32(); typ != int32(serverpackets.StatusMaxHP) || val != int32(maxHP) {
+		t.Fatalf("StatusUpdate first attr = (%d,%d), want MAX_HP=%d", typ, val, maxHP)
+	}
+	if typ, val := r.ReadInt32(), r.ReadInt32(); typ != int32(serverpackets.StatusCurrentHP) || val != int32(curHP) {
+		t.Fatalf("StatusUpdate second attr = (%d,%d), want CUR_HP=%d", typ, val, curHP)
+	}
+	if err := r.Err(); err != nil {
+		t.Fatalf("StatusUpdate read: %v", err)
+	}
+}
+
 func TestGameClientLinkNormalDisconnectLogsDebug(t *testing.T) {
 	logs := &safeLogBuffer{}
 	logger := zerolog.New(logs).Level(zerolog.DebugLevel)
@@ -856,6 +1402,45 @@ func TestGameClientLinkAttackBroadcastSendsToSelfAndObservers(t *testing.T) {
 	}
 	if len(observerFrames.frames) != 1 || observerFrames.frames[0][0] != serverpackets.OpcodeAttack {
 		t.Fatalf("observer frames = %x, want one Attack", observerFrames.frames)
+	}
+}
+
+func TestGameClientLinkAutoAttackStanceRefreshAndStop(t *testing.T) {
+	capture := &frameCapture{}
+	live := newTestLivePlayer(t, 1, capture)
+	tracker := &attackStanceRecorder{}
+	link := &GameClientLink{attackStance: tracker}
+
+	link.startLiveAutoAttack(live)
+	if len(tracker.actors) != 1 || tracker.actors[0].ObjectID() != live.ObjectID() {
+		t.Fatalf("attack stance actors = %+v, want live player", tracker.actors)
+	}
+	if !live.InCombat() {
+		t.Fatal("live player not marked in combat after AutoAttackStart")
+	}
+	if len(capture.frames) != 1 || capture.frames[0][0] != serverpackets.OpcodeAutoAttackStart {
+		t.Fatalf("start frames = %x, want one AutoAttackStart", capture.frames)
+	}
+
+	link.startLiveAutoAttack(live)
+	if len(tracker.actors) != 2 {
+		t.Fatalf("attack stance refresh count = %d, want 2", len(tracker.actors))
+	}
+	if len(capture.frames) != 1 {
+		t.Fatalf("second start emitted %d frames, want no duplicate AutoAttackStart", len(capture.frames)-1)
+	}
+
+	link.stopLiveAutoAttack(live)
+	if live.InCombat() {
+		t.Fatal("live player still marked in combat after AutoAttackStop")
+	}
+	if len(capture.frames) != 2 || capture.frames[1][0] != serverpackets.OpcodeAutoAttackStop {
+		t.Fatalf("stop frames = %x, want AutoAttackStop", capture.frames)
+	}
+
+	link.stopLiveAutoAttack(live)
+	if len(capture.frames) != 2 {
+		t.Fatalf("second stop emitted %d frames, want no duplicate AutoAttackStop", len(capture.frames)-2)
 	}
 }
 
@@ -945,18 +1530,7 @@ func TestGameClientLinkFullFlow(t *testing.T) {
 	}
 
 	c.send(encodeEnterWorld())
-	reply = c.read()
-	if reply[0] != serverpackets.OpcodeSkillList {
-		t.Fatalf("opcode = %#x, want SkillList (%#x)", reply[0], serverpackets.OpcodeSkillList)
-	}
-	reply = c.read()
-	if reply[0] != serverpackets.OpcodeUserInfo {
-		t.Fatalf("opcode = %#x, want UserInfo (%#x)", reply[0], serverpackets.OpcodeUserInfo)
-	}
-	reply = c.read()
-	if reply[0] != serverpackets.OpcodeItemList {
-		t.Fatalf("opcode = %#x, want ItemList (%#x)", reply[0], serverpackets.OpcodeItemList)
-	}
+	readEnterWorldBurst(t, c, false)
 	if _, ok := state.Player(objID); !ok {
 		t.Fatalf("world.Player(%d) missing after EnterWorld", objID)
 	}
@@ -965,7 +1539,7 @@ func TestGameClientLinkFullFlow(t *testing.T) {
 	}
 }
 
-func TestGameClientLinkIgnoresRequestSkillCoolTimeInGame(t *testing.T) {
+func TestGameClientLinkSendsSkillCoolTimeInGame(t *testing.T) {
 	c, _, _, _ := newLinkedGameClient(t)
 
 	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
@@ -975,18 +1549,354 @@ func TestGameClientLinkIgnoresRequestSkillCoolTimeInGame(t *testing.T) {
 	c.read() // SSQInfo
 	c.read() // CharSelected
 	c.send(encodeEnterWorld())
-	c.read() // SkillList
-	c.read() // UserInfo
-	c.read() // ItemList
+	readEnterWorldBurst(t, c, false)
 
 	c.send(encodeRequestSkillCoolTime())
-	c.send(encodeRequestManorList())
 	reply := c.read()
+	if reply[0] != serverpackets.OpcodeSkillCoolTime {
+		t.Fatalf("opcode = %#x, want SkillCoolTime (%#x)", reply[0], serverpackets.OpcodeSkillCoolTime)
+	}
+	if count := wire.NewReader(reply[1:]).ReadInt32(); count != 0 {
+		t.Fatalf("SkillCoolTime count = %d, want 0", count)
+	}
+
+	c.send(encodeRequestManorList())
+	reply = c.read()
 	if reply[0] != serverpackets.OpcodeExtended {
 		t.Fatalf("opcode = %#x, want extended packet (%#x)", reply[0], serverpackets.OpcodeExtended)
 	}
 	if second := wire.NewReader(reply[1:]).ReadUint16(); second != serverpackets.OpcodeExSendManorList {
 		t.Fatalf("extended opcode = %#x, want ExSendManorList (%#x)", second, serverpackets.OpcodeExSendManorList)
+	}
+}
+
+func TestGameClientLinkAutoSoulShotInGame(t *testing.T) {
+	const soulshotID int32 = 1463
+	c, chars, items, _ := newLinkedGameClient(t)
+
+	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.read() // CharCreateOk
+	c.read() // CharSelectInfo
+	objID := chars.soleObjectID(t)
+	if err := items.Create(context.Background(), objID, item.Instance{
+		ObjectID:   510,
+		TemplateID: soulshotID,
+		OwnerID:    objID,
+		Count:      100,
+		Location:   item.LocationInventory,
+	}); err != nil {
+		t.Fatalf("seed item: %v", err)
+	}
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	c.send(encodeRequestAutoSoulShot(soulshotID, 1))
+	reply := c.read()
+	assertExAutoSoulShotFrame(t, reply, soulshotID, true)
+	reply = c.read()
+	assertSystemMessageItemFrame(t, reply, serverpackets.SystemMessageUseOfItemWillBeAuto, soulshotID)
+
+	c.send(encodeRequestAutoSoulShot(soulshotID, 0))
+	reply = c.read()
+	assertExAutoSoulShotFrame(t, reply, soulshotID, false)
+	reply = c.read()
+	assertSystemMessageItemFrame(t, reply, serverpackets.SystemMessageAutoUseOfItemCancelled, soulshotID)
+}
+
+func TestGameClientLinkSendTimeCheckIsNoOpInGame(t *testing.T) {
+	c, _, _, _ := newLinkedGameClient(t)
+
+	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.read() // CharCreateOk
+	c.read() // CharSelectInfo
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	c.send(encodeSendTimeCheck(17, 34))
+	c.send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeItemList {
+		t.Fatalf("post-SendTimeCheck opcode = %#x, want ItemList (%#x)", reply[0], serverpackets.OpcodeItemList)
+	}
+}
+
+func TestGameClientLinkMalformedLivePacketsDoNotDisconnect(t *testing.T) {
+	for _, opcode := range []byte{
+		clientpackets.OpcodeUseItem,
+		clientpackets.OpcodeAction,
+		clientpackets.OpcodeSendTimeCheck,
+	} {
+		t.Run(fmt.Sprintf("opcode_%02x", opcode), func(t *testing.T) {
+			c, _, _, _ := newLinkedGameClient(t)
+			c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+			c.read() // CharCreateOk
+			c.read() // CharSelectInfo
+			c.send(encodeRequestGameStart(0))
+			c.read() // SSQInfo
+			c.read() // CharSelected
+			c.send(encodeEnterWorld())
+			readEnterWorldBurst(t, c, false)
+
+			c.send(encodeSingleOpcode(opcode))
+			c.send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
+			reply := c.read()
+			if reply[0] != serverpackets.OpcodeItemList {
+				t.Fatalf("post-malformed opcode = %#x, want ItemList (%#x)", reply[0], serverpackets.OpcodeItemList)
+			}
+		})
+	}
+}
+
+func TestGameClientLinkDropItemInGame(t *testing.T) {
+	c, chars, items, state := newLinkedGameClient(t)
+
+	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.read() // CharCreateOk
+	c.read() // CharSelectInfo
+	objID := chars.soleObjectID(t)
+	if err := items.Create(context.Background(), objID, item.Instance{
+		ObjectID:   500,
+		TemplateID: item.AdenaID,
+		OwnerID:    objID,
+		Count:      100,
+		Location:   item.LocationInventory,
+	}); err != nil {
+		t.Fatalf("seed item: %v", err)
+	}
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	c.send(encodeRequestDropItem(500, 40, location.Location{X: 10, Y: 20, Z: 30}))
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeInventoryUpdate {
+		t.Fatalf("drop inventory opcode = %#x, want InventoryUpdate (%#x)", reply[0], serverpackets.OpcodeInventoryUpdate)
+	}
+	r := wire.NewReader(reply[1:])
+	if count := r.ReadUint16(); count != 1 {
+		t.Fatalf("InventoryUpdate count = %d, want 1", count)
+	}
+	if state := r.ReadUint16(); state != uint16(itemcontainer.UpdateModified) {
+		t.Fatalf("InventoryUpdate state = %d, want modified", state)
+	}
+	r.ReadUint16()
+	if got := r.ReadInt32(); got != 500 {
+		t.Fatalf("InventoryUpdate object id = %d, want 500", got)
+	}
+	r.ReadInt32()
+	if got := r.ReadInt32(); got != 60 {
+		t.Fatalf("InventoryUpdate count = %d, want 60", got)
+	}
+
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeDropItem {
+		t.Fatalf("drop broadcast opcode = %#x, want DropItem (%#x)", reply[0], serverpackets.OpcodeDropItem)
+	}
+	r = wire.NewReader(reply[1:])
+	if got := r.ReadInt32(); got != objID {
+		t.Fatalf("DropItem dropper id = %d, want %d", got, objID)
+	}
+	groundID := r.ReadInt32()
+	if groundID == 500 {
+		t.Fatalf("DropItem ground object id reused source stack id %d", groundID)
+	}
+	if got := r.ReadInt32(); got != item.AdenaID {
+		t.Fatalf("DropItem item id = %d, want adena", got)
+	}
+	x, y, z := r.ReadInt32(), r.ReadInt32(), r.ReadInt32()
+	if x != 10 || y != 20 || z != 30 {
+		t.Fatalf("DropItem location = (%d,%d,%d), want (10,20,30)", x, y, z)
+	}
+	if stackable := r.ReadInt32(); stackable != 1 {
+		t.Fatalf("DropItem stackable = %d, want 1", stackable)
+	}
+	if got := r.ReadInt32(); got != 40 {
+		t.Fatalf("DropItem count = %d, want 40", got)
+	}
+
+	if _, ok := state.Object(groundID); !ok {
+		t.Fatalf("world.Object(%d) missing for dropped item", groundID)
+	}
+}
+
+func TestGameClientLinkDestroyItemInGame(t *testing.T) {
+	c, chars, items, _ := newLinkedGameClient(t)
+
+	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.read() // CharCreateOk
+	c.read() // CharSelectInfo
+	objID := chars.soleObjectID(t)
+	if err := items.Create(context.Background(), objID, item.Instance{
+		ObjectID:   501,
+		TemplateID: 20,
+		OwnerID:    objID,
+		Count:      5,
+		Location:   item.LocationInventory,
+	}); err != nil {
+		t.Fatalf("seed item: %v", err)
+	}
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	c.send(encodeRequestDestroyItem(501, 2))
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeInventoryUpdate {
+		t.Fatalf("destroy inventory opcode = %#x, want InventoryUpdate (%#x)", reply[0], serverpackets.OpcodeInventoryUpdate)
+	}
+	r := wire.NewReader(reply[1:])
+	if count := r.ReadUint16(); count != 1 {
+		t.Fatalf("InventoryUpdate count = %d, want 1", count)
+	}
+	if state := r.ReadUint16(); state != uint16(itemcontainer.UpdateModified) {
+		t.Fatalf("InventoryUpdate state = %d, want modified", state)
+	}
+	r.ReadUint16()
+	if got := r.ReadInt32(); got != 501 {
+		t.Fatalf("InventoryUpdate object id = %d, want 501", got)
+	}
+	r.ReadInt32()
+	if got := r.ReadInt32(); got != 3 {
+		t.Fatalf("InventoryUpdate count = %d, want 3", got)
+	}
+}
+
+func TestGameClientLinkCrystallizeItemInGame(t *testing.T) {
+	c, chars, items, _ := newLinkedGameClient(t)
+
+	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.read() // CharCreateOk
+	c.read() // CharSelectInfo
+	objID := chars.soleObjectID(t)
+	chars.updateCharacter(t, objID, func(ch *player.Character) {
+		ch.SetSkillLevel(248, 1)
+	})
+	if err := items.Create(context.Background(), objID, item.Instance{
+		ObjectID:   502,
+		TemplateID: 30,
+		OwnerID:    objID,
+		Count:      1,
+		Location:   item.LocationInventory,
+	}); err != nil {
+		t.Fatalf("seed item: %v", err)
+	}
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	c.send(encodeRequestCrystallizeItem(502, 1))
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeSystemMessage {
+		t.Fatalf("crystallize message opcode = %#x, want SystemMessage (%#x)", reply[0], serverpackets.OpcodeSystemMessage)
+	}
+	r := wire.NewReader(reply[1:])
+	if id := r.ReadInt32(); id != serverpackets.SystemMessageItemCrystallized {
+		t.Fatalf("SystemMessage id = %d, want crystallized", id)
+	}
+	if params := r.ReadInt32(); params != 1 {
+		t.Fatalf("SystemMessage params = %d, want 1", params)
+	}
+	if typ := r.ReadInt32(); typ != serverpackets.SystemMessageParamItemName {
+		t.Fatalf("SystemMessage param type = %d, want item name", typ)
+	}
+	if got := r.ReadInt32(); got != 30 {
+		t.Fatalf("SystemMessage item id = %d, want 30", got)
+	}
+
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeInventoryUpdate {
+		t.Fatalf("crystallize inventory opcode = %#x, want InventoryUpdate (%#x)", reply[0], serverpackets.OpcodeInventoryUpdate)
+	}
+	r = wire.NewReader(reply[1:])
+	if count := r.ReadUint16(); count != 2 {
+		t.Fatalf("InventoryUpdate count = %d, want 2", count)
+	}
+	if state := r.ReadUint16(); state != uint16(itemcontainer.UpdateRemoved) {
+		t.Fatalf("source update state = %d, want removed", state)
+	}
+	r.ReadUint16()
+	if got := r.ReadInt32(); got != 502 {
+		t.Fatalf("source update object id = %d, want 502", got)
+	}
+	if got := r.ReadInt32(); got != 30 {
+		t.Fatalf("source update item id = %d, want 30", got)
+	}
+	if got := r.ReadInt32(); got != 1 {
+		t.Fatalf("source update count = %d, want 1", got)
+	}
+	skipInventoryRemainder(r)
+
+	if state := r.ReadUint16(); state != uint16(itemcontainer.UpdateAdded) {
+		t.Fatalf("crystal update state = %d, want added", state)
+	}
+	r.ReadUint16()
+	if got := r.ReadInt32(); got == 0 {
+		t.Fatal("crystal update object id = 0, want allocated id")
+	}
+	if got := r.ReadInt32(); got != item.CrystalD.ItemID() {
+		t.Fatalf("crystal update item id = %d, want D crystal", got)
+	}
+	if got := r.ReadInt32(); got != 10 {
+		t.Fatalf("crystal update count = %d, want 10", got)
+	}
+}
+
+func TestGameClientLinkCrystallizeItemSkillTooLow(t *testing.T) {
+	c, chars, items, _ := newLinkedGameClient(t)
+
+	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.read() // CharCreateOk
+	c.read() // CharSelectInfo
+	objID := chars.soleObjectID(t)
+	if err := items.Create(context.Background(), objID, item.Instance{
+		ObjectID:   503,
+		TemplateID: 30,
+		OwnerID:    objID,
+		Count:      1,
+		Location:   item.LocationInventory,
+	}); err != nil {
+		t.Fatalf("seed item: %v", err)
+	}
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	c.send(encodeRequestCrystallizeItem(503, 1))
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeSystemMessage {
+		t.Fatalf("skill-low opcode = %#x, want SystemMessage (%#x)", reply[0], serverpackets.OpcodeSystemMessage)
+	}
+	r := wire.NewReader(reply[1:])
+	if id := r.ReadInt32(); id != serverpackets.SystemMessageCrystallizeLevelTooLow {
+		t.Fatalf("SystemMessage id = %d, want crystallize level too low", id)
+	}
+	if params := r.ReadInt32(); params != 0 {
+		t.Fatalf("SystemMessage params = %d, want 0", params)
+	}
+
+	c.send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeItemList {
+		t.Fatalf("post-skill-low opcode = %#x, want ItemList (%#x)", reply[0], serverpackets.OpcodeItemList)
 	}
 }
 
@@ -1002,9 +1912,7 @@ func TestGameClientLinkWireSafeMovementAndRefreshPacketsInGame(t *testing.T) {
 	c.read() // SSQInfo
 	c.read() // CharSelected
 	c.send(encodeEnterWorld())
-	c.read() // SkillList
-	c.read() // UserInfo
-	c.read() // ItemList
+	readEnterWorldBurst(t, c, false)
 
 	target := location.Location{X: 46160, Y: 41237, Z: -3534}
 	origin := location.Location{X: 46117, Y: 41247, Z: -3532}
@@ -1049,6 +1957,58 @@ func TestGameClientLinkWireSafeMovementAndRefreshPacketsInGame(t *testing.T) {
 		t.Fatalf("player position after ValidatePosition = (%d,%d,%d), want (%d,%d,%d)", x, y, z, target.X, target.Y, target.Z)
 	}
 
+	stoppedAt := location.Location{X: 46155, Y: 41240, Z: -3534}
+	c.send(encodeCannotMoveAnymore(stoppedAt, 12345))
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeStopMove {
+		t.Fatalf("stop reply opcode = %#x, want StopMove (%#x)", reply[0], serverpackets.OpcodeStopMove)
+	}
+	r = wire.NewReader(reply[1:])
+	if got := r.ReadInt32(); got != objID {
+		t.Fatalf("StopMove object id = %d, want %d", got, objID)
+	}
+	gotStoppedAt := location.Location{X: int(r.ReadInt32()), Y: int(r.ReadInt32()), Z: int(r.ReadInt32())}
+	if gotStoppedAt != stoppedAt {
+		t.Fatalf("StopMove location = %+v, want %+v", gotStoppedAt, stoppedAt)
+	}
+	if heading := r.ReadInt32(); heading != 12345 {
+		t.Fatalf("StopMove heading = %d, want 12345", heading)
+	}
+	x, y, z = positioned.Position()
+	if x != stoppedAt.X || y != stoppedAt.Y || z != stoppedAt.Z {
+		t.Fatalf("player position after CannotMoveAnymore = (%d,%d,%d), want (%d,%d,%d)", x, y, z, stoppedAt.X, stoppedAt.Y, stoppedAt.Z)
+	}
+
+	c.send(encodeStartRotating(32768, 1))
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeStartRotation {
+		t.Fatalf("start rotation opcode = %#x, want StartRotation (%#x)", reply[0], serverpackets.OpcodeStartRotation)
+	}
+	r = wire.NewReader(reply[1:])
+	if got := r.ReadInt32(); got != objID {
+		t.Fatalf("StartRotation object id = %d, want %d", got, objID)
+	}
+	if degree, side, speed := r.ReadInt32(), r.ReadInt32(), r.ReadInt32(); degree != 32768 || side != 1 || speed != 0 {
+		t.Fatalf("StartRotation fields = (%d,%d,%d), want (32768,1,0)", degree, side, speed)
+	}
+
+	c.send(encodeFinishRotating(22222, 1))
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeStopRotation {
+		t.Fatalf("stop rotation opcode = %#x, want StopRotation (%#x)", reply[0], serverpackets.OpcodeStopRotation)
+	}
+	r = wire.NewReader(reply[1:])
+	if got := r.ReadInt32(); got != objID {
+		t.Fatalf("StopRotation object id = %d, want %d", got, objID)
+	}
+	wantLowDegree := uint8(22222 & 0xff)
+	if degree, speed, lowDegree := r.ReadInt32(), r.ReadInt32(), r.ReadUint8(); degree != 22222 || speed != 0 || lowDegree != wantLowDegree {
+		t.Fatalf("StopRotation fields = (%d,%d,%d), want (22222,0,%d)", degree, speed, lowDegree, wantLowDegree)
+	}
+	if heading := obj.(*livePlayer).Character.CurrentHeading(); heading != 22222 {
+		t.Fatalf("live player heading = %d, want 22222", heading)
+	}
+
 	c.send(encodeSingleOpcode(clientpackets.OpcodeRequestSkillList))
 	reply = c.read()
 	if reply[0] != serverpackets.OpcodeSkillList {
@@ -1056,7 +2016,6 @@ func TestGameClientLinkWireSafeMovementAndRefreshPacketsInGame(t *testing.T) {
 	}
 
 	for _, opcode := range []byte{
-		clientpackets.OpcodeUseItem,
 		clientpackets.OpcodeTradeRequest,
 		clientpackets.OpcodeSendWarehouseDeposit,
 		clientpackets.OpcodeRequestQuestListInGame,
@@ -1085,9 +2044,7 @@ func TestGameClientLinkRoutesSummonActionUseToLiveSummon(t *testing.T) {
 	c.read() // SSQInfo
 	c.read() // CharSelected
 	c.send(encodeEnterWorld())
-	c.read() // SkillList
-	c.read() // UserInfo
-	c.read() // ItemList
+	readEnterWorldBurst(t, c, false)
 
 	ownerObject, ok := state.Player(objID)
 	if !ok {
@@ -1126,9 +2083,7 @@ func TestGameClientLinkLogoutLeavesWorld(t *testing.T) {
 	c.read() // SSQInfo
 	c.read() // CharSelected
 	c.send(encodeEnterWorld())
-	c.read() // SkillList
-	c.read() // UserInfo
-	c.read() // ItemList
+	readEnterWorldBurst(t, c, false)
 
 	savedAt := location.Location{X: 46160, Y: 41237, Z: -3534}
 	c.send(encodeValidatePosition(savedAt, 32768))
@@ -1158,9 +2113,7 @@ func TestGameClientLinkRestartReturnsToCharacterSelect(t *testing.T) {
 	c.read() // SSQInfo
 	c.read() // CharSelected
 	c.send(encodeEnterWorld())
-	c.read() // SkillList
-	c.read() // UserInfo
-	c.read() // ItemList
+	readEnterWorldBurst(t, c, false)
 
 	savedAt := location.Location{X: 46160, Y: 41237, Z: -3534}
 	c.send(encodeValidatePosition(savedAt, 32768))

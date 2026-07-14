@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/pathfind"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/probe"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/fatal10110/acis_golang/internal/link"
 	"github.com/fatal10110/acis_golang/internal/loginserver/model"
 )
@@ -110,6 +111,27 @@ KarmaPlayerCanShop = False
 		t.Fatalf("UnsupportedKeys = %v, want [KarmaPlayerCanShop]", opts.UnsupportedKeys)
 	}
 }
+
+func TestWorldAttackStanceEffectsStopsPlayerRegistryActor(t *testing.T) {
+	state := world.New()
+	actor := &stoppableTestActor{id: 1001}
+	state.AddPlayer(actor)
+
+	worldAttackStanceEffects{state: state}.AutoAttackStop(actor)
+
+	if !actor.stopped {
+		t.Fatal("AutoAttackStop did not stop an actor present only in the player registry")
+	}
+}
+
+type stoppableTestActor struct {
+	world.Presence
+	id      int32
+	stopped bool
+}
+
+func (a *stoppableTestActor) ObjectID() int32 { return a.id }
+func (a *stoppableTestActor) Stop()           { a.stopped = true }
 
 func TestProvideAdditionalLifecycleTasks(t *testing.T) {
 	water, err := provideWater()

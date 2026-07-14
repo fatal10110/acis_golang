@@ -10,6 +10,7 @@ import (
 
 type skillState struct {
 	mu       sync.Mutex
+	known    SkillLevels
 	effects  []effect.ActiveEffect
 	reuses   map[int32]skillReuse
 	disabled map[int32]time.Time
@@ -27,6 +28,42 @@ type skillReuse struct {
 // currently uses the base class slot.
 func (c *Character) SkillSaveClassIndex() int32 {
 	return 0
+}
+
+// SetSkillLevel records the known level for skillID. A non-positive level
+// removes the skill.
+func (c *Character) SetSkillLevel(skillID, level int) {
+	if skillID <= 0 {
+		return
+	}
+	c.skills.mu.Lock()
+	defer c.skills.mu.Unlock()
+	if level <= 0 {
+		delete(c.skills.known, skillID)
+		return
+	}
+	if c.skills.known == nil {
+		c.skills.known = make(SkillLevels)
+	}
+	c.skills.known[skillID] = level
+}
+
+// SkillLevel returns the known level for skillID, or 0 when unknown.
+func (c *Character) SkillLevel(skillID int) int {
+	c.skills.mu.Lock()
+	defer c.skills.mu.Unlock()
+	return c.skills.known.Level(skillID)
+}
+
+// SkillLevels returns a snapshot of the character's known skill levels.
+func (c *Character) SkillLevels() SkillLevels {
+	c.skills.mu.Lock()
+	defer c.skills.mu.Unlock()
+	out := make(SkillLevels, len(c.skills.known))
+	for id, level := range c.skills.known {
+		out[id] = level
+	}
+	return out
 }
 
 // AddActiveSkillEffect records an active effect for logout persistence.

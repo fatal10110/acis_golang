@@ -88,6 +88,12 @@ func (c *Character) AddRewardItem(itemID int32, count int, objectID int32) bool 
 	return c.inventory.AddNew(itemID, count, objectID) != nil
 }
 
+// Inventory returns the carried item collection attached by AttachRuntime,
+// or nil if the character has none yet.
+func (c *Character) Inventory() *itemcontainer.Inventory {
+	return c.inventory
+}
+
 // SetWorld records the world registry BroadcastAttack reaches through.
 func (c *Character) SetWorld(state *world.State) {
 	c.world = state
@@ -364,6 +370,12 @@ func (c *Character) WeaponMPConsume() int {
 // MP returns current MP as an integer for attack gating.
 func (c *Character) MP() int {
 	return int(c.CurMP)
+}
+
+// CurrentHP returns current HP through the health component guard.
+func (c *Character) CurrentHP() int {
+	c.health.Bind(&c.CurHP)
+	return int(c.health.Current())
 }
 
 // ClearRecentFakeDeath clears the recent fake-death state. Fake death is not

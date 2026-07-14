@@ -7,9 +7,7 @@ const (
 	OpcodeAction                  = 0x04
 	OpcodeAttackRequest           = 0x0a
 	OpcodeRequestItemList         = 0x0f
-	OpcodeRequestUnEquipItem      = 0x11
 	OpcodeRequestDropItem         = 0x12
-	OpcodeUseItem                 = 0x14
 	OpcodeTradeRequest            = 0x15
 	OpcodeAddTradeItem            = 0x16
 	OpcodeTradeDone               = 0x17

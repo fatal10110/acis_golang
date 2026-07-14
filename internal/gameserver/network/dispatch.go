@@ -7,7 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net"
+	"sort"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -15,14 +17,19 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -31,6 +38,23 @@ import (
 type itemStore interface {
 	ListByOwner(ctx context.Context, ownerID int32) ([]*item.Instance, error)
 }
+
+type attackStanceTracker interface {
+	Add(task.AttackStanceActor)
+}
+
+type idAllocator interface {
+	NextID() (int32, error)
+}
+
+type groundItemDropper interface {
+	Drop(*grounditem.Item, task.DropOptions)
+}
+
+const (
+	crystallizeSkillID      = 248
+	dropInteractionDistance = 150
+)
 
 // GameClientLink accepts and drives connections from Interlude game
 // clients: the VersionCheck/cipher handshake, session-key validation
@@ -45,6 +69,9 @@ type GameClientLink struct {
 	itemTemplates *item.Table
 	skills        *SkillPersistence
 	world         *world.State
+	ids           idAllocator
+	groundItems   groundItemDropper
+	attackStance  attackStanceTracker
 	log           zerolog.Logger
 
 	// newCipherKey supplies each connection's XOR cipher key; overridden in
@@ -65,6 +92,9 @@ func NewGameClientLink(
 	itemTemplates *item.Table,
 	skills *SkillPersistence,
 	worldState *world.State,
+	ids idAllocator,
+	groundItems groundItemDropper,
+	attackStance attackStanceTracker,
 	log zerolog.Logger,
 ) *GameClientLink {
 	return &GameClientLink{
@@ -76,6 +106,9 @@ func NewGameClientLink(
 		itemTemplates: itemTemplates,
 		skills:        skills,
 		world:         worldState,
+		ids:           ids,
+		groundItems:   groundItems,
+		attackStance:  attackStance,
 		log:           log,
 		newCipherKey:  randomCipherKey,
 	}
@@ -85,10 +118,40 @@ type livePlayer struct {
 	*player.Character
 	template *player.Template
 	items    []*item.Instance
+	target   world.Tracked
+	attack   *attack.Controller
+
+	stopAttack func(*livePlayer)
 }
 
 func (p *livePlayer) SendFrame(frame wire.Frame) bool {
 	return p.Character.SendFrame(frame)
+}
+
+func (p *livePlayer) Stop() {
+	if p.attack != nil {
+		p.attack.Stop()
+	}
+	if p.stopAttack != nil {
+		p.stopAttack(p)
+	}
+}
+
+func (p *livePlayer) attackController() *attack.Controller {
+	if p.attack == nil {
+		p.attack = attack.NewPlayer(p.Character)
+	}
+	return p.attack
+}
+
+func (p *livePlayer) inventoryItems() []*item.Instance {
+	if p == nil {
+		return nil
+	}
+	if inv := p.Inventory(); inv != nil {
+		return inv.Items()
+	}
+	return p.items
 }
 
 func (p *livePlayer) Discover(obj world.Tracked) {
@@ -97,11 +160,17 @@ func (p *livePlayer) Discover(obj world.Tracked) {
 		p.SendFrame(serverpackets.FrameCharInfo(serverpackets.CharInfoSnapshot{
 			Character: o.Character,
 			Template:  o.template,
-			Items:     o.items,
+			Items:     o.inventoryItems(),
 		}))
 	case *npc.Hostile:
 		p.SendFrame(serverpackets.FrameNPCInfo(npcInfoSnapshot(o)))
 	case groundItemObject:
+		if dropped, ok := o.(interface{ DropperID() int32 }); ok {
+			if dropperID := dropped.DropperID(); dropperID != 0 {
+				p.SendFrame(serverpackets.FrameDropItem(o, dropperID))
+				return
+			}
+		}
 		p.SendFrame(serverpackets.FrameSpawnItem(o))
 	case doorObject:
 		p.SendFrame(serverpackets.FrameDoorInfo(o, false))
@@ -406,6 +475,15 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			case r.Err() != nil:
 				l.log.Warn().Str("state", client.State().String()).Msg("game client: extended opcode missing")
 				continue
+			case second == clientpackets.OpcodeRequestAutoSoulShot:
+				req, err := clientpackets.DecodeRequestAutoSoulShot(payload)
+				if err != nil {
+					l.log.Warn().Err(err).Msg("game client")
+					continue
+				}
+				if live != nil {
+					l.handleAutoSoulShot(live, req)
+				}
 			case second == clientpackets.OpcodeRequestManorList:
 				session.SendFrame(serverpackets.FrameExSendManorList())
 			default:
@@ -416,7 +494,34 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 
 		case clientpackets.OpcodeRequestSkillCoolTime:
-			continue
+			if live == nil {
+				continue
+			}
+			now := time.Now()
+			session.SendFrame(serverpackets.FrameSkillCoolTime(skillCoolTimeEntries(live.SkillReuseTimers(now), now)))
+
+		case clientpackets.OpcodeAction:
+			req, err := clientpackets.DecodeAction(payload)
+			if err != nil {
+				l.log.Warn().Err(err).Msg("game client")
+				continue
+			}
+			if live == nil {
+				continue
+			}
+			l.handleTargetAction(live, req.ObjectID, false)
+
+		case clientpackets.OpcodeAttackRequest:
+			req, err := clientpackets.DecodeAttackRequest(payload)
+			if err != nil {
+				l.log.Warn().Err(err).Msg("game client")
+				continue
+			}
+			if live == nil {
+				continue
+			}
+			selected := live.target != nil && live.target.ObjectID() == req.ObjectID
+			l.handleTargetAction(live, req.ObjectID, selected)
 
 		case clientpackets.OpcodeLogout:
 			if live != nil {
@@ -429,7 +534,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			req, err := clientpackets.DecodeMoveBackwardToLocation(payload)
 			if err != nil {
 				l.log.Warn().Err(err).Msg("game client")
-				return
+				continue
 			}
 			if live == nil {
 				continue
@@ -443,11 +548,22 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				location.Location{X: int(req.TargetX), Y: int(req.TargetY), Z: int(req.TargetZ)},
 			)
 
+		case clientpackets.OpcodeCannotMoveAnymore:
+			req, err := clientpackets.DecodeCannotMoveAnymore(payload)
+			if err != nil {
+				l.log.Warn().Err(err).Msg("game client")
+				continue
+			}
+			if live == nil {
+				continue
+			}
+			l.stopLivePlayer(live, location.Location{X: int(req.X), Y: int(req.Y), Z: int(req.Z)}, int(req.Heading))
+
 		case clientpackets.OpcodeValidatePosition:
 			req, err := clientpackets.DecodeValidatePosition(payload)
 			if err != nil {
 				l.log.Warn().Err(err).Msg("game client")
-				return
+				continue
 			}
 			if live != nil {
 				l.updateLivePlayerPosition(live, location.Location{X: int(req.X), Y: int(req.Y), Z: int(req.Z)}, int(req.Heading))
@@ -457,25 +573,149 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			if live == nil {
 				continue
 			}
-			frame, err := serverpackets.FrameItemList(live.items, l.itemTemplates, false)
+			frame, err := serverpackets.FrameItemList(live.inventoryItems(), l.itemTemplates, false)
 			if err != nil {
 				l.log.Error().Err(err).Msg("build ItemList")
 				return
 			}
 			session.SendFrame(frame)
 
+		case clientpackets.OpcodeUseItem:
+			req, err := clientpackets.DecodeUseItem(payload)
+			if err != nil {
+				l.log.Warn().Err(err).Msg("game client")
+				continue
+			}
+			if live == nil {
+				continue
+			}
+			l.useItem(live, req.ObjectID)
+
+		case clientpackets.OpcodeRequestUnEquipItem:
+			req, err := clientpackets.DecodeUnequipItem(payload)
+			if err != nil {
+				l.log.Warn().Err(err).Msg("game client")
+				continue
+			}
+			if live == nil {
+				continue
+			}
+			l.unequipItem(live, req.BodySlot)
+
+		case clientpackets.OpcodeRequestDropItem:
+			req, err := clientpackets.DecodeRequestDropItem(payload)
+			if err != nil {
+				l.log.Warn().Err(err).Msg("game client")
+				continue
+			}
+			if live == nil {
+				continue
+			}
+			l.dropLiveItem(live, req)
+
+		case clientpackets.OpcodeRequestDestroyItem:
+			req, err := clientpackets.DecodeRequestDestroyItem(payload)
+			if err != nil {
+				l.log.Warn().Err(err).Msg("game client")
+				continue
+			}
+			if live == nil {
+				continue
+			}
+			l.destroyLiveItem(live, req.ObjectID, int(req.Count))
+
+		case clientpackets.OpcodeRequestCrystallizeItem:
+			req, err := clientpackets.DecodeRequestCrystallizeItem(payload)
+			if err != nil {
+				l.log.Warn().Err(err).Msg("game client")
+				continue
+			}
+			if live == nil {
+				continue
+			}
+			l.crystallizeLiveItem(live, req)
+
 		case clientpackets.OpcodeRequestSkillList:
-			session.SendFrame(serverpackets.FrameSkillList(nil))
+			if live == nil {
+				continue
+			}
+			session.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
 
 		case clientpackets.OpcodeRequestActionUse:
 			req, err := clientpackets.DecodeRequestActionUse(payload)
 			if err != nil {
 				l.log.Warn().Err(err).Msg("game client")
-				return
+				continue
 			}
 			if live != nil {
 				l.handleSummonActionUse(live, req)
 			}
+
+		case clientpackets.OpcodeRequestSocialAction:
+			req, err := clientpackets.DecodeRequestSocialAction(payload)
+			if err != nil {
+				l.log.Warn().Err(err).Msg("game client")
+				continue
+			}
+			if live != nil {
+				l.broadcastLiveSocialAction(live, req.ActionID)
+			}
+
+		case clientpackets.OpcodeRequestChangeMoveType:
+			req, err := clientpackets.DecodeRequestChangeMoveType(payload)
+			if err != nil {
+				l.log.Warn().Err(err).Msg("game client")
+				continue
+			}
+			if live != nil {
+				l.changeLiveMoveType(live, req.Run)
+			}
+
+		case clientpackets.OpcodeRequestChangeWaitType:
+			req, err := clientpackets.DecodeRequestChangeWaitType(payload)
+			if err != nil {
+				l.log.Warn().Err(err).Msg("game client")
+				continue
+			}
+			if live != nil {
+				l.changeLiveWaitType(live, req.Stand)
+			}
+
+		case clientpackets.OpcodeRequestTargetCancel:
+			if _, err := clientpackets.DecodeRequestTargetCancel(payload); err != nil {
+				l.log.Warn().Err(err).Msg("game client")
+				continue
+			}
+			if live != nil {
+				l.clearLiveTarget(live)
+			}
+
+		case clientpackets.OpcodeStartRotating:
+			req, err := clientpackets.DecodeStartRotating(payload)
+			if err != nil {
+				l.log.Warn().Err(err).Msg("game client")
+				continue
+			}
+			if live == nil {
+				continue
+			}
+			l.broadcastLiveFrame(live, func() wire.Frame {
+				return serverpackets.FrameStartRotation(live.ObjectID(), int(req.Degree), int(req.Side), 0)
+			})
+
+		case clientpackets.OpcodeFinishRotating:
+			req, err := clientpackets.DecodeFinishRotating(payload)
+			if err != nil {
+				l.log.Warn().Err(err).Msg("game client")
+				continue
+			}
+			if live == nil {
+				continue
+			}
+			live.SetHeading(int(req.Degree))
+			l.broadcastLiveFrame(live, func() wire.Frame {
+				return serverpackets.FrameStopRotation(live.ObjectID(), int(req.Degree), 0)
+			})
 
 		case clientpackets.OpcodeRequestRestart:
 			if live == nil {
@@ -493,18 +733,17 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 			chars = list
 
-		case clientpackets.OpcodeAction,
-			clientpackets.OpcodeAttackRequest,
-			clientpackets.OpcodeRequestUnEquipItem,
-			clientpackets.OpcodeRequestDropItem,
-			clientpackets.OpcodeUseItem,
-			clientpackets.OpcodeTradeRequest,
+		case clientpackets.OpcodeSendTimeCheck:
+			if _, err := clientpackets.DecodeSendTimeCheck(payload); err != nil {
+				l.log.Warn().Err(err).Msg("game client")
+				continue
+			}
+			continue
+
+		case clientpackets.OpcodeTradeRequest,
 			clientpackets.OpcodeAddTradeItem,
 			clientpackets.OpcodeTradeDone,
 			clientpackets.OpcodeDummy1A,
-			clientpackets.OpcodeRequestSocialAction,
-			clientpackets.OpcodeRequestChangeMoveType,
-			clientpackets.OpcodeRequestChangeWaitType,
 			clientpackets.OpcodeRequestSellItem,
 			clientpackets.OpcodeRequestBuyItem,
 			clientpackets.OpcodeDummy23,
@@ -516,16 +755,11 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			clientpackets.OpcodeRequestShortCutReg,
 			clientpackets.OpcodeDummy34,
 			clientpackets.OpcodeRequestShortCutDel,
-			clientpackets.OpcodeCannotMoveAnymore,
-			clientpackets.OpcodeRequestTargetCancel,
 			clientpackets.OpcodeDummy3E,
 			clientpackets.OpcodeRequestGetOnVehicle,
 			clientpackets.OpcodeRequestGetOffVehicle,
 			clientpackets.OpcodeAnswerTradeRequest,
-			clientpackets.OpcodeStartRotating,
-			clientpackets.OpcodeFinishRotating,
 			clientpackets.OpcodeRequestEnchantItem,
-			clientpackets.OpcodeRequestDestroyItem,
 			clientpackets.OpcodeRequestMoveInVehicle,
 			clientpackets.OpcodeCannotMoveInVehicle,
 			clientpackets.OpcodeRequestQuestListInGame,
@@ -533,18 +767,17 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			clientpackets.OpcodeRequestAcquireSkillInfo,
 			clientpackets.OpcodeRequestAcquireSkill,
 			clientpackets.OpcodeRequestRestartPoint,
-			clientpackets.OpcodeRequestCrystallizeItem,
 			clientpackets.OpcodeRequestChangePetName,
 			clientpackets.OpcodeRequestPetUseItem,
 			clientpackets.OpcodeRequestGiveItemToPet,
 			clientpackets.OpcodeRequestGetItemFromPet,
 			clientpackets.OpcodeRequestPetGetItem,
-			clientpackets.OpcodeSendTimeCheck,
 			clientpackets.OpcodeRequestPackageItemList,
 			clientpackets.OpcodeRequestPackageSend,
 			clientpackets.OpcodeDlgAnswer,
 			clientpackets.OpcodeGameGuardReply,
 			clientpackets.OpcodeRequestShowMiniMap:
+			l.log.Warn().Str("opcode", fmt.Sprintf("%#x", opcode)).Msg("Opcode not wired")
 			continue
 
 		default:
@@ -615,12 +848,18 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 			return nil, false
 		}
 	}
+	if c.CurHP < 0.5 {
+		c.MarkDead()
+	}
 
 	itemListFrame, err := serverpackets.FrameItemList(items, l.itemTemplates, false)
 	if err != nil {
 		l.log.Error().Err(err).Msg("enter world: build ItemList")
 		return nil, false
 	}
+	now := time.Now()
+	coolTimes := skillCoolTimeEntries(c.SkillReuseTimers(now), now)
+	skillList := skillListEntries(c, l.skills)
 
 	live := l.attachLivePlayer(client, c, tmpl, items)
 	if l.world != nil {
@@ -629,17 +868,81 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 		l.world.AddPlayer(live)
 	}
 
-	client.Session.SendFrame(serverpackets.FrameSkillList(nil))
+	client.Session.SendFrame(serverpackets.FrameExStorageMaxCount(c))
+	client.Session.SendFrame(serverpackets.FrameHennaInfo(c.ClassID))
+	client.Session.SendFrame(serverpackets.FrameEtcStatusUpdate(serverpackets.EtcStatus{}))
+	client.Session.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageWelcomeToLineage))
+	client.Session.SendFrame(serverpackets.FrameQuestList(nil))
+	client.Session.SendFrame(serverpackets.FrameSkillList(skillList))
+	client.Session.SendFrame(serverpackets.FrameFriendList(nil))
 	client.Session.SendFrame(serverpackets.FrameUserInfo(serverpackets.UserInfoSnapshot{Character: c, Template: tmpl, Items: items}))
 	client.Session.SendFrame(itemListFrame)
+	client.Session.SendFrame(serverpackets.FrameShortCutInit(serverpackets.StarterShortcuts()))
+	if c.Dead() {
+		client.Session.SendFrame(serverpackets.FrameDie(c.ObjectID(), serverpackets.DieOptions{}))
+	}
+	client.Session.SendFrame(serverpackets.FrameSkillCoolTime(coolTimes))
+	client.Session.SendFrame(serverpackets.FrameActionFailed())
 	return live, true
+}
+
+func skillCoolTimeEntries(timers []effect.ReuseTimer, now time.Time) []serverpackets.SkillCoolTimeEntry {
+	if len(timers) == 0 {
+		return nil
+	}
+	nowMillis := now.UnixMilli()
+	entries := make([]serverpackets.SkillCoolTimeEntry, 0, len(timers))
+	for _, timer := range timers {
+		remaining := timer.ExpiresAt - nowMillis
+		if remaining <= 0 {
+			continue
+		}
+		entries = append(entries, serverpackets.SkillCoolTimeEntry{
+			SkillID:          int32(timer.Skill.ID),
+			Level:            int32(timer.Skill.Level),
+			ReuseSeconds:     int32(timer.Delay / 1000),
+			RemainingSeconds: int32(remaining / 1000),
+		})
+	}
+	return entries
+}
+
+func skillListEntries(c *player.Character, skills *SkillPersistence) []serverpackets.SkillListEntry {
+	if c == nil {
+		return nil
+	}
+	levels := c.SkillLevels()
+	if len(levels) == 0 {
+		return nil
+	}
+	ids := make([]int, 0, len(levels))
+	for id := range levels {
+		ids = append(ids, id)
+	}
+	sort.Ints(ids)
+
+	entries := make([]serverpackets.SkillListEntry, 0, len(ids))
+	for _, id := range ids {
+		level := levels[id]
+		if level <= 0 {
+			continue
+		}
+		entry := serverpackets.SkillListEntry{ID: int32(id), Level: int32(level)}
+		if skills != nil {
+			if def, ok := skills.definition(modelskill.Ref{ID: modelskill.ID(id), Level: level}); ok {
+				entry.Passive = def.Activation == modelskill.ActivationPassive
+			}
+		}
+		entries = append(entries, entry)
+	}
+	return entries
 }
 
 func (l *GameClientLink) attachLivePlayer(client *Client, c *player.Character, tmpl *player.Template, items []*item.Instance) *livePlayer {
 	c.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventory(c.ID, l.itemTemplates, items))
 	c.SetWorld(l.world)
 	c.SetFrameSender(client.Session.SendFrame)
-	live := &livePlayer{Character: c, template: tmpl, items: items}
+	live := &livePlayer{Character: c, template: tmpl, items: items, attack: attack.NewPlayer(c), stopAttack: l.stopLiveAutoAttack}
 	c.SetAttackBroadcaster(func(snapshot attack.Snapshot) {
 		l.broadcastAttack(live, snapshot)
 	})
@@ -672,6 +975,308 @@ func (l *GameClientLink) broadcastAttack(attacker *livePlayer, snapshot attack.S
 	})
 }
 
+// useItem toggles the equip state of the inventory item objectID: equips
+// it if unworn, unequips it if worn. A missing or non-equipable item is a
+// silent no-op, matching how a stale or invalid client request is ignored
+// rather than disconnecting the session.
+func (l *GameClientLink) useItem(live *livePlayer, objectID int32) {
+	if !liveItemOpsAllowed(live) {
+		return
+	}
+	inv := live.Inventory()
+	if inv == nil {
+		return
+	}
+	inst := inv.ItemByObjectID(objectID)
+	if inst == nil {
+		return
+	}
+	tmpl, ok := inv.Templates().Get(inst.TemplateID)
+	if !ok || tmpl.Slot == item.SlotNone {
+		return
+	}
+
+	var altered []*item.Instance
+	if inst.Equipped() {
+		if old := inv.UnequipSlot(inst.LocationData); old != nil {
+			altered = []*item.Instance{old}
+		}
+	} else {
+		altered = inv.EquipItem(inst, tmpl)
+	}
+	if len(altered) == 0 {
+		return
+	}
+	l.sendInventoryUpdate(live, inv)
+	l.broadcastEquipmentChange(live)
+}
+
+func (l *GameClientLink) handleAutoSoulShot(live *livePlayer, req clientpackets.RequestAutoSoulShot) {
+	if live == nil || live.AlikeDead() {
+		return
+	}
+	inv := live.Inventory()
+	if inv == nil || inv.ItemByTemplateID(req.ItemID) == nil {
+		return
+	}
+
+	switch req.Type {
+	case 1:
+		if fishingShot(req.ItemID) {
+			return
+		}
+		if summonShot(req.ItemID) {
+			if l.world == nil {
+				live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNoServitorCannotAutomateUse))
+				return
+			}
+			if _, hasSummon := l.world.Summon(live.ObjectID()); !hasSummon {
+				live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNoServitorCannotAutomateUse))
+				return
+			}
+		}
+		live.SetAutoSoulShot(req.ItemID, true)
+		live.SendFrame(serverpackets.FrameExAutoSoulShot(req.ItemID, true))
+		live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageUseOfItemWillBeAuto, req.ItemID))
+	case 0:
+		live.SetAutoSoulShot(req.ItemID, false)
+		live.SendFrame(serverpackets.FrameExAutoSoulShot(req.ItemID, false))
+		live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageAutoUseOfItemCancelled, req.ItemID))
+	}
+}
+
+func fishingShot(itemID int32) bool {
+	return itemID >= 6535 && itemID <= 6540
+}
+
+func summonShot(itemID int32) bool {
+	return itemID >= 6645 && itemID <= 6647
+}
+
+// unequipItem clears whatever item occupies the paperdoll position that
+// bodySlot (a Slot bitmask value from the item's own template) resolves
+// to. An empty or unresolvable slot is a silent no-op.
+func (l *GameClientLink) unequipItem(live *livePlayer, bodySlot int32) {
+	if !liveItemOpsAllowed(live) {
+		return
+	}
+	inv := live.Inventory()
+	if inv == nil {
+		return
+	}
+	paperdollSlot, ok := item.Slot(bodySlot).PaperdollIndex()
+	if !ok {
+		return
+	}
+	if inv.UnequipSlot(paperdollSlot) == nil {
+		return
+	}
+	l.sendInventoryUpdate(live, inv)
+	l.broadcastEquipmentChange(live)
+}
+
+func (l *GameClientLink) dropLiveItem(live *livePlayer, req clientpackets.RequestDropItem) {
+	if !liveItemOpsAllowed(live) || l.groundItems == nil || req.Count <= 0 {
+		return
+	}
+	inv := live.Inventory()
+	if inv == nil {
+		return
+	}
+	inst := inv.ItemByObjectID(req.ObjectID)
+	if inst == nil {
+		return
+	}
+	count := int(req.Count)
+	tmpl, ok := inv.Templates().Get(inst.TemplateID)
+	if !ok || !inst.Dropable(tmpl) || inst.QuestItem(tmpl) || inst.Count < count {
+		return
+	}
+	if !tmpl.Stackable && count > 1 {
+		return
+	}
+	if !dropInRange(live, int(req.X), int(req.Y), int(req.Z)) {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotDiscardDistanceTooFar))
+		return
+	}
+
+	newObjectID := int32(0)
+	if inst.Count > count {
+		if l.ids == nil {
+			return
+		}
+		var err error
+		newObjectID, err = l.ids.NextID()
+		if err != nil {
+			l.log.Error().Err(err).Msg("allocate dropped item id")
+			return
+		}
+	}
+	wasEquipped := inst.Equipped() && inst.Count <= count
+	dropped := inv.DropItem(req.ObjectID, count, newObjectID)
+	if dropped == nil {
+		return
+	}
+	ground, err := grounditem.New(*dropped, tmpl)
+	if err != nil {
+		l.log.Error().Err(err).Msg("build dropped ground item")
+		return
+	}
+
+	l.sendInventoryUpdate(live, inv)
+	if wasEquipped {
+		l.broadcastEquipmentChange(live)
+	}
+
+	ground.SetDropperID(live.ObjectID())
+	l.groundItems.Drop(ground, task.DropOptions{
+		X:             int(req.X),
+		Y:             int(req.Y),
+		Z:             int(req.Z),
+		Heading:       live.CurrentHeading(),
+		PlayerDropped: true,
+	})
+	ground.SetDropperID(0)
+}
+
+func (l *GameClientLink) destroyLiveItem(live *livePlayer, objectID int32, count int) {
+	if !liveItemOpsAllowed(live) || count <= 0 {
+		return
+	}
+	inv := live.Inventory()
+	if inv == nil {
+		return
+	}
+	inst := inv.ItemByObjectID(objectID)
+	if inst == nil {
+		return
+	}
+	tmpl, ok := inv.Templates().Get(inst.TemplateID)
+	if !ok || !inst.Destroyable(tmpl) || tmpl.HeroItem() || inst.Count < count {
+		return
+	}
+	if !tmpl.Stackable && count > 1 {
+		return
+	}
+
+	wasEquipped := inst.Equipped() && inst.Count <= count
+	if inv.DestroyItem(inst, count) == nil {
+		return
+	}
+	l.sendInventoryUpdate(live, inv)
+	if wasEquipped {
+		l.broadcastEquipmentChange(live)
+	}
+}
+
+func (l *GameClientLink) crystallizeLiveItem(live *livePlayer, req clientpackets.RequestCrystallizeItem) {
+	if !liveItemOpsAllowed(live) || req.Count <= 0 {
+		return
+	}
+	skillLevel := live.SkillLevel(crystallizeSkillID)
+	if skillLevel <= 0 {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCrystallizeLevelTooLow))
+		return
+	}
+
+	inv := live.Inventory()
+	if inv == nil {
+		return
+	}
+	inst := inv.ItemByObjectID(req.ObjectID)
+	if inst == nil {
+		return
+	}
+	tmpl, ok := inv.Templates().Get(inst.TemplateID)
+	if !ok || tmpl.HeroItem() || inst.ShadowItem(tmpl) {
+		return
+	}
+	crystalItemID, crystalCount, ok := tmpl.CrystalReward(inst.EnchantLevel)
+	if !ok {
+		return
+	}
+	if !item.CanCrystallize(tmpl.Crystal, skillLevel) {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCrystallizeLevelTooLow))
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return
+	}
+	if _, ok := inv.Templates().Get(crystalItemID); !ok || l.ids == nil {
+		return
+	}
+	crystalObjectID, err := l.ids.NextID()
+	if err != nil {
+		l.log.Error().Err(err).Msg("allocate crystal item id")
+		return
+	}
+
+	count := int(req.Count)
+	if count > inst.Count {
+		count = inst.Count
+	}
+	wasEquipped := inst.Equipped() && inst.Count <= count
+	sourceItemID := inst.TemplateID
+	if inv.DestroyItem(inst, count) == nil {
+		return
+	}
+	if inv.AddNew(crystalItemID, int(crystalCount), crystalObjectID) == nil {
+		return
+	}
+
+	live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageItemCrystallized, sourceItemID))
+	l.sendInventoryUpdate(live, inv)
+	if wasEquipped {
+		l.broadcastEquipmentChange(live)
+	}
+}
+
+func (l *GameClientLink) sendInventoryUpdate(live *livePlayer, inv *itemcontainer.Inventory) {
+	updates := inv.DrainUpdates()
+	if len(updates) == 0 {
+		return
+	}
+	items := inv.Items()
+	frame, err := serverpackets.FrameInventoryUpdate(updates, items, inv.Templates())
+	if err != nil {
+		l.log.Error().Err(err).Msg("build InventoryUpdate")
+		return
+	}
+	live.SendFrame(frame)
+}
+
+// broadcastEquipmentChange resends UserInfo to live (refreshing its own
+// paperdoll/stats) and CharInfo to every client that already knows about
+// it (refreshing the worn-item visuals on their screen).
+func (l *GameClientLink) broadcastEquipmentChange(live *livePlayer) {
+	items := live.inventoryItems()
+	live.SendFrame(serverpackets.FrameUserInfo(serverpackets.UserInfoSnapshot{
+		Character: live.Character, Template: live.template, Items: items,
+	}))
+	if l.world == nil {
+		return
+	}
+	l.world.ForEachKnown(live, func(o world.Tracked) {
+		receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
+		if !ok {
+			return
+		}
+		receiver.SendFrame(serverpackets.FrameCharInfo(serverpackets.CharInfoSnapshot{
+			Character: live.Character, Template: live.template, Items: items,
+		}))
+	})
+}
+
+func liveItemOpsAllowed(live *livePlayer) bool {
+	return live != nil && !live.AlikeDead()
+}
+
+func dropInRange(live *livePlayer, x, y, z int) bool {
+	sx, sy, sz := live.Position()
+	dx := float64(sx - x)
+	dy := float64(sy - y)
+	dz := float64(sz - z)
+	return math.Sqrt(dx*dx+dy*dy+dz*dz) <= dropInteractionDistance
+}
+
 func (l *GameClientLink) moveLivePlayer(live *livePlayer, origin, target location.Location) {
 	heading := origin.HeadingTo(target)
 	l.updateLivePlayerPosition(live, origin, heading)
@@ -687,6 +1292,235 @@ func (l *GameClientLink) moveLivePlayer(live *livePlayer, origin, target locatio
 		}
 		receiver.SendFrame(serverpackets.FrameMoveToLocation(live.ObjectID(), target, origin))
 	})
+}
+
+func (l *GameClientLink) stopLivePlayer(live *livePlayer, at location.Location, heading int) {
+	l.updateLivePlayerPosition(live, at, heading)
+	l.broadcastLiveFrame(live, func() wire.Frame {
+		return serverpackets.FrameStopMove(live.ObjectID(), at, heading)
+	})
+}
+
+func (l *GameClientLink) changeLiveMoveType(live *livePlayer, run bool) {
+	if !live.SetRunning(run) {
+		return
+	}
+	l.broadcastLiveFrame(live, func() wire.Frame {
+		return serverpackets.FrameChangeMoveType(live.ObjectID(), live.Running(), false)
+	})
+}
+
+func (l *GameClientLink) changeLiveWaitType(live *livePlayer, stand bool) {
+	if live.AlikeDead() || !live.SetStanding(stand) {
+		return
+	}
+	x, y, z := live.Position()
+	waitType := serverpackets.WaitSitting
+	if stand {
+		waitType = serverpackets.WaitStanding
+	}
+	l.broadcastLiveFrame(live, func() wire.Frame {
+		return serverpackets.FrameChangeWaitType(live.ObjectID(), waitType, location.Location{X: x, Y: y, Z: z})
+	})
+}
+
+func (l *GameClientLink) broadcastLiveSocialAction(live *livePlayer, actionID int32) {
+	if actionID < 2 || actionID > 13 || live.AlikeDead() || !live.Standing() || live.InCombat() {
+		return
+	}
+	l.broadcastLiveFrame(live, func() wire.Frame {
+		return serverpackets.FrameSocialAction(live.ObjectID(), actionID)
+	})
+}
+
+func (l *GameClientLink) broadcastLiveFrame(live *livePlayer, frame func() wire.Frame) {
+	live.SendFrame(frame())
+	if l.world == nil {
+		return
+	}
+	l.world.ForEachKnown(live, func(o world.Tracked) {
+		receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
+		if !ok {
+			return
+		}
+		receiver.SendFrame(frame())
+	})
+}
+
+func (l *GameClientLink) handleTargetAction(live *livePlayer, objectID int32, selected bool) {
+	target := l.resolveTarget(objectID)
+	if target == nil {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return
+	}
+	if live.target == nil || live.target.ObjectID() != target.ObjectID() {
+		l.selectLiveTarget(live, target)
+		return
+	}
+	if selected {
+		l.attackLiveTarget(live, target)
+	}
+}
+
+func (l *GameClientLink) resolveTarget(objectID int32) world.Tracked {
+	if l.world == nil {
+		return nil
+	}
+	obj, ok := l.world.Object(objectID)
+	if !ok {
+		obj, ok = l.world.Player(objectID)
+		if !ok {
+			return nil
+		}
+	}
+	target, ok := obj.(world.Tracked)
+	if !ok {
+		return nil
+	}
+	return target
+}
+
+func (l *GameClientLink) selectLiveTarget(live *livePlayer, target world.Tracked) bool {
+	if live == nil || target == nil {
+		return false
+	}
+	if live.target != nil && live.target.ObjectID() == target.ObjectID() {
+		return true
+	}
+	live.target = target
+	live.SendFrame(serverpackets.FrameMyTargetSelected(target.ObjectID(), targetColor(live.Character, target)))
+	if attrs, ok := targetHPAttributes(target); ok {
+		live.SendFrame(serverpackets.FrameStatusUpdate(target.ObjectID(), attrs))
+	}
+	l.broadcastTargetSelected(live, target)
+	return true
+}
+
+func (l *GameClientLink) clearLiveTarget(live *livePlayer) {
+	if live == nil {
+		return
+	}
+	old := live.target
+	live.target = nil
+	live.SendFrame(serverpackets.FrameActionFailed())
+	if old != nil {
+		l.broadcastTargetUnselected(live)
+	}
+}
+
+func (l *GameClientLink) attackLiveTarget(live *livePlayer, target world.Tracked) bool {
+	combatant, ok := target.(attackable.Combatant)
+	if !ok {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return false
+	}
+	controller := live.attackController()
+	if !controller.CanAttack(combatant) {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return false
+	}
+	l.startLiveAutoAttack(live)
+	controller.DoAttack(combatant)
+	return true
+}
+
+func (l *GameClientLink) startLiveAutoAttack(live *livePlayer) {
+	if live == nil {
+		return
+	}
+	if l.attackStance != nil {
+		l.attackStance.Add(live)
+	}
+	if !live.SetInCombat(true) {
+		return
+	}
+	l.broadcastLiveFrame(live, func() wire.Frame {
+		return serverpackets.FrameAutoAttackStart(live.ObjectID())
+	})
+}
+
+func (l *GameClientLink) stopLiveAutoAttack(live *livePlayer) {
+	if live == nil || !live.SetInCombat(false) {
+		return
+	}
+	l.broadcastLiveFrame(live, func() wire.Frame {
+		return serverpackets.FrameAutoAttackStop(live.ObjectID())
+	})
+}
+
+func (l *GameClientLink) broadcastTargetSelected(live *livePlayer, target world.Tracked) {
+	if l.world == nil {
+		return
+	}
+	x, y, z := live.Position()
+	at := location.Location{X: x, Y: y, Z: z}
+	l.world.ForEachKnown(live, func(o world.Tracked) {
+		receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
+		if !ok {
+			return
+		}
+		receiver.SendFrame(serverpackets.FrameTargetSelected(live.ObjectID(), target.ObjectID(), at))
+	})
+}
+
+func (l *GameClientLink) broadcastTargetUnselected(live *livePlayer) {
+	if l.world == nil {
+		return
+	}
+	x, y, z := live.Position()
+	at := location.Location{X: x, Y: y, Z: z}
+	l.world.ForEachKnown(live, func(o world.Tracked) {
+		receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
+		if !ok {
+			return
+		}
+		receiver.SendFrame(serverpackets.FrameTargetUnselected(live.ObjectID(), at))
+	})
+}
+
+func targetColor(attacker *player.Character, target world.Tracked) int {
+	if attacker == nil {
+		return 0
+	}
+	attackableTarget, ok := target.(interface {
+		AttackableBy(attack.CreatureActor) bool
+	})
+	if !ok || !attackableTarget.AttackableBy(attacker) {
+		return 0
+	}
+	return attacker.Level - targetLevel(target)
+}
+
+func targetLevel(target world.Tracked) int {
+	switch t := target.(type) {
+	case *livePlayer:
+		return t.Level
+	case *npc.Hostile:
+		if t.Instance != nil && t.Instance.Template != nil {
+			return t.Instance.Template.Level
+		}
+	}
+	return 0
+}
+
+func targetHPAttributes(target world.Tracked) ([]serverpackets.StatusAttribute, bool) {
+	switch t := target.(type) {
+	case *livePlayer:
+		return []serverpackets.StatusAttribute{
+			{Type: serverpackets.StatusMaxHP, Value: int(t.MaxHP)},
+			{Type: serverpackets.StatusCurrentHP, Value: t.CurrentHP()},
+		}, true
+	case interface {
+		MaxHP() int
+		CurrentHP() int
+	}:
+		return []serverpackets.StatusAttribute{
+			{Type: serverpackets.StatusMaxHP, Value: t.MaxHP()},
+			{Type: serverpackets.StatusCurrentHP, Value: t.CurrentHP()},
+		}, true
+	default:
+		return nil, false
+	}
 }
 
 func (l *GameClientLink) handleSummonActionUse(live *livePlayer, req clientpackets.RequestActionUse) bool {

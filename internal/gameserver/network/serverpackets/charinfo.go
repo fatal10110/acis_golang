@@ -94,9 +94,9 @@ func writeCharInfo(w *wire.Writer, s CharInfoSnapshot) {
 	w.WriteInt32(0) // ally id
 	w.WriteInt32(0) // ally crest id
 	w.WriteInt32(0) // relation flags
-	w.WriteUint8(1) // standing
-	w.WriteUint8(1) // running
-	w.WriteUint8(0) // in combat
+	w.WriteUint8(boolUint8(c.Standing()))
+	w.WriteUint8(boolUint8(c.Running()))
+	w.WriteUint8(boolUint8(c.InCombat()))
 	w.WriteUint8(boolUint8(c.AlikeDead()))
 	w.WriteUint8(0)  // invisible
 	w.WriteUint8(0)  // mount type
@@ -119,7 +119,7 @@ func writeCharInfo(w *wire.Writer, s CharInfoSnapshot) {
 	w.WriteInt32(0)
 	w.WriteInt32(0)
 	w.WriteInt32(defaultNameColor)
-	w.WriteInt32(int32(c.Heading))
+	w.WriteInt32(int32(c.CurrentHeading()))
 	w.WriteInt32(0) // pledge class
 	w.WriteInt32(0) // pledge type
 	w.WriteInt32(defaultTitleColor)

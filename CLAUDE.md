@@ -38,6 +38,31 @@ behavior. That is precisely the material §0 tells you **not** to echo into this
 extract the behavior, then write native Go. Never carry their naming, structure, or provenance into
 your code, comments, or commit messages.
 
+## Packet impact check — every task
+
+Packets are part of the implementation scope, not an afterthought. Before planning an issue, before
+implementing each meaningful step, and before claiming a task is done, check which original client and
+server packets are related to the behavior being touched.
+
+- Start from the feature area and milestone in `GO_REWRITE_PLAN.md`, then inspect the relevant packet
+  appendices under `../aCis_gameserver/docs/go-rewrite/` (`90`, `91`, `92`, and field-layout docs
+  when needed).
+- For the exact Java behavior being ported, search both inbound handlers and outbound sends:
+  `GamePacketHandler`, `clientpackets/*`, `serverpackets/*`, `sendPacket`, `broadcastPacket`, and
+  packet imports are all scope clues.
+- If the task touches data, HTML, crests, world visibility, movement, doors, teleports, items,
+  inventory, skills, combat, death, pets, quests, clan/alliance, stores, manor, recipes, hennas, or
+  any other client-visible system, list the related client packets and server packets before coding.
+- Implement and wire the related packets in the same change when they are required for that
+  milestone's client-visible behavior. If a packet truly belongs to a later milestone or depends on a
+  deliberately missing system, call that out explicitly in the issue/PR notes instead of silently
+  skipping it.
+- Do not leave accepted opcodes as quiet no-ops and do not drop expected server sends from a flow
+  without documenting why. A ported system is incomplete if its client-visible packet surface is
+  missing.
+- Verify packet opcode, field order, state gating, send order, and byte layout with oracle fixtures,
+  `packetdiff`, or focused packet tests whenever the behavior reaches the wire.
+
 ---
 
 ## Tools
@@ -365,5 +390,7 @@ inheritance, zero getters, zero singleton, explicit ownership. **This is the bar
 - [ ] No banned name-shapes (§1), no getter/setter walls, no one-impl interfaces, no fake inheritance.
 - [ ] Concurrency ownership documented; `go test -race ./...` green.
 - [ ] Exact-contract outputs verified against committed known-good vectors.
+- [ ] Packet impact check completed: related client/server packets are implemented, wired, tested, or
+      explicitly deferred with a reason.
 - [ ] `gofmt` + `go vet` clean; exported items documented; comments explain why.
 - [ ] No reference to any external codebase or language anywhere in the diff.

@@ -56,6 +56,22 @@ func TestHostileMakeAttackHitMissesUnknownTargetType(t *testing.T) {
 	}
 }
 
+func TestHostileAttackableByLiveAttacker(t *testing.T) {
+	target := newCombatHostile(t, 2, &Template{ID: 2, Type: "Monster", PDef: 50, DEX: 30, Level: 1, HPMax: 100})
+	attacker := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", PAtk: 100, AtkSpd: 300, DEX: 30, Level: 1, HPMax: 100})
+
+	if !target.AttackableBy(attacker) {
+		t.Fatal("live hostile target is not attackable")
+	}
+	if target.AttackableBy(target) {
+		t.Fatal("hostile target is attackable by itself")
+	}
+	target.MarkDead()
+	if target.AttackableBy(attacker) {
+		t.Fatal("dead hostile target is attackable")
+	}
+}
+
 func TestHostileTakeDamageReachingZeroTriggersDieAndDecayChain(t *testing.T) {
 	attacker := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", PAtk: 100, DEX: 30, Level: 1, CritRate: 4})
 	attacker.SetRollSource(zeroRoll)

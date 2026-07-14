@@ -7,9 +7,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
 
@@ -176,6 +178,29 @@ func TestSkillPersistenceRestoreDeletesExpiredRowsWithoutReinstatingReuse(t *tes
 	}
 }
 
+func TestSkillPersistenceRestoreLoadsKnownSkillLevels(t *testing.T) {
+	store := newMemorySkillSaveStore()
+	c := skillPersistenceCharacter(1006)
+	store.seedKnown(c.ID, 0, player.SkillLevels{
+		248:  1,
+		9999: 1,
+	})
+	p := NewSkillPersistence(store, skillTable(
+		modelskill.Definition{ID: 248, Level: 1, Activation: modelskill.ActivationPassive},
+	), store)
+
+	if err := p.Restore(context.Background(), c); err != nil {
+		t.Fatalf("Restore() error = %v", err)
+	}
+
+	if got := c.SkillLevel(248); got != 1 {
+		t.Fatalf("SkillLevel(248) = %d, want 1", got)
+	}
+	if got := c.SkillLevel(9999); got != 0 {
+		t.Fatalf("stale SkillLevel(9999) = %d, want 0", got)
+	}
+}
+
 func TestGameClientLinkEnterWorldRestoresPersistedSkillState(t *testing.T) {
 	store := newMemorySkillSaveStore()
 	now := time.Now().Truncate(time.Millisecond)
@@ -203,9 +228,7 @@ func TestGameClientLinkEnterWorldRestoresPersistedSkillState(t *testing.T) {
 	c.read() // SSQInfo
 	c.read() // CharSelected
 	c.send(encodeEnterWorld())
-	c.read() // SkillList
-	c.read() // UserInfo
-	c.read() // ItemList
+	readEnterWorldBurst(t, c, false)
 
 	char := chars.character(t, objID)
 	if !char.SkillDisabled(1040*256 + 3) {
@@ -218,6 +241,38 @@ func TestGameClientLinkEnterWorldRestoresPersistedSkillState(t *testing.T) {
 	}
 	if got := store.rowsFor(objID, 0); len(got) != 0 {
 		t.Fatalf("persisted rows after EnterWorld = %+v, want consumed", got)
+	}
+}
+
+func TestGameClientLinkEnterWorldSendsKnownSkillList(t *testing.T) {
+	store := newMemorySkillSaveStore()
+	p := NewSkillPersistence(store, skillTable(
+		modelskill.Definition{ID: 248, Level: 1, Activation: modelskill.ActivationPassive},
+	), store)
+	c, chars, _, _ := newLinkedGameClientWithSkills(t, p)
+
+	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.read() // CharCreateOk
+	c.read() // CharSelectInfo
+	objID := chars.soleObjectID(t)
+	store.seedKnown(objID, 0, player.SkillLevels{248: 1})
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	frames := readEnterWorldBurst(t, c, false)
+
+	skillList := frames[5]
+	if skillList[0] != serverpackets.OpcodeSkillList {
+		t.Fatalf("EnterWorld skill frame opcode = %#x, want SkillList", skillList[0])
+	}
+	r := wire.NewReader(skillList[1:])
+	if count := r.ReadInt32(); count != 1 {
+		t.Fatalf("SkillList count = %d, want 1", count)
+	}
+	if passive, level, id := r.ReadInt32(), r.ReadInt32(), r.ReadInt32(); passive != 1 || level != 1 || id != 248 {
+		t.Fatalf("SkillList entry = passive %d level %d id %d, want passive 1 level 1 id 248", passive, level, id)
 	}
 }
 
@@ -238,9 +293,7 @@ func TestGameClientLinkLogoutPersistsSkillState(t *testing.T) {
 	c.read() // SSQInfo
 	c.read() // CharSelected
 	c.send(encodeEnterWorld())
-	c.read() // SkillList
-	c.read() // UserInfo
-	c.read() // ItemList
+	readEnterWorldBurst(t, c, false)
 
 	char := chars.character(t, objID)
 	char.AddActiveSkillEffect(effect.ActiveEffect{Skill: skillRef(1204, 2), ReuseGroup: 1204*256 + 2, Count: 3, Time: 20})
@@ -281,6 +334,7 @@ func skillTable(defs ...modelskill.Definition) *modelskill.Table {
 type memorySkillSaveStore struct {
 	mu      sync.Mutex
 	rows    map[skillSaveKey][]effect.SaveRow
+	known   map[skillSaveKey]player.SkillLevels
 	deleted int
 }
 
@@ -290,7 +344,7 @@ type skillSaveKey struct {
 }
 
 func newMemorySkillSaveStore() *memorySkillSaveStore {
-	return &memorySkillSaveStore{rows: make(map[skillSaveKey][]effect.SaveRow)}
+	return &memorySkillSaveStore{rows: make(map[skillSaveKey][]effect.SaveRow), known: make(map[skillSaveKey]player.SkillLevels)}
 }
 
 func (s *memorySkillSaveStore) Replace(_ context.Context, charObjID int32, classIndex int32, rows []effect.SaveRow) error {
@@ -330,6 +384,27 @@ func (s *memorySkillSaveStore) rowsFor(charObjID int32, classIndex int32) []effe
 
 func (s *memorySkillSaveStore) rowsForLocked(charObjID int32, classIndex int32) []effect.SaveRow {
 	return append([]effect.SaveRow(nil), s.rows[skillSaveKey{charObjID: charObjID, classIndex: classIndex}]...)
+}
+
+func (s *memorySkillSaveStore) ListKnownSkills(_ context.Context, charObjID int32, classIndex int32) (player.SkillLevels, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	levels := s.known[skillSaveKey{charObjID: charObjID, classIndex: classIndex}]
+	out := make(player.SkillLevels, len(levels))
+	for id, level := range levels {
+		out[id] = level
+	}
+	return out, nil
+}
+
+func (s *memorySkillSaveStore) seedKnown(charObjID int32, classIndex int32, levels player.SkillLevels) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	cp := make(player.SkillLevels, len(levels))
+	for id, level := range levels {
+		cp[id] = level
+	}
+	s.known[skillSaveKey{charObjID: charObjID, classIndex: classIndex}] = cp
 }
 
 func (s *fakeCharStore) character(t *testing.T, id int32) *player.Character {

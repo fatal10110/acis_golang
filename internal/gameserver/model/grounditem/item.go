@@ -2,6 +2,7 @@ package grounditem
 
 import (
 	"fmt"
+	"sync/atomic"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -17,6 +18,7 @@ type Item struct {
 	Template *item.Template
 
 	destroyProtected bool
+	dropperID        atomic.Int32
 }
 
 // New creates a visible-world item from a persisted instance and its loaded
@@ -66,6 +68,20 @@ func (i *Item) SetDestroyProtected(protected bool) {
 // DestroyProtected reports whether the item is exempt from ground cleanup.
 func (i *Item) DestroyProtected() bool {
 	return i != nil && i.destroyProtected
+}
+
+// SetDropperID records the actor whose drop animation should be shown while
+// this item is being spawned.
+func (i *Item) SetDropperID(id int32) {
+	i.dropperID.Store(id)
+}
+
+// DropperID returns the temporary dropper object id used by DropItem.
+func (i *Item) DropperID() int32 {
+	if i == nil {
+		return 0
+	}
+	return i.dropperID.Load()
 }
 
 // Snapshot captures this ground item's persisted state and remaining destroy

@@ -161,6 +161,58 @@ func TestCreatureAttackStopCancelsPendingHit(t *testing.T) {
 	}
 }
 
+func TestCreatureAttackRejectsNewAttackWhileBusy(t *testing.T) {
+	clock := &fakeAttackClock{}
+	actor := attackActor{
+		id:          100,
+		known:       map[int32]bool{200: true},
+		canSee:      true,
+		canReach:    true,
+		attackType:  item.WeaponSword,
+		attackSpeed: 500,
+		hit:         Hit{TargetID: 200, Damage: 37},
+	}
+	target := attackTarget{id: 200, attackable: true}
+	ctrl := NewCreature(&actor)
+	ctrl.afterFunc = clock.AfterFunc
+
+	ctrl.DoAttack(&target)
+	if ctrl.CanAttack(&target) {
+		t.Fatal("CanAttack() = true while the previous attack cycle is still active")
+	}
+	clock.fire(time.Second)
+	if !ctrl.CanAttack(&target) {
+		t.Fatal("CanAttack() = false after the attack cycle finished")
+	}
+}
+
+func TestCreatureAttackRejectsBowReuseUntilCooldownEnds(t *testing.T) {
+	clock := &fakeAttackClock{}
+	actor := attackActor{
+		id:          100,
+		known:       map[int32]bool{200: true},
+		canSee:      true,
+		canReach:    true,
+		attackType:  item.WeaponBow,
+		attackSpeed: 500,
+		weaponReuse: time.Second,
+		hit:         Hit{TargetID: 200, Damage: 37},
+	}
+	target := attackTarget{id: 200, attackable: true}
+	ctrl := NewCreature(&actor)
+	ctrl.afterFunc = clock.AfterFunc
+
+	ctrl.DoAttack(&target)
+	clock.fire(time.Second)
+	if ctrl.CanAttack(&target) {
+		t.Fatal("CanAttack() = true while bow reuse is cooling down")
+	}
+	clock.fire(690 * time.Millisecond)
+	if !ctrl.CanAttack(&target) {
+		t.Fatal("CanAttack() = false after bow reuse cooldown ended")
+	}
+}
+
 func TestCreatureAttackDualHitsAreSpacedOverFullCycle(t *testing.T) {
 	clock := &fakeAttackClock{}
 	actor := attackActor{
