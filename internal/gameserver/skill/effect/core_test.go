@@ -96,6 +96,14 @@ func TestNewBuildsCoreEffectMetadata(t *testing.T) {
 		{"SilenceMagicPhysical", TypeSilenceAll, flagMuted | flagPhysicalMuted, true},
 		{"SilentMove", TypeSilentMove, flagSilentMove, false},
 		{"StunSelf", TypeStunSelf, FlagStunned, false},
+		{"Heal", TypeHeal, FlagNone, false},
+		{"HealOverTime", TypeHealOverTime, FlagNone, false},
+		{"ManaHeal", TypeManaHeal, FlagNone, false},
+		{"TargetMe", TypeTargetMe, FlagNone, false},
+		{"Bluff", TypeBluff, FlagNone, false},
+		{"CharmOfCourage", TypeCharmOfCourage, flagCharmOfCourage, false},
+		{"CharmOfLuck", TypeCharmOfLuck, flagCharmOfLuck, false},
+		{"PhoenixBless", TypePhoenixBless, flagPhoenixBlessing, false},
 	}
 
 	for _, tt := range tests {
@@ -686,17 +694,24 @@ func TestStunSelfEffectIdlesEffectedAndRefreshesEffector(t *testing.T) {
 }
 
 type liveEffectTarget struct {
-	events      []string
-	hp          float64
-	mp          float64
-	dead        bool
-	afraid      bool
-	fearImmune  bool
-	playable    bool
-	raidRelated bool
-	castingNow  bool
-	castMagic   bool
-	canBeHealed bool
+	events            []string
+	hp                float64
+	mp                float64
+	dead              bool
+	afraid            bool
+	fearImmune        bool
+	playable          bool
+	raidRelated       bool
+	castingNow        bool
+	castMagic         bool
+	canBeHealed       bool
+	healProficiency   float64
+	healEffectiveness float64
+	rechargeRate      func(float64) float64
+	target            any
+	heading           int
+	bluffExempt       bool
+	isPlayer          bool
 }
 
 func (t *liveEffectTarget) Dead() bool { return t.dead }
@@ -789,11 +804,297 @@ func (t *liveEffectTarget) SetImmobilized(v bool) {
 
 func (t *liveEffectTarget) CanBeHealed() bool { return t.canBeHealed }
 
-func (t *liveEffectTarget) AddMP(amount float64) {
+func (t *liveEffectTarget) AddMP(amount float64) float64 {
 	t.mp += amount
 	t.events = append(t.events, fmt.Sprintf("add-mp:%g", amount))
+	return amount
+}
+
+func (t *liveEffectTarget) AddHP(amount float64) float64 {
+	t.hp += amount
+	t.events = append(t.events, fmt.Sprintf("add-hp:%g", amount))
+	return amount
+}
+
+func (t *liveEffectTarget) HealProficiency() float64 { return t.healProficiency }
+
+func (t *liveEffectTarget) HealEffectiveness() float64 { return t.healEffectiveness }
+
+func (t *liveEffectTarget) RechargeMP(base float64) float64 {
+	if t.rechargeRate == nil {
+		return base
+	}
+	return t.rechargeRate(base)
+}
+
+func (t *liveEffectTarget) CurrentTarget() any { return t.target }
+
+func (t *liveEffectTarget) SetTarget(target any) {
+	t.target = target
+	t.events = append(t.events, fmt.Sprintf("set-target:%v", target))
+}
+
+func (t *liveEffectTarget) TryToAttack(target any) {
+	t.events = append(t.events, fmt.Sprintf("try-attack:%v", target))
+}
+
+func (t *liveEffectTarget) Heading() int { return t.heading }
+
+func (t *liveEffectTarget) SetHeading(h int) {
+	t.heading = h
+	t.events = append(t.events, fmt.Sprintf("heading:%d", h))
+}
+
+func (t *liveEffectTarget) BluffExempt() bool { return t.bluffExempt }
+
+func (t *liveEffectTarget) IsPlayer() bool { return t.isPlayer }
+
+func (t *liveEffectTarget) StopCharmOfLuck(*Effect) {
+	t.events = append(t.events, "stop-charm-of-luck")
+}
+
+func (t *liveEffectTarget) StopPhoenixBlessing(*Effect) {
+	t.events = append(t.events, "stop-phoenix-bless")
 }
 
 func (t *liveEffectTarget) StopSkillEffectsByID(id modelskill.ID) {
 	t.events = append(t.events, fmt.Sprintf("stop-skill:%d", id))
+}
+
+// noBonusHealTarget implements only the minimum heal capability, to
+// exercise the healStart/manaHealStart fallback defaults when the optional
+// proficiency/effectiveness/recharge hooks are absent.
+type noBonusHealTarget struct {
+	hp          float64
+	mp          float64
+	canBeHealed bool
+}
+
+func (t *noBonusHealTarget) CanBeHealed() bool { return t.canBeHealed }
+
+func (t *noBonusHealTarget) AddHP(amount float64) float64 {
+	t.hp += amount
+	return amount
+}
+
+func (t *noBonusHealTarget) AddMP(amount float64) float64 {
+	t.mp += amount
+	return amount
+}
+
+func TestHealEffectAppliesProficiencyAndEffectivenessAndDoublesAmount(t *testing.T) {
+	target := &liveEffectTarget{canBeHealed: true, healProficiency: 10, healEffectiveness: 50}
+	e, err := New(Skill{ID: 1}, modelskill.EffectTemplate{Name: "Heal", Value: 100})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e.Effected = target
+
+	if !e.OnStart(e) {
+		t.Fatal("heal effect start rejected a healable target")
+	}
+	// power = 100 + 10 = 110; first add = 110 * 50/100 = 55; then the
+	// amount (55) is applied a second time.
+	if want := 55.0 + 55.0; target.hp != want {
+		t.Fatalf("target hp = %v, want %v", target.hp, want)
+	}
+	if want := []string{"add-hp:55", "add-hp:55"}; !reflect.DeepEqual(target.events, want) {
+		t.Fatalf("events = %#v, want %#v", target.events, want)
+	}
+}
+
+func TestHealEffectDefaultsProficiencyAndEffectivenessWhenAbsent(t *testing.T) {
+	target := &noBonusHealTarget{canBeHealed: true}
+	e, err := New(Skill{ID: 1}, modelskill.EffectTemplate{Name: "Heal", Value: 40})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e.Effected = target
+
+	if !e.OnStart(e) {
+		t.Fatal("heal effect start rejected a healable target")
+	}
+	// power = 40 + 0; first add = 40 * 100/100 = 40; doubled to 80.
+	if target.hp != 80 {
+		t.Fatalf("target hp = %v, want 80", target.hp)
+	}
+}
+
+func TestHealEffectRejectsUnhealableTarget(t *testing.T) {
+	target := &liveEffectTarget{canBeHealed: false}
+	e, err := New(Skill{ID: 1}, modelskill.EffectTemplate{Name: "Heal", Value: 40})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e.Effected = target
+
+	if e.OnStart(e) {
+		t.Fatal("heal effect started on an unhealable target")
+	}
+	if len(target.events) != 0 {
+		t.Fatalf("events = %#v, want none", target.events)
+	}
+}
+
+func TestHealOverTimeActionRestoresHPEachTick(t *testing.T) {
+	target := &liveEffectTarget{canBeHealed: true, hp: 1}
+	e, err := New(Skill{ID: 1}, modelskill.EffectTemplate{Name: "HealOverTime", Value: 7})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e.Effected = target
+
+	if !e.ActionTime() {
+		t.Fatal("heal over time action stopped on a healable target")
+	}
+	if target.hp != 8 {
+		t.Fatalf("target hp = %v, want 8", target.hp)
+	}
+
+	target.canBeHealed = false
+	target.events = nil
+	if e.ActionTime() {
+		t.Fatal("heal over time action continued on an unhealable target")
+	}
+	if len(target.events) != 0 {
+		t.Fatalf("events = %#v, want none", target.events)
+	}
+}
+
+func TestManaHealEffectAppliesRechargeRateAndDoublesAmount(t *testing.T) {
+	target := &liveEffectTarget{canBeHealed: true, rechargeRate: func(base float64) float64 { return base * 2 }}
+	e, err := New(Skill{ID: 1}, modelskill.EffectTemplate{Name: "ManaHeal", Value: 20})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e.Effected = target
+
+	if !e.OnStart(e) {
+		t.Fatal("mana heal effect start rejected a healable target")
+	}
+	// power = 20 * 2 = 40, applied twice.
+	if target.mp != 80 {
+		t.Fatalf("target mp = %v, want 80", target.mp)
+	}
+	if want := []string{"add-mp:40", "add-mp:40"}; !reflect.DeepEqual(target.events, want) {
+		t.Fatalf("events = %#v, want %#v", target.events, want)
+	}
+}
+
+func TestManaHealEffectDefaultsRechargeRateWhenAbsent(t *testing.T) {
+	target := &noBonusHealTarget{canBeHealed: true}
+	e, err := New(Skill{ID: 1}, modelskill.EffectTemplate{Name: "ManaHeal", Value: 15})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e.Effected = target
+
+	if !e.OnStart(e) {
+		t.Fatal("mana heal effect start rejected a healable target")
+	}
+	if target.mp != 30 {
+		t.Fatalf("target mp = %v, want 30", target.mp)
+	}
+}
+
+func TestTargetMeEffectSetsTargetOrAttacksIfAlreadyTargeted(t *testing.T) {
+	effector := &liveEffectTarget{}
+	target := &liveEffectTarget{}
+	e, err := New(Skill{ID: 1}, modelskill.EffectTemplate{Name: "TargetMe"})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e.Effected = target
+	e.Effector = effector
+
+	if !e.OnStart(e) {
+		t.Fatal("target me effect start rejected a valid target")
+	}
+	if want := []string{fmt.Sprintf("set-target:%v", effector)}; !reflect.DeepEqual(target.events, want) {
+		t.Fatalf("events = %#v, want %#v", target.events, want)
+	}
+
+	target.events = nil
+	target.target = effector
+	if !e.OnStart(e) {
+		t.Fatal("target me effect start rejected a valid target")
+	}
+	if want := []string{fmt.Sprintf("try-attack:%v", effector)}; !reflect.DeepEqual(target.events, want) {
+		t.Fatalf("events = %#v, want %#v", target.events, want)
+	}
+}
+
+func TestBluffEffectRedirectsHeadingUnlessExemptOrRaidRelated(t *testing.T) {
+	effector := &liveEffectTarget{heading: 42}
+	target := &liveEffectTarget{}
+	e, err := New(Skill{ID: 1}, modelskill.EffectTemplate{Name: "Bluff"})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e.Effected = target
+	e.Effector = effector
+
+	if !e.OnStart(e) {
+		t.Fatal("bluff effect start rejected a valid target")
+	}
+	if target.heading != 42 {
+		t.Fatalf("target heading = %d, want 42", target.heading)
+	}
+
+	target = &liveEffectTarget{bluffExempt: true}
+	e.Effected = target
+	if e.OnStart(e) {
+		t.Fatal("bluff effect started on an exempt target")
+	}
+
+	target = &liveEffectTarget{raidRelated: true}
+	e.Effected = target
+	if e.OnStart(e) {
+		t.Fatal("bluff effect started on a raid-related target")
+	}
+}
+
+func TestCharmOfCourageEffectOnlyStartsForPlayers(t *testing.T) {
+	e, err := New(Skill{ID: 1}, modelskill.EffectTemplate{Name: "CharmOfCourage"})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+
+	e.Effected = &liveEffectTarget{isPlayer: true}
+	if !e.OnStart(e) {
+		t.Fatal("charm of courage effect start rejected a player")
+	}
+
+	e.Effected = &liveEffectTarget{isPlayer: false}
+	if e.OnStart(e) {
+		t.Fatal("charm of courage effect started on a non-player")
+	}
+}
+
+func TestCharmOfLuckAndPhoenixBlessNotifyOnExit(t *testing.T) {
+	luck := &liveEffectTarget{}
+	e, err := New(Skill{ID: 1}, modelskill.EffectTemplate{Name: "CharmOfLuck"})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e.Effected = luck
+	list := NewList(nil)
+	list.Add(e)
+	list.Remove(e)
+	if want := []string{"stop-charm-of-luck"}; !reflect.DeepEqual(luck.events, want) {
+		t.Fatalf("charm of luck exit events = %#v, want %#v", luck.events, want)
+	}
+
+	bless := &liveEffectTarget{}
+	pb, err := New(Skill{ID: 1}, modelskill.EffectTemplate{Name: "PhoenixBless"})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	pb.Effected = bless
+	list2 := NewList(nil)
+	list2.Add(pb)
+	list2.Remove(pb)
+	if want := []string{"stop-phoenix-bless"}; !reflect.DeepEqual(bless.events, want) {
+		t.Fatalf("phoenix bless exit events = %#v, want %#v", bless.events, want)
+	}
 }
