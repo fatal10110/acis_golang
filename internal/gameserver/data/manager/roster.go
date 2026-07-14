@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -88,6 +89,7 @@ type Roster struct {
 	items      itemStore
 	templates  *player.TemplateTable
 	itemTable  *item.Table
+	npcs       *npc.Table
 	ids        idAllocator
 
 	deleteAfter time.Duration
@@ -98,7 +100,7 @@ type Roster struct {
 // deleteAfter is the grace period MarkForDeletion schedules (see
 // DefaultDeleteAfter); a zero value means deletion is immediate. now
 // defaults to time.Now when nil.
-func NewRoster(characters characterStore, items itemStore, templates *player.TemplateTable, itemTable *item.Table, ids idAllocator, deleteAfter time.Duration, now func() time.Time) *Roster {
+func NewRoster(characters characterStore, items itemStore, templates *player.TemplateTable, itemTable *item.Table, npcs *npc.Table, ids idAllocator, deleteAfter time.Duration, now func() time.Time) *Roster {
 	if now == nil {
 		now = time.Now
 	}
@@ -107,6 +109,7 @@ func NewRoster(characters characterStore, items itemStore, templates *player.Tem
 		items:       items,
 		templates:   templates,
 		itemTable:   itemTable,
+		npcs:        npcs,
 		ids:         ids,
 		deleteAfter: deleteAfter,
 		now:         now,
@@ -125,12 +128,6 @@ func NewRoster(characters characterStore, items itemStore, templates *player.Tem
 // Reconciling that is a job for whatever boot or maintenance pass
 // eventually audits character/item consistency, not for Create to guess
 // at by retrying or rolling back.
-//
-// One validation is intentionally not implemented yet: rejecting a name
-// that collides with an NPC's name. That check reads a data table this
-// port hasn't built yet; a name collision with an NPC is merely cosmetic
-// (chat/targeting ambiguity), not a correctness risk, so it is deferred
-// rather than pulled in early.
 func (r *Roster) Create(ctx context.Context, accountName string, req CreateRequest) (*player.Character, CreateOutcome, error) {
 	if req.Race < 0 || req.Race > 4 {
 		return nil, CreateRejected, nil
@@ -146,6 +143,11 @@ func (r *Roster) Create(ctx context.Context, accountName string, req CreateReque
 	}
 	if !validCharacterName.MatchString(req.Name) {
 		return nil, CreateInvalidName, nil
+	}
+	if r.npcs != nil {
+		if _, ok := r.npcs.GetByName(req.Name); ok {
+			return nil, CreateInvalidName, nil
+		}
 	}
 
 	count, err := r.characters.CountByAccount(ctx, accountName)
