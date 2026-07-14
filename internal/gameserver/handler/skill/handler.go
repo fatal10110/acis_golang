@@ -52,6 +52,17 @@ func NewDefaultRegistry() *Registry {
 		realDamageHandler{},
 		giveSPHandler{},
 		dummyHandler{},
+		cancelHandler{},
+		disablersHandler{},
+		resurrectHandler{},
+		instantJumpHandler{},
+		getPlayerHandler{},
+		unlockHandler{},
+		extractableHandler{},
+		sowHandler{},
+		harvestHandler{},
+		spoilHandler{},
+		sweepHandler{},
 	)
 }
 

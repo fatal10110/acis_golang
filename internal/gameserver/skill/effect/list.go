@@ -29,12 +29,16 @@ const (
 )
 
 // Skill carries the skill fields the effect container needs for ordering and
-// duplicate handling.
+// duplicate handling, plus the classification tags a disabling/dispelling
+// skill needs to recognize an already-active effect as "the same kind" of
+// disable or "eligible to be stripped".
 type Skill struct {
-	ID        modelskill.ID
-	Debuff    bool
-	Toggle    bool
-	KillByDOT bool
+	ID             modelskill.ID
+	SkillType      string
+	Debuff         bool
+	Toggle         bool
+	KillByDOT      bool
+	CanBeDispelled bool
 }
 
 func (s Skill) sevenSigns() bool {

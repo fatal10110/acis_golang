@@ -36,6 +36,12 @@ func headingDegrees(heading int) float64 {
 	return float64(heading) / headingToDegrees
 }
 
+// HeadingDegrees converts a client heading unit (0-65535 per circle) into
+// degrees.
+func HeadingDegrees(heading int) float64 {
+	return headingDegrees(heading)
+}
+
 func angleClose(diff, max float64) bool {
 	if diff <= -360+max {
 		diff += 360
