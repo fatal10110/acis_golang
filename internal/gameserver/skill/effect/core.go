@@ -32,6 +32,8 @@ const (
 	FlagSleep
 	// FlagStunned marks a target as stunned.
 	FlagStunned
+	flagParalyzed
+	flagMeditating
 )
 
 // TypeManaDamOverTime is a periodic MP-drain effect: a toggle skill's
@@ -40,6 +42,44 @@ const (
 // out of the effect list's stacking logic.
 const TypeManaDamOverTime Type = "MANA_DMG_OVER_TIME"
 
+// Type values for the additional effect kinds wired below. Each names the
+// runtime behavior it drives, not the datapack classification a skill
+// carries (several of these share a datapack classification with a plain
+// buff but need distinct hook wiring here).
+const (
+	// TypeAbortCast interrupts the target's current cast, if any.
+	TypeAbortCast Type = "ABORT_CAST"
+	// TypeImmobileUntilAttacked locks the target in place until the effect
+	// ends or is stopped early.
+	TypeImmobileUntilAttacked Type = "IMMOBILE_UNTIL_ATTACKED"
+	// TypeImmobilizeEffector locks the caster in place for the duration.
+	TypeImmobilizeEffector Type = "IMMOBILIZE_EFFECTOR"
+	// TypeInvincible grants the target damage invulnerability.
+	TypeInvincible Type = "INVINCIBLE"
+	// TypeManaHealOverTime is a periodic MP restore effect.
+	TypeManaHealOverTime Type = "MANA_HEAL_OVER_TIME"
+	// TypeMute blocks the target from casting magic skills.
+	TypeMute Type = "MUTE"
+	// TypeNoblesseBless is a marker buff consulted by revive handling.
+	TypeNoblesseBless Type = "NOBLESSE_BLESSING"
+	// TypeParalyze locks the target in place and aborts its current action.
+	TypeParalyze Type = "PARALYZE"
+	// TypePetrification locks and invulns the target for the duration.
+	TypePetrification Type = "PETRIFICATION"
+	// TypePhysicalMute blocks the target from using physical skills.
+	TypePhysicalMute Type = "PHYSICAL_MUTE"
+	// TypeRemoveTarget clears the target's current target and stops any
+	// attack or cast against it.
+	TypeRemoveTarget Type = "REMOVE_TARGET"
+	// TypeSilenceAll blocks the target from casting any skill, magic or
+	// physical.
+	TypeSilenceAll Type = "SILENCE_MAGIC_PHYSICAL"
+	// TypeSilentMove is a periodic MP-consuming stealth movement buff.
+	TypeSilentMove Type = "SILENT_MOVE"
+	// TypeStunSelf idles the target and refreshes the caster's own status.
+	TypeStunSelf Type = "STUN_SELF"
+)
+
 type kind struct {
 	typ    Type
 	flag   Flag
@@ -47,14 +87,28 @@ type kind struct {
 }
 
 var coreKinds = map[string]kind{
-	"Buff":            {typ: TypeBuff},
-	"Debuff":          {typ: TypeDebuff, debuff: true},
-	"DamOverTime":     {typ: TypeDamOverTime, debuff: true},
-	"ManaDamOverTime": {typ: TypeManaDamOverTime},
-	"Fear":            {typ: TypeFear, flag: FlagFear, debuff: true},
-	"Root":            {typ: TypeRoot, flag: FlagRooted, debuff: true},
-	"Sleep":           {typ: TypeSleep, flag: FlagSleep, debuff: true},
-	"Stun":            {typ: TypeStun, flag: FlagStunned, debuff: true},
+	"Buff":                  {typ: TypeBuff},
+	"Debuff":                {typ: TypeDebuff, debuff: true},
+	"DamOverTime":           {typ: TypeDamOverTime, debuff: true},
+	"ManaDamOverTime":       {typ: TypeManaDamOverTime},
+	"Fear":                  {typ: TypeFear, flag: FlagFear, debuff: true},
+	"Root":                  {typ: TypeRoot, flag: FlagRooted, debuff: true},
+	"Sleep":                 {typ: TypeSleep, flag: FlagSleep, debuff: true},
+	"Stun":                  {typ: TypeStun, flag: FlagStunned, debuff: true},
+	"AbortCast":             {typ: TypeAbortCast},
+	"ImmobileUntilAttacked": {typ: TypeImmobileUntilAttacked, flag: flagMeditating},
+	"ImobileBuff":           {typ: TypeImmobilizeEffector},
+	"Invincible":            {typ: TypeInvincible},
+	"ManaHealOverTime":      {typ: TypeManaHealOverTime},
+	"Mute":                  {typ: TypeMute, flag: flagMuted, debuff: true},
+	"NoblesseBless":         {typ: TypeNoblesseBless, flag: flagNoblesseBlessing},
+	"Paralyze":              {typ: TypeParalyze, flag: flagParalyzed, debuff: true},
+	"Petrification":         {typ: TypePetrification, flag: flagParalyzed, debuff: true},
+	"PhysicalMute":          {typ: TypePhysicalMute, flag: flagPhysicalMuted, debuff: true},
+	"RemoveTarget":          {typ: TypeRemoveTarget},
+	"SilenceMagicPhysical":  {typ: TypeSilenceAll, flag: flagMuted | flagPhysicalMuted, debuff: true},
+	"SilentMove":            {typ: TypeSilentMove, flag: flagSilentMove},
+	"StunSelf":              {typ: TypeStunSelf, flag: FlagStunned},
 }
 
 var fearSkippedPlayableSkillIDs = map[modelskill.ID]bool{
@@ -112,6 +166,42 @@ func wireHooks(e *Effect) {
 	case TypeStun:
 		e.OnStart = stunStart
 		e.OnExit = refreshExit
+	case TypeAbortCast:
+		e.OnStart = abortCastStart
+	case TypeImmobileUntilAttacked:
+		e.OnStart = immobileUntilAttackedStart
+		e.OnExit = immobileUntilAttackedExit
+		e.OnAction = immobileUntilAttackedAction
+	case TypeImmobilizeEffector:
+		e.OnStart = immobilizeEffectorStart
+		e.OnExit = immobilizeEffectorExit
+	case TypeInvincible:
+		e.OnStart = invincibleStart
+		e.OnExit = invincibleExit
+	case TypeManaHealOverTime:
+		e.OnAction = manaHealOverTimeAction
+	case TypeMute:
+		e.OnStart = muteStart
+		e.OnExit = refreshExit
+	case TypeParalyze:
+		e.OnStart = paralyzeStart
+		e.OnExit = paralyzeExit
+	case TypePetrification:
+		e.OnStart = petrificationStart
+		e.OnExit = petrificationExit
+	case TypePhysicalMute:
+		e.OnStart = physicalMuteStart
+		e.OnExit = refreshExit
+	case TypeRemoveTarget:
+		e.OnStart = removeTargetStart
+	case TypeSilenceAll:
+		e.OnStart = silenceAllStart
+		e.OnExit = refreshExit
+	case TypeSilentMove:
+		e.OnAction = silentMoveAction
+	case TypeStunSelf:
+		e.OnStart = stunSelfStart
+		e.OnExit = stunSelfExit
 	}
 }
 
@@ -175,6 +265,65 @@ type effectStopper interface {
 	StopEffects(Type)
 }
 
+// raidTarget optionally reports whether a target is a raid boss or minion;
+// a target without one is treated as not raid-related.
+type raidTarget interface {
+	RaidRelated() bool
+}
+
+// castInterrupter is implemented by an actor whose in-progress cast can be
+// checked and forcibly interrupted.
+type castInterrupter interface {
+	CastingNow() bool
+	InterruptCast()
+}
+
+// magicCastTarget is implemented by an actor whose in-progress cast can be
+// checked for its magic/physical nature and stopped.
+type magicCastTarget interface {
+	CastingNow() bool
+	CurrentSkillIsMagic() bool
+	StopCast()
+}
+
+// castStopper is implemented by an actor whose in-progress cast can be
+// unconditionally stopped.
+type castStopper interface {
+	StopCast()
+}
+
+// targetClearer is implemented by an actor that can drop its current
+// target and abandon any attack in progress against it.
+type targetClearer interface {
+	ClearTarget()
+	StopAttack()
+}
+
+// invulnerabilityTarget is implemented by an actor whose damage
+// invulnerability can be toggled.
+type invulnerabilityTarget interface {
+	SetInvul(bool)
+}
+
+// immobilizeTarget is implemented by an actor whose movement-lock flag can
+// be toggled.
+type immobilizeTarget interface {
+	SetImmobilized(bool)
+}
+
+// manaHealTarget is implemented by an actor whose mana pool can be checked
+// for healing eligibility and restored.
+type manaHealTarget interface {
+	CanBeHealed() bool
+	AddMP(amount float64)
+}
+
+// skillIDEffectStopper is implemented by an actor whose active effects can
+// be stopped by owning skill id.
+type skillIDEffectStopper interface {
+	StopSkillEffectsByID(id modelskill.ID)
+}
+
 func damageOverTimeAction(e *Effect) bool {
 	target, ok := e.Effected.(dotTarget)
 	if !ok {
@@ -220,6 +369,18 @@ func manaDamageOverTimeAction(e *Effect) bool {
 		target.ReduceMP(result.Damage)
 	}
 	return result.Continue
+}
+
+func manaHealOverTimeAction(e *Effect) bool {
+	target, ok := e.Effected.(manaHealTarget)
+	if !ok {
+		return false
+	}
+	if !target.CanBeHealed() {
+		return false
+	}
+	target.AddMP(e.Template.Value)
+	return true
 }
 
 func stunStart(e *Effect) bool {
@@ -283,6 +444,171 @@ func thinkAndRefreshExit(e *Effect) {
 
 func refreshExit(e *Effect) {
 	refresh(e.Effected)
+}
+
+func abortCastStart(e *Effect) bool {
+	if e.Effected == nil || e.Effected == e.Effector {
+		return false
+	}
+	if rt, ok := e.Effected.(raidTarget); ok && rt.RaidRelated() {
+		return false
+	}
+	if target, ok := e.Effected.(castInterrupter); ok && target.CastingNow() {
+		target.InterruptCast()
+	}
+	return true
+}
+
+func immobileUntilAttackedStart(e *Effect) bool {
+	abortAll(e.Effected)
+	refresh(e.Effected)
+	return true
+}
+
+func immobileUntilAttackedExit(e *Effect) {
+	if target, ok := e.Effected.(skillIDEffectStopper); ok {
+		target.StopSkillEffectsByID(e.Skill.ID)
+	}
+	if target, ok := e.Effected.(thinkTarget); ok {
+		target.Think()
+	}
+	refresh(e.Effected)
+}
+
+// immobileUntilAttackedAction always ends the effect on its first tick; an
+// early trigger (e.g. the target taking damage) is expected to reschedule
+// this tick sooner, not something this hook decides on its own.
+func immobileUntilAttackedAction(e *Effect) bool {
+	immobileUntilAttackedExit(e)
+	return false
+}
+
+func immobilizeEffectorStart(e *Effect) bool {
+	if target, ok := e.Effector.(immobilizeTarget); ok {
+		target.SetImmobilized(true)
+	}
+	return true
+}
+
+func immobilizeEffectorExit(e *Effect) {
+	if target, ok := e.Effector.(immobilizeTarget); ok {
+		target.SetImmobilized(false)
+	}
+}
+
+func invincibleStart(e *Effect) bool {
+	if target, ok := e.Effected.(invulnerabilityTarget); ok {
+		target.SetInvul(true)
+	}
+	return true
+}
+
+func invincibleExit(e *Effect) {
+	if target, ok := e.Effected.(invulnerabilityTarget); ok {
+		target.SetInvul(false)
+	}
+}
+
+func muteStart(e *Effect) bool {
+	if target, ok := e.Effected.(magicCastTarget); ok && target.CastingNow() && target.CurrentSkillIsMagic() {
+		target.StopCast()
+	}
+	refresh(e.Effected)
+	return true
+}
+
+func physicalMuteStart(e *Effect) bool {
+	if target, ok := e.Effected.(magicCastTarget); ok && target.CastingNow() && !target.CurrentSkillIsMagic() {
+		target.StopCast()
+	}
+	refresh(e.Effected)
+	return true
+}
+
+func paralyzeStart(e *Effect) bool {
+	abortAll(e.Effected)
+	return true
+}
+
+func paralyzeExit(e *Effect) {
+	if target, ok := e.Effected.(thinkTarget); ok {
+		target.Think()
+	}
+}
+
+func petrificationStart(e *Effect) bool {
+	abortAll(e.Effected)
+	if target, ok := e.Effected.(invulnerabilityTarget); ok {
+		target.SetInvul(true)
+	}
+	return true
+}
+
+func petrificationExit(e *Effect) {
+	if target, ok := e.Effected.(thinkTarget); ok {
+		target.Think()
+	}
+	if target, ok := e.Effected.(invulnerabilityTarget); ok {
+		target.SetInvul(false)
+	}
+}
+
+func removeTargetStart(e *Effect) bool {
+	if target, ok := e.Effected.(targetClearer); ok {
+		target.ClearTarget()
+		target.StopAttack()
+	}
+	if target, ok := e.Effected.(castStopper); ok {
+		target.StopCast()
+	}
+	return true
+}
+
+func silenceAllStart(e *Effect) bool {
+	if target, ok := e.Effected.(castStopper); ok {
+		target.StopCast()
+	}
+	refresh(e.Effected)
+	return true
+}
+
+func silentMoveAction(e *Effect) bool {
+	if e.Skill.SkillType != "CONT" {
+		return false
+	}
+	target, ok := e.Effected.(mpDotTarget)
+	if !ok {
+		return false
+	}
+	result := ManaDamageOverTimeTick(ManaDamageOverTimeInput{
+		Dead:   target.Dead(),
+		MP:     target.MP(),
+		Damage: e.Template.Value,
+		Toggle: true,
+	})
+	if result.RemovedForLackMP {
+		if notifier, ok := e.Effected.(lackMPNotifier); ok {
+			notifier.NotifyEffectRemovedDueLackMP(e)
+		}
+	}
+	if result.Damage > 0 {
+		target.ReduceMP(result.Damage)
+	}
+	return result.Continue
+}
+
+func stunSelfStart(e *Effect) bool {
+	if p, ok := e.Effected.(playableTarget); ok && p.Playable() {
+		if target, ok := e.Effected.(idleTarget); ok {
+			target.TryToIdle()
+		}
+	}
+	refresh(e.Effector)
+	return true
+}
+
+func stunSelfExit(e *Effect) {
+	refresh(e.Effector)
 }
 
 func abortAll(target any) {
