@@ -116,6 +116,11 @@ func (c *Character) ObjectID() int32 {
 	return c.ID
 }
 
+// LevelValue returns the player's current level for live-owned actors.
+func (c *Character) LevelValue() int {
+	return c.Level
+}
+
 // Position returns the live world position when c is spawned, otherwise the
 // persisted last-known location.
 func (c *Character) Position() (int, int, int) {
