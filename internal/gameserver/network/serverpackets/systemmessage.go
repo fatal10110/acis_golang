@@ -4,12 +4,18 @@ import "github.com/fatal10110/acis_golang/internal/commons/wire"
 
 // Static system message ids used by live summon command feedback.
 const (
+	SystemMessageNotEnoughHP                   = 23
+	SystemMessageNotEnoughMP                   = 24
+	SystemMessageUseS1                         = 46
+	SystemMessageS1PreparedForReuse            = 48
 	SystemMessageWelcomeToLineage              = 34
 	SystemMessageNothingHappened               = 61
+	SystemMessageInvalidTarget                 = 109
 	SystemMessageCannotDiscardDistanceTooFar   = 151
 	SystemMessageItemMissingToLearnSkill       = 276
 	SystemMessageLearnedSkill                  = 277
 	SystemMessageNotEnoughSPToLearnSkill       = 278
+	SystemMessageNotEnoughItems                = 351
 	SystemMessageCrystallizeLevelTooLow        = 562
 	SystemMessageNoMoreSkillsToLearn           = 750
 	SystemMessageItemCrystallized              = 1258
