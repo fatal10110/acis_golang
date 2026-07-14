@@ -58,14 +58,18 @@ func (d *Decay) Start(log zerolog.Logger) *scheduler.Ticker {
 }
 
 // Add schedules actor's corpse for removal after interval elapses,
-// replacing any deadline already tracked for it.
-func (d *Decay) Add(actor DecayActor, interval time.Duration) {
+// replacing any deadline already tracked for it. It returns the stored
+// deadline so callers that expose corpse-targeting state can share the
+// same cutoff the task will use.
+func (d *Decay) Add(actor DecayActor, interval time.Duration) time.Time {
 	if actor == nil {
-		return
+		return time.Time{}
 	}
+	deadline := d.now().Add(interval)
 	d.mu.Lock()
-	d.entries[actor.ObjectID()] = decayEntry{actor: actor, deadline: d.now().Add(interval)}
+	d.entries[actor.ObjectID()] = decayEntry{actor: actor, deadline: deadline}
 	d.mu.Unlock()
+	return deadline
 }
 
 // Cancel stops tracking actor and reports whether it had been tracked.
@@ -91,6 +95,20 @@ func (d *Decay) Tracked(actor DecayActor) bool {
 	defer d.mu.Unlock()
 	_, ok := d.entries[actor.ObjectID()]
 	return ok
+}
+
+// Deadline returns actor's pending decay deadline, if one is tracked.
+func (d *Decay) Deadline(actor DecayActor) (time.Time, bool) {
+	if actor == nil {
+		return time.Time{}, false
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	entry, ok := d.entries[actor.ObjectID()]
+	if !ok {
+		return time.Time{}, false
+	}
+	return entry.deadline, true
 }
 
 // Tick removes and decays every actor whose deadline has passed.

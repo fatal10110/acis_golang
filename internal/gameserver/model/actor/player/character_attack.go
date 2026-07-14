@@ -79,6 +79,15 @@ func (c *Character) AttachRuntime(tmpl *Template, inv *itemcontainer.Inventory) 
 	}
 }
 
+// AddRewardItem creates and adds one kill-reward item stack to this live
+// character's inventory. objectID must be allocated by the reward caller.
+func (c *Character) AddRewardItem(itemID int32, count int, objectID int32) bool {
+	if c.inventory == nil {
+		return false
+	}
+	return c.inventory.AddNew(itemID, count, objectID) != nil
+}
+
 // SetWorld records the world registry BroadcastAttack reaches through.
 func (c *Character) SetWorld(state *world.State) {
 	c.world = state

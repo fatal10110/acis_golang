@@ -1,6 +1,8 @@
 package target
 
 import (
+	"time"
+
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -78,6 +80,25 @@ type UndeadTarget interface {
 // skills.
 type CorpseTarget interface {
 	HasCorpse() bool
+}
+
+// CorpseDeadlineTarget is optionally implemented by mob corpses that expose
+// the decay deadline used for Java's too-old corpse targeting cutoff.
+type CorpseDeadlineTarget interface {
+	CorpseDeadline() (time.Time, bool)
+	CorpseTime() time.Duration
+}
+
+// SpoiledCorpse is optionally implemented by mob corpses that bypass the
+// too-old targeting cutoff after a successful spoil.
+type SpoiledCorpse interface {
+	Spoiled() bool
+}
+
+// SeededCorpse is optionally implemented by mob corpses that bypass the
+// too-old targeting cutoff after being sown.
+type SeededCorpse interface {
+	Seeded() bool
 }
 
 // PeaceZoner is implemented by creatures that can report whether hostilities
@@ -590,11 +611,9 @@ func (areaCorpseMobHandler) CanCast(_, target Creature, skill *modelskill.Defini
 // the single-target and area corpse-mob handlers: the target must have a
 // pending corpse and not be a player-controlled actor or summon, a harvest
 // skill always succeeds against an attackable corpse regardless of its age,
-// and a sweep skill only ever succeeds against an attackable corpse.
-//
-// The corpse-age cutoff and its seeded/spoiled bypass are not ported: they
-// depend on a decay-deadline accessor and runtime seed/spoil state that
-// don't exist on any creature yet.
+// and a sweep skill only ever succeeds against an attackable corpse. Mob
+// corpses that expose decay deadline state stop accepting generic corpse
+// skills once they are past the halfway age cutoff, unless seeded/spoiled.
 func corpseMobCanCast(target Creature, skill *modelskill.Definition) bool {
 	if target == nil || !hasCorpse(target) || target.Category().Has(CategoryPlayable) {
 		return false
@@ -603,6 +622,9 @@ func corpseMobCanCast(target Creature, skill *modelskill.Definition) bool {
 		return target.Category().Has(CategoryAttackable)
 	}
 	if skill != nil && skill.SkillType == "SWEEP" && !target.Category().Has(CategoryAttackable) {
+		return false
+	}
+	if target.Category().Has(CategoryAttackable) && corpseTooOld(target) && !corpseAgeBypass(target) {
 		return false
 	}
 	return true
@@ -733,6 +755,31 @@ func isUndead(creature Creature) bool {
 func hasCorpse(creature Creature) bool {
 	corpse, ok := creature.(CorpseTarget)
 	return ok && corpse.HasCorpse()
+}
+
+func corpseTooOld(creature Creature) bool {
+	target, ok := creature.(CorpseDeadlineTarget)
+	if !ok {
+		return false
+	}
+	deadline, ok := target.CorpseDeadline()
+	if !ok {
+		return false
+	}
+	corpseTime := target.CorpseTime()
+	if corpseTime <= 0 {
+		return false
+	}
+	cutoff := deadline.Add(-corpseTime / 2)
+	return !time.Now().Before(cutoff)
+}
+
+func corpseAgeBypass(creature Creature) bool {
+	if spoiled, ok := creature.(SpoiledCorpse); ok && spoiled.Spoiled() {
+		return true
+	}
+	seeded, ok := creature.(SeededCorpse)
+	return ok && seeded.Seeded()
 }
 
 func inPeaceZone(creature Creature) bool {

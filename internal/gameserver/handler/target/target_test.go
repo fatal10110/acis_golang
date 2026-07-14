@@ -4,6 +4,7 @@ import (
 	"math"
 	"slices"
 	"testing"
+	"time"
 
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
@@ -314,6 +315,7 @@ func TestAreaSummonUsesSummonAsAnchor(t *testing.T) {
 func TestCorpseMobHandlerCastConditions(t *testing.T) {
 	caster := &targetActor{id: 1, category: CategoryPlayable}
 	handler := mustHandler(t, NewRegistry(knownList{}), modelskill.TargetCorpseMob)
+	now := time.Now()
 
 	tests := []struct {
 		name   string
@@ -328,6 +330,10 @@ func TestCorpseMobHandlerCastConditions(t *testing.T) {
 		{"harvest on non-monster corpse", &targetActor{id: 6, category: CategoryFolk, corpse: true}, &modelskill.Definition{SkillType: "HARVEST"}, false},
 		{"sweep on monster corpse", &targetActor{id: 7, category: CategoryAttackable, corpse: true}, &modelskill.Definition{SkillType: "SWEEP"}, true},
 		{"sweep on non-monster corpse", &targetActor{id: 8, category: CategoryFolk, corpse: true}, &modelskill.Definition{SkillType: "SWEEP"}, false},
+		{"fresh mob corpse", &targetActor{id: 10, category: CategoryAttackable, corpse: true, corpseDeadline: now.Add(10 * time.Second), corpseTime: 8 * time.Second}, &modelskill.Definition{}, true},
+		{"too old mob corpse", &targetActor{id: 11, category: CategoryAttackable, corpse: true, corpseDeadline: now.Add(time.Second), corpseTime: 8 * time.Second}, &modelskill.Definition{}, false},
+		{"spoiled old mob corpse bypasses age cutoff", &targetActor{id: 12, category: CategoryAttackable, corpse: true, corpseDeadline: now.Add(time.Second), corpseTime: 8 * time.Second, spoiled: true}, &modelskill.Definition{}, true},
+		{"seeded old mob corpse bypasses age cutoff", &targetActor{id: 13, category: CategoryAttackable, corpse: true, corpseDeadline: now.Add(time.Second), corpseTime: 8 * time.Second, seeded: true}, &modelskill.Definition{}, true},
 	}
 
 	for _, tt := range tests {
@@ -468,6 +474,10 @@ type targetActor struct {
 	undead                 bool
 	peace                  bool
 	corpse                 bool
+	corpseDeadline         time.Time
+	corpseTime             time.Duration
+	spoiled                bool
+	seeded                 bool
 }
 
 func (a *targetActor) ObjectID() int32 { return a.id }
@@ -505,6 +515,16 @@ func (a *targetActor) Undead() bool { return a.undead }
 func (a *targetActor) InPeaceZone() bool { return a.peace }
 
 func (a *targetActor) HasCorpse() bool { return a.corpse }
+
+func (a *targetActor) CorpseDeadline() (time.Time, bool) {
+	return a.corpseDeadline, !a.corpseDeadline.IsZero()
+}
+
+func (a *targetActor) CorpseTime() time.Duration { return a.corpseTime }
+
+func (a *targetActor) Spoiled() bool { return a.spoiled }
+
+func (a *targetActor) Seeded() bool { return a.seeded }
 
 type knownList []*targetActor
 

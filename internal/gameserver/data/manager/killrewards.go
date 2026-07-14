@@ -13,20 +13,22 @@ type groundPlacer interface {
 	Drop(ground *grounditem.Item, opts task.DropOptions)
 }
 
+type rewardItemReceiver interface {
+	AddRewardItem(itemID int32, count int, objectID int32) bool
+}
+
 // KillReward rolls and places the item, spoil, and manually-picked-up herb
 // rewards for one NPC template's death, at a fixed drop location.
 //
-// Experience and SP are not granted here. The per-kill formula (damage-share
-// split across attackers, then a level-difference penalty) exists as
-// player.KillRewardExpAndSp, but there is no live player actor or
-// killer/victim resolution to drive it with yet — see the
-// kill-reward-distribution follow-up.
+// Experience and SP are granted by the higher-level death rewarder, which
+// owns damage attribution and victim level.
 type KillReward struct {
 	categories      []item.DropCategory
 	pool            *item.SpoilPool
 	levelMultiplier float64
 	raid            bool
 	rates           item.Rates
+	autoLootItems   bool
 	autoLootHerbs   bool
 
 	ids    idAllocator
@@ -41,13 +43,14 @@ type KillReward struct {
 // levelMultiplier is the caller-resolved drop-rate penalty for the
 // killer/monster level gap (see item.LevelPenaltyMultiplier); pool may be
 // nil for an unspoiled monster.
-func NewKillReward(categories []item.DropCategory, pool *item.SpoilPool, levelMultiplier float64, raid bool, rates item.Rates, autoLootHerbs bool, ids idAllocator, items *item.Table, ground groundPlacer, x, y, z, heading int) *KillReward {
+func NewKillReward(categories []item.DropCategory, pool *item.SpoilPool, levelMultiplier float64, raid bool, rates item.Rates, autoLootItems, autoLootHerbs bool, ids idAllocator, items *item.Table, ground groundPlacer, x, y, z, heading int) *KillReward {
 	return &KillReward{
 		categories:      categories,
 		pool:            pool,
 		levelMultiplier: levelMultiplier,
 		raid:            raid,
 		rates:           rates,
+		autoLootItems:   autoLootItems,
 		autoLootHerbs:   autoLootHerbs,
 		ids:             ids,
 		items:           items,
@@ -59,23 +62,39 @@ func NewKillReward(categories []item.DropCategory, pool *item.SpoilPool, levelMu
 	}
 }
 
-// CalculateRewards rolls this death's item/spoil/herb drops and places them
-// on the ground. killer is unused: nothing here depends on the killer's
-// identity, only on the victim's own drop table.
-func (k *KillReward) CalculateRewards(creature.DeathActor) {
+// CalculateRewards rolls this death's item/spoil/herb drops and either
+// places them on the ground or, when configured and supported, adds them
+// directly to the killer's inventory.
+func (k *KillReward) CalculateRewards(killer creature.DeathActor) {
+	receiver, _ := killer.(rewardItemReceiver)
 	rolled, herbs := item.RollKillReward(k.categories, k.pool, k.levelMultiplier, k.raid, k.rates, k.autoLootHerbs)
 	for id, qty := range rolled {
+		if k.autoLootItems && k.addToInventory(receiver, id, int(qty)) {
+			continue
+		}
 		k.drop(id, int(qty))
 	}
 	for _, herb := range herbs {
-		// An auto-looted herb belongs in the killer's inventory, never on
-		// the ground; there is no live inventory to place it in yet, so it
-		// is dropped rather than silently fabricated as a ground item.
 		if herb.AutoLoot {
+			k.addToInventory(receiver, herb.ItemID, int(herb.Amount))
 			continue
 		}
 		k.drop(herb.ItemID, int(herb.Amount))
 	}
+}
+
+func (k *KillReward) addToInventory(receiver rewardItemReceiver, itemID int32, count int) bool {
+	if receiver == nil || count <= 0 {
+		return false
+	}
+	if _, ok := k.items.Get(itemID); !ok {
+		return false
+	}
+	id, err := k.ids.NextID()
+	if err != nil {
+		return false
+	}
+	return receiver.AddRewardItem(itemID, count, id)
 }
 
 // drop places one item stack on the ground. It is a best-effort placement:

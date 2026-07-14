@@ -6,10 +6,12 @@ import (
 	"math"
 	"math/rand"
 	"sync"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -48,6 +50,10 @@ type Hostile struct {
 	deathMu sync.Mutex
 	dead    bool
 	decayed bool
+
+	spoil          item.SpoilPool
+	seed           SeedState
+	corpseDeadline time.Time
 
 	health creature.Health
 	hp     float64
@@ -218,6 +224,7 @@ func (h *Hostile) Decay(worldState *world.State, respawn func()) bool {
 	}
 	h.decayed = true
 	h.dead = true
+	h.corpseDeadline = time.Time{}
 	h.deathMu.Unlock()
 
 	if worldState != nil {
