@@ -15,6 +15,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
@@ -94,6 +95,8 @@ func (p *livePlayer) Discover(obj world.Tracked) {
 			Template:  o.template,
 			Items:     o.items,
 		}))
+	case *npc.Hostile:
+		p.SendFrame(serverpackets.FrameNPCInfo(npcInfoSnapshot(o)))
 	case groundItemObject:
 		p.SendFrame(serverpackets.FrameSpawnItem(o))
 	case doorObject:
@@ -134,10 +137,44 @@ type staticObject interface {
 
 func rendersObject(obj world.Tracked) bool {
 	switch obj.(type) {
-	case *livePlayer, groundItemObject, doorObject, staticObject:
+	case *livePlayer, *npc.Hostile, groundItemObject, doorObject, staticObject:
 		return true
 	default:
 		return false
+	}
+}
+
+func npcInfoSnapshot(n *npc.Hostile) serverpackets.NPCInfoSnapshot {
+	tmpl := n.Instance.Template
+	x, y, z := n.Position()
+	name, title := "", ""
+	if tmpl.UsingServerSideName {
+		name = tmpl.Name
+	}
+	if tmpl.UsingServerSideTitle {
+		title = tmpl.Title
+	}
+	return serverpackets.NPCInfoSnapshot{
+		ObjectID:        n.ObjectID(),
+		TemplateID:      tmpl.TemplateID,
+		Attackable:      true,
+		X:               x,
+		Y:               y,
+		Z:               z,
+		Heading:         n.Heading(),
+		MAtkSpd:         int(tmpl.AtkSpd),
+		PAtkSpd:         n.AttackSpeed(),
+		RunSpd:          int(tmpl.RunSpeed),
+		WalkSpd:         int(tmpl.WalkSpeed),
+		CollisionRadius: tmpl.CollisionRadius,
+		CollisionHeight: tmpl.CollisionHeight,
+		RightHand:       tmpl.RightHand,
+		LeftHand:        tmpl.LeftHand,
+		Running:         true,
+		AlikeDead:       n.AlikeDead(),
+		SummonAnimation: 2,
+		Name:            name,
+		Title:           title,
 	}
 }
 
