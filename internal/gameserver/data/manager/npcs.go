@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
@@ -30,6 +31,16 @@ type slotInfo struct {
 	key    string
 	entry  spawn.Entry
 	dbName string
+}
+
+// KillRewardConfig carries live reward settings loaded at game-server boot.
+type KillRewardConfig struct {
+	Rates             item.Rates
+	AutoLoot          bool
+	AutoLootRaid      bool
+	AutoLootHerbs     bool
+	DeepBlueDropRules bool
+	PlayerLevels      *player.LevelTable
 }
 
 // Npcs owns every live NPC instantiated from the spawn table at boot,
@@ -66,7 +77,7 @@ type Npcs struct {
 	ai        *task.AI
 	items     *item.Table
 	ground    groundPlacer
-	rates     item.Rates
+	rewards   KillRewardConfig
 	spawns    *Spawns
 	now       func() time.Time
 	log       zerolog.Logger
@@ -90,7 +101,7 @@ type Npcs struct {
 // NewNpcs walks spawns' loaded table and instantiates every "on start"
 // maker's qualifying entries into state, respecting persisted dead/alive
 // data for database-tracked entries.
-func NewNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.State, ids idAllocator, decay *task.Decay, respawnTask *task.Respawn, ai *task.AI, items *item.Table, ground groundPlacer, rates item.Rates, now func() time.Time, log zerolog.Logger) (*Npcs, error) {
+func NewNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.State, ids idAllocator, decay *task.Decay, respawnTask *task.Respawn, ai *task.AI, items *item.Table, ground groundPlacer, rewards KillRewardConfig, now func() time.Time, log zerolog.Logger) (*Npcs, error) {
 	if spawns == nil || spawns.Table() == nil {
 		return nil, fmt.Errorf("npcs: nil spawn table")
 	}
@@ -135,7 +146,7 @@ func NewNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.St
 		ai:        ai,
 		items:     items,
 		ground:    ground,
-		rates:     rates,
+		rewards:   rewards,
 		spawns:    spawns,
 		now:       now,
 		log:       log,
@@ -297,9 +308,6 @@ func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, lo
 
 	n.state.Spawn(hostile, loc.X, loc.Y, loc.Z, heading)
 	n.ai.Add(hostile)
-	if tmpl.CorpseTime > 0 {
-		n.decay.Add(hostile, time.Duration(tmpl.CorpseTime)*time.Second)
-	}
 
 	n.mu.Lock()
 	n.live[id] = key
@@ -307,21 +315,15 @@ func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, lo
 	n.mu.Unlock()
 }
 
-// rewarderFor returns the kill-reward hook for a newly spawned hostile, or
-// nil when its template has no drop table at all. Experience/SP are not
-// granted here: that formula (player.KillRewardExpAndSp) needs a live
-// player actor to credit, and player-side combat isn't wired to a live
-// actor yet (tracked separately) — only item/spoil/herb drops are reachable
-// from a real kill at this point.
-func (n *Npcs) rewarderFor(hostile *npc.Hostile, tmpl *npc.Template) *deathDrops {
-	if len(tmpl.Drops) == 0 {
-		return nil
-	}
-	return &deathDrops{
+// rewarderFor returns the kill-reward hook for a newly spawned hostile.
+func (n *Npcs) rewarderFor(hostile *npc.Hostile, tmpl *npc.Template) *deathRewards {
+	return &deathRewards{
 		hostile:    hostile,
+		tmpl:       tmpl,
 		categories: tmpl.Drops,
-		rates:      n.rates,
+		config:     n.rewards,
 		raid:       tmpl.Type == "RaidBoss",
+		decay:      n.decay,
 		ids:        n.ids,
 		items:      n.items,
 		ground:     n.ground,
@@ -532,29 +534,105 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo) (*npc.Hosti
 	return hostile, nil
 }
 
-// deathDrops rolls one victim's item/spoil/herb rewards at its position at
+// deathRewards applies one victim's live death rewards at its position at
 // the moment of death, rather than a position fixed when it spawned —
 // hostile NPCs can move (offensive follow) between spawning and dying.
-type deathDrops struct {
+type deathRewards struct {
 	hostile    *npc.Hostile
+	tmpl       *npc.Template
 	categories []item.DropCategory
-	rates      item.Rates
+	config     KillRewardConfig
 	raid       bool
+	decay      *task.Decay
 	ids        idAllocator
 	items      *item.Table
 	ground     groundPlacer
 }
 
+type playerRewardEntry struct {
+	actor  *player.Character
+	damage float64
+}
+
 // CalculateRewards implements creature.Rewarder.
-func (d *deathDrops) CalculateRewards(killer creature.DeathActor) {
+func (d *deathRewards) CalculateRewards(killer creature.DeathActor) {
+	d.scheduleDecay()
+
+	entries, totalDamage, maxDealer, highestLevel := d.rewardEntries()
+	d.rollDrops(killer, maxDealer, highestLevel)
+	d.grantExpAndSp(entries, totalDamage)
+}
+
+func (d *deathRewards) scheduleDecay() {
+	if d.tmpl.CorpseTime <= 0 {
+		return
+	}
+	interval := time.Duration(d.tmpl.CorpseTime) * time.Second
+	if d.hostile.Spoiled() || d.hostile.Seeded() {
+		interval *= 2
+	}
+	deadline := d.decay.Add(d.hostile, interval)
+	d.hostile.SetCorpseDeadline(deadline)
+}
+
+func (d *deathRewards) rewardEntries() ([]playerRewardEntry, float64, *player.Character, int) {
+	var entries []playerRewardEntry
+	var totalDamage float64
+	var maxDealer *player.Character
+	var maxDamage float64
+	var highestLevel int
+
+	for _, threat := range d.hostile.AI().Threats().Snapshot() {
+		if threat.Damage <= 1 {
+			continue
+		}
+		attacker, ok := threat.Attacker.(*player.Character)
+		if !ok || attacker.AlikeDead() || !attacker.Knows(d.hostile) {
+			continue
+		}
+		entries = append(entries, playerRewardEntry{actor: attacker, damage: threat.Damage})
+		totalDamage += threat.Damage
+		if maxDealer == nil || threat.Damage > maxDamage {
+			maxDealer = attacker
+			maxDamage = threat.Damage
+		}
+		if attacker.Level > highestLevel {
+			highestLevel = attacker.Level
+		}
+	}
+
+	return entries, totalDamage, maxDealer, highestLevel
+}
+
+func (d *deathRewards) rollDrops(killer creature.DeathActor, maxDealer *player.Character, highestLevel int) {
+	if len(d.categories) == 0 {
+		return
+	}
 	x, y, z := d.hostile.Position()
 	heading := d.hostile.Heading()
-	// pool is nil: the spoil mechanic (marking a monster spoiled via a
-	// skill cast) isn't wired to a live actor yet, so RollKillReward's own
-	// nil-pool handling (skip spoil rolls) is the correct behavior here,
-	// not a workaround. levelMultiplier is 1 (no penalty) and rates are
-	// all neutral: the drop-rate config surface (RateDropAdena and
-	// friends) and the killer-level resolution needed for
-	// item.LevelPenaltyMultiplier aren't loaded/wired anywhere yet either.
-	NewKillReward(d.categories, nil, 1, d.raid, d.rates, false, d.ids, d.items, d.ground, x, y, z, heading).CalculateRewards(killer)
+
+	levelMultiplier := 1.0
+	if highestLevel > 0 {
+		levelMultiplier = item.LevelPenaltyMultiplier(int32(highestLevel), int32(d.tmpl.Level), d.raid, d.config.DeepBlueDropRules)
+	}
+	autoLootItems := d.config.AutoLoot
+	if d.raid {
+		autoLootItems = d.config.AutoLootRaid
+	}
+
+	receiver := killer
+	if maxDealer != nil {
+		receiver = maxDealer
+	}
+	NewKillReward(d.categories, d.hostile.SpoilPool(), levelMultiplier, d.raid, d.config.Rates, autoLootItems, d.config.AutoLootHerbs, d.ids, d.items, d.ground, x, y, z, heading).CalculateRewards(receiver)
+}
+
+func (d *deathRewards) grantExpAndSp(entries []playerRewardEntry, totalDamage float64) {
+	if d.config.PlayerLevels == nil || totalDamage <= 0 {
+		return
+	}
+	for _, entry := range entries {
+		exp, sp := player.KillRewardExpAndSp(d.tmpl.RewardExp, d.tmpl.RewardSp, entry.damage, totalDamage, entry.actor.Level-d.tmpl.Level)
+		entry.actor.RewardExpAndSp(d.config.PlayerLevels, exp, sp)
+	}
 }

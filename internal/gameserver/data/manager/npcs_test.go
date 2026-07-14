@@ -8,7 +8,9 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
@@ -96,8 +98,9 @@ func newHarness(t *testing.T, spawns *Spawns, templates *npc.Table) *testHarness
 	ids := &sequentialIDs{}
 	items := item.NewTable(nil)
 	ground := &recordingGround{}
+	rewards := KillRewardConfig{Rates: neutralRates, DeepBlueDropRules: true, PlayerLevels: testLevelTable(t)}
 
-	npcs, err := NewNpcs(spawns, templates, staticGeo{}, h.state, ids, decay, respawn, ai, items, ground, neutralRates, nowFn, zerolog.Nop())
+	npcs, err := NewNpcs(spawns, templates, staticGeo{}, h.state, ids, decay, respawn, ai, items, ground, rewards, nowFn, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("NewNpcs: %v", err)
 	}
@@ -131,6 +134,27 @@ func testTerritory() *spawn.Territory {
 		Name: "t1", MinZ: -100, MaxZ: 100,
 		Nodes: []spawn.Node{{X: 0, Y: 0}, {X: 100, Y: 0}, {X: 0, Y: 100}},
 	}
+}
+
+func testPlayerTemplate() *player.Template {
+	return &player.Template{
+		HPTable:         []float64{100, 120},
+		MPTable:         []float64{80, 90},
+		CPTable:         []float64{40, 50},
+		CollisionRadius: 8,
+	}
+}
+
+func testLevelTable(t *testing.T) *player.LevelTable {
+	t.Helper()
+	levels, err := player.NewLevelTable(map[int]player.Level{
+		1: {RequiredExpToLevelUp: 0},
+		2: {RequiredExpToLevelUp: 100},
+	})
+	if err != nil {
+		t.Fatalf("NewLevelTable: %v", err)
+	}
+	return levels
 }
 
 func TestPickPositionSingleKeepsDeclaredHeading(t *testing.T) {
@@ -319,6 +343,72 @@ func TestNewNpcsRestoresAliveDBNameEntryAtPersistedHP(t *testing.T) {
 	x, y, z := hostile.Position()
 	if x != 777 || y != 888 || z != 1 || hostile.Heading() != 555 {
 		t.Fatalf("restored position = (%d,%d,%d,%d), want (777,888,1,555)", x, y, z, hostile.Heading())
+	}
+}
+
+func TestSpawnedPlayerKillRewardsExpSpSpoilAndDeathDecay(t *testing.T) {
+	defenderTpl := monsterTemplate(104)
+	defenderTpl.HPMax = 10
+	defenderTpl.RewardExp = 29
+	defenderTpl.RewardSp = 2
+	defenderTpl.Drops = []item.DropCategory{
+		{Kind: item.DropSpoil, Chance: 100, Drops: []item.Drop{{ItemID: 6673, Min: 1, Max: 1, Chance: 100}}},
+	}
+	templates := npc.NewTable([]*npc.Template{defenderTpl})
+
+	entry := fixedPositionEntry(104, 1, 1000, 1000, 0, 0, "")
+	maker, err := spawn.NewMaker(testMakerSet("maker1", 100), []*spawn.Territory{testTerritory()}, nil, []spawn.Entry{entry}, nil)
+	if err != nil {
+		t.Fatalf("NewMaker: %v", err)
+	}
+	table, err := spawn.NewTable([]*spawn.Territory{testTerritory()}, []*spawn.Maker{maker})
+	if err != nil {
+		t.Fatalf("NewTable: %v", err)
+	}
+	spawns := NewSpawns(table, nil)
+
+	h := newHarness(t, spawns, templates)
+
+	var defender *npc.Hostile
+	for _, obj := range h.state.Objects() {
+		if hostile, ok := obj.(*npc.Hostile); ok {
+			defender = hostile
+		}
+	}
+	if defender == nil {
+		t.Fatal("spawned hostile not found")
+	}
+	if h.decay.Tracked(defender) {
+		t.Fatal("spawned hostile is tracked for decay before death")
+	}
+
+	itemTemplates := item.NewTable([]*item.Template{{ID: 6673, Name: "Spoil Item", Stackable: true}})
+	attacker := &player.Character{ID: 500, Name: "killer", Level: 1, CurHP: 100, MaxHP: 100}
+	attacker.AttachRuntime(testPlayerTemplate(), itemcontainer.NewPlayerInventory(attacker.ID, itemTemplates))
+	attacker.SetWorld(h.state)
+	h.state.Spawn(attacker, 1005, 1000, 0, 0)
+	h.state.AddPlayer(attacker)
+
+	defender.SpoilPool().Mark(attacker.ObjectID())
+	defender.TakeDamage(defender.CurrentHP(), attacker)
+
+	if !defender.Dead() {
+		t.Fatal("defender.Dead() = false after lethal player damage")
+	}
+	if attacker.Exp != 29 || attacker.SP != 2 {
+		t.Fatalf("attacker rewards = exp %d, sp %d; want exp 29, sp 2", attacker.Exp, attacker.SP)
+	}
+	if !defender.SpoilPool().Sweepable() {
+		t.Fatal("defender spoil pool is not sweepable after death rewards")
+	}
+	if got := defender.SpoilPool().Sweep()[6673]; got != 1 {
+		t.Fatalf("swept spoil item 6673 = %d, want 1", got)
+	}
+	if !h.decay.Tracked(defender) {
+		t.Fatal("dead hostile is not tracked for decay")
+	}
+	if got, ok := h.decay.Deadline(defender); !ok || !got.Equal(h.now.Add(14*time.Second)) {
+		t.Fatalf("decay deadline = %v, %v; want %v, true", got, ok, h.now.Add(14*time.Second))
 	}
 }
 

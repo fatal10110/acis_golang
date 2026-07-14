@@ -138,6 +138,7 @@ func newGameServerApp(paths gameServerPaths) *fx.App {
 			provideSpawns,
 			provideRespawnTask,
 			provideAI,
+			provideKillRewardConfig,
 			provideNpcs,
 			network.NewSessionValidator,
 			provideLoginLinkState,
@@ -679,18 +680,59 @@ func provideSpawns(paths gameServerPaths, pool *sql.DB, log zerolog.Logger) (*ma
 	return spawns, store, nil
 }
 
-// spawnDropRates are the drop-rate multipliers manager.Npcs applies to kill
-// rewards. The server's actual RateDropAdena/RateDropItems/... config
-// surface isn't loaded anywhere yet, so every rate is neutral (1x) until
-// that's wired up.
-var spawnDropRates = item.Rates{Spoil: 1, Currency: 1, Item: 1, ItemRaid: 1, Herb: 1}
+func provideKillRewardConfig(paths gameServerPaths, serverProps *config.Properties, data *gameData) (manager.KillRewardConfig, error) {
+	playersProps, err := config.LoadFile(paths.PlayersConfigPath)
+	if err != nil {
+		return manager.KillRewardConfig{}, err
+	}
+
+	currencyKey := "RateDropCurrency"
+	if _, ok := serverProps.Lookup(currencyKey); !ok {
+		currencyKey = "RateDropAdena"
+	}
+	currency, err := serverProps.Float64(currencyKey, 1)
+	if err != nil {
+		return manager.KillRewardConfig{}, err
+	}
+	spoil, err := serverProps.Float64("RateDropSpoil", 1)
+	if err != nil {
+		return manager.KillRewardConfig{}, err
+	}
+	items, err := serverProps.Float64("RateDropItems", 1)
+	if err != nil {
+		return manager.KillRewardConfig{}, err
+	}
+	raidItems, err := serverProps.Float64("RateRaidDropItems", 1)
+	if err != nil {
+		return manager.KillRewardConfig{}, err
+	}
+	herbs, err := serverProps.Float64("RateDropHerbs", 1)
+	if err != nil {
+		return manager.KillRewardConfig{}, err
+	}
+
+	return manager.KillRewardConfig{
+		Rates: item.Rates{
+			Spoil:    spoil,
+			Currency: currency,
+			Item:     items,
+			ItemRaid: raidItems,
+			Herb:     herbs,
+		},
+		AutoLoot:          serverProps.Bool("AutoLoot", false),
+		AutoLootRaid:      serverProps.Bool("AutoLootRaid", false),
+		AutoLootHerbs:     serverProps.Bool("AutoLootHerbs", false),
+		DeepBlueDropRules: playersProps.Bool("UseDeepBlueDropRules", true),
+		PlayerLevels:      data.Levels,
+	}, nil
+}
 
 // provideNpcs instantiates every "on start" spawn entry into state at boot,
 // then wires the decay/respawn tasks' late-bound hooks to it — manager.Npcs
 // needs *task.Decay and *task.Respawn to register actors with, so those
 // tasks' own effects can only point back at Npcs after it exists.
-func provideNpcs(spawns *manager.Spawns, data *gameData, state *world.State, ids *idfactory.Allocator, decay *task.Decay, decayHooks *worldDecayEffects, respawnTask *task.Respawn, respawnHooks *npcRespawnEffects, ai *task.AI, ground *task.GroundItems, log zerolog.Logger) (*manager.Npcs, error) {
-	npcs, err := manager.NewNpcs(spawns, data.NPCs, data.Geo, state, ids, decay, respawnTask, ai, data.Items, ground, spawnDropRates, time.Now, log)
+func provideNpcs(spawns *manager.Spawns, data *gameData, state *world.State, ids *idfactory.Allocator, decay *task.Decay, decayHooks *worldDecayEffects, respawnTask *task.Respawn, respawnHooks *npcRespawnEffects, ai *task.AI, ground *task.GroundItems, rewards manager.KillRewardConfig, log zerolog.Logger) (*manager.Npcs, error) {
+	npcs, err := manager.NewNpcs(spawns, data.NPCs, data.Geo, state, ids, decay, respawnTask, ai, data.Items, ground, rewards, time.Now, log)
 	if err != nil {
 		return nil, err
 	}

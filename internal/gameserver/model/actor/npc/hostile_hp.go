@@ -1,6 +1,9 @@
 package npc
 
-import "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+)
 
 // MaxHP returns this NPC's maximum hit points, from its template.
 func (h *Hostile) MaxHP() int {
@@ -24,6 +27,11 @@ func (h *Hostile) SetCurrentHP(hp int) {
 // passing the reward hook set via SetRewarder (nil if none was set). It
 // reports whether this call newly killed the NPC.
 func (h *Hostile) TakeDamage(dmg int, attacker creature.DeathActor) bool {
+	if dmg > 0 {
+		if combatant, ok := attacker.(attackable.Combatant); ok {
+			h.AddDamageHate(combatant, float64(dmg), float64(dmg))
+		}
+	}
 	if !h.health.Damage(dmg) {
 		return false
 	}

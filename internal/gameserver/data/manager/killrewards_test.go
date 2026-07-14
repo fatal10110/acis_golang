@@ -35,6 +35,24 @@ type nopKiller struct{ id int32 }
 
 func (n nopKiller) ObjectID() int32 { return n.id }
 
+type lootKiller struct {
+	id    int32
+	items map[int32]int
+}
+
+func (l *lootKiller) ObjectID() int32 { return l.id }
+
+func (l *lootKiller) AddRewardItem(itemID int32, count int, objectID int32) bool {
+	if objectID == 0 {
+		return false
+	}
+	if l.items == nil {
+		l.items = make(map[int32]int)
+	}
+	l.items[itemID] += count
+	return true
+}
+
 func TestKillReward_DropsRolledItemsAtLocation(t *testing.T) {
 	items := item.NewTable([]*item.Template{{ID: 57, Name: "adena"}})
 	ground := &recordingGround{}
@@ -45,7 +63,7 @@ func TestKillReward_DropsRolledItemsAtLocation(t *testing.T) {
 	}
 	rates := item.Rates{Spoil: 1, Currency: 1, Item: 1, ItemRaid: 1, Herb: 1}
 
-	r := NewKillReward(categories, nil, 1, false, rates, false, ids, items, ground, 100, 200, 300, 45)
+	r := NewKillReward(categories, nil, 1, false, rates, false, false, ids, items, ground, 100, 200, 300, 45)
 	r.CalculateRewards(nopKiller{id: 1})
 
 	if len(ground.items) != 1 {
@@ -71,7 +89,7 @@ func TestKillReward_SkipsSpoilWithoutPool(t *testing.T) {
 	}
 	rates := item.Rates{Spoil: 1, Currency: 1, Item: 1, ItemRaid: 1, Herb: 1}
 
-	r := NewKillReward(categories, nil, 1, false, rates, false, ids, items, ground, 0, 0, 0, 0)
+	r := NewKillReward(categories, nil, 1, false, rates, false, false, ids, items, ground, 0, 0, 0, 0)
 	r.CalculateRewards(nopKiller{id: 1})
 
 	if len(ground.items) != 0 {
@@ -89,11 +107,33 @@ func TestKillReward_SkipsAutoLootHerbs(t *testing.T) {
 	}
 	rates := item.Rates{Spoil: 1, Currency: 1, Item: 1, ItemRaid: 1, Herb: 1}
 
-	r := NewKillReward(categories, nil, 1, false, rates, true, ids, items, ground, 0, 0, 0, 0)
+	r := NewKillReward(categories, nil, 1, false, rates, false, true, ids, items, ground, 0, 0, 0, 0)
 	r.CalculateRewards(nopKiller{id: 1})
 
 	if len(ground.items) != 0 {
 		t.Fatalf("dropped %d auto-loot herbs on the ground, want 0", len(ground.items))
+	}
+}
+
+func TestKillReward_AutoLootsRolledItemsIntoKillerInventory(t *testing.T) {
+	items := item.NewTable([]*item.Template{{ID: 57, Name: "adena", Stackable: true}})
+	ground := &recordingGround{}
+	ids := &sequentialIDs{}
+
+	categories := []item.DropCategory{
+		{Kind: item.DropCurrency, Chance: 100, Drops: []item.Drop{{ItemID: 57, Min: 10, Max: 10, Chance: 100}}},
+	}
+	rates := item.Rates{Spoil: 1, Currency: 1, Item: 1, ItemRaid: 1, Herb: 1}
+
+	killer := &lootKiller{id: 1}
+	r := NewKillReward(categories, nil, 1, false, rates, true, false, ids, items, ground, 0, 0, 0, 0)
+	r.CalculateRewards(killer)
+
+	if len(ground.items) != 0 {
+		t.Fatalf("dropped %d auto-looted items on the ground, want 0", len(ground.items))
+	}
+	if got := killer.items[57]; got != 10 {
+		t.Fatalf("auto-looted item 57 = %d, want 10", got)
 	}
 }
 
@@ -106,7 +146,7 @@ func TestKillReward_SkipsItemOnIDExhaustion(t *testing.T) {
 	}
 	rates := item.Rates{Spoil: 1, Currency: 1, Item: 1, ItemRaid: 1, Herb: 1}
 
-	r := NewKillReward(categories, nil, 1, false, rates, false, failingIDs{}, items, ground, 0, 0, 0, 0)
+	r := NewKillReward(categories, nil, 1, false, rates, false, false, failingIDs{}, items, ground, 0, 0, 0, 0)
 	r.CalculateRewards(nopKiller{id: 1})
 
 	if len(ground.items) != 0 {

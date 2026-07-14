@@ -23,6 +23,18 @@ func (c *Character) AddExpAndSp(table *LevelTable, tmpl *Template, exp int64, sp
 	return leveledUp
 }
 
+// RewardExpAndSp applies a kill reward using this live character's runtime
+// template for level-up stat refills.
+func (c *Character) RewardExpAndSp(table *LevelTable, exp int64, sp int) bool {
+	if table == nil {
+		if sp >= 0 {
+			c.AddSp(sp)
+		}
+		return false
+	}
+	return c.AddExpAndSp(table, c.runtimeTemplate, exp, sp)
+}
+
 // AddExp adds delta experience to c. An addition that would overflow
 // c.Exp negative is silently dropped, and an addition that would reach the
 // top of the highest level's experience band is clamped just below it. It

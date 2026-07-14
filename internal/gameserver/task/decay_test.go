@@ -69,6 +69,27 @@ func TestDecayAddThenTickFiresAfterDeadline(t *testing.T) {
 	}
 }
 
+func TestDecayDeadlineReportsTrackedDeadline(t *testing.T) {
+	now := time.UnixMilli(0)
+	effects := &decayFakeEffects{}
+	decay, _ := NewDecay(effects, func() time.Time { return now })
+
+	actor := &decayFakeActor{id: 100}
+	if _, ok := decay.Deadline(actor); ok {
+		t.Fatal("Deadline() ok = true before Add, want false")
+	}
+
+	decay.Add(actor, 7*time.Second)
+	if got, ok := decay.Deadline(actor); !ok || !got.Equal(now.Add(7*time.Second)) {
+		t.Fatalf("Deadline() = %v, %v; want %v, true", got, ok, now.Add(7*time.Second))
+	}
+
+	decay.Cancel(actor)
+	if _, ok := decay.Deadline(actor); ok {
+		t.Fatal("Deadline() ok = true after Cancel, want false")
+	}
+}
+
 func TestDecayCancelStopsPendingDecay(t *testing.T) {
 	now := time.UnixMilli(0)
 	effects := &decayFakeEffects{}
