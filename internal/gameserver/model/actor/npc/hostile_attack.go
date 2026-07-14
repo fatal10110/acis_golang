@@ -220,3 +220,8 @@ func (h *Hostile) BroadcastAttack(snapshot attack.Snapshot) {
 		receiver.SendFrame(serverpackets.FrameAttack(snapshot))
 	})
 }
+
+// AttackableBy reports whether attacker may physically attack this NPC.
+func (h *Hostile) AttackableBy(attacker attack.CreatureActor) bool {
+	return attacker != nil && attacker != h && !h.AlikeDead()
+}

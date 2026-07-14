@@ -29,8 +29,8 @@ Sources checked:
 
 - Original game client appendix: 206 concrete dispatcher targets.
 - Original game server appendix: 282 packet classes, including base/composite classes.
-- Classified M2-M5 required game client packets: 93. Missing in Go: 73.
-- Classified M2-M5 required game server packets: 128. Missing in Go: 86.
+- Classified M2-M5 required game client packets: 93. Missing in Go: 70.
+- Classified M2-M5 required game server packets: 128. Missing in Go: 85.
 - M1 login client/server packets are implemented.
 - M1 GS-LS link packets are implemented under `internal/link/`.
 - M2 base game connect/create/select packet set is implemented.
@@ -138,9 +138,10 @@ Missing M3 data/UI client packets:
 - `RequestConfirmGemStone`
 - `RequestConfirmCancelItem`
 
-Implemented and wired M4 movement/rotation client packets in Go:
+Implemented and wired M4 movement/rotation/target client packets in Go:
 
 - `CannotMoveAnymore`
+- `RequestTargetCancel`
 - `StartRotating`
 - `FinishRotating`
 
@@ -152,12 +153,14 @@ Missing M4 world/movement client packets:
 - `RequestGetOffVehicle`
 - `Appearing`
 - `ObserverReturn`
-- `RequestTargetCancel`
 
-Missing M5 stats/combat/items/progression client packets:
+Implemented and wired M5 target/combat client packets in Go:
 
 - `Action`
 - `AttackRequest`
+
+Missing M5 stats/combat/items/progression client packets:
+
 - `RequestChangeMoveType`
 - `RequestChangeWaitType`
 - `RequestSocialAction`
@@ -179,8 +182,6 @@ Missing M5 stats/combat/items/progression client packets:
 - `RequestRestartPoint`
 - `RequestEnchantItem`
 - `SendTimeCheck`
-
-`AttackRequest` remains a gap because the original flow resolves the target object, applies observer/out-of-control gates, uses current selected-target state, dispatches `onAction`, and may emit target-selection packets before an attack is attempted. The Go port has attack controllers and `Attack` server packets, but not the client-selected target/onAction routing required to wire this opcode truthfully.
 
 ## Game Server Packet Gaps
 
@@ -288,7 +289,6 @@ Missing M4 world/movement server packets:
 Missing M5 stats/combat/items/progression server packets:
 
 - `PlaySound`
-- `StatusUpdate`
 - `PetInventoryUpdate`
 - `PetItemList`
 - `PetStatusShow`
@@ -324,11 +324,20 @@ Implemented and wired M5 item server packets in Go:
 
 - `InventoryUpdate`
 
+Implemented and wired M5 target/combat server packets in Go:
+
+- `Attack`
+- `MyTargetSelected`
+- `TargetSelected`
+- `TargetUnselected`
+- `StatusUpdate`
+
 ## Notes
 
 - Duplicate names across sections are intentional. For example `NpcHtmlMessage`, `HennaInfo`, `ExStorageMaxCount`, `Die`, `PlaySound`, `ShortCutInit`, and `SkillCoolTime` are required by more than one closed milestone surface.
 - `StartRotation` was also classified into M4 during the movement/rotation pass; it is implemented and wired with `StartRotating`.
-- `StatusUpdate` remains a gap after the inventory burst. Equip/unequip emits `InventoryUpdate`, but it does not change carried load, and the broader stat/status recalculation broadcast path is not wired yet.
-- The unique missing counts deduplicate those overlaps: 73 missing game client packets and 86 missing game server packets after the EnterWorld, movement/rotation, and inventory packet-wiring passes.
+- `Action` and `AttackRequest` now wire the target-selection/onAction subset needed for attacking mobs: first request selects and sends target HP status, second `AttackRequest` against the selected target emits `Attack`. NPC dialog/interact routing remains deferred to the M7 NPC work, and skill/cast targeting remains deferred to M6.
+- `StatusUpdate` is implemented and wired for target max/current HP during selection. Broader status/stat recalculation broadcasts still need owner flows as those systems are ported.
+- The unique missing counts deduplicate those overlaps: 70 missing game client packets and 85 missing game server packets after the EnterWorld, movement/rotation, inventory, and target/action packet-wiring passes.
 - Existing Go code accepts several M4/M5 client opcodes in `clientpackets/wiresafe.go`, but many of them still log "Opcode not wired" or have no decode/run implementation.
 - This audit uses original Java class names. Go may keep a slightly different helper shape, such as `Frame...` functions instead of packet structs, but the required client-visible packet behavior is still one original packet at a time.

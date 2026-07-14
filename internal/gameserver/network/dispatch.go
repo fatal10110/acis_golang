@@ -15,6 +15,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
@@ -86,6 +87,7 @@ type livePlayer struct {
 	*player.Character
 	template *player.Template
 	items    []*item.Instance
+	target   world.Tracked
 }
 
 func (p *livePlayer) SendFrame(frame wire.Frame) bool {
@@ -423,6 +425,29 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			now := time.Now()
 			session.SendFrame(serverpackets.FrameSkillCoolTime(skillCoolTimeEntries(live.SkillReuseTimers(now), now)))
 
+		case clientpackets.OpcodeAction:
+			req, err := clientpackets.DecodeAction(payload)
+			if err != nil {
+				l.log.Warn().Err(err).Msg("game client")
+				return
+			}
+			if live == nil {
+				continue
+			}
+			l.handleTargetAction(live, req.ObjectID, false)
+
+		case clientpackets.OpcodeAttackRequest:
+			req, err := clientpackets.DecodeAttackRequest(payload)
+			if err != nil {
+				l.log.Warn().Err(err).Msg("game client")
+				return
+			}
+			if live == nil {
+				continue
+			}
+			selected := live.target != nil && live.target.ObjectID() == req.ObjectID
+			l.handleTargetAction(live, req.ObjectID, selected)
+
 		case clientpackets.OpcodeLogout:
 			if live != nil {
 				session.SendFrame(serverpackets.FrameLeaveWorld())
@@ -515,6 +540,15 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				l.handleSummonActionUse(live, req)
 			}
 
+		case clientpackets.OpcodeRequestTargetCancel:
+			if _, err := clientpackets.DecodeRequestTargetCancel(payload); err != nil {
+				l.log.Warn().Err(err).Msg("game client")
+				return
+			}
+			if live != nil {
+				l.clearLiveTarget(live)
+			}
+
 		case clientpackets.OpcodeStartRotating:
 			req, err := clientpackets.DecodeStartRotating(payload)
 			if err != nil {
@@ -537,7 +571,6 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			if live == nil {
 				continue
 			}
-			live.Heading = int(req.Degree)
 			live.SetHeading(int(req.Degree))
 			l.broadcastLiveFrame(live, func() wire.Frame {
 				return serverpackets.FrameStopRotation(live.ObjectID(), int(req.Degree), 0)
@@ -559,9 +592,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 			chars = list
 
-		case clientpackets.OpcodeAction,
-			clientpackets.OpcodeAttackRequest,
-			clientpackets.OpcodeRequestDropItem,
+		case clientpackets.OpcodeRequestDropItem,
 			clientpackets.OpcodeTradeRequest,
 			clientpackets.OpcodeAddTradeItem,
 			clientpackets.OpcodeTradeDone,
@@ -580,7 +611,6 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			clientpackets.OpcodeRequestShortCutReg,
 			clientpackets.OpcodeDummy34,
 			clientpackets.OpcodeRequestShortCutDel,
-			clientpackets.OpcodeRequestTargetCancel,
 			clientpackets.OpcodeDummy3E,
 			clientpackets.OpcodeRequestGetOnVehicle,
 			clientpackets.OpcodeRequestGetOffVehicle,
@@ -894,6 +924,154 @@ func (l *GameClientLink) broadcastLiveFrame(live *livePlayer, frame func() wire.
 		}
 		receiver.SendFrame(frame())
 	})
+}
+
+func (l *GameClientLink) handleTargetAction(live *livePlayer, objectID int32, selected bool) {
+	target := l.resolveTarget(objectID)
+	if target == nil {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return
+	}
+	if live.target == nil || live.target.ObjectID() != target.ObjectID() {
+		l.selectLiveTarget(live, target)
+		return
+	}
+	if selected {
+		l.attackLiveTarget(live, target)
+	}
+}
+
+func (l *GameClientLink) resolveTarget(objectID int32) world.Tracked {
+	if l.world == nil {
+		return nil
+	}
+	obj, ok := l.world.Object(objectID)
+	if !ok {
+		return nil
+	}
+	target, ok := obj.(world.Tracked)
+	if !ok {
+		return nil
+	}
+	return target
+}
+
+func (l *GameClientLink) selectLiveTarget(live *livePlayer, target world.Tracked) bool {
+	if live == nil || target == nil {
+		return false
+	}
+	if live.target != nil && live.target.ObjectID() == target.ObjectID() {
+		return true
+	}
+	live.target = target
+	live.SendFrame(serverpackets.FrameMyTargetSelected(target.ObjectID(), targetColor(live.Character, target)))
+	if attrs, ok := targetHPAttributes(target); ok {
+		live.SendFrame(serverpackets.FrameStatusUpdate(target.ObjectID(), attrs))
+	}
+	l.broadcastTargetSelected(live, target)
+	return true
+}
+
+func (l *GameClientLink) clearLiveTarget(live *livePlayer) {
+	if live == nil {
+		return
+	}
+	old := live.target
+	live.target = nil
+	live.SendFrame(serverpackets.FrameActionFailed())
+	if old != nil {
+		l.broadcastTargetUnselected(live)
+	}
+}
+
+func (l *GameClientLink) attackLiveTarget(live *livePlayer, target world.Tracked) bool {
+	combatant, ok := target.(attackable.Combatant)
+	if !ok {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return false
+	}
+	controller := attack.NewPlayer(live.Character)
+	if !controller.CanAttack(combatant) {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return false
+	}
+	controller.DoAttack(combatant)
+	return true
+}
+
+func (l *GameClientLink) broadcastTargetSelected(live *livePlayer, target world.Tracked) {
+	if l.world == nil {
+		return
+	}
+	x, y, z := live.Position()
+	at := location.Location{X: x, Y: y, Z: z}
+	l.world.ForEachKnown(live, func(o world.Tracked) {
+		receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
+		if !ok {
+			return
+		}
+		receiver.SendFrame(serverpackets.FrameTargetSelected(live.ObjectID(), target.ObjectID(), at))
+	})
+}
+
+func (l *GameClientLink) broadcastTargetUnselected(live *livePlayer) {
+	if l.world == nil {
+		return
+	}
+	x, y, z := live.Position()
+	at := location.Location{X: x, Y: y, Z: z}
+	l.world.ForEachKnown(live, func(o world.Tracked) {
+		receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
+		if !ok {
+			return
+		}
+		receiver.SendFrame(serverpackets.FrameTargetUnselected(live.ObjectID(), at))
+	})
+}
+
+func targetColor(attacker *player.Character, target world.Tracked) int {
+	if attacker == nil {
+		return 0
+	}
+	attackableTarget, ok := target.(interface {
+		AttackableBy(attack.CreatureActor) bool
+	})
+	if !ok || !attackableTarget.AttackableBy(attacker) {
+		return 0
+	}
+	return attacker.Level - targetLevel(target)
+}
+
+func targetLevel(target world.Tracked) int {
+	switch t := target.(type) {
+	case *livePlayer:
+		return t.Level
+	case *npc.Hostile:
+		if t.Instance != nil && t.Instance.Template != nil {
+			return t.Instance.Template.Level
+		}
+	}
+	return 0
+}
+
+func targetHPAttributes(target world.Tracked) ([]serverpackets.StatusAttribute, bool) {
+	switch t := target.(type) {
+	case *livePlayer:
+		return []serverpackets.StatusAttribute{
+			{Type: serverpackets.StatusMaxHP, Value: int(t.MaxHP)},
+			{Type: serverpackets.StatusCurrentHP, Value: int(t.CurHP)},
+		}, true
+	case interface {
+		MaxHP() int
+		CurrentHP() int
+	}:
+		return []serverpackets.StatusAttribute{
+			{Type: serverpackets.StatusMaxHP, Value: t.MaxHP()},
+			{Type: serverpackets.StatusCurrentHP, Value: t.CurrentHP()},
+		}, true
+	default:
+		return nil, false
+	}
 }
 
 func (l *GameClientLink) handleSummonActionUse(live *livePlayer, req clientpackets.RequestActionUse) bool {

@@ -87,7 +87,7 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) {
 	w.WriteInt32(int32(x))
 	w.WriteInt32(int32(y))
 	w.WriteInt32(int32(z))
-	w.WriteInt32(int32(c.Heading))
+	w.WriteInt32(int32(c.CurrentHeading()))
 	w.WriteInt32(c.ObjectID())
 	w.WriteString(c.Name)
 	w.WriteInt32(int32(c.Race))

@@ -464,6 +464,32 @@ func encodeFinishRotating(degree, side int32) []byte {
 	return w.Bytes()
 }
 
+func encodeAction(objectID int32, origin location.Location, shift bool) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeAction)
+	w.WriteInt32(objectID)
+	w.WriteInt32(int32(origin.X))
+	w.WriteInt32(int32(origin.Y))
+	w.WriteInt32(int32(origin.Z))
+	w.WriteUint8(boolUint8(shift))
+	return w.Bytes()
+}
+
+func encodeAttackRequest(objectID int32, origin location.Location, shift bool) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeAttackRequest)
+	w.WriteInt32(objectID)
+	w.WriteInt32(int32(origin.X))
+	w.WriteInt32(int32(origin.Y))
+	w.WriteInt32(int32(origin.Z))
+	w.WriteUint8(boolUint8(shift))
+	return w.Bytes()
+}
+
+func encodeRequestTargetCancel(unselect uint16) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeRequestTargetCancel)
+	w.WriteUint16(unselect)
+	return w.Bytes()
+}
+
 func encodeSingleOpcode(opcode byte) []byte {
 	return wire.NewPacketWriter(opcode).Bytes()
 }
@@ -564,6 +590,13 @@ func frameOpcodes(frames [][]byte) []byte {
 		}
 	}
 	return out
+}
+
+func boolUint8(v bool) uint8 {
+	if v {
+		return 1
+	}
+	return 0
 }
 
 func newTestLivePlayer(t *testing.T, id int32, capture *frameCapture) *livePlayer {
@@ -834,6 +867,156 @@ func TestMoveLivePlayerRelocatesWorldVisibility(t *testing.T) {
 	}
 	if got := frameOpcodes(watcherFrames.frames); string(got) != string([]byte{serverpackets.OpcodeCharInfo}) {
 		t.Fatalf("watcher opcodes = %x, want CharInfo", got)
+	}
+}
+
+func TestSelectAndClearLiveTargetSendsTargetPackets(t *testing.T) {
+	state := world.New()
+	attackerFrames := &frameCapture{}
+	observerFrames := &frameCapture{}
+	attacker := newTestLivePlayer(t, 1, attackerFrames)
+	observer := newTestLivePlayer(t, 2, observerFrames)
+	target := newTestHostileNPC(t, 3)
+
+	state.Spawn(attacker, 0, 0, 0, 0)
+	state.Spawn(observer, 100, 0, 0, 0)
+	state.Spawn(target, 150, 0, 0, 0)
+	attackerFrames.frames = nil
+	observerFrames.frames = nil
+
+	gcl := &GameClientLink{world: state, log: zerolog.Nop()}
+	if !gcl.selectLiveTarget(attacker, target) {
+		t.Fatal("selectLiveTarget returned false")
+	}
+	if got := frameOpcodes(attackerFrames.frames); string(got) != string([]byte{serverpackets.OpcodeMyTargetSelected, serverpackets.OpcodeStatusUpdate}) {
+		t.Fatalf("attacker select opcodes = %x, want MyTargetSelected, StatusUpdate", got)
+	}
+	if got := frameOpcodes(observerFrames.frames); string(got) != string([]byte{serverpackets.OpcodeTargetSelected}) {
+		t.Fatalf("observer select opcodes = %x, want TargetSelected", got)
+	}
+
+	attackerFrames.frames = nil
+	observerFrames.frames = nil
+	gcl.clearLiveTarget(attacker)
+	if got := frameOpcodes(attackerFrames.frames); string(got) != string([]byte{serverpackets.OpcodeActionFailed}) {
+		t.Fatalf("attacker clear opcodes = %x, want ActionFailed", got)
+	}
+	if got := frameOpcodes(observerFrames.frames); string(got) != string([]byte{serverpackets.OpcodeTargetUnselected}) {
+		t.Fatalf("observer clear opcodes = %x, want TargetUnselected", got)
+	}
+}
+
+func TestGameClientLinkActionAttackAndTargetCancel(t *testing.T) {
+	c, chars, _, state := newLinkedGameClient(t)
+
+	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.read() // CharCreateOk
+	c.read() // CharSelectInfo
+	objID := chars.soleObjectID(t)
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	playerObj, ok := state.Player(objID)
+	if !ok {
+		t.Fatalf("world.Player(%d) missing", objID)
+	}
+	live := playerObj.(*livePlayer)
+	live.Character.SetRollSource(func(int) int { return 0 })
+
+	target := newTestHostileNPC(t, 3000)
+	target.Instance.Template.PDef = 1
+	target.Instance.Template.DEX = 30
+	target.SetRollSource(func(int) int { return 0 })
+	state.Spawn(target, 120, 20, 30, 0)
+	if reply := c.read(); reply[0] != serverpackets.OpcodeNPCInfo {
+		t.Fatalf("visible target opcode = %#x, want NPCInfo (%#x)", reply[0], serverpackets.OpcodeNPCInfo)
+	}
+
+	origin := location.Location{X: 10, Y: 20, Z: 30}
+	c.send(encodeAction(target.ObjectID(), origin, false))
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeMyTargetSelected {
+		t.Fatalf("Action first opcode = %#x, want MyTargetSelected (%#x)", reply[0], serverpackets.OpcodeMyTargetSelected)
+	}
+	reply = c.read()
+	assertTargetHPStatus(t, reply, target.ObjectID(), target.MaxHP(), target.CurrentHP())
+
+	c.send(encodeAttackRequest(target.ObjectID(), origin, false))
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeAttack {
+		t.Fatalf("AttackRequest opcode = %#x, want Attack (%#x)", reply[0], serverpackets.OpcodeAttack)
+	}
+	r := wire.NewReader(reply[1:])
+	if attackerID := r.ReadInt32(); attackerID != objID {
+		t.Fatalf("Attack attacker id = %d, want %d", attackerID, objID)
+	}
+
+	c.send(encodeRequestTargetCancel(1))
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeActionFailed {
+		t.Fatalf("RequestTargetCancel opcode = %#x, want ActionFailed (%#x)", reply[0], serverpackets.OpcodeActionFailed)
+	}
+}
+
+func TestGameClientLinkAttackRequestFirstSelectsOnly(t *testing.T) {
+	c, _, _, state := newLinkedGameClient(t)
+
+	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.read() // CharCreateOk
+	c.read() // CharSelectInfo
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	target := newTestHostileNPC(t, 3001)
+	state.Spawn(target, 120, 20, 30, 0)
+	if reply := c.read(); reply[0] != serverpackets.OpcodeNPCInfo {
+		t.Fatalf("visible target opcode = %#x, want NPCInfo (%#x)", reply[0], serverpackets.OpcodeNPCInfo)
+	}
+
+	origin := location.Location{X: 10, Y: 20, Z: 30}
+	c.send(encodeAttackRequest(target.ObjectID(), origin, false))
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeMyTargetSelected {
+		t.Fatalf("first AttackRequest opcode = %#x, want MyTargetSelected (%#x)", reply[0], serverpackets.OpcodeMyTargetSelected)
+	}
+	reply = c.read()
+	assertTargetHPStatus(t, reply, target.ObjectID(), target.MaxHP(), target.CurrentHP())
+
+	c.send(encodeRequestTargetCancel(1))
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeActionFailed {
+		t.Fatalf("RequestTargetCancel after first AttackRequest opcode = %#x, want ActionFailed (%#x)", reply[0], serverpackets.OpcodeActionFailed)
+	}
+}
+
+func assertTargetHPStatus(t *testing.T, frame []byte, objectID int32, maxHP, curHP int) {
+	t.Helper()
+	if frame[0] != serverpackets.OpcodeStatusUpdate {
+		t.Fatalf("status opcode = %#x, want StatusUpdate (%#x)", frame[0], serverpackets.OpcodeStatusUpdate)
+	}
+	r := wire.NewReader(frame[1:])
+	if got := r.ReadInt32(); got != objectID {
+		t.Fatalf("StatusUpdate object id = %d, want %d", got, objectID)
+	}
+	if count := r.ReadInt32(); count != 2 {
+		t.Fatalf("StatusUpdate attribute count = %d, want 2", count)
+	}
+	if typ, val := r.ReadInt32(), r.ReadInt32(); typ != int32(serverpackets.StatusMaxHP) || val != int32(maxHP) {
+		t.Fatalf("StatusUpdate first attr = (%d,%d), want MAX_HP=%d", typ, val, maxHP)
+	}
+	if typ, val := r.ReadInt32(), r.ReadInt32(); typ != int32(serverpackets.StatusCurrentHP) || val != int32(curHP) {
+		t.Fatalf("StatusUpdate second attr = (%d,%d), want CUR_HP=%d", typ, val, curHP)
+	}
+	if err := r.Err(); err != nil {
+		t.Fatalf("StatusUpdate read: %v", err)
 	}
 }
 
@@ -1148,7 +1331,7 @@ func TestGameClientLinkWireSafeMovementAndRefreshPacketsInGame(t *testing.T) {
 	if degree, speed, lowDegree := r.ReadInt32(), r.ReadInt32(), r.ReadUint8(); degree != 22222 || speed != 0 || lowDegree != wantLowDegree {
 		t.Fatalf("StopRotation fields = (%d,%d,%d), want (22222,0,%d)", degree, speed, lowDegree, wantLowDegree)
 	}
-	if heading := obj.(*livePlayer).Character.Heading; heading != 22222 {
+	if heading := obj.(*livePlayer).Character.CurrentHeading(); heading != 22222 {
 		t.Fatalf("live player heading = %d, want 22222", heading)
 	}
 

@@ -277,5 +277,5 @@ func (r *Roster) Restore(ctx context.Context, objectID int32) error {
 // SavePosition persists the live character's latest world position and
 // heading for the next character-list, relog, or server restart load.
 func (r *Roster) SavePosition(ctx context.Context, c *player.Character) error {
-	return r.characters.SetPosition(ctx, c.ID, c.Location, c.Heading)
+	return r.characters.SetPosition(ctx, c.ID, c.CurrentLocation(), c.CurrentHeading())
 }

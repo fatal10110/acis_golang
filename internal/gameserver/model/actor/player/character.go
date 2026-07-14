@@ -121,3 +121,19 @@ func NewCharacter(objectID int32, tmpl *Template, accountName, name string, hair
 
 	return c, nil
 }
+
+// CurrentLocation returns the synchronized live world position when c is
+// spawned, otherwise the persisted last-known location.
+func (c *Character) CurrentLocation() location.Location {
+	x, y, z := c.Position()
+	return location.Location{X: x, Y: y, Z: z}
+}
+
+// CurrentHeading returns the synchronized live heading when c is spawned,
+// otherwise the persisted last-known heading.
+func (c *Character) CurrentHeading() int {
+	if c.Visible() {
+		return c.Presence.Heading()
+	}
+	return c.Heading
+}

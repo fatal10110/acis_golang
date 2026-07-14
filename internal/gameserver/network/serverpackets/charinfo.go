@@ -119,7 +119,7 @@ func writeCharInfo(w *wire.Writer, s CharInfoSnapshot) {
 	w.WriteInt32(0)
 	w.WriteInt32(0)
 	w.WriteInt32(defaultNameColor)
-	w.WriteInt32(int32(c.Heading))
+	w.WriteInt32(int32(c.CurrentHeading()))
 	w.WriteInt32(0) // pledge class
 	w.WriteInt32(0) // pledge type
 	w.WriteInt32(defaultTitleColor)
