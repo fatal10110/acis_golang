@@ -82,6 +82,20 @@ func TestNewBuildsCoreEffectMetadata(t *testing.T) {
 		{"Fear", TypeFear, FlagFear, true},
 		{"DamOverTime", TypeDamOverTime, FlagNone, true},
 		{"ManaDamOverTime", TypeManaDamOverTime, FlagNone, false},
+		{"AbortCast", TypeAbortCast, FlagNone, false},
+		{"ImmobileUntilAttacked", TypeImmobileUntilAttacked, flagMeditating, false},
+		{"ImobileBuff", TypeImmobilizeEffector, FlagNone, false},
+		{"Invincible", TypeInvincible, FlagNone, false},
+		{"ManaHealOverTime", TypeManaHealOverTime, FlagNone, false},
+		{"Mute", TypeMute, flagMuted, true},
+		{"NoblesseBless", TypeNoblesseBless, flagNoblesseBlessing, false},
+		{"Paralyze", TypeParalyze, flagParalyzed, true},
+		{"Petrification", TypePetrification, flagParalyzed, true},
+		{"PhysicalMute", TypePhysicalMute, flagPhysicalMuted, true},
+		{"RemoveTarget", TypeRemoveTarget, FlagNone, false},
+		{"SilenceMagicPhysical", TypeSilenceAll, flagMuted | flagPhysicalMuted, true},
+		{"SilentMove", TypeSilentMove, flagSilentMove, false},
+		{"StunSelf", TypeStunSelf, FlagStunned, false},
 	}
 
 	for _, tt := range tests {
@@ -126,6 +140,16 @@ func TestDisablerEffectsRunLiveStartExitHooks(t *testing.T) {
 			name:      "Sleep",
 			wantStart: []string{"abort:false", "abnormal"},
 			wantExit:  []string{"think", "abnormal"},
+		},
+		{
+			name:      "Paralyze",
+			wantStart: []string{"abort:false"},
+			wantExit:  []string{"think"},
+		},
+		{
+			name:      "Petrification",
+			wantStart: []string{"abort:false", "invul:true"},
+			wantExit:  []string{"think", "invul:false"},
 		},
 	}
 
@@ -388,14 +412,291 @@ func TestManaDamageOverTimeHookMutatesLiveTarget(t *testing.T) {
 	}
 }
 
+func TestAbortCastEffectHook(t *testing.T) {
+	tests := []struct {
+		name        string
+		selfCast    bool
+		raidRelated bool
+		castingNow  bool
+		wantEvents  []string
+		wantInUse   bool
+	}{
+		{
+			name:       "interrupts an in-progress cast",
+			castingNow: true,
+			wantEvents: []string{"interrupt-cast"},
+			wantInUse:  true,
+		},
+		{
+			name:       "no-ops when target is not casting",
+			castingNow: false,
+			wantEvents: nil,
+			wantInUse:  true,
+		},
+		{
+			name:       "rejected on self-cast",
+			selfCast:   true,
+			castingNow: true,
+			wantEvents: nil,
+			wantInUse:  false,
+		},
+		{
+			name:        "rejected on a raid-related target",
+			raidRelated: true,
+			castingNow:  true,
+			wantEvents:  nil,
+			wantInUse:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			target := &liveEffectTarget{castingNow: tt.castingNow, raidRelated: tt.raidRelated}
+			e, err := New(Skill{ID: 1}, modelskill.EffectTemplate{Name: "AbortCast"})
+			if err != nil {
+				t.Fatalf("New() error: %v", err)
+			}
+			e.Effected = target
+			if tt.selfCast {
+				e.Effector = target
+			} else {
+				e.Effector = "caster"
+			}
+
+			NewList(nil).Add(e)
+			if !reflect.DeepEqual(target.events, tt.wantEvents) {
+				t.Fatalf("events = %#v, want %#v", target.events, tt.wantEvents)
+			}
+			if e.InUse() != tt.wantInUse {
+				t.Fatalf("InUse() = %v, want %v", e.InUse(), tt.wantInUse)
+			}
+		})
+	}
+}
+
+func TestMuteFamilyEffectsStopMatchingCastOnly(t *testing.T) {
+	tests := []struct {
+		name       string
+		effect     string
+		castingNow bool
+		castMagic  bool
+		wantEvents []string
+	}{
+		{name: "Mute interrupts a magic cast", effect: "Mute", castingNow: true, castMagic: true, wantEvents: []string{"stop-cast", "abnormal"}},
+		{name: "Mute ignores a physical cast", effect: "Mute", castingNow: true, castMagic: false, wantEvents: []string{"abnormal"}},
+		{name: "PhysicalMute interrupts a physical cast", effect: "PhysicalMute", castingNow: true, castMagic: false, wantEvents: []string{"stop-cast", "abnormal"}},
+		{name: "PhysicalMute ignores a magic cast", effect: "PhysicalMute", castingNow: true, castMagic: true, wantEvents: []string{"abnormal"}},
+		{name: "SilenceMagicPhysical stops any cast unconditionally", effect: "SilenceMagicPhysical", castingNow: true, castMagic: true, wantEvents: []string{"stop-cast", "abnormal"}},
+		{name: "SilenceMagicPhysical stops even when the target reports idle", effect: "SilenceMagicPhysical", castingNow: false, wantEvents: []string{"stop-cast", "abnormal"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			target := &liveEffectTarget{castingNow: tt.castingNow, castMagic: tt.castMagic}
+			e, err := New(Skill{ID: 1}, modelskill.EffectTemplate{Name: tt.effect})
+			if err != nil {
+				t.Fatalf("New() error: %v", err)
+			}
+			e.Effected = target
+
+			NewList(nil).Add(e)
+			if !reflect.DeepEqual(target.events, tt.wantEvents) {
+				t.Fatalf("events = %#v, want %#v", target.events, tt.wantEvents)
+			}
+		})
+	}
+}
+
+func TestImmobileUntilAttackedEffectLifecycle(t *testing.T) {
+	target := &liveEffectTarget{}
+	e, err := New(Skill{ID: 77}, modelskill.EffectTemplate{Name: "ImmobileUntilAttacked"})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e.Effected = target
+
+	list := NewList(nil)
+	list.Add(e)
+	if want := []string{"abort:false", "abnormal"}; !reflect.DeepEqual(target.events, want) {
+		t.Fatalf("start events = %#v, want %#v", target.events, want)
+	}
+
+	target.events = nil
+	if e.ActionTime() {
+		t.Fatal("immobile-until-attacked action hook continued, want a one-shot end")
+	}
+	if want := []string{"stop-skill:77", "think", "abnormal"}; !reflect.DeepEqual(target.events, want) {
+		t.Fatalf("action events = %#v, want %#v", target.events, want)
+	}
+
+	target.events = nil
+	list.Remove(e)
+	if want := []string{"stop-skill:77", "think", "abnormal"}; !reflect.DeepEqual(target.events, want) {
+		t.Fatalf("exit events = %#v, want %#v", target.events, want)
+	}
+}
+
+func TestImmobilizeEffectorEffectTargetsEffectorNotEffected(t *testing.T) {
+	effected := &liveEffectTarget{}
+	effector := &liveEffectTarget{}
+	e, err := New(Skill{ID: 1}, modelskill.EffectTemplate{Name: "ImobileBuff"})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e.Effected = effected
+	e.Effector = effector
+
+	list := NewList(nil)
+	list.Add(e)
+	if want := []string{"immobilized:true"}; !reflect.DeepEqual(effector.events, want) {
+		t.Fatalf("effector start events = %#v, want %#v", effector.events, want)
+	}
+	if len(effected.events) != 0 {
+		t.Fatalf("effected events = %#v, want none", effected.events)
+	}
+
+	list.Remove(e)
+	if want := []string{"immobilized:true", "immobilized:false"}; !reflect.DeepEqual(effector.events, want) {
+		t.Fatalf("effector exit events = %#v, want %#v", effector.events, want)
+	}
+}
+
+func TestInvincibleEffectTogglesInvulOnStartAndExit(t *testing.T) {
+	target := &liveEffectTarget{}
+	e, err := New(Skill{ID: 1}, modelskill.EffectTemplate{Name: "Invincible"})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e.Effected = target
+
+	list := NewList(nil)
+	list.Add(e)
+	if want := []string{"invul:true"}; !reflect.DeepEqual(target.events, want) {
+		t.Fatalf("start events = %#v, want %#v", target.events, want)
+	}
+
+	list.Remove(e)
+	if want := []string{"invul:true", "invul:false"}; !reflect.DeepEqual(target.events, want) {
+		t.Fatalf("exit events = %#v, want %#v", target.events, want)
+	}
+}
+
+func TestRemoveTargetEffectClearsTargetAttackAndCast(t *testing.T) {
+	target := &liveEffectTarget{}
+	e, err := New(Skill{ID: 1}, modelskill.EffectTemplate{Name: "RemoveTarget"})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e.Effected = target
+
+	NewList(nil).Add(e)
+	want := []string{"clear-target", "stop-attack", "stop-cast"}
+	if !reflect.DeepEqual(target.events, want) {
+		t.Fatalf("events = %#v, want %#v", target.events, want)
+	}
+}
+
+func TestSilentMoveActionOnlyTicksContSkillsAndStopsOnLowMana(t *testing.T) {
+	target := &liveEffectTarget{mp: 10}
+	e, err := New(Skill{ID: 1, SkillType: "CONT"}, modelskill.EffectTemplate{Name: "SilentMove", Value: 4})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e.Effected = target
+
+	if !e.ActionTime() {
+		t.Fatal("silent move action stopped on a CONT skill with enough mana")
+	}
+	if target.mp != 6 {
+		t.Fatalf("target mp = %v, want 6", target.mp)
+	}
+	if want := []string{"mpdot:4"}; !reflect.DeepEqual(target.events, want) {
+		t.Fatalf("events = %#v, want %#v", target.events, want)
+	}
+
+	target.events = nil
+	target.mp = 2
+	if e.ActionTime() {
+		t.Fatal("silent move action continued with insufficient mana, want stop")
+	}
+	if want := []string{"lack-mp"}; !reflect.DeepEqual(target.events, want) {
+		t.Fatalf("low-mana events = %#v, want %#v", target.events, want)
+	}
+
+	nonCont, err := New(Skill{ID: 1, SkillType: "BUFF"}, modelskill.EffectTemplate{Name: "SilentMove", Value: 4})
+	if err != nil {
+		t.Fatalf("New() non-CONT error: %v", err)
+	}
+	nonCont.Effected = &liveEffectTarget{mp: 10}
+	if nonCont.ActionTime() {
+		t.Fatal("silent move action ticked on a non-CONT skill, want immediate stop")
+	}
+}
+
+func TestManaHealOverTimeEffectHookMutatesLiveTarget(t *testing.T) {
+	heal := &liveEffectTarget{mp: 1, canBeHealed: true}
+	hot, err := New(Skill{ID: 1}, modelskill.EffectTemplate{Name: "ManaHealOverTime", Value: 5})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	hot.Effected = heal
+	if !hot.ActionTime() {
+		t.Fatal("mana heal action stopped on a healable target")
+	}
+	if heal.mp != 6 {
+		t.Fatalf("target mp = %v, want 6", heal.mp)
+	}
+	if want := []string{"add-mp:5"}; !reflect.DeepEqual(heal.events, want) {
+		t.Fatalf("events = %#v, want %#v", heal.events, want)
+	}
+
+	heal.canBeHealed = false
+	heal.events = nil
+	if hot.ActionTime() {
+		t.Fatal("mana heal action continued on an unhealable target")
+	}
+	if len(heal.events) != 0 {
+		t.Fatalf("events = %#v, want none", heal.events)
+	}
+}
+
+func TestStunSelfEffectIdlesEffectedAndRefreshesEffector(t *testing.T) {
+	effected := &liveEffectTarget{playable: true}
+	effector := &liveEffectTarget{}
+	e, err := New(Skill{ID: 1}, modelskill.EffectTemplate{Name: "StunSelf"})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e.Effected = effected
+	e.Effector = effector
+
+	list := NewList(nil)
+	list.Add(e)
+	if want := []string{"idle"}; !reflect.DeepEqual(effected.events, want) {
+		t.Fatalf("effected start events = %#v, want %#v", effected.events, want)
+	}
+	if want := []string{"abnormal"}; !reflect.DeepEqual(effector.events, want) {
+		t.Fatalf("effector start events = %#v, want %#v", effector.events, want)
+	}
+
+	list.Remove(e)
+	if want := []string{"abnormal", "abnormal"}; !reflect.DeepEqual(effector.events, want) {
+		t.Fatalf("effector exit events = %#v, want %#v", effector.events, want)
+	}
+}
+
 type liveEffectTarget struct {
-	events     []string
-	hp         float64
-	mp         float64
-	dead       bool
-	afraid     bool
-	fearImmune bool
-	playable   bool
+	events      []string
+	hp          float64
+	mp          float64
+	dead        bool
+	afraid      bool
+	fearImmune  bool
+	playable    bool
+	raidRelated bool
+	castingNow  bool
+	castMagic   bool
+	canBeHealed bool
 }
 
 func (t *liveEffectTarget) Dead() bool { return t.dead }
@@ -454,4 +755,45 @@ func (t *liveEffectTarget) FleeFrom(effector any, distance int) {
 
 func (t *liveEffectTarget) StopEffects(typ Type) {
 	t.events = append(t.events, "stop-effects:"+string(typ))
+}
+
+func (t *liveEffectTarget) RaidRelated() bool { return t.raidRelated }
+
+func (t *liveEffectTarget) CastingNow() bool { return t.castingNow }
+
+func (t *liveEffectTarget) CurrentSkillIsMagic() bool { return t.castMagic }
+
+func (t *liveEffectTarget) InterruptCast() {
+	t.events = append(t.events, "interrupt-cast")
+}
+
+func (t *liveEffectTarget) StopCast() {
+	t.events = append(t.events, "stop-cast")
+}
+
+func (t *liveEffectTarget) ClearTarget() {
+	t.events = append(t.events, "clear-target")
+}
+
+func (t *liveEffectTarget) StopAttack() {
+	t.events = append(t.events, "stop-attack")
+}
+
+func (t *liveEffectTarget) SetInvul(v bool) {
+	t.events = append(t.events, fmt.Sprintf("invul:%v", v))
+}
+
+func (t *liveEffectTarget) SetImmobilized(v bool) {
+	t.events = append(t.events, fmt.Sprintf("immobilized:%v", v))
+}
+
+func (t *liveEffectTarget) CanBeHealed() bool { return t.canBeHealed }
+
+func (t *liveEffectTarget) AddMP(amount float64) {
+	t.mp += amount
+	t.events = append(t.events, fmt.Sprintf("add-mp:%g", amount))
+}
+
+func (t *liveEffectTarget) StopSkillEffectsByID(id modelskill.ID) {
+	t.events = append(t.events, fmt.Sprintf("stop-skill:%d", id))
 }
