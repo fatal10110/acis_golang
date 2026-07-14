@@ -73,6 +73,13 @@ type UndeadTarget interface {
 	Undead() bool
 }
 
+// CorpseTarget is implemented by creatures that can report whether they
+// currently have a pending, lootable corpse available to corpse-targeted
+// skills.
+type CorpseTarget interface {
+	HasCorpse() bool
+}
+
 // PeaceZoner is implemented by creatures that can report whether hostilities
 // are blocked by their current zone.
 type PeaceZoner interface {
@@ -137,6 +144,11 @@ func NewRegistry(known Known) *Registry {
 	r.Register(summonHandler{})
 	r.Register(areaSummonHandler{known: known})
 	r.Register(ownerPetHandler{})
+	r.Register(corpseMobHandler{})
+	r.Register(areaCorpseMobHandler{known: known})
+	r.Register(corpsePlayerHandler{})
+	r.Register(corpsePetHandler{})
+	r.Register(groundHandler{})
 	return r
 }
 
@@ -511,6 +523,151 @@ func (ownerPetHandler) CanCast(caster, target Creature, _ *modelskill.Definition
 	return ok && sameCreature(owner, target) && !target.Dead()
 }
 
+type corpseMobHandler struct{}
+
+func (corpseMobHandler) Target() modelskill.Target { return modelskill.TargetCorpseMob }
+
+func (corpseMobHandler) Targets(_, target Creature, _ *modelskill.Definition) []Creature {
+	return []Creature{target}
+}
+
+func (corpseMobHandler) FinalTarget(_, target Creature, _ *modelskill.Definition) Creature {
+	return target
+}
+
+func (corpseMobHandler) CanCast(_, target Creature, skill *modelskill.Definition, _ bool) bool {
+	return corpseMobCanCast(target, skill)
+}
+
+type areaCorpseMobHandler struct {
+	known Known
+}
+
+func (areaCorpseMobHandler) Target() modelskill.Target { return modelskill.TargetAreaCorpseMob }
+
+// harvestGrandBoxSkillID is the one skill (Harvest Grand Box, id 444) that
+// widens the corpse-mob area scan to also sweep in every already-dead
+// attackable creature nearby, instead of the usual live-target splash.
+const harvestGrandBoxSkillID = 444
+
+func (h areaCorpseMobHandler) Targets(caster, target Creature, skill *modelskill.Definition) []Creature {
+	if target == nil {
+		return nil
+	}
+	out := []Creature{target}
+	if h.known == nil {
+		return out
+	}
+	h.known.ForEachKnownCreatureInRadius(target, skillRadius(skill), func(creature Creature) {
+		if sameCreature(caster, creature) || !canSee(target, creature) {
+			return
+		}
+		if skill != nil && skill.ID == harvestGrandBoxSkillID {
+			if creature.Category().Has(CategoryAttackable) && creature.Dead() {
+				out = append(out, creature)
+			}
+			return
+		}
+		if creature.Dead() {
+			return
+		}
+		if areaCanAffect(caster, creature) {
+			out = append(out, creature)
+		}
+	})
+	return out
+}
+
+func (areaCorpseMobHandler) FinalTarget(_, target Creature, _ *modelskill.Definition) Creature {
+	return target
+}
+
+func (areaCorpseMobHandler) CanCast(_, target Creature, skill *modelskill.Definition, _ bool) bool {
+	return corpseMobCanCast(target, skill)
+}
+
+// corpseMobCanCast applies the mob-corpse cast-eligibility rule shared by
+// the single-target and area corpse-mob handlers: the target must have a
+// pending corpse and not be a player-controlled actor or summon, a harvest
+// skill always succeeds against an attackable corpse regardless of its age,
+// and a sweep skill only ever succeeds against an attackable corpse.
+//
+// The corpse-age cutoff and its seeded/spoiled bypass are not ported: they
+// depend on a decay-deadline accessor and runtime seed/spoil state that
+// don't exist on any creature yet.
+func corpseMobCanCast(target Creature, skill *modelskill.Definition) bool {
+	if target == nil || !hasCorpse(target) || target.Category().Has(CategoryPlayable) {
+		return false
+	}
+	if skill != nil && skill.SkillType == "HARVEST" {
+		return target.Category().Has(CategoryAttackable)
+	}
+	if skill != nil && skill.SkillType == "SWEEP" && !target.Category().Has(CategoryAttackable) {
+		return false
+	}
+	return true
+}
+
+type corpsePlayerHandler struct{}
+
+func (corpsePlayerHandler) Target() modelskill.Target { return modelskill.TargetCorpsePlayer }
+
+func (corpsePlayerHandler) Targets(_, target Creature, _ *modelskill.Definition) []Creature {
+	return []Creature{target}
+}
+
+func (corpsePlayerHandler) FinalTarget(_, target Creature, _ *modelskill.Definition) Creature {
+	return target
+}
+
+func (corpsePlayerHandler) CanCast(_, target Creature, _ *modelskill.Definition, _ bool) bool {
+	return target != nil && target.Dead() && target.Category().Has(CategoryPlayable)
+}
+
+type corpsePetHandler struct{}
+
+func (corpsePetHandler) Target() modelskill.Target { return modelskill.TargetCorpsePet }
+
+func (corpsePetHandler) Targets(_, target Creature, _ *modelskill.Definition) []Creature {
+	return []Creature{target}
+}
+
+func (corpsePetHandler) FinalTarget(_, target Creature, _ *modelskill.Definition) Creature {
+	return target
+}
+
+// CanCast requires the target be dead and owned by another creature — the
+// closest available signal to a pet, since no actor type distinguishes pets
+// from other player-owned summons yet.
+func (corpsePetHandler) CanCast(_, target Creature, _ *modelskill.Definition, _ bool) bool {
+	if target == nil || !target.Dead() {
+		return false
+	}
+	_, ok := ownerOf(target)
+	return ok
+}
+
+type groundHandler struct{}
+
+func (groundHandler) Target() modelskill.Target { return modelskill.TargetGround }
+
+func (groundHandler) Targets(caster, _ Creature, _ *modelskill.Definition) []Creature {
+	return []Creature{caster}
+}
+
+func (groundHandler) FinalTarget(caster, _ Creature, _ *modelskill.Definition) Creature {
+	return caster
+}
+
+// CanCast reports true unconditionally. The real cast-eligibility checks —
+// line of sight from the caster to the cast's target point and whether that
+// point falls inside a peace zone — depend on a per-cast target-point field
+// and a location-aware line-of-sight query that don't exist on the caster
+// yet; gating on them is deferred until that plumbing lands.
+func (groundHandler) CanCast(Creature, Creature, *modelskill.Definition, bool) bool {
+	return true
+}
+
 func skillRadius(skill *modelskill.Definition) int {
 	if skill == nil {
 		return 0
@@ -571,6 +728,11 @@ func validUndeadSingleTarget(creature Creature) bool {
 func isUndead(creature Creature) bool {
 	undead, ok := creature.(UndeadTarget)
 	return ok && undead.Undead()
+}
+
+func hasCorpse(creature Creature) bool {
+	corpse, ok := creature.(CorpseTarget)
+	return ok && corpse.HasCorpse()
 }
 
 func inPeaceZone(creature Creature) bool {
