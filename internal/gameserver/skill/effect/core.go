@@ -78,6 +78,27 @@ const (
 	TypeSilentMove Type = "SILENT_MOVE"
 	// TypeStunSelf idles the target and refreshes the caster's own status.
 	TypeStunSelf Type = "STUN_SELF"
+	// TypeHeal restores HP once when the effect starts.
+	TypeHeal Type = "HEAL"
+	// TypeHealOverTime restores HP on each periodic tick.
+	TypeHealOverTime Type = "HEAL_OVER_TIME"
+	// TypeManaHeal restores MP once when the effect starts.
+	TypeManaHeal Type = "MANA_HEAL"
+	// TypeTargetMe redirects the target's current target onto the
+	// effector, or turns an existing lock onto the effector into an attack.
+	TypeTargetMe Type = "TARGET_ME"
+	// TypeBluff redirects the target's facing onto the effector's, unless
+	// the target is exempt from facing-redirect effects.
+	TypeBluff Type = "BLUFF"
+	// TypeCharmOfCourage is a marker buff limited to players; other actors
+	// reject it outright.
+	TypeCharmOfCourage Type = "CHARM_OF_COURAGE"
+	// TypeCharmOfLuck is a marker buff consulted by whatever system reacts
+	// to it ending.
+	TypeCharmOfLuck Type = "CHARM_OF_LUCK"
+	// TypePhoenixBless is a marker buff consulted by whatever system reacts
+	// to it ending.
+	TypePhoenixBless Type = "PHOENIX_BLESSING"
 )
 
 type kind struct {
@@ -109,6 +130,14 @@ var coreKinds = map[string]kind{
 	"SilenceMagicPhysical":  {typ: TypeSilenceAll, flag: flagMuted | flagPhysicalMuted, debuff: true},
 	"SilentMove":            {typ: TypeSilentMove, flag: flagSilentMove},
 	"StunSelf":              {typ: TypeStunSelf, flag: FlagStunned},
+	"Heal":                  {typ: TypeHeal},
+	"HealOverTime":          {typ: TypeHealOverTime},
+	"ManaHeal":              {typ: TypeManaHeal},
+	"TargetMe":              {typ: TypeTargetMe},
+	"Bluff":                 {typ: TypeBluff},
+	"CharmOfCourage":        {typ: TypeCharmOfCourage, flag: flagCharmOfCourage},
+	"CharmOfLuck":           {typ: TypeCharmOfLuck, flag: flagCharmOfLuck},
+	"PhoenixBless":          {typ: TypePhoenixBless, flag: flagPhoenixBlessing},
 }
 
 var fearSkippedPlayableSkillIDs = map[modelskill.ID]bool{
@@ -202,6 +231,22 @@ func wireHooks(e *Effect) {
 	case TypeStunSelf:
 		e.OnStart = stunSelfStart
 		e.OnExit = stunSelfExit
+	case TypeHeal:
+		e.OnStart = healStart
+	case TypeHealOverTime:
+		e.OnAction = healOverTimeAction
+	case TypeManaHeal:
+		e.OnStart = manaHealStart
+	case TypeTargetMe:
+		e.OnStart = targetMeStart
+	case TypeBluff:
+		e.OnStart = bluffStart
+	case TypeCharmOfCourage:
+		e.OnStart = charmOfCourageStart
+	case TypeCharmOfLuck:
+		e.OnExit = charmOfLuckExit
+	case TypePhoenixBless:
+		e.OnExit = phoenixBlessExit
 	}
 }
 
@@ -312,10 +357,79 @@ type immobilizeTarget interface {
 }
 
 // manaHealTarget is implemented by an actor whose mana pool can be checked
-// for healing eligibility and restored.
+// for healing eligibility and restored. AddMP reports the amount actually
+// applied (e.g. clamped to the actor's max MP).
 type manaHealTarget interface {
 	CanBeHealed() bool
-	AddMP(amount float64)
+	AddMP(amount float64) float64
+}
+
+// instantHealTarget is implemented by an actor whose HP can be checked for
+// healing eligibility and restored. AddHP reports the amount actually
+// applied (e.g. clamped to the actor's max HP).
+type instantHealTarget interface {
+	CanBeHealed() bool
+	AddHP(amount float64) float64
+}
+
+// healProficiencyTarget optionally reports the additive bonus a heal
+// effect's base value is boosted by before the percentage from
+// healEffectivenessTarget is applied; absent, it defaults to 0.
+type healProficiencyTarget interface {
+	HealProficiency() float64
+}
+
+// healEffectivenessTarget optionally reports the percentage a heal amount
+// is scaled by; absent, it defaults to 100.
+type healEffectivenessTarget interface {
+	HealEffectiveness() float64
+}
+
+// rechargeRateTarget optionally adjusts a base MP-restore amount by the
+// actor's recharge rate before it is applied; absent, the base amount is
+// used unadjusted.
+type rechargeRateTarget interface {
+	RechargeMP(base float64) float64
+}
+
+// targetRedirectTarget is implemented by an actor whose current target can
+// be read or replaced, or turned into an attack.
+type targetRedirectTarget interface {
+	CurrentTarget() any
+	SetTarget(any)
+	TryToAttack(any)
+}
+
+// headingTarget is implemented by an actor whose facing can be read or set.
+type headingTarget interface {
+	Heading() int
+	SetHeading(int)
+}
+
+// bluffExemptTarget optionally reports whether an actor ignores a
+// facing-redirect effect (some non-combatant and event-specific actors do);
+// absent, the actor is not exempt.
+type bluffExemptTarget interface {
+	BluffExempt() bool
+}
+
+// playerTarget optionally reports whether an actor is specifically a
+// player, as opposed to any other playable (pet, summon, ...); absent, the
+// actor is treated as not a player.
+type playerTarget interface {
+	IsPlayer() bool
+}
+
+// charmOfLuckStopper is implemented by an actor that reacts to its Charm of
+// Luck buff ending.
+type charmOfLuckStopper interface {
+	StopCharmOfLuck(*Effect)
+}
+
+// phoenixBlessStopper is implemented by an actor that reacts to its Phoenix
+// Blessing buff ending.
+type phoenixBlessStopper interface {
+	StopPhoenixBlessing(*Effect)
 }
 
 // skillIDEffectStopper is implemented by an actor whose active effects can
@@ -609,6 +723,104 @@ func stunSelfStart(e *Effect) bool {
 
 func stunSelfExit(e *Effect) {
 	refresh(e.Effector)
+}
+
+func healStart(e *Effect) bool {
+	target, ok := e.Effected.(instantHealTarget)
+	if !ok || !target.CanBeHealed() {
+		return false
+	}
+
+	power := e.Template.Value
+	if p, ok := e.Effected.(healProficiencyTarget); ok {
+		power += p.HealProficiency()
+	}
+	effectiveness := 100.0
+	if eff, ok := e.Effected.(healEffectivenessTarget); ok {
+		effectiveness = eff.HealEffectiveness()
+	}
+
+	amount := target.AddHP(power * effectiveness / 100)
+	// The applied amount is added a second time; this reproduces the
+	// reference heal effect's own behavior exactly, not a Go-side bug.
+	target.AddHP(amount)
+	return true
+}
+
+func healOverTimeAction(e *Effect) bool {
+	target, ok := e.Effected.(instantHealTarget)
+	if !ok || !target.CanBeHealed() {
+		return false
+	}
+	target.AddHP(e.Template.Value)
+	return true
+}
+
+func manaHealStart(e *Effect) bool {
+	target, ok := e.Effected.(manaHealTarget)
+	if !ok || !target.CanBeHealed() {
+		return false
+	}
+
+	power := e.Template.Value
+	if r, ok := e.Effected.(rechargeRateTarget); ok {
+		power = r.RechargeMP(power)
+	}
+
+	amount := target.AddMP(power)
+	// The applied amount is added a second time; this reproduces the
+	// reference heal effect's own behavior exactly, not a Go-side bug.
+	target.AddMP(amount)
+	return true
+}
+
+func targetMeStart(e *Effect) bool {
+	target, ok := e.Effected.(targetRedirectTarget)
+	if !ok {
+		return false
+	}
+	if target.CurrentTarget() == e.Effector {
+		target.TryToAttack(e.Effector)
+	} else {
+		target.SetTarget(e.Effector)
+	}
+	return true
+}
+
+func bluffStart(e *Effect) bool {
+	if rt, ok := e.Effected.(raidTarget); ok && rt.RaidRelated() {
+		return false
+	}
+	if ex, ok := e.Effected.(bluffExemptTarget); ok && ex.BluffExempt() {
+		return false
+	}
+	target, ok := e.Effected.(headingTarget)
+	if !ok {
+		return false
+	}
+	effector, ok := e.Effector.(headingTarget)
+	if !ok {
+		return false
+	}
+	target.SetHeading(effector.Heading())
+	return true
+}
+
+func charmOfCourageStart(e *Effect) bool {
+	target, ok := e.Effected.(playerTarget)
+	return ok && target.IsPlayer()
+}
+
+func charmOfLuckExit(e *Effect) {
+	if target, ok := e.Effected.(charmOfLuckStopper); ok {
+		target.StopCharmOfLuck(e)
+	}
+}
+
+func phoenixBlessExit(e *Effect) {
+	if target, ok := e.Effected.(phoenixBlessStopper); ok {
+		target.StopPhoenixBlessing(e)
+	}
 }
 
 func abortAll(target any) {
