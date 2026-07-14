@@ -58,15 +58,14 @@ type undeadTarget interface {
 
 type disablersHandler struct{}
 
-// Types lists 13 of the 15 skill types the reference handler covers.
+// Types lists 14 of the 15 skill types the reference handler covers.
 // AGGDAMAGE needs an AI aggression-event notification pipeline that isn't
-// wired yet, and ERASE only ever acts on a foreign summon (dismissing it),
-// so both are left unregistered rather than half-ported into a no-op.
+// wired yet, so it is left unregistered rather than half-ported into a no-op.
 func (disablersHandler) Types() []string {
 	return []string{
 		"STUN", "ROOT", "SLEEP", "PARALYZE", "MUTE", "CONFUSION",
 		"FAKE_DEATH", "BETRAY", "NEGATE", "CANCEL_DEBUFF",
-		"AGGREDUCE", "AGGREDUCE_CHAR", "AGGREMOVE",
+		"AGGREDUCE", "AGGREDUCE_CHAR", "AGGREMOVE", "ERASE",
 	}
 }
 
@@ -102,6 +101,8 @@ func (disablersHandler) Use(cast Cast) {
 			disableAggReduceChar(cast, target)
 		case "AGGREMOVE":
 			disableAggRemove(cast, target)
+		case "ERASE":
+			disableErase(cast, target)
 		case "NEGATE":
 			disableNegate(cast, target)
 		case "CANCEL_DEBUFF":
@@ -123,6 +124,35 @@ func checkSkillSuccess(caster any, target disablerTarget, def modelskill.Definit
 	}
 	rate := formulas.SkillSuccessRate(in)
 	return formulas.SkillSucceeds(rate, rnd.Get(100)), true
+}
+
+type erasableSummon interface {
+	SummonOwner() any
+	SiegeSummon() bool
+	UnSummon(owner any)
+}
+
+type servitorVanishNotifier interface {
+	ServitorVanished()
+}
+
+func disableErase(cast Cast, target disablerTarget) {
+	succeeded, ok := checkSkillSuccess(cast.Caster, target, cast.Skill)
+	if !ok || !succeeded {
+		return
+	}
+	summon, ok := any(target).(erasableSummon)
+	if !ok || summon.SiegeSummon() {
+		return
+	}
+	owner := summon.SummonOwner()
+	if owner == nil {
+		return
+	}
+	summon.UnSummon(owner)
+	if notifier, ok := owner.(servitorVanishNotifier); ok {
+		notifier.ServitorVanished()
+	}
 }
 
 // reflectTarget returns the effect's actual destination: the original

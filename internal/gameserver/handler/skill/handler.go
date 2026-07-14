@@ -57,6 +57,8 @@ func NewDefaultRegistry() *Registry {
 		resurrectHandler{},
 		instantJumpHandler{},
 		getPlayerHandler{},
+		summonCreatureHandler{},
+		summonFriendHandler{},
 		unlockHandler{},
 		extractableHandler{},
 		sowHandler{},
