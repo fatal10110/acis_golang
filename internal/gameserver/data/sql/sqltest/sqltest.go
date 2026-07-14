@@ -138,6 +138,22 @@ const petsSchema = "CREATE TABLE IF NOT EXISTS `pets` (\n" +
 	"  PRIMARY KEY (`item_obj_id`)\n" +
 	")"
 
+// characterSkillsSaveSchema mirrors the shipped character_skills_save table
+// definition verbatim.
+const characterSkillsSaveSchema = "CREATE TABLE IF NOT EXISTS `character_skills_save` (\n" +
+	"  `char_obj_id` INT NOT NULL default 0,\n" +
+	"  `skill_id` INT NOT NULL default 0,\n" +
+	"  `skill_level` INT(3) NOT NULL default 1,\n" +
+	"  `effect_count` INT NOT NULL default 0,\n" +
+	"  `effect_cur_time` INT NOT NULL default 0,\n" +
+	"  `reuse_delay` INT(8) NOT NULL DEFAULT 0,\n" +
+	"  `systime` BIGINT UNSIGNED NOT NULL DEFAULT 0,\n" +
+	"  `restore_type` INT(1) NOT NULL DEFAULT 0,\n" +
+	"  `class_index` INT(1) NOT NULL DEFAULT 0,\n" +
+	"  `buff_index` INT(2) NOT NULL default 0,\n" +
+	"  PRIMARY KEY (`char_obj_id`,`skill_id`,`skill_level`,`class_index`)\n" +
+	")"
+
 // NewDB starts a real MariaDB container, creates the gameserver tables used
 // by integration tests, and returns a pool connected to it. The container is
 // terminated and the pool closed when the test completes.
@@ -183,6 +199,9 @@ func NewDB(t *testing.T) *sql.DB {
 	}
 	if _, err := db.ExecContext(ctx, petsSchema); err != nil {
 		t.Fatalf("create pets table: %v", err)
+	}
+	if _, err := db.ExecContext(ctx, characterSkillsSaveSchema); err != nil {
+		t.Fatalf("create character_skills_save table: %v", err)
 	}
 	return db
 }
