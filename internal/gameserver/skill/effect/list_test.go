@@ -9,7 +9,8 @@ import (
 )
 
 type eventOwner struct {
-	events *[]string
+	events  *[]string
+	maxBuff int
 }
 
 func (o eventOwner) AddStatFuncs([]basefunc.Func) {
@@ -19,6 +20,13 @@ func (o eventOwner) AddStatFuncs([]basefunc.Func) {
 func (o eventOwner) RemoveStatsByOwner(owner any) {
 	e := owner.(*Effect)
 	*o.events = append(*o.events, "owner:remove:"+e.Template.Name)
+}
+
+func (o eventOwner) MaxBuffCount() int {
+	if o.maxBuff == 0 {
+		return 20
+	}
+	return o.maxBuff
 }
 
 func newEffect(name string, id modelskill.ID, stackType string, stackOrder float64, debuff bool) *Effect {
@@ -177,6 +185,7 @@ func TestListReplacesIdenticalBuffButRejectsIdenticalDebuff(t *testing.T) {
 	requireEvents(t, events, []string{
 		"buff1:start",
 		"owner:add",
+		"buff1:stop",
 		"owner:remove:buff1",
 		"buff1:exit",
 		"buff2:start",
@@ -191,5 +200,92 @@ func TestListReplacesIdenticalBuffButRejectsIdenticalDebuff(t *testing.T) {
 	}
 	if debuff2.InUse() {
 		t.Fatal("rejected identical debuff became active")
+	}
+}
+
+// buffSlotEffect returns a named, non-stacking buff-slot-family effect
+// (the family of skill types that occupy an owner's limited buff slots and
+// are shown as an icon).
+func buffSlotEffect(name string, id modelskill.ID, events *[]string) *Effect {
+	e := namedEffect(name, id, "none", 0, false, events)
+	e.Skill.SkillType = "BUFF"
+	e.Template.Icon = true
+	return e
+}
+
+func TestListEvictsOldestBuffSlotEffectAtCapacity(t *testing.T) {
+	var events []string
+	list := NewList(eventOwner{events: &events, maxBuff: 2})
+
+	first := buffSlotEffect("first", 1, &events)
+	second := buffSlotEffect("second", 2, &events)
+	third := buffSlotEffect("third", 3, &events)
+
+	list.Add(first)
+	list.Add(second)
+	list.Add(third)
+
+	requireNames(t, list.All(), []string{"second", "third"})
+	if first.InUse() {
+		t.Fatal("evicted buff stayed active")
+	}
+	found := false
+	for _, ev := range events {
+		if ev == "first:stop" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("evicted buff's task was never stopped")
+	}
+}
+
+func TestListDropsHerbEffectAtCapacityWithoutEvicting(t *testing.T) {
+	var events []string
+	list := NewList(eventOwner{events: &events, maxBuff: 1})
+
+	real := buffSlotEffect("real", 1, &events)
+	herb := namedEffect("herb", 2, "none", 0, false, &events)
+	herb.Herb = true
+
+	list.Add(real)
+	list.Add(herb)
+
+	requireEvents(t, events, []string{
+		"real:start",
+		"owner:add",
+		"herb:stop",
+	})
+	requireNames(t, list.All(), []string{"real"})
+	if herb.InUse() {
+		t.Fatal("dropped herb effect became active")
+	}
+}
+
+func TestListSkipsCapEvictionForIncomingStackingBuff(t *testing.T) {
+	var events []string
+	list := NewList(eventOwner{events: &events, maxBuff: 2})
+
+	unrelated := buffSlotEffect("unrelated", 1, &events)
+	weak := namedEffect("weak", 2, "speed", 1, false, &events)
+	weak.Skill.SkillType = "BUFF"
+	weak.Template.Icon = true
+	strong := namedEffect("strong", 3, "speed", 2, false, &events)
+	strong.Skill.SkillType = "BUFF"
+	strong.Template.Icon = true
+
+	list.Add(unrelated)
+	list.Add(weak)
+	list.Add(strong)
+
+	requireNames(t, list.All(), []string{"unrelated", "strong"})
+	if !unrelated.InUse() {
+		t.Fatal("unrelated buff was displaced by cap eviction instead of the stack-group replacement")
+	}
+	if weak.InUse() {
+		t.Fatal("weaker stacked buff stayed active")
+	}
+	if !strong.InUse() {
+		t.Fatal("stronger stacked buff is not active")
 	}
 }

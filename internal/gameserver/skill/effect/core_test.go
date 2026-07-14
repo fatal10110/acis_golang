@@ -20,6 +20,8 @@ func (o *funcOwner) AddStatFuncs(funcs []basefunc.Func) {
 
 func (o *funcOwner) RemoveStatsByOwner(any) {}
 
+func (o *funcOwner) MaxBuffCount() int { return 20 }
+
 // The effect names, type strings, flags, stat-func mapping, and DoT branch
 // expectations below were generated from the reference effect classes with
 // actor/network dependencies replaced by scalar inputs or metadata dumps.

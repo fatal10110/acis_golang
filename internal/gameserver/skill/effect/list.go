@@ -1,6 +1,7 @@
 package effect
 
 import (
+	"math"
 	"slices"
 	"sync"
 
@@ -33,7 +34,9 @@ const (
 // skill needs to recognize an already-active effect as "the same kind" of
 // disable or "eligible to be stripped".
 type Skill struct {
-	ID             modelskill.ID
+	ID modelskill.ID
+	// SkillType is the raw datapack skill-type tag (e.g. "BUFF", "REFLECT").
+	// It drives the buff-slot family used by the list's cap enforcement.
 	SkillType      string
 	Debuff         bool
 	Toggle         bool
@@ -43,6 +46,21 @@ type Skill struct {
 
 func (s Skill) sevenSigns() bool {
 	return s.ID > 4360 && s.ID < 4367
+}
+
+// buffSlotFamily is the set of skill types that occupy (and can be evicted
+// from) an owner's limited buff slots.
+var buffSlotFamily = map[string]bool{
+	"BUFF":             true,
+	"REFLECT":          true,
+	"HEAL_PERCENT":     true,
+	"HEAL_STATIC":      true,
+	"MANAHEAL_PERCENT": true,
+	"COMBATPOINTHEAL":  true,
+}
+
+func (s Skill) buffSlot() bool {
+	return buffSlotFamily[s.SkillType]
 }
 
 // Effect is one live skill effect managed by a List. Hook fields are optional;
@@ -123,10 +141,15 @@ func (e *Effect) stackType() string {
 	return e.Template.StackType
 }
 
-// StatOwner receives stat function changes when active effects change.
+// StatOwner receives stat function changes when active effects change and
+// reports the owner's current buff-slot capacity.
 type StatOwner interface {
 	AddStatFuncs([]basefunc.Func)
 	RemoveStatsByOwner(owner any)
+	// MaxBuffCount is the number of non-toggle, non-seven-signs buffs the
+	// owner can hold at once (base slot count plus any bonus the owner
+	// grants, e.g. from a known passive).
+	MaxBuffCount() int
 }
 
 // Option changes List behavior.
@@ -202,6 +225,10 @@ func (l *List) Remove(e *Effect) {
 	l.remove(e)
 }
 
+// add inserts e. Incoming effects are not yet gated by the owner's active
+// special-effect state (e.g. rejecting an effect that conflicts with a
+// currently active status) — that needs an owner-side abnormal-state tracker
+// that doesn't exist yet; wire this gate in once that tracker lands.
 func (l *List) add(e *Effect) {
 	if e.Skill.Debuff {
 		for _, existing := range l.debuffs {
@@ -214,9 +241,21 @@ func (l *List) add(e *Effect) {
 	} else {
 		for _, existing := range slices.Clone(l.buffs) {
 			if existing.identical(e) {
-				l.remove(existing)
+				l.exit(existing)
 			}
 		}
+
+		// Herbs never evict a real buff: at or over capacity, they are
+		// simply dropped.
+		if e.Herb && l.buffCount() >= l.maxBuffCount() {
+			e.stopTask()
+			return
+		}
+
+		if !l.doesStack(e) && !e.Skill.sevenSigns() {
+			l.evictForCap(e)
+		}
+
 		l.insertBuff(e)
 	}
 
@@ -230,6 +269,68 @@ func (l *List) add(e *Effect) {
 	}
 
 	l.addStacked(e)
+}
+
+// exit fully retires e: its scheduled task is stopped and it is detached
+// from stats/visibility and, if active, run through its on-exit hook.
+func (l *List) exit(e *Effect) {
+	e.stopTask()
+	l.remove(e)
+}
+
+// doesStack reports whether e's stack type already has a member among the
+// current buffs, mirroring the check that exempts stacking buffs from
+// buff-slot cap eviction.
+func (l *List) doesStack(e *Effect) bool {
+	stackType := e.stackType()
+	if stackType == "none" {
+		return false
+	}
+	return len(l.stacks[stackType]) > 0
+}
+
+// buffCount returns the number of visible, non-seven-signs buff-slot-family
+// buffs currently held.
+func (l *List) buffCount() int {
+	count := 0
+	for _, e := range l.buffs {
+		if e != nil && e.Template.Icon && !e.Skill.sevenSigns() && e.Skill.buffSlot() {
+			count++
+		}
+	}
+	return count
+}
+
+// maxBuffCount is the owner's buff-slot capacity, or unbounded when no
+// owner is set.
+func (l *List) maxBuffCount() int {
+	if l.owner == nil {
+		return math.MaxInt
+	}
+	return l.owner.MaxBuffCount()
+}
+
+// evictForCap exits the oldest buff-slot-family buffs when e would put the
+// list at or over the owner's buff-slot cap. Only buff-slot-family incoming
+// effects trigger eviction, and only buff-slot-family buffs are evicted.
+func (l *List) evictForCap(e *Effect) {
+	if !e.Skill.buffSlot() {
+		return
+	}
+	remaining := l.buffCount() - l.maxBuffCount()
+	if remaining < 0 {
+		return
+	}
+	for _, existing := range slices.Clone(l.buffs) {
+		if existing == nil || !existing.Skill.buffSlot() {
+			continue
+		}
+		l.exit(existing)
+		remaining--
+		if remaining < 0 {
+			break
+		}
+	}
 }
 
 func (l *List) insertBuff(e *Effect) {
