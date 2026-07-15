@@ -24,3 +24,22 @@ func TestDecodeRequestLinkHTMLShort(t *testing.T) {
 		t.Fatal("DecodeRequestLinkHTML: want error on unterminated string")
 	}
 }
+
+func TestDecodeRequestBypassToServer(t *testing.T) {
+	w := wire.NewPacketWriter(OpcodeRequestBypassToServer)
+	w.WriteString("player_help tutorial.htm")
+
+	got, err := DecodeRequestBypassToServer(w.Bytes())
+	if err != nil {
+		t.Fatalf("DecodeRequestBypassToServer: %v", err)
+	}
+	if got.Command != "player_help tutorial.htm" {
+		t.Fatalf("Command = %q, want player_help tutorial.htm", got.Command)
+	}
+}
+
+func TestDecodeRequestBypassToServerShort(t *testing.T) {
+	if _, err := DecodeRequestBypassToServer([]byte{OpcodeRequestBypassToServer, 'x'}); err == nil {
+		t.Fatal("DecodeRequestBypassToServer: want error on unterminated string")
+	}
+}

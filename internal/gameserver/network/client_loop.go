@@ -476,6 +476,14 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 			l.requestLinkHTML(live, req)
 
+		case clientpackets.OpcodeRequestBypassToServer:
+			req, err := clientpackets.DecodeRequestBypassToServer(payload)
+			if err != nil {
+				l.log.Warn().Err(err).Msg("game client")
+				continue
+			}
+			l.requestBypassToServer(live, req)
+
 		case clientpackets.OpcodeRequestTargetCancel:
 			if _, err := clientpackets.DecodeRequestTargetCancel(payload); err != nil {
 				l.log.Warn().Err(err).Msg("game client")

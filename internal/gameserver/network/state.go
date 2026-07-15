@@ -82,6 +82,7 @@ var allowedOpcodes = map[State]map[byte]bool{
 		0x1e: true, // sell item
 		0x1f: true, // buy item
 		0x20: true, // request linked html
+		0x21: true, // request bypass command
 		0x23: true, // dummy packet
 		0x2e: true, // dummy packet
 		0x2f: true, // request magic skill use
