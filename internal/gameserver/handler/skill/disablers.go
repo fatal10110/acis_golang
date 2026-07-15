@@ -113,8 +113,11 @@ func (disablersHandler) Use(cast Cast) {
 	applySelfEffects(cast.Caster, cast.Skill)
 }
 
-func checkSkillSuccess(caster any, target disablerTarget, def modelskill.Definition) (succeeded, ok bool) {
-	src, ok := any(target).(skillSuccessSource)
+// checkSkillSuccess rolls an effect-landing attempt of def against target.
+// ok is false when target exposes no resolved-landing-rate source, letting a
+// caller decide whether to treat that as "doesn't apply" or fall back.
+func checkSkillSuccess(caster any, target any, def modelskill.Definition) (succeeded, ok bool) {
+	src, ok := target.(skillSuccessSource)
 	if !ok {
 		return false, false
 	}

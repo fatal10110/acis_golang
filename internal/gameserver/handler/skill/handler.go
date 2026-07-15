@@ -65,6 +65,7 @@ func NewDefaultRegistry() *Registry {
 		harvestHandler{},
 		spoilHandler{},
 		sweepHandler{},
+		continuousHandler{},
 	)
 }
 
