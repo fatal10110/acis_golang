@@ -15,11 +15,12 @@ func TestUseEnchantScrollOpensSelection(t *testing.T) {
 	scroll := &item.Instance{ObjectID: 600, TemplateID: 955, Count: 1, Location: item.LocationInventory}
 	capture := &frameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{scroll})
+	gcl := &GameClientLink{}
 
-	(&GameClientLink{}).useItem(live, scroll.ObjectID)
+	gcl.useItem(live, scroll.ObjectID)
 
-	if live.activeEnchantScrollObjectID != scroll.ObjectID {
-		t.Fatalf("active enchant scroll = %d, want %d", live.activeEnchantScrollObjectID, scroll.ObjectID)
+	if got := gcl.enchantStateStore().Active(live.ObjectID()); got != scroll.ObjectID {
+		t.Fatalf("active enchant scroll = %d, want %d", got, scroll.ObjectID)
 	}
 	if got := frameOpcodes(capture.frames); string(got) != string([]byte{serverpackets.OpcodeSystemMessage, serverpackets.OpcodeChooseInventoryItem}) {
 		t.Fatalf("opcodes = %x, want SystemMessage then ChooseInventoryItem", got)
@@ -34,9 +35,9 @@ func TestEnchantLiveItemSuccessConsumesScrollAndPersistsLevel(t *testing.T) {
 	scroll := &item.Instance{ObjectID: 600, TemplateID: 955, OwnerID: 1, Count: 1, Location: item.LocationInventory}
 	capture := &frameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{weapon, scroll})
-	live.activeEnchantScrollObjectID = scroll.ObjectID
 	store := &recordingEnchantItemStore{}
 	gcl := &GameClientLink{items: store}
+	gcl.enchantStateStore().Select(live.ObjectID(), scroll.ObjectID)
 
 	gcl.enchantLiveItem(context.Background(), live, clientpackets.RequestEnchantItem{ObjectID: weapon.ObjectID})
 
@@ -46,8 +47,8 @@ func TestEnchantLiveItemSuccessConsumesScrollAndPersistsLevel(t *testing.T) {
 	if live.Inventory().ItemByObjectID(scroll.ObjectID) != nil {
 		t.Fatal("scroll still in inventory after successful enchant")
 	}
-	if live.activeEnchantScrollObjectID != 0 {
-		t.Fatalf("active enchant scroll = %d, want cleared", live.activeEnchantScrollObjectID)
+	if got := gcl.enchantStateStore().Active(live.ObjectID()); got != 0 {
+		t.Fatalf("active enchant scroll = %d, want cleared", got)
 	}
 	if len(store.updated) != 1 || store.updated[0].ObjectID != weapon.ObjectID || store.updated[0].EnchantLevel != 1 {
 		t.Fatalf("updated rows = %+v, want enchanted weapon", store.updated)
@@ -73,9 +74,10 @@ func TestEnchantLiveItemRejectsInvalidTargetWithoutConsumingScroll(t *testing.T)
 	scroll := &item.Instance{ObjectID: 600, TemplateID: 955, OwnerID: 1, Count: 1, Location: item.LocationInventory}
 	capture := &frameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{armor, scroll})
-	live.activeEnchantScrollObjectID = scroll.ObjectID
+	gcl := &GameClientLink{}
+	gcl.enchantStateStore().Select(live.ObjectID(), scroll.ObjectID)
 
-	(&GameClientLink{}).enchantLiveItem(context.Background(), live, clientpackets.RequestEnchantItem{ObjectID: armor.ObjectID})
+	gcl.enchantLiveItem(context.Background(), live, clientpackets.RequestEnchantItem{ObjectID: armor.ObjectID})
 
 	if scroll.Count != 1 || live.Inventory().ItemByObjectID(scroll.ObjectID) == nil {
 		t.Fatalf("scroll mutated on invalid enchant: %+v", scroll)
@@ -83,8 +85,8 @@ func TestEnchantLiveItemRejectsInvalidTargetWithoutConsumingScroll(t *testing.T)
 	if armor.EnchantLevel != 0 {
 		t.Fatalf("armor enchant = %d, want unchanged", armor.EnchantLevel)
 	}
-	if live.activeEnchantScrollObjectID != 0 {
-		t.Fatalf("active enchant scroll = %d, want cleared", live.activeEnchantScrollObjectID)
+	if got := gcl.enchantStateStore().Active(live.ObjectID()); got != 0 {
+		t.Fatalf("active enchant scroll = %d, want cleared", got)
 	}
 	if got := frameOpcodes(capture.frames); string(got) != string([]byte{serverpackets.OpcodeSystemMessage, serverpackets.OpcodeEnchantResult}) {
 		t.Fatalf("opcodes = %x, want SystemMessage then EnchantResult", got)
@@ -99,14 +101,17 @@ func TestEnchantLiveItemFailureBreaksItemIntoCrystals(t *testing.T) {
 	scroll := &item.Instance{ObjectID: 600, TemplateID: 955, OwnerID: 1, Count: 1, Location: item.LocationInventory}
 	capture := &frameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{weapon, scroll})
-	live.activeEnchantScrollObjectID = scroll.ObjectID
 	store := &recordingEnchantItemStore{}
 	gcl := &GameClientLink{items: store, ids: &sequentialIDs{next: 700}, enchantRoll: func() float64 { return 0.99 }}
+	gcl.enchantStateStore().Select(live.ObjectID(), scroll.ObjectID)
 
 	gcl.enchantLiveItem(context.Background(), live, clientpackets.RequestEnchantItem{ObjectID: weapon.ObjectID})
 
 	if live.Inventory().ItemByObjectID(weapon.ObjectID) != nil {
 		t.Fatal("failed normal enchant left source weapon in inventory")
+	}
+	if got := gcl.enchantStateStore().Active(live.ObjectID()); got != 0 {
+		t.Fatalf("active enchant scroll = %d, want cleared", got)
 	}
 	crystals := live.Inventory().ItemByTemplateID(item.CrystalD.ItemID())
 	if crystals == nil || crystals.Count != 275 {
@@ -136,9 +141,9 @@ func TestEnchantLiveItemBlessedFailureResetsEnchantLevel(t *testing.T) {
 	scroll := &item.Instance{ObjectID: 601, TemplateID: 6575, OwnerID: 1, Count: 1, Location: item.LocationInventory}
 	capture := &frameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{weapon, scroll})
-	live.activeEnchantScrollObjectID = scroll.ObjectID
 	store := &recordingEnchantItemStore{}
 	gcl := &GameClientLink{items: store, enchantRoll: func() float64 { return 0.99 }}
+	gcl.enchantStateStore().Select(live.ObjectID(), scroll.ObjectID)
 
 	gcl.enchantLiveItem(context.Background(), live, clientpackets.RequestEnchantItem{ObjectID: weapon.ObjectID})
 
@@ -150,6 +155,9 @@ func TestEnchantLiveItemBlessedFailureResetsEnchantLevel(t *testing.T) {
 	}
 	if live.Inventory().ItemByObjectID(scroll.ObjectID) != nil {
 		t.Fatal("blessed failure left scroll in inventory")
+	}
+	if got := gcl.enchantStateStore().Active(live.ObjectID()); got != 0 {
+		t.Fatalf("active enchant scroll = %d, want cleared", got)
 	}
 	if len(store.deleted) != 1 || store.deleted[0] != scroll.ObjectID {
 		t.Fatalf("deleted rows = %+v, want consumed blessed scroll", store.deleted)

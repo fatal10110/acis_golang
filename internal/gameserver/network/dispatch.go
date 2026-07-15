@@ -9,10 +9,14 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
+	enchantflow "github.com/fatal10110/acis_golang/internal/gameserver/enchant"
+	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/petitem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
+	tradebook "github.com/fatal10110/acis_golang/internal/gameserver/trade"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -56,7 +60,11 @@ type GameClientLink struct {
 	ids           idAllocator
 	groundItems   groundItemDropper
 	attackStance  attackStanceTracker
-	trades        *tradeCoordinator
+	inventory     *invops.Service
+	petItems      *petitem.Service
+	trades        *tradebook.Book
+	enchantState  *enchantflow.State
+	enchant       *enchantflow.Service
 	log           zerolog.Logger
 
 	// newCipherKey supplies each connection's XOR cipher key; overridden in
@@ -97,10 +105,27 @@ func NewGameClientLink(
 		ids:           ids,
 		groundItems:   groundItems,
 		attackStance:  attackStance,
-		trades:        newTradeCoordinator(time.Now),
+		inventory:     invops.NewService(ids),
+		petItems:      petitem.NewService(ids),
+		trades:        tradebook.NewBook(time.Now),
+		enchantState:  enchantflow.NewState(),
 		log:           log,
 		newCipherKey:  randomCipherKey,
 	}
+}
+
+func (l *GameClientLink) inventoryService() *invops.Service {
+	if l.inventory == nil {
+		l.inventory = invops.NewService(l.ids)
+	}
+	return l.inventory
+}
+
+func (l *GameClientLink) petItemService() *petitem.Service {
+	if l.petItems == nil {
+		l.petItems = petitem.NewService(l.ids)
+	}
+	return l.petItems
 }
 
 func randomCipherKey() ([]byte, error) {

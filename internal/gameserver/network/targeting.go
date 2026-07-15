@@ -38,11 +38,6 @@ func (l *GameClientLink) broadcastAttack(attacker *livePlayer, snapshot attack.S
 	})
 }
 
-// useItem toggles the equip state of the inventory item objectID: equips
-// it if unworn, unequips it if worn. A missing or non-equipable item is a
-// silent no-op, matching how a stale or invalid client request is ignored
-// rather than disconnecting the session.
-
 func (l *GameClientLink) handleTargetAction(live *livePlayer, objectID int32, selected bool) {
 	target := l.resolveTarget(objectID)
 	if target == nil {

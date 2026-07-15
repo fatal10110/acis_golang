@@ -4,6 +4,7 @@ import (
 	"math"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
@@ -123,48 +124,28 @@ func (l *GameClientLink) dropLiveItem(live *livePlayer, req clientpackets.Reques
 	if inv == nil {
 		return
 	}
-	inst := inv.ItemByObjectID(req.ObjectID)
-	if inst == nil {
-		return
-	}
 	count := int(req.Count)
-	tmpl, ok := inv.Templates().Get(inst.TemplateID)
-	if !ok || !inst.Dropable(tmpl) || inst.QuestItem(tmpl) || inst.Count < count {
-		return
-	}
-	if !tmpl.Stackable && count > 1 {
-		return
-	}
 	if !dropInRange(live, int(req.X), int(req.Y), int(req.Z)) {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotDiscardDistanceTooFar))
 		return
 	}
 
-	newObjectID := int32(0)
-	if inst.Count > count {
-		if l.ids == nil {
-			return
-		}
-		var err error
-		newObjectID, err = l.ids.NextID()
-		if err != nil {
-			l.log.Error().Err(err).Msg("allocate dropped item id")
-			return
-		}
-	}
-	wasEquipped := inst.Equipped() && inst.Count <= count
-	dropped := inv.DropItem(req.ObjectID, count, newObjectID)
-	if dropped == nil {
+	res, ok, err := l.inventoryService().DropItem(inv, req.ObjectID, count)
+	if err != nil {
+		l.log.Error().Err(err).Msg("allocate dropped item id")
 		return
 	}
-	ground, err := grounditem.New(*dropped, tmpl)
+	if !ok {
+		return
+	}
+	ground, err := grounditem.New(*res.Dropped, res.Template)
 	if err != nil {
 		l.log.Error().Err(err).Msg("build dropped ground item")
 		return
 	}
 
 	l.sendInventoryUpdate(live, inv)
-	if wasEquipped {
+	if res.EquipmentChanged {
 		l.broadcastEquipmentChange(live)
 	}
 
@@ -187,24 +168,12 @@ func (l *GameClientLink) destroyLiveItem(live *livePlayer, objectID int32, count
 	if inv == nil {
 		return
 	}
-	inst := inv.ItemByObjectID(objectID)
-	if inst == nil {
-		return
-	}
-	tmpl, ok := inv.Templates().Get(inst.TemplateID)
-	if !ok || !inst.Destroyable(tmpl) || tmpl.HeroItem() || inst.Count < count {
-		return
-	}
-	if !tmpl.Stackable && count > 1 {
-		return
-	}
-
-	wasEquipped := inst.Equipped() && inst.Count <= count
-	if inv.DestroyItem(inst, count) == nil {
+	res, ok := l.inventoryService().DestroyItem(inv, objectID, count)
+	if !ok {
 		return
 	}
 	l.sendInventoryUpdate(live, inv)
-	if wasEquipped {
+	if res.EquipmentChanged {
 		l.broadcastEquipmentChange(live)
 	}
 }
@@ -213,58 +182,28 @@ func (l *GameClientLink) crystallizeLiveItem(live *livePlayer, req clientpackets
 	if !liveItemOpsAllowed(live) || req.Count <= 0 {
 		return
 	}
-	skillLevel := live.SkillLevel(crystallizeSkillID)
-	if skillLevel <= 0 {
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCrystallizeLevelTooLow))
-		return
-	}
-
 	inv := live.Inventory()
-	if inv == nil {
-		return
-	}
-	inst := inv.ItemByObjectID(req.ObjectID)
-	if inst == nil {
-		return
-	}
-	tmpl, ok := inv.Templates().Get(inst.TemplateID)
-	if !ok || tmpl.HeroItem() || inst.ShadowItem(tmpl) {
-		return
-	}
-	crystalItemID, crystalCount, ok := tmpl.CrystalReward(inst.EnchantLevel)
-	if !ok {
-		return
-	}
-	if !item.CanCrystallize(tmpl.Crystal, skillLevel) {
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCrystallizeLevelTooLow))
-		live.SendFrame(serverpackets.FrameActionFailed())
-		return
-	}
-	if _, ok := inv.Templates().Get(crystalItemID); !ok || l.ids == nil {
-		return
-	}
-	crystalObjectID, err := l.ids.NextID()
+	res, failure, err := l.inventoryService().CrystallizeItem(inv, req.ObjectID, int(req.Count), live.SkillLevel(crystallizeSkillID))
 	if err != nil {
 		l.log.Error().Err(err).Msg("allocate crystal item id")
 		return
 	}
-
-	count := int(req.Count)
-	if count > inst.Count {
-		count = inst.Count
-	}
-	wasEquipped := inst.Equipped() && inst.Count <= count
-	sourceItemID := inst.TemplateID
-	if inv.DestroyItem(inst, count) == nil {
+	switch failure {
+	case invops.CrystallizeOK:
+	case invops.CrystallizeNoSkill:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCrystallizeLevelTooLow))
+		return
+	case invops.CrystallizeGradeTooHigh:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCrystallizeLevelTooLow))
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return
+	default:
 		return
 	}
-	if inv.AddNew(crystalItemID, int(crystalCount), crystalObjectID) == nil {
-		return
-	}
 
-	live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageItemCrystallized, sourceItemID))
+	live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageItemCrystallized, res.SourceItemID))
 	l.sendInventoryUpdate(live, inv)
-	if wasEquipped {
+	if res.EquipmentChanged {
 		l.broadcastEquipmentChange(live)
 	}
 }

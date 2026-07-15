@@ -17,8 +17,7 @@ type livePlayer struct {
 	attack   *attack.Controller
 	cast     *actorcast.Controller
 
-	activeEnchantScrollObjectID int32
-	stopAttack                  func(*livePlayer)
+	stopAttack func(*livePlayer)
 }
 
 func (p *livePlayer) SendFrame(frame wire.Frame) bool {
