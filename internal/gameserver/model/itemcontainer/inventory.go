@@ -227,6 +227,21 @@ func (inv *Inventory) DestroyItem(inst *item.Instance, count int) *item.Instance
 	return inst
 }
 
+// SetEnchantLevel changes inst's enchant level and queues a modified
+// inventory notification. It returns false when inst is absent from this
+// inventory or already has level.
+func (inv *Inventory) SetEnchantLevel(inst *item.Instance, level int) bool {
+	if inst == nil {
+		return false
+	}
+	if inv.ItemByObjectID(inst.ObjectID) != inst || inst.EnchantLevel == level {
+		return false
+	}
+	inst.EnchantLevel = level
+	inv.queueUpdate(inst, UpdateModified)
+	return true
+}
+
 // DropItem removes count units of the instance identified by objectID from
 // the inventory for dropping to the ground. When the held stack is bigger
 // than count, the existing stack is decremented in place and a brand new

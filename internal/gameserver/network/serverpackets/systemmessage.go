@@ -2,37 +2,49 @@ package serverpackets
 
 import "github.com/fatal10110/acis_golang/internal/commons/wire"
 
-// Static system message ids used by live summon command feedback.
+// Static system message ids used by focused packet helpers.
 const (
-	SystemMessageNotEnoughHP                   = 23
-	SystemMessageNotEnoughMP                   = 24
-	SystemMessageUseS1                         = 46
-	SystemMessageS1PreparedForReuse            = 48
-	SystemMessageWelcomeToLineage              = 34
-	SystemMessageNothingHappened               = 61
-	SystemMessageInvalidTarget                 = 109
-	SystemMessageCannotDiscardDistanceTooFar   = 151
-	SystemMessageItemMissingToLearnSkill       = 276
-	SystemMessageLearnedSkill                  = 277
-	SystemMessageNotEnoughSPToLearnSkill       = 278
-	SystemMessageNotEnoughItems                = 351
-	SystemMessageCrystallizeLevelTooLow        = 562
-	SystemMessageNoMoreSkillsToLearn           = 750
-	SystemMessageItemCrystallized              = 1258
-	SystemMessageUseOfItemWillBeAuto           = 1433
-	SystemMessageAutoUseOfItemCancelled        = 1434
-	SystemMessagePetCannotSentBackDuringBattle = 579
-	SystemMessageDeadPetCannotBeReturned       = 589
-	SystemMessageYouCannotRestoreHungryPets    = 594
-	SystemMessageNoServitorCannotAutomateUse   = 1676
-	SystemMessagePetRefusingOrder              = 1864
-	SystemMessagePetTooHighToControl           = 1918
+	SystemMessageNotEnoughHP                     = 23
+	SystemMessageNotEnoughMP                     = 24
+	SystemMessageWelcomeToLineage                = 34
+	SystemMessageUseS1                           = 46
+	SystemMessageS1PreparedForReuse              = 48
+	SystemMessageEarnedS2S1S                     = 53
+	SystemMessageNothingHappened                 = 61
+	SystemMessageS1SuccessfullyEnchanted         = 62
+	SystemMessageS1S2SuccessfullyEnchanted       = 63
+	SystemMessageEnchantmentFailedS1Evaporated   = 64
+	SystemMessageEnchantmentFailedS1S2Evaporated = 65
+	SystemMessageInvalidTarget                   = 109
+	SystemMessageCannotDiscardDistanceTooFar     = 151
+	SystemMessageItemMissingToLearnSkill         = 276
+	SystemMessageLearnedSkill                    = 277
+	SystemMessageNotEnoughSPToLearnSkill         = 278
+	SystemMessageSelectItemToEnchant             = 303
+	SystemMessageNotEnoughItems                  = 351
+	SystemMessageInappropriateEnchantCondition   = 355
+	SystemMessageEnchantScrollCancelled          = 423
+	SystemMessageCrystallizeLevelTooLow          = 562
+	SystemMessagePetCannotSentBackDuringBattle   = 579
+	SystemMessageDeadPetCannotBeReturned         = 589
+	SystemMessageYouCannotRestoreHungryPets      = 594
+	SystemMessageNoMoreSkillsToLearn             = 750
+	SystemMessageItemCrystallized                = 1258
+	SystemMessageUseOfItemWillBeAuto             = 1433
+	SystemMessageAutoUseOfItemCancelled          = 1434
+	SystemMessageBlessedEnchantFailed            = 1517
+	SystemMessageNoServitorCannotAutomateUse     = 1676
+	SystemMessageCannotEnchantWhileStore         = 1688
+	SystemMessagePetRefusingOrder                = 1864
+	SystemMessagePetTooHighToControl             = 1918
 )
 
 // SystemMessage parameter types used by focused packet helpers.
 const (
-	SystemMessageParamItemName  = 3
-	SystemMessageParamSkillName = 4
+	SystemMessageParamNumber     = 1
+	SystemMessageParamItemName   = 3
+	SystemMessageParamSkillName  = 4
+	SystemMessageParamItemNumber = 6
 )
 
 // OpcodeSystemMessage is the wire opcode for a system message.
@@ -54,6 +66,32 @@ func FrameSystemMessageItemName(id int, itemID int32) wire.Frame {
 	w.WriteInt32(1)
 	w.WriteInt32(SystemMessageParamItemName)
 	w.WriteInt32(itemID)
+	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
+}
+
+// FrameSystemMessageNumberItemName builds a SystemMessage packet with a
+// number parameter followed by an item-name parameter.
+func FrameSystemMessageNumberItemName(id int, number int32, itemID int32) wire.Frame {
+	w := newFrameWriter(OpcodeSystemMessage)
+	w.WriteInt32(int32(id))
+	w.WriteInt32(2)
+	w.WriteInt32(SystemMessageParamNumber)
+	w.WriteInt32(number)
+	w.WriteInt32(SystemMessageParamItemName)
+	w.WriteInt32(itemID)
+	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
+}
+
+// FrameSystemMessageItemNameItemNumber builds a SystemMessage packet with
+// an item-name parameter followed by an item-number parameter.
+func FrameSystemMessageItemNameItemNumber(id int, itemID int32, count int32) wire.Frame {
+	w := newFrameWriter(OpcodeSystemMessage)
+	w.WriteInt32(int32(id))
+	w.WriteInt32(2)
+	w.WriteInt32(SystemMessageParamItemName)
+	w.WriteInt32(itemID)
+	w.WriteInt32(SystemMessageParamItemNumber)
+	w.WriteInt32(count)
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
 }
 

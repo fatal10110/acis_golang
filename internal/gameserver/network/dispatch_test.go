@@ -188,6 +188,41 @@ func (s *fakeItemStore) ListByOwner(_ context.Context, ownerID int32) ([]*item.I
 	return append([]*item.Instance(nil), s.items[ownerID]...), nil
 }
 
+func (s *fakeItemStore) Save(_ context.Context, inst *item.Instance) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for ownerID, items := range s.items {
+		for i, existing := range items {
+			if existing.ObjectID == inst.ObjectID {
+				cp := *inst
+				s.items[ownerID][i] = &cp
+				return nil
+			}
+		}
+	}
+	cp := *inst
+	s.items[inst.OwnerID] = append(s.items[inst.OwnerID], &cp)
+	return nil
+}
+
+func (s *fakeItemStore) Update(ctx context.Context, inst *item.Instance) error {
+	return s.Save(ctx, inst)
+}
+
+func (s *fakeItemStore) Delete(_ context.Context, objectID int32) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for ownerID, items := range s.items {
+		for i, existing := range items {
+			if existing.ObjectID == objectID {
+				s.items[ownerID] = append(items[:i], items[i+1:]...)
+				return nil
+			}
+		}
+	}
+	return nil
+}
+
 type sequentialIDs struct{ next int32 }
 
 func (s *sequentialIDs) NextID() (int32, error) {
@@ -269,6 +304,14 @@ func testItemTemplates() *item.Table {
 			Duration:  -1,
 			Stackable: true,
 			EtcItem:   &item.EtcItemDetail{},
+		},
+		{
+			ID:        955,
+			Name:      "Scroll: Enchant Weapon (D)",
+			Kind:      item.KindEtcItem,
+			Duration:  -1,
+			Stackable: true,
+			EtcItem:   &item.EtcItemDetail{Type: item.EtcItemScrollEnchantWeapon, Handler: "EnchantScrolls"},
 		},
 	})
 }
@@ -471,6 +514,19 @@ func encodeRequestAutoSoulShot(itemID, typ int32) []byte {
 	w.WriteUint16(clientpackets.OpcodeRequestAutoSoulShot)
 	w.WriteInt32(itemID)
 	w.WriteInt32(typ)
+	return w.Bytes()
+}
+
+func encodeUseItem(objectID int32, ctrl bool) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeUseItem)
+	w.WriteInt32(objectID)
+	w.WriteInt32(int32(boolInt32(ctrl)))
+	return w.Bytes()
+}
+
+func encodeRequestEnchantItem(objectID int32) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeRequestEnchantItem)
+	w.WriteInt32(objectID)
 	return w.Bytes()
 }
 
@@ -749,6 +805,57 @@ func seedSelectableCharacter(t *testing.T, chars *fakeCharStore, account, name s
 		t.Fatalf("seed character store: %v", err)
 	}
 	return ch.ID
+}
+
+func TestGameClientLinkEnchantItemInGame(t *testing.T) {
+	c, chars, items, _ := newLinkedGameClient(t)
+
+	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.read() // CharCreateOk
+	c.read() // CharSelectInfo
+	objID := chars.soleObjectID(t)
+	if err := items.Create(context.Background(), objID, item.Instance{
+		ObjectID:   504,
+		TemplateID: 30,
+		OwnerID:    objID,
+		Count:      1,
+		Location:   item.LocationInventory,
+	}); err != nil {
+		t.Fatalf("seed weapon: %v", err)
+	}
+	if err := items.Create(context.Background(), objID, item.Instance{
+		ObjectID:   505,
+		TemplateID: 955,
+		OwnerID:    objID,
+		Count:      1,
+		Location:   item.LocationInventory,
+	}); err != nil {
+		t.Fatalf("seed scroll: %v", err)
+	}
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	c.send(encodeUseItem(505, false))
+	assertStaticSystemMessageFrame(t, c.read(), serverpackets.SystemMessageSelectItemToEnchant)
+	assertChooseInventoryItemFrame(t, c.read(), 955)
+
+	c.send(encodeRequestEnchantItem(504))
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeSystemMessage {
+		t.Fatalf("enchant success message opcode = %#x, want SystemMessage (%#x)", reply[0], serverpackets.OpcodeSystemMessage)
+	}
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeInventoryUpdate {
+		t.Fatalf("enchant inventory opcode = %#x, want InventoryUpdate (%#x)", reply[0], serverpackets.OpcodeInventoryUpdate)
+	}
+	assertEnchantResultFrame(t, c.read(), serverpackets.EnchantResultSuccess)
+	if reply := c.read(); reply[0] != serverpackets.OpcodeUserInfo {
+		t.Fatalf("enchant userinfo opcode = %#x, want UserInfo (%#x)", reply[0], serverpackets.OpcodeUserInfo)
+	}
 }
 
 type frameCapture struct {
