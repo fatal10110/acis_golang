@@ -106,6 +106,56 @@ func TestFrameShortCutInit(t *testing.T) {
 	}
 }
 
+func TestFrameShortCutRegisterSkill(t *testing.T) {
+	got := framePayload(t, FrameShortCutRegister(Shortcut{Slot: 3, Page: 1, Type: ShortcutSkill, ID: 248, Level: 1, CharacterType: 1}))
+	want := []byte{OpcodeShortCutRegister}
+	want = appendD(want, int32(ShortcutSkill))
+	want = appendD(want, 15)
+	want = appendD(want, 248)
+	want = appendD(want, 1)
+	want = append(want, 0)
+	want = appendD(want, 1)
+	if !bytes.Equal(got, want) {
+		t.Fatalf("FrameShortCutRegister(skill) = %x, want %x", got, want)
+	}
+}
+
+func TestFrameShortCutRegisterItem(t *testing.T) {
+	got := framePayload(t, FrameShortCutRegister(Shortcut{
+		Slot:             2,
+		Page:             0,
+		Type:             ShortcutItem,
+		ID:               57,
+		CharacterType:    1,
+		SharedReuseGroup: -1,
+		RemainingSeconds: 4,
+		ReuseSeconds:     12,
+		AugmentationID:   12345,
+	}))
+	want := []byte{OpcodeShortCutRegister}
+	want = appendD(want, int32(ShortcutItem))
+	want = appendD(want, 2)
+	want = appendD(want, 57)
+	want = appendD(want, 1)
+	want = appendD(want, -1)
+	want = appendD(want, 4)
+	want = appendD(want, 12)
+	want = appendD(want, 12345)
+	if !bytes.Equal(got, want) {
+		t.Fatalf("FrameShortCutRegister(item) = %x, want %x", got, want)
+	}
+}
+
+func TestFrameShortCutDelete(t *testing.T) {
+	got := framePayload(t, FrameShortCutDelete(3, 1))
+	want := []byte{OpcodeShortCutDelete}
+	want = appendD(want, 15)
+	want = appendD(want, 0)
+	if !bytes.Equal(got, want) {
+		t.Fatalf("FrameShortCutDelete() = %x, want %x", got, want)
+	}
+}
+
 func TestFrameDie(t *testing.T) {
 	got := framePayload(t, FrameDie(123, DieOptions{Castle: true}))
 	want := []byte{OpcodeDie}

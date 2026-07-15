@@ -64,7 +64,7 @@ func newTestRoster(t *testing.T, deleteAfter time.Duration, now func() time.Time
 	db := sqltest.NewDB(t)
 	characters := sql.NewCharacterStore(db)
 	items := sql.NewItemStore(db)
-	roster := NewRoster(characters, items, humanFighterTemplate(t), starterItemTable(), npc.NewTable(nil), &sequentialIDs{next: 0x10000000}, deleteAfter, now)
+	roster := NewRoster(characters, items, nil, humanFighterTemplate(t), starterItemTable(), npc.NewTable(nil), &sequentialIDs{next: 0x10000000}, deleteAfter, now)
 	return roster, characters, items
 }
 

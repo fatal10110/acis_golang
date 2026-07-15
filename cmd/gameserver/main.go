@@ -122,6 +122,7 @@ func newGameServerApp(paths gameServerPaths) *fx.App {
 			loadGameData,
 			gamesql.NewCharacterStore,
 			gamesql.NewItemStore,
+			gamesql.NewShortcutStore,
 			provideIDAllocator,
 			provideRoster,
 			providePvPFlags,
@@ -428,8 +429,8 @@ func provideIDAllocator(pool *sql.DB, log zerolog.Logger) (*idfactory.Allocator,
 	return idfactory.New(context.Background(), pool, log)
 }
 
-func provideRoster(cfg gameServerConfig, data *gameData, characters *gamesql.CharacterStore, items *gamesql.ItemStore, ids *idfactory.Allocator) *manager.Roster {
-	return manager.NewRoster(characters, items, data.Players, data.Items, data.NPCs, ids, manager.DefaultDeleteAfter, time.Now)
+func provideRoster(cfg gameServerConfig, data *gameData, characters *gamesql.CharacterStore, items *gamesql.ItemStore, shortcuts *gamesql.ShortcutStore, ids *idfactory.Allocator) *manager.Roster {
+	return manager.NewRoster(characters, items, shortcuts, data.Players, data.Items, data.NPCs, ids, manager.DefaultDeleteAfter, time.Now)
 }
 
 func providePvPFlags(opts task.PvPFlagOptions) *task.PvPFlags {
@@ -801,6 +802,7 @@ func provideGameClientLink(
 	data *gameData,
 	roster *manager.Roster,
 	items *gamesql.ItemStore,
+	shortcuts *gamesql.ShortcutStore,
 	validator *network.SessionValidator,
 	links *loginLinkState,
 	skills *network.SkillPersistence,
@@ -810,7 +812,7 @@ func provideGameClientLink(
 	attackStance *task.AttackStance,
 	log zerolog.Logger,
 ) *network.GameClientLink {
-	return network.NewGameClientLink(validator, links.get, roster, items, data.Players, data.Items, skills, state, ids, ground, attackStance, log)
+	return network.NewGameClientLink(validator, links.get, roster, items, shortcuts, data.Players, data.Items, skills, state, ids, ground, attackStance, log)
 }
 
 func provideSkillPersistence(pool *sql.DB, data *gameData) *network.SkillPersistence {

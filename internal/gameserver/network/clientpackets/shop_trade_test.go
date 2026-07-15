@@ -59,6 +59,38 @@ func TestDecodeAnswerTradeRequest(t *testing.T) {
 	}
 }
 
+func TestDecodeRequestShortCutReg(t *testing.T) {
+	payload := []byte{
+		OpcodeRequestShortCutReg,
+		0x02, 0x00, 0x00, 0x00, // skill
+		0x0f, 0x00, 0x00, 0x00, // slot 3, page 1
+		0xf8, 0x00, 0x00, 0x00, // skill id
+		0x01, 0x00, 0x00, 0x00, // character type
+	}
+
+	got, err := DecodeRequestShortCutReg(payload)
+	if err != nil {
+		t.Fatalf("DecodeRequestShortCutReg: %v", err)
+	}
+	want := RequestShortCutReg{Type: 2, Slot: 3, Page: 1, ID: 248, CharacterType: 1}
+	if got != want {
+		t.Fatalf("DecodeRequestShortCutReg = %+v, want %+v", got, want)
+	}
+}
+
+func TestDecodeRequestShortCutDel(t *testing.T) {
+	payload := []byte{OpcodeRequestShortCutDel, 0x0f, 0x00, 0x00, 0x00}
+
+	got, err := DecodeRequestShortCutDel(payload)
+	if err != nil {
+		t.Fatalf("DecodeRequestShortCutDel: %v", err)
+	}
+	want := RequestShortCutDel{Slot: 3, Page: 1}
+	if got != want {
+		t.Fatalf("DecodeRequestShortCutDel = %+v, want %+v", got, want)
+	}
+}
+
 func TestDecodeRequestBuyItem(t *testing.T) {
 	payload := []byte{
 		OpcodeRequestBuyItem,
@@ -121,6 +153,12 @@ func TestDecodeShopTradeShort(t *testing.T) {
 	}
 	if _, err := DecodeAnswerTradeRequest([]byte{OpcodeAnswerTradeRequest, 1}); err == nil {
 		t.Fatal("DecodeAnswerTradeRequest: want error on short payload")
+	}
+	if _, err := DecodeRequestShortCutReg([]byte{OpcodeRequestShortCutReg, 1}); err == nil {
+		t.Fatal("DecodeRequestShortCutReg: want error on short payload")
+	}
+	if _, err := DecodeRequestShortCutDel([]byte{OpcodeRequestShortCutDel, 1}); err == nil {
+		t.Fatal("DecodeRequestShortCutDel: want error on short payload")
 	}
 	if _, err := DecodeRequestBuyItem([]byte{OpcodeRequestBuyItem, 1}); err == nil {
 		t.Fatal("DecodeRequestBuyItem: want error on short payload")
