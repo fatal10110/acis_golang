@@ -61,6 +61,40 @@ func TestDecodeRequestEnchantItem(t *testing.T) {
 	}
 }
 
+func TestDecodePetItemRequests(t *testing.T) {
+	use, err := DecodeRequestPetUseItem([]byte{OpcodeRequestPetUseItem, 0x21, 0x03, 0x00, 0x00})
+	if err != nil {
+		t.Fatalf("DecodeRequestPetUseItem: %v", err)
+	}
+	if use != (RequestPetUseItem{ObjectID: 801}) {
+		t.Fatalf("DecodeRequestPetUseItem = %+v, want ObjectID 801", use)
+	}
+
+	give, err := DecodeRequestGiveItemToPet([]byte{OpcodeRequestGiveItemToPet, 0x22, 0x03, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00})
+	if err != nil {
+		t.Fatalf("DecodeRequestGiveItemToPet: %v", err)
+	}
+	if give != (RequestGiveItemToPet{ObjectID: 802, Count: 5}) {
+		t.Fatalf("DecodeRequestGiveItemToPet = %+v, want ObjectID 802 Count 5", give)
+	}
+
+	take, err := DecodeRequestGetItemFromPet([]byte{OpcodeRequestGetItemFromPet, 0x23, 0x03, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff})
+	if err != nil {
+		t.Fatalf("DecodeRequestGetItemFromPet: %v", err)
+	}
+	if take != (RequestGetItemFromPet{ObjectID: 803, Count: 6, Unknown: -1}) {
+		t.Fatalf("DecodeRequestGetItemFromPet = %+v, want ObjectID 803 Count 6 Unknown -1", take)
+	}
+
+	pickup, err := DecodeRequestPetGetItem([]byte{OpcodeRequestPetGetItem, 0x24, 0x03, 0x00, 0x00})
+	if err != nil {
+		t.Fatalf("DecodeRequestPetGetItem: %v", err)
+	}
+	if pickup != (RequestPetGetItem{ObjectID: 804}) {
+		t.Fatalf("DecodeRequestPetGetItem = %+v, want ObjectID 804", pickup)
+	}
+}
+
 func TestDecodeSendTimeCheck(t *testing.T) {
 	payload := []byte{OpcodeSendTimeCheck, 0x11, 0x00, 0x00, 0x00, 0x22, 0x00, 0x00, 0x00}
 
@@ -104,6 +138,18 @@ func TestDecodeItemOpsShort(t *testing.T) {
 	}
 	if _, err := DecodeRequestEnchantItem([]byte{OpcodeRequestEnchantItem, 1}); err == nil {
 		t.Fatal("DecodeRequestEnchantItem: want error on short payload")
+	}
+	if _, err := DecodeRequestPetUseItem([]byte{OpcodeRequestPetUseItem, 1}); err == nil {
+		t.Fatal("DecodeRequestPetUseItem: want error on short payload")
+	}
+	if _, err := DecodeRequestGiveItemToPet([]byte{OpcodeRequestGiveItemToPet, 1}); err == nil {
+		t.Fatal("DecodeRequestGiveItemToPet: want error on short payload")
+	}
+	if _, err := DecodeRequestGetItemFromPet([]byte{OpcodeRequestGetItemFromPet, 1}); err == nil {
+		t.Fatal("DecodeRequestGetItemFromPet: want error on short payload")
+	}
+	if _, err := DecodeRequestPetGetItem([]byte{OpcodeRequestPetGetItem, 1}); err == nil {
+		t.Fatal("DecodeRequestPetGetItem: want error on short payload")
 	}
 	if _, err := DecodeSendTimeCheck([]byte{OpcodeSendTimeCheck, 1}); err == nil {
 		t.Fatal("DecodeSendTimeCheck: want error on short payload")

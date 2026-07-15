@@ -276,6 +276,36 @@ func (inv *Inventory) DropItem(objectID int32, count int, newObjectID int32) *it
 	return inst
 }
 
+// TransferItem moves count units from inv to target and queues inventory
+// updates on inv for the source-side change. The target inventory's Add path
+// queues its own update.
+func (inv *Inventory) TransferItem(objectID int32, count int, target *Inventory, newObjectID int32) (result *item.Instance, freedObjectID int32, freed bool) {
+	if target == nil || count <= 0 {
+		return nil, 0, false
+	}
+	source := inv.ItemByObjectID(objectID)
+	if source == nil {
+		return nil, 0, false
+	}
+	templateID := source.TemplateID
+	sourceCount := source.Count
+	movedCount := count
+	if movedCount > sourceCount {
+		movedCount = sourceCount
+	}
+
+	result, freedObjectID, freed = inv.Container.Transfer(objectID, count, target, newObjectID)
+	if result == nil {
+		return nil, 0, false
+	}
+	if remaining := inv.ItemByObjectID(objectID); remaining != nil {
+		inv.queueUpdate(remaining, UpdateModified)
+	} else {
+		inv.queueUpdateRecord(objectID, templateID, movedCount, UpdateRemoved)
+	}
+	return result, freedObjectID, freed
+}
+
 // ItemAt returns the instance equipped at paperdoll position slot, or nil.
 func (inv *Inventory) ItemAt(slot int) *item.Instance {
 	if slot < 0 || slot >= item.PaperdollSlots {
@@ -643,18 +673,28 @@ func (inv *Inventory) queueUpdateLocked(inst *item.Instance, state UpdateState) 
 	if inst == nil {
 		return
 	}
+	inv.queueUpdateRecordLocked(inst.ObjectID, inst.TemplateID, inst.Count, state)
+}
+
+func (inv *Inventory) queueUpdateRecord(objectID, templateID int32, count int, state UpdateState) {
+	inv.mu.Lock()
+	defer inv.mu.Unlock()
+	inv.queueUpdateRecordLocked(objectID, templateID, count, state)
+}
+
+func (inv *Inventory) queueUpdateRecordLocked(objectID, templateID int32, count int, state UpdateState) {
 	// Coalesce a repeated update for the same instance and state (e.g.
 	// several count changes in a row) into the latest count, matching the
 	// Java reference's dedup rule, instead of letting the queue grow
 	// unbounded.
-	tmpl, _ := inv.Templates().Get(inst.TemplateID)
+	tmpl, _ := inv.Templates().Get(templateID)
 	if tmpl != nil && tmpl.Stackable {
 		for i, u := range inv.updates {
-			if u.ObjectID == inst.ObjectID && u.State == state {
-				inv.updates[i].Count = inst.Count
+			if u.ObjectID == objectID && u.State == state {
+				inv.updates[i].Count = count
 				return
 			}
 		}
 	}
-	inv.updates = append(inv.updates, Update{ObjectID: inst.ObjectID, TemplateID: inst.TemplateID, Count: inst.Count, State: state})
+	inv.updates = append(inv.updates, Update{ObjectID: objectID, TemplateID: templateID, Count: count, State: state})
 }

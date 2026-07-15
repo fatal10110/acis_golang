@@ -275,6 +275,71 @@ func TestInventory_DropItem_FullyRemovesInstance(t *testing.T) {
 	}
 }
 
+func TestInventory_TransferItemPartialQueuesSourceAndTargetUpdates(t *testing.T) {
+	templates := item.NewTable([]*item.Template{
+		{ID: 1, Kind: item.KindEtcItem, Stackable: true, EtcItem: &item.EtcItemDetail{}},
+	})
+	playerInv := NewPlayerInventory(0x10000001, templates)
+	petInv := NewPetInventory(0x20000001, templates)
+	source := playerInv.AddNew(1, 100, 0x30000001)
+	playerInv.DrainUpdates()
+
+	result, freedID, freed := playerInv.TransferItem(source.ObjectID, 30, petInv, 0x40000001)
+	if result == nil || result.ObjectID != 0x40000001 || result.Count != 30 {
+		t.Fatalf("TransferItem() result = %+v, want new pet stack with 30 units", result)
+	}
+	if freed || freedID != 0 {
+		t.Fatalf("TransferItem() freed = (%d, %v), want none for partial transfer", freedID, freed)
+	}
+	if source.Count != 70 {
+		t.Fatalf("source Count = %d, want 70", source.Count)
+	}
+
+	sourceUpdates := playerInv.DrainUpdates()
+	if len(sourceUpdates) != 1 || sourceUpdates[0].State != UpdateModified || sourceUpdates[0].ObjectID != source.ObjectID || sourceUpdates[0].Count != 70 {
+		t.Fatalf("source updates = %+v, want one modified update for remaining source stack", sourceUpdates)
+	}
+	targetUpdates := petInv.DrainUpdates()
+	if len(targetUpdates) != 1 || targetUpdates[0].State != UpdateAdded || targetUpdates[0].ObjectID != result.ObjectID || targetUpdates[0].Count != 30 {
+		t.Fatalf("target updates = %+v, want one added update for pet stack", targetUpdates)
+	}
+}
+
+func TestInventory_TransferItemFullIntoExistingStackQueuesRemoveAndModify(t *testing.T) {
+	templates := item.NewTable([]*item.Template{
+		{ID: 1, Kind: item.KindEtcItem, Stackable: true, EtcItem: &item.EtcItemDetail{}},
+	})
+	playerInv := NewPlayerInventory(0x10000001, templates)
+	petInv := NewPetInventory(0x20000001, templates)
+	source := playerInv.AddNew(1, 20, 0x30000001)
+	existing := petInv.AddNew(1, 5, 0x40000001)
+	playerInv.DrainUpdates()
+	petInv.DrainUpdates()
+
+	result, freedID, freed := playerInv.TransferItem(source.ObjectID, 20, petInv, 0)
+	if result != existing {
+		t.Fatalf("TransferItem() result = %+v, want existing pet stack", result)
+	}
+	if !freed || freedID != source.ObjectID {
+		t.Fatalf("TransferItem() freed = (%d, %v), want source object freed", freedID, freed)
+	}
+	if existing.Count != 25 {
+		t.Fatalf("existing pet stack Count = %d, want 25", existing.Count)
+	}
+	if playerInv.ItemByObjectID(source.ObjectID) != nil {
+		t.Fatalf("source stack should leave player inventory")
+	}
+
+	sourceUpdates := playerInv.DrainUpdates()
+	if len(sourceUpdates) != 1 || sourceUpdates[0].State != UpdateRemoved || sourceUpdates[0].ObjectID != source.ObjectID || sourceUpdates[0].Count != 20 {
+		t.Fatalf("source updates = %+v, want one removed update for original source stack", sourceUpdates)
+	}
+	targetUpdates := petInv.DrainUpdates()
+	if len(targetUpdates) != 1 || targetUpdates[0].State != UpdateModified || targetUpdates[0].ObjectID != existing.ObjectID || targetUpdates[0].Count != 25 {
+		t.Fatalf("target updates = %+v, want one modified update for merged pet stack", targetUpdates)
+	}
+}
+
 func TestInventory_UnequipSlot(t *testing.T) {
 	f := newEquipFixture()
 	sword, _ := f.equip(swordID)

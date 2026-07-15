@@ -15,6 +15,10 @@ const (
 	SystemMessageS1S2SuccessfullyEnchanted       = 63
 	SystemMessageEnchantmentFailedS1Evaporated   = 64
 	SystemMessageEnchantmentFailedS1S2Evaporated = 65
+	SystemMessageTargetTooFar                    = 22
+	SystemMessageS1CannotBeUsed                  = 113
+	SystemMessageAlreadyTrading                  = 142
+	SystemMessageCannotPickupOrUseItemTrading    = 149
 	SystemMessageInvalidTarget                   = 109
 	SystemMessageCannotDiscardDistanceTooFar     = 151
 	SystemMessageItemMissingToLearnSkill         = 276
@@ -27,8 +31,15 @@ const (
 	SystemMessageCrystallizeLevelTooLow          = 562
 	SystemMessagePetCannotSentBackDuringBattle   = 579
 	SystemMessageDeadPetCannotBeReturned         = 589
+	SystemMessageCannotGiveItemsToDeadPet        = 590
 	SystemMessageYouCannotRestoreHungryPets      = 594
+	SystemMessageItemNotForPets                  = 544
+	SystemMessagePetCannotCarryMoreItems         = 545
+	SystemMessagePetTooEncumbered                = 546
 	SystemMessageNoMoreSkillsToLearn             = 750
+	SystemMessagePetCannotUseItem                = 972
+	SystemMessagePetPutOnS1                      = 1024
+	SystemMessagePetTookOffS1                    = 1025
 	SystemMessageItemCrystallized                = 1258
 	SystemMessageUseOfItemWillBeAuto             = 1433
 	SystemMessageAutoUseOfItemCancelled          = 1434

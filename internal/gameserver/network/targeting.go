@@ -6,6 +6,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -52,6 +53,9 @@ func (l *GameClientLink) handleTargetAction(live *livePlayer, objectID int32, se
 		l.selectLiveTarget(live, target)
 		return
 	}
+	if selected && l.showOwnedPetStatus(live, target) {
+		return
+	}
 	if selected {
 		l.attackLiveTarget(live, target)
 	}
@@ -73,6 +77,15 @@ func (l *GameClientLink) resolveTarget(objectID int32) world.Tracked {
 		return nil
 	}
 	return target
+}
+
+func (l *GameClientLink) showOwnedPetStatus(live *livePlayer, target world.Tracked) bool {
+	pet, ok := target.(*summon.Actor)
+	if !ok || live == nil || !pet.IsPet() || pet.OwnerID() != live.ObjectID() {
+		return false
+	}
+	live.SendFrame(serverpackets.FramePetStatusShow(pet.SummonType()))
+	return true
 }
 
 func (l *GameClientLink) selectLiveTarget(live *livePlayer, target world.Tracked) bool {
