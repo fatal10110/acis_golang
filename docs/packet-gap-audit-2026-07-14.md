@@ -29,7 +29,7 @@ Sources checked:
 
 - Original game client appendix: 206 concrete dispatcher targets.
 - Original game server appendix: 282 packet classes, including base/composite classes.
-- Classified M2-M5 required game client packets: 94. Missing in Go: 53.
+- Classified M2-M5 required game client packets: 94. Missing in Go: 52.
 - Classified M2-M5 required game server packets: 128. Missing in Go: 69.
 - M1 login client/server packets are implemented.
 - M1 GS-LS link packets are implemented under `internal/link/`.
@@ -94,7 +94,6 @@ M2 required client packets are complete:
 
 Missing M3 data/UI client packets:
 
-- `RequestBypassToServer`
 - `RequestBBSwrite`
 - `RequestPledgeCrest`
 - `RequestSetPledgeCrest`
@@ -143,6 +142,7 @@ inventory mutation, adena persistence, and the NPC dialog/bypass owner flow are 
 
 Implemented and wired M3 data/UI client packets in Go:
 
+- `RequestBypassToServer` (`player_help` HTML bypass only; admin, NPC, quest, community-board, hero, olympiad, and manor bypass owners remain deferred until those systems exist)
 - `RequestLinkHtml`
 
 Implemented and wired M4 movement/rotation/target client packets in Go:

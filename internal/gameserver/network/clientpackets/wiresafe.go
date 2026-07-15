@@ -18,6 +18,7 @@ const (
 	OpcodeRequestSellItem         = 0x1e
 	OpcodeRequestBuyItem          = 0x1f
 	OpcodeRequestLinkHtml         = 0x20
+	OpcodeRequestBypassToServer   = 0x21
 	OpcodeDummy23                 = 0x23
 	OpcodeDummy2E                 = 0x2e
 	OpcodeRequestMagicSkillUse    = 0x2f
