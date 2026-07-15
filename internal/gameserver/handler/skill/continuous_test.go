@@ -95,6 +95,55 @@ func TestContinuousBuffSkipsBlockedBuffImmuneTarget(t *testing.T) {
 	}
 }
 
+// A real BlockBuff marker loaded from the datapack (<effect name="BlockBuff">
+// with no effectType attribute) must still suppress incoming BUFF effects:
+// its classification is resolved from the runtime kind, not the attribute.
+func TestContinuousBuffSkipsBlockedBuffFromRealMarkerEffect(t *testing.T) {
+	registry := NewDefaultRegistry()
+	target := newContinuousFake(2)
+
+	blocker, err := effect.New(effect.Skill{}, modelskill.EffectTemplate{Name: "BlockBuff", Time: 600})
+	if err != nil {
+		t.Fatalf("effect.New() error: %v", err)
+	}
+	blocker.Effected = target
+	target.list.Add(blocker)
+
+	registry.Use(Cast{
+		Caster:  newContinuousFake(1),
+		Skill:   modelskill.Definition{SkillType: "BUFF", Effects: buffEffect()},
+		Targets: []any{target},
+	})
+
+	if got := len(target.list.All()); got != 1 {
+		t.Fatalf("effect list = %d after BUFF, want 1 (only the pre-existing BlockBuff marker)", got)
+	}
+}
+
+// A real BlockDebuff marker loaded from the datapack must still suppress an
+// incoming offensive debuff for the same reason as the BlockBuff case.
+func TestContinuousDebuffSkipsBlockedDebuffFromRealMarkerEffect(t *testing.T) {
+	registry := NewDefaultRegistry()
+	target := newContinuousFake(2)
+
+	blocker, err := effect.New(effect.Skill{}, modelskill.EffectTemplate{Name: "BlockDebuff", Time: 600})
+	if err != nil {
+		t.Fatalf("effect.New() error: %v", err)
+	}
+	blocker.Effected = target
+	target.list.Add(blocker)
+
+	registry.Use(Cast{
+		Caster:  newContinuousFake(1),
+		Skill:   modelskill.Definition{SkillType: "DEBUFF", Offensive: true, Debuff: true, Effects: []modelskill.EffectTemplate{{Name: "Debuff", Time: 600}}},
+		Targets: []any{target},
+	})
+
+	if got := len(target.list.All()); got != 1 {
+		t.Fatalf("effect list = %d after DEBUFF, want 1 (only the pre-existing BlockDebuff marker)", got)
+	}
+}
+
 func TestContinuousBuffSkipsCursedOther(t *testing.T) {
 	registry := NewDefaultRegistry()
 	target := newContinuousFake(2)
