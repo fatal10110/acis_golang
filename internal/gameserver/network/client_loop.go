@@ -559,6 +559,14 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 			l.getItemFromPet(ctx, live, req)
 
+		case clientpackets.OpcodeRequestPetGetItem:
+			req, err := clientpackets.DecodeRequestPetGetItem(payload)
+			if err != nil {
+				l.log.Warn().Err(err).Msg("game client")
+				continue
+			}
+			l.petGetItem(ctx, live, req)
+
 		case clientpackets.OpcodeTradeRequest:
 			req, err := clientpackets.DecodeTradeRequest(payload)
 			if err != nil {
@@ -637,7 +645,6 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			clientpackets.OpcodeRequestQuestAbort,
 			clientpackets.OpcodeRequestRestartPoint,
 			clientpackets.OpcodeRequestChangePetName,
-			clientpackets.OpcodeRequestPetGetItem,
 			clientpackets.OpcodeRequestPackageSend,
 			clientpackets.OpcodeDlgAnswer,
 			clientpackets.OpcodeGameGuardReply,

@@ -1081,6 +1081,8 @@ func (r *recordingGroundDropper) Drop(ground *grounditem.Item, opts task.DropOpt
 	r.drops = append(r.drops, recordedGroundDrop{ground: ground, opts: opts})
 }
 
+func (r *recordingGroundDropper) Remove(*grounditem.Item) {}
+
 type visibleGroundItem struct {
 	world.Presence
 	id        int32

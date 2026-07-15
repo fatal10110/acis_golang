@@ -44,6 +44,7 @@ type idAllocator interface {
 
 type groundItemDropper interface {
 	Drop(*grounditem.Item, task.DropOptions)
+	Remove(*grounditem.Item)
 }
 
 const (
