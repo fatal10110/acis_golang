@@ -3,14 +3,17 @@ package network
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -134,6 +137,108 @@ func TestGetItemFromPetTransfersBackToOwner(t *testing.T) {
 	_ = petInv
 }
 
+func TestPetGetItemPicksUpGroundItem(t *testing.T) {
+	templates := petTestTemplates()
+	capture := &frameCapture{}
+	live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
+	state := world.New()
+	state.Spawn(live, 0, 0, 0, 0)
+	pet, petInv := attachTestPet(t, state, live, templates, 12077, nil)
+
+	tmpl, ok := templates.Get(item.AdenaID)
+	if !ok {
+		t.Fatal("adena template missing")
+	}
+	ground, err := grounditem.New(item.Instance{ObjectID: 900, TemplateID: item.AdenaID, Count: 40, ManaLeft: -1}, tmpl)
+	if err != nil {
+		t.Fatalf("ground item: %v", err)
+	}
+	drops := task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour}, time.Now)
+	drops.Drop(ground, task.DropOptions{X: 10, Y: 20, Z: 30})
+
+	capture.frames = nil
+	store := &recordingEnchantItemStore{}
+	gcl := &GameClientLink{world: state, groundItems: drops, items: store}
+
+	gcl.petGetItem(context.Background(), live, clientpackets.RequestPetGetItem{ObjectID: ground.ObjectID()})
+
+	assertOpcodeSequence(t, capture.frames,
+		serverpackets.OpcodeGetItem,
+		serverpackets.OpcodeDeleteObject,
+		serverpackets.OpcodePetInventoryUpdate,
+	)
+	r := wire.NewReader(capture.frames[0][1:])
+	if got := r.ReadInt32(); got != pet.ObjectID() {
+		t.Fatalf("GetItem picker id = %d, want pet id %d", got, pet.ObjectID())
+	}
+	if got := r.ReadInt32(); got != ground.ObjectID() {
+		t.Fatalf("GetItem ground id = %d, want %d", got, ground.ObjectID())
+	}
+	x, y, z := r.ReadInt32(), r.ReadInt32(), r.ReadInt32()
+	if x != 10 || y != 20 || z != 30 {
+		t.Fatalf("GetItem location = (%d,%d,%d), want (10,20,30)", x, y, z)
+	}
+	if _, ok := state.Object(ground.ObjectID()); ok {
+		t.Fatalf("world.Object(%d) still present after pickup", ground.ObjectID())
+	}
+	if got := drops.Len(); got != 0 {
+		t.Fatalf("ground item tracker Len = %d, want 0", got)
+	}
+	petStack := petInv.ItemByTemplateID(item.AdenaID)
+	if petStack == nil || petStack.ObjectID != ground.ObjectID() || petStack.Count != 40 || petStack.OwnerID != pet.ObjectID() || petStack.Location != item.LocationPet {
+		t.Fatalf("pet stack = %+v, want picked up ground adena", petStack)
+	}
+	if len(store.saved) != 1 || store.saved[0].ObjectID != ground.ObjectID() || store.saved[0].OwnerID != pet.ObjectID() || store.saved[0].Location != item.LocationPet {
+		t.Fatalf("saved rows = %+v, want ground row moved to pet inventory", store.saved)
+	}
+}
+
+func TestPetGetItemMergesStackAndDeletesGroundRow(t *testing.T) {
+	templates := petTestTemplates()
+	petItem := &item.Instance{ObjectID: 901, TemplateID: item.AdenaID, OwnerID: 0x20000001, Count: 10, Location: item.LocationPet}
+	capture := &frameCapture{}
+	live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
+	state := world.New()
+	state.Spawn(live, 0, 0, 0, 0)
+	pet, petInv := attachTestPet(t, state, live, templates, 12077, []*item.Instance{petItem})
+
+	tmpl, ok := templates.Get(item.AdenaID)
+	if !ok {
+		t.Fatal("adena template missing")
+	}
+	ground, err := grounditem.New(item.Instance{ObjectID: 900, TemplateID: item.AdenaID, Count: 40, ManaLeft: -1}, tmpl)
+	if err != nil {
+		t.Fatalf("ground item: %v", err)
+	}
+	drops := task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour}, time.Now)
+	drops.Drop(ground, task.DropOptions{X: 10, Y: 20, Z: 30})
+
+	capture.frames = nil
+	store := &recordingEnchantItemStore{}
+	gcl := &GameClientLink{world: state, groundItems: drops, items: store}
+
+	gcl.petGetItem(context.Background(), live, clientpackets.RequestPetGetItem{ObjectID: ground.ObjectID()})
+
+	assertOpcodeSequence(t, capture.frames,
+		serverpackets.OpcodeGetItem,
+		serverpackets.OpcodeDeleteObject,
+		serverpackets.OpcodePetInventoryUpdate,
+	)
+	petStack := petInv.ItemByTemplateID(item.AdenaID)
+	if petStack != petItem || petStack.Count != 50 || petStack.OwnerID != pet.ObjectID() || petStack.Location != item.LocationPet {
+		t.Fatalf("pet stack = %+v, want merged 50 adena", petStack)
+	}
+	if len(store.updated) != 1 || store.updated[0].ObjectID != petItem.ObjectID || store.updated[0].Count != 50 {
+		t.Fatalf("updated rows = %+v, want merged pet stack", store.updated)
+	}
+	if len(store.deleted) != 1 || store.deleted[0] != ground.ObjectID() {
+		t.Fatalf("deleted rows = %+v, want absorbed ground row", store.deleted)
+	}
+	if len(store.saved) != 0 {
+		t.Fatalf("saved rows = %+v, want none for absorbed ground stack", store.saved)
+	}
+}
+
 func TestGiveItemToPetCancelsActiveEnchantBeforeTransfer(t *testing.T) {
 	templates := petTestTemplates()
 	source := &item.Instance{ObjectID: 500, TemplateID: item.AdenaID, OwnerID: 1, Count: 100, Location: item.LocationInventory}
@@ -255,6 +360,76 @@ func TestGameClientLinkRequestGiveItemToPetDispatch(t *testing.T) {
 	}
 }
 
+func TestGameClientLinkRequestPetGetItemDispatch(t *testing.T) {
+	c, chars, items, state := newLinkedGameClient(t)
+
+	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.read() // CharCreateOk
+	c.read() // CharSelectInfo
+	objID := chars.soleObjectID(t)
+	if err := items.Create(context.Background(), objID, item.Instance{
+		ObjectID:   500,
+		TemplateID: item.AdenaID,
+		OwnerID:    objID,
+		Count:      100,
+		Location:   item.LocationInventory,
+	}); err != nil {
+		t.Fatalf("seed item: %v", err)
+	}
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	playerObj, ok := state.Player(objID)
+	if !ok {
+		t.Fatalf("world.Player(%d) missing", objID)
+	}
+	live := playerObj.(*livePlayer)
+	pet, petInv := attachTestPet(t, state, live, testItemTemplates(), 12077, nil)
+
+	c.send(encodeRequestDropItem(500, 40, location.Location{X: 10, Y: 20, Z: 30}))
+	if reply := c.read(); reply[0] != serverpackets.OpcodeInventoryUpdate {
+		t.Fatalf("drop inventory opcode = %#x, want InventoryUpdate (%#x)", reply[0], serverpackets.OpcodeInventoryUpdate)
+	}
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeDropItem {
+		t.Fatalf("drop broadcast opcode = %#x, want DropItem (%#x)", reply[0], serverpackets.OpcodeDropItem)
+	}
+	r := wire.NewReader(reply[1:])
+	r.ReadInt32()
+	groundID := r.ReadInt32()
+
+	c.send(encodeRequestPetGetItem(groundID))
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeGetItem {
+		t.Fatalf("pickup opcode = %#x, want GetItem (%#x)", reply[0], serverpackets.OpcodeGetItem)
+	}
+	r = wire.NewReader(reply[1:])
+	if got := r.ReadInt32(); got != pet.ObjectID() {
+		t.Fatalf("GetItem picker id = %d, want pet id %d", got, pet.ObjectID())
+	}
+	if got := r.ReadInt32(); got != groundID {
+		t.Fatalf("GetItem ground id = %d, want %d", got, groundID)
+	}
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeDeleteObject {
+		t.Fatalf("pickup delete opcode = %#x, want DeleteObject (%#x)", reply[0], serverpackets.OpcodeDeleteObject)
+	}
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodePetInventoryUpdate {
+		t.Fatalf("pickup inventory opcode = %#x, want PetInventoryUpdate (%#x)", reply[0], serverpackets.OpcodePetInventoryUpdate)
+	}
+	if _, ok := state.Object(groundID); ok {
+		t.Fatalf("world.Object(%d) still present after pickup", groundID)
+	}
+	if stack := petInv.ItemByTemplateID(item.AdenaID); stack == nil || stack.Count != 40 || stack.OwnerID != pet.ObjectID() {
+		t.Fatalf("pet stack = %+v, want 40 adena", stack)
+	}
+}
+
 func TestHandleTargetActionShowsPetStatusForOwnerPet(t *testing.T) {
 	templates := petTestTemplates()
 	capture := &frameCapture{}
@@ -282,5 +457,11 @@ func encodeRequestGiveItemToPet(objectID, count int32) []byte {
 	w := wire.NewPacketWriter(clientpackets.OpcodeRequestGiveItemToPet)
 	w.WriteInt32(objectID)
 	w.WriteInt32(count)
+	return w.Bytes()
+}
+
+func encodeRequestPetGetItem(objectID int32) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeRequestPetGetItem)
+	w.WriteInt32(objectID)
 	return w.Bytes()
 }
