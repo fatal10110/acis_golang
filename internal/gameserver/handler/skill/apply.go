@@ -49,6 +49,15 @@ func applyEffects(effector, effected any, def modelskill.Definition, templates [
 	}
 }
 
+// stopEffectsBySkillID removes every active effect in list owned by the
+// skill id, used to drop a stale toggle or prior cast's effects before a
+// fresh copy is applied so the same skill doesn't stack on itself.
+func stopEffectsBySkillID(list *effect.List, id modelskill.ID) {
+	removeMatching(list, 0, func(e *effect.Effect) bool {
+		return e.Skill.ID == id
+	})
+}
+
 // firstEffectByID returns the first active effect in list whose owning
 // skill matches id, or nil if list is nil or has none.
 func firstEffectByID(list *effect.List, id modelskill.ID) *effect.Effect {
