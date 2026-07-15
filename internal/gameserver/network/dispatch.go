@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
 	"github.com/fatal10110/acis_golang/internal/gameserver/petitem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	tradebook "github.com/fatal10110/acis_golang/internal/gameserver/trade"
@@ -25,6 +26,12 @@ type itemStore interface {
 	Save(ctx context.Context, inst *item.Instance) error
 	Update(ctx context.Context, inst *item.Instance) error
 	Delete(ctx context.Context, objectID int32) error
+}
+
+type shortcutStore interface {
+	ListByOwner(ctx context.Context, ownerID int32) ([]shortcut.Shortcut, error)
+	Save(ctx context.Context, ownerID int32, sc shortcut.Shortcut) error
+	Delete(ctx context.Context, ownerID int32, slot, page int32) error
 }
 
 type attackStanceTracker interface {
@@ -53,6 +60,7 @@ type GameClientLink struct {
 	loginLink     func() *LoginLink
 	roster        *manager.Roster
 	items         itemStore
+	shortcuts     shortcutStore
 	templates     *player.TemplateTable
 	itemTemplates *item.Table
 	skills        *SkillPersistence
@@ -84,6 +92,7 @@ func NewGameClientLink(
 	loginLink func() *LoginLink,
 	roster *manager.Roster,
 	items itemStore,
+	shortcuts shortcutStore,
 	templates *player.TemplateTable,
 	itemTemplates *item.Table,
 	skills *SkillPersistence,
@@ -98,6 +107,7 @@ func NewGameClientLink(
 		loginLink:     loginLink,
 		roster:        roster,
 		items:         items,
+		shortcuts:     shortcuts,
 		templates:     templates,
 		itemTemplates: itemTemplates,
 		skills:        skills,

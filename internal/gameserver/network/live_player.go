@@ -6,16 +6,18 @@ import (
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 type livePlayer struct {
 	*player.Character
-	template *player.Template
-	items    []*item.Instance
-	target   world.Tracked
-	attack   *attack.Controller
-	cast     *actorcast.Controller
+	template  *player.Template
+	items     []*item.Instance
+	target    world.Tracked
+	attack    *attack.Controller
+	cast      *actorcast.Controller
+	shortcuts *shortcut.List
 
 	stopAttack func(*livePlayer)
 }

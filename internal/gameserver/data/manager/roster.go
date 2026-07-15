@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
 )
 
 // DefaultDeleteAfter is the grace period between scheduling a character for
@@ -79,6 +80,13 @@ type itemStore interface {
 	DeleteByOwner(ctx context.Context, ownerID int32) (int64, error)
 }
 
+// shortcutStore is the persistence Roster needs for character_shortcuts.
+// Satisfied by *sql.ShortcutStore.
+type shortcutStore interface {
+	Save(ctx context.Context, ownerID int32, sc shortcut.Shortcut) error
+	DeleteByOwner(ctx context.Context, ownerID int32) error
+}
+
 // Roster creates, lists, deletes and restores the characters on an
 // account, keeping the characters and items tables consistent with each
 // other. A Roster holds no mutable state of its own beyond its
@@ -87,6 +95,7 @@ type itemStore interface {
 type Roster struct {
 	characters characterStore
 	items      itemStore
+	shortcuts  shortcutStore
 	templates  *player.TemplateTable
 	itemTable  *item.Table
 	npcs       *npc.Table
@@ -100,13 +109,14 @@ type Roster struct {
 // deleteAfter is the grace period MarkForDeletion schedules (see
 // DefaultDeleteAfter); a zero value means deletion is immediate. now
 // defaults to time.Now when nil.
-func NewRoster(characters characterStore, items itemStore, templates *player.TemplateTable, itemTable *item.Table, npcs *npc.Table, ids idAllocator, deleteAfter time.Duration, now func() time.Time) *Roster {
+func NewRoster(characters characterStore, items itemStore, shortcuts shortcutStore, templates *player.TemplateTable, itemTable *item.Table, npcs *npc.Table, ids idAllocator, deleteAfter time.Duration, now func() time.Time) *Roster {
 	if now == nil {
 		now = time.Now
 	}
 	return &Roster{
 		characters:  characters,
 		items:       items,
+		shortcuts:   shortcuts,
 		templates:   templates,
 		itemTable:   itemTable,
 		npcs:        npcs,
@@ -193,6 +203,13 @@ func (r *Roster) Create(ctx context.Context, accountName string, req CreateReque
 			return nil, CreateRejected, err
 		}
 	}
+	if r.shortcuts != nil {
+		for _, sc := range shortcut.Starter() {
+			if err := r.shortcuts.Save(ctx, c.ID, sc); err != nil {
+				return nil, CreateRejected, err
+			}
+		}
+	}
 
 	return c, CreateOK, nil
 }
@@ -252,6 +269,11 @@ func (r *Roster) purge(ctx context.Context, objectID int32) error {
 	}
 	if _, err := r.items.DeleteByOwner(ctx, objectID); err != nil {
 		return err
+	}
+	if r.shortcuts != nil {
+		if err := r.shortcuts.DeleteByOwner(ctx, objectID); err != nil {
+			return err
+		}
 	}
 	return nil
 }

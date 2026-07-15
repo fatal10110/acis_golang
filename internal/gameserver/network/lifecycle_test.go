@@ -38,7 +38,7 @@ func TestGameClientLinkNormalDisconnectLogsDebug(t *testing.T) {
 func TestDetachLivePlayerSavesWithUncancelledBoundedContext(t *testing.T) {
 	chars := newFakeCharStore()
 	items := newFakeItemStore()
-	roster := gamemanager.NewRoster(chars, items, testTemplates(t), testItemTemplates(), npc.NewTable(nil), &sequentialIDs{next: 100}, gamemanager.DefaultDeleteAfter, time.Now)
+	roster := gamemanager.NewRoster(chars, items, nil, testTemplates(t), testItemTemplates(), npc.NewTable(nil), &sequentialIDs{next: 100}, gamemanager.DefaultDeleteAfter, time.Now)
 	live := newTestLivePlayer(t, 101, &frameCapture{})
 	savedAt := location.Location{X: 46160, Y: 41237, Z: -3534}
 	live.Character.Location = savedAt

@@ -135,6 +135,20 @@ const characterSkillsSchema = "CREATE TABLE IF NOT EXISTS `character_skills` (\n
 	"  PRIMARY KEY (`char_obj_id`,`skill_id`,`class_index`)\n" +
 	")"
 
+// characterShortcutsSchema mirrors the shipped character_shortcuts table
+// definition verbatim.
+const characterShortcutsSchema = "CREATE TABLE IF NOT EXISTS `character_shortcuts` (\n" +
+	"  `char_obj_id` INT UNSIGNED NOT NULL DEFAULT 0,\n" +
+	"  `slot` TINYINT UNSIGNED NOT NULL DEFAULT 0,\n" +
+	"  `page` TINYINT UNSIGNED NOT NULL DEFAULT 0,\n" +
+	"  `type` VARCHAR(6) NOT NULL DEFAULT 'NONE',\n" +
+	"  `id` INT UNSIGNED NOT NULL DEFAULT 0,\n" +
+	"  `level` SMALLINT SIGNED NOT NULL DEFAULT 0,\n" +
+	"  `class_index` TINYINT UNSIGNED NOT NULL DEFAULT 0,\n" +
+	"  PRIMARY KEY (`char_obj_id`,`slot`,`page`,`class_index`),\n" +
+	"  KEY `id` (`id`)\n" +
+	")"
+
 // petsSchema mirrors the shipped pets table definition verbatim.
 const petsSchema = "CREATE TABLE IF NOT EXISTS `pets` (\n" +
 	"  `item_obj_id` decimal(11) NOT NULL default 0,\n" +
@@ -209,6 +223,9 @@ func NewDB(t *testing.T) *sql.DB {
 	}
 	if _, err := db.ExecContext(ctx, characterSkillsSchema); err != nil {
 		t.Fatalf("create character_skills table: %v", err)
+	}
+	if _, err := db.ExecContext(ctx, characterShortcutsSchema); err != nil {
+		t.Fatalf("create character_shortcuts table: %v", err)
 	}
 	if _, err := db.ExecContext(ctx, petsSchema); err != nil {
 		t.Fatalf("create pets table: %v", err)

@@ -21,6 +21,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
@@ -221,6 +222,58 @@ func (s *fakeItemStore) Delete(_ context.Context, objectID int32) error {
 		}
 	}
 	return nil
+}
+
+type fakeShortcutStore struct {
+	mu      sync.Mutex
+	byOwner map[int32][]shortcut.Shortcut
+}
+
+func newFakeShortcutStore() *fakeShortcutStore {
+	return &fakeShortcutStore{byOwner: map[int32][]shortcut.Shortcut{}}
+}
+
+func (s *fakeShortcutStore) ListByOwner(_ context.Context, ownerID int32) ([]shortcut.Shortcut, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]shortcut.Shortcut(nil), s.byOwner[ownerID]...), nil
+}
+
+func (s *fakeShortcutStore) Save(_ context.Context, ownerID int32, sc shortcut.Shortcut) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	list := shortcut.NewList(s.byOwner[ownerID])
+	list.Register(sc)
+	s.byOwner[ownerID] = list.All()
+	return nil
+}
+
+func (s *fakeShortcutStore) Delete(_ context.Context, ownerID int32, slot, page int32) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	list := shortcut.NewList(s.byOwner[ownerID])
+	list.Delete(slot, page)
+	s.byOwner[ownerID] = list.All()
+	return nil
+}
+
+func (s *fakeShortcutStore) DeleteByOwner(_ context.Context, ownerID int32) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.byOwner, ownerID)
+	return nil
+}
+
+func (s *fakeShortcutStore) seed(ownerID int32, shortcuts ...shortcut.Shortcut) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.byOwner[ownerID] = append([]shortcut.Shortcut(nil), shortcuts...)
+}
+
+func (s *fakeShortcutStore) shortcuts(ownerID int32) []shortcut.Shortcut {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]shortcut.Shortcut(nil), s.byOwner[ownerID]...)
 }
 
 type sequentialIDs struct{ next int32 }
@@ -693,6 +746,21 @@ func encodeRequestCrystallizeItem(objectID, count int32) []byte {
 	return w.Bytes()
 }
 
+func encodeRequestShortCutReg(typ, slot, id, characterType int32) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeRequestShortCutReg)
+	w.WriteInt32(typ)
+	w.WriteInt32(slot)
+	w.WriteInt32(id)
+	w.WriteInt32(characterType)
+	return w.Bytes()
+}
+
+func encodeRequestShortCutDel(slot int32) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeRequestShortCutDel)
+	w.WriteInt32(slot)
+	return w.Bytes()
+}
+
 func encodeSendTimeCheck(requestID, responseID int32) []byte {
 	w := wire.NewPacketWriter(clientpackets.OpcodeSendTimeCheck)
 	w.WriteInt32(requestID)
@@ -718,15 +786,22 @@ func newTestGameClientLinkWithLog(t *testing.T, loginLink func() *LoginLink, val
 
 func newTestGameClientLinkWithSkillsAndLog(t *testing.T, loginLink func() *LoginLink, validator *SessionValidator, skills *SkillPersistence, log zerolog.Logger) (addr string, chars *fakeCharStore, items *fakeItemStore, state *world.State) {
 	t.Helper()
+	addr, chars, items, _, state = newTestGameClientLinkWithSkillsShortcutsAndLog(t, loginLink, validator, skills, log)
+	return addr, chars, items, state
+}
+
+func newTestGameClientLinkWithSkillsShortcutsAndLog(t *testing.T, loginLink func() *LoginLink, validator *SessionValidator, skills *SkillPersistence, log zerolog.Logger) (addr string, chars *fakeCharStore, items *fakeItemStore, shortcuts *fakeShortcutStore, state *world.State) {
+	t.Helper()
 	chars = newFakeCharStore()
 	items = newFakeItemStore()
+	shortcuts = newFakeShortcutStore()
 	state = world.New()
 	templates := testTemplates(t)
 	itemTemplates := testItemTemplates()
 	ids := &sequentialIDs{next: 100}
 	groundItems := task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour, PlayerDroppedMultiplier: 1}, time.Now)
-	roster := gamemanager.NewRoster(chars, items, templates, itemTemplates, npc.NewTable(nil), ids, gamemanager.DefaultDeleteAfter, time.Now)
-	gcl := NewGameClientLink(validator, loginLink, roster, items, templates, itemTemplates, skills, state, ids, groundItems, nil, log)
+	roster := gamemanager.NewRoster(chars, items, shortcuts, templates, itemTemplates, npc.NewTable(nil), ids, gamemanager.DefaultDeleteAfter, time.Now)
+	gcl := NewGameClientLink(validator, loginLink, roster, items, shortcuts, templates, itemTemplates, skills, state, ids, groundItems, nil, log)
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -736,7 +811,7 @@ func newTestGameClientLinkWithSkillsAndLog(t *testing.T, loginLink func() *Login
 	t.Cleanup(cancel)
 	go Serve(ctx, ln, gcl.Handle, zerolog.Nop())
 
-	return ln.Addr().String(), chars, items, state
+	return ln.Addr().String(), chars, items, shortcuts, state
 }
 
 // newLinkedGameClient wires a GameClientLink to a real login-server-side
@@ -755,6 +830,17 @@ func newLinkedGameClientWithSkills(t *testing.T, skills *SkillPersistence) (c *f
 
 func newLinkedGameClientWithSkillsSeed(t *testing.T, skills *SkillPersistence, seed func(*fakeCharStore, *fakeItemStore), wantChars int) (c *fakeGameClient, chars *fakeCharStore, items *fakeItemStore, state *world.State) {
 	t.Helper()
+	c, chars, items, _, state = newLinkedGameClientWithSkillsShortcutsSeed(t, skills, nil, seed, wantChars)
+	return c, chars, items, state
+}
+
+func newLinkedGameClientWithShortcuts(t *testing.T) (c *fakeGameClient, chars *fakeCharStore, items *fakeItemStore, shortcuts *fakeShortcutStore, state *world.State) {
+	t.Helper()
+	return newLinkedGameClientWithSkillsShortcutsSeed(t, nil, nil, nil, 0)
+}
+
+func newLinkedGameClientWithSkillsShortcutsSeed(t *testing.T, skills *SkillPersistence, shortcutSeed func(*fakeShortcutStore), seed func(*fakeCharStore, *fakeItemStore), wantChars int) (c *fakeGameClient, chars *fakeCharStore, items *fakeItemStore, shortcuts *fakeShortcutStore, state *world.State) {
+	t.Helper()
 
 	loginAddr, servers, sessions := newTestLoginServer(t, false)
 	servers.Register(1, testHexID)
@@ -767,9 +853,12 @@ func newLinkedGameClientWithSkillsSeed(t *testing.T, skills *SkillPersistence, s
 	}
 	t.Cleanup(func() { loginLink.Close() })
 
-	addr, chars, items, state := newTestGameClientLinkWithSkillsAndLog(t, func() *LoginLink { return loginLink }, validator, skills, zerolog.Nop())
+	addr, chars, items, shortcuts, state := newTestGameClientLinkWithSkillsShortcutsAndLog(t, func() *LoginLink { return loginLink }, validator, skills, zerolog.Nop())
 	if seed != nil {
 		seed(chars, items)
+	}
+	if shortcutSeed != nil {
+		shortcutSeed(shortcuts)
 	}
 
 	c = dialGameClient(t, addr)
@@ -786,7 +875,7 @@ func newLinkedGameClientWithSkillsSeed(t *testing.T, skills *SkillPersistence, s
 	if count := wire.NewReader(reply[1:]).ReadInt32(); count != int32(wantChars) {
 		t.Fatalf("initial char count = %d, want %d", count, wantChars)
 	}
-	return c, chars, items, state
+	return c, chars, items, shortcuts, state
 }
 
 func seedSelectableCharacter(t *testing.T, chars *fakeCharStore, account, name string, level, sp int) int32 {

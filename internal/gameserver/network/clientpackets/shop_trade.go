@@ -7,6 +7,8 @@ const (
 	addTradeItemSize       = 3 * 4
 	tradeDoneSize          = 4
 	answerTradeRequestSize = 4
+	shortcutRegSize        = 4 * 4
+	shortcutDelSize        = 4
 	shopBuyRowSize         = 2 * 4
 	shopSellRowSize        = 3 * 4
 	shopHeaderSize         = 2 * 4
@@ -90,6 +92,57 @@ func DecodeAnswerTradeRequest(payload []byte) (AnswerTradeRequest, error) {
 	req := AnswerTradeRequest{Response: r.ReadInt32()}
 	if err := r.Err(); err != nil {
 		return AnswerTradeRequest{}, fmt.Errorf("clientpackets: AnswerTradeRequest: %w", err)
+	}
+	return req, nil
+}
+
+// RequestShortCutReg adds or replaces one client shortcut bar entry.
+type RequestShortCutReg struct {
+	Type          int32
+	Slot          int32
+	Page          int32
+	ID            int32
+	CharacterType int32
+}
+
+// DecodeRequestShortCutReg parses a raw RequestShortCutReg payload (opcode
+// byte included).
+func DecodeRequestShortCutReg(payload []byte) (RequestShortCutReg, error) {
+	r := newReader(payload)
+	if r.Remaining() < shortcutRegSize {
+		return RequestShortCutReg{}, fmt.Errorf("clientpackets: RequestShortCutReg: need %d bytes, got %d", shortcutRegSize, r.Remaining())
+	}
+	req := RequestShortCutReg{
+		Type: r.ReadInt32(),
+	}
+	slot := r.ReadInt32()
+	req.ID = r.ReadInt32()
+	req.CharacterType = r.ReadInt32()
+	req.Slot = slot % 12
+	req.Page = slot / 12
+	if err := r.Err(); err != nil {
+		return RequestShortCutReg{}, fmt.Errorf("clientpackets: RequestShortCutReg: %w", err)
+	}
+	return req, nil
+}
+
+// RequestShortCutDel removes one client shortcut bar entry.
+type RequestShortCutDel struct {
+	Slot int32
+	Page int32
+}
+
+// DecodeRequestShortCutDel parses a raw RequestShortCutDel payload (opcode
+// byte included).
+func DecodeRequestShortCutDel(payload []byte) (RequestShortCutDel, error) {
+	r := newReader(payload)
+	if r.Remaining() < shortcutDelSize {
+		return RequestShortCutDel{}, fmt.Errorf("clientpackets: RequestShortCutDel: need %d bytes, got %d", shortcutDelSize, r.Remaining())
+	}
+	slot := r.ReadInt32()
+	req := RequestShortCutDel{Slot: slot % 12, Page: slot / 12}
+	if err := r.Err(); err != nil {
+		return RequestShortCutDel{}, fmt.Errorf("clientpackets: RequestShortCutDel: %w", err)
 	}
 	return req, nil
 }
