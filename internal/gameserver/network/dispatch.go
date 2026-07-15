@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -55,6 +56,7 @@ type GameClientLink struct {
 	ids           idAllocator
 	groundItems   groundItemDropper
 	attackStance  attackStanceTracker
+	trades        *tradeCoordinator
 	log           zerolog.Logger
 
 	// newCipherKey supplies each connection's XOR cipher key; overridden in
@@ -95,6 +97,7 @@ func NewGameClientLink(
 		ids:           ids,
 		groundItems:   groundItems,
 		attackStance:  attackStance,
+		trades:        newTradeCoordinator(time.Now),
 		log:           log,
 		newCipherKey:  randomCipherKey,
 	}

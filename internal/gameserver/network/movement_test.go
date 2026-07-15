@@ -155,7 +155,6 @@ func TestGameClientLinkWireSafeMovementAndRefreshPacketsInGame(t *testing.T) {
 	}
 
 	for _, opcode := range []byte{
-		clientpackets.OpcodeTradeRequest,
 		clientpackets.OpcodeSendWarehouseDeposit,
 		clientpackets.OpcodeRequestQuestListInGame,
 		clientpackets.OpcodeRequestPackageItemList,

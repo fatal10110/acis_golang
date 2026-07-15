@@ -11,6 +11,7 @@ func (l *GameClientLink) detachLivePlayer(ctx context.Context, live *livePlayer)
 	if live == nil {
 		return
 	}
+	l.cancelActiveTrade(live)
 	if l.roster != nil || l.skills != nil {
 		saveCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), livePlayerDetachSaveTimeout)
 		defer cancel()

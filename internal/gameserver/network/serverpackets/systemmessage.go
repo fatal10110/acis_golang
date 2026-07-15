@@ -17,8 +17,20 @@ const (
 	SystemMessageEnchantmentFailedS1S2Evaporated = 65
 	SystemMessageTargetTooFar                    = 22
 	SystemMessageS1CannotBeUsed                  = 113
+	SystemMessageRequestS1ForTrade               = 118
+	SystemMessageS1DeniedTradeRequest            = 119
+	SystemMessageBeginTradeWithS1                = 120
+	SystemMessageS1ConfirmedTrade                = 121
+	SystemMessageCannotAdjustItemsAfterConfirm   = 122
+	SystemMessageTradeSuccessful                 = 123
+	SystemMessageS1CanceledTrade                 = 124
+	SystemMessageSlotsFull                       = 129
+	SystemMessageOnceTradeConfirmedCannotMove    = 141
 	SystemMessageAlreadyTrading                  = 142
+	SystemMessageTargetIncorrect                 = 144
+	SystemMessageTargetNotFound                  = 145
 	SystemMessageCannotPickupOrUseItemTrading    = 149
+	SystemMessageS1IsBusyTryLater                = 153
 	SystemMessageInvalidTarget                   = 109
 	SystemMessageCannotDiscardDistanceTooFar     = 151
 	SystemMessageItemMissingToLearnSkill         = 276
@@ -28,6 +40,7 @@ const (
 	SystemMessageNotEnoughItems                  = 351
 	SystemMessageInappropriateEnchantCondition   = 355
 	SystemMessageEnchantScrollCancelled          = 423
+	SystemMessageWeightLimitExceeded             = 422
 	SystemMessageCrystallizeLevelTooLow          = 562
 	SystemMessagePetCannotSentBackDuringBattle   = 579
 	SystemMessageDeadPetCannotBeReturned         = 589
@@ -46,12 +59,14 @@ const (
 	SystemMessageBlessedEnchantFailed            = 1517
 	SystemMessageNoServitorCannotAutomateUse     = 1676
 	SystemMessageCannotEnchantWhileStore         = 1688
+	SystemMessageExchangeHasEnded                = 1266
 	SystemMessagePetRefusingOrder                = 1864
 	SystemMessagePetTooHighToControl             = 1918
 )
 
 // SystemMessage parameter types used by focused packet helpers.
 const (
+	SystemMessageParamText       = 0
 	SystemMessageParamNumber     = 1
 	SystemMessageParamItemName   = 3
 	SystemMessageParamSkillName  = 4
@@ -66,6 +81,17 @@ func FrameSystemMessage(id int) wire.Frame {
 	w := newFrameWriter(OpcodeSystemMessage)
 	w.WriteInt32(int32(id))
 	w.WriteInt32(0)
+	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
+}
+
+// FrameSystemMessageString builds a SystemMessage packet with one text
+// parameter.
+func FrameSystemMessageString(id int, text string) wire.Frame {
+	w := newFrameWriter(OpcodeSystemMessage)
+	w.WriteInt32(int32(id))
+	w.WriteInt32(1)
+	w.WriteInt32(SystemMessageParamText)
+	w.WriteString(text)
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
 }
 

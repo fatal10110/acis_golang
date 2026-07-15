@@ -559,10 +559,47 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 			l.getItemFromPet(ctx, live, req)
 
-		case clientpackets.OpcodeTradeRequest,
-			clientpackets.OpcodeAddTradeItem,
-			clientpackets.OpcodeTradeDone,
-			clientpackets.OpcodeDummy1A,
+		case clientpackets.OpcodeTradeRequest:
+			req, err := clientpackets.DecodeTradeRequest(payload)
+			if err != nil {
+				l.log.Warn().Err(err).Msg("game client")
+				continue
+			}
+			if live != nil {
+				l.handleTradeRequest(live, req)
+			}
+
+		case clientpackets.OpcodeAnswerTradeRequest:
+			req, err := clientpackets.DecodeAnswerTradeRequest(payload)
+			if err != nil {
+				l.log.Warn().Err(err).Msg("game client")
+				continue
+			}
+			if live != nil {
+				l.handleAnswerTradeRequest(live, req)
+			}
+
+		case clientpackets.OpcodeAddTradeItem:
+			req, err := clientpackets.DecodeAddTradeItem(payload)
+			if err != nil {
+				l.log.Warn().Err(err).Msg("game client")
+				continue
+			}
+			if live != nil {
+				l.handleAddTradeItem(live, req)
+			}
+
+		case clientpackets.OpcodeTradeDone:
+			req, err := clientpackets.DecodeTradeDone(payload)
+			if err != nil {
+				l.log.Warn().Err(err).Msg("game client")
+				continue
+			}
+			if live != nil {
+				l.handleTradeDone(ctx, live, req)
+			}
+
+		case clientpackets.OpcodeDummy1A,
 			clientpackets.OpcodeRequestSellItem,
 			clientpackets.OpcodeRequestBuyItem,
 			clientpackets.OpcodeDummy23,
@@ -576,7 +613,6 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			clientpackets.OpcodeDummy3E,
 			clientpackets.OpcodeRequestGetOnVehicle,
 			clientpackets.OpcodeRequestGetOffVehicle,
-			clientpackets.OpcodeAnswerTradeRequest,
 			clientpackets.OpcodeRequestMoveInVehicle,
 			clientpackets.OpcodeCannotMoveInVehicle,
 			clientpackets.OpcodeRequestQuestListInGame,
