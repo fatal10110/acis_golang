@@ -8,6 +8,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	enchantflow "github.com/fatal10110/acis_golang/internal/gameserver/enchant"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
@@ -64,6 +65,7 @@ type GameClientLink struct {
 	shortcuts     shortcutStore
 	templates     *player.TemplateTable
 	itemTemplates *item.Table
+	html          *datacache.HTML
 	skills        *SkillPersistence
 	world         *world.State
 	ids           idAllocator
@@ -96,6 +98,7 @@ func NewGameClientLink(
 	shortcuts shortcutStore,
 	templates *player.TemplateTable,
 	itemTemplates *item.Table,
+	html *datacache.HTML,
 	skills *SkillPersistence,
 	worldState *world.State,
 	ids idAllocator,
@@ -111,6 +114,7 @@ func NewGameClientLink(
 		shortcuts:     shortcuts,
 		templates:     templates,
 		itemTemplates: itemTemplates,
+		html:          html,
 		skills:        skills,
 		world:         worldState,
 		ids:           ids,

@@ -25,6 +25,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/logging"
 	"github.com/fatal10110/acis_golang/internal/commons/scheduler"
 	"github.com/fatal10110/acis_golang/internal/config"
+	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	gamexml "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
@@ -119,6 +120,7 @@ func newGameServerApp(paths gameServerPaths) *fx.App {
 			gameServerConfigFromLoadedProperties,
 			provideGameServerLogger,
 			provideGameServerDatabase,
+			loadHTMLCache,
 			loadGameData,
 			gamesql.NewCharacterStore,
 			gamesql.NewItemStore,
@@ -378,6 +380,10 @@ func loadGameData(paths gameServerPaths, log zerolog.Logger) (*gameData, error) 
 		Geo:     geo.Engine,
 		Finder:  geo.Finder,
 	}, nil
+}
+
+func loadHTMLCache(paths gameServerPaths) (*datacache.HTML, error) {
+	return datacache.LoadHTML(filepath.Join(paths.DataRoot, "data", "html"))
 }
 
 func loadGeodata(paths gameServerPaths) (*geodata, error) {
@@ -803,6 +809,7 @@ func provideGameClientLink(
 	roster *manager.Roster,
 	items *gamesql.ItemStore,
 	shortcuts *gamesql.ShortcutStore,
+	html *datacache.HTML,
 	validator *network.SessionValidator,
 	links *loginLinkState,
 	skills *network.SkillPersistence,
@@ -812,7 +819,7 @@ func provideGameClientLink(
 	attackStance *task.AttackStance,
 	log zerolog.Logger,
 ) *network.GameClientLink {
-	return network.NewGameClientLink(validator, links.get, roster, items, shortcuts, data.Players, data.Items, skills, state, ids, ground, attackStance, log)
+	return network.NewGameClientLink(validator, links.get, roster, items, shortcuts, data.Players, data.Items, html, skills, state, ids, ground, attackStance, log)
 }
 
 func provideSkillPersistence(pool *sql.DB, data *gameData) *network.SkillPersistence {

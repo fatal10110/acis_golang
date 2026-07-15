@@ -112,6 +112,26 @@ KarmaPlayerCanShop = False
 	}
 }
 
+func TestLoadHTMLCacheUsesDatapackRoot(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "data", "html", "help", "tutorial.htm")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("<html/>"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	html, err := loadHTMLCache(gameServerPaths{DataRoot: root})
+	if err != nil {
+		t.Fatalf("loadHTMLCache: %v", err)
+	}
+	got, ok := html.Get("help/tutorial.htm")
+	if !ok || got != "<html/>" {
+		t.Fatalf("Get(help/tutorial.htm) = %q, %v; want cached html", got, ok)
+	}
+}
+
 func TestWorldAttackStanceEffectsStopsPlayerRegistryActor(t *testing.T) {
 	state := world.New()
 	actor := &stoppableTestActor{id: 1001}

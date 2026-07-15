@@ -468,6 +468,14 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				l.changeLiveWaitType(live, req.Stand)
 			}
 
+		case clientpackets.OpcodeRequestLinkHtml:
+			req, err := clientpackets.DecodeRequestLinkHTML(payload)
+			if err != nil {
+				l.log.Warn().Err(err).Msg("game client")
+				continue
+			}
+			l.requestLinkHTML(live, req)
+
 		case clientpackets.OpcodeRequestTargetCancel:
 			if _, err := clientpackets.DecodeRequestTargetCancel(payload); err != nil {
 				l.log.Warn().Err(err).Msg("game client")
