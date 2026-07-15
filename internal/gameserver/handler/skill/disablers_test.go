@@ -87,6 +87,29 @@ func TestDisablersRespectsBlockDebuffForOffensiveSkills(t *testing.T) {
 	}
 }
 
+func TestDisablersRespectsBlockDebuffFromRealMarkerEffect(t *testing.T) {
+	registry := NewDefaultRegistry()
+	target := newDisablerFake(1)
+
+	// A real BlockDebuff marker loaded from the datapack carries no effectType
+	// attribute; its debuff immunity is resolved from the runtime kind.
+	blocker, err := effect.New(effect.Skill{}, modelskill.EffectTemplate{Name: "BlockDebuff", Time: 600})
+	if err != nil {
+		t.Fatalf("effect.New() error: %v", err)
+	}
+	blocker.Effected = target
+	target.list.Add(blocker)
+
+	registry.Use(Cast{
+		Skill:   modelskill.Definition{SkillType: "FAKE_DEATH", Offensive: true, Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 10}}},
+		Targets: []any{target},
+	})
+
+	if len(target.list.All()) != 1 {
+		t.Fatalf("target under BlockDebuff should not receive a new offensive effect, got %d effects", len(target.list.All()))
+	}
+}
+
 func TestFakeDeathAppliesUnconditionally(t *testing.T) {
 	registry := NewDefaultRegistry()
 	target := newDisablerFake(1)

@@ -77,6 +77,25 @@ func TestCancelNeverStripsNonCancellableEffectType(t *testing.T) {
 	}
 }
 
+// A real ProtectionBlessing marker loaded from the datapack carries no
+// effectType attribute, so its cancel-exemption must be resolved from the
+// runtime kind the same way the attribute-tagged blessing above is.
+func TestCancelNeverStripsProtectionBlessingMarkerEffect(t *testing.T) {
+	registry := NewDefaultRegistry()
+	target := newCancelFakeActor(40)
+
+	protection := addBuff(t, target, modelskill.EffectTemplate{Name: "ProtectionBlessing", Time: 600}, effect.Skill{})
+
+	registry.Use(Cast{
+		Skill:   modelskill.Definition{SkillType: "CANCEL", Power: 50, MaxNegatedEffects: 10, MagicLevel: 40},
+		Targets: []any{target},
+	})
+
+	if !hasEffect(target.list, protection) {
+		t.Error("protection blessing must never be stripped by CANCEL")
+	}
+}
+
 func TestMageBaneOnlyConsidersMatchingStackTypes(t *testing.T) {
 	registry := NewDefaultRegistry()
 	target := newCancelFakeActor(40)

@@ -104,6 +104,9 @@ func TestNewBuildsCoreEffectMetadata(t *testing.T) {
 		{"CharmOfCourage", TypeCharmOfCourage, flagCharmOfCourage, false},
 		{"CharmOfLuck", TypeCharmOfLuck, flagCharmOfLuck, false},
 		{"PhoenixBless", TypePhoenixBless, flagPhoenixBlessing, false},
+		{"BlockBuff", TypeBlockBuff, FlagNone, false},
+		{"BlockDebuff", TypeBlockDebuff, FlagNone, false},
+		{"ProtectionBlessing", TypeProtectionBless, flagProtectionBlessing, false},
 	}
 
 	for _, tt := range tests {
@@ -125,6 +128,28 @@ func TestNewBuildsCoreEffectMetadata(t *testing.T) {
 				t.Fatal("non-periodic action hook continued")
 			}
 		})
+	}
+}
+
+func TestClassTagPrefersAttributeThenKind(t *testing.T) {
+	// A marker effect loaded from a datapack <effect name="BlockBuff"> carries
+	// no effectType attribute, so its classification is the runtime kind.
+	withoutAttr, err := New(Skill{ID: 1}, modelskill.EffectTemplate{Name: "BlockBuff"})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	if got := withoutAttr.ClassTag(); got != "BLOCK_BUFF" {
+		t.Fatalf("ClassTag() = %q, want %q", got, "BLOCK_BUFF")
+	}
+
+	// An explicit datapack effectType attribute overrides the kind, the same
+	// reclassification used to tag a plain Buff as BLOCK_DEBUFF in tests.
+	withAttr, err := New(Skill{ID: 1}, modelskill.EffectTemplate{Name: "Buff", EffectType: "BLOCK_DEBUFF"})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	if got := withAttr.ClassTag(); got != "BLOCK_DEBUFF" {
+		t.Fatalf("ClassTag() = %q, want %q", got, "BLOCK_DEBUFF")
 	}
 }
 

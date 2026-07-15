@@ -327,7 +327,7 @@ func hasEffectType(list *effect.List, tag string) bool {
 		return false
 	}
 	for _, e := range list.All() {
-		if strings.EqualFold(e.Template.EffectType, tag) {
+		if strings.EqualFold(e.ClassTag(), tag) {
 			return true
 		}
 	}
