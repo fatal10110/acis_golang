@@ -6,6 +6,7 @@ const (
 	requestDropItemSize     = 5 * 4
 	requestDestroyItemSize  = 2 * 4
 	requestCrystallizeSize  = 2 * 4
+	requestEnchantItemSize  = 4
 	sendTimeCheckSize       = 2 * 4
 	requestAutoSoulShotSize = 2 + 2*4
 )
@@ -83,6 +84,26 @@ func DecodeRequestCrystallizeItem(payload []byte) (RequestCrystallizeItem, error
 	}
 	if err := r.Err(); err != nil {
 		return RequestCrystallizeItem{}, fmt.Errorf("clientpackets: RequestCrystallizeItem: %w", err)
+	}
+	return req, nil
+}
+
+// RequestEnchantItem asks the server to enchant the selected inventory item
+// with the scroll already opened by UseItem.
+type RequestEnchantItem struct {
+	ObjectID int32
+}
+
+// DecodeRequestEnchantItem parses a raw RequestEnchantItem payload (opcode
+// byte included).
+func DecodeRequestEnchantItem(payload []byte) (RequestEnchantItem, error) {
+	r := newReader(payload)
+	if r.Remaining() < requestEnchantItemSize {
+		return RequestEnchantItem{}, fmt.Errorf("clientpackets: RequestEnchantItem: need %d bytes, got %d", requestEnchantItemSize, r.Remaining())
+	}
+	req := RequestEnchantItem{ObjectID: r.ReadInt32()}
+	if err := r.Err(); err != nil {
+		return RequestEnchantItem{}, fmt.Errorf("clientpackets: RequestEnchantItem: %w", err)
 	}
 	return req, nil
 }

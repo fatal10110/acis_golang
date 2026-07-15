@@ -391,6 +391,17 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 			l.crystallizeLiveItem(live, req)
 
+		case clientpackets.OpcodeRequestEnchantItem:
+			req, err := clientpackets.DecodeRequestEnchantItem(payload)
+			if err != nil {
+				l.log.Warn().Err(err).Msg("game client")
+				continue
+			}
+			if live == nil {
+				continue
+			}
+			l.enchantLiveItem(ctx, live, req)
+
 		case clientpackets.OpcodeRequestSkillList:
 			if live == nil {
 				continue
@@ -542,7 +553,6 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			clientpackets.OpcodeRequestGetOnVehicle,
 			clientpackets.OpcodeRequestGetOffVehicle,
 			clientpackets.OpcodeAnswerTradeRequest,
-			clientpackets.OpcodeRequestEnchantItem,
 			clientpackets.OpcodeRequestMoveInVehicle,
 			clientpackets.OpcodeCannotMoveInVehicle,
 			clientpackets.OpcodeRequestQuestListInGame,

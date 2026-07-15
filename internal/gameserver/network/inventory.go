@@ -26,7 +26,13 @@ func (l *GameClientLink) useItem(live *livePlayer, objectID int32) {
 		return
 	}
 	tmpl, ok := inv.Templates().Get(inst.TemplateID)
-	if !ok || tmpl.Slot == item.SlotNone {
+	if !ok {
+		return
+	}
+	if l.useEnchantScroll(live, inst) {
+		return
+	}
+	if tmpl.Slot == item.SlotNone {
 		return
 	}
 

@@ -17,6 +17,9 @@ import (
 
 type itemStore interface {
 	ListByOwner(ctx context.Context, ownerID int32) ([]*item.Instance, error)
+	Save(ctx context.Context, inst *item.Instance) error
+	Update(ctx context.Context, inst *item.Instance) error
+	Delete(ctx context.Context, objectID int32) error
 }
 
 type attackStanceTracker interface {
@@ -57,6 +60,9 @@ type GameClientLink struct {
 	// newCipherKey supplies each connection's XOR cipher key; overridden in
 	// tests for a deterministic handshake.
 	newCipherKey func() ([]byte, error)
+
+	// enchantRoll supplies enchant dice rolls; overridden in tests.
+	enchantRoll func() float64
 }
 
 // NewGameClientLink builds a GameClientLink from its collaborators.
