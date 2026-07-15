@@ -72,7 +72,7 @@ func cancelOne(cast Cast, target cancelTarget, skillType string, minRate, maxRat
 		if e.Skill.Toggle || e.Skill.Debuff {
 			continue
 		}
-		if effectNotCancellable[strings.ToUpper(e.Template.EffectType)] {
+		if effectNotCancellable[strings.ToUpper(e.ClassTag())] {
 			continue
 		}
 

@@ -99,6 +99,15 @@ const (
 	// TypePhoenixBless is a marker buff consulted by whatever system reacts
 	// to it ending.
 	TypePhoenixBless Type = "PHOENIX_BLESSING"
+	// TypeBlockBuff is a marker buff that makes its owner reject incoming
+	// buff effects for its duration.
+	TypeBlockBuff Type = "BLOCK_BUFF"
+	// TypeBlockDebuff is a marker buff that makes its owner reject incoming
+	// debuff effects for its duration.
+	TypeBlockDebuff Type = "BLOCK_DEBUFF"
+	// TypeProtectionBless is a marker buff (player-kill protection) a cancel
+	// skill can never strip.
+	TypeProtectionBless Type = "PROTECTION_BLESSING"
 )
 
 type kind struct {
@@ -138,6 +147,9 @@ var coreKinds = map[string]kind{
 	"CharmOfCourage":        {typ: TypeCharmOfCourage, flag: flagCharmOfCourage},
 	"CharmOfLuck":           {typ: TypeCharmOfLuck, flag: flagCharmOfLuck},
 	"PhoenixBless":          {typ: TypePhoenixBless, flag: flagPhoenixBlessing},
+	"BlockBuff":             {typ: TypeBlockBuff},
+	"BlockDebuff":           {typ: TypeBlockDebuff},
+	"ProtectionBlessing":    {typ: TypeProtectionBless, flag: flagProtectionBlessing},
 }
 
 var fearSkippedPlayableSkillIDs = map[modelskill.ID]bool{
@@ -174,6 +186,18 @@ func New(skill Skill, tmpl modelskill.EffectTemplate) (*Effect, error) {
 	e.Funcs = funcs
 	wireHooks(e)
 	return e, nil
+}
+
+// ClassTag returns the effect's classification tag: the explicit datapack
+// effectType attribute when present, otherwise the runtime effect kind.
+// Marker effects (buff/debuff immunity, the cancel-exempt blessings) carry
+// no datapack attribute, so the handlers that branch on classification
+// match them through the kind the same way the effect's own type is matched.
+func (e *Effect) ClassTag() string {
+	if e.Template.EffectType != "" {
+		return e.Template.EffectType
+	}
+	return string(e.Type)
 }
 
 func wireHooks(e *Effect) {
