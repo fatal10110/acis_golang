@@ -170,6 +170,12 @@ func NewRegistry(known Known) *Registry {
 	r.Register(corpsePlayerHandler{})
 	r.Register(corpsePetHandler{})
 	r.Register(groundHandler{})
+	r.Register(partyHandler{known: known})
+	r.Register(allyHandler{known: known})
+	r.Register(clanHandler{known: known})
+	r.Register(partyMemberHandler{})
+	r.Register(partyOtherHandler{})
+	r.Register(corpseAllyHandler{known: known})
 	return r
 }
 
