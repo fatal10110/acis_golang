@@ -2,8 +2,14 @@ package serverpackets
 
 import "github.com/fatal10110/acis_golang/internal/commons/wire"
 
-// OpcodeShortCutInit is the wire opcode for ShortCutInit.
-const OpcodeShortCutInit = 0x45
+const (
+	// OpcodeShortCutRegister is the wire opcode for ShortCutRegister.
+	OpcodeShortCutRegister = 0x44
+	// OpcodeShortCutInit is the wire opcode for ShortCutInit.
+	OpcodeShortCutInit = 0x45
+	// OpcodeShortCutDelete is the wire opcode for ShortCutDelete.
+	OpcodeShortCutDelete = 0x46
+)
 
 // ShortcutType is the client shortcut category ordinal.
 type ShortcutType int32
@@ -46,25 +52,44 @@ func FrameShortCutInit(shortcuts []Shortcut) wire.Frame {
 	w := newFrameWriter(OpcodeShortCutInit)
 	w.WriteInt32(int32(len(shortcuts)))
 	for _, shortcut := range shortcuts {
-		w.WriteInt32(int32(shortcut.Type))
-		w.WriteInt32(shortcut.Slot + shortcut.Page*12)
-		switch shortcut.Type {
-		case ShortcutItem:
-			w.WriteInt32(shortcut.ID)
-			w.WriteInt32(shortcut.CharacterType)
-			w.WriteInt32(shortcut.SharedReuseGroup)
-			w.WriteInt32(shortcut.RemainingSeconds)
-			w.WriteInt32(shortcut.ReuseSeconds)
-			w.WriteInt32(shortcut.AugmentationID)
-		case ShortcutSkill:
-			w.WriteInt32(shortcut.ID)
-			w.WriteInt32(shortcut.Level)
-			w.WriteUint8(0)
-			w.WriteInt32(shortcut.CharacterType)
-		default:
-			w.WriteInt32(shortcut.ID)
-			w.WriteInt32(shortcut.CharacterType)
-		}
+		writeShortcut(w, shortcut)
 	}
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
+}
+
+// FrameShortCutRegister builds the single-shortcut registration packet.
+func FrameShortCutRegister(shortcut Shortcut) wire.Frame {
+	w := newFrameWriter(OpcodeShortCutRegister)
+	writeShortcut(w, shortcut)
+	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
+}
+
+// FrameShortCutDelete builds the shortcut deletion packet.
+func FrameShortCutDelete(slot, page int32) wire.Frame {
+	w := newFrameWriter(OpcodeShortCutDelete)
+	w.WriteInt32(slot + page*12)
+	w.WriteInt32(0)
+	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
+}
+
+func writeShortcut(w *wire.Writer, shortcut Shortcut) {
+	w.WriteInt32(int32(shortcut.Type))
+	w.WriteInt32(shortcut.Slot + shortcut.Page*12)
+	switch shortcut.Type {
+	case ShortcutItem:
+		w.WriteInt32(shortcut.ID)
+		w.WriteInt32(shortcut.CharacterType)
+		w.WriteInt32(shortcut.SharedReuseGroup)
+		w.WriteInt32(shortcut.RemainingSeconds)
+		w.WriteInt32(shortcut.ReuseSeconds)
+		w.WriteInt32(shortcut.AugmentationID)
+	case ShortcutSkill:
+		w.WriteInt32(shortcut.ID)
+		w.WriteInt32(shortcut.Level)
+		w.WriteUint8(0)
+		w.WriteInt32(shortcut.CharacterType)
+	default:
+		w.WriteInt32(shortcut.ID)
+		w.WriteInt32(shortcut.CharacterType)
+	}
 }

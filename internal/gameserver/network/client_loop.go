@@ -599,6 +599,26 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				l.handleTradeDone(ctx, live, req)
 			}
 
+		case clientpackets.OpcodeRequestShortCutReg:
+			req, err := clientpackets.DecodeRequestShortCutReg(payload)
+			if err != nil {
+				l.log.Warn().Err(err).Msg("game client")
+				continue
+			}
+			if live != nil {
+				l.registerShortcut(ctx, live, req)
+			}
+
+		case clientpackets.OpcodeRequestShortCutDel:
+			req, err := clientpackets.DecodeRequestShortCutDel(payload)
+			if err != nil {
+				l.log.Warn().Err(err).Msg("game client")
+				continue
+			}
+			if live != nil {
+				l.deleteShortcut(ctx, live, req)
+			}
+
 		case clientpackets.OpcodeDummy1A,
 			clientpackets.OpcodeRequestSellItem,
 			clientpackets.OpcodeRequestBuyItem,
@@ -607,9 +627,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			clientpackets.OpcodeAppearing,
 			clientpackets.OpcodeSendWarehouseDeposit,
 			clientpackets.OpcodeSendWarehouseWithdraw,
-			clientpackets.OpcodeRequestShortCutReg,
 			clientpackets.OpcodeDummy34,
-			clientpackets.OpcodeRequestShortCutDel,
 			clientpackets.OpcodeDummy3E,
 			clientpackets.OpcodeRequestGetOnVehicle,
 			clientpackets.OpcodeRequestGetOffVehicle,

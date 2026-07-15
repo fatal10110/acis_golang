@@ -88,7 +88,7 @@ func newRosterForCreateTest(t *testing.T, chars *rosterTestCharacters, npcs *npc
 	if err != nil {
 		t.Fatalf("build template table: %v", err)
 	}
-	return NewRoster(chars, rosterTestItems{}, templates, item.NewTable(nil), npcs, &rosterTestIDs{next: 100}, DefaultDeleteAfter, nil)
+	return NewRoster(chars, rosterTestItems{}, nil, templates, item.NewTable(nil), npcs, &rosterTestIDs{next: 100}, DefaultDeleteAfter, nil)
 }
 
 func TestRosterCreateRejectsNPCNameCollision(t *testing.T) {
