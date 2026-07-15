@@ -246,6 +246,16 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			now := time.Now()
 			session.SendFrame(serverpackets.FrameSkillCoolTime(skillCoolTimeEntries(live.SkillReuseTimers(now), now)))
 
+		case clientpackets.OpcodeRequestMagicSkillUse:
+			req, err := clientpackets.DecodeRequestMagicSkillUse(payload)
+			if err != nil {
+				l.log.Warn().Err(err).Msg("game client")
+				continue
+			}
+			if live != nil {
+				l.handleMagicSkillUse(live, req)
+			}
+
 		case clientpackets.OpcodeAction:
 			req, err := clientpackets.DecodeAction(payload)
 			if err != nil {
@@ -522,7 +532,6 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			clientpackets.OpcodeRequestBuyItem,
 			clientpackets.OpcodeDummy23,
 			clientpackets.OpcodeDummy2E,
-			clientpackets.OpcodeRequestMagicSkillUse,
 			clientpackets.OpcodeAppearing,
 			clientpackets.OpcodeSendWarehouseDeposit,
 			clientpackets.OpcodeSendWarehouseWithdraw,

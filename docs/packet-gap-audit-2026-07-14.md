@@ -29,8 +29,8 @@ Sources checked:
 
 - Original game client appendix: 206 concrete dispatcher targets.
 - Original game server appendix: 282 packet classes, including base/composite classes.
-- Classified M2-M5 required game client packets: 93. Missing in Go: 63.
-- Classified M2-M5 required game server packets: 128. Missing in Go: 81.
+- Classified M2-M5 required game client packets: 93. Missing in Go: 60.
+- Classified M2-M5 required game server packets: 128. Missing in Go: 75.
 - M1 login client/server packets are implemented.
 - M1 GS-LS link packets are implemented under `internal/link/`.
 - M2 base game connect/create/select packet set is implemented.
@@ -162,9 +162,12 @@ Implemented and wired M5 target/combat/item/stance/social client packets in Go:
 
 - `Action`
 - `AttackRequest`
+- `RequestAcquireSkillInfo`
+- `RequestAcquireSkill`
 - `RequestCrystallizeItem`
 - `RequestDestroyItem`
 - `RequestDropItem`
+- `RequestMagicSkillUse`
 - `RequestAutoSoulShot`
 - `RequestChangeMoveType`
 - `RequestChangeWaitType`
@@ -174,7 +177,6 @@ Implemented and wired M5 target/combat/item/stance/social client packets in Go:
 
 Missing M5 stats/combat/items/progression client packets:
 
-- `RequestMagicSkillUse`
 - `RequestPetUseItem`
 - `RequestGiveItemToPet`
 - `RequestGetItemFromPet`
@@ -182,8 +184,6 @@ Missing M5 stats/combat/items/progression client packets:
 - `SendWarehouseDepositList`
 - `SendWarehouseWithdrawList`
 - `RequestPackageSend`
-- `RequestAcquireSkillInfo`
-- `RequestAcquireSkill`
 - `RequestRestartPoint`
 - `RequestEnchantItem`
 
@@ -308,15 +308,9 @@ Missing M5 stats/combat/items/progression server packets:
 - `PetStatusUpdate`
 - `PetDelete`
 - `Revive`
-- `MagicSkillUse`
-- `MagicSkillLaunched`
 - `MagicSkillCanceled`
-- `SetupGauge`
 - `AbnormalStatusUpdate`
 - `ShortBuffStatusUpdate`
-- `AcquireSkillList`
-- `AcquireSkillInfo`
-- `AcquireSkillDone`
 - `ShortCutRegister`
 - `ShortCutDelete`
 - `ExUseSharedGroupItem`
@@ -347,6 +341,15 @@ Implemented and wired M5 target/combat server packets in Go:
 - `TargetUnselected`
 - `StatusUpdate`
 
+Implemented and wired M5 skill progression/cast server packets in Go:
+
+- `AcquireSkillList`
+- `AcquireSkillInfo`
+- `AcquireSkillDone`
+- `MagicSkillUse`
+- `MagicSkillLaunched`
+- `SetupGauge`
+
 ## Notes
 
 - Duplicate names across sections are intentional. For example `NpcHtmlMessage`, `HennaInfo`, `ExStorageMaxCount`, `Die`, `PlaySound`, `ShortCutInit`, and `SkillCoolTime` are required by more than one closed milestone surface.
@@ -354,9 +357,11 @@ Implemented and wired M5 target/combat server packets in Go:
 - `Action` and `AttackRequest` now wire the target-selection/onAction subset needed for attacking mobs: first request selects and sends target HP status, second `AttackRequest` against the selected target emits `AutoAttackStart` then `Attack`; the existing attack-stance timeout emits `AutoAttackStop`. NPC dialog/interact routing remains deferred to the M7 NPC work, and skill/cast targeting remains deferred to M6.
 - `RequestChangeMoveType`, `RequestChangeWaitType`, and `RequestSocialAction` now wire the current run/walk, sit/stand, and social-animation state available in Go. Missing higher-level gates such as mount state, fishing, requester/trade state, and full AI intention are still owned by the systems that introduce those states.
 - `RequestDropItem`, `RequestDestroyItem`, and `SendTimeCheck` are wired. Drop/destroy currently cover the inventory/template/count gates available in Go and emit `InventoryUpdate`; player drops also place a ground item through the ground-item task and emit the animated `DropItem` frame during the transient dropper-id window.
-- `RequestCrystallizeItem` is wired for runtime-known Crystallize skill levels, crystallizable item gates, crystal reward grants, `SystemMessage` feedback, and `InventoryUpdate`. Durable learned-skill loading and skill acquisition remain with the `RequestAcquireSkillInfo`/`RequestAcquireSkill` burst.
+- `RequestCrystallizeItem` is wired for restored runtime-known Crystallize skill levels, crystallizable item gates, crystal reward grants, `SystemMessage` feedback, and `InventoryUpdate`.
+- `RequestAcquireSkillInfo` and `RequestAcquireSkill` are wired for usual class-template skill learning, learned-skill persistence, `SkillList` refresh, SP `StatusUpdate`, and success/failure `SystemMessage` feedback. Enchant, clan, fishing, transform, and special-trainer learning remain deferred to their owning systems.
+- `RequestMagicSkillUse` is wired for known non-passive active skills with `SELF`, `NONE`, `GROUND`, or `ONE` targets, using the current cast controller for MP/HP/item/reuse validation and emitting `MagicSkillUse`, `SetupGauge`, `MagicSkillLaunched`, `SystemMessage`, `ActionFailed`, and MP/HP `StatusUpdate` where applicable. Full AI intention scheduling, delayed cast timers, target-handler integration, effect/skill-handler application, toggles, fusion/signet/chance skills, item-triggered casts, summon/pet casts, and `MagicSkillCanceled` remain deferred to the M6 cast/effect runtime.
 - `RequestAutoSoulShot` is wired as extended client opcode `0x0005` with per-player auto-shot toggle state, `ExAutoSoulShot`, and item-name `SystemMessage` feedback. First-shot recharge, recurring shot consumption, and `ExUseSharedGroupItem` reuse display remain deferred to the item-use/handler burst because the shared item handler/reuse pipeline is not ported yet.
 - `StatusUpdate` is implemented and wired for target max/current HP during selection. Broader status/stat recalculation broadcasts still need owner flows as those systems are ported.
-- The unique missing counts deduplicate those overlaps: 62 missing game client packets and 80 missing game server packets after the EnterWorld, movement/rotation, inventory, target/action, stance/social, item-operation, and auto-shot packet-wiring passes.
+- The unique missing counts deduplicate those overlaps: 59 missing game client packets and 74 missing game server packets after the EnterWorld, movement/rotation, inventory, target/action, stance/social, item-operation, auto-shot, skill-acquisition, and basic skill-cast packet-wiring passes.
 - Existing Go code accepts several M4/M5 client opcodes in `clientpackets/wiresafe.go`, but many of them still log "Opcode not wired" or have no decode/run implementation.
 - This audit uses original Java class names. Go may keep a slightly different helper shape, such as `Frame...` functions instead of packet structs, but the required client-visible packet behavior is still one original packet at a time.

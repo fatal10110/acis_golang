@@ -22,6 +22,8 @@ type StatusType int32
 const (
 	StatusCurrentHP StatusType = 9
 	StatusMaxHP     StatusType = 10
+	StatusCurrentMP StatusType = 11
+	StatusMaxMP     StatusType = 12
 	StatusSP        StatusType = 13
 )
 

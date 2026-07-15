@@ -3,6 +3,7 @@ package network
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
+	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -14,6 +15,7 @@ type livePlayer struct {
 	items    []*item.Instance
 	target   world.Tracked
 	attack   *attack.Controller
+	cast     *actorcast.Controller
 
 	stopAttack func(*livePlayer)
 }
@@ -36,6 +38,13 @@ func (p *livePlayer) attackController() *attack.Controller {
 		p.attack = attack.NewPlayer(p.Character)
 	}
 	return p.attack
+}
+
+func (p *livePlayer) castController() *actorcast.Controller {
+	if p.cast == nil {
+		p.cast = actorcast.NewController(liveCastActor{live: p})
+	}
+	return p.cast
 }
 
 func (p *livePlayer) inventoryItems() []*item.Instance {
