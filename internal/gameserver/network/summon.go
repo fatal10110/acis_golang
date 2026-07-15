@@ -19,9 +19,14 @@ func (l *GameClientLink) handleSummonActionUse(live *livePlayer, req clientpacke
 	if !ok {
 		return true
 	}
+	summonType := actor.SummonType()
+	objectID := actor.ObjectID()
 	result := actor.ApplyCommand(summon.CommandContext{Command: command, World: l.world})
 	if id, ok := systemMessageForSummonFeedback(result.Feedback); ok {
 		live.SendFrame(serverpackets.FrameSystemMessage(id))
+	}
+	if result.Outcome == summon.OutcomeApplied && (command == summon.CommandReturnPet || command == summon.CommandUnsummonServitor) {
+		live.SendFrame(serverpackets.FramePetDelete(summonType, objectID))
 	}
 	return true
 }

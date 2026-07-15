@@ -7,6 +7,10 @@ const (
 	requestDestroyItemSize  = 2 * 4
 	requestCrystallizeSize  = 2 * 4
 	requestEnchantItemSize  = 4
+	requestPetUseItemSize   = 4
+	requestGiveItemToPet    = 2 * 4
+	requestGetItemFromPet   = 3 * 4
+	requestPetGetItem       = 4
 	sendTimeCheckSize       = 2 * 4
 	requestAutoSoulShotSize = 2 + 2*4
 )
@@ -104,6 +108,94 @@ func DecodeRequestEnchantItem(payload []byte) (RequestEnchantItem, error) {
 	req := RequestEnchantItem{ObjectID: r.ReadInt32()}
 	if err := r.Err(); err != nil {
 		return RequestEnchantItem{}, fmt.Errorf("clientpackets: RequestEnchantItem: %w", err)
+	}
+	return req, nil
+}
+
+// RequestPetUseItem asks the server to use or toggle a pet inventory item.
+type RequestPetUseItem struct {
+	ObjectID int32
+}
+
+// DecodeRequestPetUseItem parses a raw RequestPetUseItem payload (opcode
+// byte included).
+func DecodeRequestPetUseItem(payload []byte) (RequestPetUseItem, error) {
+	r := newReader(payload)
+	if r.Remaining() < requestPetUseItemSize {
+		return RequestPetUseItem{}, fmt.Errorf("clientpackets: RequestPetUseItem: need %d bytes, got %d", requestPetUseItemSize, r.Remaining())
+	}
+	req := RequestPetUseItem{ObjectID: r.ReadInt32()}
+	if err := r.Err(); err != nil {
+		return RequestPetUseItem{}, fmt.Errorf("clientpackets: RequestPetUseItem: %w", err)
+	}
+	return req, nil
+}
+
+// RequestGiveItemToPet asks the server to move a player inventory item to
+// the active pet.
+type RequestGiveItemToPet struct {
+	ObjectID int32
+	Count    int32
+}
+
+// DecodeRequestGiveItemToPet parses a raw RequestGiveItemToPet payload
+// (opcode byte included).
+func DecodeRequestGiveItemToPet(payload []byte) (RequestGiveItemToPet, error) {
+	r := newReader(payload)
+	if r.Remaining() < requestGiveItemToPet {
+		return RequestGiveItemToPet{}, fmt.Errorf("clientpackets: RequestGiveItemToPet: need %d bytes, got %d", requestGiveItemToPet, r.Remaining())
+	}
+	req := RequestGiveItemToPet{
+		ObjectID: r.ReadInt32(),
+		Count:    r.ReadInt32(),
+	}
+	if err := r.Err(); err != nil {
+		return RequestGiveItemToPet{}, fmt.Errorf("clientpackets: RequestGiveItemToPet: %w", err)
+	}
+	return req, nil
+}
+
+// RequestGetItemFromPet asks the server to move a pet inventory item back
+// to the owner.
+type RequestGetItemFromPet struct {
+	ObjectID int32
+	Count    int32
+	Unknown  int32
+}
+
+// DecodeRequestGetItemFromPet parses a raw RequestGetItemFromPet payload
+// (opcode byte included).
+func DecodeRequestGetItemFromPet(payload []byte) (RequestGetItemFromPet, error) {
+	r := newReader(payload)
+	if r.Remaining() < requestGetItemFromPet {
+		return RequestGetItemFromPet{}, fmt.Errorf("clientpackets: RequestGetItemFromPet: need %d bytes, got %d", requestGetItemFromPet, r.Remaining())
+	}
+	req := RequestGetItemFromPet{
+		ObjectID: r.ReadInt32(),
+		Count:    r.ReadInt32(),
+		Unknown:  r.ReadInt32(),
+	}
+	if err := r.Err(); err != nil {
+		return RequestGetItemFromPet{}, fmt.Errorf("clientpackets: RequestGetItemFromPet: %w", err)
+	}
+	return req, nil
+}
+
+// RequestPetGetItem asks the active pet to pick up a world item.
+type RequestPetGetItem struct {
+	ObjectID int32
+}
+
+// DecodeRequestPetGetItem parses a raw RequestPetGetItem payload (opcode
+// byte included).
+func DecodeRequestPetGetItem(payload []byte) (RequestPetGetItem, error) {
+	r := newReader(payload)
+	if r.Remaining() < requestPetGetItem {
+		return RequestPetGetItem{}, fmt.Errorf("clientpackets: RequestPetGetItem: need %d bytes, got %d", requestPetGetItem, r.Remaining())
+	}
+	req := RequestPetGetItem{ObjectID: r.ReadInt32()}
+	if err := r.Err(); err != nil {
+		return RequestPetGetItem{}, fmt.Errorf("clientpackets: RequestPetGetItem: %w", err)
 	}
 	return req, nil
 }

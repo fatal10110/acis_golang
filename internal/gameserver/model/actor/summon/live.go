@@ -247,6 +247,32 @@ func (a *Actor) Level() int { return a.level }
 // IsPet reports whether this live summon is a pet rather than a servitor.
 func (a *Actor) IsPet() bool { return a.isPet }
 
+// SummonType returns the client-visible summon type code.
+func (a *Actor) SummonType() int {
+	if a.isPet {
+		return 2
+	}
+	return 1
+}
+
+// NPCID returns the template id backing this summon.
+func (a *Actor) NPCID() int { return a.npcID }
+
+// Dead reports whether the summon is dead.
+func (a *Actor) Dead() bool { return a.dead }
+
+// OutOfControl reports whether the owner cannot currently command this
+// summon.
+func (a *Actor) OutOfControl() bool { return a.disabled }
+
+// PetInventory returns the pet's inventory, or nil for servitors.
+func (a *Actor) PetInventory() *itemcontainer.Inventory {
+	if !a.isPet {
+		return nil
+	}
+	return a.petInventory
+}
+
 // Fed returns a pet's current meal gauge.
 func (a *Actor) Fed() int { return a.fed }
 

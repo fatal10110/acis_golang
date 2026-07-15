@@ -29,8 +29,8 @@ Sources checked:
 
 - Original game client appendix: 206 concrete dispatcher targets.
 - Original game server appendix: 282 packet classes, including base/composite classes.
-- Classified M2-M5 required game client packets: 93. Missing in Go: 60.
-- Classified M2-M5 required game server packets: 128. Missing in Go: 75.
+- Classified M2-M5 required game client packets: 94. Missing in Go: 56.
+- Classified M2-M5 required game server packets: 128. Missing in Go: 69.
 - M1 login client/server packets are implemented.
 - M1 GS-LS link packets are implemented under `internal/link/`.
 - M2 base game connect/create/select packet set is implemented.
@@ -174,13 +174,14 @@ Implemented and wired M5 target/combat/item/stance/social client packets in Go:
 - `RequestSocialAction`
 - `RequestPackageSendableItemList`
 - `RequestEnchantItem`
+- `RequestPetUseItem`
+- `RequestGiveItemToPet`
+- `RequestGetItemFromPet`
 - `SendTimeCheck`
 
 Missing M5 stats/combat/items/progression client packets:
 
-- `RequestPetUseItem`
-- `RequestGiveItemToPet`
-- `RequestGetItemFromPet`
+- `RequestChangePetName`
 - `RequestPetGetItem`
 - `SendWarehouseDepositList`
 - `SendWarehouseWithdrawList`
@@ -301,12 +302,9 @@ Missing M4 world/movement server packets:
 Missing M5 stats/combat/items/progression server packets:
 
 - `PlaySound`
-- `PetInventoryUpdate`
 - `PetItemList`
-- `PetStatusShow`
 - `PetInfo`
 - `PetStatusUpdate`
-- `PetDelete`
 - `Revive`
 - `MagicSkillCanceled`
 - `AbnormalStatusUpdate`
@@ -327,6 +325,9 @@ Implemented and wired M5 item server packets in Go:
 - `ExAutoSoulShot`
 - `InventoryUpdate`
 - `PackageSendableList`
+- `PetInventoryUpdate`
+- `PetStatusShow`
+- `PetDelete`
 
 Implemented and wired M5 target/combat server packets in Go:
 
@@ -361,8 +362,11 @@ Implemented and wired M5 skill progression/cast server packets in Go:
 - `RequestAcquireSkillInfo` and `RequestAcquireSkill` are wired for usual class-template skill learning, learned-skill persistence, `SkillList` refresh, SP `StatusUpdate`, and success/failure `SystemMessage` feedback. Enchant, clan, fishing, transform, and special-trainer learning remain deferred to their owning systems.
 - `RequestMagicSkillUse` is wired for known non-passive active skills with `SELF`, `NONE`, `GROUND`, or `ONE` targets, using the current cast controller for MP/HP/item/reuse validation and emitting `MagicSkillUse`, `SetupGauge`, `MagicSkillLaunched`, `SystemMessage`, `ActionFailed`, and MP/HP `StatusUpdate` where applicable. Full AI intention scheduling, delayed cast timers, target-handler integration, effect/skill-handler application, toggles, fusion/signet/chance skills, item-triggered casts, summon/pet casts, and `MagicSkillCanceled` remain deferred to the M6 cast/effect runtime.
 - `RequestEnchantItem` is wired through the enchant-scroll `UseItem` path, `ChooseInventoryItem`, scroll ownership/count validation, item enchantability/grade/type gates, scroll consumption, item enchant persistence, blessed reset, normal break/crystal reward, `EnchantResult`, `InventoryUpdate`, `SystemMessage`, and self `UserInfo`. Config-file overrides for enchant rates, store/trade-state gates, and +4 dual/+6 armor-set passive skill side effects remain deferred to their owning systems.
+- `RequestPetUseItem`, `RequestGiveItemToPet`, and `RequestGetItemFromPet` are wired for active-pet lookup, pet inventory transfer/equip mutation, item persistence, `PetInventoryUpdate`, player `InventoryUpdate`, and pet-use `SystemMessage` feedback. Pet food/potion item handlers, player operating/transaction-state gates, and richer pet stat refreshes remain deferred to their owning systems.
+- `RequestChangePetName` remains deferred because the Go runtime has no active pet naming state, pet-name uniqueness query, NPC-name lookup by name, or control-item custom type update flow. `RequestPetGetItem` remains deferred because pet AI ground-item pickup is not ported.
+- `PetItemList`, `PetInfo`, and `PetStatusUpdate` remain deferred together: the current Go pet actor lacks the full pet info/status snapshot surface and owner spawn/info broadcast path needed to emit truthful full-list/status packets. `PetStatusShow` and `PetDelete` are wired where the current runtime has exact backing behavior.
 - `RequestAutoSoulShot` is wired as extended client opcode `0x0005` with per-player auto-shot toggle state, `ExAutoSoulShot`, and item-name `SystemMessage` feedback. First-shot recharge, recurring shot consumption, and `ExUseSharedGroupItem` reuse display remain deferred to the item-use/handler burst because the shared item handler/reuse pipeline is not ported yet.
 - `StatusUpdate` is implemented and wired for target max/current HP during selection. Broader status/stat recalculation broadcasts still need owner flows as those systems are ported.
-- The unique missing counts deduplicate those overlaps: 58 missing game client packets and 72 missing game server packets after the EnterWorld, movement/rotation, inventory, target/action, stance/social, item-operation, auto-shot, skill-acquisition, basic skill-cast, and enchant packet-wiring passes.
+- The unique missing counts deduplicate those overlaps: 56 missing game client packets and 69 missing game server packets after the EnterWorld, movement/rotation, inventory, target/action, stance/social, item-operation, auto-shot, skill-acquisition, basic skill-cast, enchant, and backed pet inventory/status packet-wiring passes.
 - Existing Go code accepts several M4/M5 client opcodes in `clientpackets/wiresafe.go`, but many of them still log "Opcode not wired" or have no decode/run implementation.
 - This audit uses original Java class names. Go may keep a slightly different helper shape, such as `Frame...` functions instead of packet structs, but the required client-visible packet behavior is still one original packet at a time.

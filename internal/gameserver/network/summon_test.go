@@ -33,10 +33,9 @@ func TestGameClientLinkRoutesSummonActionUseToLiveSummon(t *testing.T) {
 	summon.SpawnBesideOwner(state, liveSummon, owner, location.Location{})
 
 	c.send(encodeRequestActionUse(52, false, false))
-	c.send(encodeRequestManorList())
 	reply := c.read()
-	if reply[0] != serverpackets.OpcodeExtended {
-		t.Fatalf("post-action opcode = %#x, want extended packet (%#x)", reply[0], serverpackets.OpcodeExtended)
+	if reply[0] != serverpackets.OpcodePetDelete {
+		t.Fatalf("post-action opcode = %#x, want PetDelete (%#x)", reply[0], serverpackets.OpcodePetDelete)
 	}
 
 	if _, ok := state.Summon(objID); ok {
