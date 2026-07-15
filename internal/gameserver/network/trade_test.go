@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	tradebook "github.com/fatal10110/acis_golang/internal/gameserver/trade"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -36,7 +37,7 @@ func TestDirectTradeRequestAndAnswerStartsTrade(t *testing.T) {
 	assertSystemMessageStringFrame(t, firstCap.frames[1], serverpackets.SystemMessageBeginTradeWithS1, second.Name)
 	assertSystemMessageStringFrame(t, secondCap.frames[1], serverpackets.SystemMessageBeginTradeWithS1, first.Name)
 
-	if link.trades.active[first.ObjectID()] == nil || link.trades.active[second.ObjectID()] == nil {
+	if !link.trades.HasActive(first.ObjectID()) || !link.trades.HasActive(second.ObjectID()) {
 		t.Fatal("trade session was not registered for both players")
 	}
 }
@@ -102,6 +103,8 @@ func TestDirectTradeConfirmTransfersItemsAndPersists(t *testing.T) {
 		serverpackets.OpcodeSendTradeDone,
 		serverpackets.OpcodeSystemMessage,
 	)
+	assertTradeDoneFrame(t, firstCap.frames[1], true)
+	assertTradeDoneFrame(t, secondCap.frames[1], true)
 	assertStaticSystemMessageFrame(t, firstCap.frames[2], serverpackets.SystemMessageTradeSuccessful)
 	assertStaticSystemMessageFrame(t, secondCap.frames[2], serverpackets.SystemMessageTradeSuccessful)
 
@@ -137,7 +140,7 @@ func TestDirectTradeCancelClearsSession(t *testing.T) {
 	assertOpcodeSequence(t, secondCap.frames, serverpackets.OpcodeSendTradeDone, serverpackets.OpcodeSystemMessage)
 	assertSystemMessageStringFrame(t, firstCap.frames[1], serverpackets.SystemMessageS1CanceledTrade, second.Name)
 	assertSystemMessageStringFrame(t, secondCap.frames[1], serverpackets.SystemMessageS1CanceledTrade, first.Name)
-	if link.trades.active[first.ObjectID()] != nil || link.trades.active[second.ObjectID()] != nil {
+	if link.trades.HasActive(first.ObjectID()) || link.trades.HasActive(second.ObjectID()) {
 		t.Fatal("trade session was not cleared after cancel")
 	}
 }
@@ -200,7 +203,7 @@ func newDirectTradeFixture(t *testing.T) (*GameClientLink, *fakeItemStore, *fram
 		itemTemplates: testItemTemplates(),
 		items:         store,
 		ids:           &sequentialIDs{next: 1000},
-		trades:        newTradeCoordinator(time.Now),
+		trades:        tradebook.NewBook(time.Now),
 		log:           zerolog.Nop(),
 	}
 	return link, store, firstCap, secondCap, first, second
@@ -267,6 +270,25 @@ func assertTradeUpdateCount(t *testing.T, frame []byte, want int32) {
 	}
 	if err := r.Err(); err != nil {
 		t.Fatalf("read TradeUpdate: %v", err)
+	}
+}
+
+func assertTradeDoneFrame(t *testing.T, frame []byte, success bool) {
+	t.Helper()
+	if frame[0] != serverpackets.OpcodeSendTradeDone {
+		t.Fatalf("SendTradeDone opcode = %#x, want %#x", frame[0], serverpackets.OpcodeSendTradeDone)
+	}
+	r := wire.NewReader(frame[1:])
+	got := r.ReadInt32()
+	want := int32(0)
+	if success {
+		want = 1
+	}
+	if got != want {
+		t.Fatalf("SendTradeDone success = %d, want %d", got, want)
+	}
+	if err := r.Err(); err != nil {
+		t.Fatalf("read SendTradeDone: %v", err)
 	}
 }
 

@@ -8,6 +8,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/scheduler"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/worldobject"
@@ -257,6 +258,25 @@ func (a *Actor) SummonType() int {
 
 // NPCID returns the template id backing this summon.
 func (a *Actor) NPCID() int { return a.npcID }
+
+// CanWearPetItem reports whether this pet can equip tmpl.
+func (a *Actor) CanWearPetItem(tmpl *item.Template) bool {
+	if a == nil || tmpl == nil {
+		return false
+	}
+	switch a.npcID {
+	case 12311, 12312, 12313:
+		return tmpl.Slot == item.SlotHatchling
+	case 12077:
+		return tmpl.Slot == item.SlotWolf
+	case 12526, 12527, 12528:
+		return tmpl.Slot == item.SlotStrider
+	case 12780, 12781, 12782:
+		return tmpl.Slot == item.SlotBabyPet
+	default:
+		return false
+	}
+}
 
 // Dead reports whether the summon is dead.
 func (a *Actor) Dead() bool { return a.dead }

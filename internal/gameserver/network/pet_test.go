@@ -96,7 +96,7 @@ func TestGiveItemToPetTransfersAndPersists(t *testing.T) {
 	if len(store.updated) != 1 || store.updated[0].ObjectID != source.ObjectID || store.updated[0].Count != 70 {
 		t.Fatalf("updated rows = %+v, want reduced source stack", store.updated)
 	}
-	if len(store.saved) != 1 || store.saved[0].ObjectID != petStack.ObjectID || store.saved[0].Count != 30 || store.saved[0].OwnerID != 0x20000001 {
+	if len(store.saved) != 1 || store.saved[0].ObjectID != petStack.ObjectID || store.saved[0].Count != 30 || store.saved[0].OwnerID != 0x20000001 || store.saved[0].Location != item.LocationPet {
 		t.Fatalf("saved rows = %+v, want new pet stack", store.saved)
 	}
 }
@@ -128,10 +128,39 @@ func TestGetItemFromPetTransfersBackToOwner(t *testing.T) {
 	if len(store.updated) != 1 || store.updated[0].ObjectID != petItem.ObjectID || store.updated[0].Count != 25 {
 		t.Fatalf("updated rows = %+v, want reduced pet stack", store.updated)
 	}
-	if len(store.saved) != 1 || store.saved[0].ObjectID != playerStack.ObjectID || store.saved[0].Count != 15 || store.saved[0].OwnerID != live.ObjectID() {
+	if len(store.saved) != 1 || store.saved[0].ObjectID != playerStack.ObjectID || store.saved[0].Count != 15 || store.saved[0].OwnerID != live.ObjectID() || store.saved[0].Location != item.LocationInventory {
 		t.Fatalf("saved rows = %+v, want new player stack", store.saved)
 	}
 	_ = petInv
+}
+
+func TestGiveItemToPetCancelsActiveEnchantBeforeTransfer(t *testing.T) {
+	templates := petTestTemplates()
+	source := &item.Instance{ObjectID: 500, TemplateID: item.AdenaID, OwnerID: 1, Count: 100, Location: item.LocationInventory}
+	scroll := &item.Instance{ObjectID: 501, TemplateID: 955, OwnerID: 1, Count: 1, Location: item.LocationInventory}
+	capture := &frameCapture{}
+	live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{source, scroll})
+	state := world.New()
+	state.Spawn(live, 0, 0, 0, 0)
+	attachTestPet(t, state, live, templates, 12077, nil)
+	capture.frames = nil
+	store := &recordingEnchantItemStore{}
+	gcl := &GameClientLink{world: state, ids: &sequentialIDs{next: 900}, items: store}
+	gcl.enchantStateStore().Select(live.ObjectID(), scroll.ObjectID)
+
+	gcl.giveItemToPet(context.Background(), live, clientpackets.RequestGiveItemToPet{ObjectID: source.ObjectID, Count: 30})
+
+	if got := gcl.enchantStateStore().Active(live.ObjectID()); got != 0 {
+		t.Fatalf("active enchant scroll = %d, want cleared", got)
+	}
+	assertOpcodeSequence(t, capture.frames,
+		serverpackets.OpcodeEnchantResult,
+		serverpackets.OpcodeSystemMessage,
+		serverpackets.OpcodeInventoryUpdate,
+		serverpackets.OpcodePetInventoryUpdate,
+	)
+	assertEnchantResultFrame(t, capture.frames[0], serverpackets.EnchantResultCancelled)
+	assertStaticSystemMessageFrame(t, capture.frames[1], serverpackets.SystemMessageEnchantScrollCancelled)
 }
 
 func TestPetUseItemEquipsWolfWeapon(t *testing.T) {
