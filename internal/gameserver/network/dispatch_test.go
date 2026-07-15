@@ -801,7 +801,8 @@ func newTestGameClientLinkWithSkillsShortcutsAndLog(t *testing.T, loginLink func
 	ids := &sequentialIDs{next: 100}
 	groundItems := task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour, PlayerDroppedMultiplier: 1}, time.Now)
 	roster := gamemanager.NewRoster(chars, items, shortcuts, templates, itemTemplates, npc.NewTable(nil), ids, gamemanager.DefaultDeleteAfter, time.Now)
-	gcl := NewGameClientLink(validator, loginLink, roster, items, shortcuts, templates, itemTemplates, skills, state, ids, groundItems, nil, log)
+	html := testHTMLCache(t, map[string]string{"help/tutorial.htm": "<html><body>tutorial</body></html>"})
+	gcl := NewGameClientLink(validator, loginLink, roster, items, shortcuts, templates, itemTemplates, html, skills, state, ids, groundItems, nil, log)
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {

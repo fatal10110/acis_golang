@@ -90,6 +90,7 @@ func TestAllowedAcceptsWireSafeInGameOpcodes(t *testing.T) {
 		clientpackets.OpcodeRequestChangeWaitType,
 		clientpackets.OpcodeRequestSellItem,
 		clientpackets.OpcodeRequestBuyItem,
+		clientpackets.OpcodeRequestLinkHtml,
 		clientpackets.OpcodeDummy23,
 		clientpackets.OpcodeDummy2E,
 		clientpackets.OpcodeRequestMagicSkillUse,
