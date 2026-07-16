@@ -35,6 +35,15 @@ func TestWriterFloat64RoundTrips(t *testing.T) {
 	}
 }
 
+func TestBoolWireValues(t *testing.T) {
+	if BoolByte(true) != 1 || BoolByte(false) != 0 {
+		t.Fatalf("BoolByte returned unexpected values")
+	}
+	if BoolInt32(true) != 1 || BoolInt32(false) != 0 {
+		t.Fatalf("BoolInt32 returned unexpected values")
+	}
+}
+
 func TestWriterStringIsNullTerminatedUTF16LE(t *testing.T) {
 	var w Writer
 	w.WriteString("Hi")

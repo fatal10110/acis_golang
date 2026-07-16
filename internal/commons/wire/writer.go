@@ -87,6 +87,22 @@ func (w *Writer) WriteString(s string) {
 	w.WriteUint16(0)
 }
 
+// BoolByte returns the packet byte value for b.
+func BoolByte(b bool) byte {
+	if b {
+		return 1
+	}
+	return 0
+}
+
+// BoolInt32 returns the packet int32 value for b.
+func BoolInt32(b bool) int32 {
+	if b {
+		return 1
+	}
+	return 0
+}
+
 // Bytes returns the assembled payload.
 func (w *Writer) Bytes() []byte {
 	return w.buf[w.payloadOffset:]

@@ -2,10 +2,10 @@ package network
 
 import (
 	"context"
-	"math"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	tradebook "github.com/fatal10110/acis_golang/internal/gameserver/trade"
@@ -274,10 +274,7 @@ func (l *GameClientLink) validTradeParticipants(first, second *livePlayer) bool 
 func livePlayersInRange(first, second *livePlayer, radius int) bool {
 	ax, ay, az := first.Position()
 	bx, by, bz := second.Position()
-	dx := float64(ax - bx)
-	dy := float64(ay - by)
-	dz := float64(az - bz)
-	return math.Sqrt(dx*dx+dy*dy+dz*dz) <= float64(radius)
+	return location.In3DRange(ax, ay, az, bx, by, bz, radius)
 }
 
 func (l *GameClientLink) tradeParticipants(session tradebook.Session) (*livePlayer, *livePlayer, bool) {

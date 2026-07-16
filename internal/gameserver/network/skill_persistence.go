@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -80,14 +81,14 @@ func (p *SkillPersistence) Restore(ctx context.Context, c *player.Character) err
 		if !ok {
 			continue
 		}
-		c.RestoreSkillReuse(reuse.Skill, reuseGroup(def), time.Duration(reuse.Delay)*time.Millisecond, time.UnixMilli(reuse.ExpiresAt))
+		c.RestoreSkillReuse(reuse.Skill, cast.ReuseKey(def), time.Duration(reuse.Delay)*time.Millisecond, time.UnixMilli(reuse.ExpiresAt))
 	}
 	for _, eff := range plan.Effects {
 		def, ok := p.definition(eff.Skill)
 		if !ok {
 			continue
 		}
-		c.RestoreSkillEffect(eff, reuseGroup(def))
+		c.RestoreSkillEffect(eff, cast.ReuseKey(def))
 	}
 	if _, err := p.store.DeleteByCharacter(ctx, c.ID, classIndex); err != nil {
 		return fmt.Errorf("clear restored skill state for character %d: %w", c.ID, err)
@@ -153,12 +154,4 @@ func (p *SkillPersistence) definition(ref modelskill.Ref) (modelskill.Definition
 func (p *SkillPersistence) hasDefinition(ref modelskill.Ref) bool {
 	_, ok := p.definition(ref)
 	return ok
-}
-
-func reuseGroup(def modelskill.Definition) int32 {
-	ref := modelskill.Ref{ID: def.ID, Level: def.Level}
-	if def.SharedReuse != nil {
-		ref = *def.SharedReuse
-	}
-	return int32(ref.ID)*256 + int32(ref.Level)
 }

@@ -1,7 +1,6 @@
 package player
 
 import (
-	"math"
 	"math/rand/v2"
 	"time"
 
@@ -194,7 +193,8 @@ func (c *Character) InAttackRange(target attackable.Combatant) bool {
 
 	tx, ty, tz := other.Position()
 	totalRadius := c.PhysicalAttackRange() + int(c.CollisionRadius()) + int(other.CollisionRadius())
-	return in3DRange(c.location(), location.Location{X: tx, Y: ty, Z: tz}, totalRadius)
+	at := c.CurrentLocation()
+	return location.In3DRange(at.X, at.Y, at.Z, tx, ty, tz, totalRadius)
 }
 
 // Knows reports whether target is visible to this player.
@@ -480,11 +480,6 @@ func (c *Character) AttackableBy(attack.CreatureActor) bool {
 	return !c.AlikeDead()
 }
 
-func (c *Character) location() location.Location {
-	x, y, z := c.Position()
-	return location.Location{X: x, Y: y, Z: z}
-}
-
 func (c *Character) rollValue(n int) int {
 	if n <= 0 {
 		return 0
@@ -493,13 +488,6 @@ func (c *Character) rollValue(n int) int {
 		return c.roll(n)
 	}
 	return rand.IntN(n)
-}
-
-func in3DRange(a, b location.Location, radius int) bool {
-	dx := float64(a.X - b.X)
-	dy := float64(a.Y - b.Y)
-	dz := float64(a.Z - b.Z)
-	return math.Sqrt(dx*dx+dy*dy+dz*dz) <= float64(radius)
 }
 
 var _ attack.PlayerActor = (*Character)(nil)

@@ -578,7 +578,7 @@ func encodeRequestAutoSoulShot(itemID, typ int32) []byte {
 func encodeUseItem(objectID int32, ctrl bool) []byte {
 	w := wire.NewPacketWriter(clientpackets.OpcodeUseItem)
 	w.WriteInt32(objectID)
-	w.WriteInt32(int32(boolInt32(ctrl)))
+	w.WriteInt32(wire.BoolInt32(ctrl))
 	return w.Bytes()
 }
 
@@ -613,8 +613,8 @@ func encodeRequestPackageSendableItemList(objectID int32) []byte {
 func encodeRequestMagicSkillUse(skillID int32, ctrl, shift bool) []byte {
 	w := wire.NewPacketWriter(clientpackets.OpcodeRequestMagicSkillUse)
 	w.WriteInt32(skillID)
-	w.WriteInt32(boolInt32(ctrl))
-	w.WriteUint8(byte(boolInt32(shift)))
+	w.WriteInt32(wire.BoolInt32(ctrl))
+	w.WriteUint8(wire.BoolByte(shift))
 	return w.Bytes()
 }
 
@@ -689,7 +689,7 @@ func encodeAction(objectID int32, origin location.Location, shift bool) []byte {
 	w.WriteInt32(int32(origin.X))
 	w.WriteInt32(int32(origin.Y))
 	w.WriteInt32(int32(origin.Z))
-	w.WriteUint8(boolUint8(shift))
+	w.WriteUint8(wire.BoolByte(shift))
 	return w.Bytes()
 }
 
@@ -699,7 +699,7 @@ func encodeAttackRequest(objectID int32, origin location.Location, shift bool) [
 	w.WriteInt32(int32(origin.X))
 	w.WriteInt32(int32(origin.Y))
 	w.WriteInt32(int32(origin.Z))
-	w.WriteUint8(boolUint8(shift))
+	w.WriteUint8(wire.BoolByte(shift))
 	return w.Bytes()
 }
 
@@ -711,13 +711,13 @@ func encodeRequestTargetCancel(unselect uint16) []byte {
 
 func encodeRequestChangeMoveType(run bool) []byte {
 	w := wire.NewPacketWriter(clientpackets.OpcodeRequestChangeMoveType)
-	w.WriteInt32(int32(boolInt32(run)))
+	w.WriteInt32(wire.BoolInt32(run))
 	return w.Bytes()
 }
 
 func encodeRequestChangeWaitType(stand bool) []byte {
 	w := wire.NewPacketWriter(clientpackets.OpcodeRequestChangeWaitType)
-	w.WriteInt32(int32(boolInt32(stand)))
+	w.WriteInt32(wire.BoolInt32(stand))
 	return w.Bytes()
 }
 
@@ -1014,20 +1014,6 @@ func skipPackageSendableRemainder(r *wire.Reader) {
 	r.ReadUint16()
 	r.ReadUint16()
 	r.ReadInt32()
-}
-
-func boolUint8(v bool) uint8 {
-	if v {
-		return 1
-	}
-	return 0
-}
-
-func boolInt32(v bool) int32 {
-	if v {
-		return 1
-	}
-	return 0
 }
 
 func newTestLivePlayer(t *testing.T, id int32, capture *frameCapture) *livePlayer {

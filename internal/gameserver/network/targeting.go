@@ -124,10 +124,7 @@ func (l *GameClientLink) sitLiveOnChair(live *livePlayer, target world.Tracked) 
 func in3DInteractionRange(a, b interface{ Position() (int, int, int) }, radius int) bool {
 	ax, ay, az := a.Position()
 	bx, by, bz := b.Position()
-	dx := int64(ax) - int64(bx)
-	dy := int64(ay) - int64(by)
-	dz := int64(az) - int64(bz)
-	return dx*dx+dy*dy+dz*dz <= int64(radius)*int64(radius)
+	return location.In3DRange(ax, ay, az, bx, by, bz, radius)
 }
 
 func (l *GameClientLink) selectLiveTarget(live *livePlayer, target world.Tracked) bool {

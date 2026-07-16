@@ -1,6 +1,10 @@
 package link
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
+)
 
 // OpcodePlayerAuthResponse is the wire opcode for PlayerAuthResponse,
 // answering a game server's PlayerAuthRequest.
@@ -11,7 +15,7 @@ const OpcodePlayerAuthResponse = 0x03
 func EncodePlayerAuthResponse(account string, ok bool) []byte {
 	w := newWriter(OpcodePlayerAuthResponse)
 	w.WriteString(account)
-	w.WriteUint8(boolByte(ok))
+	w.WriteUint8(wire.BoolByte(ok))
 	return w.Bytes()
 }
 

@@ -141,7 +141,7 @@ func (e *Engine) CanMove(ox, oy, oz, tx, ty, tz int) bool {
 			step = dir.dirX
 		} else {
 			checkY = gridY + dir.offsetY
-			checkX = clamp(int(float64(ox)+float64(checkY-oy)/m), gridX, gridX+block.CellSize-1)
+			checkX = min(max(int(float64(ox)+float64(checkY-oy)/m), gridX), gridX+block.CellSize-1)
 			gridY += dir.stepY
 			ny += dir.signumY
 		}
@@ -243,7 +243,7 @@ func (e *Engine) canSee(ox, oy, oz int, oheight float64, tx, ty, tz int, theight
 			step = dir.dirX
 		} else {
 			checkY = gridY + dir.offsetY
-			checkX = clamp(int(float64(ox)+float64(checkY-oy)/m), gridX, gridX+block.CellSize-1)
+			checkX = min(max(int(float64(ox)+float64(checkY-oy)/m), gridX), gridX+block.CellSize-1)
 			gridY += dir.stepY
 			goy += dir.signumY
 		}
@@ -521,16 +521,6 @@ func localCell(geo int) int {
 
 func alignCell(world int) int {
 	return world &^ (block.CellSize - 1)
-}
-
-func clamp(v, lo, hi int) int {
-	if v < lo {
-		return lo
-	}
-	if v > hi {
-		return hi
-	}
-	return v
 }
 
 type moveDirection struct {

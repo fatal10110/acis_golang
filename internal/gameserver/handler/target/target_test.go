@@ -1,11 +1,11 @@
 package target
 
 import (
-	"math"
 	"slices"
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
@@ -840,10 +840,7 @@ func (k knownList) ForEachKnownCreatureInRadius(anchor Creature, radius int, fn 
 			continue
 		}
 		if radius != -1 {
-			dx := float64(actor.x - ax)
-			dy := float64(actor.y - ay)
-			dz := float64(actor.z - az)
-			if math.Sqrt(dx*dx+dy*dy+dz*dz) > float64(radius) {
+			if !location.In3DRange(actor.x, actor.y, actor.z, ax, ay, az, radius) {
 				continue
 			}
 		}

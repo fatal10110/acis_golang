@@ -6,10 +6,3 @@ import "github.com/fatal10110/acis_golang/internal/commons/wire"
 func newWriter(opcode byte) *wire.Writer {
 	return wire.NewPacketWriter(opcode)
 }
-
-func boolByte(b bool) byte {
-	if b {
-		return 1
-	}
-	return 0
-}

@@ -1,6 +1,10 @@
 package link
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
+)
 
 // OpcodeGameServerAuth is the wire opcode for GameServerAuth, the game
 // server's registration/authentication request.
@@ -45,8 +49,8 @@ func DecodeGameServerAuth(payload []byte) (GameServerAuth, error) {
 func EncodeGameServerAuth(auth GameServerAuth) []byte {
 	w := newWriter(OpcodeGameServerAuth)
 	w.WriteUint8(auth.DesiredID)
-	w.WriteUint8(boolByte(auth.AcceptAlternateID))
-	w.WriteUint8(boolByte(auth.HostReserved))
+	w.WriteUint8(wire.BoolByte(auth.AcceptAlternateID))
+	w.WriteUint8(wire.BoolByte(auth.HostReserved))
 	w.WriteString(auth.HostName)
 	w.WriteUint16(auth.Port)
 	w.WriteInt32(auth.MaxPlayers)

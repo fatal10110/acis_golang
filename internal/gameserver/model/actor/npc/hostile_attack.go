@@ -55,7 +55,8 @@ func (h *Hostile) InAttackRange(target attackable.Combatant) bool {
 
 	tx, ty, tz := other.Position()
 	totalRadius := h.PhysicalAttackRange() + int(h.CollisionRadius()) + int(other.CollisionRadius())
-	return in3DRange(h.location(), location.Location{X: tx, Y: ty, Z: tz}, totalRadius)
+	at := h.location()
+	return location.In3DRange(at.X, at.Y, at.Z, tx, ty, tz, totalRadius)
 }
 
 // CanSee reports whether target is visible to this NPC. No geodata

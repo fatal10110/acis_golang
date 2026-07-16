@@ -127,8 +127,5 @@ func writeCharInfo(w *wire.Writer, s CharInfoSnapshot) {
 }
 
 func boolUint8(v bool) uint8 {
-	if v {
-		return 1
-	}
-	return 0
+	return wire.BoolByte(v)
 }

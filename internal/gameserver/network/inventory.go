@@ -1,13 +1,12 @@
 package network
 
 import (
-	"math"
-
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
@@ -250,8 +249,5 @@ func liveItemOpsAllowed(live *livePlayer) bool {
 
 func dropInRange(live *livePlayer, x, y, z int) bool {
 	sx, sy, sz := live.Position()
-	dx := float64(sx - x)
-	dy := float64(sy - y)
-	dz := float64(sz - z)
-	return math.Sqrt(dx*dx+dy*dy+dz*dz) <= dropInteractionDistance
+	return location.In3DRange(sx, sy, sz, x, y, z, dropInteractionDistance)
 }
