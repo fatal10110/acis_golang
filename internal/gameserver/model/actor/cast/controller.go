@@ -29,6 +29,9 @@ var (
 	ErrMagicMuted = errors.New("cast: magic muted")
 	// ErrPhysicalMuted means the actor is blocked from physical casts.
 	ErrPhysicalMuted = errors.New("cast: physical muted")
+	// ErrSkillUnavailable means a player cast request did not name a known
+	// active skill.
+	ErrSkillUnavailable = errors.New("cast: skill unavailable")
 )
 
 // Actor is the owner state a cast controller reads and updates while

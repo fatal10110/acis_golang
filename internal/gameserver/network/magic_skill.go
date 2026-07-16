@@ -13,37 +13,28 @@ import (
 )
 
 func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets.RequestMagicSkillUse) {
-	if live == nil || live.AlikeDead() || req.SkillID <= 0 {
-		sendMagicActionFailed(live)
-		return
-	}
-
-	level := live.SkillLevel(int(req.SkillID))
-	if level <= 0 || l.skills == nil {
-		sendMagicActionFailed(live)
-		return
-	}
-
-	def, ok := l.skills.Definition(modelskill.Ref{ID: modelskill.ID(req.SkillID), Level: level})
-	if !ok || def.Activation != modelskill.ActivationActive {
-		sendMagicActionFailed(live)
-		return
-	}
-
-	target, ok := actorcast.SelectTarget(live, live.target, def)
-	if !ok {
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageInvalidTarget))
+	if live == nil {
 		sendMagicActionFailed(live)
 		return
 	}
 
 	beforeHP, beforeMP := int(live.CurHP), int(live.CurMP)
 	controller := live.castController()
-	plan, err := controller.Start(time.Now(), target, def)
+	started, err := actorcast.StartPlayerSkill(actorcast.PlayerSkillRequest{
+		Now:         time.Now(),
+		Controller:  controller,
+		Caster:      live.Character,
+		Selected:    live.target,
+		SkillID:     int(req.SkillID),
+		Definitions: l.skills,
+	})
 	if err != nil {
-		sendMagicCastFailure(live, def, err)
+		sendMagicCastFailure(live, started.Definition, err)
 		return
 	}
+	def := started.Definition
+	target := started.Target
+	plan := started.Plan
 
 	casterObject := skillCastObject(live)
 	targetObject := skillCastObject(target)
