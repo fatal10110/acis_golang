@@ -29,8 +29,8 @@ Sources checked:
 
 - Original game client appendix: 206 concrete dispatcher targets.
 - Original game server appendix: 282 packet classes, including base/composite classes.
-- Classified M2-M5 required game client packets: 94. Missing in Go: 51.
-- Classified M2-M5 required game server packets: 128. Missing in Go: 68.
+- Classified M2-M5 required game client packets: 94. Missing in Go: 50.
+- Classified M2-M5 required game server packets: 128. Missing in Go: 67.
 - M1 login client/server packets are implemented.
 - M1 GS-LS link packets are implemented under `internal/link/`.
 - M2 base game connect/create/select packet set is implemented.
@@ -96,7 +96,6 @@ Missing M3 data/UI client packets:
 
 - `RequestBBSwrite`
 - `RequestSetPledgeCrest`
-- `RequestAllyCrest`
 - `RequestSetAllyCrest`
 - `RequestExPledgeCrestLarge`
 - `RequestExSetPledgeCrestLarge`
@@ -143,6 +142,7 @@ Implemented and wired M3 data/UI client packets in Go:
 
 - `RequestBypassToServer` (`player_help` HTML bypass only; admin, NPC, quest, community-board, hero, olympiad, and manor bypass owners remain deferred until those systems exist)
 - `RequestLinkHtml`
+- `RequestAllyCrest`
 - `RequestPledgeCrest`
 
 Implemented and wired M4 movement/rotation/target client packets in Go:
@@ -243,7 +243,6 @@ flow can emit them truthfully yet.
 Missing M3 data/UI server packets:
 
 - `NpcHtmlMessage`
-- `AllyCrest`
 - `ExPledgeCrestLarge`
 - `MultiSellList`
 - `BuyList`
@@ -281,6 +280,7 @@ Missing M3 data/UI server packets:
 
 Implemented and wired M3 data/UI server packets in Go:
 
+- `AllyCrest`
 - `PledgeCrest`
 
 Implemented and wired M4 movement/rotation server packets in Go:
@@ -374,10 +374,10 @@ Implemented and wired M5 shortcut server packets in Go:
 - `RequestPetUseItem`, `RequestGiveItemToPet`, `RequestGetItemFromPet`, and `RequestPetGetItem` are wired for active-pet lookup, pet inventory transfer/equip mutation, immediate visible ground-item pickup, item persistence, `GetItem`, `DeleteObject`, `PetInventoryUpdate`, player `InventoryUpdate`, and pet-use `SystemMessage` feedback. Pet AI movement-to-pickup, drop-protection/looter gates, pet food/potion item handlers, player operating/transaction-state gates, and richer pet stat refreshes remain deferred to their owning systems.
 - `RequestShortCutReg` and `RequestShortCutDel` are wired for persisted client shortcut entries, including starter shortcut creation, EnterWorld restoration, `ShortCutRegister`, and `ShortCutDelete`. Item reuse timers, macro bodies, recipe validation, and soulshot auto-use side effects remain deferred to their owning systems.
 - `RequestChangePetName` remains deferred because the Go runtime has no active pet naming state, pet-name uniqueness query, NPC-name lookup by name, or control-item custom type update flow.
-- `RequestPledgeCrest` is wired against the loaded small pledge crest `.dds` cache and emits `PledgeCrest`. Crest upload/update packets, ally crests, and large pledge crests remain deferred to the clan/crest write-owner flows.
+- `RequestPledgeCrest` is wired against the loaded small pledge crest `.dds` cache and emits `PledgeCrest`. `RequestAllyCrest` is wired in game against loaded ally crest `.dds` cache data and emits `AllyCrest` only when data exists. Crest upload/update packets and large pledge crests remain deferred to the clan/crest write-owner flows.
 - `PetItemList`, `PetInfo`, and `PetStatusUpdate` remain deferred together: the current Go pet actor lacks the full pet info/status snapshot surface and owner spawn/info broadcast path needed to emit truthful full-list/status packets. `PetStatusShow` and `PetDelete` are wired where the current runtime has exact backing behavior.
 - `RequestAutoSoulShot` is wired as extended client opcode `0x0005` with per-player auto-shot toggle state, `ExAutoSoulShot`, and item-name `SystemMessage` feedback. First-shot recharge, recurring shot consumption, and `ExUseSharedGroupItem` reuse display remain deferred to the item-use/handler burst because the shared item handler/reuse pipeline is not ported yet.
 - `StatusUpdate` is implemented and wired for target max/current HP during selection. Broader status/stat recalculation broadcasts still need owner flows as those systems are ported.
-- The unique missing counts deduplicate those overlaps: 51 missing game client packets and 68 missing game server packets after the EnterWorld, movement/rotation, inventory, target/action, stance/social, item-operation, auto-shot, skill-acquisition, basic skill-cast, enchant, backed pet inventory/status, linked-html, and pledge-crest packet-wiring passes.
+- The unique missing counts deduplicate those overlaps: 50 missing game client packets and 67 missing game server packets after the EnterWorld, movement/rotation, inventory, target/action, stance/social, item-operation, auto-shot, skill-acquisition, basic skill-cast, enchant, backed pet inventory/status, linked-html, pledge-crest, and ally-crest packet-wiring passes.
 - Existing Go code accepts several M4/M5 client opcodes in `clientpackets/wiresafe.go`, but many of them still log "Opcode not wired" or have no decode/run implementation.
 - This audit uses original Java class names. Go may keep a slightly different helper shape, such as `Frame...` functions instead of packet structs, but the required client-visible packet behavior is still one original packet at a time.

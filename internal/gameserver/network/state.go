@@ -115,6 +115,7 @@ var allowedOpcodes = map[State]map[byte]bool{
 		0x6c: true, // acquire skill
 		0x6d: true, // restart point
 		0x72: true, // crystallize item
+		0x88: true, // request ally crest
 		0x89: true, // change pet name
 		0x8a: true, // pet use item
 		0x8b: true, // give item to pet

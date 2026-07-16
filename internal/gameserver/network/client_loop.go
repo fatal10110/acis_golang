@@ -182,6 +182,19 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 			session.SendFrame(l.framePledgeCrest(req))
 
+		case clientpackets.OpcodeRequestAllyCrest:
+			req, err := clientpackets.DecodeRequestAllyCrest(payload)
+			if err != nil {
+				l.log.Warn().Err(err).Msg("game client")
+				continue
+			}
+			if live == nil {
+				continue
+			}
+			if frame, ok := l.frameAllyCrest(req); ok {
+				session.SendFrame(frame)
+			}
+
 		case clientpackets.OpcodeRequestNewCharacter:
 			frame, err := serverpackets.FrameNewCharacterSuccess(l.templates)
 			if err != nil {
