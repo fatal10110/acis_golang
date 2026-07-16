@@ -112,3 +112,28 @@ func TestCancelSucceeds(t *testing.T) {
 		t.Error("CancelSucceeds(62, 62) = true, want false")
 	}
 }
+
+func TestEffectCancelSuccessRate(t *testing.T) {
+	tests := []struct {
+		name                string
+		casterMagicLevel    int
+		candidateMagicLevel int
+		period              int
+		power, vuln         float64
+		want                int
+	}{
+		{"mid range", 50, 40, 240, 10, 1, 32},
+		{"clamped to min", 10, 50, 0, 0, 1, 25},
+		{"clamped to max", 100, 0, 0, 0, 1, 75},
+		{"power*vuln truncates toward zero, not rounds", 13, 0, 0, 2.9, 1, 28},
+		{"period term floors, not rounds", 13, 0, 239, 0, 1, 27},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := EffectCancelSuccessRate(tt.casterMagicLevel, tt.candidateMagicLevel, tt.period, tt.power, tt.vuln)
+			if got != tt.want {
+				t.Errorf("EffectCancelSuccessRate() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

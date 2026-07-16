@@ -31,12 +31,20 @@ func applyEffects(effector, effected any, def modelskill.Definition, templates [
 	}
 
 	meta := effect.Skill{
-		ID:             def.ID,
-		SkillType:      def.SkillType,
-		Debuff:         def.Debuff,
-		Toggle:         def.Activation == modelskill.ActivationToggle,
-		KillByDOT:      def.KillByDOT,
-		CanBeDispelled: def.CanBeDispelled,
+		ID:                  def.ID,
+		SkillType:           def.SkillType,
+		Debuff:              def.Debuff,
+		Toggle:              def.Activation == modelskill.ActivationToggle,
+		KillByDOT:           def.KillByDOT,
+		CanBeDispelled:      def.CanBeDispelled,
+		MagicLevel:          def.MagicLevel,
+		AbnormalLevel:       def.AbnormalLevel,
+		EffectAbnormalLevel: def.EffectAbnormalLevel,
+		EffectType:          def.EffectType,
+		MaxNegatedEffects:   def.MaxNegatedEffects,
+		NegateLevel:         def.NegateLevel,
+		NegateIDs:           def.NegateIDs,
+		NegateTypes:         def.NegateTypes,
 	}
 	for _, tmpl := range templates {
 		e, err := effect.New(meta, tmpl)

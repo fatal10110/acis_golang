@@ -2,9 +2,12 @@ package effect
 
 import (
 	"fmt"
+	"strings"
 
+	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
@@ -108,6 +111,13 @@ const (
 	// TypeProtectionBless is a marker buff (player-kill protection) a cancel
 	// skill can never strip.
 	TypeProtectionBless Type = "PROTECTION_BLESSING"
+	// TypeCancel strips a random subset of the effected actor's active
+	// non-toggle, non-debuff effects.
+	TypeCancel Type = "CANCEL"
+	// TypeNegate strips every effect owned by a configured skill id, plus
+	// every effect whose classification and abnormal level fall under a
+	// configured skill-type/level threshold.
+	TypeNegate Type = "NEGATE"
 )
 
 type kind struct {
@@ -150,6 +160,8 @@ var coreKinds = map[string]kind{
 	"BlockBuff":             {typ: TypeBlockBuff},
 	"BlockDebuff":           {typ: TypeBlockDebuff},
 	"ProtectionBlessing":    {typ: TypeProtectionBless, flag: flagProtectionBlessing},
+	"Cancel":                {typ: TypeCancel},
+	"Negate":                {typ: TypeNegate},
 }
 
 var fearSkippedPlayableSkillIDs = map[modelskill.ID]bool{
@@ -271,6 +283,10 @@ func wireHooks(e *Effect) {
 		e.OnExit = charmOfLuckExit
 	case TypePhoenixBless:
 		e.OnExit = phoenixBlessExit
+	case TypeCancel:
+		e.OnStart = cancelStart
+	case TypeNegate:
+		e.OnStart = negateStart
 	}
 }
 
@@ -460,6 +476,26 @@ type phoenixBlessStopper interface {
 // be stopped by owning skill id.
 type skillIDEffectStopper interface {
 	StopSkillEffectsByID(id modelskill.ID)
+}
+
+// deadChecker reports whether an actor is dead, consulted by a cancel-family
+// effect before it strips anything.
+type deadChecker interface {
+	Dead() bool
+}
+
+// effectListOwner is implemented by an actor whose active effect list can be
+// inspected and stripped directly, for cancel- and negate-family effects
+// that act on other effects rather than the actor's stats.
+type effectListOwner interface {
+	EffectList() *List
+}
+
+// cancelVulnerabilitySource optionally supplies an actor's already-resolved
+// vulnerability multiplier for a classification tag; an actor without one is
+// treated as unmodified (1.0).
+type cancelVulnerabilitySource interface {
+	CancelVulnerability(classification string) float64
 }
 
 func damageOverTimeAction(e *Effect) bool {
@@ -845,6 +881,146 @@ func phoenixBlessExit(e *Effect) {
 	if target, ok := e.Effected.(phoenixBlessStopper); ok {
 		target.StopPhoenixBlessing(e)
 	}
+}
+
+// cancelStart strips a random subset of the effected actor's active
+// non-toggle, non-debuff effects, up to e.Skill.MaxNegatedEffects (0 means
+// unlimited). Each candidate rolls independently against
+// formulas.EffectCancelSuccessRate.
+//
+// The classification checked against the protected-marker exemption list is
+// this effect's own tag (e.ClassTag()), which is always the cancel
+// classification and never matches any of the four protected markers
+// (courage/luck charms, noblesse and protection blessings) — so that
+// exemption can never actually trigger here, and those markers remain
+// cancellable through this path even though the check reads as if it
+// guards them. This is the required behavior; do not "fix" it by checking
+// the candidate's tag instead.
+func cancelStart(e *Effect) bool {
+	if target, ok := e.Effected.(deadChecker); ok && target.Dead() {
+		return false
+	}
+	owner, ok := e.Effected.(effectListOwner)
+	if !ok {
+		return true
+	}
+	list := owner.EffectList()
+	if list == nil {
+		return true
+	}
+	if effectNotCancellable[strings.ToUpper(e.ClassTag())] {
+		return true
+	}
+
+	vuln := 1.0
+	if v, ok := e.Effected.(cancelVulnerabilitySource); ok {
+		vuln = v.CancelVulnerability(e.ClassTag())
+	}
+
+	count := e.Skill.MaxNegatedEffects
+	candidates := list.All()
+	shuffleEffects(candidates)
+
+	for _, cand := range candidates {
+		if cand.Skill.Toggle || cand.Skill.Debuff {
+			continue
+		}
+
+		rate := formulas.EffectCancelSuccessRate(e.Skill.MagicLevel, cand.Skill.MagicLevel, cand.Template.Time, e.Template.EffectPower, vuln)
+		if formulas.CancelSucceeds(float64(rate), rnd.Get(100)) {
+			list.Remove(cand)
+		}
+
+		if count > 0 {
+			count--
+			if count == 0 {
+				break
+			}
+		}
+	}
+	return true
+}
+
+// effectNotCancellable are effect classification tags that appear to be
+// exempt from cancelStart's strip loop; see cancelStart's doc comment for
+// why the exemption never actually applies there.
+var effectNotCancellable = map[string]bool{
+	"CHARM_OF_COURAGE":    true,
+	"CHARM_OF_LUCK":       true,
+	"NOBLESSE_BLESSING":   true,
+	"PROTECTION_BLESSING": true,
+}
+
+// shuffleEffects randomizes candidates in place (Fisher-Yates) so a capped
+// cancel/dispel loop doesn't always prefer the same array position.
+func shuffleEffects(candidates []*Effect) {
+	for i := len(candidates) - 1; i > 0; i-- {
+		j := rnd.Get(i + 1)
+		candidates[i], candidates[j] = candidates[j], candidates[i]
+	}
+}
+
+// negateStart strips every active effect on the effected actor that's owned
+// by one of e.Skill.NegateIDs, plus every active effect whose classification
+// matches one of e.Skill.NegateTypes and whose abnormal level (per-effect
+// when its owning skill sets EffectType, per-skill otherwise) is within
+// e.Skill.NegateLevel — or any level when NegateLevel is -1.
+func negateStart(e *Effect) bool {
+	owner, ok := e.Effected.(effectListOwner)
+	if !ok {
+		return true
+	}
+	list := owner.EffectList()
+	if list == nil {
+		return true
+	}
+
+	for _, id := range e.Skill.NegateIDs {
+		if id == 0 {
+			continue
+		}
+		for _, cand := range list.All() {
+			if int(cand.Skill.ID) == id {
+				list.Remove(cand)
+			}
+		}
+	}
+
+	for _, negType := range e.Skill.NegateTypes {
+		negType = strings.ToUpper(strings.TrimSpace(negType))
+		for _, cand := range list.All() {
+			if !negateTypeMatches(cand.Skill, negType) {
+				continue
+			}
+			if !negateLevelAllows(cand.Skill, e.Skill.NegateLevel) {
+				continue
+			}
+			list.Remove(cand)
+		}
+	}
+	return true
+}
+
+// negateTypeMatches reports whether candidate's classification (its own
+// skill type, or its own effect-type tag when set) matches negType.
+func negateTypeMatches(candidate Skill, negType string) bool {
+	if strings.EqualFold(candidate.SkillType, negType) {
+		return true
+	}
+	return candidate.EffectType != "" && strings.EqualFold(candidate.EffectType, negType)
+}
+
+// negateLevelAllows reports whether candidate's applicable abnormal level
+// (EffectAbnormalLevel when its own EffectType is set, AbnormalLevel
+// otherwise) is within negateLvl, or negateLvl is -1 (unrestricted).
+func negateLevelAllows(candidate Skill, negateLvl int) bool {
+	if negateLvl == -1 {
+		return true
+	}
+	if candidate.EffectType != "" && candidate.EffectAbnormalLevel >= 0 && candidate.EffectAbnormalLevel <= negateLvl {
+		return true
+	}
+	return candidate.AbnormalLevel >= 0 && candidate.AbnormalLevel <= negateLvl
 }
 
 func abortAll(target any) {

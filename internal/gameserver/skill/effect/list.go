@@ -42,6 +42,33 @@ type Skill struct {
 	Toggle         bool
 	KillByDOT      bool
 	CanBeDispelled bool
+
+	// MagicLevel is the owning skill's casting level, read by cancel-family
+	// effects to compare a caster's cancel power against each candidate
+	// effect's own owning-skill level.
+	MagicLevel int
+	// AbnormalLevel and EffectAbnormalLevel are the owning skill's cancel-
+	// threshold tags: EffectAbnormalLevel applies when EffectType is set,
+	// AbnormalLevel otherwise. A negate-family effect strips a candidate
+	// only when the candidate's applicable level is within its threshold.
+	AbnormalLevel       int
+	EffectAbnormalLevel int
+	// EffectType is the owning skill's classification tag (distinct from
+	// the per-effect-template tag exposed by Effect.ClassTag), consulted
+	// alongside SkillType when a negate-family effect matches a candidate
+	// by classification.
+	EffectType string
+
+	// MaxNegatedEffects caps how many candidates a cancel-family effect
+	// strips in one activation; 0 means unlimited.
+	MaxNegatedEffects int
+	// NegateLevel, NegateIDs, and NegateTypes configure a negate-family
+	// effect: NegateIDs strips candidates by their owning skill id,
+	// NegateTypes strips candidates by classification (gated by
+	// NegateLevel, or ungated when -1).
+	NegateLevel int
+	NegateIDs   []int
+	NegateTypes []string
 }
 
 func (s Skill) sevenSigns() bool {
