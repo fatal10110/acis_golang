@@ -22,6 +22,7 @@ const defaultAccessLevel = 0
 // needed once that row enters the live world.
 type Character struct {
 	world.Presence
+	*creature.Live
 
 	ID          int32
 	AccountName string

@@ -83,13 +83,27 @@ type scheduledTimer interface {
 // speed. Zero is a valid, stationary speed (e.g. an immobile scripted NPC) —
 // MoveToLocation rejects any actual movement request once speed is zero.
 func NewCreatureMove(origin location.Location, speed float64, geo Geo) (*CreatureMove, error) {
+	state := &CreatureMove{}
+	if err := state.Init(origin, speed, geo); err != nil {
+		return nil, err
+	}
+	return state, nil
+}
+
+// Init initializes zero movement state embedded in a live actor. Do not call
+// it after the state is exposed to callers.
+func (m *CreatureMove) Init(origin location.Location, speed float64, geo Geo) error {
 	if geo == nil {
-		return nil, errors.New("move: nil geodata")
+		return errors.New("move: nil geodata")
 	}
 	if speed < 0 || math.IsNaN(speed) || math.IsInf(speed, 0) {
-		return nil, errors.New("move: speed must not be negative")
+		return errors.New("move: speed must not be negative")
 	}
-	return &CreatureMove{origin: origin, destination: origin, speed: speed, geo: geo}, nil
+	m.origin = origin
+	m.destination = origin
+	m.speed = speed
+	m.geo = geo
+	return nil
 }
 
 // SetArrivedHook records the callback fired once an accepted move reaches

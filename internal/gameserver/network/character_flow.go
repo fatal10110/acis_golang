@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -182,11 +183,12 @@ func (l *GameClientLink) attachLivePlayer(client *Client, c *player.Character, t
 	c.SetFrameSender(client.Session.SendFrame)
 
 	x, y, z := c.Position()
-	cm, err := move.NewCreatureMove(location.Location{X: x, Y: y, Z: z}, tmpl.RunSpeed, l.geo)
+	creatureLive, err := creature.NewLive(location.Location{X: x, Y: y, Z: z}, tmpl.RunSpeed, l.geo)
 	if err != nil {
 		return nil, fmt.Errorf("attach live player: %w", err)
 	}
-	moveCtl, err := move.NewController(cm, c)
+	c.Live = creatureLive
+	moveCtl, err := move.NewController(c.Move(), c)
 	if err != nil {
 		return nil, fmt.Errorf("attach live player: %w", err)
 	}

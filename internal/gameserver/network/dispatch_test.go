@@ -18,6 +18,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -1077,12 +1078,21 @@ func newTestHostileNPC(t *testing.T, id int32) *npc.Hostile {
 	if err != nil {
 		t.Fatal(err)
 	}
-	hostile, err := npc.NewHostile(inst, testHostileMove{}, testHostileAttack{})
+	live, err := creature.NewLive(location.Location{}, 100, testHostileGeo{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	hostile, err := npc.NewHostile(inst, live, testHostileMove{}, testHostileAttack{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	return hostile
 }
+
+type testHostileGeo struct{}
+
+func (testHostileGeo) CanMove(_, _, _, _, _, _ int) bool { return true }
+func (testHostileGeo) Height(_, _, _ int) int16          { return 0 }
 
 type testHostileMove struct{}
 

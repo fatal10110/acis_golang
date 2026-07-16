@@ -204,18 +204,20 @@ func TestNewHostileRejectsInvalidDependencies(t *testing.T) {
 	tests := []struct {
 		name   string
 		inst   *Instance
+		live   *creature.Live
 		move   ai.MoveController
 		strike ai.AttackController
 	}{
-		{name: "nil instance", move: move, strike: strike},
-		{name: "nil template", inst: &Instance{ObjectID: 101}, move: move, strike: strike},
-		{name: "nil move", inst: inst, strike: strike},
-		{name: "nil attack", inst: inst, move: move},
+		{name: "nil instance", live: newHostileLive(t), move: move, strike: strike},
+		{name: "nil template", inst: &Instance{ObjectID: 101}, live: newHostileLive(t), move: move, strike: strike},
+		{name: "nil live creature", inst: inst, move: move, strike: strike},
+		{name: "nil move", inst: inst, live: newHostileLive(t), strike: strike},
+		{name: "nil attack", inst: inst, live: newHostileLive(t), move: move},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if _, err := NewHostile(tc.inst, tc.move, tc.strike); err == nil {
+			if _, err := NewHostile(tc.inst, tc.live, tc.move, tc.strike); err == nil {
 				t.Fatal("NewHostile() error = nil")
 			}
 		})
@@ -229,7 +231,7 @@ func TestNewHostileRejectsNonAttackableKind(t *testing.T) {
 		Kind:     "Folk",
 	}
 
-	if _, err := NewHostile(inst, &hostileMove{}, &hostileAttack{}); err == nil {
+	if _, err := NewHostile(inst, newHostileLive(t), &hostileMove{}, &hostileAttack{}); err == nil {
 		t.Fatal("NewHostile() error = nil")
 	}
 }
@@ -244,12 +246,26 @@ func newTestHostile(t *testing.T, move ai.MoveController, strike ai.AttackContro
 			BaseAttackRange: 80,
 		},
 		Kind: "Monster",
-	}, move, strike)
+	}, newHostileLive(t), move, strike)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return hostile
 }
+
+func newHostileLive(t *testing.T) *creature.Live {
+	t.Helper()
+	live, err := creature.NewLive(location.Location{}, 100, hostileGeo{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return live
+}
+
+type hostileGeo struct{}
+
+func (hostileGeo) CanMove(_, _, _, _, _, _ int) bool { return true }
+func (hostileGeo) Height(_, _, _ int) int16          { return 0 }
 
 type hostileTarget struct {
 	world.Presence

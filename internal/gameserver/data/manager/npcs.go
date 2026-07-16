@@ -637,17 +637,17 @@ type locatedRef struct{ move.Actor }
 type creatureActorRef struct{ attack.CreatureActor }
 
 // newLiveHostile builds a live Hostile for inst, wiring a real movement
-// controller (over a fresh CreatureMove seeded at inst.Home) and a real
-// attack controller, resolving their mutual construction-order dependency
-// on the finished Hostile via locatedRef/creatureActorRef.
+// controller (over the Hostile's lifetime movement state) and a real attack
+// controller, resolving their mutual construction-order dependency on the
+// finished Hostile via locatedRef/creatureActorRef.
 func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo) (*npc.Hostile, error) {
-	cm, err := move.NewCreatureMove(inst.Home, speed, geo)
+	live, err := creature.NewLive(inst.Home, speed, geo)
 	if err != nil {
 		return nil, err
 	}
 
 	locRef := &locatedRef{}
-	moveCtl, err := move.NewController(cm, locRef)
+	moveCtl, err := move.NewController(live.Move(), locRef)
 	if err != nil {
 		return nil, err
 	}
@@ -655,7 +655,7 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo) (*npc.Hosti
 	actorRef := &creatureActorRef{}
 	attackCtl := attack.NewAttackable(actorRef)
 
-	hostile, err := npc.NewHostile(inst, moveCtl, attackCtl)
+	hostile, err := npc.NewHostile(inst, live, moveCtl, attackCtl)
 	if err != nil {
 		return nil, err
 	}

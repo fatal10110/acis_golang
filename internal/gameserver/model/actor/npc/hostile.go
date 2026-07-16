@@ -34,6 +34,7 @@ var hostileInstanceKinds = map[InstanceKind]struct{}{
 // Hostile is a live attackable NPC with world presence and an AI loop.
 type Hostile struct {
 	world.Presence
+	*creature.Live
 
 	Instance *Instance
 
@@ -74,7 +75,7 @@ func Attackable(inst *Instance) bool {
 }
 
 // NewHostile creates a live attackable NPC wrapper for inst.
-func NewHostile(inst *Instance, movement ai.MoveController, attack ai.AttackController) (*Hostile, error) {
+func NewHostile(inst *Instance, live *creature.Live, movement ai.MoveController, attack ai.AttackController) (*Hostile, error) {
 	if inst == nil {
 		return nil, errors.New("npc: nil hostile instance")
 	}
@@ -85,6 +86,9 @@ func NewHostile(inst *Instance, movement ai.MoveController, attack ai.AttackCont
 	if _, ok := hostileInstanceKinds[kind]; !ok {
 		return nil, fmt.Errorf("npc %d: instance type %q is not attackable", inst.Template.ID, kind)
 	}
+	if live == nil {
+		return nil, errors.New("npc: nil hostile creature")
+	}
 	if movement == nil {
 		return nil, errors.New("npc: nil hostile movement")
 	}
@@ -94,6 +98,7 @@ func NewHostile(inst *Instance, movement ai.MoveController, attack ai.AttackCont
 
 	h := &Hostile{
 		Instance: inst,
+		Live:     live,
 		move:     movement,
 		hp:       inst.Template.HPMax,
 		roll:     rand.Intn,

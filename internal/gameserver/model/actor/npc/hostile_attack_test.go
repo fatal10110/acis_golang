@@ -18,7 +18,7 @@ func zeroRoll(int) int { return 0 }
 
 func newCombatHostile(t *testing.T, id int32, tpl *Template) *Hostile {
 	t.Helper()
-	h, err := NewHostile(&Instance{ObjectID: id, Template: tpl, Kind: "Monster"}, &hostileMove{}, &hostileAttack{})
+	h, err := NewHostile(&Instance{ObjectID: id, Template: tpl, Kind: "Monster"}, newHostileLive(t), &hostileMove{}, &hostileAttack{})
 	if err != nil {
 		t.Fatal(err)
 	}
