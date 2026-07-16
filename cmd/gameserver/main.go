@@ -834,13 +834,14 @@ func provideGameClientLink(
 	links *loginLinkState,
 	skills *network.SkillPersistence,
 	spellbooks skill.BookPolicy,
+	skillTrees *skill.Trees,
 	state *world.State,
 	ids *idfactory.Allocator,
 	ground *task.GroundItems,
 	attackStance *task.AttackStance,
 	log zerolog.Logger,
 ) *network.GameClientLink {
-	return network.NewGameClientLink(validator, links.get, roster, items, shortcuts, data.Players, data.Items, html, crests, skills, spellbooks, state, ids, ground, attackStance, log)
+	return network.NewGameClientLink(validator, links.get, roster, items, shortcuts, data.Players, data.Items, html, crests, skills, spellbooks, data.Trees, state, ids, ground, attackStance, log)
 }
 
 func provideSkillPersistence(pool *sql.DB, data *gameData) *network.SkillPersistence {

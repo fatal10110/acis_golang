@@ -70,6 +70,7 @@ type GameClientLink struct {
 	crests        *datacache.Crests
 	skills        *SkillPersistence
 	spellbooks    modelskill.BookPolicy
+	skillTrees    *modelskill.Trees
 	world         *world.State
 	ids           idAllocator
 	groundItems   groundItemDropper
@@ -105,6 +106,7 @@ func NewGameClientLink(
 	crests *datacache.Crests,
 	skills *SkillPersistence,
 	spellbooks modelskill.BookPolicy,
+	skillTrees *modelskill.Trees,
 	worldState *world.State,
 	ids idAllocator,
 	groundItems groundItemDropper,
@@ -123,6 +125,7 @@ func NewGameClientLink(
 		crests:        crests,
 		skills:        skills,
 		spellbooks:    spellbooks,
+		skillTrees:    skillTrees,
 		world:         worldState,
 		ids:           ids,
 		groundItems:   groundItems,
