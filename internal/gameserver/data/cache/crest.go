@@ -32,6 +32,11 @@ type Crests struct {
 	byID map[int][]byte
 }
 
+// NewCrests returns an empty crest cache.
+func NewCrests() *Crests {
+	return &Crests{byID: make(map[int][]byte)}
+}
+
 // LoadCrests reads valid crest .dds files from dir into memory.
 func LoadCrests(dir string) (*Crests, error) {
 	entries, err := os.ReadDir(dir)
@@ -39,7 +44,7 @@ func LoadCrests(dir string) (*Crests, error) {
 		return nil, fmt.Errorf("load crests from %q: %w", dir, err)
 	}
 
-	c := &Crests{byID: make(map[int][]byte)}
+	c := NewCrests()
 	for _, entry := range entries {
 		if entry.IsDir() {
 			continue

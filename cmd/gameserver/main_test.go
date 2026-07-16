@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/config"
+	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/engine"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/pathfind"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/probe"
@@ -129,6 +130,37 @@ func TestLoadHTMLCacheUsesDatapackRoot(t *testing.T) {
 	got, ok := html.Get("help/tutorial.htm")
 	if !ok || got != "<html/>" {
 		t.Fatalf("Get(help/tutorial.htm) = %q, %v; want cached html", got, ok)
+	}
+}
+
+func TestLoadCrestCacheUsesDatapackRoot(t *testing.T) {
+	root := t.TempDir()
+	data := bytes.Repeat([]byte{0x5a}, 256)
+	path := filepath.Join(root, "data", "crests", "Crest_101.dds")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	crests, err := loadCrestCache(gameServerPaths{DataRoot: root})
+	if err != nil {
+		t.Fatalf("loadCrestCache: %v", err)
+	}
+	got, ok := crests.Get(datacache.PledgeCrest, 101)
+	if !ok || !bytes.Equal(got, data) {
+		t.Fatalf("Get(PledgeCrest, 101) = %d bytes, %v; want cached crest", len(got), ok)
+	}
+}
+
+func TestLoadCrestCacheAllowsMissingDirectory(t *testing.T) {
+	crests, err := loadCrestCache(gameServerPaths{DataRoot: t.TempDir()})
+	if err != nil {
+		t.Fatalf("loadCrestCache: %v", err)
+	}
+	if crests.Len() != 0 {
+		t.Fatalf("Len() = %d, want 0 for missing crest directory", crests.Len())
 	}
 }
 
