@@ -136,3 +136,11 @@ func (c *Controller) SetArrived(arrived func()) {
 func (c *Controller) Position() location.Location {
 	return c.move.Position()
 }
+
+// SetPosition reseeds the wrapped CreatureMove's position. Call it whenever
+// the actor's position changes outside this controller — a client-reported
+// walk, a teleport — so the next chase computes its route/duration from
+// where the actor actually is, not a stale seed.
+func (c *Controller) SetPosition(position location.Location) {
+	c.move.SetPosition(position)
+}

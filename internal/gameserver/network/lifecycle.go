@@ -11,6 +11,11 @@ func (l *GameClientLink) detachLivePlayer(ctx context.Context, live *livePlayer)
 	if live == nil {
 		return
 	}
+	// Stop any in-flight attack/movement timers before anything below nulls
+	// the hooks they call into (SetFrameSender/SetAttackBroadcaster) —
+	// otherwise a timer goroutine can still fire after detach and race
+	// those writes.
+	live.Stop()
 	l.cancelActiveTrade(live)
 	if l.roster != nil || l.skills != nil {
 		saveCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), livePlayerDetachSaveTimeout)

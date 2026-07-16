@@ -39,6 +39,25 @@ func TestMoveLivePlayerRelocatesWorldVisibility(t *testing.T) {
 	}
 }
 
+// TestUpdateLivePlayerPositionReseedsCreatureMove is the regression test for
+// the "first chase after a client walk computes its route from a stale
+// seed" review finding: updateLivePlayerPosition must reseed the player's
+// own CreatureMove, not just world.Presence, or a chase started right after
+// a client-reported walk measures distance/duration from the old spot.
+func TestUpdateLivePlayerPositionReseedsCreatureMove(t *testing.T) {
+	state := world.New()
+	moving := newTestLivePlayer(t, 1, &frameCapture{})
+	state.Spawn(moving, 0, 0, 0, 0)
+
+	gcl := &GameClientLink{world: state, log: zerolog.Nop()}
+	newPos := location.Location{X: 500, Y: 0, Z: 0}
+	gcl.updateLivePlayerPosition(moving, newPos, 0)
+
+	if got := moving.move.Position(); got != newPos {
+		t.Fatalf("CreatureMove position after updateLivePlayerPosition = %+v, want %+v", got, newPos)
+	}
+}
+
 func TestGameClientLinkWireSafeMovementAndRefreshPacketsInGame(t *testing.T) {
 	c, chars, _, state := newLinkedGameClient(t)
 

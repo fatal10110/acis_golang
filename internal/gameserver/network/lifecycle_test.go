@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 func TestGameClientLinkNormalDisconnectLogsDebug(t *testing.T) {
@@ -64,6 +65,43 @@ func TestDetachLivePlayerSavesWithUncancelledBoundedContext(t *testing.T) {
 	}
 	if pos.location != savedAt || pos.heading != 32768 {
 		t.Fatalf("saved position = %+v/%d, want %+v/32768", pos.location, pos.heading, savedAt)
+	}
+}
+
+// TestDetachLivePlayerStopsAttackIntention is the regression test for the
+// "disconnect mid-fight leaves timers running" review finding: detaching a
+// live player mid-swing must stop the attack intention before the frame
+// sender/broadcaster hooks are nulled, or a timer goroutine can still fire
+// against a half-torn-down player.
+func TestDetachLivePlayerStopsAttackIntention(t *testing.T) {
+	state := world.New()
+	attackerFrames := &frameCapture{}
+	attacker := newTestLivePlayer(t, 1, attackerFrames)
+	attacker.Character.SetWorld(state)
+	attacker.Character.SetRollSource(func(int) int { return 0 })
+	gcl := &GameClientLink{world: state, log: zerolog.Nop()}
+	wireLiveAttackHooks(gcl, attacker)
+	target := newTestHostileNPC(t, 3007)
+	target.Instance.Template.PDef = 1
+	target.Instance.Template.DEX = 30
+	target.SetRollSource(func(int) int { return 0 })
+
+	state.Spawn(attacker, 0, 0, 0, 0)
+	state.Spawn(target, 30, 0, 0, 0)
+	if !gcl.attackLiveTarget(attacker, target) {
+		t.Fatal("attackLiveTarget returned false for an in-range target")
+	}
+	if !attacker.attack.AttackingNow() {
+		t.Fatal("attack controller is not tracking the active swing before detach")
+	}
+
+	gcl.detachLivePlayer(context.Background(), attacker)
+
+	if attacker.attack.AttackingNow() {
+		t.Fatal("attack controller still tracking a swing after detach")
+	}
+	if attacker.combat.Target() != nil {
+		t.Fatalf("attack intention target = %v after detach, want nil", attacker.combat.Target())
 	}
 }
 
