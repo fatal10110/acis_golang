@@ -19,8 +19,23 @@ type Located interface {
 // plus its ability to broadcast its own movement to the world.
 type Actor interface {
 	Located
+	ObjectID() int32
+	SyncPosition(location.Location)
 	BroadcastMove(Event)
 	BroadcastStop()
+}
+
+// PositionUpdater is the moving actor surface consumed by the position
+// update task.
+type PositionUpdater interface {
+	ObjectID() int32
+	PositionUpdate() bool
+}
+
+// PositionUpdateRegistry tracks actors that need position-update ticks.
+type PositionUpdateRegistry interface {
+	Add(PositionUpdater)
+	Remove(PositionUpdater)
 }
 
 // Controller adapts one CreatureMove to the hostile NPC AI loop's expected
@@ -33,8 +48,9 @@ type Actor interface {
 // wrapped CreatureMove, which is the caller's own synchronization
 // responsibility per its doc comment.
 type Controller struct {
-	move *CreatureMove
-	self Actor
+	move            *CreatureMove
+	self            Actor
+	positionUpdates PositionUpdateRegistry
 }
 
 // NewController adapts move for self, the position/footprint of the actor
@@ -47,6 +63,23 @@ func NewController(move *CreatureMove, self Actor) (*Controller, error) {
 		return nil, errors.New("move: nil self")
 	}
 	return &Controller{move: move, self: self}, nil
+}
+
+// ObjectID returns the actor id this controller moves.
+func (c *Controller) ObjectID() int32 {
+	return c.self.ObjectID()
+}
+
+// SetPositionUpdates records the registry that should tick this controller
+// while movement is in flight.
+func (c *Controller) SetPositionUpdates(updates PositionUpdateRegistry) {
+	if c.positionUpdates != nil && c.move.Moving() {
+		c.positionUpdates.Remove(c)
+	}
+	c.positionUpdates = updates
+	if c.positionUpdates != nil && c.move.Moving() {
+		c.positionUpdates.Add(c)
+	}
 }
 
 // MaybeStartOffensiveFollow starts or refreshes a follow task toward target
@@ -99,6 +132,7 @@ func (c *Controller) MaybeStartOffensiveFollow(target attackable.Combatant, atta
 		event.FollowTarget = target.ObjectID()
 		event.FollowOffset = attackRange
 		c.self.BroadcastMove(event)
+		c.addPositionUpdate()
 	}
 	return true
 }
@@ -118,6 +152,7 @@ func (c *Controller) Stop() {
 	wasMoving := c.move.Moving() || c.move.Following()
 	c.move.CancelFollow()
 	c.move.CancelMove()
+	c.removePositionUpdate()
 	if wasMoving {
 		c.self.BroadcastStop()
 	}
@@ -127,7 +162,37 @@ func (c *Controller) Stop() {
 // started reaches its destination. A nil callback (the default) makes
 // arrival a no-op.
 func (c *Controller) SetArrived(arrived func()) {
-	c.move.SetArrivedHook(arrived)
+	c.move.SetArrivedHook(func() {
+		c.removePositionUpdate()
+		if arrived != nil {
+			arrived()
+		}
+	})
+}
+
+// PositionUpdate advances one movement correction tick and broadcasts the
+// current in-flight move. It returns false when the move has stopped.
+func (c *Controller) PositionUpdate() bool {
+	event, moving := c.move.UpdatePosition(PositionUpdateInterval)
+	if !moving {
+		c.removePositionUpdate()
+		return false
+	}
+	c.self.SyncPosition(event.Origin)
+	c.self.BroadcastMove(event)
+	return true
+}
+
+func (c *Controller) addPositionUpdate() {
+	if c.positionUpdates != nil {
+		c.positionUpdates.Add(c)
+	}
+}
+
+func (c *Controller) removePositionUpdate() {
+	if c.positionUpdates != nil {
+		c.positionUpdates.Remove(c)
+	}
 }
 
 // Position returns the actor's current server-authoritative position as

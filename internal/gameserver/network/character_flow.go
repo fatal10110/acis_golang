@@ -192,6 +192,7 @@ func (l *GameClientLink) attachLivePlayer(client *Client, c *player.Character, t
 	if err != nil {
 		return nil, fmt.Errorf("attach live player: %w", err)
 	}
+	moveCtl.SetPositionUpdates(l.positions)
 	attackCtl := attack.NewPlayer(c)
 	combat := ai.NewPlayerAttack(c, moveCtl, attackCtl)
 	attackCtl.SetFinished(combat.Think)

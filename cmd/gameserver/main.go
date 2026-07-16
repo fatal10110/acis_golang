@@ -144,6 +144,7 @@ func newGameServerApp(paths gameServerPaths) *fx.App {
 			provideSpawns,
 			provideRespawnTask,
 			provideAI,
+			providePositionUpdates,
 			provideKillRewardConfig,
 			provideSpellbookPolicy,
 			provideNpcs,
@@ -152,7 +153,7 @@ func newGameServerApp(paths gameServerPaths) *fx.App {
 			provideSkillPersistence,
 			provideGameClientLink,
 		),
-		fx.Invoke(startPvPFlags, startGroundItems, startGameClock, startWalker, startWater, startShadowItems, startDecay, startAttackStance, startWorldObjects, startRespawnTask, startAI, startNpcs, startNpcPersistence, startGameServer),
+		fx.Invoke(startPvPFlags, startGroundItems, startGameClock, startWalker, startWater, startShadowItems, startDecay, startAttackStance, startWorldObjects, startRespawnTask, startAI, startPositionUpdates, startNpcs, startNpcPersistence, startGameServer),
 	)
 }
 
@@ -652,6 +653,14 @@ func startAI(lc fx.Lifecycle, ai *task.AI, log zerolog.Logger) {
 	startTicker(lc, log, ai.Start)
 }
 
+func providePositionUpdates() *task.PositionUpdates {
+	return task.NewPositionUpdates()
+}
+
+func startPositionUpdates(lc fx.Lifecycle, positions *task.PositionUpdates, log zerolog.Logger) {
+	startTicker(lc, log, positions.Start)
+}
+
 // worldAttackStanceEffects stops an actor's attack animation once its
 // combat-stance inactivity period elapses. Actors that don't expose a
 // physical-attack controller are left alone.
@@ -761,8 +770,8 @@ func provideKillRewardConfig(paths gameServerPaths, serverProps *config.Properti
 // then wires the decay/respawn tasks' late-bound hooks to it — manager.Npcs
 // needs *task.Decay and *task.Respawn to register actors with, so those
 // tasks' own effects can only point back at Npcs after it exists.
-func provideNpcs(spawns *manager.Spawns, data *gameData, state *world.State, ids *idfactory.Allocator, decay *task.Decay, decayHooks *worldDecayEffects, respawnTask *task.Respawn, respawnHooks *npcRespawnEffects, ai *task.AI, ground *task.GroundItems, rewards manager.KillRewardConfig, log zerolog.Logger) (*manager.Npcs, error) {
-	npcs, err := manager.NewNpcs(spawns, data.NPCs, data.Geo, state, ids, decay, respawnTask, ai, data.Items, ground, rewards, time.Now, log)
+func provideNpcs(spawns *manager.Spawns, data *gameData, state *world.State, ids *idfactory.Allocator, decay *task.Decay, decayHooks *worldDecayEffects, respawnTask *task.Respawn, respawnHooks *npcRespawnEffects, ai *task.AI, positions *task.PositionUpdates, ground *task.GroundItems, rewards manager.KillRewardConfig, log zerolog.Logger) (*manager.Npcs, error) {
+	npcs, err := manager.NewNpcs(spawns, data.NPCs, data.Geo, state, ids, decay, respawnTask, ai, positions, data.Items, ground, rewards, time.Now, log)
 	if err != nil {
 		return nil, err
 	}
@@ -840,9 +849,10 @@ func provideGameClientLink(
 	ids *idfactory.Allocator,
 	ground *task.GroundItems,
 	attackStance *task.AttackStance,
+	positions *task.PositionUpdates,
 	log zerolog.Logger,
 ) *network.GameClientLink {
-	return network.NewGameClientLink(validator, links.get, roster, items, shortcuts, data.Players, data.Items, html, crests, skills, spellbooks, data.Trees, state, data.Geo, ids, ground, attackStance, log)
+	return network.NewGameClientLink(validator, links.get, roster, items, shortcuts, data.Players, data.Items, html, crests, skills, spellbooks, data.Trees, state, data.Geo, ids, ground, attackStance, positions, log)
 }
 
 func provideSkillPersistence(pool *sql.DB, data *gameData) *skillstate.Persistence {

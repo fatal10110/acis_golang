@@ -99,6 +99,15 @@ func (c *Character) SetWorld(state *world.State) {
 	c.world = state
 }
 
+// SyncPosition moves this player's live world-grid presence to position.
+func (c *Character) SyncPosition(position location.Location) {
+	c.Location = position
+	if c.world == nil {
+		return
+	}
+	_ = c.world.Move(c, position.X, position.Y, position.Z)
+}
+
 // SetFrameSender records the session send hook used by network-owned live
 // player wrappers. Passing nil disconnects the character from that session.
 func (c *Character) SetFrameSender(send func(wire.Frame) bool) {

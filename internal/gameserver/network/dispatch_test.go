@@ -820,7 +820,7 @@ func newTestGameClientLinkWithSkillsShortcutsCrestsAndLog(t *testing.T, loginLin
 	if crests == nil {
 		crests = datacache.NewCrests()
 	}
-	gcl := NewGameClientLink(validator, loginLink, roster, items, shortcuts, templates, itemTemplates, html, crests, skills, spellbooks, trees, state, testGeo{}, ids, groundItems, nil, log)
+	gcl := NewGameClientLink(validator, loginLink, roster, items, shortcuts, templates, itemTemplates, html, crests, skills, spellbooks, trees, state, testGeo{}, ids, groundItems, nil, task.NewPositionUpdates(), log)
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
