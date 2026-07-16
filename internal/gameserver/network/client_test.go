@@ -124,6 +124,7 @@ func TestAllowedAcceptsWireSafeInGameOpcodes(t *testing.T) {
 		clientpackets.OpcodeRequestAcquireSkill,
 		clientpackets.OpcodeRequestRestartPoint,
 		clientpackets.OpcodeRequestCrystallizeItem,
+		clientpackets.OpcodeRequestAllyCrest,
 		clientpackets.OpcodeRequestChangePetName,
 		clientpackets.OpcodeRequestPetUseItem,
 		clientpackets.OpcodeRequestGiveItemToPet,
