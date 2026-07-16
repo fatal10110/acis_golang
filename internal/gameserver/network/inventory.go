@@ -3,8 +3,8 @@ package network
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
@@ -25,26 +25,13 @@ func (l *GameClientLink) useItem(live *livePlayer, objectID int32) {
 	if inst == nil {
 		return
 	}
-	tmpl, ok := inv.Templates().Get(inst.TemplateID)
-	if !ok {
+	if _, ok := inv.Templates().Get(inst.TemplateID); !ok {
 		return
 	}
 	if l.useEnchantScroll(live, inst) {
 		return
 	}
-	if tmpl.Slot == item.SlotNone {
-		return
-	}
-
-	var altered []*item.Instance
-	if inst.Equipped() {
-		if old := inv.UnequipSlot(inst.LocationData); old != nil {
-			altered = []*item.Instance{old}
-		}
-	} else {
-		altered = inv.EquipItem(inst, tmpl)
-	}
-	if len(altered) == 0 {
+	if _, ok := l.inventoryService().ToggleEquipItem(inv, objectID); !ok {
 		return
 	}
 	l.sendInventoryUpdate(live, inv)
@@ -56,41 +43,42 @@ func (l *GameClientLink) handleAutoSoulShot(live *livePlayer, req clientpackets.
 		return
 	}
 	inv := live.Inventory()
-	if inv == nil || inv.ItemByTemplateID(req.ItemID) == nil {
+	if inv == nil {
+		return
+	}
+	hasItem := inv.ItemByTemplateID(req.ItemID) != nil
+
+	enabled := false
+	switch req.Type {
+	case 1:
+		enabled = true
+	case 0:
+	default:
 		return
 	}
 
-	switch req.Type {
-	case 1:
-		if fishingShot(req.ItemID) {
-			return
-		}
-		if summonShot(req.ItemID) {
-			if l.world == nil {
-				live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNoServitorCannotAutomateUse))
-				return
-			}
-			if _, hasSummon := l.world.Summon(live.ObjectID()); !hasSummon {
-				live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNoServitorCannotAutomateUse))
-				return
-			}
-		}
-		live.SetAutoSoulShot(req.ItemID, true)
-		live.SendFrame(serverpackets.FrameExAutoSoulShot(req.ItemID, true))
-		live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageUseOfItemWillBeAuto, req.ItemID))
-	case 0:
-		live.SetAutoSoulShot(req.ItemID, false)
-		live.SendFrame(serverpackets.FrameExAutoSoulShot(req.ItemID, false))
-		live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageAutoUseOfItemCancelled, req.ItemID))
+	switch live.ToggleAutoSoulShot(req.ItemID, enabled, hasItem, l.hasActiveSummon(live)) {
+	case player.AutoSoulShotToggled:
+	case player.AutoSoulShotNeedsSummon:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNoServitorCannotAutomateUse))
+		return
+	default:
+		return
 	}
+	live.SendFrame(serverpackets.FrameExAutoSoulShot(req.ItemID, enabled))
+	if enabled {
+		live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageUseOfItemWillBeAuto, req.ItemID))
+		return
+	}
+	live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageAutoUseOfItemCancelled, req.ItemID))
 }
 
-func fishingShot(itemID int32) bool {
-	return itemID >= 6535 && itemID <= 6540
-}
-
-func summonShot(itemID int32) bool {
-	return itemID >= 6645 && itemID <= 6647
+func (l *GameClientLink) hasActiveSummon(live *livePlayer) bool {
+	if l.world == nil || live == nil {
+		return false
+	}
+	_, ok := l.world.Summon(live.ObjectID())
+	return ok
 }
 
 // unequipItem clears whatever item occupies the paperdoll position that
@@ -104,11 +92,7 @@ func (l *GameClientLink) unequipItem(live *livePlayer, bodySlot int32) {
 	if inv == nil {
 		return
 	}
-	paperdollSlot, ok := item.Slot(bodySlot).PaperdollIndex()
-	if !ok {
-		return
-	}
-	if inv.UnequipSlot(paperdollSlot) == nil {
+	if _, ok := l.inventoryService().UnequipBodySlot(inv, bodySlot); !ok {
 		return
 	}
 	l.sendInventoryUpdate(live, inv)

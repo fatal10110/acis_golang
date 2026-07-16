@@ -96,6 +96,37 @@ func TestInventory_EquipItem_TwoHandedClearsOffhand(t *testing.T) {
 	}
 }
 
+func TestInventory_PackageSendableItems(t *testing.T) {
+	templates := item.NewTable([]*item.Template{
+		{ID: item.AdenaID, Kind: item.KindEtcItem, Stackable: true, Tradable: true, EtcItem: &item.EtcItemDetail{}},
+		{ID: potionTemplateID, Kind: item.KindEtcItem, Stackable: true, Tradable: true, EtcItem: &item.EtcItemDetail{}},
+		{ID: 300, Kind: item.KindEtcItem, Stackable: true, Tradable: true, EtcItem: &item.EtcItemDetail{Type: item.EtcItemQuest}},
+		{ID: 400, Kind: item.KindEtcItem, Stackable: true, Tradable: false, EtcItem: &item.EtcItemDetail{}},
+		{ID: 600, Kind: item.KindEtcItem, Tradable: true, EtcItem: &item.EtcItemDetail{}},
+		{ID: 601, Kind: item.KindEtcItem, Tradable: true, EtcItem: &item.EtcItemDetail{}},
+	})
+	inv := NewPlayerInventory(1, templates)
+	inv.AddNew(item.AdenaID, 100, 500)
+	inv.AddNew(potionTemplateID, 3, 501)
+	equipped := inv.AddNew(600, 1, 502)
+	warehouse := inv.AddNew(601, 1, 503)
+	inv.AddNew(300, 1, 504)
+	inv.AddNew(400, 1, 505)
+	missing := &item.Instance{ObjectID: 506, TemplateID: 999, Count: 1}
+	inv.Add(missing)
+
+	equipped.Location = item.LocationPaperdoll
+	warehouse.Location = item.LocationWarehouse
+
+	items := inv.PackageSendableItems()
+	if len(items) != 2 {
+		t.Fatalf("PackageSendableItems() returned %d items, want 2", len(items))
+	}
+	if items[0].ObjectID != 500 || items[1].ObjectID != 501 {
+		t.Fatalf("PackageSendableItems() object ids = %d,%d; want 500,501", items[0].ObjectID, items[1].ObjectID)
+	}
+}
+
 func TestInventory_EquipItem_OneHandedClearsExistingTwoHanded(t *testing.T) {
 	f := newEquipFixture()
 	f.equip(twoHandID)

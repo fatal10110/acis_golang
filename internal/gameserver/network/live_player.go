@@ -7,6 +7,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -15,7 +16,7 @@ type livePlayer struct {
 	template  *player.Template
 	items     []*item.Instance
 	target    world.Tracked
-	throne    staticChairObject
+	throne    staticobject.Chair
 	attack    *attack.Controller
 	cast      *actorcast.Controller
 	shortcuts *shortcut.List
@@ -46,7 +47,7 @@ func (p *livePlayer) attackController() *attack.Controller {
 
 func (p *livePlayer) castController() *actorcast.Controller {
 	if p.cast == nil {
-		p.cast = actorcast.NewController(liveCastActor{live: p})
+		p.cast = actorcast.NewController(actorcast.PlayerActor{Character: p.Character})
 	}
 	return p.cast
 }

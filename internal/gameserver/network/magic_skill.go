@@ -6,45 +6,36 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
-	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets.RequestMagicSkillUse) {
-	if live == nil || live.AlikeDead() || req.SkillID <= 0 {
+	if live == nil {
 		sendMagicActionFailed(live)
 		return
 	}
 
-	level := live.SkillLevel(int(req.SkillID))
-	if level <= 0 || l.skills == nil {
-		sendMagicActionFailed(live)
-		return
-	}
-
-	def, ok := l.skills.definition(modelskill.Ref{ID: modelskill.ID(req.SkillID), Level: level})
-	if !ok || def.Activation != modelskill.ActivationActive {
-		sendMagicActionFailed(live)
-		return
-	}
-
-	target, ok := magicSkillTarget(live, def)
-	if !ok {
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageInvalidTarget))
-		sendMagicActionFailed(live)
-		return
-	}
-
-	beforeHP, beforeMP := int(live.CurHP), int(live.CurMP)
+	beforeVitals := live.Vitals()
 	controller := live.castController()
-	plan, err := controller.Start(time.Now(), target, def)
+	started, err := actorcast.StartPlayerSkill(actorcast.PlayerSkillRequest{
+		Now:         time.Now(),
+		Controller:  controller,
+		Caster:      live.Character,
+		Selected:    live.target,
+		SkillID:     int(req.SkillID),
+		Definitions: l.skills,
+	})
 	if err != nil {
-		sendMagicCastFailure(live, def, err)
+		sendMagicCastFailure(live, started.Definition, err)
 		return
 	}
+	def := started.Definition
+	target := started.Target
+	plan := started.Plan
 
 	casterObject := skillCastObject(live)
 	targetObject := skillCastObject(target)
@@ -71,32 +62,15 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 
 	if err := controller.Hit(); err != nil {
 		sendMagicCastFailure(live, def, err)
-		sendMagicStatusUpdate(live, beforeHP, beforeMP)
+		sendMagicStatusUpdate(live, beforeVitals)
 		controller.Stop()
 		return
 	}
-	sendMagicStatusUpdate(live, beforeHP, beforeMP)
+	sendMagicStatusUpdate(live, beforeVitals)
 	controller.Finish()
 }
 
-type skillCastTarget interface {
-	world.Tracked
-	Position() (x, y, z int)
-}
-
-func magicSkillTarget(live *livePlayer, def modelskill.Definition) (skillCastTarget, bool) {
-	switch def.Target {
-	case modelskill.TargetNone, modelskill.TargetSelf, modelskill.TargetGround:
-		return live, true
-	case modelskill.TargetOne:
-		if target, ok := live.target.(skillCastTarget); ok {
-			return target, true
-		}
-	}
-	return nil, false
-}
-
-func skillCastObject(obj skillCastTarget) serverpackets.SkillCastObject {
+func skillCastObject(obj actorcast.Target) serverpackets.SkillCastObject {
 	x, y, z := obj.Position()
 	return serverpackets.SkillCastObject{
 		ObjectID: obj.ObjectID(),
@@ -129,107 +103,30 @@ func sendMagicActionFailed(live *livePlayer) {
 	}
 }
 
-func sendMagicStatusUpdate(live *livePlayer, beforeHP, beforeMP int) {
+func sendMagicStatusUpdate(live *livePlayer, before player.Vitals) {
 	if live == nil {
 		return
 	}
-	attrs := make([]serverpackets.StatusAttribute, 0, 2)
-	if hp := int(live.CurHP); hp != beforeHP {
-		attrs = append(attrs, serverpackets.StatusAttribute{Type: serverpackets.StatusCurrentHP, Value: hp})
-	}
-	if mp := int(live.CurMP); mp != beforeMP {
-		attrs = append(attrs, serverpackets.StatusAttribute{Type: serverpackets.StatusCurrentMP, Value: mp})
-	}
+	attrs := magicStatusAttributes(before.ChangesTo(live.Vitals()))
 	if len(attrs) > 0 {
 		live.SendFrame(serverpackets.FrameStatusUpdate(live.ObjectID(), attrs))
 	}
 }
 
+func magicStatusAttributes(change player.VitalsChange) []serverpackets.StatusAttribute {
+	if !change.Changed() {
+		return nil
+	}
+	attrs := make([]serverpackets.StatusAttribute, 0, 2)
+	if change.HPChanged {
+		attrs = append(attrs, serverpackets.StatusAttribute{Type: serverpackets.StatusCurrentHP, Value: change.HP})
+	}
+	if change.MPChanged {
+		attrs = append(attrs, serverpackets.StatusAttribute{Type: serverpackets.StatusCurrentMP, Value: change.MP})
+	}
+	return attrs
+}
+
 func millis(d time.Duration) int {
 	return int(d / time.Millisecond)
-}
-
-type liveCastActor struct {
-	live *livePlayer
-}
-
-func (a liveCastActor) AttackSpeed(bool) int {
-	if a.live == nil {
-		return 1
-	}
-	return a.live.AttackSpeed()
-}
-
-func (a liveCastActor) ReuseRate(bool) float64 { return 1 }
-
-func (a liveCastActor) MP() int {
-	if a.live == nil {
-		return 0
-	}
-	return int(a.live.CurMP)
-}
-
-func (a liveCastActor) HP() int {
-	if a.live == nil {
-		return 0
-	}
-	return int(a.live.CurHP)
-}
-
-func (liveCastActor) MPInitialCost(def modelskill.Definition) int { return def.MPInitialConsume }
-
-func (liveCastActor) MPCost(def modelskill.Definition) int { return def.MPConsume }
-
-func (a liveCastActor) ReduceMP(amount int) {
-	if a.live == nil || amount <= 0 {
-		return
-	}
-	a.live.CurMP = max(0, a.live.CurMP-float64(amount))
-}
-
-func (a liveCastActor) ReduceHP(amount int) {
-	if a.live == nil || amount <= 0 {
-		return
-	}
-	a.live.CurHP = max(0, a.live.CurHP-float64(amount))
-}
-
-func (a liveCastActor) SkillDisabled(key int32) bool {
-	return a.live != nil && a.live.SkillDisabled(key)
-}
-
-func (a liveCastActor) DisableSkill(key int32, delay time.Duration) {
-	if a.live != nil {
-		a.live.DisableSkill(key, delay)
-	}
-}
-
-func (a liveCastActor) AddSkillReuse(ref modelskill.Ref, key int32, delay time.Duration) {
-	if a.live != nil {
-		a.live.AddSkillReuse(ref, key, delay)
-	}
-}
-
-func (liveCastActor) MagicMuted() bool { return false }
-
-func (liveCastActor) PhysicalMuted() bool { return false }
-
-func (liveCastActor) SpiritshotCharged() bool { return false }
-
-func (liveCastActor) BlessedSpiritshotCharged() bool { return false }
-
-func (liveCastActor) SkillMastery(modelskill.Definition) bool { return false }
-
-func (a liveCastActor) ItemCount(itemID int) int {
-	if a.live == nil || a.live.Inventory() == nil {
-		return 0
-	}
-	return a.live.Inventory().ItemCount(int32(itemID), -1, true)
-}
-
-func (a liveCastActor) ConsumeItem(itemID, count int) bool {
-	if a.live == nil || a.live.Inventory() == nil {
-		return false
-	}
-	return a.live.Inventory().DestroyByTemplateID(int32(itemID), count) != nil
 }

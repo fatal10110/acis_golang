@@ -110,3 +110,26 @@ const (
 	// ReceiverSlotsFull means the offer would exceed the receiver's slot limit.
 	ReceiverSlotsFull
 )
+
+// SettlementStatus describes whether a ready direct-trade session was exchanged.
+type SettlementStatus uint8
+
+const (
+	// SettlementOK means both offers were exchanged.
+	SettlementOK SettlementStatus = iota
+	// SettlementEmpty means neither participant offered an item.
+	SettlementEmpty
+	// SettlementInvalidItems means an offered item is no longer valid.
+	SettlementInvalidItems
+	// SettlementWeightExceeded means a receiver cannot carry the partner's offer.
+	SettlementWeightExceeded
+	// SettlementSlotsFull means a receiver lacks slots for the partner's offer.
+	SettlementSlotsFull
+	// SettlementTransferFailed means an inventory mutation failed during exchange.
+	SettlementTransferFailed
+)
+
+// SettlementResult is returned after committing a ready direct-trade session.
+type SettlementResult struct {
+	Status SettlementStatus
+}

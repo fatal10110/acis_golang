@@ -106,6 +106,44 @@ func TestBookConfirmReturnsCommitSnapshot(t *testing.T) {
 	}
 }
 
+func TestSettleTransfersReadySession(t *testing.T) {
+	book := NewBook(time.Now)
+	first := newTradeInventory(1)
+	second := newTradeInventory(2)
+	stack := first.AddNew(item.AdenaID, 100, 500)
+
+	book.Request(1, 2)
+	book.Answer(2, true)
+	if res := book.AddItem(1, first, stack.ObjectID, 40); res.Status != AddAccepted {
+		t.Fatalf("Add status = %v, want accepted", res.Status)
+	}
+	book.Confirm(1)
+	ready := book.Confirm(2)
+	if ready.Status != DoneReady {
+		t.Fatalf("Confirm status = %v, want ready", ready.Status)
+	}
+
+	transfers := 0
+	result := Settle(ready.Session, first, second, func(source, receiver *itemcontainer.Inventory, objectID int32, count int) bool {
+		transfers++
+		moved, _, _ := source.TransferItem(objectID, count, receiver, 900)
+		return moved != nil
+	})
+
+	if result.Status != SettlementOK {
+		t.Fatalf("Settle status = %v, want ok", result.Status)
+	}
+	if transfers != 1 {
+		t.Fatalf("transfers = %d, want 1", transfers)
+	}
+	if got := first.ItemByObjectID(stack.ObjectID).Count; got != 60 {
+		t.Fatalf("first adena count = %d, want 60", got)
+	}
+	if got := second.ItemCount(item.AdenaID, -1, true); got != 40 {
+		t.Fatalf("second adena count = %d, want 40", got)
+	}
+}
+
 func newTradeInventory(ownerID int32) *itemcontainer.Inventory {
 	return itemcontainer.NewPlayerInventory(ownerID, tradeTemplates())
 }

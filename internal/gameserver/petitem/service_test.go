@@ -5,6 +5,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 )
@@ -15,6 +16,10 @@ func (ids *testIDs) NextID() (int32, error) {
 	ids.next++
 	return ids.next, nil
 }
+
+type testOwner struct{ x, y, z int }
+
+func (o testOwner) Position() (int, int, int) { return o.x, o.y, o.z }
 
 func TestForbiddenForPetRejectsNonDropableItem(t *testing.T) {
 	tmpl := &item.Template{ID: 9000, Kind: item.KindEtcItem, Dropable: false, Destroyable: true, Tradable: true, EtcItem: &item.EtcItemDetail{}}
@@ -34,7 +39,7 @@ func TestGiveToPetTransfersAndReportsPersistence(t *testing.T) {
 	playerInv.DrainUpdates()
 	petInv.DrainUpdates()
 
-	res, failure, err := NewService(&testIDs{next: 900}).GiveToPet(playerInv, petInv, pet, stack.ObjectID, 30, true)
+	res, failure, err := NewService(&testIDs{next: 900}).GiveToPet(playerInv, petInv, pet, testOwner{}, stack.ObjectID, 30)
 	if err != nil {
 		t.Fatalf("GiveToPet error = %v", err)
 	}
@@ -59,7 +64,7 @@ func TestGiveToPetChecksCapacityBeforeMutation(t *testing.T) {
 	pet := summon.NewPet(summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv})
 	inst := playerInv.AddNew(30, 1, 500)
 
-	_, failure, err := NewService(nil).GiveToPet(playerInv, petInv, pet, inst.ObjectID, 1, true)
+	_, failure, err := NewService(nil).GiveToPet(playerInv, petInv, pet, testOwner{}, inst.ObjectID, 1)
 	if err != nil {
 		t.Fatalf("GiveToPet error = %v", err)
 	}
@@ -68,6 +73,52 @@ func TestGiveToPetChecksCapacityBeforeMutation(t *testing.T) {
 	}
 	if playerInv.ItemByObjectID(inst.ObjectID) == nil {
 		t.Fatal("item moved despite capacity failure")
+	}
+}
+
+func TestGiveToPetChecksDistanceBeforeMutation(t *testing.T) {
+	templates := testTemplates()
+	playerInv := itemcontainer.NewPlayerInventory(1, templates)
+	petInv := itemcontainer.NewPetInventory(2, templates)
+	pet := summon.NewPet(summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv})
+	stack := playerInv.AddNew(item.AdenaID, 100, 500)
+
+	_, failure, err := NewService(nil).GiveToPet(playerInv, petInv, pet, testOwner{x: GiveInteractionDistance + 1}, stack.ObjectID, 30)
+	if err != nil {
+		t.Fatalf("GiveToPet error = %v", err)
+	}
+	if failure != GiveTooFar {
+		t.Fatalf("GiveToPet failure = %v, want too far", failure)
+	}
+	if stack.Count != 100 || petInv.ItemByTemplateID(item.AdenaID) != nil {
+		t.Fatalf("too-far transfer mutated source=%+v petStack=%+v", stack, petInv.ItemByTemplateID(item.AdenaID))
+	}
+}
+
+func TestPickupGroundItemAddsToPetAndReportsPersistence(t *testing.T) {
+	templates := testTemplates()
+	petInv := itemcontainer.NewPetInventory(2, templates)
+	pet := summon.NewPet(summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv})
+	tmpl, ok := templates.Get(item.AdenaID)
+	if !ok {
+		t.Fatal("adena template missing")
+	}
+	ground, err := grounditem.New(item.Instance{ObjectID: 900, TemplateID: item.AdenaID, Count: 40, ManaLeft: -1}, tmpl)
+	if err != nil {
+		t.Fatalf("ground item: %v", err)
+	}
+
+	res, failure := PickupGround(pet, petInv, ground)
+
+	if failure != PickupOK {
+		t.Fatalf("PickupGround failure = %v, want OK", failure)
+	}
+	petStack := petInv.ItemByTemplateID(item.AdenaID)
+	if petStack == nil || petStack.ObjectID != ground.ObjectID() || petStack.Count != 40 || petStack.OwnerID != 2 || petStack.Location != item.LocationPet {
+		t.Fatalf("pet stack = %+v, want picked ground item", petStack)
+	}
+	if len(res.Persist) != 1 || res.Persist[0].Action != inventory.PersistSave || res.Persist[0].Item != petStack {
+		t.Fatalf("persist actions = %+v, want save picked stack", res.Persist)
 	}
 }
 

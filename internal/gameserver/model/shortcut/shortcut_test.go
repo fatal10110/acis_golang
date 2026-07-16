@@ -31,6 +31,49 @@ func TestListDeleteRemovesSlot(t *testing.T) {
 	}
 }
 
+func TestNewRegistrationValidatesTypePageAndSkillLevel(t *testing.T) {
+	skillLevels := func(id int32) int {
+		if id == 248 {
+			return 3
+		}
+		return 0
+	}
+
+	sc, ok := NewRegistration(3, 1, Skill, 248, 1, skillLevels)
+	if !ok {
+		t.Fatal("NewRegistration returned false for known skill")
+	}
+	if sc != (Shortcut{Slot: 3, Page: 1, Type: Skill, ID: 248, Level: 3, CharacterType: 1}) {
+		t.Fatalf("NewRegistration skill = %+v, want skill level 3", sc)
+	}
+
+	sc, ok = NewRegistration(4, 1, Item, 57, 1, nil)
+	if !ok {
+		t.Fatal("NewRegistration returned false for item shortcut")
+	}
+	if sc.Level != -1 {
+		t.Fatalf("item shortcut level = %d, want -1", sc.Level)
+	}
+
+	for _, tt := range []struct {
+		name string
+		page int32
+		typ  Type
+		id   int32
+	}{
+		{"negative page", -1, Item, 57},
+		{"high page", 11, Item, 57},
+		{"bad type", 0, None, 57},
+		{"unknown skill", 0, Skill, 999},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if _, ok := NewRegistration(1, tt.page, tt.typ, tt.id, 1, skillLevels); ok {
+				t.Fatal("NewRegistration returned true, want false")
+			}
+		})
+	}
+}
+
 func TestTypeStringsRoundTrip(t *testing.T) {
 	for _, typ := range []Type{Item, Skill, Action, Macro, Recipe} {
 		got, ok := ParseType(typ.String())

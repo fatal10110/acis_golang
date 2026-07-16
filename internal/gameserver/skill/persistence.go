@@ -1,4 +1,4 @@
-package network
+package skill
 
 import (
 	"context"
@@ -25,42 +25,47 @@ type skillLevelWriter interface {
 	SetKnownSkill(ctx context.Context, charObjID int32, classIndex int32, skillID int, level int) error
 }
 
-// SkillPersistence saves and restores a live player's buff and skill-reuse
-// state at the game-client lifecycle boundary.
-type SkillPersistence struct {
+// Persistence saves and restores a live player's buff and skill-reuse state.
+type Persistence struct {
 	store  skillSaveStore
 	levels skillLevelStore
 	skills *modelskill.Table
 	now    func() time.Time
 }
 
-// NewSkillPersistence returns a lifecycle persistence component backed by
-// store and the loaded skill table.
-func NewSkillPersistence(store skillSaveStore, skills *modelskill.Table, levels ...skillLevelStore) *SkillPersistence {
-	p := &SkillPersistence{store: store, skills: skills, now: time.Now}
+// NewPersistence returns a lifecycle persistence component backed by store and
+// the loaded skill table.
+func NewPersistence(store skillSaveStore, skills *modelskill.Table, levels ...skillLevelStore) *Persistence {
+	return NewPersistenceWithClock(store, skills, time.Now, levels...)
+}
+
+// NewPersistenceWithClock returns a lifecycle persistence component using now
+// as its time source.
+func NewPersistenceWithClock(store skillSaveStore, skills *modelskill.Table, now func() time.Time, levels ...skillLevelStore) *Persistence {
+	p := &Persistence{store: store, skills: skills, now: now}
 	if len(levels) > 0 {
 		p.levels = levels[0]
 	}
 	return p
 }
 
-// Save replaces c's persisted skill state with its current active effects
-// and pending reuse timers.
-func (p *SkillPersistence) Save(ctx context.Context, c *player.Character, includeEffects bool) error {
+// Save replaces c's persisted skill state with its current active effects and
+// pending reuse timers.
+func (p *Persistence) Save(ctx context.Context, c *player.Character, includeEffects bool) error {
 	if p == nil || p.store == nil || c == nil {
 		return nil
 	}
 	classIndex := c.SkillSaveClassIndex()
-	rows := effect.BuildSaveRows(c.ActiveSkillEffects(), c.SkillReuseTimers(p.now()), classIndex, includeEffects)
+	rows := effect.BuildSaveRows(c.ActiveSkillEffects(), c.SkillReuseTimers(p.currentTime()), classIndex, includeEffects)
 	if err := p.store.Replace(ctx, c.ID, classIndex, rows); err != nil {
 		return fmt.Errorf("save skill state for character %d: %w", c.ID, err)
 	}
 	return nil
 }
 
-// Restore consumes c's persisted skill state, reinstating pending reuse
-// timers and effect rows whose skill definitions still exist.
-func (p *SkillPersistence) Restore(ctx context.Context, c *player.Character) error {
+// Restore consumes c's persisted skill state, reinstating pending reuse timers
+// and effect rows whose skill definitions still exist.
+func (p *Persistence) Restore(ctx context.Context, c *player.Character) error {
 	if p == nil || c == nil {
 		return nil
 	}
@@ -75,7 +80,7 @@ func (p *SkillPersistence) Restore(ctx context.Context, c *player.Character) err
 	if err != nil {
 		return fmt.Errorf("restore skill state for character %d: %w", c.ID, err)
 	}
-	plan := effect.BuildRestorePlan(rows, p.now().UnixMilli(), p.lookup)
+	plan := effect.BuildRestorePlan(rows, p.currentTime().UnixMilli(), p.lookup)
 	for _, reuse := range plan.Reuse {
 		def, ok := p.definition(reuse.Skill)
 		if !ok {
@@ -98,7 +103,7 @@ func (p *SkillPersistence) Restore(ctx context.Context, c *player.Character) err
 
 // SetKnownSkill records one learned skill on the character and, when the
 // backing store can write character_skills, persists it first.
-func (p *SkillPersistence) SetKnownSkill(ctx context.Context, c *player.Character, skillID, level int) error {
+func (p *Persistence) SetKnownSkill(ctx context.Context, c *player.Character, skillID, level int) error {
 	if c == nil {
 		return nil
 	}
@@ -114,7 +119,18 @@ func (p *SkillPersistence) SetKnownSkill(ctx context.Context, c *player.Characte
 	return nil
 }
 
-func (p *SkillPersistence) restoreKnownSkills(ctx context.Context, c *player.Character, classIndex int32) error {
+// Definition returns a loaded skill definition.
+func (p *Persistence) Definition(ref modelskill.Ref) (modelskill.Definition, bool) {
+	return p.definition(ref)
+}
+
+// HasDefinition reports whether a skill definition is loaded.
+func (p *Persistence) HasDefinition(ref modelskill.Ref) bool {
+	_, ok := p.definition(ref)
+	return ok
+}
+
+func (p *Persistence) restoreKnownSkills(ctx context.Context, c *player.Character, classIndex int32) error {
 	if p.levels == nil {
 		return nil
 	}
@@ -136,7 +152,7 @@ func (p *SkillPersistence) restoreKnownSkills(ctx context.Context, c *player.Cha
 	return nil
 }
 
-func (p *SkillPersistence) lookup(ref modelskill.Ref) (bool, bool) {
+func (p *Persistence) lookup(ref modelskill.Ref) (bool, bool) {
 	def, ok := p.definition(ref)
 	if !ok {
 		return false, false
@@ -144,14 +160,16 @@ func (p *SkillPersistence) lookup(ref modelskill.Ref) (bool, bool) {
 	return true, len(def.Effects) > 0 || len(def.SelfEffects) > 0
 }
 
-func (p *SkillPersistence) definition(ref modelskill.Ref) (modelskill.Definition, bool) {
+func (p *Persistence) definition(ref modelskill.Ref) (modelskill.Definition, bool) {
 	if p == nil || p.skills == nil {
 		return modelskill.Definition{}, false
 	}
 	return p.skills.Get(ref.ID, ref.Level)
 }
 
-func (p *SkillPersistence) hasDefinition(ref modelskill.Ref) bool {
-	_, ok := p.definition(ref)
-	return ok
+func (p *Persistence) currentTime() time.Time {
+	if p != nil && p.now != nil {
+		return p.now()
+	}
+	return time.Now()
 }

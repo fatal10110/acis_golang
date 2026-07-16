@@ -369,7 +369,7 @@ func (c *Character) WeaponMPConsume() int {
 
 // MP returns current MP as an integer for attack gating.
 func (c *Character) MP() int {
-	return int(c.CurMP)
+	return c.CurrentMP()
 }
 
 // CurrentHP returns current HP through the health component guard.

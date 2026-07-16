@@ -5,7 +5,15 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
+
+// GiveInteractionDistance is the maximum owner-pet distance for item transfers.
+const GiveInteractionDistance = 150
+
+type positioned interface {
+	Position() (int, int, int)
+}
 
 // GiveFailure is the non-mutating reason a give-to-pet request failed.
 type GiveFailure uint8
@@ -74,7 +82,7 @@ func NewService(ids inventory.IDAllocator) *Service {
 }
 
 // GiveToPet validates and transfers one item from an owner inventory to a pet inventory.
-func (s *Service) GiveToPet(playerInv, petInv *itemcontainer.Inventory, pet *summon.Actor, objectID int32, count int, inRange bool) (TransferResult, GiveFailure, error) {
+func (s *Service) GiveToPet(playerInv, petInv *itemcontainer.Inventory, pet *summon.Actor, owner positioned, objectID int32, count int) (TransferResult, GiveFailure, error) {
 	if playerInv == nil || petInv == nil || pet == nil || count <= 0 {
 		return TransferResult{}, GiveNoop, nil
 	}
@@ -92,7 +100,7 @@ func (s *Service) GiveToPet(playerInv, petInv *itemcontainer.Inventory, pet *sum
 	if pet.Dead() {
 		return TransferResult{}, GiveDeadPet, nil
 	}
-	if !inRange {
+	if !withinGiveRange(owner, pet) {
 		return TransferResult{}, GiveTooFar, nil
 	}
 	if !petInv.ValidateCapacity(petInv.SlotsNeededFor(inst, tmpl)) {
@@ -102,6 +110,15 @@ func (s *Service) GiveToPet(playerInv, petInv *itemcontainer.Inventory, pet *sum
 		return TransferResult{}, GivePetTooEncumbered, nil
 	}
 	return s.transfer(playerInv, petInv, objectID, count)
+}
+
+func withinGiveRange(owner positioned, pet *summon.Actor) bool {
+	if owner == nil || pet == nil {
+		return false
+	}
+	ax, ay, az := owner.Position()
+	bx, by, bz := pet.Position()
+	return location.In3DRange(ax, ay, az, bx, by, bz, GiveInteractionDistance)
 }
 
 // GetFromPet transfers one item from a pet inventory to its owner's inventory.

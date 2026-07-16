@@ -8,22 +8,10 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
-
-const (
-	chairStaticObjectType    = 1
-	chairInteractionDistance = 150
-)
-
-type staticChairObject interface {
-	world.Tracked
-	Position() (int, int, int)
-	StaticObjectID() int
-	Type() int
-	SetBusy(bool) bool
-}
 
 func (l *GameClientLink) broadcastAttack(attacker *livePlayer, snapshot attack.Snapshot) {
 	if attacker == nil {
@@ -100,14 +88,14 @@ func (l *GameClientLink) showOwnedPetStatus(live *livePlayer, target world.Track
 }
 
 func (l *GameClientLink) sitLiveOnChair(live *livePlayer, target world.Tracked) bool {
-	chair, ok := target.(staticChairObject)
-	if !ok || live == nil || live.AlikeDead() || !live.Standing() {
+	if live == nil {
 		return false
 	}
-	if chair.Type() != chairStaticObjectType || !in3DInteractionRange(live, chair, chairInteractionDistance) {
-		return false
-	}
-	if !chair.SetBusy(true) {
+	chair, ok := target.(interface {
+		staticobject.Chair
+		StaticObjectID() int
+	})
+	if !ok || !staticobject.ClaimChair(live, chair, staticobject.ChairInteractionDistance) {
 		return false
 	}
 	live.throne = chair
@@ -119,12 +107,6 @@ func (l *GameClientLink) sitLiveOnChair(live *livePlayer, target world.Tracked) 
 		return serverpackets.FrameChairSit(live.ObjectID(), chair.StaticObjectID())
 	})
 	return true
-}
-
-func in3DInteractionRange(a, b interface{ Position() (int, int, int) }, radius int) bool {
-	ax, ay, az := a.Position()
-	bx, by, bz := b.Position()
-	return location.In3DRange(ax, ay, az, bx, by, bz, radius)
 }
 
 func (l *GameClientLink) selectLiveTarget(live *livePlayer, target world.Tracked) bool {

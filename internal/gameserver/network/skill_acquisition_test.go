@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 )
 
 // testBookPolicy maps the test template's skill 3 to Adena (item id 57), so
@@ -25,7 +26,7 @@ func testBookPolicy(t *testing.T) modelskill.BookPolicy {
 
 // newAcquireSkillClient wires a linked client with a spellbook policy and one
 // selectable character at level 5 with sp sp.
-func newAcquireSkillClient(t *testing.T, skills *SkillPersistence, policy modelskill.BookPolicy, trees *modelskill.Trees, sp int, seedItems func(*fakeItemStore, int32)) *fakeGameClient {
+func newAcquireSkillClient(t *testing.T, skills *skillstate.Persistence, policy modelskill.BookPolicy, trees *modelskill.Trees, sp int, seedItems func(*fakeItemStore, int32)) *fakeGameClient {
 	t.Helper()
 	var objID int32
 	c, _, _, _, _ := newLinkedGameClientWithSkillsShortcutsCrestsSeed(t, skills, nil, nil, policy, trees, func(chars *fakeCharStore, items *fakeItemStore) {
@@ -47,7 +48,7 @@ func newAcquireSkillClient(t *testing.T, skills *SkillPersistence, policy models
 // matches the oracle tuple (type 99, book item id, count 1, unk 50).
 func TestAcquireSkillInfoIncludesSpellbookRequirement(t *testing.T) {
 	store := newMemorySkillSaveStore()
-	skills := NewSkillPersistence(store, modelskill.NewTable([]modelskill.Definition{
+	skills := skillstate.NewPersistence(store, modelskill.NewTable([]modelskill.Definition{
 		{ID: 3, Level: 1, Activation: modelskill.ActivationActive},
 	}), store)
 	c := newAcquireSkillClient(t, skills, testBookPolicy(t), nil, 50, nil)
@@ -77,7 +78,7 @@ func TestAcquireSkillInfoIncludesSpellbookRequirement(t *testing.T) {
 // item-missing system message and the skill list, without learning the skill.
 func TestAcquireSkillLearnBlockedByMissingSpellbook(t *testing.T) {
 	store := newMemorySkillSaveStore()
-	skills := NewSkillPersistence(store, modelskill.NewTable([]modelskill.Definition{
+	skills := skillstate.NewPersistence(store, modelskill.NewTable([]modelskill.Definition{
 		{ID: 3, Level: 1, Activation: modelskill.ActivationActive},
 	}), store)
 	c := newAcquireSkillClient(t, skills, testBookPolicy(t), nil, 50, nil)
@@ -134,7 +135,7 @@ func TestGameClientLinkSendsSkillCoolTimeInGame(t *testing.T) {
 
 func TestGameClientLinkAcquireSkillInfoAndLearnGeneralSkill(t *testing.T) {
 	store := newMemorySkillSaveStore()
-	skills := NewSkillPersistence(store, modelskill.NewTable([]modelskill.Definition{
+	skills := skillstate.NewPersistence(store, modelskill.NewTable([]modelskill.Definition{
 		{ID: 3, Level: 1, Activation: modelskill.ActivationActive},
 	}), store)
 	var objID int32
@@ -201,7 +202,7 @@ func TestGameClientLinkAcquireSkillInfoAndLearnGeneralSkill(t *testing.T) {
 
 func TestGameClientLinkAcquireSkillNeedsSP(t *testing.T) {
 	store := newMemorySkillSaveStore()
-	skills := NewSkillPersistence(store, modelskill.NewTable([]modelskill.Definition{
+	skills := skillstate.NewPersistence(store, modelskill.NewTable([]modelskill.Definition{
 		{ID: 3, Level: 1, Activation: modelskill.ActivationActive},
 	}), store)
 	var objID int32
@@ -251,18 +252,18 @@ func fishingTrees() *modelskill.Trees {
 	}}
 }
 
-func fishingSkills(t *testing.T) *SkillPersistence {
+func fishingSkills(t *testing.T) *skillstate.Persistence {
 	t.Helper()
 	store := newMemorySkillSaveStore()
-	return NewSkillPersistence(store, modelskill.NewTable([]modelskill.Definition{
+	return skillstate.NewPersistence(store, modelskill.NewTable([]modelskill.Definition{
 		{ID: 1368, Level: 1, Activation: modelskill.ActivationActive},
 	}), store)
 }
 
-func enterFishingClient(t *testing.T, trees *modelskill.Trees, skills *SkillPersistence, seedItems func(*fakeItemStore, int32)) (*fakeGameClient, *memorySkillSaveStore, int32) {
+func enterFishingClient(t *testing.T, trees *modelskill.Trees, skills *skillstate.Persistence, seedItems func(*fakeItemStore, int32)) (*fakeGameClient, *memorySkillSaveStore, int32) {
 	t.Helper()
 	store := newMemorySkillSaveStore()
-	pers := NewSkillPersistence(store, modelskill.NewTable([]modelskill.Definition{
+	pers := skillstate.NewPersistence(store, modelskill.NewTable([]modelskill.Definition{
 		{ID: 1368, Level: 1, Activation: modelskill.ActivationActive},
 	}), store)
 	var objID int32

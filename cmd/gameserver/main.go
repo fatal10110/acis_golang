@@ -41,6 +41,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
+	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/fatal10110/acis_golang/internal/link"
@@ -832,7 +833,7 @@ func provideGameClientLink(
 	crests *datacache.Crests,
 	validator *network.SessionValidator,
 	links *loginLinkState,
-	skills *network.SkillPersistence,
+	skills *skillstate.Persistence,
 	spellbooks skill.BookPolicy,
 	skillTrees *skill.Trees,
 	state *world.State,
@@ -844,8 +845,8 @@ func provideGameClientLink(
 	return network.NewGameClientLink(validator, links.get, roster, items, shortcuts, data.Players, data.Items, html, crests, skills, spellbooks, data.Trees, state, ids, ground, attackStance, log)
 }
 
-func provideSkillPersistence(pool *sql.DB, data *gameData) *network.SkillPersistence {
-	return network.NewSkillPersistence(gamesql.NewSkillSaveStore(pool), data.Skills, gamesql.NewCharacterSkillStore(pool))
+func provideSkillPersistence(pool *sql.DB, data *gameData) *skillstate.Persistence {
+	return skillstate.NewPersistence(gamesql.NewSkillSaveStore(pool), data.Skills, gamesql.NewCharacterSkillStore(pool))
 }
 
 func provideSpellbookPolicy(paths gameServerPaths, data *gameData) (skill.BookPolicy, error) {

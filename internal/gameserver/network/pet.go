@@ -4,11 +4,9 @@ import (
 	"context"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
-	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/petitem"
@@ -43,7 +41,7 @@ func (l *GameClientLink) giveItemToPet(ctx context.Context, live *livePlayer, re
 	if playerInv == nil {
 		return
 	}
-	res, failure, err := l.petItemService().GiveToPet(playerInv, petInv, pet, req.ObjectID, int(req.Count), withinInteractionDistance(live, pet))
+	res, failure, err := l.petItemService().GiveToPet(playerInv, petInv, pet, live, req.ObjectID, int(req.Count))
 	if err != nil {
 		l.log.Error().Err(err).Msg("transfer item to pet")
 		return
@@ -108,7 +106,7 @@ func (l *GameClientLink) petGetItem(ctx context.Context, live *livePlayer, req c
 	if !ok {
 		return
 	}
-	if pet.Dead() || pet.OutOfControl() {
+	if !petitem.PickupAvailable(pet) {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
@@ -121,33 +119,30 @@ func (l *GameClientLink) petGetItem(ctx context.Context, live *livePlayer, req c
 		return
 	}
 
-	picked := ground.Instance
-	if petitem.ForbiddenForPet(&picked, ground.Template) {
+	result, failure := petitem.PickupGround(pet, petInv, ground)
+	switch failure {
+	case petitem.PickupOK:
+	case petitem.PickupNoop:
+		return
+	case petitem.PickupPetUnavailable:
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return
+	case petitem.PickupItemNotForPets:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageItemNotForPets))
 		return
-	}
-	if !petInv.ValidateCapacity(petInv.SlotsNeededFor(&picked, ground.Template)) {
+	case petitem.PickupPetCannotCarryMore:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessagePetCannotCarryMoreItems))
 		return
-	}
-	if !petInv.ValidateWeight(int(ground.Template.Weight) * picked.Count) {
+	case petitem.PickupPetTooEncumbered:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessagePetTooEncumbered))
 		return
 	}
 
-	result, absorbed := petInv.Add(&picked)
-	if result == nil {
-		return
-	}
 	l.broadcastGroundPickup(ground, pet.ObjectID())
 	l.groundItems.Remove(ground)
 	l.world.Despawn(ground)
 
-	actions := []invops.Persist{invops.Save(result)}
-	if absorbed {
-		actions = []invops.Persist{invops.Update(result), invops.Delete(ground.ObjectID())}
-	}
-	l.applyPersistActions(ctx, actions)
+	l.applyPersistActions(ctx, result.Persist)
 	l.sendPetInventoryUpdate(live, petInv)
 }
 
@@ -176,12 +171,6 @@ func (l *GameClientLink) petUseItem(ctx context.Context, live *livePlayer, req c
 	}
 	live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessagePetPutOnS1, res.ItemID))
 	l.sendPetInventoryUpdate(live, petInv)
-}
-
-func withinInteractionDistance(live *livePlayer, pet *summon.Actor) bool {
-	ax, ay, az := live.Position()
-	bx, by, bz := pet.Position()
-	return location.In3DRange(ax, ay, az, bx, by, bz, dropInteractionDistance)
 }
 
 func (l *GameClientLink) broadcastGroundPickup(ground *grounditem.Item, pickerID int32) {
