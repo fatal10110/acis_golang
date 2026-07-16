@@ -57,6 +57,47 @@ type CrystallizeResult struct {
 	CrystalCount  int
 }
 
+// ToggleEquipItem equips objectID, or unequips it when it is already worn.
+func (s *Service) ToggleEquipItem(inv *itemcontainer.Inventory, objectID int32) (Result, bool) {
+	if inv == nil {
+		return Result{}, false
+	}
+	inst := inv.ItemByObjectID(objectID)
+	if inst == nil {
+		return Result{}, false
+	}
+	tmpl, ok := inv.Templates().Get(inst.TemplateID)
+	if !ok || tmpl.Slot == item.SlotNone {
+		return Result{}, false
+	}
+
+	if inst.Equipped() {
+		if inv.UnequipSlot(inst.LocationData) == nil {
+			return Result{}, false
+		}
+		return Result{EquipmentChanged: true}, true
+	}
+	if len(inv.EquipItem(inst, tmpl)) == 0 {
+		return Result{}, false
+	}
+	return Result{EquipmentChanged: true}, true
+}
+
+// UnequipBodySlot clears the paperdoll position represented by bodySlot.
+func (s *Service) UnequipBodySlot(inv *itemcontainer.Inventory, bodySlot int32) (Result, bool) {
+	if inv == nil {
+		return Result{}, false
+	}
+	paperdollSlot, ok := item.Slot(bodySlot).PaperdollIndex()
+	if !ok {
+		return Result{}, false
+	}
+	if inv.UnequipSlot(paperdollSlot) == nil {
+		return Result{}, false
+	}
+	return Result{EquipmentChanged: true}, true
+}
+
 // DropItem removes count units from inv for a world drop.
 func (s *Service) DropItem(inv *itemcontainer.Inventory, objectID int32, count int) (DropResult, bool, error) {
 	if inv == nil || count <= 0 {

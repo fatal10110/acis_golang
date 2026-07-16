@@ -106,6 +106,57 @@ func TestDropItemPartialAllocatesDroppedStack(t *testing.T) {
 	}
 }
 
+func TestToggleEquipItemEquipsAndUnequips(t *testing.T) {
+	templates := testTemplates()
+	inv := itemcontainer.NewPlayerInventory(1, templates)
+	inst := inv.AddNew(30, 1, 500)
+	inv.DrainUpdates()
+
+	res, ok := NewService(nil).ToggleEquipItem(inv, inst.ObjectID)
+	if !ok {
+		t.Fatal("ToggleEquipItem equip returned ok=false")
+	}
+	if !res.EquipmentChanged {
+		t.Fatal("ToggleEquipItem equip did not report equipment change")
+	}
+	if !inst.Equipped() {
+		t.Fatalf("item location = %s/%d, want equipped", inst.Location, inst.LocationData)
+	}
+
+	res, ok = NewService(nil).ToggleEquipItem(inv, inst.ObjectID)
+	if !ok {
+		t.Fatal("ToggleEquipItem unequip returned ok=false")
+	}
+	if !res.EquipmentChanged {
+		t.Fatal("ToggleEquipItem unequip did not report equipment change")
+	}
+	if inst.Equipped() {
+		t.Fatalf("item location = %s/%d, want inventory", inst.Location, inst.LocationData)
+	}
+}
+
+func TestUnequipBodySlotResolvesPaperdollSlot(t *testing.T) {
+	templates := testTemplates()
+	inv := itemcontainer.NewPlayerInventory(1, templates)
+	inst := inv.AddNew(30, 1, 500)
+	service := NewService(nil)
+	if _, ok := service.ToggleEquipItem(inv, inst.ObjectID); !ok {
+		t.Fatal("ToggleEquipItem equip returned ok=false")
+	}
+	inv.DrainUpdates()
+
+	res, ok := service.UnequipBodySlot(inv, int32(item.SlotRHand))
+	if !ok {
+		t.Fatal("UnequipBodySlot returned ok=false")
+	}
+	if !res.EquipmentChanged {
+		t.Fatal("UnequipBodySlot did not report equipment change")
+	}
+	if inst.Equipped() {
+		t.Fatalf("item location = %s/%d, want inventory", inst.Location, inst.LocationData)
+	}
+}
+
 func TestDestroyItemRejectsNonDestroyable(t *testing.T) {
 	templates := item.NewTable([]*item.Template{{ID: 20, Kind: item.KindEtcItem, Destroyable: false, Duration: -1, EtcItem: &item.EtcItemDetail{}}})
 	inv := itemcontainer.NewPlayerInventory(1, templates)

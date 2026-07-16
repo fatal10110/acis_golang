@@ -25,26 +25,13 @@ func (l *GameClientLink) useItem(live *livePlayer, objectID int32) {
 	if inst == nil {
 		return
 	}
-	tmpl, ok := inv.Templates().Get(inst.TemplateID)
-	if !ok {
+	if _, ok := inv.Templates().Get(inst.TemplateID); !ok {
 		return
 	}
 	if l.useEnchantScroll(live, inst) {
 		return
 	}
-	if tmpl.Slot == item.SlotNone {
-		return
-	}
-
-	var altered []*item.Instance
-	if inst.Equipped() {
-		if old := inv.UnequipSlot(inst.LocationData); old != nil {
-			altered = []*item.Instance{old}
-		}
-	} else {
-		altered = inv.EquipItem(inst, tmpl)
-	}
-	if len(altered) == 0 {
+	if _, ok := l.inventoryService().ToggleEquipItem(inv, objectID); !ok {
 		return
 	}
 	l.sendInventoryUpdate(live, inv)
@@ -62,10 +49,10 @@ func (l *GameClientLink) handleAutoSoulShot(live *livePlayer, req clientpackets.
 
 	switch req.Type {
 	case 1:
-		if fishingShot(req.ItemID) {
+		if item.IsFishingShotID(req.ItemID) {
 			return
 		}
-		if summonShot(req.ItemID) {
+		if item.IsSummonShotID(req.ItemID) {
 			if l.world == nil {
 				live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNoServitorCannotAutomateUse))
 				return
@@ -85,14 +72,6 @@ func (l *GameClientLink) handleAutoSoulShot(live *livePlayer, req clientpackets.
 	}
 }
 
-func fishingShot(itemID int32) bool {
-	return itemID >= 6535 && itemID <= 6540
-}
-
-func summonShot(itemID int32) bool {
-	return itemID >= 6645 && itemID <= 6647
-}
-
 // unequipItem clears whatever item occupies the paperdoll position that
 // bodySlot (a Slot bitmask value from the item's own template) resolves
 // to. An empty or unresolvable slot is a silent no-op.
@@ -104,11 +83,7 @@ func (l *GameClientLink) unequipItem(live *livePlayer, bodySlot int32) {
 	if inv == nil {
 		return
 	}
-	paperdollSlot, ok := item.Slot(bodySlot).PaperdollIndex()
-	if !ok {
-		return
-	}
-	if inv.UnequipSlot(paperdollSlot) == nil {
+	if _, ok := l.inventoryService().UnequipBodySlot(inv, bodySlot); !ok {
 		return
 	}
 	l.sendInventoryUpdate(live, inv)
