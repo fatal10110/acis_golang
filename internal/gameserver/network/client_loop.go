@@ -253,6 +253,18 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				}
 			case second == clientpackets.OpcodeRequestManorList:
 				session.SendFrame(serverpackets.FrameExSendManorList())
+			case second == clientpackets.OpcodeRequestExPledgeCrestLarge:
+				req, err := clientpackets.DecodeRequestExPledgeCrestLarge(payload)
+				if err != nil {
+					l.log.Warn().Err(err).Msg("game client")
+					continue
+				}
+				if live == nil {
+					continue
+				}
+				if frame, ok := l.frameExPledgeCrestLarge(req); ok {
+					session.SendFrame(frame)
+				}
 			default:
 				l.log.Info().
 					Uint16("opcode2", second).
