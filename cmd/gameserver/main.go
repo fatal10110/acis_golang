@@ -121,6 +121,7 @@ func newGameServerApp(paths gameServerPaths) *fx.App {
 			provideGameServerLogger,
 			provideGameServerDatabase,
 			loadHTMLCache,
+			loadCrestCache,
 			loadGameData,
 			gamesql.NewCharacterStore,
 			gamesql.NewItemStore,
@@ -384,6 +385,17 @@ func loadGameData(paths gameServerPaths, log zerolog.Logger) (*gameData, error) 
 
 func loadHTMLCache(paths gameServerPaths) (*datacache.HTML, error) {
 	return datacache.LoadHTML(filepath.Join(paths.DataRoot, "data", "html"))
+}
+
+func loadCrestCache(paths gameServerPaths) (*datacache.Crests, error) {
+	crests, err := datacache.LoadCrests(filepath.Join(paths.DataRoot, "data", "crests"))
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return datacache.NewCrests(), nil
+		}
+		return nil, err
+	}
+	return crests, nil
 }
 
 func loadGeodata(paths gameServerPaths) (*geodata, error) {
@@ -810,6 +822,7 @@ func provideGameClientLink(
 	items *gamesql.ItemStore,
 	shortcuts *gamesql.ShortcutStore,
 	html *datacache.HTML,
+	crests *datacache.Crests,
 	validator *network.SessionValidator,
 	links *loginLinkState,
 	skills *network.SkillPersistence,
@@ -819,7 +832,7 @@ func provideGameClientLink(
 	attackStance *task.AttackStance,
 	log zerolog.Logger,
 ) *network.GameClientLink {
-	return network.NewGameClientLink(validator, links.get, roster, items, shortcuts, data.Players, data.Items, html, skills, state, ids, ground, attackStance, log)
+	return network.NewGameClientLink(validator, links.get, roster, items, shortcuts, data.Players, data.Items, html, crests, skills, state, ids, ground, attackStance, log)
 }
 
 func provideSkillPersistence(pool *sql.DB, data *gameData) *network.SkillPersistence {

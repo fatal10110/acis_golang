@@ -110,6 +110,7 @@ var allowedOpcodes = map[State]map[byte]bool{
 		0x5d: true, // cannot move in vehicle
 		0x63: true, // request quest list
 		0x64: true, // abort quest
+		0x68: true, // request pledge crest
 		0x6b: true, // acquire skill info
 		0x6c: true, // acquire skill
 		0x6d: true, // restart point
