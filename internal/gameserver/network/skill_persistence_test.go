@@ -12,6 +12,7 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
 
@@ -22,10 +23,9 @@ func TestSkillPersistenceSaveWritesLiveEffectsAndReuseTimers(t *testing.T) {
 	c.AddActiveSkillEffect(effect.ActiveEffect{Skill: skillRef(1204, 2), ReuseGroup: 1204*256 + 2, Count: 3, Time: 20})
 	c.SetSkillReuse(skillRef(1204, 2), 1204*256+2, 45*time.Second, now.Add(45*time.Second))
 
-	p := NewSkillPersistence(store, skillTable(
+	p := skillstate.NewPersistenceWithClock(store, skillTable(
 		modelskill.Definition{ID: 1204, Level: 2},
-	))
-	p.now = func() time.Time { return now }
+	), func() time.Time { return now })
 
 	if err := p.Save(context.Background(), c, true); err != nil {
 		t.Fatalf("Save() error = %v", err)
@@ -61,10 +61,9 @@ func TestSkillPersistenceRestoreReinstatesEffectsAndReuseThenDeletesRows(t *test
 		BuffIndex:     1,
 	}})
 
-	p := NewSkillPersistence(store, skillTable(
+	p := skillstate.NewPersistenceWithClock(store, skillTable(
 		modelskill.Definition{ID: 1040, Level: 3, Effects: []modelskill.EffectTemplate{{Name: "Buff"}}},
-	))
-	p.now = func() time.Time { return now }
+	), func() time.Time { return now })
 
 	if err := p.Restore(context.Background(), c); err != nil {
 		t.Fatalf("Restore() error = %v", err)
@@ -97,8 +96,7 @@ func TestSkillPersistenceRestoreSkipsStaleSkillAndDeletesRows(t *testing.T) {
 		BuffIndex:   1,
 	}})
 
-	p := NewSkillPersistence(store, skillTable())
-	p.now = func() time.Time { return now }
+	p := skillstate.NewPersistenceWithClock(store, skillTable(), func() time.Time { return now })
 
 	if err := p.Restore(context.Background(), c); err != nil {
 		t.Fatalf("Restore() error = %v", err)
@@ -129,10 +127,9 @@ func TestSkillPersistenceRestoreReuseOnlyDoesNotRestoreEffect(t *testing.T) {
 		BuffIndex:     1,
 	}})
 
-	p := NewSkillPersistence(store, skillTable(
+	p := skillstate.NewPersistenceWithClock(store, skillTable(
 		modelskill.Definition{ID: 1056, Level: 1, Effects: []modelskill.EffectTemplate{{Name: "Buff"}}},
-	))
-	p.now = func() time.Time { return now }
+	), func() time.Time { return now })
 
 	if err := p.Restore(context.Background(), c); err != nil {
 		t.Fatalf("Restore() error = %v", err)
@@ -161,10 +158,9 @@ func TestSkillPersistenceRestoreDeletesExpiredRowsWithoutReinstatingReuse(t *tes
 		BuffIndex:   1,
 	}})
 
-	p := NewSkillPersistence(store, skillTable(
+	p := skillstate.NewPersistenceWithClock(store, skillTable(
 		modelskill.Definition{ID: 1068, Level: 1},
-	))
-	p.now = func() time.Time { return now }
+	), func() time.Time { return now })
 
 	if err := p.Restore(context.Background(), c); err != nil {
 		t.Fatalf("Restore() error = %v", err)
@@ -185,7 +181,7 @@ func TestSkillPersistenceRestoreLoadsKnownSkillLevels(t *testing.T) {
 		248:  1,
 		9999: 1,
 	})
-	p := NewSkillPersistence(store, skillTable(
+	p := skillstate.NewPersistence(store, skillTable(
 		modelskill.Definition{ID: 248, Level: 1, Activation: modelskill.ActivationPassive},
 	), store)
 
@@ -204,10 +200,9 @@ func TestSkillPersistenceRestoreLoadsKnownSkillLevels(t *testing.T) {
 func TestGameClientLinkEnterWorldRestoresPersistedSkillState(t *testing.T) {
 	store := newMemorySkillSaveStore()
 	now := time.Now().Truncate(time.Millisecond)
-	p := NewSkillPersistence(store, skillTable(
+	p := skillstate.NewPersistenceWithClock(store, skillTable(
 		modelskill.Definition{ID: 1040, Level: 3, Effects: []modelskill.EffectTemplate{{Name: "Buff"}}},
-	))
-	p.now = func() time.Time { return now }
+	), func() time.Time { return now })
 	c, chars, _, _ := newLinkedGameClientWithSkills(t, p)
 
 	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
@@ -246,7 +241,7 @@ func TestGameClientLinkEnterWorldRestoresPersistedSkillState(t *testing.T) {
 
 func TestGameClientLinkEnterWorldSendsKnownSkillList(t *testing.T) {
 	store := newMemorySkillSaveStore()
-	p := NewSkillPersistence(store, skillTable(
+	p := skillstate.NewPersistence(store, skillTable(
 		modelskill.Definition{ID: 248, Level: 1, Activation: modelskill.ActivationPassive},
 	), store)
 	c, chars, _, _ := newLinkedGameClientWithSkills(t, p)
@@ -279,10 +274,9 @@ func TestGameClientLinkEnterWorldSendsKnownSkillList(t *testing.T) {
 func TestGameClientLinkLogoutPersistsSkillState(t *testing.T) {
 	store := newMemorySkillSaveStore()
 	now := time.Now().Truncate(time.Millisecond)
-	p := NewSkillPersistence(store, skillTable(
+	p := skillstate.NewPersistenceWithClock(store, skillTable(
 		modelskill.Definition{ID: 1204, Level: 2},
-	))
-	p.now = func() time.Time { return now }
+	), func() time.Time { return now })
 	c, chars, _, _ := newLinkedGameClientWithSkills(t, p)
 
 	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))

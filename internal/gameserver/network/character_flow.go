@@ -14,6 +14,7 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
 
@@ -135,7 +136,7 @@ func skillCoolTimeEntries(timers []effect.ReuseTimer, now time.Time) []serverpac
 	return entries
 }
 
-func skillListEntries(c *player.Character, skills *SkillPersistence) []serverpackets.SkillListEntry {
+func skillListEntries(c *player.Character, skills *skillstate.Persistence) []serverpackets.SkillListEntry {
 	if c == nil {
 		return nil
 	}
@@ -157,7 +158,7 @@ func skillListEntries(c *player.Character, skills *SkillPersistence) []serverpac
 		}
 		entry := serverpackets.SkillListEntry{ID: int32(id), Level: int32(level)}
 		if skills != nil {
-			if def, ok := skills.definition(modelskill.Ref{ID: modelskill.ID(id), Level: level}); ok {
+			if def, ok := skills.Definition(modelskill.Ref{ID: modelskill.ID(id), Level: level}); ok {
 				entry.Passive = def.Activation == modelskill.ActivationPassive
 			}
 		}

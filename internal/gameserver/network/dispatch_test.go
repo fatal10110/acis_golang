@@ -26,6 +26,7 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/fatal10110/acis_golang/internal/link"
@@ -789,18 +790,18 @@ func newTestGameClientLinkWithLog(t *testing.T, loginLink func() *LoginLink, val
 	return newTestGameClientLinkWithSkillsAndLog(t, loginLink, validator, nil, log)
 }
 
-func newTestGameClientLinkWithSkillsAndLog(t *testing.T, loginLink func() *LoginLink, validator *SessionValidator, skills *SkillPersistence, log zerolog.Logger) (addr string, chars *fakeCharStore, items *fakeItemStore, state *world.State) {
+func newTestGameClientLinkWithSkillsAndLog(t *testing.T, loginLink func() *LoginLink, validator *SessionValidator, skills *skillstate.Persistence, log zerolog.Logger) (addr string, chars *fakeCharStore, items *fakeItemStore, state *world.State) {
 	t.Helper()
 	addr, chars, items, _, state = newTestGameClientLinkWithSkillsShortcutsAndLog(t, loginLink, validator, skills, log)
 	return addr, chars, items, state
 }
 
-func newTestGameClientLinkWithSkillsShortcutsAndLog(t *testing.T, loginLink func() *LoginLink, validator *SessionValidator, skills *SkillPersistence, log zerolog.Logger) (addr string, chars *fakeCharStore, items *fakeItemStore, shortcuts *fakeShortcutStore, state *world.State) {
+func newTestGameClientLinkWithSkillsShortcutsAndLog(t *testing.T, loginLink func() *LoginLink, validator *SessionValidator, skills *skillstate.Persistence, log zerolog.Logger) (addr string, chars *fakeCharStore, items *fakeItemStore, shortcuts *fakeShortcutStore, state *world.State) {
 	t.Helper()
 	return newTestGameClientLinkWithSkillsShortcutsCrestsAndLog(t, loginLink, validator, skills, nil, modelskill.BookPolicy{}, nil, log)
 }
 
-func newTestGameClientLinkWithSkillsShortcutsCrestsAndLog(t *testing.T, loginLink func() *LoginLink, validator *SessionValidator, skills *SkillPersistence, crests *datacache.Crests, spellbooks modelskill.BookPolicy, trees *modelskill.Trees, log zerolog.Logger) (addr string, chars *fakeCharStore, items *fakeItemStore, shortcuts *fakeShortcutStore, state *world.State) {
+func newTestGameClientLinkWithSkillsShortcutsCrestsAndLog(t *testing.T, loginLink func() *LoginLink, validator *SessionValidator, skills *skillstate.Persistence, crests *datacache.Crests, spellbooks modelskill.BookPolicy, trees *modelskill.Trees, log zerolog.Logger) (addr string, chars *fakeCharStore, items *fakeItemStore, shortcuts *fakeShortcutStore, state *world.State) {
 	t.Helper()
 	chars = newFakeCharStore()
 	items = newFakeItemStore()
@@ -837,12 +838,12 @@ func newLinkedGameClient(t *testing.T) (c *fakeGameClient, chars *fakeCharStore,
 	return newLinkedGameClientWithSkills(t, nil)
 }
 
-func newLinkedGameClientWithSkills(t *testing.T, skills *SkillPersistence) (c *fakeGameClient, chars *fakeCharStore, items *fakeItemStore, state *world.State) {
+func newLinkedGameClientWithSkills(t *testing.T, skills *skillstate.Persistence) (c *fakeGameClient, chars *fakeCharStore, items *fakeItemStore, state *world.State) {
 	t.Helper()
 	return newLinkedGameClientWithSkillsSeed(t, skills, nil, 0)
 }
 
-func newLinkedGameClientWithSkillsSeed(t *testing.T, skills *SkillPersistence, seed func(*fakeCharStore, *fakeItemStore), wantChars int) (c *fakeGameClient, chars *fakeCharStore, items *fakeItemStore, state *world.State) {
+func newLinkedGameClientWithSkillsSeed(t *testing.T, skills *skillstate.Persistence, seed func(*fakeCharStore, *fakeItemStore), wantChars int) (c *fakeGameClient, chars *fakeCharStore, items *fakeItemStore, state *world.State) {
 	t.Helper()
 	c, chars, items, _, state = newLinkedGameClientWithSkillsShortcutsSeed(t, skills, nil, seed, wantChars)
 	return c, chars, items, state
@@ -853,7 +854,7 @@ func newLinkedGameClientWithShortcuts(t *testing.T) (c *fakeGameClient, chars *f
 	return newLinkedGameClientWithSkillsShortcutsSeed(t, nil, nil, nil, 0)
 }
 
-func newLinkedGameClientWithSkillsShortcutsSeed(t *testing.T, skills *SkillPersistence, shortcutSeed func(*fakeShortcutStore), seed func(*fakeCharStore, *fakeItemStore), wantChars int) (c *fakeGameClient, chars *fakeCharStore, items *fakeItemStore, shortcuts *fakeShortcutStore, state *world.State) {
+func newLinkedGameClientWithSkillsShortcutsSeed(t *testing.T, skills *skillstate.Persistence, shortcutSeed func(*fakeShortcutStore), seed func(*fakeCharStore, *fakeItemStore), wantChars int) (c *fakeGameClient, chars *fakeCharStore, items *fakeItemStore, shortcuts *fakeShortcutStore, state *world.State) {
 	t.Helper()
 	return newLinkedGameClientWithSkillsShortcutsCrestsSeed(t, skills, shortcutSeed, nil, modelskill.BookPolicy{}, nil, seed, wantChars)
 }
@@ -864,7 +865,7 @@ func newLinkedGameClientWithCrests(t *testing.T, crests *datacache.Crests) (c *f
 	return c, chars, items, state
 }
 
-func newLinkedGameClientWithSkillsShortcutsCrestsSeed(t *testing.T, skills *SkillPersistence, shortcutSeed func(*fakeShortcutStore), crests *datacache.Crests, spellbooks modelskill.BookPolicy, trees *modelskill.Trees, seed func(*fakeCharStore, *fakeItemStore), wantChars int) (c *fakeGameClient, chars *fakeCharStore, items *fakeItemStore, shortcuts *fakeShortcutStore, state *world.State) {
+func newLinkedGameClientWithSkillsShortcutsCrestsSeed(t *testing.T, skills *skillstate.Persistence, shortcutSeed func(*fakeShortcutStore), crests *datacache.Crests, spellbooks modelskill.BookPolicy, trees *modelskill.Trees, seed func(*fakeCharStore, *fakeItemStore), wantChars int) (c *fakeGameClient, chars *fakeCharStore, items *fakeItemStore, shortcuts *fakeShortcutStore, state *world.State) {
 	t.Helper()
 
 	loginAddr, servers, sessions := newTestLoginServer(t, false)

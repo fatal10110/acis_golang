@@ -7,11 +7,12 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 )
 
 func TestGameClientLinkMagicSkillUseStartsKnownActiveSkill(t *testing.T) {
 	store := newMemorySkillSaveStore()
-	skills := NewSkillPersistence(store, modelskill.NewTable([]modelskill.Definition{
+	skills := skillstate.NewPersistence(store, modelskill.NewTable([]modelskill.Definition{
 		{
 			ID: 3, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
 			HitTime: 500, ReuseDelay: 1200, StaticHitTime: true, StaticReuse: true,
@@ -70,7 +71,7 @@ func TestGameClientLinkMagicSkillUseStartsKnownActiveSkill(t *testing.T) {
 
 func TestGameClientLinkMagicSkillUseRejectsInsufficientMP(t *testing.T) {
 	store := newMemorySkillSaveStore()
-	skills := NewSkillPersistence(store, modelskill.NewTable([]modelskill.Definition{
+	skills := skillstate.NewPersistence(store, modelskill.NewTable([]modelskill.Definition{
 		{
 			ID: 3, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
 			MPConsume: 100, SkillType: "DUMMY",

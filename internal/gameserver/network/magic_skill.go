@@ -25,7 +25,7 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 		return
 	}
 
-	def, ok := l.skills.definition(modelskill.Ref{ID: modelskill.ID(req.SkillID), Level: level})
+	def, ok := l.skills.Definition(modelskill.Ref{ID: modelskill.ID(req.SkillID), Level: level})
 	if !ok || def.Activation != modelskill.ActivationActive {
 		sendMagicActionFailed(live)
 		return
