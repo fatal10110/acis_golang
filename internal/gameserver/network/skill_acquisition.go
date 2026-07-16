@@ -45,6 +45,11 @@ func (l *GameClientLink) sendAcquireSkillInfo(live *livePlayer, req clientpacket
 		l.sendGeneralAcquireSkillInfo(live, req)
 	case acquireSkillTypeFishing:
 		l.sendFishingAcquireSkillInfo(live, req)
+	default:
+		// Pledge (clan) and other types are not handled here: the pledge
+		// runtime that owns clan skills, reputation, and leader authority
+		// is not ported yet, so pledge-skill info is left unanswered until
+		// that lands.
 	}
 }
 
@@ -57,6 +62,9 @@ func (l *GameClientLink) learnAcquireSkill(ctx context.Context, live *livePlayer
 		l.learnGeneralAcquireSkill(ctx, live, req)
 	case acquireSkillTypeFishing:
 		l.learnFishingAcquireSkill(ctx, live, req)
+	default:
+		// Pledge-skill learning is deferred for the same reason as the
+		// info path: it needs the unported pledge runtime.
 	}
 }
 
