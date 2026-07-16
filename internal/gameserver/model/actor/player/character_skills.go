@@ -55,6 +55,12 @@ func (c *Character) SkillLevel(skillID int) int {
 	return c.skills.known.Level(skillID)
 }
 
+// HasDwarvenCraft reports whether the character knows Dwarven Craft, which
+// gates dwarven-only fishing skills.
+func (c *Character) HasDwarvenCraft() bool {
+	return c.SkillLevel(int(modelskill.CreateDwarvenSkillID)) > 0
+}
+
 // SkillLevels returns a snapshot of the character's known skill levels.
 func (c *Character) SkillLevels() SkillLevels {
 	c.skills.mu.Lock()
