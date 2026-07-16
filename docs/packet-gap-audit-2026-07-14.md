@@ -29,7 +29,7 @@ Sources checked:
 
 - Original game client appendix: 206 concrete dispatcher targets.
 - Original game server appendix: 282 packet classes, including base/composite classes.
-- Classified M2-M5 required game client packets: 94. Missing in Go: 49.
+- Classified M2-M5 required game client packets: 94. Missing in Go: 48.
 - Classified M2-M5 required game server packets: 128. Missing in Go: 66.
 - M1 login client/server packets are implemented.
 - M1 GS-LS link packets are implemented under `internal/link/`.
@@ -147,6 +147,7 @@ Implemented and wired M3 data/UI client packets in Go:
 
 Implemented and wired M4 movement/rotation/target client packets in Go:
 
+- `Appearing`
 - `CannotMoveAnymore`
 - `RequestTargetCancel`
 - `StartRotating`
@@ -158,7 +159,6 @@ Missing M4 world/movement client packets:
 - `CannotMoveAnymoreInVehicle`
 - `RequestGetOnVehicle`
 - `RequestGetOffVehicle`
-- `Appearing`
 - `ObserverReturn`
 
 Implemented and wired M5 target/combat/item/stance/social client packets in Go:
