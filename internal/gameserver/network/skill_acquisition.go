@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -68,28 +67,36 @@ func (l *GameClientLink) sendGeneralAcquireSkillInfo(live *livePlayer, req clien
 	if live == nil {
 		return
 	}
-	grant, ok := skillstate.LearnableGeneral(live.template, live.Level, live.SkillLevels(), int(req.SkillID), int(req.Level))
+	offer, ok := skillstate.GeneralOfferFor(live.Character, live.template, l.skills, l.spellbooks, int(req.SkillID), int(req.Level))
 	if !ok {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNoMoreSkillsToLearn))
 		return
 	}
-	if !l.skillDefinitionLoaded(int(req.SkillID), int(req.Level)) {
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNoMoreSkillsToLearn))
-		return
-	}
 	var reqs []serverpackets.SkillRequirement
-	if bookID := l.spellbooks.BookForSkill(modelskill.ID(req.SkillID), int(req.Level)); bookID > 0 {
-		reqs = []serverpackets.SkillRequirement{{Type: spellbookRequirementType, ItemID: bookID, Count: 1, Unknown: spellbookRequirementUnk}}
+	if offer.BookID > 0 {
+		reqs = []serverpackets.SkillRequirement{{Type: spellbookRequirementType, ItemID: offer.BookID, Count: 1, Unknown: spellbookRequirementUnk}}
 	}
-	live.SendFrame(serverpackets.FrameAcquireSkillInfo(req.SkillID, req.Level, int32(grant.CorrectedCost()), acquireSkillTypeUsual, reqs))
+	live.SendFrame(serverpackets.FrameAcquireSkillInfo(req.SkillID, req.Level, int32(offer.Grant.CorrectedCost()), acquireSkillTypeUsual, reqs))
 }
 
 func (l *GameClientLink) learnGeneralAcquireSkill(ctx context.Context, live *livePlayer, req clientpackets.RequestAcquireSkill) {
-	grant, status := live.template.CheckSkillLearn(live.Level, live.SP, live.SkillLevels(), int(req.SkillID), int(req.Level))
+	if live == nil {
+		return
+	}
+	result, status, err := skillstate.LearnGeneral(ctx, live.Character, live.template, l.skills, l.spellbooks, int(req.SkillID), int(req.Level))
+	if err != nil {
+		l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("learn skill")
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNothingHappened))
+		return
+	}
 	switch status {
-	case player.LearnAllowed:
-	case player.LearnNeedsSP:
+	case skillstate.LearnDone:
+	case skillstate.LearnNeedsSP:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotEnoughSPToLearnSkill))
+		live.SendFrame(l.acquireSkillList(live))
+		return
+	case skillstate.LearnMissingItem:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageItemMissingToLearnSkill))
 		live.SendFrame(l.acquireSkillList(live))
 		return
 	default:
@@ -97,34 +104,9 @@ func (l *GameClientLink) learnGeneralAcquireSkill(ctx context.Context, live *liv
 		live.SendFrame(l.acquireSkillList(live))
 		return
 	}
-	if !l.skillDefinitionLoaded(int(req.SkillID), int(req.Level)) {
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNoMoreSkillsToLearn))
-		live.SendFrame(l.acquireSkillList(live))
-		return
-	}
-	if bookID := l.spellbooks.BookForSkill(modelskill.ID(req.SkillID), int(req.Level)); bookID > 0 {
-		if live.Inventory() == nil || live.Inventory().DestroyByTemplateID(bookID, 1) == nil {
-			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageItemMissingToLearnSkill))
-			live.SendFrame(l.acquireSkillList(live))
-			return
-		}
-	}
-	if l.skills != nil {
-		if err := l.skills.SetKnownSkill(ctx, live.Character, grant.SkillID, grant.Level); err != nil {
-			l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("learn skill")
-			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNothingHappened))
-			return
-		}
-	} else {
-		live.SetSkillLevel(grant.SkillID, grant.Level)
-	}
-	cost := grant.CorrectedCost()
-	if cost > 0 {
-		live.RemoveSp(cost)
-	}
 
 	live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageLearnedSkill, req.SkillID, req.Level))
-	if cost > 0 {
+	if result.Cost > 0 {
 		live.SendFrame(serverpackets.FrameStatusUpdate(live.ObjectID(), []serverpackets.StatusAttribute{
 			{Type: serverpackets.StatusSP, Value: live.SP},
 		}))
@@ -137,10 +119,11 @@ func (l *GameClientLink) sendFishingAcquireSkillInfo(live *livePlayer, req clien
 	if live == nil {
 		return
 	}
-	node, ok := skillstate.LearnableFishing(l.skillTrees, live.Level, live.HasDwarvenCraft(), live.SkillLevels(), l.skillDefinitionLoaded, int(req.SkillID), int(req.Level))
+	offer, ok := skillstate.FishingOfferFor(live.Character, l.skillTrees, l.skills, int(req.SkillID), int(req.Level))
 	if !ok {
 		return
 	}
+	node := offer.Node
 	reqs := []serverpackets.SkillRequirement{{Type: fishingRequirementType, ItemID: node.ItemID, Count: int32(node.ItemCount)}}
 	live.SendFrame(serverpackets.FrameAcquireSkillInfo(req.SkillID, req.Level, 0, acquireSkillTypeFishing, reqs))
 }
@@ -149,27 +132,24 @@ func (l *GameClientLink) learnFishingAcquireSkill(ctx context.Context, live *liv
 	if live == nil {
 		return
 	}
-	node, ok := skillstate.LearnableFishing(l.skillTrees, live.Level, live.HasDwarvenCraft(), live.SkillLevels(), l.skillDefinitionLoaded, int(req.SkillID), int(req.Level))
-	if !ok {
+	result, status, err := skillstate.LearnFishing(ctx, live.Character, l.skillTrees, l.skills, int(req.SkillID), int(req.Level))
+	if err != nil {
+		l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("learn fishing skill")
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNothingHappened))
 		return
 	}
-	if live.Inventory() == nil || live.Inventory().DestroyByTemplateID(node.ItemID, node.ItemCount) == nil {
+	switch status {
+	case skillstate.LearnDone:
+	case skillstate.LearnMissingItem:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageItemMissingToLearnSkill))
 		live.SendFrame(l.fishingAcquireSkillList(live))
 		return
-	}
-	if l.skills != nil {
-		if err := l.skills.SetKnownSkill(ctx, live.Character, int(req.SkillID), int(req.Level)); err != nil {
-			l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("learn fishing skill")
-			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNothingHappened))
-			return
-		}
-	} else {
-		live.SetSkillLevel(int(req.SkillID), int(req.Level))
+	default:
+		return
 	}
 
 	live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageLearnedSkill, req.SkillID, req.Level))
-	if skillstate.NeedsStorageSync(req.SkillID) {
+	if result.StorageSync {
 		live.SendFrame(serverpackets.FrameExStorageMaxCount(live.Character))
 	}
 	live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
