@@ -19,3 +19,11 @@ func (l *GameClientLink) frameAllyCrest(req clientpackets.RequestAllyCrest) (wir
 	}
 	return serverpackets.FrameAllyCrest(req.CrestID, data), true
 }
+
+func (l *GameClientLink) frameExPledgeCrestLarge(req clientpackets.RequestExPledgeCrestLarge) (wire.Frame, bool) {
+	data, ok := l.crests.Get(datacache.LargePledgeCrest, int(req.CrestID))
+	if !ok {
+		return wire.Frame{}, false
+	}
+	return serverpackets.FrameExPledgeCrestLarge(req.CrestID, data), true
+}

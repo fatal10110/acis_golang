@@ -34,6 +34,22 @@ func TestFrameAllyCrest(t *testing.T) {
 	}
 }
 
+func TestFrameExPledgeCrestLarge(t *testing.T) {
+	data := []byte{0x07, 0x08, 0x09}
+	got := framePayload(t, FrameExPledgeCrestLarge(105, data))
+
+	want := []byte{OpcodeExtended}
+	want = binary.LittleEndian.AppendUint16(want, OpcodeExPledgeCrestLarge)
+	want = binary.LittleEndian.AppendUint32(want, 0)
+	want = binary.LittleEndian.AppendUint32(want, 105)
+	want = binary.LittleEndian.AppendUint32(want, uint32(len(data)))
+	want = append(want, data...)
+
+	if !bytes.Equal(got, want) {
+		t.Fatalf("FrameExPledgeCrestLarge() = %x, want %x", got, want)
+	}
+}
+
 func TestFramePledgeCrestMissingData(t *testing.T) {
 	got := framePayload(t, FramePledgeCrest(101, nil))
 
