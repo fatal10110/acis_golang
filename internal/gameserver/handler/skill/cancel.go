@@ -57,7 +57,7 @@ func (cancelHandler) Use(cast Cast) {
 
 func cancelOne(cast Cast, target cancelTarget, skillType string, minRate, maxRate int) {
 	vuln := 1.0
-	if v, ok := any(target).(cancelVulnerabilitySource); ok {
+	if v, ok := target.(cancelVulnerabilitySource); ok {
 		vuln = v.CancelVulnerability(skillType)
 	}
 

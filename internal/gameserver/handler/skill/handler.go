@@ -1,7 +1,6 @@
 package skill
 
 import (
-	"reflect"
 	"strings"
 
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -124,16 +123,21 @@ func alikeDead(v any) bool {
 	return false
 }
 
-func sameObject(a, b any) bool {
+// sameObject reports whether a and b hold the same underlying value. It
+// never panics: comparing across differing dynamic types is false (Go's
+// == already handles that), and comparing two equal but non-comparable
+// dynamic types (e.g. a slice or map smuggled in as an any) is recovered
+// to false instead of crashing the caller.
+func sameObject(a, b any) (same bool) {
 	if a == nil || b == nil {
 		return a == b
 	}
 
-	ta := reflect.TypeOf(a)
-	tb := reflect.TypeOf(b)
-	if ta != tb || !ta.Comparable() {
-		return false
-	}
+	defer func() {
+		if recover() != nil {
+			same = false
+		}
+	}()
 
 	return a == b
 }

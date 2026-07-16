@@ -85,7 +85,7 @@ func useOnChest(cast Cast, target chestTarget) {
 	}
 
 	if !target.Box() {
-		if d, ok := any(target).(attackDesirable); ok {
+		if d, ok := target.(attackDesirable); ok {
 			d.AddAttackDesire(cast.Caster, 200)
 		}
 		return
@@ -107,7 +107,7 @@ func useOnChest(cast Cast, target chestTarget) {
 	}
 
 	if opens {
-		if h, ok := any(target).(hateAdder); ok {
+		if h, ok := target.(hateAdder); ok {
 			h.AddDamageHate(cast.Caster, 0, 200)
 		}
 		target.Die(cast.Caster)

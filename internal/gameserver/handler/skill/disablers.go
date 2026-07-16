@@ -144,7 +144,7 @@ func disableErase(cast Cast, target disablerTarget) {
 	if !ok || !succeeded {
 		return
 	}
-	summon, ok := any(target).(erasableSummon)
+	summon, ok := target.(erasableSummon)
 	if !ok || summon.SiegeSummon() {
 		return
 	}
@@ -163,7 +163,7 @@ func disableErase(cast Cast, target disablerTarget) {
 // returns nil when the skill reflects but the caster isn't itself a valid
 // disabler target (a duck-typing gap safer to drop than to guess through).
 func reflectTarget(cast Cast, target disablerTarget) disablerTarget {
-	src, ok := any(target).(skillReflectSource)
+	src, ok := target.(skillReflectSource)
 	if !ok {
 		return target
 	}
@@ -211,7 +211,7 @@ func disableMute(cast Cast, target disablerTarget) {
 }
 
 func disableConfusion(cast Cast, target disablerTarget) {
-	am, ok := any(target).(attackableMarker)
+	am, ok := target.(attackableMarker)
 	if !ok || !am.Attackable() {
 		return
 	}
@@ -229,7 +229,7 @@ func disableConfusion(cast Cast, target disablerTarget) {
 // instead subtracts a generic AGGRESSION stat delta; that needs a stat
 // resolution this port has no generic model for yet, so it's skipped.
 func disableAggReduce(cast Cast, target disablerTarget) {
-	at, ok := any(target).(aggroTables)
+	at, ok := target.(aggroTables)
 	if !ok {
 		return
 	}
@@ -244,7 +244,7 @@ func disableAggReduceChar(cast Cast, target disablerTarget) {
 	if !ok || !succeeded {
 		return
 	}
-	if at, ok := any(target).(aggroTables); ok {
+	if at, ok := target.(aggroTables); ok {
 		if attacker, ok := cast.Caster.(attackable.Combatant); ok {
 			at.AggroList().StopHate(attacker)
 			at.HateList().StopHate(attacker)
@@ -254,11 +254,11 @@ func disableAggReduceChar(cast Cast, target disablerTarget) {
 }
 
 func disableAggRemove(cast Cast, target disablerTarget) {
-	am, ok := any(target).(attackableMarker)
+	am, ok := target.(attackableMarker)
 	if !ok || !am.Attackable() {
 		return
 	}
-	if rr, ok := any(target).(raidRelatedTarget); ok && rr.RaidRelated() {
+	if rr, ok := target.(raidRelatedTarget); ok && rr.RaidRelated() {
 		return
 	}
 	succeeded, ok := checkSkillSuccess(cast.Caster, target, cast.Skill)
@@ -266,12 +266,12 @@ func disableAggRemove(cast Cast, target disablerTarget) {
 		return
 	}
 	if cast.Skill.Target == modelskill.TargetUndead {
-		ut, ok := any(target).(undeadTarget)
+		ut, ok := target.(undeadTarget)
 		if !ok || !ut.Undead() {
 			return
 		}
 	}
-	if at, ok := any(target).(aggroTables); ok {
+	if at, ok := target.(aggroTables); ok {
 		at.AggroList().Clear()
 		at.HateList().Clear()
 	}
