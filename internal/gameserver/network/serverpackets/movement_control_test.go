@@ -22,6 +22,21 @@ func TestFrameStopMove(t *testing.T) {
 	}
 }
 
+func TestFrameValidateLocation(t *testing.T) {
+	got := framePayload(t, FrameValidateLocation(268476516, location.Location{X: 46160, Y: 41237, Z: -3534}, 32768))
+	want := []byte{
+		OpcodeValidateLocation,
+		0x64, 0xa0, 0x00, 0x10,
+		0x50, 0xb4, 0x00, 0x00,
+		0x15, 0xa1, 0x00, 0x00,
+		0x32, 0xf2, 0xff, 0xff,
+		0x00, 0x80, 0x00, 0x00,
+	}
+	if !bytes.Equal(got, want) {
+		t.Fatalf("FrameValidateLocation() = %x, want %x", got, want)
+	}
+}
+
 func TestFrameStartRotation(t *testing.T) {
 	got := framePayload(t, FrameStartRotation(268476516, 32768, 1, 0))
 	want := []byte{

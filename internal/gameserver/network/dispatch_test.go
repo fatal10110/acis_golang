@@ -294,6 +294,9 @@ func testTemplates(t *testing.T) *player.TemplateTable {
 		MPTable:   []float64{30},
 		CPTable:   []float64{32},
 		Spawns:    []location.Location{{X: 10, Y: 20, Z: 30}},
+		RunSpeed:  120,
+		WalkSpeed: 60,
+		SwimSpeed: 50,
 		Skills:    []player.SkillGrant{{SkillID: 3, Level: 1, MinLevel: 5, Cost: 50}},
 	}
 	table, err := player.NewTemplateTable(map[int]*player.Template{0: tmpl})
