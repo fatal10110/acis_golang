@@ -1,6 +1,7 @@
 package ai
 
 import (
+	"sync"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
@@ -43,7 +44,10 @@ type intention struct {
 //
 // One AI loop owns the current and next intentions. Threat and hate tables,
 // and the attack desire queue, are internally synchronized so combat code
-// can raise hate while the loop reads target selection.
+// can raise hate while the loop reads target selection. mu guards
+// current/next/step: Think and Tick run on the periodic AI task's goroutine,
+// but movement-arrived and attack-finished hooks can also call Think from a
+// timer goroutine, so entry points must serialize against each other.
 type Attackable struct {
 	actor   AttackableActor
 	move    MoveController
@@ -52,6 +56,7 @@ type Attackable struct {
 	hates   *attackable.HateTable
 	desires *DesireQueue
 
+	mu      sync.Mutex
 	current intention
 	next    intention
 	step    int
@@ -114,24 +119,34 @@ func (a *Attackable) AddHate(attacker attackable.Combatant, hate float64) {
 
 // SetWander makes the next Think process wander/return-home behavior.
 func (a *Attackable) SetWander() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	a.current = intention{kind: IntentionWander}
 }
 
 // CurrentIntention returns the currently active intention kind.
 func (a *Attackable) CurrentIntention() Intention {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	return a.current.kind
 }
 
 // NextIntention returns the queued intention, if one exists.
 func (a *Attackable) NextIntention() (Intention, attackable.Combatant, bool) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	if a.next.kind == IntentionIdle {
 		return IntentionIdle, nil, false
 	}
 	return a.next.kind, a.next.target, true
 }
 
-// Think advances the current intention once.
+// Think advances the current intention once. Safe to call from the periodic
+// AI task as well as from a movement-arrived or attack-finished hook.
 func (a *Attackable) Think() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
 	if a.current.kind == IntentionIdle {
 		if desire, ok := a.desires.Peek(); ok && desire.Kind == IntentionAttack {
 			a.current = intention{kind: IntentionAttack, target: desire.FinalTarget}
@@ -148,6 +163,9 @@ func (a *Attackable) Think() {
 
 // Tick advances the AI clock and applies periodic hate decay.
 func (a *Attackable) Tick() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
 	a.step++
 	if a.step%3 != 0 {
 		return

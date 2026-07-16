@@ -114,6 +114,26 @@ type Controller struct {
 	timers         []scheduledTimer
 	attackSeq      uint64
 	afterFunc      afterFunc
+	finished       func()
+	started        func()
+}
+
+// SetFinished records the callback invoked once an attack animation
+// finishes (the swing lands and, for non-bow weapons, the actor is free to
+// attack again). A nil callback (the default) makes it a no-op.
+func (c *Controller) SetFinished(finished func()) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.finished = finished
+}
+
+// SetStarted records the callback invoked as each attack animation starts,
+// before its hits are scheduled or broadcast. A nil callback (the default)
+// makes it a no-op.
+func (c *Controller) SetStarted(started func()) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.started = started
 }
 
 // NewCreature returns a base creature attack controller.
@@ -224,6 +244,13 @@ func (c *Controller) CanAttack(target attackable.Combatant) bool {
 func (c *Controller) DoAttack(target attackable.Combatant) {
 	if target == nil || c.actor == nil {
 		return
+	}
+
+	c.mu.RLock()
+	started := c.started
+	c.mu.RUnlock()
+	if started != nil {
+		started()
 	}
 
 	attackTime := time.Duration(formulas.TimeBetweenAttacks(max(1, c.actor.AttackSpeed()))) * time.Millisecond
@@ -380,29 +407,42 @@ func (c *Controller) deliverHit(seq uint64, hit Hit) {
 
 func (c *Controller) finishBow(seq uint64) {
 	c.mu.Lock()
-	defer c.mu.Unlock()
 	if seq != c.attackSeq {
+		c.mu.Unlock()
 		return
 	}
 
 	c.attacking = false
 
 	reuse := c.scaledBowReuse()
-	if reuse <= 0 {
-		c.bowCooling = false
+	if reuse > 0 {
+		c.scheduleLocked(reuse, func() { c.clearBowCooldown(seq) })
+		c.mu.Unlock()
 		return
 	}
 
-	c.scheduleLocked(reuse, func() { c.clearBowCooldown(seq) })
+	c.bowCooling = false
+	finished := c.finished
+	c.mu.Unlock()
+
+	if finished != nil {
+		finished()
+	}
 }
 
 func (c *Controller) finishAttack(seq uint64) {
 	c.mu.Lock()
-	defer c.mu.Unlock()
 	if seq != c.attackSeq {
+		c.mu.Unlock()
 		return
 	}
 	c.attacking = false
+	finished := c.finished
+	c.mu.Unlock()
+
+	if finished != nil {
+		finished()
+	}
 }
 
 func (c *Controller) clearHitAnimation(seq uint64) {
@@ -415,9 +455,16 @@ func (c *Controller) clearHitAnimation(seq uint64) {
 
 func (c *Controller) clearBowCooldown(seq uint64) {
 	c.mu.Lock()
-	defer c.mu.Unlock()
-	if seq == c.attackSeq {
-		c.bowCooling = false
+	if seq != c.attackSeq {
+		c.mu.Unlock()
+		return
+	}
+	c.bowCooling = false
+	finished := c.finished
+	c.mu.Unlock()
+
+	if finished != nil {
+		finished()
 	}
 }
 

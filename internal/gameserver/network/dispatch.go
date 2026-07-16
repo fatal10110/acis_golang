@@ -12,6 +12,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	enchantflow "github.com/fatal10110/acis_golang/internal/gameserver/enchant"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -73,6 +74,7 @@ type GameClientLink struct {
 	spellbooks    modelskill.BookPolicy
 	skillTrees    *modelskill.Trees
 	world         *world.State
+	geo           move.Geo
 	ids           idAllocator
 	groundItems   groundItemDropper
 	attackStance  attackStanceTracker
@@ -109,6 +111,7 @@ func NewGameClientLink(
 	spellbooks modelskill.BookPolicy,
 	skillTrees *modelskill.Trees,
 	worldState *world.State,
+	geo move.Geo,
 	ids idAllocator,
 	groundItems groundItemDropper,
 	attackStance attackStanceTracker,
@@ -128,6 +131,7 @@ func NewGameClientLink(
 		spellbooks:    spellbooks,
 		skillTrees:    skillTrees,
 		world:         worldState,
+		geo:           geo,
 		ids:           ids,
 		groundItems:   groundItems,
 		attackStance:  attackStance,

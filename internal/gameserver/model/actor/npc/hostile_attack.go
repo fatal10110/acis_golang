@@ -6,6 +6,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -219,6 +220,40 @@ func (h *Hostile) BroadcastAttack(snapshot attack.Snapshot) {
 			return
 		}
 		receiver.SendFrame(serverpackets.FrameAttack(snapshot))
+	})
+}
+
+// BroadcastMove sends a MoveToLocation packet for event to every currently
+// known observer capable of receiving one. It is a no-op until SetWorld has
+// been called.
+func (h *Hostile) BroadcastMove(event move.Event) {
+	if h.world == nil {
+		return
+	}
+	h.world.ForEachKnown(h, func(o world.Tracked) {
+		receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
+		if !ok {
+			return
+		}
+		receiver.SendFrame(serverpackets.FrameMove(h.ObjectID(), event))
+	})
+}
+
+// BroadcastStop sends a stop-in-place notice to every currently known
+// observer capable of receiving one. It is a no-op until SetWorld has been
+// called.
+func (h *Hostile) BroadcastStop() {
+	if h.world == nil {
+		return
+	}
+	x, y, z := h.Position()
+	at := location.Location{X: x, Y: y, Z: z}
+	h.world.ForEachKnown(h, func(o world.Tracked) {
+		receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
+		if !ok {
+			return
+		}
+		receiver.SendFrame(serverpackets.FrameStopMove(h.ObjectID(), at, h.Heading()))
 	})
 }
 

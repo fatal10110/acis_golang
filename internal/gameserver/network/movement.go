@@ -8,6 +8,13 @@ import (
 )
 
 func (l *GameClientLink) moveLivePlayer(live *livePlayer, origin, target location.Location) {
+	// A client-initiated walk overrides any attack-driven chase movement —
+	// otherwise the server's own MaybeStartOffensiveFollow re-think would
+	// fight the player's own steering back toward the old target.
+	if live.combat != nil {
+		live.combat.Stop()
+	}
+
 	heading := origin.HeadingTo(target)
 	l.updateLivePlayerPosition(live, origin, heading)
 	live.SendFrame(serverpackets.FrameMoveToLocation(live.ObjectID(), target, origin))
@@ -102,6 +109,13 @@ func (l *GameClientLink) updateLivePlayerPosition(live *livePlayer, position loc
 	live.Character.Location = position
 	live.Character.Heading = heading
 	live.Character.SetHeading(heading)
+	if live.move != nil {
+		// Reseed CreatureMove's own position tracking too, or the next
+		// chase this controller starts computes its route/duration from a
+		// stale seed (only this position changed; CreatureMove.origin
+		// otherwise only advances on its own arrival).
+		live.move.SetPosition(position)
+	}
 	if l.world == nil {
 		return
 	}

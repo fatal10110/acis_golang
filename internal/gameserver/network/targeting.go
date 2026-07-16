@@ -131,25 +131,30 @@ func (l *GameClientLink) clearLiveTarget(live *livePlayer) {
 	}
 	old := live.target
 	live.target = nil
+	if live.combat != nil {
+		live.combat.Stop()
+	}
 	live.SendFrame(serverpackets.FrameActionFailed())
 	if old != nil {
 		l.broadcastTargetUnselected(live)
 	}
 }
 
+// attackLiveTarget starts (or continues) live's attack intention against
+// target: closing distance first when target is out of weapon range, then
+// swinging once in range, repeating on subsequent calls until target dies,
+// is lost, or the attack is cancelled. It reports whether the attempt was
+// accepted — false means the caller should report the action as failed.
 func (l *GameClientLink) attackLiveTarget(live *livePlayer, target world.Tracked) bool {
 	combatant, ok := target.(attackable.Combatant)
 	if !ok {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return false
 	}
-	controller := live.attackController()
-	if !controller.CanAttack(combatant) {
+	if !live.combat.Start(combatant) {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return false
 	}
-	l.startLiveAutoAttack(live)
-	controller.DoAttack(combatant)
 	return true
 }
 

@@ -15,7 +15,10 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	gamemanager "github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
@@ -816,7 +819,7 @@ func newTestGameClientLinkWithSkillsShortcutsCrestsAndLog(t *testing.T, loginLin
 	if crests == nil {
 		crests = datacache.NewCrests()
 	}
-	gcl := NewGameClientLink(validator, loginLink, roster, items, shortcuts, templates, itemTemplates, html, crests, skills, spellbooks, trees, state, ids, groundItems, nil, log)
+	gcl := NewGameClientLink(validator, loginLink, roster, items, shortcuts, templates, itemTemplates, html, crests, skills, spellbooks, trees, state, testGeo{}, ids, groundItems, nil, log)
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -1017,6 +1020,13 @@ func skipPackageSendableRemainder(r *wire.Reader) {
 	r.ReadInt32()
 }
 
+// testGeo is an always-passable move.Geo double for tests that don't
+// exercise geodata behavior.
+type testGeo struct{}
+
+func (testGeo) CanMove(int, int, int, int, int, int) bool { return true }
+func (testGeo) Height(_, _, z int) int16                  { return int16(z) }
+
 func newTestLivePlayer(t *testing.T, id int32, capture *frameCapture) *livePlayer {
 	t.Helper()
 	tmpl, ok := testTemplates(t).Get(0)
@@ -1031,7 +1041,22 @@ func newTestLivePlayer(t *testing.T, id int32, capture *frameCapture) *livePlaye
 	}
 	ch.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventory(ch.ID, testItemTemplates(), nil))
 	ch.SetFrameSender(capture.send)
-	return &livePlayer{Character: ch, template: tmpl}
+
+	x, y, z := ch.Position()
+	cm, err := move.NewCreatureMove(location.Location{X: x, Y: y, Z: z}, tmpl.RunSpeed, testGeo{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	moveCtl, err := move.NewController(cm, ch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	attackCtl := attack.NewPlayer(ch)
+	combat := ai.NewPlayerAttack(ch, moveCtl, attackCtl)
+	moveCtl.SetArrived(combat.Think)
+	attackCtl.SetFinished(combat.Think)
+
+	return &livePlayer{Character: ch, template: tmpl, attack: attackCtl, move: moveCtl, combat: combat}
 }
 
 func newTestHostileNPC(t *testing.T, id int32) *npc.Hostile {

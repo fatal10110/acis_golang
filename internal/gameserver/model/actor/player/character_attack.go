@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -108,6 +109,19 @@ func (c *Character) SetFrameSender(send func(wire.Frame) bool) {
 // snapshots to nearby connected clients.
 func (c *Character) SetAttackBroadcaster(broadcast func(attack.Snapshot)) {
 	c.broadcastAttack = broadcast
+}
+
+// SetMoveBroadcaster records the packet-layer hook that broadcasts movement
+// events to this character's own session and nearby connected clients.
+func (c *Character) SetMoveBroadcaster(broadcast func(move.Event)) {
+	c.broadcastMove = broadcast
+}
+
+// SetStopBroadcaster records the packet-layer hook that broadcasts a
+// stop-in-place notice to this character's own session and nearby connected
+// clients when server-driven movement is cancelled mid-flight.
+func (c *Character) SetStopBroadcaster(broadcast func()) {
+	c.broadcastStop = broadcast
 }
 
 // SendFrame sends frame to the connected client, if any.
@@ -328,6 +342,21 @@ func (c *Character) BroadcastAttack(snapshot attack.Snapshot) {
 	}
 }
 
+// BroadcastMove sends a movement event through the runtime packet hook.
+func (c *Character) BroadcastMove(event move.Event) {
+	if c.broadcastMove != nil {
+		c.broadcastMove(event)
+	}
+}
+
+// BroadcastStop sends a stop-in-place notice through the runtime packet
+// hook.
+func (c *Character) BroadcastStop() {
+	if c.broadcastStop != nil {
+		c.broadcastStop()
+	}
+}
+
 // InPeaceZone reports whether c is in a combat-blocking peace zone.
 func (c *Character) InPeaceZone() bool { return false }
 
@@ -491,4 +520,5 @@ func (c *Character) rollValue(n int) int {
 }
 
 var _ attack.PlayerActor = (*Character)(nil)
+var _ move.Actor = (*Character)(nil)
 var _ physicalTarget = (*Character)(nil)

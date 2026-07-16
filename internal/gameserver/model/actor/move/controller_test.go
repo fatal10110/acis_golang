@@ -8,12 +8,16 @@ import (
 )
 
 type fakeSelf struct {
-	x, y, z int
-	radius  float64
+	x, y, z    int
+	radius     float64
+	broadcasts []Event
+	stopCalls  int
 }
 
 func (f *fakeSelf) Position() (int, int, int) { return f.x, f.y, f.z }
 func (f *fakeSelf) CollisionRadius() float64  { return f.radius }
+func (f *fakeSelf) BroadcastMove(event Event) { f.broadcasts = append(f.broadcasts, event) }
+func (f *fakeSelf) BroadcastStop()            { f.stopCalls++ }
 
 type fakeTarget struct {
 	id      int32
@@ -104,6 +108,29 @@ func TestControllerMaybeStartOffensiveFollowIgnoresUnlocatedTarget(t *testing.T)
 	}
 }
 
+func TestControllerMaybeStartOffensiveFollowReportsFalseWhenRouteIsBlocked(t *testing.T) {
+	self := &fakeSelf{x: 0, y: 0, radius: 5}
+	cm, err := NewCreatureMove(location.Location{X: self.x, Y: self.y}, 100, &recordingGeo{canMove: false})
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, err := NewController(cm, self)
+	if err != nil {
+		t.Fatal(err)
+	}
+	target := &fakeTarget{id: 7, x: 1000, y: 0, radius: 5}
+
+	if c.MaybeStartOffensiveFollow(target, 40) {
+		t.Fatal("MaybeStartOffensiveFollow() = true, want false when the route is blocked — a caller must not wait forever on movement that will never happen")
+	}
+	if c.move.Moving() {
+		t.Fatal("Moving() = true after a blocked route, want false")
+	}
+	if len(self.broadcasts) != 0 {
+		t.Fatalf("BroadcastMove calls after a blocked route = %d, want 0", len(self.broadcasts))
+	}
+}
+
 func TestControllerStopCancelsFollow(t *testing.T) {
 	self := &fakeSelf{}
 	c := newTestController(t, self)
@@ -113,6 +140,115 @@ func TestControllerStopCancelsFollow(t *testing.T) {
 
 	if c.move.Following() {
 		t.Fatal("follow task still active after Stop")
+	}
+	if self.stopCalls != 1 {
+		t.Fatalf("BroadcastStop calls = %d, want 1", self.stopCalls)
+	}
+}
+
+func TestControllerStopIsSilentWhenNothingWasMoving(t *testing.T) {
+	self := &fakeSelf{}
+	c := newTestController(t, self)
+
+	c.Stop()
+
+	if self.stopCalls != 0 {
+		t.Fatalf("BroadcastStop calls = %d, want 0 when nothing was moving", self.stopCalls)
+	}
+}
+
+func TestControllerMaybeStartOffensiveFollowIssuesMovementTowardTarget(t *testing.T) {
+	self := &fakeSelf{x: 0, y: 0, radius: 5}
+	c := newTestController(t, self)
+	target := &fakeTarget{id: 7, x: 1000, y: 0, radius: 5}
+
+	if !c.MaybeStartOffensiveFollow(target, 40) {
+		t.Fatal("MaybeStartOffensiveFollow() = false, want true for out-of-range target")
+	}
+	if !c.move.Moving() {
+		t.Fatal("Moving() = false, want true: MaybeStartOffensiveFollow must actually start closing the distance")
+	}
+	if got := c.move.Destination(); got != (location.Location{X: 1000, Y: 0, Z: 0}) {
+		t.Fatalf("Destination() = %+v, want the target's position", got)
+	}
+	if len(self.broadcasts) != 1 {
+		t.Fatalf("BroadcastMove calls = %d, want 1", len(self.broadcasts))
+	}
+	if got := self.broadcasts[0].Destination; got != (location.Location{X: 1000, Y: 0, Z: 0}) {
+		t.Fatalf("broadcast destination = %+v, want the target's position", got)
+	}
+}
+
+func TestControllerMaybeStartOffensiveFollowDoesNotReissueAnAlreadyConvergingMove(t *testing.T) {
+	self := &fakeSelf{x: 0, y: 0, radius: 5}
+	c := newTestController(t, self)
+	target := &fakeTarget{id: 7, x: 1000, y: 0, radius: 5}
+
+	if !c.MaybeStartOffensiveFollow(target, 40) {
+		t.Fatal("first MaybeStartOffensiveFollow() = false, want true")
+	}
+	firstDestination := c.move.Destination()
+
+	// A second re-evaluation of the same stationary target before arrival
+	// must not restart the in-flight move (which would reset its timer).
+	if !c.MaybeStartOffensiveFollow(target, 40) {
+		t.Fatal("second MaybeStartOffensiveFollow() = false, want true")
+	}
+	if got := c.move.Destination(); got != firstDestination {
+		t.Fatalf("Destination() changed across a redundant re-evaluation: got %+v, want %+v", got, firstDestination)
+	}
+	if len(self.broadcasts) != 1 {
+		t.Fatalf("BroadcastMove calls across two evaluations = %d, want 1 (no re-broadcast for a redundant move)", len(self.broadcasts))
+	}
+}
+
+func TestControllerSetArrivedFiresOnceMovementCompletes(t *testing.T) {
+	self := &fakeSelf{x: 0, y: 0, radius: 5}
+	cm, err := NewCreatureMove(location.Location{X: self.x, Y: self.y}, 100, &recordingGeo{canMove: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	clock := &fakeMoveClock{}
+	cm.afterFunc = clock.AfterFunc
+	c, err := NewController(cm, self)
+	if err != nil {
+		t.Fatal(err)
+	}
+	arrivedCalls := 0
+	c.SetArrived(func() { arrivedCalls++ })
+
+	target := &fakeTarget{id: 7, x: 1000, y: 0, radius: 5}
+	if !c.MaybeStartOffensiveFollow(target, 40) {
+		t.Fatal("MaybeStartOffensiveFollow() = false, want true")
+	}
+
+	for _, timer := range clock.timers {
+		if !timer.stopped {
+			timer.stopped = true
+			timer.f()
+		}
+	}
+
+	if arrivedCalls != 1 {
+		t.Fatalf("arrived hook calls = %d, want 1", arrivedCalls)
+	}
+}
+
+func TestControllerStopCancelsInFlightMovement(t *testing.T) {
+	self := &fakeSelf{x: 0, y: 0, radius: 5}
+	c := newTestController(t, self)
+	target := &fakeTarget{id: 7, x: 1000, y: 0, radius: 5}
+	if !c.MaybeStartOffensiveFollow(target, 40) {
+		t.Fatal("MaybeStartOffensiveFollow() = false, want true")
+	}
+
+	c.Stop()
+
+	if c.move.Moving() {
+		t.Fatal("Moving() = true after Stop, want false")
+	}
+	if self.stopCalls != 1 {
+		t.Fatalf("BroadcastStop calls = %d, want 1", self.stopCalls)
 	}
 }
 

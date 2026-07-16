@@ -307,6 +307,65 @@ func TestCreatureAttackBowHitStillLandsWhenFinishTimerRunsFirst(t *testing.T) {
 	}
 }
 
+func TestCreatureAttackSetFinishedFiresOnceMeleeSwingCompletes(t *testing.T) {
+	clock := &fakeAttackClock{}
+	actor := attackActor{
+		id:          100,
+		known:       map[int32]bool{200: true},
+		canSee:      true,
+		canReach:    true,
+		attackType:  item.WeaponSword,
+		attackSpeed: 500,
+		hit:         Hit{TargetID: 200, Damage: 37},
+	}
+	target := attackTarget{id: 200, attackable: true}
+	ctrl := NewCreature(&actor)
+	ctrl.afterFunc = clock.AfterFunc
+	finishedCalls := 0
+	ctrl.SetFinished(func() { finishedCalls++ })
+
+	ctrl.DoAttack(&target)
+	clock.fire(500 * time.Millisecond)
+	if finishedCalls != 0 {
+		t.Fatalf("finished calls at hit landing = %d, want 0", finishedCalls)
+	}
+
+	clock.fire(time.Second)
+	if finishedCalls != 1 {
+		t.Fatalf("finished calls after full swing = %d, want 1", finishedCalls)
+	}
+}
+
+func TestCreatureAttackSetFinishedFiresOnceBowReuseClears(t *testing.T) {
+	clock := &fakeAttackClock{}
+	actor := attackActor{
+		id:          100,
+		known:       map[int32]bool{200: true},
+		canSee:      true,
+		canReach:    true,
+		attackType:  item.WeaponBow,
+		attackSpeed: 500,
+		weaponReuse: time.Second,
+		hit:         Hit{TargetID: 200, Damage: 37},
+	}
+	target := attackTarget{id: 200, attackable: true}
+	ctrl := NewCreature(&actor)
+	ctrl.afterFunc = clock.AfterFunc
+	finishedCalls := 0
+	ctrl.SetFinished(func() { finishedCalls++ })
+
+	ctrl.DoAttack(&target)
+	clock.fire(time.Second)
+	if finishedCalls != 0 {
+		t.Fatalf("finished calls at full swing (still cooling) = %d, want 0", finishedCalls)
+	}
+
+	clock.fire(690 * time.Millisecond)
+	if finishedCalls != 1 {
+		t.Fatalf("finished calls after scaled reuse timer = %d, want 1", finishedCalls)
+	}
+}
+
 func TestPlayableAttackRejectsPeaceZoneForPlayableTargets(t *testing.T) {
 	actor := attackActor{known: map[int32]bool{200: true}, canSee: true, canReach: true, playable: true, peace: true}
 	target := attackTarget{id: 200, attackable: true, playable: true}
