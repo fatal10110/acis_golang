@@ -5,6 +5,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 )
@@ -68,6 +69,33 @@ func TestGiveToPetChecksCapacityBeforeMutation(t *testing.T) {
 	}
 	if playerInv.ItemByObjectID(inst.ObjectID) == nil {
 		t.Fatal("item moved despite capacity failure")
+	}
+}
+
+func TestPickupGroundItemAddsToPetAndReportsPersistence(t *testing.T) {
+	templates := testTemplates()
+	petInv := itemcontainer.NewPetInventory(2, templates)
+	pet := summon.NewPet(summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv})
+	tmpl, ok := templates.Get(item.AdenaID)
+	if !ok {
+		t.Fatal("adena template missing")
+	}
+	ground, err := grounditem.New(item.Instance{ObjectID: 900, TemplateID: item.AdenaID, Count: 40, ManaLeft: -1}, tmpl)
+	if err != nil {
+		t.Fatalf("ground item: %v", err)
+	}
+
+	res, failure := PickupGround(pet, petInv, ground)
+
+	if failure != PickupOK {
+		t.Fatalf("PickupGround failure = %v, want OK", failure)
+	}
+	petStack := petInv.ItemByTemplateID(item.AdenaID)
+	if petStack == nil || petStack.ObjectID != ground.ObjectID() || petStack.Count != 40 || petStack.OwnerID != 2 || petStack.Location != item.LocationPet {
+		t.Fatalf("pet stack = %+v, want picked ground item", petStack)
+	}
+	if len(res.Persist) != 1 || res.Persist[0].Action != inventory.PersistSave || res.Persist[0].Item != petStack {
+		t.Fatalf("persist actions = %+v, want save picked stack", res.Persist)
 	}
 }
 

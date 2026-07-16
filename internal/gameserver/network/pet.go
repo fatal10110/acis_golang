@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
-	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
@@ -108,7 +107,7 @@ func (l *GameClientLink) petGetItem(ctx context.Context, live *livePlayer, req c
 	if !ok {
 		return
 	}
-	if pet.Dead() || pet.OutOfControl() {
+	if !petitem.PickupAvailable(pet) {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
@@ -121,33 +120,30 @@ func (l *GameClientLink) petGetItem(ctx context.Context, live *livePlayer, req c
 		return
 	}
 
-	picked := ground.Instance
-	if petitem.ForbiddenForPet(&picked, ground.Template) {
+	result, failure := petitem.PickupGround(pet, petInv, ground)
+	switch failure {
+	case petitem.PickupOK:
+	case petitem.PickupNoop:
+		return
+	case petitem.PickupPetUnavailable:
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return
+	case petitem.PickupItemNotForPets:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageItemNotForPets))
 		return
-	}
-	if !petInv.ValidateCapacity(petInv.SlotsNeededFor(&picked, ground.Template)) {
+	case petitem.PickupPetCannotCarryMore:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessagePetCannotCarryMoreItems))
 		return
-	}
-	if !petInv.ValidateWeight(int(ground.Template.Weight) * picked.Count) {
+	case petitem.PickupPetTooEncumbered:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessagePetTooEncumbered))
 		return
 	}
 
-	result, absorbed := petInv.Add(&picked)
-	if result == nil {
-		return
-	}
 	l.broadcastGroundPickup(ground, pet.ObjectID())
 	l.groundItems.Remove(ground)
 	l.world.Despawn(ground)
 
-	actions := []invops.Persist{invops.Save(result)}
-	if absorbed {
-		actions = []invops.Persist{invops.Update(result), invops.Delete(ground.ObjectID())}
-	}
-	l.applyPersistActions(ctx, actions)
+	l.applyPersistActions(ctx, result.Persist)
 	l.sendPetInventoryUpdate(live, petInv)
 }
 
