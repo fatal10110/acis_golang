@@ -46,7 +46,7 @@ func (p *livePlayer) attackController() *attack.Controller {
 
 func (p *livePlayer) castController() *actorcast.Controller {
 	if p.cast == nil {
-		p.cast = actorcast.NewController(liveCastActor{live: p})
+		p.cast = actorcast.NewController(actorcast.PlayerActor{Character: p.Character})
 	}
 	return p.cast
 }
