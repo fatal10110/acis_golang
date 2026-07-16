@@ -16,6 +16,13 @@ const (
 	Recipe
 )
 
+const (
+	// MaxRegistrationPage is the highest shortcut page accepted for registration.
+	MaxRegistrationPage int32 = 10
+	// MaxDeletePage is the highest shortcut page accepted for deletion.
+	MaxDeletePage int32 = 9
+)
+
 var typeNames = [...]string{"NONE", "ITEM", "SKILL", "ACTION", "MACRO", "RECIPE"}
 
 // String returns the database representation for t.
@@ -44,6 +51,36 @@ type Shortcut struct {
 	ID            int32
 	Level         int32
 	CharacterType int32
+}
+
+// NewRegistration validates and builds a client shortcut registration.
+func NewRegistration(slot, page int32, typ Type, id, characterType int32, skillLevel func(int32) int) (Shortcut, bool) {
+	if page < 0 || page > MaxRegistrationPage || typ < Item || typ > Recipe {
+		return Shortcut{}, false
+	}
+	level := int32(-1)
+	if typ == Skill {
+		if skillLevel == nil {
+			return Shortcut{}, false
+		}
+		level = int32(skillLevel(id))
+		if level <= 0 {
+			return Shortcut{}, false
+		}
+	}
+	return Shortcut{
+		Slot:          slot,
+		Page:          page,
+		Type:          typ,
+		ID:            id,
+		Level:         level,
+		CharacterType: characterType,
+	}, true
+}
+
+// ValidDeletePage reports whether page is accepted for shortcut deletion.
+func ValidDeletePage(page int32) bool {
+	return page >= 0 && page <= MaxDeletePage
 }
 
 // List is an in-memory shortcut bar. It is owned by one live player
@@ -77,6 +114,15 @@ func (l *List) Register(shortcut Shortcut) {
 		l.bySlot = make(map[int32]Shortcut)
 	}
 	l.bySlot[slotKey(shortcut.Slot, shortcut.Page)] = shortcut
+}
+
+// Has reports whether a shortcut exists at slot and page.
+func (l *List) Has(slot, page int32) bool {
+	if l == nil || l.bySlot == nil {
+		return false
+	}
+	_, ok := l.bySlot[slotKey(slot, page)]
+	return ok
 }
 
 // Delete removes one shortcut by slot and page.

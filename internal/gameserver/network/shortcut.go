@@ -9,29 +9,14 @@ import (
 )
 
 func (l *GameClientLink) registerShortcut(ctx context.Context, live *livePlayer, req clientpackets.RequestShortCutReg) {
-	if live == nil || req.Page < 0 || req.Page > 10 {
+	if live == nil {
 		return
 	}
-	typ := shortcut.Type(req.Type)
-	if typ < shortcut.Item || typ > shortcut.Recipe {
+	sc, ok := shortcut.NewRegistration(req.Slot, req.Page, shortcut.Type(req.Type), req.ID, req.CharacterType, func(id int32) int {
+		return live.SkillLevel(int(id))
+	})
+	if !ok {
 		return
-	}
-
-	level := int32(-1)
-	if typ == shortcut.Skill {
-		level = int32(live.SkillLevel(int(req.ID)))
-		if level <= 0 {
-			return
-		}
-	}
-
-	sc := shortcut.Shortcut{
-		Slot:          req.Slot,
-		Page:          req.Page,
-		Type:          typ,
-		ID:            req.ID,
-		Level:         level,
-		CharacterType: req.CharacterType,
 	}
 	if l.shortcuts != nil {
 		if err := l.shortcuts.Save(ctx, live.ObjectID(), sc); err != nil {
@@ -44,10 +29,10 @@ func (l *GameClientLink) registerShortcut(ctx context.Context, live *livePlayer,
 }
 
 func (l *GameClientLink) deleteShortcut(ctx context.Context, live *livePlayer, req clientpackets.RequestShortCutDel) {
-	if live == nil || req.Page < 0 || req.Page > 9 {
+	if live == nil || !shortcut.ValidDeletePage(req.Page) {
 		return
 	}
-	if !hasShortcutAt(live.shortcuts, req.Slot, req.Page) {
+	if !live.shortcuts.Has(req.Slot, req.Page) {
 		return
 	}
 	if l.shortcuts != nil {
@@ -58,15 +43,6 @@ func (l *GameClientLink) deleteShortcut(ctx context.Context, live *livePlayer, r
 	}
 	live.shortcuts.Delete(req.Slot, req.Page)
 	live.SendFrame(serverpackets.FrameShortCutDelete(req.Slot, req.Page))
-}
-
-func hasShortcutAt(list *shortcut.List, slot, page int32) bool {
-	for _, sc := range list.All() {
-		if sc.Slot == slot && sc.Page == page {
-			return true
-		}
-	}
-	return false
 }
 
 func serverShortcutList(shortcuts []shortcut.Shortcut) []serverpackets.Shortcut {
