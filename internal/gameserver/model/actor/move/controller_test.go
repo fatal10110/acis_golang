@@ -11,11 +11,13 @@ type fakeSelf struct {
 	x, y, z    int
 	radius     float64
 	broadcasts []Event
+	stopCalls  int
 }
 
 func (f *fakeSelf) Position() (int, int, int) { return f.x, f.y, f.z }
 func (f *fakeSelf) CollisionRadius() float64  { return f.radius }
 func (f *fakeSelf) BroadcastMove(event Event) { f.broadcasts = append(f.broadcasts, event) }
+func (f *fakeSelf) BroadcastStop()            { f.stopCalls++ }
 
 type fakeTarget struct {
 	id      int32
@@ -139,6 +141,20 @@ func TestControllerStopCancelsFollow(t *testing.T) {
 	if c.move.Following() {
 		t.Fatal("follow task still active after Stop")
 	}
+	if self.stopCalls != 1 {
+		t.Fatalf("BroadcastStop calls = %d, want 1", self.stopCalls)
+	}
+}
+
+func TestControllerStopIsSilentWhenNothingWasMoving(t *testing.T) {
+	self := &fakeSelf{}
+	c := newTestController(t, self)
+
+	c.Stop()
+
+	if self.stopCalls != 0 {
+		t.Fatalf("BroadcastStop calls = %d, want 0 when nothing was moving", self.stopCalls)
+	}
 }
 
 func TestControllerMaybeStartOffensiveFollowIssuesMovementTowardTarget(t *testing.T) {
@@ -230,6 +246,9 @@ func TestControllerStopCancelsInFlightMovement(t *testing.T) {
 
 	if c.move.Moving() {
 		t.Fatal("Moving() = true after Stop, want false")
+	}
+	if self.stopCalls != 1 {
+		t.Fatalf("BroadcastStop calls = %d, want 1", self.stopCalls)
 	}
 }
 

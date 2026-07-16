@@ -8,6 +8,13 @@ import (
 )
 
 func (l *GameClientLink) moveLivePlayer(live *livePlayer, origin, target location.Location) {
+	// A client-initiated walk overrides any attack-driven chase movement —
+	// otherwise the server's own MaybeStartOffensiveFollow re-think would
+	// fight the player's own steering back toward the old target.
+	if live.combat != nil {
+		live.combat.Stop()
+	}
+
 	heading := origin.HeadingTo(target)
 	l.updateLivePlayerPosition(live, origin, heading)
 	live.SendFrame(serverpackets.FrameMoveToLocation(live.ObjectID(), target, origin))

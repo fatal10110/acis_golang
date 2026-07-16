@@ -131,6 +131,9 @@ func (l *GameClientLink) clearLiveTarget(live *livePlayer) {
 	}
 	old := live.target
 	live.target = nil
+	if live.combat != nil {
+		live.combat.Stop()
+	}
 	live.SendFrame(serverpackets.FrameActionFailed())
 	if old != nil {
 		l.broadcastTargetUnselected(live)

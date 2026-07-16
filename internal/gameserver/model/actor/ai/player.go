@@ -19,9 +19,13 @@ type PlayerAttackActor interface {
 // distance on a target and re-attacking it until it dies, is lost, or the
 // player cancels.
 //
-// mu guards target: Start and Stop run on the packet-handling goroutine
-// while Think can also run from a movement-arrived or attack-finished hook
-// on a timer goroutine.
+// mu serializes the whole decision in thinkLocked, not just the target
+// field: Start runs on the packet-handling goroutine while Think can also
+// run concurrently from a movement-arrived or attack-finished hook on a
+// timer goroutine. Locking only the target read would let two goroutines
+// both observe AttackingNow()==false and both reach DoAttack — a logic race
+// on the compound decision that -race can't see, since each individual
+// field access would still be individually synchronized.
 type PlayerAttack struct {
 	actor  PlayerAttackActor
 	move   MoveController
@@ -44,17 +48,16 @@ func NewPlayerAttack(actor PlayerAttackActor, move MoveController, attack Attack
 // distance and will attack once it arrives.
 func (p *PlayerAttack) Start(target attackable.Combatant) bool {
 	p.mu.Lock()
+	defer p.mu.Unlock()
 	p.target = target
-	p.mu.Unlock()
-	return p.think()
+	return p.thinkLocked()
 }
 
 // Stop clears the attack intention and stops any movement toward it.
 func (p *PlayerAttack) Stop() {
 	p.mu.Lock()
-	p.target = nil
-	p.mu.Unlock()
-	p.move.Stop()
+	defer p.mu.Unlock()
+	p.stopLocked()
 }
 
 // Target returns the current attack target, or nil if idle.
@@ -67,23 +70,25 @@ func (p *PlayerAttack) Target() attackable.Combatant {
 // Think re-evaluates the current attack intention once. Safe to call from
 // a movement-arrived or attack-finished hook as well as from Start.
 func (p *PlayerAttack) Think() {
-	p.think()
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.thinkLocked()
 }
 
-func (p *PlayerAttack) think() bool {
-	p.mu.Lock()
-	target := p.target
-	p.mu.Unlock()
-	if target == nil {
+// thinkLocked runs the full attack-intention decision. Callers hold mu for
+// its entire body so a concurrent Start/Think can't interleave with it and
+// reach DoAttack twice for the same swing.
+func (p *PlayerAttack) thinkLocked() bool {
+	if p.target == nil {
 		return false
 	}
 
-	if p.actor.AttackDisabled() || p.targetLost(target) {
-		p.Stop()
+	if p.actor.AttackDisabled() || p.targetLost(p.target) {
+		p.stopLocked()
 		return false
 	}
 
-	if p.move.MaybeStartOffensiveFollow(target, p.actor.PhysicalAttackRange()) {
+	if p.move.MaybeStartOffensiveFollow(p.target, p.actor.PhysicalAttackRange()) {
 		return true
 	}
 
@@ -91,14 +96,19 @@ func (p *PlayerAttack) think() bool {
 		return false
 	}
 
-	if !p.attack.CanAttack(target) {
-		p.Stop()
+	if !p.attack.CanAttack(p.target) {
+		p.stopLocked()
 		return false
 	}
 
 	p.move.Stop()
-	p.attack.DoAttack(target)
+	p.attack.DoAttack(p.target)
 	return true
+}
+
+func (p *PlayerAttack) stopLocked() {
+	p.target = nil
+	p.move.Stop()
 }
 
 func (p *PlayerAttack) targetLost(target attackable.Combatant) bool {

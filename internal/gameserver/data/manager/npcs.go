@@ -666,8 +666,15 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo) (*npc.Hosti
 	// Re-evaluate the AI loop as soon as a chase leg completes or a swing
 	// finishes, rather than waiting for the next fixed AI tick — otherwise
 	// a hostile NPC only closes distance on, or re-attacks, its target once
-	// per task.AITick.
-	moveCtl.SetArrived(hostile.AI().Think)
+	// per task.AITick. CreatureMove tracks position for its own timing only;
+	// the arrived hook must push that position into the world-grid presence
+	// range checks actually read before re-thinking, or the AI loop re-runs
+	// against a stale position forever.
+	moveCtl.SetArrived(func() {
+		pos := moveCtl.Position()
+		hostile.SyncPosition(pos.X, pos.Y, pos.Z)
+		hostile.AI().Think()
+	})
 	attackCtl.SetFinished(hostile.AI().Think)
 
 	return hostile, nil

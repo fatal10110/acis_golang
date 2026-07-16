@@ -235,7 +235,25 @@ func (h *Hostile) BroadcastMove(event move.Event) {
 		if !ok {
 			return
 		}
-		receiver.SendFrame(serverpackets.FrameMoveToLocation(h.ObjectID(), event.Destination, event.Origin))
+		receiver.SendFrame(serverpackets.FrameMove(h.ObjectID(), event))
+	})
+}
+
+// BroadcastStop sends a stop-in-place notice to every currently known
+// observer capable of receiving one. It is a no-op until SetWorld has been
+// called.
+func (h *Hostile) BroadcastStop() {
+	if h.world == nil {
+		return
+	}
+	x, y, z := h.Position()
+	at := location.Location{X: x, Y: y, Z: z}
+	h.world.ForEachKnown(h, func(o world.Tracked) {
+		receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
+		if !ok {
+			return
+		}
+		receiver.SendFrame(serverpackets.FrameStopMove(h.ObjectID(), at, h.Heading()))
 	})
 }
 

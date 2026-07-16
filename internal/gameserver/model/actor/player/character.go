@@ -64,6 +64,7 @@ type Character struct {
 	sendFrame       func(wire.Frame) bool
 	broadcastAttack func(attack.Snapshot)
 	broadcastMove   func(move.Event)
+	broadcastStop   func()
 	roll            func(int) int
 
 	deathMu sync.Mutex

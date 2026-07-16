@@ -1,6 +1,8 @@
 package ai
 
 import (
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
@@ -175,5 +177,75 @@ func TestPlayerAttackStartRejectsWhenAttackDisabled(t *testing.T) {
 
 	if p.Start(target) {
 		t.Fatal("Start() = true, want false while attacks are disabled")
+	}
+}
+
+// stagedAttack detects overlapping DoAttack calls directly: AttackingNow
+// always reports false (simulating the window before attack.Controller has
+// updated its own busy flag), and DoAttack blocks until released, so a
+// second call reaching DoAttack while the first is still blocked flips
+// overlapped via a failed compare-and-swap.
+type stagedAttack struct {
+	canAttack  bool
+	entered    chan struct{}
+	release    chan struct{}
+	inFlight   int32
+	doAttackN  int32
+	overlapped int32
+}
+
+func (a *stagedAttack) BowCoolingDown() bool { return false }
+func (a *stagedAttack) AttackingNow() bool   { return false }
+func (a *stagedAttack) CanAttack(attackable.Combatant) bool {
+	return a.canAttack
+}
+func (a *stagedAttack) DoAttack(attackable.Combatant) {
+	if !atomic.CompareAndSwapInt32(&a.inFlight, 0, 1) {
+		atomic.StoreInt32(&a.overlapped, 1)
+	}
+	atomic.AddInt32(&a.doAttackN, 1)
+	select {
+	case <-a.entered:
+	default:
+		close(a.entered)
+	}
+	<-a.release
+	atomic.StoreInt32(&a.inFlight, 0)
+}
+
+// TestPlayerAttackThinkDoesNotDoubleAttackWhileASwingIsInFlight proves
+// thinkLocked's mutex spans the whole decision, not just the target read.
+// AttackingNow() here always reports false, so a version that only locked
+// the target field would let a concurrent Think reach DoAttack while the
+// first call is still blocked inside it — caught here as an overlap via
+// compare-and-swap, deterministically (not a timing-dependent race).
+func TestPlayerAttackThinkDoesNotDoubleAttackWhileASwingIsInFlight(t *testing.T) {
+	owner := playerActor(1)
+	target := actor(2)
+	owner.known[target.ObjectID()] = true
+	move := &recordingMove{}
+	strike := &stagedAttack{canAttack: true, entered: make(chan struct{}), release: make(chan struct{})}
+	p := NewPlayerAttack(owner, move, strike)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		p.Start(target) // holds mu for the whole decision, including DoAttack
+	}()
+	<-strike.entered // first goroutine is now inside DoAttack, still holding mu
+	go func() {
+		defer wg.Done()
+		p.Think() // must block on mu until the first decision finishes
+	}()
+
+	close(strike.release)
+	wg.Wait()
+
+	if atomic.LoadInt32(&strike.overlapped) != 0 {
+		t.Fatal("a second DoAttack call overlapped one still in flight — thinkLocked did not hold mu for the whole decision")
+	}
+	if got := atomic.LoadInt32(&strike.doAttackN); got != 2 {
+		t.Fatalf("DoAttack calls = %d, want 2 (both goroutines eventually attack, sequentially)", got)
 	}
 }

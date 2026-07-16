@@ -20,6 +20,7 @@ type Located interface {
 type Actor interface {
 	Located
 	BroadcastMove(Event)
+	BroadcastStop()
 }
 
 // Controller adapts one CreatureMove to the hostile NPC AI loop's expected
@@ -95,6 +96,8 @@ func (c *Controller) MaybeStartOffensiveFollow(target attackable.Combatant, atta
 			c.move.CancelFollow()
 			return false
 		}
+		event.FollowTarget = target.ObjectID()
+		event.FollowOffset = attackRange
 		c.self.BroadcastMove(event)
 	}
 	return true
@@ -107,10 +110,17 @@ func (c *Controller) MoveHome(home location.Location) {
 	_, _ = c.move.MoveToLocation(home)
 }
 
-// Stop cancels any active follow task and any movement already under way.
+// Stop cancels any active follow task and any movement already under way,
+// broadcasting a stop-in-place packet when there was movement to cancel —
+// otherwise a client that already received the move request keeps walking
+// toward the stale destination until it separately resyncs.
 func (c *Controller) Stop() {
+	wasMoving := c.move.Moving() || c.move.Following()
 	c.move.CancelFollow()
 	c.move.CancelMove()
+	if wasMoving {
+		c.self.BroadcastStop()
+	}
 }
 
 // SetArrived records the callback invoked once movement this controller
@@ -118,4 +128,11 @@ func (c *Controller) Stop() {
 // arrival a no-op.
 func (c *Controller) SetArrived(arrived func()) {
 	c.move.SetArrivedHook(arrived)
+}
+
+// Position returns the actor's current server-authoritative position as
+// tracked by the wrapped CreatureMove. An arrived hook reads this to learn
+// where movement actually left the actor.
+func (c *Controller) Position() location.Location {
+	return c.move.Position()
 }

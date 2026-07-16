@@ -192,19 +192,33 @@ func (l *GameClientLink) attachLivePlayer(client *Client, c *player.Character, t
 	}
 	attackCtl := attack.NewPlayer(c)
 	combat := ai.NewPlayerAttack(c, moveCtl, attackCtl)
-	moveCtl.SetArrived(combat.Think)
 	attackCtl.SetFinished(combat.Think)
 
 	live := &livePlayer{Character: c, template: tmpl, items: items, attack: attackCtl, move: moveCtl, combat: combat, shortcuts: shortcut.NewList(shortcuts), stopAttack: l.stopLiveAutoAttack}
 	attackCtl.SetStarted(func() {
 		l.startLiveAutoAttack(live)
 	})
+	moveCtl.SetArrived(func() {
+		// CreatureMove tracks position for its own timing only; push the
+		// arrived position into the world-grid presence range checks
+		// actually read before re-thinking the attack intention, or it
+		// re-evaluates against a stale position forever.
+		pos := moveCtl.Position()
+		l.updateLivePlayerPosition(live, pos, live.CurrentHeading())
+		combat.Think()
+	})
 	c.SetAttackBroadcaster(func(snapshot attack.Snapshot) {
 		l.broadcastAttack(live, snapshot)
 	})
 	c.SetMoveBroadcaster(func(event move.Event) {
 		l.broadcastLiveFrame(live, func() wire.Frame {
-			return serverpackets.FrameMoveToLocation(live.ObjectID(), event.Destination, event.Origin)
+			return serverpackets.FrameMove(live.ObjectID(), event)
+		})
+	})
+	c.SetStopBroadcaster(func() {
+		x, y, z := live.Position()
+		l.broadcastLiveFrame(live, func() wire.Frame {
+			return serverpackets.FrameStopMove(live.ObjectID(), location.Location{X: x, Y: y, Z: z}, live.CurrentHeading())
 		})
 	})
 	return live, nil

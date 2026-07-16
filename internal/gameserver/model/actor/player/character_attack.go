@@ -117,6 +117,13 @@ func (c *Character) SetMoveBroadcaster(broadcast func(move.Event)) {
 	c.broadcastMove = broadcast
 }
 
+// SetStopBroadcaster records the packet-layer hook that broadcasts a
+// stop-in-place notice to this character's own session and nearby connected
+// clients when server-driven movement is cancelled mid-flight.
+func (c *Character) SetStopBroadcaster(broadcast func()) {
+	c.broadcastStop = broadcast
+}
+
 // SendFrame sends frame to the connected client, if any.
 func (c *Character) SendFrame(frame wire.Frame) bool {
 	if c.sendFrame == nil {
@@ -339,6 +346,14 @@ func (c *Character) BroadcastAttack(snapshot attack.Snapshot) {
 func (c *Character) BroadcastMove(event move.Event) {
 	if c.broadcastMove != nil {
 		c.broadcastMove(event)
+	}
+}
+
+// BroadcastStop sends a stop-in-place notice through the runtime packet
+// hook.
+func (c *Character) BroadcastStop() {
+	if c.broadcastStop != nil {
+		c.broadcastStop()
 	}
 }
 
