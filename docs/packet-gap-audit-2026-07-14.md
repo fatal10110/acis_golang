@@ -30,7 +30,7 @@ Sources checked:
 - Original game client appendix: 206 concrete dispatcher targets.
 - Original game server appendix: 282 packet classes, including base/composite classes.
 - Classified M2-M5 required game client packets: 94. Missing in Go: 48.
-- Classified M2-M5 required game server packets: 128. Missing in Go: 66.
+- Classified M2-M5 required game server packets: 128. Missing in Go: 65.
 - M1 login client/server packets are implemented.
 - M1 GS-LS link packets are implemented under `internal/link/`.
 - M2 base game connect/create/select packet set is implemented.
@@ -283,12 +283,13 @@ Implemented and wired M3 data/UI server packets in Go:
 - `ExPledgeCrestLarge`
 - `PledgeCrest`
 
-Implemented and wired M4 movement/rotation server packets in Go:
+Implemented and wired M4 movement/rotation/static-object server packets in Go:
 
 - `StopMove`
 - `ValidateLocation`
 - `StartRotation`
 - `StopRotation`
+- `ChairSit`
 
 Missing M4 world/movement server packets:
 
@@ -303,7 +304,6 @@ Missing M4 world/movement server packets:
 - `VehicleStarted`
 - `SunRise`
 - `SunSet`
-- `ChairSit`
 
 Missing M5 stats/combat/items/progression server packets:
 
@@ -364,6 +364,7 @@ Implemented and wired M5 shortcut server packets in Go:
 
 - Duplicate names across sections are intentional. For example `NpcHtmlMessage`, `HennaInfo`, `ExStorageMaxCount`, `Die`, `PlaySound`, `ShortCutInit`, and `SkillCoolTime` are required by more than one closed milestone surface.
 - `StartRotation` was also classified into M4 during the movement/rotation pass; it is implemented and wired with `StartRotating`.
+- `ChairSit` is wired for selected type-1 static objects within interaction range. It broadcasts `ChangeWaitType` before `ChairSit`, marks the chair busy while occupied, and releases it when the player stands or stops. Map signs, arena signs, and richer static-object interactions remain deferred.
 - `Action` and `AttackRequest` now wire the target-selection/onAction subset needed for attacking mobs: first request selects and sends target HP status, second `AttackRequest` against the selected target emits `AutoAttackStart` then `Attack`; the existing attack-stance timeout emits `AutoAttackStop`. NPC dialog/interact routing remains deferred to the M7 NPC work, and skill/cast targeting remains deferred to M6.
 - `RequestChangeMoveType`, `RequestChangeWaitType`, and `RequestSocialAction` now wire the current run/walk, sit/stand, and social-animation state available in Go. Missing higher-level gates such as mount state, fishing, requester/trade state, and full AI intention are still owned by the systems that introduce those states.
 - `RequestDropItem`, `RequestDestroyItem`, and `SendTimeCheck` are wired. Drop/destroy currently cover the inventory/template/count gates available in Go and emit `InventoryUpdate`; player drops also place a ground item through the ground-item task and emit the animated `DropItem` frame during the transient dropper-id window.
@@ -378,6 +379,6 @@ Implemented and wired M5 shortcut server packets in Go:
 - `PetItemList`, `PetInfo`, and `PetStatusUpdate` remain deferred together: the current Go pet actor lacks the full pet info/status snapshot surface and owner spawn/info broadcast path needed to emit truthful full-list/status packets. `PetStatusShow` and `PetDelete` are wired where the current runtime has exact backing behavior.
 - `RequestAutoSoulShot` is wired as extended client opcode `0x0005` with per-player auto-shot toggle state, `ExAutoSoulShot`, and item-name `SystemMessage` feedback. First-shot recharge, recurring shot consumption, and `ExUseSharedGroupItem` reuse display remain deferred to the item-use/handler burst because the shared item handler/reuse pipeline is not ported yet.
 - `StatusUpdate` is implemented and wired for target max/current HP during selection. Broader status/stat recalculation broadcasts still need owner flows as those systems are ported.
-- The unique missing counts deduplicate those overlaps: 50 missing game client packets and 66 missing game server packets after the EnterWorld, movement/rotation, ValidateLocation correction, inventory, target/action, stance/social, item-operation, auto-shot, skill-acquisition, basic skill-cast, enchant, backed pet inventory/status, linked-html, pledge-crest, and ally-crest packet-wiring passes.
+- The unique missing counts deduplicate those overlaps: 50 missing game client packets and 65 missing game server packets after the EnterWorld, movement/rotation, ValidateLocation correction, ChairSit, inventory, target/action, stance/social, item-operation, auto-shot, skill-acquisition, basic skill-cast, enchant, backed pet inventory/status, linked-html, pledge-crest, and ally-crest packet-wiring passes.
 - Existing Go code accepts several M4/M5 client opcodes in `clientpackets/wiresafe.go`, but many of them still log "Opcode not wired" or have no decode/run implementation.
 - This audit uses original Java class names. Go may keep a slightly different helper shape, such as `Frame...` functions instead of packet structs, but the required client-visible packet behavior is still one original packet at a time.

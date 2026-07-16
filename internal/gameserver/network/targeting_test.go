@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -45,6 +46,58 @@ func TestSelectAndClearLiveTargetSendsTargetPackets(t *testing.T) {
 	}
 	if got := frameOpcodes(observerFrames.frames); string(got) != string([]byte{serverpackets.OpcodeTargetUnselected}) {
 		t.Fatalf("observer clear opcodes = %x, want TargetUnselected", got)
+	}
+}
+
+func TestGameClientLinkActionSitsOnSelectedChairStaticObject(t *testing.T) {
+	state := world.New()
+	frames := &frameCapture{}
+	live := newTestLivePlayer(t, 1, frames)
+	chair, err := staticobject.NewObject(2, &staticobject.Template{
+		ID:       777,
+		Location: location.Location{X: 100, Y: 0, Z: 0},
+		Type:     1,
+	})
+	if err != nil {
+		t.Fatalf("NewObject: %v", err)
+	}
+
+	state.Spawn(live, 0, 0, 0, 0)
+	state.Spawn(chair, 100, 0, 0, 0)
+	frames.frames = nil
+	live.target = chair
+
+	gcl := &GameClientLink{world: state, log: zerolog.Nop()}
+	gcl.handleTargetAction(live, chair.ObjectID(), true)
+
+	if got := frameOpcodes(frames.frames); string(got) != string([]byte{serverpackets.OpcodeChangeWaitType, serverpackets.OpcodeChairSit}) {
+		t.Fatalf("chair action opcodes = %x, want ChangeWaitType, ChairSit", got)
+	}
+	if live.Standing() {
+		t.Fatal("live player remained standing after chair action")
+	}
+	if !chair.Busy() {
+		t.Fatal("chair was not marked busy")
+	}
+
+	r := wire.NewReader(frames.frames[1][1:])
+	if got := r.ReadInt32(); got != live.ObjectID() {
+		t.Fatalf("ChairSit player id = %d, want %d", got, live.ObjectID())
+	}
+	if got := r.ReadInt32(); got != int32(chair.StaticObjectID()) {
+		t.Fatalf("ChairSit static id = %d, want %d", got, chair.StaticObjectID())
+	}
+
+	frames.frames = nil
+	gcl.changeLiveWaitType(live, true)
+	if chair.Busy() {
+		t.Fatal("chair stayed busy after standing")
+	}
+	if !live.Standing() {
+		t.Fatal("live player did not stand after stand request")
+	}
+	if got := frameOpcodes(frames.frames); string(got) != string([]byte{serverpackets.OpcodeChangeWaitType}) {
+		t.Fatalf("stand opcodes = %x, want ChangeWaitType", got)
 	}
 }
 

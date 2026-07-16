@@ -11,6 +11,8 @@ const (
 	OpcodeDoorStatusUpdate = 0x4d
 	// OpcodeStaticObjectInfo is the wire opcode for StaticObjectInfo.
 	OpcodeStaticObjectInfo = 0x99
+	// OpcodeChairSit is the wire opcode for ChairSit.
+	OpcodeChairSit = 0xe1
 )
 
 type doorPacketObject interface {
@@ -60,5 +62,13 @@ func FrameStaticObjectInfo(obj staticPacketObject) wire.Frame {
 	w := newFrameWriter(OpcodeStaticObjectInfo)
 	w.WriteInt32(int32(obj.StaticObjectID()))
 	w.WriteInt32(obj.ObjectID())
+	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
+}
+
+// FrameChairSit builds the static-object chair sit packet.
+func FrameChairSit(playerID int32, staticID int) wire.Frame {
+	w := newFrameWriter(OpcodeChairSit)
+	w.WriteInt32(playerID)
+	w.WriteInt32(int32(staticID))
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
 }

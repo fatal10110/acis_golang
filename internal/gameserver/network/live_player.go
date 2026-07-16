@@ -15,6 +15,7 @@ type livePlayer struct {
 	template  *player.Template
 	items     []*item.Instance
 	target    world.Tracked
+	throne    staticChairObject
 	attack    *attack.Controller
 	cast      *actorcast.Controller
 	shortcuts *shortcut.List
@@ -33,6 +34,7 @@ func (p *livePlayer) Stop() {
 	if p.stopAttack != nil {
 		p.stopAttack(p)
 	}
+	p.releaseChair()
 }
 
 func (p *livePlayer) attackController() *attack.Controller {
@@ -57,4 +59,12 @@ func (p *livePlayer) inventoryItems() []*item.Instance {
 		return inv.Items()
 	}
 	return p.items
+}
+
+func (p *livePlayer) releaseChair() {
+	if p == nil || p.throne == nil {
+		return
+	}
+	p.throne.SetBusy(false)
+	p.throne = nil
 }
