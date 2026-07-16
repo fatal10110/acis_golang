@@ -7,7 +7,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/petitem"
@@ -42,7 +41,7 @@ func (l *GameClientLink) giveItemToPet(ctx context.Context, live *livePlayer, re
 	if playerInv == nil {
 		return
 	}
-	res, failure, err := l.petItemService().GiveToPet(playerInv, petInv, pet, req.ObjectID, int(req.Count), withinInteractionDistance(live, pet))
+	res, failure, err := l.petItemService().GiveToPet(playerInv, petInv, pet, live, req.ObjectID, int(req.Count))
 	if err != nil {
 		l.log.Error().Err(err).Msg("transfer item to pet")
 		return
@@ -172,12 +171,6 @@ func (l *GameClientLink) petUseItem(ctx context.Context, live *livePlayer, req c
 	}
 	live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessagePetPutOnS1, res.ItemID))
 	l.sendPetInventoryUpdate(live, petInv)
-}
-
-func withinInteractionDistance(live *livePlayer, pet *summon.Actor) bool {
-	ax, ay, az := live.Position()
-	bx, by, bz := pet.Position()
-	return location.In3DRange(ax, ay, az, bx, by, bz, dropInteractionDistance)
 }
 
 func (l *GameClientLink) broadcastGroundPickup(ground *grounditem.Item, pickerID int32) {
