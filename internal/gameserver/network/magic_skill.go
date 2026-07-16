@@ -6,6 +6,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
@@ -18,7 +19,7 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 		return
 	}
 
-	beforeHP, beforeMP := int(live.CurHP), int(live.CurMP)
+	beforeVitals := live.Vitals()
 	controller := live.castController()
 	started, err := actorcast.StartPlayerSkill(actorcast.PlayerSkillRequest{
 		Now:         time.Now(),
@@ -61,11 +62,11 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 
 	if err := controller.Hit(); err != nil {
 		sendMagicCastFailure(live, def, err)
-		sendMagicStatusUpdate(live, beforeHP, beforeMP)
+		sendMagicStatusUpdate(live, beforeVitals)
 		controller.Stop()
 		return
 	}
-	sendMagicStatusUpdate(live, beforeHP, beforeMP)
+	sendMagicStatusUpdate(live, beforeVitals)
 	controller.Finish()
 }
 
@@ -102,20 +103,28 @@ func sendMagicActionFailed(live *livePlayer) {
 	}
 }
 
-func sendMagicStatusUpdate(live *livePlayer, beforeHP, beforeMP int) {
+func sendMagicStatusUpdate(live *livePlayer, before player.Vitals) {
 	if live == nil {
 		return
 	}
-	attrs := make([]serverpackets.StatusAttribute, 0, 2)
-	if hp := int(live.CurHP); hp != beforeHP {
-		attrs = append(attrs, serverpackets.StatusAttribute{Type: serverpackets.StatusCurrentHP, Value: hp})
-	}
-	if mp := int(live.CurMP); mp != beforeMP {
-		attrs = append(attrs, serverpackets.StatusAttribute{Type: serverpackets.StatusCurrentMP, Value: mp})
-	}
+	attrs := magicStatusAttributes(before.ChangesTo(live.Vitals()))
 	if len(attrs) > 0 {
 		live.SendFrame(serverpackets.FrameStatusUpdate(live.ObjectID(), attrs))
 	}
+}
+
+func magicStatusAttributes(change player.VitalsChange) []serverpackets.StatusAttribute {
+	if !change.Changed() {
+		return nil
+	}
+	attrs := make([]serverpackets.StatusAttribute, 0, 2)
+	if change.HPChanged {
+		attrs = append(attrs, serverpackets.StatusAttribute{Type: serverpackets.StatusCurrentHP, Value: change.HP})
+	}
+	if change.MPChanged {
+		attrs = append(attrs, serverpackets.StatusAttribute{Type: serverpackets.StatusCurrentMP, Value: change.MP})
+	}
+	return attrs
 }
 
 func millis(d time.Duration) int {
