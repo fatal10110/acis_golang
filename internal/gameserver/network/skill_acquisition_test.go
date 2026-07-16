@@ -8,6 +8,97 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
+// testBookPolicy maps the test template's skill 3 to Adena (item id 57), so
+// learning it requires and consumes one Adena. The wire contract for the
+// requirement entry (type 99, item id, count 1, unk 50) is what the oracle
+// sends; the item id itself is data-driven.
+func testBookPolicy(t *testing.T) modelskill.BookPolicy {
+	t.Helper()
+	tbl, err := modelskill.NewSpellbookTable([]modelskill.Spellbook{{SkillID: 3, ItemID: 57}})
+	if err != nil {
+		t.Fatalf("build spellbook table: %v", err)
+	}
+	return modelskill.BookPolicy{Table: tbl, SPBookNeeded: true, DivineBookNeeded: true}
+}
+
+// newAcquireSkillClient wires a linked client with a spellbook policy and one
+// selectable character at level 5 with sp sp.
+func newAcquireSkillClient(t *testing.T, skills *SkillPersistence, policy modelskill.BookPolicy, sp int, seedItems func(*fakeItemStore, int32)) *fakeGameClient {
+	t.Helper()
+	var objID int32
+	c, _, _, _, _ := newLinkedGameClientWithSkillsShortcutsCrestsSeed(t, skills, nil, nil, policy, func(chars *fakeCharStore, items *fakeItemStore) {
+		objID = seedSelectableCharacter(t, chars, "player1", "Newbie", 5, sp)
+		if seedItems != nil {
+			seedItems(items, objID)
+		}
+	}, 1)
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+	return c
+}
+
+// TestAcquireSkillInfoIncludesSpellbookRequirement verifies that a skill
+// level with a spellbook sends an AcquireSkillInfo whose single requirement
+// matches the oracle tuple (type 99, book item id, count 1, unk 50).
+func TestAcquireSkillInfoIncludesSpellbookRequirement(t *testing.T) {
+	store := newMemorySkillSaveStore()
+	skills := NewSkillPersistence(store, modelskill.NewTable([]modelskill.Definition{
+		{ID: 3, Level: 1, Activation: modelskill.ActivationActive},
+	}), store)
+	c := newAcquireSkillClient(t, skills, testBookPolicy(t), 50, nil)
+
+	c.send(encodeRequestAcquireSkillInfo(3, 1, 0))
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeAcquireSkillInfo {
+		t.Fatalf("opcode = %#x, want AcquireSkillInfo (%#x)", reply[0], serverpackets.OpcodeAcquireSkillInfo)
+	}
+	r := wire.NewReader(reply[1:])
+	if id, level, cost, mode := r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32(); id != 3 || level != 1 || cost != 50 || mode != 0 {
+		t.Fatalf("AcquireSkillInfo header = id %d level %d cost %d mode %d, want 3/1/50/0", id, level, cost, mode)
+	}
+	if reqCount := r.ReadInt32(); reqCount != 1 {
+		t.Fatalf("requirement count = %d, want 1", reqCount)
+	}
+	if rtype, itemID, count, unk := r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32(); rtype != 99 || itemID != 57 || count != 1 || unk != 50 {
+		t.Fatalf("requirement = type %d item %d count %d unk %d, want 99/57/1/50", rtype, itemID, count, unk)
+	}
+	if err := r.Err(); err != nil {
+		t.Fatalf("read AcquireSkillInfo: %v", err)
+	}
+}
+
+// TestAcquireSkillLearnBlockedByMissingSpellbook verifies that learning a
+// spellbook-requiring skill without the book in inventory sends the
+// item-missing system message and the skill list, without learning the skill.
+func TestAcquireSkillLearnBlockedByMissingSpellbook(t *testing.T) {
+	store := newMemorySkillSaveStore()
+	skills := NewSkillPersistence(store, modelskill.NewTable([]modelskill.Definition{
+		{ID: 3, Level: 1, Activation: modelskill.ActivationActive},
+	}), store)
+	c := newAcquireSkillClient(t, skills, testBookPolicy(t), 50, nil)
+
+	c.send(encodeRequestAcquireSkill(3, 1, 0))
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeSystemMessage {
+		t.Fatalf("opcode = %#x, want SystemMessage (%#x)", reply[0], serverpackets.OpcodeSystemMessage)
+	}
+	if id := wire.NewReader(reply[1:]).ReadInt32(); id != serverpackets.SystemMessageItemMissingToLearnSkill {
+		t.Fatalf("SystemMessage id = %d, want item-missing (%d)", id, serverpackets.SystemMessageItemMissingToLearnSkill)
+	}
+
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeAcquireSkillList {
+		t.Fatalf("opcode = %#x, want AcquireSkillList (%#x)", reply[0], serverpackets.OpcodeAcquireSkillList)
+	}
+	r := wire.NewReader(reply[1:])
+	if skillType, count := r.ReadInt32(), r.ReadInt32(); skillType != int32(serverpackets.AcquireSkillTypeUsual) || count != 1 {
+		t.Fatalf("AcquireSkillList = type %d count %d, want usual with 1 entry", skillType, count)
+	}
+}
+
 func TestGameClientLinkSendsSkillCoolTimeInGame(t *testing.T) {
 	c, _, _, _ := newLinkedGameClient(t)
 

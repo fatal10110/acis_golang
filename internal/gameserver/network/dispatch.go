@@ -16,6 +16,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/petitem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	tradebook "github.com/fatal10110/acis_golang/internal/gameserver/trade"
@@ -68,6 +69,7 @@ type GameClientLink struct {
 	html          *datacache.HTML
 	crests        *datacache.Crests
 	skills        *SkillPersistence
+	spellbooks    modelskill.BookPolicy
 	world         *world.State
 	ids           idAllocator
 	groundItems   groundItemDropper
@@ -102,6 +104,7 @@ func NewGameClientLink(
 	html *datacache.HTML,
 	crests *datacache.Crests,
 	skills *SkillPersistence,
+	spellbooks modelskill.BookPolicy,
 	worldState *world.State,
 	ids idAllocator,
 	groundItems groundItemDropper,
@@ -119,6 +122,7 @@ func NewGameClientLink(
 		html:          html,
 		crests:        crests,
 		skills:        skills,
+		spellbooks:    spellbooks,
 		world:         worldState,
 		ids:           ids,
 		groundItems:   groundItems,

@@ -11,6 +11,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
@@ -122,7 +123,7 @@ func testAllyCrestCache(t *testing.T, crests map[int][]byte) *datacache.Crests {
 
 func newInGameClientWithCrests(t *testing.T, crests *datacache.Crests) *fakeGameClient {
 	t.Helper()
-	c, _, _, _, _ := newLinkedGameClientWithSkillsShortcutsCrestsSeed(t, nil, nil, crests, func(chars *fakeCharStore, items *fakeItemStore) {
+	c, _, _, _, _ := newLinkedGameClientWithSkillsShortcutsCrestsSeed(t, nil, nil, crests, modelskill.BookPolicy{}, func(chars *fakeCharStore, items *fakeItemStore) {
 		seedSelectableCharacter(t, chars, "player1", "CrestTester", 1, 0)
 	}, 1)
 	c.send(encodeRequestGameStart(0))

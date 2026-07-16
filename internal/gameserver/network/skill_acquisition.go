@@ -10,7 +10,16 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
-const acquireSkillTypeUsual int32 = 0
+const (
+	acquireSkillTypeUsual int32 = 0
+
+	// spellbookRequirementType is the requirement kind tag marking a
+	// spellbook item in an AcquireSkillInfo requirement entry.
+	spellbookRequirementType = 99
+	// spellbookRequirementUnk is the trailing field Java sends with
+	// spellbook requirements; its value is part of the wire contract.
+	spellbookRequirementUnk = 50
+)
 
 func (l *GameClientLink) sendAcquireSkillInfo(live *livePlayer, req clientpackets.RequestAcquireSkillInfo) {
 	if !validAcquireSkillRequest(req.SkillID, req.Level) || req.SkillType != acquireSkillTypeUsual {
@@ -26,7 +35,11 @@ func (l *GameClientLink) sendAcquireSkillInfo(live *livePlayer, req clientpacket
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNoMoreSkillsToLearn))
 		return
 	}
-	live.SendFrame(serverpackets.FrameAcquireSkillInfo(req.SkillID, req.Level, int32(grant.CorrectedCost()), acquireSkillTypeUsual, nil))
+	var reqs []serverpackets.SkillRequirement
+	if bookID := l.spellbooks.BookForSkill(modelskill.ID(req.SkillID), int(req.Level)); bookID > 0 {
+		reqs = []serverpackets.SkillRequirement{{Type: spellbookRequirementType, ItemID: bookID, Count: 1, Unknown: spellbookRequirementUnk}}
+	}
+	live.SendFrame(serverpackets.FrameAcquireSkillInfo(req.SkillID, req.Level, int32(grant.CorrectedCost()), acquireSkillTypeUsual, reqs))
 }
 
 func (l *GameClientLink) learnAcquireSkill(ctx context.Context, live *livePlayer, req clientpackets.RequestAcquireSkill) {
@@ -49,6 +62,13 @@ func (l *GameClientLink) learnAcquireSkill(ctx context.Context, live *livePlayer
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNoMoreSkillsToLearn))
 		live.SendFrame(l.acquireSkillList(live))
 		return
+	}
+	if bookID := l.spellbooks.BookForSkill(modelskill.ID(req.SkillID), int(req.Level)); bookID > 0 {
+		if live.Inventory() == nil || live.Inventory().DestroyByTemplateID(bookID, 1) == nil {
+			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageItemMissingToLearnSkill))
+			live.SendFrame(l.acquireSkillList(live))
+			return
+		}
 	}
 	if l.skills != nil {
 		if err := l.skills.SetKnownSkill(ctx, live.Character, grant.SkillID, grant.Level); err != nil {

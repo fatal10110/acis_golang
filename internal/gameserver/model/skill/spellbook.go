@@ -65,3 +65,22 @@ func (t *SpellbookTable) BookForSkill(skillID ID, level int, spellbooksRequired,
 }
 
 func (t *SpellbookTable) Count() int { return len(t.books) }
+
+// BookPolicy pairs the spellbook table with the two config gates that decide
+// whether learning a skill level consumes a spellbook item. Its zero value
+// disables spellbook requirements entirely (BookForSkill always returns 0),
+// which lets callers omit it when spellbooks are off.
+type BookPolicy struct {
+	Table            *SpellbookTable
+	SPBookNeeded     bool
+	DivineBookNeeded bool
+}
+
+// BookForSkill returns the spellbook item id required to learn the given
+// skill level, or 0 when no book is required.
+func (p BookPolicy) BookForSkill(skillID ID, level int) int32 {
+	if p.Table == nil {
+		return 0
+	}
+	return p.Table.BookForSkill(skillID, level, p.SPBookNeeded, p.DivineBookNeeded)
+}
