@@ -3,6 +3,7 @@ package world
 import (
 	"fmt"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/worldobject"
 )
 
@@ -233,23 +234,20 @@ func searchDepth(radius int) int {
 	return radius/regionSize + 1
 }
 
-// inRange reports whether a and b are within rng units of each other,
-// comparing squared 3D distances. A rng of -1 means unlimited; any other
-// value is squared, so a negative rng behaves like its absolute value.
+// inRange reports whether a and b are within rng units of each other.
+// A rng of -1 means unlimited; any other negative value behaves like its
+// absolute value.
 // Objects that occupy physical space will eventually widen the allowance
 // by their body radius; until then both bodies count as points.
 func inRange(rng int, a, b Tracked) bool {
 	if rng == -1 {
 		return true
 	}
+	if rng < 0 {
+		rng = -rng
+	}
 
 	ax, ay, az := a.presence().Position()
 	bx, by, bz := b.presence().Position()
-
-	dx := int64(ax) - int64(bx)
-	dy := int64(ay) - int64(by)
-	dz := int64(az) - int64(bz)
-	distSq := dx*dx + dy*dy + dz*dz
-
-	return distSq <= int64(rng)*int64(rng)
+	return location.In3DRange(ax, ay, az, bx, by, bz, rng)
 }

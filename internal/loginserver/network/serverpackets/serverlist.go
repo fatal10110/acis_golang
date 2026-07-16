@@ -1,5 +1,7 @@
 package serverpackets
 
+import "github.com/fatal10110/acis_golang/internal/commons/wire"
+
 // OpcodeServerList is the wire opcode for ServerList, listing the game
 // servers a client may choose from.
 const OpcodeServerList = 0x04
@@ -34,10 +36,10 @@ func EncodeServerList(lastServer byte, servers []ServerEntry) []byte {
 		w.WriteBytes(s.IP[:])
 		w.WriteInt32(s.Port)
 		w.WriteUint8(s.AgeLimit)
-		w.WriteUint8(boolByte(s.PvP))
+		w.WriteUint8(wire.BoolByte(s.PvP))
 		w.WriteUint16(s.CurrentPlayers)
 		w.WriteUint16(s.MaxPlayers)
-		w.WriteUint8(boolByte(s.Online))
+		w.WriteUint8(wire.BoolByte(s.Online))
 
 		var bits int32
 		if s.TestServer {
@@ -47,14 +49,7 @@ func EncodeServerList(lastServer byte, servers []ServerEntry) []byte {
 			bits |= 0x02
 		}
 		w.WriteInt32(bits)
-		w.WriteUint8(boolByte(s.ShowBrackets))
+		w.WriteUint8(wire.BoolByte(s.ShowBrackets))
 	}
 	return w.Bytes()
-}
-
-func boolByte(b bool) byte {
-	if b {
-		return 1
-	}
-	return 0
 }

@@ -111,7 +111,7 @@ func NewHall(set *commons.StatSet, zones []residence.Zone, spawns map[residence.
 		},
 		Gates:  gates,
 		NPCs:   append([]int(nil), npcs...),
-		Spawns: copySpawns(spawns),
+		Spawns: residence.CopySpawns(spawns),
 		Zones:  append([]residence.Zone(nil), zones...),
 	}, nil
 }
@@ -274,17 +274,6 @@ func (t *DecoTable) Depth(decoType, level int) int {
 		return deco.Depth
 	}
 	return 0
-}
-
-func copySpawns(src map[residence.SpawnType][]location.Location) map[residence.SpawnType][]location.Location {
-	if len(src) == 0 {
-		return nil
-	}
-	dst := make(map[residence.SpawnType][]location.Location, len(src))
-	for kind, list := range src {
-		dst[kind] = append([]location.Location(nil), list...)
-	}
-	return dst
 }
 
 func cleanStrings(in []string) []string {

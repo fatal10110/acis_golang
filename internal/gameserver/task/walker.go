@@ -302,18 +302,11 @@ func nearestNode(origin location.Location, nodes []route.WalkerLocation) int {
 	bestIndex := 0
 	bestDistance := math.Inf(1)
 	for i, node := range nodes {
-		d := distance3D(origin, node.Location)
+		d := origin.Distance3D(node.Location)
 		if d < bestDistance {
 			bestDistance = d
 			bestIndex = i
 		}
 	}
 	return bestIndex
-}
-
-func distance3D(a, b location.Location) float64 {
-	dx := float64(a.X - b.X)
-	dy := float64(a.Y - b.Y)
-	dz := float64(a.Z - b.Z)
-	return math.Sqrt(dx*dx + dy*dy + dz*dz)
 }

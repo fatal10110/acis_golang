@@ -271,7 +271,7 @@ func (h *Hostile) InTerritory() bool {
 	if !h.Instance.HasHome {
 		return true
 	}
-	return in3DRange(h.location(), h.Instance.Home, h.driftRange())
+	return h.location().In3DRange(h.Instance.Home, h.driftRange())
 }
 
 func hostileKind(inst *Instance) InstanceKind {
@@ -295,11 +295,4 @@ func (h *Hostile) driftRange() int {
 
 func in2DRange(a, b location.Location, radius int) bool {
 	return math.Hypot(float64(a.X-b.X), float64(a.Y-b.Y)) <= float64(radius)
-}
-
-func in3DRange(a, b location.Location, radius int) bool {
-	dx := float64(a.X - b.X)
-	dy := float64(a.Y - b.Y)
-	dz := float64(a.Z - b.Z)
-	return math.Sqrt(dx*dx+dy*dy+dz*dz) <= float64(radius)
 }

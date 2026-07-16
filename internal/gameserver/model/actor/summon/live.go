@@ -485,10 +485,7 @@ func (a *Actor) ownerWithinFollowRange() bool {
 	}
 	ax, ay, az := a.Position()
 	bx, by, bz := a.owner.Position()
-	dx := int64(ax - bx)
-	dy := int64(ay - by)
-	dz := int64(az - bz)
-	return dx*dx+dy*dy+dz*dz <= 2000*2000
+	return location.In3DRange(ax, ay, az, bx, by, bz, 2000)
 }
 
 func feedbackFor(outcome Outcome) Feedback {

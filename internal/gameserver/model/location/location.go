@@ -20,6 +20,32 @@ func (l Location) Distance2D(other Location) float64 {
 	return math.Hypot(dx, dy)
 }
 
+// Distance3D returns the straight-line distance between l and other.
+func (l Location) Distance3D(other Location) float64 {
+	dx := float64(l.X - other.X)
+	dy := float64(l.Y - other.Y)
+	dz := float64(l.Z - other.Z)
+	return math.Sqrt(dx*dx + dy*dy + dz*dz)
+}
+
+// In3DRange reports whether other is within radius units of l, including
+// the exact boundary.
+func (l Location) In3DRange(other Location, radius int) bool {
+	return In3DRange(l.X, l.Y, l.Z, other.X, other.Y, other.Z, radius)
+}
+
+// In3DRange reports whether two coordinate triples are within radius units
+// of each other, including the exact boundary.
+func In3DRange(ax, ay, az, bx, by, bz, radius int) bool {
+	if radius < 0 {
+		return false
+	}
+	dx := int64(ax) - int64(bx)
+	dy := int64(ay) - int64(by)
+	dz := int64(az) - int64(bz)
+	return dx*dx+dy*dy+dz*dz <= int64(radius)*int64(radius)
+}
+
 // headingScale converts a full-circle angle in degrees to the game's
 // heading range (65536 units per circle): 65536 / 360.
 const headingScale = 182.04444444444444

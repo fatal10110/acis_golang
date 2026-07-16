@@ -195,7 +195,7 @@ func NewCastle(set *commons.StatSet, artifacts []Artifact, towers []ControlTower
 		},
 		Gates:         gates,
 		NPCs:          append([]int(nil), npcs...),
-		Spawns:        copySpawns(spawns),
+		Spawns:        residence.CopySpawns(spawns),
 		Zones:         append([]residence.Zone(nil), zones...),
 		Artifacts:     append([]Artifact(nil), artifacts...),
 		ControlTowers: append([]ControlTower(nil), towers...),
@@ -267,17 +267,6 @@ func (t *Table) All() []*Castle {
 		return nil
 	}
 	return append([]*Castle(nil), t.order...)
-}
-
-func copySpawns(src map[residence.SpawnType][]location.Location) map[residence.SpawnType][]location.Location {
-	if len(src) == 0 {
-		return nil
-	}
-	dst := make(map[residence.SpawnType][]location.Location, len(src))
-	for kind, list := range src {
-		dst[kind] = append([]location.Location(nil), list...)
-	}
-	return dst
 }
 
 func cleanStrings(in []string) []string {

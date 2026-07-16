@@ -50,16 +50,6 @@ func RestoreExp(expBeforeDeath, currentExp int64, restorePercent float64) int64 
 	return roundInt64(float64(expBeforeDeath-currentExp) * restorePercent / 100)
 }
 
-func clampInt(v, lo, hi int) int {
-	if v < lo {
-		return lo
-	}
-	if v > hi {
-		return hi
-	}
-	return v
-}
-
 // SkillLevel returns the effective level a pet's own skill is cast at,
 // given the pet's level and that skill's own maximum level. A pet's skill
 // level rises by 1 every 10 pet levels up to level 69, then by 1 every 5
@@ -71,7 +61,7 @@ func SkillLevel(petLevel, maxSkillLevel int) int {
 	} else {
 		lvl = 8 + (petLevel-70)/5
 	}
-	return clampInt(lvl, 1, maxSkillLevel)
+	return min(max(lvl, 1), maxSkillLevel)
 }
 
 // BabyPetSkillLevel returns the effective level a baby pet's own healing

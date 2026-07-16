@@ -165,20 +165,13 @@ func writeUTF16String(buf []byte, s string) []byte {
 // sendGameServerAuth sends a registration/re-authentication request.
 func (f *fakeGameServer) sendGameServerAuth(id byte, acceptAlternate, hostReserved bool, host string, port uint16, maxPlayers int32, hexID []byte) {
 	f.t.Helper()
-	payload := []byte{link.OpcodeGameServerAuth, id, boolByte(acceptAlternate), boolByte(hostReserved)}
+	payload := []byte{link.OpcodeGameServerAuth, id, wire.BoolByte(acceptAlternate), wire.BoolByte(hostReserved)}
 	payload = writeUTF16String(payload, host)
 	payload = binary.LittleEndian.AppendUint16(payload, port)
 	payload = binary.LittleEndian.AppendUint32(payload, uint32(maxPlayers))
 	payload = binary.LittleEndian.AppendUint32(payload, uint32(len(hexID)))
 	payload = append(payload, hexID...)
 	f.sendFrame(payload)
-}
-
-func boolByte(b bool) byte {
-	if b {
-		return 1
-	}
-	return 0
 }
 
 // readAuthResponse reads either an AuthResponse (ok=true) or a

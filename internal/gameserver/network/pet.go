@@ -2,13 +2,13 @@ package network
 
 import (
 	"context"
-	"math"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/petitem"
@@ -181,10 +181,7 @@ func (l *GameClientLink) petUseItem(ctx context.Context, live *livePlayer, req c
 func withinInteractionDistance(live *livePlayer, pet *summon.Actor) bool {
 	ax, ay, az := live.Position()
 	bx, by, bz := pet.Position()
-	dx := float64(ax - bx)
-	dy := float64(ay - by)
-	dz := float64(az - bz)
-	return math.Sqrt(dx*dx+dy*dy+dz*dz) <= dropInteractionDistance
+	return location.In3DRange(ax, ay, az, bx, by, bz, dropInteractionDistance)
 }
 
 func (l *GameClientLink) broadcastGroundPickup(ground *grounditem.Item, pickerID int32) {

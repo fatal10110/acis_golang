@@ -65,3 +65,15 @@ type Zone struct {
 	MinZ, MaxZ int
 	Nodes      []location.Point
 }
+
+// CopySpawns returns an independent copy of residence spawn lists.
+func CopySpawns(src map[SpawnType][]location.Location) map[SpawnType][]location.Location {
+	if len(src) == 0 {
+		return nil
+	}
+	dst := make(map[SpawnType][]location.Location, len(src))
+	for kind, list := range src {
+		dst[kind] = append([]location.Location(nil), list...)
+	}
+	return dst
+}

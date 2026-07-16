@@ -176,8 +176,5 @@ func writeCharSelectInfo(w *wire.Writer, loginName string, sessionID int32, slot
 }
 
 func boolInt32(b bool) int32 {
-	if b {
-		return 1
-	}
-	return 0
+	return wire.BoolInt32(b)
 }
