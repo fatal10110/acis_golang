@@ -174,6 +174,14 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 			chars = list
 
+		case clientpackets.OpcodeRequestPledgeCrest:
+			req, err := clientpackets.DecodeRequestPledgeCrest(payload)
+			if err != nil {
+				l.log.Warn().Err(err).Msg("game client")
+				continue
+			}
+			session.SendFrame(l.framePledgeCrest(req))
+
 		case clientpackets.OpcodeRequestNewCharacter:
 			frame, err := serverpackets.FrameNewCharacterSuccess(l.templates)
 			if err != nil {

@@ -66,6 +66,7 @@ type GameClientLink struct {
 	templates     *player.TemplateTable
 	itemTemplates *item.Table
 	html          *datacache.HTML
+	crests        *datacache.Crests
 	skills        *SkillPersistence
 	world         *world.State
 	ids           idAllocator
@@ -99,6 +100,7 @@ func NewGameClientLink(
 	templates *player.TemplateTable,
 	itemTemplates *item.Table,
 	html *datacache.HTML,
+	crests *datacache.Crests,
 	skills *SkillPersistence,
 	worldState *world.State,
 	ids idAllocator,
@@ -115,6 +117,7 @@ func NewGameClientLink(
 		templates:     templates,
 		itemTemplates: itemTemplates,
 		html:          html,
+		crests:        crests,
 		skills:        skills,
 		world:         worldState,
 		ids:           ids,
