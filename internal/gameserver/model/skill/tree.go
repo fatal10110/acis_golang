@@ -129,6 +129,10 @@ const (
 	enchantRouteLength = 30
 )
 
+// CreateDwarvenSkillID is the Dwarven Craft skill; a character who knows it
+// can learn dwarven-only fishing skills.
+const CreateDwarvenSkillID ID = 172
+
 // NewEnchantSkill builds an EnchantSkill from set, the folded attributes of
 // one <enchantSkill> element. id, lvl, exp, sp and the five rate attributes
 // are all required; itemNeeded ("itemId-count") is optional.

@@ -69,18 +69,19 @@ type gameServerConfig struct {
 }
 
 type gameData struct {
-	Players *player.TemplateTable
-	Levels  *player.LevelTable
-	Items   *item.Table
-	Skills  *skill.Table
-	Trees   *skill.Trees
-	Zones   *zone.Index
-	Routes  route.WalkerRoutes
-	NPCs    *npc.Table
-	Doors   *door.Table
-	Statics *staticobject.Table
-	Geo     *engine.Engine
-	Finder  *pathfind.Finder
+	Players    *player.TemplateTable
+	Levels     *player.LevelTable
+	Items      *item.Table
+	Skills     *skill.Table
+	Trees      *skill.Trees
+	Spellbooks *skill.SpellbookTable
+	Zones      *zone.Index
+	Routes     route.WalkerRoutes
+	NPCs       *npc.Table
+	Doors      *door.Table
+	Statics    *staticobject.Table
+	Geo        *engine.Engine
+	Finder     *pathfind.Finder
 }
 
 type geodata struct {
@@ -143,6 +144,7 @@ func newGameServerApp(paths gameServerPaths) *fx.App {
 			provideRespawnTask,
 			provideAI,
 			provideKillRewardConfig,
+			provideSpellbookPolicy,
 			provideNpcs,
 			network.NewSessionValidator,
 			provideLoginLinkState,
@@ -342,6 +344,10 @@ func loadGameData(paths gameServerPaths, log zerolog.Logger) (*gameData, error) 
 	if err != nil {
 		return nil, err
 	}
+	spellbooks, err := gamexml.LoadSpellbooks(filepath.Join(xmlRoot, "spellbooks.xml"))
+	if err != nil {
+		return nil, err
+	}
 	zones, err := gamexml.LoadZones(filepath.Join(xmlRoot, "zones"))
 	if err != nil {
 		return nil, err
@@ -368,18 +374,19 @@ func loadGameData(paths gameServerPaths, log zerolog.Logger) (*gameData, error) 
 	}
 	log.Info().Str("geodata_dir", geo.Dir).Str("geodata_type", string(geo.Type)).Int("npc_templates", npcs.Len()).Int("skills", skills.Len()).Msg("game data loaded")
 	return &gameData{
-		Players: players,
-		Levels:  levels,
-		Items:   items,
-		Skills:  skills,
-		Trees:   trees,
-		Zones:   zones,
-		Routes:  routes,
-		NPCs:    npcs,
-		Doors:   doors,
-		Statics: statics,
-		Geo:     geo.Engine,
-		Finder:  geo.Finder,
+		Players:    players,
+		Levels:     levels,
+		Items:      items,
+		Skills:     skills,
+		Trees:      trees,
+		Spellbooks: spellbooks,
+		Zones:      zones,
+		Routes:     routes,
+		NPCs:       npcs,
+		Doors:      doors,
+		Statics:    statics,
+		Geo:        geo.Engine,
+		Finder:     geo.Finder,
 	}, nil
 }
 
@@ -826,17 +833,31 @@ func provideGameClientLink(
 	validator *network.SessionValidator,
 	links *loginLinkState,
 	skills *network.SkillPersistence,
+	spellbooks skill.BookPolicy,
+	skillTrees *skill.Trees,
 	state *world.State,
 	ids *idfactory.Allocator,
 	ground *task.GroundItems,
 	attackStance *task.AttackStance,
 	log zerolog.Logger,
 ) *network.GameClientLink {
-	return network.NewGameClientLink(validator, links.get, roster, items, shortcuts, data.Players, data.Items, html, crests, skills, state, ids, ground, attackStance, log)
+	return network.NewGameClientLink(validator, links.get, roster, items, shortcuts, data.Players, data.Items, html, crests, skills, spellbooks, data.Trees, state, ids, ground, attackStance, log)
 }
 
 func provideSkillPersistence(pool *sql.DB, data *gameData) *network.SkillPersistence {
 	return network.NewSkillPersistence(gamesql.NewSkillSaveStore(pool), data.Skills, gamesql.NewCharacterSkillStore(pool))
+}
+
+func provideSpellbookPolicy(paths gameServerPaths, data *gameData) (skill.BookPolicy, error) {
+	props, err := config.LoadFile(paths.PlayersConfigPath)
+	if err != nil {
+		return skill.BookPolicy{}, err
+	}
+	return skill.BookPolicy{
+		Table:            data.Spellbooks,
+		SPBookNeeded:     props.Bool("SpBookNeeded", true),
+		DivineBookNeeded: props.Bool("DivineInspirationSpBookNeeded", true),
+	}, nil
 }
 
 func startGameServer(lc fx.Lifecycle, cfg gameServerConfig, _ *gameData, _ *manager.Roster, validator *network.SessionValidator, links *loginLinkState, clients *network.GameClientLink, log zerolog.Logger) {
