@@ -27,3 +27,14 @@ func FrameAllyCrest(crestID int32, data []byte) wire.Frame {
 	w.WriteBytes(data)
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
 }
+
+// FrameExPledgeCrestLarge builds a large pledge crest data response.
+func FrameExPledgeCrestLarge(crestID int32, data []byte) wire.Frame {
+	w := newFrameWriter(OpcodeExtended)
+	w.WriteUint16(OpcodeExPledgeCrestLarge)
+	w.WriteInt32(0)
+	w.WriteInt32(crestID)
+	w.WriteInt32(int32(len(data)))
+	w.WriteBytes(data)
+	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
+}

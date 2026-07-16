@@ -32,6 +32,22 @@ func TestDecodeRequestAllyCrest(t *testing.T) {
 	}
 }
 
+func TestDecodeRequestExPledgeCrestLarge(t *testing.T) {
+	payload := []byte{
+		OpcodeExtended,
+		0x10, 0x00,
+		0x69, 0x00, 0x00, 0x00,
+	}
+
+	got, err := DecodeRequestExPledgeCrestLarge(payload)
+	if err != nil {
+		t.Fatalf("DecodeRequestExPledgeCrestLarge: %v", err)
+	}
+	if got.CrestID != 105 {
+		t.Fatalf("CrestID = %d, want 105", got.CrestID)
+	}
+}
+
 func TestDecodeRequestPledgeCrestShort(t *testing.T) {
 	if _, err := DecodeRequestPledgeCrest([]byte{OpcodeRequestPledgeCrest, 1}); err == nil {
 		t.Fatal("DecodeRequestPledgeCrest: want error on short payload")
@@ -41,5 +57,14 @@ func TestDecodeRequestPledgeCrestShort(t *testing.T) {
 func TestDecodeRequestAllyCrestShort(t *testing.T) {
 	if _, err := DecodeRequestAllyCrest([]byte{OpcodeRequestAllyCrest, 1}); err == nil {
 		t.Fatal("DecodeRequestAllyCrest: want error on short payload")
+	}
+}
+
+func TestDecodeRequestExPledgeCrestLargeShort(t *testing.T) {
+	if _, err := DecodeRequestExPledgeCrestLarge([]byte{OpcodeExtended, 0x10, 0x00, 1}); err == nil {
+		t.Fatal("DecodeRequestExPledgeCrestLarge: want error on short payload")
+	}
+	if _, err := DecodeRequestExPledgeCrestLarge([]byte{OpcodeExtended, 0x11, 0x00, 0, 0, 0, 0}); err == nil {
+		t.Fatal("DecodeRequestExPledgeCrestLarge: want error on wrong extended opcode")
 	}
 }

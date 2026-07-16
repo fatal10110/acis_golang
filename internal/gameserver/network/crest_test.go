@@ -52,6 +52,24 @@ func TestGameClientLinkRequestAllyCrestDispatchMissingData(t *testing.T) {
 	assertNoReply(t, c)
 }
 
+func TestGameClientLinkRequestExPledgeCrestLargeDispatch(t *testing.T) {
+	data := bytes.Repeat([]byte{0x6c}, 2176)
+	c := newInGameClientWithCrests(t, testLargePledgeCrestCache(t, map[int][]byte{105: data}))
+
+	c.send(encodeRequestExPledgeCrestLarge(105))
+
+	reply := c.read()
+	assertExPledgeCrestLargeFrame(t, reply, 105, data)
+}
+
+func TestGameClientLinkRequestExPledgeCrestLargeDispatchMissingData(t *testing.T) {
+	c := newInGameClientWithCrests(t, datacache.NewCrests())
+
+	c.send(encodeRequestExPledgeCrestLarge(999))
+
+	assertNoReply(t, c)
+}
+
 func TestAllowedGatesRequestPledgeCrest(t *testing.T) {
 	if !Allowed(StateAuthed, clientpackets.OpcodeRequestPledgeCrest) {
 		t.Fatal("Allowed(authed, RequestPledgeCrest) = false, want true")
@@ -88,11 +106,34 @@ func encodeRequestAllyCrest(crestID int32) []byte {
 	return w.Bytes()
 }
 
+func encodeRequestExPledgeCrestLarge(crestID int32) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeExtended)
+	w.WriteUint16(clientpackets.OpcodeRequestExPledgeCrestLarge)
+	w.WriteInt32(crestID)
+	return w.Bytes()
+}
+
 func testCrestCache(t *testing.T, crests map[int][]byte) *datacache.Crests {
 	t.Helper()
 	dir := t.TempDir()
 	for id, data := range crests {
 		path := filepath.Join(dir, "Crest_"+strconv.Itoa(id)+".dds")
+		if err := os.WriteFile(path, data, 0o600); err != nil {
+			t.Fatalf("write crest fixture: %v", err)
+		}
+	}
+	cache, err := datacache.LoadCrests(dir)
+	if err != nil {
+		t.Fatalf("LoadCrests: %v", err)
+	}
+	return cache
+}
+
+func testLargePledgeCrestCache(t *testing.T, crests map[int][]byte) *datacache.Crests {
+	t.Helper()
+	dir := t.TempDir()
+	for id, data := range crests {
+		path := filepath.Join(dir, "LargeCrest_"+strconv.Itoa(id)+".dds")
 		if err := os.WriteFile(path, data, 0o600); err != nil {
 			t.Fatalf("write crest fixture: %v", err)
 		}
@@ -174,6 +215,34 @@ func assertAllyCrestFrame(t *testing.T, frame []byte, crestID int32, data []byte
 	}
 	if !bytes.Equal(got, data) {
 		t.Fatalf("AllyCrest data changed")
+	}
+}
+
+func assertExPledgeCrestLargeFrame(t *testing.T, frame []byte, crestID int32, data []byte) {
+	t.Helper()
+	if frame[0] != serverpackets.OpcodeExtended {
+		t.Fatalf("ExPledgeCrestLarge opcode = %#x, want %#x", frame[0], serverpackets.OpcodeExtended)
+	}
+	r := wire.NewReader(frame[1:])
+	if got := r.ReadUint16(); got != serverpackets.OpcodeExPledgeCrestLarge {
+		t.Fatalf("ExPledgeCrestLarge opcode2 = %#x, want %#x", got, serverpackets.OpcodeExPledgeCrestLarge)
+	}
+	if got := r.ReadInt32(); got != 0 {
+		t.Fatalf("ExPledgeCrestLarge unknown field = %d, want 0", got)
+	}
+	if got := r.ReadInt32(); got != crestID {
+		t.Fatalf("ExPledgeCrestLarge crest id = %d, want %d", got, crestID)
+	}
+	size := r.ReadInt32()
+	if size != int32(len(data)) {
+		t.Fatalf("ExPledgeCrestLarge data length = %d, want %d", size, len(data))
+	}
+	got := r.ReadBytes(int(size))
+	if err := r.Err(); err != nil {
+		t.Fatalf("read ExPledgeCrestLarge: %v", err)
+	}
+	if !bytes.Equal(got, data) {
+		t.Fatalf("ExPledgeCrestLarge data changed")
 	}
 }
 

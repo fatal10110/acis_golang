@@ -29,8 +29,8 @@ Sources checked:
 
 - Original game client appendix: 206 concrete dispatcher targets.
 - Original game server appendix: 282 packet classes, including base/composite classes.
-- Classified M2-M5 required game client packets: 94. Missing in Go: 50.
-- Classified M2-M5 required game server packets: 128. Missing in Go: 67.
+- Classified M2-M5 required game client packets: 94. Missing in Go: 49.
+- Classified M2-M5 required game server packets: 128. Missing in Go: 66.
 - M1 login client/server packets are implemented.
 - M1 GS-LS link packets are implemented under `internal/link/`.
 - M2 base game connect/create/select packet set is implemented.
@@ -97,7 +97,6 @@ Missing M3 data/UI client packets:
 - `RequestBBSwrite`
 - `RequestSetPledgeCrest`
 - `RequestSetAllyCrest`
-- `RequestExPledgeCrestLarge`
 - `RequestExSetPledgeCrestLarge`
 - `MultiSellChoose`
 - `RequestBuyItem`
@@ -143,6 +142,7 @@ Implemented and wired M3 data/UI client packets in Go:
 - `RequestBypassToServer` (`player_help` HTML bypass only; admin, NPC, quest, community-board, hero, olympiad, and manor bypass owners remain deferred until those systems exist)
 - `RequestLinkHtml`
 - `RequestAllyCrest`
+- `RequestExPledgeCrestLarge`
 - `RequestPledgeCrest`
 
 Implemented and wired M4 movement/rotation/target client packets in Go:
@@ -243,7 +243,6 @@ flow can emit them truthfully yet.
 Missing M3 data/UI server packets:
 
 - `NpcHtmlMessage`
-- `ExPledgeCrestLarge`
 - `MultiSellList`
 - `BuyList`
 - `SellList`
@@ -281,6 +280,7 @@ Missing M3 data/UI server packets:
 Implemented and wired M3 data/UI server packets in Go:
 
 - `AllyCrest`
+- `ExPledgeCrestLarge`
 - `PledgeCrest`
 
 Implemented and wired M4 movement/rotation server packets in Go:
