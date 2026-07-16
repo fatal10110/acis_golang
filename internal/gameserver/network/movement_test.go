@@ -96,6 +96,28 @@ func TestGameClientLinkWireSafeMovementAndRefreshPacketsInGame(t *testing.T) {
 		t.Fatalf("player position after ValidatePosition = (%d,%d,%d), want (%d,%d,%d)", x, y, z, target.X, target.Y, target.Z)
 	}
 
+	farClientPosition := location.Location{X: target.X + 500, Y: target.Y, Z: target.Z}
+	c.send(encodeValidatePosition(farClientPosition, 32768))
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeValidateLocation {
+		t.Fatalf("desync correction opcode = %#x, want ValidateLocation (%#x)", reply[0], serverpackets.OpcodeValidateLocation)
+	}
+	r = wire.NewReader(reply[1:])
+	if got := r.ReadInt32(); got != objID {
+		t.Fatalf("ValidateLocation object id = %d, want %d", got, objID)
+	}
+	gotCorrection := location.Location{X: int(r.ReadInt32()), Y: int(r.ReadInt32()), Z: int(r.ReadInt32())}
+	if gotCorrection != target {
+		t.Fatalf("ValidateLocation location = %+v, want server position %+v", gotCorrection, target)
+	}
+	if heading := r.ReadInt32(); heading != 32768 {
+		t.Fatalf("ValidateLocation heading = %d, want 32768", heading)
+	}
+	x, y, z = positioned.Position()
+	if x != target.X || y != target.Y || z != target.Z {
+		t.Fatalf("player position after desync ValidatePosition = (%d,%d,%d), want server position (%d,%d,%d)", x, y, z, target.X, target.Y, target.Z)
+	}
+
 	stoppedAt := location.Location{X: 46155, Y: 41240, Z: -3534}
 	c.send(encodeCannotMoveAnymore(stoppedAt, 12345))
 	reply = c.read()

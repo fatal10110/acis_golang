@@ -31,6 +31,25 @@ func (l *GameClientLink) stopLivePlayer(live *livePlayer, at location.Location, 
 	})
 }
 
+func (l *GameClientLink) validateLivePlayerPosition(live *livePlayer, reported location.Location, heading int) {
+	current := live.CurrentLocation()
+	if current.Distance2D(reported) > liveMoveSpeed(live) {
+		live.SendFrame(serverpackets.FrameValidateLocation(live.ObjectID(), current, live.CurrentHeading()))
+		return
+	}
+	l.updateLivePlayerPosition(live, reported, heading)
+}
+
+func liveMoveSpeed(live *livePlayer) float64 {
+	if live == nil || live.template == nil {
+		return 0
+	}
+	if live.Running() {
+		return live.template.RunSpeed
+	}
+	return live.template.WalkSpeed
+}
+
 func (l *GameClientLink) changeLiveMoveType(live *livePlayer, run bool) {
 	if !live.SetRunning(run) {
 		return

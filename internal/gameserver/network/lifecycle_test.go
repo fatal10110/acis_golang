@@ -80,7 +80,7 @@ func TestGameClientLinkLogoutLeavesWorld(t *testing.T) {
 	c.send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
-	savedAt := location.Location{X: 46160, Y: 41237, Z: -3534}
+	savedAt := location.Location{X: 80, Y: 70, Z: 30}
 	c.send(encodeValidatePosition(savedAt, 32768))
 	c.send(encodeSingleOpcode(clientpackets.OpcodeLogout))
 	reply := c.read()
@@ -110,7 +110,7 @@ func TestGameClientLinkRestartReturnsToCharacterSelect(t *testing.T) {
 	c.send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
-	savedAt := location.Location{X: 46160, Y: 41237, Z: -3534}
+	savedAt := location.Location{X: 80, Y: 70, Z: 30}
 	c.send(encodeValidatePosition(savedAt, 32768))
 	c.send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
 	reply := c.read()

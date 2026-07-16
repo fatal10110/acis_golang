@@ -286,12 +286,12 @@ Implemented and wired M3 data/UI server packets in Go:
 Implemented and wired M4 movement/rotation server packets in Go:
 
 - `StopMove`
+- `ValidateLocation`
 - `StartRotation`
 - `StopRotation`
 
 Missing M4 world/movement server packets:
 
-- `ValidateLocation`
 - `GetOnVehicle`
 - `GetOffVehicle`
 - `VehicleDeparture`
@@ -378,6 +378,6 @@ Implemented and wired M5 shortcut server packets in Go:
 - `PetItemList`, `PetInfo`, and `PetStatusUpdate` remain deferred together: the current Go pet actor lacks the full pet info/status snapshot surface and owner spawn/info broadcast path needed to emit truthful full-list/status packets. `PetStatusShow` and `PetDelete` are wired where the current runtime has exact backing behavior.
 - `RequestAutoSoulShot` is wired as extended client opcode `0x0005` with per-player auto-shot toggle state, `ExAutoSoulShot`, and item-name `SystemMessage` feedback. First-shot recharge, recurring shot consumption, and `ExUseSharedGroupItem` reuse display remain deferred to the item-use/handler burst because the shared item handler/reuse pipeline is not ported yet.
 - `StatusUpdate` is implemented and wired for target max/current HP during selection. Broader status/stat recalculation broadcasts still need owner flows as those systems are ported.
-- The unique missing counts deduplicate those overlaps: 50 missing game client packets and 67 missing game server packets after the EnterWorld, movement/rotation, inventory, target/action, stance/social, item-operation, auto-shot, skill-acquisition, basic skill-cast, enchant, backed pet inventory/status, linked-html, pledge-crest, and ally-crest packet-wiring passes.
+- The unique missing counts deduplicate those overlaps: 50 missing game client packets and 66 missing game server packets after the EnterWorld, movement/rotation, ValidateLocation correction, inventory, target/action, stance/social, item-operation, auto-shot, skill-acquisition, basic skill-cast, enchant, backed pet inventory/status, linked-html, pledge-crest, and ally-crest packet-wiring passes.
 - Existing Go code accepts several M4/M5 client opcodes in `clientpackets/wiresafe.go`, but many of them still log "Opcode not wired" or have no decode/run implementation.
 - This audit uses original Java class names. Go may keep a slightly different helper shape, such as `Frame...` functions instead of packet structs, but the required client-visible packet behavior is still one original packet at a time.

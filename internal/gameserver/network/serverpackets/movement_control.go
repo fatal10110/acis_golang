@@ -8,6 +8,8 @@ import (
 const (
 	// OpcodeStopMove is the wire opcode for StopMove.
 	OpcodeStopMove byte = 0x47
+	// OpcodeValidateLocation is the wire opcode for ValidateLocation.
+	OpcodeValidateLocation byte = 0x61
 	// OpcodeStartRotation is the wire opcode for StartRotation.
 	OpcodeStartRotation byte = 0x62
 	// OpcodeStopRotation is the wire opcode for StopRotation.
@@ -17,6 +19,17 @@ const (
 // FrameStopMove builds a stopped-movement correction packet.
 func FrameStopMove(objectID int32, at location.Location, heading int) wire.Frame {
 	w := newFrameWriter(OpcodeStopMove)
+	w.WriteInt32(objectID)
+	w.WriteInt32(int32(at.X))
+	w.WriteInt32(int32(at.Y))
+	w.WriteInt32(int32(at.Z))
+	w.WriteInt32(int32(heading))
+	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
+}
+
+// FrameValidateLocation builds a position correction packet.
+func FrameValidateLocation(objectID int32, at location.Location, heading int) wire.Frame {
+	w := newFrameWriter(OpcodeValidateLocation)
 	w.WriteInt32(objectID)
 	w.WriteInt32(int32(at.X))
 	w.WriteInt32(int32(at.Y))
