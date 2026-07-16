@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -62,6 +63,7 @@ type Character struct {
 	world           *world.State
 	sendFrame       func(wire.Frame) bool
 	broadcastAttack func(attack.Snapshot)
+	broadcastMove   func(move.Event)
 	roll            func(int) int
 
 	deathMu sync.Mutex

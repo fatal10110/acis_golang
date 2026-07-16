@@ -2,8 +2,10 @@ package network
 
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
@@ -18,6 +20,8 @@ type livePlayer struct {
 	target    world.Tracked
 	throne    staticobject.Chair
 	attack    *attack.Controller
+	move      *move.Controller
+	combat    *ai.PlayerAttack
 	cast      *actorcast.Controller
 	shortcuts *shortcut.List
 
@@ -29,6 +33,9 @@ func (p *livePlayer) SendFrame(frame wire.Frame) bool {
 }
 
 func (p *livePlayer) Stop() {
+	if p.combat != nil {
+		p.combat.Stop()
+	}
 	if p.attack != nil {
 		p.attack.Stop()
 	}

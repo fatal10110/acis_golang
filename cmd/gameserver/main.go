@@ -842,7 +842,7 @@ func provideGameClientLink(
 	attackStance *task.AttackStance,
 	log zerolog.Logger,
 ) *network.GameClientLink {
-	return network.NewGameClientLink(validator, links.get, roster, items, shortcuts, data.Players, data.Items, html, crests, skills, spellbooks, data.Trees, state, ids, ground, attackStance, log)
+	return network.NewGameClientLink(validator, links.get, roster, items, shortcuts, data.Players, data.Items, html, crests, skills, spellbooks, data.Trees, state, data.Geo, ids, ground, attackStance, log)
 }
 
 func provideSkillPersistence(pool *sql.DB, data *gameData) *skillstate.Persistence {

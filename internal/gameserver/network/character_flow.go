@@ -2,14 +2,19 @@ package network
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
@@ -90,7 +95,11 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 	coolTimes := skillCoolTimeEntries(c.SkillReuseTimers(now), now)
 	skillList := skillListEntries(c, l.skills)
 
-	live := l.attachLivePlayer(client, c, tmpl, items, shortcuts)
+	live, err := l.attachLivePlayer(client, c, tmpl, items, shortcuts)
+	if err != nil {
+		l.log.Error().Err(err).Msg("enter world: attach live player")
+		return nil, false
+	}
 	if l.world != nil {
 		x, y, z := c.Position()
 		l.world.Spawn(live, x, y, z, c.Heading)
@@ -167,15 +176,38 @@ func skillListEntries(c *player.Character, skills *skillstate.Persistence) []ser
 	return entries
 }
 
-func (l *GameClientLink) attachLivePlayer(client *Client, c *player.Character, tmpl *player.Template, items []*item.Instance, shortcuts []shortcut.Shortcut) *livePlayer {
+func (l *GameClientLink) attachLivePlayer(client *Client, c *player.Character, tmpl *player.Template, items []*item.Instance, shortcuts []shortcut.Shortcut) (*livePlayer, error) {
 	c.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventory(c.ID, l.itemTemplates, items))
 	c.SetWorld(l.world)
 	c.SetFrameSender(client.Session.SendFrame)
-	live := &livePlayer{Character: c, template: tmpl, items: items, attack: attack.NewPlayer(c), shortcuts: shortcut.NewList(shortcuts), stopAttack: l.stopLiveAutoAttack}
+
+	x, y, z := c.Position()
+	cm, err := move.NewCreatureMove(location.Location{X: x, Y: y, Z: z}, tmpl.RunSpeed, l.geo)
+	if err != nil {
+		return nil, fmt.Errorf("attach live player: %w", err)
+	}
+	moveCtl, err := move.NewController(cm, c)
+	if err != nil {
+		return nil, fmt.Errorf("attach live player: %w", err)
+	}
+	attackCtl := attack.NewPlayer(c)
+	combat := ai.NewPlayerAttack(c, moveCtl, attackCtl)
+	moveCtl.SetArrived(combat.Think)
+	attackCtl.SetFinished(combat.Think)
+
+	live := &livePlayer{Character: c, template: tmpl, items: items, attack: attackCtl, move: moveCtl, combat: combat, shortcuts: shortcut.NewList(shortcuts), stopAttack: l.stopLiveAutoAttack}
+	attackCtl.SetStarted(func() {
+		l.startLiveAutoAttack(live)
+	})
 	c.SetAttackBroadcaster(func(snapshot attack.Snapshot) {
 		l.broadcastAttack(live, snapshot)
 	})
-	return live
+	c.SetMoveBroadcaster(func(event move.Event) {
+		l.broadcastLiveFrame(live, func() wire.Frame {
+			return serverpackets.FrameMoveToLocation(live.ObjectID(), event.Destination, event.Origin)
+		})
+	})
+	return live, nil
 }
 
 func slotCharacter(chars []*player.Character, slot int32) (*player.Character, bool) {

@@ -633,7 +633,7 @@ func averageZ(territory *spawn.Territory) int {
 // built. Each embeds its target interface unset, is handed to the
 // controller constructors, and is pointed at the real NPC immediately
 // after — before anything can call through it.
-type locatedRef struct{ move.Located }
+type locatedRef struct{ move.Actor }
 type creatureActorRef struct{ attack.CreatureActor }
 
 // newLiveHostile builds a live Hostile for inst, wiring a real movement
@@ -660,8 +660,16 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo) (*npc.Hosti
 		return nil, err
 	}
 
-	locRef.Located = hostile
+	locRef.Actor = hostile
 	actorRef.CreatureActor = hostile
+
+	// Re-evaluate the AI loop as soon as a chase leg completes or a swing
+	// finishes, rather than waiting for the next fixed AI tick — otherwise
+	// a hostile NPC only closes distance on, or re-attacks, its target once
+	// per task.AITick.
+	moveCtl.SetArrived(hostile.AI().Think)
+	attackCtl.SetFinished(hostile.AI().Think)
+
 	return hostile, nil
 }
 
