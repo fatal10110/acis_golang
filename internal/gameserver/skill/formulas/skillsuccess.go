@@ -114,3 +114,23 @@ func CancelSuccessRate(effectPeriod, diffLevel int, baseRate, vuln float64, minR
 func CancelSucceeds(rate float64, roll int) bool {
 	return float64(roll) < rate
 }
+
+// EffectCancelSuccessRate returns the percent chance, clamped to [25, 75],
+// that a self-contained cancel effect (as opposed to the targeted
+// cancel-family skill covered by CancelSuccessRate) strips one candidate
+// effect. Unlike CancelSuccessRate, every term is combined as an integer
+// and only the power term is scaled by vulnerability: casterMagicLevel is
+// the cancel effect's own owning-skill magic level, candidateMagicLevel and
+// candidatePeriod are the candidate effect's owning-skill magic level and
+// remaining duration in seconds, and power*vuln truncates to an integer
+// before it's added in.
+func EffectCancelSuccessRate(casterMagicLevel, candidateMagicLevel, candidatePeriod int, power, vuln float64) int {
+	rate := 2*(casterMagicLevel-candidateMagicLevel) + candidatePeriod/120 + int(power*vuln)
+	if rate < 25 {
+		return 25
+	}
+	if rate > 75 {
+		return 75
+	}
+	return rate
+}
