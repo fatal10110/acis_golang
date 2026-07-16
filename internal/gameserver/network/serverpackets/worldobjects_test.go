@@ -72,6 +72,17 @@ func TestFrameStaticObjectInfo(t *testing.T) {
 	}
 }
 
+func TestFrameChairSit(t *testing.T) {
+	got := framePayload(t, FrameChairSit(0x1000a064, 1234))
+
+	want := []byte{OpcodeChairSit}
+	want = binary.LittleEndian.AppendUint32(want, 0x1000a064)
+	want = binary.LittleEndian.AppendUint32(want, 1234)
+	if string(got) != string(want) {
+		t.Fatalf("FrameChairSit() = % x, want % x", got, want)
+	}
+}
+
 func testDoor(t *testing.T) *door.Object {
 	t.Helper()
 	gate, err := door.NewObject(1000, &door.Template{

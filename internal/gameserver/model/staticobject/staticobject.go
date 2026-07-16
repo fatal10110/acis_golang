@@ -3,6 +3,7 @@ package staticobject
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -23,8 +24,10 @@ type Template struct {
 type Object struct {
 	world.Presence
 
+	mu       sync.Mutex
 	objectID int32
 	Template *Template
+	busy     bool
 }
 
 // NewObject creates a live static object from a static template.
@@ -40,6 +43,27 @@ func (o *Object) ObjectID() int32 { return o.objectID }
 
 // StaticObjectID returns the static object id from staticObjects.xml.
 func (o *Object) StaticObjectID() int { return o.Template.ID }
+
+// Type returns the static object type from staticObjects.xml.
+func (o *Object) Type() int { return o.Template.Type }
+
+// Busy reports whether this static object is currently occupied.
+func (o *Object) Busy() bool {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return o.busy
+}
+
+// SetBusy updates whether this static object is occupied and reports whether it changed.
+func (o *Object) SetBusy(busy bool) bool {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if o.busy == busy {
+		return false
+	}
+	o.busy = busy
+	return true
+}
 
 // NewTemplate builds a static object template from XML attributes.
 func NewTemplate(set *commons.StatSet) (*Template, error) {

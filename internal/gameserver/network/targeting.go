@@ -12,6 +12,19 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
+const (
+	chairStaticObjectType    = 1
+	chairInteractionDistance = 150
+)
+
+type staticChairObject interface {
+	world.Tracked
+	Position() (int, int, int)
+	StaticObjectID() int
+	Type() int
+	SetBusy(bool) bool
+}
+
 func (l *GameClientLink) broadcastAttack(attacker *livePlayer, snapshot attack.Snapshot) {
 	if attacker == nil {
 		return
@@ -51,6 +64,9 @@ func (l *GameClientLink) handleTargetAction(live *livePlayer, objectID int32, se
 	if selected && l.showOwnedPetStatus(live, target) {
 		return
 	}
+	if selected && l.sitLiveOnChair(live, target) {
+		return
+	}
 	if selected {
 		l.attackLiveTarget(live, target)
 	}
@@ -81,6 +97,37 @@ func (l *GameClientLink) showOwnedPetStatus(live *livePlayer, target world.Track
 	}
 	live.SendFrame(serverpackets.FramePetStatusShow(pet.SummonType()))
 	return true
+}
+
+func (l *GameClientLink) sitLiveOnChair(live *livePlayer, target world.Tracked) bool {
+	chair, ok := target.(staticChairObject)
+	if !ok || live == nil || live.AlikeDead() || !live.Standing() {
+		return false
+	}
+	if chair.Type() != chairStaticObjectType || !in3DInteractionRange(live, chair, chairInteractionDistance) {
+		return false
+	}
+	if !chair.SetBusy(true) {
+		return false
+	}
+	live.throne = chair
+	if !l.changeLiveWaitType(live, false) {
+		live.releaseChair()
+		return false
+	}
+	l.broadcastLiveFrame(live, func() wire.Frame {
+		return serverpackets.FrameChairSit(live.ObjectID(), chair.StaticObjectID())
+	})
+	return true
+}
+
+func in3DInteractionRange(a, b interface{ Position() (int, int, int) }, radius int) bool {
+	ax, ay, az := a.Position()
+	bx, by, bz := b.Position()
+	dx := int64(ax) - int64(bx)
+	dy := int64(ay) - int64(by)
+	dz := int64(az) - int64(bz)
+	return dx*dx+dy*dy+dz*dz <= int64(radius)*int64(radius)
 }
 
 func (l *GameClientLink) selectLiveTarget(live *livePlayer, target world.Tracked) bool {

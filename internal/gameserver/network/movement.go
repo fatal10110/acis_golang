@@ -59,18 +59,20 @@ func (l *GameClientLink) changeLiveMoveType(live *livePlayer, run bool) {
 	})
 }
 
-func (l *GameClientLink) changeLiveWaitType(live *livePlayer, stand bool) {
-	if live.AlikeDead() || !live.SetStanding(stand) {
-		return
+func (l *GameClientLink) changeLiveWaitType(live *livePlayer, stand bool) bool {
+	if live == nil || live.AlikeDead() || !live.SetStanding(stand) {
+		return false
 	}
 	x, y, z := live.Position()
 	waitType := serverpackets.WaitSitting
 	if stand {
 		waitType = serverpackets.WaitStanding
+		live.releaseChair()
 	}
 	l.broadcastLiveFrame(live, func() wire.Frame {
 		return serverpackets.FrameChangeWaitType(live.ObjectID(), waitType, location.Location{X: x, Y: y, Z: z})
 	})
+	return true
 }
 
 func (l *GameClientLink) broadcastLiveSocialAction(live *livePlayer, actionID int32) {
