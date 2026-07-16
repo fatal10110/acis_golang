@@ -526,6 +526,19 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				l.clearLiveTarget(live)
 			}
 
+		case clientpackets.OpcodeAppearing:
+			if _, err := clientpackets.DecodeAppearing(payload); err != nil {
+				l.log.Warn().Err(err).Msg("game client")
+				continue
+			}
+			if live != nil {
+				live.SendFrame(serverpackets.FrameUserInfo(serverpackets.UserInfoSnapshot{
+					Character: live.Character,
+					Template:  live.template,
+					Items:     live.inventoryItems(),
+				}))
+			}
+
 		case clientpackets.OpcodeStartRotating:
 			req, err := clientpackets.DecodeStartRotating(payload)
 			if err != nil {
@@ -681,7 +694,6 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			clientpackets.OpcodeRequestBuyItem,
 			clientpackets.OpcodeDummy23,
 			clientpackets.OpcodeDummy2E,
-			clientpackets.OpcodeAppearing,
 			clientpackets.OpcodeSendWarehouseDeposit,
 			clientpackets.OpcodeSendWarehouseWithdraw,
 			clientpackets.OpcodeDummy34,
