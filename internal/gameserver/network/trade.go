@@ -177,20 +177,25 @@ func (l *GameClientLink) handleTradeDone(ctx context.Context, live *livePlayer, 
 	}
 
 	first, second, ok := l.tradeParticipants(result.Session)
-	if !ok || !l.validTradeParticipants(first, second) || !result.Session.ValidItems(first.Inventory(), second.Inventory()) {
+	if !ok || !l.validTradeParticipants(first, second) {
 		l.finishTrade(first, second, false)
 		return
 	}
-	ok, failMessage := l.exchangeTradeItems(ctx, result.Session, first, second)
+
+	settlement := tradebook.Settle(result.Session, first.Inventory(), second.Inventory(), func(source, receiver *itemcontainer.Inventory, objectID int32, count int) bool {
+		return l.transferTradeInventoryItem(ctx, source, receiver, objectID, count)
+	})
+	failMessage := tradeSettlementMessage(settlement.Status)
 	if failMessage != 0 {
 		first.SendFrame(serverpackets.FrameSystemMessage(failMessage))
 		second.SendFrame(serverpackets.FrameSystemMessage(failMessage))
 	}
-	if ok {
+	success := settlement.Status == tradebook.SettlementOK
+	if success {
 		l.sendInventoryUpdate(first, first.Inventory())
 		l.sendInventoryUpdate(second, second.Inventory())
 	}
-	l.finishTrade(first, second, ok)
+	l.finishTrade(first, second, success)
 }
 
 func (l *GameClientLink) cancelActiveTrade(live *livePlayer) {
@@ -283,44 +288,6 @@ func (l *GameClientLink) tradeParticipants(session tradebook.Session) (*livePlay
 	return first, second, firstOK && secondOK
 }
 
-func (l *GameClientLink) exchangeTradeItems(ctx context.Context, session tradebook.Session, first, second *livePlayer) (bool, int) {
-	if session.Empty() {
-		return false, 0
-	}
-	switch session.ReceiverStatus(first.Inventory(), second.Inventory()) {
-	case tradebook.ReceiverWeightExceeded:
-		return false, serverpackets.SystemMessageWeightLimitExceeded
-	case tradebook.ReceiverSlotsFull:
-		return false, serverpackets.SystemMessageSlotsFull
-	}
-	if !l.transferTradeOffer(ctx, session.Offer(first.ObjectID()), second.Inventory()) {
-		return false, 0
-	}
-	if !l.transferTradeOffer(ctx, session.Offer(second.ObjectID()), first.Inventory()) {
-		return false, 0
-	}
-	return true, 0
-}
-
-func (l *GameClientLink) transferTradeOffer(ctx context.Context, offer tradebook.Offer, receiver *itemcontainer.Inventory) bool {
-	if receiver == nil {
-		return false
-	}
-	sourceLive, ok := l.livePlayerByID(offer.OwnerID)
-	if !ok || sourceLive.Inventory() == nil {
-		return false
-	}
-	source := sourceLive.Inventory()
-	for _, row := range offer.Items {
-		if !l.transferTradeInventoryItem(ctx, source, receiver, row.Snapshot.ObjectID, row.Count) {
-			return false
-		}
-	}
-	source.UpdateWeight()
-	receiver.UpdateWeight()
-	return true
-}
-
 func (l *GameClientLink) transferTradeInventoryItem(ctx context.Context, source, receiver *itemcontainer.Inventory, objectID int32, count int) bool {
 	res, ok, err := l.inventoryService().TransferItem(source, receiver, objectID, count)
 	if err != nil {
@@ -331,6 +298,17 @@ func (l *GameClientLink) transferTradeInventoryItem(ctx context.Context, source,
 		l.applyPersistActions(ctx, res.Persist)
 	}
 	return ok
+}
+
+func tradeSettlementMessage(status tradebook.SettlementStatus) int {
+	switch status {
+	case tradebook.SettlementWeightExceeded:
+		return serverpackets.SystemMessageWeightLimitExceeded
+	case tradebook.SettlementSlotsFull:
+		return serverpackets.SystemMessageSlotsFull
+	default:
+		return 0
+	}
 }
 
 func tradeItemSnapshot(item tradebook.ItemSnapshot) serverpackets.TradeItemSnapshot {
