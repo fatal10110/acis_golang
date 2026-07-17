@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
+	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -66,8 +68,43 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 		controller.Stop()
 		return
 	}
+	l.applySkillEffects(live, target, def)
 	sendMagicStatusUpdate(live, beforeVitals)
 	controller.Finish()
+}
+
+// applySkillEffects resolves def's affected target set from resolved (the
+// already cast-validated single selection) and applies the skill's
+// effects to it. A caster or resolved target that doesn't satisfy the
+// target-resolution or effect-application surfaces is skipped rather than
+// failing the cast — the same graceful degradation the effect handlers
+// already use for actor state this port hasn't modeled yet.
+func (l *GameClientLink) applySkillEffects(live *livePlayer, resolved actorcast.Target, def modelskill.Definition) {
+	caster, ok := any(live.Character).(skilltarget.Creature)
+	if !ok {
+		return
+	}
+	selected, _ := resolved.(skilltarget.Creature)
+
+	handler, ok := l.targets.Handler(def.Target)
+	if !ok || !handler.CanCast(caster, selected, &def, false) {
+		return
+	}
+
+	affected := handler.Targets(caster, selected, &def)
+	if len(affected) == 0 {
+		return
+	}
+	castTargets := make([]any, len(affected))
+	for i, t := range affected {
+		castTargets[i] = t
+	}
+
+	l.skillHandlers.Use(handlerskill.Cast{
+		Caster:  live.Character,
+		Skill:   def,
+		Targets: castTargets,
+	})
 }
 
 func skillCastObject(obj actorcast.Target) serverpackets.SkillCastObject {

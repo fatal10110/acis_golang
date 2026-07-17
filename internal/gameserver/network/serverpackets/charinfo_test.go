@@ -14,8 +14,8 @@ func TestFrameCharInfoCoreFields(t *testing.T) {
 	c := &player.Character{
 		ID: 0x10000001, Name: "Observer", ClassID: 0,
 		Race: player.RaceHuman, Sex: player.SexMale,
-		Location: location.Location{X: 10, Y: 20, Z: 30},
-		Heading:  123,
+		Location:    location.Location{X: 10, Y: 20, Z: 30},
+		LastHeading: 123,
 	}
 	tmpl := &player.Template{CollisionRadius: 9, CollisionHeight: 23, RunSpeed: 120, WalkSpeed: 80, SwimSpeed: 50}
 	items := []*item.Instance{{ObjectID: 100, TemplateID: 2369, Location: item.LocationPaperdoll, LocationData: rhandPaperdollIndex}}

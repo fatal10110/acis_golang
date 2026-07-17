@@ -107,7 +107,7 @@ func (l *GameClientLink) broadcastLiveFrame(live *livePlayer, frame func() wire.
 
 func (l *GameClientLink) updateLivePlayerPosition(live *livePlayer, position location.Location, heading int) {
 	live.Character.Location = position
-	live.Character.Heading = heading
+	live.Character.LastHeading = heading
 	live.Character.SetHeading(heading)
 	if live.move != nil {
 		// Reseed CreatureMove's own position tracking too, or the next

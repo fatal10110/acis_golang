@@ -11,6 +11,8 @@ import (
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	enchantflow "github.com/fatal10110/acis_golang/internal/gameserver/enchant"
+	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
+	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -83,6 +85,8 @@ type GameClientLink struct {
 	trades        *tradebook.Book
 	enchantState  *enchantflow.State
 	enchant       *enchantflow.Service
+	targets       *skilltarget.Registry
+	skillHandlers *handlerskill.Registry
 	log           zerolog.Logger
 
 	// newCipherKey supplies each connection's XOR cipher key; overridden in
@@ -139,6 +143,8 @@ func NewGameClientLink(
 		petItems:      petitem.NewService(ids),
 		trades:        tradebook.NewBook(time.Now),
 		enchantState:  enchantflow.NewState(),
+		targets:       skilltarget.NewRegistry(skilltarget.WorldKnown{State: worldState}),
+		skillHandlers: handlerskill.NewDefaultRegistry(),
 		log:           log,
 		newCipherKey:  randomCipherKey,
 	}
