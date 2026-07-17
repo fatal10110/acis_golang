@@ -16,9 +16,28 @@ func TestState_ObjectLifecycle(t *testing.T) {
 		t.Fatalf("Objects() = %v, want 1 entry", s.Objects())
 	}
 
-	s.RemoveObject(42)
+	s.RemoveObject(obj)
 	if _, ok := s.Object(42); ok {
 		t.Fatal("Object(42) present after RemoveObject")
+	}
+}
+
+func TestState_RemoveObjectIgnoresStaleIdentity(t *testing.T) {
+	s := New()
+
+	stale := stubObject{id: 42, gen: 1}
+	s.AddObject(stale)
+	s.RemoveObject(stale)
+
+	fresh := stubObject{id: 42, gen: 2}
+	s.AddObject(fresh) // id 42 now points at fresh, e.g. a respawn that reused the id
+
+	// A despawn racing that respawn must not evict fresh.
+	s.RemoveObject(stale)
+
+	got, ok := s.Object(42)
+	if !ok || got != fresh {
+		t.Fatalf("Object(42) = %+v, %v, want the fresh occupant %+v, true", got, ok, fresh)
 	}
 }
 

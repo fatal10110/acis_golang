@@ -514,12 +514,44 @@ func provideGroundItemOptions(props *config.Properties) (task.GroundItemOptions,
 	return task.GroundItemOptionsFromProperties(props)
 }
 
-func provideGroundItems(state *world.State, opts task.GroundItemOptions) *task.GroundItems {
-	return task.NewGroundItems(state, opts, time.Now)
+// provideGroundItems restores persisted ground items before the server
+// starts accepting connections, mirroring the reference server's own
+// load-at-boot behavior. It only clears the persisted rows after every row
+// hydrates successfully, so a row referencing a missing template (e.g.
+// after a datapack downgrade) fails boot instead of silently losing data.
+func provideGroundItems(pool *sql.DB, state *world.State, opts task.GroundItemOptions, data *gameData, log zerolog.Logger) (*task.GroundItems, *gamesql.GroundItemStore, error) {
+	store := gamesql.NewGroundItemStore(pool)
+	items := task.NewGroundItems(state, opts, time.Now)
+
+	ctx := context.Background()
+	rows, err := store.Load(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := items.Load(rows, data.Items); err != nil {
+		return nil, nil, err
+	}
+	if err := store.Clear(ctx); err != nil {
+		return nil, nil, err
+	}
+
+	log.Info().Int("restored_ground_items", items.Len()).Msg("ground items loaded")
+	return items, store, nil
 }
 
-func startGroundItems(lc fx.Lifecycle, items *task.GroundItems, log zerolog.Logger) {
+// startGroundItems runs the cleanup ticker and, at shutdown, saves every
+// still-live ground item back to items_on_ground so the next boot's
+// provideGroundItems can restore it.
+func startGroundItems(lc fx.Lifecycle, items *task.GroundItems, store *gamesql.GroundItemStore, log zerolog.Logger) {
 	startTicker(lc, log, items.Start)
+	lc.Append(fx.Hook{
+		OnStop: func(ctx context.Context) error {
+			if err := store.Save(ctx, items.Snapshots(nil)); err != nil {
+				log.Warn().Err(err).Msg("save ground items")
+			}
+			return nil
+		},
+	})
 }
 
 func provideGameClock() *task.GameClock {

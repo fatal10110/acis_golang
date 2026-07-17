@@ -28,11 +28,16 @@ func (r *Region) Add(obj Tracked) {
 	r.objects[obj.ObjectID()] = obj
 }
 
-// Remove drops the object with the given id from r, if present.
-func (r *Region) Remove(id int32) {
+// Remove drops obj from r, but only if it is still the object currently
+// registered under its id — a despawn racing a respawn that reused the id
+// must not evict the new occupant.
+func (r *Region) Remove(obj Tracked) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	delete(r.objects, id)
+	id := obj.ObjectID()
+	if cur, ok := r.objects[id]; ok && cur == obj {
+		delete(r.objects, id)
+	}
 }
 
 // Objects returns a snapshot of every object currently visible within r.

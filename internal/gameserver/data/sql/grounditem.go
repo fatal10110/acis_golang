@@ -18,20 +18,12 @@ func NewGroundItemStore(db *sql.DB) *GroundItemStore {
 	return &GroundItemStore{db: db}
 }
 
-// LoadAndClear returns every persisted ground item, then clears the table.
-func (s *GroundItemStore) LoadAndClear(ctx context.Context) ([]item.GroundSnapshot, error) {
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, fmt.Errorf("load ground items: %w", err)
-	}
-	committed := false
-	defer func() {
-		if !committed {
-			_ = tx.Rollback()
-		}
-	}()
-
-	rows, err := tx.QueryContext(ctx, `SELECT object_id,item_id,count,enchant_level,x,y,z,time FROM items_on_ground ORDER BY object_id`)
+// Load returns every persisted ground item without modifying the table.
+// Callers must validate and hydrate every row before calling Clear (see its
+// doc) rather than wrapping both in one transaction: that would commit the
+// delete before hydration can detect a bad row, losing data permanently.
+func (s *GroundItemStore) Load(ctx context.Context) ([]item.GroundSnapshot, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT object_id,item_id,count,enchant_level,x,y,z,time FROM items_on_ground ORDER BY object_id`)
 	if err != nil {
 		return nil, fmt.Errorf("load ground items: %w", err)
 	}
@@ -43,15 +35,18 @@ func (s *GroundItemStore) LoadAndClear(ctx context.Context) ([]item.GroundSnapsh
 	if err := rows.Close(); err != nil {
 		return nil, fmt.Errorf("load ground items: %w", err)
 	}
-
-	if _, err := tx.ExecContext(ctx, "DELETE FROM items_on_ground"); err != nil {
-		return nil, fmt.Errorf("clear ground items: %w", err)
-	}
-	if err := tx.Commit(); err != nil {
-		return nil, fmt.Errorf("load ground items: %w", err)
-	}
-	committed = true
 	return out, nil
+}
+
+// Clear empties items_on_ground. Callers must only call this after every
+// row returned by Load has been successfully hydrated in memory: clearing
+// first and hydrating second would permanently lose rows that fail to
+// hydrate (e.g. a missing item template after a datapack downgrade).
+func (s *GroundItemStore) Clear(ctx context.Context) error {
+	if _, err := s.db.ExecContext(ctx, "DELETE FROM items_on_ground"); err != nil {
+		return fmt.Errorf("clear ground items: %w", err)
+	}
+	return nil
 }
 
 // Save replaces items_on_ground with rows.
@@ -100,9 +95,9 @@ func (s *GroundItemStore) Save(ctx context.Context, rows []item.GroundSnapshot) 
 
 func scanGroundItems(rows *sql.Rows) ([]item.GroundSnapshot, error) {
 	var out []item.GroundSnapshot
+	var row item.GroundSnapshot
+	var itemID, count, enchant, x, y, z, millis sql.NullInt64
 	for rows.Next() {
-		var row item.GroundSnapshot
-		var itemID, count, enchant, x, y, z, millis sql.NullInt64
 		if err := rows.Scan(&row.ObjectID, &itemID, &count, &enchant, &x, &y, &z, &millis); err != nil {
 			return nil, fmt.Errorf("load ground items: %w", err)
 		}

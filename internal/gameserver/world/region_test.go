@@ -18,23 +18,43 @@ func TestRegion_AddRemoveObjects(t *testing.T) {
 		t.Fatalf("new region has %d objects, want 0", len(got))
 	}
 
-	r.Add(&trackedStub{id: 1})
-	r.Add(&trackedStub{id: 2})
+	a := &trackedStub{id: 1}
+	b := &trackedStub{id: 2}
+	r.Add(a)
+	r.Add(b)
 
 	got := r.Objects()
 	if len(got) != 2 {
 		t.Fatalf("Objects() returned %d entries, want 2", len(got))
 	}
 
-	r.Remove(1)
+	r.Remove(a)
 	got = r.Objects()
 	if len(got) != 1 || got[0].ObjectID() != 2 {
-		t.Fatalf("Objects() after Remove(1) = %+v, want only id 2", got)
+		t.Fatalf("Objects() after Remove(a) = %+v, want only id 2", got)
 	}
 
-	r.Remove(2)
+	r.Remove(b)
 	if got := r.Objects(); len(got) != 0 {
 		t.Fatalf("Objects() after removing everything has %d entries, want 0", len(got))
+	}
+}
+
+func TestRegion_RemoveIgnoresStaleIdentity(t *testing.T) {
+	r := newRegion(0, 0)
+
+	stale := &trackedStub{id: 1}
+	r.Add(stale)
+
+	fresh := &trackedStub{id: 1}
+	r.Add(fresh) // id 1 now points at fresh, e.g. a respawn that reused the id
+
+	// A despawn racing that respawn must not evict fresh.
+	r.Remove(stale)
+
+	got := r.Objects()
+	if len(got) != 1 || got[0] != Tracked(fresh) {
+		t.Fatalf("Objects() = %+v, want only the fresh occupant of id 1", got)
 	}
 }
 
@@ -46,9 +66,10 @@ func TestRegion_Concurrent(t *testing.T) {
 		wg.Add(1)
 		go func(id int32) {
 			defer wg.Done()
-			r.Add(&trackedStub{id: id})
+			obj := &trackedStub{id: id}
+			r.Add(obj)
 			r.Objects()
-			r.Remove(id)
+			r.Remove(obj)
 		}(i)
 	}
 	wg.Wait()

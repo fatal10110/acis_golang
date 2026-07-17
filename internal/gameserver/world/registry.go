@@ -34,6 +34,17 @@ func (r *registry) remove(key int32) {
 	delete(r.entries, key)
 }
 
+// removeIfCurrent drops the entry for key, but only if obj is still the
+// value stored there — a despawn racing a respawn that reused key must not
+// evict the new occupant.
+func (r *registry) removeIfCurrent(key int32, obj worldobject.Object) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if cur, ok := r.entries[key]; ok && cur == obj {
+		delete(r.entries, key)
+	}
+}
+
 func (r *registry) removeAll(keys []int32) {
 	r.mu.Lock()
 	defer r.mu.Unlock()

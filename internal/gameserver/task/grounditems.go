@@ -168,6 +168,10 @@ func (g *GroundItems) Load(rows []item.GroundSnapshot, templates *item.Table) er
 		if !ok {
 			return fmt.Errorf("ground items: item template %d not loaded", row.TemplateID)
 		}
+		// items_on_ground persists no mana column, so a restored row always
+		// comes back with the zero value here; reset it to the same default
+		// a freshly created instance of tmpl would get.
+		row.Instance.ManaLeft = tmpl.InitialManaLeft()
 		ground, err := grounditem.New(row.Instance, tmpl)
 		if err != nil {
 			return err
@@ -188,7 +192,7 @@ func (g *GroundItems) Load(rows []item.GroundSnapshot, templates *item.Table) er
 // Tick despawns all items whose cleanup deadline has passed.
 func (g *GroundItems) Tick() {
 	now := g.now()
-	var expired []*grounditem.Item
+	var expired []world.Tracked
 
 	g.mu.Lock()
 	for id, entry := range g.items {
@@ -200,9 +204,10 @@ func (g *GroundItems) Tick() {
 	}
 	g.mu.Unlock()
 
-	for _, ground := range expired {
-		g.state.Despawn(ground)
-	}
+	// DespawnBatch scans each affected region once for the whole expired
+	// set instead of once per item, so a tick expiring many co-located
+	// items doesn't cost quadratic time.
+	g.state.DespawnBatch(expired)
 }
 
 // Remove stops tracking ground, usually after pickup or explicit destruction.

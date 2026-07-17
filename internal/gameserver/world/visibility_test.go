@@ -2,6 +2,7 @@ package world
 
 import (
 	"fmt"
+	"runtime"
 	"slices"
 	"sync"
 	"testing"
@@ -227,6 +228,80 @@ func TestDespawnNotifiesAndUnregisters(t *testing.T) {
 	s.Despawn(obj)
 	if got := log.take(); len(got) != 0 {
 		t.Fatalf("second despawn logged %v, want nothing", got)
+	}
+}
+
+func TestDespawnBatchNotifiesEachObserverPerItem(t *testing.T) {
+	s := New()
+	log := &sightLog{}
+
+	o := newObserver(1, log)
+	s.Spawn(o, 0, 0, 0, 0)
+
+	a := &trackedStub{id: 2}
+	b := &trackedStub{id: 3}
+	s.Spawn(a, 100, 0, 0, 0)
+	s.Spawn(b, 200, 0, 0, 0)
+	log.take()
+
+	s.DespawnBatch([]Tracked{a, b})
+
+	got := log.take()
+	slices.Sort(got)
+	want := []string{"1 forget 2", "1 forget 3"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("DespawnBatch notifications = %v, want %v", got, want)
+	}
+	if _, ok := s.Object(2); ok {
+		t.Fatal("Object(2) still registered after DespawnBatch")
+	}
+	if _, ok := s.Object(3); ok {
+		t.Fatal("Object(3) still registered after DespawnBatch")
+	}
+	if a.Visible() || b.Visible() {
+		t.Fatal("Visible() = true after DespawnBatch")
+	}
+
+	// Despawning an empty or already-despawned batch is a harmless no-op.
+	s.DespawnBatch(nil)
+	s.DespawnBatch([]Tracked{a, b})
+	if got := log.take(); len(got) != 0 {
+		t.Fatalf("repeat DespawnBatch logged %v, want nothing", got)
+	}
+}
+
+// TestDespawnBatchScalesLinearly is the regression test for the batch
+// despawn hot path: despawning N co-located passive objects (no Observer
+// among them, mirroring an expired ground-item batch) must scan each
+// affected region once for the whole group, not once per object. A
+// per-object rescan would grow allocation roughly with N², not N.
+func TestDespawnBatchScalesLinearly(t *testing.T) {
+	measure := func(n int) uint64 {
+		s := New()
+		items := make([]Tracked, n)
+		for i := 0; i < n; i++ {
+			it := &trackedStub{id: int32(i + 1)}
+			s.Spawn(it, 50, 50, 0, 0)
+			items[i] = it
+		}
+
+		var before, after runtime.MemStats
+		runtime.GC()
+		runtime.ReadMemStats(&before)
+		s.DespawnBatch(items)
+		runtime.ReadMemStats(&after)
+		return after.TotalAlloc - before.TotalAlloc
+	}
+
+	small := measure(100)
+	big := measure(1000) // 10x the objects
+
+	// A quadratic scan would grow allocation ~100x for a 10x increase in N;
+	// the batched scan should stay close to linear. 20x leaves generous
+	// slack for map/slice growth overhead while still catching a
+	// regression back to the old per-object scan.
+	if big > small*20 {
+		t.Fatalf("DespawnBatch bytes/op did not scale linearly: N=100 -> %d bytes, N=1000 -> %d bytes", small, big)
 	}
 }
 

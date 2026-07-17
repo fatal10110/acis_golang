@@ -164,6 +164,39 @@ func TestGroundItemsLoadAndSaveSnapshots(t *testing.T) {
 	}
 }
 
+func TestGroundItemsLoadSetsManaLeftDefault(t *testing.T) {
+	now := time.UnixMilli(1_000_000)
+	state := world.New()
+	ordinaryTmpl := &item.Template{ID: 10, Kind: item.KindEtcItem, Duration: -1}
+	shadowTmpl := &item.Template{ID: 20, Kind: item.KindWeapon, Duration: 300}
+	templates := item.NewTable([]*item.Template{ordinaryTmpl, shadowTmpl})
+	items := NewGroundItems(state, GroundItemOptions{}, func() time.Time { return now })
+
+	rows := []item.GroundSnapshot{
+		{Instance: item.Instance{ObjectID: 1, TemplateID: 10}},
+		{Instance: item.Instance{ObjectID: 2, TemplateID: 20}},
+	}
+	if err := items.Load(rows, templates); err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	ordinary, ok := state.Object(1)
+	if !ok {
+		t.Fatal("ordinary item not spawned")
+	}
+	if got, want := ordinary.(*grounditem.Item).Instance.ManaLeft, ordinaryTmpl.InitialManaLeft(); got != want {
+		t.Fatalf("restored ordinary item ManaLeft = %d, want %d", got, want)
+	}
+
+	shadow, ok := state.Object(2)
+	if !ok {
+		t.Fatal("shadow item not spawned")
+	}
+	if got, want := shadow.(*grounditem.Item).Instance.ManaLeft, shadowTmpl.InitialManaLeft(); got != want {
+		t.Fatalf("restored shadow item ManaLeft = %d, want %d", got, want)
+	}
+}
+
 func testGroundItem(t *testing.T, inst item.Instance, tmpl *item.Template) *grounditem.Item {
 	t.Helper()
 	ground, err := grounditem.New(inst, tmpl)

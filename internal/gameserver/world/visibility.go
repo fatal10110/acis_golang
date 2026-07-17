@@ -84,7 +84,85 @@ func (s *State) Despawn(t Tracked) {
 
 	s.relocate(t, nil)
 
-	s.RemoveObject(t.ObjectID())
+	s.RemoveObject(t)
+}
+
+// DespawnBatch removes every object in ts from the world. It has the same
+// effect as calling Despawn on each of them individually, except objects
+// that currently share a region have that region's 3x3 neighborhood
+// scanned once for the whole group instead of once per object — despawning
+// N co-located passive objects (e.g. an expired ground-item batch) costs
+// one scan per affected region instead of going quadratic in N.
+func (s *State) DespawnBatch(ts []Tracked) {
+	if len(ts) == 0 {
+		return
+	}
+
+	type group struct {
+		region *Region
+		items  []Tracked
+	}
+	groups := make(map[*Region]*group, len(ts))
+	var order []*Region
+
+	for _, t := range ts {
+		p := t.presence()
+		p.mu.Lock()
+		p.visible = false
+		region := p.region
+		p.mu.Unlock()
+
+		if region == nil {
+			continue
+		}
+		g, ok := groups[region]
+		if !ok {
+			g = &group{region: region}
+			groups[region] = g
+			order = append(order, region)
+		}
+		g.items = append(g.items, t)
+	}
+
+	var areaBuf [9]*Region
+	var objectBuf [32]Tracked
+	for _, region := range order {
+		g := groups[region]
+		for _, t := range g.items {
+			region.Remove(t)
+		}
+
+		areas := s.AppendNeighbors(areaBuf[:0], region, 1)
+		objects := objectBuf[:0]
+		for _, r := range areas {
+			objects = r.AppendObjects(objects[:0])
+			for _, o := range objects {
+				w, isObserver := o.(Observer)
+				for _, t := range g.items {
+					if o.ObjectID() == t.ObjectID() {
+						continue
+					}
+					if isObserver {
+						w.Forget(t)
+					}
+					if tObs, ok := t.(Observer); ok {
+						tObs.Forget(o)
+					}
+				}
+			}
+		}
+
+		for _, t := range g.items {
+			p := t.presence()
+			p.mu.Lock()
+			p.region = nil
+			p.mu.Unlock()
+		}
+	}
+
+	for _, t := range ts {
+		s.RemoveObject(t)
+	}
 }
 
 // relocate moves t between grid regions: out of its current one, if any,
@@ -102,7 +180,7 @@ func (s *State) relocate(t Tracked, next *Region) {
 	var oldAreaBuf, newAreaBuf [9]*Region
 	var oldAreas, newAreas []*Region
 	if prev != nil {
-		prev.Remove(t.ObjectID())
+		prev.Remove(t)
 		oldAreas = s.AppendNeighbors(oldAreaBuf[:0], prev, 1)
 	}
 	if next != nil {

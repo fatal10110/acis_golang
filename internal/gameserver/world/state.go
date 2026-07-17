@@ -27,8 +27,10 @@ func New() *State {
 // already tracked.
 func (s *State) AddObject(obj worldobject.Object) { s.objects.add(obj.ObjectID(), obj) }
 
-// RemoveObject stops tracking the object with the given id.
-func (s *State) RemoveObject(id int32) { s.objects.remove(id) }
+// RemoveObject stops tracking obj, but only if it is still the object
+// currently registered under its id — a despawn racing a respawn that
+// reused the id must not evict the new occupant.
+func (s *State) RemoveObject(obj worldobject.Object) { s.objects.removeIfCurrent(obj.ObjectID(), obj) }
 
 // RemoveObjects stops tracking every object with the given ids.
 func (s *State) RemoveObjects(ids []int32) { s.objects.removeAll(ids) }
