@@ -1,6 +1,8 @@
 package network
 
 import (
+	"context"
+
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
@@ -39,7 +41,7 @@ func (l *GameClientLink) broadcastAttack(attacker *livePlayer, snapshot attack.S
 	})
 }
 
-func (l *GameClientLink) handleTargetAction(live *livePlayer, objectID int32, selected bool) {
+func (l *GameClientLink) handleTargetAction(ctx context.Context, live *livePlayer, objectID int32, selected bool) {
 	target := l.resolveTarget(objectID)
 	if target == nil {
 		live.SendFrame(serverpackets.FrameActionFailed())
@@ -53,6 +55,9 @@ func (l *GameClientLink) handleTargetAction(live *livePlayer, objectID int32, se
 		return
 	}
 	if selected && l.sitLiveOnChair(live, target) {
+		return
+	}
+	if selected && l.pickupLiveGroundItem(ctx, live, target) {
 		return
 	}
 	if selected {

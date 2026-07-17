@@ -55,8 +55,9 @@ type groundItemDropper interface {
 }
 
 const (
-	crystallizeSkillID      = 248
-	dropInteractionDistance = 150
+	crystallizeSkillID              = 248
+	dropInteractionDistance         = 150
+	groundPickupInteractionDistance = 150
 )
 
 // GameClientLink accepts and drives connections from Interlude game

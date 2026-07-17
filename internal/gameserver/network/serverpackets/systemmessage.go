@@ -16,6 +16,9 @@ const (
 	SystemMessageEnchantmentFailedS1Evaporated   = 64
 	SystemMessageEnchantmentFailedS1S2Evaporated = 65
 	SystemMessageTargetTooFar                    = 22
+	SystemMessageFailedToPickupAdena             = 55
+	SystemMessageFailedToPickupS1                = 56
+	SystemMessageFailedToPickupS2S1S             = 57
 	SystemMessageS1CannotBeUsed                  = 113
 	SystemMessageRequestS1ForTrade               = 118
 	SystemMessageS1DeniedTradeRequest            = 119
@@ -103,6 +106,17 @@ func FrameSystemMessageItemName(id int, itemID int32) wire.Frame {
 	w.WriteInt32(1)
 	w.WriteInt32(SystemMessageParamItemName)
 	w.WriteInt32(itemID)
+	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
+}
+
+// FrameSystemMessageNumber builds a SystemMessage packet with one number
+// parameter.
+func FrameSystemMessageNumber(id int, number int32) wire.Frame {
+	w := newFrameWriter(OpcodeSystemMessage)
+	w.WriteInt32(int32(id))
+	w.WriteInt32(1)
+	w.WriteInt32(SystemMessageParamNumber)
+	w.WriteInt32(number)
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
 }
 
