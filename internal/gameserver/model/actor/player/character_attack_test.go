@@ -1,6 +1,7 @@
 package player
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -112,4 +113,43 @@ func TestCharacterPhysicalAttackResolvesLethalHit(t *testing.T) {
 	if defender.CurHP != 0 {
 		t.Fatalf("defender.CurHP = %v, want 0 after lethal attack", defender.CurHP)
 	}
+}
+
+// TestCharacterPositionAccessIsRaceFree exercises the exact goroutine
+// pairing that produces a live game's data race on Location/LastHeading: a
+// position-update ticker calling SyncPosition during an attack chase,
+// concurrently with the owning connection's network goroutine calling
+// SetLastKnownPosition for a client-reported move, while a third goroutine
+// reads the last-known state the way a save or a range check would. Run
+// with -race.
+func TestCharacterPositionAccessIsRaceFree(t *testing.T) {
+	tmpl := combatTemplate()
+	items := combatItems()
+	c := liveCharacter(1, tmpl, items)
+
+	const iterations = 500
+	var wg sync.WaitGroup
+	wg.Add(3)
+
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			c.SyncPosition(location.Location{X: i, Y: 0, Z: 0})
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			c.SetLastKnownPosition(location.Location{X: -i, Y: 0, Z: 0}, i)
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			_ = c.CurrentLocation()
+			_ = c.CurrentHeading()
+		}
+	}()
+
+	wg.Wait()
 }

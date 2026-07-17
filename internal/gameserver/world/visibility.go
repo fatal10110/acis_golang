@@ -183,21 +183,9 @@ func Knows(t, target Tracked) bool {
 // ForEachKnown calls fn for every object in t's surrounding regions,
 // excluding t itself. It does nothing when t is off the grid.
 func (s *State) ForEachKnown(t Tracked, fn func(Tracked)) {
-	r := t.presence().currentRegion()
-	if r == nil {
-		return
-	}
-	var regionBuf [9]*Region
-	var objectBuf [32]Tracked
-	objects := objectBuf[:0]
-	for _, region := range s.AppendNeighbors(regionBuf[:0], r, 1) {
-		objects = region.AppendObjects(objects[:0])
-		for _, o := range objects {
-			if o.ObjectID() == t.ObjectID() {
-				continue
-			}
-			fn(o)
-		}
+	var buf [32]Tracked
+	for _, o := range s.AppendKnown(buf[:0], t) {
+		fn(o)
 	}
 }
 

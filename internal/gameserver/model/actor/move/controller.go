@@ -137,11 +137,19 @@ func (c *Controller) MaybeStartOffensiveFollow(target attackable.Combatant, atta
 	return true
 }
 
-// MoveHome requests movement toward home. A blocked or unreachable route is
-// silently dropped — matching a return-home attempt that simply can't make
-// progress this tick, not an application error.
+// MoveHome requests movement toward home, broadcasts the move, and
+// registers for correction ticks the same way any other movement request
+// does — otherwise this controller's world presence would stay at the
+// stale pre-move cell for the entire walk back. A blocked or unreachable
+// route is silently dropped — matching a return-home attempt that simply
+// can't make progress this tick, not an application error.
 func (c *Controller) MoveHome(home location.Location) {
-	_, _ = c.move.MoveToLocation(home)
+	event, err := c.move.MoveToLocation(home)
+	if err != nil {
+		return
+	}
+	c.self.BroadcastMove(event)
+	c.addPositionUpdate()
 }
 
 // Stop cancels any active follow task and any movement already under way,
@@ -170,16 +178,29 @@ func (c *Controller) SetArrived(arrived func()) {
 	})
 }
 
-// PositionUpdate advances one movement correction tick and broadcasts the
-// current in-flight move. It returns false when the move has stopped.
+// PositionUpdate advances one movement correction tick, syncing this
+// controller's world presence to the newly interpolated position. It does
+// not rebroadcast a movement packet: clients interpolate from the single
+// move-start packet already sent by whichever call began this move, and
+// resending it every tick would restart that client-side animation instead
+// of just correcting server-side state. It returns false once the move has
+// stopped.
+//
+// Reaching the destination fires the arrived hook synchronously inside
+// UpdatePosition, before this returns — including SetArrived's own
+// removePositionUpdate call. If that hook (an NPC's AI, say) starts a new
+// move as a result, c.move is moving again by the time UpdatePosition
+// returns, so the fresh state here — not the stale result of this tick —
+// decides whether to unregister.
 func (c *Controller) PositionUpdate() bool {
 	event, moving := c.move.UpdatePosition(PositionUpdateInterval)
 	if !moving {
-		c.removePositionUpdate()
-		return false
+		if !c.move.Moving() {
+			c.removePositionUpdate()
+		}
+		return c.move.Moving()
 	}
 	c.self.SyncPosition(event.Origin)
-	c.self.BroadcastMove(event)
 	return true
 }
 

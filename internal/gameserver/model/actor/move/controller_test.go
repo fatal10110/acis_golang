@@ -272,7 +272,7 @@ func TestControllerRemovesPositionUpdatesOnStop(t *testing.T) {
 	}
 }
 
-func TestControllerPositionUpdateAdvancesAndBroadcastsCurrentMove(t *testing.T) {
+func TestControllerPositionUpdateAdvancesPositionWithoutRebroadcasting(t *testing.T) {
 	self := &fakeSelf{id: 11, x: 0, y: 0, radius: 5}
 	c := newTestController(t, self)
 
@@ -284,11 +284,8 @@ func TestControllerPositionUpdateAdvancesAndBroadcastsCurrentMove(t *testing.T) 
 	if !c.PositionUpdate() {
 		t.Fatal("PositionUpdate() = false, want moving")
 	}
-	if len(self.broadcasts) != 2 {
-		t.Fatalf("BroadcastMove calls = %d, want initial + update", len(self.broadcasts))
-	}
-	if got := self.broadcasts[1].Origin; got != (location.Location{X: 10, Y: 0, Z: 0}) {
-		t.Fatalf("update origin = %+v, want one 100ms movement step", got)
+	if len(self.broadcasts) != 1 {
+		t.Fatalf("BroadcastMove calls = %d, want 1 (only the move-start packet — clients interpolate)", len(self.broadcasts))
 	}
 	if self.x != 10 || self.y != 0 || self.z != 0 {
 		t.Fatalf("synced position = (%d,%d,%d), want (10,0,0)", self.x, self.y, self.z)
@@ -323,6 +320,42 @@ func TestControllerPositionUpdateRemovesOnArrival(t *testing.T) {
 	}
 }
 
+func TestControllerPositionUpdateKeepsRegistrationWhenArrivedHookRestartsMovement(t *testing.T) {
+	self := &fakeSelf{id: 11, x: 0, y: 0}
+	c := newTestController(t, self)
+	updates := &fakePositionUpdates{}
+	c.SetPositionUpdates(updates)
+
+	firstTarget := &fakeTarget{id: 7, x: 10, y: 0}
+	if !c.MaybeStartOffensiveFollow(firstTarget, 0) {
+		t.Fatal("MaybeStartOffensiveFollow() = false, want true")
+	}
+
+	// An arrived hook that behaves like an NPC's AI: on arrival, it
+	// immediately re-evaluates and starts chasing a new, out-of-range
+	// target — re-registering this controller before PositionUpdate
+	// returns.
+	secondTarget := &fakeTarget{id: 8, x: 1000, y: 0, radius: 5}
+	c.SetArrived(func() {
+		if !c.MaybeStartOffensiveFollow(secondTarget, 40) {
+			t.Fatal("arrived hook: MaybeStartOffensiveFollow() = false, want true")
+		}
+	})
+
+	if !c.PositionUpdate() {
+		t.Fatal("PositionUpdate() = false, want true: the arrived hook started a new move")
+	}
+	if !c.move.Moving() || c.move.Destination() != (location.Location{X: 1000, Y: 0, Z: 0}) {
+		t.Fatalf("destination = %+v, moving = %v, want the new move still in flight toward the second target", c.move.Destination(), c.move.Moving())
+	}
+	if len(updates.removed) != 1 {
+		t.Fatalf("removed movers = %v, want exactly the stale first-move registration, not the fresh re-registration", updates.removed)
+	}
+	if len(updates.added) != 2 {
+		t.Fatalf("added movers = %v, want the initial registration plus the arrived hook's re-registration", updates.added)
+	}
+}
+
 func TestControllerStopCancelsInFlightMovement(t *testing.T) {
 	self := &fakeSelf{x: 0, y: 0, radius: 5}
 	c := newTestController(t, self)
@@ -344,12 +377,43 @@ func TestControllerStopCancelsInFlightMovement(t *testing.T) {
 func TestControllerMoveHomeRequestsMovement(t *testing.T) {
 	self := &fakeSelf{}
 	c := newTestController(t, self)
+	updates := &fakePositionUpdates{}
+	c.SetPositionUpdates(updates)
 
 	home := location.Location{X: 500, Y: 500, Z: 0}
 	c.MoveHome(home)
 
 	if got := c.move.Destination(); got != home {
 		t.Fatalf("destination = %+v, want %+v", got, home)
+	}
+	if len(self.broadcasts) != 1 {
+		t.Fatalf("BroadcastMove calls = %d, want 1: a return-home walk must be visible to clients", len(self.broadcasts))
+	}
+	if len(updates.added) != 1 || updates.added[0].ObjectID() != self.id {
+		t.Fatalf("registered movers = %v, want self: a return-home walk must keep world presence current", updates.added)
+	}
+}
+
+func TestControllerMoveHomeDropsBlockedRoute(t *testing.T) {
+	self := &fakeSelf{}
+	cm, err := NewCreatureMove(location.Location{X: self.x, Y: self.y}, 100, &recordingGeo{canMove: false})
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, err := NewController(cm, self)
+	if err != nil {
+		t.Fatal(err)
+	}
+	updates := &fakePositionUpdates{}
+	c.SetPositionUpdates(updates)
+
+	c.MoveHome(location.Location{X: 500, Y: 500, Z: 0})
+
+	if len(self.broadcasts) != 0 {
+		t.Fatalf("BroadcastMove calls = %d, want 0 for a blocked route", len(self.broadcasts))
+	}
+	if len(updates.added) != 0 {
+		t.Fatalf("registered movers = %v, want none for a blocked route", updates.added)
 	}
 }
 

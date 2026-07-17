@@ -262,15 +262,11 @@ func (h *Hostile) BroadcastStop() {
 }
 
 func (h *Hostile) appendKnown() []world.Tracked {
-	h.knownMu.Lock()
-	h.knownScratch = h.world.AppendKnown(h.knownScratch[:0], h)
-	return h.knownScratch
+	return h.known.Snapshot(h.world, h)
 }
 
 func (h *Hostile) releaseKnown() {
-	clear(h.knownScratch)
-	h.knownScratch = h.knownScratch[:0]
-	h.knownMu.Unlock()
+	h.known.Release()
 }
 
 // AttackableBy reports whether attacker may physically attack this NPC.

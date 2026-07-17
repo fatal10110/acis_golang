@@ -57,10 +57,7 @@ func (f *Finder) find(dst []location.Location, origin, target location.Location,
 		scratch = &searchScratch{}
 	}
 	scratch.reset()
-	defer func() {
-		scratch.reset()
-		f.scratch.Put(scratch)
-	}()
+	defer f.scratch.Put(scratch)
 
 	start := scratch.newNodeFromWorld(origin.X, origin.Y, int(f.engine.Height(origin.X, origin.Y, origin.Z)))
 	goal := scratch.newNodeFromWorld(target.X, target.Y, int(f.engine.Height(target.X, target.Y, target.Z)))

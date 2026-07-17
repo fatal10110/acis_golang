@@ -1,8 +1,6 @@
 package network
 
 import (
-	"sync"
-
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
@@ -27,9 +25,8 @@ type livePlayer struct {
 	cast      *actorcast.Controller
 	shortcuts *shortcut.List
 
-	knownMu      sync.Mutex
-	knownScratch []world.Tracked
-	stopAttack   func(*livePlayer)
+	known      world.KnownBuffer
+	stopAttack func(*livePlayer)
 }
 
 func (p *livePlayer) SendFrame(frame wire.Frame) bool {

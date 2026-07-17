@@ -42,8 +42,7 @@ type Hostile struct {
 	move  ai.MoveController
 	world *world.State
 
-	knownMu      sync.Mutex
-	knownScratch []world.Tracked
+	known world.KnownBuffer
 
 	// rewards computes this NPC's drop/experience payout when TakeDamage
 	// kills it. It is nil until SetRewarder is called, in which case death
