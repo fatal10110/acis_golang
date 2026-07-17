@@ -29,7 +29,7 @@ func testCharacter(objectID int32, name string) *player.Character {
 		Exp: 0, SP: 0,
 		AccessLevel: 0,
 		Location:    location.Location{X: -56733, Y: -113459, Z: -690},
-		Heading:     32768,
+		LastHeading: 32768,
 	}
 }
 
@@ -62,8 +62,8 @@ func TestCharacterStore_CreateAndReadBack(t *testing.T) {
 		got.Face != c.Face || got.HairStyle != c.HairStyle || got.HairColor != c.HairColor {
 		t.Fatalf("Get() after create = %+v, want match to %+v", got, c)
 	}
-	if got.Location != c.Location || got.Heading != c.Heading {
-		t.Errorf("Get() after create position/heading = %v/%d, want %v/%d", got.Location, got.Heading, c.Location, c.Heading)
+	if got.Location != c.Location || got.LastHeading != c.LastHeading {
+		t.Errorf("Get() after create position/heading = %v/%d, want %v/%d", got.Location, got.LastHeading, c.Location, c.LastHeading)
 	}
 	if got.DeleteAt != 0 {
 		t.Errorf("Get() after create DeleteAt = %d, want 0", got.DeleteAt)

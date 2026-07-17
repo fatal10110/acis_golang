@@ -43,7 +43,7 @@ func TestDetachLivePlayerSavesWithUncancelledBoundedContext(t *testing.T) {
 	live := newTestLivePlayer(t, 101, &frameCapture{})
 	savedAt := location.Location{X: 46160, Y: 41237, Z: -3534}
 	live.Character.Location = savedAt
-	live.Character.Heading = 32768
+	live.Character.LastHeading = 32768
 	if err := chars.Create(context.Background(), live.Character); err != nil {
 		t.Fatalf("Create() unexpected error: %v", err)
 	}

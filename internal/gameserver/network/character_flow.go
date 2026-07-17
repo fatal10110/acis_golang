@@ -102,7 +102,7 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 	}
 	if l.world != nil {
 		x, y, z := c.Position()
-		l.world.Spawn(live, x, y, z, c.Heading)
+		l.world.Spawn(live, x, y, z, c.LastHeading)
 		l.world.AddPlayer(live)
 	}
 
