@@ -2,6 +2,7 @@ package network
 
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -18,24 +19,27 @@ func (l *GameClientLink) moveLivePlayer(live *livePlayer, origin, target locatio
 	heading := origin.HeadingTo(target)
 	l.updateLivePlayerPosition(live, origin, heading)
 	live.SendFrame(serverpackets.FrameMoveToLocation(live.ObjectID(), target, origin))
+	l.broadcastKnownMoveToLocation(live, target, origin)
+}
 
+func (l *GameClientLink) broadcastKnownMoveToLocation(live *livePlayer, target, origin location.Location) {
 	if l.world == nil {
 		return
 	}
-	l.world.ForEachKnown(live, func(o world.Tracked) {
-		receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
+	known := live.appendKnown(l.world)
+	defer live.releaseKnown()
+	for _, o := range known {
+		receiver, ok := o.(frameReceiver)
 		if !ok {
-			return
+			continue
 		}
 		receiver.SendFrame(serverpackets.FrameMoveToLocation(live.ObjectID(), target, origin))
-	})
+	}
 }
 
 func (l *GameClientLink) stopLivePlayer(live *livePlayer, at location.Location, heading int) {
 	l.updateLivePlayerPosition(live, at, heading)
-	l.broadcastLiveFrame(live, func() wire.Frame {
-		return serverpackets.FrameStopMove(live.ObjectID(), at, heading)
-	})
+	l.broadcastLiveStopMove(live, at, heading)
 }
 
 func (l *GameClientLink) validateLivePlayerPosition(live *livePlayer, reported location.Location, heading int) {
@@ -91,6 +95,38 @@ func (l *GameClientLink) broadcastLiveSocialAction(live *livePlayer, actionID in
 	})
 }
 
+func (l *GameClientLink) broadcastLiveMoveEvent(live *livePlayer, event move.Event) {
+	live.SendFrame(serverpackets.FrameMove(live.ObjectID(), event))
+	if l.world == nil {
+		return
+	}
+	known := live.appendKnown(l.world)
+	defer live.releaseKnown()
+	for _, o := range known {
+		receiver, ok := o.(frameReceiver)
+		if !ok {
+			continue
+		}
+		receiver.SendFrame(serverpackets.FrameMove(live.ObjectID(), event))
+	}
+}
+
+func (l *GameClientLink) broadcastLiveStopMove(live *livePlayer, at location.Location, heading int) {
+	live.SendFrame(serverpackets.FrameStopMove(live.ObjectID(), at, heading))
+	if l.world == nil {
+		return
+	}
+	known := live.appendKnown(l.world)
+	defer live.releaseKnown()
+	for _, o := range known {
+		receiver, ok := o.(frameReceiver)
+		if !ok {
+			continue
+		}
+		receiver.SendFrame(serverpackets.FrameStopMove(live.ObjectID(), at, heading))
+	}
+}
+
 func (l *GameClientLink) broadcastLiveFrame(live *livePlayer, frame func() wire.Frame) {
 	live.SendFrame(frame())
 	if l.world == nil {
@@ -103,6 +139,22 @@ func (l *GameClientLink) broadcastLiveFrame(live *livePlayer, frame func() wire.
 		}
 		receiver.SendFrame(frame())
 	})
+}
+
+type frameReceiver interface {
+	SendFrame(wire.Frame) bool
+}
+
+func (p *livePlayer) appendKnown(state *world.State) []world.Tracked {
+	p.knownMu.Lock()
+	p.knownScratch = state.AppendKnown(p.knownScratch[:0], p)
+	return p.knownScratch
+}
+
+func (p *livePlayer) releaseKnown() {
+	clear(p.knownScratch)
+	p.knownScratch = p.knownScratch[:0]
+	p.knownMu.Unlock()
 }
 
 func (l *GameClientLink) updateLivePlayerPosition(live *livePlayer, position location.Location, heading int) {

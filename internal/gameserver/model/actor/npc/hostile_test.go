@@ -253,7 +253,7 @@ func newTestHostile(t *testing.T, move ai.MoveController, strike ai.AttackContro
 	return hostile
 }
 
-func newHostileLive(t *testing.T) *creature.Live {
+func newHostileLive(t testing.TB) *creature.Live {
 	t.Helper()
 	live, err := creature.NewLive(location.Location{}, 100, hostileGeo{})
 	if err != nil {
