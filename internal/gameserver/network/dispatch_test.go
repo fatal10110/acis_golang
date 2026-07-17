@@ -103,7 +103,7 @@ func (s *fakeCharStore) SetPosition(ctx context.Context, id int32, loc location.
 	defer s.mu.Unlock()
 	if c, ok := s.byID[id]; ok {
 		c.Location = loc
-		c.Heading = heading
+		c.LastHeading = heading
 	}
 	deadline, hasDeadline := ctx.Deadline()
 	s.savedPositions[id] = savedPosition{

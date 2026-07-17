@@ -11,6 +11,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -43,9 +45,11 @@ type Character struct {
 
 	Face, HairStyle, HairColor int
 
-	// Location and Heading are the character's last known world location.
-	Location location.Location
-	Heading  int
+	// Location and LastHeading are the character's last known world
+	// location. The field is named LastHeading, not Heading, so it doesn't
+	// shadow the Heading() method promoted from the embedded world.Presence.
+	Location    location.Location
+	LastHeading int
 
 	Karma             int
 	PvPKills, PKKills int
@@ -71,6 +75,12 @@ type Character struct {
 	deathMu sync.Mutex
 	dead    bool
 	health  creature.Health
+
+	effects *effect.List
+
+	// statMu guards statFuncs.
+	statMu    sync.Mutex
+	statFuncs []basefunc.Func
 
 	// stateMu guards transient live flags.
 	stateMu       sync.RWMutex
@@ -134,6 +144,7 @@ func NewCharacter(objectID int32, tmpl *Template, accountName, name string, hair
 		c.Location = tmpl.Spawns[rand.IntN(len(tmpl.Spawns))]
 	}
 	c.health = creature.NewHealth(&c.CurHP)
+	c.effects = effect.NewList(c)
 
 	return c, nil
 }
@@ -151,5 +162,5 @@ func (c *Character) CurrentHeading() int {
 	if c.Visible() {
 		return c.Presence.Heading()
 	}
-	return c.Heading
+	return c.LastHeading
 }

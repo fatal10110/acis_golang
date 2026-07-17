@@ -29,8 +29,8 @@ func TestCharacterStoreCreatePersistsInitialPosition(t *testing.T) {
 		MaxHP:       80, CurHP: 80,
 		MaxCP: 32, CurCP: 32,
 		MaxMP: 30, CurMP: 30,
-		Location: location.Location{X: -56733, Y: -113459, Z: -690},
-		Heading:  32768,
+		Location:    location.Location{X: -56733, Y: -113459, Z: -690},
+		LastHeading: 32768,
 	}
 
 	if err := store.Create(context.Background(), c); err != nil {
@@ -45,7 +45,7 @@ func TestCharacterStoreCreatePersistsInitialPosition(t *testing.T) {
 	for _, arg := range rec.args {
 		values[arg.Value] = true
 	}
-	for _, want := range []any{int64(c.Heading), int64(c.Location.X), int64(c.Location.Y), int64(c.Location.Z)} {
+	for _, want := range []any{int64(c.LastHeading), int64(c.Location.X), int64(c.Location.Y), int64(c.Location.Z)} {
 		if !values[want] {
 			t.Fatalf("Create() args = %#v, missing %v", rec.args, want)
 		}

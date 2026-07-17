@@ -24,9 +24,9 @@ func TestFrameUserInfo(t *testing.T) {
 		MaxMP: 30, CurMP: 30,
 		MaxCP: 40, CurCP: 40,
 		Face: 0, HairStyle: 1, HairColor: 2,
-		Location: location.Location{X: 10, Y: 20, Z: 30},
-		Heading:  100,
-		Karma:    0, PKKills: 1, PvPKills: 2,
+		Location:    location.Location{X: 10, Y: 20, Z: 30},
+		LastHeading: 100,
+		Karma:       0, PKKills: 1, PvPKills: 2,
 		ClanID: 5, Title: "Hero", AccessLevel: 1,
 	}
 	tmpl := &player.Template{
@@ -46,7 +46,7 @@ func TestFrameUserInfo(t *testing.T) {
 	want = binary.LittleEndian.AppendUint32(want, uint32(x))
 	want = binary.LittleEndian.AppendUint32(want, uint32(y))
 	want = binary.LittleEndian.AppendUint32(want, uint32(z))
-	want = binary.LittleEndian.AppendUint32(want, uint32(c.Heading))
+	want = binary.LittleEndian.AppendUint32(want, uint32(c.LastHeading))
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.ObjectID()))
 	want = append(want, encodeUTF16Z(c.Name)...)
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.Race))
