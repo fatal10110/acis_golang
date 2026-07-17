@@ -40,6 +40,17 @@ PlayerDroppedItemMultiplier = 3
 	}
 }
 
+func TestGroundItemOptionsFromPropertiesRejectsItemIDOverflowingInt32(t *testing.T) {
+	props, err := config.ParseString("AutoDestroySpecialItemTime = 9999999999-0\n")
+	if err != nil {
+		t.Fatalf("ParseString() error = %v", err)
+	}
+
+	if _, err := GroundItemOptionsFromProperties(props); err == nil {
+		t.Fatal("GroundItemOptionsFromProperties() error = nil, want error for an item id overflowing int32")
+	}
+}
+
 func TestGroundItemsDropAndExpire(t *testing.T) {
 	now := time.UnixMilli(100_000)
 	state := world.New()

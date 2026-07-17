@@ -2,6 +2,7 @@ package task
 
 import (
 	"fmt"
+	"math"
 	"sync"
 	"time"
 
@@ -58,6 +59,9 @@ func GroundItemOptionsFromProperties(props *config.Properties) (GroundItemOption
 
 	special := make(map[int32]time.Duration, len(pairs))
 	for _, pair := range pairs {
+		if pair.First < math.MinInt32 || pair.First > math.MaxInt32 {
+			return GroundItemOptions{}, fmt.Errorf("AutoDestroySpecialItemTime: item id %d overflows int32", pair.First)
+		}
 		special[int32(pair.First)] = time.Duration(pair.Second) * time.Second
 	}
 
