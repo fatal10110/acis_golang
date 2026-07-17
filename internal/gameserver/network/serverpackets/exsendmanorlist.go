@@ -10,6 +10,8 @@ const OpcodeExtended = 0xfe
 const (
 	OpcodeExSendManorList             uint16 = 0x001b
 	OpcodeExAutoSoulShot              uint16 = 0x0012
+	OpcodeExEnchantSkillList          uint16 = 0x0017
+	OpcodeExEnchantSkillInfo          uint16 = 0x0018
 	OpcodeExMailArrived               uint16 = 0x002d
 	OpcodeExStorageMaxCount           uint16 = 0x002e
 	OpcodeExPledgeCrestLarge          uint16 = 0x0028

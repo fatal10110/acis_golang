@@ -1,10 +1,6 @@
 package clientpackets
 
-import (
-	"fmt"
-
-	"github.com/fatal10110/acis_golang/internal/commons/wire"
-)
+import "fmt"
 
 const (
 	requestConfirmTargetItemSize  = 2 + 4
@@ -22,7 +18,7 @@ type RequestConfirmTargetItem struct {
 // DecodeRequestConfirmTargetItem parses a raw extended
 // RequestConfirmTargetItem payload (opcode byte included).
 func DecodeRequestConfirmTargetItem(payload []byte) (RequestConfirmTargetItem, error) {
-	r, err := newVariationReader(payload, "RequestConfirmTargetItem", OpcodeRequestConfirmTargetItem, requestConfirmTargetItemSize)
+	r, err := newExtendedReader(payload, "RequestConfirmTargetItem", OpcodeRequestConfirmTargetItem, requestConfirmTargetItemSize)
 	if err != nil {
 		return RequestConfirmTargetItem{}, err
 	}
@@ -43,7 +39,7 @@ type RequestConfirmRefinerItem struct {
 // DecodeRequestConfirmRefinerItem parses a raw extended
 // RequestConfirmRefinerItem payload (opcode byte included).
 func DecodeRequestConfirmRefinerItem(payload []byte) (RequestConfirmRefinerItem, error) {
-	r, err := newVariationReader(payload, "RequestConfirmRefinerItem", OpcodeRequestConfirmRefinerItem, requestConfirmRefinerItemSize)
+	r, err := newExtendedReader(payload, "RequestConfirmRefinerItem", OpcodeRequestConfirmRefinerItem, requestConfirmRefinerItemSize)
 	if err != nil {
 		return RequestConfirmRefinerItem{}, err
 	}
@@ -69,7 +65,7 @@ type RequestConfirmGemStone struct {
 // DecodeRequestConfirmGemStone parses a raw extended
 // RequestConfirmGemStone payload (opcode byte included).
 func DecodeRequestConfirmGemStone(payload []byte) (RequestConfirmGemStone, error) {
-	r, err := newVariationReader(payload, "RequestConfirmGemStone", OpcodeRequestConfirmGemStone, requestConfirmGemStoneSize)
+	r, err := newExtendedReader(payload, "RequestConfirmGemStone", OpcodeRequestConfirmGemStone, requestConfirmGemStoneSize)
 	if err != nil {
 		return RequestConfirmGemStone{}, err
 	}
@@ -94,7 +90,7 @@ type RequestConfirmCancelItem struct {
 // DecodeRequestConfirmCancelItem parses a raw extended
 // RequestConfirmCancelItem payload (opcode byte included).
 func DecodeRequestConfirmCancelItem(payload []byte) (RequestConfirmCancelItem, error) {
-	r, err := newVariationReader(payload, "RequestConfirmCancelItem", OpcodeRequestConfirmCancelItem, requestConfirmCancelItemSize)
+	r, err := newExtendedReader(payload, "RequestConfirmCancelItem", OpcodeRequestConfirmCancelItem, requestConfirmCancelItemSize)
 	if err != nil {
 		return RequestConfirmCancelItem{}, err
 	}
@@ -103,15 +99,4 @@ func DecodeRequestConfirmCancelItem(payload []byte) (RequestConfirmCancelItem, e
 		return RequestConfirmCancelItem{}, fmt.Errorf("clientpackets: RequestConfirmCancelItem: %w", err)
 	}
 	return req, nil
-}
-
-func newVariationReader(payload []byte, name string, opcode uint16, size int) (*wire.Reader, error) {
-	r := newReader(payload)
-	if r.Remaining() < size {
-		return nil, fmt.Errorf("clientpackets: %s: need %d bytes, got %d", name, size, r.Remaining())
-	}
-	if second := r.ReadUint16(); second != opcode {
-		return nil, fmt.Errorf("clientpackets: %s: extended opcode %#x", name, second)
-	}
-	return r, nil
 }

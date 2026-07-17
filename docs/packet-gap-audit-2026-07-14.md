@@ -135,6 +135,10 @@ Missing M3 data/UI client packets:
 are still counted as gaps because merchant NPC context, buylist loading/restock wiring, buy/sell
 inventory mutation, adena persistence, and the NPC dialog/bypass owner flow are not implemented.
 
+`RequestExEnchantSkillInfo` and `RequestExEnchantSkill` currently have Go decoders and byte-layout
+tests only. They are still counted as gaps because the skill-enchant tree, trainer validation, cost
+payment, success/failure roll, and skill persistence flow are not implemented.
+
 `RequestConfirmTargetItem`, `RequestConfirmRefinerItem`, `RequestConfirmGemStone`, and
 `RequestConfirmCancelItem` currently have Go decoders and byte-layout tests only. They are still
 counted as gaps because the live augmentation validation/apply/remove flow is not implemented.
@@ -241,7 +245,8 @@ Remaining EnterWorld burst packet gaps:
 `PledgeShowMemberListUpdate` ([#631](https://github.com/fatal10110/acis_golang/issues/631)),
 `PledgeShowMemberListAll` ([#632](https://github.com/fatal10110/acis_golang/issues/632)),
 `PledgeSkillList`, `ExMailArrived`, `PlaySound`, `NpcHtmlMessage`, `BuyList`, and `SellList`
-currently have Go frame builders only. The augmentation variation packets
+currently have Go frame builders only. `ExEnchantSkillList` and `ExEnchantSkillInfo` also have Go
+frame builders only. The augmentation variation packets
 `ExShowVariationMakeWindow`, `ExShowVariationCancelWindow`, `ExConfirmVariationItem`,
 `ExConfirmVariationRefiner`, `ExConfirmVariationGemstone`, `ExConfirmCancelItem`,
 `ExVariationResult`, and `ExVariationCancelResult` also have Go frame builders only. They are not
