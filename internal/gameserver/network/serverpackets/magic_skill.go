@@ -12,6 +12,8 @@ const (
 	OpcodeSetupGauge byte = 0x6d
 	// OpcodeMagicSkillLaunched is the wire opcode for MagicSkillLaunched.
 	OpcodeMagicSkillLaunched byte = 0x76
+	// OpcodeMagicSkillCanceled is the wire opcode for MagicSkillCanceled.
+	OpcodeMagicSkillCanceled byte = 0x49
 )
 
 // GaugeColor is the client gauge color ordinal.
@@ -70,6 +72,13 @@ func FrameMagicSkillLaunched(objectID, skillID, level int32, targetIDs []int32) 
 			w.WriteInt32(targetID)
 		}
 	}
+	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
+}
+
+// FrameMagicSkillCanceled builds the cast-cancel animation packet.
+func FrameMagicSkillCanceled(objectID int32) wire.Frame {
+	w := newFrameWriter(OpcodeMagicSkillCanceled)
+	w.WriteInt32(objectID)
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
 }
 
