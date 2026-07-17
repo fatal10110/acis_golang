@@ -2,8 +2,6 @@ package task
 
 import (
 	"fmt"
-	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -48,25 +46,19 @@ func GroundItemOptionsFromProperties(props *config.Properties) (GroundItemOption
 		return opts, nil
 	}
 
-	herb, err := props.Int("AutoDestroyHerbTime", int(opts.HerbAutoDestroy/time.Second))
-	if err != nil {
+	f := config.NewFields(props, "ground item options")
+	herb := f.Int("AutoDestroyHerbTime", int(opts.HerbAutoDestroy/time.Second))
+	regular := f.Int("AutoDestroyItemTime", int(opts.ItemAutoDestroy/time.Second))
+	equipable := f.Int("AutoDestroyEquipableItemTime", int(opts.EquipableAutoDestroy/time.Second))
+	multiplier := f.Int("PlayerDroppedItemMultiplier", opts.PlayerDroppedMultiplier)
+	pairs := f.IntPairs("AutoDestroySpecialItemTime", "57-0,5575-0,6673-0")
+	if err := f.Err(); err != nil {
 		return GroundItemOptions{}, err
 	}
-	regular, err := props.Int("AutoDestroyItemTime", int(opts.ItemAutoDestroy/time.Second))
-	if err != nil {
-		return GroundItemOptions{}, err
-	}
-	equipable, err := props.Int("AutoDestroyEquipableItemTime", int(opts.EquipableAutoDestroy/time.Second))
-	if err != nil {
-		return GroundItemOptions{}, err
-	}
-	multiplier, err := props.Int("PlayerDroppedItemMultiplier", opts.PlayerDroppedMultiplier)
-	if err != nil {
-		return GroundItemOptions{}, err
-	}
-	special, err := parseSpecialDestroy(props.String("AutoDestroySpecialItemTime", "57-0,5575-0,6673-0"))
-	if err != nil {
-		return GroundItemOptions{}, err
+
+	special := make(map[int32]time.Duration, len(pairs))
+	for _, pair := range pairs {
+		special[int32(pair.First)] = time.Duration(pair.Second) * time.Second
 	}
 
 	opts.HerbAutoDestroy = time.Duration(herb) * time.Second
@@ -75,30 +67,6 @@ func GroundItemOptionsFromProperties(props *config.Properties) (GroundItemOption
 	opts.PlayerDroppedMultiplier = multiplier
 	opts.SpecialAutoDestroy = special
 	return opts, nil
-}
-
-func parseSpecialDestroy(value string) (map[int32]time.Duration, error) {
-	if strings.TrimSpace(value) == "" {
-		return nil, nil
-	}
-	parts := strings.FieldsFunc(value, func(r rune) bool { return r == ',' || r == ';' })
-	out := make(map[int32]time.Duration, len(parts))
-	for i, part := range parts {
-		pair := strings.Split(strings.TrimSpace(part), "-")
-		if len(pair) != 2 {
-			return nil, fmt.Errorf("parse AutoDestroySpecialItemTime[%d]: want item-seconds", i)
-		}
-		id, err := strconv.ParseInt(strings.TrimSpace(pair[0]), 10, 32)
-		if err != nil {
-			return nil, fmt.Errorf("parse AutoDestroySpecialItemTime[%d] item: %w", i, err)
-		}
-		seconds, err := strconv.Atoi(strings.TrimSpace(pair[1]))
-		if err != nil {
-			return nil, fmt.Errorf("parse AutoDestroySpecialItemTime[%d] seconds: %w", i, err)
-		}
-		out[int32(id)] = time.Duration(seconds) * time.Second
-	}
-	return out, nil
 }
 
 // DropOptions describes where and how an item was dropped.
