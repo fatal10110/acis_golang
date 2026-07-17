@@ -1,7 +1,6 @@
 package pathfind
 
 import (
-	"fmt"
 	"math"
 
 	"github.com/fatal10110/acis_golang/internal/config"
@@ -42,22 +41,14 @@ func OptionsFromProperties(props *config.Properties) (Options, error) {
 	}
 
 	options := DefaultOptions()
-	var err error
-
-	if options.MoveWeight, err = props.Int("MoveWeight", options.MoveWeight); err != nil {
-		return Options{}, fmt.Errorf("geo/pathfind: %w", err)
-	}
-	if options.MoveWeightDiag, err = props.Int("MoveWeightDiag", options.MoveWeightDiag); err != nil {
-		return Options{}, fmt.Errorf("geo/pathfind: %w", err)
-	}
-	if options.ObstacleWeight, err = props.Int("ObstacleWeight", options.ObstacleWeight); err != nil {
-		return Options{}, fmt.Errorf("geo/pathfind: %w", err)
-	}
-	if options.HeuristicWeight, err = props.Int("HeuristicWeight", options.HeuristicWeight); err != nil {
-		return Options{}, fmt.Errorf("geo/pathfind: %w", err)
-	}
-	if options.MaxIterations, err = props.Int("MaxIterations", options.MaxIterations); err != nil {
-		return Options{}, fmt.Errorf("geo/pathfind: %w", err)
+	f := config.NewFields(props, "geo/pathfind")
+	options.MoveWeight = f.Int("MoveWeight", options.MoveWeight)
+	options.MoveWeightDiag = f.Int("MoveWeightDiag", options.MoveWeightDiag)
+	options.ObstacleWeight = f.Int("ObstacleWeight", options.ObstacleWeight)
+	options.HeuristicWeight = f.Int("HeuristicWeight", options.HeuristicWeight)
+	options.MaxIterations = f.Int("MaxIterations", options.MaxIterations)
+	if err := f.Err(); err != nil {
+		return Options{}, err
 	}
 	return options, nil
 }

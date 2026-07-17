@@ -77,6 +77,11 @@ func GroundItemOptionsFromProperties(props *config.Properties) (GroundItemOption
 type DropOptions struct {
 	X, Y, Z, Heading int
 	PlayerDropped    bool
+
+	// DropperID is the object id of the creature the item fell from (a
+	// player discarding an item, or a defeated NPC dropping loot). It is
+	// zero for items with no fall animation, e.g. restored ground items.
+	DropperID int32
 }
 
 type groundItemEntry struct {
@@ -119,12 +124,18 @@ func (g *GroundItems) Start(log zerolog.Logger) *scheduler.Ticker {
 }
 
 // Drop places ground in the world and starts its cleanup deadline when it is
-// not destroy-protected.
+// not destroy-protected. While Spawn notifies nearby observers, ground
+// reports opts.DropperID so those immediate observers receive the animated
+// drop packet; observers that discover it later see it simply sitting on
+// the ground (see grounditem.Item.DropperID).
 func (g *GroundItems) Drop(ground *grounditem.Item, opts DropOptions) {
 	if ground == nil {
 		return
 	}
+	ground.SetDropperID(opts.DropperID)
 	g.state.Spawn(ground, opts.X, opts.Y, opts.Z, opts.Heading)
+	ground.SetDropperID(0)
+
 	if ground.DestroyProtected() {
 		return
 	}

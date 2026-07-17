@@ -776,7 +776,7 @@ func (d *deathRewards) rollDrops(killer creature.DeathActor, maxDealer *player.C
 	if maxDealer != nil {
 		receiver = maxDealer
 	}
-	NewKillReward(d.categories, d.hostile.SpoilPool(), levelMultiplier, d.raid, d.config.Rates, autoLootItems, d.config.AutoLootHerbs, d.ids, d.items, d.ground, x, y, z, heading).CalculateRewards(receiver)
+	NewKillReward(d.categories, d.hostile.SpoilPool(), levelMultiplier, d.raid, d.config.Rates, autoLootItems, d.config.AutoLootHerbs, d.ids, d.items, d.ground, x, y, z, heading, d.hostile.ObjectID()).CalculateRewards(receiver)
 }
 
 func (d *deathRewards) grantExpAndSp(entries []playerRewardEntry, totalDamage float64) {

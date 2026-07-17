@@ -124,6 +124,40 @@ func TestGroundItemsDropAndExpireNotifiesNearbyObservers(t *testing.T) {
 	}
 }
 
+func TestGroundItemsDropReportsDropperIDToImmediateObserversOnly(t *testing.T) {
+	now := time.UnixMilli(400_000)
+	state := world.New()
+	items := NewGroundItems(state, GroundItemOptions{ItemAutoDestroy: time.Second}, func() time.Time { return now })
+
+	observer := newGroundItemObserver(100)
+	state.Spawn(observer, 0, 0, 0, 0)
+
+	ground := testGroundItem(t, item.Instance{ObjectID: 1, TemplateID: 10, Count: 1}, &item.Template{ID: 10, Kind: item.KindEtcItem})
+	items.Drop(ground, DropOptions{X: 50, Y: 50, Z: 0, DropperID: 42})
+
+	observer.mu.Lock()
+	got := observer.lastDropperID
+	observer.mu.Unlock()
+	if got != 42 {
+		t.Fatalf("dropperID seen by the observer present at drop time = %d, want 42", got)
+	}
+
+	if got := ground.DropperID(); got != 0 {
+		t.Fatalf("ground.DropperID() after Drop returns = %d, want 0 (reset for later observers)", got)
+	}
+
+	// An observer that discovers the item afterward is a late arrival: it
+	// must see it as sitting on the ground, not still being dropped.
+	late := newGroundItemObserver(200)
+	state.Spawn(late, 55, 55, 0, 0)
+	late.mu.Lock()
+	gotLate := late.lastDropperID
+	late.mu.Unlock()
+	if gotLate != 0 {
+		t.Fatalf("dropperID seen by a late observer = %d, want 0", gotLate)
+	}
+}
+
 func TestGroundItemsPlayerDroppedMultiplierZeroDisablesExpiry(t *testing.T) {
 	now := time.UnixMilli(200_000)
 	state := world.New()
@@ -254,8 +288,9 @@ type groundItemObserver struct {
 
 	id int32
 
-	mu     sync.Mutex
-	events []string
+	mu            sync.Mutex
+	events        []string
+	lastDropperID int32
 }
 
 func newGroundItemObserver(id int32) *groundItemObserver {
@@ -266,6 +301,11 @@ func (o *groundItemObserver) ObjectID() int32 { return o.id }
 
 func (o *groundItemObserver) Discover(obj world.Tracked) {
 	o.record("discover", obj)
+	if dropped, ok := obj.(interface{ DropperID() int32 }); ok {
+		o.mu.Lock()
+		o.lastDropperID = dropped.DropperID()
+		o.mu.Unlock()
+	}
 }
 
 func (o *groundItemObserver) Forget(obj world.Tracked) {

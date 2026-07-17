@@ -63,7 +63,7 @@ func TestKillReward_DropsRolledItemsAtLocation(t *testing.T) {
 	}
 	rates := item.Rates{Spoil: 1, Currency: 1, Item: 1, ItemRaid: 1, Herb: 1}
 
-	r := NewKillReward(categories, nil, 1, false, rates, false, false, ids, items, ground, 100, 200, 300, 45)
+	r := NewKillReward(categories, nil, 1, false, rates, false, false, ids, items, ground, 100, 200, 300, 45, 999)
 	r.CalculateRewards(nopKiller{id: 1})
 
 	if len(ground.items) != 1 {
@@ -77,6 +77,9 @@ func TestKillReward_DropsRolledItemsAtLocation(t *testing.T) {
 	if opts.X != 100 || opts.Y != 200 || opts.Z != 300 || opts.Heading != 45 {
 		t.Fatalf("drop location = %+v, want (100, 200, 300, 45)", opts)
 	}
+	if opts.DropperID != 999 {
+		t.Fatalf("DropperID = %d, want 999 (the dying NPC's object id)", opts.DropperID)
+	}
 }
 
 func TestKillReward_SkipsSpoilWithoutPool(t *testing.T) {
@@ -89,7 +92,7 @@ func TestKillReward_SkipsSpoilWithoutPool(t *testing.T) {
 	}
 	rates := item.Rates{Spoil: 1, Currency: 1, Item: 1, ItemRaid: 1, Herb: 1}
 
-	r := NewKillReward(categories, nil, 1, false, rates, false, false, ids, items, ground, 0, 0, 0, 0)
+	r := NewKillReward(categories, nil, 1, false, rates, false, false, ids, items, ground, 0, 0, 0, 0, 0)
 	r.CalculateRewards(nopKiller{id: 1})
 
 	if len(ground.items) != 0 {
@@ -107,7 +110,7 @@ func TestKillReward_SkipsAutoLootHerbs(t *testing.T) {
 	}
 	rates := item.Rates{Spoil: 1, Currency: 1, Item: 1, ItemRaid: 1, Herb: 1}
 
-	r := NewKillReward(categories, nil, 1, false, rates, false, true, ids, items, ground, 0, 0, 0, 0)
+	r := NewKillReward(categories, nil, 1, false, rates, false, true, ids, items, ground, 0, 0, 0, 0, 0)
 	r.CalculateRewards(nopKiller{id: 1})
 
 	if len(ground.items) != 0 {
@@ -126,7 +129,7 @@ func TestKillReward_AutoLootsRolledItemsIntoKillerInventory(t *testing.T) {
 	rates := item.Rates{Spoil: 1, Currency: 1, Item: 1, ItemRaid: 1, Herb: 1}
 
 	killer := &lootKiller{id: 1}
-	r := NewKillReward(categories, nil, 1, false, rates, true, false, ids, items, ground, 0, 0, 0, 0)
+	r := NewKillReward(categories, nil, 1, false, rates, true, false, ids, items, ground, 0, 0, 0, 0, 0)
 	r.CalculateRewards(killer)
 
 	if len(ground.items) != 0 {
@@ -146,7 +149,7 @@ func TestKillReward_SkipsItemOnIDExhaustion(t *testing.T) {
 	}
 	rates := item.Rates{Spoil: 1, Currency: 1, Item: 1, ItemRaid: 1, Herb: 1}
 
-	r := NewKillReward(categories, nil, 1, false, rates, false, false, failingIDs{}, items, ground, 0, 0, 0, 0)
+	r := NewKillReward(categories, nil, 1, false, rates, false, false, failingIDs{}, items, ground, 0, 0, 0, 0, 0)
 	r.CalculateRewards(nopKiller{id: 1})
 
 	if len(ground.items) != 0 {
