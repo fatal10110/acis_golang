@@ -8,12 +8,14 @@ const OpcodeExtended = 0xfe
 
 // Extended server packet opcodes.
 const (
-	OpcodeExSendManorList    uint16 = 0x001b
-	OpcodeExAutoSoulShot     uint16 = 0x0012
-	OpcodeExMailArrived      uint16 = 0x002d
-	OpcodeExStorageMaxCount  uint16 = 0x002e
-	OpcodeExPledgeCrestLarge uint16 = 0x0028
-	OpcodeExPledgeSkillList  uint16 = 0x0039
+	OpcodeExSendManorList        uint16 = 0x001b
+	OpcodeExAutoSoulShot         uint16 = 0x0012
+	OpcodeExMailArrived          uint16 = 0x002d
+	OpcodeExStorageMaxCount      uint16 = 0x002e
+	OpcodeExPledgeCrestLarge     uint16 = 0x0028
+	OpcodeExPledgeSkillList      uint16 = 0x0039
+	OpcodeExCursedWeaponList     uint16 = 0x0045
+	OpcodeExCursedWeaponLocation uint16 = 0x0046
 )
 
 var manorNames = [...]string{

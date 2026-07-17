@@ -265,6 +265,15 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				if frame, ok := l.frameExPledgeCrestLarge(req); ok {
 					session.SendFrame(frame)
 				}
+			case second == clientpackets.OpcodeRequestCursedWeaponList:
+				if live == nil {
+					continue
+				}
+				session.SendFrame(serverpackets.FrameExCursedWeaponList(l.cursedWeapons.IDs()))
+			case second == clientpackets.OpcodeRequestCursedWeaponLocation:
+				if live == nil {
+					continue
+				}
 			default:
 				l.log.Info().
 					Uint16("opcode2", second).

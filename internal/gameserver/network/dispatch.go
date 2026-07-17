@@ -16,6 +16,7 @@ import (
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
@@ -75,6 +76,7 @@ type GameClientLink struct {
 	skills        *skillstate.Persistence
 	spellbooks    modelskill.BookPolicy
 	skillTrees    *modelskill.Trees
+	cursedWeapons *entity.CursedWeaponTable
 	world         *world.State
 	geo           move.Geo
 	ids           idAllocator
@@ -115,6 +117,7 @@ func NewGameClientLink(
 	skills *skillstate.Persistence,
 	spellbooks modelskill.BookPolicy,
 	skillTrees *modelskill.Trees,
+	cursedWeapons *entity.CursedWeaponTable,
 	worldState *world.State,
 	geo move.Geo,
 	ids idAllocator,
@@ -136,6 +139,7 @@ func NewGameClientLink(
 		skills:        skills,
 		spellbooks:    spellbooks,
 		skillTrees:    skillTrees,
+		cursedWeapons: cursedWeapons,
 		world:         worldState,
 		geo:           geo,
 		ids:           ids,

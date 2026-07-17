@@ -35,6 +35,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/route"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -61,28 +62,30 @@ type gameServerPaths struct {
 }
 
 type gameServerConfig struct {
-	ListenAddr     string
-	LoginAddr      string
-	Auth           network.LoginServerAuth
-	GeneratedHexID bool
-	HexIDPath      string
-	Database       db.Config
+	ListenAddr         string
+	LoginAddr          string
+	Auth               network.LoginServerAuth
+	GeneratedHexID     bool
+	HexIDPath          string
+	Database           db.Config
+	AllowCursedWeapons bool
 }
 
 type gameData struct {
-	Players    *player.TemplateTable
-	Levels     *player.LevelTable
-	Items      *item.Table
-	Skills     *skill.Table
-	Trees      *skill.Trees
-	Spellbooks *skill.SpellbookTable
-	Zones      *zone.Index
-	Routes     route.WalkerRoutes
-	NPCs       *npc.Table
-	Doors      *door.Table
-	Statics    *staticobject.Table
-	Geo        *engine.Engine
-	Finder     *pathfind.Finder
+	Players       *player.TemplateTable
+	Levels        *player.LevelTable
+	Items         *item.Table
+	Skills        *skill.Table
+	Trees         *skill.Trees
+	Spellbooks    *skill.SpellbookTable
+	CursedWeapons *entity.CursedWeaponTable
+	Zones         *zone.Index
+	Routes        route.WalkerRoutes
+	NPCs          *npc.Table
+	Doors         *door.Table
+	Statics       *staticobject.Table
+	Geo           *engine.Engine
+	Finder        *pathfind.Finder
 }
 
 type geodata struct {
@@ -266,6 +269,7 @@ func gameServerConfigFromProperties(paths gameServerPaths, serverProps, hexProps
 			Login:    serverProps.String("Login", "root"),
 			Password: serverProps.String("Password", ""),
 		},
+		AllowCursedWeapons: serverProps.Bool("AllowCursedWeapons", true),
 	}, nil
 }
 
@@ -324,7 +328,7 @@ func provideGameServerDatabase(lc fx.Lifecycle, cfg gameServerConfig) (*sql.DB, 
 	return pool, nil
 }
 
-func loadGameData(paths gameServerPaths, log zerolog.Logger) (*gameData, error) {
+func loadGameData(paths gameServerPaths, cfg gameServerConfig, log zerolog.Logger) (*gameData, error) {
 	xmlRoot := filepath.Join(paths.DataRoot, "data", "xml")
 	players, err := gamexml.LoadPlayerTemplates(filepath.Join(xmlRoot, "classes"))
 	if err != nil {
@@ -349,6 +353,13 @@ func loadGameData(paths gameServerPaths, log zerolog.Logger) (*gameData, error) 
 	spellbooks, err := gamexml.LoadSpellbooks(filepath.Join(xmlRoot, "spellbooks.xml"))
 	if err != nil {
 		return nil, err
+	}
+	var cursedWeapons *entity.CursedWeaponTable
+	if cfg.AllowCursedWeapons {
+		cursedWeapons, err = gamexml.LoadCursedWeapons(filepath.Join(xmlRoot, "cursedWeapons.xml"), skills)
+		if err != nil {
+			return nil, err
+		}
 	}
 	zones, err := gamexml.LoadZones(filepath.Join(xmlRoot, "zones"))
 	if err != nil {
@@ -376,19 +387,20 @@ func loadGameData(paths gameServerPaths, log zerolog.Logger) (*gameData, error) 
 	}
 	log.Info().Str("geodata_dir", geo.Dir).Str("geodata_type", string(geo.Type)).Int("npc_templates", npcs.Len()).Int("skills", skills.Len()).Msg("game data loaded")
 	return &gameData{
-		Players:    players,
-		Levels:     levels,
-		Items:      items,
-		Skills:     skills,
-		Trees:      trees,
-		Spellbooks: spellbooks,
-		Zones:      zones,
-		Routes:     routes,
-		NPCs:       npcs,
-		Doors:      doors,
-		Statics:    statics,
-		Geo:        geo.Engine,
-		Finder:     geo.Finder,
+		Players:       players,
+		Levels:        levels,
+		Items:         items,
+		Skills:        skills,
+		Trees:         trees,
+		Spellbooks:    spellbooks,
+		CursedWeapons: cursedWeapons,
+		Zones:         zones,
+		Routes:        routes,
+		NPCs:          npcs,
+		Doors:         doors,
+		Statics:       statics,
+		Geo:           geo.Engine,
+		Finder:        geo.Finder,
 	}, nil
 }
 
@@ -884,7 +896,7 @@ func provideGameClientLink(
 	positions *task.PositionUpdates,
 	log zerolog.Logger,
 ) *network.GameClientLink {
-	return network.NewGameClientLink(validator, links.get, roster, items, shortcuts, data.Players, data.Items, html, crests, skills, spellbooks, data.Trees, state, data.Geo, ids, ground, attackStance, positions, log)
+	return network.NewGameClientLink(validator, links.get, roster, items, shortcuts, data.Players, data.Items, html, crests, skills, spellbooks, data.Trees, data.CursedWeapons, state, data.Geo, ids, ground, attackStance, positions, log)
 }
 
 func provideSkillPersistence(pool *sql.DB, data *gameData) *skillstate.Persistence {
