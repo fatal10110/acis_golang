@@ -22,6 +22,7 @@ func TestPositionUpdatesTickRunsRegisteredMovers(t *testing.T) {
 func TestPositionUpdatesTickDropsStoppedMovers(t *testing.T) {
 	updates := NewPositionUpdates()
 	a := &positionUpdateActorStub{id: 1, moving: false}
+	a.remove = func() { updates.Remove(a) }
 
 	updates.Add(a)
 	updates.Tick()
@@ -124,6 +125,9 @@ type positionUpdateActorStub struct {
 	moving bool
 	ticks  int
 	tickFn func()
+	// remove mirrors Controller's own contract: PositionUpdate deregisters
+	// itself when it stops moving instead of relying on Tick to do it.
+	remove func()
 }
 
 func (a *positionUpdateActorStub) ObjectID() int32 { return a.id }
@@ -133,9 +137,13 @@ func (a *positionUpdateActorStub) PositionUpdate() bool {
 	a.ticks++
 	moving := a.moving
 	fn := a.tickFn
+	remove := a.remove
 	a.mu.Unlock()
 	if fn != nil {
 		fn()
+	}
+	if !moving && remove != nil {
+		remove()
 	}
 	return moving
 }

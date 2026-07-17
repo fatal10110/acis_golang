@@ -65,7 +65,13 @@ func (p *PositionUpdates) Contains(actor move.PositionUpdater) bool {
 	return ok
 }
 
-// Tick advances every registered in-flight movement once.
+// Tick advances every registered in-flight movement once. A PositionUpdate
+// return of false means the actor's own bookkeeping already deregistered
+// it (or decided it needs no further ticks) — Tick does not remove it
+// again, since by the time PositionUpdate returns, a concurrent goroutine
+// may have already re-added the same actor for a new move, and a
+// second, redundant removal here would strip that fresh registration
+// out from under it.
 func (p *PositionUpdates) Tick() {
 	p.mu.Lock()
 	p.scratch = p.scratch[:0]
@@ -76,8 +82,6 @@ func (p *PositionUpdates) Tick() {
 	p.mu.Unlock()
 
 	for _, actor := range actors {
-		if !actor.PositionUpdate() {
-			p.Remove(actor)
-		}
+		actor.PositionUpdate()
 	}
 }

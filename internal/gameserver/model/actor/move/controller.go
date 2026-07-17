@@ -26,7 +26,12 @@ type Actor interface {
 }
 
 // PositionUpdater is the moving actor surface consumed by the position
-// update task.
+// update task. PositionUpdate must deregister itself from whatever
+// PositionUpdateRegistry it was added through once it no longer needs
+// ticks — a false return tells the task's own tick loop only that this
+// actor needs no further action this round, not that the task should
+// remove it: by the time PositionUpdate returns, a concurrent goroutine
+// may already have re-registered the same actor for a new move.
 type PositionUpdater interface {
 	ObjectID() int32
 	PositionUpdate() bool
