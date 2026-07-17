@@ -117,16 +117,13 @@ func (h *Hostile) SetWorld(state *world.State) {
 	h.world = state
 }
 
-// SyncPosition moves this NPC's world-grid presence to x,y,z. Call it once
-// a CreatureMove-driven move actually arrives — CreatureMove tracks
-// position internally for its own timing, but every range check and
-// known-list query reads world.Presence (embedded in Hostile), which never
-// advances on its own. A no-op until SetWorld has been called.
-func (h *Hostile) SyncPosition(x, y, z int) {
+// SyncPosition moves this NPC's world-grid presence to position. A no-op
+// until SetWorld has been called.
+func (h *Hostile) SyncPosition(position location.Location) {
 	if h.world == nil {
 		return
 	}
-	_ = h.world.Move(h, x, y, z)
+	_ = h.world.Move(h, position.X, position.Y, position.Z)
 }
 
 // SetRollSource overrides the random source MakeAttackHit uses for its

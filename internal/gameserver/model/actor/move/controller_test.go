@@ -8,16 +8,21 @@ import (
 )
 
 type fakeSelf struct {
+	id         int32
 	x, y, z    int
 	radius     float64
 	broadcasts []Event
 	stopCalls  int
 }
 
+func (f *fakeSelf) ObjectID() int32           { return f.id }
 func (f *fakeSelf) Position() (int, int, int) { return f.x, f.y, f.z }
 func (f *fakeSelf) CollisionRadius() float64  { return f.radius }
 func (f *fakeSelf) BroadcastMove(event Event) { f.broadcasts = append(f.broadcasts, event) }
 func (f *fakeSelf) BroadcastStop()            { f.stopCalls++ }
+func (f *fakeSelf) SyncPosition(position location.Location) {
+	f.x, f.y, f.z = position.X, position.Y, position.Z
+}
 
 type fakeTarget struct {
 	id      int32
@@ -234,6 +239,90 @@ func TestControllerSetArrivedFiresOnceMovementCompletes(t *testing.T) {
 	}
 }
 
+func TestControllerRegistersPositionUpdatesOnMoveStart(t *testing.T) {
+	self := &fakeSelf{id: 11, x: 0, y: 0, radius: 5}
+	c := newTestController(t, self)
+	updates := &fakePositionUpdates{}
+	c.SetPositionUpdates(updates)
+
+	target := &fakeTarget{id: 7, x: 1000, y: 0, radius: 5}
+	if !c.MaybeStartOffensiveFollow(target, 40) {
+		t.Fatal("MaybeStartOffensiveFollow() = false, want true")
+	}
+
+	if len(updates.added) != 1 || updates.added[0].ObjectID() != self.id {
+		t.Fatalf("registered movers = %v, want self", updates.added)
+	}
+}
+
+func TestControllerRemovesPositionUpdatesOnStop(t *testing.T) {
+	self := &fakeSelf{id: 11, x: 0, y: 0, radius: 5}
+	c := newTestController(t, self)
+	updates := &fakePositionUpdates{}
+	c.SetPositionUpdates(updates)
+
+	target := &fakeTarget{id: 7, x: 1000, y: 0, radius: 5}
+	if !c.MaybeStartOffensiveFollow(target, 40) {
+		t.Fatal("MaybeStartOffensiveFollow() = false, want true")
+	}
+	c.Stop()
+
+	if len(updates.removed) != 1 || updates.removed[0].ObjectID() != self.id {
+		t.Fatalf("removed movers = %v, want self", updates.removed)
+	}
+}
+
+func TestControllerPositionUpdateAdvancesAndBroadcastsCurrentMove(t *testing.T) {
+	self := &fakeSelf{id: 11, x: 0, y: 0, radius: 5}
+	c := newTestController(t, self)
+
+	target := &fakeTarget{id: 7, x: 1000, y: 0, radius: 5}
+	if !c.MaybeStartOffensiveFollow(target, 40) {
+		t.Fatal("MaybeStartOffensiveFollow() = false, want true")
+	}
+
+	if !c.PositionUpdate() {
+		t.Fatal("PositionUpdate() = false, want moving")
+	}
+	if len(self.broadcasts) != 2 {
+		t.Fatalf("BroadcastMove calls = %d, want initial + update", len(self.broadcasts))
+	}
+	if got := self.broadcasts[1].Origin; got != (location.Location{X: 10, Y: 0, Z: 0}) {
+		t.Fatalf("update origin = %+v, want one 100ms movement step", got)
+	}
+	if self.x != 10 || self.y != 0 || self.z != 0 {
+		t.Fatalf("synced position = (%d,%d,%d), want (10,0,0)", self.x, self.y, self.z)
+	}
+}
+
+func TestControllerPositionUpdateRemovesOnArrival(t *testing.T) {
+	self := &fakeSelf{id: 11, x: 0, y: 0}
+	cm, err := NewCreatureMove(location.Location{X: self.x, Y: self.y}, 100, &recordingGeo{canMove: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	clock := &fakeMoveClock{}
+	cm.afterFunc = clock.AfterFunc
+	c, err := NewController(cm, self)
+	if err != nil {
+		t.Fatal(err)
+	}
+	updates := &fakePositionUpdates{}
+	c.SetPositionUpdates(updates)
+
+	target := &fakeTarget{id: 7, x: 10, y: 0}
+	if !c.MaybeStartOffensiveFollow(target, 0) {
+		t.Fatal("MaybeStartOffensiveFollow() = false, want true")
+	}
+
+	if c.PositionUpdate() {
+		t.Fatal("PositionUpdate() = true, want false after arrival")
+	}
+	if len(updates.removed) != 1 || updates.removed[0].ObjectID() != self.id {
+		t.Fatalf("removed movers = %v, want self", updates.removed)
+	}
+}
+
 func TestControllerStopCancelsInFlightMovement(t *testing.T) {
 	self := &fakeSelf{x: 0, y: 0, radius: 5}
 	c := newTestController(t, self)
@@ -262,4 +351,17 @@ func TestControllerMoveHomeRequestsMovement(t *testing.T) {
 	if got := c.move.Destination(); got != home {
 		t.Fatalf("destination = %+v, want %+v", got, home)
 	}
+}
+
+type fakePositionUpdates struct {
+	added   []PositionUpdater
+	removed []PositionUpdater
+}
+
+func (f *fakePositionUpdates) Add(actor PositionUpdater) {
+	f.added = append(f.added, actor)
+}
+
+func (f *fakePositionUpdates) Remove(actor PositionUpdater) {
+	f.removed = append(f.removed, actor)
 }

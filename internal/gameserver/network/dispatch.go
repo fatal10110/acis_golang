@@ -78,6 +78,7 @@ type GameClientLink struct {
 	ids           idAllocator
 	groundItems   groundItemDropper
 	attackStance  attackStanceTracker
+	positions     *task.PositionUpdates
 	inventory     *invops.Service
 	petItems      *petitem.Service
 	trades        *tradebook.Book
@@ -115,6 +116,7 @@ func NewGameClientLink(
 	ids idAllocator,
 	groundItems groundItemDropper,
 	attackStance attackStanceTracker,
+	positions *task.PositionUpdates,
 	log zerolog.Logger,
 ) *GameClientLink {
 	return &GameClientLink{
@@ -135,6 +137,7 @@ func NewGameClientLink(
 		ids:           ids,
 		groundItems:   groundItems,
 		attackStance:  attackStance,
+		positions:     positions,
 		inventory:     invops.NewService(ids),
 		petItems:      petitem.NewService(ids),
 		trades:        tradebook.NewBook(time.Now),

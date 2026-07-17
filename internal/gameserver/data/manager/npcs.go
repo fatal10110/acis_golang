@@ -72,6 +72,7 @@ type Npcs struct {
 	decay     *task.Decay
 	respawn   *task.Respawn
 	ai        *task.AI
+	positions *task.PositionUpdates
 	items     *item.Table
 	ground    groundPlacer
 	rewards   KillRewardConfig
@@ -98,7 +99,7 @@ type Npcs struct {
 // NewNpcs walks spawns' loaded table and instantiates every "on start"
 // maker's qualifying entries into state, respecting persisted dead/alive
 // data for database-tracked entries.
-func NewNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.State, ids idAllocator, decay *task.Decay, respawnTask *task.Respawn, ai *task.AI, items *item.Table, ground groundPlacer, rewards KillRewardConfig, now func() time.Time, log zerolog.Logger) (*Npcs, error) {
+func NewNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.State, ids idAllocator, decay *task.Decay, respawnTask *task.Respawn, ai *task.AI, positions *task.PositionUpdates, items *item.Table, ground groundPlacer, rewards KillRewardConfig, now func() time.Time, log zerolog.Logger) (*Npcs, error) {
 	if spawns == nil || spawns.Table() == nil {
 		return nil, fmt.Errorf("npcs: nil spawn table")
 	}
@@ -123,6 +124,9 @@ func NewNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.St
 	if ai == nil {
 		return nil, fmt.Errorf("npcs: nil ai task")
 	}
+	if positions == nil {
+		return nil, fmt.Errorf("npcs: nil position updates task")
+	}
 	if items == nil {
 		return nil, fmt.Errorf("npcs: nil item table")
 	}
@@ -141,6 +145,7 @@ func NewNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.St
 		decay:     decay,
 		respawn:   respawnTask,
 		ai:        ai,
+		positions: positions,
 		items:     items,
 		ground:    ground,
 		rewards:   rewards,
@@ -296,7 +301,7 @@ func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, lo
 		return
 	}
 
-	hostile, err := newLiveHostile(inst, tmpl.RunSpeed, n.geo)
+	hostile, err := newLiveHostile(inst, tmpl.RunSpeed, n.geo, n.positions)
 	if err != nil {
 		n.log.Warn().Err(err).Int32("npc_id", entry.NPCID).Msg("spawn: cannot build live npc")
 		return
@@ -640,7 +645,7 @@ type creatureActorRef struct{ attack.CreatureActor }
 // controller (over the Hostile's lifetime movement state) and a real attack
 // controller, resolving their mutual construction-order dependency on the
 // finished Hostile via locatedRef/creatureActorRef.
-func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo) (*npc.Hostile, error) {
+func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *task.PositionUpdates) (*npc.Hostile, error) {
 	live, err := creature.NewLive(inst.Home, speed, geo)
 	if err != nil {
 		return nil, err
@@ -651,6 +656,7 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo) (*npc.Hosti
 	if err != nil {
 		return nil, err
 	}
+	moveCtl.SetPositionUpdates(positions)
 
 	actorRef := &creatureActorRef{}
 	attackCtl := attack.NewAttackable(actorRef)
@@ -672,7 +678,7 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo) (*npc.Hosti
 	// against a stale position forever.
 	moveCtl.SetArrived(func() {
 		pos := moveCtl.Position()
-		hostile.SyncPosition(pos.X, pos.Y, pos.Z)
+		hostile.SyncPosition(pos)
 		hostile.AI().Think()
 	})
 	attackCtl.SetFinished(hostile.AI().Think)

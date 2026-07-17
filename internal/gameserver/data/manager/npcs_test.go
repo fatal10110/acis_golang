@@ -44,6 +44,7 @@ type testHarness struct {
 	decay   *task.Decay
 	respawn *task.Respawn
 	ai      *task.AI
+	updates *task.PositionUpdates
 	npcs    *Npcs
 	now     time.Time
 }
@@ -94,20 +95,21 @@ func newHarness(t *testing.T, spawns *Spawns, templates *npc.Table) *testHarness
 		t.Fatalf("NewRespawn: %v", err)
 	}
 	ai := task.NewAI()
+	updates := task.NewPositionUpdates()
 
 	ids := &sequentialIDs{}
 	items := item.NewTable(nil)
 	ground := &recordingGround{}
 	rewards := KillRewardConfig{Rates: neutralRates, DeepBlueDropRules: true, PlayerLevels: testLevelTable(t)}
 
-	npcs, err := NewNpcs(spawns, templates, staticGeo{}, h.state, ids, decay, respawn, ai, items, ground, rewards, nowFn, zerolog.Nop())
+	npcs, err := NewNpcs(spawns, templates, staticGeo{}, h.state, ids, decay, respawn, ai, updates, items, ground, rewards, nowFn, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("NewNpcs: %v", err)
 	}
 	decayEffects.hook = npcs.RespawnHook
 	respawnEffects.hook = npcs.Respawn
 
-	h.decay, h.respawn, h.ai, h.npcs = decay, respawn, ai, npcs
+	h.decay, h.respawn, h.ai, h.updates, h.npcs = decay, respawn, ai, updates, npcs
 	return h
 }
 
