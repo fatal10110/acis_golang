@@ -153,7 +153,7 @@ func newGameServerApp(paths gameServerPaths) *fx.App {
 			provideSkillPersistence,
 			provideGameClientLink,
 		),
-		fx.Invoke(startPvPFlags, startGroundItems, startGameClock, startWalker, startWater, startShadowItems, startDecay, startAttackStance, startWorldObjects, startRespawnTask, startAI, startPositionUpdates, startNpcs, startNpcPersistence, startGameServer),
+		fx.Invoke(startPvPFlags, startGroundItems, startGroundItemPersistence, startGameClock, startWalker, startWater, startShadowItems, startDecay, startAttackStance, startWorldObjects, startRespawnTask, startAI, startPositionUpdates, startNpcs, startNpcPersistence, startGameServer),
 	)
 }
 
@@ -502,12 +502,44 @@ func provideGroundItemOptions(props *config.Properties) (task.GroundItemOptions,
 	return task.GroundItemOptionsFromProperties(props)
 }
 
-func provideGroundItems(state *world.State, opts task.GroundItemOptions) *task.GroundItems {
-	return task.NewGroundItems(state, opts, time.Now)
+// provideGroundItems restores dropped items persisted at the previous
+// shutdown before the world starts, returning the store alongside so it can
+// be reused to persist state back at the next shutdown.
+func provideGroundItems(state *world.State, opts task.GroundItemOptions, pool *sql.DB, data *gameData, log zerolog.Logger) (*task.GroundItems, *gamesql.GroundItemStore, error) {
+	store := gamesql.NewGroundItemStore(pool)
+	items := task.NewGroundItems(state, opts, time.Now)
+
+	rows, err := store.Load(context.Background())
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := items.Load(rows, data.Items); err != nil {
+		return nil, nil, err
+	}
+	if err := store.Clear(context.Background()); err != nil {
+		return nil, nil, err
+	}
+
+	log.Info().Int("restored_ground_items", items.Len()).Msg("ground items restored")
+	return items, store, nil
 }
 
 func startGroundItems(lc fx.Lifecycle, items *task.GroundItems, log zerolog.Logger) {
 	startTicker(lc, log, items.Start)
+}
+
+// startGroundItemPersistence saves every currently tracked ground item back
+// to items_on_ground at shutdown, mirroring the reference server's own
+// save-on-shutdown behavior.
+func startGroundItemPersistence(lc fx.Lifecycle, items *task.GroundItems, store *gamesql.GroundItemStore, log zerolog.Logger) {
+	lc.Append(fx.Hook{
+		OnStop: func(ctx context.Context) error {
+			if err := store.Save(ctx, items.Snapshots(nil)); err != nil {
+				log.Warn().Err(err).Msg("save ground items")
+			}
+			return nil
+		},
+	})
 }
 
 func provideGameClock() *task.GameClock {

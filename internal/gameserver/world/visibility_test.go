@@ -230,6 +230,94 @@ func TestDespawnNotifiesAndUnregisters(t *testing.T) {
 	}
 }
 
+func TestDespawnStaleCallDoesNotEvictNewOccupant(t *testing.T) {
+	s := New()
+	log := &sightLog{}
+
+	observer := newObserver(1, log)
+	s.Spawn(observer, 0, 0, 0, 0)
+	a := &trackedStub{id: 5}
+	s.Spawn(a, 100, 0, 0, 0)
+	log.take()
+
+	// a is legitimately despawned (e.g. picked up)...
+	s.Despawn(a)
+	log.take()
+
+	// ...and a different object is registered under the same id (e.g.
+	// re-dropped and reassigned id 5 by the allocator).
+	b := &trackedStub{id: 5}
+	s.Spawn(b, 200, 0, 0, 0)
+	log.take()
+
+	// A stale despawn call for the old a (e.g. a deferred cleanup task that
+	// captured a before the pickup) must not evict b.
+	s.Despawn(a)
+
+	if got, ok := s.Object(5); !ok || got != b {
+		t.Fatalf("Object(5) = %v, %v; want b to remain registered after a stale Despawn(a)", got, ok)
+	}
+	if got := log.take(); len(got) != 0 {
+		t.Fatalf("stale despawn notified observers of b's departure: %v", got)
+	}
+	if !b.Visible() {
+		t.Fatal("b.Visible() = false after a stale Despawn(a)")
+	}
+}
+
+func TestDespawnAllNotifiesEachObserverOncePerCoLocatedObject(t *testing.T) {
+	s := New()
+	log := &sightLog{}
+
+	observer := newObserver(1, log)
+	s.Spawn(observer, 0, 0, 0, 0)
+	a := &trackedStub{id: 2}
+	s.Spawn(a, 50, 0, 0, 0)
+	b := &trackedStub{id: 3}
+	s.Spawn(b, 60, 0, 0, 0)
+	log.take()
+
+	s.DespawnAll([]Tracked{a, b})
+
+	want := []string{"1 forget 2", "1 forget 3"}
+	if got := log.take(); !slices.Equal(got, want) {
+		t.Fatalf("DespawnAll notifications = %v, want %v", got, want)
+	}
+	if _, ok := s.Object(2); ok {
+		t.Fatal("Object(2) still registered after DespawnAll")
+	}
+	if _, ok := s.Object(3); ok {
+		t.Fatal("Object(3) still registered after DespawnAll")
+	}
+}
+
+func TestDespawnAllAcrossRegionsNotifiesEachRegionsObservers(t *testing.T) {
+	s := New()
+	log := &sightLog{}
+
+	near := newObserver(1, log)
+	s.Spawn(near, 0, 0, 0, 0)
+	far := newObserver(2, log)
+	s.Spawn(far, 8192, 0, 0, 0)
+	a := &trackedStub{id: 3}
+	s.Spawn(a, 50, 0, 0, 0)
+	b := &trackedStub{id: 4}
+	s.Spawn(b, 8200, 0, 0, 0)
+	log.take()
+
+	s.DespawnAll([]Tracked{a, b})
+
+	// Different departure regions are processed in map order, which Go
+	// does not guarantee — compare as a set instead of a fixed sequence.
+	want := []string{"1 forget 3", "2 forget 4"}
+	got := log.take()
+	slices.Sort(got)
+	slices.Sort(want)
+	if !slices.Equal(got, want) {
+		t.Fatalf("DespawnAll notifications = %v, want %v (any order)", got, want)
+	}
+}
+
 func TestKnows(t *testing.T) {
 	s := New()
 

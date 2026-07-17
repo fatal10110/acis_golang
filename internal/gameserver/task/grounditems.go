@@ -168,6 +168,7 @@ func (g *GroundItems) Load(rows []item.GroundSnapshot, templates *item.Table) er
 		if !ok {
 			return fmt.Errorf("ground items: item template %d not loaded", row.TemplateID)
 		}
+		row.Instance.ManaLeft = tmpl.InitialManaLeft()
 		ground, err := grounditem.New(row.Instance, tmpl)
 		if err != nil {
 			return err
@@ -188,7 +189,7 @@ func (g *GroundItems) Load(rows []item.GroundSnapshot, templates *item.Table) er
 // Tick despawns all items whose cleanup deadline has passed.
 func (g *GroundItems) Tick() {
 	now := g.now()
-	var expired []*grounditem.Item
+	var expired []world.Tracked
 
 	g.mu.Lock()
 	for id, entry := range g.items {
@@ -200,9 +201,7 @@ func (g *GroundItems) Tick() {
 	}
 	g.mu.Unlock()
 
-	for _, ground := range expired {
-		g.state.Despawn(ground)
-	}
+	g.state.DespawnAll(expired)
 }
 
 // Remove stops tracking ground, usually after pickup or explicit destruction.

@@ -14,12 +14,12 @@ func TestGroundItemStoreRoundTrip(t *testing.T) {
 	ctx := context.Background()
 	store := NewGroundItemStore(sqltest.NewDB(t))
 
-	initial, err := store.LoadAndClear(ctx)
+	initial, err := store.Load(ctx)
 	if err != nil {
-		t.Fatalf("initial LoadAndClear() error = %v", err)
+		t.Fatalf("initial Load() error = %v", err)
 	}
 	if len(initial) != 0 {
-		t.Fatalf("initial LoadAndClear() = %v, want empty", initial)
+		t.Fatalf("initial Load() = %v, want empty", initial)
 	}
 
 	rows := []item.GroundSnapshot{
@@ -42,9 +42,9 @@ func TestGroundItemStoreRoundTrip(t *testing.T) {
 		t.Fatalf("Save() error = %v", err)
 	}
 
-	reloaded, err := NewGroundItemStore(store.db).LoadAndClear(ctx)
+	reloaded, err := store.Load(ctx)
 	if err != nil {
-		t.Fatalf("reloaded LoadAndClear() error = %v", err)
+		t.Fatalf("reloaded Load() error = %v", err)
 	}
 	if len(reloaded) != 2 {
 		t.Fatalf("reloaded len = %d, want 2", len(reloaded))
@@ -60,12 +60,26 @@ func TestGroundItemStoreRoundTrip(t *testing.T) {
 		t.Fatalf("weapon row = %+v", got)
 	}
 
-	emptyAfterLoad, err := NewGroundItemStore(store.db).LoadAndClear(ctx)
+	// Load must not clear the table: a second Load before Clear sees the
+	// same rows, matching the two-phase restore (#432) callers rely on to
+	// avoid deleting persisted state before every row hydrates.
+	reloadedAgain, err := store.Load(ctx)
 	if err != nil {
-		t.Fatalf("empty LoadAndClear() error = %v", err)
+		t.Fatalf("second Load() error = %v", err)
 	}
-	if len(emptyAfterLoad) != 0 {
-		t.Fatalf("LoadAndClear() after restart clear = %v, want empty", emptyAfterLoad)
+	if len(reloadedAgain) != 2 {
+		t.Fatalf("second Load() len = %d, want 2 (Load must not clear)", len(reloadedAgain))
+	}
+
+	if err := store.Clear(ctx); err != nil {
+		t.Fatalf("Clear() error = %v", err)
+	}
+	emptyAfterClear, err := store.Load(ctx)
+	if err != nil {
+		t.Fatalf("empty Load() error = %v", err)
+	}
+	if len(emptyAfterClear) != 0 {
+		t.Fatalf("Load() after Clear = %v, want empty", emptyAfterClear)
 	}
 
 	rows[0].Count = 777
@@ -73,9 +87,9 @@ func TestGroundItemStoreRoundTrip(t *testing.T) {
 	if err := store.Save(ctx, rows[:1]); err != nil {
 		t.Fatalf("update Save() error = %v", err)
 	}
-	updated, err := NewGroundItemStore(store.db).LoadAndClear(ctx)
+	updated, err := store.Load(ctx)
 	if err != nil {
-		t.Fatalf("updated LoadAndClear() error = %v", err)
+		t.Fatalf("updated Load() error = %v", err)
 	}
 	if len(updated) != 1 || updated[0].ObjectID != rows[0].ObjectID || updated[0].Count != 777 || updated[0].X != 99 {
 		t.Fatalf("updated rows = %+v", updated)
@@ -84,9 +98,9 @@ func TestGroundItemStoreRoundTrip(t *testing.T) {
 	if err := store.Save(ctx, nil); err != nil {
 		t.Fatalf("empty Save() error = %v", err)
 	}
-	missing, err := NewGroundItemStore(store.db).LoadAndClear(ctx)
+	missing, err := store.Load(ctx)
 	if err != nil {
-		t.Fatalf("missing LoadAndClear() error = %v", err)
+		t.Fatalf("missing Load() error = %v", err)
 	}
 	if len(missing) != 0 {
 		t.Fatalf("missing rows = %v, want empty", missing)
