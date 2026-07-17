@@ -35,6 +35,20 @@ func (r *Region) Remove(id int32) {
 	delete(r.objects, id)
 }
 
+// removeIfSame drops the object registered under id only if it is still
+// obj. A caller that lost a race — e.g. a deferred despawn firing after a
+// pickup-and-re-drop already reused id under a different object — gets a
+// safe no-op instead of evicting the object that legitimately owns id now.
+func (r *Region) removeIfSame(id int32, obj Tracked) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if cur, ok := r.objects[id]; !ok || cur != obj {
+		return false
+	}
+	delete(r.objects, id)
+	return true
+}
+
 // Objects returns a snapshot of every object currently visible within r.
 func (r *Region) Objects() []Tracked {
 	return r.AppendObjects(nil)
