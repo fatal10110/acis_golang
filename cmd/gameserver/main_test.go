@@ -38,6 +38,7 @@ ServerListBrackets = True
 ServerListAgeLimit = 18
 TestServer = True
 PvpServer = False
+AllowCursedWeapons = False
 `)
 	if err != nil {
 		t.Fatalf("ParseString server: %v", err)
@@ -88,6 +89,9 @@ HexID = -7fff
 	}
 	if cfg.Database.URL != "jdbc:mariadb://db.example/acis" || cfg.Database.Login != "acis" || cfg.Database.Password != "secret" {
 		t.Errorf("Database = %+v, want parsed database credentials", cfg.Database)
+	}
+	if cfg.AllowCursedWeapons {
+		t.Error("AllowCursedWeapons = true, want false")
 	}
 }
 

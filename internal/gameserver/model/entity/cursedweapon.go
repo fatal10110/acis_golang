@@ -2,6 +2,7 @@ package entity
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -82,6 +83,19 @@ func NewCursedWeaponTable(weapons []CursedWeapon) (*CursedWeaponTable, error) {
 // Count returns the number of cursed weapon definitions in the table.
 func (t *CursedWeaponTable) Count() int {
 	return len(t.byItemID)
+}
+
+// IDs returns the loaded cursed weapon item ids in deterministic order.
+func (t *CursedWeaponTable) IDs() []int32 {
+	if t == nil || len(t.byItemID) == 0 {
+		return nil
+	}
+	ids := make([]int32, 0, len(t.byItemID))
+	for id := range t.byItemID {
+		ids = append(ids, id)
+	}
+	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	return ids
 }
 
 // Weapon returns the cursed weapon for itemID, if present.

@@ -126,8 +126,6 @@ Missing M3 data/UI client packets:
 - `RequestExEnchantSkillInfo`
 - `RequestExEnchantSkill`
 - `RequestExFishRanking`
-- `RequestCursedWeaponList`
-- `RequestCursedWeaponLocation`
 - `RequestConfirmTargetItem`
 - `RequestConfirmRefinerItem`
 - `RequestConfirmGemStone`
@@ -144,6 +142,8 @@ Implemented and wired M3 data/UI client packets in Go:
 - `RequestAllyCrest`
 - `RequestExPledgeCrestLarge`
 - `RequestPledgeCrest`
+- `RequestCursedWeaponList`
+- `RequestCursedWeaponLocation` (accepted; no response is emitted while no cursed weapon is active)
 
 Implemented and wired M4 movement/rotation/target client packets in Go:
 
@@ -267,8 +267,6 @@ Missing M3 data/UI server packets:
 - `ExShowProcureCropDetail`
 - `ExEnchantSkillList`
 - `ExEnchantSkillInfo`
-- `ExCursedWeaponList`
-- `ExCursedWeaponLocation`
 - `ExShowVariationMakeWindow`
 - `ExShowVariationCancelWindow`
 - `ExConfirmVariationItem`
@@ -280,6 +278,8 @@ Missing M3 data/UI server packets:
 Implemented and wired M3 data/UI server packets in Go:
 
 - `AllyCrest`
+- `ExCursedWeaponList`
+- `ExCursedWeaponLocation`
 - `ExPledgeCrestLarge`
 - `PledgeCrest`
 
@@ -376,9 +376,10 @@ Implemented and wired M5 shortcut server packets in Go:
 - `RequestShortCutReg` and `RequestShortCutDel` are wired for persisted client shortcut entries, including starter shortcut creation, EnterWorld restoration, `ShortCutRegister`, and `ShortCutDelete`. Item reuse timers, macro bodies, recipe validation, and soulshot auto-use side effects remain deferred to their owning systems.
 - `RequestChangePetName` remains deferred because the Go runtime has no active pet naming state, pet-name uniqueness query, NPC-name lookup by name, or control-item custom type update flow.
 - `RequestPledgeCrest` is wired against the loaded small pledge crest `.dds` cache and emits `PledgeCrest`. `RequestAllyCrest` is wired in game against loaded ally crest `.dds` cache data and emits `AllyCrest` only when data exists. Crest upload/update packets and large pledge crests remain deferred to the clan/crest write-owner flows.
+- `RequestCursedWeaponList` loads cursed weapon definitions at gameserver boot and emits `ExCursedWeaponList`. `RequestCursedWeaponLocation` is accepted but currently sends nothing because the Go runtime has no active cursed-weapon spawn/activation state yet.
 - `PetItemList`, `PetInfo`, and `PetStatusUpdate` remain deferred together: the current Go pet actor lacks the full pet info/status snapshot surface and owner spawn/info broadcast path needed to emit truthful full-list/status packets. `PetStatusShow` and `PetDelete` are wired where the current runtime has exact backing behavior.
 - `RequestAutoSoulShot` is wired as extended client opcode `0x0005` with per-player auto-shot toggle state, `ExAutoSoulShot`, and item-name `SystemMessage` feedback. First-shot recharge, recurring shot consumption, and `ExUseSharedGroupItem` reuse display remain deferred to the item-use/handler burst because the shared item handler/reuse pipeline is not ported yet.
 - `StatusUpdate` is implemented and wired for target max/current HP during selection. Broader status/stat recalculation broadcasts still need owner flows as those systems are ported.
-- The unique missing counts deduplicate those overlaps: 50 missing game client packets and 65 missing game server packets after the EnterWorld, movement/rotation, ValidateLocation correction, ChairSit, inventory, target/action, stance/social, item-operation, auto-shot, skill-acquisition, basic skill-cast, enchant, backed pet inventory/status, linked-html, pledge-crest, and ally-crest packet-wiring passes.
+- The unique missing counts deduplicate those overlaps: 48 missing game client packets and 63 missing game server packets after the EnterWorld, movement/rotation, ValidateLocation correction, ChairSit, inventory, target/action, stance/social, item-operation, auto-shot, skill-acquisition, basic skill-cast, enchant, backed pet inventory/status, linked-html, pledge-crest, ally-crest, and cursed-weapon-list packet-wiring passes.
 - Existing Go code accepts several M4/M5 client opcodes in `clientpackets/wiresafe.go`, but many of them still log "Opcode not wired" or have no decode/run implementation.
 - This audit uses original Java class names. Go may keep a slightly different helper shape, such as `Frame...` functions instead of packet structs, but the required client-visible packet behavior is still one original packet at a time.
