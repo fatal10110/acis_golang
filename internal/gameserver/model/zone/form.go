@@ -23,17 +23,18 @@ type Form interface {
 }
 
 // zoneForm adapts a geometry.Territory to zone's exact historical
-// IntersectsRect contract for a zero-height volume: the reference
-// implementation's containment probe for such a volume never reports a
-// hit, so a query rectangle sitting entirely inside the footprint is not
-// treated as overlapping — only a boundary crossing, or the footprint's
-// own vertex landing inside the rectangle, counts.
+// IntersectsRect contract for a non-positive-height volume (zero-height,
+// z bounds equal, or inverted, low bound above high bound): the
+// historical containment probe for such a volume never reports a hit, so
+// a query rectangle sitting entirely inside the footprint is not treated
+// as overlapping — only a boundary crossing, or the footprint's own
+// vertex landing inside the rectangle, counts.
 type zoneForm struct {
 	*geometry.Territory
 }
 
 func (f zoneForm) IntersectsRect(x1, x2, y1, y2 int) bool {
-	if f.LowZ() != f.HighZ() {
+	if f.LowZ() < f.HighZ() {
 		return f.Territory.IntersectsRect(x1, x2, y1, y2)
 	}
 	for _, s := range f.Shapes {
@@ -45,13 +46,14 @@ func (f zoneForm) IntersectsRect(x1, x2, y1, y2 int) bool {
 }
 
 // degenerateShapeIntersectsRect reproduces s.IntersectsRect for a
-// zero-height volume, omitting the "rectangle corner lies inside the
-// shape" containment case a real query never triggers at that height.
+// non-positive-height volume, omitting the "rectangle corner lies inside
+// the shape" containment case a real query never triggers at that
+// height.
 func degenerateShapeIntersectsRect(s geometry.Shape, x1, x2, y1, y2 int) bool {
 	v, ok := s.(interface{ Vertices() []geometry.Point })
 	if !ok {
-		// Not vertex-ring backed (a Circle): the reference cylinder form
-		// never had this quirk, so the normal test applies unchanged.
+		// Not vertex-ring backed (a Circle): circular forms never had
+		// this quirk, so the normal test applies unchanged.
 		return s.IntersectsRect(x1, x2, y1, y2)
 	}
 	verts := v.Vertices()

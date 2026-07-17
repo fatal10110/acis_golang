@@ -10,7 +10,10 @@ import (
 )
 
 // Shape is a 2D footprint that can answer point containment, area, and
-// overlap against another Shape or an axis-aligned rectangle.
+// overlap against another Shape or an axis-aligned rectangle. Only this
+// package's own Rectangle, Triangle, Polygon, and Circle are meant to
+// implement it: Intersects dispatches on those four concrete kinds and
+// panics on any other implementation.
 type Shape interface {
 	// Contains reports whether (x, y) lies inside the shape, bounds
 	// inclusive.
@@ -122,6 +125,11 @@ func vertexRingArea(xs, ys []int32) float64 {
 // overlaps the rectangle: first vertex strictly inside the rectangle,
 // rectangle corner inside the ring, or any ring edge crossing any rectangle
 // side.
+//
+// A ring collapsed to a line on one axis, tested against an equally
+// collapsed rectangle, can report a crossing that a per-shape hand-written
+// test would not: two zero-length segments count as touching. No caller in
+// this codebase queries a collapsed rectangle, so this is unreachable today.
 func vertexRingIntersectsRect(xs, ys []int32, ax1, ax2, ay1, ay2 int) bool {
 	if int(xs[0]) > ax1 && int(xs[0]) < ax2 && int(ys[0]) > ay1 && int(ys[0]) < ay2 {
 		return true

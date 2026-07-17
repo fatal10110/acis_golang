@@ -154,6 +154,26 @@ func TestNewPolygonRejectsTooFewVertices(t *testing.T) {
 	}
 }
 
+func TestInvertedZPolygonIntersectsRectNeverFullyContains(t *testing.T) {
+	// Some datapack zones declare an inverted z range (maxZ < minZ), e.g.
+	// ScriptZone.xml's archaic_laboratory_gate zones. The historical
+	// containment probe is dead for any inverted or zero-height range, not
+	// just zero-height, so a query rect sitting entirely inside the
+	// polygon's footprint must still report no overlap.
+	nodes := []location.Point{{X: 0, Y: 0}, {X: 100, Y: 0}, {X: 100, Y: 100}, {X: 0, Y: 100}}
+	form, err := NewPolygon(nodes, -3300, -3400)
+	if err != nil {
+		t.Fatalf("NewPolygon: %v", err)
+	}
+	if form.IntersectsRect(10, 20, 10, 20) {
+		t.Error("inverted-z polygon reported a fully-interior rect as intersecting, want false")
+	}
+	// A rect crossing the boundary must still count.
+	if !form.IntersectsRect(-10, 10, -10, 10) {
+		t.Error("inverted-z polygon failed to detect a boundary-crossing rect")
+	}
+}
+
 func TestCuboidNormalizesCorners(t *testing.T) {
 	a := NewCuboid(0, 100, 0, 200, -50, 50)
 	b := NewCuboid(100, 0, 200, 0, 50, -50)
