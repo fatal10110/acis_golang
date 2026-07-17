@@ -47,6 +47,10 @@ type PathFinder interface {
 	Find(origin, target location.Location) ([]location.Location, int, bool)
 }
 
+type pathChecker interface {
+	HasPath(origin, target location.Location) bool
+}
+
 // MoveGeo is the straight-line movement query WalkerPath can wrap.
 type MoveGeo interface {
 	CanMove(ox, oy, oz, tx, ty, tz int) bool
@@ -67,6 +71,9 @@ func (p GeoPath) CanMove(origin, target location.Location) bool {
 func (p GeoPath) HasPath(origin, target location.Location) bool {
 	if p.Finder == nil {
 		return false
+	}
+	if checker, ok := p.Finder.(pathChecker); ok {
+		return checker.HasPath(origin, target)
 	}
 	path, _, ok := p.Finder.Find(origin, target)
 	return ok && len(path) > 0

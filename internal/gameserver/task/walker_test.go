@@ -250,6 +250,23 @@ func TestGeoPathAdaptsEngineAndFinder(t *testing.T) {
 	}
 }
 
+func TestGeoPathUsesFinderPathCheck(t *testing.T) {
+	origin := loc(0)
+	target := loc(100)
+	finder := &pathCheckerStub{hasPath: true}
+	path := GeoPath{Finder: finder}
+
+	if !path.HasPath(origin, target) {
+		t.Fatal("HasPath() = false, want true")
+	}
+	if !finder.checked {
+		t.Fatal("HasPath() did not call finder path check")
+	}
+	if finder.findCalled {
+		t.Fatal("HasPath() called Find() and discarded a path")
+	}
+}
+
 type walkerActorStub struct {
 	id            int32
 	pos           location.Location
@@ -330,6 +347,26 @@ func (f *pathFinderStub) Find(origin, target location.Location) ([]location.Loca
 	f.origin = origin
 	f.target = target
 	return f.path, len(f.path), f.ok
+}
+
+type pathCheckerStub struct {
+	hasPath    bool
+	checked    bool
+	findCalled bool
+	origin     location.Location
+	target     location.Location
+}
+
+func (f *pathCheckerStub) Find(origin, target location.Location) ([]location.Location, int, bool) {
+	f.findCalled = true
+	return []location.Location{target}, 1, true
+}
+
+func (f *pathCheckerStub) HasPath(origin, target location.Location) bool {
+	f.checked = true
+	f.origin = origin
+	f.target = target
+	return f.hasPath
 }
 
 type walkerNodeOption func(*route.WalkerLocation)
