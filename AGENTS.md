@@ -224,6 +224,13 @@ internal/<area>/       all implementation (unimportable outside this module — 
 
 - Organize packages **by responsibility/domain**, not by layer-type. `player`, `world`, `skill`,
   `item`, `geo`, `packet`, `db` — each a cohesive unit with a small surface.
+- **Network packages are protocol orchestration only.** Code under `internal/gameserver/network`
+  decodes client packets, resolves session/world context, calls domain APIs, and maps domain outcomes
+  to server packets. It must not own game rules: skill/cast validation, target rules, costs, HP/MP
+  deltas, item filtering, pet/trade/shortcut/chair rules, or persistence decisions belong in
+  `model`, `handler`, `skill`, or focused service packages. If a network handler needs more than
+  packet fields, object lookup, dispatch, and packet mapping, move that logic first and leave a small
+  typed outcome/error for the network layer to translate.
 - **`main` owns composition.** Construct and connect dependencies in `cmd/.../main.go` in explicit
   order. Do not rely on hidden package `init()` side effects to build the object graph; `init()` is for
   trivial, self-contained setup only.
@@ -396,5 +403,7 @@ inheritance, zero getters, zero singleton, explicit ownership. **This is the bar
 - [ ] Exact-contract outputs verified against committed known-good vectors.
 - [ ] Packet impact check completed: related client/server packets are implemented, wired, tested, or
       explicitly deferred with a reason.
+- [ ] Network boundary check completed: packet handlers contain only protocol/session/world
+      orchestration and packet mapping; domain rules live outside `network`.
 - [ ] `gofmt` + `go vet` clean; exported items documented; comments explain why.
 - [ ] No reference to any external codebase or language anywhere in the diff.
