@@ -16,4 +16,8 @@ const (
 	OpcodeRequestExPledgeCrestLarge   uint16 = 0x0010
 	OpcodeRequestCursedWeaponList     uint16 = 0x0022
 	OpcodeRequestCursedWeaponLocation uint16 = 0x0023
+	OpcodeRequestConfirmTargetItem    uint16 = 0x0029
+	OpcodeRequestConfirmRefinerItem   uint16 = 0x002a
+	OpcodeRequestConfirmGemStone      uint16 = 0x002b
+	OpcodeRequestConfirmCancelItem    uint16 = 0x002d
 )
