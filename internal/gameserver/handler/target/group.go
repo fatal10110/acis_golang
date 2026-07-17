@@ -93,12 +93,12 @@ func isPlayerLike(creature Creature) bool {
 }
 
 func inParty(creature Creature) bool {
-	state, ok := any(creature).(PartyState)
+	state, ok := creature.(PartyState)
 	return ok && state.IsInParty()
 }
 
 func partyContains(partyMember, other Creature) bool {
-	state, ok := any(partyMember).(PartyState)
+	state, ok := partyMember.(PartyState)
 	if !ok {
 		return false
 	}
@@ -106,7 +106,7 @@ func partyContains(partyMember, other Creature) bool {
 }
 
 func sameParty(a, b Creature) bool {
-	mate, ok := any(a).(PartyMate)
+	mate, ok := a.(PartyMate)
 	if !ok {
 		return false
 	}
@@ -114,7 +114,7 @@ func sameParty(a, b Creature) bool {
 }
 
 func sameClan(a, b Creature) bool {
-	mate, ok := any(a).(ClanAllyMate)
+	mate, ok := a.(ClanAllyMate)
 	if !ok {
 		return false
 	}
@@ -122,7 +122,7 @@ func sameClan(a, b Creature) bool {
 }
 
 func sameAlly(a, b Creature) bool {
-	mate, ok := any(a).(ClanAllyMate)
+	mate, ok := a.(ClanAllyMate)
 	if !ok {
 		return false
 	}
@@ -130,17 +130,17 @@ func sameAlly(a, b Creature) bool {
 }
 
 func olympiadMode(creature Creature) bool {
-	o, ok := any(creature).(OlympiadParticipant)
+	o, ok := creature.(OlympiadParticipant)
 	return ok && o.OlympiadMode()
 }
 
 func hasClan(creature Creature) bool {
-	holder, ok := any(creature).(ClanHolder)
+	holder, ok := creature.(ClanHolder)
 	return ok && holder.HasClan()
 }
 
 func mageClass(creature Creature) bool {
-	m, ok := any(creature).(MageClasser)
+	m, ok := creature.(MageClasser)
 	return ok && m.MageClass()
 }
 
@@ -148,11 +148,11 @@ func mageClass(creature Creature) bool {
 // ally-targeting sweep. A non-dueling caster (DuelID == 0) sweeps everyone;
 // otherwise both must be in the same duel id and on the same team.
 func sameDuelTeam(a, b Creature) bool {
-	caster, ok := any(a).(Dueler)
+	caster, ok := a.(Dueler)
 	if !ok || caster.DuelID() == 0 {
 		return true
 	}
-	other, ok := any(b).(Dueler)
+	other, ok := b.(Dueler)
 	if !ok {
 		return false
 	}
@@ -160,7 +160,7 @@ func sameDuelTeam(a, b Creature) bool {
 }
 
 func clanGroupsOf(creature Creature) []string {
-	member, ok := any(creature).(ClanGroupMember)
+	member, ok := creature.(ClanGroupMember)
 	if !ok {
 		return nil
 	}

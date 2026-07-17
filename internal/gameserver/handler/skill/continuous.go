@@ -128,7 +128,7 @@ func (h continuousHandler) Use(cast Cast) {
 // skill reflects but the caster isn't itself a valid continuous target, which
 // is safer dropped than guessed through.
 func (continuousHandler) reflectTarget(cast Cast, target continuousTarget) continuousTarget {
-	src, ok := any(target).(skillReflectSource)
+	src, ok := target.(skillReflectSource)
 	if !ok {
 		return target
 	}
