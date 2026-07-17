@@ -84,7 +84,70 @@ func (s *State) Despawn(t Tracked) {
 
 	s.relocate(t, nil)
 
-	s.RemoveObject(t.ObjectID())
+	s.removeObjectIfSame(t)
+}
+
+// DespawnAll removes every object in ts from the world in one pass. Objects
+// that share a departure region trigger a single neighbor scan and a single
+// Forget per observer instead of one scan per object, which matters when
+// many objects expire in the same tick (e.g. co-located ground-item
+// cleanup): scanning and copying each neighbor region's contents once per
+// despawn is quadratic in same-region batch size.
+//
+// ponytail: ts must not themselves implement Observer (the reciprocal
+// tObs.Forget(o) that relocate does for a single despawning observer isn't
+// replicated here) — fine for today's only caller (ground items, which
+// never observe), revisit if a future caller despawns Observers in bulk.
+func (s *State) DespawnAll(ts []Tracked) {
+	byRegion := make(map[*Region][]Tracked, len(ts))
+	for _, t := range ts {
+		p := t.presence()
+		p.mu.Lock()
+		p.visible = false
+		region := p.region
+		p.mu.Unlock()
+		byRegion[region] = append(byRegion[region], t)
+	}
+
+	var areaBuf [9]*Region
+	var objectBuf []Tracked
+	for region, group := range byRegion {
+		if region == nil {
+			continue
+		}
+		left := group[:0]
+		for _, t := range group {
+			if region.removeIfSame(t.ObjectID(), t) {
+				left = append(left, t)
+			}
+		}
+		if len(left) == 0 {
+			continue
+		}
+		areas := s.AppendNeighbors(areaBuf[:0], region, 1)
+		for _, r := range areas {
+			objectBuf = r.AppendObjects(objectBuf[:0])
+			for _, o := range objectBuf {
+				w, ok := o.(Observer)
+				if !ok {
+					continue
+				}
+				for _, t := range left {
+					if o.ObjectID() != t.ObjectID() {
+						w.Forget(t)
+					}
+				}
+			}
+		}
+	}
+
+	for _, t := range ts {
+		p := t.presence()
+		p.mu.Lock()
+		p.region = nil
+		p.mu.Unlock()
+		s.removeObjectIfSame(t)
+	}
 }
 
 // relocate moves t between grid regions: out of its current one, if any,
@@ -101,8 +164,7 @@ func (s *State) relocate(t Tracked, next *Region) {
 
 	var oldAreaBuf, newAreaBuf [9]*Region
 	var oldAreas, newAreas []*Region
-	if prev != nil {
-		prev.Remove(t.ObjectID())
+	if prev != nil && prev.removeIfSame(t.ObjectID(), t) {
 		oldAreas = s.AppendNeighbors(oldAreaBuf[:0], prev, 1)
 	}
 	if next != nil {

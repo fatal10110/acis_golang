@@ -164,6 +164,71 @@ func TestGroundItemsLoadAndSaveSnapshots(t *testing.T) {
 	}
 }
 
+func TestGroundItemsLoadSetsManaLeftDefault(t *testing.T) {
+	now := time.UnixMilli(1_000_000)
+	state := world.New()
+	ordinary := &item.Template{ID: 10, Kind: item.KindEtcItem, Duration: -1}
+	shadow := &item.Template{ID: 20, Kind: item.KindWeapon, Duration: 5}
+	templates := item.NewTable([]*item.Template{ordinary, shadow})
+	items := NewGroundItems(state, GroundItemOptions{}, func() time.Time { return now })
+
+	rows := []item.GroundSnapshot{
+		{Instance: item.Instance{ObjectID: 1, TemplateID: 10, Count: 1}},
+		{Instance: item.Instance{ObjectID: 2, TemplateID: 20, Count: 1}},
+	}
+	if err := items.Load(rows, templates); err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	saved := items.Snapshots(nil)
+	byID := map[int32]item.GroundSnapshot{}
+	for _, row := range saved {
+		byID[row.ObjectID] = row
+	}
+	if got := byID[1].ManaLeft; got != -1 {
+		t.Fatalf("restored ordinary item ManaLeft = %d, want -1", got)
+	}
+	if got := byID[2].ManaLeft; got != 300 {
+		t.Fatalf("restored shadow item ManaLeft = %d, want 300 (5min * 60)", got)
+	}
+}
+
+func TestGroundItemsTickDespawnsCoLocatedItemsInOneBatch(t *testing.T) {
+	now := time.UnixMilli(400_000)
+	state := world.New()
+	items := NewGroundItems(state, GroundItemOptions{
+		ItemAutoDestroy:         time.Second,
+		PlayerDroppedMultiplier: 1,
+	}, func() time.Time { return now })
+
+	observer := newGroundItemObserver(100)
+	state.Spawn(observer, 0, 0, 0, 0)
+	observer.take()
+
+	const n = 5
+	for i := int32(1); i <= n; i++ {
+		ground := testGroundItem(t, item.Instance{ObjectID: i, TemplateID: 10, Count: 1}, &item.Template{ID: 10, Kind: item.KindEtcItem})
+		items.Drop(ground, DropOptions{X: 10 + int(i), Y: 10, Z: 0})
+	}
+	observer.take()
+
+	now = now.Add(time.Second)
+	items.Tick()
+
+	got := observer.take()
+	if len(got) != n {
+		t.Fatalf("forget events = %d, want %d: %v", len(got), n, got)
+	}
+	for i := int32(1); i <= n; i++ {
+		if _, ok := state.Object(i); ok {
+			t.Fatalf("state.Object(%d) still registered after batch expiry", i)
+		}
+	}
+	if got := items.Len(); got != 0 {
+		t.Fatalf("Len() = %d, want 0 after batch expiry", got)
+	}
+}
+
 func testGroundItem(t *testing.T, inst item.Instance, tmpl *item.Template) *grounditem.Item {
 	t.Helper()
 	ground, err := grounditem.New(inst, tmpl)

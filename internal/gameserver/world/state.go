@@ -30,6 +30,12 @@ func (s *State) AddObject(obj worldobject.Object) { s.objects.add(obj.ObjectID()
 // RemoveObject stops tracking the object with the given id.
 func (s *State) RemoveObject(id int32) { s.objects.remove(id) }
 
+// removeObjectIfSame stops tracking obj only if it is still the object
+// registered under its own id. See registry.removeIfSame.
+func (s *State) removeObjectIfSame(obj worldobject.Object) bool {
+	return s.objects.removeIfSame(obj.ObjectID(), obj)
+}
+
 // RemoveObjects stops tracking every object with the given ids.
 func (s *State) RemoveObjects(ids []int32) { s.objects.removeAll(ids) }
 

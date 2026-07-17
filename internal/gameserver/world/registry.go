@@ -34,6 +34,19 @@ func (r *registry) remove(key int32) {
 	delete(r.entries, key)
 }
 
+// removeIfSame drops the entry at key only if it is still obj, so a stale
+// caller racing a newer registration under the same key is a no-op instead
+// of evicting whatever legitimately occupies key now.
+func (r *registry) removeIfSame(key int32, obj worldobject.Object) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if cur, ok := r.entries[key]; !ok || cur != obj {
+		return false
+	}
+	delete(r.entries, key)
+	return true
+}
+
 func (r *registry) removeAll(keys []int32) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
