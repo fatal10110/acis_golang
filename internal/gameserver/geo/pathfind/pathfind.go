@@ -3,6 +3,7 @@ package pathfind
 import (
 	"container/heap"
 	"math"
+	"sync"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/engine"
@@ -13,32 +14,66 @@ import (
 type Finder struct {
 	engine  *engine.Engine
 	options Options
+	scratch sync.Pool
 }
 
 // New builds a Finder over one geodata engine.
 func New(e *engine.Engine, options Options) *Finder {
-	return &Finder{engine: e, options: options}
+	return &Finder{
+		engine:  e,
+		options: options,
+		scratch: sync.Pool{New: func() any {
+			return &searchScratch{}
+		}},
+	}
 }
 
 // Find returns a path from origin to target as corner points plus the final target cell,
 // and the path's total weighted cost. The returned slice omits the origin. ok is false
 // when no path was found within MaxIterations, in which case the other results are zero.
 func (f *Finder) Find(origin, target location.Location) ([]location.Location, int, bool) {
+	return f.FindInto(nil, origin, target)
+}
+
+// FindInto is Find with caller-owned result storage. dst is reset before use.
+func (f *Finder) FindInto(dst []location.Location, origin, target location.Location) ([]location.Location, int, bool) {
+	return f.find(dst, origin, target, true)
+}
+
+// HasPath reports whether origin can reach target without building a result path.
+func (f *Finder) HasPath(origin, target location.Location) bool {
+	_, _, ok := f.find(nil, origin, target, false)
+	return ok
+}
+
+func (f *Finder) find(dst []location.Location, origin, target location.Location, buildResult bool) ([]location.Location, int, bool) {
+	dst = dst[:0]
 	if f == nil || f.engine == nil || engine.OutOfWorld(origin.X, origin.Y) || engine.OutOfWorld(target.X, target.Y) {
-		return nil, 0, false
+		return dst, 0, false
 	}
 
-	start := newNode(origin.X, origin.Y, int(f.engine.Height(origin.X, origin.Y, origin.Z)))
-	goal := newNode(target.X, target.Y, int(f.engine.Height(target.X, target.Y, target.Z)))
+	scratch, _ := f.scratch.Get().(*searchScratch)
+	if scratch == nil {
+		scratch = &searchScratch{}
+	}
+	scratch.reset()
+	defer func() {
+		scratch.reset()
+		f.scratch.Put(scratch)
+	}()
+
+	start := scratch.newNodeFromWorld(origin.X, origin.Y, int(f.engine.Height(origin.X, origin.Y, origin.Z)))
+	goal := scratch.newNodeFromWorld(target.X, target.Y, int(f.engine.Height(target.X, target.Y, target.Z)))
 	start.h = f.heuristic(start, goal)
 	start.f = start.h
 
-	opened := &nodeHeap{}
+	opened := &scratch.opened
 	heap.Init(opened)
 	heap.Push(opened, start)
 
-	openSet := map[nodeKey]struct{}{start.key(): {}}
-	closed := make(map[nodeKey]struct{})
+	openSet := scratch.openSet
+	openSet[start.key()] = struct{}{}
+	closed := scratch.closed
 	seq := int64(1)
 	iterations := 0
 
@@ -47,27 +82,19 @@ func (f *Finder) Find(origin, target location.Location) ([]location.Location, in
 		delete(openSet, current.key())
 
 		if current.gx == goal.gx && current.gy == goal.gy && current.z == goal.z {
-			return buildPath(current), current.g, true
+			if !buildResult {
+				return dst, current.g, true
+			}
+			return buildPath(dst, current), current.g, true
 		}
 
 		closed[current.key()] = struct{}{}
-		for _, next := range f.expand(current, goal, &seq) {
-			key := next.key()
-			if _, ok := closed[key]; ok {
-				continue
-			}
-			if _, ok := openSet[key]; ok {
-				continue
-			}
-
-			heap.Push(opened, next)
-			openSet[key] = struct{}{}
-		}
+		f.expand(current, goal, &seq, scratch)
 
 		iterations++
 	}
 
-	return nil, 0, false
+	return dst, 0, false
 }
 
 type node struct {
@@ -80,15 +107,6 @@ type node struct {
 	seq    int64
 	parent *node
 	index  int
-}
-
-func newNode(worldX, worldY, z int) *node {
-	return &node{
-		gx:    engine.GeoX(worldX),
-		gy:    engine.GeoY(worldY),
-		z:     z,
-		index: -1,
-	}
 }
 
 func (n *node) key() nodeKey {
@@ -128,8 +146,47 @@ func (h *nodeHeap) Pop() any {
 	old := *h
 	n := old[len(old)-1]
 	n.index = -1
+	old[len(old)-1] = nil
 	*h = old[:len(old)-1]
 	return n
+}
+
+type searchScratch struct {
+	opened  nodeHeap
+	openSet map[nodeKey]struct{}
+	closed  map[nodeKey]struct{}
+	nodes   []node
+}
+
+func (s *searchScratch) reset() {
+	clear(s.opened)
+	s.opened = s.opened[:0]
+	if s.openSet == nil {
+		s.openSet = make(map[nodeKey]struct{})
+	} else {
+		clear(s.openSet)
+	}
+	if s.closed == nil {
+		s.closed = make(map[nodeKey]struct{})
+	} else {
+		clear(s.closed)
+	}
+	clear(s.nodes)
+	s.nodes = s.nodes[:0]
+}
+
+func (s *searchScratch) newNodeFromWorld(worldX, worldY, z int) *node {
+	return s.newNode(engine.GeoX(worldX), engine.GeoY(worldY), z)
+}
+
+func (s *searchScratch) newNode(gx, gy, z int) *node {
+	s.nodes = append(s.nodes, node{
+		gx:    gx,
+		gy:    gy,
+		z:     z,
+		index: -1,
+	})
+	return &s.nodes[len(s.nodes)-1]
 }
 
 var steps = [...]struct {
@@ -147,8 +204,7 @@ var steps = [...]struct {
 	{dx: 1, dy: 1, diagonal: true},
 }
 
-func (f *Finder) expand(current, goal *node, seq *int64) []*node {
-	next := make([]*node, 0, len(steps))
+func (f *Finder) expand(current, goal *node, seq *int64, scratch *searchScratch) {
 	for _, step := range steps {
 		if step.diagonal && !f.canMoveDiagonal(current, step.dx, step.dy) {
 			continue
@@ -165,6 +221,14 @@ func (f *Finder) expand(current, goal *node, seq *int64) []*node {
 			continue
 		}
 
+		key := nodeKey{gx: current.gx + step.dx, gy: current.gy + step.dy, z: nextZ}
+		if _, ok := scratch.closed[key]; ok {
+			continue
+		}
+		if _, ok := scratch.openSet[key]; ok {
+			continue
+		}
+
 		weight := f.options.MoveWeight
 		if step.diagonal {
 			weight = f.options.MoveWeightDiag
@@ -177,21 +241,16 @@ func (f *Finder) expand(current, goal *node, seq *int64) []*node {
 			}
 		}
 
-		n := &node{
-			gx:     current.gx + step.dx,
-			gy:     current.gy + step.dy,
-			z:      nextZ,
-			g:      current.g + weight,
-			parent: current,
-			seq:    *seq,
-			index:  -1,
-		}
+		n := scratch.newNode(key.gx, key.gy, key.z)
+		n.g = current.g + weight
+		n.parent = current
+		n.seq = *seq
 		*seq = *seq + 1
 		n.h = f.heuristic(n, goal)
 		n.f = n.g + n.h
-		next = append(next, n)
+		heap.Push(&scratch.opened, n)
+		scratch.openSet[key] = struct{}{}
 	}
-	return next
 }
 
 func (f *Finder) canMoveDiagonal(current *node, dx, dy int) bool {
@@ -246,8 +305,7 @@ func (f *Finder) heuristic(from, to *node) int {
 	return int(math.Sqrt(float64(dx*dx+dy*dy+(dz/block.CellHeight)*(dz/block.CellHeight))) * float64(f.options.HeuristicWeight))
 }
 
-func buildPath(goal *node) []location.Location {
-	path := make([]location.Location, 0, 8)
+func buildPath(path []location.Location, goal *node) []location.Location {
 	dx, dy := 0, 0
 
 	for current, parent := goal, goal.parent; parent != nil; current, parent = parent, parent.parent {

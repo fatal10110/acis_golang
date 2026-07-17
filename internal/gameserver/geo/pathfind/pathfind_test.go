@@ -102,6 +102,39 @@ func TestFind(t *testing.T) {
 	})
 }
 
+func BenchmarkFinder(b *testing.B) {
+	finder := New(newTestEngine(b, complexBlock(func(x, y int) block.Cell {
+		return block.Cell{Height: 0, NSWE: block.AllDirections}
+	})), DefaultOptions())
+	origin := at(0, 0, 0)
+	target := at(3, 0, 0)
+	dst := make([]location.Location, 0, 8)
+
+	b.Run("Find", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			path, _, ok := finder.Find(origin, target)
+			if !ok || len(path) == 0 {
+				b.Fatal("Find() = no path")
+			}
+		}
+	})
+	b.Run("FindInto", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			path, _, ok := finder.FindInto(dst[:0], origin, target)
+			if !ok || len(path) == 0 {
+				b.Fatal("FindInto() = no path")
+			}
+		}
+	})
+	b.Run("HasPath", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			if !finder.HasPath(origin, target) {
+				b.Fatal("HasPath() = false")
+			}
+		}
+	})
+}
+
 func TestOptionsFromProperties(t *testing.T) {
 	props, err := config.ParseString(`
 MoveWeight = 11
@@ -159,7 +192,7 @@ func TestOptionsFromPropertiesDefaultsAndErrors(t *testing.T) {
 	})
 }
 
-func newTestEngine(t *testing.T, first block.Block) *engine.Engine {
+func newTestEngine(t testing.TB, first block.Block) *engine.Engine {
 	t.Helper()
 
 	e := engine.New()
