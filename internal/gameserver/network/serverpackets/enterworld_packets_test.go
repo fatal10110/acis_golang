@@ -69,6 +69,29 @@ func TestFramePledgeSkillList(t *testing.T) {
 	}
 }
 
+func TestFrameExCursedWeaponList(t *testing.T) {
+	got := framePayload(t, FrameExCursedWeaponList([]int32{8190, 8689}))
+	want := []byte{OpcodeExtended}
+	want = appendH(want, OpcodeExCursedWeaponList)
+	want = appendD(want, 2)
+	want = appendD(want, 8190)
+	want = appendD(want, 8689)
+	if !bytes.Equal(got, want) {
+		t.Fatalf("FrameExCursedWeaponList() = %x, want %x", got, want)
+	}
+}
+
+func TestFrameExCursedWeaponLocationEmpty(t *testing.T) {
+	got := framePayload(t, FrameExCursedWeaponLocation(nil))
+	want := []byte{OpcodeExtended}
+	want = appendH(want, OpcodeExCursedWeaponLocation)
+	want = appendD(want, 0)
+	want = appendD(want, 0)
+	if !bytes.Equal(got, want) {
+		t.Fatalf("FrameExCursedWeaponLocation() = %x, want %x", got, want)
+	}
+}
+
 func TestFrameQuestList(t *testing.T) {
 	got := framePayload(t, FrameQuestList([]QuestListEntry{{QuestID: 255, Flags: 7}}))
 	want := []byte{OpcodeQuestList}

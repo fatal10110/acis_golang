@@ -22,6 +22,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
@@ -465,6 +466,19 @@ func (f *fakeGameClient) read() []byte {
 	return payload
 }
 
+func (f *fakeGameClient) expectNoFrame() {
+	f.t.Helper()
+	f.conn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
+	if payload, err := wire.ReadFrame(f.conn); err == nil {
+		if f.cipher != nil {
+			f.cipher.Decrypt(payload)
+		}
+		f.t.Fatalf("unexpected frame: %x", payload)
+	} else if ne, ok := err.(net.Error); !ok || !ne.Timeout() {
+		f.t.Fatalf("ReadFrame: %v", err)
+	}
+}
+
 func readEnterWorldBurst(t *testing.T, c *fakeGameClient, wantDie bool) [][]byte {
 	t.Helper()
 	want := []byte{
@@ -569,6 +583,18 @@ func encodeEnterWorld() []byte {
 func encodeRequestManorList() []byte {
 	w := wire.NewPacketWriter(clientpackets.OpcodeExtended)
 	w.WriteUint16(clientpackets.OpcodeRequestManorList)
+	return w.Bytes()
+}
+
+func encodeRequestCursedWeaponList() []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeExtended)
+	w.WriteUint16(clientpackets.OpcodeRequestCursedWeaponList)
+	return w.Bytes()
+}
+
+func encodeRequestCursedWeaponLocation() []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeExtended)
+	w.WriteUint16(clientpackets.OpcodeRequestCursedWeaponLocation)
 	return w.Bytes()
 }
 
@@ -805,7 +831,7 @@ func newTestGameClientLinkWithSkillsShortcutsAndLog(t *testing.T, loginLink func
 	return newTestGameClientLinkWithSkillsShortcutsCrestsAndLog(t, loginLink, validator, skills, nil, modelskill.BookPolicy{}, nil, log)
 }
 
-func newTestGameClientLinkWithSkillsShortcutsCrestsAndLog(t *testing.T, loginLink func() *LoginLink, validator *SessionValidator, skills *skillstate.Persistence, crests *datacache.Crests, spellbooks modelskill.BookPolicy, trees *modelskill.Trees, log zerolog.Logger) (addr string, chars *fakeCharStore, items *fakeItemStore, shortcuts *fakeShortcutStore, state *world.State) {
+func newTestGameClientLinkWithSkillsShortcutsCrestsAndLog(t *testing.T, loginLink func() *LoginLink, validator *SessionValidator, skills *skillstate.Persistence, crests *datacache.Crests, spellbooks modelskill.BookPolicy, trees *modelskill.Trees, log zerolog.Logger, cursedWeapons ...*entity.CursedWeaponTable) (addr string, chars *fakeCharStore, items *fakeItemStore, shortcuts *fakeShortcutStore, state *world.State) {
 	t.Helper()
 	chars = newFakeCharStore()
 	items = newFakeItemStore()
@@ -820,7 +846,11 @@ func newTestGameClientLinkWithSkillsShortcutsCrestsAndLog(t *testing.T, loginLin
 	if crests == nil {
 		crests = datacache.NewCrests()
 	}
-	gcl := NewGameClientLink(validator, loginLink, roster, items, shortcuts, templates, itemTemplates, html, crests, skills, spellbooks, trees, state, testGeo{}, ids, groundItems, nil, task.NewPositionUpdates(), log)
+	var cursed *entity.CursedWeaponTable
+	if len(cursedWeapons) > 0 {
+		cursed = cursedWeapons[0]
+	}
+	gcl := NewGameClientLink(validator, loginLink, roster, items, shortcuts, templates, itemTemplates, html, crests, skills, spellbooks, trees, cursed, state, testGeo{}, ids, groundItems, nil, task.NewPositionUpdates(), log)
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -869,7 +899,7 @@ func newLinkedGameClientWithCrests(t *testing.T, crests *datacache.Crests) (c *f
 	return c, chars, items, state
 }
 
-func newLinkedGameClientWithSkillsShortcutsCrestsSeed(t *testing.T, skills *skillstate.Persistence, shortcutSeed func(*fakeShortcutStore), crests *datacache.Crests, spellbooks modelskill.BookPolicy, trees *modelskill.Trees, seed func(*fakeCharStore, *fakeItemStore), wantChars int) (c *fakeGameClient, chars *fakeCharStore, items *fakeItemStore, shortcuts *fakeShortcutStore, state *world.State) {
+func newLinkedGameClientWithSkillsShortcutsCrestsSeed(t *testing.T, skills *skillstate.Persistence, shortcutSeed func(*fakeShortcutStore), crests *datacache.Crests, spellbooks modelskill.BookPolicy, trees *modelskill.Trees, seed func(*fakeCharStore, *fakeItemStore), wantChars int, cursedWeapons ...*entity.CursedWeaponTable) (c *fakeGameClient, chars *fakeCharStore, items *fakeItemStore, shortcuts *fakeShortcutStore, state *world.State) {
 	t.Helper()
 
 	loginAddr, servers, sessions := newTestLoginServer(t, false)
@@ -883,7 +913,7 @@ func newLinkedGameClientWithSkillsShortcutsCrestsSeed(t *testing.T, skills *skil
 	}
 	t.Cleanup(func() { loginLink.Close() })
 
-	addr, chars, items, shortcuts, state := newTestGameClientLinkWithSkillsShortcutsCrestsAndLog(t, func() *LoginLink { return loginLink }, validator, skills, crests, spellbooks, trees, zerolog.Nop())
+	addr, chars, items, shortcuts, state := newTestGameClientLinkWithSkillsShortcutsCrestsAndLog(t, func() *LoginLink { return loginLink }, validator, skills, crests, spellbooks, trees, zerolog.Nop(), cursedWeapons...)
 	if seed != nil {
 		seed(chars, items)
 	}

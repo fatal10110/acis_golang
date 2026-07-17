@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -131,6 +132,44 @@ func TestGameClientLinkSendsSkillCoolTimeInGame(t *testing.T) {
 	if second := wire.NewReader(reply[1:]).ReadUint16(); second != serverpackets.OpcodeExSendManorList {
 		t.Fatalf("extended opcode = %#x, want ExSendManorList (%#x)", second, serverpackets.OpcodeExSendManorList)
 	}
+}
+
+func TestGameClientLinkSendsCursedWeaponListAndEmptyLocations(t *testing.T) {
+	table, err := entity.NewCursedWeaponTable([]entity.CursedWeapon{{ItemID: 8689}, {ItemID: 8190}})
+	if err != nil {
+		t.Fatalf("NewCursedWeaponTable: %v", err)
+	}
+	c, _, _, _, _ := newLinkedGameClientWithSkillsShortcutsCrestsSeed(t, nil, nil, nil, modelskill.BookPolicy{}, nil, func(chars *fakeCharStore, _ *fakeItemStore) {
+		seedSelectableCharacter(t, chars, "player1", "Newbie", 5, 0)
+	}, 1, table)
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	c.send(encodeRequestCursedWeaponList())
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeExtended {
+		t.Fatalf("list opcode = %#x, want extended packet (%#x)", reply[0], serverpackets.OpcodeExtended)
+	}
+	r := wire.NewReader(reply[1:])
+	if second := r.ReadUint16(); second != serverpackets.OpcodeExCursedWeaponList {
+		t.Fatalf("list extended opcode = %#x, want ExCursedWeaponList (%#x)", second, serverpackets.OpcodeExCursedWeaponList)
+	}
+	if count := r.ReadInt32(); count != 2 {
+		t.Fatalf("list count = %d, want 2", count)
+	}
+	if first, second := r.ReadInt32(), r.ReadInt32(); first != 8190 || second != 8689 {
+		t.Fatalf("list ids = %d/%d, want 8190/8689", first, second)
+	}
+	if err := r.Err(); err != nil {
+		t.Fatalf("read cursed weapon list: %v", err)
+	}
+
+	c.send(encodeRequestCursedWeaponLocation())
+	c.expectNoFrame()
 }
 
 func TestGameClientLinkAcquireSkillInfoAndLearnGeneralSkill(t *testing.T) {

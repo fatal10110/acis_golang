@@ -33,3 +33,21 @@ func TestNewCursedWeaponTableRejectsDuplicateIDs(t *testing.T) {
 		t.Fatal("expected duplicate item id error, got nil")
 	}
 }
+
+func TestCursedWeaponTableIDsAreSorted(t *testing.T) {
+	table, err := NewCursedWeaponTable([]CursedWeapon{{ItemID: 8689}, {ItemID: 8190}})
+	if err != nil {
+		t.Fatalf("NewCursedWeaponTable() error: %v", err)
+	}
+	got := table.IDs()
+	want := []int32{8190, 8689}
+	if len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
+		t.Fatalf("IDs() = %v, want %v", got, want)
+	}
+
+	got[0] = 1
+	again := table.IDs()
+	if again[0] != want[0] {
+		t.Fatalf("IDs() returned mutable backing slice: %v", again)
+	}
+}
