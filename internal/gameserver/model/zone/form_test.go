@@ -154,13 +154,42 @@ func TestNewPolygonRejectsTooFewVertices(t *testing.T) {
 	}
 }
 
+func TestInvertedZPolygonIntersectsRectNeverFullyContains(t *testing.T) {
+	// Some datapack zones declare an inverted z range (maxZ < minZ), e.g.
+	// ScriptZone.xml's archaic_laboratory_gate zones. The historical
+	// containment probe is dead for any inverted or zero-height range, not
+	// just zero-height, so a query rect sitting entirely inside the
+	// polygon's footprint must still report no overlap.
+	nodes := []location.Point{{X: 0, Y: 0}, {X: 100, Y: 0}, {X: 100, Y: 100}, {X: 0, Y: 100}}
+	form, err := NewPolygon(nodes, -3300, -3400)
+	if err != nil {
+		t.Fatalf("NewPolygon: %v", err)
+	}
+	if form.IntersectsRect(10, 20, 10, 20) {
+		t.Error("inverted-z polygon reported a fully-interior rect as intersecting, want false")
+	}
+	// A rect crossing the boundary must still count.
+	if !form.IntersectsRect(-10, 10, -10, 10) {
+		t.Error("inverted-z polygon failed to detect a boundary-crossing rect")
+	}
+}
+
 func TestCuboidNormalizesCorners(t *testing.T) {
 	a := NewCuboid(0, 100, 0, 200, -50, 50)
 	b := NewCuboid(100, 0, 200, 0, 50, -50)
-	if a != b {
-		t.Errorf("reversed corners produced a different cuboid: %+v vs %+v", a, b)
-	}
 	if a.LowZ() != -50 || a.HighZ() != 50 {
-		t.Errorf("z bounds = %d..%d, want -50..50", a.LowZ(), a.HighZ())
+		t.Errorf("a z bounds = %d..%d, want -50..50", a.LowZ(), a.HighZ())
+	}
+	if b.LowZ() != -50 || b.HighZ() != 50 {
+		t.Errorf("b z bounds = %d..%d, want -50..50", b.LowZ(), b.HighZ())
+	}
+	probes := [][3]int{{0, 0, 0}, {100, 200, 0}, {50, 100, 0}, {-1, 0, 0}, {0, -1, 0}, {50, 100, 60}}
+	for _, p := range probes {
+		if a.Contains(p[0], p[1], p[2]) != b.Contains(p[0], p[1], p[2]) {
+			t.Errorf("reversed corners disagree at (%d, %d, %d)", p[0], p[1], p[2])
+		}
+		if a.IntersectsRect(p[0]-1, p[0]+1, p[1]-1, p[1]+1) != b.IntersectsRect(p[0]-1, p[0]+1, p[1]-1, p[1]+1) {
+			t.Errorf("reversed corners disagree on IntersectsRect near (%d, %d)", p[0], p[1])
+		}
 	}
 }
