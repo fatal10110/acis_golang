@@ -16,6 +16,7 @@ const (
 	OpcodeExPledgeSkillList           uint16 = 0x0039
 	OpcodeExCursedWeaponList          uint16 = 0x0045
 	OpcodeExCursedWeaponLocation      uint16 = 0x0046
+	OpcodeExUseSharedGroupItem        uint16 = 0x0049
 	OpcodeExShowVariationMakeWindow   uint16 = 0x0050
 	OpcodeExShowVariationCancelWindow uint16 = 0x0051
 	OpcodeExConfirmVariationItem      uint16 = 0x0052
