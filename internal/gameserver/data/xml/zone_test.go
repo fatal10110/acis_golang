@@ -95,9 +95,9 @@ func TestLoadZonesDatapackFields(t *testing.T) {
 	if giran.CastleID != 3 || !giran.Peaceful {
 		t.Errorf("Giran town: castle %d peaceful %v, want castle 3, peaceful", giran.CastleID, giran.Peaceful)
 	}
-	if _, ok := giran.Form().(zone.Polygon); !ok {
-		t.Errorf("Giran town form is %T, want polygon", giran.Form())
-	}
+	// The underlying shape kind isn't observable from outside the zone
+	// package; the ContainsPoint check below verifies the loaded form's
+	// behavior directly instead.
 	// A point in central Giran, inside the pinned polygon and z band.
 	if !giran.ContainsPoint(82000, 148000, -3450) {
 		t.Error("central Giran not inside the Giran town zone")

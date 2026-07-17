@@ -29,6 +29,23 @@ type Point struct {
 	X, Y int
 }
 
+// EdgesCross reports whether any edge of the closed vertex ring a crosses
+// any edge of the closed vertex ring b (shared endpoints and collinear
+// overlap both count). It does not check whether one ring's vertices lie
+// inside the other — only whether their boundaries touch.
+func EdgesCross(a, b []Point) bool {
+	for i := range a {
+		j := (i + 1) % len(a)
+		for k := range b {
+			l := (k + 1) % len(b)
+			if segmentsIntersect(a[i].X, a[i].Y, a[j].X, a[j].Y, b[k].X, b[k].Y, b[l].X, b[l].Y) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // relativeCCW classifies where the point (px, py) sits relative to the
 // directed segment (x1, y1)->(x2, y2): -1 counter-clockwise, 1 clockwise,
 // 0 on the segment (points beyond either endpoint on the segment's line

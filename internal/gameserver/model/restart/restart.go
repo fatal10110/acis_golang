@@ -15,7 +15,7 @@ import (
 
 // Area is a polygon that overrides region-scale restart data by race.
 type Area struct {
-	shape        zone.Polygon
+	shape        zone.Form
 	Restrictions map[player.Race]string
 }
 

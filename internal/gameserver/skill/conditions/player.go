@@ -232,9 +232,9 @@ func (c ActiveSkillID) Test(effector, effected, skill any) bool {
 }
 
 // InsidePoly requires the effector's position to be inside (or, if
-// CheckInside is false, outside) the given zone polygon.
+// CheckInside is false, outside) the given zone form.
 type InsidePoly struct {
-	Zone        zone.Polygon
+	Zone        zone.Form
 	CheckInside bool
 }
 

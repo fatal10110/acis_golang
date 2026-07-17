@@ -1,9 +1,6 @@
 package geometry
 
-import (
-	"errors"
-	"fmt"
-)
+import "errors"
 
 // Territory is a 3D region: a vertical z range paired with one or more 2D
 // shapes whose union describes the footprint at every height in that
@@ -14,13 +11,12 @@ type Territory struct {
 }
 
 // NewTerritory builds a Territory spanning minZ..maxZ over the union of
-// shapes. At least one shape is required, and minZ must not exceed maxZ.
+// shapes. At least one shape is required. minZ may exceed maxZ (some
+// source data declares inverted ranges); Contains then simply never
+// matches any z, rather than NewTerritory rejecting the input.
 func NewTerritory(minZ, maxZ int, shapes ...Shape) (*Territory, error) {
 	if len(shapes) == 0 {
 		return nil, errors.New("geometry: territory needs at least one shape")
-	}
-	if minZ > maxZ {
-		return nil, fmt.Errorf("geometry: territory minZ %d exceeds maxZ %d", minZ, maxZ)
 	}
 	return &Territory{MinZ: minZ, MaxZ: maxZ, Shapes: shapes}, nil
 }

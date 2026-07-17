@@ -43,6 +43,16 @@ func (v vertexList) Intersects(other Shape) bool { return intersects(v, other) }
 
 func (v vertexList) vertices() (xs, ys []int32) { return v.xs, v.ys }
 
+// Vertices returns the shape's vertex ring in traversal order (the ring is
+// implicitly closed: the last vertex connects back to the first).
+func (v vertexList) Vertices() []Point {
+	out := make([]Point, len(v.xs))
+	for i := range v.xs {
+		out[i] = Point{X: int(v.xs[i]), Y: int(v.ys[i])}
+	}
+	return out
+}
+
 // Polygon is a simple (non-self-intersecting) 2D polygon of arbitrary
 // vertex count, convex or concave.
 type Polygon struct {

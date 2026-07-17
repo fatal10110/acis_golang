@@ -157,10 +157,19 @@ func TestNewPolygonRejectsTooFewVertices(t *testing.T) {
 func TestCuboidNormalizesCorners(t *testing.T) {
 	a := NewCuboid(0, 100, 0, 200, -50, 50)
 	b := NewCuboid(100, 0, 200, 0, 50, -50)
-	if a != b {
-		t.Errorf("reversed corners produced a different cuboid: %+v vs %+v", a, b)
-	}
 	if a.LowZ() != -50 || a.HighZ() != 50 {
-		t.Errorf("z bounds = %d..%d, want -50..50", a.LowZ(), a.HighZ())
+		t.Errorf("a z bounds = %d..%d, want -50..50", a.LowZ(), a.HighZ())
+	}
+	if b.LowZ() != -50 || b.HighZ() != 50 {
+		t.Errorf("b z bounds = %d..%d, want -50..50", b.LowZ(), b.HighZ())
+	}
+	probes := [][3]int{{0, 0, 0}, {100, 200, 0}, {50, 100, 0}, {-1, 0, 0}, {0, -1, 0}, {50, 100, 60}}
+	for _, p := range probes {
+		if a.Contains(p[0], p[1], p[2]) != b.Contains(p[0], p[1], p[2]) {
+			t.Errorf("reversed corners disagree at (%d, %d, %d)", p[0], p[1], p[2])
+		}
+		if a.IntersectsRect(p[0]-1, p[0]+1, p[1]-1, p[1]+1) != b.IntersectsRect(p[0]-1, p[0]+1, p[1]-1, p[1]+1) {
+			t.Errorf("reversed corners disagree on IntersectsRect near (%d, %d)", p[0], p[1])
+		}
 	}
 }

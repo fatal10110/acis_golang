@@ -2,13 +2,20 @@ package geometry
 
 import "testing"
 
-func TestNewTerritoryRejectsInvalidInput(t *testing.T) {
-	rect := NewRectangle(0, 10, 0, 10)
+func TestNewTerritoryRejectsNoShapes(t *testing.T) {
 	if _, err := NewTerritory(0, 10); err == nil {
 		t.Error("NewTerritory with no shapes succeeded, want error")
 	}
-	if _, err := NewTerritory(10, 0, rect); err == nil {
-		t.Error("NewTerritory with minZ > maxZ succeeded, want error")
+}
+
+func TestNewTerritoryAcceptsInvertedZRangeAsAlwaysEmpty(t *testing.T) {
+	rect := NewRectangle(0, 10, 0, 10)
+	tr, err := NewTerritory(10, 0, rect)
+	if err != nil {
+		t.Fatalf("NewTerritory with minZ > maxZ: %v", err)
+	}
+	if tr.Contains(5, 5, 5) {
+		t.Error("Contains matched a z inside an inverted range, want never true")
 	}
 }
 
