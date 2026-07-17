@@ -198,9 +198,7 @@ func wireLiveAttackHooks(gcl *GameClientLink, live *livePlayer) {
 		gcl.broadcastAttack(live, snapshot)
 	})
 	live.Character.SetMoveBroadcaster(func(event move.Event) {
-		gcl.broadcastLiveFrame(live, func() wire.Frame {
-			return serverpackets.FrameMove(live.ObjectID(), event)
-		})
+		gcl.broadcastLiveMoveEvent(live, event)
 	})
 	live.move.SetArrived(func() {
 		pos := live.move.Position()

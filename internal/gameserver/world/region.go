@@ -51,3 +51,15 @@ func (r *Region) AppendObjects(out []Tracked) []Tracked {
 	}
 	return out
 }
+
+func (r *Region) appendObjectsExcept(out []Tracked, except int32) []Tracked {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	for id, o := range r.objects {
+		if id == except {
+			continue
+		}
+		out = append(out, o)
+	}
+	return out
+}
