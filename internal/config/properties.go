@@ -316,28 +316,34 @@ func (p *Properties) Float64s(key string, def []float64) ([]float64, error) {
 	return def, nil
 }
 
-// IntPairs returns pairs parsed from values shaped like "57-100;6651-3".
+// pairSepRE splits pair-list values on ';' or ',', matching every shipped
+// server.properties pair-list format (semicolon in most keys, comma in
+// AutoDestroySpecialItemTime).
+var pairSepRE = regexp.MustCompile(`[,;]`)
+
+// IntPairs returns pairs parsed from values shaped like "57-100;6651-3" or
+// "57-0,5575-0".
 func (p *Properties) IntPairs(key, def string) ([]IntPair, error) {
 	value := def
 	if found, ok := p.Lookup(key); ok {
 		value = found
 	}
-	if value == "" {
+	if strings.TrimSpace(value) == "" {
 		return nil, nil
 	}
 
-	parts := splitLiteralTrimTrailingEmpty(value, ";")
+	parts := trimTrailingEmpty(pairSepRE.Split(value, -1))
 	out := make([]IntPair, len(parts))
 	for i, part := range parts {
-		bounds := splitLiteralTrimTrailingEmpty(part, "-")
+		bounds := splitLiteralTrimTrailingEmpty(strings.TrimSpace(part), "-")
 		if len(bounds) != 2 {
 			return nil, fmt.Errorf("parse %s[%d]: want first-second", key, i)
 		}
-		first, err := strconv.Atoi(bounds[0])
+		first, err := strconv.Atoi(strings.TrimSpace(bounds[0]))
 		if err != nil {
 			return nil, fmt.Errorf("parse %s[%d] first: %w", key, i, err)
 		}
-		second, err := strconv.Atoi(bounds[1])
+		second, err := strconv.Atoi(strings.TrimSpace(bounds[1]))
 		if err != nil {
 			return nil, fmt.Errorf("parse %s[%d] second: %w", key, i, err)
 		}

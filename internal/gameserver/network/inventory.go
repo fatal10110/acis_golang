@@ -132,15 +132,14 @@ func (l *GameClientLink) dropLiveItem(live *livePlayer, req clientpackets.Reques
 		l.broadcastEquipmentChange(live)
 	}
 
-	ground.SetDropperID(live.ObjectID())
 	l.groundItems.Drop(ground, task.DropOptions{
 		X:             int(req.X),
 		Y:             int(req.Y),
 		Z:             int(req.Z),
 		Heading:       live.CurrentHeading(),
 		PlayerDropped: true,
+		DropperID:     live.ObjectID(),
 	})
-	ground.SetDropperID(0)
 }
 
 func (l *GameClientLink) destroyLiveItem(live *livePlayer, objectID int32, count int) {

@@ -69,12 +69,10 @@ func PvPFlagOptionsFromProperties(props *config.Properties) (PvPFlagOptions, err
 		return opts, nil
 	}
 
-	normal, err := props.Int("PvPVsNormalTime", int(opts.Normal/time.Millisecond))
-	if err != nil {
-		return PvPFlagOptions{}, err
-	}
-	flagged, err := props.Int("PvPVsPvPTime", int(opts.Flagged/time.Millisecond))
-	if err != nil {
+	f := config.NewFields(props, "pvp flag options")
+	normal := f.Int("PvPVsNormalTime", int(opts.Normal/time.Millisecond))
+	flagged := f.Int("PvPVsPvPTime", int(opts.Flagged/time.Millisecond))
+	if err := f.Err(); err != nil {
 		return PvPFlagOptions{}, err
 	}
 	opts.Normal = time.Duration(normal) * time.Millisecond

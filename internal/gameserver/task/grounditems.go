@@ -2,8 +2,7 @@ package task
 
 import (
 	"fmt"
-	"strconv"
-	"strings"
+	"math"
 	"sync"
 	"time"
 
@@ -48,25 +47,22 @@ func GroundItemOptionsFromProperties(props *config.Properties) (GroundItemOption
 		return opts, nil
 	}
 
-	herb, err := props.Int("AutoDestroyHerbTime", int(opts.HerbAutoDestroy/time.Second))
-	if err != nil {
+	f := config.NewFields(props, "ground item options")
+	herb := f.Int("AutoDestroyHerbTime", int(opts.HerbAutoDestroy/time.Second))
+	regular := f.Int("AutoDestroyItemTime", int(opts.ItemAutoDestroy/time.Second))
+	equipable := f.Int("AutoDestroyEquipableItemTime", int(opts.EquipableAutoDestroy/time.Second))
+	multiplier := f.Int("PlayerDroppedItemMultiplier", opts.PlayerDroppedMultiplier)
+	pairs := f.IntPairs("AutoDestroySpecialItemTime", "57-0,5575-0,6673-0")
+	if err := f.Err(); err != nil {
 		return GroundItemOptions{}, err
 	}
-	regular, err := props.Int("AutoDestroyItemTime", int(opts.ItemAutoDestroy/time.Second))
-	if err != nil {
-		return GroundItemOptions{}, err
-	}
-	equipable, err := props.Int("AutoDestroyEquipableItemTime", int(opts.EquipableAutoDestroy/time.Second))
-	if err != nil {
-		return GroundItemOptions{}, err
-	}
-	multiplier, err := props.Int("PlayerDroppedItemMultiplier", opts.PlayerDroppedMultiplier)
-	if err != nil {
-		return GroundItemOptions{}, err
-	}
-	special, err := parseSpecialDestroy(props.String("AutoDestroySpecialItemTime", "57-0,5575-0,6673-0"))
-	if err != nil {
-		return GroundItemOptions{}, err
+
+	special := make(map[int32]time.Duration, len(pairs))
+	for _, pair := range pairs {
+		if pair.First < math.MinInt32 || pair.First > math.MaxInt32 {
+			return GroundItemOptions{}, fmt.Errorf("AutoDestroySpecialItemTime: item id %d overflows int32", pair.First)
+		}
+		special[int32(pair.First)] = time.Duration(pair.Second) * time.Second
 	}
 
 	opts.HerbAutoDestroy = time.Duration(herb) * time.Second
@@ -77,34 +73,15 @@ func GroundItemOptionsFromProperties(props *config.Properties) (GroundItemOption
 	return opts, nil
 }
 
-func parseSpecialDestroy(value string) (map[int32]time.Duration, error) {
-	if strings.TrimSpace(value) == "" {
-		return nil, nil
-	}
-	parts := strings.FieldsFunc(value, func(r rune) bool { return r == ',' || r == ';' })
-	out := make(map[int32]time.Duration, len(parts))
-	for i, part := range parts {
-		pair := strings.Split(strings.TrimSpace(part), "-")
-		if len(pair) != 2 {
-			return nil, fmt.Errorf("parse AutoDestroySpecialItemTime[%d]: want item-seconds", i)
-		}
-		id, err := strconv.ParseInt(strings.TrimSpace(pair[0]), 10, 32)
-		if err != nil {
-			return nil, fmt.Errorf("parse AutoDestroySpecialItemTime[%d] item: %w", i, err)
-		}
-		seconds, err := strconv.Atoi(strings.TrimSpace(pair[1]))
-		if err != nil {
-			return nil, fmt.Errorf("parse AutoDestroySpecialItemTime[%d] seconds: %w", i, err)
-		}
-		out[int32(id)] = time.Duration(seconds) * time.Second
-	}
-	return out, nil
-}
-
 // DropOptions describes where and how an item was dropped.
 type DropOptions struct {
 	X, Y, Z, Heading int
 	PlayerDropped    bool
+
+	// DropperID is the object id of the creature the item fell from (a
+	// player discarding an item, or a defeated NPC dropping loot). It is
+	// zero for items with no fall animation, e.g. restored ground items.
+	DropperID int32
 }
 
 type groundItemEntry struct {
@@ -147,12 +124,18 @@ func (g *GroundItems) Start(log zerolog.Logger) *scheduler.Ticker {
 }
 
 // Drop places ground in the world and starts its cleanup deadline when it is
-// not destroy-protected.
+// not destroy-protected. While Spawn notifies nearby observers, ground
+// reports opts.DropperID so those immediate observers receive the animated
+// drop packet; observers that discover it later see it simply sitting on
+// the ground (see grounditem.Item.DropperID).
 func (g *GroundItems) Drop(ground *grounditem.Item, opts DropOptions) {
 	if ground == nil {
 		return
 	}
+	ground.SetDropperID(opts.DropperID)
 	g.state.Spawn(ground, opts.X, opts.Y, opts.Z, opts.Heading)
+	ground.SetDropperID(0)
+
 	if ground.DestroyProtected() {
 		return
 	}

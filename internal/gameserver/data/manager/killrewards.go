@@ -36,14 +36,16 @@ type KillReward struct {
 	ground groundPlacer
 
 	x, y, z, heading int
+	dropperID        int32
 }
 
 // NewKillReward returns a Rewarder that rolls categories against pool and
 // rates, then places the results on the ground at (x, y, z, heading).
 // levelMultiplier is the caller-resolved drop-rate penalty for the
 // killer/monster level gap (see item.LevelPenaltyMultiplier); pool may be
-// nil for an unspoiled monster.
-func NewKillReward(categories []item.DropCategory, pool *item.SpoilPool, levelMultiplier float64, raid bool, rates item.Rates, autoLootItems, autoLootHerbs bool, ids idAllocator, items *item.Table, ground groundPlacer, x, y, z, heading int) *KillReward {
+// nil for an unspoiled monster. dropperID is the dying NPC's object id, so
+// nearby observers see the loot fall from its corpse.
+func NewKillReward(categories []item.DropCategory, pool *item.SpoilPool, levelMultiplier float64, raid bool, rates item.Rates, autoLootItems, autoLootHerbs bool, ids idAllocator, items *item.Table, ground groundPlacer, x, y, z, heading int, dropperID int32) *KillReward {
 	return &KillReward{
 		categories:      categories,
 		pool:            pool,
@@ -59,6 +61,7 @@ func NewKillReward(categories []item.DropCategory, pool *item.SpoilPool, levelMu
 		y:               y,
 		z:               z,
 		heading:         heading,
+		dropperID:       dropperID,
 	}
 }
 
@@ -118,5 +121,5 @@ func (k *KillReward) drop(itemID int32, count int) {
 	if err != nil {
 		return
 	}
-	k.ground.Drop(ground, task.DropOptions{X: k.x, Y: k.y, Z: k.z, Heading: k.heading})
+	k.ground.Drop(ground, task.DropOptions{X: k.x, Y: k.y, Z: k.z, Heading: k.heading, DropperID: k.dropperID})
 }
