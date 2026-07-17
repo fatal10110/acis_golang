@@ -135,6 +135,10 @@ Missing M3 data/UI client packets:
 are still counted as gaps because merchant NPC context, buylist loading/restock wiring, buy/sell
 inventory mutation, adena persistence, and the NPC dialog/bypass owner flow are not implemented.
 
+`RequestExEnchantSkillInfo` and `RequestExEnchantSkill` currently have Go decoders and byte-layout
+tests only. They are still counted as gaps because the skill-enchant tree, trainer validation, cost
+payment, success/failure roll, and skill persistence flow are not implemented.
+
 `RequestConfirmTargetItem`, `RequestConfirmRefinerItem`, `RequestConfirmGemStone`, and
 `RequestConfirmCancelItem` currently have Go decoders and byte-layout tests only. They are still
 counted as gaps because the live augmentation validation/apply/remove flow is not implemented.
@@ -241,7 +245,8 @@ Remaining EnterWorld burst packet gaps:
 `PledgeShowMemberListUpdate` ([#631](https://github.com/fatal10110/acis_golang/issues/631)),
 `PledgeShowMemberListAll` ([#632](https://github.com/fatal10110/acis_golang/issues/632)),
 `PledgeSkillList`, `ExMailArrived`, `PlaySound`, `NpcHtmlMessage`, `BuyList`, and `SellList`
-currently have Go frame builders only. The augmentation variation packets
+currently have Go frame builders only. `ExEnchantSkillList` and `ExEnchantSkillInfo` also have Go
+frame builders only. The augmentation variation packets
 `ExShowVariationMakeWindow`, `ExShowVariationCancelWindow`, `ExConfirmVariationItem`,
 `ExConfirmVariationRefiner`, `ExConfirmVariationGemstone`, `ExConfirmCancelItem`,
 `ExVariationResult`, and `ExVariationCancelResult` also have Go frame builders only. They are not
@@ -314,19 +319,22 @@ Missing M4 world/movement server packets:
 
 Missing M5 stats/combat/items/progression server packets:
 
-- `PlaySound`
 - `PetItemList`
 - `PetInfo`
 - `PetStatusUpdate`
-- `Revive`
-- `MagicSkillCanceled`
+
+Implemented M5 item/status server packet encoders in Go, with owning runtime wiring still tracked by the relevant systems:
+
 - `AbnormalStatusUpdate`
-- `ShortBuffStatusUpdate`
 - `ExUseSharedGroupItem`
-- `WarehouseDepositList`
-- `WarehouseWithdrawList`
+- `MagicSkillCanceled`
 - `PackageToList`
 - `PackageSendableList`
+- `PlaySound`
+- `Revive`
+- `ShortBuffStatusUpdate`
+- `WarehouseDepositList`
+- `WarehouseWithdrawList`
 
 Implemented and wired M5 item server packets in Go:
 
@@ -377,7 +385,7 @@ Implemented and wired M5 shortcut server packets in Go:
 - `RequestDropItem`, `RequestDestroyItem`, and `SendTimeCheck` are wired. Drop/destroy currently cover the inventory/template/count gates available in Go and emit `InventoryUpdate`; player drops also place a ground item through the ground-item task and emit the animated `DropItem` frame during the transient dropper-id window.
 - `RequestCrystallizeItem` is wired for restored runtime-known Crystallize skill levels, crystallizable item gates, crystal reward grants, `SystemMessage` feedback, and `InventoryUpdate`.
 - `RequestAcquireSkillInfo` and `RequestAcquireSkill` are wired for usual class-template skill learning, learned-skill persistence, `SkillList` refresh, SP `StatusUpdate`, and success/failure `SystemMessage` feedback. Enchant, clan, fishing, transform, and special-trainer learning remain deferred to their owning systems.
-- `RequestMagicSkillUse` is wired for known non-passive active skills with `SELF`, `NONE`, `GROUND`, or `ONE` targets, using the current cast controller for MP/HP/item/reuse validation and emitting `MagicSkillUse`, `SetupGauge`, `MagicSkillLaunched`, `SystemMessage`, `ActionFailed`, and MP/HP `StatusUpdate` where applicable. Full AI intention scheduling, delayed cast timers, target-handler integration, effect/skill-handler application, toggles, fusion/signet/chance skills, item-triggered casts, summon/pet casts, and `MagicSkillCanceled` remain deferred to the M6 cast/effect runtime.
+- `RequestMagicSkillUse` is wired for known non-passive active skills with `SELF`, `NONE`, `GROUND`, or `ONE` targets, using the current cast controller for MP/HP/item/reuse validation and emitting `MagicSkillUse`, `SetupGauge`, `MagicSkillLaunched`, `SystemMessage`, `ActionFailed`, and MP/HP `StatusUpdate` where applicable. Full AI intention scheduling, delayed cast timers, target-handler integration, effect/skill-handler application, toggles, fusion/signet/chance skills, item-triggered casts, summon/pet casts, and the `MagicSkillCanceled` send path remain deferred to the M6 cast/effect runtime.
 - `RequestEnchantItem` is wired through the enchant-scroll `UseItem` path, `ChooseInventoryItem`, scroll ownership/count validation, item enchantability/grade/type gates, scroll consumption, item enchant persistence, blessed reset, normal break/crystal reward, `EnchantResult`, `InventoryUpdate`, `SystemMessage`, and self `UserInfo`. Config-file overrides for enchant rates, store/trade-state gates, and +4 dual/+6 armor-set passive skill side effects remain deferred to their owning systems.
 - `RequestPetUseItem`, `RequestGiveItemToPet`, `RequestGetItemFromPet`, and `RequestPetGetItem` are wired for active-pet lookup, pet inventory transfer/equip mutation, immediate visible ground-item pickup, item persistence, `GetItem`, `DeleteObject`, `PetInventoryUpdate`, player `InventoryUpdate`, and pet-use `SystemMessage` feedback. Pet AI movement-to-pickup, drop-protection/looter gates, pet food/potion item handlers, player operating/transaction-state gates, and richer pet stat refreshes remain deferred to their owning systems.
 - `RequestShortCutReg` and `RequestShortCutDel` are wired for persisted client shortcut entries, including starter shortcut creation, EnterWorld restoration, `ShortCutRegister`, and `ShortCutDelete`. Item reuse timers, macro bodies, recipe validation, and soulshot auto-use side effects remain deferred to their owning systems.
@@ -385,8 +393,9 @@ Implemented and wired M5 shortcut server packets in Go:
 - `RequestPledgeCrest` is wired against the loaded small pledge crest `.dds` cache and emits `PledgeCrest`. `RequestAllyCrest` is wired in game against loaded ally crest `.dds` cache data and emits `AllyCrest` only when data exists. Crest upload/update packets and large pledge crests remain deferred to the clan/crest write-owner flows.
 - `RequestCursedWeaponList` loads cursed weapon definitions at gameserver boot and emits `ExCursedWeaponList`. `RequestCursedWeaponLocation` is accepted but currently sends nothing because the Go runtime has no active cursed-weapon spawn/activation state yet.
 - `PetItemList`, `PetInfo`, and `PetStatusUpdate` remain deferred together: the current Go pet actor lacks the full pet info/status snapshot surface and owner spawn/info broadcast path needed to emit truthful full-list/status packets. `PetStatusShow` and `PetDelete` are wired where the current runtime has exact backing behavior.
+- `Revive`, `MagicSkillCanceled`, `AbnormalStatusUpdate`, `ShortBuffStatusUpdate`, and `ExUseSharedGroupItem` have byte-layout encoders with focused tests. Their send paths remain deferred until resurrect, cast-cancel, effect-list, short-buff, and shared-item reuse systems produce truthful runtime state.
 - `RequestAutoSoulShot` is wired as extended client opcode `0x0005` with per-player auto-shot toggle state, `ExAutoSoulShot`, and item-name `SystemMessage` feedback. First-shot recharge, recurring shot consumption, and `ExUseSharedGroupItem` reuse display remain deferred to the item-use/handler burst because the shared item handler/reuse pipeline is not ported yet.
 - `StatusUpdate` is implemented and wired for target max/current HP during selection. Broader status/stat recalculation broadcasts still need owner flows as those systems are ported.
-- The unique missing counts deduplicate those overlaps: 48 missing game client packets and 63 missing game server packets after the EnterWorld, movement/rotation, ValidateLocation correction, ChairSit, inventory, target/action, stance/social, item-operation, auto-shot, skill-acquisition, basic skill-cast, enchant, backed pet inventory/status, linked-html, pledge-crest, ally-crest, and cursed-weapon-list packet-wiring passes.
+- The last full unique missing-count pass deduplicated those overlaps as 48 missing game client packets and 63 missing game server packets after the EnterWorld, movement/rotation, ValidateLocation correction, ChairSit, inventory, target/action, stance/social, item-operation, auto-shot, skill-acquisition, basic skill-cast, enchant, backed pet inventory/status, linked-html, pledge-crest, ally-crest, and cursed-weapon-list packet-wiring passes. Recompute this count during the next full packet audit; this M5 burst only removes encoder gaps and leaves runtime send-path gaps tracked above.
 - Existing Go code accepts several M4/M5 client opcodes in `clientpackets/wiresafe.go`, but many of them still log "Opcode not wired" or have no decode/run implementation.
 - This audit uses original Java class names. Go may keep a slightly different helper shape, such as `Frame...` functions instead of packet structs, but the required client-visible packet behavior is still one original packet at a time.

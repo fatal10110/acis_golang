@@ -31,3 +31,11 @@ func TestFrameLeaveWorld(t *testing.T) {
 		t.Fatalf("FrameLeaveWorld() = %x, want %x", got, want)
 	}
 }
+
+func TestFrameRevive(t *testing.T) {
+	got := framePayload(t, FrameRevive(100))
+	want := []byte{OpcodeRevive, 100, 0, 0, 0}
+	if !bytes.Equal(got, want) {
+		t.Fatalf("FrameRevive() = %x, want %x", got, want)
+	}
+}

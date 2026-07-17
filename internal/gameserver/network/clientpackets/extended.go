@@ -12,6 +12,8 @@ const OpcodeRequestSkillCoolTime = 0x9d
 // Extended client packet opcodes.
 const (
 	OpcodeRequestAutoSoulShot         uint16 = 0x0005
+	OpcodeRequestExEnchantSkillInfo   uint16 = 0x0006
+	OpcodeRequestExEnchantSkill       uint16 = 0x0007
 	OpcodeRequestManorList            uint16 = 0x0008
 	OpcodeRequestExPledgeCrestLarge   uint16 = 0x0010
 	OpcodeRequestCursedWeaponList     uint16 = 0x0022

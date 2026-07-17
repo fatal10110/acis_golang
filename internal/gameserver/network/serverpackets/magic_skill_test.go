@@ -63,3 +63,11 @@ func TestFrameSetupGauge(t *testing.T) {
 		t.Fatalf("FrameSetupGauge() = %x, want %x", got, want)
 	}
 }
+
+func TestFrameMagicSkillCanceled(t *testing.T) {
+	got := framePayload(t, FrameMagicSkillCanceled(100))
+	want := []byte{OpcodeMagicSkillCanceled, 100, 0, 0, 0}
+	if !bytes.Equal(got, want) {
+		t.Fatalf("FrameMagicSkillCanceled() = %x, want %x", got, want)
+	}
+}
