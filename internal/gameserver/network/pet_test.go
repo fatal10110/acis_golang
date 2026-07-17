@@ -440,9 +440,9 @@ func TestHandleTargetActionShowsPetStatusForOwnerPet(t *testing.T) {
 	capture.frames = nil
 	gcl := &GameClientLink{world: state}
 
-	gcl.handleTargetAction(live, pet.ObjectID(), false)
+	gcl.handleTargetAction(context.Background(), live, pet.ObjectID(), false)
 	capture.frames = nil
-	gcl.handleTargetAction(live, pet.ObjectID(), true)
+	gcl.handleTargetAction(context.Background(), live, pet.ObjectID(), true)
 
 	if got := frameOpcodes(capture.frames); string(got) != string([]byte{serverpackets.OpcodePetStatusShow}) {
 		t.Fatalf("opcodes = %x, want PetStatusShow", got)

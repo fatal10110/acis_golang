@@ -134,6 +134,46 @@ func (s *Service) DropItem(inv *itemcontainer.Inventory, objectID int32, count i
 	}, true, nil
 }
 
+// PickupFailure is the non-mutating reason a ground-item pickup failed.
+type PickupFailure uint8
+
+const (
+	// PickupOK means the ground item was moved into inv.
+	PickupOK PickupFailure = iota
+	// PickupNoop means the request is invalid and should be ignored.
+	PickupNoop
+	// PickupLootLocked means ground is owned by someone other than picker.
+	PickupLootLocked
+	// PickupSlotsFull means inv lacks free inventory slots.
+	PickupSlotsFull
+)
+
+// PickupGround moves ground (with its loaded template) into inv, the same
+// way any other incoming item would merge into an existing stack or take a
+// free slot. pickerID is compared against ground.OwnerID to enforce a loot
+// lock; an unowned ground item (OwnerID == 0) is free for anyone.
+func (s *Service) PickupGround(inv *itemcontainer.Inventory, ground *item.Instance, tmpl *item.Template, pickerID int32) (Result, PickupFailure) {
+	if inv == nil || ground == nil || tmpl == nil || ground.Count <= 0 {
+		return Result{}, PickupNoop
+	}
+	if ground.OwnerID != 0 && ground.OwnerID != pickerID {
+		return Result{}, PickupLootLocked
+	}
+	if !inv.ValidateCapacity(inv.SlotsNeededFor(ground, tmpl)) {
+		return Result{}, PickupSlotsFull
+	}
+
+	picked := *ground
+	result, absorbed := inv.Add(&picked)
+	if result == nil {
+		return Result{}, PickupNoop
+	}
+	if absorbed {
+		return Result{Persist: []Persist{Update(result), Delete(ground.ObjectID)}}, PickupOK
+	}
+	return Result{Persist: []Persist{Save(result)}}, PickupOK
+}
+
 // DestroyItem consumes count units from inv.
 func (s *Service) DestroyItem(inv *itemcontainer.Inventory, objectID int32, count int) (Result, bool) {
 	if inv == nil || count <= 0 {

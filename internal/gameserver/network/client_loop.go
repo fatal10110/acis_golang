@@ -307,7 +307,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			if live == nil {
 				continue
 			}
-			l.handleTargetAction(live, req.ObjectID, false)
+			l.handleTargetAction(ctx, live, req.ObjectID, false)
 
 		case clientpackets.OpcodeAttackRequest:
 			req, err := clientpackets.DecodeAttackRequest(payload)
@@ -319,7 +319,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				continue
 			}
 			selected := live.target != nil && live.target.ObjectID() == req.ObjectID
-			l.handleTargetAction(live, req.ObjectID, selected)
+			l.handleTargetAction(ctx, live, req.ObjectID, selected)
 
 		case clientpackets.OpcodeLogout:
 			if live != nil {
