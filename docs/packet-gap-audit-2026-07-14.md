@@ -229,16 +229,16 @@ Implemented and wired EnterWorld burst packets in Go:
 
 Remaining EnterWorld burst packet gaps:
 
-- `PledgeShowMemberListUpdate` ([#631](https://github.com/fatal10110/acis_golang/issues/631))
-- `PledgeShowMemberListAll` ([#632](https://github.com/fatal10110/acis_golang/issues/632))
 - `PledgeSkillList` ([#717](https://github.com/fatal10110/acis_golang/issues/717))
 - `ExMailArrived` ([#718](https://github.com/fatal10110/acis_golang/issues/718))
 - `PlaySound` ([#719](https://github.com/fatal10110/acis_golang/issues/719))
 - `NpcHtmlMessage` ([#720](https://github.com/fatal10110/acis_golang/issues/720))
 
+`PledgeShowMemberListUpdate` ([#631](https://github.com/fatal10110/acis_golang/issues/631)),
+`PledgeShowMemberListAll` ([#632](https://github.com/fatal10110/acis_golang/issues/632)),
 `PledgeSkillList`, `ExMailArrived`, `PlaySound`, `NpcHtmlMessage`, `BuyList`, and `SellList`
-currently have Go frame builders only. They are still counted as gaps because no production owner
-flow can emit them truthfully yet.
+currently have Go frame builders only. They are not wired into EnterWorld until production owner
+flows can emit them truthfully.
 
 Missing M3 data/UI server packets:
 
