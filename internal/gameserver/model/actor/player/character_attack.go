@@ -103,6 +103,28 @@ func (c *Character) SetWorld(state *world.State) {
 	c.world = state
 }
 
+// SyncPosition moves this player's live world-grid presence to position.
+func (c *Character) SyncPosition(position location.Location) {
+	c.locMu.Lock()
+	c.Location = position
+	c.locMu.Unlock()
+	if c.world == nil {
+		return
+	}
+	_ = c.world.Move(c, position.X, position.Y, position.Z)
+}
+
+// SetLastKnownPosition records position and heading as this player's last
+// known world state. Call it whenever a client-reported move is accepted,
+// alongside the world-grid presence and CreatureMove position it must
+// stay consistent with.
+func (c *Character) SetLastKnownPosition(position location.Location, heading int) {
+	c.locMu.Lock()
+	c.Location = position
+	c.LastHeading = heading
+	c.locMu.Unlock()
+}
+
 // SetFrameSender records the session send hook used by network-owned live
 // player wrappers. Passing nil disconnects the character from that session.
 func (c *Character) SetFrameSender(send func(wire.Frame) bool) {
@@ -159,6 +181,8 @@ func (c *Character) Position() (int, int, int) {
 	if c.Visible() {
 		return c.Presence.Position()
 	}
+	c.locMu.RLock()
+	defer c.locMu.RUnlock()
 	return c.Location.X, c.Location.Y, c.Location.Z
 }
 

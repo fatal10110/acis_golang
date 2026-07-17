@@ -2,6 +2,7 @@ package network
 
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -17,25 +18,14 @@ func (l *GameClientLink) moveLivePlayer(live *livePlayer, origin, target locatio
 
 	heading := origin.HeadingTo(target)
 	l.updateLivePlayerPosition(live, origin, heading)
-	live.SendFrame(serverpackets.FrameMoveToLocation(live.ObjectID(), target, origin))
-
-	if l.world == nil {
-		return
-	}
-	l.world.ForEachKnown(live, func(o world.Tracked) {
-		receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
-		if !ok {
-			return
-		}
-		receiver.SendFrame(serverpackets.FrameMoveToLocation(live.ObjectID(), target, origin))
+	l.broadcastLiveFrame(live, func() wire.Frame {
+		return serverpackets.FrameMoveToLocation(live.ObjectID(), target, origin)
 	})
 }
 
 func (l *GameClientLink) stopLivePlayer(live *livePlayer, at location.Location, heading int) {
 	l.updateLivePlayerPosition(live, at, heading)
-	l.broadcastLiveFrame(live, func() wire.Frame {
-		return serverpackets.FrameStopMove(live.ObjectID(), at, heading)
-	})
+	l.broadcastLiveStopMove(live, at, heading)
 }
 
 func (l *GameClientLink) validateLivePlayerPosition(live *livePlayer, reported location.Location, heading int) {
@@ -91,23 +81,51 @@ func (l *GameClientLink) broadcastLiveSocialAction(live *livePlayer, actionID in
 	})
 }
 
+func (l *GameClientLink) broadcastLiveMoveEvent(live *livePlayer, event move.Event) {
+	l.broadcastLiveFrame(live, func() wire.Frame {
+		return serverpackets.FrameMove(live.ObjectID(), event)
+	})
+}
+
+func (l *GameClientLink) broadcastLiveStopMove(live *livePlayer, at location.Location, heading int) {
+	l.broadcastLiveFrame(live, func() wire.Frame {
+		return serverpackets.FrameStopMove(live.ObjectID(), at, heading)
+	})
+}
+
+// broadcastLiveFrame sends frame() to live's own session and to every
+// object it currently knows, building a fresh frame per recipient since
+// each wire.Frame is released after its own send.
 func (l *GameClientLink) broadcastLiveFrame(live *livePlayer, frame func() wire.Frame) {
 	live.SendFrame(frame())
 	if l.world == nil {
 		return
 	}
-	l.world.ForEachKnown(live, func(o world.Tracked) {
-		receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
+	known := live.appendKnown(l.world)
+	defer live.releaseKnown()
+	for _, o := range known {
+		receiver, ok := o.(frameReceiver)
 		if !ok {
-			return
+			continue
 		}
 		receiver.SendFrame(frame())
-	})
+	}
+}
+
+type frameReceiver interface {
+	SendFrame(wire.Frame) bool
+}
+
+func (p *livePlayer) appendKnown(state *world.State) []world.Tracked {
+	return p.known.Snapshot(state, p)
+}
+
+func (p *livePlayer) releaseKnown() {
+	p.known.Release()
 }
 
 func (l *GameClientLink) updateLivePlayerPosition(live *livePlayer, position location.Location, heading int) {
-	live.Character.Location = position
-	live.Character.LastHeading = heading
+	live.Character.SetLastKnownPosition(position, heading)
 	live.Character.SetHeading(heading)
 	if live.move != nil {
 		// Reseed CreatureMove's own position tracking too, or the next

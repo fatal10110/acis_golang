@@ -24,6 +24,7 @@ const defaultAccessLevel = 0
 // needed once that row enters the live world.
 type Character struct {
 	world.Presence
+	*creature.Live
 
 	ID          int32
 	AccountName string
@@ -47,8 +48,13 @@ type Character struct {
 	// Location and LastHeading are the character's last known world
 	// location. The field is named LastHeading, not Heading, so it doesn't
 	// shadow the Heading() method promoted from the embedded world.Presence.
+	// locMu guards both fields once the character is live: the
+	// position-update ticker (SyncPosition, during an attack chase) and the
+	// owning connection's network goroutine (SetLastKnownPosition, during
+	// client-reported movement) write them from different goroutines.
 	Location    location.Location
 	LastHeading int
+	locMu       sync.RWMutex
 
 	Karma             int
 	PvPKills, PKKills int
@@ -161,5 +167,7 @@ func (c *Character) CurrentHeading() int {
 	if c.Visible() {
 		return c.Presence.Heading()
 	}
+	c.locMu.RLock()
+	defer c.locMu.RUnlock()
 	return c.LastHeading
 }

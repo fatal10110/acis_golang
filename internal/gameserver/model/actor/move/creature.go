@@ -37,6 +37,9 @@ const (
 	FollowOffensive
 )
 
+// PositionUpdateInterval is the movement correction cadence.
+const PositionUpdateInterval = 100 * time.Millisecond
+
 // TargetSnapshot is the target state a follow tick needs. Build Known from
 // the current known-list relationship before calling FollowTick.
 type TargetSnapshot struct {
@@ -53,26 +56,24 @@ type TargetSnapshot struct {
 // timer goroutine that advances origin and fires the arrived hook
 // independently of the caller.
 //
-// A straight-line move snaps origin to destination once its Duration
-// elapses, rather than interpolating intermediate positions every 100ms the
-// way the reference client-correction ticker does — a deliberate
-// simplification. Nothing in this port depends on sub-tick position
-// accuracy mid-move; only the end state (arrived, or still moving) matters
-// for range checks and AI re-evaluation.
+// The arrival timer preserves progress when no position-update task is
+// wired. When it is wired, UpdatePosition advances origin at the fixed
+// movement correction cadence and may complete the move first.
 type CreatureMove struct {
 	geo Geo
 
-	mu                  sync.Mutex
-	origin, destination location.Location
-	speed               float64
-	moving              bool
-	followTarget        int32
-	followOffset        int
-	followMode          FollowMode
-	arrived             func()
-	timer               scheduledTimer
-	moveSeq             uint64
-	afterFunc           func(time.Duration, func()) scheduledTimer
+	mu                   sync.Mutex
+	origin, destination  location.Location
+	accurateX, accurateY float64
+	speed                float64
+	moving               bool
+	followTarget         int32
+	followOffset         int
+	followMode           FollowMode
+	arrived              func()
+	timer                scheduledTimer
+	moveSeq              uint64
+	afterFunc            func(time.Duration, func()) scheduledTimer
 }
 
 type scheduledTimer interface {
@@ -83,13 +84,29 @@ type scheduledTimer interface {
 // speed. Zero is a valid, stationary speed (e.g. an immobile scripted NPC) —
 // MoveToLocation rejects any actual movement request once speed is zero.
 func NewCreatureMove(origin location.Location, speed float64, geo Geo) (*CreatureMove, error) {
+	state := &CreatureMove{}
+	if err := state.Init(origin, speed, geo); err != nil {
+		return nil, err
+	}
+	return state, nil
+}
+
+// Init initializes zero movement state embedded in a live actor. Do not call
+// it after the state is exposed to callers.
+func (m *CreatureMove) Init(origin location.Location, speed float64, geo Geo) error {
 	if geo == nil {
-		return nil, errors.New("move: nil geodata")
+		return errors.New("move: nil geodata")
 	}
 	if speed < 0 || math.IsNaN(speed) || math.IsInf(speed, 0) {
-		return nil, errors.New("move: speed must not be negative")
+		return errors.New("move: speed must not be negative")
 	}
-	return &CreatureMove{origin: origin, destination: origin, speed: speed, geo: geo}, nil
+	m.origin = origin
+	m.destination = origin
+	m.accurateX = float64(origin.X)
+	m.accurateY = float64(origin.Y)
+	m.speed = speed
+	m.geo = geo
+	return nil
 }
 
 // SetArrivedHook records the callback fired once an accepted move reaches
@@ -112,6 +129,8 @@ func (m *CreatureMove) SetPosition(position location.Location) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.origin = position
+	m.accurateX = float64(position.X)
+	m.accurateY = float64(position.Y)
 	if m.destination == position {
 		m.moving = false
 	}
@@ -133,6 +152,8 @@ func (m *CreatureMove) moveToLocationLocked(target location.Location) (Event, er
 	}
 	if target.X == m.origin.X && target.Y == m.origin.Y {
 		m.destination = target
+		m.accurateX = float64(m.origin.X)
+		m.accurateY = float64(m.origin.Y)
 		m.moving = false
 		m.rescheduleLocked(0)
 		return Event{Origin: m.origin, Destination: target, Speed: m.speed}, nil
@@ -150,6 +171,8 @@ func (m *CreatureMove) moveToLocationLocked(target location.Location) (Event, er
 	}
 	duration := time.Duration(ticks) * tickDuration
 	origin := m.origin
+	m.accurateX = float64(origin.X)
+	m.accurateY = float64(origin.Y)
 	m.destination = target
 	m.moving = duration > 0
 	m.rescheduleLocked(duration)
@@ -190,15 +213,80 @@ func (m *CreatureMove) onArrive(seq uint64) {
 		m.mu.Unlock()
 		return
 	}
-	m.origin = m.destination
-	m.moving = false
-	m.timer = nil
-	arrived := m.arrived
+	arrived := m.finishLocked()
 	m.mu.Unlock()
 
 	if arrived != nil {
 		arrived()
 	}
+}
+
+func (m *CreatureMove) finishLocked() func() {
+	if m.timer != nil {
+		m.timer.Stop()
+		m.timer = nil
+	}
+	m.origin = m.destination
+	m.accurateX = float64(m.destination.X)
+	m.accurateY = float64(m.destination.Y)
+	m.moving = false
+	return m.arrived
+}
+
+// UpdatePosition advances one in-flight movement by step and reports the
+// current movement event to broadcast. It returns false after the move has
+// already stopped or reaches its destination.
+func (m *CreatureMove) UpdatePosition(step time.Duration) (Event, bool) {
+	m.mu.Lock()
+	if !m.moving {
+		m.mu.Unlock()
+		return Event{}, false
+	}
+	if step <= 0 {
+		event := m.currentEventLocked()
+		m.mu.Unlock()
+		return event, true
+	}
+
+	dx := float64(m.destination.X) - m.accurateX
+	dy := float64(m.destination.Y) - m.accurateY
+	left := math.Hypot(dx, dy)
+	passed := m.speed * step.Seconds()
+	if left == 0 || passed >= left {
+		arrived := m.finishLocked()
+		m.mu.Unlock()
+		if arrived != nil {
+			arrived()
+		}
+		return Event{}, false
+	}
+
+	fraction := passed / left
+	m.accurateX += dx * fraction
+	m.accurateY += dy * fraction
+	nextX := int(m.accurateX)
+	nextY := int(m.accurateY)
+	m.origin = location.Location{
+		X: nextX,
+		Y: nextY,
+		Z: int(m.geo.Height(nextX, nextY, m.origin.Z)),
+	}
+	event := m.currentEventLocked()
+	m.mu.Unlock()
+	return event, true
+}
+
+func (m *CreatureMove) currentEventLocked() Event {
+	event := Event{
+		Origin:      m.origin,
+		Destination: m.destination,
+		Speed:       m.speed,
+	}
+	if m.followMode == FollowOffensive {
+		event.FollowTarget = m.followTarget
+		event.FollowOffset = m.followOffset
+	}
+	return event
 }
 
 // CancelMove stops any pending arrival timer and leaves the actor at its

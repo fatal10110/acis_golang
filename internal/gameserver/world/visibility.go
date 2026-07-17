@@ -183,22 +183,26 @@ func Knows(t, target Tracked) bool {
 // ForEachKnown calls fn for every object in t's surrounding regions,
 // excluding t itself. It does nothing when t is off the grid.
 func (s *State) ForEachKnown(t Tracked, fn func(Tracked)) {
+	var buf [32]Tracked
+	for _, o := range s.AppendKnown(buf[:0], t) {
+		fn(o)
+	}
+}
+
+// AppendKnown appends every object in t's surrounding regions to out,
+// excluding t itself. It does nothing when t is off the grid. Reusing out lets
+// hot broadcast paths keep one grown snapshot buffer instead of allocating a
+// fresh known-list slice per event.
+func (s *State) AppendKnown(out []Tracked, t Tracked) []Tracked {
 	r := t.presence().currentRegion()
 	if r == nil {
-		return
+		return out
 	}
 	var regionBuf [9]*Region
-	var objectBuf [32]Tracked
-	objects := objectBuf[:0]
 	for _, region := range s.AppendNeighbors(regionBuf[:0], r, 1) {
-		objects = region.AppendObjects(objects[:0])
-		for _, o := range objects {
-			if o.ObjectID() == t.ObjectID() {
-				continue
-			}
-			fn(o)
-		}
+		out = region.appendObjectsExcept(out, t.ObjectID())
 	}
+	return out
 }
 
 // ForEachKnownInRadius calls fn for every object within radius units of t

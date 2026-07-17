@@ -6,10 +6,10 @@ import (
 	"sort"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -182,14 +182,16 @@ func (l *GameClientLink) attachLivePlayer(client *Client, c *player.Character, t
 	c.SetFrameSender(client.Session.SendFrame)
 
 	x, y, z := c.Position()
-	cm, err := move.NewCreatureMove(location.Location{X: x, Y: y, Z: z}, tmpl.RunSpeed, l.geo)
+	creatureLive, err := creature.NewLive(location.Location{X: x, Y: y, Z: z}, tmpl.RunSpeed, l.geo)
 	if err != nil {
 		return nil, fmt.Errorf("attach live player: %w", err)
 	}
-	moveCtl, err := move.NewController(cm, c)
+	c.Live = creatureLive
+	moveCtl, err := move.NewController(c.Move(), c)
 	if err != nil {
 		return nil, fmt.Errorf("attach live player: %w", err)
 	}
+	moveCtl.SetPositionUpdates(l.positions)
 	attackCtl := attack.NewPlayer(c)
 	combat := ai.NewPlayerAttack(c, moveCtl, attackCtl)
 	attackCtl.SetFinished(combat.Think)
@@ -211,15 +213,11 @@ func (l *GameClientLink) attachLivePlayer(client *Client, c *player.Character, t
 		l.broadcastAttack(live, snapshot)
 	})
 	c.SetMoveBroadcaster(func(event move.Event) {
-		l.broadcastLiveFrame(live, func() wire.Frame {
-			return serverpackets.FrameMove(live.ObjectID(), event)
-		})
+		l.broadcastLiveMoveEvent(live, event)
 	})
 	c.SetStopBroadcaster(func() {
 		x, y, z := live.Position()
-		l.broadcastLiveFrame(live, func() wire.Frame {
-			return serverpackets.FrameStopMove(live.ObjectID(), location.Location{X: x, Y: y, Z: z}, live.CurrentHeading())
-		})
+		l.broadcastLiveStopMove(live, location.Location{X: x, Y: y, Z: z}, live.CurrentHeading())
 	})
 	return live, nil
 }

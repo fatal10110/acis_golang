@@ -230,13 +230,15 @@ func (h *Hostile) BroadcastMove(event move.Event) {
 	if h.world == nil {
 		return
 	}
-	h.world.ForEachKnown(h, func(o world.Tracked) {
+	known := h.appendKnown()
+	defer h.releaseKnown()
+	for _, o := range known {
 		receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
 		if !ok {
-			return
+			continue
 		}
 		receiver.SendFrame(serverpackets.FrameMove(h.ObjectID(), event))
-	})
+	}
 }
 
 // BroadcastStop sends a stop-in-place notice to every currently known
@@ -248,13 +250,23 @@ func (h *Hostile) BroadcastStop() {
 	}
 	x, y, z := h.Position()
 	at := location.Location{X: x, Y: y, Z: z}
-	h.world.ForEachKnown(h, func(o world.Tracked) {
+	known := h.appendKnown()
+	defer h.releaseKnown()
+	for _, o := range known {
 		receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
 		if !ok {
-			return
+			continue
 		}
 		receiver.SendFrame(serverpackets.FrameStopMove(h.ObjectID(), at, h.Heading()))
-	})
+	}
+}
+
+func (h *Hostile) appendKnown() []world.Tracked {
+	return h.known.Snapshot(h.world, h)
+}
+
+func (h *Hostile) releaseKnown() {
+	h.known.Release()
 }
 
 // AttackableBy reports whether attacker may physically attack this NPC.

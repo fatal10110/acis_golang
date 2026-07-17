@@ -25,6 +25,7 @@ type livePlayer struct {
 	cast      *actorcast.Controller
 	shortcuts *shortcut.List
 
+	known      world.KnownBuffer
 	stopAttack func(*livePlayer)
 }
 

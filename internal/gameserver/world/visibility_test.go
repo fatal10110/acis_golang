@@ -302,6 +302,35 @@ func TestForEachKnownCoversSurroundingRegionsOnly(t *testing.T) {
 	}
 }
 
+func TestAppendKnownReusesCallerBuffer(t *testing.T) {
+	s := New()
+
+	center := &trackedStub{id: 1}
+	s.Spawn(center, 0, 0, 0, 0)
+	s.Spawn(&trackedStub{id: 2}, 100, 0, 0, 0)
+	s.Spawn(&trackedStub{id: 3}, 2048, 0, 0, 0)
+	s.Spawn(&trackedStub{id: 4}, 8192, 0, 0, 0)
+
+	buf := make([]Tracked, 0, 4)
+	known := s.AppendKnown(buf[:0], center)
+	if len(known) == 0 || &known[0] != &buf[:1][0] {
+		t.Fatal("AppendKnown did not reuse caller buffer")
+	}
+	var ids []int32
+	for _, obj := range known {
+		ids = append(ids, obj.ObjectID())
+	}
+	slices.Sort(ids)
+	if !slices.Equal(ids, []int32{2, 3}) {
+		t.Fatalf("AppendKnown ids = %v, want [2 3]", ids)
+	}
+
+	known = s.AppendKnown(known[:0], &trackedStub{id: 99})
+	if len(known) != 0 {
+		t.Fatalf("AppendKnown unspawned = %v, want none", known)
+	}
+}
+
 func radiusIDs(s *State, t Tracked, radius int) []int32 {
 	var ids []int32
 	s.ForEachKnownInRadius(t, radius, func(o Tracked) { ids = append(ids, o.ObjectID()) })
