@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"sync"
+	"sync/atomic"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/dynamic"
@@ -29,12 +30,25 @@ const (
 
 // Engine serves geodata height, movement, and line-of-sight queries.
 //
-// mu guards regions and dynamicBlocks. Dynamic block contents are guarded by
-// each dynamic.Block.
+// regions is written only by SetRegion during boot loading and never again
+// afterward (LoadEngine finishes before the engine is handed to any
+// concurrent reader), so query paths read it without synchronization.
+//
+// dynamicBlocks holds the door/fence overlay blocks; it changes only on the
+// rare toggleObject write (a door opening/closing), against a read volume of
+// every CanMove/CanSee/pathfind cell step. It's held behind an atomic
+// pointer so steady-state reads are a single atomic load plus a plain map
+// read, no lock: toggleObject clones-and-swaps the map when it introduces a
+// block the map doesn't have yet, and mutates an already-present block's
+// *dynamic.Block in place, under that block's own internal lock, without
+// touching the map at all. dynamicBlocksMu only serializes concurrent
+// writers against each other; no read path ever acquires it.
 type Engine struct {
-	mu            sync.RWMutex
-	regions       [regionTilesX][regionTilesY]*block.Region
-	dynamicBlocks map[blockKey]*dynamic.Block
+	regionsMu sync.Mutex
+	regions   [regionTilesX][regionTilesY]*block.Region
+
+	dynamicBlocksMu sync.Mutex
+	dynamicBlocks   atomic.Pointer[map[blockKey]*dynamic.Block]
 
 	maxObstacleHeight int
 }
@@ -53,7 +67,9 @@ func (e *Engine) MaxObstacleHeight() int {
 	return e.maxObstacleHeight
 }
 
-// SetRegion installs one decoded geodata region at the given tile coordinates.
+// SetRegion installs one decoded geodata region at the given tile
+// coordinates. Must only be called during boot, before any concurrent
+// query — query paths read regions without synchronization.
 func (e *Engine) SetRegion(regionX, regionY int, region *block.Region) error {
 	if regionX < TileXMin || regionX > TileXMax || regionY < TileYMin || regionY > TileYMax {
 		return fmt.Errorf("geo/engine: region %d_%d out of range", regionX, regionY)
@@ -61,8 +77,8 @@ func (e *Engine) SetRegion(regionX, regionY int, region *block.Region) error {
 	if region == nil {
 		return fmt.Errorf("geo/engine: region %d_%d is nil", regionX, regionY)
 	}
-	e.mu.Lock()
-	defer e.mu.Unlock()
+	e.regionsMu.Lock()
+	defer e.regionsMu.Unlock()
 	e.regions[regionX-TileXMin][regionY-TileYMin] = region
 	return nil
 }
@@ -312,22 +328,19 @@ func (e *Engine) blockAtGeo(geoX, geoY int) engineBlock {
 	blockX := geoX / block.CellsX
 	blockY := geoY / block.CellsY
 
-	e.mu.RLock()
-	if b := e.dynamicBlocks[blockKey{blockX, blockY}]; b != nil {
-		e.mu.RUnlock()
-		return engineBlock{dyn: b}
+	if p := e.dynamicBlocks.Load(); p != nil {
+		if b := (*p)[blockKey{blockX, blockY}]; b != nil {
+			return engineBlock{dyn: b}
+		}
 	}
 	region := e.regions[regionX-TileXMin][regionY-TileYMin]
 	if region == nil {
-		e.mu.RUnlock()
 		return engineBlock{}
 	}
 
 	localGeoX := geoX % regionCellsX
 	localGeoY := geoY % regionCellsY
-	rb := engineBlock{region: region, blockX: localGeoX / block.CellsX, blockY: localGeoY / block.CellsY}
-	e.mu.RUnlock()
-	return rb
+	return engineBlock{region: region, blockX: localGeoX / block.CellsX, blockY: localGeoY / block.CellsY}
 }
 
 type engineBlock struct {
@@ -408,25 +421,33 @@ func (e *Engine) toggleObject(obj dynamic.Object, add bool) {
 	minBY := obj.GeoY() / block.CellsY
 	maxBY := (obj.GeoY() + len(data[0]) - 1) / block.CellsY
 
-	e.mu.Lock()
-	defer e.mu.Unlock()
+	e.dynamicBlocksMu.Lock()
+	defer e.dynamicBlocksMu.Unlock()
+
+	current := e.dynamicBlocks.Load()
+	var next map[blockKey]*dynamic.Block
 	for bx := minBX; bx <= maxBX; bx++ {
 		for by := minBY; by <= maxBY; by++ {
 			key := blockKey{bx, by}
-			b := e.dynamicBlocks[key]
+			var b *dynamic.Block
+			if next != nil {
+				b = next[key]
+			} else if current != nil {
+				b = (*current)[key]
+			}
 			if b == nil {
 				if !add {
 					continue
 				}
-				base := e.blockAtBlockLocked(bx, by)
+				base := e.blockAtBlock(bx, by)
 				if !base.HasGeodata() {
 					continue
 				}
-				if e.dynamicBlocks == nil {
-					e.dynamicBlocks = make(map[blockKey]*dynamic.Block)
+				if next == nil {
+					next = cloneDynamicBlocks(current)
 				}
 				b = dynamic.NewBlock(bx, by, base)
-				e.dynamicBlocks[key] = b
+				next[key] = b
 			}
 			if add {
 				b.Add(obj)
@@ -435,9 +456,32 @@ func (e *Engine) toggleObject(obj dynamic.Object, add bool) {
 			}
 		}
 	}
+	if next != nil {
+		e.dynamicBlocks.Store(&next)
+	}
 }
 
-func (e *Engine) blockAtBlockLocked(blockX, blockY int) regionBlock {
+// cloneDynamicBlocks copies current's entries into a fresh map so
+// toggleObject can insert a newly-created dynamic block without mutating
+// the map any concurrent reader may already be holding a pointer to.
+func cloneDynamicBlocks(current *map[blockKey]*dynamic.Block) map[blockKey]*dynamic.Block {
+	size := 0
+	if current != nil {
+		size = len(*current)
+	}
+	next := make(map[blockKey]*dynamic.Block, size+1)
+	if current != nil {
+		for k, v := range *current {
+			next[k] = v
+		}
+	}
+	return next
+}
+
+// blockAtBlock resolves the static region block underlying (blockX, blockY).
+// Safe without synchronization: regions is only ever written by SetRegion
+// during boot, before the engine is handed to any concurrent caller.
+func (e *Engine) blockAtBlock(blockX, blockY int) regionBlock {
 	if blockX < 0 || blockY < 0 {
 		return regionBlock{}
 	}
