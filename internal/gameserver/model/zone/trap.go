@@ -1,7 +1,7 @@
 package zone
 
 import (
-	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
@@ -56,15 +56,15 @@ type Damage struct {
 
 	// StartPulse begins the periodic damage task; nil until the combat
 	// system wires it. The zone fires it at most once until PulseStopped
-	// resets the latch.
+	// resets the latch. Hook implementations must tolerate overlapping
+	// calls when a task resets the latch before its previous StartPulse
+	// invocation returns.
 	StartPulse func()
 	// DangerNotice refreshes a player's danger status display; nil until
 	// the messaging layer wires it.
 	DangerNotice func(a Actor)
 
-	// pmu guards pulsing.
-	pmu     sync.Mutex
-	pulsing bool
+	pulsing atomic.Bool
 }
 
 // NewDamage builds a damage trap zone from its data settings.
@@ -101,14 +101,9 @@ func (z *Damage) enter(a Actor) {
 		if z.dormant() {
 			return
 		}
-		z.pmu.Lock()
-		if !z.pulsing {
-			z.pulsing = true
-			if z.StartPulse != nil {
-				z.StartPulse()
-			}
+		if z.pulsing.CompareAndSwap(false, true) && z.StartPulse != nil {
+			z.StartPulse()
 		}
-		z.pmu.Unlock()
 	}
 	if a.Class() == ClassPlayer {
 		a.ZoneFlags().Set(FlagDanger, true)
@@ -132,9 +127,7 @@ func (z *Damage) exit(a Actor) {
 // PulseStopped resets the pulse latch; the damage task calls it when it
 // shuts itself down, so the next entry can start a fresh pulse.
 func (z *Damage) PulseStopped() {
-	z.pmu.Lock()
-	z.pulsing = false
-	z.pmu.Unlock()
+	z.pulsing.Store(false)
 }
 
 // Swamp is a trap that slows down everyone wading through it.

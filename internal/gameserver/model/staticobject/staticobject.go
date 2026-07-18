@@ -3,7 +3,7 @@ package staticobject
 
 import (
 	"fmt"
-	"sync"
+	"sync/atomic"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -24,10 +24,9 @@ type Template struct {
 type Object struct {
 	world.Presence
 
-	mu       sync.Mutex
 	objectID int32
 	Template *Template
-	busy     bool
+	busy     atomic.Bool
 }
 
 // NewObject creates a live static object from a static template.
@@ -49,20 +48,12 @@ func (o *Object) Type() int { return o.Template.Type }
 
 // Busy reports whether this static object is currently occupied.
 func (o *Object) Busy() bool {
-	o.mu.Lock()
-	defer o.mu.Unlock()
-	return o.busy
+	return o.busy.Load()
 }
 
 // SetBusy updates whether this static object is occupied and reports whether it changed.
 func (o *Object) SetBusy(busy bool) bool {
-	o.mu.Lock()
-	defer o.mu.Unlock()
-	if o.busy == busy {
-		return false
-	}
-	o.busy = busy
-	return true
+	return o.busy.CompareAndSwap(!busy, busy)
 }
 
 // NewTemplate builds a static object template from XML attributes.

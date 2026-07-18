@@ -453,6 +453,12 @@ func (e *Engine) toggleObject(obj dynamic.Object, add bool) {
 				b.Add(obj)
 			} else {
 				b.Remove(obj)
+				if b.Empty() {
+					if next == nil {
+						next = cloneDynamicBlocks(current)
+					}
+					delete(next, key)
+				}
 			}
 		}
 	}

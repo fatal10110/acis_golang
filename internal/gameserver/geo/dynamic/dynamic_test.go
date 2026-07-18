@@ -187,6 +187,32 @@ func TestBlockDelegatesToBaseWhenUntouched(t *testing.T) {
 	}
 }
 
+func TestBlockLayerHandleSurvivesRemove(t *testing.T) {
+	b := NewBlock(0, 0, block.NewFlat(0))
+	obj := &stubObject{
+		x:      0,
+		y:      0,
+		z:      0,
+		height: 32,
+		data:   [][]block.NSWE{{block.NoDirections}},
+	}
+
+	b.Add(obj)
+	layer := b.Below(0, 0, 100)
+	if layer == -1 {
+		t.Fatal("Below() = -1, want dynamic layer")
+	}
+
+	b.Remove(obj)
+
+	if got := b.Height(layer); got != 0 {
+		t.Fatalf("Height(stale layer) = %d, want restored base height 0", got)
+	}
+	if got := b.NSWE(layer); got != block.AllDirections {
+		t.Fatalf("NSWE(stale layer) = %v, want restored base directions", got)
+	}
+}
+
 func TestBlockConcurrentAddRemoveAndReads(t *testing.T) {
 	b := NewBlock(0, 0, block.NewFlat(0))
 	obj := &stubObject{

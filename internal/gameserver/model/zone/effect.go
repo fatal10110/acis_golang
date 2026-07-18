@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
@@ -86,16 +86,16 @@ type Effect struct {
 
 	// StartPulse begins the periodic effect task; nil until the skill
 	// system wires it. The zone fires it at most once until PulseStopped
-	// resets the latch.
+	// resets the latch. Hook implementations must tolerate overlapping
+	// calls when a task resets the latch before its previous StartPulse
+	// invocation returns.
 	StartPulse func()
 	// DangerNotice refreshes a player's danger status display; nil until
 	// the messaging layer wires it.
 	DangerNotice func(a Actor)
 
-	// mu guards enabled and pulsing.
-	mu      sync.Mutex
-	enabled bool
-	pulsing bool
+	enabled atomic.Bool
+	pulsing atomic.Bool
 }
 
 // NewEffect builds an effect zone from its data settings.
@@ -120,15 +120,16 @@ func NewEffect(id int, form Form, set *commons.StatSet) (*Effect, error) {
 	if err := f.Err(); err != nil {
 		return nil, err
 	}
-	return &Effect{
+	z := &Effect{
 		Zone:         newZone(id, form),
 		Skills:       skills,
 		Chance:       chance,
 		InitialDelay: time.Duration(initial) * time.Millisecond,
 		ReuseDelay:   time.Duration(reuse) * time.Millisecond,
 		Target:       target,
-		enabled:      enabled,
-	}, nil
+	}
+	z.enabled.Store(enabled)
+	return z, nil
 }
 
 // parseSkillRefs parses the data files' skill list syntax: semicolon
@@ -163,14 +164,9 @@ func (z *Effect) Core() *Zone { return &z.Zone }
 func (z *Effect) affects(a Actor) bool { return z.Target.Matches(a.Class()) }
 
 func (z *Effect) enter(a Actor) {
-	z.mu.Lock()
-	if !z.pulsing {
-		z.pulsing = true
-		if z.StartPulse != nil {
-			z.StartPulse()
-		}
+	if z.pulsing.CompareAndSwap(false, true) && z.StartPulse != nil {
+		z.StartPulse()
 	}
-	z.mu.Unlock()
 	if a.Class() == ClassPlayer {
 		a.ZoneFlags().Set(FlagDanger, true)
 		if z.DangerNotice != nil {
@@ -192,22 +188,16 @@ func (z *Effect) exit(a Actor) {
 
 // Enabled reports whether the pulse currently applies its effects.
 func (z *Effect) Enabled() bool {
-	z.mu.Lock()
-	defer z.mu.Unlock()
-	return z.enabled
+	return z.enabled.Load()
 }
 
 // SetEnabled toggles whether the pulse applies its effects.
 func (z *Effect) SetEnabled(v bool) {
-	z.mu.Lock()
-	z.enabled = v
-	z.mu.Unlock()
+	z.enabled.Store(v)
 }
 
 // PulseStopped resets the pulse latch; the effect task calls it when it
 // shuts itself down, so the next entry can start a fresh pulse.
 func (z *Effect) PulseStopped() {
-	z.mu.Lock()
-	z.pulsing = false
-	z.mu.Unlock()
+	z.pulsing.Store(false)
 }
