@@ -516,7 +516,7 @@ func (c *Character) ManaDamageInput(caster any, def modelskill.Definition) (form
 		TargetMaxMp:     c.MaxMPValue(),
 		SoulShot:        sps,
 		BlessedSoulShot: bsps,
-		VulnMul:         c.skillVulnerability(def.SkillType),
+		VulnMul:         c.skillVulnerability(def.SkillType, def),
 	}, true
 }
 

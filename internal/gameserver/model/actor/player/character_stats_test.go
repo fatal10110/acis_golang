@@ -417,6 +417,61 @@ func TestCharacterSkillSuccessInputUsesStatsAndCasterMagicAttack(t *testing.T) {
 	}
 }
 
+func TestCharacterSkillSuccessInputFoldsElementalResistanceIntoVulnerability(t *testing.T) {
+	tmpl := combatTemplate()
+	tmpl.MAtk = 100
+	tmpl.MDef = 50
+	caster := liveCharacter(1, tmpl, combatItems())
+	target := liveCharacter(2, tmpl, combatItems())
+	owner := &struct{}{}
+	target.AddStatFuncs([]basefunc.Func{
+		basefunc.NewMul(owner, stat.FireRes, 0.36, nil),
+		basefunc.NewMul(owner, stat.StunVuln, 0.5, nil),
+	})
+
+	in, ok := target.SkillSuccessInput(caster, modelskill.Definition{
+		SkillType:    "STUN",
+		EffectType:   "STUN",
+		Element:      modelskill.ElementFire,
+		BaseLandRate: 50,
+	})
+	if !ok {
+		t.Fatal("SkillSuccessInput() ok = false")
+	}
+
+	// Java folds sqrt(elemental resistance) in as the vulnerability base
+	// before applying the stat-specific (here STUN) vulnerability on top:
+	// sqrt(0.36) * 0.5 = 0.3.
+	if want := 0.3; !closeFloat(in.VulnModifier, want) {
+		t.Fatalf("VulnModifier = %v, want %v", in.VulnModifier, want)
+	}
+}
+
+func TestCharacterManaDamageInputFoldsElementalResistanceIntoVulnerability(t *testing.T) {
+	tmpl := combatTemplate()
+	tmpl.MAtk = 100
+	tmpl.MDef = 50
+	caster := liveCharacter(1, tmpl, combatItems())
+	target := liveCharacter(2, tmpl, combatItems())
+	owner := &struct{}{}
+	target.AddStatFuncs([]basefunc.Func{basefunc.NewMul(owner, stat.FireRes, 0.36, nil)})
+
+	mana, ok := target.ManaDamageInput(caster, modelskill.Definition{
+		SkillType: "MANADAM",
+		Element:   modelskill.ElementFire,
+		Power:     20,
+	})
+	if !ok {
+		t.Fatal("ManaDamageInput() ok = false")
+	}
+	// MANADAM has no matching vulnerability case (see the STUN/POISON/...
+	// switch), so Java's calcSkillVulnerability returns the elemental base
+	// unchanged: sqrt(0.36) = 0.6.
+	if want := 0.6; !closeFloat(mana.VulnMul, want) {
+		t.Fatalf("VulnMul = %v, want %v", mana.VulnMul, want)
+	}
+}
+
 func TestCharacterSkillSuccessInputDoesNotFallbackToSkillType(t *testing.T) {
 	tmpl := combatTemplate()
 	tmpl.MAtk = 100

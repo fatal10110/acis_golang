@@ -81,7 +81,7 @@ func (c *Character) SkillSuccessInput(caster any, def modelskill.Definition) (fo
 	return formulas.SkillSuccessInput{
 		BaseChance:    float64(def.BaseLandRate),
 		StatModifier:  c.skillStatModifier(def.EffectType, def.Magic),
-		VulnModifier:  c.skillVulnerability(def.EffectType),
+		VulnModifier:  c.skillVulnerability(def.EffectType, def),
 		MAtkModifier:  c.skillMAtkModifier(attacker, def),
 		LevelModifier: c.skillLevelModifier(attacker, def),
 		IgnoreResists: def.IgnoreResists,
@@ -100,28 +100,32 @@ func (c *Character) skillStatModifier(typ string, magic bool) float64 {
 	return 1
 }
 
-func (c *Character) skillVulnerability(typ string) float64 {
+// skillVulnerability returns the target's success-roll vulnerability
+// multiplier for typ, folding in def's elemental resistance modifier (as
+// its square root) as the base every stat-specific vulnerability builds on.
+func (c *Character) skillVulnerability(typ string, def modelskill.Definition) float64 {
+	base := math.Sqrt(c.elementalSkillModifier(def))
 	switch skillTypeKey(typ) {
 	case "BLEED":
-		return c.calcStat(stat.BleedVuln, 1)
+		return c.calcStat(stat.BleedVuln, base)
 	case "POISON":
-		return c.calcStat(stat.PoisonVuln, 1)
+		return c.calcStat(stat.PoisonVuln, base)
 	case "STUN":
-		return c.calcStat(stat.StunVuln, 1)
+		return c.calcStat(stat.StunVuln, base)
 	case "PARALYZE":
-		return c.calcStat(stat.ParalyzeVuln, 1)
+		return c.calcStat(stat.ParalyzeVuln, base)
 	case "ROOT":
-		return c.calcStat(stat.RootVuln, 1)
+		return c.calcStat(stat.RootVuln, base)
 	case "SLEEP":
-		return c.calcStat(stat.SleepVuln, 1)
+		return c.calcStat(stat.SleepVuln, base)
 	case "MUTE", "FEAR", "BETRAY", "AGGDEBUFF", "AGGREDUCE_CHAR", "ERASE", "CONFUSION":
-		return c.calcStat(stat.DerangementVuln, 1)
+		return c.calcStat(stat.DerangementVuln, base)
 	case "DEBUFF", "WEAKNESS":
-		return c.calcStat(stat.DebuffVuln, 1)
+		return c.calcStat(stat.DebuffVuln, base)
 	case "CANCEL":
-		return c.calcStat(stat.CancelVuln, 1)
+		return c.calcStat(stat.CancelVuln, base)
 	default:
-		return 1
+		return base
 	}
 }
 
