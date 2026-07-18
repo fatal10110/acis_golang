@@ -30,9 +30,14 @@ type Observer interface {
 // the only objects whose presence keeps a Region active. Entering or
 // leaving a region's 3x3 neighborhood as a Player toggles Region.Active
 // for the regions that lose or gain a nearby player.
+//
+// WorldPlayer takes no arguments and returns nothing: it is a pure type
+// marker. Implementing it at all is what makes a type count as a Player —
+// there is no way to implement it and opt out, unlike a boolean-returning
+// method a caller might reasonably expect to report false sometimes.
 type Player interface {
 	Tracked
-	IsPlayer() bool
+	WorldPlayer()
 }
 
 // Spawn places t in the world at (x, y, z) facing heading, clamping x and
@@ -166,6 +171,17 @@ func (s *State) DespawnAll(ts []Tracked) {
 // shared by both neighborhoods stay silent. For each affected object the
 // other party is notified before t itself.
 func (s *State) relocate(t Tracked, next *Region) {
+	_, tIsPlayer := t.(Player)
+	if tIsPlayer {
+		// Holds for the whole call: the playersCount updates below and the
+		// setActive decisions they feed must be atomic with respect to
+		// every other player's relocate, or one player's departure can
+		// deactivate a region just activated by another's concurrent
+		// arrival. See regionActivityMu's doc comment.
+		s.regionActivityMu.Lock()
+		defer s.regionActivityMu.Unlock()
+	}
+
 	p := t.presence()
 	p.mu.RLock()
 	prev := p.region
@@ -182,7 +198,6 @@ func (s *State) relocate(t Tracked, next *Region) {
 	}
 
 	tObs, tObserves := t.(Observer)
-	_, tIsPlayer := t.(Player)
 	var objectBuf [32]Tracked
 	objects := objectBuf[:0]
 

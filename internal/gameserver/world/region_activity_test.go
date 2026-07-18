@@ -1,6 +1,9 @@
 package world
 
-import "testing"
+import (
+	"sync"
+	"testing"
+)
 
 // playerStub is a grid occupant that counts toward Region activity, like a
 // live player character.
@@ -8,7 +11,7 @@ type playerStub struct {
 	trackedStub
 }
 
-func (p *playerStub) IsPlayer() bool { return true }
+func (p *playerStub) WorldPlayer() {}
 
 func TestRegionActivatesOnPlayerSpawnAndDeactivatesOnDespawn(t *testing.T) {
 	s := New()
@@ -112,5 +115,46 @@ func TestRegionActiveGatesSchedulerShapedWork(t *testing.T) {
 	}
 	if ticked[npcFarFromPlayer.id] {
 		t.Fatal("scheduler ticked an npc in a region with no nearby player")
+	}
+}
+
+// TestRegionActivityConcurrentPlayerChurn guards against a check-then-act
+// race: one player's departure could read a stale (pre-arrival) player
+// count for a region and deactivate it right after another player's
+// concurrent arrival had just activated it. regionActivityMu serializes
+// player relocations against each other, so a permanently present player
+// must leave the region active no matter how much unrelated player traffic
+// churns through concurrently.
+func TestRegionActivityConcurrentPlayerChurn(t *testing.T) {
+	s := New()
+
+	const churners = 32
+	const cycles = 200
+
+	var wg sync.WaitGroup
+	wg.Add(1 + churners)
+
+	go func() {
+		defer wg.Done()
+		s.Spawn(&playerStub{trackedStub: trackedStub{id: 1}}, 0, 0, 0, 0)
+	}()
+	for i := 0; i < churners; i++ {
+		go func(id int32) {
+			defer wg.Done()
+			p := &playerStub{trackedStub: trackedStub{id: id}}
+			for j := 0; j < cycles; j++ {
+				s.Spawn(p, 0, 0, 0, 0)
+				s.Despawn(p)
+			}
+		}(int32(100 + i))
+	}
+	wg.Wait()
+
+	region, ok := s.RegionAt(0, 0)
+	if !ok {
+		t.Fatal("RegionAt(0, 0) not found")
+	}
+	if !region.Active() {
+		t.Fatal("region with a permanently present player went inactive under concurrent player churn")
 	}
 }
