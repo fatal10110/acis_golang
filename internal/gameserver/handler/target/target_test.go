@@ -390,8 +390,10 @@ func TestCorpsePlayerAndCorpsePetHandlers(t *testing.T) {
 	alivePlayer := &targetActor{id: 3, category: CategoryPlayable}
 	deadPlayer := &targetActor{id: 4, category: CategoryPlayable, dead: true}
 	deadMob := &targetActor{id: 5, category: CategoryAttackable, dead: true}
-	deadOwnedSummon := &targetActor{id: 6, category: CategoryPlayable, dead: true, owner: owner}
+	deadPet := &targetActor{id: 6, category: CategoryPlayable, dead: true, owner: owner, pet: true}
 	deadUnownedPlayable := &targetActor{id: 7, category: CategoryPlayable, dead: true}
+	deadServitor := &targetActor{id: 8, category: CategoryPlayable, dead: true, owner: owner}
+	deadNoPetSignal := targetCreature{id: 9, category: CategoryPlayable, dead: true}
 
 	registry := NewRegistry(knownList{})
 
@@ -413,11 +415,17 @@ func TestCorpsePlayerAndCorpsePetHandlers(t *testing.T) {
 	}
 
 	corpsePet := mustHandler(t, registry, modelskill.TargetCorpsePet)
-	if got := corpsePet.FinalTarget(caster, deadOwnedSummon, &modelskill.Definition{}); got != deadOwnedSummon {
+	if got := corpsePet.FinalTarget(caster, deadPet, &modelskill.Definition{}); got != deadPet {
 		t.Fatalf("corpse pet final target = %v, want target", got)
 	}
-	if !corpsePet.CanCast(caster, deadOwnedSummon, &modelskill.Definition{}, false) {
-		t.Fatal("corpse pet CanCast on dead owned summon = false, want true")
+	if !corpsePet.CanCast(caster, deadPet, &modelskill.Definition{}, false) {
+		t.Fatal("corpse pet CanCast on dead pet = false, want true")
+	}
+	if corpsePet.CanCast(caster, deadServitor, &modelskill.Definition{}, false) {
+		t.Fatal("corpse pet CanCast on dead servitor = true, want false")
+	}
+	if corpsePet.CanCast(caster, deadNoPetSignal, &modelskill.Definition{}, false) {
+		t.Fatal("corpse pet CanCast on dead creature without pet signal = true, want false")
 	}
 	if corpsePet.CanCast(caster, deadUnownedPlayable, &modelskill.Definition{}, false) {
 		t.Fatal("corpse pet CanCast on dead unowned playable = true, want false")
@@ -746,7 +754,26 @@ type targetActor struct {
 	hasClan      bool
 	mageClass    bool
 	clanGroups   []string
+	pet          bool
 }
+
+type targetCreature struct {
+	id       int32
+	x, y, z  int
+	heading  int
+	dead     bool
+	category Category
+}
+
+func (c targetCreature) ObjectID() int32 { return c.id }
+
+func (c targetCreature) Position() (int, int, int) { return c.x, c.y, c.z }
+
+func (c targetCreature) Heading() int { return c.heading }
+
+func (c targetCreature) Dead() bool { return c.dead }
+
+func (c targetCreature) Category() Category { return c.category }
 
 func (a *targetActor) ObjectID() int32 { return a.id }
 
@@ -773,6 +800,8 @@ func (a *targetActor) AttackableWithoutForceBy(Creature) bool { return a.attacka
 func (a *targetActor) Summon() (Creature, bool) { return a.summon, a.summon != nil }
 
 func (a *targetActor) Owner() (Creature, bool) { return a.owner, a.owner != nil }
+
+func (a *targetActor) IsPet() bool { return a.pet }
 
 func (a *targetActor) Holy() bool { return a.holy }
 
