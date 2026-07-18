@@ -170,6 +170,10 @@ func (c *Character) ObjectID() int32 {
 	return c.ID
 }
 
+// WorldPlayer satisfies world.Player: a Character's presence keeps its
+// world Region active.
+func (c *Character) WorldPlayer() {}
+
 // LevelValue returns the player's current level for live-owned actors.
 func (c *Character) LevelValue() int {
 	return c.Level

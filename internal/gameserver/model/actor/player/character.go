@@ -20,6 +20,8 @@ import (
 // at, matching the shipped server default.
 const defaultAccessLevel = 0
 
+var _ world.Player = (*Character)(nil)
+
 // Character is one persisted characters-table row plus the runtime state
 // needed once that row enters the live world.
 type Character struct {

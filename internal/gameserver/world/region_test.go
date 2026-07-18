@@ -38,6 +38,23 @@ func TestRegion_AddRemoveObjects(t *testing.T) {
 	}
 }
 
+func TestRegion_ActiveToggle(t *testing.T) {
+	r := newRegion(0, 0)
+	if r.Active() {
+		t.Fatal("new region is active, want inactive")
+	}
+
+	r.setActive(true)
+	if !r.Active() {
+		t.Fatal("setActive(true) did not activate the region")
+	}
+
+	r.setActive(false)
+	if r.Active() {
+		t.Fatal("setActive(false) did not deactivate the region")
+	}
+}
+
 func TestRegion_Concurrent(t *testing.T) {
 	r := newRegion(0, 0)
 
