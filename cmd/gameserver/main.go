@@ -888,7 +888,6 @@ func provideGameClientLink(
 	links *loginLinkState,
 	skills *skillstate.Persistence,
 	spellbooks skill.BookPolicy,
-	skillTrees *skill.Trees,
 	state *world.State,
 	ids *idfactory.Allocator,
 	ground *task.GroundItems,
