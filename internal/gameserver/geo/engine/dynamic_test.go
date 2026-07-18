@@ -55,22 +55,46 @@ func TestEngineDynamicObjectBlocksAndRestoresMovement(t *testing.T) {
 	}
 }
 
+func TestEngineEvictsDynamicBlockAfterLastObjectRemove(t *testing.T) {
+	e := New()
+	region, err := block.NewRegionFromBlocks([]block.Block{block.NewFlat(0)})
+	if err != nil {
+		t.Fatalf("NewRegionFromBlocks: %v", err)
+	}
+	if err := e.SetRegion(TileXMin, TileYMin, region); err != nil {
+		t.Fatalf("SetRegion: %v", err)
+	}
+
+	obj := &dynamicStub{
+		x:      0,
+		y:      0,
+		z:      0,
+		height: 32,
+		data:   [][]block.NSWE{{block.NoDirections}},
+	}
+
+	e.AddObject(obj)
+	if got := dynamicBlockCount(e); got != 1 {
+		t.Fatalf("dynamic block count after AddObject = %d, want 1", got)
+	}
+
+	e.RemoveObject(obj)
+
+	if got := dynamicBlockCount(e); got != 0 {
+		t.Fatalf("dynamic block count after RemoveObject = %d, want 0", got)
+	}
+}
+
 // TestEngineConcurrentDoorToggleAndQueries covers #513's correctness
 // requirement: swapping dynamicBlocks to a lock-free atomic-pointer read path
 // must stay race-safe while a door concurrently opens/closes (toggleObject's
 // clone-and-swap on first creation, and repeated in-place Add/Remove on an
 // already-created block).
 //
-// The querying goroutine deliberately targets a different block than the
-// door: reusing the same block would also exercise a pre-existing hazard in
-// dynamic.Block itself (Below/Above hands back a layer index that Height/NSWE
-// re-decodes later, and a concurrent Add/Remove's rebuild can invalidate that
-// index in between — reproducible against dynamicBlocks's *old* RWMutex-based
-// code too, so it's not something this change introduced or is scoped to
-// fix; tracked separately). This test's job is only #513's own claim: the
-// atomic pointer swap and the map it publishes are safe to read concurrently
-// with a writer, and door state itself stays correct under concurrent
-// toggles.
+// The querying goroutine targets the same block as the toggled door so a
+// query can hold a dynamic layer handle across a concurrent Add/Remove. That
+// covers both the atomic pointer swap around dynamicBlocks and the dynamic
+// block's own stale-handle safety.
 func TestEngineConcurrentDoorToggleAndQueries(t *testing.T) {
 	e := New()
 	region, err := block.NewRegionFromBlocks([]block.Block{block.NewFlat(0)})
@@ -102,11 +126,8 @@ func TestEngineConcurrentDoorToggleAndQueries(t *testing.T) {
 		data:   [][]block.NSWE{{block.NoDirections}},
 	}
 
-	// Far outside block (0,0): null geodata, untouched by obj/other, so the
-	// query goroutine only exercises blockAtGeo's atomic read of
-	// dynamicBlocks concurrently with the toggling goroutines' writes.
-	queryOriginX, queryOriginY := WorldX(800), WorldY(800)
-	queryTargetX, queryTargetY := WorldX(801), WorldY(800)
+	queryOriginX, queryOriginY := doorOriginX, doorOriginY
+	queryTargetX, queryTargetY := doorTargetX, doorTargetY
 
 	const iterations = 500
 	var wg sync.WaitGroup
@@ -139,4 +160,12 @@ func TestEngineConcurrentDoorToggleAndQueries(t *testing.T) {
 	if !e.CanMove(doorOriginX, doorOriginY, 0, doorTargetX, doorTargetY, 0) {
 		t.Fatal("CanMove() = false after every toggling goroutine finished on Remove, want the door left open")
 	}
+}
+
+func dynamicBlockCount(e *Engine) int {
+	current := e.dynamicBlocks.Load()
+	if current == nil {
+		return 0
+	}
+	return len(*current)
 }

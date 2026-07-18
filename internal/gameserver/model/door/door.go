@@ -2,7 +2,7 @@ package door
 
 import (
 	"fmt"
-	"sync"
+	"sync/atomic"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
@@ -89,8 +89,7 @@ type GeoShape interface {
 
 // Object is one live door spawned into the world.
 //
-// mu guards opened. Position and visibility are guarded by the embedded
-// world.Presence.
+// Position and visibility are guarded by the embedded world.Presence.
 type Object struct {
 	world.Presence
 
@@ -101,8 +100,7 @@ type Object struct {
 	height           int
 	geoData          [][]block.NSWE
 
-	mu     sync.RWMutex
-	opened bool
+	opened atomic.Bool
 }
 
 // NewObject creates a live door object from a static template and geodata shape.
@@ -118,7 +116,7 @@ func NewObject(objectID int32, tmpl *Template, shape GeoShape) (*Object, error) 
 		return nil, fmt.Errorf("door %d: empty geo shape", tmpl.ID)
 	}
 
-	return &Object{
+	o := &Object{
 		objectID: objectID,
 		Template: tmpl,
 		geoX:     shape.GeoX(),
@@ -126,8 +124,9 @@ func NewObject(objectID int32, tmpl *Template, shape GeoShape) (*Object, error) 
 		geoZ:     shape.GeoZ(),
 		height:   shape.Height(),
 		geoData:  cloneGeoData(data),
-		opened:   tmpl.Opened,
-	}, nil
+	}
+	o.opened.Store(tmpl.Opened)
+	return o, nil
 }
 
 // ObjectID returns the world object id assigned to this door.
@@ -148,20 +147,12 @@ func (o *Object) Damage() int { return 0 }
 
 // Opened reports whether this door is currently open.
 func (o *Object) Opened() bool {
-	o.mu.RLock()
-	defer o.mu.RUnlock()
-	return o.opened
+	return o.opened.Load()
 }
 
 // SetOpened updates the door's open state and reports whether it changed.
 func (o *Object) SetOpened(open bool) bool {
-	o.mu.Lock()
-	defer o.mu.Unlock()
-	if o.opened == open {
-		return false
-	}
-	o.opened = open
-	return true
+	return o.opened.CompareAndSwap(!open, open)
 }
 
 // GeoX returns the door footprint's starting geodata X coordinate.

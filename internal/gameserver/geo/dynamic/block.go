@@ -10,10 +10,14 @@ var _ block.Block = (*Block)(nil)
 
 // cellOverride is one cell's dynamic state: original is the baseline
 // captured from base.Cells the first time an object touched the cell,
-// current is that baseline with every active object's edits applied.
+// current is that baseline with every active object's edits applied, and
+// active means at least one object currently touches this cell. Inactive
+// records are kept only so previously issued layer handles still decode to
+// a valid snapshot.
 type cellOverride struct {
 	original []block.Cell
 	current  []block.Cell
+	active   bool
 }
 
 // Block overlays dynamic objects on top of one static geodata block. A
@@ -23,9 +27,7 @@ type cellOverride struct {
 // Block implementation base is.
 //
 // Add and Remove mutate Block, unlike every static Block implementation.
-// The mutex below makes that safe to call concurrently with reads, but a
-// handle returned by Nearest, Above, or Below is only valid until the
-// next Add or Remove on this Block.
+// The mutex below makes that safe to call concurrently with reads.
 type Block struct {
 	blockX int
 	blockY int
@@ -52,7 +54,7 @@ func (b *Block) HasGeodata() bool { return b.base.HasGeodata() }
 func (b *Block) Layers(x, y int) int {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
-	if ov, ok := b.overrides[cellIndex(x, y)]; ok {
+	if ov, ok := b.overrides[cellIndex(x, y)]; ok && ov.active {
 		return len(ov.current)
 	}
 	return b.base.Layers(x, y)
@@ -61,7 +63,7 @@ func (b *Block) Layers(x, y int) int {
 func (b *Block) HeightNearest(x, y int, z int32) int16 {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
-	if ov, ok := b.overrides[cellIndex(x, y)]; ok {
+	if ov, ok := b.overrides[cellIndex(x, y)]; ok && ov.active {
 		if i, ok := nearestLayerIndex(ov.current, z); ok {
 			return ov.current[i].Height
 		}
@@ -72,7 +74,7 @@ func (b *Block) HeightNearest(x, y int, z int32) int16 {
 func (b *Block) NSWENearest(x, y int, z int32) block.NSWE {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
-	if ov, ok := b.overrides[cellIndex(x, y)]; ok {
+	if ov, ok := b.overrides[cellIndex(x, y)]; ok && ov.active {
 		if i, ok := nearestLayerIndex(ov.current, z); ok {
 			return ov.current[i].NSWE
 		}
@@ -84,7 +86,7 @@ func (b *Block) Nearest(x, y int, z int32) int {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 	ci := cellIndex(x, y)
-	if ov, ok := b.overrides[ci]; ok {
+	if ov, ok := b.overrides[ci]; ok && ov.active {
 		if i, ok := nearestLayerIndex(ov.current, z); ok {
 			return ci*layerSlot + i
 		}
@@ -96,7 +98,7 @@ func (b *Block) Above(x, y int, z int32) int {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 	ci := cellIndex(x, y)
-	if ov, ok := b.overrides[ci]; ok {
+	if ov, ok := b.overrides[ci]; ok && ov.active {
 		if i := firstAboveIndex(ov.current, z); i >= 0 {
 			return ci*layerSlot + i
 		}
@@ -109,7 +111,7 @@ func (b *Block) Below(x, y int, z int32) int {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 	ci := cellIndex(x, y)
-	if ov, ok := b.overrides[ci]; ok {
+	if ov, ok := b.overrides[ci]; ok && ov.active {
 		if i := firstBelowIndex(ov.current, z); i >= 0 {
 			return ci*layerSlot + i
 		}
@@ -139,7 +141,7 @@ func (b *Block) NSWE(layer int) block.NSWE {
 func (b *Block) Cells(x, y int) []block.Cell {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
-	if ov, ok := b.overrides[cellIndex(x, y)]; ok {
+	if ov, ok := b.overrides[cellIndex(x, y)]; ok && ov.active {
 		return append([]block.Cell(nil), ov.current...)
 	}
 	return b.base.Cells(x, y)
@@ -149,7 +151,7 @@ func (b *Block) HeightNearestIgnore(x, y int, z int32, ignore Object) int16 {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 	ov, ok := b.overrides[cellIndex(x, y)]
-	if !ok {
+	if !ok || !ov.active {
 		return b.base.HeightNearest(x, y, z)
 	}
 	cells := ov.current
@@ -166,7 +168,7 @@ func (b *Block) NSWENearestIgnore(x, y int, z int32, ignore Object) block.NSWE {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 	ov, ok := b.overrides[cellIndex(x, y)]
-	if !ok {
+	if !ok || !ov.active {
 		return b.base.NSWENearest(x, y, z)
 	}
 	cells := ov.current
@@ -203,6 +205,13 @@ func (b *Block) Remove(obj Object) {
 	}
 }
 
+// Empty reports whether the block has no active dynamic objects.
+func (b *Block) Empty() bool {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	return len(b.objects) == 0
+}
+
 // hasObject requires b.mu to already be held, for reading or writing.
 func (b *Block) hasObject(obj Object) bool {
 	for _, existing := range b.objects {
@@ -230,14 +239,14 @@ func (b *Block) override(x, y int) *cellOverride {
 }
 
 // rebuild recomputes every override from scratch against the current
-// object list, then drops any override no object touches anymore so
-// that cell goes back to answering straight from base. Requires b.mu to
-// be held for writing.
+// object list. Restored cells keep their override record so layer handles
+// issued before a concurrent rebuild still decode to a valid cell snapshot.
+// Requires b.mu to be held for writing.
 func (b *Block) rebuild() {
 	for _, ov := range b.overrides {
 		ov.current = append(ov.current[:0], ov.original...)
+		ov.active = false
 	}
-	touched := make(map[int]bool, len(b.overrides))
 
 	minBX := b.blockX * block.CellsX
 	minBY := b.blockY * block.CellsY
@@ -265,7 +274,7 @@ func (b *Block) rebuild() {
 
 				lx, ly := gx-minBX, gy-minBY
 				ov := b.override(lx, ly)
-				touched[cellIndex(lx, ly)] = true
+				ov.active = true
 
 				currentIndex, ok1 := nearestLayerIndex(ov.current, int32(minOZ))
 				originalIndex, ok2 := nearestLayerIndex(ov.original, int32(minOZ))
@@ -299,12 +308,6 @@ func (b *Block) rebuild() {
 				}
 				ov.current[currentIndex].NSWE &= objNSWE
 			}
-		}
-	}
-
-	for ci := range b.overrides {
-		if !touched[ci] {
-			delete(b.overrides, ci)
 		}
 	}
 }
