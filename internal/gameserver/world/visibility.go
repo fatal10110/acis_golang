@@ -41,9 +41,8 @@ func (s *State) Spawn(t Tracked, x, y, z, heading int) {
 	p.mu.Unlock()
 
 	next, _ := s.RegionAt(x, y) // clamped coordinates always land on the grid
-	s.relocate(t, next)
-
 	s.AddObject(t)
+	s.relocate(t, next)
 }
 
 // Move updates t's position and, when the new coordinates land in a
