@@ -137,6 +137,24 @@ func BenchmarkQueries(b *testing.B) {
 	}
 }
 
+// BenchmarkQueriesParallel exercises the contention #513 targets: many
+// goroutines hammering CanMove/CanSee/Height concurrently, the actual
+// AI-tick-population shape rather than a single-goroutine ns/op number.
+func BenchmarkQueriesParallel(b *testing.B) {
+	e := newTestEngine(b, complexBlock(func(x, y int) block.Cell {
+		return block.Cell{Height: 0, NSWE: block.AllDirections}
+	}))
+
+	b.ReportAllocs()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			_ = e.Height(worldX(0), worldY(0), 0)
+			_ = e.CanMove(worldX(0), worldY(0), 0, worldX(1), worldY(0), 0)
+			_ = e.CanSee(worldX(0), worldY(0), 0, worldX(3), worldY(0), 0)
+		}
+	})
+}
+
 func complexBlock(cell func(x, y int) block.Cell) block.Block {
 	var cells [block.CellCount]block.Cell
 	for x := range block.CellsX {

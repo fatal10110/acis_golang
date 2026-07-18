@@ -229,6 +229,86 @@ func TestWalkerTickRetriesRejectedMove(t *testing.T) {
 	assertMoves(t, actor, loc(0), loc(100))
 }
 
+// allocFreeWalkerActor is a zero-allocation WalkerActor stub for allocation-
+// ceiling tests: walkerActorStub's move/teleport/say/social slices grow and
+// occasionally reallocate, which would add noise to a per-call measurement.
+type allocFreeWalkerActor struct {
+	id        int32
+	pos       location.Location
+	moveCount int
+}
+
+func (a *allocFreeWalkerActor) ObjectID() int32              { return a.id }
+func (a *allocFreeWalkerActor) Position() location.Location  { return a.pos }
+func (a *allocFreeWalkerActor) Moving() bool                 { return false }
+func (a *allocFreeWalkerActor) TeleportTo(location.Location) {}
+func (a *allocFreeWalkerActor) GeoPathFailCount() int        { return 0 }
+func (a *allocFreeWalkerActor) ResetGeoPathFailCount()       {}
+func (a *allocFreeWalkerActor) AddGeoPathFailCount()         {}
+func (a *allocFreeWalkerActor) SayNPCString(id int)          {}
+func (a *allocFreeWalkerActor) SocialAction(id int)          {}
+
+func (a *allocFreeWalkerActor) MoveToLocation(target location.Location) (move.Event, error) {
+	a.moveCount++
+	a.pos = target
+	return move.Event{Origin: a.pos, Destination: target}, nil
+}
+
+// TestWalkerTickAllocs locks in Walker.Tick's zero-steady-state allocation
+// property (#421, #425): the no-release path (nothing due) must stay
+// allocation-free as more walkers/AI call sites are wired, and the release
+// path's ceiling is 0 too, since a successful release only touches value
+// types and interface calls into an allocation-free actor/path — the
+// documented non-zero case is the error path (fmt.Errorf on a rejected
+// move), covered separately by TestWalkerTickRetriesRejectedMove.
+func TestWalkerTickAllocs(t *testing.T) {
+	routes := route.WalkerRoutes{
+		"patrol": {"guard": {walkerNode(0), walkerNode(100)}},
+	}
+	path := &walkerPathStub{canMove: true}
+	now := time.Unix(100, 0)
+	past := now.Add(-time.Second)
+
+	t.Run("no-release path", func(t *testing.T) {
+		actor := &allocFreeWalkerActor{id: 1, pos: loc(0)}
+		w := newTestWalker(t, routes, path, func() time.Time { return now })
+		if err := w.StartRoute(actor, "patrol", "guard"); err != nil {
+			t.Fatal(err)
+		}
+		w.entries[actor.id].wakeTime = time.Time{}
+
+		allocs := testing.AllocsPerRun(1000, func() {
+			if errs := w.Tick(); len(errs) != 0 {
+				t.Fatalf("Tick() errors = %v, want none", errs)
+			}
+		})
+		if allocs != 0 {
+			t.Fatalf("Tick() no-release path allocs/run = %v, want 0", allocs)
+		}
+	})
+
+	t.Run("release path", func(t *testing.T) {
+		actor := &allocFreeWalkerActor{id: 1, pos: loc(0)}
+		w := newTestWalker(t, routes, path, func() time.Time { return now })
+		if err := w.StartRoute(actor, "patrol", "guard"); err != nil {
+			t.Fatal(err)
+		}
+
+		allocs := testing.AllocsPerRun(1000, func() {
+			w.entries[actor.id].wakeTime = past
+			if errs := w.Tick(); len(errs) != 0 {
+				t.Fatalf("Tick() errors = %v, want none", errs)
+			}
+		})
+		if allocs != 0 {
+			t.Fatalf("Tick() release path allocs/run = %v, want 0", allocs)
+		}
+		if actor.moveCount == 0 {
+			t.Fatal("Tick() release path never called MoveToLocation")
+		}
+	})
+}
+
 func TestGeoPathAdaptsEngineAndFinder(t *testing.T) {
 	origin := loc(0)
 	target := loc(100)
