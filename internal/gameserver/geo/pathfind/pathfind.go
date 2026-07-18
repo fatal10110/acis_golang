@@ -60,6 +60,7 @@ func (f *Finder) find(dst []location.Location, origin, target location.Location,
 	defer f.scratch.Put(scratch)
 
 	start := scratch.newNodeFromWorld(origin.X, origin.Y, int(f.engine.Height(origin.X, origin.Y, origin.Z)))
+	start.nswe = f.engine.NSWENearest(start.gx, start.gy, start.z)
 	goal := scratch.newNodeFromWorld(target.X, target.Y, int(f.engine.Height(target.X, target.Y, target.Z)))
 	start.h = f.heuristic(start, goal)
 	start.f = start.h
@@ -98,6 +99,7 @@ type node struct {
 	gx     int
 	gy     int
 	z      int
+	nswe   block.NSWE
 	g      int
 	h      int
 	f      int
@@ -186,104 +188,149 @@ func (s *searchScratch) newNode(gx, gy, z int) *node {
 	return &s.nodes[len(s.nodes)-1]
 }
 
-var steps = [...]struct {
-	dx       int
-	dy       int
-	diagonal bool
+// cardinalSteps mirrors the reference PathFinder's four addDirectionalNode
+// calls: N, S, W, E, in that order. Corner (diagonal) gating below indexes
+// into this array by direction, matching addCornerNode's directionFlagX/Y
+// parameters.
+var cardinalSteps = [4]struct {
+	dx, dy int
+	flag   block.NSWE
 }{
-	{dx: 0, dy: -1},
-	{dx: 0, dy: 1},
-	{dx: -1, dy: 0},
-	{dx: 1, dy: 0},
-	{dx: -1, dy: -1, diagonal: true},
-	{dx: 1, dy: -1, diagonal: true},
-	{dx: -1, dy: 1, diagonal: true},
-	{dx: 1, dy: 1, diagonal: true},
+	{dx: 0, dy: -1, flag: block.North},
+	{dx: 0, dy: 1, flag: block.South},
+	{dx: -1, dy: 0, flag: block.West},
+	{dx: 1, dy: 0, flag: block.East},
 }
 
+const (
+	dirN = iota
+	dirS
+	dirW
+	dirE
+)
+
+// cornerSteps mirrors the reference PathFinder's four addCornerNode calls:
+// NW, NE, SW, SE. xDir/yDir name which cardinalSteps entries supply the
+// mutual-mask gate for this diagonal.
+var cornerSteps = [4]struct {
+	dx, dy     int
+	xDir, yDir int
+}{
+	{dx: -1, dy: -1, xDir: dirW, yDir: dirN},
+	{dx: 1, dy: -1, xDir: dirE, yDir: dirN},
+	{dx: -1, dy: 1, xDir: dirW, yDir: dirS},
+	{dx: 1, dy: 1, xDir: dirE, yDir: dirS},
+}
+
+// expand generates current's neighbor candidates, mirroring the reference
+// PathFinder.expand/addDirectionalNode/addCornerNode/addNode: candidate
+// passability and weight come from each cell's own decoded NSWE mask
+// (resolved once per node, at node-creation time), not from a per-candidate
+// CanMove line-walk.
 func (f *Finder) expand(current, goal *node, seq *int64, scratch *searchScratch) {
-	for _, step := range steps {
-		if step.diagonal && !f.canMoveDiagonal(current, step.dx, step.dy) {
+	if current.nswe == block.NoDirections {
+		return
+	}
+
+	z := current.z + block.CellIgnoreHeight
+
+	var cardinalNSWE [4]block.NSWE
+	for i, step := range cardinalSteps {
+		if !current.nswe.Allows(step.flag) {
+			continue
+		}
+		gx, gy := current.gx+step.dx, current.gy+step.dy
+		height, nswe, ok := f.candidateNSWE(gx, gy, z)
+		if !ok {
+			continue
+		}
+		cardinalNSWE[i] = nswe
+		f.addCandidate(current, goal, seq, scratch, gx, gy, height, nswe, false)
+	}
+
+	for _, corner := range cornerSteps {
+		nsweX := cardinalNSWE[corner.xDir]
+		nsweY := cardinalNSWE[corner.yDir]
+		flagX := cardinalSteps[corner.xDir].flag
+		flagY := cardinalSteps[corner.yDir].flag
+		if !nsweX.Allows(flagY) || !nsweY.Allows(flagX) {
 			continue
 		}
 
-		worldX := engine.WorldX(current.gx + step.dx)
-		worldY := engine.WorldY(current.gy + step.dy)
-		if engine.OutOfWorld(worldX, worldY) {
+		// Mirrors the reference's extra getNodeNswe(x+dx, y, z) corner
+		// check: a fresh resolve of the X-direction neighbor (same cell and
+		// z as nsweX above, kept as its own call for structural fidelity
+		// with addCornerNode rather than reusing nsweX's value). Provably
+		// value-identical to nsweX given static geodata — this line is only
+		// reachable once nsweX itself came from a successful candidateNSWE
+		// call at this exact cell/z — so it's a candidate for collapsing to
+		// nsweX if profiling ever calls for it; the only behavioral
+		// difference would surface under a door toggling this block mid-
+		// search, which isn't a case the reference itself accounts for.
+		xGX, xGY := current.gx+corner.dx, current.gy
+		_, recheckNSWE, ok := f.candidateNSWE(xGX, xGY, z)
+		if !ok || !recheckNSWE.Allows(flagY) {
 			continue
 		}
 
-		nextZ := int(f.engine.Height(worldX, worldY, current.z+block.CellIgnoreHeight))
-		if !f.engine.CanMove(engine.WorldX(current.gx), engine.WorldY(current.gy), current.z, worldX, worldY, nextZ) {
+		gx, gy := current.gx+corner.dx, current.gy+corner.dy
+		height, nswe, ok := f.candidateNSWE(gx, gy, z)
+		if !ok {
 			continue
 		}
-
-		key := nodeKey{gx: current.gx + step.dx, gy: current.gy + step.dy, z: nextZ}
-		if _, ok := scratch.closed[key]; ok {
-			continue
-		}
-		if _, ok := scratch.openSet[key]; ok {
-			continue
-		}
-
-		weight := f.options.MoveWeight
-		if step.diagonal {
-			weight = f.options.MoveWeightDiag
-		}
-		if !f.cellOpen(worldX, worldY, nextZ) {
-			if step.diagonal {
-				weight = f.options.obstacleWeightDiag()
-			} else {
-				weight = f.options.ObstacleWeight
-			}
-		}
-
-		n := scratch.newNode(key.gx, key.gy, key.z)
-		n.g = current.g + weight
-		n.parent = current
-		n.seq = *seq
-		*seq = *seq + 1
-		n.h = f.heuristic(n, goal)
-		n.f = n.g + n.h
-		heap.Push(&scratch.opened, n)
-		scratch.openSet[key] = struct{}{}
+		f.addCandidate(current, goal, seq, scratch, gx, gy, height, nswe, true)
 	}
 }
 
-func (f *Finder) canMoveDiagonal(current *node, dx, dy int) bool {
-	sideX := engine.WorldX(current.gx + dx)
-	sideY := engine.WorldY(current.gy)
-	if engine.OutOfWorld(sideX, sideY) {
-		return false
+// candidateNSWE resolves a candidate cell's own decoded height and NSWE
+// mask, mirroring the reference's getIndexBelow/getHeight/getNswe sequence.
+func (f *Finder) candidateNSWE(gx, gy, z int) (height int, nswe block.NSWE, ok bool) {
+	worldX, worldY := engine.WorldX(gx), engine.WorldY(gy)
+	if engine.OutOfWorld(worldX, worldY) {
+		return 0, 0, false
 	}
-	sideZX := int(f.engine.Height(sideX, sideY, current.z+block.CellIgnoreHeight))
-	if !f.engine.CanMove(engine.WorldX(current.gx), engine.WorldY(current.gy), current.z, sideX, sideY, sideZX) {
-		return false
+	h, m, found := f.engine.NodeBelow(gx, gy, z)
+	if !found {
+		return 0, 0, false
 	}
-
-	sideX = engine.WorldX(current.gx)
-	sideY = engine.WorldY(current.gy + dy)
-	if engine.OutOfWorld(sideX, sideY) {
-		return false
-	}
-	sideZY := int(f.engine.Height(sideX, sideY, current.z+block.CellIgnoreHeight))
-	return f.engine.CanMove(engine.WorldX(current.gx), engine.WorldY(current.gy), current.z, sideX, sideY, sideZY)
+	return int(h), m, true
 }
 
-func (f *Finder) cellOpen(worldX, worldY, worldZ int) bool {
-	for _, step := range steps[:4] {
-		nextX := engine.WorldX(engine.GeoX(worldX) + step.dx)
-		nextY := engine.WorldY(engine.GeoY(worldY) + step.dy)
-		if engine.OutOfWorld(nextX, nextY) {
-			return false
-		}
+// addCandidate mirrors the reference's addNode: dedup against already
+// explored/queued nodes, then weight the move by whether the candidate's own
+// mask is fully open (MoveWeight) or not (ObstacleWeight) — never by
+// probing neighboring cells.
+func (f *Finder) addCandidate(current, goal *node, seq *int64, scratch *searchScratch, gx, gy, height int, nswe block.NSWE, diagonal bool) {
+	key := nodeKey{gx: gx, gy: gy, z: height}
+	if _, ok := scratch.closed[key]; ok {
+		return
+	}
+	if _, ok := scratch.openSet[key]; ok {
+		return
+	}
 
-		nextZ := int(f.engine.Height(nextX, nextY, worldZ+block.CellIgnoreHeight))
-		if !f.engine.CanMove(worldX, worldY, worldZ, nextX, nextY, nextZ) {
-			return false
+	weight := f.options.MoveWeight
+	if diagonal {
+		weight = f.options.MoveWeightDiag
+	}
+	if nswe != block.AllDirections {
+		if diagonal {
+			weight = f.options.obstacleWeightDiag()
+		} else {
+			weight = f.options.ObstacleWeight
 		}
 	}
-	return true
+
+	n := scratch.newNode(gx, gy, height)
+	n.nswe = nswe
+	n.g = current.g + weight
+	n.parent = current
+	n.seq = *seq
+	*seq = *seq + 1
+	n.h = f.heuristic(n, goal)
+	n.f = n.g + n.h
+	heap.Push(&scratch.opened, n)
+	scratch.openSet[key] = struct{}{}
 }
 
 func (f *Finder) heuristic(from, to *node) int {
