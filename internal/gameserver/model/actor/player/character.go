@@ -11,8 +11,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -85,9 +85,9 @@ type Character struct {
 
 	effects *effect.List
 
-	// statMu guards statFuncs.
+	// statMu guards statCalcs map creation. Each Calculator owns its Funcs.
 	statMu    sync.Mutex
-	statFuncs []basefunc.Func
+	statCalcs map[stat.Stat]*statCalculator
 
 	// stateMu guards transient live flags and runtime send/broadcast hooks.
 	stateMu       sync.RWMutex

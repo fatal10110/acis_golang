@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/statbonus"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -472,16 +473,17 @@ func (c *Character) pAtk(weapon activeWeapon) float64 {
 	if tmpl != nil && tmpl.PAtk > 0 {
 		base = tmpl.PAtk
 	}
-	return weapon.stat("pAtk", base)
+	return c.calcStat(stat.PowerAttack, weapon.stat("pAtk", base))
 }
 
 // PDef returns the current physical defence value.
 func (c *Character) PDef() float64 {
 	tmpl := c.template()
-	if tmpl == nil || tmpl.PDef <= 0 {
-		return 1
+	base := 1.0
+	if tmpl != nil && tmpl.PDef > 0 {
+		base = tmpl.PDef
 	}
-	return tmpl.PDef
+	return c.calcStat(stat.PowerDefence, base)
 }
 
 // Evasion returns this player's physical evasion rating.
@@ -490,7 +492,7 @@ func (c *Character) Evasion() int {
 	if tmpl == nil {
 		return c.Level
 	}
-	return int(statbonus.BaseEvasionAccuracy[statbonus.ClampIndex(tmpl.DEX)]) + c.Level
+	return int(c.calcStat(stat.EvasionRate, 0))
 }
 
 // CollisionRadius returns this player's body radius.

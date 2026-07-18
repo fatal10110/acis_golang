@@ -1,0 +1,578 @@
+package player
+
+import (
+	"math"
+	"sync"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/funcs"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/statbonus"
+)
+
+type statCalculator struct {
+	mu    sync.RWMutex
+	funcs []basefunc.Func
+}
+
+func (c *Character) statCalc(s stat.Stat) *statCalculator {
+	c.statMu.Lock()
+	defer c.statMu.Unlock()
+	return c.statCalcLocked(s)
+}
+
+func (c *Character) statCalcLocked(s stat.Stat) *statCalculator {
+	if c.statCalcs == nil {
+		c.statCalcs = make(map[stat.Stat]*statCalculator)
+	}
+	if calc := c.statCalcs[s]; calc != nil {
+		return calc
+	}
+	calc := &statCalculator{}
+	for _, fn := range defaultStatFuncs(s) {
+		calc.AddFunc(fn)
+	}
+	c.statCalcs[s] = calc
+	return calc
+}
+
+func (c *Character) calcStat(s stat.Stat, base float64) float64 {
+	value := c.statCalc(s).Calc(characterStatActor{c: c}, c, nil, base)
+	if s.CantBeNegative() && value < 0 {
+		return 0
+	}
+	return value
+}
+
+func (c *statCalculator) AddFunc(fn basefunc.Func) {
+	if fn == nil {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	order := fn.Order()
+	i := 0
+	for i < len(c.funcs) && order >= c.funcs[i].Order() {
+		i++
+	}
+	next := make([]basefunc.Func, len(c.funcs)+1)
+	copy(next, c.funcs[:i])
+	next[i] = fn
+	copy(next[i+1:], c.funcs[i:])
+	c.funcs = next
+}
+
+func (c *statCalculator) RemoveOwner(owner any) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	kept := make([]basefunc.Func, 0, len(c.funcs))
+	for _, fn := range c.funcs {
+		if fn.Owner() != owner {
+			kept = append(kept, fn)
+		}
+	}
+	c.funcs = kept
+}
+
+func (c *statCalculator) Calc(effector, effected, skill any, base float64) float64 {
+	c.mu.RLock()
+	funcs := c.funcs
+	c.mu.RUnlock()
+
+	value := base
+	for _, fn := range funcs {
+		value = fn.Calc(effector, effected, skill, base, value)
+		if _, ok := fn.(*basefunc.Set); ok {
+			base = value
+		}
+	}
+	return value
+}
+
+func defaultStatFuncs(s stat.Stat) []basefunc.Func {
+	switch s {
+	case stat.MaxHP:
+		return []basefunc.Func{funcs.MaxHpMul}
+	case stat.MaxMP:
+		return []basefunc.Func{funcs.MaxMpMul}
+	case stat.MaxCP:
+		return []basefunc.Func{funcs.MaxCpMul}
+	case stat.RegenerateHPRate:
+		return []basefunc.Func{funcs.RegenHpMul}
+	case stat.RegenerateMPRate:
+		return []basefunc.Func{funcs.RegenMpMul}
+	case stat.RegenerateCPRate:
+		return []basefunc.Func{funcs.RegenCpMul}
+	case stat.PowerAttack:
+		return []basefunc.Func{funcs.PAtkMod}
+	case stat.PowerDefence:
+		return []basefunc.Func{funcs.PDefMod}
+	case stat.MagicAttack:
+		return []basefunc.Func{funcs.MAtkMod}
+	case stat.MagicDefence:
+		return []basefunc.Func{funcs.MDefMod}
+	case stat.PowerAttackSpeed:
+		return []basefunc.Func{funcs.PAtkSpeed}
+	case stat.MagicAttackSpeed:
+		return []basefunc.Func{funcs.MAtkSpeed}
+	case stat.AccuracyCombat:
+		return []basefunc.Func{funcs.AtkAccuracy}
+	case stat.EvasionRate:
+		return []basefunc.Func{funcs.AtkEvasion}
+	case stat.CriticalRate:
+		return []basefunc.Func{funcs.AtkCritical}
+	case stat.MCriticalRate:
+		return []basefunc.Func{funcs.MAtkCritical}
+	case stat.RunSpeed:
+		return []basefunc.Func{funcs.MoveSpeed}
+	case stat.StatSTR:
+		return []basefunc.Func{funcs.HennaSTR}
+	case stat.StatCON:
+		return []basefunc.Func{funcs.HennaCON}
+	case stat.StatDEX:
+		return []basefunc.Func{funcs.HennaDEX}
+	case stat.StatINT:
+		return []basefunc.Func{funcs.HennaINT}
+	case stat.StatWIT:
+		return []basefunc.Func{funcs.HennaWIT}
+	case stat.StatMEN:
+		return []basefunc.Func{funcs.HennaMEN}
+	default:
+		return nil
+	}
+}
+
+type characterStatActor struct {
+	c *Character
+}
+
+func (a characterStatActor) STR() int {
+	return int(a.c.calcStat(stat.StatSTR, a.c.baseAttribute(stat.StatSTR)))
+}
+func (a characterStatActor) CON() int {
+	return int(a.c.calcStat(stat.StatCON, a.c.baseAttribute(stat.StatCON)))
+}
+func (a characterStatActor) DEX() int {
+	return int(a.c.calcStat(stat.StatDEX, a.c.baseAttribute(stat.StatDEX)))
+}
+func (a characterStatActor) INT() int {
+	return int(a.c.calcStat(stat.StatINT, a.c.baseAttribute(stat.StatINT)))
+}
+func (a characterStatActor) WIT() int {
+	return int(a.c.calcStat(stat.StatWIT, a.c.baseAttribute(stat.StatWIT)))
+}
+func (a characterStatActor) MEN() int {
+	return int(a.c.calcStat(stat.StatMEN, a.c.baseAttribute(stat.StatMEN)))
+}
+
+func (a characterStatActor) Level() int {
+	if a.c.Level <= 0 {
+		return 1
+	}
+	return a.c.Level
+}
+
+func (a characterStatActor) LevelMod() float64 {
+	return (89 + float64(a.Level())) / 100
+}
+
+func (a characterStatActor) IsSummon() bool { return false }
+
+func (a characterStatActor) IsMageClass() bool { return false }
+
+func (a characterStatActor) HennaBonus(stat.Stat) float64 { return 0 }
+
+func (a characterStatActor) HasEquipped(slotMask int) bool {
+	return a.hasEquipped(slotMask, funcs.SlotLFinger, itemcontainer.LFinger) ||
+		a.hasEquipped(slotMask, funcs.SlotRFinger, itemcontainer.RFinger) ||
+		a.hasEquipped(slotMask, funcs.SlotLEar, itemcontainer.LEar) ||
+		a.hasEquipped(slotMask, funcs.SlotREar, itemcontainer.REar) ||
+		a.hasEquipped(slotMask, funcs.SlotNeck, itemcontainer.Neck) ||
+		a.hasEquipped(slotMask, funcs.SlotHead, itemcontainer.Head) ||
+		a.hasEquipped(slotMask, funcs.SlotChest, itemcontainer.Chest) ||
+		a.hasEquipped(slotMask, funcs.SlotLegs, itemcontainer.Legs) ||
+		a.hasEquipped(slotMask, funcs.SlotGloves, itemcontainer.Gloves) ||
+		a.hasEquipped(slotMask, funcs.SlotFeet, itemcontainer.Feet) ||
+		a.hasFullBodyArmor(slotMask)
+}
+
+func (a characterStatActor) hasEquipped(slotMask, bit, paperdoll int) bool {
+	if slotMask&bit == 0 || a.c.inventory == nil {
+		return false
+	}
+	return a.c.inventory.ItemAt(paperdoll) != nil
+}
+
+func (a characterStatActor) hasFullBodyArmor(slotMask int) bool {
+	if slotMask&funcs.FullBodyArmor == 0 || a.c.inventory == nil {
+		return false
+	}
+	inst := a.c.inventory.ItemAt(itemcontainer.Chest)
+	if inst == nil {
+		return false
+	}
+	tmpl, ok := a.c.inventory.Templates().Get(inst.TemplateID)
+	return ok && (tmpl.Slot == item.SlotFullArmor || tmpl.Slot == item.SlotAllDress)
+}
+
+func (a characterStatActor) HasWeaponEquipped() bool {
+	if a.c.inventory == nil {
+		return false
+	}
+	inst := a.c.inventory.ItemAt(itemcontainer.RHand)
+	if inst == nil {
+		return false
+	}
+	tmpl, ok := a.c.inventory.Templates().Get(inst.TemplateID)
+	return ok && tmpl.Kind == item.KindWeapon
+}
+
+func (c *Character) baseAttribute(s stat.Stat) float64 {
+	tmpl := c.template()
+	if tmpl == nil {
+		return 0
+	}
+	switch s {
+	case stat.StatSTR:
+		return float64(tmpl.STR)
+	case stat.StatCON:
+		return float64(tmpl.CON)
+	case stat.StatDEX:
+		return float64(tmpl.DEX)
+	case stat.StatINT:
+		return float64(tmpl.INT)
+	case stat.StatWIT:
+		return float64(tmpl.WIT)
+	case stat.StatMEN:
+		return float64(tmpl.MEN)
+	default:
+		return 0
+	}
+}
+
+func (c *Character) STR() int { return characterStatActor{c: c}.STR() }
+func (c *Character) CON() int { return characterStatActor{c: c}.CON() }
+func (c *Character) DEX() int { return characterStatActor{c: c}.DEX() }
+func (c *Character) INT() int { return characterStatActor{c: c}.INT() }
+func (c *Character) WIT() int { return characterStatActor{c: c}.WIT() }
+func (c *Character) MEN() int { return characterStatActor{c: c}.MEN() }
+
+func (c *Character) LevelMod() float64 { return characterStatActor{c: c}.LevelMod() }
+
+// MAtk returns the current magic attack value.
+func (c *Character) MAtk() float64 {
+	tmpl := c.template()
+	base := 1.0
+	if tmpl != nil && tmpl.MAtk > 0 {
+		base = tmpl.MAtk
+	}
+	return c.calcStat(stat.MagicAttack, c.activeWeapon().stat("mAtk", base))
+}
+
+// MDef returns the current magic defence value.
+func (c *Character) MDef() float64 {
+	tmpl := c.template()
+	base := 1.0
+	if tmpl != nil && tmpl.MDef > 0 {
+		base = tmpl.MDef
+	}
+	return c.calcStat(stat.MagicDefence, base)
+}
+
+// HP returns current HP as a floating-point skill-resource value.
+func (c *Character) HP() float64 { return c.ResourceValues().CurrentHP }
+
+// MPValue returns current MP as a floating-point skill-resource value.
+func (c *Character) MPValue() float64 { return c.ResourceValues().CurrentMP }
+
+// CP returns current CP as a floating-point skill-resource value.
+func (c *Character) CP() float64 { return c.ResourceValues().CurrentCP }
+
+// MaxHPValue returns maximum HP as a floating-point skill-resource value.
+func (c *Character) MaxHPValue() float64 { return c.ResourceValues().MaxHP }
+
+// MaxMPValue returns maximum MP as a floating-point skill-resource value.
+func (c *Character) MaxMPValue() float64 { return c.ResourceValues().MaxMP }
+
+// MaxCPValue returns maximum CP as a floating-point skill-resource value.
+func (c *Character) MaxCPValue() float64 { return c.ResourceValues().MaxCP }
+
+// AddHP restores HP, clamped to MaxHP, and returns the applied amount.
+func (c *Character) AddHP(amount float64) float64 {
+	if amount <= 0 {
+		return 0
+	}
+	c.vitalsMu.Lock()
+	defer c.vitalsMu.Unlock()
+	if c.CurHP >= c.MaxHP {
+		return 0
+	}
+	if c.CurHP+amount > c.MaxHP {
+		amount = c.MaxHP - c.CurHP
+	}
+	c.CurHP += amount
+	return amount
+}
+
+// AddMP restores MP, clamped to MaxMP, and returns the applied amount.
+func (c *Character) AddMP(amount float64) float64 {
+	if amount <= 0 {
+		return 0
+	}
+	c.vitalsMu.Lock()
+	defer c.vitalsMu.Unlock()
+	if c.CurMP >= c.MaxMP {
+		return 0
+	}
+	if c.CurMP+amount > c.MaxMP {
+		amount = c.MaxMP - c.CurMP
+	}
+	c.CurMP += amount
+	return amount
+}
+
+// ReduceMP subtracts MP, clamped at zero, and returns the applied amount.
+func (c *Character) ReduceMP(amount float64) float64 {
+	if amount <= 0 {
+		return 0
+	}
+	c.vitalsMu.Lock()
+	defer c.vitalsMu.Unlock()
+	if c.CurMP <= 0 {
+		return 0
+	}
+	if amount > c.CurMP {
+		amount = c.CurMP
+	}
+	c.CurMP -= amount
+	return amount
+}
+
+// ReduceHP applies skill HP damage and runs the once-only death path.
+func (c *Character) ReduceHP(amount float64, attacker any, _ modelskill.Definition) {
+	if amount <= 0 {
+		return
+	}
+	c.vitalsMu.Lock()
+	if c.CurHP <= 0 {
+		c.vitalsMu.Unlock()
+		return
+	}
+	c.CurHP -= amount
+	dead := c.CurHP <= 0
+	if dead {
+		c.CurHP = 0
+	}
+	c.vitalsMu.Unlock()
+	if dead {
+		killer, _ := attacker.(creature.DeathActor)
+		c.Die(killer)
+	}
+}
+
+// SetHP sets current HP, clamped to [0, MaxHP].
+func (c *Character) SetHP(value float64) {
+	c.vitalsMu.Lock()
+	defer c.vitalsMu.Unlock()
+	if value < 0 {
+		value = 0
+	}
+	if value > c.MaxHP {
+		value = c.MaxHP
+	}
+	c.CurHP = value
+}
+
+// SetCP sets current CP, clamped to [0, MaxCP].
+func (c *Character) SetCP(value float64) {
+	c.vitalsMu.Lock()
+	defer c.vitalsMu.Unlock()
+	if value < 0 {
+		value = 0
+	}
+	if value > c.MaxCP {
+		value = c.MaxCP
+	}
+	c.CurCP = value
+}
+
+// CanBeHealed reports whether c may receive HP/MP restoration.
+func (c *Character) CanBeHealed() bool {
+	return !c.Dead() && !c.Invul()
+}
+
+// Invulnerable reports whether c ignores direct resource effects.
+func (c *Character) Invulnerable() bool { return c.Invul() }
+
+// HealEffectiveness returns the percentage multiplier applied to incoming heals.
+func (c *Character) HealEffectiveness() float64 {
+	return c.calcStat(stat.HealEffectiveness, 100)
+}
+
+// HealProficiency returns the flat heal-power bonus c contributes.
+func (c *Character) HealProficiency() float64 {
+	return c.calcStat(stat.HealProficiency, 0)
+}
+
+// RechargeMP applies c's MP recharge multiplier to amount.
+func (c *Character) RechargeMP(amount float64) float64 {
+	return c.calcStat(stat.RechargeMPRate, amount)
+}
+
+// HealAmount resolves c's outgoing HEAL amount before target effectiveness.
+func (c *Character) HealAmount(def modelskill.Definition) (float64, bool) {
+	amount := float64(def.Power) + c.HealProficiency()
+	if skillTypeKey(def.SkillType) == "HEAL_STATIC" {
+		return amount, true
+	}
+	return amount + math.Sqrt(c.MAtk()), true
+}
+
+// PhysicalSkillInput resolves the damage formula input for a physical skill
+// cast by caster against c.
+func (c *Character) PhysicalSkillInput(caster any, def modelskill.Definition) (formulas.PhysicalSkillInput, bool) {
+	attacker, ok := caster.(*Character)
+	if !ok || attacker == nil {
+		return formulas.PhysicalSkillInput{}, false
+	}
+	soulshot := attacker.SoulshotCharged()
+	skillPower := float64(def.Power)
+	if soulshot && def.SoulShotBoost > 0 {
+		skillPower *= float64(def.SoulShotBoost)
+	}
+	return formulas.PhysicalSkillInput{
+		AttackPower:   attacker.PAtk(),
+		SkillPower:    skillPower,
+		Defence:       positive(c.PDef()),
+		Crit:          attacker.physicalSkillCrit(def),
+		SoulShot:      soulshot,
+		RandomMul:     attacker.randomDamageMultiplier(def),
+		ElementalMul:  1,
+		RaceMul:       1,
+		WeaponVulnMul: c.weaponVulnerability(attacker),
+		PvPMul:        1,
+	}, true
+}
+
+// MagicDamageInput resolves the damage formula input for a magic skill cast
+// by caster against c.
+func (c *Character) MagicDamageInput(caster any, def modelskill.Definition) (formulas.MagicDamageInput, bool) {
+	attacker, ok := caster.(*Character)
+	if !ok || attacker == nil {
+		return formulas.MagicDamageInput{}, false
+	}
+	return formulas.MagicDamageInput{
+		MAtk:            attacker.MAtk(),
+		MDef:            positive(c.MDef()),
+		SkillPower:      float64(def.Power),
+		PvPMul:          1,
+		ElementalMul:    1,
+		MagicCrit:       false,
+		SoulShot:        false,
+		BlessedSoulShot: false,
+	}, true
+}
+
+// BlowInput resolves the damage formula input for a blow skill cast by
+// caster against c.
+func (c *Character) BlowInput(caster any, def modelskill.Definition) (formulas.BlowInput, bool) {
+	attacker, ok := caster.(*Character)
+	if !ok || attacker == nil {
+		return formulas.BlowInput{}, false
+	}
+	soulshot := attacker.SoulshotCharged()
+	skillPower := float64(def.Power)
+	if soulshot && def.SoulShotBoost > 0 {
+		skillPower *= float64(def.SoulShotBoost)
+	}
+	return formulas.BlowInput{
+		AttackPower:       attacker.PAtk(),
+		SkillPower:        skillPower,
+		Defence:           positive(c.PDef()),
+		SoulShot:          soulshot,
+		IsPvP:             false,
+		RandomMul:         float64(95+attacker.rollValue(11)) / 100,
+		PosMul:            formulas.PosMul(false, true, true),
+		PvPMul:            1,
+		CritDamageMul:     attacker.calcStat(stat.CriticalDamage, 1),
+		CritDamagePosMul:  (attacker.calcStat(stat.CriticalDamagePos, 1)-1)/2 + 1,
+		CritVulnMul:       c.calcStat(stat.CritVuln, 1),
+		DaggerVulnMul:     c.calcStat(stat.DaggerWpnVuln, 1),
+		CritDamageAddBase: attacker.calcStat(stat.CriticalDamageAdd, 0),
+	}, true
+}
+
+// ManaDamageInput resolves the MP-damage formula input for a magic skill
+// cast by caster against c.
+func (c *Character) ManaDamageInput(caster any, def modelskill.Definition) (formulas.ManaDamageInput, bool) {
+	attacker, ok := caster.(*Character)
+	if !ok || attacker == nil {
+		return formulas.ManaDamageInput{}, false
+	}
+	return formulas.ManaDamageInput{
+		MAtk:        attacker.MAtk(),
+		MDef:        positive(c.MDef()),
+		SkillPower:  float64(def.Power),
+		TargetMaxMp: c.MaxMPValue(),
+		VulnMul:     c.skillVulnerability(def.SkillType),
+	}, true
+}
+
+func (c *Character) physicalSkillCrit(def modelskill.Definition) bool {
+	if def.BaseCritRate <= 0 {
+		return false
+	}
+	rate := float64(def.BaseCritRate) * 10 * statbonus.STRBonus[c.STR()]
+	return formulas.CritSucceeds(rate, c.rollValue(1000))
+}
+
+func (c *Character) randomDamageMultiplier(def modelskill.Definition) float64 {
+	if skillTypeKey(def.EffectType) == "CHARGEDAM" {
+		return 1
+	}
+	weapon := c.activeWeapon()
+	if weapon.tmpl == nil || weapon.tmpl.Weapon == nil || weapon.tmpl.Weapon.RandomDamage <= 0 {
+		return 1
+	}
+	spread := int(weapon.tmpl.Weapon.RandomDamage)
+	return 1 + float64(c.rollValue(2*spread+1)-spread)/100
+}
+
+func (c *Character) weaponVulnerability(attacker *Character) float64 {
+	switch attacker.AttackType() {
+	case item.WeaponSword:
+		return c.calcStat(stat.SwordWpnVuln, 1)
+	case item.WeaponBlunt:
+		return c.calcStat(stat.BluntWpnVuln, 1)
+	case item.WeaponDagger:
+		return c.calcStat(stat.DaggerWpnVuln, 1)
+	case item.WeaponBow:
+		return c.calcStat(stat.BowWpnVuln, 1)
+	case item.WeaponPole:
+		return c.calcStat(stat.PoleWpnVuln, 1)
+	case item.WeaponDual:
+		return c.calcStat(stat.DualWpnVuln, 1)
+	case item.WeaponDualFist:
+		return c.calcStat(stat.DualFistWpnVuln, 1)
+	case item.WeaponBigSword:
+		return c.calcStat(stat.BigSwordWpnVuln, 1)
+	case item.WeaponBigBlunt:
+		return c.calcStat(stat.BigBluntWpnVuln, 1)
+	default:
+		return 1
+	}
+}
+
+func positive(v float64) float64 {
+	if v <= 0 {
+		return 1
+	}
+	return v
+}

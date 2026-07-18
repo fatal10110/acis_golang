@@ -1,11 +1,15 @@
 package player
 
 import (
+	"math"
+
 	"github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/statbonus"
 )
 
 // baseBuffSlots is the non-toggle, non-seven-signs buff-slot count every
@@ -27,31 +31,31 @@ func (c *Character) MaxBuffCount() int {
 	return baseBuffSlots
 }
 
-// AddStatFuncs records fns as attached to c. Folding them into c's computed
-// combat stats (PAtk, PDef, and the rest of the attribute chain) is not
-// wired yet, so an active effect's stat bonuses have no observable effect
-// on c until that lands; this only keeps add/remove bookkeeping correct in
-// the meantime.
+// AddStatFuncs attaches fns to c's live stat calculators.
 func (c *Character) AddStatFuncs(fns []basefunc.Func) {
 	if len(fns) == 0 {
 		return
 	}
 	c.statMu.Lock()
 	defer c.statMu.Unlock()
-	c.statFuncs = append(c.statFuncs, fns...)
+	for _, fn := range fns {
+		if fn == nil {
+			continue
+		}
+		c.statCalcLocked(fn.Stat()).AddFunc(fn)
+	}
 }
 
 // RemoveStatsByOwner drops every stat func previously added for owner.
 func (c *Character) RemoveStatsByOwner(owner any) {
+	if owner == nil {
+		return
+	}
 	c.statMu.Lock()
 	defer c.statMu.Unlock()
-	kept := c.statFuncs[:0]
-	for _, f := range c.statFuncs {
-		if f.Owner() != owner {
-			kept = append(kept, f)
-		}
+	for _, calc := range c.statCalcs {
+		calc.RemoveOwner(owner)
 	}
-	c.statFuncs = kept
 }
 
 // Category reports c as a playable actor for skill target resolution.
@@ -67,19 +71,98 @@ func (c *Character) Invul() bool {
 }
 
 // SkillSuccessInput returns the effect-landing roll input for def cast
-// against c. Only the skill's own base land rate and ignore-resists flag
-// are resolved from real skill data; the stat-derived modifiers (c's
-// resistance, the caster's magic-attack ratio, the level difference)
-// default to neutral until Character's stat-calculation chain is wired up,
-// so an effect-landing roll against c is currently less accurate than the
-// full formula but never fabricated.
+// against c.
 func (c *Character) SkillSuccessInput(caster any, def modelskill.Definition) (formulas.SkillSuccessInput, bool) {
+	attacker, ok := caster.(*Character)
+	if !ok || attacker == nil {
+		return formulas.SkillSuccessInput{}, false
+	}
+	typ := def.EffectType
+	if typ == "" {
+		typ = def.SkillType
+	}
 	return formulas.SkillSuccessInput{
 		BaseChance:    float64(def.BaseLandRate),
-		StatModifier:  1,
-		VulnModifier:  1,
-		MAtkModifier:  1,
-		LevelModifier: 1,
+		StatModifier:  c.skillStatModifier(typ, def.Magic),
+		VulnModifier:  c.skillVulnerability(typ),
+		MAtkModifier:  c.skillMAtkModifier(attacker, def),
+		LevelModifier: c.skillLevelModifier(attacker, def),
 		IgnoreResists: def.IgnoreResists,
 	}, true
+}
+
+func (c *Character) skillStatModifier(typ string, magic bool) float64 {
+	switch skillTypeKey(typ) {
+	case "STUN", "BLEED", "POISON":
+		return math.Max(0, 2-math.Sqrt(statbonus.CONBonus[c.CON()]))
+	case "SLEEP", "DEBUFF", "WEAKNESS", "ERASE", "ROOT", "MUTE", "FEAR", "BETRAY", "CONFUSION", "AGGREDUCE_CHAR", "PARALYZE":
+		if magic {
+			return math.Max(0, 2-math.Sqrt(statbonus.MENBonus[c.MEN()]))
+		}
+	}
+	return 1
+}
+
+func (c *Character) skillVulnerability(typ string) float64 {
+	switch skillTypeKey(typ) {
+	case "BLEED":
+		return c.calcStat(stat.BleedVuln, 1)
+	case "POISON":
+		return c.calcStat(stat.PoisonVuln, 1)
+	case "STUN":
+		return c.calcStat(stat.StunVuln, 1)
+	case "PARALYZE":
+		return c.calcStat(stat.ParalyzeVuln, 1)
+	case "ROOT":
+		return c.calcStat(stat.RootVuln, 1)
+	case "SLEEP":
+		return c.calcStat(stat.SleepVuln, 1)
+	case "MUTE", "FEAR", "BETRAY", "AGGDEBUFF", "AGGREDUCE_CHAR", "ERASE", "CONFUSION":
+		return c.calcStat(stat.DerangementVuln, 1)
+	case "DEBUFF", "WEAKNESS":
+		return c.calcStat(stat.DebuffVuln, 1)
+	case "CANCEL":
+		return c.calcStat(stat.CancelVuln, 1)
+	default:
+		return 1
+	}
+}
+
+func (c *Character) skillMAtkModifier(attacker *Character, def modelskill.Definition) float64 {
+	if !def.Magic {
+		return 1
+	}
+	mDef := c.MDef()
+	if mDef <= 0 {
+		mDef = 1
+	}
+	return math.Sqrt(attacker.MAtk()) / mDef * 11
+}
+
+func (c *Character) skillLevelModifier(attacker *Character, def modelskill.Definition) float64 {
+	if def.LevelDepend == 0 {
+		return 1
+	}
+	level := attacker.Level
+	if def.MagicLevel > 0 {
+		level = def.MagicLevel
+	}
+	delta := level + def.LevelDepend - c.Level
+	scale := 0.005
+	if delta < 0 {
+		scale = 0.01
+	}
+	return 1 + scale*float64(delta)
+}
+
+func skillTypeKey(s string) string {
+	out := make([]byte, 0, len(s))
+	for i := 0; i < len(s); i++ {
+		ch := s[i]
+		if ch >= 'a' && ch <= 'z' {
+			ch -= 'a' - 'A'
+		}
+		out = append(out, ch)
+	}
+	return string(out)
 }
