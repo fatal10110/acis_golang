@@ -92,6 +92,28 @@ func (e *Engine) HeightNearest(geoX, geoY, worldZ int) int16 {
 	return e.heightNearest(geoX, geoY, worldZ)
 }
 
+// NSWENearest returns the NSWE mask of the geodata layer nearest worldZ at
+// geodata cell coordinates.
+func (e *Engine) NSWENearest(geoX, geoY, worldZ int) block.NSWE {
+	return e.nsweNearest(geoX, geoY, worldZ)
+}
+
+// NodeBelow returns the resolved height and own decoded NSWE mask of the
+// geodata layer nearest at-or-below worldZ for the given geodata cell — the
+// same getIndexBelow/getHeight/getNswe sequence pathfinding candidate
+// generation needs to read a cell's own passability bits directly, instead
+// of re-deriving them with a CanMove line-walk. ok is false only when a
+// loaded region has no layer within reach of worldZ; an unloaded region
+// always answers open, same as every other null-block query on this engine.
+func (e *Engine) NodeBelow(geoX, geoY, worldZ int) (height int16, nswe block.NSWE, ok bool) {
+	b := e.blockAtGeo(geoX, geoY)
+	layer := b.Below(localCell(geoX), localCell(geoY), int32(worldZ))
+	if layer == -1 {
+		return 0, 0, false
+	}
+	return b.Height(layer), b.NSWE(layer), true
+}
+
 // Above returns the first layer above worldZ at geodata cell coordinates.
 func (e *Engine) Above(geoX, geoY, worldZ int) (int16, bool) {
 	b := e.blockAtGeo(geoX, geoY)
