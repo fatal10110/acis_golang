@@ -1,6 +1,11 @@
 package itemcontainer
 
-import "github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+import (
+	"cmp"
+	"slices"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+)
 
 // Freight is a player's freight container: items ordered from a merchant
 // for pickup at a specific castle town. Unlike a plain Container, its
@@ -54,6 +59,7 @@ func (f *Freight) VisibleItems() []*item.Instance {
 			out = append(out, inst)
 		}
 	}
+	slices.SortFunc(out, func(a, b *item.Instance) int { return cmp.Compare(a.ObjectID, b.ObjectID) })
 	return out
 }
 
@@ -86,11 +92,17 @@ func (f *Freight) Add(inst *item.Instance) (result *item.Instance, absorbed bool
 
 	tmpl, _ := f.templates.Get(inst.TemplateID)
 	if tmpl != nil && tmpl.Stackable {
-		for _, old := range f.items {
-			if old.TemplateID == inst.TemplateID && f.visible(old) {
-				old.Count += inst.Count
-				return old, true
+		var old *item.Instance
+		for _, candidate := range f.items {
+			if candidate.TemplateID == inst.TemplateID && f.visible(candidate) {
+				if old == nil || candidate.ObjectID < old.ObjectID {
+					old = candidate
+				}
 			}
+		}
+		if old != nil {
+			old.Count += inst.Count
+			return old, true
 		}
 	}
 
