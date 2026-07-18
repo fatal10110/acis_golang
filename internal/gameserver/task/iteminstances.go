@@ -37,8 +37,7 @@ type PetItemPersistence interface {
 
 // ItemInstances lazily persists changed item instances.
 //
-// mu guards pending. The owning actor/runtime must serialize access to the
-// item instances themselves.
+// mu guards pending. Mutable item fields are guarded by item.Instance.
 type ItemInstances struct {
 	items         ItemPersistence
 	augmentations AugmentationPersistence
@@ -152,38 +151,43 @@ func (i *ItemInstances) snapshotPending() []*item.Instance {
 }
 
 func (i *ItemInstances) updateItem(ctx context.Context, inst *item.Instance) error {
-	tmpl, _ := i.templates.Get(inst.TemplateID)
+	saved := inst.Clone()
+	if saved == nil {
+		return nil
+	}
+	st := saved.Snapshot()
+	tmpl, _ := i.templates.Get(st.TemplateID)
 	isWeapon := tmpl != nil && tmpl.Kind == item.KindWeapon
 
-	if inst.Count <= 0 || inst.Location == item.LocationVoid {
-		if err := i.items.Delete(ctx, inst.ObjectID); err != nil {
-			return fmt.Errorf("delete item %d: %w", inst.ObjectID, err)
+	if st.Count <= 0 || st.Location == item.LocationVoid {
+		if err := i.items.Delete(ctx, st.ObjectID); err != nil {
+			return fmt.Errorf("delete item %d: %w", st.ObjectID, err)
 		}
-		if inst.Count <= 0 {
+		if st.Count <= 0 {
 			if isWeapon && i.augmentations != nil {
-				if err := i.augmentations.Delete(ctx, inst.ObjectID); err != nil {
-					return fmt.Errorf("delete augmentation %d: %w", inst.ObjectID, err)
+				if err := i.augmentations.Delete(ctx, st.ObjectID); err != nil {
+					return fmt.Errorf("delete augmentation %d: %w", st.ObjectID, err)
 				}
 			}
 			if i.pets != nil && isPetCollar(tmpl) {
-				if err := i.pets.DeleteByItemObjectID(ctx, inst.ObjectID); err != nil {
-					return fmt.Errorf("delete pet item %d: %w", inst.ObjectID, err)
+				if err := i.pets.DeleteByItemObjectID(ctx, st.ObjectID); err != nil {
+					return fmt.Errorf("delete pet item %d: %w", st.ObjectID, err)
 				}
 			}
 		}
 		return nil
 	}
 
-	if err := i.items.Save(ctx, inst); err != nil {
-		return fmt.Errorf("save item %d: %w", inst.ObjectID, err)
+	if err := i.items.Save(ctx, saved); err != nil {
+		return fmt.Errorf("save item %d: %w", st.ObjectID, err)
 	}
 	if isWeapon && i.augmentations != nil {
-		if inst.Augmentation == nil {
-			if err := i.augmentations.Delete(ctx, inst.ObjectID); err != nil {
-				return fmt.Errorf("delete augmentation %d: %w", inst.ObjectID, err)
+		if st.Augmentation == nil {
+			if err := i.augmentations.Delete(ctx, st.ObjectID); err != nil {
+				return fmt.Errorf("delete augmentation %d: %w", st.ObjectID, err)
 			}
-		} else if err := i.augmentations.Save(ctx, inst.ObjectID, *inst.Augmentation); err != nil {
-			return fmt.Errorf("save augmentation %d: %w", inst.ObjectID, err)
+		} else if err := i.augmentations.Save(ctx, st.ObjectID, *st.Augmentation); err != nil {
+			return fmt.Errorf("save augmentation %d: %w", st.ObjectID, err)
 		}
 	}
 	return nil

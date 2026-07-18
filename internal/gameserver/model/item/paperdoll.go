@@ -18,16 +18,17 @@ type PaperdollEntry struct {
 func Paperdoll(items []*Instance) [PaperdollSlots]PaperdollEntry {
 	var out [PaperdollSlots]PaperdollEntry
 	for _, inst := range items {
-		if inst.Location != LocationPaperdoll {
+		st := inst.Snapshot()
+		if st.Location != LocationPaperdoll {
 			continue
 		}
-		if inst.LocationData < 0 || inst.LocationData >= PaperdollSlots {
+		if st.LocationData < 0 || st.LocationData >= PaperdollSlots {
 			continue
 		}
-		out[inst.LocationData] = PaperdollEntry{
-			ObjectID:     inst.ObjectID,
-			TemplateID:   inst.TemplateID,
-			EnchantLevel: inst.EnchantLevel,
+		out[st.LocationData] = PaperdollEntry{
+			ObjectID:     st.ObjectID,
+			TemplateID:   st.TemplateID,
+			EnchantLevel: st.EnchantLevel,
 		}
 	}
 	return out

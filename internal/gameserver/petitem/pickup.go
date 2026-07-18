@@ -44,18 +44,18 @@ func PickupGround(pet *summon.Actor, petInv *itemcontainer.Inventory, ground *gr
 		return PickupResult{}, PickupPetUnavailable
 	}
 
-	picked := ground.Instance
-	if ForbiddenForPet(&picked, ground.Template) {
+	picked := ground.Instance.Clone()
+	if ForbiddenForPet(picked, ground.Template) {
 		return PickupResult{}, PickupItemNotForPets
 	}
-	if !petInv.ValidateCapacity(petInv.SlotsNeededFor(&picked, ground.Template)) {
+	if !petInv.ValidateCapacity(petInv.SlotsNeededFor(picked, ground.Template)) {
 		return PickupResult{}, PickupPetCannotCarryMore
 	}
-	if !petInv.ValidateWeight(int(ground.Template.Weight) * picked.Count) {
+	if !petInv.ValidateWeight(int(ground.Template.Weight) * picked.Snapshot().Count) {
 		return PickupResult{}, PickupPetTooEncumbered
 	}
 
-	result, absorbed := petInv.Add(&picked)
+	result, absorbed := petInv.Add(picked)
 	if result == nil {
 		return PickupResult{}, PickupNoop
 	}

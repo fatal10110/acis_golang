@@ -147,8 +147,9 @@ func UseItem(pet *summon.Actor, petInv *itemcontainer.Inventory, objectID int32,
 		return UseResult{}, UsePetCannotUseItem
 	}
 
-	if inst.Equipped() {
-		old := petInv.UnequipSlot(inst.LocationData)
+	st := inst.Snapshot()
+	if st.Location == item.LocationPaperdoll || st.Location == item.LocationPetEquip {
+		old := petInv.UnequipSlot(st.LocationData)
 		if old == nil {
 			return UseResult{}, UseNoop
 		}

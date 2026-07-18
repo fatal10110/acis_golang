@@ -3,9 +3,11 @@ package task
 import (
 	"context"
 	"slices"
+	"sync"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 )
 
 func TestItemInstancesSaveFlushesAndClearsPendingItems(t *testing.T) {
@@ -79,6 +81,50 @@ func TestItemInstancesSaveDeletesVoidItemsWithoutDeletingAugmentation(t *testing
 	}
 }
 
+func TestItemInstanceBackgroundAndInventoryMutationIsRaceFree(t *testing.T) {
+	tmpl := &item.Template{ID: 10, Kind: item.KindEtcItem, Stackable: true, Duration: 100000, EtcItem: &item.EtcItemDetail{}}
+	templates := item.NewTable([]*item.Template{tmpl})
+	inv := itemcontainer.NewPlayerInventory(100, templates)
+	inst := inv.AddNew(tmpl.ID, 100000, 1)
+
+	effects := &shadowItemFakeEffects{}
+	shadowItems, err := NewShadowItems(effects)
+	if err != nil {
+		t.Fatalf("NewShadowItems() error = %v", err)
+	}
+	shadowItems.Track(100, inst, tmpl)
+
+	instances := NewItemInstances(&itemPersistenceReadStub{}, nil, nil, templates)
+
+	const iterations = 1000
+	var wg sync.WaitGroup
+	wg.Add(3)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			shadowItems.Tick()
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			instances.Add(inst)
+			if err := instances.Save(context.Background()); err != nil {
+				t.Errorf("Save() error = %v", err)
+			}
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			if inv.DestroyItem(inst, 1) == nil {
+				t.Errorf("DestroyItem() returned nil")
+			}
+		}
+	}()
+	wg.Wait()
+}
+
 type itemPersistenceStub struct {
 	saved   []int32
 	deleted []int32
@@ -93,6 +139,15 @@ func (s *itemPersistenceStub) Delete(_ context.Context, objectID int32) error {
 	s.deleted = append(s.deleted, objectID)
 	return nil
 }
+
+type itemPersistenceReadStub struct{}
+
+func (itemPersistenceReadStub) Save(_ context.Context, inst *item.Instance) error {
+	_, _, _ = inst.Count, inst.Location, inst.ManaLeft
+	return nil
+}
+
+func (itemPersistenceReadStub) Delete(context.Context, int32) error { return nil }
 
 type augmentationPersistenceStub struct {
 	saved   []int32

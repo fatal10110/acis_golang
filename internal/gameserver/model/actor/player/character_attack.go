@@ -407,7 +407,7 @@ func (c *Character) CheckAndEquipArrows() bool {
 	if arrows == nil {
 		return false
 	}
-	if arrows.Location == item.LocationPaperdoll {
+	if arrows.Snapshot().Location == item.LocationPaperdoll {
 		return true
 	}
 	tmpl, ok := c.inventory.Templates().Get(arrows.TemplateID)

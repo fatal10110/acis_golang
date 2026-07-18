@@ -177,15 +177,15 @@ func (b *Book) AddItem(playerID int32, inv *itemcontainer.Inventory, objectID in
 		return AddResult{Status: AddNoSession, PartnerID: partnerID}
 	}
 
-	return AddResult{
-		Status:         AddAccepted,
-		PartnerID:      partnerID,
-		Item:           added.snapshot,
-		AddedCount:     count,
-		AvailableCount: inst.Count - added.count,
-		Entries:        s.offers[playerID].entries(inv),
+		return AddResult{
+			Status:         AddAccepted,
+			PartnerID:      partnerID,
+			Item:           added.snapshot,
+			AddedCount:     count,
+			AvailableCount: inst.Snapshot().Count - added.count,
+			Entries:        s.offers[playerID].entries(inv),
+		}
 	}
-}
 
 // Confirm records a player's confirmation and returns a session snapshot when both sides confirmed.
 func (b *Book) Confirm(playerID int32) DoneResult {
@@ -283,12 +283,12 @@ func (o Offer) Empty() bool {
 func (o Offer) Entries(inv *itemcontainer.Inventory) []ItemUpdateEntry {
 	entries := make([]ItemUpdateEntry, 0, len(o.Items))
 	for _, row := range o.Items {
-		available := 0
-		if inv != nil {
-			if inst := inv.ItemByObjectID(row.Snapshot.ObjectID); inst != nil {
-				available = inst.Count - row.Count
+			available := 0
+			if inv != nil {
+				if inst := inv.ItemByObjectID(row.Snapshot.ObjectID); inst != nil {
+					available = inst.Snapshot().Count - row.Count
+				}
 			}
-		}
 		entries = append(entries, ItemUpdateEntry{Item: row.Snapshot, AvailableCount: available})
 	}
 	return entries
@@ -381,22 +381,23 @@ func (o *offer) add(inst *item.Instance, count int) (*offeredItem, bool) {
 		return nil, false
 	}
 	if existing := o.items[inst.ObjectID]; existing != nil {
-		if existing.count+count > inst.Count {
+		if existing.count+count > inst.Snapshot().Count {
 			return nil, false
 		}
 		existing.count += count
 		existing.snapshot.Count = existing.count
 		return existing, true
 	}
-	if count > inst.Count {
+	st := inst.Snapshot()
+	if count > st.Count {
 		return nil, false
 	}
 	row := &offeredItem{
 		snapshot: ItemSnapshot{
-			ObjectID:     inst.ObjectID,
-			TemplateID:   inst.TemplateID,
+			ObjectID:     st.ObjectID,
+			TemplateID:   st.TemplateID,
 			Count:        count,
-			EnchantLevel: inst.EnchantLevel,
+			EnchantLevel: st.EnchantLevel,
 		},
 		count: count,
 	}
@@ -447,7 +448,8 @@ func itemForOffer(inv *itemcontainer.Inventory, ownerID, objectID int32, count i
 		return nil, false
 	}
 	inst := inv.ItemByObjectID(objectID)
-	if inst == nil || inst.OwnerID != ownerID || inst.Equipped() || inst.Count < count {
+	st := inst.Snapshot()
+	if inst == nil || st.OwnerID != ownerID || st.Location == item.LocationPaperdoll || st.Location == item.LocationPetEquip || st.Count < count {
 		return nil, false
 	}
 	tmpl, ok := inv.Templates().Get(inst.TemplateID)

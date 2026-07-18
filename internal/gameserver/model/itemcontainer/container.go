@@ -19,9 +19,8 @@ import (
 // comes from (player status, clan config, ...) — this package doesn't load
 // config itself.
 //
-// mu guards the membership map. It does not make returned *item.Instance
-// values independently thread-safe; the owning actor/runtime must serialize
-// instance field access.
+// mu guards the membership map. Mutable item fields are guarded by
+// item.Instance once an instance is visible outside construction/restore code.
 type Container struct {
 	ownerID   int32
 	location  item.Location
@@ -181,15 +180,16 @@ func (c *Container) ItemCount(templateID int32, enchantLevel int, includeEquippe
 		if inst.TemplateID != templateID {
 			continue
 		}
-		if enchantLevel >= 0 && inst.EnchantLevel != enchantLevel {
+		st := inst.Snapshot()
+		if enchantLevel >= 0 && st.EnchantLevel != enchantLevel {
 			continue
 		}
-		if !includeEquipped && inst.Equipped() {
+		if !includeEquipped && (st.Location == item.LocationPaperdoll || st.Location == item.LocationPetEquip) {
 			continue
 		}
 		tmpl, _ := c.templates.Get(inst.TemplateID)
 		if tmpl != nil && tmpl.Stackable {
-			return inst.Count
+			return st.Count
 		}
 		count++
 	}
@@ -214,13 +214,11 @@ func (c *Container) Add(inst *item.Instance) (result *item.Instance, absorbed bo
 
 	tmpl, _ := c.templates.Get(inst.TemplateID)
 	if old := c.itemByTemplateIDLocked(inst.TemplateID); old != nil && tmpl != nil && tmpl.Stackable {
-		old.Count += inst.Count
+		old.AddCount(inst.Snapshot().Count)
 		return old, true
 	}
 
-	inst.OwnerID = c.ownerID
-	inst.Location = c.location
-	inst.LocationData = 0
+	inst.SetOwnerLocation(c.ownerID, c.location, 0)
 	c.items[inst.ObjectID] = inst
 	return inst, false
 }
@@ -305,22 +303,23 @@ func (c *Container) DestroyItem(inst *item.Instance, count int) *item.Instance {
 }
 
 func destroyItemCore(inst *item.Instance, count int, remove func(*item.Instance) bool, modified func(*item.Instance)) *item.Instance {
-	if inst.Count > count {
-		inst.Count -= count
+	held := inst.CountValue()
+	if held > count {
+		if _, ok := inst.ReduceCount(count); !ok {
+			return nil
+		}
 		if modified != nil {
 			modified(inst)
 		}
 		return inst
 	}
-	if inst.Count < count {
+	if held < count {
 		return nil
 	}
 	if !remove(inst) {
 		return nil
 	}
-	inst.Count = 0
-	inst.OwnerID = 0
-	inst.Location = item.LocationVoid
+	inst.DestroyState()
 	return inst
 }
 
@@ -341,7 +340,7 @@ func (c *Container) DestroyAll(inst *item.Instance) *item.Instance {
 	if inst == nil {
 		return nil
 	}
-	return c.DestroyItem(inst, inst.Count)
+	return c.DestroyItem(inst, inst.CountValue())
 }
 
 // DestroyAllItems destroys every item instance the container holds.
@@ -350,9 +349,7 @@ func (c *Container) DestroyAllItems() {
 	defer c.mu.Unlock()
 	for objectID, inst := range c.items {
 		delete(c.items, objectID)
-		inst.Count = 0
-		inst.OwnerID = 0
-		inst.Location = item.LocationVoid
+		inst.DestroyState()
 	}
 }
 
@@ -388,13 +385,14 @@ func (c *Container) Transfer(objectID int32, count int, target transferTarget, n
 		c.mu.Unlock()
 		return nil, 0, false
 	}
-	templateID := src.TemplateID
+	st := src.Snapshot()
+	templateID := st.TemplateID
 	tmpl, _ := c.templates.Get(templateID)
 	stackable := tmpl != nil && tmpl.Stackable
-	if count > src.Count {
-		count = src.Count
+	if count > st.Count {
+		count = st.Count
 	}
-	sourceCount := src.Count
+	sourceCount := st.Count
 	c.mu.Unlock()
 
 	var targetItem *item.Instance
@@ -404,27 +402,33 @@ func (c *Container) Transfer(objectID int32, count int, target transferTarget, n
 
 	c.mu.Lock()
 	src = c.items[objectID]
-	if src == nil || src.TemplateID != templateID || src.Count != sourceCount {
+	if src == nil {
 		c.mu.Unlock()
 		return nil, 0, false
 	}
-	if count > src.Count {
-		count = src.Count
+	st = src.Snapshot()
+	if st.TemplateID != templateID || st.Count != sourceCount {
+		c.mu.Unlock()
+		return nil, 0, false
 	}
-	if src.Count == count && targetItem == nil {
+	if count > st.Count {
+		count = st.Count
+	}
+	if st.Count == count && targetItem == nil {
 		delete(c.items, objectID)
 		c.mu.Unlock()
 		result, _ = target.Add(src)
 		return result, 0, false
 	}
 
-	if src.Count > count {
-		src.Count -= count
+	if st.Count > count {
+		if _, ok := src.ReduceCount(count); !ok {
+			c.mu.Unlock()
+			return nil, 0, false
+		}
 	} else {
 		delete(c.items, objectID)
-		src.Count = 0
-		src.OwnerID = 0
-		src.Location = item.LocationVoid
+		src.DestroyState()
 		freedObjectID, freed = objectID, true
 	}
 	c.mu.Unlock()
