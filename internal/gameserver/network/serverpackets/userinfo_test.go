@@ -20,15 +20,17 @@ func TestFrameUserInfo(t *testing.T) {
 		Level:   1,
 		Exp:     0,
 		SP:      0,
-		MaxHP:   80, CurHP: 75,
-		MaxMP: 30, CurMP: 30,
-		MaxCP: 40, CurCP: 40,
-		Face: 0, HairStyle: 1, HairColor: 2,
+		Face:    0, HairStyle: 1, HairColor: 2,
 		Location:    location.Location{X: 10, Y: 20, Z: 30},
 		LastHeading: 100,
 		Karma:       0, PKKills: 1, PvPKills: 2,
 		ClanID: 5, Title: "Hero", AccessLevel: 1,
 	}
+	c.SetResourceValues(player.Resources{
+		MaxHP: 80, CurrentHP: 75,
+		MaxMP: 30, CurrentMP: 30,
+		MaxCP: 40, CurrentCP: 40,
+	})
 	tmpl := &player.Template{
 		STR: 40, CON: 43, DEX: 30, INT: 21, WIT: 11, MEN: 25,
 		PAtk: 4, PDef: 30, MAtk: 3, MDef: 15,
@@ -40,6 +42,7 @@ func TestFrameUserInfo(t *testing.T) {
 	}
 
 	got := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: c, Template: tmpl, Items: items}))
+	resources := c.ResourceValues()
 
 	want := []byte{OpcodeUserInfo}
 	x, y, z := c.Position()
@@ -60,10 +63,10 @@ func TestFrameUserInfo(t *testing.T) {
 	want = binary.LittleEndian.AppendUint32(want, uint32(tmpl.INT))
 	want = binary.LittleEndian.AppendUint32(want, uint32(tmpl.WIT))
 	want = binary.LittleEndian.AppendUint32(want, uint32(tmpl.MEN))
-	want = binary.LittleEndian.AppendUint32(want, uint32(c.MaxHP))
-	want = binary.LittleEndian.AppendUint32(want, uint32(c.CurHP))
-	want = binary.LittleEndian.AppendUint32(want, uint32(c.MaxMP))
-	want = binary.LittleEndian.AppendUint32(want, uint32(c.CurMP))
+	want = binary.LittleEndian.AppendUint32(want, uint32(resources.MaxHP))
+	want = binary.LittleEndian.AppendUint32(want, uint32(resources.CurrentHP))
+	want = binary.LittleEndian.AppendUint32(want, uint32(resources.MaxMP))
+	want = binary.LittleEndian.AppendUint32(want, uint32(resources.CurrentMP))
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.SP))
 	want = binary.LittleEndian.AppendUint32(want, 0)  // current weight
 	want = binary.LittleEndian.AppendUint32(want, 0)  // weight limit
@@ -148,8 +151,8 @@ func TestFrameUserInfo(t *testing.T) {
 	want = binary.LittleEndian.AppendUint16(want, nonDwarfInventoryLimit)
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.ClassID))
 	want = binary.LittleEndian.AppendUint32(want, 0)
-	want = binary.LittleEndian.AppendUint32(want, uint32(c.MaxCP))
-	want = binary.LittleEndian.AppendUint32(want, uint32(c.CurCP))
+	want = binary.LittleEndian.AppendUint32(want, uint32(resources.MaxCP))
+	want = binary.LittleEndian.AppendUint32(want, uint32(resources.CurrentCP))
 	want = append(want, 127) // enchant effect, capped
 
 	want = append(want, 0)                           // team

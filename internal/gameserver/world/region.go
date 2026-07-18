@@ -45,11 +45,12 @@ func (r *Region) Active() bool {
 	return r.active.Load()
 }
 
-func (r *Region) setActive(value bool) {
-	if !r.active.CompareAndSwap(!value, value) {
-		return
-	}
-	r.notifyActivity(value)
+// setActive flips the active flag to value if it isn't already there,
+// reporting whether it changed. The caller decides when to run
+// notifyActivity for a change it reports — see relocate, which defers that
+// work until after releasing regionActivityMu.
+func (r *Region) setActive(value bool) bool {
+	return r.active.CompareAndSwap(!value, value)
 }
 
 func (r *Region) notifyActivity(active bool) {

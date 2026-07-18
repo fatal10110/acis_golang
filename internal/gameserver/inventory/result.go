@@ -49,7 +49,7 @@ func DestroyedOrUpdated(inst *item.Instance) Persist {
 	if inst == nil {
 		return Persist{}
 	}
-	if inst.Count == 0 {
+	if inst.Snapshot().Count == 0 {
 		return Delete(inst.ObjectID)
 	}
 	return Update(inst)

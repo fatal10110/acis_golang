@@ -27,7 +27,7 @@ type blowDamageTarget interface {
 
 type manaDamageTarget interface {
 	Dead() bool
-	MP() float64
+	MPValue() float64
 	ReduceMP(float64) float64
 	ManaDamageInput(caster any, skill modelskill.Definition) (formulas.ManaDamageInput, bool)
 }
@@ -122,8 +122,8 @@ func (manaDamageHandler) Use(cast Cast) {
 			continue
 		}
 		damage := formulas.ManaDamage(in)
-		if damage > target.MP() {
-			damage = target.MP()
+		if damage > target.MPValue() {
+			damage = target.MPValue()
 		}
 		if damage > 0 {
 			target.ReduceMP(damage)

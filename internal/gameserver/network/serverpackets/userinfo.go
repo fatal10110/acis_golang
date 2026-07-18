@@ -61,6 +61,7 @@ func FrameUserInfo(s UserInfoSnapshot) wire.Frame {
 func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) {
 	c, t := s.Character, s.Template
 	x, y, z := c.Position()
+	resources := c.ResourceValues()
 	paperdoll := item.Paperdoll(s.Items)
 	rhand := paperdoll[rhandPaperdollIndex]
 
@@ -101,10 +102,10 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) {
 	w.WriteInt32(int32(t.INT))
 	w.WriteInt32(int32(t.WIT))
 	w.WriteInt32(int32(t.MEN))
-	w.WriteInt32(int32(c.MaxHP))
-	w.WriteInt32(int32(c.CurHP))
-	w.WriteInt32(int32(c.MaxMP))
-	w.WriteInt32(int32(c.CurMP))
+	w.WriteInt32(int32(resources.MaxHP))
+	w.WriteInt32(int32(resources.CurrentHP))
+	w.WriteInt32(int32(resources.MaxMP))
+	w.WriteInt32(int32(resources.CurrentMP))
 	w.WriteInt32(int32(c.SP))
 	w.WriteInt32(0) // current weight: encumbrance is not modeled
 	w.WriteInt32(0) // weight limit: encumbrance is not modeled
@@ -193,8 +194,8 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) {
 	w.WriteUint16(uint16(inventoryLimit))
 	w.WriteInt32(int32(c.ClassID))
 	w.WriteInt32(0)
-	w.WriteInt32(int32(c.MaxCP))
-	w.WriteInt32(int32(c.CurCP))
+	w.WriteInt32(int32(resources.MaxCP))
+	w.WriteInt32(int32(resources.CurrentCP))
 	w.WriteUint8(byte(enchantEffect))
 	w.WriteUint8(0) // team: teams (duel/event) are not modeled
 	w.WriteInt32(0) // large clan crest id: clans are not modeled

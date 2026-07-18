@@ -43,8 +43,7 @@ type shadowItemEntry struct {
 // non-negative mana value, so it never actually fires there either — this
 // port simply doesn't reproduce that dead branch.
 //
-// mu guards entries. The owning actor/runtime must serialize access to the
-// tracked item instances themselves; this manager only owns the decay schedule.
+// mu guards entries. Mutable item fields are guarded by item.Instance.
 type ShadowItems struct {
 	effects ShadowItemEffects
 
@@ -75,7 +74,7 @@ func (s *ShadowItems) Track(actorID int32, inst *item.Instance, tmpl *item.Templ
 	if inst == nil || tmpl == nil || !inst.ShadowItem(tmpl) {
 		return
 	}
-	if inst.ManaLeft != tmpl.InitialManaLeft() {
+	if inst.Snapshot().ManaLeft != tmpl.InitialManaLeft() {
 		inst.DecreaseMana(60)
 	}
 
@@ -138,16 +137,16 @@ func (s *ShadowItems) Tick() {
 	s.mu.Unlock()
 
 	for _, e := range entries {
-		e.inst.DecreaseMana(1)
+		manaLeft := e.inst.DecreaseMana(1)
 
-		if e.inst.ManaLeft <= 0 {
+		if manaLeft <= 0 {
 			s.Untrack(e.inst)
 			s.effects.Expire(e.actorID, e.inst)
 			continue
 		}
 
-		if manaThreshold(e.inst.ManaLeft) {
-			s.effects.ManaThreshold(e.actorID, e.inst, e.inst.ManaLeft)
+		if manaThreshold(manaLeft) {
+			s.effects.ManaThreshold(e.actorID, e.inst, manaLeft)
 		}
 	}
 }

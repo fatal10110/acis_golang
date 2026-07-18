@@ -59,6 +59,40 @@ func TestTransferItemPartialCreatesNewStackAndPersistenceActions(t *testing.T) {
 	}
 }
 
+func TestTransferItemPartialMergePersistsTargetUpdate(t *testing.T) {
+	templates := testTemplates()
+	source := itemcontainer.NewPlayerInventory(1, templates)
+	target := itemcontainer.NewPetInventory(2, templates)
+	stack := source.AddNew(item.AdenaID, 100, 500)
+	existing := target.AddNew(item.AdenaID, 5, 600)
+	source.DrainUpdates()
+	target.DrainUpdates()
+
+	res, ok, err := NewService(&testIDs{next: 900}).TransferItem(source, target, stack.ObjectID, 30)
+	if err != nil {
+		t.Fatalf("TransferItem error = %v", err)
+	}
+	if !ok {
+		t.Fatal("TransferItem returned ok=false")
+	}
+
+	if stack.Count != 70 {
+		t.Fatalf("source count = %d, want 70", stack.Count)
+	}
+	if existing.Count != 35 {
+		t.Fatalf("target count = %d, want 35", existing.Count)
+	}
+	if len(res.Persist) != 2 {
+		t.Fatalf("persist actions = %+v, want source update and target update", res.Persist)
+	}
+	if res.Persist[0].Action != PersistUpdate || res.Persist[0].Item.ObjectID != stack.ObjectID {
+		t.Fatalf("first persist = %+v, want source update", res.Persist[0])
+	}
+	if res.Persist[1].Action != PersistUpdate || res.Persist[1].Item.ObjectID != existing.ObjectID {
+		t.Fatalf("second persist = %+v, want target update", res.Persist[1])
+	}
+}
+
 func TestTransferItemFullMoveUpdatesMovedInstance(t *testing.T) {
 	templates := testTemplates()
 	source := itemcontainer.NewPlayerInventory(1, templates)
