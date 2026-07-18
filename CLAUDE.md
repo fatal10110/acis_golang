@@ -32,6 +32,18 @@ down to bytes and constants:
 - **Execution** — the milestone playbook: what to build in what order, and how each piece is verified
   against known-good behavior.
 
+## GitHub issue status and shared cache
+
+Never rely on a local cache for GitHub issue status. Before choosing work, resuming work, closing
+work, or reporting whether an issue is open or closed, fetch current state from
+`fatal10110/acis_golang` with `gh issue list` or `gh issue view`.
+
+Use the shared issue cache only for reusable context: issue descriptions already read, exploration
+notes, investigation findings, parent/child context, Java files inspected, oracle observations, and
+follow-up notes. The canonical shared cache for both Codex and Claude is
+`../.claude/skills/acis-porting/cache/`. The `.claude` path name is historical; do not keep a
+separate Codex-only cache for issue status or investigation context.
+
 Use these docs to learn **what** to produce — the bytes, numbers, sequences, and rules. They are a
 specification of behavior, and they describe an existing implementation as the authority for that
 behavior. That is precisely the material §0 tells you **not** to echo into this repository: read them,
