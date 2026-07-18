@@ -26,9 +26,8 @@ type AIActor interface {
 type AI struct {
 	state *world.State
 
-	mu       sync.RWMutex
-	actors   map[int32]AIActor
-	inactive map[int32]struct{}
+	mu     sync.RWMutex
+	actors map[int32]AIActor
 }
 
 // NewAI returns an empty active-AI registry. A nil state treats every actor
@@ -36,9 +35,8 @@ type AI struct {
 // spawned into it; off-grid actors are not ticked.
 func NewAI(state *world.State) *AI {
 	return &AI{
-		state:    state,
-		actors:   make(map[int32]AIActor),
-		inactive: make(map[int32]struct{}),
+		state:  state,
+		actors: make(map[int32]AIActor),
 	}
 }
 
@@ -55,7 +53,6 @@ func (a *AI) Add(actor AIActor) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.actors[actor.ObjectID()] = actor
-	delete(a.inactive, actor.ObjectID())
 }
 
 // Remove unregisters actor from recurring AI ticks.
@@ -66,7 +63,6 @@ func (a *AI) Remove(actor AIActor) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	delete(a.actors, actor.ObjectID())
-	delete(a.inactive, actor.ObjectID())
 }
 
 // Tick runs one AI cycle for every registered actor in an active region,
@@ -83,14 +79,9 @@ func (a *AI) Tick() {
 		placed, active := regionActivity(a.state, actor)
 		switch {
 		case !placed:
-			a.clearInactive(actor)
 			continue
 		case active:
-			a.clearInactive(actor)
 		default:
-			if a.markInactive(actor) {
-				notifyInactiveRegion(actor)
-			}
 			if sleepsWhenRegionInactive(actor) {
 				continue
 			}
@@ -98,24 +89,4 @@ func (a *AI) Tick() {
 		actor.Tick()
 		actor.Think()
 	}
-}
-
-func (a *AI) markInactive(actor AIActor) bool {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	id := actor.ObjectID()
-	if _, ok := a.actors[id]; !ok {
-		return false
-	}
-	if _, ok := a.inactive[id]; ok {
-		return false
-	}
-	a.inactive[id] = struct{}{}
-	return true
-}
-
-func (a *AI) clearInactive(actor AIActor) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	delete(a.inactive, actor.ObjectID())
 }

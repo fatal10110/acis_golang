@@ -188,6 +188,11 @@ func (h *Hostile) OnInactiveRegion() {
 	h.enterInactiveRegion()
 }
 
+// OnActiveRegion clears the deactivation latch once players wake the region.
+func (h *Hostile) OnActiveRegion() {
+	h.regionInactive.Store(false)
+}
+
 // SleepWhenRegionInactive reports whether the AI task should pause this NPC
 // while no player is near its region. noSleepMode NPCs and off-territory NPCs
 // keep ticking, matching the oracle's deactivation exemption.
