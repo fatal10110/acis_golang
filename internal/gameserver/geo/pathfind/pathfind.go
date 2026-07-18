@@ -260,7 +260,13 @@ func (f *Finder) expand(current, goal *node, seq *int64, scratch *searchScratch)
 		// Mirrors the reference's extra getNodeNswe(x+dx, y, z) corner
 		// check: a fresh resolve of the X-direction neighbor (same cell and
 		// z as nsweX above, kept as its own call for structural fidelity
-		// with addCornerNode rather than reusing nsweX's value).
+		// with addCornerNode rather than reusing nsweX's value). Provably
+		// value-identical to nsweX given static geodata — this line is only
+		// reachable once nsweX itself came from a successful candidateNSWE
+		// call at this exact cell/z — so it's a candidate for collapsing to
+		// nsweX if profiling ever calls for it; the only behavioral
+		// difference would surface under a door toggling this block mid-
+		// search, which isn't a case the reference itself accounts for.
 		xGX, xGY := current.gx+corner.dx, current.gy
 		_, recheckNSWE, ok := f.candidateNSWE(xGX, xGY, z)
 		if !ok || !recheckNSWE.Allows(flagY) {

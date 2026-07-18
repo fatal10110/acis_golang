@@ -129,31 +129,57 @@ func TestExpandCornerCutting(t *testing.T) {
 
 	tests := []struct {
 		name                           string
+		currentMask                    block.NSWE // defaults to AllDirections when zero
 		north, south, west, east       block.NSWE
+		wantN, wantS, wantW, wantE     bool
 		wantNW, wantNE, wantSW, wantSE bool
 	}{
 		{
-			name:  "open room allows every diagonal",
+			name:  "open room allows every direction",
 			north: block.AllDirections, south: block.AllDirections,
 			west: block.AllDirections, east: block.AllDirections,
+			wantN: true, wantS: true, wantW: true, wantE: true,
 			wantNW: true, wantNE: true, wantSW: true, wantSE: true,
 		},
 		{
+			// The cardinal candidate itself is gated only by CURRENT's own
+			// mask (always open here), not the neighbor's — a walled
+			// neighbor still gets created as an obstacle-weighted dead end
+			// (matches addNode: the target cell's mask never gates its own
+			// creation). Only the diagonals, which mutually test the
+			// neighbors' own masks, are affected.
 			name:  "walled west neighbor blocks both west diagonals",
 			north: block.AllDirections, south: block.AllDirections,
 			west: block.NoDirections, east: block.AllDirections,
+			wantN: true, wantS: true, wantW: true, wantE: true,
 			wantNW: false, wantNE: true, wantSW: false, wantSE: true,
 		},
 		{
 			name:  "walled north neighbor blocks both north diagonals",
 			north: block.NoDirections, south: block.AllDirections,
 			west: block.AllDirections, east: block.AllDirections,
+			wantN: true, wantS: true, wantW: true, wantE: true,
 			wantNW: false, wantNE: false, wantSW: true, wantSE: true,
 		},
 		{
-			name:  "walled south and east neighbors block only their shared corner",
+			name:  "walled south and east neighbors leave only the NW corner open",
 			north: block.AllDirections, south: block.NoDirections,
 			west: block.AllDirections, east: block.NoDirections,
+			wantN: true, wantS: true, wantW: true, wantE: true,
+			wantNW: true, wantNE: false, wantSW: false, wantSE: false,
+		},
+		{
+			// Pins the OTHER gate in expand: current's own mask, not just
+			// the neighbors'. North/West open on an otherwise fully open
+			// room still must not generate S/E (or any corner needing
+			// them), because current.nswe itself never allows those
+			// directions to be considered at all — addDirectionalNode's
+			// short-circuit, before any neighbor is even queried.
+			name:        "partial current mask suppresses the closed cardinals and their corners",
+			currentMask: block.North | block.West,
+			north:       block.AllDirections, south: block.AllDirections,
+			west: block.AllDirections, east: block.AllDirections,
+			wantN: true, wantS: false, wantW: true, wantE: false,
 			wantNW: true, wantNE: false, wantSW: false, wantSE: false,
 		},
 	}
@@ -179,25 +205,32 @@ func TestExpandCornerCutting(t *testing.T) {
 			scratch := &searchScratch{}
 			scratch.reset()
 			current := scratch.newNode(cx, cy, 0)
-			current.nswe = block.AllDirections
+			current.nswe = test.currentMask
+			if current.nswe == block.NoDirections {
+				current.nswe = block.AllDirections
+			}
 			goal := scratch.newNode(cx+5, cy+5, 0)
 			seq := int64(1)
 
 			f.expand(current, goal, &seq, scratch)
 
-			for _, corner := range []struct {
+			for _, candidate := range []struct {
 				name   string
 				gx, gy int
 				want   bool
 			}{
+				{"N", cx, cy - 1, test.wantN},
+				{"S", cx, cy + 1, test.wantS},
+				{"W", cx - 1, cy, test.wantW},
+				{"E", cx + 1, cy, test.wantE},
 				{"NW", cx - 1, cy - 1, test.wantNW},
 				{"NE", cx + 1, cy - 1, test.wantNE},
 				{"SW", cx - 1, cy + 1, test.wantSW},
 				{"SE", cx + 1, cy + 1, test.wantSE},
 			} {
-				_, got := scratch.openSet[nodeKey{gx: corner.gx, gy: corner.gy, z: 0}]
-				if got != corner.want {
-					t.Errorf("%s candidate queued = %v, want %v", corner.name, got, corner.want)
+				_, got := scratch.openSet[nodeKey{gx: candidate.gx, gy: candidate.gy, z: 0}]
+				if got != candidate.want {
+					t.Errorf("%s candidate queued = %v, want %v", candidate.name, got, candidate.want)
 				}
 			}
 		})
@@ -216,12 +249,20 @@ func TestExpandCornerCutting(t *testing.T) {
 // for each bridge-column candidate, mirroring the reference's
 // getIndexBelow/getHeight/getNswe sequence.
 func TestFindCrossesBridgeWithNoFloorBeneath(t *testing.T) {
+	// bridgeHeight must stay below block.CellIgnoreHeight (48 = CellHeight(8)
+	// x 6) for NodeBelow to resolve the bridge layer at all when stepping on
+	// from ground level (query z = ground height + CellIgnoreHeight) — if
+	// this ever exceeds CellIgnoreHeight independently of the fixture, the
+	// bridge becomes unreachable and this test would start failing for an
+	// unrelated reason.
+	const bridgeHeight = 40
+
 	var cells [block.CellCount][]block.Cell
 	for x := range block.CellsX {
 		for y := range block.CellsY {
 			ci := x*block.CellsY + y
 			if x >= 3 && x <= 5 {
-				cells[ci] = []block.Cell{{Height: 40, NSWE: block.AllDirections}}
+				cells[ci] = []block.Cell{{Height: bridgeHeight, NSWE: block.AllDirections}}
 			} else {
 				cells[ci] = []block.Cell{{Height: 0, NSWE: block.AllDirections}}
 			}
