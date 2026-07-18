@@ -90,3 +90,10 @@ func (q *DesireQueue) Len() int {
 
 	return len(q.desires)
 }
+
+// Clear drops every queued Desire.
+func (q *DesireQueue) Clear() {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	q.desires = nil
+}

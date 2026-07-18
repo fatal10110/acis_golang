@@ -119,6 +119,44 @@ func TestAttackableAITickDecaysThreatEveryThirdTick(t *testing.T) {
 	}
 }
 
+func TestAttackableAISetBackToPeaceClearsCombatState(t *testing.T) {
+	owner := actor(1)
+	target := actor(2)
+	owner.known = map[int32]bool{target.ObjectID(): true}
+	owner.inTerritory = false
+	move := &recordingMove{}
+	ai := NewAttackable(owner, move, &recordingAttack{canAttack: true})
+
+	ai.AddDamageHate(target, 5, 20)
+	ai.AddHate(target, 30)
+	ai.Think()
+
+	if got := ai.CurrentIntention(); got != IntentionAttack {
+		t.Fatalf("CurrentIntention() before reset = %v, want %v", got, IntentionAttack)
+	}
+
+	ai.SetBackToPeace()
+
+	if !ai.Threats().IsEmpty() {
+		t.Fatal("threat table not cleared")
+	}
+	if !ai.Hates().IsEmpty() {
+		t.Fatal("hate table not cleared")
+	}
+	if got := ai.Desires().Len(); got != 0 {
+		t.Fatalf("desires len = %d, want 0", got)
+	}
+	if got := ai.CurrentIntention(); got != IntentionWander {
+		t.Fatalf("CurrentIntention() after reset = %v, want %v", got, IntentionWander)
+	}
+	if _, _, ok := ai.NextIntention(); ok {
+		t.Fatal("NextIntention() ok = true after reset, want false")
+	}
+	if move.stopCount != 2 {
+		t.Fatalf("stop count = %d, want 2", move.stopCount)
+	}
+}
+
 func TestAttackableAIWanderReturnHome(t *testing.T) {
 	owner := actor(1)
 	owner.inTerritory = false
