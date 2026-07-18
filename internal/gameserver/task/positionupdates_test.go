@@ -3,10 +3,13 @@ package task
 import (
 	"sync"
 	"testing"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world/worldtest"
 )
 
 func TestPositionUpdatesTickRunsRegisteredMovers(t *testing.T) {
-	updates := NewPositionUpdates()
+	updates := NewPositionUpdates(nil)
 	a := &positionUpdateActorStub{id: 1, moving: true}
 	b := &positionUpdateActorStub{id: 2, moving: true}
 
@@ -20,7 +23,7 @@ func TestPositionUpdatesTickRunsRegisteredMovers(t *testing.T) {
 }
 
 func TestPositionUpdatesTickDropsStoppedMovers(t *testing.T) {
-	updates := NewPositionUpdates()
+	updates := NewPositionUpdates(nil)
 	a := &positionUpdateActorStub{id: 1, moving: false}
 	a.remove = func() { updates.Remove(a) }
 
@@ -37,7 +40,7 @@ func TestPositionUpdatesTickDropsStoppedMovers(t *testing.T) {
 }
 
 func TestPositionUpdatesTickAllowsMutationDuringTick(t *testing.T) {
-	updates := NewPositionUpdates()
+	updates := NewPositionUpdates(nil)
 	a := &positionUpdateActorStub{id: 1, moving: true}
 	b := &positionUpdateActorStub{id: 2, moving: true}
 	a.tickFn = func() { updates.Remove(b) }
@@ -58,7 +61,7 @@ func TestPositionUpdatesTickAllowsMutationDuringTick(t *testing.T) {
 
 func TestPositionUpdatesTickAllocationIsFlat(t *testing.T) {
 	for _, movers := range []int{1, 128} {
-		updates := NewPositionUpdates()
+		updates := NewPositionUpdates(nil)
 		for i := 0; i < movers; i++ {
 			updates.Add(&positionUpdateActorStub{id: int32(i + 1), moving: true})
 		}
@@ -72,7 +75,7 @@ func TestPositionUpdatesTickAllocationIsFlat(t *testing.T) {
 }
 
 func TestPositionUpdatesConcurrentAccess(t *testing.T) {
-	updates := NewPositionUpdates()
+	updates := NewPositionUpdates(nil)
 	actors := make([]*positionUpdateActorStub, 20)
 	for i := range actors {
 		actors[i] = &positionUpdateActorStub{id: int32(i + 1), moving: true}
@@ -105,8 +108,45 @@ func TestPositionUpdatesConcurrentAccess(t *testing.T) {
 	wg.Wait()
 }
 
+func TestPositionUpdatesTickSkipsInactiveRegions(t *testing.T) {
+	state := world.New()
+	updates := NewPositionUpdates(state)
+	inactive := &positionUpdateActorStub{id: 1, moving: true}
+	active := &positionUpdateActorStub{id: 2, moving: true}
+
+	state.Spawn(inactive, 0, 0, 0, 0)
+	state.Spawn(active, 8192, 0, 0, 0)
+	worldtest.SpawnPlayer(state, 3, 8192, 0, 0)
+	updates.Add(inactive)
+	updates.Add(active)
+
+	updates.Tick()
+
+	if inactive.ticks != 0 {
+		t.Fatalf("inactive ticks = %d, want 0", inactive.ticks)
+	}
+	if active.ticks != 1 {
+		t.Fatalf("active ticks = %d, want 1", active.ticks)
+	}
+}
+
+func TestPositionUpdatesTickRunsNoSleepInactiveActor(t *testing.T) {
+	state := world.New()
+	updates := NewPositionUpdates(state)
+	actor := &positionUpdateActorStub{id: 1, moving: true, keepAwakeInactive: true}
+
+	state.Spawn(actor, 0, 0, 0, 0)
+	updates.Add(actor)
+
+	updates.Tick()
+
+	if actor.ticks != 1 {
+		t.Fatalf("no-sleep inactive ticks = %d, want 1", actor.ticks)
+	}
+}
+
 func BenchmarkPositionUpdatesTickManyMovers(b *testing.B) {
-	updates := NewPositionUpdates()
+	updates := NewPositionUpdates(nil)
 	for i := 0; i < 4096; i++ {
 		updates.Add(&positionUpdateActorStub{id: int32(i + 1), moving: true})
 	}
@@ -120,17 +160,22 @@ func BenchmarkPositionUpdatesTickManyMovers(b *testing.B) {
 }
 
 type positionUpdateActorStub struct {
-	mu     sync.Mutex
-	id     int32
-	moving bool
-	ticks  int
-	tickFn func()
+	world.Presence
+
+	mu                sync.Mutex
+	id                int32
+	moving            bool
+	ticks             int
+	tickFn            func()
+	keepAwakeInactive bool
 	// remove mirrors Controller's own contract: PositionUpdate deregisters
 	// itself when it stops moving instead of relying on Tick to do it.
 	remove func()
 }
 
 func (a *positionUpdateActorStub) ObjectID() int32 { return a.id }
+
+func (a *positionUpdateActorStub) SleepWhenRegionInactive() bool { return !a.keepAwakeInactive }
 
 func (a *positionUpdateActorStub) PositionUpdate() bool {
 	a.mu.Lock()

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world/worldtest"
 )
 
 func TestAIManagerTickRunsRegisteredActors(t *testing.T) {
@@ -96,11 +97,10 @@ func TestAIManagerTickSkipsInactiveRegions(t *testing.T) {
 	mgr := NewAI(state)
 	inactive := &aiActorStub{id: 1}
 	active := &aiActorStub{id: 2}
-	player := &playerStub{id: 3}
 
 	state.Spawn(inactive, 0, 0, 0, 0)
 	state.Spawn(active, 8192, 0, 0, 0)
-	state.Spawn(player, 8192, 0, 0, 0)
+	worldtest.SpawnPlayer(state, 3, 8192, 0, 0)
 	mgr.Add(inactive)
 	mgr.Add(active)
 
@@ -132,8 +132,7 @@ func TestAIManagerInactiveRegionResetsOnceAndSleeps(t *testing.T) {
 		t.Fatalf("inactive actor ticks/thinks = %d/%d, want 0/0", actor.ticks, actor.thinks)
 	}
 
-	player := &playerStub{id: 2}
-	state.Spawn(player, 0, 0, 0, 0)
+	player := worldtest.SpawnPlayer(state, 2, 0, 0, 0)
 	mgr.Tick()
 
 	if actor.ticks != 1 || actor.thinks != 1 {

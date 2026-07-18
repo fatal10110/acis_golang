@@ -850,7 +850,7 @@ func newTestGameClientLinkWithSkillsShortcutsCrestsAndLog(t *testing.T, loginLin
 	if len(cursedWeapons) > 0 {
 		cursed = cursedWeapons[0]
 	}
-	gcl := NewGameClientLink(validator, loginLink, roster, items, shortcuts, templates, itemTemplates, html, crests, skills, spellbooks, trees, cursed, state, testGeo{}, ids, groundItems, nil, task.NewPositionUpdates(), log)
+	gcl := NewGameClientLink(validator, loginLink, roster, items, shortcuts, templates, itemTemplates, html, crests, skills, spellbooks, trees, cursed, state, testGeo{}, ids, groundItems, nil, task.NewPositionUpdates(state), log)
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {

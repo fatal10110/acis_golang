@@ -165,6 +165,35 @@ func TestHostileOnInactiveRegionResetsCombatAndReturnsHome(t *testing.T) {
 	}
 }
 
+func TestHostileThinkSleepsInInactiveRegion(t *testing.T) {
+	state := world.New()
+	move := &hostileMove{}
+	strike := &hostileAttack{canAttack: true}
+	hostile := newTestHostile(t, move, strike)
+	hostile.SetWorld(state)
+	state.Spawn(hostile, 0, 0, 0, 0)
+	target := &hostileTarget{id: 200}
+	state.Spawn(target, 10, 0, 0, 0)
+
+	hostile.AddDamageHate(target, 5, 20)
+
+	hostile.Think()
+	hostile.Think()
+
+	if strike.target != nil {
+		t.Fatalf("attack target = %v, want none while region inactive", strike.target)
+	}
+	if !hostile.AI().Threats().IsEmpty() {
+		t.Fatal("threat table not cleared by inactive Think")
+	}
+	if got := hostile.AI().Desires().Len(); got != 0 {
+		t.Fatalf("desires len = %d, want 0", got)
+	}
+	if move.stopCount != 1 {
+		t.Fatalf("stop count = %d, want one inactive reset", move.stopCount)
+	}
+}
+
 type hostileRewarder struct {
 	calls []creature.DeathActor
 }
