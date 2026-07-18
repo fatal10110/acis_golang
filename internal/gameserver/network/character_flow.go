@@ -74,7 +74,7 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 			return nil, false
 		}
 	}
-	if c.CurHP < 0.5 {
+	if c.ResourceValues().CurrentHP < 0.5 {
 		c.MarkDead()
 	}
 	shortcuts := shortcut.Starter()
@@ -182,7 +182,7 @@ func (l *GameClientLink) attachLivePlayer(client *Client, c *player.Character, t
 	c.SetFrameSender(client.Session.SendFrame)
 
 	x, y, z := c.Position()
-	creatureLive, err := creature.NewLive(location.Location{X: x, Y: y, Z: z}, tmpl.RunSpeed, l.geo)
+	creatureLive, err := creature.NewLive(location.Location{X: x, Y: y, Z: z}, c.RunSpeed(), l.geo)
 	if err != nil {
 		return nil, fmt.Errorf("attach live player: %w", err)
 	}

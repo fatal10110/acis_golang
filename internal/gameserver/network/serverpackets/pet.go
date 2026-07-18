@@ -67,10 +67,12 @@ func writePetInventoryUpdate(w *wire.Writer, updates []itemcontainer.Update, ite
 func writePetItem(w *wire.Writer, inst *item.Instance, templates *item.Table, update itemcontainer.Update) error {
 	templateID := update.TemplateID
 	count := update.Count
+	var st item.InstanceState
 	if inst != nil {
-		templateID = inst.TemplateID
+		st = inst.Snapshot()
+		templateID = st.TemplateID
 		if count == 0 {
-			count = inst.Count
+			count = st.Count
 		}
 	}
 
@@ -97,10 +99,10 @@ func writePetItem(w *wire.Writer, inst *item.Instance, templates *item.Table, up
 		w.WriteUint16(0)
 		return nil
 	}
-	w.WriteUint16(uint16(inst.CustomType1))
-	w.WriteUint16(uint16(boolInt32(inst.Location == item.LocationPetEquip)))
+	w.WriteUint16(uint16(st.CustomType1))
+	w.WriteUint16(uint16(boolInt32(st.Location == item.LocationPetEquip)))
 	w.WriteInt32(int32(tmpl.Slot))
-	w.WriteUint16(uint16(inst.EnchantLevel))
-	w.WriteUint16(uint16(inst.CustomType2))
+	w.WriteUint16(uint16(st.EnchantLevel))
+	w.WriteUint16(uint16(st.CustomType2))
 	return nil
 }

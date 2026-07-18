@@ -71,8 +71,9 @@ func (s *Service) ToggleEquipItem(inv *itemcontainer.Inventory, objectID int32) 
 		return Result{}, false
 	}
 
-	if inst.Equipped() {
-		if inv.UnequipSlot(inst.LocationData) == nil {
+	st := inst.Snapshot()
+	if st.Equipped() {
+		if inv.UnequipSlot(st.LocationData) == nil {
 			return Result{}, false
 		}
 		return Result{EquipmentChanged: true}, true
@@ -108,21 +109,22 @@ func (s *Service) DropItem(inv *itemcontainer.Inventory, objectID int32, count i
 		return DropResult{}, false, nil
 	}
 	tmpl, ok := inv.Templates().Get(inst.TemplateID)
-	if !ok || !inst.Dropable(tmpl) || inst.QuestItem(tmpl) || inst.Count < count {
+	st := inst.Snapshot()
+	if !ok || !inst.Dropable(tmpl) || inst.QuestItem(tmpl) || st.Count < count {
 		return DropResult{}, false, nil
 	}
 	if !tmpl.Stackable && count > 1 {
 		return DropResult{}, false, nil
 	}
 	newObjectID := int32(0)
-	if inst.Count > count {
+	if st.Count > count {
 		id, ok, err := s.nextID()
 		if err != nil || !ok {
 			return DropResult{}, false, err
 		}
 		newObjectID = id
 	}
-	wasEquipped := inst.Equipped() && inst.Count <= count
+	wasEquipped := st.Equipped() && st.Count <= count
 	dropped := inv.DropItem(objectID, count, newObjectID)
 	if dropped == nil {
 		return DropResult{}, false, nil
@@ -153,18 +155,19 @@ const (
 // free slot. pickerID is compared against ground.OwnerID to enforce a loot
 // lock; an unowned ground item (OwnerID == 0) is free for anyone.
 func (s *Service) PickupGround(inv *itemcontainer.Inventory, ground *item.Instance, tmpl *item.Template, pickerID int32) (Result, PickupFailure) {
-	if inv == nil || ground == nil || tmpl == nil || ground.Count <= 0 {
+	groundState := ground.Snapshot()
+	if inv == nil || ground == nil || tmpl == nil || groundState.Count <= 0 {
 		return Result{}, PickupNoop
 	}
-	if ground.OwnerID != 0 && ground.OwnerID != pickerID {
+	if groundState.OwnerID != 0 && groundState.OwnerID != pickerID {
 		return Result{}, PickupLootLocked
 	}
 	if !inv.ValidateCapacity(inv.SlotsNeededFor(ground, tmpl)) {
 		return Result{}, PickupSlotsFull
 	}
 
-	picked := *ground
-	result, absorbed := inv.Add(&picked)
+	picked := groundState.Instance()
+	result, absorbed := inv.Add(picked)
 	if result == nil {
 		return Result{}, PickupNoop
 	}
@@ -184,13 +187,14 @@ func (s *Service) DestroyItem(inv *itemcontainer.Inventory, objectID int32, coun
 		return Result{}, false
 	}
 	tmpl, ok := inv.Templates().Get(inst.TemplateID)
-	if !ok || !inst.Destroyable(tmpl) || tmpl.HeroItem() || inst.Count < count {
+	st := inst.Snapshot()
+	if !ok || !inst.Destroyable(tmpl) || tmpl.HeroItem() || st.Count < count {
 		return Result{}, false
 	}
 	if !tmpl.Stackable && count > 1 {
 		return Result{}, false
 	}
-	wasEquipped := inst.Equipped() && inst.Count <= count
+	wasEquipped := st.Equipped() && st.Count <= count
 	if inv.DestroyItem(inst, count) == nil {
 		return Result{}, false
 	}
@@ -206,8 +210,9 @@ func (s *Service) TransferItem(source, receiver *itemcontainer.Inventory, object
 	if inst == nil {
 		return TransferResult{}, false, nil
 	}
-	if count > inst.Count {
-		count = inst.Count
+	st := inst.Snapshot()
+	if count > st.Count {
+		count = st.Count
 	}
 	tmpl, ok := source.Templates().Get(inst.TemplateID)
 	if !ok {
@@ -215,11 +220,11 @@ func (s *Service) TransferItem(source, receiver *itemcontainer.Inventory, object
 	}
 	targetStack := (*item.Instance)(nil)
 	if tmpl.Stackable {
-		targetStack = receiver.ItemByTemplateID(inst.TemplateID)
+		targetStack = receiver.ItemByTemplateID(st.TemplateID)
 	}
 
 	newObjectID := int32(0)
-	if inst.Count > count && targetStack == nil {
+	if st.Count > count || targetStack != nil {
 		id, ok, err := s.nextID()
 		if err != nil || !ok {
 			return TransferResult{}, false, err
@@ -239,10 +244,10 @@ func (s *Service) TransferItem(source, receiver *itemcontainer.Inventory, object
 	if freed {
 		out.Persist = append(out.Persist, Delete(freedObjectID))
 	}
-	if result.ObjectID == objectID || receiver.ItemByObjectID(result.ObjectID) == result && newObjectID == 0 {
-		out.Persist = append(out.Persist, Update(result))
-	} else {
+	if newObjectID != 0 && result.ObjectID == newObjectID {
 		out.Persist = append(out.Persist, Save(result))
+	} else {
+		out.Persist = append(out.Persist, Update(result))
 	}
 	return out, true, nil
 }
@@ -266,7 +271,8 @@ func (s *Service) CrystallizeItem(inv *itemcontainer.Inventory, objectID int32, 
 	if !ok || tmpl.HeroItem() || inst.ShadowItem(tmpl) {
 		return CrystallizeResult{}, CrystallizeNoop, nil
 	}
-	crystalItemID, crystalCount, ok := tmpl.CrystalReward(inst.EnchantLevel)
+	st := inst.Snapshot()
+	crystalItemID, crystalCount, ok := tmpl.CrystalReward(st.EnchantLevel)
 	if !ok {
 		return CrystallizeResult{}, CrystallizeNoop, nil
 	}
@@ -281,11 +287,11 @@ func (s *Service) CrystallizeItem(inv *itemcontainer.Inventory, objectID int32, 
 		return CrystallizeResult{}, CrystallizeNoop, err
 	}
 
-	if count > inst.Count {
-		count = inst.Count
+	if count > st.Count {
+		count = st.Count
 	}
-	wasEquipped := inst.Equipped() && inst.Count <= count
-	sourceItemID := inst.TemplateID
+	wasEquipped := st.Equipped() && st.Count <= count
+	sourceItemID := st.TemplateID
 	if inv.DestroyItem(inst, count) == nil {
 		return CrystallizeResult{}, CrystallizeNoop, nil
 	}

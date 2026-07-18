@@ -408,7 +408,8 @@ func TestSpawnedPlayerKillRewardsExpSpSpoilAndDeathDecay(t *testing.T) {
 	}
 
 	itemTemplates := item.NewTable([]*item.Template{{ID: 6673, Name: "Spoil Item", Stackable: true}})
-	attacker := &player.Character{ID: 500, Name: "killer", Level: 1, CurHP: 100, MaxHP: 100}
+	attacker := &player.Character{ID: 500, Name: "killer", Level: 1}
+	attacker.SetResourceValues(player.Resources{MaxHP: 100, CurrentHP: 100})
 	attacker.AttachRuntime(testPlayerTemplate(), itemcontainer.NewPlayerInventory(attacker.ID, itemTemplates))
 	attacker.SetWorld(h.state)
 	h.state.Spawn(attacker, 1005, 1000, 0, 0)

@@ -40,7 +40,7 @@ func (i *Item) ObjectID() int32 { return i.Instance.ObjectID }
 func (i *Item) ItemID() int32 { return i.Instance.TemplateID }
 
 // Count returns the item stack count.
-func (i *Item) Count() int { return i.Instance.Count }
+func (i *Item) Count() int { return i.Instance.CountValue() }
 
 // Stackable reports whether the item should display its count on the ground.
 func (i *Item) Stackable() bool {
@@ -88,8 +88,9 @@ func (i *Item) DropperID() int32 {
 // interval in milliseconds.
 func (i *Item) Snapshot(timeLeftMillis int64) item.GroundSnapshot {
 	x, y, z := i.Position()
+	inst := i.Instance.Clone()
 	return item.GroundSnapshot{
-		Instance:       i.Instance,
+		Instance:       *inst,
 		X:              x,
 		Y:              y,
 		Z:              z,

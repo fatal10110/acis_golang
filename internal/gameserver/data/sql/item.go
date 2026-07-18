@@ -36,19 +36,20 @@ func (s *ItemStore) Create(ctx context.Context, ownerID int32, inst item.Instanc
 
 // Save inserts or updates inst in the items table.
 func (s *ItemStore) Save(ctx context.Context, inst *item.Instance) error {
+	st := inst.Snapshot()
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO items
-			(owner_id, object_id, item_id, count, enchant_level, loc, loc_data, custom_type1, custom_type2, mana_left, time)
+				(owner_id, object_id, item_id, count, enchant_level, loc, loc_data, custom_type1, custom_type2, mana_left, time)
 		 VALUES (?,?,?,?,?,?,?,?,?,?,?)
 		 ON DUPLICATE KEY UPDATE
-			owner_id=VALUES(owner_id), count=VALUES(count), loc=VALUES(loc), loc_data=VALUES(loc_data),
-			enchant_level=VALUES(enchant_level), custom_type1=VALUES(custom_type1), custom_type2=VALUES(custom_type2),
-			mana_left=VALUES(mana_left), time=VALUES(time)`,
-		inst.OwnerID, inst.ObjectID, inst.TemplateID, inst.Count, inst.EnchantLevel,
-		inst.Location.String(), inst.LocationData, inst.CustomType1, inst.CustomType2, inst.ManaLeft, inst.Time,
+				owner_id=VALUES(owner_id), count=VALUES(count), loc=VALUES(loc), loc_data=VALUES(loc_data),
+				enchant_level=VALUES(enchant_level), custom_type1=VALUES(custom_type1), custom_type2=VALUES(custom_type2),
+				mana_left=VALUES(mana_left), time=VALUES(time)`,
+		st.OwnerID, st.ObjectID, st.TemplateID, st.Count, st.EnchantLevel,
+		st.Location.String(), st.LocationData, st.CustomType1, st.CustomType2, st.ManaLeft, st.Time,
 	)
 	if err != nil {
-		return fmt.Errorf("save item %d: %w", inst.ObjectID, err)
+		return fmt.Errorf("save item %d: %w", st.ObjectID, err)
 	}
 	return nil
 }
@@ -131,15 +132,16 @@ func scanItems(rows *sql.Rows, ownerID int32) ([]*item.Instance, error) {
 
 // Update overwrites the persisted state of inst's row.
 func (s *ItemStore) Update(ctx context.Context, inst *item.Instance) error {
+	st := inst.Snapshot()
 	_, err := s.db.ExecContext(ctx,
 		`UPDATE items SET owner_id=?, item_id=?, count=?, enchant_level=?, loc=?, loc_data=?,
-			custom_type1=?, custom_type2=?, mana_left=?, time=?
-		 WHERE object_id=?`,
-		inst.OwnerID, inst.TemplateID, inst.Count, inst.EnchantLevel, inst.Location.String(), inst.LocationData,
-		inst.CustomType1, inst.CustomType2, inst.ManaLeft, inst.Time, inst.ObjectID,
+				custom_type1=?, custom_type2=?, mana_left=?, time=?
+			 WHERE object_id=?`,
+		st.OwnerID, st.TemplateID, st.Count, st.EnchantLevel, st.Location.String(), st.LocationData,
+		st.CustomType1, st.CustomType2, st.ManaLeft, st.Time, st.ObjectID,
 	)
 	if err != nil {
-		return fmt.Errorf("update item %d: %w", inst.ObjectID, err)
+		return fmt.Errorf("update item %d: %w", st.ObjectID, err)
 	}
 	return nil
 }

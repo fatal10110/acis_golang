@@ -1,9 +1,22 @@
 package player
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+)
+
+func TestCharacterResourcesAreNotExportedFields(t *testing.T) {
+	typ := reflect.TypeOf(Character{})
+	for _, name := range []string{"MaxHP", "CurHP", "MaxMP", "CurMP", "MaxCP", "CurCP"} {
+		if _, ok := typ.FieldByName(name); ok {
+			t.Fatalf("Character exports mutable resource field %s", name)
+		}
+	}
+}
 
 func TestCharacterVitals(t *testing.T) {
-	ch := &Character{CurHP: 12.9, CurMP: 7.1}
+	ch := &Character{}
+	ch.SetResourceValues(Resources{CurrentHP: 12.9, CurrentMP: 7.1})
 
 	got := ch.Vitals()
 	want := Vitals{HP: 12, MP: 7}

@@ -10,7 +10,7 @@ import (
 )
 
 func TestStartPlayerSkillAcceptsKnownActiveSkill(t *testing.T) {
-	ch := &player.Character{ID: 10, CurHP: 100, CurMP: 100}
+	ch := newRequestCharacter(10)
 	ch.SetSkillLevel(3, 1)
 	target := requestTarget{id: 20}
 	ctrl := NewController(&testActor{mp: 100, hp: 100})
@@ -67,7 +67,7 @@ func TestStartPlayerSkillRejectsUnavailableSkill(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ch := &player.Character{ID: 10, CurHP: 100, CurMP: 100}
+			ch := newRequestCharacter(10)
 			ch.SetSkillLevel(3, tt.level)
 			if tt.dead {
 				ch.MarkDead()
@@ -91,7 +91,7 @@ func TestStartPlayerSkillRejectsUnavailableSkill(t *testing.T) {
 }
 
 func TestStartPlayerSkillRejectsInvalidTarget(t *testing.T) {
-	ch := &player.Character{ID: 10, CurHP: 100, CurMP: 100}
+	ch := newRequestCharacter(10)
 	ch.SetSkillLevel(3, 1)
 	ctrl := NewController(&testActor{mp: 100, hp: 100})
 	defs := requestDefinitions{
@@ -118,6 +118,12 @@ func TestStartPlayerSkillRejectsInvalidTarget(t *testing.T) {
 }
 
 type requestDefinitions map[modelskill.Ref]modelskill.Definition
+
+func newRequestCharacter(id int32) *player.Character {
+	ch := &player.Character{ID: id}
+	ch.SetResourceValues(player.Resources{MaxHP: 100, CurrentHP: 100, MaxMP: 100, CurrentMP: 100})
+	return ch
+}
 
 func (d requestDefinitions) Definition(ref modelskill.Ref) (modelskill.Definition, bool) {
 	def, ok := d[ref]

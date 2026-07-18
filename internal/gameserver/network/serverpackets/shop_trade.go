@@ -95,11 +95,12 @@ func writeSellList(w *wire.Writer, currentMoney int, items []*item.Instance, tem
 	w.WriteInt32(0)
 	w.WriteUint16(uint16(len(items)))
 	for _, inst := range items {
-		tmpl, ok := templates.Get(inst.TemplateID)
+		st := inst.Snapshot()
+		tmpl, ok := templates.Get(st.TemplateID)
 		if !ok {
-			return fmt.Errorf("serverpackets: SellList: no template loaded for item template %d", inst.TemplateID)
+			return fmt.Errorf("serverpackets: SellList: no template loaded for item template %d", st.TemplateID)
 		}
-		writeShopItem(w, tmpl, inst.ObjectID, inst.TemplateID, inst.Count, inst.EnchantLevel, inst.CustomType1, inst.CustomType2, tmpl.ReferencePrice/2)
+		writeShopItem(w, tmpl, st.ObjectID, st.TemplateID, st.Count, st.EnchantLevel, st.CustomType1, st.CustomType2, tmpl.ReferencePrice/2)
 	}
 	return nil
 }
@@ -153,7 +154,8 @@ func writeTradeStart(w *wire.Writer, partnerID int32, items []*item.Instance, te
 	for _, row := range available {
 		inst := row.inst
 		tmpl := row.tmpl
-		writeTradeItem(w, tmpl, inst.ObjectID, inst.TemplateID, inst.Count, inst.EnchantLevel)
+		st := inst.Snapshot()
+		writeTradeItem(w, tmpl, st.ObjectID, st.TemplateID, st.Count, st.EnchantLevel)
 	}
 	return nil
 }
@@ -276,12 +278,13 @@ func availableTradeStartItems(items []*item.Instance, templates *item.Table) ([]
 		if inst == nil {
 			continue
 		}
-		if inst.Location != item.LocationInventory {
+		st := inst.Snapshot()
+		if st.Location != item.LocationInventory {
 			continue
 		}
-		tmpl, ok := templates.Get(inst.TemplateID)
+		tmpl, ok := templates.Get(st.TemplateID)
 		if !ok {
-			return nil, fmt.Errorf("serverpackets: TradeStart: no template loaded for item template %d", inst.TemplateID)
+			return nil, fmt.Errorf("serverpackets: TradeStart: no template loaded for item template %d", st.TemplateID)
 		}
 		if !inst.Tradable(tmpl) || inst.QuestItem(tmpl) {
 			continue

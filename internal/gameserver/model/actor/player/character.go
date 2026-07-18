@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -41,9 +42,11 @@ type Character struct {
 	Exp   int64
 	SP    int
 
-	MaxHP, CurHP float64
-	MaxCP, CurCP float64
-	MaxMP, CurMP float64
+	maxHP, curHP float64
+	maxCP, curCP float64
+	maxMP, curMP float64
+	// vitalsMu guards maxHP/curHP, maxCP/curCP and maxMP/curMP.
+	vitalsMu sync.RWMutex
 
 	Face, HairStyle, HairColor int
 
@@ -81,15 +84,14 @@ type Character struct {
 
 	deathMu sync.Mutex
 	dead    bool
-	health  creature.Health
 
 	effects *effect.List
 
-	// statMu guards statFuncs.
+	// statMu guards statCalcs map creation. Each Calculator owns its Funcs.
 	statMu    sync.Mutex
-	statFuncs []basefunc.Func
+	statCalcs map[stat.Stat]*basefunc.Calculator
 
-	// stateMu guards transient live flags.
+	// stateMu guards transient live flags and runtime send/broadcast hooks.
 	stateMu       sync.RWMutex
 	stateInit     bool
 	running       bool
@@ -134,9 +136,9 @@ func NewCharacter(objectID int32, tmpl *Template, accountName, name string, hair
 
 		Level: 1,
 
-		MaxHP: tmpl.HPTable[0], CurHP: tmpl.HPTable[0],
-		MaxCP: tmpl.CPTable[0], CurCP: tmpl.CPTable[0],
-		MaxMP: tmpl.MPTable[0], CurMP: tmpl.MPTable[0],
+		maxHP: tmpl.HPTable[0], curHP: tmpl.HPTable[0],
+		maxCP: tmpl.CPTable[0], curCP: tmpl.CPTable[0],
+		maxMP: tmpl.MPTable[0], curMP: tmpl.MPTable[0],
 
 		Face: int(face), HairStyle: int(hairStyle), HairColor: int(hairColor),
 
@@ -150,7 +152,6 @@ func NewCharacter(objectID int32, tmpl *Template, accountName, name string, hair
 	if len(tmpl.Spawns) > 0 {
 		c.Location = tmpl.Spawns[rand.IntN(len(tmpl.Spawns))]
 	}
-	c.health = creature.NewHealth(&c.CurHP)
 	c.effects = effect.NewList(c)
 
 	return c, nil

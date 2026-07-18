@@ -20,13 +20,14 @@ func TestFrameCharSelected(t *testing.T) {
 		Race:     player.RaceHuman,
 		ClassID:  0,
 		Location: location.Location{X: 10, Y: 20, Z: 30},
-		CurHP:    75, CurMP: 30,
-		SP: 7, Exp: 12345, Level: 3,
+		SP:       7, Exp: 12345, Level: 3,
 		Karma: 1, PKKills: 2,
 	}
+	c.SetResourceValues(player.Resources{CurrentHP: 75, CurrentMP: 30})
 	tmpl := &player.Template{STR: 40, CON: 43, DEX: 30, INT: 21, WIT: 11, MEN: 25}
 
 	got := framePayload(t, FrameCharSelected(CharSelectedSnapshot{Character: c, Template: tmpl, SessionID: 999}))
+	resources := c.ResourceValues()
 
 	want := []byte{OpcodeCharSelected}
 	x, y, z := c.Position()
@@ -46,8 +47,8 @@ func TestFrameCharSelected(t *testing.T) {
 	want = binary.LittleEndian.AppendUint32(want, uint32(x))
 	want = binary.LittleEndian.AppendUint32(want, uint32(y))
 	want = binary.LittleEndian.AppendUint32(want, uint32(z))
-	want = binary.LittleEndian.AppendUint64(want, math.Float64bits(c.CurHP))
-	want = binary.LittleEndian.AppendUint64(want, math.Float64bits(c.CurMP))
+	want = binary.LittleEndian.AppendUint64(want, math.Float64bits(resources.CurrentHP))
+	want = binary.LittleEndian.AppendUint64(want, math.Float64bits(resources.CurrentMP))
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.SP))
 	want = binary.LittleEndian.AppendUint64(want, uint64(c.Exp))
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.Level))

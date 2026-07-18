@@ -19,11 +19,17 @@ func (k ShotKind) Mask() int32 {
 
 // ChargedShot reports whether kind is currently charged on inst.
 func (inst *Instance) ChargedShot(kind ShotKind) bool {
+	mu := inst.lock()
+	mu.RLock()
+	defer mu.RUnlock()
 	return inst.ShotsMask&kind.Mask() == kind.Mask()
 }
 
 // SetChargedShot charges or discharges kind on inst.
 func (inst *Instance) SetChargedShot(kind ShotKind, charged bool) {
+	mu := inst.lock()
+	mu.Lock()
+	defer mu.Unlock()
 	if charged {
 		inst.ShotsMask |= kind.Mask()
 	} else {
@@ -34,6 +40,9 @@ func (inst *Instance) SetChargedShot(kind ShotKind, charged bool) {
 // UnchargeAllShots clears every charged shot on inst, e.g. when it is
 // unequipped.
 func (inst *Instance) UnchargeAllShots() {
+	mu := inst.lock()
+	mu.Lock()
+	defer mu.Unlock()
 	inst.ShotsMask = 0
 }
 

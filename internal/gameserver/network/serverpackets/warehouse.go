@@ -95,30 +95,31 @@ func writeWarehouseItem(w *wire.Writer, inst *item.Instance, templates *item.Tab
 	if inst == nil {
 		return fmt.Errorf("nil item")
 	}
-	tmpl, ok := templates.Get(inst.TemplateID)
+	st := inst.Snapshot()
+	tmpl, ok := templates.Get(st.TemplateID)
 	if !ok {
-		return fmt.Errorf("no template loaded for item template %d", inst.TemplateID)
+		return fmt.Errorf("no template loaded for item template %d", st.TemplateID)
 	}
 	category, subCategory := tmpl.Category()
 
 	w.WriteUint16(uint16(category))
-	w.WriteInt32(inst.ObjectID)
-	w.WriteInt32(inst.TemplateID)
-	w.WriteInt32(int32(inst.Count))
+	w.WriteInt32(st.ObjectID)
+	w.WriteInt32(st.TemplateID)
+	w.WriteInt32(int32(st.Count))
 	w.WriteUint16(uint16(subCategory))
-	w.WriteUint16(uint16(inst.CustomType1))
+	w.WriteUint16(uint16(st.CustomType1))
 	w.WriteInt32(int32(tmpl.Slot))
-	w.WriteUint16(uint16(inst.EnchantLevel))
-	w.WriteUint16(uint16(inst.CustomType2))
+	w.WriteUint16(uint16(st.EnchantLevel))
+	w.WriteUint16(uint16(st.CustomType2))
 	w.WriteUint16(0)
-	w.WriteInt32(inst.ObjectID)
+	w.WriteInt32(st.ObjectID)
 
 	if includeAugmentation {
-		if inst.Augmentation == nil {
+		if st.Augmentation == nil {
 			w.WriteInt64(0)
 		} else {
-			w.WriteInt32(inst.Augmentation.Attributes & 0x0000ffff)
-			w.WriteInt32(inst.Augmentation.Attributes >> 16)
+			w.WriteInt32(st.Augmentation.Attributes & 0x0000ffff)
+			w.WriteInt32(st.Augmentation.Attributes >> 16)
 		}
 	}
 	return nil

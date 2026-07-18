@@ -26,12 +26,14 @@ func TestCharacterStoreCreatePersistsInitialPosition(t *testing.T) {
 		Race:        player.RaceOrc,
 		Sex:         player.SexMale,
 		Level:       1,
-		MaxHP:       80, CurHP: 80,
-		MaxCP: 32, CurCP: 32,
-		MaxMP: 30, CurMP: 30,
 		Location:    location.Location{X: -56733, Y: -113459, Z: -690},
 		LastHeading: 32768,
 	}
+	c.SetResourceValues(player.Resources{
+		MaxHP: 80, CurrentHP: 80,
+		MaxCP: 32, CurrentCP: 32,
+		MaxMP: 30, CurrentMP: 30,
+	})
 
 	if err := store.Create(context.Background(), c); err != nil {
 		t.Fatalf("Create() error = %v", err)
