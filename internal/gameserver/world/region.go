@@ -22,6 +22,14 @@ type Region struct {
 	active       atomic.Bool
 }
 
+type activeRegionActor interface {
+	OnActiveRegion()
+}
+
+type inactiveRegionActor interface {
+	OnInactiveRegion()
+}
+
 func newRegion(tileX, tileY int) *Region {
 	return &Region{
 		tileX:   tileX,
@@ -38,7 +46,28 @@ func (r *Region) Active() bool {
 }
 
 func (r *Region) setActive(value bool) {
-	r.active.Store(value)
+	if !r.active.CompareAndSwap(!value, value) {
+		return
+	}
+	r.notifyActivity(value)
+}
+
+func (r *Region) notifyActivity(active bool) {
+	for _, obj := range r.Objects() {
+		notifyObjectActivity(obj, active)
+	}
+}
+
+func notifyObjectActivity(obj Tracked, active bool) {
+	if active {
+		if actor, ok := obj.(activeRegionActor); ok {
+			actor.OnActiveRegion()
+		}
+		return
+	}
+	if actor, ok := obj.(inactiveRegionActor); ok {
+		actor.OnInactiveRegion()
+	}
 }
 
 // Add registers obj as visible within r.

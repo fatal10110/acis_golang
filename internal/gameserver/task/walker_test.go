@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/route"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world/worldtest"
 )
 
 func TestWalkerStartRouteUsesNearestNodeAndAdvances(t *testing.T) {
@@ -239,10 +240,9 @@ func TestWalkerTickSkipsInactiveRegions(t *testing.T) {
 	state := world.New()
 	inactive := &walkerActorStub{id: 1, pos: loc(0)}
 	active := &walkerActorStub{id: 2, pos: loc(8192)}
-	player := &playerStub{id: 3}
 	spawnWalker(state, inactive)
 	spawnWalker(state, active)
-	state.Spawn(player, active.pos.X, active.pos.Y, active.pos.Z, 0)
+	worldtest.SpawnPlayer(state, 3, active.pos.X, active.pos.Y, active.pos.Z)
 	w := newTestWalker(t, routes, &walkerPathStub{canMove: true}, func() time.Time { return now }, state)
 	past := now.Add(-time.Second)
 	w.entries[inactive.id] = &walkerEntry{actor: inactive, route: "inactive", npc: "guard", onRoute: true, wakeTime: past}
@@ -263,9 +263,8 @@ func TestWalkerArrivedQueuesZeroDelayWhileInactive(t *testing.T) {
 	now := time.Unix(100, 0)
 	state := world.New()
 	actor := &walkerActorStub{id: 1, pos: loc(0)}
-	player := &playerStub{id: 2}
 	spawnWalker(state, actor)
-	state.Spawn(player, actor.pos.X, actor.pos.Y, actor.pos.Z, 0)
+	player := worldtest.SpawnPlayer(state, 2, actor.pos.X, actor.pos.Y, actor.pos.Z)
 	w := newTestWalker(t, routes, &walkerPathStub{canMove: true}, func() time.Time { return now }, state)
 
 	if err := w.StartRoute(actor, "patrol", "guard"); err != nil {

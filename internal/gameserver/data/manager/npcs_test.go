@@ -95,7 +95,7 @@ func newHarness(t *testing.T, spawns *Spawns, templates *npc.Table) *testHarness
 		t.Fatalf("NewRespawn: %v", err)
 	}
 	ai := task.NewAI(nil)
-	updates := task.NewPositionUpdates()
+	updates := task.NewPositionUpdates(h.state)
 
 	ids := &sequentialIDs{}
 	items := item.NewTable(nil)

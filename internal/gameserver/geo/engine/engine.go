@@ -130,6 +130,19 @@ func (e *Engine) NodeBelow(geoX, geoY, worldZ int) (height int16, nswe block.NSW
 	return b.Height(layer), b.NSWE(layer), true
 }
 
+// NodeAtOrAbove returns the resolved height and own decoded NSWE mask of the
+// topmost geodata layer at or above worldZ for the given geodata cell.
+func (e *Engine) NodeAtOrAbove(geoX, geoY, worldZ int) (height int16, nswe block.NSWE, ok bool) {
+	b := e.blockAtGeo(geoX, geoY)
+	cells := b.Cells(localCell(geoX), localCell(geoY))
+	for i := len(cells) - 1; i >= 0; i-- {
+		if int(cells[i].Height) >= worldZ {
+			return cells[i].Height, cells[i].NSWE, true
+		}
+	}
+	return 0, 0, false
+}
+
 // Above returns the first layer above worldZ at geodata cell coordinates.
 func (e *Engine) Above(geoX, geoY, worldZ int) (int16, bool) {
 	b := e.blockAtGeo(geoX, geoY)
@@ -401,6 +414,13 @@ func (b engineBlock) NSWE(layer int) block.NSWE {
 		return b.dyn.NSWE(layer)
 	}
 	return b.static().NSWE(layer)
+}
+
+func (b engineBlock) Cells(cellX, cellY int) []block.Cell {
+	if b.dyn != nil {
+		return b.dyn.Cells(cellX, cellY)
+	}
+	return b.static().Cells(cellX, cellY)
 }
 
 type blockKey struct {

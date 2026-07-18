@@ -21,6 +21,11 @@ type Options struct {
 	ObstacleWeight  int
 	HeuristicWeight int
 	MaxIterations   int
+
+	// Bidirectional searches from both ends and stops at the first frontier
+	// meet, including queued nodes, so tied paths can report a different cost
+	// than the single-frontier search.
+	Bidirectional bool
 }
 
 // DefaultOptions returns the shipped pathfinding defaults.
@@ -31,6 +36,7 @@ func DefaultOptions() Options {
 		ObstacleWeight:  defaultObstacleWeight,
 		HeuristicWeight: defaultHeuristicWeight,
 		MaxIterations:   defaultMaxIterations,
+		Bidirectional:   true,
 	}
 }
 
@@ -47,6 +53,7 @@ func OptionsFromProperties(props *config.Properties) (Options, error) {
 	options.ObstacleWeight = f.Int("ObstacleWeight", options.ObstacleWeight)
 	options.HeuristicWeight = f.Int("HeuristicWeight", options.HeuristicWeight)
 	options.MaxIterations = f.Int("MaxIterations", options.MaxIterations)
+	options.Bidirectional = f.Bool("Bidirectional", options.Bidirectional)
 	if err := f.Err(); err != nil {
 		return Options{}, err
 	}

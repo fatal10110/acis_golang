@@ -1,6 +1,7 @@
 package pathfind
 
 import (
+	"math/rand"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/config"
@@ -136,6 +137,124 @@ func TestFind(t *testing.T) {
 			t.Fatalf("Find() = %#v, want no path", path)
 		}
 	})
+}
+
+func TestFindBidirectionalMeetsUnderLowerIterationCap(t *testing.T) {
+	const width, height = 64, 48
+	e := newSeededMazeEngine(t, width, height, 1)
+	origin := at(2, 2, 0)
+	target := at(width-3, height-3, 0)
+	bidirectionalCap := minimumPathIterationCap(t, e, origin, target, true)
+	singleCap := minimumPathIterationCap(t, e, origin, target, false)
+	t.Logf("minimum iteration cap: bidirectional=%d single-frontier=%d", bidirectionalCap, singleCap)
+	if bidirectionalCap >= singleCap {
+		t.Fatalf("minimum iteration cap: bidirectional=%d single-frontier=%d, want bidirectional lower", bidirectionalCap, singleCap)
+	}
+
+	options := DefaultOptions()
+	options.MaxIterations = bidirectionalCap
+	options.Bidirectional = true
+	finder := New(e, options)
+
+	path, _, ok := finder.Find(origin, target)
+	if !ok {
+		t.Fatal("Find() = no path under bidirectional cap, want path")
+	}
+	if got := path[len(path)-1]; got != target {
+		t.Fatalf("Find() last = %#v, want %#v", got, target)
+	}
+	assertPathCanMove(t, e, origin, path)
+
+	options.Bidirectional = false
+	if path, _, ok := New(e, options).Find(origin, target); ok {
+		t.Fatalf("single-frontier Find() under same cap = %#v, want no path", path)
+	}
+}
+
+func TestFindBidirectionalMatchesForwardCostWhenBackwardExpands(t *testing.T) {
+	e := newTestEngine(t, complexBlock(func(x, y int) block.Cell {
+		return block.Cell{Height: 0, NSWE: block.AllDirections}
+	}))
+	options := DefaultOptions()
+	options.HeuristicWeight = 0
+
+	options.Bidirectional = false
+	_, wantCost, ok := New(e, options).Find(at(0, 0, 0), at(2, 0, 0))
+	if !ok {
+		t.Fatal("single-frontier Find() = no path, want path")
+	}
+
+	options.Bidirectional = true
+	path, gotCost, ok := New(e, options).Find(at(0, 0, 0), at(2, 0, 0))
+	if !ok {
+		t.Fatal("bidirectional Find() = no path, want path")
+	}
+	if gotCost != wantCost {
+		t.Fatalf("bidirectional cost = %d, want forward cost %d for path %#v", gotCost, wantCost, path)
+	}
+}
+
+func TestFindBidirectionalTraversesLargeDrop(t *testing.T) {
+	e := newTestEngine(t, complexBlock(func(x, y int) block.Cell {
+		if y != 0 || x > 2 {
+			return block.Cell{Height: 0, NSWE: block.NoDirections}
+		}
+		if x < 2 {
+			return block.Cell{Height: 80, NSWE: block.AllDirections}
+		}
+		return block.Cell{Height: 0, NSWE: block.AllDirections}
+	}))
+	options := DefaultOptions()
+	options.HeuristicWeight = 0
+
+	options.Bidirectional = false
+	if _, _, ok := New(e, options).Find(at(0, 0, 80), at(2, 0, 0)); !ok {
+		t.Fatal("single-frontier Find() = no path across drop, want path")
+	}
+
+	options.Bidirectional = true
+	path, _, ok := New(e, options).Find(at(0, 0, 80), at(2, 0, 0))
+	if !ok {
+		t.Fatal("bidirectional Find() = no path across drop, want path")
+	}
+	if got := path[len(path)-1]; got != at(2, 0, 0) {
+		t.Fatalf("Find() last = %#v, want %#v", got, at(2, 0, 0))
+	}
+	assertPathCanMove(t, e, at(0, 0, 80), path)
+}
+
+func TestFindBidirectionalMatchesForwardReachabilityOnRandomHeights(t *testing.T) {
+	options := DefaultOptions()
+	options.HeuristicWeight = 0
+	options.MaxIterations = 10000
+
+	for seed := int64(1); seed <= 40; seed++ {
+		r := rand.New(rand.NewSource(seed))
+		var heights [block.CellsX][block.CellsY]int16
+		for x := range block.CellsX {
+			for y := range block.CellsY {
+				heights[x][y] = int16(r.Intn(7) * 24)
+			}
+		}
+		e := newTestEngine(t, complexBlock(func(x, y int) block.Cell {
+			return block.Cell{Height: heights[x][y], NSWE: block.AllDirections}
+		}))
+		origin := at(0, 0, int(heights[0][0]))
+		target := at(7, 7, int(heights[7][7]))
+
+		options.Bidirectional = false
+		_, _, wantOK := New(e, options).Find(origin, target)
+		options.Bidirectional = true
+		path, _, gotOK := New(e, options).Find(origin, target)
+		if gotOK != wantOK {
+			t.Fatalf("seed %d: bidirectional ok = %v, want forward ok %v", seed, gotOK, wantOK)
+		}
+		if gotOK {
+			if got := path[len(path)-1]; got != target {
+				t.Fatalf("seed %d: Find() last = %#v, want %#v", seed, got, target)
+			}
+		}
+	}
 }
 
 // TestExpandCornerCutting pins expand's diagonal gating to
@@ -390,6 +509,7 @@ MaxIterations = 1234
 		ObstacleWeight:  31,
 		HeuristicWeight: 13,
 		MaxIterations:   1234,
+		Bidirectional:   true,
 	}
 	if got != want {
 		t.Fatalf("OptionsFromProperties() = %#v, want %#v", got, want)
@@ -436,6 +556,130 @@ func newTestEngine(t testing.TB, first block.Block) *engine.Engine {
 		t.Fatalf("SetRegion(): %v", err)
 	}
 	return e
+}
+
+func newGridEngine(t testing.TB, width, height int, cell func(x, y int) block.Cell) *engine.Engine {
+	t.Helper()
+
+	e := engine.New()
+	region := block.NewRegion()
+	for blockX := 0; blockX*block.CellsX < width; blockX++ {
+		for blockY := 0; blockY*block.CellsY < height; blockY++ {
+			var cells [block.CellCount]block.Cell
+			for x := range block.CellsX {
+				for y := range block.CellsY {
+					gx := blockX*block.CellsX + x
+					gy := blockY*block.CellsY + y
+					cells[x*block.CellsY+y] = cell(gx, gy)
+				}
+			}
+			if err := region.SetComplex(blockX*block.RegionBlocksY+blockY, cells); err != nil {
+				t.Fatalf("SetComplex(): %v", err)
+			}
+		}
+	}
+	if err := e.SetRegion(engine.TileXMin, engine.TileYMin, region); err != nil {
+		t.Fatalf("SetRegion(): %v", err)
+	}
+	return e
+}
+
+func newSeededMazeEngine(t testing.TB, width, height int, seed int64) *engine.Engine {
+	t.Helper()
+
+	r := rand.New(rand.NewSource(seed))
+	walls := make(map[[2]int]bool)
+	for x := 0; x < width; x++ {
+		walls[[2]int{x, 0}] = true
+		walls[[2]int{x, height - 1}] = true
+	}
+	for y := 0; y < height; y++ {
+		walls[[2]int{0, y}] = true
+		walls[[2]int{width - 1, y}] = true
+	}
+	for i := 0; i < 18; i++ {
+		if r.Intn(2) == 0 {
+			x := 2 + r.Intn(width-4)
+			y0 := 1 + r.Intn(height-2)
+			y1 := 1 + r.Intn(height-2)
+			if y0 > y1 {
+				y0, y1 = y1, y0
+			}
+			gap := y0 + r.Intn(y1-y0+1)
+			for y := y0; y <= y1; y++ {
+				if y != gap {
+					walls[[2]int{x, y}] = true
+				}
+			}
+		} else {
+			y := 2 + r.Intn(height-4)
+			x0 := 1 + r.Intn(width-2)
+			x1 := 1 + r.Intn(width-2)
+			if x0 > x1 {
+				x0, x1 = x1, x0
+			}
+			gap := x0 + r.Intn(x1-x0+1)
+			for x := x0; x <= x1; x++ {
+				if x != gap {
+					walls[[2]int{x, y}] = true
+				}
+			}
+		}
+	}
+	walls[[2]int{2, 2}] = false
+	walls[[2]int{width - 3, height - 3}] = false
+
+	return newGridEngine(t, width, height, func(x, y int) block.Cell {
+		if walls[[2]int{x, y}] {
+			return block.Cell{Height: 0, NSWE: block.NoDirections}
+		}
+		return block.Cell{Height: 0, NSWE: block.AllDirections}
+	})
+}
+
+func minimumPathIterationCap(t testing.TB, e *engine.Engine, origin, target location.Location, bidirectional bool) int {
+	t.Helper()
+
+	options := DefaultOptions()
+	options.Bidirectional = bidirectional
+	maxIterations := options.MaxIterations
+	for cap := 1; cap <= maxIterations; cap *= 2 {
+		options.MaxIterations = cap
+		if _, _, ok := New(e, options).Find(origin, target); ok {
+			low, high := cap/2+1, cap
+			for low < high {
+				mid := (low + high) / 2
+				options.MaxIterations = mid
+				if _, _, ok := New(e, options).Find(origin, target); ok {
+					high = mid
+				} else {
+					low = mid + 1
+				}
+			}
+			return low
+		}
+	}
+	t.Fatalf("Find() never found a path with bidirectional=%v", bidirectional)
+	return 0
+}
+
+func assertPathCanMove(t testing.TB, e *engine.Engine, origin location.Location, path []location.Location) {
+	t.Helper()
+
+	if from, to, ok := firstBlockedSegment(e, origin, path); !ok {
+		t.Fatalf("path segment cannot move: from %#v to %#v in %#v", from, to, path)
+	}
+}
+
+func firstBlockedSegment(e *engine.Engine, origin location.Location, path []location.Location) (location.Location, location.Location, bool) {
+	previous := origin
+	for _, step := range path {
+		if !e.CanMove(previous.X, previous.Y, previous.Z, step.X, step.Y, step.Z) {
+			return previous, step, false
+		}
+		previous = step
+	}
+	return location.Location{}, location.Location{}, true
 }
 
 func complexBlock(cell func(x, y int) block.Cell) block.Block {

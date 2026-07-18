@@ -2,10 +2,6 @@ package task
 
 import "github.com/fatal10110/acis_golang/internal/gameserver/world"
 
-type inactiveRegionActor interface {
-	OnInactiveRegion()
-}
-
 type inactiveRegionSleeper interface {
 	SleepWhenRegionInactive() bool
 }
@@ -28,11 +24,4 @@ func canWorkInRegion(state *world.State, actor world.Tracked) bool {
 		return false
 	}
 	return active || !sleepsWhenRegionInactive(actor)
-}
-
-func notifyInactiveRegion(actor world.Tracked) {
-	inactive, ok := actor.(inactiveRegionActor)
-	if ok {
-		inactive.OnInactiveRegion()
-	}
 }

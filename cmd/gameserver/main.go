@@ -698,8 +698,8 @@ func startAI(lc fx.Lifecycle, ai *task.AI, log zerolog.Logger) {
 	startTicker(lc, log, ai.Start)
 }
 
-func providePositionUpdates() *task.PositionUpdates {
-	return task.NewPositionUpdates()
+func providePositionUpdates(state *world.State) *task.PositionUpdates {
+	return task.NewPositionUpdates(state)
 }
 
 func startPositionUpdates(lc fx.Lifecycle, positions *task.PositionUpdates, log zerolog.Logger) {

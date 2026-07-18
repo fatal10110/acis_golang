@@ -679,9 +679,9 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 	moveCtl.SetArrived(func() {
 		pos := moveCtl.Position()
 		hostile.SyncPosition(pos)
-		hostile.AI().Think()
+		hostile.Think()
 	})
-	attackCtl.SetFinished(hostile.AI().Think)
+	attackCtl.SetFinished(hostile.Think)
 
 	return hostile, nil
 }
