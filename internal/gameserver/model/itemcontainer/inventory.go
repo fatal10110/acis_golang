@@ -120,17 +120,10 @@ func (inv *Inventory) Add(inst *item.Instance) (result *item.Instance, absorbed 
 // AddNew creates a new instance of templateID and adds it, per
 // Container.AddNew, queuing the same notification Add does.
 func (inv *Inventory) AddNew(templateID int32, count int, objectID int32) *item.Instance {
-	tmpl, ok := inv.Templates().Get(templateID)
+	inst, ok := newInstance(inv.Templates(), templateID, count, objectID)
 	if !ok {
 		return nil
 	}
-	if count < 1 {
-		count = 1
-	}
-	if !tmpl.Stackable {
-		count = 1
-	}
-	inst := &item.Instance{ObjectID: objectID, TemplateID: templateID, Count: count, ManaLeft: tmpl.InitialManaLeft()}
 	result, _ := inv.Add(inst)
 	return result
 }
@@ -210,21 +203,11 @@ func (inv *Inventory) DestroyItem(inst *item.Instance, count int) *item.Instance
 	if inst == nil {
 		return nil
 	}
-	if inst.Count > count {
-		inst.Count -= count
+	return destroyItemCore(inst, count, func(inst *item.Instance) bool {
+		return inv.Remove(inst, false)
+	}, func(inst *item.Instance) {
 		inv.queueUpdate(inst, UpdateModified)
-		return inst
-	}
-	if inst.Count < count {
-		return nil
-	}
-	if !inv.Remove(inst, false) {
-		return nil
-	}
-	inst.Count = 0
-	inst.OwnerID = 0
-	inst.Location = item.LocationVoid
-	return inst
+	})
 }
 
 // SetEnchantLevel changes inst's enchant level and queues a modified
@@ -410,7 +393,7 @@ func (inv *Inventory) EquipItem(inst *item.Instance, tmpl *item.Template) []*ite
 		}
 		altered = append(altered, inst)
 	}
-	clear := func(slot int) {
+	clearSlot := func(slot int) {
 		if old := inv.setPaperdollItemLocked(slot, nil, nil); old != nil {
 			altered = append(altered, old)
 		}
@@ -426,7 +409,7 @@ func (inv *Inventory) EquipItem(inst *item.Instance, tmpl *item.Template) []*ite
 
 	switch tmpl.Slot {
 	case item.SlotLRHand:
-		clear(LHand)
+		clearSlot(LHand)
 		set(RHand)
 
 	case item.SlotLHand:
@@ -436,7 +419,7 @@ func (inv *Inventory) EquipItem(inst *item.Instance, tmpl *item.Template) []*ite
 			pairedRodLure := rhTmpl.Weapon != nil && rhTmpl.Weapon.Type == item.WeaponFishingRod &&
 				tmpl.EtcItem != nil && tmpl.EtcItem.Type == item.EtcItemLure
 			if !pairedBowArrow && !pairedRodLure {
-				clear(RHand)
+				clearSlot(RHand)
 			}
 		}
 		set(LHand)
@@ -445,58 +428,16 @@ func (inv *Inventory) EquipItem(inst *item.Instance, tmpl *item.Template) []*ite
 		set(RHand)
 
 	case item.SlotLEar, item.SlotREar, item.SlotLREar:
-		switch {
-		case inv.paperdoll[LEar] == nil:
-			set(LEar)
-		case inv.paperdoll[REar] == nil:
-			set(REar)
-		default:
-			rearID, learID := int32(0), int32(0)
-			if inv.paperdoll[REar] != nil {
-				rearID = inv.paperdoll[REar].TemplateID
-			}
-			if inv.paperdoll[LEar] != nil {
-				learID = inv.paperdoll[LEar].TemplateID
-			}
-			switch tmpl.ID {
-			case rearID:
-				set(LEar)
-			case learID:
-				set(REar)
-			default:
-				set(LEar)
-			}
-		}
+		inv.equipPaired(tmpl, LEar, REar, set)
 
 	case item.SlotLFinger, item.SlotRFinger, item.SlotLRFinger:
-		switch {
-		case inv.paperdoll[LFinger] == nil:
-			set(LFinger)
-		case inv.paperdoll[RFinger] == nil:
-			set(RFinger)
-		default:
-			rfingerID, lfingerID := int32(0), int32(0)
-			if inv.paperdoll[RFinger] != nil {
-				rfingerID = inv.paperdoll[RFinger].TemplateID
-			}
-			if inv.paperdoll[LFinger] != nil {
-				lfingerID = inv.paperdoll[LFinger].TemplateID
-			}
-			switch tmpl.ID {
-			case rfingerID:
-				set(LFinger)
-			case lfingerID:
-				set(RFinger)
-			default:
-				set(LFinger)
-			}
-		}
+		inv.equipPaired(tmpl, LFinger, RFinger, set)
 
 	case item.SlotNeck:
 		set(Neck)
 
 	case item.SlotFullArmor:
-		clear(Legs)
+		clearSlot(Legs)
 		set(Chest)
 
 	case item.SlotChest:
@@ -504,7 +445,7 @@ func (inv *Inventory) EquipItem(inst *item.Instance, tmpl *item.Template) []*ite
 
 	case item.SlotLegs:
 		if chestTmpl := occupantTemplate(Chest); chestTmpl != nil && chestTmpl.Slot == item.SlotFullArmor {
-			clear(Chest)
+			clearSlot(Chest)
 		}
 		set(Legs)
 
@@ -519,18 +460,18 @@ func (inv *Inventory) EquipItem(inst *item.Instance, tmpl *item.Template) []*ite
 
 	case item.SlotFace:
 		if hairTmpl := occupantTemplate(Hair); hairTmpl != nil && hairTmpl.Slot == item.SlotHairAll {
-			clear(Hair)
+			clearSlot(Hair)
 		}
 		set(Face)
 
 	case item.SlotHair:
 		if faceTmpl := occupantTemplate(Face); faceTmpl != nil && faceTmpl.Slot == item.SlotHairAll {
-			clear(Face)
+			clearSlot(Face)
 		}
 		set(Hair)
 
 	case item.SlotHairAll:
-		clear(Face)
+		clearSlot(Face)
 		set(Hair)
 
 	case item.SlotUnderwear:
@@ -540,12 +481,12 @@ func (inv *Inventory) EquipItem(inst *item.Instance, tmpl *item.Template) []*ite
 		set(Cloak)
 
 	case item.SlotAllDress:
-		clear(Legs)
-		clear(LHand)
-		clear(RHand)
-		clear(Head)
-		clear(Feet)
-		clear(Gloves)
+		clearSlot(Legs)
+		clearSlot(LHand)
+		clearSlot(RHand)
+		clearSlot(Head)
+		clearSlot(Feet)
+		clearSlot(Gloves)
 		set(Chest)
 
 	default:
@@ -554,6 +495,25 @@ func (inv *Inventory) EquipItem(inst *item.Instance, tmpl *item.Template) []*ite
 	}
 
 	return altered
+}
+
+func (inv *Inventory) equipPaired(tmpl *item.Template, slotA, slotB int, set func(int)) {
+	switch {
+	case inv.paperdoll[slotA] == nil:
+		set(slotA)
+	case inv.paperdoll[slotB] == nil:
+		set(slotB)
+	default:
+		aID, bID := inv.paperdoll[slotA].TemplateID, inv.paperdoll[slotB].TemplateID
+		switch tmpl.ID {
+		case bID:
+			set(slotA)
+		case aID:
+			set(slotB)
+		default:
+			set(slotA)
+		}
+	}
 }
 
 // UnequipSlot clears whatever instance occupies paperdoll position slot
@@ -580,11 +540,11 @@ func (inv *Inventory) unequipSlotLocked(slot int) *item.Instance {
 // whether it changed.
 func (inv *Inventory) UpdateWeight() bool {
 	weight := 0
-	for _, inst := range inv.Items() {
+	inv.forEach(func(inst *item.Instance) {
 		if tmpl, ok := inv.Templates().Get(inst.TemplateID); ok {
 			weight += int(tmpl.Weight) * inst.Count
 		}
-	}
+	})
 
 	inv.mu.Lock()
 	defer inv.mu.Unlock()
@@ -625,20 +585,29 @@ func (inv *Inventory) SlotsNeededFor(inst *item.Instance, tmpl *item.Template) i
 	return 1
 }
 
-// arrowForCrystal maps a bow's crystal grade to the matching arrow item id.
-var arrowForCrystal = map[item.CrystalType]int32{
-	item.CrystalNone: 17,   // wooden arrow
-	item.CrystalD:    1341, // bone arrow
-	item.CrystalC:    1342, // fine steel arrow
-	item.CrystalB:    1343, // silver arrow
-	item.CrystalA:    1344, // mithril arrow
-	item.CrystalS:    1345, // shining arrow
+func arrowIDForCrystal(crystal item.CrystalType) (int32, bool) {
+	switch crystal {
+	case item.CrystalNone:
+		return 17, true
+	case item.CrystalD:
+		return 1341, true
+	case item.CrystalC:
+		return 1342, true
+	case item.CrystalB:
+		return 1343, true
+	case item.CrystalA:
+		return 1344, true
+	case item.CrystalS:
+		return 1345, true
+	default:
+		return 0, false
+	}
 }
 
 // FindArrowForBow returns the instance of the arrow matching bowCrystal
 // currently held, or nil if the inventory holds none.
 func (inv *Inventory) FindArrowForBow(bowCrystal item.CrystalType) *item.Instance {
-	arrowID, ok := arrowForCrystal[bowCrystal]
+	arrowID, ok := arrowIDForCrystal(bowCrystal)
 	if !ok {
 		return nil
 	}

@@ -9,7 +9,7 @@ type crystalTypeData struct {
 	enchantBonusWeapon int32
 }
 
-var crystalTypeTable = map[CrystalType]crystalTypeData{
+var crystalTypeTable = [...]crystalTypeData{
 	CrystalNone: {itemID: 0, enchantBonusArmor: 0, enchantBonusWeapon: 0},
 	CrystalD:    {itemID: 1458, enchantBonusArmor: 11, enchantBonusWeapon: 90},
 	CrystalC:    {itemID: 1459, enchantBonusArmor: 6, enchantBonusWeapon: 45},
@@ -18,22 +18,29 @@ var crystalTypeTable = map[CrystalType]crystalTypeData{
 	CrystalS:    {itemID: 1462, enchantBonusArmor: 25, enchantBonusWeapon: 250},
 }
 
+func (c CrystalType) data() crystalTypeData {
+	if int(c) >= len(crystalTypeTable) {
+		return crystalTypeData{}
+	}
+	return crystalTypeTable[int(c)]
+}
+
 // ItemID returns the crystal item produced by crystallizing an item of
 // grade c, or 0 for CrystalNone.
 func (c CrystalType) ItemID() int32 {
-	return crystalTypeTable[c].itemID
+	return c.data().itemID
 }
 
 // EnchantBonusArmor returns the per-enchant-level crystal count bonus an
 // armor or accessory of grade c earns when crystallized.
 func (c CrystalType) EnchantBonusArmor() int32 {
-	return crystalTypeTable[c].enchantBonusArmor
+	return c.data().enchantBonusArmor
 }
 
 // EnchantBonusWeapon returns the per-enchant-level crystal count bonus a
 // weapon of grade c earns when crystallized.
 func (c CrystalType) EnchantBonusWeapon() int32 {
-	return crystalTypeTable[c].enchantBonusWeapon
+	return c.data().enchantBonusWeapon
 }
 
 // Crystallizable reports whether t can be crystallized at all.
@@ -82,7 +89,7 @@ func (t *Template) CrystalCountAt(enchantLevel int) int32 {
 // (hero items and shadow items can never be crystallized regardless of
 // template).
 func (t *Template) CrystalReward(enchantLevel int) (itemID int32, count int32, ok bool) {
-	if !t.Crystallizable() || t.CrystalCount <= 0 || t.Crystal == CrystalNone {
+	if !t.Crystallizable() {
 		return 0, 0, false
 	}
 	return t.Crystal.ItemID(), t.CrystalCountAt(enchantLevel), true

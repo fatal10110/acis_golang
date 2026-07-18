@@ -119,6 +119,40 @@ func TestFreight_VisibleItems_FiltersByActiveTown(t *testing.T) {
 	}
 }
 
+func TestFreight_VisibleItems_OrderedByObjectID(t *testing.T) {
+	f := NewFreight(0x10000001, freightTestTemplates())
+	f.ActiveLocation = 1
+
+	for _, objectID := range []int32{0x20000003, 0x20000001, 0x20000004, 0x20000002} {
+		f.AddNew(freightTestItemID, 1, objectID)
+	}
+
+	visible := f.VisibleItems()
+	for i := 1; i < len(visible); i++ {
+		if visible[i-1].ObjectID > visible[i].ObjectID {
+			t.Fatalf("VisibleItems() object ids are not ordered: %d before %d", visible[i-1].ObjectID, visible[i].ObjectID)
+		}
+	}
+}
+
+func TestFreight_Add_MergesLowestObjectIDVisibleStack(t *testing.T) {
+	f := NewFreight(0x10000001, freightTestTemplates())
+
+	f.ActiveLocation = 1
+	low := f.AddNew(freightTestStackableID, 10, 0x20000001)
+	f.ActiveLocation = 2
+	high := f.AddNew(freightTestStackableID, 5, 0x20000002)
+	f.ActiveLocation = 0
+
+	merged := f.AddNew(freightTestStackableID, 3, 0x20000003)
+	if merged != low {
+		t.Fatalf("AddNew() with multiple visible stacks returned object %d, want lowest visible object %d", merged.ObjectID, low.ObjectID)
+	}
+	if low.Count != 13 || high.Count != 5 {
+		t.Errorf("stack counts after merge = low %d high %d, want low 13 high 5", low.Count, high.Count)
+	}
+}
+
 func TestFreight_VisibleItemByTemplateID(t *testing.T) {
 	f := NewFreight(0x10000001, freightTestTemplates())
 

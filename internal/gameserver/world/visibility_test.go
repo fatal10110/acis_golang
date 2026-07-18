@@ -49,6 +49,19 @@ func newObserver(id int32, log *sightLog) *observerStub {
 func (o *observerStub) Discover(obj Tracked) { o.log.add(o.id, "discover", obj) }
 func (o *observerStub) Forget(obj Tracked)   { o.log.add(o.id, "forget", obj) }
 
+type observerFuncStub struct {
+	trackedStub
+	discover func(Tracked)
+}
+
+func (o *observerFuncStub) Discover(obj Tracked) {
+	if o.discover != nil {
+		o.discover(obj)
+	}
+}
+
+func (o *observerFuncStub) Forget(Tracked) {}
+
 func TestSpawnNotifiesResidentFirstThenArrival(t *testing.T) {
 	s := New()
 	log := &sightLog{}
@@ -73,6 +86,19 @@ func TestSpawnNotifiesResidentFirstThenArrival(t *testing.T) {
 	if _, ok := s.Object(2); !ok {
 		t.Fatal("Object(2) missing after Spawn")
 	}
+}
+
+func TestSpawnRegistersObjectBeforeDiscover(t *testing.T) {
+	s := New()
+	observer := &observerFuncStub{trackedStub: trackedStub{id: 1}}
+	observer.discover = func(obj Tracked) {
+		if _, ok := s.Object(obj.ObjectID()); !ok {
+			t.Fatalf("Object(%d) missing during Discover", obj.ObjectID())
+		}
+	}
+
+	s.Spawn(observer, 0, 0, 0, 0)
+	s.Spawn(&trackedStub{id: 2}, 100, 0, 0, 0)
 }
 
 func TestSpawnPlainObjectNotifiesOnlyObservers(t *testing.T) {

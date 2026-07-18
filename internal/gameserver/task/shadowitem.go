@@ -117,9 +117,14 @@ func (s *ShadowItems) Tracked(inst *item.Instance) bool {
 	return ok
 }
 
-// manaThresholds are the remaining-mana values (in seconds) that fire a
-// client notification: 10, 5, and 1 minute left.
-var manaThresholds = map[int]bool{600: true, 300: true, 60: true}
+func manaThreshold(secondsLeft int) bool {
+	switch secondsLeft {
+	case 600, 300, 60:
+		return true
+	default:
+		return false
+	}
+}
 
 // Tick decreases every tracked item's mana by one second, firing a
 // threshold notification at 10/5/1 minutes remaining and an expiry event
@@ -141,7 +146,7 @@ func (s *ShadowItems) Tick() {
 			continue
 		}
 
-		if manaThresholds[e.inst.ManaLeft] {
+		if manaThreshold(e.inst.ManaLeft) {
 			s.effects.ManaThreshold(e.actorID, e.inst, e.inst.ManaLeft)
 		}
 	}
