@@ -94,7 +94,7 @@ func newHarness(t *testing.T, spawns *Spawns, templates *npc.Table) *testHarness
 	if err != nil {
 		t.Fatalf("NewRespawn: %v", err)
 	}
-	ai := task.NewAI()
+	ai := task.NewAI(nil)
 	updates := task.NewPositionUpdates()
 
 	ids := &sequentialIDs{}

@@ -259,13 +259,23 @@ func (s *State) regionNeighborhoodEmpty(r *Region) bool {
 	return true
 }
 
-// RegionActive reports whether t currently sits in an active Region — one
-// with a player somewhere in its 3x3 neighborhood. Scheduled per-object
-// work (AI, follow, route walking) calls this to skip objects in regions
-// with no nearby player. An object off the grid is never active.
-func (s *State) RegionActive(t Tracked) bool {
+// RegionActivity reports whether t is currently placed on the world grid,
+// and whether that Region is active — one with a player somewhere in its
+// 3x3 neighborhood. Scheduled per-object work (AI, follow, route walking)
+// calls this to skip objects in regions with no nearby player. An object
+// off the grid is not placed and is never active.
+func (s *State) RegionActivity(t Tracked) (placed, active bool) {
 	r := t.presence().currentRegion()
-	return r != nil && r.Active()
+	if r == nil {
+		return false, false
+	}
+	return true, r.Active()
+}
+
+// RegionActive reports whether t currently sits in an active Region.
+func (s *State) RegionActive(t Tracked) bool {
+	_, active := s.RegionActivity(t)
+	return active
 }
 
 func containsRegion(regions []*Region, r *Region) bool {

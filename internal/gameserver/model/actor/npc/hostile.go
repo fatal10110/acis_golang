@@ -173,6 +173,19 @@ func (h *Hostile) Think() {
 	h.brain.Think()
 }
 
+// OnInactiveRegion applies the hostile-NPC reset that aCis runs when the
+// owning world region deactivates.
+func (h *Hostile) OnInactiveRegion() {
+	h.brain.SetBackToPeace()
+}
+
+// SleepWhenRegionInactive reports whether the AI task should pause this NPC
+// while no player is near its region. noSleepMode NPCs and off-territory NPCs
+// keep ticking, matching the oracle's deactivation exemption.
+func (h *Hostile) SleepWhenRegionInactive() bool {
+	return !h.Instance.Template.NoSleepMode && h.InTerritory()
+}
+
 // SiegeGuard reports whether this NPC is a defensive siege guard.
 func (h *Hostile) SiegeGuard() bool {
 	return hostileKind(h.Instance) == "SiegeGuard"
