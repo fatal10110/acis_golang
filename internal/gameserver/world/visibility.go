@@ -26,6 +26,15 @@ type Observer interface {
 	Forget(obj Tracked)
 }
 
+// Player is implemented by tracked objects that are player characters —
+// the only objects whose presence keeps a Region active. Entering or
+// leaving a region's 3x3 neighborhood as a Player toggles Region.Active
+// for the regions that lose or gain a nearby player.
+type Player interface {
+	Tracked
+	IsPlayer() bool
+}
+
 // Spawn places t in the world at (x, y, z) facing heading, clamping x and
 // y to the world bounds, registers it, and notifies observers around the
 // landing region that t entered their sight (and t of everything it now
@@ -173,6 +182,7 @@ func (s *State) relocate(t Tracked, next *Region) {
 	}
 
 	tObs, tObserves := t.(Observer)
+	_, tIsPlayer := t.(Player)
 	var objectBuf [32]Tracked
 	objects := objectBuf[:0]
 
@@ -192,6 +202,9 @@ func (s *State) relocate(t Tracked, next *Region) {
 				tObs.Forget(o)
 			}
 		}
+		if tIsPlayer && s.regionNeighborhoodEmpty(r) {
+			r.setActive(false)
+		}
 	}
 
 	for _, r := range newAreas {
@@ -210,11 +223,35 @@ func (s *State) relocate(t Tracked, next *Region) {
 				tObs.Discover(o)
 			}
 		}
+		if tIsPlayer {
+			r.setActive(true)
+		}
 	}
 
 	p.mu.Lock()
 	p.region = next
 	p.mu.Unlock()
+}
+
+// regionNeighborhoodEmpty reports whether r and its 3x3 neighborhood
+// currently hold no players.
+func (s *State) regionNeighborhoodEmpty(r *Region) bool {
+	var buf [9]*Region
+	for _, n := range s.AppendNeighbors(buf[:0], r, 1) {
+		if n.playersCount.Load() != 0 {
+			return false
+		}
+	}
+	return true
+}
+
+// RegionActive reports whether t currently sits in an active Region — one
+// with a player somewhere in its 3x3 neighborhood. Scheduled per-object
+// work (AI, follow, route walking) calls this to skip objects in regions
+// with no nearby player. An object off the grid is never active.
+func (s *State) RegionActive(t Tracked) bool {
+	r := t.presence().currentRegion()
+	return r != nil && r.Active()
 }
 
 func containsRegion(regions []*Region, r *Region) bool {
