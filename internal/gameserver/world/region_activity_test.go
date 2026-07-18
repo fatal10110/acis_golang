@@ -118,6 +118,42 @@ func TestRegionActiveGatesSchedulerShapedWork(t *testing.T) {
 	}
 }
 
+// TestRegionActivityNotifiesNonPlayerMovingIntoAlreadyInactiveRegion covers
+// the gap issue #816 filed against #812/#815: a non-player crossing from an
+// active region straight into a neighbor that was already inactive doesn't
+// flip that neighbor's active flag (only a Player's presence does), so no
+// setActive transition fires there. Region.Add's own current-state notify
+// is what tells the arriving object it landed in dead space — without it,
+// nothing would, until (if ever) some other event happened to re-run its
+// Tick/Think.
+func TestRegionActivityNotifiesNonPlayerMovingIntoAlreadyInactiveRegion(t *testing.T) {
+	s := New()
+
+	player := &playerStub{trackedStub: trackedStub{id: 1}}
+	s.Spawn(player, 0, 0, 0, 0)
+
+	obj := &activeTrackedStub{trackedStub: trackedStub{id: 2}}
+	s.Spawn(obj, 0, 0, 0, 0)
+	obj.activeCalls = 0
+	obj.inactiveCalls = 0
+
+	const far = 8192 // several regions away: outside player's 3x3 neighborhood
+	if err := s.Move(obj, far, 0, 0); err != nil {
+		t.Fatalf("Move: %v", err)
+	}
+
+	dest, ok := s.RegionAt(far, 0)
+	if !ok {
+		t.Fatal("RegionAt(far, 0) not found")
+	}
+	if dest.Active() {
+		t.Fatal("destination region activated by a non-player move, want inactive")
+	}
+	if obj.inactiveCalls != 1 {
+		t.Fatalf("inactive calls after moving into an already-inactive region = %d, want 1 (no Tick required)", obj.inactiveCalls)
+	}
+}
+
 // TestRegionActivityConcurrentPlayerChurn guards against a check-then-act
 // race: one player's departure could read a stale (pre-arrival) player
 // count for a region and deactivate it right after another player's
