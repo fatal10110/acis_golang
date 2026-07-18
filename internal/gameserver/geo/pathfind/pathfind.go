@@ -438,15 +438,13 @@ func (f *Finder) backwardCandidateNSWE(gx, gy int, current *node) (height int, n
 		return height, nswe, true
 	}
 
-	h, n, found := f.engine.NodeAtOrAbove(gx, gy, z)
+	h, n, found := f.engine.NodeAtOrAbove(gx, gy, z, func(candidateHeight int16) bool {
+		return f.candidateHeightMatches(current.gx, current.gy, int(candidateHeight)+block.CellIgnoreHeight, current.z)
+	})
 	if !found {
 		return 0, 0, false
 	}
-	height = int(h)
-	if !f.candidateHeightMatches(current.gx, current.gy, height+block.CellIgnoreHeight, current.z) {
-		return 0, 0, false
-	}
-	return height, n, true
+	return int(h), n, true
 }
 
 // addCandidate dedups against already explored/queued nodes, weights the grid

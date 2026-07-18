@@ -131,12 +131,21 @@ func (e *Engine) NodeBelow(geoX, geoY, worldZ int) (height int16, nswe block.NSW
 }
 
 // NodeAtOrAbove returns the resolved height and own decoded NSWE mask of the
-// topmost geodata layer at or above worldZ for the given geodata cell.
-func (e *Engine) NodeAtOrAbove(geoX, geoY, worldZ int) (height int16, nswe block.NSWE, ok bool) {
+// first geodata layer at or above worldZ, scanning from the topmost layer
+// down, whose height satisfies accept. This lets a caller reject a
+// higher-but-invalid layer (e.g. one with no matching edge back to the
+// searcher) and fall through to the next-highest qualifying layer, instead
+// of being stuck with whichever layer happens to be topmost. ok is false if
+// no layer both qualifies and satisfies accept.
+func (e *Engine) NodeAtOrAbove(geoX, geoY, worldZ int, accept func(height int16) bool) (height int16, nswe block.NSWE, ok bool) {
 	b := e.blockAtGeo(geoX, geoY)
+	// ponytail: Cells() copies every layer at this cell; cold path (only
+	// reached once per candidate that already missed NodeBelow's guess),
+	// so the allocation is left as-is. Upgrade to a Layers()+per-index
+	// accessor if profiling ever puts this on a hot path.
 	cells := b.Cells(localCell(geoX), localCell(geoY))
 	for i := len(cells) - 1; i >= 0; i-- {
-		if int(cells[i].Height) >= worldZ {
+		if int(cells[i].Height) >= worldZ && accept(cells[i].Height) {
 			return cells[i].Height, cells[i].NSWE, true
 		}
 	}
