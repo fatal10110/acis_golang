@@ -124,6 +124,24 @@ func (a *Attackable) SetWander() {
 	a.current = intention{kind: IntentionWander}
 }
 
+// SetBackToPeace clears combat memory and cancels the current action. If the
+// actor is outside its spawn territory, the next Think runs the return-home
+// path instead of leaving it idle off leash.
+func (a *Attackable) SetBackToPeace() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	a.threats.Clear()
+	a.hates.Clear()
+	a.desires.Clear()
+	a.next = intention{}
+	a.current = intention{kind: IntentionIdle}
+	if !a.actor.InTerritory() {
+		a.current = intention{kind: IntentionWander}
+	}
+	a.move.Stop()
+}
+
 // CurrentIntention returns the currently active intention kind.
 func (a *Attackable) CurrentIntention() Intention {
 	a.mu.Lock()

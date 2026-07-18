@@ -63,7 +63,7 @@ func TestHostileRunsFromAITask(t *testing.T) {
 	state.Spawn(hostile, 120, 100, 0, 0)
 	hostile.AddDamageHate(target, 0, 100)
 
-	brains := task.NewAI()
+	brains := task.NewAI(nil)
 	brains.Add(hostile)
 	brains.Tick()
 
@@ -93,6 +93,75 @@ func TestHostileReturnHomeMovesTowardHomeAndClearsThreat(t *testing.T) {
 	}
 	if got := hostile.AI().CurrentIntention(); got != ai.IntentionWander {
 		t.Fatalf("current intention = %v, want wander while returning home", got)
+	}
+}
+
+func TestHostileInactiveRegionSleepHonorsTemplateAndTerritory(t *testing.T) {
+	state := world.New()
+
+	sleeping := newTestHostile(t, &hostileMove{}, &hostileAttack{})
+	state.Spawn(sleeping, 0, 0, 0, 0)
+	if !sleeping.SleepWhenRegionInactive() {
+		t.Fatal("regular in-territory hostile sleep = false, want true")
+	}
+
+	noSleep := newTestHostile(t, &hostileMove{}, &hostileAttack{})
+	noSleep.Instance.Template.NoSleepMode = true
+	state.Spawn(noSleep, 0, 0, 0, 0)
+	if noSleep.SleepWhenRegionInactive() {
+		t.Fatal("no-sleep hostile sleep = true, want false")
+	}
+
+	outside := newTestHostile(t, &hostileMove{}, &hostileAttack{})
+	outside.Instance.HasHome = true
+	outside.Instance.Home = location.Location{X: 0, Y: 0, Z: 0}
+	state.Spawn(outside, 500, 0, 0, 0)
+	if outside.SleepWhenRegionInactive() {
+		t.Fatal("out-of-territory hostile sleep = true, want false")
+	}
+}
+
+func TestHostileOnInactiveRegionResetsCombatAndReturnsHome(t *testing.T) {
+	state := world.New()
+	move := &hostileMove{}
+	strike := &hostileAttack{canAttack: true}
+	hostile := newTestHostile(t, move, strike)
+	hostile.Instance.HasHome = true
+	hostile.Instance.Home = location.Location{X: 0, Y: 0, Z: 0}
+	state.Spawn(hostile, 500, 0, 0, 0)
+	target := &hostileTarget{id: 200}
+	state.Spawn(target, 520, 0, 0, 0)
+
+	hostile.AddDamageHate(target, 5, 20)
+	hostile.AddHate(target, 30)
+	hostile.Think()
+
+	if got := hostile.AI().CurrentIntention(); got != ai.IntentionAttack {
+		t.Fatalf("current intention before reset = %v, want %v", got, ai.IntentionAttack)
+	}
+
+	hostile.OnInactiveRegion()
+
+	if !hostile.AI().Threats().IsEmpty() {
+		t.Fatal("threat table not cleared")
+	}
+	if !hostile.AI().Hates().IsEmpty() {
+		t.Fatal("hate table not cleared")
+	}
+	if got := hostile.AI().Desires().Len(); got != 0 {
+		t.Fatalf("desires len = %d, want 0", got)
+	}
+	if got := hostile.AI().CurrentIntention(); got != ai.IntentionWander {
+		t.Fatalf("current intention after reset = %v, want %v", got, ai.IntentionWander)
+	}
+	if move.stopCount == 0 {
+		t.Fatal("movement was not stopped on inactive reset")
+	}
+
+	hostile.Think()
+
+	if move.home != hostile.Instance.Home {
+		t.Fatalf("home move = %+v, want %+v", move.home, hostile.Instance.Home)
 	}
 }
 
@@ -280,6 +349,7 @@ type hostileMove struct {
 	followTarget attackable.Combatant
 	followRange  int
 	home         location.Location
+	stopCount    int
 }
 
 func (m *hostileMove) MaybeStartOffensiveFollow(target attackable.Combatant, attackRange int) bool {
@@ -292,7 +362,7 @@ func (m *hostileMove) MoveHome(home location.Location) {
 	m.home = home
 }
 
-func (m *hostileMove) Stop() {}
+func (m *hostileMove) Stop() { m.stopCount++ }
 
 type hostileAttack struct {
 	canAttack bool

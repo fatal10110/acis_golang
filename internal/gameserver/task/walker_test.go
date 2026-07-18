@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/route"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 func TestWalkerStartRouteUsesNearestNodeAndAdvances(t *testing.T) {
@@ -17,7 +18,7 @@ func TestWalkerStartRouteUsesNearestNodeAndAdvances(t *testing.T) {
 		},
 	}
 	actor := &walkerActorStub{id: 1, pos: loc(140)}
-	w := newTestWalker(t, routes, &walkerPathStub{canMove: true}, nil)
+	w := newTestWalker(t, routes, &walkerPathStub{canMove: true}, nil, nil)
 
 	if err := w.StartRoute(actor, "patrol", "guard"); err != nil {
 		t.Fatal(err)
@@ -48,7 +49,7 @@ func TestWalkerArrivedSchedulesDelayAndTickReleases(t *testing.T) {
 	}
 	now := time.Unix(100, 0)
 	actor := &walkerActorStub{id: 1, pos: loc(0)}
-	w := newTestWalker(t, routes, &walkerPathStub{canMove: true}, func() time.Time { return now })
+	w := newTestWalker(t, routes, &walkerPathStub{canMove: true}, func() time.Time { return now }, nil)
 
 	if err := w.StartRoute(actor, "patrol", "guard"); err != nil {
 		t.Fatal(err)
@@ -97,7 +98,7 @@ func TestWalkerReversesWhenNoPathFromRouteEnd(t *testing.T) {
 	}
 	path := &walkerPathStub{canMove: true}
 	actor := &walkerActorStub{id: 1, pos: loc(100)}
-	w := newTestWalker(t, routes, path, nil)
+	w := newTestWalker(t, routes, path, nil, nil)
 
 	if err := w.StartRoute(actor, "patrol", "guard"); err != nil {
 		t.Fatal(err)
@@ -134,7 +135,7 @@ func TestWalkerTeleportsAfterRepeatedPathFailures(t *testing.T) {
 		},
 	}
 	actor := &walkerActorStub{id: 1, pos: loc(0), geoFails: walkerGeoFailLimit}
-	w := newTestWalker(t, routes, &walkerPathStub{canMove: true}, nil)
+	w := newTestWalker(t, routes, &walkerPathStub{canMove: true}, nil, nil)
 
 	if err := w.StartRoute(actor, "patrol", "guard"); err != nil {
 		t.Fatal(err)
@@ -154,7 +155,7 @@ func TestWalkerTeleportsAfterRepeatedPathFailures(t *testing.T) {
 }
 
 func TestWalkerRouteValidation(t *testing.T) {
-	w := newTestWalker(t, route.WalkerRoutes{"patrol": {"guard": nil}}, &walkerPathStub{canMove: true}, nil)
+	w := newTestWalker(t, route.WalkerRoutes{"patrol": {"guard": nil}}, &walkerPathStub{canMove: true}, nil, nil)
 	actor := &walkerActorStub{id: 1}
 
 	tests := []struct {
@@ -176,7 +177,7 @@ func TestWalkerRouteValidation(t *testing.T) {
 }
 
 func TestNewWalkerRejectsNilPath(t *testing.T) {
-	if _, err := NewWalker(nil, nil, nil); err == nil {
+	if _, err := NewWalker(nil, nil, nil, nil); err == nil {
 		t.Fatal("NewWalker() error = nil")
 	}
 }
@@ -185,7 +186,7 @@ func TestWalkerMoveErrorsAreReturned(t *testing.T) {
 	wantErr := errors.New("move failed")
 	routes := route.WalkerRoutes{"patrol": {"guard": {walkerNode(0)}}}
 	actor := &walkerActorStub{id: 1, moveErr: wantErr}
-	w := newTestWalker(t, routes, &walkerPathStub{canMove: true}, nil)
+	w := newTestWalker(t, routes, &walkerPathStub{canMove: true}, nil, nil)
 
 	if err := w.StartRoute(actor, "patrol", "guard"); !errors.Is(err, wantErr) {
 		t.Fatalf("StartRoute() error = %v, want %v", err, wantErr)
@@ -204,7 +205,7 @@ func TestWalkerTickRetriesRejectedMove(t *testing.T) {
 	}
 	now := time.Unix(100, 0)
 	actor := &walkerActorStub{id: 1, pos: loc(0)}
-	w := newTestWalker(t, routes, &walkerPathStub{canMove: true}, func() time.Time { return now })
+	w := newTestWalker(t, routes, &walkerPathStub{canMove: true}, func() time.Time { return now }, nil)
 
 	if err := w.StartRoute(actor, "patrol", "guard"); err != nil {
 		t.Fatal(err)
@@ -229,10 +230,92 @@ func TestWalkerTickRetriesRejectedMove(t *testing.T) {
 	assertMoves(t, actor, loc(0), loc(100))
 }
 
+func TestWalkerTickSkipsInactiveRegions(t *testing.T) {
+	routes := route.WalkerRoutes{
+		"inactive": {"guard": {walkerNode(0), walkerNode(100)}},
+		"active":   {"guard": {walkerNode(8192), walkerNode(8292)}},
+	}
+	now := time.Unix(100, 0)
+	state := world.New()
+	inactive := &walkerActorStub{id: 1, pos: loc(0)}
+	active := &walkerActorStub{id: 2, pos: loc(8192)}
+	player := &playerStub{id: 3}
+	spawnWalker(state, inactive)
+	spawnWalker(state, active)
+	state.Spawn(player, active.pos.X, active.pos.Y, active.pos.Z, 0)
+	w := newTestWalker(t, routes, &walkerPathStub{canMove: true}, func() time.Time { return now }, state)
+	past := now.Add(-time.Second)
+	w.entries[inactive.id] = &walkerEntry{actor: inactive, route: "inactive", npc: "guard", onRoute: true, wakeTime: past}
+	w.entries[active.id] = &walkerEntry{actor: active, route: "active", npc: "guard", onRoute: true, wakeTime: past}
+
+	if errs := w.Tick(); len(errs) != 0 {
+		t.Fatalf("Tick() errors = %v", errs)
+	}
+
+	assertMoves(t, inactive)
+	assertMoves(t, active, loc(8292))
+}
+
+func TestWalkerArrivedQueuesZeroDelayWhileInactive(t *testing.T) {
+	routes := route.WalkerRoutes{
+		"patrol": {"guard": {walkerNode(0), walkerNode(100)}},
+	}
+	now := time.Unix(100, 0)
+	state := world.New()
+	actor := &walkerActorStub{id: 1, pos: loc(0)}
+	player := &playerStub{id: 2}
+	spawnWalker(state, actor)
+	state.Spawn(player, actor.pos.X, actor.pos.Y, actor.pos.Z, 0)
+	w := newTestWalker(t, routes, &walkerPathStub{canMove: true}, func() time.Time { return now }, state)
+
+	if err := w.StartRoute(actor, "patrol", "guard"); err != nil {
+		t.Fatal(err)
+	}
+	state.Despawn(player)
+	if err := w.Arrived(actor); err != nil {
+		t.Fatal(err)
+	}
+	assertMoves(t, actor, loc(0))
+
+	now = now.Add(WalkerTick)
+	if errs := w.Tick(); len(errs) != 0 {
+		t.Fatalf("Tick() errors = %v", errs)
+	}
+	assertMoves(t, actor, loc(0))
+
+	state.Spawn(player, actor.pos.X, actor.pos.Y, actor.pos.Z, 0)
+	now = now.Add(WalkerTick)
+	if errs := w.Tick(); len(errs) != 0 {
+		t.Fatalf("Tick() errors = %v", errs)
+	}
+	assertMoves(t, actor, loc(0), loc(100))
+}
+
+func TestWalkerNoSleepInactiveActorKeepsMoving(t *testing.T) {
+	routes := route.WalkerRoutes{
+		"patrol": {"guard": {walkerNode(0), walkerNode(100)}},
+	}
+	state := world.New()
+	actor := &walkerActorStub{id: 1, pos: loc(0), keepAwakeInactive: true}
+	spawnWalker(state, actor)
+	w := newTestWalker(t, routes, &walkerPathStub{canMove: true}, nil, state)
+
+	if err := w.StartRoute(actor, "patrol", "guard"); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Arrived(actor); err != nil {
+		t.Fatal(err)
+	}
+
+	assertMoves(t, actor, loc(0), loc(100))
+}
+
 // allocFreeWalkerActor is a zero-allocation WalkerActor stub for allocation-
 // ceiling tests: walkerActorStub's move/teleport/say/social slices grow and
 // occasionally reallocate, which would add noise to a per-call measurement.
 type allocFreeWalkerActor struct {
+	world.Presence
+
 	id        int32
 	pos       location.Location
 	moveCount int
@@ -271,7 +354,7 @@ func TestWalkerTickAllocs(t *testing.T) {
 
 	t.Run("no-release path", func(t *testing.T) {
 		actor := &allocFreeWalkerActor{id: 1, pos: loc(0)}
-		w := newTestWalker(t, routes, path, func() time.Time { return now })
+		w := newTestWalker(t, routes, path, func() time.Time { return now }, nil)
 		if err := w.StartRoute(actor, "patrol", "guard"); err != nil {
 			t.Fatal(err)
 		}
@@ -289,7 +372,7 @@ func TestWalkerTickAllocs(t *testing.T) {
 
 	t.Run("release path", func(t *testing.T) {
 		actor := &allocFreeWalkerActor{id: 1, pos: loc(0)}
-		w := newTestWalker(t, routes, path, func() time.Time { return now })
+		w := newTestWalker(t, routes, path, func() time.Time { return now }, nil)
 		if err := w.StartRoute(actor, "patrol", "guard"); err != nil {
 			t.Fatal(err)
 		}
@@ -348,16 +431,19 @@ func TestGeoPathUsesFinderPathCheck(t *testing.T) {
 }
 
 type walkerActorStub struct {
-	id            int32
-	pos           location.Location
-	moving        bool
-	moves         []location.Location
-	teleports     []location.Location
-	says          []int
-	socials       []int
-	geoFails      int
-	resetGeoFails int
-	moveErr       error
+	world.Presence
+
+	id                int32
+	pos               location.Location
+	moving            bool
+	moves             []location.Location
+	teleports         []location.Location
+	says              []int
+	socials           []int
+	geoFails          int
+	resetGeoFails     int
+	moveErr           error
+	keepAwakeInactive bool
 }
 
 func (a *walkerActorStub) ObjectID() int32 { return a.id }
@@ -391,6 +477,8 @@ func (a *walkerActorStub) AddGeoPathFailCount() { a.geoFails++ }
 func (a *walkerActorStub) SayNPCString(id int) { a.says = append(a.says, id) }
 
 func (a *walkerActorStub) SocialAction(id int) { a.socials = append(a.socials, id) }
+
+func (a *walkerActorStub) SleepWhenRegionInactive() bool { return !a.keepAwakeInactive }
 
 type walkerPathStub struct {
 	canMove bool
@@ -475,9 +563,13 @@ func loc(x int) location.Location {
 	return location.Location{X: x, Y: 10, Z: 20}
 }
 
-func newTestWalker(t *testing.T, routes route.WalkerRoutes, path WalkerPath, now func() time.Time) *Walker {
+func spawnWalker(state *world.State, actor *walkerActorStub) {
+	state.Spawn(actor, actor.pos.X, actor.pos.Y, actor.pos.Z, 0)
+}
+
+func newTestWalker(t *testing.T, routes route.WalkerRoutes, path WalkerPath, now func() time.Time, state *world.State) *Walker {
 	t.Helper()
-	w, err := NewWalker(routes, path, now)
+	w, err := NewWalker(routes, path, now, state)
 	if err != nil {
 		t.Fatal(err)
 	}
