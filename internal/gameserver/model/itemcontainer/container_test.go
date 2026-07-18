@@ -44,6 +44,26 @@ func TestContainer_AddNew_MergesStackable(t *testing.T) {
 	}
 }
 
+func TestContainer_AddRejectsZeroObjectIDWithoutMerge(t *testing.T) {
+	c := newTestContainer()
+
+	if got, absorbed := c.Add(&item.Instance{ObjectID: 0, TemplateID: daggerTemplateID, Count: 1}); got != nil || absorbed {
+		t.Fatalf("Add() with zero object id = (%+v, %v), want nil,false", got, absorbed)
+	}
+	if c.ItemByObjectID(0) != nil {
+		t.Fatal("container registered object id 0")
+	}
+
+	existing := c.AddNew(adenaTemplateID, 5, 0x20000001)
+	got, absorbed := c.Add(&item.Instance{ObjectID: 0, TemplateID: adenaTemplateID, Count: 3})
+	if got != existing || !absorbed {
+		t.Fatalf("Add() zero-id stack merge = (%+v, %v), want existing,true", got, absorbed)
+	}
+	if existing.Count != 8 {
+		t.Fatalf("merged count = %d, want 8", existing.Count)
+	}
+}
+
 func TestContainer_AddNew_NonStackableStaysSeparate(t *testing.T) {
 	c := newTestContainer()
 

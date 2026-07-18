@@ -42,7 +42,7 @@ func liveMoveSpeed(live *livePlayer) float64 {
 		return 0
 	}
 	if live.Running() {
-		return live.template.RunSpeed
+		return live.RunSpeed()
 	}
 	return live.template.WalkSpeed
 }

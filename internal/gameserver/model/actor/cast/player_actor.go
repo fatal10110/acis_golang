@@ -13,9 +13,12 @@ type PlayerActor struct {
 	Character *player.Character
 }
 
-func (a PlayerActor) AttackSpeed(bool) int {
+func (a PlayerActor) AttackSpeed(magic bool) int {
 	if a.Character == nil {
 		return 1
+	}
+	if magic {
+		return a.Character.MagicAttackSpeed()
 	}
 	return a.Character.AttackSpeed()
 }

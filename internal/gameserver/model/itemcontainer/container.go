@@ -184,7 +184,7 @@ func (c *Container) ItemCount(templateID int32, enchantLevel int, includeEquippe
 		if enchantLevel >= 0 && st.EnchantLevel != enchantLevel {
 			continue
 		}
-		if !includeEquipped && (st.Location == item.LocationPaperdoll || st.Location == item.LocationPetEquip) {
+		if !includeEquipped && st.Equipped() {
 			continue
 		}
 		tmpl, _ := c.templates.Get(inst.TemplateID)
@@ -209,6 +209,9 @@ func (c *Container) Adena() int {
 // it's no longer live. The returned instance is always the one the
 // container now actually holds.
 func (c *Container) Add(inst *item.Instance) (result *item.Instance, absorbed bool) {
+	if inst == nil {
+		return nil, false
+	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -216,6 +219,9 @@ func (c *Container) Add(inst *item.Instance) (result *item.Instance, absorbed bo
 	if old := c.itemByTemplateIDLocked(inst.TemplateID); old != nil && tmpl != nil && tmpl.Stackable {
 		old.AddCount(inst.Snapshot().Count)
 		return old, true
+	}
+	if inst.ObjectID == 0 {
+		return nil, false
 	}
 
 	inst.SetOwnerLocation(c.ownerID, c.location, 0)

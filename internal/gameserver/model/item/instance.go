@@ -1,6 +1,10 @@
 package item
 
-import "sync"
+import (
+	"sync"
+	"sync/atomic"
+	"unsafe"
+)
 
 // Instance is one persisted item: a template plus the owner-specific state
 // recorded in the items table (how many, where it sits, its enchant level).
@@ -10,7 +14,7 @@ import "sync"
 // decay, and lazy persistence; access that state through the methods below
 // once an instance is visible outside construction/restore code.
 type Instance struct {
-	mu *sync.RWMutex
+	mu unsafe.Pointer
 
 	ObjectID   int32
 	TemplateID int32
@@ -37,8 +41,6 @@ type Instance struct {
 	Augmentation *Augmentation
 }
 
-var instanceLockInit sync.Mutex
-
 // InstanceState is a point-in-time copy of an instance's mutable live state,
 // plus the immutable ids callers usually need alongside it.
 type InstanceState struct {
@@ -61,12 +63,14 @@ type InstanceState struct {
 }
 
 func (inst *Instance) lock() *sync.RWMutex {
-	instanceLockInit.Lock()
-	defer instanceLockInit.Unlock()
-	if inst.mu == nil {
-		inst.mu = &sync.RWMutex{}
+	if mu := atomic.LoadPointer(&inst.mu); mu != nil {
+		return (*sync.RWMutex)(mu)
 	}
-	return inst.mu
+	mu := &sync.RWMutex{}
+	if atomic.CompareAndSwapPointer(&inst.mu, nil, unsafe.Pointer(mu)) {
+		return mu
+	}
+	return (*sync.RWMutex)(atomic.LoadPointer(&inst.mu))
 }
 
 // Snapshot returns a race-free copy of inst's current persisted and transient
@@ -134,6 +138,12 @@ func (st InstanceState) Instance() *Instance {
 		inst.Augmentation = &aug
 	}
 	return inst
+}
+
+// Equipped reports whether st describes an item occupying a paperdoll or
+// pet equipment slot.
+func (st InstanceState) Equipped() bool {
+	return st.Location == LocationPaperdoll || st.Location == LocationPetEquip
 }
 
 // CountValue returns inst's current count.
@@ -234,7 +244,7 @@ func (inst *Instance) Equipped() bool {
 	mu := inst.lock()
 	mu.RLock()
 	defer mu.RUnlock()
-	return inst.Location == LocationPaperdoll || inst.Location == LocationPetEquip
+	return InstanceState{Location: inst.Location}.Equipped()
 }
 
 // Augmented reports whether inst carries an augmentation.

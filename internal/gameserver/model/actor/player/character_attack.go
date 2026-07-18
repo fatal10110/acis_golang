@@ -15,11 +15,13 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/statbonus"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
-const defaultPlayerAttackSpeed = 300
+const (
+	defaultPlayerAttackSpeed      = 300
+	defaultPlayerMagicAttackSpeed = 333
+)
 
 var weaponRange = map[item.WeaponType]int{
 	item.WeaponBow:  500,
@@ -274,7 +276,36 @@ func (c *Character) AttackType() item.WeaponType {
 
 // AttackSpeed resolves the equipped weapon's pAtkSpd stat-set value.
 func (c *Character) AttackSpeed() int {
-	return int(c.activeWeapon().stat("pAtkSpd", defaultPlayerAttackSpeed))
+	return int(c.calcStat(stat.PowerAttackSpeed, c.activeWeapon().stat("pAtkSpd", defaultPlayerAttackSpeed)))
+}
+
+// MagicAttackSpeed returns the casting speed used by magic-skill timing.
+func (c *Character) MagicAttackSpeed() int {
+	return int(c.calcStat(stat.MagicAttackSpeed, defaultPlayerMagicAttackSpeed))
+}
+
+// Accuracy returns this player's physical accuracy rating.
+func (c *Character) Accuracy() int {
+	return int(c.calcStat(stat.AccuracyCombat, 0))
+}
+
+// CriticalRate returns this player's physical critical rate.
+func (c *Character) CriticalRate() float64 {
+	return c.calcStat(stat.CriticalRate, c.activeWeapon().stat("rCrit", 4))
+}
+
+// MagicCriticalRate returns this player's magic critical rate.
+func (c *Character) MagicCriticalRate() float64 {
+	return c.calcStat(stat.MCriticalRate, 1)
+}
+
+// RunSpeed returns the current run speed.
+func (c *Character) RunSpeed() float64 {
+	tmpl := c.template()
+	if tmpl == nil {
+		return 0
+	}
+	return c.calcStat(stat.RunSpeed, tmpl.RunSpeed)
 }
 
 // PhysicalAttackRange returns the attack range for the active weapon
@@ -328,8 +359,7 @@ func (c *Character) MakeAttackHit(target attackable.Combatant, split bool) attac
 	}
 	weapon := c.activeWeapon()
 
-	dexIdx := statbonus.ClampIndex(tmpl.DEX)
-	accuracy := int(statbonus.BaseEvasionAccuracy[dexIdx]) + c.Level
+	accuracy := c.Accuracy()
 	evasion := other.Evasion()
 
 	_, _, sz := c.Position()
@@ -340,7 +370,7 @@ func (c *Character) MakeAttackHit(target attackable.Combatant, split bool) attac
 		return hit
 	}
 
-	critRate := weapon.stat("rCrit", 4) * statbonus.DEXBonus[dexIdx] * 10
+	critRate := c.CriticalRate()
 	crit := formulas.CritSucceeds(critRate, c.rollValue(1000))
 
 	randomMul := 1.0

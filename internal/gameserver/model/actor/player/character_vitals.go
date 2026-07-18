@@ -1,5 +1,7 @@
 package player
 
+import "github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
+
 // Vitals snapshots the character's current visible resources.
 type Vitals struct {
 	HP int
@@ -29,12 +31,19 @@ func (c *Character) Vitals() Vitals {
 // ResourceValues returns a synchronized HP/MP/CP resource snapshot.
 func (c *Character) ResourceValues() Resources {
 	c.vitalsMu.RLock()
-	defer c.vitalsMu.RUnlock()
-	return Resources{
+	res := Resources{
 		MaxHP: c.MaxHP, CurrentHP: c.CurHP,
 		MaxMP: c.MaxMP, CurrentMP: c.CurMP,
 		MaxCP: c.MaxCP, CurrentCP: c.CurCP,
 	}
+	c.vitalsMu.RUnlock()
+	if c.template() == nil {
+		return res
+	}
+	res.MaxHP = c.calcStat(stat.MaxHP, res.MaxHP)
+	res.MaxMP = c.calcStat(stat.MaxMP, res.MaxMP)
+	res.MaxCP = c.calcStat(stat.MaxCP, res.MaxCP)
+	return res
 }
 
 // CurrentHP returns current HP as an integer resource value.

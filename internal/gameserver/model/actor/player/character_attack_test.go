@@ -61,8 +61,8 @@ func TestCharacterAttackUsesEquippedRightHandWeapon(t *testing.T) {
 	if got := c.AttackType(); got != item.WeaponSword {
 		t.Fatalf("AttackType() = %v, want equipped sword", got)
 	}
-	if got := c.AttackSpeed(); got != 433 {
-		t.Fatalf("AttackSpeed() = %d, want equipped weapon pAtkSpd", got)
+	if got := c.AttackSpeed(); got != 476 {
+		t.Fatalf("AttackSpeed() = %d, want DEX-adjusted equipped weapon speed", got)
 	}
 	if got := c.WeaponReuseDelay(); got != 1200*time.Millisecond {
 		t.Fatalf("WeaponReuseDelay() = %s, want 1200ms", got)
@@ -80,8 +80,8 @@ func TestCharacterAttackFallsBackToTemplateFists(t *testing.T) {
 	if got := c.AttackType(); got != item.WeaponFist {
 		t.Fatalf("AttackType() = %v, want template fists", got)
 	}
-	if got := c.AttackSpeed(); got != 300 {
-		t.Fatalf("AttackSpeed() = %d, want fists pAtkSpd", got)
+	if got := c.AttackSpeed(); got != 330 {
+		t.Fatalf("AttackSpeed() = %d, want DEX-adjusted fists speed", got)
 	}
 }
 

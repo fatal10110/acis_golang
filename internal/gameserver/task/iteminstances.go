@@ -151,11 +151,11 @@ func (i *ItemInstances) snapshotPending() []*item.Instance {
 }
 
 func (i *ItemInstances) updateItem(ctx context.Context, inst *item.Instance) error {
-	saved := inst.Clone()
-	if saved == nil {
+	if inst == nil {
 		return nil
 	}
-	st := saved.Snapshot()
+	st := inst.Snapshot()
+	saved := st.Instance()
 	tmpl, _ := i.templates.Get(st.TemplateID)
 	isWeapon := tmpl != nil && tmpl.Kind == item.KindWeapon
 

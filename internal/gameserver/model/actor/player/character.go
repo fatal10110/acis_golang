@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -44,7 +45,8 @@ type Character struct {
 	MaxHP, CurHP float64
 	MaxCP, CurCP float64
 	MaxMP, CurMP float64
-	vitalsMu     sync.RWMutex
+	// vitalsMu guards MaxHP/CurHP, MaxCP/CurCP and MaxMP/CurMP.
+	vitalsMu sync.RWMutex
 
 	Face, HairStyle, HairColor int
 
@@ -87,7 +89,7 @@ type Character struct {
 
 	// statMu guards statCalcs map creation. Each Calculator owns its Funcs.
 	statMu    sync.Mutex
-	statCalcs map[stat.Stat]*statCalculator
+	statCalcs map[stat.Stat]*basefunc.Calculator
 
 	// stateMu guards transient live flags and runtime send/broadcast hooks.
 	stateMu       sync.RWMutex

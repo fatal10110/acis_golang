@@ -72,7 +72,7 @@ func (s *Service) ToggleEquipItem(inv *itemcontainer.Inventory, objectID int32) 
 	}
 
 	st := inst.Snapshot()
-	if st.Location == item.LocationPaperdoll || st.Location == item.LocationPetEquip {
+	if st.Equipped() {
 		if inv.UnequipSlot(st.LocationData) == nil {
 			return Result{}, false
 		}
@@ -124,7 +124,7 @@ func (s *Service) DropItem(inv *itemcontainer.Inventory, objectID int32, count i
 		}
 		newObjectID = id
 	}
-	wasEquipped := (st.Location == item.LocationPaperdoll || st.Location == item.LocationPetEquip) && st.Count <= count
+	wasEquipped := st.Equipped() && st.Count <= count
 	dropped := inv.DropItem(objectID, count, newObjectID)
 	if dropped == nil {
 		return DropResult{}, false, nil
@@ -194,7 +194,7 @@ func (s *Service) DestroyItem(inv *itemcontainer.Inventory, objectID int32, coun
 	if !tmpl.Stackable && count > 1 {
 		return Result{}, false
 	}
-	wasEquipped := (st.Location == item.LocationPaperdoll || st.Location == item.LocationPetEquip) && st.Count <= count
+	wasEquipped := st.Equipped() && st.Count <= count
 	if inv.DestroyItem(inst, count) == nil {
 		return Result{}, false
 	}
@@ -224,7 +224,7 @@ func (s *Service) TransferItem(source, receiver *itemcontainer.Inventory, object
 	}
 
 	newObjectID := int32(0)
-	if st.Count > count && targetStack == nil {
+	if st.Count > count || targetStack != nil {
 		id, ok, err := s.nextID()
 		if err != nil || !ok {
 			return TransferResult{}, false, err
@@ -244,10 +244,10 @@ func (s *Service) TransferItem(source, receiver *itemcontainer.Inventory, object
 	if freed {
 		out.Persist = append(out.Persist, Delete(freedObjectID))
 	}
-	if result.ObjectID == objectID || receiver.ItemByObjectID(result.ObjectID) == result && newObjectID == 0 {
-		out.Persist = append(out.Persist, Update(result))
-	} else {
+	if newObjectID != 0 && result.ObjectID == newObjectID {
 		out.Persist = append(out.Persist, Save(result))
+	} else {
+		out.Persist = append(out.Persist, Update(result))
 	}
 	return out, true, nil
 }
@@ -290,7 +290,7 @@ func (s *Service) CrystallizeItem(inv *itemcontainer.Inventory, objectID int32, 
 	if count > st.Count {
 		count = st.Count
 	}
-	wasEquipped := (st.Location == item.LocationPaperdoll || st.Location == item.LocationPetEquip) && st.Count <= count
+	wasEquipped := st.Equipped() && st.Count <= count
 	sourceItemID := st.TemplateID
 	if inv.DestroyItem(inst, count) == nil {
 		return CrystallizeResult{}, CrystallizeNoop, nil

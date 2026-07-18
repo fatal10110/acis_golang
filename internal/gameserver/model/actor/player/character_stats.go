@@ -2,7 +2,6 @@ package player
 
 import (
 	"math"
-	"sync"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -15,25 +14,20 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/statbonus"
 )
 
-type statCalculator struct {
-	mu    sync.RWMutex
-	funcs []basefunc.Func
-}
-
-func (c *Character) statCalc(s stat.Stat) *statCalculator {
+func (c *Character) statCalc(s stat.Stat) *basefunc.Calculator {
 	c.statMu.Lock()
 	defer c.statMu.Unlock()
 	return c.statCalcLocked(s)
 }
 
-func (c *Character) statCalcLocked(s stat.Stat) *statCalculator {
+func (c *Character) statCalcLocked(s stat.Stat) *basefunc.Calculator {
 	if c.statCalcs == nil {
-		c.statCalcs = make(map[stat.Stat]*statCalculator)
+		c.statCalcs = make(map[stat.Stat]*basefunc.Calculator)
 	}
 	if calc := c.statCalcs[s]; calc != nil {
 		return calc
 	}
-	calc := &statCalculator{}
+	calc := &basefunc.Calculator{}
 	for _, fn := range defaultStatFuncs(s) {
 		calc.AddFunc(fn)
 	}
@@ -45,53 +39,6 @@ func (c *Character) calcStat(s stat.Stat, base float64) float64 {
 	value := c.statCalc(s).Calc(characterStatActor{c: c}, c, nil, base)
 	if s.CantBeNegative() && value < 0 {
 		return 0
-	}
-	return value
-}
-
-func (c *statCalculator) AddFunc(fn basefunc.Func) {
-	if fn == nil {
-		return
-	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	order := fn.Order()
-	i := 0
-	for i < len(c.funcs) && order >= c.funcs[i].Order() {
-		i++
-	}
-	next := make([]basefunc.Func, len(c.funcs)+1)
-	copy(next, c.funcs[:i])
-	next[i] = fn
-	copy(next[i+1:], c.funcs[i:])
-	c.funcs = next
-}
-
-func (c *statCalculator) RemoveOwner(owner any) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	kept := make([]basefunc.Func, 0, len(c.funcs))
-	for _, fn := range c.funcs {
-		if fn.Owner() != owner {
-			kept = append(kept, fn)
-		}
-	}
-	c.funcs = kept
-}
-
-func (c *statCalculator) Calc(effector, effected, skill any, base float64) float64 {
-	c.mu.RLock()
-	funcs := c.funcs
-	c.mu.RUnlock()
-
-	value := base
-	for _, fn := range funcs {
-		value = fn.Calc(effector, effected, skill, base, value)
-		if _, ok := fn.(*basefunc.Set); ok {
-			base = value
-		}
 	}
 	return value
 }
@@ -304,18 +251,58 @@ func (c *Character) MaxMPValue() float64 { return c.ResourceValues().MaxMP }
 // MaxCPValue returns maximum CP as a floating-point skill-resource value.
 func (c *Character) MaxCPValue() float64 { return c.ResourceValues().MaxCP }
 
+// HPRegenRate returns c's current HP regeneration rate.
+func (c *Character) HPRegenRate() float64 {
+	tmpl := c.template()
+	if tmpl == nil {
+		return c.calcStat(stat.RegenerateHPRate, 0)
+	}
+	return c.calcStat(stat.RegenerateHPRate, c.levelTableValue(tmpl.HPRegenTable, 0))
+}
+
+// MPRegenRate returns c's current MP regeneration rate.
+func (c *Character) MPRegenRate() float64 {
+	tmpl := c.template()
+	if tmpl == nil {
+		return c.calcStat(stat.RegenerateMPRate, 0)
+	}
+	return c.calcStat(stat.RegenerateMPRate, c.levelTableValue(tmpl.MPRegenTable, 0))
+}
+
+// CPRegenRate returns c's current CP regeneration rate.
+func (c *Character) CPRegenRate() float64 {
+	tmpl := c.template()
+	if tmpl == nil {
+		return c.calcStat(stat.RegenerateCPRate, 0)
+	}
+	return c.calcStat(stat.RegenerateCPRate, c.levelTableValue(tmpl.CPRegenTable, 0))
+}
+
+func (c *Character) levelTableValue(values []float64, fallback float64) float64 {
+	level := c.Level
+	if level <= 0 {
+		level = 1
+	}
+	idx := level - 1
+	if idx < 0 || idx >= len(values) {
+		return fallback
+	}
+	return values[idx]
+}
+
 // AddHP restores HP, clamped to MaxHP, and returns the applied amount.
 func (c *Character) AddHP(amount float64) float64 {
 	if amount <= 0 {
 		return 0
 	}
+	maxHP := c.MaxHPValue()
 	c.vitalsMu.Lock()
 	defer c.vitalsMu.Unlock()
-	if c.CurHP >= c.MaxHP {
+	if c.CurHP >= maxHP {
 		return 0
 	}
-	if c.CurHP+amount > c.MaxHP {
-		amount = c.MaxHP - c.CurHP
+	if c.CurHP+amount > maxHP {
+		amount = maxHP - c.CurHP
 	}
 	c.CurHP += amount
 	return amount
@@ -326,13 +313,14 @@ func (c *Character) AddMP(amount float64) float64 {
 	if amount <= 0 {
 		return 0
 	}
+	maxMP := c.MaxMPValue()
 	c.vitalsMu.Lock()
 	defer c.vitalsMu.Unlock()
-	if c.CurMP >= c.MaxMP {
+	if c.CurMP >= maxMP {
 		return 0
 	}
-	if c.CurMP+amount > c.MaxMP {
-		amount = c.MaxMP - c.CurMP
+	if c.CurMP+amount > maxMP {
+		amount = maxMP - c.CurMP
 	}
 	c.CurMP += amount
 	return amount
@@ -379,26 +367,28 @@ func (c *Character) ReduceHP(amount float64, attacker any, _ modelskill.Definiti
 
 // SetHP sets current HP, clamped to [0, MaxHP].
 func (c *Character) SetHP(value float64) {
+	maxHP := c.MaxHPValue()
 	c.vitalsMu.Lock()
 	defer c.vitalsMu.Unlock()
 	if value < 0 {
 		value = 0
 	}
-	if value > c.MaxHP {
-		value = c.MaxHP
+	if value > maxHP {
+		value = maxHP
 	}
 	c.CurHP = value
 }
 
 // SetCP sets current CP, clamped to [0, MaxCP].
 func (c *Character) SetCP(value float64) {
+	maxCP := c.MaxCPValue()
 	c.vitalsMu.Lock()
 	defer c.vitalsMu.Unlock()
 	if value < 0 {
 		value = 0
 	}
-	if value > c.MaxCP {
-		value = c.MaxCP
+	if value > maxCP {
+		value = maxCP
 	}
 	c.CurCP = value
 }
@@ -432,7 +422,7 @@ func (c *Character) HealAmount(def modelskill.Definition) (float64, bool) {
 	if skillTypeKey(def.SkillType) == "HEAL_STATIC" {
 		return amount, true
 	}
-	return amount + math.Sqrt(c.MAtk()), true
+	return amount + math.Sqrt(float64(int(c.MAtk()))), true
 }
 
 // PhysicalSkillInput resolves the damage formula input for a physical skill
@@ -454,7 +444,7 @@ func (c *Character) PhysicalSkillInput(caster any, def modelskill.Definition) (f
 		Crit:          attacker.physicalSkillCrit(def),
 		SoulShot:      soulshot,
 		RandomMul:     attacker.randomDamageMultiplier(def),
-		ElementalMul:  1,
+		ElementalMul:  1, // TODO(#782): feed elemental skill and defence attributes.
 		RaceMul:       1,
 		WeaponVulnMul: c.weaponVulnerability(attacker),
 		PvPMul:        1,
@@ -473,8 +463,8 @@ func (c *Character) MagicDamageInput(caster any, def modelskill.Definition) (for
 		MDef:            positive(c.MDef()),
 		SkillPower:      float64(def.Power),
 		PvPMul:          1,
-		ElementalMul:    1,
-		MagicCrit:       false,
+		ElementalMul:    1,     // TODO(#782): feed elemental skill and defence attributes.
+		MagicCrit:       false, // TODO(#782): feed magic-critical rolls.
 		SoulShot:        false,
 		BlessedSoulShot: false,
 	}, true
@@ -497,9 +487,9 @@ func (c *Character) BlowInput(caster any, def modelskill.Definition) (formulas.B
 		SkillPower:        skillPower,
 		Defence:           positive(c.PDef()),
 		SoulShot:          soulshot,
-		IsPvP:             false,
+		IsPvP:             true,
 		RandomMul:         float64(95+attacker.rollValue(11)) / 100,
-		PosMul:            formulas.PosMul(false, true, true),
+		PosMul:            formulas.PosMul(false, true, true), // TODO(#782): feed relative headings.
 		PvPMul:            1,
 		CritDamageMul:     attacker.calcStat(stat.CriticalDamage, 1),
 		CritDamagePosMul:  (attacker.calcStat(stat.CriticalDamagePos, 1)-1)/2 + 1,

@@ -2,6 +2,7 @@ package player
 
 import (
 	"math"
+	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -77,14 +78,10 @@ func (c *Character) SkillSuccessInput(caster any, def modelskill.Definition) (fo
 	if !ok || attacker == nil {
 		return formulas.SkillSuccessInput{}, false
 	}
-	typ := def.EffectType
-	if typ == "" {
-		typ = def.SkillType
-	}
 	return formulas.SkillSuccessInput{
 		BaseChance:    float64(def.BaseLandRate),
-		StatModifier:  c.skillStatModifier(typ, def.Magic),
-		VulnModifier:  c.skillVulnerability(typ),
+		StatModifier:  c.skillStatModifier(def.EffectType, def.Magic),
+		VulnModifier:  c.skillVulnerability(def.EffectType),
 		MAtkModifier:  c.skillMAtkModifier(attacker, def),
 		LevelModifier: c.skillLevelModifier(attacker, def),
 		IgnoreResists: def.IgnoreResists,
@@ -156,13 +153,5 @@ func (c *Character) skillLevelModifier(attacker *Character, def modelskill.Defin
 }
 
 func skillTypeKey(s string) string {
-	out := make([]byte, 0, len(s))
-	for i := 0; i < len(s); i++ {
-		ch := s[i]
-		if ch >= 'a' && ch <= 'z' {
-			ch -= 'a' - 'A'
-		}
-		out = append(out, ch)
-	}
-	return string(out)
+	return strings.ToUpper(s)
 }
