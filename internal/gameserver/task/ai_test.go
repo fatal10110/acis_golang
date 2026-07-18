@@ -3,10 +3,12 @@ package task
 import (
 	"sync"
 	"testing"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 func TestAIManagerTickRunsRegisteredActors(t *testing.T) {
-	mgr := NewAI()
+	mgr := NewAI(nil)
 	a := &aiActorStub{id: 1}
 	b := &aiActorStub{id: 2}
 
@@ -23,7 +25,7 @@ func TestAIManagerTickRunsRegisteredActors(t *testing.T) {
 }
 
 func TestAIManagerRemoveStopsTicks(t *testing.T) {
-	mgr := NewAI()
+	mgr := NewAI(nil)
 	a := &aiActorStub{id: 1}
 
 	mgr.Add(a)
@@ -36,7 +38,7 @@ func TestAIManagerRemoveStopsTicks(t *testing.T) {
 }
 
 func TestAIManagerSnapshotAllowsMutationDuringTick(t *testing.T) {
-	mgr := NewAI()
+	mgr := NewAI(nil)
 	a := &aiActorStub{id: 1}
 	b := &aiActorStub{id: 2}
 	a.thinkFn = func() { mgr.Remove(b) }
@@ -56,7 +58,7 @@ func TestAIManagerSnapshotAllowsMutationDuringTick(t *testing.T) {
 }
 
 func TestAIManagerConcurrentAccess(t *testing.T) {
-	mgr := NewAI()
+	mgr := NewAI(nil)
 	actors := make([]*aiActorStub, 20)
 	for i := range actors {
 		actors[i] = &aiActorStub{id: int32(i + 1)}
@@ -89,7 +91,32 @@ func TestAIManagerConcurrentAccess(t *testing.T) {
 	wg.Wait()
 }
 
+func TestAIManagerTickSkipsInactiveRegions(t *testing.T) {
+	state := world.New()
+	mgr := NewAI(state)
+	inactive := &aiActorStub{id: 1}
+	active := &aiActorStub{id: 2}
+	player := &aiPlayerStub{id: 3}
+
+	state.Spawn(inactive, 0, 0, 0, 0)
+	state.Spawn(active, 8192, 0, 0, 0)
+	state.Spawn(player, 8192, 0, 0, 0)
+	mgr.Add(inactive)
+	mgr.Add(active)
+
+	mgr.Tick()
+
+	if inactive.ticks != 0 || inactive.thinks != 0 {
+		t.Fatalf("inactive actor ticks/thinks = %d/%d, want 0/0", inactive.ticks, inactive.thinks)
+	}
+	if active.ticks != 1 || active.thinks != 1 {
+		t.Fatalf("active actor ticks/thinks = %d/%d, want 1/1", active.ticks, active.thinks)
+	}
+}
+
 type aiActorStub struct {
+	world.Presence
+
 	mu      sync.Mutex
 	id      int32
 	ticks   int
@@ -114,3 +141,13 @@ func (a *aiActorStub) Think() {
 		fn()
 	}
 }
+
+type aiPlayerStub struct {
+	world.Presence
+
+	id int32
+}
+
+func (p *aiPlayerStub) ObjectID() int32 { return p.id }
+
+func (p *aiPlayerStub) WorldPlayer() {}

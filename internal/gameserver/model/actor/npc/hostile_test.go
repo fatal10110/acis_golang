@@ -63,7 +63,7 @@ func TestHostileRunsFromAITask(t *testing.T) {
 	state.Spawn(hostile, 120, 100, 0, 0)
 	hostile.AddDamageHate(target, 0, 100)
 
-	brains := task.NewAI()
+	brains := task.NewAI(nil)
 	brains.Add(hostile)
 	brains.Tick()
 

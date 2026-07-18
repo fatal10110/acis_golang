@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/route"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 const (
@@ -24,7 +25,7 @@ const (
 
 // WalkerActor is the narrow NPC surface route walking needs.
 type WalkerActor interface {
-	ObjectID() int32
+	world.Tracked
 	Position() location.Location
 	Moving() bool
 	MoveToLocation(location.Location) (move.Event, error)
@@ -86,6 +87,7 @@ type Walker struct {
 	routes route.WalkerRoutes
 	path   WalkerPath
 	now    func() time.Time
+	state  *world.State
 
 	mu      sync.Mutex
 	entries map[int32]*walkerEntry
@@ -101,8 +103,9 @@ type walkerEntry struct {
 	wakeTime time.Time
 }
 
-// NewWalker returns a route walker over loaded walkerRoutes.xml data.
-func NewWalker(routes route.WalkerRoutes, path WalkerPath, now func() time.Time) (*Walker, error) {
+// NewWalker returns a route walker over loaded walkerRoutes.xml data. A nil
+// state treats every walker as active.
+func NewWalker(routes route.WalkerRoutes, path WalkerPath, now func() time.Time, state *world.State) (*Walker, error) {
 	if path == nil {
 		return nil, errors.New("task: walker path is nil")
 	}
@@ -113,6 +116,7 @@ func NewWalker(routes route.WalkerRoutes, path WalkerPath, now func() time.Time)
 		routes:  routes,
 		path:    path,
 		now:     now,
+		state:   state,
 		entries: make(map[int32]*walkerEntry),
 	}, nil
 }
@@ -221,6 +225,9 @@ func (w *Walker) Tick() []error {
 	now := w.now()
 	var errs []error
 	for id, entry := range w.entries {
+		if !w.regionActive(entry.actor) {
+			continue
+		}
 		if entry.wakeTime.IsZero() || now.Before(entry.wakeTime) {
 			continue
 		}
@@ -233,6 +240,10 @@ func (w *Walker) Tick() []error {
 		}
 	}
 	return errs
+}
+
+func (w *Walker) regionActive(actor WalkerActor) bool {
+	return w.state == nil || w.state.RegionActive(actor)
 }
 
 func (w *Walker) moveToNextPoint(entry *walkerEntry) error {

@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/fatal10110/acis_golang/internal/commons/scheduler"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // AITick is the fixed hostile-NPC AI interval.
@@ -14,7 +15,7 @@ const AITick = time.Second
 
 // AIActor is the narrow actor brain surface the AI task runs.
 type AIActor interface {
-	ObjectID() int32
+	world.Tracked
 	Tick()
 	Think()
 }
@@ -23,13 +24,16 @@ type AIActor interface {
 //
 // All methods are safe for concurrent use; mu guards actors.
 type AI struct {
+	state *world.State
+
 	mu     sync.RWMutex
 	actors map[int32]AIActor
 }
 
-// NewAI returns an empty active-AI registry.
-func NewAI() *AI {
-	return &AI{actors: make(map[int32]AIActor)}
+// NewAI returns an empty active-AI registry. A nil state treats every actor
+// as active.
+func NewAI(state *world.State) *AI {
+	return &AI{state: state, actors: make(map[int32]AIActor)}
 }
 
 // Start launches the fixed one-second AI task.
@@ -57,7 +61,7 @@ func (a *AI) Remove(actor AIActor) {
 	delete(a.actors, actor.ObjectID())
 }
 
-// Tick runs one AI cycle for every registered actor.
+// Tick runs one AI cycle for every registered actor in an active region.
 func (a *AI) Tick() {
 	a.mu.RLock()
 	actors := make([]AIActor, 0, len(a.actors))
@@ -67,7 +71,14 @@ func (a *AI) Tick() {
 	a.mu.RUnlock()
 
 	for _, actor := range actors {
+		if !a.regionActive(actor) {
+			continue
+		}
 		actor.Tick()
 		actor.Think()
 	}
+}
+
+func (a *AI) regionActive(actor AIActor) bool {
+	return a.state == nil || a.state.RegionActive(actor)
 }

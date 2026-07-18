@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/route"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 func TestWalkerStartRouteUsesNearestNodeAndAdvances(t *testing.T) {
@@ -176,7 +177,7 @@ func TestWalkerRouteValidation(t *testing.T) {
 }
 
 func TestNewWalkerRejectsNilPath(t *testing.T) {
-	if _, err := NewWalker(nil, nil, nil); err == nil {
+	if _, err := NewWalker(nil, nil, nil, nil); err == nil {
 		t.Fatal("NewWalker() error = nil")
 	}
 }
@@ -229,10 +230,38 @@ func TestWalkerTickRetriesRejectedMove(t *testing.T) {
 	assertMoves(t, actor, loc(0), loc(100))
 }
 
+func TestWalkerTickSkipsInactiveRegions(t *testing.T) {
+	routes := route.WalkerRoutes{
+		"inactive": {"guard": {walkerNode(0), walkerNode(100)}},
+		"active":   {"guard": {walkerNode(8192), walkerNode(8292)}},
+	}
+	now := time.Unix(100, 0)
+	state := world.New()
+	inactive := &walkerActorStub{id: 1, pos: loc(0)}
+	active := &walkerActorStub{id: 2, pos: loc(8192)}
+	player := &walkerPlayerStub{id: 3}
+	spawnWalker(state, inactive)
+	spawnWalker(state, active)
+	state.Spawn(player, active.pos.X, active.pos.Y, active.pos.Z, 0)
+	w := newTestWalker(t, routes, &walkerPathStub{canMove: true}, func() time.Time { return now }, state)
+	past := now.Add(-time.Second)
+	w.entries[inactive.id] = &walkerEntry{actor: inactive, route: "inactive", npc: "guard", onRoute: true, wakeTime: past}
+	w.entries[active.id] = &walkerEntry{actor: active, route: "active", npc: "guard", onRoute: true, wakeTime: past}
+
+	if errs := w.Tick(); len(errs) != 0 {
+		t.Fatalf("Tick() errors = %v", errs)
+	}
+
+	assertMoves(t, inactive)
+	assertMoves(t, active, loc(8292))
+}
+
 // allocFreeWalkerActor is a zero-allocation WalkerActor stub for allocation-
 // ceiling tests: walkerActorStub's move/teleport/say/social slices grow and
 // occasionally reallocate, which would add noise to a per-call measurement.
 type allocFreeWalkerActor struct {
+	world.Presence
+
 	id        int32
 	pos       location.Location
 	moveCount int
@@ -348,6 +377,8 @@ func TestGeoPathUsesFinderPathCheck(t *testing.T) {
 }
 
 type walkerActorStub struct {
+	world.Presence
+
 	id            int32
 	pos           location.Location
 	moving        bool
@@ -391,6 +422,16 @@ func (a *walkerActorStub) AddGeoPathFailCount() { a.geoFails++ }
 func (a *walkerActorStub) SayNPCString(id int) { a.says = append(a.says, id) }
 
 func (a *walkerActorStub) SocialAction(id int) { a.socials = append(a.socials, id) }
+
+type walkerPlayerStub struct {
+	world.Presence
+
+	id int32
+}
+
+func (p *walkerPlayerStub) ObjectID() int32 { return p.id }
+
+func (p *walkerPlayerStub) WorldPlayer() {}
 
 type walkerPathStub struct {
 	canMove bool
@@ -475,9 +516,17 @@ func loc(x int) location.Location {
 	return location.Location{X: x, Y: 10, Z: 20}
 }
 
-func newTestWalker(t *testing.T, routes route.WalkerRoutes, path WalkerPath, now func() time.Time) *Walker {
+func spawnWalker(state *world.State, actor *walkerActorStub) {
+	state.Spawn(actor, actor.pos.X, actor.pos.Y, actor.pos.Z, 0)
+}
+
+func newTestWalker(t *testing.T, routes route.WalkerRoutes, path WalkerPath, now func() time.Time, state ...*world.State) *Walker {
 	t.Helper()
-	w, err := NewWalker(routes, path, now)
+	var active *world.State
+	if len(state) != 0 {
+		active = state[0]
+	}
+	w, err := NewWalker(routes, path, now, active)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -564,8 +564,8 @@ func startGameClock(lc fx.Lifecycle, clock *task.GameClock, log zerolog.Logger) 
 	})
 }
 
-func provideWalker(data *gameData) (*task.Walker, error) {
-	return task.NewWalker(data.Routes, task.GeoPath{Geo: data.Geo, Finder: data.Finder}, time.Now)
+func provideWalker(data *gameData, state *world.State) (*task.Walker, error) {
+	return task.NewWalker(data.Routes, task.GeoPath{Geo: data.Geo, Finder: data.Finder}, time.Now, state)
 }
 
 func startWalker(lc fx.Lifecycle, walker *task.Walker, log zerolog.Logger) {
@@ -689,8 +689,8 @@ func startRespawnTask(lc fx.Lifecycle, r *task.Respawn, log zerolog.Logger) {
 	startTicker(lc, log, r.Start)
 }
 
-func provideAI() *task.AI {
-	return task.NewAI()
+func provideAI(state *world.State) *task.AI {
+	return task.NewAI(state)
 }
 
 func startAI(lc fx.Lifecycle, ai *task.AI, log zerolog.Logger) {
