@@ -345,6 +345,7 @@ MaxObstacleHeight = 48
 		ObstacleWeight:  33,
 		HeuristicWeight: 17,
 		MaxIterations:   1234,
+		Bidirectional:   true,
 	}
 	if geo.Pathfind != wantOptions {
 		t.Errorf("Pathfind = %#v, want %#v", geo.Pathfind, wantOptions)

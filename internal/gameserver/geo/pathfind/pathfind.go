@@ -62,6 +62,18 @@ func (f *Finder) find(dst []location.Location, origin, target location.Location,
 	start := scratch.newNodeFromWorld(origin.X, origin.Y, int(f.engine.Height(origin.X, origin.Y, origin.Z)))
 	start.nswe = f.engine.NSWENearest(start.gx, start.gy, start.z)
 	goal := scratch.newNodeFromWorld(target.X, target.Y, int(f.engine.Height(target.X, target.Y, target.Z)))
+	goal.nswe = f.engine.NSWENearest(goal.gx, goal.gy, goal.z)
+
+	if start.key() == goal.key() {
+		return dst, 0, true
+	}
+	if f.options.Bidirectional {
+		return f.findBidirectional(dst, start, goal, buildResult, scratch)
+	}
+	return f.findForward(dst, start, goal, buildResult, scratch)
+}
+
+func (f *Finder) findForward(dst []location.Location, start, goal *node, buildResult bool, scratch *searchScratch) ([]location.Location, int, bool) {
 	start.h = f.heuristic(start, goal)
 	start.f = start.h
 
@@ -70,7 +82,7 @@ func (f *Finder) find(dst []location.Location, origin, target location.Location,
 	heap.Push(opened, start)
 
 	openSet := scratch.openSet
-	openSet[start.key()] = struct{}{}
+	openSet[start.key()] = start
 	closed := scratch.closed
 	seq := int64(1)
 	iterations := 0
@@ -86,9 +98,68 @@ func (f *Finder) find(dst []location.Location, origin, target location.Location,
 			return buildPath(dst, current), current.g, true
 		}
 
-		closed[current.key()] = struct{}{}
+		closed[current.key()] = current
 		f.expand(current, goal, &seq, scratch)
 
+		iterations++
+	}
+
+	return dst, 0, false
+}
+
+func (f *Finder) findBidirectional(dst []location.Location, start, goal *node, buildResult bool, scratch *searchScratch) ([]location.Location, int, bool) {
+	start.h = f.heuristic(start, goal)
+	start.f = start.h
+	start.seq = 1
+	goal.h = f.heuristic(goal, start)
+	goal.f = goal.h
+	goal.seq = 2
+
+	heap.Init(&scratch.opened)
+	heap.Push(&scratch.opened, start)
+	scratch.openSet[start.key()] = start
+	heap.Init(&scratch.backOpened)
+	heap.Push(&scratch.backOpened, goal)
+	scratch.backOpenSet[goal.key()] = goal
+
+	seq := int64(3)
+	iterations := 0
+	for scratch.opened.Len() > 0 && scratch.backOpened.Len() > 0 && iterations < f.options.MaxIterations {
+		if scratch.opened[0].f <= scratch.backOpened[0].f {
+			current := heap.Pop(&scratch.opened).(*node)
+			delete(scratch.openSet, current.key())
+			if meet := scratch.backClosed[current.key()]; meet != nil {
+				if !buildResult {
+					return dst, current.g + meet.g, true
+				}
+				return buildBidirectionalPath(dst, current, meet, scratch), current.g + meet.g, true
+			}
+			if meet := scratch.backOpenSet[current.key()]; meet != nil {
+				if !buildResult {
+					return dst, current.g + meet.g, true
+				}
+				return buildBidirectionalPath(dst, current, meet, scratch), current.g + meet.g, true
+			}
+			scratch.closed[current.key()] = current
+			f.expandForward(current, goal, &seq, scratch, &scratch.opened, scratch.openSet, scratch.closed)
+		} else {
+			current := heap.Pop(&scratch.backOpened).(*node)
+			delete(scratch.backOpenSet, current.key())
+			if meet := scratch.closed[current.key()]; meet != nil {
+				if !buildResult {
+					return dst, current.g + meet.g, true
+				}
+				return buildBidirectionalPath(dst, meet, current, scratch), current.g + meet.g, true
+			}
+			if meet := scratch.openSet[current.key()]; meet != nil {
+				if !buildResult {
+					return dst, current.g + meet.g, true
+				}
+				return buildBidirectionalPath(dst, meet, current, scratch), current.g + meet.g, true
+			}
+			scratch.backClosed[current.key()] = current
+			f.expandBackward(current, start, &seq, scratch)
+		}
 		iterations++
 	}
 
@@ -151,27 +222,45 @@ func (h *nodeHeap) Pop() any {
 }
 
 type searchScratch struct {
-	opened  nodeHeap
-	openSet map[nodeKey]struct{}
-	closed  map[nodeKey]struct{}
-	nodes   []node
+	opened      nodeHeap
+	openSet     map[nodeKey]*node
+	closed      map[nodeKey]*node
+	backOpened  nodeHeap
+	backOpenSet map[nodeKey]*node
+	backClosed  map[nodeKey]*node
+	nodes       []node
+	pathNodes   []*node
 }
 
 func (s *searchScratch) reset() {
 	clear(s.opened)
 	s.opened = s.opened[:0]
 	if s.openSet == nil {
-		s.openSet = make(map[nodeKey]struct{})
+		s.openSet = make(map[nodeKey]*node)
 	} else {
 		clear(s.openSet)
 	}
 	if s.closed == nil {
-		s.closed = make(map[nodeKey]struct{})
+		s.closed = make(map[nodeKey]*node)
 	} else {
 		clear(s.closed)
 	}
+	clear(s.backOpened)
+	s.backOpened = s.backOpened[:0]
+	if s.backOpenSet == nil {
+		s.backOpenSet = make(map[nodeKey]*node)
+	} else {
+		clear(s.backOpenSet)
+	}
+	if s.backClosed == nil {
+		s.backClosed = make(map[nodeKey]*node)
+	} else {
+		clear(s.backClosed)
+	}
 	clear(s.nodes)
 	s.nodes = s.nodes[:0]
+	clear(s.pathNodes)
+	s.pathNodes = s.pathNodes[:0]
 }
 
 func (s *searchScratch) newNodeFromWorld(worldX, worldY, z int) *node {
@@ -228,6 +317,10 @@ var cornerSteps = [4]struct {
 // NSWE mask, then addCandidate may smooth the parent link when a bounded
 // direct movement check proves that shortcut is cheaper.
 func (f *Finder) expand(current, goal *node, seq *int64, scratch *searchScratch) {
+	f.expandForward(current, goal, seq, scratch, &scratch.opened, scratch.openSet, scratch.closed)
+}
+
+func (f *Finder) expandForward(current, goal *node, seq *int64, scratch *searchScratch, opened *nodeHeap, openSet, closed map[nodeKey]*node) {
 	if current.nswe == block.NoDirections {
 		return
 	}
@@ -245,7 +338,7 @@ func (f *Finder) expand(current, goal *node, seq *int64, scratch *searchScratch)
 			continue
 		}
 		cardinalNSWE[i] = nswe
-		f.addCandidate(current, goal, seq, scratch, gx, gy, height, nswe, false)
+		f.addCandidateTo(current, goal, seq, scratch, opened, openSet, closed, gx, gy, height, nswe, false)
 	}
 
 	for _, corner := range cornerSteps {
@@ -278,7 +371,39 @@ func (f *Finder) expand(current, goal *node, seq *int64, scratch *searchScratch)
 		if !ok {
 			continue
 		}
-		f.addCandidate(current, goal, seq, scratch, gx, gy, height, nswe, true)
+		f.addCandidateTo(current, goal, seq, scratch, opened, openSet, closed, gx, gy, height, nswe, true)
+	}
+}
+
+func (f *Finder) expandBackward(current, goal *node, seq *int64, scratch *searchScratch) {
+	for _, step := range cardinalSteps {
+		gx, gy := current.gx-step.dx, current.gy-step.dy
+		height, nswe, ok := f.backwardCandidateNSWE(gx, gy, current)
+		if !ok || !nswe.Allows(step.flag) {
+			continue
+		}
+		f.addBackwardCandidate(current, goal, seq, scratch, gx, gy, height, nswe, false)
+	}
+
+	for _, corner := range cornerSteps {
+		flagX := cardinalSteps[corner.xDir].flag
+		flagY := cardinalSteps[corner.yDir].flag
+		gx, gy := current.gx-corner.dx, current.gy-corner.dy
+		height, nswe, ok := f.backwardCandidateNSWE(gx, gy, current)
+		if !ok || !nswe.Allows(flagX|flagY) {
+			continue
+		}
+
+		candidateZ := height + block.CellIgnoreHeight
+		_, nsweX, ok := f.candidateNSWE(gx+corner.dx, gy, candidateZ)
+		if !ok || !nsweX.Allows(flagY) {
+			continue
+		}
+		_, nsweY, ok := f.candidateNSWE(gx, gy+corner.dy, candidateZ)
+		if !ok || !nsweY.Allows(flagX) {
+			continue
+		}
+		f.addBackwardCandidate(current, goal, seq, scratch, gx, gy, height, nswe, true)
 	}
 }
 
@@ -296,16 +421,48 @@ func (f *Finder) candidateNSWE(gx, gy, z int) (height int, nswe block.NSWE, ok b
 	return int(h), m, true
 }
 
+func (f *Finder) candidateHeightMatches(gx, gy, z, wantHeight int) bool {
+	height, _, ok := f.candidateNSWE(gx, gy, z)
+	return ok && height == wantHeight
+}
+
+func (f *Finder) backwardCandidateNSWE(gx, gy int, current *node) (height int, nswe block.NSWE, ok bool) {
+	worldX, worldY := engine.WorldX(gx), engine.WorldY(gy)
+	if engine.OutOfWorld(worldX, worldY) {
+		return 0, 0, false
+	}
+
+	z := current.z + block.CellIgnoreHeight
+	height, nswe, ok = f.candidateNSWE(gx, gy, z)
+	if ok && f.candidateHeightMatches(current.gx, current.gy, height+block.CellIgnoreHeight, current.z) {
+		return height, nswe, true
+	}
+
+	h, n, found := f.engine.NodeAtOrAbove(gx, gy, z)
+	if !found {
+		return 0, 0, false
+	}
+	height = int(h)
+	if !f.candidateHeightMatches(current.gx, current.gy, height+block.CellIgnoreHeight, current.z) {
+		return 0, 0, false
+	}
+	return height, n, true
+}
+
 // addCandidate dedups against already explored/queued nodes, weights the grid
 // step by the candidate's own NSWE mask, then keeps a parent-skip shortcut
 // only when its straight-line cost is lower and the bounded direct movement
 // check succeeds.
 func (f *Finder) addCandidate(current, goal *node, seq *int64, scratch *searchScratch, gx, gy, height int, nswe block.NSWE, diagonal bool) {
+	f.addCandidateTo(current, goal, seq, scratch, &scratch.opened, scratch.openSet, scratch.closed, gx, gy, height, nswe, diagonal)
+}
+
+func (f *Finder) addCandidateTo(current, goal *node, seq *int64, scratch *searchScratch, opened *nodeHeap, openSet, closed map[nodeKey]*node, gx, gy, height int, nswe block.NSWE, diagonal bool) {
 	key := nodeKey{gx: gx, gy: gy, z: height}
-	if _, ok := scratch.closed[key]; ok {
+	if _, ok := closed[key]; ok {
 		return
 	}
-	if _, ok := scratch.openSet[key]; ok {
+	if _, ok := openSet[key]; ok {
 		return
 	}
 
@@ -340,8 +497,56 @@ func (f *Finder) addCandidate(current, goal *node, seq *int64, scratch *searchSc
 	*seq = *seq + 1
 	n.h = f.heuristic(n, goal)
 	n.f = n.g + n.h
-	heap.Push(&scratch.opened, n)
-	scratch.openSet[key] = struct{}{}
+	heap.Push(opened, n)
+	openSet[key] = n
+}
+
+func (f *Finder) addBackwardCandidate(current, goal *node, seq *int64, scratch *searchScratch, gx, gy, height int, nswe block.NSWE, diagonal bool) {
+	key := nodeKey{gx: gx, gy: gy, z: height}
+	if _, ok := scratch.backClosed[key]; ok {
+		return
+	}
+	if _, ok := scratch.backOpenSet[key]; ok {
+		return
+	}
+
+	weight := f.options.MoveWeight
+	if diagonal {
+		weight = f.options.MoveWeightDiag
+	}
+	if current.nswe != block.AllDirections {
+		if diagonal {
+			weight = f.options.obstacleWeightDiag()
+		} else {
+			weight = f.options.ObstacleWeight
+		}
+	}
+
+	parent := current
+	cost := current.g + weight
+	if current.parent != nil {
+		smoothed := current.parent.g + f.straightLineCostFrom(gx, gy, height, current.parent.gx, current.parent.gy, current.parent.z, current.parent.nswe)
+		if smoothed < cost &&
+			withinSmoothRangeFrom(gx, gy, height, current.parent.gx, current.parent.gy, current.parent.z) &&
+			f.engine.CanMove(
+				engine.WorldX(gx), engine.WorldY(gy), height,
+				engine.WorldX(current.parent.gx), engine.WorldY(current.parent.gy), current.parent.z,
+			) {
+			parent = current.parent
+			cost = smoothed
+		}
+	}
+
+	n := scratch.newNode(gx, gy, height)
+	n.nswe = nswe
+	n.g = cost
+	n.parent = parent
+	n.seq = *seq
+	*seq = *seq + 1
+	n.h = f.heuristic(n, goal)
+	n.f = n.g + n.h
+	heap.Push(&scratch.backOpened, n)
+	scratch.backOpenSet[key] = n
 }
 
 func (f *Finder) canMoveDirect(from *node, gx, gy, height int) bool {
@@ -352,16 +557,24 @@ func (f *Finder) canMoveDirect(from *node, gx, gy, height int) bool {
 }
 
 func withinSmoothRange(from *node, gx, gy, height int) bool {
-	dx := gx - from.gx
-	dy := gy - from.gy
-	dz := (height - from.z) / block.CellHeight
+	return withinSmoothRangeFrom(from.gx, from.gy, from.z, gx, gy, height)
+}
+
+func withinSmoothRangeFrom(fromGX, fromGY, fromZ, toGX, toGY, toZ int) bool {
+	dx := toGX - fromGX
+	dy := toGY - fromGY
+	dz := (toZ - fromZ) / block.CellHeight
 	return location.In3DRange(0, 0, 0, dx, dy, dz, maxSmoothCells)
 }
 
 func (f *Finder) straightLineCost(from *node, gx, gy, height int, nswe block.NSWE) int {
-	dx := gx - from.gx
-	dy := gy - from.gy
-	dz := (height - from.z) / block.CellHeight
+	return f.straightLineCostFrom(from.gx, from.gy, from.z, gx, gy, height, nswe)
+}
+
+func (f *Finder) straightLineCostFrom(fromGX, fromGY, fromZ, toGX, toGY, toZ int, nswe block.NSWE) int {
+	dx := toGX - fromGX
+	dy := toGY - fromGY
+	dz := (toZ - fromZ) / block.CellHeight
 	weight := f.options.MoveWeight
 	if nswe != block.AllDirections {
 		weight = f.options.ObstacleWeight
@@ -404,6 +617,41 @@ func buildPath(path []location.Location, goal *node) []location.Location {
 
 	for i, j := 0, len(path)-1; i < j; i, j = i+1, j-1 {
 		path[i], path[j] = path[j], path[i]
+	}
+	return path
+}
+
+func buildBidirectionalPath(path []location.Location, fromStart, fromGoal *node, scratch *searchScratch) []location.Location {
+	nodes := scratch.pathNodes[:0]
+	for n := fromStart; n != nil; n = n.parent {
+		nodes = append(nodes, n)
+	}
+	for i, j := 0, len(nodes)-1; i < j; i, j = i+1, j-1 {
+		nodes[i], nodes[j] = nodes[j], nodes[i]
+	}
+	for n := fromGoal.parent; n != nil; n = n.parent {
+		nodes = append(nodes, n)
+	}
+	scratch.pathNodes = nodes
+	return buildPathFromNodes(path, nodes)
+}
+
+func buildPathFromNodes(path []location.Location, nodes []*node) []location.Location {
+	for i := 1; i < len(nodes); i++ {
+		dx := nodes[i].gx - nodes[i-1].gx
+		dy := nodes[i].gy - nodes[i-1].gy
+		if i < len(nodes)-1 {
+			nextDX := nodes[i+1].gx - nodes[i].gx
+			nextDY := nodes[i+1].gy - nodes[i].gy
+			if dx == nextDX && dy == nextDY {
+				continue
+			}
+		}
+		path = append(path, location.Location{
+			X: engine.WorldX(nodes[i].gx),
+			Y: engine.WorldY(nodes[i].gy),
+			Z: nodes[i].z,
+		})
 	}
 	return path
 }
