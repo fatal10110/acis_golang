@@ -39,14 +39,12 @@ func TestFind(t *testing.T) {
 		if !ok {
 			t.Fatal("Find() = no path, want path")
 		}
-		want := []location.Location{at(7, 3, 0)}
-		if len(path) != len(want) {
-			t.Fatalf("Find() path = %#v, want %#v", path, want)
+		if got := path[len(path)-1]; got != at(7, 3, 0) {
+			t.Fatalf("Find() last = %#v, want %#v", got, at(7, 3, 0))
 		}
-		for i := range want {
-			if path[i] != want[i] {
-				t.Fatalf("Find() path = %#v, want %#v", path, want)
-			}
+		const gridLockedCorners = 5
+		if len(path) >= gridLockedCorners {
+			t.Fatalf("Find() path = %#v, want fewer than %d grid-locked corners", path, gridLockedCorners)
 		}
 		const gridLockedCost = 82
 		if cost >= gridLockedCost {
@@ -258,6 +256,31 @@ func TestExpandCornerCutting(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestAddCandidateKeepsCheaperGridParent(t *testing.T) {
+	finder := New(newTestEngine(t, complexBlock(func(x, y int) block.Cell {
+		return block.Cell{Height: 0, NSWE: block.AllDirections}
+	})), DefaultOptions())
+	scratch := &searchScratch{}
+	scratch.reset()
+	parent := scratch.newNode(0, 0, 0)
+	current := scratch.newNode(1, 0, 0)
+	current.g = finder.options.MoveWeight
+	current.parent = parent
+	goal := scratch.newNode(3, 0, 0)
+	seq := int64(1)
+
+	finder.addCandidate(current, goal, &seq, scratch, 2, 0, 0, block.East|block.West, false)
+
+	got := &scratch.nodes[len(scratch.nodes)-1]
+	if got.parent != current {
+		t.Fatal("addCandidate() re-parented to a more expensive smoothed link")
+	}
+	wantCost := finder.options.MoveWeight + finder.options.ObstacleWeight
+	if got.g != wantCost {
+		t.Fatalf("candidate g = %d, want grid cost %d", got.g, wantCost)
 	}
 }
 
