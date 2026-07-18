@@ -434,7 +434,7 @@ func (c *Container) Transfer(objectID int32, count int, target transferTarget, n
 	c.mu.Unlock()
 
 	if targetItem != nil {
-		result, _ = target.Add(&item.Instance{TemplateID: templateID, Count: count, ManaLeft: -1})
+		result, _ = target.Add(&item.Instance{ObjectID: newObjectID, TemplateID: templateID, Count: count, ManaLeft: -1})
 		return result, freedObjectID, freed
 	}
 

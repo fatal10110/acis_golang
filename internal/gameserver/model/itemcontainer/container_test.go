@@ -197,6 +197,40 @@ func TestContainer_Transfer_UsesInventoryAddHooks(t *testing.T) {
 	}
 }
 
+func TestContainer_Transfer_UsesNewObjectIDWhenTargetStackDisappears(t *testing.T) {
+	src := newTestContainer()
+	dst := &staleMergeTarget{Container: NewContainer(0x10000002, item.LocationWarehouse, testTemplates())}
+
+	dst.AddNew(adenaTemplateID, 5, 0x20000002)
+	inst := src.AddNew(adenaTemplateID, 100, 0x20000001)
+
+	result, _, freed := src.Transfer(inst.ObjectID, 40, dst, 0x30000001)
+	if result == nil {
+		t.Fatalf("Transfer() returned nil")
+	}
+	if result.ObjectID != 0x30000001 {
+		t.Fatalf("Transfer() result object id = %#x, want newObjectID", result.ObjectID)
+	}
+	if dst.ItemByObjectID(0) != nil {
+		t.Fatalf("destination contains item with object id 0")
+	}
+	if freed {
+		t.Errorf("partial transfer reported a freed source id")
+	}
+}
+
+type staleMergeTarget struct {
+	*Container
+}
+
+func (t *staleMergeTarget) ItemByTemplateID(templateID int32) *item.Instance {
+	inst := t.Container.ItemByTemplateID(templateID)
+	if inst != nil {
+		t.DestroyAllItems()
+	}
+	return inst
+}
+
 func TestContainer_Transfer_UsesFreightVisibleTownHooks(t *testing.T) {
 	src := NewContainer(0x10000001, item.LocationWarehouse, freightTestTemplates())
 	dst := NewFreight(0x10000002, freightTestTemplates())
