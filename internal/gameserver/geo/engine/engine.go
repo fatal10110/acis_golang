@@ -67,7 +67,9 @@ func (e *Engine) MaxObstacleHeight() int {
 	return e.maxObstacleHeight
 }
 
-// SetRegion installs one decoded geodata region at the given tile coordinates.
+// SetRegion installs one decoded geodata region at the given tile
+// coordinates. Must only be called during boot, before any concurrent
+// query — query paths read regions without synchronization.
 func (e *Engine) SetRegion(regionX, regionY int, region *block.Region) error {
 	if regionX < TileXMin || regionX > TileXMax || regionY < TileYMin || regionY > TileYMax {
 		return fmt.Errorf("geo/engine: region %d_%d out of range", regionX, regionY)

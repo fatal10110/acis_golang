@@ -136,7 +136,7 @@ func TestEngineConcurrentDoorToggleAndQueries(t *testing.T) {
 	}()
 	wg.Wait()
 
-	if e.CanMove(doorOriginX, doorOriginY, 0, doorTargetX, doorTargetY, 0) == false {
+	if !e.CanMove(doorOriginX, doorOriginY, 0, doorTargetX, doorTargetY, 0) {
 		t.Fatal("CanMove() = false after every toggling goroutine finished on Remove, want the door left open")
 	}
 }
