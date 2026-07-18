@@ -7,6 +7,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/scheduler"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // PositionUpdateTick is the fixed movement correction interval.
@@ -18,15 +19,18 @@ const PositionUpdateTick = move.PositionUpdateInterval
 // ticker's single goroutine, one call at a time, so no separate lock is
 // needed to serialize it.
 type PositionUpdates struct {
+	state *world.State
+
 	mu sync.Mutex
 
 	entries map[int32]move.PositionUpdater
 	scratch []move.PositionUpdater
 }
 
-// NewPositionUpdates returns an empty movement-correction registry.
-func NewPositionUpdates() *PositionUpdates {
-	return &PositionUpdates{entries: make(map[int32]move.PositionUpdater)}
+// NewPositionUpdates returns an empty movement-correction registry. A nil
+// state treats every mover as active.
+func NewPositionUpdates(state *world.State) *PositionUpdates {
+	return &PositionUpdates{state: state, entries: make(map[int32]move.PositionUpdater)}
 }
 
 // Start launches the fixed movement-correction task.
@@ -82,6 +86,28 @@ func (p *PositionUpdates) Tick() {
 	p.mu.Unlock()
 
 	for _, actor := range actors {
+		if !p.canUpdate(actor) {
+			continue
+		}
 		actor.PositionUpdate()
 	}
+}
+
+type regionPositionUpdater interface {
+	RegionActor() world.Tracked
+}
+
+func (p *PositionUpdates) canUpdate(actor move.PositionUpdater) bool {
+	if p.state == nil {
+		return true
+	}
+	if tracked, ok := actor.(world.Tracked); ok {
+		return canWorkInRegion(p.state, tracked)
+	}
+	regioned, ok := actor.(regionPositionUpdater)
+	if !ok {
+		return true
+	}
+	tracked := regioned.RegionActor()
+	return tracked == nil || canWorkInRegion(p.state, tracked)
 }

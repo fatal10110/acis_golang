@@ -5,6 +5,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // Located is the position and footprint of a live actor a Controller reads
@@ -73,6 +74,13 @@ func NewController(move *CreatureMove, self Actor) (*Controller, error) {
 // ObjectID returns the actor id this controller moves.
 func (c *Controller) ObjectID() int32 {
 	return c.self.ObjectID()
+}
+
+// RegionActor returns the world-tracked actor this controller advances, when
+// the actor participates in region activity.
+func (c *Controller) RegionActor() world.Tracked {
+	tracked, _ := c.self.(world.Tracked)
+	return tracked
 }
 
 // SetPositionUpdates records the registry that should tick this controller

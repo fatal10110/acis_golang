@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world/worldtest"
 )
 
 func TestHostileUsesWorldVisibilityAndTemplateAttackRange(t *testing.T) {
@@ -158,6 +159,84 @@ func TestHostileOnInactiveRegionResetsCombatAndReturnsHome(t *testing.T) {
 		t.Fatal("movement was not stopped on inactive reset")
 	}
 
+	hostile.Think()
+
+	if move.home != hostile.Instance.Home {
+		t.Fatalf("home move = %+v, want %+v", move.home, hostile.Instance.Home)
+	}
+}
+
+func TestHostileThinkSleepsInInactiveRegion(t *testing.T) {
+	state := world.New()
+	move := &hostileMove{}
+	strike := &hostileAttack{canAttack: true}
+	hostile := newTestHostile(t, move, strike)
+	hostile.SetWorld(state)
+	state.Spawn(hostile, 0, 0, 0, 0)
+	target := &hostileTarget{id: 200}
+	state.Spawn(target, 10, 0, 0, 0)
+
+	hostile.AddDamageHate(target, 5, 20)
+
+	hostile.Think()
+	hostile.Think()
+
+	if strike.target != nil {
+		t.Fatalf("attack target = %v, want none while region inactive", strike.target)
+	}
+	if !hostile.AI().Threats().IsEmpty() {
+		t.Fatal("threat table not cleared by inactive Think")
+	}
+	if got := hostile.AI().Desires().Len(); got != 0 {
+		t.Fatalf("desires len = %d, want 0", got)
+	}
+	if move.stopCount != 1 {
+		t.Fatalf("stop count = %d, want one inactive reset", move.stopCount)
+	}
+}
+
+func TestHostileRegionDeactivationResetsCombatImmediately(t *testing.T) {
+	state := world.New()
+	move := &hostileMove{}
+	hostile := newTestHostile(t, move, &hostileAttack{})
+	hostile.SetWorld(state)
+	player := worldtest.SpawnPlayer(state, 1, 0, 0, 0)
+	state.Spawn(hostile, 10, 0, 0, 0)
+	target := &hostileTarget{id: 200}
+
+	hostile.AddDamageHate(target, 5, 20)
+	hostile.AddHate(target, 30)
+
+	state.Despawn(player)
+
+	if !hostile.AI().Threats().IsEmpty() {
+		t.Fatal("threat table not cleared on region deactivation")
+	}
+	if !hostile.AI().Hates().IsEmpty() {
+		t.Fatal("hate table not cleared on region deactivation")
+	}
+	if got := hostile.AI().Desires().Len(); got != 0 {
+		t.Fatalf("desires len = %d, want 0", got)
+	}
+	if move.stopCount != 1 {
+		t.Fatalf("stop count = %d, want one deactivation reset", move.stopCount)
+	}
+}
+
+func TestHostileOutOfTerritoryReturnsHomeAfterRegionDeactivation(t *testing.T) {
+	state := world.New()
+	move := &hostileMove{}
+	hostile := newTestHostile(t, move, &hostileAttack{})
+	hostile.SetWorld(state)
+	hostile.Instance.HasHome = true
+	hostile.Instance.Home = location.Location{X: 0, Y: 0, Z: 0}
+	player := worldtest.SpawnPlayer(state, 1, 500, 0, 0)
+	state.Spawn(hostile, 500, 0, 0, 0)
+	target := &hostileTarget{id: 200}
+
+	hostile.AddHate(target, 30)
+
+	state.Despawn(player)
 	hostile.Think()
 
 	if move.home != hostile.Instance.Home {
