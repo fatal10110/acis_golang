@@ -30,6 +30,30 @@ func TestFind(t *testing.T) {
 		}
 	})
 
+	t.Run("open field path is smoothed to target", func(t *testing.T) {
+		finder := New(newTestEngine(t, complexBlock(func(x, y int) block.Cell {
+			return block.Cell{Height: 0, NSWE: block.AllDirections}
+		})), DefaultOptions())
+
+		path, cost, ok := finder.Find(at(0, 0, 0), at(7, 3, 0))
+		if !ok {
+			t.Fatal("Find() = no path, want path")
+		}
+		want := []location.Location{at(7, 3, 0)}
+		if len(path) != len(want) {
+			t.Fatalf("Find() path = %#v, want %#v", path, want)
+		}
+		for i := range want {
+			if path[i] != want[i] {
+				t.Fatalf("Find() path = %#v, want %#v", path, want)
+			}
+		}
+		const gridLockedCost = 82
+		if cost >= gridLockedCost {
+			t.Fatalf("Find() cost = %d, want less than grid-locked cost %d", cost, gridLockedCost)
+		}
+	})
+
 	t.Run("blocked path returns no path", func(t *testing.T) {
 		// Fully enclose the target in a ring of walled (NoDirections)
 		// cells on all 8 sides, cardinal and diagonal. A single walled

@@ -323,14 +323,38 @@ func (f *Finder) addCandidate(current, goal *node, seq *int64, scratch *searchSc
 
 	n := scratch.newNode(gx, gy, height)
 	n.nswe = nswe
-	n.g = current.g + weight
-	n.parent = current
+	parent := current
+	cost := current.g + weight
+	if current.parent != nil && f.canMoveDirect(current.parent, gx, gy, height) {
+		parent = current.parent
+		cost = current.parent.g + f.straightLineCost(current.parent, gx, gy, height, nswe)
+	}
+	n.g = cost
+	n.parent = parent
 	n.seq = *seq
 	*seq = *seq + 1
 	n.h = f.heuristic(n, goal)
 	n.f = n.g + n.h
 	heap.Push(&scratch.opened, n)
 	scratch.openSet[key] = struct{}{}
+}
+
+func (f *Finder) canMoveDirect(from *node, gx, gy, height int) bool {
+	return f.engine.CanMove(
+		engine.WorldX(from.gx), engine.WorldY(from.gy), from.z,
+		engine.WorldX(gx), engine.WorldY(gy), height,
+	)
+}
+
+func (f *Finder) straightLineCost(from *node, gx, gy, height int, nswe block.NSWE) int {
+	dx := gx - from.gx
+	dy := gy - from.gy
+	dz := (height - from.z) / block.CellHeight
+	weight := f.options.MoveWeight
+	if nswe != block.AllDirections {
+		weight = f.options.ObstacleWeight
+	}
+	return int(math.Sqrt(float64(dx*dx+dy*dy+dz*dz)) * float64(weight))
 }
 
 func (f *Finder) heuristic(from, to *node) int {
