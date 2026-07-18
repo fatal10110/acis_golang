@@ -355,7 +355,7 @@ func withinSmoothRange(from *node, gx, gy, height int) bool {
 	dx := gx - from.gx
 	dy := gy - from.gy
 	dz := (height - from.z) / block.CellHeight
-	return dx*dx+dy*dy+dz*dz <= maxSmoothCells*maxSmoothCells
+	return location.In3DRange(0, 0, 0, dx, dy, dz, maxSmoothCells)
 }
 
 func (f *Finder) straightLineCost(from *node, gx, gy, height int, nswe block.NSWE) int {
