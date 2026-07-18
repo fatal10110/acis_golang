@@ -44,12 +44,13 @@ func NewCharacterStore(db *sql.DB) *CharacterStore {
 // character only gains once it is actually played keep the schema's own
 // default until something sets them.
 func (s *CharacterStore) Create(ctx context.Context, c *player.Character) error {
+	resources := c.ResourceValues()
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO characters
-			(account_name, obj_Id, char_name, level, maxHp, curHp, maxCp, curCp, maxMp, curMp,
-			 face, hairStyle, hairColor, sex, heading, x, y, z, exp, sp, race, classid, base_class, title, accesslevel)
-		 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		c.AccountName, c.ID, c.Name, c.Level, c.MaxHP, c.CurHP, c.MaxCP, c.CurCP, c.MaxMP, c.CurMP,
+				(account_name, obj_Id, char_name, level, maxHp, curHp, maxCp, curCp, maxMp, curMp,
+				 face, hairStyle, hairColor, sex, heading, x, y, z, exp, sp, race, classid, base_class, title, accesslevel)
+			 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		c.AccountName, c.ID, c.Name, c.Level, resources.MaxHP, resources.CurrentHP, resources.MaxCP, resources.CurrentCP, resources.MaxMP, resources.CurrentMP,
 		c.Face, c.HairStyle, c.HairColor, byte(c.Sex), c.LastHeading, c.Location.X, c.Location.Y, c.Location.Z,
 		c.Exp, c.SP, int(c.Race), c.ClassID, c.BaseClassID, c.Title, c.AccessLevel,
 	)

@@ -44,6 +44,7 @@ type Character struct {
 	MaxHP, CurHP float64
 	MaxCP, CurCP float64
 	MaxMP, CurMP float64
+	vitalsMu     sync.RWMutex
 
 	Face, HairStyle, HairColor int
 
@@ -81,7 +82,6 @@ type Character struct {
 
 	deathMu sync.Mutex
 	dead    bool
-	health  creature.Health
 
 	effects *effect.List
 
@@ -150,7 +150,6 @@ func NewCharacter(objectID int32, tmpl *Template, accountName, name string, hair
 	if len(tmpl.Spawns) > 0 {
 		c.Location = tmpl.Spawns[rand.IntN(len(tmpl.Spawns))]
 	}
-	c.health = creature.NewHealth(&c.CurHP)
 	c.effects = effect.NewList(c)
 
 	return c, nil

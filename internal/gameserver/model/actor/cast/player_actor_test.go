@@ -1,6 +1,7 @@
 package cast
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -47,5 +48,56 @@ func TestPlayerActorSkillReuseDelegatesToCharacter(t *testing.T) {
 
 	if !actor.SkillDisabled(key) {
 		t.Fatalf("SkillDisabled() = false, want true")
+	}
+}
+
+func TestPlayerActorResourceAccessIsRaceFree(t *testing.T) {
+	ch := &player.Character{
+		ID:    1,
+		MaxHP: 100000, CurHP: 100000,
+		MaxMP: 100000, CurMP: 100000,
+	}
+	ch.AttachRuntime(&player.Template{}, nil)
+	actor := PlayerActor{Character: ch}
+
+	const iterations = 1000
+	var wg sync.WaitGroup
+	wg.Add(4)
+
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			ch.TakeDamage(1, nil)
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			actor.ReduceHP(1)
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			actor.ReduceMP(1)
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			_ = actor.HP()
+			_ = actor.MP()
+			_ = ch.CurrentHP()
+			_ = ch.CurrentMP()
+		}
+	}()
+
+	wg.Wait()
+
+	if got := ch.CurrentHP(); got <= 0 {
+		t.Fatalf("CurrentHP() = %d, want still alive", got)
+	}
+	if got := ch.CurrentMP(); got <= 0 {
+		t.Fatalf("CurrentMP() = %d, want MP remaining", got)
 	}
 }

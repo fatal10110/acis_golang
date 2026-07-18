@@ -74,7 +74,6 @@ type physicalTarget interface {
 func (c *Character) AttachRuntime(tmpl *Template, inv *itemcontainer.Inventory) {
 	c.runtimeTemplate = tmpl
 	c.inventory = inv
-	c.health.Bind(&c.CurHP)
 	if c.effects == nil {
 		c.effects = effect.NewList(c)
 	}
@@ -433,12 +432,6 @@ func (c *Character) MP() int {
 	return c.CurrentMP()
 }
 
-// CurrentHP returns current HP through the health component guard.
-func (c *Character) CurrentHP() int {
-	c.health.Bind(&c.CurHP)
-	return int(c.health.Current())
-}
-
 // ClearRecentFakeDeath clears the recent fake-death state. Fake death is not
 // modeled yet, so this is a no-op.
 func (c *Character) ClearRecentFakeDeath() {}
@@ -495,8 +488,7 @@ func (c *Character) CollisionRadius() float64 {
 // TakeDamage applies physical damage and runs the once-only death path when
 // HP reaches zero.
 func (c *Character) TakeDamage(dmg int, attacker creature.DeathActor) bool {
-	c.health.Bind(&c.CurHP)
-	if !c.health.Damage(dmg) {
+	if !c.ReduceCurrentHP(dmg) {
 		return false
 	}
 	return c.Die(attacker)

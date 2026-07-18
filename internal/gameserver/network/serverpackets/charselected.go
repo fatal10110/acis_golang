@@ -32,6 +32,7 @@ func FrameCharSelected(s CharSelectedSnapshot) wire.Frame {
 func writeCharSelected(w *wire.Writer, s CharSelectedSnapshot) {
 	c, t := s.Character, s.Template
 	x, y, z := c.Position()
+	resources := c.ResourceValues()
 	w.WriteString(c.Name)
 	w.WriteInt32(c.ObjectID())
 	w.WriteString(c.Title)
@@ -48,8 +49,8 @@ func writeCharSelected(w *wire.Writer, s CharSelectedSnapshot) {
 	w.WriteInt32(int32(x))
 	w.WriteInt32(int32(y))
 	w.WriteInt32(int32(z))
-	w.WriteFloat64(c.CurHP)
-	w.WriteFloat64(c.CurMP)
+	w.WriteFloat64(resources.CurrentHP)
+	w.WriteFloat64(resources.CurrentMP)
 	w.WriteInt32(int32(c.SP))
 	w.WriteInt64(c.Exp)
 	w.WriteInt32(int32(c.Level))

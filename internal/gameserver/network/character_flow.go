@@ -74,7 +74,7 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 			return nil, false
 		}
 	}
-	if c.CurHP < 0.5 {
+	if c.ResourceValues().CurrentHP < 0.5 {
 		c.MarkDead()
 	}
 	shortcuts := shortcut.Starter()
