@@ -48,8 +48,8 @@ func (f *Freight) VisibleSize() int {
 func (f *Freight) VisibleItems() []*item.Instance {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
-	var out []*item.Instance
-	for _, inst := range f.itemsLocked() {
+	out := make([]*item.Instance, 0, len(f.items))
+	for _, inst := range f.items {
 		if f.visible(inst) {
 			out = append(out, inst)
 		}
@@ -85,9 +85,13 @@ func (f *Freight) Add(inst *item.Instance) (result *item.Instance, absorbed bool
 	defer f.mu.Unlock()
 
 	tmpl, _ := f.templates.Get(inst.TemplateID)
-	if old := f.itemByTemplateIDLocked(inst.TemplateID); old != nil && tmpl != nil && tmpl.Stackable {
-		old.Count += inst.Count
-		return old, true
+	if tmpl != nil && tmpl.Stackable {
+		for _, old := range f.items {
+			if old.TemplateID == inst.TemplateID && f.visible(old) {
+				old.Count += inst.Count
+				return old, true
+			}
+		}
 	}
 
 	inst.OwnerID = f.ownerID
@@ -105,22 +109,9 @@ func (f *Freight) Add(inst *item.Instance) (result *item.Instance, absorbed bool
 // the currently active town so it's scoped like every other town-tagged
 // freight item.
 func (f *Freight) AddNew(templateID int32, count int, objectID int32) *item.Instance {
-	tmpl, ok := f.Templates().Get(templateID)
+	inst, ok := newInstance(f.Templates(), templateID, count, objectID)
 	if !ok {
 		return nil
-	}
-	if count < 1 {
-		count = 1
-	}
-	if !tmpl.Stackable {
-		count = 1
-	}
-
-	inst := &item.Instance{
-		ObjectID:   objectID,
-		TemplateID: templateID,
-		Count:      count,
-		ManaLeft:   tmpl.InitialManaLeft(),
 	}
 	result, _ := f.Add(inst)
 	return result

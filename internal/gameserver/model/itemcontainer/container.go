@@ -90,6 +90,14 @@ func (c *Container) itemsLocked() []*item.Instance {
 	return out
 }
 
+func (c *Container) forEach(fn func(*item.Instance)) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	for _, inst := range c.items {
+		fn(inst)
+	}
+}
+
 // HasItem reports whether the container holds any instance of templateID.
 func (c *Container) HasItem(templateID int32) bool {
 	return c.ItemByTemplateID(templateID) != nil
@@ -229,9 +237,18 @@ func (c *Container) Add(inst *item.Instance) (result *item.Instance, absorbed bo
 // count) — a deliberate simplification, since that config path only
 // matters for bulk GM item creation.
 func (c *Container) AddNew(templateID int32, count int, objectID int32) *item.Instance {
-	tmpl, ok := c.templates.Get(templateID)
+	inst, ok := newInstance(c.templates, templateID, count, objectID)
 	if !ok {
 		return nil
+	}
+	result, _ := c.Add(inst)
+	return result
+}
+
+func newInstance(templates *item.Table, templateID int32, count int, objectID int32) (*item.Instance, bool) {
+	tmpl, ok := templates.Get(templateID)
+	if !ok {
+		return nil, false
 	}
 	if count < 1 {
 		count = 1
@@ -239,15 +256,12 @@ func (c *Container) AddNew(templateID int32, count int, objectID int32) *item.In
 	if !tmpl.Stackable {
 		count = 1
 	}
-
-	inst := &item.Instance{
+	return &item.Instance{
 		ObjectID:   objectID,
 		TemplateID: templateID,
 		Count:      count,
 		ManaLeft:   tmpl.InitialManaLeft(),
-	}
-	result, _ := c.Add(inst)
-	return result
+	}, true
 }
 
 // Remove removes inst from the container, leaving its ownership and
@@ -284,14 +298,26 @@ func (c *Container) DestroyItem(inst *item.Instance, count int) *item.Instance {
 	if c.items[inst.ObjectID] != inst {
 		return nil
 	}
+	return destroyItemCore(inst, count, func(inst *item.Instance) bool {
+		delete(c.items, inst.ObjectID)
+		return true
+	}, nil)
+}
+
+func destroyItemCore(inst *item.Instance, count int, remove func(*item.Instance) bool, modified func(*item.Instance)) *item.Instance {
 	if inst.Count > count {
 		inst.Count -= count
+		if modified != nil {
+			modified(inst)
+		}
 		return inst
 	}
 	if inst.Count < count {
 		return nil
 	}
-	delete(c.items, inst.ObjectID)
+	if !remove(inst) {
+		return nil
+	}
 	inst.Count = 0
 	inst.OwnerID = 0
 	inst.Location = item.LocationVoid
@@ -320,8 +346,13 @@ func (c *Container) DestroyAll(inst *item.Instance) *item.Instance {
 
 // DestroyAllItems destroys every item instance the container holds.
 func (c *Container) DestroyAllItems() {
-	for _, inst := range c.Items() {
-		c.DestroyAll(inst)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for objectID, inst := range c.items {
+		delete(c.items, objectID)
+		inst.Count = 0
+		inst.OwnerID = 0
+		inst.Location = item.LocationVoid
 	}
 }
 
