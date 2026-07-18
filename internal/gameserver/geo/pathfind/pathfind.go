@@ -202,6 +202,8 @@ var cardinalSteps = [4]struct {
 	{dx: 1, dy: 0, flag: block.East},
 }
 
+const maxSmoothCells = 32
+
 const (
 	dirN = iota
 	dirS
@@ -222,11 +224,9 @@ var cornerSteps = [4]struct {
 	{dx: 1, dy: 1, xDir: dirE, yDir: dirS},
 }
 
-// expand generates current's neighbor candidates, mirroring the reference
-// PathFinder.expand/addDirectionalNode/addCornerNode/addNode: candidate
-// passability and weight come from each cell's own decoded NSWE mask
-// (resolved once per node, at node-creation time), not from a per-candidate
-// CanMove line-walk.
+// expand generates current's neighbor candidates from each cell's decoded
+// NSWE mask, then addCandidate may smooth the parent link when a bounded
+// direct movement check proves that shortcut is cheaper.
 func (f *Finder) expand(current, goal *node, seq *int64, scratch *searchScratch) {
 	if current.nswe == block.NoDirections {
 		return
@@ -296,10 +296,10 @@ func (f *Finder) candidateNSWE(gx, gy, z int) (height int, nswe block.NSWE, ok b
 	return int(h), m, true
 }
 
-// addCandidate mirrors the reference's addNode: dedup against already
-// explored/queued nodes, then weight the move by whether the candidate's own
-// mask is fully open (MoveWeight) or not (ObstacleWeight) — never by
-// probing neighboring cells.
+// addCandidate dedups against already explored/queued nodes, weights the grid
+// step by the candidate's own NSWE mask, then keeps a parent-skip shortcut
+// only when its straight-line cost is lower and the bounded direct movement
+// check succeeds.
 func (f *Finder) addCandidate(current, goal *node, seq *int64, scratch *searchScratch, gx, gy, height int, nswe block.NSWE, diagonal bool) {
 	key := nodeKey{gx: gx, gy: gy, z: height}
 	if _, ok := scratch.closed[key]; ok {
@@ -323,14 +323,50 @@ func (f *Finder) addCandidate(current, goal *node, seq *int64, scratch *searchSc
 
 	n := scratch.newNode(gx, gy, height)
 	n.nswe = nswe
-	n.g = current.g + weight
-	n.parent = current
+	parent := current
+	cost := current.g + weight
+	if current.parent != nil {
+		smoothed := current.parent.g + f.straightLineCost(current.parent, gx, gy, height, nswe)
+		if smoothed < cost &&
+			withinSmoothRange(current.parent, gx, gy, height) &&
+			f.canMoveDirect(current.parent, gx, gy, height) {
+			parent = current.parent
+			cost = smoothed
+		}
+	}
+	n.g = cost
+	n.parent = parent
 	n.seq = *seq
 	*seq = *seq + 1
 	n.h = f.heuristic(n, goal)
 	n.f = n.g + n.h
 	heap.Push(&scratch.opened, n)
 	scratch.openSet[key] = struct{}{}
+}
+
+func (f *Finder) canMoveDirect(from *node, gx, gy, height int) bool {
+	return f.engine.CanMove(
+		engine.WorldX(from.gx), engine.WorldY(from.gy), from.z,
+		engine.WorldX(gx), engine.WorldY(gy), height,
+	)
+}
+
+func withinSmoothRange(from *node, gx, gy, height int) bool {
+	dx := gx - from.gx
+	dy := gy - from.gy
+	dz := (height - from.z) / block.CellHeight
+	return location.In3DRange(0, 0, 0, dx, dy, dz, maxSmoothCells)
+}
+
+func (f *Finder) straightLineCost(from *node, gx, gy, height int, nswe block.NSWE) int {
+	dx := gx - from.gx
+	dy := gy - from.gy
+	dz := (height - from.z) / block.CellHeight
+	weight := f.options.MoveWeight
+	if nswe != block.AllDirections {
+		weight = f.options.ObstacleWeight
+	}
+	return int(math.Sqrt(float64(dx*dx+dy*dy+dz*dz)) * float64(weight))
 }
 
 func (f *Finder) heuristic(from, to *node) int {
