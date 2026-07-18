@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -849,8 +850,7 @@ func startNpcPersistence(lc fx.Lifecycle, npcs *manager.Npcs, spawns *manager.Sp
 }
 
 type loginLinkState struct {
-	mu   sync.RWMutex
-	link *network.LoginLink
+	link atomic.Pointer[network.LoginLink]
 }
 
 func provideLoginLinkState() *loginLinkState {
@@ -858,23 +858,15 @@ func provideLoginLinkState() *loginLinkState {
 }
 
 func (s *loginLinkState) set(link *network.LoginLink) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.link = link
+	s.link.Store(link)
 }
 
 func (s *loginLinkState) clear(link *network.LoginLink) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.link == link {
-		s.link = nil
-	}
+	s.link.CompareAndSwap(link, nil)
 }
 
 func (s *loginLinkState) get() *network.LoginLink {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.link
+	return s.link.Load()
 }
 
 func provideGameClientLink(

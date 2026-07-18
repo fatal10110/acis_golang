@@ -101,6 +101,12 @@ type SeededCorpse interface {
 	Seeded() bool
 }
 
+// PetTarget is implemented by summons that can report whether they are pets
+// rather than servitors.
+type PetTarget interface {
+	IsPet() bool
+}
+
 // PeaceZoner is implemented by creatures that can report whether hostilities
 // are blocked by their current zone.
 type PeaceZoner interface {
@@ -664,15 +670,12 @@ func (corpsePetHandler) FinalTarget(_, target Creature, _ *modelskill.Definition
 	return target
 }
 
-// CanCast requires the target be dead and owned by another creature — the
-// closest available signal to a pet, since no actor type distinguishes pets
-// from other player-owned summons yet.
 func (corpsePetHandler) CanCast(_, target Creature, _ *modelskill.Definition, _ bool) bool {
 	if target == nil || !target.Dead() {
 		return false
 	}
-	_, ok := ownerOf(target)
-	return ok
+	pet, ok := target.(PetTarget)
+	return ok && pet.IsPet()
 }
 
 type groundHandler struct{}

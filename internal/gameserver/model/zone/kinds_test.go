@@ -83,6 +83,26 @@ func TestDamageZoneUnlinkedTrap(t *testing.T) {
 	}
 }
 
+func TestDamageZoneStartsPulseOutsideLatch(t *testing.T) {
+	z, err := NewDamage(1, testForm, commons.NewStatSet())
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := newFakePlayer(2, insideAt)
+	done := make(chan struct{})
+	z.StartPulse = func() {
+		z.PulseStopped()
+		close(done)
+	}
+
+	Revalidate(z, a)
+	select {
+	case <-done:
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("StartPulse could not call back into zone state")
+	}
+}
+
 func TestDamageZoneDormantCastleTrap(t *testing.T) {
 	z, err := NewDamage(1, testForm, statSet(map[string]string{"castleId": "3", "eventId": "10"}))
 	if err != nil {
@@ -165,6 +185,27 @@ func TestEffectZoneSettingsAndScope(t *testing.T) {
 	Revalidate(z, npc)
 	if !z.Inside(npc) || pulses != 1 {
 		t.Fatal("Npc-scoped effect zone ignored an NPC")
+	}
+}
+
+func TestEffectZoneStartsPulseOutsideLatch(t *testing.T) {
+	z, err := NewEffect(1, testForm, commons.NewStatSet())
+	if err != nil {
+		t.Fatal(err)
+	}
+	npc := &fakeActor{id: 3, pos: insideAt, class: ClassNPC}
+	z.Target = ScopeNPC
+	done := make(chan struct{})
+	z.StartPulse = func() {
+		z.Enabled()
+		close(done)
+	}
+
+	Revalidate(z, npc)
+	select {
+	case <-done:
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("StartPulse could not call back into zone state")
 	}
 }
 
