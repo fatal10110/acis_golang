@@ -172,13 +172,17 @@ func (s *State) DespawnAll(ts []Tracked) {
 func (s *State) relocate(t Tracked, next *Region) {
 	_, tIsPlayer := t.(Player)
 	if tIsPlayer {
-		// Holds for the whole call: the playersCount updates below and the
-		// setActive decisions they feed must be atomic with respect to
-		// every other player's relocate, or one player's departure can
-		// deactivate a region just activated by another's concurrent
-		// arrival. See regionActivityMu's doc comment.
+		// Holds until every setActive decision below is made: the
+		// playersCount updates and the setActive decisions they feed must
+		// be atomic with respect to every other player's relocate, or one
+		// player's departure can deactivate a region just activated by
+		// another's concurrent arrival. See regionActivityMu's doc comment.
+		// It does not need to cover notifyActivity's per-object resets
+		// (unlocked explicitly below, before those run) — those aren't part
+		// of the invariant it protects, and holding it through a possibly
+		// large region's worth of resets would serialize every other
+		// player's relocate against this one for no reason.
 		s.regionActivityMu.Lock()
-		defer s.regionActivityMu.Unlock()
 	}
 
 	p := t.presence()
@@ -194,11 +198,22 @@ func (s *State) relocate(t Tracked, next *Region) {
 	if next != nil {
 		next.Add(t)
 		newAreas = s.AppendNeighbors(newAreaBuf[:0], next, 1)
+		if prev != nil {
+			// t already had a region (this is a move, not its first Spawn)
+			// and next never toggled to get here: a non-player crossing
+			// into a neighbor that was already active or already inactive
+			// triggers no setActive transition there, so nothing else would
+			// tell t which side of the gate it just landed on.
+			notifyObjectActivity(t, next.Active())
+		}
 	}
 
 	tObs, tObserves := t.(Observer)
 	var objectBuf [32]Tracked
 	objects := objectBuf[:0]
+
+	var toggleBuf [18]regionToggle
+	toggles := toggleBuf[:0]
 
 	for _, r := range oldAreas {
 		if containsRegion(newAreas, r) {
@@ -216,8 +231,8 @@ func (s *State) relocate(t Tracked, next *Region) {
 				tObs.Forget(o)
 			}
 		}
-		if tIsPlayer && s.regionNeighborhoodEmpty(r) {
-			r.setActive(false)
+		if tIsPlayer && s.regionNeighborhoodEmpty(r) && r.setActive(false) {
+			toggles = append(toggles, regionToggle{r, false})
 		}
 	}
 
@@ -237,14 +252,30 @@ func (s *State) relocate(t Tracked, next *Region) {
 				tObs.Discover(o)
 			}
 		}
-		if tIsPlayer {
-			r.setActive(true)
+		if tIsPlayer && r.setActive(true) {
+			toggles = append(toggles, regionToggle{r, true})
 		}
 	}
 
 	p.mu.Lock()
 	p.region = next
 	p.mu.Unlock()
+
+	if tIsPlayer {
+		s.regionActivityMu.Unlock()
+	}
+
+	for _, tg := range toggles {
+		tg.region.notifyActivity(tg.active)
+	}
+}
+
+// regionToggle is a region whose activity flag setActive just flipped,
+// queued so relocate can run its notifyActivity after releasing
+// regionActivityMu instead of while holding it.
+type regionToggle struct {
+	region *Region
+	active bool
 }
 
 // regionNeighborhoodEmpty reports whether r and its 3x3 neighborhood

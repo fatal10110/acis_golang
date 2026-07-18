@@ -69,6 +69,15 @@ func (s *activeTrackedStub) OnInactiveRegion() {
 	s.inactiveCalls++
 }
 
+// toggle flips r's active flag and runs the notify relocate would run for a
+// real transition, mirroring how the only production caller (relocate) uses
+// setActive's return value.
+func toggle(r *Region, value bool) {
+	if r.setActive(value) {
+		r.notifyActivity(value)
+	}
+}
+
 func TestRegion_ActiveToggleNotifiesObjectsOncePerTransition(t *testing.T) {
 	r := newRegion(0, 0)
 	obj := &activeTrackedStub{trackedStub: trackedStub{id: 1}}
@@ -76,8 +85,8 @@ func TestRegion_ActiveToggleNotifiesObjectsOncePerTransition(t *testing.T) {
 	obj.activeCalls = 0
 	obj.inactiveCalls = 0
 
-	r.setActive(true)
-	r.setActive(true)
+	toggle(r, true)
+	toggle(r, true)
 
 	if obj.activeCalls != 1 {
 		t.Fatalf("active calls = %d, want 1", obj.activeCalls)
@@ -86,8 +95,8 @@ func TestRegion_ActiveToggleNotifiesObjectsOncePerTransition(t *testing.T) {
 		t.Fatalf("inactive calls = %d, want 0", obj.inactiveCalls)
 	}
 
-	r.setActive(false)
-	r.setActive(false)
+	toggle(r, false)
+	toggle(r, false)
 
 	if obj.activeCalls != 1 {
 		t.Fatalf("active calls after deactivate = %d, want 1", obj.activeCalls)
