@@ -127,18 +127,24 @@ func (c *Character) SetLastKnownPosition(position location.Location, heading int
 // SetFrameSender records the session send hook used by network-owned live
 // player wrappers. Passing nil disconnects the character from that session.
 func (c *Character) SetFrameSender(send func(wire.Frame) bool) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
 	c.sendFrame = send
 }
 
 // SetAttackBroadcaster records the packet-layer hook that broadcasts attack
 // snapshots to nearby connected clients.
 func (c *Character) SetAttackBroadcaster(broadcast func(attack.Snapshot)) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
 	c.broadcastAttack = broadcast
 }
 
 // SetMoveBroadcaster records the packet-layer hook that broadcasts movement
 // events to this character's own session and nearby connected clients.
 func (c *Character) SetMoveBroadcaster(broadcast func(move.Event)) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
 	c.broadcastMove = broadcast
 }
 
@@ -146,16 +152,21 @@ func (c *Character) SetMoveBroadcaster(broadcast func(move.Event)) {
 // stop-in-place notice to this character's own session and nearby connected
 // clients when server-driven movement is cancelled mid-flight.
 func (c *Character) SetStopBroadcaster(broadcast func()) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
 	c.broadcastStop = broadcast
 }
 
 // SendFrame sends frame to the connected client, if any.
 func (c *Character) SendFrame(frame wire.Frame) bool {
-	if c.sendFrame == nil {
+	c.stateMu.RLock()
+	send := c.sendFrame
+	c.stateMu.RUnlock()
+	if send == nil {
 		frame.Release()
 		return false
 	}
-	return c.sendFrame(frame)
+	return send(frame)
 }
 
 // SetRollSource overrides MakeAttackHit's random source for deterministic
@@ -368,23 +379,32 @@ func (c *Character) MakeAttackHit(target attackable.Combatant, split bool) attac
 
 // BroadcastAttack sends an attack snapshot through the runtime packet hook.
 func (c *Character) BroadcastAttack(snapshot attack.Snapshot) {
-	if c.broadcastAttack != nil {
-		c.broadcastAttack(snapshot)
+	c.stateMu.RLock()
+	broadcast := c.broadcastAttack
+	c.stateMu.RUnlock()
+	if broadcast != nil {
+		broadcast(snapshot)
 	}
 }
 
 // BroadcastMove sends a movement event through the runtime packet hook.
 func (c *Character) BroadcastMove(event move.Event) {
-	if c.broadcastMove != nil {
-		c.broadcastMove(event)
+	c.stateMu.RLock()
+	broadcast := c.broadcastMove
+	c.stateMu.RUnlock()
+	if broadcast != nil {
+		broadcast(event)
 	}
 }
 
 // BroadcastStop sends a stop-in-place notice through the runtime packet
 // hook.
 func (c *Character) BroadcastStop() {
-	if c.broadcastStop != nil {
-		c.broadcastStop()
+	c.stateMu.RLock()
+	broadcast := c.broadcastStop
+	c.stateMu.RUnlock()
+	if broadcast != nil {
+		broadcast()
 	}
 }
 

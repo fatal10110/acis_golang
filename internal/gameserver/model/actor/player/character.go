@@ -89,7 +89,7 @@ type Character struct {
 	statMu    sync.Mutex
 	statFuncs []basefunc.Func
 
-	// stateMu guards transient live flags.
+	// stateMu guards transient live flags and runtime send/broadcast hooks.
 	stateMu       sync.RWMutex
 	stateInit     bool
 	running       bool
