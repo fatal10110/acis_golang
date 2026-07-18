@@ -414,6 +414,59 @@ func TestAddCandidateKeepsCheaperGridParent(t *testing.T) {
 // NodeBelow correctly resolved the bridge layer's own height and NSWE mask
 // for each bridge-column candidate, mirroring the reference's
 // getIndexBelow/getHeight/getNswe sequence.
+// TestFindOnRandomMultilayerCellsAlwaysSatisfiesCanMove fuzzes multilayer
+// terrain (cells with 1-3 ascending height layers) and checks that every
+// consecutive pair in a returned path actually satisfies CanMove. It once
+// found seeds where a corner (diagonal) candidate's own NSWE mutual-mask
+// gate was satisfied while a straight line from the expanding node to that
+// candidate still crossed a blocked edge on multilayer terrain — see
+// addCandidateTo's diagonal-only CanMove gate.
+func TestFindOnRandomMultilayerCellsAlwaysSatisfiesCanMove(t *testing.T) {
+	options := DefaultOptions()
+	options.HeuristicWeight = 0
+	options.MaxIterations = 10000
+
+	for seed := int64(1); seed <= 40; seed++ {
+		r := rand.New(rand.NewSource(seed))
+		var cells [block.CellCount][]block.Cell
+		for x := range block.CellsX {
+			for y := range block.CellsY {
+				n := r.Intn(3) + 1
+				layers := make([]block.Cell, n)
+				h := int16(0)
+				for i := 0; i < n; i++ {
+					h += int16(r.Intn(9) * 24)
+					layers[i] = block.Cell{Height: h, NSWE: block.AllDirections}
+				}
+				cells[x*block.CellsY+y] = layers
+			}
+		}
+		ml, err := block.NewMultilayer(cells)
+		if err != nil {
+			t.Fatalf("seed %d: NewMultilayer(): %v", seed, err)
+		}
+		e := newTestEngine(t, ml)
+
+		topHeight := func(x, y int) int {
+			layers := cells[x*block.CellsY+y]
+			return int(layers[len(layers)-1].Height)
+		}
+		origin := at(0, 0, topHeight(0, 0))
+		target := at(7, 7, topHeight(7, 7))
+
+		for _, bidirectional := range []bool{false, true} {
+			options.Bidirectional = bidirectional
+			path, _, ok := New(e, options).Find(origin, target)
+			if !ok {
+				continue
+			}
+			if from, to, good := firstBlockedSegment(e, origin, path); !good {
+				t.Errorf("seed %d bidirectional=%v: CanMove rejects segment %#v -> %#v in path %#v", seed, bidirectional, from, to, path)
+			}
+		}
+	}
+}
+
 func TestFindCrossesBridgeWithNoFloorBeneath(t *testing.T) {
 	// bridgeHeight must stay below block.CellIgnoreHeight (48 = CellHeight(8)
 	// x 6) for NodeBelow to resolve the bridge layer at all when stepping on

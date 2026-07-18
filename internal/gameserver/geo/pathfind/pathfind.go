@@ -476,19 +476,36 @@ func (f *Finder) addCandidateTo(current, goal *node, seq *int64, scratch *search
 		}
 	}
 
-	n := scratch.newNode(gx, gy, height)
-	n.nswe = nswe
+	// Corner-cut candidates can pass the NSWE mutual-mask gate in expand yet
+	// still cross terrain CanMove would reject: on multilayer cells, the
+	// diagonal target's own height (resolved independently via NodeBelow)
+	// doesn't guarantee a walkable straight line from current, since
+	// CanMove's line-walk visits the corner's flanking cells rather than
+	// jumping straight to the target the way candidate generation does.
+	// Cardinal steps need no such check: CanMove's single-iteration walk
+	// for an axis-aligned 1-cell step resolves the same NodeBelow call
+	// candidate generation already used, so it can never disagree.
+	direct := !diagonal || f.canMoveDirect(current, gx, gy, height)
+
 	parent := current
 	cost := current.g + weight
 	if current.parent != nil {
-		smoothed := current.parent.g + f.straightLineCost(current.parent, gx, gy, height, nswe)
-		if smoothed < cost &&
-			withinSmoothRange(current.parent, gx, gy, height) &&
-			f.canMoveDirect(current.parent, gx, gy, height) {
-			parent = current.parent
-			cost = smoothed
+		reachable := withinSmoothRange(current.parent, gx, gy, height) && f.canMoveDirect(current.parent, gx, gy, height)
+		if reachable {
+			smoothed := current.parent.g + f.straightLineCost(current.parent, gx, gy, height, nswe)
+			if !direct || smoothed < cost {
+				parent = current.parent
+				cost = smoothed
+				direct = true
+			}
 		}
 	}
+	if !direct {
+		return
+	}
+
+	n := scratch.newNode(gx, gy, height)
+	n.nswe = nswe
 	n.g = cost
 	n.parent = parent
 	n.seq = *seq
@@ -520,19 +537,33 @@ func (f *Finder) addBackwardCandidate(current, goal *node, seq *int64, scratch *
 		}
 	}
 
+	// See the matching comment in addCandidateTo: corner-cut candidates need
+	// their own direct-connectivity check on multilayer terrain, cardinal
+	// steps don't.
+	direct := !diagonal || f.engine.CanMove(
+		engine.WorldX(gx), engine.WorldY(gy), height,
+		engine.WorldX(current.gx), engine.WorldY(current.gy), current.z,
+	)
+
 	parent := current
 	cost := current.g + weight
 	if current.parent != nil {
-		smoothed := current.parent.g + f.straightLineCostFrom(gx, gy, height, current.parent.gx, current.parent.gy, current.parent.z, current.parent.nswe)
-		if smoothed < cost &&
-			withinSmoothRangeFrom(gx, gy, height, current.parent.gx, current.parent.gy, current.parent.z) &&
+		reachable := withinSmoothRangeFrom(gx, gy, height, current.parent.gx, current.parent.gy, current.parent.z) &&
 			f.engine.CanMove(
 				engine.WorldX(gx), engine.WorldY(gy), height,
 				engine.WorldX(current.parent.gx), engine.WorldY(current.parent.gy), current.parent.z,
-			) {
-			parent = current.parent
-			cost = smoothed
+			)
+		if reachable {
+			smoothed := current.parent.g + f.straightLineCostFrom(gx, gy, height, current.parent.gx, current.parent.gy, current.parent.z, current.parent.nswe)
+			if !direct || smoothed < cost {
+				parent = current.parent
+				cost = smoothed
+				direct = true
+			}
 		}
+	}
+	if !direct {
+		return
 	}
 
 	n := scratch.newNode(gx, gy, height)
