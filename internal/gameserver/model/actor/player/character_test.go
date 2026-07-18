@@ -42,11 +42,12 @@ func TestNewCharacter(t *testing.T) {
 	if c.Level != 1 {
 		t.Errorf("Level = %d, want 1", c.Level)
 	}
-	if c.MaxHP != tmpl.HPTable[0] || c.CurHP != tmpl.HPTable[0] {
-		t.Errorf("HP = %v/%v, want %v/%v", c.MaxHP, c.CurHP, tmpl.HPTable[0], tmpl.HPTable[0])
+	res := c.ResourceValues()
+	if res.MaxHP != tmpl.HPTable[0] || res.CurrentHP != tmpl.HPTable[0] {
+		t.Errorf("HP = %v/%v, want %v/%v", res.MaxHP, res.CurrentHP, tmpl.HPTable[0], tmpl.HPTable[0])
 	}
-	if c.MaxMP != tmpl.MPTable[0] || c.MaxCP != tmpl.CPTable[0] {
-		t.Errorf("MaxMP/MaxCP = %v/%v, want %v/%v", c.MaxMP, c.MaxCP, tmpl.MPTable[0], tmpl.CPTable[0])
+	if res.MaxMP != tmpl.MPTable[0] || res.MaxCP != tmpl.CPTable[0] {
+		t.Errorf("MaxMP/MaxCP = %v/%v, want %v/%v", res.MaxMP, res.MaxCP, tmpl.MPTable[0], tmpl.CPTable[0])
 	}
 	if c.HairStyle != 1 || c.HairColor != 2 || c.Face != 0 {
 		t.Errorf("appearance = hairStyle=%d hairColor=%d face=%d, want 1/2/0", c.HairStyle, c.HairColor, c.Face)

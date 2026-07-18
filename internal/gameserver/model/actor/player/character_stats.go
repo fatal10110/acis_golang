@@ -6,6 +6,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
@@ -298,13 +299,13 @@ func (c *Character) AddHP(amount float64) float64 {
 	maxHP := c.MaxHPValue()
 	c.vitalsMu.Lock()
 	defer c.vitalsMu.Unlock()
-	if c.CurHP >= maxHP {
+	if c.curHP >= maxHP {
 		return 0
 	}
-	if c.CurHP+amount > maxHP {
-		amount = maxHP - c.CurHP
+	if c.curHP+amount > maxHP {
+		amount = maxHP - c.curHP
 	}
-	c.CurHP += amount
+	c.curHP += amount
 	return amount
 }
 
@@ -316,13 +317,13 @@ func (c *Character) AddMP(amount float64) float64 {
 	maxMP := c.MaxMPValue()
 	c.vitalsMu.Lock()
 	defer c.vitalsMu.Unlock()
-	if c.CurMP >= maxMP {
+	if c.curMP >= maxMP {
 		return 0
 	}
-	if c.CurMP+amount > maxMP {
-		amount = maxMP - c.CurMP
+	if c.curMP+amount > maxMP {
+		amount = maxMP - c.curMP
 	}
-	c.CurMP += amount
+	c.curMP += amount
 	return amount
 }
 
@@ -333,13 +334,13 @@ func (c *Character) ReduceMP(amount float64) float64 {
 	}
 	c.vitalsMu.Lock()
 	defer c.vitalsMu.Unlock()
-	if c.CurMP <= 0 {
+	if c.curMP <= 0 {
 		return 0
 	}
-	if amount > c.CurMP {
-		amount = c.CurMP
+	if amount > c.curMP {
+		amount = c.curMP
 	}
-	c.CurMP -= amount
+	c.curMP -= amount
 	return amount
 }
 
@@ -349,14 +350,14 @@ func (c *Character) ReduceHP(amount float64, attacker any, _ modelskill.Definiti
 		return
 	}
 	c.vitalsMu.Lock()
-	if c.CurHP <= 0 {
+	if c.curHP <= 0 {
 		c.vitalsMu.Unlock()
 		return
 	}
-	c.CurHP -= amount
-	dead := c.CurHP <= 0
+	c.curHP -= amount
+	dead := c.curHP <= 0
 	if dead {
-		c.CurHP = 0
+		c.curHP = 0
 	}
 	c.vitalsMu.Unlock()
 	if dead {
@@ -376,7 +377,7 @@ func (c *Character) SetHP(value float64) {
 	if value > maxHP {
 		value = maxHP
 	}
-	c.CurHP = value
+	c.curHP = value
 }
 
 // SetCP sets current CP, clamped to [0, MaxCP].
@@ -390,7 +391,7 @@ func (c *Character) SetCP(value float64) {
 	if value > maxCP {
 		value = maxCP
 	}
-	c.CurCP = value
+	c.curCP = value
 }
 
 // CanBeHealed reports whether c may receive HP/MP restoration.
@@ -444,10 +445,10 @@ func (c *Character) PhysicalSkillInput(caster any, def modelskill.Definition) (f
 		Crit:          attacker.physicalSkillCrit(def),
 		SoulShot:      soulshot,
 		RandomMul:     attacker.randomDamageMultiplier(def),
-		ElementalMul:  1, // TODO(#782): feed elemental skill and defence attributes.
+		ElementalMul:  c.elementalSkillModifier(def),
 		RaceMul:       1,
 		WeaponVulnMul: c.weaponVulnerability(attacker),
-		PvPMul:        1,
+		PvPMul:        attacker.calcStat(stat.PvPPhysSkillDmg, 1),
 	}, true
 }
 
@@ -458,15 +459,16 @@ func (c *Character) MagicDamageInput(caster any, def modelskill.Definition) (for
 	if !ok || attacker == nil {
 		return formulas.MagicDamageInput{}, false
 	}
+	sps, bsps := attacker.spiritshotFlags()
 	return formulas.MagicDamageInput{
 		MAtk:            attacker.MAtk(),
 		MDef:            positive(c.MDef()),
 		SkillPower:      float64(def.Power),
-		PvPMul:          1,
-		ElementalMul:    1,     // TODO(#782): feed elemental skill and defence attributes.
-		MagicCrit:       false, // TODO(#782): feed magic-critical rolls.
-		SoulShot:        false,
-		BlessedSoulShot: false,
+		PvPMul:          attacker.magicPvPMul(def),
+		ElementalMul:    c.elementalSkillModifier(def),
+		MagicCrit:       formulas.MCritSucceeds(int(attacker.MagicCriticalRate()), attacker.rollValue(1000)),
+		SoulShot:        sps,
+		BlessedSoulShot: bsps,
 	}, true
 }
 
@@ -489,8 +491,8 @@ func (c *Character) BlowInput(caster any, def modelskill.Definition) (formulas.B
 		SoulShot:          soulshot,
 		IsPvP:             true,
 		RandomMul:         float64(95+attacker.rollValue(11)) / 100,
-		PosMul:            formulas.PosMul(false, true, true), // TODO(#782): feed relative headings.
-		PvPMul:            1,
+		PosMul:            c.positionMultiplierFrom(attacker, true),
+		PvPMul:            attacker.calcStat(stat.PvPPhysSkillDmg, 1),
 		CritDamageMul:     attacker.calcStat(stat.CriticalDamage, 1),
 		CritDamagePosMul:  (attacker.calcStat(stat.CriticalDamagePos, 1)-1)/2 + 1,
 		CritVulnMul:       c.calcStat(stat.CritVuln, 1),
@@ -506,13 +508,66 @@ func (c *Character) ManaDamageInput(caster any, def modelskill.Definition) (form
 	if !ok || attacker == nil {
 		return formulas.ManaDamageInput{}, false
 	}
+	sps, bsps := attacker.spiritshotFlags()
 	return formulas.ManaDamageInput{
-		MAtk:        attacker.MAtk(),
-		MDef:        positive(c.MDef()),
-		SkillPower:  float64(def.Power),
-		TargetMaxMp: c.MaxMPValue(),
-		VulnMul:     c.skillVulnerability(def.SkillType),
+		MAtk:            attacker.MAtk(),
+		MDef:            positive(c.MDef()),
+		SkillPower:      float64(def.Power),
+		TargetMaxMp:     c.MaxMPValue(),
+		SoulShot:        sps,
+		BlessedSoulShot: bsps,
+		VulnMul:         c.skillVulnerability(def.SkillType),
 	}, true
+}
+
+func (c *Character) elementalSkillModifier(def modelskill.Definition) float64 {
+	s, ok := elementResistanceStat(def.Element)
+	if !ok {
+		return 1
+	}
+	return c.calcStat(s, 1)
+}
+
+func elementResistanceStat(element modelskill.Element) (stat.Stat, bool) {
+	switch element {
+	case modelskill.ElementWind:
+		return stat.WindRes, true
+	case modelskill.ElementFire:
+		return stat.FireRes, true
+	case modelskill.ElementWater:
+		return stat.WaterRes, true
+	case modelskill.ElementEarth:
+		return stat.EarthRes, true
+	case modelskill.ElementHoly:
+		return stat.HolyRes, true
+	case modelskill.ElementDark:
+		return stat.DarkRes, true
+	case modelskill.ElementValakas:
+		return stat.ValakasRes, true
+	default:
+		return 0, false
+	}
+}
+
+func (c *Character) spiritshotFlags() (sps, bsps bool) {
+	bsps = c.BlessedSpiritshotCharged()
+	if bsps {
+		return false, true
+	}
+	return c.SpiritshotCharged(), false
+}
+
+func (c *Character) magicPvPMul(def modelskill.Definition) float64 {
+	if def.Magic {
+		return c.calcStat(stat.PvPMagicalDmg, 1)
+	}
+	return c.calcStat(stat.PvPPhysSkillDmg, 1)
+}
+
+func (c *Character) positionMultiplierFrom(attacker *Character, crit bool) float64 {
+	targetFacing := location.OrientedLocation{Location: c.CurrentLocation(), Heading: c.CurrentHeading()}
+	attackerLoc := attacker.CurrentLocation()
+	return formulas.PosMul(targetFacing.IsBehind(attackerLoc), targetFacing.IsInFrontOf(attackerLoc), crit)
 }
 
 func (c *Character) physicalSkillCrit(def modelskill.Definition) bool {

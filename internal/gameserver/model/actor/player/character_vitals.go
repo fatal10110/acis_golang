@@ -32,9 +32,9 @@ func (c *Character) Vitals() Vitals {
 func (c *Character) ResourceValues() Resources {
 	c.vitalsMu.RLock()
 	res := Resources{
-		MaxHP: c.MaxHP, CurrentHP: c.CurHP,
-		MaxMP: c.MaxMP, CurrentMP: c.CurMP,
-		MaxCP: c.MaxCP, CurrentCP: c.CurCP,
+		MaxHP: c.maxHP, CurrentHP: c.curHP,
+		MaxMP: c.maxMP, CurrentMP: c.curMP,
+		MaxCP: c.maxCP, CurrentCP: c.curCP,
 	}
 	c.vitalsMu.RUnlock()
 	if c.template() == nil {
@@ -44,6 +44,15 @@ func (c *Character) ResourceValues() Resources {
 	res.MaxMP = c.calcStat(stat.MaxMP, res.MaxMP)
 	res.MaxCP = c.calcStat(stat.MaxCP, res.MaxCP)
 	return res
+}
+
+// SetResourceValues replaces c's persisted HP/MP/CP resource values.
+func (c *Character) SetResourceValues(res Resources) {
+	c.vitalsMu.Lock()
+	defer c.vitalsMu.Unlock()
+	c.maxHP, c.curHP = res.MaxHP, res.CurrentHP
+	c.maxMP, c.curMP = res.MaxMP, res.CurrentMP
+	c.maxCP, c.curCP = res.MaxCP, res.CurrentCP
 }
 
 // CurrentHP returns current HP as an integer resource value.
@@ -69,14 +78,14 @@ func (c *Character) ReduceCurrentHP(amount int) bool {
 	}
 	c.vitalsMu.Lock()
 	defer c.vitalsMu.Unlock()
-	if c.CurHP <= 0 {
+	if c.curHP <= 0 {
 		return false
 	}
-	c.CurHP -= float64(amount)
-	if c.CurHP > 0 {
+	c.curHP -= float64(amount)
+	if c.curHP > 0 {
 		return false
 	}
-	c.CurHP = 0
+	c.curHP = 0
 	return true
 }
 
@@ -87,18 +96,18 @@ func (c *Character) ReduceCurrentMP(amount int) {
 	}
 	c.vitalsMu.Lock()
 	defer c.vitalsMu.Unlock()
-	c.CurMP -= float64(amount)
-	if c.CurMP < 0 {
-		c.CurMP = 0
+	c.curMP -= float64(amount)
+	if c.curMP < 0 {
+		c.curMP = 0
 	}
 }
 
 func (c *Character) refillResources(maxHP, maxMP, maxCP float64) {
 	c.vitalsMu.Lock()
 	defer c.vitalsMu.Unlock()
-	c.MaxHP, c.CurHP = maxHP, maxHP
-	c.MaxMP, c.CurMP = maxMP, maxMP
-	c.MaxCP, c.CurCP = maxCP, maxCP
+	c.maxHP, c.curHP = maxHP, maxHP
+	c.maxMP, c.curMP = maxMP, maxMP
+	c.maxCP, c.curCP = maxCP, maxCP
 }
 
 // ChangesTo reports which resources differ in next.

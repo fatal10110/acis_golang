@@ -30,6 +30,7 @@ var weaponRange = map[item.WeaponType]int{
 
 type activeWeapon struct {
 	tmpl *item.Template
+	inst *item.Instance
 }
 
 func (w activeWeapon) stat(stat string, fallback float64) float64 {
@@ -216,7 +217,7 @@ func (c *Character) activeWeapon() activeWeapon {
 		return activeWeapon{tmpl: c.fistTemplate()}
 	}
 	if tmpl, ok := c.inventory.Templates().Get(inst.TemplateID); ok && tmpl != nil && tmpl.Weapon != nil {
-		return activeWeapon{tmpl: tmpl}
+		return activeWeapon{tmpl: tmpl, inst: inst}
 	}
 	return activeWeapon{tmpl: c.fistTemplate()}
 }
@@ -296,7 +297,7 @@ func (c *Character) CriticalRate() float64 {
 
 // MagicCriticalRate returns this player's magic critical rate.
 func (c *Character) MagicCriticalRate() float64 {
-	return c.calcStat(stat.MCriticalRate, 1)
+	return c.calcStat(stat.MCriticalRate, 8)
 }
 
 // RunSpeed returns the current run speed.
@@ -329,7 +330,20 @@ func (c *Character) WeaponGrade() int {
 
 // SoulshotCharged reports whether a soulshot charge is currently active.
 func (c *Character) SoulshotCharged() bool {
-	return false
+	weapon := c.activeWeapon()
+	return weapon.inst != nil && weapon.inst.ChargedShot(item.ShotSoul)
+}
+
+// SpiritshotCharged reports whether a spiritshot charge is currently active.
+func (c *Character) SpiritshotCharged() bool {
+	weapon := c.activeWeapon()
+	return weapon.inst != nil && weapon.inst.ChargedShot(item.ShotSpirit)
+}
+
+// BlessedSpiritshotCharged reports whether a blessed spiritshot charge is currently active.
+func (c *Character) BlessedSpiritshotCharged() bool {
+	weapon := c.activeWeapon()
+	return weapon.inst != nil && weapon.inst.ChargedShot(item.ShotBlessedSpirit)
 }
 
 // SetHeadingTo orients this player toward target.
