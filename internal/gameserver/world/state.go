@@ -1,6 +1,10 @@
 package world
 
-import "github.com/fatal10110/acis_golang/internal/gameserver/model/worldobject"
+import (
+	"sync"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/worldobject"
+)
 
 // State tracks every live object, player, and pet currently in the game
 // world, alongside the spatial grid (embedded *Grid) used to index them by
@@ -11,6 +15,15 @@ type State struct {
 	objects *registry
 	players *registry
 	pets    *registry // keyed by the pet owner's id, not the pet's own id
+
+	// regionActivityMu serializes a Player's region-activity accounting
+	// (relocate's playersCount updates plus the resulting Region.setActive
+	// calls) against every other concurrent Player relocation, closing the
+	// check-then-act race between one player's departure deactivating a
+	// region and another's arrival activating it. Only relocate calls for a
+	// Player take it; non-player traffic (the overwhelming majority —
+	// NPCs, ground items, doors) never touches it.
+	regionActivityMu sync.Mutex
 }
 
 // New returns an empty State with a freshly built region grid.

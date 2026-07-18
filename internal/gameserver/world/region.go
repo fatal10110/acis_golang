@@ -1,16 +1,25 @@
 package world
 
-import "sync"
+import (
+	"sync"
+	"sync/atomic"
+)
 
 // Region is one cell of the world grid. It tracks which objects are
-// currently visible within its bounds.
+// currently visible within its bounds, and whether it is active — see
+// Active.
 //
-// mu guards objects.
+// mu guards objects. playersCount and active are updated outside mu (by
+// State, which coordinates across several regions at once during a
+// relocation) so they are atomics rather than fields mu also guards.
 type Region struct {
 	tileX, tileY int
 
 	mu      sync.RWMutex
 	objects map[int32]Tracked
+
+	playersCount atomic.Int32
+	active       atomic.Bool
 }
 
 func newRegion(tileX, tileY int) *Region {
@@ -21,18 +30,40 @@ func newRegion(tileX, tileY int) *Region {
 	}
 }
 
+// Active reports whether r currently has a Player somewhere in its 3x3
+// neighborhood. Scheduled per-object work (AI, follow, route walking) is
+// expected to skip objects sitting in an inactive region.
+func (r *Region) Active() bool {
+	return r.active.Load()
+}
+
+func (r *Region) setActive(value bool) {
+	r.active.Store(value)
+}
+
 // Add registers obj as visible within r.
 func (r *Region) Add(obj Tracked) {
 	r.mu.Lock()
-	defer r.mu.Unlock()
 	r.objects[obj.ObjectID()] = obj
+	r.mu.Unlock()
+	if _, ok := obj.(Player); ok {
+		r.playersCount.Add(1)
+	}
 }
 
 // Remove drops the object with the given id from r, if present.
 func (r *Region) Remove(id int32) {
 	r.mu.Lock()
-	defer r.mu.Unlock()
-	delete(r.objects, id)
+	obj, ok := r.objects[id]
+	if ok {
+		delete(r.objects, id)
+	}
+	r.mu.Unlock()
+	if ok {
+		if _, isPlayer := obj.(Player); isPlayer {
+			r.playersCount.Add(-1)
+		}
+	}
 }
 
 // removeIfSame drops the object registered under id only if it is still
@@ -41,11 +72,16 @@ func (r *Region) Remove(id int32) {
 // safe no-op instead of evicting the object that legitimately owns id now.
 func (r *Region) removeIfSame(id int32, obj Tracked) bool {
 	r.mu.Lock()
-	defer r.mu.Unlock()
-	if cur, ok := r.objects[id]; !ok || cur != obj {
+	cur, ok := r.objects[id]
+	if !ok || cur != obj {
+		r.mu.Unlock()
 		return false
 	}
 	delete(r.objects, id)
+	r.mu.Unlock()
+	if _, isPlayer := obj.(Player); isPlayer {
+		r.playersCount.Add(-1)
+	}
 	return true
 }
 
