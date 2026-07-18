@@ -21,7 +21,11 @@ type Options struct {
 	ObstacleWeight  int
 	HeuristicWeight int
 	MaxIterations   int
-	Bidirectional   bool
+
+	// Bidirectional searches from both ends and stops at the first frontier
+	// meet, including queued nodes, so tied paths can report a different cost
+	// than the single-frontier search.
+	Bidirectional bool
 }
 
 // DefaultOptions returns the shipped pathfinding defaults.

@@ -62,6 +62,7 @@ func (f *Finder) find(dst []location.Location, origin, target location.Location,
 	start := scratch.newNodeFromWorld(origin.X, origin.Y, int(f.engine.Height(origin.X, origin.Y, origin.Z)))
 	start.nswe = f.engine.NSWENearest(start.gx, start.gy, start.z)
 	goal := scratch.newNodeFromWorld(target.X, target.Y, int(f.engine.Height(target.X, target.Y, target.Z)))
+	goal.nswe = f.engine.NSWENearest(goal.gx, goal.gy, goal.z)
 
 	if start.key() == goal.key() {
 		return dst, 0, true
@@ -375,12 +376,10 @@ func (f *Finder) expandForward(current, goal *node, seq *int64, scratch *searchS
 }
 
 func (f *Finder) expandBackward(current, goal *node, seq *int64, scratch *searchScratch) {
-	z := current.z + block.CellIgnoreHeight
-
 	for _, step := range cardinalSteps {
 		gx, gy := current.gx-step.dx, current.gy-step.dy
-		height, nswe, ok := f.candidateNSWE(gx, gy, z)
-		if !ok || !nswe.Allows(step.flag) || !f.candidateHeightMatches(current.gx, current.gy, height+block.CellIgnoreHeight, current.z) {
+		height, nswe, ok := f.backwardCandidateNSWE(gx, gy, current)
+		if !ok || !nswe.Allows(step.flag) {
 			continue
 		}
 		f.addBackwardCandidate(current, goal, seq, scratch, gx, gy, height, nswe, false)
@@ -390,7 +389,7 @@ func (f *Finder) expandBackward(current, goal *node, seq *int64, scratch *search
 		flagX := cardinalSteps[corner.xDir].flag
 		flagY := cardinalSteps[corner.yDir].flag
 		gx, gy := current.gx-corner.dx, current.gy-corner.dy
-		height, nswe, ok := f.candidateNSWE(gx, gy, z)
+		height, nswe, ok := f.backwardCandidateNSWE(gx, gy, current)
 		if !ok || !nswe.Allows(flagX|flagY) {
 			continue
 		}
@@ -402,13 +401,6 @@ func (f *Finder) expandBackward(current, goal *node, seq *int64, scratch *search
 		}
 		_, nsweY, ok := f.candidateNSWE(gx, gy+corner.dy, candidateZ)
 		if !ok || !nsweY.Allows(flagX) {
-			continue
-		}
-		_, recheckNSWE, ok := f.candidateNSWE(gx+corner.dx, gy, candidateZ)
-		if !ok || !recheckNSWE.Allows(flagY) {
-			continue
-		}
-		if !f.candidateHeightMatches(current.gx, current.gy, candidateZ, current.z) {
 			continue
 		}
 		f.addBackwardCandidate(current, goal, seq, scratch, gx, gy, height, nswe, true)
@@ -432,6 +424,29 @@ func (f *Finder) candidateNSWE(gx, gy, z int) (height int, nswe block.NSWE, ok b
 func (f *Finder) candidateHeightMatches(gx, gy, z, wantHeight int) bool {
 	height, _, ok := f.candidateNSWE(gx, gy, z)
 	return ok && height == wantHeight
+}
+
+func (f *Finder) backwardCandidateNSWE(gx, gy int, current *node) (height int, nswe block.NSWE, ok bool) {
+	worldX, worldY := engine.WorldX(gx), engine.WorldY(gy)
+	if engine.OutOfWorld(worldX, worldY) {
+		return 0, 0, false
+	}
+
+	z := current.z + block.CellIgnoreHeight
+	height, nswe, ok = f.candidateNSWE(gx, gy, z)
+	if ok && f.candidateHeightMatches(current.gx, current.gy, height+block.CellIgnoreHeight, current.z) {
+		return height, nswe, true
+	}
+
+	h, n, found := f.engine.NodeAtOrAbove(gx, gy, z)
+	if !found {
+		return 0, 0, false
+	}
+	height = int(h)
+	if !f.candidateHeightMatches(current.gx, current.gy, height+block.CellIgnoreHeight, current.z) {
+		return 0, 0, false
+	}
+	return height, n, true
 }
 
 // addCandidate dedups against already explored/queued nodes, weights the grid
