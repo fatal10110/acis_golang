@@ -55,6 +55,48 @@ func TestRegion_ActiveToggle(t *testing.T) {
 	}
 }
 
+type activeTrackedStub struct {
+	trackedStub
+	activeCalls   int
+	inactiveCalls int
+}
+
+func (s *activeTrackedStub) OnActiveRegion() {
+	s.activeCalls++
+}
+
+func (s *activeTrackedStub) OnInactiveRegion() {
+	s.inactiveCalls++
+}
+
+func TestRegion_ActiveToggleNotifiesObjectsOncePerTransition(t *testing.T) {
+	r := newRegion(0, 0)
+	obj := &activeTrackedStub{trackedStub: trackedStub{id: 1}}
+	r.Add(obj)
+	obj.activeCalls = 0
+	obj.inactiveCalls = 0
+
+	r.setActive(true)
+	r.setActive(true)
+
+	if obj.activeCalls != 1 {
+		t.Fatalf("active calls = %d, want 1", obj.activeCalls)
+	}
+	if obj.inactiveCalls != 0 {
+		t.Fatalf("inactive calls = %d, want 0", obj.inactiveCalls)
+	}
+
+	r.setActive(false)
+	r.setActive(false)
+
+	if obj.activeCalls != 1 {
+		t.Fatalf("active calls after deactivate = %d, want 1", obj.activeCalls)
+	}
+	if obj.inactiveCalls != 1 {
+		t.Fatalf("inactive calls = %d, want 1", obj.inactiveCalls)
+	}
+}
+
 func TestRegion_Concurrent(t *testing.T) {
 	r := newRegion(0, 0)
 

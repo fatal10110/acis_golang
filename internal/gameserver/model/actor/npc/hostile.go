@@ -6,6 +6,7 @@ import (
 	"math"
 	"math/rand"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
@@ -53,6 +54,8 @@ type Hostile struct {
 	deathMu sync.Mutex
 	dead    bool
 	decayed bool
+
+	regionInactive atomic.Bool
 
 	spoil          item.SpoilPool
 	seed           SeedState
@@ -165,18 +168,29 @@ func (h *Hostile) AddHate(attacker attackable.Combatant, hate float64) {
 
 // Tick advances the hostile AI clock once.
 func (h *Hostile) Tick() {
+	if !h.canRunAI() {
+		return
+	}
 	h.brain.Tick()
 }
 
 // Think runs one hostile AI decision cycle.
 func (h *Hostile) Think() {
+	if !h.canRunAI() {
+		return
+	}
 	h.brain.Think()
 }
 
 // OnInactiveRegion applies the hostile-NPC reset that aCis runs when the
 // owning world region deactivates.
 func (h *Hostile) OnInactiveRegion() {
-	h.brain.SetBackToPeace()
+	h.enterInactiveRegion()
+}
+
+// OnActiveRegion clears the deactivation latch once players wake the region.
+func (h *Hostile) OnActiveRegion() {
+	h.regionInactive.Store(false)
 }
 
 // SleepWhenRegionInactive reports whether the AI task should pause this NPC
@@ -184,6 +198,30 @@ func (h *Hostile) OnInactiveRegion() {
 // keep ticking, matching the oracle's deactivation exemption.
 func (h *Hostile) SleepWhenRegionInactive() bool {
 	return !h.Instance.Template.NoSleepMode && h.InTerritory()
+}
+
+func (h *Hostile) canRunAI() bool {
+	if h.world == nil {
+		h.regionInactive.Store(false)
+		return true
+	}
+	placed, active := h.world.RegionActivity(h)
+	if !placed {
+		h.regionInactive.Store(false)
+		return false
+	}
+	if !active {
+		h.enterInactiveRegion()
+		return !h.SleepWhenRegionInactive()
+	}
+	h.regionInactive.Store(false)
+	return true
+}
+
+func (h *Hostile) enterInactiveRegion() {
+	if h.regionInactive.CompareAndSwap(false, true) {
+		h.brain.SetBackToPeace()
+	}
 }
 
 // SiegeGuard reports whether this NPC is a defensive siege guard.
