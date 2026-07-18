@@ -26,14 +26,20 @@ type AIActor interface {
 type AI struct {
 	state *world.State
 
-	mu     sync.RWMutex
-	actors map[int32]AIActor
+	mu       sync.RWMutex
+	actors   map[int32]AIActor
+	inactive map[int32]struct{}
 }
 
 // NewAI returns an empty active-AI registry. A nil state treats every actor
-// as active.
+// as active. When state is non-nil, registered actors must already be
+// spawned into it; off-grid actors are not ticked.
 func NewAI(state *world.State) *AI {
-	return &AI{state: state, actors: make(map[int32]AIActor)}
+	return &AI{
+		state:    state,
+		actors:   make(map[int32]AIActor),
+		inactive: make(map[int32]struct{}),
+	}
 }
 
 // Start launches the fixed one-second AI task.
@@ -49,6 +55,7 @@ func (a *AI) Add(actor AIActor) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.actors[actor.ObjectID()] = actor
+	delete(a.inactive, actor.ObjectID())
 }
 
 // Remove unregisters actor from recurring AI ticks.
@@ -59,9 +66,11 @@ func (a *AI) Remove(actor AIActor) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	delete(a.actors, actor.ObjectID())
+	delete(a.inactive, actor.ObjectID())
 }
 
-// Tick runs one AI cycle for every registered actor in an active region.
+// Tick runs one AI cycle for every registered actor in an active region,
+// and for inactive-region actors that explicitly opt out of sleeping.
 func (a *AI) Tick() {
 	a.mu.RLock()
 	actors := make([]AIActor, 0, len(a.actors))
@@ -71,14 +80,42 @@ func (a *AI) Tick() {
 	a.mu.RUnlock()
 
 	for _, actor := range actors {
-		if !a.regionActive(actor) {
+		placed, active := regionActivity(a.state, actor)
+		switch {
+		case !placed:
+			a.clearInactive(actor)
 			continue
+		case active:
+			a.clearInactive(actor)
+		default:
+			if a.markInactive(actor) {
+				notifyInactiveRegion(actor)
+			}
+			if sleepsWhenRegionInactive(actor) {
+				continue
+			}
 		}
 		actor.Tick()
 		actor.Think()
 	}
 }
 
-func (a *AI) regionActive(actor AIActor) bool {
-	return a.state == nil || a.state.RegionActive(actor)
+func (a *AI) markInactive(actor AIActor) bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	id := actor.ObjectID()
+	if _, ok := a.actors[id]; !ok {
+		return false
+	}
+	if _, ok := a.inactive[id]; ok {
+		return false
+	}
+	a.inactive[id] = struct{}{}
+	return true
+}
+
+func (a *AI) clearInactive(actor AIActor) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	delete(a.inactive, actor.ObjectID())
 }

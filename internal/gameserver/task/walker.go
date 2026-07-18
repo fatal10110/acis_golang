@@ -104,7 +104,8 @@ type walkerEntry struct {
 }
 
 // NewWalker returns a route walker over loaded walkerRoutes.xml data. A nil
-// state treats every walker as active.
+// state treats every walker as active. When state is non-nil, registered
+// actors must already be spawned into it; off-grid actors are not ticked.
 func NewWalker(routes route.WalkerRoutes, path WalkerPath, now func() time.Time, state *world.State) (*Walker, error) {
 	if path == nil {
 		return nil, errors.New("task: walker path is nil")
@@ -225,9 +226,6 @@ func (w *Walker) Tick() []error {
 	now := w.now()
 	var errs []error
 	for id, entry := range w.entries {
-		if !w.regionActive(entry.actor) {
-			continue
-		}
 		if entry.wakeTime.IsZero() || now.Before(entry.wakeTime) {
 			continue
 		}
@@ -242,11 +240,12 @@ func (w *Walker) Tick() []error {
 	return errs
 }
 
-func (w *Walker) regionActive(actor WalkerActor) bool {
-	return w.state == nil || w.state.RegionActive(actor)
-}
-
 func (w *Walker) moveToNextPoint(entry *walkerEntry) error {
+	if !canWorkInRegion(w.state, entry.actor) {
+		entry.wakeTime = w.now().Add(WalkerTick)
+		return nil
+	}
+
 	nodes, err := w.nodes(entry.route, entry.npc)
 	if err != nil {
 		entry.onRoute = false

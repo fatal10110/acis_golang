@@ -18,7 +18,7 @@ func TestWalkerStartRouteUsesNearestNodeAndAdvances(t *testing.T) {
 		},
 	}
 	actor := &walkerActorStub{id: 1, pos: loc(140)}
-	w := newTestWalker(t, routes, &walkerPathStub{canMove: true}, nil)
+	w := newTestWalker(t, routes, &walkerPathStub{canMove: true}, nil, nil)
 
 	if err := w.StartRoute(actor, "patrol", "guard"); err != nil {
 		t.Fatal(err)
@@ -49,7 +49,7 @@ func TestWalkerArrivedSchedulesDelayAndTickReleases(t *testing.T) {
 	}
 	now := time.Unix(100, 0)
 	actor := &walkerActorStub{id: 1, pos: loc(0)}
-	w := newTestWalker(t, routes, &walkerPathStub{canMove: true}, func() time.Time { return now })
+	w := newTestWalker(t, routes, &walkerPathStub{canMove: true}, func() time.Time { return now }, nil)
 
 	if err := w.StartRoute(actor, "patrol", "guard"); err != nil {
 		t.Fatal(err)
@@ -98,7 +98,7 @@ func TestWalkerReversesWhenNoPathFromRouteEnd(t *testing.T) {
 	}
 	path := &walkerPathStub{canMove: true}
 	actor := &walkerActorStub{id: 1, pos: loc(100)}
-	w := newTestWalker(t, routes, path, nil)
+	w := newTestWalker(t, routes, path, nil, nil)
 
 	if err := w.StartRoute(actor, "patrol", "guard"); err != nil {
 		t.Fatal(err)
@@ -135,7 +135,7 @@ func TestWalkerTeleportsAfterRepeatedPathFailures(t *testing.T) {
 		},
 	}
 	actor := &walkerActorStub{id: 1, pos: loc(0), geoFails: walkerGeoFailLimit}
-	w := newTestWalker(t, routes, &walkerPathStub{canMove: true}, nil)
+	w := newTestWalker(t, routes, &walkerPathStub{canMove: true}, nil, nil)
 
 	if err := w.StartRoute(actor, "patrol", "guard"); err != nil {
 		t.Fatal(err)
@@ -155,7 +155,7 @@ func TestWalkerTeleportsAfterRepeatedPathFailures(t *testing.T) {
 }
 
 func TestWalkerRouteValidation(t *testing.T) {
-	w := newTestWalker(t, route.WalkerRoutes{"patrol": {"guard": nil}}, &walkerPathStub{canMove: true}, nil)
+	w := newTestWalker(t, route.WalkerRoutes{"patrol": {"guard": nil}}, &walkerPathStub{canMove: true}, nil, nil)
 	actor := &walkerActorStub{id: 1}
 
 	tests := []struct {
@@ -186,7 +186,7 @@ func TestWalkerMoveErrorsAreReturned(t *testing.T) {
 	wantErr := errors.New("move failed")
 	routes := route.WalkerRoutes{"patrol": {"guard": {walkerNode(0)}}}
 	actor := &walkerActorStub{id: 1, moveErr: wantErr}
-	w := newTestWalker(t, routes, &walkerPathStub{canMove: true}, nil)
+	w := newTestWalker(t, routes, &walkerPathStub{canMove: true}, nil, nil)
 
 	if err := w.StartRoute(actor, "patrol", "guard"); !errors.Is(err, wantErr) {
 		t.Fatalf("StartRoute() error = %v, want %v", err, wantErr)
@@ -205,7 +205,7 @@ func TestWalkerTickRetriesRejectedMove(t *testing.T) {
 	}
 	now := time.Unix(100, 0)
 	actor := &walkerActorStub{id: 1, pos: loc(0)}
-	w := newTestWalker(t, routes, &walkerPathStub{canMove: true}, func() time.Time { return now })
+	w := newTestWalker(t, routes, &walkerPathStub{canMove: true}, func() time.Time { return now }, nil)
 
 	if err := w.StartRoute(actor, "patrol", "guard"); err != nil {
 		t.Fatal(err)
@@ -239,7 +239,7 @@ func TestWalkerTickSkipsInactiveRegions(t *testing.T) {
 	state := world.New()
 	inactive := &walkerActorStub{id: 1, pos: loc(0)}
 	active := &walkerActorStub{id: 2, pos: loc(8192)}
-	player := &walkerPlayerStub{id: 3}
+	player := &playerStub{id: 3}
 	spawnWalker(state, inactive)
 	spawnWalker(state, active)
 	state.Spawn(player, active.pos.X, active.pos.Y, active.pos.Z, 0)
@@ -254,6 +254,60 @@ func TestWalkerTickSkipsInactiveRegions(t *testing.T) {
 
 	assertMoves(t, inactive)
 	assertMoves(t, active, loc(8292))
+}
+
+func TestWalkerArrivedQueuesZeroDelayWhileInactive(t *testing.T) {
+	routes := route.WalkerRoutes{
+		"patrol": {"guard": {walkerNode(0), walkerNode(100)}},
+	}
+	now := time.Unix(100, 0)
+	state := world.New()
+	actor := &walkerActorStub{id: 1, pos: loc(0)}
+	player := &playerStub{id: 2}
+	spawnWalker(state, actor)
+	state.Spawn(player, actor.pos.X, actor.pos.Y, actor.pos.Z, 0)
+	w := newTestWalker(t, routes, &walkerPathStub{canMove: true}, func() time.Time { return now }, state)
+
+	if err := w.StartRoute(actor, "patrol", "guard"); err != nil {
+		t.Fatal(err)
+	}
+	state.Despawn(player)
+	if err := w.Arrived(actor); err != nil {
+		t.Fatal(err)
+	}
+	assertMoves(t, actor, loc(0))
+
+	now = now.Add(WalkerTick)
+	if errs := w.Tick(); len(errs) != 0 {
+		t.Fatalf("Tick() errors = %v", errs)
+	}
+	assertMoves(t, actor, loc(0))
+
+	state.Spawn(player, actor.pos.X, actor.pos.Y, actor.pos.Z, 0)
+	now = now.Add(WalkerTick)
+	if errs := w.Tick(); len(errs) != 0 {
+		t.Fatalf("Tick() errors = %v", errs)
+	}
+	assertMoves(t, actor, loc(0), loc(100))
+}
+
+func TestWalkerNoSleepInactiveActorKeepsMoving(t *testing.T) {
+	routes := route.WalkerRoutes{
+		"patrol": {"guard": {walkerNode(0), walkerNode(100)}},
+	}
+	state := world.New()
+	actor := &walkerActorStub{id: 1, pos: loc(0), keepAwakeInactive: true}
+	spawnWalker(state, actor)
+	w := newTestWalker(t, routes, &walkerPathStub{canMove: true}, nil, state)
+
+	if err := w.StartRoute(actor, "patrol", "guard"); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Arrived(actor); err != nil {
+		t.Fatal(err)
+	}
+
+	assertMoves(t, actor, loc(0), loc(100))
 }
 
 // allocFreeWalkerActor is a zero-allocation WalkerActor stub for allocation-
@@ -300,7 +354,7 @@ func TestWalkerTickAllocs(t *testing.T) {
 
 	t.Run("no-release path", func(t *testing.T) {
 		actor := &allocFreeWalkerActor{id: 1, pos: loc(0)}
-		w := newTestWalker(t, routes, path, func() time.Time { return now })
+		w := newTestWalker(t, routes, path, func() time.Time { return now }, nil)
 		if err := w.StartRoute(actor, "patrol", "guard"); err != nil {
 			t.Fatal(err)
 		}
@@ -318,7 +372,7 @@ func TestWalkerTickAllocs(t *testing.T) {
 
 	t.Run("release path", func(t *testing.T) {
 		actor := &allocFreeWalkerActor{id: 1, pos: loc(0)}
-		w := newTestWalker(t, routes, path, func() time.Time { return now })
+		w := newTestWalker(t, routes, path, func() time.Time { return now }, nil)
 		if err := w.StartRoute(actor, "patrol", "guard"); err != nil {
 			t.Fatal(err)
 		}
@@ -379,16 +433,17 @@ func TestGeoPathUsesFinderPathCheck(t *testing.T) {
 type walkerActorStub struct {
 	world.Presence
 
-	id            int32
-	pos           location.Location
-	moving        bool
-	moves         []location.Location
-	teleports     []location.Location
-	says          []int
-	socials       []int
-	geoFails      int
-	resetGeoFails int
-	moveErr       error
+	id                int32
+	pos               location.Location
+	moving            bool
+	moves             []location.Location
+	teleports         []location.Location
+	says              []int
+	socials           []int
+	geoFails          int
+	resetGeoFails     int
+	moveErr           error
+	keepAwakeInactive bool
 }
 
 func (a *walkerActorStub) ObjectID() int32 { return a.id }
@@ -423,15 +478,7 @@ func (a *walkerActorStub) SayNPCString(id int) { a.says = append(a.says, id) }
 
 func (a *walkerActorStub) SocialAction(id int) { a.socials = append(a.socials, id) }
 
-type walkerPlayerStub struct {
-	world.Presence
-
-	id int32
-}
-
-func (p *walkerPlayerStub) ObjectID() int32 { return p.id }
-
-func (p *walkerPlayerStub) WorldPlayer() {}
+func (a *walkerActorStub) SleepWhenRegionInactive() bool { return !a.keepAwakeInactive }
 
 type walkerPathStub struct {
 	canMove bool
@@ -520,13 +567,9 @@ func spawnWalker(state *world.State, actor *walkerActorStub) {
 	state.Spawn(actor, actor.pos.X, actor.pos.Y, actor.pos.Z, 0)
 }
 
-func newTestWalker(t *testing.T, routes route.WalkerRoutes, path WalkerPath, now func() time.Time, state ...*world.State) *Walker {
+func newTestWalker(t *testing.T, routes route.WalkerRoutes, path WalkerPath, now func() time.Time, state *world.State) *Walker {
 	t.Helper()
-	var active *world.State
-	if len(state) != 0 {
-		active = state[0]
-	}
-	w, err := NewWalker(routes, path, now, active)
+	w, err := NewWalker(routes, path, now, state)
 	if err != nil {
 		t.Fatal(err)
 	}

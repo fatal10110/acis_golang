@@ -96,7 +96,7 @@ func TestAIManagerTickSkipsInactiveRegions(t *testing.T) {
 	mgr := NewAI(state)
 	inactive := &aiActorStub{id: 1}
 	active := &aiActorStub{id: 2}
-	player := &aiPlayerStub{id: 3}
+	player := &playerStub{id: 3}
 
 	state.Spawn(inactive, 0, 0, 0, 0)
 	state.Spawn(active, 8192, 0, 0, 0)
@@ -114,14 +114,69 @@ func TestAIManagerTickSkipsInactiveRegions(t *testing.T) {
 	}
 }
 
+func TestAIManagerInactiveRegionResetsOnceAndSleeps(t *testing.T) {
+	state := world.New()
+	mgr := NewAI(state)
+	actor := &aiActorStub{id: 1}
+
+	state.Spawn(actor, 0, 0, 0, 0)
+	mgr.Add(actor)
+
+	mgr.Tick()
+	mgr.Tick()
+
+	if actor.inactiveCalls != 1 {
+		t.Fatalf("inactive calls = %d, want 1", actor.inactiveCalls)
+	}
+	if actor.ticks != 0 || actor.thinks != 0 {
+		t.Fatalf("inactive actor ticks/thinks = %d/%d, want 0/0", actor.ticks, actor.thinks)
+	}
+
+	player := &playerStub{id: 2}
+	state.Spawn(player, 0, 0, 0, 0)
+	mgr.Tick()
+
+	if actor.ticks != 1 || actor.thinks != 1 {
+		t.Fatalf("reactivated actor ticks/thinks = %d/%d, want 1/1", actor.ticks, actor.thinks)
+	}
+
+	state.Despawn(player)
+	mgr.Tick()
+
+	if actor.inactiveCalls != 2 {
+		t.Fatalf("inactive calls after second inactive stretch = %d, want 2", actor.inactiveCalls)
+	}
+}
+
+func TestAIManagerNoSleepInactiveActorKeepsTickingAfterReset(t *testing.T) {
+	state := world.New()
+	mgr := NewAI(state)
+	actor := &aiActorStub{id: 1, keepAwakeInactive: true}
+
+	state.Spawn(actor, 0, 0, 0, 0)
+	mgr.Add(actor)
+
+	mgr.Tick()
+	mgr.Tick()
+
+	if actor.inactiveCalls != 1 {
+		t.Fatalf("inactive calls = %d, want 1", actor.inactiveCalls)
+	}
+	if actor.ticks != 2 || actor.thinks != 2 {
+		t.Fatalf("no-sleep actor ticks/thinks = %d/%d, want 2/2", actor.ticks, actor.thinks)
+	}
+}
+
 type aiActorStub struct {
 	world.Presence
 
-	mu      sync.Mutex
-	id      int32
-	ticks   int
-	thinks  int
-	thinkFn func()
+	mu                sync.Mutex
+	id                int32
+	ticks             int
+	thinks            int
+	inactiveCalls     int
+	keepAwakeInactive bool
+	thinkFn           func()
 }
 
 func (a *aiActorStub) ObjectID() int32 { return a.id }
@@ -142,12 +197,10 @@ func (a *aiActorStub) Think() {
 	}
 }
 
-type aiPlayerStub struct {
-	world.Presence
-
-	id int32
+func (a *aiActorStub) OnInactiveRegion() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.inactiveCalls++
 }
 
-func (p *aiPlayerStub) ObjectID() int32 { return p.id }
-
-func (p *aiPlayerStub) WorldPlayer() {}
+func (a *aiActorStub) SleepWhenRegionInactive() bool { return !a.keepAwakeInactive }
