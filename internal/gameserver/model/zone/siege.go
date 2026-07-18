@@ -1,7 +1,7 @@
 package zone
 
 import (
-	"sync"
+	"sync/atomic"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 )
@@ -32,9 +32,7 @@ type Siege struct {
 	// battlefield; nil until the teleport system wires it.
 	Banish func(a Actor)
 
-	// amu guards active.
-	amu    sync.RWMutex
-	active bool
+	active atomic.Bool
 }
 
 // NewSiege builds a siege battlefield zone from its data settings.
@@ -59,9 +57,7 @@ func (z *Siege) affects(Actor) bool { return true }
 
 // Active reports whether the siege is currently running.
 func (z *Siege) Active() bool {
-	z.amu.RLock()
-	defer z.amu.RUnlock()
-	return z.active
+	return z.active.Load()
 }
 
 func (z *Siege) enter(a Actor) {
@@ -109,9 +105,7 @@ func (z *Siege) exit(a Actor) {
 // rules for everyone already inside; turning it off strips the combat
 // state from them (without the leave-battlefield pvp flag).
 func (z *Siege) SetActive(v bool) {
-	z.amu.Lock()
-	z.active = v
-	z.amu.Unlock()
+	z.active.Store(v)
 
 	if v {
 		for _, a := range z.Occupants() {
