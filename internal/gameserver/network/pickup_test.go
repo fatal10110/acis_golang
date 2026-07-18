@@ -93,6 +93,81 @@ func TestPickupLiveGroundItemMergesStackAndDeletesGroundRow(t *testing.T) {
 	}
 }
 
+func TestPickupLiveGroundItemBroadcastsAttentionForWeaponAndArmor(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		templateID   int32
+		enchantLevel int
+		messageID    int
+	}{
+		{name: "weapon", templateID: 2375, messageID: serverpackets.SystemMessageAttentionS1PickedUpS2},
+		{name: "enchanted armor", templateID: 1146, enchantLevel: 3, messageID: serverpackets.SystemMessageAttentionS1PickedUpS2S3},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			templates := pickupAttentionTestTemplates()
+			pickerFrames := &frameCapture{}
+			observerFrames := &frameCapture{}
+			farFrames := &frameCapture{}
+			picker := newEquipTestLivePlayer(t, 1, pickerFrames, templates, nil)
+			observer := newEquipTestLivePlayer(t, 2, observerFrames, templates, nil)
+			far := newEquipTestLivePlayer(t, 3, farFrames, templates, nil)
+			state := world.New()
+			state.Spawn(picker, 100, 0, 0, 0)
+			state.Spawn(observer, 200, 0, 0, 0)
+			state.Spawn(far, 100+pickupAttentionRadius+1, 0, 0, 0)
+			drops := task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour}, time.Now)
+			tmpl, _ := templates.Get(tc.templateID)
+			ground := dropTestGround(t, state, drops, item.Instance{
+				ObjectID:     900,
+				TemplateID:   tc.templateID,
+				Count:        1,
+				EnchantLevel: tc.enchantLevel,
+				ManaLeft:     -1,
+			}, tmpl, 100, 0, 0)
+
+			pickerFrames.frames = nil
+			observerFrames.frames = nil
+			farFrames.frames = nil
+			gcl := &GameClientLink{world: state, groundItems: drops}
+
+			gcl.pickupLiveGroundItem(context.Background(), picker, ground)
+
+			assertPickupAttentionFrame(t, firstSystemMessageFrame(pickerFrames.frames), tc.messageID, picker.Name, tc.enchantLevel, tc.templateID)
+			assertPickupAttentionFrame(t, firstSystemMessageFrame(observerFrames.frames), tc.messageID, picker.Name, tc.enchantLevel, tc.templateID)
+			if frame := firstSystemMessageFrame(farFrames.frames); frame != nil {
+				t.Fatalf("far observer received attention SystemMessage frame: % x", frame)
+			}
+		})
+	}
+}
+
+func TestPickupLiveGroundItemSkipsAttentionForEtcItem(t *testing.T) {
+	templates := pickupAttentionTestTemplates()
+	pickerFrames := &frameCapture{}
+	observerFrames := &frameCapture{}
+	picker := newEquipTestLivePlayer(t, 1, pickerFrames, templates, nil)
+	observer := newEquipTestLivePlayer(t, 2, observerFrames, templates, nil)
+	state := world.New()
+	state.Spawn(picker, 100, 0, 0, 0)
+	state.Spawn(observer, 200, 0, 0, 0)
+	drops := task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour}, time.Now)
+	tmpl, _ := templates.Get(item.AdenaID)
+	ground := dropTestGround(t, state, drops, item.Instance{ObjectID: 900, TemplateID: item.AdenaID, Count: 40, ManaLeft: -1}, tmpl, 100, 0, 0)
+
+	pickerFrames.frames = nil
+	observerFrames.frames = nil
+	gcl := &GameClientLink{world: state, groundItems: drops}
+
+	gcl.pickupLiveGroundItem(context.Background(), picker, ground)
+
+	if frame := firstSystemMessageFrame(pickerFrames.frames); frame != nil {
+		t.Fatalf("etc pickup sent picker attention SystemMessage frame: % x", frame)
+	}
+	if frame := firstSystemMessageFrame(observerFrames.frames); frame != nil {
+		t.Fatalf("etc pickup broadcast SystemMessage frame: % x", frame)
+	}
+}
+
 func TestPickupLiveGroundItemRejectsOutOfRange(t *testing.T) {
 	templates := petTestTemplates()
 	capture := &frameCapture{}
@@ -111,6 +186,67 @@ func TestPickupLiveGroundItemRejectsOutOfRange(t *testing.T) {
 	assertOpcodeSequence(t, capture.frames, serverpackets.OpcodeSystemMessage)
 	if _, ok := state.Object(ground.ObjectID()); !ok {
 		t.Fatal("ground item removed after an out-of-range pickup attempt")
+	}
+}
+
+func pickupAttentionTestTemplates() *item.Table {
+	return item.NewTable([]*item.Template{
+		{ID: item.AdenaID, Name: "Adena", Kind: item.KindEtcItem, Duration: -1, Stackable: true, Dropable: true, Tradable: true, Destroyable: true, EtcItem: &item.EtcItemDetail{}},
+		{ID: 2375, Name: "Wolf Tooth", Kind: item.KindWeapon, Slot: item.SlotWolf, Duration: -1, Dropable: true, Tradable: true, Destroyable: true, Weapon: &item.WeaponDetail{Type: item.WeaponPet}},
+		{ID: 1146, Name: "Cotton Shirt", Kind: item.KindArmor, Slot: item.SlotChest, Duration: -1, Dropable: true, Tradable: true, Destroyable: true, Armor: &item.ArmorDetail{Type: item.ArmorLight}},
+	})
+}
+
+func firstSystemMessageFrame(frames [][]byte) []byte {
+	for _, frame := range frames {
+		if len(frame) > 0 && frame[0] == serverpackets.OpcodeSystemMessage {
+			return frame
+		}
+	}
+	return nil
+}
+
+func assertPickupAttentionFrame(t *testing.T, frame []byte, wantID int, wantName string, wantEnchant int, wantItemID int32) {
+	t.Helper()
+	if frame == nil {
+		t.Fatal("missing attention SystemMessage frame")
+	}
+	if frame[0] != serverpackets.OpcodeSystemMessage {
+		t.Fatalf("opcode = %#x, want SystemMessage", frame[0])
+	}
+	r := wire.NewReader(frame[1:])
+	if got := r.ReadInt32(); got != int32(wantID) {
+		t.Fatalf("SystemMessage id = %d, want %d", got, wantID)
+	}
+	wantParams := int32(2)
+	if wantEnchant > 0 {
+		wantParams = 3
+	}
+	if got := r.ReadInt32(); got != wantParams {
+		t.Fatalf("SystemMessage param count = %d, want %d", got, wantParams)
+	}
+	if got := r.ReadInt32(); got != serverpackets.SystemMessageParamText {
+		t.Fatalf("param[0] type = %d, want text", got)
+	}
+	if got := r.ReadString(); got != wantName {
+		t.Fatalf("param[0] text = %q, want %q", got, wantName)
+	}
+	if wantEnchant > 0 {
+		if got := r.ReadInt32(); got != serverpackets.SystemMessageParamNumber {
+			t.Fatalf("param[1] type = %d, want number", got)
+		}
+		if got := r.ReadInt32(); got != int32(wantEnchant) {
+			t.Fatalf("param[1] number = %d, want %d", got, wantEnchant)
+		}
+	}
+	if got := r.ReadInt32(); got != serverpackets.SystemMessageParamItemName {
+		t.Fatalf("item param type = %d, want item name", got)
+	}
+	if got := r.ReadInt32(); got != wantItemID {
+		t.Fatalf("item id = %d, want %d", got, wantItemID)
+	}
+	if err := r.Err(); err != nil {
+		t.Fatalf("decode attention SystemMessage: %v", err)
 	}
 }
 

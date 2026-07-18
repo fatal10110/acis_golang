@@ -14,11 +14,14 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/statbonus"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
-const defaultPlayerAttackSpeed = 300
+const (
+	defaultPlayerAttackSpeed      = 300
+	defaultPlayerMagicAttackSpeed = 333
+)
 
 var weaponRange = map[item.WeaponType]int{
 	item.WeaponBow:  500,
@@ -27,6 +30,7 @@ var weaponRange = map[item.WeaponType]int{
 
 type activeWeapon struct {
 	tmpl *item.Template
+	inst *item.Instance
 }
 
 func (w activeWeapon) stat(stat string, fallback float64) float64 {
@@ -74,7 +78,6 @@ type physicalTarget interface {
 func (c *Character) AttachRuntime(tmpl *Template, inv *itemcontainer.Inventory) {
 	c.runtimeTemplate = tmpl
 	c.inventory = inv
-	c.health.Bind(&c.CurHP)
 	if c.effects == nil {
 		c.effects = effect.NewList(c)
 	}
@@ -128,18 +131,24 @@ func (c *Character) SetLastKnownPosition(position location.Location, heading int
 // SetFrameSender records the session send hook used by network-owned live
 // player wrappers. Passing nil disconnects the character from that session.
 func (c *Character) SetFrameSender(send func(wire.Frame) bool) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
 	c.sendFrame = send
 }
 
 // SetAttackBroadcaster records the packet-layer hook that broadcasts attack
 // snapshots to nearby connected clients.
 func (c *Character) SetAttackBroadcaster(broadcast func(attack.Snapshot)) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
 	c.broadcastAttack = broadcast
 }
 
 // SetMoveBroadcaster records the packet-layer hook that broadcasts movement
 // events to this character's own session and nearby connected clients.
 func (c *Character) SetMoveBroadcaster(broadcast func(move.Event)) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
 	c.broadcastMove = broadcast
 }
 
@@ -147,16 +156,21 @@ func (c *Character) SetMoveBroadcaster(broadcast func(move.Event)) {
 // stop-in-place notice to this character's own session and nearby connected
 // clients when server-driven movement is cancelled mid-flight.
 func (c *Character) SetStopBroadcaster(broadcast func()) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
 	c.broadcastStop = broadcast
 }
 
 // SendFrame sends frame to the connected client, if any.
 func (c *Character) SendFrame(frame wire.Frame) bool {
-	if c.sendFrame == nil {
+	c.stateMu.RLock()
+	send := c.sendFrame
+	c.stateMu.RUnlock()
+	if send == nil {
 		frame.Release()
 		return false
 	}
-	return c.sendFrame(frame)
+	return send(frame)
 }
 
 // SetRollSource overrides MakeAttackHit's random source for deterministic
@@ -203,7 +217,7 @@ func (c *Character) activeWeapon() activeWeapon {
 		return activeWeapon{tmpl: c.fistTemplate()}
 	}
 	if tmpl, ok := c.inventory.Templates().Get(inst.TemplateID); ok && tmpl != nil && tmpl.Weapon != nil {
-		return activeWeapon{tmpl: tmpl}
+		return activeWeapon{tmpl: tmpl, inst: inst}
 	}
 	return activeWeapon{tmpl: c.fistTemplate()}
 }
@@ -263,7 +277,36 @@ func (c *Character) AttackType() item.WeaponType {
 
 // AttackSpeed resolves the equipped weapon's pAtkSpd stat-set value.
 func (c *Character) AttackSpeed() int {
-	return int(c.activeWeapon().stat("pAtkSpd", defaultPlayerAttackSpeed))
+	return int(c.calcStat(stat.PowerAttackSpeed, c.activeWeapon().stat("pAtkSpd", defaultPlayerAttackSpeed)))
+}
+
+// MagicAttackSpeed returns the casting speed used by magic-skill timing.
+func (c *Character) MagicAttackSpeed() int {
+	return int(c.calcStat(stat.MagicAttackSpeed, defaultPlayerMagicAttackSpeed))
+}
+
+// Accuracy returns this player's physical accuracy rating.
+func (c *Character) Accuracy() int {
+	return int(c.calcStat(stat.AccuracyCombat, 0))
+}
+
+// CriticalRate returns this player's physical critical rate.
+func (c *Character) CriticalRate() float64 {
+	return c.calcStat(stat.CriticalRate, c.activeWeapon().stat("rCrit", 4))
+}
+
+// MagicCriticalRate returns this player's magic critical rate.
+func (c *Character) MagicCriticalRate() float64 {
+	return c.calcStat(stat.MCriticalRate, 8)
+}
+
+// RunSpeed returns the current run speed.
+func (c *Character) RunSpeed() float64 {
+	tmpl := c.template()
+	if tmpl == nil {
+		return 0
+	}
+	return c.calcStat(stat.RunSpeed, tmpl.RunSpeed)
 }
 
 // PhysicalAttackRange returns the attack range for the active weapon
@@ -287,7 +330,20 @@ func (c *Character) WeaponGrade() int {
 
 // SoulshotCharged reports whether a soulshot charge is currently active.
 func (c *Character) SoulshotCharged() bool {
-	return false
+	weapon := c.activeWeapon()
+	return weapon.inst != nil && weapon.inst.ChargedShot(item.ShotSoul)
+}
+
+// SpiritshotCharged reports whether a spiritshot charge is currently active.
+func (c *Character) SpiritshotCharged() bool {
+	weapon := c.activeWeapon()
+	return weapon.inst != nil && weapon.inst.ChargedShot(item.ShotSpirit)
+}
+
+// BlessedSpiritshotCharged reports whether a blessed spiritshot charge is currently active.
+func (c *Character) BlessedSpiritshotCharged() bool {
+	weapon := c.activeWeapon()
+	return weapon.inst != nil && weapon.inst.ChargedShot(item.ShotBlessedSpirit)
 }
 
 // SetHeadingTo orients this player toward target.
@@ -317,8 +373,7 @@ func (c *Character) MakeAttackHit(target attackable.Combatant, split bool) attac
 	}
 	weapon := c.activeWeapon()
 
-	dexIdx := statbonus.ClampIndex(tmpl.DEX)
-	accuracy := int(statbonus.BaseEvasionAccuracy[dexIdx]) + c.Level
+	accuracy := c.Accuracy()
 	evasion := other.Evasion()
 
 	_, _, sz := c.Position()
@@ -329,7 +384,7 @@ func (c *Character) MakeAttackHit(target attackable.Combatant, split bool) attac
 		return hit
 	}
 
-	critRate := weapon.stat("rCrit", 4) * statbonus.DEXBonus[dexIdx] * 10
+	critRate := c.CriticalRate()
 	crit := formulas.CritSucceeds(critRate, c.rollValue(1000))
 
 	randomMul := 1.0
@@ -369,23 +424,32 @@ func (c *Character) MakeAttackHit(target attackable.Combatant, split bool) attac
 
 // BroadcastAttack sends an attack snapshot through the runtime packet hook.
 func (c *Character) BroadcastAttack(snapshot attack.Snapshot) {
-	if c.broadcastAttack != nil {
-		c.broadcastAttack(snapshot)
+	c.stateMu.RLock()
+	broadcast := c.broadcastAttack
+	c.stateMu.RUnlock()
+	if broadcast != nil {
+		broadcast(snapshot)
 	}
 }
 
 // BroadcastMove sends a movement event through the runtime packet hook.
 func (c *Character) BroadcastMove(event move.Event) {
-	if c.broadcastMove != nil {
-		c.broadcastMove(event)
+	c.stateMu.RLock()
+	broadcast := c.broadcastMove
+	c.stateMu.RUnlock()
+	if broadcast != nil {
+		broadcast(event)
 	}
 }
 
 // BroadcastStop sends a stop-in-place notice through the runtime packet
 // hook.
 func (c *Character) BroadcastStop() {
-	if c.broadcastStop != nil {
-		c.broadcastStop()
+	c.stateMu.RLock()
+	broadcast := c.broadcastStop
+	c.stateMu.RUnlock()
+	if broadcast != nil {
+		broadcast()
 	}
 }
 
@@ -408,7 +472,7 @@ func (c *Character) CheckAndEquipArrows() bool {
 	if arrows == nil {
 		return false
 	}
-	if arrows.Location == item.LocationPaperdoll {
+	if arrows.Snapshot().Location == item.LocationPaperdoll {
 		return true
 	}
 	tmpl, ok := c.inventory.Templates().Get(arrows.TemplateID)
@@ -433,12 +497,6 @@ func (c *Character) MP() int {
 	return c.CurrentMP()
 }
 
-// CurrentHP returns current HP through the health component guard.
-func (c *Character) CurrentHP() int {
-	c.health.Bind(&c.CurHP)
-	return int(c.health.Current())
-}
-
 // ClearRecentFakeDeath clears the recent fake-death state. Fake death is not
 // modeled yet, so this is a no-op.
 func (c *Character) ClearRecentFakeDeath() {}
@@ -459,16 +517,17 @@ func (c *Character) pAtk(weapon activeWeapon) float64 {
 	if tmpl != nil && tmpl.PAtk > 0 {
 		base = tmpl.PAtk
 	}
-	return weapon.stat("pAtk", base)
+	return c.calcStat(stat.PowerAttack, weapon.stat("pAtk", base))
 }
 
 // PDef returns the current physical defence value.
 func (c *Character) PDef() float64 {
 	tmpl := c.template()
-	if tmpl == nil || tmpl.PDef <= 0 {
-		return 1
+	base := 1.0
+	if tmpl != nil && tmpl.PDef > 0 {
+		base = tmpl.PDef
 	}
-	return tmpl.PDef
+	return c.calcStat(stat.PowerDefence, base)
 }
 
 // Evasion returns this player's physical evasion rating.
@@ -477,7 +536,7 @@ func (c *Character) Evasion() int {
 	if tmpl == nil {
 		return c.Level
 	}
-	return int(statbonus.BaseEvasionAccuracy[statbonus.ClampIndex(tmpl.DEX)]) + c.Level
+	return int(c.calcStat(stat.EvasionRate, 0))
 }
 
 // CollisionRadius returns this player's body radius.
@@ -495,8 +554,7 @@ func (c *Character) CollisionRadius() float64 {
 // TakeDamage applies physical damage and runs the once-only death path when
 // HP reaches zero.
 func (c *Character) TakeDamage(dmg int, attacker creature.DeathActor) bool {
-	c.health.Bind(&c.CurHP)
-	if !c.health.Damage(dmg) {
+	if !c.ReduceCurrentHP(dmg) {
 		return false
 	}
 	return c.Die(attacker)

@@ -13,7 +13,7 @@ import (
 )
 
 func testCharacter(objectID int32, name string) *player.Character {
-	return &player.Character{
+	c := &player.Character{
 		ID:          objectID,
 		AccountName: "acct1",
 		Name:        name,
@@ -22,15 +22,18 @@ func testCharacter(objectID int32, name string) *player.Character {
 		Race:        player.RaceHuman,
 		Sex:         player.SexMale,
 		Level:       1,
-		MaxHP:       80, CurHP: 80,
-		MaxCP: 32, CurCP: 32,
-		MaxMP: 30, CurMP: 30,
-		Face: 1, HairStyle: 2, HairColor: 3,
+		Face:        1, HairStyle: 2, HairColor: 3,
 		Exp: 0, SP: 0,
 		AccessLevel: 0,
 		Location:    location.Location{X: -56733, Y: -113459, Z: -690},
 		LastHeading: 32768,
 	}
+	c.SetResourceValues(player.Resources{
+		MaxHP: 80, CurrentHP: 80,
+		MaxCP: 32, CurrentCP: 32,
+		MaxMP: 30, CurrentMP: 30,
+	})
+	return c
 }
 
 func TestCharacterStore_Get_NotFound(t *testing.T) {
@@ -56,9 +59,11 @@ func TestCharacterStore_CreateAndReadBack(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get() unexpected error: %v", err)
 	}
+	gotRes := got.ResourceValues()
+	wantRes := c.ResourceValues()
 	if got.AccountName != c.AccountName || got.Name != c.Name || got.ClassID != c.ClassID ||
 		got.Race != c.Race || got.Sex != c.Sex || got.Level != c.Level ||
-		got.MaxHP != c.MaxHP || got.CurHP != c.CurHP || got.MaxMP != c.MaxMP || got.MaxCP != c.MaxCP ||
+		gotRes != wantRes ||
 		got.Face != c.Face || got.HairStyle != c.HairStyle || got.HairColor != c.HairColor {
 		t.Fatalf("Get() after create = %+v, want match to %+v", got, c)
 	}

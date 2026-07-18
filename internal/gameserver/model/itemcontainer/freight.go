@@ -32,7 +32,8 @@ func NewFreight(ownerID int32, templates *item.Table) *Freight {
 }
 
 func (f *Freight) visible(inst *item.Instance) bool {
-	return inst.LocationData == 0 || f.ActiveLocation == 0 || inst.LocationData == f.ActiveLocation
+	st := inst.Snapshot()
+	return st.LocationData == 0 || f.ActiveLocation == 0 || st.LocationData == f.ActiveLocation
 }
 
 // VisibleSize returns the number of items visible at the currently active
@@ -101,18 +102,16 @@ func (f *Freight) Add(inst *item.Instance) (result *item.Instance, absorbed bool
 			}
 		}
 		if old != nil {
-			old.Count += inst.Count
+			old.AddCount(inst.Snapshot().Count)
 			return old, true
 		}
 	}
 
-	inst.OwnerID = f.ownerID
-	inst.Location = f.location
+	locData := 0
 	if f.ActiveLocation > 0 {
-		inst.LocationData = f.ActiveLocation
-	} else {
-		inst.LocationData = 0
+		locData = f.ActiveLocation
 	}
+	inst.SetOwnerLocation(f.ownerID, f.location, locData)
 	f.items[inst.ObjectID] = inst
 	return inst, false
 }

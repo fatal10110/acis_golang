@@ -10,7 +10,10 @@ func (inv *Inventory) PackageSendableItems() []*item.Instance {
 	items := inv.Items()
 	out := make([]*item.Instance, 0, len(items))
 	for _, inst := range items {
-		if inst == nil || inst.Location != item.LocationInventory {
+		if inst == nil {
+			continue
+		}
+		if inst.Snapshot().Location != item.LocationInventory {
 			continue
 		}
 		tmpl, ok := inv.Templates().Get(inst.TemplateID)

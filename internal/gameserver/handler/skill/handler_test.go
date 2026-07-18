@@ -100,8 +100,8 @@ func (t *skillTarget) HealEffectiveness() float64 {
 	return t.healEffectiveness
 }
 
-func (t *skillTarget) HP() float64    { return t.hp }
-func (t *skillTarget) MaxHP() float64 { return t.maxHP }
+func (t *skillTarget) HP() float64         { return t.hp }
+func (t *skillTarget) MaxHPValue() float64 { return t.maxHP }
 
 func (t *skillTarget) SetHP(v float64) { t.hp = v }
 
@@ -116,8 +116,8 @@ func (t *skillTarget) AddHP(v float64) float64 {
 	return v
 }
 
-func (t *skillTarget) MaxMP() float64 { return t.maxMP }
-func (t *skillTarget) MP() float64    { return t.mp }
+func (t *skillTarget) MaxMPValue() float64 { return t.maxMP }
+func (t *skillTarget) MPValue() float64    { return t.mp }
 
 func (t *skillTarget) AddMP(v float64) float64 {
 	if t.mp+v > t.maxMP {
@@ -143,8 +143,8 @@ func (t *skillTarget) ReduceMP(v float64) float64 {
 
 func (t *skillTarget) RechargeMP(v float64) float64 { return v * t.recharge }
 
-func (t *skillTarget) CP() float64    { return t.cp }
-func (t *skillTarget) MaxCP() float64 { return t.maxCP }
+func (t *skillTarget) CP() float64         { return t.cp }
+func (t *skillTarget) MaxCPValue() float64 { return t.maxCP }
 func (t *skillTarget) SetCP(v float64) {
 	if v < 0 {
 		v = 0

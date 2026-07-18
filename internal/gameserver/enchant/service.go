@@ -203,7 +203,7 @@ func (s *Service) EnchantItem(playerID int32, inv *itemcontainer.Inventory, obje
 	out.Persist = append(out.Persist, inventory.DestroyedOrUpdated(destroyedScroll))
 
 	chance := scrollDef.chance(target, targetTemplate)
-	if target.OwnerID != playerID || !Enchantable(target, targetTemplate) || chance < 0 {
+	if target.Snapshot().OwnerID != playerID || !Enchantable(target, targetTemplate) || chance < 0 {
 		failed := s.failCondition(playerID)
 		failed.Persist = append(out.Persist, failed.Persist...)
 		failed.Steps = append(failed.Steps, Step{Kind: StepInventoryUpdate})
@@ -234,7 +234,8 @@ func Enchantable(inst *item.Instance, tmpl *item.Template) bool {
 	if tmpl.Weapon != nil && tmpl.Weapon.Type == item.WeaponFishingRod {
 		return false
 	}
-	if inst.Location != item.LocationInventory && inst.Location != item.LocationPaperdoll {
+	st := inst.Snapshot()
+	if st.Location != item.LocationInventory && st.Location != item.LocationPaperdoll {
 		return false
 	}
 	if tmpl.Kind == item.KindWeapon {
@@ -261,7 +262,7 @@ func (s *Service) failCondition(playerID int32) Result {
 }
 
 func (s *Service) success(playerID int32, inv *itemcontainer.Inventory, target *item.Instance, out Result) Result {
-	oldLevel := target.EnchantLevel
+	oldLevel := target.Snapshot().EnchantLevel
 	if oldLevel == 0 {
 		out.Steps = append(out.Steps, messageStep(Message{Code: MessageS1SuccessfullyEnchanted, ItemID: target.TemplateID}))
 	} else {
@@ -285,11 +286,12 @@ func (s *Service) blessedFailure(playerID int32, inv *itemcontainer.Inventory, t
 
 func (s *Service) normalFailure(playerID int32, inv *itemcontainer.Inventory, target *item.Instance, tmpl *item.Template, out Result) (Result, error) {
 	crystalID := tmpl.Crystal.ItemID()
-	crystalCount := BreakCrystalCount(tmpl, target.EnchantLevel)
-	targetLevel := target.EnchantLevel
-	targetID := target.TemplateID
+	st := target.Snapshot()
+	crystalCount := BreakCrystalCount(tmpl, st.EnchantLevel)
+	targetLevel := st.EnchantLevel
+	targetID := st.TemplateID
 
-	if inv.DestroyItem(target, target.Count) == nil {
+	if inv.DestroyItem(target, st.Count) == nil {
 		s.state.Clear(playerID)
 		out.Steps = append(out.Steps, resultStep(ResultCancelled))
 		return out, nil
@@ -348,11 +350,13 @@ func (s scroll) valid(inst *item.Instance, tmpl *item.Template) bool {
 	}
 	switch tmpl.Kind {
 	case item.KindWeapon:
-		if !s.weapon || (maxWeapon > 0 && inst.EnchantLevel >= maxWeapon) {
+		enchantLevel := inst.Snapshot().EnchantLevel
+		if !s.weapon || (maxWeapon > 0 && enchantLevel >= maxWeapon) {
 			return false
 		}
 	case item.KindArmor:
-		if s.weapon || (maxArmor > 0 && inst.EnchantLevel >= maxArmor) {
+		enchantLevel := inst.Snapshot().EnchantLevel
+		if s.weapon || (maxArmor > 0 && enchantLevel >= maxArmor) {
 			return false
 		}
 	default:
@@ -366,20 +370,21 @@ func (s scroll) chance(inst *item.Instance, tmpl *item.Template) float64 {
 		return -1
 	}
 	fullBody := tmpl.Slot == item.SlotFullArmor
-	if inst.EnchantLevel < safeMax || (fullBody && inst.EnchantLevel < safeMaxFull) {
+	enchantLevel := inst.Snapshot().EnchantLevel
+	if enchantLevel < safeMax || (fullBody && enchantLevel < safeMaxFull) {
 		return 1
 	}
 	switch tmpl.Kind {
 	case item.KindArmor:
-		return math.Pow(chanceArmor, float64(inst.EnchantLevel-2))
+		return math.Pow(chanceArmor, float64(enchantLevel-2))
 	case item.KindWeapon:
 		if tmpl.Weapon != nil && tmpl.Weapon.Magical {
-			if inst.EnchantLevel > 14 {
+			if enchantLevel > 14 {
 				return chanceMagicWeapon15Plus
 			}
 			return chanceMagicWeapon
 		}
-		if inst.EnchantLevel > 14 {
+		if enchantLevel > 14 {
 			return chanceWeapon15Plus
 		}
 		return chanceWeapon

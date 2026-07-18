@@ -43,9 +43,9 @@ func liveCharacter(id int32, tmpl *Template, items *item.Table, equipped ...*ite
 	c := &Character{
 		ID: id, Name: "char", ClassID: tmpl.ID, BaseClassID: tmpl.ID,
 		Race: RaceHuman, Sex: SexMale, Level: 1,
-		MaxHP: 100, CurHP: 100, MaxMP: 30, CurMP: 30,
 		Location: location.Location{X: int(id) * 100, Y: 0, Z: 0},
 	}
+	c.SetResourceValues(Resources{MaxHP: 100, CurrentHP: 100, MaxMP: 30, CurrentMP: 30})
 	c.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventory(c.ID, items, equipped))
 	c.SetRollSource(zeroRoll)
 	return c
@@ -61,8 +61,8 @@ func TestCharacterAttackUsesEquippedRightHandWeapon(t *testing.T) {
 	if got := c.AttackType(); got != item.WeaponSword {
 		t.Fatalf("AttackType() = %v, want equipped sword", got)
 	}
-	if got := c.AttackSpeed(); got != 433 {
-		t.Fatalf("AttackSpeed() = %d, want equipped weapon pAtkSpd", got)
+	if got := c.AttackSpeed(); got != 476 {
+		t.Fatalf("AttackSpeed() = %d, want DEX-adjusted equipped weapon speed", got)
 	}
 	if got := c.WeaponReuseDelay(); got != 1200*time.Millisecond {
 		t.Fatalf("WeaponReuseDelay() = %s, want 1200ms", got)
@@ -80,8 +80,8 @@ func TestCharacterAttackFallsBackToTemplateFists(t *testing.T) {
 	if got := c.AttackType(); got != item.WeaponFist {
 		t.Fatalf("AttackType() = %v, want template fists", got)
 	}
-	if got := c.AttackSpeed(); got != 300 {
-		t.Fatalf("AttackSpeed() = %d, want fists pAtkSpd", got)
+	if got := c.AttackSpeed(); got != 330 {
+		t.Fatalf("AttackSpeed() = %d, want DEX-adjusted fists speed", got)
 	}
 }
 
@@ -92,7 +92,7 @@ func TestCharacterPhysicalAttackResolvesLethalHit(t *testing.T) {
 		ObjectID: 10, TemplateID: 2, Location: item.LocationPaperdoll, LocationData: itemcontainer.RHand,
 	})
 	defender := liveCharacter(2, tmpl, items)
-	defender.CurHP = 100
+	defender.SetHP(100)
 
 	state := world.New()
 	state.Spawn(attacker, 0, 0, 0, 0)
@@ -110,8 +110,8 @@ func TestCharacterPhysicalAttackResolvesLethalHit(t *testing.T) {
 	if !defender.Dead() {
 		t.Fatal("defender.Dead() = false after lethal player attack")
 	}
-	if defender.CurHP != 0 {
-		t.Fatalf("defender.CurHP = %v, want 0 after lethal attack", defender.CurHP)
+	if got := defender.HP(); got != 0 {
+		t.Fatalf("defender HP = %v, want 0 after lethal attack", got)
 	}
 }
 

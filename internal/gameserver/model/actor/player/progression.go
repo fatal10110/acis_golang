@@ -128,9 +128,7 @@ func (c *Character) AddLevel(table *LevelTable, tmpl *Template, delta int) bool 
 	}
 
 	if idx := c.Level - 1; tmpl != nil && idx >= 0 && idx < len(tmpl.HPTable) && idx < len(tmpl.MPTable) && idx < len(tmpl.CPTable) {
-		c.MaxHP, c.CurHP = tmpl.HPTable[idx], tmpl.HPTable[idx]
-		c.MaxMP, c.CurMP = tmpl.MPTable[idx], tmpl.MPTable[idx]
-		c.MaxCP, c.CurCP = tmpl.CPTable[idx], tmpl.CPTable[idx]
+		c.refillResources(tmpl.HPTable[idx], tmpl.MPTable[idx], tmpl.CPTable[idx])
 	}
 	return true
 }

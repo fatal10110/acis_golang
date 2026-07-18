@@ -3,6 +3,7 @@ package network
 import (
 	"context"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -10,6 +11,8 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	gamemanager "github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
@@ -103,6 +106,44 @@ func TestDetachLivePlayerStopsAttackIntention(t *testing.T) {
 	if attacker.combat.Target() != nil {
 		t.Fatalf("attack intention target = %v after detach, want nil", attacker.combat.Target())
 	}
+}
+
+func TestDetachLivePlayerRacesNoHookAccess(t *testing.T) {
+	state := world.New()
+	gcl := &GameClientLink{world: state, log: zerolog.Nop()}
+	attacker := newTestLivePlayer(t, 1, &frameCapture{})
+	target := newTestLivePlayer(t, 2, &frameCapture{})
+	state.Spawn(attacker, 0, 0, 0, 0)
+	state.Spawn(target, 30, 0, 0, 0)
+	state.AddPlayer(attacker)
+	state.AddPlayer(target)
+
+	snapshot := attack.Snapshot{AttackerID: attacker.ObjectID(), Hits: []attack.SnapshotHit{{TargetID: target.ObjectID(), Damage: 1}}}
+	send := func(wire.Frame) bool { return true }
+
+	const iterations = 1000
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			gcl.broadcastAttack(attacker, snapshot)
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			target.Character.SetFrameSender(send)
+			target.Character.SetAttackBroadcaster(func(attack.Snapshot) {})
+			target.Character.SetMoveBroadcaster(func(move.Event) {})
+			target.Character.SetStopBroadcaster(func() {})
+			target.Character.SetFrameSender(nil)
+			target.Character.SetAttackBroadcaster(nil)
+			target.Character.SetMoveBroadcaster(nil)
+			target.Character.SetStopBroadcaster(nil)
+		}
+	}()
+	wg.Wait()
 }
 
 func TestGameClientLinkLogoutLeavesWorld(t *testing.T) {

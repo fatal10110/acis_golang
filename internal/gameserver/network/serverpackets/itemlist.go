@@ -29,10 +29,11 @@ func FrameItemList(items []*item.Instance, templates *item.Table, showWindow boo
 }
 
 func writeItemList(w *wire.Writer, items []*item.Instance, templates *item.Table, showWindow bool) error {
-	owned := make([]*item.Instance, 0, len(items))
+	owned := make([]item.InstanceState, 0, len(items))
 	for _, it := range items {
-		if it.Location == item.LocationInventory || it.Location == item.LocationPaperdoll {
-			owned = append(owned, it)
+		st := it.Snapshot()
+		if st.Location == item.LocationInventory || st.Location == item.LocationPaperdoll {
+			owned = append(owned, st)
 		}
 	}
 

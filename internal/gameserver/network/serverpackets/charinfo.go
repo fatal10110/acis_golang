@@ -28,6 +28,7 @@ func FrameCharInfo(s CharInfoSnapshot) wire.Frame {
 func writeCharInfo(w *wire.Writer, s CharInfoSnapshot) {
 	c, t := s.Character, s.Template
 	x, y, z := c.Position()
+	resources := c.ResourceValues()
 	paperdoll := item.Paperdoll(s.Items)
 
 	collisionRadius, collisionHeight := t.CollisionRadius, t.CollisionHeight
@@ -107,8 +108,8 @@ func writeCharInfo(w *wire.Writer, s CharInfoSnapshot) {
 	w.WriteUint8(0)  // recommendations left
 	w.WriteUint16(0) // recommendations received
 	w.WriteInt32(int32(c.ClassID))
-	w.WriteInt32(int32(c.MaxCP))
-	w.WriteInt32(int32(c.CurCP))
+	w.WriteInt32(int32(resources.MaxCP))
+	w.WriteInt32(int32(resources.CurrentCP))
 	w.WriteUint8(0) // enchant effect
 	w.WriteUint8(0) // team
 	w.WriteInt32(0) // large clan crest id

@@ -245,9 +245,10 @@ func targetLevel(target world.Tracked) int {
 func targetHPAttributes(target world.Tracked) ([]serverpackets.StatusAttribute, bool) {
 	switch t := target.(type) {
 	case *livePlayer:
+		resources := t.ResourceValues()
 		return []serverpackets.StatusAttribute{
-			{Type: serverpackets.StatusMaxHP, Value: int(t.MaxHP)},
-			{Type: serverpackets.StatusCurrentHP, Value: t.CurrentHP()},
+			{Type: serverpackets.StatusMaxHP, Value: int(resources.MaxHP)},
+			{Type: serverpackets.StatusCurrentHP, Value: int(resources.CurrentHP)},
 		}, true
 	case interface {
 		MaxHP() int

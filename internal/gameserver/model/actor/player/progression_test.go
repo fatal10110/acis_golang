@@ -48,12 +48,15 @@ func levelStepTemplate(levels int) *Template {
 
 func newProgressionCharacter() *Character {
 	tmpl := levelStepTemplate(81)
-	return &Character{
+	c := &Character{
 		Level: 1,
-		MaxHP: tmpl.HPTable[0], CurHP: tmpl.HPTable[0],
-		MaxMP: tmpl.MPTable[0], CurMP: tmpl.MPTable[0],
-		MaxCP: tmpl.CPTable[0], CurCP: tmpl.CPTable[0],
 	}
+	c.SetResourceValues(Resources{
+		MaxHP: tmpl.HPTable[0], CurrentHP: tmpl.HPTable[0],
+		MaxMP: tmpl.MPTable[0], CurrentMP: tmpl.MPTable[0],
+		MaxCP: tmpl.CPTable[0], CurrentCP: tmpl.CPTable[0],
+	})
+	return c
 }
 
 // TestCharacter_AddExpAndSp compares Go's exp/sp/level accumulation
@@ -125,14 +128,15 @@ func TestCharacter_AddExpAndSp(t *testing.T) {
 			if c.SP != tt.wantSP {
 				t.Errorf("SP = %d, want %d", c.SP, tt.wantSP)
 			}
-			if c.MaxHP != tt.wantMaxHP || c.CurHP != tt.wantMaxHP {
-				t.Errorf("MaxHP/CurHP = %v/%v, want %v", c.MaxHP, c.CurHP, tt.wantMaxHP)
+			res := c.ResourceValues()
+			if res.MaxHP != tt.wantMaxHP || res.CurrentHP != tt.wantMaxHP {
+				t.Errorf("MaxHP/CurHP = %v/%v, want %v", res.MaxHP, res.CurrentHP, tt.wantMaxHP)
 			}
-			if c.MaxMP != tt.wantMaxMP || c.CurMP != tt.wantMaxMP {
-				t.Errorf("MaxMP/CurMP = %v/%v, want %v", c.MaxMP, c.CurMP, tt.wantMaxMP)
+			if res.MaxMP != tt.wantMaxMP || res.CurrentMP != tt.wantMaxMP {
+				t.Errorf("MaxMP/CurMP = %v/%v, want %v", res.MaxMP, res.CurrentMP, tt.wantMaxMP)
 			}
-			if c.MaxCP != tt.wantMaxCP || c.CurCP != tt.wantMaxCP {
-				t.Errorf("MaxCP/CurCP = %v/%v, want %v", c.MaxCP, c.CurCP, tt.wantMaxCP)
+			if res.MaxCP != tt.wantMaxCP || res.CurrentCP != tt.wantMaxCP {
+				t.Errorf("MaxCP/CurCP = %v/%v, want %v", res.MaxCP, res.CurrentCP, tt.wantMaxCP)
 			}
 		})
 	}
@@ -194,8 +198,9 @@ func TestCharacter_RemoveExpAndSp(t *testing.T) {
 			t.Errorf("Exp = %d, want 63", c.Exp)
 		}
 		// A delevel never refills HP/MP/CP: the level-3 row values persist.
-		if c.MaxHP != 120 || c.MaxMP != 60 || c.MaxCP != 24 {
-			t.Errorf("MaxHP/MP/CP = %v/%v/%v, want 120/60/24 (unrefilled)", c.MaxHP, c.MaxMP, c.MaxCP)
+		res := c.ResourceValues()
+		if res.MaxHP != 120 || res.MaxMP != 60 || res.MaxCP != 24 {
+			t.Errorf("MaxHP/MP/CP = %v/%v/%v, want 120/60/24 (unrefilled)", res.MaxHP, res.MaxMP, res.MaxCP)
 		}
 	})
 
@@ -265,8 +270,9 @@ func TestCharacter_AddLevel_Direct(t *testing.T) {
 	if c.Exp != 68 {
 		t.Errorf("Exp = %d, want 68 (resynced to level 2's threshold)", c.Exp)
 	}
-	if c.MaxHP != 110 || c.MaxMP != 55 || c.MaxCP != 22 {
-		t.Errorf("MaxHP/MP/CP = %v/%v/%v, want 110/55/22", c.MaxHP, c.MaxMP, c.MaxCP)
+	res := c.ResourceValues()
+	if res.MaxHP != 110 || res.MaxMP != 55 || res.MaxCP != 22 {
+		t.Errorf("MaxHP/MP/CP = %v/%v/%v, want 110/55/22", res.MaxHP, res.MaxMP, res.MaxCP)
 	}
 }
 
@@ -285,8 +291,8 @@ func TestCharacter_AddLevel_NilTemplateSkipsRefill(t *testing.T) {
 	if c.Level != 2 {
 		t.Errorf("Level = %d, want 2", c.Level)
 	}
-	if c.MaxHP != 100 {
-		t.Errorf("MaxHP = %v, want unchanged 100 (no template to resync from)", c.MaxHP)
+	if res := c.ResourceValues(); res.MaxHP != 100 {
+		t.Errorf("MaxHP = %v, want unchanged 100 (no template to resync from)", res.MaxHP)
 	}
 }
 

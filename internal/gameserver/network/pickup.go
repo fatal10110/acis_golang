@@ -12,6 +12,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
+const pickupAttentionRadius = 1400
+
 // pickupLiveGroundItem handles a second Action click on an already-selected
 // ground item: it validates and moves the item into live's own inventory,
 // then removes it from the visible world. It reports whether target was a
@@ -58,6 +60,7 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 	}
 
 	l.broadcastGroundPickup(ground, live.ObjectID())
+	l.broadcastPickupAttention(live, ground)
 	l.groundItems.Remove(ground)
 	l.world.Despawn(ground)
 
@@ -70,6 +73,42 @@ func groundPickupInRange(live *livePlayer, ground *grounditem.Item) bool {
 	sx, sy, sz := live.Position()
 	gx, gy, gz := ground.Position()
 	return location.In3DRange(sx, sy, sz, gx, gy, gz, groundPickupInteractionDistance)
+}
+
+func (l *GameClientLink) broadcastPickupAttention(live *livePlayer, ground *grounditem.Item) {
+	if l.world == nil || live == nil || ground == nil || ground.Template == nil {
+		return
+	}
+	switch ground.Template.Kind {
+	case item.KindArmor, item.KindWeapon:
+	default:
+		return
+	}
+
+	st := ground.Instance.Snapshot()
+	frame := func() wire.Frame {
+		if st.EnchantLevel > 0 {
+			return serverpackets.FrameSystemMessageStringNumberItemName(
+				serverpackets.SystemMessageAttentionS1PickedUpS2S3,
+				live.Name,
+				int32(st.EnchantLevel),
+				st.TemplateID,
+			)
+		}
+		return serverpackets.FrameSystemMessageStringItemName(
+			serverpackets.SystemMessageAttentionS1PickedUpS2,
+			live.Name,
+			st.TemplateID,
+		)
+	}
+	live.SendFrame(frame())
+	l.world.ForEachKnownInRadius(live, pickupAttentionRadius, func(o world.Tracked) {
+		receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
+		if !ok {
+			return
+		}
+		receiver.SendFrame(frame())
+	})
 }
 
 // failedPickupFrame mirrors the reference server's loot-locked messaging:

@@ -44,6 +44,26 @@ func TestContainer_AddNew_MergesStackable(t *testing.T) {
 	}
 }
 
+func TestContainer_AddRejectsZeroObjectIDWithoutMerge(t *testing.T) {
+	c := newTestContainer()
+
+	if got, absorbed := c.Add(&item.Instance{ObjectID: 0, TemplateID: daggerTemplateID, Count: 1}); got != nil || absorbed {
+		t.Fatalf("Add() with zero object id = (%+v, %v), want nil,false", got, absorbed)
+	}
+	if c.ItemByObjectID(0) != nil {
+		t.Fatal("container registered object id 0")
+	}
+
+	existing := c.AddNew(adenaTemplateID, 5, 0x20000001)
+	got, absorbed := c.Add(&item.Instance{ObjectID: 0, TemplateID: adenaTemplateID, Count: 3})
+	if got != existing || !absorbed {
+		t.Fatalf("Add() zero-id stack merge = (%+v, %v), want existing,true", got, absorbed)
+	}
+	if existing.Count != 8 {
+		t.Fatalf("merged count = %d, want 8", existing.Count)
+	}
+}
+
 func TestContainer_AddNew_NonStackableStaysSeparate(t *testing.T) {
 	c := newTestContainer()
 
@@ -195,6 +215,40 @@ func TestContainer_Transfer_UsesInventoryAddHooks(t *testing.T) {
 	if len(updates) != 1 || updates[0].ObjectID != result.ObjectID || updates[0].State != UpdateModified || updates[0].Count != 45 {
 		t.Fatalf("destination updates = %+v, want one MODIFIED update with count 45", updates)
 	}
+}
+
+func TestContainer_Transfer_UsesNewObjectIDWhenTargetStackDisappears(t *testing.T) {
+	src := newTestContainer()
+	dst := &staleMergeTarget{Container: NewContainer(0x10000002, item.LocationWarehouse, testTemplates())}
+
+	dst.AddNew(adenaTemplateID, 5, 0x20000002)
+	inst := src.AddNew(adenaTemplateID, 100, 0x20000001)
+
+	result, _, freed := src.Transfer(inst.ObjectID, 40, dst, 0x30000001)
+	if result == nil {
+		t.Fatalf("Transfer() returned nil")
+	}
+	if result.ObjectID != 0x30000001 {
+		t.Fatalf("Transfer() result object id = %#x, want newObjectID", result.ObjectID)
+	}
+	if dst.ItemByObjectID(0) != nil {
+		t.Fatalf("destination contains item with object id 0")
+	}
+	if freed {
+		t.Errorf("partial transfer reported a freed source id")
+	}
+}
+
+type staleMergeTarget struct {
+	*Container
+}
+
+func (t *staleMergeTarget) ItemByTemplateID(templateID int32) *item.Instance {
+	inst := t.Container.ItemByTemplateID(templateID)
+	if inst != nil {
+		t.DestroyAllItems()
+	}
+	return inst
 }
 
 func TestContainer_Transfer_UsesFreightVisibleTownHooks(t *testing.T) {

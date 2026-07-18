@@ -57,9 +57,8 @@ type Update struct {
 // unlimited, sourced the same way Container.SlotLimit is: this package
 // doesn't load config or read owner stats itself.
 //
-// mu guards paperdoll, wornMask, totalWeight and updates. It does not make
-// the *item.Instance values themselves thread-safe; those follow Container's
-// owner-serialized access rule.
+// mu guards paperdoll, wornMask, totalWeight and updates. Mutable item fields
+// are guarded by item.Instance.
 type Inventory struct {
 	*Container
 
@@ -146,23 +145,24 @@ func (inv *Inventory) Restore(items []*item.Instance) {
 		if inst == nil {
 			continue
 		}
-		switch inst.Location {
+		st := inst.Snapshot()
+		switch st.Location {
 		case inv.Location(), inv.equipLocation:
 		default:
 			continue
 		}
 
-		inst.OwnerID = inv.OwnerID()
+		inst.SetOwnerLocation(inv.OwnerID(), st.Location, st.LocationData)
 		inv.Container.items[inst.ObjectID] = inst
 
 		tmpl, _ := inv.Templates().Get(inst.TemplateID)
 		if tmpl != nil {
-			inv.totalWeight += int(tmpl.Weight) * inst.Count
+			inv.totalWeight += int(tmpl.Weight) * st.Count
 		}
-		if inst.Location != inv.equipLocation || inst.LocationData < 0 || inst.LocationData >= item.PaperdollSlots {
+		if st.Location != inv.equipLocation || st.LocationData < 0 || st.LocationData >= item.PaperdollSlots {
 			continue
 		}
-		inv.paperdoll[inst.LocationData] = inst
+		inv.paperdoll[st.LocationData] = inst
 		if tmpl != nil {
 			inv.wornMask |= tmpl.Mask()
 		}
@@ -189,8 +189,8 @@ func (inv *Inventory) Remove(inst *item.Instance, isDrop bool) bool {
 	inv.mu.Unlock()
 
 	if isDrop {
-		inst.OwnerID = 0
-		inst.Location = item.LocationVoid
+		st := inst.Snapshot()
+		inst.SetOwnerLocation(0, item.LocationVoid, st.LocationData)
 	}
 
 	inv.queueUpdate(inst, UpdateRemoved)
@@ -217,10 +217,9 @@ func (inv *Inventory) SetEnchantLevel(inst *item.Instance, level int) bool {
 	if inst == nil {
 		return false
 	}
-	if inv.ItemByObjectID(inst.ObjectID) != inst || inst.EnchantLevel == level {
+	if inv.ItemByObjectID(inst.ObjectID) != inst || !inst.SetEnchantLevel(level) {
 		return false
 	}
-	inst.EnchantLevel = level
 	inv.queueUpdate(inst, UpdateModified)
 	return true
 }
@@ -239,18 +238,21 @@ func (inv *Inventory) DropItem(objectID int32, count int, newObjectID int32) *it
 		return nil
 	}
 
-	if inst.Count > count {
-		inst.Count -= count
+	st := inst.Snapshot()
+	if st.Count > count {
+		if _, ok := inst.ReduceCount(count); !ok {
+			return nil
+		}
 		inv.queueUpdate(inst, UpdateModified)
 
-		tmpl, _ := inv.Templates().Get(inst.TemplateID)
+		tmpl, _ := inv.Templates().Get(st.TemplateID)
 		var manaLeft int
 		if tmpl != nil {
 			manaLeft = tmpl.InitialManaLeft()
 		} else {
 			manaLeft = -1
 		}
-		return &item.Instance{ObjectID: newObjectID, TemplateID: inst.TemplateID, Count: count, ManaLeft: manaLeft}
+		return &item.Instance{ObjectID: newObjectID, TemplateID: st.TemplateID, Count: count, ManaLeft: manaLeft}
 	}
 
 	if !inv.Remove(inst, true) {
@@ -270,8 +272,9 @@ func (inv *Inventory) TransferItem(objectID int32, count int, target *Inventory,
 	if source == nil {
 		return nil, 0, false
 	}
-	templateID := source.TemplateID
-	sourceCount := source.Count
+	st := source.Snapshot()
+	templateID := st.TemplateID
+	sourceCount := st.Count
 	movedCount := count
 	if movedCount > sourceCount {
 		movedCount = sourceCount
@@ -340,8 +343,7 @@ func (inv *Inventory) setPaperdollItemLocked(slot int, inst *item.Instance, tmpl
 
 	if old != nil {
 		inv.paperdoll[slot] = nil
-		old.Location = inv.Location()
-		old.LocationData = 0
+		old.SetLocation(inv.Location(), 0)
 		if oldTmpl, ok := inv.Templates().Get(old.TemplateID); ok {
 			inv.wornMask &^= oldTmpl.Mask()
 		}
@@ -350,8 +352,7 @@ func (inv *Inventory) setPaperdollItemLocked(slot int, inst *item.Instance, tmpl
 
 	if inst != nil {
 		inv.paperdoll[slot] = inst
-		inst.Location = inv.equipLocation
-		inst.LocationData = slot
+		inst.SetLocation(inv.equipLocation, slot)
 		inv.queueUpdateLocked(inst, UpdateModified)
 
 		switch {
@@ -542,7 +543,7 @@ func (inv *Inventory) UpdateWeight() bool {
 	weight := 0
 	inv.forEach(func(inst *item.Instance) {
 		if tmpl, ok := inv.Templates().Get(inst.TemplateID); ok {
-			weight += int(tmpl.Weight) * inst.Count
+			weight += int(tmpl.Weight) * inst.Snapshot().Count
 		}
 	})
 
@@ -642,7 +643,8 @@ func (inv *Inventory) queueUpdateLocked(inst *item.Instance, state UpdateState) 
 	if inst == nil {
 		return
 	}
-	inv.queueUpdateRecordLocked(inst.ObjectID, inst.TemplateID, inst.Count, state)
+	st := inst.Snapshot()
+	inv.queueUpdateRecordLocked(st.ObjectID, st.TemplateID, st.Count, state)
 }
 
 func (inv *Inventory) queueUpdateRecord(objectID, templateID int32, count int, state UpdateState) {

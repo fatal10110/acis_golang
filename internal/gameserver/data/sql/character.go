@@ -44,12 +44,13 @@ func NewCharacterStore(db *sql.DB) *CharacterStore {
 // character only gains once it is actually played keep the schema's own
 // default until something sets them.
 func (s *CharacterStore) Create(ctx context.Context, c *player.Character) error {
+	resources := c.ResourceValues()
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO characters
-			(account_name, obj_Id, char_name, level, maxHp, curHp, maxCp, curCp, maxMp, curMp,
-			 face, hairStyle, hairColor, sex, heading, x, y, z, exp, sp, race, classid, base_class, title, accesslevel)
-		 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		c.AccountName, c.ID, c.Name, c.Level, c.MaxHP, c.CurHP, c.MaxCP, c.CurCP, c.MaxMP, c.CurMP,
+				(account_name, obj_Id, char_name, level, maxHp, curHp, maxCp, curCp, maxMp, curMp,
+				 face, hairStyle, hairColor, sex, heading, x, y, z, exp, sp, race, classid, base_class, title, accesslevel)
+			 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		c.AccountName, c.ID, c.Name, c.Level, resources.MaxHP, resources.CurrentHP, resources.MaxCP, resources.CurrentCP, resources.MaxMP, resources.CurrentMP,
 		c.Face, c.HairStyle, c.HairColor, byte(c.Sex), c.LastHeading, c.Location.X, c.Location.Y, c.Location.Z,
 		c.Exp, c.SP, int(c.Race), c.ClassID, c.BaseClassID, c.Title, c.AccessLevel,
 	)
@@ -106,10 +107,11 @@ func scanCharacter(row rowScanner) (*player.Character, error) {
 	var c player.Character
 	var sex byte
 	var race, classID int
+	var maxHP, curHP, maxCP, curCP, maxMP, curMP float64
 
 	err := row.Scan(
 		&c.ID, &c.AccountName, &c.Name,
-		&c.Level, &c.MaxHP, &c.CurHP, &c.MaxCP, &c.CurCP, &c.MaxMP, &c.CurMP,
+		&c.Level, &maxHP, &curHP, &maxCP, &curCP, &maxMP, &curMP,
 		&c.Face, &c.HairStyle, &c.HairColor, &sex,
 		&c.LastHeading, &c.Location.X, &c.Location.Y, &c.Location.Z,
 		&c.Exp, &c.SP, &c.Karma, &c.PvPKills, &c.PKKills, &c.ClanID,
@@ -122,6 +124,11 @@ func scanCharacter(row rowScanner) (*player.Character, error) {
 	c.Sex = player.Sex(sex)
 	c.Race = player.Race(race)
 	c.ClassID = classID
+	c.SetResourceValues(player.Resources{
+		MaxHP: maxHP, CurrentHP: curHP,
+		MaxCP: maxCP, CurrentCP: curCP,
+		MaxMP: maxMP, CurrentMP: curMP,
+	})
 	return &c, nil
 }
 

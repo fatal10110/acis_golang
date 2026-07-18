@@ -35,10 +35,12 @@ func writeInventoryUpdate(w *wire.Writer, updates []itemcontainer.Update, items 
 		inst := byObjectID[update.ObjectID]
 		templateID := update.TemplateID
 		count := update.Count
+		var st item.InstanceState
 		if inst != nil {
-			templateID = inst.TemplateID
+			st = inst.Snapshot()
+			templateID = st.TemplateID
 			if count == 0 {
-				count = inst.Count
+				count = st.Count
 			}
 		}
 
@@ -64,13 +66,13 @@ func writeInventoryUpdate(w *wire.Writer, updates []itemcontainer.Update, items 
 			w.WriteInt32(-1)
 			continue
 		}
-		w.WriteUint16(uint16(inst.CustomType1))
-		w.WriteUint16(uint16(boolInt32(inst.Location == item.LocationPaperdoll)))
+		w.WriteUint16(uint16(st.CustomType1))
+		w.WriteUint16(uint16(boolInt32(st.Location == item.LocationPaperdoll)))
 		w.WriteInt32(int32(tmpl.Slot))
-		w.WriteUint16(uint16(inst.EnchantLevel))
-		w.WriteUint16(uint16(inst.CustomType2))
-		if inst.Augmentation != nil {
-			w.WriteInt32(inst.Augmentation.Attributes)
+		w.WriteUint16(uint16(st.EnchantLevel))
+		w.WriteUint16(uint16(st.CustomType2))
+		if st.Augmentation != nil {
+			w.WriteInt32(st.Augmentation.Attributes)
 		} else {
 			w.WriteInt32(0)
 		}

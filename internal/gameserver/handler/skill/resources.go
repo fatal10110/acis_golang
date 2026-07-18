@@ -17,13 +17,13 @@ type healEffectivenessTarget interface {
 
 type hpPercentTarget interface {
 	CanBeHealed() bool
-	MaxHP() float64
+	MaxHPValue() float64
 	AddHP(float64) float64
 }
 
 type mpPercentTarget interface {
 	CanBeHealed() bool
-	MaxMP() float64
+	MaxMPValue() float64
 	AddMP(float64) float64
 }
 
@@ -40,7 +40,7 @@ type cpHealTarget interface {
 	Dead() bool
 	Invulnerable() bool
 	CP() float64
-	MaxCP() float64
+	MaxCPValue() float64
 	SetCP(float64)
 }
 
@@ -54,7 +54,7 @@ type cpDamagePercentTarget interface {
 type balanceLifeTarget interface {
 	Dead() bool
 	HP() float64
-	MaxHP() float64
+	MaxHPValue() float64
 	SetHP(float64)
 }
 
@@ -107,7 +107,7 @@ func (healPercentHandler) Use(cast Cast) {
 			if !ok || !target.CanBeHealed() {
 				continue
 			}
-			target.AddHP(target.MaxHP() * float64(cast.Skill.Power) / 100)
+			target.AddHP(target.MaxHPValue() * float64(cast.Skill.Power) / 100)
 		}
 		return
 	}
@@ -117,7 +117,7 @@ func (healPercentHandler) Use(cast Cast) {
 		if !ok || !target.CanBeHealed() {
 			continue
 		}
-		target.AddMP(target.MaxMP() * float64(cast.Skill.Power) / 100)
+		target.AddMP(target.MaxMPValue() * float64(cast.Skill.Power) / 100)
 	}
 }
 
@@ -152,8 +152,8 @@ func (combatPointHealHandler) Use(cast Cast) {
 			continue
 		}
 		amount := float64(cast.Skill.Power)
-		if target.CP()+amount > target.MaxCP() {
-			amount = target.MaxCP() - target.CP()
+		if target.CP()+amount > target.MaxCPValue() {
+			amount = target.MaxCPValue() - target.CP()
 		}
 		target.SetCP(target.CP() + amount)
 	}
@@ -196,7 +196,7 @@ func (balanceLifeHandler) Use(cast Cast) {
 		if !sameObject(obj, cast.Caster) && (casterCursed || cursed(obj)) {
 			continue
 		}
-		fullHP += target.MaxHP()
+		fullHP += target.MaxHPValue()
 		currentHP += target.HP()
 		targets = append(targets, target)
 	}
@@ -207,7 +207,7 @@ func (balanceLifeHandler) Use(cast Cast) {
 
 	ratio := currentHP / fullHP
 	for _, target := range targets {
-		target.SetHP(target.MaxHP() * ratio)
+		target.SetHP(target.MaxHPValue() * ratio)
 	}
 }
 
