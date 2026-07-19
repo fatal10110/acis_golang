@@ -75,9 +75,9 @@ type PlayerToggleRequest struct {
 
 // ResolvePlayerToggle validates skillID against caster's known skills and
 // resolves it to a toggle definition and target, without consuming any
-// resource or touching effect state — a toggle's on/off decision depends on
-// the caster's live effect list, which this package doesn't own, so the
-// caller looks that up and drives Controller.CastToggle with the result.
+// resource or touching effect state. ApplyToggle is the typical caller — it
+// looks up the caster's live effect list to decide the on/off branch and
+// drives Controller.CastToggle with the result.
 func ResolvePlayerToggle(req PlayerToggleRequest) (modelskill.Definition, Target, error) {
 	if req.Caster == nil || req.Caster.AlikeDead() || req.SkillID <= 0 || req.Definitions == nil {
 		return modelskill.Definition{}, nil, ErrSkillUnavailable

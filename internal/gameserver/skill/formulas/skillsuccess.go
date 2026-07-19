@@ -17,13 +17,21 @@ type SkillSuccessInput struct {
 	MAtkModifier  float64
 	LevelModifier float64
 	IgnoreResists bool
+	// Shield is the target's already-resolved shield-block outcome against
+	// this cast. A perfect block fails the roll unconditionally, taking
+	// priority over IgnoreResists.
+	Shield ShieldDefense
 }
 
 // SkillSuccessRate returns the percent chance that an effect-landing roll
 // against in succeeds: the product of every modifier, clamped to [1, 99].
-// A skill that ignores resistances skips the modifiers and clamp entirely,
-// returning BaseChance as-is.
+// A perfect shield block fails the roll outright, before anything else is
+// considered. A skill that ignores resistances otherwise skips the
+// modifiers and clamp entirely, returning BaseChance as-is.
 func SkillSuccessRate(in SkillSuccessInput) float64 {
+	if in.Shield == ShieldPerfect {
+		return 0
+	}
 	if in.IgnoreResists {
 		return in.BaseChance
 	}

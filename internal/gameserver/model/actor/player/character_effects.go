@@ -72,8 +72,9 @@ func (c *Character) Invul() bool {
 }
 
 // SkillSuccessInput returns the effect-landing roll input for def cast
-// against c.
-func (c *Character) SkillSuccessInput(caster any, def modelskill.Definition) (formulas.SkillSuccessInput, bool) {
+// against c, given the caster's blessed-spiritshot charge state (bss) and
+// this cast's already-resolved shield-block outcome (shield).
+func (c *Character) SkillSuccessInput(caster any, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
 	attacker, ok := caster.(*Character)
 	if !ok || attacker == nil {
 		return formulas.SkillSuccessInput{}, false
@@ -82,9 +83,10 @@ func (c *Character) SkillSuccessInput(caster any, def modelskill.Definition) (fo
 		BaseChance:    float64(def.BaseLandRate),
 		StatModifier:  c.skillStatModifier(def.EffectType, def.Magic),
 		VulnModifier:  c.skillVulnerability(def.EffectType, def),
-		MAtkModifier:  c.skillMAtkModifier(attacker, def),
+		MAtkModifier:  c.skillMAtkModifier(attacker, def, bss),
 		LevelModifier: c.skillLevelModifier(attacker, def),
 		IgnoreResists: def.IgnoreResists,
+		Shield:        shield,
 	}, true
 }
 
@@ -129,7 +131,10 @@ func (c *Character) skillVulnerability(typ string, def modelskill.Definition) fl
 	}
 }
 
-func (c *Character) skillMAtkModifier(attacker *Character, def modelskill.Definition) float64 {
+// skillMAtkModifier returns the magic-attack-vs-defence term of the
+// effect-landing roll. A blessed-spiritshot charge (bss) quadruples the
+// caster's effective magic attack before the square root is taken.
+func (c *Character) skillMAtkModifier(attacker *Character, def modelskill.Definition, bss bool) float64 {
 	if !def.Magic {
 		return 1
 	}
@@ -137,7 +142,11 @@ func (c *Character) skillMAtkModifier(attacker *Character, def modelskill.Defini
 	if mDef <= 0 {
 		mDef = 1
 	}
-	return math.Sqrt(attacker.MAtk()) / mDef * 11
+	mAtk := attacker.MAtk()
+	if bss {
+		mAtk *= 4
+	}
+	return math.Sqrt(mAtk) / mDef * 11
 }
 
 func (c *Character) skillLevelModifier(attacker *Character, def modelskill.Definition) float64 {

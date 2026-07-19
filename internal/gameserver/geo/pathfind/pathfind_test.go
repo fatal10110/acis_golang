@@ -403,6 +403,73 @@ func TestAddCandidateKeepsCheaperGridParent(t *testing.T) {
 	}
 }
 
+// TestFindOnRandomMultilayerCellsAlwaysSatisfiesCanMove fuzzes multilayer
+// terrain (cells with 1-3 ascending height layers, each step one of 0, 16,
+// 32, or 48 units — steep enough that corner candidates on adjacent cells
+// can land on different layers, but not so steep that Find() rarely
+// returns a path to check) and asserts that every consecutive pair in a
+// returned path satisfies CanMove. It once found seeds where a corner
+// (diagonal) candidate's own NSWE mutual-mask gate was satisfied while a
+// straight line from the expanding node to that candidate still crossed a
+// blocked edge on multilayer terrain — see addCandidateTo's diagonal-only
+// CanMove gate. wantMinFound guards against the check going vacuous again:
+// an over-pruning regression that made Find() always fail would still pass
+// an assertion that only fires when ok is true.
+func TestFindOnRandomMultilayerCellsAlwaysSatisfiesCanMove(t *testing.T) {
+	options := DefaultOptions()
+	options.HeuristicWeight = 0
+	options.MaxIterations = 10000
+
+	const seeds = 40
+	const wantMinFound = 25
+	found := 0
+
+	for seed := int64(1); seed <= seeds; seed++ {
+		r := rand.New(rand.NewSource(seed))
+		var cells [block.CellCount][]block.Cell
+		for x := range block.CellsX {
+			for y := range block.CellsY {
+				n := r.Intn(3) + 1
+				layers := make([]block.Cell, n)
+				h := int16(0)
+				for i := 0; i < n; i++ {
+					h += int16(r.Intn(4) * 16)
+					layers[i] = block.Cell{Height: h, NSWE: block.AllDirections}
+				}
+				cells[x*block.CellsY+y] = layers
+			}
+		}
+		ml, err := block.NewMultilayer(cells)
+		if err != nil {
+			t.Fatalf("seed %d: NewMultilayer(): %v", seed, err)
+		}
+		e := newTestEngine(t, ml)
+
+		topHeight := func(x, y int) int {
+			layers := cells[x*block.CellsY+y]
+			return int(layers[len(layers)-1].Height)
+		}
+		origin := at(0, 0, topHeight(0, 0))
+		target := at(7, 7, topHeight(7, 7))
+
+		for _, bidirectional := range []bool{false, true} {
+			options.Bidirectional = bidirectional
+			path, _, ok := New(e, options).Find(origin, target)
+			if !ok {
+				continue
+			}
+			found++
+			if from, to, good := firstBlockedSegment(e, origin, path); !good {
+				t.Errorf("seed %d bidirectional=%v: CanMove rejects segment %#v -> %#v in path %#v", seed, bidirectional, from, to, path)
+			}
+		}
+	}
+
+	if found < wantMinFound {
+		t.Fatalf("found a path in %d/%d seed-runs, want at least %d — terrain generator may be too steep to exercise the corner-cut check", found, seeds*2, wantMinFound)
+	}
+}
+
 // TestFindCrossesBridgeWithNoFloorBeneath covers the multilayer case: a
 // bridge column (x=3..5) whose cells have a single layer at height 40 —
 // deliberately no ground layer underneath, the unambiguous multilayer

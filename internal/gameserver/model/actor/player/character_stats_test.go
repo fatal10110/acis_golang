@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
@@ -395,7 +396,7 @@ func TestCharacterSkillSuccessInputUsesStatsAndCasterMagicAttack(t *testing.T) {
 		BaseLandRate: 50,
 	}
 
-	in, ok := target.SkillSuccessInput(caster, def)
+	in, ok := target.SkillSuccessInput(caster, def, false, formulas.ShieldFailed)
 	if !ok {
 		t.Fatal("SkillSuccessInput() ok = false")
 	}
@@ -434,7 +435,7 @@ func TestCharacterSkillSuccessInputFoldsElementalResistanceIntoVulnerability(t *
 		EffectType:   "STUN",
 		Element:      modelskill.ElementFire,
 		BaseLandRate: 50,
-	})
+	}, false, formulas.ShieldFailed)
 	if !ok {
 		t.Fatal("SkillSuccessInput() ok = false")
 	}
@@ -485,7 +486,7 @@ func TestCharacterSkillSuccessInputDoesNotFallbackToSkillType(t *testing.T) {
 		SkillType:    "STUN",
 		Magic:        true,
 		BaseLandRate: 50,
-	})
+	}, false, formulas.ShieldFailed)
 	if !ok {
 		t.Fatal("SkillSuccessInput() ok = false")
 	}
@@ -495,6 +496,55 @@ func TestCharacterSkillSuccessInputDoesNotFallbackToSkillType(t *testing.T) {
 	}
 	if in.VulnModifier != 1 {
 		t.Fatalf("VulnModifier = %v, want 1 without EffectType", in.VulnModifier)
+	}
+}
+
+// TestCharacterSkillSuccessInputQuadruplesMAtkOnBlessedSpiritshot asserts a
+// blessed-spiritshot charge quadruples the caster's effective magic attack
+// before the square root is taken, exactly doubling the resulting modifier
+// (sqrt(4x) == 2*sqrt(x)) relative to an uncharged cast against the same
+// stats used by TestCharacterSkillSuccessInputUsesStatsAndCasterMagicAttack.
+func TestCharacterSkillSuccessInputQuadruplesMAtkOnBlessedSpiritshot(t *testing.T) {
+	tmpl := combatTemplate()
+	tmpl.MAtk = 100
+	tmpl.MDef = 50
+	caster := liveCharacter(1, tmpl, combatItems())
+	target := liveCharacter(2, tmpl, combatItems())
+	def := modelskill.Definition{SkillType: "STUN", EffectType: "STUN", Magic: true, BaseLandRate: 50}
+
+	without, ok := target.SkillSuccessInput(caster, def, false, formulas.ShieldFailed)
+	if !ok {
+		t.Fatal("SkillSuccessInput(bss=false) ok = false")
+	}
+	with, ok := target.SkillSuccessInput(caster, def, true, formulas.ShieldFailed)
+	if !ok {
+		t.Fatal("SkillSuccessInput(bss=true) ok = false")
+	}
+
+	if want := without.MAtkModifier * 2; !closeFloat(with.MAtkModifier, want) {
+		t.Fatalf("MAtkModifier with bss = %v, want %v (2x the uncharged modifier)", with.MAtkModifier, want)
+	}
+}
+
+// TestCharacterSkillSuccessInputCarriesShieldOutcome asserts the
+// already-resolved shield-block outcome passed into SkillSuccessInput
+// reaches the returned formula input unchanged, and that a perfect block
+// fails the landing roll outright through the real formulas pipeline.
+func TestCharacterSkillSuccessInputCarriesShieldOutcome(t *testing.T) {
+	tmpl := combatTemplate()
+	caster := liveCharacter(1, tmpl, combatItems())
+	target := liveCharacter(2, tmpl, combatItems())
+	def := modelskill.Definition{SkillType: "STUN", BaseLandRate: 100, IgnoreResists: true}
+
+	in, ok := target.SkillSuccessInput(caster, def, false, formulas.ShieldPerfect)
+	if !ok {
+		t.Fatal("SkillSuccessInput() ok = false")
+	}
+	if in.Shield != formulas.ShieldPerfect {
+		t.Fatalf("Shield = %v, want ShieldPerfect", in.Shield)
+	}
+	if rate := formulas.SkillSuccessRate(in); rate != 0 {
+		t.Fatalf("SkillSuccessRate() = %v, want 0 for a perfect block despite IgnoreResists", rate)
 	}
 }
 

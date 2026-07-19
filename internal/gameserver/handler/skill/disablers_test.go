@@ -23,6 +23,13 @@ type disablerFake struct {
 	undeadFlag             bool
 	aggro                  *attackable.ThreatTable
 	hate                   *attackable.HateTable
+	shield                 formulas.ShieldDefense
+
+	// lastBss and lastShield record the most recent SkillSuccessInput call's
+	// resolved caster/target state, for tests asserting checkSkillSuccess
+	// threaded them through correctly.
+	lastBss    bool
+	lastShield formulas.ShieldDefense
 }
 
 func newDisablerFake(id int32) *disablerFake {
@@ -40,8 +47,16 @@ func (d *disablerFake) Invul() bool              { return d.invul }
 func (d *disablerFake) Paralyzed() bool          { return d.paralyzed }
 func (d *disablerFake) EffectList() *effect.List { return d.list }
 
-func (d *disablerFake) SkillSuccessInput(caster any, def modelskill.Definition) (formulas.SkillSuccessInput, bool) {
-	return formulas.SkillSuccessInput{IgnoreResists: true, BaseChance: 100}, d.successOK
+func (d *disablerFake) SkillSuccessInput(caster any, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
+	d.lastBss = bss
+	d.lastShield = shield
+	return formulas.SkillSuccessInput{IgnoreResists: true, BaseChance: 100, Shield: shield}, d.successOK
+}
+
+// ShieldDefense reports d's pre-set shield-block outcome, letting tests
+// exercise checkSkillSuccess's shield-block threading.
+func (d *disablerFake) ShieldDefense(caster any, def modelskill.Definition, isCrit bool) formulas.ShieldDefense {
+	return d.shield
 }
 
 func (d *disablerFake) Attackable() bool                   { return d.attackableFlag }
@@ -235,5 +250,45 @@ func TestAggRemoveClearsBothTablesOnSuccess(t *testing.T) {
 
 	if !target.aggro.IsEmpty() || !target.hate.IsEmpty() {
 		t.Fatal("AGGREMOVE should clear both hate tables on a guaranteed-success roll")
+	}
+}
+
+// bssCasterFake exposes a fixed blessed-spiritshot charge state for tests
+// asserting checkSkillSuccess resolves it from the caster.
+type bssCasterFake struct{ bss bool }
+
+func (c *bssCasterFake) BlessedSpiritshotCharged() bool { return c.bss }
+
+func TestCheckSkillSuccessFailsOnPerfectShieldBlockDespiteGuaranteedRate(t *testing.T) {
+	registry := NewDefaultRegistry()
+	target := newDisablerFake(1)
+	target.shield = formulas.ShieldPerfect
+
+	registry.Use(Cast{
+		Skill:   modelskill.Definition{SkillType: "STUN", Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 10}}},
+		Targets: []any{target},
+	})
+
+	if len(target.list.All()) != 0 {
+		t.Fatal("a perfect shield block must fail the roll even though the target reports a guaranteed-success rate")
+	}
+	if target.lastShield != formulas.ShieldPerfect {
+		t.Fatalf("lastShield = %v, want ShieldPerfect", target.lastShield)
+	}
+}
+
+func TestCheckSkillSuccessResolvesCasterBlessedSpiritshotCharge(t *testing.T) {
+	registry := NewDefaultRegistry()
+	target := newDisablerFake(1)
+	caster := &bssCasterFake{bss: true}
+
+	registry.Use(Cast{
+		Caster:  caster,
+		Skill:   modelskill.Definition{SkillType: "STUN", Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 10}}},
+		Targets: []any{target},
+	})
+
+	if !target.lastBss {
+		t.Fatal("checkSkillSuccess should have resolved the caster's blessed-spiritshot charge as true")
 	}
 }
