@@ -489,15 +489,15 @@ func (f *Finder) addCandidateTo(current, goal *node, seq *int64, scratch *search
 
 	parent := current
 	cost := current.g + weight
-	if current.parent != nil {
-		reachable := withinSmoothRange(current.parent, gx, gy, height) && f.canMoveDirect(current.parent, gx, gy, height)
-		if reachable {
-			smoothed := current.parent.g + f.straightLineCost(current.parent, gx, gy, height, nswe)
-			if !direct || smoothed < cost {
-				parent = current.parent
-				cost = smoothed
-				direct = true
-			}
+	// canMoveDirect is a line-walk; only pay for it once the cheap cost/range
+	// comparison shows this parent-skip could actually change the outcome
+	// (either it's the only way direct connectivity holds, or it's cheaper).
+	if current.parent != nil && withinSmoothRange(current.parent, gx, gy, height) {
+		smoothed := current.parent.g + f.straightLineCost(current.parent, gx, gy, height, nswe)
+		if (!direct || smoothed < cost) && f.canMoveDirect(current.parent, gx, gy, height) {
+			parent = current.parent
+			cost = smoothed
+			direct = true
 		}
 	}
 	if !direct {
@@ -547,19 +547,17 @@ func (f *Finder) addBackwardCandidate(current, goal *node, seq *int64, scratch *
 
 	parent := current
 	cost := current.g + weight
-	if current.parent != nil {
-		reachable := withinSmoothRangeFrom(gx, gy, height, current.parent.gx, current.parent.gy, current.parent.z) &&
-			f.engine.CanMove(
-				engine.WorldX(gx), engine.WorldY(gy), height,
-				engine.WorldX(current.parent.gx), engine.WorldY(current.parent.gy), current.parent.z,
-			)
-		if reachable {
-			smoothed := current.parent.g + f.straightLineCostFrom(gx, gy, height, current.parent.gx, current.parent.gy, current.parent.z, current.parent.nswe)
-			if !direct || smoothed < cost {
-				parent = current.parent
-				cost = smoothed
-				direct = true
-			}
+	// See the matching comment in addCandidateTo: defer the CanMove line-walk
+	// behind the cheap cost/range comparison.
+	if current.parent != nil && withinSmoothRangeFrom(gx, gy, height, current.parent.gx, current.parent.gy, current.parent.z) {
+		smoothed := current.parent.g + f.straightLineCostFrom(gx, gy, height, current.parent.gx, current.parent.gy, current.parent.z, current.parent.nswe)
+		if (!direct || smoothed < cost) && f.engine.CanMove(
+			engine.WorldX(gx), engine.WorldY(gy), height,
+			engine.WorldX(current.parent.gx), engine.WorldY(current.parent.gy), current.parent.z,
+		) {
+			parent = current.parent
+			cost = smoothed
+			direct = true
 		}
 	}
 	if !direct {
