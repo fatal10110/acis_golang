@@ -161,6 +161,15 @@ func (c *Character) SetStopBroadcaster(broadcast func()) {
 	c.broadcastStop = broadcast
 }
 
+// SetDieBroadcaster records the packet-layer hook that broadcasts the death
+// packet to this character's own session and nearby connected clients at
+// the moment this character dies.
+func (c *Character) SetDieBroadcaster(broadcast func()) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	c.broadcastDie = broadcast
+}
+
 // SendFrame sends frame to the connected client, if any.
 func (c *Character) SendFrame(frame wire.Frame) bool {
 	c.stateMu.RLock()
@@ -460,6 +469,16 @@ func (c *Character) BroadcastStop() {
 	}
 }
 
+// BroadcastDie sends the death packet through the runtime packet hook.
+func (c *Character) BroadcastDie() {
+	c.stateMu.RLock()
+	broadcast := c.broadcastDie
+	c.stateMu.RUnlock()
+	if broadcast != nil {
+		broadcast()
+	}
+}
+
 // InPeaceZone reports whether c is in a combat-blocking peace zone.
 func (c *Character) InPeaceZone() bool { return false }
 
@@ -590,9 +609,16 @@ func (c *Character) MarkDead() bool {
 	return true
 }
 
-// Die runs this player's death sequence.
+// Die runs this player's death sequence: the once-only dead-state
+// transition, then the death packet broadcast to this player's own session
+// and every observer, so the corpse-fall animation plays live instead of
+// only on a later dead reconnect.
 func (c *Character) Die(killer creature.DeathActor) bool {
-	return creature.Die(c, killer, nil)
+	if !creature.Die(c, killer, nil) {
+		return false
+	}
+	c.BroadcastDie()
+	return true
 }
 
 // SiegeGuard reports whether this player is a defensive siege guard.

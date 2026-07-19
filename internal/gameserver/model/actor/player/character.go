@@ -84,6 +84,7 @@ type Character struct {
 	broadcastAttack func(attack.Snapshot)
 	broadcastMove   func(move.Event)
 	broadcastStop   func()
+	broadcastDie    func()
 	roll            func(int) int
 
 	deathMu sync.Mutex
