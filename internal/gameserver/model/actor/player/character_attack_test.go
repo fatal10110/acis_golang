@@ -115,6 +115,32 @@ func TestCharacterPhysicalAttackResolvesLethalHit(t *testing.T) {
 	}
 }
 
+func TestCharacterDieBroadcastsDieOnceOnly(t *testing.T) {
+	tmpl := combatTemplate()
+	items := combatItems()
+	c := liveCharacter(1, tmpl, items)
+	c.SetHP(1)
+
+	var calls int
+	c.SetDieBroadcaster(func() { calls++ })
+
+	if !c.Die(nil) {
+		t.Fatal("Die() = false on a live character, want true")
+	}
+	if calls != 1 {
+		t.Fatalf("die broadcast calls = %d, want 1", calls)
+	}
+
+	// A repeated kill is a no-op per Die's once-only contract: no second
+	// Die packet.
+	if c.Die(nil) {
+		t.Fatal("Die() = true on an already-dead character, want false")
+	}
+	if calls != 1 {
+		t.Fatalf("die broadcast calls after repeat kill = %d, want still 1", calls)
+	}
+}
+
 // TestCharacterPositionAccessIsRaceFree exercises the exact goroutine
 // pairing that produces a live game's data race on Location/LastHeading: a
 // position-update ticker calling SyncPosition during an attack chase,

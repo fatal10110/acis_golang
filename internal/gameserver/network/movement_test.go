@@ -39,6 +39,29 @@ func TestMoveLivePlayerRelocatesWorldVisibility(t *testing.T) {
 	}
 }
 
+func TestBroadcastLiveDieSendsDieToOwnSessionAndObservers(t *testing.T) {
+	state := world.New()
+	victimFrames := &frameCapture{}
+	observerFrames := &frameCapture{}
+	victim := newTestLivePlayer(t, 1, victimFrames)
+	observer := newTestLivePlayer(t, 2, observerFrames)
+
+	state.Spawn(victim, 0, 0, 0, 0)
+	state.Spawn(observer, 100, 0, 0, 0)
+	victimFrames.frames = nil
+	observerFrames.frames = nil
+
+	gcl := &GameClientLink{world: state, log: zerolog.Nop()}
+	gcl.broadcastLiveDie(victim)
+
+	if got := frameOpcodes(victimFrames.frames); string(got) != string([]byte{serverpackets.OpcodeDie}) {
+		t.Fatalf("victim opcodes = %x, want Die", got)
+	}
+	if got := frameOpcodes(observerFrames.frames); string(got) != string([]byte{serverpackets.OpcodeDie}) {
+		t.Fatalf("observer opcodes = %x, want Die", got)
+	}
+}
+
 // TestUpdateLivePlayerPositionReseedsCreatureMove is the regression test for
 // the "first chase after a client walk computes its route from a stale
 // seed" review finding: updateLivePlayerPosition must reseed the player's

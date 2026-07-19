@@ -93,6 +93,17 @@ func (l *GameClientLink) broadcastLiveStopMove(live *livePlayer, at location.Loc
 	})
 }
 
+// broadcastLiveDie sends the death packet live's own session and every
+// observer, so the corpse-fall animation plays immediately instead of only
+// on a later dead reconnect. Restart-selector options are left at their
+// zero value: they depend on clan hall/castle/siege ownership and sweep
+// eligibility that aren't wired yet.
+func (l *GameClientLink) broadcastLiveDie(live *livePlayer) {
+	l.broadcastLiveFrame(live, func() wire.Frame {
+		return serverpackets.FrameDie(live.ObjectID(), serverpackets.DieOptions{})
+	})
+}
+
 // broadcastLiveFrame sends frame() to live's own session and to every
 // object it currently knows, building a fresh frame per recipient since
 // each wire.Frame is released after its own send.

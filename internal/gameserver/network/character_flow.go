@@ -219,6 +219,9 @@ func (l *GameClientLink) attachLivePlayer(client *Client, c *player.Character, t
 		x, y, z := live.Position()
 		l.broadcastLiveStopMove(live, location.Location{X: x, Y: y, Z: z}, live.CurrentHeading())
 	})
+	c.SetDieBroadcaster(func() {
+		l.broadcastLiveDie(live)
+	})
 	return live, nil
 }
 
