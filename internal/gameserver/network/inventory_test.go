@@ -7,7 +7,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -82,8 +81,8 @@ func TestGameClientLinkDropItemInGame(t *testing.T) {
 	if count := r.ReadUint16(); count != 1 {
 		t.Fatalf("InventoryUpdate count = %d, want 1", count)
 	}
-	if state := r.ReadUint16(); state != uint16(itemcontainer.UpdateModified) {
-		t.Fatalf("InventoryUpdate state = %d, want modified", state)
+	if state := r.ReadUint16(); state != 2 {
+		t.Fatalf("InventoryUpdate state = %d, want modified (2, per ItemState.ordinal)", state)
 	}
 	r.ReadUint16()
 	if got := r.ReadInt32(); got != 500 {
@@ -157,8 +156,8 @@ func TestGameClientLinkDestroyItemInGame(t *testing.T) {
 	if count := r.ReadUint16(); count != 1 {
 		t.Fatalf("InventoryUpdate count = %d, want 1", count)
 	}
-	if state := r.ReadUint16(); state != uint16(itemcontainer.UpdateModified) {
-		t.Fatalf("InventoryUpdate state = %d, want modified", state)
+	if state := r.ReadUint16(); state != 2 {
+		t.Fatalf("InventoryUpdate state = %d, want modified (2, per ItemState.ordinal)", state)
 	}
 	r.ReadUint16()
 	if got := r.ReadInt32(); got != 501 {
@@ -223,8 +222,8 @@ func TestGameClientLinkCrystallizeItemInGame(t *testing.T) {
 	if count := r.ReadUint16(); count != 2 {
 		t.Fatalf("InventoryUpdate count = %d, want 2", count)
 	}
-	if state := r.ReadUint16(); state != uint16(itemcontainer.UpdateRemoved) {
-		t.Fatalf("source update state = %d, want removed", state)
+	if state := r.ReadUint16(); state != 3 {
+		t.Fatalf("source update state = %d, want removed (3, per ItemState.ordinal)", state)
 	}
 	r.ReadUint16()
 	if got := r.ReadInt32(); got != 502 {
@@ -238,8 +237,8 @@ func TestGameClientLinkCrystallizeItemInGame(t *testing.T) {
 	}
 	skipInventoryRemainder(r)
 
-	if state := r.ReadUint16(); state != uint16(itemcontainer.UpdateAdded) {
-		t.Fatalf("crystal update state = %d, want added", state)
+	if state := r.ReadUint16(); state != 1 {
+		t.Fatalf("crystal update state = %d, want added (1, per ItemState.ordinal)", state)
 	}
 	r.ReadUint16()
 	if got := r.ReadInt32(); got == 0 {

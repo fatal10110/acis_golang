@@ -32,9 +32,12 @@ const (
 // inventory-update notification.
 type UpdateState uint8
 
-// Update states.
+// Update states. Values start at 1, not 0: the wire format's leading state
+// code 0 is reserved for "unchanged" (never queued here, but the client's
+// parser assigns it that meaning and shifts every other code accordingly).
 const (
-	UpdateAdded UpdateState = iota
+	updateUnchanged UpdateState = iota
+	UpdateAdded
 	UpdateModified
 	UpdateRemoved
 )
