@@ -25,7 +25,7 @@ func TestCharacterStoreCreatePersistsInitialPosition(t *testing.T) {
 		BaseClassID: 44,
 		Race:        player.RaceOrc,
 		Sex:         player.SexMale,
-		Level:       1,
+		CharLevel:   1,
 		Location:    location.Location{X: -56733, Y: -113459, Z: -690},
 		LastHeading: 32768,
 	}

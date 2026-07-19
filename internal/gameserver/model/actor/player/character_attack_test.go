@@ -42,7 +42,7 @@ func combatItems() *item.Table {
 func liveCharacter(id int32, tmpl *Template, items *item.Table, equipped ...*item.Instance) *Character {
 	c := &Character{
 		ID: id, Name: "char", ClassID: tmpl.ID, BaseClassID: tmpl.ID,
-		Race: RaceHuman, Sex: SexMale, Level: 1,
+		Race: RaceHuman, Sex: SexMale, CharLevel: 1,
 		Location: location.Location{X: int(id) * 100, Y: 0, Z: 0},
 	}
 	c.SetResourceValues(Resources{MaxHP: 100, CurrentHP: 100, MaxMP: 30, CurrentMP: 30})
