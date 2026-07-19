@@ -72,7 +72,7 @@ func NewCharacterSlot(c *player.Character, items []*item.Instance, now time.Time
 		Sex: c.Sex, Race: c.Race, ClassID: int32(c.ClassID),
 		X: int32(x), Y: int32(y), Z: int32(z),
 		CurHP: resources.CurrentHP, CurMP: resources.CurrentMP, MaxHP: resources.MaxHP, MaxMP: resources.MaxMP,
-		SP: int32(c.SP), Exp: c.Exp, Level: int32(c.Level),
+		SP: int32(c.SP), Exp: c.Exp, Level: int32(c.CharLevel),
 		Karma: int32(c.Karma), PKKills: int32(c.PKKills), PvPKills: int32(c.PvPKills),
 		HairStyle: int32(c.HairStyle), HairColor: int32(c.HairColor), Face: int32(c.Face),
 		AccessLevel: int32(c.AccessLevel),

@@ -3,8 +3,19 @@ package skill
 import (
 	"testing"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+)
+
+// *player.Character must satisfy cancelTarget (and the sibling caster
+// shapes that share the same Level() int requirement): it couldn't, before
+// Character's persisted level field was renamed off of Level to make room
+// for the method (see player.Character.CharLevel).
+var (
+	_ cancelTarget = (*player.Character)(nil)
+	_ sowCaster    = (*player.Character)(nil)
+	_ magicCaster  = (*player.Character)(nil)
 )
 
 type cancelFakeActor struct {

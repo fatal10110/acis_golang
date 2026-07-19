@@ -244,6 +244,35 @@ func TestHostileOutOfTerritoryReturnsHomeAfterRegionDeactivation(t *testing.T) {
 	}
 }
 
+// TestHostileMovingIntoAlreadyInactiveRegionResetsWithoutThink covers issue
+// #816: a hostile's own region never toggles when it (a non-player) is the
+// one crossing into a neighbor that was already inactive, so nothing would
+// reset it without Region.Add's current-state notify — and unlike the
+// notify-on-toggle path, this doesn't depend on Think ever running again.
+func TestHostileMovingIntoAlreadyInactiveRegionResetsWithoutThink(t *testing.T) {
+	state := world.New()
+	move := &hostileMove{}
+	hostile := newTestHostile(t, move, &hostileAttack{})
+	hostile.SetWorld(state)
+	worldtest.SpawnPlayer(state, 1, 0, 0, 0)
+	state.Spawn(hostile, 0, 0, 0, 0)
+	target := &hostileTarget{id: 200}
+
+	hostile.AddHate(target, 30)
+
+	const far = 8192 // outside the player's 3x3 neighborhood; destination stays inactive
+	if err := state.Move(hostile, far, 0, 0); err != nil {
+		t.Fatalf("Move: %v", err)
+	}
+
+	if !hostile.AI().Hates().IsEmpty() {
+		t.Fatal("hate table not cleared after moving into an already-inactive region")
+	}
+	if move.stopCount != 1 {
+		t.Fatalf("stop count = %d, want one reset from the move-in notify", move.stopCount)
+	}
+}
+
 type hostileRewarder struct {
 	calls []creature.DeathActor
 }

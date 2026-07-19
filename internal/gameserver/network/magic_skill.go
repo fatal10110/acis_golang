@@ -5,8 +5,6 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
-	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
-	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -18,6 +16,11 @@ import (
 func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets.RequestMagicSkillUse) {
 	if live == nil {
 		sendMagicActionFailed(live)
+		return
+	}
+
+	if def, ok := l.skills.Definition(modelskill.Ref{ID: modelskill.ID(req.SkillID), Level: live.SkillLevel(int(req.SkillID))}); ok && def.Activation == modelskill.ActivationToggle {
+		l.handleToggleSkillUse(live, req)
 		return
 	}
 
@@ -68,42 +71,38 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 		controller.Stop()
 		return
 	}
-	l.applySkillEffects(live, target, def)
+	actorcast.ApplyEffects(actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers}, live.Character, target, def)
 	sendMagicStatusUpdate(live, beforeVitals)
 	controller.Finish()
 }
 
-// applySkillEffects resolves def's affected target set from resolved (the
-// already cast-validated single selection) and applies the skill's
-// effects to it. A caster or resolved target that doesn't satisfy the
-// target-resolution or effect-application surfaces is skipped rather than
-// failing the cast — the same graceful degradation the effect handlers
-// already use for actor state this port hasn't modeled yet.
-func (l *GameClientLink) applySkillEffects(live *livePlayer, resolved actorcast.Target, def modelskill.Definition) {
-	caster, ok := any(live.Character).(skilltarget.Creature)
-	if !ok {
+// handleToggleSkillUse applies casting a toggle skill: an already-active
+// instance turns off at no cost, an inactive one pays its MP/HP cost and
+// turns on. A toggle's cast window is instantaneous — there is no cast bar,
+// no launch packet, and activating one never installs a reuse delay — so
+// this bypasses the timed Start/Hit/Finish sequence handleMagicSkillUse
+// drives for an ordinary active skill. The on/off decision and effect
+// application both happen inside actorcast.ApplyToggle; this handler only
+// translates the outcome into packets.
+func (l *GameClientLink) handleToggleSkillUse(live *livePlayer, req clientpackets.RequestMagicSkillUse) {
+	def, _, _, err := actorcast.ApplyToggle(
+		actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers},
+		live.castController(),
+		actorcast.PlayerToggleRequest{
+			Caster:      live.Character,
+			Selected:    live.target,
+			SkillID:     int(req.SkillID),
+			Definitions: l.skills,
+		},
+	)
+	if err != nil {
+		sendMagicCastFailure(live, def, err)
 		return
 	}
-	selected, _ := resolved.(skilltarget.Creature)
 
-	handler, ok := l.targets.Handler(def.Target)
-	if !ok || !handler.CanCast(caster, selected, &def, false) {
-		return
-	}
-
-	affected := handler.Targets(caster, selected, &def)
-	if len(affected) == 0 {
-		return
-	}
-	castTargets := make([]any, len(affected))
-	for i, t := range affected {
-		castTargets[i] = t
-	}
-
-	l.skillHandlers.Use(handlerskill.Cast{
-		Caster:  live.Character,
-		Skill:   def,
-		Targets: castTargets,
+	selfObject := skillCastObject(live)
+	l.broadcastLiveFrame(live, func() wire.Frame {
+		return serverpackets.FrameMagicSkillUse(selfObject, selfObject, int32(def.ID), int32(def.Level), 0, 0, false)
 	})
 }
 

@@ -175,7 +175,7 @@ func acquireSkillListEntries(live *livePlayer) []serverpackets.AcquireSkillListE
 	if live == nil || live.template == nil {
 		return nil
 	}
-	grants := live.template.AvailableSkillGrants(live.Level, live.SkillLevels())
+	grants := live.template.AvailableSkillGrants(live.CharLevel, live.SkillLevels())
 	entries := make([]serverpackets.AcquireSkillListEntry, 0, len(grants))
 	for _, grant := range grants {
 		entries = append(entries, serverpackets.AcquireSkillListEntry{
@@ -194,7 +194,7 @@ func (l *GameClientLink) fishingAcquireSkillList(live *livePlayer) wire.Frame {
 	if l.skillTrees == nil || live == nil {
 		return serverpackets.FrameAcquireSkillList(serverpackets.AcquireSkillTypeFishing, nil)
 	}
-	nodes := l.skillTrees.FishingSkillsFor(live.Level, live.HasDwarvenCraft(), skillstate.TreeSkillLevels(live.SkillLevels()))
+	nodes := l.skillTrees.FishingSkillsFor(live.CharLevel, live.HasDwarvenCraft(), skillstate.TreeSkillLevels(live.SkillLevels()))
 	entries := make([]serverpackets.AcquireSkillListEntry, 0, len(nodes))
 	for _, node := range nodes {
 		entries = append(entries, serverpackets.AcquireSkillListEntry{

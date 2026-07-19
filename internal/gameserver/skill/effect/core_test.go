@@ -1331,3 +1331,169 @@ func TestNegateEffectTypeUnrestrictedWhenLevelIsMinusOne(t *testing.T) {
 		t.Error("a negateLevel of -1 must strip regardless of abnormal level")
 	}
 }
+
+func TestFusionEffectActionNeverEndsOnItsOwnTick(t *testing.T) {
+	e, err := New(Skill{Level: 3}, modelskill.EffectTemplate{Name: "Fusion", Time: 15})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	if !e.ActionTime() {
+		t.Fatal("ActionTime() = false, want true: a fusion effect never ends via its own periodic tick")
+	}
+}
+
+func TestFusionEffectIncreaseEffectGrowsLevelAndReapplies(t *testing.T) {
+	target := &liveEffectTarget{list: NewList(nil)}
+	e, err := New(Skill{Level: 3}, modelskill.EffectTemplate{Name: "Fusion", Time: 15})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e.Effected = target
+	target.list.Add(e)
+
+	var reappliedAt int
+	e.IncreaseEffect(target.list, 5, func(level int) { reappliedAt = level })
+
+	if e.Level != 4 {
+		t.Fatalf("Level after IncreaseEffect = %d, want 4", e.Level)
+	}
+	if reappliedAt != 4 {
+		t.Fatalf("reapply level = %d, want 4", reappliedAt)
+	}
+	if hasEffectInList(target.list, e) {
+		t.Error("the prior instance must be removed before its replacement is applied")
+	}
+}
+
+func TestFusionEffectIncreaseEffectAtMaxLevelIsANoop(t *testing.T) {
+	target := &liveEffectTarget{list: NewList(nil)}
+	e, err := New(Skill{Level: 5}, modelskill.EffectTemplate{Name: "Fusion", Time: 15})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e.Effected = target
+	target.list.Add(e)
+
+	reapplied := false
+	e.IncreaseEffect(target.list, 5, func(int) { reapplied = true })
+
+	if e.Level != 5 {
+		t.Fatalf("Level after IncreaseEffect at max = %d, want unchanged 5", e.Level)
+	}
+	if reapplied {
+		t.Error("IncreaseEffect at max level must not reapply")
+	}
+	if !hasEffectInList(target.list, e) {
+		t.Error("IncreaseEffect at max level must leave the instance in place")
+	}
+}
+
+func TestFusionEffectDecreaseForceShrinksLevelAndReapplies(t *testing.T) {
+	target := &liveEffectTarget{list: NewList(nil)}
+	e, err := New(Skill{Level: 3}, modelskill.EffectTemplate{Name: "Fusion", Time: 15})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e.Effected = target
+	target.list.Add(e)
+
+	var reappliedAt int
+	e.DecreaseForce(target.list, func(level int) { reappliedAt = level })
+
+	if e.Level != 2 {
+		t.Fatalf("Level after DecreaseForce = %d, want 2", e.Level)
+	}
+	if reappliedAt != 2 {
+		t.Fatalf("reapply level = %d, want 2", reappliedAt)
+	}
+	if hasEffectInList(target.list, e) {
+		t.Error("the prior instance must be removed before its replacement is applied")
+	}
+}
+
+func TestFusionEffectDecreaseForceBelowOneRemovesWithoutReapply(t *testing.T) {
+	target := &liveEffectTarget{list: NewList(nil)}
+	e, err := New(Skill{Level: 1}, modelskill.EffectTemplate{Name: "Fusion", Time: 15})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e.Effected = target
+	target.list.Add(e)
+
+	reapplied := false
+	e.DecreaseForce(target.list, func(int) { reapplied = true })
+
+	if e.Level != 0 {
+		t.Fatalf("Level after DecreaseForce below 1 = %d, want 0", e.Level)
+	}
+	if reapplied {
+		t.Error("DecreaseForce dropping below level 1 must not reapply")
+	}
+	if hasEffectInList(target.list, e) {
+		t.Error("DecreaseForce dropping below level 1 must remove the instance")
+	}
+}
+
+func TestNewChanceSkillTriggerRejectsUnknownTriggerType(t *testing.T) {
+	if _, err := New(Skill{}, modelskill.EffectTemplate{Name: "ChanceSkillTrigger", ChanceType: "BOGUS", ActivationChance: 50}); err == nil {
+		t.Fatal("New() error = nil, want an error for an unknown chanceType")
+	}
+}
+
+func TestNewChanceSkillTriggerAcceptsAnAbsentChanceType(t *testing.T) {
+	if _, err := New(Skill{}, modelskill.EffectTemplate{Name: "ChanceSkillTrigger", TriggeredID: 5144}); err != nil {
+		t.Fatalf("New() error = %v, want nil for an absent chanceType", err)
+	}
+}
+
+type chanceTriggerFakeActor struct {
+	tracked []*Effect
+}
+
+func (a *chanceTriggerFakeActor) AddChanceTrigger(e *Effect) {
+	a.tracked = append(a.tracked, e)
+}
+
+func (a *chanceTriggerFakeActor) RemoveChanceTrigger(e *Effect) {
+	for i, cur := range a.tracked {
+		if cur == e {
+			a.tracked = append(a.tracked[:i], a.tracked[i+1:]...)
+			return
+		}
+	}
+}
+
+func TestChanceSkillTriggerInstallsAndRemovesOnTarget(t *testing.T) {
+	target := &chanceTriggerFakeActor{}
+	e, err := New(Skill{}, modelskill.EffectTemplate{
+		Name: "ChanceSkillTrigger", Time: 60, TriggeredID: 5144,
+		ChanceType: "ON_ATTACKED", ActivationChance: 80,
+	})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e.Effected = target
+
+	if !e.OnStart(e) {
+		t.Fatal("OnStart() = false, want true")
+	}
+	if len(target.tracked) != 1 || target.tracked[0] != e {
+		t.Fatalf("tracked after OnStart = %+v, want [e]", target.tracked)
+	}
+
+	e.OnExit(e)
+	if len(target.tracked) != 0 {
+		t.Fatalf("tracked after OnExit = %+v, want empty", target.tracked)
+	}
+}
+
+func TestChanceSkillTriggerOnATargetWithNoTrackingIsANoop(t *testing.T) {
+	e, err := New(Skill{}, modelskill.EffectTemplate{Name: "ChanceSkillTrigger", ChanceType: "ON_HIT", ActivationChance: 50})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	if !e.OnStart(e) {
+		t.Fatal("OnStart() = false, want true even without a tracking target")
+	}
+	e.OnExit(e)
+}

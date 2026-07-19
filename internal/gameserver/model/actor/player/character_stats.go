@@ -121,10 +121,10 @@ func (a characterStatActor) MEN() int {
 }
 
 func (a characterStatActor) Level() int {
-	if a.c.Level <= 0 {
+	if a.c.CharLevel <= 0 {
 		return 1
 	}
-	return a.c.Level
+	return a.c.CharLevel
 }
 
 func (a characterStatActor) LevelMod() float64 {
@@ -280,7 +280,7 @@ func (c *Character) CPRegenRate() float64 {
 }
 
 func (c *Character) levelTableValue(values []float64, fallback float64) float64 {
-	level := c.Level
+	level := c.CharLevel
 	if level <= 0 {
 		level = 1
 	}

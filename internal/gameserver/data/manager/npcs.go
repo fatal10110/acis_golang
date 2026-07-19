@@ -748,8 +748,8 @@ func (d *deathRewards) rewardEntries() ([]playerRewardEntry, float64, *player.Ch
 			maxDealer = attacker
 			maxDamage = threat.Damage
 		}
-		if attacker.Level > highestLevel {
-			highestLevel = attacker.Level
+		if attacker.CharLevel > highestLevel {
+			highestLevel = attacker.CharLevel
 		}
 	}
 
@@ -784,7 +784,7 @@ func (d *deathRewards) grantExpAndSp(entries []playerRewardEntry, totalDamage fl
 		return
 	}
 	for _, entry := range entries {
-		exp, sp := player.KillRewardExpAndSp(d.tmpl.RewardExp, d.tmpl.RewardSp, entry.damage, totalDamage, entry.actor.Level-d.tmpl.Level)
+		exp, sp := player.KillRewardExpAndSp(d.tmpl.RewardExp, d.tmpl.RewardSp, entry.damage, totalDamage, entry.actor.CharLevel-d.tmpl.Level)
 		entry.actor.RewardExpAndSp(d.config.PlayerLevels, exp, sp)
 	}
 }

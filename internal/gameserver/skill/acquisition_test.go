@@ -159,7 +159,7 @@ func TestNeedsStorageSync(t *testing.T) {
 
 func testLearner(level, sp int) (*player.Character, *player.Template) {
 	tmpl := &player.Template{Skills: []player.SkillGrant{{SkillID: 3, Level: 1, MinLevel: 5, Cost: 50}}}
-	ch := &player.Character{ID: 1, Level: level, SP: sp}
+	ch := &player.Character{ID: 1, CharLevel: level, SP: sp}
 	return ch, tmpl
 }
 

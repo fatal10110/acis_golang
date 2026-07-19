@@ -35,6 +35,9 @@ const (
 // disable or "eligible to be stripped".
 type Skill struct {
 	ID modelskill.ID
+	// Level is the applied level of the skill that owns this effect
+	// instance's template.
+	Level int
 	// SkillType is the raw datapack skill-type tag (e.g. "BUFF", "REFLECT").
 	// It drives the buff-slot family used by the list's cap enforcement.
 	SkillType      string
@@ -102,6 +105,12 @@ type Effect struct {
 	Effector any
 	Effected any
 
+	// Level is the applied skill level this effect instance represents,
+	// initialized from Skill.Level. Every kind treats it as fixed for the
+	// effect's lifetime except a fusion effect's IncreaseEffect/
+	// DecreaseForce, which grow or shrink it while the effect stays live.
+	Level int
+
 	OnStart    func(*Effect) bool
 	OnAction   func(*Effect) bool
 	OnExit     func(*Effect)
@@ -127,28 +136,30 @@ func (e *Effect) ActionTime() bool {
 	return e.OnAction(e)
 }
 
-func (e *Effect) setInUse(inUse bool) bool {
-	if inUse {
-		if e.OnStart != nil && !e.OnStart(e) {
-			return false
-		}
-		e.inUse = true
-		return true
-	}
+// beginExit flips e's in-use flag off, if it was on, and returns a thunk
+// that fires the resulting on-exit hook — or nil if e wasn't active or has
+// no such hook. The flag flips immediately (so InUse() is accurate the
+// moment the caller's lock is released) but the hook itself is returned
+// for the caller to run later, outside that lock: see List.runHooks.
+func (e *Effect) beginExit() func() {
 	if !e.inUse {
-		return true
+		return nil
 	}
 	e.inUse = false
-	if e.OnExit != nil {
-		e.OnExit(e)
+	if e.OnExit == nil {
+		return nil
 	}
-	return true
+	return func() { e.OnExit(e) }
 }
 
-func (e *Effect) stopTask() {
-	if e.OnStopTask != nil {
-		e.OnStopTask(e)
+// stopTaskThunk returns a thunk that fires e's on-stop-task hook, or nil
+// when e has none. Like beginExit, the caller runs the returned thunk only
+// after releasing List's lock.
+func (e *Effect) stopTaskThunk() func() {
+	if e.OnStopTask == nil {
+		return nil
 	}
+	return func() { e.OnStopTask(e) }
 }
 
 func (e *Effect) identical(other *Effect) bool {
@@ -234,10 +245,12 @@ func (l *List) Add(e *Effect) {
 	if l == nil || e == nil {
 		return
 	}
+	var pending []func()
 	l.mu.Lock()
-	defer l.mu.Unlock()
+	l.add(e, &pending)
+	l.mu.Unlock()
 
-	l.add(e)
+	runHooks(pending)
 }
 
 // Remove drops e from the list and activates the next member of its stack
@@ -246,21 +259,66 @@ func (l *List) Remove(e *Effect) {
 	if l == nil || e == nil {
 		return
 	}
+	var pending []func()
 	l.mu.Lock()
-	defer l.mu.Unlock()
+	l.remove(e, &pending)
+	l.mu.Unlock()
 
-	l.remove(e)
+	runHooks(pending)
+}
+
+// runHooks fires each queued hook in order, after the caller has released
+// l.mu. Add/Remove queue every OnStart/OnExit/OnStopTask call (and the
+// owner stat-func callbacks that accompany them) here instead of firing
+// them while l.mu is held, so a hook that calls back into this same List's
+// Add/Remove doesn't self-deadlock on l.mu (sync.Mutex isn't reentrant).
+// Queuing preserves the original call order exactly, since every entry is
+// appended at the point the original code invoked it synchronously.
+func runHooks(pending []func()) {
+	for _, fn := range pending {
+		fn()
+	}
+}
+
+// appendThunk queues thunk, a possibly-nil hook invocation (nil meaning the
+// effect has no such hook set).
+func appendThunk(pending *[]func(), thunk func()) {
+	if thunk != nil {
+		*pending = append(*pending, thunk)
+	}
+}
+
+// beginActivate returns a thunk that runs e's on-start hook once the
+// caller's lock is released, then briefly re-acquires l.mu to apply the
+// result: e activates and gains its stat funcs on success, or onReject
+// runs (still under l.mu) on failure.
+func (l *List) beginActivate(e *Effect, onReject func(*Effect)) func() {
+	return func() {
+		ok := true
+		if e.OnStart != nil {
+			ok = e.OnStart(e)
+		}
+
+		l.mu.Lock()
+		if ok {
+			e.inUse = true
+			l.addStatFuncs(e)
+		} else {
+			onReject(e)
+		}
+		l.mu.Unlock()
+	}
 }
 
 // add inserts e. Incoming effects are not yet gated by the owner's active
 // special-effect state (e.g. rejecting an effect that conflicts with a
 // currently active status) — that needs an owner-side abnormal-state tracker
 // that doesn't exist yet; wire this gate in once that tracker lands.
-func (l *List) add(e *Effect) {
+func (l *List) add(e *Effect, pending *[]func()) {
 	if e.Skill.Debuff {
 		for _, existing := range l.debuffs {
 			if existing.identical(e) {
-				e.stopTask()
+				appendThunk(pending, e.stopTaskThunk())
 				return
 			}
 		}
@@ -268,41 +326,37 @@ func (l *List) add(e *Effect) {
 	} else {
 		for _, existing := range slices.Clone(l.buffs) {
 			if existing.identical(e) {
-				l.exit(existing)
+				l.exit(existing, pending)
 			}
 		}
 
 		// Herbs never evict a real buff: at or over capacity, they are
 		// simply dropped.
 		if e.Herb && l.buffCount() >= l.maxBuffCount() {
-			e.stopTask()
+			appendThunk(pending, e.stopTaskThunk())
 			return
 		}
 
 		if !l.doesStack(e) && !e.Skill.sevenSigns() {
-			l.evictForCap(e)
+			l.evictForCap(e, pending)
 		}
 
 		l.insertBuff(e)
 	}
 
 	if e.stackType() == "none" {
-		if e.setInUse(true) {
-			l.addStatFuncs(e)
-		} else {
-			l.removeFromVisible(e)
-		}
+		*pending = append(*pending, l.beginActivate(e, func(rejected *Effect) { l.removeFromVisible(rejected) }))
 		return
 	}
 
-	l.addStacked(e)
+	l.addStacked(e, pending)
 }
 
 // exit fully retires e: its scheduled task is stopped and it is detached
 // from stats/visibility and, if active, run through its on-exit hook.
-func (l *List) exit(e *Effect) {
-	e.stopTask()
-	l.remove(e)
+func (l *List) exit(e *Effect, pending *[]func()) {
+	appendThunk(pending, e.stopTaskThunk())
+	l.remove(e, pending)
 }
 
 // doesStack reports whether e's stack type already has a member among the
@@ -340,7 +394,7 @@ func (l *List) maxBuffCount() int {
 // evictForCap exits the oldest buff-slot-family buffs when e would put the
 // list at or over the owner's buff-slot cap. Only buff-slot-family incoming
 // effects trigger eviction, and only buff-slot-family buffs are evicted.
-func (l *List) evictForCap(e *Effect) {
+func (l *List) evictForCap(e *Effect, pending *[]func()) {
 	if !e.Skill.buffSlot() {
 		return
 	}
@@ -352,7 +406,7 @@ func (l *List) evictForCap(e *Effect) {
 		if existing == nil || !existing.Skill.buffSlot() {
 			continue
 		}
-		l.exit(existing)
+		l.exit(existing, pending)
 		remaining--
 		if remaining < 0 {
 			break
@@ -376,7 +430,7 @@ func (l *List) insertBuff(e *Effect) {
 	l.buffs = slices.Insert(l.buffs, pos, e)
 }
 
-func (l *List) addStacked(e *Effect) {
+func (l *List) addStacked(e *Effect, pending *[]func()) {
 	if l.stacks == nil {
 		l.stacks = make(map[string][]*Effect)
 	}
@@ -407,15 +461,11 @@ func (l *List) addStacked(e *Effect) {
 	}
 
 	if deactivate != nil {
-		l.removeStats(deactivate)
-		deactivate.setInUse(false)
+		*pending = append(*pending, func() { l.removeStats(deactivate) })
+		appendThunk(pending, deactivate.beginExit())
 	}
 	if activate != nil {
-		if activate.setInUse(true) {
-			l.addStatFuncs(activate)
-		} else {
-			l.removeRejectedStacked(activate)
-		}
+		*pending = append(*pending, l.beginActivate(activate, func(rejected *Effect) { l.removeRejectedStacked(rejected) }))
 	}
 }
 
@@ -433,11 +483,11 @@ func (l *List) removeRejectedStacked(e *Effect) {
 	l.removeFromVisible(e)
 }
 
-func (l *List) remove(e *Effect) {
+func (l *List) remove(e *Effect, pending *[]func()) {
 	if e.stackType() == "none" {
 		if l.removeFromVisible(e) && e.InUse() {
-			l.removeStats(e)
-			e.setInUse(false)
+			*pending = append(*pending, func() { l.removeStats(e) })
+			appendThunk(pending, e.beginExit())
 		}
 		return
 	}
@@ -451,12 +501,12 @@ func (l *List) remove(e *Effect) {
 
 	queue = slices.Delete(queue, index, index+1)
 	if index == 0 {
-		l.removeStats(e)
-		e.setInUse(false)
+		*pending = append(*pending, func() { l.removeStats(e) })
+		appendThunk(pending, e.beginExit())
 		if len(queue) > 0 {
 			next := l.contained(queue[0])
-			if next != nil && next.setInUse(true) {
-				l.addStatFuncs(next)
+			if next != nil {
+				*pending = append(*pending, l.beginActivate(next, func(*Effect) {}))
 			}
 		}
 	}

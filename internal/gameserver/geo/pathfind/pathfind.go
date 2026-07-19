@@ -438,15 +438,13 @@ func (f *Finder) backwardCandidateNSWE(gx, gy int, current *node) (height int, n
 		return height, nswe, true
 	}
 
-	h, n, found := f.engine.NodeAtOrAbove(gx, gy, z)
+	h, n, found := f.engine.NodeAtOrAbove(gx, gy, z, func(candidateHeight int16) bool {
+		return f.candidateHeightMatches(current.gx, current.gy, int(candidateHeight)+block.CellIgnoreHeight, current.z)
+	})
 	if !found {
 		return 0, 0, false
 	}
-	height = int(h)
-	if !f.candidateHeightMatches(current.gx, current.gy, height+block.CellIgnoreHeight, current.z) {
-		return 0, 0, false
-	}
-	return height, n, true
+	return int(h), n, true
 }
 
 // addCandidate dedups against already explored/queued nodes, weights the grid
@@ -478,19 +476,36 @@ func (f *Finder) addCandidateTo(current, goal *node, seq *int64, scratch *search
 		}
 	}
 
-	n := scratch.newNode(gx, gy, height)
-	n.nswe = nswe
+	// Corner-cut candidates can pass the NSWE mutual-mask gate in expand yet
+	// still cross terrain CanMove would reject: on multilayer cells, the
+	// diagonal target's own height (resolved independently via NodeBelow)
+	// doesn't guarantee a walkable straight line from current, since
+	// CanMove's line-walk visits the corner's flanking cells rather than
+	// jumping straight to the target the way candidate generation does.
+	// Cardinal steps need no such check: CanMove's single-iteration walk
+	// for an axis-aligned 1-cell step resolves the same NodeBelow call
+	// candidate generation already used, so it can never disagree.
+	direct := !diagonal || f.canMoveDirect(current, gx, gy, height)
+
 	parent := current
 	cost := current.g + weight
-	if current.parent != nil {
+	// canMoveDirect is a line-walk; only pay for it once the cheap cost/range
+	// comparison shows this parent-skip could actually change the outcome
+	// (either it's the only way direct connectivity holds, or it's cheaper).
+	if current.parent != nil && withinSmoothRange(current.parent, gx, gy, height) {
 		smoothed := current.parent.g + f.straightLineCost(current.parent, gx, gy, height, nswe)
-		if smoothed < cost &&
-			withinSmoothRange(current.parent, gx, gy, height) &&
-			f.canMoveDirect(current.parent, gx, gy, height) {
+		if (!direct || smoothed < cost) && f.canMoveDirect(current.parent, gx, gy, height) {
 			parent = current.parent
 			cost = smoothed
+			direct = true
 		}
 	}
+	if !direct {
+		return
+	}
+
+	n := scratch.newNode(gx, gy, height)
+	n.nswe = nswe
 	n.g = cost
 	n.parent = parent
 	n.seq = *seq
@@ -522,19 +537,31 @@ func (f *Finder) addBackwardCandidate(current, goal *node, seq *int64, scratch *
 		}
 	}
 
+	// See the matching comment in addCandidateTo: corner-cut candidates need
+	// their own direct-connectivity check on multilayer terrain, cardinal
+	// steps don't.
+	direct := !diagonal || f.engine.CanMove(
+		engine.WorldX(gx), engine.WorldY(gy), height,
+		engine.WorldX(current.gx), engine.WorldY(current.gy), current.z,
+	)
+
 	parent := current
 	cost := current.g + weight
-	if current.parent != nil {
+	// See the matching comment in addCandidateTo: defer the CanMove line-walk
+	// behind the cheap cost/range comparison.
+	if current.parent != nil && withinSmoothRangeFrom(gx, gy, height, current.parent.gx, current.parent.gy, current.parent.z) {
 		smoothed := current.parent.g + f.straightLineCostFrom(gx, gy, height, current.parent.gx, current.parent.gy, current.parent.z, current.parent.nswe)
-		if smoothed < cost &&
-			withinSmoothRangeFrom(gx, gy, height, current.parent.gx, current.parent.gy, current.parent.z) &&
-			f.engine.CanMove(
-				engine.WorldX(gx), engine.WorldY(gy), height,
-				engine.WorldX(current.parent.gx), engine.WorldY(current.parent.gy), current.parent.z,
-			) {
+		if (!direct || smoothed < cost) && f.engine.CanMove(
+			engine.WorldX(gx), engine.WorldY(gy), height,
+			engine.WorldX(current.parent.gx), engine.WorldY(current.parent.gy), current.parent.z,
+		) {
 			parent = current.parent
 			cost = smoothed
+			direct = true
 		}
+	}
+	if !direct {
+		return
 	}
 
 	n := scratch.newNode(gx, gy, height)
