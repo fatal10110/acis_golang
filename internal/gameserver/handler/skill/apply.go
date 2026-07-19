@@ -32,6 +32,7 @@ func applyEffects(effector, effected any, def modelskill.Definition, templates [
 
 	meta := effect.Skill{
 		ID:                  def.ID,
+		Level:               def.Level,
 		SkillType:           def.SkillType,
 		Debuff:              def.Debuff,
 		Toggle:              def.Activation == modelskill.ActivationToggle,
@@ -78,6 +79,28 @@ func firstEffectByID(list *effect.List, id modelskill.ID) *effect.Effect {
 		}
 	}
 	return nil
+}
+
+// ActiveEffect reports whether target's live effect list currently holds an
+// active instance of skill id — the caller-side lookup a toggle skill's
+// on/off decision needs before driving cast.Controller.CastToggle.
+func ActiveEffect(target any, id modelskill.ID) bool {
+	t, ok := target.(effectListTarget)
+	if !ok {
+		return false
+	}
+	return firstEffectByID(t.EffectList(), id) != nil
+}
+
+// StopEffect removes target's active instance of skill id from its live
+// effect list, if one exists, running that instance's exit hook. This is
+// how deactivating an already-active toggle turns it off.
+func StopEffect(target any, id modelskill.ID) {
+	t, ok := target.(effectListTarget)
+	if !ok {
+		return
+	}
+	stopEffectsBySkillID(t.EffectList(), id)
 }
 
 // removeMatching removes every effect in list for which remove returns

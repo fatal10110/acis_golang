@@ -21,6 +21,11 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 		return
 	}
 
+	if def, ok := l.skills.Definition(modelskill.Ref{ID: modelskill.ID(req.SkillID), Level: live.SkillLevel(int(req.SkillID))}); ok && def.Activation == modelskill.ActivationToggle {
+		l.handleToggleSkillUse(live, req)
+		return
+	}
+
 	beforeVitals := live.Vitals()
 	controller := live.castController()
 	started, err := actorcast.StartPlayerSkill(actorcast.PlayerSkillRequest{
@@ -71,6 +76,45 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 	l.applySkillEffects(live, target, def)
 	sendMagicStatusUpdate(live, beforeVitals)
 	controller.Finish()
+}
+
+// handleToggleSkillUse applies casting a toggle skill: an already-active
+// instance turns off at no cost, an inactive one pays its MP/HP cost and
+// turns on. A toggle's cast window is instantaneous — there is no cast bar,
+// no launch packet, and activating one never installs a reuse delay — so
+// this bypasses the timed Start/Hit/Finish sequence handleMagicSkillUse
+// drives for an ordinary active skill.
+func (l *GameClientLink) handleToggleSkillUse(live *livePlayer, req clientpackets.RequestMagicSkillUse) {
+	def, target, err := actorcast.ResolvePlayerToggle(actorcast.PlayerToggleRequest{
+		Caster:      live.Character,
+		Selected:    live.target,
+		SkillID:     int(req.SkillID),
+		Definitions: l.skills,
+	})
+	if err != nil {
+		sendMagicCastFailure(live, def, err)
+		return
+	}
+
+	selfObject := skillCastObject(live)
+	l.broadcastLiveFrame(live, func() wire.Frame {
+		return serverpackets.FrameMagicSkillUse(selfObject, selfObject, int32(def.ID), int32(def.Level), 0, 0, false)
+	})
+
+	alreadyActive := handlerskill.ActiveEffect(live.Character, def.ID)
+	activated, err := live.castController().CastToggle(alreadyActive, def)
+	if err != nil {
+		sendMagicCastFailure(live, def, err)
+		return
+	}
+
+	if alreadyActive {
+		handlerskill.StopEffect(live.Character, def.ID)
+		return
+	}
+	if activated {
+		l.applySkillEffects(live, target, def)
+	}
 }
 
 // applySkillEffects resolves def's affected target set from resolved (the

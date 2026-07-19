@@ -118,6 +118,13 @@ const (
 	// every effect whose classification and abnormal level fall under a
 	// configured skill-type/level threshold.
 	TypeNegate Type = "NEGATE"
+	// TypeFusion links a skill's applied level to a scalable force effect:
+	// IncreaseEffect/DecreaseForce can grow or shrink it while it's active,
+	// instead of it only ever starting or ending outright.
+	TypeFusion Type = "FUSION"
+	// TypeChanceSkillTrigger installs a live chance-to-trigger-another-skill
+	// condition on its target for as long as the effect is active.
+	TypeChanceSkillTrigger Type = "CHANCE_SKILL_TRIGGER"
 )
 
 type kind struct {
@@ -162,6 +169,8 @@ var coreKinds = map[string]kind{
 	"ProtectionBlessing":    {typ: TypeProtectionBless, flag: flagProtectionBlessing},
 	"Cancel":                {typ: TypeCancel},
 	"Negate":                {typ: TypeNegate},
+	"Fusion":                {typ: TypeFusion},
+	"ChanceSkillTrigger":    {typ: TypeChanceSkillTrigger},
 }
 
 var fearSkippedPlayableSkillIDs = map[modelskill.ID]bool{
@@ -179,6 +188,11 @@ func New(skill Skill, tmpl modelskill.EffectTemplate) (*Effect, error) {
 	if tmpl.AttachCondition != nil {
 		return nil, fmt.Errorf("effect %s: attach conditions are not wired yet", tmpl.Name)
 	}
+	if k.typ == TypeChanceSkillTrigger {
+		if _, _, err := modelskill.ParseChanceCondition(tmpl.ChanceType, tmpl.ActivationChance); err != nil {
+			return nil, fmt.Errorf("effect %s: %w", tmpl.Name, err)
+		}
+	}
 	if k.flag == 0 {
 		k.flag = FlagNone
 	}
@@ -189,6 +203,7 @@ func New(skill Skill, tmpl modelskill.EffectTemplate) (*Effect, error) {
 		Template: tmpl,
 		Type:     k.typ,
 		Flag:     k.flag,
+		Level:    skill.Level,
 	}
 
 	funcs, err := statFuncs(e, tmpl.Funcs)
@@ -287,6 +302,11 @@ func wireHooks(e *Effect) {
 		e.OnStart = cancelStart
 	case TypeNegate:
 		e.OnStart = negateStart
+	case TypeFusion:
+		e.OnAction = fusionAction
+	case TypeChanceSkillTrigger:
+		e.OnStart = chanceSkillTriggerStart
+		e.OnExit = chanceSkillTriggerExit
 	}
 }
 
@@ -1021,6 +1041,68 @@ func negateLevelAllows(candidate Skill, negateLvl int) bool {
 		return true
 	}
 	return candidate.AbnormalLevel >= 0 && candidate.AbnormalLevel <= negateLvl
+}
+
+// fusionAction is a fusion effect's periodic tick: it never ends on its own
+// action timer, only when its Time runs out or IncreaseEffect/
+// DecreaseForce removes it.
+func fusionAction(*Effect) bool {
+	return true
+}
+
+// IncreaseEffect grows a live fusion effect by one level, up to maxLevel.
+// It removes this instance from list and, unless it was already at
+// maxLevel, asks reapply to install a fresh instance at the grown level —
+// exactly what constructing a new effect at that level in this one's place
+// would produce. Doing nothing at maxLevel (rather than reapplying at the
+// same level) matches the reference: the growth attempt is a plain no-op
+// once the effect is already maxed out.
+func (e *Effect) IncreaseEffect(list *List, maxLevel int, reapply func(level int)) {
+	if e == nil || list == nil || e.Level >= maxLevel {
+		return
+	}
+	e.Level++
+	list.Remove(e)
+	if reapply != nil {
+		reapply(e.Level)
+	}
+}
+
+// DecreaseForce shrinks a live fusion effect by one level. Once its level
+// drops below 1 it is removed outright instead of reapplied.
+func (e *Effect) DecreaseForce(list *List, reapply func(level int)) {
+	if e == nil || list == nil {
+		return
+	}
+	e.Level--
+	list.Remove(e)
+	if e.Level >= 1 && reapply != nil {
+		reapply(e.Level)
+	}
+}
+
+// chanceTriggerTarget is implemented by an actor that tracks its own set of
+// active chance-triggered skill effects, for whatever system later reacts
+// to combat/cast events against it. No actor in this port implements it
+// yet — installing and removing the effect degrades to a no-op until one
+// does, the same graceful-degradation pattern every optional capability in
+// this file follows.
+type chanceTriggerTarget interface {
+	AddChanceTrigger(e *Effect)
+	RemoveChanceTrigger(e *Effect)
+}
+
+func chanceSkillTriggerStart(e *Effect) bool {
+	if target, ok := e.Effected.(chanceTriggerTarget); ok {
+		target.AddChanceTrigger(e)
+	}
+	return true
+}
+
+func chanceSkillTriggerExit(e *Effect) {
+	if target, ok := e.Effected.(chanceTriggerTarget); ok {
+		target.RemoveChanceTrigger(e)
+	}
 }
 
 func abortAll(target any) {
