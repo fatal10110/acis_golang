@@ -4,52 +4,10 @@ import (
 	"testing"
 	"time"
 
-	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
-
-func TestCastEffectsApplyDispatchesToRegisteredSkillHandler(t *testing.T) {
-	caster := &fakeCastCreature{id: 1, category: skilltarget.CategoryAttackable}
-	target := &fakeCastCreature{id: 2, category: skilltarget.CategoryAttackable}
-	handler := &recordingSkillHandler{types: []string{"DUMMYCAST"}}
-	effects := CastEffects{
-		Targets: skilltarget.NewRegistry(nil),
-		Skills:  handlerskill.NewRegistry(handler),
-	}
-	def := modelskill.Definition{Target: modelskill.TargetOne, SkillType: "DUMMYCAST"}
-
-	effects.Apply(caster, target, def)
-
-	if len(handler.calls) != 1 {
-		t.Fatalf("handler calls = %d, want 1", len(handler.calls))
-	}
-	call := handler.calls[0]
-	if call.Caster != caster {
-		t.Fatalf("call.Caster = %v, want caster", call.Caster)
-	}
-	if len(call.Targets) != 1 || call.Targets[0] != target {
-		t.Fatalf("call.Targets = %v, want [target]", call.Targets)
-	}
-}
-
-func TestCastEffectsApplySkipsWhenTargetHandlerRejects(t *testing.T) {
-	caster := &fakeCastCreature{id: 1, category: skilltarget.CategoryAttackable}
-	target := &fakeCastCreature{id: 2, category: skilltarget.CategoryAttackable, dead: true}
-	handler := &recordingSkillHandler{types: []string{"DUMMYCAST"}}
-	effects := CastEffects{
-		Targets: skilltarget.NewRegistry(nil),
-		Skills:  handlerskill.NewRegistry(handler),
-	}
-	def := modelskill.Definition{Target: modelskill.TargetOne, SkillType: "DUMMYCAST", Offensive: true}
-
-	effects.Apply(caster, target, def)
-
-	if len(handler.calls) != 0 {
-		t.Fatalf("handler calls = %d, want 0 for a dead offensive target", len(handler.calls))
-	}
-}
 
 func TestAIControllerDisabledReflectsCastingNow(t *testing.T) {
 	actor := &testActor{mp: 100, hp: 100}
@@ -129,6 +87,11 @@ func TestAIControllerCanCastReflectsControllerGates(t *testing.T) {
 	}
 }
 
+// TestAIControllerCastStartsSchedulesAndAppliesEffectsOnHit exercises
+// AIController.Cast end to end: it must start and schedule the cast on
+// Controller, then — only once the scheduled Hit phase runs — resolve and
+// apply the skill's effects through the exact same ApplyEffects/
+// EffectHandlers plumbing the live player cast pipeline drives.
 func TestAIControllerCastStartsSchedulesAndAppliesEffectsOnHit(t *testing.T) {
 	clock := &fakeCastClock{}
 	actor := scalingActor()
@@ -140,18 +103,15 @@ func TestAIControllerCastStartsSchedulesAndAppliesEffectsOnHit(t *testing.T) {
 	def.Target = modelskill.TargetOne
 	def.SkillType = "DUMMYCAST"
 
-	handler := &recordingSkillHandler{types: []string{"DUMMYCAST"}}
+	rec := &recordingSkillHandler{}
 	caster := &fakeCastCreature{id: 1, category: skilltarget.CategoryAttackable}
 	target := &fakeCastCreature{id: 2, category: skilltarget.CategoryAttackable}
 
 	ai := &AIController{
 		Controller:  ctrl,
 		Definitions: fakeDefinitions{ref: def},
-		Effects: CastEffects{
-			Targets: skilltarget.NewRegistry(nil),
-			Skills:  handlerskill.NewRegistry(handler),
-		},
-		Caster: caster,
+		Effects:     newEffectHandlers(effectsKnown{}, "DUMMYCAST", rec),
+		Caster:      caster,
 	}
 
 	ai.Cast(target, ref)
@@ -159,7 +119,7 @@ func TestAIControllerCastStartsSchedulesAndAppliesEffectsOnHit(t *testing.T) {
 	if !ctrl.CastingNow() {
 		t.Fatal("CastingNow() = false right after Cast(), want mid-cast")
 	}
-	if len(handler.calls) != 0 {
+	if len(rec.calls) != 0 {
 		t.Fatal("skill handler ran before the Hit phase")
 	}
 
@@ -169,11 +129,11 @@ func TestAIControllerCastStartsSchedulesAndAppliesEffectsOnHit(t *testing.T) {
 	clock.fire(125 * time.Millisecond)
 	clock.fire(400 * time.Millisecond)
 
-	if len(handler.calls) != 1 {
-		t.Fatalf("handler calls after Hit phase = %d, want 1", len(handler.calls))
+	if len(rec.calls) != 1 {
+		t.Fatalf("handler calls after Hit phase = %d, want 1", len(rec.calls))
 	}
-	if len(handler.calls[0].Targets) != 1 || handler.calls[0].Targets[0] != target {
-		t.Fatalf("handler call targets = %v, want [target]", handler.calls[0].Targets)
+	if len(rec.calls[0].Targets) != 1 || rec.calls[0].Targets[0] != any(target) {
+		t.Fatalf("handler call targets = %v, want [target]", rec.calls[0].Targets)
 	}
 }
 
@@ -197,6 +157,10 @@ func (f fakeDefinitions) Definition(ref modelskill.Ref) (modelskill.Definition, 
 	return d, ok
 }
 
+// fakeCastCreature satisfies both attackable.Combatant (the ai package's
+// desire/target surface) and skilltarget.Creature (the target-resolution
+// surface ApplyEffects needs), so the same fake can stand in for an
+// AIController's target on both sides of the bridge it builds.
 type fakeCastCreature struct {
 	id       int32
 	x, y, z  int
@@ -215,11 +179,3 @@ func (f *fakeCastCreature) AlikeDead() bool                { return f.dead }
 var _ attackable.Combatant = (*fakeCastCreature)(nil)
 var _ skilltarget.Creature = (*fakeCastCreature)(nil)
 var _ Target = (*fakeCastCreature)(nil)
-
-type recordingSkillHandler struct {
-	types []string
-	calls []handlerskill.Cast
-}
-
-func (h *recordingSkillHandler) Types() []string         { return h.types }
-func (h *recordingSkillHandler) Use(c handlerskill.Cast) { h.calls = append(h.calls, c) }
