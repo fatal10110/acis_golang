@@ -482,8 +482,13 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				l.log.Warn().Err(err).Msg("game client")
 				continue
 			}
-			if live != nil {
-				l.handleSummonActionUse(live, req)
+			if live != nil && !l.handleSummonActionUse(live, req) {
+				// An action-bar command no handler claims must still answer
+				// the client — it locks its input until the action resolves.
+				// The log keeps the gap visible instead of silently dropped.
+				l.log.Warn().Int32("action_id", req.ActionID).Int32("object_id", live.ObjectID()).
+					Msg("game client: action-bar command not implemented yet")
+				live.SendFrame(serverpackets.FrameActionFailed())
 			}
 
 		case clientpackets.OpcodeRequestSocialAction:
