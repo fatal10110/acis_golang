@@ -263,7 +263,11 @@ func (h *Hostile) MarkDead() bool {
 // interval) — Hostile does not hold a reference to that task, so the
 // scheduling stays at the orchestration layer that owns it.
 func (h *Hostile) Die(killer creature.DeathActor, rewards creature.Rewarder) bool {
-	return creature.Die(h, killer, rewards)
+	if !creature.Die(h, killer, rewards) {
+		return false
+	}
+	h.BroadcastDie()
+	return true
 }
 
 // Decayed reports whether this NPC's corpse has already been removed from

@@ -156,6 +156,36 @@ func TestHostileBroadcastAttackNoopsWithoutWorld(t *testing.T) {
 	attacker.BroadcastAttack(serverpackets.AttackSnapshot{AttackerID: 1})
 }
 
+func TestHostileDieBroadcastsDieToKnownReceivers(t *testing.T) {
+	state := world.New()
+	victim := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", HPMax: 10})
+	victim.SetWorld(state)
+	state.Spawn(victim, 100, 100, 0, 0)
+
+	observer := &frameReceiver{trackedID: 55}
+	state.Spawn(observer, 100, 100, 0, 0)
+
+	if !victim.Die(&hostileTarget{id: 2}, nil) {
+		t.Fatal("Die() = false on a live target, want true")
+	}
+
+	if len(observer.frames) != 1 {
+		t.Fatalf("observer received %d frames, want 1", len(observer.frames))
+	}
+	if observer.frames[0][0] != serverpackets.OpcodeDie {
+		t.Fatalf("frame opcode = %#x, want %#x", observer.frames[0][0], serverpackets.OpcodeDie)
+	}
+
+	// A repeated kill is a no-op per Die's once-only contract: no second
+	// Die packet.
+	if victim.Die(&hostileTarget{id: 2}, nil) {
+		t.Fatal("Die() = true on an already-dead target, want false")
+	}
+	if len(observer.frames) != 1 {
+		t.Fatalf("observer received %d frames after a repeat kill, want still 1", len(observer.frames))
+	}
+}
+
 type frameReceiver struct {
 	world.Presence
 	trackedID int32
