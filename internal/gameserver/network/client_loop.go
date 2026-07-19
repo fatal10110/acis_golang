@@ -17,6 +17,13 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
+// Action-bar command ids carried by an action-use request that toggle the
+// player's own stance rather than command a summon.
+const (
+	actionSitStand int32 = 0
+	actionWalkRun  int32 = 1
+)
+
 // Handle drives one game-client connection end to end. It matches Serve's
 // handle signature, so a caller wires it in directly:
 // network.Serve(ctx, ln, link.Handle, log).
@@ -274,6 +281,10 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				if live == nil {
 					continue
 				}
+				// The location-list reply is not implemented yet; log so
+				// the accepted request is never a silent no-op.
+				l.log.Warn().Int32("object_id", live.ObjectID()).
+					Msg("game client: cursed-weapon location request not implemented yet")
 			default:
 				l.log.Info().
 					Uint16("opcode2", second).
@@ -482,13 +493,24 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				l.log.Warn().Err(err).Msg("game client")
 				continue
 			}
-			if live != nil && !l.handleSummonActionUse(live, req) {
-				// An action-bar command no handler claims must still answer
-				// the client — it locks its input until the action resolves.
-				// The log keeps the gap visible instead of silently dropped.
-				l.log.Warn().Int32("action_id", req.ActionID).Int32("object_id", live.ObjectID()).
-					Msg("game client: action-bar command not implemented yet")
-				live.SendFrame(serverpackets.FrameActionFailed())
+			if live == nil {
+				continue
+			}
+			switch req.ActionID {
+			case actionSitStand:
+				l.changeLiveWaitType(live, !live.Standing())
+			case actionWalkRun:
+				l.changeLiveMoveType(live, !live.Running())
+			default:
+				if !l.handleSummonActionUse(live, req) {
+					// An action-bar command no handler claims must still
+					// answer the client — it locks its input until the
+					// action resolves. The log keeps the gap visible
+					// instead of silently dropped.
+					l.log.Warn().Int32("action_id", req.ActionID).Int32("object_id", live.ObjectID()).
+						Msg("game client: action-bar command not implemented yet")
+					live.SendFrame(serverpackets.FrameActionFailed())
+				}
 			}
 
 		case clientpackets.OpcodeRequestSocialAction:

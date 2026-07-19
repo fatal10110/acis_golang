@@ -547,6 +547,84 @@ func TestGameClientLinkAttackRequestFirstSelectsOnly(t *testing.T) {
 	}
 }
 
+// TestGameClientLinkActionBarStanceCommandsToggleStance covers the
+// action-bar sit/stand and walk/run buttons, which arrive as action-use
+// requests rather than the dedicated wait/move-type packets, and the
+// release path for an action-bar command no handler claims yet: the client
+// must get ActionFailed back, never silence.
+func TestGameClientLinkActionBarStanceCommandsToggleStance(t *testing.T) {
+	c, chars, _, _ := newLinkedGameClient(t)
+
+	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.read() // CharCreateOk
+	c.read() // CharSelectInfo
+	objID := chars.soleObjectID(t)
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	// Walk/run button: a fresh character runs, so the first press walks and
+	// the second runs again.
+	c.send(encodeRequestActionUse(1, false, false))
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeChangeMoveType {
+		t.Fatalf("walk/run toggle opcode = %#x, want ChangeMoveType (%#x)", reply[0], serverpackets.OpcodeChangeMoveType)
+	}
+	r := wire.NewReader(reply[1:])
+	if got := r.ReadInt32(); got != objID {
+		t.Fatalf("ChangeMoveType object id = %d, want %d", got, objID)
+	}
+	if running := r.ReadInt32(); running != 0 {
+		t.Fatalf("ChangeMoveType running = %d, want 0 after first toggle", running)
+	}
+	c.send(encodeRequestActionUse(1, false, false))
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeChangeMoveType {
+		t.Fatalf("run toggle opcode = %#x, want ChangeMoveType (%#x)", reply[0], serverpackets.OpcodeChangeMoveType)
+	}
+	r = wire.NewReader(reply[1:])
+	r.ReadInt32()
+	if running := r.ReadInt32(); running != 1 {
+		t.Fatalf("ChangeMoveType running = %d, want 1 after second toggle", running)
+	}
+
+	// Sit/stand button: a fresh character stands, so the first press sits
+	// and the second stands back up.
+	c.send(encodeRequestActionUse(0, false, false))
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeChangeWaitType {
+		t.Fatalf("sit toggle opcode = %#x, want ChangeWaitType (%#x)", reply[0], serverpackets.OpcodeChangeWaitType)
+	}
+	r = wire.NewReader(reply[1:])
+	if got := r.ReadInt32(); got != objID {
+		t.Fatalf("ChangeWaitType object id = %d, want %d", got, objID)
+	}
+	if waitType := r.ReadInt32(); waitType != int32(serverpackets.WaitSitting) {
+		t.Fatalf("ChangeWaitType type = %d, want sitting", waitType)
+	}
+	c.send(encodeRequestActionUse(0, false, false))
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeChangeWaitType {
+		t.Fatalf("stand toggle opcode = %#x, want ChangeWaitType (%#x)", reply[0], serverpackets.OpcodeChangeWaitType)
+	}
+	r = wire.NewReader(reply[1:])
+	r.ReadInt32()
+	if waitType := r.ReadInt32(); waitType != int32(serverpackets.WaitStanding) {
+		t.Fatalf("ChangeWaitType type = %d, want standing", waitType)
+	}
+
+	// An action-bar command nothing claims (private store sell) must
+	// release the client with ActionFailed instead of silence.
+	c.send(encodeRequestActionUse(10, false, false))
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeActionFailed {
+		t.Fatalf("unclaimed action opcode = %#x, want ActionFailed (%#x)", reply[0], serverpackets.OpcodeActionFailed)
+	}
+}
+
 func TestGameClientLinkStanceAndSocialPacketsInGame(t *testing.T) {
 	c, chars, _, _ := newLinkedGameClient(t)
 
