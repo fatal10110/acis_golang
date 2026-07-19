@@ -18,10 +18,44 @@ type disablerTarget interface {
 }
 
 // skillSuccessSource supplies the already-resolved modifier set an
-// effect-landing roll needs; ok is false when the target can't be rolled
-// against at all.
+// effect-landing roll needs, given the caster's blessed-spiritshot charge
+// state and the target's shield-block outcome against this cast; ok is
+// false when the target can't be rolled against at all.
 type skillSuccessSource interface {
-	SkillSuccessInput(caster any, def modelskill.Definition) (in formulas.SkillSuccessInput, ok bool)
+	SkillSuccessInput(caster any, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (in formulas.SkillSuccessInput, ok bool)
+}
+
+// blessedSpiritshotCaster optionally reports whether a caster currently has
+// a blessed spiritshot charge active; a caster without one never does.
+type blessedSpiritshotCaster interface {
+	BlessedSpiritshotCharged() bool
+}
+
+// shieldDefenseSource optionally resolves the shield-block outcome of an
+// incoming skill against a target, given the caster and whether this is a
+// critical hit. A target without one never blocks with a shield, matching a
+// target whose shield equip/facing resolution isn't wired yet.
+type shieldDefenseSource interface {
+	ShieldDefense(caster any, def modelskill.Definition, isCrit bool) formulas.ShieldDefense
+}
+
+func blessedSpiritshotCharged(caster any) bool {
+	c, ok := caster.(blessedSpiritshotCaster)
+	return ok && c.BlessedSpiritshotCharged()
+}
+
+// resolveShieldDefense returns def's shield-block outcome against target,
+// or ShieldFailed when the skill ignores shields entirely or target exposes
+// no resolved shield-block source yet.
+func resolveShieldDefense(caster, target any, def modelskill.Definition) formulas.ShieldDefense {
+	if def.IgnoreShield {
+		return formulas.ShieldFailed
+	}
+	src, ok := target.(shieldDefenseSource)
+	if !ok {
+		return formulas.ShieldFailed
+	}
+	return src.ShieldDefense(caster, def, false)
 }
 
 // skillReflectSource optionally supplies the already-resolved state needed
@@ -113,15 +147,19 @@ func (disablersHandler) Use(cast Cast) {
 	applySelfEffects(cast.Caster, cast.Skill)
 }
 
-// checkSkillSuccess rolls an effect-landing attempt of def against target.
-// ok is false when target exposes no resolved-landing-rate source, letting a
-// caller decide whether to treat that as "doesn't apply" or fall back.
+// checkSkillSuccess rolls an effect-landing attempt of def against target,
+// folding in the caster's blessed-spiritshot charge and the target's
+// shield-block outcome against this cast. ok is false when target exposes
+// no resolved-landing-rate source, letting a caller decide whether to treat
+// that as "doesn't apply" or fall back.
 func checkSkillSuccess(caster any, target any, def modelskill.Definition) (succeeded, ok bool) {
 	src, ok := target.(skillSuccessSource)
 	if !ok {
 		return false, false
 	}
-	in, ok := src.SkillSuccessInput(caster, def)
+	bss := blessedSpiritshotCharged(caster)
+	shield := resolveShieldDefense(caster, target, def)
+	in, ok := src.SkillSuccessInput(caster, def, bss, shield)
 	if !ok {
 		return false, false
 	}

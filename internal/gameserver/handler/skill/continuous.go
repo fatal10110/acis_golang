@@ -36,8 +36,6 @@ type playableTarget interface {
 type continuousHandler struct{}
 
 // Types lists the 14 skill types the reference continuous handler covers.
-// AGGDEBUFF's aggression AI event is dropped after the effect lands (see Use)
-// because the AI-aggression pipeline isn't wired into this layer yet.
 func (continuousHandler) Types() []string {
 	return []string{
 		"BUFF", "DEBUFF", "DOT", "MDOT", "POISON", "BLEED",
@@ -88,11 +86,9 @@ func (h continuousHandler) Use(cast Cast) {
 			continue
 		}
 
-		// Offensive and debuff skills roll to land; everything else acts
-		// unconditionally. The reference also passes a shield-block outcome
-		// and blessed-spiritshot charge into the roll; neither is wired
-		// through this layer's landing-rate source yet, so the roll matches
-		// the reduced-input form the other effect-landing handlers share.
+		// Offensive and debuff skills roll to land, folding in the caster's
+		// blessed-spiritshot charge and the target's shield-block outcome
+		// against this cast; everything else acts unconditionally.
 		acted := true
 		if cast.Skill.Offensive || cast.Skill.Debuff {
 			succeeded, ok := checkSkillSuccess(cast.Caster, effected, cast.Skill)
@@ -113,10 +109,7 @@ func (h continuousHandler) Use(cast Cast) {
 		applyEffects(cast.Caster, effected, cast.Skill, cast.Skill.Effects)
 
 		if skillType == "AGGDEBUFF" {
-			// The reference then fires an aggression AI event on an attackable
-			// target, or retargets/attacks a playable. That AI-aggression
-			// pipeline isn't wired into this handler layer yet, so only the
-			// debuff effect itself lands here.
+			fireAggressionEvent(cast.Caster, effected, cast.Skill)
 		}
 	}
 
@@ -140,4 +133,47 @@ func (continuousHandler) reflectTarget(cast Cast, target continuousTarget) conti
 		return nil
 	}
 	return self
+}
+
+// aggressionNotifiable is implemented by an attackable target that can react
+// to an incoming AI aggression notification carrying the landed skill's
+// power; a target without one doesn't react to it yet.
+type aggressionNotifiable interface {
+	NotifyAggression(source any, power int)
+}
+
+// retargetableOnAggression is implemented by a playable target that tracks
+// a currently selected target and can be provoked into attacking the source
+// of a landed aggression-debuff effect; a target without one isn't
+// retargeted yet.
+type retargetableOnAggression interface {
+	CurrentTarget() any
+	SetTarget(any)
+	AttackTarget(any)
+}
+
+// fireAggressionEvent runs the post-landing aggression notification an
+// AGGDEBUFF-type effect triggers: an attackable target is notified of the
+// caster's aggression at the skill's power, while a playable target is
+// provoked into attacking the caster if it was already targeting it, or
+// retargeted onto the caster otherwise. A target implementing neither
+// optional surface is left as-is.
+func fireAggressionEvent(caster, effected any, def modelskill.Definition) {
+	if am, ok := effected.(attackableMarker); ok && am.Attackable() {
+		if n, ok := effected.(aggressionNotifiable); ok {
+			n.NotifyAggression(caster, int(def.Power))
+		}
+		return
+	}
+	if pt, ok := effected.(playableTarget); ok && pt.Playable() {
+		r, ok := effected.(retargetableOnAggression)
+		if !ok {
+			return
+		}
+		if sameObject(r.CurrentTarget(), caster) {
+			r.AttackTarget(caster)
+		} else {
+			r.SetTarget(caster)
+		}
+	}
 }
