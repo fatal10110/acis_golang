@@ -15,12 +15,27 @@ type continuousFake struct {
 	id                int32
 	dead, invul       bool
 	playable          bool
+	attackableFlag    bool
 	cursed            bool
+	bss               bool
 	list              *effect.List
 	successOK         bool
 	reflectOK         bool
 	successInput      formulas.SkillSuccessInput
 	skillReflectInput formulas.SkillReflectInput
+
+	// recordSuccessInput, when set, is called with every SkillSuccessInput
+	// invocation's raw arguments, letting tests assert on the resolved
+	// caster/shield state without duplicating checkSkillSuccess's logic.
+	recordSuccessInput func(caster any, def modelskill.Definition, bss bool, shield formulas.ShieldDefense)
+
+	// aggression-event recording: which optional surface fired, and with
+	// what arguments.
+	aggressionSource  any
+	aggressionPower   int
+	currentTarget     any
+	setTargetCalls    []any
+	attackTargetCalls []any
 }
 
 func newContinuousFake(id int32) *continuousFake {
@@ -33,19 +48,39 @@ func newContinuousFake(id int32) *continuousFake {
 	}
 }
 
-func (f *continuousFake) ObjectID() int32            { return f.id }
-func (f *continuousFake) Dead() bool                 { return f.dead }
-func (f *continuousFake) Invul() bool                { return f.invul }
-func (f *continuousFake) Playable() bool             { return f.playable }
-func (f *continuousFake) CursedWeaponEquipped() bool { return f.cursed }
-func (f *continuousFake) EffectList() *effect.List   { return f.list }
+func (f *continuousFake) ObjectID() int32                { return f.id }
+func (f *continuousFake) Dead() bool                     { return f.dead }
+func (f *continuousFake) Invul() bool                    { return f.invul }
+func (f *continuousFake) Playable() bool                 { return f.playable }
+func (f *continuousFake) Attackable() bool               { return f.attackableFlag }
+func (f *continuousFake) CursedWeaponEquipped() bool     { return f.cursed }
+func (f *continuousFake) EffectList() *effect.List       { return f.list }
+func (f *continuousFake) BlessedSpiritshotCharged() bool { return f.bss }
 
-func (f *continuousFake) SkillSuccessInput(any, modelskill.Definition) (formulas.SkillSuccessInput, bool) {
+func (f *continuousFake) SkillSuccessInput(caster any, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
+	if f.recordSuccessInput != nil {
+		f.recordSuccessInput(caster, def, bss, shield)
+	}
 	return f.successInput, f.successOK
 }
 
 func (f *continuousFake) SkillReflectInput(modelskill.Definition) formulas.SkillReflectInput {
 	return f.skillReflectInput
+}
+
+func (f *continuousFake) NotifyAggression(source any, power int) {
+	f.aggressionSource = source
+	f.aggressionPower = power
+}
+
+func (f *continuousFake) CurrentTarget() any { return f.currentTarget }
+
+func (f *continuousFake) SetTarget(target any) {
+	f.setTargetCalls = append(f.setTargetCalls, target)
+}
+
+func (f *continuousFake) AttackTarget(target any) {
+	f.attackTargetCalls = append(f.attackTargetCalls, target)
 }
 
 // addContinuousEffect seeds target's list with one effect of the given effect
@@ -376,5 +411,95 @@ func TestContinuousRegistryHasAllHandledTypes(t *testing.T) {
 		if _, ok := registry.Handler(typ); !ok {
 			t.Errorf("continuous handler missing registered skill type %q", typ)
 		}
+	}
+}
+
+func TestContinuousAGGDEBUFFNotifiesAttackableTarget(t *testing.T) {
+	registry := NewDefaultRegistry()
+	caster := newContinuousFake(1)
+	target := newContinuousFake(2)
+	target.attackableFlag = true
+
+	registry.Use(Cast{
+		Caster:  caster,
+		Skill:   modelskill.Definition{SkillType: "AGGDEBUFF", Power: 42, Effects: buffEffect()},
+		Targets: []any{target},
+	})
+
+	if got := len(target.list.All()); got != 1 {
+		t.Fatalf("effect list = %d, want 1 (the debuff itself still lands)", got)
+	}
+	if target.aggressionSource != any(caster) {
+		t.Fatalf("aggressionSource = %v, want caster", target.aggressionSource)
+	}
+	if target.aggressionPower != 42 {
+		t.Fatalf("aggressionPower = %v, want 42", target.aggressionPower)
+	}
+	if len(target.setTargetCalls) != 0 || len(target.attackTargetCalls) != 0 {
+		t.Fatal("an attackable target must not be retargeted through the playable branch")
+	}
+}
+
+func TestContinuousAGGDEBUFFRetargetsPlayableNotAlreadyTargetingCaster(t *testing.T) {
+	registry := NewDefaultRegistry()
+	caster := newContinuousFake(1)
+	other := newContinuousFake(3)
+	target := newContinuousFake(2)
+	target.playable = true
+	target.currentTarget = other
+
+	registry.Use(Cast{
+		Caster:  caster,
+		Skill:   modelskill.Definition{SkillType: "AGGDEBUFF", Power: 10, Effects: buffEffect()},
+		Targets: []any{target},
+	})
+
+	if len(target.setTargetCalls) != 1 || target.setTargetCalls[0] != any(caster) {
+		t.Fatalf("setTargetCalls = %v, want exactly one call with caster", target.setTargetCalls)
+	}
+	if len(target.attackTargetCalls) != 0 {
+		t.Fatal("a playable not already targeting the caster must be retargeted, not attacked")
+	}
+}
+
+func TestContinuousAGGDEBUFFAttacksPlayableAlreadyTargetingCaster(t *testing.T) {
+	registry := NewDefaultRegistry()
+	caster := newContinuousFake(1)
+	target := newContinuousFake(2)
+	target.playable = true
+	target.currentTarget = caster
+
+	registry.Use(Cast{
+		Caster:  caster,
+		Skill:   modelskill.Definition{SkillType: "AGGDEBUFF", Power: 10, Effects: buffEffect()},
+		Targets: []any{target},
+	})
+
+	if len(target.attackTargetCalls) != 1 || target.attackTargetCalls[0] != any(caster) {
+		t.Fatalf("attackTargetCalls = %v, want exactly one call with caster", target.attackTargetCalls)
+	}
+	if len(target.setTargetCalls) != 0 {
+		t.Fatal("a playable already targeting the caster must be attacked, not retargeted")
+	}
+}
+
+func TestContinuousDebuffUsesCasterBlessedSpiritshotCharge(t *testing.T) {
+	registry := NewDefaultRegistry()
+	caster := newContinuousFake(1)
+	caster.bss = true
+	target := newContinuousFake(2)
+	var seenBss bool
+	target.recordSuccessInput = func(_ any, _ modelskill.Definition, bss bool, _ formulas.ShieldDefense) {
+		seenBss = bss
+	}
+
+	registry.Use(Cast{
+		Caster:  caster,
+		Skill:   modelskill.Definition{SkillType: "DEBUFF", Debuff: true, Effects: buffEffect()},
+		Targets: []any{target},
+	})
+
+	if !seenBss {
+		t.Fatal("continuous landing roll should have resolved the caster's blessed-spiritshot charge as true")
 	}
 }
