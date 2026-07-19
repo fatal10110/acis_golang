@@ -20,7 +20,7 @@ func TestFrameCharSelected(t *testing.T) {
 		Race:     player.RaceHuman,
 		ClassID:  0,
 		Location: location.Location{X: 10, Y: 20, Z: 30},
-		SP:       7, Exp: 12345, Level: 3,
+		SP:       7, Exp: 12345, CharLevel: 3,
 		Karma: 1, PKKills: 2,
 	}
 	c.SetResourceValues(player.Resources{CurrentHP: 75, CurrentMP: 30})
@@ -51,7 +51,7 @@ func TestFrameCharSelected(t *testing.T) {
 	want = binary.LittleEndian.AppendUint64(want, math.Float64bits(resources.CurrentMP))
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.SP))
 	want = binary.LittleEndian.AppendUint64(want, uint64(c.Exp))
-	want = binary.LittleEndian.AppendUint32(want, uint32(c.Level))
+	want = binary.LittleEndian.AppendUint32(want, uint32(c.CharLevel))
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.Karma))
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.PKKills))
 	want = binary.LittleEndian.AppendUint32(want, uint32(tmpl.INT))

@@ -383,7 +383,7 @@ func TestCharacterSkillSuccessInputUsesStatsAndCasterMagicAttack(t *testing.T) {
 	tmpl.MDef = 50
 	caster := liveCharacter(1, tmpl, combatItems())
 	target := liveCharacter(2, tmpl, combatItems())
-	target.Level = 44
+	target.CharLevel = 44
 	owner := &struct{}{}
 	target.AddStatFuncs([]basefunc.Func{basefunc.NewMul(owner, stat.StunVuln, 0.5, nil)})
 	def := modelskill.Definition{
@@ -412,7 +412,7 @@ func TestCharacterSkillSuccessInputUsesStatsAndCasterMagicAttack(t *testing.T) {
 	if want := 0.9420817669172932; !closeFloat(in.MAtkModifier, want) {
 		t.Fatalf("MAtkModifier = %v, want %v", in.MAtkModifier, want)
 	}
-	if want := 1 + 0.01*(float64(def.MagicLevel+def.LevelDepend-target.Level)); !closeFloat(in.LevelModifier, want) {
+	if want := 1 + 0.01*(float64(def.MagicLevel+def.LevelDepend-target.CharLevel)); !closeFloat(in.LevelModifier, want) {
 		t.Fatalf("LevelModifier = %v, want %v", in.LevelModifier, want)
 	}
 }

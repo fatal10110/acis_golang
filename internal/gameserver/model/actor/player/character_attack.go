@@ -190,7 +190,14 @@ func (c *Character) WorldPlayer() {}
 
 // LevelValue returns the player's current level for live-owned actors.
 func (c *Character) LevelValue() int {
-	return c.Level
+	return c.CharLevel
+}
+
+// Level satisfies the cast/target handler interfaces (cancelTarget,
+// seedableTarget, spoilableTarget, sowCaster, harvestCaster, magicCaster)
+// that require a Level() int method.
+func (c *Character) Level() int {
+	return c.CharLevel
 }
 
 // Position returns the live world position when c is spawned, otherwise the
@@ -534,7 +541,7 @@ func (c *Character) PDef() float64 {
 func (c *Character) Evasion() int {
 	tmpl := c.template()
 	if tmpl == nil {
-		return c.Level
+		return c.CharLevel
 	}
 	return int(c.calcStat(stat.EvasionRate, 0))
 }
