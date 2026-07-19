@@ -89,10 +89,21 @@ type DamageInterrupt struct {
 	Fusion       bool
 }
 
+// scheduledTimer is the subset of *time.Timer the delayed cast scheduler
+// needs, narrow enough for tests to substitute a fake clock.
+type scheduledTimer interface {
+	Stop() bool
+}
+
+// afterFunc matches time.AfterFunc's signature, injectable for deterministic
+// tests.
+type afterFunc func(time.Duration, func()) scheduledTimer
+
 // Controller coordinates validation, resource consumption, cooldowns and
 // interruption state for one actor's active cast.
 //
-// mu guards every mutable field below.
+// mu guards every mutable field below, including the scheduled timers
+// Schedule installs.
 type Controller struct {
 	actor Actor
 
@@ -103,6 +114,14 @@ type Controller struct {
 	plan           Plan
 	startedAt      time.Time
 	interruptUntil time.Time
+
+	// castSeq increments every time the active cast is cleared (Stop,
+	// Finish, or the start of a fresh cast), so a scheduled Launch/Hit/
+	// Finish callback belonging to a superseded cast can recognize itself
+	// as stale and no-op instead of acting on the wrong cast.
+	castSeq   uint64
+	timers    []scheduledTimer
+	afterFunc afterFunc
 }
 
 // NewController returns a cast controller for actor.
@@ -284,6 +303,17 @@ func (c *Controller) InterruptOnDamage(now time.Time, d DamageInterrupt) bool {
 	return c.Interrupt(now)
 }
 
+// SkillOnCooldown reports whether def's reuse key is still cooling down. It
+// is the lightweight pre-movement cast gate an AI loop checks before
+// committing to close distance on a target, ahead of the fuller CanCast
+// check run immediately before the cast itself starts.
+func (c *Controller) SkillOnCooldown(def modelskill.Definition) bool {
+	if c.actor == nil {
+		return false
+	}
+	return c.actor.SkillDisabled(ReuseKey(def))
+}
+
 // ReuseKey returns the cooldown key for def, using a shared-reuse reference
 // when one is configured.
 func ReuseKey(def modelskill.Definition) int32 {
@@ -337,12 +367,31 @@ func (c *Controller) buildPlan(def modelskill.Definition) Plan {
 }
 
 func (c *Controller) clearLocked() {
+	c.stopTimersLocked()
+	c.castSeq++
 	c.casting = false
 	c.current = modelskill.Definition{}
 	c.target = nil
 	c.plan = Plan{}
 	c.startedAt = time.Time{}
 	c.interruptUntil = time.Time{}
+}
+
+func (c *Controller) stopTimersLocked() {
+	for _, t := range c.timers {
+		t.Stop()
+	}
+	c.timers = nil
+}
+
+func (c *Controller) scheduleLocked(delay time.Duration, f func()) {
+	source := c.afterFunc
+	if source == nil {
+		source = func(d time.Duration, fn func()) scheduledTimer {
+			return time.AfterFunc(d, fn)
+		}
+	}
+	c.timers = append(c.timers, source(delay, f))
 }
 
 func positive(n int) int {

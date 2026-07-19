@@ -6,6 +6,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
 const attackHateDecay = 6.6
@@ -18,6 +19,9 @@ type AttackableActor interface {
 	PhysicalAttackRange() int
 	ReturnHome() bool
 	InTerritory() bool
+	// SetHeadingTo faces the actor toward target, used before committing to
+	// a skill cast whose animation is long enough to plant first.
+	SetHeadingTo(attackable.Combatant)
 }
 
 // MoveController controls movement requests emitted by the AI loop.
@@ -35,9 +39,36 @@ type AttackController interface {
 	DoAttack(attackable.Combatant)
 }
 
+// CastController controls skill-cast requests emitted by the AI loop,
+// mirroring AttackController's role for AI-initiated skill casts. A nil
+// CastController on an Attackable makes IntentionCast a no-op, matching an
+// actor with no skills to cast.
+type CastController interface {
+	// Disabled reports whether the actor cannot attempt a cast at all right
+	// now: already mid-cast, or every skill disabled.
+	Disabled() bool
+	// Range returns ref's cast range, used to decide whether the actor must
+	// close distance on target before attempting the cast.
+	Range(ref skill.Ref) int
+	// CanAttempt validates the lightweight pre-movement cast gate (reuse
+	// cooldown) for ref against target.
+	CanAttempt(target attackable.Combatant, ref skill.Ref) bool
+	// StopsMovement reports whether ref's cast animation is long enough that
+	// the actor should stop moving and face target before the final cast
+	// attempt.
+	StopsMovement(ref skill.Ref) bool
+	// CanCast validates the final HP/MP/mute/reuse/item gates, immediately
+	// before the cast commits.
+	CanCast(target attackable.Combatant, ref skill.Ref) bool
+	// Cast starts the cast against target. Delayed scheduling and effect
+	// application are the implementation's responsibility.
+	Cast(target attackable.Combatant, ref skill.Ref)
+}
+
 type intention struct {
 	kind   Intention
 	target attackable.Combatant
+	skill  skill.Ref
 }
 
 // Attackable drives one hostile NPC's combat and wander intentions.
@@ -52,6 +83,7 @@ type Attackable struct {
 	actor   AttackableActor
 	move    MoveController
 	attack  AttackController
+	cast    CastController
 	threats *attackable.ThreatTable
 	hates   *attackable.HateTable
 	desires *DesireQueue
@@ -80,6 +112,15 @@ func (a *Attackable) ObjectID() int32 {
 	return a.actor.ObjectID()
 }
 
+// SetCastController wires the AI loop's IntentionCast handling to
+// controller. Left unset (the default), IntentionCast desires are ignored,
+// matching an actor with no skills to cast.
+func (a *Attackable) SetCastController(controller CastController) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.cast = controller
+}
+
 // Threats returns the physical-attack threat table.
 func (a *Attackable) Threats() *attackable.ThreatTable {
 	return a.threats
@@ -90,8 +131,10 @@ func (a *Attackable) Hates() *attackable.HateTable {
 	return a.hates
 }
 
-// Desires returns the queue of weighted candidate intentions, currently
-// populated by attack threat and drained by Think's target selection.
+// Desires returns the queue of weighted candidate intentions. Attack threat
+// populates it automatically; a Cast desire is queued by whatever decides
+// this actor should cast a skill (e.g. a monster AI script), and Think
+// promotes whichever queued desire currently outweighs the rest.
 func (a *Attackable) Desires() *DesireQueue {
 	return a.desires
 }
@@ -166,14 +209,21 @@ func (a *Attackable) Think() {
 	defer a.mu.Unlock()
 
 	if a.current.kind == IntentionIdle {
-		if desire, ok := a.desires.Peek(); ok && desire.Kind == IntentionAttack {
-			a.current = intention{kind: IntentionAttack, target: desire.FinalTarget}
+		if desire, ok := a.desires.Peek(); ok {
+			switch desire.Kind {
+			case IntentionAttack:
+				a.current = intention{kind: IntentionAttack, target: desire.FinalTarget}
+			case IntentionCast:
+				a.current = intention{kind: IntentionCast, target: desire.FinalTarget, skill: desire.Skill}
+			}
 		}
 	}
 
 	switch a.current.kind {
 	case IntentionAttack:
 		a.thinkAttack()
+	case IntentionCast:
+		a.thinkCast()
 	case IntentionWander:
 		a.thinkWander()
 	}
@@ -219,6 +269,47 @@ func (a *Attackable) thinkAttack() {
 
 	a.move.Stop()
 	a.attack.DoAttack(target)
+}
+
+// thinkCast advances an IntentionCast desire once it has been promoted to
+// the current intention: pre-movement validation, closing distance on the
+// target, planting and facing it once the cast animation is long enough to
+// warrant it, then the final cast attempt. It mirrors thinkAttack's shape
+// for skill casts instead of physical attacks.
+func (a *Attackable) thinkCast() {
+	if a.actor.DenyAIAction() || a.cast == nil {
+		return
+	}
+	if a.cast.Disabled() {
+		return
+	}
+
+	target := a.current.target
+	ref := a.current.skill
+	if a.targetLost(target) {
+		return
+	}
+
+	if !a.cast.CanAttempt(target, ref) {
+		return
+	}
+
+	if a.move.MaybeStartOffensiveFollow(target, a.cast.Range(ref)) {
+		return
+	}
+
+	if a.cast.StopsMovement(ref) {
+		a.move.Stop()
+		if target.ObjectID() != a.actor.ObjectID() {
+			a.actor.SetHeadingTo(target)
+		}
+	}
+
+	if !a.cast.CanCast(target, ref) {
+		return
+	}
+
+	a.cast.Cast(target, ref)
 }
 
 func (a *Attackable) thinkWander() {
