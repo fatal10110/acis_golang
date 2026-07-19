@@ -49,7 +49,7 @@ func levelStepTemplate(levels int) *Template {
 func newProgressionCharacter() *Character {
 	tmpl := levelStepTemplate(81)
 	c := &Character{
-		Level: 1,
+		CharLevel: 1,
 	}
 	c.SetResourceValues(Resources{
 		MaxHP: tmpl.HPTable[0], CurrentHP: tmpl.HPTable[0],
@@ -119,8 +119,8 @@ func TestCharacter_AddExpAndSp(t *testing.T) {
 			if leveled != tt.wantLeveled {
 				t.Errorf("AddExpAndSp() leveled = %v, want %v", leveled, tt.wantLeveled)
 			}
-			if c.Level != tt.wantLevel {
-				t.Errorf("Level = %d, want %d", c.Level, tt.wantLevel)
+			if c.CharLevel != tt.wantLevel {
+				t.Errorf("Level = %d, want %d", c.CharLevel, tt.wantLevel)
 			}
 			if c.Exp != tt.wantExp {
 				t.Errorf("Exp = %d, want %d", c.Exp, tt.wantExp)
@@ -162,7 +162,7 @@ func TestCharacter_AddExp_OverflowGuard(t *testing.T) {
 	tmpl := levelStepTemplate(81)
 
 	c := newProgressionCharacter()
-	c.Level = 80
+	c.CharLevel = 80
 	c.Exp = 6000000000
 
 	leveled := c.AddExp(table, tmpl, 1<<63-1)
@@ -173,8 +173,8 @@ func TestCharacter_AddExp_OverflowGuard(t *testing.T) {
 	if c.Exp != 6000000000 {
 		t.Errorf("Exp = %d, want unchanged 6000000000", c.Exp)
 	}
-	if c.Level != 80 {
-		t.Errorf("Level = %d, want unchanged 80", c.Level)
+	if c.CharLevel != 80 {
+		t.Errorf("Level = %d, want unchanged 80", c.CharLevel)
 	}
 }
 
@@ -191,8 +191,8 @@ func TestCharacter_RemoveExpAndSp(t *testing.T) {
 
 		c.RemoveExpAndSp(table, tmpl, 300, 0) // exp -> 63, under level 2's 68 threshold
 
-		if c.Level != 1 {
-			t.Errorf("Level = %d, want 1", c.Level)
+		if c.CharLevel != 1 {
+			t.Errorf("Level = %d, want 1", c.CharLevel)
 		}
 		if c.Exp != 63 {
 			t.Errorf("Exp = %d, want 63", c.Exp)
@@ -213,8 +213,8 @@ func TestCharacter_RemoveExpAndSp(t *testing.T) {
 		if c.Exp != 1 {
 			t.Errorf("Exp = %d, want 1", c.Exp)
 		}
-		if c.Level != 1 {
-			t.Errorf("Level = %d, want 1", c.Level)
+		if c.CharLevel != 1 {
+			t.Errorf("Level = %d, want 1", c.CharLevel)
 		}
 	})
 
@@ -238,7 +238,7 @@ func TestCharacter_AddLevel_RefusesPastRealMax(t *testing.T) {
 	tmpl := levelStepTemplate(81)
 
 	c := newProgressionCharacter()
-	c.Level = table.RealMaxLevel()
+	c.CharLevel = table.RealMaxLevel()
 	c.Exp = table.RequiredExpForLevel(table.RealMaxLevel())
 
 	leveled := c.AddLevel(table, tmpl, 1)
@@ -246,8 +246,8 @@ func TestCharacter_AddLevel_RefusesPastRealMax(t *testing.T) {
 	if leveled {
 		t.Errorf("AddLevel() = true, want false at the real max level")
 	}
-	if c.Level != table.RealMaxLevel() {
-		t.Errorf("Level = %d, want unchanged %d", c.Level, table.RealMaxLevel())
+	if c.CharLevel != table.RealMaxLevel() {
+		t.Errorf("Level = %d, want unchanged %d", c.CharLevel, table.RealMaxLevel())
 	}
 }
 
@@ -264,8 +264,8 @@ func TestCharacter_AddLevel_Direct(t *testing.T) {
 	if !leveled {
 		t.Fatal("AddLevel(+1) from level 1: want leveled up")
 	}
-	if c.Level != 2 {
-		t.Errorf("Level = %d, want 2", c.Level)
+	if c.CharLevel != 2 {
+		t.Errorf("Level = %d, want 2", c.CharLevel)
 	}
 	if c.Exp != 68 {
 		t.Errorf("Exp = %d, want 68 (resynced to level 2's threshold)", c.Exp)
@@ -288,8 +288,8 @@ func TestCharacter_AddLevel_NilTemplateSkipsRefill(t *testing.T) {
 	if !leveled {
 		t.Fatal("AddLevel(+1) with nil template: want leveled up")
 	}
-	if c.Level != 2 {
-		t.Errorf("Level = %d, want 2", c.Level)
+	if c.CharLevel != 2 {
+		t.Errorf("Level = %d, want 2", c.CharLevel)
 	}
 	if res := c.ResourceValues(); res.MaxHP != 100 {
 		t.Errorf("MaxHP = %v, want unchanged 100 (no template to resync from)", res.MaxHP)

@@ -12,15 +12,15 @@ import (
 
 func TestFrameUserInfo(t *testing.T) {
 	c := &player.Character{
-		ID:      0x10000001,
-		Name:    "Newbie",
-		ClassID: 0,
-		Race:    player.RaceHuman,
-		Sex:     player.SexMale,
-		Level:   1,
-		Exp:     0,
-		SP:      0,
-		Face:    0, HairStyle: 1, HairColor: 2,
+		ID:        0x10000001,
+		Name:      "Newbie",
+		ClassID:   0,
+		Race:      player.RaceHuman,
+		Sex:       player.SexMale,
+		CharLevel: 1,
+		Exp:       0,
+		SP:        0,
+		Face:      0, HairStyle: 1, HairColor: 2,
 		Location:    location.Location{X: 10, Y: 20, Z: 30},
 		LastHeading: 100,
 		Karma:       0, PKKills: 1, PvPKills: 2,
@@ -55,7 +55,7 @@ func TestFrameUserInfo(t *testing.T) {
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.Race))
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.Sex))
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.ClassID))
-	want = binary.LittleEndian.AppendUint32(want, uint32(c.Level))
+	want = binary.LittleEndian.AppendUint32(want, uint32(c.CharLevel))
 	want = binary.LittleEndian.AppendUint64(want, uint64(c.Exp))
 	want = binary.LittleEndian.AppendUint32(want, uint32(tmpl.STR))
 	want = binary.LittleEndian.AppendUint32(want, uint32(tmpl.DEX))

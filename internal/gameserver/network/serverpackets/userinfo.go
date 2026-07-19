@@ -94,7 +94,7 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) {
 	w.WriteInt32(int32(c.Race))
 	w.WriteInt32(int32(c.Sex))
 	w.WriteInt32(int32(c.ClassID))
-	w.WriteInt32(int32(c.Level))
+	w.WriteInt32(int32(c.CharLevel))
 	w.WriteInt64(c.Exp)
 	w.WriteInt32(int32(t.STR))
 	w.WriteInt32(int32(t.DEX))

@@ -144,11 +144,11 @@ func (c *Character) skillLevelModifier(attacker *Character, def modelskill.Defin
 	if def.LevelDepend == 0 {
 		return 1
 	}
-	level := attacker.Level
+	level := attacker.CharLevel
 	if def.MagicLevel > 0 {
 		level = def.MagicLevel
 	}
-	delta := level + def.LevelDepend - c.Level
+	delta := level + def.LevelDepend - c.CharLevel
 	scale := 0.005
 	if delta < 0 {
 		scale = 0.01

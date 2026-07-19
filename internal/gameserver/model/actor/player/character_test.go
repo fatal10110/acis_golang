@@ -39,8 +39,8 @@ func TestNewCharacter(t *testing.T) {
 	if c.Sex != SexMale {
 		t.Errorf("Sex = %v, want %v", c.Sex, SexMale)
 	}
-	if c.Level != 1 {
-		t.Errorf("Level = %d, want 1", c.Level)
+	if c.CharLevel != 1 {
+		t.Errorf("Level = %d, want 1", c.CharLevel)
 	}
 	res := c.ResourceValues()
 	if res.MaxHP != tmpl.HPTable[0] || res.CurrentHP != tmpl.HPTable[0] {

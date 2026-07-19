@@ -38,9 +38,13 @@ type Character struct {
 	Race        Race
 	Sex         Sex
 
-	Level int
-	Exp   int64
-	SP    int
+	// CharLevel is the persisted level. The field is named CharLevel, not
+	// Level, so it doesn't collide with the Level() method the cast/target
+	// handlers need (Go disallows a field and method sharing one name on
+	// the same type) — same class of naming fix as LastHeading below.
+	CharLevel int
+	Exp       int64
+	SP        int
 
 	maxHP, curHP float64
 	maxCP, curCP float64
@@ -134,7 +138,7 @@ func NewCharacter(objectID int32, tmpl *Template, accountName, name string, hair
 		Race:        race,
 		Sex:         sex,
 
-		Level: 1,
+		CharLevel: 1,
 
 		maxHP: tmpl.HPTable[0], curHP: tmpl.HPTable[0],
 		maxCP: tmpl.CPTable[0], curCP: tmpl.CPTable[0],
