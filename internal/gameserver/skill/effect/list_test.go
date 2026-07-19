@@ -3,6 +3,7 @@ package effect
 import (
 	"reflect"
 	"testing"
+	"time"
 
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
@@ -287,5 +288,62 @@ func TestListSkipsCapEvictionForIncomingStackingBuff(t *testing.T) {
 	}
 	if !strong.InUse() {
 		t.Fatal("stronger stacked buff is not active")
+	}
+}
+
+// runWithDeadlockGuard runs fn and fails t if it doesn't return within a
+// short timeout, the symptom a reentrant hook self-deadlocking on List.mu
+// would produce.
+func runWithDeadlockGuard(t *testing.T, name string, fn func()) {
+	t.Helper()
+	done := make(chan struct{})
+	go func() {
+		fn()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatalf("%s deadlocked", name)
+	}
+}
+
+func TestListOnStartHookCanReenterAddWithoutDeadlock(t *testing.T) {
+	list := NewList(nil)
+	followUp := newEffect("followup", 2, "none", 0, false)
+
+	reentrant := newEffect("reentrant", 1, "none", 0, false)
+	reentrant.OnStart = func(*Effect) bool {
+		list.Add(followUp)
+		return true
+	}
+
+	runWithDeadlockGuard(t, "List.Add", func() {
+		list.Add(reentrant)
+	})
+
+	requireNames(t, list.All(), []string{"reentrant", "followup"})
+	if !followUp.InUse() {
+		t.Fatal("effect added from within a reentrant OnStart hook never activated")
+	}
+}
+
+func TestListOnExitHookCanReenterAddWithoutDeadlock(t *testing.T) {
+	list := NewList(nil)
+	var followUp *Effect
+
+	reentrant := newEffect("reentrant", 1, "none", 0, false)
+	reentrant.OnExit = func(*Effect) {
+		followUp = newEffect("followup", 2, "none", 0, false)
+		list.Add(followUp)
+	}
+	list.Add(reentrant)
+
+	runWithDeadlockGuard(t, "List.Remove", func() {
+		list.Remove(reentrant)
+	})
+
+	if followUp == nil || !followUp.InUse() {
+		t.Fatal("effect added from within a reentrant OnExit hook never activated")
 	}
 }
