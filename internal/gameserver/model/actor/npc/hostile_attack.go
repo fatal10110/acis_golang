@@ -223,6 +223,23 @@ func (h *Hostile) BroadcastAttack(snapshot attack.Snapshot) {
 	})
 }
 
+// BroadcastDie sends the death packet to every currently known observer
+// capable of receiving one, so clients play the corpse-fall animation
+// instead of leaving this NPC standing until its corpse decays. It is a
+// no-op until SetWorld has been called.
+func (h *Hostile) BroadcastDie() {
+	if h.world == nil {
+		return
+	}
+	h.world.ForEachKnown(h, func(o world.Tracked) {
+		receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
+		if !ok {
+			return
+		}
+		receiver.SendFrame(serverpackets.FrameDie(h.ObjectID(), serverpackets.DieOptions{}))
+	})
+}
+
 // BroadcastMove sends a MoveToLocation packet for event to every currently
 // known observer capable of receiving one. It is a no-op until SetWorld has
 // been called.
