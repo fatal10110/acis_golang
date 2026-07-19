@@ -19,6 +19,11 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 		return
 	}
 
+	if def, ok := l.skills.Definition(modelskill.Ref{ID: modelskill.ID(req.SkillID), Level: live.SkillLevel(int(req.SkillID))}); ok && def.Activation == modelskill.ActivationToggle {
+		l.handleToggleSkillUse(live, req)
+		return
+	}
+
 	beforeVitals := live.Vitals()
 	controller := live.castController()
 	started, err := actorcast.StartPlayerSkill(actorcast.PlayerSkillRequest{
@@ -69,6 +74,36 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 	actorcast.ApplyEffects(actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers}, live.Character, target, def)
 	sendMagicStatusUpdate(live, beforeVitals)
 	controller.Finish()
+}
+
+// handleToggleSkillUse applies casting a toggle skill: an already-active
+// instance turns off at no cost, an inactive one pays its MP/HP cost and
+// turns on. A toggle's cast window is instantaneous — there is no cast bar,
+// no launch packet, and activating one never installs a reuse delay — so
+// this bypasses the timed Start/Hit/Finish sequence handleMagicSkillUse
+// drives for an ordinary active skill. The on/off decision and effect
+// application both happen inside actorcast.ApplyToggle; this handler only
+// translates the outcome into packets.
+func (l *GameClientLink) handleToggleSkillUse(live *livePlayer, req clientpackets.RequestMagicSkillUse) {
+	def, _, _, err := actorcast.ApplyToggle(
+		actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers},
+		live.castController(),
+		actorcast.PlayerToggleRequest{
+			Caster:      live.Character,
+			Selected:    live.target,
+			SkillID:     int(req.SkillID),
+			Definitions: l.skills,
+		},
+	)
+	if err != nil {
+		sendMagicCastFailure(live, def, err)
+		return
+	}
+
+	selfObject := skillCastObject(live)
+	l.broadcastLiveFrame(live, func() wire.Frame {
+		return serverpackets.FrameMagicSkillUse(selfObject, selfObject, int32(def.ID), int32(def.Level), 0, 0, false)
+	})
 }
 
 func skillCastObject(obj actorcast.Target) serverpackets.SkillCastObject {

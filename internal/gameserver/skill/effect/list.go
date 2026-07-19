@@ -35,6 +35,9 @@ const (
 // disable or "eligible to be stripped".
 type Skill struct {
 	ID modelskill.ID
+	// Level is the applied level of the skill that owns this effect
+	// instance's template.
+	Level int
 	// SkillType is the raw datapack skill-type tag (e.g. "BUFF", "REFLECT").
 	// It drives the buff-slot family used by the list's cap enforcement.
 	SkillType      string
@@ -101,6 +104,12 @@ type Effect struct {
 	Herb     bool
 	Effector any
 	Effected any
+
+	// Level is the applied skill level this effect instance represents,
+	// initialized from Skill.Level. Every kind treats it as fixed for the
+	// effect's lifetime except a fusion effect's IncreaseEffect/
+	// DecreaseForce, which grow or shrink it while the effect stays live.
+	Level int
 
 	OnStart    func(*Effect) bool
 	OnAction   func(*Effect) bool

@@ -112,6 +112,83 @@ func TestGameClientLinkMagicSkillUseAppliesBuffEffectToSelf(t *testing.T) {
 	}
 }
 
+// TestGameClientLinkTogglesOnThenOff reproduces recasting a toggle skill
+// twice: the first cast has no active instance yet, so it pays the MP cost
+// and applies the buff; the second cast finds that instance still active,
+// so it turns it off at no cost instead of refreshing it. Both casts send
+// only the one MagicSkillUse packet (caster and target both the caster,
+// hitTime/reuseDelay both 0) — no SystemMessage, SetupGauge, or
+// MagicSkillLaunched, since a toggle's cast window is instantaneous and
+// carries no cast bar.
+func TestGameClientLinkTogglesOnThenOff(t *testing.T) {
+	store := newMemorySkillSaveStore()
+	skills := skillstate.NewPersistence(store, modelskill.NewTable([]modelskill.Definition{
+		{
+			ID: 288, Level: 1, Activation: modelskill.ActivationToggle, Target: modelskill.TargetSelf,
+			MPConsume: 12, SkillType: "BUFF",
+			Effects: []modelskill.EffectTemplate{{Name: "Buff", Time: 60}},
+		},
+	}), store)
+	var objID int32
+	c, _, _, state := newLinkedGameClientWithSkillsSeed(t, skills, func(chars *fakeCharStore, _ *fakeItemStore) {
+		objID = seedSelectableCharacter(t, chars, "player1", "Newbie", 5, 0)
+		store.seedKnown(objID, 0, player.SkillLevels{288: 1})
+	}, 1)
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	obj, ok := state.Player(objID)
+	if !ok {
+		t.Fatalf("player %d not found in world state", objID)
+	}
+	character, ok := obj.(*livePlayer)
+	if !ok {
+		t.Fatalf("world state player %d is not a *livePlayer", objID)
+	}
+
+	// First cast: no active instance yet, activates and pays MP.
+	c.send(encodeRequestMagicSkillUse(288, false, false))
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeMagicSkillUse {
+		t.Fatalf("magic use opcode = %#x, want MagicSkillUse (%#x)", reply[0], serverpackets.OpcodeMagicSkillUse)
+	}
+	r := wire.NewReader(reply[1:])
+	if caster, target, skillID, level := r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32(); caster != objID || target != objID || skillID != 288 || level != 1 {
+		t.Fatalf("MagicSkillUse ids = caster %d target %d skill %d level %d, want %d/%d/288/1", caster, target, skillID, level, objID, objID)
+	}
+	if hitTime, reuse := r.ReadInt32(), r.ReadInt32(); hitTime != 0 || reuse != 0 {
+		t.Fatalf("MagicSkillUse timing = hit %d reuse %d, want 0/0", hitTime, reuse)
+	}
+	c.expectNoFrame()
+
+	effects := character.EffectList().All()
+	if len(effects) != 1 || effects[0].Skill.ID != 288 {
+		t.Fatalf("effects after toggle activation = %+v, want one effect from skill 288", effects)
+	}
+
+	// Second cast: an instance is already active, so this turns it off
+	// instead of reapplying it, and never touches MP.
+	beforeMP := character.MP()
+	c.send(encodeRequestMagicSkillUse(288, false, false))
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeMagicSkillUse {
+		t.Fatalf("magic use opcode = %#x, want MagicSkillUse (%#x)", reply[0], serverpackets.OpcodeMagicSkillUse)
+	}
+	c.expectNoFrame()
+
+	if got := character.MP(); got != beforeMP {
+		t.Fatalf("MP after toggle deactivation = %d, want unchanged %d", got, beforeMP)
+	}
+	effects = character.EffectList().All()
+	if len(effects) != 0 {
+		t.Fatalf("effects after toggle deactivation = %+v, want none", effects)
+	}
+}
+
 func TestGameClientLinkMagicSkillUseRejectsInsufficientMP(t *testing.T) {
 	store := newMemorySkillSaveStore()
 	skills := skillstate.NewPersistence(store, modelskill.NewTable([]modelskill.Definition{

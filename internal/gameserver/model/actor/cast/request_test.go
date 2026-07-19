@@ -117,6 +117,88 @@ func TestStartPlayerSkillRejectsInvalidTarget(t *testing.T) {
 	}
 }
 
+func TestResolvePlayerToggleAcceptsKnownToggleSkill(t *testing.T) {
+	ch := newRequestCharacter(10)
+	ch.SetSkillLevel(288, 1)
+	defs := requestDefinitions{
+		{ID: 288, Level: 1}: {ID: 288, Level: 1, Activation: modelskill.ActivationToggle, Target: modelskill.TargetSelf},
+	}
+
+	def, target, err := ResolvePlayerToggle(PlayerToggleRequest{
+		Caster:      ch,
+		SkillID:     288,
+		Definitions: defs,
+	})
+	if err != nil {
+		t.Fatalf("ResolvePlayerToggle() error: %v", err)
+	}
+	if def.ID != 288 || def.Level != 1 {
+		t.Fatalf("Definition = %+v, want skill 288/1", def)
+	}
+	if target != ch {
+		t.Fatalf("Target = %v, want the caster (SELF target)", target)
+	}
+}
+
+func TestResolvePlayerToggleRejectsUnavailableSkill(t *testing.T) {
+	toggle := modelskill.Definition{ID: 288, Level: 1, Activation: modelskill.ActivationToggle, Target: modelskill.TargetSelf}
+	active := toggle
+	active.Activation = modelskill.ActivationActive
+
+	tests := []struct {
+		name    string
+		skillID int
+		level   int
+		dead    bool
+		defs    requestDefinitions
+	}{
+		{name: "nonpositive request", skillID: 0, level: 1, defs: requestDefinitions{{ID: 288, Level: 1}: toggle}},
+		{name: "dead caster", skillID: 288, level: 1, dead: true, defs: requestDefinitions{{ID: 288, Level: 1}: toggle}},
+		{name: "unknown level", skillID: 288, defs: requestDefinitions{{ID: 288, Level: 1}: toggle}},
+		{name: "missing definition", skillID: 288, level: 1, defs: requestDefinitions{}},
+		{name: "non-toggle definition", skillID: 288, level: 1, defs: requestDefinitions{{ID: 288, Level: 1}: active}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ch := newRequestCharacter(10)
+			ch.SetSkillLevel(288, tt.level)
+			if tt.dead {
+				ch.MarkDead()
+			}
+
+			if _, _, err := ResolvePlayerToggle(PlayerToggleRequest{
+				Caster:      ch,
+				SkillID:     tt.skillID,
+				Definitions: tt.defs,
+			}); !errors.Is(err, ErrSkillUnavailable) {
+				t.Fatalf("ResolvePlayerToggle() error = %v, want ErrSkillUnavailable", err)
+			}
+		})
+	}
+}
+
+func TestResolvePlayerToggleRejectsInvalidTarget(t *testing.T) {
+	ch := newRequestCharacter(10)
+	ch.SetSkillLevel(288, 1)
+	defs := requestDefinitions{
+		{ID: 288, Level: 1}: {ID: 288, Level: 1, Activation: modelskill.ActivationToggle, Target: modelskill.TargetOne},
+	}
+
+	def, target, err := ResolvePlayerToggle(PlayerToggleRequest{
+		Caster:      ch,
+		Selected:    struct{}{},
+		SkillID:     288,
+		Definitions: defs,
+	})
+	if !errors.Is(err, ErrInvalidTarget) {
+		t.Fatalf("ResolvePlayerToggle() error = %v, want ErrInvalidTarget", err)
+	}
+	if def.ID != 288 || target != nil {
+		t.Fatalf("resolved = %+v/%v, want definition with nil target", def, target)
+	}
+}
+
 type requestDefinitions map[modelskill.Ref]modelskill.Definition
 
 func newRequestCharacter(id int32) *player.Character {

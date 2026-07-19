@@ -3,6 +3,7 @@ package cast
 import (
 	"fmt"
 
+	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
@@ -64,4 +65,32 @@ func (c *Controller) CastToggle(alreadyActive bool, def modelskill.Definition) (
 		c.actor.ReduceHP(hp)
 	}
 	return true, nil
+}
+
+// ApplyToggle resolves req's toggle skill, decides whether it activates or
+// deactivates based on the caster's current effect state, drives that
+// decision through controller, and applies the skill's effects when it
+// activates. This is the one call a caller needs to cast a toggle skill —
+// the on/off rule CastToggle documents lives entirely inside this package,
+// not in whatever is decoding the request.
+func ApplyToggle(handlers EffectHandlers, controller *Controller, req PlayerToggleRequest) (def modelskill.Definition, target Target, activated bool, err error) {
+	def, target, err = ResolvePlayerToggle(req)
+	if err != nil {
+		return def, target, false, err
+	}
+
+	alreadyActive := handlerskill.ActiveEffect(req.Caster, def.ID)
+	activated, err = controller.CastToggle(alreadyActive, def)
+	if err != nil {
+		return def, target, false, err
+	}
+
+	if alreadyActive {
+		handlerskill.StopEffect(req.Caster, def.ID)
+		return def, target, false, nil
+	}
+	if activated {
+		ApplyEffects(handlers, req.Caster, target, def)
+	}
+	return def, target, activated, nil
 }
