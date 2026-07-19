@@ -307,7 +307,13 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			if live == nil {
 				continue
 			}
-			l.handleTargetAction(ctx, live, req.ObjectID, false)
+			// A plain click on the already-selected object acts on it
+			// (attack, sit, pick up), exactly like an attack request —
+			// the client sends this second click expecting the action to
+			// resolve, and locks its own input until Attack or
+			// ActionFailed answers it.
+			selected := live.target != nil && live.target.ObjectID() == req.ObjectID
+			l.handleTargetAction(ctx, live, req.ObjectID, selected)
 
 		case clientpackets.OpcodeAttackRequest:
 			req, err := clientpackets.DecodeAttackRequest(payload)
