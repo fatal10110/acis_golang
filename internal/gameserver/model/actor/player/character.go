@@ -86,6 +86,7 @@ type Character struct {
 	broadcastMove   func(move.Event)
 	broadcastStop   func()
 	broadcastDie    func()
+	broadcastStatus func()
 	roll            func(int) int
 
 	deathMu sync.Mutex
