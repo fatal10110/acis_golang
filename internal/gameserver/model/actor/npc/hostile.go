@@ -73,6 +73,8 @@ type Hostile struct {
 	// damage-spread rolls. It defaults to math/rand's global source; tests
 	// substitute a fixed function for deterministic combat outcomes.
 	roll func(n int) int
+
+	los LineOfSight
 }
 
 // Attackable reports whether inst's instance type belongs to the set of

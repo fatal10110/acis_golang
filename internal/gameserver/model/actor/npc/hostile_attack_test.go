@@ -272,3 +272,57 @@ func (f *frameReceiver) SendFrame(frame wire.Frame) bool {
 }
 
 var _ creature.DeathActor = (*Hostile)(nil)
+
+// fakeHostileLineOfSight is a LineOfSight double that records the query it
+// received and returns a fixed result.
+type fakeHostileLineOfSight struct {
+	result bool
+	got    struct {
+		ox, oy, oz       int
+		oCollisionHeight float64
+		tx, ty, tz       int
+		tCollisionHeight float64
+	}
+}
+
+func (f *fakeHostileLineOfSight) CanSeeActor(ox, oy, oz int, oCollisionHeight float64, tx, ty, tz int, tCollisionHeight float64) bool {
+	f.got.ox, f.got.oy, f.got.oz, f.got.oCollisionHeight = ox, oy, oz, oCollisionHeight
+	f.got.tx, f.got.ty, f.got.tz, f.got.tCollisionHeight = tx, ty, tz, tCollisionHeight
+	return f.result
+}
+
+func TestHostileCanSeeDefaultsToVisibleWithoutLineOfSight(t *testing.T) {
+	h := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", CollisionHeight: 30})
+	target := newCombatHostile(t, 2, &Template{ID: 2, Type: "Monster", CollisionHeight: 30})
+
+	if !h.CanSee(target) {
+		t.Fatal("CanSee() = false with no line-of-sight query attached, want true")
+	}
+}
+
+func TestHostileCanSeeQueriesLineOfSightWithActorHeights(t *testing.T) {
+	h := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", CollisionHeight: 30})
+	target := newCombatHostile(t, 2, &Template{ID: 2, Type: "Monster", CollisionHeight: 40})
+
+	los := &fakeHostileLineOfSight{result: false}
+	h.SetLineOfSight(los)
+
+	if got := h.CanSee(target); got != false {
+		t.Fatalf("CanSee() = %v, want false (from line-of-sight query result)", got)
+	}
+
+	ox, oy, oz := h.Position()
+	tx, ty, tz := target.Position()
+	if los.got.ox != ox || los.got.oy != oy || los.got.oz != oz {
+		t.Fatalf("CanSeeActor() origin = (%d,%d,%d), want (%d,%d,%d)", los.got.ox, los.got.oy, los.got.oz, ox, oy, oz)
+	}
+	if los.got.tx != tx || los.got.ty != ty || los.got.tz != tz {
+		t.Fatalf("CanSeeActor() target = (%d,%d,%d), want (%d,%d,%d)", los.got.tx, los.got.ty, los.got.tz, tx, ty, tz)
+	}
+	if los.got.oCollisionHeight != h.CollisionHeight() {
+		t.Fatalf("CanSeeActor() origin collision height = %v, want %v", los.got.oCollisionHeight, h.CollisionHeight())
+	}
+	if los.got.tCollisionHeight != target.CollisionHeight() {
+		t.Fatalf("CanSeeActor() target collision height = %v, want %v", los.got.tCollisionHeight, target.CollisionHeight())
+	}
+}
