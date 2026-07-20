@@ -609,6 +609,25 @@ func (c *Character) MarkDead() bool {
 	return true
 }
 
+// Revive clears this player's dead state and restores HP to fraction of
+// calculated max HP. It reports whether the player was dead and is now
+// revived; a call on a living player is a no-op.
+func (c *Character) Revive(fraction float64) bool {
+	c.deathMu.Lock()
+	if !c.dead {
+		c.deathMu.Unlock()
+		return false
+	}
+	c.dead = false
+	c.deathMu.Unlock()
+
+	maxHP := c.ResourceValues().MaxHP
+	c.vitalsMu.Lock()
+	c.curHP = maxHP * fraction
+	c.vitalsMu.Unlock()
+	return true
+}
+
 // Die runs this player's death sequence: the once-only dead-state
 // transition, then the death packet broadcast to this player's own session
 // and every observer, so the corpse-fall animation plays live instead of

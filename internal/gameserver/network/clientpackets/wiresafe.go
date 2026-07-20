@@ -47,7 +47,6 @@ const (
 	OpcodeRequestQuestAbort       = 0x64
 	OpcodeRequestAcquireSkillInfo = 0x6b
 	OpcodeRequestAcquireSkill     = 0x6c
-	OpcodeRequestRestartPoint     = 0x6d
 	OpcodeRequestCrystallizeItem  = 0x72
 	OpcodeRequestChangePetName    = 0x89
 	OpcodeRequestPetUseItem       = 0x8a

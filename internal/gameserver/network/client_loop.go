@@ -513,6 +513,16 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				}
 			}
 
+		case clientpackets.OpcodeRequestRestartPoint:
+			req, err := clientpackets.DecodeRequestRestartPoint(payload)
+			if err != nil {
+				l.log.Warn().Err(err).Msg("game client")
+				continue
+			}
+			if live != nil {
+				l.restartLivePlayer(live, req)
+			}
+
 		case clientpackets.OpcodeRequestSocialAction:
 			req, err := clientpackets.DecodeRequestSocialAction(payload)
 			if err != nil {
@@ -746,7 +756,6 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			clientpackets.OpcodeCannotMoveInVehicle,
 			clientpackets.OpcodeRequestQuestListInGame,
 			clientpackets.OpcodeRequestQuestAbort,
-			clientpackets.OpcodeRequestRestartPoint,
 			clientpackets.OpcodeRequestChangePetName,
 			clientpackets.OpcodeRequestPackageSend,
 			clientpackets.OpcodeDlgAnswer,

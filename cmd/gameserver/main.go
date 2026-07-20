@@ -38,6 +38,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/restart"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/route"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
@@ -85,6 +86,7 @@ type gameData struct {
 	NPCs          *npc.Table
 	Doors         *door.Table
 	Statics       *staticobject.Table
+	Restarts      *restart.Table
 	Geo           *engine.Engine
 	Finder        *pathfind.Finder
 }
@@ -122,6 +124,7 @@ func newGameServerApp(paths gameServerPaths) *fx.App {
 		fx.Provide(
 			loadGameServerProperties,
 			loadPvPFlagOptions,
+			loadRespawnRestoreHP,
 			loadHexIDProperties,
 			gameServerConfigFromLoadedProperties,
 			provideGameServerLogger,
@@ -163,6 +166,18 @@ func newGameServerApp(paths gameServerPaths) *fx.App {
 
 func loadGameServerProperties(paths gameServerPaths) (*config.Properties, error) {
 	return config.LoadFile(paths.ConfigPath)
+}
+
+// respawnRestoreHP is the fraction of calculated max HP a non-percent
+// revive restores, read from players.properties.
+type respawnRestoreHP float64
+
+func loadRespawnRestoreHP(paths gameServerPaths) (respawnRestoreHP, error) {
+	props, err := config.LoadFile(paths.PlayersConfigPath)
+	if err != nil {
+		return 0, err
+	}
+	return respawnRestoreHP(config.NewFields(props, "respawn restore hp").Float64("RespawnRestoreHP", 0.7)), nil
 }
 
 func loadPvPFlagOptions(paths gameServerPaths) (task.PvPFlagOptions, error) {
@@ -382,6 +397,10 @@ func loadGameData(paths gameServerPaths, cfg gameServerConfig, log zerolog.Logge
 	if err != nil {
 		return nil, err
 	}
+	restarts, err := gamexml.LoadRestartPoints(filepath.Join(xmlRoot, "restartPointAreas.xml"))
+	if err != nil {
+		return nil, err
+	}
 	geo, err := loadGeodata(paths)
 	if err != nil {
 		return nil, err
@@ -400,6 +419,7 @@ func loadGameData(paths gameServerPaths, cfg gameServerConfig, log zerolog.Logge
 		NPCs:          npcs,
 		Doors:         doors,
 		Statics:       statics,
+		Restarts:      restarts,
 		Geo:           geo.Engine,
 		Finder:        geo.Finder,
 	}, nil
@@ -885,9 +905,10 @@ func provideGameClientLink(
 	ground *task.GroundItems,
 	attackStance *task.AttackStance,
 	positions *task.PositionUpdates,
+	respawnHP respawnRestoreHP,
 	log zerolog.Logger,
 ) *network.GameClientLink {
-	return network.NewGameClientLink(validator, links.get, roster, items, shortcuts, data.Players, data.Items, html, crests, skills, spellbooks, data.Trees, data.CursedWeapons, state, data.Geo, ids, ground, attackStance, positions, log)
+	return network.NewGameClientLink(validator, links.get, roster, items, shortcuts, data.Players, data.Items, html, crests, skills, spellbooks, data.Trees, data.CursedWeapons, state, data.Geo, ids, ground, attackStance, positions, data.Restarts, float64(respawnHP), log)
 }
 
 func provideSkillPersistence(pool *sql.DB, data *gameData) *skillstate.Persistence {
