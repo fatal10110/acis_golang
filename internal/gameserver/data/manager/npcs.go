@@ -309,6 +309,7 @@ func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, lo
 
 	hostile.SetCurrentHP(hp)
 	hostile.SetWorld(n.state)
+	hostile.SetWeapon(n.items)
 	hostile.SetRewarder(n.rewarderFor(hostile, tmpl))
 
 	n.state.Spawn(hostile, loc.X, loc.Y, loc.Z, heading)
