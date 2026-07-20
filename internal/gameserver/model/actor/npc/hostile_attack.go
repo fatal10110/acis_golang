@@ -60,17 +60,50 @@ func (h *Hostile) InAttackRange(target attackable.Combatant) bool {
 	return location.In3DRange(at.X, at.Y, at.Z, tx, ty, tz, totalRadius)
 }
 
-// CanSee reports whether target is visible to this NPC. No geodata
-// line-of-sight query is wired into a live NPC yet, so every known target
-// counts as visible until that's plumbed in.
-func (h *Hostile) CanSee(attackable.Combatant) bool {
-	return true
+// LineOfSight is the geodata query CanSee needs to gate targeting on real
+// terrain occlusion between two actors.
+type LineOfSight interface {
+	CanSeeActor(ox, oy, oz int, oCollisionHeight float64, tx, ty, tz int, tCollisionHeight float64) bool
+}
+
+// SetLineOfSight records the geodata line-of-sight query used by CanSee. A
+// nil los (e.g. in tests that don't exercise geodata) leaves CanSee
+// permissive.
+func (h *Hostile) SetLineOfSight(los LineOfSight) {
+	h.los = los
+}
+
+// CanSee reports whether target is visible to this NPC: a geodata
+// line-of-sight query between the two actors' positions and eye heights, or
+// permissive when no line-of-sight query is attached (e.g. in tests).
+func (h *Hostile) CanSee(target attackable.Combatant) bool {
+	if h.los == nil {
+		return true
+	}
+	other, ok := target.(interface{ Position() (int, int, int) })
+	if !ok {
+		return false
+	}
+	var theight float64
+	if th, ok := target.(interface{ CollisionHeight() float64 }); ok {
+		theight = th.CollisionHeight()
+	}
+
+	ox, oy, oz := h.Position()
+	tx, ty, tz := other.Position()
+	return h.los.CanSeeActor(ox, oy, oz, h.CollisionHeight(), tx, ty, tz, theight)
 }
 
 // CollisionRadius returns this NPC's body radius, used to resolve attack
 // and follow ranges.
 func (h *Hostile) CollisionRadius() float64 {
 	return h.Instance.Template.CollisionRadius
+}
+
+// CollisionHeight returns this NPC's body height, used for line-of-sight
+// eye-height resolution.
+func (h *Hostile) CollisionHeight() float64 {
+	return h.Instance.Template.CollisionHeight
 }
 
 // AttackType returns this NPC's attack style, resolved from the weapon
