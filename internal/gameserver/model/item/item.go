@@ -191,8 +191,10 @@ type Template struct {
 
 	DefaultAction ActionType
 
-	// AttachedSkills are passive skills granted merely by holding or
-	// wearing the item; nil when the template attaches none.
+	// AttachedSkills are the skills an item's item_skill attribute names.
+	// For equipped items they are passive bonuses granted while worn; for
+	// an etc-item consumable (potion, scroll) they are the skill its use
+	// casts. Nil when the template attaches none.
 	AttachedSkills []SkillRef
 
 	// Modifiers are the item's passive stat bonuses while equipped.

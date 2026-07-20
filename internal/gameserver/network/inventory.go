@@ -35,6 +35,9 @@ func (l *GameClientLink) useItem(live *livePlayer, objectID int32) {
 	if l.useEnchantScroll(live, inst) {
 		return
 	}
+	if l.useConsumableSkillItem(live, inv, inst) {
+		return
+	}
 	if _, ok := l.inventoryService().ToggleEquipItem(inv, objectID); !ok {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
