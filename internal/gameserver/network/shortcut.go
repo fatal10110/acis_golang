@@ -8,6 +8,15 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
+// registerShortcut mirrors the reference behavior for shortcut registration:
+// it accepts only well-formed items, actions, macros, recipes, and learned
+// skills, and silently rejects everything else (bad page range, unknown type,
+// or a skill-shortcut for a skill the player doesn't have). Shortcuts are a
+// client-side UI convenience with no server-authoritative action lock — a
+// rejected registration can't freeze client input the way the silent-drop bug
+// class behind #829 freezes it, and the reference handler itself stays silent
+// on every rejection path — so this is left intentionally silent instead of
+// patched with ActionFailed the way the action-locked handlers in #873 were.
 func (l *GameClientLink) registerShortcut(ctx context.Context, live *livePlayer, req clientpackets.RequestShortCutReg) {
 	if live == nil {
 		return
@@ -28,6 +37,10 @@ func (l *GameClientLink) registerShortcut(ctx context.Context, live *livePlayer,
 	live.SendFrame(serverpackets.FrameShortCutRegister(serverShortcut(sc)))
 }
 
+// deleteShortcut mirrors the reference behavior: a delete on a page outside
+// the valid range, or for a slot the player has nothing in, returns nothing.
+// Same reasoning as registerShortcut above — silent rejection is intentional
+// Java parity for a UI packet that doesn't lock client input.
 func (l *GameClientLink) deleteShortcut(ctx context.Context, live *livePlayer, req clientpackets.RequestShortCutDel) {
 	if live == nil || !shortcut.ValidDeletePage(req.Page) {
 		return
