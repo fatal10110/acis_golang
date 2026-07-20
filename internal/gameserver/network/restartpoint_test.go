@@ -75,7 +75,14 @@ func TestRestartLivePlayerRevivesAndTeleportsDeadPlayer(t *testing.T) {
 	}
 }
 
-func TestRestartLivePlayerWithNoRestartTableWarnsAndSendsNothing(t *testing.T) {
+// TestRestartLivePlayerWithNoRestartTableSendsActionFailed pins the
+// data-missing fallback: when the restart-point table didn't load at all, the
+// dead player can't be revived or teleported, and silently answering nothing
+// would strand them on the death screen. The reference path always resolves
+// at least the nearest town, so this case is a Go-side data-loading gap, not a
+// rejection the reference makes — it falls back to ActionFailed so the client
+// can dismiss the pending death action and stays dead past the warn in the log.
+func TestRestartLivePlayerWithNoRestartTableSendsActionFailed(t *testing.T) {
 	state := world.New()
 	frames := &frameCapture{}
 	live := newTestLivePlayer(t, 1, frames)
@@ -87,8 +94,8 @@ func TestRestartLivePlayerWithNoRestartTableWarnsAndSendsNothing(t *testing.T) {
 	gcl := &GameClientLink{world: state, geo: testGeo{}, log: zerolog.Nop()}
 	gcl.restartLivePlayer(live, clientpackets.RequestRestartPoint{})
 
-	if len(frames.frames) != 0 {
-		t.Fatalf("frames sent with no restart table = %d, want 0", len(frames.frames))
+	if got := frameOpcodes(frames.frames); len(got) != 1 || got[0] != serverpackets.OpcodeActionFailed {
+		t.Fatalf("opcodes = %x, want [ActionFailed]", got)
 	}
 	if !live.Dead() {
 		t.Fatal("Dead() = false with no restart destination resolved, want still dead")

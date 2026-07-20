@@ -94,6 +94,14 @@ func (l *GameClientLink) handleAddTradeItem(live *livePlayer, req clientpackets.
 	}
 	partnerID, ok := session.PartnerID(live.ObjectID())
 	if !ok {
+		// The session exists but has no partner recorded — equivalent
+		// to the reference's getPartner() == null, which the reference
+		// answers with TARGET_IS_NOT_FOUND and a trade cancel. The race
+		// is rare (partner logged off between the two packets) but a
+		// silent return would leave the trader's add-item click pending
+		// forever.
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetNotFound))
+		l.cancelTradeByID(live.ObjectID())
 		return
 	}
 	partner, ok := l.livePlayerByID(partnerID)
@@ -159,6 +167,11 @@ func (l *GameClientLink) handleTradeDone(ctx context.Context, live *livePlayer, 
 	}
 	partnerID, ok := session.PartnerID(live.ObjectID())
 	if !ok {
+		// Same race shape as handleAddTradeItem: the session is here but
+		// its partner is gone, which the reference answers with
+		// TARGET_IS_NOT_FOUND. Answer the same instead of dropping the
+		// confirm packet silently.
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetNotFound))
 		return
 	}
 	partner, ok := l.livePlayerByID(partnerID)

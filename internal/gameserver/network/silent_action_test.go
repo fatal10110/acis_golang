@@ -68,6 +68,11 @@ func TestGameClientLinkNeverGoesSilentOnActionRequests(t *testing.T) {
 		{"RequestDropItem on an object the player doesn't hold", encodeRequestDropItem(missingObjectID, 1, location.Location{})},
 		{"RequestActionUse with an action id no handler claims", encodeRequestActionUse(9999, false, false)},
 		{"RequestActionUse pet command with no active summon", encodeRequestActionUse(16, false, false)},
+		// Fishing trainer info for a skill the trainer can't offer: the
+		// general trainer branch already answered with NoMoreSkillsToLearn,
+		// the fishing branch used to drop the request silently. Same
+		// trainer-window rejection, now the same reply.
+		{"RequestAcquireSkillInfo fishing for a skill the player can't obtain", encodeRequestAcquireSkillInfo(99999, 1, 1)},
 	}
 
 	for _, tc := range cases {

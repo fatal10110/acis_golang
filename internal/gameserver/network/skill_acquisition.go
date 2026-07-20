@@ -121,6 +121,13 @@ func (l *GameClientLink) sendFishingAcquireSkillInfo(live *livePlayer, req clien
 	}
 	offer, ok := skillstate.FishingOfferFor(live.Character, l.skillTrees, l.skills, int(req.SkillID), int(req.Level))
 	if !ok {
+		// The general trainer branch answers an unresolvable offer with
+		// NoMoreSkillsToLearn; the fishing branch used to answer with
+		// nothing, leaving the trainer window waiting for info that
+		// never arrives. Match the general branch so a dismissed fishing
+		// trainer request behaves the same way the dismissed general
+		// trainer request already does.
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNoMoreSkillsToLearn))
 		return
 	}
 	node := offer.Node

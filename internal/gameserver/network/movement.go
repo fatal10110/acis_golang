@@ -72,6 +72,17 @@ func (l *GameClientLink) changeLiveWaitType(live *livePlayer, stand bool) bool {
 	return true
 }
 
+// broadcastLiveSocialAction mirrors the reference behavior for an emote
+// request: a rejected emote (out-of-range id, dead, sitting, or in combat)
+// answers with nothing, on purpose. Emotes don't register a pending client
+// action the way target/attack/item clicks do, so silence can't freeze input
+// the way the silent-drop bug class behind #829 freezes it — and the
+// reference handler itself stays silent on every rejection path except the
+// fishing one (the fishing check is a separate, not-yet-wired gap and would
+// carry its own message, not ActionFailed). Adding ActionFailed here would
+// diverge from that behavior with no client-side benefit, so this is left
+// intentionally silent instead of patched to match the ActionFailed pattern
+// used by the action-locked handlers in #873.
 func (l *GameClientLink) broadcastLiveSocialAction(live *livePlayer, actionID int32) {
 	if actionID < 2 || actionID > 13 || live.AlikeDead() || !live.Standing() || live.InCombat() {
 		return
