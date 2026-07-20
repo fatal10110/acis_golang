@@ -19,6 +19,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/restart"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/petitem"
@@ -65,33 +66,35 @@ const (
 // against the login server, character list/create/delete/restore, and
 // character select through to world entry.
 type GameClientLink struct {
-	validator     *SessionValidator
-	loginLink     func() *LoginLink
-	roster        *manager.Roster
-	items         itemStore
-	shortcuts     shortcutStore
-	templates     *player.TemplateTable
-	itemTemplates *item.Table
-	html          *datacache.HTML
-	crests        *datacache.Crests
-	skills        *skillstate.Persistence
-	spellbooks    modelskill.BookPolicy
-	skillTrees    *modelskill.Trees
-	cursedWeapons *entity.CursedWeaponTable
-	world         *world.State
-	geo           move.Geo
-	ids           idAllocator
-	groundItems   groundItemDropper
-	attackStance  attackStanceTracker
-	positions     *task.PositionUpdates
-	inventory     *invops.Service
-	petItems      *petitem.Service
-	trades        *tradebook.Book
-	enchantState  *enchantflow.State
-	enchant       *enchantflow.Service
-	targets       *skilltarget.Registry
-	skillHandlers *handlerskill.Registry
-	log           zerolog.Logger
+	validator        *SessionValidator
+	loginLink        func() *LoginLink
+	roster           *manager.Roster
+	items            itemStore
+	shortcuts        shortcutStore
+	templates        *player.TemplateTable
+	itemTemplates    *item.Table
+	html             *datacache.HTML
+	crests           *datacache.Crests
+	skills           *skillstate.Persistence
+	spellbooks       modelskill.BookPolicy
+	skillTrees       *modelskill.Trees
+	cursedWeapons    *entity.CursedWeaponTable
+	world            *world.State
+	geo              move.Geo
+	ids              idAllocator
+	groundItems      groundItemDropper
+	attackStance     attackStanceTracker
+	positions        *task.PositionUpdates
+	restarts         *restart.Table
+	respawnRestoreHP float64
+	inventory        *invops.Service
+	petItems         *petitem.Service
+	trades           *tradebook.Book
+	enchantState     *enchantflow.State
+	enchant          *enchantflow.Service
+	targets          *skilltarget.Registry
+	skillHandlers    *handlerskill.Registry
+	log              zerolog.Logger
 
 	// newCipherKey supplies each connection's XOR cipher key; overridden in
 	// tests for a deterministic handshake.
@@ -125,36 +128,40 @@ func NewGameClientLink(
 	groundItems groundItemDropper,
 	attackStance attackStanceTracker,
 	positions *task.PositionUpdates,
+	restarts *restart.Table,
+	respawnRestoreHP float64,
 	log zerolog.Logger,
 ) *GameClientLink {
 	return &GameClientLink{
-		validator:     validator,
-		loginLink:     loginLink,
-		roster:        roster,
-		items:         items,
-		shortcuts:     shortcuts,
-		templates:     templates,
-		itemTemplates: itemTemplates,
-		html:          html,
-		crests:        crests,
-		skills:        skills,
-		spellbooks:    spellbooks,
-		skillTrees:    skillTrees,
-		cursedWeapons: cursedWeapons,
-		world:         worldState,
-		geo:           geo,
-		ids:           ids,
-		groundItems:   groundItems,
-		attackStance:  attackStance,
-		positions:     positions,
-		inventory:     invops.NewService(ids),
-		petItems:      petitem.NewService(ids),
-		trades:        tradebook.NewBook(time.Now),
-		enchantState:  enchantflow.NewState(),
-		targets:       skilltarget.NewRegistry(skilltarget.WorldKnown{State: worldState}),
-		skillHandlers: handlerskill.NewDefaultRegistry(),
-		log:           log,
-		newCipherKey:  randomCipherKey,
+		validator:        validator,
+		loginLink:        loginLink,
+		roster:           roster,
+		items:            items,
+		shortcuts:        shortcuts,
+		templates:        templates,
+		itemTemplates:    itemTemplates,
+		html:             html,
+		crests:           crests,
+		skills:           skills,
+		spellbooks:       spellbooks,
+		skillTrees:       skillTrees,
+		cursedWeapons:    cursedWeapons,
+		world:            worldState,
+		geo:              geo,
+		ids:              ids,
+		groundItems:      groundItems,
+		attackStance:     attackStance,
+		positions:        positions,
+		restarts:         restarts,
+		respawnRestoreHP: respawnRestoreHP,
+		inventory:        invops.NewService(ids),
+		petItems:         petitem.NewService(ids),
+		trades:           tradebook.NewBook(time.Now),
+		enchantState:     enchantflow.NewState(),
+		targets:          skilltarget.NewRegistry(skilltarget.WorldKnown{State: worldState}),
+		skillHandlers:    handlerskill.NewDefaultRegistry(),
+		log:              log,
+		newCipherKey:     randomCipherKey,
 	}
 }
 

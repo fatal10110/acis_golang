@@ -204,6 +204,32 @@ func TestCharacterDieBroadcastsDieOnceOnly(t *testing.T) {
 	}
 }
 
+func TestCharacterRevive(t *testing.T) {
+	tmpl := combatTemplate()
+	items := combatItems()
+	c := liveCharacter(1, tmpl, items)
+	c.SetHP(1)
+	c.Die(nil)
+	if !c.Dead() {
+		t.Fatal("precondition: character should be dead after Die()")
+	}
+
+	maxHP := c.ResourceValues().MaxHP
+	if !c.Revive(0.5) {
+		t.Fatal("Revive() = false on a dead character, want true")
+	}
+	if c.Dead() {
+		t.Fatal("Dead() = true after Revive, want false")
+	}
+	if got, want := c.CurrentHP(), int(maxHP*0.5); got != want {
+		t.Fatalf("CurrentHP() after Revive(0.5) = %d, want %d (half of calculated max HP %v)", got, want, maxHP)
+	}
+
+	if c.Revive(0.5) {
+		t.Fatal("Revive() = true on an already-alive character, want false")
+	}
+}
+
 // TestCharacterPositionAccessIsRaceFree exercises the exact goroutine
 // pairing that produces a live game's data race on Location/LastHeading: a
 // position-update ticker calling SyncPosition during an attack chase,

@@ -104,6 +104,14 @@ func (l *GameClientLink) broadcastLiveDie(live *livePlayer) {
 	})
 }
 
+// broadcastLiveRevive sends the revive packet to live's own session and
+// every observer, so the corpse-fall animation clears immediately.
+func (l *GameClientLink) broadcastLiveRevive(live *livePlayer) {
+	l.broadcastLiveFrame(live, func() wire.Frame {
+		return serverpackets.FrameRevive(live.ObjectID())
+	})
+}
+
 // broadcastLiveFrame sends frame() to live's own session and to every
 // object it currently knows, building a fresh frame per recipient since
 // each wire.Frame is released after its own send.
