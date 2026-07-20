@@ -18,13 +18,20 @@ const pickupAttentionRadius = 1400
 // ground item: it validates and moves the item into live's own inventory,
 // then removes it from the visible world. It reports whether target was a
 // ground item at all — false lets the caller fall through to its normal
-// attack-target handling.
+// attack-target handling. Every other outcome answers with ActionFailed (in
+// addition to any explanatory system message) so a rejected pickup releases
+// the client's pending action instead of leaving it waiting for a response
+// that never comes — the same failure shape as an unanswered attack click.
 func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePlayer, target world.Tracked) bool {
 	ground, ok := target.(*grounditem.Item)
 	if !ok {
 		return false
 	}
-	if live == nil || l.world == nil || l.groundItems == nil || ground.Template == nil || ground.Count() <= 0 {
+	if live == nil {
+		return true
+	}
+	if l.world == nil || l.groundItems == nil || ground.Template == nil || ground.Count() <= 0 {
+		live.SendFrame(serverpackets.FrameActionFailed())
 		return true
 	}
 	if !liveItemOpsAllowed(live) || !live.Standing() {
@@ -33,29 +40,33 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 	}
 	if !groundPickupInRange(live, ground) {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetTooFar))
+		live.SendFrame(serverpackets.FrameActionFailed())
 		return true
 	}
 	if l.trades != nil && l.trades.HasActive(live.ObjectID()) {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotPickupOrUseItemTrading))
+		live.SendFrame(serverpackets.FrameActionFailed())
 		return true
 	}
 	inv := live.Inventory()
 	if inv == nil {
+		live.SendFrame(serverpackets.FrameActionFailed())
 		return true
 	}
 
 	res, failure := l.inventoryService().PickupGround(inv, &ground.Instance, ground.Template, live.ObjectID())
 	switch failure {
 	case invops.PickupOK:
-	case invops.PickupNoop:
-		return true
 	case invops.PickupSlotsFull:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSlotsFull))
+		live.SendFrame(serverpackets.FrameActionFailed())
 		return true
 	case invops.PickupLootLocked:
 		live.SendFrame(failedPickupFrame(ground.ItemID(), ground.Count()))
+		live.SendFrame(serverpackets.FrameActionFailed())
 		return true
-	default:
+	default: // invops.PickupNoop and any other unhandled failure
+		live.SendFrame(serverpackets.FrameActionFailed())
 		return true
 	}
 

@@ -217,6 +217,30 @@ func (l *GameClientLink) broadcastTargetUnselected(live *livePlayer) {
 	})
 }
 
+// broadcastLiveStatus sends live's current HP to its own session and every
+// currently known observer, so a health bar reflects damage as it lands
+// instead of only the moment the target dies or is reselected.
+func (l *GameClientLink) broadcastLiveStatus(live *livePlayer) {
+	if live == nil {
+		return
+	}
+	attrs, ok := targetHPAttributes(live)
+	if !ok {
+		return
+	}
+	live.SendFrame(serverpackets.FrameStatusUpdate(live.ObjectID(), attrs))
+	if l.world == nil {
+		return
+	}
+	l.world.ForEachKnown(live, func(o world.Tracked) {
+		receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
+		if !ok {
+			return
+		}
+		receiver.SendFrame(serverpackets.FrameStatusUpdate(live.ObjectID(), attrs))
+	})
+}
+
 func targetColor(attacker *player.Character, target world.Tracked) int {
 	if attacker == nil {
 		return 0

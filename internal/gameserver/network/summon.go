@@ -13,10 +13,15 @@ func (l *GameClientLink) handleSummonActionUse(live *livePlayer, req clientpacke
 	}
 	obj, ok := l.world.Summon(live.ObjectID())
 	if !ok {
+		// A pet-command shortcut with no active summon to command is
+		// still a claimed, resolved action — the client must be
+		// released, not left waiting for a response that never comes.
+		live.SendFrame(serverpackets.FrameActionFailed())
 		return true
 	}
 	actor, ok := obj.(*summon.Actor)
 	if !ok {
+		live.SendFrame(serverpackets.FrameActionFailed())
 		return true
 	}
 	summonType := actor.SummonType()

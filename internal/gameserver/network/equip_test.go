@@ -72,8 +72,10 @@ func TestUseItemUnknownObjectIDIsNoop(t *testing.T) {
 
 	gcl.useItem(live, 999)
 
-	if len(capture.frames) != 0 {
-		t.Fatalf("frames for unknown object id = %x, want none", capture.frames)
+	// ActionFailed must still answer a rejected use: the client's item
+	// window locks the clicked slot waiting for a response.
+	if len(capture.frames) != 1 || capture.frames[0][0] != serverpackets.OpcodeActionFailed {
+		t.Fatalf("frames for unknown object id = %x, want ActionFailed only", capture.frames)
 	}
 }
 
@@ -102,8 +104,8 @@ func TestUnequipItemEmptySlotIsNoop(t *testing.T) {
 
 	gcl.unequipItem(live, int32(item.SlotChest))
 
-	if len(capture.frames) != 0 {
-		t.Fatalf("frames for empty slot = %x, want none", capture.frames)
+	if len(capture.frames) != 1 || capture.frames[0][0] != serverpackets.OpcodeActionFailed {
+		t.Fatalf("frames for empty slot = %x, want ActionFailed only", capture.frames)
 	}
 }
 
@@ -142,8 +144,8 @@ func TestDeadPlayerItemOpsAreNoops(t *testing.T) {
 
 		(&GameClientLink{}).useItem(live, weapon.ObjectID)
 
-		if weapon.Equipped() || len(capture.frames) != 0 {
-			t.Fatalf("dead UseItem mutated item=%+v frames=%x", weapon, capture.frames)
+		if weapon.Equipped() || len(capture.frames) != 1 || capture.frames[0][0] != serverpackets.OpcodeActionFailed {
+			t.Fatalf("dead UseItem mutated item=%+v frames=%x, want unchanged item and ActionFailed only", weapon, capture.frames)
 		}
 	})
 
@@ -156,8 +158,8 @@ func TestDeadPlayerItemOpsAreNoops(t *testing.T) {
 
 		(&GameClientLink{}).unequipItem(live, int32(item.SlotChest))
 
-		if !chest.Equipped() || len(capture.frames) != 0 {
-			t.Fatalf("dead RequestUnEquipItem mutated item=%+v frames=%x", chest, capture.frames)
+		if !chest.Equipped() || len(capture.frames) != 1 || capture.frames[0][0] != serverpackets.OpcodeActionFailed {
+			t.Fatalf("dead RequestUnEquipItem mutated item=%+v frames=%x, want unchanged item and ActionFailed only", chest, capture.frames)
 		}
 	})
 
@@ -170,8 +172,8 @@ func TestDeadPlayerItemOpsAreNoops(t *testing.T) {
 
 		(&GameClientLink{}).destroyLiveItem(live, stack.ObjectID, 2)
 
-		if stack.Count != 5 || len(capture.frames) != 0 {
-			t.Fatalf("dead RequestDestroyItem mutated item=%+v frames=%x", stack, capture.frames)
+		if stack.Count != 5 || len(capture.frames) != 1 || capture.frames[0][0] != serverpackets.OpcodeActionFailed {
+			t.Fatalf("dead RequestDestroyItem mutated item=%+v frames=%x, want unchanged item and ActionFailed only", stack, capture.frames)
 		}
 	})
 
@@ -185,8 +187,8 @@ func TestDeadPlayerItemOpsAreNoops(t *testing.T) {
 
 		(&GameClientLink{ids: &sequentialIDs{next: 100}}).crystallizeLiveItem(live, clientpackets.RequestCrystallizeItem{ObjectID: weapon.ObjectID, Count: 1})
 
-		if live.Inventory().ItemByObjectID(weapon.ObjectID) == nil || len(capture.frames) != 0 {
-			t.Fatalf("dead RequestCrystallizeItem mutated inventory frames=%x", capture.frames)
+		if live.Inventory().ItemByObjectID(weapon.ObjectID) == nil || len(capture.frames) != 1 || capture.frames[0][0] != serverpackets.OpcodeActionFailed {
+			t.Fatalf("dead RequestCrystallizeItem mutated inventory frames=%x, want unchanged inventory and ActionFailed only", capture.frames)
 		}
 	})
 }
@@ -209,8 +211,8 @@ func TestDropLiveItemRejectsFarCoordinatesBeforeInventoryMutation(t *testing.T) 
 	if stack.Count != 100 || len(drops.drops) != 0 {
 		t.Fatalf("far drop mutated count=%d drops=%d", stack.Count, len(drops.drops))
 	}
-	if got := frameOpcodes(capture.frames); string(got) != string([]byte{serverpackets.OpcodeSystemMessage}) {
-		t.Fatalf("far drop opcodes = %x, want SystemMessage", got)
+	if got := frameOpcodes(capture.frames); string(got) != string([]byte{serverpackets.OpcodeSystemMessage, serverpackets.OpcodeActionFailed}) {
+		t.Fatalf("far drop opcodes = %x, want SystemMessage, ActionFailed", got)
 	}
 	r := wire.NewReader(capture.frames[0][1:])
 	if id := r.ReadInt32(); id != 151 {

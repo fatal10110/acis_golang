@@ -287,6 +287,9 @@ func TestGameClientLinkCrystallizeItemSkillTooLow(t *testing.T) {
 	if params := r.ReadInt32(); params != 0 {
 		t.Fatalf("SystemMessage params = %d, want 0", params)
 	}
+	if reply := c.read(); reply[0] != serverpackets.OpcodeActionFailed {
+		t.Fatalf("skill-low follow-up opcode = %#x, want ActionFailed (%#x)", reply[0], serverpackets.OpcodeActionFailed)
+	}
 
 	c.send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
 	reply = c.read()
