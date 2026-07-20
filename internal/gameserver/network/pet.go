@@ -98,12 +98,23 @@ func (l *GameClientLink) getItemFromPet(ctx context.Context, live *livePlayer, r
 	l.sendInventoryUpdate(live, playerInv)
 }
 
+// petGetItem handles a command-your-pet-to-loot request. Once live is known
+// non-nil (there is a connected client to answer), every rejection answers
+// with ActionFailed so the command always resolves — the same "accepted
+// action packet must never go unanswered" rule the player's own pickup path
+// follows, since this opcode's client-side command state waits on a
+// response exactly the same way.
 func (l *GameClientLink) petGetItem(ctx context.Context, live *livePlayer, req clientpackets.RequestPetGetItem) {
-	if live == nil || l.world == nil || l.groundItems == nil {
+	if live == nil {
+		return
+	}
+	if l.world == nil || l.groundItems == nil {
+		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
 	pet, petInv, ok := l.activePet(live)
 	if !ok {
+		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
 	if !petitem.PickupAvailable(pet) {
@@ -112,29 +123,35 @@ func (l *GameClientLink) petGetItem(ctx context.Context, live *livePlayer, req c
 	}
 	obj, ok := l.world.Object(req.ObjectID)
 	if !ok {
+		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
 	ground, ok := obj.(*grounditem.Item)
 	if !ok || ground.Template == nil || ground.Count() <= 0 {
+		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
 
 	result, failure := petitem.PickupGround(pet, petInv, ground)
 	switch failure {
 	case petitem.PickupOK:
-	case petitem.PickupNoop:
-		return
 	case petitem.PickupPetUnavailable:
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	case petitem.PickupItemNotForPets:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageItemNotForPets))
+		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	case petitem.PickupPetCannotCarryMore:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessagePetCannotCarryMoreItems))
+		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	case petitem.PickupPetTooEncumbered:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessagePetTooEncumbered))
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return
+	default: // petitem.PickupNoop and any other unhandled failure
+		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
 
