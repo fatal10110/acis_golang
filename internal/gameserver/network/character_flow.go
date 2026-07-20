@@ -179,6 +179,9 @@ func skillListEntries(c *player.Character, skills *skillstate.Persistence) []ser
 func (l *GameClientLink) attachLivePlayer(client *Client, c *player.Character, tmpl *player.Template, items []*item.Instance, shortcuts []shortcut.Shortcut) (*livePlayer, error) {
 	c.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventory(c.ID, l.itemTemplates, items))
 	c.SetWorld(l.world)
+	if los, ok := l.geo.(player.LineOfSight); ok {
+		c.SetLineOfSight(los)
+	}
 	c.SetFrameSender(client.Session.SendFrame)
 
 	x, y, z := c.Position()
