@@ -115,6 +115,69 @@ func TestCharacterPhysicalAttackResolvesLethalHit(t *testing.T) {
 	}
 }
 
+// fakeLineOfSight is a LineOfSight double that records the query it
+// received and returns a fixed result.
+type fakeLineOfSight struct {
+	result bool
+	got    struct {
+		ox, oy, oz       int
+		oCollisionHeight float64
+		tx, ty, tz       int
+		tCollisionHeight float64
+	}
+}
+
+func (f *fakeLineOfSight) CanSeeActor(ox, oy, oz int, oCollisionHeight float64, tx, ty, tz int, tCollisionHeight float64) bool {
+	f.got.ox, f.got.oy, f.got.oz, f.got.oCollisionHeight = ox, oy, oz, oCollisionHeight
+	f.got.tx, f.got.ty, f.got.tz, f.got.tCollisionHeight = tx, ty, tz, tCollisionHeight
+	return f.result
+}
+
+func TestCharacterCanSeeDefaultsToVisibleWithoutLineOfSight(t *testing.T) {
+	tmpl := combatTemplate()
+	items := combatItems()
+	c := liveCharacter(1, tmpl, items)
+	target := liveCharacter(2, tmpl, items)
+
+	if !c.CanSee(target) {
+		t.Fatal("CanSee() = false with no line-of-sight query attached, want true")
+	}
+}
+
+func TestCharacterCanSeeQueriesLineOfSightWithActorHeights(t *testing.T) {
+	tmpl := combatTemplate()
+	items := combatItems()
+	c := liveCharacter(1, tmpl, items)
+	target := liveCharacter(2, tmpl, items)
+
+	los := &fakeLineOfSight{result: false}
+	c.SetLineOfSight(los)
+
+	if got := c.CanSee(target); got != false {
+		t.Fatalf("CanSee() = %v, want false (from line-of-sight query result)", got)
+	}
+
+	ox, oy, oz := c.Position()
+	tx, ty, tz := target.Position()
+	if los.got.ox != ox || los.got.oy != oy || los.got.oz != oz {
+		t.Fatalf("CanSeeActor() origin = (%d,%d,%d), want (%d,%d,%d)", los.got.ox, los.got.oy, los.got.oz, ox, oy, oz)
+	}
+	if los.got.tx != tx || los.got.ty != ty || los.got.tz != tz {
+		t.Fatalf("CanSeeActor() target = (%d,%d,%d), want (%d,%d,%d)", los.got.tx, los.got.ty, los.got.tz, tx, ty, tz)
+	}
+	if los.got.oCollisionHeight != c.CollisionHeight() {
+		t.Fatalf("CanSeeActor() origin collision height = %v, want %v", los.got.oCollisionHeight, c.CollisionHeight())
+	}
+	if los.got.tCollisionHeight != target.CollisionHeight() {
+		t.Fatalf("CanSeeActor() target collision height = %v, want %v", los.got.tCollisionHeight, target.CollisionHeight())
+	}
+
+	los.result = true
+	if got := c.CanSee(target); got != true {
+		t.Fatalf("CanSee() = %v, want true (from line-of-sight query result)", got)
+	}
+}
+
 func TestCharacterDieBroadcastsDieOnceOnly(t *testing.T) {
 	tmpl := combatTemplate()
 	items := combatItems()

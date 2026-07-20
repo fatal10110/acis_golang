@@ -332,7 +332,7 @@ MaxObstacleHeight = 48
 	if geo.Type != probe.L2J {
 		t.Errorf("Type = %q, want %q", geo.Type, probe.L2J)
 	}
-	wantEngineOptions := engine.Options{MaxObstacleHeight: 48}
+	wantEngineOptions := engine.Options{MaxObstacleHeight: 48, PartOfCharacterHeight: 75}
 	if geo.EngineOptions != wantEngineOptions {
 		t.Errorf("EngineOptions = %#v, want %#v", geo.EngineOptions, wantEngineOptions)
 	}

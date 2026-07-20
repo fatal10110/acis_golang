@@ -50,7 +50,8 @@ type Engine struct {
 	dynamicBlocksMu sync.Mutex
 	dynamicBlocks   atomic.Pointer[map[blockKey]*dynamic.Block]
 
-	maxObstacleHeight int
+	maxObstacleHeight     int
+	partOfCharacterHeight int
 }
 
 // New returns an empty engine that answers unloaded regions with null geodata.
@@ -59,12 +60,19 @@ func New(options ...Options) *Engine {
 	if len(options) > 0 {
 		opts = options[0]
 	}
-	return &Engine{maxObstacleHeight: opts.MaxObstacleHeight}
+	return &Engine{maxObstacleHeight: opts.MaxObstacleHeight, partOfCharacterHeight: opts.PartOfCharacterHeight}
 }
 
 // MaxObstacleHeight returns the line-of-sight obstacle allowance.
 func (e *Engine) MaxObstacleHeight() int {
 	return e.maxObstacleHeight
+}
+
+// SightHeight converts an actor's collision height into its line-of-sight
+// eye height: real creature height is collision height * 2, of which the
+// configured PartOfCharacterHeight percentage counts for visibility.
+func (e *Engine) SightHeight(collisionHeight float64) float64 {
+	return collisionHeight * 2 * float64(e.partOfCharacterHeight) / 100
 }
 
 // SetRegion installs one decoded geodata region at the given tile
@@ -235,6 +243,13 @@ func (e *Engine) CanSee(ox, oy, oz, tx, ty, tz int) bool {
 func (e *Engine) CanSeeWithHeights(ox, oy, oz int, oheight float64, tx, ty, tz int, theight float64) bool {
 	return e.canSee(ox, oy, oz, oheight, tx, ty, tz, theight) &&
 		e.canSee(tx, ty, tz, theight, ox, oy, oz, oheight)
+}
+
+// CanSeeActor reports whether two actors, each supplying its own collision
+// height, share mutual line of sight. Collision heights are converted to
+// eye height via SightHeight before the query.
+func (e *Engine) CanSeeActor(ox, oy, oz int, oCollisionHeight float64, tx, ty, tz int, tCollisionHeight float64) bool {
+	return e.CanSeeWithHeights(ox, oy, oz, e.SightHeight(oCollisionHeight), tx, ty, tz, e.SightHeight(tCollisionHeight))
 }
 
 // GeoX converts a world X coordinate to geodata X.

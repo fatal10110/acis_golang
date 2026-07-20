@@ -73,14 +73,15 @@ func (h *Hostile) CollisionRadius() float64 {
 	return h.Instance.Template.CollisionRadius
 }
 
-// AttackType always resolves to an unarmed strike: hostile NPCs in this
-// port fight with their body, not equipped gear. The overwhelming majority
-// of monster templates carry no weapon item id in the shipped data;
-// resolving the rare weapon-wielding template's right-hand item id to its
-// weapon kind data is deferred until an NPC-side equipment/item-table
-// lookup is wired to a live actor.
+// AttackType returns this NPC's attack style, resolved from the weapon
+// SetWeapon recorded. Unarmed (WeaponFist) when SetWeapon found no
+// right-hand weapon — the common case, since the overwhelming majority of
+// monster templates carry no weapon item id in the shipped data.
 func (h *Hostile) AttackType() item.WeaponType {
-	return item.WeaponFist
+	if h.weapon == nil {
+		return item.WeaponFist
+	}
+	return h.weapon.Type
 }
 
 // AttackSpeed returns this NPC's physical attack speed stat.
@@ -88,10 +89,14 @@ func (h *Hostile) AttackSpeed() int {
 	return int(h.Instance.Template.AtkSpd)
 }
 
-// WeaponReuseDelay is only read for a bow attacker; hostile NPCs always
-// fight unarmed (see AttackType), so this never gates a real cooldown.
+// WeaponReuseDelay returns this NPC's weapon reuse delay; only read for a
+// bow attacker. Zero when unarmed or not wielding a template-defined
+// weapon.
 func (h *Hostile) WeaponReuseDelay() time.Duration {
-	return 0
+	if h.weapon == nil {
+		return 0
+	}
+	return time.Duration(h.weapon.ReuseDelay) * time.Millisecond
 }
 
 // WeaponGrade only matters when SoulshotCharged reports true, which this

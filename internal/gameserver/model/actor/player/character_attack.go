@@ -73,6 +73,19 @@ type physicalTarget interface {
 	Evasion() int
 }
 
+// LineOfSight is the geodata query CanSee needs to gate targeting on real
+// terrain occlusion between two actors.
+type LineOfSight interface {
+	CanSeeActor(ox, oy, oz int, oCollisionHeight float64, tx, ty, tz int, tCollisionHeight float64) bool
+}
+
+// SetLineOfSight records the geodata line-of-sight query used by CanSee. A
+// nil los (e.g. in tests that don't exercise geodata) leaves CanSee
+// permissive.
+func (c *Character) SetLineOfSight(los LineOfSight) {
+	c.los = los
+}
+
 // AttachRuntime records the static template and restored inventory used by
 // live combat and visibility code. Call it before exposing c to the world.
 func (c *Character) AttachRuntime(tmpl *Template, inv *itemcontainer.Inventory) {
@@ -279,10 +292,25 @@ func (c *Character) Knows(target attackable.Combatant) bool {
 	return ok && world.Knows(c, tracked)
 }
 
-// CanSee reports whether target is visible to this player. Geodata line of
-// sight is not wired for live players yet, so known targets count as visible.
-func (c *Character) CanSee(attackable.Combatant) bool {
-	return true
+// CanSee reports whether target is visible to this player: a geodata
+// line-of-sight query between the two actors' positions and eye heights, or
+// permissive when no line-of-sight query is attached (e.g. in tests).
+func (c *Character) CanSee(target attackable.Combatant) bool {
+	if c.los == nil {
+		return true
+	}
+	other, ok := target.(interface{ Position() (int, int, int) })
+	if !ok {
+		return false
+	}
+	var theight float64
+	if h, ok := target.(interface{ CollisionHeight() float64 }); ok {
+		theight = h.CollisionHeight()
+	}
+
+	ox, oy, oz := c.Position()
+	tx, ty, tz := other.Position()
+	return c.los.CanSeeActor(ox, oy, oz, c.CollisionHeight(), tx, ty, tz, theight)
 }
 
 // AttackType resolves from the equipped right-hand weapon, falling back to
@@ -575,6 +603,19 @@ func (c *Character) CollisionRadius() float64 {
 		return tmpl.CollisionRadiusFemale
 	}
 	return tmpl.CollisionRadius
+}
+
+// CollisionHeight returns this player's body height, used for line-of-sight
+// eye-height calculation.
+func (c *Character) CollisionHeight() float64 {
+	tmpl := c.template()
+	if tmpl == nil {
+		return 0
+	}
+	if c.Sex == SexFemale {
+		return tmpl.CollisionHeightFemale
+	}
+	return tmpl.CollisionHeight
 }
 
 // TakeDamage applies physical damage and runs the once-only death path when
