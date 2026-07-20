@@ -74,6 +74,17 @@ server packets are related to the behavior being touched.
   missing.
 - Verify packet opcode, field order, state gating, send order, and byte layout with oracle fixtures,
   `packetdiff`, or focused packet tests whenever the behavior reaches the wire.
+- **Every rejection branch inside an implemented handler must still answer.** "The opcode is wired"
+  is not the same guarantee as "every branch through it sends something back." A handler that decodes
+  a request, then returns early on some internal condition (missing object, wrong state, insufficient
+  materials, no active session) without sending a reply or `ActionFailed` leaves the client's pending
+  action unresolved — this has repeatedly presented as "character stops responding to movement" or
+  "item never leaves the ground" (see #828/#829/#873). When you add or touch a handler that reacts to
+  a client action packet, walk every early return and confirm it sends a domain packet, a system
+  message, or `ActionFailed` — never nothing. `internal/gameserver/network/silent_action_test.go`
+  sweeps the live action opcodes with deliberately-rejectable requests and fails if any of them goes
+  silent; extend its case table when you add a new action-shaped opcode or handler branch, don't just
+  eyeball the diff.
 
 ---
 
@@ -411,6 +422,9 @@ inheritance, zero getters, zero singleton, explicit ownership. **This is the bar
 - [ ] Exact-contract outputs verified against committed known-good vectors.
 - [ ] Packet impact check completed: related client/server packets are implemented, wired, tested, or
       explicitly deferred with a reason.
+- [ ] Every rejection branch in a touched action-packet handler answers with a packet, system message,
+      or `ActionFailed` — none fall through silently. `silent_action_test.go`'s case table is extended
+      to cover any new action-shaped opcode or handler branch.
 - [ ] Network boundary check completed: packet handlers contain only protocol/session/world
       orchestration and packet mapping; domain rules live outside `network`.
 - [ ] `gofmt` + `go vet` clean; exported items documented; comments explain why.
