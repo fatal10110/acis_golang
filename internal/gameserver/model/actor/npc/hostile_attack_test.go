@@ -6,6 +6,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -53,6 +54,73 @@ func TestHostileMakeAttackHitMissesUnknownTargetType(t *testing.T) {
 	hit := attacker.MakeAttackHit(&hostileTarget{id: 99}, false)
 	if !hit.Miss {
 		t.Fatal("MakeAttackHit().Miss = false, want true for a target with no physical-damage surface")
+	}
+}
+
+func TestHostileAttackTypeAndWeaponReuseDelay(t *testing.T) {
+	const bowItemID = 500
+	const bowReuseMillis = 1500
+
+	bow := &item.Template{
+		ID:     bowItemID,
+		Kind:   item.KindWeapon,
+		Weapon: &item.WeaponDetail{Type: item.WeaponBow, ReuseDelay: bowReuseMillis},
+	}
+	notAWeapon := &item.Template{ID: 501, Kind: item.KindEtcItem}
+	items := item.NewTable([]*item.Template{bow, notAWeapon})
+
+	tests := []struct {
+		name           string
+		rightHand      int
+		items          *item.Table
+		wantAttackType item.WeaponType
+		wantReuseDelay time.Duration
+	}{
+		{
+			name:           "no right-hand item id stays unarmed",
+			rightHand:      0,
+			items:          items,
+			wantAttackType: item.WeaponFist,
+		},
+		{
+			name:           "unknown right-hand item id stays unarmed",
+			rightHand:      999,
+			items:          items,
+			wantAttackType: item.WeaponFist,
+		},
+		{
+			name:           "right-hand item that isn't a weapon stays unarmed",
+			rightHand:      int(notAWeapon.ID),
+			items:          items,
+			wantAttackType: item.WeaponFist,
+		},
+		{
+			name:           "nil item table stays unarmed",
+			rightHand:      bowItemID,
+			items:          nil,
+			wantAttackType: item.WeaponFist,
+		},
+		{
+			name:           "right-hand weapon item resolves its type and reuse delay",
+			rightHand:      bowItemID,
+			items:          items,
+			wantAttackType: item.WeaponBow,
+			wantReuseDelay: bowReuseMillis * time.Millisecond,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", RightHand: tc.rightHand})
+			h.SetWeapon(tc.items)
+
+			if got := h.AttackType(); got != tc.wantAttackType {
+				t.Fatalf("AttackType() = %v, want %v", got, tc.wantAttackType)
+			}
+			if got := h.WeaponReuseDelay(); got != tc.wantReuseDelay {
+				t.Fatalf("WeaponReuseDelay() = %v, want %v", got, tc.wantReuseDelay)
+			}
+		})
 	}
 }
 
