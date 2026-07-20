@@ -64,6 +64,11 @@ type Hostile struct {
 	health creature.Health
 	hp     float64
 
+	// weapon is this NPC's resolved right-hand weapon kind, recorded by
+	// SetWeapon. Nil means unarmed — the common case, since the
+	// overwhelming majority of monster templates carry no weapon item id.
+	weapon *item.WeaponDetail
+
 	// roll draws a uniform integer in [0, n) for MakeAttackHit's hit/crit/
 	// damage-spread rolls. It defaults to math/rand's global source; tests
 	// substitute a fixed function for deterministic combat outcomes.
@@ -129,6 +134,22 @@ func (h *Hostile) SyncPosition(position location.Location) {
 		return
 	}
 	_ = h.world.Move(h, position.X, position.Y, position.Z)
+}
+
+// SetWeapon resolves this NPC's template right-hand item id against items
+// and records its weapon kind for AttackType and WeaponReuseDelay. Call it
+// once, before exposing this NPC to other goroutines — same constraint as
+// SetWorld. A template with no right-hand item id, an unknown item id, or a
+// right-hand item that isn't a weapon leaves this NPC unarmed.
+func (h *Hostile) SetWeapon(items *item.Table) {
+	if items == nil || h.Instance.Template.RightHand == 0 {
+		return
+	}
+	tmpl, ok := items.Get(int32(h.Instance.Template.RightHand))
+	if !ok || tmpl.Weapon == nil {
+		return
+	}
+	h.weapon = tmpl.Weapon
 }
 
 // SetRollSource overrides the random source MakeAttackHit uses for its
