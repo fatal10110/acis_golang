@@ -91,6 +91,53 @@ func TestCanSee(t *testing.T) {
 	})
 }
 
+func TestSightHeight(t *testing.T) {
+	tests := []struct {
+		name                  string
+		collisionHeight       float64
+		partOfCharacterHeight int
+		want                  float64
+	}{
+		// Java reference: creature.getCollisionHeight() * 2 * Config.PART_OF_CHARACTER_HEIGHT / 100.
+		{"default 75 percent", 20, 75, 30},
+		{"100 percent doubles collision height", 20, 100, 40},
+		{"0 percent", 20, 0, 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e := New(Options{PartOfCharacterHeight: tt.partOfCharacterHeight})
+			if got := e.SightHeight(tt.collisionHeight); got != tt.want {
+				t.Fatalf("SightHeight(%v) = %v, want %v", tt.collisionHeight, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCanSeeActor(t *testing.T) {
+	// A height-40 wall sits between the two actors, matching TestCanSee's
+	// "blocks wall crossing" fixture.
+	makeBlock := func(x, y int) block.Cell {
+		if x == 1 && y == 0 {
+			return block.Cell{Height: 40, NSWE: block.AllDirections}
+		}
+		return block.Cell{Height: 0, NSWE: block.AllDirections}
+	}
+
+	t.Run("blocked at ground-level eye height", func(t *testing.T) {
+		e := newTestEngine(t, complexBlock(makeBlock))
+		if e.CanSeeActor(worldX(0), worldY(0), 0, 0, worldX(2), worldY(0), 0, 0) {
+			t.Fatal("CanSeeActor() = true over 40-height wall at 0 collision height, want false")
+		}
+	})
+
+	t.Run("clears wall once actor eye height accounts for it", func(t *testing.T) {
+		e := newTestEngine(t, complexBlock(makeBlock))
+		if !e.CanSeeActor(worldX(0), worldY(0), 0, 20, worldX(2), worldY(0), 0, 20) {
+			t.Fatal("CanSeeActor() = false with 20 collision height over 40-height wall, want true")
+		}
+	})
+}
+
 func newTestEngine(t testing.TB, first block.Block) *Engine {
 	return newTestEngineWithOptions(t, DefaultOptions(), first)
 }

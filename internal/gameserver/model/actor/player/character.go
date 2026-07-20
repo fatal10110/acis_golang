@@ -80,6 +80,7 @@ type Character struct {
 	runtimeTemplate *Template
 	inventory       *itemcontainer.Inventory
 	world           *world.State
+	los             LineOfSight
 	sendFrame       func(wire.Frame) bool
 	broadcastAttack func(attack.Snapshot)
 	broadcastMove   func(move.Event)
