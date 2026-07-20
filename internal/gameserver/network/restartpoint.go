@@ -1,9 +1,8 @@
 package network
 
 import (
-	"math/rand/v2"
-
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -53,27 +52,9 @@ func (l *GameClientLink) restartDestination(live *livePlayer) (location.Location
 // every observer.
 func (l *GameClientLink) teleportLivePlayer(live *livePlayer, target location.Location, randomOffset int) {
 	live.Stop()
-	target = l.scatterTeleportTarget(target, randomOffset)
+	target = move.RandomNearbyLocation(l.geo, target, randomOffset)
 	l.updateLivePlayerPosition(live, target, live.CurrentHeading())
 	l.broadcastLiveFrame(live, func() wire.Frame {
 		return serverpackets.FrameTeleportToLocation(live.ObjectID(), target, false)
 	})
-}
-
-// scatterTeleportTarget randomizes target within offset units, keeping the
-// original point when the scattered one isn't directly reachable, then
-// snaps to ground height.
-func (l *GameClientLink) scatterTeleportTarget(target location.Location, offset int) location.Location {
-	if l.geo == nil {
-		return target
-	}
-	if offset > 0 {
-		nx := target.X + rand.IntN(2*offset+1) - offset
-		ny := target.Y + rand.IntN(2*offset+1) - offset
-		if l.geo.CanMove(target.X, target.Y, target.Z, nx, ny, target.Z) {
-			target.X, target.Y = nx, ny
-		}
-	}
-	target.Z = int(l.geo.Height(target.X, target.Y, target.Z))
-	return target
 }
