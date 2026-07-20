@@ -183,6 +183,25 @@ func (c *Character) SetDieBroadcaster(broadcast func()) {
 	c.broadcastDie = broadcast
 }
 
+// SetStatusBroadcaster records the packet-layer hook that broadcasts this
+// character's current HP to nearby connected clients whenever it changes.
+func (c *Character) SetStatusBroadcaster(broadcast func()) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	c.broadcastStatus = broadcast
+}
+
+// BroadcastStatus sends this character's current HP through the runtime
+// packet hook.
+func (c *Character) BroadcastStatus() {
+	c.stateMu.RLock()
+	broadcast := c.broadcastStatus
+	c.stateMu.RUnlock()
+	if broadcast != nil {
+		broadcast()
+	}
+}
+
 // SendFrame sends frame to the connected client, if any.
 func (c *Character) SendFrame(frame wire.Frame) bool {
 	c.stateMu.RLock()
@@ -618,10 +637,17 @@ func (c *Character) CollisionHeight() float64 {
 	return tmpl.CollisionHeight
 }
 
-// TakeDamage applies physical damage and runs the once-only death path when
-// HP reaches zero.
+// TakeDamage applies physical damage, broadcasts the resulting HP to nearby
+// observers, and runs the once-only death path when HP reaches zero. A hit
+// against an already-dead character is a no-op: no damage is applied and no
+// status is broadcast.
 func (c *Character) TakeDamage(dmg int, attacker creature.DeathActor) bool {
-	if !c.ReduceCurrentHP(dmg) {
+	if c.AlikeDead() {
+		return false
+	}
+	newlyDead := c.ReduceCurrentHP(dmg)
+	c.BroadcastStatus()
+	if !newlyDead {
 		return false
 	}
 	return c.Die(attacker)

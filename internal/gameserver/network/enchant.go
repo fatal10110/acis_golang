@@ -43,10 +43,12 @@ func (l *GameClientLink) useEnchantScroll(live *livePlayer, scroll *item.Instanc
 
 func (l *GameClientLink) enchantLiveItem(ctx context.Context, live *livePlayer, req clientpackets.RequestEnchantItem) {
 	if !liveItemOpsAllowed(live) || req.ObjectID == 0 {
+		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
 	inv := live.Inventory()
 	if inv == nil {
+		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
 
@@ -55,6 +57,14 @@ func (l *GameClientLink) enchantLiveItem(ctx context.Context, live *livePlayer, 
 		l.log.Error().Err(err).Msg("enchant item")
 	}
 	l.applyPersistActions(ctx, result.Persist)
+	if len(result.Steps) == 0 {
+		// A target with no active scroll selected (or any other condition
+		// EnchantItem treats as "nothing to do") produces no steps to
+		// report. The request was still accepted and must still resolve,
+		// or the client's pending enchant action never clears.
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return
+	}
 	l.applyEnchantSteps(live, inv, result.Steps)
 }
 

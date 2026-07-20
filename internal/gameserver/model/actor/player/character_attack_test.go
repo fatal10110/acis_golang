@@ -230,6 +230,46 @@ func TestCharacterRevive(t *testing.T) {
 	}
 }
 
+// TestCharacterTakeDamageBroadcastsStatusOnEveryHit is the regression test
+// for a target's HP bar never visibly dropping: TakeDamage applied damage
+// and ran the death check, but never told any client the target's HP had
+// changed until the corpse appeared. A non-lethal hit must broadcast once;
+// a hit against an already-dead character (a stray late multi-hit landing
+// after death) must not broadcast at all, since no damage was applied.
+func TestCharacterTakeDamageBroadcastsStatusOnEveryHit(t *testing.T) {
+	tmpl := combatTemplate()
+	items := combatItems()
+	defender := liveCharacter(2, tmpl, items)
+	defender.SetHP(100)
+
+	var broadcasts int
+	defender.SetStatusBroadcaster(func() { broadcasts++ })
+
+	if defender.TakeDamage(30, nil) {
+		t.Fatal("TakeDamage(30) on a 100 HP defender reported a kill")
+	}
+	if got := defender.HP(); got != 70 {
+		t.Fatalf("defender HP = %v, want 70 after non-lethal hit", got)
+	}
+	if broadcasts != 1 {
+		t.Fatalf("broadcasts after non-lethal hit = %d, want 1", broadcasts)
+	}
+
+	if !defender.TakeDamage(70, nil) {
+		t.Fatal("TakeDamage(70) on a 70 HP defender did not report a kill")
+	}
+	if broadcasts != 2 {
+		t.Fatalf("broadcasts after lethal hit = %d, want 2", broadcasts)
+	}
+
+	if defender.TakeDamage(10, nil) {
+		t.Fatal("TakeDamage against an already-dead defender reported a kill")
+	}
+	if broadcasts != 2 {
+		t.Fatalf("broadcasts after a stray hit on a dead defender = %d, want unchanged at 2", broadcasts)
+	}
+}
+
 // TestCharacterPositionAccessIsRaceFree exercises the exact goroutine
 // pairing that produces a live game's data race on Location/LastHeading: a
 // position-update ticker calling SyncPosition during an attack chase,

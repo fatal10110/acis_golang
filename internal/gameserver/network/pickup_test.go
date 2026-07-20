@@ -8,10 +8,89 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
+
+// TestGameClientLinkPickupGroundItemFullClientFlow is the regression test
+// for two reported bugs, both observed after picking up a ground item: the
+// item stayed visible on the ground until its unrelated auto-destroy timer
+// eventually cleared it, and the character stopped responding to movement
+// afterward — the same "accepted action packet answered with nothing"
+// failure shape fixed for attacking (see the second-click Action tests in
+// targeting_test.go), reached through the pickup path this time. It drives
+// the real dispatch loop with a real TCP client end to end, rather than
+// calling pickupLiveGroundItem directly, so it exercises the same Action
+// opcode routing a live client relies on.
+func TestGameClientLinkPickupGroundItemFullClientFlow(t *testing.T) {
+	c, chars, _, state := newLinkedGameClient(t)
+
+	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.read() // CharCreateOk
+	c.read() // CharSelectInfo
+	objID := chars.soleObjectID(t)
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	playerObj, ok := state.Player(objID)
+	if !ok {
+		t.Fatalf("world.Player(%d) missing", objID)
+	}
+	live := playerObj.(*livePlayer)
+
+	px, py, pz := live.Position()
+
+	adenaTmpl, ok := testItemTemplates().Get(item.AdenaID)
+	if !ok {
+		t.Fatal("missing test adena template")
+	}
+	ground, err := grounditem.New(item.Instance{ObjectID: 5000, TemplateID: item.AdenaID, Count: 40, ManaLeft: -1}, adenaTmpl)
+	if err != nil {
+		t.Fatalf("ground item: %v", err)
+	}
+	state.Spawn(ground, px+30, py, pz, 0)
+	if reply := c.read(); reply[0] != serverpackets.OpcodeSpawnItem {
+		t.Fatalf("ground item spawn opcode = %#x, want SpawnItem (%#x)", reply[0], serverpackets.OpcodeSpawnItem)
+	}
+
+	origin := location.Location{X: px, Y: py, Z: pz}
+	c.send(encodeAction(ground.ObjectID(), origin, false))
+	if reply := c.read(); reply[0] != serverpackets.OpcodeMyTargetSelected {
+		t.Fatalf("first Action opcode = %#x, want MyTargetSelected (%#x)", reply[0], serverpackets.OpcodeMyTargetSelected)
+	}
+
+	c.send(encodeAction(ground.ObjectID(), origin, false))
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeGetItem {
+		t.Fatalf("second Action opcode = %#x, want GetItem (%#x) — the pickup click was silently dropped", reply[0], serverpackets.OpcodeGetItem)
+	}
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeDeleteObject {
+		t.Fatalf("pickup follow-up opcode = %#x, want DeleteObject (%#x) — the item never disappears from the ground", reply[0], serverpackets.OpcodeDeleteObject)
+	}
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeInventoryUpdate {
+		t.Fatalf("pickup follow-up opcode = %#x, want InventoryUpdate (%#x)", reply[0], serverpackets.OpcodeInventoryUpdate)
+	}
+
+	if _, ok := state.Object(ground.ObjectID()); ok {
+		t.Fatalf("world.Object(%d) still present after pickup", ground.ObjectID())
+	}
+
+	// Movement must still work after the pickup resolves.
+	x, y, z := live.Position()
+	c.send(encodeMoveBackwardToLocation(origin, location.Location{X: x, Y: y, Z: z}, 1))
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeMoveToLocation {
+		t.Fatalf("movement after pickup opcode = %#x, want MoveToLocation (%#x) — client is unresponsive to move commands", reply[0], serverpackets.OpcodeMoveToLocation)
+	}
+}
 
 func dropTestGround(t *testing.T, state *world.State, drops *task.GroundItems, inst item.Instance, tmpl *item.Template, x, y, z int) *grounditem.Item {
 	t.Helper()
@@ -183,7 +262,10 @@ func TestPickupLiveGroundItemRejectsOutOfRange(t *testing.T) {
 
 	gcl.pickupLiveGroundItem(context.Background(), live, ground)
 
-	assertOpcodeSequence(t, capture.frames, serverpackets.OpcodeSystemMessage)
+	// ActionFailed must follow the system message, or the client's pending
+	// pickup action never resolves — the same "stuck, unresponsive to
+	// movement" bug reported for a rejected pickup click.
+	assertOpcodeSequence(t, capture.frames, serverpackets.OpcodeSystemMessage, serverpackets.OpcodeActionFailed)
 	if _, ok := state.Object(ground.ObjectID()); !ok {
 		t.Fatal("ground item removed after an out-of-range pickup attempt")
 	}
@@ -265,7 +347,7 @@ func TestPickupLiveGroundItemRejectsLootLockedByOtherOwner(t *testing.T) {
 
 	gcl.pickupLiveGroundItem(context.Background(), live, ground)
 
-	assertOpcodeSequence(t, capture.frames, serverpackets.OpcodeSystemMessage)
+	assertOpcodeSequence(t, capture.frames, serverpackets.OpcodeSystemMessage, serverpackets.OpcodeActionFailed)
 	if _, ok := state.Object(ground.ObjectID()); !ok {
 		t.Fatal("loot-locked ground item removed by a non-owner pickup attempt")
 	}
@@ -289,6 +371,15 @@ func TestPickupLiveGroundItemRejectsWhenSlotsFull(t *testing.T) {
 	gcl.pickupLiveGroundItem(context.Background(), live, ground)
 
 	assertSystemMessageIDFrame(t, capture.frames[0], serverpackets.SystemMessageSlotsFull)
+	// This is the regression case for the reported bug: a full inventory
+	// (an easy state to reach while playtesting pickup) previously answered
+	// only with the system message, leaving the client's action pending
+	// forever — matching "item never disappears" (the pickup click that
+	// would have retried never got a chance) and "character stops
+	// responding to movement".
+	if got := frameOpcodes(capture.frames); string(got) != string([]byte{serverpackets.OpcodeSystemMessage, serverpackets.OpcodeActionFailed}) {
+		t.Fatalf("slots-full opcodes = %x, want SystemMessage, ActionFailed", got)
+	}
 	if _, ok := state.Object(ground.ObjectID()); !ok {
 		t.Fatal("ground item removed after a slots-full pickup attempt")
 	}

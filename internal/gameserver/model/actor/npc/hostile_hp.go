@@ -23,16 +23,23 @@ func (h *Hostile) SetCurrentHP(hp int) {
 }
 
 // TakeDamage applies dmg physical damage from attacker, clamping at zero,
-// and — the first time it reaches zero — runs this NPC's death sequence,
-// passing the reward hook set via SetRewarder (nil if none was set). It
-// reports whether this call newly killed the NPC.
+// broadcasts the resulting HP to nearby observers, and — the first time it
+// reaches zero — runs this NPC's death sequence, passing the reward hook
+// set via SetRewarder (nil if none was set). It reports whether this call
+// newly killed the NPC. A hit against an already-dead NPC is a no-op: no
+// damage is applied and no status is broadcast.
 func (h *Hostile) TakeDamage(dmg int, attacker creature.DeathActor) bool {
+	if h.AlikeDead() {
+		return false
+	}
 	if dmg > 0 {
 		if combatant, ok := attacker.(attackable.Combatant); ok {
 			h.AddDamageHate(combatant, float64(dmg), float64(dmg))
 		}
 	}
-	if !h.health.Damage(dmg) {
+	newlyDead := h.health.Damage(dmg)
+	h.BroadcastStatus()
+	if !newlyDead {
 		return false
 	}
 	return h.Die(attacker, h.rewards)

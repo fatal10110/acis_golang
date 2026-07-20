@@ -15,23 +15,28 @@ import (
 
 func (l *GameClientLink) useItem(live *livePlayer, objectID int32) {
 	if !liveItemOpsAllowed(live) {
+		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
 	inv := live.Inventory()
 	if inv == nil {
+		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
 	inst := inv.ItemByObjectID(objectID)
 	if inst == nil {
+		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
 	if _, ok := inv.Templates().Get(inst.TemplateID); !ok {
+		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
 	if l.useEnchantScroll(live, inst) {
 		return
 	}
 	if _, ok := l.inventoryService().ToggleEquipItem(inv, objectID); !ok {
+		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
 	l.sendInventoryUpdate(live, inv)
@@ -86,13 +91,16 @@ func (l *GameClientLink) hasActiveSummon(live *livePlayer) bool {
 // to. An empty or unresolvable slot is a silent no-op.
 func (l *GameClientLink) unequipItem(live *livePlayer, bodySlot int32) {
 	if !liveItemOpsAllowed(live) {
+		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
 	inv := live.Inventory()
 	if inv == nil {
+		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
 	if _, ok := l.inventoryService().UnequipBodySlot(inv, bodySlot); !ok {
+		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
 	l.sendInventoryUpdate(live, inv)
@@ -101,29 +109,35 @@ func (l *GameClientLink) unequipItem(live *livePlayer, bodySlot int32) {
 
 func (l *GameClientLink) dropLiveItem(live *livePlayer, req clientpackets.RequestDropItem) {
 	if !liveItemOpsAllowed(live) || l.groundItems == nil || req.Count <= 0 {
+		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
 	inv := live.Inventory()
 	if inv == nil {
+		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
 	count := int(req.Count)
 	if !dropInRange(live, int(req.X), int(req.Y), int(req.Z)) {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotDiscardDistanceTooFar))
+		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
 
 	res, ok, err := l.inventoryService().DropItem(inv, req.ObjectID, count)
 	if err != nil {
 		l.log.Error().Err(err).Msg("allocate dropped item id")
+		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
 	if !ok {
+		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
 	ground, err := grounditem.New(*res.Dropped, res.Template)
 	if err != nil {
 		l.log.Error().Err(err).Msg("build dropped ground item")
+		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
 
@@ -144,14 +158,17 @@ func (l *GameClientLink) dropLiveItem(live *livePlayer, req clientpackets.Reques
 
 func (l *GameClientLink) destroyLiveItem(live *livePlayer, objectID int32, count int) {
 	if !liveItemOpsAllowed(live) || count <= 0 {
+		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
 	inv := live.Inventory()
 	if inv == nil {
+		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
 	res, ok := l.inventoryService().DestroyItem(inv, objectID, count)
 	if !ok {
+		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
 	l.sendInventoryUpdate(live, inv)
@@ -162,24 +179,28 @@ func (l *GameClientLink) destroyLiveItem(live *livePlayer, objectID int32, count
 
 func (l *GameClientLink) crystallizeLiveItem(live *livePlayer, req clientpackets.RequestCrystallizeItem) {
 	if !liveItemOpsAllowed(live) || req.Count <= 0 {
+		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
 	inv := live.Inventory()
 	res, failure, err := l.inventoryService().CrystallizeItem(inv, req.ObjectID, int(req.Count), live.SkillLevel(crystallizeSkillID))
 	if err != nil {
 		l.log.Error().Err(err).Msg("allocate crystal item id")
+		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
 	switch failure {
 	case invops.CrystallizeOK:
 	case invops.CrystallizeNoSkill:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCrystallizeLevelTooLow))
+		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	case invops.CrystallizeGradeTooHigh:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCrystallizeLevelTooLow))
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	default:
+		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
 

@@ -225,6 +225,9 @@ func (l *GameClientLink) attachLivePlayer(client *Client, c *player.Character, t
 	c.SetDieBroadcaster(func() {
 		l.broadcastLiveDie(live)
 	})
+	c.SetStatusBroadcaster(func() {
+		l.broadcastLiveStatus(live)
+	})
 	return live, nil
 }
 

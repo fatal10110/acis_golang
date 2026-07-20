@@ -316,6 +316,29 @@ func (h *Hostile) BroadcastStop() {
 	}
 }
 
+// BroadcastStatus sends this NPC's current/max HP to every currently known
+// observer capable of receiving one, so a target's health bar reflects
+// damage as it lands rather than only the moment it dies. It is a no-op
+// until SetWorld has been called.
+func (h *Hostile) BroadcastStatus() {
+	if h.world == nil {
+		return
+	}
+	attrs := []serverpackets.StatusAttribute{
+		{Type: serverpackets.StatusMaxHP, Value: h.MaxHP()},
+		{Type: serverpackets.StatusCurrentHP, Value: h.CurrentHP()},
+	}
+	known := h.appendKnown()
+	defer h.releaseKnown()
+	for _, o := range known {
+		receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
+		if !ok {
+			continue
+		}
+		receiver.SendFrame(serverpackets.FrameStatusUpdate(h.ObjectID(), attrs))
+	}
+}
+
 func (h *Hostile) appendKnown() []world.Tracked {
 	return h.known.Snapshot(h.world, h)
 }
