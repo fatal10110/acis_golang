@@ -102,7 +102,11 @@ func (p *Persistence) Restore(ctx context.Context, c *player.Character) error {
 }
 
 // SetKnownSkill records one learned skill on the character and, when the
-// backing store can write character_skills, persists it first.
+// backing store can write character_skills, persists it first. When the
+// skill is passive, its stat functions are (re)attached to the character's
+// live stat calculators so the bonus takes effect immediately; a prior
+// level's functions are dropped first so relearning at a new level doesn't
+// stack.
 func (p *Persistence) SetKnownSkill(ctx context.Context, c *player.Character, skillID, level int) error {
 	if c == nil {
 		return nil
@@ -115,7 +119,23 @@ func (p *Persistence) SetKnownSkill(ctx context.Context, c *player.Character, sk
 			}
 		}
 	}
+	oldLevel := c.SkillLevel(skillID)
 	c.SetSkillLevel(skillID, level)
+	if oldLevel > 0 {
+		c.RemoveStatsByOwner(modelskill.Ref{ID: modelskill.ID(skillID), Level: oldLevel})
+	}
+	if level <= 0 {
+		return nil
+	}
+	def, ok := p.definition(modelskill.Ref{ID: modelskill.ID(skillID), Level: level})
+	if !ok || def.Activation != modelskill.ActivationPassive {
+		return nil
+	}
+	fns, err := effect.PassiveFuncs(def)
+	if err != nil {
+		return fmt.Errorf("apply passive stats for character %d skill %d level %d: %w", c.ID, skillID, level, err)
+	}
+	c.AddStatFuncs(fns)
 	return nil
 }
 
@@ -142,12 +162,20 @@ func (p *Persistence) restoreKnownSkills(ctx context.Context, c *player.Characte
 		if level <= 0 {
 			continue
 		}
-		if p.skills != nil {
-			if _, ok := p.skills.Get(modelskill.ID(id), level); !ok {
-				continue
-			}
+		ref := modelskill.Ref{ID: modelskill.ID(id), Level: level}
+		def, ok := p.definition(ref)
+		if p.skills != nil && !ok {
+			continue
 		}
 		c.SetSkillLevel(id, level)
+		if !ok || def.Activation != modelskill.ActivationPassive {
+			continue
+		}
+		fns, err := effect.PassiveFuncs(def)
+		if err != nil {
+			return fmt.Errorf("restore passive stats for character %d skill %d level %d: %w", c.ID, id, level, err)
+		}
+		c.AddStatFuncs(fns)
 	}
 	return nil
 }
