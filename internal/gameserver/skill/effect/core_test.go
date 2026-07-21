@@ -116,7 +116,7 @@ func TestNewBuildsCoreEffectMetadata(t *testing.T) {
 		{"CancelDebuff", TypeCancelDebuff, FlagNone, false, false},
 		{"ImobilePetBuff", TypeImmobilizePetBuff, FlagNone, false, false},
 		{"Distrust", TypeDistrust, FlagNone, false, false},
-		{"Confusion", TypeConfusion, flagConfused, false, false},
+		{"Confusion", TypeConfusion, FlagConfused, false, false},
 	}
 
 	for _, tt := range tests {

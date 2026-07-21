@@ -237,6 +237,13 @@ func (c *Character) Level() int {
 	return c.CharLevel
 }
 
+// Karma satisfies the cross-package karma-gated target checks (e.g. a
+// Guard's or friendly monster's attack-target rule) that type-assert for a
+// Karma() int method.
+func (c *Character) Karma() int {
+	return c.KarmaPoints
+}
+
 // Position returns the live world position when c is spawned, otherwise the
 // persisted last-known location.
 func (c *Character) Position() (int, int, int) {

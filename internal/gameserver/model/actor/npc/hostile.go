@@ -59,6 +59,11 @@ type Hostile struct {
 
 	regionInactive atomic.Bool
 
+	// raidRelated marks this NPC as tied to a raid encounter (a raid boss
+	// or one of its minions), set per-instance rather than derived from
+	// the template. See RaidRelated.
+	raidRelated atomic.Bool
+
 	spoil          item.SpoilPool
 	seed           SeedState
 	corpseDeadline time.Time
@@ -339,6 +344,19 @@ func (h *Hostile) enterInactiveRegion() {
 // SiegeGuard reports whether this NPC is a defensive siege guard.
 func (h *Hostile) SiegeGuard() bool {
 	return hostileKind(h.Instance) == "SiegeGuard"
+}
+
+// RaidRelated reports whether this NPC is tied to a raid encounter (a raid
+// boss or one of its minions). A raid-related NPC sees through silent
+// movement in AutoAttackTargetValid regardless of its template's own
+// concealment-detection setting. False until SetRaidRelated marks it.
+func (h *Hostile) RaidRelated() bool {
+	return h.raidRelated.Load()
+}
+
+// SetRaidRelated marks or clears this NPC's raid-encounter association.
+func (h *Hostile) SetRaidRelated(v bool) {
+	h.raidRelated.Store(v)
 }
 
 // AlikeDead reports whether this NPC should be ignored as a live target.
