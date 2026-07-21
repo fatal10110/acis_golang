@@ -1135,7 +1135,7 @@ func newTestHostileNPC(t *testing.T, id int32) *npc.Hostile {
 	if err != nil {
 		t.Fatal(err)
 	}
-	live, err := creature.NewLive(location.Location{}, 100, testHostileGeo{})
+	live, err := creature.NewLive(location.Location{}, 100, testHostileGeo{}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

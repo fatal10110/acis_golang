@@ -250,8 +250,12 @@ func (l *GameClientLink) broadcastEquipmentChange(live *livePlayer) {
 	})
 }
 
+// liveItemOpsAllowed reports whether live may currently use, equip, or
+// unequip an item: not gone, not dead, and free of every crowd-control
+// state that locks item interaction (stunned, sleeping, paralyzed, or
+// afraid).
 func liveItemOpsAllowed(live *livePlayer) bool {
-	return live != nil && !live.AlikeDead()
+	return live != nil && !live.AlikeDead() && !live.Stunned() && !live.Sleeping() && !live.Paralyzed() && !live.Afraid()
 }
 
 func dropInRange(live *livePlayer, x, y, z int) bool {

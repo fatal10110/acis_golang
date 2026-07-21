@@ -226,6 +226,36 @@ func NewList(owner StatOwner, opts ...Option) *List {
 	return l
 }
 
+// Flags returns the union of every held effect's flag bits, across both
+// active and stacked-but-not-yet-active members. It is recomputed from the
+// current buffs and debuffs on every call rather than cached, matching how
+// rarely a caller needs it compared to how often the list itself changes.
+func (l *List) Flags() Flag {
+	if l == nil {
+		return 0
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	var flags Flag
+	for _, e := range l.buffs {
+		if e != nil {
+			flags |= e.Flag
+		}
+	}
+	for _, e := range l.debuffs {
+		if e != nil {
+			flags |= e.Flag
+		}
+	}
+	return flags
+}
+
+// IsAffected reports whether any bit of flag is set in l.Flags().
+func (l *List) IsAffected(flag Flag) bool {
+	return l.Flags()&flag != 0
+}
+
 // All returns a snapshot of effects ordered as buffs followed by debuffs.
 func (l *List) All() []*Effect {
 	if l == nil {

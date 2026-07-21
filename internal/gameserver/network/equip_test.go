@@ -4,12 +4,15 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -28,7 +31,33 @@ func newEquipTestLivePlayer(t *testing.T, id int32, capture *frameCapture, templ
 	ch.SetResourceValues(player.Resources{MaxHP: 80, CurrentHP: 80, MaxMP: 30, CurrentMP: 30})
 	ch.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventory(ch.ID, templates, items))
 	ch.SetFrameSender(capture.send)
+
+	live, err := creature.NewLive(ch.Location, tmpl.RunSpeed, testGeo{}, ch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ch.Live = live
+
 	return &livePlayer{Character: ch, template: tmpl, items: items}
+}
+
+// equipFleeTarget satisfies the flee hook a Fear effect's runtime needs, so
+// it activates regardless of what its actual effected actor is.
+type equipFleeTarget struct{}
+
+func (equipFleeTarget) FleeFrom(effector any, distance int) {}
+
+// addEquipTestEffect installs an active core effect of name on live, for
+// exercising crowd-control gating without wiring a full skill cast.
+func addEquipTestEffect(t *testing.T, live *livePlayer, name string) *effect.Effect {
+	t.Helper()
+	e, err := effect.New(effect.Skill{ID: 1}, modelskill.EffectTemplate{Name: name})
+	if err != nil {
+		t.Fatalf("effect.New(%q) error: %v", name, err)
+	}
+	e.Effected = equipFleeTarget{}
+	live.EffectList().Add(e)
+	return e
 }
 
 func TestUseItemTogglesEquipState(t *testing.T) {
@@ -189,6 +218,54 @@ func TestDeadPlayerItemOpsAreNoops(t *testing.T) {
 
 		if live.Inventory().ItemByObjectID(weapon.ObjectID) == nil || len(capture.frames) != 1 || capture.frames[0][0] != serverpackets.OpcodeActionFailed {
 			t.Fatalf("dead RequestCrystallizeItem mutated inventory frames=%x, want unchanged inventory and ActionFailed only", capture.frames)
+		}
+	})
+}
+
+func TestCrowdControlledPlayerItemOpsAreNoops(t *testing.T) {
+	effectNames := []string{"Stun", "Sleep", "Paralyze", "Fear"}
+
+	for _, effectName := range effectNames {
+		t.Run(effectName+"/use item", func(t *testing.T) {
+			templates := testItemTemplates()
+			weapon := &item.Instance{ObjectID: 500, TemplateID: 30, Location: item.LocationInventory}
+			capture := &frameCapture{}
+			live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{weapon})
+			addEquipTestEffect(t, live, effectName)
+
+			(&GameClientLink{}).useItem(live, weapon.ObjectID)
+
+			if weapon.Equipped() || len(capture.frames) != 1 || capture.frames[0][0] != serverpackets.OpcodeActionFailed {
+				t.Fatalf("%s UseItem mutated item=%+v frames=%x, want unchanged item and ActionFailed only", effectName, weapon, capture.frames)
+			}
+		})
+
+		t.Run(effectName+"/unequip item", func(t *testing.T) {
+			templates := item.NewTable([]*item.Template{{ID: 20, Kind: item.KindArmor, Slot: item.SlotChest, Armor: &item.ArmorDetail{Type: item.ArmorLight}}})
+			chest := &item.Instance{ObjectID: 501, TemplateID: 20, Location: item.LocationPaperdoll, LocationData: itemcontainer.Chest}
+			capture := &frameCapture{}
+			live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{chest})
+			addEquipTestEffect(t, live, effectName)
+
+			(&GameClientLink{}).unequipItem(live, int32(item.SlotChest))
+
+			if !chest.Equipped() || len(capture.frames) != 1 || capture.frames[0][0] != serverpackets.OpcodeActionFailed {
+				t.Fatalf("%s RequestUnEquipItem mutated item=%+v frames=%x, want unchanged item and ActionFailed only", effectName, chest, capture.frames)
+			}
+		})
+	}
+
+	t.Run("manual paralysis lock/use item", func(t *testing.T) {
+		templates := testItemTemplates()
+		weapon := &item.Instance{ObjectID: 500, TemplateID: 30, Location: item.LocationInventory}
+		capture := &frameCapture{}
+		live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{weapon})
+		live.SetParalyzed(true)
+
+		(&GameClientLink{}).useItem(live, weapon.ObjectID)
+
+		if weapon.Equipped() || len(capture.frames) != 1 || capture.frames[0][0] != serverpackets.OpcodeActionFailed {
+			t.Fatalf("paralyzed UseItem mutated item=%+v frames=%x, want unchanged item and ActionFailed only", weapon, capture.frames)
 		}
 	})
 }

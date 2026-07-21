@@ -2,6 +2,7 @@ package network
 
 import (
 	"context"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
@@ -13,6 +14,10 @@ import (
 )
 
 const pickupAttentionRadius = 1400
+
+// pickupParalyzeLock is how long a successful ground-item pickup briefly
+// paralyzes the picking-up player, discouraging rapid repeated pickups.
+const pickupParalyzeLock = 200 * time.Millisecond
 
 // pickupLiveGroundItem handles a second Action click on an already-selected
 // ground item: it validates and moves the item into live's own inventory,
@@ -74,10 +79,18 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 	l.broadcastPickupAttention(live, ground)
 	l.groundItems.Remove(ground)
 	l.world.Despawn(ground)
+	l.lockPickupParalysis(live)
 
 	l.applyPersistActions(ctx, res.Persist)
 	l.sendInventoryUpdate(live, inv)
 	return true
+}
+
+// lockPickupParalysis briefly paralyzes live after a successful pickup,
+// clearing the lock once pickupParalyzeLock elapses.
+func (l *GameClientLink) lockPickupParalysis(live *livePlayer) {
+	l.scheduleAfter(pickupParalyzeLock, func() { live.SetParalyzed(false) })
+	live.SetParalyzed(true)
 }
 
 func groundPickupInRange(live *livePlayer, ground *grounditem.Item) bool {

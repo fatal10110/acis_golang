@@ -347,3 +347,56 @@ func TestListOnExitHookCanReenterAddWithoutDeadlock(t *testing.T) {
 		t.Fatal("effect added from within a reentrant OnExit hook never activated")
 	}
 }
+
+func TestListFlagsAggregatesActiveEffectFlagsAndDropsThemOnRemoval(t *testing.T) {
+	list := NewList(nil)
+
+	stun := newEffect("stun", 1, "none", 0, true)
+	stun.Flag = FlagStunned
+	root := newEffect("root", 2, "none", 0, true)
+	root.Flag = FlagRooted
+	fear := newEffect("fear", 3, "none", 0, true)
+	fear.Flag = FlagFear
+	paralyze := newEffect("paralyze", 4, "none", 0, true)
+	paralyze.Flag = FlagParalyzed
+
+	if got := list.Flags(); got != 0 {
+		t.Fatalf("Flags() on an empty list = %#x, want 0", got)
+	}
+
+	list.Add(stun)
+	if !list.IsAffected(FlagStunned) {
+		t.Fatal("IsAffected(FlagStunned) = false after adding a stun effect")
+	}
+	if list.IsAffected(FlagRooted) || list.IsAffected(FlagFear) || list.IsAffected(FlagParalyzed) {
+		t.Fatal("IsAffected reported a flag from an effect never added")
+	}
+
+	list.Add(root)
+	list.Add(fear)
+	list.Add(paralyze)
+
+	for _, flag := range []Flag{FlagStunned, FlagRooted, FlagFear, FlagParalyzed} {
+		if !list.IsAffected(flag) {
+			t.Fatalf("IsAffected(%#x) = false, want true with all four effects active", flag)
+		}
+	}
+	if want := FlagStunned | FlagRooted | FlagFear | FlagParalyzed; list.Flags() != want {
+		t.Fatalf("Flags() = %#x, want %#x", list.Flags(), want)
+	}
+
+	list.Remove(stun)
+	if list.IsAffected(FlagStunned) {
+		t.Fatal("IsAffected(FlagStunned) still true after its effect was removed")
+	}
+	if !list.IsAffected(FlagRooted) || !list.IsAffected(FlagFear) || !list.IsAffected(FlagParalyzed) {
+		t.Fatal("removing one flagged effect cleared an unrelated flag")
+	}
+
+	list.Remove(root)
+	list.Remove(fear)
+	list.Remove(paralyze)
+	if got := list.Flags(); got != 0 {
+		t.Fatalf("Flags() after removing every effect = %#x, want 0", got)
+	}
+}

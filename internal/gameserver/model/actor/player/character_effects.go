@@ -7,7 +7,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/statbonus"
@@ -20,11 +19,6 @@ const baseBuffSlots = 20
 
 // Character satisfies the actor surface skill target resolution needs.
 var _ target.Creature = (*Character)(nil)
-
-// EffectList returns c's active buffs and debuffs.
-func (c *Character) EffectList() *effect.List {
-	return c.effects
-}
 
 // MaxBuffCount is the number of non-toggle, non-seven-signs buffs c can
 // hold at once. See baseBuffSlots.
