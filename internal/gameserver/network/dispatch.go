@@ -8,6 +8,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	enchantflow "github.com/fatal10110/acis_golang/internal/gameserver/enchant"
@@ -66,35 +67,37 @@ const (
 // against the login server, character list/create/delete/restore, and
 // character select through to world entry.
 type GameClientLink struct {
-	validator        *SessionValidator
-	loginLink        func() *LoginLink
-	roster           *manager.Roster
-	items            itemStore
-	shortcuts        shortcutStore
-	templates        *player.TemplateTable
-	itemTemplates    *item.Table
-	html             *datacache.HTML
-	crests           *datacache.Crests
-	skills           *skillstate.Persistence
-	spellbooks       modelskill.BookPolicy
-	skillTrees       *modelskill.Trees
-	cursedWeapons    *entity.CursedWeaponTable
-	world            *world.State
-	geo              move.Geo
-	ids              idAllocator
-	groundItems      groundItemDropper
-	attackStance     attackStanceTracker
-	positions        *task.PositionUpdates
-	restarts         *restart.Table
-	respawnRestoreHP float64
-	inventory        *invops.Service
-	petItems         *petitem.Service
-	trades           *tradebook.Book
-	enchantState     *enchantflow.State
-	enchant          *enchantflow.Service
-	targets          *skilltarget.Registry
-	skillHandlers    *handlerskill.Registry
-	log              zerolog.Logger
+	validator                *SessionValidator
+	loginLink                func() *LoginLink
+	roster                   *manager.Roster
+	items                    itemStore
+	shortcuts                shortcutStore
+	templates                *player.TemplateTable
+	itemTemplates            *item.Table
+	html                     *datacache.HTML
+	crests                   *datacache.Crests
+	skills                   *skillstate.Persistence
+	spellbooks               modelskill.BookPolicy
+	skillTrees               *modelskill.Trees
+	cursedWeapons            *entity.CursedWeaponTable
+	world                    *world.State
+	geo                      move.Geo
+	ids                      idAllocator
+	groundItems              groundItemDropper
+	attackStance             attackStanceTracker
+	positions                *task.PositionUpdates
+	restarts                 *restart.Table
+	respawnRestoreHP         float64
+	levels                   *player.LevelTable
+	skillEnchantSPBookNeeded bool
+	inventory                *invops.Service
+	petItems                 *petitem.Service
+	trades                   *tradebook.Book
+	enchantState             *enchantflow.State
+	enchant                  *enchantflow.Service
+	targets                  *skilltarget.Registry
+	skillHandlers            *handlerskill.Registry
+	log                      zerolog.Logger
 
 	// newCipherKey supplies each connection's XOR cipher key; overridden in
 	// tests for a deterministic handshake.
@@ -102,6 +105,10 @@ type GameClientLink struct {
 
 	// enchantRoll supplies enchant dice rolls; overridden in tests.
 	enchantRoll func() float64
+
+	// skillEnchantRoll supplies skill-enchant dice rolls in [0,99];
+	// overridden in tests for a deterministic outcome.
+	skillEnchantRoll func() int
 }
 
 // NewGameClientLink builds a GameClientLink from its collaborators.
@@ -130,38 +137,42 @@ func NewGameClientLink(
 	positions *task.PositionUpdates,
 	restarts *restart.Table,
 	respawnRestoreHP float64,
+	levels *player.LevelTable,
+	skillEnchantSPBookNeeded bool,
 	log zerolog.Logger,
 ) *GameClientLink {
 	return &GameClientLink{
-		validator:        validator,
-		loginLink:        loginLink,
-		roster:           roster,
-		items:            items,
-		shortcuts:        shortcuts,
-		templates:        templates,
-		itemTemplates:    itemTemplates,
-		html:             html,
-		crests:           crests,
-		skills:           skills,
-		spellbooks:       spellbooks,
-		skillTrees:       skillTrees,
-		cursedWeapons:    cursedWeapons,
-		world:            worldState,
-		geo:              geo,
-		ids:              ids,
-		groundItems:      groundItems,
-		attackStance:     attackStance,
-		positions:        positions,
-		restarts:         restarts,
-		respawnRestoreHP: respawnRestoreHP,
-		inventory:        invops.NewService(ids),
-		petItems:         petitem.NewService(ids),
-		trades:           tradebook.NewBook(time.Now),
-		enchantState:     enchantflow.NewState(),
-		targets:          skilltarget.NewRegistry(skilltarget.WorldKnown{State: worldState}),
-		skillHandlers:    handlerskill.NewDefaultRegistry(),
-		log:              log,
-		newCipherKey:     randomCipherKey,
+		validator:                validator,
+		loginLink:                loginLink,
+		roster:                   roster,
+		items:                    items,
+		shortcuts:                shortcuts,
+		templates:                templates,
+		itemTemplates:            itemTemplates,
+		html:                     html,
+		crests:                   crests,
+		skills:                   skills,
+		spellbooks:               spellbooks,
+		skillTrees:               skillTrees,
+		cursedWeapons:            cursedWeapons,
+		world:                    worldState,
+		geo:                      geo,
+		ids:                      ids,
+		groundItems:              groundItems,
+		attackStance:             attackStance,
+		positions:                positions,
+		restarts:                 restarts,
+		respawnRestoreHP:         respawnRestoreHP,
+		levels:                   levels,
+		skillEnchantSPBookNeeded: skillEnchantSPBookNeeded,
+		inventory:                invops.NewService(ids),
+		petItems:                 petitem.NewService(ids),
+		trades:                   tradebook.NewBook(time.Now),
+		enchantState:             enchantflow.NewState(),
+		targets:                  skilltarget.NewRegistry(skilltarget.WorldKnown{State: worldState}),
+		skillHandlers:            handlerskill.NewDefaultRegistry(),
+		log:                      log,
+		newCipherKey:             randomCipherKey,
 	}
 }
 
@@ -177,6 +188,13 @@ func (l *GameClientLink) petItemService() *petitem.Service {
 		l.petItems = petitem.NewService(l.ids)
 	}
 	return l.petItems
+}
+
+func (l *GameClientLink) rollEnchantSkill() int {
+	if l.skillEnchantRoll != nil {
+		return l.skillEnchantRoll()
+	}
+	return rnd.Get(100)
 }
 
 func randomCipherKey() ([]byte, error) {

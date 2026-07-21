@@ -34,3 +34,24 @@ func ClassParent(id int) (int, bool) {
 	p, ok := classParent[id]
 	return p, ok
 }
+
+// ClassLevel returns id's profession tier — 0 for a base profession, 1 or 2
+// for a first or second occupation change, 3 for a third-class/awakened
+// profession — counted by walking classParent to its root, and whether id
+// is a known profession at all.
+func ClassLevel(id int) (int, bool) {
+	parent, ok := classParent[id]
+	if !ok {
+		return 0, false
+	}
+	level := 0
+	for parent != -1 {
+		level++
+		next, ok := classParent[parent]
+		if !ok {
+			return 0, false
+		}
+		parent = next
+	}
+	return level, true
+}
