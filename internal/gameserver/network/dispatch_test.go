@@ -1084,6 +1084,11 @@ type testGeo struct{}
 func (testGeo) CanMove(int, int, int, int, int, int) bool { return true }
 func (testGeo) Height(_, _, z int) int16                  { return int16(z) }
 
+func (testGeo) FindPath(_, _ location.Location) ([]location.Location, bool) { return nil, false }
+func (testGeo) ValidLocation(ox, oy, oz, _, _, _ int) location.Location {
+	return location.Location{X: ox, Y: oy, Z: oz}
+}
+
 func newTestLivePlayer(t *testing.T, id int32, capture *frameCapture) *livePlayer {
 	t.Helper()
 	tmpl, ok := testTemplates(t).Get(0)
@@ -1150,6 +1155,11 @@ type testHostileGeo struct{}
 
 func (testHostileGeo) CanMove(_, _, _, _, _, _ int) bool { return true }
 func (testHostileGeo) Height(_, _, _ int) int16          { return 0 }
+
+func (testHostileGeo) FindPath(_, _ location.Location) ([]location.Location, bool) { return nil, false }
+func (testHostileGeo) ValidLocation(ox, oy, oz, _, _, _ int) location.Location {
+	return location.Location{X: ox, Y: oy, Z: oz}
+}
 
 type testHostileMove struct{}
 
