@@ -1,6 +1,7 @@
 package npc
 
 import (
+	"math"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
@@ -11,7 +12,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/statbonus"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -157,30 +158,22 @@ func (h *Hostile) SetHeadingTo(target attackable.Combatant) {
 	h.Presence.SetHeading(location.Location{X: sx, Y: sy}.HeadingTo(location.Location{X: tx, Y: ty}))
 }
 
-// PDef returns this NPC's physical defense stat.
+// PDef returns this NPC's physical defense stat, finalized through its stat
+// calculator (level scaling plus any active buff/debuff).
 func (h *Hostile) PDef() float64 {
-	return h.Instance.Template.PDef
+	return h.calcStat(stat.PowerDefence, h.Instance.Template.PDef)
 }
 
-// Evasion returns this NPC's physical evasion rating (per-mille), derived
-// from its base DEX and level. Equipment- and effect-driven evasion bonuses
-// aren't modeled yet — no gear or buff/debuff system exists for a live NPC
-// actor.
+// Evasion returns this NPC's physical evasion rating (per-mille), finalized
+// through its stat calculator (base DEX/level plus any active buff/debuff).
 func (h *Hostile) Evasion() int {
-	tpl := h.Instance.Template
-	return int(statbonus.BaseEvasionAccuracy[statbonus.ClampIndex(tpl.DEX)]) + tpl.Level
+	return int(h.calcStat(stat.EvasionRate, 0))
 }
 
 // MakeAttackHit resolves one physical attack against target: a hit/miss
 // roll, a critical roll, and a damage roll through the shared
 // physical-damage formula. A target that can't exchange physical damage (no
 // physicalTarget surface) always misses.
-//
-// Accuracy, evasion, critical rate and attack power are derived directly
-// from base template stats (DEX/level/STR-independent PAtk); the full
-// buff/debuff and STR/level finalization stat chain isn't wired to a live
-// NPC yet, so these are the pre-modifier values, not a live creature's
-// fully finalized combat stats.
 func (h *Hostile) MakeAttackHit(target attackable.Combatant, split bool) attack.Hit {
 	hit := attack.Hit{Target: target, TargetID: target.ObjectID()}
 
@@ -191,9 +184,8 @@ func (h *Hostile) MakeAttackHit(target attackable.Combatant, split bool) attack.
 	}
 
 	tpl := h.Instance.Template
-	dexIdx := statbonus.ClampIndex(tpl.DEX)
 
-	accuracy := int(statbonus.BaseEvasionAccuracy[dexIdx]) + tpl.Level
+	accuracy := int(h.calcStat(stat.AccuracyCombat, 0))
 	evasion := other.Evasion()
 
 	sx, sy, sz := h.Position()
@@ -207,7 +199,7 @@ func (h *Hostile) MakeAttackHit(target attackable.Combatant, split bool) attack.
 		return hit
 	}
 
-	critRate := tpl.CritRate * statbonus.DEXBonus[dexIdx] * 10
+	critRate := math.Min(h.calcStat(stat.CriticalRate, tpl.CritRate), 500)
 	crit := formulas.CritSucceeds(critRate, h.roll(1000))
 
 	randomMul := 1.0
@@ -221,7 +213,7 @@ func (h *Hostile) MakeAttackHit(target attackable.Combatant, split bool) attack.
 	}
 
 	damage := formulas.PhysicalAttackDamage(formulas.PhysicalAttackInput{
-		AttackPower:       tpl.PAtk,
+		AttackPower:       h.calcStat(stat.PowerAttack, tpl.PAtk),
 		Defence:           defence,
 		Crit:              crit,
 		PosMul:            formulas.PosMul(false, true, crit),
