@@ -17,6 +17,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -641,16 +642,15 @@ func averageZ(territory *spawn.Territory) int {
 // after — before anything can call through it.
 type locatedRef struct{ move.Actor }
 type creatureActorRef struct{ attack.CreatureActor }
+type statOwnerRef struct{ effect.StatOwner }
 
 // newLiveHostile builds a live Hostile for inst, wiring a real movement
 // controller (over the Hostile's lifetime movement state) and a real attack
 // controller, resolving their mutual construction-order dependency on the
-// finished Hostile via locatedRef/creatureActorRef.
+// finished Hostile via locatedRef/creatureActorRef/statOwnerRef.
 func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *task.PositionUpdates) (*npc.Hostile, error) {
-	// A hostile NPC has no stat calculator wired yet, so its effect list
-	// runs with no owner: active effects still gate its crowd-control
-	// status flags, they just don't feed any stat funcs back.
-	live, err := creature.NewLive(inst.Home, speed, geo, nil)
+	statRef := &statOwnerRef{}
+	live, err := creature.NewLive(inst.Home, speed, geo, statRef)
 	if err != nil {
 		return nil, err
 	}
@@ -675,6 +675,7 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 
 	locRef.Actor = hostile
 	actorRef.CreatureActor = hostile
+	statRef.StatOwner = hostile
 
 	// Re-evaluate the AI loop as soon as a chase leg completes or a swing
 	// finishes, rather than waiting for the next fixed AI tick — otherwise

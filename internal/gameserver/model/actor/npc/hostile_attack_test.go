@@ -8,6 +8,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -27,23 +29,50 @@ func newCombatHostile(t testing.TB, id int32, tpl *Template) *Hostile {
 }
 
 func TestHostileMakeAttackHitResolvesDamage(t *testing.T) {
-	attacker := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", PAtk: 100, DEX: 30, Level: 1, CritRate: 4})
+	attacker := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", PAtk: 100, STR: 40, DEX: 30, Level: 1, CritRate: 4})
 	attacker.SetRollSource(zeroRoll)
-	defender := newCombatHostile(t, 2, &Template{ID: 2, Type: "Monster", PDef: 50, DEX: 30, Level: 1, HPMax: 1000})
+	defender := newCombatHostile(t, 2, &Template{ID: 2, Type: "Monster", PDef: 50, STR: 40, DEX: 30, Level: 1, HPMax: 1000})
 
 	hit := attacker.MakeAttackHit(defender, false)
 
-	// With attacker.PAtk=100, defender.PDef=50, an even accuracy/evasion
-	// match (same DEX/level on both sides) and a guaranteed critical hit
-	// (zeroRoll), the physical-attack formula (already verified against
-	// the reference implementation) resolves to:
-	//   (100*2 * 1(posMul) * 1(randomMul) + 0) * 77/50 = 308
-	const wantDamage = 308
+	// Attacker/defender both finalize through the stat calculator: at
+	// STR=40 (the reference base-attribute default), STRBonus[40]=1.2 and
+	// level 1's LevelMod=0.9, so attacker.PAtk finalizes to
+	// 100*1.2*0.9=108 and defender.PDef to 50*0.9=45. An even accuracy/
+	// evasion match (same DEX/level on both sides) and a guaranteed
+	// critical hit (zeroRoll) then resolve through the physical-attack
+	// formula (already verified against the reference implementation) to:
+	//   (108*2 * 1(posMul) * 1(randomMul) + 0) * 77/45 = 369 (truncated)
+	const wantDamage = 369
 	if hit.Miss || hit.Damage != wantDamage {
 		t.Fatalf("MakeAttackHit() = %+v, want %d damage", hit, wantDamage)
 	}
 	if got := defender.CurrentHP(); got != defender.MaxHP() {
 		t.Fatalf("defender HP = %d, want unchanged %d", got, defender.MaxHP())
+	}
+}
+
+func TestHostileStatFuncsAdjustFinalizedCombatStats(t *testing.T) {
+	tpl := &Template{ID: 1, Type: "Monster", PAtk: 100, PDef: 50, STR: 40, DEX: 30, Level: 1}
+	h := newCombatHostile(t, 1, tpl)
+
+	basePAtk := h.calcStat(stat.PowerAttack, tpl.PAtk)
+	basePDef := h.PDef()
+
+	owner := "test-buff"
+	h.AddStatFuncs([]basefunc.Func{basefunc.NewMul(owner, stat.PowerAttack, 1.5, nil)})
+
+	if got, want := h.calcStat(stat.PowerAttack, tpl.PAtk), basePAtk*1.5; got != want {
+		t.Fatalf("P.Atk after buff = %v, want %v", got, want)
+	}
+	if got := h.PDef(); got != basePDef {
+		t.Fatalf("P.Def changed by an unrelated P.Atk buff: got %v, want unchanged %v", got, basePDef)
+	}
+
+	h.RemoveStatsByOwner(owner)
+
+	if got := h.calcStat(stat.PowerAttack, tpl.PAtk); got != basePAtk {
+		t.Fatalf("P.Atk after RemoveStatsByOwner = %v, want reverted %v", got, basePAtk)
 	}
 }
 
@@ -141,9 +170,9 @@ func TestHostileAttackableByLiveAttacker(t *testing.T) {
 }
 
 func TestHostileTakeDamageReachingZeroTriggersDieAndDecayChain(t *testing.T) {
-	attacker := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", PAtk: 100, DEX: 30, Level: 1, CritRate: 4})
+	attacker := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", PAtk: 100, STR: 40, DEX: 30, Level: 1, CritRate: 4})
 	attacker.SetRollSource(zeroRoll)
-	defender := newCombatHostile(t, 2, &Template{ID: 2, Type: "Monster", PDef: 50, DEX: 30, Level: 1, HPMax: 100, CorpseTime: 7})
+	defender := newCombatHostile(t, 2, &Template{ID: 2, Type: "Monster", PDef: 50, STR: 40, DEX: 30, Level: 1, HPMax: 100, CorpseTime: 7})
 
 	state := world.New()
 	state.Spawn(defender, 100, 100, 0, 0)
@@ -152,7 +181,7 @@ func TestHostileTakeDamageReachingZeroTriggersDieAndDecayChain(t *testing.T) {
 		t.Fatal("defender.Dead() = true before any damage, want false")
 	}
 
-	hit := attacker.MakeAttackHit(defender, false) // 308 damage vs 100 HP: lethal in one hit.
+	hit := attacker.MakeAttackHit(defender, false) // 369 damage vs 100 HP: lethal in one hit.
 	defender.TakeDamage(hit.Damage, attacker)
 
 	if !defender.Dead() {

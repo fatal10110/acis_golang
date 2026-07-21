@@ -14,6 +14,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -75,6 +77,10 @@ type Hostile struct {
 	roll func(n int) int
 
 	los LineOfSight
+
+	// statMu guards statCalcs, this NPC's per-stat finalization chains.
+	statMu    sync.Mutex
+	statCalcs map[stat.Stat]*basefunc.Calculator
 }
 
 // Attackable reports whether inst's instance type belongs to the set of
