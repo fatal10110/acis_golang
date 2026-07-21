@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"sync"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
@@ -81,17 +82,18 @@ type Character struct {
 	DeleteAt   int64
 	LastAccess int64
 
-	runtimeTemplate *Template
-	inventory       *itemcontainer.Inventory
-	world           *world.State
-	los             LineOfSight
-	sendFrame       func(wire.Frame) bool
-	broadcastAttack func(attack.Snapshot)
-	broadcastMove   func(move.Event)
-	broadcastStop   func()
-	broadcastDie    func()
-	broadcastStatus func()
-	roll            func(int) int
+	runtimeTemplate    *Template
+	inventory          *itemcontainer.Inventory
+	world              *world.State
+	los                LineOfSight
+	sendFrame          func(wire.Frame) bool
+	broadcastAttack    func(attack.Snapshot)
+	broadcastMove      func(move.Event)
+	broadcastStop      func()
+	broadcastDie       func()
+	broadcastStatus    func()
+	broadcastShortBuff func(ShortBuffUpdate)
+	roll               func(int) int
 
 	deathMu sync.Mutex
 	dead    bool
@@ -101,12 +103,14 @@ type Character struct {
 	statCalcs map[stat.Stat]*basefunc.Calculator
 
 	// stateMu guards transient live flags and runtime send/broadcast hooks.
-	stateMu       sync.RWMutex
-	stateInit     bool
-	running       bool
-	standing      bool
-	inCombat      bool
-	autoSoulShots map[int32]bool
+	stateMu              sync.RWMutex
+	stateInit            bool
+	running              bool
+	standing             bool
+	inCombat             bool
+	autoSoulShots        map[int32]bool
+	shortBuffTaskSkillID int32
+	shortBuffTimer       *time.Timer
 
 	skills skillState
 }
