@@ -12,7 +12,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -91,9 +90,6 @@ func (c *Character) SetLineOfSight(los LineOfSight) {
 func (c *Character) AttachRuntime(tmpl *Template, inv *itemcontainer.Inventory) {
 	c.runtimeTemplate = tmpl
 	c.inventory = inv
-	if c.effects == nil {
-		c.effects = effect.NewList(c)
-	}
 	if c.roll == nil {
 		c.roll = rand.IntN
 	}

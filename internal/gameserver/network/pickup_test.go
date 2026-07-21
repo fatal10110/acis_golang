@@ -140,6 +140,64 @@ func TestPickupLiveGroundItemMovesItemAndDespawns(t *testing.T) {
 	}
 }
 
+// fakeAfterFuncs records scheduled delayed calls so a test can trigger them
+// deterministically instead of waiting on a real timer.
+type fakeAfterFuncs struct {
+	calls []struct {
+		delay time.Duration
+		fn    func()
+	}
+}
+
+func (f *fakeAfterFuncs) schedule(d time.Duration, fn func()) {
+	f.calls = append(f.calls, struct {
+		delay time.Duration
+		fn    func()
+	}{d, fn})
+}
+
+func (f *fakeAfterFuncs) fireAll() {
+	for _, c := range f.calls {
+		c.fn()
+	}
+}
+
+func TestPickupLiveGroundItemLocksAndReleasesTransientParalysis(t *testing.T) {
+	templates := petTestTemplates()
+	capture := &frameCapture{}
+	live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
+	state := world.New()
+	state.Spawn(live, 100, 0, 0, 0)
+	drops := task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour}, time.Now)
+	tmpl, _ := templates.Get(item.AdenaID)
+	ground := dropTestGround(t, state, drops, item.Instance{ObjectID: 900, TemplateID: item.AdenaID, Count: 40, ManaLeft: -1}, tmpl, 100, 0, 0)
+
+	store := &recordingEnchantItemStore{}
+	fake := &fakeAfterFuncs{}
+	gcl := &GameClientLink{world: state, groundItems: drops, items: store, afterFunc: fake.schedule}
+
+	if live.Paralyzed() {
+		t.Fatal("Paralyzed() = true before any pickup")
+	}
+
+	if !gcl.pickupLiveGroundItem(context.Background(), live, ground) {
+		t.Fatal("pickupLiveGroundItem returned false for a ground item target")
+	}
+
+	if !live.Paralyzed() {
+		t.Fatal("Paralyzed() = false immediately after a successful pickup")
+	}
+	if len(fake.calls) != 1 || fake.calls[0].delay != pickupParalyzeLock {
+		t.Fatalf("scheduled calls = %+v, want exactly one call after %s", fake.calls, pickupParalyzeLock)
+	}
+
+	fake.fireAll()
+
+	if live.Paralyzed() {
+		t.Fatal("Paralyzed() = true after the scheduled release ran")
+	}
+}
+
 func TestPickupLiveGroundItemMergesStackAndDeletesGroundRow(t *testing.T) {
 	templates := petTestTemplates()
 	existing := &item.Instance{ObjectID: 800, TemplateID: item.AdenaID, OwnerID: 1, Count: 10, Location: item.LocationInventory}

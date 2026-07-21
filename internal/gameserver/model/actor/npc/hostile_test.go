@@ -8,6 +8,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world/worldtest"
@@ -432,7 +434,7 @@ func newTestHostile(t *testing.T, move ai.MoveController, strike ai.AttackContro
 
 func newHostileLive(t testing.TB) *creature.Live {
 	t.Helper()
-	live, err := creature.NewLive(location.Location{}, 100, hostileGeo{})
+	live, err := creature.NewLive(location.Location{}, 100, hostileGeo{}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -484,4 +486,62 @@ func (a *hostileAttack) CanAttack(attackable.Combatant) bool {
 }
 func (a *hostileAttack) DoAttack(target attackable.Combatant) {
 	a.target = target
+}
+
+// hostileEffectTarget satisfies the flee hook a Fear effect's runtime needs,
+// so it activates regardless of what its actual effected actor is.
+type hostileEffectTarget struct{}
+
+func (hostileEffectTarget) FleeFrom(effector any, distance int) {}
+
+func addHostileEffect(t *testing.T, hostile *Hostile, name string) *effect.Effect {
+	t.Helper()
+	e, err := effect.New(effect.Skill{ID: 1}, modelskill.EffectTemplate{Name: name})
+	if err != nil {
+		t.Fatalf("effect.New(%q) error: %v", name, err)
+	}
+	e.Effected = hostileEffectTarget{}
+	hostile.EffectList().Add(e)
+	return e
+}
+
+func TestHostileDenyAIActionReflectsCrowdControlAndDeath(t *testing.T) {
+	tests := []struct {
+		name       string
+		effectName string
+	}{
+		{"stunned", "Stun"},
+		{"sleeping", "Sleep"},
+		{"paralyzed", "Paralyze"},
+		{"afraid", "Fear"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			hostile := newTestHostile(t, &hostileMove{}, &hostileAttack{})
+			if hostile.DenyAIAction() {
+				t.Fatal("DenyAIAction() = true before any effect is active")
+			}
+
+			e := addHostileEffect(t, hostile, tt.effectName)
+			if !hostile.DenyAIAction() {
+				t.Fatalf("DenyAIAction() = false while %s, want true", tt.name)
+			}
+
+			hostile.EffectList().Remove(e)
+			if hostile.DenyAIAction() {
+				t.Fatalf("DenyAIAction() = true after the %s effect was removed", tt.name)
+			}
+		})
+	}
+
+	t.Run("dead", func(t *testing.T) {
+		hostile := newTestHostile(t, &hostileMove{}, &hostileAttack{})
+		if !hostile.MarkDead() {
+			t.Fatal("MarkDead() reported no change on a live NPC")
+		}
+		if !hostile.DenyAIAction() {
+			t.Fatal("DenyAIAction() = false for a dead NPC")
+		}
+	})
 }

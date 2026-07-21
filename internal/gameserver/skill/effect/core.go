@@ -35,8 +35,10 @@ const (
 	FlagSleep
 	// FlagStunned marks a target as stunned.
 	FlagStunned
-	flagParalyzed
-	flagMeditating
+	// FlagParalyzed marks a target as paralyzed.
+	FlagParalyzed
+	// FlagMeditating marks a target as immobile until it is next attacked.
+	FlagMeditating
 )
 
 // TypeManaDamOverTime is a periodic MP-drain effect: a toggle skill's
@@ -143,14 +145,14 @@ var coreKinds = map[string]kind{
 	"Sleep":                 {typ: TypeSleep, flag: FlagSleep, debuff: true},
 	"Stun":                  {typ: TypeStun, flag: FlagStunned, debuff: true},
 	"AbortCast":             {typ: TypeAbortCast},
-	"ImmobileUntilAttacked": {typ: TypeImmobileUntilAttacked, flag: flagMeditating},
+	"ImmobileUntilAttacked": {typ: TypeImmobileUntilAttacked, flag: FlagMeditating},
 	"ImobileBuff":           {typ: TypeImmobilizeEffector},
 	"Invincible":            {typ: TypeInvincible},
 	"ManaHealOverTime":      {typ: TypeManaHealOverTime},
 	"Mute":                  {typ: TypeMute, flag: flagMuted, debuff: true},
 	"NoblesseBless":         {typ: TypeNoblesseBless, flag: flagNoblesseBlessing},
-	"Paralyze":              {typ: TypeParalyze, flag: flagParalyzed, debuff: true},
-	"Petrification":         {typ: TypePetrification, flag: flagParalyzed, debuff: true},
+	"Paralyze":              {typ: TypeParalyze, flag: FlagParalyzed, debuff: true},
+	"Petrification":         {typ: TypePetrification, flag: FlagParalyzed, debuff: true},
 	"PhysicalMute":          {typ: TypePhysicalMute, flag: flagPhysicalMuted, debuff: true},
 	"RemoveTarget":          {typ: TypeRemoveTarget},
 	"SilenceMagicPhysical":  {typ: TypeSilenceAll, flag: flagMuted | flagPhysicalMuted, debuff: true},
@@ -177,6 +179,14 @@ var fearSkippedPlayableSkillIDs = map[modelskill.ID]bool{
 	98:   true,
 	1272: true,
 	1381: true,
+}
+
+// fearHalvedDurationPlayableSkillIDs are skill ids whose fear effect runs at
+// half its configured tick count against a playable target.
+var fearHalvedDurationPlayableSkillIDs = map[modelskill.ID]bool{
+	65:   true,
+	1092: true,
+	1169: true,
 }
 
 // New builds a runtime effect from a parsed core effect template.
@@ -411,9 +421,10 @@ type invulnerabilityTarget interface {
 }
 
 // immobilizeTarget is implemented by an actor whose movement-lock flag can
-// be toggled.
+// be toggled. SetImmobilized reports whether the flag actually changed;
+// this hook ignores that report.
 type immobilizeTarget interface {
-	SetImmobilized(bool)
+	SetImmobilized(bool) bool
 }
 
 // manaHealTarget is implemented by an actor whose mana pool can be checked
@@ -601,6 +612,9 @@ func sleepStart(e *Effect) bool {
 }
 
 func fearStart(e *Effect) bool {
+	if isPlayable(e.Effected) && fearHalvedDurationPlayableSkillIDs[e.Skill.ID] {
+		e.Template.Count /= 2
+	}
 	if fearImmune(e.Effected) || isAfraid(e.Effected) {
 		return false
 	}

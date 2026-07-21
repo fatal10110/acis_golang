@@ -109,6 +109,10 @@ type GameClientLink struct {
 	// skillEnchantRoll supplies skill-enchant dice rolls in [0,99];
 	// overridden in tests for a deterministic outcome.
 	skillEnchantRoll func() int
+
+	// afterFunc schedules fn to run once after d; nil defaults to
+	// time.AfterFunc. Overridden in tests for deterministic timing.
+	afterFunc func(d time.Duration, fn func())
 }
 
 // NewGameClientLink builds a GameClientLink from its collaborators.
@@ -195,6 +199,15 @@ func (l *GameClientLink) rollEnchantSkill() int {
 		return l.skillEnchantRoll()
 	}
 	return rnd.Get(100)
+}
+
+// scheduleAfter runs fn once, after d elapses.
+func (l *GameClientLink) scheduleAfter(d time.Duration, fn func()) {
+	if l.afterFunc != nil {
+		l.afterFunc(d, fn)
+		return
+	}
+	time.AfterFunc(d, fn)
 }
 
 func randomCipherKey() ([]byte, error) {

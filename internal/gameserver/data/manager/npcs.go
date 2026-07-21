@@ -647,7 +647,10 @@ type creatureActorRef struct{ attack.CreatureActor }
 // controller, resolving their mutual construction-order dependency on the
 // finished Hostile via locatedRef/creatureActorRef.
 func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *task.PositionUpdates) (*npc.Hostile, error) {
-	live, err := creature.NewLive(inst.Home, speed, geo)
+	// A hostile NPC has no stat calculator wired yet, so its effect list
+	// runs with no owner: active effects still gate its crowd-control
+	// status flags, they just don't feed any stat funcs back.
+	live, err := creature.NewLive(inst.Home, speed, geo, nil)
 	if err != nil {
 		return nil, err
 	}

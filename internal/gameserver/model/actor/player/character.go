@@ -92,8 +92,6 @@ type Character struct {
 	deathMu sync.Mutex
 	dead    bool
 
-	effects *effect.List
-
 	// statMu guards statCalcs map creation. Each Calculator owns its Funcs.
 	statMu    sync.Mutex
 	statCalcs map[stat.Stat]*basefunc.Calculator
@@ -108,6 +106,8 @@ type Character struct {
 
 	skills skillState
 }
+
+var _ effect.StatOwner = (*Character)(nil)
 
 // NewCharacter builds a freshly created Character of profession tmpl for
 // accountName, seeded with the profession's level-1 base stats and a
@@ -159,7 +159,6 @@ func NewCharacter(objectID int32, tmpl *Template, accountName, name string, hair
 	if len(tmpl.Spawns) > 0 {
 		c.Location = tmpl.Spawns[rand.IntN(len(tmpl.Spawns))]
 	}
-	c.effects = effect.NewList(c)
 
 	return c, nil
 }

@@ -83,14 +83,14 @@ func TestNewBuildsCoreEffectMetadata(t *testing.T) {
 		{"DamOverTime", TypeDamOverTime, FlagNone, true},
 		{"ManaDamOverTime", TypeManaDamOverTime, FlagNone, false},
 		{"AbortCast", TypeAbortCast, FlagNone, false},
-		{"ImmobileUntilAttacked", TypeImmobileUntilAttacked, flagMeditating, false},
+		{"ImmobileUntilAttacked", TypeImmobileUntilAttacked, FlagMeditating, false},
 		{"ImobileBuff", TypeImmobilizeEffector, FlagNone, false},
 		{"Invincible", TypeInvincible, FlagNone, false},
 		{"ManaHealOverTime", TypeManaHealOverTime, FlagNone, false},
 		{"Mute", TypeMute, flagMuted, true},
 		{"NoblesseBless", TypeNoblesseBless, flagNoblesseBlessing, false},
-		{"Paralyze", TypeParalyze, flagParalyzed, true},
-		{"Petrification", TypePetrification, flagParalyzed, true},
+		{"Paralyze", TypeParalyze, FlagParalyzed, true},
+		{"Petrification", TypePetrification, FlagParalyzed, true},
 		{"PhysicalMute", TypePhysicalMute, flagPhysicalMuted, true},
 		{"RemoveTarget", TypeRemoveTarget, FlagNone, false},
 		{"SilenceMagicPhysical", TypeSilenceAll, flagMuted | flagPhysicalMuted, true},
@@ -267,6 +267,44 @@ func TestFearEffectHooksFleeAndRejectImmuneTargets(t *testing.T) {
 	}
 	if got := len(skippedList.All()); got != 0 {
 		t.Fatalf("playable-skipped fear effects in list = %d, want 0", got)
+	}
+}
+
+// The fear tick counts below (10, halving to 5) are the count/time datapack
+// values shared by skill ids 65 ("Horror"), 1092 ("Fear"), and 1169 ("Curse
+// Fear")'s own Fear effect entries; id 98 ("Sword Symphony") carries the
+// same count but is not one of the halved skill ids.
+func TestFearEffectHalvesTickCountAgainstPlayableForListedSkillsOnly(t *testing.T) {
+	tests := []struct {
+		name      string
+		skillID   modelskill.ID
+		playable  bool
+		wantCount int
+	}{
+		{"halved: Horror against a playable", 65, true, 5},
+		{"halved: Fear against a playable", 1092, true, 5},
+		{"halved: Curse Fear against a playable", 1169, true, 5},
+		{"not halved: Horror against a non-playable", 65, false, 10},
+		{"not halved: Fear against a non-playable", 1092, false, 10},
+		{"not halved: an unlisted skill against a playable", 98, true, 10},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			target := &liveEffectTarget{playable: tt.playable}
+			e, err := New(Skill{ID: tt.skillID}, modelskill.EffectTemplate{Name: "Fear", Count: 10, Time: 2})
+			if err != nil {
+				t.Fatalf("New() error: %v", err)
+			}
+			e.Effector = "caster"
+			e.Effected = target
+
+			e.OnStart(e)
+
+			if e.Template.Count != tt.wantCount {
+				t.Fatalf("Template.Count = %d, want %d", e.Template.Count, tt.wantCount)
+			}
+		})
 	}
 }
 
@@ -829,8 +867,9 @@ func (t *liveEffectTarget) SetInvul(v bool) {
 	t.events = append(t.events, fmt.Sprintf("invul:%v", v))
 }
 
-func (t *liveEffectTarget) SetImmobilized(v bool) {
+func (t *liveEffectTarget) SetImmobilized(v bool) bool {
 	t.events = append(t.events, fmt.Sprintf("immobilized:%v", v))
+	return true
 }
 
 func (t *liveEffectTarget) CanBeHealed() bool { return t.canBeHealed }
