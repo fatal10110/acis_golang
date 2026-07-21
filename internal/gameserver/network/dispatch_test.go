@@ -377,6 +377,32 @@ func testItemTemplates() *item.Table {
 			Stackable: true,
 			EtcItem:   &item.EtcItemDetail{Type: item.EtcItemScrollEnchantWeapon, Handler: "EnchantScrolls"},
 		},
+		{
+			ID:             1060,
+			Name:           "Lesser Healing Potion",
+			Kind:           item.KindEtcItem,
+			Duration:       -1,
+			Stackable:      true,
+			Dropable:       true,
+			Tradable:       true,
+			Destroyable:    true,
+			Depositable:    true,
+			EtcItem:        &item.EtcItemDetail{Type: item.EtcItemPotion, Handler: "ItemSkills", ReuseDelay: 10000, SharedReuseGroup: 8},
+			AttachedSkills: []item.SkillRef{{ID: 2031, Level: 1}},
+		},
+		{
+			ID:             728,
+			Name:           "Mana Potion",
+			Kind:           item.KindEtcItem,
+			Duration:       -1,
+			Stackable:      true,
+			Dropable:       true,
+			Tradable:       true,
+			Destroyable:    true,
+			Depositable:    true,
+			EtcItem:        &item.EtcItemDetail{Type: item.EtcItemPotion, Handler: "ItemSkills", ReuseDelay: 2000},
+			AttachedSkills: []item.SkillRef{{ID: 2279, Level: 2}},
+		},
 	})
 }
 

@@ -1,11 +1,13 @@
 package network
 
 import (
+	"context"
 	"net"
 	"testing"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
 
@@ -92,4 +94,48 @@ func TestGameClientLinkNeverGoesSilentOnActionRequests(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestGameClientLinkUseItemPotionRejectionReplies is the silent-drop
+// guardrail for the consumable-use branch useItem now dispatches. A
+// healing potion whose reuse delay is still cooling must still answer the
+// client (a reuse system message plus ActionFailed) rather than going
+// quiet, the way the #873 guardrail already requires of every other
+// rejected item-window action. The first use succeeds and installs the
+// reuse; the second use, sent while the reuse window is open, is the case
+// under test.
+func TestGameClientLinkUseItemPotionRejectionReplies(t *testing.T) {
+	skills := consumableSkillTable(t)
+	const objectID int32 = 720
+	c, chars, _, _ := newLinkedGameClientWithSkillsSeed(t, skills, func(chars *fakeCharStore, items *fakeItemStore) {
+		objID := seedSelectableCharacter(t, chars, "player1", "Newbie", 5, 0)
+		if err := items.Create(context.Background(), objID, item.Instance{
+			ObjectID: objectID, TemplateID: 1060, OwnerID: objID,
+			Count: 5, Location: item.LocationInventory, ManaLeft: -1,
+		}); err != nil {
+			t.Fatalf("seed potion: %v", err)
+		}
+	}, 1)
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	// First use succeeds: drains the InventoryUpdate, MagicSkillUse and
+	// USE_S1 frames so the second use's reply is the next thing read.
+	c.send(encodeUseItem(objectID, false))
+	for c.readWithTimeout(time.Second) != nil {
+	}
+
+	c.send(encodeUseItem(objectID, false))
+	first := c.readWithTimeout(2 * time.Second)
+	if first == nil {
+		t.Fatal("reuse-rejected potion use produced no reply at all — the request was silently dropped")
+	}
+	for c.readWithTimeout(100*time.Millisecond) != nil {
+	}
+
+	_ = chars // keep the character-store handle live for the seeded player
 }
