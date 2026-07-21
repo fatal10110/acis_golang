@@ -552,6 +552,35 @@ func TestInRangeMatchesOracle(t *testing.T) {
 	}
 }
 
+// bodiedStub is a grid occupant with a collision radius, like a live
+// creature, as opposed to trackedStub's point footprint.
+type bodiedStub struct {
+	trackedStub
+	radius float64
+}
+
+func (b *bodiedStub) CollisionRadius() float64 { return b.radius }
+
+func TestInRangeWidensByCollisionRadius(t *testing.T) {
+	a := &bodiedStub{trackedStub: trackedStub{id: 1}, radius: 40}
+	a.x, a.y, a.z = 0, 0, 0
+	b := &bodiedStub{trackedStub: trackedStub{id: 2}, radius: 40}
+	b.x, b.y, b.z = 150, 0, 0
+
+	// Centre distance (150) exceeds the raw range (100), but with both
+	// 40-unit bodies added (100+40+40=180) they're within range.
+	if !inRange(100, a, b) {
+		t.Error("inRange(100, ...) = false, want true once collision radii are added")
+	}
+
+	// A point occupant (no CollisionRadius) gets no widening.
+	p := &trackedStub{id: 3}
+	p.x, p.y, p.z = 150, 0, 0
+	if inRange(100, a, p) {
+		t.Error("inRange(100, ...) = true, want false: point occupant should not be widened")
+	}
+}
+
 func TestVisibilityConcurrent(t *testing.T) {
 	s := New()
 	log := &sightLog{} // exercised concurrently; contents not asserted

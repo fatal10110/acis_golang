@@ -392,17 +392,28 @@ func searchDepth(radius int) int {
 	return radius/regionSize + 1
 }
 
-// inRange reports whether a and b are within rng units of each other.
-// A rng of -1 means unlimited; any other negative value behaves like its
-// absolute value.
-// Objects that occupy physical space will eventually widen the allowance
-// by their body radius; until then both bodies count as points.
+// bodied is implemented by Tracked objects that occupy physical space.
+// Objects without it (ground items, static objects) count as points.
+type bodied interface {
+	CollisionRadius() float64
+}
+
+// inRange reports whether a and b are within rng units of each other,
+// widened by each side's collision radius when it has one. A rng of -1
+// means unlimited; any other negative value behaves like its absolute
+// value.
 func inRange(rng int, a, b Tracked) bool {
 	if rng == -1 {
 		return true
 	}
 	if rng < 0 {
 		rng = -rng
+	}
+	if ab, ok := a.(bodied); ok {
+		rng += int(ab.CollisionRadius())
+	}
+	if bb, ok := b.(bodied); ok {
+		rng += int(bb.CollisionRadius())
 	}
 
 	ax, ay, az := a.presence().Position()
