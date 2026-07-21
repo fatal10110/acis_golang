@@ -97,7 +97,7 @@ func TestNewBuildsCoreEffectMetadata(t *testing.T) {
 		{"PhysicalMute", TypePhysicalMute, flagPhysicalMuted, true, false},
 		{"RemoveTarget", TypeRemoveTarget, FlagNone, false, false},
 		{"SilenceMagicPhysical", TypeSilenceAll, flagMuted | flagPhysicalMuted, true, false},
-		{"SilentMove", TypeSilentMove, flagSilentMove, false, false},
+		{"SilentMove", TypeSilentMove, FlagSilentMove, false, false},
 		{"StunSelf", TypeStunSelf, FlagStunned, false, false},
 		{"Heal", TypeHeal, FlagNone, false, false},
 		{"HealOverTime", TypeHealOverTime, FlagNone, false, false},
@@ -1745,7 +1745,7 @@ func TestChameleonRestEffectGatesActionOnContSkillTypeAndSitting(t *testing.T) {
 	}
 	e.Effected = target
 
-	if want := flagSilentMove | flagRelaxing; e.Flag != want {
+	if want := FlagSilentMove | flagRelaxing; e.Flag != want {
 		t.Fatalf("Flag = %v, want %v", e.Flag, want)
 	}
 	if !e.OnStart(e) {

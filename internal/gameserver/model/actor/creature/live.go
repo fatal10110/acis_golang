@@ -72,6 +72,15 @@ func (l *Live) Sleeping() bool {
 	return l.effects.IsAffected(effect.FlagSleep)
 }
 
+// SilentMoving reports whether an active effect currently lets this
+// creature move without alerting nearby AI.
+func (l *Live) SilentMoving() bool {
+	if l == nil {
+		return false
+	}
+	return l.effects.IsAffected(effect.FlagSilentMove)
+}
+
 // Afraid reports whether an active effect currently fears this creature.
 func (l *Live) Afraid() bool {
 	if l == nil {
