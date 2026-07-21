@@ -68,6 +68,11 @@ func NewController(move *CreatureMove, self Actor) (*Controller, error) {
 	if self == nil {
 		return nil, errors.New("move: nil self")
 	}
+	// A route split across geopath waypoints re-broadcasts on every segment
+	// advance, not just the first: without it, clients keep predicting the
+	// original straight-line walk and visibly cut through obstacles the
+	// server itself routed around.
+	move.SetSegmentAdvancedHook(func(event Event) { self.BroadcastMove(event) })
 	return &Controller{move: move, self: self}, nil
 }
 
