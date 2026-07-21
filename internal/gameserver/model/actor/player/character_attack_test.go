@@ -36,6 +36,9 @@ func combatItems() *item.Table {
 			{Op: item.FuncSet, Stat: "pAtkSpd", Value: 433},
 			{Op: item.FuncSet, Stat: "rCrit", Value: 4},
 		}},
+		{ID: 3, Kind: item.KindWeapon, Slot: item.SlotRHand, Crystal: item.CrystalD, Weapon: &item.WeaponDetail{
+			Type: item.WeaponSword, SoulshotCount: 2, SpiritshotCount: 1,
+		}},
 	})
 }
 
@@ -307,4 +310,102 @@ func TestCharacterPositionAccessIsRaceFree(t *testing.T) {
 	}()
 
 	wg.Wait()
+}
+
+func shotWeaponCharacter(t *testing.T) *Character {
+	t.Helper()
+	tmpl := combatTemplate()
+	items := combatItems()
+	return liveCharacter(1, tmpl, items, &item.Instance{
+		ObjectID: 10, TemplateID: 3, Location: item.LocationPaperdoll, LocationData: itemcontainer.RHand,
+	})
+}
+
+func TestCharacterChargeSoulshot(t *testing.T) {
+	c := shotWeaponCharacter(t)
+
+	consume, result := c.ChargeSoulshot(item.CrystalD, 0)
+	if result != ChargeShotOK {
+		t.Fatalf("result = %v, want ChargeShotOK", result)
+	}
+	if consume != 2 {
+		t.Fatalf("consume = %d, want 2 (weapon SoulshotCount)", consume)
+	}
+	if !c.SoulshotCharged() {
+		t.Fatal("SoulshotCharged() = false after a successful charge")
+	}
+
+	// Already charged: reported distinctly from the other rejections so
+	// the caller can stay silent for this one, matching the reference.
+	if _, result := c.ChargeSoulshot(item.CrystalD, 0); result != ChargeShotAlreadyCharged {
+		t.Fatalf("result = %v, want ChargeShotAlreadyCharged", result)
+	}
+}
+
+func TestCharacterChargeSoulshotRejectsGradeMismatchBeforeCharged(t *testing.T) {
+	c := shotWeaponCharacter(t)
+
+	if _, result := c.ChargeSoulshot(item.CrystalC, 0); result != ChargeShotGradeMismatch {
+		t.Fatalf("result = %v, want ChargeShotGradeMismatch", result)
+	}
+	if c.SoulshotCharged() {
+		t.Fatal("SoulshotCharged() = true after a rejected charge")
+	}
+}
+
+func TestCharacterChargeSoulshotRejectsNoWeaponCapacity(t *testing.T) {
+	tmpl := combatTemplate()
+	items := combatItems()
+	c := liveCharacter(1, tmpl, items) // fists: no soulshot capacity
+
+	if _, result := c.ChargeSoulshot(item.CrystalD, 0); result != ChargeShotNoCapacity {
+		t.Fatalf("result = %v, want ChargeShotNoCapacity", result)
+	}
+}
+
+func TestCharacterChargeSpiritshot(t *testing.T) {
+	c := shotWeaponCharacter(t)
+
+	consume, result := c.ChargeSpiritshot(item.ShotSpirit, item.CrystalD)
+	if result != ChargeShotOK {
+		t.Fatalf("result = %v, want ChargeShotOK", result)
+	}
+	if consume != 1 {
+		t.Fatalf("consume = %d, want 1 (weapon SpiritshotCount)", consume)
+	}
+	if !c.SpiritshotCharged() {
+		t.Fatal("SpiritshotCharged() = false after a successful charge")
+	}
+
+	if _, result := c.ChargeSpiritshot(item.ShotSpirit, item.CrystalD); result != ChargeShotAlreadyCharged {
+		t.Fatalf("result = %v, want ChargeShotAlreadyCharged", result)
+	}
+}
+
+func TestCharacterChargeSpiritshotChecksAlreadyChargedBeforeGrade(t *testing.T) {
+	c := shotWeaponCharacter(t)
+	if _, result := c.ChargeSpiritshot(item.ShotSpirit, item.CrystalD); result != ChargeShotOK {
+		t.Fatal("setup charge failed")
+	}
+
+	// Reference order for this shot kind checks already-charged before
+	// grade — a mismatched-grade attempt on an already-charged weapon
+	// still reports ChargeShotAlreadyCharged, not ChargeShotGradeMismatch.
+	if _, result := c.ChargeSpiritshot(item.ShotSpirit, item.CrystalC); result != ChargeShotAlreadyCharged {
+		t.Fatalf("result = %v, want ChargeShotAlreadyCharged (checked before grade)", result)
+	}
+}
+
+func TestCharacterChargeSpiritshotAndBlessedAreIndependentCharges(t *testing.T) {
+	c := shotWeaponCharacter(t)
+
+	if _, result := c.ChargeSpiritshot(item.ShotSpirit, item.CrystalD); result != ChargeShotOK {
+		t.Fatal("spirit charge setup failed")
+	}
+	if _, result := c.ChargeSpiritshot(item.ShotBlessedSpirit, item.CrystalD); result != ChargeShotOK {
+		t.Fatalf("result = %v, want ChargeShotOK (blessed is a distinct charge slot)", result)
+	}
+	if !c.BlessedSpiritshotCharged() {
+		t.Fatal("BlessedSpiritshotCharged() = false after a successful charge")
+	}
 }
