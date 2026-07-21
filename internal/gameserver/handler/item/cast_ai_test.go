@@ -36,13 +36,14 @@ func TestConsumeAndCompleteAICastAppliesEffects(t *testing.T) {
 	inst := &modelitem.Instance{ObjectID: 20, TemplateID: 1}
 	destroyer := &fakeDestroyer{}
 
-	if err := ConsumeAICastItem(ConsumeAICastItemRequest{
+	if consumed := ConsumeAICastItem(ConsumeAICastItemRequest{
 		Controller: ctrl,
+		Definition: def,
 		Inventory:  inv,
 		Item:       inst,
 		Destroyer:  destroyer,
-	}); err != nil {
-		t.Fatalf("ConsumeAICastItem() error: %v", err)
+	}); consumed.Err != nil {
+		t.Fatalf("ConsumeAICastItem() error: %v", consumed.Err)
 	}
 	if destroyer.calls != 1 {
 		t.Fatalf("DestroyItem calls = %d, want 1", destroyer.calls)
@@ -75,19 +76,60 @@ func TestConsumeAICastItemStopsControllerWhenItemMissing(t *testing.T) {
 	inst := &modelitem.Instance{ObjectID: 20, TemplateID: 1}
 	destroyer := &fakeDestroyer{fail: true}
 
-	err := ConsumeAICastItem(ConsumeAICastItemRequest{
+	consumed := ConsumeAICastItem(ConsumeAICastItemRequest{
 		Controller: ctrl,
+		Definition: def,
 		Inventory:  inv,
 		Item:       inst,
 		Destroyer:  destroyer,
 	})
 
-	if !errors.Is(err, actorcast.ErrNotEnoughItems) {
-		t.Fatalf("ConsumeAICastItem() error = %v, want ErrNotEnoughItems", err)
+	if !errors.Is(consumed.Err, actorcast.ErrNotEnoughItems) {
+		t.Fatalf("ConsumeAICastItem() error = %v, want ErrNotEnoughItems", consumed.Err)
 	}
 	if ctrl.CastingNow() {
 		t.Fatal("controller CastingNow() = true after a rejection, want stopped/cleared")
 	}
+}
+
+func TestConsumeAICastItemReportsSharedReuseGroup(t *testing.T) {
+	def := modelskill.Definition{ID: 9, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf, ReuseDelay: 5000}
+	inv := itemcontainer.NewPlayerInventory(10, modelitem.NewTable(nil))
+	inst := &modelitem.Instance{ObjectID: 20, TemplateID: 1}
+	destroyer := &fakeDestroyer{}
+
+	t.Run("no group defined", func(t *testing.T) {
+		caster := newCastAICharacter(10)
+		ctrl := startedCastAIController(t, caster, def)
+		tmpl := &modelitem.Template{ID: 1, EtcItem: &modelitem.EtcItemDetail{SharedReuseGroup: -1}}
+		res := ConsumeAICastItem(ConsumeAICastItemRequest{
+			Controller: ctrl, Definition: def, Inventory: inv, Item: inst, Template: tmpl, Destroyer: destroyer,
+		})
+		if res.Err != nil {
+			t.Fatalf("ConsumeAICastItem() error: %v", res.Err)
+		}
+		if res.SharedReuseGroup != -1 {
+			t.Fatalf("SharedReuseGroup = %d, want -1", res.SharedReuseGroup)
+		}
+	})
+
+	t.Run("group defined, item reuse longer than skill's", func(t *testing.T) {
+		caster := newCastAICharacter(11)
+		ctrl := startedCastAIController(t, caster, def)
+		tmpl := &modelitem.Template{ID: 1, EtcItem: &modelitem.EtcItemDetail{SharedReuseGroup: 3, ReuseDelay: 8000}}
+		res := ConsumeAICastItem(ConsumeAICastItemRequest{
+			Controller: ctrl, Definition: def, Inventory: inv, Item: inst, Template: tmpl, Destroyer: destroyer,
+		})
+		if res.Err != nil {
+			t.Fatalf("ConsumeAICastItem() error: %v", res.Err)
+		}
+		if res.SharedReuseGroup != 3 {
+			t.Fatalf("SharedReuseGroup = %d, want 3", res.SharedReuseGroup)
+		}
+		if res.ReuseMillis != 8000 {
+			t.Fatalf("ReuseMillis = %d, want 8000 (item's reuse, longer than the skill's 5000)", res.ReuseMillis)
+		}
+	})
 }
 
 func TestCompleteAICastStopsControllerOnHitFailure(t *testing.T) {

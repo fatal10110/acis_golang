@@ -11,9 +11,21 @@ import (
 // carrying an already-started AI cast.
 type ConsumeAICastItemRequest struct {
 	Controller *actorcast.Controller
+	Definition modelskill.Definition
 	Inventory  *itemcontainer.Inventory
 	Item       *modelitem.Instance
+	Template   *modelitem.Template
 	Destroyer  InventoryDestroyer
+}
+
+// ConsumeAICastItemResult is the outcome of one ConsumeAICastItem call.
+// SharedReuseGroup and ReuseMillis are only meaningful when Err is nil:
+// SharedReuseGroup is -1 when req.Template defines no shared-reuse group
+// (the caller sends no ExUseSharedGroupItem packet in that case).
+type ConsumeAICastItemResult struct {
+	Err              error
+	SharedReuseGroup int32
+	ReuseMillis      int
 }
 
 // ConsumeAICastItem consumes one unit of req.Item, matching how the
@@ -23,12 +35,30 @@ type ConsumeAICastItemRequest struct {
 // StartItemSkill) and must call this before broadcasting any cast/launch
 // packet. On failure it stops req.Controller, since a half-open cast must
 // not linger.
-func ConsumeAICastItem(req ConsumeAICastItemRequest) error {
+//
+// On success it also reports the shared-reuse-group HUD values the
+// reference's addItemSkillTimeStamp computes for an item-driven cast:
+// reuse is the longer of the skill's own reuse delay and the item's, used
+// as both the remaining and total time on the client's shared-reuse
+// indicator (matching the reference, which always reports the freshly
+// installed reuse as both).
+func ConsumeAICastItem(req ConsumeAICastItemRequest) ConsumeAICastItemResult {
 	if _, ok := req.Destroyer.DestroyItem(req.Inventory, req.Item.ObjectID, 1); !ok {
 		req.Controller.Stop()
-		return actorcast.ErrNotEnoughItems
+		return ConsumeAICastItemResult{Err: actorcast.ErrNotEnoughItems}
 	}
-	return nil
+
+	reuse := req.Definition.ReuseDelay
+	if req.Template != nil && req.Template.EtcItem != nil {
+		if itemReuse := int(req.Template.EtcItem.ReuseDelay); itemReuse > reuse {
+			reuse = itemReuse
+		}
+	}
+	sharedReuseGroup := int32(-1)
+	if req.Template != nil && req.Template.EtcItem != nil {
+		sharedReuseGroup = req.Template.EtcItem.SharedReuseGroup
+	}
+	return ConsumeAICastItemResult{SharedReuseGroup: sharedReuseGroup, ReuseMillis: reuse}
 }
 
 // CompleteAICastRequest carries what's needed to apply an already-started,

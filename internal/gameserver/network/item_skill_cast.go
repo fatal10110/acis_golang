@@ -55,16 +55,22 @@ func (l *GameClientLink) useItemAICast(live *livePlayer, inv *itemcontainer.Inve
 	target := started.Target
 	plan := started.Plan
 
-	if err := itemhandler.ConsumeAICastItem(itemhandler.ConsumeAICastItemRequest{
+	consumed := itemhandler.ConsumeAICastItem(itemhandler.ConsumeAICastItemRequest{
 		Controller: controller,
+		Definition: def,
 		Inventory:  inv,
 		Item:       inst,
+		Template:   tmpl,
 		Destroyer:  l.inventoryService(),
-	}); err != nil {
-		sendMagicCastFailure(live, def, err)
+	})
+	if consumed.Err != nil {
+		sendMagicCastFailure(live, def, consumed.Err)
 		return true
 	}
 	l.sendInventoryUpdate(live, inv)
+	if consumed.SharedReuseGroup >= 0 {
+		live.SendFrame(serverpackets.FrameExUseSharedGroupItem(inst.TemplateID, consumed.SharedReuseGroup, consumed.ReuseMillis, consumed.ReuseMillis))
+	}
 
 	casterObject := skillCastObject(live)
 	targetObject := skillCastObject(target)

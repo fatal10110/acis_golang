@@ -94,6 +94,47 @@ func TestGameClientLinkUseScrollRunsAICastAndConsumes(t *testing.T) {
 	}
 }
 
+// TestGameClientLinkUseScrollWithSharedGroupSendsExUseSharedGroupItem
+// verifies an item-carried skill from an item with a shared-reuse group
+// drives the client's shared-reuse HUD packet, carrying the longer of the
+// skill's own reuse delay and the item's.
+func TestGameClientLinkUseScrollWithSharedGroupSendsExUseSharedGroupItem(t *testing.T) {
+	skills := itemAICastSkillTable(t)
+	const scrollTemplate int32 = 737 // shared group 5, item reuse 9000ms > skill's 5000ms
+	const objectID int32 = 704
+	c, chars, _, _ := newLinkedGameClientWithSkillsSeed(t, skills, func(chars *fakeCharStore, items *fakeItemStore) {
+		objID := seedSelectableCharacter(t, chars, "player1", "Newbie", 5, 0)
+		if err := items.Create(context.Background(), objID, item.Instance{
+			ObjectID: objectID, TemplateID: scrollTemplate, OwnerID: objID,
+			Count: 3, Location: item.LocationInventory, ManaLeft: -1,
+		}); err != nil {
+			t.Fatalf("seed scroll: %v", err)
+		}
+	}, 1)
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+	chars.soleObjectID(t)
+
+	c.send(encodeUseItem(objectID, false))
+	readInventoryUpdate(t, c, objectID, 2)
+
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeExtended {
+		t.Fatalf("opcode = %#x, want extended (%#x)", reply[0], serverpackets.OpcodeExtended)
+	}
+	r := wire.NewReader(reply[1:])
+	if sub := r.ReadUint16(); sub != serverpackets.OpcodeExUseSharedGroupItem {
+		t.Fatalf("extended sub-opcode = %#x, want ExUseSharedGroupItem (%#x)", sub, serverpackets.OpcodeExUseSharedGroupItem)
+	}
+	if itemID, group, remain, total := r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32(); itemID != scrollTemplate || group != 5 || remain != 9 || total != 9 {
+		t.Fatalf("ExUseSharedGroupItem = item %d group %d remain %d total %d, want %d/5/9/9", itemID, group, remain, total, scrollTemplate)
+	}
+}
+
 // TestGameClientLinkUseScrollRejectsReuse verifies a still-cooling
 // item-carried skill answers the same reuse rejection a player skill cast
 // produces, and does not consume the item.
