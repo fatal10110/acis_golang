@@ -2,9 +2,12 @@ package effect
 
 import (
 	"fmt"
+	"math"
 	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
@@ -39,6 +42,8 @@ const (
 	FlagParalyzed
 	// FlagMeditating marks a target as immobile until it is next attacked.
 	FlagMeditating
+	// flagBigHead marks a target as carrying the big-head cosmetic buff.
+	flagBigHead
 )
 
 // TypeManaDamOverTime is a periodic MP-drain effect: a toggle skill's
@@ -127,6 +132,33 @@ const (
 	// TypeChanceSkillTrigger installs a live chance-to-trigger-another-skill
 	// condition on its target for as long as the effect is active.
 	TypeChanceSkillTrigger Type = "CHANCE_SKILL_TRIGGER"
+	// TypeSpoil rolls a magic-resist check against a monster target and
+	// marks it spoiled on success.
+	TypeSpoil Type = "SPOIL"
+	// TypePolearmTargetSingle is a classification marker consulted by
+	// weapon-target-count logic elsewhere; it carries no behavior of its
+	// own.
+	TypePolearmTargetSingle Type = "POLEARM_TARGET_SINGLE"
+	// TypeBigHead is a cosmetic marker buff.
+	TypeBigHead Type = "BIG_HEAD"
+	// TypeCancelDebuff strips a capped, independently-rolled selection of a
+	// player target's active dispellable debuffs.
+	TypeCancelDebuff Type = "CANCEL_DEBUFF"
+	// TypeRelax sits its target down and periodically drains MP while it
+	// stays seated.
+	TypeRelax Type = "RELAX"
+	// TypeChameleonRest sits its target down and periodically drains MP
+	// while a continuous cast keeps it seated.
+	TypeChameleonRest Type = "CHAMELEON_REST"
+	// TypeImmobilizePetBuff locks the effected summon in place for the
+	// duration, gated on the caster being that summon's own owner.
+	TypeImmobilizePetBuff Type = "IMMOBILIZE_PET_BUFF"
+	// TypeDistrust turns a Monster-family target's aggression toward
+	// another nearby monster.
+	TypeDistrust Type = "DISTRUST"
+	// TypeConfusion aborts its non-player target's current action and
+	// redirects its aggression toward a random nearby combatant.
+	TypeConfusion Type = "CONFUSION"
 )
 
 type kind struct {
@@ -173,6 +205,15 @@ var coreKinds = map[string]kind{
 	"Negate":                {typ: TypeNegate},
 	"Fusion":                {typ: TypeFusion},
 	"ChanceSkillTrigger":    {typ: TypeChanceSkillTrigger},
+	"Spoil":                 {typ: TypeSpoil},
+	"PolearmTargetSingle":   {typ: TypePolearmTargetSingle},
+	"BigHead":               {typ: TypeBigHead, flag: flagBigHead},
+	"CancelDebuff":          {typ: TypeCancelDebuff},
+	"Relax":                 {typ: TypeRelax, flag: flagRelaxing},
+	"ChameleonRest":         {typ: TypeChameleonRest, flag: flagSilentMove | flagRelaxing},
+	"ImobilePetBuff":        {typ: TypeImmobilizePetBuff},
+	"Distrust":              {typ: TypeDistrust},
+	"Confusion":             {typ: TypeConfusion, flag: flagConfused},
 }
 
 var fearSkippedPlayableSkillIDs = map[modelskill.ID]bool{
@@ -317,6 +358,24 @@ func wireHooks(e *Effect) {
 	case TypeChanceSkillTrigger:
 		e.OnStart = chanceSkillTriggerStart
 		e.OnExit = chanceSkillTriggerExit
+	case TypeSpoil:
+		e.OnStart = spoilStart
+	case TypeCancelDebuff:
+		e.OnStart = cancelDebuffStart
+	case TypeRelax:
+		e.OnStart = relaxStart
+		e.OnAction = relaxAction
+	case TypeChameleonRest:
+		e.OnStart = chameleonRestStart
+		e.OnAction = chameleonRestAction
+	case TypeImmobilizePetBuff:
+		e.OnStart = immobilizePetBuffStart
+		e.OnExit = immobilizePetBuffExit
+	case TypeDistrust:
+		e.OnStart = distrustStart
+	case TypeConfusion:
+		e.OnStart = confusionStart
+		e.OnExit = confusionExit
 	}
 }
 
@@ -527,6 +586,102 @@ type effectListOwner interface {
 // treated as unmodified (1.0).
 type cancelVulnerabilitySource interface {
 	CancelVulnerability(classification string) float64
+}
+
+// objectIDTarget optionally reports an actor's world object id.
+type objectIDTarget interface {
+	ObjectID() int32
+}
+
+// levelTarget optionally reports an actor's level.
+type levelTarget interface {
+	Level() int
+}
+
+// spoilCaster is implemented by an actor whose identity and level a spoil
+// effect's magic-resist roll needs.
+type spoilCaster interface {
+	objectIDTarget
+	levelTarget
+}
+
+// spoilTarget is implemented by a monster-kind actor whose spoil pool can
+// be checked and marked, mirroring the SPOIL skill-type handler's own
+// target surface for a caster-applied spoil effect.
+type spoilTarget interface {
+	deadChecker
+	levelTarget
+	SpoilPool() *item.SpoilPool
+}
+
+// weaponGradePenalized optionally reports whether the caster's equipped
+// weapon grade is insufficient for the skill being cast (a flat magic-
+// resist penalty); a caster without one is treated as unpenalized.
+type weaponGradePenalized interface {
+	WeaponGradePenalty() bool
+}
+
+// standingTarget optionally reports whether an actor is currently standing
+// rather than sitting; an actor without one is treated as not standing, so
+// a rest-family effect's seated-check never rejects it.
+type standingTarget interface {
+	Standing() bool
+}
+
+// sitTarget is implemented by an actor whose sit/stand state can be set.
+type sitTarget interface {
+	SetStanding(bool) bool
+}
+
+// hpFullTarget optionally reports whether an actor's HP is already at (or
+// within the reference effect's own +1 rounding tolerance of) its maximum,
+// consulted by Relax before it drains MP on a tick; an actor without one is
+// treated as never full.
+type hpFullTarget interface {
+	HPFull() bool
+}
+
+// summonOwnerTarget is implemented by a summon actor whose owning player's
+// object id can be read, to confirm an effector is that summon's own
+// owner.
+type summonOwnerTarget interface {
+	OwnerID() int32
+}
+
+// hateRaiser is implemented by an actor whose physical-attack threat can be
+// raised against another combatant.
+type hateRaiser interface {
+	AddDamageHate(attacker attackable.Combatant, damage, hate float64)
+}
+
+// monsterKindTarget optionally reports whether an actor is specifically a
+// Monster-family hostile NPC (as opposed to a guard, siege guard, or
+// friendly monster); an actor without one is treated as not Monster-family.
+type monsterKindTarget interface {
+	MonsterKind() bool
+}
+
+// nearbyMonsterFinder is implemented by an actor that can pick a random
+// other Monster-family actor within radius units of itself, for an effect
+// that redirects one monster's aggression onto another; an actor without
+// one finds no candidate.
+type nearbyMonsterFinder interface {
+	RandomNearbyMonster(radius int) (attackable.Combatant, bool)
+}
+
+// nearbyCombatTarget is implemented by an actor that can pick a random
+// other attackable actor within radius units of itself, for an effect that
+// redirects its own aggression onto a random bystander; an actor without
+// one finds no candidate.
+type nearbyCombatTarget interface {
+	RandomNearbyCombatant(radius int) (attackable.Combatant, bool)
+}
+
+// mostHatedResetter is implemented by an actor whose physical threat table
+// can have its current top target's hate cleared, used to drop a confusion
+// effect's forced redirect once the effect ends.
+type mostHatedResetter interface {
+	StopMostHatedTarget()
 }
 
 func damageOverTimeAction(e *Effect) bool {
@@ -1119,6 +1274,292 @@ func chanceSkillTriggerExit(e *Effect) {
 	}
 }
 
+// spoilRoll is the upper bound of the uniform random draw a spoil effect's
+// magic-resist roll compares against, matching the SPOIL skill-type
+// handler's own roll.
+const spoilRoll = 10000
+
+// spoilStart rolls a magic-resist check against a live, unspoiled monster
+// target and marks it spoiled by the caster on success. It always reports
+// success once the roll is attempted, regardless of the roll's outcome.
+func spoilStart(e *Effect) bool {
+	caster, ok := e.Effector.(spoilCaster)
+	if !ok {
+		return false
+	}
+	target, ok := e.Effected.(spoilTarget)
+	if !ok || target.Dead() {
+		return false
+	}
+	pool := target.SpoilPool()
+	if pool == nil || pool.IsSpoiled() {
+		return false
+	}
+
+	penalty := false
+	if p, ok := e.Effector.(weaponGradePenalized); ok {
+		penalty = p.WeaponGradePenalty()
+	}
+
+	rate := formulas.MagicSuccessRate(target.Level(), caster.Level(), e.Skill.MagicLevel, e.Skill.LevelDepend, penalty)
+	if formulas.MagicSucceeds(rate, rnd.Get(spoilRoll)) {
+		pool.Mark(caster.ObjectID())
+	}
+	return true
+}
+
+// distrustRadius is the search radius, in game units, a distrust effect
+// scans for a redirect candidate.
+const distrustRadius = 600
+
+// distrustStart turns a Monster-family target's aggression toward a random
+// other Monster-family actor found nearby (excluding lootable chests),
+// with an aggro amount scaled by the caster's level. A target with no
+// nearby candidate, or no radius-search capability at all, still reports
+// success.
+func distrustStart(e *Effect) bool {
+	target, ok := e.Effected.(hateRaiser)
+	if !ok {
+		return false
+	}
+	if m, ok := e.Effected.(monsterKindTarget); !ok || !m.MonsterKind() {
+		return false
+	}
+	finder, ok := e.Effected.(nearbyMonsterFinder)
+	if !ok {
+		return true
+	}
+	candidate, ok := finder.RandomNearbyMonster(distrustRadius)
+	if !ok {
+		return true
+	}
+
+	level := 0
+	if lv, ok := e.Effector.(levelTarget); ok {
+		level = lv.Level()
+	}
+	aggro := float64((5 + rnd.Get(5)) * level)
+	target.AddDamageHate(candidate, 0, aggro)
+	return true
+}
+
+// confusionRadius is the search radius, in game units, a confusion
+// effect scans for a redirect candidate.
+const confusionRadius = 1000
+
+// confusionStart aborts a non-player target's current move, then redirects
+// its aggression toward a random nearby attackable actor found within
+// confusionRadius. A player target is left untouched entirely. Unlike the
+// reference effect's own 2D-only distance check, the radius search this
+// port reuses (world.State.ForEachKnownInRadius) filters in 3D — a
+// documented simplification, not a byte-exact match, since no 2D-only
+// radius query exists in this port yet.
+func confusionStart(e *Effect) bool {
+	if isPlayer(e.Effected) {
+		return true
+	}
+	if target, ok := e.Effected.(moveStopper); ok {
+		target.StopMove()
+	}
+	refresh(e.Effected)
+
+	finder, ok := e.Effected.(nearbyCombatTarget)
+	if !ok {
+		return true
+	}
+	candidate, ok := finder.RandomNearbyCombatant(confusionRadius)
+	if !ok {
+		return true
+	}
+	if target, ok := e.Effected.(hateRaiser); ok {
+		target.AddDamageHate(candidate, 0, math.MaxInt32)
+	}
+	return true
+}
+
+func confusionExit(e *Effect) {
+	refresh(e.Effected)
+	if isPlayer(e.Effected) {
+		return
+	}
+	if target, ok := e.Effected.(mostHatedResetter); ok {
+		target.StopMostHatedTarget()
+	}
+}
+
+// relaxStart sits the target down; it always reports success.
+func relaxStart(e *Effect) bool {
+	if target, ok := e.Effected.(sitTarget); ok {
+		target.SetStanding(false)
+	}
+	return true
+}
+
+// relaxAction drains MP each tick while the target stays seated and its HP
+// isn't already full, reusing the same lack-MP handling as the other
+// mana-drain ticks in this file. Unlike TypeChameleonRest, this tick has no
+// continuous-skill gate: the reference effect never checks one.
+func relaxAction(e *Effect) bool {
+	target, ok := e.Effected.(mpDotTarget)
+	if !ok {
+		return false
+	}
+	if st, ok := e.Effected.(standingTarget); ok && st.Standing() {
+		return false
+	}
+	if full, ok := e.Effected.(hpFullTarget); ok && full.HPFull() {
+		return false
+	}
+	return manaDrainTick(e, target)
+}
+
+// chameleonRestStart sits the target down; it always reports success.
+func chameleonRestStart(e *Effect) bool {
+	if target, ok := e.Effected.(sitTarget); ok {
+		target.SetStanding(false)
+	}
+	return true
+}
+
+// chameleonRestAction drains MP each tick while a continuous cast keeps the
+// tick alive and the target stays seated, reusing the same lack-MP
+// handling as the other mana-drain ticks in this file.
+func chameleonRestAction(e *Effect) bool {
+	if e.Skill.SkillType != "CONT" {
+		return false
+	}
+	target, ok := e.Effected.(mpDotTarget)
+	if !ok {
+		return false
+	}
+	if st, ok := e.Effected.(standingTarget); ok && st.Standing() {
+		return false
+	}
+	return manaDrainTick(e, target)
+}
+
+// manaDrainTick runs one ManaDamageOverTimeTick against target and applies
+// its result, shared by relaxAction and chameleonRestAction.
+func manaDrainTick(e *Effect, target mpDotTarget) bool {
+	result := ManaDamageOverTimeTick(ManaDamageOverTimeInput{
+		Dead:   target.Dead(),
+		MP:     target.MP(),
+		Damage: e.Template.Value,
+		Toggle: e.Skill.Toggle,
+	})
+	if result.RemovedForLackMP {
+		if notifier, ok := e.Effected.(lackMPNotifier); ok {
+			notifier.NotifyEffectRemovedDueLackMP(e)
+		}
+	}
+	if result.Damage > 0 {
+		target.ReduceMP(result.Damage)
+	}
+	return result.Continue
+}
+
+// immobilizePetBuffStart locks the effected summon in place, gated on the
+// caster being specifically a player and that summon's own owner.
+func immobilizePetBuffStart(e *Effect) bool {
+	if !isPlayer(e.Effector) {
+		return false
+	}
+	player, ok := e.Effector.(objectIDTarget)
+	if !ok {
+		return false
+	}
+	summon, ok := e.Effected.(summonOwnerTarget)
+	if !ok || summon.OwnerID() != player.ObjectID() {
+		return false
+	}
+	target, ok := e.Effected.(immobilizeTarget)
+	if !ok {
+		return false
+	}
+	target.SetImmobilized(true)
+	return true
+}
+
+func immobilizePetBuffExit(e *Effect) {
+	if target, ok := e.Effected.(immobilizeTarget); ok {
+		target.SetImmobilized(false)
+	}
+}
+
+// cancelDebuffStart strips a capped selection of a player target's active,
+// dispellable debuffs against an independently-rolled per-candidate chance
+// (formulas.EffectCancelDebuffSuccessRate), scanning the effect list's
+// current snapshot from its most-recently-added entry back to its oldest.
+//
+// The scan runs up to two full passes over the same snapshot whenever the
+// cap isn't reached (or is unlimited, cap 0) in the first pass — including
+// re-examining candidates the first pass already removed, since removing
+// an already-removed candidate is a safe no-op but still counts against
+// the cap exactly as it does in the reference effect. A candidate whose
+// owning skill id matches the immediately preceding removal is stripped
+// without its own roll. Both quirks reproduce the reference effect's own
+// two-pass loop exactly; do not "simplify" this into cancelStart's single
+// shuffled pass.
+func cancelDebuffStart(e *Effect) bool {
+	target, ok := e.Effected.(playerTarget)
+	if !ok || !target.IsPlayer() {
+		return false
+	}
+	if dc, ok := e.Effected.(deadChecker); ok && dc.Dead() {
+		return false
+	}
+	owner, ok := e.Effected.(effectListOwner)
+	if !ok {
+		return true
+	}
+	list := owner.EffectList()
+	if list == nil {
+		return true
+	}
+
+	vuln := 1.0
+	if v, ok := e.Effected.(cancelVulnerabilitySource); ok {
+		vuln = v.CancelVulnerability(e.ClassTag())
+	}
+
+	candidates := list.All()
+	count := cancelDebuffPass(list, candidates, e.Skill.MagicLevel, vuln, e.Skill.MaxNegatedEffects)
+	if count != 0 {
+		cancelDebuffPass(list, candidates, e.Skill.MagicLevel, vuln, count)
+	}
+	return true
+}
+
+// cancelDebuffPass runs one reverse-order sweep of candidates, stripping
+// dispellable debuffs against an independent roll each, up to count
+// removals (0 meaning unlimited); it returns the remaining count.
+func cancelDebuffPass(list *List, candidates []*Effect, cancelLvl int, vuln float64, count int) int {
+	lastCanceledSkillID := modelskill.ID(0)
+	for i := len(candidates) - 1; i >= 0; i-- {
+		cand := candidates[i]
+		if !cand.Skill.Debuff || !cand.Skill.CanBeDispelled {
+			continue
+		}
+		if cand.Skill.ID == lastCanceledSkillID {
+			list.Remove(cand)
+			continue
+		}
+
+		rate := formulas.EffectCancelDebuffSuccessRate(cancelLvl, cand.Skill.MagicLevel, cand.Template.Time, vuln)
+		if !formulas.CancelSucceeds(float64(rate), rnd.Get(100)) {
+			continue
+		}
+
+		lastCanceledSkillID = cand.Skill.ID
+		list.Remove(cand)
+		count--
+		if count == 0 {
+			break
+		}
+	}
+	return count
+}
+
 func abortAll(target any) {
 	if target, ok := target.(aborter); ok {
 		target.AbortAll(false)
@@ -1144,6 +1585,11 @@ func isAfraid(target any) bool {
 func isPlayable(target any) bool {
 	t, ok := target.(playableTarget)
 	return ok && t.Playable()
+}
+
+func isPlayer(target any) bool {
+	t, ok := target.(playerTarget)
+	return ok && t.IsPlayer()
 }
 
 // statFuncs builds the stat functions templates describes, attributed to

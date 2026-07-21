@@ -142,3 +142,29 @@ func EffectCancelSuccessRate(casterMagicLevel, candidateMagicLevel, candidatePer
 	}
 	return rate
 }
+
+// EffectCancelDebuffSuccessRate returns the percent chance, clamped to
+// [25, 75], that a targeted debuff-cancel effect strips one candidate
+// debuff: casterMagicLevel is the cancel effect's own owning-skill magic
+// level, candidateMagicLevel is the candidate debuff's owning-skill magic
+// level, remainingSeconds is the candidate's remaining duration in
+// seconds, and vuln is the target's already-resolved cancel-vulnerability
+// multiplier for this cancel effect's own classification.
+//
+// This differs from EffectCancelSuccessRate in two ways the reference
+// arithmetic requires exactly: the duration term divides by 1200 (not
+// 120), and vuln is truncated to an integer *before* it scales the whole
+// additive rate (not just a separate power term) — so a vuln under 1.0
+// zeroes the rate outright (clamping it to the floor) and a vuln of 2.0 or
+// higher doubles it, with nothing in between ever taking effect.
+func EffectCancelDebuffSuccessRate(casterMagicLevel, candidateMagicLevel, remainingSeconds int, vuln float64) int {
+	baseRate := int(vuln)
+	rate := (2*(casterMagicLevel-candidateMagicLevel) + remainingSeconds/1200) * baseRate
+	if rate < 25 {
+		return 25
+	}
+	if rate > 75 {
+		return 75
+	}
+	return rate
+}
