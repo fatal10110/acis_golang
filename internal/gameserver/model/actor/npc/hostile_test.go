@@ -545,3 +545,107 @@ func TestHostileDenyAIActionReflectsCrowdControlAndDeath(t *testing.T) {
 		}
 	})
 }
+
+func newTestHostileOfKind(t *testing.T, state *world.State, kind InstanceKind, objectID int32, x, y int) *Hostile {
+	t.Helper()
+	hostile, err := NewHostile(&Instance{
+		ObjectID: objectID,
+		Template: &Template{
+			ID:              9000 + int(objectID),
+			Type:            string(kind),
+			BaseAttackRange: 80,
+		},
+		Kind: kind,
+	}, newHostileLive(t), &hostileMove{}, &hostileAttack{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	hostile.SetWorld(state)
+	state.Spawn(hostile, x, y, 0, 0)
+	return hostile
+}
+
+func TestHostileMonsterKind(t *testing.T) {
+	tests := []struct {
+		kind InstanceKind
+		want bool
+	}{
+		{"Monster", true},
+		{"RaidBoss", true},
+		{"GrandBoss", true},
+		{"FeedableBeast", true},
+		{"FestivalMonster", true},
+		{"Chest", true},
+		{"HalishaChest", true},
+		{"Guard", false},
+		{"SiegeGuard", false},
+		{"FriendlyMonster", false},
+	}
+	for _, tt := range tests {
+		t.Run(string(tt.kind), func(t *testing.T) {
+			state := world.New()
+			hostile := newTestHostileOfKind(t, state, tt.kind, 1, 100, 100)
+			if got := hostile.MonsterKind(); got != tt.want {
+				t.Fatalf("MonsterKind() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestHostileRandomNearbyMonsterExcludesChestAndNonMonsterKinds(t *testing.T) {
+	state := world.New()
+	self := newTestHostileOfKind(t, state, "Monster", 1, 100, 100)
+	newTestHostileOfKind(t, state, "Chest", 2, 110, 100)
+	newTestHostileOfKind(t, state, "Guard", 3, 110, 105)
+
+	if _, ok := self.RandomNearbyMonster(600); ok {
+		t.Fatal("RandomNearbyMonster() found a candidate with only a chest and a guard nearby, want none")
+	}
+
+	halisha := newTestHostileOfKind(t, state, "HalishaChest", 4, 110, 110)
+
+	got, ok := self.RandomNearbyMonster(600)
+	if !ok {
+		t.Fatal("RandomNearbyMonster() found no candidate with a HalishaChest nearby, want one")
+	}
+	if got.ObjectID() != halisha.ObjectID() {
+		t.Fatalf("RandomNearbyMonster() candidate = %d, want the HalishaChest (%d)", got.ObjectID(), halisha.ObjectID())
+	}
+}
+
+func TestHostileRandomNearbyCombatantExcludesOnlyChest(t *testing.T) {
+	state := world.New()
+	self := newTestHostileOfKind(t, state, "Monster", 1, 100, 100)
+	newTestHostileOfKind(t, state, "Chest", 2, 110, 100)
+
+	if _, ok := self.RandomNearbyCombatant(1000); ok {
+		t.Fatal("RandomNearbyCombatant() found a candidate with only a chest nearby, want none")
+	}
+
+	guard := newTestHostileOfKind(t, state, "Guard", 3, 110, 105)
+
+	got, ok := self.RandomNearbyCombatant(1000)
+	if !ok {
+		t.Fatal("RandomNearbyCombatant() found no candidate with a guard nearby, want one")
+	}
+	if got.ObjectID() != guard.ObjectID() {
+		t.Fatalf("RandomNearbyCombatant() candidate = %d, want the guard (%d)", got.ObjectID(), guard.ObjectID())
+	}
+}
+
+func TestHostileStopMostHatedTargetClearsOnlyTheTopThreatEntry(t *testing.T) {
+	hostile := newTestHostile(t, &hostileMove{}, &hostileAttack{})
+	top := &hostileTarget{id: 200}
+	other := &hostileTarget{id: 201}
+	hostile.AddDamageHate(top, 0, 100)
+	hostile.AddDamageHate(other, 0, 10)
+
+	hostile.StopMostHatedTarget()
+
+	if got := hostile.AI().Threats().Hate(top); got != 0 {
+		t.Fatalf("top threat hate after StopMostHatedTarget = %v, want 0", got)
+	}
+	if got := hostile.AI().Threats().Hate(other); got != 10 {
+		t.Fatalf("other threat hate after StopMostHatedTarget = %v, want unchanged 10", got)
+	}
+}

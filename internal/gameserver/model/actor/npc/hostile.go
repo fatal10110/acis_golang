@@ -189,6 +189,89 @@ func (h *Hostile) AddHate(attacker attackable.Combatant, hate float64) {
 	h.brain.AddHate(attacker, hate)
 }
 
+// monsterInstanceKinds is the subset of hostileInstanceKinds whose
+// counterpart type is Monster-family, consulted by hostility-redirect
+// effects that only accept a Monster-family actor as their target.
+var monsterInstanceKinds = map[InstanceKind]struct{}{
+	"Chest":           {},
+	"FeedableBeast":   {},
+	"FestivalMonster": {},
+	"GrandBoss":       {},
+	"HalishaChest":    {},
+	"Monster":         {},
+	"RaidBoss":        {},
+}
+
+// MonsterKind reports whether this NPC's instance type is Monster-family
+// (see monsterInstanceKinds) — as opposed to a Guard, SiegeGuard, or
+// FriendlyMonster, which are hostile but not Monster-family.
+func (h *Hostile) MonsterKind() bool {
+	_, ok := monsterInstanceKinds[hostileKind(h.Instance)]
+	return ok
+}
+
+// chestKind reports whether this NPC's instance type is specifically the
+// lootable Chest kind. HalishaChest is Monster-family but distinct from
+// Chest, and is not excluded by this check.
+func (h *Hostile) chestKind() bool {
+	return hostileKind(h.Instance) == "Chest"
+}
+
+// RandomNearbyMonster returns a random other Monster-family NPC known
+// within radius units, excluding chests, or ok false if none exist or this
+// NPC has no world placement yet.
+func (h *Hostile) RandomNearbyMonster(radius int) (attackable.Combatant, bool) {
+	if h.world == nil {
+		return nil, false
+	}
+	var candidates []attackable.Combatant
+	h.world.ForEachKnownInRadius(h, radius, func(obj world.Tracked) {
+		other, ok := obj.(*Hostile)
+		if !ok || !other.MonsterKind() || other.chestKind() {
+			return
+		}
+		candidates = append(candidates, other)
+	})
+	if len(candidates) == 0 {
+		return nil, false
+	}
+	return candidates[h.roll(len(candidates))], true
+}
+
+// RandomNearbyCombatant returns a random other attackable NPC known within
+// radius units, excluding chests, or ok false if none exist or this NPC
+// has no world placement yet. The reference confusion effect also
+// considers nearby playable actors as candidates; no playable actor in
+// this port exposes itself to this search yet, so only other attackable
+// NPCs are ever found here.
+func (h *Hostile) RandomNearbyCombatant(radius int) (attackable.Combatant, bool) {
+	if h.world == nil {
+		return nil, false
+	}
+	var candidates []attackable.Combatant
+	h.world.ForEachKnownInRadius(h, radius, func(obj world.Tracked) {
+		other, ok := obj.(*Hostile)
+		if !ok || other.chestKind() {
+			return
+		}
+		candidates = append(candidates, other)
+	})
+	if len(candidates) == 0 {
+		return nil, false
+	}
+	return candidates[h.roll(len(candidates))], true
+}
+
+// StopMostHatedTarget clears this NPC's physical threat against whichever
+// attacker currently sits at the top of its threat table, without
+// dropping that attacker's entry. A confusion effect uses this to drop
+// its forced redirect once the effect ends.
+func (h *Hostile) StopMostHatedTarget() {
+	if most, ok := h.brain.Threats().MostHated(); ok {
+		h.brain.Threats().StopHate(most.Attacker)
+	}
+}
+
 // Tick advances the hostile AI clock once.
 func (h *Hostile) Tick() {
 	if !h.canRunAI() {

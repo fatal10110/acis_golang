@@ -50,6 +50,9 @@ type Skill struct {
 	// effects to compare a caster's cancel power against each candidate
 	// effect's own owning-skill level.
 	MagicLevel int
+	// LevelDepend is the owning skill's configured level-dependency bonus,
+	// read by a magic-resist roll (e.g. a caster-applied spoil effect).
+	LevelDepend int
 	// AbnormalLevel and EffectAbnormalLevel are the owning skill's cancel-
 	// threshold tags: EffectAbnormalLevel applies when EffectType is set,
 	// AbnormalLevel otherwise. A negate-family effect strips a candidate

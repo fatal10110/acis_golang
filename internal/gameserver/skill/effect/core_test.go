@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
@@ -108,6 +110,13 @@ func TestNewBuildsCoreEffectMetadata(t *testing.T) {
 		{"BlockBuff", TypeBlockBuff, FlagNone, false, false},
 		{"BlockDebuff", TypeBlockDebuff, FlagNone, false, false},
 		{"ProtectionBlessing", TypeProtectionBless, flagProtectionBlessing, false, false},
+		{"PolearmTargetSingle", TypePolearmTargetSingle, FlagNone, false, false},
+		{"BigHead", TypeBigHead, flagBigHead, false, false},
+		{"Spoil", TypeSpoil, FlagNone, false, false},
+		{"CancelDebuff", TypeCancelDebuff, FlagNone, false, false},
+		{"ImobilePetBuff", TypeImmobilizePetBuff, FlagNone, false, false},
+		{"Distrust", TypeDistrust, FlagNone, false, false},
+		{"Confusion", TypeConfusion, flagConfused, false, false},
 	}
 
 	for _, tt := range tests {
@@ -781,6 +790,10 @@ type liveEffectTarget struct {
 	isPlayer          bool
 	list              *List
 	vuln              float64
+	standing          bool
+	hpFull            bool
+	objectID          int32
+	ownerID           int32
 }
 
 func (t *liveEffectTarget) EffectList() *List { return t.list }
@@ -934,6 +947,21 @@ func (t *liveEffectTarget) StopPhoenixBlessing(*Effect) {
 func (t *liveEffectTarget) StopSkillEffectsByID(id modelskill.ID) {
 	t.events = append(t.events, fmt.Sprintf("stop-skill:%d", id))
 }
+
+func (t *liveEffectTarget) Standing() bool { return t.standing }
+
+func (t *liveEffectTarget) SetStanding(v bool) bool {
+	changed := t.standing != v
+	t.standing = v
+	t.events = append(t.events, fmt.Sprintf("standing:%v", v))
+	return changed
+}
+
+func (t *liveEffectTarget) HPFull() bool { return t.hpFull }
+
+func (t *liveEffectTarget) ObjectID() int32 { return t.objectID }
+
+func (t *liveEffectTarget) OwnerID() int32 { return t.ownerID }
 
 // noBonusHealTarget implements only the minimum heal capability, to
 // exercise the healStart/manaHealStart fallback defaults when the optional
@@ -1539,4 +1567,514 @@ func TestChanceSkillTriggerOnATargetWithNoTrackingIsANoop(t *testing.T) {
 		t.Fatal("OnStart() = false, want true even without a tracking target")
 	}
 	e.OnExit(e)
+}
+
+// spoilFakeCaster and spoilFakeTarget are minimal actors for spoil effect
+// tests, standing in for the SPOIL skill-type handler's own target/caster
+// surface.
+type spoilFakeCaster struct {
+	id    int32
+	level int
+}
+
+func (c *spoilFakeCaster) ObjectID() int32 { return c.id }
+
+func (c *spoilFakeCaster) Level() int { return c.level }
+
+type spoilFakeTarget struct {
+	dead  bool
+	level int
+	pool  *item.SpoilPool
+}
+
+func (t *spoilFakeTarget) Dead() bool { return t.dead }
+
+func (t *spoilFakeTarget) Level() int { return t.level }
+
+func (t *spoilFakeTarget) SpoilPool() *item.SpoilPool { return t.pool }
+
+func TestSpoilEffectMarksLiveUnspoiledTargetOnSuccess(t *testing.T) {
+	// A caster far above the target's level drives the resist rate to its
+	// floor, making success near-certain; repeated trials tolerate the
+	// residual chance without asserting a literal 100%.
+	const trials = 100
+	marked := 0
+	for i := 0; i < trials; i++ {
+		caster := &spoilFakeCaster{id: 77, level: 80}
+		target := &spoilFakeTarget{level: 1, pool: &item.SpoilPool{}}
+		e, err := New(Skill{MagicLevel: 80}, modelskill.EffectTemplate{Name: "Spoil"})
+		if err != nil {
+			t.Fatalf("New() error: %v", err)
+		}
+		e.Effector = caster
+		e.Effected = target
+
+		if !e.OnStart(e) {
+			t.Fatal("spoil effect start rejected a valid attempt")
+		}
+		if target.pool.IsSpoiler(77) {
+			marked++
+		}
+	}
+	if marked == 0 {
+		t.Fatal("target was never marked spoiled across repeated trials, want at least one success")
+	}
+}
+
+func TestSpoilEffectRejectsDeadOrAlreadySpoiledOrWrongActorTypes(t *testing.T) {
+	e, err := New(Skill{MagicLevel: 80}, modelskill.EffectTemplate{Name: "Spoil"})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+
+	// Effector missing the caster surface entirely.
+	e.Effector = &liveEffectTarget{}
+	e.Effected = &spoilFakeTarget{level: 1, pool: &item.SpoilPool{}}
+	if e.OnStart(e) {
+		t.Error("spoil effect started with an effector lacking caster identity")
+	}
+
+	caster := &spoilFakeCaster{id: 5, level: 80}
+
+	// Effected missing the spoil-pool surface entirely.
+	e.Effector = caster
+	e.Effected = &liveEffectTarget{}
+	if e.OnStart(e) {
+		t.Error("spoil effect started against a target with no spoil pool")
+	}
+
+	// Dead target.
+	dead := &spoilFakeTarget{dead: true, level: 1, pool: &item.SpoilPool{}}
+	e.Effected = dead
+	if e.OnStart(e) {
+		t.Error("spoil effect started against a dead target")
+	}
+
+	// Already spoiled target.
+	spoiled := &spoilFakeTarget{level: 1, pool: &item.SpoilPool{}}
+	spoiled.pool.Mark(999)
+	e.Effected = spoiled
+	if e.OnStart(e) {
+		t.Error("spoil effect started against an already-spoiled target")
+	}
+	if !spoiled.pool.IsSpoiler(999) {
+		t.Error("an already-spoiled target's existing spoiler must not be overwritten")
+	}
+}
+
+func TestPolearmTargetSingleEffectCarriesNoHooks(t *testing.T) {
+	e, err := New(Skill{}, modelskill.EffectTemplate{Name: "PolearmTargetSingle"})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	if e.OnStart != nil || e.OnExit != nil {
+		t.Fatal("PolearmTargetSingle must carry no start/exit hooks, only a classification marker")
+	}
+	if e.Flag != FlagNone {
+		t.Fatalf("Flag = %v, want FlagNone", e.Flag)
+	}
+}
+
+func TestBigHeadEffectCarriesFlagWithNoHooks(t *testing.T) {
+	e, err := New(Skill{}, modelskill.EffectTemplate{Name: "BigHead"})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	if e.OnStart != nil || e.OnExit != nil {
+		t.Fatal("BigHead must carry no start/exit hooks: the abnormal-effect broadcast isn't wired anywhere yet")
+	}
+	if e.Flag == FlagNone {
+		t.Fatal("BigHead must carry a distinct, non-zero flag")
+	}
+}
+
+func TestRelaxEffectSitsOnStartAndDrainsMpWhileSeatedAndNotFull(t *testing.T) {
+	target := &liveEffectTarget{standing: true, mp: 10}
+	e, err := New(Skill{Toggle: true}, modelskill.EffectTemplate{Name: "Relax", Value: 2})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e.Effected = target
+
+	if e.Flag != flagRelaxing {
+		t.Fatalf("Flag = %v, want flagRelaxing", e.Flag)
+	}
+	if !e.OnStart(e) {
+		t.Fatal("relax effect start rejected a valid target")
+	}
+	if target.standing {
+		t.Fatal("relax effect start must sit its target down")
+	}
+
+	if !e.ActionTime() {
+		t.Fatal("relax effect action tick ended while seated with MP and HP available")
+	}
+	if target.mp != 8 {
+		t.Fatalf("target mp = %v, want 8", target.mp)
+	}
+}
+
+func TestRelaxEffectActionEndsWhenStandingOrHpFullOrLackMp(t *testing.T) {
+	tests := []struct {
+		name   string
+		target *liveEffectTarget
+	}{
+		{"standing", &liveEffectTarget{standing: true, mp: 10}},
+		{"hp full", &liveEffectTarget{standing: false, hpFull: true, mp: 10}},
+		{"lacks mp", &liveEffectTarget{standing: false, mp: 1}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e, err := New(Skill{Toggle: true}, modelskill.EffectTemplate{Name: "Relax", Value: 2})
+			if err != nil {
+				t.Fatalf("New() error: %v", err)
+			}
+			e.Effected = tt.target
+			if e.ActionTime() {
+				t.Fatal("relax effect action tick continued, want it to end")
+			}
+		})
+	}
+}
+
+func TestChameleonRestEffectGatesActionOnContSkillTypeAndSitting(t *testing.T) {
+	target := &liveEffectTarget{standing: true, mp: 10}
+	e, err := New(Skill{Toggle: true, SkillType: "CONT"}, modelskill.EffectTemplate{Name: "ChameleonRest", Value: 6})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e.Effected = target
+
+	if want := flagSilentMove | flagRelaxing; e.Flag != want {
+		t.Fatalf("Flag = %v, want %v", e.Flag, want)
+	}
+	if !e.OnStart(e) {
+		t.Fatal("chameleon rest effect start rejected a valid target")
+	}
+	if target.standing {
+		t.Fatal("chameleon rest effect start must sit its target down")
+	}
+
+	if !e.ActionTime() {
+		t.Fatal("chameleon rest effect action tick ended while seated on a CONT skill")
+	}
+	if target.mp != 4 {
+		t.Fatalf("target mp = %v, want 4", target.mp)
+	}
+
+	nonCont, err := New(Skill{Toggle: true, SkillType: "BUFF"}, modelskill.EffectTemplate{Name: "ChameleonRest", Value: 6})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	nonCont.Effected = &liveEffectTarget{standing: false, mp: 10}
+	if nonCont.ActionTime() {
+		t.Fatal("chameleon rest effect action tick continued on a non-CONT skill, want it to end")
+	}
+
+	standingTarget := &liveEffectTarget{standing: true, mp: 10}
+	e.Effected = standingTarget
+	if e.ActionTime() {
+		t.Fatal("chameleon rest effect action tick continued while standing, want it to end")
+	}
+}
+
+func TestImmobilizePetBuffEffectLocksOnlyASummonOwnedByThePlayerEffector(t *testing.T) {
+	owner := &liveEffectTarget{isPlayer: true, objectID: 42}
+	summon := &liveEffectTarget{ownerID: 42}
+	e, err := New(Skill{}, modelskill.EffectTemplate{Name: "ImobilePetBuff"})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e.Effector = owner
+	e.Effected = summon
+
+	if !e.OnStart(e) {
+		t.Fatal("immobilize pet buff effect start rejected the summon's own owner")
+	}
+	if want := []string{"immobilized:true"}; !reflect.DeepEqual(summon.events, want) {
+		t.Fatalf("events = %#v, want %#v", summon.events, want)
+	}
+
+	e.OnExit(e)
+	if want := []string{"immobilized:true", "immobilized:false"}; !reflect.DeepEqual(summon.events, want) {
+		t.Fatalf("events after exit = %#v, want %#v", summon.events, want)
+	}
+
+	notOwner := &liveEffectTarget{isPlayer: true, objectID: 99}
+	otherSummon := &liveEffectTarget{ownerID: 42}
+	e2, err := New(Skill{}, modelskill.EffectTemplate{Name: "ImobilePetBuff"})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e2.Effector = notOwner
+	e2.Effected = otherSummon
+	if e2.OnStart(e2) {
+		t.Fatal("immobilize pet buff effect started for a non-owner effector")
+	}
+	if len(otherSummon.events) != 0 {
+		t.Fatalf("events = %#v, want none", otherSummon.events)
+	}
+
+	nonPlayer := &liveEffectTarget{isPlayer: false, objectID: 42}
+	e3, err := New(Skill{}, modelskill.EffectTemplate{Name: "ImobilePetBuff"})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e3.Effector = nonPlayer
+	e3.Effected = &liveEffectTarget{ownerID: 42}
+	if e3.OnStart(e3) {
+		t.Fatal("immobilize pet buff effect started for a non-player effector")
+	}
+}
+
+// fakeCombatant is a minimal attackable.Combatant used as the redirect
+// candidate/attacker argument in hostility-redirect effect tests.
+type fakeCombatant struct {
+	id int32
+}
+
+func (f *fakeCombatant) ObjectID() int32  { return f.id }
+func (f *fakeCombatant) SiegeGuard() bool { return false }
+func (f *fakeCombatant) AlikeDead() bool  { return false }
+
+// hostileEffectTarget is a minimal actor implementing only the interfaces
+// a hostility-redirect effect needs, standing in for the npc package's
+// live wiring.
+type hostileEffectTarget struct {
+	events       []string
+	level        int
+	monsterKind  bool
+	candidate    attackable.Combatant
+	hasCandidate bool
+}
+
+func (t *hostileEffectTarget) Level() int { return t.level }
+
+func (t *hostileEffectTarget) MonsterKind() bool { return t.monsterKind }
+
+func (t *hostileEffectTarget) AddDamageHate(attacker attackable.Combatant, damage, hate float64) {
+	t.events = append(t.events, fmt.Sprintf("add-damage-hate:%d:%g:%g", attacker.ObjectID(), damage, hate))
+}
+
+func (t *hostileEffectTarget) RandomNearbyMonster(radius int) (attackable.Combatant, bool) {
+	t.events = append(t.events, fmt.Sprintf("nearby-monster:%d", radius))
+	return t.candidate, t.hasCandidate
+}
+
+func (t *hostileEffectTarget) RandomNearbyCombatant(radius int) (attackable.Combatant, bool) {
+	t.events = append(t.events, fmt.Sprintf("nearby-combatant:%d", radius))
+	return t.candidate, t.hasCandidate
+}
+
+func (t *hostileEffectTarget) StopMostHatedTarget() {
+	t.events = append(t.events, "stop-most-hated")
+}
+
+func (t *hostileEffectTarget) StopMove() {
+	t.events = append(t.events, "stop-move")
+}
+
+func (t *hostileEffectTarget) UpdateAbnormalEffect() {
+	t.events = append(t.events, "abnormal")
+}
+
+func TestDistrustEffectRaisesHateAgainstARandomNearbyMonster(t *testing.T) {
+	target := &hostileEffectTarget{monsterKind: true, candidate: &fakeCombatant{id: 9}, hasCandidate: true}
+	effector := &hostileEffectTarget{level: 40}
+	e, err := New(Skill{}, modelskill.EffectTemplate{Name: "Distrust"})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e.Effector = effector
+	e.Effected = target
+
+	if !e.OnStart(e) {
+		t.Fatal("distrust effect start rejected a valid Monster-family target")
+	}
+	if len(target.events) != 2 || target.events[0] != "nearby-monster:600" {
+		t.Fatalf("events = %#v, want a nearby-monster search followed by an add-damage-hate call", target.events)
+	}
+}
+
+func TestDistrustEffectRejectsNonMonsterTargetAndNoOpsWithNoCandidate(t *testing.T) {
+	notMonster := &hostileEffectTarget{monsterKind: false}
+	e, err := New(Skill{}, modelskill.EffectTemplate{Name: "Distrust"})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e.Effected = notMonster
+	if e.OnStart(e) {
+		t.Fatal("distrust effect started against a non-Monster-family target")
+	}
+
+	noCandidate := &hostileEffectTarget{monsterKind: true, hasCandidate: false}
+	e2, err := New(Skill{}, modelskill.EffectTemplate{Name: "Distrust"})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e2.Effected = noCandidate
+	if !e2.OnStart(e2) {
+		t.Fatal("distrust effect start rejected a Monster-family target with no nearby candidate, want success")
+	}
+	for _, evt := range noCandidate.events {
+		if evt != "nearby-monster:600" {
+			t.Fatalf("unexpected event %q with no candidate available", evt)
+		}
+	}
+}
+
+func TestConfusionEffectRedirectsNonPlayerTargetOntoARandomNearbyCombatant(t *testing.T) {
+	target := &hostileEffectTarget{candidate: &fakeCombatant{id: 3}, hasCandidate: true}
+	e, err := New(Skill{}, modelskill.EffectTemplate{Name: "Confusion"})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e.Effected = target
+
+	if !e.OnStart(e) {
+		t.Fatal("confusion effect start rejected a valid non-player target")
+	}
+	want := []string{"stop-move", "abnormal", "nearby-combatant:1000", "add-damage-hate:3:0:2.147483647e+09"}
+	if !reflect.DeepEqual(target.events, want) {
+		t.Fatalf("events = %#v, want %#v", target.events, want)
+	}
+
+	e.OnExit(e)
+	if got := target.events[len(target.events)-2:]; !reflect.DeepEqual(got, []string{"abnormal", "stop-most-hated"}) {
+		t.Fatalf("exit events = %#v, want abnormal refresh followed by stop-most-hated", got)
+	}
+}
+
+func TestConfusionEffectLeavesAPlayerTargetEntirelyUntouched(t *testing.T) {
+	target := &liveEffectTarget{isPlayer: true}
+	e, err := New(Skill{}, modelskill.EffectTemplate{Name: "Confusion"})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e.Effected = target
+
+	if !e.OnStart(e) {
+		t.Fatal("confusion effect start rejected a player target, want success as a no-op")
+	}
+	if len(target.events) != 0 {
+		t.Fatalf("events = %#v, want none: a player target must never be redirected", target.events)
+	}
+
+	// The abnormal-effect refresh runs unconditionally on exit, even for a
+	// player target — only the hate-table redirect and its cleanup are
+	// player-exempt.
+	e.OnExit(e)
+	if want := []string{"abnormal"}; !reflect.DeepEqual(target.events, want) {
+		t.Fatalf("exit events = %#v, want %#v", target.events, want)
+	}
+}
+
+func TestCancelDebuffEffectOnlyAffectsAPlayerTargetsDispellableDebuffs(t *testing.T) {
+	target := &liveEffectTarget{isPlayer: true, vuln: 1, list: NewList(nil)}
+
+	buff, err := New(Skill{}, modelskill.EffectTemplate{Name: "Buff", Time: 3600})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	target.list.Add(buff)
+
+	nonDispellable, err := New(Skill{Debuff: true}, modelskill.EffectTemplate{Name: "Debuff", Time: 3600})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	target.list.Add(nonDispellable)
+
+	e, err := New(Skill{MagicLevel: 76}, modelskill.EffectTemplate{Name: "CancelDebuff"})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e.Effected = target
+	e.OnStart(e)
+
+	if !hasEffectInList(target.list, buff) {
+		t.Error("a non-debuff candidate must never be stripped by a cancel-debuff effect")
+	}
+	if !hasEffectInList(target.list, nonDispellable) {
+		t.Error("a non-dispellable debuff candidate must never be stripped by a cancel-debuff effect")
+	}
+}
+
+func TestCancelDebuffEffectRejectsNonPlayerOrDeadTarget(t *testing.T) {
+	target := &liveEffectTarget{isPlayer: false, vuln: 1, list: NewList(nil)}
+	e, err := New(Skill{MagicLevel: 76}, modelskill.EffectTemplate{Name: "CancelDebuff"})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e.Effected = target
+	if e.OnStart(e) {
+		t.Fatal("cancel-debuff effect started against a non-player target")
+	}
+
+	dead := &liveEffectTarget{isPlayer: true, dead: true, vuln: 1, list: NewList(nil)}
+	e2, err := New(Skill{MagicLevel: 76}, modelskill.EffectTemplate{Name: "CancelDebuff"})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e2.Effected = dead
+	if e2.OnStart(e2) {
+		t.Fatal("cancel-debuff effect started against a dead player target")
+	}
+}
+
+// TestCancelDebuffEffectAutoStripsASameSkillIDCandidateWithoutItsOwnRoll
+// proves the reference effect's own quirk: once a candidate's roll
+// succeeds, the very next candidate examined that shares its owning skill
+// id is stripped unconditionally, without an independent roll of its own.
+// A single trial can't isolate "always stripped once its predecessor
+// succeeds" from "coincidentally also rolled successfully", so this
+// repeats many independent trials and checks the one-directional
+// implication holds in every one: whenever the first candidate ends up
+// stripped, the second must also always be stripped. Skill.MaxNegatedEffects
+// is left at its zero-value default (unlimited), so every trial also
+// exercises the effect's second pass over the same candidate snapshot.
+func TestCancelDebuffEffectAutoStripsASameSkillIDCandidateWithoutItsOwnRoll(t *testing.T) {
+	const trials = 200
+	bothOrNeither := 0
+	for i := 0; i < trials; i++ {
+		target := &liveEffectTarget{isPlayer: true, vuln: 1, list: NewList(nil)}
+
+		// Same skill id, distinct stack order so both coexist as separate
+		// active debuffs instead of the second Add being rejected as a
+		// duplicate of the first.
+		older, err := New(Skill{ID: 5, Debuff: true, CanBeDispelled: true, MagicLevel: 1},
+			modelskill.EffectTemplate{Name: "Debuff", Time: 36000, StackType: "poison", StackOrder: 1})
+		if err != nil {
+			t.Fatalf("New() error: %v", err)
+		}
+		target.list.Add(older)
+
+		newer, err := New(Skill{ID: 5, Debuff: true, CanBeDispelled: true, MagicLevel: 1},
+			modelskill.EffectTemplate{Name: "Debuff", Time: 36000, StackType: "poison", StackOrder: 2})
+		if err != nil {
+			t.Fatalf("New() error: %v", err)
+		}
+		target.list.Add(newer)
+
+		// Cancel level and remaining time both drive the rate to its
+		// ceiling clamp (75%), maximizing the chance the first roll lands
+		// without forcing a literal certainty the formula can't produce.
+		e, err := New(Skill{MagicLevel: 76}, modelskill.EffectTemplate{Name: "CancelDebuff"})
+		if err != nil {
+			t.Fatalf("New() error: %v", err)
+		}
+		e.Effected = target
+		e.OnStart(e)
+
+		newerRemoved := !hasEffectInList(target.list, newer)
+		olderRemoved := !hasEffectInList(target.list, older)
+		if newerRemoved == olderRemoved {
+			bothOrNeither++
+		}
+		if newerRemoved && !olderRemoved {
+			t.Fatal("the newer (first-examined) candidate was stripped without stripping the older same-skill-id candidate")
+		}
+	}
+	if bothOrNeither == 0 {
+		t.Fatal("neither candidate was ever stripped together across repeated trials, want at least one paired removal")
+	}
 }

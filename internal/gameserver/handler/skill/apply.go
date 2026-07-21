@@ -39,6 +39,7 @@ func applyEffects(effector, effected any, def modelskill.Definition, templates [
 		KillByDOT:           def.KillByDOT,
 		CanBeDispelled:      def.CanBeDispelled,
 		MagicLevel:          def.MagicLevel,
+		LevelDepend:         def.LevelDepend,
 		AbnormalLevel:       def.AbnormalLevel,
 		EffectAbnormalLevel: def.EffectAbnormalLevel,
 		EffectType:          def.EffectType,
