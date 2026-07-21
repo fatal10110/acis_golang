@@ -201,13 +201,23 @@ func (l *GameClientLink) rollEnchantSkill() int {
 	return rnd.Get(100)
 }
 
-// scheduleAfter runs fn once, after d elapses.
+// scheduleAfter runs fn once, after d elapses, on its own goroutine outside
+// the connection's read loop (and its accept-loop recover). fn is wrapped so
+// a panic there is recovered and logged instead of taking down the process.
 func (l *GameClientLink) scheduleAfter(d time.Duration, fn func()) {
+	wrapped := func() {
+		defer func() {
+			if r := recover(); r != nil {
+				l.log.Error().Interface("panic", r).Msg("scheduled callback panic")
+			}
+		}()
+		fn()
+	}
 	if l.afterFunc != nil {
-		l.afterFunc(d, fn)
+		l.afterFunc(d, wrapped)
 		return
 	}
-	time.AfterFunc(d, fn)
+	time.AfterFunc(d, wrapped)
 }
 
 func randomCipherKey() ([]byte, error) {

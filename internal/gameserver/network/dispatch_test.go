@@ -1395,6 +1395,46 @@ func assertSPStatus(t *testing.T, frame []byte, objectID int32, sp int) {
 	}
 }
 
+// TestScheduleAfterRecoversPanickingCallback is the regression test for a
+// live crash: a scheduled callback (e.g. the ground-item pickup paralysis
+// release) runs on its own goroutine outside the per-connection accept-loop
+// recover, so an unrecovered panic there brings down the whole process
+// instead of just the one connection. scheduleAfter must recover and log,
+// matching every other scheduled/ticked callback in this codebase.
+func TestScheduleAfterRecoversPanickingCallback(t *testing.T) {
+	buf := &syncBuffer{}
+	l := &GameClientLink{log: zerolog.New(buf)}
+
+	l.scheduleAfter(time.Millisecond, func() { panic("boom") })
+
+	deadline := time.Now().Add(time.Second)
+	for !strings.Contains(buf.String(), "boom") {
+		if time.Now().After(deadline) {
+			t.Fatalf("panic was not recovered and logged, got: %s", buf.String())
+		}
+		time.Sleep(time.Millisecond)
+	}
+}
+
+// syncBuffer is a mutex-guarded bytes.Buffer safe for a test's polling
+// goroutine to read while a background goroutine writes to it.
+type syncBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (s *syncBuffer) Write(p []byte) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.buf.Write(p)
+}
+
+func (s *syncBuffer) String() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.buf.String()
+}
+
 func assertStatusAttrs(t *testing.T, frame []byte, objectID int32, attrs []serverpackets.StatusAttribute) {
 	t.Helper()
 	if frame[0] != serverpackets.OpcodeStatusUpdate {
