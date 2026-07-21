@@ -129,6 +129,35 @@ func resolveInstantItemSkill(refs []modelitem.SkillRef, defs actorcast.Definitio
 	return modelskill.Definition{}, false
 }
 
+// ResolveAICastSkill returns the first carried skill of tmpl that resolves
+// to a definition neither a potion nor a simultaneous-cast: the carried
+// skills Use's instant-cast path doesn't handle, and that instead route
+// through the caster's ordinary skill-cast pipeline (with the item
+// providing the skill and being consumed on a successful cast). False for
+// anything that isn't an ItemSkills-handled etc item, carries no such
+// skill, or whose skill can't be resolved.
+func ResolveAICastSkill(tmpl *modelitem.Template, defs actorcast.Definitions) (modelskill.Definition, bool) {
+	if tmpl == nil || tmpl.Kind != modelitem.KindEtcItem || tmpl.EtcItem == nil {
+		return modelskill.Definition{}, false
+	}
+	if tmpl.EtcItem.Handler != ItemSkillsHandler {
+		return modelskill.Definition{}, false
+	}
+	if defs == nil {
+		return modelskill.Definition{}, false
+	}
+	for _, ref := range tmpl.AttachedSkills {
+		def, ok := defs.Definition(modelskill.Ref{ID: modelskill.ID(ref.ID), Level: int(ref.Level)})
+		if !ok {
+			continue
+		}
+		if !def.Potion && !def.SimultaneousCast {
+			return def, true
+		}
+	}
+	return modelskill.Definition{}, false
+}
+
 // installItemReuse applies the item-driven reuse delay to the skill's
 // cooldown key, taking the longer of the skill's own reuse delay and the
 // item's, the way an item-carried skill's timestamp is recorded.

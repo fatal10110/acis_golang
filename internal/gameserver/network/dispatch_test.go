@@ -403,6 +403,19 @@ func testItemTemplates() *item.Table {
 			EtcItem:        &item.EtcItemDetail{Type: item.EtcItemPotion, Handler: "ItemSkills", ReuseDelay: 2000},
 			AttachedSkills: []item.SkillRef{{ID: 2279, Level: 2}},
 		},
+		{
+			ID:             736,
+			Name:           "Scroll: Escape",
+			Kind:           item.KindEtcItem,
+			Duration:       -1,
+			Stackable:      true,
+			Dropable:       true,
+			Tradable:       true,
+			Destroyable:    true,
+			Depositable:    true,
+			EtcItem:        &item.EtcItemDetail{Type: item.EtcItemScroll, Handler: "ItemSkills"},
+			AttachedSkills: []item.SkillRef{{ID: 2013, Level: 1}},
+		},
 	})
 }
 
