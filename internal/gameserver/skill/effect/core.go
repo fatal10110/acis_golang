@@ -30,7 +30,8 @@ const (
 	flagRelaxing
 	// FlagFear marks a target as feared.
 	FlagFear
-	flagConfused
+	// FlagConfused marks a target as confused.
+	FlagConfused
 	flagMuted
 	flagPhysicalMuted
 	// FlagRooted marks a target as rooted.
@@ -222,7 +223,7 @@ var coreKinds = map[string]kind{
 	"ChameleonRest":         {typ: TypeChameleonRest, flag: FlagSilentMove | flagRelaxing},
 	"ImobilePetBuff":        {typ: TypeImmobilizePetBuff},
 	"Distrust":              {typ: TypeDistrust},
-	"Confusion":             {typ: TypeConfusion, flag: flagConfused},
+	"Confusion":             {typ: TypeConfusion, flag: FlagConfused},
 }
 
 var fearSkippedPlayableSkillIDs = map[modelskill.ID]bool{

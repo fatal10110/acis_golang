@@ -114,7 +114,7 @@ func scanCharacter(row rowScanner) (*player.Character, error) {
 		&c.CharLevel, &maxHP, &curHP, &maxCP, &curCP, &maxMP, &curMP,
 		&c.Face, &c.HairStyle, &c.HairColor, &sex,
 		&c.LastHeading, &c.Location.X, &c.Location.Y, &c.Location.Z,
-		&c.Exp, &c.SP, &c.Karma, &c.PvPKills, &c.PKKills, &c.ClanID,
+		&c.Exp, &c.SP, &c.KarmaPoints, &c.PvPKills, &c.PKKills, &c.ClanID,
 		&race, &classID, &c.BaseClassID,
 		&c.DeleteAt, &c.Title, &c.AccessLevel, &c.LastAccess,
 	)

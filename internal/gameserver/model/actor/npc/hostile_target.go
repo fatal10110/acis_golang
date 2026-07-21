@@ -18,44 +18,46 @@ func (h *Hostile) Aggressive() bool {
 // attacking or select from its hate list, not a player-issued attack
 // request.
 //
-// Excluded unconditionally: a nil target, another NPC (this codebase's
-// combat AI never auto-attacks another NPC by default), and an
-// already-dead target. Also excluded: a target outside rangeVal, a
-// silently-moving target (unless this NPC's template can see through
-// concealment), and — unless allowPeaceful is set — a target standing in
-// a peace zone, or this NPC not being aggressive. A surviving candidate
-// must still be within line of sight.
+// Excluded unconditionally: a nil target and an already-dead target. A
+// non-NPC target must also be within rangeVal and, unless this NPC is
+// raid-related or its template can see through concealment, not be
+// silently moving.
 //
-// This ports the reference server's default targeting rule only. Door
-// exclusion needs no explicit check: door.Object doesn't implement
+// Guard and FriendlyMonster kinds then use one rule: attack only a
+// karma-positive target, purely on line of sight. Every other kind excludes
+// another NPC target unless this NPC is confused, in which case it attacks
+// purely on line of sight; otherwise, unless allowPeaceful is set, it
+// excludes a target standing in a peace zone or excludes any target at all
+// when this NPC isn't aggressive. A surviving candidate must still be
+// within line of sight.
+//
+// This ports the reference server's default targeting rule. Door exclusion
+// needs no explicit check: door.Object doesn't implement
 // attackable.Combatant, so a door can never be passed as target here. Not
 // modeled: the Player-only sub-checks (appearance invisibility,
-// allied-race exclusion, rift-room memo, recent-fake-death grace period),
-// the confused-actor special case, and the Guard/FriendlyMonster
-// karma-gated branches — every Hostile uses this same general rule
-// regardless of its own instance kind.
+// allied-Varka/allied-Ketra exclusion, rift-room memo — recent-fake-death
+// grace period is tracked separately by issue #898), Guard's aggressive-
+// Monster branch (gated by a config flag that ships disabled by default,
+// and needs npc AI config plumbing that doesn't exist yet), and the
+// peace-zone aggro config flag (allowPeaceful is a caller-supplied
+// parameter here rather than the reference's own config-driven default).
 func (h *Hostile) AutoAttackTargetValid(target attackable.Combatant, rangeVal int, allowPeaceful bool) bool {
 	if target == nil || target.AlikeDead() {
 		return false
 	}
-	if _, isNpcTarget := target.(*Hostile); isNpcTarget {
+
+	_, targetIsNPC := target.(*Hostile)
+	if !targetIsNPC && !h.inRangeAndUnconcealed(target, rangeVal) {
 		return false
 	}
 
-	other, ok := target.(interface{ Position() (int, int, int) })
-	if !ok {
-		return false
-	}
-	tx, ty, tz := other.Position()
-	sx, sy, sz := h.Position()
-	if !location.In3DRange(sx, sy, sz, tx, ty, tz, rangeVal) {
-		return false
+	switch hostileKind(h.Instance) {
+	case "Guard", "FriendlyMonster":
+		return h.karmaTargetVisible(target)
 	}
 
-	if !h.Instance.Template.CanSeeThrough {
-		if sm, ok := target.(interface{ SilentMoving() bool }); ok && sm.SilentMoving() {
-			return false
-		}
+	if targetIsNPC {
+		return h.Confused() && h.CanSee(target)
 	}
 
 	if !allowPeaceful {
@@ -68,4 +70,32 @@ func (h *Hostile) AutoAttackTargetValid(target attackable.Combatant, rangeVal in
 	}
 
 	return h.CanSee(target)
+}
+
+// inRangeAndUnconcealed applies the range and silent-move gates the
+// reference rule reserves for non-NPC targets.
+func (h *Hostile) inRangeAndUnconcealed(target attackable.Combatant, rangeVal int) bool {
+	other, ok := target.(interface{ Position() (int, int, int) })
+	if !ok {
+		return false
+	}
+	tx, ty, tz := other.Position()
+	sx, sy, sz := h.Position()
+	if !location.In3DRange(sx, sy, sz, tx, ty, tz, rangeVal) {
+		return false
+	}
+
+	if h.RaidRelated() || h.Instance.Template.CanSeeThrough {
+		return true
+	}
+	sm, ok := target.(interface{ SilentMoving() bool })
+	return !ok || !sm.SilentMoving()
+}
+
+// karmaTargetVisible reports whether target is a karma-positive actor
+// within line of sight — the sole target rule Guard and FriendlyMonster
+// kinds use in place of the general rule below.
+func (h *Hostile) karmaTargetVisible(target attackable.Combatant) bool {
+	pk, ok := target.(interface{ Karma() int })
+	return ok && pk.Karma() > 0 && h.CanSee(target)
 }

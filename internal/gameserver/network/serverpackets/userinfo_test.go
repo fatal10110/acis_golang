@@ -23,7 +23,7 @@ func TestFrameUserInfo(t *testing.T) {
 		Face:      0, HairStyle: 1, HairColor: 2,
 		Location:    location.Location{X: 10, Y: 20, Z: 30},
 		LastHeading: 100,
-		Karma:       0, PKKills: 1, PvPKills: 2,
+		KarmaPoints: 0, PKKills: 1, PvPKills: 2,
 		ClanID: 5, Title: "Hero", AccessLevel: 1,
 	}
 	c.SetResourceValues(player.Resources{
@@ -103,7 +103,7 @@ func TestFrameUserInfo(t *testing.T) {
 	want = binary.LittleEndian.AppendUint32(want, 0) // p.atk speed (repeated)
 	want = binary.LittleEndian.AppendUint32(want, uint32(int32(tmpl.MDef)))
 	want = binary.LittleEndian.AppendUint32(want, 0) // pvp flag
-	want = binary.LittleEndian.AppendUint32(want, uint32(c.Karma))
+	want = binary.LittleEndian.AppendUint32(want, uint32(c.Karma()))
 
 	want = binary.LittleEndian.AppendUint32(want, uint32(int32(tmpl.RunSpeed)))
 	want = binary.LittleEndian.AppendUint32(want, uint32(int32(tmpl.WalkSpeed)))

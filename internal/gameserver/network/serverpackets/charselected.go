@@ -54,7 +54,7 @@ func writeCharSelected(w *wire.Writer, s CharSelectedSnapshot) {
 	w.WriteInt32(int32(c.SP))
 	w.WriteInt64(c.Exp)
 	w.WriteInt32(int32(c.CharLevel))
-	w.WriteInt32(int32(c.Karma))
+	w.WriteInt32(int32(c.Karma()))
 	w.WriteInt32(int32(c.PKKills))
 	w.WriteInt32(int32(t.INT))
 	w.WriteInt32(int32(t.STR))

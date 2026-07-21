@@ -65,7 +65,7 @@ func TestRestartLivePlayerRevivesAndTeleportsDeadPlayer(t *testing.T) {
 		t.Fatalf("opcodes = %x, want Revive then TeleportToLocation (%x)", got, wantOpcodes)
 	}
 
-	dest, _ := restarts.NearestLocation(location.Location{}, live.Race, live.Karma)
+	dest, _ := restarts.NearestLocation(location.Location{}, live.Race, live.Karma())
 	got := live.CurrentLocation()
 	if dx := got.X - dest.X; dx < -restartTeleportOffset || dx > restartTeleportOffset {
 		t.Fatalf("teleported X = %d, want within %d of %d", got.X, restartTeleportOffset, dest.X)

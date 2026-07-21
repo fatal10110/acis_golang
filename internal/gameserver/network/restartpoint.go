@@ -51,7 +51,7 @@ func (l *GameClientLink) restartDestination(live *livePlayer) (location.Location
 	if l.restarts == nil {
 		return location.Location{}, false
 	}
-	return l.restarts.NearestLocation(live.CurrentLocation(), live.Race, live.Karma)
+	return l.restarts.NearestLocation(live.CurrentLocation(), live.Race, live.Karma())
 }
 
 // teleportLivePlayer relocates live to a scattered, ground-height-snapped

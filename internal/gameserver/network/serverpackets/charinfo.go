@@ -63,11 +63,11 @@ func writeCharInfo(w *wire.Writer, s CharInfoSnapshot) {
 	}
 
 	w.WriteInt32(0) // pvp flag
-	w.WriteInt32(int32(c.Karma))
+	w.WriteInt32(int32(c.Karma()))
 	w.WriteInt32(0) // M.Atk speed: not modeled
 	w.WriteInt32(int32(c.AttackSpeed()))
 	w.WriteInt32(0) // pvp flag repeated
-	w.WriteInt32(int32(c.Karma))
+	w.WriteInt32(int32(c.Karma()))
 
 	runSpd := int32(t.RunSpeed)
 	walkSpd := int32(t.WalkSpeed)

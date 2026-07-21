@@ -144,7 +144,7 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) {
 	w.WriteInt32(0) // P.Atk speed (repeated field): combat-formula stats are not modeled
 	w.WriteInt32(int32(t.MDef))
 	w.WriteInt32(0) // pvp flag: not in combat on world entry
-	w.WriteInt32(int32(c.Karma))
+	w.WriteInt32(int32(c.Karma()))
 
 	runSpd := int32(t.RunSpeed)
 	walkSpd := int32(t.WalkSpeed)

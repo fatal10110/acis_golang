@@ -81,6 +81,15 @@ func (l *Live) SilentMoving() bool {
 	return l.effects.IsAffected(effect.FlagSilentMove)
 }
 
+// Confused reports whether an active effect currently confuses this
+// creature into attacking indiscriminately.
+func (l *Live) Confused() bool {
+	if l == nil {
+		return false
+	}
+	return l.effects.IsAffected(effect.FlagConfused)
+}
+
 // Afraid reports whether an active effect currently fears this creature.
 func (l *Live) Afraid() bool {
 	if l == nil {

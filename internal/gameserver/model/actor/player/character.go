@@ -65,7 +65,11 @@ type Character struct {
 	LastHeading int
 	locMu       sync.RWMutex
 
-	Karma             int
+	// KarmaPoints is the persisted karma value. The field is named
+	// KarmaPoints, not Karma, so it doesn't collide with the Karma() method
+	// cross-package target-validity checks need — same naming fix as
+	// CharLevel/LastHeading above.
+	KarmaPoints       int
 	PvPKills, PKKills int
 
 	ClanID      int

@@ -8,14 +8,16 @@ import (
 )
 
 // gateTarget is a minimal attackable.Combatant double whose gate-relevant
-// state (dead, silently moving, standing in a peace zone) is set directly
-// by each test case, rather than derived from a live effect list or zone.
+// state (dead, silently moving, standing in a peace zone, karma) is set
+// directly by each test case, rather than derived from a live effect list,
+// zone, or player record.
 type gateTarget struct {
 	world.Presence
 	id     int32
 	dead   bool
 	silent bool
 	peace  bool
+	karma  int
 }
 
 func (t *gateTarget) ObjectID() int32    { return t.id }
@@ -23,6 +25,16 @@ func (t *gateTarget) SiegeGuard() bool   { return false }
 func (t *gateTarget) AlikeDead() bool    { return t.dead }
 func (t *gateTarget) SilentMoving() bool { return t.silent }
 func (t *gateTarget) InPeaceZone() bool  { return t.peace }
+func (t *gateTarget) Karma() int         { return t.karma }
+
+func newKindHostile(t testing.TB, id int32, tpl *Template, kind InstanceKind) *Hostile {
+	t.Helper()
+	h, err := NewHostile(&Instance{ObjectID: id, Template: tpl, Kind: kind}, newHostileLive(t), &hostileMove{}, &hostileAttack{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return h
+}
 
 func TestHostileAutoAttackTargetValid(t *testing.T) {
 	const rangeVal = 500
@@ -134,6 +146,89 @@ func TestHostileAutoAttackTargetValidExcludesNilAndOtherNPCs(t *testing.T) {
 	state.Spawn(otherNPC, 100, 100, 0, 0)
 	if attacker.AutoAttackTargetValid(otherNPC, 500, true) {
 		t.Fatal("AutoAttackTargetValid(other NPC) = true, want false")
+	}
+}
+
+func TestHostileAutoAttackTargetValidGuardAndFriendlyMonster(t *testing.T) {
+	tests := []struct {
+		name  string
+		kind  InstanceKind
+		karma int
+		want  bool
+	}{
+		{"guard attacks karma-positive target", "Guard", 1, true},
+		{"guard ignores non-karma target", "Guard", 0, false},
+		{"friendly monster attacks karma-positive target", "FriendlyMonster", 1, true},
+		{"friendly monster ignores non-karma target", "FriendlyMonster", 0, false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			state := world.New()
+			attacker := newKindHostile(t, 1, &Template{ID: 1, Type: string(tc.kind)}, tc.kind)
+			state.Spawn(attacker, 100, 100, 0, 0)
+
+			target := &gateTarget{id: 2, karma: tc.karma}
+			state.Spawn(target, 100, 100, 0, 0)
+
+			if got := attacker.AutoAttackTargetValid(target, 500, false); got != tc.want {
+				t.Fatalf("AutoAttackTargetValid() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestHostileAutoAttackTargetValidGuardIgnoresAggressiveMonster(t *testing.T) {
+	// GuardAttackAggroMob ships disabled by default in the reference
+	// config; a Guard must not attack a nearby aggressive monster until
+	// that toggle is wired.
+	state := world.New()
+	guard := newKindHostile(t, 1, &Template{ID: 1, Type: "Guard"}, "Guard")
+	state.Spawn(guard, 100, 100, 0, 0)
+
+	monster := newCombatHostile(t, 2, &Template{ID: 2, Type: "Monster", AggroRange: 400})
+	state.Spawn(monster, 100, 100, 0, 0)
+
+	if guard.AutoAttackTargetValid(monster, 500, true) {
+		t.Fatal("AutoAttackTargetValid(aggressive monster) = true, want false")
+	}
+}
+
+func TestHostileAutoAttackTargetValidConfusedActorTargetsAnyNPC(t *testing.T) {
+	state := world.New()
+	attacker := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster"})
+	state.Spawn(attacker, 100, 100, 0, 0)
+
+	other := newCombatHostile(t, 2, &Template{ID: 2, Type: "Monster"})
+	state.Spawn(other, 100, 100, 0, 0)
+
+	if attacker.AutoAttackTargetValid(other, 500, false) {
+		t.Fatal("AutoAttackTargetValid(other NPC) = true before confusion, want false")
+	}
+
+	addHostileEffect(t, attacker, "Confusion")
+
+	if !attacker.AutoAttackTargetValid(other, 500, false) {
+		t.Fatal("AutoAttackTargetValid(other NPC) = false while confused, want true")
+	}
+}
+
+func TestHostileAutoAttackTargetValidRaidRelatedSeesThroughSilentMove(t *testing.T) {
+	state := world.New()
+	attacker := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", AggroRange: 10})
+	state.Spawn(attacker, 100, 100, 0, 0)
+
+	target := &gateTarget{id: 2, silent: true}
+	state.Spawn(target, 100, 100, 0, 0)
+
+	if attacker.AutoAttackTargetValid(target, 500, false) {
+		t.Fatal("AutoAttackTargetValid(silent target) = true before RaidRelated, want false")
+	}
+
+	attacker.SetRaidRelated(true)
+
+	if !attacker.AutoAttackTargetValid(target, 500, false) {
+		t.Fatal("AutoAttackTargetValid(silent target) = false once RaidRelated, want true")
 	}
 }
 
