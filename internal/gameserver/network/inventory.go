@@ -38,6 +38,9 @@ func (l *GameClientLink) useItem(live *livePlayer, objectID int32) {
 	if l.useConsumableSkillItem(live, inv, inst) {
 		return
 	}
+	if l.useItemAICast(live, inv, inst) {
+		return
+	}
 	if l.useShotItem(live, inv, inst) {
 		return
 	}

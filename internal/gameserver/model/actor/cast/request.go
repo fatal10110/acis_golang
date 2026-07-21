@@ -46,17 +46,52 @@ func StartPlayerSkill(req PlayerSkillRequest) (StartedSkill, error) {
 		return StartedSkill{}, ErrSkillUnavailable
 	}
 
-	target, ok := SelectTarget(req.Caster, req.Selected, def)
+	return startResolvedSkill(req.Now, req.Controller, req.Caster, req.Selected, def)
+}
+
+// ItemSkillRequest is one item-carried skill cast request, routed through
+// the AI cast path rather than the instant-cast (potion) path: Skill names
+// the definition directly (an item's own attached-skill entry), instead of
+// being looked up from the caster's learned skill list.
+type ItemSkillRequest struct {
+	Now         time.Time
+	Controller  *Controller
+	Caster      *player.Character
+	Selected    any
+	Skill       modelskill.Ref
+	Definitions Definitions
+}
+
+// StartItemSkill validates and starts an item-carried skill cast: the same
+// cost/reuse/target machinery as StartPlayerSkill, but the skill definition
+// comes from Skill directly rather than the caster's own skill level.
+func StartItemSkill(req ItemSkillRequest) (StartedSkill, error) {
+	if req.Caster == nil || req.Caster.AlikeDead() || req.Definitions == nil || req.Controller == nil {
+		return StartedSkill{}, ErrSkillUnavailable
+	}
+
+	def, ok := req.Definitions.Definition(req.Skill)
+	if !ok || def.Activation != modelskill.ActivationActive {
+		return StartedSkill{}, ErrSkillUnavailable
+	}
+
+	return startResolvedSkill(req.Now, req.Controller, req.Caster, req.Selected, def)
+}
+
+// startResolvedSkill runs the shared target-resolution and cost/reuse start
+// sequence once a caller has already resolved def, regardless of whether
+// def came from the caster's own skill list or an item's attached skill.
+func startResolvedSkill(now time.Time, controller *Controller, caster *player.Character, selected any, def modelskill.Definition) (StartedSkill, error) {
+	target, ok := SelectTarget(caster, selected, def)
 	started := StartedSkill{Definition: def, Target: target}
 	if !ok {
 		return started, ErrInvalidTarget
 	}
 
-	now := req.Now
 	if now.IsZero() {
 		now = time.Now()
 	}
-	plan, err := req.Controller.Start(now, target, def)
+	plan, err := controller.Start(now, target, def)
 	if err != nil {
 		return started, err
 	}
