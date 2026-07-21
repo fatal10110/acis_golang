@@ -16,15 +16,16 @@ import (
 type Category string
 
 const (
-	Height      Category = "height"
-	CanMove     Category = "canmove"
-	LineOfSight Category = "los"
-	Path        Category = "path"
+	Height        Category = "height"
+	CanMove       Category = "canmove"
+	LineOfSight   Category = "los"
+	Path          Category = "path"
+	ValidLocation Category = "validlocation"
 )
 
 // categories lists every Category, in the fixed order Random cycles
 // through to spread a generated sample evenly across kinds.
-var categories = [...]Category{Height, CanMove, LineOfSight, Path}
+var categories = [...]Category{Height, CanMove, LineOfSight, Path, ValidLocation}
 
 // Query is one geodata question: a single point for Height, or a from/to
 // pair for the others.
@@ -73,7 +74,7 @@ func ParseQuery(id string) (Query, error) {
 	}
 
 	switch c := Category(category); c {
-	case CanMove, LineOfSight, Path:
+	case CanMove, LineOfSight, Path, ValidLocation:
 		return Query{Category: c, From: from, To: to}, nil
 	default:
 		return Query{}, fmt.Errorf("probe: query id %q: unknown category %q", id, category)
@@ -116,6 +117,11 @@ func Evaluate(e *engine.Engine, f *pathfind.Finder, q Query) datadiff.Record {
 		fields["result"] = strconv.FormatBool(e.CanMove(q.From.X, q.From.Y, q.From.Z, q.To.X, q.To.Y, q.To.Z))
 	case LineOfSight:
 		fields["result"] = strconv.FormatBool(e.CanSee(q.From.X, q.From.Y, q.From.Z, q.To.X, q.To.Y, q.To.Z))
+	case ValidLocation:
+		v := e.ValidLocation(q.From.X, q.From.Y, q.From.Z, q.To.X, q.To.Y, q.To.Z)
+		fields["x"] = strconv.Itoa(v.X)
+		fields["y"] = strconv.Itoa(v.Y)
+		fields["z"] = strconv.Itoa(v.Z)
 	case Path:
 		path, cost, ok := f.Find(q.From, q.To)
 		fields["found"] = strconv.FormatBool(ok)
