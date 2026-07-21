@@ -12,9 +12,10 @@ import (
 )
 
 type fakeCaster struct {
-	disabled     map[int32]bool
-	disableCalls int
-	reuseCalls   int
+	disabled             map[int32]bool
+	disableCalls         int
+	reuseCalls           int
+	shortBuffTaskSkillID int32
 }
 
 func (f *fakeCaster) ObjectID() int32              { return 1 }
@@ -26,6 +27,7 @@ func (f *fakeCaster) DisableSkill(key int32, d time.Duration) {
 func (f *fakeCaster) AddSkillReuse(ref modelskill.Ref, key int32, d time.Duration) {
 	f.reuseCalls++
 }
+func (f *fakeCaster) ShortBuffTaskSkillID() int32 { return f.shortBuffTaskSkillID }
 
 type fakeDefinitions struct {
 	def modelskill.Definition
