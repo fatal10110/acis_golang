@@ -1,29 +1,53 @@
 package network
 
 import (
-	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	itemhandler "github.com/fatal10110/acis_golang/internal/gameserver/handler/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
-// Handler names for the direct-from-window shot etc items this path
-// covers. Beast (summon-charged) variants and fishing shots are not
-// handled here: they need charged-shot state on the summon actor and on
-// the (currently unmodeled) fishing state respectively, neither of which
-// exists yet.
-const (
-	soulShotsHandler          = "SoulShots"
-	spiritShotsHandler        = "SpiritShots"
-	blessedSpiritShotsHandler = "BlessedSpiritShots"
-)
+// shotMessageSet names the client messages one shot handler's rejections
+// and success map to.
+type shotMessageSet struct {
+	noCapacity    int
+	gradeMismatch int
+	notEnough     int
+	enabled       int
+}
+
+// shotMessages maps each shot handler name itemhandler.UseShot covers to
+// its client messages. Spirit and blessed-spirit share the same message
+// ids in the reference.
+var shotMessages = map[string]shotMessageSet{
+	itemhandler.SoulShotsHandler: {
+		noCapacity:    serverpackets.SystemMessageCannotUseSoulshots,
+		gradeMismatch: serverpackets.SystemMessageSoulshotsGradeMismatch,
+		notEnough:     serverpackets.SystemMessageNotEnoughSoulshots,
+		enabled:       serverpackets.SystemMessageEnabledSoulshot,
+	},
+	itemhandler.SpiritShotsHandler: {
+		noCapacity:    serverpackets.SystemMessageCannotUseSpiritshots,
+		gradeMismatch: serverpackets.SystemMessageSpiritshotsGradeMismatch,
+		notEnough:     serverpackets.SystemMessageNotEnoughSpiritshots,
+		enabled:       serverpackets.SystemMessageEnabledSpiritshot,
+	},
+	itemhandler.BlessedSpiritShotsHandler: {
+		noCapacity:    serverpackets.SystemMessageCannotUseSpiritshots,
+		gradeMismatch: serverpackets.SystemMessageSpiritshotsGradeMismatch,
+		notEnough:     serverpackets.SystemMessageNotEnoughSpiritshots,
+		enabled:       serverpackets.SystemMessageEnabledSpiritshot,
+	},
+}
 
 // useShotItem charges the player's active weapon with a soulshot or
 // spiritshot used directly from the item window: the same ChargedShot
 // state the background AutoSoulShot path drives at attack time, so direct
-// and auto use stay consistent. It reports whether inst was handled by
+// and auto use stay consistent. Which shot kind to charge, the capacity/
+// grade/already-charged decision, and the item consumption are
+// itemhandler.UseShot's job; this method only builds and sends the
+// packets its result produces. It reports whether inst was handled by
 // this path.
 func (l *GameClientLink) useShotItem(live *livePlayer, inv *itemcontainer.Inventory, inst *item.Instance) bool {
 	if live == nil || inv == nil || inst == nil {
@@ -33,82 +57,51 @@ func (l *GameClientLink) useShotItem(live *livePlayer, inv *itemcontainer.Invent
 	if !ok || tmpl.Kind != item.KindEtcItem || tmpl.EtcItem == nil {
 		return false
 	}
-
-	switch tmpl.EtcItem.Handler {
-	case soulShotsHandler:
-		consume, result := live.ChargeSoulshot(tmpl.Crystal, rnd.Get(100))
-		l.replyShotCharge(live, inv, inst, tmpl, result, consume,
-			serverpackets.SystemMessageCannotUseSoulshots,
-			serverpackets.SystemMessageSoulshotsGradeMismatch,
-			serverpackets.SystemMessageNotEnoughSoulshots,
-			serverpackets.SystemMessageEnabledSoulshot,
-		)
-		return true
-	case spiritShotsHandler:
-		consume, result := live.ChargeSpiritshot(item.ShotSpirit, tmpl.Crystal)
-		l.replyShotCharge(live, inv, inst, tmpl, result, consume,
-			serverpackets.SystemMessageCannotUseSpiritshots,
-			serverpackets.SystemMessageSpiritshotsGradeMismatch,
-			serverpackets.SystemMessageNotEnoughSpiritshots,
-			serverpackets.SystemMessageEnabledSpiritshot,
-		)
-		return true
-	case blessedSpiritShotsHandler:
-		consume, result := live.ChargeSpiritshot(item.ShotBlessedSpirit, tmpl.Crystal)
-		l.replyShotCharge(live, inv, inst, tmpl, result, consume,
-			serverpackets.SystemMessageCannotUseSpiritshots,
-			serverpackets.SystemMessageSpiritshotsGradeMismatch,
-			serverpackets.SystemMessageNotEnoughSpiritshots,
-			serverpackets.SystemMessageEnabledSpiritshot,
-		)
-		return true
+	msgs, ok := shotMessages[tmpl.EtcItem.Handler]
+	if !ok {
+		return false
 	}
-	return false
+
+	res := itemhandler.UseShot(itemhandler.ShotUseRequest{
+		Caster:    live.Character,
+		Inventory: inv,
+		Item:      inst,
+		Template:  tmpl,
+		Destroyer: l.inventoryService(),
+	})
+
+	switch res.Outcome {
+	case itemhandler.ShotAlreadyCharged:
+		// The reference treats this as a pure no-op, not a rejection of
+		// something that changed: fully silent, no message, no
+		// ActionFailed.
+	case itemhandler.ShotNoCapacity:
+		l.replyShotRejection(live, res.AutoEnabled, msgs.noCapacity)
+	case itemhandler.ShotGradeMismatch:
+		l.replyShotRejection(live, res.AutoEnabled, msgs.gradeMismatch)
+	case itemhandler.ShotNotEnoughItems:
+		l.replyShotRejection(live, res.AutoEnabled, msgs.notEnough)
+	case itemhandler.ShotApplied:
+		l.sendInventoryUpdate(live, inv)
+		live.SendFrame(serverpackets.FrameSystemMessage(msgs.enabled))
+		if res.SkillID != 0 {
+			self := skillCastObject(live)
+			l.broadcastLiveFrame(live, func() wire.Frame {
+				return serverpackets.FrameMagicSkillUse(self, self, res.SkillID, 1, 0, 0, false)
+			})
+		}
+	}
+	return true
 }
 
-// replyShotCharge maps one ChargeSoulshot/ChargeSpiritshot outcome to
-// client packets. A rejection message is suppressed when the item is
-// enabled for AutoSoulShot, matching the reference's own message
-// suppression for that case — but this path still answers ActionFailed
-// even then, so the client's pending click always resolves to something,
-// per this codebase's no-silent-rejection rule. An already-charged
-// result stays fully silent (no message, no ActionFailed): the reference
-// treats it as a pure no-op, not a rejection of something that changed.
-func (l *GameClientLink) replyShotCharge(live *livePlayer, inv *itemcontainer.Inventory, inst *item.Instance, tmpl *item.Template, result player.ChargeShotResult, consume int32, noCapacityMsg, gradeMismatchMsg, notEnoughMsg, enabledMsg int) {
-	autoEnabled := live.AutoSoulShotEnabled(tmpl.ID)
-
-	switch result {
-	case player.ChargeShotAlreadyCharged:
-		return
-	case player.ChargeShotNoCapacity:
-		if !autoEnabled {
-			live.SendFrame(serverpackets.FrameSystemMessage(noCapacityMsg))
-		}
-		live.SendFrame(serverpackets.FrameActionFailed())
-		return
-	case player.ChargeShotGradeMismatch:
-		if !autoEnabled {
-			live.SendFrame(serverpackets.FrameSystemMessage(gradeMismatchMsg))
-		}
-		live.SendFrame(serverpackets.FrameActionFailed())
-		return
+// replyShotRejection answers a shot-charge rejection: msg unless
+// autoEnabled suppresses it (matching the reference's own suppression for
+// an AutoSoulShot-enabled item), and always ActionFailed so the client's
+// pending click resolves to something, per this codebase's
+// no-silent-rejection rule.
+func (l *GameClientLink) replyShotRejection(live *livePlayer, autoEnabled bool, msg int) {
+	if !autoEnabled {
+		live.SendFrame(serverpackets.FrameSystemMessage(msg))
 	}
-
-	if _, ok := l.inventoryService().DestroyItem(inv, inst.ObjectID, int(consume)); !ok {
-		if !autoEnabled {
-			live.SendFrame(serverpackets.FrameSystemMessage(notEnoughMsg))
-		}
-		live.SendFrame(serverpackets.FrameActionFailed())
-		return
-	}
-	l.sendInventoryUpdate(live, inv)
-
-	live.SendFrame(serverpackets.FrameSystemMessage(enabledMsg))
-	if len(tmpl.AttachedSkills) > 0 {
-		self := skillCastObject(live)
-		skillID := int32(tmpl.AttachedSkills[0].ID)
-		l.broadcastLiveFrame(live, func() wire.Frame {
-			return serverpackets.FrameMagicSkillUse(self, self, skillID, 1, 0, 0, false)
-		})
-	}
+	live.SendFrame(serverpackets.FrameActionFailed())
 }
