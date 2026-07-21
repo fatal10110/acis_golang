@@ -35,6 +35,9 @@ func (l *GameClientLink) useConsumableSkillItem(live *livePlayer, inv *itemconta
 	switch res.Outcome {
 	case itemhandler.NotHandled:
 		return false
+	case itemhandler.PetRejected:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageItemNotForPets))
+		return true
 	case itemhandler.ReuseRejected:
 		sendMagicCastFailure(live, res.Skill, actorcast.ErrSkillDisabled)
 		return true
