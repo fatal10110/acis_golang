@@ -105,6 +105,12 @@ type Effect struct {
 	Effector any
 	Effected any
 
+	// RejectsIfAffected marks an effect that must not be added at all
+	// (only its stop-task hook runs) when the owner is already affected by
+	// its own Flag bit from any currently held effect — not just another
+	// instance of the same kind. Most kinds leave this false.
+	RejectsIfAffected bool
+
 	// Level is the applied skill level this effect instance represents,
 	// initialized from Skill.Level. Every kind treats it as fixed for the
 	// effect's lifetime except a fusion effect's IncreaseEffect/
@@ -237,6 +243,13 @@ func (l *List) Flags() Flag {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
+	return l.flagsLocked()
+}
+
+// flagsLocked is Flags' body for callers that already hold l.mu (e.g. add,
+// which cannot call the exported Flags/IsAffected without self-deadlocking
+// on the non-reentrant mutex).
+func (l *List) flagsLocked() Flag {
 	var flags Flag
 	for _, e := range l.buffs {
 		if e != nil {
@@ -340,11 +353,18 @@ func (l *List) beginActivate(e *Effect, onReject func(*Effect)) func() {
 	}
 }
 
-// add inserts e. Incoming effects are not yet gated by the owner's active
-// special-effect state (e.g. rejecting an effect that conflicts with a
-// currently active status) — that needs an owner-side abnormal-state tracker
-// that doesn't exist yet; wire this gate in once that tracker lands.
+// add inserts e. A RejectsIfAffected effect that finds its own Flag bit
+// already set by any currently held effect is dropped outright before any
+// buff/debuff handling: its stop-task hook fires and it never reaches the
+// identical-effect replace/reject logic below, so a same-skill-id recast
+// while the flag is already active is rejected here rather than treated as
+// a replacement.
 func (l *List) add(e *Effect, pending *[]func()) {
+	if e.RejectsIfAffected && l.flagsLocked()&e.Flag != 0 {
+		appendThunk(pending, e.stopTaskThunk())
+		return
+	}
+
 	if e.Skill.Debuff {
 		for _, existing := range l.debuffs {
 			if existing.identical(e) {
@@ -389,15 +409,23 @@ func (l *List) exit(e *Effect, pending *[]func()) {
 	l.remove(e, pending)
 }
 
-// doesStack reports whether e's stack type already has a member among the
-// current buffs, mirroring the check that exempts stacking buffs from
-// buff-slot cap eviction.
+// doesStack reports whether e's stack type already has a buff member among
+// the current stack group, mirroring the check that exempts stacking buffs
+// from buff-slot cap eviction. Only called from the non-debuff insertion
+// path, it looks at buff members exclusively — a debuff sharing the same
+// stack-type string (the shared l.stacks map holds both families) doesn't
+// count.
 func (l *List) doesStack(e *Effect) bool {
 	stackType := e.stackType()
 	if stackType == "none" {
 		return false
 	}
-	return len(l.stacks[stackType]) > 0
+	for _, existing := range l.stacks[stackType] {
+		if existing != nil && !existing.Skill.Debuff {
+			return true
+		}
+	}
+	return false
 }
 
 // buffCount returns the number of visible, non-seven-signs buff-slot-family
