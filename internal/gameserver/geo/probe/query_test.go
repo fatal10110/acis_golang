@@ -124,6 +124,23 @@ func TestEvaluate(t *testing.T) {
 			t.Error("points is empty, want a value when found")
 		}
 	})
+
+	t.Run("validlocation", func(t *testing.T) {
+		// An open loaded block walks the line straight to the target: the
+		// last reachable point equals the target, with its Z resolved by
+		// the engine.
+		e, finder := openLoadedEngine(t)
+		x, y := engine.WorldX(0), engine.WorldY(0)
+		from := location.Location{X: x, Y: y, Z: 0}
+		to := location.Location{X: x + 48, Y: y, Z: 0}
+		r := Evaluate(e, finder, Query{Category: ValidLocation, From: from, To: to})
+		if r.Fields["x"] == "" || r.Fields["y"] == "" || r.Fields["z"] == "" {
+			t.Fatalf("ValidLocation fields = %+v, want x/y/z all populated", r.Fields)
+		}
+		if r.ID != "validlocation:"+formatPoint(from)+"->"+formatPoint(to) {
+			t.Errorf("ID = %q", r.ID)
+		}
+	})
 }
 
 func TestRandomIsDeterministic(t *testing.T) {

@@ -33,6 +33,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/engine"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/pathfind"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/probe"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
@@ -850,7 +851,7 @@ func provideKillRewardConfig(paths gameServerPaths, serverProps *config.Properti
 // needs *task.Decay and *task.Respawn to register actors with, so those
 // tasks' own effects can only point back at Npcs after it exists.
 func provideNpcs(spawns *manager.Spawns, data *gameData, state *world.State, ids *idfactory.Allocator, decay *task.Decay, decayHooks *worldDecayEffects, respawnTask *task.Respawn, respawnHooks *npcRespawnEffects, ai *task.AI, positions *task.PositionUpdates, ground *task.GroundItems, rewards manager.KillRewardConfig, log zerolog.Logger) (*manager.Npcs, error) {
-	npcs, err := manager.NewNpcs(spawns, data.NPCs, data.Geo, state, ids, decay, respawnTask, ai, positions, data.Items, ground, rewards, time.Now, log)
+	npcs, err := manager.NewNpcs(spawns, data.NPCs, move.NewGeo(data.Geo, data.Finder), state, ids, decay, respawnTask, ai, positions, data.Items, ground, rewards, time.Now, log)
 	if err != nil {
 		return nil, err
 	}
@@ -923,7 +924,7 @@ func provideGameClientLink(
 	spBookNeeded skillEnchantSPBookNeeded,
 	log zerolog.Logger,
 ) *network.GameClientLink {
-	return network.NewGameClientLink(validator, links.get, roster, items, shortcuts, data.Players, data.Items, html, crests, skills, spellbooks, data.Trees, data.CursedWeapons, state, data.Geo, ids, ground, attackStance, positions, data.Restarts, float64(respawnHP), data.Levels, bool(spBookNeeded), log)
+	return network.NewGameClientLink(validator, links.get, roster, items, shortcuts, data.Players, data.Items, html, crests, skills, spellbooks, data.Trees, data.CursedWeapons, state, move.NewGeo(data.Geo, data.Finder), ids, ground, attackStance, positions, data.Restarts, float64(respawnHP), data.Levels, bool(spBookNeeded), log)
 }
 
 func provideSkillPersistence(pool *sql.DB, data *gameData) *skillstate.Persistence {

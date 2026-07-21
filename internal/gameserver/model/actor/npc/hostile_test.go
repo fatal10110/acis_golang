@@ -446,6 +446,13 @@ type hostileGeo struct{}
 func (hostileGeo) CanMove(_, _, _, _, _, _ int) bool { return true }
 func (hostileGeo) Height(_, _, _ int) int16          { return 0 }
 
+// hostileGeo never blocks in these tests, so pathfinding and fall-back
+// queries never need a useful answer: return no path and reflect the origin.
+func (hostileGeo) FindPath(_, _ location.Location) ([]location.Location, bool) { return nil, false }
+func (hostileGeo) ValidLocation(ox, oy, oz, _, _, _ int) location.Location {
+	return location.Location{X: ox, Y: oy, Z: oz}
+}
+
 type hostileTarget struct {
 	world.Presence
 	id int32
