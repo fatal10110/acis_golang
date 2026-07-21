@@ -15,6 +15,11 @@ import (
 // (potions and similar) to the skill its template carries.
 const ItemSkillsHandler = "ItemSkills"
 
+// ElixirsHandler is the etc-item handler name for elixirs: the same
+// instant-cast dispatch as ItemSkillsHandler, but restricted to a
+// player-owned caster.
+const ElixirsHandler = "Elixirs"
+
 // Outcome classifies the result of an ItemSkills instant-cast use.
 type Outcome uint8
 
@@ -22,13 +27,15 @@ const (
 	// NotHandled means the item is not a consumable this path covers, so
 	// the caller should fall through to its next branch.
 	NotHandled Outcome = iota
-	// Applied means the skill resolved, one unit was consumed, and the
-	// skill's effects were applied to the caster.
+	// Applied means the skill resolved and its effects were applied to the
+	// caster. One unit was consumed unless the item is a herb.
 	Applied
 	// ReuseRejected means the skill's reuse delay is still cooling.
 	ReuseRejected
 	// NotEnoughItems means the stack couldn't be decremented.
 	NotEnoughItems
+	// PetRejected means an elixir was used by a non-player caster.
+	PetRejected
 )
 
 // UseResult is the outcome of one ItemSkills instant-cast use. Skill is the
@@ -63,19 +70,26 @@ type UseRequest struct {
 	Definitions actorcast.Definitions
 	Effects     actorcast.EffectHandlers
 	Destroyer   InventoryDestroyer
+
+	// IsPet marks Caster as a non-player-owned actor (pet/servitor) rather
+	// than the player itself. An Elixirs-handled item rejects such a
+	// caster; ItemSkillsHandler items do not distinguish on this field.
+	IsPet bool
 }
 
 // Use runs the ItemSkills instant-cast path for one etc item: it
-// discriminates an etc consumable whose handler is ItemSkills (excluding
-// herbs), resolves the first carried skill flagged as a potion or
+// discriminates an etc consumable whose handler is ItemSkills or Elixirs,
+// resolves the first carried skill flagged as a potion or
 // simultaneous-cast, rejects a still-cooling reuse, consumes one unit
-// from the clicked stack, installs the item-driven reuse delay, and
-// applies the skill's effects to the caster.
+// from the clicked stack (skipped for herbs, which apply without
+// consuming), installs the item-driven reuse delay, and applies the
+// skill's effects to the caster.
 //
 // It reports NotHandled for anything that isn't such an instant-cast
 // consumable, so the caller's next branch (equip-toggle, etc.) still gets
-// a chance to answer the client. Herbs are intentionally not handled
-// here: their no-consume and servitor-mirror behavior is a separate path.
+// a chance to answer the client. Mirroring a herb's effect onto the
+// caster's active servitor is not handled here: it needs a servitor cast
+// surface this package doesn't have a dependency on yet.
 func Use(req UseRequest) UseResult {
 	if req.Caster == nil || req.Inventory == nil || req.Item == nil {
 		return UseResult{Outcome: NotHandled}
@@ -84,8 +98,12 @@ func Use(req UseRequest) UseResult {
 	if !ok || tmpl.Kind != modelitem.KindEtcItem || tmpl.EtcItem == nil {
 		return UseResult{Outcome: NotHandled}
 	}
-	if tmpl.EtcItem.Handler != ItemSkillsHandler || tmpl.EtcItem.Type == modelitem.EtcItemHerb {
+	handler := tmpl.EtcItem.Handler
+	if handler != ItemSkillsHandler && handler != ElixirsHandler {
 		return UseResult{Outcome: NotHandled}
+	}
+	if handler == ElixirsHandler && req.IsPet {
+		return UseResult{Outcome: PetRejected}
 	}
 	if len(tmpl.AttachedSkills) == 0 {
 		return UseResult{Outcome: NotHandled}
@@ -101,8 +119,10 @@ func Use(req UseRequest) UseResult {
 		return UseResult{Outcome: ReuseRejected, Skill: def}
 	}
 
-	if _, ok := req.Destroyer.DestroyItem(req.Inventory, req.Item.ObjectID, 1); !ok {
-		return UseResult{Outcome: NotEnoughItems, Skill: def}
+	if tmpl.EtcItem.Type != modelitem.EtcItemHerb {
+		if _, ok := req.Destroyer.DestroyItem(req.Inventory, req.Item.ObjectID, 1); !ok {
+			return UseResult{Outcome: NotEnoughItems, Skill: def}
+		}
 	}
 
 	installItemReuse(req.Caster, def, reuseKey, tmpl.EtcItem.ReuseDelay)
