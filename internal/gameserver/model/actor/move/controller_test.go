@@ -417,6 +417,70 @@ func TestControllerMoveHomeDropsBlockedRoute(t *testing.T) {
 	}
 }
 
+// TestControllerBroadcastsMoveOnEachSegmentAdvance covers a route split across
+// geopath waypoints: the client must be told about every leg, not just the
+// first, or it keeps predicting the original (obstacle-crossing) straight
+// line instead of the server-routed path.
+func TestControllerBroadcastsMoveOnEachSegmentAdvance(t *testing.T) {
+	self := &fakeSelf{x: 0, y: 0, z: 30}
+	waypoints := []location.Location{
+		{X: 50, Y: 0, Z: 30},
+		{X: 50, Y: 50, Z: 30},
+		{X: 100, Y: 50, Z: 30},
+	}
+	geo := &recordingGeo{
+		canMove:    false, // direct line blocked -> tier 2 pathfinding
+		height:     30,
+		findPath:   waypoints,
+		findPathOK: true,
+	}
+	cm, err := NewCreatureMove(location.Location{X: self.x, Y: self.y, Z: self.z}, 50, geo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	clock := &fakeMoveClock{}
+	cm.afterFunc = clock.AfterFunc
+	c, err := NewController(cm, self)
+	if err != nil {
+		t.Fatal(err)
+	}
+	updates := &fakePositionUpdates{}
+	c.SetPositionUpdates(updates)
+
+	c.MoveHome(location.Location{X: 100, Y: 50, Z: 30})
+	if len(self.broadcasts) != 1 {
+		t.Fatalf("BroadcastMove calls after move start = %d, want 1 (first segment)", len(self.broadcasts))
+	}
+
+	// Fire each segment's arrival timer in turn: the first two advance to
+	// the next waypoint (one BroadcastMove each), the third exhausts the
+	// queue and stops without an extra broadcast.
+	segmentDuration := clock.timers[len(clock.timers)-1].delay
+	clock.fire(segmentDuration)
+	if len(self.broadcasts) != 2 {
+		t.Fatalf("BroadcastMove calls after segment 1 advance = %d, want 2", len(self.broadcasts))
+	}
+	if got := c.move.Destination(); got != waypoints[1] {
+		t.Fatalf("Destination() = %+v, want %+v", got, waypoints[1])
+	}
+
+	clock.fire(segmentDuration)
+	if len(self.broadcasts) != 3 {
+		t.Fatalf("BroadcastMove calls after segment 2 advance = %d, want 3", len(self.broadcasts))
+	}
+	if got := c.move.Destination(); got != waypoints[2] {
+		t.Fatalf("Destination() = %+v, want %+v", got, waypoints[2])
+	}
+
+	clock.fire(segmentDuration)
+	if len(self.broadcasts) != 3 {
+		t.Fatalf("BroadcastMove calls after final segment = %d, want 3 (no re-broadcast on arrival)", len(self.broadcasts))
+	}
+	if c.move.Moving() {
+		t.Fatal("Moving() = true after final segment, want false")
+	}
+}
+
 type fakePositionUpdates struct {
 	added   []PositionUpdater
 	removed []PositionUpdater

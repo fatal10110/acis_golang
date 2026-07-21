@@ -72,6 +72,7 @@ type CreatureMove struct {
 	followOffset         int
 	followMode           FollowMode
 	arrived              func()
+	segmentAdvanced      func(Event)
 	timer                scheduledTimer
 	moveSeq              uint64
 	afterFunc            func(time.Duration, func()) scheduledTimer
@@ -116,6 +117,18 @@ func (m *CreatureMove) SetArrivedHook(arrived func()) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.arrived = arrived
+}
+
+// SetSegmentAdvancedHook records the callback fired each time a multi-segment
+// move advances from one queued waypoint to the next, with the event
+// describing the newly active segment. It does not fire for the first
+// segment (already reported by MoveToLocation's own return value) or for the
+// final segment's completion (that's the arrived hook's job). A nil hook
+// (the default) makes segment advancement a no-op.
+func (m *CreatureMove) SetSegmentAdvancedHook(segmentAdvanced func(Event)) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.segmentAdvanced = segmentAdvanced
 }
 
 // Position returns the actor's current server-authoritative position.
@@ -260,14 +273,20 @@ func (m *CreatureMove) onArrive(seq uint64) {
 		m.mu.Unlock()
 		return
 	}
-	arrived := m.finishLocked()
+	action := m.finishLocked()
 	m.mu.Unlock()
 
-	if arrived != nil {
-		arrived()
+	if action != nil {
+		action()
 	}
 }
 
+// finishLocked completes the just-elapsed segment and either advances to the
+// next queued waypoint or, once the queue is empty, stops the move. It
+// returns a callback for the caller to invoke after unlocking: the arrived
+// hook when the move is fully done, or the segment-advanced hook (bound to
+// the newly active segment's event) when another waypoint remains. Callers
+// hold mu.
 func (m *CreatureMove) finishLocked() func() {
 	if m.timer != nil {
 		m.timer.Stop()
@@ -307,7 +326,12 @@ func (m *CreatureMove) finishLocked() func() {
 		m.destination = next
 		m.moving = true
 		m.rescheduleLocked(duration)
-		return nil
+		event := m.currentEventLocked()
+		segmentAdvanced := m.segmentAdvanced
+		if segmentAdvanced == nil {
+			return nil
+		}
+		return func() { segmentAdvanced(event) }
 	}
 
 	m.moving = false
@@ -335,16 +359,23 @@ func (m *CreatureMove) UpdatePosition(step time.Duration) (Event, bool) {
 	left := math.Hypot(dx, dy)
 	passed := m.speed * step.Seconds()
 	if left == 0 || passed >= left {
-		arrived := m.finishLocked()
-		if arrived != nil {
+		action := m.finishLocked()
+		if !m.moving {
 			m.mu.Unlock()
-			arrived()
+			if action != nil {
+				action()
+			}
 			return Event{}, false
 		}
-		// Advanced to the next waypoint segment; report it.
+		// Advanced to the next waypoint segment; report it and fire the
+		// segment-advanced hook (if any) so the client is told about the new
+		// leg the same tick the server itself commits to it.
 		event := m.currentEventLocked()
 		m.mu.Unlock()
-		return event, m.moving
+		if action != nil {
+			action()
+		}
+		return event, true
 	}
 
 	fraction := passed / left
