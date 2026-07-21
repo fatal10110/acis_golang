@@ -24,7 +24,8 @@ const (
 	flagCharmOfLuck
 	flagPhoenixBlessing
 	flagNoblesseBlessing
-	flagSilentMove
+	// FlagSilentMove marks a target as moving without alerting nearby AI.
+	FlagSilentMove
 	flagProtectionBlessing
 	flagRelaxing
 	// FlagFear marks a target as feared.
@@ -196,7 +197,7 @@ var coreKinds = map[string]kind{
 	"PhysicalMute":          {typ: TypePhysicalMute, flag: flagPhysicalMuted, debuff: true},
 	"RemoveTarget":          {typ: TypeRemoveTarget},
 	"SilenceMagicPhysical":  {typ: TypeSilenceAll, flag: flagMuted | flagPhysicalMuted, debuff: true},
-	"SilentMove":            {typ: TypeSilentMove, flag: flagSilentMove},
+	"SilentMove":            {typ: TypeSilentMove, flag: FlagSilentMove},
 	"StunSelf":              {typ: TypeStunSelf, flag: FlagStunned},
 	"Heal":                  {typ: TypeHeal},
 	"HealOverTime":          {typ: TypeHealOverTime},
@@ -218,7 +219,7 @@ var coreKinds = map[string]kind{
 	"BigHead":               {typ: TypeBigHead, flag: flagBigHead},
 	"CancelDebuff":          {typ: TypeCancelDebuff},
 	"Relax":                 {typ: TypeRelax, flag: flagRelaxing},
-	"ChameleonRest":         {typ: TypeChameleonRest, flag: flagSilentMove | flagRelaxing},
+	"ChameleonRest":         {typ: TypeChameleonRest, flag: FlagSilentMove | flagRelaxing},
 	"ImobilePetBuff":        {typ: TypeImmobilizePetBuff},
 	"Distrust":              {typ: TypeDistrust},
 	"Confusion":             {typ: TypeConfusion, flag: flagConfused},
