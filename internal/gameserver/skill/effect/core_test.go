@@ -72,50 +72,51 @@ func TestNewBuildsBuffWithRuntimeStatFuncs(t *testing.T) {
 
 func TestNewBuildsCoreEffectMetadata(t *testing.T) {
 	tests := []struct {
-		name     string
-		wantType Type
-		wantFlag Flag
-		debuff   bool
+		name        string
+		wantType    Type
+		wantFlag    Flag
+		debuff      bool
+		wantRejects bool
 	}{
-		{"Debuff", TypeDebuff, FlagNone, true},
-		{"Stun", TypeStun, FlagStunned, true},
-		{"Root", TypeRoot, FlagRooted, true},
-		{"Sleep", TypeSleep, FlagSleep, true},
-		{"Fear", TypeFear, FlagFear, true},
-		{"DamOverTime", TypeDamOverTime, FlagNone, true},
-		{"ManaDamOverTime", TypeManaDamOverTime, FlagNone, false},
-		{"AbortCast", TypeAbortCast, FlagNone, false},
-		{"ImmobileUntilAttacked", TypeImmobileUntilAttacked, FlagMeditating, false},
-		{"ImobileBuff", TypeImmobilizeEffector, FlagNone, false},
-		{"Invincible", TypeInvincible, FlagNone, false},
-		{"ManaHealOverTime", TypeManaHealOverTime, FlagNone, false},
-		{"Mute", TypeMute, flagMuted, true},
-		{"NoblesseBless", TypeNoblesseBless, flagNoblesseBlessing, false},
-		{"Paralyze", TypeParalyze, FlagParalyzed, true},
-		{"Petrification", TypePetrification, FlagParalyzed, true},
-		{"PhysicalMute", TypePhysicalMute, flagPhysicalMuted, true},
-		{"RemoveTarget", TypeRemoveTarget, FlagNone, false},
-		{"SilenceMagicPhysical", TypeSilenceAll, flagMuted | flagPhysicalMuted, true},
-		{"SilentMove", TypeSilentMove, flagSilentMove, false},
-		{"StunSelf", TypeStunSelf, FlagStunned, false},
-		{"Heal", TypeHeal, FlagNone, false},
-		{"HealOverTime", TypeHealOverTime, FlagNone, false},
-		{"ManaHeal", TypeManaHeal, FlagNone, false},
-		{"TargetMe", TypeTargetMe, FlagNone, false},
-		{"Bluff", TypeBluff, FlagNone, false},
-		{"CharmOfCourage", TypeCharmOfCourage, flagCharmOfCourage, false},
-		{"CharmOfLuck", TypeCharmOfLuck, flagCharmOfLuck, false},
-		{"PhoenixBless", TypePhoenixBless, flagPhoenixBlessing, false},
-		{"BlockBuff", TypeBlockBuff, FlagNone, false},
-		{"BlockDebuff", TypeBlockDebuff, FlagNone, false},
-		{"ProtectionBlessing", TypeProtectionBless, flagProtectionBlessing, false},
-		{"PolearmTargetSingle", TypePolearmTargetSingle, FlagNone, false},
-		{"BigHead", TypeBigHead, flagBigHead, false},
-		{"Spoil", TypeSpoil, FlagNone, false},
-		{"CancelDebuff", TypeCancelDebuff, FlagNone, false},
-		{"ImobilePetBuff", TypeImmobilizePetBuff, FlagNone, false},
-		{"Distrust", TypeDistrust, FlagNone, false},
-		{"Confusion", TypeConfusion, flagConfused, false},
+		{"Debuff", TypeDebuff, FlagNone, true, false},
+		{"Stun", TypeStun, FlagStunned, true, true},
+		{"Root", TypeRoot, FlagRooted, true, true},
+		{"Sleep", TypeSleep, FlagSleep, true, true},
+		{"Fear", TypeFear, FlagFear, true, true},
+		{"DamOverTime", TypeDamOverTime, FlagNone, true, false},
+		{"ManaDamOverTime", TypeManaDamOverTime, FlagNone, false, false},
+		{"AbortCast", TypeAbortCast, FlagNone, false, false},
+		{"ImmobileUntilAttacked", TypeImmobileUntilAttacked, FlagMeditating, false, false},
+		{"ImobileBuff", TypeImmobilizeEffector, FlagNone, false, false},
+		{"Invincible", TypeInvincible, FlagNone, false, false},
+		{"ManaHealOverTime", TypeManaHealOverTime, FlagNone, false, false},
+		{"Mute", TypeMute, flagMuted, true, false},
+		{"NoblesseBless", TypeNoblesseBless, flagNoblesseBlessing, false, false},
+		{"Paralyze", TypeParalyze, FlagParalyzed, true, false},
+		{"Petrification", TypePetrification, FlagParalyzed, true, false},
+		{"PhysicalMute", TypePhysicalMute, flagPhysicalMuted, true, false},
+		{"RemoveTarget", TypeRemoveTarget, FlagNone, false, false},
+		{"SilenceMagicPhysical", TypeSilenceAll, flagMuted | flagPhysicalMuted, true, false},
+		{"SilentMove", TypeSilentMove, flagSilentMove, false, false},
+		{"StunSelf", TypeStunSelf, FlagStunned, false, false},
+		{"Heal", TypeHeal, FlagNone, false, false},
+		{"HealOverTime", TypeHealOverTime, FlagNone, false, false},
+		{"ManaHeal", TypeManaHeal, FlagNone, false, false},
+		{"TargetMe", TypeTargetMe, FlagNone, false, false},
+		{"Bluff", TypeBluff, FlagNone, false, false},
+		{"CharmOfCourage", TypeCharmOfCourage, flagCharmOfCourage, false, false},
+		{"CharmOfLuck", TypeCharmOfLuck, flagCharmOfLuck, false, false},
+		{"PhoenixBless", TypePhoenixBless, flagPhoenixBlessing, false, false},
+		{"BlockBuff", TypeBlockBuff, FlagNone, false, false},
+		{"BlockDebuff", TypeBlockDebuff, FlagNone, false, false},
+		{"ProtectionBlessing", TypeProtectionBless, flagProtectionBlessing, false, false},
+		{"PolearmTargetSingle", TypePolearmTargetSingle, FlagNone, false, false},
+		{"BigHead", TypeBigHead, flagBigHead, false, false},
+		{"Spoil", TypeSpoil, FlagNone, false, false},
+		{"CancelDebuff", TypeCancelDebuff, FlagNone, false, false},
+		{"ImobilePetBuff", TypeImmobilizePetBuff, FlagNone, false, false},
+		{"Distrust", TypeDistrust, FlagNone, false, false},
+		{"Confusion", TypeConfusion, flagConfused, false, false},
 	}
 
 	for _, tt := range tests {
@@ -132,6 +133,9 @@ func TestNewBuildsCoreEffectMetadata(t *testing.T) {
 			}
 			if e.Skill.Debuff != tt.debuff {
 				t.Fatalf("Debuff = %v, want %v", e.Skill.Debuff, tt.debuff)
+			}
+			if e.RejectsIfAffected != tt.wantRejects {
+				t.Fatalf("RejectsIfAffected = %v, want %v", e.RejectsIfAffected, tt.wantRejects)
 			}
 			if e.ActionTime() {
 				t.Fatal("non-periodic action hook continued")

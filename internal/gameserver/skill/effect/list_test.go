@@ -50,6 +50,17 @@ func newEffect(name string, id modelskill.ID, stackType string, stackOrder float
 	return e
 }
 
+// flagGatedEffect returns a named debuff carrying flag and marked
+// RejectsIfAffected, matching how New() builds a Stun/Root/Sleep/Fear
+// effect: it must never be added while the owner already carries flag from
+// any currently held effect.
+func flagGatedEffect(name string, id modelskill.ID, flag Flag, events *[]string) *Effect {
+	e := namedEffect(name, id, "none", 0, true, events)
+	e.Flag = flag
+	e.RejectsIfAffected = true
+	return e
+}
+
 func namedEffect(name string, id modelskill.ID, stackType string, stackOrder float64, debuff bool, events *[]string) *Effect {
 	e := newEffect(name, id, stackType, stackOrder, debuff)
 	e.OnStart = func(*Effect) bool {
@@ -399,4 +410,134 @@ func TestListFlagsAggregatesActiveEffectFlagsAndDropsThemOnRemoval(t *testing.T)
 	if got := list.Flags(); got != 0 {
 		t.Fatalf("Flags() after removing every effect = %#x, want 0", got)
 	}
+}
+
+func TestListRejectsSecondFlagGatedEffectOfEachKindWhileFirstIsActive(t *testing.T) {
+	tests := []struct {
+		name string
+		flag Flag
+	}{
+		{"stun", FlagStunned},
+		{"root", FlagRooted},
+		{"sleep", FlagSleep},
+		{"fear", FlagFear},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var events []string
+			list := NewList(eventOwner{events: &events})
+
+			first := flagGatedEffect(tt.name+"1", 1, tt.flag, &events)
+			second := flagGatedEffect(tt.name+"2", 2, tt.flag, &events)
+
+			list.Add(first)
+			list.Add(second)
+
+			requireEvents(t, events, []string{
+				tt.name + "1:start",
+				"owner:add",
+				tt.name + "2:stop",
+			})
+			if !first.InUse() {
+				t.Fatal("first flag-gated effect was displaced instead of the second one being rejected")
+			}
+			if second.InUse() {
+				t.Fatal("second flag-gated effect was added while its own flag was already active")
+			}
+			requireNames(t, list.All(), []string{tt.name + "1"})
+		})
+	}
+}
+
+func TestListRejectsFlagGatedEffectWhenFlagIsSetByADifferentEffectKind(t *testing.T) {
+	var events []string
+	list := NewList(eventOwner{events: &events})
+
+	// stunSelf carries FlagStunned but, like the reference StunSelf effect,
+	// is not itself flag-gated: it only ever blocks other Stunned-flag
+	// effects, it never rejects itself.
+	stunSelf := namedEffect("stunself", 1, "none", 0, false, &events)
+	stunSelf.Flag = FlagStunned
+
+	stun := flagGatedEffect("stun", 2, FlagStunned, &events)
+
+	list.Add(stunSelf)
+	list.Add(stun)
+
+	requireEvents(t, events, []string{
+		"stunself:start",
+		"owner:add",
+		"stun:stop",
+	})
+	if !stunSelf.InUse() {
+		t.Fatal("stunself was displaced instead of the incoming stun being rejected")
+	}
+	if stun.InUse() {
+		t.Fatal("stun was added despite FlagStunned already being set by a different effect kind")
+	}
+	requireNames(t, list.All(), []string{"stunself"})
+}
+
+func TestListDoesNotFlagGateParalyzeOrPetrificationEffects(t *testing.T) {
+	var events []string
+	list := NewList(eventOwner{events: &events})
+
+	// Paralyze and Petrification both carry FlagParalyzed but, unlike
+	// Stun/Root/Sleep/Fear, neither is flag-gated: a second one proceeds
+	// through the ordinary buff/debuff handling instead of being rejected
+	// outright.
+	paralyze1 := namedEffect("paralyze1", 1, "none", 0, true, &events)
+	paralyze1.Flag = FlagParalyzed
+	paralyze2 := namedEffect("paralyze2", 2, "none", 0, true, &events)
+	paralyze2.Flag = FlagParalyzed
+	petrification := namedEffect("petrification", 3, "none", 0, true, &events)
+	petrification.Flag = FlagParalyzed
+
+	list.Add(paralyze1)
+	list.Add(paralyze2)
+	list.Add(petrification)
+
+	if !paralyze1.InUse() {
+		t.Fatal("first paralyze effect is not active")
+	}
+	if !paralyze2.InUse() {
+		t.Fatal("second paralyze effect was rejected despite FlagParalyzed not being flag-gated")
+	}
+	if !petrification.InUse() {
+		t.Fatal("petrification was rejected despite FlagParalyzed not being flag-gated")
+	}
+	requireNames(t, list.All(), []string{"paralyze1", "paralyze2", "petrification"})
+}
+
+func TestListRejectsSameSkillRecastOfFlagGatedEffectBeforeIdenticalDebuffLogic(t *testing.T) {
+	var events []string
+	list := NewList(eventOwner{events: &events})
+
+	first := flagGatedEffect("stun", 7, FlagStunned, &events)
+	recast := flagGatedEffect("stun", 7, FlagStunned, &events)
+	// Line up every field the identical-debuff-reject branch compares, so
+	// that branch alone (absent the flag gate) would produce the very same
+	// "reject the incoming effect" outcome. The flag gate must still be
+	// what actually fires: it runs before that branch is ever reached, and
+	// it rejects based on the flag alone, not a same-skill/same-stack match.
+	recast.Type = first.Type
+	recast.Template.StackOrder = first.Template.StackOrder
+	recast.Template.StackType = first.Template.StackType
+
+	list.Add(first)
+	list.Add(recast)
+
+	requireEvents(t, events, []string{
+		"stun:start",
+		"owner:add",
+		"stun:stop",
+	})
+	if !first.InUse() {
+		t.Fatal("original stun was removed/exited instead of the recast being rejected")
+	}
+	if recast.InUse() {
+		t.Fatal("recast stun became active")
+	}
+	requireNames(t, list.All(), []string{"stun"})
 }
