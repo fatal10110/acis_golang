@@ -14,6 +14,13 @@ type ccGeo struct{}
 func (ccGeo) CanMove(_, _, _, _, _, _ int) bool { return true }
 func (ccGeo) Height(_, _, _ int) int16          { return 0 }
 
+// ccGeo never blocks in these tests, so pathfinding and fall-back queries
+// never need a useful answer: return no path and reflect the origin.
+func (ccGeo) FindPath(_, _ location.Location) ([]location.Location, bool) { return nil, false }
+func (ccGeo) ValidLocation(ox, oy, oz, _, _, _ int) location.Location {
+	return location.Location{X: ox, Y: oy, Z: oz}
+}
+
 // ccFleeTarget satisfies the flee hook a Fear effect's runtime needs, so it
 // activates regardless of what its actual effected actor is.
 type ccFleeTarget struct{}

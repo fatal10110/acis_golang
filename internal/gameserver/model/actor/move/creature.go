@@ -10,12 +10,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
 
-// Geo supplies the terrain queries required to validate ground movement.
-type Geo interface {
-	CanMove(ox, oy, oz, tx, ty, tz int) bool
-	Height(x, y, z int) int16
-}
-
 // Event describes one accepted movement request.
 type Event struct {
 	Origin, Destination location.Location
@@ -56,6 +50,12 @@ type TargetSnapshot struct {
 // timer goroutine that advances origin and fires the arrived hook
 // independently of the caller.
 //
+// A single request may resolve into multiple segments: when the straight
+// line is blocked, route resolution produces a sequence of waypoints
+// (segments) the actor walks in order. The current segment's destination
+// lives in destination; the remaining ones queue in waypoints. The arrived
+// hook fires only when the final segment completes, not once per segment.
+//
 // The arrival timer preserves progress when no position-update task is
 // wired. When it is wired, UpdatePosition advances origin at the fixed
 // movement correction cadence and may complete the move first.
@@ -64,6 +64,7 @@ type CreatureMove struct {
 
 	mu                   sync.Mutex
 	origin, destination  location.Location
+	waypoints            []location.Location
 	accurateX, accurateY float64
 	speed                float64
 	moving               bool
@@ -132,6 +133,10 @@ func (m *CreatureMove) SetPosition(position location.Location) {
 	m.accurateX = float64(position.X)
 	m.accurateY = float64(position.Y)
 	if m.destination == position {
+		// Position reports arrival at the active destination; any queued
+		// segments are dropped, since the caller is the authoritative
+		// source of position corrections.
+		m.waypoints = nil
 		m.moving = false
 	}
 }
@@ -147,10 +152,11 @@ func (m *CreatureMove) MoveToLocation(target location.Location) (Event, error) {
 
 func (m *CreatureMove) moveToLocationLocked(target location.Location) (Event, error) {
 	target.Z = int(m.geo.Height(target.X, target.Y, target.Z))
-	if !m.geo.CanMove(m.origin.X, m.origin.Y, m.origin.Z, target.X, target.Y, target.Z) {
-		return Event{}, errors.New("move: route is blocked")
-	}
+
+	// Same-cell requests resolve as a zero-distance completion: no
+	// pathfinding query, no arrival timer.
 	if target.X == m.origin.X && target.Y == m.origin.Y {
+		m.waypoints = nil
 		m.destination = target
 		m.accurateX = float64(m.origin.X)
 		m.accurateY = float64(m.origin.Y)
@@ -163,7 +169,12 @@ func (m *CreatureMove) moveToLocationLocked(target location.Location) (Event, er
 		return Event{}, errors.New("move: actor cannot move at zero speed")
 	}
 
-	distance := math.Hypot(float64(target.X)-float64(m.origin.X), float64(target.Y)-float64(m.origin.Y))
+	destination, waypoints, err := m.resolvePathLocked(target)
+	if err != nil {
+		return Event{}, err
+	}
+
+	distance := math.Hypot(float64(destination.X)-float64(m.origin.X), float64(destination.Y)-float64(m.origin.Y))
 	ticks := math.Ceil(distance / (m.speed / 10))
 	const tickDuration = 100 * time.Millisecond
 	if math.IsNaN(ticks) || ticks > float64(time.Duration(1<<63-1)/tickDuration) {
@@ -173,16 +184,52 @@ func (m *CreatureMove) moveToLocationLocked(target location.Location) (Event, er
 	origin := m.origin
 	m.accurateX = float64(origin.X)
 	m.accurateY = float64(origin.Y)
-	m.destination = target
+	m.destination = destination
+	m.waypoints = waypoints
 	m.moving = duration > 0
 	m.rescheduleLocked(duration)
 
 	return Event{
 		Origin:      origin,
-		Destination: target,
+		Destination: destination,
 		Speed:       m.speed,
 		Duration:    duration,
 	}, nil
+}
+
+// resolvePathLocked applies the three-tier route resolution a move request
+// uses: a straight-line reachability check (tier 1), a routed search around
+// the obstacle (tier 2), and a partial-progress last reachable point when
+// the route cannot complete (tier 3). The returned destination is the
+// first segment to walk; waypoints holds the remaining segments, if any.
+//
+// origin and target carry geodata-snapped Z.
+func (m *CreatureMove) resolvePathLocked(target location.Location) (location.Location, []location.Location, error) {
+	if m.geo.CanMove(m.origin.X, m.origin.Y, m.origin.Z, target.X, target.Y, target.Z) {
+		return target, nil, nil
+	}
+
+	if path, ok := m.geo.FindPath(m.origin, target); ok && len(path) >= 2 {
+		// The pathfinder returns every corner plus the final target cell,
+		// omitting the origin. Treat the first entry as the active segment
+		// and queue the rest for per-segment advancement.
+		destination := path[0]
+		var tail []location.Location
+		if len(path) > 1 {
+			tail = make([]location.Location, len(path)-1)
+			copy(tail, path[1:])
+		}
+		return destination, tail, nil
+	}
+
+	fallback := m.geo.ValidLocation(m.origin.X, m.origin.Y, m.origin.Z, target.X, target.Y, target.Z)
+	// A fall-back that resolves to the origin itself means walking the line
+	// makes no lateral progress: the route is genuinely blocked, so the
+	// request fails without disturbing the prior destination.
+	if fallback.X == m.origin.X && fallback.Y == m.origin.Y {
+		return location.Location{}, nil, errors.New("move: route is blocked")
+	}
+	return fallback, nil, nil
 }
 
 // rescheduleLocked cancels any pending arrival timer and, for a positive
@@ -226,16 +273,51 @@ func (m *CreatureMove) finishLocked() func() {
 		m.timer.Stop()
 		m.timer = nil
 	}
+	// Snap to the just-completed segment's destination.
 	m.origin = m.destination
 	m.accurateX = float64(m.destination.X)
 	m.accurateY = float64(m.destination.Y)
+
+	// Advance through any remaining waypoints. Zero-distance segments are
+	// skipped silently; a positive-distance segment becomes the active
+	// destination with a freshly scheduled arrival timer. Scheduling a new
+	// timer advances moveSeq, so the previous segment's onArrive callback
+	// (if still in flight) is ignored.
+	const tickDuration = 100 * time.Millisecond
+	for len(m.waypoints) > 0 {
+		next := m.waypoints[0]
+		m.waypoints = m.waypoints[1:]
+		distance := math.Hypot(float64(next.X)-float64(m.origin.X), float64(next.Y)-float64(m.origin.Y))
+		ticks := math.Ceil(distance / (m.speed / 10))
+		if math.IsNaN(ticks) || ticks > float64(time.Duration(1<<63-1)/tickDuration) {
+			// Unrepresentable next-segment duration: stop here, drop tail.
+			m.waypoints = nil
+			m.moving = false
+			return m.arrived
+		}
+		duration := time.Duration(ticks) * tickDuration
+		if duration <= 0 {
+			// Zero-distance segment: snap forward and continue.
+			m.destination = next
+			m.origin = next
+			m.accurateX = float64(next.X)
+			m.accurateY = float64(next.Y)
+			continue
+		}
+		m.destination = next
+		m.moving = true
+		m.rescheduleLocked(duration)
+		return nil
+	}
+
 	m.moving = false
 	return m.arrived
 }
 
 // UpdatePosition advances one in-flight movement by step and reports the
 // current movement event to broadcast. It returns false after the move has
-// already stopped or reaches its destination.
+// already stopped or reaches its final destination; reaching an intermediate
+// waypoint segment returns the next segment's event with true.
 func (m *CreatureMove) UpdatePosition(step time.Duration) (Event, bool) {
 	m.mu.Lock()
 	if !m.moving {
@@ -254,11 +336,15 @@ func (m *CreatureMove) UpdatePosition(step time.Duration) (Event, bool) {
 	passed := m.speed * step.Seconds()
 	if left == 0 || passed >= left {
 		arrived := m.finishLocked()
-		m.mu.Unlock()
 		if arrived != nil {
+			m.mu.Unlock()
 			arrived()
+			return Event{}, false
 		}
-		return Event{}, false
+		// Advanced to the next waypoint segment; report it.
+		event := m.currentEventLocked()
+		m.mu.Unlock()
+		return event, m.moving
 	}
 
 	fraction := passed / left
@@ -295,6 +381,7 @@ func (m *CreatureMove) CancelMove() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.rescheduleLocked(0)
+	m.waypoints = nil
 	m.moving = false
 }
 

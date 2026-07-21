@@ -24,6 +24,13 @@ type staticGeo struct{}
 func (staticGeo) CanMove(int, int, int, int, int, int) bool { return true }
 func (staticGeo) Height(_, _, z int) int16                  { return int16(z) }
 
+// staticGeo never blocks in these tests, so pathfinding and fall-back queries
+// never need a useful answer: return no path and reflect the origin.
+func (staticGeo) FindPath(_, _ location.Location) ([]location.Location, bool) { return nil, false }
+func (staticGeo) ValidLocation(ox, oy, oz, _, _, _ int) location.Location {
+	return location.Location{X: ox, Y: oy, Z: oz}
+}
+
 var neutralRates = item.Rates{Spoil: 1, Currency: 1, Item: 1, ItemRaid: 1, Herb: 1}
 
 func monsterTemplate(id int) *npc.Template {
