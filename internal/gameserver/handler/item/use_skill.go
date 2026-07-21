@@ -40,11 +40,24 @@ const (
 
 // UseResult is the outcome of one ItemSkills instant-cast use. Skill is the
 // resolved skill definition for every outcome except NotHandled, so the
-// caller can name it in a rejection reply.
+// caller can name it in a rejection reply. The ShortBuff* fields are only
+// meaningful on Applied when HasShortBuff is true: the caller drives the
+// caster's short-buff HUD state with them (after sending its own cast
+// packets, so the HUD update lands last on the wire, matching the
+// reference's own ordering).
 type UseResult struct {
 	Outcome Outcome
 	Skill   modelskill.Definition
+
+	HasShortBuff             bool
+	ShortBuffSkillID         int32
+	ShortBuffLevel           int32
+	ShortBuffDurationSeconds int32
 }
+
+// HPPotionSkillIDs are the healing-potion-family skill ids that drive the
+// item-window short-buff HUD slot.
+var hpPotionSkillIDs = map[int32]bool{2031: true, 2032: true, 2037: true}
 
 // SkillCaster is the actor using the item: it identifies and positions
 // itself (for the cast animation and effect resolution) and owns its own
@@ -54,6 +67,12 @@ type SkillCaster interface {
 	SkillDisabled(key int32) bool
 	DisableSkill(key int32, delay time.Duration)
 	AddSkillReuse(ref modelskill.Ref, key int32, delay time.Duration)
+
+	// ShortBuffTaskSkillID returns the skill id of the short buff
+	// currently showing on the item-window HUD slot, or 0 if none. Use
+	// reads this only to decide HasShortBuff; it never mutates the HUD
+	// state itself — see UseResult's doc comment.
+	ShortBuffTaskSkillID() int32
 }
 
 // InventoryDestroyer decrements a stack by a count from an inventory.
@@ -127,7 +146,28 @@ func Use(req UseRequest) UseResult {
 
 	installItemReuse(req.Caster, def, reuseKey, tmpl.EtcItem.ReuseDelay)
 	actorcast.ApplyEffects(req.Effects, req.Caster, req.Caster, def)
-	return UseResult{Outcome: Applied, Skill: def}
+
+	result := UseResult{Outcome: Applied, Skill: def}
+	result.HasShortBuff, result.ShortBuffSkillID, result.ShortBuffLevel, result.ShortBuffDurationSeconds = shortBuffDecision(req.Caster, def)
+	return result
+}
+
+// shortBuffDecision decides whether def should drive the item-window
+// short-buff HUD slot: it's one of the healing-potion-family skills, and
+// its id doesn't lose to whatever short buff is already showing — the
+// reference's own gate (`skillInfo.getId() >= player.getShortBuffTaskSkillId()`).
+// It only reads caster's current HUD state; actually updating that state
+// (and sending the packet) is the caller's job once its own cast packets
+// are already on the wire.
+func shortBuffDecision(caster SkillCaster, def modelskill.Definition) (ok bool, skillID, level, durationSeconds int32) {
+	if !hpPotionSkillIDs[int32(def.ID)] || int32(def.ID) < caster.ShortBuffTaskSkillID() {
+		return false, 0, 0, 0
+	}
+	if len(def.Effects) == 0 {
+		return false, 0, 0, 0
+	}
+	duration := int32(def.Effects[0].Count * def.Effects[0].Time)
+	return true, int32(def.ID), int32(def.Level), duration
 }
 
 // resolveInstantItemSkill returns the first carried skill of refs that

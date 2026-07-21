@@ -52,6 +52,9 @@ func (l *GameClientLink) useConsumableSkillItem(live *livePlayer, inv *itemconta
 		})
 		live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageUseS1, int32(res.Skill.ID), int32(res.Skill.Level)))
 		sendMagicStatusUpdate(live, beforeVitals)
+		if res.HasShortBuff {
+			live.Character.UpdateShortBuff(res.ShortBuffSkillID, res.ShortBuffLevel, res.ShortBuffDurationSeconds)
+		}
 		return true
 	}
 	return false
