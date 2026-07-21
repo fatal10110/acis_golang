@@ -73,6 +73,14 @@ const (
 	SystemMessageFailedEnchantingSkillS1          = 1441
 	SystemMessageNotEnoughSPToEnchantSkill        = 1443
 	SystemMessageNotEnoughExpToEnchantSkill       = 1444
+	SystemMessageSoulshotsGradeMismatch           = 337
+	SystemMessageNotEnoughSoulshots               = 338
+	SystemMessageCannotUseSoulshots               = 339
+	SystemMessageEnabledSoulshot                  = 342
+	SystemMessageSpiritshotsGradeMismatch         = 530
+	SystemMessageNotEnoughSpiritshots             = 531
+	SystemMessageCannotUseSpiritshots             = 532
+	SystemMessageEnabledSpiritshot                = 533
 )
 
 // SystemMessage parameter types used by focused packet helpers.
