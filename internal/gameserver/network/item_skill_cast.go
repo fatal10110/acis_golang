@@ -15,9 +15,13 @@ import (
 // useItemAICast runs an item-carried skill that isn't an instant-cast
 // potion (a regular scroll etc.) through the same Start/Hit/Finish cast
 // sequence a player-initiated RequestMagicSkillUse drives, targeting the
-// player's current selection. The item is consumed once the cast starts
-// (matching how the reference commits an item-driven cast's consumption
-// up front, before the hit/effect phase), not only on a successful hit.
+// player's current selection. Starting the cast, consuming the item, and
+// applying its effects are itemhandler's decisions (itemhandler.
+// ResolveAICastSkill / actorcast.StartItemSkill / itemhandler.
+// ConsumeAICastItem / itemhandler.CompleteAICast); this method only builds
+// and sends the packets those decisions produce, in the order the
+// reference itself uses: the item is consumed before the cast/launch
+// packets go out, not only on a successful hit.
 //
 // It reports whether inst was handled by this path, so the caller's
 // equip-toggle fallback still answers the client for anything else.
@@ -51,9 +55,13 @@ func (l *GameClientLink) useItemAICast(live *livePlayer, inv *itemcontainer.Inve
 	target := started.Target
 	plan := started.Plan
 
-	if _, ok := l.inventoryService().DestroyItem(inv, inst.ObjectID, 1); !ok {
-		sendMagicCastFailure(live, def, actorcast.ErrNotEnoughItems)
-		controller.Stop()
+	if err := itemhandler.ConsumeAICastItem(itemhandler.ConsumeAICastItemRequest{
+		Controller: controller,
+		Inventory:  inv,
+		Item:       inst,
+		Destroyer:  l.inventoryService(),
+	}); err != nil {
+		sendMagicCastFailure(live, def, err)
 		return true
 	}
 	l.sendInventoryUpdate(live, inv)
@@ -81,14 +89,18 @@ func (l *GameClientLink) useItemAICast(live *livePlayer, inv *itemcontainer.Inve
 		return serverpackets.FrameMagicSkillLaunched(live.ObjectID(), int32(def.ID), int32(def.Level), targetIDs)
 	})
 
-	if err := controller.Hit(); err != nil {
-		sendMagicCastFailure(live, def, err)
+	result := itemhandler.CompleteAICast(itemhandler.CompleteAICastRequest{
+		Controller: controller,
+		Definition: def,
+		Caster:     live.Character,
+		Target:     target,
+		Effects:    actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers},
+	})
+	if result.Err != nil {
+		sendMagicCastFailure(live, def, result.Err)
 		sendMagicStatusUpdate(live, beforeVitals)
-		controller.Stop()
 		return true
 	}
-	actorcast.ApplyEffects(actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers}, live.Character, target, def)
 	sendMagicStatusUpdate(live, beforeVitals)
-	controller.Finish()
 	return true
 }
