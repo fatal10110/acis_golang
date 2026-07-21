@@ -133,6 +133,14 @@ type kind struct {
 	typ    Type
 	flag   Flag
 	debuff bool
+	// rejectsIfAffected marks a kind that refuses to be added at all (its
+	// stop-task hook fires instead) when the owner is already affected by
+	// its own Flag bit, from any currently held effect that carries it —
+	// not just another instance of the same kind. Left false (the default
+	// for every kind but these four) it never blocks; those four never
+	// merge with or replace an existing same-flag effect, they simply
+	// don't apply while one is live.
+	rejectsIfAffected bool
 }
 
 var coreKinds = map[string]kind{
@@ -140,10 +148,10 @@ var coreKinds = map[string]kind{
 	"Debuff":                {typ: TypeDebuff, debuff: true},
 	"DamOverTime":           {typ: TypeDamOverTime, debuff: true},
 	"ManaDamOverTime":       {typ: TypeManaDamOverTime},
-	"Fear":                  {typ: TypeFear, flag: FlagFear, debuff: true},
-	"Root":                  {typ: TypeRoot, flag: FlagRooted, debuff: true},
-	"Sleep":                 {typ: TypeSleep, flag: FlagSleep, debuff: true},
-	"Stun":                  {typ: TypeStun, flag: FlagStunned, debuff: true},
+	"Fear":                  {typ: TypeFear, flag: FlagFear, debuff: true, rejectsIfAffected: true},
+	"Root":                  {typ: TypeRoot, flag: FlagRooted, debuff: true, rejectsIfAffected: true},
+	"Sleep":                 {typ: TypeSleep, flag: FlagSleep, debuff: true, rejectsIfAffected: true},
+	"Stun":                  {typ: TypeStun, flag: FlagStunned, debuff: true, rejectsIfAffected: true},
 	"AbortCast":             {typ: TypeAbortCast},
 	"ImmobileUntilAttacked": {typ: TypeImmobileUntilAttacked, flag: FlagMeditating},
 	"ImobileBuff":           {typ: TypeImmobilizeEffector},
@@ -209,11 +217,12 @@ func New(skill Skill, tmpl modelskill.EffectTemplate) (*Effect, error) {
 
 	skill.Debuff = skill.Debuff || k.debuff
 	e := &Effect{
-		Skill:    skill,
-		Template: tmpl,
-		Type:     k.typ,
-		Flag:     k.flag,
-		Level:    skill.Level,
+		Skill:             skill,
+		Template:          tmpl,
+		Type:              k.typ,
+		Flag:              k.flag,
+		Level:             skill.Level,
+		RejectsIfAffected: k.rejectsIfAffected,
 	}
 
 	funcs, err := statFuncs(e, tmpl.Funcs)
