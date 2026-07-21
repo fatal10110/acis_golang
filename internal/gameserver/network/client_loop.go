@@ -258,6 +258,24 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				if live != nil {
 					l.handleAutoSoulShot(live, req)
 				}
+			case second == clientpackets.OpcodeRequestExEnchantSkillInfo:
+				req, err := clientpackets.DecodeRequestExEnchantSkillInfo(payload)
+				if err != nil {
+					l.log.Warn().Err(err).Msg("game client")
+					continue
+				}
+				if live != nil {
+					l.sendEnchantSkillInfo(live, req)
+				}
+			case second == clientpackets.OpcodeRequestExEnchantSkill:
+				req, err := clientpackets.DecodeRequestExEnchantSkill(payload)
+				if err != nil {
+					l.log.Warn().Err(err).Msg("game client")
+					continue
+				}
+				if live != nil {
+					l.applyEnchantSkill(ctx, live, req)
+				}
 			case second == clientpackets.OpcodeRequestManorList:
 				session.SendFrame(serverpackets.FrameExSendManorList())
 			case second == clientpackets.OpcodeRequestExPledgeCrestLarge:

@@ -125,6 +125,7 @@ func newGameServerApp(paths gameServerPaths) *fx.App {
 			loadGameServerProperties,
 			loadPvPFlagOptions,
 			loadRespawnRestoreHP,
+			loadSkillEnchantSPBookNeeded,
 			loadHexIDProperties,
 			gameServerConfigFromLoadedProperties,
 			provideGameServerLogger,
@@ -178,6 +179,19 @@ func loadRespawnRestoreHP(paths gameServerPaths) (respawnRestoreHP, error) {
 		return 0, err
 	}
 	return respawnRestoreHP(config.NewFields(props, "respawn restore hp").Float64("RespawnRestoreHP", 0.7)), nil
+}
+
+// skillEnchantSPBookNeeded controls whether enchanting a skill above level
+// 76 also consumes the tree's configured spellbook item, read from
+// players.properties.
+type skillEnchantSPBookNeeded bool
+
+func loadSkillEnchantSPBookNeeded(paths gameServerPaths) (skillEnchantSPBookNeeded, error) {
+	props, err := config.LoadFile(paths.PlayersConfigPath)
+	if err != nil {
+		return false, err
+	}
+	return skillEnchantSPBookNeeded(config.NewFields(props, "skill enchant sp book needed").Bool("EnchantSkillSpBookNeeded", true)), nil
 }
 
 func loadPvPFlagOptions(paths gameServerPaths) (task.PvPFlagOptions, error) {
@@ -906,9 +920,10 @@ func provideGameClientLink(
 	attackStance *task.AttackStance,
 	positions *task.PositionUpdates,
 	respawnHP respawnRestoreHP,
+	spBookNeeded skillEnchantSPBookNeeded,
 	log zerolog.Logger,
 ) *network.GameClientLink {
-	return network.NewGameClientLink(validator, links.get, roster, items, shortcuts, data.Players, data.Items, html, crests, skills, spellbooks, data.Trees, data.CursedWeapons, state, data.Geo, ids, ground, attackStance, positions, data.Restarts, float64(respawnHP), log)
+	return network.NewGameClientLink(validator, links.get, roster, items, shortcuts, data.Players, data.Items, html, crests, skills, spellbooks, data.Trees, data.CursedWeapons, state, data.Geo, ids, ground, attackStance, positions, data.Restarts, float64(respawnHP), data.Levels, bool(spBookNeeded), log)
 }
 
 func provideSkillPersistence(pool *sql.DB, data *gameData) *skillstate.Persistence {
