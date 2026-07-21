@@ -1440,12 +1440,21 @@ func chameleonRestAction(e *Effect) bool {
 
 // manaDrainTick runs one ManaDamageOverTimeTick against target and applies
 // its result, shared by relaxAction and chameleonRestAction.
+//
+// Toggle is forced true regardless of e.Skill.Toggle: the reference Relax
+// and ChameleonRest effects check "cost exceeds current MP" unconditionally,
+// not only for toggle skills (unlike EffectManaDamOverTime, whose lack-MP
+// check really is toggle-gated). Every skill carrying either effect in the
+// current datapack happens to be TOGGLE-typed, so reading e.Skill.Toggle
+// would produce the same result today — but that's a data coincidence, not
+// a contract; force true here so a future non-toggle skill using these
+// effects still gets the unconditional check Java requires.
 func manaDrainTick(e *Effect, target mpDotTarget) bool {
 	result := ManaDamageOverTimeTick(ManaDamageOverTimeInput{
 		Dead:   target.Dead(),
 		MP:     target.MP(),
 		Damage: e.Template.Value,
-		Toggle: e.Skill.Toggle,
+		Toggle: true,
 	})
 	if result.RemovedForLackMP {
 		if notifier, ok := e.Effected.(lackMPNotifier); ok {
@@ -1545,6 +1554,10 @@ func cancelDebuffPass(list *List, candidates []*Effect, cancelLvl int, vuln floa
 			continue
 		}
 
+		// Template.Time (the candidate's full configured duration) stands in for the
+		// reference effect's remaining duration (period-elapsed): this port has no
+		// live elapsed-time tracking per effect yet, so "remaining" always reads as
+		// "full". Revisit once effects track elapsed time.
 		rate := formulas.EffectCancelDebuffSuccessRate(cancelLvl, cand.Skill.MagicLevel, cand.Template.Time, vuln)
 		if !formulas.CancelSucceeds(float64(rate), rnd.Get(100)) {
 			continue
