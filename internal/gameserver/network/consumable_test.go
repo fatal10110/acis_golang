@@ -72,6 +72,20 @@ func readMagicSkillUseSelf(t *testing.T, c *fakeGameClient, objectID int32, skil
 	}
 }
 
+// readShortBuffStatusUpdateFrame asserts the next frame is
+// ShortBuffStatusUpdate carrying skillID/level/durationSeconds.
+func readShortBuffStatusUpdateFrame(t *testing.T, c *fakeGameClient, skillID, level, durationSeconds int32) {
+	t.Helper()
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeShortBuffStatusUpdate {
+		t.Fatalf("opcode = %#x, want ShortBuffStatusUpdate (%#x)", reply[0], serverpackets.OpcodeShortBuffStatusUpdate)
+	}
+	r := wire.NewReader(reply[1:])
+	if sid, lvl, dur := r.ReadInt32(), r.ReadInt32(), r.ReadInt32(); sid != skillID || lvl != level || dur != durationSeconds {
+		t.Fatalf("ShortBuffStatusUpdate = skill %d level %d duration %d, want %d/%d/%d", sid, lvl, dur, skillID, level, durationSeconds)
+	}
+}
+
 // TestGameClientLinkUseHealingPotionAppliesAndConsumes verifies a healing
 // potion used from the item window decrements the stack by one, announces
 // the instant skill use, and installs the heal-over-time effect on the
@@ -110,6 +124,7 @@ func TestGameClientLinkUseHealingPotionAppliesAndConsumes(t *testing.T) {
 	readInventoryUpdate(t, c, objectID, 4)
 	readMagicSkillUseSelf(t, c, live.ObjectID(), 2031, 1)
 	assertSystemMessageSkillFrame(t, c.read(), serverpackets.SystemMessageUseS1, 2031, 1)
+	readShortBuffStatusUpdateFrame(t, c, 2031, 1, 14)
 
 	effects := live.EffectList().All()
 	if len(effects) == 0 || effects[0].Skill.ID != 2031 {

@@ -427,7 +427,7 @@ func testItemTemplates() *item.Table {
 			Tradable:       true,
 			Destroyable:    true,
 			Depositable:    true,
-			EtcItem:        &item.EtcItemDetail{Type: item.EtcItemPotion, Handler: "ItemSkills", ReuseDelay: 2000},
+			EtcItem:        &item.EtcItemDetail{Type: item.EtcItemPotion, Handler: "ItemSkills", ReuseDelay: 2000, SharedReuseGroup: -1},
 			AttachedSkills: []item.SkillRef{{ID: 2279, Level: 2}},
 		},
 	})
