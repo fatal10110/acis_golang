@@ -244,7 +244,10 @@ func (c *Character) secondaryShieldEquipped() bool {
 		return false
 	}
 	tmpl, ok := c.inventory.Templates().Get(inst.TemplateID)
-	return ok && tmpl != nil && tmpl.Kind == item.KindArmor && tmpl.Armor != nil
+	return ok && tmpl != nil &&
+		tmpl.Kind == item.KindArmor &&
+		tmpl.Armor != nil &&
+		tmpl.Armor.Type == item.ArmorShield
 }
 
 func (c *Character) facing(caster any, degrees int) bool {

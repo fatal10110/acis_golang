@@ -630,6 +630,14 @@ func TestCharacterShieldDefenseGatesEquipStatsAndFacing(t *testing.T) {
 			def:       def,
 		},
 		{
+			name:      "left hand armor is not a shield",
+			equipped:  []*item.Instance{equippedLightArmor()},
+			rate:      20,
+			angle:     120,
+			casterLoc: location.Location{X: 80, Y: 0, Z: 0},
+			def:       def,
+		},
+		{
 			name:      "zero shield rate",
 			equipped:  []*item.Instance{equippedShield()},
 			angle:     120,
@@ -683,6 +691,7 @@ func shieldDefenseItems() *item.Table {
 		{ID: 2, Kind: item.KindWeapon, Slot: item.SlotRHand, Weapon: &item.WeaponDetail{Type: item.WeaponSword}},
 		{ID: 3, Kind: item.KindArmor, Slot: item.SlotLHand, Armor: &item.ArmorDetail{Type: item.ArmorShield}},
 		{ID: 4, Kind: item.KindEtcItem, Slot: item.SlotLHand, EtcItem: &item.EtcItemDetail{Type: item.EtcItemArrow}},
+		{ID: 5, Kind: item.KindArmor, Slot: item.SlotLHand, Armor: &item.ArmorDetail{Type: item.ArmorLight}},
 	})
 }
 
@@ -692,6 +701,10 @@ func equippedShield() *item.Instance {
 
 func equippedArrow() *item.Instance {
 	return &item.Instance{ObjectID: 40, TemplateID: 4, Location: item.LocationPaperdoll, LocationData: itemcontainer.LHand}
+}
+
+func equippedLightArmor() *item.Instance {
+	return &item.Instance{ObjectID: 50, TemplateID: 5, Location: item.LocationPaperdoll, LocationData: itemcontainer.LHand}
 }
 
 func closeFloat(a, b float64) bool {
