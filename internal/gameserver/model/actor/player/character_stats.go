@@ -15,6 +15,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/statbonus"
 )
 
+const perfectShieldBlockRate = 5
+
 func (c *Character) statCalc(s stat.Stat) *basefunc.Calculator {
 	c.statMu.Lock()
 	defer c.statMu.Unlock()
@@ -213,6 +215,52 @@ func (c *Character) WIT() int { return characterStatActor{c: c}.WIT() }
 func (c *Character) MEN() int { return characterStatActor{c: c}.MEN() }
 
 func (c *Character) LevelMod() float64 { return characterStatActor{c: c}.LevelMod() }
+
+// ShieldDefense resolves c's shield-block outcome against an incoming skill.
+func (c *Character) ShieldDefense(caster any, def modelskill.Definition, isCrit bool) formulas.ShieldDefense {
+	if def.IgnoreShield || !c.secondaryShieldEquipped() {
+		return formulas.ShieldFailed
+	}
+
+	baseRate := c.calcStat(stat.ShieldRate, 0)
+	if baseRate == 0 {
+		return formulas.ShieldFailed
+	}
+
+	degrees := int(c.calcStat(stat.ShieldDefenceAngle, 120))
+	if degrees < 360 && !c.facing(caster, degrees) {
+		return formulas.ShieldFailed
+	}
+
+	return formulas.ShieldUse(baseRate, c.DEX(), attackerUsesBow(caster), isCrit, perfectShieldBlockRate, c.rollValue(100))
+}
+
+func (c *Character) secondaryShieldEquipped() bool {
+	if c.inventory == nil {
+		return false
+	}
+	inst := c.inventory.ItemAt(itemcontainer.LHand)
+	if inst == nil {
+		return false
+	}
+	tmpl, ok := c.inventory.Templates().Get(inst.TemplateID)
+	return ok && tmpl != nil && tmpl.Kind == item.KindArmor && tmpl.Armor != nil
+}
+
+func (c *Character) facing(caster any, degrees int) bool {
+	other, ok := caster.(interface{ Position() (int, int, int) })
+	if !ok {
+		return false
+	}
+	x, y, z := other.Position()
+	targetFacing := location.OrientedLocation{Location: c.CurrentLocation(), Heading: c.CurrentHeading()}
+	return targetFacing.IsFacing(location.Location{X: x, Y: y, Z: z}, degrees)
+}
+
+func attackerUsesBow(caster any) bool {
+	attacker, ok := caster.(interface{ AttackType() item.WeaponType })
+	return ok && attacker.AttackType() == item.WeaponBow
+}
 
 // MAtk returns the current magic attack value.
 func (c *Character) MAtk() float64 {
@@ -518,6 +566,41 @@ func (c *Character) ManaDamageInput(caster any, def modelskill.Definition) (form
 		BlessedSoulShot: bsps,
 		VulnMul:         c.skillVulnerability(def.SkillType, def),
 	}, true
+}
+
+// LethalRate returns c's lethal-strike rate multiplier.
+func (c *Character) LethalRate() float64 {
+	return c.calcStat(stat.LethalRate, 1)
+}
+
+// LethalInput resolves a lethal-strike roll against c.
+func (c *Character) LethalInput(caster any, def modelskill.Definition) (formulas.LethalInput, bool) {
+	attacker, ok := caster.(interface {
+		Level() int
+		LethalRate() float64
+	})
+	if !ok {
+		return formulas.LethalInput{}, false
+	}
+	return formulas.LethalInput{
+		Chance1:       def.LethalChance1,
+		Chance2:       def.LethalChance2,
+		MagicLevel:    def.MagicLevel,
+		AttackerLevel: attacker.Level(),
+		TargetLevel:   c.Level(),
+		LethalMul:     attacker.LethalRate(),
+	}, true
+}
+
+// ApplyLethalOutcome applies a lethal-strike tier to c.
+func (c *Character) ApplyLethalOutcome(outcome formulas.LethalOutcome, _ any, _ modelskill.Definition) {
+	switch outcome {
+	case formulas.LethalFull:
+		c.SetHP(1)
+		c.SetCP(1)
+	case formulas.LethalHalf:
+		c.SetCP(1)
+	}
 }
 
 func (c *Character) elementalSkillModifier(def modelskill.Definition) float64 {

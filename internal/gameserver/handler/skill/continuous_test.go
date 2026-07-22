@@ -99,6 +99,13 @@ func buffEffect() []modelskill.EffectTemplate {
 	return []modelskill.EffectTemplate{{Name: "Buff", Time: 600}}
 }
 
+type continuousDefinitions map[modelskill.Ref]modelskill.Definition
+
+func (d continuousDefinitions) Definition(ref modelskill.Ref) (modelskill.Definition, bool) {
+	def, ok := d[ref]
+	return def, ok
+}
+
 func TestContinuousBuffLandsOnCleanTarget(t *testing.T) {
 	registry := NewDefaultRegistry()
 	target := newContinuousFake(2)
@@ -111,6 +118,41 @@ func TestContinuousBuffLandsOnCleanTarget(t *testing.T) {
 
 	if got := len(target.list.All()); got != 1 {
 		t.Fatalf("effect list = %d, want 1 landed buff", got)
+	}
+}
+
+func TestContinuousAppliesReferencedEffectSkill(t *testing.T) {
+	for _, tt := range []struct {
+		name        string
+		effectLevel int
+		wantLevel   int
+	}{
+		{name: "fallback", effectLevel: 0, wantLevel: 1},
+		{name: "explicit", effectLevel: 2, wantLevel: 2},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			registry := NewDefaultRegistryWithDefinitions(continuousDefinitions{
+				{ID: 5123, Level: tt.wantLevel}: {
+					ID: 5123, Level: tt.wantLevel, SkillType: "BUFF",
+					Effects: buffEffect(),
+				},
+			})
+			target := newContinuousFake(2)
+
+			registry.Use(Cast{
+				Caster: newContinuousFake(1),
+				Skill: modelskill.Definition{
+					ID: 454, Level: 1, SkillType: "BUFF",
+					EffectID: 5123, EffectLevel: tt.effectLevel,
+				},
+				Targets: []any{target},
+			})
+
+			effects := target.list.All()
+			if len(effects) != 1 || effects[0].Skill.ID != 5123 || effects[0].Skill.Level != tt.wantLevel {
+				t.Fatalf("effects = %+v, want one effect from skill 5123 level %d", effects, tt.wantLevel)
+			}
+		})
 	}
 }
 
@@ -292,6 +334,24 @@ func TestContinuousDebuffFailRollDoesNotLand(t *testing.T) {
 
 	if got := len(target.list.All()); got != 0 {
 		t.Fatalf("effect list = %d, want 0 (failed landing roll applies nothing)", got)
+	}
+}
+
+func TestContinuousDebuffFailRollReportsAttackFailed(t *testing.T) {
+	registry := NewDefaultRegistry()
+	target := newContinuousFake(2)
+	target.successInput = formulas.SkillSuccessInput{IgnoreResists: true, BaseChance: 0}
+
+	result, ok := registry.UseResult(Cast{
+		Caster:  newContinuousFake(1),
+		Skill:   modelskill.Definition{SkillType: "DEBUFF", Debuff: true, Effects: buffEffect()},
+		Targets: []any{target},
+	})
+	if !ok {
+		t.Fatal("UseResult() handled = false, want true for DEBUFF")
+	}
+	if result.AttackFailed != 1 {
+		t.Fatalf("AttackFailed = %d, want 1", result.AttackFailed)
 	}
 }
 

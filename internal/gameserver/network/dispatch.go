@@ -181,7 +181,7 @@ func NewGameClientLink(
 		trades:                   tradebook.NewBook(time.Now),
 		enchantState:             enchantflow.NewState(),
 		targets:                  skilltarget.NewRegistry(skilltarget.WorldKnown{State: worldState}),
-		skillHandlers:            handlerskill.NewDefaultRegistry(),
+		skillHandlers:            handlerskill.NewDefaultRegistryWithDefinitions(skills),
 		log:                      log,
 		newCipherKey:             randomCipherKey,
 	}

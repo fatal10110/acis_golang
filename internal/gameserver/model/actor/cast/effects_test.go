@@ -56,17 +56,38 @@ func (k effectsKnown) ForEachKnownCreatureInRadius(anchor skilltarget.Creature, 
 type recordingSkillHandler struct {
 	skillTypes []string
 	calls      []handlerskill.Cast
+	result     handlerskill.Result
 }
 
 func (h *recordingSkillHandler) Types() []string { return h.skillTypes }
 
 func (h *recordingSkillHandler) Use(c handlerskill.Cast) { h.calls = append(h.calls, c) }
 
+func (h *recordingSkillHandler) UseResult(c handlerskill.Cast) handlerskill.Result {
+	h.Use(c)
+	return h.result
+}
+
 func newEffectHandlers(known skilltarget.Known, skillType string, rec *recordingSkillHandler) EffectHandlers {
 	rec.skillTypes = []string{skillType}
 	return EffectHandlers{
 		Targets: skilltarget.NewRegistry(known),
 		Skills:  handlerskill.NewRegistry(rec),
+	}
+}
+
+func TestApplyEffectsResultCarriesSkillHandlerAttackFailed(t *testing.T) {
+	caster := &effectsActor{id: 1, category: skilltarget.CategoryPlayable}
+	rec := &recordingSkillHandler{result: handlerskill.Result{AttackFailed: 2}}
+	handlers := newEffectHandlers(effectsKnown{}, "DUMMY", rec)
+	def := modelskill.Definition{ID: 99, Target: modelskill.TargetSelf, SkillType: "DUMMY"}
+
+	result := ApplyEffectsResult(handlers, caster, caster, def)
+	if !result.Handled {
+		t.Fatal("ApplyEffectsResult() handled = false, want true")
+	}
+	if result.AttackFailed != 2 {
+		t.Fatalf("AttackFailed = %d, want 2", result.AttackFailed)
 	}
 }
 

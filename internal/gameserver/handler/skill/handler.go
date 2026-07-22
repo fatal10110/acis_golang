@@ -15,10 +15,24 @@ type Cast struct {
 	Item    any
 }
 
+// Definitions resolves loaded skill definitions.
+type Definitions interface {
+	Definition(modelskill.Ref) (modelskill.Definition, bool)
+}
+
 // Handler applies one skill action to already-resolved targets.
 type Handler interface {
 	Types() []string
 	Use(Cast)
+}
+
+// Result reports caster-visible outcomes produced while a skill handler ran.
+type Result struct {
+	AttackFailed int
+}
+
+type resultHandler interface {
+	UseResult(Cast) Result
 }
 
 // Registry maps skill type names to their handlers.
@@ -38,6 +52,12 @@ func NewRegistry(handlers ...Handler) *Registry {
 // NewDefaultRegistry returns the representative handlers that currently have
 // enough surrounding model support to run deterministically.
 func NewDefaultRegistry() *Registry {
+	return NewDefaultRegistryWithDefinitions(nil)
+}
+
+// NewDefaultRegistryWithDefinitions returns the default handlers, providing
+// loaded skill definitions to handlers that need cross-skill effect lookup.
+func NewDefaultRegistryWithDefinitions(defs Definitions) *Registry {
 	return NewRegistry(
 		pdamHandler{},
 		mdamHandler{},
@@ -65,7 +85,7 @@ func NewDefaultRegistry() *Registry {
 		harvestHandler{},
 		spoilHandler{},
 		sweepHandler{},
-		continuousHandler{},
+		continuousHandler{defs: defs},
 	)
 }
 
@@ -96,12 +116,21 @@ func (r *Registry) Handler(skillType string) (Handler, bool) {
 
 // Use dispatches cast to the handler registered for cast.Skill.SkillType.
 func (r *Registry) Use(cast Cast) bool {
+	_, ok := r.UseResult(cast)
+	return ok
+}
+
+// UseResult dispatches cast and returns any caster-visible handler result.
+func (r *Registry) UseResult(cast Cast) (Result, bool) {
 	h, ok := r.Handler(cast.Skill.SkillType)
 	if !ok {
-		return false
+		return Result{}, false
+	}
+	if rh, ok := h.(resultHandler); ok {
+		return rh.UseResult(cast), true
 	}
 	h.Use(cast)
-	return true
+	return Result{}, true
 }
 
 func skillTypeKey(skillType string) string {
