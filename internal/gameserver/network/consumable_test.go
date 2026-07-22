@@ -3,6 +3,7 @@ package network
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -146,6 +147,95 @@ func TestGameClientLinkUseHealingPotionAppliesAndConsumes(t *testing.T) {
 
 	if got := live.Inventory().ItemByObjectID(objectID).Snapshot().Count; got != 4 {
 		t.Fatalf("stack count after rejected reuse = %d, want 4 (unchanged)", got)
+	}
+}
+
+// TestGameClientLinkUseHealingPotionRejectsFlyingCondition verifies the
+// item-window path checks a potion's item-level use condition before
+// dispatching to the consumable handler. Lesser Healing Potion is rejected
+// while flying and the stack remains untouched.
+func TestGameClientLinkUseHealingPotionRejectsFlyingCondition(t *testing.T) {
+	skills := consumableSkillTable(t)
+	const potionTemplate int32 = 1060
+	const objectID int32 = 702
+	c, chars, _, state := newLinkedGameClientWithSkillsSeed(t, skills, func(chars *fakeCharStore, items *fakeItemStore) {
+		objID := seedSelectableCharacter(t, chars, "player1", "Newbie", 5, 0)
+		if err := items.Create(context.Background(), objID, item.Instance{
+			ObjectID: objectID, TemplateID: potionTemplate, OwnerID: objID,
+			Count: 5, Location: item.LocationInventory, ManaLeft: -1,
+		}); err != nil {
+			t.Fatalf("seed potion: %v", err)
+		}
+	}, 1)
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	obj, ok := state.Player(chars.soleObjectID(t))
+	if !ok {
+		t.Fatal("player not in world state after enter")
+	}
+	live, ok := obj.(*livePlayer)
+	if !ok {
+		t.Fatal("world player is not a *livePlayer")
+	}
+	live.SetFlying(true)
+
+	c.send(encodeUseItem(objectID, false))
+	assertSystemMessageItemFrame(t, c.read(), serverpackets.SystemMessageS1CannotBeUsed, potionTemplate)
+
+	if got := live.Inventory().ItemByObjectID(objectID).Snapshot().Count; got != 5 {
+		t.Fatalf("stack count after flying-condition rejection = %d, want 5 (unchanged)", got)
+	}
+	if effects := live.EffectList().All(); len(effects) != 0 {
+		t.Fatalf("flying-condition rejection installed effects = %+v, want none", effects)
+	}
+}
+
+// TestGameClientLinkUseDisabledPotionRejectsBeforeConsume verifies the
+// item-window path honors per-item reuse disables before the consumable
+// handler can consume from the stack.
+func TestGameClientLinkUseDisabledPotionRejectsBeforeConsume(t *testing.T) {
+	skills := consumableSkillTable(t)
+	const potionTemplate int32 = 1060
+	const objectID int32 = 703
+	c, chars, _, state := newLinkedGameClientWithSkillsSeed(t, skills, func(chars *fakeCharStore, items *fakeItemStore) {
+		objID := seedSelectableCharacter(t, chars, "player1", "Newbie", 5, 0)
+		if err := items.Create(context.Background(), objID, item.Instance{
+			ObjectID: objectID, TemplateID: potionTemplate, OwnerID: objID,
+			Count: 5, Location: item.LocationInventory, ManaLeft: -1,
+		}); err != nil {
+			t.Fatalf("seed potion: %v", err)
+		}
+	}, 1)
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	obj, ok := state.Player(chars.soleObjectID(t))
+	if !ok {
+		t.Fatal("player not in world state after enter")
+	}
+	live, ok := obj.(*livePlayer)
+	if !ok {
+		t.Fatal("world player is not a *livePlayer")
+	}
+	live.DisableItem(objectID, time.Minute)
+
+	c.send(encodeUseItem(objectID, false))
+	assertSystemMessageSkillFrame(t, c.read(), serverpackets.SystemMessageS1PreparedForReuse, 2031, 1)
+	if reply := c.read(); reply[0] != serverpackets.OpcodeActionFailed {
+		t.Fatalf("disabled-item follow-up opcode = %#x, want ActionFailed (%#x)", reply[0], serverpackets.OpcodeActionFailed)
+	}
+
+	if got := live.Inventory().ItemByObjectID(objectID).Snapshot().Count; got != 5 {
+		t.Fatalf("stack count after disabled-item rejection = %d, want 5 (unchanged)", got)
 	}
 }
 

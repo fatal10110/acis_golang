@@ -9,6 +9,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 )
 
+const useConditionCannotUseItemMessageID int32 = 113
+
 // itemFile is the root element of one item template XML file: a flat list
 // of <item> elements.
 type itemFile struct {
@@ -160,6 +162,7 @@ func buildItemTemplate(el itemElement) (*item.Template, error) {
 		}
 		useConditions = append(useConditions, uc)
 	}
+	useConditions = append(useConditions, buildUseConditionsFromSet(set.GetStringDefault("use_condition", ""))...)
 	if useConditions != nil {
 		set.Set("useConditions", useConditions)
 	}
@@ -195,6 +198,34 @@ func buildUseCondition(id string, attrs []xml.Attr, children []condNode) (item.U
 		return item.UseCondition{}, fmt.Errorf("item %s: %w", id, err)
 	}
 	return uc, nil
+}
+
+func buildUseConditionsFromSet(raw string) []item.UseCondition {
+	lower := strings.ToLower(raw)
+	if !strings.Contains(lower, "uc_transmode_exclude") {
+		return nil
+	}
+
+	var children []item.Condition
+	if strings.Contains(lower, "tt_flying") {
+		children = append(children, item.Condition{Kind: "player", Attrs: map[string]string{"flying": "False"}})
+	}
+	if strings.Contains(lower, "tt_pure_stat") {
+		children = append(children, item.Condition{Kind: "player", Attrs: map[string]string{"transformed": "False"}})
+	}
+	if len(children) == 0 {
+		return nil
+	}
+
+	root := children[0]
+	if len(children) > 1 {
+		root = item.Condition{Kind: "and", Children: children}
+	}
+	return []item.UseCondition{{
+		Root:      root,
+		MessageID: useConditionCannotUseItemMessageID,
+		AddName:   true,
+	}}
 }
 
 // buildCondition converts one decoded condition node into an item.Condition,
