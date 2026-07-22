@@ -5,6 +5,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
@@ -159,6 +160,44 @@ func TestStunAppliesOnGuaranteedSuccess(t *testing.T) {
 	}
 }
 
+func TestControlDisablersApplyToHostileNPC(t *testing.T) {
+	registry := NewDefaultRegistry()
+	tests := []struct {
+		skillType  string
+		effectName string
+	}{
+		{skillType: "STUN", effectName: "Stun"},
+		{skillType: "ROOT", effectName: "Root"},
+		{skillType: "SLEEP", effectName: "Sleep"},
+		{skillType: "PARALYZE", effectName: "Paralyze"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.skillType, func(t *testing.T) {
+			target := newDisablerHostile(t, 100)
+
+			registry.Use(Cast{
+				Caster: &bssCasterFake{},
+				Skill: modelskill.Definition{
+					SkillType:     tt.skillType,
+					EffectType:    tt.skillType,
+					BaseLandRate:  100,
+					IgnoreResists: true,
+					Effects: []modelskill.EffectTemplate{{
+						Name: tt.effectName,
+						Time: 10,
+					}},
+				},
+				Targets: []any{target},
+			})
+
+			if len(target.EffectList().All()) != 1 {
+				t.Fatalf("%s should apply its effect to a hostile NPC target", tt.skillType)
+			}
+		})
+	}
+}
+
 func TestCancelDebuffStripsOnlyDispellableDebuffsUpToLimit(t *testing.T) {
 	registry := NewDefaultRegistry()
 	target := newDisablerFake(1)
@@ -265,6 +304,58 @@ func TestAggRemoveClearsBothTablesOnSuccess(t *testing.T) {
 type bssCasterFake struct{ bss bool }
 
 func (c *bssCasterFake) BlessedSpiritshotCharged() bool { return c.bss }
+
+func newDisablerHostile(t testing.TB, id int32) *npc.Hostile {
+	t.Helper()
+	live, err := creature.NewLive(location.Location{}, 100, disablerHostileGeo{}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h, err := npc.NewHostile(&npc.Instance{
+		ObjectID: id,
+		Kind:     "Monster",
+		Template: &npc.Template{
+			ID:              int(id),
+			Type:            "Monster",
+			Level:           1,
+			CON:             40,
+			MEN:             40,
+			HPMax:           100,
+			MAtk:            1,
+			MDef:            1,
+			BaseAttackRange: 40,
+			CanMove:         true,
+		},
+	}, live, disablerHostileMove{}, disablerHostileAttack{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return h
+}
+
+type disablerHostileGeo struct{}
+
+func (disablerHostileGeo) CanMove(_, _, _, _, _, _ int) bool { return true }
+func (disablerHostileGeo) Height(_, _, _ int) int16          { return 0 }
+func (disablerHostileGeo) FindPath(_, _ location.Location) ([]location.Location, bool) {
+	return nil, false
+}
+func (disablerHostileGeo) ValidLocation(ox, oy, oz, _, _, _ int) location.Location {
+	return location.Location{X: ox, Y: oy, Z: oz}
+}
+
+type disablerHostileMove struct{}
+
+func (disablerHostileMove) MaybeStartOffensiveFollow(attackable.Combatant, int) bool { return false }
+func (disablerHostileMove) MoveHome(location.Location)                               {}
+func (disablerHostileMove) Stop()                                                    {}
+
+type disablerHostileAttack struct{}
+
+func (disablerHostileAttack) BowCoolingDown() bool                { return false }
+func (disablerHostileAttack) AttackingNow() bool                  { return false }
+func (disablerHostileAttack) CanAttack(attackable.Combatant) bool { return false }
+func (disablerHostileAttack) DoAttack(attackable.Combatant)       {}
 
 func TestCheckSkillSuccessFailsOnPerfectShieldBlockDespiteGuaranteedRate(t *testing.T) {
 	registry := NewDefaultRegistry()
