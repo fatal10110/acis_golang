@@ -24,6 +24,19 @@ func (l OrientedLocation) IsInFrontOf(other Location) bool {
 	return angleClose(angleHeading-angleOther, 60)
 }
 
+// IsFacing reports whether other is inside l's forward-facing angle.
+func (l OrientedLocation) IsFacing(other Location, degrees int) bool {
+	if degrees >= 360 {
+		return true
+	}
+	if degrees <= 0 {
+		return false
+	}
+	angleOther := angleFrom(l.X, l.Y, other.X, other.Y)
+	angleHeading := headingDegrees(l.Heading)
+	return angleClose(angleHeading-angleOther, float64(degrees)/2)
+}
+
 func angleFrom(x1, y1, x2, y2 int) float64 {
 	angle := math.Atan2(float64(y2-y1), float64(x2-x1)) * 180 / math.Pi
 	if angle < 0 {

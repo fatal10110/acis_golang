@@ -4,9 +4,16 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
 // disablerFake is a Combatant (for the hate-table skill types) that also
@@ -275,6 +282,94 @@ func TestCheckSkillSuccessFailsOnPerfectShieldBlockDespiteGuaranteedRate(t *test
 	if target.lastShield != formulas.ShieldPerfect {
 		t.Fatalf("lastShield = %v, want ShieldPerfect", target.lastShield)
 	}
+}
+
+func TestCheckSkillSuccessUsesLivePlayerShieldDefense(t *testing.T) {
+	registry := NewDefaultRegistry()
+	items := liveShieldItems()
+	caster := liveShieldCharacter(t, 1, items)
+	unblocked := liveShieldCharacter(t, 2, items)
+	blocked := liveShieldCharacter(t, 3, items, &item.Instance{
+		ObjectID: 30, TemplateID: 3, Location: item.LocationPaperdoll, LocationData: itemcontainer.LHand,
+	})
+	caster.SetLastKnownPosition(location.Location{X: 80, Y: 0, Z: 0}, 0)
+	for _, target := range []*player.Character{unblocked, blocked} {
+		target.SetLastKnownPosition(location.Location{X: 0, Y: 0, Z: 0}, 0)
+		target.AddStatFuncs([]basefunc.Func{
+			basefunc.NewSet(target, stat.ShieldRate, 20, nil),
+			basefunc.NewSet(target, stat.ShieldDefenceAngle, 120, nil),
+		})
+	}
+	blocked.SetRollSource(func(n int) int {
+		if n != 100 {
+			t.Fatalf("shield roll bound = %d, want 100", n)
+		}
+		return 0
+	})
+
+	skill := modelskill.Definition{
+		SkillType:     "STUN",
+		EffectType:    "STUN",
+		BaseLandRate:  100,
+		IgnoreResists: true,
+		Effects:       []modelskill.EffectTemplate{{Name: "Stun", Time: 10}},
+	}
+	registry.Use(Cast{Caster: caster, Skill: skill, Targets: []any{unblocked}})
+	if got := len(unblocked.EffectList().All()); got != 1 {
+		t.Fatalf("unblocked target effects = %d, want 1", got)
+	}
+
+	registry.Use(Cast{Caster: caster, Skill: skill, Targets: []any{blocked}})
+	if got := len(blocked.EffectList().All()); got != 0 {
+		t.Fatalf("perfect-shield-blocked target effects = %d, want 0", got)
+	}
+}
+
+type liveShieldGeo struct{}
+
+func (liveShieldGeo) CanMove(_, _, _, _, _, _ int) bool { return true }
+func (liveShieldGeo) Height(_, _, _ int) int16          { return 0 }
+func (liveShieldGeo) FindPath(_, _ location.Location) ([]location.Location, bool) {
+	return nil, false
+}
+func (liveShieldGeo) ValidLocation(ox, oy, oz, _, _, _ int) location.Location {
+	return location.Location{X: ox, Y: oy, Z: oz}
+}
+
+func liveShieldItems() *item.Table {
+	return item.NewTable([]*item.Template{
+		{ID: 1, Kind: item.KindWeapon, Slot: item.SlotRHand, Weapon: &item.WeaponDetail{Type: item.WeaponFist}},
+		{ID: 3, Kind: item.KindArmor, Slot: item.SlotLHand, Armor: &item.ArmorDetail{Type: item.ArmorShield}},
+	})
+}
+
+func liveShieldTemplate() *player.Template {
+	return &player.Template{
+		ID: 0, FistsItemID: 1,
+		STR: 40, CON: 43, DEX: 30, INT: 21, WIT: 11, MEN: 25,
+		PAtk: 5, PDef: 50, MAtk: 25, MDef: 40,
+		CollisionRadius: 9, CollisionHeight: 23,
+		HPTable: []float64{100}, MPTable: []float64{30}, CPTable: []float64{0},
+	}
+}
+
+func liveShieldCharacter(t *testing.T, id int32, items *item.Table, equipped ...*item.Instance) *player.Character {
+	t.Helper()
+	tmpl := liveShieldTemplate()
+	c := &player.Character{
+		ID: id, Name: "char", ClassID: tmpl.ID, BaseClassID: tmpl.ID,
+		Race: player.RaceHuman, Sex: player.SexMale, CharLevel: 1,
+		Location: location.Location{X: int(id) * 100, Y: 0, Z: 0},
+	}
+	c.SetResourceValues(player.Resources{MaxHP: 100, CurrentHP: 100, MaxMP: 30, CurrentMP: 30})
+	c.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventory(c.ID, items, equipped))
+	live, err := creature.NewLive(c.Location, 0, liveShieldGeo{}, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.Live = live
+	c.SetRollSource(func(int) int { return 99 })
+	return c
 }
 
 func TestCheckSkillSuccessResolvesCasterBlessedSpiritshotCharge(t *testing.T) {
