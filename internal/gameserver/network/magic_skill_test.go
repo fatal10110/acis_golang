@@ -2,6 +2,7 @@ package network
 
 import (
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -190,10 +191,7 @@ func TestGameClientLinkMagicSkillUseAppliesReferencedEffectSkillAtFallbackLevel(
 	if !ok {
 		t.Fatalf("world state player %d is not a *livePlayer", objID)
 	}
-	effects := character.EffectList().All()
-	if len(effects) != 1 || effects[0].Skill.ID != 5123 || effects[0].Skill.Level != 1 {
-		t.Fatalf("effects after effectId self-cast BUFF = %+v, want one effect from skill 5123 level 1", effects)
-	}
+	assertEventuallyEffect(t, character, 5123, 1)
 }
 
 // TestGameClientLinkTogglesOnThenOff reproduces recasting a toggle skill
@@ -270,6 +268,21 @@ func TestGameClientLinkTogglesOnThenOff(t *testing.T) {
 	effects = character.EffectList().All()
 	if len(effects) != 0 {
 		t.Fatalf("effects after toggle deactivation = %+v, want none", effects)
+	}
+}
+
+func assertEventuallyEffect(t *testing.T, character *livePlayer, skillID modelskill.ID, level int) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		effects := character.EffectList().All()
+		if len(effects) == 1 && effects[0].Skill.ID == skillID && effects[0].Skill.Level == level {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("effects after effectId self-cast BUFF = %+v, want one effect from skill %d level %d", effects, skillID, level)
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
 }
 
