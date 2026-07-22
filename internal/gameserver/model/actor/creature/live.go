@@ -137,6 +137,11 @@ func (l *Live) SetParalyzed(v bool) bool {
 	return true
 }
 
+// Invul reports whether this creature is currently invulnerable.
+func (l *Live) Invul() bool {
+	return false
+}
+
 // Immobilized reports whether this creature's movement-lock flag is set.
 func (l *Live) Immobilized() bool {
 	if l == nil {

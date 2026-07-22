@@ -12,8 +12,6 @@
 // values, and defers wiring it to real actors until that actor exists.
 //
 // Not covered here, left for whoever wires up per-skill data: the land
-// chance for a blow-type skill's critical hit (BlowDamage computes its
-// damage once it's known to land) and the lethal-strike proc chance, both
-// of which need skill-configured base rates this package has no model for
-// yet.
+// chance for a blow-type skill's critical hit. BlowDamage computes its
+// damage once it's known to land.
 package formulas

@@ -15,6 +15,11 @@ type Cast struct {
 	Item    any
 }
 
+// Definitions resolves loaded skill definitions.
+type Definitions interface {
+	Definition(modelskill.Ref) (modelskill.Definition, bool)
+}
+
 // Handler applies one skill action to already-resolved targets.
 type Handler interface {
 	Types() []string
@@ -38,6 +43,12 @@ func NewRegistry(handlers ...Handler) *Registry {
 // NewDefaultRegistry returns the representative handlers that currently have
 // enough surrounding model support to run deterministically.
 func NewDefaultRegistry() *Registry {
+	return NewDefaultRegistryWithDefinitions(nil)
+}
+
+// NewDefaultRegistryWithDefinitions returns the default handlers, providing
+// loaded skill definitions to handlers that need cross-skill effect lookup.
+func NewDefaultRegistryWithDefinitions(defs Definitions) *Registry {
 	return NewRegistry(
 		pdamHandler{},
 		mdamHandler{},
@@ -65,7 +76,7 @@ func NewDefaultRegistry() *Registry {
 		harvestHandler{},
 		spoilHandler{},
 		sweepHandler{},
-		continuousHandler{},
+		continuousHandler{defs: defs},
 	)
 }
 

@@ -1,6 +1,7 @@
 package skill
 
 import (
+	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 )
@@ -32,6 +33,23 @@ type manaDamageTarget interface {
 	ManaDamageInput(caster any, skill modelskill.Definition) (formulas.ManaDamageInput, bool)
 }
 
+type lethalTarget interface {
+	LethalInput(caster any, skill modelskill.Definition) (formulas.LethalInput, bool)
+	ApplyLethalOutcome(formulas.LethalOutcome, any, modelskill.Definition)
+}
+
+type lethalInvulnerableTarget interface {
+	Invulnerable() bool
+}
+
+type lethalInvulTarget interface {
+	Invul() bool
+}
+
+type lethalableTarget interface {
+	Lethalable() bool
+}
+
 type pdamHandler struct{}
 
 func (pdamHandler) Types() []string { return []string{"PDAM", "FATAL"} }
@@ -52,6 +70,7 @@ func (pdamHandler) Use(cast Cast) {
 		damage := formulas.PhysicalSkillDamage(in)
 		if damage > 0 {
 			target.ReduceHP(damage, cast.Caster, cast.Skill)
+			applyLethalHit(cast, target)
 		}
 	}
 }
@@ -100,6 +119,7 @@ func (blowHandler) Use(cast Cast) {
 		damage := int(formulas.BlowDamage(in))
 		if damage > 0 {
 			target.ReduceHP(float64(damage), cast.Caster, cast.Skill)
+			applyLethalHit(cast, target)
 		}
 	}
 }
@@ -128,5 +148,32 @@ func (manaDamageHandler) Use(cast Cast) {
 		if damage > 0 {
 			target.ReduceMP(damage)
 		}
+	}
+}
+
+func applyLethalHit(cast Cast, obj any) {
+	target, ok := obj.(lethalTarget)
+	if !ok {
+		return
+	}
+	if v, ok := obj.(lethalInvulnerableTarget); ok && v.Invulnerable() {
+		return
+	}
+	if v, ok := obj.(lethalInvulTarget); ok && v.Invul() {
+		return
+	}
+	if v, ok := obj.(raidRelatedTarget); ok && v.RaidRelated() {
+		return
+	}
+	if v, ok := obj.(lethalableTarget); ok && !v.Lethalable() {
+		return
+	}
+	in, ok := target.LethalInput(cast.Caster, cast.Skill)
+	if !ok {
+		return
+	}
+	outcome := formulas.LethalHit(in, rnd.Get)
+	if outcome != formulas.LethalNone {
+		target.ApplyLethalOutcome(outcome, cast.Caster, cast.Skill)
 	}
 }
