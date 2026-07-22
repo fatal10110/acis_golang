@@ -15,6 +15,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/statbonus"
 )
 
+const perfectShieldBlockRate = 5
+
 func (c *Character) statCalc(s stat.Stat) *basefunc.Calculator {
 	c.statMu.Lock()
 	defer c.statMu.Unlock()
@@ -213,6 +215,52 @@ func (c *Character) WIT() int { return characterStatActor{c: c}.WIT() }
 func (c *Character) MEN() int { return characterStatActor{c: c}.MEN() }
 
 func (c *Character) LevelMod() float64 { return characterStatActor{c: c}.LevelMod() }
+
+// ShieldDefense resolves c's shield-block outcome against an incoming skill.
+func (c *Character) ShieldDefense(caster any, def modelskill.Definition, isCrit bool) formulas.ShieldDefense {
+	if def.IgnoreShield || !c.secondaryShieldEquipped() {
+		return formulas.ShieldFailed
+	}
+
+	baseRate := c.calcStat(stat.ShieldRate, 0)
+	if baseRate == 0 {
+		return formulas.ShieldFailed
+	}
+
+	degrees := int(c.calcStat(stat.ShieldDefenceAngle, 120))
+	if degrees < 360 && !c.facing(caster, degrees) {
+		return formulas.ShieldFailed
+	}
+
+	return formulas.ShieldUse(baseRate, c.DEX(), attackerUsesBow(caster), isCrit, perfectShieldBlockRate, c.rollValue(100))
+}
+
+func (c *Character) secondaryShieldEquipped() bool {
+	if c.inventory == nil {
+		return false
+	}
+	inst := c.inventory.ItemAt(itemcontainer.LHand)
+	if inst == nil {
+		return false
+	}
+	tmpl, ok := c.inventory.Templates().Get(inst.TemplateID)
+	return ok && tmpl != nil && tmpl.Kind == item.KindArmor && tmpl.Armor != nil
+}
+
+func (c *Character) facing(caster any, degrees int) bool {
+	other, ok := caster.(interface{ Position() (int, int, int) })
+	if !ok {
+		return false
+	}
+	x, y, z := other.Position()
+	targetFacing := location.OrientedLocation{Location: c.CurrentLocation(), Heading: c.CurrentHeading()}
+	return targetFacing.IsFacing(location.Location{X: x, Y: y, Z: z}, degrees)
+}
+
+func attackerUsesBow(caster any) bool {
+	attacker, ok := caster.(interface{ AttackType() item.WeaponType })
+	return ok && attacker.AttackType() == item.WeaponBow
+}
 
 // MAtk returns the current magic attack value.
 func (c *Character) MAtk() float64 {

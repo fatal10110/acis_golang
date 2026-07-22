@@ -15,10 +15,11 @@ type Live struct {
 	movement move.CreatureMove
 	effects  *effect.List
 
-	// stateMu guards paralyzed and immobilized.
+	// stateMu guards paralyzed, immobilized and teleporting.
 	stateMu     sync.RWMutex
 	paralyzed   bool
 	immobilized bool
+	teleporting bool
 }
 
 // NewLive creates runtime state at origin with speed and geodata-bound
@@ -98,6 +99,15 @@ func (l *Live) Afraid() bool {
 	return l.effects.IsAffected(effect.FlagFear)
 }
 
+// ImmobileUntilAttacked reports whether an active effect currently holds
+// this creature in place until it is attacked.
+func (l *Live) ImmobileUntilAttacked() bool {
+	if l == nil {
+		return false
+	}
+	return l.effects.IsAffected(effect.FlagMeditating)
+}
+
 // Paralyzed reports whether this creature is paralyzed, either by a
 // transient action lock (SetParalyzed) or by an active effect that carries
 // the paralyze flag.
@@ -154,5 +164,31 @@ func (l *Live) SetImmobilized(v bool) bool {
 		return false
 	}
 	l.immobilized = v
+	return true
+}
+
+// Teleporting reports whether this creature is in the client-visible
+// teleport transition.
+func (l *Live) Teleporting() bool {
+	if l == nil {
+		return false
+	}
+	l.stateMu.RLock()
+	defer l.stateMu.RUnlock()
+	return l.teleporting
+}
+
+// SetTeleporting sets or clears this creature's teleport transition flag
+// and reports whether it changed.
+func (l *Live) SetTeleporting(v bool) bool {
+	if l == nil {
+		return false
+	}
+	l.stateMu.Lock()
+	defer l.stateMu.Unlock()
+	if l.teleporting == v {
+		return false
+	}
+	l.teleporting = v
 	return true
 }
