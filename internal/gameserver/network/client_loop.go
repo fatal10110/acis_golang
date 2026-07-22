@@ -602,6 +602,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				continue
 			}
 			if live != nil {
+				live.SetTeleporting(false)
 				live.SendFrame(serverpackets.FrameUserInfo(serverpackets.UserInfoSnapshot{
 					Character: live.Character,
 					Template:  live.template,
