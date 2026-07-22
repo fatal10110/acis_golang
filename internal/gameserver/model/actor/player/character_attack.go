@@ -798,6 +798,20 @@ func (c *Character) rollValue(n int) int {
 	return rand.IntN(n)
 }
 
+// Roll draws a uniform random integer in [0, n) from c's combat random source.
+func (c *Character) Roll(n int) int {
+	return c.rollValue(n)
+}
+
+// RandomDamageSpread returns the active weapon's random-damage spread.
+func (c *Character) RandomDamageSpread() int {
+	weapon := c.activeWeapon()
+	if weapon.tmpl == nil || weapon.tmpl.Weapon == nil {
+		return 0
+	}
+	return int(weapon.tmpl.Weapon.RandomDamage)
+}
+
 var _ attack.PlayerActor = (*Character)(nil)
 var _ move.Actor = (*Character)(nil)
 var _ physicalTarget = (*Character)(nil)
