@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/fatal10110/acis_golang/internal/commons/scheduler"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
@@ -14,6 +15,13 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/worldobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
+
+// AI is the summon intention loop controlled by owner commands and effects.
+type AI interface {
+	TryToAttack(attackable.Combatant) bool
+	TryToFollow(attackable.Combatant) bool
+	TryToIdle()
+}
 
 // Owner is the live player surface a summon needs for world placement and
 // command preconditions.
@@ -43,6 +51,7 @@ type Actor struct {
 	disabled bool
 	combat   bool
 	attack   bool
+	brain    AI
 
 	followActive       bool
 	belowUnsummonLimit bool
@@ -285,6 +294,45 @@ func (a *Actor) Dead() bool { return a.dead }
 // summon.
 func (a *Actor) OutOfControl() bool { return a.disabled }
 
+// OwnerCombatant returns the owning player when it can be targeted by AI.
+func (a *Actor) OwnerCombatant() attackable.Combatant {
+	owner, _ := a.owner.(attackable.Combatant)
+	return owner
+}
+
+// SetAI attaches the summon intention loop used by accepted commands.
+func (a *Actor) SetAI(brain AI) {
+	a.brain = brain
+}
+
+// TryToAttack forwards an attack request to the attached AI when target is
+// a live combatant.
+func (a *Actor) TryToAttack(target any) {
+	combatant, ok := target.(attackable.Combatant)
+	if !ok || a.brain == nil {
+		return
+	}
+	a.brain.TryToAttack(combatant)
+}
+
+// TryToFollow forwards a follow request to the attached AI when target is
+// a live combatant.
+func (a *Actor) TryToFollow(target any) {
+	combatant, ok := target.(attackable.Combatant)
+	if !ok || a.brain == nil {
+		return
+	}
+	a.brain.TryToFollow(combatant)
+}
+
+// TryToIdle cancels the attached AI's current intention.
+func (a *Actor) TryToIdle() {
+	a.intent = IntentIdle
+	if a.brain != nil {
+		a.brain.TryToIdle()
+	}
+}
+
 // PetInventory returns the pet's inventory, or nil for servitors.
 func (a *Actor) PetInventory() *itemcontainer.Inventory {
 	if !a.isPet {
@@ -315,28 +363,32 @@ func (a *Actor) ApplyCommand(ctx CommandContext) CommandResult {
 		a.followActive = !a.followActive
 		if a.followActive {
 			a.intent = IntentFollowOwner
+			a.TryToFollow(a.OwnerCombatant())
 		} else {
-			a.intent = IntentIdle
+			a.TryToIdle()
 		}
 	case CommandAttack:
 		a.target = ctx.Target
 		if ctx.TargetIsCreature && ctx.TargetAttackable {
 			a.intent = IntentAttackTarget
+			a.TryToAttack(ctx.Target)
 		} else if ctx.TargetIsCreature {
 			a.intent = IntentFollowTarget
+			a.TryToFollow(ctx.Target)
 		} else {
 			a.intent = IntentInteractTarget
 		}
 	case CommandStop:
-		a.intent = IntentIdle
+		a.TryToIdle()
 	case CommandReturnPet, CommandUnsummonServitor:
-		a.intent = IntentIdle
+		a.TryToIdle()
 		a.despawn(ctx.World)
 	case CommandMoveToTarget:
 		a.followActive = false
 		a.target = ctx.Target
 		if ctx.TargetIsCreature {
 			a.intent = IntentFollowTarget
+			a.TryToFollow(ctx.Target)
 		} else {
 			a.intent = IntentInteractTarget
 		}
