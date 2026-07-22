@@ -1,11 +1,14 @@
 package summon
 
 import (
+	"reflect"
+	"strconv"
 	"testing"
 	"time"
 
 	"github.com/rs/zerolog"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
@@ -21,6 +24,13 @@ type liveOwnerStub struct {
 
 func (o *liveOwnerStub) ObjectID() int32 { return o.id }
 func (o *liveOwnerStub) LevelValue() int { return o.level }
+
+type liveOwnerCombatant struct {
+	liveOwnerStub
+}
+
+func (o *liveOwnerCombatant) SiegeGuard() bool { return false }
+func (o *liveOwnerCombatant) AlikeDead() bool  { return false }
 
 func TestSpawnBesideOwnerRegistersLiveSummon(t *testing.T) {
 	state := world.New()
@@ -72,6 +82,84 @@ func TestApplyCommandTogglesFollowAndUnsummonsServitor(t *testing.T) {
 	}
 	if _, ok := state.Summon(owner.ObjectID()); ok {
 		t.Fatalf("owner %d still has active summon after unsummon", owner.ObjectID())
+	}
+}
+
+func TestApplyCommandDispatchesValidatedCommandsToAI(t *testing.T) {
+	tests := []struct {
+		name             string
+		setup            func(*Actor)
+		ctx              CommandContext
+		wantEvents       []string
+		wantIntent       Intent
+		wantFollowActive bool
+	}{
+		{
+			name: "attackable creature",
+			ctx: CommandContext{
+				Command:          CommandAttack,
+				Target:           &liveCombatant{id: 300},
+				TargetIsCreature: true,
+				TargetAttackable: true,
+			},
+			wantEvents:       []string{"attack:300"},
+			wantIntent:       IntentAttackTarget,
+			wantFollowActive: true,
+		},
+		{
+			name: "non-attackable creature",
+			ctx: CommandContext{
+				Command:          CommandAttack,
+				Target:           &liveCombatant{id: 301},
+				TargetIsCreature: true,
+			},
+			wantEvents:       []string{"follow:301"},
+			wantIntent:       IntentFollowTarget,
+			wantFollowActive: true,
+		},
+		{
+			name:             "stop",
+			ctx:              CommandContext{Command: CommandStop},
+			wantEvents:       []string{"idle"},
+			wantIntent:       IntentIdle,
+			wantFollowActive: true,
+		},
+		{
+			name: "follow owner",
+			setup: func(actor *Actor) {
+				actor.followActive = false
+			},
+			ctx:              CommandContext{Command: CommandToggleFollow},
+			wantEvents:       []string{"follow:100"},
+			wantIntent:       IntentFollowOwner,
+			wantFollowActive: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			owner := &liveOwnerCombatant{liveOwnerStub: liveOwnerStub{id: 100, level: 40}}
+			actor := NewServitor(ServitorConfig{ObjectID: 200, Owner: owner, Level: 44})
+			if tt.setup != nil {
+				tt.setup(actor)
+			}
+			brain := &recordingSummonAI{}
+			actor.SetAI(brain)
+
+			result := actor.ApplyCommand(tt.ctx)
+			if result.Outcome != OutcomeApplied {
+				t.Fatalf("outcome = %v, want OutcomeApplied", result.Outcome)
+			}
+			if !reflect.DeepEqual(brain.events, tt.wantEvents) {
+				t.Fatalf("AI events = %#v, want %#v", brain.events, tt.wantEvents)
+			}
+			if actor.Intent() != tt.wantIntent {
+				t.Fatalf("Intent() = %v, want %v", actor.Intent(), tt.wantIntent)
+			}
+			if actor.FollowActive() != tt.wantFollowActive {
+				t.Fatalf("FollowActive() = %v, want %v", actor.FollowActive(), tt.wantFollowActive)
+			}
+		})
 	}
 }
 
@@ -234,6 +322,40 @@ func TestStartPetFeedSchedulesStarvation(t *testing.T) {
 	ticker := actor.StartPetFeed(5*time.Millisecond, state, zerolog.Nop())
 	defer ticker.Stop()
 	waitForNoSummon(t, state, owner.ObjectID())
+}
+
+type recordingSummonAI struct {
+	events []string
+}
+
+func (a *recordingSummonAI) TryToAttack(target attackable.Combatant) bool {
+	a.events = append(a.events, "attack:"+objectIDString(target))
+	return true
+}
+
+func (a *recordingSummonAI) TryToFollow(target attackable.Combatant) bool {
+	a.events = append(a.events, "follow:"+objectIDString(target))
+	return true
+}
+
+func (a *recordingSummonAI) TryToIdle() {
+	a.events = append(a.events, "idle")
+}
+
+type liveCombatant struct {
+	id   int32
+	dead bool
+}
+
+func (c *liveCombatant) ObjectID() int32  { return c.id }
+func (c *liveCombatant) SiegeGuard() bool { return false }
+func (c *liveCombatant) AlikeDead() bool  { return c.dead }
+
+func objectIDString(target attackable.Combatant) string {
+	if target == nil {
+		return "nil"
+	}
+	return strconv.FormatInt(int64(target.ObjectID()), 10)
 }
 
 func waitForNoSummon(t *testing.T, state *world.State, ownerID int32) {

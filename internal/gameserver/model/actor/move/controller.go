@@ -117,7 +117,19 @@ func (c *Controller) SetPositionUpdates(updates PositionUpdateRegistry) {
 // naturally the next time the caller re-evaluates (on arrival, or on the
 // next attack attempt).
 func (c *Controller) MaybeStartOffensiveFollow(target attackable.Combatant, attackRange int) bool {
-	if attackRange < 0 {
+	return c.maybeStartFollow(target, attackRange, FollowOffensive)
+}
+
+// MaybeStartFriendlyFollow starts or refreshes a friendly follow task
+// toward target when it sits farther than offset plus both actors'
+// footprints. Friendly follow broadcasts a plain movement request; follow
+// identity stays server-side for the follow tick.
+func (c *Controller) MaybeStartFriendlyFollow(target attackable.Combatant, offset int) bool {
+	return c.maybeStartFollow(target, offset, FollowFriendly)
+}
+
+func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, mode FollowMode) bool {
+	if offset < 0 {
 		return false
 	}
 
@@ -131,13 +143,18 @@ func (c *Controller) MaybeStartOffensiveFollow(target attackable.Combatant, atta
 	origin := location.Location{X: sx, Y: sy, Z: sz}
 	dest := location.Location{X: tx, Y: ty, Z: tz}
 
-	totalRadius := attackRange + int(c.self.CollisionRadius()) + int(other.CollisionRadius())
+	totalRadius := followRange(offset, c.self.CollisionRadius(), other.CollisionRadius())
 	if in2DRange(origin, dest, totalRadius) {
 		c.move.CancelFollow()
 		return false
 	}
 
-	c.move.StartOffensiveFollow(target.ObjectID(), attackRange)
+	switch mode {
+	case FollowFriendly:
+		c.move.StartFriendlyFollow(target.ObjectID(), offset)
+	default:
+		c.move.StartOffensiveFollow(target.ObjectID(), offset)
+	}
 	if !c.move.Moving() || c.move.Destination() != dest {
 		event, err := c.move.MoveToLocation(dest)
 		if err != nil {
@@ -147,8 +164,10 @@ func (c *Controller) MaybeStartOffensiveFollow(target attackable.Combatant, atta
 			c.move.CancelFollow()
 			return false
 		}
-		event.FollowTarget = target.ObjectID()
-		event.FollowOffset = attackRange
+		if mode == FollowOffensive {
+			event.FollowTarget = target.ObjectID()
+			event.FollowOffset = offset
+		}
 		c.self.BroadcastMove(event)
 		c.addPositionUpdate()
 	}
