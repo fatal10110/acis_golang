@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/statbonus"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -163,6 +164,38 @@ func TestPetTickAutoFeedsFromPetInventory(t *testing.T) {
 	}
 	if got := inventory.ItemCount(foodID, -1, true); got != 0 {
 		t.Fatalf("pet food count = %d, want 0", got)
+	}
+}
+
+func TestNewPetAppliesConfiguredInventoryLimits(t *testing.T) {
+	inventory := itemcontainer.NewPetInventory(200, item.NewTable(nil))
+	cfg := petmodel.DefaultConfig()
+	cfg.ExpRate = 1.5
+	cfg.SinEaterExpRate = 4.0
+	cfg.InventorySlots = 7
+	cfg.WeightLimitMultiplier = 2.0
+
+	actor := NewPet(PetConfig{
+		ObjectID:  200,
+		NPCID:     12077,
+		CON:       43,
+		Inventory: inventory,
+		Config:    &cfg,
+	})
+
+	if actor.PetInventory().SlotLimit != 7 {
+		t.Fatalf("pet inventory SlotLimit = %d, want 7", actor.PetInventory().SlotLimit)
+	}
+	if want := int(34500 * statbonus.CONBonus[43] * 2.0); actor.PetInventory().WeightLimit != want {
+		t.Fatalf("pet inventory WeightLimit = %d, want %d", actor.PetInventory().WeightLimit, want)
+	}
+	if got := actor.ScaledExpGain(1000); got != 1500 {
+		t.Fatalf("ScaledExpGain(ordinary pet) = %d, want 1500", got)
+	}
+
+	sinEater := NewPet(PetConfig{ObjectID: 201, NPCID: 12564, Config: &cfg})
+	if got := sinEater.ScaledExpGain(1000); got != 4000 {
+		t.Fatalf("ScaledExpGain(sin eater) = %d, want 4000", got)
 	}
 }
 
