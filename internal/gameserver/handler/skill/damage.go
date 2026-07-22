@@ -54,9 +54,14 @@ type pdamHandler struct{}
 
 func (pdamHandler) Types() []string { return []string{"PDAM", "FATAL"} }
 
-func (pdamHandler) Use(cast Cast) {
+func (h pdamHandler) Use(cast Cast) {
+	h.UseResult(cast)
+}
+
+func (pdamHandler) UseResult(cast Cast) Result {
+	var result Result
 	if alikeDead(cast.Caster) {
-		return
+		return result
 	}
 	for _, obj := range cast.Targets {
 		target, ok := obj.(physicalSkillTarget)
@@ -71,8 +76,11 @@ func (pdamHandler) Use(cast Cast) {
 		if damage > 0 {
 			target.ReduceHP(damage, cast.Caster, cast.Skill)
 			applyLethalHit(cast, target)
+		} else {
+			result.AttackFailed++
 		}
 	}
+	return result
 }
 
 type mdamHandler struct{}
