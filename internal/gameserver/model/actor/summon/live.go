@@ -77,6 +77,10 @@ type Actor struct {
 	hungryLimit   float64
 	unsummonLimit float64
 	roll          func(int) int
+
+	stats    CombatStats
+	statCalc summonStatCalcs
+	vitals   summonVitals
 }
 
 // Intent is the live action this actor is currently trying to carry out.
@@ -177,6 +181,7 @@ type PetConfig struct {
 	HungryLimit   float64
 	UnsummonLimit float64
 	Roll          func(int) int
+	Stats         CombatStats
 }
 
 // ServitorConfig carries the minimum state needed to create a live servitor.
@@ -193,11 +198,13 @@ type ServitorConfig struct {
 	TimeLostActive   int
 	ItemConsumeID    int32
 	ItemConsumeCount int
+	Roll             func(int) int
+	Stats            CombatStats
 }
 
 // NewServitor returns a live servitor actor.
 func NewServitor(cfg ServitorConfig) *Actor {
-	return &Actor{
+	a := &Actor{
 		id:               cfg.ObjectID,
 		owner:            cfg.Owner,
 		level:            cfg.Level,
@@ -211,12 +218,16 @@ func NewServitor(cfg ServitorConfig) *Actor {
 		timeLostActive:   defaultPositive(cfg.TimeLostActive, 1000),
 		itemConsumeID:    cfg.ItemConsumeID,
 		itemConsumeCount: cfg.ItemConsumeCount,
+		roll:             defaultRoll(cfg.Roll),
+		stats:            cfg.Stats,
 	}
+	a.initVitals()
+	return a
 }
 
 // NewPet returns a live pet actor.
 func NewPet(cfg PetConfig) *Actor {
-	return &Actor{
+	a := &Actor{
 		id:            cfg.ObjectID,
 		owner:         cfg.Owner,
 		level:         cfg.Level,
@@ -237,7 +248,10 @@ func NewPet(cfg PetConfig) *Actor {
 		hungryLimit:   cfg.HungryLimit,
 		unsummonLimit: cfg.UnsummonLimit,
 		roll:          defaultRoll(cfg.Roll),
+		stats:         cfg.Stats,
 	}
+	a.initVitals()
+	return a
 }
 
 // ObjectID returns the live world object id assigned to this summon.

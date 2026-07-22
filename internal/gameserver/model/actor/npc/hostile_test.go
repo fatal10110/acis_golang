@@ -532,6 +532,7 @@ func TestHostileDenyAIActionReflectsCrowdControlAndDeath(t *testing.T) {
 		{"sleeping", "Sleep"},
 		{"paralyzed", "Paralyze"},
 		{"afraid", "Fear"},
+		{"immobile until attacked", "ImmobileUntilAttacked"},
 	}
 
 	for _, tt := range tests {
@@ -560,6 +561,22 @@ func TestHostileDenyAIActionReflectsCrowdControlAndDeath(t *testing.T) {
 		}
 		if !hostile.DenyAIAction() {
 			t.Fatal("DenyAIAction() = false for a dead NPC")
+		}
+	})
+
+	t.Run("teleporting", func(t *testing.T) {
+		hostile := newTestHostile(t, &hostileMove{}, &hostileAttack{})
+		if !hostile.SetTeleporting(true) {
+			t.Fatal("SetTeleporting(true) reported no change")
+		}
+		if !hostile.DenyAIAction() {
+			t.Fatal("DenyAIAction() = false while teleporting")
+		}
+		if !hostile.SetTeleporting(false) {
+			t.Fatal("SetTeleporting(false) reported no change")
+		}
+		if hostile.DenyAIAction() {
+			t.Fatal("DenyAIAction() = true after teleporting cleared")
 		}
 	})
 }

@@ -2,6 +2,7 @@ package network
 
 import (
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -112,6 +113,87 @@ func TestGameClientLinkMagicSkillUseAppliesBuffEffectToSelf(t *testing.T) {
 	}
 }
 
+func TestGameClientLinkMagicSkillUseSendsAttackFailedWhenContinuousSkillDoesNotLand(t *testing.T) {
+	store := newMemorySkillSaveStore()
+	skills := skillstate.NewPersistence(store, modelskill.NewTable([]modelskill.Definition{
+		{
+			ID: 5, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+			SkillType: "DEBUFF", EffectType: "DEBUFF", Debuff: true,
+			BaseLandRate: 0, IgnoreResists: true,
+			Effects: []modelskill.EffectTemplate{{Name: "Debuff", Time: 60}},
+		},
+	}), store)
+	var objID int32
+	c, _, _, state := newLinkedGameClientWithSkillsSeed(t, skills, func(chars *fakeCharStore, _ *fakeItemStore) {
+		objID = seedSelectableCharacter(t, chars, "player1", "Newbie", 5, 0)
+		store.seedKnown(objID, 0, player.SkillLevels{5: 1})
+	}, 1)
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	c.send(encodeRequestMagicSkillUse(5, false, false))
+	c.read() // MagicSkillUse
+	c.read() // SystemMessage UseS1
+	c.read() // MagicSkillLaunched
+	assertStaticSystemMessageFrame(t, c.read(), serverpackets.SystemMessageAttackFailed)
+
+	obj, ok := state.Player(objID)
+	if !ok {
+		t.Fatalf("player %d not found in world state after cast", objID)
+	}
+	character, ok := obj.(*livePlayer)
+	if !ok {
+		t.Fatalf("world state player %d is not a *livePlayer", objID)
+	}
+	if effects := character.EffectList().All(); len(effects) != 0 {
+		t.Fatalf("effects after failed DEBUFF = %+v, want none", effects)
+	}
+}
+
+func TestGameClientLinkMagicSkillUseAppliesReferencedEffectSkillAtFallbackLevel(t *testing.T) {
+	store := newMemorySkillSaveStore()
+	skills := skillstate.NewPersistence(store, modelskill.NewTable([]modelskill.Definition{
+		{
+			ID: 454, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+			SkillType: "BUFF", EffectID: 5123,
+		},
+		{
+			ID: 5123, Level: 1, SkillType: "BUFF",
+			Effects: []modelskill.EffectTemplate{{Name: "Buff", Time: 60}},
+		},
+	}), store)
+	var objID int32
+	c, _, _, state := newLinkedGameClientWithSkillsSeed(t, skills, func(chars *fakeCharStore, _ *fakeItemStore) {
+		objID = seedSelectableCharacter(t, chars, "player1", "Newbie", 5, 0)
+		store.seedKnown(objID, 0, player.SkillLevels{454: 1})
+	}, 1)
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	c.send(encodeRequestMagicSkillUse(454, false, false))
+	c.read() // MagicSkillUse
+	c.read() // SystemMessage
+	c.read() // MagicSkillLaunched
+
+	obj, ok := state.Player(objID)
+	if !ok {
+		t.Fatalf("player %d not found in world state after cast", objID)
+	}
+	character, ok := obj.(*livePlayer)
+	if !ok {
+		t.Fatalf("world state player %d is not a *livePlayer", objID)
+	}
+	assertEventuallyEffect(t, character, 5123, 1)
+}
+
 // TestGameClientLinkTogglesOnThenOff reproduces recasting a toggle skill
 // twice: the first cast has no active instance yet, so it pays the MP cost
 // and applies the buff; the second cast finds that instance still active,
@@ -186,6 +268,21 @@ func TestGameClientLinkTogglesOnThenOff(t *testing.T) {
 	effects = character.EffectList().All()
 	if len(effects) != 0 {
 		t.Fatalf("effects after toggle deactivation = %+v, want none", effects)
+	}
+}
+
+func assertEventuallyEffect(t *testing.T, character *livePlayer, skillID modelskill.ID, level int) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		effects := character.EffectList().All()
+		if len(effects) == 1 && effects[0].Skill.ID == skillID && effects[0].Skill.Level == level {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("effects after effectId self-cast BUFF = %+v, want one effect from skill %d level %d", effects, skillID, level)
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
 }
 

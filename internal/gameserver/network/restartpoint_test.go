@@ -59,6 +59,9 @@ func TestRestartLivePlayerRevivesAndTeleportsDeadPlayer(t *testing.T) {
 	if live.Dead() {
 		t.Fatal("Dead() = true after restart, want false (revived)")
 	}
+	if !live.Teleporting() {
+		t.Fatal("Teleporting() = false after restart teleport started")
+	}
 
 	wantOpcodes := []byte{serverpackets.OpcodeRevive, serverpackets.OpcodeTeleportToLocation}
 	if got := frameOpcodes(frames.frames); string(got) != string(wantOpcodes) {
