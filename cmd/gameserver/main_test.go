@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/engine"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/pathfind"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/probe"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/fatal10110/acis_golang/internal/link"
@@ -114,6 +115,43 @@ KarmaPlayerCanShop = False
 	}
 	if len(opts.UnsupportedKeys) != 1 || opts.UnsupportedKeys[0] != "KarmaPlayerCanShop" {
 		t.Fatalf("UnsupportedKeys = %v, want [KarmaPlayerCanShop]", opts.UnsupportedKeys)
+	}
+}
+
+func TestLoadPetConfigUsesServerAndPlayersProperties(t *testing.T) {
+	dir := t.TempDir()
+	serverPath := filepath.Join(dir, "server.properties")
+	playersPath := filepath.Join(dir, "players.properties")
+	if err := os.WriteFile(serverPath, []byte(`
+PetXpRate = 1.5
+SinEaterXpRate = 4.0
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(playersPath, []byte(`
+MaximumSlotsForPet = 19
+WeightLimit = 1.25
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := loadPetConfig(gameServerPaths{ConfigPath: serverPath, PlayersConfigPath: playersPath})
+	if err != nil {
+		t.Fatalf("loadPetConfig() error = %v", err)
+	}
+
+	if got := cfg.ScaledExpGain(12077, 1000); got != 1500 {
+		t.Errorf("ordinary pet configured exp = %d, want 1500", got)
+	}
+	if got := cfg.ScaledExpGain(12564, 1000); got != 4000 {
+		t.Errorf("sin eater configured exp = %d, want 4000", got)
+	}
+	slots, _ := cfg.InventoryLimits(43)
+	if slots != 19 {
+		t.Errorf("pet inventory slots = %d, want 19", slots)
+	}
+	if cfg == pet.DefaultConfig() {
+		t.Fatal("loadPetConfig returned defaults, want values from both files")
 	}
 }
 

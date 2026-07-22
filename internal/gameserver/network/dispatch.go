@@ -16,6 +16,7 @@ import (
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
+	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
@@ -91,6 +92,7 @@ type GameClientLink struct {
 	respawnRestoreHP         float64
 	levels                   *player.LevelTable
 	skillEnchantSPBookNeeded bool
+	petConfig                petmodel.Config
 	inventory                *invops.Service
 	petItems                 *petitem.Service
 	trades                   *tradebook.Book
@@ -145,6 +147,7 @@ func NewGameClientLink(
 	respawnRestoreHP float64,
 	levels *player.LevelTable,
 	skillEnchantSPBookNeeded bool,
+	petConfig petmodel.Config,
 	log zerolog.Logger,
 ) *GameClientLink {
 	return &GameClientLink{
@@ -172,6 +175,7 @@ func NewGameClientLink(
 		respawnRestoreHP:         respawnRestoreHP,
 		levels:                   levels,
 		skillEnchantSPBookNeeded: skillEnchantSPBookNeeded,
+		petConfig:                petConfig,
 		inventory:                invops.NewService(ids),
 		petItems:                 petitem.NewService(ids),
 		trades:                   tradebook.NewBook(time.Now),
