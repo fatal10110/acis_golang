@@ -107,6 +107,7 @@ func (l *GameClientLink) useItemAICast(live *livePlayer, inv *itemcontainer.Inve
 		sendMagicStatusUpdate(live, beforeVitals)
 		return true
 	}
+	sendSkillHandlerResult(live, result.HandlerResult)
 	sendMagicStatusUpdate(live, beforeVitals)
 	return true
 }

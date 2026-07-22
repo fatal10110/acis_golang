@@ -35,6 +35,7 @@ const (
 	SystemMessageCannotUseQuestItems              = 148
 	SystemMessageCannotPickupOrUseItemTrading     = 149
 	SystemMessageS1IsBusyTryLater                 = 153
+	SystemMessageAttackFailed                     = 158
 	SystemMessageInvalidTarget                    = 109
 	SystemMessageCannotDiscardDistanceTooFar      = 151
 	SystemMessageItemMissingToLearnSkill          = 276

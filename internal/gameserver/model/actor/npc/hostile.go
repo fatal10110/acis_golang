@@ -71,6 +71,10 @@ type Hostile struct {
 	health creature.Health
 	hp     float64
 
+	// mpMu guards mp, the live MP value consumed by skill-resource handlers.
+	mpMu sync.RWMutex
+	mp   float64
+
 	// weapon is this NPC's resolved right-hand weapon kind, recorded by
 	// SetWeapon. Nil means unarmed — the common case, since the
 	// overwhelming majority of monster templates carry no weapon item id.
@@ -124,6 +128,7 @@ func NewHostile(inst *Instance, live *creature.Live, movement ai.MoveController,
 		Live:     live,
 		move:     movement,
 		hp:       inst.Template.HPMax,
+		mp:       inst.Template.MPMax,
 		roll:     rand.Intn,
 	}
 	h.health = creature.NewHealth(&h.hp)
@@ -442,10 +447,10 @@ func (h *Hostile) Decay(worldState *world.State, respawn func()) bool {
 	return true
 }
 
-// DenyAIAction reports whether this NPC is unable to act: dead, or held by
-// a crowd-control effect (stunned, sleeping, paralyzed, or afraid).
+// DenyAIAction reports whether this NPC is unable to act: dead, teleporting,
+// or held by a crowd-control effect.
 func (h *Hostile) DenyAIAction() bool {
-	return h.AlikeDead() || h.Stunned() || h.Sleeping() || h.Paralyzed() || h.Afraid()
+	return h.AlikeDead() || h.Stunned() || h.ImmobileUntilAttacked() || h.Sleeping() || h.Paralyzed() || h.Teleporting() || h.Afraid()
 }
 
 // Knows reports whether target is currently visible to this NPC.

@@ -71,7 +71,8 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 		controller.Stop()
 		return
 	}
-	actorcast.ApplyEffects(actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers}, live.Character, target, def)
+	result := actorcast.ApplyEffectsResult(actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers}, live.Character, target, def)
+	sendSkillHandlerResult(live, result)
 	sendMagicStatusUpdate(live, beforeVitals)
 	controller.Finish()
 }
@@ -136,6 +137,15 @@ func sendMagicCastFailure(live *livePlayer, def modelskill.Definition, err error
 func sendMagicActionFailed(live *livePlayer) {
 	if live != nil {
 		live.SendFrame(serverpackets.FrameActionFailed())
+	}
+}
+
+func sendSkillHandlerResult(live *livePlayer, result actorcast.EffectResult) {
+	if live == nil {
+		return
+	}
+	for i := 0; i < result.AttackFailed; i++ {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageAttackFailed))
 	}
 }
 

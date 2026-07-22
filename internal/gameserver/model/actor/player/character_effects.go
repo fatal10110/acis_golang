@@ -1,15 +1,11 @@
 package player
 
 import (
-	"math"
-	"strings"
-
 	"github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/statbonus"
 )
 
 // baseBuffSlots is the non-toggle, non-seven-signs buff-slot count every
@@ -69,96 +65,5 @@ func (c *Character) Invul() bool {
 // against c, given the caster's blessed-spiritshot charge state (bss) and
 // this cast's already-resolved shield-block outcome (shield).
 func (c *Character) SkillSuccessInput(caster any, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
-	attacker, ok := caster.(*Character)
-	if !ok || attacker == nil {
-		return formulas.SkillSuccessInput{}, false
-	}
-	return formulas.SkillSuccessInput{
-		BaseChance:    float64(def.BaseLandRate),
-		StatModifier:  c.skillStatModifier(def.EffectType, def.Magic),
-		VulnModifier:  c.skillVulnerability(def.EffectType, def),
-		MAtkModifier:  c.skillMAtkModifier(attacker, def, bss),
-		LevelModifier: c.skillLevelModifier(attacker, def),
-		IgnoreResists: def.IgnoreResists,
-		Shield:        shield,
-	}, true
-}
-
-func (c *Character) skillStatModifier(typ string, magic bool) float64 {
-	switch skillTypeKey(typ) {
-	case "STUN", "BLEED", "POISON":
-		return math.Max(0, 2-math.Sqrt(statbonus.CONBonus[c.CON()]))
-	case "SLEEP", "DEBUFF", "WEAKNESS", "ERASE", "ROOT", "MUTE", "FEAR", "BETRAY", "CONFUSION", "AGGREDUCE_CHAR", "PARALYZE":
-		if magic {
-			return math.Max(0, 2-math.Sqrt(statbonus.MENBonus[c.MEN()]))
-		}
-	}
-	return 1
-}
-
-// skillVulnerability returns the target's success-roll vulnerability
-// multiplier for typ, folding in def's elemental resistance modifier (as
-// its square root) as the base every stat-specific vulnerability builds on.
-func (c *Character) skillVulnerability(typ string, def modelskill.Definition) float64 {
-	base := math.Sqrt(c.elementalSkillModifier(def))
-	switch skillTypeKey(typ) {
-	case "BLEED":
-		return c.calcStat(stat.BleedVuln, base)
-	case "POISON":
-		return c.calcStat(stat.PoisonVuln, base)
-	case "STUN":
-		return c.calcStat(stat.StunVuln, base)
-	case "PARALYZE":
-		return c.calcStat(stat.ParalyzeVuln, base)
-	case "ROOT":
-		return c.calcStat(stat.RootVuln, base)
-	case "SLEEP":
-		return c.calcStat(stat.SleepVuln, base)
-	case "MUTE", "FEAR", "BETRAY", "AGGDEBUFF", "AGGREDUCE_CHAR", "ERASE", "CONFUSION":
-		return c.calcStat(stat.DerangementVuln, base)
-	case "DEBUFF", "WEAKNESS":
-		return c.calcStat(stat.DebuffVuln, base)
-	case "CANCEL":
-		return c.calcStat(stat.CancelVuln, base)
-	default:
-		return base
-	}
-}
-
-// skillMAtkModifier returns the magic-attack-vs-defence term of the
-// effect-landing roll. A blessed-spiritshot charge (bss) quadruples the
-// caster's effective magic attack before the square root is taken.
-func (c *Character) skillMAtkModifier(attacker *Character, def modelskill.Definition, bss bool) float64 {
-	if !def.Magic {
-		return 1
-	}
-	mDef := c.MDef()
-	if mDef <= 0 {
-		mDef = 1
-	}
-	mAtk := attacker.MAtk()
-	if bss {
-		mAtk *= 4
-	}
-	return math.Sqrt(mAtk) / mDef * 11
-}
-
-func (c *Character) skillLevelModifier(attacker *Character, def modelskill.Definition) float64 {
-	if def.LevelDepend == 0 {
-		return 1
-	}
-	level := attacker.CharLevel
-	if def.MagicLevel > 0 {
-		level = def.MagicLevel
-	}
-	delta := level + def.LevelDepend - c.CharLevel
-	scale := 0.005
-	if delta < 0 {
-		scale = 0.01
-	}
-	return 1 + scale*float64(delta)
-}
-
-func skillTypeKey(s string) string {
-	return strings.ToUpper(s)
+	return creature.ResolveSkillSuccessInput(caster, c, def, bss, shield)
 }
