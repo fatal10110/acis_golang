@@ -35,6 +35,28 @@ func TestRegistryDispatchesBySkillType(t *testing.T) {
 	}
 }
 
+func TestRegistryReportsAttackFailedForPhysicalSkillWithNoDamage(t *testing.T) {
+	registry := NewDefaultRegistry()
+	target := &skillTarget{
+		physicalOK: true,
+		physicalInput: formulas.PhysicalSkillInput{
+			AttackPower: -1, Defence: 1,
+			RandomMul: 1, RaceMul: 1, PvPMul: 1, ElementalMul: 1, WeaponVulnMul: 1,
+		},
+	}
+
+	result, ok := registry.UseResult(Cast{
+		Skill:   modelskill.Definition{SkillType: "PDAM"},
+		Targets: []any{target},
+	})
+	if !ok {
+		t.Fatal("UseResult() handled = false, want true for PDAM")
+	}
+	if result.AttackFailed != 1 {
+		t.Fatalf("AttackFailed = %d, want 1", result.AttackFailed)
+	}
+}
+
 func TestDefaultRegistryHasRepresentativeHandlers(t *testing.T) {
 	registry := NewDefaultRegistry()
 

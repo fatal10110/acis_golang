@@ -405,14 +405,21 @@ func TestCheckSkillSuccessUsesLivePlayerShieldDefense(t *testing.T) {
 		IgnoreResists: true,
 		Effects:       []modelskill.EffectTemplate{{Name: "Stun", Time: 10}},
 	}
-	registry.Use(Cast{Caster: caster, Skill: skill, Targets: []any{unblocked}})
-	if got := len(unblocked.EffectList().All()); got != 1 {
-		t.Fatalf("unblocked target effects = %d, want 1", got)
+	tests := []struct {
+		name   string
+		target *player.Character
+		want   int
+	}{
+		{name: "unblocked", target: unblocked, want: 1},
+		{name: "perfect shield blocked", target: blocked, want: 0},
 	}
-
-	registry.Use(Cast{Caster: caster, Skill: skill, Targets: []any{blocked}})
-	if got := len(blocked.EffectList().All()); got != 0 {
-		t.Fatalf("perfect-shield-blocked target effects = %d, want 0", got)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			registry.Use(Cast{Caster: caster, Skill: skill, Targets: []any{tt.target}})
+			if got := len(tt.target.EffectList().All()); got != tt.want {
+				t.Fatalf("target effects = %d, want %d", got, tt.want)
+			}
+		})
 	}
 }
 
