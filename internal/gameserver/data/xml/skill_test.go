@@ -146,6 +146,23 @@ func TestLoadSkillDefinitions(t *testing.T) {
 		}
 	})
 
+	t.Run("effect skill delegation fields are loaded", func(t *testing.T) {
+		d, ok := table.Get(454, 1)
+		if !ok {
+			t.Fatal("skill 454 level 1 not loaded")
+		}
+		if d.EffectID != 5123 || d.EffectLevel != 0 {
+			t.Fatalf("skill 454 delegation fields = effectID %d effectLevel %d, want 5123/0", d.EffectID, d.EffectLevel)
+		}
+		referenced, ok := table.Get(5123, 1)
+		if !ok {
+			t.Fatal("referenced skill 5123 level 1 not loaded")
+		}
+		if len(referenced.Effects) == 0 {
+			t.Fatal("referenced skill 5123 level 1 has no effect templates")
+		}
+	})
+
 	t.Run("for block preserves effect templates and nested stat funcs", func(t *testing.T) {
 		d, ok := table.Get(4, 1)
 		if !ok {
