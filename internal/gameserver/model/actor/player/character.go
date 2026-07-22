@@ -102,13 +102,19 @@ type Character struct {
 	statMu    sync.Mutex
 	statCalcs map[stat.Stat]*basefunc.Calculator
 
-	// stateMu guards transient live flags and runtime send/broadcast hooks.
+	// stateMu guards transient live flags, item-use disabled timestamps, and
+	// runtime send/broadcast hooks.
 	stateMu              sync.RWMutex
 	stateInit            bool
 	running              bool
 	standing             bool
 	inCombat             bool
 	autoSoulShots        map[int32]bool
+	flying               bool
+	transformed          bool
+	operating            bool
+	fishing              bool
+	disabledItems        map[int32]time.Time
 	shortBuffTaskSkillID int32
 	shortBuffTimer       *time.Timer
 

@@ -5,6 +5,7 @@ import (
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
@@ -14,8 +15,15 @@ import (
 )
 
 func (l *GameClientLink) useItem(live *livePlayer, objectID int32) {
-	if !liveItemOpsAllowed(live) {
-		live.SendFrame(serverpackets.FrameActionFailed())
+	if live == nil {
+		return
+	}
+	if live.Operating() {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageItemsUnavailableForStore))
+		return
+	}
+	if l.trades != nil && l.trades.HasActive(live.ObjectID()) {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotPickupOrUseItemTrading))
 		return
 	}
 	inv := live.Inventory()
@@ -28,8 +36,28 @@ func (l *GameClientLink) useItem(live *livePlayer, objectID int32) {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
-	if _, ok := inv.Templates().Get(inst.TemplateID); !ok {
+	tmpl, ok := inv.Templates().Get(inst.TemplateID)
+	if !ok {
 		live.SendFrame(serverpackets.FrameActionFailed())
+		return
+	}
+	if live.ItemDisabled(objectID) {
+		l.rejectDisabledItemUse(live, tmpl)
+		return
+	}
+	if inst.QuestItem(tmpl) {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotUseQuestItems))
+		return
+	}
+	if !liveItemOpsAllowed(live) {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return
+	}
+	if live.Fishing() && tmpl.DefaultAction != item.ActionFishingShot {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotDoWhileFishing))
+		return
+	}
+	if !inst.Equipped() && rejectUseItemConditions(live, tmpl) {
 		return
 	}
 	if l.useEnchantScroll(live, inst) {

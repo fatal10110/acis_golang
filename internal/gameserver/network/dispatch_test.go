@@ -416,6 +416,11 @@ func testItemTemplates() *item.Table {
 			Depositable:    true,
 			EtcItem:        &item.EtcItemDetail{Type: item.EtcItemPotion, Handler: "ItemSkills", ReuseDelay: 10000, SharedReuseGroup: 8},
 			AttachedSkills: []item.SkillRef{{ID: 2031, Level: 1}},
+			UseConditions: []item.UseCondition{{
+				Root:      item.Condition{Kind: "player", Attrs: map[string]string{"flying": "False"}},
+				MessageID: int32(serverpackets.SystemMessageS1CannotBeUsed),
+				AddName:   true,
+			}},
 		},
 		{
 			ID:             728,
@@ -455,6 +460,14 @@ func testItemTemplates() *item.Table {
 			Depositable:    true,
 			EtcItem:        &item.EtcItemDetail{Type: item.EtcItemScroll, Handler: "ItemSkills", SharedReuseGroup: 5, ReuseDelay: 9000},
 			AttachedSkills: []item.SkillRef{{ID: 2013, Level: 1}},
+		},
+		{
+			ID:          9001,
+			Name:        "Quest Token",
+			Kind:        item.KindEtcItem,
+			Duration:    -1,
+			Destroyable: true,
+			EtcItem:     &item.EtcItemDetail{Type: item.EtcItemQuest},
 		},
 	})
 }

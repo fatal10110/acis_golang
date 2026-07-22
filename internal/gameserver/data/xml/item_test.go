@@ -102,6 +102,7 @@ func TestLoadItemTemplates(t *testing.T) {
 	<item id="1400" type="EtcItem" name="Soulshot Sample">
 		<set name="default_action" val="soulshot" />
 		<set name="etcitem_type" val="SCROLL" />
+		<set name="use_condition" val="{{uc_transmode_exclude;{tt_flying}}}" />
 	</item>`)
 
 	writeItemFile(t, dir, "5500-5599.xml", `
@@ -239,6 +240,13 @@ func TestLoadItemTemplates(t *testing.T) {
 		}
 		if tpl.EtcItem == nil || tpl.EtcItem.Type != item.EtcItemShot {
 			t.Fatalf("item 1400 etc item detail = %+v, want EtcItemShot", tpl.EtcItem)
+		}
+		if len(tpl.UseConditions) != 1 {
+			t.Fatalf("item 1400 UseConditions = %+v, want flying exclusion", tpl.UseConditions)
+		}
+		uc := tpl.UseConditions[0]
+		if uc.MessageID != 113 || !uc.AddName || uc.Root.Kind != "player" || uc.Root.Attrs["flying"] != "False" {
+			t.Fatalf("item 1400 UseConditions[0] = %+v, want cannot-use item-name message with flying=False", uc)
 		}
 	})
 
@@ -545,6 +553,13 @@ func TestLoadItemTemplatesAgainstDatapack(t *testing.T) {
 		}
 		if !tpl.OlyRestricted {
 			t.Fatal("item 1060 OlyRestricted = false, want true")
+		}
+		if len(tpl.UseConditions) != 1 {
+			t.Fatalf("item 1060 UseConditions = %+v, want flying exclusion", tpl.UseConditions)
+		}
+		uc := tpl.UseConditions[0]
+		if uc.MessageID != 113 || !uc.AddName || uc.Root.Kind != "player" || uc.Root.Attrs["flying"] != "False" {
+			t.Fatalf("item 1060 UseConditions[0] = %+v, want cannot-use item-name message with flying=False", uc)
 		}
 	})
 }

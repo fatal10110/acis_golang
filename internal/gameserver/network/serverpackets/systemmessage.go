@@ -32,6 +32,7 @@ const (
 	SystemMessageAlreadyTrading                   = 142
 	SystemMessageTargetIncorrect                  = 144
 	SystemMessageTargetNotFound                   = 145
+	SystemMessageCannotUseQuestItems              = 148
 	SystemMessageCannotPickupOrUseItemTrading     = 149
 	SystemMessageS1IsBusyTryLater                 = 153
 	SystemMessageAttackFailed                     = 158
@@ -60,9 +61,13 @@ const (
 	SystemMessageItemCrystallized                 = 1258
 	SystemMessageUseOfItemWillBeAuto              = 1433
 	SystemMessageAutoUseOfItemCancelled           = 1434
+	SystemMessageCannotDoWhileFishing             = 1471
+	SystemMessageItemCantBeEquippedForOlympiad    = 1507
+	SystemMessageItemUnavailableForOlympiad       = 1508
 	SystemMessageBlessedEnchantFailed             = 1517
 	SystemMessageAttentionS1PickedUpS2            = 1533
 	SystemMessageAttentionS1PickedUpS2S3          = 1534
+	SystemMessageItemsUnavailableForStore         = 1578
 	SystemMessageNoServitorCannotAutomateUse      = 1676
 	SystemMessageCannotEnchantWhileStore          = 1688
 	SystemMessageExchangeHasEnded                 = 1266
