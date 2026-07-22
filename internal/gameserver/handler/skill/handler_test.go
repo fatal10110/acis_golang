@@ -76,6 +76,14 @@ type skillTarget struct {
 	blowOK        bool
 	manaInput     formulas.ManaDamageInput
 	manaOK        bool
+	lethalInput   formulas.LethalInput
+	lethalOK      bool
+	lethalPlayer  bool
+
+	raidRelated  bool
+	lethalImmune bool
+
+	lethalOutcomes []formulas.LethalOutcome
 }
 
 func (t *skillTarget) AlikeDead() bool { return t.dead }
@@ -84,6 +92,10 @@ func (t *skillTarget) Dead() bool      { return t.dead }
 func (t *skillTarget) Invulnerable() bool { return t.invulnerable }
 
 func (t *skillTarget) CursedWeaponEquipped() bool { return t.cursed }
+
+func (t *skillTarget) RaidRelated() bool { return t.raidRelated }
+
+func (t *skillTarget) Lethalable() bool { return !t.lethalImmune }
 
 func (t *skillTarget) CanBeHealed() bool {
 	return !t.dead && !t.invulnerable && !t.cursed
@@ -180,6 +192,31 @@ func (t *skillTarget) BlowInput(caster any, skill modelskill.Definition) (formul
 
 func (t *skillTarget) ManaDamageInput(caster any, skill modelskill.Definition) (formulas.ManaDamageInput, bool) {
 	return t.manaInput, t.manaOK
+}
+
+func (t *skillTarget) LethalInput(caster any, skill modelskill.Definition) (formulas.LethalInput, bool) {
+	in := t.lethalInput
+	in.Chance1 = skill.LethalChance1
+	in.Chance2 = skill.LethalChance2
+	in.MagicLevel = skill.MagicLevel
+	return in, t.lethalOK
+}
+
+func (t *skillTarget) ApplyLethalOutcome(outcome formulas.LethalOutcome, caster any, skill modelskill.Definition) {
+	t.lethalOutcomes = append(t.lethalOutcomes, outcome)
+	switch outcome {
+	case formulas.LethalFull:
+		t.hp = 1
+		if t.lethalPlayer {
+			t.cp = 1
+		}
+	case formulas.LethalHalf:
+		if t.lethalPlayer {
+			t.cp = 1
+		} else {
+			t.hp -= t.hp / 2
+		}
+	}
 }
 
 func almost(a, b float64) bool { return math.Abs(a-b) < 1e-9 }
@@ -410,5 +447,60 @@ func TestPhysicalMagicBlowAndManaDamageHandlersUseFormulaInputs(t *testing.T) {
 	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "MANADAM"}, Targets: []any{target}})
 	if target.mp != 20 {
 		t.Fatalf("MANADAM mp = %v, want 20", target.mp)
+	}
+}
+
+func TestPhysicalAndBlowHandlersResolveLethalHits(t *testing.T) {
+	registry := NewDefaultRegistry()
+	caster := &skillTarget{}
+	target := &skillTarget{
+		hp:           2000,
+		cp:           300,
+		lethalPlayer: true,
+		physicalInput: formulas.PhysicalSkillInput{
+			AttackPower: 100, SkillPower: 50, Defence: 60,
+			RandomMul: 1, RaceMul: 1, WeaponVulnMul: 1, PvPMul: 1, ElementalMul: 1,
+		},
+		physicalOK: true,
+		blowInput: formulas.BlowInput{
+			AttackPower: 100, SkillPower: 50, Defence: 40,
+			RandomMul: 1, PosMul: 1.2,
+			CritDamageMul: 1.5, CritDamagePosMul: 1, CritVulnMul: 1, DaggerVulnMul: 1, CritDamageAddBase: 5,
+		},
+		blowOK: true,
+		lethalInput: formulas.LethalInput{
+			AttackerLevel: 40,
+			TargetLevel:   40,
+			LethalMul:     1,
+		},
+		lethalOK: true,
+	}
+
+	registry.Use(Cast{
+		Caster:  caster,
+		Skill:   modelskill.Definition{SkillType: "PDAM", LethalChance2: 100},
+		Targets: []any{target},
+	})
+	if target.hp != 1 || target.cp != 1 {
+		t.Fatalf("PDAM lethal2 hp/cp = %v/%v, want 1/1", target.hp, target.cp)
+	}
+	if len(target.lethalOutcomes) != 1 || target.lethalOutcomes[0] != formulas.LethalFull {
+		t.Fatalf("PDAM lethal outcomes = %v, want [LethalFull]", target.lethalOutcomes)
+	}
+
+	target.hp = 2000
+	target.cp = 300
+	target.lethalOutcomes = nil
+
+	registry.Use(Cast{
+		Caster:  caster,
+		Skill:   modelskill.Definition{SkillType: "BLOW", LethalChance1: 100},
+		Targets: []any{target},
+	})
+	if !almost(target.hp, 1423) || target.cp != 1 {
+		t.Fatalf("BLOW lethal1 hp/cp = %v/%v, want 1423/1", target.hp, target.cp)
+	}
+	if len(target.lethalOutcomes) != 1 || target.lethalOutcomes[0] != formulas.LethalHalf {
+		t.Fatalf("BLOW lethal outcomes = %v, want [LethalHalf]", target.lethalOutcomes)
 	}
 }
