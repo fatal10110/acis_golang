@@ -59,6 +59,9 @@ func (l *GameClientLink) restartDestination(live *livePlayer) (location.Location
 // broadcasts the discontinuous-position packet to live's own session and
 // every observer.
 func (l *GameClientLink) teleportLivePlayer(live *livePlayer, target location.Location, randomOffset int) {
+	if !live.SetTeleporting(true) {
+		return
+	}
 	live.Stop()
 	target = move.RandomNearbyLocation(l.geo, target, randomOffset)
 	l.updateLivePlayerPosition(live, target, live.CurrentHeading())

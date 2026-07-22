@@ -122,6 +122,7 @@ func TestLiveCrowdControlGettersTrackActiveEffectsAndClearOnRemoval(t *testing.T
 		{"Rooted", "Root", (*Live).Rooted},
 		{"Sleeping", "Sleep", (*Live).Sleeping},
 		{"Afraid", "Fear", (*Live).Afraid},
+		{"ImmobileUntilAttacked", "ImmobileUntilAttacked", (*Live).ImmobileUntilAttacked},
 	}
 
 	for _, tt := range tests {
@@ -202,16 +203,40 @@ func TestLiveImmobilizedReportsChange(t *testing.T) {
 	}
 }
 
+func TestLiveTeleportingReportsChange(t *testing.T) {
+	live := newTestLive(t)
+	if live.Teleporting() {
+		t.Fatal("Teleporting() = true on a fresh creature")
+	}
+
+	if !live.SetTeleporting(true) {
+		t.Fatal("SetTeleporting(true) reported no change on first call")
+	}
+	if !live.Teleporting() {
+		t.Fatal("Teleporting() = false after SetTeleporting(true)")
+	}
+	if live.SetTeleporting(true) {
+		t.Fatal("SetTeleporting(true) reported a change on a no-op call")
+	}
+
+	if !live.SetTeleporting(false) {
+		t.Fatal("SetTeleporting(false) reported no change")
+	}
+	if live.Teleporting() {
+		t.Fatal("Teleporting() = true after SetTeleporting(false)")
+	}
+}
+
 func TestLiveNilReceiverGettersDoNotPanic(t *testing.T) {
 	var live *Live
 
 	if live.EffectList() != nil {
 		t.Fatal("EffectList() on a nil receiver = non-nil")
 	}
-	if live.Stunned() || live.Rooted() || live.Sleeping() || live.Afraid() || live.Paralyzed() || live.Immobilized() {
+	if live.Stunned() || live.Rooted() || live.Sleeping() || live.Afraid() || live.ImmobileUntilAttacked() || live.Paralyzed() || live.Immobilized() || live.Teleporting() {
 		t.Fatal("a crowd-control getter on a nil receiver reported true")
 	}
-	if live.SetParalyzed(true) || live.SetImmobilized(true) {
+	if live.SetParalyzed(true) || live.SetImmobilized(true) || live.SetTeleporting(true) {
 		t.Fatal("a crowd-control setter on a nil receiver reported a change")
 	}
 }

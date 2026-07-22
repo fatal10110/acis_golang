@@ -442,10 +442,10 @@ func (h *Hostile) Decay(worldState *world.State, respawn func()) bool {
 	return true
 }
 
-// DenyAIAction reports whether this NPC is unable to act: dead, or held by
-// a crowd-control effect (stunned, sleeping, paralyzed, or afraid).
+// DenyAIAction reports whether this NPC is unable to act: dead, teleporting,
+// or held by a crowd-control effect.
 func (h *Hostile) DenyAIAction() bool {
-	return h.AlikeDead() || h.Stunned() || h.Sleeping() || h.Paralyzed() || h.Afraid()
+	return h.AlikeDead() || h.Stunned() || h.ImmobileUntilAttacked() || h.Sleeping() || h.Paralyzed() || h.Teleporting() || h.Afraid()
 }
 
 // Knows reports whether target is currently visible to this NPC.
