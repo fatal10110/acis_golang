@@ -33,7 +33,9 @@ type playableTarget interface {
 	Playable() bool
 }
 
-type continuousHandler struct{}
+type continuousHandler struct {
+	defs Definitions
+}
 
 // Types lists the 14 skill types the reference continuous handler covers.
 func (continuousHandler) Types() []string {
@@ -45,7 +47,8 @@ func (continuousHandler) Types() []string {
 }
 
 func (h continuousHandler) Use(cast Cast) {
-	skillType := skillTypeKey(cast.Skill.SkillType)
+	def := h.effectSkill(cast.Skill)
+	skillType := skillTypeKey(def.SkillType)
 
 	for _, obj := range cast.Targets {
 		target, ok := obj.(continuousTarget)
@@ -53,7 +56,7 @@ func (h continuousHandler) Use(cast Cast) {
 			continue
 		}
 
-		effected := h.reflectTarget(cast, target)
+		effected := h.reflectTarget(cast.Caster, def, target)
 		if effected == nil {
 			continue
 		}
@@ -76,13 +79,13 @@ func (h continuousHandler) Use(cast Cast) {
 				continue
 			}
 		case "FEAR":
-			if pt, ok := effected.(playableTarget); ok && pt.Playable() && fearImmunePlayableSkillIDs[cast.Skill.ID] {
+			if pt, ok := effected.(playableTarget); ok && pt.Playable() && fearImmunePlayableSkillIDs[def.ID] {
 				continue
 			}
 		}
 
 		// Target under debuff immunity.
-		if cast.Skill.Offensive && hasEffectType(effected.EffectList(), "BLOCK_DEBUFF") {
+		if def.Offensive && hasEffectType(effected.EffectList(), "BLOCK_DEBUFF") {
 			continue
 		}
 
@@ -90,8 +93,8 @@ func (h continuousHandler) Use(cast Cast) {
 		// blessed-spiritshot charge and the target's shield-block outcome
 		// against this cast; everything else acts unconditionally.
 		acted := true
-		if cast.Skill.Offensive || cast.Skill.Debuff {
-			succeeded, ok := checkSkillSuccess(cast.Caster, effected, cast.Skill)
+		if def.Offensive || def.Debuff {
+			succeeded, ok := checkSkillSuccess(cast.Caster, effected, def)
 			acted = ok && succeeded
 		}
 
@@ -102,33 +105,47 @@ func (h continuousHandler) Use(cast Cast) {
 		}
 
 		// A toggle refresh drops the prior same-skill effect before reapplying.
-		if cast.Skill.Activation == modelskill.ActivationToggle {
-			stopEffectsBySkillID(effected.EffectList(), cast.Skill.ID)
+		if def.Activation == modelskill.ActivationToggle {
+			stopEffectsBySkillID(effected.EffectList(), def.ID)
 		}
 
-		applyEffects(cast.Caster, effected, cast.Skill, cast.Skill.Effects)
+		applyEffects(cast.Caster, effected, def, def.Effects)
 
 		if skillType == "AGGDEBUFF" {
-			fireAggressionEvent(cast.Caster, effected, cast.Skill)
+			fireAggressionEvent(cast.Caster, effected, def)
 		}
 	}
 
-	applySelfEffects(cast.Caster, cast.Skill)
+	applySelfEffects(cast.Caster, def)
+}
+
+func (h continuousHandler) effectSkill(def modelskill.Definition) modelskill.Definition {
+	if def.EffectID == 0 || h.defs == nil {
+		return def
+	}
+	level := def.EffectLevel
+	if level == 0 {
+		level = 1
+	}
+	if resolved, ok := h.defs.Definition(modelskill.Ref{ID: modelskill.ID(def.EffectID), Level: level}); ok {
+		return resolved
+	}
+	return def
 }
 
 // reflectTarget returns the actual effect destination: the original target, or
 // the caster when the target reflects the skill back. It returns nil when the
 // skill reflects but the caster isn't itself a valid continuous target, which
 // is safer dropped than guessed through.
-func (continuousHandler) reflectTarget(cast Cast, target continuousTarget) continuousTarget {
+func (continuousHandler) reflectTarget(caster any, def modelskill.Definition, target continuousTarget) continuousTarget {
 	src, ok := target.(skillReflectSource)
 	if !ok {
 		return target
 	}
-	if !formulas.SkillReflects(src.SkillReflectInput(cast.Skill), rnd.Get(100)) {
+	if !formulas.SkillReflects(src.SkillReflectInput(def), rnd.Get(100)) {
 		return target
 	}
-	self, ok := cast.Caster.(continuousTarget)
+	self, ok := caster.(continuousTarget)
 	if !ok {
 		return nil
 	}
