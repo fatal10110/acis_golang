@@ -75,7 +75,8 @@ type CompleteAICastRequest struct {
 // nil on a successful hit; the caller maps it to a rejection reply the
 // same way it maps actorcast.StartItemSkill's error.
 type CompleteAICastResult struct {
-	Err error
+	Err           error
+	HandlerResult actorcast.EffectResult
 }
 
 // CompleteAICast applies the cast's hit-phase cost and, on success, the
@@ -87,7 +88,7 @@ func CompleteAICast(req CompleteAICastRequest) CompleteAICastResult {
 		return CompleteAICastResult{Err: err}
 	}
 
-	actorcast.ApplyEffects(req.Effects, req.Caster, req.Target, req.Definition)
+	result := actorcast.ApplyEffectsResult(req.Effects, req.Caster, req.Target, req.Definition)
 	req.Controller.Finish()
-	return CompleteAICastResult{}
+	return CompleteAICastResult{HandlerResult: result}
 }
