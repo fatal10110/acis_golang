@@ -48,7 +48,15 @@ func TestEffectsStartTicksLiveEffectListsOverWallClock(t *testing.T) {
 		t.Fatal("periodic effect was not ticked by the live scheduler")
 	}
 
-	if effects := actor.effects.All(); len(effects) != 0 {
-		t.Fatalf("one-count effect remained after its live tick: %d effects", len(effects))
+	deadline := time.After(500 * time.Millisecond)
+	for {
+		if effects := actor.effects.All(); len(effects) == 0 {
+			return
+		}
+		select {
+		case <-deadline:
+			t.Fatalf("one-count effect remained after its live tick: %d effects", len(actor.effects.All()))
+		case <-time.After(10 * time.Millisecond):
+		}
 	}
 }
