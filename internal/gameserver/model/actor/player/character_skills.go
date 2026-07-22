@@ -55,6 +55,12 @@ func (c *Character) SkillLevel(skillID int) int {
 	return c.skills.known.Level(skillID)
 }
 
+// HasSkill reports whether the character currently knows skillID at any
+// positive level.
+func (c *Character) HasSkill(skillID int) bool {
+	return c.SkillLevel(skillID) > 0
+}
+
 // HasDwarvenCraft reports whether the character knows Dwarven Craft, which
 // gates dwarven-only fishing skills.
 func (c *Character) HasDwarvenCraft() bool {

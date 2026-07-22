@@ -31,6 +31,7 @@ type GameClock struct {
 	mu       sync.RWMutex
 	minutes  int  // in-game minutes elapsed since the midnight alignment
 	night    bool // night state as of the last Tick, kept to detect boundary crossings
+	minute   []func()
 	dayNight []func(night bool)
 }
 
@@ -61,6 +62,7 @@ func (c *GameClock) Tick() {
 	night := c.minutes%minutesPerDay < nightEndMinute
 	crossed := night != c.night
 	c.night = night
+	minuteListeners := append([]func(){}, c.minute...)
 	var listeners []func(night bool)
 	if crossed {
 		listeners = append(listeners, c.dayNight...)
@@ -70,6 +72,9 @@ func (c *GameClock) Tick() {
 	// Listeners run outside the lock so they can read the clock.
 	for _, fn := range listeners {
 		fn(night)
+	}
+	for _, fn := range minuteListeners {
+		fn()
 	}
 }
 
@@ -82,11 +87,29 @@ func (c *GameClock) OnDayNight(fn func(night bool)) {
 	c.dayNight = append(c.dayNight, fn)
 }
 
+// OnMinute registers fn to run after every in-game minute advance. Day/night
+// boundary listeners run before minute listeners on a crossing tick.
+func (c *GameClock) OnMinute(fn func()) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.minute = append(c.minute, fn)
+}
+
 // TimeOfDay returns the minute of the current in-game day, 0-1439.
 func (c *GameClock) TimeOfDay() int {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.minutes % minutesPerDay
+}
+
+// Minutes returns the absolute number of in-game minutes elapsed since the
+// midnight alignment at construction. Use this rather than TimeOfDay when a
+// caller needs a monotonic counter that increases across in-game days
+// (for example, to schedule periodic reminders that survive the wrap).
+func (c *GameClock) Minutes() int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.minutes
 }
 
 // Hour returns the in-game hour, 0-23.

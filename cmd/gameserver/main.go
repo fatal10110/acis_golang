@@ -160,9 +160,10 @@ func newGameServerApp(paths gameServerPaths) *fx.App {
 			network.NewSessionValidator,
 			provideLoginLinkState,
 			provideSkillPersistence,
+			providePlayerClock,
 			provideGameClientLink,
 		),
-		fx.Invoke(startPvPFlags, startGroundItems, startGroundItemPersistence, startGameClock, startWalker, startWater, startShadowItems, startDecay, startAttackStance, startWorldObjects, startRespawnTask, startAI, startPositionUpdates, startNpcs, startNpcPersistence, startGameServer),
+		fx.Invoke(startPvPFlags, startGroundItems, startGroundItemPersistence, startPlayerClock, startGameClock, startWalker, startWater, startShadowItems, startDecay, startAttackStance, startWorldObjects, startRespawnTask, startAI, startPositionUpdates, startNpcs, startNpcPersistence, startGameServer),
 	)
 }
 
@@ -600,6 +601,14 @@ func startGameClock(lc fx.Lifecycle, clock *task.GameClock, log zerolog.Logger) 
 	})
 }
 
+func providePlayerClock(clock *task.GameClock, state *world.State) (*task.PlayerClock, error) {
+	return task.NewPlayerClock(clock, state, network.NewPlayerClockEffects(state))
+}
+
+// startPlayerClock forces PlayerClock construction before startGameClock
+// launches the ticker; PlayerClock itself registers listeners on GameClock.
+func startPlayerClock(_ *task.PlayerClock) {}
+
 func provideWalker(data *gameData, state *world.State) (*task.Walker, error) {
 	return task.NewWalker(data.Routes, task.GeoPath{Geo: data.Geo, Finder: data.Finder}, time.Now, state)
 }
@@ -920,11 +929,12 @@ func provideGameClientLink(
 	ground *task.GroundItems,
 	attackStance *task.AttackStance,
 	positions *task.PositionUpdates,
+	playerClock *task.PlayerClock,
 	respawnHP respawnRestoreHP,
 	spBookNeeded skillEnchantSPBookNeeded,
 	log zerolog.Logger,
 ) *network.GameClientLink {
-	return network.NewGameClientLink(validator, links.get, roster, items, shortcuts, data.Players, data.Items, html, crests, skills, spellbooks, data.Trees, data.CursedWeapons, state, move.NewGeo(data.Geo, data.Finder), ids, ground, attackStance, positions, data.Restarts, float64(respawnHP), data.Levels, bool(spBookNeeded), log)
+	return network.NewGameClientLink(validator, links.get, roster, items, shortcuts, data.Players, data.Items, html, crests, skills, spellbooks, data.Trees, data.CursedWeapons, state, move.NewGeo(data.Geo, data.Finder), ids, ground, attackStance, positions, playerClock, data.Restarts, float64(respawnHP), data.Levels, bool(spBookNeeded), log)
 }
 
 func provideSkillPersistence(pool *sql.DB, data *gameData) *skillstate.Persistence {

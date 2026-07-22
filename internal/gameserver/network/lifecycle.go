@@ -31,6 +31,9 @@ func (l *GameClientLink) detachLivePlayer(ctx context.Context, live *livePlayer)
 			}
 		}
 	}
+	if l.playerClock != nil {
+		l.playerClock.Remove(live.ObjectID())
+	}
 	if l.world != nil {
 		l.world.Despawn(live)
 		l.world.RemovePlayer(live.ObjectID())
