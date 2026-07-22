@@ -57,6 +57,7 @@ func TestCharacterCrowdControlGettersTrackActiveEffectsAndClearOnRemoval(t *test
 		{"Rooted", "Root", (*Character).Rooted},
 		{"Sleeping", "Sleep", (*Character).Sleeping},
 		{"Afraid", "Fear", (*Character).Afraid},
+		{"ImmobileUntilAttacked", "ImmobileUntilAttacked", (*Character).ImmobileUntilAttacked},
 	}
 
 	for _, tt := range tests {
@@ -115,7 +116,28 @@ func TestCharacterEffectListAndCrowdControlGettersAreSafeBeforeLiveIsAttached(t 
 	if c.EffectList() != nil {
 		t.Fatal("EffectList() = non-nil before Live is attached")
 	}
-	if c.Stunned() || c.Rooted() || c.Sleeping() || c.Afraid() || c.Paralyzed() {
+	if c.Stunned() || c.Rooted() || c.Sleeping() || c.Afraid() || c.ImmobileUntilAttacked() || c.Paralyzed() || c.Teleporting() {
 		t.Fatal("a crowd-control getter reported true before Live is attached")
+	}
+}
+
+func TestCharacterTeleportingReportsLiveState(t *testing.T) {
+	c := &Character{ID: 1}
+	attachTestLive(t, c)
+
+	if c.Teleporting() {
+		t.Fatal("Teleporting() = true on a fresh character")
+	}
+	if !c.SetTeleporting(true) {
+		t.Fatal("SetTeleporting(true) reported no change")
+	}
+	if !c.Teleporting() {
+		t.Fatal("Teleporting() = false after SetTeleporting(true)")
+	}
+	if !c.SetTeleporting(false) {
+		t.Fatal("SetTeleporting(false) reported no change")
+	}
+	if c.Teleporting() {
+		t.Fatal("Teleporting() = true after SetTeleporting(false)")
 	}
 }

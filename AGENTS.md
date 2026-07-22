@@ -44,20 +44,6 @@ follow-up notes. The canonical shared cache for both Codex and Claude is
 `../.claude/skills/acis-porting/cache/`. The `.claude` path name is historical; do not keep a
 separate Codex-only cache for issue status or investigation context.
 
-## Tool and skill use — when context is not already local
-
-- Use **OpenMemory** when a task may depend on prior project decisions, user preferences, issue
-  context, or naming/architecture choices that are not visible in the current files. Treat memory as
-  a hint; verify against this repo and the spec docs before coding.
-- Use **grepai** for semantic codebase exploration when you know the behavior or concept but not the
-  exact identifier or file. Check `grepai status --no-ui` when available, use `grepai search` for
-  intent-based discovery, and use `rg` for exact text, symbols, and file names.
-- Use **Ponytail** for coding work: prefer the smallest correct Go change, reuse existing code first,
-  avoid speculative abstractions, and leave the minimum useful check for non-trivial logic.
-- Use relevant **Superpowers** skills when they match the task, especially systematic debugging for
-  bugs, TDD for behavior changes, and verification-before-completion before claiming work is done.
-  User instructions and this file stay higher priority than skill defaults.
-
 Use these docs to learn **what** to produce — the bytes, numbers, sequences, and rules. They are a
 specification of behavior, and they describe an existing implementation as the authority for that
 behavior. That is precisely the material §0 tells you **not** to echo into this repository: read them,
@@ -88,6 +74,33 @@ server packets are related to the behavior being touched.
   missing.
 - Verify packet opcode, field order, state gating, send order, and byte layout with oracle fixtures,
   `packetdiff`, or focused packet tests whenever the behavior reaches the wire.
+- **Every rejection branch inside an implemented handler must still answer.** "The opcode is wired"
+  is not the same guarantee as "every branch through it sends something back." A handler that decodes
+  a request, then returns early on some internal condition (missing object, wrong state, insufficient
+  materials, no active session) without sending a reply or `ActionFailed` leaves the client's pending
+  action unresolved — this has repeatedly presented as "character stops responding to movement" or
+  "item never leaves the ground" (see #828/#829/#873). When you add or touch a handler that reacts to
+  a client action packet, walk every early return and confirm it sends a domain packet, a system
+  message, or `ActionFailed` — never nothing. `internal/gameserver/network/silent_action_test.go`
+  sweeps the live action opcodes with deliberately-rejectable requests and fails if any of them goes
+  silent; extend its case table when you add a new action-shaped opcode or handler branch, don't just
+  eyeball the diff.
+
+---
+
+## Tools
+
+- **grepai** — use for semantic/code search across the codebase when plain `grep`/text search isn't
+  enough (finding behavior by meaning, locating where a rule is implemented).
+- **openmemory** — use to store and recall cross-session context (decisions made, milestone progress,
+  gotchas discovered) so later sessions don't re-derive it.
+- **ponytail skill** — apply for the laziest solution that works: YAGNI, stdlib first, shortest diff.
+  Matches §9's dependency ladder — use it when tempted to over-build.
+- **superpowers skills** — use the process skills (brainstorming before new features,
+  systematic-debugging before fixes, test-driven-development for implementation) as the default
+  workflow for non-trivial changes.
+
+Reach for them when needed; don't invoke them ritually on every task.
 
 ---
 
@@ -195,6 +208,11 @@ This is a concurrent server. Concurrency is a first-class design concern, not an
 - **Channels to transfer ownership and coordinate; mutexes to guard state.** Use whichever is simpler
   for the case. Don't force a channel where a short `sync.Mutex` around a map is clearer, and don't
   share a map across goroutines with no guard at all.
+- **`sync.RWMutex` once reads and writes coexist.** If a type has even one read-only accessor
+  (a getter, a lookup) alongside methods that mutate, default to `sync.RWMutex`: `RLock`/`RUnlock` in
+  the read-only methods, `Lock`/`Unlock` in the writers. Plain `sync.Mutex` is only for types with no
+  read-only accessor at all (every method mutates). A read path that also mutates as a side effect
+  (e.g. lazily evicting an expired entry) is a writer, not a reader — it keeps `Lock`, not `RLock`.
 - **One goroutine writes a given connection.** Per connection: a read goroutine and a write goroutine
   draining a channel. Never write the same socket from two goroutines.
 - **Context for lifecycle.** Long-running loops take `context.Context` and stop on cancel. Shutdown
@@ -236,6 +254,11 @@ internal/<area>/       all implementation (unimportable outside this module — 
 
 - Organize packages **by responsibility/domain**, not by layer-type. `player`, `world`, `skill`,
   `item`, `geo`, `packet`, `db` — each a cohesive unit with a small surface.
+- **Place a helper by what it operates on, not by who first needed it.** An encoding/parsing/rendering
+  function for a type belongs beside that type's definition, even if the first caller was a DB store or
+  a network codec. A `sql` package reaching for a byte<->text codec for a domain type should call it
+  from `model`, never own it — otherwise every other caller of that codec (a CLI, a second store) ends
+  up importing the DB package just to get a text encoder.
 - **Network packages are protocol orchestration only.** Code under `internal/gameserver/network`
   decodes client packets, resolves session/world context, calls domain APIs, and maps domain outcomes
   to server packets. It must not own game rules: skill/cast validation, target rules, costs, HP/MP
@@ -264,23 +287,6 @@ internal/<area>/       all implementation (unimportable outside this module — 
 - Prefer fast, hermetic unit tests. Anything needing external services is separated and not on the
   default `go test ./...` path.
 
-### Integration parity plan
-
-Integration tests compare the original Java backend and this Go backend as black boxes. Keep one
-backend-neutral harness: it connects to a configured login/game address, runs a scripted scenario, and
-emits a canonical transcript of packets, visible state, and saved rows.
-
-- Run both backends from the same manifest: datapack, SQL baseline, config files, and geodata list.
-  If the manifest differs, the test is invalid.
-- Run each scenario against Java first as the oracle, then against Go, and diff the canonical
-  transcripts. The harness must not contain backend-specific assertions.
-- Keep live Java-vs-Go runs opt-in or scheduled; they need processes, ports, and a database. Default CI
-  should diff Go against committed oracle fixtures generated from those runs.
-- Start with connection/login, character lifecycle, and EnterWorld. Add movement, inventory/money,
-  combat/skills, and persistence only when the earlier scenarios are stable.
-- A failure reports the scenario step, backend, input manifest, and smallest canonical diff needed to
-  reproduce the mismatch.
-
 ## 9. Dependencies
 
 Follow the ladder — stop at the first rung that works:
@@ -294,7 +300,7 @@ Follow the ladder — stop at the first rung that works:
 5. Can it be a few lines of our own code? Write the few lines.
 
 Keep the dependency set tiny, but do not hand-roll a subsystem when a standard Go package or a small,
-well-scoped dependency is the simpler, safer implementation. For logging in this repo, use Logrus and
+well-scoped dependency is the simpler, safer implementation. For logging in this repo, use zerolog and
 write only the glue needed to map existing config and route project-specific sinks. For non-trivial
 application composition, use Uber Fx instead of inventing a DI/lifecycle framework.
 
@@ -334,6 +340,7 @@ Seeing the left column in a diff means stop and rewrite as the right column.
 | reflection-driven registration | explicit registration in `main` or a package var |
 | shared map mutated from many goroutines, unguarded | documented mutex, or channel-owned state |
 | `Util`/`Helper` grab-bag package | put the function next to the type it serves |
+| a type's codec/formatter living in the package of its first caller (e.g. a hex encoder for a game-server key defined in the `sql` package) | move it beside the type's own definition (`model`); every caller depends on it equally |
 
 ## 13. Worked example — the same behavior, two ways
 
@@ -415,6 +422,9 @@ inheritance, zero getters, zero singleton, explicit ownership. **This is the bar
 - [ ] Exact-contract outputs verified against committed known-good vectors.
 - [ ] Packet impact check completed: related client/server packets are implemented, wired, tested, or
       explicitly deferred with a reason.
+- [ ] Every rejection branch in a touched action-packet handler answers with a packet, system message,
+      or `ActionFailed` — none fall through silently. `silent_action_test.go`'s case table is extended
+      to cover any new action-shaped opcode or handler branch.
 - [ ] Network boundary check completed: packet handlers contain only protocol/session/world
       orchestration and packet mapping; domain rules live outside `network`.
 - [ ] `gofmt` + `go vet` clean; exported items documented; comments explain why.
