@@ -568,6 +568,41 @@ func (c *Character) ManaDamageInput(caster any, def modelskill.Definition) (form
 	}, true
 }
 
+// LethalRate returns c's lethal-strike rate multiplier.
+func (c *Character) LethalRate() float64 {
+	return c.calcStat(stat.LethalRate, 1)
+}
+
+// LethalInput resolves a lethal-strike roll against c.
+func (c *Character) LethalInput(caster any, def modelskill.Definition) (formulas.LethalInput, bool) {
+	attacker, ok := caster.(interface {
+		Level() int
+		LethalRate() float64
+	})
+	if !ok {
+		return formulas.LethalInput{}, false
+	}
+	return formulas.LethalInput{
+		Chance1:       def.LethalChance1,
+		Chance2:       def.LethalChance2,
+		MagicLevel:    def.MagicLevel,
+		AttackerLevel: attacker.Level(),
+		TargetLevel:   c.Level(),
+		LethalMul:     attacker.LethalRate(),
+	}, true
+}
+
+// ApplyLethalOutcome applies a lethal-strike tier to c.
+func (c *Character) ApplyLethalOutcome(outcome formulas.LethalOutcome, _ any, _ modelskill.Definition) {
+	switch outcome {
+	case formulas.LethalFull:
+		c.SetHP(1)
+		c.SetCP(1)
+	case formulas.LethalHalf:
+		c.SetCP(1)
+	}
+}
+
 func (c *Character) elementalSkillModifier(def modelskill.Definition) float64 {
 	s, ok := elementResistanceStat(def.Element)
 	if !ok {

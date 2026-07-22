@@ -153,6 +153,48 @@ func TestCharacterFormulaInputsResolveLiveStats(t *testing.T) {
 	}
 }
 
+func TestCharacterLethalInputAndOutcomes(t *testing.T) {
+	tmpl := combatTemplate()
+	caster := liveCharacter(1, tmpl, combatItems())
+	target := liveCharacter(2, tmpl, combatItems())
+	target.SetResourceValues(Resources{
+		MaxHP: 500, CurrentHP: 500,
+		MaxMP: 30, CurrentMP: 30,
+		MaxCP: 200, CurrentCP: 200,
+	})
+	caster.CharLevel = 40
+	target.CharLevel = 45
+	caster.AddStatFuncs([]basefunc.Func{
+		basefunc.NewMul(&struct{}{}, stat.LethalRate, 1.5, nil),
+	})
+
+	skill := modelskill.Definition{MagicLevel: 40, LethalChance1: 30, LethalChance2: 10}
+	in, ok := target.LethalInput(caster, skill)
+	if !ok {
+		t.Fatal("LethalInput() ok = false")
+	}
+	if in.Chance1 != 30 || in.Chance2 != 10 || in.MagicLevel != 40 {
+		t.Fatalf("LethalInput skill fields = %+v, want chances 30/10 and magic level 40", in)
+	}
+	if in.AttackerLevel != 40 || in.TargetLevel != 45 || in.LethalMul != 1.5 {
+		t.Fatalf("LethalInput actor fields = %+v, want attacker 40 target 45 lethal mul 1.5", in)
+	}
+
+	target.SetHP(500)
+	target.SetCP(200)
+	target.ApplyLethalOutcome(formulas.LethalHalf, caster, skill)
+	if target.HP() != 500 || target.CP() != 1 {
+		t.Fatalf("half lethal hp/cp = %v/%v, want 500/1", target.HP(), target.CP())
+	}
+
+	target.SetHP(500)
+	target.SetCP(200)
+	target.ApplyLethalOutcome(formulas.LethalFull, caster, skill)
+	if target.HP() != 1 || target.CP() != 1 {
+		t.Fatalf("full lethal hp/cp = %v/%v, want 1/1", target.HP(), target.CP())
+	}
+}
+
 func TestCharacterSkillDamageInputsUseElementalSkillModifier(t *testing.T) {
 	tmpl := combatTemplate()
 	tmpl.MAtk = 25
