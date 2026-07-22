@@ -1159,11 +1159,12 @@ func newTestLivePlayer(t *testing.T, id int32, capture *frameCapture) *livePlaye
 	ch.SetFrameSender(capture.send)
 
 	x, y, z := ch.Position()
-	cm, err := move.NewCreatureMove(location.Location{X: x, Y: y, Z: z}, tmpl.RunSpeed, testGeo{})
+	live, err := creature.NewLive(location.Location{X: x, Y: y, Z: z}, tmpl.RunSpeed, testGeo{}, ch)
 	if err != nil {
 		t.Fatal(err)
 	}
-	moveCtl, err := move.NewController(cm, ch)
+	ch.Live = live
+	moveCtl, err := move.NewController(ch.Move(), ch)
 	if err != nil {
 		t.Fatal(err)
 	}

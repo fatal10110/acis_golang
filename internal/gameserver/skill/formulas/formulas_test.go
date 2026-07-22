@@ -219,6 +219,80 @@ func TestBlowDamage(t *testing.T) {
 	}
 }
 
+func TestLethalRate(t *testing.T) {
+	tests := []struct {
+		name string
+		in   LethalInput
+		want float64
+	}{
+		{
+			name: "no magic level uses attacker target level ratio",
+			in:   LethalInput{Chance1: 10, AttackerLevel: 40, TargetLevel: 40, LethalMul: 1},
+			want: 100,
+		},
+		{
+			name: "magic level within three levels uses attacker target level ratio",
+			in:   LethalInput{Chance1: 15, MagicLevel: 40, AttackerLevel: 40, TargetLevel: 40, LethalMul: 1},
+			want: 150,
+		},
+		{
+			name: "magic level four to nine below uses divided penalty",
+			in:   LethalInput{Chance1: 30, MagicLevel: 40, AttackerLevel: 40, TargetLevel: 45, LethalMul: 1},
+			want: 150,
+		},
+		{
+			name: "magic level ten or more below uses fifteenth penalty",
+			in:   LethalInput{Chance1: 30, MagicLevel: 40, AttackerLevel: 40, TargetLevel: 60, LethalMul: 1},
+			want: 20,
+		},
+		{
+			name: "lethal stat multiplier scales final per mille rate",
+			in:   LethalInput{Chance1: 10, AttackerLevel: 40, TargetLevel: 40, LethalMul: 1.5},
+			want: 150,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := LethalRate(tt.in, tt.in.Chance1); !almostEqual(got, tt.want) {
+				t.Fatalf("LethalRate() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestLethalHitRollsSecondTierBeforeFirst(t *testing.T) {
+	in := LethalInput{
+		Chance1:       10,
+		Chance2:       1,
+		MagicLevel:    0,
+		AttackerLevel: 40,
+		TargetLevel:   40,
+		LethalMul:     1,
+	}
+	rolls := []int{10, 99}
+	calls := 0
+	outcome := LethalHit(in, func(n int) int {
+		if n != 1000 {
+			t.Fatalf("roll bound = %d, want 1000", n)
+		}
+		roll := rolls[calls]
+		calls++
+		return roll
+	})
+	if outcome != LethalHalf {
+		t.Fatalf("LethalHit() = %v, want LethalHalf", outcome)
+	}
+	if calls != 2 {
+		t.Fatalf("roll calls = %d, want 2", calls)
+	}
+
+	in.Chance2 = 100
+	outcome = LethalHit(in, func(int) int { return 999 })
+	if outcome != LethalFull {
+		t.Fatalf("LethalHit() with guaranteed second tier = %v, want LethalFull", outcome)
+	}
+}
+
 func TestMagicDamage(t *testing.T) {
 	plain := MagicDamageInput{
 		MAtk: 400, MDef: 50, SkillPower: 20,

@@ -153,6 +153,49 @@ func TestGameClientLinkMagicSkillUseSendsAttackFailedWhenContinuousSkillDoesNotL
 	}
 }
 
+func TestGameClientLinkMagicSkillUseAppliesReferencedEffectSkillAtFallbackLevel(t *testing.T) {
+	store := newMemorySkillSaveStore()
+	skills := skillstate.NewPersistence(store, modelskill.NewTable([]modelskill.Definition{
+		{
+			ID: 454, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+			SkillType: "BUFF", EffectID: 5123,
+		},
+		{
+			ID: 5123, Level: 1, SkillType: "BUFF",
+			Effects: []modelskill.EffectTemplate{{Name: "Buff", Time: 60}},
+		},
+	}), store)
+	var objID int32
+	c, _, _, state := newLinkedGameClientWithSkillsSeed(t, skills, func(chars *fakeCharStore, _ *fakeItemStore) {
+		objID = seedSelectableCharacter(t, chars, "player1", "Newbie", 5, 0)
+		store.seedKnown(objID, 0, player.SkillLevels{454: 1})
+	}, 1)
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	c.send(encodeRequestMagicSkillUse(454, false, false))
+	c.read() // MagicSkillUse
+	c.read() // SystemMessage
+	c.read() // MagicSkillLaunched
+
+	obj, ok := state.Player(objID)
+	if !ok {
+		t.Fatalf("player %d not found in world state after cast", objID)
+	}
+	character, ok := obj.(*livePlayer)
+	if !ok {
+		t.Fatalf("world state player %d is not a *livePlayer", objID)
+	}
+	effects := character.EffectList().All()
+	if len(effects) != 1 || effects[0].Skill.ID != 5123 || effects[0].Skill.Level != 1 {
+		t.Fatalf("effects after effectId self-cast BUFF = %+v, want one effect from skill 5123 level 1", effects)
+	}
+}
+
 // TestGameClientLinkTogglesOnThenOff reproduces recasting a toggle skill
 // twice: the first cast has no active instance yet, so it pays the MP cost
 // and applies the buff; the second cast finds that instance still active,
