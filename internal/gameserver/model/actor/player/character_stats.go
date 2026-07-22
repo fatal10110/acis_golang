@@ -12,7 +12,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/funcs"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/statbonus"
 )
 
 const perfectShieldBlockRate = 5
@@ -44,6 +43,11 @@ func (c *Character) calcStat(s stat.Stat, base float64) float64 {
 		return 0
 	}
 	return value
+}
+
+// CalcStat finalizes base for s through c's live stat calculator.
+func (c *Character) CalcStat(s stat.Stat, base float64) float64 {
+	return c.calcStat(s, base)
 }
 
 func defaultStatFuncs(s stat.Stat) []basefunc.Func {
@@ -468,7 +472,7 @@ func (c *Character) RechargeMP(amount float64) float64 {
 // HealAmount resolves c's outgoing HEAL amount before target effectiveness.
 func (c *Character) HealAmount(def modelskill.Definition) (float64, bool) {
 	amount := float64(def.Power) + c.HealProficiency()
-	if skillTypeKey(def.SkillType) == "HEAL_STATIC" {
+	if creature.SkillTypeKey(def.SkillType) == "HEAL_STATIC" {
 		return amount, true
 	}
 	return amount + math.Sqrt(float64(int(c.MAtk()))), true
@@ -477,95 +481,25 @@ func (c *Character) HealAmount(def modelskill.Definition) (float64, bool) {
 // PhysicalSkillInput resolves the damage formula input for a physical skill
 // cast by caster against c.
 func (c *Character) PhysicalSkillInput(caster any, def modelskill.Definition) (formulas.PhysicalSkillInput, bool) {
-	attacker, ok := caster.(*Character)
-	if !ok || attacker == nil {
-		return formulas.PhysicalSkillInput{}, false
-	}
-	soulshot := attacker.SoulshotCharged()
-	skillPower := float64(def.Power)
-	if soulshot && def.SoulShotBoost > 0 {
-		skillPower *= float64(def.SoulShotBoost)
-	}
-	return formulas.PhysicalSkillInput{
-		AttackPower:   attacker.PAtk(),
-		SkillPower:    skillPower,
-		Defence:       positive(c.PDef()),
-		Crit:          attacker.physicalSkillCrit(def),
-		SoulShot:      soulshot,
-		RandomMul:     attacker.randomDamageMultiplier(def),
-		ElementalMul:  c.elementalSkillModifier(def),
-		RaceMul:       1,
-		WeaponVulnMul: c.weaponVulnerability(attacker),
-		PvPMul:        attacker.calcStat(stat.PvPPhysSkillDmg, 1),
-	}, true
+	return creature.ResolvePhysicalSkillInput(caster, c, def, creature.Playable(caster), 1)
 }
 
 // MagicDamageInput resolves the damage formula input for a magic skill cast
 // by caster against c.
 func (c *Character) MagicDamageInput(caster any, def modelskill.Definition) (formulas.MagicDamageInput, bool) {
-	attacker, ok := caster.(*Character)
-	if !ok || attacker == nil {
-		return formulas.MagicDamageInput{}, false
-	}
-	sps, bsps := attacker.spiritshotFlags()
-	return formulas.MagicDamageInput{
-		MAtk:            attacker.MAtk(),
-		MDef:            positive(c.MDef()),
-		SkillPower:      float64(def.Power),
-		PvPMul:          attacker.magicPvPMul(def),
-		ElementalMul:    c.elementalSkillModifier(def),
-		MagicCrit:       formulas.MCritSucceeds(int(attacker.MagicCriticalRate()), attacker.rollValue(1000)),
-		SoulShot:        sps,
-		BlessedSoulShot: bsps,
-	}, true
+	return creature.ResolveMagicDamageInput(caster, c, def, creature.Playable(caster))
 }
 
 // BlowInput resolves the damage formula input for a blow skill cast by
 // caster against c.
 func (c *Character) BlowInput(caster any, def modelskill.Definition) (formulas.BlowInput, bool) {
-	attacker, ok := caster.(*Character)
-	if !ok || attacker == nil {
-		return formulas.BlowInput{}, false
-	}
-	soulshot := attacker.SoulshotCharged()
-	skillPower := float64(def.Power)
-	if soulshot && def.SoulShotBoost > 0 {
-		skillPower *= float64(def.SoulShotBoost)
-	}
-	return formulas.BlowInput{
-		AttackPower:       attacker.PAtk(),
-		SkillPower:        skillPower,
-		Defence:           positive(c.PDef()),
-		SoulShot:          soulshot,
-		IsPvP:             true,
-		RandomMul:         float64(95+attacker.rollValue(11)) / 100,
-		PosMul:            c.positionMultiplierFrom(attacker, true),
-		PvPMul:            attacker.calcStat(stat.PvPPhysSkillDmg, 1),
-		CritDamageMul:     attacker.calcStat(stat.CriticalDamage, 1),
-		CritDamagePosMul:  (attacker.calcStat(stat.CriticalDamagePos, 1)-1)/2 + 1,
-		CritVulnMul:       c.calcStat(stat.CritVuln, 1),
-		DaggerVulnMul:     c.calcStat(stat.DaggerWpnVuln, 1),
-		CritDamageAddBase: attacker.calcStat(stat.CriticalDamageAdd, 0),
-	}, true
+	return creature.ResolveBlowInput(caster, c, def, creature.Playable(caster))
 }
 
 // ManaDamageInput resolves the MP-damage formula input for a magic skill
 // cast by caster against c.
 func (c *Character) ManaDamageInput(caster any, def modelskill.Definition) (formulas.ManaDamageInput, bool) {
-	attacker, ok := caster.(*Character)
-	if !ok || attacker == nil {
-		return formulas.ManaDamageInput{}, false
-	}
-	sps, bsps := attacker.spiritshotFlags()
-	return formulas.ManaDamageInput{
-		MAtk:            attacker.MAtk(),
-		MDef:            positive(c.MDef()),
-		SkillPower:      float64(def.Power),
-		TargetMaxMp:     c.MaxMPValue(),
-		SoulShot:        sps,
-		BlessedSoulShot: bsps,
-		VulnMul:         c.skillVulnerability(def.SkillType, def),
-	}, true
+	return creature.ResolveManaDamageInput(caster, c, c.MaxMPValue(), def)
 }
 
 // LethalRate returns c's lethal-strike rate multiplier.
@@ -601,106 +535,4 @@ func (c *Character) ApplyLethalOutcome(outcome formulas.LethalOutcome, _ any, _ 
 	case formulas.LethalHalf:
 		c.SetCP(1)
 	}
-}
-
-func (c *Character) elementalSkillModifier(def modelskill.Definition) float64 {
-	s, ok := elementResistanceStat(def.Element)
-	if !ok {
-		return 1
-	}
-	return c.calcStat(s, 1)
-}
-
-func elementResistanceStat(element modelskill.Element) (stat.Stat, bool) {
-	switch element {
-	case modelskill.ElementWind:
-		return stat.WindRes, true
-	case modelskill.ElementFire:
-		return stat.FireRes, true
-	case modelskill.ElementWater:
-		return stat.WaterRes, true
-	case modelskill.ElementEarth:
-		return stat.EarthRes, true
-	case modelskill.ElementHoly:
-		return stat.HolyRes, true
-	case modelskill.ElementDark:
-		return stat.DarkRes, true
-	case modelskill.ElementValakas:
-		return stat.ValakasRes, true
-	default:
-		return 0, false
-	}
-}
-
-func (c *Character) spiritshotFlags() (sps, bsps bool) {
-	bsps = c.BlessedSpiritshotCharged()
-	if bsps {
-		return false, true
-	}
-	return c.SpiritshotCharged(), false
-}
-
-func (c *Character) magicPvPMul(def modelskill.Definition) float64 {
-	if def.Magic {
-		return c.calcStat(stat.PvPMagicalDmg, 1)
-	}
-	return c.calcStat(stat.PvPPhysSkillDmg, 1)
-}
-
-func (c *Character) positionMultiplierFrom(attacker *Character, crit bool) float64 {
-	targetFacing := location.OrientedLocation{Location: c.CurrentLocation(), Heading: c.CurrentHeading()}
-	attackerLoc := attacker.CurrentLocation()
-	return formulas.PosMul(targetFacing.IsBehind(attackerLoc), targetFacing.IsInFrontOf(attackerLoc), crit)
-}
-
-func (c *Character) physicalSkillCrit(def modelskill.Definition) bool {
-	if def.BaseCritRate <= 0 {
-		return false
-	}
-	rate := float64(def.BaseCritRate) * 10 * statbonus.STRBonus[c.STR()]
-	return formulas.CritSucceeds(rate, c.rollValue(1000))
-}
-
-func (c *Character) randomDamageMultiplier(def modelskill.Definition) float64 {
-	if skillTypeKey(def.EffectType) == "CHARGEDAM" {
-		return 1
-	}
-	weapon := c.activeWeapon()
-	if weapon.tmpl == nil || weapon.tmpl.Weapon == nil || weapon.tmpl.Weapon.RandomDamage <= 0 {
-		return 1
-	}
-	spread := int(weapon.tmpl.Weapon.RandomDamage)
-	return 1 + float64(c.rollValue(2*spread+1)-spread)/100
-}
-
-func (c *Character) weaponVulnerability(attacker *Character) float64 {
-	switch attacker.AttackType() {
-	case item.WeaponSword:
-		return c.calcStat(stat.SwordWpnVuln, 1)
-	case item.WeaponBlunt:
-		return c.calcStat(stat.BluntWpnVuln, 1)
-	case item.WeaponDagger:
-		return c.calcStat(stat.DaggerWpnVuln, 1)
-	case item.WeaponBow:
-		return c.calcStat(stat.BowWpnVuln, 1)
-	case item.WeaponPole:
-		return c.calcStat(stat.PoleWpnVuln, 1)
-	case item.WeaponDual:
-		return c.calcStat(stat.DualWpnVuln, 1)
-	case item.WeaponDualFist:
-		return c.calcStat(stat.DualFistWpnVuln, 1)
-	case item.WeaponBigSword:
-		return c.calcStat(stat.BigSwordWpnVuln, 1)
-	case item.WeaponBigBlunt:
-		return c.calcStat(stat.BigBluntWpnVuln, 1)
-	default:
-		return 1
-	}
-}
-
-func positive(v float64) float64 {
-	if v <= 0 {
-		return 1
-	}
-	return v
 }

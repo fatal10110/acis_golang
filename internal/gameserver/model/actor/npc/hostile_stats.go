@@ -76,6 +76,11 @@ func (h *Hostile) calcStat(s stat.Stat, base float64) float64 {
 	return value
 }
 
+// CalcStat finalizes base for s through h's live stat calculator.
+func (h *Hostile) CalcStat(s stat.Stat, base float64) float64 {
+	return h.calcStat(s, base)
+}
+
 // defaultStatFuncs returns the base stat-finalization funcs every NPC
 // attaches for s. Unlike a player, an NPC gets no henna or CP funcs — the
 // reference AI only ever adds the shared creature set to a monster.
@@ -143,3 +148,24 @@ func (a hostileStatActor) LevelMod() float64 {
 }
 
 func (a hostileStatActor) IsSummon() bool { return false }
+
+// STR returns this NPC's current STR attribute.
+func (h *Hostile) STR() int { return hostileStatActor{h: h}.STR() }
+
+// CON returns this NPC's current CON attribute.
+func (h *Hostile) CON() int { return hostileStatActor{h: h}.CON() }
+
+// DEX returns this NPC's current DEX attribute.
+func (h *Hostile) DEX() int { return hostileStatActor{h: h}.DEX() }
+
+// INT returns this NPC's current INT attribute.
+func (h *Hostile) INT() int { return hostileStatActor{h: h}.INT() }
+
+// WIT returns this NPC's current WIT attribute.
+func (h *Hostile) WIT() int { return hostileStatActor{h: h}.WIT() }
+
+// MEN returns this NPC's current MEN attribute.
+func (h *Hostile) MEN() int { return hostileStatActor{h: h}.MEN() }
+
+// LevelMod returns this NPC's level-scaling factor.
+func (h *Hostile) LevelMod() float64 { return hostileStatActor{h: h}.LevelMod() }
