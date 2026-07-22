@@ -86,6 +86,7 @@ type GameClientLink struct {
 	groundItems              groundItemDropper
 	attackStance             attackStanceTracker
 	positions                *task.PositionUpdates
+	playerClock              *task.PlayerClock
 	restarts                 *restart.Table
 	respawnRestoreHP         float64
 	levels                   *player.LevelTable
@@ -139,6 +140,7 @@ func NewGameClientLink(
 	groundItems groundItemDropper,
 	attackStance attackStanceTracker,
 	positions *task.PositionUpdates,
+	playerClock *task.PlayerClock,
 	restarts *restart.Table,
 	respawnRestoreHP float64,
 	levels *player.LevelTable,
@@ -165,6 +167,7 @@ func NewGameClientLink(
 		groundItems:              groundItems,
 		attackStance:             attackStance,
 		positions:                positions,
+		playerClock:              playerClock,
 		restarts:                 restarts,
 		respawnRestoreHP:         respawnRestoreHP,
 		levels:                   levels,

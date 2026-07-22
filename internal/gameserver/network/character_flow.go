@@ -105,6 +105,11 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 		l.world.Spawn(live, x, y, z, c.LastHeading)
 		l.world.AddPlayer(live)
 	}
+	// Track this player for the in-game clock's activity reminder so the
+	// PLAYING_FOR_LONG_TIME send reaches them every 720 game minutes.
+	if l.playerClock != nil {
+		l.playerClock.Add(live)
+	}
 
 	client.Session.SendFrame(serverpackets.FrameExStorageMaxCount(c))
 	client.Session.SendFrame(serverpackets.FrameHennaInfo(c.ClassID))

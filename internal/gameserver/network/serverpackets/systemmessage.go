@@ -81,6 +81,11 @@ const (
 	SystemMessageNotEnoughSpiritshots             = 531
 	SystemMessageCannotUseSpiritshots             = 532
 	SystemMessageEnabledSpiritshot                = 533
+
+	// Periodic in-game clock messages.
+	SystemMessagePlayingForLongTime       = 764  // no parameter
+	SystemMessageNightSkillEffectApplies  = 1131 // skill-name parameter
+	SystemMessageDaySkillEffectDisappears = 1132 // skill-name parameter
 )
 
 // SystemMessage parameter types used by focused packet helpers.
