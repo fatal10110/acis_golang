@@ -118,6 +118,64 @@ func TestDesireQueueDecreaseWeightByTypeRemovesBelowZero(t *testing.T) {
 	}
 }
 
+func TestDesireQueueRemoveByKindAndTarget(t *testing.T) {
+	q := NewDesireQueue()
+	target := actor(1)
+	other := actor(2)
+	q.AddOrUpdate(&Desire{Kind: IntentionAttack, FinalTarget: target, Weight: 100})
+	q.AddOrUpdate(&Desire{Kind: IntentionCast, FinalTarget: target, Weight: 200})
+	q.AddOrUpdate(&Desire{Kind: IntentionAttack, FinalTarget: other, Weight: 50})
+
+	q.Remove(IntentionAttack, target)
+
+	if got := q.Len(); got != 2 {
+		t.Fatalf("Len() = %d, want 2", got)
+	}
+	got, ok := q.Peek()
+	if !ok {
+		t.Fatal("Peek() ok = false, want true")
+	}
+	if got.Kind != IntentionCast || got.FinalTarget != target {
+		t.Fatalf("Peek() = (%v, %v), want cast desire for removed attack target still present", got.Kind, got.FinalTarget)
+	}
+}
+
+func TestDesireQueueRemoveFinalTarget(t *testing.T) {
+	q := NewDesireQueue()
+	target := actor(1)
+	other := actor(2)
+	q.AddOrUpdate(&Desire{Kind: IntentionAttack, FinalTarget: target, Weight: 100})
+	q.AddOrUpdate(&Desire{Kind: IntentionCast, FinalTarget: target, Weight: 200})
+	q.AddOrUpdate(&Desire{Kind: IntentionAttack, FinalTarget: other, Weight: 50})
+
+	q.RemoveFinalTarget(target)
+
+	if got := q.Len(); got != 1 {
+		t.Fatalf("Len() = %d, want only the other target left", got)
+	}
+	got, ok := q.Peek()
+	if !ok || got.FinalTarget != other {
+		t.Fatalf("Peek() = (%v, %v), want other target", got, ok)
+	}
+}
+
+func TestDesireQueueRemoveKind(t *testing.T) {
+	q := NewDesireQueue()
+	target := actor(1)
+	q.AddOrUpdate(&Desire{Kind: IntentionAttack, FinalTarget: target, Weight: 100})
+	q.AddOrUpdate(&Desire{Kind: IntentionCast, FinalTarget: target, Weight: 200})
+
+	q.RemoveKind(IntentionAttack)
+
+	if got := q.Len(); got != 1 {
+		t.Fatalf("Len() = %d, want only cast desire left", got)
+	}
+	got, ok := q.Peek()
+	if !ok || got.Kind != IntentionCast {
+		t.Fatalf("Peek() = (%v, %v), want cast desire", got, ok)
+	}
+}
+
 func TestDesireQueueConcurrentAccess(t *testing.T) {
 	q := NewDesireQueue()
 

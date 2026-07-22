@@ -41,6 +41,33 @@ func TestHateTable_AddSkipsSiegeGuardOnSiegeGuard(t *testing.T) {
 	}
 }
 
+func TestHateTable_AddDefaultUsesOpeningTerritoryHate(t *testing.T) {
+	table := NewHateTable(combatant(1))
+	first := combatant(2)
+	second := combatant(3)
+
+	table.AddDefault(first, true)
+	table.AddDefault(second, true)
+
+	if got := table.Hate(first); got != 300 {
+		t.Fatalf("first default hate in territory = %v, want 300", got)
+	}
+	if got := table.Hate(second); got != 100 {
+		t.Fatalf("second default hate in territory = %v, want 100", got)
+	}
+}
+
+func TestHateTable_AddDefaultOutsideTerritoryUsesBaseHate(t *testing.T) {
+	table := NewHateTable(combatant(1))
+	attacker := combatant(2)
+
+	table.AddDefault(attacker, false)
+
+	if got := table.Hate(attacker); got != 100 {
+		t.Fatalf("default hate outside territory = %v, want 100", got)
+	}
+}
+
 func TestHateTable_MostHatedHasNoPositiveFilter(t *testing.T) {
 	// Fixture: entries {a:-5, b:-10}; Collections.max with no filter picks
 	// a (-5), the greatest even though every entry is negative. Cross-
@@ -94,6 +121,33 @@ func TestHateTable_StopHateDropsEntry(t *testing.T) {
 	}
 	if got := table.Hate(attacker); got != 0 {
 		t.Errorf("Hate = %v after StopHate, want 0", got)
+	}
+}
+
+func TestHateTable_RefreshDropsDeadAndLostEntries(t *testing.T) {
+	table := NewHateTable(combatant(1))
+	dead := &fakeCombatant{id: 2, alikeDead: true}
+	lost := combatant(3)
+	kept := combatant(4)
+	table.Add(dead, 100)
+	table.Add(lost, 110)
+	table.Add(kept, 120)
+
+	changed := table.Refresh(func(c Combatant) bool {
+		return c.ObjectID() != lost.ObjectID()
+	})
+
+	if len(changed) != 2 {
+		t.Fatalf("Refresh changed %d targets, want 2", len(changed))
+	}
+	if got := table.Hate(dead); got != 0 {
+		t.Fatalf("dead attacker hate = %v, want removed", got)
+	}
+	if got := table.Hate(lost); got != 0 {
+		t.Fatalf("lost attacker hate = %v, want removed", got)
+	}
+	if got := table.Hate(kept); got != 120 {
+		t.Fatalf("kept attacker hate = %v, want 120", got)
 	}
 }
 

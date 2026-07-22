@@ -24,11 +24,6 @@ type Threat struct {
 // builds threat between two siege guards, and reports no most-hated
 // attacker while its owner is alike dead.
 //
-// Aging out stale entries (dropping attackers that haven't dealt damage
-// recently, or that left visibility) is a target-selection policy driven by
-// the NPC's AI loop, not a concern of this table; ReduceAllHate and the
-// Timestamp field give that loop what it needs to do so.
-//
 // mu guards entries.
 type ThreatTable struct {
 	owner Combatant
@@ -143,6 +138,28 @@ func (t *ThreatTable) ReduceAllHate(amount float64) {
 	for _, e := range t.entries {
 		e.Hate -= amount
 	}
+}
+
+// Refresh drops attackers the owner no longer sees and stops hate for
+// dead-equivalent attackers while preserving their damage. It returns the
+// attackers whose queued target desires should be removed.
+func (t *ThreatTable) Refresh(visible func(Combatant) bool) []Combatant {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	var changed []Combatant
+	for id, e := range t.entries {
+		if e.Attacker.AlikeDead() {
+			e.Hate = 0
+			changed = append(changed, e.Attacker)
+			continue
+		}
+		if visible != nil && !visible(e.Attacker) {
+			delete(t.entries, id)
+			changed = append(changed, e.Attacker)
+		}
+	}
+	return changed
 }
 
 // ZeroHate zeroes every entry's hate without dropping any entries.

@@ -200,6 +200,11 @@ func (h *Hostile) AddHate(attacker attackable.Combatant, hate float64) {
 	h.brain.AddHate(attacker, hate)
 }
 
+// AddDefaultHate records the default skill-cast hate against this NPC.
+func (h *Hostile) AddDefaultHate(attacker attackable.Combatant) {
+	h.brain.AddDefaultHate(attacker)
+}
+
 // monsterInstanceKinds is the subset of hostileInstanceKinds whose
 // counterpart type is Monster-family, consulted by hostility-redirect
 // effects that only accept a Monster-family actor as their target.
