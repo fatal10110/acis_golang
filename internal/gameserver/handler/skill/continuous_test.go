@@ -295,6 +295,24 @@ func TestContinuousDebuffFailRollDoesNotLand(t *testing.T) {
 	}
 }
 
+func TestContinuousDebuffFailRollReportsAttackFailed(t *testing.T) {
+	registry := NewDefaultRegistry()
+	target := newContinuousFake(2)
+	target.successInput = formulas.SkillSuccessInput{IgnoreResists: true, BaseChance: 0}
+
+	result, ok := registry.UseResult(Cast{
+		Caster:  newContinuousFake(1),
+		Skill:   modelskill.Definition{SkillType: "DEBUFF", Debuff: true, Effects: buffEffect()},
+		Targets: []any{target},
+	})
+	if !ok {
+		t.Fatal("UseResult() handled = false, want true for DEBUFF")
+	}
+	if result.AttackFailed != 1 {
+		t.Fatalf("AttackFailed = %d, want 1", result.AttackFailed)
+	}
+}
+
 func TestContinuousDebuffSuccessRollLands(t *testing.T) {
 	registry := NewDefaultRegistry()
 	target := newContinuousFake(2)

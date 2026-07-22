@@ -13,6 +13,13 @@ type EffectHandlers struct {
 	Skills  *handlerskill.Registry
 }
 
+// EffectResult reports whether effect dispatch reached a skill handler and
+// which caster-visible outcomes that handler produced.
+type EffectResult struct {
+	Handled      bool
+	AttackFailed int
+}
+
 // ApplyEffects resolves def's affected target set from caster and the
 // already cast-validated single selection, then routes the skill's effects
 // to the resolved set. It reports whether a skill handler actually ran.
@@ -28,20 +35,26 @@ type EffectHandlers struct {
 // mirrors the graceful degradation the effect handlers already use for
 // actor state this port hasn't modeled yet, rather than failing the caller.
 func ApplyEffects(handlers EffectHandlers, caster any, resolved Target, def modelskill.Definition) bool {
+	return ApplyEffectsResult(handlers, caster, resolved, def).Handled
+}
+
+// ApplyEffectsResult resolves def's affected targets and returns any
+// caster-visible result the selected skill handler produced.
+func ApplyEffectsResult(handlers EffectHandlers, caster any, resolved Target, def modelskill.Definition) EffectResult {
 	casterCreature, ok := caster.(skilltarget.Creature)
 	if !ok || handlers.Targets == nil || handlers.Skills == nil {
-		return false
+		return EffectResult{}
 	}
 	selected, _ := resolved.(skilltarget.Creature)
 
 	handler, ok := handlers.Targets.Handler(def.Target)
 	if !ok || !handler.CanCast(casterCreature, selected, &def, false) {
-		return false
+		return EffectResult{}
 	}
 
 	affected := handler.Targets(casterCreature, selected, &def)
 	if len(affected) == 0 {
-		return false
+		return EffectResult{}
 	}
 
 	castTargets := make([]any, len(affected))
@@ -49,9 +62,13 @@ func ApplyEffects(handlers EffectHandlers, caster any, resolved Target, def mode
 		castTargets[i] = t
 	}
 
-	return handlers.Skills.Use(handlerskill.Cast{
+	result, ok := handlers.Skills.UseResult(handlerskill.Cast{
 		Caster:  caster,
 		Skill:   def,
 		Targets: castTargets,
 	})
+	if !ok {
+		return EffectResult{}
+	}
+	return EffectResult{Handled: true, AttackFailed: result.AttackFailed}
 }

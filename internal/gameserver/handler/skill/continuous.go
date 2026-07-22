@@ -45,6 +45,11 @@ func (continuousHandler) Types() []string {
 }
 
 func (h continuousHandler) Use(cast Cast) {
+	h.UseResult(cast)
+}
+
+func (h continuousHandler) UseResult(cast Cast) Result {
+	var result Result
 	skillType := skillTypeKey(cast.Skill.SkillType)
 
 	for _, obj := range cast.Targets {
@@ -96,8 +101,7 @@ func (h continuousHandler) Use(cast Cast) {
 		}
 
 		if !acted {
-			// The reference sends ATTACK_FAILED to the caster here. Network
-			// sends are not this handler's concern; the cast pipeline owns them.
+			result.AttackFailed++
 			continue
 		}
 
@@ -114,6 +118,7 @@ func (h continuousHandler) Use(cast Cast) {
 	}
 
 	applySelfEffects(cast.Caster, cast.Skill)
+	return result
 }
 
 // reflectTarget returns the actual effect destination: the original target, or
