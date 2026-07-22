@@ -4,6 +4,7 @@ import (
 	"math"
 	"slices"
 	"sync"
+	"time"
 
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
@@ -126,6 +127,10 @@ type Effect struct {
 	OnStopTask func(*Effect)
 
 	inUse bool
+
+	scheduleMu sync.Mutex
+	remaining  int
+	nextAction time.Time
 }
 
 // InUse reports whether e is the active member of its stack group.
@@ -145,6 +150,54 @@ func (e *Effect) ActionTime() bool {
 	return e.OnAction(e)
 }
 
+func (e *Effect) period() time.Duration {
+	if e == nil || e.Template.Time <= 0 {
+		return 0
+	}
+	return time.Duration(e.Template.Time) * time.Second
+}
+
+func (e *Effect) startSchedule(now time.Time) {
+	e.scheduleMu.Lock()
+	defer e.scheduleMu.Unlock()
+
+	e.remaining = e.Template.Count
+	if period := e.period(); period > 0 {
+		e.nextAction = now.Add(period)
+		return
+	}
+	e.nextAction = time.Time{}
+}
+
+func (e *Effect) stopSchedule() {
+	e.scheduleMu.Lock()
+	e.remaining = 0
+	e.nextAction = time.Time{}
+	e.scheduleMu.Unlock()
+}
+
+func (e *Effect) claimAction(now time.Time) (runAction bool, remove bool) {
+	e.scheduleMu.Lock()
+	defer e.scheduleMu.Unlock()
+
+	if e.nextAction.IsZero() || now.Before(e.nextAction) {
+		return false, false
+	}
+	if e.remaining <= 0 {
+		e.nextAction = time.Time{}
+		return false, true
+	}
+
+	e.remaining--
+	remove = e.remaining <= 0
+	if remove {
+		e.nextAction = time.Time{}
+	} else {
+		e.nextAction = e.nextAction.Add(e.period())
+	}
+	return true, remove
+}
+
 // beginExit flips e's in-use flag off, if it was on, and returns a thunk
 // that fires the resulting on-exit hook — or nil if e wasn't active or has
 // no such hook. The flag flips immediately (so InUse() is accurate the
@@ -155,6 +208,7 @@ func (e *Effect) beginExit() func() {
 		return nil
 	}
 	e.inUse = false
+	e.stopSchedule()
 	if e.OnExit == nil {
 		return nil
 	}
@@ -286,6 +340,51 @@ func (l *List) All() []*Effect {
 	return effects
 }
 
+func (l *List) active() []*Effect {
+	if l == nil {
+		return nil
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	effects := make([]*Effect, 0, len(l.buffs)+len(l.debuffs))
+	for _, e := range l.buffs {
+		if e != nil && e.inUse {
+			effects = append(effects, e)
+		}
+	}
+	for _, e := range l.debuffs {
+		if e != nil && e.inUse {
+			effects = append(effects, e)
+		}
+	}
+	return effects
+}
+
+// Tick runs periodic actions due at the current time and removes effects
+// whose action hook stops or whose configured tick count is exhausted.
+func (l *List) Tick() {
+	l.tickAt(time.Now())
+}
+
+func (l *List) tickAt(now time.Time) {
+	for _, e := range l.active() {
+		run, remove := e.claimAction(now)
+		if !run {
+			if remove {
+				l.Remove(e)
+			}
+			continue
+		}
+		if !e.ActionTime() {
+			remove = true
+		}
+		if remove {
+			l.Remove(e)
+		}
+	}
+}
+
 // Add inserts e and activates it when it wins its stack group.
 func (l *List) Add(e *Effect) {
 	if l == nil || e == nil {
@@ -348,6 +447,7 @@ func (l *List) beginActivate(e *Effect, onReject func(*Effect)) func() {
 		l.mu.Lock()
 		if ok {
 			e.inUse = true
+			e.startSchedule(time.Now())
 			l.addStatFuncs(e)
 		} else {
 			onReject(e)

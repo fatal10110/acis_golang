@@ -154,6 +154,7 @@ func newGameServerApp(paths gameServerPaths) *fx.App {
 			provideRespawnTask,
 			provideAI,
 			providePositionUpdates,
+			provideEffects,
 			provideKillRewardConfig,
 			provideSpellbookPolicy,
 			provideNpcs,
@@ -163,7 +164,7 @@ func newGameServerApp(paths gameServerPaths) *fx.App {
 			providePlayerClock,
 			provideGameClientLink,
 		),
-		fx.Invoke(startPvPFlags, startGroundItems, startGroundItemPersistence, startPlayerClock, startGameClock, startWalker, startWater, startShadowItems, startDecay, startAttackStance, startWorldObjects, startRespawnTask, startAI, startPositionUpdates, startNpcs, startNpcPersistence, startGameServer),
+		fx.Invoke(startPvPFlags, startGroundItems, startGroundItemPersistence, startPlayerClock, startGameClock, startWalker, startWater, startShadowItems, startDecay, startAttackStance, startWorldObjects, startRespawnTask, startAI, startPositionUpdates, startEffects, startNpcs, startNpcPersistence, startGameServer),
 	)
 }
 
@@ -748,6 +749,14 @@ func providePositionUpdates(state *world.State) *task.PositionUpdates {
 
 func startPositionUpdates(lc fx.Lifecycle, positions *task.PositionUpdates, log zerolog.Logger) {
 	startTicker(lc, log, positions.Start)
+}
+
+func provideEffects(state *world.State) *task.Effects {
+	return task.NewEffects(state)
+}
+
+func startEffects(lc fx.Lifecycle, effects *task.Effects, log zerolog.Logger) {
+	startTicker(lc, log, effects.Start)
 }
 
 // worldAttackStanceEffects stops an actor's attack animation once its
