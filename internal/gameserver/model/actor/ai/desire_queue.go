@@ -1,6 +1,10 @@
 package ai
 
-import "sync"
+import (
+	"sync"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+)
 
 // maxDesires bounds how many concurrent candidate Desires a DesireQueue can
 // hold, so a long-lived or very busy actor can't accumulate an unbounded
@@ -77,6 +81,47 @@ func (q *DesireQueue) DecreaseWeightByType(kind Intention, amount float64) {
 				continue
 			}
 			d.Weight -= amount
+		}
+		kept = append(kept, d)
+	}
+	q.desires = kept
+}
+
+// Remove drops queued Desires of kind aimed at target.
+func (q *DesireQueue) Remove(kind Intention, target attackable.Combatant) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	q.removeLocked(func(d *Desire) bool {
+		return d.Kind == kind && sameCombatant(d.FinalTarget, target)
+	})
+}
+
+// RemoveFinalTarget drops every queued Desire aimed at target.
+func (q *DesireQueue) RemoveFinalTarget(target attackable.Combatant) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	q.removeLocked(func(d *Desire) bool {
+		return sameCombatant(d.FinalTarget, target)
+	})
+}
+
+// RemoveKind drops every queued Desire of kind.
+func (q *DesireQueue) RemoveKind(kind Intention) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	q.removeLocked(func(d *Desire) bool {
+		return d.Kind == kind
+	})
+}
+
+func (q *DesireQueue) removeLocked(drop func(*Desire) bool) {
+	kept := q.desires[:0]
+	for _, d := range q.desires {
+		if drop(d) {
+			continue
 		}
 		kept = append(kept, d)
 	}

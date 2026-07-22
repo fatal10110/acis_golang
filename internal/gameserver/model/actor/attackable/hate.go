@@ -2,6 +2,11 @@ package attackable
 
 import "sync"
 
+const (
+	defaultHateAmount          = 100
+	openingTerritoryHateAmount = 300
+)
+
 // HateEntry is one attacker's accumulated hate in a HateTable.
 type HateEntry struct {
 	Attacker Combatant
@@ -41,6 +46,34 @@ func (h *HateTable) Add(attacker Combatant, amount float64) {
 
 	h.mu.Lock()
 	defer h.mu.Unlock()
+
+	e, ok := h.entries[attacker.ObjectID()]
+	if !ok {
+		e = &HateEntry{Attacker: attacker}
+		h.entries[attacker.ObjectID()] = e
+	}
+	e.Hate += amount
+}
+
+// AddDefault raises attacker's hate by the default amount used when an NPC
+// notices a target. The first target noticed while the owner is in its
+// territory gets a larger opening value; all later targets use the base
+// value.
+func (h *HateTable) AddDefault(attacker Combatant, inTerritory bool) {
+	if attacker == nil {
+		return
+	}
+	if h.owner.SiegeGuard() && attacker.SiegeGuard() {
+		return
+	}
+
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	amount := float64(defaultHateAmount)
+	if inTerritory && len(h.entries) == 0 {
+		amount = openingTerritoryHateAmount
+	}
 
 	e, ok := h.entries[attacker.ObjectID()]
 	if !ok {
@@ -101,6 +134,23 @@ func (h *HateTable) ReduceAllHate(amount float64) {
 	for _, e := range h.entries {
 		e.Hate -= amount
 	}
+}
+
+// Refresh drops dead-equivalent attackers and attackers the owner no longer
+// sees. It returns the attackers whose queued target desires should be
+// removed.
+func (h *HateTable) Refresh(visible func(Combatant) bool) []Combatant {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	var changed []Combatant
+	for id, e := range h.entries {
+		if e.Attacker.AlikeDead() || (visible != nil && !visible(e.Attacker)) {
+			delete(h.entries, id)
+			changed = append(changed, e.Attacker)
+		}
+	}
+	return changed
 }
 
 // ZeroHate zeroes every entry's hate without dropping any entries.

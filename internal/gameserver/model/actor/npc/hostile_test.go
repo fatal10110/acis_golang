@@ -36,6 +36,17 @@ func TestHostileUsesWorldVisibilityAndTemplateAttackRange(t *testing.T) {
 	}
 }
 
+func TestHostileAddDefaultHateUsesOpeningValue(t *testing.T) {
+	hostile := newTestHostile(t, &hostileMove{}, &hostileAttack{})
+	target := &hostileTarget{id: 200}
+
+	hostile.AddDefaultHate(target)
+
+	if got := hostile.AI().Hates().Hate(target); got != 300 {
+		t.Fatalf("default hate = %v, want 300", got)
+	}
+}
+
 func TestHostileIgnoresUnknownTarget(t *testing.T) {
 	state := world.New()
 	target := &hostileTarget{id: 200}

@@ -162,6 +162,37 @@ func TestThreatTable_StopHateOnUnknownTargetIsNoop(t *testing.T) {
 	table.StopHate(combatant(99)) // must not panic
 }
 
+func TestThreatTable_RefreshStopsDeadThreatAndRemovesLostThreat(t *testing.T) {
+	table := NewThreatTable(combatant(1))
+	dead := &fakeCombatant{id: 2, alikeDead: true}
+	lost := combatant(3)
+	kept := combatant(4)
+	table.AddDamage(dead, 40, 100)
+	table.AddDamage(lost, 50, 110)
+	table.AddDamage(kept, 60, 120)
+
+	changed := table.Refresh(func(c Combatant) bool {
+		return c.ObjectID() != lost.ObjectID()
+	})
+
+	if len(changed) != 2 {
+		t.Fatalf("Refresh changed %d targets, want 2", len(changed))
+	}
+	got, ok := table.Get(dead)
+	if !ok {
+		t.Fatal("dead attacker entry was dropped, want it kept for damage accounting")
+	}
+	if got.Hate != 0 || got.Damage != 40 {
+		t.Fatalf("dead attacker entry = %+v, want hate zeroed and damage preserved", got)
+	}
+	if _, ok := table.Get(lost); ok {
+		t.Fatal("lost attacker entry still present after Refresh")
+	}
+	if got, ok := table.Get(kept); !ok || got.Hate != 120 {
+		t.Fatalf("kept attacker entry = (%+v, %v), want present with hate 120", got, ok)
+	}
+}
+
 func TestThreatTable_Remove(t *testing.T) {
 	table := NewThreatTable(combatant(1))
 	attacker := combatant(2)

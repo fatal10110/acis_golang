@@ -147,6 +147,10 @@ func (a *Attackable) AddDamageHate(attacker attackable.Combatant, damage, hate f
 	if attacker == nil || (a.actor.SiegeGuard() && attacker.SiegeGuard()) {
 		return
 	}
+	a.addAttackDesire(attacker, hate)
+}
+
+func (a *Attackable) addAttackDesire(attacker attackable.Combatant, hate float64) {
 	a.desires.AddOrUpdate(&Desire{
 		Kind:        IntentionAttack,
 		FinalTarget: attacker,
@@ -158,6 +162,12 @@ func (a *Attackable) AddDamageHate(attacker attackable.Combatant, damage, hate f
 // AddHate records an attacker in the skill-cast hate table.
 func (a *Attackable) AddHate(attacker attackable.Combatant, hate float64) {
 	a.hates.Add(attacker, hate)
+}
+
+// AddDefaultHate records the default skill-cast hate for an attacker this
+// actor has noticed.
+func (a *Attackable) AddDefaultHate(attacker attackable.Combatant) {
+	a.hates.AddDefault(attacker, a.actor.InTerritory())
 }
 
 // SetWander makes the next Think process wander/return-home behavior.
@@ -208,24 +218,38 @@ func (a *Attackable) Think() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	if a.current.kind == IntentionIdle {
-		if desire, ok := a.desires.Peek(); ok {
-			switch desire.Kind {
-			case IntentionAttack:
-				a.current = intention{kind: IntentionAttack, target: desire.FinalTarget}
-			case IntentionCast:
-				a.current = intention{kind: IntentionCast, target: desire.FinalTarget, skill: desire.Skill}
+	a.refreshCombatMemory()
+	for attempts := 0; attempts <= maxDesires; attempts++ {
+		a.promoteNext()
+		switch a.current.kind {
+		case IntentionAttack:
+			if a.thinkAttack() {
+				continue
 			}
+		case IntentionCast:
+			if a.thinkCast() {
+				continue
+			}
+		case IntentionWander:
+			a.thinkWander()
 		}
+		return
 	}
+}
 
-	switch a.current.kind {
+func (a *Attackable) promoteNext() {
+	if a.current.kind != IntentionIdle {
+		return
+	}
+	desire, ok := a.desires.Peek()
+	if !ok {
+		return
+	}
+	switch desire.Kind {
 	case IntentionAttack:
-		a.thinkAttack()
+		a.current = intention{kind: IntentionAttack, target: desire.FinalTarget}
 	case IntentionCast:
-		a.thinkCast()
-	case IntentionWander:
-		a.thinkWander()
+		a.current = intention{kind: IntentionCast, target: desire.FinalTarget, skill: desire.Skill}
 	}
 }
 
@@ -238,37 +262,40 @@ func (a *Attackable) Tick() {
 	if a.step%3 != 0 {
 		return
 	}
+	a.refreshCombatMemory()
 	a.threats.ReduceAllHate(attackHateDecay)
 	a.hates.ReduceAllHate(66000)
 	a.desires.DecreaseWeightByType(IntentionAttack, attackHateDecay)
 	a.step = 0
 }
 
-func (a *Attackable) thinkAttack() {
+func (a *Attackable) thinkAttack() bool {
 	if a.actor.DenyAIAction() {
-		return
+		return false
 	}
 
 	target := a.current.target
-	if a.targetLost(target) {
-		return
+	if a.dropLostTarget(target) {
+		return true
 	}
 
 	if a.move.MaybeStartOffensiveFollow(target, a.actor.PhysicalAttackRange()) {
-		return
+		return false
 	}
 
 	if a.attack.BowCoolingDown() || a.attack.AttackingNow() {
 		a.next = a.current
-		return
+		return false
 	}
 
 	if !a.attack.CanAttack(target) {
-		return
+		a.skipAttackTarget(target)
+		return true
 	}
 
 	a.move.Stop()
 	a.attack.DoAttack(target)
+	return false
 }
 
 // thinkCast advances an IntentionCast desire once it has been promoted to
@@ -276,26 +303,26 @@ func (a *Attackable) thinkAttack() {
 // target, planting and facing it once the cast animation is long enough to
 // warrant it, then the final cast attempt. It mirrors thinkAttack's shape
 // for skill casts instead of physical attacks.
-func (a *Attackable) thinkCast() {
+func (a *Attackable) thinkCast() bool {
 	if a.actor.DenyAIAction() || a.cast == nil {
-		return
+		return false
 	}
 	if a.cast.Disabled() {
-		return
+		return false
 	}
 
 	target := a.current.target
 	ref := a.current.skill
-	if a.targetLost(target) {
-		return
+	if a.dropLostTarget(target) {
+		return true
 	}
 
 	if !a.cast.CanAttempt(target, ref) {
-		return
+		return false
 	}
 
 	if a.move.MaybeStartOffensiveFollow(target, a.cast.Range(ref)) {
-		return
+		return false
 	}
 
 	if a.cast.StopsMovement(ref) {
@@ -306,10 +333,11 @@ func (a *Attackable) thinkCast() {
 	}
 
 	if !a.cast.CanCast(target, ref) {
-		return
+		return false
 	}
 
 	a.cast.Cast(target, ref)
+	return false
 }
 
 func (a *Attackable) thinkWander() {
@@ -321,12 +349,64 @@ func (a *Attackable) thinkWander() {
 	}
 }
 
-func (a *Attackable) targetLost(target attackable.Combatant) bool {
+func (a *Attackable) refreshCombatMemory() {
+	if a.threats.IsEmpty() {
+		a.desires.RemoveKind(IntentionAttack)
+	}
+	for _, target := range a.threats.Refresh(a.actor.Knows) {
+		a.desires.RemoveFinalTarget(target)
+		a.clearIntentionsFor(target)
+	}
+	for _, target := range a.hates.Refresh(a.actor.Knows) {
+		a.desires.RemoveFinalTarget(target)
+		a.clearIntentionsFor(target)
+	}
+}
+
+func (a *Attackable) dropLostTarget(target attackable.Combatant) bool {
 	if target == nil {
+		a.current = intention{kind: IntentionIdle}
 		return true
 	}
 	if target.AlikeDead() {
+		a.threats.StopHate(target)
+		a.hates.StopHate(target)
+		a.desires.RemoveFinalTarget(target)
+		a.clearIntentionsFor(target)
 		return true
 	}
-	return !a.actor.Knows(target)
+	if !a.actor.Knows(target) {
+		a.threats.Remove(target)
+		a.hates.StopHate(target)
+		a.desires.RemoveFinalTarget(target)
+		a.clearIntentionsFor(target)
+		return true
+	}
+	return false
+}
+
+func (a *Attackable) skipAttackTarget(target attackable.Combatant) {
+	var hate float64
+	if threat, ok := a.threats.Get(target); ok {
+		hate = threat.Hate
+	}
+	a.threats.StopHate(target)
+	a.desires.Remove(IntentionAttack, target)
+	a.clearIntentionsFor(target)
+	if hate <= 0 {
+		return
+	}
+	if next, ok := a.threats.MostHated(); ok {
+		a.threats.AddDamage(next.Attacker, 0, hate)
+		a.addAttackDesire(next.Attacker, hate)
+	}
+}
+
+func (a *Attackable) clearIntentionsFor(target attackable.Combatant) {
+	if sameCombatant(a.current.target, target) {
+		a.current = intention{kind: IntentionIdle}
+	}
+	if sameCombatant(a.next.target, target) {
+		a.next = intention{}
+	}
 }
