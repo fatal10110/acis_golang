@@ -1,6 +1,8 @@
 package network
 
 import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -26,7 +28,7 @@ func (l *GameClientLink) handleSummonActionUse(live *livePlayer, req clientpacke
 	}
 	summonType := actor.SummonType()
 	objectID := actor.ObjectID()
-	result := actor.ApplyCommand(summon.CommandContext{Command: command, World: l.world})
+	result := actor.ApplyCommand(l.summonCommandContext(live, command))
 	if id, ok := systemMessageForSummonFeedback(result.Feedback); ok {
 		live.SendFrame(serverpackets.FrameSystemMessage(id))
 	}
@@ -34,6 +36,32 @@ func (l *GameClientLink) handleSummonActionUse(live *livePlayer, req clientpacke
 		live.SendFrame(serverpackets.FramePetDelete(summonType, objectID))
 	}
 	return true
+}
+
+func (l *GameClientLink) summonCommandContext(live *livePlayer, command summon.Command) summon.CommandContext {
+	ctx := summon.CommandContext{Command: command, World: l.world}
+	if live == nil || live.target == nil {
+		return ctx
+	}
+	ctx.Target = live.target
+	target, ok := live.target.(attackable.Combatant)
+	if !ok {
+		return ctx
+	}
+	ctx.TargetIsCreature = true
+	ctx.TargetIsDeadCreature = target.AlikeDead()
+	ctx.TargetAttackable = summonTargetAttackable(live, target)
+	return ctx
+}
+
+func summonTargetAttackable(live *livePlayer, target attackable.Combatant) bool {
+	if live == nil || target == nil {
+		return false
+	}
+	attackableTarget, ok := target.(interface {
+		AttackableBy(attack.CreatureActor) bool
+	})
+	return ok && attackableTarget.AttackableBy(live.Character)
 }
 
 func summonCommandForActionID(actionID int32) (summon.Command, bool) {

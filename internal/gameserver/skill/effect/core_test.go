@@ -3,6 +3,7 @@ package effect
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
@@ -117,6 +118,7 @@ func TestNewBuildsCoreEffectMetadata(t *testing.T) {
 		{"ImobilePetBuff", TypeImmobilizePetBuff, FlagNone, false, false},
 		{"Distrust", TypeDistrust, FlagNone, false, false},
 		{"Confusion", TypeConfusion, FlagConfused, false, false},
+		{"Betray", TypeBetray, FlagBetrayed, true, false},
 	}
 
 	for _, tt := range tests {
@@ -1827,6 +1829,28 @@ func TestImmobilizePetBuffEffectLocksOnlyASummonOwnedByThePlayerEffector(t *test
 	}
 }
 
+func TestBetrayEffectAttacksSummonOwnerAndFollowsOnExit(t *testing.T) {
+	owner := &betrayOwner{id: 42}
+	summon := &betraySummon{owner: owner}
+	e, err := New(Skill{}, modelskill.EffectTemplate{Name: "Betray"})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e.Effected = summon
+
+	if !e.OnStart(e) {
+		t.Fatal("betray effect start rejected a summon with an owner")
+	}
+	if want := []string{"attack:42"}; !reflect.DeepEqual(summon.events, want) {
+		t.Fatalf("events after OnStart = %#v, want %#v", summon.events, want)
+	}
+
+	e.OnExit(e)
+	if want := []string{"attack:42", "follow:42"}; !reflect.DeepEqual(summon.events, want) {
+		t.Fatalf("events after OnExit = %#v, want %#v", summon.events, want)
+	}
+}
+
 // fakeCombatant is a minimal attackable.Combatant used as the redirect
 // candidate/attacker argument in hostility-redirect effect tests.
 type fakeCombatant struct {
@@ -1836,6 +1860,37 @@ type fakeCombatant struct {
 func (f *fakeCombatant) ObjectID() int32  { return f.id }
 func (f *fakeCombatant) SiegeGuard() bool { return false }
 func (f *fakeCombatant) AlikeDead() bool  { return false }
+
+type betrayOwner struct {
+	id int32
+}
+
+func (o *betrayOwner) ObjectID() int32  { return o.id }
+func (o *betrayOwner) SiegeGuard() bool { return false }
+func (o *betrayOwner) AlikeDead() bool  { return false }
+
+type betraySummon struct {
+	owner  attackable.Combatant
+	events []string
+}
+
+func (s *betraySummon) OwnerCombatant() attackable.Combatant { return s.owner }
+
+func (s *betraySummon) TryToAttack(target any) {
+	s.events = append(s.events, "attack:"+effectObjectID(target))
+}
+
+func (s *betraySummon) TryToFollow(target any) {
+	s.events = append(s.events, "follow:"+effectObjectID(target))
+}
+
+func effectObjectID(target any) string {
+	o, ok := target.(interface{ ObjectID() int32 })
+	if !ok || o == nil {
+		return "nil"
+	}
+	return strconv.FormatInt(int64(o.ObjectID()), 10)
+}
 
 // hostileEffectTarget is a minimal actor implementing only the interfaces
 // a hostility-redirect effect needs, standing in for the npc package's

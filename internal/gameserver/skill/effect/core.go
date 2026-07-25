@@ -32,6 +32,8 @@ const (
 	FlagFear
 	// FlagConfused marks a target as confused.
 	FlagConfused
+	// FlagBetrayed marks a summon as temporarily hostile to its owner.
+	FlagBetrayed
 	flagMuted
 	flagPhysicalMuted
 	// FlagRooted marks a target as rooted.
@@ -161,6 +163,9 @@ const (
 	// TypeConfusion aborts its non-player target's current action and
 	// redirects its aggression toward a random nearby combatant.
 	TypeConfusion Type = "CONFUSION"
+	// TypeBetray turns an effected summon against its owner for the effect
+	// duration.
+	TypeBetray Type = "BETRAY"
 )
 
 type kind struct {
@@ -224,6 +229,7 @@ var coreKinds = map[string]kind{
 	"ImobilePetBuff":        {typ: TypeImmobilizePetBuff},
 	"Distrust":              {typ: TypeDistrust},
 	"Confusion":             {typ: TypeConfusion, flag: FlagConfused},
+	"Betray":                {typ: TypeBetray, flag: FlagBetrayed, debuff: true},
 }
 
 var fearSkippedPlayableSkillIDs = map[modelskill.ID]bool{
@@ -387,6 +393,9 @@ func wireHooks(e *Effect) {
 	case TypeConfusion:
 		e.OnStart = confusionStart
 		e.OnExit = confusionExit
+	case TypeBetray:
+		e.OnStart = betrayStart
+		e.OnExit = betrayExit
 	}
 }
 
@@ -693,6 +702,19 @@ type nearbyCombatTarget interface {
 // effect's forced redirect once the effect ends.
 type mostHatedResetter interface {
 	StopMostHatedTarget()
+}
+
+// summonOwnerCombatant is implemented by a summon that can expose its
+// owning player as an AI target.
+type summonOwnerCombatant interface {
+	OwnerCombatant() attackable.Combatant
+}
+
+// summonOwnerAttacker is implemented by a summon that can redirect its AI
+// toward and away from its owner.
+type summonOwnerAttacker interface {
+	TryToAttack(any)
+	TryToFollow(any)
 }
 
 func damageOverTimeAction(e *Effect) bool {
@@ -1395,6 +1417,37 @@ func confusionExit(e *Effect) {
 	}
 	if target, ok := e.Effected.(mostHatedResetter); ok {
 		target.StopMostHatedTarget()
+	}
+}
+
+func betrayStart(e *Effect) bool {
+	summon, ok := e.Effected.(summonOwnerAttacker)
+	if !ok {
+		return false
+	}
+	ownerSource, ok := e.Effected.(summonOwnerCombatant)
+	if !ok {
+		return false
+	}
+	owner := ownerSource.OwnerCombatant()
+	if owner == nil {
+		return false
+	}
+	summon.TryToAttack(owner)
+	return true
+}
+
+func betrayExit(e *Effect) {
+	summon, ok := e.Effected.(summonOwnerAttacker)
+	if !ok {
+		return
+	}
+	ownerSource, ok := e.Effected.(summonOwnerCombatant)
+	if !ok {
+		return
+	}
+	if owner := ownerSource.OwnerCombatant(); owner != nil {
+		summon.TryToFollow(owner)
 	}
 }
 
