@@ -57,6 +57,7 @@ type Actor struct {
 	itemConsumeCount int
 
 	petInventory  *itemcontainer.Inventory
+	petConfig     *petmodel.Config
 	fed           int
 	maxMeal       int
 	mealInNormal  int
@@ -158,7 +159,9 @@ type PetConfig struct {
 	Owner    Owner
 	NPCID    int
 	Level    int
+	CON      int
 	Passive  bool
+	Config   *petmodel.Config
 
 	Inventory     *itemcontainer.Inventory
 	Fed           int
@@ -218,6 +221,12 @@ func NewServitor(cfg ServitorConfig) *Actor {
 
 // NewPet returns a live pet actor.
 func NewPet(cfg PetConfig) *Actor {
+	petCfg := copyPetConfig(cfg.Config)
+	if petCfg != nil && cfg.Inventory != nil {
+		slots, weight := petCfg.InventoryLimits(cfg.CON)
+		cfg.Inventory.SlotLimit = slots
+		cfg.Inventory.WeightLimit = weight
+	}
 	a := &Actor{
 		id:            cfg.ObjectID,
 		owner:         cfg.Owner,
@@ -228,6 +237,7 @@ func NewPet(cfg PetConfig) *Actor {
 		followActive:  true,
 		intent:        IntentFollowOwner,
 		petInventory:  cfg.Inventory,
+		petConfig:     petCfg,
 		fed:           cfg.Fed,
 		maxMeal:       cfg.MaxMeal,
 		mealInNormal:  cfg.MealInNormal,
@@ -243,6 +253,14 @@ func NewPet(cfg PetConfig) *Actor {
 	}
 	a.initVitals()
 	return a
+}
+
+func copyPetConfig(cfg *petmodel.Config) *petmodel.Config {
+	if cfg == nil {
+		return nil
+	}
+	copied := *cfg
+	return &copied
 }
 
 // ObjectID returns the live world object id assigned to this summon.
@@ -272,6 +290,18 @@ func (a *Actor) SummonType() int {
 
 // NPCID returns the template id backing this summon.
 func (a *Actor) NPCID() int { return a.npcID }
+
+// ScaledExpGain returns rawExp multiplied by this pet's configured
+// experience rate.
+func (a *Actor) ScaledExpGain(rawExp int64) int64 {
+	if a == nil || !a.isPet {
+		return 0
+	}
+	if a.petConfig == nil {
+		return petmodel.DefaultConfig().ScaledExpGain(a.npcID, rawExp)
+	}
+	return a.petConfig.ScaledExpGain(a.npcID, rawExp)
+}
 
 // CanWearPetItem reports whether this pet can equip tmpl.
 func (a *Actor) CanWearPetItem(tmpl *item.Template) bool {

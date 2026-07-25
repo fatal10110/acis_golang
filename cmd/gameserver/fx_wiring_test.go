@@ -10,6 +10,7 @@ import (
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
@@ -38,6 +39,7 @@ func TestProvideGameClientLinkUsesGameDataSkillTrees(t *testing.T) {
 			func() *task.PlayerClock { return nil },
 			func() respawnRestoreHP { return 0.7 },
 			func() skillEnchantSPBookNeeded { return true },
+			func() pet.Config { return pet.DefaultConfig() },
 			func() zerolog.Logger { return zerolog.Nop() },
 			provideGameClientLink,
 		),
