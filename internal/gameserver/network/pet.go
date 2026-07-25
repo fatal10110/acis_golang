@@ -29,11 +29,6 @@ func (l *GameClientLink) activePet(live *livePlayer) (*summon.Actor, *itemcontai
 	return pet, inv, inv != nil
 }
 
-func (l *GameClientLink) newPet(cfg summon.PetConfig) *summon.Actor {
-	cfg.Config = &l.petConfig
-	return summon.NewPet(cfg)
-}
-
 func (l *GameClientLink) giveItemToPet(ctx context.Context, live *livePlayer, req clientpackets.RequestGiveItemToPet) {
 	if req.Count <= 0 || !liveItemOpsAllowed(live) {
 		return

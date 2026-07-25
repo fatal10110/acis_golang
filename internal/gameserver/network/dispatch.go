@@ -18,6 +18,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -185,6 +186,11 @@ func NewGameClientLink(
 		log:                      log,
 		newCipherKey:             randomCipherKey,
 	}
+}
+
+func (l *GameClientLink) newPet(cfg summon.PetConfig) *summon.Actor {
+	cfg.Config = &l.petConfig
+	return summon.NewPet(cfg)
 }
 
 func (l *GameClientLink) inventoryService() *invops.Service {
