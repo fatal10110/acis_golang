@@ -93,7 +93,7 @@ type GameClientLink struct {
 	respawnRestoreHP         float64
 	levels                   *player.LevelTable
 	skillEnchantSPBookNeeded bool
-	petConfig                petmodel.Config
+	petConfig                petmodel.Config // passed into summon.PetConfig by newPet.
 	inventory                *invops.Service
 	petItems                 *petitem.Service
 	trades                   *tradebook.Book
