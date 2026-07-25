@@ -152,8 +152,10 @@ func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, m
 	switch mode {
 	case FollowFriendly:
 		c.move.StartFriendlyFollow(target.ObjectID(), offset)
-	default:
+	case FollowOffensive:
 		c.move.StartOffensiveFollow(target.ObjectID(), offset)
+	default:
+		return false
 	}
 	if !c.move.Moving() || c.move.Destination() != dest {
 		event, err := c.move.MoveToLocation(dest)

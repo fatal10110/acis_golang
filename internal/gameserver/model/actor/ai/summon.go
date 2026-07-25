@@ -28,7 +28,7 @@ type Summon struct {
 	move   SummonMoveController
 	attack AttackController
 
-	mu      sync.Mutex
+	mu      sync.Mutex // guards current and next.
 	current intention
 	next    intention
 }
@@ -139,7 +139,6 @@ func (s *Summon) thinkAttackLocked() bool {
 	}
 
 	if s.busyLocked() {
-		s.next = s.current
 		return false
 	}
 

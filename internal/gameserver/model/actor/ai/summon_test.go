@@ -50,6 +50,31 @@ func TestSummonAITryToAttackQueuesWhileSwingingAndExecutesOnThink(t *testing.T) 
 	}
 }
 
+func TestSummonAIThinkPreservesQueuedRetargetWhileCurrentAttackIsBusy(t *testing.T) {
+	owner := actor(100)
+	firstTarget := actor(200)
+	secondTarget := actor(300)
+	strike := &recordingAttack{canAttack: true}
+	brain := NewSummon(owner, &summonMove{}, strike)
+
+	if !brain.TryToAttack(firstTarget) {
+		t.Fatal("TryToAttack(first) = false, want accepted attack")
+	}
+	if strike.target != firstTarget {
+		t.Fatalf("attack target = %v, want first target", strike.target)
+	}
+
+	strike.attackingNow = true
+	if !brain.TryToAttack(secondTarget) {
+		t.Fatal("TryToAttack(second) = false, want queued retarget accepted while busy")
+	}
+	brain.Think()
+
+	if kind, queuedTarget, ok := brain.NextIntention(); !ok || kind != IntentionAttack || queuedTarget != secondTarget {
+		t.Fatalf("NextIntention() = (%v,%v,%v), want attack,second target,true", kind, queuedTarget, ok)
+	}
+}
+
 func TestSummonAITryToFollowStartsFriendlyFollow(t *testing.T) {
 	owner := actor(100)
 	target := actor(200)
