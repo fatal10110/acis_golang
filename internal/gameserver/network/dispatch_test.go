@@ -21,6 +21,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
@@ -416,6 +417,11 @@ func testItemTemplates() *item.Table {
 			Depositable:    true,
 			EtcItem:        &item.EtcItemDetail{Type: item.EtcItemPotion, Handler: "ItemSkills", ReuseDelay: 10000, SharedReuseGroup: 8},
 			AttachedSkills: []item.SkillRef{{ID: 2031, Level: 1}},
+			UseConditions: []item.UseCondition{{
+				Root:      item.Condition{Kind: "player", Attrs: map[string]string{"flying": "False"}},
+				MessageID: int32(serverpackets.SystemMessageS1CannotBeUsed),
+				AddName:   true,
+			}},
 		},
 		{
 			ID:             728,
@@ -455,6 +461,14 @@ func testItemTemplates() *item.Table {
 			Depositable:    true,
 			EtcItem:        &item.EtcItemDetail{Type: item.EtcItemScroll, Handler: "ItemSkills", SharedReuseGroup: 5, ReuseDelay: 9000},
 			AttachedSkills: []item.SkillRef{{ID: 2013, Level: 1}},
+		},
+		{
+			ID:          9001,
+			Name:        "Quest Token",
+			Kind:        item.KindEtcItem,
+			Duration:    -1,
+			Destroyable: true,
+			EtcItem:     &item.EtcItemDetail{Type: item.EtcItemQuest},
 		},
 	})
 }
@@ -929,7 +943,7 @@ func newTestGameClientLinkWithSkillsShortcutsCrestsAndLog(t *testing.T, loginLin
 	if len(cursedWeapons) > 0 {
 		cursed = cursedWeapons[0]
 	}
-	gcl := NewGameClientLink(validator, loginLink, roster, items, shortcuts, templates, itemTemplates, html, crests, skills, spellbooks, trees, cursed, state, testGeo{}, ids, groundItems, nil, task.NewPositionUpdates(state), nil, nil, 0.7, nil, true, log)
+	gcl := NewGameClientLink(validator, loginLink, roster, items, shortcuts, templates, itemTemplates, html, crests, skills, spellbooks, trees, cursed, state, testGeo{}, ids, groundItems, nil, task.NewPositionUpdates(state), nil, nil, 0.7, nil, true, petmodel.DefaultConfig(), log)
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {

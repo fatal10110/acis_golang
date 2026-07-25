@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
 // readWithTimeout reads one frame within d, returning nil on timeout instead
@@ -138,4 +139,32 @@ func TestGameClientLinkUseItemPotionRejectionReplies(t *testing.T) {
 	}
 
 	_ = chars // keep the character-store handle live for the seeded player
+}
+
+// TestGameClientLinkUseItemQuestItemRejectionReplies verifies the
+// item-window path rejects quest items with the dedicated system message
+// instead of falling through to a generic failure or going silent.
+func TestGameClientLinkUseItemQuestItemRejectionReplies(t *testing.T) {
+	const objectID int32 = 721
+	const questItemID int32 = 9001
+	c, _, _, _ := newLinkedGameClientWithSkillsSeed(t, nil, func(chars *fakeCharStore, items *fakeItemStore) {
+		objID := seedSelectableCharacter(t, chars, "player1", "Newbie", 5, 0)
+		if err := items.Create(context.Background(), objID, item.Instance{
+			ObjectID: objectID, TemplateID: questItemID, OwnerID: objID,
+			Count: 1, Location: item.LocationInventory, ManaLeft: -1,
+		}); err != nil {
+			t.Fatalf("seed quest item: %v", err)
+		}
+	}, 1)
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	c.send(encodeUseItem(objectID, false))
+	assertSystemMessageIDFrame(t, c.read(), serverpackets.SystemMessageCannotUseQuestItems)
+	for c.readWithTimeout(100*time.Millisecond) != nil {
+	}
 }

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -70,6 +71,33 @@ func attachTestPet(t *testing.T, state *world.State, live *livePlayer, templates
 	})
 	summon.SpawnBesideOwner(state, pet, live, location.Location{X: 10})
 	return pet, petInv
+}
+
+func TestGameClientLinkNewPetAppliesConfiguredPetLimits(t *testing.T) {
+	cfg := petmodel.DefaultConfig()
+	cfg.ExpRate = 1.75
+	cfg.InventorySlots = 9
+	cfg.WeightLimitMultiplier = 2.0
+
+	inventory := itemcontainer.NewPetInventory(0x20000001, petTestTemplates())
+	gcl := &GameClientLink{petConfig: cfg}
+
+	pet := gcl.newPet(summon.PetConfig{
+		ObjectID:  0x20000001,
+		NPCID:     12077,
+		CON:       43,
+		Inventory: inventory,
+	})
+
+	if inventory.SlotLimit != 9 {
+		t.Fatalf("pet inventory SlotLimit = %d, want 9", inventory.SlotLimit)
+	}
+	if inventory.WeightLimit != 109020 {
+		t.Fatalf("pet inventory WeightLimit = %d, want %d", inventory.WeightLimit, 109020)
+	}
+	if got := pet.ScaledExpGain(1000); got != 1750 {
+		t.Fatalf("ScaledExpGain(ordinary pet) = %d, want 1750", got)
+	}
 }
 
 func TestGiveItemToPetTransfersAndPersists(t *testing.T) {

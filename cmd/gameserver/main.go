@@ -35,6 +35,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/probe"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
@@ -127,6 +128,7 @@ func newGameServerApp(paths gameServerPaths) *fx.App {
 			loadPvPFlagOptions,
 			loadRespawnRestoreHP,
 			loadSkillEnchantSPBookNeeded,
+			loadPetConfig,
 			loadHexIDProperties,
 			gameServerConfigFromLoadedProperties,
 			provideGameServerLogger,
@@ -195,6 +197,18 @@ func loadSkillEnchantSPBookNeeded(paths gameServerPaths) (skillEnchantSPBookNeed
 		return false, err
 	}
 	return skillEnchantSPBookNeeded(config.NewFields(props, "skill enchant sp book needed").Bool("EnchantSkillSpBookNeeded", true)), nil
+}
+
+func loadPetConfig(paths gameServerPaths) (pet.Config, error) {
+	serverProps, err := config.LoadFile(paths.ConfigPath)
+	if err != nil {
+		return pet.Config{}, err
+	}
+	playersProps, err := config.LoadFile(paths.PlayersConfigPath)
+	if err != nil {
+		return pet.Config{}, err
+	}
+	return pet.ConfigFromProperties(serverProps, playersProps)
 }
 
 func loadPvPFlagOptions(paths gameServerPaths) (task.PvPFlagOptions, error) {
@@ -941,9 +955,10 @@ func provideGameClientLink(
 	playerClock *task.PlayerClock,
 	respawnHP respawnRestoreHP,
 	spBookNeeded skillEnchantSPBookNeeded,
+	petCfg pet.Config,
 	log zerolog.Logger,
 ) *network.GameClientLink {
-	return network.NewGameClientLink(validator, links.get, roster, items, shortcuts, data.Players, data.Items, html, crests, skills, spellbooks, data.Trees, data.CursedWeapons, state, move.NewGeo(data.Geo, data.Finder), ids, ground, attackStance, positions, playerClock, data.Restarts, float64(respawnHP), data.Levels, bool(spBookNeeded), log)
+	return network.NewGameClientLink(validator, links.get, roster, items, shortcuts, data.Players, data.Items, html, crests, skills, spellbooks, data.Trees, data.CursedWeapons, state, move.NewGeo(data.Geo, data.Finder), ids, ground, attackStance, positions, playerClock, data.Restarts, float64(respawnHP), data.Levels, bool(spBookNeeded), petCfg, log)
 }
 
 func provideSkillPersistence(pool *sql.DB, data *gameData) *skillstate.Persistence {

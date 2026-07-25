@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -78,6 +80,50 @@ func TestCharacterStoreSetPositionPersistsCoordinates(t *testing.T) {
 			t.Fatalf("SetPosition() arg %d = %v, want %v; args=%#v", i, arg.Value, want[i], rec.args)
 		}
 	}
+}
+
+func TestScanCharacterReadsHeroFlag(t *testing.T) {
+	c, err := scanCharacter(characterScanRow{
+		int32(0x10000001), "acct1", "Newbie",
+		1, 80.0, 80.0, 32.0, 32.0, 30.0, 30.0,
+		1, 2, 3, byte(player.SexMale),
+		32768, -56733, -113459, -690,
+		int64(0), 0, 0, 0, 0, 0,
+		int(player.RaceHuman), 0, 0,
+		int64(0), "", 0, 1, int64(0),
+	})
+	if err != nil {
+		t.Fatalf("scanCharacter() error = %v", err)
+	}
+	if !c.IsHero() {
+		t.Fatal("scanCharacter() returned non-hero for hero = 1")
+	}
+}
+
+type characterScanRow []any
+
+func (r characterScanRow) Scan(dest ...any) error {
+	if len(dest) != len(r) {
+		return fmt.Errorf("scan dest count = %d, want %d", len(dest), len(r))
+	}
+	for i := range r {
+		dst := reflect.ValueOf(dest[i])
+		if dst.Kind() != reflect.Pointer || dst.IsNil() {
+			return fmt.Errorf("dest %d is not a non-nil pointer", i)
+		}
+		src := reflect.ValueOf(r[i])
+		elem := dst.Elem()
+		if src.Type().AssignableTo(elem.Type()) {
+			elem.Set(src)
+			continue
+		}
+		if src.Type().ConvertibleTo(elem.Type()) {
+			elem.Set(src.Convert(elem.Type()))
+			continue
+		}
+		return fmt.Errorf("cannot scan %T into %s at %d", r[i], elem.Type(), i)
+	}
+	return nil
 }
 
 type characterStoreRecorder struct {
