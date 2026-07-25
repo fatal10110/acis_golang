@@ -71,6 +71,10 @@ type Hostile struct {
 	health creature.Health
 	hp     float64
 
+	// mpMu guards mp, the live MP value consumed by skill-resource handlers.
+	mpMu sync.RWMutex
+	mp   float64
+
 	// weapon is this NPC's resolved right-hand weapon kind, recorded by
 	// SetWeapon. Nil means unarmed — the common case, since the
 	// overwhelming majority of monster templates carry no weapon item id.
@@ -124,6 +128,7 @@ func NewHostile(inst *Instance, live *creature.Live, movement ai.MoveController,
 		Live:     live,
 		move:     movement,
 		hp:       inst.Template.HPMax,
+		mp:       inst.Template.MPMax,
 		roll:     rand.Intn,
 	}
 	h.health = creature.NewHealth(&h.hp)

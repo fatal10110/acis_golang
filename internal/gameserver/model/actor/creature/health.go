@@ -41,20 +41,45 @@ func (h *Health) SetCurrent(v float64) {
 	*h.current = v
 }
 
+// Add restores non-negative hit points up to max and returns the applied amount.
+func (h *Health) Add(amount, max float64) float64 {
+	if amount <= 0 {
+		return 0
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.current == nil || *h.current >= max {
+		return 0
+	}
+	if *h.current+amount > max {
+		amount = max - *h.current
+	}
+	*h.current += amount
+	return amount
+}
+
 // Damage applies non-negative damage, clamps at zero, and reports whether
 // this damage newly reached zero.
 func (h *Health) Damage(dmg int) bool {
 	if dmg < 0 {
 		dmg = 0
 	}
+	return h.DamageValue(float64(dmg))
+}
 
+// DamageValue applies non-negative fractional damage, clamps at zero, and
+// reports whether this damage newly reached zero.
+func (h *Health) DamageValue(dmg float64) bool {
+	if dmg < 0 {
+		dmg = 0
+	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if h.current == nil || *h.current <= 0 {
 		return false
 	}
 
-	*h.current -= float64(dmg)
+	*h.current -= dmg
 	if *h.current > 0 {
 		return false
 	}

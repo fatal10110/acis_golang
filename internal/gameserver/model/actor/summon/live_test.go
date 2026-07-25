@@ -10,7 +10,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/statbonus"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -186,8 +185,8 @@ func TestNewPetAppliesConfiguredInventoryLimits(t *testing.T) {
 	if actor.PetInventory().SlotLimit != 7 {
 		t.Fatalf("pet inventory SlotLimit = %d, want 7", actor.PetInventory().SlotLimit)
 	}
-	if want := int(34500 * statbonus.CONBonus[43] * 2.0); actor.PetInventory().WeightLimit != want {
-		t.Fatalf("pet inventory WeightLimit = %d, want %d", actor.PetInventory().WeightLimit, want)
+	if actor.PetInventory().WeightLimit != 109020 {
+		t.Fatalf("pet inventory WeightLimit = %d, want %d", actor.PetInventory().WeightLimit, 109020)
 	}
 	if got := actor.ScaledExpGain(1000); got != 1500 {
 		t.Fatalf("ScaledExpGain(ordinary pet) = %d, want 1500", got)

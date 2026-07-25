@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/config"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/statbonus"
 )
 
 func TestIsMountable(t *testing.T) {
@@ -84,8 +83,8 @@ WeightLimit = 2.5
 	if slots != 21 {
 		t.Errorf("Inventory slots = %d, want 21", slots)
 	}
-	if want := int(34500 * statbonus.CONBonus[43] * 2.5); weight != want {
-		t.Errorf("Weight limit = %d, want %d", weight, want)
+	if weight != 136275 {
+		t.Errorf("Weight limit = %d, want %d", weight, 136275)
 	}
 }
 
@@ -105,7 +104,7 @@ func TestConfigFromPropertiesUsesReferenceDefaults(t *testing.T) {
 	if slots != 12 {
 		t.Errorf("default pet inventory slots = %d, want 12", slots)
 	}
-	if want := int(34500 * statbonus.CONBonus[43]); weight != want {
-		t.Errorf("default weight limit = %d, want %d", weight, want)
+	if weight != 54510 {
+		t.Errorf("default weight limit = %d, want %d", weight, 54510)
 	}
 }
