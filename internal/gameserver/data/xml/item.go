@@ -9,6 +9,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 )
 
+// useConditionCannotUseItemMessageID stays literal to keep data/xml free of
+// the serverpackets dependency. It must match SystemMessageS1CannotBeUsed.
 const useConditionCannotUseItemMessageID int32 = 113
 
 // itemFile is the root element of one item template XML file: a flat list

@@ -114,6 +114,7 @@ type Character struct {
 	transformed          bool
 	operating            bool
 	fishing              bool
+	hero                 bool
 	disabledItems        map[int32]time.Time
 	shortBuffTaskSkillID int32
 	shortBuffTimer       *time.Timer

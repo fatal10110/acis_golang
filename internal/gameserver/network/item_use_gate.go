@@ -47,6 +47,8 @@ func rejectUseItemConditions(live *livePlayer, tmpl *item.Template) bool {
 
 func sendUseConditionFailure(live *livePlayer, tmpl *item.Template, uc item.UseCondition) {
 	switch {
+	case uc.Message != "":
+		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1, uc.Message))
 	case uc.MessageID > 0 && uc.AddName:
 		live.SendFrame(serverpackets.FrameSystemMessageItemName(int(uc.MessageID), tmpl.ID))
 	case uc.MessageID > 0:
@@ -96,7 +98,7 @@ func playerUseConditionHolds(live *livePlayer, attrs map[string]string) bool {
 			}
 		case "ishero":
 			want, ok := parseConditionBool(raw)
-			if !ok || want {
+			if !ok || live.IsHero() != want {
 				return false
 			}
 		case "pkcount":

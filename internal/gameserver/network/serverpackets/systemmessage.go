@@ -73,6 +73,7 @@ const (
 	SystemMessageExchangeHasEnded                 = 1266
 	SystemMessagePetRefusingOrder                 = 1864
 	SystemMessagePetTooHighToControl              = 1918
+	SystemMessageS1                               = 1987
 	SystemMessageThereIsNoSkillThatEnablesEnchant = 1438
 	SystemMessageMissingItemsToEnchantSkill       = 1439
 	SystemMessageSucceededEnchantingSkillS1       = 1440

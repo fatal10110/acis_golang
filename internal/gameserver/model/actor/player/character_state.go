@@ -144,6 +144,25 @@ func (c *Character) SetFishing(fishing bool) bool {
 	return true
 }
 
+// IsHero reports whether this character currently has hero status.
+func (c *Character) IsHero() bool {
+	c.stateMu.RLock()
+	defer c.stateMu.RUnlock()
+	return c.hero
+}
+
+// SetHero updates hero status and reports whether it changed.
+func (c *Character) SetHero(hero bool) bool {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	c.initStateLocked()
+	if c.hero == hero {
+		return false
+	}
+	c.hero = hero
+	return true
+}
+
 // DisableItem marks an inventory object id unusable until delay expires.
 func (c *Character) DisableItem(objectID int32, delay time.Duration) {
 	if objectID <= 0 {

@@ -27,7 +27,7 @@ const characterColumns = `obj_Id, account_name, char_name,
 	COALESCE(heading,0), COALESCE(x,0), COALESCE(y,0), COALESCE(z,0),
 	exp, sp, COALESCE(karma,0), COALESCE(pvpkills,0), COALESCE(pkkills,0), COALESCE(clanid,0),
 	COALESCE(race,0), COALESCE(classid,0), base_class,
-	COALESCE(deletetime,0), COALESCE(title,''), COALESCE(accesslevel,0), COALESCE(lastAccess,0)`
+	COALESCE(deletetime,0), COALESCE(title,''), COALESCE(accesslevel,0), COALESCE(hero,0), COALESCE(lastAccess,0)`
 
 // CharacterStore reads and writes the characters table.
 type CharacterStore struct {
@@ -107,6 +107,7 @@ func scanCharacter(row rowScanner) (*player.Character, error) {
 	var c player.Character
 	var sex byte
 	var race, classID int
+	var hero int
 	var maxHP, curHP, maxCP, curCP, maxMP, curMP float64
 
 	err := row.Scan(
@@ -116,7 +117,7 @@ func scanCharacter(row rowScanner) (*player.Character, error) {
 		&c.LastHeading, &c.Location.X, &c.Location.Y, &c.Location.Z,
 		&c.Exp, &c.SP, &c.KarmaPoints, &c.PvPKills, &c.PKKills, &c.ClanID,
 		&race, &classID, &c.BaseClassID,
-		&c.DeleteAt, &c.Title, &c.AccessLevel, &c.LastAccess,
+		&c.DeleteAt, &c.Title, &c.AccessLevel, &hero, &c.LastAccess,
 	)
 	if err != nil {
 		return nil, err
@@ -124,6 +125,7 @@ func scanCharacter(row rowScanner) (*player.Character, error) {
 	c.Sex = player.Sex(sex)
 	c.Race = player.Race(race)
 	c.ClassID = classID
+	c.SetHero(hero != 0)
 	c.SetResourceValues(player.Resources{
 		MaxHP: maxHP, CurrentHP: curHP,
 		MaxCP: maxCP, CurrentCP: curCP,
