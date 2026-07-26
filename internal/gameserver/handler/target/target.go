@@ -678,6 +678,16 @@ func (corpsePetHandler) CanCast(_, target Creature, _ *modelskill.Definition, _ 
 	return ok && pet.IsPet()
 }
 
+// GroundTargeter is implemented by casters that track a pending
+// ground-click point for ground-targeted skills (signets and similar), and
+// can answer the point-based line-of-sight and peace-zone queries
+// groundHandler.CanCast gates on.
+type GroundTargeter interface {
+	GroundTarget() (x, y, z int)
+	CanSeePoint(x, y, z int) bool
+	EffectRangeInPeaceZone(x, y, z, effectRange int) bool
+}
+
 type groundHandler struct{}
 
 func (groundHandler) Target() modelskill.Target { return modelskill.TargetGround }
@@ -690,13 +700,26 @@ func (groundHandler) FinalTarget(caster, _ Creature, _ *modelskill.Definition) C
 	return caster
 }
 
-// CanCast reports true unconditionally. The real cast-eligibility checks —
-// line of sight from the caster to the cast's target point and whether that
-// point falls inside a peace zone — depend on a per-cast target-point field
-// and a location-aware line-of-sight query that don't exist on the caster
-// yet; gating on them is deferred until that plumbing lands.
-func (groundHandler) CanCast(Creature, Creature, *modelskill.Definition, bool) bool {
-	return true
+// CanCast gates a ground-targeted cast on the caster's last ground-click
+// point: real line of sight from the caster to that point, then whether the
+// skill's effect range around that point overlaps a peace zone attached to
+// the caster's own region. A caster that doesn't track a ground-click point
+// (e.g. a test double, or a non-player caster) is permissive, matching the
+// reference restricting this target type to players.
+func (groundHandler) CanCast(caster, _ Creature, skill *modelskill.Definition, _ bool) bool {
+	gt, ok := caster.(GroundTargeter)
+	if !ok {
+		return true
+	}
+	x, y, z := gt.GroundTarget()
+	if !gt.CanSeePoint(x, y, z) {
+		return false
+	}
+	var effectRange int
+	if skill != nil {
+		effectRange = skill.EffectRange
+	}
+	return !gt.EffectRangeInPeaceZone(x, y, z, effectRange)
 }
 
 func skillRadius(skill *modelskill.Definition) int {

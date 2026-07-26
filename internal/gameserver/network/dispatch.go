@@ -26,6 +26,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/restart"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/petitem"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
@@ -86,6 +87,7 @@ type GameClientLink struct {
 	world                    *world.State
 	npcs                     *npc.Table
 	geo                      move.Geo
+	zones                    *zone.Index
 	ids                      idAllocator
 	groundItems              groundItemDropper
 	attackStance             attackStanceTracker
@@ -142,6 +144,7 @@ func NewGameClientLink(
 	worldState *world.State,
 	npcs *npc.Table,
 	geo move.Geo,
+	zones *zone.Index,
 	ids idAllocator,
 	groundItems groundItemDropper,
 	attackStance attackStanceTracker,
@@ -171,6 +174,7 @@ func NewGameClientLink(
 		world:                    worldState,
 		npcs:                     npcs,
 		geo:                      geo,
+		zones:                    zones,
 		ids:                      ids,
 		groundItems:              groundItems,
 		attackStance:             attackStance,

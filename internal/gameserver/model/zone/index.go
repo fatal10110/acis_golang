@@ -105,6 +105,52 @@ func FindAtXY[T Kind](ix *Index, x, y int) (T, bool) {
 	return zero, false
 }
 
+// EffectRangeInPeaceZone reports whether a skill's effect range around
+// (x, y, z) overlaps a peace-suspending zone attached to the region
+// containing (regionX, regionY) — the caster's own region, not necessarily
+// the region containing (x, y, z), matching the reference's region-only
+// zone lookup. It samples the center point and the four axis-aligned range
+// offsets, mirroring the reference's diamond sample.
+func (ix *Index) EffectRangeInPeaceZone(regionX, regionY, x, y, z, effectRange int) bool {
+	zones := ix.At(regionX, regionY)
+	if len(zones) == 0 {
+		return false
+	}
+	samples := [5][2]int{
+		{x, y},
+		{x + effectRange, y},
+		{x - effectRange, y},
+		{x, y + effectRange},
+		{x, y - effectRange},
+	}
+	for _, k := range zones {
+		if !peaceCapable(k) {
+			continue
+		}
+		for _, s := range samples {
+			if k.Core().ContainsPoint(s[0], s[1], z) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// peaceCapable reports whether k is one of the zone kinds that can suspend
+// hostilities: an explicit Peace zone, a monster-race derby track, or a
+// town whose data marks it peaceful.
+func peaceCapable(k Kind) bool {
+	switch v := k.(type) {
+	case *Peace:
+		return true
+	case *DerbyTrack:
+		return true
+	case *Town:
+		return v.Peaceful
+	}
+	return false
+}
+
 // OfKind returns every zone of type T, in load order.
 func OfKind[T Kind](ix *Index) []T {
 	var out []T

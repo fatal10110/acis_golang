@@ -80,6 +80,28 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 	controller.Finish()
 }
 
+// handleMagicSkillUseGround records the client-supplied ground-click point
+// on the caster, height-snapped to geodata like the reference, then runs the
+// same cast pipeline an ordinary RequestMagicSkillUse drives — the ground
+// point itself is carried out-of-band via live.Character, not as this
+// cast's resolved target.
+func (l *GameClientLink) handleMagicSkillUseGround(live *livePlayer, req clientpackets.RequestExMagicSkillUseGround) {
+	if live == nil {
+		sendMagicActionFailed(live)
+		return
+	}
+	z := int(req.Z)
+	if l.geo != nil {
+		z = int(l.geo.Height(int(req.X), int(req.Y), int(req.Z)))
+	}
+	live.Character.SetGroundTarget(int(req.X), int(req.Y), z)
+	l.handleMagicSkillUse(live, clientpackets.RequestMagicSkillUse{
+		SkillID:      req.SkillID,
+		CtrlPressed:  req.CtrlPressed,
+		ShiftPressed: req.ShiftPressed,
+	})
+}
+
 // handleToggleSkillUse applies casting a toggle skill: an already-active
 // instance turns off at no cost, an inactive one pays its MP/HP cost and
 // turns on. A toggle's cast window is instantaneous — there is no cast bar,

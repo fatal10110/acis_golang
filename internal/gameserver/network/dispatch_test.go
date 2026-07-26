@@ -742,6 +742,18 @@ func encodeRequestMagicSkillUse(skillID int32, ctrl, shift bool) []byte {
 	return w.Bytes()
 }
 
+func encodeRequestExMagicSkillUseGround(x, y, z, skillID int32, ctrl, shift bool) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeExtended)
+	w.WriteUint16(clientpackets.OpcodeRequestExMagicSkillUseGround)
+	w.WriteInt32(x)
+	w.WriteInt32(y)
+	w.WriteInt32(z)
+	w.WriteInt32(skillID)
+	w.WriteInt32(wire.BoolInt32(ctrl))
+	w.WriteUint8(wire.BoolByte(shift))
+	return w.Bytes()
+}
+
 func encodeRequestSkillCoolTime() []byte {
 	return wire.NewPacketWriter(clientpackets.OpcodeRequestSkillCoolTime).Bytes()
 }
@@ -943,7 +955,7 @@ func newTestGameClientLinkWithSkillsShortcutsCrestsAndLog(t *testing.T, loginLin
 	if len(cursedWeapons) > 0 {
 		cursed = cursedWeapons[0]
 	}
-	gcl := NewGameClientLink(validator, loginLink, roster, items, shortcuts, templates, itemTemplates, html, crests, skills, spellbooks, trees, cursed, state, nil, testGeo{}, ids, groundItems, nil, task.NewPositionUpdates(state), nil, nil, 0.7, nil, true, petmodel.DefaultConfig(), log)
+	gcl := NewGameClientLink(validator, loginLink, roster, items, shortcuts, templates, itemTemplates, html, crests, skills, spellbooks, trees, cursed, state, nil, testGeo{}, nil, ids, groundItems, nil, task.NewPositionUpdates(state), nil, nil, 0.7, nil, true, petmodel.DefaultConfig(), log)
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {

@@ -85,6 +85,62 @@ func (c *Character) SetLineOfSight(los LineOfSight) {
 	c.los = los
 }
 
+// PeaceZoneQuery reports whether any point within effectRange of (x, y, z) —
+// sampled at the point and its four axis-aligned range offsets — falls
+// inside a peace-suspending zone attached to the region containing
+// (regionX, regionY). Callers pass their own position as the region anchor,
+// matching the reference's caster-region-only zone lookup.
+type PeaceZoneQuery interface {
+	EffectRangeInPeaceZone(regionX, regionY, x, y, z, effectRange int) bool
+}
+
+// SetZones records the zone index EffectRangeInPeaceZone queries. A nil
+// zones (e.g. in tests that don't exercise zone data) leaves it permissive.
+func (c *Character) SetZones(zones PeaceZoneQuery) {
+	c.zones = zones
+}
+
+// SetGroundTarget records the last ground-click point a ground-targeted
+// skill cast (RequestExMagicSkillUseGround) resolved, reused across casts
+// until the next ground click overwrites it.
+func (c *Character) SetGroundTarget(x, y, z int) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	c.groundTarget = location.Location{X: x, Y: y, Z: z}
+}
+
+// GroundTarget returns the last recorded ground-click point.
+func (c *Character) GroundTarget() (x, y, z int) {
+	c.stateMu.RLock()
+	defer c.stateMu.RUnlock()
+	return c.groundTarget.X, c.groundTarget.Y, c.groundTarget.Z
+}
+
+// CanSeePoint reports whether an arbitrary world point is visible to this
+// player: a geodata line-of-sight query from this player's position and eye
+// height to the raw point (no height offset on the point end, matching the
+// reference's ground-target LOS query), or permissive when no
+// line-of-sight query is attached (e.g. in tests).
+func (c *Character) CanSeePoint(x, y, z int) bool {
+	if c.los == nil {
+		return true
+	}
+	ox, oy, oz := c.Position()
+	return c.los.CanSeeActor(ox, oy, oz, c.CollisionHeight(), x, y, z, 0)
+}
+
+// EffectRangeInPeaceZone reports whether the given point's effect range
+// overlaps a peace-suspending zone attached to this player's own current
+// region, or permissive (false) when no zone index is attached (e.g. in
+// tests).
+func (c *Character) EffectRangeInPeaceZone(x, y, z, effectRange int) bool {
+	if c.zones == nil {
+		return false
+	}
+	rx, ry, _ := c.Position()
+	return c.zones.EffectRangeInPeaceZone(rx, ry, x, y, z, effectRange)
+}
+
 // AttachRuntime records the static template and restored inventory used by
 // live combat and visibility code. Call it before exposing c to the world.
 func (c *Character) AttachRuntime(tmpl *Template, inv *itemcontainer.Inventory) {

@@ -193,6 +193,9 @@ func (l *GameClientLink) attachLivePlayer(client *Client, c *player.Character, t
 	if los, ok := l.geo.(player.LineOfSight); ok {
 		c.SetLineOfSight(los)
 	}
+	if l.zones != nil {
+		c.SetZones(l.zones)
+	}
 	c.SetFrameSender(client.Session.SendFrame)
 	c.SetLogger(l.log)
 

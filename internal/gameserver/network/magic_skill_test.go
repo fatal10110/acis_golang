@@ -113,6 +113,52 @@ func TestGameClientLinkMagicSkillUseAppliesBuffEffectToSelf(t *testing.T) {
 	}
 }
 
+func TestGameClientLinkMagicSkillUseGroundRecordsGroundTargetAndAppliesEffect(t *testing.T) {
+	store := newMemorySkillSaveStore()
+	skills := skillstate.NewPersistence(store, modelskill.NewTable([]modelskill.Definition{
+		{
+			ID: 5, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetGround,
+			HitTime: 500, ReuseDelay: 1200, StaticHitTime: true, StaticReuse: true,
+			MPInitialConsume: 2, MPConsume: 3, SkillType: "BUFF",
+			Effects: []modelskill.EffectTemplate{{Name: "Buff", Time: 60}},
+		},
+	}), store)
+	var objID int32
+	c, _, _, state := newLinkedGameClientWithSkillsSeed(t, skills, func(chars *fakeCharStore, _ *fakeItemStore) {
+		objID = seedSelectableCharacter(t, chars, "player1", "Newbie", 5, 0)
+		store.seedKnown(objID, 0, player.SkillLevels{5: 1})
+	}, 1)
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	c.send(encodeRequestExMagicSkillUseGround(1000, 2000, 300, 5, false, false))
+	c.read() // MagicSkillUse
+	c.read() // SystemMessage
+	c.read() // SetupGauge
+	c.read() // MagicSkillLaunched
+	c.read() // StatusUpdate
+
+	obj, ok := state.Player(objID)
+	if !ok {
+		t.Fatalf("player %d not found in world state after cast", objID)
+	}
+	character, ok := obj.(*livePlayer)
+	if !ok {
+		t.Fatalf("world state player %d is not a *livePlayer", objID)
+	}
+	if x, y, z := character.GroundTarget(); x != 1000 || y != 2000 || z != 300 {
+		t.Fatalf("GroundTarget() = (%d,%d,%d), want (1000,2000,300)", x, y, z)
+	}
+	effects := character.EffectList().All()
+	if len(effects) != 1 || effects[0].Skill.ID != 5 {
+		t.Fatalf("effects after ground-target cast = %+v, want one effect from skill 5", effects)
+	}
+}
+
 func TestGameClientLinkMagicSkillUseSendsAttackFailedWhenContinuousSkillDoesNotLand(t *testing.T) {
 	store := newMemorySkillSaveStore()
 	skills := skillstate.NewPersistence(store, modelskill.NewTable([]modelskill.Definition{

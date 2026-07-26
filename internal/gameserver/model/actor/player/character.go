@@ -88,6 +88,7 @@ type Character struct {
 	inventory          *itemcontainer.Inventory
 	world              *world.State
 	los                LineOfSight
+	zones              PeaceZoneQuery
 	sendFrame          func(wire.Frame) bool
 	broadcastAttack    func(attack.Snapshot)
 	broadcastMove      func(move.Event)
@@ -120,6 +121,7 @@ type Character struct {
 	disabledItems        map[int32]time.Time
 	shortBuffTaskSkillID int32
 	shortBuffTimer       *time.Timer
+	groundTarget         location.Location
 	log                  zerolog.Logger
 
 	skills skillState
