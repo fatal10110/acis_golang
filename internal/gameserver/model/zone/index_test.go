@@ -63,6 +63,27 @@ func TestIndexFindAndKindQueries(t *testing.T) {
 	}
 }
 
+func TestIndexEffectRangeInPeaceZone(t *testing.T) {
+	ix := NewIndex()
+	peace := NewPeace(1, NewCuboid(0, 100, 0, 100, -100, 100))
+	ix.Add(peace)
+
+	// Region anchor (caster position) far away, in a region the peace zone
+	// never attached to.
+	if ix.EffectRangeInPeaceZone(50000, 50000, 50, 50, 0, 0) {
+		t.Fatal("blocked outside the caster's own region's zone list")
+	}
+	// Caster's own region (0,0 side) sees the peace zone even though the
+	// sampled point sits outside it — only the range offsets reach in.
+	if !ix.EffectRangeInPeaceZone(50, 50, 150, 50, 0, 60) {
+		t.Fatal("effect range sample did not reach into the peace zone")
+	}
+	// Center point and every offset sit outside effectRange 0 of the zone.
+	if ix.EffectRangeInPeaceZone(50, 50, 500, 500, 0, 0) {
+		t.Fatal("unrelated point falsely blocked")
+	}
+}
+
 func TestIndexRevalidateAndRemoveFrom(t *testing.T) {
 	ix := NewIndex()
 	peace := NewPeace(1, NewCuboid(0, 1000, 0, 1000, -100, 100))

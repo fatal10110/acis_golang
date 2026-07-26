@@ -181,6 +181,79 @@ func TestCharacterCanSeeQueriesLineOfSightWithActorHeights(t *testing.T) {
 	}
 }
 
+func TestCharacterCanSeePointDefaultsToVisibleWithoutLineOfSight(t *testing.T) {
+	c := liveCharacter(1, combatTemplate(), combatItems())
+
+	if !c.CanSeePoint(10, 20, 30) {
+		t.Fatal("CanSeePoint() = false with no line-of-sight query attached, want true")
+	}
+}
+
+func TestCharacterCanSeePointQueriesLineOfSightWithZeroTargetHeight(t *testing.T) {
+	c := liveCharacter(1, combatTemplate(), combatItems())
+	los := &fakeLineOfSight{result: true}
+	c.SetLineOfSight(los)
+
+	if got := c.CanSeePoint(10, 20, 30); got != true {
+		t.Fatalf("CanSeePoint() = %v, want true", got)
+	}
+	if los.got.tx != 10 || los.got.ty != 20 || los.got.tz != 30 {
+		t.Fatalf("CanSeeActor() target = (%d,%d,%d), want (10,20,30)", los.got.tx, los.got.ty, los.got.tz)
+	}
+	if los.got.tCollisionHeight != 0 {
+		t.Fatalf("CanSeeActor() target collision height = %v, want 0", los.got.tCollisionHeight)
+	}
+}
+
+func TestCharacterGroundTargetRoundTrips(t *testing.T) {
+	c := liveCharacter(1, combatTemplate(), combatItems())
+
+	if x, y, z := c.GroundTarget(); x != 0 || y != 0 || z != 0 {
+		t.Fatalf("GroundTarget() before any cast = (%d,%d,%d), want (0,0,0)", x, y, z)
+	}
+	c.SetGroundTarget(100, 200, 300)
+	if x, y, z := c.GroundTarget(); x != 100 || y != 200 || z != 300 {
+		t.Fatalf("GroundTarget() = (%d,%d,%d), want (100,200,300)", x, y, z)
+	}
+}
+
+type fakePeaceZoneQuery struct {
+	result           bool
+	gotRX, gotRY     int
+	gotX, gotY, gotZ int
+	gotEffectRange   int
+}
+
+func (f *fakePeaceZoneQuery) EffectRangeInPeaceZone(regionX, regionY, x, y, z, effectRange int) bool {
+	f.gotRX, f.gotRY, f.gotX, f.gotY, f.gotZ, f.gotEffectRange = regionX, regionY, x, y, z, effectRange
+	return f.result
+}
+
+func TestCharacterEffectRangeInPeaceZoneDefaultsToPermissiveWithoutZones(t *testing.T) {
+	c := liveCharacter(1, combatTemplate(), combatItems())
+
+	if c.EffectRangeInPeaceZone(10, 20, 30, 40) {
+		t.Fatal("EffectRangeInPeaceZone() = true with no zone index attached, want false")
+	}
+}
+
+func TestCharacterEffectRangeInPeaceZoneQueriesZonesWithOwnRegion(t *testing.T) {
+	c := liveCharacter(1, combatTemplate(), combatItems())
+	zones := &fakePeaceZoneQuery{result: true}
+	c.SetZones(zones)
+
+	if got := c.EffectRangeInPeaceZone(10, 20, 30, 40); got != true {
+		t.Fatalf("EffectRangeInPeaceZone() = %v, want true", got)
+	}
+	ox, oy, _ := c.Position()
+	if zones.gotRX != ox || zones.gotRY != oy {
+		t.Fatalf("region anchor = (%d,%d), want caster position (%d,%d)", zones.gotRX, zones.gotRY, ox, oy)
+	}
+	if zones.gotX != 10 || zones.gotY != 20 || zones.gotZ != 30 || zones.gotEffectRange != 40 {
+		t.Fatalf("query args = (%d,%d,%d,%d), want (10,20,30,40)", zones.gotX, zones.gotY, zones.gotZ, zones.gotEffectRange)
+	}
+}
+
 func TestCharacterDieBroadcastsDieOnceOnly(t *testing.T) {
 	tmpl := combatTemplate()
 	items := combatItems()

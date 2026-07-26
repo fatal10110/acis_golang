@@ -88,6 +88,8 @@ type Character struct {
 	inventory          *itemcontainer.Inventory
 	world              *world.State
 	los                LineOfSight
+	zones              PeaceZoneQuery
+	groundTarget       location.Location
 	sendFrame          func(wire.Frame) bool
 	broadcastAttack    func(attack.Snapshot)
 	broadcastMove      func(move.Event)

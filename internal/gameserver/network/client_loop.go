@@ -295,6 +295,15 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 					continue
 				}
 				session.SendFrame(serverpackets.FrameExCursedWeaponList(l.cursedWeapons.IDs()))
+			case second == clientpackets.OpcodeRequestExMagicSkillUseGround:
+				req, err := clientpackets.DecodeRequestExMagicSkillUseGround(payload)
+				if err != nil {
+					l.log.Warn().Err(err).Msg("game client")
+					continue
+				}
+				if live != nil {
+					l.handleMagicSkillUseGround(live, req)
+				}
 			case second == clientpackets.OpcodeRequestCursedWeaponLocation:
 				if live == nil {
 					continue
