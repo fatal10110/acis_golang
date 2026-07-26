@@ -102,6 +102,13 @@ type UseRequest struct {
 	// than the player itself. An Elixirs-handled item rejects such a
 	// caster; ItemSkillsHandler items do not distinguish on this field.
 	IsPet bool
+
+	// Summon is the caster's active pet or servitor, if any. A herb's
+	// effect is mirrored onto it in addition to Caster, matching the
+	// reference's `player.getSummon().getCast().doInstantCast(...)`. Nil
+	// when the caster has no active summon, or is itself one (IsPet),
+	// leaves the mirror unapplied.
+	Summon actorcast.Target
 }
 
 // Use runs the ItemSkills instant-cast path for one etc item: it
@@ -110,13 +117,12 @@ type UseRequest struct {
 // simultaneous-cast, rejects a still-cooling reuse, consumes one unit
 // from the clicked stack (skipped for herbs, which apply without
 // consuming), installs the item-driven reuse delay, and applies the
-// skill's effects to the caster.
+// skill's effects to the caster, mirroring a herb's effect onto req.Summon
+// when present.
 //
 // It reports NotHandled for anything that isn't such an instant-cast
 // consumable, so the caller's next branch (equip-toggle, etc.) still gets
-// a chance to answer the client. Mirroring a herb's effect onto the
-// caster's active servitor is not handled here: it needs a servitor cast
-// surface this package doesn't have a dependency on yet.
+// a chance to answer the client.
 func Use(req UseRequest) UseResult {
 	if req.Caster == nil || req.Inventory == nil || req.Item == nil {
 		return UseResult{Outcome: NotHandled}
@@ -154,6 +160,10 @@ func Use(req UseRequest) UseResult {
 
 	reuse := installItemReuse(req.Caster, def, reuseKey, tmpl.EtcItem.ReuseDelay)
 	actorcast.ApplyEffects(req.Effects, req.Caster, req.Caster, def)
+
+	if tmpl.EtcItem.Type == modelitem.EtcItemHerb && !req.IsPet && req.Summon != nil {
+		actorcast.ApplyEffects(req.Effects, req.Summon, req.Summon, def)
+	}
 
 	result := UseResult{Outcome: Applied, Skill: def, SharedReuseGroup: tmpl.EtcItem.SharedReuseGroup, ReuseMillis: reuse}
 	result.HasShortBuff, result.ShortBuffSkillID, result.ShortBuffLevel, result.ShortBuffDurationSeconds = shortBuffDecision(req.Caster, def)

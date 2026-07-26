@@ -31,6 +31,7 @@ func (l *GameClientLink) useConsumableSkillItem(live *livePlayer, inv *itemconta
 		Definitions: l.skills,
 		Effects:     actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers},
 		Destroyer:   l.inventoryService(),
+		Summon:      l.activeSummonTarget(live),
 	})
 	switch res.Outcome {
 	case itemhandler.NotHandled:
