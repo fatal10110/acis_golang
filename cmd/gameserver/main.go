@@ -958,7 +958,7 @@ func provideGameClientLink(
 	petCfg pet.Config,
 	log zerolog.Logger,
 ) *network.GameClientLink {
-	return network.NewGameClientLink(validator, links.get, roster, items, shortcuts, data.Players, data.Items, html, crests, skills, spellbooks, data.Trees, data.CursedWeapons, state, move.NewGeo(data.Geo, data.Finder), ids, ground, attackStance, positions, playerClock, data.Restarts, float64(respawnHP), data.Levels, bool(spBookNeeded), petCfg, log)
+	return network.NewGameClientLink(validator, links.get, roster, items, shortcuts, data.Players, data.Items, html, crests, skills, spellbooks, data.Trees, data.CursedWeapons, state, data.NPCs, move.NewGeo(data.Geo, data.Finder), ids, ground, attackStance, positions, playerClock, data.Restarts, float64(respawnHP), data.Levels, bool(spBookNeeded), petCfg, log)
 }
 
 func provideSkillPersistence(pool *sql.DB, data *gameData) *skillstate.Persistence {

@@ -16,6 +16,7 @@ import (
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
@@ -83,6 +84,7 @@ type GameClientLink struct {
 	skillTrees               *modelskill.Trees
 	cursedWeapons            *entity.CursedWeaponTable
 	world                    *world.State
+	npcs                     *npc.Table
 	geo                      move.Geo
 	ids                      idAllocator
 	groundItems              groundItemDropper
@@ -138,6 +140,7 @@ func NewGameClientLink(
 	skillTrees *modelskill.Trees,
 	cursedWeapons *entity.CursedWeaponTable,
 	worldState *world.State,
+	npcs *npc.Table,
 	geo move.Geo,
 	ids idAllocator,
 	groundItems groundItemDropper,
@@ -166,6 +169,7 @@ func NewGameClientLink(
 		skillTrees:               skillTrees,
 		cursedWeapons:            cursedWeapons,
 		world:                    worldState,
+		npcs:                     npcs,
 		geo:                      geo,
 		ids:                      ids,
 		groundItems:              groundItems,
@@ -182,9 +186,13 @@ func NewGameClientLink(
 		trades:                   tradebook.NewBook(time.Now),
 		enchantState:             enchantflow.NewState(),
 		targets:                  skilltarget.NewRegistry(skilltarget.WorldKnown{State: worldState}),
-		skillHandlers:            handlerskill.NewDefaultRegistryWithDefinitions(skills),
-		log:                      log,
-		newCipherKey:             randomCipherKey,
+		skillHandlers: handlerskill.NewDefaultRegistryWithSignet(skills, handlerskill.SignetDeps{
+			Templates: npcs,
+			IDs:       ids,
+			World:     worldState,
+		}),
+		log:          log,
+		newCipherKey: randomCipherKey,
 	}
 }
 

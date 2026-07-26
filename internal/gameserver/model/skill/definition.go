@@ -108,6 +108,11 @@ type Definition struct {
 	EffectPower int
 	EffectLevel int
 
+	// EffectNpcID is the template id of the world actor a signet-family
+	// skill (SIGNET/SIGNET_CASTTIME) spawns to carry its periodic area
+	// effect. -1 when unset, matching the reference default.
+	EffectNpcID int
+
 	Element      Element
 	BaseLandRate int
 
@@ -232,6 +237,7 @@ func NewDefinition(id ID, level int, name string, set *commons.StatSet) (Definit
 		EffectID:    f.IntDefault("effectId", 0),
 		EffectPower: f.IntDefault("effectPower", 0),
 		EffectLevel: f.IntDefault("effectLevel", 0),
+		EffectNpcID: f.IntDefault("effectNpcId", -1),
 
 		Element:      commons.FieldEnumDefault[Element](f, "element", elementNames, ElementNone),
 		BaseLandRate: f.IntDefault("baseLandRate", 0),

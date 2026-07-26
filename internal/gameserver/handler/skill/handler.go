@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // Cast carries the already-resolved inputs a skill handler needs.
@@ -87,6 +88,23 @@ func NewDefaultRegistryWithDefinitions(defs Definitions) *Registry {
 		sweepHandler{},
 		continuousHandler{defs: defs},
 	)
+}
+
+// SignetDeps carries the world-spawning collaborators the signet cast
+// shape needs beyond skill definitions.
+type SignetDeps struct {
+	Templates signetTemplates
+	IDs       signetIDAllocator
+	World     *world.State
+}
+
+// NewDefaultRegistryWithSignet returns the same handlers as
+// NewDefaultRegistryWithDefinitions, plus the signet cast shape wired with
+// signet's own world-spawning collaborators.
+func NewDefaultRegistryWithSignet(defs Definitions, signet SignetDeps) *Registry {
+	r := NewDefaultRegistryWithDefinitions(defs)
+	r.Register(signetHandler{defs: defs, templates: signet.Templates, ids: signet.IDs, world: signet.World})
+	return r
 }
 
 // Register adds h for every skill type it reports.
