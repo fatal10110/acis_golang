@@ -104,11 +104,15 @@ func (c *Character) SetZones(zones PeaceZoneQuery) {
 // skill cast (RequestExMagicSkillUseGround) resolved, reused across casts
 // until the next ground click overwrites it.
 func (c *Character) SetGroundTarget(x, y, z int) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
 	c.groundTarget = location.Location{X: x, Y: y, Z: z}
 }
 
 // GroundTarget returns the last recorded ground-click point.
 func (c *Character) GroundTarget() (x, y, z int) {
+	c.stateMu.RLock()
+	defer c.stateMu.RUnlock()
 	return c.groundTarget.X, c.groundTarget.Y, c.groundTarget.Z
 }
 
