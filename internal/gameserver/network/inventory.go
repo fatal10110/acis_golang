@@ -72,12 +72,39 @@ func (l *GameClientLink) useItem(live *livePlayer, objectID int32) {
 	if l.useShotItem(live, inv, inst) {
 		return
 	}
-	if _, ok := l.inventoryService().ToggleEquipItem(inv, objectID); !ok {
+	res, ok := l.inventoryService().ToggleEquipItem(inv, objectID)
+	if !ok {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
+	l.applyEquipStatChanges(live, inv, res)
 	l.sendInventoryUpdate(live, inv)
 	l.broadcastEquipmentChange(live)
+}
+
+// applyEquipStatChanges attaches or detaches the stat functions each
+// instance in res.Changed contributes while equipped — item-attached
+// passive skills and equip modifiers — based on its current equip state.
+// Unequip and equip changes for the same paperdoll slot arrive in that
+// order (the old occupant first, the new one second), mirroring the
+// reference's unequip-before-equip listener sequencing for one slot swap.
+func (l *GameClientLink) applyEquipStatChanges(live *livePlayer, inv *itemcontainer.Inventory, res invops.Result) {
+	if l.skills == nil || live == nil || inv == nil {
+		return
+	}
+	for _, inst := range res.Changed {
+		tmpl, ok := inv.Templates().Get(inst.TemplateID)
+		if !ok {
+			continue
+		}
+		if inst.Equipped() {
+			if err := l.skills.EquipItemStats(live.Character, inst, tmpl); err != nil {
+				l.log.Error().Err(err).Int32("object_id", inst.ObjectID).Msg("equip item stats")
+			}
+			continue
+		}
+		l.skills.UnequipItemStats(live.Character, inst, tmpl)
+	}
 }
 
 func (l *GameClientLink) handleAutoSoulShot(live *livePlayer, req clientpackets.RequestAutoSoulShot) {
@@ -136,10 +163,12 @@ func (l *GameClientLink) unequipItem(live *livePlayer, bodySlot int32) {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
-	if _, ok := l.inventoryService().UnequipBodySlot(inv, bodySlot); !ok {
+	res, ok := l.inventoryService().UnequipBodySlot(inv, bodySlot)
+	if !ok {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
+	l.applyEquipStatChanges(live, inv, res)
 	l.sendInventoryUpdate(live, inv)
 	l.broadcastEquipmentChange(live)
 }

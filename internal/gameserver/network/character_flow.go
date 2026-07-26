@@ -100,6 +100,12 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 		l.log.Error().Err(err).Msg("enter world: attach live player")
 		return nil, false
 	}
+	if l.skills != nil {
+		if err := l.skills.RestoreEquippedItemStats(c, c.Inventory()); err != nil {
+			l.log.Error().Err(err).Int32("object_id", c.ID).Msg("enter world: restore equipped item stats")
+			return nil, false
+		}
+	}
 	if l.world != nil {
 		x, y, z := c.Position()
 		l.world.Spawn(live, x, y, z, c.LastHeading)

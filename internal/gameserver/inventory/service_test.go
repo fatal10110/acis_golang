@@ -156,6 +156,9 @@ func TestToggleEquipItemEquipsAndUnequips(t *testing.T) {
 	if !inst.Equipped() {
 		t.Fatalf("item location = %s/%d, want equipped", inst.Location, inst.LocationData)
 	}
+	if len(res.Changed) != 1 || res.Changed[0] != inst {
+		t.Fatalf("Changed = %+v, want [inst]", res.Changed)
+	}
 
 	res, ok = NewService(nil).ToggleEquipItem(inv, inst.ObjectID)
 	if !ok {
@@ -166,6 +169,9 @@ func TestToggleEquipItemEquipsAndUnequips(t *testing.T) {
 	}
 	if inst.Equipped() {
 		t.Fatalf("item location = %s/%d, want inventory", inst.Location, inst.LocationData)
+	}
+	if len(res.Changed) != 1 || res.Changed[0] != inst {
+		t.Fatalf("Changed = %+v, want [inst]", res.Changed)
 	}
 }
 
@@ -188,6 +194,9 @@ func TestUnequipBodySlotResolvesPaperdollSlot(t *testing.T) {
 	}
 	if inst.Equipped() {
 		t.Fatalf("item location = %s/%d, want inventory", inst.Location, inst.LocationData)
+	}
+	if len(res.Changed) != 1 || res.Changed[0] != inst {
+		t.Fatalf("Changed = %+v, want [inst]", res.Changed)
 	}
 }
 
