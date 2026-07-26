@@ -67,17 +67,29 @@ func TestFrameCharInfoUsesDoublePrecisionFloatFields(t *testing.T) {
 
 func TestFrameCharInfo_CubicsSerializeCountAndIDs(t *testing.T) {
 	tmpl := &player.Template{}
-	c := &player.Character{Name: "C"}
-	c.SetSkillLevel(143, 5) // Cubic Mastery: room for more than one cubic
-	c.AddOrRefreshCubic(1, false)
-	c.AddOrRefreshCubic(3, false)
+	empty := &player.Character{Name: "C"}
+	withCubics := &player.Character{Name: "C"}
+	withCubics.SetSkillLevel(143, 5) // Cubic Mastery: room for more than one cubic
+	withCubics.AddOrRefreshCubic(1, false)
+	withCubics.AddOrRefreshCubic(3, false)
 
-	got := framePayload(t, FrameCharInfo(CharInfoSnapshot{Character: c, Template: tmpl}))
+	base := framePayload(t, FrameCharInfo(CharInfoSnapshot{Character: empty, Template: tmpl}))
+	got := framePayload(t, FrameCharInfo(CharInfoSnapshot{Character: withCubics, Template: tmpl}))
 
+	// The cubic field is the only difference between the two encodings, so
+	// its exact position is the point the two payloads diverge, and the
+	// bytes after it must resync with base once the field is skipped.
+	prefixLen := 0
+	for prefixLen < len(base) && prefixLen < len(got) && base[prefixLen] == got[prefixLen] {
+		prefixLen++
+	}
 	want := binary.LittleEndian.AppendUint16(nil, 2)
 	want = binary.LittleEndian.AppendUint16(want, 1)
 	want = binary.LittleEndian.AppendUint16(want, 3)
-	if !bytes.Contains(got, want) {
-		t.Fatalf("encoding did not contain cubic count 2 followed by ids [1 3]")
+	if prefixLen+len(want) > len(got) || !bytes.Equal(got[prefixLen:prefixLen+len(want)], want) {
+		t.Fatalf("cubic field at offset %d = % x, want count 2 followed by ids [1 3] (% x)", prefixLen, got[prefixLen:], want)
+	}
+	if suffix := got[prefixLen+len(want):]; !bytes.Equal(suffix, base[prefixLen+2:]) {
+		t.Fatalf("bytes after cubic field don't resync with the no-cubic encoding: got %x, want %x", suffix, base[prefixLen+2:])
 	}
 }
