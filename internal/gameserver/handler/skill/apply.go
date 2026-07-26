@@ -37,6 +37,7 @@ func applyEffects(effector, effected any, def modelskill.Definition, templates [
 		Debuff:              def.Debuff,
 		Toggle:              def.Activation == modelskill.ActivationToggle,
 		KillByDOT:           def.KillByDOT,
+		Dance:               def.Dance,
 		CanBeDispelled:      def.CanBeDispelled,
 		MagicLevel:          def.MagicLevel,
 		LevelDepend:         def.LevelDepend,

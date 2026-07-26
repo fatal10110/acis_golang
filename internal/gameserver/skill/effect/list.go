@@ -46,6 +46,9 @@ type Skill struct {
 	Toggle         bool
 	KillByDOT      bool
 	CanBeDispelled bool
+	// Dance marks a song/dance skill, consulted by a signet-family effect's
+	// area tick that cancels dances on nearby targets.
+	Dance bool
 
 	// MagicLevel is the owning skill's casting level, read by cancel-family
 	// effects to compare a caster's cancel power against each candidate
@@ -139,6 +142,19 @@ func (e *Effect) InUse() bool {
 		return false
 	}
 	return e.inUse
+}
+
+// Remaining reports the number of ticks left after the one currently
+// running, mirroring the reference effect's own getCount(): it reads as
+// Template.Count on the first tick and counts down by one on each
+// subsequent tick.
+func (e *Effect) Remaining() int {
+	if e == nil {
+		return 0
+	}
+	e.scheduleMu.Lock()
+	defer e.scheduleMu.Unlock()
+	return e.remaining
 }
 
 // ActionTime runs e's periodic hook. Effects without periodic behavior stop

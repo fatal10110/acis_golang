@@ -139,6 +139,10 @@ func TestLoadSkillDefinitions(t *testing.T) {
 		if d.AggroPoints != 204 {
 			t.Fatalf("skill 4 level 1 AggroPoints = %d, want 204", d.AggroPoints)
 		}
+		// effectNpcId is absent, so it keeps the reference default of -1.
+		if d.EffectNpcID != -1 {
+			t.Fatalf("skill 4 level 1 EffectNpcID = %d, want -1", d.EffectNpcID)
+		}
 		// BUFF isn't a classified-offensive type, isn't a debuff, and
 		// doesn't target CORPSE_MOB, so Offensive defaults to false.
 		if d.Offensive {
@@ -153,6 +157,9 @@ func TestLoadSkillDefinitions(t *testing.T) {
 		}
 		if d.EffectID != 5123 || d.EffectLevel != 0 {
 			t.Fatalf("skill 454 delegation fields = effectID %d effectLevel %d, want 5123/0", d.EffectID, d.EffectLevel)
+		}
+		if d.EffectNpcID != 13018 {
+			t.Fatalf("skill 454 EffectNpcID = %d, want 13018", d.EffectNpcID)
 		}
 		referenced, ok := table.Get(5123, 1)
 		if !ok {
