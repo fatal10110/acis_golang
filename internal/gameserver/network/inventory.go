@@ -295,6 +295,13 @@ func (l *GameClientLink) sendInventoryUpdate(live *livePlayer, inv *itemcontaine
 // paperdoll/stats) and CharInfo to every client that already knows about
 // it (refreshing the worn-item visuals on their screen).
 func (l *GameClientLink) broadcastEquipmentChange(live *livePlayer) {
+	l.broadcastCharacterInfo(live)
+}
+
+// broadcastCharacterInfo resends UserInfo to live (refreshing its own
+// visible state) and CharInfo to every client that already knows about it,
+// matching the reference's broadcastUserInfo().
+func (l *GameClientLink) broadcastCharacterInfo(live *livePlayer) {
 	items := live.inventoryItems()
 	live.SendFrame(serverpackets.FrameUserInfo(serverpackets.UserInfoSnapshot{
 		Character: live.Character, Template: live.template, Items: items,

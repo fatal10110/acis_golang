@@ -18,6 +18,7 @@ type EffectHandlers struct {
 type EffectResult struct {
 	Handled      bool
 	AttackFailed int
+	CubicAdded   bool
 }
 
 // ApplyEffects resolves def's affected target set from caster and the
@@ -70,5 +71,5 @@ func ApplyEffectsResult(handlers EffectHandlers, caster any, resolved Target, de
 	if !ok {
 		return EffectResult{}
 	}
-	return EffectResult{Handled: true, AttackFailed: result.AttackFailed}
+	return EffectResult{Handled: true, AttackFailed: result.AttackFailed, CubicAdded: result.CubicAdded}
 }

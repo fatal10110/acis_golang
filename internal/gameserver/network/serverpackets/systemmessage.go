@@ -47,6 +47,7 @@ const (
 	SystemMessageEnchantScrollCancelled           = 423
 	SystemMessageWeightLimitExceeded              = 422
 	SystemMessageCrystallizeLevelTooLow           = 562
+	SystemMessageCubicSummoningFailed             = 568
 	SystemMessagePetCannotSentBackDuringBattle    = 579
 	SystemMessageDeadPetCannotBeReturned          = 589
 	SystemMessageCannotGiveItemsToDeadPet         = 590

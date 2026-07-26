@@ -96,3 +96,10 @@ func (a PlayerActor) ConsumeItem(itemID, count int) bool {
 	}
 	return a.Character.Inventory().DestroyByTemplateID(int32(itemID), count) != nil
 }
+
+// CubicListFull reports whether a's character already holds as many active
+// cubics as Cubic Mastery allows, satisfying the cubicLister interface
+// CanCast's cubic-specific gate checks.
+func (a PlayerActor) CubicListFull() bool {
+	return a.Character != nil && a.Character.CubicListFull()
+}

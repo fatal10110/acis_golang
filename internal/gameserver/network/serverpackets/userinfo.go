@@ -39,7 +39,7 @@ const (
 
 // UserInfoSnapshot is everything UserInfo needs about one character at the
 // moment of encoding. It is deliberately narrower than the client's full
-// field list: systems this server hasn't built yet (clans, cubics,
+// field list: systems this server hasn't built yet (clans,
 // hero/noble status, mounts, fishing, recommendations, and the
 // formula-derived combat stats — attack/cast speed, evasion, accuracy,
 // critical rate) always report their at-rest default, matching a freshly
@@ -182,7 +182,11 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) {
 	w.WriteInt32(int32(c.PKKills))
 	w.WriteInt32(int32(c.PvPKills))
 
-	w.WriteUint16(0) // cubic count: cubics are not modeled
+	cubicIDs := c.CubicIDs()
+	w.WriteUint16(uint16(len(cubicIDs)))
+	for _, id := range cubicIDs {
+		w.WriteUint16(uint16(id))
+	}
 
 	w.WriteUint8(0) // in party-match room: party matching is not modeled
 	w.WriteInt32(0) // abnormal effect mask: status effects are not modeled

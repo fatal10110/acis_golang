@@ -30,6 +30,7 @@ type Handler interface {
 // Result reports caster-visible outcomes produced while a skill handler ran.
 type Result struct {
 	AttackFailed int
+	CubicAdded   bool
 }
 
 type resultHandler interface {
@@ -80,6 +81,7 @@ func NewDefaultRegistryWithDefinitions(defs Definitions) *Registry {
 		getPlayerHandler{},
 		summonCreatureHandler{},
 		summonFriendHandler{},
+		cubicHandler{},
 		unlockHandler{},
 		extractableHandler{},
 		sowHandler{},

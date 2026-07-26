@@ -33,7 +33,21 @@ var (
 	// ErrSkillUnavailable means a player cast request did not name a known
 	// active skill.
 	ErrSkillUnavailable = errors.New("cast: skill unavailable")
+	// ErrCubicListFull means a self-targeted cubic-granting skill was cast
+	// while the caster already holds as many cubics as Cubic Mastery
+	// allows.
+	ErrCubicListFull = errors.New("cast: cubic list full")
 )
+
+// cubicLister is the narrow surface a self-targeted cubic-granting skill
+// checks before casting is allowed to start at all — matching the
+// reference's CubicList.isFull() gate in L2SkillSummon.checkCondition. A
+// mass-cubic skill (target type other than SELF) skips this gate entirely;
+// each recipient's own list silently evicts its oldest cubic instead, once
+// the skill actually applies its effect.
+type cubicLister interface {
+	CubicListFull() bool
+}
 
 // Actor is the owner state a cast controller reads and updates while
 // validating and advancing casts. Status implementations own stat
@@ -166,6 +180,11 @@ func (c *Controller) CanCast(target any, def modelskill.Definition) error {
 	key := ReuseKey(def)
 	if c.actor.SkillDisabled(key) {
 		return ErrSkillDisabled
+	}
+	if def.SkillType == "SUMMON" && def.IsCubic && def.Target == modelskill.TargetSelf {
+		if lister, ok := c.actor.(cubicLister); ok && lister.CubicListFull() {
+			return ErrCubicListFull
+		}
 	}
 
 	initialMP := c.actor.MPInitialCost(def)

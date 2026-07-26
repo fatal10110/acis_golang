@@ -121,6 +121,13 @@ type Definition struct {
 	SuicideAttack    bool
 	SiegeSummonSkill bool
 
+	// IsCubic and NpcID select the cubic branch of a SUMMON skill: NpcID is
+	// the cubic type id (matching cubic.ID) the skill grants when IsCubic
+	// is set. The same NpcID attribute also carries a servitor's spawn
+	// template id when IsCubic is false, which is that branch's concern.
+	IsCubic bool
+	NpcID   int
+
 	// WeaponsAllowed is the raw comma-separated weapon/armor type list a
 	// level restricts casting to, or "" when unrestricted. Resolving a name
 	// to its equipment mask is the item-type data's job, not this loader's.
@@ -246,6 +253,9 @@ func NewDefinition(id ID, level int, name string, set *commons.StatSet) (Definit
 		KillByDOT:        f.BoolDefault("killByDOT", false),
 		SuicideAttack:    f.BoolDefault("isSuicideAttack", false),
 		SiegeSummonSkill: f.BoolDefault("isSiegeSummonSkill", false),
+
+		IsCubic: f.BoolDefault("isCubic", false),
+		NpcID:   f.IntDefault("npcId", 0),
 
 		WeaponsAllowed: f.StringDefault("weaponsAllowed", ""),
 

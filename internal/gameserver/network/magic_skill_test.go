@@ -324,3 +324,89 @@ func TestGameClientLinkMagicSkillUseRejectsInsufficientMP(t *testing.T) {
 		t.Fatalf("after not-enough-mp opcode = %#x, want ActionFailed (%#x)", reply[0], serverpackets.OpcodeActionFailed)
 	}
 }
+
+func TestGameClientLinkMagicSkillUseCubicCastBroadcastsCharacterInfo(t *testing.T) {
+	store := newMemorySkillSaveStore()
+	skills := skillstate.NewPersistence(store, modelskill.NewTable([]modelskill.Definition{
+		{
+			ID: 10, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+			SkillType: "SUMMON", IsCubic: true, NpcID: 1,
+			StaticHitTime: true, StaticReuse: true,
+		},
+	}), store)
+	var objID int32
+	c, _, _, state := newLinkedGameClientWithSkillsSeed(t, skills, func(chars *fakeCharStore, _ *fakeItemStore) {
+		objID = seedSelectableCharacter(t, chars, "player1", "Newbie", 5, 0)
+		store.seedKnown(objID, 0, player.SkillLevels{10: 1})
+	}, 1)
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	c.send(encodeRequestMagicSkillUse(10, false, false))
+	c.read() // MagicSkillUse
+	c.read() // SystemMessage UseS1
+	c.read() // MagicSkillLaunched
+
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeUserInfo {
+		t.Fatalf("opcode = %#x, want UserInfo (%#x): a new cubic must refresh the caster's character info", reply[0], serverpackets.OpcodeUserInfo)
+	}
+
+	obj, ok := state.Player(objID)
+	if !ok {
+		t.Fatalf("player %d not found in world state after cast", objID)
+	}
+	character, ok := obj.(*livePlayer)
+	if !ok {
+		t.Fatalf("world state player %d is not a *livePlayer", objID)
+	}
+	if ids := character.Character.CubicIDs(); len(ids) != 1 || ids[0] != 1 {
+		t.Fatalf("CubicIDs() after cast = %v, want [1]", ids)
+	}
+}
+
+func TestGameClientLinkMagicSkillUseRejectsCubicCastWhenListFull(t *testing.T) {
+	store := newMemorySkillSaveStore()
+	skills := skillstate.NewPersistence(store, modelskill.NewTable([]modelskill.Definition{
+		{
+			ID: 11, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+			SkillType: "SUMMON", IsCubic: true, NpcID: 2,
+			StaticHitTime: true, StaticReuse: true,
+		},
+	}), store)
+	var objID int32
+	c, _, _, state := newLinkedGameClientWithSkillsSeed(t, skills, func(chars *fakeCharStore, _ *fakeItemStore) {
+		objID = seedSelectableCharacter(t, chars, "player1", "Newbie", 5, 0)
+		store.seedKnown(objID, 0, player.SkillLevels{11: 1})
+	}, 1)
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	obj, ok := state.Player(objID)
+	if !ok {
+		t.Fatalf("player %d not found in world state", objID)
+	}
+	character, ok := obj.(*livePlayer)
+	if !ok {
+		t.Fatalf("world state player %d is not a *livePlayer", objID)
+	}
+	// Already at the default cap (no Cubic Mastery): one active cubic.
+	character.Character.AddOrRefreshCubic(1, false)
+
+	c.send(encodeRequestMagicSkillUse(11, false, false))
+	assertStaticSystemMessageFrame(t, c.read(), serverpackets.SystemMessageCubicSummoningFailed)
+	if reply := c.read(); reply[0] != serverpackets.OpcodeActionFailed {
+		t.Fatalf("follow-up opcode = %#x, want ActionFailed (%#x)", reply[0], serverpackets.OpcodeActionFailed)
+	}
+	if ids := character.Character.CubicIDs(); len(ids) != 1 || ids[0] != 1 {
+		t.Fatalf("CubicIDs() after rejected cast = %v, want unchanged [1]", ids)
+	}
+}

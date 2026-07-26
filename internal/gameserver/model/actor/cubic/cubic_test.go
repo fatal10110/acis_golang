@@ -73,6 +73,21 @@ func TestList_AddOrRefresh_EvictsOldestPastCap(t *testing.T) {
 	}
 }
 
+func TestList_IDs(t *testing.T) {
+	var l List
+	if got := l.IDs(); len(got) != 0 {
+		t.Fatalf("IDs() on empty list = %v, want empty", got)
+	}
+
+	l.AddOrRefresh(Vampiric, false, 5)
+	l.AddOrRefresh(Storm, false, 5)
+
+	want := []int{int(Vampiric), int(Storm)}
+	if got := l.IDs(); !reflect.DeepEqual(got, want) {
+		t.Fatalf("IDs() = %v, want %v (grant order)", got, want)
+	}
+}
+
 func TestList_Remove(t *testing.T) {
 	var l List
 	l.AddOrRefresh(Storm, false, 5)

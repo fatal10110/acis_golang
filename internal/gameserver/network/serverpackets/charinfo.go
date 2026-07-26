@@ -99,10 +99,14 @@ func writeCharInfo(w *wire.Writer, s CharInfoSnapshot) {
 	w.WriteUint8(boolUint8(c.Running()))
 	w.WriteUint8(boolUint8(c.InCombat()))
 	w.WriteUint8(boolUint8(c.AlikeDead()))
-	w.WriteUint8(0)  // invisible
-	w.WriteUint8(0)  // mount type
-	w.WriteUint8(0)  // private store/craft mode
-	w.WriteUint16(0) // cubic count
+	w.WriteUint8(0) // invisible
+	w.WriteUint8(0) // mount type
+	w.WriteUint8(0) // private store/craft mode
+	cubicIDs := c.CubicIDs()
+	w.WriteUint16(uint16(len(cubicIDs)))
+	for _, id := range cubicIDs {
+		w.WriteUint16(uint16(id))
+	}
 	w.WriteUint8(0)  // party match room
 	w.WriteInt32(0)  // abnormal effect
 	w.WriteUint8(0)  // recommendations left

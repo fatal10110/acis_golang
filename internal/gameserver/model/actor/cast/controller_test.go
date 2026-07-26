@@ -128,6 +128,33 @@ func TestCanCastChecksCostsItemsReuseAndMute(t *testing.T) {
 	}
 }
 
+func TestCanCastRejectsSelfCubicSkillWhenCubicListFull(t *testing.T) {
+	def := modelskill.Definition{
+		ID: 1, Level: 1, SkillType: "SUMMON", IsCubic: true, Target: modelskill.TargetSelf,
+	}
+
+	actor := &testActor{mp: 100, hp: 100, cubicFull: true}
+	if err := NewController(actor).CanCast(testTarget{}, def); !errors.Is(err, ErrCubicListFull) {
+		t.Fatalf("CanCast() error = %v, want ErrCubicListFull", err)
+	}
+
+	actor.cubicFull = false
+	if err := NewController(actor).CanCast(testTarget{}, def); err != nil {
+		t.Fatalf("CanCast() error = %v, want nil once the list has room", err)
+	}
+}
+
+func TestCanCastIgnoresCubicListFullForMassCubicTarget(t *testing.T) {
+	def := modelskill.Definition{
+		ID: 1, Level: 1, SkillType: "SUMMON", IsCubic: true, Target: modelskill.TargetParty,
+	}
+
+	actor := &testActor{mp: 100, hp: 100, cubicFull: true}
+	if err := NewController(actor).CanCast(testTarget{}, def); err != nil {
+		t.Fatalf("CanCast() error = %v, want nil: the full-list gate only applies to SELF-target cubic skills", err)
+	}
+}
+
 func TestStartConsumesRequiredItems(t *testing.T) {
 	actor := &testActor{mp: 100, hp: 100, items: map[int]int{57: 3}}
 	ctrl := NewController(actor)
@@ -410,7 +437,11 @@ type testActor struct {
 	disabledKeys map[int32]bool
 	disabled     []testCooldown
 	reuses       []testReuse
+
+	cubicFull bool
 }
+
+func (a *testActor) CubicListFull() bool { return a.cubicFull }
 
 type testCooldown struct {
 	key   int32

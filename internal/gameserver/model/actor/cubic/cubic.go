@@ -112,6 +112,18 @@ func (l *List) AddOrRefresh(id ID, givenByOther bool, maxSlots int) (refreshed b
 	return false, evicted, didEvict
 }
 
+// IDs returns the ids of every currently active cubic, in grant order
+// (oldest first), for packet serialization.
+func (l *List) IDs() []int {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	ids := make([]int, len(l.entries))
+	for i, e := range l.entries {
+		ids[i] = int(e.id)
+	}
+	return ids
+}
+
 // Remove deactivates the cubic of id, if active.
 func (l *List) Remove(id ID) {
 	l.mu.Lock()
