@@ -1,8 +1,10 @@
 package npc
 
 import (
+	"bytes"
 	"testing"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -66,11 +68,14 @@ func TestEffectPointForEachNearbyExcludesSelfAndFindsOthers(t *testing.T) {
 	ep.SetWorld(state)
 	ep.Spawn(100, 100, 0, 0)
 
-	nearby := &frameReceiver{trackedID: 55}
-	state.Spawn(nearby, 150, 100, 0, 0)
+	inRange := &frameReceiver{trackedID: 55}
+	state.Spawn(inRange, 150, 100, 0, 0)
+
+	outOfRange := &frameReceiver{trackedID: 66}
+	state.Spawn(outOfRange, 1000, 100, 0, 0)
 
 	var found []int32
-	ep.ForEachNearby(-1, func(o world.Tracked) {
+	ep.ForEachNearby(200, func(o world.Tracked) {
 		found = append(found, o.ObjectID())
 	})
 
@@ -100,11 +105,19 @@ func TestEffectPointBroadcastSkillUseAndLaunched(t *testing.T) {
 	if len(observer.frames) != 2 {
 		t.Fatalf("observer received %d frames, want 2", len(observer.frames))
 	}
-	if observer.frames[0][0] != serverpackets.OpcodeMagicSkillUse {
-		t.Fatalf("frame[0] opcode = %#x, want %#x", observer.frames[0][0], serverpackets.OpcodeMagicSkillUse)
+
+	wantUse := serverpackets.FrameMagicSkillUse(
+		serverpackets.SkillCastObject{ObjectID: ep.ObjectID(), Location: location.Location{X: 100, Y: 100, Z: 0}},
+		serverpackets.SkillCastObject{ObjectID: target.ObjectID(), Location: location.Location{X: 150, Y: 100, Z: 0}},
+		454, 1, 0, 0, true,
+	)
+	if !bytes.Equal(observer.frames[0], wantUse.Bytes()[2:]) {
+		t.Fatalf("frame[0] = %x, want %x", observer.frames[0], wantUse.Bytes()[2:])
 	}
-	if observer.frames[1][0] != serverpackets.OpcodeMagicSkillLaunched {
-		t.Fatalf("frame[1] opcode = %#x, want %#x", observer.frames[1][0], serverpackets.OpcodeMagicSkillLaunched)
+
+	wantLaunched := serverpackets.FrameMagicSkillLaunched(ep.ObjectID(), 454, 1, []int32{77})
+	if !bytes.Equal(observer.frames[1], wantLaunched.Bytes()[2:]) {
+		t.Fatalf("frame[1] = %x, want %x", observer.frames[1], wantLaunched.Bytes()[2:])
 	}
 }
 

@@ -144,10 +144,8 @@ func (e *Effect) InUse() bool {
 	return e.inUse
 }
 
-// Remaining reports the number of ticks left after the one currently
-// running, mirroring the reference effect's own getCount(): it reads as
-// Template.Count on the first tick and counts down by one on each
-// subsequent tick.
+// Remaining reports the scheduler's remaining-tick counter. On the first
+// action of a Count N effect, it is N-1, then decreases on later actions.
 func (e *Effect) Remaining() int {
 	if e == nil {
 		return 0

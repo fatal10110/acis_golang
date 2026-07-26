@@ -95,10 +95,11 @@ func (h signetHandler) Use(cast Cast) {
 	h.useSignet(cast)
 }
 
-// useSignet ports L2SkillSignet.useSkill: it spawns the actor immediately,
-// at the caster's own position (the reference's per-cast ground-target
-// point, PlayerCast.getSignetLocation, has no Go equivalent yet — tracked
-// by #862), then applies the skill's own effect templates onto that actor.
+// useSignet spawns the actor immediately, at the caster's own position (a
+// per-cast ground-target point has no Go equivalent yet — tracked by
+// #862), then applies the skill's own effect templates onto that actor. If
+// none of the templates yield a recognized effect, the actor is despawned
+// immediately since nothing will ever call Despawn on its behalf.
 func (h signetHandler) useSignet(cast Cast) {
 	actor, ok := h.spawnActor(cast.Caster, cast.Skill)
 	if !ok {
@@ -106,18 +107,23 @@ func (h signetHandler) useSignet(cast Cast) {
 	}
 
 	meta := signetEffectMeta(cast.Skill)
+	added := false
 	for _, tmpl := range cast.Skill.Effects {
 		e := h.newActorEffect(cast.Skill, meta, tmpl, actor)
 		if e == nil {
 			continue
 		}
 		actor.EffectList().Add(e)
+		added = true
+	}
+	if !added {
+		actor.Despawn()
 	}
 }
 
-// useCasttime ports L2SkillSignetCasttime.useSkill: the skill applies a
-// self-targeted effect (SignetMDam) whose own onStart spawns the actor,
-// since the caster - not a pre-spawned actor - is the effect's target.
+// useCasttime applies a self-targeted effect (SignetMDam) whose own
+// onStart spawns the actor, since the caster - not a pre-spawned actor -
+// is the effect's target.
 func (h signetHandler) useCasttime(cast Cast) {
 	target, ok := cast.Caster.(effectListTarget)
 	if !ok {
@@ -201,9 +207,9 @@ func (h signetHandler) newActorEffect(def modelskill.Definition, meta effect.Ski
 	}
 }
 
-// newSignetBuffEffect ports EffectSignet.onActionTime: each tick, it
-// applies the skill's linked effectId sub-skill's own effects onto every
-// living, non-peace-zone creature the actor finds within skill radius.
+// newSignetBuffEffect builds the effect that, each tick, applies the
+// skill's linked effectId sub-skill's own effects onto every living,
+// non-peace-zone creature the actor finds within skill radius.
 func (h signetHandler) newSignetBuffEffect(def modelskill.Definition, meta effect.Skill, tmpl modelskill.EffectTemplate, actor *npc.EffectPoint) *effect.Effect {
 	e := &effect.Effect{Skill: meta, Template: tmpl, Effector: actor, Effected: actor}
 	e.OnStart = func(*effect.Effect) bool { return true }
@@ -229,10 +235,9 @@ func (h signetHandler) newSignetBuffEffect(def modelskill.Definition, meta effec
 	return e
 }
 
-// newSignetNoiseEffect ports EffectSignetNoise.onActionTime: after
-// skipping its first tick, each tick strips every dance/song effect from
-// every living, non-peace-zone creature the actor finds within skill
-// radius.
+// newSignetNoiseEffect builds the effect that, after skipping its first
+// tick, strips every dance/song effect from every living, non-peace-zone
+// creature the actor finds within skill radius on each subsequent tick.
 func (h signetHandler) newSignetNoiseEffect(def modelskill.Definition, meta effect.Skill, tmpl modelskill.EffectTemplate, actor *npc.EffectPoint) *effect.Effect {
 	e := &effect.Effect{Skill: meta, Template: tmpl, Effector: actor, Effected: actor}
 	e.OnStart = func(*effect.Effect) bool { return true }
@@ -268,14 +273,14 @@ func (h signetHandler) newSignetNoiseEffect(def modelskill.Definition, meta effe
 	return e
 }
 
-// newSignetAntiSummonEffect ports EffectSignetAntiSummon.onActionTime:
-// after skipping its first tick, each tick unsummons every living,
-// non-peace-zone summon the actor finds within skill radius. The reference
-// effect broadcasts each dismissed summon's own MagicSkillUse packet from
-// that summon's own known list; this port broadcasts it from the actor's
-// known list instead, since summon.Actor has no broadcast surface of its
-// own yet. Both actors occupy the same area, so the observer set is the
-// same in practice — a documented simplification, not a byte-exact match.
+// newSignetAntiSummonEffect builds the effect that, after skipping its
+// first tick, unsummons every living, non-peace-zone summon the actor
+// finds within skill radius on each subsequent tick. Each dismissed
+// summon's skill-use packet broadcasts from the actor's own known list
+// instead of the summon's, since summon.Actor has no broadcast surface of
+// its own yet. Both actors occupy the same area, so the observer set is
+// the same in practice — a documented simplification, not a byte-exact
+// match.
 func (h signetHandler) newSignetAntiSummonEffect(def modelskill.Definition, meta effect.Skill, tmpl modelskill.EffectTemplate, actor *npc.EffectPoint) *effect.Effect {
 	e := &effect.Effect{Skill: meta, Template: tmpl, Effector: actor, Effected: actor}
 	e.OnStart = func(*effect.Effect) bool { return true }
@@ -304,7 +309,7 @@ func (h signetHandler) newSignetAntiSummonEffect(def modelskill.Definition, meta
 	return e
 }
 
-// newSignetMDamEffect ports EffectSignetMDam: onStart spawns the carrying
+// newSignetMDamEffect builds the effect whose onStart spawns the carrying
 // actor at caster's position; each of its first two ticks does nothing,
 // and every tick after pays the skill's MP cost (dropping the effect when
 // the caster can't afford it) then deals magic damage, using the skill's
@@ -379,8 +384,7 @@ type mpPayer interface {
 
 // forEachSignetTarget calls fn for every living, non-peace-zone object
 // actor's radius scan finds, excluding doors and ground items (neither
-// implements Dead()), mirroring the reference's shared
-// getKnownTypeInRadius filter.
+// implements Dead()).
 func (h signetHandler) forEachSignetTarget(actor *npc.EffectPoint, radius int, fn func(signetNearby)) {
 	actor.ForEachNearby(radius, func(o world.Tracked) {
 		target, ok := o.(signetNearby)

@@ -531,8 +531,7 @@ func (a *Actor) StartPetFeed(period time.Duration, state *world.State, log zerol
 	}, log)
 }
 
-// Unsummon despawns this summon and detaches it from its owner, mirroring
-// the reference actor's unSummon() call.
+// Unsummon despawns this summon and detaches it from its owner.
 func (a *Actor) Unsummon() {
 	a.despawn(nil)
 }
