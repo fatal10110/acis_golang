@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/funcs"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
@@ -186,6 +187,17 @@ func (a *Actor) LevelMod() float64 { return summonStatActor{a: a}.LevelMod() }
 // Category reports a pet or servitor as a playable actor.
 func (a *Actor) Category() skilltarget.Category {
 	return skilltarget.CategoryPlayable
+}
+
+// EffectList returns this summon's active buffs and debuffs.
+func (a *Actor) EffectList() *effect.List {
+	return a.effects
+}
+
+// MaxBuffCount is the number of non-toggle, non-seven-signs buffs this
+// summon can hold at once. See baseBuffSlots.
+func (a *Actor) MaxBuffCount() int {
+	return baseBuffSlots
 }
 
 // Playable reports whether a is player-controlled.

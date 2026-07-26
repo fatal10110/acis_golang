@@ -3,6 +3,7 @@ package network
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
+	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -148,6 +149,23 @@ func (l *GameClientLink) hasActiveSummon(live *livePlayer) bool {
 	}
 	_, ok := l.world.Summon(live.ObjectID())
 	return ok
+}
+
+// activeSummonTarget returns live's active pet or servitor as an
+// actorcast.Target, or nil if it has none or doesn't expose that surface.
+func (l *GameClientLink) activeSummonTarget(live *livePlayer) actorcast.Target {
+	if l.world == nil || live == nil {
+		return nil
+	}
+	obj, ok := l.world.Summon(live.ObjectID())
+	if !ok {
+		return nil
+	}
+	target, ok := obj.(actorcast.Target)
+	if !ok {
+		return nil
+	}
+	return target
 }
 
 // unequipItem clears whatever item occupies the paperdoll position that

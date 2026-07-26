@@ -13,8 +13,15 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/worldobject"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
+
+// baseBuffSlots is the non-toggle, non-seven-signs buff-slot count every
+// pet or servitor holds, matching the same fixed cap player.Character uses
+// (see baseBuffSlots in character_effects.go) since no passive modeled here
+// raises it.
+const baseBuffSlots = 20
 
 // AI is the summon intention loop controlled by owner commands and effects.
 type AI interface {
@@ -82,6 +89,7 @@ type Actor struct {
 	stats    CombatStats
 	statCalc summonStatCalcs
 	vitals   summonVitals
+	effects  *effect.List
 }
 
 // Intent is the live action this actor is currently trying to carry out.
@@ -225,6 +233,7 @@ func NewServitor(cfg ServitorConfig) *Actor {
 		stats:            cfg.Stats,
 	}
 	a.initVitals()
+	a.effects = effect.NewList(a)
 	return a
 }
 
@@ -261,6 +270,7 @@ func NewPet(cfg PetConfig) *Actor {
 		stats:         cfg.Stats,
 	}
 	a.initVitals()
+	a.effects = effect.NewList(a)
 	return a
 }
 
