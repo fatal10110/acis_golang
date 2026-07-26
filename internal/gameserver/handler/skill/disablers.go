@@ -153,11 +153,18 @@ func (disablersHandler) Use(cast Cast) {
 // no resolved-landing-rate source, letting a caller decide whether to treat
 // that as "doesn't apply" or fall back.
 func checkSkillSuccess(caster any, target any, def modelskill.Definition) (succeeded, ok bool) {
+	return checkSkillSuccessBSS(caster, target, def, blessedSpiritshotCharged(caster))
+}
+
+// checkSkillSuccessBSS is checkSkillSuccess with the blessed-spiritshot
+// input forced to bss rather than read from caster's real charge state —
+// Blow.java hardcodes this input to true regardless of the caster's actual
+// charge, unlike every other landing-rate roll in the reference.
+func checkSkillSuccessBSS(caster any, target any, def modelskill.Definition, bss bool) (succeeded, ok bool) {
 	src, ok := target.(skillSuccessSource)
 	if !ok {
 		return false, false
 	}
-	bss := blessedSpiritshotCharged(caster)
 	shield := resolveShieldDefense(caster, target, def)
 	in, ok := src.SkillSuccessInput(caster, def, bss, shield)
 	if !ok {
