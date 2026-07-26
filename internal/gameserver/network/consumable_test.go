@@ -58,6 +58,23 @@ func readInventoryUpdate(t *testing.T, c *fakeGameClient, objectID int32, wantCo
 	}
 }
 
+// readExUseSharedGroupItem asserts the next frame is the extended
+// ExUseSharedGroupItem packet carrying templateID/group/remain/total.
+func readExUseSharedGroupItem(t *testing.T, c *fakeGameClient, templateID, group, remain, total int32) {
+	t.Helper()
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeExtended {
+		t.Fatalf("opcode = %#x, want extended (%#x)", reply[0], serverpackets.OpcodeExtended)
+	}
+	r := wire.NewReader(reply[1:])
+	if sub := r.ReadUint16(); sub != serverpackets.OpcodeExUseSharedGroupItem {
+		t.Fatalf("extended sub-opcode = %#x, want ExUseSharedGroupItem (%#x)", sub, serverpackets.OpcodeExUseSharedGroupItem)
+	}
+	if gotItem, gotGroup, gotRemain, gotTotal := r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32(); gotItem != templateID || gotGroup != group || gotRemain != remain || gotTotal != total {
+		t.Fatalf("ExUseSharedGroupItem = item %d group %d remain %d total %d, want %d/%d/%d/%d", gotItem, gotGroup, gotRemain, gotTotal, templateID, group, remain, total)
+	}
+}
+
 func readMagicSkillUseSelf(t *testing.T, c *fakeGameClient, objectID int32, skillID, level int32) {
 	t.Helper()
 	reply := c.read()
@@ -123,6 +140,7 @@ func TestGameClientLinkUseHealingPotionAppliesAndConsumes(t *testing.T) {
 
 	c.send(encodeUseItem(objectID, false))
 	readInventoryUpdate(t, c, objectID, 4)
+	readExUseSharedGroupItem(t, c, potionTemplate, 8, 10, 10)
 	readMagicSkillUseSelf(t, c, live.ObjectID(), 2031, 1)
 	assertSystemMessageSkillFrame(t, c.read(), serverpackets.SystemMessageUseS1, 2031, 1)
 	readShortBuffStatusUpdateFrame(t, c, 2031, 1, 14)

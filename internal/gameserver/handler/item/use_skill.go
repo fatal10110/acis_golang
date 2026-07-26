@@ -45,6 +45,11 @@ const (
 // caster's short-buff HUD state with them (after sending its own cast
 // packets, so the HUD update lands last on the wire, matching the
 // reference's own ordering).
+// SharedReuseGroup and ReuseMillis are only meaningful on Applied.
+// SharedReuseGroup is -1 when the item defines no shared-reuse group (the
+// caller sends no ExUseSharedGroupItem packet in that case), matching the
+// reference's addItemSkillTimeStamp, which reports the same shared-reuse
+// group and reuse timing for an instant-cast item as for an AI-cast one.
 type UseResult struct {
 	Outcome Outcome
 	Skill   modelskill.Definition
@@ -53,6 +58,9 @@ type UseResult struct {
 	ShortBuffSkillID         int32
 	ShortBuffLevel           int32
 	ShortBuffDurationSeconds int32
+
+	SharedReuseGroup int32
+	ReuseMillis      int
 }
 
 // HPPotionSkillIDs are the healing-potion-family skill ids that drive the
@@ -144,10 +152,10 @@ func Use(req UseRequest) UseResult {
 		}
 	}
 
-	installItemReuse(req.Caster, def, reuseKey, tmpl.EtcItem.ReuseDelay)
+	reuse := installItemReuse(req.Caster, def, reuseKey, tmpl.EtcItem.ReuseDelay)
 	actorcast.ApplyEffects(req.Effects, req.Caster, req.Caster, def)
 
-	result := UseResult{Outcome: Applied, Skill: def}
+	result := UseResult{Outcome: Applied, Skill: def, SharedReuseGroup: tmpl.EtcItem.SharedReuseGroup, ReuseMillis: reuse}
 	result.HasShortBuff, result.ShortBuffSkillID, result.ShortBuffLevel, result.ShortBuffDurationSeconds = shortBuffDecision(req.Caster, def)
 	return result
 }
@@ -220,15 +228,20 @@ func ResolveAICastSkill(tmpl *modelitem.Template, defs actorcast.Definitions) (m
 
 // installItemReuse applies the item-driven reuse delay to the skill's
 // cooldown key, taking the longer of the skill's own reuse delay and the
-// item's, the way an item-carried skill's timestamp is recorded.
-func installItemReuse(caster SkillCaster, def modelskill.Definition, reuseKey int32, itemReuseDelay int32) {
+// item's, the way an item-carried skill's timestamp is recorded. It
+// reports that reuse delay in milliseconds regardless of whether it
+// installed a cooldown, matching the reference's addItemSkillTimeStamp,
+// which reports the same reuse value on the shared-reuse-group packet
+// even when the delay is too short to disable the skill.
+func installItemReuse(caster SkillCaster, def modelskill.Definition, reuseKey int32, itemReuseDelay int32) int {
 	reuse := time.Duration(def.ReuseDelay) * time.Millisecond
 	if item := time.Duration(itemReuseDelay) * time.Millisecond; item > reuse {
 		reuse = item
 	}
 	if reuse <= 0 {
-		return
+		return 0
 	}
 	caster.DisableSkill(reuseKey, reuse)
 	caster.AddSkillReuse(modelskill.Ref{ID: def.ID, Level: def.Level}, reuseKey, reuse)
+	return int(reuse.Milliseconds())
 }
