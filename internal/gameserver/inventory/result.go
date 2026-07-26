@@ -27,6 +27,11 @@ type Persist struct {
 type Result struct {
 	Persist          []Persist
 	EquipmentChanged bool
+	// Changed lists every instance whose equip state (paperdoll occupancy)
+	// this call altered — the caller resolves each one's current Equipped()
+	// state after the call to decide whether to attach or detach its
+	// template's stat functions.
+	Changed []*item.Instance
 }
 
 // Save returns a persistence action for a new item row.

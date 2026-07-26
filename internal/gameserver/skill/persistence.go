@@ -7,6 +7,8 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
@@ -136,6 +138,59 @@ func (p *Persistence) SetKnownSkill(ctx context.Context, c *player.Character, sk
 		return fmt.Errorf("apply passive stats for character %d skill %d level %d: %w", c.ID, skillID, level, err)
 	}
 	c.AddStatFuncs(fns)
+	return nil
+}
+
+// EquipItemStats attaches the stat functions inst's template contributes
+// while equipped — item.Template.AttachedSkills passives and
+// item.Template.Modifiers equip bonuses — to c's live stat calculators.
+// Call once per instance, right after it becomes equipped.
+func (p *Persistence) EquipItemStats(c *player.Character, inst *item.Instance, tmpl *item.Template) error {
+	if c == nil || inst == nil || tmpl == nil {
+		return nil
+	}
+	owner := effect.ItemOwner{Inst: inst, Tmpl: tmpl}
+	modFns, err := effect.ItemModifierFuncs(owner)
+	if err != nil {
+		return fmt.Errorf("apply equip modifiers for character %d item %d: %w", c.ID, inst.ObjectID, err)
+	}
+	passiveFns, err := effect.ItemPassiveFuncs(p.skills, owner)
+	if err != nil {
+		return fmt.Errorf("apply equip passives for character %d item %d: %w", c.ID, inst.ObjectID, err)
+	}
+	c.AddStatFuncs(modFns)
+	c.AddStatFuncs(passiveFns)
+	return nil
+}
+
+// UnequipItemStats removes every stat function inst previously contributed
+// via EquipItemStats. tmpl must be the same template instance EquipItemStats
+// was called with, so the owner identity used to attach the functions
+// matches the one used to remove them.
+func (p *Persistence) UnequipItemStats(c *player.Character, inst *item.Instance, tmpl *item.Template) {
+	if c == nil || inst == nil {
+		return
+	}
+	c.RemoveStatsByOwner(effect.ItemOwner{Inst: inst, Tmpl: tmpl})
+}
+
+// RestoreEquippedItemStats attaches the stat functions every item currently
+// equipped in inv contributes, for reinstating a relogging character's
+// equip-granted passives and modifiers alongside the learned-skill restore
+// Restore already performs.
+func (p *Persistence) RestoreEquippedItemStats(c *player.Character, inv *itemcontainer.Inventory) error {
+	if c == nil || inv == nil {
+		return nil
+	}
+	for _, inst := range inv.PaperdollItems() {
+		tmpl, ok := inv.Templates().Get(inst.TemplateID)
+		if !ok {
+			continue
+		}
+		if err := p.EquipItemStats(c, inst, tmpl); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

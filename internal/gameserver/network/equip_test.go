@@ -12,6 +12,7 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -90,6 +91,31 @@ func TestUseItemTogglesEquipState(t *testing.T) {
 	}
 	if len(capture.frames) != 2 || capture.frames[0][0] != serverpackets.OpcodeInventoryUpdate || capture.frames[1][0] != serverpackets.OpcodeUserInfo {
 		t.Fatalf("frames after unequip = %x, want InventoryUpdate then UserInfo", capture.frames)
+	}
+}
+
+func TestUseItemAttachesAndUnequipDetachesItemStats(t *testing.T) {
+	templates := item.NewTable([]*item.Template{{
+		ID: 10, Kind: item.KindWeapon, Slot: item.SlotRHand,
+		Weapon:    &item.WeaponDetail{Type: item.WeaponSword},
+		Modifiers: []item.StatModifier{{Op: item.FuncAdd, Stat: "mAtk", Value: 17}},
+	}})
+	weapon := &item.Instance{ObjectID: 500, TemplateID: 10, Location: item.LocationInventory}
+	capture := &frameCapture{}
+	live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{weapon})
+	gcl := &GameClientLink{skills: skillstate.NewPersistence(nil, modelskill.NewTable(nil))}
+	baseMAtk := live.MAtk()
+
+	gcl.useItem(live, weapon.ObjectID)
+
+	if got, want := live.MAtk(), baseMAtk+17; got != want {
+		t.Fatalf("MAtk() after equip = %v, want %v", got, want)
+	}
+
+	gcl.useItem(live, weapon.ObjectID)
+
+	if got := live.MAtk(); got != baseMAtk {
+		t.Fatalf("MAtk() after unequip = %v, want unchanged %v", got, baseMAtk)
 	}
 }
 

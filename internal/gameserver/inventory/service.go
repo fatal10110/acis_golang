@@ -73,15 +73,17 @@ func (s *Service) ToggleEquipItem(inv *itemcontainer.Inventory, objectID int32) 
 
 	st := inst.Snapshot()
 	if st.Equipped() {
-		if inv.UnequipSlot(st.LocationData) == nil {
+		unequipped := inv.UnequipSlot(st.LocationData)
+		if unequipped == nil {
 			return Result{}, false
 		}
-		return Result{EquipmentChanged: true}, true
+		return Result{EquipmentChanged: true, Changed: []*item.Instance{unequipped}}, true
 	}
-	if len(inv.EquipItem(inst, tmpl)) == 0 {
+	changed := inv.EquipItem(inst, tmpl)
+	if len(changed) == 0 {
 		return Result{}, false
 	}
-	return Result{EquipmentChanged: true}, true
+	return Result{EquipmentChanged: true, Changed: changed}, true
 }
 
 // UnequipBodySlot clears the paperdoll position represented by bodySlot.
@@ -93,10 +95,11 @@ func (s *Service) UnequipBodySlot(inv *itemcontainer.Inventory, bodySlot int32) 
 	if !ok {
 		return Result{}, false
 	}
-	if inv.UnequipSlot(paperdollSlot) == nil {
+	unequipped := inv.UnequipSlot(paperdollSlot)
+	if unequipped == nil {
 		return Result{}, false
 	}
-	return Result{EquipmentChanged: true}, true
+	return Result{EquipmentChanged: true, Changed: []*item.Instance{unequipped}}, true
 }
 
 // DropItem removes count units from inv for a world drop.
