@@ -73,6 +73,9 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 	}
 	result := actorcast.ApplyEffectsResult(actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers}, live.Character, target, def)
 	sendSkillHandlerResult(live, result)
+	if result.CubicAdded {
+		l.broadcastCharacterInfo(live)
+	}
 	sendMagicStatusUpdate(live, beforeVitals)
 	controller.Finish()
 }
@@ -130,6 +133,8 @@ func sendMagicCastFailure(live *livePlayer, def modelskill.Definition, err error
 		live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1PreparedForReuse, int32(def.ID), int32(def.Level)))
 	case errors.Is(err, actorcast.ErrInvalidTarget):
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageInvalidTarget))
+	case errors.Is(err, actorcast.ErrCubicListFull):
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCubicSummoningFailed))
 	}
 	sendMagicActionFailed(live)
 }

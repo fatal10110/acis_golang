@@ -214,3 +214,20 @@ func TestFrameUserInfo_DwarfUsesDwarfInventoryLimit(t *testing.T) {
 		t.Errorf("dwarf encoding did not contain the dwarf inventory limit %d", dwarfInventoryLimit)
 	}
 }
+
+func TestFrameUserInfo_CubicsSerializeCountAndIDs(t *testing.T) {
+	tmpl := &player.Template{}
+	c := &player.Character{Name: "C"}
+	c.SetSkillLevel(143, 5) // Cubic Mastery: room for more than one cubic
+	c.AddOrRefreshCubic(1, false)
+	c.AddOrRefreshCubic(3, false)
+
+	got := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: c, Template: tmpl}))
+
+	want := binary.LittleEndian.AppendUint16(nil, 2)
+	want = binary.LittleEndian.AppendUint16(want, 1)
+	want = binary.LittleEndian.AppendUint16(want, 3)
+	if !bytes.Contains(got, want) {
+		t.Fatalf("encoding did not contain cubic count 2 followed by ids [1 3]")
+	}
+}

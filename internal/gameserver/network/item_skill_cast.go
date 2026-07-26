@@ -108,6 +108,9 @@ func (l *GameClientLink) useItemAICast(live *livePlayer, inv *itemcontainer.Inve
 		return true
 	}
 	sendSkillHandlerResult(live, result.HandlerResult)
+	if result.HandlerResult.CubicAdded {
+		l.broadcastCharacterInfo(live)
+	}
 	sendMagicStatusUpdate(live, beforeVitals)
 	return true
 }

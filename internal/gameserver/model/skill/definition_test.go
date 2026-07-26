@@ -87,6 +87,27 @@ func TestNewDefinitionExplicitOverridesDefault(t *testing.T) {
 	}
 }
 
+func TestNewDefinitionCubicFields(t *testing.T) {
+	d, err := NewDefinition(1, 1, "x", minimalSet())
+	if err != nil {
+		t.Fatalf("NewDefinition() error: %v", err)
+	}
+	if d.IsCubic || d.NpcID != 0 {
+		t.Fatalf("NewDefinition() defaults IsCubic/NpcID = %v/%d, want false/0", d.IsCubic, d.NpcID)
+	}
+
+	set := minimalSet()
+	set.Set("isCubic", "true")
+	set.Set("npcId", "1")
+	d, err = NewDefinition(1, 1, "x", set)
+	if err != nil {
+		t.Fatalf("NewDefinition() error: %v", err)
+	}
+	if !d.IsCubic || d.NpcID != 1 {
+		t.Fatalf("NewDefinition() IsCubic/NpcID = %v/%d, want true/1", d.IsCubic, d.NpcID)
+	}
+}
+
 func TestNewDefinitionOptionalReferences(t *testing.T) {
 	set := minimalSet()
 	set.Set("sharedReuse", "10-2")
