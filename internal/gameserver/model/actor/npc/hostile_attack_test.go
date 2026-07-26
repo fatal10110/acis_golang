@@ -4,9 +4,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
@@ -49,6 +51,49 @@ func TestHostileMakeAttackHitResolvesDamage(t *testing.T) {
 	}
 	if got := defender.CurrentHP(); got != defender.MaxHP() {
 		t.Fatalf("defender HP = %d, want unchanged %d", got, defender.MaxHP())
+	}
+}
+
+func TestHostileRechargeShotsUsesTemplateCountersAndBroadcasts(t *testing.T) {
+	ai := commons.NewStatSet()
+	ai.Set("SoulShot", 1)
+	ai.Set("SpiritShot", 1)
+	hostile := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", AIParams: ai})
+	state := world.New()
+	hostile.SetWorld(state)
+	state.Spawn(hostile, 0, 0, 0, 0)
+
+	near := &frameReceiver{trackedID: 2}
+	far := &frameReceiver{trackedID: 3}
+	state.Spawn(near, 600, 0, 0, 0)
+	state.Spawn(far, 601, 0, 0, 0)
+
+	hostile.RechargeShots(true, true)
+	if !hostile.SoulshotCharged() || !hostile.SpiritshotCharged() {
+		t.Fatalf("charged state = soul %v spirit %v, want both true", hostile.SoulshotCharged(), hostile.SpiritshotCharged())
+	}
+	if got := hostile.CurrentSoulshotCount(); got != 0 {
+		t.Fatalf("CurrentSoulshotCount() = %d, want 0", got)
+	}
+	if got := hostile.CurrentSpiritshotCount(); got != 0 {
+		t.Fatalf("CurrentSpiritshotCount() = %d, want 0", got)
+	}
+	if len(near.frames) != 2 || len(far.frames) != 0 {
+		t.Fatalf("recharge frames near/far = %d/%d, want 2/0", len(near.frames), len(far.frames))
+	}
+	target := newCombatHostile(t, 4, &Template{ID: 4, Type: "Monster", PDef: 1, MDef: 1})
+	physical, ok := target.PhysicalSkillInput(hostile, modelskill.Definition{Power: 1})
+	if !ok || !physical.SoulShot {
+		t.Fatalf("PhysicalSkillInput soulshot = %v, %v; want true, true", physical.SoulShot, ok)
+	}
+	magic, ok := target.MagicDamageInput(hostile, modelskill.Definition{Power: 1})
+	if !ok || !magic.SoulShot || magic.BlessedSoulShot {
+		t.Fatalf("MagicDamageInput spirit flags = %v/%v, ok %v; want true/false, true", magic.SoulShot, magic.BlessedSoulShot, ok)
+	}
+
+	hostile.RechargeShots(true, true)
+	if len(near.frames) != 2 {
+		t.Fatalf("duplicate recharge frames = %d, want 2", len(near.frames))
 	}
 }
 

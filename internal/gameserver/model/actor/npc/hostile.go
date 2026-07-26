@@ -87,6 +87,12 @@ type Hostile struct {
 
 	los LineOfSight
 
+	// shotsMu guards the per-spawn NPC shot counters and charge mask.
+	shotsMu            sync.RWMutex
+	currentSoulshots   int
+	currentSpiritshots int
+	shotsMask          int32
+
 	// statMu guards statCalcs, this NPC's per-stat finalization chains.
 	statMu    sync.Mutex
 	statCalcs map[stat.Stat]*basefunc.Calculator
@@ -122,18 +128,37 @@ func NewHostile(inst *Instance, live *creature.Live, movement ai.MoveController,
 	if attack == nil {
 		return nil, errors.New("npc: nil hostile attack")
 	}
+	currentSoulshots, currentSpiritshots, err := shotCounts(inst.Template)
+	if err != nil {
+		return nil, err
+	}
 
 	h := &Hostile{
-		Instance: inst,
-		Live:     live,
-		move:     movement,
-		hp:       inst.Template.HPMax,
-		mp:       inst.Template.MPMax,
-		roll:     rand.Intn,
+		Instance:           inst,
+		Live:               live,
+		move:               movement,
+		hp:                 inst.Template.HPMax,
+		mp:                 inst.Template.MPMax,
+		roll:               rand.Intn,
+		currentSoulshots:   currentSoulshots,
+		currentSpiritshots: currentSpiritshots,
 	}
 	h.health = creature.NewHealth(&h.hp)
 	h.brain = ai.NewAttackable(h, movement, attack)
 	return h, nil
+}
+
+func shotCounts(tpl *Template) (soulshots, spiritshots int, err error) {
+	if tpl.AIParams == nil {
+		return 0, 0, nil
+	}
+	if soulshots, err = tpl.AIParams.GetIntDefault("SoulShot", 0); err != nil {
+		return 0, 0, fmt.Errorf("npc %d: SoulShot AI parameter: %w", tpl.ID, err)
+	}
+	if spiritshots, err = tpl.AIParams.GetIntDefault("SpiritShot", 0); err != nil {
+		return 0, 0, fmt.Errorf("npc %d: SpiritShot AI parameter: %w", tpl.ID, err)
+	}
+	return soulshots, spiritshots, nil
 }
 
 // SetWorld records the world registry BroadcastAttack reaches nearby

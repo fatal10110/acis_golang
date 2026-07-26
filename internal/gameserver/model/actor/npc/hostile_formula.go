@@ -7,6 +7,7 @@ import (
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
@@ -40,7 +41,11 @@ func (h *Hostile) MagicCriticalRate() float64 {
 }
 
 // SpiritshotCharged reports whether a spiritshot charge is currently active.
-func (h *Hostile) SpiritshotCharged() bool { return false }
+func (h *Hostile) SpiritshotCharged() bool {
+	h.shotsMu.RLock()
+	defer h.shotsMu.RUnlock()
+	return h.shotsMask&item.ShotSpirit.Mask() != 0
+}
 
 // BlessedSpiritshotCharged reports whether a blessed spiritshot charge is active.
 func (h *Hostile) BlessedSpiritshotCharged() bool { return false }

@@ -139,11 +139,61 @@ func (h *Hostile) WeaponGrade() int {
 	return 0
 }
 
-// SoulshotCharged always reports false. A template can define an
-// AI-driven soulshot recharge counter (its <ai> SoulShot value), but that
-// stateful recharge loop isn't wired to a live NPC yet.
 func (h *Hostile) SoulshotCharged() bool {
-	return false
+	h.shotsMu.RLock()
+	defer h.shotsMu.RUnlock()
+	return h.shotsMask&item.ShotSoul.Mask() != 0
+}
+
+// CurrentSoulshotCount reports the remaining per-spawn soulshot charges.
+func (h *Hostile) CurrentSoulshotCount() int {
+	h.shotsMu.RLock()
+	defer h.shotsMu.RUnlock()
+	return h.currentSoulshots
+}
+
+// CurrentSpiritshotCount reports the remaining per-spawn spiritshot charges.
+func (h *Hostile) CurrentSpiritshotCount() int {
+	h.shotsMu.RLock()
+	defer h.shotsMu.RUnlock()
+	return h.currentSpiritshots
+}
+
+// RechargeShots charges the requested NPC shot types once, consuming their
+// per-spawn counters and showing the matching animation to observers within
+// 600 units.
+func (h *Hostile) RechargeShots(physical, magic bool) {
+	var skills []int32
+	h.shotsMu.Lock()
+	if physical && h.currentSoulshots > 0 && h.shotsMask&item.ShotSoul.Mask() == 0 {
+		h.currentSoulshots--
+		h.shotsMask |= item.ShotSoul.Mask()
+		skills = append(skills, 2154)
+	}
+	if magic && h.currentSpiritshots > 0 && h.shotsMask&item.ShotSpirit.Mask() == 0 {
+		h.currentSpiritshots--
+		h.shotsMask |= item.ShotSpirit.Mask()
+		skills = append(skills, 2061)
+	}
+	h.shotsMu.Unlock()
+
+	for _, skillID := range skills {
+		h.broadcastShotRecharge(skillID)
+	}
+}
+
+func (h *Hostile) broadcastShotRecharge(skillID int32) {
+	if h.world == nil {
+		return
+	}
+	x, y, z := h.Position()
+	self := serverpackets.SkillCastObject{ObjectID: h.ObjectID(), Location: location.Location{X: x, Y: y, Z: z}}
+	h.world.ForEachKnownInRadius(h, 600, func(o world.Tracked) {
+		receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
+		if ok {
+			receiver.SendFrame(serverpackets.FrameMagicSkillUse(self, self, skillID, 1, 0, 0, false))
+		}
+	})
 }
 
 // SetHeadingTo orients this NPC toward target. A target with no known
