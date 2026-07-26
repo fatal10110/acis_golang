@@ -1,0 +1,71 @@
+# Verification policy
+
+Verification has two levels: fast feedback while editing and complete gates before claiming an
+implementation change is done.
+
+## Focused checks during implementation
+
+Choose the smallest command that exercises the changed behavior:
+
+```bash
+rtk go -C acis_golang test ./internal/gameserver/<affected-package>
+rtk go -C acis_golang test ./internal/gameserver/<affected-package> -run '<FocusedTest>'
+rtk go -C acis_golang test -race ./internal/gameserver/<affected-concurrent-package>
+```
+
+Use the equivalent `internal/loginserver/...`, `internal/commons/...`, or `cmd/...` package when that
+is the actual scope. Do not repeatedly run the full repository suite after each small edit.
+
+Contract-specific checks supplement unit tests:
+
+- packets: opcode, byte layout, state gate, send order, rejection response, and `packetdiff` or
+  committed byte fixtures;
+- formulas: independent oracle vectors, including boundary, rounding, and overflow cases;
+- loaders: same-file load counts and representative field dumps;
+- geodata: `geoprobe` comparisons for movement, line of sight, and paths;
+- persistence: integration tests against the expected schema and transaction effects;
+- concurrency: focused `-race` coverage and lifecycle cancellation.
+
+## Complete implementation gates
+
+Before claiming completion of a source-code change, require no output from the formatting check and
+successful completion of every repository gate:
+
+```bash
+find acis_golang -name '*.go' -type f -exec gofmt -l {} +
+rtk go -C acis_golang vet ./...
+rtk go -C acis_golang build ./...
+rtk go -C acis_golang test -race ./...
+```
+
+The installed `rtk` version exposes compact `go test`, `go build`, and `go vet` wrappers.
+`golangci-lint` is not currently installed or configured as a repository gate. Run
+`rtk err golangci-lint run` only when the task or CI requires it and the binary is available;
+otherwise report it as unavailable, never as passed.
+
+If an external integration service is unavailable, run all independent gates and report the exact
+blocked test; do not convert the missing service into a passing result.
+
+## Documentation and agent configuration
+
+When only Markdown, TOML, JSON, YAML, or agent configuration changes, the full game-server suite is
+not required unless another repository policy says otherwise. Instead:
+
+- parse every changed TOML, JSON, and YAML file;
+- validate installed-tool configuration with the tool's strict/local parser where available;
+- check Markdown links and required headings;
+- search for stale paths and contradictory duplicate rules;
+- verify no source or shared data file changed;
+- compare instruction line, word, and byte counts before and after.
+
+## Completion evidence
+
+Report the commands actually run and their exit status. Do not claim an unrun gate passed. Preserve
+the exact-contract fixtures, packet-impact check, silent-rejection check, concurrency ownership, and
+documented deferrals in the final review. For each shipped gap or out-of-scope item, report the live
+follow-up issue number, confirm its comments were checked, and confirm that its body and milestone
+cover the deferred work. For issue implementation, report the draft pull-request URL and confirm it
+targets `main`, contains the issue-closing keyword, and includes only the scoped commit; omit this
+only when the user explicitly requested local-only work. Before staging or opening the pull request,
+audit the final diff for gaps and require `Gap audit: no shipped gaps` or one verified open issue,
+checked comments, and milestone for every shipped gap.
