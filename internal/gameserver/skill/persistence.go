@@ -146,7 +146,7 @@ func (p *Persistence) SetKnownSkill(ctx context.Context, c *player.Character, sk
 // item.Template.Modifiers equip bonuses — to c's live stat calculators.
 // Call once per instance, right after it becomes equipped.
 func (p *Persistence) EquipItemStats(c *player.Character, inst *item.Instance, tmpl *item.Template) error {
-	if c == nil || inst == nil || tmpl == nil {
+	if p == nil || c == nil || inst == nil || tmpl == nil {
 		return nil
 	}
 	owner := effect.ItemOwner{Inst: inst, Tmpl: tmpl}
