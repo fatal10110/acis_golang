@@ -59,8 +59,7 @@ func newUseRequest(t *testing.T, handler string, etcType modelitem.EtcItemType, 
 		ID:   1,
 		Kind: modelitem.KindEtcItem,
 		EtcItem: &modelitem.EtcItemDetail{
-			Type:    etcType,
-			Handler: handler,
+			Type: etcType, Handler: handler, SharedReuseGroup: -1,
 		},
 		AttachedSkills: []modelitem.SkillRef{{ID: int32(def.ID), Level: int32(def.Level)}},
 	}
@@ -179,6 +178,51 @@ func TestUse(t *testing.T) {
 		}
 		if destroyer.calls != 0 {
 			t.Fatalf("DestroyItem calls = %d, want 0", destroyer.calls)
+		}
+	})
+
+	t.Run("reports shared reuse group and the longer of skill/item reuse delay", func(t *testing.T) {
+		def := modelskill.Definition{ID: 101, Level: 1, Potion: true, ReuseDelay: 1000}
+		caster := &fakeCaster{}
+		destroyer := &fakeDestroyer{}
+		tmpl := &modelitem.Template{
+			ID:   1,
+			Kind: modelitem.KindEtcItem,
+			EtcItem: &modelitem.EtcItemDetail{
+				Type: modelitem.EtcItemPotion, Handler: ItemSkillsHandler,
+				ReuseDelay: 3000, SharedReuseGroup: 7,
+			},
+			AttachedSkills: []modelitem.SkillRef{{ID: int32(def.ID), Level: int32(def.Level)}},
+		}
+		table := modelitem.NewTable([]*modelitem.Template{tmpl})
+		inv := itemcontainer.NewPlayerInventory(2, table)
+		req := UseRequest{
+			Caster: caster, Inventory: inv, Item: &modelitem.Instance{ObjectID: 10, TemplateID: 1},
+			Definitions: fakeDefinitions{def: def}, Effects: actorcast.EffectHandlers{}, Destroyer: destroyer,
+		}
+
+		res := Use(req)
+
+		if res.Outcome != Applied {
+			t.Fatalf("Outcome = %v, want Applied", res.Outcome)
+		}
+		if res.SharedReuseGroup != 7 {
+			t.Fatalf("SharedReuseGroup = %d, want 7", res.SharedReuseGroup)
+		}
+		if res.ReuseMillis != 3000 {
+			t.Fatalf("ReuseMillis = %d, want 3000 (item's 3000 > skill's 1000)", res.ReuseMillis)
+		}
+	})
+
+	t.Run("no shared reuse group reports -1", func(t *testing.T) {
+		caster := &fakeCaster{}
+		destroyer := &fakeDestroyer{}
+		req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemPotion, potion, caster, destroyer, false)
+
+		res := Use(req)
+
+		if res.SharedReuseGroup != -1 {
+			t.Fatalf("SharedReuseGroup = %d, want -1 (template default)", res.SharedReuseGroup)
 		}
 	})
 

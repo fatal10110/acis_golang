@@ -46,6 +46,9 @@ func (l *GameClientLink) useConsumableSkillItem(live *livePlayer, inv *itemconta
 		return true
 	case itemhandler.Applied:
 		l.sendInventoryUpdate(live, inv)
+		if res.SharedReuseGroup >= 0 {
+			live.SendFrame(serverpackets.FrameExUseSharedGroupItem(inst.TemplateID, res.SharedReuseGroup, res.ReuseMillis, res.ReuseMillis))
+		}
 		self := skillCastObject(live)
 		l.broadcastLiveFrame(live, func() wire.Frame {
 			return serverpackets.FrameMagicSkillUse(self, self, int32(res.Skill.ID), int32(res.Skill.Level), 0, 0, false)
