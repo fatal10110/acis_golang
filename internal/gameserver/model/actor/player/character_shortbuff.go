@@ -1,6 +1,10 @@
 package player
 
-import "time"
+import (
+	"time"
+
+	"github.com/rs/zerolog"
+)
 
 // ShortBuffUpdate is one short-buff HUD state change for the item-window
 // healing-potion-family HUD slot: SkillID/Level/DurationSeconds for a new
@@ -17,6 +21,14 @@ func (c *Character) SetShortBuffBroadcaster(broadcast func(ShortBuffUpdate)) {
 	c.stateMu.Lock()
 	defer c.stateMu.Unlock()
 	c.broadcastShortBuff = broadcast
+}
+
+// SetLogger records where a panic recovered from a scheduled callback (e.g.
+// the short-buff clear timer) is logged. The zero value discards it.
+func (c *Character) SetLogger(log zerolog.Logger) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	c.log = log
 }
 
 // ShortBuffTaskSkillID returns the skill id of the short buff currently
@@ -44,7 +56,15 @@ func (c *Character) UpdateShortBuff(skillID, level, durationSeconds int32) {
 	}
 	c.shortBuffTaskSkillID = skillID
 	broadcast := c.broadcastShortBuff
-	c.shortBuffTimer = time.AfterFunc(time.Duration(durationSeconds)*time.Second, c.clearShortBuff)
+	log := c.log
+	c.shortBuffTimer = time.AfterFunc(time.Duration(durationSeconds)*time.Second, func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Error().Interface("panic", r).Msg("character: recovered panic in short-buff clear callback")
+			}
+		}()
+		c.clearShortBuff()
+	})
 	c.stateMu.Unlock()
 
 	if broadcast != nil {

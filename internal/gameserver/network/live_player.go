@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+	"github.com/rs/zerolog"
 )
 
 type livePlayer struct {
@@ -24,6 +25,7 @@ type livePlayer struct {
 	combat    *ai.PlayerAttack
 	cast      *actorcast.Controller
 	shortcuts *shortcut.List
+	log       zerolog.Logger
 
 	known      world.KnownBuffer
 	stopAttack func(*livePlayer)
@@ -56,6 +58,7 @@ func (p *livePlayer) attackController() *attack.Controller {
 func (p *livePlayer) castController() *actorcast.Controller {
 	if p.cast == nil {
 		p.cast = actorcast.NewController(actorcast.PlayerActor{Character: p.Character})
+		p.cast.SetLogger(p.log)
 	}
 	return p.cast
 }

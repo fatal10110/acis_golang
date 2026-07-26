@@ -8,6 +8,7 @@ import (
 
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
+	"github.com/rs/zerolog"
 )
 
 var (
@@ -122,11 +123,20 @@ type Controller struct {
 	castSeq   uint64
 	timers    []scheduledTimer
 	afterFunc afterFunc
+	log       zerolog.Logger
 }
 
 // NewController returns a cast controller for actor.
 func NewController(actor Actor) *Controller {
 	return &Controller{actor: actor}
+}
+
+// SetLogger records where a panic recovered from a scheduled cast callback
+// (Launch/Hit/Finish) is logged. The zero value discards it.
+func (c *Controller) SetLogger(log zerolog.Logger) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.log = log
 }
 
 // CastingNow reports whether the actor currently has an active cast.
@@ -387,8 +397,16 @@ func (c *Controller) stopTimersLocked() {
 func (c *Controller) scheduleLocked(delay time.Duration, f func()) {
 	source := c.afterFunc
 	if source == nil {
+		log := c.log
 		source = func(d time.Duration, fn func()) scheduledTimer {
-			return time.AfterFunc(d, fn)
+			return time.AfterFunc(d, func() {
+				defer func() {
+					if r := recover(); r != nil {
+						log.Error().Interface("panic", r).Msg("cast: recovered panic in scheduled callback")
+					}
+				}()
+				fn()
+			})
 		}
 	}
 	c.timers = append(c.timers, source(delay, f))
