@@ -1,11 +1,15 @@
 package cast
 
 import (
+	"bytes"
 	"errors"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/rs/zerolog"
 )
 
 // scalingActor and scalingDef are the exact fixture TestStartScalesTimingAndInstallsReuse
@@ -272,4 +276,52 @@ func (t *fakeCastTimer) Stop() bool {
 	}
 	t.stopped = true
 	return true
+}
+
+// TestScheduleRecoversPanickingHook is the regression test for the panic
+// class fixed in dispatch.go's scheduleAfter (network/dispatch_test.go's
+// TestScheduleAfterRecoversPanickingCallback): a scheduled cast callback
+// (Launch/Hit/Finish) runs on its own goroutine via the real time.AfterFunc
+// default branch, outside any per-connection recover, so an unrecovered
+// panic there would kill the whole process instead of just this cast.
+func TestScheduleRecoversPanickingHook(t *testing.T) {
+	buf := &syncCastBuffer{}
+	actor := scalingActor()
+	ctrl := NewController(actor)
+	ctrl.SetLogger(zerolog.New(buf))
+	now := time.Unix(1000, 0)
+
+	def := scalingDef
+	plan, err := ctrl.Start(now, testTarget{}, def)
+	if err != nil {
+		t.Fatalf("Start() error: %v", err)
+	}
+	ctrl.Schedule(plan, Hooks{Launch: func() bool { panic("boom") }})
+
+	deadline := time.Now().Add(time.Second)
+	for !strings.Contains(buf.String(), "boom") {
+		if time.Now().After(deadline) {
+			t.Fatalf("panic was not recovered and logged, got: %s", buf.String())
+		}
+		time.Sleep(time.Millisecond)
+	}
+}
+
+// syncCastBuffer is a mutex-guarded bytes.Buffer safe for a test's polling
+// goroutine to read while a scheduled callback's goroutine writes to it.
+type syncCastBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (s *syncCastBuffer) Write(p []byte) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.buf.Write(p)
+}
+
+func (s *syncCastBuffer) String() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.buf.String()
 }

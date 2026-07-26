@@ -1,9 +1,13 @@
 package player
 
 import (
+	"bytes"
+	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/rs/zerolog"
 )
 
 func TestCharacterUpdateShortBuffBroadcastsAndClearsAfterDuration(t *testing.T) {
@@ -47,6 +51,53 @@ func TestCharacterUpdateShortBuffBroadcastsAndClearsAfterDuration(t *testing.T) 
 	if updates[1] != (ShortBuffUpdate{}) {
 		t.Fatalf("clear update = %+v, want zero value", updates[1])
 	}
+}
+
+// TestUpdateShortBuffRecoversPanickingClearCallback is the regression test
+// for the panic class fixed in dispatch.go's scheduleAfter
+// (network/dispatch_test.go's TestScheduleAfterRecoversPanickingCallback):
+// the short-buff clear runs on its own goroutine via time.AfterFunc, outside
+// any per-connection recover, so an unrecovered panic there (e.g. from a
+// broadcaster hook) would kill the whole process instead of just this
+// character.
+func TestUpdateShortBuffRecoversPanickingClearCallback(t *testing.T) {
+	buf := &syncCharBuffer{}
+	c := &Character{ID: 1}
+	c.SetLogger(zerolog.New(buf))
+	c.SetShortBuffBroadcaster(func(u ShortBuffUpdate) {
+		if u == (ShortBuffUpdate{}) {
+			panic("boom")
+		}
+	})
+
+	c.UpdateShortBuff(2031, 1, 1)
+
+	deadline := time.Now().Add(2 * time.Second)
+	for !strings.Contains(buf.String(), "boom") {
+		if time.Now().After(deadline) {
+			t.Fatalf("panic was not recovered and logged, got: %s", buf.String())
+		}
+		time.Sleep(time.Millisecond)
+	}
+}
+
+// syncCharBuffer is a mutex-guarded bytes.Buffer safe for a test's polling
+// goroutine to read while a scheduled callback's goroutine writes to it.
+type syncCharBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (s *syncCharBuffer) Write(p []byte) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.buf.Write(p)
+}
+
+func (s *syncCharBuffer) String() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.buf.String()
 }
 
 func TestCharacterUpdateShortBuffCancelsPreviousTimer(t *testing.T) {

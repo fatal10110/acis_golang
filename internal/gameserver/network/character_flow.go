@@ -194,6 +194,7 @@ func (l *GameClientLink) attachLivePlayer(client *Client, c *player.Character, t
 		c.SetLineOfSight(los)
 	}
 	c.SetFrameSender(client.Session.SendFrame)
+	c.SetLogger(l.log)
 
 	x, y, z := c.Position()
 	creatureLive, err := creature.NewLive(location.Location{X: x, Y: y, Z: z}, c.RunSpeed(), l.geo, c)
@@ -210,7 +211,7 @@ func (l *GameClientLink) attachLivePlayer(client *Client, c *player.Character, t
 	combat := ai.NewPlayerAttack(c, moveCtl, attackCtl)
 	attackCtl.SetFinished(combat.Think)
 
-	live := &livePlayer{Character: c, template: tmpl, items: items, attack: attackCtl, move: moveCtl, combat: combat, shortcuts: shortcut.NewList(shortcuts), stopAttack: l.stopLiveAutoAttack}
+	live := &livePlayer{Character: c, template: tmpl, items: items, attack: attackCtl, move: moveCtl, combat: combat, shortcuts: shortcut.NewList(shortcuts), stopAttack: l.stopLiveAutoAttack, log: l.log}
 	attackCtl.SetStarted(func() {
 		l.startLiveAutoAttack(live)
 	})

@@ -16,6 +16,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+	"github.com/rs/zerolog"
 )
 
 // defaultAccessLevel is the access level a freshly created character starts
@@ -118,6 +119,7 @@ type Character struct {
 	disabledItems        map[int32]time.Time
 	shortBuffTaskSkillID int32
 	shortBuffTimer       *time.Timer
+	log                  zerolog.Logger
 
 	skills skillState
 }
