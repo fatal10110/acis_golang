@@ -139,7 +139,7 @@ func TestLoadSkillDefinitions(t *testing.T) {
 		if d.AggroPoints != 204 {
 			t.Fatalf("skill 4 level 1 AggroPoints = %d, want 204", d.AggroPoints)
 		}
-		// effectNpcId is absent, so it keeps the reference default of -1.
+		// effectNpcId is absent, so it defaults to -1.
 		if d.EffectNpcID != -1 {
 			t.Fatalf("skill 4 level 1 EffectNpcID = %d, want -1", d.EffectNpcID)
 		}

@@ -13,8 +13,6 @@ import (
 // spawns to carry its periodic area effect: it has no HP pool, is never a
 // legal attack or skill target, and exists only to host a ticking
 // effect.List and broadcast its own skill-use packets to nearby observers.
-// It mirrors the reference EffectPoint actor spawned by the L2SkillSignet/
-// L2SkillSignetCasttime family.
 type EffectPoint struct {
 	world.Presence
 
@@ -45,8 +43,8 @@ func (ep *EffectPoint) ObjectID() int32 { return ep.objectID }
 // for.
 func (ep *EffectPoint) OwnerID() int32 { return ep.ownerID }
 
-// Dead always reports false: an EffectPoint carries no HP pool and the
-// reference actor spawns invulnerable.
+// Dead always reports false: an EffectPoint carries no HP pool and spawns
+// invulnerable.
 func (ep *EffectPoint) Dead() bool { return false }
 
 // EffectList returns the actor's own live effect list, driven by the
@@ -72,8 +70,8 @@ func (ep *EffectPoint) Spawn(x, y, z, heading int) {
 	ep.world.Spawn(ep, x, y, z, heading)
 }
 
-// Despawn removes the actor from the world, mirroring the reference
-// actor's deleteMe. It is a no-op until SetWorld has been called.
+// Despawn removes the actor from the world. It is a no-op until SetWorld
+// has been called.
 func (ep *EffectPoint) Despawn() {
 	if ep.world == nil {
 		return
@@ -82,8 +80,8 @@ func (ep *EffectPoint) Despawn() {
 }
 
 // ForEachNearby calls fn for every world object within radius units of
-// this actor, excluding itself, mirroring the reference actor's
-// getKnownTypeInRadius. It is a no-op until SetWorld has been called.
+// this actor, excluding itself. It is a no-op until SetWorld has been
+// called.
 func (ep *EffectPoint) ForEachNearby(radius int, fn func(world.Tracked)) {
 	if ep.world == nil {
 		return

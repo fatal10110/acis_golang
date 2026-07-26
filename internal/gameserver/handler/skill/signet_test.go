@@ -197,8 +197,8 @@ func TestSignetCasttimeMDamSpawnsPaysMPAndDamagesOnItsLiveTick(t *testing.T) {
 	}
 	actor := actors[0]
 
-	// Ticks 1 and 2 are the reference effect's documented warmup: no MP
-	// paid, no damage dealt.
+	// Ticks 1 and 2 are the effect's documented warmup: no MP paid, no
+	// damage dealt.
 	time.Sleep(tickInterval)
 	caster.EffectList().Tick()
 	time.Sleep(tickInterval)

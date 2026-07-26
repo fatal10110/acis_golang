@@ -110,7 +110,7 @@ type Definition struct {
 
 	// EffectNpcID is the template id of the world actor a signet-family
 	// skill (SIGNET/SIGNET_CASTTIME) spawns to carry its periodic area
-	// effect. -1 when unset, matching the reference default.
+	// effect. -1 when unset.
 	EffectNpcID int
 
 	Element      Element
