@@ -50,6 +50,31 @@ type lethalableTarget interface {
 	Lethalable() bool
 }
 
+// reflectEffectTarget returns the effect-list-owning destination for def's
+// effects cast at obj: obj itself, or cast.Caster when obj reflects the
+// skill back — the rule disablers.go's reflectTarget applies, generalized
+// to whatever satisfies effectListTarget rather than the fuller
+// disablerTarget surface (Dead/Invul/Paralyzed) a damage handler's own
+// Dead()/evasion checks already cover before this runs. Returns nil when
+// reflect fires but the caster doesn't expose an effect list to redirect
+// onto — a duck-typing gap safer to drop than to guess through, matching
+// reflectTarget's own behavior.
+func reflectEffectTarget(cast Cast, obj any) effectListTarget {
+	target, ok := obj.(effectListTarget)
+	if !ok {
+		return nil
+	}
+	src, ok := obj.(skillReflectSource)
+	if !ok || !formulas.SkillReflects(src.SkillReflectInput(cast.Skill), rnd.Get(100)) {
+		return target
+	}
+	caster, ok := cast.Caster.(effectListTarget)
+	if !ok {
+		return nil
+	}
+	return caster
+}
+
 type pdamHandler struct{}
 
 func (pdamHandler) Types() []string { return []string{"PDAM", "FATAL"} }
@@ -68,6 +93,7 @@ func (pdamHandler) UseResult(cast Cast) Result {
 		if !ok || target.Dead() {
 			continue
 		}
+		applyPdamEffects(cast, obj)
 		in, ok := target.PhysicalSkillInput(cast.Caster, cast.Skill)
 		if !ok {
 			continue
@@ -80,7 +106,30 @@ func (pdamHandler) UseResult(cast Cast) Result {
 			result.AttackFailed++
 		}
 	}
+	applySelfEffects(cast.Caster, cast.Skill)
 	return result
+}
+
+// applyPdamEffects applies a PDAM/FATAL skill's target effect list to obj,
+// mirroring Pdam.java: a target with an active BLOCK_DEBUFF effect is
+// skipped, a reflecting target sends the effects back onto the caster
+// instead, and the destination's prior instance of the same skill is
+// dropped first so a repeat cast doesn't stack. Unlike Mdam/Blow, PDAM
+// applies these unconditionally — no landing-rate roll gates activation.
+func applyPdamEffects(cast Cast, obj any) {
+	if len(cast.Skill.Effects) == 0 {
+		return
+	}
+	elt, ok := obj.(effectListTarget)
+	if !ok || hasEffectType(elt.EffectList(), "BLOCK_DEBUFF") {
+		return
+	}
+	effected := reflectEffectTarget(cast, obj)
+	if effected == nil {
+		return
+	}
+	stopEffectsBySkillID(effected.EffectList(), cast.Skill.ID)
+	applyEffects(cast.Caster, effected, cast.Skill, cast.Skill.Effects)
 }
 
 type mdamHandler struct{}
@@ -103,8 +152,36 @@ func (mdamHandler) Use(cast Cast) {
 		damage := int(formulas.MagicDamage(in))
 		if damage > 0 {
 			target.ReduceHP(float64(damage), cast.Caster, cast.Skill)
+			applyMdamEffects(cast, obj)
 		}
 	}
+	applySelfEffects(cast.Caster, cast.Skill)
+}
+
+// applyMdamEffects applies an MDAM/DEATHLINK skill's target effect list to
+// obj after a successful damage tick, mirroring Mdam.java: BLOCK_DEBUFF
+// skips it, reflect redirects it onto the caster, and — matching
+// disablers.go's own reflect+landing-roll shape (checkSkillSuccess run
+// once against whichever side ends up effected) — a landing-rate roll
+// gates activation regardless of which side that is.
+func applyMdamEffects(cast Cast, obj any) {
+	if len(cast.Skill.Effects) == 0 {
+		return
+	}
+	elt, ok := obj.(effectListTarget)
+	if !ok || hasEffectType(elt.EffectList(), "BLOCK_DEBUFF") {
+		return
+	}
+	effected := reflectEffectTarget(cast, obj)
+	if effected == nil {
+		return
+	}
+	succeeded, ok := checkSkillSuccess(cast.Caster, effected, cast.Skill)
+	if !ok || !succeeded {
+		return
+	}
+	stopEffectsBySkillID(effected.EffectList(), cast.Skill.ID)
+	applyEffects(cast.Caster, effected, cast.Skill, cast.Skill.Effects)
 }
 
 type blowHandler struct{}
@@ -128,8 +205,32 @@ func (blowHandler) Use(cast Cast) {
 		if damage > 0 {
 			target.ReduceHP(float64(damage), cast.Caster, cast.Skill)
 			applyLethalHit(cast, target)
+			applyBlowEffects(cast, obj)
 		}
 	}
+	applySelfEffects(cast.Caster, cast.Skill)
+}
+
+// applyBlowEffects applies a BLOW skill's target effect list to obj after a
+// successful hit, mirroring Blow.java: reflect redirects it onto the
+// caster (unlike Pdam/Mdam, Blow never checks BLOCK_DEBUFF), and a
+// landing-rate roll gates activation with the blessed-spiritshot input
+// forced true — Blow.java hardcodes that argument regardless of the
+// caster's real charge state.
+func applyBlowEffects(cast Cast, obj any) {
+	if len(cast.Skill.Effects) == 0 {
+		return
+	}
+	effected := reflectEffectTarget(cast, obj)
+	if effected == nil {
+		return
+	}
+	succeeded, ok := checkSkillSuccessBSS(cast.Caster, effected, cast.Skill, true)
+	if !ok || !succeeded {
+		return
+	}
+	stopEffectsBySkillID(effected.EffectList(), cast.Skill.ID)
+	applyEffects(cast.Caster, effected, cast.Skill, cast.Skill.Effects)
 }
 
 type manaDamageHandler struct{}
