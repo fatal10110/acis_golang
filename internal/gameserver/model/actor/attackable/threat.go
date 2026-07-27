@@ -146,6 +146,79 @@ func (t *ThreatTable) RandomizeAttack(valid func(Combatant) bool, pick func(int)
 	return true
 }
 
+// ReconsiderTarget ports Npc.java's AggroList.reconsiderTarget(range): used
+// when the owner can no longer act on its current target (e.g. an
+// immobilize state) and must pick a replacement from its own hate list.
+// Among attackers with positive hate other than the current most-hated,
+// passing both inRange and valid, it picks the lowest-ObjectID candidate
+// (Go map iteration order is unlike Java's ConcurrentHashMap, so entries are
+// sorted for a reproducible pick instead of taking iteration's "first").
+//
+// If a most-hated attacker exists, its hate is zeroed and previousMostHated
+// reports it so the caller can drop its queued attack desire; the chosen
+// candidate's own hate is left unchanged — the reference reads
+// mostHated.getHate() for the addDamageHate call only after already calling
+// mostHated.stopHate() in the same statement sequence, so it always adds
+// zero there. This is not a missed transfer to fix; it is the exact
+// reference order, reproduced as coded. If no most-hated exists (empty hate
+// list or an alike-dead owner, mirroring getMostHated's own dead check),
+// the candidate instead gets a flat +2000 hate and previousMostHated is
+// nil.
+//
+// Reports found false when the table has fewer than two entries or no
+// candidate passes both filters.
+func (t *ThreatTable) ReconsiderTarget(inRange func(Combatant) bool, valid func(Combatant) bool) (previousMostHated, chosen Combatant, found bool) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if len(t.entries) < 2 {
+		return nil, nil, false
+	}
+
+	var mostHated *Threat
+	if !t.owner.AlikeDead() {
+		for _, e := range t.entries {
+			if e.Hate <= 0 {
+				continue
+			}
+			if mostHated == nil || e.Hate > mostHated.Hate {
+				mostHated = e
+			}
+		}
+	}
+
+	var candidates []*Threat
+	for _, e := range t.entries {
+		if mostHated != nil && e == mostHated {
+			continue
+		}
+		if e.Hate <= 0 {
+			continue
+		}
+		if !inRange(e.Attacker) || !valid(e.Attacker) {
+			continue
+		}
+		candidates = append(candidates, e)
+	}
+	if len(candidates) == 0 {
+		return nil, nil, false
+	}
+	slices.SortFunc(candidates, func(a, b *Threat) int {
+		return int(a.Attacker.ObjectID() - b.Attacker.ObjectID())
+	})
+	picked := candidates[0]
+	picked.Timestamp = time.Now()
+
+	if mostHated == nil {
+		picked.Hate = min(picked.Hate+2000, maxThreatValue)
+		return nil, picked.Attacker, true
+	}
+
+	prevAttacker := mostHated.Attacker
+	mostHated.Hate = 0
+	return prevAttacker, picked.Attacker, true
+}
+
 // Hate returns the owner's hate against target, or 0 if target is not in
 // the table.
 func (t *ThreatTable) Hate(target Combatant) float64 {

@@ -332,6 +332,111 @@ func TestThreatTable_RandomizeAttackNoopUnderVariousConditions(t *testing.T) {
 	})
 }
 
+func alwaysInRange(Combatant) bool { return true }
+
+func TestThreatTable_ReconsiderTargetSwapsFromMostHated(t *testing.T) {
+	// Fixture cross-checked against reconsiderTarget: mostHated (b, hate 25)
+	// has its hate zeroed and its ATTACK desire dropped by the caller; the
+	// picked candidate (a, hate 10, lowest ObjectID among qualifying
+	// entries) keeps its own hate unchanged, since the reference reads
+	// mostHated.getHate() for the add only after already zeroing it.
+	table := NewThreatTable(combatant(1))
+	a, b := combatant(10), combatant(11)
+	table.AddDamage(a, 0, 10)
+	table.AddDamage(b, 0, 25)
+
+	prev, chosen, ok := table.ReconsiderTarget(alwaysInRange, alwaysValid)
+	if !ok {
+		t.Fatal("ReconsiderTarget: ok = false, want true")
+	}
+	if chosen.ObjectID() != a.ObjectID() {
+		t.Fatalf("chosen = %d, want %d", chosen.ObjectID(), a.ObjectID())
+	}
+	if prev == nil || prev.ObjectID() != b.ObjectID() {
+		t.Fatalf("previousMostHated = %v, want %d", prev, b.ObjectID())
+	}
+
+	gotA, _ := table.Get(a)
+	if gotA.Hate != 10 {
+		t.Errorf("chosen hate = %v, want unchanged 10", gotA.Hate)
+	}
+	gotB, _ := table.Get(b)
+	if gotB.Hate != 0 {
+		t.Errorf("previous mostHated hate = %v, want zeroed 0", gotB.Hate)
+	}
+}
+
+func TestThreatTable_ReconsiderTargetGrantsFlat2000WhenOwnerAlikeDead(t *testing.T) {
+	// getMostHated() returns nil whenever the owner is alike dead
+	// (regardless of positive-hate entries existing), so reconsiderTarget
+	// takes the "no most hated" branch: the picked candidate gets a flat
+	// +2000 instead of a hate transfer, and previousMostHated is nil since
+	// no entry was ever identified as the old top target to clear. This is
+	// the only reachable path to that branch: if the owner is alive, any
+	// positive-hate entry becomes mostHated and is excluded as its own
+	// candidate, so a genuine "positive hate but no mostHated" state can't
+	// otherwise occur.
+	owner := &fakeCombatant{id: 1, alikeDead: true}
+	table := NewThreatTable(owner)
+	a := combatant(10)
+	table.AddDamage(a, 0, 1)
+	table.AddDamage(combatant(11), 0, 5)
+
+	prev, chosen, ok := table.ReconsiderTarget(alwaysInRange, alwaysValid)
+	if !ok {
+		t.Fatal("ReconsiderTarget: ok = false, want true")
+	}
+	if prev != nil {
+		t.Fatalf("previousMostHated = %v, want nil", prev)
+	}
+	if chosen.ObjectID() != a.ObjectID() {
+		t.Fatalf("chosen = %d, want %d (lowest ObjectID among candidates)", chosen.ObjectID(), a.ObjectID())
+	}
+	got, _ := table.Get(a)
+	if got.Hate != 2001 {
+		t.Fatalf("chosen hate = %v, want 2001 (1 + 2000)", got.Hate)
+	}
+}
+
+func TestThreatTable_ReconsiderTargetNoopUnderVariousConditions(t *testing.T) {
+	t.Run("fewer than two entries", func(t *testing.T) {
+		table := NewThreatTable(combatant(1))
+		table.AddDamage(combatant(2), 0, 10)
+		if _, _, ok := table.ReconsiderTarget(alwaysInRange, alwaysValid); ok {
+			t.Error("ReconsiderTarget: ok = true, want false with one entry")
+		}
+	})
+
+	t.Run("no candidate passes inRange", func(t *testing.T) {
+		table := NewThreatTable(combatant(1))
+		table.AddDamage(combatant(2), 0, 10)
+		table.AddDamage(combatant(3), 0, 20)
+		never := func(Combatant) bool { return false }
+		if _, _, ok := table.ReconsiderTarget(never, alwaysValid); ok {
+			t.Error("ReconsiderTarget: ok = true, want false when inRange rejects every candidate")
+		}
+	})
+
+	t.Run("no candidate passes valid", func(t *testing.T) {
+		table := NewThreatTable(combatant(1))
+		table.AddDamage(combatant(2), 0, 10)
+		table.AddDamage(combatant(3), 0, 20)
+		never := func(Combatant) bool { return false }
+		if _, _, ok := table.ReconsiderTarget(alwaysInRange, never); ok {
+			t.Error("ReconsiderTarget: ok = true, want false when valid rejects every candidate")
+		}
+	})
+
+	t.Run("only zero-or-negative-hate candidates", func(t *testing.T) {
+		table := NewThreatTable(combatant(1))
+		table.AddDamage(combatant(2), 0, 0)
+		table.AddDamage(combatant(3), 0, 20)
+		if _, _, ok := table.ReconsiderTarget(alwaysInRange, alwaysValid); ok {
+			t.Error("ReconsiderTarget: ok = true, want false when the only other entry has non-positive hate")
+		}
+	})
+}
+
 func TestThreatTable_ConcurrentAccess(t *testing.T) {
 	owner := combatant(1)
 	table := NewThreatTable(owner)

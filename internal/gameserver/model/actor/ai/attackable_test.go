@@ -311,6 +311,58 @@ func TestAttackableAIRandomizeHateNoopWithSingleAttacker(t *testing.T) {
 	}
 }
 
+func TestAttackableAIReconsiderTargetSwapsAndDropsPreviousDesire(t *testing.T) {
+	owner := actor(1)
+	low := actor(2)
+	high := actor(3)
+	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+
+	ai.AddDamageHate(low, 0, 10)
+	ai.AddDamageHate(high, 0, 25)
+
+	always := func(attackable.Combatant) bool { return true }
+	chosen, ok := ai.ReconsiderTarget(always, always)
+	if !ok {
+		t.Fatal("ReconsiderTarget: ok = false, want true")
+	}
+	if chosen != low {
+		t.Fatalf("chosen = %v, want low", chosen)
+	}
+
+	if got := ai.Threats().Hate(low); got != 10 {
+		t.Fatalf("chosen hate = %v, want unchanged 10", got)
+	}
+	if got := ai.Threats().Hate(high); got != 0 {
+		t.Fatalf("previous mostHated hate = %v, want zeroed 0", got)
+	}
+	if _, ok := ai.Desires().Peek(); !ok {
+		t.Fatal("Desires().Peek() ok = false, want the new target's desire queued")
+	}
+	if got := ai.Desires().Len(); got != 1 {
+		t.Fatalf("desires len = %d, want 1 (previous mostHated's desire dropped)", got)
+	}
+	desire, _ := ai.Desires().Peek()
+	if desire.FinalTarget != low {
+		t.Fatalf("queued desire target = %v, want low", desire.FinalTarget)
+	}
+}
+
+func TestAttackableAIReconsiderTargetNoopWithSingleAttacker(t *testing.T) {
+	owner := actor(1)
+	target := actor(2)
+	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+
+	ai.AddDamageHate(target, 0, 10)
+
+	always := func(attackable.Combatant) bool { return true }
+	if _, ok := ai.ReconsiderTarget(always, always); ok {
+		t.Fatal("ReconsiderTarget: ok = true, want false with a single attacker")
+	}
+	if got := ai.Desires().Len(); got != 1 {
+		t.Fatalf("desires len = %d, want 1 (untouched)", got)
+	}
+}
+
 func TestAttackableAIWanderReturnHome(t *testing.T) {
 	owner := actor(1)
 	owner.inTerritory = false
