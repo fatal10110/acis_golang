@@ -30,7 +30,7 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 		Now:         time.Now(),
 		Controller:  controller,
 		Caster:      live.Character,
-		Selected:    live.target,
+		Selected:    live.Target(),
 		SkillID:     int(req.SkillID),
 		Definitions: l.skills,
 	})
@@ -116,7 +116,7 @@ func (l *GameClientLink) handleToggleSkillUse(live *livePlayer, req clientpacket
 		live.castController(),
 		actorcast.PlayerToggleRequest{
 			Caster:      live.Character,
-			Selected:    live.target,
+			Selected:    live.Target(),
 			SkillID:     int(req.SkillID),
 			Definitions: l.skills,
 		},

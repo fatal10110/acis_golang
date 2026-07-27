@@ -173,18 +173,18 @@ func (l *GameClientLink) summonSkillTarget(live *livePlayer, actor *summon.Actor
 	case summonSkillTargetSelf:
 		return actor
 	default:
-		target, _ := live.target.(attackable.Combatant)
+		target, _ := live.Target().(attackable.Combatant)
 		return target
 	}
 }
 
 func (l *GameClientLink) summonCommandContext(live *livePlayer, command summon.Command) summon.CommandContext {
 	ctx := summon.CommandContext{Command: command, World: l.world}
-	if live == nil || live.target == nil {
+	if live == nil || live.Target() == nil {
 		return ctx
 	}
-	ctx.Target = live.target
-	target, ok := live.target.(attackable.Combatant)
+	ctx.Target = live.Target()
+	target, ok := live.Target().(attackable.Combatant)
 	if !ok {
 		return ctx
 	}

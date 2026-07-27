@@ -97,6 +97,7 @@ type Character struct {
 	broadcastStatus    func()
 	broadcastShortBuff func(ShortBuffUpdate)
 	roll               func(int) int
+	attackTarget       func(world.Tracked)
 
 	deathMu sync.Mutex
 	dead    bool
@@ -122,6 +123,7 @@ type Character struct {
 	shortBuffTaskSkillID int32
 	shortBuffTimer       *time.Timer
 	groundTarget         location.Location
+	target               world.Tracked
 	log                  zerolog.Logger
 
 	skills skillState

@@ -21,6 +21,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 func (l *GameClientLink) authenticate(ctx context.Context, client *Client, req clientpackets.AuthLogin) (bool, error) {
@@ -245,6 +246,9 @@ func (l *GameClientLink) attachLivePlayer(client *Client, c *player.Character, t
 	})
 	c.SetShortBuffBroadcaster(func(update player.ShortBuffUpdate) {
 		live.SendFrame(serverpackets.FrameShortBuffStatusUpdate(update.SkillID, update.Level, update.DurationSeconds))
+	})
+	c.SetAttackTargetHook(func(target world.Tracked) {
+		l.attackLiveTarget(live, target)
 	})
 	return live, nil
 }

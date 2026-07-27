@@ -350,7 +350,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			// the client sends this second click expecting the action to
 			// resolve, and locks its own input until Attack or
 			// ActionFailed answers it.
-			selected := live.target != nil && live.target.ObjectID() == req.ObjectID
+			selected := live.Target() != nil && live.Target().ObjectID() == req.ObjectID
 			l.handleTargetAction(ctx, live, req.ObjectID, selected)
 
 		case clientpackets.OpcodeAttackRequest:
@@ -362,7 +362,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			if live == nil {
 				continue
 			}
-			selected := live.target != nil && live.target.ObjectID() == req.ObjectID
+			selected := live.Target() != nil && live.Target().ObjectID() == req.ObjectID
 			l.handleTargetAction(ctx, live, req.ObjectID, selected)
 
 		case clientpackets.OpcodeLogout:

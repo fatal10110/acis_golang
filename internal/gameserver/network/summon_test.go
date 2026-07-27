@@ -64,7 +64,7 @@ func TestGameClientLinkSummonActionUseDispatchesSelectedTargetToAI(t *testing.T)
 	liveSummon.SetAI(brain)
 	summon.SpawnBesideOwner(state, liveSummon, live, location.Location{})
 
-	live.target = hostile
+	live.SetTargetTracked(hostile)
 	gcl := &GameClientLink{world: state}
 	if !gcl.handleSummonActionUse(live, clientpackets.RequestActionUse{ActionID: 16}) {
 		t.Fatal("handleSummonActionUse returned false for a summon attack command")
@@ -75,7 +75,7 @@ func TestGameClientLinkSummonActionUseDispatchesSelectedTargetToAI(t *testing.T)
 
 	friendlyCreature := &summonActionCombatant{id: 301}
 	state.Spawn(friendlyCreature, 150, 0, 0, 0)
-	live.target = friendlyCreature
+	live.SetTargetTracked(friendlyCreature)
 	if !gcl.handleSummonActionUse(live, clientpackets.RequestActionUse{ActionID: 16}) {
 		t.Fatal("handleSummonActionUse returned false for a summon follow-target command")
 	}
@@ -119,7 +119,7 @@ func TestGameClientLinkSummonSkillUseResolvesTargetKindAndDispatches(t *testing.
 
 	hostile := newTestHostileNPC(t, 300)
 	state.Spawn(hostile, 100, 0, 0, 0)
-	live.target = hostile
+	live.SetTargetTracked(hostile)
 
 	liveSummon := summon.NewServitor(summon.ServitorConfig{
 		ObjectID: 500, Owner: live, Level: 40,
@@ -162,7 +162,7 @@ func TestGameClientLinkSummonSkillUsePetBeyondLevelGapIsBlocked(t *testing.T) {
 	frames := &frameCapture{}
 	live := newTestLivePlayer(t, 100, frames)
 	state.Spawn(live, 0, 0, 0, 0)
-	live.target = live
+	live.SetTargetTracked(live)
 
 	livePet := summon.NewPet(summon.PetConfig{
 		ObjectID: 500, Owner: live, Level: live.LevelValue() + 21,
@@ -201,7 +201,7 @@ func TestGameClientLinkSummonSkillUseDoorOnlyActionNeverDispatchesYet(t *testing
 
 	hostile := newTestHostileNPC(t, 300)
 	state.Spawn(hostile, 100, 0, 0, 0)
-	live.target = hostile
+	live.SetTargetTracked(hostile)
 
 	liveSummon := summon.NewServitor(summon.ServitorConfig{
 		ObjectID: 500, Owner: live, Level: 40,
