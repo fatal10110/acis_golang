@@ -240,3 +240,55 @@ func TestHostileAggressive(t *testing.T) {
 		t.Fatal("Aggressive() = false for a positive aggro range, want true")
 	}
 }
+
+func TestHostileRandomizeHateDisplacesTargetGatedByAutoAttackTargetValid(t *testing.T) {
+	state := world.New()
+	owner := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", AggroRange: 10})
+	owner.SetRollSource(zeroRoll)
+	state.Spawn(owner, 100, 100, 0, 0)
+
+	low := &gateTarget{id: 2}
+	high := &gateTarget{id: 3}
+	// outOfRange sits well past partyRangeDefault and holds the highest
+	// hate, so it becomes mostHated (selection is unfiltered by valid, per
+	// AggroList.randomizeAttack) but AutoAttackTargetValid still excludes
+	// it from candidacy, so it can never be the chosen displacer.
+	outOfRange := &gateTarget{id: 4}
+	state.Spawn(low, 100, 100, 0, 0)
+	state.Spawn(high, 100, 100, 0, 0)
+	state.Spawn(outOfRange, 100+partyRangeDefault+1000, 100, 0, 0)
+
+	owner.AddDamageHate(low, 0, 10)
+	owner.AddDamageHate(high, 0, 25)
+	owner.AddDamageHate(outOfRange, 0, 999)
+
+	if ok := owner.RandomizeHate(); !ok {
+		t.Fatal("RandomizeHate: ok = false, want true")
+	}
+
+	// Candidates sort by attacker id: low(2) before high(3), so pick=0
+	// (zeroRoll) selects low. new hate = 10 + (999 - 10) + 200 = 1199.
+	if got := owner.AI().Threats().Hate(low); got != 1199 {
+		t.Fatalf("displaced attacker hate = %v, want 1199", got)
+	}
+	if got := owner.AI().Threats().Hate(high); got != 25 {
+		t.Fatalf("non-candidate hate = %v, want unchanged 25", got)
+	}
+	if got := owner.AI().Threats().Hate(outOfRange); got != 999 {
+		t.Fatalf("mostHated hate = %v, want unchanged 999", got)
+	}
+}
+
+func TestHostileRandomizeHateNoopWithSingleAttacker(t *testing.T) {
+	state := world.New()
+	owner := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", AggroRange: 10})
+	state.Spawn(owner, 100, 100, 0, 0)
+
+	target := &gateTarget{id: 2}
+	state.Spawn(target, 100, 100, 0, 0)
+	owner.AddDamageHate(target, 0, 10)
+
+	if owner.RandomizeHate() {
+		t.Fatal("RandomizeHate: ok = true, want false with a single attacker")
+	}
+}

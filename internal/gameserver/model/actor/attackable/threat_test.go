@@ -234,6 +234,104 @@ func TestThreatTable_ClearDropsEntries(t *testing.T) {
 	}
 }
 
+func alwaysValid(Combatant) bool { return true }
+
+func firstIndex(int) int { return 0 }
+
+func TestThreatTable_RandomizeAttackDisplacesMostHated(t *testing.T) {
+	// Fixture: mostHated = b (25), candidate = a (10). New a hate =
+	// 10 + (25 - 10) + 200 = 225, cross-checked against
+	// AggroList.randomizeAttack's addDamageHate(candidate, 0,
+	// mostHated.getHate() - candidate.getHate() + 200) formula.
+	table := NewThreatTable(combatant(1))
+	a, b := combatant(10), combatant(11)
+	table.AddDamage(a, 0, 10)
+	table.AddDamage(b, 0, 25)
+
+	if ok := table.RandomizeAttack(alwaysValid, firstIndex); !ok {
+		t.Fatal("RandomizeAttack: ok = false, want true")
+	}
+
+	got, _ := table.Get(a)
+	if got.Hate != 225 {
+		t.Errorf("candidate hate = %v, want 225", got.Hate)
+	}
+	untouched, _ := table.Get(b)
+	if untouched.Hate != 25 {
+		t.Errorf("mostHated hate = %v, want unchanged 25", untouched.Hate)
+	}
+}
+
+func TestThreatTable_RandomizeAttackFiltersByValidAndExcludesMostHated(t *testing.T) {
+	table := NewThreatTable(combatant(1))
+	a, b, c := combatant(10), combatant(11), combatant(12)
+	table.AddDamage(a, 0, 10)
+	table.AddDamage(b, 0, 5)
+	table.AddDamage(c, 0, 50) // mostHated
+
+	valid := func(target Combatant) bool { return target.ObjectID() == a.ObjectID() }
+	if ok := table.RandomizeAttack(valid, firstIndex); !ok {
+		t.Fatal("RandomizeAttack: ok = false, want true")
+	}
+
+	got, _ := table.Get(a)
+	if got.Hate != 10+(50-10)+200 {
+		t.Errorf("candidate hate = %v, want %v", got.Hate, 10+(50-10)+200)
+	}
+	untouched, _ := table.Get(b)
+	if untouched.Hate != 5 {
+		t.Errorf("non-candidate hate = %v, want unchanged 5", untouched.Hate)
+	}
+}
+
+func TestThreatTable_RandomizeAttackNoopUnderVariousConditions(t *testing.T) {
+	t.Run("fewer than two entries", func(t *testing.T) {
+		table := NewThreatTable(combatant(1))
+		table.AddDamage(combatant(2), 0, 10)
+		if table.RandomizeAttack(alwaysValid, firstIndex) {
+			t.Error("RandomizeAttack: ok = true, want false with one entry")
+		}
+	})
+
+	t.Run("owner alike dead", func(t *testing.T) {
+		owner := &fakeCombatant{id: 1, alikeDead: true}
+		table := NewThreatTable(owner)
+		table.AddDamage(combatant(2), 0, 10)
+		table.AddDamage(combatant(3), 0, 20)
+		if table.RandomizeAttack(alwaysValid, firstIndex) {
+			t.Error("RandomizeAttack: ok = true, want false while owner is alike dead")
+		}
+	})
+
+	t.Run("no positive-hate most hated", func(t *testing.T) {
+		table := NewThreatTable(combatant(1))
+		table.AddDamage(combatant(2), 0, -5)
+		table.AddDamage(combatant(3), 0, 0)
+		if table.RandomizeAttack(alwaysValid, firstIndex) {
+			t.Error("RandomizeAttack: ok = true, want false with no positive-hate entry")
+		}
+	})
+
+	t.Run("no candidate passes valid", func(t *testing.T) {
+		table := NewThreatTable(combatant(1))
+		table.AddDamage(combatant(2), 0, 10)
+		table.AddDamage(combatant(3), 0, 20)
+		never := func(Combatant) bool { return false }
+		if table.RandomizeAttack(never, firstIndex) {
+			t.Error("RandomizeAttack: ok = true, want false when valid rejects every candidate")
+		}
+	})
+
+	t.Run("only zero-or-negative-hate candidates", func(t *testing.T) {
+		table := NewThreatTable(combatant(1))
+		table.AddDamage(combatant(2), 0, 0)
+		table.AddDamage(combatant(3), 0, 20)
+		if table.RandomizeAttack(alwaysValid, firstIndex) {
+			t.Error("RandomizeAttack: ok = true, want false when the only other entry has non-positive hate")
+		}
+	})
+}
+
 func TestThreatTable_ConcurrentAccess(t *testing.T) {
 	owner := combatant(1)
 	table := NewThreatTable(owner)

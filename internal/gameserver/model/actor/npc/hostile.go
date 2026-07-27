@@ -21,6 +21,12 @@ import (
 
 const defaultDriftRange = 200
 
+// partyRangeDefault mirrors players.properties' PartyRange default (1500),
+// used by RandomizeHate's canAutoAttack gate. The Party subsystem isn't
+// ported yet, so this stays a local default instead of a wired Config
+// value; move it there once Party configuration exists.
+const partyRangeDefault = 1500
+
 var hostileInstanceKinds = map[InstanceKind]struct{}{
 	"Chest":           {},
 	"FeedableBeast":   {},
@@ -316,6 +322,17 @@ func (h *Hostile) StopMostHatedTarget() {
 	if most, ok := h.brain.Threats().MostHated(); ok {
 		h.brain.Threats().StopHate(most.Attacker)
 	}
+}
+
+// RandomizeHate ports Npc.java's AggroList.randomizeAttack(), the behavior
+// behind EffectRandomizeHate: swaps a random valid attacker into the
+// most-hated slot ahead of the current target, gated by the same
+// canAutoAttack(target, PARTY_RANGE, true) rule reconsiderTarget uses.
+// Reports whether a swap happened.
+func (h *Hostile) RandomizeHate() bool {
+	return h.brain.RandomizeHate(func(target attackable.Combatant) bool {
+		return h.AutoAttackTargetValid(target, partyRangeDefault, true)
+	}, h.roll)
 }
 
 // Tick advances the hostile AI clock once.
