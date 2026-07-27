@@ -298,6 +298,34 @@ func TestHostileBroadcastAttackNoopsWithoutWorld(t *testing.T) {
 	attacker.BroadcastAttack(serverpackets.AttackSnapshot{AttackerID: 1})
 }
 
+func TestHostileBroadcastMoveToPawnSendsFrameToKnownReceivers(t *testing.T) {
+	state := world.New()
+	caster := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster"})
+	caster.SetWorld(state)
+	state.Spawn(caster, 100, 100, 0, 0)
+
+	observer := &frameReceiver{trackedID: 55}
+	state.Spawn(observer, 100, 100, 0, 0)
+
+	target := &hostileTarget{id: 2}
+	state.Spawn(target, 200, 100, 0, 0)
+
+	caster.BroadcastMoveToPawn(target)
+
+	if len(observer.frames) != 1 {
+		t.Fatalf("observer received %d frames, want 1", len(observer.frames))
+	}
+	if observer.frames[0][0] != serverpackets.OpcodeMoveToPawn {
+		t.Fatalf("frame opcode = %#x, want %#x", observer.frames[0][0], serverpackets.OpcodeMoveToPawn)
+	}
+}
+
+func TestHostileBroadcastMoveToPawnNoopsWithoutWorld(t *testing.T) {
+	caster := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster"})
+	// SetWorld was never called; this must not panic.
+	caster.BroadcastMoveToPawn(&hostileTarget{id: 2})
+}
+
 func TestHostileDieBroadcastsDieToKnownReceivers(t *testing.T) {
 	state := world.New()
 	victim := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", HPMax: 10})

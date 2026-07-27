@@ -338,6 +338,36 @@ func (h *Hostile) BroadcastMove(event move.Event) {
 	}
 }
 
+// BroadcastMoveToPawn sends a rotation-only MoveToPawn notice toward target
+// to every currently known observer capable of receiving one, matching the
+// reference's fallback when an AI-initiated cast is rejected after movement
+// has already turned the actor toward target. It is a no-op until SetWorld
+// has been called or if target exposes no position.
+func (h *Hostile) BroadcastMoveToPawn(target attackable.Combatant) {
+	if h.world == nil {
+		return
+	}
+	located, ok := target.(interface{ Position() (int, int, int) })
+	if !ok {
+		return
+	}
+	sx, sy, sz := h.Position()
+	origin := location.Location{X: sx, Y: sy, Z: sz}
+	tx, ty, tz := located.Position()
+	dest := location.Location{X: tx, Y: ty, Z: tz}
+	distance := int(origin.Distance3D(dest))
+
+	known := h.appendKnown()
+	defer h.releaseKnown()
+	for _, o := range known {
+		receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
+		if !ok {
+			continue
+		}
+		receiver.SendFrame(serverpackets.FrameMoveToPawn(h.ObjectID(), target.ObjectID(), distance, origin))
+	}
+}
+
 // BroadcastStop sends a stop-in-place notice to every currently known
 // observer capable of receiving one. It is a no-op until SetWorld has been
 // called.
