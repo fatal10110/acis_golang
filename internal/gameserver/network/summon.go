@@ -10,7 +10,10 @@ import (
 
 func (l *GameClientLink) handleSummonActionUse(live *livePlayer, req clientpackets.RequestActionUse) bool {
 	command, ok := summonCommandForActionID(req.ActionID)
-	if !ok || l.world == nil {
+	if !ok {
+		return l.handleSummonSkillUse(live, req)
+	}
+	if l.world == nil {
 		return false
 	}
 	obj, ok := l.world.Summon(live.ObjectID())
@@ -36,6 +39,143 @@ func (l *GameClientLink) handleSummonActionUse(live *livePlayer, req clientpacke
 		live.SendFrame(serverpackets.FramePetDelete(summonType, objectID))
 	}
 	return true
+}
+
+// summonSkillTargetKind identifies which live object an owner-commanded
+// special-skill action targets, mirroring the WorldObject argument Java's
+// RequestActionUse passes to each useSkill(skillId, ...) call.
+type summonSkillTargetKind uint8
+
+const (
+	// summonSkillTargetClicked uses the owner's current client-side target.
+	summonSkillTargetClicked summonSkillTargetKind = iota
+	// summonSkillTargetOwner uses the commanding player themself.
+	summonSkillTargetOwner
+	// summonSkillTargetSelf uses the summon itself (e.g. Sin Eater's
+	// Ultimate Bombastic Buster casting on its own owner's summon).
+	summonSkillTargetSelf
+)
+
+// summonSkillEntry is one RequestActionUse action-id-to-skill mapping for a
+// pet/servitor's commanded special skill.
+type summonSkillEntry struct {
+	SkillID    int
+	TargetKind summonSkillTargetKind
+	// DoorOnly marks the two siege actions (Siege Golem's Siege Hammer,
+	// Wild Hog Cannon's Attack) Java restricts to a Door target. No Door
+	// world-object type is modeled in Go yet, so this always evaluates to
+	// "not a Door" and these two actions correctly stay unusable until
+	// siege doors are ported, matching what a target-less/non-door click
+	// already does in the reference.
+	DoorOnly bool
+}
+
+// summonSkillActionTable mirrors every commanded special-skill case in
+// Java's RequestActionUse.runImpl. Action 32 (Wild Hog Cannon Mode Change)
+// is intentionally absent: the reference's own case body is commented out,
+// making it a real no-op in Java too.
+var summonSkillActionTable = map[int32]summonSkillEntry{
+	36:   {SkillID: 4259, TargetKind: summonSkillTargetClicked},
+	39:   {SkillID: 4138, TargetKind: summonSkillTargetClicked},
+	41:   {SkillID: 4230, TargetKind: summonSkillTargetClicked, DoorOnly: true},
+	42:   {SkillID: 4378, TargetKind: summonSkillTargetOwner},
+	43:   {SkillID: 4137, TargetKind: summonSkillTargetClicked},
+	44:   {SkillID: 4139, TargetKind: summonSkillTargetClicked},
+	45:   {SkillID: 4025, TargetKind: summonSkillTargetOwner},
+	46:   {SkillID: 4261, TargetKind: summonSkillTargetClicked},
+	47:   {SkillID: 4260, TargetKind: summonSkillTargetClicked},
+	48:   {SkillID: 4068, TargetKind: summonSkillTargetClicked},
+	1000: {SkillID: 4079, TargetKind: summonSkillTargetClicked, DoorOnly: true},
+	// 1001 (Sin Eater's Ultimate Bombastic Buster) targets the summon
+	// itself in Java. The reference's own 10%-chance NpcSay flavor line on
+	// a successful cast is tracked separately, not part of the skill-cast
+	// mechanism this table drives.
+	1001: {SkillID: 4139, TargetKind: summonSkillTargetSelf},
+	1003: {SkillID: 4710, TargetKind: summonSkillTargetClicked},
+	1004: {SkillID: 4711, TargetKind: summonSkillTargetOwner},
+	1005: {SkillID: 4712, TargetKind: summonSkillTargetClicked},
+	1006: {SkillID: 4713, TargetKind: summonSkillTargetOwner},
+	1007: {SkillID: 4699, TargetKind: summonSkillTargetOwner},
+	1008: {SkillID: 4700, TargetKind: summonSkillTargetOwner},
+	1009: {SkillID: 4701, TargetKind: summonSkillTargetClicked},
+	1010: {SkillID: 4702, TargetKind: summonSkillTargetOwner},
+	1011: {SkillID: 4703, TargetKind: summonSkillTargetOwner},
+	1012: {SkillID: 4704, TargetKind: summonSkillTargetClicked},
+	1013: {SkillID: 4705, TargetKind: summonSkillTargetClicked},
+	1014: {SkillID: 4706, TargetKind: summonSkillTargetOwner},
+	1015: {SkillID: 4707, TargetKind: summonSkillTargetClicked},
+	1016: {SkillID: 4709, TargetKind: summonSkillTargetClicked},
+	1017: {SkillID: 4708, TargetKind: summonSkillTargetClicked},
+	1031: {SkillID: 5135, TargetKind: summonSkillTargetClicked},
+	1032: {SkillID: 5136, TargetKind: summonSkillTargetClicked},
+	1033: {SkillID: 5137, TargetKind: summonSkillTargetClicked},
+	1034: {SkillID: 5138, TargetKind: summonSkillTargetClicked},
+	1035: {SkillID: 5139, TargetKind: summonSkillTargetClicked},
+	1036: {SkillID: 5142, TargetKind: summonSkillTargetClicked},
+	1037: {SkillID: 5141, TargetKind: summonSkillTargetClicked},
+	1038: {SkillID: 5140, TargetKind: summonSkillTargetClicked},
+	// 1039/1040 (Swoop Cannon) reject a Door target in Java. No Door type
+	// exists in Go yet, so no target can match one and this restriction is
+	// vacuously satisfied — safe to omit without behavior divergence.
+	1039: {SkillID: 5110, TargetKind: summonSkillTargetClicked},
+	1040: {SkillID: 5111, TargetKind: summonSkillTargetClicked},
+}
+
+// doorTarget is satisfied by a future siege-door world object. Nothing in
+// the codebase implements it yet, so doorOnlyBlocked always returns true
+// for a DoorOnly entry until siege doors are ported.
+type doorTarget interface {
+	IsSiegeDoor() bool
+}
+
+func doorOnlyBlocked(entry summonSkillEntry, target attackable.Combatant) bool {
+	if !entry.DoorOnly {
+		return false
+	}
+	door, ok := target.(doorTarget)
+	return !ok || !door.IsSiegeDoor()
+}
+
+// handleSummonSkillUse dispatches an owner-commanded pet/servitor special
+// skill (e.g. Wild Hog Cannon Attack), matching Java's
+// RequestActionUse.useSkill. Unlike handleSummonActionUse's movement/status
+// commands, an unresolvable summon or skill still returns true so the
+// client's input is released, matching the existing action-bar contract;
+// only an unmapped action id returns false.
+func (l *GameClientLink) handleSummonSkillUse(live *livePlayer, req clientpackets.RequestActionUse) bool {
+	entry, ok := summonSkillActionTable[req.ActionID]
+	if !ok || l.world == nil {
+		return false
+	}
+	obj, ok := l.world.Summon(live.ObjectID())
+	if !ok {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return true
+	}
+	actor, ok := obj.(*summon.Actor)
+	if !ok {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return true
+	}
+
+	target := l.summonSkillTarget(live, actor, entry.TargetKind)
+	if !doorOnlyBlocked(entry, target) {
+		actor.TryUseSkill(entry.SkillID, target)
+	}
+	live.SendFrame(serverpackets.FrameActionFailed())
+	return true
+}
+
+func (l *GameClientLink) summonSkillTarget(live *livePlayer, actor *summon.Actor, kind summonSkillTargetKind) attackable.Combatant {
+	switch kind {
+	case summonSkillTargetOwner:
+		return live.Character
+	case summonSkillTargetSelf:
+		return actor
+	default:
+		target, _ := live.target.(attackable.Combatant)
+		return target
+	}
 }
 
 func (l *GameClientLink) summonCommandContext(live *livePlayer, command summon.Command) summon.CommandContext {

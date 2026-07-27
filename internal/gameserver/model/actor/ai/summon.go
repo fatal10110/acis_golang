@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
 const summonFollowOffset = 70
@@ -27,6 +28,7 @@ type Summon struct {
 	actor  SummonActor
 	move   SummonMoveController
 	attack AttackController
+	cast   CastController
 
 	mu      sync.Mutex // guards current and next.
 	current intention
@@ -41,6 +43,15 @@ func NewSummon(actor SummonActor, move SummonMoveController, attack AttackContro
 		attack:  attack,
 		current: intention{kind: IntentionIdle},
 	}
+}
+
+// SetCastController wires the AI loop's TryToCast handling to controller.
+// Left unset (the default), TryToCast is a no-op, matching a summon with no
+// commandable special skill.
+func (s *Summon) SetCastController(controller CastController) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.cast = controller
 }
 
 // CurrentIntention returns the currently active intention kind.
@@ -92,6 +103,26 @@ func (s *Summon) TryToFollow(target attackable.Combatant) bool {
 	return s.thinkFollowLocked()
 }
 
+// TryToCast sets target/ref as the cast intention and evaluates it once,
+// mirroring TryToAttack's shape for an owner-commanded special-skill cast.
+func (s *Summon) TryToCast(target attackable.Combatant, ref skill.Ref) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if target == nil || s.actor.DenyAIAction() || s.cast == nil || s.cast.Disabled() {
+		return false
+	}
+	if !s.cast.CanAttempt(target, ref) {
+		return false
+	}
+	if s.busyLocked() {
+		s.next = intention{kind: IntentionCast, target: target, skill: ref}
+		return true
+	}
+	s.current = intention{kind: IntentionCast, target: target, skill: ref}
+	return s.thinkCastLocked()
+}
+
 // TryToIdle clears active and queued intentions, then stops movement.
 func (s *Summon) TryToIdle() {
 	s.mu.Lock()
@@ -112,6 +143,8 @@ func (s *Summon) Think() {
 		s.thinkAttackLocked()
 	case IntentionFollow:
 		s.thinkFollowLocked()
+	case IntentionCast:
+		s.thinkCastLocked()
 	}
 }
 
@@ -149,6 +182,28 @@ func (s *Summon) thinkAttackLocked() bool {
 	}
 
 	s.attack.DoAttack(target)
+	return true
+}
+
+func (s *Summon) thinkCastLocked() bool {
+	if s.actor.DenyAIAction() || s.cast == nil {
+		s.current = intention{kind: IntentionIdle}
+		return false
+	}
+
+	target := s.current.target
+	ref := s.current.skill
+	if s.targetLostLocked(target) {
+		return false
+	}
+
+	if !s.cast.CanCast(target, ref) {
+		s.current = intention{kind: IntentionIdle}
+		return false
+	}
+
+	s.cast.Cast(target, ref)
+	s.current = intention{kind: IntentionIdle}
 	return true
 }
 

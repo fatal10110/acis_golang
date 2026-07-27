@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -356,6 +357,78 @@ func TestStartPetFeedSchedulesStarvation(t *testing.T) {
 	waitForNoSummon(t, state, owner.ObjectID())
 }
 
+func TestActorGetSkillCanUseSkillTryUseSkill(t *testing.T) {
+	owner := &liveOwnerStub{id: 100, level: 40}
+	target := &liveCombatant{id: 300}
+
+	t.Run("unknown skill id returns false", func(t *testing.T) {
+		actor := NewPet(PetConfig{ObjectID: 200, Owner: owner, Level: 40, Skills: map[int]int{4139: 8}})
+		brain := &recordingSummonAI{}
+		actor.SetAI(brain)
+
+		if actor.TryUseSkill(9999, target) {
+			t.Fatal("TryUseSkill = true for a skill id absent from the template's skill map")
+		}
+		if len(brain.events) != 0 {
+			t.Fatalf("AI events = %v, want none", brain.events)
+		}
+	})
+
+	t.Run("pet within level gap dispatches to AI", func(t *testing.T) {
+		actor := NewPet(PetConfig{ObjectID: 200, Owner: owner, Level: 60, Skills: map[int]int{4139: 8}})
+		brain := &recordingSummonAI{}
+		actor.SetAI(brain)
+
+		if !actor.CanUseSkill() {
+			t.Fatal("CanUseSkill = false for a 20-level gap, want true (gate is strictly > 20)")
+		}
+		if !actor.TryUseSkill(4139, target) {
+			t.Fatal("TryUseSkill = false, want true")
+		}
+		want := []string{"cast:300"}
+		if !reflect.DeepEqual(brain.events, want) {
+			t.Fatalf("AI events = %v, want %v", brain.events, want)
+		}
+	})
+
+	t.Run("pet beyond level gap is blocked without touching the AI", func(t *testing.T) {
+		actor := NewPet(PetConfig{ObjectID: 200, Owner: owner, Level: 61, Skills: map[int]int{4139: 8}})
+		brain := &recordingSummonAI{}
+		actor.SetAI(brain)
+
+		if actor.CanUseSkill() {
+			t.Fatal("CanUseSkill = true for a 21-level gap, want false")
+		}
+		if actor.TryUseSkill(4139, target) {
+			t.Fatal("TryUseSkill = true, want false")
+		}
+		if len(brain.events) != 0 {
+			t.Fatalf("AI events = %v, want none", brain.events)
+		}
+	})
+
+	t.Run("servitor has no level gate", func(t *testing.T) {
+		actor := NewServitor(ServitorConfig{ObjectID: 200, Owner: owner, Level: 90, Skills: map[int]int{4139: 8}})
+		brain := &recordingSummonAI{}
+		actor.SetAI(brain)
+
+		if !actor.CanUseSkill() {
+			t.Fatal("CanUseSkill = false for a servitor, want true regardless of level gap")
+		}
+		if !actor.TryUseSkill(4139, target) {
+			t.Fatal("TryUseSkill = false, want true")
+		}
+	})
+
+	t.Run("skill ref carries the template-granted level", func(t *testing.T) {
+		actor := NewPet(PetConfig{ObjectID: 200, Owner: owner, Level: 40, Skills: map[int]int{4139: 8}})
+		ref, ok := actor.GetSkill(4139)
+		if !ok || ref.Level != 8 {
+			t.Fatalf("GetSkill(4139) = %+v, %v, want level 8, true", ref, ok)
+		}
+	})
+}
+
 type recordingSummonAI struct {
 	events []string
 }
@@ -372,6 +445,11 @@ func (a *recordingSummonAI) TryToFollow(target attackable.Combatant) bool {
 
 func (a *recordingSummonAI) TryToIdle() {
 	a.events = append(a.events, "idle")
+}
+
+func (a *recordingSummonAI) TryToCast(target attackable.Combatant, ref modelskill.Ref) bool {
+	a.events = append(a.events, "cast:"+objectIDString(target))
+	return true
 }
 
 type liveCombatant struct {

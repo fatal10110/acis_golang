@@ -263,6 +263,28 @@ func TestLoadNPCTemplates(t *testing.T) {
 		}
 	})
 
+	t.Run("skills map carries every id/level pair a template's <skills> block grants", func(t *testing.T) {
+		table := withNoItems
+		sinEater, ok := table.Get(12564)
+		if !ok {
+			t.Fatal("npc 12564 (Sin Eater) not loaded")
+		}
+		want := map[int]int{4121: 1, 4416: 13}
+		if len(sinEater.Skills) != len(want) {
+			t.Fatalf("Sin Eater Skills = %v, want %v", sinEater.Skills, want)
+		}
+		for id, level := range want {
+			if sinEater.Skills[id] != level {
+				t.Fatalf("Sin Eater Skills = %v, want %v", sinEater.Skills, want)
+			}
+		}
+		// The race-marker skill (4416) is still resolved into Race
+		// alongside being recorded in the raw Skills map.
+		if sinEater.Race != npc.RaceFairy {
+			t.Fatalf("Sin Eater Race = %v, want RaceFairy", sinEater.Race)
+		}
+	})
+
 	t.Run("idTemplate defaults to id when absent", func(t *testing.T) {
 		table := withNoItems
 		gremlin, _ := table.Get(20001)

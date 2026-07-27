@@ -85,6 +85,12 @@ type Template struct {
 	// Pet is non-nil when this template also defines a <petdata> block,
 	// i.e. the npc can be tamed/summoned as a pet or mount.
 	Pet *PetData
+
+	// Skills maps skill id to the level this template grants it, from the
+	// template's <skills> block. A pet/servitor may only cast a skill via
+	// its owner's commanded action-bar shortcut when its own template
+	// grants that skill id, matching Java's Summon.getSkill.
+	Skills map[int]int
 }
 
 // PrivateEntry describes one escort minion a template spawns alongside its
@@ -303,6 +309,10 @@ func NewTemplate(set *commons.StatSet) (*Template, error) {
 
 	if pet, ok := commons.FieldObject[*PetData](f, "pet"); ok {
 		t.Pet = pet
+	}
+
+	if skills, ok := commons.FieldObject[map[int]int](f, "skills"); ok {
+		t.Skills = skills
 	}
 
 	if err := f.Err(); err != nil {
