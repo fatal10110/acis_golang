@@ -89,6 +89,11 @@ const (
 	SystemMessageNotEnoughSpiritshots             = 531
 	SystemMessageCannotUseSpiritshots             = 532
 	SystemMessageEnabledSpiritshot                = 533
+	SystemMessagePetsNotAvailableAtThisTime       = 574
+	SystemMessagePetUsesS1                        = 1018
+	SystemMessageShotsNotAvailableForDeadPet      = 1598
+	SystemMessageNotEnoughSpiritshotsForPet       = 1700
+	SystemMessageNotEnoughSoulshotsForPet         = 1701
 
 	// Periodic in-game clock messages.
 	SystemMessagePlayingForLongTime       = 764  // no parameter

@@ -2,6 +2,7 @@ package summon
 
 import (
 	"math/rand/v2"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -90,6 +91,9 @@ type Actor struct {
 	statCalc summonStatCalcs
 	vitals   summonVitals
 	effects  *effect.List
+
+	shotsMu   sync.Mutex
+	shotsMask int32
 }
 
 // Intent is the live action this actor is currently trying to carry out.

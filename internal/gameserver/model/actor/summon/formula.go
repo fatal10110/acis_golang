@@ -22,6 +22,7 @@ type CombatStats struct {
 	PAtk, PDef, MAtk, MDef       float64
 	MaxHP, MaxMP                 float64
 	BaseRandomDamage             int
+	SSCount, SPSCount            int
 }
 
 type summonVitals struct {
@@ -238,13 +239,37 @@ func (a *Actor) MagicCriticalRate() float64 {
 func (a *Actor) AttackType() item.WeaponType { return item.WeaponFist }
 
 // SoulshotCharged reports whether a soulshot charge is currently active.
-func (a *Actor) SoulshotCharged() bool { return false }
+func (a *Actor) SoulshotCharged() bool { return a.ChargedShot(item.ShotSoul) }
 
 // SpiritshotCharged reports whether a spiritshot charge is currently active.
-func (a *Actor) SpiritshotCharged() bool { return false }
+func (a *Actor) SpiritshotCharged() bool { return a.ChargedShot(item.ShotSpirit) }
 
 // BlessedSpiritshotCharged reports whether a blessed spiritshot charge is active.
-func (a *Actor) BlessedSpiritshotCharged() bool { return false }
+func (a *Actor) BlessedSpiritshotCharged() bool { return a.ChargedShot(item.ShotBlessedSpirit) }
+
+// ChargedShot reports whether kind is currently charged on a.
+func (a *Actor) ChargedShot(kind item.ShotKind) bool {
+	a.shotsMu.Lock()
+	defer a.shotsMu.Unlock()
+	return a.shotsMask&kind.Mask() == kind.Mask()
+}
+
+// SetChargedShot charges or discharges kind on a.
+func (a *Actor) SetChargedShot(kind item.ShotKind, charged bool) {
+	a.shotsMu.Lock()
+	defer a.shotsMu.Unlock()
+	if charged {
+		a.shotsMask |= kind.Mask()
+	} else {
+		a.shotsMask &^= kind.Mask()
+	}
+}
+
+// SSCount returns the beast soulshot count this summon consumes per charge.
+func (a *Actor) SSCount() int { return a.stats.SSCount }
+
+// SPSCount returns the beast spiritshot count this summon consumes per charge.
+func (a *Actor) SPSCount() int { return a.stats.SPSCount }
 
 // Roll draws a uniform random integer in [0, n) from a's combat random source.
 func (a *Actor) Roll(n int) int {
