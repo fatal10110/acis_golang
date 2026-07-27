@@ -73,6 +73,9 @@ func (l *GameClientLink) useItem(live *livePlayer, objectID int32) {
 	if l.useShotItem(live, inv, inst) {
 		return
 	}
+	if l.useBeastShotItem(live, inv, inst) {
+		return
+	}
 	res, ok := l.inventoryService().ToggleEquipItem(inv, objectID)
 	if !ok {
 		live.SendFrame(serverpackets.FrameActionFailed())
