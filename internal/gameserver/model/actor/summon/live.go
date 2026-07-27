@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/worldobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -29,6 +30,7 @@ type AI interface {
 	TryToAttack(attackable.Combatant) bool
 	TryToFollow(attackable.Combatant) bool
 	TryToIdle()
+	TryToCast(target attackable.Combatant, ref modelskill.Ref) bool
 }
 
 // Owner is the live player surface a summon needs for world placement and
@@ -60,6 +62,10 @@ type Actor struct {
 	combat   bool
 	attack   bool
 	brain    AI
+	// skills maps skill id to the level this summon's npc template grants
+	// it, used by TryUseSkill to resolve an owner-commanded action-bar
+	// skill shortcut, matching Java's Summon.getSkill.
+	skills map[int]int
 
 	followActive       bool
 	belowUnsummonLimit bool
@@ -197,6 +203,9 @@ type PetConfig struct {
 	UnsummonLimit float64
 	Roll          func(int) int
 	Stats         CombatStats
+	// Skills maps skill id to level, from this pet's npc template. See
+	// Actor.skills.
+	Skills map[int]int
 }
 
 // ServitorConfig carries the minimum state needed to create a live servitor.
@@ -215,6 +224,9 @@ type ServitorConfig struct {
 	ItemConsumeCount int
 	Roll             func(int) int
 	Stats            CombatStats
+	// Skills maps skill id to level, from this servitor's npc template.
+	// See Actor.skills.
+	Skills map[int]int
 }
 
 // NewServitor returns a live servitor actor.
@@ -235,6 +247,7 @@ func NewServitor(cfg ServitorConfig) *Actor {
 		itemConsumeCount: cfg.ItemConsumeCount,
 		roll:             defaultRoll(cfg.Roll),
 		stats:            cfg.Stats,
+		skills:           cfg.Skills,
 	}
 	a.initVitals()
 	a.effects = effect.NewList(a)
@@ -272,6 +285,7 @@ func NewPet(cfg PetConfig) *Actor {
 		unsummonLimit: cfg.UnsummonLimit,
 		roll:          defaultRoll(cfg.Roll),
 		stats:         cfg.Stats,
+		skills:        cfg.Skills,
 	}
 	a.initVitals()
 	a.effects = effect.NewList(a)
@@ -347,6 +361,54 @@ func (a *Actor) CanWearPetItem(tmpl *item.Template) bool {
 
 // Dead reports whether the summon is dead.
 func (a *Actor) Dead() bool { return a.dead }
+
+// AlikeDead reports whether this summon is dead, satisfying
+// attackable.Combatant so a summon can be targeted by its own owner-
+// commanded skills (e.g. a self-cast special skill).
+func (a *Actor) AlikeDead() bool { return a.dead }
+
+// SiegeGuard always reports false: pets and servitors are never defensive
+// siege guards.
+func (a *Actor) SiegeGuard() bool { return false }
+
+// GetSkill returns the skill this summon's npc template grants at skillID,
+// matching Java's Summon.getSkill. ok is false when the template doesn't
+// grant that skill id at all.
+func (a *Actor) GetSkill(skillID int) (modelskill.Ref, bool) {
+	level, ok := a.skills[skillID]
+	if !ok {
+		return modelskill.Ref{}, false
+	}
+	return modelskill.Ref{ID: modelskill.ID(skillID), Level: level}, true
+}
+
+// CanUseSkill reports whether the owner may currently command this summon
+// to use one of its special skills. Matching Java's
+// RequestActionUse.useSkill, this only gates a pet on the owner-vs-pet
+// level gap; it does not check out-of-control state the way movement
+// commands do, and servitors have no gate at all.
+func (a *Actor) CanUseSkill() bool {
+	if !a.isPet {
+		return true
+	}
+	ownerLevel := 0
+	if a.owner != nil {
+		ownerLevel = a.owner.LevelValue()
+	}
+	return a.level-ownerLevel <= 20
+}
+
+// TryUseSkill dispatches an owner-commanded special-skill cast: resolves
+// skillID against this summon's own skill catalog, checks the level gate,
+// then forwards to the attached AI. It returns false wherever Java's
+// useSkill would return false (unknown skill, level gap, no attached AI).
+func (a *Actor) TryUseSkill(skillID int, target attackable.Combatant) bool {
+	ref, ok := a.GetSkill(skillID)
+	if !ok || !a.CanUseSkill() || a.brain == nil {
+		return false
+	}
+	return a.brain.TryToCast(target, ref)
+}
 
 // OutOfControl reports whether the owner cannot currently command this
 // summon.

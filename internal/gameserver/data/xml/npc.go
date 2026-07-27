@@ -155,31 +155,39 @@ func buildNPCTemplate(el npcElement, items *item.Table, log zerolog.Logger) (*np
 	}
 
 	// Resolving a <skill> entry to its effect is skill-engine behavior this
-	// loader doesn't own. The one exception is race: a template's race is
+	// loader doesn't own. The two exceptions are race (a template's race is
 	// encoded as either a secondary "race marker" skill id, or the level of
-	// the dedicated race skill, and both are plain ids readable straight
-	// off the XML with no skill-engine lookup at all.
-	for _, s := range el.Skills {
-		skillSet := commons.StatSetFromXMLAttrs(s.Attrs)
-		skillID, err := skillSet.GetInt("id")
-		if err != nil {
-			return nil, fmt.Errorf("npc %d: skill: %w", npcID, err)
-		}
-		if race := npc.RaceBySecondarySkillID(skillID); race != npc.RaceDummy {
-			set.Set("race", race)
-			continue
-		}
-		if skillID == npc.RaceSkillID && !set.Has("race") {
+	// the dedicated race skill, both plain ids readable straight off the
+	// XML with no skill-engine lookup) and the raw id/level pairs
+	// themselves, which Summon.getSkill-equivalent lookups need to know
+	// which skills a pet/servitor template grants at all.
+	if len(el.Skills) > 0 {
+		skills := make(map[int]int, len(el.Skills))
+		for _, s := range el.Skills {
+			skillSet := commons.StatSetFromXMLAttrs(s.Attrs)
+			skillID, err := skillSet.GetInt("id")
+			if err != nil {
+				return nil, fmt.Errorf("npc %d: skill: %w", npcID, err)
+			}
 			level, err := skillSet.GetInt("level")
 			if err != nil {
 				return nil, fmt.Errorf("npc %d: skill: %w", npcID, err)
 			}
-			race, ok := npc.RaceByOrdinal(level)
-			if !ok {
-				return nil, fmt.Errorf("npc %d: race skill level %d out of range", npcID, level)
+			skills[skillID] = level
+
+			if race := npc.RaceBySecondarySkillID(skillID); race != npc.RaceDummy {
+				set.Set("race", race)
+				continue
 			}
-			set.Set("race", race)
+			if skillID == npc.RaceSkillID && !set.Has("race") {
+				race, ok := npc.RaceByOrdinal(level)
+				if !ok {
+					return nil, fmt.Errorf("npc %d: race skill level %d out of range", npcID, level)
+				}
+				set.Set("race", race)
+			}
 		}
+		set.Set("skills", skills)
 	}
 
 	if el.TeachTo != nil {

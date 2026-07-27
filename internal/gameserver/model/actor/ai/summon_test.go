@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
 func TestSummonAITryToAttackExecutesPhysicalAttack(t *testing.T) {
@@ -89,6 +90,73 @@ func TestSummonAITryToFollowStartsFriendlyFollow(t *testing.T) {
 	}
 	if got := brain.CurrentIntention(); got != IntentionFollow {
 		t.Fatalf("CurrentIntention() = %v, want follow", got)
+	}
+}
+
+func TestSummonAITryToCastExecutesImmediately(t *testing.T) {
+	owner := actor(100)
+	target := actor(200)
+	cast := &recordingCast{canAttempt: true, canCast: true}
+	brain := NewSummon(owner, &summonMove{}, &recordingAttack{})
+	brain.SetCastController(cast)
+	ref := skill.Ref{ID: 4139, Level: 8}
+
+	if !brain.TryToCast(target, ref) {
+		t.Fatal("TryToCast() = false, want accepted cast")
+	}
+	if cast.castedTarget != target || cast.castedRef != ref {
+		t.Fatalf("cast = (%v,%v), want (%v,%v)", cast.castedTarget, cast.castedRef, target, ref)
+	}
+	if got := brain.CurrentIntention(); got != IntentionIdle {
+		t.Fatalf("CurrentIntention() = %v, want idle once the cast is dispatched", got)
+	}
+}
+
+func TestSummonAITryToCastQueuesWhileBusyAndExecutesOnThink(t *testing.T) {
+	owner := actor(100)
+	target := actor(200)
+	strike := &recordingAttack{canAttack: true, attackingNow: true}
+	cast := &recordingCast{canAttempt: true, canCast: true}
+	brain := NewSummon(owner, &summonMove{}, strike)
+	brain.SetCastController(cast)
+	ref := skill.Ref{ID: 4139, Level: 8}
+
+	if !brain.TryToCast(target, ref) {
+		t.Fatal("TryToCast() = false, want queued cast accepted while attacking")
+	}
+	if cast.castedTarget != nil {
+		t.Fatalf("cast target = %v while busy, want no cast dispatched yet", cast.castedTarget)
+	}
+	if kind, queuedTarget, ok := brain.NextIntention(); !ok || kind != IntentionCast || queuedTarget != target {
+		t.Fatalf("NextIntention() = (%v,%v,%v), want cast,target,true", kind, queuedTarget, ok)
+	}
+
+	strike.attackingNow = false
+	brain.Think()
+	if cast.castedTarget != target {
+		t.Fatalf("cast target after Think = %v, want target", cast.castedTarget)
+	}
+}
+
+func TestSummonAITryToCastRejectsWithoutCastController(t *testing.T) {
+	brain := NewSummon(actor(100), &summonMove{}, &recordingAttack{})
+
+	if brain.TryToCast(actor(200), skill.Ref{ID: 4139, Level: 8}) {
+		t.Fatal("TryToCast() = true with no CastController attached, want false")
+	}
+}
+
+func TestSummonAITryToCastRejectsWhenCanAttemptFails(t *testing.T) {
+	target := actor(200)
+	cast := &recordingCast{canAttempt: false, canCast: true}
+	brain := NewSummon(actor(100), &summonMove{}, &recordingAttack{})
+	brain.SetCastController(cast)
+
+	if brain.TryToCast(target, skill.Ref{ID: 4139, Level: 8}) {
+		t.Fatal("TryToCast() = true when CanAttempt rejects the skill, want false")
+	}
+	if cast.castedTarget != nil {
+		t.Fatalf("cast target = %v, want no cast dispatched", cast.castedTarget)
 	}
 }
 

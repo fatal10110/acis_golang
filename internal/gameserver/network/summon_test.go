@@ -6,6 +6,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -110,10 +111,122 @@ func TestGameClientLinkSummonActionUseWithNoActiveSummonAnswersActionFailed(t *t
 	}
 }
 
+func TestGameClientLinkSummonSkillUseResolvesTargetKindAndDispatches(t *testing.T) {
+	state := world.New()
+	frames := &frameCapture{}
+	live := newTestLivePlayer(t, 100, frames)
+	state.Spawn(live, 0, 0, 0, 0)
+
+	hostile := newTestHostileNPC(t, 300)
+	state.Spawn(hostile, 100, 0, 0, 0)
+	live.target = hostile
+
+	liveSummon := summon.NewServitor(summon.ServitorConfig{
+		ObjectID: 500, Owner: live, Level: 40,
+		Skills: map[int]int{4259: 1, 4378: 1, 4139: 8},
+	})
+	brain := &recordingNetworkSummonAI{}
+	liveSummon.SetAI(brain)
+	summon.SpawnBesideOwner(state, liveSummon, live, location.Location{})
+
+	gcl := &GameClientLink{world: state}
+
+	// Action 36 (Soulless - Toxic Smoke) targets the clicked target.
+	if !gcl.handleSummonActionUse(live, clientpackets.RequestActionUse{ActionID: 36}) {
+		t.Fatal("handleSummonActionUse returned false for a mapped skill action")
+	}
+	if len(brain.casts) != 1 || brain.casts[0] != hostile.ObjectID() {
+		t.Fatalf("AI casts = %v, want clicked target %d", brain.casts, hostile.ObjectID())
+	}
+
+	// Action 42 (Kai the Cat - Self Damage Shield) targets the owner.
+	if !gcl.handleSummonActionUse(live, clientpackets.RequestActionUse{ActionID: 42}) {
+		t.Fatal("handleSummonActionUse returned false for a mapped skill action")
+	}
+	if len(brain.casts) != 2 || brain.casts[1] != live.ObjectID() {
+		t.Fatalf("AI casts = %v, want owner target %d", brain.casts, live.ObjectID())
+	}
+
+	// Action 1001 (Sin Eater - Ultimate Bombastic Buster) targets the
+	// summon itself.
+	if !gcl.handleSummonActionUse(live, clientpackets.RequestActionUse{ActionID: 1001}) {
+		t.Fatal("handleSummonActionUse returned false for a mapped skill action")
+	}
+	if len(brain.casts) != 3 || brain.casts[2] != liveSummon.ObjectID() {
+		t.Fatalf("AI casts = %v, want self target %d", brain.casts, liveSummon.ObjectID())
+	}
+}
+
+func TestGameClientLinkSummonSkillUsePetBeyondLevelGapIsBlocked(t *testing.T) {
+	state := world.New()
+	frames := &frameCapture{}
+	live := newTestLivePlayer(t, 100, frames)
+	state.Spawn(live, 0, 0, 0, 0)
+	live.target = live
+
+	livePet := summon.NewPet(summon.PetConfig{
+		ObjectID: 500, Owner: live, Level: live.LevelValue() + 21,
+		Skills: map[int]int{4259: 1},
+	})
+	brain := &recordingNetworkSummonAI{}
+	livePet.SetAI(brain)
+	summon.SpawnBesideOwner(state, livePet, live, location.Location{})
+
+	gcl := &GameClientLink{world: state}
+	if !gcl.handleSummonActionUse(live, clientpackets.RequestActionUse{ActionID: 36}) {
+		t.Fatal("handleSummonActionUse returned false for a mapped skill action")
+	}
+	if len(brain.casts) != 0 {
+		t.Fatalf("AI casts = %v, want none for a pet beyond the level gap", brain.casts)
+	}
+}
+
+func TestGameClientLinkSummonSkillUseUnmappedActionFallsThrough(t *testing.T) {
+	state := world.New()
+	frames := &frameCapture{}
+	live := newTestLivePlayer(t, 100, frames)
+	state.Spawn(live, 0, 0, 0, 0)
+
+	gcl := &GameClientLink{world: state}
+	if gcl.handleSummonActionUse(live, clientpackets.RequestActionUse{ActionID: 9999}) {
+		t.Fatal("handleSummonActionUse = true for an action id with no command or skill mapping")
+	}
+}
+
+func TestGameClientLinkSummonSkillUseDoorOnlyActionNeverDispatchesYet(t *testing.T) {
+	state := world.New()
+	frames := &frameCapture{}
+	live := newTestLivePlayer(t, 100, frames)
+	state.Spawn(live, 0, 0, 0, 0)
+
+	hostile := newTestHostileNPC(t, 300)
+	state.Spawn(hostile, 100, 0, 0, 0)
+	live.target = hostile
+
+	liveSummon := summon.NewServitor(summon.ServitorConfig{
+		ObjectID: 500, Owner: live, Level: 40,
+		Skills: map[int]int{4079: 1},
+	})
+	brain := &recordingNetworkSummonAI{}
+	liveSummon.SetAI(brain)
+	summon.SpawnBesideOwner(state, liveSummon, live, location.Location{})
+
+	gcl := &GameClientLink{world: state}
+	// Action 1000 (Siege Golem - Siege Hammer) requires a Door target; no
+	// Door world-object type exists yet, so it must never dispatch.
+	if !gcl.handleSummonActionUse(live, clientpackets.RequestActionUse{ActionID: 1000}) {
+		t.Fatal("handleSummonActionUse returned false for a mapped skill action")
+	}
+	if len(brain.casts) != 0 {
+		t.Fatalf("AI casts = %v, want none for a door-only action with no Door target", brain.casts)
+	}
+}
+
 type recordingNetworkSummonAI struct {
 	attacks []int32
 	follows []int32
 	idles   int
+	casts   []int32
 }
 
 func (a *recordingNetworkSummonAI) TryToAttack(target attackable.Combatant) bool {
@@ -128,6 +241,11 @@ func (a *recordingNetworkSummonAI) TryToFollow(target attackable.Combatant) bool
 
 func (a *recordingNetworkSummonAI) TryToIdle() {
 	a.idles++
+}
+
+func (a *recordingNetworkSummonAI) TryToCast(target attackable.Combatant, ref modelskill.Ref) bool {
+	a.casts = append(a.casts, target.ObjectID())
+	return true
 }
 
 type summonActionCombatant struct {
