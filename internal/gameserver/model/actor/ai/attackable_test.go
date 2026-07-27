@@ -419,6 +419,44 @@ func TestAttackableAICastRespectsFinalCastGate(t *testing.T) {
 	if cast.castCalled {
 		t.Fatal("Cast() called after the final cast gate rejected the attempt")
 	}
+	if owner.moveToPawnCalls != 1 || owner.moveToPawnTo != target {
+		t.Fatalf("BroadcastMoveToPawn calls = (%d, %v), want (1, target)", owner.moveToPawnCalls, owner.moveToPawnTo)
+	}
+}
+
+func TestAttackableAICastFinalGateRejectDoesNotBroadcastForSelfTarget(t *testing.T) {
+	owner := actor(1)
+	owner.known[owner.ObjectID()] = true
+	move := &recordingMove{}
+	ref := skill.Ref{ID: 4, Level: 1}
+	cast := &recordingCast{canAttempt: true, canCast: false}
+	ai := NewAttackable(owner, move, &recordingAttack{})
+	ai.SetCastController(cast)
+
+	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionCast, FinalTarget: owner, Skill: ref, Weight: 10})
+	ai.Think()
+
+	if owner.moveToPawnCalls != 0 {
+		t.Fatalf("BroadcastMoveToPawn calls = %d, want 0 for a self-targeted skill", owner.moveToPawnCalls)
+	}
+}
+
+func TestAttackableAICastSummonFriendBypassesTargetLostCheck(t *testing.T) {
+	owner := actor(1)
+	target := actor(2)
+	owner.known = map[int32]bool{target.ObjectID(): false}
+	move := &recordingMove{}
+	ref := skill.Ref{ID: 4, Level: 1}
+	cast := &recordingCast{canAttempt: true, canCast: true, skillType: "SUMMON_FRIEND"}
+	ai := NewAttackable(owner, move, &recordingAttack{})
+	ai.SetCastController(cast)
+
+	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionCast, FinalTarget: target, Skill: ref, Weight: 10})
+	ai.Think()
+
+	if !cast.castCalled || cast.castedTarget != target {
+		t.Fatal("Cast() not called for a SUMMON_FRIEND cast against an unknown target")
+	}
 }
 
 func TestAttackableAIIgnoresCastDesireForLostTarget(t *testing.T) {
@@ -467,6 +505,8 @@ type fakeActor struct {
 	returnHome      bool
 	returnHomeCalls int
 	headingTarget   attackable.Combatant
+	moveToPawnCalls int
+	moveToPawnTo    attackable.Combatant
 }
 
 func actor(id int32) *fakeActor {
@@ -491,6 +531,10 @@ func (a *fakeActor) ReturnHome() bool {
 func (a *fakeActor) InTerritory() bool { return a.inTerritory }
 func (a *fakeActor) SetHeadingTo(target attackable.Combatant) {
 	a.headingTarget = target
+}
+func (a *fakeActor) BroadcastMoveToPawn(target attackable.Combatant) {
+	a.moveToPawnCalls++
+	a.moveToPawnTo = target
 }
 
 type recordingMove struct {
@@ -538,6 +582,7 @@ type recordingCast struct {
 	canCast    bool
 	stopsMove  bool
 	castRange  int
+	skillType  string
 
 	castCalled   bool
 	castedTarget attackable.Combatant
@@ -547,6 +592,7 @@ type recordingCast struct {
 func (c *recordingCast) Disabled() bool               { return c.disabled }
 func (c *recordingCast) Range(ref skill.Ref) int      { return c.castRange }
 func (c *recordingCast) StopsMovement(skill.Ref) bool { return c.stopsMove }
+func (c *recordingCast) SkillType(skill.Ref) string   { return c.skillType }
 
 func (c *recordingCast) CanAttempt(target attackable.Combatant, ref skill.Ref) bool {
 	return c.canAttempt

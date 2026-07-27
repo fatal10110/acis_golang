@@ -57,6 +57,15 @@ func (a *AIController) StopsMovement(ref modelskill.Ref) bool {
 	return ok && def.HitTime > 50
 }
 
+// SkillType returns ref's raw skillType tag.
+func (a *AIController) SkillType(ref modelskill.Ref) string {
+	def, ok := a.definition(ref)
+	if !ok {
+		return ""
+	}
+	return def.SkillType
+}
+
 // CanAttempt validates the lightweight pre-movement cast gate (reuse
 // cooldown) for ref, before the actor commits to closing distance on
 // target.

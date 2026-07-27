@@ -22,6 +22,10 @@ type AttackableActor interface {
 	// SetHeadingTo faces the actor toward target, used before committing to
 	// a skill cast whose animation is long enough to plant first.
 	SetHeadingTo(attackable.Combatant)
+	// BroadcastMoveToPawn sends a rotation-only MoveToPawn notice toward
+	// target, used when a final cast attempt is rejected after movement so
+	// observers still see the actor face its target.
+	BroadcastMoveToPawn(target attackable.Combatant)
 }
 
 // MoveController controls movement requests emitted by the AI loop.
@@ -57,6 +61,10 @@ type CastController interface {
 	// the actor should stop moving and face target before the final cast
 	// attempt.
 	StopsMovement(ref skill.Ref) bool
+	// SkillType returns ref's raw skillType tag, used to grant SUMMON_FRIEND
+	// casts a target-lost bypass matching the reference's rotation-target
+	// exemption.
+	SkillType(ref skill.Ref) string
 	// CanCast validates the final HP/MP/mute/reuse/item gates, immediately
 	// before the cast commits.
 	CanCast(target attackable.Combatant, ref skill.Ref) bool
@@ -313,7 +321,7 @@ func (a *Attackable) thinkCast() bool {
 
 	target := a.current.target
 	ref := a.current.skill
-	if a.dropLostTarget(target) {
+	if a.dropLostCastTarget(target, a.cast.SkillType(ref)) {
 		return true
 	}
 
@@ -333,6 +341,9 @@ func (a *Attackable) thinkCast() bool {
 	}
 
 	if !a.cast.CanCast(target, ref) {
+		if target.ObjectID() != a.actor.ObjectID() {
+			a.actor.BroadcastMoveToPawn(target)
+		}
 		return false
 	}
 
@@ -364,6 +375,13 @@ func (a *Attackable) refreshCombatMemory() {
 }
 
 func (a *Attackable) dropLostTarget(target attackable.Combatant) bool {
+	return a.dropLostCastTarget(target, "")
+}
+
+// dropLostCastTarget is dropLostTarget's cast-path variant: a SUMMON_FRIEND
+// cast's target is exempt from the "not known" drop, mirroring the
+// reference's isTargetLost(target, skill) rotation-target bypass.
+func (a *Attackable) dropLostCastTarget(target attackable.Combatant, skillType string) bool {
 	if target == nil {
 		a.current = intention{kind: IntentionIdle}
 		return true
@@ -374,6 +392,9 @@ func (a *Attackable) dropLostTarget(target attackable.Combatant) bool {
 		a.desires.RemoveFinalTarget(target)
 		a.clearIntentionsFor(target)
 		return true
+	}
+	if skillType == "SUMMON_FRIEND" {
+		return false
 	}
 	if !a.actor.Knows(target) {
 		a.threats.Remove(target)
