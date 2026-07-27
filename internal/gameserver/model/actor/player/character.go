@@ -126,6 +126,16 @@ type Character struct {
 	target               world.Tracked
 	log                  zerolog.Logger
 
+	// charges is the Force/Soul charge counter (increaseCharges/
+	// decreaseCharges/clearCharges), auto-cleared by chargeTimer after
+	// chargeAutoClearDelay of inactivity.
+	charges     int
+	chargeTimer *time.Timer
+
+	// deathPenaltyLevel is the persisted death-penalty debuff level (skill
+	// 5076), capped at maxDeathPenaltyLevel.
+	deathPenaltyLevel int
+
 	skills skillState
 	cubics cubic.List
 }

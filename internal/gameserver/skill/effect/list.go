@@ -375,6 +375,19 @@ func (l *List) active() []*Effect {
 	return effects
 }
 
+// ActiveBySkillID returns the applied Level of the first currently active
+// effect owned by skill id, and whether one was found. This is the
+// getFirstEffect(skillId) lookup ConditionElementSeed/ConditionForceBuff-
+// style consumers need for live seed-charge power and Force-buff level.
+func (l *List) ActiveBySkillID(id int) (level int, ok bool) {
+	for _, e := range l.active() {
+		if int(e.Skill.ID) == id {
+			return e.Level, true
+		}
+	}
+	return 0, false
+}
+
 // Tick runs periodic actions due at the current time and removes effects
 // whose action hook stops or whose configured tick count is exhausted.
 func (l *List) Tick() {

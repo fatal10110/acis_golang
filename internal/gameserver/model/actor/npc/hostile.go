@@ -102,6 +102,10 @@ type Hostile struct {
 	// statMu guards statCalcs, this NPC's per-stat finalization chains.
 	statMu    sync.Mutex
 	statCalcs map[stat.Stat]*basefunc.Calculator
+
+	// collisionRadiusOverride is the runtime body-radius override a live
+	// effect (e.g. Grow) installs; nil means "use the template value".
+	collisionRadiusOverride atomic.Pointer[float64]
 }
 
 // Attackable reports whether inst's instance type belongs to the set of
