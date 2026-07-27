@@ -188,6 +188,30 @@ func (a *Attackable) RandomizeHate(valid func(attackable.Combatant) bool, pick f
 	return true
 }
 
+// ReconsiderTarget ports the AI side of AggroList.reconsiderTarget(range),
+// used when this actor can no longer act on its current target (e.g. an
+// immobilize state): swaps in a replacement from the threat table (see
+// ThreatTable.ReconsiderTarget), drops the previous most-hated attacker's
+// queued attack desire if one existed, and queues the new target's desire
+// at its current hate. Reports the new target and whether a swap happened.
+func (a *Attackable) ReconsiderTarget(inRange func(attackable.Combatant) bool, valid func(attackable.Combatant) bool) (attackable.Combatant, bool) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	prev, chosen, ok := a.threats.ReconsiderTarget(inRange, valid)
+	if !ok {
+		return nil, false
+	}
+
+	if prev != nil {
+		a.desires.Remove(IntentionAttack, prev)
+	}
+	if threat, tok := a.threats.Get(chosen); tok {
+		a.addAttackDesire(chosen, threat.Hate)
+	}
+	return chosen, true
+}
+
 // AddHate records an attacker in the skill-cast hate table.
 func (a *Attackable) AddHate(attacker attackable.Combatant, hate float64) {
 	a.hates.Add(attacker, hate)

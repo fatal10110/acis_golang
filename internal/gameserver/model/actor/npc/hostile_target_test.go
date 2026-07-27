@@ -292,3 +292,140 @@ func TestHostileRandomizeHateNoopWithSingleAttacker(t *testing.T) {
 		t.Fatal("RandomizeHate: ok = true, want false with a single attacker")
 	}
 }
+
+func TestHostileReconsiderTargetSwapsFromHateList(t *testing.T) {
+	state := world.New()
+	owner := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", AggroRange: 10})
+	state.Spawn(owner, 100, 100, 0, 0)
+
+	low := &gateTarget{id: 2}
+	high := &gateTarget{id: 3}
+	state.Spawn(low, 100, 100, 0, 0)
+	state.Spawn(high, 100, 100, 0, 0)
+	owner.AddDamageHate(low, 0, 10)
+	owner.AddDamageHate(high, 0, 25)
+
+	chosen, ok := owner.ReconsiderTarget(0)
+	if !ok {
+		t.Fatal("ReconsiderTarget: ok = false, want true")
+	}
+	if chosen.ObjectID() != low.ObjectID() {
+		t.Fatalf("chosen = %d, want %d (lowest ObjectID candidate)", chosen.ObjectID(), low.ObjectID())
+	}
+	if got := owner.AI().Threats().Hate(low); got != 10 {
+		t.Fatalf("chosen hate = %v, want unchanged 10", got)
+	}
+	if got := owner.AI().Threats().Hate(high); got != 0 {
+		t.Fatalf("previous mostHated hate = %v, want zeroed 0", got)
+	}
+}
+
+func TestHostileReconsiderTargetGatedByAutoAttackTargetValid(t *testing.T) {
+	// low is silently moving and this NPC neither sees through concealment
+	// nor is raid-related, so AutoAttackTargetValid excludes it; only high
+	// remains, but it's mostHated, so no other candidate qualifies.
+	state := world.New()
+	owner := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", AggroRange: 10})
+	state.Spawn(owner, 100, 100, 0, 0)
+
+	low := &gateTarget{id: 2, silent: true}
+	high := &gateTarget{id: 3}
+	state.Spawn(low, 100, 100, 0, 0)
+	state.Spawn(high, 100, 100, 0, 0)
+	owner.AddDamageHate(low, 0, 10)
+	owner.AddDamageHate(high, 0, 25)
+
+	if _, ok := owner.ReconsiderTarget(0); ok {
+		t.Fatal("ReconsiderTarget: ok = true, want false when the only candidate fails AutoAttackTargetValid")
+	}
+}
+
+func TestHostileReconsiderTargetRangeFilterExcludesOutOfRangeCandidate(t *testing.T) {
+	const rangeVal = 500
+
+	state := world.New()
+	owner := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", AggroRange: 10})
+	state.Spawn(owner, 100, 100, 0, 0)
+
+	far := &gateTarget{id: 2}
+	near := &gateTarget{id: 3}
+	state.Spawn(far, 100+rangeVal+1000, 100, 0, 0)
+	state.Spawn(near, 100, 100, 0, 0)
+	owner.AddDamageHate(far, 0, 10)
+	owner.AddDamageHate(near, 0, 25)
+
+	// near is mostHated (higher hate), leaving far as the sole candidate;
+	// the rangeVal filter (independent of AutoAttackTargetValid's own
+	// aggro-range check) excludes it for being out of range.
+	if _, ok := owner.ReconsiderTarget(rangeVal); ok {
+		t.Fatal("ReconsiderTarget: ok = true, want false when the only candidate fails the range filter")
+	}
+}
+
+func TestHostileReconsiderTargetZeroRangeDisablesDistanceFilter(t *testing.T) {
+	state := world.New()
+	owner := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", AggroRange: 10000})
+	state.Spawn(owner, 100, 100, 0, 0)
+
+	far := &gateTarget{id: 2}
+	near := &gateTarget{id: 3}
+	state.Spawn(far, 100+2000, 100, 0, 0)
+	state.Spawn(near, 100, 100, 0, 0)
+	owner.AddDamageHate(far, 0, 10)
+	owner.AddDamageHate(near, 0, 25)
+
+	if _, ok := owner.ReconsiderTarget(0); !ok {
+		t.Fatal("ReconsiderTarget: ok = false, want true with the distance filter disabled (rangeVal = 0)")
+	}
+}
+
+func TestHostileReconsiderTargetFallsBackToKnownlistWhenHateListEmpty(t *testing.T) {
+	state := world.New()
+	owner := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", AggroRange: 400})
+	owner.SetWorld(state)
+	state.Spawn(owner, 100, 100, 0, 0)
+
+	bystander := &gateTarget{id: 2}
+	state.Spawn(bystander, 100, 100, 0, 0)
+
+	chosen, ok := owner.ReconsiderTarget(0)
+	if !ok {
+		t.Fatal("ReconsiderTarget: ok = false, want true from the knownlist fallback")
+	}
+	if chosen.ObjectID() != bystander.ObjectID() {
+		t.Fatalf("chosen = %d, want %d", chosen.ObjectID(), bystander.ObjectID())
+	}
+	if got := owner.AI().Threats().Hate(bystander); got != 1 {
+		t.Fatalf("fallback candidate hate = %v, want 1 (simulated aggro-range entrance)", got)
+	}
+}
+
+func TestHostileReconsiderTargetKnownlistFallbackNoopForSiegeGuardOrNonAggressive(t *testing.T) {
+	t.Run("SiegeGuard never uses the knownlist fallback", func(t *testing.T) {
+		state := world.New()
+		guard := newKindHostile(t, 1, &Template{ID: 1, Type: "SiegeGuard", AggroRange: 400}, "SiegeGuard")
+		guard.SetWorld(state)
+		state.Spawn(guard, 100, 100, 0, 0)
+
+		bystander := &gateTarget{id: 2}
+		state.Spawn(bystander, 100, 100, 0, 0)
+
+		if _, ok := guard.ReconsiderTarget(0); ok {
+			t.Fatal("ReconsiderTarget: ok = true, want false for a SiegeGuard with no hate-list candidate")
+		}
+	})
+
+	t.Run("non-aggressive owner never uses the knownlist fallback", func(t *testing.T) {
+		state := world.New()
+		owner := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", AggroRange: 0})
+		owner.SetWorld(state)
+		state.Spawn(owner, 100, 100, 0, 0)
+
+		bystander := &gateTarget{id: 2}
+		state.Spawn(bystander, 100, 100, 0, 0)
+
+		if _, ok := owner.ReconsiderTarget(0); ok {
+			t.Fatal("ReconsiderTarget: ok = true, want false for a non-aggressive NPC (zero aggro range)")
+		}
+	})
+}
