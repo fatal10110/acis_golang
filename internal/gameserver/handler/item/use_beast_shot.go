@@ -59,10 +59,13 @@ type AutoShotChecker interface {
 // one beast shot item onto the caster's active summon.
 type BeastShotUseRequest struct {
 	// CallerIsSummon is true when the entity using the item is itself a
-	// summon (the reference's Playable-instanceof-Summon guard). Direct
-	// item-window use is always player-initiated in this codebase, so real
-	// callers always pass false; the field exists so this rejection branch
-	// has independent oracle coverage.
+	// summon: the reference rejects a pet trying to use a beast shot from
+	// its own inventory. Not reachable yet: the pet's own item-use path
+	// (petitem.UseItem, wired to RequestPetUseItem) only handles
+	// equip/unequip and never reaches an item-handler dispatch — tracked
+	// at #553. Real callers pass false until that pipeline wires beast
+	// shots through it; the field exists so this rejection branch has
+	// independent oracle coverage in the meantime.
 	CallerIsSummon bool
 	Caster         AutoShotChecker
 	Summon         BeastShotCharger
