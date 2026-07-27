@@ -18,7 +18,6 @@ type livePlayer struct {
 	*player.Character
 	template  *player.Template
 	items     []*item.Instance
-	target    world.Tracked
 	throne    staticobject.Chair
 	attack    *attack.Controller
 	move      *move.Controller

@@ -44,7 +44,7 @@ func (l *GameClientLink) useItemAICast(live *livePlayer, inv *itemcontainer.Inve
 		Now:         time.Now(),
 		Controller:  controller,
 		Caster:      live.Character,
-		Selected:    live.target,
+		Selected:    live.Target(),
 		Skill:       modelskill.Ref{ID: def.ID, Level: def.Level},
 		Definitions: l.skills,
 	})

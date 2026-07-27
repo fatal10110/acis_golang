@@ -68,7 +68,7 @@ func TestGameClientLinkActionSitsOnSelectedChairStaticObject(t *testing.T) {
 	state.Spawn(live, 0, 0, 0, 0)
 	state.Spawn(chair, 100, 0, 0, 0)
 	frames.frames = nil
-	live.target = chair
+	live.SetTargetTracked(chair)
 
 	gcl := &GameClientLink{world: state, log: zerolog.Nop()}
 	gcl.handleTargetAction(context.Background(), live, chair.ObjectID(), true)
@@ -439,7 +439,7 @@ func TestClearLiveTargetStopsAttackIntention(t *testing.T) {
 
 	state.Spawn(attacker, 0, 0, 0, 0)
 	state.Spawn(target, 30, 0, 0, 0)
-	attacker.target = target
+	attacker.SetTargetTracked(target)
 	if !gcl.attackLiveTarget(attacker, target) {
 		t.Fatal("attackLiveTarget returned false for an in-range target")
 	}
@@ -847,5 +847,72 @@ func TestGameClientLinkAutoAttackStanceRefreshAndStop(t *testing.T) {
 	link.stopLiveAutoAttack(live)
 	if len(capture.frames) != 2 {
 		t.Fatalf("second stop emitted %d frames, want no duplicate AutoAttackStop", len(capture.frames)-2)
+	}
+}
+
+// TestLiveTargetReflectsDomainLevelRetarget is the regression test for
+// issue #855: the network layer no longer keeps its own copy of the
+// selected target, so a domain-level retarget (the AGGDEBUFF continuous
+// effect's retargetableOnAggression branch, here simulated directly through
+// player.Character.SetTarget) is immediately visible through the same
+// live.Target() read the network click path uses, without any extra sync
+// step.
+func TestLiveTargetReflectsDomainLevelRetarget(t *testing.T) {
+	state := world.New()
+	frames := &frameCapture{}
+	live := newTestLivePlayer(t, 1, frames)
+	other := newTestHostileNPC(t, 2)
+	caster := newTestHostileNPC(t, 3)
+
+	state.Spawn(live, 0, 0, 0, 0)
+	state.Spawn(other, 100, 0, 0, 0)
+	state.Spawn(caster, 200, 0, 0, 0)
+
+	gcl := &GameClientLink{world: state, log: zerolog.Nop()}
+	if !gcl.selectLiveTarget(live, other) {
+		t.Fatal("selectLiveTarget returned false")
+	}
+	if live.Target() != world.Tracked(other) {
+		t.Fatalf("Target() after click-select = %v, want %v", live.Target(), other)
+	}
+
+	live.Character.SetTarget(any(world.Tracked(caster)))
+
+	if got := live.Target(); got != world.Tracked(caster) {
+		t.Fatalf("Target() after domain-level retarget = %v, want %v", got, caster)
+	}
+	if got := live.CurrentTarget(); got != any(world.Tracked(caster)) {
+		t.Fatalf("CurrentTarget() = %v, want %v", got, caster)
+	}
+}
+
+// TestAttackTargetHookStartsLiveAttackIntention is the regression test for
+// the AGGDEBUFF "already targeting the caster" branch's wiring: the hook
+// character_flow.go's attachLivePlayer registers via SetAttackTargetHook
+// must route through the same attackLiveTarget path a client-initiated
+// attack click uses.
+func TestAttackTargetHookStartsLiveAttackIntention(t *testing.T) {
+	state := world.New()
+	frames := &frameCapture{}
+	live := newTestLivePlayer(t, 1, frames)
+	live.Character.SetWorld(state)
+	live.Character.SetRollSource(func(int) int { return 0 })
+	gcl := &GameClientLink{world: state, log: zerolog.Nop()}
+	target := newTestHostileNPC(t, 4)
+	target.Instance.Template.PDef = 1
+	target.Instance.Template.DEX = 30
+	target.SetRollSource(func(int) int { return 0 })
+
+	live.Character.SetAttackTargetHook(func(t world.Tracked) {
+		gcl.attackLiveTarget(live, t)
+	})
+
+	state.Spawn(live, 0, 0, 0, 0)
+	state.Spawn(target, 30, 0, 0, 0)
+
+	live.Character.AttackTarget(any(world.Tracked(target)))
+
+	if live.combat.Target() != target {
+		t.Fatal("AttackTarget hook did not start the live attack intention on the caster")
 	}
 }

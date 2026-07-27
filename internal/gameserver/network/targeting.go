@@ -47,7 +47,7 @@ func (l *GameClientLink) handleTargetAction(ctx context.Context, live *livePlaye
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
-	if live.target == nil || live.target.ObjectID() != target.ObjectID() {
+	if cur := live.Target(); cur == nil || cur.ObjectID() != target.ObjectID() {
 		l.selectLiveTarget(live, target)
 		return
 	}
@@ -118,10 +118,10 @@ func (l *GameClientLink) selectLiveTarget(live *livePlayer, target world.Tracked
 	if live == nil || target == nil {
 		return false
 	}
-	if live.target != nil && live.target.ObjectID() == target.ObjectID() {
+	if cur := live.Target(); cur != nil && cur.ObjectID() == target.ObjectID() {
 		return true
 	}
-	live.target = target
+	live.SetTargetTracked(target)
 	live.SendFrame(serverpackets.FrameMyTargetSelected(target.ObjectID(), targetColor(live.Character, target)))
 	if attrs, ok := targetHPAttributes(target); ok {
 		live.SendFrame(serverpackets.FrameStatusUpdate(target.ObjectID(), attrs))
@@ -134,8 +134,8 @@ func (l *GameClientLink) clearLiveTarget(live *livePlayer) {
 	if live == nil {
 		return
 	}
-	old := live.target
-	live.target = nil
+	old := live.Target()
+	live.SetTargetTracked(nil)
 	if live.combat != nil {
 		live.combat.Stop()
 	}
