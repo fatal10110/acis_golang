@@ -260,6 +260,57 @@ func TestAttackableAISetBackToPeaceClearsCombatState(t *testing.T) {
 	}
 }
 
+func TestAttackableAIRandomizeHateDisplacesTargetAndRebuildsDesires(t *testing.T) {
+	owner := actor(1)
+	low := actor(2)
+	high := actor(3)
+	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+
+	ai.AddDamageHate(low, 0, 10)
+	ai.AddDamageHate(high, 0, 25)
+
+	always := func(attackable.Combatant) bool { return true }
+	first := func(int) int { return 0 }
+	if ok := ai.RandomizeHate(always, first); !ok {
+		t.Fatal("RandomizeHate: ok = false, want true")
+	}
+
+	if got := ai.Threats().Hate(low); got != 225 {
+		t.Fatalf("displaced attacker hate = %v, want 225", got)
+	}
+	if got := ai.Threats().Hate(high); got != 25 {
+		t.Fatalf("mostHated hate = %v, want unchanged 25", got)
+	}
+
+	desire, ok := ai.Desires().Peek()
+	if !ok {
+		t.Fatal("Desires().Peek() ok = false after RandomizeHate")
+	}
+	if desire.FinalTarget != low || desire.Weight != 225 {
+		t.Fatalf("top desire = (%v, %v), want (low, 225)", desire.FinalTarget, desire.Weight)
+	}
+	if got := ai.Desires().Len(); got != 2 {
+		t.Fatalf("desires len = %d, want 2 (requeued from threat table)", got)
+	}
+}
+
+func TestAttackableAIRandomizeHateNoopWithSingleAttacker(t *testing.T) {
+	owner := actor(1)
+	target := actor(2)
+	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+
+	ai.AddDamageHate(target, 0, 10)
+
+	always := func(attackable.Combatant) bool { return true }
+	first := func(int) int { return 0 }
+	if ok := ai.RandomizeHate(always, first); ok {
+		t.Fatal("RandomizeHate: ok = true, want false with a single attacker")
+	}
+	if got := ai.Desires().Len(); got != 1 {
+		t.Fatalf("desires len = %d, want 1 (untouched)", got)
+	}
+}
+
 func TestAttackableAIWanderReturnHome(t *testing.T) {
 	owner := actor(1)
 	owner.inTerritory = false

@@ -166,6 +166,9 @@ const (
 	// TypeBetray turns an effected summon against its owner for the effect
 	// duration.
 	TypeBetray Type = "BETRAY"
+	// TypeRandomizeHate swaps a random valid attacker into its target's
+	// most-hated slot, ahead of the current top-hate attacker.
+	TypeRandomizeHate Type = "RANDOMIZE_HATE"
 )
 
 type kind struct {
@@ -230,6 +233,7 @@ var coreKinds = map[string]kind{
 	"Distrust":              {typ: TypeDistrust},
 	"Confusion":             {typ: TypeConfusion, flag: FlagConfused},
 	"Betray":                {typ: TypeBetray, flag: FlagBetrayed, debuff: true},
+	"RandomizeHate":         {typ: TypeRandomizeHate},
 }
 
 var fearSkippedPlayableSkillIDs = map[modelskill.ID]bool{
@@ -396,6 +400,8 @@ func wireHooks(e *Effect) {
 	case TypeBetray:
 		e.OnStart = betrayStart
 		e.OnExit = betrayExit
+	case TypeRandomizeHate:
+		e.OnStart = randomizeHateStart
 	}
 }
 
@@ -695,6 +701,13 @@ type nearbyMonsterFinder interface {
 // one finds no candidate.
 type nearbyCombatTarget interface {
 	RandomNearbyCombatant(radius int) (attackable.Combatant, bool)
+}
+
+// hateRandomizer is implemented by an actor whose physical threat table can
+// swap a random valid attacker into the most-hated slot ahead of its
+// current top-hate attacker.
+type hateRandomizer interface {
+	RandomizeHate() bool
 }
 
 // mostHatedResetter is implemented by an actor whose physical threat table
@@ -1373,6 +1386,18 @@ func distrustStart(e *Effect) bool {
 	}
 	aggro := float64((5 + rnd.Get(5)) * level)
 	target.AddDamageHate(candidate, 0, aggro)
+	return true
+}
+
+// randomizeHateStart ports EffectRandomizeHate.onStart(): rejects a target
+// that isn't an Attackable-shaped actor, otherwise delegates the swap to
+// its threat table.
+func randomizeHateStart(e *Effect) bool {
+	target, ok := e.Effected.(hateRandomizer)
+	if !ok {
+		return false
+	}
+	target.RandomizeHate()
 	return true
 }
 

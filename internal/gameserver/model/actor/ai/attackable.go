@@ -167,6 +167,27 @@ func (a *Attackable) addAttackDesire(attacker attackable.Combatant, hate float64
 	})
 }
 
+// RandomizeHate ports the AI side of AggroList.randomizeAttack(), driving
+// EffectRandomizeHate: swaps a random valid attacker into the most-hated
+// slot ahead of the current target (see ThreatTable.RandomizeAttack), then
+// clears and rebuilds the queued attack desires from every threat entry so
+// they match the post-swap hate table, mirroring the reference's
+// updateAggro=false requeue. Reports whether a swap happened.
+func (a *Attackable) RandomizeHate(valid func(attackable.Combatant) bool, pick func(int) int) bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	if !a.threats.RandomizeAttack(valid, pick) {
+		return false
+	}
+
+	a.desires.RemoveKind(IntentionAttack)
+	for _, t := range a.threats.Snapshot() {
+		a.addAttackDesire(t.Attacker, t.Hate)
+	}
+	return true
+}
+
 // AddHate records an attacker in the skill-cast hate table.
 func (a *Attackable) AddHate(attacker attackable.Combatant, hate float64) {
 	a.hates.Add(attacker, hate)

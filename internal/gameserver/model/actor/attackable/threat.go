@@ -1,6 +1,7 @@
 package attackable
 
 import (
+	"slices"
 	"sync"
 	"time"
 )
@@ -88,6 +89,61 @@ func (t *ThreatTable) MostHated() (threat Threat, ok bool) {
 		return Threat{}, false
 	}
 	return *best, true
+}
+
+// RandomizeAttack ports Npc.java's AggroList.randomizeAttack(): among
+// attackers other than the current most-hated with positive hate, it picks
+// one passing valid and raises its hate to mostHated's hate plus 200,
+// displacing mostHated as the new top target without altering mostHated's
+// own hate. pick selects an index in [0, n) among the filtered candidates,
+// letting the caller plug in its own randomness source. Reports whether a
+// swap happened; a no-op when the table has fewer than two entries, the
+// owner is alike dead, no attacker currently holds positive hate, or no
+// candidate passes valid.
+func (t *ThreatTable) RandomizeAttack(valid func(Combatant) bool, pick func(int) int) bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if len(t.entries) < 2 || t.owner.AlikeDead() {
+		return false
+	}
+
+	var mostHated *Threat
+	for _, e := range t.entries {
+		if e.Hate <= 0 {
+			continue
+		}
+		if mostHated == nil || e.Hate > mostHated.Hate {
+			mostHated = e
+		}
+	}
+	if mostHated == nil {
+		return false
+	}
+
+	var candidates []*Threat
+	for _, e := range t.entries {
+		if e == mostHated || e.Hate <= 0 {
+			continue
+		}
+		if valid(e.Attacker) {
+			candidates = append(candidates, e)
+		}
+	}
+	if len(candidates) == 0 {
+		return false
+	}
+	// Map iteration order is randomized per Go's runtime, unlike Java's
+	// ConcurrentHashMap; sort by attacker id first so pick's index lands on
+	// a reproducible candidate instead of a different one each call.
+	slices.SortFunc(candidates, func(a, b *Threat) int {
+		return int(a.Attacker.ObjectID() - b.Attacker.ObjectID())
+	})
+
+	chosen := candidates[pick(len(candidates))]
+	chosen.Hate = min(chosen.Hate+(mostHated.Hate-chosen.Hate)+200, maxThreatValue)
+	chosen.Timestamp = time.Now()
+	return true
 }
 
 // Hate returns the owner's hate against target, or 0 if target is not in

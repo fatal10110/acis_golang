@@ -1925,6 +1925,11 @@ func (t *hostileEffectTarget) StopMostHatedTarget() {
 	t.events = append(t.events, "stop-most-hated")
 }
 
+func (t *hostileEffectTarget) RandomizeHate() bool {
+	t.events = append(t.events, "randomize-hate")
+	return t.hasCandidate
+}
+
 func (t *hostileEffectTarget) StopMove() {
 	t.events = append(t.events, "stop-move")
 }
@@ -1997,6 +2002,34 @@ func TestConfusionEffectRedirectsNonPlayerTargetOntoARandomNearbyCombatant(t *te
 	e.OnExit(e)
 	if got := target.events[len(target.events)-2:]; !reflect.DeepEqual(got, []string{"abnormal", "stop-most-hated"}) {
 		t.Fatalf("exit events = %#v, want abnormal refresh followed by stop-most-hated", got)
+	}
+}
+
+func TestRandomizeHateEffectDelegatesToTheThreatTableSwap(t *testing.T) {
+	target := &hostileEffectTarget{hasCandidate: true}
+	e, err := New(Skill{}, modelskill.EffectTemplate{Name: "RandomizeHate"})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e.Effected = target
+
+	if !e.OnStart(e) {
+		t.Fatal("randomize-hate effect start rejected a valid Attackable target")
+	}
+	if want := []string{"randomize-hate"}; !reflect.DeepEqual(target.events, want) {
+		t.Fatalf("events = %#v, want %#v", target.events, want)
+	}
+}
+
+func TestRandomizeHateEffectRejectsATargetWithNoThreatTable(t *testing.T) {
+	e, err := New(Skill{}, modelskill.EffectTemplate{Name: "RandomizeHate"})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e.Effected = &fakeCombatant{id: 1}
+
+	if e.OnStart(e) {
+		t.Fatal("randomize-hate effect started against a target with no RandomizeHate method")
 	}
 }
 
