@@ -21,11 +21,12 @@ const tickInterval = 1100 * time.Millisecond
 // tests: it can be positioned and identified, owns its own live effect
 // list (for the self-targeted SIGNET_CASTTIME family), and can pay MP.
 type signetFakeCaster struct {
-	id      int32
-	x, y, z int
-	dead    bool
-	mp      float64
-	list    *effect.List
+	id         int32
+	x, y, z    int
+	gx, gy, gz int
+	dead       bool
+	mp         float64
+	list       *effect.List
 }
 
 func newSignetFakeCaster(id int32, x, y, z int, mp float64) *signetFakeCaster {
@@ -37,8 +38,11 @@ func newSignetFakeCaster(id int32, x, y, z int, mp float64) *signetFakeCaster {
 func (c *signetFakeCaster) AlikeDead() bool           { return c.dead }
 func (c *signetFakeCaster) ObjectID() int32           { return c.id }
 func (c *signetFakeCaster) Position() (int, int, int) { return c.x, c.y, c.z }
-func (c *signetFakeCaster) EffectList() *effect.List  { return c.list }
-func (c *signetFakeCaster) MPValue() float64          { return c.mp }
+func (c *signetFakeCaster) GroundTarget() (int, int, int) {
+	return c.gx, c.gy, c.gz
+}
+func (c *signetFakeCaster) EffectList() *effect.List { return c.list }
+func (c *signetFakeCaster) MPValue() float64         { return c.mp }
 func (c *signetFakeCaster) ReduceMP(v float64) float64 {
 	if v > c.mp {
 		v = c.mp
@@ -170,6 +174,25 @@ func TestSignetBuffAppliesSubSkillToNearbyTargetsAndDespawns(t *testing.T) {
 
 	if _, ok := state.Object(actor.ObjectID()); ok {
 		t.Fatal("actor still tracked in world after its driving effect exited")
+	}
+}
+
+func TestSignetSpawnsAtGroundTarget(t *testing.T) {
+	h, state := newTestSignetHandler(nil)
+	caster := newSignetFakeCaster(1, 100, 100, 0, 100)
+	caster.gx, caster.gy, caster.gz = 300, 400, 50
+
+	h.Use(Cast{Caster: caster, Skill: modelskill.Definition{
+		ID: 454, Level: 1, SkillType: "SIGNET", Target: modelskill.TargetGround,
+		EffectNpcID: 13018, Effects: []modelskill.EffectTemplate{{Name: "Signet", Count: 1, Time: 1}},
+	}})
+
+	actors := findEffectPointObjects(state)
+	if len(actors) != 1 {
+		t.Fatalf("spawned actors = %d, want 1", len(actors))
+	}
+	if x, y, z := actors[0].Position(); x != 300 || y != 400 || z != 50 {
+		t.Fatalf("signet position = (%d,%d,%d), want ground target (300,400,50)", x, y, z)
 	}
 }
 
