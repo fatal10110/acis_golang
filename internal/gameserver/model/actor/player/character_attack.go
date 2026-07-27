@@ -829,6 +829,7 @@ func (c *Character) Die(killer creature.DeathActor) bool {
 	if !creature.Die(c, killer, nil) {
 		return false
 	}
+	c.ClearCharges()
 	c.BroadcastDie()
 	return true
 }

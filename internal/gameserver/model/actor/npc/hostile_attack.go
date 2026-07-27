@@ -96,9 +96,25 @@ func (h *Hostile) CanSee(target attackable.Combatant) bool {
 }
 
 // CollisionRadius returns this NPC's body radius, used to resolve attack
-// and follow ranges.
+// and follow ranges: a live runtime override (e.g. from the Grow effect) if
+// one is set, otherwise the template value.
 func (h *Hostile) CollisionRadius() float64 {
+	if r := h.collisionRadiusOverride.Load(); r != nil {
+		return *r
+	}
 	return h.Instance.Template.CollisionRadius
+}
+
+// SetCollisionRadius installs a runtime body-radius override, e.g. the Grow
+// effect's radius*1.19 scaling.
+func (h *Hostile) SetCollisionRadius(radius float64) {
+	h.collisionRadiusOverride.Store(&radius)
+}
+
+// ResetCollisionRadius clears any runtime body-radius override, restoring
+// the template value, e.g. on the Grow effect's exit.
+func (h *Hostile) ResetCollisionRadius() {
+	h.collisionRadiusOverride.Store(nil)
 }
 
 // CollisionHeight returns this NPC's body height, used for line-of-sight
