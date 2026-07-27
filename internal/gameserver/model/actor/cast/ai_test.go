@@ -137,6 +137,70 @@ func TestAIControllerCastStartsSchedulesAndAppliesEffectsOnHit(t *testing.T) {
 	}
 }
 
+// TestAIControllerCastBroadcastsSkillUseOnLaunchAndLaunchedOnHit verifies
+// the observer packet sequence #856 wires: MagicSkillUse fires once the
+// scheduled cast reaches its Launch phase, and MagicSkillLaunched fires
+// once the Hit phase resolves — matching the player-cast packet order in
+// network/magic_skill.go, just driven by Schedule's timers instead of a
+// client round trip.
+func TestAIControllerCastBroadcastsSkillUseOnLaunchAndLaunchedOnHit(t *testing.T) {
+	clock := &fakeCastClock{}
+	actor := scalingActor()
+	ctrl := NewController(actor)
+	ctrl.afterFunc = clock.AfterFunc
+
+	ref := modelskill.Ref{ID: scalingDef.ID, Level: scalingDef.Level}
+	def := scalingDef
+	def.Target = modelskill.TargetOne
+	def.SkillType = "DUMMYCAST"
+
+	rec := &recordingSkillHandler{}
+	caster := &fakeBroadcastingCaster{fakeCastCreature: fakeCastCreature{id: 1, category: skilltarget.CategoryAttackable}}
+	target := &fakeCastCreature{id: 2, x: 10, y: 20, z: 30, category: skilltarget.CategoryAttackable}
+
+	ai := &AIController{
+		Controller:  ctrl,
+		Definitions: fakeDefinitions{ref: def},
+		Effects:     newEffectHandlers(effectsKnown{}, "DUMMYCAST", rec),
+		Caster:      caster,
+	}
+
+	ai.Cast(target, ref)
+
+	if len(caster.skillUseCalls) != 0 {
+		t.Fatal("BroadcastSkillUse called before the Launch phase")
+	}
+
+	clock.fire(125 * time.Millisecond) // Launch
+
+	if len(caster.skillUseCalls) != 1 {
+		t.Fatalf("BroadcastSkillUse calls after Launch = %d, want 1", len(caster.skillUseCalls))
+	}
+	use := caster.skillUseCalls[0]
+	if use.targetID != 2 || use.targetX != 10 || use.targetY != 20 || use.targetZ != 30 {
+		t.Fatalf("BroadcastSkillUse target = %+v, want id 2 at (10,20,30)", use)
+	}
+	if use.skillID != int32(def.ID) || use.level != int32(def.Level) {
+		t.Fatalf("BroadcastSkillUse skill = (%d,%d), want (%d,%d)", use.skillID, use.level, def.ID, def.Level)
+	}
+	if len(caster.skillLaunchedCalls) != 0 {
+		t.Fatal("BroadcastSkillLaunched called before the Hit phase")
+	}
+
+	clock.fire(400 * time.Millisecond) // Hit
+
+	if len(caster.skillLaunchedCalls) != 1 {
+		t.Fatalf("BroadcastSkillLaunched calls after Hit = %d, want 1", len(caster.skillLaunchedCalls))
+	}
+	launched := caster.skillLaunchedCalls[0]
+	if launched.skillID != int32(def.ID) || launched.level != int32(def.Level) {
+		t.Fatalf("BroadcastSkillLaunched skill = (%d,%d), want (%d,%d)", launched.skillID, launched.level, def.ID, def.Level)
+	}
+	if len(launched.targetIDs) != 1 || launched.targetIDs[0] != 2 {
+		t.Fatalf("BroadcastSkillLaunched targetIDs = %v, want [2]", launched.targetIDs)
+	}
+}
+
 func TestAIControllerCastNoOpsForUnknownSkill(t *testing.T) {
 	actor := &testActor{mp: 100, hp: 100}
 	ctrl := NewController(actor)
@@ -179,3 +243,34 @@ func (f *fakeCastCreature) AlikeDead() bool                { return f.dead }
 var _ attackable.Combatant = (*fakeCastCreature)(nil)
 var _ skilltarget.Creature = (*fakeCastCreature)(nil)
 var _ Target = (*fakeCastCreature)(nil)
+
+type skillUseCall struct {
+	targetID                  int32
+	targetX, targetY, targetZ int
+	skillID, level            int32
+	hitTime, reuseDelay       int
+}
+
+type skillLaunchedCall struct {
+	skillID, level int32
+	targetIDs      []int32
+}
+
+// fakeBroadcastingCaster is a fakeCastCreature that also satisfies
+// magicCastBroadcaster, recording every AI-cast broadcast call so tests can
+// assert the Launch/Hit packet sequence AIController.Cast wires.
+type fakeBroadcastingCaster struct {
+	fakeCastCreature
+	skillUseCalls      []skillUseCall
+	skillLaunchedCalls []skillLaunchedCall
+}
+
+func (f *fakeBroadcastingCaster) BroadcastSkillUse(targetID int32, targetX, targetY, targetZ int, skillID, level int32, hitTime, reuseDelay int) {
+	f.skillUseCalls = append(f.skillUseCalls, skillUseCall{targetID, targetX, targetY, targetZ, skillID, level, hitTime, reuseDelay})
+}
+
+func (f *fakeBroadcastingCaster) BroadcastSkillLaunched(skillID, level int32, targetIDs []int32) {
+	f.skillLaunchedCalls = append(f.skillLaunchedCalls, skillLaunchedCall{skillID, level, targetIDs})
+}
+
+var _ magicCastBroadcaster = (*fakeBroadcastingCaster)(nil)

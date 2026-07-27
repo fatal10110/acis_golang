@@ -97,6 +97,17 @@ func (a *AIController) CanCast(target attackable.Combatant, ref modelskill.Ref) 
 	return a.Controller.CanCast(castTarget, def) == nil
 }
 
+// magicCastBroadcaster is the observer-broadcast surface an AI-initiated
+// cast's caster optionally exposes, mirroring the packet pair a live
+// player cast sends through network/magic_skill.go: MagicSkillUse at the
+// cast's launch point and MagicSkillLaunched once the hit phase resolves.
+// A caster that doesn't implement it (e.g. in tests) simply broadcasts
+// nothing.
+type magicCastBroadcaster interface {
+	BroadcastSkillUse(targetID int32, targetX, targetY, targetZ int, skillID, level int32, hitTime, reuseDelay int)
+	BroadcastSkillLaunched(skillID, level int32, targetIDs []int32)
+}
+
 // Cast starts the cast against target and schedules its Launch, Hit and
 // Finish phases, applying def's effects through Effects once the Hit phase
 // consumes its final resource cost.
@@ -118,8 +129,21 @@ func (a *AIController) Cast(target attackable.Combatant, ref modelskill.Ref) {
 		return
 	}
 
+	broadcaster, _ := a.Caster.(magicCastBroadcaster)
+
 	a.Controller.Schedule(plan, Hooks{
+		Launch: func() bool {
+			if broadcaster != nil {
+				tx, ty, tz := castTarget.Position()
+				broadcaster.BroadcastSkillUse(castTarget.ObjectID(), tx, ty, tz, int32(def.ID), int32(def.Level),
+					int(plan.HitTime/time.Millisecond), int(plan.ReuseDelay/time.Millisecond))
+			}
+			return true
+		},
 		Hit: func() {
+			if broadcaster != nil {
+				broadcaster.BroadcastSkillLaunched(int32(def.ID), int32(def.Level), []int32{castTarget.ObjectID()})
+			}
 			ApplyEffects(a.Effects, a.Caster, castTarget, def)
 		},
 	})

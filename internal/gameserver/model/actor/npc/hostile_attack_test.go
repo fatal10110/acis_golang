@@ -298,6 +298,56 @@ func TestHostileBroadcastAttackNoopsWithoutWorld(t *testing.T) {
 	attacker.BroadcastAttack(serverpackets.AttackSnapshot{AttackerID: 1})
 }
 
+func TestHostileBroadcastSkillUseSendsFrameToKnownReceivers(t *testing.T) {
+	state := world.New()
+	caster := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster"})
+	caster.SetWorld(state)
+	state.Spawn(caster, 100, 100, 0, 0)
+
+	observer := &frameReceiver{trackedID: 55}
+	state.Spawn(observer, 100, 100, 0, 0)
+
+	caster.BroadcastSkillUse(2, 200, 100, 0, 4, 1, 1200, 5000)
+
+	if len(observer.frames) != 1 {
+		t.Fatalf("observer received %d frames, want 1", len(observer.frames))
+	}
+	if observer.frames[0][0] != serverpackets.OpcodeMagicSkillUse {
+		t.Fatalf("frame opcode = %#x, want %#x", observer.frames[0][0], serverpackets.OpcodeMagicSkillUse)
+	}
+}
+
+func TestHostileBroadcastSkillUseNoopsWithoutWorld(t *testing.T) {
+	caster := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster"})
+	// SetWorld was never called; this must not panic.
+	caster.BroadcastSkillUse(2, 200, 100, 0, 4, 1, 1200, 5000)
+}
+
+func TestHostileBroadcastSkillLaunchedSendsFrameToKnownReceivers(t *testing.T) {
+	state := world.New()
+	caster := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster"})
+	caster.SetWorld(state)
+	state.Spawn(caster, 100, 100, 0, 0)
+
+	observer := &frameReceiver{trackedID: 55}
+	state.Spawn(observer, 100, 100, 0, 0)
+
+	caster.BroadcastSkillLaunched(4, 1, []int32{2})
+
+	if len(observer.frames) != 1 {
+		t.Fatalf("observer received %d frames, want 1", len(observer.frames))
+	}
+	if observer.frames[0][0] != serverpackets.OpcodeMagicSkillLaunched {
+		t.Fatalf("frame opcode = %#x, want %#x", observer.frames[0][0], serverpackets.OpcodeMagicSkillLaunched)
+	}
+}
+
+func TestHostileBroadcastSkillLaunchedNoopsWithoutWorld(t *testing.T) {
+	caster := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster"})
+	// SetWorld was never called; this must not panic.
+	caster.BroadcastSkillLaunched(4, 1, []int32{2})
+}
+
 func TestHostileBroadcastMoveToPawnSendsFrameToKnownReceivers(t *testing.T) {
 	state := world.New()
 	caster := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster"})

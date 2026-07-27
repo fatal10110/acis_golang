@@ -303,6 +303,44 @@ func (h *Hostile) BroadcastAttack(snapshot attack.Snapshot) {
 	})
 }
 
+// BroadcastSkillUse sends a cast-start animation packet from this actor to
+// the target at (targetX, targetY, targetZ), to every currently known
+// observer capable of receiving one. It is a no-op until SetWorld has been
+// called.
+func (h *Hostile) BroadcastSkillUse(targetID int32, targetX, targetY, targetZ int, skillID, level int32, hitTime, reuseDelay int) {
+	if h.world == nil {
+		return
+	}
+	sx, sy, sz := h.Position()
+	h.world.ForEachKnown(h, func(o world.Tracked) {
+		receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
+		if !ok {
+			return
+		}
+		receiver.SendFrame(serverpackets.FrameMagicSkillUse(
+			serverpackets.SkillCastObject{ObjectID: h.ObjectID(), Location: location.Location{X: sx, Y: sy, Z: sz}},
+			serverpackets.SkillCastObject{ObjectID: targetID, Location: location.Location{X: targetX, Y: targetY, Z: targetZ}},
+			skillID, level, hitTime, reuseDelay, false,
+		))
+	})
+}
+
+// BroadcastSkillLaunched sends the cast-launch target packet for skillID at
+// level, listing targetIDs, to every currently known observer capable of
+// receiving one. It is a no-op until SetWorld has been called.
+func (h *Hostile) BroadcastSkillLaunched(skillID, level int32, targetIDs []int32) {
+	if h.world == nil {
+		return
+	}
+	h.world.ForEachKnown(h, func(o world.Tracked) {
+		receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
+		if !ok {
+			return
+		}
+		receiver.SendFrame(serverpackets.FrameMagicSkillLaunched(h.ObjectID(), skillID, level, targetIDs))
+	})
+}
+
 // BroadcastDie sends the death packet to every currently known observer
 // capable of receiving one, so clients play the corpse-fall animation
 // instead of leaving this NPC standing until its corpse decays. It is a
