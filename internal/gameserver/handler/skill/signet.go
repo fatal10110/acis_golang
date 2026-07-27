@@ -95,11 +95,11 @@ func (h signetHandler) Use(cast Cast) {
 	h.useSignet(cast)
 }
 
-// useSignet spawns the actor immediately, at the caster's own position (a
-// per-cast ground-target point has no Go equivalent yet — tracked by
-// #862), then applies the skill's own effect templates onto that actor. If
-// none of the templates yield a recognized effect, the actor is despawned
-// immediately since nothing will ever call Despawn on its behalf.
+// useSignet spawns the actor immediately, at its ground target when the
+// caster supplies one for a ground-targeted skill, then applies the skill's
+// own effect templates onto that actor. If none of the templates yield a
+// recognized effect, the actor is despawned immediately since nothing will
+// ever call Despawn on its behalf.
 func (h signetHandler) useSignet(cast Cast) {
 	actor, ok := h.spawnActor(cast.Caster, cast.Skill)
 	if !ok {
@@ -171,6 +171,11 @@ func (h signetHandler) spawnActor(caster any, def modelskill.Definition) (*npc.E
 		return nil, false
 	}
 	x, y, z := pos.Position()
+	if def.Target == modelskill.TargetGround {
+		if ground, ok := caster.(interface{ GroundTarget() (int, int, int) }); ok {
+			x, y, z = ground.GroundTarget()
+		}
+	}
 	heading := 0
 	if hd, ok := caster.(signetHeaded); ok {
 		heading = hd.Heading()
