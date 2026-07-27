@@ -98,6 +98,9 @@ const (
 	TypeHealOverTime Type = "HEAL_OVER_TIME"
 	// TypeManaHeal restores MP once when the effect starts.
 	TypeManaHeal Type = "MANA_HEAL"
+	// TypeIncreaseCharges adds Force/Soul charges once when the effect
+	// starts, up to the effect template's count cap.
+	TypeIncreaseCharges Type = "INCREASE_CHARGES"
 	// TypeTargetMe redirects the target's current target onto the
 	// effector, or turns an existing lock onto the effector into an attack.
 	TypeTargetMe Type = "TARGET_ME"
@@ -211,6 +214,7 @@ var coreKinds = map[string]kind{
 	"Heal":                  {typ: TypeHeal},
 	"HealOverTime":          {typ: TypeHealOverTime},
 	"ManaHeal":              {typ: TypeManaHeal},
+	"IncreaseCharges":       {typ: TypeIncreaseCharges},
 	"TargetMe":              {typ: TypeTargetMe},
 	"Bluff":                 {typ: TypeBluff},
 	"CharmOfCourage":        {typ: TypeCharmOfCourage, flag: flagCharmOfCourage},
@@ -360,6 +364,8 @@ func wireHooks(e *Effect) {
 		e.OnAction = healOverTimeAction
 	case TypeManaHeal:
 		e.OnStart = manaHealStart
+	case TypeIncreaseCharges:
+		e.OnStart = increaseChargesStart
 	case TypeTargetMe:
 		e.OnStart = targetMeStart
 	case TypeBluff:
@@ -1066,6 +1072,26 @@ func manaHealStart(e *Effect) bool {
 	// The applied amount is added a second time; this reproduces the
 	// reference heal effect's own behavior exactly, not a Go-side bug.
 	target.AddMP(amount)
+	return true
+}
+
+// chargesTarget is implemented by an actor that tracks Force/Soul charges.
+type chargesTarget interface {
+	IncreaseCharges(count, max int) bool
+}
+
+// increaseChargesStart adds the template's charge amount, capped at the
+// template's count (repurposed here as the max-charges cap, not a tick
+// count), matching the reference's one-shot onStart call into
+// Player.increaseCharges. It always reports success: whether the target
+// was already at the cap is the target method's own no-op/system-message
+// concern, not this effect's.
+func increaseChargesStart(e *Effect) bool {
+	target, ok := e.Effected.(chargesTarget)
+	if !ok {
+		return false
+	}
+	target.IncreaseCharges(int(e.Template.Value), e.Template.Count)
 	return true
 }
 
