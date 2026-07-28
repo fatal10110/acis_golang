@@ -2341,3 +2341,61 @@ func TestThrowUpEffectOutOfRangeAbortsButStillAbortsCurrentAction(t *testing.T) 
 		t.Fatalf("effected events = %#v, want %#v (abort still runs before the range gate, but no fly)", effected.events, want)
 	}
 }
+
+// growEffectTarget is a minimal Npc-shaped actor implementing only the
+// collision-radius override surface Grow needs.
+type growEffectTarget struct {
+	events []string
+	radius float64
+}
+
+func (t *growEffectTarget) CollisionRadius() float64 { return t.radius }
+
+func (t *growEffectTarget) SetCollisionRadius(radius float64) {
+	t.radius = radius
+	t.events = append(t.events, fmt.Sprintf("set:%g", radius))
+}
+
+func (t *growEffectTarget) ResetCollisionRadius() {
+	t.events = append(t.events, "reset")
+}
+
+func (t *growEffectTarget) UpdateAbnormalEffect() {
+	t.events = append(t.events, "abnormal")
+}
+
+func TestGrowEffectScalesCollisionRadiusAndRestoresOnExit(t *testing.T) {
+	baseRadius := 9.0
+	target := &growEffectTarget{radius: baseRadius}
+	e, err := New(Skill{}, modelskill.EffectTemplate{Name: "Grow"})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e.Effected = target
+
+	if !e.OnStart(e) {
+		t.Fatal("grow effect start rejected a valid Npc-shaped target")
+	}
+	want := baseRadius * growRadiusScale
+	if target.radius != want {
+		t.Fatalf("radius after start = %v, want %v", target.radius, want)
+	}
+
+	e.OnExit(e)
+	if wantEvents := []string{fmt.Sprintf("set:%g", want), "abnormal", "reset", "abnormal"}; !reflect.DeepEqual(target.events, wantEvents) {
+		t.Fatalf("events = %#v, want %#v", target.events, wantEvents)
+	}
+}
+
+func TestGrowEffectRejectsNonNpcTarget(t *testing.T) {
+	target := &liveEffectTarget{}
+	e, err := New(Skill{}, modelskill.EffectTemplate{Name: "Grow"})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e.Effected = target
+
+	if e.OnStart(e) {
+		t.Fatal("grow effect started against a non-Npc-shaped target")
+	}
+}

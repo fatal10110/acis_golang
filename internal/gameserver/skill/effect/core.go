@@ -177,6 +177,9 @@ const (
 	// duration, computes a geo-corrected landing point once at start, and
 	// teleports the target there at effect end.
 	TypeThrowUp Type = "THROW_UP"
+	// TypeGrow scales an Npc-shaped target's runtime collision radius for
+	// the effect's duration, restoring it on exit.
+	TypeGrow Type = "GROW"
 )
 
 type kind struct {
@@ -244,6 +247,7 @@ var coreKinds = map[string]kind{
 	"Betray":                {typ: TypeBetray, flag: FlagBetrayed, debuff: true},
 	"RandomizeHate":         {typ: TypeRandomizeHate},
 	"ThrowUp":               {typ: TypeThrowUp, flag: FlagStunned, debuff: true},
+	"Grow":                  {typ: TypeGrow},
 }
 
 var fearSkippedPlayableSkillIDs = map[modelskill.ID]bool{
@@ -417,6 +421,9 @@ func wireHooks(e *Effect) {
 	case TypeThrowUp:
 		e.OnStart = throwUpStart
 		e.OnExit = throwUpExit
+	case TypeGrow:
+		e.OnStart = growStart
+		e.OnExit = growExit
 	}
 }
 
@@ -1422,6 +1429,41 @@ func distrustStart(e *Effect) bool {
 	aggro := float64((5 + rnd.Get(5)) * level)
 	target.AddDamageHate(candidate, 0, aggro)
 	return true
+}
+
+// growTarget is implemented by an Npc-shaped actor whose collision radius
+// can be overridden at runtime and later restored to its template value.
+type growTarget interface {
+	CollisionRadius() float64
+	SetCollisionRadius(radius float64)
+	ResetCollisionRadius()
+}
+
+// growRadiusScale is EffectGrow.onStart()'s collision-radius multiplier.
+const growRadiusScale = 1.19
+
+// growStart ports EffectGrow.onStart(): rejects a target that isn't
+// Npc-shaped (a player target never grows), otherwise scales its collision
+// radius by growRadiusScale and refreshes its visible state.
+func growStart(e *Effect) bool {
+	target, ok := e.Effected.(growTarget)
+	if !ok {
+		return false
+	}
+	target.SetCollisionRadius(target.CollisionRadius() * growRadiusScale)
+	refresh(e.Effected)
+	return true
+}
+
+// growExit ports EffectGrow.onExit(): restores the target's runtime
+// collision-radius override to its template value.
+func growExit(e *Effect) {
+	target, ok := e.Effected.(growTarget)
+	if !ok {
+		return
+	}
+	target.ResetCollisionRadius()
+	refresh(e.Effected)
 }
 
 // randomizeHateStart ports EffectRandomizeHate.onStart(): rejects a target
