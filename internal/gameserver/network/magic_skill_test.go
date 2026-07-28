@@ -278,11 +278,11 @@ func TestGameClientLinkTogglesOnThenOff(t *testing.T) {
 		t.Fatalf("world state player %d is not a *livePlayer", objID)
 	}
 
-	// First cast: no active instance yet, activates and pays MP.
+	// First cast: no active instance yet, activates and pays MP. The
+	// reference broadcasts MagicSkillUse before applying the skill's
+	// effects, so the ack packet lands before any AbnormalStatusUpdate the
+	// activation's effect triggers.
 	c.send(encodeRequestMagicSkillUse(288, false, false))
-	if entries := readAbnormalStatusUpdateFrame(t, c); len(entries) != 0 {
-		t.Fatalf("AbnormalStatusUpdate entries after activation = %+v, want none (test skill has no icon)", entries)
-	}
 	reply := c.read()
 	if reply[0] != serverpackets.OpcodeMagicSkillUse {
 		t.Fatalf("magic use opcode = %#x, want MagicSkillUse (%#x)", reply[0], serverpackets.OpcodeMagicSkillUse)
@@ -293,6 +293,9 @@ func TestGameClientLinkTogglesOnThenOff(t *testing.T) {
 	}
 	if hitTime, reuse := r.ReadInt32(), r.ReadInt32(); hitTime != 0 || reuse != 0 {
 		t.Fatalf("MagicSkillUse timing = hit %d reuse %d, want 0/0", hitTime, reuse)
+	}
+	if entries := readAbnormalStatusUpdateFrame(t, c); len(entries) != 0 {
+		t.Fatalf("AbnormalStatusUpdate entries after activation = %+v, want none (test skill has no icon)", entries)
 	}
 	c.expectNoFrame()
 

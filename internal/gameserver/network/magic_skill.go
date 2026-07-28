@@ -117,8 +117,9 @@ func (l *GameClientLink) handleMagicSkillUseGround(live *livePlayer, req clientp
 // application both happen inside actorcast.ApplyToggle; this handler only
 // translates the outcome into packets.
 func (l *GameClientLink) handleToggleSkillUse(live *livePlayer, req clientpackets.RequestMagicSkillUse) {
-	def, _, _, err := actorcast.ApplyToggle(
-		actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers},
+	handlers := actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers}
+	def, target, activated, err := actorcast.ApplyToggle(
+		handlers,
 		live.castController(),
 		actorcast.PlayerToggleRequest{
 			Caster:      live.Character,
@@ -136,6 +137,9 @@ func (l *GameClientLink) handleToggleSkillUse(live *livePlayer, req clientpacket
 	l.broadcastLiveFrame(live, func() wire.Frame {
 		return serverpackets.FrameMagicSkillUse(selfObject, selfObject, int32(def.ID), int32(def.Level), 0, 0, false)
 	})
+	if activated {
+		actorcast.ApplyEffects(handlers, live.Character, target, def)
+	}
 }
 
 func skillCastObject(obj actorcast.Target) serverpackets.SkillCastObject {
