@@ -67,23 +67,29 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 	}
 
 	targetIDs := []int32{target.ObjectID()}
-	l.broadcastLiveFrame(live, func() wire.Frame {
-		return serverpackets.FrameMagicSkillLaunched(live.ObjectID(), int32(def.ID), int32(def.Level), targetIDs)
+	controller.Schedule(plan, actorcast.Hooks{
+		// Full mid-cast target-lost/range/LOS/peace-zone revalidation is
+		// #1001; this always continues to Hit, matching the reference's
+		// launch phase minus its recheck gates.
+		Launch: func() bool {
+			l.broadcastLiveFrame(live, func() wire.Frame {
+				return serverpackets.FrameMagicSkillLaunched(live.ObjectID(), int32(def.ID), int32(def.Level), targetIDs)
+			})
+			return true
+		},
+		Hit: func() {
+			result := actorcast.ApplyEffectsResult(actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers}, live.Character, target, def)
+			sendSkillHandlerResult(live, result)
+			if result.CubicAdded {
+				l.broadcastCharacterInfo(live)
+			}
+			sendMagicStatusUpdate(live, beforeVitals)
+		},
+		Failed: func(err error) {
+			sendMagicCastFailure(live, def, err)
+			sendMagicStatusUpdate(live, beforeVitals)
+		},
 	})
-
-	if err := controller.Hit(); err != nil {
-		sendMagicCastFailure(live, def, err)
-		sendMagicStatusUpdate(live, beforeVitals)
-		controller.Stop()
-		return
-	}
-	result := actorcast.ApplyEffectsResult(actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers}, live.Character, target, def)
-	sendSkillHandlerResult(live, result)
-	if result.CubicAdded {
-		l.broadcastCharacterInfo(live)
-	}
-	sendMagicStatusUpdate(live, beforeVitals)
-	controller.Finish()
 }
 
 // handleMagicSkillUseGround records the client-supplied ground-click point

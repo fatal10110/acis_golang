@@ -60,35 +60,3 @@ func ConsumeAICastItem(req ConsumeAICastItemRequest) ConsumeAICastItemResult {
 	}
 	return ConsumeAICastItemResult{SharedReuseGroup: sharedReuseGroup, ReuseMillis: reuse}
 }
-
-// CompleteAICastRequest carries what's needed to apply an already-started,
-// already-consumed item-carried cast's hit-phase cost and effects.
-type CompleteAICastRequest struct {
-	Controller *actorcast.Controller
-	Definition modelskill.Definition
-	Caster     any
-	Target     actorcast.Target
-	Effects    actorcast.EffectHandlers
-}
-
-// CompleteAICastResult is the outcome of one CompleteAICast call. Err is
-// nil on a successful hit; the caller maps it to a rejection reply the
-// same way it maps actorcast.StartItemSkill's error.
-type CompleteAICastResult struct {
-	Err           error
-	HandlerResult actorcast.EffectResult
-}
-
-// CompleteAICast applies the cast's hit-phase cost and, on success, the
-// skill's effects to req.Target. It stops req.Controller and reports the
-// hit error on failure, so a half-open cast never lingers.
-func CompleteAICast(req CompleteAICastRequest) CompleteAICastResult {
-	if err := req.Controller.Hit(); err != nil {
-		req.Controller.Stop()
-		return CompleteAICastResult{Err: err}
-	}
-
-	result := actorcast.ApplyEffectsResult(req.Effects, req.Caster, req.Target, req.Definition)
-	req.Controller.Finish()
-	return CompleteAICastResult{HandlerResult: result}
-}

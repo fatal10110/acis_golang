@@ -27,7 +27,7 @@ func startedCastAIController(t *testing.T, caster *player.Character, def modelsk
 	return ctrl
 }
 
-func TestConsumeAndCompleteAICastAppliesEffects(t *testing.T) {
+func TestConsumeAICastItemLeavesControllerCastingOnSuccess(t *testing.T) {
 	def := modelskill.Definition{ID: 9, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf}
 	caster := newCastAICharacter(10)
 	ctrl := startedCastAIController(t, caster, def)
@@ -48,22 +48,11 @@ func TestConsumeAndCompleteAICastAppliesEffects(t *testing.T) {
 	if destroyer.calls != 1 {
 		t.Fatalf("DestroyItem calls = %d, want 1", destroyer.calls)
 	}
+	// The caller drives the cast's Launch/Hit/Finish phases through
+	// Controller.Schedule after consuming the item (network/item_skill_cast.go);
+	// consuming must not itself clear the cast.
 	if !ctrl.CastingNow() {
 		t.Fatal("controller CastingNow() = false after a successful consume, want still casting")
-	}
-
-	result := CompleteAICast(CompleteAICastRequest{
-		Controller: ctrl,
-		Definition: def,
-		Caster:     caster,
-		Target:     caster,
-		Effects:    actorcast.EffectHandlers{},
-	})
-	if result.Err != nil {
-		t.Fatalf("CompleteAICast() error: %v", result.Err)
-	}
-	if ctrl.CastingNow() {
-		t.Fatal("controller CastingNow() = true after Finish, want cleared")
 	}
 }
 
@@ -130,30 +119,4 @@ func TestConsumeAICastItemReportsSharedReuseGroup(t *testing.T) {
 			t.Fatalf("ReuseMillis = %d, want 8000 (item's reuse, longer than the skill's 5000)", res.ReuseMillis)
 		}
 	})
-}
-
-func TestCompleteAICastStopsControllerOnHitFailure(t *testing.T) {
-	def := modelskill.Definition{ID: 9, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf, MPConsume: 50}
-	caster := newCastAICharacter(10)
-	ctrl := startedCastAIController(t, caster, def)
-
-	// Drain MP below the hit-phase cost after Start (which already
-	// validated the cost against the caster's MP at that time), so Hit()
-	// itself is what fails here, not Start().
-	caster.ReduceCurrentMP(caster.CurrentMP())
-
-	result := CompleteAICast(CompleteAICastRequest{
-		Controller: ctrl,
-		Definition: def,
-		Caster:     caster,
-		Target:     caster,
-		Effects:    actorcast.EffectHandlers{},
-	})
-
-	if result.Err == nil {
-		t.Fatal("CompleteAICast() error = nil, want a hit-cost failure (MP cost exceeds current MP)")
-	}
-	if ctrl.CastingNow() {
-		t.Fatal("controller CastingNow() = true after a hit failure, want stopped/cleared")
-	}
 }
