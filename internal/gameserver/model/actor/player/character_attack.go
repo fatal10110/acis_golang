@@ -786,9 +786,10 @@ func (c *Character) Dead() bool {
 	return c.dead
 }
 
-// AlikeDead reports whether this player is dead or dead-equivalent.
+// AlikeDead reports whether this player is dead or dead-equivalent,
+// including a Fake Death toggle that is currently active.
 func (c *Character) AlikeDead() bool {
-	return c.Dead()
+	return c.Dead() || c.FakeDead()
 }
 
 // MarkDead transitions this player into its dead state.

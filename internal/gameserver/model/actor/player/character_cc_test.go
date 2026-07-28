@@ -2,6 +2,7 @@ package player
 
 import (
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -58,6 +59,7 @@ func TestCharacterCrowdControlGettersTrackActiveEffectsAndClearOnRemoval(t *test
 		{"Sleeping", "Sleep", (*Character).Sleeping},
 		{"Afraid", "Fear", (*Character).Afraid},
 		{"ImmobileUntilAttacked", "ImmobileUntilAttacked", (*Character).ImmobileUntilAttacked},
+		{"FakeDead", "FakeDeath", (*Character).FakeDead},
 	}
 
 	for _, tt := range tests {
@@ -108,6 +110,51 @@ func TestCharacterParalyzedUnionsManualLockAndActiveEffect(t *testing.T) {
 	c.EffectList().Remove(e)
 	if c.Paralyzed() {
 		t.Fatal("Paralyzed() = true after the paralyze effect was removed")
+	}
+}
+
+func TestCharacterAlikeDeadUnionsRealDeathAndFakeDeath(t *testing.T) {
+	c := &Character{ID: 1}
+	attachTestLive(t, c)
+	c.maxHP = 100
+	c.curHP = 100
+
+	if c.AlikeDead() {
+		t.Fatal("AlikeDead() = true on a fresh character")
+	}
+
+	e := addCharacterEffect(t, c, "FakeDeath")
+	if !c.AlikeDead() {
+		t.Fatal("AlikeDead() = false with an active fake-death effect, want true")
+	}
+
+	c.EffectList().Remove(e)
+	if c.AlikeDead() {
+		t.Fatal("AlikeDead() = true after the fake-death effect was removed")
+	}
+
+	c.MarkDead()
+	if !c.AlikeDead() {
+		t.Fatal("AlikeDead() = false on a really-dead character, want true")
+	}
+}
+
+func TestCharacterRecentFakeDeathTracksGracePeriodAfterMarking(t *testing.T) {
+	c := &Character{ID: 1}
+	attachTestLive(t, c)
+
+	if c.RecentFakeDeath() {
+		t.Fatal("RecentFakeDeath() = true before MarkRecentFakeDeath was ever called")
+	}
+
+	c.MarkRecentFakeDeath()
+	if !c.RecentFakeDeath() {
+		t.Fatal("RecentFakeDeath() = false right after MarkRecentFakeDeath, want true")
+	}
+
+	c.recentFakeDeathUntil = time.Now().Add(-time.Second)
+	if c.RecentFakeDeath() {
+		t.Fatal("RecentFakeDeath() = true after the grace period elapsed")
 	}
 }
 

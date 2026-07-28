@@ -795,6 +795,7 @@ type liveEffectTarget struct {
 	vuln              float64
 	standing          bool
 	hpFull            bool
+	recentFakeDeath   bool
 	objectID          int32
 	ownerID           int32
 	x, y, z           int
@@ -965,6 +966,11 @@ func (t *liveEffectTarget) SetStanding(v bool) bool {
 }
 
 func (t *liveEffectTarget) HPFull() bool { return t.hpFull }
+
+func (t *liveEffectTarget) MarkRecentFakeDeath() {
+	t.recentFakeDeath = true
+	t.events = append(t.events, "recent-fake-death")
+}
 
 func (t *liveEffectTarget) ObjectID() int32 { return t.objectID }
 
@@ -1807,6 +1813,71 @@ func TestChameleonRestEffectGatesActionOnContSkillTypeAndSitting(t *testing.T) {
 	e.Effected = standingTarget
 	if e.ActionTime() {
 		t.Fatal("chameleon rest effect action tick continued while standing, want it to end")
+	}
+}
+
+func TestFakeDeathEffectSitsOnStartAndDrainsMpEachTick(t *testing.T) {
+	target := &liveEffectTarget{standing: true, mp: 100}
+	e, err := New(Skill{Toggle: true}, modelskill.EffectTemplate{Name: "FakeDeath", Value: 35})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e.Effected = target
+
+	if e.Flag != FlagFakeDeath {
+		t.Fatalf("Flag = %v, want FlagFakeDeath", e.Flag)
+	}
+	if !e.OnStart(e) {
+		t.Fatal("fake death effect start rejected a valid target")
+	}
+	if target.standing {
+		t.Fatal("fake death effect start must sit its target down")
+	}
+
+	if !e.ActionTime() {
+		t.Fatal("fake death effect action tick ended with MP available")
+	}
+	if target.mp != 65 {
+		t.Fatalf("target mp = %v, want 65", target.mp)
+	}
+}
+
+func TestFakeDeathEffectActionEndsWhenDeadOrLackMp(t *testing.T) {
+	tests := []struct {
+		name   string
+		target *liveEffectTarget
+	}{
+		{"dead", &liveEffectTarget{dead: true, mp: 100}},
+		{"lacks mp", &liveEffectTarget{mp: 1}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e, err := New(Skill{Toggle: true}, modelskill.EffectTemplate{Name: "FakeDeath", Value: 35})
+			if err != nil {
+				t.Fatalf("New() error: %v", err)
+			}
+			e.Effected = tt.target
+			if e.ActionTime() {
+				t.Fatal("fake death effect action tick continued, want it to end")
+			}
+		})
+	}
+}
+
+func TestFakeDeathEffectExitStandsUpAndStartsRecentFakeDeathGrace(t *testing.T) {
+	target := &liveEffectTarget{standing: false, mp: 10}
+	e, err := New(Skill{Toggle: true}, modelskill.EffectTemplate{Name: "FakeDeath", Value: 35})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e.Effected = target
+
+	e.OnExit(e)
+	if !target.standing {
+		t.Fatal("fake death effect exit must stand its target back up")
+	}
+	if !target.recentFakeDeath {
+		t.Fatal("fake death effect exit must mark the recent-fake-death grace period")
 	}
 }
 

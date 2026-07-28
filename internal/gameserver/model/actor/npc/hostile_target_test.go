@@ -13,19 +13,21 @@ import (
 // zone, or player record.
 type gateTarget struct {
 	world.Presence
-	id     int32
-	dead   bool
-	silent bool
-	peace  bool
-	karma  int
+	id              int32
+	dead            bool
+	silent          bool
+	peace           bool
+	karma           int
+	recentFakeDeath bool
 }
 
-func (t *gateTarget) ObjectID() int32    { return t.id }
-func (t *gateTarget) SiegeGuard() bool   { return false }
-func (t *gateTarget) AlikeDead() bool    { return t.dead }
-func (t *gateTarget) SilentMoving() bool { return t.silent }
-func (t *gateTarget) InPeaceZone() bool  { return t.peace }
-func (t *gateTarget) Karma() int         { return t.karma }
+func (t *gateTarget) ObjectID() int32       { return t.id }
+func (t *gateTarget) SiegeGuard() bool      { return false }
+func (t *gateTarget) AlikeDead() bool       { return t.dead }
+func (t *gateTarget) SilentMoving() bool    { return t.silent }
+func (t *gateTarget) InPeaceZone() bool     { return t.peace }
+func (t *gateTarget) Karma() int            { return t.karma }
+func (t *gateTarget) RecentFakeDeath() bool { return t.recentFakeDeath }
 
 func newKindHostile(t testing.TB, id int32, tpl *Template, kind InstanceKind) *Hostile {
 	t.Helper()
@@ -113,6 +115,13 @@ func TestHostileAutoAttackTargetValid(t *testing.T) {
 			target:        func() *gateTarget { return &gateTarget{id: 2} },
 			targetPos:     [3]int{100, 100, 0},
 			want:          true,
+		},
+		{
+			name:       "a target within its post-fake-death grace period is excluded",
+			aggroRange: 10,
+			target:     func() *gateTarget { return &gateTarget{id: 2, recentFakeDeath: true} },
+			targetPos:  [3]int{100, 100, 0},
+			want:       false,
 		},
 	}
 

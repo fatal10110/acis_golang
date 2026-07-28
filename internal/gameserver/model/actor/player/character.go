@@ -122,6 +122,7 @@ type Character struct {
 	disabledItems        map[int32]time.Time
 	shortBuffTaskSkillID int32
 	shortBuffTimer       *time.Timer
+	recentFakeDeathUntil time.Time
 	groundTarget         location.Location
 	target               world.Tracked
 	log                  zerolog.Logger

@@ -36,20 +36,26 @@ func (h *Hostile) Aggressive() bool {
 //
 // This ports the reference server's default targeting rule. Door exclusion
 // needs no explicit check: door.Object doesn't implement
-// attackable.Combatant, so a door can never be passed as target here. Not
-// modeled: the Player-only sub-checks (appearance invisibility,
-// allied-Varka/allied-Ketra exclusion, rift-room memo — recent-fake-death
-// grace period is tracked separately by issue #898), Guard's aggressive-
-// Monster branch (gated by a config flag that ships disabled by default,
-// and needs npc AI config plumbing that doesn't exist yet), and the
-// peace-zone aggro config flag (allowPeaceful is a caller-supplied
-// parameter here rather than the reference's own config-driven default).
+// attackable.Combatant, so a door can never be passed as target here. A
+// non-NPC target still within its post-fake-death grace period is excluded
+// too, matching the reference's recent-fake-death check. Not modeled: the
+// remaining Player-only sub-checks (appearance invisibility, allied-Varka/
+// allied-Ketra exclusion, rift-room memo), Guard's aggressive-Monster
+// branch (gated by a config flag that ships disabled by default, and needs
+// npc AI config plumbing that doesn't exist yet), and the peace-zone aggro
+// config flag (allowPeaceful is a caller-supplied parameter here rather
+// than the reference's own config-driven default).
 func (h *Hostile) AutoAttackTargetValid(target attackable.Combatant, rangeVal int, allowPeaceful bool) bool {
 	if target == nil || target.AlikeDead() {
 		return false
 	}
 
 	_, targetIsNPC := target.(*Hostile)
+	if !targetIsNPC {
+		if recent, ok := target.(interface{ RecentFakeDeath() bool }); ok && recent.RecentFakeDeath() {
+			return false
+		}
+	}
 	if !targetIsNPC && !h.inRangeAndUnconcealed(target, rangeVal) {
 		return false
 	}

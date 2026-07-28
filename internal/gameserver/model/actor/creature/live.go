@@ -73,6 +73,15 @@ func (l *Live) Sleeping() bool {
 	return l.effects.IsAffected(effect.FlagSleep)
 }
 
+// FakeDead reports whether an active effect currently makes this creature
+// play dead.
+func (l *Live) FakeDead() bool {
+	if l == nil {
+		return false
+	}
+	return l.effects.IsAffected(effect.FlagFakeDeath)
+}
+
 // SilentMoving reports whether an active effect currently lets this
 // creature move without alerting nearby AI.
 func (l *Live) SilentMoving() bool {
