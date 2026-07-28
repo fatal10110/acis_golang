@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
@@ -172,6 +173,10 @@ const (
 	// TypeRandomizeHate swaps a random valid attacker into its target's
 	// most-hated slot, ahead of the current top-hate attacker.
 	TypeRandomizeHate Type = "RANDOMIZE_HATE"
+	// TypeThrowUp is a knockback: it stuns the target for the effect's
+	// duration, computes a geo-corrected landing point once at start, and
+	// teleports the target there at effect end.
+	TypeThrowUp Type = "THROW_UP"
 )
 
 type kind struct {
@@ -238,6 +243,7 @@ var coreKinds = map[string]kind{
 	"Confusion":             {typ: TypeConfusion, flag: FlagConfused},
 	"Betray":                {typ: TypeBetray, flag: FlagBetrayed, debuff: true},
 	"RandomizeHate":         {typ: TypeRandomizeHate},
+	"ThrowUp":               {typ: TypeThrowUp, flag: FlagStunned, debuff: true},
 }
 
 var fearSkippedPlayableSkillIDs = map[modelskill.ID]bool{
@@ -408,6 +414,9 @@ func wireHooks(e *Effect) {
 		e.OnExit = betrayExit
 	case TypeRandomizeHate:
 		e.OnStart = randomizeHateStart
+	case TypeThrowUp:
+		e.OnStart = throwUpStart
+		e.OnExit = throwUpExit
 	}
 }
 
@@ -1838,4 +1847,93 @@ func ManaDamageOverTimeTick(in ManaDamageOverTimeInput) ManaDamageOverTimeResult
 		return ManaDamageOverTimeResult{RemovedForLackMP: true}
 	}
 	return ManaDamageOverTimeResult{Damage: in.Damage, Continue: true}
+}
+
+// flightPosition is the world coordinates a knockback reads from both sides
+// of the throw: the effector as pivot, the effected as origin.
+type flightPosition interface {
+	X() int
+	Y() int
+	Z() int
+}
+
+// flightResolver corrects a knockback's raw destination against geodata,
+// the same terrain-walk primitive ordinary movement resolution uses.
+type flightResolver interface {
+	ValidLocation(ox, oy, oz, tx, ty, tz int) location.Location
+}
+
+// flightMover carries out a knockback's client-visible flight and its
+// server-authoritative landing. SetXYZ and BroadcastPosition reuse the
+// jumpCaster naming from handler/skill/teleport.go so one actor
+// implementation satisfies both.
+type flightMover interface {
+	FlyTo(dest location.Location, flight modelskill.Flight)
+	SetXYZ(x, y, z int)
+	BroadcastPosition()
+}
+
+// throwUpStart computes a knockback's landing point and starts the
+// client-visible flight. The target is always aborted first, even when the
+// distance gate below rejects the effect outright — that ordering matches
+// the reference behavior, where the abort is unconditional and the range
+// check only guards whether the flight itself happens.
+//
+// The destination pivots on the effector's position, not the effected's:
+// the target is pushed further along the effector-to-effected line. Z is
+// left at the effected's current height even after the X/Y geo correction
+// below — the reference implementation never corrects Z for this effect,
+// a known approximation preserved here rather than fixed.
+func throwUpStart(e *Effect) bool {
+	abortAll(e.Effected)
+
+	source, ok := e.Effector.(flightPosition)
+	if !ok {
+		return false
+	}
+	target, ok := e.Effected.(flightPosition)
+	if !ok {
+		return false
+	}
+
+	ox, oy, oz := target.X(), target.Y(), target.Z()
+	dx := float64(source.X() - ox)
+	dy := float64(source.Y() - oy)
+	distance := math.Sqrt(dx*dx + dy*dy)
+	if distance < 1 || distance > 2000 {
+		return false
+	}
+
+	offset := math.Min(distance+float64(e.Skill.FlyRadius), 1400)
+	offset += math.Abs(float64(source.Z() - oz))
+	if offset < 5 {
+		offset = 5
+	}
+
+	x := source.X() - int(offset*(dx/distance))
+	y := source.Y() - int(offset*(dy/distance))
+	z := oz
+
+	if resolver, ok := e.Effected.(flightResolver); ok {
+		valid := resolver.ValidLocation(ox, oy, oz, x, y, z)
+		x, y = valid.X, valid.Y
+	}
+
+	e.landing = location.Location{X: x, Y: y, Z: z}
+	refresh(e.Effected)
+
+	if mover, ok := e.Effected.(flightMover); ok {
+		mover.FlyTo(e.landing, modelskill.FlightThrowUp)
+	}
+	return true
+}
+
+// throwUpExit teleports the target to its pre-computed landing point and
+// syncs it to observers.
+func throwUpExit(e *Effect) {
+	refresh(e.Effected)
+	if mover, ok := e.Effected.(flightMover); ok {
+		mover.SetXYZ(e.landing.X, e.landing.Y, e.landing.Z)
+		mover.BroadcastPosition()
+	}
 }

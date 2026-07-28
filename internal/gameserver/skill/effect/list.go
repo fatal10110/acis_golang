@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
 )
@@ -79,6 +80,10 @@ type Skill struct {
 	NegateLevel int
 	NegateIDs   []int
 	NegateTypes []string
+
+	// FlyRadius is the owning skill's configured forced-flight distance,
+	// read by the knockback effect kind to size its landing offset.
+	FlyRadius int
 }
 
 func (s Skill) sevenSigns() bool {
@@ -128,6 +133,11 @@ type Effect struct {
 	OnAction   func(*Effect) bool
 	OnExit     func(*Effect)
 	OnStopTask func(*Effect)
+
+	// landing is the knockback effect kind's geo-resolved touchdown point,
+	// computed once in throwUpStart and applied in throwUpExit. Unused by
+	// every other kind.
+	landing location.Location
 
 	inUse bool
 

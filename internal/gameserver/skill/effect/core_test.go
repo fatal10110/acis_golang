@@ -8,6 +8,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
@@ -796,6 +797,10 @@ type liveEffectTarget struct {
 	hpFull            bool
 	objectID          int32
 	ownerID           int32
+	x, y, z           int
+	validLocationFn   func(ox, oy, oz, tx, ty, tz int) location.Location
+	flightDest        location.Location
+	flightType        modelskill.Flight
 }
 
 func (t *liveEffectTarget) EffectList() *List { return t.list }
@@ -964,6 +969,31 @@ func (t *liveEffectTarget) HPFull() bool { return t.hpFull }
 func (t *liveEffectTarget) ObjectID() int32 { return t.objectID }
 
 func (t *liveEffectTarget) OwnerID() int32 { return t.ownerID }
+
+func (t *liveEffectTarget) X() int { return t.x }
+func (t *liveEffectTarget) Y() int { return t.y }
+func (t *liveEffectTarget) Z() int { return t.z }
+
+func (t *liveEffectTarget) ValidLocation(ox, oy, oz, tx, ty, tz int) location.Location {
+	if t.validLocationFn != nil {
+		return t.validLocationFn(ox, oy, oz, tx, ty, tz)
+	}
+	return location.Location{X: tx, Y: ty, Z: tz}
+}
+
+func (t *liveEffectTarget) FlyTo(dest location.Location, flight modelskill.Flight) {
+	t.flightDest = dest
+	t.flightType = flight
+	t.events = append(t.events, "fly")
+}
+
+func (t *liveEffectTarget) SetXYZ(x, y, z int) {
+	t.x, t.y, t.z = x, y, z
+}
+
+func (t *liveEffectTarget) BroadcastPosition() {
+	t.events = append(t.events, "broadcast")
+}
 
 // noBonusHealTarget implements only the minimum heal capability, to
 // exercise the healStart/manaHealStart fallback defaults when the optional
@@ -2224,5 +2254,90 @@ func TestIncreaseChargesEffectRejectsNonChargesTarget(t *testing.T) {
 
 	if e.OnStart(e) {
 		t.Fatal("increase charges effect start accepted a target without IncreaseCharges")
+	}
+}
+
+func TestThrowUpEffectComputesLandingAndFliesThenTeleportsOnExit(t *testing.T) {
+	effector := &liveEffectTarget{x: 100, y: 0, z: 0}
+	effected := &liveEffectTarget{x: 0, y: 0, z: 0}
+
+	e, err := New(Skill{ID: 1, FlyRadius: 600}, modelskill.EffectTemplate{Name: "ThrowUp"})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e.Effector = effector
+	e.Effected = effected
+
+	if !e.OnStart(e) {
+		t.Fatal("throw-up effect start rejected a valid range")
+	}
+	// distance=100, offset=min(100+600,1400)=700, cos=1, sin=0:
+	// x = 100 - 700*1 = -600, y = 0, z = effected's Z at cast time (0).
+	want := location.Location{X: -600, Y: 0, Z: 0}
+	if e.landing != want {
+		t.Fatalf("landing = %+v, want %+v", e.landing, want)
+	}
+	if effected.flightDest != want {
+		t.Fatalf("FlyTo dest = %+v, want %+v", effected.flightDest, want)
+	}
+	if effected.flightType != modelskill.FlightThrowUp {
+		t.Fatalf("FlyTo flight = %v, want FlightThrowUp", effected.flightType)
+	}
+	if effected.x != 0 || effected.y != 0 || effected.z != 0 {
+		t.Fatal("throw-up effect start must not move the target before exit")
+	}
+
+	e.OnExit(e)
+	if effected.x != want.X || effected.y != want.Y || effected.z != want.Z {
+		t.Fatalf("position after exit = (%d,%d,%d), want (%d,%d,%d)", effected.x, effected.y, effected.z, want.X, want.Y, want.Z)
+	}
+	if want := []string{"abort:false", "abnormal", "fly", "abnormal", "broadcast"}; !reflect.DeepEqual(effected.events, want) {
+		t.Fatalf("effected events = %#v, want %#v", effected.events, want)
+	}
+}
+
+func TestThrowUpEffectAppliesGeoCorrectedXYButKeepsOriginalZ(t *testing.T) {
+	effector := &liveEffectTarget{x: 100, y: 0, z: 500}
+	effected := &liveEffectTarget{x: 0, y: 0, z: 0}
+	effected.validLocationFn = func(ox, oy, oz, tx, ty, tz int) location.Location {
+		return location.Location{X: tx / 2, Y: ty, Z: 999}
+	}
+
+	e, err := New(Skill{ID: 1, FlyRadius: 600}, modelskill.EffectTemplate{Name: "ThrowUp"})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e.Effector = effector
+	e.Effected = effected
+
+	if !e.OnStart(e) {
+		t.Fatal("throw-up effect start rejected a valid range")
+	}
+	// offset = min(100+600,1400) + |effector.Z-effected.Z| = 700+500 = 1200,
+	// so raw x before geo correction is 100-1200 = -1100; geo halves it to
+	// -550. Z stays the effected's Z at cast time (0), never the
+	// geo-returned 999.
+	want := location.Location{X: -550, Y: 0, Z: 0}
+	if e.landing != want {
+		t.Fatalf("landing = %+v, want %+v (geo-corrected X/Y, uncorrected Z)", e.landing, want)
+	}
+}
+
+func TestThrowUpEffectOutOfRangeAbortsButStillAbortsCurrentAction(t *testing.T) {
+	effector := &liveEffectTarget{x: 3000, y: 0, z: 0}
+	effected := &liveEffectTarget{x: 0, y: 0, z: 0}
+
+	e, err := New(Skill{ID: 1, FlyRadius: 600}, modelskill.EffectTemplate{Name: "ThrowUp"})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e.Effector = effector
+	e.Effected = effected
+
+	if e.OnStart(e) {
+		t.Fatal("throw-up effect start accepted a distance beyond the 2000-unit range gate")
+	}
+	if want := []string{"abort:false"}; !reflect.DeepEqual(effected.events, want) {
+		t.Fatalf("effected events = %#v, want %#v (abort still runs before the range gate, but no fly)", effected.events, want)
 	}
 }
