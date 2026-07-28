@@ -244,6 +244,9 @@ func (l *GameClientLink) attachLivePlayer(client *Client, c *player.Character, t
 	c.SetStatusBroadcaster(func() {
 		l.broadcastLiveStatus(live)
 	})
+	c.SetAbnormalEffectUpdater(func() {
+		l.updateLiveAbnormalEffect(live)
+	})
 	c.SetShortBuffBroadcaster(func(update player.ShortBuffUpdate) {
 		live.SendFrame(serverpackets.FrameShortBuffStatusUpdate(update.SkillID, update.Level, update.DurationSeconds))
 	})

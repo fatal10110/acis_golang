@@ -2,6 +2,7 @@ package network
 
 import (
 	"context"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
@@ -239,6 +240,27 @@ func (l *GameClientLink) broadcastLiveStatus(live *livePlayer) {
 		}
 		receiver.SendFrame(serverpackets.FrameStatusUpdate(live.ObjectID(), attrs))
 	})
+}
+
+// updateLiveAbnormalEffect sends live's own session its current active
+// abnormal-effect icon list. Unlike broadcastLiveStatus, this packet only
+// ever goes to the effected player's own client, matching the reference's
+// AbnormalStatusUpdate.
+func (l *GameClientLink) updateLiveAbnormalEffect(live *livePlayer) {
+	if live == nil {
+		return
+	}
+	entries := live.EffectList().IconEntries(time.Now())
+	effects := make([]serverpackets.AbnormalStatusEffect, len(entries))
+	for i, e := range entries {
+		effects[i] = serverpackets.AbnormalStatusEffect{
+			SkillID:        e.ID,
+			Level:          int32(e.Level),
+			DurationMillis: int(e.Duration),
+			Toggle:         e.Toggle,
+		}
+	}
+	live.SendFrame(serverpackets.FrameAbnormalStatusUpdate(effects))
 }
 
 func targetColor(attacker *player.Character, target world.Tracked) int {

@@ -84,20 +84,21 @@ type Character struct {
 	DeleteAt   int64
 	LastAccess int64
 
-	runtimeTemplate    *Template
-	inventory          *itemcontainer.Inventory
-	world              *world.State
-	los                LineOfSight
-	zones              PeaceZoneQuery
-	sendFrame          func(wire.Frame) bool
-	broadcastAttack    func(attack.Snapshot)
-	broadcastMove      func(move.Event)
-	broadcastStop      func()
-	broadcastDie       func()
-	broadcastStatus    func()
-	broadcastShortBuff func(ShortBuffUpdate)
-	roll               func(int) int
-	attackTarget       func(world.Tracked)
+	runtimeTemplate      *Template
+	inventory            *itemcontainer.Inventory
+	world                *world.State
+	los                  LineOfSight
+	zones                PeaceZoneQuery
+	sendFrame            func(wire.Frame) bool
+	broadcastAttack      func(attack.Snapshot)
+	broadcastMove        func(move.Event)
+	broadcastStop        func()
+	broadcastDie         func()
+	broadcastStatus      func()
+	updateAbnormalEffect func()
+	broadcastShortBuff   func(ShortBuffUpdate)
+	roll                 func(int) int
+	attackTarget         func(world.Tracked)
 
 	deathMu sync.Mutex
 	dead    bool

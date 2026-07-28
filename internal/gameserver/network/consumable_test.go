@@ -24,7 +24,7 @@ func consumableSkillTable(t *testing.T) *skillstate.Persistence {
 		{
 			ID: 2031, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
 			SkillType: "HOT", Potion: true, HitTime: 0,
-			Effects: []modelskill.EffectTemplate{{Name: "HealOverTime", Count: 7, Time: 2, Value: 16}},
+			Effects: []modelskill.EffectTemplate{{Name: "HealOverTime", Count: 7, Time: 2, Value: 16, Icon: true}},
 		},
 		{
 			ID: 2279, Level: 2, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
@@ -139,6 +139,9 @@ func TestGameClientLinkUseHealingPotionAppliesAndConsumes(t *testing.T) {
 	}
 
 	c.send(encodeUseItem(objectID, false))
+	if entries := readAbnormalStatusUpdateFrame(t, c); len(entries) != 1 || entries[0].SkillID != 2031 || entries[0].Level != 1 || entries[0].Duration != 14 {
+		t.Fatalf("AbnormalStatusUpdate entries = %+v, want one entry skill 2031 level 1 duration 14s", entries)
+	}
 	readInventoryUpdate(t, c, objectID, 4)
 	readExUseSharedGroupItem(t, c, potionTemplate, 8, 10, 10)
 	readMagicSkillUseSelf(t, c, live.ObjectID(), 2031, 1)

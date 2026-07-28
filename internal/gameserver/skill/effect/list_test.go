@@ -567,3 +567,96 @@ func TestListRejectsSameSkillRecastOfFlagGatedEffectBeforeIdenticalDebuffLogic(t
 	}
 	requireNames(t, list.All(), []string{"stun"})
 }
+
+// abnormalUpdateOwner is a StatOwner that also implements abnormalUpdater,
+// recording one call per notification.
+type abnormalUpdateOwner struct {
+	eventOwner
+	calls *int
+}
+
+func (o abnormalUpdateOwner) UpdateAbnormalEffect() {
+	*o.calls++
+}
+
+func TestListNotifiesAbnormalUpdateOnEveryAddAndRemove(t *testing.T) {
+	var events []string
+	var calls int
+	list := NewList(abnormalUpdateOwner{eventOwner: eventOwner{events: &events}, calls: &calls})
+
+	e := namedEffect("buff", 1, "none", 0, false, &events)
+	list.Add(e)
+	if calls != 1 {
+		t.Fatalf("calls after Add = %d, want 1", calls)
+	}
+
+	list.Remove(e)
+	if calls != 2 {
+		t.Fatalf("calls after Remove = %d, want 2", calls)
+	}
+}
+
+func TestListIconEntriesSkipsEffectsWithoutShowIconOrNotActive(t *testing.T) {
+	list := NewList(nil)
+
+	shown := &Effect{
+		Skill:    Skill{ID: 10, Level: 3},
+		Template: modelskill.EffectTemplate{Name: "buff", Time: -1, Icon: true},
+		Level:    3,
+	}
+	shown.OnStart = func(*Effect) bool { return true }
+
+	hidden := &Effect{
+		Skill:    Skill{ID: 11, Level: 1},
+		Template: modelskill.EffectTemplate{Name: "buff", Time: -1, Icon: false},
+	}
+	hidden.OnStart = func(*Effect) bool { return true }
+
+	signetGround := &Effect{
+		Skill:    Skill{ID: 12, Level: 1},
+		Template: modelskill.EffectTemplate{Name: "buff", Time: -1, Icon: true, EffectType: "SIGNET_GROUND"},
+	}
+	signetGround.OnStart = func(*Effect) bool { return true }
+
+	list.Add(shown)
+	list.Add(hidden)
+	list.Add(signetGround)
+
+	entries := list.IconEntries(time.Now())
+	if len(entries) != 1 || entries[0].ID != 10 || entries[0].Level != 3 || entries[0].Duration != -1 {
+		t.Fatalf("IconEntries() = %+v, want one permanent entry for skill 10", entries)
+	}
+}
+
+func TestListIconEntriesReportsToggleAndRepeatCountDurations(t *testing.T) {
+	list := NewList(nil)
+
+	toggle := &Effect{
+		Skill:    Skill{ID: 20, Level: 1, Toggle: true},
+		Template: modelskill.EffectTemplate{Name: "buff", Time: -1, Icon: true},
+	}
+	toggle.OnStart = func(*Effect) bool { return true }
+
+	repeat := &Effect{
+		Skill:    Skill{ID: 21, Level: 1},
+		Template: modelskill.EffectTemplate{Name: "dot", Time: 2, Count: 5, Icon: true},
+	}
+	repeat.OnStart = func(*Effect) bool { return true }
+
+	list.Add(toggle)
+	list.Add(repeat)
+
+	entries := list.IconEntries(time.Now())
+	if len(entries) != 2 {
+		t.Fatalf("IconEntries() len = %d, want 2", len(entries))
+	}
+	// insertBuff always places a non-toggle buff ahead of any toggle
+	// already in the list, so the repeat-count entry (non-toggle) comes
+	// first even though the toggle was added first.
+	if entries[0].ID != 21 || entries[0].Toggle || entries[0].Duration != 10_000 {
+		t.Fatalf("repeat-count entry = %+v, want id 21, non-toggle, duration 10000ms (5*2s)", entries[0])
+	}
+	if entries[1].ID != 20 || !entries[1].Toggle || entries[1].Duration != -1 {
+		t.Fatalf("toggle entry = %+v, want id 20, toggle, duration -1", entries[1])
+	}
+}
