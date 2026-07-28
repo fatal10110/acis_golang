@@ -42,7 +42,7 @@ func (l *GameClientLink) restartLivePlayer(live *livePlayer, req clientpackets.R
 		return
 	}
 
-	live.Revive(l.respawnRestoreHP)
+	live.Revive(l.playerConfig.RespawnRestoreHP)
 	l.broadcastLiveRevive(live)
 	l.teleportLivePlayer(live, dest, restartTeleportOffset)
 }

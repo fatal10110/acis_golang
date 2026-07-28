@@ -993,7 +993,8 @@ func newTestGameClientLinkWithSkillsShortcutsCrestsKarmaAndLog(t *testing.T, log
 	if len(cursedWeapons) > 0 {
 		cursed = cursedWeapons[0]
 	}
-	gcl := NewGameClientLink(validator, loginLink, roster, items, shortcuts, templates, itemTemplates, html, crests, skills, spellbooks, trees, cursed, state, nil, testGeo{}, nil, ids, groundItems, nil, task.NewPositionUpdates(state), nil, nil, 0.7, nil, true, karmaPlayerCanTeleport, petmodel.DefaultConfig(), log)
+	playerConfig := PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: karmaPlayerCanTeleport}
+	gcl := NewGameClientLink(validator, loginLink, roster, items, shortcuts, templates, itemTemplates, html, crests, skills, spellbooks, trees, cursed, state, nil, testGeo{}, nil, ids, groundItems, nil, task.NewPositionUpdates(state), nil, nil, nil, playerConfig, petmodel.DefaultConfig(), log)
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {

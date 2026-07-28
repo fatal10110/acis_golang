@@ -20,7 +20,7 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 	}
 
 	if def, ok := l.skills.Definition(modelskill.Ref{ID: modelskill.ID(req.SkillID), Level: live.SkillLevel(int(req.SkillID))}); ok {
-		if def.SkillType == "RECALL" && !l.karmaPlayerCanTeleport && live.Karma() > 0 {
+		if def.SkillType == "RECALL" && !l.playerConfig.KarmaPlayerCanTeleport && live.Karma() > 0 {
 			sendMagicActionFailed(live)
 			return
 		}
