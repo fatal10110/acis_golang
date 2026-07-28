@@ -19,6 +19,7 @@ type Cast struct {
 // Definitions resolves loaded skill definitions.
 type Definitions interface {
 	Definition(modelskill.Ref) (modelskill.Definition, bool)
+	MaxLevel(modelskill.ID) int
 }
 
 // Handler applies one skill action to already-resolved targets.
@@ -90,6 +91,7 @@ func NewDefaultRegistryWithDefinitions(defs Definitions) *Registry {
 		sweepHandler{},
 		seedHandler{},
 		continuousHandler{defs: defs},
+		fusionHandler{defs: defs},
 	)
 }
 

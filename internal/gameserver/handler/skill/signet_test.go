@@ -124,6 +124,16 @@ func (f fakeSignetDefinitions) Definition(ref modelskill.Ref) (modelskill.Defini
 	return d, ok
 }
 
+func (f fakeSignetDefinitions) MaxLevel(id modelskill.ID) int {
+	max := 0
+	for ref := range f.byRef {
+		if ref.ID == id && ref.Level > max {
+			max = ref.Level
+		}
+	}
+	return max
+}
+
 func newTestSignetHandler(defs Definitions) (signetHandler, *world.State) {
 	state := world.New()
 	templates := fakeSignetTemplates{byID: map[int]*npc.Template{

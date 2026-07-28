@@ -106,6 +106,16 @@ func (d continuousDefinitions) Definition(ref modelskill.Ref) (modelskill.Defini
 	return def, ok
 }
 
+func (d continuousDefinitions) MaxLevel(id modelskill.ID) int {
+	max := 0
+	for ref := range d {
+		if ref.ID == id && ref.Level > max {
+			max = ref.Level
+		}
+	}
+	return max
+}
+
 func TestContinuousBuffLandsOnCleanTarget(t *testing.T) {
 	registry := NewDefaultRegistry()
 	target := newContinuousFake(2)
