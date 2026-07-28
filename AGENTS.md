@@ -102,7 +102,9 @@ its risk and uncertainty.
   work.
 - Use verification-before-completion before claiming implementation work complete.
 - Answer inline when `rg`, `gopls`, or a targeted read resolves it in a few calls; delegation is
-  never the default. When delegation is warranted, use the bounded named agents rather than a
+  never the default. For a bounded, independent read-only lookup, run the free OpenCode scout via
+  `scripts/agent-tools/opencode_eval.py`, then verify its evidence locally. Use its builder or reviewer only when the
+  user explicitly requests them. For other delegation, use the bounded named agents rather than a
   generic search agent: `java-lookup` for one exact fact, `java-researcher` for one multi-file
   behavior investigation. They cap model, turns, and report size, so they cost less than
   `general-purpose` or `Explore` for the same question. Never use a generic search agent for aCis

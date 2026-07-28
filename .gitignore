@@ -1,1 +1,5 @@
 .worktrees/
+log
+config/
+.DS_Store
+.vscode
