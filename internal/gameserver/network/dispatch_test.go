@@ -967,6 +967,15 @@ func newTestGameClientLinkWithSkillsShortcutsAndLog(t *testing.T, loginLink func
 
 func newTestGameClientLinkWithSkillsShortcutsCrestsAndLog(t *testing.T, loginLink func() *LoginLink, validator *SessionValidator, skills *skillstate.Persistence, crests *datacache.Crests, spellbooks modelskill.BookPolicy, trees *modelskill.Trees, log zerolog.Logger, cursedWeapons ...*entity.CursedWeaponTable) (addr string, chars *fakeCharStore, items *fakeItemStore, shortcuts *fakeShortcutStore, state *world.State) {
 	t.Helper()
+	return newTestGameClientLinkWithSkillsShortcutsCrestsKarmaAndLog(t, loginLink, validator, skills, crests, spellbooks, trees, true, log, cursedWeapons...)
+}
+
+// newTestGameClientLinkWithSkillsShortcutsCrestsKarmaAndLog is the full
+// constructor; karmaPlayerCanTeleport plugs the players.properties
+// KarmaPlayerCanTeleport gate so karma-teleport-rejection tests can run it
+// false without disturbing every other caller's default-true setup.
+func newTestGameClientLinkWithSkillsShortcutsCrestsKarmaAndLog(t *testing.T, loginLink func() *LoginLink, validator *SessionValidator, skills *skillstate.Persistence, crests *datacache.Crests, spellbooks modelskill.BookPolicy, trees *modelskill.Trees, karmaPlayerCanTeleport bool, log zerolog.Logger, cursedWeapons ...*entity.CursedWeaponTable) (addr string, chars *fakeCharStore, items *fakeItemStore, shortcuts *fakeShortcutStore, state *world.State) {
+	t.Helper()
 	chars = newFakeCharStore()
 	items = newFakeItemStore()
 	shortcuts = newFakeShortcutStore()
@@ -984,7 +993,8 @@ func newTestGameClientLinkWithSkillsShortcutsCrestsAndLog(t *testing.T, loginLin
 	if len(cursedWeapons) > 0 {
 		cursed = cursedWeapons[0]
 	}
-	gcl := NewGameClientLink(validator, loginLink, roster, items, shortcuts, templates, itemTemplates, html, crests, skills, spellbooks, trees, cursed, state, nil, testGeo{}, nil, ids, groundItems, nil, task.NewPositionUpdates(state), nil, nil, 0.7, nil, true, petmodel.DefaultConfig(), log)
+	playerConfig := PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: karmaPlayerCanTeleport}
+	gcl := NewGameClientLink(validator, loginLink, roster, items, shortcuts, templates, itemTemplates, html, crests, skills, spellbooks, trees, cursed, state, nil, testGeo{}, nil, ids, groundItems, nil, task.NewPositionUpdates(state), nil, nil, nil, playerConfig, petmodel.DefaultConfig(), log)
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -1070,6 +1080,45 @@ func newLinkedGameClientWithSkillsShortcutsCrestsSeed(t *testing.T, skills *skil
 		t.Fatalf("initial char count = %d, want %d", count, wantChars)
 	}
 	return c, chars, items, shortcuts, state
+}
+
+// newLinkedGameClientWithKarmaPlayerCanTeleport is
+// newLinkedGameClientWithSkillsShortcutsCrestsSeed with an explicit
+// KarmaPlayerCanTeleport value, for the karma-teleport-rejection tests.
+func newLinkedGameClientWithKarmaPlayerCanTeleport(t *testing.T, karmaPlayerCanTeleport bool, skills *skillstate.Persistence, seed func(*fakeCharStore, *fakeItemStore), wantChars int) (c *fakeGameClient, chars *fakeCharStore, items *fakeItemStore, state *world.State) {
+	t.Helper()
+
+	loginAddr, servers, sessions := newTestLoginServer(t, false)
+	servers.Register(1, testHexID)
+
+	validator := NewSessionValidator()
+	auth := LoginServerAuth{ServerID: 1, HexID: testHexID, HostName: "*", Port: 7777, MaxPlayers: 300}
+	loginLink, err := DialLoginLink(context.Background(), loginAddr, auth, LoginLinkHandlers{PlayerAuthResponse: validator.Resolve}, zerolog.Nop())
+	if err != nil {
+		t.Fatalf("DialLoginLink: %v", err)
+	}
+	t.Cleanup(func() { loginLink.Close() })
+
+	addr, chars, items, _, state := newTestGameClientLinkWithSkillsShortcutsCrestsKarmaAndLog(t, func() *LoginLink { return loginLink }, validator, skills, nil, modelskill.BookPolicy{}, nil, karmaPlayerCanTeleport, zerolog.Nop())
+	if seed != nil {
+		seed(chars, items)
+	}
+
+	c = dialGameClient(t, addr)
+	c.sendProtocolVersion(746)
+
+	key := link.SessionKey{LoginKey1: 11, LoginKey2: 22, PlayKey1: 33, PlayKey2: 44}
+	sessions.Put("player1", key)
+	c.send(encodeAuthLogin("player1", key))
+
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeCharSelectInfo {
+		t.Fatalf("opcode = %#x, want CharSelectInfo (%#x)", reply[0], serverpackets.OpcodeCharSelectInfo)
+	}
+	if count := wire.NewReader(reply[1:]).ReadInt32(); count != int32(wantChars) {
+		t.Fatalf("initial char count = %d, want %d", count, wantChars)
+	}
+	return c, chars, items, state
 }
 
 func seedSelectableCharacter(t *testing.T, chars *fakeCharStore, account, name string, level, sp int) int32 {

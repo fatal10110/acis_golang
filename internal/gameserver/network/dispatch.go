@@ -66,46 +66,60 @@ const (
 	groundPickupInteractionDistance = 150
 )
 
+// PlayerConfig bundles the primitive players.properties-derived gameplay
+// flags GameClientLink needs, so its constructor doesn't grow one
+// bool/float parameter per config key.
+type PlayerConfig struct {
+	// RespawnRestoreHP is the fraction of calculated max HP a non-percent
+	// revive restores.
+	RespawnRestoreHP float64
+	// SkillEnchantSPBookNeeded controls whether enchanting a skill above
+	// level 76 also consumes the tree's configured spellbook item.
+	SkillEnchantSPBookNeeded bool
+	// KarmaPlayerCanTeleport controls whether a karma-carrying player may
+	// use a TELEPORT/RECALL-type skill, direct or item-attached.
+	KarmaPlayerCanTeleport bool
+}
+
 // GameClientLink accepts and drives connections from Interlude game
 // clients: the VersionCheck/cipher handshake, session-key validation
 // against the login server, character list/create/delete/restore, and
 // character select through to world entry.
 type GameClientLink struct {
-	validator                *SessionValidator
-	loginLink                func() *LoginLink
-	roster                   *manager.Roster
-	items                    itemStore
-	shortcuts                shortcutStore
-	templates                *player.TemplateTable
-	itemTemplates            *item.Table
-	html                     *datacache.HTML
-	crests                   *datacache.Crests
-	skills                   *skillstate.Persistence
-	spellbooks               modelskill.BookPolicy
-	skillTrees               *modelskill.Trees
-	cursedWeapons            *entity.CursedWeaponTable
-	world                    *world.State
-	npcs                     *npc.Table
-	geo                      move.Geo
-	zones                    *zone.Index
-	ids                      idAllocator
-	groundItems              groundItemDropper
-	attackStance             attackStanceTracker
-	positions                *task.PositionUpdates
-	playerClock              *task.PlayerClock
-	restarts                 *restart.Table
-	respawnRestoreHP         float64
-	levels                   *player.LevelTable
-	skillEnchantSPBookNeeded bool
-	petConfig                petmodel.Config // passed into summon.PetConfig by newPet.
-	inventory                *invops.Service
-	petItems                 *petitem.Service
-	trades                   *tradebook.Book
-	enchantState             *enchantflow.State
-	enchant                  *enchantflow.Service
-	targets                  *skilltarget.Registry
-	skillHandlers            *handlerskill.Registry
-	log                      zerolog.Logger
+	validator     *SessionValidator
+	loginLink     func() *LoginLink
+	roster        *manager.Roster
+	items         itemStore
+	shortcuts     shortcutStore
+	templates     *player.TemplateTable
+	itemTemplates *item.Table
+	html          *datacache.HTML
+	crests        *datacache.Crests
+	skills        *skillstate.Persistence
+	spellbooks    modelskill.BookPolicy
+	skillTrees    *modelskill.Trees
+	cursedWeapons *entity.CursedWeaponTable
+	world         *world.State
+	npcs          *npc.Table
+	geo           move.Geo
+	zones         *zone.Index
+	ids           idAllocator
+	groundItems   groundItemDropper
+	attackStance  attackStanceTracker
+	positions     *task.PositionUpdates
+	playerClock   *task.PlayerClock
+	restarts      *restart.Table
+	levels        *player.LevelTable
+	playerConfig  PlayerConfig
+	petConfig     petmodel.Config // passed into summon.PetConfig by newPet.
+	inventory     *invops.Service
+	petItems      *petitem.Service
+	trades        *tradebook.Book
+	enchantState  *enchantflow.State
+	enchant       *enchantflow.Service
+	targets       *skilltarget.Registry
+	skillHandlers *handlerskill.Registry
+	log           zerolog.Logger
 
 	// newCipherKey supplies each connection's XOR cipher key; overridden in
 	// tests for a deterministic handshake.
@@ -151,45 +165,43 @@ func NewGameClientLink(
 	positions *task.PositionUpdates,
 	playerClock *task.PlayerClock,
 	restarts *restart.Table,
-	respawnRestoreHP float64,
 	levels *player.LevelTable,
-	skillEnchantSPBookNeeded bool,
+	playerConfig PlayerConfig,
 	petConfig petmodel.Config,
 	log zerolog.Logger,
 ) *GameClientLink {
 	return &GameClientLink{
-		validator:                validator,
-		loginLink:                loginLink,
-		roster:                   roster,
-		items:                    items,
-		shortcuts:                shortcuts,
-		templates:                templates,
-		itemTemplates:            itemTemplates,
-		html:                     html,
-		crests:                   crests,
-		skills:                   skills,
-		spellbooks:               spellbooks,
-		skillTrees:               skillTrees,
-		cursedWeapons:            cursedWeapons,
-		world:                    worldState,
-		npcs:                     npcs,
-		geo:                      geo,
-		zones:                    zones,
-		ids:                      ids,
-		groundItems:              groundItems,
-		attackStance:             attackStance,
-		positions:                positions,
-		playerClock:              playerClock,
-		restarts:                 restarts,
-		respawnRestoreHP:         respawnRestoreHP,
-		levels:                   levels,
-		skillEnchantSPBookNeeded: skillEnchantSPBookNeeded,
-		petConfig:                petConfig,
-		inventory:                invops.NewService(ids),
-		petItems:                 petitem.NewService(ids),
-		trades:                   tradebook.NewBook(time.Now),
-		enchantState:             enchantflow.NewState(),
-		targets:                  skilltarget.NewRegistry(skilltarget.WorldKnown{State: worldState}),
+		validator:     validator,
+		loginLink:     loginLink,
+		roster:        roster,
+		items:         items,
+		shortcuts:     shortcuts,
+		templates:     templates,
+		itemTemplates: itemTemplates,
+		html:          html,
+		crests:        crests,
+		skills:        skills,
+		spellbooks:    spellbooks,
+		skillTrees:    skillTrees,
+		cursedWeapons: cursedWeapons,
+		world:         worldState,
+		npcs:          npcs,
+		geo:           geo,
+		zones:         zones,
+		ids:           ids,
+		groundItems:   groundItems,
+		attackStance:  attackStance,
+		positions:     positions,
+		playerClock:   playerClock,
+		restarts:      restarts,
+		levels:        levels,
+		playerConfig:  playerConfig,
+		petConfig:     petConfig,
+		inventory:     invops.NewService(ids),
+		petItems:      petitem.NewService(ids),
+		trades:        tradebook.NewBook(time.Now),
+		enchantState:  enchantflow.NewState(),
+		targets:       skilltarget.NewRegistry(skilltarget.WorldKnown{State: worldState}),
 		skillHandlers: handlerskill.NewDefaultRegistryWithSignet(skills, handlerskill.SignetDeps{
 			Templates: npcs,
 			IDs:       ids,

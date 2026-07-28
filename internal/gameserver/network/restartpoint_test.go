@@ -33,7 +33,7 @@ func TestRestartLivePlayerIgnoresLivingPlayer(t *testing.T) {
 	state.Spawn(live, 0, 0, 0, 0)
 	frames.frames = nil
 
-	gcl := &GameClientLink{world: state, geo: testGeo{}, restarts: townRestartTable(), respawnRestoreHP: 0.7, log: zerolog.Nop()}
+	gcl := &GameClientLink{world: state, geo: testGeo{}, restarts: townRestartTable(), playerConfig: PlayerConfig{RespawnRestoreHP: 0.7}, log: zerolog.Nop()}
 	gcl.restartLivePlayer(live, clientpackets.RequestRestartPoint{})
 
 	if len(frames.frames) != 0 {
@@ -53,7 +53,7 @@ func TestRestartLivePlayerRevivesAndTeleportsDeadPlayer(t *testing.T) {
 	frames.frames = nil
 
 	restarts := townRestartTable()
-	gcl := &GameClientLink{world: state, geo: testGeo{}, restarts: restarts, respawnRestoreHP: 0.7, log: zerolog.Nop()}
+	gcl := &GameClientLink{world: state, geo: testGeo{}, restarts: restarts, playerConfig: PlayerConfig{RespawnRestoreHP: 0.7}, log: zerolog.Nop()}
 	gcl.restartLivePlayer(live, clientpackets.RequestRestartPoint{RequestType: 0})
 
 	if live.Dead() {

@@ -52,7 +52,6 @@ var unsupportedPvPFlagKeys = []string{
 	"AwardPKKillPVPPoint",
 	"CanGMDropEquipment",
 	"KarmaPlayerCanShop",
-	"KarmaPlayerCanTeleport",
 	"KarmaPlayerCanTrade",
 	"KarmaPlayerCanUseGK",
 	"KarmaPlayerCanUseWareHouse",

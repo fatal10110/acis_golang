@@ -128,6 +128,7 @@ func newGameServerApp(paths gameServerPaths) *fx.App {
 			loadPvPFlagOptions,
 			loadRespawnRestoreHP,
 			loadSkillEnchantSPBookNeeded,
+			loadKarmaPlayerCanTeleport,
 			loadPetConfig,
 			loadHexIDProperties,
 			gameServerConfigFromLoadedProperties,
@@ -197,6 +198,19 @@ func loadSkillEnchantSPBookNeeded(paths gameServerPaths) (skillEnchantSPBookNeed
 		return false, err
 	}
 	return skillEnchantSPBookNeeded(config.NewFields(props, "skill enchant sp book needed").Bool("EnchantSkillSpBookNeeded", true)), nil
+}
+
+// karmaPlayerCanTeleport controls whether a karma-carrying player may use a
+// TELEPORT/RECALL-type skill, direct or item-attached, read from
+// players.properties.
+type karmaPlayerCanTeleport bool
+
+func loadKarmaPlayerCanTeleport(paths gameServerPaths) (karmaPlayerCanTeleport, error) {
+	props, err := config.LoadFile(paths.PlayersConfigPath)
+	if err != nil {
+		return false, err
+	}
+	return karmaPlayerCanTeleport(config.NewFields(props, "karma player can teleport").Bool("KarmaPlayerCanTeleport", true)), nil
 }
 
 func loadPetConfig(paths gameServerPaths) (pet.Config, error) {
@@ -955,10 +969,16 @@ func provideGameClientLink(
 	playerClock *task.PlayerClock,
 	respawnHP respawnRestoreHP,
 	spBookNeeded skillEnchantSPBookNeeded,
+	karmaTeleport karmaPlayerCanTeleport,
 	petCfg pet.Config,
 	log zerolog.Logger,
 ) *network.GameClientLink {
-	return network.NewGameClientLink(validator, links.get, roster, items, shortcuts, data.Players, data.Items, html, crests, skills, spellbooks, data.Trees, data.CursedWeapons, state, data.NPCs, move.NewGeo(data.Geo, data.Finder), data.Zones, ids, ground, attackStance, positions, playerClock, data.Restarts, float64(respawnHP), data.Levels, bool(spBookNeeded), petCfg, log)
+	playerConfig := network.PlayerConfig{
+		RespawnRestoreHP:         float64(respawnHP),
+		SkillEnchantSPBookNeeded: bool(spBookNeeded),
+		KarmaPlayerCanTeleport:   bool(karmaTeleport),
+	}
+	return network.NewGameClientLink(validator, links.get, roster, items, shortcuts, data.Players, data.Items, html, crests, skills, spellbooks, data.Trees, data.CursedWeapons, state, data.NPCs, move.NewGeo(data.Geo, data.Finder), data.Zones, ids, ground, attackStance, positions, playerClock, data.Restarts, data.Levels, playerConfig, petCfg, log)
 }
 
 func provideSkillPersistence(pool *sql.DB, data *gameData) *skillstate.Persistence {
