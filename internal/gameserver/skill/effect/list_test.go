@@ -178,6 +178,32 @@ func TestListOrdersBuffsBeforeTogglesThenDebuffs(t *testing.T) {
 	requireNames(t, list.All(), []string{"first", "second", "toggle", "debuff"})
 }
 
+func TestListDanceCountCountsOnlyActiveDanceSkillToggles(t *testing.T) {
+	list := NewList(nil)
+
+	dance1 := newEffect("dance1", 1, "none", 0, false)
+	dance1.Skill.Toggle = true
+	dance1.Skill.Dance = true
+	list.Add(dance1)
+
+	dance2 := newEffect("dance2", 2, "none", 0, false)
+	dance2.Skill.Toggle = true
+	dance2.Skill.Dance = true
+	list.Add(dance2)
+
+	buff := newEffect("buff", 3, "none", 0, false)
+	list.Add(buff)
+
+	if got := list.DanceCount(); got != 2 {
+		t.Fatalf("DanceCount() = %d, want 2 (buff and pending effects must not count)", got)
+	}
+
+	list.Remove(dance1)
+	if got := list.DanceCount(); got != 1 {
+		t.Fatalf("DanceCount() after removing one dance = %d, want 1", got)
+	}
+}
+
 func TestListReplacesIdenticalBuffButRejectsIdenticalDebuff(t *testing.T) {
 	var events []string
 	list := NewList(eventOwner{events: &events})

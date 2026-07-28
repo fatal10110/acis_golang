@@ -398,6 +398,20 @@ func (l *List) ActiveBySkillID(id int) (level int, ok bool) {
 	return 0, false
 }
 
+// DanceCount returns the number of active dance/song effects, mirroring
+// Java's EffectList.getDanceCount(). It drives the per-cast MP surcharge a
+// dance/song skill pays for each already-running dance/song: casting
+// another one gets more expensive as more stay active simultaneously.
+func (l *List) DanceCount() int {
+	count := 0
+	for _, e := range l.active() {
+		if e.Skill.Dance {
+			count++
+		}
+	}
+	return count
+}
+
 // RescheduleSeeds restarts the duration timer of every currently active seed
 // effect, matching L2SkillSeed.useSkill()'s behavior of refreshing every
 // live EffectSeed on the target whenever any seed skill lands on it, not

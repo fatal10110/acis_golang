@@ -5,6 +5,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
 // PlayerActor adapts a live player character to the cast controller's actor
@@ -39,9 +40,41 @@ func (a PlayerActor) HP() int {
 	return a.Character.CurrentHP()
 }
 
-func (PlayerActor) MPInitialCost(def modelskill.Definition) int { return def.MPInitialConsume }
+// MPInitialCost is def's up-front MP cost, scaled by the caster's dance/song
+// MP-consume rate when def is a dance/song skill (Java's
+// CreatureStatus.getMpInitialConsume, Stats.DANCE_MP_CONSUME_RATE).
+func (a PlayerActor) MPInitialCost(def modelskill.Definition) int {
+	return a.scaleDanceMP(def, def.MPInitialConsume)
+}
 
-func (PlayerActor) MPCost(def modelskill.Definition) int { return def.MPConsume }
+// MPCost is def's per-cast MP cost. A dance/song skill (def.Dance) pays an
+// extra danceCount * def.NextDanceCost surcharge for each dance/song
+// already active on the caster, then the whole sum is scaled by the
+// caster's dance MP-consume rate — mirroring Java's
+// CreatureStatus.getMpConsume: "casting more dances costs more MP".
+func (a PlayerActor) MPCost(def modelskill.Definition) int {
+	mp := def.MPConsume
+	if def.Dance {
+		if dc := a.danceCount(); dc > 0 {
+			mp += dc * def.NextDanceCost
+		}
+	}
+	return a.scaleDanceMP(def, mp)
+}
+
+func (a PlayerActor) danceCount() int {
+	if a.Character == nil {
+		return 0
+	}
+	return a.Character.EffectList().DanceCount()
+}
+
+func (a PlayerActor) scaleDanceMP(def modelskill.Definition, mp int) int {
+	if !def.Dance || a.Character == nil {
+		return mp
+	}
+	return int(a.Character.CalcStat(stat.DanceMpConsumeRate, float64(mp)))
+}
 
 func (a PlayerActor) ReduceMP(amount int) {
 	if a.Character == nil || amount <= 0 {
