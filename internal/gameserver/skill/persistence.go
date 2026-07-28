@@ -205,6 +205,14 @@ func (p *Persistence) HasDefinition(ref modelskill.Ref) bool {
 	return ok
 }
 
+// MaxLevel returns the highest regular level loaded for id.
+func (p *Persistence) MaxLevel(id modelskill.ID) int {
+	if p.skills == nil {
+		return 0
+	}
+	return p.skills.MaxLevel(id)
+}
+
 func (p *Persistence) restoreKnownSkills(ctx context.Context, c *player.Character, classIndex int32) error {
 	if p.levels == nil {
 		return nil

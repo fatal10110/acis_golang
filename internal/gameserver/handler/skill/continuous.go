@@ -37,12 +37,15 @@ type continuousHandler struct {
 	defs Definitions
 }
 
-// Types lists the 14 skill types the reference continuous handler covers.
+// Types lists the 13 skill types the reference continuous handler covers.
+// FUSION is dispatched separately by fusionHandler: Java applies it via
+// startFusionSkill at cast start, bypassing this handler's landing checks
+// entirely (PlayerCast.java:81-84).
 func (continuousHandler) Types() []string {
 	return []string{
 		"BUFF", "DEBUFF", "DOT", "MDOT", "POISON", "BLEED",
 		"HOT", "MPHOT", "FEAR", "CONT", "WEAKNESS", "REFLECT",
-		"AGGDEBUFF", "FUSION",
+		"AGGDEBUFF",
 	}
 }
 
