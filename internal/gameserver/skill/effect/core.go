@@ -185,6 +185,12 @@ const (
 	// TypeFakeDeath is the Fake Death toggle: it drains MP each tick while
 	// active and marks its target as playing dead.
 	TypeFakeDeath Type = "FAKE_DEATH"
+	// TypeSeed is an elemental-seed charge: a pure counter (Level tracks its
+	// power, starting at the skill's own level) with no start/exit/tick
+	// behavior of its own. Recasting the same seed skill on an already-seeded
+	// target grows the existing instance's power in place via IncreasePower
+	// instead of replacing it.
+	TypeSeed Type = "SEED"
 )
 
 type kind struct {
@@ -254,6 +260,7 @@ var coreKinds = map[string]kind{
 	"ThrowUp":               {typ: TypeThrowUp, flag: FlagStunned, debuff: true},
 	"Grow":                  {typ: TypeGrow},
 	"FakeDeath":             {typ: TypeFakeDeath, flag: FlagFakeDeath},
+	"Seed":                  {typ: TypeSeed},
 }
 
 var fearSkippedPlayableSkillIDs = map[modelskill.ID]bool{
@@ -1354,6 +1361,17 @@ func (e *Effect) DecreaseForce(list *List, reapply func(level int)) {
 	if e.Level >= 1 && reapply != nil {
 		reapply(e.Level)
 	}
+}
+
+// IncreasePower grows a live seed effect's charge level by one in place,
+// matching EffectSeed.increasePower(): unlike a fusion effect's
+// IncreaseEffect, the same instance keeps running — only its Level (power)
+// changes, nothing is removed or reapplied.
+func (e *Effect) IncreasePower() {
+	if e == nil {
+		return
+	}
+	e.Level++
 }
 
 // chanceTriggerTarget is implemented by an actor that tracks its own set of

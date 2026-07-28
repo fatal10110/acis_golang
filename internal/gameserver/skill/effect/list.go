@@ -398,6 +398,19 @@ func (l *List) ActiveBySkillID(id int) (level int, ok bool) {
 	return 0, false
 }
 
+// RescheduleSeeds restarts the duration timer of every currently active seed
+// effect, matching L2SkillSeed.useSkill()'s behavior of refreshing every
+// live EffectSeed on the target whenever any seed skill lands on it, not
+// just the one instance that grew.
+func (l *List) RescheduleSeeds() {
+	now := time.Now()
+	for _, e := range l.active() {
+		if e.Type == TypeSeed {
+			e.startSchedule(now)
+		}
+	}
+}
+
 // Tick runs periodic actions due at the current time and removes effects
 // whose action hook stops or whose configured tick count is exhausted.
 func (l *List) Tick() {

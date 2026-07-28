@@ -88,6 +88,7 @@ func NewDefaultRegistryWithDefinitions(defs Definitions) *Registry {
 		harvestHandler{},
 		spoilHandler{},
 		sweepHandler{},
+		seedHandler{},
 		continuousHandler{defs: defs},
 	)
 }
