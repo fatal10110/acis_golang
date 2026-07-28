@@ -13,15 +13,15 @@ import (
 )
 
 // useItemAICast runs an item-carried skill that isn't an instant-cast
-// potion (a regular scroll etc.) through the same Start/Hit/Finish cast
-// sequence a player-initiated RequestMagicSkillUse drives, targeting the
-// player's current selection. Starting the cast, consuming the item, and
-// applying its effects are itemhandler's decisions (itemhandler.
-// ResolveAICastSkill / actorcast.StartItemSkill / itemhandler.
-// ConsumeAICastItem / itemhandler.CompleteAICast); this method only builds
-// and sends the packets those decisions produce, in the order the
-// reference itself uses: the item is consumed before the cast/launch
-// packets go out, not only on a successful hit.
+// potion (a regular scroll etc.) through the same Start/Launch/Hit/Finish
+// cast sequence a player-initiated RequestMagicSkillUse drives, targeting
+// the player's current selection. Resolving the skill and consuming the
+// item are itemhandler's decisions (itemhandler.ResolveAICastSkill /
+// actorcast.StartItemSkill / itemhandler.ConsumeAICastItem); this method
+// sends the packets those decisions produce and drives the timed
+// Launch/Hit phases itself, in the order the reference uses: the item is
+// consumed before the cast/launch packets go out, not only on a
+// successful hit.
 //
 // It reports whether inst was handled by this path, so the caller's
 // equip-toggle fallback still answers the client for anything else.
@@ -91,26 +91,28 @@ func (l *GameClientLink) useItemAICast(live *livePlayer, inv *itemcontainer.Inve
 	}
 
 	targetIDs := []int32{target.ObjectID()}
-	l.broadcastLiveFrame(live, func() wire.Frame {
-		return serverpackets.FrameMagicSkillLaunched(live.ObjectID(), int32(def.ID), int32(def.Level), targetIDs)
+	controller.Schedule(plan, actorcast.Hooks{
+		// Full mid-cast target-lost/range/LOS/peace-zone revalidation is
+		// #1001; this always continues to Hit, matching the reference's
+		// launch phase minus its recheck gates.
+		Launch: func() bool {
+			l.broadcastLiveFrame(live, func() wire.Frame {
+				return serverpackets.FrameMagicSkillLaunched(live.ObjectID(), int32(def.ID), int32(def.Level), targetIDs)
+			})
+			return true
+		},
+		Hit: func() {
+			result := actorcast.ApplyEffectsResult(actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers}, live.Character, target, def)
+			sendSkillHandlerResult(live, result)
+			if result.CubicAdded {
+				l.broadcastCharacterInfo(live)
+			}
+			sendMagicStatusUpdate(live, beforeVitals)
+		},
+		Failed: func(err error) {
+			sendMagicCastFailure(live, def, err)
+			sendMagicStatusUpdate(live, beforeVitals)
+		},
 	})
-
-	result := itemhandler.CompleteAICast(itemhandler.CompleteAICastRequest{
-		Controller: controller,
-		Definition: def,
-		Caster:     live.Character,
-		Target:     target,
-		Effects:    actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers},
-	})
-	if result.Err != nil {
-		sendMagicCastFailure(live, def, result.Err)
-		sendMagicStatusUpdate(live, beforeVitals)
-		return true
-	}
-	sendSkillHandlerResult(live, result.HandlerResult)
-	if result.HandlerResult.CubicAdded {
-		l.broadcastCharacterInfo(live)
-	}
-	sendMagicStatusUpdate(live, beforeVitals)
 	return true
 }
