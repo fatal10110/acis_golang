@@ -70,6 +70,7 @@ type characterStore interface {
 	NameTaken(ctx context.Context, name string) (bool, error)
 	SetDeleteAt(ctx context.Context, objectID int32, at int64) error
 	SetPosition(ctx context.Context, objectID int32, loc location.Location, heading int) error
+	SetDeathPenaltyLevel(ctx context.Context, objectID int32, level int) error
 	Delete(ctx context.Context, objectID int32) (bool, error)
 }
 
@@ -300,4 +301,10 @@ func (r *Roster) Restore(ctx context.Context, objectID int32) error {
 // heading for the next character-list, relog, or server restart load.
 func (r *Roster) SavePosition(ctx context.Context, c *player.Character) error {
 	return r.characters.SetPosition(ctx, c.ID, c.CurrentLocation(), c.CurrentHeading())
+}
+
+// SaveDeathPenaltyLevel persists the live character's current death-penalty
+// debuff level for the next relog or server restart load.
+func (r *Roster) SaveDeathPenaltyLevel(ctx context.Context, c *player.Character) error {
+	return r.characters.SetDeathPenaltyLevel(ctx, c.ID, c.DeathPenaltyLevel())
 }

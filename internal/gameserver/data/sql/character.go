@@ -27,7 +27,8 @@ const characterColumns = `obj_Id, account_name, char_name,
 	COALESCE(heading,0), COALESCE(x,0), COALESCE(y,0), COALESCE(z,0),
 	exp, sp, COALESCE(karma,0), COALESCE(pvpkills,0), COALESCE(pkkills,0), COALESCE(clanid,0),
 	COALESCE(race,0), COALESCE(classid,0), base_class,
-	COALESCE(deletetime,0), COALESCE(title,''), COALESCE(accesslevel,0), COALESCE(hero,0), COALESCE(lastAccess,0)`
+	COALESCE(deletetime,0), COALESCE(title,''), COALESCE(accesslevel,0), COALESCE(hero,0), COALESCE(lastAccess,0),
+	COALESCE(death_penalty_level,0)`
 
 // CharacterStore reads and writes the characters table.
 type CharacterStore struct {
@@ -109,6 +110,7 @@ func scanCharacter(row rowScanner) (*player.Character, error) {
 	var race, classID int
 	var hero int
 	var maxHP, curHP, maxCP, curCP, maxMP, curMP float64
+	var deathPenaltyLevel int
 
 	err := row.Scan(
 		&c.ID, &c.AccountName, &c.Name,
@@ -118,6 +120,7 @@ func scanCharacter(row rowScanner) (*player.Character, error) {
 		&c.Exp, &c.SP, &c.KarmaPoints, &c.PvPKills, &c.PKKills, &c.ClanID,
 		&race, &classID, &c.BaseClassID,
 		&c.DeleteAt, &c.Title, &c.AccessLevel, &hero, &c.LastAccess,
+		&deathPenaltyLevel,
 	)
 	if err != nil {
 		return nil, err
@@ -126,6 +129,7 @@ func scanCharacter(row rowScanner) (*player.Character, error) {
 	c.Race = player.Race(race)
 	c.ClassID = classID
 	c.SetHero(hero != 0)
+	c.SetDeathPenaltyLevel(deathPenaltyLevel)
 	c.SetResourceValues(player.Resources{
 		MaxHP: maxHP, CurrentHP: curHP,
 		MaxCP: maxCP, CurrentCP: curCP,
@@ -169,6 +173,15 @@ func (s *CharacterStore) SetDeleteAt(ctx context.Context, objectID int32, at int
 func (s *CharacterStore) SetPosition(ctx context.Context, objectID int32, loc location.Location, heading int) error {
 	if _, err := s.db.ExecContext(ctx, "UPDATE characters SET heading = ?, x = ?, y = ?, z = ? WHERE obj_Id = ?", heading, loc.X, loc.Y, loc.Z, objectID); err != nil {
 		return fmt.Errorf("set position for %d: %w", objectID, err)
+	}
+	return nil
+}
+
+// SetDeathPenaltyLevel updates the character's persisted death-penalty
+// debuff level.
+func (s *CharacterStore) SetDeathPenaltyLevel(ctx context.Context, objectID int32, level int) error {
+	if _, err := s.db.ExecContext(ctx, "UPDATE characters SET death_penalty_level = ? WHERE obj_Id = ?", level, objectID); err != nil {
+		return fmt.Errorf("set death penalty level for %d: %w", objectID, err)
 	}
 	return nil
 }

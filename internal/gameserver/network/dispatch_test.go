@@ -118,6 +118,15 @@ func (s *fakeCharStore) SetPosition(ctx context.Context, id int32, loc location.
 	return ctx.Err()
 }
 
+func (s *fakeCharStore) SetDeathPenaltyLevel(_ context.Context, id int32, level int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if c, ok := s.byID[id]; ok {
+		c.SetDeathPenaltyLevel(level)
+	}
+	return nil
+}
+
 func (s *fakeCharStore) Delete(_ context.Context, id int32) (bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

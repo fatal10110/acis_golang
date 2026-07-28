@@ -91,12 +91,56 @@ func TestScanCharacterReadsHeroFlag(t *testing.T) {
 		int64(0), 0, 0, 0, 0, 0,
 		int(player.RaceHuman), 0, 0,
 		int64(0), "", 0, 1, int64(0),
+		0,
 	})
 	if err != nil {
 		t.Fatalf("scanCharacter() error = %v", err)
 	}
 	if !c.IsHero() {
 		t.Fatal("scanCharacter() returned non-hero for hero = 1")
+	}
+}
+
+func TestScanCharacterReadsDeathPenaltyLevel(t *testing.T) {
+	c, err := scanCharacter(characterScanRow{
+		int32(0x10000001), "acct1", "Newbie",
+		1, 80.0, 80.0, 32.0, 32.0, 30.0, 30.0,
+		1, 2, 3, byte(player.SexMale),
+		32768, -56733, -113459, -690,
+		int64(0), 0, 0, 0, 0, 0,
+		int(player.RaceHuman), 0, 0,
+		int64(0), "", 0, 0, int64(0),
+		7,
+	})
+	if err != nil {
+		t.Fatalf("scanCharacter() error = %v", err)
+	}
+	if got := c.DeathPenaltyLevel(); got != 7 {
+		t.Fatalf("scanCharacter() DeathPenaltyLevel() = %d, want 7", got)
+	}
+}
+
+func TestCharacterStoreSetDeathPenaltyLevelPersists(t *testing.T) {
+	rec := &characterStoreRecorder{}
+	db := sql.OpenDB(characterStoreConnector{rec: rec})
+	t.Cleanup(func() { _ = db.Close() })
+	store := NewCharacterStore(db)
+
+	if err := store.SetDeathPenaltyLevel(context.Background(), 0x10000001, 5); err != nil {
+		t.Fatalf("SetDeathPenaltyLevel() error = %v", err)
+	}
+
+	if !strings.Contains(rec.query, "SET death_penalty_level = ?") {
+		t.Fatalf("SetDeathPenaltyLevel() query = %q, missing death_penalty_level column", rec.query)
+	}
+	want := []any{int64(5), int64(0x10000001)}
+	if len(rec.args) != len(want) {
+		t.Fatalf("SetDeathPenaltyLevel() args = %#v, want %d args", rec.args, len(want))
+	}
+	for i, arg := range rec.args {
+		if arg.Value != want[i] {
+			t.Fatalf("SetDeathPenaltyLevel() arg %d = %v, want %v; args=%#v", i, arg.Value, want[i], rec.args)
+		}
 	}
 }
 
