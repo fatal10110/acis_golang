@@ -831,6 +831,7 @@ func (c *Character) Die(killer creature.DeathActor) bool {
 		return false
 	}
 	c.ClearCharges()
+	c.RaiseDeathPenaltyLevel(killer, c.rollValue(100)+1)
 	c.BroadcastDie()
 	return true
 }

@@ -22,8 +22,12 @@ const (
 	// FlagNone is the default effect flag mask.
 	FlagNone Flag = 1 << iota
 	flagCharmOfCourage
-	flagCharmOfLuck
-	flagPhoenixBlessing
+	// FlagCharmOfLuck marks a target as carrying Charm of Luck, consulted by
+	// systems that exempt a lucky death from raising its own penalties.
+	FlagCharmOfLuck
+	// FlagPhoenixBlessing marks a target as carrying Phoenix Blessing,
+	// consulted by systems that exempt a blessed death from its penalties.
+	FlagPhoenixBlessing
 	flagNoblesseBlessing
 	// FlagSilentMove marks a target as moving without alerting nearby AI.
 	FlagSilentMove
@@ -191,6 +195,9 @@ const (
 	// target grows the existing instance's power in place via IncreasePower
 	// instead of replacing it.
 	TypeSeed Type = "SEED"
+	// TypeRecovery lowers a player target's death-penalty debuff level by
+	// one on start; a non-player target rejects it.
+	TypeRecovery Type = "RECOVERY"
 )
 
 type kind struct {
@@ -237,11 +244,12 @@ var coreKinds = map[string]kind{
 	"TargetMe":              {typ: TypeTargetMe},
 	"Bluff":                 {typ: TypeBluff},
 	"CharmOfCourage":        {typ: TypeCharmOfCourage, flag: flagCharmOfCourage},
-	"CharmOfLuck":           {typ: TypeCharmOfLuck, flag: flagCharmOfLuck},
-	"PhoenixBless":          {typ: TypePhoenixBless, flag: flagPhoenixBlessing},
+	"CharmOfLuck":           {typ: TypeCharmOfLuck, flag: FlagCharmOfLuck},
+	"PhoenixBless":          {typ: TypePhoenixBless, flag: FlagPhoenixBlessing},
 	"BlockBuff":             {typ: TypeBlockBuff},
 	"BlockDebuff":           {typ: TypeBlockDebuff},
 	"ProtectionBlessing":    {typ: TypeProtectionBless, flag: flagProtectionBlessing},
+	"Recovery":              {typ: TypeRecovery},
 	"Cancel":                {typ: TypeCancel},
 	"Negate":                {typ: TypeNegate},
 	"Fusion":                {typ: TypeFusion},
@@ -441,6 +449,8 @@ func wireHooks(e *Effect) {
 		e.OnStart = fakeDeathStart
 		e.OnAction = fakeDeathAction
 		e.OnExit = fakeDeathExit
+	case TypeRecovery:
+		e.OnStart = recoveryStart
 	}
 }
 
@@ -1500,6 +1510,25 @@ func growExit(e *Effect) {
 	}
 	target.ResetCollisionRadius()
 	refresh(e.Effected)
+}
+
+// recoveryTarget is implemented by a player-shaped actor that tracks a
+// death-penalty debuff level.
+type recoveryTarget interface {
+	ReduceDeathPenaltyLevel() int
+}
+
+// recoveryStart lowers the target's death-penalty debuff level by one,
+// rejecting a target that isn't player-shaped. Reapplying the debuff skill
+// at its new level and refreshing the client's status window are the live
+// character's own concern, not this effect's.
+func recoveryStart(e *Effect) bool {
+	target, ok := e.Effected.(recoveryTarget)
+	if !ok {
+		return false
+	}
+	target.ReduceDeathPenaltyLevel()
+	return true
 }
 
 // randomizeHateStart ports EffectRandomizeHate.onStart(): rejects a target

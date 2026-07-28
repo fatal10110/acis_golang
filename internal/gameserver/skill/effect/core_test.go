@@ -107,8 +107,8 @@ func TestNewBuildsCoreEffectMetadata(t *testing.T) {
 		{"TargetMe", TypeTargetMe, FlagNone, false, false},
 		{"Bluff", TypeBluff, FlagNone, false, false},
 		{"CharmOfCourage", TypeCharmOfCourage, flagCharmOfCourage, false, false},
-		{"CharmOfLuck", TypeCharmOfLuck, flagCharmOfLuck, false, false},
-		{"PhoenixBless", TypePhoenixBless, flagPhoenixBlessing, false, false},
+		{"CharmOfLuck", TypeCharmOfLuck, FlagCharmOfLuck, false, false},
+		{"PhoenixBless", TypePhoenixBless, FlagPhoenixBlessing, false, false},
 		{"BlockBuff", TypeBlockBuff, FlagNone, false, false},
 		{"BlockDebuff", TypeBlockDebuff, FlagNone, false, false},
 		{"ProtectionBlessing", TypeProtectionBless, flagProtectionBlessing, false, false},
@@ -2542,5 +2542,63 @@ func TestGrowEffectRejectsNonNpcTarget(t *testing.T) {
 
 	if e.OnStart(e) {
 		t.Fatal("grow effect started against a non-Npc-shaped target")
+	}
+}
+
+// recoveryEffectTarget is a minimal player-shaped actor implementing only
+// the death-penalty-level counter surface Recovery needs.
+type recoveryEffectTarget struct {
+	level int
+}
+
+func (t *recoveryEffectTarget) ReduceDeathPenaltyLevel() int {
+	if t.level > 0 {
+		t.level--
+	}
+	return t.level
+}
+
+func TestRecoveryEffectDecrementsAboveZero(t *testing.T) {
+	target := &recoveryEffectTarget{level: 3}
+	e, err := New(Skill{}, modelskill.EffectTemplate{Name: "Recovery"})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e.Effected = target
+
+	if !e.OnStart(e) {
+		t.Fatal("recovery effect start rejected a valid player-shaped target")
+	}
+	if target.level != 2 {
+		t.Fatalf("level after start = %d, want 2", target.level)
+	}
+}
+
+func TestRecoveryEffectDecrementsToZeroIsNoFurtherOp(t *testing.T) {
+	target := &recoveryEffectTarget{level: 0}
+	e, err := New(Skill{}, modelskill.EffectTemplate{Name: "Recovery"})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e.Effected = target
+
+	if !e.OnStart(e) {
+		t.Fatal("recovery effect start rejected a valid player-shaped target")
+	}
+	if target.level != 0 {
+		t.Fatalf("level after start = %d, want 0", target.level)
+	}
+}
+
+func TestRecoveryEffectRejectsNonPlayerTarget(t *testing.T) {
+	target := &liveEffectTarget{}
+	e, err := New(Skill{}, modelskill.EffectTemplate{Name: "Recovery"})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e.Effected = target
+
+	if e.OnStart(e) {
+		t.Fatal("recovery effect started against a non-player-shaped target")
 	}
 }

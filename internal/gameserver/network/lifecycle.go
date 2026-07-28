@@ -24,6 +24,9 @@ func (l *GameClientLink) detachLivePlayer(ctx context.Context, live *livePlayer)
 			if err := l.roster.SavePosition(saveCtx, live.Character); err != nil {
 				l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("save player position")
 			}
+			if err := l.roster.SaveDeathPenaltyLevel(saveCtx, live.Character); err != nil {
+				l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("save player death penalty level")
+			}
 		}
 		if l.skills != nil {
 			if err := l.skills.Save(saveCtx, live.Character, true); err != nil {

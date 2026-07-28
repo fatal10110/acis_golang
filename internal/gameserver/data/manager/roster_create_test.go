@@ -56,6 +56,10 @@ func (s *rosterTestCharacters) SetPosition(context.Context, int32, location.Loca
 	return nil
 }
 
+func (s *rosterTestCharacters) SetDeathPenaltyLevel(context.Context, int32, int) error {
+	return nil
+}
+
 func (s *rosterTestCharacters) Delete(context.Context, int32) (bool, error) {
 	return false, nil
 }
