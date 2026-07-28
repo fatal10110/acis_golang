@@ -97,6 +97,7 @@ type GameClientLink struct {
 	respawnRestoreHP         float64
 	levels                   *player.LevelTable
 	skillEnchantSPBookNeeded bool
+	karmaPlayerCanTeleport   bool
 	petConfig                petmodel.Config // passed into summon.PetConfig by newPet.
 	inventory                *invops.Service
 	petItems                 *petitem.Service
@@ -154,6 +155,7 @@ func NewGameClientLink(
 	respawnRestoreHP float64,
 	levels *player.LevelTable,
 	skillEnchantSPBookNeeded bool,
+	karmaPlayerCanTeleport bool,
 	petConfig petmodel.Config,
 	log zerolog.Logger,
 ) *GameClientLink {
@@ -184,6 +186,7 @@ func NewGameClientLink(
 		respawnRestoreHP:         respawnRestoreHP,
 		levels:                   levels,
 		skillEnchantSPBookNeeded: skillEnchantSPBookNeeded,
+		karmaPlayerCanTeleport:   karmaPlayerCanTeleport,
 		petConfig:                petConfig,
 		inventory:                invops.NewService(ids),
 		petItems:                 petitem.NewService(ids),

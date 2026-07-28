@@ -19,9 +19,15 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 		return
 	}
 
-	if def, ok := l.skills.Definition(modelskill.Ref{ID: modelskill.ID(req.SkillID), Level: live.SkillLevel(int(req.SkillID))}); ok && def.Activation == modelskill.ActivationToggle {
-		l.handleToggleSkillUse(live, req)
-		return
+	if def, ok := l.skills.Definition(modelskill.Ref{ID: modelskill.ID(req.SkillID), Level: live.SkillLevel(int(req.SkillID))}); ok {
+		if def.SkillType == "RECALL" && !l.karmaPlayerCanTeleport && live.Karma() > 0 {
+			sendMagicActionFailed(live)
+			return
+		}
+		if def.Activation == modelskill.ActivationToggle {
+			l.handleToggleSkillUse(live, req)
+			return
+		}
 	}
 
 	beforeVitals := live.Vitals()
