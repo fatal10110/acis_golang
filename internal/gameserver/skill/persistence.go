@@ -207,7 +207,7 @@ func (p *Persistence) HasDefinition(ref modelskill.Ref) bool {
 
 // MaxLevel returns the highest regular level loaded for id.
 func (p *Persistence) MaxLevel(id modelskill.ID) int {
-	if p.skills == nil {
+	if p == nil || p.skills == nil {
 		return 0
 	}
 	return p.skills.MaxLevel(id)
