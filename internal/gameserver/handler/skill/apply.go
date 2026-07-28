@@ -48,6 +48,7 @@ func applyEffects(effector, effected any, def modelskill.Definition, templates [
 		NegateLevel:         def.NegateLevel,
 		NegateIDs:           def.NegateIDs,
 		NegateTypes:         def.NegateTypes,
+		FlyRadius:           def.FlyRadius,
 	}
 	for _, tmpl := range templates {
 		e, err := effect.New(meta, tmpl)
