@@ -5,11 +5,27 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
+
+// permissiveGeo is a test-only move.Geo that permits every move, needed
+// only because creature.NewLive requires a non-nil Geo.
+type permissiveGeo struct{}
+
+func (permissiveGeo) CanMove(ox, oy, oz, tx, ty, tz int) bool { return true }
+func (permissiveGeo) Height(x, y, z int) int16                { return int16(z) }
+func (permissiveGeo) FindPath(origin, target location.Location) ([]location.Location, bool) {
+	return nil, false
+}
+func (permissiveGeo) ValidLocation(ox, oy, oz, tx, ty, tz int) location.Location {
+	return location.Location{X: tx, Y: ty, Z: tz}
+}
 
 func TestPlayerActorResourcesAndInventory(t *testing.T) {
 	templates := item.NewTable([]*item.Template{
@@ -37,6 +53,37 @@ func TestPlayerActorResourcesAndInventory(t *testing.T) {
 	}
 	if got := actor.ItemCount(57); got != 2 {
 		t.Fatalf("ItemCount() after consume = %d, want 2", got)
+	}
+}
+
+// TestPlayerActorMPCostAppliesDanceSurcharge covers Java's
+// CreatureStatus.getMpConsume: a dance/song skill's MP cost grows by
+// def.NextDanceCost for each dance/song already active on the caster, and
+// a non-dance skill never picks up the surcharge.
+func TestPlayerActorMPCostAppliesDanceSurcharge(t *testing.T) {
+	ch := &player.Character{ID: 1}
+	live, err := creature.NewLive(location.Location{}, 100, permissiveGeo{}, ch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ch.Live = live
+	actor := PlayerActor{Character: ch}
+
+	dance := modelskill.Definition{Dance: true, MPConsume: 10, NextDanceCost: 4}
+	if got := actor.MPCost(dance); got != 10 {
+		t.Fatalf("MPCost() with no active dances = %d, want 10", got)
+	}
+
+	ch.EffectList().Add(&effect.Effect{Skill: effect.Skill{ID: 1, Dance: true, Toggle: true}, Type: effect.TypeBuff})
+	ch.EffectList().Add(&effect.Effect{Skill: effect.Skill{ID: 2, Dance: true, Toggle: true}, Type: effect.TypeBuff})
+
+	if got := actor.MPCost(dance); got != 18 {
+		t.Fatalf("MPCost() with 2 active dances = %d, want 18 (10 + 2*4)", got)
+	}
+
+	nonDance := modelskill.Definition{MPConsume: 10, NextDanceCost: 4}
+	if got := actor.MPCost(nonDance); got != 10 {
+		t.Fatalf("MPCost() for non-dance skill = %d, want 10, unaffected by active dances", got)
 	}
 }
 
