@@ -67,12 +67,14 @@ func (c *Controller) CastToggle(alreadyActive bool, def modelskill.Definition) (
 	return true, nil
 }
 
-// ApplyToggle resolves req's toggle skill, decides whether it activates or
-// deactivates based on the caster's current effect state, drives that
-// decision through controller, and applies the skill's effects when it
-// activates. This is the one call a caller needs to cast a toggle skill —
-// the on/off rule CastToggle documents lives entirely inside this package,
-// not in whatever is decoding the request.
+// ApplyToggle resolves req's toggle skill and decides whether it activates
+// or deactivates based on the caster's current effect state, driving that
+// decision through controller. It does not apply the skill's effects —
+// matching the reference's send-then-apply cast sequencing, the caller
+// sends its cast-acknowledgment packets first and then calls ApplyEffects
+// itself with the returned def and target when activated is true. The
+// on/off rule CastToggle documents lives entirely inside this package, not
+// in whatever is decoding the request.
 func ApplyToggle(handlers EffectHandlers, controller *Controller, req PlayerToggleRequest) (def modelskill.Definition, target Target, activated bool, err error) {
 	def, target, err = ResolvePlayerToggle(req)
 	if err != nil {
@@ -88,9 +90,6 @@ func ApplyToggle(handlers EffectHandlers, controller *Controller, req PlayerTogg
 	if alreadyActive {
 		handlerskill.StopEffect(req.Caster, def.ID)
 		return def, target, false, nil
-	}
-	if activated {
-		ApplyEffects(handlers, req.Caster, target, def)
 	}
 	return def, target, activated, nil
 }

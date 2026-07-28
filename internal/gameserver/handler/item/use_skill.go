@@ -54,6 +54,12 @@ type UseResult struct {
 	Outcome Outcome
 	Skill   modelskill.Definition
 
+	// Apply runs the skill's effects on the caster (and the mirrored
+	// summon, for a herb). It is set only on Applied and is the caller's
+	// job to invoke after sending its own cast-acknowledgment packets,
+	// matching the reference's send-then-apply cast sequencing.
+	Apply func()
+
 	HasShortBuff             bool
 	ShortBuffSkillID         int32
 	ShortBuffLevel           int32
@@ -159,13 +165,15 @@ func Use(req UseRequest) UseResult {
 	}
 
 	reuse := installItemReuse(req.Caster, def, reuseKey, tmpl.EtcItem.ReuseDelay)
-	actorcast.ApplyEffects(req.Effects, req.Caster, req.Caster, def)
-
-	if tmpl.EtcItem.Type == modelitem.EtcItemHerb && !req.IsPet && req.Summon != nil {
-		actorcast.ApplyEffects(req.Effects, req.Summon, req.Summon, def)
+	mirrorToSummon := tmpl.EtcItem.Type == modelitem.EtcItemHerb && !req.IsPet && req.Summon != nil
+	apply := func() {
+		actorcast.ApplyEffects(req.Effects, req.Caster, req.Caster, def)
+		if mirrorToSummon {
+			actorcast.ApplyEffects(req.Effects, req.Summon, req.Summon, def)
+		}
 	}
 
-	result := UseResult{Outcome: Applied, Skill: def, SharedReuseGroup: tmpl.EtcItem.SharedReuseGroup, ReuseMillis: reuse}
+	result := UseResult{Outcome: Applied, Skill: def, Apply: apply, SharedReuseGroup: tmpl.EtcItem.SharedReuseGroup, ReuseMillis: reuse}
 	result.HasShortBuff, result.ShortBuffSkillID, result.ShortBuffLevel, result.ShortBuffDurationSeconds = shortBuffDecision(req.Caster, def)
 	return result
 }

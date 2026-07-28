@@ -55,6 +55,7 @@ func TestUseMirrorsHerbEffectOntoSummon(t *testing.T) {
 		if res.Outcome != Applied {
 			t.Fatalf("Outcome = %v, want Applied", res.Outcome)
 		}
+		res.Apply()
 		// fakeCaster doesn't implement skilltarget.Creature, so its own
 		// ApplyEffects call is a no-op here (as in every other Use test);
 		// only the summon mirror, which does satisfy that surface, records.
@@ -78,6 +79,7 @@ func TestUseMirrorsHerbEffectOntoSummon(t *testing.T) {
 		if res.Outcome != Applied {
 			t.Fatalf("Outcome = %v, want Applied", res.Outcome)
 		}
+		res.Apply()
 		if len(rec.calls) != 0 {
 			t.Fatalf("skill handler calls = %d, want 0 (no summon to mirror onto)", len(rec.calls))
 		}
@@ -96,6 +98,7 @@ func TestUseMirrorsHerbEffectOntoSummon(t *testing.T) {
 		if res.Outcome != Applied {
 			t.Fatalf("Outcome = %v, want Applied", res.Outcome)
 		}
+		res.Apply()
 		if len(rec.calls) != 0 {
 			t.Fatalf("skill handler calls = %d, want 0 (IsPet caster must not mirror)", len(rec.calls))
 		}
@@ -114,6 +117,7 @@ func TestUseMirrorsHerbEffectOntoSummon(t *testing.T) {
 		if res.Outcome != Applied {
 			t.Fatalf("Outcome = %v, want Applied", res.Outcome)
 		}
+		res.Apply()
 		if len(rec.calls) != 0 {
 			t.Fatalf("skill handler calls = %d, want 0 (non-herb must not mirror)", len(rec.calls))
 		}

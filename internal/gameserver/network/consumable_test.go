@@ -139,13 +139,13 @@ func TestGameClientLinkUseHealingPotionAppliesAndConsumes(t *testing.T) {
 	}
 
 	c.send(encodeUseItem(objectID, false))
-	if entries := readAbnormalStatusUpdateFrame(t, c); len(entries) != 1 || entries[0].SkillID != 2031 || entries[0].Level != 1 || entries[0].Duration != 14 {
-		t.Fatalf("AbnormalStatusUpdate entries = %+v, want one entry skill 2031 level 1 duration 14s", entries)
-	}
 	readInventoryUpdate(t, c, objectID, 4)
 	readExUseSharedGroupItem(t, c, potionTemplate, 8, 10, 10)
 	readMagicSkillUseSelf(t, c, live.ObjectID(), 2031, 1)
 	assertSystemMessageSkillFrame(t, c.read(), serverpackets.SystemMessageUseS1, 2031, 1)
+	if entries := readAbnormalStatusUpdateFrame(t, c); len(entries) != 1 || entries[0].SkillID != 2031 || entries[0].Level != 1 || entries[0].Duration != 14 {
+		t.Fatalf("AbnormalStatusUpdate entries = %+v, want one entry skill 2031 level 1 duration 14s", entries)
+	}
 	readShortBuffStatusUpdateFrame(t, c, 2031, 1, 14)
 
 	effects := live.EffectList().All()
