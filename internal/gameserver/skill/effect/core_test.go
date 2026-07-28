@@ -1543,6 +1543,80 @@ func TestFusionEffectDecreaseForceBelowOneRemovesWithoutReapply(t *testing.T) {
 	}
 }
 
+func TestSeedEffectNeverEndsViaItsOwnTick(t *testing.T) {
+	e, err := New(Skill{Level: 1}, modelskill.EffectTemplate{Name: "Seed", Time: 5})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	if e.ActionTime() {
+		t.Fatal("ActionTime() = true, want false: a seed effect has no periodic tick behavior")
+	}
+}
+
+func TestSeedEffectStartsAtSkillLevel(t *testing.T) {
+	e, err := New(Skill{Level: 1}, modelskill.EffectTemplate{Name: "Seed", Time: 5})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	if e.Level != 1 {
+		t.Fatalf("initial Level = %d, want 1 (matching EffectSeed's initial power)", e.Level)
+	}
+}
+
+func TestSeedEffectIncreasePowerGrowsLevelInPlace(t *testing.T) {
+	target := &liveEffectTarget{list: NewList(nil)}
+	e, err := New(Skill{Level: 1}, modelskill.EffectTemplate{Name: "Seed", Time: 5})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e.Effected = target
+	target.list.Add(e)
+
+	e.IncreasePower()
+
+	if e.Level != 2 {
+		t.Fatalf("Level after IncreasePower = %d, want 2", e.Level)
+	}
+	if !hasEffectInList(target.list, e) {
+		t.Error("IncreasePower must grow the same instance in place, not replace it")
+	}
+}
+
+func TestListRescheduleSeedsRestartsOnlyActiveSeedEffects(t *testing.T) {
+	list := NewList(nil)
+	target := &liveEffectTarget{list: list}
+
+	seed, err := New(Skill{Level: 1}, modelskill.EffectTemplate{Name: "Seed", Time: 5})
+	if err != nil {
+		t.Fatalf("New(Seed) error: %v", err)
+	}
+	seed.Effected = target
+	list.Add(seed)
+
+	buff, err := New(Skill{Level: 1}, modelskill.EffectTemplate{Name: "Buff", Time: 600})
+	if err != nil {
+		t.Fatalf("New(Buff) error: %v", err)
+	}
+	buff.Effected = target
+	list.Add(buff)
+
+	seed.scheduleMu.Lock()
+	seed.remaining = 0
+	seed.scheduleMu.Unlock()
+	buff.scheduleMu.Lock()
+	buff.remaining = 0
+	buff.scheduleMu.Unlock()
+
+	list.RescheduleSeeds()
+
+	if got := seed.Remaining(); got != seed.Template.Count {
+		t.Fatalf("seed Remaining() after RescheduleSeeds = %d, want reset to %d", got, seed.Template.Count)
+	}
+	if got := buff.Remaining(); got != 0 {
+		t.Fatalf("buff Remaining() after RescheduleSeeds = %d, want left untouched at 0", got)
+	}
+}
+
 func TestNewChanceSkillTriggerRejectsUnknownTriggerType(t *testing.T) {
 	if _, err := New(Skill{}, modelskill.EffectTemplate{Name: "ChanceSkillTrigger", ChanceType: "BOGUS", ActivationChance: 50}); err == nil {
 		t.Fatal("New() error = nil, want an error for an unknown chanceType")
