@@ -266,6 +266,61 @@ func (e *Effect) stackType() string {
 	return e.Template.StackType
 }
 
+// iconDuration reports the remaining duration, in milliseconds, e should
+// report to an AbnormalStatusUpdate-style icon list, mirroring
+// AbstractEffect.addIcon(): a repeat-count effect reports its remaining tick
+// countdown, a single scheduled effect reports the time left until that
+// schedule fires, and a permanent (no period) effect reports -1. ok is false
+// when none of those apply (an unscheduled, non-repeating, non-permanent
+// effect), meaning it is omitted from the icon list entirely.
+func (e *Effect) iconDuration(now time.Time) (millis int32, ok bool) {
+	if e.Template.Count > 1 {
+		return int32(e.Remaining() * e.Template.Time * 1000), true
+	}
+
+	e.scheduleMu.Lock()
+	next := e.nextAction
+	e.scheduleMu.Unlock()
+	if !next.IsZero() {
+		remaining := max(next.Sub(now), 0)
+		return int32(remaining.Milliseconds()), true
+	}
+
+	if e.Template.Time == -1 {
+		return -1, true
+	}
+	return 0, false
+}
+
+// IconEntry is one active effect's projection onto an AbnormalStatusUpdate-
+// style icon list.
+type IconEntry struct {
+	ID       int32
+	Level    int
+	Toggle   bool
+	Duration int32
+}
+
+// IconEntries returns the icon-list projection of l's currently active,
+// icon-showing effects, in buffs-then-debuffs order, mirroring
+// EffectList.updateEffectIcons()'s buff/debuff scan: an effect not currently
+// active, not flagged to show an icon, or classified SIGNET_GROUND is
+// skipped, matching the reference's own skip conditions.
+func (l *List) IconEntries(now time.Time) []IconEntry {
+	var entries []IconEntry
+	for _, e := range l.active() {
+		if !e.Template.Icon || e.ClassTag() == "SIGNET_GROUND" {
+			continue
+		}
+		duration, ok := e.iconDuration(now)
+		if !ok {
+			continue
+		}
+		entries = append(entries, IconEntry{ID: int32(e.Skill.ID), Level: e.Level, Toggle: e.Skill.Toggle, Duration: duration})
+	}
+	return entries
+}
+
 // StatOwner receives stat function changes when active effects change and
 // reports the owner's current buff-slot capacity.
 type StatOwner interface {
@@ -460,6 +515,7 @@ func (l *List) Add(e *Effect) {
 	l.mu.Unlock()
 
 	runHooks(pending)
+	l.notifyAbnormalUpdate()
 }
 
 // Remove drops e from the list and activates the next member of its stack
@@ -474,6 +530,19 @@ func (l *List) Remove(e *Effect) {
 	l.mu.Unlock()
 
 	runHooks(pending)
+	l.notifyAbnormalUpdate()
+}
+
+// notifyAbnormalUpdate tells l's owner to refresh its abnormal-effect icon
+// state, mirroring Creature.addEffect()/removeEffect() unconditionally
+// queueing an EffectList icon update on every add or remove attempt,
+// regardless of whether the attempt actually changed anything. An owner
+// that doesn't track abnormal-effect icons (not a Player) leaves this a
+// no-op.
+func (l *List) notifyAbnormalUpdate() {
+	if u, ok := l.owner.(abnormalUpdater); ok {
+		u.UpdateAbnormalEffect()
+	}
 }
 
 // runHooks fires each queued hook in order, after the caller has released

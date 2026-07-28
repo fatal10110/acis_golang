@@ -325,7 +325,6 @@ Missing M5 stats/combat/items/progression server packets:
 
 Implemented M5 item/status server packet encoders in Go, with owning runtime wiring still tracked by the relevant systems:
 
-- `AbnormalStatusUpdate`
 - `ExUseSharedGroupItem`
 - `MagicSkillCanceled`
 - `PackageToList`
@@ -369,6 +368,7 @@ Implemented and wired M5 skill progression/cast server packets in Go:
 - `MagicSkillUse`
 - `MagicSkillLaunched`
 - `SetupGauge`
+- `AbnormalStatusUpdate`
 
 Implemented and wired M5 shortcut server packets in Go:
 
@@ -393,7 +393,8 @@ Implemented and wired M5 shortcut server packets in Go:
 - `RequestPledgeCrest` is wired against the loaded small pledge crest `.dds` cache and emits `PledgeCrest`. `RequestAllyCrest` is wired in game against loaded ally crest `.dds` cache data and emits `AllyCrest` only when data exists. Crest upload/update packets and large pledge crests remain deferred to the clan/crest write-owner flows.
 - `RequestCursedWeaponList` loads cursed weapon definitions at gameserver boot and emits `ExCursedWeaponList`. `RequestCursedWeaponLocation` is accepted but currently sends nothing because the Go runtime has no active cursed-weapon spawn/activation state yet.
 - `PetItemList`, `PetInfo`, and `PetStatusUpdate` remain deferred together: the current Go pet actor lacks the full pet info/status snapshot surface and owner spawn/info broadcast path needed to emit truthful full-list/status packets. `PetStatusShow` and `PetDelete` are wired where the current runtime has exact backing behavior.
-- `Revive`, `MagicSkillCanceled`, `AbnormalStatusUpdate`, `ShortBuffStatusUpdate`, and `ExUseSharedGroupItem` have byte-layout encoders with focused tests. Their send paths remain deferred until resurrect, cast-cancel, effect-list, short-buff, and shared-item reuse systems produce truthful runtime state.
+- `Revive`, `MagicSkillCanceled`, `ShortBuffStatusUpdate`, and `ExUseSharedGroupItem` have byte-layout encoders with focused tests. Their send paths remain deferred until resurrect, cast-cancel, short-buff, and shared-item reuse systems produce truthful runtime state.
+- `AbnormalStatusUpdate` is wired: the effect list notifies its owning `player.Character` on every effect start and stop (mirroring `Creature.addEffect()`/`removeEffect()` unconditionally queueing an icon-list update), and the Character sends the current active-effect icon list to its own session only, matching the reference's self-only broadcast. Toggle dedup/sort-by-id and permanent/-1 duration encoding were already correct in the existing frame builder.
 - `RequestAutoSoulShot` is wired as extended client opcode `0x0005` with per-player auto-shot toggle state, `ExAutoSoulShot`, and item-name `SystemMessage` feedback. First-shot recharge, recurring shot consumption, and `ExUseSharedGroupItem` reuse display remain deferred to the item-use/handler burst because the shared item handler/reuse pipeline is not ported yet.
 - `StatusUpdate` is implemented and wired for target max/current HP during selection. Broader status/stat recalculation broadcasts still need owner flows as those systems are ported.
 - The last full unique missing-count pass deduplicated those overlaps as 48 missing game client packets and 63 missing game server packets after the EnterWorld, movement/rotation, ValidateLocation correction, ChairSit, inventory, target/action, stance/social, item-operation, auto-shot, skill-acquisition, basic skill-cast, enchant, backed pet inventory/status, linked-html, pledge-crest, ally-crest, and cursed-weapon-list packet-wiring passes. Recompute this count during the next full packet audit; this M5 burst only removes encoder gaps and leaves runtime send-path gaps tracked above.

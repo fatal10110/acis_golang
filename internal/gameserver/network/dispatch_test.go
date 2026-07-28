@@ -1402,6 +1402,33 @@ func assertTargetHPStatus(t *testing.T, frame []byte, objectID int32, maxHP, cur
 	}
 }
 
+// abnormalStatusEntry is one decoded AbnormalStatusUpdate icon entry.
+type abnormalStatusEntry struct {
+	SkillID  int32
+	Level    uint16
+	Duration int32
+}
+
+// readAbnormalStatusUpdateFrame asserts the next frame is AbnormalStatusUpdate
+// and returns its decoded icon entries in wire order.
+func readAbnormalStatusUpdateFrame(t *testing.T, c *fakeGameClient) []abnormalStatusEntry {
+	t.Helper()
+	frame := c.read()
+	if frame[0] != serverpackets.OpcodeAbnormalStatusUpdate {
+		t.Fatalf("opcode = %#x, want AbnormalStatusUpdate (%#x)", frame[0], serverpackets.OpcodeAbnormalStatusUpdate)
+	}
+	r := wire.NewReader(frame[1:])
+	count := r.ReadUint16()
+	entries := make([]abnormalStatusEntry, 0, count)
+	for range count {
+		entries = append(entries, abnormalStatusEntry{SkillID: r.ReadInt32(), Level: r.ReadUint16(), Duration: r.ReadInt32()})
+	}
+	if err := r.Err(); err != nil {
+		t.Fatalf("read AbnormalStatusUpdate: %v", err)
+	}
+	return entries
+}
+
 func assertSystemMessageSkillFrame(t *testing.T, frame []byte, messageID int, skillID, level int32) {
 	t.Helper()
 	if frame[0] != serverpackets.OpcodeSystemMessage {

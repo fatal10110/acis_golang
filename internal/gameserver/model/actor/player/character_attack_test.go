@@ -346,6 +346,28 @@ func TestCharacterTakeDamageBroadcastsStatusOnEveryHit(t *testing.T) {
 	}
 }
 
+// TestCharacterUpdateAbnormalEffectRunsTheRegisteredHook verifies the
+// abnormalUpdater plumbing the effect list calls into on every effect start
+// and stop: SetAbnormalEffectUpdater installs the packet-layer hook, and a
+// nil hook (e.g. before a session attaches) leaves UpdateAbnormalEffect a
+// no-op instead of panicking.
+func TestCharacterUpdateAbnormalEffectRunsTheRegisteredHook(t *testing.T) {
+	tmpl := combatTemplate()
+	items := combatItems()
+	c := liveCharacter(1, tmpl, items)
+
+	c.UpdateAbnormalEffect()
+
+	var calls int
+	c.SetAbnormalEffectUpdater(func() { calls++ })
+
+	c.UpdateAbnormalEffect()
+	c.UpdateAbnormalEffect()
+	if calls != 2 {
+		t.Fatalf("calls = %d, want 2", calls)
+	}
+}
+
 // TestCharacterPositionAccessIsRaceFree exercises the exact goroutine
 // pairing that produces a live game's data race on Location/LastHeading: a
 // position-update ticker calling SyncPosition during an attack chase,

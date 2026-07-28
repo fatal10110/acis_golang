@@ -243,6 +243,28 @@ func (c *Character) SetStatusBroadcaster(broadcast func()) {
 	c.broadcastStatus = broadcast
 }
 
+// SetAbnormalEffectUpdater records the packet-layer hook that sends this
+// character's own session its current active-effect icon list.
+func (c *Character) SetAbnormalEffectUpdater(update func()) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	c.updateAbnormalEffect = update
+}
+
+// UpdateAbnormalEffect refreshes this character's abnormal-effect icon
+// state through the runtime packet hook, implementing the effect list's
+// abnormalUpdater hook: it fires on every effect start and stop, matching
+// Creature.addEffect()/removeEffect() unconditionally queueing an
+// EffectList icon update on each attempt.
+func (c *Character) UpdateAbnormalEffect() {
+	c.stateMu.RLock()
+	update := c.updateAbnormalEffect
+	c.stateMu.RUnlock()
+	if update != nil {
+		update()
+	}
+}
+
 // BroadcastStatus sends this character's current HP through the runtime
 // packet hook.
 func (c *Character) BroadcastStatus() {

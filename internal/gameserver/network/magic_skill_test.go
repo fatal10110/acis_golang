@@ -280,6 +280,9 @@ func TestGameClientLinkTogglesOnThenOff(t *testing.T) {
 
 	// First cast: no active instance yet, activates and pays MP.
 	c.send(encodeRequestMagicSkillUse(288, false, false))
+	if entries := readAbnormalStatusUpdateFrame(t, c); len(entries) != 0 {
+		t.Fatalf("AbnormalStatusUpdate entries after activation = %+v, want none (test skill has no icon)", entries)
+	}
 	reply := c.read()
 	if reply[0] != serverpackets.OpcodeMagicSkillUse {
 		t.Fatalf("magic use opcode = %#x, want MagicSkillUse (%#x)", reply[0], serverpackets.OpcodeMagicSkillUse)
@@ -302,6 +305,9 @@ func TestGameClientLinkTogglesOnThenOff(t *testing.T) {
 	// instead of reapplying it, and never touches MP.
 	beforeMP := character.MP()
 	c.send(encodeRequestMagicSkillUse(288, false, false))
+	if entries := readAbnormalStatusUpdateFrame(t, c); len(entries) != 0 {
+		t.Fatalf("AbnormalStatusUpdate entries after deactivation = %+v, want none (test skill has no icon)", entries)
+	}
 	reply = c.read()
 	if reply[0] != serverpackets.OpcodeMagicSkillUse {
 		t.Fatalf("magic use opcode = %#x, want MagicSkillUse (%#x)", reply[0], serverpackets.OpcodeMagicSkillUse)
