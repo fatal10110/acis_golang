@@ -197,3 +197,24 @@ func (c *Character) ItemDisabled(objectID int32) bool {
 	delete(c.disabledItems, objectID)
 	return false
 }
+
+// recentFakeDeathGrace is how long a player is exempt from hostile NPC
+// auto-targeting after standing up from Fake Death, matching the shipped
+// PlayerFakeDeathUpProtection default (players.properties).
+const recentFakeDeathGrace = 5 * time.Second
+
+// MarkRecentFakeDeath starts this player's post-fake-death grace period.
+func (c *Character) MarkRecentFakeDeath() {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	c.recentFakeDeathUntil = time.Now().Add(recentFakeDeathGrace)
+}
+
+// RecentFakeDeath reports whether this player is still within its
+// post-fake-death grace period, during which hostile NPC AI won't
+// retarget it.
+func (c *Character) RecentFakeDeath() bool {
+	c.stateMu.RLock()
+	defer c.stateMu.RUnlock()
+	return time.Now().Before(c.recentFakeDeathUntil)
+}

@@ -49,6 +49,8 @@ const (
 	FlagMeditating
 	// flagBigHead marks a target as carrying the big-head cosmetic buff.
 	flagBigHead
+	// FlagFakeDeath marks a target as playing dead.
+	FlagFakeDeath
 )
 
 // TypeManaDamOverTime is a periodic MP-drain effect: a toggle skill's
@@ -180,6 +182,9 @@ const (
 	// TypeGrow scales an Npc-shaped target's runtime collision radius for
 	// the effect's duration, restoring it on exit.
 	TypeGrow Type = "GROW"
+	// TypeFakeDeath is the Fake Death toggle: it drains MP each tick while
+	// active and marks its target as playing dead.
+	TypeFakeDeath Type = "FAKE_DEATH"
 )
 
 type kind struct {
@@ -248,6 +253,7 @@ var coreKinds = map[string]kind{
 	"RandomizeHate":         {typ: TypeRandomizeHate},
 	"ThrowUp":               {typ: TypeThrowUp, flag: FlagStunned, debuff: true},
 	"Grow":                  {typ: TypeGrow},
+	"FakeDeath":             {typ: TypeFakeDeath, flag: FlagFakeDeath},
 }
 
 var fearSkippedPlayableSkillIDs = map[modelskill.ID]bool{
@@ -424,6 +430,10 @@ func wireHooks(e *Effect) {
 	case TypeGrow:
 		e.OnStart = growStart
 		e.OnExit = growExit
+	case TypeFakeDeath:
+		e.OnStart = fakeDeathStart
+		e.OnAction = fakeDeathAction
+		e.OnExit = fakeDeathExit
 	}
 }
 
@@ -445,6 +455,14 @@ type mpDotTarget interface {
 
 type lackMPNotifier interface {
 	NotifyEffectRemovedDueLackMP(*Effect)
+}
+
+// recentFakeDeathMarker is implemented by an actor that tracks its own
+// stand-up grace period after Fake Death exits; an actor without one gets
+// no grace-period tracking (fake death still applies while the effect is
+// active regardless).
+type recentFakeDeathMarker interface {
+	MarkRecentFakeDeath()
 }
 
 type aborter interface {
@@ -1659,6 +1677,38 @@ func immobilizePetBuffExit(e *Effect) {
 	if target, ok := e.Effected.(immobilizeTarget); ok {
 		target.SetImmobilized(false)
 	}
+}
+
+// fakeDeathStart puts the target in the seated transition Fake Death
+// reuses for its lie-down animation; it always reports success.
+func fakeDeathStart(e *Effect) bool {
+	if target, ok := e.Effected.(sitTarget); ok {
+		target.SetStanding(false)
+	}
+	refresh(e.Effected)
+	return true
+}
+
+// fakeDeathAction drains MP each tick, reusing the same lack-MP handling
+// as the other mana-drain ticks in this file.
+func fakeDeathAction(e *Effect) bool {
+	target, ok := e.Effected.(mpDotTarget)
+	if !ok {
+		return false
+	}
+	return manaDrainTick(e, target)
+}
+
+// fakeDeathExit stands the target back up and starts its recent-fake-death
+// grace period, during which hostile NPC AI won't retarget it.
+func fakeDeathExit(e *Effect) {
+	if target, ok := e.Effected.(sitTarget); ok {
+		target.SetStanding(true)
+	}
+	if target, ok := e.Effected.(recentFakeDeathMarker); ok {
+		target.MarkRecentFakeDeath()
+	}
+	refresh(e.Effected)
 }
 
 // cancelDebuffStart strips a capped selection of a player target's active,
