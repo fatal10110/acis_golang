@@ -212,6 +212,8 @@ func (l *GameClientLink) attachLivePlayer(client *Client, c *player.Character, t
 	}
 	moveCtl.SetPositionUpdates(l.positions)
 	attackCtl := attack.NewPlayer(c)
+	c.Move().SetLogger(l.log)
+	attackCtl.SetLogger(l.log)
 	combat := ai.NewPlayerAttack(c, moveCtl, attackCtl)
 	attackCtl.SetFinished(combat.Think)
 
