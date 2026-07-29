@@ -88,6 +88,90 @@ func TestGameClientLinkPickupGroundItemFullClientFlow(t *testing.T) {
 	}
 }
 
+// TestGameClientLinkPickupAdenaMergeFullClientFlow tests the full client
+// flow when picking up Adena that merges into an existing inventory stack.
+// This is the regression test for the bug where the ground item stayed
+// visible and the character froze after pickup when the item was absorbed
+// into an existing stack (absorbed=true path in PickupGround).
+func TestGameClientLinkPickupAdenaMergeFullClientFlow(t *testing.T) {
+	c, chars, _, state := newLinkedGameClient(t)
+
+	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.read() // CharCreateOk
+	c.read() // CharSelectInfo
+	objID := chars.soleObjectID(t)
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	playerObj, ok := state.Player(objID)
+	if !ok {
+		t.Fatalf("world.Player(%d) missing", objID)
+	}
+	live := playerObj.(*livePlayer)
+
+	// Give the player an existing Adena stack in inventory (100 Adena)
+	existingAdena := &item.Instance{ObjectID: 800, TemplateID: item.AdenaID, OwnerID: live.ObjectID(), Count: 100, Location: item.LocationInventory, ManaLeft: -1}
+	live.Inventory().Add(existingAdena)
+
+	px, py, pz := live.Position()
+
+	adenaTmpl, ok := testItemTemplates().Get(item.AdenaID)
+	if !ok {
+		t.Fatal("missing test adena template")
+	}
+	// Spawn ground Adena directly in world (like mob drops do)
+	ground, err := grounditem.New(item.Instance{ObjectID: 5000, TemplateID: item.AdenaID, Count: 40, ManaLeft: -1}, adenaTmpl)
+	if err != nil {
+		t.Fatalf("ground item: %v", err)
+	}
+	state.Spawn(ground, px+30, py, pz, 0)
+	if reply := c.read(); reply[0] != serverpackets.OpcodeSpawnItem {
+		t.Fatalf("ground item spawn opcode = %#x, want SpawnItem (%#x)", reply[0], serverpackets.OpcodeSpawnItem)
+	}
+
+	origin := location.Location{X: px, Y: py, Z: pz}
+	c.send(encodeAction(ground.ObjectID(), origin, false))
+	if reply := c.read(); reply[0] != serverpackets.OpcodeMyTargetSelected {
+		t.Fatalf("first Action opcode = %#x, want MyTargetSelected (%#x)", reply[0], serverpackets.OpcodeMyTargetSelected)
+	}
+
+	c.send(encodeAction(ground.ObjectID(), origin, false))
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeGetItem {
+		t.Fatalf("second Action opcode = %#x, want GetItem (%#x) — the pickup click was silently dropped", reply[0], serverpackets.OpcodeGetItem)
+	}
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeDeleteObject {
+		t.Fatalf("pickup follow-up opcode = %#x, want DeleteObject (%#x) — the item never disappears from the ground", reply[0], serverpackets.OpcodeDeleteObject)
+	}
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeInventoryUpdate {
+		t.Fatalf("pickup follow-up opcode = %#x, want InventoryUpdate (%#x)", reply[0], serverpackets.OpcodeInventoryUpdate)
+	}
+
+	if _, ok := state.Object(ground.ObjectID()); ok {
+		t.Fatalf("world.Object(%d) still present after pickup", ground.ObjectID())
+	}
+
+	// Verify merged stack: 100 + 40 = 140 Adena in existing stack (objectID 800)
+	stack := live.Inventory().ItemByTemplateID(item.AdenaID)
+	if stack == nil || stack.ObjectID != existingAdena.ObjectID || stack.Count != 140 || stack.OwnerID != live.ObjectID() {
+		t.Fatalf("inventory stack = %+v, want merged 140 adena in existing stack", stack)
+	}
+
+	// Movement must still work after the pickup resolves.
+	x, y, z := live.Position()
+	c.send(encodeMoveBackwardToLocation(origin, location.Location{X: x, Y: y, Z: z}, 1))
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeMoveToLocation {
+		t.Fatalf("movement after pickup opcode = %#x, want MoveToLocation (%#x) — client is unresponsive to move commands", reply[0], serverpackets.OpcodeMoveToLocation)
+	}
+}
+
 func dropTestGround(t *testing.T, state *world.State, drops *task.GroundItems, inst item.Instance, tmpl *item.Template, x, y, z int) *grounditem.Item {
 	t.Helper()
 	ground, err := grounditem.New(inst, tmpl)
