@@ -8,7 +8,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// outboundBuffer is how many pending writes a Conn queues before Send
+// outboundBuffer is how many pending writes a Conn queues before SendFrame
 // starts blocking the caller.
 const outboundBuffer = 64
 
@@ -45,12 +45,12 @@ func newConn(c net.Conn, log zerolog.Logger) *Conn {
 
 // writeLoop drains queued sends in order and only closes the
 // underlying connection once the queue is empty and Close has been
-// called (or a write fails), so a Send queued right before Close is
+// called (or a write fails), so a frame queued right before Close is
 // never dropped. A panic while writing is recovered and logged so it
 // disconnects only this client, never the process; the deferred
 // cleanup still runs so Close never blocks forever waiting on stopped.
 //
-// Once this loop exits early on a write error, later Send calls fail
+// Once this loop exits early on a write error, later SendFrame calls fail
 // without queueing because nothing drains c.out any more.
 //
 // Each iteration greedily drains c.out (bounded by outboundBuffer) after
@@ -135,16 +135,8 @@ func (c *Conn) releaseQueued() {
 	}
 }
 
-// Send queues payload to be written by this connection's writer goroutine.
-// If Send returns true, the caller has handed off ownership and must not
-// mutate payload. It returns false without blocking if the connection is
-// already closed or its writer has stopped.
-func (c *Conn) Send(payload []byte) bool {
-	return c.send(queuedWrite{frame: wire.BorrowedFrame(payload)})
-}
-
-// SendFrame queues an owned frame and calls release exactly once after the
-// frame is written or dropped because the connection is closed.
+// SendFrame queues a frame and calls release exactly once after the frame is
+// written or dropped because the connection is closed.
 func (c *Conn) SendFrame(frame wire.Frame) bool {
 	if c.send(queuedWrite{frame: frame}) {
 		return true
