@@ -71,7 +71,35 @@ func provideGameClientLink(
 		SkillEnchantSPBookNeeded: bool(spBookNeeded),
 		KarmaPlayerCanTeleport:   bool(karmaTeleport),
 	}
-	return network.NewGameClientLink(validator, links.get, roster, items, shortcuts, data.Players, data.Items, html, crests, skills, spellbooks, data.Trees, data.CursedWeapons, state, data.NPCs, move.NewGeo(data.Geo, data.Finder), data.Zones, ids, ground, attackStance, positions, playerClock, data.Restarts, data.Levels, playerConfig, petCfg, log)
+	return network.NewGameClientLink(network.GameClientLinkConfig{
+		Validator:     validator,
+		LoginLink:     links.get,
+		Roster:        roster,
+		Items:         items,
+		Shortcuts:     shortcuts,
+		Templates:     data.Players,
+		ItemTemplates: data.Items,
+		HTML:          html,
+		Crests:        crests,
+		Skills:        skills,
+		Spellbooks:    spellbooks,
+		SkillTrees:    data.Trees,
+		CursedWeapons: data.CursedWeapons,
+		World:         state,
+		NPCs:          data.NPCs,
+		Geo:           move.NewGeo(data.Geo, data.Finder),
+		Zones:         data.Zones,
+		IDs:           ids,
+		GroundItems:   ground,
+		AttackStance:  attackStance,
+		Positions:     positions,
+		PlayerClock:   playerClock,
+		Restarts:      data.Restarts,
+		Levels:        data.Levels,
+		PlayerConfig:  playerConfig,
+		PetConfig:     petCfg,
+		Log:           log,
+	})
 }
 
 func provideSkillPersistence(pool *sql.DB, data *gameData) *skillstate.Persistence {

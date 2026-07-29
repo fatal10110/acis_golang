@@ -415,6 +415,7 @@ func (c *Character) ReduceHP(amount float64, attacker any, _ modelskill.Definiti
 		c.curHP = 0
 	}
 	c.vitalsMu.Unlock()
+	c.breakCastOnDamage(amount)
 	if dead {
 		killer, _ := attacker.(creature.DeathActor)
 		c.Die(killer)

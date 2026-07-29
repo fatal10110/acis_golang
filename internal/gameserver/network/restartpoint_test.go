@@ -2,6 +2,7 @@ package network
 
 import (
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -11,6 +12,27 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
+
+// TestTeleportLivePlayerStopsInFlightCast pins the teleport half of the
+// actor-state cast-abort surface: a discontinuous relocation stops an
+// in-flight cast, the same way it already cancels attack/combat.
+func TestTeleportLivePlayerStopsInFlightCast(t *testing.T) {
+	state := world.New()
+	live := newTestLivePlayer(t, 1, &frameCapture{})
+	state.Spawn(live, 0, 0, 0, 0)
+
+	gcl := &GameClientLink{world: state, geo: testGeo{}, log: zerolog.Nop()}
+	controller := gcl.castController(live)
+	if _, err := controller.Start(time.Now(), skillCastObject(live), castingDef); err != nil {
+		t.Fatalf("Start() error: %v", err)
+	}
+
+	gcl.teleportLivePlayer(live, location.Location{X: 5000, Y: 5000, Z: 100}, 0)
+
+	if controller.CastingNow() {
+		t.Fatal("CastingNow() = true after a teleport, want cleared")
+	}
+}
 
 // townRestartTable returns a restart table whose only point covers the map
 // region a player spawned near the world origin falls into.
