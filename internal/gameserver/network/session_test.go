@@ -42,6 +42,15 @@ func TestSessionSendFramesWithLittleEndianLengthHeader(t *testing.T) {
 	}
 }
 
+func TestSessionFrameWriterPoolable(t *testing.T) {
+	if !sessionFrameWriterPoolable(wire.NewFrameWriter(sessionFrameWriterMaxCapacity)) {
+		t.Fatal("writer at maximum pool capacity is not poolable")
+	}
+	if sessionFrameWriterPoolable(wire.NewFrameWriter(sessionFrameWriterMaxCapacity + 1)) {
+		t.Fatal("oversized writer is poolable")
+	}
+}
+
 func TestSessionSendFrameWritesAndReleasesOwnedFrame(t *testing.T) {
 	s, client := pipeSessions(t)
 
