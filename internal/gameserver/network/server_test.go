@@ -129,8 +129,13 @@ func TestServeClosesConnectionsAndWaitsForHandlersOnCancel(t *testing.T) {
 		t.Fatal("connection handler did not finish after context cancel")
 	}
 
-	if err := <-errCh; err != nil {
-		t.Fatalf("Serve returned error after handler cleanup: %v", err)
+	select {
+	case err := <-errCh:
+		if err != nil {
+			t.Fatalf("Serve returned error after handler cleanup: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("Serve did not return after handlers finished")
 	}
 }
 
