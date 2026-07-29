@@ -37,6 +37,9 @@ var (
 	// while the caster already holds as many cubics as Cubic Mastery
 	// allows.
 	ErrCubicListFull = errors.New("cast: cubic list full")
+	// ErrAllSkillsDisabled means the actor is under a blanket skill lock
+	// (crowd control, or Java's Duel-defeat lock once that lands).
+	ErrAllSkillsDisabled = errors.New("cast: all skills disabled")
 )
 
 // cubicLister is the narrow surface a self-targeted cubic-granting skill
@@ -58,9 +61,9 @@ type signetGroundExiter interface {
 }
 
 // allSkillsDisabler is the optional owner surface for the blanket
-// skill-lock an abort lifts. No owner implements it yet: nothing in the
-// port installs the lock in the first place, so the funnel below is wired
-// but inert until that state exists.
+// skill-lock CanCast gates on and an abort lifts, matching Java's
+// Creature.isAllSkillsDisabled()/enableAllSkills(). An owner that cannot
+// carry the lock simply doesn't implement it.
 type allSkillsDisabler interface {
 	AllSkillsDisabled() bool
 	EnableAllSkills()
@@ -208,6 +211,9 @@ func (c *Controller) CurrentSkill() (modelskill.Definition, bool) {
 func (c *Controller) CanCast(target any, def modelskill.Definition) error {
 	if c.actor == nil || target == nil {
 		return ErrInvalidTarget
+	}
+	if d, ok := c.actor.(allSkillsDisabler); ok && d.AllSkillsDisabled() {
+		return ErrAllSkillsDisabled
 	}
 	key := ReuseKey(def)
 	if c.actor.SkillDisabled(key) {

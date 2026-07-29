@@ -1,6 +1,10 @@
 package player
 
-import "time"
+import (
+	"time"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+)
 
 func (c *Character) initStateLocked() {
 	if c.stateInit {
@@ -181,10 +185,26 @@ func (c *Character) DisableItem(objectID int32, delay time.Duration) {
 }
 
 // ItemDisabled reports whether an inventory object id is still disabled.
+// Matches Java's Playable.isItemDisabled: the AllSkillsDisabled lock only
+// short-circuits every id when at least one item is already tracked as
+// disabled (Playable.java:355-359) — with no disabled item at all, the lock
+// has no effect here.
 func (c *Character) ItemDisabled(objectID int32) bool {
 	if objectID <= 0 {
 		return false
 	}
+	c.stateMu.Lock()
+	empty := len(c.disabledItems) == 0
+	c.stateMu.Unlock()
+	if empty {
+		return false
+	}
+	// AllSkillsDisabled takes stateMu itself, so it must run outside the
+	// lock above to avoid a self-deadlock on the non-reentrant RWMutex.
+	if c.AllSkillsDisabled() {
+		return true
+	}
+
 	c.stateMu.Lock()
 	defer c.stateMu.Unlock()
 	until, ok := c.disabledItems[objectID]
@@ -196,6 +216,38 @@ func (c *Character) ItemDisabled(objectID int32) bool {
 	}
 	delete(c.disabledItems, objectID)
 	return false
+}
+
+// AllSkillsDisabled mirrors Java's Creature.isAllSkillsDisabled(): the
+// crowd-control states that block skill and item use. Java also unions a raw
+// Duel-defeat lock (Creature._allSkillsDisabled, set/cleared only by
+// PlayerStatus/Player's Duel handling), which this port does not model since
+// Duel isn't ported yet.
+func (c *Character) AllSkillsDisabled() bool {
+	live := c.liveLocked()
+	if live == nil {
+		return false
+	}
+	return live.Stunned() || live.ImmobileUntilAttacked() || live.Sleeping() || live.Paralyzed() || live.Afraid()
+}
+
+// AttachLive installs live as this character's crowd-control/movement
+// runtime state. EnterWorld's live-attach and AllSkillsDisabled's read both
+// go through stateMu, so a concurrent caller (e.g. a persisted-state
+// assertion racing live setup) never observes a torn pointer.
+func (c *Character) AttachLive(live *creature.Live) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	c.Live = live
+}
+
+// liveLocked reads the Live pointer under stateMu, for call sites that
+// cannot rely on Live having been set before any other goroutine can see
+// this Character.
+func (c *Character) liveLocked() *creature.Live {
+	c.stateMu.RLock()
+	defer c.stateMu.RUnlock()
+	return c.Live
 }
 
 // recentFakeDeathGrace is how long a player is exempt from hostile NPC
