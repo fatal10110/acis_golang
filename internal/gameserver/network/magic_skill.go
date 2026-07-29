@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	itemhandler "github.com/fatal10110/acis_golang/internal/gameserver/handler/item"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -20,7 +21,7 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 	}
 
 	if def, ok := l.skills.Definition(modelskill.Ref{ID: modelskill.ID(req.SkillID), Level: live.SkillLevel(int(req.SkillID))}); ok {
-		if def.SkillType == "RECALL" && !l.playerConfig.KarmaPlayerCanTeleport && live.Karma() > 0 {
+		if itemhandler.IsRecallSkillType(def.SkillType) && !l.playerConfig.KarmaPlayerCanTeleport && live.Karma() > 0 {
 			sendMagicActionFailed(live)
 			return
 		}

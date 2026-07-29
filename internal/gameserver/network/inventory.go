@@ -2,6 +2,7 @@ package network
 
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	itemhandler "github.com/fatal10110/acis_golang/internal/gameserver/handler/item"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -54,7 +55,7 @@ func (l *GameClientLink) useItem(live *livePlayer, objectID int32) {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
-	if !l.playerConfig.KarmaPlayerCanTeleport && live.Karma() > 0 && itemBlockedByKarmaTeleport(tmpl, l.skills) {
+	if !l.playerConfig.KarmaPlayerCanTeleport && live.Karma() > 0 && itemhandler.BlockedByKarmaTeleport(tmpl, l.skills) {
 		return
 	}
 	if live.Fishing() && tmpl.DefaultAction != item.ActionFishingShot {
