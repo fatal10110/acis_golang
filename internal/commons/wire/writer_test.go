@@ -64,6 +64,36 @@ func TestWriterStringEncodesSurrogatePairs(t *testing.T) {
 	}
 }
 
+func TestWriterStringReplacesInvalidUTF8(t *testing.T) {
+	var w Writer
+	w.WriteString("\xff")
+
+	want := []byte{0xFD, 0xFF, 0, 0}
+	if got := w.Bytes(); !bytes.Equal(got, want) {
+		t.Fatalf("Bytes() = % X, want % X", got, want)
+	}
+}
+
+func TestWriterStringDoesNotAllocateWithReusedWriter(t *testing.T) {
+	w := NewFrameWriter(64)
+	allocs := testing.AllocsPerRun(1000, func() {
+		w.ResetFrame(64)
+		w.WriteString("PlayerName")
+	})
+	if allocs != 0 {
+		t.Fatalf("WriteString allocations = %v, want 0", allocs)
+	}
+}
+
+func BenchmarkWriteString(b *testing.B) {
+	w := NewFrameWriter(64)
+	b.ReportAllocs()
+	for b.Loop() {
+		w.ResetFrame(64)
+		w.WriteString("PlayerName")
+	}
+}
+
 func TestFrameWriterBackfillsHeaderWithoutChangingBytes(t *testing.T) {
 	w := NewFrameWriter(16)
 	w.WriteUint8(0x14)
