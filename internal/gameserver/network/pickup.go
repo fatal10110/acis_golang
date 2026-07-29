@@ -71,6 +71,7 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return true
 	default: // invops.PickupNoop and any other unhandled failure
+		l.log.Warn().Int32("item_id", ground.ItemID()).Int32("object_id", ground.ObjectID()).Int32("picker", live.ObjectID()).Msg("pickup rejected (PickupNoop)")
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return true
 	}
@@ -87,9 +88,15 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 }
 
 // lockPickupParalysis briefly paralyzes live after a successful pickup,
-// clearing the lock once pickupParalyzeLock elapses.
+// clearing the lock once pickupParalyzeLock elapses. The callback is
+// wrapped with panic recovery by scheduleAfter so a failure here is
+// logged rather than silently leaving the player permanently paralyzed.
 func (l *GameClientLink) lockPickupParalysis(live *livePlayer) {
-	l.scheduleAfter(pickupParalyzeLock, func() { live.SetParalyzed(false) })
+	l.scheduleAfter(pickupParalyzeLock, func() {
+		if !live.SetParalyzed(false) {
+			l.log.Warn().Int32("object_id", live.ObjectID()).Msg("pickup paralysis release was a no-op (already clear)")
+		}
+	})
 	live.SetParalyzed(true)
 }
 

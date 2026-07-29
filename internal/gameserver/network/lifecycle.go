@@ -16,6 +16,10 @@ func (l *GameClientLink) detachLivePlayer(ctx context.Context, live *livePlayer)
 	// otherwise a timer goroutine can still fire after detach and race
 	// those writes.
 	live.Stop()
+	// Clear any transient paralysis lock left by a pickup or other action.
+	// A scheduled release goroutine may have panicked or not yet fired;
+	// leaving the lock set would block every item op on the next login.
+	live.SetParalyzed(false)
 	l.cancelActiveTrade(live)
 	if l.roster != nil || l.skills != nil {
 		saveCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), livePlayerDetachSaveTimeout)

@@ -311,6 +311,11 @@ func (l *GameClientLink) sendInventoryUpdate(live *livePlayer, inv *itemcontaine
 	frame, err := serverpackets.FrameInventoryUpdate(updates, items, inv.Templates())
 	if err != nil {
 		l.log.Error().Err(err).Msg("build InventoryUpdate")
+		// The inventory state was mutated but the client never learns
+		// about it. Sending ActionFailed unblocks the client's pending
+		// action instead of leaving it frozen forever — a visual desync
+		// (open inventory to resync) is recoverable; a stuck client is not.
+		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
 	live.SendFrame(frame)
