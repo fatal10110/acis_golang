@@ -9,7 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
-func testTemplates(t *testing.T) *player.TemplateTable {
+func testTemplates(t testing.TB) *player.TemplateTable {
 	t.Helper()
 	tmpl := &player.Template{
 		ID:        0,
