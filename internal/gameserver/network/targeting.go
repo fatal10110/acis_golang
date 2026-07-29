@@ -89,6 +89,10 @@ func (l *GameClientLink) showOwnedPetStatus(live *livePlayer, target world.Track
 	if !ok || live == nil || !pet.IsPet() || pet.OwnerID() != live.ObjectID() {
 		return false
 	}
+	// Interacting with an owned summon releases the pending action the client
+	// registered for the click before showing the status window; PetStatusShow
+	// alone leaves that action outstanding and locks further input.
+	live.SendFrame(serverpackets.FrameActionFailed())
 	live.SendFrame(serverpackets.FramePetStatusShow(pet.SummonType()))
 	return true
 }

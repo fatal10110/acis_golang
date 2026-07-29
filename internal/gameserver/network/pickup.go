@@ -75,6 +75,13 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 		return true
 	}
 
+	// A successful pickup still has to release the pending action the client
+	// registered when it accepted the click. GetItem, DeleteObject and
+	// InventoryUpdate all describe the world, not the action's outcome, so
+	// without this the client keeps its input locked and stops responding to
+	// every later click — the same failure shape as an unanswered rejection.
+	live.SendFrame(serverpackets.FrameActionFailed())
+
 	l.broadcastGroundPickup(ground, live.ObjectID())
 	l.broadcastPickupAttention(live, ground)
 	l.groundItems.Remove(ground)

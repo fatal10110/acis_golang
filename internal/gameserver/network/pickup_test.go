@@ -67,6 +67,10 @@ func TestGameClientLinkPickupGroundItemFullClientFlow(t *testing.T) {
 
 	c.send(encodeAction(ground.ObjectID(), origin, false))
 	reply := c.read()
+	if reply[0] != serverpackets.OpcodeActionFailed {
+		t.Fatalf("second Action opcode = %#x, want ActionFailed (%#x) — a successful pickup must still release the client's pending action", reply[0], serverpackets.OpcodeActionFailed)
+	}
+	reply = c.read()
 	if reply[0] != serverpackets.OpcodeGetItem {
 		t.Fatalf("second Action opcode = %#x, want GetItem (%#x) — the pickup click was silently dropped", reply[0], serverpackets.OpcodeGetItem)
 	}
@@ -121,6 +125,7 @@ func TestPickupLiveGroundItemMovesItemAndDespawns(t *testing.T) {
 	}
 
 	assertOpcodeSequence(t, capture.frames,
+		serverpackets.OpcodeActionFailed,
 		serverpackets.OpcodeGetItem,
 		serverpackets.OpcodeDeleteObject,
 		serverpackets.OpcodeInventoryUpdate,
@@ -451,5 +456,89 @@ func assertSystemMessageIDFrame(t *testing.T, frame []byte, want int) {
 	r := wire.NewReader(frame[1:])
 	if got := r.ReadInt32(); got != int32(want) {
 		t.Fatalf("SystemMessage id = %d, want %d", got, want)
+	}
+}
+
+//	adena picked up while the player already holds an adena stack, so
+//
+// Container.Add takes the absorbed (merge) branch instead of inserting a new
+// instance. Same end-to-end shape as
+// TestGameClientLinkPickupGroundItemFullClientFlow.
+func TestGameClientLinkPickupAdenaMergeFullClientFlow(t *testing.T) {
+	c, chars, _, state := newLinkedGameClient(t)
+
+	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.read() // CharCreateOk
+	c.read() // CharSelectInfo
+	objID := chars.soleObjectID(t)
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	playerObj, ok := state.Player(objID)
+	if !ok {
+		t.Fatalf("world.Player(%d) missing", objID)
+	}
+	live := playerObj.(*livePlayer)
+	px, py, pz := live.Position()
+
+	// Pre-existing adena stack -> pickup must merge.
+	inv := live.Inventory()
+	if inv == nil {
+		t.Fatal("inventory missing")
+	}
+	if got := inv.AddNew(item.AdenaID, 100, 800); got == nil {
+		t.Fatal("failed to seed existing adena stack")
+	}
+	inv.DrainUpdates() // discard the seeding update
+
+	adenaTmpl, ok := testItemTemplates().Get(item.AdenaID)
+	if !ok {
+		t.Fatal("missing test adena template")
+	}
+	ground, err := grounditem.New(item.Instance{ObjectID: 5000, TemplateID: item.AdenaID, Count: 40, ManaLeft: -1}, adenaTmpl)
+	if err != nil {
+		t.Fatalf("ground item: %v", err)
+	}
+	state.Spawn(ground, px+30, py, pz, 0)
+	if reply := c.read(); reply[0] != serverpackets.OpcodeSpawnItem {
+		t.Fatalf("ground spawn opcode = %#x, want SpawnItem (%#x)", reply[0], serverpackets.OpcodeSpawnItem)
+	}
+
+	origin := location.Location{X: px, Y: py, Z: pz}
+	c.send(encodeAction(ground.ObjectID(), origin, false))
+	if reply := c.read(); reply[0] != serverpackets.OpcodeMyTargetSelected {
+		t.Fatalf("first Action opcode = %#x, want MyTargetSelected", reply[0])
+	}
+
+	c.send(encodeAction(ground.ObjectID(), origin, false))
+	if reply := c.read(); reply[0] != serverpackets.OpcodeActionFailed {
+		t.Fatalf("pickup opcode = %#x, want ActionFailed (%#x) — the client's pending action is never released", reply[0], serverpackets.OpcodeActionFailed)
+	}
+	if reply := c.read(); reply[0] != serverpackets.OpcodeGetItem {
+		t.Fatalf("second Action opcode = %#x, want GetItem (%#x)", reply[0], serverpackets.OpcodeGetItem)
+	}
+	if reply := c.read(); reply[0] != serverpackets.OpcodeDeleteObject {
+		t.Fatalf("follow-up opcode = %#x, want DeleteObject (%#x) — item stays on the ground", reply[0], serverpackets.OpcodeDeleteObject)
+	}
+	if reply := c.read(); reply[0] != serverpackets.OpcodeInventoryUpdate {
+		t.Fatalf("follow-up opcode = %#x, want InventoryUpdate (%#x)", reply[0], serverpackets.OpcodeInventoryUpdate)
+	}
+
+	if _, ok := state.Object(ground.ObjectID()); ok {
+		t.Fatalf("world.Object(%d) still present after pickup", ground.ObjectID())
+	}
+	if stack := inv.ItemByTemplateID(item.AdenaID); stack == nil || stack.Snapshot().Count != 140 {
+		t.Fatalf("merged adena stack = %+v, want count 140", stack)
+	}
+
+	// Must still respond to movement.
+	x, y, z := live.Position()
+	c.send(encodeMoveBackwardToLocation(origin, location.Location{X: x, Y: y, Z: z}, 1))
+	if reply := c.read(); reply[0] != serverpackets.OpcodeMoveToLocation {
+		t.Fatalf("movement after pickup opcode = %#x, want MoveToLocation — character unresponsive", reply[0])
 	}
 }
