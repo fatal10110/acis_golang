@@ -3,17 +3,15 @@ package dynamic
 import (
 	"fmt"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/geo"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
 
 const (
-	tileXMin  = 16
-	tileYMin  = 10
-	tileSize  = 32768
-	worldXMin = (tileXMin - 20) * tileSize
-	worldYMin = (tileYMin - 18) * tileSize
+	worldXMin = geo.WorldXMin
+	worldYMin = geo.WorldYMin
 )
 
 // Sampler provides the static geodata lookups door shaping needs.

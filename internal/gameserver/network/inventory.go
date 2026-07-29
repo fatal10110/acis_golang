@@ -2,6 +2,7 @@ package network
 
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	itemhandler "github.com/fatal10110/acis_golang/internal/gameserver/handler/item"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -54,7 +55,7 @@ func (l *GameClientLink) useItem(live *livePlayer, objectID int32) {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
-	if !l.playerConfig.KarmaPlayerCanTeleport && live.Karma() > 0 && itemBlockedByKarmaTeleport(tmpl, l.skills) {
+	if itemhandler.ItemBlockedByKarmaTeleport(tmpl, l.skills, live.Karma(), l.playerConfig.KarmaPlayerCanTeleport) {
 		return
 	}
 	if live.Fishing() && tmpl.DefaultAction != item.ActionFishingShot {
@@ -333,14 +334,15 @@ func (l *GameClientLink) broadcastCharacterInfo(live *livePlayer) {
 	if l.world == nil {
 		return
 	}
-	l.world.ForEachKnown(live, func(o world.Tracked) {
-		receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
-		if !ok {
-			return
-		}
-		receiver.SendFrame(serverpackets.FrameCharInfo(serverpackets.CharInfoSnapshot{
-			Character: live.Character, Template: live.template, Items: items,
-		}))
+	info := serverpackets.CharInfoSnapshot{Character: live.Character, Template: live.template, Items: items}
+	broadcastFrame(func() wire.Frame {
+		return serverpackets.FrameCharInfo(info)
+	}, func(send func(frameReceiver)) {
+		l.world.ForEachKnown(live, func(o world.Tracked) {
+			if receiver, ok := o.(frameReceiver); ok {
+				send(receiver)
+			}
+		})
 	})
 }
 

@@ -1,16 +1,18 @@
 package world
 
+import "github.com/fatal10110/acis_golang/internal/gameserver/geo"
+
 // World bounds, in game coordinates. Derived from the game's fixed 32768-unit
 // tile size and the map's tile span (X 16..26, Y 10..25).
 const (
-	TileSize = 32768
-	TileXMin = 16
-	TileYMin = 10
+	TileSize = geo.TileSize
+	TileXMin = geo.TileXMin
+	TileYMin = geo.TileYMin
 
-	MinX = (TileXMin - 20) * TileSize
-	MaxX = (26-19)*TileSize - 1
-	MinY = (TileYMin - 18) * TileSize
-	MaxY = (25-17)*TileSize - 1
+	MinX = geo.WorldXMin
+	MaxX = geo.WorldXMax
+	MinY = geo.WorldYMin
+	MaxY = geo.WorldYMax
 )
 
 // regionSize is the edge length, in game coordinates, of one grid region.

@@ -15,6 +15,19 @@ type broadcastFrameReceiver struct {
 	frames    [][]byte
 }
 
+type retainedBroadcastFrameReceiver struct {
+	world.Presence
+	trackedID int32
+	frame     wire.Frame
+}
+
+func (f *retainedBroadcastFrameReceiver) ObjectID() int32 { return f.trackedID }
+
+func (f *retainedBroadcastFrameReceiver) SendFrame(frame wire.Frame) bool {
+	f.frame = frame
+	return true
+}
+
 func (f *broadcastFrameReceiver) ObjectID() int32 { return f.trackedID }
 
 func (f *broadcastFrameReceiver) SendFrame(frame wire.Frame) bool {
@@ -52,6 +65,34 @@ func TestActorBroadcastFrameReachesOwnKnownObservers(t *testing.T) {
 	}
 	if len(substitute.frames) != 0 {
 		t.Fatalf("out-of-range substitute received %d frames, want 0", len(substitute.frames))
+	}
+}
+
+func TestActorBroadcastFrameGivesObserversIndependentBuffers(t *testing.T) {
+	state := world.New()
+	owner := &liveOwnerStub{id: 100, level: 40}
+	state.Spawn(owner, 0, 0, 0, 0)
+	state.AddPlayer(owner)
+	actor := NewServitor(ServitorConfig{ObjectID: 200, Owner: owner, Level: 44})
+	SpawnBesideOwner(state, actor, owner, location.Location{})
+
+	first := &retainedBroadcastFrameReceiver{trackedID: 300}
+	second := &retainedBroadcastFrameReceiver{trackedID: 400}
+	state.Spawn(first, 0, 0, 0, 0)
+	state.Spawn(second, 0, 0, 0, 0)
+
+	self := serverpackets.SkillCastObject{ObjectID: actor.ObjectID()}
+	actor.BroadcastFrame(serverpackets.FrameMagicSkillUse(self, self, 1, 1, 0, 0, false))
+	defer first.frame.Release()
+	defer second.frame.Release()
+
+	if len(first.frame.Bytes()) <= wire.FrameHeaderSize || len(second.frame.Bytes()) <= wire.FrameHeaderSize {
+		t.Fatal("observers did not receive frames")
+	}
+	secondPayload := second.frame.Bytes()[wire.FrameHeaderSize]
+	first.frame.Bytes()[wire.FrameHeaderSize] ^= 0xff
+	if second.frame.Bytes()[wire.FrameHeaderSize] != secondPayload {
+		t.Fatal("mutating one observer frame changed another observer frame")
 	}
 }
 

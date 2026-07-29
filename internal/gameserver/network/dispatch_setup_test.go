@@ -248,7 +248,7 @@ func seedSelectableCharacter(t *testing.T, chars *fakeCharStore, account, name s
 	}
 	return ch.ID
 }
-func newTestLivePlayer(t *testing.T, id int32, capture *frameCapture) *livePlayer {
+func newTestLivePlayer(t testing.TB, id int32, capture *frameCapture) *livePlayer {
 	t.Helper()
 	tmpl, ok := testTemplates(t).Get(0)
 	if !ok {

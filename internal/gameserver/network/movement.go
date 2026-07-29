@@ -129,27 +129,43 @@ func (l *GameClientLink) broadcastLiveRevive(live *livePlayer) {
 	})
 }
 
-// broadcastLiveFrame sends frame() to live's own session and to every
-// object it currently knows, building a fresh frame per recipient since
-// each wire.Frame is released after its own send.
+// broadcastLiveFrame sends one serialized frame to live's own session and to
+// every object it currently knows. Each recipient gets an independent pooled
+// copy because its session encrypts outgoing bytes in place.
 func (l *GameClientLink) broadcastLiveFrame(live *livePlayer, frame func() wire.Frame) {
-	live.SendFrame(frame())
-	if l.world == nil {
-		return
-	}
-	known := live.appendKnown(l.world)
-	defer live.releaseKnown()
-	for _, o := range known {
-		receiver, ok := o.(frameReceiver)
-		if !ok {
-			continue
+	broadcastFrame(frame, func(send func(frameReceiver)) {
+		send(live)
+		if l.world == nil {
+			return
 		}
-		receiver.SendFrame(frame())
-	}
+		known := live.appendKnown(l.world)
+		defer live.releaseKnown()
+		for _, o := range known {
+			if receiver, ok := o.(frameReceiver); ok {
+				send(receiver)
+			}
+		}
+	})
 }
 
 type frameReceiver interface {
 	SendFrame(wire.Frame) bool
+}
+
+func broadcastFrame(build func() wire.Frame, recipients func(func(frameReceiver))) {
+	var serialized wire.Frame
+	built := false
+	defer func() { serialized.Release() }()
+	recipients(func(receiver frameReceiver) {
+		if !built {
+			serialized = build()
+			built = true
+		}
+		frame, ok := serverpackets.CopyFrame(serialized)
+		if ok {
+			receiver.SendFrame(frame)
+		}
+	})
 }
 
 func (p *livePlayer) appendKnown(state *world.State) []world.Tracked {

@@ -204,10 +204,20 @@ func (h *Hostile) broadcastShotRecharge(skillID int32) {
 	}
 	x, y, z := h.Position()
 	self := serverpackets.SkillCastObject{ObjectID: h.ObjectID(), Location: location.Location{X: x, Y: y, Z: z}}
+	var frame wire.Frame
+	built := false
+	defer func() { frame.Release() }()
 	h.world.ForEachKnownInRadius(h, 600, func(o world.Tracked) {
 		receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
 		if ok {
-			receiver.SendFrame(serverpackets.FrameMagicSkillUse(self, self, skillID, 1, 0, 0, false))
+			if !built {
+				frame = serverpackets.FrameMagicSkillUse(self, self, skillID, 1, 0, 0, false)
+				built = true
+			}
+			owned, copied := serverpackets.CopyFrame(frame)
+			if copied {
+				receiver.SendFrame(owned)
+			}
 		}
 	})
 }
@@ -307,15 +317,8 @@ func (h *Hostile) MakeAttackHit(target attackable.Combatant, split bool) attack.
 // observer capable of receiving one (i.e. a connected player session). It
 // is a no-op until SetWorld has been called.
 func (h *Hostile) BroadcastAttack(snapshot attack.Snapshot) {
-	if h.world == nil {
-		return
-	}
-	h.world.ForEachKnown(h, func(o world.Tracked) {
-		receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
-		if !ok {
-			return
-		}
-		receiver.SendFrame(serverpackets.FrameAttack(snapshot))
+	h.broadcastFrame(func() wire.Frame {
+		return serverpackets.FrameAttack(snapshot)
 	})
 }
 
@@ -324,20 +327,13 @@ func (h *Hostile) BroadcastAttack(snapshot attack.Snapshot) {
 // observer capable of receiving one. It is a no-op until SetWorld has been
 // called.
 func (h *Hostile) BroadcastSkillUse(targetID int32, targetX, targetY, targetZ int, skillID, level int32, hitTime, reuseDelay int) {
-	if h.world == nil {
-		return
-	}
 	sx, sy, sz := h.Position()
-	h.world.ForEachKnown(h, func(o world.Tracked) {
-		receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
-		if !ok {
-			return
-		}
-		receiver.SendFrame(serverpackets.FrameMagicSkillUse(
+	h.broadcastFrame(func() wire.Frame {
+		return serverpackets.FrameMagicSkillUse(
 			serverpackets.SkillCastObject{ObjectID: h.ObjectID(), Location: location.Location{X: sx, Y: sy, Z: sz}},
 			serverpackets.SkillCastObject{ObjectID: targetID, Location: location.Location{X: targetX, Y: targetY, Z: targetZ}},
 			skillID, level, hitTime, reuseDelay, false,
-		))
+		)
 	})
 }
 
@@ -345,15 +341,8 @@ func (h *Hostile) BroadcastSkillUse(targetID int32, targetX, targetY, targetZ in
 // level, listing targetIDs, to every currently known observer capable of
 // receiving one. It is a no-op until SetWorld has been called.
 func (h *Hostile) BroadcastSkillLaunched(skillID, level int32, targetIDs []int32) {
-	if h.world == nil {
-		return
-	}
-	h.world.ForEachKnown(h, func(o world.Tracked) {
-		receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
-		if !ok {
-			return
-		}
-		receiver.SendFrame(serverpackets.FrameMagicSkillLaunched(h.ObjectID(), skillID, level, targetIDs))
+	h.broadcastFrame(func() wire.Frame {
+		return serverpackets.FrameMagicSkillLaunched(h.ObjectID(), skillID, level, targetIDs)
 	})
 }
 
@@ -362,15 +351,8 @@ func (h *Hostile) BroadcastSkillLaunched(skillID, level int32, targetIDs []int32
 // instead of leaving this NPC standing until its corpse decays. It is a
 // no-op until SetWorld has been called.
 func (h *Hostile) BroadcastDie() {
-	if h.world == nil {
-		return
-	}
-	h.world.ForEachKnown(h, func(o world.Tracked) {
-		receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
-		if !ok {
-			return
-		}
-		receiver.SendFrame(serverpackets.FrameDie(h.ObjectID(), serverpackets.DieOptions{}))
+	h.broadcastFrame(func() wire.Frame {
+		return serverpackets.FrameDie(h.ObjectID(), serverpackets.DieOptions{})
 	})
 }
 
@@ -378,18 +360,7 @@ func (h *Hostile) BroadcastDie() {
 // known observer capable of receiving one. It is a no-op until SetWorld has
 // been called.
 func (h *Hostile) BroadcastMove(event move.Event) {
-	if h.world == nil {
-		return
-	}
-	known := h.appendKnown()
-	defer h.releaseKnown()
-	for _, o := range known {
-		receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
-		if !ok {
-			continue
-		}
-		receiver.SendFrame(serverpackets.FrameMove(h.ObjectID(), event))
-	}
+	h.broadcastFrame(func() wire.Frame { return serverpackets.FrameMove(h.ObjectID(), event) })
 }
 
 // BroadcastMoveToPawn sends a rotation-only MoveToPawn notice toward target
@@ -411,15 +382,9 @@ func (h *Hostile) BroadcastMoveToPawn(target attackable.Combatant) {
 	dest := location.Location{X: tx, Y: ty, Z: tz}
 	distance := int(origin.Distance3D(dest))
 
-	known := h.appendKnown()
-	defer h.releaseKnown()
-	for _, o := range known {
-		receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
-		if !ok {
-			continue
-		}
-		receiver.SendFrame(serverpackets.FrameMoveToPawn(h.ObjectID(), target.ObjectID(), distance, origin))
-	}
+	h.broadcastFrame(func() wire.Frame {
+		return serverpackets.FrameMoveToPawn(h.ObjectID(), target.ObjectID(), distance, origin)
+	})
 }
 
 // BroadcastStop sends a stop-in-place notice to every currently known
@@ -431,15 +396,7 @@ func (h *Hostile) BroadcastStop() {
 	}
 	x, y, z := h.Position()
 	at := location.Location{X: x, Y: y, Z: z}
-	known := h.appendKnown()
-	defer h.releaseKnown()
-	for _, o := range known {
-		receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
-		if !ok {
-			continue
-		}
-		receiver.SendFrame(serverpackets.FrameStopMove(h.ObjectID(), at, h.Heading()))
-	}
+	h.broadcastFrame(func() wire.Frame { return serverpackets.FrameStopMove(h.ObjectID(), at, h.Heading()) })
 }
 
 // BroadcastStatus sends this NPC's current/max HP to every currently known
@@ -454,14 +411,29 @@ func (h *Hostile) BroadcastStatus() {
 		{Type: serverpackets.StatusMaxHP, Value: h.MaxHP()},
 		{Type: serverpackets.StatusCurrentHP, Value: h.CurrentHP()},
 	}
+	h.broadcastFrame(func() wire.Frame { return serverpackets.FrameStatusUpdate(h.ObjectID(), attrs) })
+}
+
+func (h *Hostile) broadcastFrame(build func() wire.Frame) {
+	if h.world == nil {
+		return
+	}
 	known := h.appendKnown()
 	defer h.releaseKnown()
+	var frame wire.Frame
+	built := false
+	defer func() { frame.Release() }()
 	for _, o := range known {
-		receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
-		if !ok {
-			continue
+		if receiver, ok := o.(interface{ SendFrame(wire.Frame) bool }); ok {
+			if !built {
+				frame = build()
+				built = true
+			}
+			owned, copied := serverpackets.CopyFrame(frame)
+			if copied {
+				receiver.SendFrame(owned)
+			}
 		}
-		receiver.SendFrame(serverpackets.FrameStatusUpdate(h.ObjectID(), attrs))
 	}
 }
 

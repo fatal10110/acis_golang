@@ -1,6 +1,7 @@
 package network
 
 import (
+	"bytes"
 	"testing"
 	"time"
 
@@ -105,6 +106,161 @@ func TestBroadcastLiveDieSendsDieToOwnSessionAndObservers(t *testing.T) {
 	}
 	if got := frameOpcodes(observerFrames.frames); string(got) != string([]byte{serverpackets.OpcodeDie}) {
 		t.Fatalf("observer opcodes = %x, want Die", got)
+	}
+}
+
+func TestBroadcastLiveFrameBuildsOnceForAllRecipients(t *testing.T) {
+	state := world.New()
+	selfFrames := &frameCapture{}
+	observerFrames := &frameCapture{}
+	self := newTestLivePlayer(t, 1, selfFrames)
+	observer := newTestLivePlayer(t, 2, observerFrames)
+
+	state.Spawn(self, 0, 0, 0, 0)
+	state.Spawn(observer, 100, 0, 0, 0)
+	selfFrames.frames = nil
+	observerFrames.frames = nil
+
+	builds := 0
+	(&GameClientLink{world: state, log: zerolog.Nop()}).broadcastLiveFrame(self, func() wire.Frame {
+		builds++
+		return serverpackets.FrameRevive(self.ObjectID())
+	})
+
+	if builds != 1 {
+		t.Fatalf("frame builds = %d, want 1", builds)
+	}
+	if len(selfFrames.frames) != 1 || len(observerFrames.frames) != 1 {
+		t.Fatalf("received frames = (%d, %d), want (1, 1)", len(selfFrames.frames), len(observerFrames.frames))
+	}
+	if !bytes.Equal(selfFrames.frames[0], observerFrames.frames[0]) {
+		t.Fatalf("recipient frames differ: self %x observer %x", selfFrames.frames[0], observerFrames.frames[0])
+	}
+}
+
+func TestBroadcastLiveFrameGivesRecipientsIndependentFrames(t *testing.T) {
+	state := world.New()
+	self := newTestLivePlayer(t, 1, &frameCapture{})
+	observer := newTestLivePlayer(t, 2, &frameCapture{})
+	var selfFrame, observerFrame wire.Frame
+	self.Character.SetFrameSender(func(frame wire.Frame) bool {
+		selfFrame = frame
+		return true
+	})
+	observer.Character.SetFrameSender(func(frame wire.Frame) bool {
+		observerFrame = frame
+		return true
+	})
+	state.Spawn(self, 0, 0, 0, 0)
+	state.Spawn(observer, 100, 0, 0, 0)
+
+	(&GameClientLink{world: state, log: zerolog.Nop()}).broadcastLiveFrame(self, func() wire.Frame {
+		return serverpackets.FrameRevive(self.ObjectID())
+	})
+	defer selfFrame.Release()
+	defer observerFrame.Release()
+
+	if len(selfFrame.Bytes()) <= wire.FrameHeaderSize || len(observerFrame.Bytes()) <= wire.FrameHeaderSize {
+		t.Fatal("recipients did not receive frames")
+	}
+	observerPayload := observerFrame.Bytes()[wire.FrameHeaderSize]
+	selfFrame.Bytes()[wire.FrameHeaderSize] ^= 0xff
+	if observerFrame.Bytes()[wire.FrameHeaderSize] != observerPayload {
+		t.Fatal("mutating one recipient frame changed another recipient frame")
+	}
+}
+
+func TestBroadcastFrameBuildsOnceAndCopiesForRecipients(t *testing.T) {
+	selfFrames := &frameCapture{}
+	observerFrames := &frameCapture{}
+	self := newTestLivePlayer(t, 1, selfFrames)
+	observer := newTestLivePlayer(t, 2, observerFrames)
+
+	builds := 0
+	broadcastFrame(func() wire.Frame {
+		builds++
+		return serverpackets.FrameStatusUpdate(self.ObjectID(), []serverpackets.StatusAttribute{
+			{Type: serverpackets.StatusMaxHP, Value: 100},
+			{Type: serverpackets.StatusCurrentHP, Value: 75},
+		})
+	}, func(send func(frameReceiver)) {
+		send(self)
+		send(observer)
+	})
+
+	if builds != 1 {
+		t.Fatalf("frame builds = %d, want 1", builds)
+	}
+	if len(selfFrames.frames) != 1 || len(observerFrames.frames) != 1 {
+		t.Fatalf("recipient frame counts = %d, %d; want 1, 1", len(selfFrames.frames), len(observerFrames.frames))
+	}
+	if !bytes.Equal(selfFrames.frames[0], observerFrames.frames[0]) {
+		t.Fatalf("recipient frames differ: self %x observer %x", selfFrames.frames[0], observerFrames.frames[0])
+	}
+}
+
+func TestBroadcastFrameSkipsBuildWithoutRecipients(t *testing.T) {
+	builds := 0
+	broadcastFrame(func() wire.Frame {
+		builds++
+		return serverpackets.FrameRevive(1)
+	}, func(func(frameReceiver)) {})
+	if builds != 0 {
+		t.Fatalf("frame builds = %d, want 0", builds)
+	}
+}
+
+func BenchmarkBroadcastLiveFrameKnownObservers(b *testing.B) {
+	// These senders release synchronously; production queues may retain many frames.
+	state := world.New()
+	self := newTestLivePlayer(b, 1, &frameCapture{})
+	self.Character.SetFrameSender(func(frame wire.Frame) bool {
+		frame.Release()
+		return true
+	})
+	state.Spawn(self, 0, 0, 0, 0)
+	for i := 0; i < 50; i++ {
+		observer := newTestLivePlayer(b, int32(i+2), &frameCapture{})
+		observer.Character.SetFrameSender(func(frame wire.Frame) bool {
+			frame.Release()
+			return true
+		})
+		state.Spawn(observer, i+100, 0, 0, 0)
+	}
+
+	link := &GameClientLink{world: state, log: zerolog.Nop()}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		link.broadcastLiveFrame(self, func() wire.Frame {
+			return serverpackets.FrameRevive(self.ObjectID())
+		})
+	}
+}
+
+func BenchmarkBroadcastCharacterInfoKnownObservers(b *testing.B) {
+	// These senders release synchronously; production queues may retain many frames.
+	state := world.New()
+	self := newTestLivePlayer(b, 1, &frameCapture{})
+	self.Character.SetFrameSender(func(frame wire.Frame) bool {
+		frame.Release()
+		return true
+	})
+	state.Spawn(self, 0, 0, 0, 0)
+	for i := 0; i < 50; i++ {
+		observer := newTestLivePlayer(b, int32(i+2), &frameCapture{})
+		observer.Character.SetFrameSender(func(frame wire.Frame) bool {
+			frame.Release()
+			return true
+		})
+		state.Spawn(observer, i+100, 0, 0, 0)
+	}
+
+	link := &GameClientLink{world: state, log: zerolog.Nop()}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		link.broadcastCharacterInfo(self)
 	}
 }
 

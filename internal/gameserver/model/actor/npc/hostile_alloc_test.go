@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -36,6 +37,26 @@ func BenchmarkHostileBroadcastMoveKnownObservers(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		hostile.BroadcastMove(event)
+	}
+}
+
+func BenchmarkHostileBroadcastAttackKnownObservers(b *testing.B) {
+	hostile, _, _ := newBroadcastMoveFixture(b, 50)
+	snapshot := attack.Snapshot{
+		AttackerID: hostile.ObjectID(),
+		X:          100,
+		Y:          200,
+		Z:          -50,
+		Hits: []attack.SnapshotHit{
+			{TargetID: 2, Damage: 100, Flags: 1},
+			{TargetID: 3, Damage: 200},
+		},
+	}
+	hostile.BroadcastAttack(snapshot)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		hostile.BroadcastAttack(snapshot)
 	}
 }
 
@@ -70,6 +91,8 @@ type allocFrameReceiver struct {
 func (r *allocFrameReceiver) ObjectID() int32 { return r.id }
 
 func (r *allocFrameReceiver) SendFrame(frame wire.Frame) bool {
+	// Benchmarks release synchronously to measure builder and copy cost. Real
+	// connections queue frames, so they can hold many pooled writers at once.
 	frame.Release()
 	r.frames++
 	return true
