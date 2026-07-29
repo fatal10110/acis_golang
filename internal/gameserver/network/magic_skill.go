@@ -68,10 +68,11 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 
 	targetIDs := []int32{target.ObjectID()}
 	controller.Schedule(plan, actorcast.Hooks{
-		// Full mid-cast target-lost/range/LOS/peace-zone revalidation is
-		// #1001; this always continues to Hit, matching the reference's
-		// launch phase minus its recheck gates.
 		Launch: func() bool {
+			if reason := actorcast.RevalidateLaunch(live.Character, target, def); reason != actorcast.LaunchAbortNone {
+				sendLaunchAbort(live, reason)
+				return false
+			}
 			l.broadcastLiveFrame(live, func() wire.Frame {
 				return serverpackets.FrameMagicSkillLaunched(live.ObjectID(), int32(def.ID), int32(def.Level), targetIDs)
 			})
@@ -175,6 +176,25 @@ func sendMagicCastFailure(live *livePlayer, def modelskill.Definition, err error
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCubicSummoningFailed))
 	}
 	sendMagicActionFailed(live)
+}
+
+// sendLaunchAbort sends the reference's distinct system message for a
+// launch-phase mid-cast revalidation failure. A lost target sends nothing,
+// matching CreatureCast.onMagicLaunch.
+func sendLaunchAbort(live *livePlayer, reason actorcast.LaunchAbortReason) {
+	if live == nil {
+		return
+	}
+	switch reason {
+	case actorcast.LaunchAbortTooFar:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageDistTooFarCastingStopped))
+	case actorcast.LaunchAbortNoLineOfSight:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCantSeeTarget))
+	case actorcast.LaunchAbortCasterPeaceZone:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCantAtkPeacezone))
+	case actorcast.LaunchAbortTargetPeaceZone:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetInPeacezone))
+	}
 }
 
 func sendMagicActionFailed(live *livePlayer) {
