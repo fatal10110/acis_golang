@@ -154,3 +154,15 @@ func (a PlayerActor) ExitSignetGround() {
 func (a PlayerActor) CubicListFull() bool {
 	return a.Character != nil && a.Character.CubicListFull()
 }
+
+// AllSkillsDisabled satisfies the allSkillsDisabler interface Controller.Stop
+// and AIController.Disabled probe for, matching Java's
+// Creature.isAllSkillsDisabled().
+func (a PlayerActor) AllSkillsDisabled() bool {
+	return a.Character != nil && a.Character.AllSkillsDisabled()
+}
+
+// EnableAllSkills is a no-op: it mirrors Java's Creature.enableAllSkills(),
+// which clears only the raw Duel-defeat lock. This port doesn't model that
+// lock since Duel isn't ported, so there is nothing to clear yet.
+func (PlayerActor) EnableAllSkills() {}

@@ -27,6 +27,25 @@ func TestAIControllerDisabledReflectsCastingNow(t *testing.T) {
 	}
 }
 
+func TestAIControllerDisabledReflectsAllSkillsDisabled(t *testing.T) {
+	actor := &testActor{mp: 100, hp: 100}
+	ai := &AIController{Controller: NewController(actor), Definitions: fakeDefinitions{}}
+
+	if ai.Disabled() {
+		t.Fatal("Disabled() = true before the lock is set")
+	}
+
+	actor.allDisabled = true
+	if !ai.Disabled() {
+		t.Fatal("Disabled() = false with AllSkillsDisabled true, want true")
+	}
+
+	actor.allDisabled = false
+	if ai.Disabled() {
+		t.Fatal("Disabled() = true after the lock clears")
+	}
+}
+
 func TestAIControllerRangeAndStopsMovementReadDefinition(t *testing.T) {
 	ref := modelskill.Ref{ID: 5, Level: 1}
 	ai := &AIController{
