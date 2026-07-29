@@ -133,6 +133,9 @@ func (a *AIController) Cast(target attackable.Combatant, ref modelskill.Ref) {
 
 	a.Controller.Schedule(plan, Hooks{
 		Launch: func() bool {
+			if RevalidateLaunch(a.Caster, castTarget, def) != LaunchAbortNone {
+				return false
+			}
 			if broadcaster != nil {
 				tx, ty, tz := castTarget.Position()
 				broadcaster.BroadcastSkillUse(castTarget.ObjectID(), tx, ty, tz, int32(def.ID), int32(def.Level),

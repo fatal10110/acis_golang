@@ -3,11 +3,15 @@ package player
 import (
 	"math/rand/v2"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
+
+// Character satisfies the cast pipeline's line-of-sight surface.
+var _ target.SightChecker = (*Character)(nil)
 
 // LineOfSight is the geodata query CanSee needs to gate targeting on real
 // terrain occlusion between two actors.
@@ -179,9 +183,6 @@ func (c *Character) Knows(target attackable.Combatant) bool {
 // line-of-sight query between the two actors' positions and eye heights, or
 // permissive when no line-of-sight query is attached (e.g. in tests).
 func (c *Character) CanSee(target attackable.Combatant) bool {
-	if c.los == nil {
-		return true
-	}
 	other, ok := target.(interface{ Position() (int, int, int) })
 	if !ok {
 		return false
@@ -190,8 +191,27 @@ func (c *Character) CanSee(target attackable.Combatant) bool {
 	if h, ok := target.(interface{ CollisionHeight() float64 }); ok {
 		theight = h.CollisionHeight()
 	}
-
-	ox, oy, oz := c.Position()
 	tx, ty, tz := other.Position()
+	return c.canSeePosition(tx, ty, tz, theight)
+}
+
+// CanSeeTarget reports whether t is visible to this player, satisfying
+// handler/target.SightChecker for the cast pipeline's launch-phase
+// line-of-sight gate. Same geodata query as CanSee, keyed to t's own eye
+// height when it exposes one.
+func (c *Character) CanSeeTarget(t target.Creature) bool {
+	var theight float64
+	if h, ok := t.(interface{ CollisionHeight() float64 }); ok {
+		theight = h.CollisionHeight()
+	}
+	tx, ty, tz := t.Position()
+	return c.canSeePosition(tx, ty, tz, theight)
+}
+
+func (c *Character) canSeePosition(tx, ty, tz int, theight float64) bool {
+	if c.los == nil {
+		return true
+	}
+	ox, oy, oz := c.Position()
 	return c.los.CanSeeActor(ox, oy, oz, c.CollisionHeight(), tx, ty, tz, theight)
 }
