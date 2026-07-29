@@ -2,10 +2,12 @@ package network
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"errors"
 	"io"
 	"net"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -193,6 +195,23 @@ func TestConnSendFrameAfterCloseReleasesFrame(t *testing.T) {
 	case <-released:
 	case <-time.After(5 * time.Second):
 		t.Fatal("owned frame was not released after rejected send")
+	}
+}
+
+func TestConnAbortLogsVisibilityQueueOverflow(t *testing.T) {
+	server, client := net.Pipe()
+	defer client.Close()
+
+	var logs bytes.Buffer
+	conn := &Conn{
+		Conn: server,
+		log:  zerolog.New(&logs),
+		out:  make(chan queuedWrite),
+	}
+	conn.abort()
+
+	if got := logs.String(); !strings.Contains(got, "visibility queue full, aborting connection") {
+		t.Fatalf("abort log = %q, want visibility queue overflow diagnostic", got)
 	}
 }
 

@@ -9,25 +9,25 @@ import (
 func (p *livePlayer) Discover(obj world.Tracked) {
 	switch o := obj.(type) {
 	case *livePlayer:
-		p.SendFrame(serverpackets.FrameCharInfo(serverpackets.CharInfoSnapshot{
+		p.sendVisibilityFrame(serverpackets.FrameCharInfo(serverpackets.CharInfoSnapshot{
 			Character: o.Character,
 			Template:  o.template,
 			Items:     o.inventoryItems(),
 		}))
 	case *npc.Hostile:
-		p.SendFrame(serverpackets.FrameNPCInfo(npcInfoSnapshot(o)))
+		p.sendVisibilityFrame(serverpackets.FrameNPCInfo(npcInfoSnapshot(o)))
 	case groundItemObject:
 		if dropped, ok := o.(interface{ DropperID() int32 }); ok {
 			if dropperID := dropped.DropperID(); dropperID != 0 {
-				p.SendFrame(serverpackets.FrameDropItem(o, dropperID))
+				p.sendVisibilityFrame(serverpackets.FrameDropItem(o, dropperID))
 				return
 			}
 		}
-		p.SendFrame(serverpackets.FrameSpawnItem(o))
+		p.sendVisibilityFrame(serverpackets.FrameSpawnItem(o))
 	case doorObject:
-		p.SendFrame(serverpackets.FrameDoorInfo(o, false))
+		p.sendVisibilityFrame(serverpackets.FrameDoorInfo(o, false))
 	case staticObject:
-		p.SendFrame(serverpackets.FrameStaticObjectInfo(o))
+		p.sendVisibilityFrame(serverpackets.FrameStaticObjectInfo(o))
 	}
 }
 
@@ -35,7 +35,7 @@ func (p *livePlayer) Forget(obj world.Tracked) {
 	if !rendersObject(obj) {
 		return
 	}
-	p.SendFrame(serverpackets.FrameDeleteObject(obj.ObjectID(), false))
+	p.sendVisibilityFrame(serverpackets.FrameDeleteObject(obj.ObjectID(), false))
 }
 
 type groundItemObject interface {
