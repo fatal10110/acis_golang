@@ -55,7 +55,7 @@ func (l *GameClientLink) useItem(live *livePlayer, objectID int32) {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
-	if !l.playerConfig.KarmaPlayerCanTeleport && live.Karma() > 0 && itemhandler.BlockedByKarmaTeleport(tmpl, l.skills) {
+	if itemhandler.ItemBlockedByKarmaTeleport(tmpl, l.skills, live.Karma(), l.playerConfig.KarmaPlayerCanTeleport) {
 		return
 	}
 	if live.Fishing() && tmpl.DefaultAction != item.ActionFishingShot {
