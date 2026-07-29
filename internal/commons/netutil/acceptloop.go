@@ -13,8 +13,8 @@ import (
 // fails, running handle on its own goroutine per connection. A panic in
 // either the shutdown watcher or a connection's handle is recovered and
 // logged rather than taking down the caller. The caller owns ln: AcceptLoop
-// closes it on ctx cancellation but does not create it. log may be nil, in
-// The zero logger disables logging.
+// closes it on ctx cancellation but does not create it. A zero-value logger
+// disables logging.
 func AcceptLoop(ctx context.Context, ln net.Listener, handle func(conn net.Conn), log zerolog.Logger) error {
 
 	go func() {
