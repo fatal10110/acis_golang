@@ -137,77 +137,80 @@ type GameClientLink struct {
 	afterFunc func(d time.Duration, fn func())
 }
 
+// GameClientLinkConfig contains the collaborators required by GameClientLink.
+type GameClientLinkConfig struct {
+	Validator     *SessionValidator
+	LoginLink     func() *LoginLink
+	Roster        *manager.Roster
+	Items         itemStore
+	Shortcuts     shortcutStore
+	Templates     *player.TemplateTable
+	ItemTemplates *item.Table
+	HTML          *datacache.HTML
+	Crests        *datacache.Crests
+	Skills        *skillstate.Persistence
+	Spellbooks    modelskill.BookPolicy
+	SkillTrees    *modelskill.Trees
+	CursedWeapons *entity.CursedWeaponTable
+	World         *world.State
+	NPCs          *npc.Table
+	Geo           move.Geo
+	Zones         *zone.Index
+	IDs           idAllocator
+	GroundItems   groundItemDropper
+	AttackStance  attackStanceTracker
+	Positions     *task.PositionUpdates
+	PlayerClock   *task.PlayerClock
+	Restarts      *restart.Table
+	Levels        *player.LevelTable
+	PlayerConfig  PlayerConfig
+	PetConfig     petmodel.Config
+	Log           zerolog.Logger
+}
+
 // NewGameClientLink builds a GameClientLink from its collaborators.
 // loginLink returns the game server's current link to the login server, or
 // nil while disconnected/reconnecting: session validation fails clients
 // gracefully (AuthLoginFail) rather than panicking while the link is down.
-func NewGameClientLink(
-	validator *SessionValidator,
-	loginLink func() *LoginLink,
-	roster *manager.Roster,
-	items itemStore,
-	shortcuts shortcutStore,
-	templates *player.TemplateTable,
-	itemTemplates *item.Table,
-	html *datacache.HTML,
-	crests *datacache.Crests,
-	skills *skillstate.Persistence,
-	spellbooks modelskill.BookPolicy,
-	skillTrees *modelskill.Trees,
-	cursedWeapons *entity.CursedWeaponTable,
-	worldState *world.State,
-	npcs *npc.Table,
-	geo move.Geo,
-	zones *zone.Index,
-	ids idAllocator,
-	groundItems groundItemDropper,
-	attackStance attackStanceTracker,
-	positions *task.PositionUpdates,
-	playerClock *task.PlayerClock,
-	restarts *restart.Table,
-	levels *player.LevelTable,
-	playerConfig PlayerConfig,
-	petConfig petmodel.Config,
-	log zerolog.Logger,
-) *GameClientLink {
+func NewGameClientLink(cfg GameClientLinkConfig) *GameClientLink {
 	return &GameClientLink{
-		validator:     validator,
-		loginLink:     loginLink,
-		roster:        roster,
-		items:         items,
-		shortcuts:     shortcuts,
-		templates:     templates,
-		itemTemplates: itemTemplates,
-		html:          html,
-		crests:        crests,
-		skills:        skills,
-		spellbooks:    spellbooks,
-		skillTrees:    skillTrees,
-		cursedWeapons: cursedWeapons,
-		world:         worldState,
-		npcs:          npcs,
-		geo:           geo,
-		zones:         zones,
-		ids:           ids,
-		groundItems:   groundItems,
-		attackStance:  attackStance,
-		positions:     positions,
-		playerClock:   playerClock,
-		restarts:      restarts,
-		levels:        levels,
-		playerConfig:  playerConfig,
-		petConfig:     petConfig,
-		inventory:     invops.NewService(ids),
-		petItems:      petitem.NewService(ids),
+		validator:     cfg.Validator,
+		loginLink:     cfg.LoginLink,
+		roster:        cfg.Roster,
+		items:         cfg.Items,
+		shortcuts:     cfg.Shortcuts,
+		templates:     cfg.Templates,
+		itemTemplates: cfg.ItemTemplates,
+		html:          cfg.HTML,
+		crests:        cfg.Crests,
+		skills:        cfg.Skills,
+		spellbooks:    cfg.Spellbooks,
+		skillTrees:    cfg.SkillTrees,
+		cursedWeapons: cfg.CursedWeapons,
+		world:         cfg.World,
+		npcs:          cfg.NPCs,
+		geo:           cfg.Geo,
+		zones:         cfg.Zones,
+		ids:           cfg.IDs,
+		groundItems:   cfg.GroundItems,
+		attackStance:  cfg.AttackStance,
+		positions:     cfg.Positions,
+		playerClock:   cfg.PlayerClock,
+		restarts:      cfg.Restarts,
+		levels:        cfg.Levels,
+		playerConfig:  cfg.PlayerConfig,
+		petConfig:     cfg.PetConfig,
+		inventory:     invops.NewService(cfg.IDs),
+		petItems:      petitem.NewService(cfg.IDs),
 		trades:        tradebook.NewBook(time.Now),
 		enchantState:  enchantflow.NewState(),
-		targets:       skilltarget.NewRegistry(skilltarget.WorldKnown{State: worldState}),
-		skillHandlers: handlerskill.NewDefaultRegistryWithSignet(skills, handlerskill.SignetDeps{
-			Templates: npcs,
-			IDs:       ids,
-			World:     worldState,
+		targets:       skilltarget.NewRegistry(skilltarget.WorldKnown{State: cfg.World}),
+		skillHandlers: handlerskill.NewDefaultRegistryWithSignet(cfg.Skills, handlerskill.SignetDeps{
+			Templates: cfg.NPCs,
+			IDs:       cfg.IDs,
+			World:     cfg.World,
 		}),
-		log:          log,
+		log:          cfg.Log,
 		newCipherKey: randomCipherKey,
 	}
 }
