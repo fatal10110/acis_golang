@@ -30,10 +30,10 @@ type spyDamageCall struct {
 	immune       bool
 }
 
-func (s *spyCastController) CastingNow() bool         { return s.casting }
+func (s *spyCastController) CastingNow() bool          { return s.casting }
 func (s *spyCastController) CurrentSkillIsMagic() bool { return s.magic }
-func (s *spyCastController) InterruptCast()           { s.interruptCalls++ }
-func (s *spyCastController) StopCast()                { s.stopCalls++ }
+func (s *spyCastController) InterruptCast()            { s.interruptCalls++ }
+func (s *spyCastController) StopCast()                 { s.stopCalls++ }
 
 func (s *spyCastController) InterruptCastOnDamage(damage float64, men int, attackCancel func(float64) float64, roll int, immune bool) bool {
 	cancelled := 0.0

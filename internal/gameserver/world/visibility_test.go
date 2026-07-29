@@ -291,6 +291,58 @@ func TestDespawnStaleCallDoesNotEvictNewOccupant(t *testing.T) {
 	}
 }
 
+func TestConcurrentMoveAndDespawnKeepWorldStateConsistent(t *testing.T) {
+	tests := []struct {
+		name    string
+		despawn func(*State, Tracked)
+	}{
+		{"Despawn", func(s *State, obj Tracked) { s.Despawn(obj) }},
+		{"DespawnAll", func(s *State, obj Tracked) { s.DespawnAll([]Tracked{obj}) }},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			for range 2000 {
+				s := New()
+				obj := &trackedStub{id: 1}
+				s.Spawn(obj, 0, 0, 0, 0)
+
+				old, _ := s.RegionAt(0, 0)
+				next, _ := s.RegionAt(4096, 0)
+				start := make(chan struct{})
+				moveErr := make(chan error, 1)
+				var wg sync.WaitGroup
+				wg.Add(2)
+				go func() {
+					defer wg.Done()
+					<-start
+					moveErr <- s.Move(obj, 4096, 0, 0)
+				}()
+				go func() {
+					defer wg.Done()
+					<-start
+					tc.despawn(s, obj)
+				}()
+				close(start)
+				wg.Wait()
+				if err := <-moveErr; err != nil {
+					t.Fatal(err)
+				}
+
+				region := obj.currentRegion()
+				if got, want := slices.Contains(old.Objects(), Tracked(obj)), region == old; got != want {
+					t.Fatalf("old region membership = %t, want %t", got, want)
+				}
+				if got, want := slices.Contains(next.Objects(), Tracked(obj)), region == next; got != want {
+					t.Fatalf("next region membership = %t, want %t", got, want)
+				}
+				if _, ok := s.Object(obj.ObjectID()); ok {
+					t.Fatal("object still registered after despawn")
+				}
+			}
+		})
+	}
+}
+
 func TestDespawnAllNotifiesEachObserverOncePerCoLocatedObject(t *testing.T) {
 	s := New()
 	log := &sightLog{}
