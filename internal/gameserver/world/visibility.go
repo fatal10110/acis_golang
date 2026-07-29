@@ -198,19 +198,13 @@ func (s *State) relocate(t Tracked, next *Region) {
 	if next != nil {
 		next.Add(t)
 		newAreas = s.AppendNeighbors(newAreaBuf[:0], next, 1)
-		if prev != nil {
-			// t already had a region (this is a move, not its first Spawn)
-			// and next never toggled to get here: a non-player crossing
-			// into a neighbor that was already active or already inactive
-			// triggers no setActive transition there, so nothing else would
-			// tell t which side of the gate it just landed on.
-			notifyObjectActivity(t, next.Active())
-		}
 	}
 
 	tObs, tObserves := t.(Observer)
 	var objectBuf [32]Tracked
 	objects := objectBuf[:0]
+	var notificationBuf [64]visibilityNotification
+	notifications := notificationBuf[:0]
 
 	var toggleBuf [18]regionToggle
 	toggles := toggleBuf[:0]
@@ -225,10 +219,10 @@ func (s *State) relocate(t Tracked, next *Region) {
 				continue
 			}
 			if w, ok := o.(Observer); ok {
-				w.Forget(t)
+				notifications = append(notifications, visibilityNotification{w, t, false})
 			}
 			if tObserves {
-				tObs.Forget(o)
+				notifications = append(notifications, visibilityNotification{tObs, o, false})
 			}
 		}
 		if tIsPlayer && s.regionNeighborhoodEmpty(r) && r.setActive(false) {
@@ -246,10 +240,10 @@ func (s *State) relocate(t Tracked, next *Region) {
 				continue
 			}
 			if w, ok := o.(Observer); ok {
-				w.Discover(t)
+				notifications = append(notifications, visibilityNotification{w, t, true})
 			}
 			if tObserves {
-				tObs.Discover(o)
+				notifications = append(notifications, visibilityNotification{tObs, o, true})
 			}
 		}
 		if tIsPlayer && r.setActive(true) {
@@ -265,9 +259,32 @@ func (s *State) relocate(t Tracked, next *Region) {
 		s.regionActivityMu.Unlock()
 	}
 
+	if prev != nil && next != nil {
+		// t already had a region (this is a move, not its first Spawn) and
+		// next never toggled to get here, so no region activity transition
+		// would otherwise tell t which side of the gate it landed on.
+		notifyObjectActivity(t, next.Active())
+	}
+	for _, notification := range notifications {
+		notification.notify()
+	}
 	for _, tg := range toggles {
 		tg.region.notifyActivity(tg.active)
 	}
+}
+
+type visibilityNotification struct {
+	observer Observer
+	object   Tracked
+	discover bool
+}
+
+func (n visibilityNotification) notify() {
+	if n.discover {
+		n.observer.Discover(n.object)
+		return
+	}
+	n.observer.Forget(n.object)
 }
 
 // regionToggle is a region whose activity flag setActive just flipped,
