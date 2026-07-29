@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/rs/zerolog"
 )
 
 // Event describes one accepted movement request.
@@ -76,6 +77,7 @@ type CreatureMove struct {
 	timer                scheduledTimer
 	moveSeq              uint64
 	afterFunc            func(time.Duration, func()) scheduledTimer
+	log                  zerolog.Logger
 }
 
 type scheduledTimer interface {
@@ -117,6 +119,14 @@ func (m *CreatureMove) SetArrivedHook(arrived func()) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.arrived = arrived
+}
+
+// SetLogger records where a panic recovered from an arrival callback is
+// logged. The zero value discards it.
+func (m *CreatureMove) SetLogger(log zerolog.Logger) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.log = log
 }
 
 // SetSegmentAdvancedHook records the callback fired each time a multi-segment
@@ -260,8 +270,16 @@ func (m *CreatureMove) rescheduleLocked(duration time.Duration) {
 	seq := m.moveSeq
 	source := m.afterFunc
 	if source == nil {
-		source = func(d time.Duration, f func()) scheduledTimer {
-			return time.AfterFunc(d, f)
+		log := m.log
+		source = func(d time.Duration, fn func()) scheduledTimer {
+			return time.AfterFunc(d, func() {
+				defer func() {
+					if r := recover(); r != nil {
+						log.Error().Interface("panic", r).Msg("move: recovered panic in arrival callback")
+					}
+				}()
+				fn()
+			})
 		}
 	}
 	m.timer = source(duration, func() { m.onArrive(seq) })
