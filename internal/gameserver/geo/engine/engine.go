@@ -5,21 +5,22 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/geo"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/dynamic"
 )
 
 const (
-	TileXMin = 16
-	TileXMax = 26
-	TileYMin = 10
-	TileYMax = 25
+	TileXMin = geo.TileXMin
+	TileXMax = geo.TileXMax
+	TileYMin = geo.TileYMin
+	TileYMax = geo.TileYMax
 
-	TileSize  = 32768
-	WorldXMin = (TileXMin - 20) * TileSize
-	WorldXMax = (TileXMax-19)*TileSize - 1
-	WorldYMin = (TileYMin - 18) * TileSize
-	WorldYMax = (TileYMax-17)*TileSize - 1
+	TileSize  = geo.TileSize
+	WorldXMin = geo.WorldXMin
+	WorldXMax = geo.WorldXMax
+	WorldYMin = geo.WorldYMin
+	WorldYMax = geo.WorldYMax
 
 	regionCellsX = block.RegionBlocksX * block.CellsX
 	regionCellsY = block.RegionBlocksY * block.CellsY
