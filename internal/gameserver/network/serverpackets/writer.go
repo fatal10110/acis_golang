@@ -41,3 +41,12 @@ func releaseFrameWriter(w *wire.Writer) {
 	}
 	packetWriterPool.Put(w)
 }
+
+// CopyFrame returns an independently owned pooled copy of frame for a session
+// that encrypts its outgoing bytes in place.
+func CopyFrame(frame wire.Frame) wire.Frame {
+	w := packetWriterPool.Get().(*wire.Writer)
+	w.ResetFrame(packetWriterCapacity)
+	w.WriteBytes(frame.Bytes()[wire.FrameHeaderSize:])
+	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
+}
