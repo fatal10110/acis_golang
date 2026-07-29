@@ -22,12 +22,15 @@ type AIActor interface {
 
 // AI runs active actor brains once per tick.
 //
-// All methods are safe for concurrent use; mu guards actors.
+// Add and Remove are safe to call concurrently with Tick. mu guards actors and
+// the scratch refill. Tick only ever runs on the scheduler ticker's single
+// goroutine, one call at a time.
 type AI struct {
 	state *world.State
 
-	mu     sync.RWMutex
-	actors map[int32]AIActor
+	mu      sync.Mutex
+	actors  map[int32]AIActor
+	scratch []AIActor
 }
 
 // NewAI returns an empty active-AI registry. A nil state treats every actor
@@ -68,12 +71,13 @@ func (a *AI) Remove(actor AIActor) {
 // Tick runs one AI cycle for every registered actor in an active region,
 // and for inactive-region actors that explicitly opt out of sleeping.
 func (a *AI) Tick() {
-	a.mu.RLock()
-	actors := make([]AIActor, 0, len(a.actors))
+	a.mu.Lock()
+	a.scratch = a.scratch[:0]
 	for _, actor := range a.actors {
-		actors = append(actors, actor)
+		a.scratch = append(a.scratch, actor)
 	}
-	a.mu.RUnlock()
+	actors := a.scratch
+	a.mu.Unlock()
 
 	for _, actor := range actors {
 		placed, active := regionActivity(a.state, actor)
@@ -89,4 +93,5 @@ func (a *AI) Tick() {
 		actor.Tick()
 		actor.Think()
 	}
+	clear(a.scratch)
 }
