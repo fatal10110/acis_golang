@@ -1,6 +1,9 @@
 package attack
 
 import (
+	"bytes"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -8,7 +11,51 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
+	"github.com/rs/zerolog"
 )
+
+func TestScheduleRecoversPanickingCallbackAndRunsLaterTimer(t *testing.T) {
+	buf := &syncAttackBuffer{}
+	ctrl := NewCreature(&attackActor{})
+	ctrl.SetLogger(zerolog.New(buf))
+	defer ctrl.Stop()
+
+	done := make(chan struct{})
+	ctrl.mu.Lock()
+	ctrl.scheduleLocked(0, func() { panic("attack boom") })
+	ctrl.scheduleLocked(0, func() { close(done) })
+	ctrl.mu.Unlock()
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("timer scheduled after panicking callback did not run")
+	}
+	deadline := time.Now().Add(time.Second)
+	for !strings.Contains(buf.String(), "attack boom") {
+		if time.Now().After(deadline) {
+			t.Fatalf("recovered panic log = %q, want panic value", buf.String())
+		}
+		time.Sleep(time.Millisecond)
+	}
+}
+
+type syncAttackBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *syncAttackBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *syncAttackBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
+}
 
 func TestCreatureAttackBroadcastsSimpleHitAndTracksState(t *testing.T) {
 	actor := attackActor{

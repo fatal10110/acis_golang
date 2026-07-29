@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
+	"github.com/rs/zerolog"
 )
 
 const (
@@ -116,6 +117,15 @@ type Controller struct {
 	afterFunc      afterFunc
 	finished       func()
 	started        func()
+	log            zerolog.Logger
+}
+
+// SetLogger records where a panic recovered from a scheduled attack callback
+// is logged. The zero value discards it.
+func (c *Controller) SetLogger(log zerolog.Logger) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.log = log
 }
 
 // SetFinished records the callback invoked once an attack animation
@@ -479,8 +489,16 @@ func (c *Controller) scaledBowReuse() time.Duration {
 func (c *Controller) scheduleLocked(delay time.Duration, f func()) {
 	source := c.afterFunc
 	if source == nil {
-		source = func(delay time.Duration, f func()) scheduledTimer {
-			return time.AfterFunc(delay, f)
+		log := c.log
+		source = func(delay time.Duration, fn func()) scheduledTimer {
+			return time.AfterFunc(delay, func() {
+				defer func() {
+					if r := recover(); r != nil {
+						log.Error().Interface("panic", r).Msg("attack: recovered panic in scheduled callback")
+					}
+				}()
+				fn()
+			})
 		}
 	}
 	c.timers = append(c.timers, source(delay, f))
