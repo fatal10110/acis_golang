@@ -61,7 +61,7 @@ func (l *GameClientLink) useItemAICast(live *livePlayer, inv *itemcontainer.Inve
 		Inventory:  inv,
 		Item:       inst,
 		Template:   tmpl,
-		Destroyer:  l.inventoryService(),
+		Destroyer:  l.inventory,
 	})
 	if consumed.Err != nil {
 		sendMagicCastFailure(live, def, consumed.Err)

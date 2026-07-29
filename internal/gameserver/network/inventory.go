@@ -80,7 +80,7 @@ func (l *GameClientLink) useItem(live *livePlayer, objectID int32) {
 	if l.useBeastShotItem(live, inv, inst) {
 		return
 	}
-	res, ok := l.inventoryService().ToggleEquipItem(inv, objectID)
+	res, ok := l.inventory.ToggleEquipItem(inv, objectID)
 	if !ok {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
@@ -188,7 +188,7 @@ func (l *GameClientLink) unequipItem(live *livePlayer, bodySlot int32) {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
-	res, ok := l.inventoryService().UnequipBodySlot(inv, bodySlot)
+	res, ok := l.inventory.UnequipBodySlot(inv, bodySlot)
 	if !ok {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
@@ -215,7 +215,7 @@ func (l *GameClientLink) dropLiveItem(live *livePlayer, req clientpackets.Reques
 		return
 	}
 
-	res, ok, err := l.inventoryService().DropItem(inv, req.ObjectID, count)
+	res, ok, err := l.inventory.DropItem(inv, req.ObjectID, count)
 	if err != nil {
 		l.log.Error().Err(err).Msg("allocate dropped item id")
 		live.SendFrame(serverpackets.FrameActionFailed())
@@ -257,7 +257,7 @@ func (l *GameClientLink) destroyLiveItem(live *livePlayer, objectID int32, count
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
-	res, ok := l.inventoryService().DestroyItem(inv, objectID, count)
+	res, ok := l.inventory.DestroyItem(inv, objectID, count)
 	if !ok {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
@@ -274,7 +274,7 @@ func (l *GameClientLink) crystallizeLiveItem(live *livePlayer, req clientpackets
 		return
 	}
 	inv := live.Inventory()
-	res, failure, err := l.inventoryService().CrystallizeItem(inv, req.ObjectID, int(req.Count), live.SkillLevel(crystallizeSkillID))
+	res, failure, err := l.inventory.CrystallizeItem(inv, req.ObjectID, int(req.Count), live.SkillLevel(crystallizeSkillID))
 	if err != nil {
 		l.log.Error().Err(err).Msg("allocate crystal item id")
 		live.SendFrame(serverpackets.FrameActionFailed())

@@ -220,20 +220,6 @@ func (l *GameClientLink) newPet(cfg summon.PetConfig) *summon.Actor {
 	return summon.NewPet(cfg)
 }
 
-func (l *GameClientLink) inventoryService() *invops.Service {
-	if l.inventory == nil {
-		l.inventory = invops.NewService(l.ids)
-	}
-	return l.inventory
-}
-
-func (l *GameClientLink) petItemService() *petitem.Service {
-	if l.petItems == nil {
-		l.petItems = petitem.NewService(l.ids)
-	}
-	return l.petItems
-}
-
 func (l *GameClientLink) rollEnchantSkill() int {
 	if l.skillEnchantRoll != nil {
 		return l.skillEnchantRoll()
