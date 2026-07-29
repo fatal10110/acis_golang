@@ -7,16 +7,16 @@ import "sync"
 // in any type that enters the world; the zero value is unplaced and
 // invisible.
 //
-// mu guards every field. State methods perform all region bookkeeping;
-// callers that reposition the same object from several goroutines must
-// serialize those calls per object, since a region transition is a
-// multi-step operation.
+// mu guards every field. transitionMu serializes State's complete
+// Spawn, Move, and Despawn operations for this object, so their multi-step
+// region transitions cannot interleave.
 type Presence struct {
-	mu      sync.RWMutex
-	x, y, z int
-	heading int
-	visible bool
-	region  *Region
+	transitionMu sync.Mutex
+	mu           sync.RWMutex
+	x, y, z      int
+	heading      int
+	visible      bool
+	region       *Region
 }
 
 // presence exposes the embedded footprint to State. Embedding *Presence

@@ -84,11 +84,11 @@ func newSignetFakeTarget(id int32) *signetFakeTarget {
 	return t
 }
 
-func (t *signetFakeTarget) ObjectID() int32          { return t.id }
-func (t *signetFakeTarget) Dead() bool               { return t.dead }
-func (t *signetFakeTarget) InPeaceZone() bool        { return t.peace }
-func (t *signetFakeTarget) EffectList() *effect.List { return t.list }
-func (t *signetFakeTarget) Unsummon()                { t.unsummoned = true }
+func (t *signetFakeTarget) ObjectID() int32           { return t.id }
+func (t *signetFakeTarget) Dead() bool                { return t.dead }
+func (t *signetFakeTarget) InPeaceZone() bool         { return t.peace }
+func (t *signetFakeTarget) EffectList() *effect.List  { return t.list }
+func (t *signetFakeTarget) Unsummon()                 { t.unsummoned = true }
 func (t *signetFakeTarget) BroadcastFrame(wire.Frame) {}
 
 func (t *signetFakeTarget) MagicDamageInput(caster any, skill modelskill.Definition) (formulas.MagicDamageInput, bool) {

@@ -291,6 +291,42 @@ func TestDespawnStaleCallDoesNotEvictNewOccupant(t *testing.T) {
 	}
 }
 
+func TestConcurrentMoveAndDespawnKeepRegionMembershipConsistent(t *testing.T) {
+	for range 100 {
+		s := New()
+		obj := &trackedStub{id: 1}
+		s.Spawn(obj, 0, 0, 0, 0)
+
+		old, _ := s.RegionAt(0, 0)
+		next, _ := s.RegionAt(4096, 0)
+		start := make(chan struct{})
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			<-start
+			if err := s.Move(obj, 4096, 0, 0); err != nil {
+				t.Error(err)
+			}
+		}()
+		go func() {
+			defer wg.Done()
+			<-start
+			s.Despawn(obj)
+		}()
+		close(start)
+		wg.Wait()
+
+		region := obj.currentRegion()
+		if got, want := slices.Contains(old.Objects(), Tracked(obj)), region == old; got != want {
+			t.Fatalf("old region membership = %t, want %t", got, want)
+		}
+		if got, want := slices.Contains(next.Objects(), Tracked(obj)), region == next; got != want {
+			t.Fatalf("next region membership = %t, want %t", got, want)
+		}
+	}
+}
+
 func TestDespawnAllNotifiesEachObserverOncePerCoLocatedObject(t *testing.T) {
 	s := New()
 	log := &sightLog{}
