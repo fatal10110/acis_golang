@@ -24,6 +24,21 @@ const (
 	actionWalkRun  int32 = 1
 )
 
+var errMalformedPacketDisconnect = errors.New("malformed packet requires disconnect")
+
+// decodeClientPacket disconnects malformed handshake, authentication, and
+// character-select packets. Malformed in-game packets are logged and dropped.
+func decodeClientPacket[T any](l *GameClientLink, client *Client, payload []byte, decode func([]byte) (T, error)) (T, error) {
+	req, err := decode(payload)
+	if err != nil {
+		l.log.Warn().Err(err).Msg("game client")
+		if client.State() != StateInGame {
+			return req, errMalformedPacketDisconnect
+		}
+	}
+	return req, err
+}
+
 // Handle drives one game-client connection end to end. It matches Serve's
 // handle signature, so a caller wires it in directly:
 // network.Serve(ctx, ln, link.Handle, log).
@@ -78,10 +93,12 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 
 		switch opcode {
 		case clientpackets.OpcodeProtocolVersion:
-			req, err := clientpackets.DecodeProtocolVersion(payload)
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeProtocolVersion)
 			if err != nil {
-				l.log.Warn().Err(err).Msg("game client")
-				return
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
 			}
 			if !validProtocolRevision(req.Revision) {
 				return
@@ -92,10 +109,12 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			protocolReady = true
 
 		case clientpackets.OpcodeAuthLogin:
-			req, err := clientpackets.DecodeAuthLogin(payload)
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeAuthLogin)
 			if err != nil {
-				l.log.Warn().Err(err).Msg("game client")
-				return
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
 			}
 			ok, err := l.authenticate(ctx, client, req)
 			if err != nil || !ok {
@@ -109,10 +128,12 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			chars = list
 
 		case clientpackets.OpcodeRequestCharacterCreate:
-			req, err := clientpackets.DecodeRequestCharacterCreate(payload)
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestCharacterCreate)
 			if err != nil {
-				l.log.Warn().Err(err).Msg("game client")
-				return
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
 			}
 			sex, err := player.ParseSex(req.Sex)
 			if err != nil {
@@ -140,10 +161,12 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			chars = list
 
 		case clientpackets.OpcodeRequestCharacterDelete:
-			req, err := clientpackets.DecodeRequestCharacterDelete(payload)
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestCharacterDelete)
 			if err != nil {
-				l.log.Warn().Err(err).Msg("game client")
-				return
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
 			}
 			c, ok := slotCharacter(chars, req.Slot)
 			if !ok {
@@ -164,10 +187,12 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			chars = list
 
 		case clientpackets.OpcodeCharacterRestore:
-			req, err := clientpackets.DecodeCharacterRestore(payload)
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeCharacterRestore)
 			if err != nil {
-				l.log.Warn().Err(err).Msg("game client")
-				return
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
 			}
 			if c, ok := slotCharacter(chars, req.Slot); ok {
 				if err := l.roster.Restore(ctx, c.ID); err != nil {
@@ -182,17 +207,21 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			chars = list
 
 		case clientpackets.OpcodeRequestPledgeCrest:
-			req, err := clientpackets.DecodeRequestPledgeCrest(payload)
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestPledgeCrest)
 			if err != nil {
-				l.log.Warn().Err(err).Msg("game client")
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
 				continue
 			}
 			session.SendFrame(l.framePledgeCrest(req))
 
 		case clientpackets.OpcodeRequestAllyCrest:
-			req, err := clientpackets.DecodeRequestAllyCrest(payload)
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestAllyCrest)
 			if err != nil {
-				l.log.Warn().Err(err).Msg("game client")
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
 				continue
 			}
 			if live == nil {
@@ -211,10 +240,12 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			session.SendFrame(frame)
 
 		case clientpackets.OpcodeRequestGameStart:
-			req, err := clientpackets.DecodeRequestGameStart(payload)
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestGameStart)
 			if err != nil {
-				l.log.Warn().Err(err).Msg("game client")
-				return
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
 			}
 			c, ok := slotCharacter(chars, req.Slot)
 			if !ok {
@@ -250,27 +281,33 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				l.log.Warn().Str("state", client.State().String()).Msg("game client: extended opcode missing")
 				continue
 			case second == clientpackets.OpcodeRequestAutoSoulShot:
-				req, err := clientpackets.DecodeRequestAutoSoulShot(payload)
+				req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestAutoSoulShot)
 				if err != nil {
-					l.log.Warn().Err(err).Msg("game client")
+					if errors.Is(err, errMalformedPacketDisconnect) {
+						return
+					}
 					continue
 				}
 				if live != nil {
 					l.handleAutoSoulShot(live, req)
 				}
 			case second == clientpackets.OpcodeRequestExEnchantSkillInfo:
-				req, err := clientpackets.DecodeRequestExEnchantSkillInfo(payload)
+				req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestExEnchantSkillInfo)
 				if err != nil {
-					l.log.Warn().Err(err).Msg("game client")
+					if errors.Is(err, errMalformedPacketDisconnect) {
+						return
+					}
 					continue
 				}
 				if live != nil {
 					l.sendEnchantSkillInfo(live, req)
 				}
 			case second == clientpackets.OpcodeRequestExEnchantSkill:
-				req, err := clientpackets.DecodeRequestExEnchantSkill(payload)
+				req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestExEnchantSkill)
 				if err != nil {
-					l.log.Warn().Err(err).Msg("game client")
+					if errors.Is(err, errMalformedPacketDisconnect) {
+						return
+					}
 					continue
 				}
 				if live != nil {
@@ -279,9 +316,11 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			case second == clientpackets.OpcodeRequestManorList:
 				session.SendFrame(serverpackets.FrameExSendManorList())
 			case second == clientpackets.OpcodeRequestExPledgeCrestLarge:
-				req, err := clientpackets.DecodeRequestExPledgeCrestLarge(payload)
+				req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestExPledgeCrestLarge)
 				if err != nil {
-					l.log.Warn().Err(err).Msg("game client")
+					if errors.Is(err, errMalformedPacketDisconnect) {
+						return
+					}
 					continue
 				}
 				if live == nil {
@@ -296,9 +335,11 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				}
 				session.SendFrame(serverpackets.FrameExCursedWeaponList(l.cursedWeapons.IDs()))
 			case second == clientpackets.OpcodeRequestExMagicSkillUseGround:
-				req, err := clientpackets.DecodeRequestExMagicSkillUseGround(payload)
+				req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestExMagicSkillUseGround)
 				if err != nil {
-					l.log.Warn().Err(err).Msg("game client")
+					if errors.Is(err, errMalformedPacketDisconnect) {
+						return
+					}
 					continue
 				}
 				if live != nil {
@@ -327,9 +368,11 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			session.SendFrame(serverpackets.FrameSkillCoolTime(skillCoolTimeEntries(live.SkillReuseTimers(now), now)))
 
 		case clientpackets.OpcodeRequestMagicSkillUse:
-			req, err := clientpackets.DecodeRequestMagicSkillUse(payload)
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestMagicSkillUse)
 			if err != nil {
-				l.log.Warn().Err(err).Msg("game client")
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
 				continue
 			}
 			if live != nil {
@@ -337,9 +380,11 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 
 		case clientpackets.OpcodeAction:
-			req, err := clientpackets.DecodeAction(payload)
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeAction)
 			if err != nil {
-				l.log.Warn().Err(err).Msg("game client")
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
 				continue
 			}
 			if live == nil {
@@ -354,9 +399,11 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			l.handleTargetAction(ctx, live, req.ObjectID, selected)
 
 		case clientpackets.OpcodeAttackRequest:
-			req, err := clientpackets.DecodeAttackRequest(payload)
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeAttackRequest)
 			if err != nil {
-				l.log.Warn().Err(err).Msg("game client")
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
 				continue
 			}
 			if live == nil {
@@ -373,9 +420,11 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			return
 
 		case clientpackets.OpcodeMoveBackwardToLocation:
-			req, err := clientpackets.DecodeMoveBackwardToLocation(payload)
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeMoveBackwardToLocation)
 			if err != nil {
-				l.log.Warn().Err(err).Msg("game client")
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
 				continue
 			}
 			if live == nil {
@@ -391,9 +440,11 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			)
 
 		case clientpackets.OpcodeCannotMoveAnymore:
-			req, err := clientpackets.DecodeCannotMoveAnymore(payload)
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeCannotMoveAnymore)
 			if err != nil {
-				l.log.Warn().Err(err).Msg("game client")
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
 				continue
 			}
 			if live == nil {
@@ -402,9 +453,11 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			l.stopLivePlayer(live, location.Location{X: int(req.X), Y: int(req.Y), Z: int(req.Z)}, int(req.Heading))
 
 		case clientpackets.OpcodeValidatePosition:
-			req, err := clientpackets.DecodeValidatePosition(payload)
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeValidatePosition)
 			if err != nil {
-				l.log.Warn().Err(err).Msg("game client")
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
 				continue
 			}
 			if live != nil {
@@ -423,9 +476,11 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			session.SendFrame(frame)
 
 		case clientpackets.OpcodeUseItem:
-			req, err := clientpackets.DecodeUseItem(payload)
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeUseItem)
 			if err != nil {
-				l.log.Warn().Err(err).Msg("game client")
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
 				continue
 			}
 			if live == nil {
@@ -434,9 +489,11 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			l.useItem(live, req.ObjectID)
 
 		case clientpackets.OpcodeRequestUnEquipItem:
-			req, err := clientpackets.DecodeUnequipItem(payload)
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeUnequipItem)
 			if err != nil {
-				l.log.Warn().Err(err).Msg("game client")
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
 				continue
 			}
 			if live == nil {
@@ -445,9 +502,11 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			l.unequipItem(live, req.BodySlot)
 
 		case clientpackets.OpcodeRequestDropItem:
-			req, err := clientpackets.DecodeRequestDropItem(payload)
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestDropItem)
 			if err != nil {
-				l.log.Warn().Err(err).Msg("game client")
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
 				continue
 			}
 			if live == nil {
@@ -456,9 +515,11 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			l.dropLiveItem(live, req)
 
 		case clientpackets.OpcodeRequestDestroyItem:
-			req, err := clientpackets.DecodeRequestDestroyItem(payload)
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestDestroyItem)
 			if err != nil {
-				l.log.Warn().Err(err).Msg("game client")
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
 				continue
 			}
 			if live == nil {
@@ -467,9 +528,11 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			l.destroyLiveItem(live, req.ObjectID, int(req.Count))
 
 		case clientpackets.OpcodeRequestCrystallizeItem:
-			req, err := clientpackets.DecodeRequestCrystallizeItem(payload)
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestCrystallizeItem)
 			if err != nil {
-				l.log.Warn().Err(err).Msg("game client")
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
 				continue
 			}
 			if live == nil {
@@ -478,9 +541,11 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			l.crystallizeLiveItem(live, req)
 
 		case clientpackets.OpcodeRequestEnchantItem:
-			req, err := clientpackets.DecodeRequestEnchantItem(payload)
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestEnchantItem)
 			if err != nil {
-				l.log.Warn().Err(err).Msg("game client")
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
 				continue
 			}
 			if live == nil {
@@ -495,9 +560,11 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			session.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
 
 		case clientpackets.OpcodeRequestAcquireSkillInfo:
-			req, err := clientpackets.DecodeRequestAcquireSkillInfo(payload)
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestAcquireSkillInfo)
 			if err != nil {
-				l.log.Warn().Err(err).Msg("game client")
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
 				continue
 			}
 			if live != nil {
@@ -505,9 +572,11 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 
 		case clientpackets.OpcodeRequestAcquireSkill:
-			req, err := clientpackets.DecodeRequestAcquireSkill(payload)
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestAcquireSkill)
 			if err != nil {
-				l.log.Warn().Err(err).Msg("game client")
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
 				continue
 			}
 			if live != nil {
@@ -515,9 +584,11 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 
 		case clientpackets.OpcodeRequestActionUse:
-			req, err := clientpackets.DecodeRequestActionUse(payload)
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestActionUse)
 			if err != nil {
-				l.log.Warn().Err(err).Msg("game client")
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
 				continue
 			}
 			if live == nil {
@@ -541,9 +612,11 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 
 		case clientpackets.OpcodeRequestRestartPoint:
-			req, err := clientpackets.DecodeRequestRestartPoint(payload)
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestRestartPoint)
 			if err != nil {
-				l.log.Warn().Err(err).Msg("game client")
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
 				continue
 			}
 			if live != nil {
@@ -551,9 +624,11 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 
 		case clientpackets.OpcodeRequestSocialAction:
-			req, err := clientpackets.DecodeRequestSocialAction(payload)
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestSocialAction)
 			if err != nil {
-				l.log.Warn().Err(err).Msg("game client")
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
 				continue
 			}
 			if live != nil {
@@ -561,9 +636,11 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 
 		case clientpackets.OpcodeRequestChangeMoveType:
-			req, err := clientpackets.DecodeRequestChangeMoveType(payload)
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestChangeMoveType)
 			if err != nil {
-				l.log.Warn().Err(err).Msg("game client")
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
 				continue
 			}
 			if live != nil {
@@ -571,9 +648,11 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 
 		case clientpackets.OpcodeRequestChangeWaitType:
-			req, err := clientpackets.DecodeRequestChangeWaitType(payload)
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestChangeWaitType)
 			if err != nil {
-				l.log.Warn().Err(err).Msg("game client")
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
 				continue
 			}
 			if live != nil {
@@ -581,24 +660,30 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 
 		case clientpackets.OpcodeRequestLinkHtml:
-			req, err := clientpackets.DecodeRequestLinkHTML(payload)
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestLinkHTML)
 			if err != nil {
-				l.log.Warn().Err(err).Msg("game client")
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
 				continue
 			}
 			l.requestLinkHTML(live, req)
 
 		case clientpackets.OpcodeRequestBypassToServer:
-			req, err := clientpackets.DecodeRequestBypassToServer(payload)
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestBypassToServer)
 			if err != nil {
-				l.log.Warn().Err(err).Msg("game client")
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
 				continue
 			}
 			l.requestBypassToServer(live, req)
 
 		case clientpackets.OpcodeRequestTargetCancel:
-			if _, err := clientpackets.DecodeRequestTargetCancel(payload); err != nil {
-				l.log.Warn().Err(err).Msg("game client")
+			if _, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestTargetCancel); err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
 				continue
 			}
 			if live != nil {
@@ -606,8 +691,10 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 
 		case clientpackets.OpcodeAppearing:
-			if _, err := clientpackets.DecodeAppearing(payload); err != nil {
-				l.log.Warn().Err(err).Msg("game client")
+			if _, err := decodeClientPacket(l, client, payload, clientpackets.DecodeAppearing); err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
 				continue
 			}
 			if live != nil {
@@ -620,9 +707,11 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 
 		case clientpackets.OpcodeStartRotating:
-			req, err := clientpackets.DecodeStartRotating(payload)
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeStartRotating)
 			if err != nil {
-				l.log.Warn().Err(err).Msg("game client")
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
 				continue
 			}
 			if live == nil {
@@ -633,9 +722,11 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			})
 
 		case clientpackets.OpcodeFinishRotating:
-			req, err := clientpackets.DecodeFinishRotating(payload)
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeFinishRotating)
 			if err != nil {
-				l.log.Warn().Err(err).Msg("game client")
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
 				continue
 			}
 			if live == nil {
@@ -663,56 +754,70 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			chars = list
 
 		case clientpackets.OpcodeSendTimeCheck:
-			if _, err := clientpackets.DecodeSendTimeCheck(payload); err != nil {
-				l.log.Warn().Err(err).Msg("game client")
+			if _, err := decodeClientPacket(l, client, payload, clientpackets.DecodeSendTimeCheck); err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
 				continue
 			}
 			continue
 
 		case clientpackets.OpcodeRequestPackageItemList:
-			req, err := clientpackets.DecodeRequestPackageSendableItemList(payload)
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestPackageSendableItemList)
 			if err != nil {
-				l.log.Warn().Err(err).Msg("game client")
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
 				continue
 			}
 			l.sendPackageSendableItemList(live, req.ObjectID)
 
 		case clientpackets.OpcodeRequestPetUseItem:
-			req, err := clientpackets.DecodeRequestPetUseItem(payload)
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestPetUseItem)
 			if err != nil {
-				l.log.Warn().Err(err).Msg("game client")
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
 				continue
 			}
 			l.petUseItem(ctx, live, req)
 
 		case clientpackets.OpcodeRequestGiveItemToPet:
-			req, err := clientpackets.DecodeRequestGiveItemToPet(payload)
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestGiveItemToPet)
 			if err != nil {
-				l.log.Warn().Err(err).Msg("game client")
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
 				continue
 			}
 			l.giveItemToPet(ctx, live, req)
 
 		case clientpackets.OpcodeRequestGetItemFromPet:
-			req, err := clientpackets.DecodeRequestGetItemFromPet(payload)
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestGetItemFromPet)
 			if err != nil {
-				l.log.Warn().Err(err).Msg("game client")
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
 				continue
 			}
 			l.getItemFromPet(ctx, live, req)
 
 		case clientpackets.OpcodeRequestPetGetItem:
-			req, err := clientpackets.DecodeRequestPetGetItem(payload)
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestPetGetItem)
 			if err != nil {
-				l.log.Warn().Err(err).Msg("game client")
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
 				continue
 			}
 			l.petGetItem(ctx, live, req)
 
 		case clientpackets.OpcodeTradeRequest:
-			req, err := clientpackets.DecodeTradeRequest(payload)
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeTradeRequest)
 			if err != nil {
-				l.log.Warn().Err(err).Msg("game client")
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
 				continue
 			}
 			if live != nil {
@@ -720,9 +825,11 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 
 		case clientpackets.OpcodeAnswerTradeRequest:
-			req, err := clientpackets.DecodeAnswerTradeRequest(payload)
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeAnswerTradeRequest)
 			if err != nil {
-				l.log.Warn().Err(err).Msg("game client")
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
 				continue
 			}
 			if live != nil {
@@ -730,9 +837,11 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 
 		case clientpackets.OpcodeAddTradeItem:
-			req, err := clientpackets.DecodeAddTradeItem(payload)
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeAddTradeItem)
 			if err != nil {
-				l.log.Warn().Err(err).Msg("game client")
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
 				continue
 			}
 			if live != nil {
@@ -740,9 +849,11 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 
 		case clientpackets.OpcodeTradeDone:
-			req, err := clientpackets.DecodeTradeDone(payload)
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeTradeDone)
 			if err != nil {
-				l.log.Warn().Err(err).Msg("game client")
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
 				continue
 			}
 			if live != nil {
@@ -750,9 +861,11 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 
 		case clientpackets.OpcodeRequestShortCutReg:
-			req, err := clientpackets.DecodeRequestShortCutReg(payload)
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestShortCutReg)
 			if err != nil {
-				l.log.Warn().Err(err).Msg("game client")
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
 				continue
 			}
 			if live != nil {
@@ -760,9 +873,11 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 
 		case clientpackets.OpcodeRequestShortCutDel:
-			req, err := clientpackets.DecodeRequestShortCutDel(payload)
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestShortCutDel)
 			if err != nil {
-				l.log.Warn().Err(err).Msg("game client")
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
 				continue
 			}
 			if live != nil {
