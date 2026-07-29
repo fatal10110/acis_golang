@@ -63,6 +63,7 @@ func (l *GameClientLink) teleportLivePlayer(live *livePlayer, target location.Lo
 		return
 	}
 	live.Stop()
+	live.Character.StopCast()
 	target = move.RandomNearbyLocation(l.geo, target, randomOffset)
 	l.updateLivePlayerPosition(live, target, live.CurrentHeading())
 	l.broadcastLiveFrame(live, func() wire.Frame {

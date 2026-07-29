@@ -13,6 +13,7 @@ func (c *Character) TakeDamage(dmg int, attacker creature.DeathActor) bool {
 		return false
 	}
 	newlyDead := c.ReduceCurrentHP(dmg)
+	c.breakCastOnDamage(float64(dmg))
 	c.BroadcastStatus()
 	if !newlyDead {
 		return false
@@ -71,6 +72,7 @@ func (c *Character) Die(killer creature.DeathActor) bool {
 	if !creature.Die(c, killer, nil) {
 		return false
 	}
+	c.StopCast()
 	c.ClearCharges()
 	c.RaiseDeathPenaltyLevel(killer, c.rollValue(100)+1)
 	c.BroadcastDie()

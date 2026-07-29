@@ -16,6 +16,7 @@ const (
 	SystemMessageEnchantmentFailedS1Evaporated    = 64
 	SystemMessageEnchantmentFailedS1S2Evaporated  = 65
 	SystemMessageTargetTooFar                     = 22
+	SystemMessageCastingInterrupted               = 27
 	SystemMessageFailedToPickupAdena              = 55
 	SystemMessageFailedToPickupS1                 = 56
 	SystemMessageFailedToPickupS2S1S              = 57

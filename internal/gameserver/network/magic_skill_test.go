@@ -417,6 +417,37 @@ func TestAbortedCastSendsCancelAndActionFailed(t *testing.T) {
 	}
 }
 
+// TestInterruptedCastSendsCancelCastingInterruptedAndActionFailed pins the
+// interrupt() vs stop() distinction: an abort inside the interrupt window
+// additionally sends CASTING_INTERRUPTED to the caster, matching
+// CreatureCast.interrupt() vs the unconditional stop() TestAbortedCastSends
+// CancelAndActionFailed covers.
+func TestInterruptedCastSendsCancelCastingInterruptedAndActionFailed(t *testing.T) {
+	capture := &frameCapture{}
+	link := &GameClientLink{}
+	live := newEquipTestLivePlayer(t, 7, capture, item.NewTable(nil), nil)
+	controller := link.castController(live)
+
+	def := modelskill.Definition{
+		ID: 3, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+		HitTime: 5000, ReuseDelay: 1200, StaticHitTime: true, StaticReuse: true,
+	}
+	now := time.Now()
+	if _, err := controller.Start(now, skillCastObject(live), def); err != nil {
+		t.Fatalf("Start() error: %v", err)
+	}
+	capture.frames = nil
+
+	if !controller.Interrupt(now.Add(100 * time.Millisecond)) {
+		t.Fatal("Interrupt() = false inside the interrupt window, want true")
+	}
+
+	want := []byte{serverpackets.OpcodeMagicSkillCanceled, serverpackets.OpcodeSystemMessage, serverpackets.OpcodeActionFailed}
+	if got := frameOpcodes(capture.frames); !bytes.Equal(got, want) {
+		t.Fatalf("interrupt opcodes = %#x, want MagicSkillCanceled, SystemMessage, ActionFailed (%#x)", got, want)
+	}
+}
+
 func TestGameClientLinkMagicSkillUseCubicCastBroadcastsCharacterInfo(t *testing.T) {
 	store := newMemorySkillSaveStore()
 	skills := skillstate.NewPersistence(store, modelskill.NewTable([]modelskill.Definition{

@@ -34,7 +34,7 @@ func newAbortController() (*Controller, *abortActor, *int) {
 	actor := &abortActor{testActor: scalingActor()}
 	ctrl := NewController(actor)
 	aborts := new(int)
-	ctrl.SetOnAbort(func() { *aborts++ })
+	ctrl.SetOnAbort(func(bool) { *aborts++ })
 	return ctrl, actor, aborts
 }
 
