@@ -204,12 +204,20 @@ func (h *Hostile) broadcastShotRecharge(skillID int32) {
 	}
 	x, y, z := h.Position()
 	self := serverpackets.SkillCastObject{ObjectID: h.ObjectID(), Location: location.Location{X: x, Y: y, Z: z}}
-	frame := serverpackets.FrameMagicSkillUse(self, self, skillID, 1, 0, 0, false)
-	defer frame.Release()
+	var frame wire.Frame
+	built := false
+	defer func() { frame.Release() }()
 	h.world.ForEachKnownInRadius(h, 600, func(o world.Tracked) {
 		receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
 		if ok {
-			receiver.SendFrame(serverpackets.CopyFrame(frame))
+			if !built {
+				frame = serverpackets.FrameMagicSkillUse(self, self, skillID, 1, 0, 0, false)
+				built = true
+			}
+			copy, copied := serverpackets.CopyFrame(frame)
+			if copied {
+				receiver.SendFrame(copy)
+			}
 		}
 	})
 }
@@ -410,13 +418,21 @@ func (h *Hostile) broadcastFrame(build func() wire.Frame) {
 	if h.world == nil {
 		return
 	}
-	frame := build()
-	defer frame.Release()
 	known := h.appendKnown()
 	defer h.releaseKnown()
+	var frame wire.Frame
+	built := false
+	defer func() { frame.Release() }()
 	for _, o := range known {
 		if receiver, ok := o.(interface{ SendFrame(wire.Frame) bool }); ok {
-			receiver.SendFrame(serverpackets.CopyFrame(frame))
+			if !built {
+				frame = build()
+				built = true
+			}
+			copy, copied := serverpackets.CopyFrame(frame)
+			if copied {
+				receiver.SendFrame(copy)
+			}
 		}
 	}
 }

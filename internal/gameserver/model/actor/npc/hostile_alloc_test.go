@@ -46,6 +46,32 @@ func TestHostileBroadcastFrameBuildsOnceForKnownObservers(t *testing.T) {
 	}
 }
 
+func TestHostileBroadcastFrameSkipsBuildWithoutObservers(t *testing.T) {
+	hostile, _, _ := newBroadcastMoveFixture(t, 0)
+	builds := 0
+	hostile.broadcastFrame(func() wire.Frame {
+		builds++
+		return wire.BorrowedFrame(wire.FrameBytes([]byte{1, 2, 3}))
+	})
+	if builds != 0 {
+		t.Fatalf("frame builds = %d, want 0", builds)
+	}
+}
+
+func TestHostileBroadcastFrameGivesObserversIndependentBuffers(t *testing.T) {
+	hostile, first, second := newRetainedBroadcastFixture(t)
+	hostile.broadcastFrame(func() wire.Frame {
+		return wire.BorrowedFrame(wire.FrameBytes([]byte{1, 2, 3}))
+	})
+	assertIndependentFrames(t, first.frame, second.frame)
+}
+
+func TestHostileBroadcastShotRechargeGivesObserversIndependentBuffers(t *testing.T) {
+	hostile, first, second := newRetainedBroadcastFixture(t)
+	hostile.broadcastShotRecharge(123)
+	assertIndependentFrames(t, first.frame, second.frame)
+}
+
 func BenchmarkHostileBroadcastMoveKnownObservers(b *testing.B) {
 	hostile, event, _ := newBroadcastMoveFixture(b, 50)
 	hostile.BroadcastMove(event)
@@ -105,10 +131,52 @@ type allocFrameReceiver struct {
 	frames int
 }
 
+type retainedFrameReceiver struct {
+	world.Presence
+	id    int32
+	frame wire.Frame
+}
+
 func (r *allocFrameReceiver) ObjectID() int32 { return r.id }
 
 func (r *allocFrameReceiver) SendFrame(frame wire.Frame) bool {
+	// Benchmarks release synchronously to measure builder and copy cost. Real
+	// connections queue frames, so they can hold many pooled writers at once.
 	frame.Release()
 	r.frames++
 	return true
+}
+
+func (r *retainedFrameReceiver) ObjectID() int32 { return r.id }
+
+func (r *retainedFrameReceiver) SendFrame(frame wire.Frame) bool {
+	r.frame = frame
+	return true
+}
+
+func newRetainedBroadcastFixture(t testing.TB) (*Hostile, *retainedFrameReceiver, *retainedFrameReceiver) {
+	t.Helper()
+	state := world.New()
+	hostile := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster"})
+	hostile.SetWorld(state)
+	state.Spawn(hostile, 0, 0, 0, 0)
+	first := &retainedFrameReceiver{id: 100}
+	second := &retainedFrameReceiver{id: 101}
+	state.Spawn(first, 100, 0, 0, 0)
+	state.Spawn(second, 101, 0, 0, 0)
+	return hostile, first, second
+}
+
+func assertIndependentFrames(t testing.TB, first, second wire.Frame) {
+	t.Helper()
+	defer first.Release()
+	defer second.Release()
+	if len(first.Bytes()) <= wire.FrameHeaderSize || len(second.Bytes()) <= wire.FrameHeaderSize {
+		t.Fatal("observers did not receive frames")
+	}
+	secondPayload := second.Bytes()[wire.FrameHeaderSize]
+	first.Bytes()[wire.FrameHeaderSize] ^= 0xff
+	if second.Bytes()[wire.FrameHeaderSize] != secondPayload {
+		t.Fatal("mutating one observer frame changed another observer frame")
+	}
 }

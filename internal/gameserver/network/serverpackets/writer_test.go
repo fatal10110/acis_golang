@@ -22,10 +22,10 @@ func TestFrameWriterPoolability(t *testing.T) {
 	}
 }
 
-func TestCopyFrameShortSourceReturnsEmptyFrame(t *testing.T) {
-	frame := CopyFrame(wire.BorrowedFrame([]byte{1}))
+func TestCopyFrameShortSourceReportsFailure(t *testing.T) {
+	frame, ok := CopyFrame(wire.BorrowedFrame([]byte{1}))
 	defer frame.Release()
-	if len(frame.Bytes()) != 0 {
-		t.Fatalf("CopyFrame short source = %x, want empty frame", frame.Bytes())
+	if ok {
+		t.Fatalf("CopyFrame short source = %x, true; want empty frame, false", frame.Bytes())
 	}
 }

@@ -86,7 +86,7 @@ func TestActorBroadcastFrameGivesObserversIndependentBuffers(t *testing.T) {
 	defer first.frame.Release()
 	defer second.frame.Release()
 
-	if len(first.frame.Bytes()) == 0 || len(second.frame.Bytes()) == 0 {
+	if len(first.frame.Bytes()) <= wire.FrameHeaderSize || len(second.frame.Bytes()) <= wire.FrameHeaderSize {
 		t.Fatal("observers did not receive frames")
 	}
 	secondPayload := second.frame.Bytes()[wire.FrameHeaderSize]

@@ -153,10 +153,18 @@ type frameReceiver interface {
 }
 
 func broadcastFrame(build func() wire.Frame, recipients func(func(frameReceiver))) {
-	serialized := build()
-	defer serialized.Release()
+	var serialized wire.Frame
+	built := false
+	defer func() { serialized.Release() }()
 	recipients(func(receiver frameReceiver) {
-		receiver.SendFrame(serverpackets.CopyFrame(serialized))
+		if !built {
+			serialized = build()
+			built = true
+		}
+		frame, ok := serverpackets.CopyFrame(serialized)
+		if ok {
+			receiver.SendFrame(frame)
+		}
 	})
 }
 

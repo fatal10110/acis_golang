@@ -199,7 +199,19 @@ func TestBroadcastFrameBuildsOnceAndCopiesForRecipients(t *testing.T) {
 	}
 }
 
+func TestBroadcastFrameSkipsBuildWithoutRecipients(t *testing.T) {
+	builds := 0
+	broadcastFrame(func() wire.Frame {
+		builds++
+		return serverpackets.FrameRevive(1)
+	}, func(func(frameReceiver)) {})
+	if builds != 0 {
+		t.Fatalf("frame builds = %d, want 0", builds)
+	}
+}
+
 func BenchmarkBroadcastLiveFrameKnownObservers(b *testing.B) {
+	// These senders release synchronously; production queues may retain many frames.
 	state := world.New()
 	self := newTestLivePlayer(b, 1, &frameCapture{})
 	self.Character.SetFrameSender(func(frame wire.Frame) bool {
@@ -227,6 +239,7 @@ func BenchmarkBroadcastLiveFrameKnownObservers(b *testing.B) {
 }
 
 func BenchmarkBroadcastCharacterInfoKnownObservers(b *testing.B) {
+	// These senders release synchronously; production queues may retain many frames.
 	state := world.New()
 	self := newTestLivePlayer(b, 1, &frameCapture{})
 	self.Character.SetFrameSender(func(frame wire.Frame) bool {

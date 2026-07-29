@@ -8,7 +8,8 @@ import (
 
 // BroadcastFrame sends frame to every currently known observer capable of
 // receiving one (i.e. a connected player session), from this summon's own
-// known list. It is a no-op until SpawnBesideOwner has attached a world.
+// known list. It takes ownership of frame and releases it. It is a no-op until
+// SpawnBesideOwner has attached a world.
 func (a *Actor) BroadcastFrame(frame wire.Frame) {
 	defer frame.Release()
 	if a.world == nil {
@@ -19,6 +20,9 @@ func (a *Actor) BroadcastFrame(frame wire.Frame) {
 		if !ok {
 			return
 		}
-		receiver.SendFrame(serverpackets.CopyFrame(frame))
+		copy, ok := serverpackets.CopyFrame(frame)
+		if ok {
+			receiver.SendFrame(copy)
+		}
 	})
 }
