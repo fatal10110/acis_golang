@@ -1,11 +1,13 @@
 package network
 
 import (
+	"bytes"
 	"testing"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
@@ -377,6 +379,41 @@ func TestGameClientLinkMagicSkillUseRejectsInsufficientMP(t *testing.T) {
 	reply = c.read()
 	if reply[0] != serverpackets.OpcodeActionFailed {
 		t.Fatalf("after not-enough-mp opcode = %#x, want ActionFailed (%#x)", reply[0], serverpackets.OpcodeActionFailed)
+	}
+}
+
+// TestAbortedCastSendsCancelAndActionFailed pins the two packets an aborted
+// in-flight cast owes the client. The abort triggers themselves (damage,
+// mute, death, ...) are wired separately, so this drives the funnel
+// directly.
+func TestAbortedCastSendsCancelAndActionFailed(t *testing.T) {
+	capture := &frameCapture{}
+	link := &GameClientLink{}
+	live := newEquipTestLivePlayer(t, 7, capture, item.NewTable(nil), nil)
+	controller := link.castController(live)
+
+	def := modelskill.Definition{
+		ID: 3, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+		HitTime: 5000, ReuseDelay: 1200, StaticHitTime: true, StaticReuse: true,
+	}
+	if _, err := controller.Start(time.Now(), skillCastObject(live), def); err != nil {
+		t.Fatalf("Start() error: %v", err)
+	}
+	capture.frames = nil
+
+	controller.Stop()
+
+	if got, want := frameOpcodes(capture.frames), []byte{serverpackets.OpcodeMagicSkillCanceled, serverpackets.OpcodeActionFailed}; !bytes.Equal(got, want) {
+		t.Fatalf("abort opcodes = %#x, want MagicSkillCanceled then ActionFailed (%#x)", got, want)
+	}
+	if caster := wire.NewReader(capture.frames[0][1:]).ReadInt32(); caster != live.ObjectID() {
+		t.Fatalf("MagicSkillCanceled caster = %d, want %d", caster, live.ObjectID())
+	}
+
+	capture.frames = nil
+	controller.Stop()
+	if len(capture.frames) != 0 {
+		t.Fatalf("idle Stop sent %#x, want nothing", frameOpcodes(capture.frames))
 	}
 }
 

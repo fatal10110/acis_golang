@@ -31,7 +31,7 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 	}
 
 	beforeVitals := live.Vitals()
-	controller := live.castController()
+	controller := l.castController(live)
 	started, err := actorcast.StartPlayerSkill(actorcast.PlayerSkillRequest{
 		Now:         time.Now(),
 		Controller:  controller,
@@ -87,7 +87,7 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 			sendMagicStatusUpdate(live, beforeVitals)
 		},
 		Failed: func(err error) {
-			sendMagicCastFailure(live, def, err)
+			sendMagicCastFailureReason(live, def, err)
 			sendMagicStatusUpdate(live, beforeVitals)
 		},
 	})
@@ -127,7 +127,7 @@ func (l *GameClientLink) handleToggleSkillUse(live *livePlayer, req clientpacket
 	handlers := actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers}
 	def, target, activated, err := actorcast.ApplyToggle(
 		handlers,
-		live.castController(),
+		l.castController(live),
 		actorcast.PlayerToggleRequest{
 			Caster:      live.Character,
 			Selected:    live.Target(),
@@ -149,6 +149,20 @@ func (l *GameClientLink) handleToggleSkillUse(live *livePlayer, req clientpacket
 	}
 }
 
+// broadcastCastAborted tells the caster and everyone watching it that an
+// in-flight cast was cancelled: the cancel animation goes to the whole
+// known list, while the action-failed acknowledgement is the caster's
+// alone.
+func (l *GameClientLink) broadcastCastAborted(live *livePlayer) {
+	if live == nil {
+		return
+	}
+	l.broadcastLiveFrame(live, func() wire.Frame {
+		return serverpackets.FrameMagicSkillCanceled(live.ObjectID())
+	})
+	sendMagicActionFailed(live)
+}
+
 func skillCastObject(obj actorcast.Target) serverpackets.SkillCastObject {
 	x, y, z := obj.Position()
 	return serverpackets.SkillCastObject{
@@ -157,7 +171,17 @@ func skillCastObject(obj actorcast.Target) serverpackets.SkillCastObject {
 	}
 }
 
+// sendMagicCastFailure rejects a cast that never started: the reason, then
+// the action-failed acknowledgement releasing the client's pending action.
 func sendMagicCastFailure(live *livePlayer, def modelskill.Definition, err error) {
+	sendMagicCastFailureReason(live, def, err)
+	sendMagicActionFailed(live)
+}
+
+// sendMagicCastFailureReason sends the reason alone, for a cast that failed
+// mid-flight: the abort funnel that cancels it owns the action-failed
+// acknowledgement, so sending one here would duplicate it.
+func sendMagicCastFailureReason(live *livePlayer, def modelskill.Definition, err error) {
 	if live == nil {
 		return
 	}
@@ -175,7 +199,6 @@ func sendMagicCastFailure(live *livePlayer, def modelskill.Definition, err error
 	case errors.Is(err, actorcast.ErrCubicListFull):
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCubicSummoningFailed))
 	}
-	sendMagicActionFailed(live)
 }
 
 // sendLaunchAbort sends the reference's distinct system message for a

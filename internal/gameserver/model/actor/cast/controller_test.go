@@ -186,7 +186,11 @@ func TestHitConsumesFinalCostsAndAllowsExactHP(t *testing.T) {
 	}
 }
 
-func TestHitStopsCastWhenFinalCostsCannotBePaid(t *testing.T) {
+// TestHitReportsUnpayableFinalCosts pins Hit's half of the contract only:
+// it reports why the cast cannot be paid for and charges nothing, leaving
+// the cast in flight for the abort funnel to cancel. The scheduled path
+// that actually cancels it is TestUnaffordableHitReportsBeforeTheAbortFunnel.
+func TestHitReportsUnpayableFinalCosts(t *testing.T) {
 	t.Run("mp", func(t *testing.T) {
 		actor := &testActor{mp: 30, hp: 100, hitCost: 20}
 		ctrl := NewController(actor)
@@ -198,8 +202,11 @@ func TestHitStopsCastWhenFinalCostsCannotBePaid(t *testing.T) {
 		if err := ctrl.Hit(); !errors.Is(err, ErrNotEnoughMP) {
 			t.Fatalf("Hit() error = %v, want ErrNotEnoughMP", err)
 		}
-		if ctrl.CastingNow() {
-			t.Fatal("CastingNow() = true after final MP failure, want stopped")
+		if actor.mp != 10 {
+			t.Fatalf("MP = %d, want 10; an unaffordable hit must charge nothing", actor.mp)
+		}
+		if !ctrl.CastingNow() {
+			t.Fatal("CastingNow() = false after final MP failure; Hit reports, the abort funnel stops")
 		}
 	})
 
@@ -214,8 +221,11 @@ func TestHitStopsCastWhenFinalCostsCannotBePaid(t *testing.T) {
 		if err := ctrl.Hit(); !errors.Is(err, ErrNotEnoughHP) {
 			t.Fatalf("Hit() error = %v, want ErrNotEnoughHP", err)
 		}
-		if ctrl.CastingNow() {
-			t.Fatal("CastingNow() = true after final HP failure, want stopped")
+		if actor.hp != 10 {
+			t.Fatalf("HP = %d, want 10; an unaffordable hit must charge nothing", actor.hp)
+		}
+		if !ctrl.CastingNow() {
+			t.Fatal("CastingNow() = false after final HP failure; Hit reports, the abort funnel stops")
 		}
 	})
 }

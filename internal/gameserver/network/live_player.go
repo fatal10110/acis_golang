@@ -54,12 +54,16 @@ func (p *livePlayer) attackController() *attack.Controller {
 	return p.attack
 }
 
-func (p *livePlayer) castController() *actorcast.Controller {
-	if p.cast == nil {
-		p.cast = actorcast.NewController(actorcast.PlayerActor{Character: p.Character})
-		p.cast.SetLogger(p.log)
+// castController returns live's cast controller, building it on first use
+// with the abort observer that turns an aborted in-flight cast into its
+// client-visible cancel packets.
+func (l *GameClientLink) castController(live *livePlayer) *actorcast.Controller {
+	if live.cast == nil {
+		live.cast = actorcast.NewController(actorcast.PlayerActor{Character: live.Character})
+		live.cast.SetLogger(live.log)
+		live.cast.SetOnAbort(func() { l.broadcastCastAborted(live) })
 	}
-	return p.cast
+	return live.cast
 }
 
 func (p *livePlayer) inventoryItems() []*item.Instance {

@@ -5,6 +5,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
@@ -128,6 +129,23 @@ func (a PlayerActor) ConsumeItem(itemID, count int) bool {
 		return false
 	}
 	return a.Character.Inventory().DestroyByTemplateID(int32(itemID), count) != nil
+}
+
+// ExitSignetGround drops the first ground-signet effect the character
+// carries, ending the signet its cast placed. Only the caster-side signet
+// effect is held here; the ones living on the signet's own world actor are
+// unreachable from the caster and end with that actor instead.
+func (a PlayerActor) ExitSignetGround() {
+	if a.Character == nil {
+		return
+	}
+	list := a.Character.EffectList()
+	for _, e := range list.All() {
+		if e != nil && e.Type == effect.TypeSignetGround {
+			list.Remove(e)
+			return
+		}
+	}
 }
 
 // CubicListFull reports whether a's character already holds as many active
