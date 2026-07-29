@@ -77,6 +77,11 @@ structure.
   `rg` attempt, switch to grepai or a symbol/structural tool instead of trying more shell scans.
 - Run the smallest focused check during development and the complete required gates before declaring
   implementation work complete; configuration-only work uses syntax, link, and consistency checks.
+- For a broadcast with identical bytes for every recipient, serialize once, keep the source frame alive
+  through the fan-out, and send an independently owned `serverpackets.CopyFrame` to each recipient.
+  `SendFrame` consumes and may encrypt its frame in place; never hand one frame to multiple recipients.
+  Keep self-only or recipient-specific packets separate. Tests must retain raw frames, mutate one, and
+  prove the others are unchanged; builder counts and byte equality alone do not prove ownership.
 - Done means specified behavior and rejection paths match, packet impact is covered, exact contracts
   have independent evidence, boundaries and ownership remain sound, required checks pass, every
   deferral has a verified milestone-assigned follow-up issue, the diff is scoped, and an issue-closing

@@ -334,14 +334,15 @@ func (l *GameClientLink) broadcastCharacterInfo(live *livePlayer) {
 	if l.world == nil {
 		return
 	}
-	l.world.ForEachKnown(live, func(o world.Tracked) {
-		receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
-		if !ok {
-			return
-		}
-		receiver.SendFrame(serverpackets.FrameCharInfo(serverpackets.CharInfoSnapshot{
-			Character: live.Character, Template: live.template, Items: items,
-		}))
+	info := serverpackets.CharInfoSnapshot{Character: live.Character, Template: live.template, Items: items}
+	broadcastFrame(func() wire.Frame {
+		return serverpackets.FrameCharInfo(info)
+	}, func(send func(frameReceiver)) {
+		l.world.ForEachKnown(live, func(o world.Tracked) {
+			if receiver, ok := o.(frameReceiver); ok {
+				send(receiver)
+			}
+		})
 	})
 }
 

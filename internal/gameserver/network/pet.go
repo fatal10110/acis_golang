@@ -194,12 +194,14 @@ func (l *GameClientLink) broadcastGroundPickup(ground *grounditem.Item, pickerID
 	if l.world == nil {
 		return
 	}
-	l.world.ForEachKnown(ground, func(o world.Tracked) {
-		receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
-		if !ok {
-			return
-		}
-		receiver.SendFrame(serverpackets.FrameGetItem(ground, pickerID))
+	broadcastFrame(func() wire.Frame {
+		return serverpackets.FrameGetItem(ground, pickerID)
+	}, func(send func(frameReceiver)) {
+		l.world.ForEachKnown(ground, func(o world.Tracked) {
+			if receiver, ok := o.(frameReceiver); ok {
+				send(receiver)
+			}
+		})
 	})
 }
 
