@@ -82,6 +82,10 @@ structure.
   `SendFrame` consumes and may encrypt its frame in place; never hand one frame to multiple recipients.
   Keep self-only or recipient-specific packets separate. Tests must retain raw frames, mutate one, and
   prove the others are unchanged; builder counts and byte equality alone do not prove ownership.
+- Packet-impact review: no accepted user-action opcode may be a quiet no-op. It performs its
+  client-visible action, answers with a rejection (system message and/or `ActionFailed`), or logs
+  the gap and sends `ActionFailed`. Silence is allowed only when the reference is also silent and
+  the opcode registers no pending client action; document both reasons at the branch.
 - Done means specified behavior and rejection paths match, packet impact is covered, exact contracts
   have independent evidence, boundaries and ownership remain sound, required checks pass, every
   deferral has a verified milestone-assigned follow-up issue, the diff is scoped, and an issue-closing
