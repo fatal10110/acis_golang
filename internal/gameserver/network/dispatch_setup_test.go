@@ -82,7 +82,29 @@ func newTestGameClientLinkWithSkillsShortcutsCrestsKarmaAndLog(t *testing.T, log
 		cursed = cursedWeapons[0]
 	}
 	playerConfig := PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: karmaPlayerCanTeleport}
-	gcl := NewGameClientLink(validator, loginLink, roster, items, shortcuts, templates, itemTemplates, html, crests, skills, spellbooks, trees, cursed, state, nil, testGeo{}, nil, ids, groundItems, nil, task.NewPositionUpdates(state), nil, nil, nil, playerConfig, petmodel.DefaultConfig(), log)
+	gcl := NewGameClientLink(GameClientLinkConfig{
+		Validator:     validator,
+		LoginLink:     loginLink,
+		Roster:        roster,
+		Items:         items,
+		Shortcuts:     shortcuts,
+		Templates:     templates,
+		ItemTemplates: itemTemplates,
+		HTML:          html,
+		Crests:        crests,
+		Skills:        skills,
+		Spellbooks:    spellbooks,
+		SkillTrees:    trees,
+		CursedWeapons: cursed,
+		World:         state,
+		Geo:           testGeo{},
+		IDs:           ids,
+		GroundItems:   groundItems,
+		Positions:     task.NewPositionUpdates(state),
+		PlayerConfig:  playerConfig,
+		PetConfig:     petmodel.DefaultConfig(),
+		Log:           log,
+	})
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
