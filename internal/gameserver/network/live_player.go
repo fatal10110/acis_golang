@@ -71,6 +71,11 @@ func (l *GameClientLink) castController(live *livePlayer) *actorcast.Controller 
 		live.cast = actorcast.NewController(actorcast.PlayerActor{Character: live.Character})
 		live.cast.SetLogger(live.log)
 		live.cast.SetOnAbort(func(interrupted bool) { l.broadcastCastAborted(live, interrupted) })
+		live.cast.SetOnFinish(func(bool) {
+			if live.combat != nil {
+				live.combat.Think()
+			}
+		})
 		live.Character.SetCastController(live.cast)
 	}
 	return live.cast

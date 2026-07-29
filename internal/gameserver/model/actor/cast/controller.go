@@ -158,6 +158,7 @@ type Controller struct {
 	timers    []scheduledTimer
 	afterFunc afterFunc
 	onAbort   func(interrupted bool)
+	onFinish  func(interrupted bool)
 	log       zerolog.Logger
 }
 
@@ -186,6 +187,15 @@ func (c *Controller) SetOnAbort(f func(interrupted bool)) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.onAbort = f
+}
+
+// SetOnFinish registers the observer fired once whenever an in-flight cast
+// ends. interrupted distinguishes an abort from natural completion. The
+// observer runs after the controller lock is released.
+func (c *Controller) SetOnFinish(f func(interrupted bool)) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.onFinish = f
 }
 
 // CastingNow reports whether the actor currently has an active cast.
@@ -321,8 +331,11 @@ func (c *Controller) hitLocked() error {
 // Finish clears the active cast after its hit and cool phases complete.
 func (c *Controller) Finish() {
 	c.mu.Lock()
-	c.clearLocked()
+	finish := c.finishLocked()
 	c.mu.Unlock()
+	if finish != nil {
+		finish(false)
+	}
 }
 
 // Stop aborts and clears the active cast. It is the single funnel every
@@ -341,22 +354,33 @@ func (c *Controller) stopInternal(interrupted bool) {
 	c.enableAllSkills()
 
 	c.mu.Lock()
-	abort := c.abortLocked()
+	abort, finish := c.abortLocked()
 	c.mu.Unlock()
 	if abort != nil {
 		abort(interrupted)
+	}
+	if finish != nil {
+		finish(true)
 	}
 }
 
 // abortLocked clears the cast and returns the observer the caller must run
 // once it has released mu, or nil when no cast was in flight.
-func (c *Controller) abortLocked() func(bool) {
+func (c *Controller) abortLocked() (func(bool), func(bool)) {
 	aborted := c.casting
 	c.clearLocked()
 	if !aborted {
+		return nil, nil
+	}
+	return c.onAbort, c.onFinish
+}
+
+func (c *Controller) finishLocked() func(bool) {
+	if !c.casting {
 		return nil
 	}
-	return c.onAbort
+	c.clearLocked()
+	return c.onFinish
 }
 
 func (c *Controller) exitSignetGround() {
