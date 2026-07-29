@@ -13,6 +13,15 @@ type playerStub struct {
 
 func (p *playerStub) WorldPlayer() {}
 
+type activePlayerStub struct {
+	playerStub
+	activeCalls   int
+	inactiveCalls int
+}
+
+func (p *activePlayerStub) OnActiveRegion()   { p.activeCalls++ }
+func (p *activePlayerStub) OnInactiveRegion() { p.inactiveCalls++ }
+
 func TestRegionActivatesOnPlayerSpawnAndDeactivatesOnDespawn(t *testing.T) {
 	s := New()
 
@@ -151,6 +160,26 @@ func TestRegionActivityNotifiesNonPlayerMovingIntoAlreadyInactiveRegion(t *testi
 	}
 	if obj.inactiveCalls != 1 {
 		t.Fatalf("inactive calls after moving into an already-inactive region = %d, want 1 (no Tick required)", obj.inactiveCalls)
+	}
+}
+
+func TestRegionActivityPlayerMoveIntoInactiveRegionNotifiedActiveOnce(t *testing.T) {
+	s := New()
+	p := &activePlayerStub{playerStub: playerStub{trackedStub: trackedStub{id: 1}}}
+	s.Spawn(p, 0, 0, 0, 0)
+	p.activeCalls = 0
+	p.inactiveCalls = 0
+
+	const far = 4 * regionSize
+	if err := s.Move(p, far, 0, 0); err != nil {
+		t.Fatalf("Move: %v", err)
+	}
+
+	if p.activeCalls != 1 {
+		t.Fatalf("active calls after moving into an inactive region = %d, want 1", p.activeCalls)
+	}
+	if p.inactiveCalls != 0 {
+		t.Fatalf("inactive calls after moving into an inactive region = %d, want 0", p.inactiveCalls)
 	}
 }
 

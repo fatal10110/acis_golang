@@ -18,12 +18,14 @@ type Tracked interface {
 
 // Observer is implemented by tracked objects that react when another
 // object enters or leaves their sight range — the 3x3 block of regions
-// around their own. Discover and Forget run on whichever goroutine drives
-// the region transition, so implementations must be safe to call
-// concurrently and return promptly without blocking. They must not call
+// around their own. For a Player subject, callbacks run after it has entered
+// its destination region or left the grid; non-player callbacks preserve the
+// existing in-transition timing. Discover and Forget run on whichever
+// goroutine drives the region transition, so implementations must be safe to
+// call concurrently and return promptly without blocking. They must not call
 // State's transition methods (Spawn, Move, Despawn, or DespawnAll) from a
 // callback; read-only queries such as Knows and RegionActivity are safe.
-// Panics propagate after State releases its transition locks.
+// Panics propagate.
 type Observer interface {
 	// Discover tells the observer that obj just became visible to it.
 	Discover(obj Tracked)
@@ -204,13 +206,10 @@ func (s *State) relocate(t Tracked, next *Region) {
 		// be atomic with respect to every other player's relocate, or one
 		// player's departure can deactivate a region just activated by
 		// another's concurrent arrival. See regionActivityMu's doc comment.
-		// It does not need to cover notifyActivity's per-object resets
-		// (unlocked explicitly below, before those run) — those aren't part
-		// of the invariant it protects, and holding it through a possibly
-		// large region's worth of resets would serialize every other
-		// player's relocate against this one for no reason.
+		// Every membership mutation and setActive decision happens before
+		// release. Visibility notifications and notifyActivity delivery do
+		// not affect that invariant, and can block or scan many objects.
 		s.regionActivityMu.Lock()
-		defer s.regionActivityMu.Unlock()
 	}
 
 	p := t.presence()
@@ -226,12 +225,9 @@ func (s *State) relocate(t Tracked, next *Region) {
 	if next != nil {
 		next.Add(t)
 		newAreas = s.AppendNeighbors(newAreaBuf[:0], next, 1)
-		if prev != nil {
-			// t already had a region (this is a move, not its first Spawn)
-			// and next never toggled to get here: a non-player crossing
-			// into a neighbor that was already active or already inactive
-			// triggers no setActive transition there, so nothing else would
-			// tell t which side of the gate it just landed on.
+		if !tIsPlayer && prev != nil {
+			// A non-player entering a region that was already active or
+			// inactive sees no setActive transition, so notify it directly.
 			notifyObjectActivity(t, next.Active())
 		}
 	}
@@ -239,6 +235,7 @@ func (s *State) relocate(t Tracked, next *Region) {
 	tObs, tObserves := t.(Observer)
 	var objectBuf [32]Tracked
 	objects := objectBuf[:0]
+	var notifications []visibilityNotification
 
 	var toggleBuf [18]regionToggle
 	toggles := toggleBuf[:0]
@@ -253,10 +250,18 @@ func (s *State) relocate(t Tracked, next *Region) {
 				continue
 			}
 			if w, ok := o.(Observer); ok {
-				w.Forget(t)
+				if tIsPlayer {
+					notifications = append(notifications, visibilityNotification{w, t, false})
+				} else {
+					w.Forget(t)
+				}
 			}
 			if tObserves {
-				tObs.Forget(o)
+				if tIsPlayer {
+					notifications = append(notifications, visibilityNotification{tObs, o, false})
+				} else {
+					tObs.Forget(o)
+				}
 			}
 		}
 		if tIsPlayer && s.regionNeighborhoodEmpty(r) && r.setActive(false) {
@@ -274,10 +279,18 @@ func (s *State) relocate(t Tracked, next *Region) {
 				continue
 			}
 			if w, ok := o.(Observer); ok {
-				w.Discover(t)
+				if tIsPlayer {
+					notifications = append(notifications, visibilityNotification{w, t, true})
+				} else {
+					w.Discover(t)
+				}
 			}
 			if tObserves {
-				tObs.Discover(o)
+				if tIsPlayer {
+					notifications = append(notifications, visibilityNotification{tObs, o, true})
+				} else {
+					tObs.Discover(o)
+				}
 			}
 		}
 		if tIsPlayer && r.setActive(true) {
@@ -289,9 +302,30 @@ func (s *State) relocate(t Tracked, next *Region) {
 	p.region = next
 	p.mu.Unlock()
 
+	if tIsPlayer {
+		s.regionActivityMu.Unlock()
+	}
+
+	for _, notification := range notifications {
+		notification.notify()
+	}
 	for _, tg := range toggles {
 		tg.region.notifyActivity(tg.active)
 	}
+}
+
+type visibilityNotification struct {
+	observer Observer
+	object   Tracked
+	discover bool
+}
+
+func (n visibilityNotification) notify() {
+	if n.discover {
+		n.observer.Discover(n.object)
+		return
+	}
+	n.observer.Forget(n.object)
 }
 
 // regionToggle is a region whose activity flag setActive just flipped,

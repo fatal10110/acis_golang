@@ -53,6 +53,7 @@ func (o *observerStub) Forget(obj Tracked)   { o.log.add(o.id, "forget", obj) }
 type observerFuncStub struct {
 	trackedStub
 	discover func(Tracked)
+	forget   func(Tracked)
 }
 
 func (o *observerFuncStub) Discover(obj Tracked) {
@@ -61,7 +62,95 @@ func (o *observerFuncStub) Discover(obj Tracked) {
 	}
 }
 
-func (o *observerFuncStub) Forget(Tracked) {}
+func (o *observerFuncStub) Forget(obj Tracked) {
+	if o.forget != nil {
+		o.forget(obj)
+	}
+}
+
+func TestPlayerRelocateReleasesActivityLockBeforeObserverNotifications(t *testing.T) {
+	tests := []struct {
+		name     string
+		prepare  func(*State, *playerStub)
+		block    func(*observerFuncStub, func(Tracked))
+		relocate func(*State, *playerStub) error
+	}{
+		{
+			name:    "spawn discovers",
+			prepare: func(*State, *playerStub) {},
+			block:   func(o *observerFuncStub, f func(Tracked)) { o.discover = f },
+			relocate: func(s *State, p *playerStub) error {
+				s.Spawn(p, 0, 0, 0, 0)
+				return nil
+			},
+		},
+		{
+			name: "move forgets",
+			prepare: func(s *State, p *playerStub) {
+				s.Spawn(p, 0, 0, 0, 0)
+			},
+			block: func(o *observerFuncStub, f func(Tracked)) { o.forget = f },
+			relocate: func(s *State, p *playerStub) error {
+				return s.Move(p, 3*regionSize, 0, 0)
+			},
+		},
+		{
+			name: "despawn forgets",
+			prepare: func(s *State, p *playerStub) {
+				s.Spawn(p, 0, 0, 0, 0)
+			},
+			block: func(o *observerFuncStub, f func(Tracked)) { o.forget = f },
+			relocate: func(s *State, p *playerStub) error {
+				s.Despawn(p)
+				return nil
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := New()
+			observer := &observerFuncStub{trackedStub: trackedStub{id: 1}}
+			s.Spawn(observer, 0, 0, 0, 0)
+
+			subject := &playerStub{trackedStub: trackedStub{id: 2}}
+			tt.prepare(s, subject)
+
+			started := make(chan struct{}, 1)
+			release := make(chan struct{})
+			tt.block(observer, func(Tracked) {
+				started <- struct{}{}
+				<-release
+			})
+
+			firstDone := make(chan error, 1)
+			go func() {
+				firstDone <- tt.relocate(s, subject)
+			}()
+			<-started
+
+			otherDone := make(chan struct{})
+			go func() {
+				defer close(otherDone)
+				s.Spawn(&playerStub{trackedStub: trackedStub{id: 3}}, 6*regionSize, 0, 0, 0)
+			}()
+
+			select {
+			case <-otherDone:
+			case <-time.After(time.Second):
+				close(release)
+				<-firstDone
+				<-otherDone
+				t.Fatal("unrelated player relocate waited for a blocked observer notification")
+			}
+
+			close(release)
+			if err := <-firstDone; err != nil {
+				t.Fatalf("relocate: %v", err)
+			}
+		})
+	}
+}
 
 func TestPlayerRelocatePanicReleasesActivityLock(t *testing.T) {
 	s := New()
