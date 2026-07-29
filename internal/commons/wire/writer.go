@@ -81,8 +81,15 @@ func (w *Writer) WriteBytes(b []byte) {
 // WriteString appends s as null-terminated UTF-16LE: each rune as one or two
 // 16-bit code units, followed by a trailing 0x0000 unit.
 func (w *Writer) WriteString(s string) {
-	for _, unit := range utf16.Encode([]rune(s)) {
-		w.WriteUint16(unit)
+	for _, r := range s {
+		// Ranging over a string replaces invalid UTF-8, including encoded surrogates, with RuneError.
+		if r < 0x10000 {
+			w.WriteUint16(uint16(r))
+			continue
+		}
+		high, low := utf16.EncodeRune(r)
+		w.WriteUint16(uint16(high))
+		w.WriteUint16(uint16(low))
 	}
 	w.WriteUint16(0)
 }
