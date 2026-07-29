@@ -7,9 +7,11 @@ import "sync"
 // in any type that enters the world; the zero value is unplaced and
 // invisible.
 //
-// mu guards every field. transitionMu serializes State's complete
-// Spawn, Move, and Despawn operations for this object, so their multi-step
-// region transitions cannot interleave.
+// mu guards every field. transitionMu serializes State's complete placement
+// operations for this object, so their multi-step region transitions cannot
+// interleave. State holds it while observer and activity callbacks run;
+// callbacks must not synchronously reposition this object or another object
+// whose transition is already in progress.
 type Presence struct {
 	transitionMu sync.Mutex
 	mu           sync.RWMutex

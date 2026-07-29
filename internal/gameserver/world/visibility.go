@@ -1,7 +1,9 @@
 package world
 
 import (
+	"cmp"
 	"fmt"
+	"slices"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/worldobject"
@@ -118,6 +120,22 @@ func (s *State) Despawn(t Tracked) {
 // replicated here) — fine for today's only caller (ground items, which
 // never observe), revisit if a future caller despawns Observers in bulk.
 func (s *State) DespawnAll(ts []Tracked) {
+	locked := slices.Clone(ts)
+	slices.SortFunc(locked, func(a, b Tracked) int {
+		return cmp.Compare(a.ObjectID(), b.ObjectID())
+	})
+	locked = slices.CompactFunc(locked, func(a, b Tracked) bool {
+		return a.presence() == b.presence()
+	})
+	for _, t := range locked {
+		t.presence().transitionMu.Lock()
+	}
+	defer func() {
+		for i := len(locked) - 1; i >= 0; i-- {
+			locked[i].presence().transitionMu.Unlock()
+		}
+	}()
+
 	byRegion := make(map[*Region][]Tracked, len(ts))
 	for _, t := range ts {
 		p := t.presence()
