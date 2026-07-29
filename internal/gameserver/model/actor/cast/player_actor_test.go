@@ -87,6 +87,41 @@ func TestPlayerActorMPCostAppliesDanceSurcharge(t *testing.T) {
 	}
 }
 
+// TestPlayerActorAllSkillsDisabledReflectsCrowdControl covers Java's
+// Creature.isAllSkillsDisabled(): a live crowd-control state (here, Stun)
+// blocks casting through the same allSkillsDisabler seam Controller.CanCast
+// and Controller.Stop both probe, and EnableAllSkills stays a no-op since
+// this port doesn't model the raw Duel-defeat lock.
+func TestPlayerActorAllSkillsDisabledReflectsCrowdControl(t *testing.T) {
+	ch := &player.Character{ID: 1}
+	live, err := creature.NewLive(location.Location{}, 100, permissiveGeo{}, ch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ch.Live = live
+	actor := PlayerActor{Character: ch}
+
+	if actor.AllSkillsDisabled() {
+		t.Fatal("AllSkillsDisabled() = true before any lock is active")
+	}
+
+	e := &effect.Effect{Skill: effect.Skill{ID: 1}, Type: effect.TypeBuff, Flag: effect.FlagStunned}
+	ch.EffectList().Add(e)
+	if !actor.AllSkillsDisabled() {
+		t.Fatal("AllSkillsDisabled() = false while stunned, want true")
+	}
+
+	actor.EnableAllSkills()
+	if !actor.AllSkillsDisabled() {
+		t.Fatal("AllSkillsDisabled() = false after EnableAllSkills, want still true: it only clears the unmodeled raw Duel lock, not crowd control")
+	}
+
+	ch.EffectList().Remove(e)
+	if actor.AllSkillsDisabled() {
+		t.Fatal("AllSkillsDisabled() = true after the stun effect was removed")
+	}
+}
+
 func TestPlayerActorSkillReuseDelegatesToCharacter(t *testing.T) {
 	ch := &player.Character{}
 	actor := PlayerActor{Character: ch}

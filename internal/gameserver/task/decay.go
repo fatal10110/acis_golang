@@ -32,13 +32,16 @@ type decayEntry struct {
 // Decay tracks dead actors awaiting corpse removal and fires the removal
 // side effect once each actor's display interval elapses.
 //
-// All methods are safe for concurrent use; mu guards entries.
+// Add, Cancel, Tracked, and Deadline are safe to call concurrently with Tick.
+// mu guards entries and the scratch refill. Tick only ever runs on the
+// scheduler ticker's single goroutine, one call at a time.
 type Decay struct {
 	effects DecayEffects
 	now     func() time.Time
 
 	mu      sync.Mutex
 	entries map[int32]decayEntry
+	scratch []decayEntry
 }
 
 // NewDecay returns an empty corpse-decay tracker.
@@ -116,17 +119,19 @@ func (d *Decay) Tick() {
 	now := d.now()
 
 	d.mu.Lock()
-	due := make([]decayEntry, 0, len(d.entries))
+	d.scratch = d.scratch[:0]
 	for id, entry := range d.entries {
 		if now.Before(entry.deadline) {
 			continue
 		}
-		due = append(due, entry)
+		d.scratch = append(d.scratch, entry)
 		delete(d.entries, id)
 	}
+	due := d.scratch
 	d.mu.Unlock()
 
 	for _, entry := range due {
 		d.effects.Decay(entry.actor)
 	}
+	clear(d.scratch)
 }
