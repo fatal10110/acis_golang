@@ -476,10 +476,12 @@ func TestHandleTargetActionShowsPetStatusForOwnerPet(t *testing.T) {
 	capture.frames = nil
 	gcl.handleTargetAction(context.Background(), live, pet.ObjectID(), true)
 
-	if got := frameOpcodes(capture.frames); string(got) != string([]byte{serverpackets.OpcodePetStatusShow}) {
-		t.Fatalf("opcodes = %x, want PetStatusShow", got)
+	// Interacting with an owned summon must also release the pending action
+	// the client registered for the click, or its input stays locked.
+	if got := frameOpcodes(capture.frames); string(got) != string([]byte{serverpackets.OpcodeActionFailed, serverpackets.OpcodePetStatusShow}) {
+		t.Fatalf("opcodes = %x, want ActionFailed, PetStatusShow", got)
 	}
-	r := wire.NewReader(capture.frames[0][1:])
+	r := wire.NewReader(capture.frames[1][1:])
 	if got := r.ReadInt32(); got != int32(pet.SummonType()) {
 		t.Fatalf("PetStatusShow summon type = %d, want %d", got, pet.SummonType())
 	}

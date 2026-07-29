@@ -144,6 +144,8 @@ Load only the guide needed for the current work:
   selection.
 - [`docs/agents/process-skills.md`](docs/agents/process-skills.md): task-risk classification and
   conditional Superpowers and Ponytail selection.
+- [`docs/agents/action-response-contract.md`](docs/agents/action-response-contract.md): what a handler
+  owes the client after accepting an action, on rejection and on success, and how to verify it.
 - [`internal/gameserver/network/AGENTS.md`](internal/gameserver/network/AGENTS.md): packet impact,
   protocol order, rejection responses, orchestration boundaries, and network concurrency. It applies
   to every change below that directory.

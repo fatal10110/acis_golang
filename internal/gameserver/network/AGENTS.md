@@ -42,6 +42,11 @@ Never return nothing while the client is waiting for completion. Walk every earl
 errors returned by domain services. Extend `silent_action_test.go` whenever a new action-shaped opcode
 or rejection branch is added; passing registration checks alone is not sufficient.
 
+Rejections are not the only way to leave a client's pending action outstanding: some flows must also
+release the click when the action *succeeds*, and others must not. Before adding or changing a handler
+for a client action, read
+[`../../../docs/agents/action-response-contract.md`](../../../docs/agents/action-response-contract.md).
+
 ## Orchestration boundary
 
 Network code decodes fields, resolves session/world context, calls a domain API, and translates a
@@ -61,5 +66,6 @@ the network-facing outcome explicit enough to map every success and rejection br
 ## Completion check
 
 Before completion, confirm the inbound/outbound packet list, opcode and field layout, state gates,
-send order, rejection responses, byte fixtures, `silent_action_test.go` coverage, domain boundary,
-concurrency ownership, and every explicit deferral.
+send order, rejection responses, pending-action release on both success and rejection paths, byte
+fixtures, `silent_action_test.go` coverage, domain boundary, concurrency ownership, and every explicit
+deferral.

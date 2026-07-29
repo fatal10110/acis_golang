@@ -44,6 +44,13 @@ func (f *fakeGameClient) readWithTimeout(d time.Duration) []byte {
 // not assert which frame — the point is that the handler answered at all,
 // not what it said — so this test keeps working (and keeps catching
 // regressions) as new rejection reasons and messages are added.
+//
+// Scope limit: every case here is a *rejected* request, so this guardrail
+// cannot catch a flow that answers rejections correctly but leaves the
+// client's pending action outstanding when the action succeeds. Flows whose
+// success path must also release the click (pickup, interact, follow — see
+// docs/agents/action-response-contract.md) assert that release in their own
+// success-path tests instead.
 func TestGameClientLinkNeverGoesSilentOnActionRequests(t *testing.T) {
 	c, chars, _, _ := newLinkedGameClient(t)
 
