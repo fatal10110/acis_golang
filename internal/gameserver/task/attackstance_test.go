@@ -91,6 +91,39 @@ func TestAttackStanceAddRefreshesTimeoutAndFiresCubics(t *testing.T) {
 	}
 }
 
+func TestAttackStanceTickAllocationIsFlat(t *testing.T) {
+	now := time.UnixMilli(0)
+	stance, err := NewAttackStance(&attackStanceFakeEffects{}, func() time.Time { return now })
+	if err != nil {
+		t.Fatalf("NewAttackStance() error = %v", err)
+	}
+	for i := 0; i < 128; i++ {
+		stance.Add(&attackStanceFakeActor{id: int32(i + 1)})
+	}
+	stance.Tick()
+
+	if allocs := testing.AllocsPerRun(100, stance.Tick); allocs != 0 {
+		t.Fatalf("AllocsPerRun(128 actors) = %v, want 0", allocs)
+	}
+}
+
+func BenchmarkAttackStanceTickManyActors(b *testing.B) {
+	stance, err := NewAttackStance(&attackStanceFakeEffects{}, time.Now)
+	if err != nil {
+		b.Fatal(err)
+	}
+	for i := 0; i < 4096; i++ {
+		stance.Add(&attackStanceFakeActor{id: int32(i + 1)})
+	}
+	stance.Tick()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		stance.Tick()
+	}
+}
+
 func TestAttackStanceTimeoutAlsoStopsPlayerSummon(t *testing.T) {
 	now := time.UnixMilli(0)
 	effects := &attackStanceFakeEffects{}

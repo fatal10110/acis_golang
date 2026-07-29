@@ -38,6 +38,32 @@ func TestAIManagerRemoveStopsTicks(t *testing.T) {
 	}
 }
 
+func TestAIManagerTickAllocationIsFlat(t *testing.T) {
+	mgr := NewAI(nil)
+	for i := 0; i < 128; i++ {
+		mgr.Add(&aiActorStub{id: int32(i + 1)})
+	}
+	mgr.Tick()
+
+	if allocs := testing.AllocsPerRun(100, mgr.Tick); allocs != 0 {
+		t.Fatalf("AllocsPerRun(128 actors) = %v, want 0", allocs)
+	}
+}
+
+func BenchmarkAIManagerTickManyActors(b *testing.B) {
+	mgr := NewAI(nil)
+	for i := 0; i < 4096; i++ {
+		mgr.Add(&aiActorStub{id: int32(i + 1)})
+	}
+	mgr.Tick()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		mgr.Tick()
+	}
+}
+
 func TestAIManagerSnapshotAllowsMutationDuringTick(t *testing.T) {
 	mgr := NewAI(nil)
 	a := &aiActorStub{id: 1}

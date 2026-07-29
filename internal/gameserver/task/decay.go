@@ -32,13 +32,16 @@ type decayEntry struct {
 // Decay tracks dead actors awaiting corpse removal and fires the removal
 // side effect once each actor's display interval elapses.
 //
-// All methods are safe for concurrent use; mu guards entries.
+// All methods are safe for concurrent use; mu guards entries and scratch,
+// while tickMu keeps concurrent ticks from reusing scratch before callbacks finish.
 type Decay struct {
 	effects DecayEffects
 	now     func() time.Time
 
 	mu      sync.Mutex
+	tickMu  sync.Mutex
 	entries map[int32]decayEntry
+	scratch []decayEntry
 }
 
 // NewDecay returns an empty corpse-decay tracker.
@@ -115,15 +118,19 @@ func (d *Decay) Deadline(actor DecayActor) (time.Time, bool) {
 func (d *Decay) Tick() {
 	now := d.now()
 
+	d.tickMu.Lock()
+	defer d.tickMu.Unlock()
+
 	d.mu.Lock()
-	due := make([]decayEntry, 0, len(d.entries))
+	d.scratch = d.scratch[:0]
 	for id, entry := range d.entries {
 		if now.Before(entry.deadline) {
 			continue
 		}
-		due = append(due, entry)
+		d.scratch = append(d.scratch, entry)
 		delete(d.entries, id)
 	}
+	due := d.scratch
 	d.mu.Unlock()
 
 	for _, entry := range due {

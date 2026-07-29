@@ -69,6 +69,39 @@ func TestDecayAddThenTickFiresAfterDeadline(t *testing.T) {
 	}
 }
 
+func TestDecayTickAllocationIsFlat(t *testing.T) {
+	now := time.UnixMilli(0)
+	decay, err := NewDecay(&decayFakeEffects{}, func() time.Time { return now })
+	if err != nil {
+		t.Fatalf("NewDecay() error = %v", err)
+	}
+	for i := 0; i < 128; i++ {
+		decay.Add(&decayFakeActor{id: int32(i + 1)}, time.Hour)
+	}
+	decay.Tick()
+
+	if allocs := testing.AllocsPerRun(100, decay.Tick); allocs != 0 {
+		t.Fatalf("AllocsPerRun(128 actors) = %v, want 0", allocs)
+	}
+}
+
+func BenchmarkDecayTickManyActors(b *testing.B) {
+	decay, err := NewDecay(&decayFakeEffects{}, time.Now)
+	if err != nil {
+		b.Fatal(err)
+	}
+	for i := 0; i < 4096; i++ {
+		decay.Add(&decayFakeActor{id: int32(i + 1)}, time.Hour)
+	}
+	decay.Tick()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		decay.Tick()
+	}
+}
+
 func TestDecayDeadlineReportsTrackedDeadline(t *testing.T) {
 	now := time.UnixMilli(0)
 	effects := &decayFakeEffects{}
