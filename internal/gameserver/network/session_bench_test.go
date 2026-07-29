@@ -39,17 +39,6 @@ func benchmarkSession(b *testing.B) *Session {
 	return NewSession(conn, cipher)
 }
 
-func BenchmarkSessionSendAuthLoginFailPayload(b *testing.B) {
-	session := benchmarkSession(b)
-	b.ReportAllocs()
-
-	for i := 0; i < b.N; i++ {
-		if !session.Send(serverpackets.EncodeAuthLoginFail(serverpackets.LoginFailSystemErrorTryLater)) {
-			b.Fatal("Send returned false")
-		}
-	}
-}
-
 func BenchmarkSessionSendAuthLoginFailFrame(b *testing.B) {
 	session := benchmarkSession(b)
 	b.ReportAllocs()
@@ -73,16 +62,6 @@ func benchmarkUserInfoPayload(s serverpackets.UserInfoSnapshot) []byte {
 	return serverpackets.EncodeUserInfo(s)
 }
 
-func benchmarkUserInfoPayloadMatchesFrame(b *testing.B, s serverpackets.UserInfoSnapshot) {
-	b.Helper()
-	frame := serverpackets.FrameUserInfo(s)
-	defer frame.Release()
-	want := frame.Bytes()[frameHeaderSize:]
-	if got := benchmarkUserInfoPayload(s); !bytes.Equal(got, want) {
-		b.Fatal("unpooled UserInfo payload differs from FrameUserInfo")
-	}
-}
-
 func TestBenchmarkUserInfoPayloadMatchesFrame(t *testing.T) {
 	snapshot := benchmarkUserInfoSnapshot()
 	frame := serverpackets.FrameUserInfo(snapshot)
@@ -93,22 +72,8 @@ func TestBenchmarkUserInfoPayloadMatchesFrame(t *testing.T) {
 	}
 }
 
-func BenchmarkSessionSendUserInfoPayload(b *testing.B) {
-	snapshot := benchmarkUserInfoSnapshot()
-	benchmarkUserInfoPayloadMatchesFrame(b, snapshot)
-	session := benchmarkSession(b)
-	b.ReportAllocs()
-
-	for i := 0; i < b.N; i++ {
-		if !session.Send(benchmarkUserInfoPayload(snapshot)) {
-			b.Fatal("Send returned false")
-		}
-	}
-}
-
 func BenchmarkSessionSendUserInfoFrame(b *testing.B) {
 	snapshot := benchmarkUserInfoSnapshot()
-	benchmarkUserInfoPayloadMatchesFrame(b, snapshot)
 	session := benchmarkSession(b)
 	b.ReportAllocs()
 

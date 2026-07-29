@@ -23,7 +23,7 @@ func listen(t *testing.T) net.Listener {
 	return ln
 }
 
-func TestServeEchoesThroughSend(t *testing.T) {
+func TestServeEchoesThroughSendFrame(t *testing.T) {
 	ln := listen(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -35,7 +35,7 @@ func TestServeEchoesThroughSend(t *testing.T) {
 			if _, err := conn.Read(buf); err != nil {
 				return
 			}
-			conn.Send(buf)
+			conn.SendFrame(wire.BorrowedFrame(buf))
 		}, zerolog.Nop())
 	}()
 
@@ -170,35 +170,6 @@ func TestServeHandlesConnectionsConcurrently(t *testing.T) {
 	}
 }
 
-func TestConnSendAfterCloseReturnsFalse(t *testing.T) {
-	ln := listen(t)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	closed := make(chan *Conn, 1)
-	go Serve(ctx, ln, func(ctx context.Context, conn *Conn) {
-		conn.Close()
-		closed <- conn
-	}, zerolog.Nop())
-
-	client, err := net.Dial("tcp", ln.Addr().String())
-	if err != nil {
-		t.Fatalf("dial: %v", err)
-	}
-	defer client.Close()
-
-	var conn *Conn
-	select {
-	case conn = <-closed:
-	case <-time.After(5 * time.Second):
-		t.Fatal("connection was not handled")
-	}
-
-	if conn.Send([]byte("late")) {
-		t.Fatal("Send on closed connection returned true, want false")
-	}
-}
-
 func TestConnSendFrameAfterCloseReleasesFrame(t *testing.T) {
 	server, client := net.Pipe()
 	defer client.Close()
@@ -227,7 +198,7 @@ func TestConnWriteLoopExitsOnWriteErrorAndCloseCompletes(t *testing.T) {
 	// Closing the read side makes the next write on server fail
 	// synchronously, exercising writeLoop's error path.
 	client.Close()
-	conn.Send([]byte("payload"))
+	conn.SendFrame(wire.BorrowedFrame([]byte("payload")))
 
 	done := make(chan struct{})
 	go func() {
@@ -247,7 +218,7 @@ func TestConnSendFrameAfterWriteLoopExitReturnsFalseAndReleasesFrame(t *testing.
 	conn := newConn(server, zerolog.Nop())
 
 	client.Close()
-	conn.Send([]byte("payload"))
+	conn.SendFrame(wire.BorrowedFrame([]byte("payload")))
 
 	select {
 	case <-conn.stopped:
@@ -444,7 +415,7 @@ func TestConnCloseFlushesBurst(t *testing.T) {
 	const want = "flush-me"
 	go Serve(ctx, ln, func(ctx context.Context, conn *Conn) {
 		for i := 0; i < len(want); i++ {
-			conn.Send([]byte{want[i]})
+			conn.SendFrame(wire.BorrowedFrame([]byte{want[i]}))
 		}
 		conn.Close()
 	}, zerolog.Nop())

@@ -431,6 +431,47 @@ func TestCanAbort(t *testing.T) {
 	}
 }
 
+// TestInterruptOnDamageWindowBoundaryTable pins the exact interrupt-window
+// edge at hitTime-200 (here 800ms into a 1000ms hitTime): a damage-break
+// roll on either side of that instant must land on the side its timestamp
+// implies, with the roll itself injected deterministically rather than
+// relying on real randomness.
+func TestInterruptOnDamageWindowBoundaryTable(t *testing.T) {
+	now := time.Unix(1000, 0)
+	def := modelskill.Definition{ID: 1, Level: 1, Magic: true, HitTime: 1000}
+
+	tests := []struct {
+		name   string
+		offset time.Duration
+		want   bool
+	}{
+		{name: "1ms inside the window", offset: 799 * time.Millisecond, want: true},
+		{name: "exactly at the window edge", offset: 800 * time.Millisecond, want: false},
+		{name: "1ms outside the window", offset: 801 * time.Millisecond, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			actor := &testActor{mp: 100, hp: 100, mAtkSpd: 333, pAtkSpd: 333, magicReuseRate: 1, physicalReuseRate: 1}
+			ctrl := NewController(actor)
+			if _, err := ctrl.Start(now, testTarget{}, def); err != nil {
+				t.Fatalf("Start() error: %v", err)
+			}
+
+			// Roll 0 against a rate the CastBreakRate formula always clamps
+			// to at least 1: a deterministic guaranteed-break roll, so the
+			// only variable under test is the window boundary itself.
+			got := ctrl.InterruptOnDamage(now.Add(tt.offset), DamageInterrupt{Damage: 1, MEN: 30, Roll: 0})
+			if got != tt.want {
+				t.Fatalf("InterruptOnDamage() at +%s = %v, want %v", tt.offset, got, tt.want)
+			}
+			if got == ctrl.CastingNow() {
+				t.Fatalf("CastingNow() = %v after InterruptOnDamage() = %v, want the opposite", ctrl.CastingNow(), got)
+			}
+		})
+	}
+}
+
 type testTarget struct{}
 
 type testActor struct {

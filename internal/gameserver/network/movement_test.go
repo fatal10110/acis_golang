@@ -2,15 +2,61 @@ package network
 
 import (
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
+
+// castingDef is a minimal long-hitTime active skill definition, long enough
+// that Start leaves a real cast in flight for an actor-state abort test to
+// interrupt.
+var castingDef = modelskill.Definition{
+	ID: 9, Level: 1, HitTime: 5000, StaticHitTime: true, StaticReuse: true,
+}
+
+// TestMoveLivePlayerStopsInFlightCast pins PlayerAI.onEvtCancel: a
+// client-initiated walk cancels the AI's current intention, including an
+// in-flight cast.
+func TestMoveLivePlayerStopsInFlightCast(t *testing.T) {
+	live := newTestLivePlayer(t, 1, &frameCapture{})
+	gcl := &GameClientLink{log: zerolog.Nop()}
+	controller := gcl.castController(live)
+	if _, err := controller.Start(time.Now(), skillCastObject(live), castingDef); err != nil {
+		t.Fatalf("Start() error: %v", err)
+	}
+
+	gcl.moveLivePlayer(live, live.CurrentLocation(), location.Location{X: 100})
+
+	if controller.CastingNow() {
+		t.Fatal("CastingNow() = true after a client-initiated walk, want cleared")
+	}
+}
+
+// TestChangeLiveWaitTypeSitStopsInFlightCast pins the sit-down half of the
+// reference's cast-abort surface: sitting down stops an in-flight cast,
+// standing up does not.
+func TestChangeLiveWaitTypeSitStopsInFlightCast(t *testing.T) {
+	live := newTestLivePlayer(t, 1, &frameCapture{})
+	gcl := &GameClientLink{log: zerolog.Nop()}
+	controller := gcl.castController(live)
+	if _, err := controller.Start(time.Now(), skillCastObject(live), castingDef); err != nil {
+		t.Fatalf("Start() error: %v", err)
+	}
+
+	if !gcl.changeLiveWaitType(live, false) {
+		t.Fatal("changeLiveWaitType(sit) = false, want true")
+	}
+	if controller.CastingNow() {
+		t.Fatal("CastingNow() = true after sitting down, want cleared")
+	}
+}
 
 func TestMoveLivePlayerRelocatesWorldVisibility(t *testing.T) {
 	state := world.New()

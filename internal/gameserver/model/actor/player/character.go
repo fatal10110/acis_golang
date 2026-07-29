@@ -103,6 +103,13 @@ type Character struct {
 	deathMu sync.Mutex
 	dead    bool
 
+	// castMu guards cast, the network-owned live cast controller wired back
+	// onto this character so effect hooks (mute, silence, abort-cast,
+	// damage-break) can reach it without this domain package importing the
+	// cast package that already imports this one.
+	castMu sync.RWMutex
+	cast   CastController
+
 	// statMu guards statCalcs map creation. Each Calculator owns its Funcs.
 	statMu    sync.Mutex
 	statCalcs map[stat.Stat]*basefunc.Calculator
