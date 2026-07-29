@@ -142,6 +142,30 @@ func (l *GameClientLink) broadcastPickupAttention(live *livePlayer, ground *grou
 	})
 }
 
+func (l *GameClientLink) broadcastGroundPickup(ground *grounditem.Item, pickerID int32) {
+	if l.world == nil {
+		return
+	}
+	serialized := serverpackets.FrameGetItem(ground, pickerID)
+	defer serialized.Release()
+
+	l.world.ForEachKnown(ground, func(o world.Tracked) {
+		receiver, ok := o.(*livePlayer)
+		if !ok {
+			return
+		}
+		frame, ok := serverpackets.CopyFrame(serialized)
+		if !ok {
+			return
+		}
+		if o.ObjectID() == pickerID {
+			receiver.SendFrame(frame)
+		} else {
+			receiver.sendVisibilityFrame(frame)
+		}
+	})
+}
+
 // failedPickupFrame mirrors the reference server's loot-locked messaging:
 // adena reports only the amount, a single non-adena item names itself, and
 // a stack of more than one names itself alongside its count.
