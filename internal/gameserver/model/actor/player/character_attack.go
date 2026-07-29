@@ -1,20 +1,16 @@
 package player
 
 import (
-	"math/rand/v2"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
-	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 const (
@@ -74,124 +70,54 @@ type physicalTarget interface {
 
 // LineOfSight is the geodata query CanSee needs to gate targeting on real
 // terrain occlusion between two actors.
-type LineOfSight interface {
-	CanSeeActor(ox, oy, oz int, oCollisionHeight float64, tx, ty, tz int, tCollisionHeight float64) bool
-}
 
 // SetLineOfSight records the geodata line-of-sight query used by CanSee. A
 // nil los (e.g. in tests that don't exercise geodata) leaves CanSee
 // permissive.
-func (c *Character) SetLineOfSight(los LineOfSight) {
-	c.los = los
-}
 
 // PeaceZoneQuery reports whether any point within effectRange of (x, y, z) —
 // sampled at the point and its four axis-aligned range offsets — falls
 // inside a peace-suspending zone attached to the region containing
 // (regionX, regionY). Callers pass their own position as the region anchor,
 // matching the reference's caster-region-only zone lookup.
-type PeaceZoneQuery interface {
-	EffectRangeInPeaceZone(regionX, regionY, x, y, z, effectRange int) bool
-}
 
 // SetZones records the zone index EffectRangeInPeaceZone queries. A nil
 // zones (e.g. in tests that don't exercise zone data) leaves it permissive.
-func (c *Character) SetZones(zones PeaceZoneQuery) {
-	c.zones = zones
-}
 
 // SetGroundTarget records the last ground-click point a ground-targeted
 // skill cast (RequestExMagicSkillUseGround) resolved, reused across casts
 // until the next ground click overwrites it.
-func (c *Character) SetGroundTarget(x, y, z int) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.groundTarget = location.Location{X: x, Y: y, Z: z}
-}
 
 // GroundTarget returns the last recorded ground-click point.
-func (c *Character) GroundTarget() (x, y, z int) {
-	c.stateMu.RLock()
-	defer c.stateMu.RUnlock()
-	return c.groundTarget.X, c.groundTarget.Y, c.groundTarget.Z
-}
 
 // CanSeePoint reports whether an arbitrary world point is visible to this
 // player: a geodata line-of-sight query from this player's position and eye
 // height to the raw point (no height offset on the point end, matching the
 // reference's ground-target LOS query), or permissive when no
 // line-of-sight query is attached (e.g. in tests).
-func (c *Character) CanSeePoint(x, y, z int) bool {
-	if c.los == nil {
-		return true
-	}
-	ox, oy, oz := c.Position()
-	return c.los.CanSeeActor(ox, oy, oz, c.CollisionHeight(), x, y, z, 0)
-}
 
 // EffectRangeInPeaceZone reports whether the given point's effect range
 // overlaps a peace-suspending zone attached to this player's own current
 // region, or permissive (false) when no zone index is attached (e.g. in
 // tests).
-func (c *Character) EffectRangeInPeaceZone(x, y, z, effectRange int) bool {
-	if c.zones == nil {
-		return false
-	}
-	rx, ry, _ := c.Position()
-	return c.zones.EffectRangeInPeaceZone(rx, ry, x, y, z, effectRange)
-}
 
 // AttachRuntime records the static template and restored inventory used by
 // live combat and visibility code. Call it before exposing c to the world.
-func (c *Character) AttachRuntime(tmpl *Template, inv *itemcontainer.Inventory) {
-	c.runtimeTemplate = tmpl
-	c.inventory = inv
-	if c.roll == nil {
-		c.roll = rand.IntN
-	}
-}
 
 // AddRewardItem creates and adds one kill-reward item stack to this live
 // character's inventory. objectID must be allocated by the reward caller.
-func (c *Character) AddRewardItem(itemID int32, count int, objectID int32) bool {
-	if c.inventory == nil {
-		return false
-	}
-	return c.inventory.AddNew(itemID, count, objectID) != nil
-}
 
 // Inventory returns the carried item collection attached by AttachRuntime,
 // or nil if the character has none yet.
-func (c *Character) Inventory() *itemcontainer.Inventory {
-	return c.inventory
-}
 
 // SetWorld records the world registry BroadcastAttack reaches through.
-func (c *Character) SetWorld(state *world.State) {
-	c.world = state
-}
 
 // SyncPosition moves this player's live world-grid presence to position.
-func (c *Character) SyncPosition(position location.Location) {
-	c.locMu.Lock()
-	c.Location = position
-	c.locMu.Unlock()
-	if c.world == nil {
-		return
-	}
-	_ = c.world.Move(c, position.X, position.Y, position.Z)
-}
 
 // SetLastKnownPosition records position and heading as this player's last
 // known world state. Call it whenever a client-reported move is accepted,
 // alongside the world-grid presence and CreatureMove position it must
 // stay consistent with.
-func (c *Character) SetLastKnownPosition(position location.Location, heading int) {
-	c.locMu.Lock()
-	c.Location = position
-	c.LastHeading = heading
-	c.locMu.Unlock()
-}
 
 // SetFrameSender records the session send hook used by network-owned live
 // player wrappers. Passing nil disconnects the character from that session.
@@ -290,48 +216,24 @@ func (c *Character) SendFrame(frame wire.Frame) bool {
 
 // SetRollSource overrides MakeAttackHit's random source for deterministic
 // tests.
-func (c *Character) SetRollSource(f func(int) int) {
-	c.roll = f
-}
 
 // ObjectID returns the persistent world object id assigned to this player.
-func (c *Character) ObjectID() int32 {
-	return c.ID
-}
 
 // WorldPlayer satisfies world.Player: a Character's presence keeps its
 // world Region active.
-func (c *Character) WorldPlayer() {}
 
 // LevelValue returns the player's current level for live-owned actors.
-func (c *Character) LevelValue() int {
-	return c.CharLevel
-}
 
 // Level satisfies the cast/target handler interfaces (cancelTarget,
 // seedableTarget, spoilableTarget, sowCaster, harvestCaster, magicCaster)
 // that require a Level() int method.
-func (c *Character) Level() int {
-	return c.CharLevel
-}
 
 // Karma satisfies the cross-package karma-gated target checks (e.g. a
 // Guard's or friendly monster's attack-target rule) that type-assert for a
 // Karma() int method.
-func (c *Character) Karma() int {
-	return c.KarmaPoints
-}
 
 // Position returns the live world position when c is spawned, otherwise the
 // persisted last-known location.
-func (c *Character) Position() (int, int, int) {
-	if c.Visible() {
-		return c.Presence.Position()
-	}
-	c.locMu.RLock()
-	defer c.locMu.RUnlock()
-	return c.Location.X, c.Location.Y, c.Location.Z
-}
 
 func (c *Character) template() *Template {
 	return c.runtimeTemplate
@@ -387,31 +289,10 @@ func (c *Character) InAttackRange(target attackable.Combatant) bool {
 }
 
 // Knows reports whether target is visible to this player.
-func (c *Character) Knows(target attackable.Combatant) bool {
-	tracked, ok := target.(world.Tracked)
-	return ok && world.Knows(c, tracked)
-}
 
 // CanSee reports whether target is visible to this player: a geodata
 // line-of-sight query between the two actors' positions and eye heights, or
 // permissive when no line-of-sight query is attached (e.g. in tests).
-func (c *Character) CanSee(target attackable.Combatant) bool {
-	if c.los == nil {
-		return true
-	}
-	other, ok := target.(interface{ Position() (int, int, int) })
-	if !ok {
-		return false
-	}
-	var theight float64
-	if h, ok := target.(interface{ CollisionHeight() float64 }); ok {
-		theight = h.CollisionHeight()
-	}
-
-	ox, oy, oz := c.Position()
-	tx, ty, tz := other.Position()
-	return c.los.CanSeeActor(ox, oy, oz, c.CollisionHeight(), tx, ty, tz, theight)
-}
 
 // AttackType resolves from the equipped right-hand weapon, falling back to
 // the character template's fist weapon.
@@ -473,43 +354,27 @@ func (c *Character) WeaponGrade() int {
 }
 
 // SoulshotCharged reports whether a soulshot charge is currently active.
-func (c *Character) SoulshotCharged() bool {
-	weapon := c.activeWeapon()
-	return weapon.inst != nil && weapon.inst.ChargedShot(item.ShotSoul)
-}
 
 // SpiritshotCharged reports whether a spiritshot charge is currently active.
-func (c *Character) SpiritshotCharged() bool {
-	weapon := c.activeWeapon()
-	return weapon.inst != nil && weapon.inst.ChargedShot(item.ShotSpirit)
-}
 
 // BlessedSpiritshotCharged reports whether a blessed spiritshot charge is currently active.
-func (c *Character) BlessedSpiritshotCharged() bool {
-	weapon := c.activeWeapon()
-	return weapon.inst != nil && weapon.inst.ChargedShot(item.ShotBlessedSpirit)
-}
 
 // ChargeShotResult distinguishes why a direct-use shot charge attempt did
 // or didn't take, so the network layer can pick the matching client
 // message (or suppress it for an auto-shot-enabled item, the way the
 // reference does).
-type ChargeShotResult uint8
 
-const (
-	// ChargeShotOK means the weapon accepted the charge.
-	ChargeShotOK ChargeShotResult = iota
-	// ChargeShotNoCapacity means no real weapon is equipped, or it can't
-	// carry this shot kind at all.
-	ChargeShotNoCapacity
-	// ChargeShotGradeMismatch means the shot's crystal grade doesn't match
-	// the weapon's.
-	ChargeShotGradeMismatch
-	// ChargeShotAlreadyCharged means the weapon already carries this
-	// charge; the reference answers this case with total silence, not a
-	// system message.
-	ChargeShotAlreadyCharged
-)
+// ChargeShotOK means the weapon accepted the charge.
+
+// ChargeShotNoCapacity means no real weapon is equipped, or it can't
+// carry this shot kind at all.
+
+// ChargeShotGradeMismatch means the shot's crystal grade doesn't match
+// the weapon's.
+
+// ChargeShotAlreadyCharged means the weapon already carries this
+// charge; the reference answers this case with total silence, not a
+// system message.
 
 // ChargeSoulshot attempts to charge the active weapon with a soulshot of
 // shotCrystal grade, using reducedRoll (a 0-99 percentile roll) to decide
@@ -518,21 +383,6 @@ const (
 // for this shot kind, which differs from ChargeSpiritshot's order. On
 // ChargeShotOK the weapon is marked charged and consume is the count to
 // destroy from the item stack.
-func (c *Character) ChargeSoulshot(shotCrystal item.CrystalType, reducedRoll int) (consume int32, result ChargeShotResult) {
-	w := c.activeWeapon()
-	if w.inst == nil || w.tmpl == nil || w.tmpl.Weapon == nil || w.tmpl.Weapon.SoulshotCount == 0 {
-		return 0, ChargeShotNoCapacity
-	}
-	if w.tmpl.Crystal != shotCrystal {
-		return 0, ChargeShotGradeMismatch
-	}
-	if w.inst.ChargedShot(item.ShotSoul) {
-		return 0, ChargeShotAlreadyCharged
-	}
-	consume, _ = w.tmpl.Weapon.EvaluateSoulshot(w.tmpl.Crystal, shotCrystal, false, reducedRoll)
-	w.inst.SetChargedShot(item.ShotSoul, true)
-	return consume, ChargeShotOK
-}
 
 // ChargeSpiritshot attempts to charge the active weapon with a spiritshot
 // of shotCrystal grade (kind is ShotSpirit or ShotBlessedSpirit; both draw
@@ -541,21 +391,6 @@ func (c *Character) ChargeSoulshot(shotCrystal item.CrystalType, reducedRoll int
 // kind, which differs from ChargeSoulshot's order. On ChargeShotOK the
 // weapon is marked charged with kind and consume is the count to destroy
 // from the item stack.
-func (c *Character) ChargeSpiritshot(kind item.ShotKind, shotCrystal item.CrystalType) (consume int32, result ChargeShotResult) {
-	w := c.activeWeapon()
-	if w.inst == nil || w.tmpl == nil || w.tmpl.Weapon == nil || w.tmpl.Weapon.SpiritshotCount == 0 {
-		return 0, ChargeShotNoCapacity
-	}
-	if w.inst.ChargedShot(kind) {
-		return 0, ChargeShotAlreadyCharged
-	}
-	if w.tmpl.Crystal != shotCrystal {
-		return 0, ChargeShotGradeMismatch
-	}
-	consume, _ = w.tmpl.Weapon.EvaluateSpiritshot(w.tmpl.Crystal, shotCrystal, false)
-	w.inst.SetChargedShot(kind, true)
-	return consume, ChargeShotOK
-}
 
 // SetHeadingTo orients this player toward target.
 func (c *Character) SetHeadingTo(target attackable.Combatant) {
@@ -569,69 +404,6 @@ func (c *Character) SetHeadingTo(target attackable.Combatant) {
 }
 
 // MakeAttackHit resolves one physical attack result.
-func (c *Character) MakeAttackHit(target attackable.Combatant, split bool) attack.Hit {
-	hit := attack.Hit{Target: target, TargetID: target.ObjectID()}
-	other, ok := target.(physicalTarget)
-	if !ok {
-		hit.Miss = true
-		return hit
-	}
-
-	tmpl := c.template()
-	if tmpl == nil {
-		hit.Miss = true
-		return hit
-	}
-	weapon := c.activeWeapon()
-
-	accuracy := c.Accuracy()
-	evasion := other.Evasion()
-
-	_, _, sz := c.Position()
-	_, _, tz := other.Position()
-	rate := formulas.HitRate(accuracy, evasion, sz-tz, false, false, true)
-	if formulas.Missed(rate, c.rollValue(1000)) {
-		hit.Miss = true
-		return hit
-	}
-
-	critRate := c.CriticalRate()
-	crit := formulas.CritSucceeds(critRate, c.rollValue(1000))
-
-	randomMul := 1.0
-	if weapon.tmpl != nil && weapon.tmpl.Weapon != nil {
-		if spread := int(weapon.tmpl.Weapon.RandomDamage); spread > 0 {
-			randomMul = 1 + float64(c.rollValue(2*spread+1)-spread)/100
-		}
-	}
-
-	defence := other.PDef()
-	if defence <= 0 {
-		defence = 1
-	}
-	damage := formulas.PhysicalAttackDamage(formulas.PhysicalAttackInput{
-		AttackPower:       c.pAtk(weapon),
-		Defence:           defence,
-		Crit:              crit,
-		PosMul:            formulas.PosMul(false, true, crit),
-		ElementalMul:      1,
-		RandomMul:         randomMul,
-		RaceMul:           1,
-		WeaponVulnMul:     1,
-		PvPMul:            1,
-		CritDamageMul:     1,
-		CritDamagePosMul:  1,
-		CritVulnMul:       1,
-		CritDamageAddBase: 0,
-	})
-	if split {
-		damage /= 2
-	}
-
-	hit.Damage = int(damage)
-	hit.Crit = crit
-	return hit
-}
 
 // BroadcastAttack sends an attack snapshot through the runtime packet hook.
 func (c *Character) BroadcastAttack(snapshot attack.Snapshot) {
@@ -789,74 +561,22 @@ func (c *Character) CollisionHeight() float64 {
 // observers, and runs the once-only death path when HP reaches zero. A hit
 // against an already-dead character is a no-op: no damage is applied and no
 // status is broadcast.
-func (c *Character) TakeDamage(dmg int, attacker creature.DeathActor) bool {
-	if c.AlikeDead() {
-		return false
-	}
-	newlyDead := c.ReduceCurrentHP(dmg)
-	c.BroadcastStatus()
-	if !newlyDead {
-		return false
-	}
-	return c.Die(attacker)
-}
 
 // Dead reports whether the player has died.
-func (c *Character) Dead() bool {
-	c.deathMu.Lock()
-	defer c.deathMu.Unlock()
-	return c.dead
-}
 
 // AlikeDead reports whether this player is dead or dead-equivalent,
 // including a Fake Death toggle that is currently active.
-func (c *Character) AlikeDead() bool {
-	return c.Dead() || c.FakeDead()
-}
 
 // MarkDead transitions this player into its dead state.
-func (c *Character) MarkDead() bool {
-	c.deathMu.Lock()
-	defer c.deathMu.Unlock()
-	if c.dead {
-		return false
-	}
-	c.dead = true
-	return true
-}
 
 // Revive clears this player's dead state and restores HP to fraction of
 // calculated max HP. It reports whether the player was dead and is now
 // revived; a call on a living player is a no-op.
-func (c *Character) Revive(fraction float64) bool {
-	c.deathMu.Lock()
-	if !c.dead {
-		c.deathMu.Unlock()
-		return false
-	}
-	c.dead = false
-	c.deathMu.Unlock()
-
-	maxHP := c.ResourceValues().MaxHP
-	c.vitalsMu.Lock()
-	c.curHP = maxHP * fraction
-	c.vitalsMu.Unlock()
-	return true
-}
 
 // Die runs this player's death sequence: the once-only dead-state
 // transition, then the death packet broadcast to this player's own session
 // and every observer, so the corpse-fall animation plays live instead of
 // only on a later dead reconnect.
-func (c *Character) Die(killer creature.DeathActor) bool {
-	if !creature.Die(c, killer, nil) {
-		return false
-	}
-	c.ClearCharges()
-	c.RaiseDeathPenaltyLevel(killer, c.rollValue(100)+1)
-	c.BroadcastDie()
-	return true
-}
 
 // SiegeGuard reports whether this player is a defensive siege guard.
 func (c *Character) SiegeGuard() bool { return false }
@@ -869,20 +589,7 @@ func (c *Character) AttackableBy(attack.CreatureActor) bool {
 	return !c.AlikeDead()
 }
 
-func (c *Character) rollValue(n int) int {
-	if n <= 0 {
-		return 0
-	}
-	if c.roll != nil {
-		return c.roll(n)
-	}
-	return rand.IntN(n)
-}
-
 // Roll draws a uniform random integer in [0, n) from c's combat random source.
-func (c *Character) Roll(n int) int {
-	return c.rollValue(n)
-}
 
 // RandomDamageSpread returns the active weapon's random-damage spread.
 func (c *Character) RandomDamageSpread() int {
