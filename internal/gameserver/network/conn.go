@@ -160,6 +160,7 @@ func (c *Conn) trySendFrame(frame wire.Frame) bool {
 func (c *Conn) abort() {
 	c.mu.Lock()
 	if !c.closed {
+		c.log.Warn().Msg("visibility queue full, aborting connection")
 		c.closed = true
 		close(c.out)
 	}
