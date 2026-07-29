@@ -7,11 +7,13 @@ import (
 )
 
 const (
-	packetWriterCapacity    = 256
-	maxPacketWriterCapacity = packetWriterCapacity * 4
+	packetWriterCapacity = 256
+	// maxPacketWriterCapacity keeps routine variable-length packets pooled while
+	// preventing outliers from pinning buffers near the uint16 frame-size limit.
+	maxPacketWriterCapacity = 8 * 1024
 )
 
-var packetWriterPool = &sync.Pool{
+var packetWriterPool = sync.Pool{
 	New: func() any {
 		return wire.NewFrameWriter(packetWriterCapacity)
 	},
@@ -29,8 +31,12 @@ func newFrameWriter(opcode byte) *wire.Writer {
 	return w
 }
 
+func poolable(w *wire.Writer) bool {
+	return w.Cap() <= maxPacketWriterCapacity
+}
+
 func releaseFrameWriter(w *wire.Writer) {
-	if cap(w.Frame()) > maxPacketWriterCapacity {
+	if !poolable(w) {
 		return
 	}
 	packetWriterPool.Put(w)

@@ -108,6 +108,11 @@ func (w *Writer) Bytes() []byte {
 	return w.buf[w.payloadOffset:]
 }
 
+// Cap returns the capacity of w's backing buffer.
+func (w *Writer) Cap() int {
+	return cap(w.buf)
+}
+
 // Frame returns the assembled payload behind a little-endian frame length
 // header. Writers built with NewFrameWriter backfill that header in place.
 func (w *Writer) Frame() []byte {
