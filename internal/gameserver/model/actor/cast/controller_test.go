@@ -128,6 +128,20 @@ func TestCanCastChecksCostsItemsReuseAndMute(t *testing.T) {
 	}
 }
 
+func TestCanCastRejectsAllSkillsDisabled(t *testing.T) {
+	def := modelskill.Definition{ID: 1, Level: 1}
+
+	actor := &testActor{mp: 100, hp: 100, allDisabled: true}
+	if err := NewController(actor).CanCast(testTarget{}, def); !errors.Is(err, ErrAllSkillsDisabled) {
+		t.Fatalf("CanCast() error = %v, want ErrAllSkillsDisabled", err)
+	}
+
+	actor.allDisabled = false
+	if err := NewController(actor).CanCast(testTarget{}, def); err != nil {
+		t.Fatalf("CanCast() error = %v, want nil once the lock clears", err)
+	}
+}
+
 func TestCanCastRejectsSelfCubicSkillWhenCubicListFull(t *testing.T) {
 	def := modelskill.Definition{
 		ID: 1, Level: 1, SkillType: "SUMMON", IsCubic: true, Target: modelskill.TargetSelf,
@@ -489,10 +503,14 @@ type testActor struct {
 	disabled     []testCooldown
 	reuses       []testReuse
 
-	cubicFull bool
+	cubicFull   bool
+	allDisabled bool
 }
 
 func (a *testActor) CubicListFull() bool { return a.cubicFull }
+
+func (a *testActor) AllSkillsDisabled() bool { return a.allDisabled }
+func (a *testActor) EnableAllSkills()        { a.allDisabled = false }
 
 type testCooldown struct {
 	key   int32

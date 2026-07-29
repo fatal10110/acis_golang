@@ -156,9 +156,19 @@ func (c *Character) SkillReuseTimers(now time.Time) []effect.ReuseTimer {
 }
 
 // SkillDisabled reports whether key is still waiting for its reuse delay.
+// Matches Java's Creature.isSkillDisabled: the AllSkillsDisabled lock only
+// short-circuits every key when at least one skill is already tracked as
+// disabled (Creature.java:1586-1590) — with no skill on cooldown at all, the
+// lock has no effect here.
 func (c *Character) SkillDisabled(key int32) bool {
 	c.skills.mu.Lock()
 	defer c.skills.mu.Unlock()
+	if len(c.skills.disabled) == 0 {
+		return false
+	}
+	if c.AllSkillsDisabled() {
+		return true
+	}
 	expiresAt, ok := c.skills.disabled[key]
 	if !ok {
 		return false

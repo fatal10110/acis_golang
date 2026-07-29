@@ -205,7 +205,7 @@ func (l *GameClientLink) attachLivePlayer(client *Client, c *player.Character, t
 	if err != nil {
 		return nil, fmt.Errorf("attach live player: %w", err)
 	}
-	c.Live = creatureLive
+	c.AttachLive(creatureLive)
 	moveCtl, err := move.NewController(c.Move(), c)
 	if err != nil {
 		return nil, fmt.Errorf("attach live player: %w", err)
