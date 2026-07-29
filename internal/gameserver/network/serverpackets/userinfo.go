@@ -51,6 +51,13 @@ type UserInfoSnapshot struct {
 	Items     []*item.Instance
 }
 
+// EncodeUserInfo builds the UserInfo packet payload for an unframed send.
+func EncodeUserInfo(s UserInfoSnapshot) []byte {
+	w := wire.NewPacketWriter(OpcodeUserInfo)
+	writeUserInfo(w, s)
+	return w.Bytes()
+}
+
 // FrameUserInfo builds the UserInfo packet for s as an owned frame.
 func FrameUserInfo(s UserInfoSnapshot) wire.Frame {
 	w := newFrameWriter(OpcodeUserInfo)
