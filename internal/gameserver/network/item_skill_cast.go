@@ -39,7 +39,7 @@ func (l *GameClientLink) useItemAICast(live *livePlayer, inv *itemcontainer.Inve
 	}
 
 	beforeVitals := live.Vitals()
-	controller := live.castController()
+	controller := l.castController(live)
 	started, err := actorcast.StartItemSkill(actorcast.ItemSkillRequest{
 		Now:         time.Now(),
 		Controller:  controller,
@@ -110,7 +110,7 @@ func (l *GameClientLink) useItemAICast(live *livePlayer, inv *itemcontainer.Inve
 			sendMagicStatusUpdate(live, beforeVitals)
 		},
 		Failed: func(err error) {
-			sendMagicCastFailure(live, def, err)
+			sendMagicCastFailureReason(live, def, err)
 			sendMagicStatusUpdate(live, beforeVitals)
 		},
 	})

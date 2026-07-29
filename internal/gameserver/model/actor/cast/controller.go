@@ -49,6 +49,23 @@ type cubicLister interface {
 	CubicListFull() bool
 }
 
+// signetGroundExiter is the optional owner surface an abort uses to drop a
+// live ground-signet effect, matching the reference exiting the actor's
+// first SIGNET_GROUND effect on every stop. An owner that cannot hold one
+// simply doesn't implement it.
+type signetGroundExiter interface {
+	ExitSignetGround()
+}
+
+// allSkillsDisabler is the optional owner surface for the blanket
+// skill-lock an abort lifts. No owner implements it yet: nothing in the
+// port installs the lock in the first place, so the funnel below is wired
+// but inert until that state exists.
+type allSkillsDisabler interface {
+	AllSkillsDisabled() bool
+	EnableAllSkills()
+}
+
 // Actor is the owner state a cast controller reads and updates while
 // validating and advancing casts. Status implementations own stat
 // calculation; the controller only consumes already-resolved costs, speeds,
@@ -137,6 +154,7 @@ type Controller struct {
 	castSeq   uint64
 	timers    []scheduledTimer
 	afterFunc afterFunc
+	onAbort   func()
 	log       zerolog.Logger
 }
 
@@ -151,6 +169,17 @@ func (c *Controller) SetLogger(log zerolog.Logger) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.log = log
+}
+
+// SetOnAbort registers the observer fired once whenever a cast that was
+// actually in flight is aborted, so the owner can tell the client the cast
+// was cancelled and react to the interruption. It never fires for a natural
+// Finish, nor for a Stop on an idle controller. The observer runs after the
+// controller's lock is released, so it may call back into the controller.
+func (c *Controller) SetOnAbort(f func()) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.onAbort = f
 }
 
 // CastingNow reports whether the actor currently has an active cast.
@@ -249,17 +278,23 @@ func (c *Controller) Start(now time.Time, target any, def modelskill.Definition)
 	return plan, nil
 }
 
-// Hit applies the final MP and HP costs for the active cast.
+// Hit applies the final MP and HP costs for the active cast. It leaves an
+// unaffordable cast in flight for the caller to abort through Stop, so the
+// caller can report why the cast failed before the abort funnel cancels it
+// — the packet order the reference produces.
 func (c *Controller) Hit() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	return c.hitLocked()
+}
+
+func (c *Controller) hitLocked() error {
 	if !c.casting {
 		return ErrNotCasting
 	}
 
 	if mp := c.actor.MPCost(c.current); mp > 0 {
 		if mp > c.actor.MP() {
-			c.clearLocked()
 			return ErrNotEnoughMP
 		}
 		c.actor.ReduceMP(mp)
@@ -267,7 +302,6 @@ func (c *Controller) Hit() error {
 
 	if hp := c.current.HPConsume; hp > 0 {
 		if hp > c.actor.HP() {
-			c.clearLocked()
 			return ErrNotEnoughHP
 		}
 		c.actor.ReduceHP(hp)
@@ -282,11 +316,46 @@ func (c *Controller) Finish() {
 	c.mu.Unlock()
 }
 
-// Stop aborts and clears the active cast.
+// Stop aborts and clears the active cast. It is the single funnel every
+// abort reason passes through, which is what lets "abort for any reason"
+// behave uniformly without each call site enumerating its own cleanup.
+//
+// The two owner-state steps run unconditionally, as the reference does them
+// ahead of its own casting check; only the abort observer is reserved for a
+// cast that was really in flight.
 func (c *Controller) Stop() {
+	c.exitSignetGround()
+	c.enableAllSkills()
+
 	c.mu.Lock()
-	c.clearLocked()
+	abort := c.abortLocked()
 	c.mu.Unlock()
+	if abort != nil {
+		abort()
+	}
+}
+
+// abortLocked clears the cast and returns the observer the caller must run
+// once it has released mu, or nil when no cast was in flight.
+func (c *Controller) abortLocked() func() {
+	aborted := c.casting
+	c.clearLocked()
+	if !aborted {
+		return nil
+	}
+	return c.onAbort
+}
+
+func (c *Controller) exitSignetGround() {
+	if s, ok := c.actor.(signetGroundExiter); ok {
+		s.ExitSignetGround()
+	}
+}
+
+func (c *Controller) enableAllSkills() {
+	if d, ok := c.actor.(allSkillsDisabler); ok && d.AllSkillsDisabled() {
+		d.EnableAllSkills()
+	}
 }
 
 // CanAbort reports whether an active cast is still inside its interrupt

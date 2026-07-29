@@ -134,6 +134,11 @@ const (
 	// IncreaseEffect/DecreaseForce can grow or shrink it while it's active,
 	// instead of it only ever starting or ending outright.
 	TypeFusion Type = "FUSION"
+	// TypeSignetGround marks the caster-side half of a ground signet: the
+	// effect that owns the signet's world actor for as long as it runs.
+	// Aborting the caster's cast drops it, which is how the signet it
+	// carries stops existing.
+	TypeSignetGround Type = "SIGNET_GROUND"
 	// TypeChanceSkillTrigger installs a live chance-to-trigger-another-skill
 	// condition on its target for as long as the effect is active.
 	TypeChanceSkillTrigger Type = "CHANCE_SKILL_TRIGGER"

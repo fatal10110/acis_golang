@@ -321,7 +321,7 @@ func (h signetHandler) newSignetAntiSummonEffect(def modelskill.Definition, meta
 // own formula inputs, to every living, non-peace-zone creature the actor
 // finds within skill radius.
 func (h signetHandler) newSignetMDamEffect(caster any, def modelskill.Definition, meta effect.Skill, tmpl modelskill.EffectTemplate) *effect.Effect {
-	e := &effect.Effect{Skill: meta, Template: tmpl, Effector: caster, Effected: caster}
+	e := &effect.Effect{Skill: meta, Template: tmpl, Type: effect.TypeSignetGround, Effector: caster, Effected: caster}
 	var actor *npc.EffectPoint
 	e.OnStart = func(*effect.Effect) bool {
 		a, ok := h.spawnActor(caster, def)

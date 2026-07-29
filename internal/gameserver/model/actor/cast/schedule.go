@@ -66,6 +66,7 @@ func (c *Controller) runHit(seq uint64, plan Plan, hooks Hooks) {
 		if hooks.Failed != nil {
 			hooks.Failed(err)
 		}
+		c.Stop()
 		return
 	}
 	if hooks.Hit != nil {
