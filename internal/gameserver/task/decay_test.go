@@ -19,6 +19,10 @@ type decayFakeEffects struct {
 	events []string
 }
 
+type decayNoopEffects struct{}
+
+func (decayNoopEffects) Decay(DecayActor) {}
+
 func (e *decayFakeEffects) Decay(actor DecayActor) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -66,6 +70,52 @@ func TestDecayAddThenTickFiresAfterDeadline(t *testing.T) {
 	}
 	if decay.Tracked(actor) {
 		t.Fatal("actor should be removed after decay fires")
+	}
+}
+
+func TestDecayTickAllocationIsFlat(t *testing.T) {
+	now := time.UnixMilli(0)
+	decay, err := NewDecay(decayNoopEffects{}, func() time.Time { return now })
+	if err != nil {
+		t.Fatalf("NewDecay() error = %v", err)
+	}
+	actors := make([]*decayFakeActor, 128)
+	for i := 0; i < 128; i++ {
+		actors[i] = &decayFakeActor{id: int32(i + 1)}
+	}
+	tick := func() {
+		for _, actor := range actors {
+			decay.Add(actor, -time.Second)
+		}
+		decay.Tick()
+	}
+	tick()
+	for i, entry := range decay.scratch {
+		if entry.actor != nil {
+			t.Fatalf("scratch[%d] retains actor after Tick", i)
+		}
+	}
+
+	if allocs := testing.AllocsPerRun(100, tick); allocs != 0 {
+		t.Fatalf("AllocsPerRun(128 actors) = %v, want 0", allocs)
+	}
+}
+
+func BenchmarkDecayTickManyActors(b *testing.B) {
+	now := time.UnixMilli(0)
+	decay, err := NewDecay(decayNoopEffects{}, func() time.Time { return now })
+	if err != nil {
+		b.Fatal(err)
+	}
+	for i := 0; i < 4096; i++ {
+		decay.Add(&decayFakeActor{id: int32(i + 1)}, time.Hour)
+	}
+	decay.Tick()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		decay.Tick()
 	}
 }
 
@@ -137,17 +187,30 @@ func TestDecayAddReplacesExistingDeadline(t *testing.T) {
 func TestDecayConcurrentAddAndTick(t *testing.T) {
 	effects := &decayFakeEffects{}
 	decay, _ := NewDecay(effects, nil)
+	actors := make([]*decayFakeActor, 100)
+	for i := range actors {
+		actors[i] = &decayFakeActor{id: int32(i)}
+	}
 
 	var wg sync.WaitGroup
-	for i := 0; i < 100; i++ {
-		wg.Add(1)
-		go func(id int32) {
-			defer wg.Done()
-			actor := &decayFakeActor{id: id}
+	wg.Add(3)
+	go func() {
+		defer wg.Done()
+		for _, actor := range actors {
 			decay.Add(actor, 0)
-			decay.Tick()
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for _, actor := range actors {
 			decay.Cancel(actor)
-		}(int32(i))
-	}
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for range actors {
+			decay.Tick()
+		}
+	}()
 	wg.Wait()
 }
