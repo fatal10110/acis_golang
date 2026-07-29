@@ -39,6 +39,10 @@ type attackStanceFakeEffects struct {
 	events []string
 }
 
+type attackStanceNoopEffects struct{}
+
+func (attackStanceNoopEffects) AutoAttackStop(AttackStanceActor) {}
+
 func (e *attackStanceFakeEffects) AutoAttackStop(actor AttackStanceActor) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -89,6 +93,92 @@ func TestAttackStanceAddRefreshesTimeoutAndFiresCubics(t *testing.T) {
 	if stance.InAttackStance(actor) {
 		t.Fatal("actor should be removed after timeout")
 	}
+}
+
+func TestAttackStanceTickAllocationIsFlat(t *testing.T) {
+	base := time.UnixMilli(0)
+	now := base
+	stance, err := NewAttackStance(attackStanceNoopEffects{}, func() time.Time { return now })
+	if err != nil {
+		t.Fatalf("NewAttackStance() error = %v", err)
+	}
+	actors := make([]*attackStanceFakeActor, 128)
+	for i := 0; i < 128; i++ {
+		actors[i] = &attackStanceFakeActor{id: int32(i + 1)}
+	}
+	tick := func() {
+		now = base
+		for _, actor := range actors {
+			stance.Add(actor)
+		}
+		now = base.Add(AttackStancePeriod)
+		stance.Tick()
+	}
+	tick()
+	for i, entry := range stance.scratch {
+		if entry.actor != nil {
+			t.Fatalf("scratch[%d] retains actor after Tick", i)
+		}
+	}
+
+	if allocs := testing.AllocsPerRun(100, tick); allocs != 0 {
+		t.Fatalf("AllocsPerRun(128 actors) = %v, want 0", allocs)
+	}
+}
+
+func BenchmarkAttackStanceTickManyActors(b *testing.B) {
+	now := time.UnixMilli(0)
+	stance, err := NewAttackStance(attackStanceNoopEffects{}, func() time.Time { return now })
+	if err != nil {
+		b.Fatal(err)
+	}
+	for i := 0; i < 4096; i++ {
+		stance.Add(&attackStanceFakeActor{id: int32(i + 1)})
+	}
+	stance.Tick()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		stance.Tick()
+	}
+}
+
+func TestAttackStanceConcurrentAccess(t *testing.T) {
+	stance, err := NewAttackStance(attackStanceNoopEffects{}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	actors := make([]*attackStanceFakeActor, 20)
+	for i := range actors {
+		actors[i] = &attackStanceFakeActor{id: int32(i + 1)}
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(3)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 200; i++ {
+			for _, actor := range actors {
+				stance.Add(actor)
+			}
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 200; i++ {
+			for _, actor := range actors {
+				stance.Remove(actor)
+			}
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 200; i++ {
+			stance.Tick()
+		}
+	}()
+	wg.Wait()
 }
 
 func TestAttackStanceTimeoutAlsoStopsPlayerSummon(t *testing.T) {
