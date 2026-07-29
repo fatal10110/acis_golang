@@ -135,7 +135,7 @@ func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, lo
 		return
 	}
 
-	hostile, err := newLiveHostile(inst, tmpl.RunSpeed, n.geo, n.positions)
+	hostile, err := newLiveHostile(inst, tmpl.RunSpeed, n.geo, n.positions, n.log)
 	if err != nil {
 		n.log.Warn().Err(err).Int32("npc_id", entry.NPCID).Msg("spawn: cannot build live npc")
 		return

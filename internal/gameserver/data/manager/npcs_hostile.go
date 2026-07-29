@@ -7,6 +7,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
+	"github.com/rs/zerolog"
 )
 
 type locatedRef struct{ move.Actor }
@@ -17,7 +18,7 @@ type statOwnerRef struct{ effect.StatOwner }
 // controller (over the Hostile's lifetime movement state) and a real attack
 // controller, resolving their mutual construction-order dependency on the
 // finished Hostile via locatedRef/creatureActorRef/statOwnerRef.
-func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *task.PositionUpdates) (*npc.Hostile, error) {
+func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *task.PositionUpdates, log zerolog.Logger) (*npc.Hostile, error) {
 	statRef := &statOwnerRef{}
 	live, err := creature.NewLive(inst.Home, speed, geo, statRef)
 	if err != nil {
@@ -33,6 +34,8 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 
 	actorRef := &creatureActorRef{}
 	attackCtl := attack.NewAttackable(actorRef)
+	live.Move().SetLogger(log)
+	attackCtl.SetLogger(log)
 
 	hostile, err := npc.NewHostile(inst, live, moveCtl, attackCtl)
 	if err != nil {

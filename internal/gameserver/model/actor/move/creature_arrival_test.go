@@ -1,10 +1,64 @@
 package move
 
 import (
+	"bytes"
+	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/rs/zerolog"
 )
+
+func TestArrivalTimerRecoversPanickingHookAndRunsNextMove(t *testing.T) {
+	buf := &syncMoveBuffer{}
+	mover, err := NewCreatureMove(location.Location{}, 1_000_000, &recordingGeo{canMove: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mover.SetLogger(zerolog.New(buf))
+	mover.SetArrivedHook(func() { panic("move boom") })
+	if _, err := mover.MoveToLocation(location.Location{X: 1}); err != nil {
+		t.Fatal(err)
+	}
+
+	deadline := time.Now().Add(time.Second)
+	for !strings.Contains(buf.String(), "move boom") {
+		if time.Now().After(deadline) {
+			t.Fatalf("recovered panic log = %q, want panic value", buf.String())
+		}
+		time.Sleep(time.Millisecond)
+	}
+
+	done := make(chan struct{})
+	mover.SetArrivedHook(func() { close(done) })
+	if _, err := mover.MoveToLocation(location.Location{X: 2}); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("move scheduled after panicking arrival hook did not complete")
+	}
+}
+
+type syncMoveBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *syncMoveBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *syncMoveBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
+}
 
 func TestCreatureMove_MoveToLocationFiresArrivedOnceDurationElapses(t *testing.T) {
 	origin := location.Location{X: 0, Y: 0, Z: 0}
