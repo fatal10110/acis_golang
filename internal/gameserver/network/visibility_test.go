@@ -1,8 +1,10 @@
 package network
 
 import (
+	"bytes"
 	"encoding/binary"
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -121,5 +123,50 @@ func TestLivePlayerForgetSkipsObjectsItWouldNotDiscover(t *testing.T) {
 
 	if len(frames.frames) != 0 {
 		t.Fatalf("frames for non-live tracked object = %x, want none", frames.frames)
+	}
+}
+
+func TestLivePlayerForgetDoesNotBlockOnFullVisibilityQueue(t *testing.T) {
+	cipher, err := NewCipher(bytes.Repeat([]byte{0x11}, keySize))
+	if err != nil {
+		t.Fatalf("NewCipher: %v", err)
+	}
+	conn := fullQueueConn(t)
+
+	player := newTestLivePlayer(t, 1, &frameCapture{})
+	player.visibilitySend = NewSession(conn, cipher).trySendFrame
+	done := make(chan struct{})
+	go func() {
+		player.Forget(player)
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("Forget blocked on a full visibility queue")
+	}
+}
+
+func TestLivePlayerDiscoverDroppedItemDoesNotBlockOnFullVisibilityQueue(t *testing.T) {
+	cipher, err := NewCipher(bytes.Repeat([]byte{0x11}, keySize))
+	if err != nil {
+		t.Fatalf("NewCipher: %v", err)
+	}
+	conn := fullQueueConn(t)
+	s := NewSession(conn, cipher)
+
+	player := newTestLivePlayer(t, 1, &frameCapture{})
+	player.Character.SetFrameSender(s.SendFrame)
+	player.visibilitySend = s.trySendFrame
+	item := &visibleGroundItem{id: 2, itemID: 57, count: 1, dropperID: 1}
+	done := make(chan struct{})
+	go func() {
+		player.Discover(item)
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("Discover blocked on a full visibility queue for a dropped item")
 	}
 }

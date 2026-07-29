@@ -145,6 +145,29 @@ func (c *Conn) SendFrame(frame wire.Frame) bool {
 	return false
 }
 
+// trySendFrame queues a frame only when the outbound queue has capacity. It
+// takes ownership of frame and releases it when the queue is full or closed.
+func (c *Conn) trySendFrame(frame wire.Frame) bool {
+	if c.trySend(queuedWrite{frame: frame}) {
+		return true
+	}
+	frame.Release()
+	return false
+}
+
+// abort closes a connection without waiting for its writer to drain. It is
+// used when a client can no longer decode its ordered packet stream.
+func (c *Conn) abort() {
+	c.mu.Lock()
+	if !c.closed {
+		c.log.Warn().Msg("visibility queue full, aborting connection")
+		c.closed = true
+		close(c.out)
+	}
+	c.mu.Unlock()
+	_ = c.Conn.Close()
+}
+
 func (c *Conn) send(queued queuedWrite) bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -160,6 +183,25 @@ func (c *Conn) send(queued queuedWrite) bool {
 	case c.out <- queued:
 		return true
 	case <-c.stopping:
+		return false
+	}
+}
+
+func (c *Conn) trySend(queued queuedWrite) bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if c.closed {
+		return false
+	}
+	select {
+	case <-c.stopping:
+		return false
+	default:
+	}
+	select {
+	case c.out <- queued:
+		return true
+	default:
 		return false
 	}
 }
