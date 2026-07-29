@@ -70,6 +70,15 @@ type summonSkillEntry struct {
 	DoorOnly bool
 }
 
+const sinEaterNPCID = 12564
+
+var sinEaterActionStrings = [...]string{
+	"special skill? Abuses in this kind of place, can turn blood Knots...!",
+	"Hey! Brother! What do you anticipate to me?",
+	"shouts ha! Flap! Flap! Response?",
+	", has not hit...!",
+}
+
 // summonSkillActionTable mirrors every commanded special-skill case in
 // Java's RequestActionUse.runImpl. Action 32 (Wild Hog Cannon Mode Change)
 // is intentionally absent: the reference's own case body is commented out,
@@ -86,10 +95,7 @@ var summonSkillActionTable = map[int32]summonSkillEntry{
 	47:   {SkillID: 4260, TargetKind: summonSkillTargetClicked},
 	48:   {SkillID: 4068, TargetKind: summonSkillTargetClicked},
 	1000: {SkillID: 4079, TargetKind: summonSkillTargetClicked, DoorOnly: true},
-	// 1001 (Sin Eater's Ultimate Bombastic Buster) targets the summon
-	// itself in Java. The reference's own 10%-chance NpcSay flavor line on
-	// a successful cast is tracked separately, not part of the skill-cast
-	// mechanism this table drives.
+	// 1001 (Sin Eater's Ultimate Bombastic Buster) targets the summon itself.
 	1001: {SkillID: 4139, TargetKind: summonSkillTargetSelf},
 	1003: {SkillID: 4710, TargetKind: summonSkillTargetClicked},
 	1004: {SkillID: 4711, TargetKind: summonSkillTargetOwner},
@@ -160,7 +166,9 @@ func (l *GameClientLink) handleSummonSkillUse(live *livePlayer, req clientpacket
 
 	target := l.summonSkillTarget(live, actor, entry.TargetKind)
 	if !doorOnlyBlocked(entry, target) {
-		actor.TryUseSkill(entry.SkillID, target)
+		if actor.TryUseSkill(entry.SkillID, target) && req.ActionID == 1001 && actor.NPCID() == sinEaterNPCID && actor.Roll(100) < 10 {
+			actor.BroadcastFrame(serverpackets.FrameNpcSay(actor.ObjectID(), actor.NPCID(), serverpackets.SayTypeAll, sinEaterActionStrings[actor.Roll(len(sinEaterActionStrings))]))
+		}
 	}
 	live.SendFrame(serverpackets.FrameActionFailed())
 	return true
