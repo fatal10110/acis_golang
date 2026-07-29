@@ -195,7 +195,6 @@ func TestPetGetItemPicksUpGroundItem(t *testing.T) {
 
 	assertOpcodeSequence(t, capture.frames,
 		serverpackets.OpcodeGetItem,
-		serverpackets.OpcodeDeleteObject,
 		serverpackets.OpcodePetInventoryUpdate,
 	)
 	r := wire.NewReader(capture.frames[0][1:])
@@ -209,8 +208,8 @@ func TestPetGetItemPicksUpGroundItem(t *testing.T) {
 	if x != 10 || y != 20 || z != 30 {
 		t.Fatalf("GetItem location = (%d,%d,%d), want (10,20,30)", x, y, z)
 	}
-	if _, ok := state.Object(ground.ObjectID()); ok {
-		t.Fatalf("world.Object(%d) still present after pickup", ground.ObjectID())
+	if _, ok := state.Object(ground.ObjectID()); !ok {
+		t.Fatalf("world.Object(%d) missing after pickup — ground item must remain invisible in the world", ground.ObjectID())
 	}
 	if got := drops.Len(); got != 0 {
 		t.Fatalf("ground item tracker Len = %d, want 0", got)
@@ -252,7 +251,6 @@ func TestPetGetItemMergesStackAndDeletesGroundRow(t *testing.T) {
 
 	assertOpcodeSequence(t, capture.frames,
 		serverpackets.OpcodeGetItem,
-		serverpackets.OpcodeDeleteObject,
 		serverpackets.OpcodePetInventoryUpdate,
 	)
 	petStack := petInv.ItemByTemplateID(item.AdenaID)
@@ -447,15 +445,11 @@ func TestGameClientLinkRequestPetGetItemDispatch(t *testing.T) {
 		t.Fatalf("GetItem ground id = %d, want %d", got, groundID)
 	}
 	reply = c.read()
-	if reply[0] != serverpackets.OpcodeDeleteObject {
-		t.Fatalf("pickup delete opcode = %#x, want DeleteObject (%#x)", reply[0], serverpackets.OpcodeDeleteObject)
-	}
-	reply = c.read()
 	if reply[0] != serverpackets.OpcodePetInventoryUpdate {
 		t.Fatalf("pickup inventory opcode = %#x, want PetInventoryUpdate (%#x)", reply[0], serverpackets.OpcodePetInventoryUpdate)
 	}
-	if _, ok := state.Object(groundID); ok {
-		t.Fatalf("world.Object(%d) still present after pickup", groundID)
+	if _, ok := state.Object(groundID); !ok {
+		t.Fatalf("world.Object(%d) missing after pickup — ground item must remain invisible in the world", groundID)
 	}
 	if stack := petInv.ItemByTemplateID(item.AdenaID); stack == nil || stack.Count != 40 || stack.OwnerID != pet.ObjectID() {
 		t.Fatalf("pet stack = %+v, want 40 adena", stack)

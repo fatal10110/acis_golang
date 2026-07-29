@@ -1,7 +1,5 @@
 # Adena Pickup Fix
 
-<system-reminder>
-
 ## Issue Description
 Clicking on Adena (or Ancient Adena) on the ground after killing mobs results in:
 - Client shows "picking" animation briefly

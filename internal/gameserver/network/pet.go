@@ -3,14 +3,12 @@ package network
 import (
 	"context"
 
-	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/petitem"
-	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 func (l *GameClientLink) activePet(live *livePlayer) (*summon.Actor, *itemcontainer.Inventory, bool) {
@@ -157,7 +155,6 @@ func (l *GameClientLink) petGetItem(ctx context.Context, live *livePlayer, req c
 
 	l.broadcastGroundPickup(ground, pet.ObjectID())
 	l.groundItems.Remove(ground)
-	l.world.Despawn(ground)
 
 	l.applyPersistActions(ctx, result.Persist)
 	l.sendPetInventoryUpdate(live, petInv)
@@ -188,21 +185,6 @@ func (l *GameClientLink) petUseItem(ctx context.Context, live *livePlayer, req c
 	}
 	live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessagePetPutOnS1, res.ItemID))
 	l.sendPetInventoryUpdate(live, petInv)
-}
-
-func (l *GameClientLink) broadcastGroundPickup(ground *grounditem.Item, pickerID int32) {
-	if l.world == nil {
-		return
-	}
-	broadcastFrame(func() wire.Frame {
-		return serverpackets.FrameGetItem(ground, pickerID)
-	}, func(send func(frameReceiver)) {
-		l.world.ForEachKnown(ground, func(o world.Tracked) {
-			if receiver, ok := o.(frameReceiver); ok {
-				send(receiver)
-			}
-		})
-	})
 }
 
 func (l *GameClientLink) sendPetInventoryUpdate(live *livePlayer, inv *itemcontainer.Inventory) {

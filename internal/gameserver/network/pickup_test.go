@@ -71,16 +71,12 @@ func TestGameClientLinkPickupGroundItemFullClientFlow(t *testing.T) {
 		t.Fatalf("second Action opcode = %#x, want GetItem (%#x) — the pickup click was silently dropped", reply[0], serverpackets.OpcodeGetItem)
 	}
 	reply = c.read()
-	if reply[0] != serverpackets.OpcodeDeleteObject {
-		t.Fatalf("pickup follow-up opcode = %#x, want DeleteObject (%#x) — the item never disappears from the ground", reply[0], serverpackets.OpcodeDeleteObject)
-	}
-	reply = c.read()
 	if reply[0] != serverpackets.OpcodeInventoryUpdate {
 		t.Fatalf("pickup follow-up opcode = %#x, want InventoryUpdate (%#x)", reply[0], serverpackets.OpcodeInventoryUpdate)
 	}
 
-	if _, ok := state.Object(ground.ObjectID()); ok {
-		t.Fatalf("world.Object(%d) still present after pickup", ground.ObjectID())
+	if _, ok := state.Object(ground.ObjectID()); !ok {
+		t.Fatalf("world.Object(%d) missing after pickup — ground item must remain invisible in the world", ground.ObjectID())
 	}
 
 	// Movement must still work after the pickup resolves.
@@ -122,11 +118,10 @@ func TestPickupLiveGroundItemMovesItemAndDespawns(t *testing.T) {
 
 	assertOpcodeSequence(t, capture.frames,
 		serverpackets.OpcodeGetItem,
-		serverpackets.OpcodeDeleteObject,
 		serverpackets.OpcodeInventoryUpdate,
 	)
-	if _, ok := state.Object(ground.ObjectID()); ok {
-		t.Fatalf("world.Object(%d) still present after pickup", ground.ObjectID())
+	if _, ok := state.Object(ground.ObjectID()); !ok {
+		t.Fatalf("world.Object(%d) missing after pickup — ground item must remain invisible in the world", ground.ObjectID())
 	}
 	if got := drops.Len(); got != 0 {
 		t.Fatalf("ground item tracker Len = %d, want 0", got)

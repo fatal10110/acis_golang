@@ -79,7 +79,6 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 	l.broadcastGroundPickup(ground, live.ObjectID())
 	l.broadcastPickupAttention(live, ground)
 	l.groundItems.Remove(ground)
-	l.world.Despawn(ground)
 	l.lockPickupParalysis(live)
 
 	l.applyPersistActions(ctx, res.Persist)
