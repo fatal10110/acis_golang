@@ -214,9 +214,9 @@ func (h *Hostile) broadcastShotRecharge(skillID int32) {
 				frame = serverpackets.FrameMagicSkillUse(self, self, skillID, 1, 0, 0, false)
 				built = true
 			}
-			copy, copied := serverpackets.CopyFrame(frame)
+			owned, copied := serverpackets.CopyFrame(frame)
 			if copied {
-				receiver.SendFrame(copy)
+				receiver.SendFrame(owned)
 			}
 		}
 	})
@@ -429,9 +429,9 @@ func (h *Hostile) broadcastFrame(build func() wire.Frame) {
 				frame = build()
 				built = true
 			}
-			copy, copied := serverpackets.CopyFrame(frame)
+			owned, copied := serverpackets.CopyFrame(frame)
 			if copied {
-				receiver.SendFrame(copy)
+				receiver.SendFrame(owned)
 			}
 		}
 	}

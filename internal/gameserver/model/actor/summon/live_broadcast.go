@@ -20,9 +20,9 @@ func (a *Actor) BroadcastFrame(frame wire.Frame) {
 		if !ok {
 			return
 		}
-		copy, ok := serverpackets.CopyFrame(frame)
+		owned, ok := serverpackets.CopyFrame(frame)
 		if ok {
-			receiver.SendFrame(copy)
+			receiver.SendFrame(owned)
 		}
 	})
 }
