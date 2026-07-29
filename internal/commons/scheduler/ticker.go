@@ -20,9 +20,8 @@ type Ticker struct {
 
 // Start launches a goroutine that calls fn every period, starting after the
 // first period elapses. A panic inside fn is recovered and logged so one bad
-// tick never stops later ticks or crashes the process. If log is nil,
-// The zero logger disables logging. Callers must call Stop to release the
-// goroutine.
+// tick never stops later ticks or crashes the process. A zero-value logger
+// disables logging. Callers must call Stop to release the goroutine.
 func Start(period time.Duration, fn func(), log zerolog.Logger) *Ticker {
 
 	t := &Ticker{stop: make(chan struct{}), done: make(chan struct{})}
