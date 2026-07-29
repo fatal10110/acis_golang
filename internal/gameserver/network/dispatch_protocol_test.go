@@ -1,7 +1,9 @@
 package network
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"net"
 	"testing"
 	"time"
@@ -105,5 +107,15 @@ func TestGameClientLinkMalformedLivePacketsDoNotDisconnect(t *testing.T) {
 				t.Fatalf("post-malformed opcode = %#x, want ItemList (%#x)", reply[0], serverpackets.OpcodeItemList)
 			}
 		})
+	}
+}
+
+func TestGameClientLinkMalformedCharacterSelectPacketCloses(t *testing.T) {
+	c, _, _, _ := newLinkedGameClient(t)
+	c.send(encodeSingleOpcode(clientpackets.OpcodeRequestPledgeCrest))
+
+	c.conn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
+	if _, err := c.conn.Read(make([]byte, 1)); !errors.Is(err, io.EOF) {
+		t.Fatalf("malformed character-select packet read error = %v, want EOF", err)
 	}
 }
