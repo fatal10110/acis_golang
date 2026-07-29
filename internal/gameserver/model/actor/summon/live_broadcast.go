@@ -2,6 +2,7 @@ package summon
 
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -9,6 +10,7 @@ import (
 // receiving one (i.e. a connected player session), from this summon's own
 // known list. It is a no-op until SpawnBesideOwner has attached a world.
 func (a *Actor) BroadcastFrame(frame wire.Frame) {
+	defer frame.Release()
 	if a.world == nil {
 		return
 	}
@@ -17,6 +19,6 @@ func (a *Actor) BroadcastFrame(frame wire.Frame) {
 		if !ok {
 			return
 		}
-		receiver.SendFrame(frame)
+		receiver.SendFrame(serverpackets.CopyFrame(frame))
 	})
 }

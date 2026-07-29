@@ -21,3 +21,11 @@ func TestFrameWriterPoolability(t *testing.T) {
 		t.Fatal("oversized writer should be dropped")
 	}
 }
+
+func TestCopyFrameShortSourceReturnsEmptyFrame(t *testing.T) {
+	frame := CopyFrame(wire.BorrowedFrame([]byte{1}))
+	defer frame.Release()
+	if len(frame.Bytes()) != 0 {
+		t.Fatalf("CopyFrame short source = %x, want empty frame", frame.Bytes())
+	}
+}

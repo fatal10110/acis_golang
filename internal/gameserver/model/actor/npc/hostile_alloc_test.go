@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -28,6 +29,23 @@ func TestHostileBroadcastMoveUsesReusableKnownSnapshot(t *testing.T) {
 	}
 }
 
+func TestHostileBroadcastFrameBuildsOnceForKnownObservers(t *testing.T) {
+	hostile, _, receivers := newBroadcastMoveFixture(t, 2)
+	builds := 0
+	hostile.broadcastFrame(func() wire.Frame {
+		builds++
+		return wire.BorrowedFrame(wire.FrameBytes([]byte{1, 2, 3}))
+	})
+	if builds != 1 {
+		t.Fatalf("frame builds = %d, want 1", builds)
+	}
+	for _, receiver := range receivers {
+		if receiver.frames != 1 {
+			t.Fatalf("receiver %d frames = %d, want 1", receiver.id, receiver.frames)
+		}
+	}
+}
+
 func BenchmarkHostileBroadcastMoveKnownObservers(b *testing.B) {
 	hostile, event, _ := newBroadcastMoveFixture(b, 50)
 	hostile.BroadcastMove(event)
@@ -36,6 +54,26 @@ func BenchmarkHostileBroadcastMoveKnownObservers(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		hostile.BroadcastMove(event)
+	}
+}
+
+func BenchmarkHostileBroadcastAttackKnownObservers(b *testing.B) {
+	hostile, _, _ := newBroadcastMoveFixture(b, 50)
+	snapshot := attack.Snapshot{
+		AttackerID: hostile.ObjectID(),
+		X:          100,
+		Y:          200,
+		Z:          -50,
+		Hits: []attack.SnapshotHit{
+			{TargetID: 2, Damage: 100, Flags: 1},
+			{TargetID: 3, Damage: 200},
+		},
+	}
+	hostile.BroadcastAttack(snapshot)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		hostile.BroadcastAttack(snapshot)
 	}
 }
 
