@@ -157,6 +157,62 @@ func TestGameClientLinkSummonSkillUseResolvesTargetKindAndDispatches(t *testing.
 	}
 }
 
+func TestGameClientLinkSinEaterSkillUseBroadcastsFlavorLine(t *testing.T) {
+	if got, want := sinEaterActionStrings, [4]string{
+		"special skill? Abuses in this kind of place, can turn blood Knots...!",
+		"Hey! Brother! What do you anticipate to me?",
+		"shouts ha! Flap! Flap! Response?",
+		", has not hit...!",
+	}; got != want {
+		t.Fatalf("Sin Eater flavor strings = %q, want %q", got, want)
+	}
+
+	state := world.New()
+	frames := &frameCapture{}
+	live := newTestLivePlayer(t, 100, frames)
+	state.Spawn(live, 0, 0, 0, 0)
+
+	liveSummon := summon.NewPet(summon.PetConfig{
+		ObjectID: 500, Owner: live, NPCID: 12564, Level: live.LevelValue(),
+		Skills: map[int]int{4139: 1},
+		Roll:   func(int) int { return 0 },
+	})
+	brain := &recordingNetworkSummonAI{}
+	liveSummon.SetAI(brain)
+	summon.SpawnBesideOwner(state, liveSummon, live, location.Location{})
+	frames.frames = nil
+
+	gcl := &GameClientLink{world: state}
+	if !gcl.handleSummonActionUse(live, clientpackets.RequestActionUse{ActionID: 1001}) {
+		t.Fatal("handleSummonActionUse returned false for Sin Eater skill action")
+	}
+	if got := frameOpcodes(frames.frames); string(got) != string([]byte{serverpackets.OpcodeNpcSay, serverpackets.OpcodeActionFailed}) {
+		t.Fatalf("Sin Eater skill-use opcodes = %x, want NpcSay then ActionFailed", got)
+	}
+}
+
+func TestGameClientLinkSinEaterSkillUseMissedFlavorRollDoesNotBroadcast(t *testing.T) {
+	state := world.New()
+	frames := &frameCapture{}
+	live := newTestLivePlayer(t, 100, frames)
+	state.Spawn(live, 0, 0, 0, 0)
+
+	liveSummon := summon.NewPet(summon.PetConfig{
+		ObjectID: 500, Owner: live, NPCID: 12564, Level: live.LevelValue(),
+		Skills: map[int]int{4139: 1},
+		Roll:   func(int) int { return 10 },
+	})
+	liveSummon.SetAI(&recordingNetworkSummonAI{})
+	summon.SpawnBesideOwner(state, liveSummon, live, location.Location{})
+	frames.frames = nil
+
+	gcl := &GameClientLink{world: state}
+	gcl.handleSummonActionUse(live, clientpackets.RequestActionUse{ActionID: 1001})
+	if got := frameOpcodes(frames.frames); string(got) != string([]byte{serverpackets.OpcodeActionFailed}) {
+		t.Fatalf("missed Sin Eater flavor-roll opcodes = %x, want ActionFailed only", got)
+	}
+}
+
 func TestGameClientLinkSummonSkillUsePetBeyondLevelGapIsBlocked(t *testing.T) {
 	state := world.New()
 	frames := &frameCapture{}
