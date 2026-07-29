@@ -302,7 +302,7 @@ func (l *GameClientLink) tradeParticipants(session tradebook.Session) (*livePlay
 }
 
 func (l *GameClientLink) transferTradeInventoryItem(ctx context.Context, source, receiver *itemcontainer.Inventory, objectID int32, count int) bool {
-	res, ok, err := l.inventoryService().TransferItem(source, receiver, objectID, count)
+	res, ok, err := l.inventory.TransferItem(source, receiver, objectID, count)
 	if err != nil {
 		l.log.Error().Err(err).Msg("allocate trade item id")
 		return false

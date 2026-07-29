@@ -59,7 +59,7 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 		return true
 	}
 
-	res, failure := l.inventoryService().PickupGround(inv, &ground.Instance, ground.Template, live.ObjectID())
+	res, failure := l.inventory.PickupGround(inv, &ground.Instance, ground.Template, live.ObjectID())
 	switch failure {
 	case invops.PickupOK:
 	case invops.PickupSlotsFull:

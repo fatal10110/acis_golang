@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -198,11 +199,13 @@ func newDirectTradeFixture(t *testing.T) (*GameClientLink, *fakeItemStore, *fram
 	resetCapture(firstCap, secondCap)
 
 	store := newFakeItemStore()
+	ids := &sequentialIDs{next: 1000}
 	link := &GameClientLink{
 		world:         state,
 		itemTemplates: testItemTemplates(),
 		items:         store,
-		ids:           &sequentialIDs{next: 1000},
+		ids:           ids,
+		inventory:     invops.NewService(ids),
 		trades:        tradebook.NewBook(time.Now),
 		log:           zerolog.Nop(),
 	}
