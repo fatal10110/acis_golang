@@ -13,6 +13,12 @@ type dotTarget interface {
 	ReduceHPByDOT(damage float64, effector any, skill Skill)
 }
 
+// statusBroadcaster is implemented by an actor that can push its current
+// vitals to the clients watching it.
+type statusBroadcaster interface {
+	BroadcastStatus()
+}
+
 type lackHPNotifier interface {
 	NotifyEffectRemovedDueLackHP(*Effect)
 }

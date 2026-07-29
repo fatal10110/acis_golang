@@ -74,6 +74,7 @@ type Inventory struct {
 	wornMask    int32
 	totalWeight int
 	updates     []Update
+	notify      func()
 }
 
 // NewInventory returns an empty inventory owned by ownerID: baseLocation
@@ -629,6 +630,21 @@ func (inv *Inventory) DrainUpdates() []Update {
 	return out
 }
 
+// SetUpdateNotifier records the hook fired whenever inv queues a client
+// update, so a server-driven change — an auto-looted kill reward, a task
+// consuming a stack — reaches the owner's client instead of waiting for
+// the next inventory action the owner happens to perform. Passing nil
+// detaches the hook; an inventory without one simply keeps queueing.
+//
+// The hook runs while inv's own lock is held, so it must only hand the
+// inventory off (registering it with the batching task, say) and must not
+// call back into inv.
+func (inv *Inventory) SetUpdateNotifier(notify func()) {
+	inv.mu.Lock()
+	defer inv.mu.Unlock()
+	inv.notify = notify
+}
+
 // HasUpdates reports whether any inventory-change notifications are queued.
 func (inv *Inventory) HasUpdates() bool {
 	inv.mu.Lock()
@@ -666,9 +682,17 @@ func (inv *Inventory) queueUpdateRecordLocked(objectID, templateID int32, count 
 		for i, u := range inv.updates {
 			if u.ObjectID == objectID && u.State == state {
 				inv.updates[i].Count = count
+				inv.notifyLocked()
 				return
 			}
 		}
 	}
 	inv.updates = append(inv.updates, Update{ObjectID: objectID, TemplateID: templateID, Count: count, State: state})
+	inv.notifyLocked()
+}
+
+func (inv *Inventory) notifyLocked() {
+	if inv.notify != nil {
+		inv.notify()
+	}
 }

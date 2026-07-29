@@ -20,6 +20,7 @@ func (c *Character) AddExpAndSp(table *LevelTable, tmpl *Template, exp int64, sp
 	if sp >= 0 {
 		c.AddSp(sp)
 	}
+	c.UpdateUserInfo()
 	return leveledUp
 }
 
@@ -30,6 +31,7 @@ func (c *Character) RewardExpAndSp(table *LevelTable, exp int64, sp int) bool {
 		if sp >= 0 {
 			c.AddSp(sp)
 		}
+		c.UpdateUserInfo()
 		return false
 	}
 	return c.AddExpAndSp(table, c.runtimeTemplate, exp, sp)

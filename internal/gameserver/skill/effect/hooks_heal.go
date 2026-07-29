@@ -28,7 +28,19 @@ func healOverTimeAction(e *Effect) bool {
 		return false
 	}
 	target.AddHP(e.Template.Value)
+	broadcastStatus(e.Effected)
 	return true
+}
+
+// broadcastStatus refreshes effected's health bars for everyone watching.
+// A periodic effect action runs outside any client request, so unlike the
+// cast and item paths — which send their own batched StatusUpdate at the
+// call site — nothing else would tell the client the tick happened. Actors
+// with no broadcast hook are left alone.
+func broadcastStatus(effected any) {
+	if b, ok := effected.(statusBroadcaster); ok {
+		b.BroadcastStatus()
+	}
 }
 
 func manaHealStart(e *Effect) bool {

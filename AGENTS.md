@@ -86,6 +86,10 @@ structure.
   client-visible action, answers with a rejection (system message and/or `ActionFailed`), or logs
   the gap and sends `ActionFailed`. Silence is allowed only when the reference is also silent and
   the opcode registers no pending client action; document both reasons at the branch.
+- The packet-impact rule above covers inbound opcodes only. State the server changes on its own —
+  rewards, ticking tasks, effect actions, AI, decay, respawn — is governed by
+  [`docs/agents/server-initiated-updates.md`](docs/agents/server-initiated-updates.md); load it
+  whenever a change touches one of those paths.
 - Done means specified behavior and rejection paths match, packet impact is covered, exact contracts
   have independent evidence, boundaries and ownership remain sound, required checks pass, every
   deferral has a verified milestone-assigned follow-up issue, the diff is scoped, and an issue-closing
@@ -140,6 +144,9 @@ Load only the guide needed for the current work:
   and ast-grep selection with verified bounded commands and fallbacks.
 - [`docs/agents/verification.md`](docs/agents/verification.md): focused checks, final gates, independent
   fixtures, configuration-only validation, and the definition of done.
+- [`docs/agents/server-initiated-updates.md`](docs/agents/server-initiated-updates.md): delivering
+  state the server changes without a client request, runtime hooks instead of `serverpackets`
+  imports in domain packages, and wire-through of ported tasks and adapters.
 - [`docs/agents/model-policy.md`](docs/agents/model-policy.md): evidence-based model and effort
   selection.
 - [`docs/agents/process-skills.md`](docs/agents/process-skills.md): task-risk classification and

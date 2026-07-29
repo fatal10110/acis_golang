@@ -96,7 +96,9 @@ type Character struct {
 	broadcastDie         func()
 	broadcastStatus      func()
 	updateAbnormalEffect func()
+	updateUserInfo       func()
 	broadcastShortBuff   func(ShortBuffUpdate)
+	consumeHerb          func(itemID int32)
 	roll                 func(int) int
 	attackTarget         func(world.Tracked)
 

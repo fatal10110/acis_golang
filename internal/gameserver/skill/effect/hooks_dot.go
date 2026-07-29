@@ -56,6 +56,7 @@ func manaHealOverTimeAction(e *Effect) bool {
 		return false
 	}
 	target.AddMP(e.Template.Value)
+	broadcastStatus(e.Effected)
 	return true
 }
 

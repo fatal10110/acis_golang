@@ -26,6 +26,29 @@ Contract-specific checks supplement unit tests:
 - persistence: integration tests against the expected schema and transaction effects;
 - concurrency: focused `-race` coverage and lifecycle cancellation.
 
+## Server-initiated update checks
+
+Rules for this class of change live in
+[`server-initiated-updates.md`](server-initiated-updates.md); these are its checks. Unit tests assert
+the changed value, not its delivery, so check delivery separately whenever a change touches rewards,
+tasks, effect actions, AI, or any other server-driven path.
+
+Confirm the new state has a live consumer:
+
+```bash
+go run golang.org/x/tools/cmd/deadcode@latest ./cmd/gameserver | rg 'gameserver/task/'
+rg -n --multiline 'func \([a-zA-Z ]*[Ee]ffects\) [A-Z][A-Za-z]*\([^)]*\) *\{\}' cmd/gameserver
+```
+
+The first command lists ticking subsystems no production path constructs; the second lists
+composition-root adapters whose methods are empty stubs. Both mean the subsystem runs, or appears to
+run, while doing nothing. `deadcode` reports a method of an `fx`-provided type as reachable through
+reflection even when nothing calls it, so for those types also confirm a real caller with `rg` before
+concluding the subsystem is wired.
+
+Then confirm the change is delivered: trace the mutating call to a `SendFrame`, a broadcast, or a
+queue that a running task drains, and cover it with a domain test that counts runtime-hook calls.
+
 ## Complete implementation gates
 
 Before claiming completion of a source-code change, require no output from the formatting check and

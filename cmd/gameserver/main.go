@@ -61,6 +61,7 @@ func newGameServerApp(paths gameServerPaths) *fx.App {
 			provideIDAllocator,
 			provideRoster,
 			providePvPFlags,
+			provideInventoryUpdates,
 			provideWorldState,
 			provideGroundItemOptions,
 			provideGroundItems,
@@ -85,6 +86,6 @@ func newGameServerApp(paths gameServerPaths) *fx.App {
 			providePlayerClock,
 			provideGameClientLink,
 		),
-		fx.Invoke(startPvPFlags, startGroundItems, startGroundItemPersistence, startPlayerClock, startGameClock, startWalker, startWater, startShadowItems, startDecay, startAttackStance, startWorldObjects, startRespawnTask, startAI, startPositionUpdates, startEffects, startNpcs, startNpcPersistence, startGameServer),
+		fx.Invoke(startPvPFlags, startGroundItems, startGroundItemPersistence, startPlayerClock, startGameClock, startWalker, startWater, startShadowItems, startDecay, startAttackStance, startWorldObjects, startRespawnTask, startAI, startPositionUpdates, startInventoryUpdates, startEffects, startNpcs, startNpcPersistence, startGameServer),
 	)
 }

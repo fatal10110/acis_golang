@@ -504,3 +504,35 @@ func TestInventory_SlotsNeededFor(t *testing.T) {
 		t.Errorf("SlotsNeededFor() for a brand new non-stackable item = %d, want 1", got)
 	}
 }
+
+// TestInventory_UpdateNotifierFiresOnQueuedUpdate pins the hook a
+// server-driven inventory change relies on: without it an auto-looted kill
+// reward sits in the queue until the owner happens to perform an inventory
+// action of their own.
+func TestInventory_UpdateNotifierFiresOnQueuedUpdate(t *testing.T) {
+	templates := item.NewTable([]*item.Template{
+		{ID: 1, Kind: item.KindEtcItem, Stackable: true, EtcItem: &item.EtcItemDetail{}},
+	})
+	inv := NewPlayerInventory(0x10000001, templates)
+
+	notified := 0
+	inv.SetUpdateNotifier(func() { notified++ })
+
+	inv.AddNew(1, 5, 0x30000001)
+	if notified != 1 {
+		t.Fatalf("notifier calls after AddNew = %d, want 1", notified)
+	}
+
+	// A coalesced update still has to register the inventory: the batch it
+	// merges into may already have been drained.
+	inv.AddNew(1, 5, 0x30000002)
+	if notified != 2 {
+		t.Errorf("notifier calls after coalesced AddNew = %d, want 2", notified)
+	}
+
+	inv.SetUpdateNotifier(nil)
+	inv.AddNew(1, 5, 0x30000003)
+	if notified != 2 {
+		t.Errorf("notifier calls after detach = %d, want 2", notified)
+	}
+}

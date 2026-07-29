@@ -108,18 +108,21 @@ type GameClientLink struct {
 	attackStance  attackStanceTracker
 	positions     *task.PositionUpdates
 	playerClock   *task.PlayerClock
-	restarts      *restart.Table
-	levels        *player.LevelTable
-	playerConfig  PlayerConfig
-	petConfig     petmodel.Config // passed into summon.PetConfig by newPet.
-	inventory     *invops.Service
-	petItems      *petitem.Service
-	trades        *tradebook.Book
-	enchantState  *enchantflow.State
-	enchant       *enchantflow.Service
-	targets       *skilltarget.Registry
-	skillHandlers *handlerskill.Registry
-	log           zerolog.Logger
+	// inventoryUpdates batches InventoryUpdate packets for inventory
+	// changes the server makes on its own, outside a client request.
+	inventoryUpdates *task.InventoryUpdates
+	restarts         *restart.Table
+	levels           *player.LevelTable
+	playerConfig     PlayerConfig
+	petConfig        petmodel.Config // passed into summon.PetConfig by newPet.
+	inventory        *invops.Service
+	petItems         *petitem.Service
+	trades           *tradebook.Book
+	enchantState     *enchantflow.State
+	enchant          *enchantflow.Service
+	targets          *skilltarget.Registry
+	skillHandlers    *handlerskill.Registry
+	log              zerolog.Logger
 
 	// newCipherKey supplies each connection's XOR cipher key; overridden in
 	// tests for a deterministic handshake.
@@ -161,11 +164,14 @@ type GameClientLinkConfig struct {
 	AttackStance  attackStanceTracker
 	Positions     *task.PositionUpdates
 	PlayerClock   *task.PlayerClock
-	Restarts      *restart.Table
-	Levels        *player.LevelTable
-	PlayerConfig  PlayerConfig
-	PetConfig     petmodel.Config
-	Log           zerolog.Logger
+	// InventoryUpdates batches InventoryUpdate packets for inventory
+	// changes the server makes on its own, outside a client request.
+	InventoryUpdates *task.InventoryUpdates
+	Restarts         *restart.Table
+	Levels           *player.LevelTable
+	PlayerConfig     PlayerConfig
+	PetConfig        petmodel.Config
+	Log              zerolog.Logger
 }
 
 // NewGameClientLink builds a GameClientLink from its collaborators.
@@ -196,15 +202,17 @@ func NewGameClientLink(cfg GameClientLinkConfig) *GameClientLink {
 		attackStance:  cfg.AttackStance,
 		positions:     cfg.Positions,
 		playerClock:   cfg.PlayerClock,
-		restarts:      cfg.Restarts,
-		levels:        cfg.Levels,
-		playerConfig:  cfg.PlayerConfig,
-		petConfig:     cfg.PetConfig,
-		inventory:     invops.NewService(cfg.IDs),
-		petItems:      petitem.NewService(cfg.IDs),
-		trades:        tradebook.NewBook(time.Now),
-		enchantState:  enchantflow.NewState(),
-		targets:       skilltarget.NewRegistry(skilltarget.WorldKnown{State: cfg.World}),
+
+		inventoryUpdates: cfg.InventoryUpdates,
+		restarts:         cfg.Restarts,
+		levels:           cfg.Levels,
+		playerConfig:     cfg.PlayerConfig,
+		petConfig:        cfg.PetConfig,
+		inventory:        invops.NewService(cfg.IDs),
+		petItems:         petitem.NewService(cfg.IDs),
+		trades:           tradebook.NewBook(time.Now),
+		enchantState:     enchantflow.NewState(),
+		targets:          skilltarget.NewRegistry(skilltarget.WorldKnown{State: cfg.World}),
 		skillHandlers: handlerskill.NewDefaultRegistryWithSignet(cfg.Skills, handlerskill.SignetDeps{
 			Templates: cfg.NPCs,
 			IDs:       cfg.IDs,

@@ -44,6 +44,9 @@ func (l *GameClientLink) detachLivePlayer(ctx context.Context, live *livePlayer)
 	live.Character.SetFrameSender(nil)
 	live.Character.SetAttackBroadcaster(nil)
 	live.Character.SetDieBroadcaster(nil)
+	if inv := live.Character.Inventory(); inv != nil {
+		inv.SetUpdateNotifier(nil)
+	}
 }
 
 func (l *GameClientLink) notifyPlayerLogout(account string) {

@@ -177,6 +177,28 @@ func (c *Character) SetAbnormalEffectUpdater(update func()) {
 	c.updateAbnormalEffect = update
 }
 
+// SetUserInfoUpdater records the packet-layer hook that resends this
+// character's own UserInfo, the packet carrying its experience, SP and
+// level.
+func (c *Character) SetUserInfoUpdater(update func()) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	c.updateUserInfo = update
+}
+
+// UpdateUserInfo resends this character's UserInfo through the runtime
+// packet hook, mirroring PlayerStatus.addExp() pushing a fresh UserInfo on
+// every experience change — without it the client keeps displaying the
+// experience, SP and level it was last told about.
+func (c *Character) UpdateUserInfo() {
+	c.stateMu.RLock()
+	update := c.updateUserInfo
+	c.stateMu.RUnlock()
+	if update != nil {
+		update()
+	}
+}
+
 // UpdateAbnormalEffect refreshes this character's abnormal-effect icon
 // state through the runtime packet hook, implementing the effect list's
 // abnormalUpdater hook: it fires on every effect start and stop, matching

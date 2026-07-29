@@ -139,3 +139,41 @@ func TestManaHealEffectDefaultsRechargeRateWhenAbsent(t *testing.T) {
 		t.Fatalf("target mp = %v, want 30", target.mp)
 	}
 }
+
+// broadcastingHealTarget records the status broadcasts an over-time tick
+// asks for.
+type broadcastingHealTarget struct {
+	noBonusHealTarget
+	broadcasts int
+}
+
+func (t *broadcastingHealTarget) BroadcastStatus() { t.broadcasts++ }
+
+// TestHealOverTimeTickBroadcastsStatus pins the client notification a
+// periodic heal owes its target: the tick runs outside any client request,
+// so without it the bars keep showing the value the client was last told.
+func TestHealOverTimeTickBroadcastsStatus(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		kind string
+	}{
+		{name: "hp", kind: "HealOverTime"},
+		{name: "mp", kind: "ManaHealOverTime"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			target := &broadcastingHealTarget{noBonusHealTarget: noBonusHealTarget{canBeHealed: true}}
+			e, err := New(Skill{ID: 1}, modelskill.EffectTemplate{Name: tt.kind, Value: 10})
+			if err != nil {
+				t.Fatalf("New() error: %v", err)
+			}
+			e.Effected = target
+
+			if !e.OnAction(e) {
+				t.Fatalf("%s tick rejected a healable target", tt.kind)
+			}
+			if target.broadcasts != 1 {
+				t.Errorf("status broadcasts = %d, want 1", target.broadcasts)
+			}
+		})
+	}
+}
