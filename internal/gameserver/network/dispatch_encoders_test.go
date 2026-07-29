@@ -97,6 +97,12 @@ func encodeUseItem(objectID int32, ctrl bool) []byte {
 	return w.Bytes()
 }
 
+func encodeRequestUnEquipItem(bodySlot int32) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeRequestUnEquipItem)
+	w.WriteInt32(bodySlot)
+	return w.Bytes()
+}
+
 func encodeRequestEnchantItem(objectID int32) []byte {
 	w := wire.NewPacketWriter(clientpackets.OpcodeRequestEnchantItem)
 	w.WriteInt32(objectID)
