@@ -197,7 +197,7 @@ func sendMagicCastFailureReason(live *livePlayer, def modelskill.Definition, err
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotEnoughHP))
 	case errors.Is(err, actorcast.ErrNotEnoughItems):
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotEnoughItems))
-	case errors.Is(err, actorcast.ErrSkillDisabled):
+	case errors.Is(err, actorcast.ErrSkillDisabled), errors.Is(err, actorcast.ErrAllSkillsDisabled):
 		live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1PreparedForReuse, int32(def.ID), int32(def.Level)))
 	case errors.Is(err, actorcast.ErrInvalidTarget):
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageInvalidTarget))

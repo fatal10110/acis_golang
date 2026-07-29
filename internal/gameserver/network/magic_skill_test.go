@@ -11,6 +11,7 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
 
 func TestGameClientLinkMagicSkillUseStartsKnownActiveSkill(t *testing.T) {
@@ -531,5 +532,56 @@ func TestGameClientLinkMagicSkillUseRejectsCubicCastWhenListFull(t *testing.T) {
 	}
 	if ids := character.Character.CubicIDs(); len(ids) != 1 || ids[0] != 1 {
 		t.Fatalf("CubicIDs() after rejected cast = %v, want unchanged [1]", ids)
+	}
+}
+
+// TestGameClientLinkMagicSkillUseRejectsAllSkillsDisabled covers Java's
+// Creature.isSkillDisabled() short-circuit through isAllSkillsDisabled(): a
+// stunned caster with a skill already on cooldown gets the same
+// S1_PREPARED_FOR_REUSE rejection as an ordinary reuse-delay hit, for a
+// skill that has no reuse entry of its own.
+func TestGameClientLinkMagicSkillUseRejectsAllSkillsDisabled(t *testing.T) {
+	store := newMemorySkillSaveStore()
+	skills := skillstate.NewPersistence(store, modelskill.NewTable([]modelskill.Definition{
+		{
+			ID: 12, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+			SkillType: "DUMMY", StaticHitTime: true, StaticReuse: true,
+		},
+	}), store)
+	var objID int32
+	c, _, _, state := newLinkedGameClientWithSkillsSeed(t, skills, func(chars *fakeCharStore, _ *fakeItemStore) {
+		objID = seedSelectableCharacter(t, chars, "player1", "Newbie", 5, 0)
+		store.seedKnown(objID, 0, player.SkillLevels{12: 1})
+	}, 1)
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	obj, ok := state.Player(objID)
+	if !ok {
+		t.Fatalf("player %d not found in world state", objID)
+	}
+	character, ok := obj.(*livePlayer)
+	if !ok {
+		t.Fatalf("world state player %d is not a *livePlayer", objID)
+	}
+	// isSkillDisabled()'s AllSkillsDisabled short-circuit only fires once at
+	// least one skill is already tracked as disabled; put an unrelated skill
+	// on cooldown first, matching Java's own emptiness quirk.
+	character.Character.DisableSkill(99, time.Minute)
+	e, err := effect.New(effect.Skill{ID: 1}, modelskill.EffectTemplate{Name: "Stun"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	character.Character.EffectList().Add(e)
+	c.read() // AbnormalStatusUpdate from the Stun effect landing
+
+	c.send(encodeRequestMagicSkillUse(12, false, false))
+	assertSystemMessageSkillFrame(t, c.read(), serverpackets.SystemMessageS1PreparedForReuse, 12, 1)
+	if reply := c.read(); reply[0] != serverpackets.OpcodeActionFailed {
+		t.Fatalf("follow-up opcode = %#x, want ActionFailed (%#x)", reply[0], serverpackets.OpcodeActionFailed)
 	}
 }
