@@ -138,6 +138,38 @@ func TestBroadcastLiveFrameBuildsOnceForAllRecipients(t *testing.T) {
 	}
 }
 
+func TestBroadcastLiveFrameGivesRecipientsIndependentFrames(t *testing.T) {
+	state := world.New()
+	self := newTestLivePlayer(t, 1, &frameCapture{})
+	observer := newTestLivePlayer(t, 2, &frameCapture{})
+	var selfFrame, observerFrame wire.Frame
+	self.Character.SetFrameSender(func(frame wire.Frame) bool {
+		selfFrame = frame
+		return true
+	})
+	observer.Character.SetFrameSender(func(frame wire.Frame) bool {
+		observerFrame = frame
+		return true
+	})
+	state.Spawn(self, 0, 0, 0, 0)
+	state.Spawn(observer, 100, 0, 0, 0)
+
+	(&GameClientLink{world: state, log: zerolog.Nop()}).broadcastLiveFrame(self, func() wire.Frame {
+		return serverpackets.FrameRevive(self.ObjectID())
+	})
+	defer selfFrame.Release()
+	defer observerFrame.Release()
+
+	if len(selfFrame.Bytes()) <= wire.FrameHeaderSize || len(observerFrame.Bytes()) <= wire.FrameHeaderSize {
+		t.Fatal("recipients did not receive frames")
+	}
+	observerPayload := observerFrame.Bytes()[wire.FrameHeaderSize]
+	selfFrame.Bytes()[wire.FrameHeaderSize] ^= 0xff
+	if observerFrame.Bytes()[wire.FrameHeaderSize] != observerPayload {
+		t.Fatal("mutating one recipient frame changed another recipient frame")
+	}
+}
+
 func TestBroadcastFrameBuildsOnceAndCopiesForRecipients(t *testing.T) {
 	selfFrames := &frameCapture{}
 	observerFrames := &frameCapture{}
