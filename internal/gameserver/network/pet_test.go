@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/petitem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -110,7 +111,8 @@ func TestGiveItemToPetTransfersAndPersists(t *testing.T) {
 	_, petInv := attachTestPet(t, state, live, templates, 12077, nil)
 	capture.frames = nil
 	store := &recordingEnchantItemStore{}
-	gcl := &GameClientLink{world: state, ids: &sequentialIDs{next: 900}, items: store}
+	ids := &sequentialIDs{next: 900}
+	gcl := &GameClientLink{world: state, ids: ids, items: store, petItems: petitem.NewService(ids)}
 
 	gcl.giveItemToPet(context.Background(), live, clientpackets.RequestGiveItemToPet{ObjectID: source.ObjectID, Count: 30})
 
@@ -142,7 +144,8 @@ func TestGetItemFromPetTransfersBackToOwner(t *testing.T) {
 	_, petInv := attachTestPet(t, state, live, templates, 12077, []*item.Instance{petItem})
 	capture.frames = nil
 	store := &recordingEnchantItemStore{}
-	gcl := &GameClientLink{world: state, ids: &sequentialIDs{next: 910}, items: store}
+	ids := &sequentialIDs{next: 910}
+	gcl := &GameClientLink{world: state, ids: ids, items: store, petItems: petitem.NewService(ids)}
 
 	gcl.getItemFromPet(context.Background(), live, clientpackets.RequestGetItemFromPet{ObjectID: petItem.ObjectID, Count: 15})
 
@@ -278,7 +281,8 @@ func TestGiveItemToPetCancelsActiveEnchantBeforeTransfer(t *testing.T) {
 	attachTestPet(t, state, live, templates, 12077, nil)
 	capture.frames = nil
 	store := &recordingEnchantItemStore{}
-	gcl := &GameClientLink{world: state, ids: &sequentialIDs{next: 900}, items: store}
+	ids := &sequentialIDs{next: 900}
+	gcl := &GameClientLink{world: state, ids: ids, items: store, petItems: petitem.NewService(ids)}
 	gcl.enchantStateStore().Select(live.ObjectID(), scroll.ObjectID)
 
 	gcl.giveItemToPet(context.Background(), live, clientpackets.RequestGiveItemToPet{ObjectID: source.ObjectID, Count: 30})
