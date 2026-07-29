@@ -36,6 +36,16 @@ func NewSession(conn *Conn, cipher *Cipher) *Session {
 // little-endian length header. It takes ownership of frame and releases it
 // once the connection writer is done with it.
 func (s *Session) SendFrame(frame wire.Frame) bool {
+	return s.sendFrame(frame, s.conn.SendFrame)
+}
+
+// trySendFrame encrypts and queues frame only when the connection's outbound
+// queue has capacity. It takes ownership of frame in every outcome.
+func (s *Session) trySendFrame(frame wire.Frame) bool {
+	return s.sendFrame(frame, s.conn.trySendFrame)
+}
+
+func (s *Session) sendFrame(frame wire.Frame, send func(wire.Frame) bool) bool {
 	frameBytes := frame.Bytes()
 	if len(frameBytes) < frameHeaderSize {
 		frame.Release()
@@ -46,7 +56,7 @@ func (s *Session) SendFrame(frame wire.Frame) bool {
 	defer s.mu.Unlock()
 
 	s.cipher.Encrypt(frameBytes[frameHeaderSize:])
-	return s.conn.SendFrame(frame)
+	return send(frame)
 }
 
 // ReadFrame blocks for the next inbound frame, decrypts it, and returns its

@@ -26,12 +26,21 @@ type livePlayer struct {
 	shortcuts *shortcut.List
 	log       zerolog.Logger
 
-	known      world.KnownBuffer
-	stopAttack func(*livePlayer)
+	known          world.KnownBuffer
+	visibilitySend func(wire.Frame) bool
+	stopAttack     func(*livePlayer)
 }
 
 func (p *livePlayer) SendFrame(frame wire.Frame) bool {
 	return p.Character.SendFrame(frame)
+}
+
+func (p *livePlayer) sendVisibilityFrame(frame wire.Frame) bool {
+	if p.visibilitySend == nil {
+		frame.Release()
+		return false
+	}
+	return p.visibilitySend(frame)
 }
 
 func (p *livePlayer) Stop() {

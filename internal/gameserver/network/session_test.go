@@ -70,6 +70,30 @@ func TestSessionSendFrameWritesAndReleasesOwnedFrame(t *testing.T) {
 	}
 }
 
+func TestSessionTrySendFrameDropsAndReleasesOwnedFrameWhenQueueFull(t *testing.T) {
+	key := bytes.Repeat([]byte{0x11}, keySize)
+	cipher, err := NewCipher(key)
+	if err != nil {
+		t.Fatalf("NewCipher: %v", err)
+	}
+	conn := &Conn{out: make(chan queuedWrite, outboundBuffer), stopping: make(chan struct{})}
+	for range outboundBuffer {
+		conn.out <- queuedWrite{}
+	}
+	s := NewSession(conn, cipher)
+
+	released := make(chan struct{}, 1)
+	frame := wire.OwnedFrame([]byte{0x02, 0x00}, nil, func(*wire.Writer) { released <- struct{}{} })
+	if s.trySendFrame(frame) {
+		t.Fatal("trySendFrame returned true with a full outbound queue")
+	}
+	select {
+	case <-released:
+	case <-time.After(time.Second):
+		t.Fatal("dropped frame was not released")
+	}
+}
+
 func TestSessionSendFrameArmsCipherSoFirstPacketIsCleartext(t *testing.T) {
 	s, client := pipeSessions(t)
 
