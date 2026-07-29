@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
@@ -88,6 +89,7 @@ func (t *signetFakeTarget) Dead() bool               { return t.dead }
 func (t *signetFakeTarget) InPeaceZone() bool        { return t.peace }
 func (t *signetFakeTarget) EffectList() *effect.List { return t.list }
 func (t *signetFakeTarget) Unsummon()                { t.unsummoned = true }
+func (t *signetFakeTarget) BroadcastFrame(wire.Frame) {}
 
 func (t *signetFakeTarget) MagicDamageInput(caster any, skill modelskill.Definition) (formulas.MagicDamageInput, bool) {
 	return t.magicInput, t.magicOK

@@ -1,8 +1,11 @@
 package skill
 
 import (
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -72,6 +75,9 @@ type signetDancer interface {
 type signetUnsummonable interface {
 	Dead() bool
 	Unsummon()
+	ObjectID() int32
+	Position() (x, y, z int)
+	BroadcastFrame(wire.Frame)
 }
 
 type signetHandler struct {
@@ -281,11 +287,9 @@ func (h signetHandler) newSignetNoiseEffect(def modelskill.Definition, meta effe
 // newSignetAntiSummonEffect builds the effect that, after skipping its
 // first tick, unsummons every living, non-peace-zone summon the actor
 // finds within skill radius on each subsequent tick. Each dismissed
-// summon's skill-use packet broadcasts from the actor's own known list
-// instead of the summon's, since summon.Actor has no broadcast surface of
-// its own yet. Both actors occupy the same area, so the observer set is
-// the same in practice — a documented simplification, not a byte-exact
-// match.
+// summon broadcasts its own self-cast MagicSkillUse packet from its own
+// known list, matching Java's summon.broadcastPacket(new
+// MagicSkillUse(summon, ...)).
 func (h signetHandler) newSignetAntiSummonEffect(def modelskill.Definition, meta effect.Skill, tmpl modelskill.EffectTemplate, actor *npc.EffectPoint) *effect.Effect {
 	e := &effect.Effect{Skill: meta, Template: tmpl, Effector: actor, Effected: actor}
 	e.OnStart = func(*effect.Effect) bool { return true }
@@ -299,10 +303,10 @@ func (h signetHandler) newSignetAntiSummonEffect(def modelskill.Definition, meta
 			if !ok {
 				return
 			}
-			if ct, ok := target.(signetCastTarget); ok {
-				actor.BroadcastSkillUse(ct, int32(def.ID), int32(def.Level))
-				ids = append(ids, ct.ObjectID())
-			}
+			sx, sy, sz := summon.Position()
+			self := serverpackets.SkillCastObject{ObjectID: summon.ObjectID(), Location: location.Location{X: sx, Y: sy, Z: sz}}
+			summon.BroadcastFrame(serverpackets.FrameMagicSkillUse(self, self, int32(def.ID), int32(def.Level), 0, 0, false))
+			ids = append(ids, summon.ObjectID())
 			summon.Unsummon()
 		})
 		if len(ids) > 0 {
