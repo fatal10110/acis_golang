@@ -154,7 +154,7 @@ type Controller struct {
 	castSeq   uint64
 	timers    []scheduledTimer
 	afterFunc afterFunc
-	onAbort   func()
+	onAbort   func(interrupted bool)
 	log       zerolog.Logger
 }
 
@@ -176,7 +176,10 @@ func (c *Controller) SetLogger(log zerolog.Logger) {
 // was cancelled and react to the interruption. It never fires for a natural
 // Finish, nor for a Stop on an idle controller. The observer runs after the
 // controller's lock is released, so it may call back into the controller.
-func (c *Controller) SetOnAbort(f func()) {
+// interrupted reports whether the abort went through the window-gated
+// Interrupt path (which additionally sends CASTING_INTERRUPTED) rather than
+// an unconditional Stop.
+func (c *Controller) SetOnAbort(f func(interrupted bool)) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.onAbort = f
@@ -324,6 +327,10 @@ func (c *Controller) Finish() {
 // ahead of its own casting check; only the abort observer is reserved for a
 // cast that was really in flight.
 func (c *Controller) Stop() {
+	c.stopInternal(false)
+}
+
+func (c *Controller) stopInternal(interrupted bool) {
 	c.exitSignetGround()
 	c.enableAllSkills()
 
@@ -331,13 +338,13 @@ func (c *Controller) Stop() {
 	abort := c.abortLocked()
 	c.mu.Unlock()
 	if abort != nil {
-		abort()
+		abort(interrupted)
 	}
 }
 
 // abortLocked clears the cast and returns the observer the caller must run
 // once it has released mu, or nil when no cast was in flight.
-func (c *Controller) abortLocked() func() {
+func (c *Controller) abortLocked() func(bool) {
 	aborted := c.casting
 	c.clearLocked()
 	if !aborted {
@@ -372,8 +379,45 @@ func (c *Controller) Interrupt(now time.Time) bool {
 	if !c.CanAbort(now) {
 		return false
 	}
-	c.Stop()
+	c.stopInternal(true)
 	return true
+}
+
+// InterruptCast aborts the current cast if it is still inside its interrupt
+// window, for callers that don't already hold `now` — the effect-driven
+// abort-cast surface (castInterrupter) uses this.
+func (c *Controller) InterruptCast() {
+	c.Interrupt(time.Now())
+}
+
+// StopCast aborts the current cast unconditionally, matching the
+// effect-driven abort surfaces (mute, silence, remove-target) that don't
+// gate on the interrupt window or send CASTING_INTERRUPTED.
+func (c *Controller) StopCast() {
+	c.Stop()
+}
+
+// CurrentSkillIsMagic reports whether the active cast's skill is a magic
+// skill, letting a caller distinguish Mute (magic-only) from PhysicalMute
+// (physical-only) without holding the skill definition itself.
+func (c *Controller) CurrentSkillIsMagic() bool {
+	def, casting := c.CurrentSkill()
+	return casting && def.Magic
+}
+
+// InterruptCastOnDamage applies the damage-based cast-break rule
+// (Formulas.calcCastBreak) to the active cast using time.Now(), for callers
+// outside this package that don't hold a DamageInterrupt value already.
+// Fusion is always false here; DamageInterrupt.Fusion needs live
+// fusion-channel state that only #998 wires.
+func (c *Controller) InterruptCastOnDamage(damage float64, men int, attackCancel func(float64) float64, roll int, immune bool) bool {
+	return c.InterruptOnDamage(time.Now(), DamageInterrupt{
+		Damage:       damage,
+		MEN:          men,
+		AttackCancel: attackCancel,
+		Roll:         roll,
+		Immune:       immune,
+	})
 }
 
 // InterruptOnDamage applies the damage-based magic cast break rule to the
