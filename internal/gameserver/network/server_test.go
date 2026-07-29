@@ -89,6 +89,51 @@ func TestServeStopsOnContextCancel(t *testing.T) {
 	}
 }
 
+func TestServeClosesConnectionsAndWaitsForHandlersOnCancel(t *testing.T) {
+	ln := listen(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	started := make(chan struct{})
+	finished := make(chan struct{})
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- Serve(ctx, ln, func(_ context.Context, conn *Conn) {
+			close(started)
+			buf := make([]byte, 1)
+			if _, err := conn.Read(buf); err == nil {
+				t.Error("handler Read returned nil after shutdown")
+			}
+			close(finished)
+		}, zerolog.Nop())
+	}()
+
+	client, err := net.Dial("tcp", ln.Addr().String())
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	defer client.Close()
+
+	select {
+	case <-started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("connection handler did not start")
+	}
+	cancel()
+
+	select {
+	case err := <-errCh:
+		t.Fatalf("Serve returned before connection handler finished: %v", err)
+	case <-finished:
+	case <-time.After(5 * time.Second):
+		t.Fatal("connection handler did not finish after context cancel")
+	}
+
+	if err := <-errCh; err != nil {
+		t.Fatalf("Serve returned error after handler cleanup: %v", err)
+	}
+}
+
 func TestServeHandlesConnectionsConcurrently(t *testing.T) {
 	ln := listen(t)
 	ctx, cancel := context.WithCancel(context.Background())
