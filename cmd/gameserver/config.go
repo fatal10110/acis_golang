@@ -120,6 +120,9 @@ func gameServerConfigFromProperties(paths gameServerPaths, serverProps, hexProps
 	if err != nil {
 		return gameServerConfig{}, err
 	}
+	if listenPort < 0 || listenPort > math.MaxUint16 {
+		return gameServerConfig{}, fmt.Errorf("GameserverPort %d outside uint16 range", listenPort)
+	}
 	loginPort, err := serverProps.Int("LoginPort", 9014)
 	if err != nil {
 		return gameServerConfig{}, err
@@ -163,6 +166,9 @@ func gameServerConfigFromProperties(paths gameServerPaths, serverProps, hexProps
 	serverListAgeLimit, err := serverProps.Int("ServerListAgeLimit", 0)
 	if err != nil {
 		return gameServerConfig{}, err
+	}
+	if serverListAgeLimit < math.MinInt32 || serverListAgeLimit > math.MaxInt32 {
+		return gameServerConfig{}, fmt.Errorf("ServerListAgeLimit %d outside int32 range", serverListAgeLimit)
 	}
 	ageLimit := int32(serverListAgeLimit)
 	testServer := serverProps.Bool("TestServer", false)
