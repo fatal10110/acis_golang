@@ -73,14 +73,15 @@ func TestPlayerRelocateReleasesActivityLockBeforeObserverNotifications(t *testin
 		name     string
 		prepare  func(*State, *playerStub)
 		block    func(*observerFuncStub, func(Tracked))
-		relocate func(*State, *playerStub)
+		relocate func(*State, *playerStub) error
 	}{
 		{
 			name:    "spawn discovers",
 			prepare: func(*State, *playerStub) {},
 			block:   func(o *observerFuncStub, f func(Tracked)) { o.discover = f },
-			relocate: func(s *State, p *playerStub) {
+			relocate: func(s *State, p *playerStub) error {
 				s.Spawn(p, 0, 0, 0, 0)
+				return nil
 			},
 		},
 		{
@@ -89,10 +90,8 @@ func TestPlayerRelocateReleasesActivityLockBeforeObserverNotifications(t *testin
 				s.Spawn(p, 0, 0, 0, 0)
 			},
 			block: func(o *observerFuncStub, f func(Tracked)) { o.forget = f },
-			relocate: func(s *State, p *playerStub) {
-				if err := s.Move(p, 3*regionSize, 0, 0); err != nil {
-					t.Errorf("Move() error = %v", err)
-				}
+			relocate: func(s *State, p *playerStub) error {
+				return s.Move(p, 3*regionSize, 0, 0)
 			},
 		},
 		{
@@ -101,8 +100,9 @@ func TestPlayerRelocateReleasesActivityLockBeforeObserverNotifications(t *testin
 				s.Spawn(p, 0, 0, 0, 0)
 			},
 			block: func(o *observerFuncStub, f func(Tracked)) { o.forget = f },
-			relocate: func(s *State, p *playerStub) {
+			relocate: func(s *State, p *playerStub) error {
 				s.Despawn(p)
+				return nil
 			},
 		},
 	}
@@ -123,10 +123,9 @@ func TestPlayerRelocateReleasesActivityLockBeforeObserverNotifications(t *testin
 				<-release
 			})
 
-			firstDone := make(chan struct{})
+			firstDone := make(chan error, 1)
 			go func() {
-				defer close(firstDone)
-				tt.relocate(s, subject)
+				firstDone <- tt.relocate(s, subject)
 			}()
 			<-started
 
@@ -138,14 +137,17 @@ func TestPlayerRelocateReleasesActivityLockBeforeObserverNotifications(t *testin
 
 			select {
 			case <-otherDone:
-			case <-time.After(250 * time.Millisecond):
+			case <-time.After(time.Second):
 				close(release)
 				<-firstDone
+				<-otherDone
 				t.Fatal("unrelated player relocate waited for a blocked observer notification")
 			}
 
 			close(release)
-			<-firstDone
+			if err := <-firstDone; err != nil {
+				t.Fatalf("relocate: %v", err)
+			}
 		})
 	}
 }
