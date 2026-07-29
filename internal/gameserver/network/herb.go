@@ -1,0 +1,54 @@
+package network
+
+import (
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	itemhandler "github.com/fatal10110/acis_golang/internal/gameserver/handler/item"
+	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+)
+
+// consumeHerb applies a received herb's carried skill to live and mirrors it
+// onto an active servitor, the way a herb behaves the moment it is picked up
+// or auto-looted. A herb never enters an inventory, so nothing is consumed
+// from one and no InventoryUpdate follows: the item exists only long enough
+// to resolve its skill.
+func (l *GameClientLink) consumeHerb(live *livePlayer, itemID int32) {
+	if live == nil {
+		return
+	}
+	inv := live.Inventory()
+	if inv == nil {
+		return
+	}
+	// ponytail: a transient off-inventory instance is enough here — the
+	// instant-cast path reads only its template, and skips the stack
+	// decrement for herbs.
+	herb := &item.Instance{TemplateID: itemID, Count: 1, Location: item.LocationVoid}
+	beforeVitals := live.Vitals()
+	res := itemhandler.Use(itemhandler.UseRequest{
+		Caster:      live.Character,
+		Inventory:   inv,
+		Item:        herb,
+		Definitions: l.skills,
+		Effects:     actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers},
+		Destroyer:   l.inventory,
+		Summon:      l.activeSummonTarget(live),
+	})
+	if res.Outcome == itemhandler.ReuseRejected {
+		// The herb is already gone by the time its skill is dispatched, so a
+		// still-cooling reuse only reports the reason — the pickup that
+		// consumed it owns the action acknowledgement.
+		sendMagicCastFailureReason(live, res.Skill, actorcast.ErrSkillDisabled)
+		return
+	}
+	if res.Outcome != itemhandler.Applied {
+		return
+	}
+	self := skillCastObject(live)
+	l.broadcastLiveFrame(live, func() wire.Frame {
+		return serverpackets.FrameMagicSkillUse(self, self, int32(res.Skill.ID), int32(res.Skill.Level), 0, 0, false)
+	})
+	res.Apply()
+	sendMagicStatusUpdate(live, beforeVitals)
+}

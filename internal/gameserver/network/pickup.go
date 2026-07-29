@@ -59,6 +59,24 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 		return true
 	}
 
+	// A herb is used the instant it is picked up and never reaches the
+	// inventory: it carries no client icon there, so storing it would leave
+	// an unusable blank slot.
+	if ground.Herb() {
+		if invops.LootLocked(&ground.Instance, live.ObjectID()) {
+			live.SendFrame(failedPickupFrame(ground.ItemID(), ground.Count()))
+			live.SendFrame(serverpackets.FrameActionFailed())
+			return true
+		}
+		live.SendFrame(serverpackets.FrameActionFailed())
+		l.broadcastGroundPickup(ground, live.ObjectID())
+		l.groundItems.Remove(ground)
+		l.world.Despawn(ground)
+		l.lockPickupParalysis(live)
+		l.consumeHerb(live, ground.ItemID())
+		return true
+	}
+
 	res, failure := l.inventory.PickupGround(inv, &ground.Instance, ground.Template, live.ObjectID())
 	switch failure {
 	case invops.PickupOK:

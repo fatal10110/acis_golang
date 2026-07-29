@@ -38,6 +38,11 @@ func (n nopKiller) ObjectID() int32 { return n.id }
 type lootKiller struct {
 	id    int32
 	items map[int32]int
+	herbs []int32
+}
+
+func (l *lootKiller) ConsumeHerb(itemID int32) {
+	l.herbs = append(l.herbs, itemID)
 }
 
 func (l *lootKiller) ObjectID() int32 { return l.id }
@@ -113,6 +118,31 @@ func TestKillReward_SkipsAutoLootHerbs(t *testing.T) {
 	r := NewKillReward(categories, nil, 1, false, rates, false, true, ids, items, ground, 0, 0, 0, 0, 0)
 	r.CalculateRewards(nopKiller{id: 1})
 
+	if len(ground.items) != 0 {
+		t.Fatalf("dropped %d auto-loot herbs on the ground, want 0", len(ground.items))
+	}
+}
+
+func TestKillReward_ConsumesAutoLootHerbInsteadOfStoringIt(t *testing.T) {
+	items := item.NewTable([]*item.Template{{ID: 8600, Name: "herb"}})
+	ground := &recordingGround{}
+	ids := &sequentialIDs{}
+
+	categories := []item.DropCategory{
+		{Kind: item.DropHerb, Chance: 100, Drops: []item.Drop{{ItemID: 8600, Min: 1, Max: 1, Chance: 100}}},
+	}
+	rates := item.Rates{Spoil: 1, Currency: 1, Item: 1, ItemRaid: 1, Herb: 1}
+
+	killer := &lootKiller{id: 1}
+	r := NewKillReward(categories, nil, 1, false, rates, false, true, ids, items, ground, 0, 0, 0, 0, 0)
+	r.CalculateRewards(killer)
+
+	if len(killer.herbs) != 1 || killer.herbs[0] != 8600 {
+		t.Fatalf("consumed herbs = %v, want [8600]", killer.herbs)
+	}
+	if len(killer.items) != 0 {
+		t.Fatalf("inventory items = %v, want none: a herb never occupies a slot", killer.items)
+	}
 	if len(ground.items) != 0 {
 		t.Fatalf("dropped %d auto-loot herbs on the ground, want 0", len(ground.items))
 	}

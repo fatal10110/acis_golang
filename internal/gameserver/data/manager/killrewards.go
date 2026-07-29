@@ -17,6 +17,13 @@ type rewardItemReceiver interface {
 	AddRewardItem(itemID int32, count int, objectID int32) bool
 }
 
+// herbReceiver consumes an auto-looted herb on the spot. A herb never
+// reaches an inventory: it applies its carried skill to the receiver and is
+// discarded.
+type herbReceiver interface {
+	ConsumeHerb(itemID int32)
+}
+
 // KillReward rolls and places the item, spoil, and manually-picked-up herb
 // rewards for one NPC template's death, at a fixed drop location.
 //
@@ -67,7 +74,8 @@ func NewKillReward(categories []item.DropCategory, pool *item.SpoilPool, levelMu
 
 // CalculateRewards rolls this death's item/spoil/herb drops and either
 // places them on the ground or, when configured and supported, adds them
-// directly to the killer's inventory.
+// directly to the killer's inventory. An auto-looted herb is consumed
+// instantly instead: herbs never occupy an inventory slot.
 func (k *KillReward) CalculateRewards(killer creature.DeathActor) {
 	receiver, _ := killer.(rewardItemReceiver)
 	rolled, herbs := item.RollKillReward(k.categories, k.pool, k.levelMultiplier, k.raid, k.rates, k.autoLootHerbs)
@@ -79,7 +87,9 @@ func (k *KillReward) CalculateRewards(killer creature.DeathActor) {
 	}
 	for _, herb := range herbs {
 		if herb.AutoLoot {
-			k.addToInventory(receiver, herb.ItemID, int(herb.Amount))
+			if consumer, ok := killer.(herbReceiver); ok {
+				consumer.ConsumeHerb(herb.ItemID)
+			}
 			continue
 		}
 		k.drop(herb.ItemID, int(herb.Amount))

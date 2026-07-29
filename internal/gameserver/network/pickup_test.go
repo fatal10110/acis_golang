@@ -145,6 +145,55 @@ func TestPickupLiveGroundItemMovesItemAndDespawns(t *testing.T) {
 	}
 }
 
+// TestPickupLiveGroundItemConsumesHerbWithoutStoringIt is the regression
+// test for a herb looted from a mob showing up as a blank inventory square:
+// a herb carries no inventory icon, is used the instant it is picked up, and
+// must never reach the inventory or a store row.
+func TestPickupLiveGroundItemConsumesHerbWithoutStoringIt(t *testing.T) {
+	const herbTemplate int32 = 8600
+	templates := item.NewTable([]*item.Template{{
+		ID:             herbTemplate,
+		Name:           "Herb of Life",
+		Kind:           item.KindEtcItem,
+		Duration:       -1,
+		EtcItem:        &item.EtcItemDetail{Type: item.EtcItemHerb, Handler: "ItemSkills"},
+		AttachedSkills: []item.SkillRef{{ID: 2278, Level: 1}},
+	}})
+	capture := &frameCapture{}
+	live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
+	state := world.New()
+	state.Spawn(live, 100, 0, 0, 0)
+	drops := task.NewGroundItems(state, task.GroundItemOptions{HerbAutoDestroy: time.Hour}, time.Now)
+	tmpl, _ := templates.Get(herbTemplate)
+	ground := dropTestGround(t, state, drops, item.Instance{ObjectID: 900, TemplateID: herbTemplate, Count: 1, ManaLeft: -1}, tmpl, 100, 0, 0)
+
+	capture.frames = nil
+	store := &recordingEnchantItemStore{}
+	gcl := &GameClientLink{world: state, groundItems: drops, items: store}
+
+	if !gcl.pickupLiveGroundItem(context.Background(), live, ground) {
+		t.Fatal("pickupLiveGroundItem returned false for a herb ground item target")
+	}
+
+	assertOpcodeSequence(t, capture.frames,
+		serverpackets.OpcodeActionFailed,
+		serverpackets.OpcodeGetItem,
+		serverpackets.OpcodeDeleteObject,
+	)
+	if _, ok := state.Object(ground.ObjectID()); ok {
+		t.Fatalf("world.Object(%d) still present after herb pickup", ground.ObjectID())
+	}
+	if got := drops.Len(); got != 0 {
+		t.Fatalf("ground item tracker Len = %d, want 0", got)
+	}
+	if stack := live.Inventory().ItemByTemplateID(herbTemplate); stack != nil {
+		t.Fatalf("inventory stack = %+v, want none: a herb is consumed on pickup", stack)
+	}
+	if len(store.saved) != 0 || len(store.updated) != 0 {
+		t.Fatalf("store rows saved = %+v updated = %+v, want none for a consumed herb", store.saved, store.updated)
+	}
+}
+
 // fakeAfterFuncs records scheduled delayed calls so a test can trigger them
 // deterministically instead of waiting on a real timer.
 type fakeAfterFuncs struct {
