@@ -20,7 +20,10 @@ type Tracked interface {
 // object enters or leaves their sight range — the 3x3 block of regions
 // around their own. Discover and Forget run on whichever goroutine drives
 // the region transition, so implementations must be safe to call
-// concurrently.
+// concurrently and return promptly without blocking. They must not call back
+// into State (including Knows, RegionActivity, Spawn, Move, or Despawn).
+// Panics intentionally propagate; State does not recover and continue
+// notification delivery.
 type Observer interface {
 	// Discover tells the observer that obj just became visible to it.
 	Discover(obj Tracked)
