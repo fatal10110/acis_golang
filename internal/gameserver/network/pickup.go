@@ -125,13 +125,13 @@ func (l *GameClientLink) broadcastPickupAttention(live *livePlayer, ground *grou
 			st.TemplateID,
 		)
 	}
-	live.SendFrame(frame())
-	l.world.ForEachKnownInRadius(live, pickupAttentionRadius, func(o world.Tracked) {
-		receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
-		if !ok {
-			return
-		}
-		receiver.SendFrame(frame())
+	broadcastFrame(frame, func(send func(frameReceiver)) {
+		send(live)
+		l.world.ForEachKnownInRadius(live, pickupAttentionRadius, func(o world.Tracked) {
+			if receiver, ok := o.(frameReceiver); ok {
+				send(receiver)
+			}
+		})
 	})
 }
 

@@ -138,6 +138,35 @@ func TestBroadcastLiveFrameBuildsOnceForAllRecipients(t *testing.T) {
 	}
 }
 
+func TestBroadcastFrameBuildsOnceAndCopiesForRecipients(t *testing.T) {
+	selfFrames := &frameCapture{}
+	observerFrames := &frameCapture{}
+	self := newTestLivePlayer(t, 1, selfFrames)
+	observer := newTestLivePlayer(t, 2, observerFrames)
+
+	builds := 0
+	broadcastFrame(func() wire.Frame {
+		builds++
+		return serverpackets.FrameStatusUpdate(self.ObjectID(), []serverpackets.StatusAttribute{
+			{Type: serverpackets.StatusMaxHP, Value: 100},
+			{Type: serverpackets.StatusCurrentHP, Value: 75},
+		})
+	}, func(send func(frameReceiver)) {
+		send(self)
+		send(observer)
+	})
+
+	if builds != 1 {
+		t.Fatalf("frame builds = %d, want 1", builds)
+	}
+	if len(selfFrames.frames) != 1 || len(observerFrames.frames) != 1 {
+		t.Fatalf("recipient frame counts = %d, %d; want 1, 1", len(selfFrames.frames), len(observerFrames.frames))
+	}
+	if !bytes.Equal(selfFrames.frames[0], observerFrames.frames[0]) {
+		t.Fatalf("recipient frames differ: self %x observer %x", selfFrames.frames[0], observerFrames.frames[0])
+	}
+}
+
 func BenchmarkBroadcastLiveFrameKnownObservers(b *testing.B) {
 	state := world.New()
 	self := newTestLivePlayer(b, 1, &frameCapture{})
@@ -162,6 +191,31 @@ func BenchmarkBroadcastLiveFrameKnownObservers(b *testing.B) {
 		link.broadcastLiveFrame(self, func() wire.Frame {
 			return serverpackets.FrameRevive(self.ObjectID())
 		})
+	}
+}
+
+func BenchmarkBroadcastCharacterInfoKnownObservers(b *testing.B) {
+	state := world.New()
+	self := newTestLivePlayer(b, 1, &frameCapture{})
+	self.Character.SetFrameSender(func(frame wire.Frame) bool {
+		frame.Release()
+		return true
+	})
+	state.Spawn(self, 0, 0, 0, 0)
+	for i := 0; i < 50; i++ {
+		observer := newTestLivePlayer(b, int32(i+2), &frameCapture{})
+		observer.Character.SetFrameSender(func(frame wire.Frame) bool {
+			frame.Release()
+			return true
+		})
+		state.Spawn(observer, i+100, 0, 0, 0)
+	}
+
+	link := &GameClientLink{world: state, log: zerolog.Nop()}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		link.broadcastCharacterInfo(self)
 	}
 }
 

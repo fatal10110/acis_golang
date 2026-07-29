@@ -194,12 +194,14 @@ func (l *GameClientLink) broadcastTargetSelected(live *livePlayer, target world.
 	}
 	x, y, z := live.Position()
 	at := location.Location{X: x, Y: y, Z: z}
-	l.world.ForEachKnown(live, func(o world.Tracked) {
-		receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
-		if !ok {
-			return
-		}
-		receiver.SendFrame(serverpackets.FrameTargetSelected(live.ObjectID(), target.ObjectID(), at))
+	broadcastFrame(func() wire.Frame {
+		return serverpackets.FrameTargetSelected(live.ObjectID(), target.ObjectID(), at)
+	}, func(send func(frameReceiver)) {
+		l.world.ForEachKnown(live, func(o world.Tracked) {
+			if receiver, ok := o.(frameReceiver); ok {
+				send(receiver)
+			}
+		})
 	})
 }
 
@@ -209,12 +211,14 @@ func (l *GameClientLink) broadcastTargetUnselected(live *livePlayer) {
 	}
 	x, y, z := live.Position()
 	at := location.Location{X: x, Y: y, Z: z}
-	l.world.ForEachKnown(live, func(o world.Tracked) {
-		receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
-		if !ok {
-			return
-		}
-		receiver.SendFrame(serverpackets.FrameTargetUnselected(live.ObjectID(), at))
+	broadcastFrame(func() wire.Frame {
+		return serverpackets.FrameTargetUnselected(live.ObjectID(), at)
+	}, func(send func(frameReceiver)) {
+		l.world.ForEachKnown(live, func(o world.Tracked) {
+			if receiver, ok := o.(frameReceiver); ok {
+				send(receiver)
+			}
+		})
 	})
 }
 
@@ -229,16 +233,18 @@ func (l *GameClientLink) broadcastLiveStatus(live *livePlayer) {
 	if !ok {
 		return
 	}
-	live.SendFrame(serverpackets.FrameStatusUpdate(live.ObjectID(), attrs))
-	if l.world == nil {
-		return
-	}
-	l.world.ForEachKnown(live, func(o world.Tracked) {
-		receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
-		if !ok {
+	broadcastFrame(func() wire.Frame {
+		return serverpackets.FrameStatusUpdate(live.ObjectID(), attrs)
+	}, func(send func(frameReceiver)) {
+		send(live)
+		if l.world == nil {
 			return
 		}
-		receiver.SendFrame(serverpackets.FrameStatusUpdate(live.ObjectID(), attrs))
+		l.world.ForEachKnown(live, func(o world.Tracked) {
+			if receiver, ok := o.(frameReceiver); ok {
+				send(receiver)
+			}
+		})
 	})
 }
 
