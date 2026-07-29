@@ -18,11 +18,13 @@ type Tracked interface {
 
 // Observer is implemented by tracked objects that react when another
 // object enters or leaves their sight range — the 3x3 block of regions
-// around their own. For a Player subject, callbacks run after it has entered
-// its destination region or left the grid; non-player callbacks preserve the
-// existing in-transition timing. Discover and Forget run on whichever
-// goroutine drives the region transition, so implementations must be safe to
-// call concurrently.
+// around their own. Callbacks run after the subject has entered its destination
+// region or left the grid. Discover and Forget run on whichever goroutine drives
+// the region transition, so implementations must be safe to call concurrently
+// and return promptly without blocking. They must not call State's transition
+// methods (Spawn, Move, Despawn, or DespawnAll) from a callback; read-only
+// queries such as Knows and RegionActivity are safe. Panics propagate and skip
+// remaining callbacks, but region membership remains consistent.
 type Observer interface {
 	// Discover tells the observer that obj just became visible to it.
 	Discover(obj Tracked)
@@ -222,11 +224,14 @@ func (s *State) relocate(t Tracked, next *Region) {
 	if next != nil {
 		next.Add(t)
 		newAreas = s.AppendNeighbors(newAreaBuf[:0], next, 1)
-		if !tIsPlayer && prev != nil {
-			// A non-player entering a region that was already active or
-			// inactive sees no setActive transition, so notify it directly.
-			notifyObjectActivity(t, next.Active())
-		}
+	}
+	p.mu.Lock()
+	p.region = next
+	p.mu.Unlock()
+	if next != nil && !tIsPlayer && prev != nil {
+		// A non-player entering a region that was already active or
+		// inactive sees no setActive transition, so notify it directly.
+		notifyObjectActivity(t, next.Active())
 	}
 
 	tObs, tObserves := t.(Observer)
@@ -295,19 +300,15 @@ func (s *State) relocate(t Tracked, next *Region) {
 		}
 	}
 
-	p.mu.Lock()
-	p.region = next
-	p.mu.Unlock()
-
 	if tIsPlayer {
 		s.regionActivityMu.Unlock()
 	}
 
-	for _, notification := range notifications {
-		notification.notify()
-	}
 	for _, tg := range toggles {
 		tg.region.notifyActivity(tg.active)
+	}
+	for _, notification := range notifications {
+		notification.notify()
 	}
 }
 

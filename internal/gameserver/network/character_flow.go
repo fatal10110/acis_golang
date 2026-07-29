@@ -217,7 +217,7 @@ func (l *GameClientLink) attachLivePlayer(client *Client, c *player.Character, t
 	combat := ai.NewPlayerAttack(c, moveCtl, attackCtl)
 	attackCtl.SetFinished(combat.Think)
 
-	live := &livePlayer{Character: c, template: tmpl, items: items, attack: attackCtl, move: moveCtl, combat: combat, shortcuts: shortcut.NewList(shortcuts), stopAttack: l.stopLiveAutoAttack, log: l.log}
+	live := &livePlayer{Character: c, template: tmpl, items: items, attack: attackCtl, move: moveCtl, combat: combat, shortcuts: shortcut.NewList(shortcuts), visibilitySend: client.Session.trySendFrame, stopAttack: l.stopLiveAutoAttack, log: l.log}
 	attackCtl.SetStarted(func() {
 		l.startLiveAutoAttack(live)
 	})

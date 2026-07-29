@@ -344,12 +344,14 @@ type visibleGroundItem struct {
 	itemID    int32
 	count     int
 	stackable bool
+	dropperID int32
 }
 
-func (g *visibleGroundItem) ObjectID() int32 { return g.id }
-func (g *visibleGroundItem) ItemID() int32   { return g.itemID }
-func (g *visibleGroundItem) Count() int      { return g.count }
-func (g *visibleGroundItem) Stackable() bool { return g.stackable }
+func (g *visibleGroundItem) ObjectID() int32  { return g.id }
+func (g *visibleGroundItem) ItemID() int32    { return g.itemID }
+func (g *visibleGroundItem) Count() int       { return g.count }
+func (g *visibleGroundItem) Stackable() bool  { return g.stackable }
+func (g *visibleGroundItem) DropperID() int32 { return g.dropperID }
 
 type visibleDoor struct {
 	world.Presence

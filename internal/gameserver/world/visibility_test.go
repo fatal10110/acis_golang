@@ -152,6 +152,80 @@ func TestPlayerRelocateReleasesActivityLockBeforeObserverNotifications(t *testin
 	}
 }
 
+func TestPlayerRelocatePanicReleasesActivityLock(t *testing.T) {
+	s := New()
+	observer := &observerFuncStub{trackedStub: trackedStub{id: 1}, discover: func(Tracked) { panic("observer panic") }}
+	s.Spawn(observer, 0, 0, 0, 0)
+
+	func() {
+		defer func() { _ = recover() }()
+		s.Spawn(&playerStub{trackedStub: trackedStub{id: 2}}, 100, 0, 0, 0)
+	}()
+
+	done := make(chan struct{})
+	go func() {
+		s.Spawn(&playerStub{trackedStub: trackedStub{id: 3}}, 200000, 0, 0, 0)
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("player relocation remained blocked after an observer panic")
+	}
+}
+
+func TestNonPlayerRelocatePanicKeepsRegionMembershipConsistent(t *testing.T) {
+	s := New()
+	const destination = 4 * regionSize
+
+	observer := &observerFuncStub{trackedStub: trackedStub{id: 1}}
+	s.Spawn(observer, destination, 0, 0, 0)
+	mover := &trackedStub{id: 2}
+	s.Spawn(mover, 0, 0, 0, 0)
+	observer.discover = func(Tracked) { panic("observer panic") }
+
+	func() {
+		defer func() {
+			if recover() == nil {
+				t.Fatal("Move did not propagate observer panic")
+			}
+		}()
+		_ = s.Move(mover, destination, 0, 0)
+	}()
+
+	next, _ := s.RegionAt(destination, 0)
+	if mover.currentRegion() != next {
+		t.Fatal("mover presence did not advance to its destination after observer panic")
+	}
+	if !slices.Contains(next.Objects(), Tracked(mover)) {
+		t.Fatal("destination region lost mover after observer panic")
+	}
+}
+
+func TestPlayerRelocateNotifiesActivityBeforeVisibility(t *testing.T) {
+	s := New()
+	const destination = 4 * regionSize
+
+	actor := &activeTrackedStub{trackedStub: trackedStub{id: 1}}
+	s.Spawn(actor, destination, 0, 0, 0)
+	observer := &observerFuncStub{trackedStub: trackedStub{id: 2}}
+	s.Spawn(observer, destination, 0, 0, 0)
+	observer.discover = func(Tracked) { panic("observer panic") }
+
+	func() {
+		defer func() {
+			if recover() == nil {
+				t.Fatal("Spawn did not propagate observer panic")
+			}
+		}()
+		s.Spawn(&playerStub{trackedStub: trackedStub{id: 3}}, destination, 0, 0, 0)
+	}()
+
+	if actor.activeCalls != 1 {
+		t.Fatalf("active notifications before observer panic = %d, want 1", actor.activeCalls)
+	}
+}
+
 func TestSpawnNotifiesResidentFirstThenArrival(t *testing.T) {
 	s := New()
 	log := &sightLog{}

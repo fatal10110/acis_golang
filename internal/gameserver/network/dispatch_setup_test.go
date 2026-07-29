@@ -279,7 +279,7 @@ func newTestLivePlayer(t testing.TB, id int32, capture *frameCapture) *livePlaye
 	moveCtl.SetArrived(combat.Think)
 	attackCtl.SetFinished(combat.Think)
 
-	return &livePlayer{Character: ch, template: tmpl, attack: attackCtl, move: moveCtl, combat: combat}
+	return &livePlayer{Character: ch, template: tmpl, attack: attackCtl, move: moveCtl, combat: combat, visibilitySend: capture.send}
 }
 
 func newTestHostileNPC(t *testing.T, id int32) *npc.Hostile {

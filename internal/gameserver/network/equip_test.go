@@ -39,7 +39,7 @@ func newEquipTestLivePlayer(t *testing.T, id int32, capture *frameCapture, templ
 	}
 	ch.Live = live
 
-	return &livePlayer{Character: ch, template: tmpl, items: items}
+	return &livePlayer{Character: ch, template: tmpl, items: items, visibilitySend: capture.send}
 }
 
 // equipFleeTarget satisfies the flee hook a Fear effect's runtime needs, so
