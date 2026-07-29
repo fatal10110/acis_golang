@@ -7,8 +7,10 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
+	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -235,5 +237,81 @@ func TestMoveLivePlayerStopsAttackIntention(t *testing.T) {
 
 	if attacker.combat.Target() != nil {
 		t.Fatalf("attack intention target = %v after a player-initiated walk, want nil", attacker.combat.Target())
+	}
+}
+
+// TestCastFinishResumesPendingAttackIntention pins issue #1016's remaining
+// acceptance criterion: the cast-finish notification wired in castController
+// (live_player.go) must resume a pending attack intention, matching what the
+// reference's FINISHED_CASTING AI event does for a player. A cast pauses the
+// in-flight swing (attack.Stop(), mirroring what starting a cast does to the
+// attack controller) while combat's queued target survives untouched; on
+// both natural completion and abort the finish observer must re-think and
+// land a fresh swing instead of leaving the intention stalled.
+func TestCastFinishResumesPendingAttackIntention(t *testing.T) {
+	def := modelskill.Definition{
+		ID: 3, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+		HitTime: 5000, ReuseDelay: 1200, StaticHitTime: true, StaticReuse: true,
+	}
+
+	tests := []struct {
+		name string
+		end  func(*actorcast.Controller)
+	}{
+		{name: "natural finish", end: func(c *actorcast.Controller) { c.Finish() }},
+		{name: "abort", end: func(c *actorcast.Controller) { c.Stop() }},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			state := world.New()
+			attackerFrames := &frameCapture{}
+			attacker := newTestLivePlayer(t, 1, attackerFrames)
+			attacker.Character.SetWorld(state)
+			attacker.Character.SetRollSource(func(int) int { return 0 })
+			gcl := &GameClientLink{world: state, log: zerolog.Nop()}
+			wireLiveAttackHooks(gcl, attacker)
+			target := newTestHostileNPC(t, 3200)
+			target.Instance.Template.PDef = 1
+			target.Instance.Template.DEX = 30
+			target.SetRollSource(func(int) int { return 0 })
+
+			state.Spawn(attacker, 0, 0, 0, 0)
+			state.Spawn(target, 30, 0, 0, 0)
+
+			if !gcl.attackLiveTarget(attacker, target) {
+				t.Fatal("attackLiveTarget returned false for an in-range target")
+			}
+			if !attacker.attack.AttackingNow() {
+				t.Fatal("expected the first swing to be in flight")
+			}
+
+			// A cast pauses the in-flight swing but leaves the queued
+			// target intention alone, the way starting a cast does.
+			attacker.attack.Stop()
+			attackerFrames.frames = nil
+
+			controller := gcl.castController(attacker)
+			if _, err := controller.Start(time.Now(), skillCastObject(attacker), def); err != nil {
+				t.Fatalf("Start() error: %v", err)
+			}
+			if attacker.combat.Target() != target {
+				t.Fatal("attack intention target was cleared by starting a cast, want it queued")
+			}
+
+			tt.end(controller)
+
+			// The abort path additionally broadcasts MagicSkillCanceled and
+			// ActionFailed ahead of the resumed swing; AutoAttackStart does
+			// not repeat since the actor never left combat stance. In both
+			// cases the last frame must be the resumed swing's Attack.
+			frames := frameOpcodes(attackerFrames.frames)
+			if len(frames) == 0 || frames[len(frames)-1] != serverpackets.OpcodeAttack {
+				t.Fatalf("attack opcodes after cast %s = %#x, want the last frame to be Attack (the resumed intention)", tt.name, frames)
+			}
+			if !attacker.attack.AttackingNow() {
+				t.Fatal("attack intention did not resume after the cast ended")
+			}
+		})
 	}
 }
