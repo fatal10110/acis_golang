@@ -20,10 +20,10 @@ type Tracked interface {
 // object enters or leaves their sight range — the 3x3 block of regions
 // around their own. Discover and Forget run on whichever goroutine drives
 // the region transition, so implementations must be safe to call
-// concurrently and return promptly without blocking. They must not call back
-// into State (including Knows, RegionActivity, Spawn, Move, or Despawn).
-// Panics intentionally propagate; State does not recover and continue
-// notification delivery.
+// concurrently and return promptly without blocking. They must not call
+// State's transition methods (Spawn, Move, Despawn, or DespawnAll) from a
+// callback; read-only queries such as Knows and RegionActivity are safe.
+// Panics propagate after State releases its transition locks.
 type Observer interface {
 	// Discover tells the observer that obj just became visible to it.
 	Discover(obj Tracked)
@@ -210,6 +210,7 @@ func (s *State) relocate(t Tracked, next *Region) {
 		// large region's worth of resets would serialize every other
 		// player's relocate against this one for no reason.
 		s.regionActivityMu.Lock()
+		defer s.regionActivityMu.Unlock()
 	}
 
 	p := t.presence()
@@ -287,10 +288,6 @@ func (s *State) relocate(t Tracked, next *Region) {
 	p.mu.Lock()
 	p.region = next
 	p.mu.Unlock()
-
-	if tIsPlayer {
-		s.regionActivityMu.Unlock()
-	}
 
 	for _, tg := range toggles {
 		tg.region.notifyActivity(tg.active)

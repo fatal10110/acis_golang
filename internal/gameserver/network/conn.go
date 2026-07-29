@@ -155,6 +155,18 @@ func (c *Conn) trySendFrame(frame wire.Frame) bool {
 	return false
 }
 
+// abort closes a connection without waiting for its writer to drain. It is
+// used when a client can no longer decode its ordered packet stream.
+func (c *Conn) abort() {
+	c.mu.Lock()
+	if !c.closed {
+		c.closed = true
+		close(c.out)
+	}
+	c.mu.Unlock()
+	_ = c.Conn.Close()
+}
+
 func (c *Conn) send(queued queuedWrite) bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()

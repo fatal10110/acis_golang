@@ -19,7 +19,7 @@ func (p *livePlayer) Discover(obj world.Tracked) {
 	case groundItemObject:
 		if dropped, ok := o.(interface{ DropperID() int32 }); ok {
 			if dropperID := dropped.DropperID(); dropperID != 0 {
-				p.SendFrame(serverpackets.FrameDropItem(o, dropperID))
+				p.sendVisibilityFrame(serverpackets.FrameDropItem(o, dropperID))
 				return
 			}
 		}

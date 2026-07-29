@@ -5,6 +5,7 @@ import (
 	"slices"
 	"sync"
 	"testing"
+	"time"
 )
 
 // trackedStub is a minimal grid occupant.
@@ -61,6 +62,28 @@ func (o *observerFuncStub) Discover(obj Tracked) {
 }
 
 func (o *observerFuncStub) Forget(Tracked) {}
+
+func TestPlayerRelocatePanicReleasesActivityLock(t *testing.T) {
+	s := New()
+	observer := &observerFuncStub{trackedStub: trackedStub{id: 1}, discover: func(Tracked) { panic("observer panic") }}
+	s.Spawn(observer, 0, 0, 0, 0)
+
+	func() {
+		defer func() { _ = recover() }()
+		s.Spawn(&playerStub{trackedStub: trackedStub{id: 2}}, 100, 0, 0, 0)
+	}()
+
+	done := make(chan struct{})
+	go func() {
+		s.Spawn(&playerStub{trackedStub: trackedStub{id: 3}}, 200000, 0, 0, 0)
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("player relocation remained blocked after an observer panic")
+	}
+}
 
 func TestSpawnNotifiesResidentFirstThenArrival(t *testing.T) {
 	s := New()

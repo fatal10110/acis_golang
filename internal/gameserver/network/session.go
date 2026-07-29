@@ -40,9 +40,25 @@ func (s *Session) SendFrame(frame wire.Frame) bool {
 }
 
 // trySendFrame encrypts and queues frame only when the connection's outbound
-// queue has capacity. It takes ownership of frame in every outcome.
+// queue has capacity. A full queue disconnects the client before encryption,
+// because dropping an ordered frame would desynchronize its cipher. It takes
+// ownership of frame in every outcome.
 func (s *Session) trySendFrame(frame wire.Frame) bool {
-	return s.sendFrame(frame, s.conn.trySendFrame)
+	frameBytes := frame.Bytes()
+	if len(frameBytes) < frameHeaderSize {
+		frame.Release()
+		return false
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if len(s.conn.out) == cap(s.conn.out) {
+		frame.Release()
+		s.conn.abort()
+		return false
+	}
+	s.cipher.Encrypt(frameBytes[frameHeaderSize:])
+	return s.conn.trySendFrame(frame)
 }
 
 func (s *Session) sendFrame(frame wire.Frame, send func(wire.Frame) bool) bool {

@@ -131,10 +131,7 @@ func TestLivePlayerForgetDoesNotBlockOnFullVisibilityQueue(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewCipher: %v", err)
 	}
-	conn := &Conn{out: make(chan queuedWrite, outboundBuffer), stopping: make(chan struct{})}
-	for range outboundBuffer {
-		conn.out <- queuedWrite{}
-	}
+	conn := fullQueueConn(t)
 
 	player := newTestLivePlayer(t, 1, &frameCapture{})
 	player.visibilitySend = NewSession(conn, cipher).trySendFrame
@@ -147,5 +144,29 @@ func TestLivePlayerForgetDoesNotBlockOnFullVisibilityQueue(t *testing.T) {
 	case <-done:
 	case <-time.After(time.Second):
 		t.Fatal("Forget blocked on a full visibility queue")
+	}
+}
+
+func TestLivePlayerDiscoverDroppedItemDoesNotBlockOnFullVisibilityQueue(t *testing.T) {
+	cipher, err := NewCipher(bytes.Repeat([]byte{0x11}, keySize))
+	if err != nil {
+		t.Fatalf("NewCipher: %v", err)
+	}
+	conn := fullQueueConn(t)
+	s := NewSession(conn, cipher)
+
+	player := newTestLivePlayer(t, 1, &frameCapture{})
+	player.Character.SetFrameSender(s.SendFrame)
+	player.visibilitySend = s.trySendFrame
+	item := &visibleGroundItem{id: 2, itemID: 57, count: 1, dropperID: 1}
+	done := make(chan struct{})
+	go func() {
+		player.Discover(item)
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("Discover blocked on a full visibility queue for a dropped item")
 	}
 }

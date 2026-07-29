@@ -26,6 +26,17 @@ func pipeSessions(t *testing.T) (server *Session, client net.Conn) {
 	return NewSession(newConn(serverRaw, zerolog.Nop()), cipher), clientRaw
 }
 
+func fullQueueConn(t *testing.T) *Conn {
+	t.Helper()
+	serverRaw, clientRaw := net.Pipe()
+	t.Cleanup(func() { serverRaw.Close(); clientRaw.Close() })
+	conn := &Conn{Conn: serverRaw, out: make(chan queuedWrite, outboundBuffer), stopping: make(chan struct{})}
+	for range outboundBuffer {
+		conn.out <- queuedWrite{frame: wire.BorrowedFrame(wire.FrameBytes([]byte{0x02, 0x00}))}
+	}
+	return conn
+}
+
 func sendSessionPayload(s *Session, payload []byte) bool {
 	return s.SendFrame(wire.BorrowedFrame(wire.FrameBytes(payload)))
 }
@@ -76,11 +87,10 @@ func TestSessionTrySendFrameDropsAndReleasesOwnedFrameWhenQueueFull(t *testing.T
 	if err != nil {
 		t.Fatalf("NewCipher: %v", err)
 	}
-	conn := &Conn{out: make(chan queuedWrite, outboundBuffer), stopping: make(chan struct{})}
-	for range outboundBuffer {
-		conn.out <- queuedWrite{}
-	}
+	conn := fullQueueConn(t)
 	s := NewSession(conn, cipher)
+	wantEnabled := cipher.enabled
+	wantOutKey := cipher.outKey
 
 	released := make(chan struct{}, 1)
 	frame := wire.OwnedFrame([]byte{0x02, 0x00}, nil, func(*wire.Writer) { released <- struct{}{} })
@@ -91,6 +101,9 @@ func TestSessionTrySendFrameDropsAndReleasesOwnedFrameWhenQueueFull(t *testing.T
 	case <-released:
 	case <-time.After(time.Second):
 		t.Fatal("dropped frame was not released")
+	}
+	if cipher.enabled != wantEnabled || cipher.outKey != wantOutKey {
+		t.Fatal("dropped frame advanced the outbound cipher")
 	}
 }
 
