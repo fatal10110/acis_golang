@@ -57,8 +57,9 @@ type attackStanceEntry struct {
 // AttackStance tracks actors whose combat animation should remain active
 // until the inactivity period expires.
 //
-// mu guards entries and the scratch refill. Tick only ever runs on the
-// scheduler ticker's single goroutine, one call at a time.
+// Add, Remove, and InAttackStance are safe to call concurrently with Tick. mu
+// guards entries and the scratch refill. Tick only ever runs on the scheduler
+// ticker's single goroutine, one call at a time.
 type AttackStance struct {
 	effects AttackStanceEffects
 	now     func() time.Time

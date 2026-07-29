@@ -22,8 +22,9 @@ type AIActor interface {
 
 // AI runs active actor brains once per tick.
 //
-// mu guards actors and the scratch refill. Tick only ever runs on the
-// scheduler ticker's single goroutine, one call at a time.
+// Add and Remove are safe to call concurrently with Tick. mu guards actors and
+// the scratch refill. Tick only ever runs on the scheduler ticker's single
+// goroutine, one call at a time.
 type AI struct {
 	state *world.State
 

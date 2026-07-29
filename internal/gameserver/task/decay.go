@@ -32,6 +32,7 @@ type decayEntry struct {
 // Decay tracks dead actors awaiting corpse removal and fires the removal
 // side effect once each actor's display interval elapses.
 //
+// Add, Cancel, Tracked, and Deadline are safe to call concurrently with Tick.
 // mu guards entries and the scratch refill. Tick only ever runs on the
 // scheduler ticker's single goroutine, one call at a time.
 type Decay struct {
