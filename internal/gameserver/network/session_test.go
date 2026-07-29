@@ -26,11 +26,15 @@ func pipeSessions(t *testing.T) (server *Session, client net.Conn) {
 	return NewSession(newConn(serverRaw, zerolog.Nop()), cipher), clientRaw
 }
 
+func sendSessionPayload(s *Session, payload []byte) bool {
+	return s.SendFrame(wire.BorrowedFrame(wire.FrameBytes(payload)))
+}
+
 func TestSessionSendFramesWithLittleEndianLengthHeader(t *testing.T) {
 	s, client := pipeSessions(t)
 
-	if !s.Send([]byte{0xAA, 0xBB, 0xCC}) {
-		t.Fatal("Send returned false")
+	if !sendSessionPayload(s, []byte{0xAA, 0xBB, 0xCC}) {
+		t.Fatal("SendFrame returned false")
 	}
 
 	frame := make([]byte, frameHeaderSize+3)
@@ -39,15 +43,6 @@ func TestSessionSendFramesWithLittleEndianLengthHeader(t *testing.T) {
 	}
 	if got := binary.LittleEndian.Uint16(frame); got != uint16(len(frame)) {
 		t.Fatalf("length header = %d, want %d", got, len(frame))
-	}
-}
-
-func TestSessionFrameWriterPoolable(t *testing.T) {
-	if !sessionFrameWriterPoolable(wire.NewFrameWriter(sessionFrameWriterMaxCapacity)) {
-		t.Fatal("writer at maximum pool capacity is not poolable")
-	}
-	if sessionFrameWriterPoolable(wire.NewFrameWriter(sessionFrameWriterMaxCapacity + 1)) {
-		t.Fatal("oversized writer is poolable")
 	}
 }
 
@@ -75,12 +70,12 @@ func TestSessionSendFrameWritesAndReleasesOwnedFrame(t *testing.T) {
 	}
 }
 
-func TestSessionSendArmsCipherSoFirstPacketIsCleartext(t *testing.T) {
+func TestSessionSendFrameArmsCipherSoFirstPacketIsCleartext(t *testing.T) {
 	s, client := pipeSessions(t)
 
 	payload := []byte{0x01, 0x02, 0x03, 0x04}
-	if !s.Send(payload) {
-		t.Fatal("Send returned false")
+	if !sendSessionPayload(s, payload) {
+		t.Fatal("SendFrame returned false")
 	}
 
 	frame := make([]byte, frameHeaderSize+len(payload))
@@ -98,8 +93,8 @@ func TestSessionReadFrameDecryptsAfterCipherArmed(t *testing.T) {
 	// Arm the session's cipher exactly like the real handshake does: the
 	// server's first outbound packet flips encryption on for both
 	// directions without transforming that packet's own bytes.
-	if !s.Send([]byte{0x00}) {
-		t.Fatal("Send returned false")
+	if !sendSessionPayload(s, []byte{0x00}) {
+		t.Fatal("SendFrame returned false")
 	}
 	armFrame := make([]byte, frameHeaderSize+1)
 	if _, err := io.ReadFull(client, armFrame); err != nil {
@@ -143,10 +138,10 @@ func TestSessionReadFrameRejectsHeaderShorterThanItself(t *testing.T) {
 	}
 }
 
-func TestSessionSendSerializesConcurrentCallers(t *testing.T) {
+func TestSessionSendFrameSerializesConcurrentCallers(t *testing.T) {
 	s, client := pipeSessions(t)
 
-	// Session.Send arms the shared cipher on the first frame (sent
+	// Session.SendFrame arms the shared cipher on the first frame (sent
 	// cleartext, per the cipher's first-packet rule) and rolls it on every
 	// frame after; mirror decrypts each frame in receipt order to recover
 	// the original byte, proving send order matched encrypt order (a
@@ -162,7 +157,7 @@ func TestSessionSendSerializesConcurrentCallers(t *testing.T) {
 	for i := 0; i < senders; i++ {
 		go func(i int) {
 			defer wg.Done()
-			s.Send([]byte{byte(i)})
+			sendSessionPayload(s, []byte{byte(i)})
 		}(i)
 	}
 
@@ -184,7 +179,7 @@ func TestSessionSendSerializesConcurrentCallers(t *testing.T) {
 			t.Fatalf("payload %d length = %d, want 1", i, len(payload))
 		}
 		if i == 0 {
-			// The arm frame: Session.Send's first call leaves it cleartext,
+			// The arm frame: Session.SendFrame's first call leaves it cleartext,
 			// so there is nothing to decrypt.
 			mirror.enabled = true
 		} else {
