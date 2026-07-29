@@ -65,6 +65,7 @@ func TestGameClientLinkNeverGoesSilentOnActionRequests(t *testing.T) {
 		payload []byte
 	}{
 		{"UseItem on an object the player doesn't hold", encodeUseItem(missingObjectID, false)},
+		{"RequestUnEquipItem for an empty body slot", encodeRequestUnEquipItem(0)},
 		{"RequestEnchantItem on an object the player doesn't hold", encodeRequestEnchantItem(missingObjectID)},
 		{"RequestDestroyItem on an object the player doesn't hold", encodeRequestDestroyItem(missingObjectID, 1)},
 		{"RequestCrystallizeItem on an object the player doesn't hold", encodeRequestCrystallizeItem(missingObjectID, 1)},
