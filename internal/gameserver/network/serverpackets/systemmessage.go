@@ -94,6 +94,10 @@ const (
 	SystemMessageShotsNotAvailableForDeadPet      = 1598
 	SystemMessageNotEnoughSpiritshotsForPet       = 1700
 	SystemMessageNotEnoughSoulshotsForPet         = 1701
+	SystemMessageCantAtkPeacezone                 = 84
+	SystemMessageTargetInPeacezone                = 85
+	SystemMessageCantSeeTarget                    = 181
+	SystemMessageDistTooFarCastingStopped         = 748
 
 	// Periodic in-game clock messages.
 	SystemMessagePlayingForLongTime       = 764  // no parameter
