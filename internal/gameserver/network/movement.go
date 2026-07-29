@@ -129,11 +129,17 @@ func (l *GameClientLink) broadcastLiveRevive(live *livePlayer) {
 	})
 }
 
-// broadcastLiveFrame sends frame() to live's own session and to every
-// object it currently knows, building a fresh frame per recipient since
-// each wire.Frame is released after its own send.
+// broadcastLiveFrame sends one serialized frame to live's own session and to
+// every object it currently knows. Each recipient gets an independent pooled
+// copy because its session encrypts outgoing bytes in place.
 func (l *GameClientLink) broadcastLiveFrame(live *livePlayer, frame func() wire.Frame) {
-	live.SendFrame(frame())
+	serialized := frame()
+	defer serialized.Release()
+
+	send := func(receiver frameReceiver) {
+		receiver.SendFrame(serverpackets.CopyFrame(serialized))
+	}
+	send(live)
 	if l.world == nil {
 		return
 	}
@@ -144,7 +150,7 @@ func (l *GameClientLink) broadcastLiveFrame(live *livePlayer, frame func() wire.
 		if !ok {
 			continue
 		}
-		receiver.SendFrame(frame())
+		send(receiver)
 	}
 }
 
