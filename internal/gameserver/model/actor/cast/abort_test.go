@@ -2,6 +2,7 @@ package cast
 
 import (
 	"errors"
+	"slices"
 	"testing"
 	"time"
 
@@ -88,6 +89,39 @@ func TestAbortObserverFiresOnlyForAnInFlightCast(t *testing.T) {
 			}
 			if ctrl.CastingNow() {
 				t.Fatal("CastingNow() = true after the cast ended, want cleared")
+			}
+		})
+	}
+}
+
+func TestFinishObserverReportsEveryInFlightCastOnce(t *testing.T) {
+	now := time.Unix(1000, 0)
+
+	tests := []struct {
+		name  string
+		end   func(*Controller)
+		start bool
+		want  []bool
+	}{
+		{name: "abort", start: true, end: func(c *Controller) { c.Stop() }, want: []bool{true}},
+		{name: "natural finish", start: true, end: func(c *Controller) { c.Finish() }, want: []bool{false}},
+		{name: "idle stop", end: func(c *Controller) { c.Stop() }},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl, _, _ := newAbortController()
+			var got []bool
+			ctrl.SetOnFinish(func(interrupted bool) { got = append(got, interrupted) })
+			if tt.start {
+				if _, err := ctrl.Start(now, testTarget{}, scalingDef); err != nil {
+					t.Fatalf("Start() error: %v", err)
+				}
+			}
+
+			tt.end(ctrl)
+			if !slices.Equal(got, tt.want) {
+				t.Fatalf("finish observer = %v, want %v", got, tt.want)
 			}
 		})
 	}
