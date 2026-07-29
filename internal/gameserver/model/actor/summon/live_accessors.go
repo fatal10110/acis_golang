@@ -1,0 +1,180 @@
+package summon
+
+import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+)
+
+func (a *Actor) ObjectID() int32 { return a.id }
+
+// OwnerID returns the owning player's world object id.
+func (a *Actor) OwnerID() int32 {
+	if a.owner == nil {
+		return 0
+	}
+	return a.owner.ObjectID()
+}
+
+// Level returns the summon's current level.
+func (a *Actor) Level() int { return a.level }
+
+// IsPet reports whether this live summon is a pet rather than a servitor.
+func (a *Actor) IsPet() bool { return a.isPet }
+
+// SummonType returns the client-visible summon type code.
+func (a *Actor) SummonType() int {
+	if a.isPet {
+		return 2
+	}
+	return 1
+}
+
+// NPCID returns the template id backing this summon.
+func (a *Actor) NPCID() int { return a.npcID }
+
+// ScaledExpGain returns rawExp multiplied by this pet's configured
+// experience rate.
+func (a *Actor) ScaledExpGain(rawExp int64) int64 {
+	if a == nil || !a.isPet {
+		return 0
+	}
+	if a.petConfig == nil {
+		return petmodel.DefaultConfig().ScaledExpGain(a.npcID, rawExp)
+	}
+	return a.petConfig.ScaledExpGain(a.npcID, rawExp)
+}
+
+// CanWearPetItem reports whether this pet can equip tmpl.
+func (a *Actor) CanWearPetItem(tmpl *item.Template) bool {
+	if a == nil || tmpl == nil {
+		return false
+	}
+	switch a.npcID {
+	case 12311, 12312, 12313:
+		return tmpl.Slot == item.SlotHatchling
+	case 12077:
+		return tmpl.Slot == item.SlotWolf
+	case 12526, 12527, 12528:
+		return tmpl.Slot == item.SlotStrider
+	case 12780, 12781, 12782:
+		return tmpl.Slot == item.SlotBabyPet
+	default:
+		return false
+	}
+}
+
+// Dead reports whether the summon is dead.
+func (a *Actor) Dead() bool { return a.dead }
+
+// AlikeDead reports whether this summon is dead, satisfying
+// attackable.Combatant so a summon can be targeted by its own owner-
+// commanded skills (e.g. a self-cast special skill).
+func (a *Actor) AlikeDead() bool { return a.dead }
+
+// SiegeGuard always reports false: pets and servitors are never defensive
+// siege guards.
+func (a *Actor) SiegeGuard() bool { return false }
+
+// GetSkill returns the skill this summon's npc template grants at skillID,
+// matching Java's Summon.getSkill. ok is false when the template doesn't
+// grant that skill id at all.
+func (a *Actor) GetSkill(skillID int) (modelskill.Ref, bool) {
+	level, ok := a.skills[skillID]
+	if !ok {
+		return modelskill.Ref{}, false
+	}
+	return modelskill.Ref{ID: modelskill.ID(skillID), Level: level}, true
+}
+
+// CanUseSkill reports whether the owner may currently command this summon
+// to use one of its special skills. Matching Java's
+// RequestActionUse.useSkill, this only gates a pet on the owner-vs-pet
+// level gap; it does not check out-of-control state the way movement
+// commands do, and servitors have no gate at all.
+func (a *Actor) CanUseSkill() bool {
+	if !a.isPet {
+		return true
+	}
+	ownerLevel := 0
+	if a.owner != nil {
+		ownerLevel = a.owner.LevelValue()
+	}
+	return a.level-ownerLevel <= 20
+}
+
+// TryUseSkill dispatches an owner-commanded special-skill cast: resolves
+// skillID against this summon's own skill catalog, checks the level gate,
+// then forwards to the attached AI. It returns false wherever Java's
+// useSkill would return false (unknown skill, level gap, no attached AI).
+func (a *Actor) TryUseSkill(skillID int, target attackable.Combatant) bool {
+	ref, ok := a.GetSkill(skillID)
+	if !ok || !a.CanUseSkill() || a.brain == nil {
+		return false
+	}
+	return a.brain.TryToCast(target, ref)
+}
+
+// OutOfControl reports whether the owner cannot currently command this
+// summon.
+func (a *Actor) OutOfControl() bool { return a.disabled }
+
+// OwnerCombatant returns the owning player when it can be targeted by AI.
+func (a *Actor) OwnerCombatant() attackable.Combatant {
+	owner, _ := a.owner.(attackable.Combatant)
+	return owner
+}
+
+// SetAI attaches the summon intention loop used by accepted commands.
+func (a *Actor) SetAI(brain AI) {
+	a.brain = brain
+}
+
+// TryToAttack forwards an attack request to the attached AI when target is
+// a live combatant.
+func (a *Actor) TryToAttack(target any) {
+	combatant, ok := target.(attackable.Combatant)
+	if !ok || a.brain == nil {
+		return
+	}
+	a.brain.TryToAttack(combatant)
+}
+
+// TryToFollow forwards a follow request to the attached AI when target is
+// a live combatant.
+func (a *Actor) TryToFollow(target any) {
+	combatant, ok := target.(attackable.Combatant)
+	if !ok || a.brain == nil {
+		return
+	}
+	a.brain.TryToFollow(combatant)
+}
+
+// TryToIdle cancels the attached AI's current intention.
+func (a *Actor) TryToIdle() {
+	a.intent = IntentIdle
+	if a.brain != nil {
+		a.brain.TryToIdle()
+	}
+}
+
+// PetInventory returns the pet's inventory, or nil for servitors.
+func (a *Actor) PetInventory() *itemcontainer.Inventory {
+	if !a.isPet {
+		return nil
+	}
+	return a.petInventory
+}
+
+// Fed returns a pet's current meal gauge.
+func (a *Actor) Fed() int { return a.fed }
+
+// FollowActive reports whether this actor is following its owner.
+func (a *Actor) FollowActive() bool { return a.followActive }
+
+// Intent returns the live action this actor is currently pursuing.
+func (a *Actor) Intent() Intent { return a.intent }
+
+// ApplyCommand resolves and applies an owner-issued control command.
