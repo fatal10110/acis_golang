@@ -57,14 +57,13 @@ type attackStanceEntry struct {
 // AttackStance tracks actors whose combat animation should remain active
 // until the inactivity period expires.
 //
-// All methods are safe for concurrent use; mu guards entries and scratch,
-// while tickMu keeps concurrent ticks from reusing scratch before callbacks finish.
+// mu guards entries and the scratch refill. Tick only ever runs on the
+// scheduler ticker's single goroutine, one call at a time.
 type AttackStance struct {
 	effects AttackStanceEffects
 	now     func() time.Time
 
 	mu      sync.Mutex
-	tickMu  sync.Mutex
 	entries map[int32]attackStanceEntry
 	scratch []attackStanceEntry
 }
@@ -136,9 +135,6 @@ func (a *AttackStance) InAttackStance(actor AttackStanceActor) bool {
 func (a *AttackStance) Tick() {
 	now := a.now()
 
-	a.tickMu.Lock()
-	defer a.tickMu.Unlock()
-
 	a.mu.Lock()
 	a.scratch = a.scratch[:0]
 	for id, entry := range a.entries {
@@ -159,6 +155,7 @@ func (a *AttackStance) Tick() {
 			}
 		}
 	}
+	clear(a.scratch)
 }
 
 func stanceOwner(actor AttackStanceActor) AttackStanceActor {

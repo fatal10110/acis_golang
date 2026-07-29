@@ -44,6 +44,11 @@ func TestAIManagerTickAllocationIsFlat(t *testing.T) {
 		mgr.Add(&aiActorStub{id: int32(i + 1)})
 	}
 	mgr.Tick()
+	for i, actor := range mgr.scratch {
+		if actor != nil {
+			t.Fatalf("scratch[%d] retains actor after Tick", i)
+		}
+	}
 
 	if allocs := testing.AllocsPerRun(100, mgr.Tick); allocs != 0 {
 		t.Fatalf("AllocsPerRun(128 actors) = %v, want 0", allocs)
