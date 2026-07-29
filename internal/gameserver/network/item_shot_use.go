@@ -68,7 +68,7 @@ func (l *GameClientLink) useShotItem(live *livePlayer, inv *itemcontainer.Invent
 		Inventory: inv,
 		Item:      inst,
 		Template:  tmpl,
-		Destroyer: l.inventoryService(),
+		Destroyer: l.inventory,
 	})
 
 	switch res.Outcome {
@@ -139,7 +139,7 @@ func (l *GameClientLink) useBeastShotItem(live *livePlayer, inv *itemcontainer.I
 		Inventory: inv,
 		Item:      inst,
 		Template:  tmpl,
-		Destroyer: l.inventoryService(),
+		Destroyer: l.inventory,
 	})
 
 	switch res.Outcome {

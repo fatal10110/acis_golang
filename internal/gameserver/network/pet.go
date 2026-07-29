@@ -41,7 +41,7 @@ func (l *GameClientLink) giveItemToPet(ctx context.Context, live *livePlayer, re
 	if playerInv == nil {
 		return
 	}
-	res, failure, err := l.petItemService().GiveToPet(playerInv, petInv, pet, live, req.ObjectID, int(req.Count))
+	res, failure, err := l.petItems.GiveToPet(playerInv, petInv, pet, live, req.ObjectID, int(req.Count))
 	if err != nil {
 		l.log.Error().Err(err).Msg("transfer item to pet")
 		return
@@ -84,7 +84,7 @@ func (l *GameClientLink) getItemFromPet(ctx context.Context, live *livePlayer, r
 	if playerInv == nil {
 		return
 	}
-	res, ok, err := l.petItemService().GetFromPet(petInv, playerInv, req.ObjectID, int(req.Count))
+	res, ok, err := l.petItems.GetFromPet(petInv, playerInv, req.ObjectID, int(req.Count))
 	if err != nil {
 		l.log.Error().Err(err).Msg("transfer item from pet")
 		return
