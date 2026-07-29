@@ -82,6 +82,7 @@ func (w *Writer) WriteBytes(b []byte) {
 // 16-bit code units, followed by a trailing 0x0000 unit.
 func (w *Writer) WriteString(s string) {
 	for _, r := range s {
+		// Ranging over a string replaces invalid UTF-8, including encoded surrogates, with RuneError.
 		if r < 0x10000 {
 			w.WriteUint16(uint16(r))
 			continue

@@ -78,7 +78,7 @@ func TestWriterStringDoesNotAllocateWithReusedWriter(t *testing.T) {
 	w := NewFrameWriter(64)
 	allocs := testing.AllocsPerRun(1000, func() {
 		w.ResetFrame(64)
-		w.WriteString("PlayerName")
+		w.WriteString("PlayerName\U0001F600")
 	})
 	if allocs != 0 {
 		t.Fatalf("WriteString allocations = %v, want 0", allocs)
