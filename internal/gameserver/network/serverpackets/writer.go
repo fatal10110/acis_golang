@@ -6,9 +6,12 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 )
 
-const packetWriterCapacity = 256
+const (
+	packetWriterCapacity    = 256
+	maxPacketWriterCapacity = packetWriterCapacity * 4
+)
 
-var packetWriterPool = sync.Pool{
+var packetWriterPool = &sync.Pool{
 	New: func() any {
 		return wire.NewFrameWriter(packetWriterCapacity)
 	},
@@ -27,5 +30,8 @@ func newFrameWriter(opcode byte) *wire.Writer {
 }
 
 func releaseFrameWriter(w *wire.Writer) {
+	if cap(w.Frame()) > maxPacketWriterCapacity {
+		return
+	}
 	packetWriterPool.Put(w)
 }
