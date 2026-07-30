@@ -27,7 +27,7 @@ func TestItemFlushStore_Flush_Atomic(t *testing.T) {
 	}
 
 	batch := item.FlushBatch{
-		Saves: []*item.Instance{
+		Saves: []item.InstanceState{
 			{ObjectID: 0x10000101, TemplateID: 10, OwnerID: 0x10000001, Count: 5, Location: item.LocationInventory, ManaLeft: -1},
 			{ObjectID: 0x10000102, TemplateID: 10, OwnerID: 0x10000001, Count: 3, Location: item.LocationInventory, ManaLeft: -1},
 		},
@@ -73,7 +73,7 @@ func TestItemFlushStore_Flush_MultiRow(t *testing.T) {
 	}
 
 	batch := item.FlushBatch{
-		Saves: []*item.Instance{
+		Saves: []item.InstanceState{
 			{ObjectID: 0x10000301, TemplateID: 10, OwnerID: 0x10000001, Count: 7, Location: item.LocationInventory, ManaLeft: -1},
 		},
 		Deletes: []int32{0x10000201},
@@ -136,9 +136,9 @@ func TestItemFlushStore_Flush_ChunksLargeBatches(t *testing.T) {
 	store := NewItemFlushStore(db)
 
 	const n = itemFlushChunkSize + 250
-	saves := make([]*item.Instance, n)
+	saves := make([]item.InstanceState, n)
 	for i := range n {
-		saves[i] = &item.Instance{
+		saves[i] = item.InstanceState{
 			ObjectID: 0x10000001 + int32(i), TemplateID: 10, OwnerID: 0x10000001,
 			Count: i + 1, Location: item.LocationInventory, ManaLeft: -1,
 		}

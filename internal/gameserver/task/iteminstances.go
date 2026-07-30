@@ -118,13 +118,11 @@ func (i *ItemInstances) UpdateItems(ctx context.Context, items []*item.Instance)
 		return errors.New("task: item persistence is nil")
 	}
 
+	items = slices.DeleteFunc(items, func(inst *item.Instance) bool { return inst == nil })
 	slices.SortFunc(items, func(a, b *item.Instance) int { return cmp.Compare(a.ObjectID, b.ObjectID) })
 
 	var batch item.FlushBatch
 	for _, inst := range items {
-		if inst == nil {
-			continue
-		}
 		i.addToBatch(&batch, inst)
 	}
 	return i.flusher.Flush(ctx, batch)
@@ -162,7 +160,7 @@ func (i *ItemInstances) addToBatch(batch *item.FlushBatch, inst *item.Instance) 
 		return
 	}
 
-	batch.Saves = append(batch.Saves, st.Instance())
+	batch.Saves = append(batch.Saves, st)
 	if isWeapon {
 		if st.Augmentation == nil {
 			batch.AugmentationDeletes = append(batch.AugmentationDeletes, st.ObjectID)

@@ -28,9 +28,7 @@ type recordingItemPersistence struct {
 func (r *recordingItemPersistence) Flush(_ context.Context, batch item.FlushBatch) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	for _, inst := range batch.Saves {
-		r.saved = append(r.saved, inst.Snapshot())
-	}
+	r.saved = append(r.saved, batch.Saves...)
 	r.deleted = append(r.deleted, batch.Deletes...)
 	return nil
 }

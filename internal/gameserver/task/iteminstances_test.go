@@ -36,7 +36,7 @@ func TestItemInstancesSaveFlushesAndClearsPendingItems(t *testing.T) {
 		t.Fatalf("Save() error = %v", err)
 	}
 
-	batch := flusher.batch
+	batch := flusher.last()
 	if got, want := savedIDs(batch.Saves), []int32{1}; !slices.Equal(got, want) {
 		t.Fatalf("saved item ids = %v, want %v", got, want)
 	}
@@ -71,11 +71,12 @@ func TestItemInstancesSaveDeletesVoidItemsWithoutDeletingAugmentation(t *testing
 		t.Fatalf("Save() error = %v", err)
 	}
 
-	if got, want := flusher.batch.Deletes, []int32{1}; !slices.Equal(got, want) {
+	batch := flusher.last()
+	if got, want := batch.Deletes, []int32{1}; !slices.Equal(got, want) {
 		t.Fatalf("deleted item ids = %v, want %v", got, want)
 	}
-	if len(flusher.batch.AugmentationDeletes) != 0 {
-		t.Fatalf("void item with positive count should not delete augmentation, got %v", flusher.batch.AugmentationDeletes)
+	if len(batch.AugmentationDeletes) != 0 {
+		t.Fatalf("void item with positive count should not delete augmentation, got %v", batch.AugmentationDeletes)
 	}
 }
 
@@ -143,7 +144,13 @@ func (s *itemFlusherStub) Flush(_ context.Context, batch item.FlushBatch) error 
 	return nil
 }
 
-func savedIDs(saves []*item.Instance) []int32 {
+func (s *itemFlusherStub) last() item.FlushBatch {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.batch
+}
+
+func savedIDs(saves []item.InstanceState) []int32 {
 	ids := make([]int32, len(saves))
 	for i, inst := range saves {
 		ids[i] = inst.ObjectID

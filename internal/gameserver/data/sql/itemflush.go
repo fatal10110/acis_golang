@@ -52,16 +52,16 @@ func (s *ItemFlushStore) Flush(ctx context.Context, batch item.FlushBatch) error
 	if err := flushItemSaves(ctx, tx, batch.Saves); err != nil {
 		return err
 	}
-	if err := flushInt32Delete(ctx, tx, "items", "DELETE FROM items WHERE object_id IN (%s)", batch.Deletes); err != nil {
+	if err := flushInt32Delete(ctx, tx, "items", "object_id", batch.Deletes); err != nil {
 		return err
 	}
 	if err := flushAugmentationSaves(ctx, tx, batch.AugmentationSaves); err != nil {
 		return err
 	}
-	if err := flushInt32Delete(ctx, tx, "augmentations", "DELETE FROM augmentations WHERE item_oid IN (%s)", batch.AugmentationDeletes); err != nil {
+	if err := flushInt32Delete(ctx, tx, "augmentations", "item_oid", batch.AugmentationDeletes); err != nil {
 		return err
 	}
-	if err := flushInt32Delete(ctx, tx, "pets", "DELETE FROM pets WHERE item_obj_id IN (%s)", batch.PetDeletes); err != nil {
+	if err := flushInt32Delete(ctx, tx, "pets", "item_obj_id", batch.PetDeletes); err != nil {
 		return err
 	}
 
@@ -72,11 +72,10 @@ func (s *ItemFlushStore) Flush(ctx context.Context, batch item.FlushBatch) error
 	return nil
 }
 
-// flushItemSaves reads saves' fields directly rather than through
-// Snapshot(): FlushBatch.Saves holds instances task.ItemInstances already
-// detached via InstanceState.Instance(), so nothing else can be mutating
-// them concurrently.
-func flushItemSaves(ctx context.Context, tx *sql.Tx, saves []*item.Instance) error {
+// flushItemSaves reads saves' fields directly: FlushBatch.Saves holds
+// point-in-time state, not a live instance, so nothing else can be
+// mutating it concurrently.
+func flushItemSaves(ctx context.Context, tx *sql.Tx, saves []item.InstanceState) error {
 	for chunk := range slices.Chunk(saves, itemFlushChunkSize) {
 		placeholders := make([]string, len(chunk))
 		args := make([]any, 0, len(chunk)*11)
@@ -121,7 +120,10 @@ func flushAugmentationSaves(ctx context.Context, tx *sql.Tx, saves []item.FlushA
 	return nil
 }
 
-func flushInt32Delete(ctx context.Context, tx *sql.Tx, table, queryFmt string, ids []int32) error {
+// flushInt32Delete deletes every row in table whose column matches one of
+// ids, building the statement from table and column itself so the query
+// and the error message it can produce always name the same table.
+func flushInt32Delete(ctx context.Context, tx *sql.Tx, table, column string, ids []int32) error {
 	for chunk := range slices.Chunk(ids, itemFlushChunkSize) {
 		placeholders := strings.TrimSuffix(strings.Repeat("?,", len(chunk)), ",")
 		args := make([]any, len(chunk))
@@ -129,7 +131,8 @@ func flushInt32Delete(ctx context.Context, tx *sql.Tx, table, queryFmt string, i
 			args[i] = id
 		}
 
-		if _, err := tx.ExecContext(ctx, fmt.Sprintf(queryFmt, placeholders), args...); err != nil {
+		query := fmt.Sprintf("DELETE FROM %s WHERE %s IN (%s)", table, column, placeholders)
+		if _, err := tx.ExecContext(ctx, query, args...); err != nil {
 			return fmt.Errorf("delete %d %s (object ids %d..%d): %w", len(chunk), table, chunk[0], chunk[len(chunk)-1], err)
 		}
 	}
