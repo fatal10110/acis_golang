@@ -128,6 +128,11 @@ func (inv *Inventory) AddNew(templateID int32, count int, objectID int32) *item.
 		return nil
 	}
 	result, _ := inv.Add(inst)
+	if result != nil {
+		// Nothing else drains this queue: the change came from the server, so
+		// no client-request handler is on its way to send the packet.
+		inv.notifyUpdate()
+	}
 	return result
 }
 
@@ -630,15 +635,21 @@ func (inv *Inventory) DrainUpdates() []Update {
 	return out
 }
 
-// SetUpdateNotifier records the hook fired whenever inv queues a client
-// update, so a server-driven change — an auto-looted kill reward, a task
-// consuming a stack — reaches the owner's client instead of waiting for
-// the next inventory action the owner happens to perform. Passing nil
-// detaches the hook; an inventory without one simply keeps queueing.
+// SetUpdateNotifier records the hook fired when a server-driven change
+// queues a client update — an auto-looted kill reward, a task consuming a
+// stack — so it reaches the owner's client instead of waiting for the next
+// inventory action the owner happens to perform. Passing nil detaches the
+// hook; an inventory without one simply keeps queueing.
 //
-// The hook runs while inv's own lock is held, so it must only hand the
-// inventory off (registering it with the batching task, say) and must not
-// call back into inv.
+// Only server-driven mutation entry points notify (see notifyUpdate).
+// A client-requested change must not: its own handler drains the queue and
+// sends the packet in the sequence it built, and handing the same queue to
+// the batching task as well would let a tick land mid-sequence and drain it
+// first.
+//
+// The hook runs with no inventory lock held, but it is still meant only to
+// hand the inventory off (registering it with the batching task, say) rather
+// than to mutate it.
 func (inv *Inventory) SetUpdateNotifier(notify func()) {
 	inv.mu.Lock()
 	defer inv.mu.Unlock()
@@ -682,17 +693,22 @@ func (inv *Inventory) queueUpdateRecordLocked(objectID, templateID int32, count 
 		for i, u := range inv.updates {
 			if u.ObjectID == objectID && u.State == state {
 				inv.updates[i].Count = count
-				inv.notifyLocked()
 				return
 			}
 		}
 	}
 	inv.updates = append(inv.updates, Update{ObjectID: objectID, TemplateID: templateID, Count: count, State: state})
-	inv.notifyLocked()
 }
 
-func (inv *Inventory) notifyLocked() {
-	if inv.notify != nil {
-		inv.notify()
+// notifyUpdate fires the update hook for a change nobody is waiting to drain.
+// Server-driven mutation entry points call it after queueing; it reads the
+// hook under the lock and calls it outside, so a hook that reaches back into
+// inv cannot deadlock against the mutation that triggered it.
+func (inv *Inventory) notifyUpdate() {
+	inv.mu.Lock()
+	notify := inv.notify
+	inv.mu.Unlock()
+	if notify != nil {
+		notify()
 	}
 }

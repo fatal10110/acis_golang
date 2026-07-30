@@ -13,6 +13,7 @@ const maxSP = math.MaxInt32
 // nil, in which case a level increase still updates c.CharLevel and c.Exp but
 // leaves HP/MP/CP untouched. It reports whether the level increased.
 func (c *Character) AddExpAndSp(table *LevelTable, tmpl *Template, exp int64, sp int) bool {
+	beforeExp, beforeSP := c.Exp, c.SP
 	leveledUp := false
 	if exp >= 0 {
 		leveledUp = c.AddExp(table, tmpl, exp)
@@ -20,7 +21,12 @@ func (c *Character) AddExpAndSp(table *LevelTable, tmpl *Template, exp int64, sp
 	if sp >= 0 {
 		c.AddSp(sp)
 	}
-	c.UpdateUserInfo()
+	// Only an add that actually landed pushes UserInfo, matching the
+	// reference's experience setter, which returns early — before its own
+	// packet — when the addition is dropped. Both adds here can be no-ops.
+	if c.Exp != beforeExp || c.SP != beforeSP {
+		c.UpdateUserInfo()
+	}
 	return leveledUp
 }
 
@@ -28,10 +34,13 @@ func (c *Character) AddExpAndSp(table *LevelTable, tmpl *Template, exp int64, sp
 // template for level-up stat refills.
 func (c *Character) RewardExpAndSp(table *LevelTable, exp int64, sp int) bool {
 	if table == nil {
+		beforeSP := c.SP
 		if sp >= 0 {
 			c.AddSp(sp)
 		}
-		c.UpdateUserInfo()
+		if c.SP != beforeSP {
+			c.UpdateUserInfo()
+		}
 		return false
 	}
 	return c.AddExpAndSp(table, c.runtimeTemplate, exp, sp)

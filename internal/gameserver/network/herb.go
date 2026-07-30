@@ -21,9 +21,17 @@ func (l *GameClientLink) consumeHerb(live *livePlayer, itemID int32) {
 	if inv == nil {
 		return
 	}
+	// Only a herb template may take this path: the transient instance below
+	// carries no object id, and the instant-cast path only skips its stack
+	// decrement — the destroy that would run against the live inventory —
+	// for herbs. Checking here keeps that precondition local to the function
+	// that depends on it, for every caller.
+	tmpl, ok := inv.Templates().Get(itemID)
+	if !ok || tmpl.EtcItem == nil || tmpl.EtcItem.Type != item.EtcItemHerb {
+		return
+	}
 	// ponytail: a transient off-inventory instance is enough here — the
-	// instant-cast path reads only its template, and skips the stack
-	// decrement for herbs.
+	// instant-cast path reads only its template.
 	herb := &item.Instance{TemplateID: itemID, Count: 1, Location: item.LocationVoid}
 	beforeVitals := live.Vitals()
 	res := itemhandler.Use(itemhandler.UseRequest{

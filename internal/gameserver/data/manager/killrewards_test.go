@@ -105,36 +105,27 @@ func TestKillReward_SkipsSpoilWithoutPool(t *testing.T) {
 	}
 }
 
-func TestKillReward_SkipsAutoLootHerbs(t *testing.T) {
-	items := item.NewTable([]*item.Template{{ID: 8600, Name: "herb"}})
-	ground := &recordingGround{}
-	ids := &sequentialIDs{}
+// herbTable is a drop table holding one real herb template: the etc type is
+// what decides herb handling, not the drop category it was rolled from.
+func herbTable() *item.Table {
+	return item.NewTable([]*item.Template{{
+		ID: 8600, Name: "herb", Kind: item.KindEtcItem,
+		EtcItem: &item.EtcItemDetail{Type: item.EtcItemHerb, Handler: "ItemSkills"},
+	}})
+}
 
-	categories := []item.DropCategory{
+func herbCategories() []item.DropCategory {
+	return []item.DropCategory{
 		{Kind: item.DropHerb, Chance: 100, Drops: []item.Drop{{ItemID: 8600, Min: 1, Max: 1, Chance: 100}}},
-	}
-	rates := item.Rates{Spoil: 1, Currency: 1, Item: 1, ItemRaid: 1, Herb: 1}
-
-	r := NewKillReward(categories, nil, 1, false, rates, false, true, ids, items, ground, 0, 0, 0, 0, 0)
-	r.CalculateRewards(nopKiller{id: 1})
-
-	if len(ground.items) != 0 {
-		t.Fatalf("dropped %d auto-loot herbs on the ground, want 0", len(ground.items))
 	}
 }
 
 func TestKillReward_ConsumesAutoLootHerbInsteadOfStoringIt(t *testing.T) {
-	items := item.NewTable([]*item.Template{{ID: 8600, Name: "herb"}})
 	ground := &recordingGround{}
-	ids := &sequentialIDs{}
-
-	categories := []item.DropCategory{
-		{Kind: item.DropHerb, Chance: 100, Drops: []item.Drop{{ItemID: 8600, Min: 1, Max: 1, Chance: 100}}},
-	}
 	rates := item.Rates{Spoil: 1, Currency: 1, Item: 1, ItemRaid: 1, Herb: 1}
 
 	killer := &lootKiller{id: 1}
-	r := NewKillReward(categories, nil, 1, false, rates, false, true, ids, items, ground, 0, 0, 0, 0, 0)
+	r := NewKillReward(herbCategories(), nil, 1, false, rates, false, true, &sequentialIDs{}, herbTable(), ground, 0, 0, 0, 0, 0)
 	r.CalculateRewards(killer)
 
 	if len(killer.herbs) != 1 || killer.herbs[0] != 8600 {
@@ -145,6 +136,47 @@ func TestKillReward_ConsumesAutoLootHerbInsteadOfStoringIt(t *testing.T) {
 	}
 	if len(ground.items) != 0 {
 		t.Fatalf("dropped %d auto-loot herbs on the ground, want 0", len(ground.items))
+	}
+}
+
+// TestKillReward_DropsAutoLootHerbWhenKillerCannotConsume covers the killer
+// that cannot consume a herb at all — a pet or servitor kill (#1057). The
+// herb has to stay obtainable rather than vanish between the roll and the
+// delivery.
+func TestKillReward_DropsAutoLootHerbWhenKillerCannotConsume(t *testing.T) {
+	ground := &recordingGround{}
+	rates := item.Rates{Spoil: 1, Currency: 1, Item: 1, ItemRaid: 1, Herb: 1}
+
+	r := NewKillReward(herbCategories(), nil, 1, false, rates, false, true, &sequentialIDs{}, herbTable(), ground, 0, 0, 0, 0, 0)
+	r.CalculateRewards(nopKiller{id: 1})
+
+	if len(ground.items) != 1 || ground.items[0].ItemID() != 8600 {
+		t.Fatalf("ground items = %+v, want the unconsumable herb dropped", ground.items)
+	}
+}
+
+// TestKillReward_StoresNonHerbTemplateFromHerbCategory pins the discriminator:
+// a category tagged HERB holding an ordinary item still delivers that item the
+// ordinary way instead of being consumed and discarded.
+func TestKillReward_StoresNonHerbTemplateFromHerbCategory(t *testing.T) {
+	items := item.NewTable([]*item.Template{{
+		ID: 8600, Name: "not-a-herb", Kind: item.KindEtcItem, EtcItem: &item.EtcItemDetail{},
+	}})
+	ground := &recordingGround{}
+	rates := item.Rates{Spoil: 1, Currency: 1, Item: 1, ItemRaid: 1, Herb: 1}
+
+	killer := &lootKiller{id: 1}
+	r := NewKillReward(herbCategories(), nil, 1, false, rates, false, true, &sequentialIDs{}, items, ground, 0, 0, 0, 0, 0)
+	r.CalculateRewards(killer)
+
+	if len(killer.herbs) != 0 {
+		t.Fatalf("consumed herbs = %v, want none for a non-herb template", killer.herbs)
+	}
+	if got := killer.items[8600]; got != 1 {
+		t.Fatalf("inventory count = %d, want 1", got)
+	}
+	if len(ground.items) != 0 {
+		t.Fatalf("dropped %d items on the ground, want 0", len(ground.items))
 	}
 }
 

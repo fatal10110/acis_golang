@@ -55,8 +55,11 @@ func manaHealOverTimeAction(e *Effect) bool {
 	if !target.CanBeHealed() {
 		return false
 	}
-	target.AddMP(e.Template.Value)
-	broadcastStatus(e.Effected)
+	// Same bypass as the HP tick: a full-MP target applies 0 and the
+	// reference's MP setter — and its status update — never runs.
+	if target.AddMP(e.Template.Value) > 0 {
+		broadcastStatus(e.Effected)
+	}
 	return true
 }
 

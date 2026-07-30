@@ -11,16 +11,25 @@ type noBonusHealTarget struct {
 	hp          float64
 	mp          float64
 	canBeHealed bool
+	// full models a target already at its maximum: the live character's
+	// AddHP/AddMP apply nothing and report 0 in that state.
+	full bool
 }
 
 func (t *noBonusHealTarget) CanBeHealed() bool { return t.canBeHealed }
 
 func (t *noBonusHealTarget) AddHP(amount float64) float64 {
+	if t.full {
+		return 0
+	}
 	t.hp += amount
 	return amount
 }
 
 func (t *noBonusHealTarget) AddMP(amount float64) float64 {
+	if t.full {
+		return 0
+	}
 	t.mp += amount
 	return amount
 }
@@ -152,16 +161,23 @@ func (t *broadcastingHealTarget) BroadcastStatus() { t.broadcasts++ }
 // TestHealOverTimeTickBroadcastsStatus pins the client notification a
 // periodic heal owes its target: the tick runs outside any client request,
 // so without it the bars keep showing the value the client was last told.
+// A tick that applied nothing broadcasts nothing — the reference's HP/MP
+// setters bypass themselves, and their status update, at zero applied, which
+// is every tick of a regen buff on an already-full target.
 func TestHealOverTimeTickBroadcastsStatus(t *testing.T) {
 	for _, tt := range []struct {
-		name string
-		kind string
+		name           string
+		kind           string
+		full           bool
+		wantBroadcasts int
 	}{
-		{name: "hp", kind: "HealOverTime"},
-		{name: "mp", kind: "ManaHealOverTime"},
+		{name: "hp", kind: "HealOverTime", wantBroadcasts: 1},
+		{name: "mp", kind: "ManaHealOverTime", wantBroadcasts: 1},
+		{name: "hp already full", kind: "HealOverTime", full: true},
+		{name: "mp already full", kind: "ManaHealOverTime", full: true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			target := &broadcastingHealTarget{noBonusHealTarget: noBonusHealTarget{canBeHealed: true}}
+			target := &broadcastingHealTarget{noBonusHealTarget: noBonusHealTarget{canBeHealed: true, full: tt.full}}
 			e, err := New(Skill{ID: 1}, modelskill.EffectTemplate{Name: tt.kind, Value: 10})
 			if err != nil {
 				t.Fatalf("New() error: %v", err)
@@ -171,8 +187,8 @@ func TestHealOverTimeTickBroadcastsStatus(t *testing.T) {
 			if !e.OnAction(e) {
 				t.Fatalf("%s tick rejected a healable target", tt.kind)
 			}
-			if target.broadcasts != 1 {
-				t.Errorf("status broadcasts = %d, want 1", target.broadcasts)
+			if target.broadcasts != tt.wantBroadcasts {
+				t.Errorf("status broadcasts = %d, want %d", target.broadcasts, tt.wantBroadcasts)
 			}
 		})
 	}

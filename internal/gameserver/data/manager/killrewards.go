@@ -87,13 +87,34 @@ func (k *KillReward) CalculateRewards(killer creature.DeathActor) {
 	}
 	for _, herb := range herbs {
 		if herb.AutoLoot {
-			if consumer, ok := killer.(herbReceiver); ok {
-				consumer.ConsumeHerb(herb.ItemID)
+			if k.consumeHerb(killer, herb.ItemID) {
+				continue
 			}
-			continue
+			// Not a herb this killer can consume: an auto-looted stack still
+			// belongs to the killer, so try the inventory before the ground.
+			if k.addToInventory(receiver, herb.ItemID, int(herb.Amount)) {
+				continue
+			}
 		}
 		k.drop(herb.ItemID, int(herb.Amount))
 	}
+}
+
+// consumeHerb applies itemID to killer instantly and reports whether it did.
+// The decision follows the item template's etc type, not the drop category
+// it was rolled from: only a real herb template is consumed on receipt, so a
+// category mislabelled HERB still delivers its item the ordinary way.
+func (k *KillReward) consumeHerb(killer creature.DeathActor, itemID int32) bool {
+	tmpl, ok := k.items.Get(itemID)
+	if !ok || tmpl.EtcItem == nil || tmpl.EtcItem.Type != item.EtcItemHerb {
+		return false
+	}
+	consumer, ok := killer.(herbReceiver)
+	if !ok {
+		return false
+	}
+	consumer.ConsumeHerb(itemID)
+	return true
 }
 
 func (k *KillReward) addToInventory(receiver rewardItemReceiver, itemID int32, count int) bool {

@@ -6,10 +6,14 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
+	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -145,20 +149,41 @@ func TestPickupLiveGroundItemMovesItemAndDespawns(t *testing.T) {
 	}
 }
 
-// TestPickupLiveGroundItemConsumesHerbWithoutStoringIt is the regression
-// test for a herb looted from a mob showing up as a blank inventory square:
-// a herb carries no inventory icon, is used the instant it is picked up, and
-// must never reach the inventory or a store row.
-func TestPickupLiveGroundItemConsumesHerbWithoutStoringIt(t *testing.T) {
-	const herbTemplate int32 = 8600
-	templates := item.NewTable([]*item.Template{{
-		ID:             herbTemplate,
+// herbTestTemplates is one herb template carrying herbTestSkill.
+func herbTestTemplates() *item.Table {
+	return item.NewTable([]*item.Template{{
+		ID:             8600,
 		Name:           "Herb of Life",
 		Kind:           item.KindEtcItem,
 		Duration:       -1,
 		EtcItem:        &item.EtcItemDetail{Type: item.EtcItemHerb, Handler: "ItemSkills"},
 		AttachedSkills: []item.SkillRef{{ID: 2278, Level: 1}},
 	}})
+}
+
+// herbTestSkill seeds the herb's carried skill as an instant-cast potion, so
+// the consume path resolves it the way an item-window potion resolves.
+func herbTestSkill(t *testing.T) *skillstate.Persistence {
+	t.Helper()
+	store := newMemorySkillSaveStore()
+	return skillstate.NewPersistence(store, modelskill.NewTable([]modelskill.Definition{{
+		ID: 2278, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+		SkillType: "HOT", Potion: true, HitTime: 0,
+		Effects: []modelskill.EffectTemplate{{Name: "HealOverTime", Count: 5, Time: 3, Value: 12, Icon: true}},
+	}}), store)
+}
+
+// TestPickupLiveGroundItemConsumesHerbWithoutStoringIt is the regression
+// test for a herb looted from a mob showing up as a blank inventory square:
+// a herb carries no inventory icon, is used the instant it is picked up, and
+// must never reach the inventory or a store row. It pins both halves — the
+// herb is gone from the world and absent from the inventory, and its skill
+// actually landed (MagicSkillUse on the wire, effect installed), which an
+// assertion on the absence alone cannot distinguish from the consume call
+// being deleted outright.
+func TestPickupLiveGroundItemConsumesHerbWithoutStoringIt(t *testing.T) {
+	const herbTemplate int32 = 8600
+	templates := herbTestTemplates()
 	capture := &frameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
 	state := world.New()
@@ -169,7 +194,14 @@ func TestPickupLiveGroundItemConsumesHerbWithoutStoringIt(t *testing.T) {
 
 	capture.frames = nil
 	store := &recordingEnchantItemStore{}
-	gcl := &GameClientLink{world: state, groundItems: drops, items: store}
+	gcl := &GameClientLink{
+		world:         state,
+		groundItems:   drops,
+		items:         store,
+		skills:        herbTestSkill(t),
+		targets:       skilltarget.NewRegistry(skilltarget.WorldKnown{State: state}),
+		skillHandlers: handlerskill.NewDefaultRegistry(),
+	}
 
 	if !gcl.pickupLiveGroundItem(context.Background(), live, ground) {
 		t.Fatal("pickupLiveGroundItem returned false for a herb ground item target")
@@ -179,6 +211,7 @@ func TestPickupLiveGroundItemConsumesHerbWithoutStoringIt(t *testing.T) {
 		serverpackets.OpcodeActionFailed,
 		serverpackets.OpcodeGetItem,
 		serverpackets.OpcodeDeleteObject,
+		serverpackets.OpcodeMagicSkillUse,
 	)
 	if _, ok := state.Object(ground.ObjectID()); ok {
 		t.Fatalf("world.Object(%d) still present after herb pickup", ground.ObjectID())
@@ -191,6 +224,39 @@ func TestPickupLiveGroundItemConsumesHerbWithoutStoringIt(t *testing.T) {
 	}
 	if len(store.saved) != 0 || len(store.updated) != 0 {
 		t.Fatalf("store rows saved = %+v updated = %+v, want none for a consumed herb", store.saved, store.updated)
+	}
+	effects := live.EffectList().All()
+	if len(effects) != 1 || effects[0].Skill.ID != 2278 {
+		t.Fatalf("installed effects = %+v, want one effect from the herb's skill 2278", effects)
+	}
+}
+
+// TestConsumeHerbRejectsNonHerbTemplate pins the precondition consumeHerb
+// enforces for both its callers: a non-herb template never builds the
+// transient, object-id-less instance, so no destroy can run against the live
+// inventory.
+func TestConsumeHerbRejectsNonHerbTemplate(t *testing.T) {
+	templates := item.NewTable([]*item.Template{{
+		ID: 20, Name: "Potion", Kind: item.KindEtcItem, Duration: -1,
+		EtcItem:        &item.EtcItemDetail{Type: item.EtcItemPotion, Handler: "ItemSkills"},
+		AttachedSkills: []item.SkillRef{{ID: 2278, Level: 1}},
+	}})
+	capture := &frameCapture{}
+	live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
+	gcl := &GameClientLink{
+		skills:        herbTestSkill(t),
+		targets:       skilltarget.NewRegistry(skilltarget.WorldKnown{State: world.New()}),
+		skillHandlers: handlerskill.NewDefaultRegistry(),
+	}
+
+	capture.frames = nil
+	gcl.consumeHerb(live, 20)
+
+	if len(capture.frames) != 0 {
+		t.Fatalf("frames = %d, want none for a non-herb template", len(capture.frames))
+	}
+	if effects := live.EffectList().All(); len(effects) != 0 {
+		t.Fatalf("installed effects = %+v, want none", effects)
 	}
 }
 

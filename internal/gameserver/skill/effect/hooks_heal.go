@@ -27,8 +27,12 @@ func healOverTimeAction(e *Effect) bool {
 	if !ok || !target.CanBeHealed() {
 		return false
 	}
-	target.AddHP(e.Template.Value)
-	broadcastStatus(e.Effected)
+	// A tick that healed nothing broadcasts nothing: the reference's HP
+	// setter bypasses itself — and the status update with it — when the
+	// applied amount is 0, which is every tick on an already-full target.
+	if target.AddHP(e.Template.Value) > 0 {
+		broadcastStatus(e.Effected)
+	}
 	return true
 }
 

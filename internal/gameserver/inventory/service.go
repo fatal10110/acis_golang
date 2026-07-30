@@ -153,15 +153,16 @@ const (
 	PickupSlotsFull
 )
 
-// LootLocked reports whether ground's drop protection blocks pickerID: an
-// owned ground item is reserved for its owner, an unowned one (OwnerID == 0)
-// is free for anyone.
-func LootLocked(ground *item.Instance, pickerID int32) bool {
-	if ground == nil {
-		return false
-	}
-	owner := ground.Snapshot().OwnerID
-	return owner != 0 && owner != pickerID
+// LootLocked reports whether a ground item owned by ownerID is reserved
+// against pickerID: an unowned item (ownerID == 0) is free for anyone, an
+// owned one only goes to its owner. Callers pass an owner id they already
+// read, so one snapshot decides both the lock and the pickup.
+//
+// The reference also admits the owner's looting party (isLooterOrInLooterParty);
+// this narrower owner comparison is the repo's existing simplification, now
+// stated in one place instead of two.
+func LootLocked(ownerID, pickerID int32) bool {
+	return ownerID != 0 && ownerID != pickerID
 }
 
 // PickupGround moves ground (with its loaded template) into inv, the same
@@ -173,7 +174,7 @@ func (s *Service) PickupGround(inv *itemcontainer.Inventory, ground *item.Instan
 	if inv == nil || ground == nil || tmpl == nil || groundState.Count <= 0 {
 		return Result{}, PickupNoop
 	}
-	if LootLocked(ground, pickerID) {
+	if LootLocked(groundState.OwnerID, pickerID) {
 		return Result{}, PickupLootLocked
 	}
 	if !inv.ValidateCapacity(inv.SlotsNeededFor(ground, tmpl)) {
