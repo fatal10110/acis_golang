@@ -12,15 +12,19 @@ import (
 
 // TestItemFlushStore_Flush_Atomic pins the atomicity acceptance criterion:
 // a flush interrupted mid-write leaves the items table with either all of
-// that flush's changes or none of them. The augmentation group's write
-// deliberately violates the augmentations table's unsigned item_oid column
-// after the items group's write has already gone through inside the same
-// transaction; Flush must roll the whole thing back rather than leave the
-// item row committed.
+// that flush's changes or none of them. Dropping the augmentations table
+// guarantees the augmentation group's statement fails after the items
+// group's write has already gone through inside the same transaction,
+// regardless of the server's sql_mode; Flush must roll the whole thing
+// back rather than leave the item rows committed.
 func TestItemFlushStore_Flush_Atomic(t *testing.T) {
 	ctx := context.Background()
 	db := sqltest.NewDB(t)
 	store := NewItemFlushStore(db)
+
+	if _, err := db.ExecContext(ctx, "DROP TABLE augmentations"); err != nil {
+		t.Fatalf("drop augmentations table: %v", err)
+	}
 
 	batch := item.FlushBatch{
 		Saves: []*item.Instance{
@@ -28,14 +32,12 @@ func TestItemFlushStore_Flush_Atomic(t *testing.T) {
 			{ObjectID: 0x10000102, TemplateID: 10, OwnerID: 0x10000001, Count: 3, Location: item.LocationInventory, ManaLeft: -1},
 		},
 		AugmentationSaves: []item.FlushAugmentationSave{
-			// item_oid is UNSIGNED NOT NULL; -1 is rejected by the driver,
-			// failing this statement after the items group already ran.
-			{ObjectID: -1, Augmentation: item.Augmentation{Attributes: 1, SkillID: 1, SkillLevel: 1}},
+			{ObjectID: 0x10000101, Augmentation: item.Augmentation{Attributes: 1, SkillID: 1, SkillLevel: 1}},
 		},
 	}
 
 	if err := store.Flush(ctx, batch); err == nil {
-		t.Fatal("Flush() with an invalid augmentation row succeeded, want error")
+		t.Fatal("Flush() against a missing augmentations table succeeded, want error")
 	}
 
 	var count int
@@ -121,5 +123,45 @@ func TestItemFlushStore_Flush_MultiRow(t *testing.T) {
 	}
 	if n != 0 {
 		t.Errorf("deleted pet rows = %d, want 0", n)
+	}
+}
+
+// TestItemFlushStore_Flush_ChunksLargeBatches proves a save group bigger
+// than one multi-row statement can hold still lands in full: Flush must
+// split it across several statements inside the one transaction rather
+// than failing outright or dropping rows past the chunk boundary.
+func TestItemFlushStore_Flush_ChunksLargeBatches(t *testing.T) {
+	ctx := context.Background()
+	db := sqltest.NewDB(t)
+	store := NewItemFlushStore(db)
+
+	const n = itemFlushChunkSize + 250
+	saves := make([]*item.Instance, n)
+	for i := range n {
+		saves[i] = &item.Instance{
+			ObjectID: 0x10000001 + int32(i), TemplateID: 10, OwnerID: 0x10000001,
+			Count: i + 1, Location: item.LocationInventory, ManaLeft: -1,
+		}
+	}
+
+	if err := store.Flush(ctx, item.FlushBatch{Saves: saves}); err != nil {
+		t.Fatalf("Flush() error = %v", err)
+	}
+
+	var count int
+	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM items WHERE object_id BETWEEN ? AND ?",
+		0x10000001, 0x10000001+n-1).Scan(&count); err != nil {
+		t.Fatalf("count saved items: %v", err)
+	}
+	if count != n {
+		t.Errorf("saved item rows = %d, want %d", count, n)
+	}
+
+	var lastCount int
+	if err := db.QueryRowContext(ctx, "SELECT count FROM items WHERE object_id = ?", 0x10000001+n-1).Scan(&lastCount); err != nil {
+		t.Fatalf("read last item: %v", err)
+	}
+	if lastCount != n {
+		t.Errorf("last chunk's item count = %d, want %d (last chunk dropped or misordered)", lastCount, n)
 	}
 }

@@ -87,10 +87,15 @@ func (i *ItemInstances) RemoveItems(items []*item.Instance) {
 	}
 }
 
-// Save flushes every pending item and clears the pending set.
+// Save flushes every pending item and, only once the flush actually
+// succeeds, clears them from the pending set. UpdateItems is all-or-nothing,
+// so on error nothing was written; keeping the whole snapshot pending hands
+// it to the next tick or the shutdown flush instead of losing it.
 func (i *ItemInstances) Save(ctx context.Context) error {
 	items := i.snapshotPending()
-	err := i.UpdateItems(ctx, items)
+	if err := i.UpdateItems(ctx, items); err != nil {
+		return err
+	}
 
 	i.mu.Lock()
 	for _, inst := range items {
@@ -98,11 +103,13 @@ func (i *ItemInstances) Save(ctx context.Context) error {
 	}
 	i.mu.Unlock()
 
-	return err
+	return nil
 }
 
 // UpdateItems persists the provided item instances immediately, as one
-// atomic flush: either every row lands, or, on error, none of them do.
+// atomic flush: either every row lands, or, on error, none of them do. A
+// non-nil error means nothing was written, so callers must keep their
+// items pending for a retry rather than dropping them.
 func (i *ItemInstances) UpdateItems(ctx context.Context, items []*item.Instance) error {
 	if len(items) == 0 {
 		return nil

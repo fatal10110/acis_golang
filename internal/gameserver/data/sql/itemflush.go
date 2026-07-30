@@ -4,10 +4,18 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 )
+
+// itemFlushChunkSize bounds how many rows one multi-row statement covers.
+// MySQL/MariaDB caps a prepared statement at 65535 placeholders; the items
+// row (11 params) is the widest group here, so 1000 rows per statement
+// stays far under that ceiling for every group while still keeping a
+// large flush down to a handful of round trips.
+const itemFlushChunkSize = 1000
 
 // ItemFlushStore persists a task.ItemInstances flush batch as one
 // transaction spanning the items, augmentations, and pets tables, so a
@@ -44,17 +52,17 @@ func (s *ItemFlushStore) Flush(ctx context.Context, batch item.FlushBatch) error
 	if err := flushItemSaves(ctx, tx, batch.Saves); err != nil {
 		return err
 	}
-	if err := flushInt32Delete(ctx, tx, "DELETE FROM items WHERE object_id IN (%s)", batch.Deletes); err != nil {
-		return fmt.Errorf("delete items: %w", err)
+	if err := flushInt32Delete(ctx, tx, "items", "DELETE FROM items WHERE object_id IN (%s)", batch.Deletes); err != nil {
+		return err
 	}
 	if err := flushAugmentationSaves(ctx, tx, batch.AugmentationSaves); err != nil {
 		return err
 	}
-	if err := flushInt32Delete(ctx, tx, "DELETE FROM augmentations WHERE item_oid IN (%s)", batch.AugmentationDeletes); err != nil {
-		return fmt.Errorf("delete augmentations: %w", err)
+	if err := flushInt32Delete(ctx, tx, "augmentations", "DELETE FROM augmentations WHERE item_oid IN (%s)", batch.AugmentationDeletes); err != nil {
+		return err
 	}
-	if err := flushInt32Delete(ctx, tx, "DELETE FROM pets WHERE item_obj_id IN (%s)", batch.PetDeletes); err != nil {
-		return fmt.Errorf("delete pet items: %w", err)
+	if err := flushInt32Delete(ctx, tx, "pets", "DELETE FROM pets WHERE item_obj_id IN (%s)", batch.PetDeletes); err != nil {
+		return err
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -64,69 +72,66 @@ func (s *ItemFlushStore) Flush(ctx context.Context, batch item.FlushBatch) error
 	return nil
 }
 
+// flushItemSaves reads saves' fields directly rather than through
+// Snapshot(): FlushBatch.Saves holds instances task.ItemInstances already
+// detached via InstanceState.Instance(), so nothing else can be mutating
+// them concurrently.
 func flushItemSaves(ctx context.Context, tx *sql.Tx, saves []*item.Instance) error {
-	if len(saves) == 0 {
-		return nil
-	}
+	for chunk := range slices.Chunk(saves, itemFlushChunkSize) {
+		placeholders := make([]string, len(chunk))
+		args := make([]any, 0, len(chunk)*11)
+		for i, inst := range chunk {
+			placeholders[i] = "(?,?,?,?,?,?,?,?,?,?,?)"
+			args = append(args, inst.OwnerID, inst.ObjectID, inst.TemplateID, inst.Count, inst.EnchantLevel,
+				inst.Location.String(), inst.LocationData, inst.CustomType1, inst.CustomType2, inst.ManaLeft, inst.Time)
+		}
 
-	placeholders := make([]string, len(saves))
-	args := make([]any, 0, len(saves)*11)
-	for i, inst := range saves {
-		st := inst.Snapshot()
-		placeholders[i] = "(?,?,?,?,?,?,?,?,?,?,?)"
-		args = append(args, st.OwnerID, st.ObjectID, st.TemplateID, st.Count, st.EnchantLevel,
-			st.Location.String(), st.LocationData, st.CustomType1, st.CustomType2, st.ManaLeft, st.Time)
-	}
+		query := fmt.Sprintf(`INSERT INTO items
+				(owner_id, object_id, item_id, count, enchant_level, loc, loc_data, custom_type1, custom_type2, mana_left, time)
+			 VALUES %s
+			 ON DUPLICATE KEY UPDATE
+				owner_id=VALUES(owner_id), count=VALUES(count), loc=VALUES(loc), loc_data=VALUES(loc_data),
+				enchant_level=VALUES(enchant_level), custom_type1=VALUES(custom_type1), custom_type2=VALUES(custom_type2),
+				mana_left=VALUES(mana_left), time=VALUES(time)`, strings.Join(placeholders, ","))
 
-	query := fmt.Sprintf(`INSERT INTO items
-			(owner_id, object_id, item_id, count, enchant_level, loc, loc_data, custom_type1, custom_type2, mana_left, time)
-		 VALUES %s
-		 ON DUPLICATE KEY UPDATE
-			owner_id=VALUES(owner_id), count=VALUES(count), loc=VALUES(loc), loc_data=VALUES(loc_data),
-			enchant_level=VALUES(enchant_level), custom_type1=VALUES(custom_type1), custom_type2=VALUES(custom_type2),
-			mana_left=VALUES(mana_left), time=VALUES(time)`, strings.Join(placeholders, ","))
-
-	if _, err := tx.ExecContext(ctx, query, args...); err != nil {
-		return fmt.Errorf("save items: %w", err)
+		if _, err := tx.ExecContext(ctx, query, args...); err != nil {
+			return fmt.Errorf("save %d items (object ids %d..%d): %w", len(chunk), chunk[0].ObjectID, chunk[len(chunk)-1].ObjectID, err)
+		}
 	}
 	return nil
 }
 
 func flushAugmentationSaves(ctx context.Context, tx *sql.Tx, saves []item.FlushAugmentationSave) error {
-	if len(saves) == 0 {
-		return nil
-	}
+	for chunk := range slices.Chunk(saves, itemFlushChunkSize) {
+		placeholders := make([]string, len(chunk))
+		args := make([]any, 0, len(chunk)*4)
+		for i, save := range chunk {
+			placeholders[i] = "(?,?,?,?)"
+			args = append(args, save.ObjectID, save.Augmentation.Attributes, save.Augmentation.SkillID, save.Augmentation.SkillLevel)
+		}
 
-	placeholders := make([]string, len(saves))
-	args := make([]any, 0, len(saves)*4)
-	for i, save := range saves {
-		placeholders[i] = "(?,?,?,?)"
-		args = append(args, save.ObjectID, save.Augmentation.Attributes, save.Augmentation.SkillID, save.Augmentation.SkillLevel)
-	}
+		query := fmt.Sprintf(`INSERT INTO augmentations (item_oid, attributes, skill_id, skill_level) VALUES %s
+			 ON DUPLICATE KEY UPDATE attributes=VALUES(attributes), skill_id=VALUES(skill_id), skill_level=VALUES(skill_level)`,
+			strings.Join(placeholders, ","))
 
-	query := fmt.Sprintf(`INSERT INTO augmentations (item_oid, attributes, skill_id, skill_level) VALUES %s
-		 ON DUPLICATE KEY UPDATE attributes=VALUES(attributes), skill_id=VALUES(skill_id), skill_level=VALUES(skill_level)`,
-		strings.Join(placeholders, ","))
-
-	if _, err := tx.ExecContext(ctx, query, args...); err != nil {
-		return fmt.Errorf("save augmentations: %w", err)
+		if _, err := tx.ExecContext(ctx, query, args...); err != nil {
+			return fmt.Errorf("save %d augmentations (object ids %d..%d): %w", len(chunk), chunk[0].ObjectID, chunk[len(chunk)-1].ObjectID, err)
+		}
 	}
 	return nil
 }
 
-func flushInt32Delete(ctx context.Context, tx *sql.Tx, queryFmt string, ids []int32) error {
-	if len(ids) == 0 {
-		return nil
-	}
+func flushInt32Delete(ctx context.Context, tx *sql.Tx, table, queryFmt string, ids []int32) error {
+	for chunk := range slices.Chunk(ids, itemFlushChunkSize) {
+		placeholders := strings.TrimSuffix(strings.Repeat("?,", len(chunk)), ",")
+		args := make([]any, len(chunk))
+		for i, id := range chunk {
+			args[i] = id
+		}
 
-	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(ids)), ",")
-	args := make([]any, len(ids))
-	for i, id := range ids {
-		args[i] = id
-	}
-
-	if _, err := tx.ExecContext(ctx, fmt.Sprintf(queryFmt, placeholders), args...); err != nil {
-		return err
+		if _, err := tx.ExecContext(ctx, fmt.Sprintf(queryFmt, placeholders), args...); err != nil {
+			return fmt.Errorf("delete %d %s (object ids %d..%d): %w", len(chunk), table, chunk[0], chunk[len(chunk)-1], err)
+		}
 	}
 	return nil
 }

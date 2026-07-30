@@ -124,11 +124,22 @@ func TestItemInstanceBackgroundAndInventoryMutationIsRaceFree(t *testing.T) {
 }
 
 type itemFlusherStub struct {
+	mu    sync.Mutex
 	batch item.FlushBatch
 }
 
+// Flush reads every save's mutable fields directly (not through
+// Snapshot()), the same way a real store's Flush does, so a race between
+// this and a concurrent mutation of the live instance still trips -race:
+// FlushBatch.Saves is meant to hold already-detached copies, and this is
+// the assertion that they actually are.
 func (s *itemFlusherStub) Flush(_ context.Context, batch item.FlushBatch) error {
+	for _, inst := range batch.Saves {
+		_, _, _ = inst.Count, inst.Location, inst.ManaLeft
+	}
+	s.mu.Lock()
 	s.batch = batch
+	s.mu.Unlock()
 	return nil
 }
 
