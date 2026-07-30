@@ -21,13 +21,13 @@ func (c *Character) AddExpAndSp(table *LevelTable, tmpl *Template, exp int64, sp
 	if sp >= 0 {
 		c.AddSp(sp)
 	}
-	// Only an add that actually landed pushes UserInfo. Deliberate divergence:
-	// the reference sends it for any non-negative add, because its dropped-
-	// addition branch still reports success to the caller that sends the
-	// packet, so a zero-value reward (a full level-difference penalty) pushes
-	// a UserInfo describing nothing that changed. Both adds here can be
-	// no-ops, and the packet is self-only and purely descriptive, so the
-	// redundant one is suppressed.
+	// Only an add that actually landed pushes UserInfo. Deliberate divergence
+	// under review in issue #1060: the reference sends it for any non-negative
+	// add, because its dropped-addition branch still reports success to the
+	// caller that sends the packet, so a zero-value reward (a full
+	// level-difference penalty) pushes a UserInfo describing nothing that
+	// changed. Both adds here can be no-ops, and the packet is self-only and
+	// purely descriptive, so the redundant one is suppressed.
 	if c.Exp != beforeExp || c.SP != beforeSP {
 		c.UpdateUserInfo()
 	}
