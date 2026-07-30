@@ -203,12 +203,7 @@ func (l *GameClientLink) handleTradeDone(ctx context.Context, live *livePlayer, 
 		first.SendFrame(serverpackets.FrameSystemMessage(failMessage))
 		second.SendFrame(serverpackets.FrameSystemMessage(failMessage))
 	}
-	success := settlement.Status == tradebook.SettlementOK
-	if success {
-		l.sendInventoryUpdate(first, first.Inventory())
-		l.sendInventoryUpdate(second, second.Inventory())
-	}
-	l.finishTrade(first, second, success)
+	l.finishTrade(first, second, settlement.Status == tradebook.SettlementOK)
 }
 
 func (l *GameClientLink) cancelActiveTrade(live *livePlayer) {

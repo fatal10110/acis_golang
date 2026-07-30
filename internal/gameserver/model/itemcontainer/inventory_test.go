@@ -505,12 +505,10 @@ func TestInventory_SlotsNeededFor(t *testing.T) {
 	}
 }
 
-// TestInventory_UpdateNotifierFiresOnQueuedUpdate pins the hook a
-// server-driven inventory change relies on: without it an auto-looted kill
-// reward sits in the queue until the owner happens to perform an inventory
-// action of their own. Whether a given mutation is server-driven is the
-// caller's call, so the mutation methods stay silent and NotifyUpdate is
-// explicit — see Character.AddRewardItem for the production trigger.
+// TestInventory_UpdateNotifierFiresOnQueuedUpdate pins the hook every queued
+// inventory change relies on, matching the reference's Inventory.addUpdate
+// registering with InventoryUpdateTaskManager unconditionally: the batching
+// task, not the mutation's caller, decides whether and when to drain it.
 func TestInventory_UpdateNotifierFiresOnQueuedUpdate(t *testing.T) {
 	templates := item.NewTable([]*item.Template{
 		{ID: 1, Kind: item.KindEtcItem, Stackable: true, EtcItem: &item.EtcItemDetail{}},
@@ -521,26 +519,38 @@ func TestInventory_UpdateNotifierFiresOnQueuedUpdate(t *testing.T) {
 	inv.SetUpdateNotifier(func() { notified++ })
 
 	inv.AddNew(1, 5, 0x30000001)
-	if notified != 0 {
-		t.Fatalf("notifier calls after a bare AddNew = %d, want 0: the caller decides", notified)
-	}
-	inv.NotifyUpdate()
 	if notified != 1 {
-		t.Fatalf("notifier calls after NotifyUpdate = %d, want 1", notified)
+		t.Fatalf("notifier calls after AddNew = %d, want 1", notified)
 	}
 
 	// A coalesced update still has to register the inventory: the batch it
 	// merges into may already have been drained.
 	inv.AddNew(1, 5, 0x30000002)
-	inv.NotifyUpdate()
 	if notified != 2 {
 		t.Errorf("notifier calls after a coalesced add = %d, want 2", notified)
 	}
 
 	inv.SetUpdateNotifier(nil)
 	inv.AddNew(1, 5, 0x30000003)
-	inv.NotifyUpdate()
 	if notified != 2 {
 		t.Errorf("notifier calls after detach = %d, want 2", notified)
+	}
+}
+
+// TestInventory_UpdateNotifierSkipsNoOpMutation matches the reference's
+// addUpdate, which returns before registering with the manager whenever it
+// appends nothing. A mutation that queues no update — an empty paperdoll
+// slot here — must not fire the notifier either, or it parks the inventory
+// in the batching task with nothing to send.
+func TestInventory_UpdateNotifierSkipsNoOpMutation(t *testing.T) {
+	templates := item.NewTable(nil)
+	inv := NewPlayerInventory(0x10000001, templates)
+
+	notified := 0
+	inv.SetUpdateNotifier(func() { notified++ })
+
+	inv.UnequipSlot(RHand)
+	if notified != 0 {
+		t.Fatalf("notifier calls after unequipping an empty slot = %d, want 0", notified)
 	}
 }

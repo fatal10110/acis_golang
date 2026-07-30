@@ -15,7 +15,7 @@ import (
 )
 
 func TestGameClientLinkEnchantItemInGame(t *testing.T) {
-	c, chars, items, _ := newLinkedGameClient(t)
+	c, chars, items, state := newLinkedGameClient(t)
 
 	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
 	c.read() // CharCreateOk
@@ -55,13 +55,14 @@ func TestGameClientLinkEnchantItemInGame(t *testing.T) {
 	if reply[0] != serverpackets.OpcodeSystemMessage {
 		t.Fatalf("enchant success message opcode = %#x, want SystemMessage (%#x)", reply[0], serverpackets.OpcodeSystemMessage)
 	}
-	reply = c.read()
-	if reply[0] != serverpackets.OpcodeInventoryUpdate {
-		t.Fatalf("enchant inventory opcode = %#x, want InventoryUpdate (%#x)", reply[0], serverpackets.OpcodeInventoryUpdate)
-	}
 	assertEnchantResultFrame(t, c.read(), serverpackets.EnchantResultSuccess)
 	if reply := c.read(); reply[0] != serverpackets.OpcodeUserInfo {
 		t.Fatalf("enchant userinfo opcode = %#x, want UserInfo (%#x)", reply[0], serverpackets.OpcodeUserInfo)
+	}
+
+	inventoryUpdatesFor(t, state).Tick()
+	if reply := c.read(); reply[0] != serverpackets.OpcodeInventoryUpdate {
+		t.Fatalf("enchant inventory opcode = %#x, want InventoryUpdate (%#x)", reply[0], serverpackets.OpcodeInventoryUpdate)
 	}
 }
 

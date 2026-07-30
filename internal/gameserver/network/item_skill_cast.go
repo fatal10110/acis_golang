@@ -67,7 +67,6 @@ func (l *GameClientLink) useItemAICast(live *livePlayer, inv *itemcontainer.Inve
 		sendMagicCastFailure(live, def, consumed.Err)
 		return true
 	}
-	l.sendInventoryUpdate(live, inv)
 	if consumed.SharedReuseGroup >= 0 {
 		live.SendFrame(serverpackets.FrameExUseSharedGroupItem(inst.TemplateID, consumed.SharedReuseGroup, consumed.ReuseMillis, consumed.ReuseMillis))
 	}

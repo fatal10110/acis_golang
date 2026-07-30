@@ -83,7 +83,6 @@ func (l *GameClientLink) useShotItem(live *livePlayer, inv *itemcontainer.Invent
 	case itemhandler.ShotNotEnoughItems:
 		l.replyShotRejection(live, res.AutoEnabled, msgs.notEnough)
 	case itemhandler.ShotApplied:
-		l.sendInventoryUpdate(live, inv)
 		live.SendFrame(serverpackets.FrameSystemMessage(msgs.enabled))
 		if res.SkillID != 0 {
 			self := skillCastObject(live)
@@ -158,7 +157,6 @@ func (l *GameClientLink) useBeastShotItem(live *livePlayer, inv *itemcontainer.I
 	case itemhandler.BeastShotNotEnoughItems:
 		l.replyShotRejection(live, res.AutoEnabled, notEnoughMsg)
 	case itemhandler.BeastShotApplied:
-		l.sendInventoryUpdate(live, inv)
 		live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessagePetUsesS1, tmpl.ID))
 		if res.SkillID != 0 && summonTarget != nil {
 			self := skillCastObject(summonTarget)

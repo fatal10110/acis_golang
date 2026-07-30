@@ -37,6 +37,12 @@ func (l *GameClientLink) handleSummonActionUse(live *livePlayer, req clientpacke
 	}
 	if result.Outcome == summon.OutcomeApplied && (command == summon.CommandReturnPet || command == summon.CommandUnsummonServitor) {
 		live.SendFrame(serverpackets.FramePetDelete(summonType, objectID))
+		// Unsummoning detaches the pet inventory's notifier so its closure
+		// stops holding live; lifecycle.go does the same for a still-active
+		// pet on logout.
+		if inv := actor.PetInventory(); inv != nil {
+			inv.SetUpdateNotifier(nil)
+		}
 	}
 	return true
 }

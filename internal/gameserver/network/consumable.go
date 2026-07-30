@@ -46,7 +46,6 @@ func (l *GameClientLink) useConsumableSkillItem(live *livePlayer, inv *itemconta
 		sendMagicCastFailure(live, res.Skill, actorcast.ErrNotEnoughItems)
 		return true
 	case itemhandler.Applied:
-		l.sendInventoryUpdate(live, inv)
 		if res.SharedReuseGroup >= 0 {
 			live.SendFrame(serverpackets.FrameExUseSharedGroupItem(inst.TemplateID, res.SharedReuseGroup, res.ReuseMillis, res.ReuseMillis))
 		}

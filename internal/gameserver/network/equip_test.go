@@ -6,6 +6,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -14,6 +15,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -42,6 +44,41 @@ func newEquipTestLivePlayer(t *testing.T, id int32, capture *frameCapture, templ
 	return &livePlayer{Character: ch, template: tmpl, items: items, visibilitySend: capture.send}
 }
 
+// wireInventoryUpdates gives gcl a batching task and registers live's
+// inventory with it, the way character_flow.go's spawn wiring does for a
+// live player built through the full login flow. Tests that construct
+// *GameClientLink and *livePlayer directly need this to exercise
+// InventoryUpdate delivery, now that the task is the packet's only sender.
+// It also spawns live into a fresh world.State if it isn't already visible
+// somewhere: the task's tick gate skips an owner that isn't visible or
+// teleporting, and a live player built directly rather than through the
+// full login flow starts out in no world at all.
+//
+// If live already has a spawned pet (attachTestPet ran first, as in the pet
+// tests), this also registers the pet's inventory — the structural
+// attach-point wiring newPet does in production, done here once for tests
+// that build the pet directly rather than through newPet.
+func wireInventoryUpdates(gcl *GameClientLink, live *livePlayer) *task.InventoryUpdates {
+	updates := task.NewInventoryUpdates()
+	gcl.inventoryUpdates = updates
+	if inv := live.Inventory(); inv != nil {
+		inv.SetUpdateNotifier(func() {
+			updates.Add(inv, live)
+		})
+	}
+	if !live.Visible() {
+		world.New().Spawn(live, 0, 0, 0, 0)
+	}
+	if gcl.world != nil {
+		if obj, ok := gcl.world.Summon(live.ObjectID()); ok {
+			if pet, ok := obj.(*summon.Actor); ok {
+				gcl.registerPetInventoryUpdates(pet, live)
+			}
+		}
+	}
+	return updates
+}
+
 // equipFleeTarget satisfies the flee hook a Fear effect's runtime needs, so
 // it activates regardless of what its actual effected actor is.
 type equipFleeTarget struct{}
@@ -67,8 +104,10 @@ func TestUseItemTogglesEquipState(t *testing.T) {
 	capture := &frameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{weapon})
 	gcl := &GameClientLink{}
+	updates := wireInventoryUpdates(gcl, live)
 
 	gcl.useItem(live, weapon.ObjectID)
+	updates.Tick()
 
 	if !weapon.Equipped() {
 		t.Fatal("weapon not equipped after first UseItem")
@@ -76,12 +115,13 @@ func TestUseItemTogglesEquipState(t *testing.T) {
 	if weapon.Location != item.LocationPaperdoll || weapon.LocationData != itemcontainer.RHand {
 		t.Fatalf("weapon location = %v/%d, want paperdoll/RHand", weapon.Location, weapon.LocationData)
 	}
-	if len(capture.frames) != 2 || capture.frames[0][0] != serverpackets.OpcodeInventoryUpdate || capture.frames[1][0] != serverpackets.OpcodeUserInfo {
-		t.Fatalf("frames after equip = %x, want InventoryUpdate then UserInfo", capture.frames)
+	if len(capture.frames) != 2 || capture.frames[0][0] != serverpackets.OpcodeUserInfo || capture.frames[1][0] != serverpackets.OpcodeInventoryUpdate {
+		t.Fatalf("frames after equip = %x, want UserInfo then InventoryUpdate", capture.frames)
 	}
 	capture.frames = nil
 
 	gcl.useItem(live, weapon.ObjectID)
+	updates.Tick()
 
 	if weapon.Equipped() {
 		t.Fatal("weapon still equipped after second UseItem")
@@ -89,8 +129,8 @@ func TestUseItemTogglesEquipState(t *testing.T) {
 	if weapon.Location != item.LocationInventory {
 		t.Fatalf("weapon location = %v, want inventory", weapon.Location)
 	}
-	if len(capture.frames) != 2 || capture.frames[0][0] != serverpackets.OpcodeInventoryUpdate || capture.frames[1][0] != serverpackets.OpcodeUserInfo {
-		t.Fatalf("frames after unequip = %x, want InventoryUpdate then UserInfo", capture.frames)
+	if len(capture.frames) != 2 || capture.frames[0][0] != serverpackets.OpcodeUserInfo || capture.frames[1][0] != serverpackets.OpcodeInventoryUpdate {
+		t.Fatalf("frames after unequip = %x, want UserInfo then InventoryUpdate", capture.frames)
 	}
 }
 
@@ -140,14 +180,16 @@ func TestUnequipItemBySlot(t *testing.T) {
 	capture := &frameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{chest})
 	gcl := &GameClientLink{}
+	updates := wireInventoryUpdates(gcl, live)
 
 	gcl.unequipItem(live, int32(item.SlotChest))
+	updates.Tick()
 
 	if chest.Equipped() {
 		t.Fatal("chest piece still equipped after RequestUnEquipItem")
 	}
-	if len(capture.frames) != 2 || capture.frames[0][0] != serverpackets.OpcodeInventoryUpdate || capture.frames[1][0] != serverpackets.OpcodeUserInfo {
-		t.Fatalf("frames after unequip = %x, want InventoryUpdate then UserInfo", capture.frames)
+	if len(capture.frames) != 2 || capture.frames[0][0] != serverpackets.OpcodeUserInfo || capture.frames[1][0] != serverpackets.OpcodeInventoryUpdate {
+		t.Fatalf("frames after unequip = %x, want UserInfo then InventoryUpdate", capture.frames)
 	}
 }
 
@@ -179,10 +221,12 @@ func TestUseItemBroadcastsCharInfoToObservers(t *testing.T) {
 	observerFrames.frames = nil
 
 	gcl := &GameClientLink{world: state}
+	updates := wireInventoryUpdates(gcl, wearer)
 	gcl.useItem(wearer, weapon.ObjectID)
+	updates.Tick()
 
-	if len(wearerFrames.frames) != 2 || wearerFrames.frames[0][0] != serverpackets.OpcodeInventoryUpdate || wearerFrames.frames[1][0] != serverpackets.OpcodeUserInfo {
-		t.Fatalf("wearer frames = %x, want InventoryUpdate then UserInfo", wearerFrames.frames)
+	if len(wearerFrames.frames) != 2 || wearerFrames.frames[0][0] != serverpackets.OpcodeUserInfo || wearerFrames.frames[1][0] != serverpackets.OpcodeInventoryUpdate {
+		t.Fatalf("wearer frames = %x, want UserInfo then InventoryUpdate", wearerFrames.frames)
 	}
 	if len(observerFrames.frames) != 1 || observerFrames.frames[0][0] != serverpackets.OpcodeCharInfo {
 		t.Fatalf("observer frames = %x, want one CharInfo", observerFrames.frames)

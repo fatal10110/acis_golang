@@ -82,6 +82,7 @@ func TestGameClientLinkPickupGroundItemFullClientFlow(t *testing.T) {
 	if reply[0] != serverpackets.OpcodeDeleteObject {
 		t.Fatalf("pickup follow-up opcode = %#x, want DeleteObject (%#x) — the item never disappears from the ground", reply[0], serverpackets.OpcodeDeleteObject)
 	}
+	inventoryUpdatesFor(t, state).Tick()
 	reply = c.read()
 	if reply[0] != serverpackets.OpcodeInventoryUpdate {
 		t.Fatalf("pickup follow-up opcode = %#x, want InventoryUpdate (%#x)", reply[0], serverpackets.OpcodeInventoryUpdate)
@@ -123,10 +124,12 @@ func TestPickupLiveGroundItemMovesItemAndDespawns(t *testing.T) {
 	capture.frames = nil
 	store := &recordingEnchantItemStore{}
 	gcl := &GameClientLink{world: state, groundItems: drops, items: store}
+	updates := wireInventoryUpdates(gcl, live)
 
 	if !gcl.pickupLiveGroundItem(context.Background(), live, ground) {
 		t.Fatal("pickupLiveGroundItem returned false for a ground item target")
 	}
+	updates.Tick()
 
 	assertOpcodeSequence(t, capture.frames,
 		serverpackets.OpcodeActionFailed,
@@ -639,6 +642,7 @@ func TestGameClientLinkPickupAdenaMergeFullClientFlow(t *testing.T) {
 	if reply := c.read(); reply[0] != serverpackets.OpcodeDeleteObject {
 		t.Fatalf("follow-up opcode = %#x, want DeleteObject (%#x) — item stays on the ground", reply[0], serverpackets.OpcodeDeleteObject)
 	}
+	inventoryUpdatesFor(t, state).Tick()
 	if reply := c.read(); reply[0] != serverpackets.OpcodeInventoryUpdate {
 		t.Fatalf("follow-up opcode = %#x, want InventoryUpdate (%#x)", reply[0], serverpackets.OpcodeInventoryUpdate)
 	}

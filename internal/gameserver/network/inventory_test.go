@@ -74,30 +74,10 @@ func TestGameClientLinkDropItemInGame(t *testing.T) {
 
 	c.send(encodeRequestDropItem(500, 40, location.Location{X: 10, Y: 20, Z: 30}))
 	reply := c.read()
-	if reply[0] != serverpackets.OpcodeInventoryUpdate {
-		t.Fatalf("drop inventory opcode = %#x, want InventoryUpdate (%#x)", reply[0], serverpackets.OpcodeInventoryUpdate)
-	}
-	r := wire.NewReader(reply[1:])
-	if count := r.ReadUint16(); count != 1 {
-		t.Fatalf("InventoryUpdate count = %d, want 1", count)
-	}
-	if state := r.ReadUint16(); state != 2 {
-		t.Fatalf("InventoryUpdate state = %d, want modified (2, per ItemState.ordinal)", state)
-	}
-	r.ReadUint16()
-	if got := r.ReadInt32(); got != 500 {
-		t.Fatalf("InventoryUpdate object id = %d, want 500", got)
-	}
-	r.ReadInt32()
-	if got := r.ReadInt32(); got != 60 {
-		t.Fatalf("InventoryUpdate count = %d, want 60", got)
-	}
-
-	reply = c.read()
 	if reply[0] != serverpackets.OpcodeDropItem {
 		t.Fatalf("drop broadcast opcode = %#x, want DropItem (%#x)", reply[0], serverpackets.OpcodeDropItem)
 	}
-	r = wire.NewReader(reply[1:])
+	r := wire.NewReader(reply[1:])
 	if got := r.ReadInt32(); got != objID {
 		t.Fatalf("DropItem dropper id = %d, want %d", got, objID)
 	}
@@ -122,10 +102,31 @@ func TestGameClientLinkDropItemInGame(t *testing.T) {
 	if _, ok := state.Object(groundID); !ok {
 		t.Fatalf("world.Object(%d) missing for dropped item", groundID)
 	}
+
+	inventoryUpdatesFor(t, state).Tick()
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeInventoryUpdate {
+		t.Fatalf("drop inventory opcode = %#x, want InventoryUpdate (%#x)", reply[0], serverpackets.OpcodeInventoryUpdate)
+	}
+	r = wire.NewReader(reply[1:])
+	if count := r.ReadUint16(); count != 1 {
+		t.Fatalf("InventoryUpdate count = %d, want 1", count)
+	}
+	if state := r.ReadUint16(); state != 2 {
+		t.Fatalf("InventoryUpdate state = %d, want modified (2, per ItemState.ordinal)", state)
+	}
+	r.ReadUint16()
+	if got := r.ReadInt32(); got != 500 {
+		t.Fatalf("InventoryUpdate object id = %d, want 500", got)
+	}
+	r.ReadInt32()
+	if got := r.ReadInt32(); got != 60 {
+		t.Fatalf("InventoryUpdate count = %d, want 60", got)
+	}
 }
 
 func TestGameClientLinkDestroyItemInGame(t *testing.T) {
-	c, chars, items, _ := newLinkedGameClient(t)
+	c, chars, items, state := newLinkedGameClient(t)
 
 	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
 	c.read() // CharCreateOk
@@ -148,6 +149,11 @@ func TestGameClientLinkDestroyItemInGame(t *testing.T) {
 	readEnterWorldBurst(t, c, false)
 
 	c.send(encodeRequestDestroyItem(501, 2))
+	// A destroy that doesn't touch equipment sends no frame of its own, so
+	// there's nothing to block on that proves the server has processed it
+	// before the test drives the batching task's tick.
+	syncBarrier(t, c, func() { c.send(encodeRequestDestroyItem(999999, 1)) }, serverpackets.OpcodeActionFailed)
+	inventoryUpdatesFor(t, state).Tick()
 	reply := c.read()
 	if reply[0] != serverpackets.OpcodeInventoryUpdate {
 		t.Fatalf("destroy inventory opcode = %#x, want InventoryUpdate (%#x)", reply[0], serverpackets.OpcodeInventoryUpdate)
@@ -170,7 +176,7 @@ func TestGameClientLinkDestroyItemInGame(t *testing.T) {
 }
 
 func TestGameClientLinkCrystallizeItemInGame(t *testing.T) {
-	c, chars, items, _ := newLinkedGameClient(t)
+	c, chars, items, state := newLinkedGameClient(t)
 
 	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
 	c.read() // CharCreateOk
@@ -214,6 +220,7 @@ func TestGameClientLinkCrystallizeItemInGame(t *testing.T) {
 		t.Fatalf("SystemMessage item id = %d, want 30", got)
 	}
 
+	inventoryUpdatesFor(t, state).Tick()
 	reply = c.read()
 	if reply[0] != serverpackets.OpcodeInventoryUpdate {
 		t.Fatalf("crystallize inventory opcode = %#x, want InventoryUpdate (%#x)", reply[0], serverpackets.OpcodeInventoryUpdate)

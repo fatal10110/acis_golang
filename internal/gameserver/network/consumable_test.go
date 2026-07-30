@@ -139,7 +139,6 @@ func TestGameClientLinkUseHealingPotionAppliesAndConsumes(t *testing.T) {
 	}
 
 	c.send(encodeUseItem(objectID, false))
-	readInventoryUpdate(t, c, objectID, 4)
 	readExUseSharedGroupItem(t, c, potionTemplate, 8, 10, 10)
 	readMagicSkillUseSelf(t, c, live.ObjectID(), 2031, 1)
 	assertSystemMessageSkillFrame(t, c.read(), serverpackets.SystemMessageUseS1, 2031, 1)
@@ -147,6 +146,11 @@ func TestGameClientLinkUseHealingPotionAppliesAndConsumes(t *testing.T) {
 		t.Fatalf("AbnormalStatusUpdate entries = %+v, want one entry skill 2031 level 1 duration 14s", entries)
 	}
 	readShortBuffStatusUpdateFrame(t, c, 2031, 1, 14)
+
+	// InventoryUpdate is batching-task-driven now: it arrives after the
+	// handler's own frames, on the next tick.
+	inventoryUpdatesFor(t, state).Tick()
+	readInventoryUpdate(t, c, objectID, 4)
 
 	effects := live.EffectList().All()
 	if len(effects) == 0 || effects[0].Skill.ID != 2031 {
@@ -301,12 +305,14 @@ func TestGameClientLinkUseManaPotionRestoresAndConsumes(t *testing.T) {
 	beforeMP := live.CurrentMP()
 
 	c.send(encodeUseItem(objectID, false))
-	readInventoryUpdate(t, c, objectID, 2)
 	readMagicSkillUseSelf(t, c, live.ObjectID(), 2279, 2)
 	assertSystemMessageSkillFrame(t, c.read(), serverpackets.SystemMessageUseS1, 2279, 2)
 	assertStatusAttrs(t, c.read(), live.ObjectID(), []serverpackets.StatusAttribute{
 		{Type: serverpackets.StatusCurrentMP, Value: beforeMP + int(maxMP*20/100)},
 	})
+
+	inventoryUpdatesFor(t, state).Tick()
+	readInventoryUpdate(t, c, objectID, 2)
 
 	if got := live.CurrentMP(); got <= beforeMP {
 		t.Fatalf("MP after mana potion = %d, want > %d (before)", got, beforeMP)

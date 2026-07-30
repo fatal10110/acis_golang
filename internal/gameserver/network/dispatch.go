@@ -223,9 +223,24 @@ func NewGameClientLink(cfg GameClientLinkConfig) *GameClientLink {
 	}
 }
 
+// newPet builds a pet and, if its owner is a connected client, registers
+// its inventory with the batching task once here rather than on every
+// lookup — the structural attach point activePet/registerPetInventoryUpdates
+// expect.
+//
+// No production code calls this yet — pet summoning itself isn't wired up
+// (neither is summon.SpawnBesideOwner, which would place the result in the
+// world). Only pet_test.go exercises this path today. Whatever eventually
+// spawns a pet must route through here rather than calling summon.NewPet
+// directly, or the pet's inventory never registers and PetInventoryUpdate
+// silently stops reaching the client.
 func (l *GameClientLink) newPet(cfg summon.PetConfig) *summon.Actor {
 	cfg.Config = &l.petConfig
-	return summon.NewPet(cfg)
+	pet := summon.NewPet(cfg)
+	if live, ok := cfg.Owner.(*livePlayer); ok {
+		l.registerPetInventoryUpdates(pet, live)
+	}
+	return pet
 }
 
 func (l *GameClientLink) rollEnchantSkill() int {

@@ -80,7 +80,6 @@ func TestGameClientLinkUseScrollRunsAICastAndConsumes(t *testing.T) {
 	}
 
 	c.send(encodeUseItem(objectID, false))
-	readInventoryUpdate(t, c, objectID, 2)
 	readMagicSkillUseSelfWithReuse(t, c, live.ObjectID(), 2013, 1, 5000)
 	assertSystemMessageSkillFrame(t, c.read(), serverpackets.SystemMessageUseS1, 2013, 1)
 
@@ -88,6 +87,9 @@ func TestGameClientLinkUseScrollRunsAICastAndConsumes(t *testing.T) {
 	if reply[0] != serverpackets.OpcodeMagicSkillLaunched {
 		t.Fatalf("next opcode = %#x, want MagicSkillLaunched (%#x)", reply[0], serverpackets.OpcodeMagicSkillLaunched)
 	}
+
+	inventoryUpdatesFor(t, state).Tick()
+	readInventoryUpdate(t, c, objectID, 2)
 
 	if got := live.Inventory().ItemByObjectID(objectID).Snapshot().Count; got != 2 {
 		t.Fatalf("scroll stack count after cast = %d, want 2", got)
@@ -102,7 +104,7 @@ func TestGameClientLinkUseScrollWithSharedGroupSendsExUseSharedGroupItem(t *test
 	skills := itemAICastSkillTable(t)
 	const scrollTemplate int32 = 737 // shared group 5, item reuse 9000ms > skill's 5000ms
 	const objectID int32 = 704
-	c, chars, _, _ := newLinkedGameClientWithSkillsSeed(t, skills, func(chars *fakeCharStore, items *fakeItemStore) {
+	c, chars, _, state := newLinkedGameClientWithSkillsSeed(t, skills, func(chars *fakeCharStore, items *fakeItemStore) {
 		objID := seedSelectableCharacter(t, chars, "player1", "Newbie", 5, 0)
 		if err := items.Create(context.Background(), objID, item.Instance{
 			ObjectID: objectID, TemplateID: scrollTemplate, OwnerID: objID,
@@ -120,8 +122,6 @@ func TestGameClientLinkUseScrollWithSharedGroupSendsExUseSharedGroupItem(t *test
 	chars.soleObjectID(t)
 
 	c.send(encodeUseItem(objectID, false))
-	readInventoryUpdate(t, c, objectID, 2)
-
 	reply := c.read()
 	if reply[0] != serverpackets.OpcodeExtended {
 		t.Fatalf("opcode = %#x, want extended (%#x)", reply[0], serverpackets.OpcodeExtended)
@@ -133,6 +133,23 @@ func TestGameClientLinkUseScrollWithSharedGroupSendsExUseSharedGroupItem(t *test
 	if itemID, group, remain, total := r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32(); itemID != scrollTemplate || group != 5 || remain != 9 || total != 9 {
 		t.Fatalf("ExUseSharedGroupItem = item %d group %d remain %d total %d, want %d/5/9/9", itemID, group, remain, total, scrollTemplate)
 	}
+
+	// Drain the AI cast's own frames (MagicSkillUse, SystemMessage,
+	// MagicSkillLaunched) before the tick-driven InventoryUpdate that now
+	// follows them, whatever their exact content — this test only pins the
+	// shared-reuse packet and the eventual stack count.
+	if reply := c.read(); reply[0] != serverpackets.OpcodeMagicSkillUse {
+		t.Fatalf("opcode = %#x, want MagicSkillUse (%#x)", reply[0], serverpackets.OpcodeMagicSkillUse)
+	}
+	if reply := c.read(); reply[0] != serverpackets.OpcodeSystemMessage {
+		t.Fatalf("opcode = %#x, want SystemMessage (%#x)", reply[0], serverpackets.OpcodeSystemMessage)
+	}
+	if reply := c.read(); reply[0] != serverpackets.OpcodeMagicSkillLaunched {
+		t.Fatalf("opcode = %#x, want MagicSkillLaunched (%#x)", reply[0], serverpackets.OpcodeMagicSkillLaunched)
+	}
+
+	inventoryUpdatesFor(t, state).Tick()
+	readInventoryUpdate(t, c, objectID, 2)
 }
 
 // TestGameClientLinkUseScrollRejectsReuse verifies a still-cooling
@@ -168,12 +185,13 @@ func TestGameClientLinkUseScrollRejectsReuse(t *testing.T) {
 	}
 
 	c.send(encodeUseItem(objectID, false))
-	readInventoryUpdate(t, c, objectID, 2)
 	readMagicSkillUseSelfWithReuse(t, c, live.ObjectID(), 2013, 1, 5000)
 	assertSystemMessageSkillFrame(t, c.read(), serverpackets.SystemMessageUseS1, 2013, 1)
 	if reply := c.read(); reply[0] != serverpackets.OpcodeMagicSkillLaunched {
 		t.Fatalf("opcode = %#x, want MagicSkillLaunched (%#x)", reply[0], serverpackets.OpcodeMagicSkillLaunched)
 	}
+	inventoryUpdatesFor(t, state).Tick()
+	readInventoryUpdate(t, c, objectID, 2)
 
 	c.send(encodeUseItem(objectID, false))
 	reply := c.read()

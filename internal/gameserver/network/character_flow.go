@@ -254,11 +254,10 @@ func (l *GameClientLink) attachLivePlayer(client *Client, c *player.Character, t
 			Character: live.Character, Template: live.template, Items: live.inventoryItems(),
 		}))
 	})
-	// A server-driven inventory change — an auto-looted kill reward, a task
-	// consuming a stack — queues an update nobody drains until the player
-	// happens to perform an inventory action. Register the inventory with
-	// the batching task the moment it queues one, the way the reference
-	// inventory registers itself.
+	// Register the inventory with the batching task the moment it queues an
+	// update, matching the reference's Inventory.addUpdate registering with
+	// InventoryUpdateTaskManager on every mutation. The task is the only
+	// drainer; it sends InventoryUpdate on its own 333ms cadence.
 	if inv := c.Inventory(); inv != nil && l.inventoryUpdates != nil {
 		inv.SetUpdateNotifier(func() {
 			l.inventoryUpdates.Add(inv, live)

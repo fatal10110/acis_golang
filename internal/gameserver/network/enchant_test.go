@@ -37,9 +37,11 @@ func TestEnchantLiveItemSuccessConsumesScrollAndPersistsLevel(t *testing.T) {
 	live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{weapon, scroll})
 	store := &recordingEnchantItemStore{}
 	gcl := &GameClientLink{items: store}
+	updates := wireInventoryUpdates(gcl, live)
 	gcl.enchantStateStore().Select(live.ObjectID(), scroll.ObjectID)
 
 	gcl.enchantLiveItem(context.Background(), live, clientpackets.RequestEnchantItem{ObjectID: weapon.ObjectID})
+	updates.Tick()
 
 	if weapon.EnchantLevel != 1 {
 		t.Fatalf("weapon enchant = %d, want 1", weapon.EnchantLevel)
@@ -58,14 +60,14 @@ func TestEnchantLiveItemSuccessConsumesScrollAndPersistsLevel(t *testing.T) {
 	}
 	want := []byte{
 		serverpackets.OpcodeSystemMessage,
-		serverpackets.OpcodeInventoryUpdate,
 		serverpackets.OpcodeEnchantResult,
 		serverpackets.OpcodeUserInfo,
+		serverpackets.OpcodeInventoryUpdate,
 	}
 	if got := frameOpcodes(capture.frames); string(got) != string(want) {
 		t.Fatalf("opcodes = %x, want %x", got, want)
 	}
-	assertEnchantResultFrame(t, capture.frames[2], serverpackets.EnchantResultSuccess)
+	assertEnchantResultFrame(t, capture.frames[1], serverpackets.EnchantResultSuccess)
 }
 
 func TestEnchantLiveItemRejectsInvalidTargetWithoutConsumingScroll(t *testing.T) {
@@ -103,9 +105,11 @@ func TestEnchantLiveItemFailureBreaksItemIntoCrystals(t *testing.T) {
 	live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{weapon, scroll})
 	store := &recordingEnchantItemStore{}
 	gcl := &GameClientLink{items: store, ids: &sequentialIDs{next: 700}, enchantRoll: func() float64 { return 0.99 }}
+	updates := wireInventoryUpdates(gcl, live)
 	gcl.enchantStateStore().Select(live.ObjectID(), scroll.ObjectID)
 
 	gcl.enchantLiveItem(context.Background(), live, clientpackets.RequestEnchantItem{ObjectID: weapon.ObjectID})
+	updates.Tick()
 
 	if live.Inventory().ItemByObjectID(weapon.ObjectID) != nil {
 		t.Fatal("failed normal enchant left source weapon in inventory")
@@ -126,13 +130,13 @@ func TestEnchantLiveItemFailureBreaksItemIntoCrystals(t *testing.T) {
 	if got := frameOpcodes(capture.frames); string(got) != string([]byte{
 		serverpackets.OpcodeSystemMessage,
 		serverpackets.OpcodeSystemMessage,
-		serverpackets.OpcodeInventoryUpdate,
 		serverpackets.OpcodeEnchantResult,
 		serverpackets.OpcodeUserInfo,
+		serverpackets.OpcodeInventoryUpdate,
 	}) {
-		t.Fatalf("opcodes = %x, want crystal/system messages, inventory, result, UserInfo", got)
+		t.Fatalf("opcodes = %x, want crystal/system messages, result, UserInfo, inventory", got)
 	}
-	assertEnchantResultFrame(t, capture.frames[3], serverpackets.EnchantResultBrokenWithCrystals)
+	assertEnchantResultFrame(t, capture.frames[2], serverpackets.EnchantResultBrokenWithCrystals)
 }
 
 func TestEnchantLiveItemBlessedFailureResetsEnchantLevel(t *testing.T) {
@@ -143,9 +147,11 @@ func TestEnchantLiveItemBlessedFailureResetsEnchantLevel(t *testing.T) {
 	live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{weapon, scroll})
 	store := &recordingEnchantItemStore{}
 	gcl := &GameClientLink{items: store, enchantRoll: func() float64 { return 0.99 }}
+	updates := wireInventoryUpdates(gcl, live)
 	gcl.enchantStateStore().Select(live.ObjectID(), scroll.ObjectID)
 
 	gcl.enchantLiveItem(context.Background(), live, clientpackets.RequestEnchantItem{ObjectID: weapon.ObjectID})
+	updates.Tick()
 
 	if weapon.EnchantLevel != 0 {
 		t.Fatalf("weapon enchant = %d, want reset to 0", weapon.EnchantLevel)
@@ -167,14 +173,14 @@ func TestEnchantLiveItemBlessedFailureResetsEnchantLevel(t *testing.T) {
 	}
 	if got := frameOpcodes(capture.frames); string(got) != string([]byte{
 		serverpackets.OpcodeSystemMessage,
-		serverpackets.OpcodeInventoryUpdate,
 		serverpackets.OpcodeEnchantResult,
 		serverpackets.OpcodeUserInfo,
+		serverpackets.OpcodeInventoryUpdate,
 	}) {
-		t.Fatalf("opcodes = %x, want blessed message, inventory, result, UserInfo", got)
+		t.Fatalf("opcodes = %x, want blessed message, result, UserInfo, inventory", got)
 	}
 	assertStaticSystemMessageFrame(t, capture.frames[0], serverpackets.SystemMessageBlessedEnchantFailed)
-	assertEnchantResultFrame(t, capture.frames[2], serverpackets.EnchantResultUnsuccess)
+	assertEnchantResultFrame(t, capture.frames[1], serverpackets.EnchantResultUnsuccess)
 }
 
 func enchantTestTemplates() *item.Table {

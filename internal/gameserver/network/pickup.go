@@ -115,7 +115,6 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 	l.lockPickupParalysis(live)
 
 	l.applyPersistActions(ctx, res.Persist)
-	l.sendInventoryUpdate(live, inv)
 	return true
 }
 

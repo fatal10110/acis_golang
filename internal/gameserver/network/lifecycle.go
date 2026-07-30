@@ -3,6 +3,8 @@ package network
 import (
 	"context"
 	"time"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 )
 
 const livePlayerDetachSaveTimeout = 2 * time.Second
@@ -38,6 +40,17 @@ func (l *GameClientLink) detachLivePlayer(ctx context.Context, live *livePlayer)
 		l.playerClock.Remove(live.ObjectID())
 	}
 	if l.world != nil {
+		// A still-active pet's inventory notifier closure holds live too;
+		// detach it before live itself is despawned and its client-frame
+		// hooks are cleared below, so it can't run against an already
+		// detached player.
+		if obj, ok := l.world.Summon(live.ObjectID()); ok {
+			if pet, ok := obj.(*summon.Actor); ok {
+				if inv := pet.PetInventory(); inv != nil {
+					inv.SetUpdateNotifier(nil)
+				}
+			}
+		}
 		l.world.Despawn(live)
 		l.world.RemovePlayer(live.ObjectID())
 	}

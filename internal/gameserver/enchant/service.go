@@ -69,8 +69,6 @@ const (
 	StepSystemMessage StepKind = iota
 	// StepEnchantResult means EnchantResult should be sent.
 	StepEnchantResult
-	// StepInventoryUpdate means the changed inventory should be sent.
-	StepInventoryUpdate
 	// StepBroadcastEquipment means other players need equipment refreshes.
 	StepBroadcastEquipment
 )
@@ -206,7 +204,6 @@ func (s *Service) EnchantItem(playerID int32, inv *itemcontainer.Inventory, obje
 	if target.Snapshot().OwnerID != playerID || !Enchantable(target, targetTemplate) || chance < 0 {
 		failed := s.failCondition(playerID)
 		failed.Persist = append(out.Persist, failed.Persist...)
-		failed.Steps = append(failed.Steps, Step{Kind: StepInventoryUpdate})
 		return failed, nil
 	}
 
@@ -271,7 +268,7 @@ func (s *Service) success(playerID int32, inv *itemcontainer.Inventory, target *
 	if inv.SetEnchantLevel(target, oldLevel+1) {
 		out.Persist = append(out.Persist, inventory.Update(target))
 	}
-	out.Steps = append(out.Steps, Step{Kind: StepInventoryUpdate}, resultStep(ResultSuccess))
+	out.Steps = append(out.Steps, resultStep(ResultSuccess))
 	return out
 }
 
@@ -280,7 +277,7 @@ func (s *Service) blessedFailure(playerID int32, inv *itemcontainer.Inventory, t
 	if inv.SetEnchantLevel(target, 0) {
 		out.Persist = append(out.Persist, inventory.Update(target))
 	}
-	out.Steps = append(out.Steps, Step{Kind: StepInventoryUpdate}, resultStep(ResultUnsuccess))
+	out.Steps = append(out.Steps, resultStep(ResultUnsuccess))
 	return out
 }
 
@@ -313,7 +310,6 @@ func (s *Service) normalFailure(playerID int32, inv *itemcontainer.Inventory, ta
 	} else {
 		out.Steps = append(out.Steps, messageStep(Message{Code: MessageEnchantmentFailedS1Evaporated, ItemID: targetID}))
 	}
-	out.Steps = append(out.Steps, Step{Kind: StepInventoryUpdate})
 	if crystalID == 0 {
 		out.Steps = append(out.Steps, resultStep(ResultBrokenNoCrystals))
 	} else {
