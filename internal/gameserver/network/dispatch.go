@@ -111,18 +111,22 @@ type GameClientLink struct {
 	// inventoryUpdates batches InventoryUpdate packets for inventory
 	// changes the server makes on its own, outside a client request.
 	inventoryUpdates *task.InventoryUpdates
-	restarts         *restart.Table
-	levels           *player.LevelTable
-	playerConfig     PlayerConfig
-	petConfig        petmodel.Config // passed into summon.PetConfig by newPet.
-	inventory        *invops.Service
-	petItems         *petitem.Service
-	trades           *tradebook.Book
-	enchantState     *enchantflow.State
-	enchant          *enchantflow.Service
-	targets          *skilltarget.Registry
-	skillHandlers    *handlerskill.Registry
-	log              zerolog.Logger
+	// itemInstances lazily persists item rows whose live state changed,
+	// so a mutation made outside a client request still reaches the
+	// items table.
+	itemInstances *task.ItemInstances
+	restarts      *restart.Table
+	levels        *player.LevelTable
+	playerConfig  PlayerConfig
+	petConfig     petmodel.Config // passed into summon.PetConfig by newPet.
+	inventory     *invops.Service
+	petItems      *petitem.Service
+	trades        *tradebook.Book
+	enchantState  *enchantflow.State
+	enchant       *enchantflow.Service
+	targets       *skilltarget.Registry
+	skillHandlers *handlerskill.Registry
+	log           zerolog.Logger
 
 	// newCipherKey supplies each connection's XOR cipher key; overridden in
 	// tests for a deterministic handshake.
@@ -167,11 +171,13 @@ type GameClientLinkConfig struct {
 	// InventoryUpdates batches InventoryUpdate packets for inventory
 	// changes the server makes on its own, outside a client request.
 	InventoryUpdates *task.InventoryUpdates
-	Restarts         *restart.Table
-	Levels           *player.LevelTable
-	PlayerConfig     PlayerConfig
-	PetConfig        petmodel.Config
-	Log              zerolog.Logger
+	// ItemInstances lazily persists item rows whose live state changed.
+	ItemInstances *task.ItemInstances
+	Restarts      *restart.Table
+	Levels        *player.LevelTable
+	PlayerConfig  PlayerConfig
+	PetConfig     petmodel.Config
+	Log           zerolog.Logger
 }
 
 // NewGameClientLink builds a GameClientLink from its collaborators.
@@ -204,6 +210,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) *GameClientLink {
 		playerClock:   cfg.PlayerClock,
 
 		inventoryUpdates: cfg.InventoryUpdates,
+		itemInstances:    cfg.ItemInstances,
 		restarts:         cfg.Restarts,
 		levels:           cfg.Levels,
 		playerConfig:     cfg.PlayerConfig,

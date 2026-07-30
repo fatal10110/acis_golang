@@ -600,7 +600,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			case actionWalkRun:
 				l.changeLiveMoveType(live, !live.Running())
 			default:
-				if !l.handleSummonActionUse(live, req) {
+				if !l.handleSummonActionUse(ctx, live, req) {
 					// An action-bar command no handler claims must still
 					// answer the client — it locks its input until the
 					// action resolves. The log keeps the gap visible

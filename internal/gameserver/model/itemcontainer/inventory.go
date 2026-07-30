@@ -156,7 +156,12 @@ func (inv *Inventory) Restore(items []*item.Instance) {
 			continue
 		}
 
+		// Restoring a row is not a change to persist: attach the hook
+		// only once the instance already carries its stored owner and
+		// location, so a reload doesn't schedule a redundant write of
+		// what was just read.
 		inst.SetOwnerLocation(inv.OwnerID(), st.Location, st.LocationData)
+		inst.SetPersistNotifier(inv.Container.persist)
 		inv.Container.items[inst.ObjectID] = inst
 
 		tmpl, _ := inv.Templates().Get(inst.TemplateID)

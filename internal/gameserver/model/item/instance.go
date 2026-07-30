@@ -39,6 +39,13 @@ type Instance struct {
 	// nil when none. An augmented item cannot be dropped, traded, or
 	// sold, and only a private warehouse (not a public one) accepts it.
 	Augmentation *Augmentation
+
+	// persist is fired after every mutation that changes state the items
+	// table records, so lazy persistence follows the mutation itself
+	// rather than each call site remembering to schedule a write. nil
+	// (an instance nothing persists, or any domain test) is a silent
+	// no-op.
+	persist func(*Instance)
 }
 
 // InstanceState is a point-in-time copy of an instance's mutable live state,
@@ -146,6 +153,36 @@ func (st InstanceState) Equipped() bool {
 	return st.Location == LocationPaperdoll || st.Location == LocationPetEquip
 }
 
+// SetPersistNotifier records the hook fired whenever a mutation changes
+// state the items table records. Passing nil clears it.
+func (inst *Instance) SetPersistNotifier(notify func(*Instance)) {
+	if inst == nil {
+		return
+	}
+	mu := inst.lock()
+	mu.Lock()
+	defer mu.Unlock()
+	inst.persist = notify
+}
+
+// persisted fires inst's persistence notifier. Call it after releasing
+// inst's lock, so a hook that reads inst back can't deadlock against the
+// mutation that fired it.
+//
+// That is the only lock the hook is guaranteed to be clear of: callers in
+// itemcontainer fire these mutations with the container's own lock held
+// (Container.Add, Container.DestroyAllItems, Inventory.Restore), so a
+// persister must not reach back into the container that installed it.
+func (inst *Instance) persisted() {
+	mu := inst.lock()
+	mu.RLock()
+	notify := inst.persist
+	mu.RUnlock()
+	if notify != nil {
+		notify(inst)
+	}
+}
+
 // CountValue returns inst's current count.
 func (inst *Instance) CountValue() int {
 	mu := inst.lock()
@@ -158,9 +195,14 @@ func (inst *Instance) CountValue() int {
 func (inst *Instance) AddCount(delta int) int {
 	mu := inst.lock()
 	mu.Lock()
-	defer mu.Unlock()
 	inst.Count += delta
-	return inst.Count
+	count := inst.Count
+	mu.Unlock()
+
+	if delta != 0 {
+		inst.persisted()
+	}
+	return count
 }
 
 // ReduceCount subtracts count when enough units are present and returns the
@@ -171,42 +213,59 @@ func (inst *Instance) ReduceCount(count int) (remaining int, ok bool) {
 	}
 	mu := inst.lock()
 	mu.Lock()
-	defer mu.Unlock()
 	if inst.Count < count {
-		return inst.Count, false
+		remaining = inst.Count
+		mu.Unlock()
+		return remaining, false
 	}
 	inst.Count -= count
-	return inst.Count, true
+	remaining = inst.Count
+	mu.Unlock()
+
+	inst.persisted()
+	return remaining, true
 }
 
 // DestroyState marks inst as no longer owned or persisted as a live item row.
 func (inst *Instance) DestroyState() {
 	mu := inst.lock()
 	mu.Lock()
-	defer mu.Unlock()
 	inst.Count = 0
 	inst.OwnerID = 0
 	inst.Location = LocationVoid
 	inst.LocationData = 0
+	mu.Unlock()
+
+	inst.persisted()
 }
 
 // SetOwnerLocation records inst's owning object and location data.
 func (inst *Instance) SetOwnerLocation(ownerID int32, loc Location, locData int) {
 	mu := inst.lock()
 	mu.Lock()
-	defer mu.Unlock()
+	changed := inst.OwnerID != ownerID || inst.Location != loc || inst.LocationData != locData
 	inst.OwnerID = ownerID
 	inst.Location = loc
 	inst.LocationData = locData
+	mu.Unlock()
+
+	if changed {
+		inst.persisted()
+	}
 }
 
 // SetLocation records inst's current location while preserving its owner.
 func (inst *Instance) SetLocation(loc Location, locData int) {
 	mu := inst.lock()
 	mu.Lock()
-	defer mu.Unlock()
+	changed := inst.Location != loc || inst.LocationData != locData
 	inst.Location = loc
 	inst.LocationData = locData
+	mu.Unlock()
+
+	if changed {
+		inst.persisted()
+	}
 }
 
 // SetEnchantLevel changes inst's enchant level. It reports whether anything
@@ -214,11 +273,14 @@ func (inst *Instance) SetLocation(loc Location, locData int) {
 func (inst *Instance) SetEnchantLevel(level int) bool {
 	mu := inst.lock()
 	mu.Lock()
-	defer mu.Unlock()
 	if inst.EnchantLevel == level {
+		mu.Unlock()
 		return false
 	}
 	inst.EnchantLevel = level
+	mu.Unlock()
+
+	inst.persisted()
 	return true
 }
 
@@ -227,15 +289,22 @@ func (inst *Instance) SetEnchantLevel(level int) bool {
 func (inst *Instance) DecreaseMana(amount int) int {
 	mu := inst.lock()
 	mu.Lock()
-	defer mu.Unlock()
 	if inst.ManaLeft < 0 || amount <= 0 {
-		return inst.ManaLeft
+		manaLeft := inst.ManaLeft
+		mu.Unlock()
+		return manaLeft
 	}
 	if amount > inst.ManaLeft {
 		amount = inst.ManaLeft
 	}
 	inst.ManaLeft -= amount
-	return inst.ManaLeft
+	manaLeft := inst.ManaLeft
+	mu.Unlock()
+
+	if amount > 0 {
+		inst.persisted()
+	}
+	return manaLeft
 }
 
 // Equipped reports whether inst currently occupies a paperdoll (or pet

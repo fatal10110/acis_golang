@@ -86,7 +86,9 @@ func (f *Freight) itemByTemplateIDLocked(templateID int32) *item.Instance {
 	return nil
 }
 
-// Add adds inst to the currently active town's visible freight contents.
+// Add adds inst to the currently active town's visible freight contents,
+// absorbing it into a visible stack of the same template per Container.Add
+// (including resetting an absorbed inst as destroyed).
 func (f *Freight) Add(inst *item.Instance) (result *item.Instance, absorbed bool) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -103,6 +105,7 @@ func (f *Freight) Add(inst *item.Instance) (result *item.Instance, absorbed bool
 		}
 		if old != nil {
 			old.AddCount(inst.Snapshot().Count)
+			inst.DestroyState()
 			return old, true
 		}
 	}
@@ -110,6 +113,9 @@ func (f *Freight) Add(inst *item.Instance) (result *item.Instance, absorbed bool
 	locData := 0
 	if f.ActiveLocation > 0 {
 		locData = f.ActiveLocation
+	}
+	if f.persist != nil {
+		inst.SetPersistNotifier(f.persist)
 	}
 	inst.SetOwnerLocation(f.ownerID, f.location, locData)
 	f.items[inst.ObjectID] = inst
