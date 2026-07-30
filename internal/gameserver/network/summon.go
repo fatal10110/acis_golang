@@ -48,8 +48,8 @@ func (l *GameClientLink) handleSummonActionUse(ctx context.Context, live *livePl
 		if inv := actor.PetInventory(); inv != nil {
 			inv.SetUpdateNotifier(nil)
 			flushCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), livePlayerDetachSaveTimeout)
+			defer cancel()
 			l.flushItemPersistence(flushCtx, inv)
-			cancel()
 		}
 	}
 	return true

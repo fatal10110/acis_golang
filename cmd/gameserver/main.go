@@ -3,12 +3,20 @@ package main
 
 import (
 	"flag"
+	"time"
 
 	"go.uber.org/fx"
 
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 )
+
+// gameServerStopTimeout bounds the whole shutdown sequence, which runs every
+// stop hook in turn: draining connections, persisting ground items and npcs,
+// and finally flushing pending item rows. fx's 15s default leaves that last
+// flush able to be cut short by the process exiting rather than by its own
+// itemInstanceShutdownSaveTimeout budget.
+const gameServerStopTimeout = 30 * time.Second
 
 type gameServerPaths struct {
 	ConfigPath        string
@@ -40,6 +48,7 @@ func parseGameServerFlags() gameServerPaths {
 
 func newGameServerApp(paths gameServerPaths) *fx.App {
 	return fx.New(
+		fx.StopTimeout(gameServerStopTimeout),
 		fx.Supply(paths),
 		fx.Provide(
 			loadGameServerProperties,
