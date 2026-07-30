@@ -15,10 +15,16 @@ const maxSP = math.MaxInt32
 func (c *Character) AddExpAndSp(table *LevelTable, tmpl *Template, exp int64, sp int) bool {
 	beforeExp, beforeSP := c.Exp, c.SP
 	leveledUp := false
+	// The reward message follows the attempt, not the result: an experience
+	// add always counts, and an SP add counts unless SP already sits at the
+	// ceiling. Only an attempt where neither amount applied stays silent.
+	attempted := false
 	if exp >= 0 {
 		leveledUp = c.AddExp(table, tmpl, exp)
+		attempted = true
 	}
 	if sp >= 0 {
+		attempted = attempted || c.SP < maxSP
 		c.AddSp(sp)
 	}
 	// Only an add that actually landed pushes UserInfo. Deliberate divergence
@@ -31,6 +37,9 @@ func (c *Character) AddExpAndSp(table *LevelTable, tmpl *Template, exp int64, sp
 	if c.Exp != beforeExp || c.SP != beforeSP {
 		c.UpdateUserInfo()
 	}
+	if attempted {
+		c.sendExpSpGain(exp, sp)
+	}
 	return leveledUp
 }
 
@@ -41,11 +50,12 @@ func (c *Character) RewardExpAndSp(table *LevelTable, exp int64, sp int) bool {
 		beforeSP := c.SP
 		if sp >= 0 {
 			c.AddSp(sp)
-		}
-		// Same deliberate divergence as AddExpAndSp: no packet when the add
-		// changed nothing.
-		if c.SP != beforeSP {
-			c.UpdateUserInfo()
+			// Same deliberate divergence as AddExpAndSp: no packet when the
+			// add changed nothing.
+			if c.SP != beforeSP {
+				c.UpdateUserInfo()
+			}
+			c.sendExpSpGain(0, sp)
 		}
 		return false
 	}
@@ -92,11 +102,21 @@ func (c *Character) AddSp(delta int) {
 // is ignored unless positive — resyncing c.CharLevel the same way AddExpAndSp
 // does. A level drop never refills HP/MP/CP, matching AddLevel.
 func (c *Character) RemoveExpAndSp(table *LevelTable, tmpl *Template, exp int64, sp int) {
+	beforeLevel := c.CharLevel
 	if exp > 0 {
 		c.RemoveExp(table, tmpl, exp)
 	}
 	if sp > 0 {
 		c.RemoveSp(sp)
+	}
+	if exp <= 0 && sp <= 0 {
+		return
+	}
+	c.sendExpSpLoss(exp, sp)
+	// A removal deep enough to drop a level changes max HP and MP, so the
+	// observers' health bars need the new values, not only this client.
+	if c.CharLevel < beforeLevel {
+		c.BroadcastStatus()
 	}
 }
 
@@ -147,5 +167,60 @@ func (c *Character) AddLevel(table *LevelTable, tmpl *Template, delta int) bool 
 	if idx := c.CharLevel - 1; tmpl != nil && idx >= 0 && idx < len(tmpl.HPTable) && idx < len(tmpl.MPTable) && idx < len(tmpl.CPTable) {
 		c.refillResources(tmpl.HPTable[idx], tmpl.MPTable[idx], tmpl.CPTable[idx])
 	}
+	c.announceLevelUp()
 	return true
+}
+
+// SetExpSpGainNotifier records the packet-layer hook that tells this
+// character's own client how much experience and SP an addition granted. It
+// fires once per addition attempt that was not fully rejected, including one
+// granting zero of both.
+func (c *Character) SetExpSpGainNotifier(notify func(exp int64, sp int)) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	c.notifyExpSpGain = notify
+}
+
+// SetExpSpLossNotifier records the packet-layer hook that tells this
+// character's own client how much experience and SP a removal took.
+func (c *Character) SetExpSpLossNotifier(notify func(exp int64, sp int)) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	c.notifyExpSpLoss = notify
+}
+
+// SetLevelUpBroadcaster records the packet-layer hook that plays this
+// character's level-up animation for every observer and tells its own client
+// the level went up.
+func (c *Character) SetLevelUpBroadcaster(broadcast func()) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	c.broadcastLevelUp = broadcast
+}
+
+func (c *Character) sendExpSpGain(exp int64, sp int) {
+	c.stateMu.RLock()
+	notify := c.notifyExpSpGain
+	c.stateMu.RUnlock()
+	if notify != nil {
+		notify(exp, sp)
+	}
+}
+
+func (c *Character) sendExpSpLoss(exp int64, sp int) {
+	c.stateMu.RLock()
+	notify := c.notifyExpSpLoss
+	c.stateMu.RUnlock()
+	if notify != nil {
+		notify(exp, sp)
+	}
+}
+
+func (c *Character) announceLevelUp() {
+	c.stateMu.RLock()
+	broadcast := c.broadcastLevelUp
+	c.stateMu.RUnlock()
+	if broadcast != nil {
+		broadcast()
+	}
 }

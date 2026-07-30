@@ -324,6 +324,171 @@ func TestLevelTable_ExpSpanAtLevel(t *testing.T) {
 	}
 }
 
+// TestAddExpAndSpNotifiesGain pins the reward message an addition owes the
+// player. The hook fires once per attempt that was not fully rejected —
+// including one adding nothing — and carries the raw requested amounts, which
+// are what the message reports.
+func TestAddExpAndSpNotifiesGain(t *testing.T) {
+	table := realLevelTable(t)
+	tmpl := levelStepTemplate(81)
+
+	type gain struct {
+		exp int64
+		sp  int
+	}
+	tests := []struct {
+		name string
+		exp  int64
+		sp   int
+		want []gain
+	}{
+		{name: "experience only", exp: 100, sp: 0, want: []gain{{100, 0}}},
+		{name: "sp only", exp: 0, sp: 25, want: []gain{{0, 25}}},
+		{name: "both", exp: 100, sp: 25, want: []gain{{100, 25}}},
+		{name: "neither", exp: 0, sp: 0, want: []gain{{0, 0}}},
+		{name: "both rejected", exp: -1, sp: -1, want: nil},
+		{name: "experience rejected", exp: -1, sp: 25, want: []gain{{-1, 25}}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			c := newProgressionCharacter()
+			var got []gain
+			c.SetExpSpGainNotifier(func(exp int64, sp int) {
+				got = append(got, gain{exp, sp})
+			})
+			c.AddExpAndSp(table, tmpl, tc.exp, tc.sp)
+			if len(got) != len(tc.want) {
+				t.Fatalf("gain notifications = %v, want %v", got, tc.want)
+			}
+			for i, want := range tc.want {
+				if got[i] != want {
+					t.Errorf("gain notification %d = %v, want %v", i, got[i], want)
+				}
+			}
+		})
+	}
+}
+
+// TestAddExpAndSpNotifiesGainAtSPCeiling pins the one case where an addition
+// stays silent despite a non-negative SP amount: SP already at the ceiling
+// with no experience added leaves nothing to report.
+func TestAddExpAndSpNotifiesGainAtSPCeiling(t *testing.T) {
+	table := realLevelTable(t)
+	tmpl := levelStepTemplate(81)
+
+	c := newProgressionCharacter()
+	c.SP = maxSP
+	notifications := 0
+	c.SetExpSpGainNotifier(func(int64, int) { notifications++ })
+	c.AddExpAndSp(table, tmpl, -1, 25)
+	if notifications != 0 {
+		t.Errorf("gain notifications = %d, want 0", notifications)
+	}
+}
+
+// TestRewardExpAndSpNotifiesGain covers the table-less reward fallback, which
+// applies SP only and must still report it.
+func TestRewardExpAndSpNotifiesGain(t *testing.T) {
+	c := newProgressionCharacter()
+	var got []int
+	c.SetExpSpGainNotifier(func(exp int64, sp int) {
+		if exp != 0 {
+			t.Errorf("gain notification exp = %d, want 0", exp)
+		}
+		got = append(got, sp)
+	})
+	c.RewardExpAndSp(nil, 100, 25)
+	if len(got) != 1 || got[0] != 25 {
+		t.Errorf("gain notifications = %v, want [25]", got)
+	}
+}
+
+// TestAddLevelBroadcastsLevelUp pins the level-up animation and message: they
+// belong to an actual increase, never to a level drop.
+func TestAddLevelBroadcastsLevelUp(t *testing.T) {
+	table := realLevelTable(t)
+	tmpl := levelStepTemplate(81)
+
+	t.Run("increase", func(t *testing.T) {
+		c := newProgressionCharacter()
+		broadcasts := 0
+		c.SetLevelUpBroadcaster(func() { broadcasts++ })
+		if !c.AddLevel(table, tmpl, 1) {
+			t.Fatal("AddLevel(1) = false, want true")
+		}
+		if broadcasts != 1 {
+			t.Errorf("level-up broadcasts = %d, want 1", broadcasts)
+		}
+	})
+
+	t.Run("decrease", func(t *testing.T) {
+		c := newProgressionCharacter()
+		c.AddLevel(table, tmpl, 5)
+		broadcasts := 0
+		c.SetLevelUpBroadcaster(func() { broadcasts++ })
+		if c.AddLevel(table, tmpl, -1) {
+			t.Fatal("AddLevel(-1) = true, want false")
+		}
+		if broadcasts != 0 {
+			t.Errorf("level-up broadcasts = %d, want 0", broadcasts)
+		}
+	})
+}
+
+// TestRemoveExpAndSpNotifiesLoss pins the decrease messages and the status
+// broadcast a level-dropping removal owes nearby clients.
+func TestRemoveExpAndSpNotifiesLoss(t *testing.T) {
+	table := realLevelTable(t)
+	tmpl := levelStepTemplate(81)
+
+	t.Run("without level drop", func(t *testing.T) {
+		c := newProgressionCharacter()
+		c.AddExpAndSp(table, tmpl, table.RequiredExpForLevel(10)+1000, 1000)
+		var lost [][2]int64
+		broadcasts := 0
+		c.SetExpSpLossNotifier(func(exp int64, sp int) {
+			lost = append(lost, [2]int64{exp, int64(sp)})
+		})
+		c.SetStatusBroadcaster(func() { broadcasts++ })
+		c.RemoveExpAndSp(table, tmpl, 10, 25)
+		if len(lost) != 1 || lost[0] != [2]int64{10, 25} {
+			t.Errorf("loss notifications = %v, want [[10 25]]", lost)
+		}
+		if broadcasts != 0 {
+			t.Errorf("status broadcasts = %d, want 0", broadcasts)
+		}
+	})
+
+	t.Run("with level drop", func(t *testing.T) {
+		c := newProgressionCharacter()
+		c.AddExpAndSp(table, tmpl, table.RequiredExpForLevel(10), 1000)
+		before := c.CharLevel
+		notifications, broadcasts := 0, 0
+		c.SetExpSpLossNotifier(func(int64, int) { notifications++ })
+		c.SetStatusBroadcaster(func() { broadcasts++ })
+		c.RemoveExpAndSp(table, tmpl, c.Exp, 0)
+		if c.CharLevel >= before {
+			t.Fatalf("CharLevel = %d, want below %d", c.CharLevel, before)
+		}
+		if notifications != 1 {
+			t.Errorf("loss notifications = %d, want 1", notifications)
+		}
+		if broadcasts != 1 {
+			t.Errorf("status broadcasts = %d, want 1", broadcasts)
+		}
+	})
+
+	t.Run("nothing removed", func(t *testing.T) {
+		c := newProgressionCharacter()
+		notifications := 0
+		c.SetExpSpLossNotifier(func(int64, int) { notifications++ })
+		c.RemoveExpAndSp(table, tmpl, 0, 0)
+		if notifications != 0 {
+			t.Errorf("loss notifications = %d, want 0", notifications)
+		}
+	})
+}
+
 // TestRewardExpAndSpUpdatesUserInfo pins the client notification a kill
 // reward owes the player: without it the client keeps showing the
 // experience, SP and level it was last told about.

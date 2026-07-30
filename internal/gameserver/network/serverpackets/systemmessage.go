@@ -100,6 +100,14 @@ const (
 	SystemMessageCantSeeTarget                    = 181
 	SystemMessageDistTooFarCastingStopped         = 748
 
+	// Experience, SP and level change feedback.
+	SystemMessageEarnedS1Experience    = 45  // number parameter
+	SystemMessageYouEarnedS1ExpAndS2SP = 95  // two number parameters
+	SystemMessageYouIncreasedYourLevel = 96  // no parameter
+	SystemMessageAcquiredS1SP          = 331 // number parameter
+	SystemMessageSPDecreasedS1         = 538 // number parameter
+	SystemMessageExpDecreasedByS1      = 539 // number parameter
+
 	// Periodic in-game clock messages.
 	SystemMessagePlayingForLongTime       = 764  // no parameter
 	SystemMessageNightSkillEffectApplies  = 1131 // skill-name parameter
@@ -169,6 +177,19 @@ func FrameSystemMessageNumber(id int, number int32) wire.Frame {
 	w.WriteInt32(1)
 	w.WriteInt32(SystemMessageParamNumber)
 	w.WriteInt32(number)
+	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
+}
+
+// FrameSystemMessageTwoNumbers builds a SystemMessage packet with two number
+// parameters.
+func FrameSystemMessageTwoNumbers(id int, first, second int32) wire.Frame {
+	w := newFrameWriter(OpcodeSystemMessage)
+	w.WriteInt32(int32(id))
+	w.WriteInt32(2)
+	w.WriteInt32(SystemMessageParamNumber)
+	w.WriteInt32(first)
+	w.WriteInt32(SystemMessageParamNumber)
+	w.WriteInt32(second)
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
 }
 
