@@ -93,6 +93,31 @@ func TestInventoryUpdatesRemoveUnchangedKeepsReregisteredInventory(t *testing.T)
 	}
 }
 
+// TestInventoryUpdatesRemoveUnchangedClearsDroppedSlots pins that the
+// in-place filter in removeUnchanged doesn't leak dropped *Inventory
+// pointers past order's new length: order only ever appends and filters, so
+// a leaked pointer there would keep a logged-out player's inventory (and
+// every item it holds) reachable indefinitely.
+func TestInventoryUpdatesRemoveUnchangedClearsDroppedSlots(t *testing.T) {
+	templates := item.NewTable([]*item.Template{{ID: 57, Kind: item.KindEtcItem, Stackable: true}})
+	invA := itemcontainer.NewPlayerInventory(0x10000001, templates)
+	invB := itemcontainer.NewPlayerInventory(0x10000002, templates)
+	owner := &inventoryUpdateOwnerStub{visible: true}
+	updates := NewInventoryUpdates()
+
+	updates.Add(invA, owner)
+	updates.Add(invB, owner)
+
+	updates.removeUnchanged(map[*itemcontainer.Inventory]uint64{invB: updates.epoch[invB]})
+
+	full := updates.order[:cap(updates.order)]
+	for i := len(updates.order); i < len(full); i++ {
+		if full[i] != nil {
+			t.Fatalf("order's backing array at index %d still references a dropped inventory past its new length", i)
+		}
+	}
+}
+
 func TestInventoryUpdatesTickDropsInvisibleNonTeleportingOwners(t *testing.T) {
 	templates := item.NewTable([]*item.Template{{ID: 57, Kind: item.KindEtcItem, Stackable: true}})
 	inv := itemcontainer.NewPlayerInventory(0x10000001, templates)

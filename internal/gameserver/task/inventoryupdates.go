@@ -129,6 +129,7 @@ func (u *InventoryUpdates) snapshot() []inventoryUpdateEntry {
 func (u *InventoryUpdates) removeUnchanged(seen map[*itemcontainer.Inventory]uint64) {
 	u.mu.Lock()
 	defer u.mu.Unlock()
+	n := len(u.order)
 	kept := u.order[:0]
 	for _, inv := range u.order {
 		wantEpoch, marked := seen[inv]
@@ -139,5 +140,11 @@ func (u *InventoryUpdates) removeUnchanged(seen map[*itemcontainer.Inventory]uin
 		}
 		kept = append(kept, inv)
 	}
+	// The in-place filter above leaves dropped *Inventory pointers live in
+	// the backing array past the new length; clear them so a logged-out
+	// player's inventory (and every item.Instance it holds) doesn't stay
+	// reachable through order's capacity until it happens to grow back to
+	// this size.
+	clear(u.order[len(kept):n])
 	u.order = kept
 }
