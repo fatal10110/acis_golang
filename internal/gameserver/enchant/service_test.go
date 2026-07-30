@@ -59,8 +59,8 @@ func TestServiceSuccessConsumesScrollAndPersistsLevel(t *testing.T) {
 	if len(res.Persist) != 2 || res.Persist[0].Action != inventory.PersistDelete || res.Persist[1].Action != inventory.PersistUpdate {
 		t.Fatalf("persist actions = %+v, want scroll delete and weapon update", res.Persist)
 	}
-	want := []StepKind{StepSystemMessage, StepInventoryUpdate, StepEnchantResult, StepBroadcastEquipment}
-	if !sameStepKinds(res.Steps, want) || res.Steps[2].EnchantResult != ResultSuccess {
+	want := []StepKind{StepSystemMessage, StepEnchantResult, StepBroadcastEquipment}
+	if !sameStepKinds(res.Steps, want) || res.Steps[1].EnchantResult != ResultSuccess {
 		t.Fatalf("steps = %+v, want success flow", res.Steps)
 	}
 }

@@ -223,9 +223,17 @@ func NewGameClientLink(cfg GameClientLinkConfig) *GameClientLink {
 	}
 }
 
+// newPet builds a pet and, if its owner is a connected client, registers
+// its inventory with the batching task once here rather than on every
+// lookup — the structural attach point activePet/registerPetInventoryUpdates
+// expect.
 func (l *GameClientLink) newPet(cfg summon.PetConfig) *summon.Actor {
 	cfg.Config = &l.petConfig
-	return summon.NewPet(cfg)
+	pet := summon.NewPet(cfg)
+	if live, ok := cfg.Owner.(*livePlayer); ok {
+		l.registerPetInventoryUpdates(pet, live)
+	}
+	return pet
 }
 
 func (l *GameClientLink) rollEnchantSkill() int {

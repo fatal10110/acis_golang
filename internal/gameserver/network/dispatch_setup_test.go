@@ -58,13 +58,22 @@ func registerTestInventoryUpdates(t *testing.T, state *world.State, updates *tas
 // registerTestInventoryUpdates.
 func inventoryUpdatesFor(t *testing.T, state *world.State) *task.InventoryUpdates {
 	t.Helper()
-	testInventoryUpdatesMu.Lock()
-	defer testInventoryUpdatesMu.Unlock()
-	u, ok := testInventoryUpdates[state]
+	u, ok := lookupTestInventoryUpdates(state)
 	if !ok {
 		t.Fatal("no inventory update task registered for this test link")
 	}
 	return u
+}
+
+// lookupTestInventoryUpdates is inventoryUpdatesFor without the test
+// failure, for callers like attachTestPet that run before some test setups
+// have registered a task yet and need to treat that as "nothing to wire
+// here" rather than a failure.
+func lookupTestInventoryUpdates(state *world.State) (*task.InventoryUpdates, bool) {
+	testInventoryUpdatesMu.Lock()
+	defer testInventoryUpdatesMu.Unlock()
+	u, ok := testInventoryUpdates[state]
+	return u, ok
 }
 
 // syncBarrier sends a request guaranteed to be answered with wantOpcode and

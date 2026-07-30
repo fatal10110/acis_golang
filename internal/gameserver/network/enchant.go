@@ -82,10 +82,6 @@ func (l *GameClientLink) applyEnchantSteps(live *livePlayer, steps []enchantflow
 			l.sendEnchantMessage(live, step.Message)
 		case enchantflow.StepEnchantResult:
 			live.SendFrame(serverpackets.FrameEnchantResult(enchantResult(step.EnchantResult)))
-		case enchantflow.StepInventoryUpdate:
-			// The batching task drains and sends InventoryUpdate on its own
-			// cadence now; the mutation that produced this step already
-			// queued the change and notified it.
 		case enchantflow.StepBroadcastEquipment:
 			l.broadcastEquipmentChange(live)
 		}

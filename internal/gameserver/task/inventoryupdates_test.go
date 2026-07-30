@@ -59,6 +59,40 @@ func TestInventoryUpdatesTickBatchesMultipleMutationsIntoOneSend(t *testing.T) {
 	}
 }
 
+// TestInventoryUpdatesRemoveUnchangedKeepsReregisteredInventory pins the
+// epoch guard against Tick's check-then-remove race: a mutation that lands
+// between a tick observing an inventory as empty (or gated out) and the
+// sweep that drops it must not orphan the update it just queued. Add bumps
+// the inventory's epoch on every registration; removeUnchanged only drops
+// an entry whose epoch still matches what the tick observed when it decided
+// to remove it.
+func TestInventoryUpdatesRemoveUnchangedKeepsReregisteredInventory(t *testing.T) {
+	templates := item.NewTable([]*item.Template{{ID: 57, Kind: item.KindEtcItem, Stackable: true}})
+	inv := itemcontainer.NewPlayerInventory(0x10000001, templates)
+	owner := &inventoryUpdateOwnerStub{visible: true}
+	updates := NewInventoryUpdates()
+
+	updates.Add(inv, owner)
+	seenEpoch := updates.epoch[inv]
+
+	// A mutation "landing mid-tick" re-registers the inventory, bumping its
+	// epoch past what this tick's snapshot observed.
+	updates.Add(inv, owner)
+
+	updates.removeUnchanged(map[*itemcontainer.Inventory]uint64{inv: seenEpoch})
+
+	if !updates.Contains(inv) {
+		t.Fatal("inventory re-registered mid-tick was dropped by the stale removal sweep")
+	}
+
+	// The ordinary case still removes: no re-registration happened, so the
+	// epoch removeUnchanged sees still matches.
+	updates.removeUnchanged(map[*itemcontainer.Inventory]uint64{inv: updates.epoch[inv]})
+	if updates.Contains(inv) {
+		t.Fatal("inventory with an unchanged epoch should have been removed")
+	}
+}
+
 func TestInventoryUpdatesTickDropsInvisibleNonTeleportingOwners(t *testing.T) {
 	templates := item.NewTable([]*item.Template{{ID: 57, Kind: item.KindEtcItem, Stackable: true}})
 	inv := itemcontainer.NewPlayerInventory(0x10000001, templates)

@@ -335,10 +335,9 @@ func (inv *Inventory) IsWearingType(mask int32) bool {
 // pieces share the same armor type.
 func (inv *Inventory) SetPaperdollItem(slot int, inst *item.Instance, tmpl *item.Template) *item.Instance {
 	inv.mu.Lock()
-	old := inv.setPaperdollItemLocked(slot, inst, tmpl)
-	inv.mu.Unlock()
-	inv.fireNotifier()
-	return old
+	defer inv.fireNotifier() // registered first, so it runs last, after the unlock
+	defer inv.mu.Unlock()
+	return inv.setPaperdollItemLocked(slot, inst, tmpl)
 }
 
 func (inv *Inventory) setPaperdollItemLocked(slot int, inst *item.Instance, tmpl *item.Template) *item.Instance {
@@ -391,6 +390,8 @@ func (inv *Inventory) setPaperdollItemLocked(slot int, inst *item.Instance, tmpl
 // item plus any implicitly unequipped ones).
 func (inv *Inventory) EquipItem(inst *item.Instance, tmpl *item.Template) []*item.Instance {
 	inv.mu.Lock()
+	defer inv.fireNotifier() // registered first, so it runs last, after the unlock
+	defer inv.mu.Unlock()
 
 	var altered []*item.Instance
 	set := func(slot int) {
@@ -500,8 +501,6 @@ func (inv *Inventory) EquipItem(inst *item.Instance, tmpl *item.Template) []*ite
 		// is a no-op rather than a hard error.
 	}
 
-	inv.mu.Unlock()
-	inv.fireNotifier()
 	return altered
 }
 
@@ -533,10 +532,9 @@ func (inv *Inventory) equipPaired(tmpl *item.Template, slotA, slotB int, set fun
 // unnecessary — it always round-trips to the same position.
 func (inv *Inventory) UnequipSlot(slot int) *item.Instance {
 	inv.mu.Lock()
-	old := inv.unequipSlotLocked(slot)
-	inv.mu.Unlock()
-	inv.fireNotifier()
-	return old
+	defer inv.fireNotifier() // registered first, so it runs last, after the unlock
+	defer inv.mu.Unlock()
+	return inv.unequipSlotLocked(slot)
 }
 
 func (inv *Inventory) unequipSlotLocked(slot int) *item.Instance {
@@ -658,9 +656,9 @@ func (inv *Inventory) HasUpdates() bool {
 
 func (inv *Inventory) queueUpdate(inst *item.Instance, state UpdateState) {
 	inv.mu.Lock()
+	defer inv.fireNotifier() // registered first, so it runs last, after the unlock
+	defer inv.mu.Unlock()
 	inv.queueUpdateLocked(inst, state)
-	inv.mu.Unlock()
-	inv.fireNotifier()
 }
 
 func (inv *Inventory) queueUpdateLocked(inst *item.Instance, state UpdateState) {
@@ -673,9 +671,9 @@ func (inv *Inventory) queueUpdateLocked(inst *item.Instance, state UpdateState) 
 
 func (inv *Inventory) queueUpdateRecord(objectID, templateID int32, count int, state UpdateState) {
 	inv.mu.Lock()
+	defer inv.fireNotifier() // registered first, so it runs last, after the unlock
+	defer inv.mu.Unlock()
 	inv.queueUpdateRecordLocked(objectID, templateID, count, state)
-	inv.mu.Unlock()
-	inv.fireNotifier()
 }
 
 func (inv *Inventory) queueUpdateRecordLocked(objectID, templateID int32, count int, state UpdateState) {
@@ -705,8 +703,9 @@ func (inv *Inventory) queueUpdateRecordLocked(objectID, templateID int32, count 
 func (inv *Inventory) fireNotifier() {
 	inv.mu.Lock()
 	notify := inv.notify
+	pending := len(inv.updates) > 0
 	inv.mu.Unlock()
-	if notify != nil {
+	if notify != nil && pending {
 		notify()
 	}
 }

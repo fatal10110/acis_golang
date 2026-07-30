@@ -6,6 +6,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -52,6 +53,11 @@ func newEquipTestLivePlayer(t *testing.T, id int32, capture *frameCapture, templ
 // somewhere: the task's tick gate skips an owner that isn't visible or
 // teleporting, and a live player built directly rather than through the
 // full login flow starts out in no world at all.
+//
+// If live already has a spawned pet (attachTestPet ran first, as in the pet
+// tests), this also registers the pet's inventory — the structural
+// attach-point wiring newPet does in production, done here once for tests
+// that build the pet directly rather than through newPet.
 func wireInventoryUpdates(gcl *GameClientLink, live *livePlayer) *task.InventoryUpdates {
 	updates := task.NewInventoryUpdates()
 	gcl.inventoryUpdates = updates
@@ -62,6 +68,13 @@ func wireInventoryUpdates(gcl *GameClientLink, live *livePlayer) *task.Inventory
 	}
 	if !live.Visible() {
 		world.New().Spawn(live, 0, 0, 0, 0)
+	}
+	if gcl.world != nil {
+		if obj, ok := gcl.world.Summon(live.ObjectID()); ok {
+			if pet, ok := obj.(*summon.Actor); ok {
+				gcl.registerPetInventoryUpdates(pet, live)
+			}
+		}
 	}
 	return updates
 }
