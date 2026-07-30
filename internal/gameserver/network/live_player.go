@@ -8,8 +8,10 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/rs/zerolog"
 )
@@ -89,6 +91,25 @@ func (p *livePlayer) inventoryItems() []*item.Instance {
 		return inv.Items()
 	}
 	return p.items
+}
+
+// SendInventoryUpdate delivers one batch of queued inventory changes as an
+// InventoryUpdate packet, implementing task.InventoryUpdateOwner for
+// changes the server makes outside a client request.
+func (p *livePlayer) SendInventoryUpdate(updates []itemcontainer.Update) {
+	if p == nil || len(updates) == 0 {
+		return
+	}
+	inv := p.Inventory()
+	if inv == nil {
+		return
+	}
+	frame, err := serverpackets.FrameInventoryUpdate(updates, inv.Items(), inv.Templates())
+	if err != nil {
+		p.log.Error().Err(err).Msg("build InventoryUpdate")
+		return
+	}
+	p.SendFrame(frame)
 }
 
 func (p *livePlayer) releaseChair() {

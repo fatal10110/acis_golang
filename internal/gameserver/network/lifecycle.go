@@ -44,6 +44,15 @@ func (l *GameClientLink) detachLivePlayer(ctx context.Context, live *livePlayer)
 	live.Character.SetFrameSender(nil)
 	live.Character.SetAttackBroadcaster(nil)
 	live.Character.SetDieBroadcaster(nil)
+	// The herb consumer reaches skill reuse and effect application without
+	// going through SendFrame, so a kill reward resolving against an already
+	// detached character would still mutate it. Unwire it here, and the
+	// UserInfo updater with it, so detaching really does unwire every hook.
+	live.Character.SetHerbConsumer(nil)
+	live.Character.SetUserInfoUpdater(nil)
+	if inv := live.Character.Inventory(); inv != nil {
+		inv.SetUpdateNotifier(nil)
+	}
 }
 
 func (l *GameClientLink) notifyPlayerLogout(account string) {

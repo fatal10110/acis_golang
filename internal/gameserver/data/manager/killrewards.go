@@ -17,6 +17,15 @@ type rewardItemReceiver interface {
 	AddRewardItem(itemID int32, count int, objectID int32) bool
 }
 
+// herbReceiver consumes an auto-looted herb on the spot. A herb never
+// reaches an inventory: it applies its carried skill to the receiver and is
+// discarded. The result reports whether a consumer was wired to take it — a
+// detached character has none — so a refused herb can still be delivered
+// another way.
+type herbReceiver interface {
+	ConsumeHerb(itemID int32) bool
+}
+
 // KillReward rolls and places the item, spoil, and manually-picked-up herb
 // rewards for one NPC template's death, at a fixed drop location.
 //
@@ -67,7 +76,8 @@ func NewKillReward(categories []item.DropCategory, pool *item.SpoilPool, levelMu
 
 // CalculateRewards rolls this death's item/spoil/herb drops and either
 // places them on the ground or, when configured and supported, adds them
-// directly to the killer's inventory.
+// directly to the killer's inventory. An auto-looted herb is consumed
+// instantly instead: herbs never occupy an inventory slot.
 func (k *KillReward) CalculateRewards(killer creature.DeathActor) {
 	receiver, _ := killer.(rewardItemReceiver)
 	rolled, herbs := item.RollKillReward(k.categories, k.pool, k.levelMultiplier, k.raid, k.rates, k.autoLootHerbs)
@@ -79,11 +89,37 @@ func (k *KillReward) CalculateRewards(killer creature.DeathActor) {
 	}
 	for _, herb := range herbs {
 		if herb.AutoLoot {
-			k.addToInventory(receiver, herb.ItemID, int(herb.Amount))
-			continue
+			// A herb is consumed or it is left on the ground for another
+			// attempt; it never occupies an inventory slot, since it carries
+			// no icon there. Only an ordinary item that a category mislabelled
+			// HERB happens to hold takes the auto-loot inventory path.
+			if k.isHerb(herb.ItemID) {
+				if k.consumeHerb(killer, herb.ItemID) {
+					continue
+				}
+			} else if k.addToInventory(receiver, herb.ItemID, int(herb.Amount)) {
+				continue
+			}
 		}
 		k.drop(herb.ItemID, int(herb.Amount))
 	}
+}
+
+// isHerb reports whether itemID's template is a herb. Herb handling follows
+// the template's etc type, not the drop category the item was rolled from.
+func (k *KillReward) isHerb(itemID int32) bool {
+	tmpl, ok := k.items.Get(itemID)
+	return ok && tmpl.EtcItem != nil && tmpl.EtcItem.Type == item.EtcItemHerb
+}
+
+// consumeHerb hands itemID to killer for instant consumption and reports
+// whether a consumer was there to take it.
+func (k *KillReward) consumeHerb(killer creature.DeathActor, itemID int32) bool {
+	consumer, ok := killer.(herbReceiver)
+	if !ok {
+		return false
+	}
+	return consumer.ConsumeHerb(itemID)
 }
 
 func (k *KillReward) addToInventory(receiver rewardItemReceiver, itemID int32, count int) bool {

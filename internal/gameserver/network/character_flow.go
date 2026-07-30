@@ -249,11 +249,29 @@ func (l *GameClientLink) attachLivePlayer(client *Client, c *player.Character, t
 	c.SetAbnormalEffectUpdater(func() {
 		l.updateLiveAbnormalEffect(live)
 	})
+	c.SetUserInfoUpdater(func() {
+		live.SendFrame(serverpackets.FrameUserInfo(serverpackets.UserInfoSnapshot{
+			Character: live.Character, Template: live.template, Items: live.inventoryItems(),
+		}))
+	})
+	// A server-driven inventory change — an auto-looted kill reward, a task
+	// consuming a stack — queues an update nobody drains until the player
+	// happens to perform an inventory action. Register the inventory with
+	// the batching task the moment it queues one, the way the reference
+	// inventory registers itself.
+	if inv := c.Inventory(); inv != nil && l.inventoryUpdates != nil {
+		inv.SetUpdateNotifier(func() {
+			l.inventoryUpdates.Add(inv, live)
+		})
+	}
 	c.SetShortBuffBroadcaster(func(update player.ShortBuffUpdate) {
 		live.SendFrame(serverpackets.FrameShortBuffStatusUpdate(update.SkillID, update.Level, update.DurationSeconds))
 	})
 	c.SetAttackTargetHook(func(target world.Tracked) {
 		l.attackLiveTarget(live, target)
+	})
+	c.SetHerbConsumer(func(itemID int32) {
+		l.consumeHerb(live, itemID)
 	})
 	return live, nil
 }

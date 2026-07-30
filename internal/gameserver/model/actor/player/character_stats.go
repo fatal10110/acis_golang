@@ -347,6 +347,9 @@ func (c *Character) levelTableValue(values []float64, fallback float64) float64 
 }
 
 // AddHP restores HP, clamped to MaxHP, and returns the applied amount.
+// Callers that change HP outside a client request broadcast the resulting
+// status themselves; the cast and item paths already send their own batched
+// StatusUpdate at the call site.
 func (c *Character) AddHP(amount float64) float64 {
 	if amount <= 0 {
 		return 0

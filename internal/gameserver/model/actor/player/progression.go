@@ -13,12 +13,23 @@ const maxSP = math.MaxInt32
 // nil, in which case a level increase still updates c.CharLevel and c.Exp but
 // leaves HP/MP/CP untouched. It reports whether the level increased.
 func (c *Character) AddExpAndSp(table *LevelTable, tmpl *Template, exp int64, sp int) bool {
+	beforeExp, beforeSP := c.Exp, c.SP
 	leveledUp := false
 	if exp >= 0 {
 		leveledUp = c.AddExp(table, tmpl, exp)
 	}
 	if sp >= 0 {
 		c.AddSp(sp)
+	}
+	// Only an add that actually landed pushes UserInfo. Deliberate divergence
+	// under review in issue #1060: the reference sends it for any non-negative
+	// add, because its dropped-addition branch still reports success to the
+	// caller that sends the packet, so a zero-value reward (a full
+	// level-difference penalty) pushes a UserInfo describing nothing that
+	// changed. Both adds here can be no-ops, and the packet is self-only and
+	// purely descriptive, so the redundant one is suppressed.
+	if c.Exp != beforeExp || c.SP != beforeSP {
+		c.UpdateUserInfo()
 	}
 	return leveledUp
 }
@@ -27,8 +38,14 @@ func (c *Character) AddExpAndSp(table *LevelTable, tmpl *Template, exp int64, sp
 // template for level-up stat refills.
 func (c *Character) RewardExpAndSp(table *LevelTable, exp int64, sp int) bool {
 	if table == nil {
+		beforeSP := c.SP
 		if sp >= 0 {
 			c.AddSp(sp)
+		}
+		// Same deliberate divergence as AddExpAndSp: no packet when the add
+		// changed nothing.
+		if c.SP != beforeSP {
+			c.UpdateUserInfo()
 		}
 		return false
 	}

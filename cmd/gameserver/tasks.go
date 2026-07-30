@@ -245,6 +245,14 @@ func startAI(lc fx.Lifecycle, ai *task.AI, log zerolog.Logger) {
 	startTicker(lc, log, ai.Start)
 }
 
+func provideInventoryUpdates() *task.InventoryUpdates {
+	return task.NewInventoryUpdates()
+}
+
+func startInventoryUpdates(lc fx.Lifecycle, updates *task.InventoryUpdates, log zerolog.Logger) {
+	startTicker(lc, log, updates.Start)
+}
+
 func providePositionUpdates(state *world.State) *task.PositionUpdates {
 	return task.NewPositionUpdates(state)
 }

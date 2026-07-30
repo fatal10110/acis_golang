@@ -323,3 +323,30 @@ func TestLevelTable_ExpSpanAtLevel(t *testing.T) {
 		t.Errorf("ExpSpanAtLevel(maxLevel) = %d, want %d", got, wantTopSpan)
 	}
 }
+
+// TestRewardExpAndSpUpdatesUserInfo pins the client notification a kill
+// reward owes the player: without it the client keeps showing the
+// experience, SP and level it was last told about.
+func TestRewardExpAndSpUpdatesUserInfo(t *testing.T) {
+	table := realLevelTable(t)
+
+	t.Run("with level table", func(t *testing.T) {
+		c := newProgressionCharacter()
+		updates := 0
+		c.SetUserInfoUpdater(func() { updates++ })
+		c.RewardExpAndSp(table, 100, 10)
+		if updates != 1 {
+			t.Errorf("UserInfo updates = %d, want 1", updates)
+		}
+	})
+
+	t.Run("without level table", func(t *testing.T) {
+		c := newProgressionCharacter()
+		updates := 0
+		c.SetUserInfoUpdater(func() { updates++ })
+		c.RewardExpAndSp(nil, 100, 10)
+		if updates != 1 {
+			t.Errorf("UserInfo updates = %d, want 1", updates)
+		}
+	})
+}

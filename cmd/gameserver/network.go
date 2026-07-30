@@ -60,6 +60,7 @@ func provideGameClientLink(
 	attackStance *task.AttackStance,
 	positions *task.PositionUpdates,
 	playerClock *task.PlayerClock,
+	inventoryUpdates *task.InventoryUpdates,
 	respawnHP respawnRestoreHP,
 	spBookNeeded skillEnchantSPBookNeeded,
 	karmaTeleport karmaPlayerCanTeleport,
@@ -94,11 +95,13 @@ func provideGameClientLink(
 		AttackStance:  attackStance,
 		Positions:     positions,
 		PlayerClock:   playerClock,
-		Restarts:      data.Restarts,
-		Levels:        data.Levels,
-		PlayerConfig:  playerConfig,
-		PetConfig:     petCfg,
-		Log:           log,
+
+		InventoryUpdates: inventoryUpdates,
+		Restarts:         data.Restarts,
+		Levels:           data.Levels,
+		PlayerConfig:     playerConfig,
+		PetConfig:        petCfg,
+		Log:              log,
 	})
 }
 
