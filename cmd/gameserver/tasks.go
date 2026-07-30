@@ -253,6 +253,30 @@ func startInventoryUpdates(lc fx.Lifecycle, updates *task.InventoryUpdates, log 
 	startTicker(lc, log, updates.Start)
 }
 
+// provideItemInstances builds the lazy item persistence task over the real
+// items, augmentations and pets tables.
+func provideItemInstances(pool *sql.DB, items *gamesql.ItemStore, data *gameData) *task.ItemInstances {
+	return task.NewItemInstances(items, gamesql.NewAugmentationStore(pool), gamesql.NewPetStore(pool), data.Items)
+}
+
+// startItemInstances launches the persistence tick and flushes whatever is
+// still pending at shutdown, matching the reference's shutdown sequence
+// forcing one final ItemInstanceTaskManager save.
+func startItemInstances(lc fx.Lifecycle, items *task.ItemInstances, log zerolog.Logger) {
+	// Appended first so fx's reverse stop order runs it after the ticker
+	// has stopped: the final save then sees a pending set nothing else is
+	// still draining.
+	lc.Append(fx.Hook{
+		OnStop: func(ctx context.Context) error {
+			if err := items.Save(ctx); err != nil {
+				log.Warn().Err(err).Msg("save pending item instances")
+			}
+			return nil
+		},
+	})
+	startTicker(lc, log, items.Start)
+}
+
 func providePositionUpdates(state *world.State) *task.PositionUpdates {
 	return task.NewPositionUpdates(state)
 }

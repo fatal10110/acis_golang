@@ -111,6 +111,7 @@ func (f *Freight) Add(inst *item.Instance) (result *item.Instance, absorbed bool
 	if f.ActiveLocation > 0 {
 		locData = f.ActiveLocation
 	}
+	inst.SetPersistNotifier(f.persist)
 	inst.SetOwnerLocation(f.ownerID, f.location, locData)
 	f.items[inst.ObjectID] = inst
 	return inst, false

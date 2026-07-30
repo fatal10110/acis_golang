@@ -263,6 +263,14 @@ func (l *GameClientLink) attachLivePlayer(client *Client, c *player.Character, t
 			l.inventoryUpdates.Add(inv, live)
 		})
 	}
+	// Register every item mutation with the lazy persistence task, matching
+	// the reference registering an item with ItemInstanceTaskManager from
+	// the item's own setters: a count, location, enchant or mana change made
+	// without a client request still reaches the items table on the task's
+	// own cadence.
+	if inv := c.Inventory(); inv != nil && l.itemInstances != nil {
+		inv.SetItemPersister(l.itemInstances.Add)
+	}
 	c.SetShortBuffBroadcaster(func(update player.ShortBuffUpdate) {
 		live.SendFrame(serverpackets.FrameShortBuffStatusUpdate(update.SkillID, update.Level, update.DurationSeconds))
 	})

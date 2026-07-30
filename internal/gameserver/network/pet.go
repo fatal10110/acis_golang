@@ -46,10 +46,16 @@ func (l *GameClientLink) activePet(live *livePlayer) (*summon.Actor, *itemcontai
 // the owner's client. Call it once, when pet becomes live for live — from
 // newPet, or wherever else a pet is attached to its owner.
 func (l *GameClientLink) registerPetInventoryUpdates(pet *summon.Actor, live *livePlayer) {
-	if l.inventoryUpdates == nil {
-		return
+	if l.inventoryUpdates != nil {
+		wirePetInventoryUpdates(l.inventoryUpdates, pet, live, l.log)
 	}
-	wirePetInventoryUpdates(l.inventoryUpdates, pet, live, l.log)
+	// A pet's inventory persists through the same lazy task the owner's
+	// does; its items carry the pet's own object id as owner.
+	if l.itemInstances != nil && pet != nil {
+		if inv := pet.PetInventory(); inv != nil {
+			inv.SetItemPersister(l.itemInstances.Add)
+		}
+	}
 }
 
 // wirePetInventoryUpdates registers pet's inventory with updates, addressed

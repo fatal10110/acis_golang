@@ -28,8 +28,9 @@ type Container struct {
 
 	SlotLimit int
 
-	mu    sync.RWMutex
-	items map[int32]*item.Instance
+	mu      sync.RWMutex
+	items   map[int32]*item.Instance
+	persist func(*item.Instance)
 }
 
 // NewContainer returns an empty container owned by ownerID, holding items
@@ -62,6 +63,21 @@ func (c *Container) Location() item.Location { return c.location }
 // Templates returns the template table this container resolves item ids
 // against.
 func (c *Container) Templates() *item.Table { return c.templates }
+
+// SetItemPersister records the hook every item held by this container
+// reports its persisted-state mutations to, applying it to the items
+// already held as well as to every item added later. Items keep the hook
+// after they leave the container, until whichever container they land in
+// next replaces it; an item destroyed on the way out still reports the
+// destruction that removed it. Passing nil clears it.
+func (c *Container) SetItemPersister(persist func(*item.Instance)) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.persist = persist
+	for _, inst := range c.items {
+		inst.SetPersistNotifier(persist)
+	}
+}
 
 // Size returns the number of item instances the container holds.
 func (c *Container) Size() int {
@@ -224,6 +240,10 @@ func (c *Container) Add(inst *item.Instance) (result *item.Instance, absorbed bo
 		return nil, false
 	}
 
+	// Hand the item this container's persistence hook before the move
+	// itself mutates it, so the ownership/location change that brings it
+	// in is the first thing reported.
+	inst.SetPersistNotifier(c.persist)
 	inst.SetOwnerLocation(c.ownerID, c.location, 0)
 	c.items[inst.ObjectID] = inst
 	return inst, false
