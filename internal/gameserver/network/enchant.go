@@ -7,7 +7,6 @@ import (
 	enchantflow "github.com/fatal10110/acis_golang/internal/gameserver/enchant"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
@@ -65,7 +64,7 @@ func (l *GameClientLink) enchantLiveItem(ctx context.Context, live *livePlayer, 
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
-	l.applyEnchantSteps(live, inv, result.Steps)
+	l.applyEnchantSteps(live, result.Steps)
 }
 
 func (l *GameClientLink) cancelActiveEnchant(live *livePlayer) {
@@ -73,10 +72,10 @@ func (l *GameClientLink) cancelActiveEnchant(live *livePlayer) {
 		return
 	}
 	result := l.enchantService().Cancel(live.ObjectID())
-	l.applyEnchantSteps(live, live.Inventory(), result.Steps)
+	l.applyEnchantSteps(live, result.Steps)
 }
 
-func (l *GameClientLink) applyEnchantSteps(live *livePlayer, inv *itemcontainer.Inventory, steps []enchantflow.Step) {
+func (l *GameClientLink) applyEnchantSteps(live *livePlayer, steps []enchantflow.Step) {
 	for _, step := range steps {
 		switch step.Kind {
 		case enchantflow.StepSystemMessage:
@@ -84,7 +83,9 @@ func (l *GameClientLink) applyEnchantSteps(live *livePlayer, inv *itemcontainer.
 		case enchantflow.StepEnchantResult:
 			live.SendFrame(serverpackets.FrameEnchantResult(enchantResult(step.EnchantResult)))
 		case enchantflow.StepInventoryUpdate:
-			l.sendInventoryUpdate(live, inv)
+			// The batching task drains and sends InventoryUpdate on its own
+			// cadence now; the mutation that produced this step already
+			// queued the change and notified it.
 		case enchantflow.StepBroadcastEquipment:
 			l.broadcastEquipmentChange(live)
 		}

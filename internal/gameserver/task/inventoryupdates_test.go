@@ -30,6 +30,35 @@ func TestInventoryUpdatesTickSendsVisibleOwnersAndUpdatesWeight(t *testing.T) {
 	}
 }
 
+// TestInventoryUpdatesTickBatchesMultipleMutationsIntoOneSend pins the
+// batching half of the task: several mutations queued before a tick runs —
+// here, two different items changing on the same inventory — reach the
+// owner as exactly one SendInventoryUpdate call carrying both, not one call
+// per mutation.
+func TestInventoryUpdatesTickBatchesMultipleMutationsIntoOneSend(t *testing.T) {
+	templates := item.NewTable([]*item.Template{
+		{ID: 57, Kind: item.KindEtcItem, Weight: 2, Stackable: true},
+		{ID: 58, Kind: item.KindEtcItem, Weight: 1, Stackable: true},
+	})
+	inv := itemcontainer.NewPlayerInventory(0x10000001, templates)
+
+	owner := &inventoryUpdateOwnerStub{visible: true}
+	updates := NewInventoryUpdates()
+	inv.SetUpdateNotifier(func() { updates.Add(inv, owner) })
+
+	inv.Add(&item.Instance{ObjectID: 1, TemplateID: 57, Count: 3})
+	inv.Add(&item.Instance{ObjectID: 2, TemplateID: 58, Count: 1})
+
+	updates.Tick()
+
+	if len(owner.sent) != 1 {
+		t.Fatalf("SendInventoryUpdate calls = %d, want 1 (one tick, one batch)", len(owner.sent))
+	}
+	if got := len(owner.sent[0]); got != 2 {
+		t.Fatalf("updates in the single batch = %d, want 2", got)
+	}
+}
+
 func TestInventoryUpdatesTickDropsInvisibleNonTeleportingOwners(t *testing.T) {
 	templates := item.NewTable([]*item.Template{{ID: 57, Kind: item.KindEtcItem, Stackable: true}})
 	inv := itemcontainer.NewPlayerInventory(0x10000001, templates)

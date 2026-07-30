@@ -57,8 +57,6 @@ func TestGameClientLinkUseSoulshotChargesWeaponAndConsumes(t *testing.T) {
 	}
 
 	c.send(encodeUseItem(shotObjectID, false))
-	readInventoryUpdate(t, c, shotObjectID, 9)
-
 	reply := c.read()
 	if reply[0] != serverpackets.OpcodeSystemMessage {
 		t.Fatalf("opcode = %#x, want SystemMessage (%#x)", reply[0], serverpackets.OpcodeSystemMessage)
@@ -76,6 +74,9 @@ func TestGameClientLinkUseSoulshotChargesWeaponAndConsumes(t *testing.T) {
 	if caster, target, sid, lvl := r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32(); caster != live.ObjectID() || target != live.ObjectID() || sid != 2154 || lvl != 1 {
 		t.Fatalf("MagicSkillUse = caster %d target %d skill %d level %d, want %d/%d/2154/1", caster, target, sid, lvl, live.ObjectID(), live.ObjectID())
 	}
+
+	inventoryUpdatesFor(t, state).Tick()
+	readInventoryUpdate(t, c, shotObjectID, 9)
 
 	if !live.SoulshotCharged() {
 		t.Fatal("SoulshotCharged() = false after use")

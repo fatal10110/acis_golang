@@ -12,6 +12,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	tradebook "github.com/fatal10110/acis_golang/internal/gameserver/trade"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -93,21 +94,22 @@ func TestDirectTradeConfirmTransfersItemsAndPersists(t *testing.T) {
 	resetCapture(firstCap, secondCap)
 
 	link.handleTradeDone(ctx, second, clientpackets.TradeDone{Response: 1})
+	link.inventoryUpdates.Tick()
 
 	assertOpcodeSequence(t, firstCap.frames,
-		serverpackets.OpcodeInventoryUpdate,
 		serverpackets.OpcodeSendTradeDone,
 		serverpackets.OpcodeSystemMessage,
+		serverpackets.OpcodeInventoryUpdate,
 	)
 	assertOpcodeSequence(t, secondCap.frames,
-		serverpackets.OpcodeInventoryUpdate,
 		serverpackets.OpcodeSendTradeDone,
 		serverpackets.OpcodeSystemMessage,
+		serverpackets.OpcodeInventoryUpdate,
 	)
-	assertTradeDoneFrame(t, firstCap.frames[1], true)
-	assertTradeDoneFrame(t, secondCap.frames[1], true)
-	assertStaticSystemMessageFrame(t, firstCap.frames[2], serverpackets.SystemMessageTradeSuccessful)
-	assertStaticSystemMessageFrame(t, secondCap.frames[2], serverpackets.SystemMessageTradeSuccessful)
+	assertTradeDoneFrame(t, firstCap.frames[0], true)
+	assertTradeDoneFrame(t, secondCap.frames[0], true)
+	assertStaticSystemMessageFrame(t, firstCap.frames[1], serverpackets.SystemMessageTradeSuccessful)
+	assertStaticSystemMessageFrame(t, secondCap.frames[1], serverpackets.SystemMessageTradeSuccessful)
 
 	if got := first.Inventory().ItemByObjectID(500).Count; got != 60 {
 		t.Fatalf("first adena count = %d, want 60", got)
@@ -200,14 +202,23 @@ func newDirectTradeFixture(t *testing.T) (*GameClientLink, *fakeItemStore, *fram
 
 	store := newFakeItemStore()
 	ids := &sequentialIDs{next: 1000}
+	updates := task.NewInventoryUpdates()
 	link := &GameClientLink{
-		world:         state,
-		itemTemplates: testItemTemplates(),
-		items:         store,
-		ids:           ids,
-		inventory:     invops.NewService(ids),
-		trades:        tradebook.NewBook(time.Now),
-		log:           zerolog.Nop(),
+		world:            state,
+		itemTemplates:    testItemTemplates(),
+		items:            store,
+		ids:              ids,
+		inventory:        invops.NewService(ids),
+		trades:           tradebook.NewBook(time.Now),
+		inventoryUpdates: updates,
+		log:              zerolog.Nop(),
+	}
+	for _, live := range []*livePlayer{first, second} {
+		inv := live.Inventory()
+		live := live
+		inv.SetUpdateNotifier(func() {
+			updates.Add(inv, live)
+		})
 	}
 	return link, store, firstCap, secondCap, first, second
 }

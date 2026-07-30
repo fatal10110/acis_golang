@@ -28,16 +28,21 @@ type inventoryUpdateEntry struct {
 
 // InventoryUpdates batches pending inventory update packets.
 //
-// mu guards entries. Inventories keep their own update queue and weight
-// state under their own lock.
+// mu guards order and owners. Inventories keep their own update queue and
+// weight state under their own lock. order tracks registration order
+// (oldest first) so a tick with several newly-registered inventories — a
+// give-to-pet touching both the player's and the pet's — sends them in a
+// deterministic sequence, matching the reference manager's list-based
+// visitation instead of Go map iteration order.
 type InventoryUpdates struct {
-	mu      sync.RWMutex
-	entries map[*itemcontainer.Inventory]InventoryUpdateOwner
+	mu     sync.RWMutex
+	order  []*itemcontainer.Inventory
+	owners map[*itemcontainer.Inventory]InventoryUpdateOwner
 }
 
 // NewInventoryUpdates returns an empty inventory update task.
 func NewInventoryUpdates() *InventoryUpdates {
-	return &InventoryUpdates{entries: make(map[*itemcontainer.Inventory]InventoryUpdateOwner)}
+	return &InventoryUpdates{owners: make(map[*itemcontainer.Inventory]InventoryUpdateOwner)}
 }
 
 // Start launches the fixed inventory update task.
@@ -51,7 +56,10 @@ func (u *InventoryUpdates) Add(inv *itemcontainer.Inventory, owner InventoryUpda
 		return
 	}
 	u.mu.Lock()
-	u.entries[inv] = owner
+	if _, exists := u.owners[inv]; !exists {
+		u.order = append(u.order, inv)
+	}
+	u.owners[inv] = owner
 	u.mu.Unlock()
 }
 
@@ -59,7 +67,7 @@ func (u *InventoryUpdates) Add(inv *itemcontainer.Inventory, owner InventoryUpda
 func (u *InventoryUpdates) Contains(inv *itemcontainer.Inventory) bool {
 	u.mu.RLock()
 	defer u.mu.RUnlock()
-	_, ok := u.entries[inv]
+	_, ok := u.owners[inv]
 	return ok
 }
 
@@ -90,15 +98,21 @@ func (u *InventoryUpdates) Tick() {
 func (u *InventoryUpdates) snapshot() []inventoryUpdateEntry {
 	u.mu.RLock()
 	defer u.mu.RUnlock()
-	entries := make([]inventoryUpdateEntry, 0, len(u.entries))
-	for inv, owner := range u.entries {
-		entries = append(entries, inventoryUpdateEntry{inventory: inv, owner: owner})
+	entries := make([]inventoryUpdateEntry, 0, len(u.order))
+	for _, inv := range u.order {
+		entries = append(entries, inventoryUpdateEntry{inventory: inv, owner: u.owners[inv]})
 	}
 	return entries
 }
 
 func (u *InventoryUpdates) remove(inv *itemcontainer.Inventory) {
 	u.mu.Lock()
-	delete(u.entries, inv)
+	delete(u.owners, inv)
+	for i, other := range u.order {
+		if other == inv {
+			u.order = append(u.order[:i], u.order[i+1:]...)
+			break
+		}
+	}
 	u.mu.Unlock()
 }

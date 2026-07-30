@@ -113,8 +113,10 @@ func TestGiveItemToPetTransfersAndPersists(t *testing.T) {
 	store := &recordingEnchantItemStore{}
 	ids := &sequentialIDs{next: 900}
 	gcl := &GameClientLink{world: state, ids: ids, items: store, petItems: petitem.NewService(ids)}
+	updates := wireInventoryUpdates(gcl, live)
 
 	gcl.giveItemToPet(context.Background(), live, clientpackets.RequestGiveItemToPet{ObjectID: source.ObjectID, Count: 30})
+	updates.Tick()
 
 	if source.Count != 70 {
 		t.Fatalf("source Count = %d, want 70", source.Count)
@@ -123,8 +125,11 @@ func TestGiveItemToPetTransfersAndPersists(t *testing.T) {
 	if petStack == nil || petStack.Count != 30 || petStack.OwnerID != 0x20000001 || petStack.Location != item.LocationPet {
 		t.Fatalf("pet stack = %+v, want 30 adena in pet inventory", petStack)
 	}
-	if got := frameOpcodes(capture.frames); string(got) != string([]byte{serverpackets.OpcodeInventoryUpdate, serverpackets.OpcodePetInventoryUpdate}) {
-		t.Fatalf("opcodes = %x, want InventoryUpdate then PetInventoryUpdate", got)
+	// The receiving inventory (the pet's) registers with the batching task
+	// first, inside TransferItem's own Add path; the source registers after
+	// the transfer completes. The task delivers in registration order.
+	if got := frameOpcodes(capture.frames); string(got) != string([]byte{serverpackets.OpcodePetInventoryUpdate, serverpackets.OpcodeInventoryUpdate}) {
+		t.Fatalf("opcodes = %x, want PetInventoryUpdate then InventoryUpdate", got)
 	}
 	if len(store.updated) != 1 || store.updated[0].ObjectID != source.ObjectID || store.updated[0].Count != 70 {
 		t.Fatalf("updated rows = %+v, want reduced source stack", store.updated)
@@ -146,8 +151,10 @@ func TestGetItemFromPetTransfersBackToOwner(t *testing.T) {
 	store := &recordingEnchantItemStore{}
 	ids := &sequentialIDs{next: 910}
 	gcl := &GameClientLink{world: state, ids: ids, items: store, petItems: petitem.NewService(ids)}
+	updates := wireInventoryUpdates(gcl, live)
 
 	gcl.getItemFromPet(context.Background(), live, clientpackets.RequestGetItemFromPet{ObjectID: petItem.ObjectID, Count: 15})
+	updates.Tick()
 
 	if petItem.Count != 25 {
 		t.Fatalf("pet item Count = %d, want 25", petItem.Count)
@@ -156,8 +163,10 @@ func TestGetItemFromPetTransfersBackToOwner(t *testing.T) {
 	if playerStack == nil || playerStack.Count != 15 || playerStack.OwnerID != live.ObjectID() || playerStack.Location != item.LocationInventory {
 		t.Fatalf("player stack = %+v, want 15 adena in player inventory", playerStack)
 	}
-	if got := frameOpcodes(capture.frames); string(got) != string([]byte{serverpackets.OpcodePetInventoryUpdate, serverpackets.OpcodeInventoryUpdate}) {
-		t.Fatalf("opcodes = %x, want PetInventoryUpdate then InventoryUpdate", got)
+	// The receiving inventory (the player's) registers with the batching
+	// task first, inside TransferItem's own Add path.
+	if got := frameOpcodes(capture.frames); string(got) != string([]byte{serverpackets.OpcodeInventoryUpdate, serverpackets.OpcodePetInventoryUpdate}) {
+		t.Fatalf("opcodes = %x, want InventoryUpdate then PetInventoryUpdate", got)
 	}
 	if len(store.updated) != 1 || store.updated[0].ObjectID != petItem.ObjectID || store.updated[0].Count != 25 {
 		t.Fatalf("updated rows = %+v, want reduced pet stack", store.updated)
@@ -190,8 +199,10 @@ func TestPetGetItemPicksUpGroundItem(t *testing.T) {
 	capture.frames = nil
 	store := &recordingEnchantItemStore{}
 	gcl := &GameClientLink{world: state, groundItems: drops, items: store}
+	updates := wireInventoryUpdates(gcl, live)
 
 	gcl.petGetItem(context.Background(), live, clientpackets.RequestPetGetItem{ObjectID: ground.ObjectID()})
+	updates.Tick()
 
 	assertOpcodeSequence(t, capture.frames,
 		serverpackets.OpcodeGetItem,
@@ -247,8 +258,10 @@ func TestPetGetItemMergesStackAndDeletesGroundRow(t *testing.T) {
 	capture.frames = nil
 	store := &recordingEnchantItemStore{}
 	gcl := &GameClientLink{world: state, groundItems: drops, items: store}
+	updates := wireInventoryUpdates(gcl, live)
 
 	gcl.petGetItem(context.Background(), live, clientpackets.RequestPetGetItem{ObjectID: ground.ObjectID()})
+	updates.Tick()
 
 	assertOpcodeSequence(t, capture.frames,
 		serverpackets.OpcodeGetItem,
@@ -283,9 +296,11 @@ func TestGiveItemToPetCancelsActiveEnchantBeforeTransfer(t *testing.T) {
 	store := &recordingEnchantItemStore{}
 	ids := &sequentialIDs{next: 900}
 	gcl := &GameClientLink{world: state, ids: ids, items: store, petItems: petitem.NewService(ids)}
+	updates := wireInventoryUpdates(gcl, live)
 	gcl.enchantStateStore().Select(live.ObjectID(), scroll.ObjectID)
 
 	gcl.giveItemToPet(context.Background(), live, clientpackets.RequestGiveItemToPet{ObjectID: source.ObjectID, Count: 30})
+	updates.Tick()
 
 	if got := gcl.enchantStateStore().Active(live.ObjectID()); got != 0 {
 		t.Fatalf("active enchant scroll = %d, want cleared", got)
@@ -293,8 +308,8 @@ func TestGiveItemToPetCancelsActiveEnchantBeforeTransfer(t *testing.T) {
 	assertOpcodeSequence(t, capture.frames,
 		serverpackets.OpcodeEnchantResult,
 		serverpackets.OpcodeSystemMessage,
-		serverpackets.OpcodeInventoryUpdate,
 		serverpackets.OpcodePetInventoryUpdate,
+		serverpackets.OpcodeInventoryUpdate,
 	)
 	assertEnchantResultFrame(t, capture.frames[0], serverpackets.EnchantResultCancelled)
 	assertStaticSystemMessageFrame(t, capture.frames[1], serverpackets.SystemMessageEnchantScrollCancelled)
@@ -311,8 +326,10 @@ func TestPetUseItemEquipsWolfWeapon(t *testing.T) {
 	capture.frames = nil
 	store := &recordingEnchantItemStore{}
 	gcl := &GameClientLink{world: state, items: store}
+	updates := wireInventoryUpdates(gcl, live)
 
 	gcl.petUseItem(context.Background(), live, clientpackets.RequestPetUseItem{ObjectID: weapon.ObjectID})
+	updates.Tick()
 
 	if weapon.Location != item.LocationPetEquip || weapon.LocationData != itemcontainer.RHand || petInv.ItemAt(itemcontainer.RHand) != weapon {
 		t.Fatalf("weapon equip state = %+v, want pet RHand equipped", weapon)
@@ -379,13 +396,21 @@ func TestGameClientLinkRequestGiveItemToPetDispatch(t *testing.T) {
 	_, petInv := attachTestPet(t, state, live, testItemTemplates(), 12077, nil)
 
 	c.send(encodeRequestGiveItemToPet(500, 25))
+	// giveItemToPet's own handler sends nothing on success; sync on a
+	// guaranteed-rejected follow-up (strictly ordered on this connection)
+	// before driving the tick, so the tick doesn't race the transfer.
+	c.send(encodeRequestDestroyItem(999999, 1))
+	if reply := c.read(); reply[0] != serverpackets.OpcodeActionFailed {
+		t.Fatalf("sync barrier opcode = %#x, want ActionFailed (%#x)", reply[0], serverpackets.OpcodeActionFailed)
+	}
+	inventoryUpdatesFor(t, state).Tick()
 	reply := c.read()
-	if reply[0] != serverpackets.OpcodeInventoryUpdate {
-		t.Fatalf("first reply opcode = %#x, want InventoryUpdate (%#x)", reply[0], serverpackets.OpcodeInventoryUpdate)
+	if reply[0] != serverpackets.OpcodePetInventoryUpdate {
+		t.Fatalf("first reply opcode = %#x, want PetInventoryUpdate (%#x)", reply[0], serverpackets.OpcodePetInventoryUpdate)
 	}
 	reply = c.read()
-	if reply[0] != serverpackets.OpcodePetInventoryUpdate {
-		t.Fatalf("second reply opcode = %#x, want PetInventoryUpdate (%#x)", reply[0], serverpackets.OpcodePetInventoryUpdate)
+	if reply[0] != serverpackets.OpcodeInventoryUpdate {
+		t.Fatalf("second reply opcode = %#x, want InventoryUpdate (%#x)", reply[0], serverpackets.OpcodeInventoryUpdate)
 	}
 	if stack := petInv.ItemByTemplateID(item.AdenaID); stack == nil || stack.Count != 25 {
 		t.Fatalf("pet stack = %+v, want 25 adena", stack)
@@ -423,9 +448,6 @@ func TestGameClientLinkRequestPetGetItemDispatch(t *testing.T) {
 	pet, petInv := attachTestPet(t, state, live, testItemTemplates(), 12077, nil)
 
 	c.send(encodeRequestDropItem(500, 40, location.Location{X: 10, Y: 20, Z: 30}))
-	if reply := c.read(); reply[0] != serverpackets.OpcodeInventoryUpdate {
-		t.Fatalf("drop inventory opcode = %#x, want InventoryUpdate (%#x)", reply[0], serverpackets.OpcodeInventoryUpdate)
-	}
 	reply := c.read()
 	if reply[0] != serverpackets.OpcodeDropItem {
 		t.Fatalf("drop broadcast opcode = %#x, want DropItem (%#x)", reply[0], serverpackets.OpcodeDropItem)
@@ -433,6 +455,11 @@ func TestGameClientLinkRequestPetGetItemDispatch(t *testing.T) {
 	r := wire.NewReader(reply[1:])
 	r.ReadInt32()
 	groundID := r.ReadInt32()
+
+	inventoryUpdatesFor(t, state).Tick()
+	if reply := c.read(); reply[0] != serverpackets.OpcodeInventoryUpdate {
+		t.Fatalf("drop inventory opcode = %#x, want InventoryUpdate (%#x)", reply[0], serverpackets.OpcodeInventoryUpdate)
+	}
 
 	c.send(encodeRequestPetGetItem(groundID))
 	reply = c.read()
@@ -450,6 +477,7 @@ func TestGameClientLinkRequestPetGetItemDispatch(t *testing.T) {
 	if reply[0] != serverpackets.OpcodeDeleteObject {
 		t.Fatalf("pickup delete opcode = %#x, want DeleteObject (%#x)", reply[0], serverpackets.OpcodeDeleteObject)
 	}
+	inventoryUpdatesFor(t, state).Tick()
 	reply = c.read()
 	if reply[0] != serverpackets.OpcodePetInventoryUpdate {
 		t.Fatalf("pickup inventory opcode = %#x, want PetInventoryUpdate (%#x)", reply[0], serverpackets.OpcodePetInventoryUpdate)

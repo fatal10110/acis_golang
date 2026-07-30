@@ -335,8 +335,10 @@ func (inv *Inventory) IsWearingType(mask int32) bool {
 // pieces share the same armor type.
 func (inv *Inventory) SetPaperdollItem(slot int, inst *item.Instance, tmpl *item.Template) *item.Instance {
 	inv.mu.Lock()
-	defer inv.mu.Unlock()
-	return inv.setPaperdollItemLocked(slot, inst, tmpl)
+	old := inv.setPaperdollItemLocked(slot, inst, tmpl)
+	inv.mu.Unlock()
+	inv.fireNotifier()
+	return old
 }
 
 func (inv *Inventory) setPaperdollItemLocked(slot int, inst *item.Instance, tmpl *item.Template) *item.Instance {
@@ -389,7 +391,6 @@ func (inv *Inventory) setPaperdollItemLocked(slot int, inst *item.Instance, tmpl
 // item plus any implicitly unequipped ones).
 func (inv *Inventory) EquipItem(inst *item.Instance, tmpl *item.Template) []*item.Instance {
 	inv.mu.Lock()
-	defer inv.mu.Unlock()
 
 	var altered []*item.Instance
 	set := func(slot int) {
@@ -499,6 +500,8 @@ func (inv *Inventory) EquipItem(inst *item.Instance, tmpl *item.Template) []*ite
 		// is a no-op rather than a hard error.
 	}
 
+	inv.mu.Unlock()
+	inv.fireNotifier()
 	return altered
 }
 
@@ -530,8 +533,10 @@ func (inv *Inventory) equipPaired(tmpl *item.Template, slotA, slotB int, set fun
 // unnecessary — it always round-trips to the same position.
 func (inv *Inventory) UnequipSlot(slot int) *item.Instance {
 	inv.mu.Lock()
-	defer inv.mu.Unlock()
-	return inv.unequipSlotLocked(slot)
+	old := inv.unequipSlotLocked(slot)
+	inv.mu.Unlock()
+	inv.fireNotifier()
+	return old
 }
 
 func (inv *Inventory) unequipSlotLocked(slot int) *item.Instance {
@@ -630,17 +635,10 @@ func (inv *Inventory) DrainUpdates() []Update {
 	return out
 }
 
-// SetUpdateNotifier records the hook fired when a server-driven change
-// queues a client update — an auto-looted kill reward, a task consuming a
-// stack — so it reaches the owner's client instead of waiting for the next
-// inventory action the owner happens to perform. Passing nil detaches the
+// SetUpdateNotifier records the hook fired on every queued inventory
+// change, matching the reference's Inventory.addUpdate registering with
+// InventoryUpdateTaskManager unconditionally. Passing nil detaches the
 // hook; an inventory without one simply keeps queueing.
-//
-// Only a server-driven change notifies, and its own caller says so by
-// calling NotifyUpdate. A client-requested change must not: its handler
-// drains the queue and sends the packet in the sequence it built, and handing
-// the same queue to the batching task as well would let a tick land
-// mid-sequence and drain it first.
 //
 // The hook runs with no inventory lock held, but it is still meant only to
 // hand the inventory off (registering it with the batching task, say) rather
@@ -660,8 +658,9 @@ func (inv *Inventory) HasUpdates() bool {
 
 func (inv *Inventory) queueUpdate(inst *item.Instance, state UpdateState) {
 	inv.mu.Lock()
-	defer inv.mu.Unlock()
 	inv.queueUpdateLocked(inst, state)
+	inv.mu.Unlock()
+	inv.fireNotifier()
 }
 
 func (inv *Inventory) queueUpdateLocked(inst *item.Instance, state UpdateState) {
@@ -674,8 +673,9 @@ func (inv *Inventory) queueUpdateLocked(inst *item.Instance, state UpdateState) 
 
 func (inv *Inventory) queueUpdateRecord(objectID, templateID int32, count int, state UpdateState) {
 	inv.mu.Lock()
-	defer inv.mu.Unlock()
 	inv.queueUpdateRecordLocked(objectID, templateID, count, state)
+	inv.mu.Unlock()
+	inv.fireNotifier()
 }
 
 func (inv *Inventory) queueUpdateRecordLocked(objectID, templateID int32, count int, state UpdateState) {
@@ -695,16 +695,14 @@ func (inv *Inventory) queueUpdateRecordLocked(objectID, templateID int32, count 
 	inv.updates = append(inv.updates, Update{ObjectID: objectID, TemplateID: templateID, Count: count, State: state})
 }
 
-// NotifyUpdate fires the update hook for a change no client-request handler
-// is waiting to drain. The server-driven caller decides that, not the
-// mutation method it went through: the same methods also serve client
-// requests, whose own handler drains the queue and sends the packet in the
-// sequence it built.
+// fireNotifier notifies the update hook, if any, that inv has a pending
+// change, matching the reference's Inventory.addUpdate registering with
+// InventoryUpdateTaskManager on every mutation.
 //
 // It reads the hook under the lock and calls it outside, so a hook that
 // reaches back into inv cannot deadlock against the mutation that triggered
 // it.
-func (inv *Inventory) NotifyUpdate() {
+func (inv *Inventory) fireNotifier() {
 	inv.mu.Lock()
 	notify := inv.notify
 	inv.mu.Unlock()

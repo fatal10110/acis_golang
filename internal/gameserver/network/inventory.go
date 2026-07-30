@@ -86,7 +86,6 @@ func (l *GameClientLink) useItem(live *livePlayer, objectID int32) {
 		return
 	}
 	l.applyEquipStatChanges(live, inv, res)
-	l.sendInventoryUpdate(live, inv)
 	l.broadcastEquipmentChange(live)
 }
 
@@ -194,7 +193,6 @@ func (l *GameClientLink) unequipItem(live *livePlayer, bodySlot int32) {
 		return
 	}
 	l.applyEquipStatChanges(live, inv, res)
-	l.sendInventoryUpdate(live, inv)
 	l.broadcastEquipmentChange(live)
 }
 
@@ -232,7 +230,6 @@ func (l *GameClientLink) dropLiveItem(live *livePlayer, req clientpackets.Reques
 		return
 	}
 
-	l.sendInventoryUpdate(live, inv)
 	if res.EquipmentChanged {
 		l.broadcastEquipmentChange(live)
 	}
@@ -262,7 +259,6 @@ func (l *GameClientLink) destroyLiveItem(live *livePlayer, objectID int32, count
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
-	l.sendInventoryUpdate(live, inv)
 	if res.EquipmentChanged {
 		l.broadcastEquipmentChange(live)
 	}
@@ -296,24 +292,9 @@ func (l *GameClientLink) crystallizeLiveItem(live *livePlayer, req clientpackets
 	}
 
 	live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageItemCrystallized, res.SourceItemID))
-	l.sendInventoryUpdate(live, inv)
 	if res.EquipmentChanged {
 		l.broadcastEquipmentChange(live)
 	}
-}
-
-func (l *GameClientLink) sendInventoryUpdate(live *livePlayer, inv *itemcontainer.Inventory) {
-	updates := inv.DrainUpdates()
-	if len(updates) == 0 {
-		return
-	}
-	items := inv.Items()
-	frame, err := serverpackets.FrameInventoryUpdate(updates, items, inv.Templates())
-	if err != nil {
-		l.log.Error().Err(err).Msg("build InventoryUpdate")
-		return
-	}
-	live.SendFrame(frame)
 }
 
 // broadcastEquipmentChange resends UserInfo to live (refreshing its own

@@ -51,8 +51,6 @@ func TestGameClientLinkUseBeastSoulshotChargesSummonAndConsumes(t *testing.T) {
 	state.AddSummon(objID, servitor)
 
 	c.send(encodeUseItem(shotObjectID, false))
-	readInventoryUpdate(t, c, shotObjectID, 5)
-
 	reply := c.read()
 	if reply[0] != serverpackets.OpcodeSystemMessage {
 		t.Fatalf("opcode = %#x, want SystemMessage (%#x)", reply[0], serverpackets.OpcodeSystemMessage)
@@ -70,6 +68,9 @@ func TestGameClientLinkUseBeastSoulshotChargesSummonAndConsumes(t *testing.T) {
 	if caster, target, sid, lvl := r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32(); caster != servitor.ObjectID() || target != servitor.ObjectID() || sid != 2033 || lvl != 1 {
 		t.Fatalf("MagicSkillUse = caster %d target %d skill %d level %d, want %d/%d/2033/1", caster, target, sid, lvl, servitor.ObjectID(), servitor.ObjectID())
 	}
+
+	inventoryUpdatesFor(t, state).Tick()
+	readInventoryUpdate(t, c, shotObjectID, 5)
 
 	if !servitor.SoulshotCharged() {
 		t.Fatal("SoulshotCharged() = false after use")

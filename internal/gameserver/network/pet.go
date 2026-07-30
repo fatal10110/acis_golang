@@ -3,6 +3,8 @@ package network
 import (
 	"context"
 
+	"github.com/rs/zerolog"
+
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
@@ -26,7 +28,49 @@ func (l *GameClientLink) activePet(live *livePlayer) (*summon.Actor, *itemcontai
 		return nil, nil, false
 	}
 	inv := pet.PetInventory()
-	return pet, inv, inv != nil
+	if inv == nil {
+		return nil, nil, false
+	}
+	// Register the pet inventory with the batching task, matching the
+	// reference's Pet registering itself with InventoryUpdateTaskManager:
+	// the task is the only drainer, addressed to the owner's client.
+	if l.inventoryUpdates != nil {
+		owner := &petInventoryOwner{live: live, pet: pet, log: l.log}
+		inv.SetUpdateNotifier(func() {
+			l.inventoryUpdates.Add(inv, owner)
+		})
+	}
+	return pet, inv, true
+}
+
+// petInventoryOwner adapts a pet's inventory to task.InventoryUpdateOwner:
+// visibility follows the pet itself, but delivery goes over the owning
+// player's connection since pets have no connection of their own. Pets
+// never teleport independently, so the reference's isTeleporting() gate is
+// always false here.
+type petInventoryOwner struct {
+	live *livePlayer
+	pet  *summon.Actor
+	log  zerolog.Logger
+}
+
+func (o *petInventoryOwner) Visible() bool     { return o.pet.Visible() }
+func (o *petInventoryOwner) Teleporting() bool { return false }
+
+func (o *petInventoryOwner) SendInventoryUpdate(updates []itemcontainer.Update) {
+	if len(updates) == 0 {
+		return
+	}
+	inv := o.pet.PetInventory()
+	if inv == nil {
+		return
+	}
+	frame, err := serverpackets.FramePetInventoryUpdate(updates, inv.Items(), inv.Templates())
+	if err != nil {
+		o.log.Error().Err(err).Msg("build PetInventoryUpdate")
+		return
+	}
+	o.live.SendFrame(frame)
 }
 
 func (l *GameClientLink) giveItemToPet(ctx context.Context, live *livePlayer, req clientpackets.RequestGiveItemToPet) {
@@ -68,8 +112,6 @@ func (l *GameClientLink) giveItemToPet(ctx context.Context, live *livePlayer, re
 
 	l.cancelActiveEnchant(live)
 	l.applyPersistActions(ctx, res.Persist)
-	l.sendInventoryUpdate(live, playerInv)
-	l.sendPetInventoryUpdate(live, petInv)
 }
 
 func (l *GameClientLink) getItemFromPet(ctx context.Context, live *livePlayer, req clientpackets.RequestGetItemFromPet) {
@@ -94,8 +136,6 @@ func (l *GameClientLink) getItemFromPet(ctx context.Context, live *livePlayer, r
 	}
 	l.cancelActiveEnchant(live)
 	l.applyPersistActions(ctx, res.Persist)
-	l.sendPetInventoryUpdate(live, petInv)
-	l.sendInventoryUpdate(live, playerInv)
 }
 
 // petGetItem handles a command-your-pet-to-loot request. Once live is known
@@ -160,7 +200,6 @@ func (l *GameClientLink) petGetItem(ctx context.Context, live *livePlayer, req c
 	l.world.Despawn(ground)
 
 	l.applyPersistActions(ctx, result.Persist)
-	l.sendPetInventoryUpdate(live, petInv)
 }
 
 func (l *GameClientLink) petUseItem(ctx context.Context, live *livePlayer, req clientpackets.RequestPetUseItem) {
@@ -183,11 +222,9 @@ func (l *GameClientLink) petUseItem(ctx context.Context, live *livePlayer, req c
 	l.applyPersistActions(ctx, res.Persist)
 	if res.Outcome == petitem.Unequipped {
 		live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessagePetTookOffS1, res.ItemID))
-		l.sendPetInventoryUpdate(live, petInv)
 		return
 	}
 	live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessagePetPutOnS1, res.ItemID))
-	l.sendPetInventoryUpdate(live, petInv)
 }
 
 func (l *GameClientLink) broadcastGroundPickup(ground *grounditem.Item, pickerID int32) {
@@ -203,17 +240,4 @@ func (l *GameClientLink) broadcastGroundPickup(ground *grounditem.Item, pickerID
 			}
 		})
 	})
-}
-
-func (l *GameClientLink) sendPetInventoryUpdate(live *livePlayer, inv *itemcontainer.Inventory) {
-	updates := inv.DrainUpdates()
-	if len(updates) == 0 {
-		return
-	}
-	frame, err := serverpackets.FramePetInventoryUpdate(updates, inv.Items(), inv.Templates())
-	if err != nil {
-		l.log.Error().Err(err).Msg("build PetInventoryUpdate")
-		return
-	}
-	live.SendFrame(frame)
 }

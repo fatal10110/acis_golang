@@ -3,6 +3,7 @@ package network
 import (
 	"context"
 	"net"
+	"sync"
 	"testing"
 	"time"
 
@@ -31,6 +32,40 @@ import (
 )
 
 // --- test server setup ---
+
+// testInventoryUpdates maps each test's *world.State to the
+// *task.InventoryUpdates wired into its GameClientLink, so a test that
+// otherwise only gets back state (not gcl) can still drive the batching
+// task's tick deterministically instead of waiting on its real cadence.
+var (
+	testInventoryUpdatesMu sync.Mutex
+	testInventoryUpdates   = map[*world.State]*task.InventoryUpdates{}
+)
+
+func registerTestInventoryUpdates(t *testing.T, state *world.State, updates *task.InventoryUpdates) {
+	t.Helper()
+	testInventoryUpdatesMu.Lock()
+	testInventoryUpdates[state] = updates
+	testInventoryUpdatesMu.Unlock()
+	t.Cleanup(func() {
+		testInventoryUpdatesMu.Lock()
+		delete(testInventoryUpdates, state)
+		testInventoryUpdatesMu.Unlock()
+	})
+}
+
+// inventoryUpdatesFor returns the batching task registered for state by
+// registerTestInventoryUpdates.
+func inventoryUpdatesFor(t *testing.T, state *world.State) *task.InventoryUpdates {
+	t.Helper()
+	testInventoryUpdatesMu.Lock()
+	defer testInventoryUpdatesMu.Unlock()
+	u, ok := testInventoryUpdates[state]
+	if !ok {
+		t.Fatal("no inventory update task registered for this test link")
+	}
+	return u
+}
 
 func newTestGameClientLink(t *testing.T, loginLink func() *LoginLink, validator *SessionValidator) (addr string, chars *fakeCharStore, items *fakeItemStore, state *world.State) {
 	t.Helper()
@@ -82,29 +117,32 @@ func newTestGameClientLinkWithSkillsShortcutsCrestsKarmaAndLog(t *testing.T, log
 		cursed = cursedWeapons[0]
 	}
 	playerConfig := PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: karmaPlayerCanTeleport}
+	inventoryUpdates := task.NewInventoryUpdates()
 	gcl := NewGameClientLink(GameClientLinkConfig{
-		Validator:     validator,
-		LoginLink:     loginLink,
-		Roster:        roster,
-		Items:         items,
-		Shortcuts:     shortcuts,
-		Templates:     templates,
-		ItemTemplates: itemTemplates,
-		HTML:          html,
-		Crests:        crests,
-		Skills:        skills,
-		Spellbooks:    spellbooks,
-		SkillTrees:    trees,
-		CursedWeapons: cursed,
-		World:         state,
-		Geo:           testGeo{},
-		IDs:           ids,
-		GroundItems:   groundItems,
-		Positions:     task.NewPositionUpdates(state),
-		PlayerConfig:  playerConfig,
-		PetConfig:     petmodel.DefaultConfig(),
-		Log:           log,
+		Validator:        validator,
+		LoginLink:        loginLink,
+		Roster:           roster,
+		Items:            items,
+		Shortcuts:        shortcuts,
+		Templates:        templates,
+		ItemTemplates:    itemTemplates,
+		HTML:             html,
+		Crests:           crests,
+		Skills:           skills,
+		Spellbooks:       spellbooks,
+		SkillTrees:       trees,
+		CursedWeapons:    cursed,
+		World:            state,
+		Geo:              testGeo{},
+		IDs:              ids,
+		GroundItems:      groundItems,
+		Positions:        task.NewPositionUpdates(state),
+		InventoryUpdates: inventoryUpdates,
+		PlayerConfig:     playerConfig,
+		PetConfig:        petmodel.DefaultConfig(),
+		Log:              log,
 	})
+	registerTestInventoryUpdates(t, state, inventoryUpdates)
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
