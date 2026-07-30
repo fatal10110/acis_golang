@@ -27,6 +27,10 @@ type skillLevelWriter interface {
 	SetKnownSkill(ctx context.Context, charObjID int32, classIndex int32, skillID int, level int) error
 }
 
+type skillLevelDeleter interface {
+	DeleteKnownSkill(ctx context.Context, charObjID int32, classIndex int32, skillID int) error
+}
+
 // Persistence saves and restores a live player's buff and skill-reuse state.
 type Persistence struct {
 	store  skillSaveStore
@@ -110,15 +114,21 @@ func (p *Persistence) Restore(ctx context.Context, c *player.Character) error {
 // level's functions are dropped first so relearning at a new level doesn't
 // stack.
 func (p *Persistence) SetKnownSkill(ctx context.Context, c *player.Character, skillID, level int) error {
+	return p.setKnownSkill(ctx, c, skillID, level, true)
+}
+
+// setKnownSkill is SetKnownSkill with control over whether the change
+// reaches character_skills. A skill the server hands out purely from the
+// character's level is re-derived on every level change, so it is held in
+// memory only: persisting it would leave a row behind that a later level
+// loss has to clean up, and the reference does not write one either.
+func (p *Persistence) setKnownSkill(ctx context.Context, c *player.Character, skillID, level int, persist bool) error {
 	if c == nil {
 		return nil
 	}
-	classIndex := c.SkillSaveClassIndex()
-	if p != nil && p.levels != nil {
-		if writer, ok := p.levels.(skillLevelWriter); ok {
-			if err := writer.SetKnownSkill(ctx, c.ID, classIndex, skillID, level); err != nil {
-				return fmt.Errorf("set known skill for character %d: %w", c.ID, err)
-			}
+	if persist {
+		if err := p.persistKnownSkill(ctx, c, skillID, level); err != nil {
+			return err
 		}
 	}
 	oldLevel := c.SkillLevel(skillID)
@@ -138,6 +148,35 @@ func (p *Persistence) SetKnownSkill(ctx context.Context, c *player.Character, sk
 		return fmt.Errorf("apply passive stats for character %d skill %d level %d: %w", c.ID, skillID, level, err)
 	}
 	c.AddStatFuncs(fns)
+	return nil
+}
+
+// persistKnownSkill writes one learned skill level through to
+// character_skills. A non-positive level is a removal, so it deletes the row
+// rather than storing a level of 0, which would restore as a known skill the
+// character does not have.
+func (p *Persistence) persistKnownSkill(ctx context.Context, c *player.Character, skillID, level int) error {
+	if p == nil || p.levels == nil {
+		return nil
+	}
+	classIndex := c.SkillSaveClassIndex()
+	if level <= 0 {
+		deleter, ok := p.levels.(skillLevelDeleter)
+		if !ok {
+			return nil
+		}
+		if err := deleter.DeleteKnownSkill(ctx, c.ID, classIndex, skillID); err != nil {
+			return fmt.Errorf("delete known skill for character %d: %w", c.ID, err)
+		}
+		return nil
+	}
+	writer, ok := p.levels.(skillLevelWriter)
+	if !ok {
+		return nil
+	}
+	if err := writer.SetKnownSkill(ctx, c.ID, classIndex, skillID, level); err != nil {
+		return fmt.Errorf("set known skill for character %d: %w", c.ID, err)
+	}
 	return nil
 }
 

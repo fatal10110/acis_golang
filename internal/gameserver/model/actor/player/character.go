@@ -100,6 +100,7 @@ type Character struct {
 	notifyExpSpGain      func(exp int64, sp int)
 	notifyExpSpLoss      func(exp int64, sp int)
 	broadcastLevelUp     func()
+	refreshLevel         func()
 	broadcastShortBuff   func(ShortBuffUpdate)
 	consumeHerb          func(itemID int32)
 	roll                 func(int) int

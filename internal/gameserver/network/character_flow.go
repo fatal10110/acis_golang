@@ -97,7 +97,7 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 	coolTimes := skillCoolTimeEntries(c.SkillReuseTimers(now), now)
 	skillList := skillListEntries(c, l.skills)
 
-	live, err := l.attachLivePlayer(client, c, tmpl, items, shortcuts)
+	live, err := l.attachLivePlayer(ctx, client, c, tmpl, items, shortcuts)
 	if err != nil {
 		l.log.Error().Err(err).Msg("enter world: attach live player")
 		return nil, false
@@ -155,6 +155,23 @@ func expSpGainMessage(exp int64, sp int) wire.Frame {
 	}
 }
 
+// refreshLiveLevelSkills re-derives the skills live's new level entitles it
+// to and hands the client the resulting list. It runs on every level change,
+// up or down, as the level refresher attachLivePlayer registers.
+//
+// The skill list goes out even when the refresh failed part-way: the
+// character's in-memory skills have already moved, so the client's copy is
+// stale either way, and resending is what makes the two agree again.
+func (l *GameClientLink) refreshLiveLevelSkills(ctx context.Context, live *livePlayer) {
+	if l.skills == nil || live == nil {
+		return
+	}
+	if err := l.skills.GiveSkills(ctx, live.Character, live.template); err != nil {
+		l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("level change: refresh level skills")
+	}
+	live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
+}
+
 func skillCoolTimeEntries(timers []effect.ReuseTimer, now time.Time) []serverpackets.SkillCoolTimeEntry {
 	if len(timers) == 0 {
 		return nil
@@ -207,7 +224,7 @@ func skillListEntries(c *player.Character, skills *skillstate.Persistence) []ser
 	return entries
 }
 
-func (l *GameClientLink) attachLivePlayer(client *Client, c *player.Character, tmpl *player.Template, items []*item.Instance, shortcuts []shortcut.Shortcut) (*livePlayer, error) {
+func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c *player.Character, tmpl *player.Template, items []*item.Instance, shortcuts []shortcut.Shortcut) (*livePlayer, error) {
 	c.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventory(c.ID, l.itemTemplates, items))
 	c.SetWorld(l.world)
 	if los, ok := l.geo.(player.LineOfSight); ok {
@@ -290,6 +307,7 @@ func (l *GameClientLink) attachLivePlayer(client *Client, c *player.Character, t
 			Character: live.Character, Template: live.template, Items: live.inventoryItems(),
 		}))
 	})
+	c.SetLevelRefresher(func() { l.refreshLiveLevelSkills(ctx, live) })
 	// Register the inventory with the batching task the moment it queues an
 	// update, matching the reference's Inventory.addUpdate registering with
 	// InventoryUpdateTaskManager on every mutation. The task is the only
