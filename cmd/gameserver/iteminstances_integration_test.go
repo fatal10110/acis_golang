@@ -9,7 +9,6 @@ import (
 	"github.com/rs/zerolog"
 	"go.uber.org/fx/fxtest"
 
-	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
@@ -31,7 +30,7 @@ func TestItemInstancesBootWiringPersistsServerSideMutation(t *testing.T) {
 	ctx := context.Background()
 
 	data := itemPersistenceTestData()
-	items := provideItemInstances(db, gamesql.NewItemStore(db), data)
+	items := provideItemInstances(db, data)
 
 	inv := itemcontainer.NewPlayerInventory(0x10000001, data.Items)
 	inv.SetItemPersister(items.Add)
@@ -84,7 +83,7 @@ func TestItemInstancesShutdownFlushesPending(t *testing.T) {
 	ctx := context.Background()
 
 	data := itemPersistenceTestData()
-	items := provideItemInstances(db, gamesql.NewItemStore(db), data)
+	items := provideItemInstances(db, data)
 
 	lc := fxtest.NewLifecycle(t)
 	startItemInstances(lc, items, zerolog.Nop())
@@ -117,7 +116,7 @@ func TestItemInstancesPersistsDestruction(t *testing.T) {
 	ctx := context.Background()
 
 	data := itemPersistenceTestData()
-	items := provideItemInstances(db, gamesql.NewItemStore(db), data)
+	items := provideItemInstances(db, data)
 
 	inv := itemcontainer.NewPlayerInventory(0x10000003, data.Items)
 	inv.SetItemPersister(items.Add)
