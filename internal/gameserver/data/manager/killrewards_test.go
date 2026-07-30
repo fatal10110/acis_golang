@@ -162,11 +162,12 @@ func TestKillReward_DropsAutoLootHerbWhenKillerCannotConsume(t *testing.T) {
 	}
 }
 
-// TestKillReward_StoresAutoLootHerbWhenTheConsumerIsInactive covers a killer
+// TestKillReward_DropsAutoLootHerbWhenTheConsumerIsInactive covers a killer
 // that satisfies the receiver contract but consumes nothing — a character
-// whose herb consumer was unwired on detach. The herb has to reach the
-// inventory or the ground rather than count as consumed.
-func TestKillReward_StoresAutoLootHerbWhenTheConsumerIsInactive(t *testing.T) {
+// whose herb consumer was unwired on detach, e.g. by logging out between the
+// killing blow and reward resolution. The herb goes to the ground: storing it
+// would put back the blank inventory square this whole change removes.
+func TestKillReward_DropsAutoLootHerbWhenTheConsumerIsInactive(t *testing.T) {
 	ground := &recordingGround{}
 	rates := item.Rates{Spoil: 1, Currency: 1, Item: 1, ItemRaid: 1, Herb: 1}
 
@@ -177,11 +178,11 @@ func TestKillReward_StoresAutoLootHerbWhenTheConsumerIsInactive(t *testing.T) {
 	if len(killer.herbs) != 0 {
 		t.Fatalf("consumed herbs = %v, want none", killer.herbs)
 	}
-	if got := killer.items[8600]; got != 1 {
-		t.Fatalf("inventory count = %d, want 1: a refused herb still belongs to the killer", got)
+	if len(killer.items) != 0 {
+		t.Fatalf("inventory items = %v, want none: a herb never occupies a slot", killer.items)
 	}
-	if len(ground.items) != 0 {
-		t.Fatalf("dropped %d items on the ground, want 0 while the inventory accepts it", len(ground.items))
+	if len(ground.items) != 1 || ground.items[0].ItemID() != 8600 {
+		t.Fatalf("ground items = %+v, want the refused herb dropped", ground.items)
 	}
 }
 

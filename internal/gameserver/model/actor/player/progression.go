@@ -21,9 +21,13 @@ func (c *Character) AddExpAndSp(table *LevelTable, tmpl *Template, exp int64, sp
 	if sp >= 0 {
 		c.AddSp(sp)
 	}
-	// Only an add that actually landed pushes UserInfo, matching the
-	// reference's experience setter, which returns early — before its own
-	// packet — when the addition is dropped. Both adds here can be no-ops.
+	// Only an add that actually landed pushes UserInfo. Deliberate divergence:
+	// the reference sends it for any non-negative add, because its dropped-
+	// addition branch still reports success to the caller that sends the
+	// packet, so a zero-value reward (a full level-difference penalty) pushes
+	// a UserInfo describing nothing that changed. Both adds here can be
+	// no-ops, and the packet is self-only and purely descriptive, so the
+	// redundant one is suppressed.
 	if c.Exp != beforeExp || c.SP != beforeSP {
 		c.UpdateUserInfo()
 	}
@@ -38,6 +42,8 @@ func (c *Character) RewardExpAndSp(table *LevelTable, exp int64, sp int) bool {
 		if sp >= 0 {
 			c.AddSp(sp)
 		}
+		// Same deliberate divergence as AddExpAndSp: no packet when the add
+		// changed nothing.
 		if c.SP != beforeSP {
 			c.UpdateUserInfo()
 		}
