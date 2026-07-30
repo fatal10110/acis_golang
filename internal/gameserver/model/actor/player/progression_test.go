@@ -1,6 +1,9 @@
 package player
 
-import "testing"
+import (
+	"slices"
+	"testing"
+)
 
 // realPlayerLevelExp holds the requiredExpToLevelUp value for every level
 // 1-81 of the shipped player level table (level 81 is the sentinel entry
@@ -435,6 +438,52 @@ func TestAddLevelBroadcastsLevelUp(t *testing.T) {
 	})
 }
 
+// TestAddLevelRefreshesLevelEntitlements pins the refresh a level change
+// owes: what a level entitles a character to is re-derived, so a drop has to
+// run the same refresh a gain does, and the UserInfo that follows has to
+// describe the already-refreshed character.
+func TestAddLevelRefreshesLevelEntitlements(t *testing.T) {
+	table := realLevelTable(t)
+	tmpl := levelStepTemplate(81)
+
+	for _, tc := range []struct {
+		name  string
+		delta int
+	}{
+		{"increase", 1},
+		{"decrease", -1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c := newProgressionCharacter()
+			c.AddLevel(table, tmpl, 20)
+
+			var order []string
+			c.SetLevelRefresher(func() { order = append(order, "refresh") })
+			c.SetUserInfoUpdater(func() { order = append(order, "userinfo") })
+
+			c.AddLevel(table, tmpl, tc.delta)
+			if want := []string{"refresh", "userinfo"}; !slices.Equal(order, want) {
+				t.Errorf("hook calls = %v, want %v", order, want)
+			}
+		})
+	}
+
+	// A refused change — one that would push past the real max level —
+	// leaves the character alone, so it owes neither hook.
+	t.Run("refused", func(t *testing.T) {
+		c := newProgressionCharacter()
+		refreshes, updates := 0, 0
+		c.SetLevelRefresher(func() { refreshes++ })
+		c.SetUserInfoUpdater(func() { updates++ })
+		if c.AddLevel(table, tmpl, table.RealMaxLevel()+1) {
+			t.Fatal("AddLevel past the real max reported an increase")
+		}
+		if refreshes != 0 || updates != 0 {
+			t.Errorf("refreshes = %d, UserInfo updates = %d, want 0 and 0", refreshes, updates)
+		}
+	})
+}
+
 // TestRemoveExpAndSpNotifiesLoss pins the decrease messages and the status
 // broadcast a level-dropping removal owes nearby clients.
 func TestRemoveExpAndSpNotifiesLoss(t *testing.T) {
@@ -495,13 +544,30 @@ func TestRemoveExpAndSpNotifiesLoss(t *testing.T) {
 func TestRewardExpAndSpUpdatesUserInfo(t *testing.T) {
 	table := realLevelTable(t)
 
-	t.Run("with level table", func(t *testing.T) {
+	t.Run("with level table, no level gained", func(t *testing.T) {
+		c := newProgressionCharacter()
+		c.AddExpAndSp(table, nil, table.RequiredExpForLevel(10), 0)
+		updates := 0
+		c.SetUserInfoUpdater(func() { updates++ })
+		c.RewardExpAndSp(table, 1, 10)
+		if updates != 1 {
+			t.Errorf("UserInfo updates = %d, want 1", updates)
+		}
+	})
+
+	// A reward that levels the character sends UserInfo twice: the level
+	// change pushes one describing the new level, and the experience add
+	// pushes its own afterwards. Both are self-only and descriptive, so the
+	// second restates the first rather than contradicting it.
+	t.Run("with level table, level gained", func(t *testing.T) {
 		c := newProgressionCharacter()
 		updates := 0
 		c.SetUserInfoUpdater(func() { updates++ })
-		c.RewardExpAndSp(table, 100, 10)
-		if updates != 1 {
-			t.Errorf("UserInfo updates = %d, want 1", updates)
+		if !c.RewardExpAndSp(table, table.RequiredExpForLevel(2), 10) {
+			t.Fatal("RewardExpAndSp did not report a level increase")
+		}
+		if updates != 2 {
+			t.Errorf("UserInfo updates = %d, want 2", updates)
 		}
 	})
 

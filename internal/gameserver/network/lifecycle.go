@@ -73,6 +73,7 @@ func (l *GameClientLink) detachLivePlayer(ctx context.Context, live *livePlayer)
 	// UserInfo updater with it, so detaching really does unwire every hook.
 	live.Character.SetHerbConsumer(nil)
 	live.Character.SetUserInfoUpdater(nil)
+	live.Character.SetLevelRefresher(nil)
 	if inv := live.Character.Inventory(); inv != nil {
 		inv.SetUpdateNotifier(nil)
 		l.flushItemPersistence(saveCtx, inv)

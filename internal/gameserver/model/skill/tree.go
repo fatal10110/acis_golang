@@ -133,6 +133,20 @@ const (
 // can learn dwarven-only fishing skills.
 const CreateDwarvenSkillID ID = 172
 
+// LuckySkillID is the newbie Lucky skill. It is granted for free at low
+// level and taken away again once the character reaches LuckySkillMaxLevel.
+const LuckySkillID ID = 194
+
+// LuckySkillMaxLevel is the first character level at which Lucky is no
+// longer held.
+const LuckySkillMaxLevel = 10
+
+// ExpertiseSkillID is the grade-expertise skill. It is the one profession
+// skill that is never held ahead of the character's own level, so a level
+// correction checks it against the level exactly rather than allowing the
+// lookahead every other skill gets.
+const ExpertiseSkillID ID = 239
+
 // NewEnchantSkill builds an EnchantSkill from set, the folded attributes of
 // one <enchantSkill> element. id, lvl, exp, sp and the five rate attributes
 // are all required; itemNeeded ("itemId-count") is optional.

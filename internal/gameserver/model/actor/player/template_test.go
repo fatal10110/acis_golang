@@ -113,6 +113,92 @@ func equalInts(a, b []int) bool {
 	return true
 }
 
+// TestTemplateAutoGetSkillGrants pins which grants a level hands over for
+// free: only an exact cost of 0, only the highest level unlocked per skill,
+// and only where the character is not already at or above that level.
+func TestTemplateAutoGetSkillGrants(t *testing.T) {
+	tmpl := &Template{Skills: []SkillGrant{
+		{SkillID: 194, Level: 1, MinLevel: 1, Cost: 0},
+		{SkillID: 249, Level: 1, MinLevel: 5, Cost: 0},
+		{SkillID: 249, Level: 2, MinLevel: 10, Cost: 0},
+		{SkillID: 249, Level: 3, MinLevel: 20, Cost: 0},
+		// Bought, and the -1 variant that merely displays a price of 0.
+		{SkillID: 3, Level: 1, MinLevel: 5, Cost: 50},
+		{SkillID: 1405, Level: 1, MinLevel: 5, Cost: -1},
+	}}
+
+	got := tmpl.AutoGetSkillGrants(10, SkillLevels{})
+	want := []SkillGrant{
+		{SkillID: 194, Level: 1, MinLevel: 1, Cost: 0},
+		{SkillID: 249, Level: 2, MinLevel: 10, Cost: 0},
+	}
+	if !equalSkillGrants(got, want) {
+		t.Fatalf("AutoGetSkillGrants(level 10, known none) = %+v, want %+v", got, want)
+	}
+
+	got = tmpl.AutoGetSkillGrants(10, SkillLevels{194: 1, 249: 2})
+	if len(got) != 0 {
+		t.Fatalf("AutoGetSkillGrants(level 10, already granted) = %+v, want none", got)
+	}
+
+	got = tmpl.AutoGetSkillGrants(10, SkillLevels{249: 1})
+	want = []SkillGrant{
+		{SkillID: 194, Level: 1, MinLevel: 1, Cost: 0},
+		{SkillID: 249, Level: 2, MinLevel: 10, Cost: 0},
+	}
+	if !equalSkillGrants(got, want) {
+		t.Fatalf("AutoGetSkillGrants(level 10, known 249:1) = %+v, want %+v", got, want)
+	}
+}
+
+// TestTemplateReachableSkillGrants pins the nine-level slack every skill but
+// expertise keeps, so a small level loss does not strip skills the character
+// legitimately learned.
+func TestTemplateReachableSkillGrants(t *testing.T) {
+	tmpl := &Template{Skills: []SkillGrant{
+		{SkillID: 3, Level: 1, MinLevel: 5, Cost: 50},
+		{SkillID: 3, Level: 2, MinLevel: 20, Cost: 50},
+		{SkillID: 239, Level: 1, MinLevel: 20, Cost: 0},
+		{SkillID: 239, Level: 2, MinLevel: 40, Cost: 0},
+	}}
+
+	// At level 15 the lookahead reaches skill 3's level-20 grant, but
+	// expertise stays pinned to the level itself and so has no grant yet.
+	reachable := tmpl.ReachableSkillGrants(15)
+	if got, ok := reachable[3]; !ok || got.Level != 2 {
+		t.Fatalf("ReachableSkillGrants(15)[3] = %+v, %v; want level 2", got, ok)
+	}
+	if got, ok := reachable[239]; ok {
+		t.Fatalf("ReachableSkillGrants(15)[239] = %+v; want no expertise grant", got)
+	}
+
+	if got, ok := tmpl.ReachableSkillGrants(20)[239]; !ok || got.Level != 1 {
+		t.Fatalf("ReachableSkillGrants(20)[239] = %+v, %v; want level 1", got, ok)
+	}
+	if got, ok := tmpl.ReachableSkillGrants(40)[239]; !ok || got.Level != 2 {
+		t.Fatalf("ReachableSkillGrants(40)[239] = %+v, %v; want level 2", got, ok)
+	}
+
+	// One level short of the lookahead, skill 3 falls back to its lower
+	// grant rather than dropping out entirely.
+	if got, ok := tmpl.ReachableSkillGrants(10)[3]; !ok || got.Level != 1 {
+		t.Fatalf("ReachableSkillGrants(10)[3] = %+v, %v; want level 1", got, ok)
+	}
+	// Far enough below every grant, nothing is reachable at all.
+	if reachable := (&Template{Skills: []SkillGrant{
+		{SkillID: 3, Level: 1, MinLevel: 20, Cost: 50},
+	}}).ReachableSkillGrants(10); len(reachable) != 0 {
+		t.Fatalf("ReachableSkillGrants(10) = %+v, want none", reachable)
+	}
+
+	if !tmpl.GrantsSkill(3) {
+		t.Error("GrantsSkill(3) = false, want true")
+	}
+	if tmpl.GrantsSkill(4267) {
+		t.Error("GrantsSkill(4267) = true, want false for a skill the line never grants")
+	}
+}
+
 func equalSkillGrants(a, b []SkillGrant) bool {
 	if len(a) != len(b) {
 		return false

@@ -6,6 +6,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
 // Template holds the base stats, starter equipment, spawn points and
@@ -275,6 +276,84 @@ func (t *Template) AvailableSkillGrants(characterLevel int, known SkillLevels) [
 		}
 	}
 	return grants
+}
+
+// skillGrantLookahead is how far below a grant's own MinLevel a character
+// may sit and still hold the skill. A level loss therefore does not strip
+// skills immediately; only a drop of more than this many levels does.
+const skillGrantLookahead = 9
+
+// AutoGetSkillGrants returns the free skill grants a character at
+// characterLevel is entitled to without ever learning them: the
+// highest-level zero-cost grant per skill id whose MinLevel the character
+// has reached, skipping any id already known at that level or above. A cost
+// of -1 is not free — it marks a grant that is bought but displays a price
+// of 0 — so only an exact cost of 0 qualifies. The result is ordered by
+// skill id.
+func (t *Template) AutoGetSkillGrants(characterLevel int, known SkillLevels) []SkillGrant {
+	if t == nil {
+		return nil
+	}
+	highest := make(map[int]SkillGrant)
+	for _, grant := range t.Skills {
+		if grant.Cost != 0 || grant.MinLevel > characterLevel {
+			continue
+		}
+		if best, ok := highest[grant.SkillID]; ok && best.Level >= grant.Level {
+			continue
+		}
+		highest[grant.SkillID] = grant
+	}
+	grants := make([]SkillGrant, 0, len(highest))
+	for id, grant := range highest {
+		if known.Level(id) < grant.Level {
+			grants = append(grants, grant)
+		}
+	}
+	sort.Slice(grants, func(i, j int) bool { return grants[i].SkillID < grants[j].SkillID })
+	return grants
+}
+
+// ReachableSkillGrants returns the highest-level grant per skill id a
+// character at characterLevel is still close enough to hold, keyed by skill
+// id. Every skill but expertise stays reachable skillGrantLookahead levels
+// before its own MinLevel; expertise is checked against characterLevel
+// exactly. A skill id absent from the result is one the character may no
+// longer hold at all.
+func (t *Template) ReachableSkillGrants(characterLevel int) map[int]SkillGrant {
+	if t == nil {
+		return nil
+	}
+	highest := make(map[int]SkillGrant)
+	for _, grant := range t.Skills {
+		reach := characterLevel + skillGrantLookahead
+		if grant.SkillID == int(modelskill.ExpertiseSkillID) {
+			reach = characterLevel
+		}
+		if grant.MinLevel > reach {
+			continue
+		}
+		if best, ok := highest[grant.SkillID]; ok && best.Level >= grant.Level {
+			continue
+		}
+		highest[grant.SkillID] = grant
+	}
+	return highest
+}
+
+// GrantsSkill reports whether this profession line defines any grant for
+// skillID. A known skill it does not define came from an item, a quest or a
+// temporary award, and profession-level bookkeeping leaves it alone.
+func (t *Template) GrantsSkill(skillID int) bool {
+	if t == nil {
+		return false
+	}
+	for _, grant := range t.Skills {
+		if grant.SkillID == skillID {
+			return true
+		}
+	}
+	return false
 }
 
 // RequiredLevelForNextSkillGrant returns the lowest future character level

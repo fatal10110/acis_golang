@@ -56,3 +56,15 @@ func (s *CharacterSkillStore) SetKnownSkill(ctx context.Context, charObjID int32
 	}
 	return nil
 }
+
+// DeleteKnownSkill drops one learned skill from one character class.
+func (s *CharacterSkillStore) DeleteKnownSkill(ctx context.Context, charObjID int32, classIndex int32, skillID int) error {
+	_, err := s.db.ExecContext(ctx,
+		`DELETE FROM character_skills WHERE char_obj_id = ? AND skill_id = ? AND class_index = ?`,
+		charObjID, skillID, classIndex,
+	)
+	if err != nil {
+		return fmt.Errorf("delete known skill %d for character %d class %d: %w", skillID, charObjID, classIndex, err)
+	}
+	return nil
+}

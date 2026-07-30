@@ -146,6 +146,11 @@ func (c *Character) RemoveSp(delta int) {
 // level actually increases, refills HP, MP and CP to the full amount
 // tmpl's per-level tables define for the new level (skipped if tmpl is nil
 // or has no row for it). It reports whether the level increased.
+//
+// A level change in either direction then runs the level-dependent refresh
+// and pushes UserInfo: what a character's level entitles it to is re-derived
+// from the new level, never remembered, so a drop has to revoke exactly what
+// a gain would have granted.
 func (c *Character) AddLevel(table *LevelTable, tmpl *Template, delta int) bool {
 	if c.CharLevel+delta > table.RealMaxLevel() {
 		return false
@@ -160,15 +165,16 @@ func (c *Character) AddLevel(table *LevelTable, tmpl *Template, delta int) bool 
 		c.Exp = lower
 	}
 
-	if !increased {
-		return false
+	if increased {
+		if idx := c.CharLevel - 1; tmpl != nil && idx >= 0 && idx < len(tmpl.HPTable) && idx < len(tmpl.MPTable) && idx < len(tmpl.CPTable) {
+			c.refillResources(tmpl.HPTable[idx], tmpl.MPTable[idx], tmpl.CPTable[idx])
+		}
+		c.announceLevelUp()
 	}
 
-	if idx := c.CharLevel - 1; tmpl != nil && idx >= 0 && idx < len(tmpl.HPTable) && idx < len(tmpl.MPTable) && idx < len(tmpl.CPTable) {
-		c.refillResources(tmpl.HPTable[idx], tmpl.MPTable[idx], tmpl.CPTable[idx])
-	}
-	c.announceLevelUp()
-	return true
+	c.refreshForLevel()
+	c.UpdateUserInfo()
+	return increased
 }
 
 // SetExpSpGainNotifier records the packet-layer hook that tells this
@@ -187,6 +193,17 @@ func (c *Character) SetExpSpLossNotifier(notify func(exp int64, sp int)) {
 	c.stateMu.Lock()
 	defer c.stateMu.Unlock()
 	c.notifyExpSpLoss = notify
+}
+
+// SetLevelRefresher records the hook that re-derives everything a
+// character's level entitles it to — the skills the new level grants or
+// revokes, and the client's view of them — after any level change, up or
+// down. It runs before the level change's UserInfo, so the packet describes
+// the already-refreshed character.
+func (c *Character) SetLevelRefresher(refresh func()) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	c.refreshLevel = refresh
 }
 
 // SetLevelUpBroadcaster records the packet-layer hook that plays this
@@ -213,6 +230,15 @@ func (c *Character) sendExpSpLoss(exp int64, sp int) {
 	c.stateMu.RUnlock()
 	if notify != nil {
 		notify(exp, sp)
+	}
+}
+
+func (c *Character) refreshForLevel() {
+	c.stateMu.RLock()
+	refresh := c.refreshLevel
+	c.stateMu.RUnlock()
+	if refresh != nil {
+		refresh()
 	}
 }
 
