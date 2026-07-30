@@ -166,9 +166,13 @@ func (inst *Instance) SetPersistNotifier(notify func(*Instance)) {
 }
 
 // persisted fires inst's persistence notifier. Call it after releasing
-// inst's lock: the hook runs outside it, so a hook reading inst back — or
-// taking a lock of its own — can't deadlock against the mutation that
-// fired it.
+// inst's lock, so a hook that reads inst back can't deadlock against the
+// mutation that fired it.
+//
+// That is the only lock the hook is guaranteed to be clear of: callers in
+// itemcontainer fire these mutations with the container's own lock held
+// (Container.Add, Container.DestroyAllItems, Inventory.Restore), so a
+// persister must not reach back into the container that installed it.
 func (inst *Instance) persisted() {
 	mu := inst.lock()
 	mu.RLock()

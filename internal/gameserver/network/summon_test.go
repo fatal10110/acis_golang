@@ -1,6 +1,7 @@
 package network
 
 import (
+	"context"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
@@ -66,7 +67,7 @@ func TestGameClientLinkSummonActionUseDispatchesSelectedTargetToAI(t *testing.T)
 
 	live.SetTargetTracked(hostile)
 	gcl := &GameClientLink{world: state}
-	if !gcl.handleSummonActionUse(live, clientpackets.RequestActionUse{ActionID: 16}) {
+	if !gcl.handleSummonActionUse(context.Background(), live, clientpackets.RequestActionUse{ActionID: 16}) {
 		t.Fatal("handleSummonActionUse returned false for a summon attack command")
 	}
 	if len(brain.attacks) != 1 || brain.attacks[0] != hostile.ObjectID() {
@@ -76,7 +77,7 @@ func TestGameClientLinkSummonActionUseDispatchesSelectedTargetToAI(t *testing.T)
 	friendlyCreature := &summonActionCombatant{id: 301}
 	state.Spawn(friendlyCreature, 150, 0, 0, 0)
 	live.SetTargetTracked(friendlyCreature)
-	if !gcl.handleSummonActionUse(live, clientpackets.RequestActionUse{ActionID: 16}) {
+	if !gcl.handleSummonActionUse(context.Background(), live, clientpackets.RequestActionUse{ActionID: 16}) {
 		t.Fatal("handleSummonActionUse returned false for a summon follow-target command")
 	}
 	if len(brain.follows) != 1 || brain.follows[0] != friendlyCreature.ObjectID() {
@@ -132,7 +133,7 @@ func TestGameClientLinkSummonSkillUseResolvesTargetKindAndDispatches(t *testing.
 	gcl := &GameClientLink{world: state}
 
 	// Action 36 (Soulless - Toxic Smoke) targets the clicked target.
-	if !gcl.handleSummonActionUse(live, clientpackets.RequestActionUse{ActionID: 36}) {
+	if !gcl.handleSummonActionUse(context.Background(), live, clientpackets.RequestActionUse{ActionID: 36}) {
 		t.Fatal("handleSummonActionUse returned false for a mapped skill action")
 	}
 	if len(brain.casts) != 1 || brain.casts[0] != hostile.ObjectID() {
@@ -140,7 +141,7 @@ func TestGameClientLinkSummonSkillUseResolvesTargetKindAndDispatches(t *testing.
 	}
 
 	// Action 42 (Kai the Cat - Self Damage Shield) targets the owner.
-	if !gcl.handleSummonActionUse(live, clientpackets.RequestActionUse{ActionID: 42}) {
+	if !gcl.handleSummonActionUse(context.Background(), live, clientpackets.RequestActionUse{ActionID: 42}) {
 		t.Fatal("handleSummonActionUse returned false for a mapped skill action")
 	}
 	if len(brain.casts) != 2 || brain.casts[1] != live.ObjectID() {
@@ -149,7 +150,7 @@ func TestGameClientLinkSummonSkillUseResolvesTargetKindAndDispatches(t *testing.
 
 	// Action 1001 (Sin Eater - Ultimate Bombastic Buster) targets the
 	// summon itself.
-	if !gcl.handleSummonActionUse(live, clientpackets.RequestActionUse{ActionID: 1001}) {
+	if !gcl.handleSummonActionUse(context.Background(), live, clientpackets.RequestActionUse{ActionID: 1001}) {
 		t.Fatal("handleSummonActionUse returned false for a mapped skill action")
 	}
 	if len(brain.casts) != 3 || brain.casts[2] != liveSummon.ObjectID() {
@@ -183,7 +184,7 @@ func TestGameClientLinkSinEaterSkillUseBroadcastsFlavorLine(t *testing.T) {
 	frames.frames = nil
 
 	gcl := &GameClientLink{world: state}
-	if !gcl.handleSummonActionUse(live, clientpackets.RequestActionUse{ActionID: 1001}) {
+	if !gcl.handleSummonActionUse(context.Background(), live, clientpackets.RequestActionUse{ActionID: 1001}) {
 		t.Fatal("handleSummonActionUse returned false for Sin Eater skill action")
 	}
 	if got := frameOpcodes(frames.frames); string(got) != string([]byte{serverpackets.OpcodeNpcSay, serverpackets.OpcodeActionFailed}) {
@@ -207,7 +208,7 @@ func TestGameClientLinkSinEaterSkillUseMissedFlavorRollDoesNotBroadcast(t *testi
 	frames.frames = nil
 
 	gcl := &GameClientLink{world: state}
-	gcl.handleSummonActionUse(live, clientpackets.RequestActionUse{ActionID: 1001})
+	gcl.handleSummonActionUse(context.Background(), live, clientpackets.RequestActionUse{ActionID: 1001})
 	if got := frameOpcodes(frames.frames); string(got) != string([]byte{serverpackets.OpcodeActionFailed}) {
 		t.Fatalf("missed Sin Eater flavor-roll opcodes = %x, want ActionFailed only", got)
 	}
@@ -229,7 +230,7 @@ func TestGameClientLinkSummonSkillUsePetBeyondLevelGapIsBlocked(t *testing.T) {
 	summon.SpawnBesideOwner(state, livePet, live, location.Location{})
 
 	gcl := &GameClientLink{world: state}
-	if !gcl.handleSummonActionUse(live, clientpackets.RequestActionUse{ActionID: 36}) {
+	if !gcl.handleSummonActionUse(context.Background(), live, clientpackets.RequestActionUse{ActionID: 36}) {
 		t.Fatal("handleSummonActionUse returned false for a mapped skill action")
 	}
 	if len(brain.casts) != 0 {
@@ -244,7 +245,7 @@ func TestGameClientLinkSummonSkillUseUnmappedActionFallsThrough(t *testing.T) {
 	state.Spawn(live, 0, 0, 0, 0)
 
 	gcl := &GameClientLink{world: state}
-	if gcl.handleSummonActionUse(live, clientpackets.RequestActionUse{ActionID: 9999}) {
+	if gcl.handleSummonActionUse(context.Background(), live, clientpackets.RequestActionUse{ActionID: 9999}) {
 		t.Fatal("handleSummonActionUse = true for an action id with no command or skill mapping")
 	}
 }
@@ -270,7 +271,7 @@ func TestGameClientLinkSummonSkillUseDoorOnlyActionNeverDispatchesYet(t *testing
 	gcl := &GameClientLink{world: state}
 	// Action 1000 (Siege Golem - Siege Hammer) requires a Door target; no
 	// Door world-object type exists yet, so it must never dispatch.
-	if !gcl.handleSummonActionUse(live, clientpackets.RequestActionUse{ActionID: 1000}) {
+	if !gcl.handleSummonActionUse(context.Background(), live, clientpackets.RequestActionUse{ActionID: 1000}) {
 		t.Fatal("handleSummonActionUse returned false for a mapped skill action")
 	}
 	if len(brain.casts) != 0 {

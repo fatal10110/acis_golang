@@ -253,6 +253,11 @@ func startInventoryUpdates(lc fx.Lifecycle, updates *task.InventoryUpdates, log 
 	startTicker(lc, log, updates.Start)
 }
 
+// itemInstanceShutdownSaveTimeout bounds the final flush of pending item
+// rows independently of however much of fx's stop timeout the earlier stop
+// hooks have already spent.
+const itemInstanceShutdownSaveTimeout = 10 * time.Second
+
 // provideItemInstances builds the lazy item persistence task over the real
 // items, augmentations and pets tables.
 func provideItemInstances(pool *sql.DB, items *gamesql.ItemStore, data *gameData) *task.ItemInstances {
@@ -268,8 +273,17 @@ func startItemInstances(lc fx.Lifecycle, items *task.ItemInstances, log zerolog.
 	// still draining.
 	lc.Append(fx.Hook{
 		OnStop: func(ctx context.Context) error {
-			if err := items.Save(ctx); err != nil {
-				log.Warn().Err(err).Msg("save pending item instances")
+			// This is the last chance to write these rows, and Save
+			// releases the pending set either way, so a failure here is
+			// lost data rather than a delay: it gets its own budget
+			// (earlier stop hooks draining player containers can have
+			// consumed most of fx's stop timeout by now) and is reported
+			// rather than swallowed.
+			saveCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), itemInstanceShutdownSaveTimeout)
+			defer cancel()
+			if err := items.Save(saveCtx); err != nil {
+				log.Error().Err(err).Msg("save pending item instances")
+				return err
 			}
 			return nil
 		},

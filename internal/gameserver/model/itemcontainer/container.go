@@ -66,10 +66,11 @@ func (c *Container) Templates() *item.Table { return c.templates }
 
 // SetItemPersister records the hook every item held by this container
 // reports its persisted-state mutations to, applying it to the items
-// already held as well as to every item added later. Items keep the hook
-// after they leave the container, until whichever container they land in
-// next replaces it; an item destroyed on the way out still reports the
-// destruction that removed it. Passing nil clears it.
+// already held as well as to every item added later.
+//
+// Passing nil clears the hook on this container and on the items it holds,
+// which is how a container being torn down stops registering. Moving an
+// item into an unwired container does not clear it, though — see Add.
 func (c *Container) SetItemPersister(persist func(*item.Instance)) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -220,10 +221,12 @@ func (c *Container) Adena() int {
 // Add adds inst to the container, merging into an existing stack of the
 // same template when one already exists and the template is stackable.
 // When merged, inst's own identity is absorbed into the pre-existing
-// stack: absorbed is true and the caller must release inst's object id
-// back to the id allocator (and remove it from the world registry) since
-// it's no longer live. The returned instance is always the one the
-// container now actually holds.
+// stack: absorbed is true, inst's own state is reset as destroyed — so a
+// row it may have had is deleted rather than surviving alongside the units
+// now counted on the pre-existing stack — and the caller must release its
+// object id back to the id allocator (and remove it from the world
+// registry) since it's no longer live. The returned instance is always the
+// one the container now actually holds.
 func (c *Container) Add(inst *item.Instance) (result *item.Instance, absorbed bool) {
 	if inst == nil {
 		return nil, false
@@ -234,6 +237,7 @@ func (c *Container) Add(inst *item.Instance) (result *item.Instance, absorbed bo
 	tmpl, _ := c.templates.Get(inst.TemplateID)
 	if old := c.itemByTemplateIDLocked(inst.TemplateID); old != nil && tmpl != nil && tmpl.Stackable {
 		old.AddCount(inst.Snapshot().Count)
+		inst.DestroyState()
 		return old, true
 	}
 	if inst.ObjectID == 0 {
@@ -242,8 +246,14 @@ func (c *Container) Add(inst *item.Instance) (result *item.Instance, absorbed bo
 
 	// Hand the item this container's persistence hook before the move
 	// itself mutates it, so the ownership/location change that brings it
-	// in is the first thing reported.
-	inst.SetPersistNotifier(c.persist)
+	// in is the first thing reported. A container with no persister of its
+	// own must not clear one the item already carries: moving between
+	// containers never unregisters an item, and dropping the hook here
+	// would both swallow this very move and silence every mutation after
+	// it.
+	if c.persist != nil {
+		inst.SetPersistNotifier(c.persist)
+	}
 	inst.SetOwnerLocation(c.ownerID, c.location, 0)
 	c.items[inst.ObjectID] = inst
 	return inst, false

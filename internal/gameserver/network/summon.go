@@ -1,6 +1,8 @@
 package network
 
 import (
+	"context"
+
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
@@ -8,7 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
-func (l *GameClientLink) handleSummonActionUse(live *livePlayer, req clientpackets.RequestActionUse) bool {
+func (l *GameClientLink) handleSummonActionUse(ctx context.Context, live *livePlayer, req clientpackets.RequestActionUse) bool {
 	command, ok := summonCommandForActionID(req.ActionID)
 	if !ok {
 		return l.handleSummonSkillUse(live, req)
@@ -39,9 +41,15 @@ func (l *GameClientLink) handleSummonActionUse(live *livePlayer, req clientpacke
 		live.SendFrame(serverpackets.FramePetDelete(summonType, objectID))
 		// Unsummoning detaches the pet inventory's notifier so its closure
 		// stops holding live; lifecycle.go does the same for a still-active
-		// pet on logout.
+		// pet on logout. The pet's container also goes away here, so its
+		// items are flushed and unregistered on the same path logout uses —
+		// otherwise they'd sit in the persistence task's pending set
+		// referencing a despawned pet.
 		if inv := actor.PetInventory(); inv != nil {
 			inv.SetUpdateNotifier(nil)
+			flushCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), livePlayerDetachSaveTimeout)
+			l.flushItemPersistence(flushCtx, inv)
+			cancel()
 		}
 	}
 	return true
