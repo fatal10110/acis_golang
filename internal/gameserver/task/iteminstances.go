@@ -4,7 +4,6 @@ import (
 	"cmp"
 	"context"
 	"errors"
-	"fmt"
 	"slices"
 	"sync"
 	"time"
@@ -18,47 +17,32 @@ import (
 // ItemInstanceTick is the fixed cadence for lazy item persistence.
 const ItemInstanceTick = time.Minute
 
-// ItemPersistence saves and deletes item rows.
-type ItemPersistence interface {
-	Save(context.Context, *item.Instance) error
-	Delete(context.Context, int32) error
-}
-
-// AugmentationPersistence saves and deletes item augmentation rows.
-type AugmentationPersistence interface {
-	Save(context.Context, int32, item.Augmentation) error
-	Delete(context.Context, int32) error
-}
-
-// PetItemPersistence deletes pet rows tied to consumed pet-collar items.
-type PetItemPersistence interface {
-	DeleteByItemObjectID(context.Context, int32) error
+// ItemFlusher atomically persists one flush batch: either every change in
+// it lands, or, on error, none of it does.
+type ItemFlusher interface {
+	Flush(ctx context.Context, batch item.FlushBatch) error
 }
 
 // ItemInstances lazily persists changed item instances.
 //
 // mu guards pending. Mutable item fields are guarded by item.Instance.
 type ItemInstances struct {
-	items         ItemPersistence
-	augmentations AugmentationPersistence
-	pets          PetItemPersistence
-	templates     *item.Table
+	flusher   ItemFlusher
+	templates *item.Table
 
 	mu      sync.RWMutex
 	pending map[int32]*item.Instance
 }
 
 // NewItemInstances returns an empty item persistence task.
-func NewItemInstances(items ItemPersistence, augmentations AugmentationPersistence, pets PetItemPersistence, templates *item.Table) *ItemInstances {
+func NewItemInstances(flusher ItemFlusher, templates *item.Table) *ItemInstances {
 	if templates == nil {
 		templates = item.NewTable(nil)
 	}
 	return &ItemInstances{
-		items:         items,
-		augmentations: augmentations,
-		pets:          pets,
-		templates:     templates,
-		pending:       make(map[int32]*item.Instance),
+		flusher:   flusher,
+		templates: templates,
+		pending:   make(map[int32]*item.Instance),
 	}
 }
 
@@ -103,10 +87,15 @@ func (i *ItemInstances) RemoveItems(items []*item.Instance) {
 	}
 }
 
-// Save flushes every pending item and clears the pending set.
+// Save flushes every pending item and, only once the flush actually
+// succeeds, clears them from the pending set. UpdateItems is all-or-nothing,
+// so on error nothing was written; keeping the whole snapshot pending hands
+// it to the next tick or the shutdown flush instead of losing it.
 func (i *ItemInstances) Save(ctx context.Context) error {
 	items := i.snapshotPending()
-	err := i.UpdateItems(ctx, items)
+	if err := i.UpdateItems(ctx, items); err != nil {
+		return err
+	}
 
 	i.mu.Lock()
 	for _, inst := range items {
@@ -114,30 +103,29 @@ func (i *ItemInstances) Save(ctx context.Context) error {
 	}
 	i.mu.Unlock()
 
-	return err
+	return nil
 }
 
-// UpdateItems persists the provided item instances immediately.
+// UpdateItems persists the provided item instances immediately, as one
+// atomic flush: either every row lands, or, on error, none of them do. A
+// non-nil error means nothing was written, so callers must keep their
+// items pending for a retry rather than dropping them.
 func (i *ItemInstances) UpdateItems(ctx context.Context, items []*item.Instance) error {
 	if len(items) == 0 {
 		return nil
 	}
-	if i.items == nil {
+	if i.flusher == nil {
 		return errors.New("task: item persistence is nil")
 	}
 
+	items = slices.DeleteFunc(items, func(inst *item.Instance) bool { return inst == nil })
 	slices.SortFunc(items, func(a, b *item.Instance) int { return cmp.Compare(a.ObjectID, b.ObjectID) })
 
-	var errs []error
+	var batch item.FlushBatch
 	for _, inst := range items {
-		if inst == nil {
-			continue
-		}
-		if err := i.updateItem(ctx, inst); err != nil {
-			errs = append(errs, err)
-		}
+		i.addToBatch(&batch, inst)
 	}
-	return errors.Join(errs...)
+	return i.flusher.Flush(ctx, batch)
 }
 
 func (i *ItemInstances) snapshotPending() []*item.Instance {
@@ -150,47 +138,39 @@ func (i *ItemInstances) snapshotPending() []*item.Instance {
 	return items
 }
 
-func (i *ItemInstances) updateItem(ctx context.Context, inst *item.Instance) error {
-	if inst == nil {
-		return nil
-	}
+// addToBatch resolves inst's persistence effect and appends it to batch,
+// matching the per-item semantics updateItem used to apply immediately:
+// delete when count <= 0 or location == VOID, augmentation delete/save
+// only for weapons, pet-row delete only for a pet collar at zero count.
+func (i *ItemInstances) addToBatch(batch *item.FlushBatch, inst *item.Instance) {
 	st := inst.Snapshot()
-	saved := st.Instance()
 	tmpl, _ := i.templates.Get(st.TemplateID)
 	isWeapon := tmpl != nil && tmpl.Kind == item.KindWeapon
 
 	if st.Count <= 0 || st.Location == item.LocationVoid {
-		if err := i.items.Delete(ctx, st.ObjectID); err != nil {
-			return fmt.Errorf("delete item %d: %w", st.ObjectID, err)
-		}
+		batch.Deletes = append(batch.Deletes, st.ObjectID)
 		if st.Count <= 0 {
-			if isWeapon && i.augmentations != nil {
-				if err := i.augmentations.Delete(ctx, st.ObjectID); err != nil {
-					return fmt.Errorf("delete augmentation %d: %w", st.ObjectID, err)
-				}
+			if isWeapon {
+				batch.AugmentationDeletes = append(batch.AugmentationDeletes, st.ObjectID)
 			}
-			if i.pets != nil && isPetCollar(tmpl) {
-				if err := i.pets.DeleteByItemObjectID(ctx, st.ObjectID); err != nil {
-					return fmt.Errorf("delete pet item %d: %w", st.ObjectID, err)
-				}
+			if isPetCollar(tmpl) {
+				batch.PetDeletes = append(batch.PetDeletes, st.ObjectID)
 			}
 		}
-		return nil
+		return
 	}
 
-	if err := i.items.Save(ctx, saved); err != nil {
-		return fmt.Errorf("save item %d: %w", st.ObjectID, err)
-	}
-	if isWeapon && i.augmentations != nil {
+	batch.Saves = append(batch.Saves, st)
+	if isWeapon {
 		if st.Augmentation == nil {
-			if err := i.augmentations.Delete(ctx, st.ObjectID); err != nil {
-				return fmt.Errorf("delete augmentation %d: %w", st.ObjectID, err)
-			}
-		} else if err := i.augmentations.Save(ctx, st.ObjectID, *st.Augmentation); err != nil {
-			return fmt.Errorf("save augmentation %d: %w", st.ObjectID, err)
+			batch.AugmentationDeletes = append(batch.AugmentationDeletes, st.ObjectID)
+		} else {
+			batch.AugmentationSaves = append(batch.AugmentationSaves, item.FlushAugmentationSave{
+				ObjectID:     st.ObjectID,
+				Augmentation: *st.Augmentation,
+			})
 		}
 	}
-	return nil
 }
 
 func isPetCollar(tmpl *item.Template) bool {

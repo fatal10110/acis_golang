@@ -259,9 +259,9 @@ func startInventoryUpdates(lc fx.Lifecycle, updates *task.InventoryUpdates, log 
 const itemInstanceShutdownSaveTimeout = 10 * time.Second
 
 // provideItemInstances builds the lazy item persistence task over the real
-// items, augmentations and pets tables.
-func provideItemInstances(pool *sql.DB, items *gamesql.ItemStore, data *gameData) *task.ItemInstances {
-	return task.NewItemInstances(items, gamesql.NewAugmentationStore(pool), gamesql.NewPetStore(pool), data.Items)
+// items, augmentations and pets tables, flushed atomically as one batch.
+func provideItemInstances(pool *sql.DB, data *gameData) *task.ItemInstances {
+	return task.NewItemInstances(gamesql.NewItemFlushStore(pool), data.Items)
 }
 
 // startItemInstances launches the persistence tick and flushes whatever is

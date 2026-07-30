@@ -25,17 +25,11 @@ type recordingItemPersistence struct {
 	deleted []int32
 }
 
-func (r *recordingItemPersistence) Save(_ context.Context, inst *item.Instance) error {
+func (r *recordingItemPersistence) Flush(_ context.Context, batch item.FlushBatch) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.saved = append(r.saved, inst.Snapshot())
-	return nil
-}
-
-func (r *recordingItemPersistence) Delete(_ context.Context, objectID int32) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.deleted = append(r.deleted, objectID)
+	r.saved = append(r.saved, batch.Saves...)
+	r.deleted = append(r.deleted, batch.Deletes...)
 	return nil
 }
 
@@ -56,7 +50,7 @@ func (r *recordingItemPersistence) savedCount(objectID int32) (int, bool) {
 // never see that inventory again.
 func TestDetachLivePlayerFlushesPendingItems(t *testing.T) {
 	store := &recordingItemPersistence{}
-	items := task.NewItemInstances(store, nil, nil, testItemTemplates())
+	items := task.NewItemInstances(store, testItemTemplates())
 
 	live := newTestLivePlayer(t, 101, &frameCapture{})
 	inv := live.Character.Inventory()
@@ -100,7 +94,7 @@ func TestDetachLivePlayerFlushesPendingItems(t *testing.T) {
 // tick or the shutdown flush retries them instead of dropping them.
 func TestFlushItemPersistenceKeepsItemsPendingOnFailure(t *testing.T) {
 	store := &failingItemPersistence{}
-	items := task.NewItemInstances(store, nil, nil, testItemTemplates())
+	items := task.NewItemInstances(store, testItemTemplates())
 
 	live := newTestLivePlayer(t, 102, &frameCapture{})
 	inv := live.Character.Inventory()
@@ -125,12 +119,8 @@ func TestFlushItemPersistenceKeepsItemsPendingOnFailure(t *testing.T) {
 // that is unreachable or a deadline that expired mid-flush.
 type failingItemPersistence struct{}
 
-func (failingItemPersistence) Save(context.Context, *item.Instance) error {
-	return errors.New("save failed")
-}
-
-func (failingItemPersistence) Delete(context.Context, int32) error {
-	return errors.New("delete failed")
+func (failingItemPersistence) Flush(context.Context, item.FlushBatch) error {
+	return errors.New("flush failed")
 }
 
 // TestUnsummonFlushesPetInventoryPersistence covers the reference's
@@ -139,7 +129,7 @@ func (failingItemPersistence) Delete(context.Context, int32) error {
 // there rather than lingering in the pending set behind a despawned pet.
 func TestUnsummonFlushesPetInventoryPersistence(t *testing.T) {
 	store := &recordingItemPersistence{}
-	items := task.NewItemInstances(store, nil, nil, petTestTemplates())
+	items := task.NewItemInstances(store, petTestTemplates())
 
 	state := world.New()
 	live := newTestLivePlayer(t, 103, &frameCapture{})

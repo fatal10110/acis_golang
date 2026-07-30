@@ -86,10 +86,10 @@ func (l *GameClientLink) detachLivePlayer(ctx context.Context, live *livePlayer)
 // a tick that will never see the container again.
 //
 // The items leave the pending set only once the write has actually
-// succeeded. Each item is its own statement, so a deadline expiring partway
-// through a full inventory leaves the rest unwritten; keeping them pending
-// hands the remainder to the next tick, or to the shutdown flush, instead
-// of dropping them on the floor.
+// succeeded. UpdateItems writes the whole container as one atomic flush, so
+// a deadline expiring partway through leaves none of it written; keeping
+// the container pending hands all of it to the next tick, or to the
+// shutdown flush, instead of dropping it on the floor.
 func (l *GameClientLink) flushItemPersistence(ctx context.Context, inv *itemcontainer.Inventory) {
 	inv.SetItemPersister(nil)
 	if l.itemInstances == nil {
