@@ -17,6 +17,22 @@ func TestFrameSystemMessage(t *testing.T) {
 	}
 }
 
+func TestFrameSystemMessageTwoNumbers(t *testing.T) {
+	got := framePayload(t, FrameSystemMessageTwoNumbers(SystemMessageYouEarnedS1ExpAndS2SP, 1000, 25))
+	want := []byte{
+		OpcodeSystemMessage,
+		0x5f, 0x00, 0x00, 0x00, // 95
+		0x02, 0x00, 0x00, 0x00, // two params
+		0x01, 0x00, 0x00, 0x00, // number param
+		0xe8, 0x03, 0x00, 0x00, // 1000 exp
+		0x01, 0x00, 0x00, 0x00, // number param
+		0x19, 0x00, 0x00, 0x00, // 25 sp
+	}
+	if !bytes.Equal(got, want) {
+		t.Fatalf("FrameSystemMessageTwoNumbers() = %x, want %x", got, want)
+	}
+}
+
 func TestFrameSystemMessageSkillName(t *testing.T) {
 	got := framePayload(t, FrameSystemMessageSkillName(SystemMessageNightSkillEffectApplies, 294, 1))
 	want := []byte{

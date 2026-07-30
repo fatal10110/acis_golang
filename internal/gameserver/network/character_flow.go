@@ -6,6 +6,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
@@ -136,6 +137,24 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 	return live, true
 }
 
+// socialActionLevelUp is the social animation id played for everyone who can
+// see a character that just gained a level.
+const socialActionLevelUp = 15
+
+// expSpGainMessage picks the single system message that reports one
+// experience/SP gain. The amounts pick the message: SP alone, experience
+// alone, or the combined one, which also covers a gain of nothing.
+func expSpGainMessage(exp int64, sp int) wire.Frame {
+	switch {
+	case exp == 0 && sp > 0:
+		return serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageAcquiredS1SP, int32(sp))
+	case exp > 0 && sp == 0:
+		return serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageEarnedS1Experience, int32(exp))
+	default:
+		return serverpackets.FrameSystemMessageTwoNumbers(serverpackets.SystemMessageYouEarnedS1ExpAndS2SP, int32(exp), int32(sp))
+	}
+}
+
 func skillCoolTimeEntries(timers []effect.ReuseTimer, now time.Time) []serverpackets.SkillCoolTimeEntry {
 	if len(timers) == 0 {
 		return nil
@@ -248,6 +267,23 @@ func (l *GameClientLink) attachLivePlayer(client *Client, c *player.Character, t
 	})
 	c.SetAbnormalEffectUpdater(func() {
 		l.updateLiveAbnormalEffect(live)
+	})
+	c.SetExpSpGainNotifier(func(exp int64, sp int) {
+		live.SendFrame(expSpGainMessage(exp, sp))
+	})
+	c.SetExpSpLossNotifier(func(exp int64, sp int) {
+		if exp > 0 {
+			live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageExpDecreasedByS1, int32(exp)))
+		}
+		if sp > 0 {
+			live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageSPDecreasedS1, int32(sp)))
+		}
+	})
+	c.SetLevelUpBroadcaster(func() {
+		l.broadcastLiveFrame(live, func() wire.Frame {
+			return serverpackets.FrameSocialAction(live.ObjectID(), socialActionLevelUp)
+		})
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageYouIncreasedYourLevel))
 	})
 	c.SetUserInfoUpdater(func() {
 		live.SendFrame(serverpackets.FrameUserInfo(serverpackets.UserInfoSnapshot{
