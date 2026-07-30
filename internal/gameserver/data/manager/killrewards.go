@@ -19,9 +19,11 @@ type rewardItemReceiver interface {
 
 // herbReceiver consumes an auto-looted herb on the spot. A herb never
 // reaches an inventory: it applies its carried skill to the receiver and is
-// discarded.
+// discarded. The result reports whether the receiver actually consumed it —
+// a detached character accepts nothing — so a refused herb can still be
+// delivered another way.
 type herbReceiver interface {
-	ConsumeHerb(itemID int32)
+	ConsumeHerb(itemID int32) bool
 }
 
 // KillReward rolls and places the item, spoil, and manually-picked-up herb
@@ -113,8 +115,7 @@ func (k *KillReward) consumeHerb(killer creature.DeathActor, itemID int32) bool 
 	if !ok {
 		return false
 	}
-	consumer.ConsumeHerb(itemID)
-	return true
+	return consumer.ConsumeHerb(itemID)
 }
 
 func (k *KillReward) addToInventory(receiver rewardItemReceiver, itemID int32, count int) bool {

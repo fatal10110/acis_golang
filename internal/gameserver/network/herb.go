@@ -30,8 +30,8 @@ func (l *GameClientLink) consumeHerb(live *livePlayer, itemID int32) {
 	if !ok || tmpl.EtcItem == nil || tmpl.EtcItem.Type != item.EtcItemHerb {
 		return
 	}
-	// ponytail: a transient off-inventory instance is enough here — the
-	// instant-cast path reads only its template.
+	// A transient off-inventory instance is enough: the instant-cast path
+	// reads only its template.
 	herb := &item.Instance{TemplateID: itemID, Count: 1, Location: item.LocationVoid}
 	beforeVitals := live.Vitals()
 	res := itemhandler.Use(itemhandler.UseRequest{

@@ -98,7 +98,13 @@ func (c *Character) AddRewardItem(itemID int32, count int, objectID int32) bool 
 	if c.inventory == nil {
 		return false
 	}
-	return c.inventory.AddNew(itemID, count, objectID) != nil
+	if c.inventory.AddNew(itemID, count, objectID) == nil {
+		return false
+	}
+	// A kill reward is server-driven: no client-request handler is on its way
+	// to drain the queued update, so the batching task has to be told about it.
+	c.inventory.NotifyUpdate()
+	return true
 }
 
 // Inventory returns the carried item collection attached by AttachRuntime,

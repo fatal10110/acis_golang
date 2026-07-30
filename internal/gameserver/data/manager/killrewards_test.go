@@ -39,10 +39,17 @@ type lootKiller struct {
 	id    int32
 	items map[int32]int
 	herbs []int32
+	// refuseHerbs models a detached character: it still satisfies the
+	// receiver contract but has no consumer behind it.
+	refuseHerbs bool
 }
 
-func (l *lootKiller) ConsumeHerb(itemID int32) {
+func (l *lootKiller) ConsumeHerb(itemID int32) bool {
+	if l.refuseHerbs {
+		return false
+	}
 	l.herbs = append(l.herbs, itemID)
+	return true
 }
 
 func (l *lootKiller) ObjectID() int32 { return l.id }
@@ -152,6 +159,29 @@ func TestKillReward_DropsAutoLootHerbWhenKillerCannotConsume(t *testing.T) {
 
 	if len(ground.items) != 1 || ground.items[0].ItemID() != 8600 {
 		t.Fatalf("ground items = %+v, want the unconsumable herb dropped", ground.items)
+	}
+}
+
+// TestKillReward_StoresAutoLootHerbWhenTheConsumerIsInactive covers a killer
+// that satisfies the receiver contract but consumes nothing — a character
+// whose herb consumer was unwired on detach. The herb has to reach the
+// inventory or the ground rather than count as consumed.
+func TestKillReward_StoresAutoLootHerbWhenTheConsumerIsInactive(t *testing.T) {
+	ground := &recordingGround{}
+	rates := item.Rates{Spoil: 1, Currency: 1, Item: 1, ItemRaid: 1, Herb: 1}
+
+	killer := &lootKiller{id: 1, refuseHerbs: true}
+	r := NewKillReward(herbCategories(), nil, 1, false, rates, false, true, &sequentialIDs{}, herbTable(), ground, 0, 0, 0, 0, 0)
+	r.CalculateRewards(killer)
+
+	if len(killer.herbs) != 0 {
+		t.Fatalf("consumed herbs = %v, want none", killer.herbs)
+	}
+	if got := killer.items[8600]; got != 1 {
+		t.Fatalf("inventory count = %d, want 1: a refused herb still belongs to the killer", got)
+	}
+	if len(ground.items) != 0 {
+		t.Fatalf("dropped %d items on the ground, want 0 while the inventory accepts it", len(ground.items))
 	}
 }
 
