@@ -67,6 +67,20 @@ func inventoryUpdatesFor(t *testing.T, state *world.State) *task.InventoryUpdate
 	return u
 }
 
+// syncBarrier sends a request guaranteed to be answered with wantOpcode and
+// reads that reply. A connection's dispatch loop handles requests strictly
+// in order, so reading it proves everything sent before it has already been
+// processed server-side — used before driving InventoryUpdates.Tick() in a
+// test whose triggering request has no synchronous reply of its own to
+// block on.
+func syncBarrier(t *testing.T, c *fakeGameClient, send func(), wantOpcode byte) {
+	t.Helper()
+	send()
+	if reply := c.read(); reply[0] != wantOpcode {
+		t.Fatalf("sync barrier opcode = %#x, want %#x", reply[0], wantOpcode)
+	}
+}
+
 func newTestGameClientLink(t *testing.T, loginLink func() *LoginLink, validator *SessionValidator) (addr string, chars *fakeCharStore, items *fakeItemStore, state *world.State) {
 	t.Helper()
 	return newTestGameClientLinkWithLog(t, loginLink, validator, zerolog.Nop())

@@ -151,14 +151,8 @@ func TestGameClientLinkDestroyItemInGame(t *testing.T) {
 	c.send(encodeRequestDestroyItem(501, 2))
 	// A destroy that doesn't touch equipment sends no frame of its own, so
 	// there's nothing to block on that proves the server has processed it
-	// before the test drives the batching task's tick. Send a second,
-	// guaranteed-rejected request as a sync barrier: the connection's
-	// dispatch loop handles requests strictly in order, so reading this
-	// ActionFailed proves the destroy above already ran.
-	c.send(encodeRequestDestroyItem(999999, 1))
-	if reply := c.read(); reply[0] != serverpackets.OpcodeActionFailed {
-		t.Fatalf("sync barrier opcode = %#x, want ActionFailed (%#x)", reply[0], serverpackets.OpcodeActionFailed)
-	}
+	// before the test drives the batching task's tick.
+	syncBarrier(t, c, func() { c.send(encodeRequestDestroyItem(999999, 1)) }, serverpackets.OpcodeActionFailed)
 	inventoryUpdatesFor(t, state).Tick()
 	reply := c.read()
 	if reply[0] != serverpackets.OpcodeInventoryUpdate {
