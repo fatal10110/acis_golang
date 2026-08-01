@@ -122,6 +122,38 @@ func TestPickupGroundItemAddsToPetAndReportsPersistence(t *testing.T) {
 	}
 }
 
+func TestPickupGroundHerbStaysOutOfPetInventory(t *testing.T) {
+	templates := item.NewTable([]*item.Template{{
+		ID:          9001,
+		Kind:        item.KindEtcItem,
+		Stackable:   true,
+		Dropable:    true,
+		Tradable:    true,
+		Destroyable: true,
+		Duration:    -1,
+		EtcItem:     &item.EtcItemDetail{Type: item.EtcItemHerb},
+	}})
+	petInv := itemcontainer.NewPetInventory(2, templates)
+	pet := summon.NewPet(summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv})
+	tmpl, _ := templates.Get(9001)
+	ground, err := grounditem.New(item.Instance{ObjectID: 900, TemplateID: 9001, Count: 1, ManaLeft: -1}, tmpl)
+	if err != nil {
+		t.Fatalf("ground item: %v", err)
+	}
+
+	res, failure := PickupGround(pet, petInv, ground)
+
+	if failure != PickupOK {
+		t.Fatalf("PickupGround failure = %v, want OK", failure)
+	}
+	if petInv.ItemByTemplateID(9001) != nil {
+		t.Fatal("herb entered pet inventory")
+	}
+	if res.Herb == nil || res.Herb.TemplateID != 9001 || len(res.Persist) != 0 {
+		t.Fatalf("result = %+v, want transient herb and no persistence", res)
+	}
+}
+
 func TestUseItemEquipsAndUnequipsPetWeapon(t *testing.T) {
 	templates := testTemplates()
 	petInv := itemcontainer.NewPetInventory(2, templates)

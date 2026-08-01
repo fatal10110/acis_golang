@@ -4,6 +4,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
+	modelitem "github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 )
 
@@ -28,6 +29,7 @@ const (
 // PickupResult carries item-store operations for a pet ground-item pickup.
 type PickupResult struct {
 	Persist []inventory.Persist
+	Herb    *modelitem.Instance
 }
 
 // PickupAvailable reports whether pet can currently pick up ground items.
@@ -45,6 +47,9 @@ func PickupGround(pet *summon.Actor, petInv *itemcontainer.Inventory, ground *gr
 	}
 
 	picked := ground.Instance.Clone()
+	if ground.Template.EtcItem != nil && ground.Template.EtcItem.Type == modelitem.EtcItemHerb {
+		return PickupResult{Herb: picked}, PickupOK
+	}
 	if ForbiddenForPet(picked, ground.Template) {
 		return PickupResult{}, PickupItemNotForPets
 	}

@@ -55,6 +55,22 @@ func TestSpawnBesideOwnerRegistersLiveSummon(t *testing.T) {
 	}
 }
 
+func TestPetTracksItemSkillReuse(t *testing.T) {
+	pet := NewPet(PetConfig{ObjectID: 2, NPCID: 12077})
+	ref := modelskill.Ref{ID: 2278, Level: 1}
+	const key int32 = 2278*256 + 1
+
+	pet.DisableSkill(key, time.Minute)
+	pet.AddSkillReuse(ref, key, time.Minute)
+
+	if !pet.SkillDisabled(key) {
+		t.Fatal("SkillDisabled() = false after pet item reuse was installed")
+	}
+	if got := pet.ShortBuffTaskSkillID(); got != 0 {
+		t.Fatalf("ShortBuffTaskSkillID() = %d, want 0 for a pet", got)
+	}
+}
+
 func TestApplyCommandTogglesFollowAndUnsummonsServitor(t *testing.T) {
 	state := world.New()
 	owner := &liveOwnerStub{id: 100, level: 40}

@@ -2,6 +2,7 @@ package summon
 
 import (
 	"sync"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
@@ -91,8 +92,10 @@ type Actor struct {
 	vitals   summonVitals
 	effects  *effect.List
 
-	shotsMu   sync.Mutex
-	shotsMask int32
+	shotsMu        sync.Mutex
+	shotsMask      int32
+	skillMu        sync.Mutex // guards disabledSkills
+	disabledSkills map[int32]time.Time
 }
 
 // Intent is the live action this actor is currently trying to carry out.

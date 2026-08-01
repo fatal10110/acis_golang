@@ -144,6 +144,9 @@ func Use(req UseRequest) UseResult {
 	if handler == ElixirsHandler && req.IsPet {
 		return UseResult{Outcome: PetRejected}
 	}
+	if req.IsPet && !tmpl.Tradable {
+		return UseResult{Outcome: PetRejected}
+	}
 	if len(tmpl.AttachedSkills) == 0 {
 		return UseResult{Outcome: NotHandled}
 	}
