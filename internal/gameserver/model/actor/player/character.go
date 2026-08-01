@@ -84,34 +84,36 @@ type Character struct {
 	DeleteAt   int64
 	LastAccess int64
 
-	runtimeTemplate       *Template
-	inventory             *itemcontainer.Inventory
-	world                 *world.State
-	los                   LineOfSight
-	zones                 PeaceZoneQuery
-	revalidateZones       func(location.Location)
-	sendFrame             func(wire.Frame) bool
-	broadcastAttack       func(attack.Snapshot)
-	broadcastMove         func(move.Event)
-	broadcastStop         func()
-	broadcastDie          func()
-	broadcastStatus       func()
-	updateAbnormalEffect  func()
-	updateWeightPenalty   func()
-	weightPenalty         int
-	weightLimitMultiplier float64
-	updateUserInfo        func()
-	updateGradePenalty    func()
-	refreshItemStats      func()
-	notifyExpSpGain       func(exp int64, sp int)
-	notifyExpSpLoss       func(exp int64, sp int)
-	broadcastLevelUp      func()
-	refreshLevel          func()
-	broadcastShortBuff    func(ShortBuffUpdate)
-	sendRegenMax          func(count, period int32, hpRegen float64)
-	consumeHerb           func(itemID int32)
-	roll                  func(int) int
-	attackTarget          func(world.Tracked)
+	runtimeTemplate          *Template
+	inventory                *itemcontainer.Inventory
+	world                    *world.State
+	los                      LineOfSight
+	zones                    PeaceZoneQuery
+	revalidateZones          func(location.Location)
+	sendFrame                func(wire.Frame) bool
+	broadcastAttack          func(attack.Snapshot)
+	broadcastMove            func(move.Event)
+	broadcastStop            func()
+	broadcastDie             func()
+	broadcastStatus          func()
+	broadcastStance          func(Stance)
+	broadcastFakeDeathRevive func()
+	updateAbnormalEffect     func()
+	updateWeightPenalty      func()
+	weightPenalty            int
+	weightLimitMultiplier    float64
+	updateUserInfo           func()
+	updateGradePenalty       func()
+	refreshItemStats         func()
+	notifyExpSpGain          func(exp int64, sp int)
+	notifyExpSpLoss          func(exp int64, sp int)
+	broadcastLevelUp         func()
+	refreshLevel             func()
+	broadcastShortBuff       func(ShortBuffUpdate)
+	sendRegenMax             func(count, period int32, hpRegen float64)
+	consumeHerb              func(itemID int32)
+	roll                     func(int) int
+	attackTarget             func(world.Tracked)
 
 	deathMu sync.Mutex
 	dead    bool

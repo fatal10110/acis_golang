@@ -279,6 +279,15 @@ type sitTarget interface {
 	SetStanding(bool) bool
 }
 
+type stanceTarget interface {
+	Sit() bool
+}
+
+type fakeDeathStanceTarget interface {
+	StartFakeDeath() bool
+	StopFakeDeath() bool
+}
+
 // hpFullTarget optionally reports whether an actor's HP is already at (or
 // within the reference effect's own +1 rounding tolerance of) its maximum,
 // consulted by Relax before it drains MP on a tick; an actor without one is
