@@ -95,8 +95,6 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 	}
 	now := time.Now()
 	coolTimes := skillCoolTimeEntries(c.SkillReuseTimers(now), now)
-	skillList := skillListEntries(c, l.skills)
-
 	live, err := l.attachLivePlayer(ctx, client, c, tmpl, items, shortcuts)
 	if err != nil {
 		l.log.Error().Err(err).Msg("enter world: attach live player")
@@ -108,6 +106,7 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 			return nil, false
 		}
 	}
+	skillList := skillListEntries(c, l.skills)
 	if l.world != nil {
 		x, y, z := c.Position()
 		l.world.Spawn(live, x, y, z, c.LastHeading)
@@ -121,7 +120,7 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 
 	client.Session.SendFrame(serverpackets.FrameExStorageMaxCount(c))
 	client.Session.SendFrame(serverpackets.FrameHennaInfo(c.ClassID))
-	client.Session.SendFrame(serverpackets.FrameEtcStatusUpdate(serverpackets.EtcStatus{}))
+	client.Session.SendFrame(serverpackets.FrameEtcStatusUpdate(serverpackets.EtcStatus{GradePenalty: c.WeaponGradePenalty() || c.ArmorGradePenalty() > 0}))
 	client.Session.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageWelcomeToLineage))
 	client.Session.SendFrame(serverpackets.FrameQuestList(nil))
 	client.Session.SendFrame(serverpackets.FrameSkillList(skillList))
@@ -173,6 +172,7 @@ func (l *GameClientLink) refreshLiveLevelSkills(ctx context.Context, live *liveP
 	if err := refresh(ctx, live.Character, live.template); err != nil {
 		l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("level change: refresh level skills")
 	}
+	live.RefreshExpertisePenalty()
 	live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
 }
 
@@ -230,6 +230,7 @@ func skillListEntries(c *player.Character, skills *skillstate.Persistence) []ser
 
 func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c *player.Character, tmpl *player.Template, items []*item.Instance, shortcuts []shortcut.Shortcut) (*livePlayer, error) {
 	c.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventory(c.ID, l.itemTemplates, items))
+	c.RefreshExpertisePenalty()
 	c.SetWorld(l.world)
 	if los, ok := l.geo.(player.LineOfSight); ok {
 		c.SetLineOfSight(los)
@@ -314,6 +315,18 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 		live.SendFrame(serverpackets.FrameUserInfo(serverpackets.UserInfoSnapshot{
 			Character: live.Character, Template: live.template, Items: live.inventoryItems(),
 		}))
+	})
+	c.SetGradePenaltyUpdater(func() {
+		live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
+		live.SendFrame(serverpackets.FrameEtcStatusUpdate(serverpackets.EtcStatus{GradePenalty: live.WeaponGradePenalty() || live.ArmorGradePenalty() > 0}))
+	})
+	c.SetItemStatsRefresher(func() {
+		if l.skills == nil {
+			return
+		}
+		if err := l.skills.RefreshEquippedItemStats(live.Character, live.Inventory()); err != nil {
+			l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("refresh grade-penalty item stats")
+		}
 	})
 	c.SetLevelRefresher(func() { l.refreshLiveLevelSkills(ctx, live) })
 	// Register the inventory with the batching task the moment it queues an

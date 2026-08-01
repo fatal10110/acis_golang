@@ -96,22 +96,25 @@ func (l *GameClientLink) useItem(live *livePlayer, objectID int32) {
 // order (the old occupant first, the new one second), mirroring the
 // reference's unequip-before-equip listener sequencing for one slot swap.
 func (l *GameClientLink) applyEquipStatChanges(live *livePlayer, inv *itemcontainer.Inventory, res invops.Result) {
-	if l.skills == nil || live == nil || inv == nil {
+	if live == nil || inv == nil {
 		return
 	}
-	for _, inst := range res.Changed {
-		tmpl, ok := inv.Templates().Get(inst.TemplateID)
-		if !ok {
-			continue
-		}
-		if inst.Equipped() {
-			if err := l.skills.EquipItemStats(live.Character, inst, tmpl); err != nil {
-				l.log.Error().Err(err).Int32("object_id", inst.ObjectID).Msg("equip item stats")
+	if l.skills != nil {
+		for _, inst := range res.Changed {
+			tmpl, ok := inv.Templates().Get(inst.TemplateID)
+			if !ok {
+				continue
 			}
-			continue
+			if inst.Equipped() {
+				if err := l.skills.EquipItemStats(live.Character, inst, tmpl); err != nil {
+					l.log.Error().Err(err).Int32("object_id", inst.ObjectID).Msg("equip item stats")
+				}
+				continue
+			}
+			l.skills.UnequipItemStats(live.Character, inst, tmpl)
 		}
-		l.skills.UnequipItemStats(live.Character, inst, tmpl)
 	}
+	live.RefreshExpertisePenalty()
 }
 
 func (l *GameClientLink) handleAutoSoulShot(live *livePlayer, req clientpackets.RequestAutoSoulShot) {

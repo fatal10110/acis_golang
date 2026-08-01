@@ -97,6 +97,8 @@ type Character struct {
 	broadcastStatus      func()
 	updateAbnormalEffect func()
 	updateUserInfo       func()
+	updateGradePenalty   func()
+	refreshItemStats     func()
 	notifyExpSpGain      func(exp int64, sp int)
 	notifyExpSpLoss      func(exp int64, sp int)
 	broadcastLevelUp     func()
@@ -135,6 +137,8 @@ type Character struct {
 	hero                 bool
 	disabledItems        map[int32]time.Time
 	shortBuffTaskSkillID int32
+	weaponGradePenalty   bool
+	armorGradePenalty    int
 	shortBuffTimer       *time.Timer
 	recentFakeDeathUntil time.Time
 	groundTarget         location.Location
