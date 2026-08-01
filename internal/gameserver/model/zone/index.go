@@ -1,6 +1,7 @@
 package zone
 
 import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -70,6 +71,16 @@ func (ix *Index) Revalidate(a Actor) {
 	for _, k := range ix.At(pos.X, pos.Y) {
 		Revalidate(k, a)
 	}
+}
+
+// RevalidateMove synchronizes zones near both the prior and current
+// positions, so crossing a world-region boundary evicts zones left behind
+// without restarting zones that span the boundary.
+func (ix *Index) RevalidateMove(a Actor, previous location.Location) {
+	for _, k := range ix.At(previous.X, previous.Y) {
+		Revalidate(k, a)
+	}
+	ix.Revalidate(a)
 }
 
 // RemoveFrom evicts a from every zone attached to the region containing

@@ -32,6 +32,7 @@ type livePlayer struct {
 	log       zerolog.Logger
 
 	known          world.KnownBuffer
+	zoneActor      *liveZoneActor
 	visibilitySend func(wire.Frame) bool
 	stopAttack     func(*livePlayer)
 	pickupMu       sync.Mutex // guards pickup, deferredPickup, and pickupLocked

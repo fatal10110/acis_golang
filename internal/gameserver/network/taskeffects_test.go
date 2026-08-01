@@ -6,7 +6,11 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -35,6 +39,91 @@ func TestTaskEffectsWaterSendsCyanGauge(t *testing.T) {
 	}
 	if duration := binary.LittleEndian.Uint32(got[9:13]); duration != 10_000 {
 		t.Fatalf("gauge duration = %d, want 10000", duration)
+	}
+}
+
+func TestWaterZoneMovementUsesBreathStatAndClearsGaugeOnExit(t *testing.T) {
+	state := world.New()
+	capture := &frameCapture{}
+	live := newTestLivePlayer(t, 100, capture)
+	live.zoneActor = &liveZoneActor{live: live}
+	state.Spawn(live, 0, 0, 0, 0)
+	state.AddPlayer(live)
+	live.AddStatFuncs([]basefunc.Func{basefunc.NewMul(nil, stat.Breath, 2, nil)})
+
+	effects := NewTaskEffects(state)
+	water, err := task.NewWater(effects, time.Now)
+	if err != nil {
+		t.Fatalf("NewWater() error = %v", err)
+	}
+	zones := zone.NewIndex()
+	zones.Add(zone.NewWater(1, zone.NewCuboid(1000, 2000, -100, 100, -100, 100)))
+	link := &GameClientLink{world: state, zones: zones, water: water}
+	link.wireWaterZones()
+
+	link.updateLivePlayerPosition(live, location.Location{X: 1500}, 0)
+	link.updateLivePlayerPosition(live, location.Location{}, 0)
+
+	if len(capture.frames) != 2 {
+		t.Fatalf("water-zone frames = %d, want 2", len(capture.frames))
+	}
+	if duration := binary.LittleEndian.Uint32(capture.frames[0][9:13]); duration != 120_000 {
+		t.Fatalf("breath gauge duration = %d, want 120000", duration)
+	}
+	if duration := binary.LittleEndian.Uint32(capture.frames[1][9:13]); duration != 0 {
+		t.Fatalf("exit gauge duration = %d, want 0", duration)
+	}
+}
+
+func TestWaterZoneMovementAcrossRegionKeepsCountdown(t *testing.T) {
+	state := world.New()
+	capture := &frameCapture{}
+	live := newTestLivePlayer(t, 101, capture)
+	live.zoneActor = &liveZoneActor{live: live}
+	boundary := world.MinX + (world.MaxX-world.MinX+1)/world.RegionsX
+	state.Spawn(live, boundary-200, 0, 0, 0)
+	state.AddPlayer(live)
+
+	water, err := task.NewWater(NewTaskEffects(state), time.Now)
+	if err != nil {
+		t.Fatalf("NewWater() error = %v", err)
+	}
+	zones := zone.NewIndex()
+	zones.Add(zone.NewWater(1, zone.NewCuboid(boundary-100, boundary+100, -100, 100, -100, 100)))
+	link := &GameClientLink{world: state, zones: zones, water: water}
+	link.wireWaterZones()
+
+	link.updateLivePlayerPosition(live, location.Location{X: boundary - 1}, 0)
+	link.updateLivePlayerPosition(live, location.Location{X: boundary + 1}, 0)
+
+	if len(capture.frames) != 1 {
+		t.Fatalf("cross-region water frames = %d, want 1", len(capture.frames))
+	}
+}
+
+func TestWaterZoneServerPositionSyncStartsCountdown(t *testing.T) {
+	state := world.New()
+	capture := &frameCapture{}
+	live := newTestLivePlayer(t, 102, capture)
+	live.zoneActor = &liveZoneActor{live: live}
+	live.SetWorld(state)
+	state.Spawn(live, 0, 0, 0, 0)
+	state.AddPlayer(live)
+
+	water, err := task.NewWater(NewTaskEffects(state), time.Now)
+	if err != nil {
+		t.Fatalf("NewWater() error = %v", err)
+	}
+	zones := zone.NewIndex()
+	zones.Add(zone.NewWater(1, zone.NewCuboid(1000, 2000, -100, 100, -100, 100)))
+	link := &GameClientLink{world: state, zones: zones, water: water}
+	link.wireWaterZones()
+	live.SetZoneRevalidator(func(previous location.Location) { link.revalidateZones(live, previous) })
+
+	live.SyncPosition(location.Location{X: 1500})
+
+	if len(capture.frames) != 1 {
+		t.Fatalf("server-sync water frames = %d, want 1", len(capture.frames))
 	}
 }
 

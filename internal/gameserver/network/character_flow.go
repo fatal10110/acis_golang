@@ -112,6 +112,9 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 		x, y, z := c.Position()
 		l.world.Spawn(live, x, y, z, c.LastHeading)
 		l.world.AddPlayer(live)
+		if l.zones != nil && live.zoneActor != nil {
+			l.zones.Revalidate(live.zoneActor)
+		}
 	}
 	// Track this player for the in-game clock's activity reminder so the
 	// PLAYING_FOR_LONG_TIME send reaches them every 720 game minutes.
@@ -261,6 +264,10 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	combat := ai.NewPlayerAttack(c, moveCtl, attackCtl)
 
 	live := &livePlayer{Character: c, template: tmpl, items: items, attack: attackCtl, move: moveCtl, combat: combat, shortcuts: shortcut.NewList(shortcuts), visibilitySend: client.Session.trySendFrame, stopAttack: l.stopLiveAutoAttack, log: l.log}
+	live.zoneActor = &liveZoneActor{live: live}
+	c.SetZoneRevalidator(func(previous location.Location) {
+		l.revalidateZones(live, previous)
+	})
 	attackCtl.SetFinished(func() {
 		l.finishDeferredPickup(live)
 		combat.Think()
