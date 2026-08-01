@@ -37,6 +37,7 @@ func itemStatsTestTemplates() *item.Table {
 			Modifiers: []item.StatModifier{
 				{Op: item.FuncAdd, Stat: "pAtk", Value: 20},
 			},
+			AttachedSkills: []item.SkillRef{{ID: 300, Level: 1}},
 		},
 		{
 			ID:   enchantArmorID,
@@ -82,6 +83,35 @@ func TestEquipItemStatsAttachesModifiersAndAttachedSkillPassives(t *testing.T) {
 	p.UnequipItemStats(ch, inst, tmpl)
 	if got := ch.MAtk(); got != baseMAtk {
 		t.Fatalf("MAtk() after unequip = %v, want unchanged %v", got, baseMAtk)
+	}
+}
+
+func TestEquipItemStatsWithholdsWeaponPassiveBelowExpertise(t *testing.T) {
+	templates := itemStatsTestTemplates()
+	inv := itemcontainer.NewPlayerInventory(1, templates)
+	p := NewPersistence(nil, itemStatsTestSkills())
+	ch := &player.Character{ID: 1}
+	baseMAtk, basePAtk := ch.MAtk(), ch.PAtk()
+	tmpl, _ := templates.Get(swordTemplateID)
+	inst := inv.AddNew(swordTemplateID, 1, 100)
+	inv.EquipItem(inst, tmpl)
+
+	if err := p.EquipItemStats(ch, inst, tmpl); err != nil {
+		t.Fatalf("EquipItemStats() error: %v", err)
+	}
+	if got, want := ch.MAtk(), baseMAtk; got != want {
+		t.Fatalf("MAtk() below Expertise = %v, want %v (weapon passive withheld)", got, want)
+	}
+	if got, want := ch.PAtk(), basePAtk+20; got != want {
+		t.Fatalf("PAtk() below Expertise = %v, want %v (weapon modifier remains)", got, want)
+	}
+
+	ch.SetSkillLevel(239, int(item.CrystalD))
+	if err := p.RefreshEquippedItemStats(ch, inv); err != nil {
+		t.Fatalf("RefreshEquippedItemStats() error: %v", err)
+	}
+	if got, want := ch.MAtk(), baseMAtk+8; got != want {
+		t.Fatalf("MAtk() at Expertise grade = %v, want %v (weapon passive restored)", got, want)
 	}
 }
 
