@@ -63,6 +63,16 @@ func loadSkillEnchantSPBookNeeded(paths gameServerPaths) (skillEnchantSPBookNeed
 	return skillEnchantSPBookNeeded(config.NewFields(props, "skill enchant sp book needed").Bool("EnchantSkillSpBookNeeded", true)), nil
 }
 
+type autoLearnSkills bool
+
+func loadAutoLearnSkills(paths gameServerPaths) (autoLearnSkills, error) {
+	props, err := config.LoadFile(paths.PlayersConfigPath)
+	if err != nil {
+		return false, err
+	}
+	return autoLearnSkills(config.NewFields(props, "auto learn skills").Bool("AutoLearnSkills", false)), nil
+}
+
 // karmaPlayerCanTeleport controls whether a karma-carrying player may use a
 // TELEPORT/RECALL-type skill, direct or item-attached, read from
 // players.properties.

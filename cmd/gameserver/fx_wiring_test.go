@@ -41,6 +41,7 @@ func TestProvideGameClientLinkUsesGameDataSkillTrees(t *testing.T) {
 			func() *task.PlayerClock { return nil },
 			func() respawnRestoreHP { return 0.7 },
 			func() skillEnchantSPBookNeeded { return true },
+			func() autoLearnSkills { return false },
 			func() karmaPlayerCanTeleport { return true },
 			func() pet.Config { return pet.DefaultConfig() },
 			func() zerolog.Logger { return zerolog.Nop() },

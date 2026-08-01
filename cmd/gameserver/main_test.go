@@ -118,6 +118,21 @@ KarmaPlayerCanShop = False
 	}
 }
 
+func TestLoadAutoLearnSkillsUsesPlayersProperties(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "players.properties")
+	if err := os.WriteFile(configPath, []byte("AutoLearnSkills = True\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := loadAutoLearnSkills(gameServerPaths{PlayersConfigPath: configPath})
+	if err != nil {
+		t.Fatalf("loadAutoLearnSkills() error = %v", err)
+	}
+	if !got {
+		t.Fatal("loadAutoLearnSkills() = false, want true")
+	}
+}
+
 func TestLoadPetConfigUsesServerAndPlayersProperties(t *testing.T) {
 	dir := t.TempDir()
 	serverPath := filepath.Join(dir, "server.properties")

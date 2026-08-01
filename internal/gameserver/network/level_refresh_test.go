@@ -62,6 +62,32 @@ func TestRefreshLiveLevelSkillsReconcilesAndSendsSkillList(t *testing.T) {
 	}
 }
 
+func TestRefreshLiveLevelSkillsAutoLearnsBoughtSkills(t *testing.T) {
+	frames := &frameCapture{}
+	live := newTestLivePlayer(t, 1, frames)
+	live.Character.CharLevel = 10
+	live.template = &player.Template{Skills: []player.SkillGrant{
+		{SkillID: 3, Level: 1, MinLevel: 5, Cost: 50},
+		{SkillID: 249, Level: 1, MinLevel: 5, Cost: 0},
+	}}
+	gcl := &GameClientLink{
+		skills: skillstate.NewPersistence(nil, skillTable(
+			modelskill.Definition{ID: 3, Level: 1},
+			modelskill.Definition{ID: 249, Level: 1},
+		)),
+		playerConfig: PlayerConfig{AutoLearnSkills: true},
+	}
+
+	gcl.refreshLiveLevelSkills(context.Background(), live)
+
+	if got := live.Character.SkillLevel(3); got != 1 {
+		t.Errorf("SkillLevel(3) = %d, want 1 (bought grant auto-learned)", got)
+	}
+	if got := live.Character.SkillLevel(249); got != 1 {
+		t.Errorf("SkillLevel(249) = %d, want 1 (free grant auto-learned)", got)
+	}
+}
+
 // TestRefreshLiveLevelSkillsWithoutSkillsIsSilent pins the guard: a link with
 // no skill persistence attached has nothing to reconcile and sends nothing,
 // rather than pushing an empty skill list that would wipe the client's copy.

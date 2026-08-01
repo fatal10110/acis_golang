@@ -151,6 +151,26 @@ func TestTemplateAutoGetSkillGrants(t *testing.T) {
 	}
 }
 
+func TestTemplateAllAvailableSkillGrants(t *testing.T) {
+	tmpl := &Template{Skills: []SkillGrant{
+		{SkillID: 194, Level: 1, MinLevel: 1, Cost: 0},
+		{SkillID: 3, Level: 1, MinLevel: 5, Cost: 50},
+		{SkillID: 249, Level: 1, MinLevel: 5, Cost: 0},
+		{SkillID: 249, Level: 2, MinLevel: 10, Cost: 0},
+		{SkillID: 3, Level: 2, MinLevel: 10, Cost: -1},
+		{SkillID: 249, Level: 3, MinLevel: 20, Cost: 0},
+	}}
+
+	got := tmpl.AllAvailableSkillGrants(10, SkillLevels{194: 1, 249: 1})
+	want := []SkillGrant{
+		{SkillID: 3, Level: 2, MinLevel: 10, Cost: -1},
+		{SkillID: 249, Level: 2, MinLevel: 10, Cost: 0},
+	}
+	if !equalSkillGrants(got, want) {
+		t.Fatalf("AllAvailableSkillGrants(level 10, known 194:1/249:1) = %+v, want %+v", got, want)
+	}
+}
+
 // TestTemplateReachableSkillGrants pins the nine-level slack every skill but
 // expertise keeps, so a small level loss does not strip skills the character
 // legitimately learned.

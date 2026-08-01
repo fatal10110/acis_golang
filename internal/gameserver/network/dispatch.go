@@ -76,6 +76,8 @@ type PlayerConfig struct {
 	// SkillEnchantSPBookNeeded controls whether enchanting a skill above
 	// level 76 also consumes the tree's configured spellbook item.
 	SkillEnchantSPBookNeeded bool
+	// AutoLearnSkills grants every available class skill on a level refresh.
+	AutoLearnSkills bool
 	// KarmaPlayerCanTeleport controls whether a karma-carrying player may
 	// use a TELEPORT/RECALL-type skill, direct or item-attached.
 	KarmaPlayerCanTeleport bool
