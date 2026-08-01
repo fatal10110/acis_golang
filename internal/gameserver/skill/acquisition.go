@@ -135,7 +135,7 @@ func LearnGeneral(ctx context.Context, c *player.Character, tmpl *player.Templat
 		return result, LearnDone, err
 	}
 	if result.Cost > 0 {
-		c.RemoveSp(result.Cost)
+		c.RemoveExpAndSp(nil, tmpl, 0, result.Cost)
 	}
 	return result, LearnDone, nil
 }
