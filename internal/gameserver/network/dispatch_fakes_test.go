@@ -187,24 +187,54 @@ func (s *fakeItemStore) ListByOwner(_ context.Context, ownerID int32) ([]*item.I
 }
 
 func (s *fakeItemStore) Save(_ context.Context, inst *item.Instance) error {
+	st := inst.Snapshot()
+	cp := item.Instance{
+		ObjectID: st.ObjectID, TemplateID: st.TemplateID, OwnerID: st.OwnerID,
+		Count: st.Count, EnchantLevel: st.EnchantLevel,
+		Location: st.Location, LocationData: st.LocationData,
+		CustomType1: st.CustomType1, CustomType2: st.CustomType2,
+		ManaLeft: st.ManaLeft, Time: st.Time, ShotsMask: st.ShotsMask,
+		Augmentation: st.Augmentation,
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for ownerID, items := range s.items {
 		for i, existing := range items {
-			if existing.ObjectID == inst.ObjectID {
-				cp := *inst
+			if existing.ObjectID == cp.ObjectID {
 				s.items[ownerID][i] = &cp
 				return nil
 			}
 		}
 	}
-	cp := *inst
-	s.items[inst.OwnerID] = append(s.items[inst.OwnerID], &cp)
+	s.items[cp.OwnerID] = append(s.items[cp.OwnerID], &cp)
 	return nil
 }
 
 func (s *fakeItemStore) Update(ctx context.Context, inst *item.Instance) error {
 	return s.Save(ctx, inst)
+}
+
+func TestFakeItemStoreSaveSnapshotsConcurrentItemMutation(t *testing.T) {
+	store := newFakeItemStore()
+	inst := &item.Instance{ObjectID: 1, TemplateID: item.AdenaID, OwnerID: 1, Count: 1, Location: item.LocationInventory}
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		for range 1_000 {
+			if err := store.Save(context.Background(), inst); err != nil {
+				t.Error(err)
+			}
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for range 1_000 {
+			inst.SetPersistNotifier(nil)
+		}
+	}()
+	wg.Wait()
 }
 
 func (s *fakeItemStore) Delete(_ context.Context, objectID int32) error {
