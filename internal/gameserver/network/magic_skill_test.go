@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -447,6 +448,38 @@ func TestGameClientLinkMagicSkillUseRejectsInsufficientMP(t *testing.T) {
 	reply = c.read()
 	if reply[0] != serverpackets.OpcodeActionFailed {
 		t.Fatalf("after not-enough-mp opcode = %#x, want ActionFailed (%#x)", reply[0], serverpackets.OpcodeActionFailed)
+	}
+}
+
+func TestGameClientLinkMagicSkillUseRejectsMissingSkillItemsWithSkillName(t *testing.T) {
+	capture := &frameCapture{}
+	live := newTestLivePlayer(t, 7, capture)
+	live.Character.SetSkillLevel(3, 1)
+	link := &GameClientLink{skills: skillstate.NewPersistence(nil, modelskill.NewTable([]modelskill.Definition{{
+		ID: 3, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+		ItemConsumeID: 57, ItemConsumeCount: 1,
+	}}), nil)}
+
+	link.handleMagicSkillUse(live, clientpackets.RequestMagicSkillUse{SkillID: 3})
+
+	if got, want := frameOpcodes(capture.frames), []byte{serverpackets.OpcodeSystemMessage, serverpackets.OpcodeActionFailed}; !bytes.Equal(got, want) {
+		t.Fatalf("missing-item cast opcodes = %#x, want SystemMessage then ActionFailed (%#x)", got, want)
+	}
+	assertSystemMessageSkillFrame(t, capture.frames[0], serverpackets.SystemMessageS1CannotBeUsed, 3, 1)
+}
+
+func TestGameClientLinkMagicSkillUseMissingOneTargetSendsActionFailedOnly(t *testing.T) {
+	capture := &frameCapture{}
+	live := newTestLivePlayer(t, 7, capture)
+	live.Character.SetSkillLevel(3, 1)
+	link := &GameClientLink{skills: skillstate.NewPersistence(nil, modelskill.NewTable([]modelskill.Definition{{
+		ID: 3, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
+	}}), nil)}
+
+	link.handleMagicSkillUse(live, clientpackets.RequestMagicSkillUse{SkillID: 3})
+
+	if got, want := frameOpcodes(capture.frames), []byte{serverpackets.OpcodeActionFailed}; !bytes.Equal(got, want) {
+		t.Fatalf("missing-target cast opcodes = %#x, want ActionFailed only (%#x)", got, want)
 	}
 }
 

@@ -43,6 +43,10 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 		Definitions: l.skills,
 	})
 	if err != nil {
+		if errors.Is(err, actorcast.ErrInvalidTarget) && started.Target == nil {
+			sendMagicActionFailed(live)
+			return
+		}
 		sendMagicCastFailure(live, started.Definition, err)
 		return
 	}
@@ -225,7 +229,7 @@ func sendMagicCastFailureReason(live *livePlayer, def modelskill.Definition, err
 	case errors.Is(err, actorcast.ErrNotEnoughHP):
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotEnoughHP))
 	case errors.Is(err, actorcast.ErrNotEnoughItems):
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotEnoughItems))
+		live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1CannotBeUsed, int32(def.ID), int32(def.Level)))
 	case errors.Is(err, actorcast.ErrSkillDisabled), errors.Is(err, actorcast.ErrAllSkillsDisabled):
 		live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1PreparedForReuse, int32(def.ID), int32(def.Level)))
 	case errors.Is(err, actorcast.ErrInvalidTarget):
