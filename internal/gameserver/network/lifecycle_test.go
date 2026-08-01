@@ -71,6 +71,28 @@ func TestDetachLivePlayerSavesWithUncancelledBoundedContext(t *testing.T) {
 	}
 }
 
+func TestDetachLivePlayerPersistsOfflineRecency(t *testing.T) {
+	chars := newFakeCharStore()
+	items := newFakeItemStore()
+	fixedNow := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	roster := gamemanager.NewRoster(chars, items, nil, testTemplates(t), testItemTemplates(), npc.NewTable(nil), &sequentialIDs{next: 100}, gamemanager.DefaultDeleteAfter, func() time.Time { return fixedNow })
+	live := newTestLivePlayer(t, 101, &frameCapture{})
+	if err := chars.Create(context.Background(), live.Character); err != nil {
+		t.Fatalf("Create() unexpected error: %v", err)
+	}
+
+	gcl := &GameClientLink{roster: roster, log: zerolog.Nop()}
+	gcl.detachLivePlayer(context.Background(), live)
+
+	lastAccess, ok := chars.lastOffline(live.ObjectID())
+	if !ok {
+		t.Fatal("detachLivePlayer did not persist offline recency")
+	}
+	if want := fixedNow.UnixMilli(); lastAccess != want {
+		t.Fatalf("lastAccess = %d, want %d", lastAccess, want)
+	}
+}
+
 // TestDetachLivePlayerStopsAttackIntention is the regression test for the
 // "disconnect mid-fight leaves timers running" review finding: detaching a
 // live player mid-swing must stop the attack intention before the frame

@@ -24,10 +24,11 @@ type fakeCharStore struct {
 	byID           map[int32]*player.Character
 	names          map[string]bool
 	savedPositions map[int32]savedPosition
+	offline        map[int32]int64
 }
 
 func newFakeCharStore() *fakeCharStore {
-	return &fakeCharStore{byID: map[int32]*player.Character{}, names: map[string]bool{}, savedPositions: map[int32]savedPosition{}}
+	return &fakeCharStore{byID: map[int32]*player.Character{}, names: map[string]bool{}, savedPositions: map[int32]savedPosition{}, offline: map[int32]int64{}}
 }
 
 type savedPosition struct {
@@ -104,6 +105,20 @@ func (s *fakeCharStore) SetDeathPenaltyLevel(_ context.Context, id int32, level 
 		c.SetDeathPenaltyLevel(level)
 	}
 	return nil
+}
+
+func (s *fakeCharStore) SetOffline(_ context.Context, id int32, lastAccess int64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.offline[id] = lastAccess
+	return nil
+}
+
+func (s *fakeCharStore) lastOffline(id int32) (int64, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	v, ok := s.offline[id]
+	return v, ok
 }
 
 func (s *fakeCharStore) Delete(_ context.Context, id int32) (bool, error) {

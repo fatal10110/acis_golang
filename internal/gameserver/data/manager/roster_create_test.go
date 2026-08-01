@@ -60,6 +60,10 @@ func (s *rosterTestCharacters) SetDeathPenaltyLevel(context.Context, int32, int)
 	return nil
 }
 
+func (s *rosterTestCharacters) SetOffline(context.Context, int32, int64) error {
+	return nil
+}
+
 func (s *rosterTestCharacters) Delete(context.Context, int32) (bool, error) {
 	return false, nil
 }
