@@ -508,9 +508,9 @@ func TestHandleTargetActionShowsPetStatusForOwnerPet(t *testing.T) {
 	capture.frames = nil
 	gcl := &GameClientLink{world: state}
 
-	gcl.handleTargetAction(context.Background(), live, pet.ObjectID(), false)
+	gcl.handleTargetAction(context.Background(), live, pet.ObjectID(), false, false)
 	capture.frames = nil
-	gcl.handleTargetAction(context.Background(), live, pet.ObjectID(), true)
+	gcl.handleTargetAction(context.Background(), live, pet.ObjectID(), true, false)
 
 	// Interacting with an owned summon must also release the pending action
 	// the client registered for the click, or its input stays locked.
