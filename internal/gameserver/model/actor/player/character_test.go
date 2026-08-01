@@ -46,13 +46,13 @@ func TestNewCharacter(t *testing.T) {
 		t.Errorf("Level = %d, want 1", c.CharLevel)
 	}
 	res := c.ResourceValues()
-	if want := tmpl.HPTable[0] * statbonus.CONBonus[tmpl.CON]; res.MaxHP != want || res.CurrentHP != want {
+	if want := float64(int(tmpl.HPTable[0] * statbonus.CONBonus[tmpl.CON])); res.MaxHP != want || res.CurrentHP != want {
 		t.Errorf("HP = %v/%v, want %v/%v", res.MaxHP, res.CurrentHP, want, want)
 	}
-	if want := tmpl.MPTable[0] * statbonus.MENBonus[tmpl.MEN]; res.MaxMP != want || res.CurrentMP != want {
+	if want := float64(int(tmpl.MPTable[0] * statbonus.MENBonus[tmpl.MEN])); res.MaxMP != want || res.CurrentMP != want {
 		t.Errorf("MP = %v/%v, want %v/%v", res.MaxMP, res.CurrentMP, want, want)
 	}
-	if want := tmpl.CPTable[0] * statbonus.CONBonus[tmpl.CON]; res.MaxCP != want || res.CurrentCP != 0 {
+	if want := float64(int(tmpl.CPTable[0] * statbonus.CONBonus[tmpl.CON])); res.MaxCP != want || res.CurrentCP != 0 {
 		t.Errorf("CP = %v/%v, want %v/0", res.MaxCP, res.CurrentCP, want)
 	}
 	if c.HairStyle != 1 || c.HairColor != 2 || c.Face != 0 {

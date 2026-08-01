@@ -203,9 +203,9 @@ func NewCharacter(objectID int32, tmpl *Template, accountName, name string, hair
 
 		CharLevel: 1,
 
-		maxHP: tmpl.HPTable[0] * statbonus.CONBonus[tmpl.CON], curHP: tmpl.HPTable[0] * statbonus.CONBonus[tmpl.CON],
-		maxCP: tmpl.CPTable[0] * statbonus.CONBonus[tmpl.CON],
-		maxMP: tmpl.MPTable[0] * statbonus.MENBonus[tmpl.MEN], curMP: tmpl.MPTable[0] * statbonus.MENBonus[tmpl.MEN],
+		maxHP: float64(int(tmpl.HPTable[0] * statbonus.CONBonus[tmpl.CON])), curHP: float64(int(tmpl.HPTable[0] * statbonus.CONBonus[tmpl.CON])),
+		maxCP: float64(int(tmpl.CPTable[0] * statbonus.CONBonus[tmpl.CON])),
+		maxMP: float64(int(tmpl.MPTable[0] * statbonus.MENBonus[tmpl.MEN])), curMP: float64(int(tmpl.MPTable[0] * statbonus.MENBonus[tmpl.MEN])),
 
 		Face: int(face), HairStyle: int(hairStyle), HairColor: int(hairColor),
 
