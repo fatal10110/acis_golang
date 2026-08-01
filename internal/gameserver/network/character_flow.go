@@ -113,7 +113,7 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 		l.world.Spawn(live, x, y, z, c.LastHeading)
 		l.world.AddPlayer(live)
 		if l.zones != nil && live.zoneActor != nil {
-			l.zones.Revalidate(live.zoneActor)
+			live.zoneActor.revalidate(l.zones)
 		}
 	}
 	// Track this player for the in-game clock's activity reminder so the

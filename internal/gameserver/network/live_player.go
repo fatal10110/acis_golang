@@ -36,6 +36,7 @@ type livePlayer struct {
 	visibilitySend func(wire.Frame) bool
 	stopAttack     func(*livePlayer)
 	shadowExpiryMu sync.RWMutex
+	detaching      bool
 	pickupMu       sync.Mutex // guards pickup, deferredPickup, and pickupLocked
 	pickup         *pickupIntention
 	deferredPickup *pickupIntention

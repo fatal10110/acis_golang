@@ -22,6 +22,7 @@ var _ task.ShadowItemEffects = (*TaskEffects)(nil)
 // liveZoneActor adapts a live player to the zone package without changing
 // Character's world.Position method signature.
 type liveZoneActor struct {
+	mu    sync.Mutex
 	live  *livePlayer
 	flags zone.Flags
 }
@@ -34,6 +35,24 @@ func (a *liveZoneActor) GM() bool                    { return a.live.AccessLevel
 func (a *liveZoneActor) Online() bool                { return a.live.Visible() }
 func (a *liveZoneActor) Race() player.Race           { return a.live.Character.Race }
 func (a *liveZoneActor) ClanID() int32               { return int32(a.live.Character.ClanID) }
+
+func (a *liveZoneActor) revalidate(ix *zone.Index) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	ix.Revalidate(a)
+}
+
+func (a *liveZoneActor) revalidateMove(ix *zone.Index, previous location.Location) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	ix.RevalidateMove(a, previous)
+}
+
+func (a *liveZoneActor) removeFrom(ix *zone.Index, x, y int) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	ix.RemoveFrom(a, x, y)
+}
 
 // TaskEffects routes periodic task effects to their current live player.
 type TaskEffects struct {
@@ -122,6 +141,9 @@ func (e *TaskEffects) Expire(actorID int32, inst *item.Instance) {
 	}
 	live.shadowExpiryMu.RLock()
 	defer live.shadowExpiryMu.RUnlock()
+	if live.detaching {
+		return
+	}
 	if current, ok := e.state.Player(actorID); !ok || current != live {
 		return
 	}
@@ -166,7 +188,7 @@ func (l *GameClientLink) wireWaterZones() {
 
 func (l *GameClientLink) revalidateZones(live *livePlayer, previous location.Location) {
 	if l.zones != nil && live != nil && live.zoneActor != nil {
-		l.zones.RevalidateMove(live.zoneActor, previous)
+		live.zoneActor.revalidateMove(l.zones, previous)
 	}
 }
 

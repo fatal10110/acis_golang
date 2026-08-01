@@ -130,6 +130,55 @@ func TestWaterZoneServerPositionSyncStartsCountdown(t *testing.T) {
 	}
 }
 
+func TestZoneRevalidationSerializesClientAndServerPositions(t *testing.T) {
+	state := world.New()
+	live := newTestLivePlayer(t, 103, &frameCapture{})
+	live.zoneActor = &liveZoneActor{live: live}
+	live.SetWorld(state)
+	state.Spawn(live, 0, 0, 0, 0)
+	state.AddPlayer(live)
+
+	entered := make(chan struct{})
+	releaseEnter := make(chan struct{})
+	water := zone.NewWater(1, zone.NewCuboid(1000, 2000, -100, 100, -100, 100))
+	water.OnEnter(func(zone.Actor) {
+		close(entered)
+		<-releaseEnter
+	})
+	zones := zone.NewIndex()
+	zones.Add(water)
+	link := &GameClientLink{world: state, zones: zones}
+	live.SetZoneRevalidator(func(previous location.Location) { link.revalidateZones(live, previous) })
+
+	clientDone := make(chan struct{})
+	go func() {
+		link.updateLivePlayerPosition(live, location.Location{X: 1500}, 0)
+		close(clientDone)
+	}()
+	<-entered
+
+	serverDone := make(chan struct{})
+	go func() {
+		live.SyncPosition(location.Location{})
+		close(serverDone)
+	}()
+	select {
+	case <-serverDone:
+		t.Fatal("server position sync interleaved with zone entry")
+	case <-time.After(50 * time.Millisecond):
+	}
+	close(releaseEnter)
+	<-clientDone
+	<-serverDone
+
+	if water.Inside(live.zoneActor) {
+		t.Fatal("outside player remains in water zone")
+	}
+	if live.zoneActor.ZoneFlags().Has(zone.FlagWater) {
+		t.Fatal("outside player remains flagged as swimming")
+	}
+}
+
 func TestTaskEffectsDrownDamagesAndNotifiesLivePlayer(t *testing.T) {
 	state := world.New()
 	capture := &frameCapture{}
