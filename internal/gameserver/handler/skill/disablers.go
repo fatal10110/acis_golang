@@ -92,14 +92,12 @@ type undeadTarget interface {
 
 type disablersHandler struct{}
 
-// Types lists 14 of the 15 skill types the reference handler covers.
-// AGGDAMAGE needs an AI aggression-event notification pipeline that isn't
-// wired yet, so it is left unregistered rather than half-ported into a no-op.
+// Types lists all 15 skill types the reference handler covers.
 func (disablersHandler) Types() []string {
 	return []string{
 		"STUN", "ROOT", "SLEEP", "PARALYZE", "MUTE", "CONFUSION",
 		"FAKE_DEATH", "BETRAY", "NEGATE", "CANCEL_DEBUFF",
-		"AGGREDUCE", "AGGREDUCE_CHAR", "AGGREMOVE", "ERASE",
+		"AGGREDUCE", "AGGREDUCE_CHAR", "AGGREMOVE", "ERASE", "AGGDAMAGE",
 	}
 }
 
@@ -141,6 +139,8 @@ func (disablersHandler) Use(cast Cast) {
 			disableNegate(cast, target)
 		case "CANCEL_DEBUFF":
 			disableCancelDebuff(cast, target)
+		case "AGGDAMAGE":
+			disableAggDamage(cast, target)
 		}
 	}
 
@@ -184,6 +184,29 @@ type servitorVanishNotifier interface {
 	ServitorVanished()
 }
 
+// leveledTarget optionally reports a target's level, needed to scale the
+// AGGDAMAGE aggro-notification power; a target without one still receives
+// the skill's effects, just no aggro notification.
+type leveledTarget interface {
+	Level() int
+}
+
+// disableAggDamage applies an AGGDAMAGE skill's effects unconditionally (no
+// landing roll, no reflect, matching Disablers.java's AGGDAMAGE case) and,
+// for an attackable target that can also report its level, notifies its AI
+// of the caster's aggression at power/(targetLevel+7)*150.
+func disableAggDamage(cast Cast, target disablerTarget) {
+	if am, ok := target.(attackableMarker); ok && am.Attackable() {
+		if n, ok := target.(aggressionNotifiable); ok {
+			if lt, ok := target.(leveledTarget); ok {
+				power := int(float64(cast.Skill.Power) / float64(lt.Level()+7) * 150)
+				n.NotifyAggression(cast.Caster, power)
+			}
+		}
+	}
+	applyEffects(cast.Caster, target, cast.Skill, cast.Skill.Effects)
+}
+
 func disableErase(cast Cast, target disablerTarget) {
 	succeeded, ok := checkSkillSuccess(cast.Caster, target, cast.Skill)
 	if !ok || !succeeded {
@@ -212,7 +235,9 @@ func reflectTarget(cast Cast, target disablerTarget) disablerTarget {
 	if !ok {
 		return target
 	}
-	if !formulas.SkillReflects(src.SkillReflectInput(cast.Skill), rnd.Get(100)) {
+	in := src.SkillReflectInput(cast.Skill)
+	in.SkillType = skillTypeKey(cast.Skill.SkillType)
+	if !formulas.SkillReflects(in, rnd.Get(100)) {
 		return target
 	}
 	self, ok := cast.Caster.(disablerTarget)

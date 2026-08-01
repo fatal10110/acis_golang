@@ -150,7 +150,9 @@ func (continuousHandler) reflectTarget(caster any, def modelskill.Definition, ta
 	if !ok {
 		return target
 	}
-	if !formulas.SkillReflects(src.SkillReflectInput(def), rnd.Get(100)) {
+	in := src.SkillReflectInput(def)
+	in.SkillType = skillTypeKey(def.SkillType)
+	if !formulas.SkillReflects(in, rnd.Get(100)) {
 		return target
 	}
 	self, ok := caster.(continuousTarget)
