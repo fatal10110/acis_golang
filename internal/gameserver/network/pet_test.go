@@ -364,6 +364,35 @@ func TestPetGetItemReportsHerbReuse(t *testing.T) {
 	assertSystemMessageSkillFrame(t, capture.frames[2], serverpackets.SystemMessageS1PreparedForReuse, 2278, 1)
 }
 
+func TestPetGetItemAcknowledgesUnhandledHerb(t *testing.T) {
+	const herbTemplate int32 = 8600
+	templates := herbTestTemplates()
+	tmpl, _ := templates.Get(herbTemplate)
+	tmpl.AttachedSkills = nil
+	capture := &frameCapture{}
+	live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
+	state := world.New()
+	state.Spawn(live, 0, 0, 0, 0)
+	_, _ = attachTestPet(t, state, live, templates, 12077, nil)
+	ground, err := grounditem.New(item.Instance{ObjectID: 900, TemplateID: herbTemplate, Count: 1, ManaLeft: -1}, tmpl)
+	if err != nil {
+		t.Fatalf("ground item: %v", err)
+	}
+	drops := task.NewGroundItems(state, task.GroundItemOptions{HerbAutoDestroy: time.Hour}, time.Now)
+	drops.Drop(ground, task.DropOptions{X: 10, Y: 20, Z: 30})
+
+	capture.frames = nil
+	gcl := &GameClientLink{world: state, groundItems: drops, skills: herbTestSkill(t)}
+
+	gcl.petGetItem(context.Background(), live, clientpackets.RequestPetGetItem{ObjectID: ground.ObjectID()})
+
+	assertOpcodeSequence(t, capture.frames,
+		serverpackets.OpcodeGetItem,
+		serverpackets.OpcodeDeleteObject,
+		serverpackets.OpcodeActionFailed,
+	)
+}
+
 func TestPetGetItemMergesStackAndDeletesGroundRow(t *testing.T) {
 	templates := petTestTemplates()
 	petItem := &item.Instance{ObjectID: 901, TemplateID: item.AdenaID, OwnerID: 0x20000001, Count: 10, Location: item.LocationPet}
