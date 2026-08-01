@@ -302,6 +302,36 @@ func TestScheduleFusionEndsOnAbortOrChannelCompletion(t *testing.T) {
 	}
 }
 
+func TestScheduleFusionStopsWhenRecurringCheckFails(t *testing.T) {
+	now := time.Unix(1000, 0)
+	ctrl, _, _ := newAbortController()
+	plan, err := ctrl.Start(now, testTarget{}, modelskill.Definition{ID: 426, Level: 1, Magic: true, HitTime: 15000, StaticHitTime: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	clock := &fakeCastClock{}
+	ctrl.afterFunc = clock.AfterFunc
+	ended := 0
+	ctrl.ScheduleFusion(plan, time.Second, func() bool { return false }, func() { ended++ })
+	clock.fire(time.Second)
+	if ended != 1 || ctrl.CastingNow() {
+		t.Fatalf("failed fusion check = end calls %d, casting %v; want 1 and false", ended, ctrl.CastingNow())
+	}
+}
+
+func TestScheduleFusionReportsWhenCastAlreadyStopped(t *testing.T) {
+	now := time.Unix(1000, 0)
+	ctrl, _, _ := newAbortController()
+	plan, err := ctrl.Start(now, testTarget{}, modelskill.Definition{ID: 426, Level: 1, Magic: true, HitTime: 15000, StaticHitTime: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctrl.Stop()
+	if ctrl.ScheduleFusion(plan, time.Second, func() bool { return true }, nil) {
+		t.Fatal("ScheduleFusion() = true after Stop, want false")
+	}
+}
+
 func (t *fakeCastTimer) Stop() bool {
 	if t.stopped {
 		return false
