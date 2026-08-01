@@ -1,6 +1,7 @@
 package network
 
 import (
+	"bytes"
 	"context"
 	"testing"
 	"time"
@@ -234,6 +235,37 @@ func TestGameClientLinkUseHealingPotionRejectsFlyingCondition(t *testing.T) {
 	if effects := live.EffectList().All(); len(effects) != 0 {
 		t.Fatalf("flying-condition rejection installed effects = %+v, want none", effects)
 	}
+}
+
+// TestGameClientLinkUsePotionNotEnoughItemsSendsNotEnoughItems verifies a
+// potion whose stack destroy fails (e.g. a use/pickup race) is rejected with
+// NOT_ENOUGH_ITEMS (351), matching Java's PlayableCast.doInstantCast
+// destroyItem failure — not S1_CANNOT_BE_USED, which is reserved for the
+// skill's own itemConsumeId precheck on a player-requested cast.
+func TestGameClientLinkUsePotionNotEnoughItemsSendsNotEnoughItems(t *testing.T) {
+	skills := consumableSkillTable(t)
+	capture := &frameCapture{}
+	live := newTestLivePlayer(t, 7, capture)
+	link := &GameClientLink{skills: skills}
+
+	const potionTemplate int32 = 1060
+	const objectID int32 = 704
+	// inst is never added to live's inventory container, so the
+	// destroyer's ItemByObjectID lookup misses and DestroyItem fails,
+	// reproducing the race without a full item-store round trip.
+	inst := &item.Instance{
+		ObjectID: objectID, TemplateID: potionTemplate, OwnerID: live.ObjectID(),
+		Count: 1, Location: item.LocationInventory, ManaLeft: -1,
+	}
+
+	if link.useConsumableSkillItem(live, live.Inventory(), inst) != true {
+		t.Fatal("useConsumableSkillItem() = false, want true (handled)")
+	}
+
+	if got, want := frameOpcodes(capture.frames), []byte{serverpackets.OpcodeSystemMessage, serverpackets.OpcodeActionFailed}; !bytes.Equal(got, want) {
+		t.Fatalf("destroy-failure opcodes = %#x, want SystemMessage then ActionFailed (%#x)", got, want)
+	}
+	assertSystemMessageIDFrame(t, capture.frames[0], serverpackets.SystemMessageNotEnoughItems)
 }
 
 // TestGameClientLinkUseDisabledPotionRejectsBeforeConsume verifies the

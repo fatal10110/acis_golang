@@ -4,12 +4,15 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/statbonus"
 )
 
 func humanFighterTemplate() *Template {
 	return &Template{
 		ID:        0,
 		BaseLevel: 1,
+		CON:       43,
+		MEN:       25,
 		HPTable:   []float64{80, 91.83},
 		MPTable:   []float64{30, 35.46},
 		CPTable:   []float64{32, 36.732},
@@ -43,11 +46,14 @@ func TestNewCharacter(t *testing.T) {
 		t.Errorf("Level = %d, want 1", c.CharLevel)
 	}
 	res := c.ResourceValues()
-	if res.MaxHP != tmpl.HPTable[0] || res.CurrentHP != tmpl.HPTable[0] {
-		t.Errorf("HP = %v/%v, want %v/%v", res.MaxHP, res.CurrentHP, tmpl.HPTable[0], tmpl.HPTable[0])
+	if want := float64(int(tmpl.HPTable[0] * statbonus.CONBonus[tmpl.CON])); res.MaxHP != want || res.CurrentHP != want {
+		t.Errorf("HP = %v/%v, want %v/%v", res.MaxHP, res.CurrentHP, want, want)
 	}
-	if res.MaxMP != tmpl.MPTable[0] || res.MaxCP != tmpl.CPTable[0] {
-		t.Errorf("MaxMP/MaxCP = %v/%v, want %v/%v", res.MaxMP, res.MaxCP, tmpl.MPTable[0], tmpl.CPTable[0])
+	if want := float64(int(tmpl.MPTable[0] * statbonus.MENBonus[tmpl.MEN])); res.MaxMP != want || res.CurrentMP != want {
+		t.Errorf("MP = %v/%v, want %v/%v", res.MaxMP, res.CurrentMP, want, want)
+	}
+	if want := float64(int(tmpl.CPTable[0] * statbonus.CONBonus[tmpl.CON])); res.MaxCP != want || res.CurrentCP != 0 {
+		t.Errorf("CP = %v/%v, want %v/0", res.MaxCP, res.CurrentCP, want)
 	}
 	if c.HairStyle != 1 || c.HairColor != 2 || c.Face != 0 {
 		t.Errorf("appearance = hairStyle=%d hairColor=%d face=%d, want 1/2/0", c.HairStyle, c.HairColor, c.Face)
