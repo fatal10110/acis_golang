@@ -243,7 +243,8 @@ func (a *stoppableTestActor) ObjectID() int32 { return a.id }
 func (a *stoppableTestActor) Stop()           { a.stopped = true }
 
 func TestProvideAdditionalLifecycleTasks(t *testing.T) {
-	water, err := provideWater()
+	state := provideWorldState()
+	water, err := provideWater(state)
 	if err != nil {
 		t.Fatalf("provideWater() error = %v", err)
 	}
@@ -251,7 +252,7 @@ func TestProvideAdditionalLifecycleTasks(t *testing.T) {
 		t.Fatal("provideWater() = nil")
 	}
 
-	shadowItems, err := provideShadowItems()
+	shadowItems, err := provideShadowItems(state)
 	if err != nil {
 		t.Fatalf("provideShadowItems() error = %v", err)
 	}

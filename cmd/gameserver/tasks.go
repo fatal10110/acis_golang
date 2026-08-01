@@ -8,7 +8,6 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/scheduler"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -120,23 +119,16 @@ func startWalker(lc fx.Lifecycle, walker *task.Walker, log zerolog.Logger) {
 	startTicker(lc, log, walker.Start)
 }
 
-type gameTaskEffects struct{}
-
-func (gameTaskEffects) GaugeSet(task.WaterActor, time.Duration)  {}
-func (gameTaskEffects) Drown(task.WaterActor)                    {}
-func (gameTaskEffects) ManaThreshold(int32, *item.Instance, int) {}
-func (gameTaskEffects) Expire(int32, *item.Instance)             {}
-
-func provideWater() (*task.Water, error) {
-	return task.NewWater(gameTaskEffects{}, time.Now)
+func provideWater(state *world.State) (*task.Water, error) {
+	return task.NewWater(network.NewTaskEffects(state, nil), time.Now)
 }
 
 func startWater(lc fx.Lifecycle, water *task.Water, log zerolog.Logger) {
 	startTicker(lc, log, water.Start)
 }
 
-func provideShadowItems() (*task.ShadowItems, error) {
-	return task.NewShadowItems(gameTaskEffects{})
+func provideShadowItems(state *world.State) (*task.ShadowItems, error) {
+	return task.NewShadowItems(network.NewTaskEffects(state, nil))
 }
 
 func startShadowItems(lc fx.Lifecycle, items *task.ShadowItems, log zerolog.Logger) {

@@ -33,6 +33,21 @@ func (r Race) String() string {
 	}
 }
 
+// BreathMultiplier returns the race-specific underwater-breath duration and
+// drowning-damage multiplier used by the reference server.
+func (r Race) BreathMultiplier() float64 {
+	switch r {
+	case RaceElf, RaceDarkElf:
+		return 1.5
+	case RaceOrc:
+		return 0.9
+	case RaceDwarf:
+		return 0.8
+	default:
+		return 1
+	}
+}
+
 // baseClassRace gives the race of each of the 9 root professions (the ids
 // for which ClassParent reports no parent). Every other profession in a
 // line shares its root's race; ClassRace walks ClassParent to find it
@@ -60,6 +75,21 @@ func ClassRace(id int) (Race, bool) {
 		if parent < 0 {
 			race, ok := baseClassRace[id]
 			return race, ok
+		}
+		id = parent
+	}
+}
+
+// ClassMage reports whether id belongs to one of the four mystic profession
+// trees. Every upgraded profession has the same root class.
+func ClassMage(id int) bool {
+	for {
+		parent, ok := ClassParent(id)
+		if !ok {
+			return false
+		}
+		if parent < 0 {
+			return id == 10 || id == 25 || id == 38 || id == 49
 		}
 		id = parent
 	}
