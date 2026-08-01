@@ -39,7 +39,10 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return true
 	}
-	if !liveItemOpsAllowed(live) || !live.Standing() {
+	if livePickupBlocked(live) {
+		if livePickupDeferrable(live) {
+			live.deferPickup(ctx, ground)
+		}
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return true
 	}
@@ -121,8 +124,21 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 // lockPickupParalysis briefly paralyzes live after a successful pickup,
 // clearing the lock once pickupParalyzeLock elapses.
 func (l *GameClientLink) lockPickupParalysis(live *livePlayer) {
-	l.scheduleAfter(pickupParalyzeLock, func() { live.SetParalyzed(false) })
+	l.scheduleAfter(pickupParalyzeLock, func() {
+		live.SetParalyzed(false)
+		live.setPickupLocked(false)
+		l.finishDeferredPickup(live)
+	})
+	live.setPickupLocked(true)
 	live.SetParalyzed(true)
+}
+
+func livePickupBlocked(live *livePlayer) bool {
+	return !liveItemOpsAllowed(live) || !live.Standing() || (live.attack != nil && live.attack.AttackingNow()) || (live.cast != nil && live.cast.CastingNow())
+}
+
+func livePickupDeferrable(live *livePlayer) bool {
+	return live != nil && ((live.attack != nil && live.attack.AttackingNow()) || live.pickupLockActive())
 }
 
 func groundPickupInRange(live *livePlayer, ground *grounditem.Item) bool {

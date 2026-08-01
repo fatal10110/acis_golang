@@ -34,8 +34,10 @@ type livePlayer struct {
 	known          world.KnownBuffer
 	visibilitySend func(wire.Frame) bool
 	stopAttack     func(*livePlayer)
-	pickupMu       sync.Mutex
+	pickupMu       sync.Mutex // guards pickup, deferredPickup, and pickupLocked
 	pickup         *pickupIntention
+	deferredPickup *pickupIntention
+	pickupLocked   bool
 }
 
 type pickupIntention struct {
@@ -57,6 +59,7 @@ func (p *livePlayer) sendVisibilityFrame(frame wire.Frame) bool {
 
 func (p *livePlayer) Stop() {
 	p.takePickup()
+	p.takeDeferredPickup()
 	if p.combat != nil {
 		p.combat.Stop()
 	}
@@ -81,6 +84,32 @@ func (p *livePlayer) takePickup() *pickupIntention {
 	pickup := p.pickup
 	p.pickup = nil
 	return pickup
+}
+
+func (p *livePlayer) deferPickup(ctx context.Context, target world.Tracked) {
+	p.pickupMu.Lock()
+	defer p.pickupMu.Unlock()
+	p.deferredPickup = &pickupIntention{ctx: ctx, target: target}
+}
+
+func (p *livePlayer) takeDeferredPickup() *pickupIntention {
+	p.pickupMu.Lock()
+	defer p.pickupMu.Unlock()
+	pickup := p.deferredPickup
+	p.deferredPickup = nil
+	return pickup
+}
+
+func (p *livePlayer) setPickupLocked(locked bool) {
+	p.pickupMu.Lock()
+	defer p.pickupMu.Unlock()
+	p.pickupLocked = locked
+}
+
+func (p *livePlayer) pickupLockActive() bool {
+	p.pickupMu.Lock()
+	defer p.pickupMu.Unlock()
+	return p.pickupLocked
 }
 
 func (p *livePlayer) attackController() *attack.Controller {

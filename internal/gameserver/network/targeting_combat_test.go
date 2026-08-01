@@ -23,6 +23,10 @@ import (
 // wiring because it has no GameClientLink to close over.
 func wireLiveAttackHooks(gcl *GameClientLink, live *livePlayer) {
 	live.stopAttack = gcl.stopLiveAutoAttack
+	live.attack.SetFinished(func() {
+		gcl.finishDeferredPickup(live)
+		live.combat.Think()
+	})
 	live.attack.SetStarted(func() {
 		gcl.startLiveAutoAttack(live)
 	})
