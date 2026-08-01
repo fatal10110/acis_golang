@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
 
@@ -193,9 +194,12 @@ func (p *Persistence) EquipItemStats(c *player.Character, inst *item.Instance, t
 	if err != nil {
 		return fmt.Errorf("apply equip modifiers for character %d item %d: %w", c.ID, inst.ObjectID, err)
 	}
-	passiveFns, err := effect.ItemPassiveFuncs(p.skills, owner)
-	if err != nil {
-		return fmt.Errorf("apply equip passives for character %d item %d: %w", c.ID, inst.ObjectID, err)
+	var passiveFns []basefunc.Func
+	if tmpl.Weapon == nil || c.WeaponSkillsAllowed(tmpl.Crystal) {
+		passiveFns, err = effect.ItemPassiveFuncs(p.skills, owner)
+		if err != nil {
+			return fmt.Errorf("apply equip passives for character %d item %d: %w", c.ID, inst.ObjectID, err)
+		}
 	}
 	c.AddStatFuncs(modFns)
 	c.AddStatFuncs(passiveFns)
@@ -226,6 +230,25 @@ func (p *Persistence) RestoreEquippedItemStats(c *player.Character, inv *itemcon
 		if !ok {
 			continue
 		}
+		if err := p.EquipItemStats(c, inst, tmpl); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// RefreshEquippedItemStats reapplies equipped item modifiers and passives
+// after a state gate changes which passives may be active.
+func (p *Persistence) RefreshEquippedItemStats(c *player.Character, inv *itemcontainer.Inventory) error {
+	if c == nil || inv == nil {
+		return nil
+	}
+	for _, inst := range inv.PaperdollItems() {
+		tmpl, ok := inv.Templates().Get(inst.TemplateID)
+		if !ok {
+			continue
+		}
+		p.UnequipItemStats(c, inst, tmpl)
 		if err := p.EquipItemStats(c, inst, tmpl); err != nil {
 			return err
 		}
