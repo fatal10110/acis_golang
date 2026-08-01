@@ -131,6 +131,35 @@ type BlowInput struct {
 	CritVulnMul       float64
 	DaggerVulnMul     float64
 	CritDamageAddBase float64 // raw critical-damage-add stat, pre ×6 scaling
+	Landed            bool
+}
+
+// BlowRateInput is the resolved state for a blow's independent landing roll.
+type BlowRateInput struct {
+	BaseRate, DexMul, BlowMul float64
+	Behind, Front, Backstab   bool
+}
+
+// BlowSucceeds matches calcBlowRate's per-mille roll and its Backstab caps.
+func BlowSucceeds(in BlowRateInput, roll int) bool {
+	if in.BaseRate == 0 {
+		return false
+	}
+	if in.Backstab && in.Front {
+		return 30 > roll
+	}
+	posMul := 1.1
+	if in.Behind {
+		posMul = 1.15
+	} else if in.Front {
+		posMul = 1
+	}
+	rate := in.BaseRate * 2 * in.DexMul * in.BlowMul * posMul
+	cap := 800.
+	if in.Backstab {
+		cap = 1000
+	}
+	return math.Min(rate, cap) > float64(roll)
 }
 
 // BlowDamage computes a blow-type skill's damage. Unlike the other damage
@@ -207,7 +236,24 @@ type ManaDamageInput struct {
 
 	// VulnMul is the target's skill-type vulnerability multiplier (e.g.
 	// DRAIN); pass 1 when not applicable.
-	VulnMul float64
+	VulnMul  float64
+	Affected bool
+}
+
+// MagicAffectedInput is the resolved state for calcMagicAffected.
+type MagicAffectedInput struct {
+	MAtk, MDef, VulnMul float64
+	Defended            bool
+}
+
+// MagicAffected applies the reference magic landing threshold using gaussian.
+func MagicAffected(in MagicAffectedInput, gaussian float64) bool {
+	defence := 0.
+	if in.Defended {
+		defence = in.MDef
+	}
+	attack := 2 * in.MAtk * in.VulnMul
+	return (attack-defence)/(attack+defence)+0.5*gaussian > 0
 }
 
 // ManaDamage computes a mana-drain skill's damage.

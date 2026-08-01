@@ -4,6 +4,7 @@ import (
 	"math"
 	"strings"
 
+	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -108,6 +109,23 @@ func ResolveBlowInput(caster any, target FormulaActor, def modelskill.Definition
 	if pvp {
 		pvpMul = attacker.CalcStat(stat.PvPPhysSkillDmg, 1)
 	}
+	tx, ty, tz := target.Position()
+	ax, ay, az := attacker.Position()
+	facing := location.OrientedLocation{
+		Location: location.Location{X: tx, Y: ty, Z: tz},
+		Heading:  formulaHeading(target),
+	}
+	attackerLocation := location.Location{X: ax, Y: ay, Z: az}
+	behind := facing.IsBehind(attackerLocation)
+	front := facing.IsInFrontOf(attackerLocation)
+	landed := formulas.BlowSucceeds(formulas.BlowRateInput{
+		BaseRate: float64(def.BaseLandRate),
+		DexMul:   statbonus.DEXBonus[attacker.DEX()],
+		BlowMul:  attacker.CalcStat(stat.BlowRate, 1),
+		Behind:   behind,
+		Front:    front,
+		Backstab: def.ID == 30,
+	}, attacker.Roll(1000))
 	return formulas.BlowInput{
 		AttackPower:       attacker.PAtk(),
 		SkillPower:        skillPower,
@@ -122,6 +140,7 @@ func ResolveBlowInput(caster any, target FormulaActor, def modelskill.Definition
 		CritVulnMul:       target.CalcStat(stat.CritVuln, 1),
 		DaggerVulnMul:     target.CalcStat(stat.DaggerWpnVuln, 1),
 		CritDamageAddBase: attacker.CalcStat(stat.CriticalDamageAdd, 0),
+		Landed:            landed,
 	}, true
 }
 
@@ -133,6 +152,12 @@ func ResolveManaDamageInput(caster any, target FormulaActor, maxMP float64, def 
 		return formulas.ManaDamageInput{}, false
 	}
 	sps, bsps := SpiritshotFlags(attacker)
+	affected := formulas.MagicAffected(formulas.MagicAffectedInput{
+		MAtk:     attacker.MAtk(),
+		MDef:     Positive(target.MDef()),
+		VulnMul:  SkillVulnerability(target, def.SkillType, def),
+		Defended: def.Activation == modelskill.ActivationActive && def.Offensive,
+	}, rnd.NextGaussian())
 	return formulas.ManaDamageInput{
 		MAtk:            attacker.MAtk(),
 		MDef:            Positive(target.MDef()),
@@ -141,6 +166,7 @@ func ResolveManaDamageInput(caster any, target FormulaActor, maxMP float64, def 
 		SoulShot:        sps,
 		BlessedSoulShot: bsps,
 		VulnMul:         SkillVulnerability(target, def.SkillType, def),
+		Affected:        affected,
 	}, true
 }
 

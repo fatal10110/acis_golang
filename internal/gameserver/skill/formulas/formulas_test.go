@@ -219,6 +219,53 @@ func TestBlowDamage(t *testing.T) {
 	}
 }
 
+func TestBlowSucceeds(t *testing.T) {
+	tests := []struct {
+		name string
+		in   BlowRateInput
+		roll int
+		want bool
+	}{
+		{
+			name: "ordinary blow uses dex stat and side multipliers",
+			in:   BlowRateInput{BaseRate: 100, DexMul: 1.1, BlowMul: 1.2},
+			roll: 263,
+			want: true,
+		},
+		{
+			name: "ordinary blow caps at eight hundred",
+			in:   BlowRateInput{BaseRate: 1000, DexMul: 2, BlowMul: 2, Behind: true},
+			roll: 800,
+			want: false,
+		},
+		{
+			name: "backstab from the front uses its fixed thirty per mille chance",
+			in:   BlowRateInput{BaseRate: 1000, Backstab: true, Front: true},
+			roll: 30,
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := BlowSucceeds(tt.in, tt.roll); got != tt.want {
+				t.Fatalf("BlowSucceeds() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestMagicAffected(t *testing.T) {
+	if !MagicAffected(MagicAffectedInput{MAtk: 100, MDef: 100, VulnMul: 1, Defended: true}, 0.1) {
+		t.Fatal("MagicAffected() = false, want true above the zero threshold")
+	}
+	if MagicAffected(MagicAffectedInput{MAtk: 100, MDef: 200, VulnMul: 1, Defended: true}, 0) {
+		t.Fatal("MagicAffected() = true, want false at the strict zero threshold")
+	}
+	if !MagicAffected(MagicAffectedInput{MAtk: 100, VulnMul: 1}, 0.1) {
+		t.Fatal("MagicAffected() = false, want true for an undefended skill")
+	}
+}
+
 func TestLethalRate(t *testing.T) {
 	tests := []struct {
 		name string

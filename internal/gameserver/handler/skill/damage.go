@@ -201,6 +201,9 @@ func (blowHandler) Use(cast Cast) {
 		if !ok {
 			continue
 		}
+		if !in.Landed {
+			continue
+		}
 		damage := int(formulas.BlowDamage(in))
 		if damage > 0 {
 			target.ReduceHP(float64(damage), cast.Caster, cast.Skill)
@@ -246,9 +249,32 @@ func (manaDamageHandler) Use(cast Cast) {
 		if !ok || target.Dead() {
 			continue
 		}
+		var effected effectListTarget
+		effective := any(target)
+		if _, ok := obj.(effectListTarget); ok {
+			effected = reflectEffectTarget(cast, obj)
+			if effected == nil {
+				continue
+			}
+			effective = effected
+		}
+		target, ok = effective.(manaDamageTarget)
+		if !ok || target.Dead() {
+			continue
+		}
 		in, ok := target.ManaDamageInput(cast.Caster, cast.Skill)
 		if !ok {
 			continue
+		}
+		if invul, ok := target.(interface{ Invul() bool }); ok && invul.Invul() || !in.Affected {
+			continue
+		}
+		if effected != nil && len(cast.Skill.Effects) > 0 {
+			succeeded, ok := checkSkillSuccess(cast.Caster, effected, cast.Skill)
+			if ok && succeeded {
+				stopEffectsBySkillID(effected.EffectList(), cast.Skill.ID)
+				applyEffects(cast.Caster, effected, cast.Skill, cast.Skill.Effects)
+			}
 		}
 		damage := formulas.ManaDamage(in)
 		if damage > target.MPValue() {
@@ -258,6 +284,7 @@ func (manaDamageHandler) Use(cast Cast) {
 			target.ReduceMP(damage)
 		}
 	}
+	applySelfEffects(cast.Caster, cast.Skill)
 }
 
 func applyLethalHit(cast Cast, obj any) {
