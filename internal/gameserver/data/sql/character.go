@@ -187,6 +187,16 @@ func (s *CharacterStore) SetDeathPenaltyLevel(ctx context.Context, objectID int3
 	return nil
 }
 
+// SetOffline marks the character offline and persists lastAccess (epoch
+// milliseconds), so a later char-select reload highlights the most recently
+// played character.
+func (s *CharacterStore) SetOffline(ctx context.Context, objectID int32, lastAccess int64) error {
+	if _, err := s.db.ExecContext(ctx, "UPDATE characters SET online = 0, lastAccess = ? WHERE obj_Id = ?", lastAccess, objectID); err != nil {
+		return fmt.Errorf("set offline recency for %d: %w", objectID, err)
+	}
+	return nil
+}
+
 // Delete removes the character row for objectID. It reports whether a row
 // was deleted.
 func (s *CharacterStore) Delete(ctx context.Context, objectID int32) (bool, error) {

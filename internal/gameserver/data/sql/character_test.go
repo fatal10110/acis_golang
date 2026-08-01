@@ -155,6 +155,31 @@ func TestCharacterStoreSetDeathPenaltyLevelPersists(t *testing.T) {
 	}
 }
 
+func TestCharacterStoreSetOfflinePersistsRecency(t *testing.T) {
+	rec := &characterStoreRecorder{}
+	db := sql.OpenDB(characterStoreConnector{rec: rec})
+	t.Cleanup(func() { _ = db.Close() })
+	store := NewCharacterStore(db)
+
+	lastAccess := time.Now().UnixMilli()
+	if err := store.SetOffline(context.Background(), 0x10000001, lastAccess); err != nil {
+		t.Fatalf("SetOffline() error = %v", err)
+	}
+
+	if !strings.Contains(rec.query, "SET online = 0, lastAccess = ?") {
+		t.Fatalf("SetOffline() query = %q, missing offline recency columns", rec.query)
+	}
+	want := []any{lastAccess, int64(0x10000001)}
+	if len(rec.args) != len(want) {
+		t.Fatalf("SetOffline() args = %#v, want %d args", rec.args, len(want))
+	}
+	for i, arg := range rec.args {
+		if arg.Value != want[i] {
+			t.Fatalf("SetOffline() arg %d = %v, want %v; args=%#v", i, arg.Value, want[i], rec.args)
+		}
+	}
+}
+
 type characterScanRow []any
 
 func (r characterScanRow) Scan(dest ...any) error {
