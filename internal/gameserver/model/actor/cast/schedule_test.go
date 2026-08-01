@@ -273,7 +273,7 @@ type fakeCastTimer struct {
 func TestScheduleFusionEndsOnAbortOrChannelCompletion(t *testing.T) {
 	now := time.Unix(1000, 0)
 	ctrl, _, _ := newAbortController()
-	plan, err := ctrl.Start(now, testTarget{}, modelskill.Definition{ID: 426, Level: 1, Magic: true, HitTime: 15000, StaticHitTime: true})
+	plan, err := ctrl.Start(now, testTarget{}, modelskill.Definition{ID: 426, Level: 1, Magic: true, SkillType: "FUSION", HitTime: 15000})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -291,7 +291,7 @@ func TestScheduleFusionEndsOnAbortOrChannelCompletion(t *testing.T) {
 		t.Fatalf("fusion abort order = %s, want end abort", got)
 	}
 
-	plan, err = ctrl.Start(now, testTarget{}, modelskill.Definition{ID: 426, Level: 1, Magic: true, HitTime: 15000, StaticHitTime: true})
+	plan, err = ctrl.Start(now, testTarget{}, modelskill.Definition{ID: 426, Level: 1, Magic: true, SkillType: "FUSION", HitTime: 15000})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -305,7 +305,7 @@ func TestScheduleFusionEndsOnAbortOrChannelCompletion(t *testing.T) {
 func TestScheduleFusionStopsWhenRecurringCheckFails(t *testing.T) {
 	now := time.Unix(1000, 0)
 	ctrl, _, _ := newAbortController()
-	plan, err := ctrl.Start(now, testTarget{}, modelskill.Definition{ID: 426, Level: 1, Magic: true, HitTime: 15000, StaticHitTime: true})
+	plan, err := ctrl.Start(now, testTarget{}, modelskill.Definition{ID: 426, Level: 1, Magic: true, SkillType: "FUSION", HitTime: 15000})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -322,7 +322,7 @@ func TestScheduleFusionStopsWhenRecurringCheckFails(t *testing.T) {
 func TestScheduleFusionReportsWhenCastAlreadyStopped(t *testing.T) {
 	now := time.Unix(1000, 0)
 	ctrl, _, _ := newAbortController()
-	plan, err := ctrl.Start(now, testTarget{}, modelskill.Definition{ID: 426, Level: 1, Magic: true, HitTime: 15000, StaticHitTime: true})
+	plan, err := ctrl.Start(now, testTarget{}, modelskill.Definition{ID: 426, Level: 1, Magic: true, SkillType: "FUSION", HitTime: 15000})
 	if err != nil {
 		t.Fatal(err)
 	}

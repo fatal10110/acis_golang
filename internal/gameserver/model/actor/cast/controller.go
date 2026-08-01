@@ -455,15 +455,20 @@ func (c *Controller) CurrentSkillIsMagic() bool {
 // InterruptCastOnDamage applies the damage-based cast-break rule
 // (Formulas.calcCastBreak) to the active cast using time.Now(), for callers
 // outside this package that don't hold a DamageInterrupt value already.
-// Fusion is always false here; DamageInterrupt.Fusion needs live
-// fusion-channel state that only #998 wires.
+// Fusion reflects whether the actor is currently channeling a FUSION cast
+// (target.getFusionSkill() != null in Formulas.calcCastBreak, Formulas.java:732),
+// which unconditionally interrupts on any damage — no rate roll, no MEN.
 func (c *Controller) InterruptCastOnDamage(damage float64, men int, attackCancel func(float64) float64, roll int, immune bool) bool {
+	c.mu.RLock()
+	fusion := c.fusionEnd != nil
+	c.mu.RUnlock()
 	return c.InterruptOnDamage(time.Now(), DamageInterrupt{
 		Damage:       damage,
 		MEN:          men,
 		AttackCancel: attackCancel,
 		Roll:         roll,
 		Immune:       immune,
+		Fusion:       fusion,
 	})
 }
 
@@ -514,9 +519,16 @@ func ReuseKey(def modelskill.Definition) int32 {
 }
 
 func (c *Controller) buildPlan(def modelskill.Definition) Plan {
+	// PlayerCast.doFusionCast (PlayerCast.java:75-76,52) reads
+	// skill.getHitTime()/getCoolTime()/getReuseDelay() raw, with no atkSpd,
+	// spiritshot, or reuse-rate scaling applied — channel length, gauge,
+	// interrupt window, and reuse are fixed for every caster regardless of
+	// attack speed.
+	fusion := def.SkillType == "FUSION"
+
 	hitTime := def.HitTime
 	coolTime := def.CoolTime
-	if !def.StaticHitTime {
+	if !def.StaticHitTime && !fusion {
 		hitTime = formulas.AtkSpd(def.Magic, positive(c.actor.AttackSpeed(true)), positive(c.actor.AttackSpeed(false)), float64(hitTime))
 		if coolTime > 0 {
 			coolTime = formulas.AtkSpd(def.Magic, positive(c.actor.AttackSpeed(true)), positive(c.actor.AttackSpeed(false)), float64(coolTime))
@@ -531,7 +543,7 @@ func (c *Controller) buildPlan(def modelskill.Definition) Plan {
 	}
 
 	reuseDelay := def.ReuseDelay
-	if !def.StaticReuse {
+	if !def.StaticReuse && !fusion {
 		reuseDelay = int(float64(reuseDelay) * c.actor.ReuseRate(def.Magic))
 		reuseDelay = int(float64(reuseDelay) * 333.0 / float64(positive(c.actor.AttackSpeed(def.Magic))))
 	}
