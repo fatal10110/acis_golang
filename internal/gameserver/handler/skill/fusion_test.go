@@ -81,3 +81,19 @@ func TestFusionHandlerCapsGrowthAtMaxLevel(t *testing.T) {
 		t.Fatalf("effect list has %d effects, want exactly 1", len(target.list.All()))
 	}
 }
+
+func TestDecreaseFusionShrinksTriggeredEffectWhenChannelEnds(t *testing.T) {
+	target := newContinuousFake(1)
+	defs := battleForceDefs()
+	registry := NewDefaultRegistryWithDefinitions(defs)
+	cast := Cast{Caster: newContinuousFake(2), Skill: battleForce(1), Targets: []any{target}}
+
+	registry.Use(cast)
+	registry.Use(cast)
+	DecreaseFusion(defs, cast.Caster, target, cast.Skill)
+
+	e := firstEffectByID(target.list, 5104)
+	if e == nil || e.Level != 1 {
+		t.Fatalf("fusion level after channel end = %v, want level 1", e)
+	}
+}

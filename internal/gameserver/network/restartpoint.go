@@ -62,6 +62,7 @@ func (l *GameClientLink) teleportLivePlayer(live *livePlayer, target location.Lo
 	if !live.SetTeleporting(true) {
 		return
 	}
+	l.abortFusionTargeting(live)
 	live.Stop()
 	live.Character.StopCast()
 	target = move.RandomNearbyLocation(l.geo, target, randomOffset)

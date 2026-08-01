@@ -116,6 +116,7 @@ func (l *GameClientLink) broadcastLiveStopMove(live *livePlayer, at location.Loc
 // zero value: they depend on clan hall/castle/siege ownership and sweep
 // eligibility that aren't wired yet.
 func (l *GameClientLink) broadcastLiveDie(live *livePlayer) {
+	l.abortFusionTargeting(live)
 	l.broadcastLiveFrame(live, func() wire.Frame {
 		return serverpackets.FrameDie(live.ObjectID(), serverpackets.DieOptions{})
 	})

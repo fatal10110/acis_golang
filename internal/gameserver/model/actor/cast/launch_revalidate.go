@@ -67,6 +67,12 @@ func RevalidateLaunch(caster, target Target, def modelskill.Definition) LaunchAb
 	return LaunchAbortNone
 }
 
+// FusionChannelValid reports whether a live fusion channel still has range
+// and line of sight to its target. Fusion does not run normal launch gates.
+func FusionChannelValid(caster, target Target, castRange int) bool {
+	return caster != nil && target != nil && withinLaunchRange(castRange, caster, target) && launchCanSee(caster, target)
+}
+
 func sameLaunchTarget(a, b Target) bool {
 	return a.ObjectID() == b.ObjectID()
 }

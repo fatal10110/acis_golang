@@ -270,6 +270,38 @@ type fakeCastTimer struct {
 	stopped bool
 }
 
+func TestScheduleFusionEndsOnAbortOrChannelCompletion(t *testing.T) {
+	now := time.Unix(1000, 0)
+	ctrl, _, _ := newAbortController()
+	plan, err := ctrl.Start(now, testTarget{}, modelskill.Definition{ID: 426, Level: 1, Magic: true, HitTime: 15000, StaticHitTime: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	clock := &fakeCastClock{}
+	ctrl.afterFunc = clock.AfterFunc
+	ended := 0
+	order := []string{}
+	ctrl.SetOnAbort(func(bool) { order = append(order, "abort") })
+	ctrl.ScheduleFusion(plan, time.Second, func() bool { return true }, func() { ended++; order = append(order, "end") })
+	ctrl.Stop()
+	if ended != 1 {
+		t.Fatalf("fusion end calls after abort = %d, want 1", ended)
+	}
+	if got := strings.Join(order, " "); got != "end abort" {
+		t.Fatalf("fusion abort order = %s, want end abort", got)
+	}
+
+	plan, err = ctrl.Start(now, testTarget{}, modelskill.Definition{ID: 426, Level: 1, Magic: true, HitTime: 15000, StaticHitTime: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctrl.ScheduleFusion(plan, time.Second, func() bool { return true }, func() { ended++ })
+	clock.fire(plan.LaunchDelay)
+	if ended != 2 {
+		t.Fatalf("fusion end calls after natural completion = %d, want 2", ended)
+	}
+}
+
 func (t *fakeCastTimer) Stop() bool {
 	if t.stopped {
 		return false
