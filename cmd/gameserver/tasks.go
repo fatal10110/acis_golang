@@ -119,16 +119,20 @@ func startWalker(lc fx.Lifecycle, walker *task.Walker, log zerolog.Logger) {
 	startTicker(lc, log, walker.Start)
 }
 
-func provideWater(state *world.State) (*task.Water, error) {
-	return task.NewWater(network.NewTaskEffects(state, nil), time.Now)
+func provideTaskEffects(state *world.State) *network.TaskEffects {
+	return network.NewTaskEffects(state)
+}
+
+func provideWater(effects *network.TaskEffects) (*task.Water, error) {
+	return task.NewWater(effects, time.Now)
 }
 
 func startWater(lc fx.Lifecycle, water *task.Water, log zerolog.Logger) {
 	startTicker(lc, log, water.Start)
 }
 
-func provideShadowItems(state *world.State) (*task.ShadowItems, error) {
-	return task.NewShadowItems(network.NewTaskEffects(state, nil))
+func provideShadowItems(effects *network.TaskEffects) (*task.ShadowItems, error) {
+	return task.NewShadowItems(effects)
 }
 
 func startShadowItems(lc fx.Lifecycle, items *task.ShadowItems, log zerolog.Logger) {

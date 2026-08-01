@@ -62,6 +62,9 @@ func provideGameClientLink(
 	playerClock *task.PlayerClock,
 	inventoryUpdates *task.InventoryUpdates,
 	itemInstances *task.ItemInstances,
+	water *task.Water,
+	shadowItems *task.ShadowItems,
+	effects *network.TaskEffects,
 	respawnHP respawnRestoreHP,
 	spBookNeeded skillEnchantSPBookNeeded,
 	autoLearn autoLearnSkills,
@@ -77,7 +80,7 @@ func provideGameClientLink(
 		WeightLimitMultiplier:    float64(weightLimit),
 		KarmaPlayerCanTeleport:   bool(karmaTeleport),
 	}
-	return network.NewGameClientLink(network.GameClientLinkConfig{
+	link := network.NewGameClientLink(network.GameClientLinkConfig{
 		Validator:     validator,
 		LoginLink:     links.get,
 		Roster:        roster,
@@ -100,6 +103,8 @@ func provideGameClientLink(
 		AttackStance:  attackStance,
 		Positions:     positions,
 		PlayerClock:   playerClock,
+		Water:         water,
+		ShadowItems:   shadowItems,
 
 		InventoryUpdates: inventoryUpdates,
 		ItemInstances:    itemInstances,
@@ -109,6 +114,10 @@ func provideGameClientLink(
 		PetConfig:        petCfg,
 		Log:              log,
 	})
+	if effects != nil {
+		effects.SetShadowItemExpiry(link.ExpireShadowItem)
+	}
+	return link
 }
 
 func provideSkillPersistence(pool *sql.DB, data *gameData) *skillstate.Persistence {

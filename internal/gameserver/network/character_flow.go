@@ -289,6 +289,9 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 		l.broadcastLiveStopMove(live, location.Location{X: x, Y: y, Z: z}, live.CurrentHeading())
 	})
 	c.SetDieBroadcaster(func() {
+		if l.water != nil {
+			l.water.Remove(live)
+		}
 		l.broadcastLiveDie(live)
 	})
 	c.SetStatusBroadcaster(func() {
@@ -369,6 +372,14 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	// own cadence.
 	if inv := c.Inventory(); inv != nil && l.itemInstances != nil {
 		inv.SetItemPersister(l.itemInstances.Add)
+	}
+	if inv := c.Inventory(); inv != nil && l.shadowItems != nil {
+		for _, inst := range inv.PaperdollItems() {
+			tmpl, ok := inv.Templates().Get(inst.TemplateID)
+			if ok {
+				l.shadowItems.Track(live.ObjectID(), inst, tmpl)
+			}
+		}
 	}
 	c.SetShortBuffBroadcaster(func(update player.ShortBuffUpdate) {
 		live.SendFrame(serverpackets.FrameShortBuffStatusUpdate(update.SkillID, update.Level, update.DurationSeconds))
