@@ -65,7 +65,12 @@ func reflectEffectTarget(cast Cast, obj any) effectListTarget {
 		return nil
 	}
 	src, ok := obj.(skillReflectSource)
-	if !ok || !formulas.SkillReflects(src.SkillReflectInput(cast.Skill), rnd.Get(100)) {
+	if !ok {
+		return target
+	}
+	in := src.SkillReflectInput(cast.Skill)
+	in.SkillType = skillTypeKey(cast.Skill.SkillType)
+	if !formulas.SkillReflects(in, rnd.Get(100)) {
 		return target
 	}
 	caster, ok := cast.Caster.(effectListTarget)
