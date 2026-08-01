@@ -101,12 +101,16 @@ const (
 	SystemMessageDistTooFarCastingStopped         = 748
 
 	// Experience, SP and level change feedback.
-	SystemMessageEarnedS1Experience    = 45  // number parameter
-	SystemMessageYouEarnedS1ExpAndS2SP = 95  // two number parameters
-	SystemMessageYouIncreasedYourLevel = 96  // no parameter
-	SystemMessageAcquiredS1SP          = 331 // number parameter
-	SystemMessageSPDecreasedS1         = 538 // number parameter
-	SystemMessageExpDecreasedByS1      = 539 // number parameter
+	SystemMessageEarnedS1Experience     = 45   // number parameter
+	SystemMessageYouEarnedS1ExpAndS2SP  = 95   // two number parameters
+	SystemMessageYouIncreasedYourLevel  = 96   // no parameter
+	SystemMessageAcquiredS1SP           = 331  // number parameter
+	SystemMessageSPDecreasedS1          = 538  // number parameter
+	SystemMessageExpDecreasedByS1       = 539  // number parameter
+	SystemMessageDrownDamage            = 297  // number parameter
+	SystemMessageRemainingMana10Minutes = 1979 // item-name parameter
+	SystemMessageRemainingMana5Minutes  = 1980 // item-name parameter
+	SystemMessageRemainingMana1Minute   = 1981 // item-name parameter
 
 	// Periodic in-game clock messages.
 	SystemMessagePlayingForLongTime       = 764  // no parameter

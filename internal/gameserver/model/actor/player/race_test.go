@@ -33,6 +33,34 @@ func TestClassRace(t *testing.T) {
 	}
 }
 
+func TestRaceBreathMultiplier(t *testing.T) {
+	tests := map[Race]float64{
+		RaceHuman:   1,
+		RaceElf:     1.5,
+		RaceDarkElf: 1.5,
+		RaceOrc:     0.9,
+		RaceDwarf:   0.8,
+	}
+	for race, want := range tests {
+		if got := race.BreathMultiplier(); got != want {
+			t.Errorf("%v BreathMultiplier() = %v, want %v", race, got, want)
+		}
+	}
+}
+
+func TestClassMage(t *testing.T) {
+	for _, classID := range []int{10, 25, 38, 49, 94} {
+		if !ClassMage(classID) {
+			t.Errorf("ClassMage(%d) = false, want true", classID)
+		}
+	}
+	for _, classID := range []int{0, 18, 31, 44, 53, 93} {
+		if ClassMage(classID) {
+			t.Errorf("ClassMage(%d) = true, want false", classID)
+		}
+	}
+}
+
 func TestClassRace_UnknownID(t *testing.T) {
 	if _, ok := ClassRace(9999); ok {
 		t.Error("ClassRace(9999) reported known, want unknown")

@@ -139,7 +139,7 @@ func (a characterStatActor) LevelMod() float64 {
 
 func (a characterStatActor) IsSummon() bool { return false }
 
-func (a characterStatActor) IsMageClass() bool { return false }
+func (a characterStatActor) IsMageClass() bool { return ClassMage(a.c.ClassID) }
 
 func (a characterStatActor) HennaBonus(stat.Stat) float64 { return 0 }
 
