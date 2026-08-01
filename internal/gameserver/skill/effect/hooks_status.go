@@ -193,9 +193,7 @@ func betrayExit(e *Effect) {
 
 // relaxStart sits the target down; it always reports success.
 func relaxStart(e *Effect) bool {
-	if target, ok := e.Effected.(sitTarget); ok {
-		target.SetStanding(false)
-	}
+	sit(e.Effected)
 	return true
 }
 
@@ -219,9 +217,7 @@ func relaxAction(e *Effect) bool {
 
 // chameleonRestStart sits the target down; it always reports success.
 func chameleonRestStart(e *Effect) bool {
-	if target, ok := e.Effected.(sitTarget); ok {
-		target.SetStanding(false)
-	}
+	sit(e.Effected)
 	return true
 }
 
@@ -255,8 +251,10 @@ func chameleonRestAction(e *Effect) bool {
 // effects still gets the unconditional check Java requires.
 
 func fakeDeathStart(e *Effect) bool {
-	if target, ok := e.Effected.(sitTarget); ok {
-		target.SetStanding(false)
+	if target, ok := e.Effected.(fakeDeathStanceTarget); ok {
+		target.StartFakeDeath()
+	} else {
+		sit(e.Effected)
 	}
 	refresh(e.Effected)
 	return true
@@ -275,13 +273,23 @@ func fakeDeathAction(e *Effect) bool {
 // fakeDeathExit stands the target back up and starts its recent-fake-death
 // grace period, during which hostile NPC AI won't retarget it.
 func fakeDeathExit(e *Effect) {
-	if target, ok := e.Effected.(sitTarget); ok {
-		target.SetStanding(true)
-	}
 	if target, ok := e.Effected.(recentFakeDeathMarker); ok {
 		target.MarkRecentFakeDeath()
 	}
+	if target, ok := e.Effected.(fakeDeathStanceTarget); ok {
+		target.StopFakeDeath()
+	} else if target, ok := e.Effected.(sitTarget); ok {
+		target.SetStanding(true)
+	}
 	refresh(e.Effected)
+}
+
+func sit(effected any) {
+	if target, ok := effected.(stanceTarget); ok {
+		target.Sit()
+	} else if target, ok := effected.(sitTarget); ok {
+		target.SetStanding(false)
+	}
 }
 
 // cancelDebuffStart strips a capped selection of a player target's active,

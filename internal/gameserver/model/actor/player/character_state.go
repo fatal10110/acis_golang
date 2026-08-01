@@ -6,6 +6,16 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 )
 
+// Stance is the client-visible animation caused by a sit/stand transition.
+type Stance int
+
+const (
+	StanceSitting Stance = iota
+	StanceStanding
+	StanceFakeDeathStart
+	StanceFakeDeathStop
+)
+
 func (c *Character) initStateLocked() {
 	if c.stateInit {
 		return
@@ -51,6 +61,61 @@ func (c *Character) SetStanding(standing bool) bool {
 	}
 	c.standing = standing
 	return true
+}
+
+// SetStanceBroadcaster records the packet-layer hook for sit and fake-death
+// animation changes.
+func (c *Character) SetStanceBroadcaster(broadcast func(Stance)) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	c.broadcastStance = broadcast
+}
+
+// SetFakeDeathReviveBroadcaster records the packet-layer hook sent after a
+// fake-death stand-up animation.
+func (c *Character) SetFakeDeathReviveBroadcaster(broadcast func()) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	c.broadcastFakeDeathRevive = broadcast
+}
+
+// Sit changes to the ordinary seated stance and broadcasts it.
+func (c *Character) Sit() bool {
+	changed := c.SetStanding(false)
+	c.broadcastStanceChange(StanceSitting)
+	return changed
+}
+
+// StartFakeDeath changes to the fake-death stance and broadcasts it.
+func (c *Character) StartFakeDeath() bool {
+	changed := c.SetStanding(false)
+	c.broadcastStanceChange(StanceFakeDeathStart)
+	return changed
+}
+
+// StopFakeDeath stands up and sends the matching fake-death revive visual.
+func (c *Character) StopFakeDeath() bool {
+	if c.Dead() {
+		return false
+	}
+	changed := c.SetStanding(true)
+	c.broadcastStanceChange(StanceFakeDeathStop)
+	c.stateMu.RLock()
+	revive := c.broadcastFakeDeathRevive
+	c.stateMu.RUnlock()
+	if revive != nil {
+		revive()
+	}
+	return changed
+}
+
+func (c *Character) broadcastStanceChange(stance Stance) {
+	c.stateMu.RLock()
+	broadcast := c.broadcastStance
+	c.stateMu.RUnlock()
+	if broadcast != nil {
+		broadcast(stance)
+	}
 }
 
 // InCombat reports whether this character has started an attack stance.

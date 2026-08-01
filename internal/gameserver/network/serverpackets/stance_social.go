@@ -20,8 +20,10 @@ const (
 type WaitType int32
 
 const (
-	WaitSitting  WaitType = 0
-	WaitStanding WaitType = 1
+	WaitSitting        WaitType = 0
+	WaitStanding       WaitType = 1
+	WaitFakeDeathStart WaitType = 2
+	WaitFakeDeathStop  WaitType = 3
 )
 
 // FrameAutoAttackStart builds the attack-stance start broadcast packet.

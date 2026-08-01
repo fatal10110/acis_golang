@@ -116,6 +116,73 @@ func TestGameClientLinkMagicSkillUseAppliesBuffEffectToSelf(t *testing.T) {
 	}
 }
 
+func TestGameClientLinkEffectStanceBroadcasts(t *testing.T) {
+	var objID int32
+	c, _, _, state := newLinkedGameClientWithSkillsSeed(t, nil, func(chars *fakeCharStore, _ *fakeItemStore) {
+		objID = seedSelectableCharacter(t, chars, "player1", "Newbie", 5, 0)
+	}, 1)
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	obj, ok := state.Player(objID)
+	if !ok {
+		t.Fatalf("player %d not found in world state", objID)
+	}
+	live, ok := obj.(*livePlayer)
+	if !ok {
+		t.Fatalf("world state player %d is not a *livePlayer", objID)
+	}
+	start := func(name string, want serverpackets.WaitType) *effect.Effect {
+		t.Helper()
+		e, err := effect.New(effect.Skill{}, modelskill.EffectTemplate{Name: name})
+		if err != nil {
+			t.Fatalf("New(%s): %v", name, err)
+		}
+		e.Effected = live.Character
+		if !e.OnStart(e) {
+			t.Fatalf("%s start rejected live character", name)
+		}
+		frame := c.read()
+		if frame[0] != serverpackets.OpcodeChangeWaitType {
+			t.Fatalf("%s opcode = %#x, want ChangeWaitType", name, frame[0])
+		}
+		r := wire.NewReader(frame[1:])
+		if got := r.ReadInt32(); got != objID {
+			t.Fatalf("%s object id = %d, want %d", name, got, objID)
+		}
+		if got := r.ReadInt32(); got != int32(want) {
+			t.Fatalf("%s wait type = %d, want %d", name, got, want)
+		}
+		return e
+	}
+
+	start("Relax", serverpackets.WaitSitting)
+	start("ChameleonRest", serverpackets.WaitSitting)
+	fakeDeath := start("FakeDeath", serverpackets.WaitFakeDeathStart)
+	if frame := c.read(); frame[0] != serverpackets.OpcodeAbnormalStatusUpdate {
+		t.Fatalf("fake death start follow-up opcode = %#x, want AbnormalStatusUpdate", frame[0])
+	}
+	fakeDeath.OnExit(fakeDeath)
+	frame := c.read()
+	if frame[0] != serverpackets.OpcodeChangeWaitType {
+		t.Fatalf("fake death exit opcode = %#x, want ChangeWaitType", frame[0])
+	}
+	r := wire.NewReader(frame[1:])
+	if got := r.ReadInt32(); got != objID {
+		t.Fatalf("fake death exit object id = %d, want %d", got, objID)
+	}
+	if got := r.ReadInt32(); got != int32(serverpackets.WaitFakeDeathStop) {
+		t.Fatalf("fake death exit wait type = %d, want %d", got, serverpackets.WaitFakeDeathStop)
+	}
+	if frame := c.read(); frame[0] != serverpackets.OpcodeRevive {
+		t.Fatalf("fake death exit opcode = %#x, want Revive", frame[0])
+	}
+}
+
 func TestGameClientLinkMagicSkillUseGroundRecordsGroundTargetAndAppliesEffect(t *testing.T) {
 	store := newMemorySkillSaveStore()
 	skills := skillstate.NewPersistence(store, modelskill.NewTable([]modelskill.Definition{

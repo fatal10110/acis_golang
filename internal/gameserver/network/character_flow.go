@@ -295,6 +295,22 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 		x, y, z := live.Position()
 		l.broadcastLiveStopMove(live, location.Location{X: x, Y: y, Z: z}, live.CurrentHeading())
 	})
+	c.SetStanceBroadcaster(func(stance player.Stance) {
+		waitType := serverpackets.WaitSitting
+		switch stance {
+		case player.StanceStanding:
+			waitType = serverpackets.WaitStanding
+		case player.StanceFakeDeathStart:
+			waitType = serverpackets.WaitFakeDeathStart
+		case player.StanceFakeDeathStop:
+			waitType = serverpackets.WaitFakeDeathStop
+		}
+		x, y, z := live.Position()
+		l.broadcastLiveFrame(live, func() wire.Frame {
+			return serverpackets.FrameChangeWaitType(live.ObjectID(), waitType, location.Location{X: x, Y: y, Z: z})
+		})
+	})
+	c.SetFakeDeathReviveBroadcaster(func() { l.broadcastLiveRevive(live) })
 	c.SetDieBroadcaster(func() {
 		if l.water != nil {
 			l.water.Remove(live)
