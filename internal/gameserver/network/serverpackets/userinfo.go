@@ -4,7 +4,18 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"math"
 )
+
+func clampInt32(value int) int32 {
+	if value > math.MaxInt32 {
+		return math.MaxInt32
+	}
+	if value < math.MinInt32 {
+		return math.MinInt32
+	}
+	return int32(value)
+}
 
 // OpcodeUserInfo is the wire opcode for UserInfo, the full self-status
 // packet sent on world entry and after any change to a character's own
@@ -114,8 +125,8 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) {
 	w.WriteInt32(int32(resources.MaxMP))
 	w.WriteInt32(int32(resources.CurrentMP))
 	w.WriteInt32(int32(c.SP))
-	w.WriteInt32(int32(c.CurrentWeight()))
-	w.WriteInt32(int32(c.WeightLimit()))
+	w.WriteInt32(clampInt32(c.CurrentWeight()))
+	w.WriteInt32(clampInt32(c.WeightLimit()))
 	w.WriteInt32(bonusSlots)
 
 	for _, pos := range paperdollWriteOrder {

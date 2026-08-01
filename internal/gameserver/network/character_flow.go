@@ -106,6 +106,7 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 			return nil, false
 		}
 	}
+	c.RefreshWeightPenalty()
 	skillList := skillListEntries(c, l.skills)
 	if l.world != nil {
 		x, y, z := c.Position()
