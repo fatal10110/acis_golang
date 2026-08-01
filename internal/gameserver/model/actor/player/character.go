@@ -16,6 +16,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/statbonus"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/rs/zerolog"
 )
@@ -202,9 +203,9 @@ func NewCharacter(objectID int32, tmpl *Template, accountName, name string, hair
 
 		CharLevel: 1,
 
-		maxHP: tmpl.HPTable[0], curHP: tmpl.HPTable[0],
-		maxCP: tmpl.CPTable[0], curCP: tmpl.CPTable[0],
-		maxMP: tmpl.MPTable[0], curMP: tmpl.MPTable[0],
+		maxHP: tmpl.HPTable[0] * statbonus.CONBonus[tmpl.CON], curHP: tmpl.HPTable[0] * statbonus.CONBonus[tmpl.CON],
+		maxCP: tmpl.CPTable[0] * statbonus.CONBonus[tmpl.CON],
+		maxMP: tmpl.MPTable[0] * statbonus.MENBonus[tmpl.MEN], curMP: tmpl.MPTable[0] * statbonus.MENBonus[tmpl.MEN],
 
 		Face: int(face), HairStyle: int(hairStyle), HairColor: int(hairColor),
 

@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -43,6 +44,16 @@ func TestCharacterStoreCreatePersistsInitialPosition(t *testing.T) {
 
 	if !strings.Contains(rec.query, "heading, x, y, z") {
 		t.Fatalf("Create() query = %q, missing initial position columns", rec.query)
+	}
+	if !strings.Contains(rec.query, "online, lastAccess") {
+		t.Fatalf("Create() query = %q, missing offline recency columns", rec.query)
+	}
+	if got := rec.args[len(rec.args)-2].Value; got != int64(0) {
+		t.Fatalf("Create() online = %#v, want 0", got)
+	}
+	lastAccess, ok := rec.args[len(rec.args)-1].Value.(int64)
+	if !ok || lastAccess < time.Now().Add(-time.Minute).UnixMilli() || lastAccess > time.Now().Add(time.Minute).UnixMilli() {
+		t.Fatalf("Create() lastAccess = %#v, want current epoch milliseconds", rec.args[len(rec.args)-1].Value)
 	}
 
 	values := map[any]bool{}

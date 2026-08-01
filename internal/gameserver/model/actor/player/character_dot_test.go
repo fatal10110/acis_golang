@@ -27,6 +27,7 @@ func TestDamageOverTimeEffectTargetsCharacterAndBroadcastsStatus(t *testing.T) {
 	}
 	statusUpdates := 0
 	c.SetStatusBroadcaster(func() { statusUpdates++ })
+	before := c.HP()
 
 	e, err := effect.New(effect.Skill{ID: 1}, skill.EffectTemplate{Name: "DamOverTime", Value: 4})
 	if err != nil {
@@ -36,7 +37,7 @@ func TestDamageOverTimeEffectTargetsCharacterAndBroadcastsStatus(t *testing.T) {
 	if !e.ActionTime() {
 		t.Fatal("ActionTime() = false, want true")
 	}
-	if got, want := c.HP(), 76.0; got != want {
+	if got, want := c.HP(), before-4; got != want {
 		t.Fatalf("HP() = %v, want %v", got, want)
 	}
 	if statusUpdates != 1 {
@@ -49,6 +50,7 @@ func TestManaDamageOverTimeEffectTargetsCharacter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewCharacter() error: %v", err)
 	}
+	before := c.MPValue()
 	e, err := effect.New(effect.Skill{ID: 1}, skill.EffectTemplate{Name: "ManaDamOverTime", Value: 4})
 	if err != nil {
 		t.Fatalf("effect.New() error: %v", err)
@@ -57,7 +59,7 @@ func TestManaDamageOverTimeEffectTargetsCharacter(t *testing.T) {
 	if !e.ActionTime() {
 		t.Fatal("ActionTime() = false, want true")
 	}
-	if got, want := c.MPValue(), 26.0; got != want {
+	if got, want := c.MPValue(), before-4; got != want {
 		t.Fatalf("MPValue() = %v, want %v", got, want)
 	}
 }
