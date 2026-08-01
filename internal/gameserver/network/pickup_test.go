@@ -58,25 +58,24 @@ func TestGameClientLinkPickupGroundItemFullClientFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ground item: %v", err)
 	}
-	state.Spawn(ground, px+30, py, pz, 0)
+	state.Spawn(ground, px+groundPickupInteractionDistance+1, py, pz, 0)
 	if reply := c.read(); reply[0] != serverpackets.OpcodeSpawnItem {
 		t.Fatalf("ground item spawn opcode = %#x, want SpawnItem (%#x)", reply[0], serverpackets.OpcodeSpawnItem)
 	}
 
 	origin := location.Location{X: px, Y: py, Z: pz}
 	c.send(encodeAction(ground.ObjectID(), origin, false))
-	if reply := c.read(); reply[0] != serverpackets.OpcodeMyTargetSelected {
-		t.Fatalf("first Action opcode = %#x, want MyTargetSelected (%#x)", reply[0], serverpackets.OpcodeMyTargetSelected)
-	}
-
-	c.send(encodeAction(ground.ObjectID(), origin, false))
 	reply := c.read()
+	if reply[0] != serverpackets.OpcodeMoveToLocation {
+		t.Fatalf("Action opcode = %#x, want MoveToLocation (%#x) — an out-of-range pickup must approach before collecting", reply[0], serverpackets.OpcodeMoveToLocation)
+	}
+	reply = c.read()
 	if reply[0] != serverpackets.OpcodeActionFailed {
-		t.Fatalf("second Action opcode = %#x, want ActionFailed (%#x) — a successful pickup must still release the client's pending action", reply[0], serverpackets.OpcodeActionFailed)
+		t.Fatalf("Action opcode = %#x, want ActionFailed (%#x) — a successful pickup must still release the client's pending action", reply[0], serverpackets.OpcodeActionFailed)
 	}
 	reply = c.read()
 	if reply[0] != serverpackets.OpcodeGetItem {
-		t.Fatalf("second Action opcode = %#x, want GetItem (%#x) — the pickup click was silently dropped", reply[0], serverpackets.OpcodeGetItem)
+		t.Fatalf("Action opcode = %#x, want GetItem (%#x) — the pickup click was silently dropped", reply[0], serverpackets.OpcodeGetItem)
 	}
 	reply = c.read()
 	if reply[0] != serverpackets.OpcodeDeleteObject {
@@ -98,6 +97,35 @@ func TestGameClientLinkPickupGroundItemFullClientFlow(t *testing.T) {
 	reply = c.read()
 	if reply[0] != serverpackets.OpcodeMoveToLocation {
 		t.Fatalf("movement after pickup opcode = %#x, want MoveToLocation (%#x) — client is unresponsive to move commands", reply[0], serverpackets.OpcodeMoveToLocation)
+	}
+}
+
+func TestHandleTargetActionShiftClickGroundItemDoesNotMoveOrRetarget(t *testing.T) {
+	state := world.New()
+	frames := &frameCapture{}
+	live := newTestLivePlayer(t, 1, frames)
+	prior := newTestHostileNPC(t, 2)
+	state.Spawn(live, 0, 0, 0, 0)
+	state.Spawn(prior, 20, 0, 0, 0)
+	live.SetTargetTracked(prior)
+
+	tmpl, ok := testItemTemplates().Get(item.AdenaID)
+	if !ok {
+		t.Fatal("missing test adena template")
+	}
+	ground, err := grounditem.New(item.Instance{ObjectID: 900, TemplateID: item.AdenaID, Count: 1, ManaLeft: -1}, tmpl)
+	if err != nil {
+		t.Fatalf("ground item: %v", err)
+	}
+	state.Spawn(ground, groundPickupInteractionDistance+1, 0, 0, 0)
+
+	frames.frames = nil
+	gcl := &GameClientLink{world: state}
+	gcl.handleTargetAction(context.Background(), live, ground.ObjectID(), false, true)
+
+	assertOpcodeSequence(t, frames.frames, serverpackets.OpcodeActionFailed)
+	if got := live.Target(); got != prior {
+		t.Fatalf("Target() = %v, want prior creature %v", got, prior)
 	}
 }
 
@@ -627,11 +655,6 @@ func TestGameClientLinkPickupAdenaMergeFullClientFlow(t *testing.T) {
 	}
 
 	origin := location.Location{X: px, Y: py, Z: pz}
-	c.send(encodeAction(ground.ObjectID(), origin, false))
-	if reply := c.read(); reply[0] != serverpackets.OpcodeMyTargetSelected {
-		t.Fatalf("first Action opcode = %#x, want MyTargetSelected", reply[0])
-	}
-
 	c.send(encodeAction(ground.ObjectID(), origin, false))
 	if reply := c.read(); reply[0] != serverpackets.OpcodeActionFailed {
 		t.Fatalf("pickup opcode = %#x, want ActionFailed (%#x) — the client's pending action is never released", reply[0], serverpackets.OpcodeActionFailed)

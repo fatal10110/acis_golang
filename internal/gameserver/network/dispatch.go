@@ -63,7 +63,7 @@ type groundItemDropper interface {
 const (
 	crystallizeSkillID              = 248
 	dropInteractionDistance         = 150
-	groundPickupInteractionDistance = 150
+	groundPickupInteractionDistance = 36
 )
 
 // PlayerConfig bundles the primitive players.properties-derived gameplay

@@ -68,7 +68,7 @@ func TestGameClientLinkActionSitsOnSelectedChairStaticObject(t *testing.T) {
 	live.SetTargetTracked(chair)
 
 	gcl := &GameClientLink{world: state, log: zerolog.Nop()}
-	gcl.handleTargetAction(context.Background(), live, chair.ObjectID(), true)
+	gcl.handleTargetAction(context.Background(), live, chair.ObjectID(), true, false)
 
 	if got := frameOpcodes(frames.frames); string(got) != string([]byte{serverpackets.OpcodeChangeWaitType, serverpackets.OpcodeChairSit}) {
 		t.Fatalf("chair action opcodes = %x, want ChangeWaitType, ChairSit", got)

@@ -396,7 +396,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			// resolve, and locks its own input until Attack or
 			// ActionFailed answers it.
 			selected := live.Target() != nil && live.Target().ObjectID() == req.ObjectID
-			l.handleTargetAction(ctx, live, req.ObjectID, selected)
+			l.handleTargetAction(ctx, live, req.ObjectID, selected, req.Shift)
 
 		case clientpackets.OpcodeAttackRequest:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeAttackRequest)
@@ -410,7 +410,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				continue
 			}
 			selected := live.Target() != nil && live.Target().ObjectID() == req.ObjectID
-			l.handleTargetAction(ctx, live, req.ObjectID, selected)
+			l.handleTargetAction(ctx, live, req.ObjectID, selected, req.Shift)
 
 		case clientpackets.OpcodeLogout:
 			if live != nil {

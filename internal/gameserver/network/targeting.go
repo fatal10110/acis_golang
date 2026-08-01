@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -42,10 +43,13 @@ func (l *GameClientLink) broadcastAttack(attacker *livePlayer, snapshot attack.S
 	})
 }
 
-func (l *GameClientLink) handleTargetAction(ctx context.Context, live *livePlayer, objectID int32, selected bool) {
+func (l *GameClientLink) handleTargetAction(ctx context.Context, live *livePlayer, objectID int32, selected, shift bool) {
 	target := l.resolveTarget(objectID)
 	if target == nil {
 		live.SendFrame(serverpackets.FrameActionFailed())
+		return
+	}
+	if l.startPickupLiveGroundItem(ctx, live, target, shift) {
 		return
 	}
 	if cur := live.Target(); cur == nil || cur.ObjectID() != target.ObjectID() {
@@ -58,11 +62,41 @@ func (l *GameClientLink) handleTargetAction(ctx context.Context, live *livePlaye
 	if selected && l.sitLiveOnChair(live, target) {
 		return
 	}
-	if selected && l.pickupLiveGroundItem(ctx, live, target) {
-		return
-	}
 	if selected {
 		l.attackLiveTarget(live, target)
+	}
+}
+
+func (l *GameClientLink) startPickupLiveGroundItem(ctx context.Context, live *livePlayer, target world.Tracked, shift bool) bool {
+	ground, ok := target.(*grounditem.Item)
+	if !ok {
+		return false
+	}
+	if live.combat != nil {
+		live.combat.Stop()
+	}
+	if groundPickupInRange(live, ground) {
+		return l.pickupLiveGroundItem(ctx, live, ground)
+	}
+	if shift || live.move == nil {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return true
+	}
+	x, y, z := ground.Position()
+	live.setPickup(ctx, ground)
+	if live.move.MoveToLocation(location.Location{X: x, Y: y, Z: z}) {
+		return true
+	}
+	live.takePickup()
+	live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetTooFar))
+	live.SendFrame(serverpackets.FrameActionFailed())
+	return true
+}
+
+func (l *GameClientLink) finishLiveGroundPickup(live *livePlayer) {
+	pickup := live.takePickup()
+	if pickup != nil {
+		l.pickupLiveGroundItem(pickup.ctx, live, pickup.target)
 	}
 }
 

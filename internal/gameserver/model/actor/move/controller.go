@@ -191,6 +191,18 @@ func (c *Controller) MoveHome(home location.Location) {
 	c.addPositionUpdate()
 }
 
+// MoveToLocation starts a direct movement request and reports whether it was
+// accepted.
+func (c *Controller) MoveToLocation(target location.Location) bool {
+	event, err := c.move.MoveToLocation(target)
+	if err != nil {
+		return false
+	}
+	c.self.BroadcastMove(event)
+	c.addPositionUpdate()
+	return true
+}
+
 // Stop cancels any active follow task and any movement already under way,
 // broadcasting a stop-in-place packet when there was movement to cancel —
 // otherwise a client that already received the move request keeps walking

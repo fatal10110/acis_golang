@@ -264,6 +264,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 		// re-evaluates against a stale position forever.
 		pos := moveCtl.Position()
 		l.updateLivePlayerPosition(live, pos, live.CurrentHeading())
+		l.finishLiveGroundPickup(live)
 		combat.Think()
 	})
 	c.SetAttackBroadcaster(func(snapshot attack.Snapshot) {

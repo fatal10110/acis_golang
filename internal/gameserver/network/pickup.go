@@ -19,8 +19,8 @@ const pickupAttentionRadius = 1400
 // paralyzes the picking-up player, discouraging rapid repeated pickups.
 const pickupParalyzeLock = 200 * time.Millisecond
 
-// pickupLiveGroundItem handles a second Action click on an already-selected
-// ground item: it validates and moves the item into live's own inventory,
+// pickupLiveGroundItem handles an Action click on a ground item: it validates
+// and moves the item into live's own inventory,
 // then removes it from the visible world. It reports whether target was a
 // ground item at all — false lets the caller fall through to its normal
 // attack-target handling. Every other outcome answers with ActionFailed (in

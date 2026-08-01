@@ -1,6 +1,9 @@
 package network
 
 import (
+	"context"
+	"sync"
+
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
@@ -31,6 +34,13 @@ type livePlayer struct {
 	known          world.KnownBuffer
 	visibilitySend func(wire.Frame) bool
 	stopAttack     func(*livePlayer)
+	pickupMu       sync.Mutex
+	pickup         *pickupIntention
+}
+
+type pickupIntention struct {
+	ctx    context.Context
+	target world.Tracked
 }
 
 func (p *livePlayer) SendFrame(frame wire.Frame) bool {
@@ -46,6 +56,7 @@ func (p *livePlayer) sendVisibilityFrame(frame wire.Frame) bool {
 }
 
 func (p *livePlayer) Stop() {
+	p.takePickup()
 	if p.combat != nil {
 		p.combat.Stop()
 	}
@@ -56,6 +67,20 @@ func (p *livePlayer) Stop() {
 		p.stopAttack(p)
 	}
 	p.releaseChair()
+}
+
+func (p *livePlayer) setPickup(ctx context.Context, target world.Tracked) {
+	p.pickupMu.Lock()
+	defer p.pickupMu.Unlock()
+	p.pickup = &pickupIntention{ctx: ctx, target: target}
+}
+
+func (p *livePlayer) takePickup() *pickupIntention {
+	p.pickupMu.Lock()
+	defer p.pickupMu.Unlock()
+	pickup := p.pickup
+	p.pickup = nil
+	return pickup
 }
 
 func (p *livePlayer) attackController() *attack.Controller {
