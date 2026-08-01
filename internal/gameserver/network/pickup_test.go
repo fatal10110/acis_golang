@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -346,6 +347,83 @@ func TestPickupLiveGroundItemLocksAndReleasesTransientParalysis(t *testing.T) {
 
 	if live.Paralyzed() {
 		t.Fatal("Paralyzed() = true after the scheduled release ran")
+	}
+}
+
+func TestPickupLiveGroundItemDefersLatestClickUntilParalysisReleases(t *testing.T) {
+	templates := petTestTemplates()
+	capture := &frameCapture{}
+	live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
+	state := world.New()
+	state.Spawn(live, 100, 0, 0, 0)
+	drops := task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour}, time.Now)
+	tmpl, _ := templates.Get(item.AdenaID)
+	first := dropTestGround(t, state, drops, item.Instance{ObjectID: 900, TemplateID: item.AdenaID, Count: 1, ManaLeft: -1}, tmpl, 100, 0, 0)
+	older := dropTestGround(t, state, drops, item.Instance{ObjectID: 901, TemplateID: item.AdenaID, Count: 1, ManaLeft: -1}, tmpl, 100, 0, 0)
+	latest := dropTestGround(t, state, drops, item.Instance{ObjectID: 902, TemplateID: item.AdenaID, Count: 1, ManaLeft: -1}, tmpl, 100, 0, 0)
+	fake := &fakeAfterFuncs{}
+	gcl := &GameClientLink{world: state, groundItems: drops, afterFunc: fake.schedule}
+
+	gcl.pickupLiveGroundItem(context.Background(), live, first)
+	capture.frames = nil
+	gcl.pickupLiveGroundItem(context.Background(), live, older)
+	gcl.pickupLiveGroundItem(context.Background(), live, latest)
+
+	assertOpcodeSequence(t, capture.frames, serverpackets.OpcodeActionFailed, serverpackets.OpcodeActionFailed)
+	if _, ok := state.Object(older.ObjectID()); !ok {
+		t.Fatal("older deferred pickup ran before the paralysis lock released")
+	}
+
+	fake.fireAll()
+
+	if _, ok := state.Object(older.ObjectID()); !ok {
+		t.Fatal("older deferred pickup ran instead of being replaced by the latest click")
+	}
+	if _, ok := state.Object(latest.ObjectID()); ok {
+		t.Fatal("latest deferred pickup did not run after the paralysis lock released")
+	}
+}
+
+func TestStartPickupLiveGroundItemDefersUntilAttackFinishes(t *testing.T) {
+	templates := petTestTemplates()
+	frames := &frameCapture{}
+	live := newTestLivePlayer(t, 1, frames)
+	state := world.New()
+	drops := task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour}, time.Now)
+	gcl := &GameClientLink{world: state, groundItems: drops, inventory: invops.NewService(nil)}
+	wireLiveAttackHooks(gcl, live)
+	target := newTestHostileNPC(t, 2)
+	target.Instance.Template.PDef = 1
+	target.Instance.Template.DEX = 30
+	target.SetRollSource(func(int) int { return 0 })
+	tmpl, _ := templates.Get(item.AdenaID)
+	ground := dropTestGround(t, state, drops, item.Instance{ObjectID: 900, TemplateID: item.AdenaID, Count: 1, ManaLeft: -1}, tmpl, 100, 0, 0)
+	state.Spawn(live, 100, 0, 0, 0)
+	state.Spawn(target, 130, 0, 0, 0)
+	t.Cleanup(live.Stop)
+
+	if !gcl.attackLiveTarget(live, target) {
+		t.Fatal("attackLiveTarget returned false")
+	}
+	frames.frames = nil
+	if !gcl.startPickupLiveGroundItem(context.Background(), live, ground, false) {
+		t.Fatal("startPickupLiveGroundItem returned false")
+	}
+	assertOpcodeSequence(t, frames.frames, serverpackets.OpcodeActionFailed)
+	live.Character.SetFrameSender(func(frame wire.Frame) bool {
+		frame.Release()
+		return true
+	})
+
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		if _, ok := state.Object(ground.ObjectID()); !ok {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("deferred pickup did not run when the attack finished")
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
 }
 
