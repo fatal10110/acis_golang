@@ -83,33 +83,53 @@ func NewService(ids inventory.IDAllocator) *Service {
 
 // GiveToPet validates and transfers one item from an owner inventory to a pet inventory.
 func (s *Service) GiveToPet(playerInv, petInv *itemcontainer.Inventory, pet *summon.Actor, owner positioned, objectID int32, count int) (TransferResult, GiveFailure, error) {
+	if failure := s.CheckGive(playerInv, petInv, pet, owner, objectID, count); failure != GiveOK {
+		return TransferResult{}, failure, nil
+	}
+	return s.transfer(playerInv, petInv, objectID, count)
+}
+
+// CheckGive runs the non-mutating precondition checks for a give-to-pet
+// request without performing the transfer. Split out from GiveToPet so
+// callers can cancel an active enchant selection between validation and
+// mutation, matching the reference's Player.cancelActiveEnchant() call
+// placed after preconditions pass but before Player.transferItem().
+func (s *Service) CheckGive(playerInv, petInv *itemcontainer.Inventory, pet *summon.Actor, owner positioned, objectID int32, count int) GiveFailure {
 	if playerInv == nil || petInv == nil || pet == nil || count <= 0 {
-		return TransferResult{}, GiveNoop, nil
+		return GiveNoop
 	}
 	inst := playerInv.ItemByObjectID(objectID)
 	if inst == nil || inst.Augmented() {
-		return TransferResult{}, GiveNoop, nil
+		return GiveNoop
 	}
 	tmpl, ok := playerInv.Templates().Get(inst.TemplateID)
 	if !ok {
-		return TransferResult{}, GiveNoop, nil
+		return GiveNoop
 	}
 	if ForbiddenForPet(inst, tmpl) {
-		return TransferResult{}, GiveItemNotForPets, nil
+		return GiveItemNotForPets
 	}
 	if pet.Dead() {
-		return TransferResult{}, GiveDeadPet, nil
+		return GiveDeadPet
 	}
 	if !withinGiveRange(owner, pet) {
-		return TransferResult{}, GiveTooFar, nil
+		return GiveTooFar
 	}
 	if !petInv.ValidateCapacity(petInv.SlotsNeededFor(inst, tmpl)) {
-		return TransferResult{}, GivePetCannotCarryMore, nil
+		return GivePetCannotCarryMore
 	}
 	if !petInv.ValidateWeight(int(tmpl.Weight) * count) {
-		return TransferResult{}, GivePetTooEncumbered, nil
+		return GivePetTooEncumbered
 	}
-	return s.transfer(playerInv, petInv, objectID, count)
+	return GiveOK
+}
+
+// Transfer moves one item between inventories, exported so handlers can
+// perform the mutation after their own between-validation-and-mutation
+// side effects (e.g. cancelling an active enchant selection).
+func (s *Service) Transfer(from, to *itemcontainer.Inventory, objectID int32, count int) (TransferResult, bool, error) {
+	result, failure, err := s.transfer(from, to, objectID, count)
+	return result, failure == GiveOK, err
 }
 
 func withinGiveRange(owner positioned, pet *summon.Actor) bool {
