@@ -216,6 +216,18 @@ func sendMagicCastFailure(live *livePlayer, def modelskill.Definition, err error
 	sendMagicActionFailed(live)
 }
 
+// sendItemConsumeFailure rejects an item-triggered cast whose required item
+// could not be destroyed (a stack-destroy race, not the skill's own
+// itemConsumeId precheck): NOT_ENOUGH_ITEMS (351), matching Java's
+// PlayableCast destroyItem failure, then the action-failed acknowledgement.
+func sendItemConsumeFailure(live *livePlayer) {
+	if live == nil {
+		return
+	}
+	live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotEnoughItems))
+	sendMagicActionFailed(live)
+}
+
 // sendMagicCastFailureReason sends the reason alone, for a cast that failed
 // mid-flight: the abort funnel that cancels it owns the action-failed
 // acknowledgement, so sending one here would duplicate it.

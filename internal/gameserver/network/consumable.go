@@ -43,7 +43,7 @@ func (l *GameClientLink) useConsumableSkillItem(live *livePlayer, inv *itemconta
 		sendMagicCastFailure(live, res.Skill, actorcast.ErrSkillDisabled)
 		return true
 	case itemhandler.NotEnoughItems:
-		sendMagicCastFailure(live, res.Skill, actorcast.ErrNotEnoughItems)
+		sendItemConsumeFailure(live)
 		return true
 	case itemhandler.Applied:
 		if res.SharedReuseGroup >= 0 {
