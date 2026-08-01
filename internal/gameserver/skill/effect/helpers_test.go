@@ -47,16 +47,17 @@ func (t *liveEffectTarget) Dead() bool { return t.dead }
 
 func (t *liveEffectTarget) HP() float64 { return t.hp }
 
-func (t *liveEffectTarget) MP() float64 { return t.mp }
+func (t *liveEffectTarget) MPValue() float64 { return t.mp }
 
-func (t *liveEffectTarget) ReduceHPByDOT(damage float64, effector any, skill Skill) {
+func (t *liveEffectTarget) ReduceHPByDOT(damage float64, effector any) {
 	t.hp -= damage
-	t.events = append(t.events, fmt.Sprintf("dot:%g:%v:%d", damage, effector, skill.ID))
+	t.events = append(t.events, fmt.Sprintf("dot:%g:%v", damage, effector))
 }
 
-func (t *liveEffectTarget) ReduceMP(damage float64) {
+func (t *liveEffectTarget) ReduceMP(damage float64) float64 {
 	t.mp -= damage
 	t.events = append(t.events, fmt.Sprintf("mpdot:%g", damage))
+	return damage
 }
 
 func (t *liveEffectTarget) NotifyEffectRemovedDueLackHP(*Effect) {

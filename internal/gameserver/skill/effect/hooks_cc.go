@@ -209,7 +209,7 @@ func silentMoveAction(e *Effect) bool {
 	}
 	result := ManaDamageOverTimeTick(ManaDamageOverTimeInput{
 		Dead:   target.Dead(),
-		MP:     target.MP(),
+		MP:     target.MPValue(),
 		Damage: e.Template.Value,
 		Toggle: true,
 	})
