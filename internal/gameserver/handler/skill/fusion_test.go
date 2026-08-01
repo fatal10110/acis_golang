@@ -97,3 +97,17 @@ func TestDecreaseFusionShrinksTriggeredEffectWhenChannelEnds(t *testing.T) {
 		t.Fatalf("fusion level after channel end = %v, want level 1", e)
 	}
 }
+
+func TestDecreaseFusionRemovesLevelOneTriggeredEffect(t *testing.T) {
+	target := newContinuousFake(1)
+	defs := battleForceDefs()
+	registry := NewDefaultRegistryWithDefinitions(defs)
+	cast := Cast{Caster: newContinuousFake(2), Skill: battleForce(1), Targets: []any{target}}
+
+	registry.Use(cast)
+	DecreaseFusion(defs, cast.Caster, target, cast.Skill)
+
+	if e := firstEffectByID(target.list, 5104); e != nil {
+		t.Fatalf("fusion effect after level-one channel end = %v, want removed", e)
+	}
+}

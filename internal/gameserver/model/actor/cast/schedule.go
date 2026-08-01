@@ -45,11 +45,11 @@ func (c *Controller) Schedule(plan Plan, hooks Hooks) {
 // ScheduleFusion keeps a FUSION cast active until its channel window ends.
 // Its effect lands at channel start, so it bypasses ordinary launch and hit
 // phases. The controller owns its timers and runs end on either outcome.
-func (c *Controller) ScheduleFusion(plan Plan, interval time.Duration, check func() bool, end func()) {
+func (c *Controller) ScheduleFusion(plan Plan, interval time.Duration, check func() bool, end func()) bool {
 	c.mu.Lock()
 	if !c.casting {
 		c.mu.Unlock()
-		return
+		return false
 	}
 	seq := c.castSeq
 	c.fusionEnd = end
@@ -62,6 +62,7 @@ func (c *Controller) ScheduleFusion(plan Plan, interval time.Duration, check fun
 		c.scheduleLocked(interval, func() { c.runFusionCheck(seq, interval, check) })
 	}
 	c.mu.Unlock()
+	return true
 }
 
 func (c *Controller) runFusionCheck(seq uint64, interval time.Duration, check func() bool) {
