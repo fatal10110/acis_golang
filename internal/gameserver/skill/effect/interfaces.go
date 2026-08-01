@@ -19,6 +19,10 @@ type statusBroadcaster interface {
 	BroadcastStatus()
 }
 
+type regenMaxSender interface {
+	SendRegenMax(count, period int32, hpRegen float64)
+}
+
 type lackHPNotifier interface {
 	NotifyEffectRemovedDueLackHP(*Effect)
 }

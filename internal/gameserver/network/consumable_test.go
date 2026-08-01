@@ -90,6 +90,21 @@ func readMagicSkillUseSelf(t *testing.T, c *fakeGameClient, objectID int32, skil
 	}
 }
 
+func readExRegenMax(t *testing.T, c *fakeGameClient, count, period int32, hpRegen float64) {
+	t.Helper()
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeExtended {
+		t.Fatalf("opcode = %#x, want extended (%#x)", reply[0], serverpackets.OpcodeExtended)
+	}
+	r := wire.NewReader(reply[1:])
+	if sub := r.ReadUint16(); sub != serverpackets.OpcodeExRegenMax {
+		t.Fatalf("extended sub-opcode = %#x, want ExRegenMax (%#x)", sub, serverpackets.OpcodeExRegenMax)
+	}
+	if kind, gotCount, gotPeriod, gotRegen := r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadFloat64(); kind != 1 || gotCount != count || gotPeriod != period || gotRegen != hpRegen {
+		t.Fatalf("ExRegenMax = %d/%d/%d/%g, want 1/%d/%d/%g", kind, gotCount, gotPeriod, gotRegen, count, period, hpRegen)
+	}
+}
+
 // readShortBuffStatusUpdateFrame asserts the next frame is
 // ShortBuffStatusUpdate carrying skillID/level/durationSeconds.
 func readShortBuffStatusUpdateFrame(t *testing.T, c *fakeGameClient, skillID, level, durationSeconds int32) {
@@ -142,6 +157,7 @@ func TestGameClientLinkUseHealingPotionAppliesAndConsumes(t *testing.T) {
 	readExUseSharedGroupItem(t, c, potionTemplate, 8, 10, 10)
 	readMagicSkillUseSelf(t, c, live.ObjectID(), 2031, 1)
 	assertSystemMessageSkillFrame(t, c.read(), serverpackets.SystemMessageUseS1, 2031, 1)
+	readExRegenMax(t, c, 14, 2, 16*0.66)
 	if entries := readAbnormalStatusUpdateFrame(t, c); len(entries) != 1 || entries[0].SkillID != 2031 || entries[0].Level != 1 || entries[0].Duration != 14 {
 		t.Fatalf("AbnormalStatusUpdate entries = %+v, want one entry skill 2031 level 1 duration 14s", entries)
 	}

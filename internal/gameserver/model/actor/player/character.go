@@ -108,6 +108,7 @@ type Character struct {
 	broadcastLevelUp      func()
 	refreshLevel          func()
 	broadcastShortBuff    func(ShortBuffUpdate)
+	sendRegenMax          func(count, period int32, hpRegen float64)
 	consumeHerb           func(itemID int32)
 	roll                  func(int) int
 	attackTarget          func(world.Tracked)
