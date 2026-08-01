@@ -85,6 +85,7 @@ func (l *GameClientLink) detachLivePlayer(ctx context.Context, live *livePlayer)
 	// detached character would still mutate it. Unwire it here, and the
 	// UserInfo updater with it, so detaching really does unwire every hook.
 	live.Character.SetHerbConsumer(nil)
+	live.Character.SetRegenMaxSender(nil)
 	live.Character.SetUserInfoUpdater(nil)
 	live.Character.SetLevelRefresher(nil)
 	live.Character.SetWeightPenaltyUpdater(nil)

@@ -16,6 +16,15 @@ type noBonusHealTarget struct {
 	full bool
 }
 
+type regenMaxTarget struct {
+	liveEffectTarget
+	updates [][3]float64
+}
+
+func (t *regenMaxTarget) SendRegenMax(count, period int32, hpRegen float64) {
+	t.updates = append(t.updates, [3]float64{float64(count), float64(period), hpRegen})
+}
+
 func (t *noBonusHealTarget) CanBeHealed() bool { return t.canBeHealed }
 
 func (t *noBonusHealTarget) AddHP(amount float64) float64 {
@@ -110,6 +119,38 @@ func TestHealOverTimeActionRestoresHPEachTick(t *testing.T) {
 	}
 	if len(target.events) != 0 {
 		t.Fatalf("events = %#v, want none", target.events)
+	}
+}
+
+func TestHealOverTimeStartSendsRegenMaxOnlyForPlayersWithPositiveTiming(t *testing.T) {
+	for _, tt := range []struct {
+		name        string
+		isPlayer    bool
+		count, time int
+		want        [][3]float64
+	}{
+		{name: "player", isPlayer: true, count: 3, time: 5, want: [][3]float64{{15, 5, 12.5}}},
+		{name: "non-player", count: 3, time: 5},
+		{name: "zero count", isPlayer: true, time: 5},
+		{name: "zero period", isPlayer: true, count: 3},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			target := &regenMaxTarget{liveEffectTarget: liveEffectTarget{isPlayer: tt.isPlayer}}
+			e, err := New(Skill{ID: 1}, modelskill.EffectTemplate{Name: "HealOverTime", Count: tt.count, Time: tt.time, Value: 12.5})
+			if err != nil {
+				t.Fatalf("New() error: %v", err)
+			}
+			e.Effected = target
+			if e.OnStart == nil {
+				t.Fatal("HealOverTime has no start hook")
+			}
+			if !e.OnStart(e) {
+				t.Fatal("HealOverTime start rejected")
+			}
+			if !reflect.DeepEqual(target.updates, tt.want) {
+				t.Fatalf("regen updates = %#v, want %#v", target.updates, tt.want)
+			}
+		})
 	}
 }
 

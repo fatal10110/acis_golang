@@ -388,6 +388,7 @@ func wireHooks(e *Effect) {
 	case TypeHeal:
 		e.OnStart = healStart
 	case TypeHealOverTime:
+		e.OnStart = healOverTimeStart
 		e.OnAction = healOverTimeAction
 	case TypeManaHeal:
 		e.OnStart = manaHealStart

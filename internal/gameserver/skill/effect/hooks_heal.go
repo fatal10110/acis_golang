@@ -36,6 +36,16 @@ func healOverTimeAction(e *Effect) bool {
 	return true
 }
 
+func healOverTimeStart(e *Effect) bool {
+	if !isPlayer(e.Effected) || e.Template.Count <= 0 || e.Template.Time <= 0 {
+		return true
+	}
+	if target, ok := e.Effected.(regenMaxSender); ok {
+		target.SendRegenMax(int32(e.Template.Count)*int32(e.Template.Time), int32(e.Template.Time), e.Template.Value)
+	}
+	return true
+}
+
 // broadcastStatus refreshes effected's health bars for everyone watching.
 // A periodic effect action runs outside any client request, so unlike the
 // cast and item paths — which send their own batched StatusUpdate at the

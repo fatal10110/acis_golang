@@ -8,6 +8,7 @@ const OpcodeExtended = 0xfe
 
 // Extended server packet opcodes.
 const (
+	OpcodeExRegenMax                  uint16 = 0x0001
 	OpcodeExSendManorList             uint16 = 0x001b
 	OpcodeExAutoSoulShot              uint16 = 0x0012
 	OpcodeExEnchantSkillList          uint16 = 0x0017
