@@ -353,7 +353,7 @@ func (c *Character) RunSpeed() float64 {
 	if tmpl == nil {
 		return 0
 	}
-	return c.calcStat(stat.RunSpeed, tmpl.RunSpeed)
+	return c.calcStat(stat.RunSpeed, tmpl.RunSpeed) * c.weightPenaltySpeedMultiplier()
 }
 
 // PhysicalAttackRange returns the attack range for the active weapon

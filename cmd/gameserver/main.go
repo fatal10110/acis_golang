@@ -56,6 +56,7 @@ func newGameServerApp(paths gameServerPaths) *fx.App {
 			loadRespawnRestoreHP,
 			loadSkillEnchantSPBookNeeded,
 			loadAutoLearnSkills,
+			loadWeightLimitMultiplier,
 			loadKarmaPlayerCanTeleport,
 			loadPetConfig,
 			loadHexIDProperties,

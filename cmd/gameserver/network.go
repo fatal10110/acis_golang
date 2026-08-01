@@ -65,6 +65,7 @@ func provideGameClientLink(
 	respawnHP respawnRestoreHP,
 	spBookNeeded skillEnchantSPBookNeeded,
 	autoLearn autoLearnSkills,
+	weightLimit weightLimitMultiplier,
 	karmaTeleport karmaPlayerCanTeleport,
 	petCfg pet.Config,
 	log zerolog.Logger,
@@ -73,6 +74,7 @@ func provideGameClientLink(
 		RespawnRestoreHP:         float64(respawnHP),
 		SkillEnchantSPBookNeeded: bool(spBookNeeded),
 		AutoLearnSkills:          bool(autoLearn),
+		WeightLimitMultiplier:    float64(weightLimit),
 		KarmaPlayerCanTeleport:   bool(karmaTeleport),
 	}
 	return network.NewGameClientLink(network.GameClientLinkConfig{

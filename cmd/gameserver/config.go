@@ -65,6 +65,16 @@ func loadSkillEnchantSPBookNeeded(paths gameServerPaths) (skillEnchantSPBookNeed
 
 type autoLearnSkills bool
 
+type weightLimitMultiplier float64
+
+func loadWeightLimitMultiplier(paths gameServerPaths) (weightLimitMultiplier, error) {
+	props, err := config.LoadFile(paths.PlayersConfigPath)
+	if err != nil {
+		return 0, err
+	}
+	return weightLimitMultiplier(config.NewFields(props, "weight limit").Float64("WeightLimit", 1)), nil
+}
+
 func loadAutoLearnSkills(paths gameServerPaths) (autoLearnSkills, error) {
 	props, err := config.LoadFile(paths.PlayersConfigPath)
 	if err != nil {
