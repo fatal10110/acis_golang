@@ -10,7 +10,7 @@ import (
 type dotTarget interface {
 	Dead() bool
 	HP() float64
-	ReduceHPByDOT(damage float64, effector any, skill Skill)
+	ReduceHPByDOT(damage float64, effector any)
 }
 
 // statusBroadcaster is implemented by an actor that can push its current
@@ -29,8 +29,8 @@ type lackHPNotifier interface {
 
 type mpDotTarget interface {
 	Dead() bool
-	MP() float64
-	ReduceMP(amount float64)
+	MPValue() float64
+	ReduceMP(amount float64) float64
 }
 
 type lackMPNotifier interface {

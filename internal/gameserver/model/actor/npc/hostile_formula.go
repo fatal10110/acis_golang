@@ -157,6 +157,20 @@ func (h *Hostile) ReduceHP(amount float64, attacker any, _ modelskill.Definition
 	h.Die(killer, h.rewards)
 }
 
+// ReduceHPByDOT applies periodic damage without adding attack hate.
+func (h *Hostile) ReduceHPByDOT(amount float64, attacker any) {
+	if amount <= 0 || h.AlikeDead() {
+		return
+	}
+	newlyDead := h.health.DamageValue(amount)
+	h.BroadcastStatus()
+	if !newlyDead {
+		return
+	}
+	killer, _ := attacker.(creature.DeathActor)
+	h.Die(killer, h.rewards)
+}
+
 // CanBeHealed reports whether h may receive HP/MP restoration.
 func (h *Hostile) CanBeHealed() bool {
 	return !h.Dead() && !h.Invul()

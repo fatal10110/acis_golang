@@ -425,6 +425,29 @@ func (c *Character) ReduceHP(amount float64, attacker any, _ modelskill.Definiti
 	}
 }
 
+// ReduceHPByDOT applies periodic damage without the normal-hit cast interruption.
+func (c *Character) ReduceHPByDOT(amount float64, attacker any) {
+	if amount <= 0 {
+		return
+	}
+	c.vitalsMu.Lock()
+	if c.curHP <= 0 {
+		c.vitalsMu.Unlock()
+		return
+	}
+	c.curHP -= amount
+	dead := c.curHP <= 0
+	if dead {
+		c.curHP = 0
+	}
+	c.vitalsMu.Unlock()
+	c.BroadcastStatus()
+	if dead {
+		killer, _ := attacker.(creature.DeathActor)
+		c.Die(killer)
+	}
+}
+
 // SetHP sets current HP, clamped to [0, MaxHP].
 func (c *Character) SetHP(value float64) {
 	maxHP := c.MaxHPValue()

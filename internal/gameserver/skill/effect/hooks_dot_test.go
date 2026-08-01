@@ -69,7 +69,7 @@ func TestDamageOverTimeHookMutatesLiveTarget(t *testing.T) {
 	if target.hp != 6 {
 		t.Fatalf("target hp = %v, want 6", target.hp)
 	}
-	if want := []string{"dot:4:caster:4082"}; !reflect.DeepEqual(target.events, want) {
+	if want := []string{"dot:4:caster"}; !reflect.DeepEqual(target.events, want) {
 		t.Fatalf("DoT events = %#v, want %#v", target.events, want)
 	}
 
@@ -82,7 +82,7 @@ func TestDamageOverTimeHookMutatesLiveTarget(t *testing.T) {
 	if target.hp != 1 {
 		t.Fatalf("low-hp target hp = %v, want 1", target.hp)
 	}
-	if want := []string{"dot:2:caster:4082"}; !reflect.DeepEqual(target.events, want) {
+	if want := []string{"dot:2:caster"}; !reflect.DeepEqual(target.events, want) {
 		t.Fatalf("low-hp DoT events = %#v, want %#v", target.events, want)
 	}
 

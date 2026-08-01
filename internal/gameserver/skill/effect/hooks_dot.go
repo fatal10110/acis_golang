@@ -19,7 +19,7 @@ func damageOverTimeAction(e *Effect) bool {
 		}
 	}
 	if result.Damage > 0 {
-		target.ReduceHPByDOT(result.Damage, e.Effector, e.Skill)
+		target.ReduceHPByDOT(result.Damage, e.Effector)
 	}
 	return result.Continue
 }
@@ -32,7 +32,7 @@ func manaDamageOverTimeAction(e *Effect) bool {
 
 	result := ManaDamageOverTimeTick(ManaDamageOverTimeInput{
 		Dead:   target.Dead(),
-		MP:     target.MP(),
+		MP:     target.MPValue(),
 		Damage: e.Template.Value,
 		Toggle: e.Skill.Toggle,
 	})
@@ -66,7 +66,7 @@ func manaHealOverTimeAction(e *Effect) bool {
 func manaDrainTick(e *Effect, target mpDotTarget) bool {
 	result := ManaDamageOverTimeTick(ManaDamageOverTimeInput{
 		Dead:   target.Dead(),
-		MP:     target.MP(),
+		MP:     target.MPValue(),
 		Damage: e.Template.Value,
 		Toggle: true,
 	})
