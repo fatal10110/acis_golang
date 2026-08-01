@@ -44,6 +44,23 @@ func TestRevalidateLaunchSelfTargetSkipsEveryGate(t *testing.T) {
 	}
 }
 
+func TestFusionChannelValidRequiresRangeAndLineOfSight(t *testing.T) {
+	caster := &launchActor{id: 1, sees: true}
+	target := &launchActor{id: 2, x: 400}
+	if !FusionChannelValid(caster, target, 400) {
+		t.Fatal("FusionChannelValid() = false within range and line of sight")
+	}
+	target.x = 401
+	if FusionChannelValid(caster, target, 400) {
+		t.Fatal("FusionChannelValid() = true out of range")
+	}
+	target.x = 400
+	caster.sees = false
+	if FusionChannelValid(caster, target, 400) {
+		t.Fatal("FusionChannelValid() = true without line of sight")
+	}
+}
+
 func TestRevalidateLaunchTargetLost(t *testing.T) {
 	caster := &launchActor{id: 1, knows: false}
 	target := &launchActor{id: 2}
