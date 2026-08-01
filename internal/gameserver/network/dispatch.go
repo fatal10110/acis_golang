@@ -70,6 +70,7 @@ const (
 // flags GameClientLink needs, so its constructor doesn't grow one
 // bool/float parameter per config key.
 type PlayerConfig struct {
+	WeightLimitMultiplier float64
 	// RespawnRestoreHP is the fraction of calculated max HP a non-percent
 	// revive restores.
 	RespawnRestoreHP float64

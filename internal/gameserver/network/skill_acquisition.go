@@ -83,7 +83,7 @@ func (l *GameClientLink) learnGeneralAcquireSkill(ctx context.Context, live *liv
 	if live == nil {
 		return
 	}
-	result, status, err := skillstate.LearnGeneral(ctx, live.Character, live.template, l.skills, l.spellbooks, int(req.SkillID), int(req.Level))
+	_, status, err := skillstate.LearnGeneral(ctx, live.Character, live.template, l.skills, l.spellbooks, int(req.SkillID), int(req.Level))
 	if err != nil {
 		l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("learn skill")
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNothingHappened))
@@ -106,11 +106,6 @@ func (l *GameClientLink) learnGeneralAcquireSkill(ctx context.Context, live *liv
 	}
 
 	live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageLearnedSkill, req.SkillID, req.Level))
-	if result.Cost > 0 {
-		live.SendFrame(serverpackets.FrameStatusUpdate(live.ObjectID(), []serverpackets.StatusAttribute{
-			{Type: serverpackets.StatusSP, Value: live.SP},
-		}))
-	}
 	live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
 	live.SendFrame(l.acquireSkillList(live))
 }

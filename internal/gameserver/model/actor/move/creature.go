@@ -113,6 +113,16 @@ func (m *CreatureMove) Init(origin location.Location, speed float64, geo Geo) er
 	return nil
 }
 
+// SetSpeed changes the speed used by subsequent movement updates.
+func (m *CreatureMove) SetSpeed(speed float64) {
+	if speed < 0 || math.IsNaN(speed) || math.IsInf(speed, 0) {
+		return
+	}
+	m.mu.Lock()
+	m.speed = speed
+	m.mu.Unlock()
+}
+
 // SetArrivedHook records the callback fired once an accepted move reaches
 // its destination. A nil hook (the default) makes arrival a no-op.
 func (m *CreatureMove) SetArrivedHook(arrived func()) {

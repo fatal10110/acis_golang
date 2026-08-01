@@ -69,12 +69,13 @@ type Inventory struct {
 
 	WeightLimit int
 
-	mu          sync.Mutex
-	paperdoll   [item.PaperdollSlots]*item.Instance
-	wornMask    int32
-	totalWeight int
-	updates     []Update
-	notify      func()
+	mu           sync.Mutex
+	paperdoll    [item.PaperdollSlots]*item.Instance
+	wornMask     int32
+	totalWeight  int
+	updates      []Update
+	notify       func()
+	weightNotify func()
 }
 
 // NewInventory returns an empty inventory owned by ownerID: baseLocation
@@ -560,11 +561,16 @@ func (inv *Inventory) UpdateWeight() bool {
 	})
 
 	inv.mu.Lock()
-	defer inv.mu.Unlock()
 	if inv.totalWeight == weight {
+		inv.mu.Unlock()
 		return false
 	}
 	inv.totalWeight = weight
+	notify := inv.weightNotify
+	inv.mu.Unlock()
+	if notify != nil {
+		notify()
+	}
 	return true
 }
 
@@ -650,6 +656,13 @@ func (inv *Inventory) SetUpdateNotifier(notify func()) {
 	inv.mu.Lock()
 	defer inv.mu.Unlock()
 	inv.notify = notify
+}
+
+// SetWeightNotifier records the owner hook run after a changed total weight.
+func (inv *Inventory) SetWeightNotifier(notify func()) {
+	inv.mu.Lock()
+	defer inv.mu.Unlock()
+	inv.weightNotify = notify
 }
 
 // HasUpdates reports whether any inventory-change notifications are queued.

@@ -106,6 +106,7 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 			return nil, false
 		}
 	}
+	c.RefreshWeightPenalty()
 	skillList := skillListEntries(c, l.skills)
 	if l.world != nil {
 		x, y, z := c.Position()
@@ -120,7 +121,7 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 
 	client.Session.SendFrame(serverpackets.FrameExStorageMaxCount(c))
 	client.Session.SendFrame(serverpackets.FrameHennaInfo(c.ClassID))
-	client.Session.SendFrame(serverpackets.FrameEtcStatusUpdate(serverpackets.EtcStatus{GradePenalty: c.WeaponGradePenalty() || c.ArmorGradePenalty() > 0}))
+	client.Session.SendFrame(serverpackets.FrameEtcStatusUpdate(serverpackets.EtcStatus{WeightPenalty: int32(c.WeightPenalty()), GradePenalty: c.WeaponGradePenalty() || c.ArmorGradePenalty() > 0}))
 	client.Session.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageWelcomeToLineage))
 	client.Session.SendFrame(serverpackets.FrameQuestList(nil))
 	client.Session.SendFrame(serverpackets.FrameSkillList(skillList))
@@ -230,6 +231,8 @@ func skillListEntries(c *player.Character, skills *skillstate.Persistence) []ser
 
 func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c *player.Character, tmpl *player.Template, items []*item.Instance, shortcuts []shortcut.Shortcut) (*livePlayer, error) {
 	c.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventory(c.ID, l.itemTemplates, items))
+	c.SetWeightLimitMultiplier(l.playerConfig.WeightLimitMultiplier)
+	c.RefreshWeightPenalty()
 	c.RefreshExpertisePenalty()
 	c.SetWorld(l.world)
 	if los, ok := l.geo.(player.LineOfSight); ok {
@@ -302,6 +305,9 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 			live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageExpDecreasedByS1, int32(exp)))
 		}
 		if sp > 0 {
+			live.SendFrame(serverpackets.FrameStatusUpdate(live.ObjectID(), []serverpackets.StatusAttribute{
+				{Type: serverpackets.StatusSP, Value: live.SP},
+			}))
 			live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageSPDecreasedS1, int32(sp)))
 		}
 	})
@@ -320,6 +326,21 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 		live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
 		live.SendFrame(serverpackets.FrameEtcStatusUpdate(serverpackets.EtcStatus{GradePenalty: live.WeaponGradePenalty() || live.ArmorGradePenalty() > 0}))
 	})
+	c.SetWeightPenaltyUpdater(func() {
+		items := live.inventoryItems()
+		live.SendFrame(serverpackets.FrameUserInfo(serverpackets.UserInfoSnapshot{Character: live.Character, Template: live.template, Items: items}))
+		live.SendFrame(serverpackets.FrameEtcStatusUpdate(serverpackets.EtcStatus{WeightPenalty: int32(live.WeightPenalty()), GradePenalty: live.WeaponGradePenalty() || live.ArmorGradePenalty() > 0}))
+		if l.world != nil {
+			info := serverpackets.CharInfoSnapshot{Character: live.Character, Template: live.template, Items: items}
+			broadcastFrame(func() wire.Frame { return serverpackets.FrameCharInfo(info) }, func(send func(frameReceiver)) {
+				l.world.ForEachKnown(live, func(o world.Tracked) {
+					if receiver, ok := o.(frameReceiver); ok {
+						send(receiver)
+					}
+				})
+			})
+		}
+	})
 	c.SetItemStatsRefresher(func() {
 		if l.skills == nil {
 			return
@@ -337,6 +358,9 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 		inv.SetUpdateNotifier(func() {
 			l.inventoryUpdates.Add(inv, live)
 		})
+	}
+	if inv := c.Inventory(); inv != nil {
+		inv.SetWeightNotifier(c.RefreshWeightPenalty)
 	}
 	// Register every item mutation with the lazy persistence task, matching
 	// the reference registering an item with ItemInstanceTaskManager from
