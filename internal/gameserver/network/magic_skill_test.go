@@ -167,10 +167,19 @@ func TestGameClientLinkEffectStanceBroadcasts(t *testing.T) {
 		t.Fatalf("fake death start follow-up opcode = %#x, want AbnormalStatusUpdate", frame[0])
 	}
 	fakeDeath.OnExit(fakeDeath)
-	for _, want := range []byte{serverpackets.OpcodeChangeWaitType, serverpackets.OpcodeRevive} {
-		if frame := c.read(); frame[0] != want {
-			t.Fatalf("fake death exit opcode = %#x, want %#x", frame[0], want)
-		}
+	frame := c.read()
+	if frame[0] != serverpackets.OpcodeChangeWaitType {
+		t.Fatalf("fake death exit opcode = %#x, want ChangeWaitType", frame[0])
+	}
+	r := wire.NewReader(frame[1:])
+	if got := r.ReadInt32(); got != objID {
+		t.Fatalf("fake death exit object id = %d, want %d", got, objID)
+	}
+	if got := r.ReadInt32(); got != int32(serverpackets.WaitFakeDeathStop) {
+		t.Fatalf("fake death exit wait type = %d, want %d", got, serverpackets.WaitFakeDeathStop)
+	}
+	if frame := c.read(); frame[0] != serverpackets.OpcodeRevive {
+		t.Fatalf("fake death exit opcode = %#x, want Revive", frame[0])
 	}
 }
 

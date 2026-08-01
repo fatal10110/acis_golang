@@ -95,6 +95,9 @@ func (c *Character) StartFakeDeath() bool {
 
 // StopFakeDeath stands up and sends the matching fake-death revive visual.
 func (c *Character) StopFakeDeath() bool {
+	if c.Dead() {
+		return false
+	}
 	changed := c.SetStanding(true)
 	c.broadcastStanceChange(StanceFakeDeathStop)
 	c.stateMu.RLock()

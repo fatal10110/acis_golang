@@ -5,6 +5,24 @@ import (
 	"time"
 )
 
+func TestCharacterStopFakeDeathDoesNotBroadcastAfterDeath(t *testing.T) {
+	c := &Character{ID: 1}
+	c.SetStanding(false)
+	stances, revives := 0, 0
+	c.SetStanceBroadcaster(func(Stance) { stances++ })
+	c.SetFakeDeathReviveBroadcaster(func() { revives++ })
+	if !c.MarkDead() {
+		t.Fatal("MarkDead() = false, want true")
+	}
+
+	if c.StopFakeDeath() {
+		t.Fatal("StopFakeDeath() = true for a dead character, want false")
+	}
+	if stances != 0 || revives != 0 {
+		t.Fatalf("dead fake-death exit broadcasts = stances:%d revives:%d, want none", stances, revives)
+	}
+}
+
 func TestCharacterAllSkillsDisabledUnionsCrowdControlStates(t *testing.T) {
 	tests := []struct {
 		name       string
