@@ -20,6 +20,8 @@ func (l *GameClientLink) detachLivePlayer(ctx context.Context, live *livePlayer)
 	// those writes.
 	live.Stop()
 	l.cancelActiveTrade(live)
+	live.shadowExpiryMu.Lock()
+	defer live.shadowExpiryMu.Unlock()
 
 	// One budget for the whole detach, not one per store: a logout with an
 	// active pet writes the character row, the skill state, the player

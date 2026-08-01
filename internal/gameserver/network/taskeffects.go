@@ -120,6 +120,11 @@ func (e *TaskEffects) Expire(actorID int32, inst *item.Instance) {
 	if !ok {
 		return
 	}
+	live.shadowExpiryMu.RLock()
+	defer live.shadowExpiryMu.RUnlock()
+	if current, ok := e.state.Player(actorID); !ok || current != live {
+		return
+	}
 	e.mu.RLock()
 	expire := e.expire
 	e.mu.RUnlock()

@@ -1,10 +1,12 @@
 package network
 
 import (
+	"context"
 	"encoding/binary"
 	"testing"
 	"time"
 
+	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
@@ -13,6 +15,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+	"github.com/rs/zerolog"
 )
 
 func TestTaskEffectsWaterSendsCyanGauge(t *testing.T) {
@@ -163,7 +166,7 @@ func TestTaskEffectsShadowItemExpiryDestroysAndUpdatesLivePlayer(t *testing.T) {
 	inv.EquipItem(inst, shadow)
 
 	effects := NewTaskEffects(state)
-	link := &GameClientLink{world: state}
+	link := &GameClientLink{world: state, inventory: invops.NewService(nil)}
 	effects.SetShadowItemExpiry(link.ExpireShadowItem)
 	updates := wireInventoryUpdates(link, live)
 	updates.Tick()
@@ -182,5 +185,60 @@ func TestTaskEffectsShadowItemExpiryDestroysAndUpdatesLivePlayer(t *testing.T) {
 	}
 	if len(capture.frames) != 2 || capture.frames[0][0] != serverpackets.OpcodeUserInfo || capture.frames[1][0] != serverpackets.OpcodeInventoryUpdate {
 		t.Fatalf("expiry frames = %x, want UserInfo then InventoryUpdate", capture.frames)
+	}
+}
+
+func TestShadowItemExpiryWaitsForDetach(t *testing.T) {
+	state := world.New()
+	live := newTestLivePlayer(t, 101, &frameCapture{})
+	state.Spawn(live, 0, 0, 0, 0)
+	state.AddPlayer(live)
+
+	effects := NewTaskEffects(state)
+	shadows, err := task.NewShadowItems(effects)
+	if err != nil {
+		t.Fatalf("NewShadowItems() error = %v", err)
+	}
+	link := &GameClientLink{world: state, inventory: invops.NewService(nil), shadowItems: shadows, log: zerolog.Nop()}
+	inst := &item.Instance{ObjectID: 201, TemplateID: 30, Count: 1}
+	tmpl := &item.Template{ID: 30, Kind: item.KindWeapon, Slot: item.SlotRHand, Duration: 0, Weapon: &item.WeaponDetail{Type: item.WeaponSword}}
+	inv := live.Inventory()
+	inv.Add(inst)
+	inv.EquipItem(inst, tmpl)
+
+	expiryStarted := make(chan struct{})
+	releaseExpiry := make(chan struct{})
+	effects.SetShadowItemExpiry(func(actor *livePlayer, expired *item.Instance) {
+		close(expiryStarted)
+		<-releaseExpiry
+		link.ExpireShadowItem(actor, expired)
+	})
+	shadows.Track(live.ObjectID(), inst, tmpl)
+	tickDone := make(chan struct{})
+	go func() {
+		shadows.Tick()
+		close(tickDone)
+	}()
+	<-expiryStarted
+
+	detachDone := make(chan struct{})
+	go func() {
+		link.detachLivePlayer(context.Background(), live)
+		close(detachDone)
+	}()
+	select {
+	case <-detachDone:
+		t.Fatal("detach completed while shadow expiry was admitted")
+	case <-time.After(50 * time.Millisecond):
+	}
+	close(releaseExpiry)
+	<-tickDone
+	<-detachDone
+
+	if inv.ItemByObjectID(inst.ObjectID) != nil {
+		t.Fatal("expired shadow item remains in inventory")
+	}
+	if shadows.Tracked(inst) {
+		t.Fatal("expired shadow item remains tracked")
 	}
 }
