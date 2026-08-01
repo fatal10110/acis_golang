@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -57,5 +58,40 @@ func TestTaskEffectsDrownDamagesAndNotifiesLivePlayer(t *testing.T) {
 	}
 	if message := binary.LittleEndian.Uint32(got[1:5]); message != serverpackets.SystemMessageDrownDamage {
 		t.Fatalf("message = %d, want %d", message, serverpackets.SystemMessageDrownDamage)
+	}
+}
+
+func TestTaskEffectsShadowItemExpiryDestroysAndUpdatesLivePlayer(t *testing.T) {
+	state := world.New()
+	capture := &frameCapture{}
+	live := newTestLivePlayer(t, 100, capture)
+	state.AddPlayer(live)
+
+	inst := &item.Instance{ObjectID: 200, TemplateID: 30, Count: 1}
+	shadow := &item.Template{ID: 30, Kind: item.KindWeapon, Slot: item.SlotRHand, Duration: 0, Weapon: &item.WeaponDetail{Type: item.WeaponSword}}
+	inv := live.Inventory()
+	inv.Add(inst)
+	inv.EquipItem(inst, shadow)
+
+	effects := NewTaskEffects(state)
+	link := &GameClientLink{world: state}
+	effects.SetShadowItemExpiry(link.ExpireShadowItem)
+	updates := wireInventoryUpdates(link, live)
+	updates.Tick()
+	resetCapture(capture)
+
+	items, err := task.NewShadowItems(effects)
+	if err != nil {
+		t.Fatalf("NewShadowItems() error = %v", err)
+	}
+	items.Track(live.ObjectID(), inst, shadow)
+	items.Tick()
+	updates.Tick()
+
+	if inv.ItemByObjectID(inst.ObjectID) != nil {
+		t.Fatal("expired shadow item remains in inventory")
+	}
+	if len(capture.frames) != 2 || capture.frames[0][0] != serverpackets.OpcodeUserInfo || capture.frames[1][0] != serverpackets.OpcodeInventoryUpdate {
+		t.Fatalf("expiry frames = %x, want UserInfo then InventoryUpdate", capture.frames)
 	}
 }
