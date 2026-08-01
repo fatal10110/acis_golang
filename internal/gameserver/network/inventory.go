@@ -135,16 +135,25 @@ func (l *GameClientLink) ExpireShadowItem(live *livePlayer, inst *item.Instance)
 	if live == nil || inst == nil {
 		return
 	}
+	if l.inventory == nil {
+		return
+	}
 	inv := live.Inventory()
 	if inv == nil || inv.ItemByObjectID(inst.ObjectID) != inst {
 		return
 	}
 	count := int(inst.Snapshot().Count)
-	if count <= 0 || inv.DestroyItem(inst, count) == nil {
+	if count <= 0 {
 		return
 	}
-	l.applyEquipStatChanges(live, inv, invops.Result{Changed: []*item.Instance{inst}})
-	l.broadcastEquipmentChange(live)
+	res, ok := l.inventory.DestroyItem(inv, inst.ObjectID, count)
+	if !ok {
+		return
+	}
+	l.applyEquipStatChanges(live, inv, res)
+	if res.EquipmentChanged {
+		l.broadcastEquipmentChange(live)
+	}
 }
 
 func (l *GameClientLink) handleAutoSoulShot(live *livePlayer, req clientpackets.RequestAutoSoulShot) {
@@ -292,6 +301,7 @@ func (l *GameClientLink) destroyLiveItem(live *livePlayer, objectID int32, count
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
+	l.applyEquipStatChanges(live, inv, res)
 	if res.EquipmentChanged {
 		l.broadcastEquipmentChange(live)
 	}

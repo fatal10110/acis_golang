@@ -213,7 +213,11 @@ func (s *Service) DestroyItem(inv *itemcontainer.Inventory, objectID int32, coun
 	if inv.DestroyItem(inst, count) == nil {
 		return Result{}, false
 	}
-	return Result{EquipmentChanged: wasEquipped}, true
+	res := Result{EquipmentChanged: wasEquipped}
+	if wasEquipped {
+		res.Changed = []*item.Instance{inst}
+	}
+	return res, true
 }
 
 // TransferItem moves count units from source to receiver and reports store writes.

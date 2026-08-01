@@ -216,6 +216,27 @@ func TestDestroyItemRejectsNonDestroyable(t *testing.T) {
 	}
 }
 
+func TestDestroyItemReportsUnequippedInstance(t *testing.T) {
+	templates := testTemplates()
+	inv := itemcontainer.NewPlayerInventory(1, templates)
+	inst := inv.AddNew(30, 1, 500)
+	tmpl, _ := templates.Get(30)
+	inv.EquipItem(inst, tmpl)
+	inv.DrainUpdates()
+
+	res, ok := NewService(nil).DestroyItem(inv, inst.ObjectID, 1)
+
+	if !ok {
+		t.Fatal("DestroyItem returned ok=false")
+	}
+	if !res.EquipmentChanged {
+		t.Fatal("DestroyItem did not report equipment change")
+	}
+	if len(res.Changed) != 1 || res.Changed[0] != inst {
+		t.Fatalf("Changed = %+v, want [inst]", res.Changed)
+	}
+}
+
 func TestCrystallizeItemDestroysSourceAndAddsCrystals(t *testing.T) {
 	templates := item.NewTable([]*item.Template{
 		{ID: 30, Kind: item.KindWeapon, Crystal: item.CrystalD, CrystalCount: 10, Destroyable: true, Duration: -1, Weapon: &item.WeaponDetail{Type: item.WeaponSword}},

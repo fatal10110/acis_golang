@@ -41,6 +41,14 @@ func (c *Character) SetZones(zones PeaceZoneQuery) {
 	c.zones = zones
 }
 
+// SetZoneRevalidator records the runtime hook that updates zone occupancy
+// whenever the player's server-authoritative position changes.
+func (c *Character) SetZoneRevalidator(revalidate func(location.Location)) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	c.revalidateZones = revalidate
+}
+
 // SetGroundTarget records the last ground-click point a ground-targeted
 // skill cast (RequestExMagicSkillUseGround) resolved, reused across casts
 // until the next ground click overwrites it.
@@ -117,6 +125,7 @@ func (c *Character) SetWorld(state *world.State) {
 
 // SyncPosition moves this player's live world-grid presence to position.
 func (c *Character) SyncPosition(position location.Location) {
+	previous := c.CurrentLocation()
 	c.locMu.Lock()
 	c.Location = position
 	c.locMu.Unlock()
@@ -124,6 +133,12 @@ func (c *Character) SyncPosition(position location.Location) {
 		return
 	}
 	_ = c.world.Move(c, position.X, position.Y, position.Z)
+	c.stateMu.RLock()
+	revalidate := c.revalidateZones
+	c.stateMu.RUnlock()
+	if revalidate != nil {
+		revalidate(previous)
+	}
 }
 
 // SetLastKnownPosition records position and heading as this player's last

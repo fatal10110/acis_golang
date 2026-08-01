@@ -20,6 +20,9 @@ func (l *GameClientLink) detachLivePlayer(ctx context.Context, live *livePlayer)
 	// those writes.
 	live.Stop()
 	l.cancelActiveTrade(live)
+	live.shadowExpiryMu.Lock()
+	live.detaching = true
+	live.shadowExpiryMu.Unlock()
 
 	// One budget for the whole detach, not one per store: a logout with an
 	// active pet writes the character row, the skill state, the player
@@ -53,6 +56,10 @@ func (l *GameClientLink) detachLivePlayer(ctx context.Context, live *livePlayer)
 	}
 	if l.shadowItems != nil {
 		l.shadowItems.Remove(live.ObjectID())
+	}
+	if l.zones != nil && live.zoneActor != nil {
+		position := live.CurrentLocation()
+		live.zoneActor.removeFrom(l.zones, position.X, position.Y)
 	}
 	if l.world != nil {
 		// A still-active pet's inventory notifier closure holds live too;

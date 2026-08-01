@@ -89,6 +89,7 @@ type Character struct {
 	world                 *world.State
 	los                   LineOfSight
 	zones                 PeaceZoneQuery
+	revalidateZones       func(location.Location)
 	sendFrame             func(wire.Frame) bool
 	broadcastAttack       func(attack.Snapshot)
 	broadcastMove         func(move.Event)
