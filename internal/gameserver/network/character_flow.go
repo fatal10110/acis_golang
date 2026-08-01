@@ -301,6 +301,9 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 			live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageExpDecreasedByS1, int32(exp)))
 		}
 		if sp > 0 {
+			live.SendFrame(serverpackets.FrameStatusUpdate(live.ObjectID(), []serverpackets.StatusAttribute{
+				{Type: serverpackets.StatusSP, Value: live.SP},
+			}))
 			live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageSPDecreasedS1, int32(sp)))
 		}
 	})

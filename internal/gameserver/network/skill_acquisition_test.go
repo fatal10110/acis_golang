@@ -203,10 +203,22 @@ func TestGameClientLinkAcquireSkillInfoAndLearnGeneralSkill(t *testing.T) {
 
 	c.send(encodeRequestAcquireSkill(3, 1, 0))
 	reply = c.read()
-	assertSystemMessageSkillFrame(t, reply, serverpackets.SystemMessageLearnedSkill, 3, 1)
+	assertSPStatus(t, reply, objID, 0)
 
 	reply = c.read()
-	assertSPStatus(t, reply, objID, 0)
+	if reply[0] != serverpackets.OpcodeSystemMessage {
+		t.Fatalf("SP-decreased opcode = %#x, want SystemMessage (%#x)", reply[0], serverpackets.OpcodeSystemMessage)
+	}
+	r = wire.NewReader(reply[1:])
+	if id, params, typ, cost := r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32(); id != serverpackets.SystemMessageSPDecreasedS1 || params != 1 || typ != serverpackets.SystemMessageParamNumber || cost != 50 {
+		t.Fatalf("SP-decreased message = %d/%d/%d/%d, want %d/1/number/50", id, params, typ, cost, serverpackets.SystemMessageSPDecreasedS1)
+	}
+	if err := r.Err(); err != nil {
+		t.Fatalf("read SP-decreased message: %v", err)
+	}
+
+	reply = c.read()
+	assertSystemMessageSkillFrame(t, reply, serverpackets.SystemMessageLearnedSkill, 3, 1)
 
 	reply = c.read()
 	if reply[0] != serverpackets.OpcodeSkillList {
