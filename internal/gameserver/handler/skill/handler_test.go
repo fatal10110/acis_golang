@@ -442,11 +442,12 @@ func TestPhysicalMagicBlowAndManaDamageHandlersUseFormulaInputs(t *testing.T) {
 			AttackPower: 100, SkillPower: 50, Defence: 40,
 			RandomMul: 1, PosMul: 1.2,
 			CritDamageMul: 1.5, CritDamagePosMul: 1, CritVulnMul: 1, DaggerVulnMul: 1, CritDamageAddBase: 5,
+			Landed: true,
 		},
 		blowOK: true,
 		manaInput: formulas.ManaDamageInput{
 			MAtk: 400, MDef: 50, SkillPower: 20, TargetMaxMp: 970,
-			VulnMul: 1,
+			VulnMul: 1, Affected: true,
 		},
 		manaOK: true,
 	}
@@ -488,6 +489,7 @@ func TestPhysicalAndBlowHandlersResolveLethalHits(t *testing.T) {
 			AttackPower: 100, SkillPower: 50, Defence: 40,
 			RandomMul: 1, PosMul: 1.2,
 			CritDamageMul: 1.5, CritDamagePosMul: 1, CritVulnMul: 1, DaggerVulnMul: 1, CritDamageAddBase: 5,
+			Landed: true,
 		},
 		blowOK: true,
 		lethalInput: formulas.LethalInput{

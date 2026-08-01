@@ -115,6 +115,7 @@ func TestBlowAppliesEffectsWithForcedBlessedSpiritshotInput(t *testing.T) {
 		AttackPower: 100, SkillPower: 50, Defence: 40,
 		RandomMul: 1, PosMul: 1.2,
 		CritDamageMul: 1.5, CritDamagePosMul: 1, CritVulnMul: 1, DaggerVulnMul: 1, CritDamageAddBase: 5,
+		Landed: true,
 	}
 
 	def := modelskill.Definition{ID: 409, SkillType: "BLOW", Effects: targetEffect()}
@@ -125,6 +126,28 @@ func TestBlowAppliesEffectsWithForcedBlessedSpiritshotInput(t *testing.T) {
 	}
 	if !target.lastBss {
 		t.Fatal("BLOW landing roll bss = false, want true (Blow.java hardcodes this input)")
+	}
+}
+
+func TestBlowMissSkipsDamageAndEffects(t *testing.T) {
+	registry := NewDefaultRegistry()
+	caster := newDamageEffectFake()
+	target := newDamageEffectFake()
+	target.hp = 2000
+	target.blowOK = true
+	target.blowInput = formulas.BlowInput{
+		AttackPower: 100, SkillPower: 50, Defence: 40,
+		RandomMul: 1, PosMul: 1.2,
+		CritDamageMul: 1.5, CritDamagePosMul: 1, CritVulnMul: 1, DaggerVulnMul: 1, CritDamageAddBase: 5,
+		Landed: false,
+	}
+
+	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{ID: 409, SkillType: "BLOW", Effects: targetEffect()}, Targets: []any{target}})
+	if target.hp != 2000 {
+		t.Fatalf("BLOW miss hp = %v, want unchanged 2000", target.hp)
+	}
+	if got := len(target.EffectList().All()); got != 0 {
+		t.Fatalf("BLOW miss effects = %d, want 0", got)
 	}
 }
 

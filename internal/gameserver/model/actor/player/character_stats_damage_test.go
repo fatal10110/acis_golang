@@ -105,6 +105,30 @@ func TestCharacterBlowInputUsesTargetRelativeHeading(t *testing.T) {
 	}
 }
 
+func TestCharacterBlowInputCarriesResolvedLandingRoll(t *testing.T) {
+	tmpl := combatTemplate()
+	tmpl.DEX = 40
+	caster := liveCharacter(1, tmpl, combatItems())
+	target := liveCharacter(2, tmpl, combatItems())
+	caster.SetRollSource(func(n int) int {
+		if n == 11 {
+			return 5
+		}
+		if n != 1000 {
+			t.Fatalf("blow roll bound = %d, want 1000", n)
+		}
+		return 799
+	})
+
+	in, ok := target.BlowInput(caster, modelskill.Definition{ID: 1, Power: 30, SkillType: "BLOW", BaseLandRate: 1000})
+	if !ok {
+		t.Fatal("BlowInput() ok = false")
+	}
+	if !in.Landed {
+		t.Fatal("BlowInput().Landed = false, want true for a capped ordinary blow")
+	}
+}
+
 func TestCharacterDamageInputsUseChargedShots(t *testing.T) {
 	tmpl := combatTemplate()
 	tmpl.MAtk = 25
