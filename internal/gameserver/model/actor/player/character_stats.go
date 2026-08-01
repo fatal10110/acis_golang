@@ -313,7 +313,7 @@ func (c *Character) HPRegenRate() float64 {
 	if tmpl == nil {
 		return c.calcStat(stat.RegenerateHPRate, 0)
 	}
-	return c.calcStat(stat.RegenerateHPRate, c.levelTableValue(tmpl.HPRegenTable, 0))
+	return c.calcStat(stat.RegenerateHPRate, c.levelTableValue(tmpl.HPRegenTable, 0)) * c.weightPenaltyRegenMultiplier()
 }
 
 // MPRegenRate returns c's current MP regeneration rate.
@@ -322,7 +322,7 @@ func (c *Character) MPRegenRate() float64 {
 	if tmpl == nil {
 		return c.calcStat(stat.RegenerateMPRate, 0)
 	}
-	return c.calcStat(stat.RegenerateMPRate, c.levelTableValue(tmpl.MPRegenTable, 0))
+	return c.calcStat(stat.RegenerateMPRate, c.levelTableValue(tmpl.MPRegenTable, 0)) * c.weightPenaltyRegenMultiplier()
 }
 
 // CPRegenRate returns c's current CP regeneration rate.
@@ -331,7 +331,7 @@ func (c *Character) CPRegenRate() float64 {
 	if tmpl == nil {
 		return c.calcStat(stat.RegenerateCPRate, 0)
 	}
-	return c.calcStat(stat.RegenerateCPRate, c.levelTableValue(tmpl.CPRegenTable, 0))
+	return c.calcStat(stat.RegenerateCPRate, c.levelTableValue(tmpl.CPRegenTable, 0)) * c.weightPenaltyRegenMultiplier()
 }
 
 func (c *Character) levelTableValue(values []float64, fallback float64) float64 {

@@ -114,8 +114,8 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) {
 	w.WriteInt32(int32(resources.MaxMP))
 	w.WriteInt32(int32(resources.CurrentMP))
 	w.WriteInt32(int32(c.SP))
-	w.WriteInt32(0) // current weight: encumbrance is not modeled
-	w.WriteInt32(0) // weight limit: encumbrance is not modeled
+	w.WriteInt32(int32(c.CurrentWeight()))
+	w.WriteInt32(int32(c.WeightLimit()))
 	w.WriteInt32(bonusSlots)
 
 	for _, pos := range paperdollWriteOrder {

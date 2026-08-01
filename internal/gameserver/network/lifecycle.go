@@ -74,8 +74,10 @@ func (l *GameClientLink) detachLivePlayer(ctx context.Context, live *livePlayer)
 	live.Character.SetHerbConsumer(nil)
 	live.Character.SetUserInfoUpdater(nil)
 	live.Character.SetLevelRefresher(nil)
+	live.Character.SetWeightPenaltyUpdater(nil)
 	if inv := live.Character.Inventory(); inv != nil {
 		inv.SetUpdateNotifier(nil)
+		inv.SetWeightNotifier(nil)
 		l.flushItemPersistence(saveCtx, inv)
 	}
 }
