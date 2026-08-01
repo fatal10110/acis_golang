@@ -49,6 +49,9 @@ func TestSkillReflects(t *testing.T) {
 		{"melee with no cast range never reflects", SkillReflectInput{CanBeReflected: true, Magic: false, CastRange: -1, ReflectChance: 100}, 0, false},
 		{"ignores resists never reflects", SkillReflectInput{IgnoreResists: true, CanBeReflected: true, Magic: true, ReflectChance: 100}, 0, false},
 		{"cannot be reflected", SkillReflectInput{CanBeReflected: false, Magic: true, ReflectChance: 100}, 0, false},
+		{"excluded type BUFF never reflects", SkillReflectInput{CanBeReflected: true, Magic: true, SkillType: "BUFF", ReflectChance: 100}, 0, false},
+		{"excluded type HOT never reflects", SkillReflectInput{CanBeReflected: true, Magic: true, SkillType: "HOT", ReflectChance: 100}, 0, false},
+		{"non-excluded type still reflects", SkillReflectInput{CanBeReflected: true, Magic: true, SkillType: "DEBUFF", ReflectChance: 100}, 0, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -68,9 +71,10 @@ func TestRevivePower(t *testing.T) {
 		{"zero power passes through", 2.0, 0, 0},
 		{"full power passes through", 0.1, 100, 100},
 		{"neutral bonus", 1.0, 50, 50},
-		{"bonus capped 20 above base", 2.0, 50, 70},
+		{"bonus adds 20 once past threshold", 2.0, 50, 90},
 		{"malus floored at base", 0.5, 50, 50},
 		{"hard cap at 90", 1.5, 80, 90},
+		{"below threshold no bonus added", 1.3, 50, 65},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

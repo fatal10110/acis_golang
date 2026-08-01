@@ -58,17 +58,39 @@ type SkillReflectInput struct {
 	CanBeReflected bool
 	Magic          bool
 	CastRange      int
+	// SkillType is the cast skill's uppercase type key (e.g. "BUFF",
+	// "HOT"), used to exclude skill types the reference never lets bounce
+	// back regardless of the target's reflect stat.
+	SkillType string
 	// ReflectChance is the target's already-resolved percent chance to
 	// reflect this skill (REFLECT_SKILL_MAGIC or REFLECT_SKILL_PHYSIC).
 	ReflectChance float64
 }
 
+// skillReflectExcludedTypes are skill types the reference's
+// calcSkillReflect never lets bounce back at the caster, regardless of the
+// target's reflect stat or any chance roll.
+var skillReflectExcludedTypes = map[string]bool{
+	"BUFF":             true,
+	"REFLECT":          true,
+	"HEAL_PERCENT":     true,
+	"MANAHEAL_PERCENT": true,
+	"HOT":              true,
+	"MPHOT":            true,
+	"AGGDEBUFF":        true,
+	"CONT":             true,
+}
+
 // SkillReflects reports whether the target reflects the skill back at its
 // caster, given roll, a uniform random draw in [0, 100). Skills that
-// ignore resistances or can't be reflected never reflect; neither does a
-// non-magic skill cast beyond melee range.
+// ignore resistances, can't be reflected, or belong to an excluded skill
+// type never reflect; neither does a non-magic skill cast beyond melee
+// range.
 func SkillReflects(in SkillReflectInput, roll int) bool {
 	if in.IgnoreResists || !in.CanBeReflected {
+		return false
+	}
+	if skillReflectExcludedTypes[in.SkillType] {
 		return false
 	}
 	if !in.Magic && (in.CastRange == -1 || in.CastRange > meleeAttackRange) {
@@ -78,9 +100,10 @@ func SkillReflects(in SkillReflectInput, roll int) bool {
 }
 
 // RevivePower returns the HP percentage a resurrection restores:
-// skillPower scaled by the caster's already-resolved WIT bonus, capped 20
-// points above the base skill power and never below it, then hard-capped
-// at 90. 0 and 100 skill power pass through unchanged.
+// skillPower scaled by the caster's already-resolved WIT bonus, with 20
+// added on top when that product already exceeds skillPower by more than
+// 20, never below skillPower, then hard-capped at 90. 0 and 100 skill power
+// pass through unchanged.
 func RevivePower(witBonus, skillPower float64) float64 {
 	if skillPower == 0 || skillPower == 100 {
 		return skillPower
@@ -88,7 +111,7 @@ func RevivePower(witBonus, skillPower float64) float64 {
 
 	revivePower := skillPower * witBonus
 	if revivePower-skillPower > 20 {
-		revivePower = skillPower + 20
+		revivePower += 20
 	}
 	if revivePower < skillPower {
 		revivePower = skillPower

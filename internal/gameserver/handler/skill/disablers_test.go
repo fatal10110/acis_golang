@@ -32,12 +32,19 @@ type disablerFake struct {
 	aggro                  *attackable.ThreatTable
 	hate                   *attackable.HateTable
 	shield                 formulas.ShieldDefense
+	level                  int
 
 	// lastBss and lastShield record the most recent SkillSuccessInput call's
 	// resolved caster/target state, for tests asserting checkSkillSuccess
 	// threaded them through correctly.
 	lastBss    bool
 	lastShield formulas.ShieldDefense
+
+	// aggressionSource and aggressionPower record the most recent
+	// NotifyAggression call, for tests asserting AGGDAMAGE's aggro
+	// notification.
+	aggressionSource any
+	aggressionPower  int
 }
 
 func newDisablerFake(id int32) *disablerFake {
@@ -72,6 +79,12 @@ func (d *disablerFake) RaidRelated() bool                  { return d.raidRelate
 func (d *disablerFake) Undead() bool                       { return d.undeadFlag }
 func (d *disablerFake) AggroList() *attackable.ThreatTable { return d.aggro }
 func (d *disablerFake) HateList() *attackable.HateTable    { return d.hate }
+func (d *disablerFake) Level() int                         { return d.level }
+
+func (d *disablerFake) NotifyAggression(source any, power int) {
+	d.aggressionSource = source
+	d.aggressionPower = power
+}
 
 func TestDisablersSkipsDeadAndUnparalyzedInvulTargets(t *testing.T) {
 	registry := NewDefaultRegistry()
@@ -278,6 +291,51 @@ func TestAggRemoveSkipsNonAttackableAndRaidRelatedTargets(t *testing.T) {
 	}
 	if raidRelated.aggro.IsEmpty() {
 		t.Error("a raid-related target's aggro should be untouched")
+	}
+}
+
+func TestAggDamageNotifiesAttackableTargetAndAppliesEffectsUnconditionally(t *testing.T) {
+	registry := NewDefaultRegistry()
+	caster := newDisablerFake(9)
+	target := newDisablerFake(1)
+	target.attackableFlag = true
+	target.level = 43
+	target.successOK = false // AGGDAMAGE never rolls; effects apply regardless
+
+	registry.Use(Cast{
+		Caster:  caster,
+		Skill:   modelskill.Definition{SkillType: "AGGDAMAGE", Power: 100, Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 10}}},
+		Targets: []any{target},
+	})
+
+	if target.aggressionSource != caster {
+		t.Fatalf("aggression source = %v, want caster", target.aggressionSource)
+	}
+	// power/(targetLevel+7)*150 = 100/(43+7)*150 = 300.
+	if target.aggressionPower != 300 {
+		t.Fatalf("aggression power = %d, want 300", target.aggressionPower)
+	}
+	if len(target.list.All()) != 1 {
+		t.Fatalf("AGGDAMAGE must apply its effects unconditionally, got %d effects", len(target.list.All()))
+	}
+}
+
+func TestAggDamageSkipsAggroNotificationForNonAttackableTarget(t *testing.T) {
+	registry := NewDefaultRegistry()
+	caster := newDisablerFake(9)
+	target := newDisablerFake(1) // not attackable
+
+	registry.Use(Cast{
+		Caster:  caster,
+		Skill:   modelskill.Definition{SkillType: "AGGDAMAGE", Power: 100, Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 10}}},
+		Targets: []any{target},
+	})
+
+	if target.aggressionSource != nil {
+		t.Fatalf("a non-attackable target must never receive an aggro notification, got source %v", target.aggressionSource)
+	}
+	if len(target.list.All()) != 1 {
+		t.Fatalf("AGGDAMAGE must still apply its effects to a non-attackable target, got %d effects", len(target.list.All()))
 	}
 }
 
