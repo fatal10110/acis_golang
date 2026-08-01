@@ -69,15 +69,18 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 	}
 	if def.SkillType == "FUSION" {
 		live.setFusionTarget(target.ObjectID())
+		finishFusion := func() {
+			skillhandler.DecreaseFusion(l.skills, live.Character, target, def)
+			live.clearFusionTarget(target.ObjectID())
+		}
 		result := actorcast.ApplyEffectsResult(actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers}, live.Character, target, def)
 		sendSkillHandlerResult(live, result)
 		sendMagicStatusUpdate(live, beforeVitals)
-		controller.ScheduleFusion(plan, time.Second, func() bool {
+		if !controller.ScheduleFusion(plan, time.Second, func() bool {
 			return actorcast.FusionChannelValid(live.Character, target, def.CastRange)
-		}, func() {
-			skillhandler.DecreaseFusion(l.skills, live.Character, target, def)
-			live.clearFusionTarget(target.ObjectID())
-		})
+		}, finishFusion) {
+			finishFusion()
+		}
 		return
 	}
 
