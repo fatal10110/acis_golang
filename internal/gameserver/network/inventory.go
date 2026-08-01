@@ -114,7 +114,37 @@ func (l *GameClientLink) applyEquipStatChanges(live *livePlayer, inv *itemcontai
 			l.skills.UnequipItemStats(live.Character, inst, tmpl)
 		}
 	}
+	if l.shadowItems != nil {
+		for _, inst := range res.Changed {
+			tmpl, ok := inv.Templates().Get(inst.TemplateID)
+			if !ok {
+				continue
+			}
+			if inst.Equipped() {
+				l.shadowItems.Track(live.ObjectID(), inst, tmpl)
+			} else {
+				l.shadowItems.Untrack(inst)
+			}
+		}
+	}
 	live.RefreshExpertisePenalty()
+}
+
+// ExpireShadowItem unequips and destroys an exhausted shadow item.
+func (l *GameClientLink) ExpireShadowItem(live *livePlayer, inst *item.Instance) {
+	if live == nil || inst == nil {
+		return
+	}
+	inv := live.Inventory()
+	if inv == nil || inv.ItemByObjectID(inst.ObjectID) != inst {
+		return
+	}
+	count := int(inst.Snapshot().Count)
+	if count <= 0 || inv.DestroyItem(inst, count) == nil {
+		return
+	}
+	l.applyEquipStatChanges(live, inv, invops.Result{Changed: []*item.Instance{inst}})
+	l.broadcastEquipmentChange(live)
 }
 
 func (l *GameClientLink) handleAutoSoulShot(live *livePlayer, req clientpackets.RequestAutoSoulShot) {

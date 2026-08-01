@@ -111,6 +111,8 @@ type GameClientLink struct {
 	attackStance  attackStanceTracker
 	positions     *task.PositionUpdates
 	playerClock   *task.PlayerClock
+	water         *task.Water
+	shadowItems   *task.ShadowItems
 	// inventoryUpdates batches InventoryUpdate packets for inventory
 	// changes the server makes on its own, outside a client request.
 	inventoryUpdates *task.InventoryUpdates
@@ -171,6 +173,8 @@ type GameClientLinkConfig struct {
 	AttackStance  attackStanceTracker
 	Positions     *task.PositionUpdates
 	PlayerClock   *task.PlayerClock
+	Water         *task.Water
+	ShadowItems   *task.ShadowItems
 	// InventoryUpdates batches InventoryUpdate packets for inventory
 	// changes the server makes on its own, outside a client request.
 	InventoryUpdates *task.InventoryUpdates
@@ -188,7 +192,7 @@ type GameClientLinkConfig struct {
 // nil while disconnected/reconnecting: session validation fails clients
 // gracefully (AuthLoginFail) rather than panicking while the link is down.
 func NewGameClientLink(cfg GameClientLinkConfig) *GameClientLink {
-	return &GameClientLink{
+	link := &GameClientLink{
 		validator:     cfg.Validator,
 		loginLink:     cfg.LoginLink,
 		roster:        cfg.Roster,
@@ -211,6 +215,8 @@ func NewGameClientLink(cfg GameClientLinkConfig) *GameClientLink {
 		attackStance:  cfg.AttackStance,
 		positions:     cfg.Positions,
 		playerClock:   cfg.PlayerClock,
+		water:         cfg.Water,
+		shadowItems:   cfg.ShadowItems,
 
 		inventoryUpdates: cfg.InventoryUpdates,
 		itemInstances:    cfg.ItemInstances,
@@ -231,6 +237,8 @@ func NewGameClientLink(cfg GameClientLinkConfig) *GameClientLink {
 		log:          cfg.Log,
 		newCipherKey: randomCipherKey,
 	}
+	link.wireWaterZones()
+	return link
 }
 
 // newPet builds a pet and, if its owner is a connected client, registers

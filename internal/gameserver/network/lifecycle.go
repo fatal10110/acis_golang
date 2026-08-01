@@ -48,6 +48,12 @@ func (l *GameClientLink) detachLivePlayer(ctx context.Context, live *livePlayer)
 	if l.playerClock != nil {
 		l.playerClock.Remove(live.ObjectID())
 	}
+	if l.water != nil {
+		l.water.Remove(live)
+	}
+	if l.shadowItems != nil {
+		l.shadowItems.Remove(live.ObjectID())
+	}
 	if l.world != nil {
 		// A still-active pet's inventory notifier closure holds live too;
 		// detach it before live itself is despawned and its client-frame

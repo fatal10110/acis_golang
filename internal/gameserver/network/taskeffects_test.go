@@ -16,7 +16,7 @@ func TestTaskEffectsWaterSendsCyanGauge(t *testing.T) {
 	live := newTestLivePlayer(t, 100, capture)
 	state.AddPlayer(live)
 
-	water, err := task.NewWater(NewTaskEffects(state, nil), time.Now)
+	water, err := task.NewWater(NewTaskEffects(state), time.Now)
 	if err != nil {
 		t.Fatalf("NewWater() error = %v", err)
 	}
@@ -43,7 +43,7 @@ func TestTaskEffectsDrownDamagesAndNotifiesLivePlayer(t *testing.T) {
 	live := newTestLivePlayer(t, 100, capture)
 	state.AddPlayer(live)
 
-	NewTaskEffects(state, nil).Drown(live)
+	NewTaskEffects(state).Drown(live)
 
 	if live.CurrentHP() >= 100 {
 		t.Fatalf("current HP = %d, want drowning damage", live.CurrentHP())

@@ -75,6 +75,7 @@ func newGameServerApp(paths gameServerPaths) *fx.App {
 			provideInventoryUpdates,
 			provideItemInstances,
 			provideWorldState,
+			provideTaskEffects,
 			provideGroundItemOptions,
 			provideGroundItems,
 			provideGameClock,

@@ -244,7 +244,8 @@ func (a *stoppableTestActor) Stop()           { a.stopped = true }
 
 func TestProvideAdditionalLifecycleTasks(t *testing.T) {
 	state := provideWorldState()
-	water, err := provideWater(state)
+	effects := provideTaskEffects(state)
+	water, err := provideWater(effects)
 	if err != nil {
 		t.Fatalf("provideWater() error = %v", err)
 	}
@@ -252,7 +253,7 @@ func TestProvideAdditionalLifecycleTasks(t *testing.T) {
 		t.Fatal("provideWater() = nil")
 	}
 
-	shadowItems, err := provideShadowItems(state)
+	shadowItems, err := provideShadowItems(effects)
 	if err != nil {
 		t.Fatalf("provideShadowItems() error = %v", err)
 	}
