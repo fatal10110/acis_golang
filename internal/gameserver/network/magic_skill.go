@@ -43,6 +43,10 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 		Definitions: l.skills,
 	})
 	if err != nil {
+		if errors.Is(err, actorcast.ErrInvalidTarget) && started.Target == nil {
+			sendMagicActionFailed(live)
+			return
+		}
 		sendMagicCastFailure(live, started.Definition, err)
 		return
 	}
@@ -212,6 +216,18 @@ func sendMagicCastFailure(live *livePlayer, def modelskill.Definition, err error
 	sendMagicActionFailed(live)
 }
 
+// sendItemConsumeFailure rejects an item-triggered cast whose required item
+// could not be destroyed (a stack-destroy race, not the skill's own
+// itemConsumeId precheck): NOT_ENOUGH_ITEMS (351), matching Java's
+// PlayableCast destroyItem failure, then the action-failed acknowledgement.
+func sendItemConsumeFailure(live *livePlayer) {
+	if live == nil {
+		return
+	}
+	live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotEnoughItems))
+	sendMagicActionFailed(live)
+}
+
 // sendMagicCastFailureReason sends the reason alone, for a cast that failed
 // mid-flight: the abort funnel that cancels it owns the action-failed
 // acknowledgement, so sending one here would duplicate it.
@@ -225,7 +241,7 @@ func sendMagicCastFailureReason(live *livePlayer, def modelskill.Definition, err
 	case errors.Is(err, actorcast.ErrNotEnoughHP):
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotEnoughHP))
 	case errors.Is(err, actorcast.ErrNotEnoughItems):
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotEnoughItems))
+		live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1CannotBeUsed, int32(def.ID), int32(def.Level)))
 	case errors.Is(err, actorcast.ErrSkillDisabled), errors.Is(err, actorcast.ErrAllSkillsDisabled):
 		live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1PreparedForReuse, int32(def.ID), int32(def.Level)))
 	case errors.Is(err, actorcast.ErrInvalidTarget):

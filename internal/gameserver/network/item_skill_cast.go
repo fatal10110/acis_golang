@@ -64,7 +64,7 @@ func (l *GameClientLink) useItemAICast(live *livePlayer, inv *itemcontainer.Inve
 		Destroyer:  l.inventory,
 	})
 	if consumed.Err != nil {
-		sendMagicCastFailure(live, def, consumed.Err)
+		sendItemConsumeFailure(live)
 		return true
 	}
 	if consumed.SharedReuseGroup >= 0 {
