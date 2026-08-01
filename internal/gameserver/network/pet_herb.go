@@ -30,6 +30,7 @@ func (l *GameClientLink) consumePetHerb(live *livePlayer, pet *summon.Actor, inv
 		return
 	case itemhandler.Applied:
 	default:
+		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
 
