@@ -171,6 +171,7 @@ func (l *GameClientLink) handleAutoSoulShot(live *livePlayer, req clientpackets.
 	case 1:
 		enabled = true
 	case 0:
+		// Deliberate disable path: enabled stays false, falls through to ToggleAutoSoulShot below.
 	default:
 		return
 	}
