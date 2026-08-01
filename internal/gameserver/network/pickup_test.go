@@ -188,6 +188,7 @@ func herbTestTemplates() *item.Table {
 		Name:           "Herb of Life",
 		Kind:           item.KindEtcItem,
 		Duration:       -1,
+		Tradable:       true,
 		EtcItem:        &item.EtcItemDetail{Type: item.EtcItemHerb, Handler: "ItemSkills"},
 		AttachedSkills: []item.SkillRef{{ID: 2278, Level: 1}},
 	}})

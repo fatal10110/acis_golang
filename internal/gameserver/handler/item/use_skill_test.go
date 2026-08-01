@@ -56,8 +56,9 @@ func (f *fakeDestroyer) DestroyItem(inv *itemcontainer.Inventory, objectID int32
 func newUseRequest(t *testing.T, handler string, etcType modelitem.EtcItemType, def modelskill.Definition, caster *fakeCaster, destroyer *fakeDestroyer, isPet bool) UseRequest {
 	t.Helper()
 	tmpl := &modelitem.Template{
-		ID:   1,
-		Kind: modelitem.KindEtcItem,
+		ID:       1,
+		Kind:     modelitem.KindEtcItem,
+		Tradable: true,
 		EtcItem: &modelitem.EtcItemDetail{
 			Type: etcType, Handler: handler, SharedReuseGroup: -1,
 		},
@@ -162,6 +163,23 @@ func TestUse(t *testing.T) {
 
 		if res.Outcome != Applied {
 			t.Fatalf("Outcome = %v, want Applied (ItemSkillsHandler doesn't gate on IsPet)", res.Outcome)
+		}
+	})
+
+	t.Run("pet rejects non-tradable herb", func(t *testing.T) {
+		caster := &fakeCaster{}
+		destroyer := &fakeDestroyer{}
+		req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemHerb, potion, caster, destroyer, true)
+		tmpl, _ := req.Inventory.Templates().Get(req.Item.TemplateID)
+		tmpl.Tradable = false
+
+		res := Use(req)
+
+		if res.Outcome != PetRejected {
+			t.Fatalf("Outcome = %v, want PetRejected", res.Outcome)
+		}
+		if destroyer.calls != 0 {
+			t.Fatalf("DestroyItem calls = %d, want 0", destroyer.calls)
 		}
 	})
 

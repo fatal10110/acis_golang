@@ -232,6 +232,9 @@ func (l *GameClientLink) petGetItem(ctx context.Context, live *livePlayer, req c
 	l.groundItems.Remove(ground)
 	l.world.Despawn(ground)
 
+	if result.Herb != nil {
+		l.consumePetHerb(live, pet, petInv, result.Herb)
+	}
 	l.applyPersistActions(ctx, result.Persist)
 }
 
