@@ -6,6 +6,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	itemhandler "github.com/fatal10110/acis_golang/internal/gameserver/handler/item"
+	skillhandler "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -66,6 +67,19 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 	if plan.GaugeDuration > 0 {
 		live.SendFrame(serverpackets.FrameSetupGauge(serverpackets.GaugeBlue, millis(plan.GaugeDuration), millis(plan.GaugeDuration)))
 	}
+	if def.SkillType == "FUSION" {
+		live.setFusionTarget(target.ObjectID())
+		result := actorcast.ApplyEffectsResult(actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers}, live.Character, target, def)
+		sendSkillHandlerResult(live, result)
+		sendMagicStatusUpdate(live, beforeVitals)
+		controller.ScheduleFusion(plan, time.Second, func() bool {
+			return actorcast.FusionChannelValid(live.Character, target, def.CastRange)
+		}, func() {
+			skillhandler.DecreaseFusion(l.skills, live.Character, target, def)
+			live.clearFusionTarget(target.ObjectID())
+		})
+		return
+	}
 
 	targetIDs := []int32{target.ObjectID()}
 	controller.Schedule(plan, actorcast.Hooks{
@@ -92,6 +106,18 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 			sendMagicStatusUpdate(live, beforeVitals)
 		},
 	})
+}
+
+func (l *GameClientLink) abortFusionTargeting(target *livePlayer) {
+	if l == nil || l.world == nil || target == nil {
+		return
+	}
+	for _, obj := range l.world.Objects() {
+		caster, ok := obj.(*livePlayer)
+		if ok && caster.fusesTarget(target.ObjectID()) {
+			caster.Character.StopCast()
+		}
+	}
 }
 
 // handleMagicSkillUseGround records the client-supplied ground-click point

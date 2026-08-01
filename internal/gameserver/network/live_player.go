@@ -38,6 +38,8 @@ type livePlayer struct {
 	shadowExpiryMu sync.RWMutex
 	detaching      bool
 	pickupMu       sync.Mutex // guards pickup, deferredPickup, and pickupLocked
+	fusionMu       sync.Mutex // guards fusionTargetID
+	fusionTargetID int32
 	pickup         *pickupIntention
 	deferredPickup *pickupIntention
 	pickupLocked   bool
@@ -113,6 +115,26 @@ func (p *livePlayer) pickupLockActive() bool {
 	p.pickupMu.Lock()
 	defer p.pickupMu.Unlock()
 	return p.pickupLocked
+}
+
+func (p *livePlayer) setFusionTarget(id int32) {
+	p.fusionMu.Lock()
+	p.fusionTargetID = id
+	p.fusionMu.Unlock()
+}
+
+func (p *livePlayer) clearFusionTarget(id int32) {
+	p.fusionMu.Lock()
+	if p.fusionTargetID == id {
+		p.fusionTargetID = 0
+	}
+	p.fusionMu.Unlock()
+}
+
+func (p *livePlayer) fusesTarget(id int32) bool {
+	p.fusionMu.Lock()
+	defer p.fusionMu.Unlock()
+	return p.fusionTargetID == id
 }
 
 func (p *livePlayer) attackController() *attack.Controller {

@@ -1,5 +1,7 @@
 package cast
 
+import "time"
+
 // Hooks are the phase callbacks a scheduled cast invokes as it advances
 // through Launch, Hit and Finish, layered on top of the resource and
 // cooldown state Start/Hit/Finish already own.
@@ -37,6 +39,43 @@ func (c *Controller) Schedule(plan Plan, hooks Hooks) {
 	}
 	seq := c.castSeq
 	c.scheduleLocked(plan.LaunchDelay, func() { c.runLaunch(seq, plan, hooks) })
+	c.mu.Unlock()
+}
+
+// ScheduleFusion keeps a FUSION cast active until its channel window ends.
+// Its effect lands at channel start, so it bypasses ordinary launch and hit
+// phases. The controller owns its timers and runs end on either outcome.
+func (c *Controller) ScheduleFusion(plan Plan, interval time.Duration, check func() bool, end func()) {
+	c.mu.Lock()
+	if !c.casting {
+		c.mu.Unlock()
+		return
+	}
+	seq := c.castSeq
+	c.fusionEnd = end
+	c.scheduleLocked(plan.LaunchDelay, func() {
+		if c.stillCasting(seq) {
+			c.Finish()
+		}
+	})
+	if interval > 0 && check != nil {
+		c.scheduleLocked(interval, func() { c.runFusionCheck(seq, interval, check) })
+	}
+	c.mu.Unlock()
+}
+
+func (c *Controller) runFusionCheck(seq uint64, interval time.Duration, check func() bool) {
+	if !c.stillCasting(seq) {
+		return
+	}
+	if !check() {
+		c.Stop()
+		return
+	}
+	c.mu.Lock()
+	if c.castingLocked(seq) {
+		c.scheduleLocked(interval, func() { c.runFusionCheck(seq, interval, check) })
+	}
 	c.mu.Unlock()
 }
 

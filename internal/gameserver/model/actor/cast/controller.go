@@ -156,6 +156,7 @@ type Controller struct {
 	// as stale and no-op instead of acting on the wrong cast.
 	castSeq   uint64
 	timers    []scheduledTimer
+	fusionEnd func()
 	afterFunc afterFunc
 	onAbort   func(interrupted bool)
 	onFinish  func(interrupted bool)
@@ -368,19 +369,35 @@ func (c *Controller) stopInternal(interrupted bool) {
 // once it has released mu, or nil when no cast was in flight.
 func (c *Controller) abortLocked() (func(bool), func(bool)) {
 	aborted := c.casting
+	fusionEnd, onAbort, onFinish := c.fusionEnd, c.onAbort, c.onFinish
 	c.clearLocked()
 	if !aborted {
 		return nil, nil
 	}
-	return c.onAbort, c.onFinish
+	return func(interrupted bool) {
+		if fusionEnd != nil {
+			fusionEnd()
+		}
+		if onAbort != nil {
+			onAbort(interrupted)
+		}
+	}, onFinish
 }
 
 func (c *Controller) finishLocked() func(bool) {
 	if !c.casting {
 		return nil
 	}
+	fusionEnd, onFinish := c.fusionEnd, c.onFinish
 	c.clearLocked()
-	return c.onFinish
+	return func(aborted bool) {
+		if fusionEnd != nil {
+			fusionEnd()
+		}
+		if onFinish != nil {
+			onFinish(aborted)
+		}
+	}
 }
 
 func (c *Controller) exitSignetGround() {
@@ -547,6 +564,7 @@ func (c *Controller) clearLocked() {
 	c.plan = Plan{}
 	c.startedAt = time.Time{}
 	c.interruptUntil = time.Time{}
+	c.fusionEnd = nil
 }
 
 func (c *Controller) stopTimersLocked() {
