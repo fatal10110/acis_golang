@@ -314,6 +314,33 @@ func (t *Template) AutoGetSkillGrants(characterLevel int, known SkillLevels) []S
 	return grants
 }
 
+// AllAvailableSkillGrants returns the highest-level unlocked grant per skill
+// id, regardless of cost, skipping skills the character already knows at that
+// level or above. The result is ordered by skill id.
+func (t *Template) AllAvailableSkillGrants(characterLevel int, known SkillLevels) []SkillGrant {
+	if t == nil {
+		return nil
+	}
+	highest := make(map[int]SkillGrant)
+	for _, grant := range t.Skills {
+		if grant.MinLevel > characterLevel {
+			continue
+		}
+		if best, ok := highest[grant.SkillID]; ok && best.Level >= grant.Level {
+			continue
+		}
+		highest[grant.SkillID] = grant
+	}
+	grants := make([]SkillGrant, 0, len(highest))
+	for id, grant := range highest {
+		if known.Level(id) < grant.Level {
+			grants = append(grants, grant)
+		}
+	}
+	sort.Slice(grants, func(i, j int) bool { return grants[i].SkillID < grants[j].SkillID })
+	return grants
+}
+
 // ReachableSkillGrants returns the highest-level grant per skill id a
 // character at characterLevel is still close enough to hold, keyed by skill
 // id. Every skill but expertise stays reachable skillGrantLookahead levels

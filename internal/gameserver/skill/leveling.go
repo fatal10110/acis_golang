@@ -50,6 +50,27 @@ func (p *Persistence) GiveSkills(ctx context.Context, c *player.Character, tmpl 
 	return p.correctInvalidSkills(ctx, c, tmpl, level)
 }
 
+// RewardSkills grants every skill the character's level unlocks. Bought
+// grants are persisted while free grants remain level-derived in memory.
+func (p *Persistence) RewardSkills(ctx context.Context, c *player.Character, tmpl *player.Template) error {
+	if p == nil || c == nil || tmpl == nil {
+		return nil
+	}
+	level := c.CharLevel
+	for _, grant := range tmpl.AllAvailableSkillGrants(level, c.SkillLevels()) {
+		if err := p.setKnownSkill(ctx, c, grant.SkillID, grant.Level, grant.Cost != 0); err != nil {
+			return err
+		}
+	}
+	lucky := int(modelskill.LuckySkillID)
+	if level >= modelskill.LuckySkillMaxLevel && c.HasSkill(lucky) {
+		if err := p.setKnownSkill(ctx, c, lucky, 0, false); err != nil {
+			return err
+		}
+	}
+	return p.correctInvalidSkills(ctx, c, tmpl, level)
+}
+
 // correctInvalidSkills drops or downgrades the profession skills a character
 // at level may no longer hold at the level it holds them. Skills the
 // profession line never grants — item, quest and temporary awards — are left

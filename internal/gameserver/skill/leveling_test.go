@@ -74,6 +74,30 @@ func TestGiveSkillsGrantsFreeSkillsWithoutPersisting(t *testing.T) {
 	}
 }
 
+func TestRewardSkillsGrantsAllAvailableSkillsWithSelectivePersistence(t *testing.T) {
+	store := &recordingSkillLevelStore{}
+	p := newLevelingPersistence(store)
+	c := &player.Character{ID: 1, CharLevel: 10}
+	tmpl := &player.Template{Skills: []player.SkillGrant{
+		{SkillID: 249, Level: 1, MinLevel: 5, Cost: 0},
+		{SkillID: 249, Level: 2, MinLevel: 10, Cost: 0},
+		{SkillID: 3, Level: 1, MinLevel: 5, Cost: 50},
+	}}
+
+	if err := p.RewardSkills(context.Background(), c, tmpl); err != nil {
+		t.Fatalf("RewardSkills() error: %v", err)
+	}
+	if got := c.SkillLevel(249); got != 2 {
+		t.Errorf("SkillLevel(249) = %d, want 2", got)
+	}
+	if got := c.SkillLevel(3); got != 1 {
+		t.Errorf("SkillLevel(3) = %d, want 1", got)
+	}
+	if len(store.written) != 1 || store.written[0] != (writtenSkill{skillID: 3, level: 1}) {
+		t.Errorf("persisted writes = %v, want [{3 1}]", store.written)
+	}
+}
+
 // TestGiveSkillsDropsLuckyAtMaxLevel pins the newbie Lucky skill going away
 // at level 10, without a persisted delete: it was never persisted either.
 func TestGiveSkillsDropsLuckyAtMaxLevel(t *testing.T) {

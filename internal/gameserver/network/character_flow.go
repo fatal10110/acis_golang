@@ -166,7 +166,11 @@ func (l *GameClientLink) refreshLiveLevelSkills(ctx context.Context, live *liveP
 	if l.skills == nil || live == nil {
 		return
 	}
-	if err := l.skills.GiveSkills(ctx, live.Character, live.template); err != nil {
+	refresh := l.skills.GiveSkills
+	if l.playerConfig.AutoLearnSkills {
+		refresh = l.skills.RewardSkills
+	}
+	if err := refresh(ctx, live.Character, live.template); err != nil {
 		l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("level change: refresh level skills")
 	}
 	live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
