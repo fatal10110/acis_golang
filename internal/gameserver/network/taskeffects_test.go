@@ -9,6 +9,7 @@ import (
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
@@ -208,6 +209,32 @@ func TestTaskEffectsDrownDamagesAndNotifiesLivePlayer(t *testing.T) {
 	}
 	if message := binary.LittleEndian.Uint32(got[1:5]); message != serverpackets.SystemMessageDrownDamage {
 		t.Fatalf("message = %d, want %d", message, serverpackets.SystemMessageDrownDamage)
+	}
+}
+
+// TestTaskEffectsDrownDoesNotBreakInFlightCast pins WaterTaskManager.java:53
+// (player.reduceCurrentHp(hp, player, false, false, null)) against
+// PlayerStatus.reduceHp (PlayerStatus.java:96-193): calcCastBreak is only
+// invoked from attack handlers (Pdam/Mdam/Blow/CreatureAttack/etc.), never
+// from reduceHp, so a drowning tick never rolls to interrupt an in-progress
+// cast. Drown must go through the DOT-style HP path (ReduceHPByDOT), not the
+// normal-hit path (ReduceHP, which runs breakCastOnDamage).
+func TestTaskEffectsDrownDoesNotBreakInFlightCast(t *testing.T) {
+	live := newTestLivePlayer(t, 100, &frameCapture{})
+	state := world.New()
+	state.AddPlayer(live)
+
+	gcl := &GameClientLink{log: zerolog.Nop()}
+	controller := gcl.castController(live)
+	castingDef := modelskill.Definition{ID: 9, Level: 1, HitTime: 5000, StaticHitTime: true, StaticReuse: true}
+	if _, err := controller.Start(time.Now(), skillCastObject(live), castingDef); err != nil {
+		t.Fatalf("Start() error: %v", err)
+	}
+
+	NewTaskEffects(state).Drown(live)
+
+	if !controller.CastingNow() {
+		t.Fatal("CastingNow() = false after drowning damage, want the in-flight cast to survive")
 	}
 }
 
