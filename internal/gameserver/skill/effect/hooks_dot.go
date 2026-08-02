@@ -43,6 +43,7 @@ func manaDamageOverTimeAction(e *Effect) bool {
 	}
 	if result.Damage > 0 {
 		target.ReduceMP(result.Damage)
+		broadcastStatus(e.Effected)
 	}
 	return result.Continue
 }
