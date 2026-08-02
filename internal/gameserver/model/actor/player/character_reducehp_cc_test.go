@@ -1,0 +1,74 @@
+package player
+
+import (
+	"testing"
+
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+)
+
+// reduceHPPlayableAttacker is a minimal Playable-attacker stub for CP
+// absorption tests (a distinct actor from the target, unlike self-damage).
+type reduceHPPlayableAttacker struct{}
+
+func (reduceHPPlayableAttacker) Playable() bool { return true }
+
+// reduceHPNpcAttacker is a non-Playable attacker stub.
+type reduceHPNpcAttacker struct{}
+
+func (reduceHPNpcAttacker) Playable() bool { return false }
+
+func TestReduceHPDrainsCPBeforeHPForPlayableAttacker(t *testing.T) {
+	c := liveCharacter(1, combatTemplate(), combatItems())
+	c.SetResourceValues(Resources{MaxHP: 500, CurrentHP: 500, MaxCP: 200, CurrentCP: 200})
+
+	c.ReduceHP(50, reduceHPPlayableAttacker{}, modelskill.Definition{})
+
+	if c.HP() != 500 {
+		t.Fatalf("HP() = %v, want 500 (fully absorbed by CP)", c.HP())
+	}
+	if c.CP() != 150 {
+		t.Fatalf("CP() = %v, want 150", c.CP())
+	}
+}
+
+func TestReduceHPSpillsOverToHPOnceCPExhausted(t *testing.T) {
+	c := liveCharacter(1, combatTemplate(), combatItems())
+	c.SetResourceValues(Resources{MaxHP: 500, CurrentHP: 500, MaxCP: 200, CurrentCP: 30})
+
+	c.ReduceHP(50, reduceHPPlayableAttacker{}, modelskill.Definition{})
+
+	if c.CP() != 0 {
+		t.Fatalf("CP() = %v, want 0", c.CP())
+	}
+	if c.HP() != 480 {
+		t.Fatalf("HP() = %v, want 480 (20 dmg after CP absorbed 30)", c.HP())
+	}
+}
+
+func TestReduceHPSkipsCPAbsorptionForNonPlayableAttacker(t *testing.T) {
+	c := liveCharacter(1, combatTemplate(), combatItems())
+	c.SetResourceValues(Resources{MaxHP: 500, CurrentHP: 500, MaxCP: 200, CurrentCP: 200})
+
+	c.ReduceHP(50, reduceHPNpcAttacker{}, modelskill.Definition{})
+
+	if c.CP() != 200 {
+		t.Fatalf("CP() = %v, want 200 unchanged", c.CP())
+	}
+	if c.HP() != 450 {
+		t.Fatalf("HP() = %v, want 450", c.HP())
+	}
+}
+
+func TestReduceHPSkipsCPAbsorptionForSelfAttacker(t *testing.T) {
+	c := liveCharacter(1, combatTemplate(), combatItems())
+	c.SetResourceValues(Resources{MaxHP: 500, CurrentHP: 500, MaxCP: 200, CurrentCP: 200})
+
+	c.ReduceHP(50, c, modelskill.Definition{})
+
+	if c.CP() != 200 {
+		t.Fatalf("CP() = %v, want 200 unchanged for self-attacker (matches PlayerStatus.java's attacker != _actor gate)", c.CP())
+	}
+	if c.HP() != 450 {
+		t.Fatalf("HP() = %v, want 450", c.HP())
+	}
+}

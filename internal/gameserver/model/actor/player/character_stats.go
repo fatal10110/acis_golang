@@ -402,11 +402,38 @@ func (c *Character) ReduceMP(amount float64) float64 {
 	return amount
 }
 
+// playableAttacker is satisfied by any attacker that counts as a Playable
+// for CP-absorption purposes (Player and Summon actors).
+type playableAttacker interface {
+	Playable() bool
+}
+
 // ReduceHP applies skill HP damage and runs the once-only death path.
+// Mirrors PlayerStatus.reduceHp's CP absorption (PlayerStatus.java:166-184):
+// a Playable attacker other than the actor itself (PvP, pet/summon damage)
+// drains CP before HP. The sleep/immobile-stop, stand-up, and stun-break
+// side effects (PlayerStatus.java:118-134) are tracked separately in #1136.
 func (c *Character) ReduceHP(amount float64, attacker any, _ modelskill.Definition) {
 	if amount <= 0 {
 		return
 	}
+	c.vitalsMu.Lock()
+	if c.curHP <= 0 {
+		c.vitalsMu.Unlock()
+		return
+	}
+	c.vitalsMu.Unlock()
+
+	if attacker != nil && attacker != any(c) {
+		if p, ok := attacker.(playableAttacker); ok && p.Playable() {
+			if cp := c.CP(); cp > 0 {
+				drained := math.Min(cp, amount)
+				c.SetCP(cp - drained)
+				amount -= drained
+			}
+		}
+	}
+
 	c.vitalsMu.Lock()
 	if c.curHP <= 0 {
 		c.vitalsMu.Unlock()
