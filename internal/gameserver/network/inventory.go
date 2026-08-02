@@ -146,6 +146,7 @@ func (l *GameClientLink) ExpireShadowItem(live *livePlayer, inst *item.Instance)
 	if count <= 0 {
 		return
 	}
+	templateID := inst.TemplateID
 	res, ok := l.inventory.DestroyItem(inv, inst.ObjectID, count)
 	if !ok {
 		return
@@ -154,6 +155,7 @@ func (l *GameClientLink) ExpireShadowItem(live *livePlayer, inst *item.Instance)
 	if res.EquipmentChanged {
 		l.broadcastEquipmentChange(live)
 	}
+	live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageRemainingManaIsNow0, templateID))
 }
 
 func (l *GameClientLink) handleAutoSoulShot(live *livePlayer, req clientpackets.RequestAutoSoulShot) {

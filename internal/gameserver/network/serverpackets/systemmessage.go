@@ -111,6 +111,7 @@ const (
 	SystemMessageRemainingMana10Minutes = 1979 // item-name parameter
 	SystemMessageRemainingMana5Minutes  = 1980 // item-name parameter
 	SystemMessageRemainingMana1Minute   = 1981 // item-name parameter
+	SystemMessageRemainingManaIsNow0    = 1982 // item-name parameter
 
 	// Periodic in-game clock messages.
 	SystemMessagePlayingForLongTime       = 764  // no parameter
