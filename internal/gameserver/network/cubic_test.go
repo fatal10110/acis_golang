@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cubic"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -261,6 +262,7 @@ func TestCubicGrantedLevel(t *testing.T) {
 		{"regular skill passes level through", modelskill.Definition{ID: 10, Level: 5}, 5},
 		{"Life Cubic for Beginners forces level 8", modelskill.Definition{ID: 4338, Level: 1}, 8},
 		{"enchanted level above 100 collapses via the reference formula", modelskill.Definition{ID: 10, Level: 121}, 11},
+		{"non-exact-multiple truncates toward zero like Java int division", modelskill.Definition{ID: 10, Level: 125}, 11},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -300,5 +302,33 @@ func TestApplyCubicHeal_SkipsUnhealableTarget(t *testing.T) {
 
 	if target.added != 0 {
 		t.Fatalf("AddHP called on an unhealable target, amount = %v", target.added)
+	}
+}
+
+type fakeCubicHealPlayerTarget struct {
+	fakeCubicHealTarget
+	capture *frameCapture
+}
+
+func (f *fakeCubicHealPlayerTarget) SendFrame(frame wire.Frame) bool {
+	return f.capture.send(frame)
+}
+
+func TestApplyCubicHeal_SendsRejuvenatingHPToPlayerTarget(t *testing.T) {
+	capture := &frameCapture{}
+	target := &fakeCubicHealPlayerTarget{
+		fakeCubicHealTarget: fakeCubicHealTarget{healable: true, effectiveness: 100},
+		capture:             capture,
+	}
+	applyCubicHeal(modelskill.Definition{Power: 200}, target)
+
+	found := false
+	for _, op := range frameOpcodes(capture.frames) {
+		if op == serverpackets.OpcodeSystemMessage {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("applyCubicHeal on a player-shaped target did not send SystemMessage (REJUVENATING_HP), frames = %v", frameOpcodes(capture.frames))
 	}
 }

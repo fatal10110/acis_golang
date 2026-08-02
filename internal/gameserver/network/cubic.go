@@ -33,7 +33,11 @@ func cubicGrantedLevel(def modelskill.Definition) int {
 	case int(def.ID) == 4338:
 		return 8
 	case def.Level > 100:
-		return int(math.Round(float64(def.Level-100)/7 + 8))
+		// Java: Math.round(((getLevel() - 100) / 7) + 8) — all-int
+		// arithmetic, truncating toward zero; the Math.round call is a
+		// no-op since the operand is already an integer by then. Go's
+		// integer division truncates toward zero the same way.
+		return (def.Level-100)/7 + 8
 	default:
 		return def.Level
 	}
@@ -197,11 +201,19 @@ type cubicHealEffectiveness interface {
 	HealEffectiveness() float64
 }
 
+// cubicHealMessageTarget is the narrow surface applyCubicHeal sends the
+// heal feedback message to; only a player-shaped target gets it, matching
+// Cubic.useHealSkill's `if (target instanceof Player)` guard.
+type cubicHealMessageTarget interface {
+	SendFrame(wire.Frame) bool
+}
+
 // applyCubicHeal restores HP directly, matching Cubic.useHealSkill: a flat
 // skill.getPower() * target's HEAL_EFFECTIVNESS / 100, with no caster stat
 // or proficiency contribution — distinct from the generic HEAL skill
 // handler a player's own heal cast goes through, which scales by the
-// caster's own MATK and healing proficiency.
+// caster's own MATK and healing proficiency. A player-shaped target also
+// gets the REJUVENATING_HP feedback message.
 func applyCubicHeal(def modelskill.Definition, target any) {
 	healable, ok := target.(cubicHealTarget)
 	if !ok || !healable.CanBeHealed() {
@@ -212,6 +224,10 @@ func applyCubicHeal(def modelskill.Definition, target any) {
 		effectiveness = eff.HealEffectiveness()
 	}
 	healable.AddHP(float64(def.Power) * effectiveness / 100)
+
+	if recipient, ok := target.(cubicHealMessageTarget); ok {
+		recipient.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageRejuvenatingHP))
+	}
 }
 
 // pickCubicEnemyTarget mirrors Cubic.pickEnemyTarget: the owner's currently
