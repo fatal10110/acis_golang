@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cubic"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -95,14 +94,20 @@ func TestFireCubic_LifeCubicSelfStartsAndFiresWithoutAttackStance(t *testing.T) 
 	}
 	clock.fireLast()
 
-	found := false
+	var foundMagicSkillUse, foundSystemMessage bool
 	for _, op := range frameOpcodes(capture.frames) {
-		if op == serverpackets.OpcodeMagicSkillUse {
-			found = true
+		switch op {
+		case serverpackets.OpcodeMagicSkillUse:
+			foundMagicSkillUse = true
+		case serverpackets.OpcodeSystemMessage:
+			foundSystemMessage = true
 		}
 	}
-	if !found {
+	if !foundMagicSkillUse {
 		t.Fatalf("Life Cubic fire did not broadcast MagicSkillUse, frames = %v", frameOpcodes(capture.frames))
+	}
+	if !foundSystemMessage {
+		t.Fatalf("Life Cubic heal did not send SystemMessage (REJUVENATING_HP) to the player-shaped target, frames = %v", frameOpcodes(capture.frames))
 	}
 }
 
@@ -185,6 +190,90 @@ func TestFireCubic_NonLifeCubicFiresAgainstOwnerTargetInAttackStance(t *testing.
 	}
 }
 
+// TestFireCubic_OwnerDiesDuringCastDelaySkipsDeferredEffect covers the
+// window between the MagicSkillUse broadcast and cubicCastDelay elapsing:
+// fireCubic only checks live.Character.Dead() once, at the start of the
+// tick, before that delay — the deferred closure itself must re-check, or
+// the reference's stop()-cancels-the-cast-task behavior is lost and a dead
+// owner still gets healed/damaged once the delay elapses.
+func TestFireCubic_OwnerDiesDuringCastDelaySkipsDeferredEffect(t *testing.T) {
+	clock := &fakeCubicClock{}
+	stance := &attackStanceRecorder{}
+	l := newCubicTestLink(t, clock, stance,
+		modelskill.Definition{
+			ID: testLifeCubicGrantSkillID, Level: 1, SkillType: "SUMMON", IsCubic: true, NpcID: int(cubic.Life),
+			CubicActivationTime: 8, CubicActivationChance: 30, SummonTotalLifeTime: 1200000,
+		},
+		modelskill.Definition{ID: testLifeCubicHealSkillID, Level: 1, SkillType: "HEAL", Target: modelskill.TargetOne},
+	)
+
+	var deferred func()
+	l.afterFunc = func(_ time.Duration, fn func()) { deferred = fn } // captured, not run yet
+
+	capture := &frameCapture{}
+	live := newTestLivePlayer(t, 1, capture)
+	live.SetResourceValues(player.Resources{MaxHP: 1000, CurrentHP: 1, MaxMP: 30, CurrentMP: 30})
+	live.SetRollSource(func(int) int { return 0 })
+
+	def, _ := l.skills.Definition(modelskill.Ref{ID: testLifeCubicGrantSkillID, Level: 1})
+	l.syncCubicRuntime(live, cubic.Life, def)
+	clock.fireLast() // broadcasts MagicSkillUse and captures the deferred heal closure
+
+	if deferred == nil {
+		t.Fatal("fireCubic did not schedule a deferred effect closure")
+	}
+
+	live.Character.Die(nil) // owner dies inside the cast-delay window
+	beforeHP := live.CurrentHP()
+	deferred()
+
+	if got := live.CurrentHP(); got != beforeHP {
+		t.Fatalf("CurrentHP() after deferred heal on a dead owner = %d, want unchanged %d", got, beforeHP)
+	}
+}
+
+// TestFireCubic_CubicExpiresDuringCastDelaySkipsDeferredEffect covers the
+// same window as above for a still-alive owner: if the cubic's own
+// disappear timer elapses (or it is otherwise stopped) while its
+// cast-delay closure is pending, the closure must not still apply the
+// effect — CanBeHealed()-style target-side gates don't catch this case
+// since the owner (and target) are both otherwise healthy.
+func TestFireCubic_CubicExpiresDuringCastDelaySkipsDeferredEffect(t *testing.T) {
+	clock := &fakeCubicClock{}
+	stance := &attackStanceRecorder{}
+	l := newCubicTestLink(t, clock, stance,
+		modelskill.Definition{
+			ID: testLifeCubicGrantSkillID, Level: 1, SkillType: "SUMMON", IsCubic: true, NpcID: int(cubic.Life),
+			CubicActivationTime: 8, CubicActivationChance: 30, SummonTotalLifeTime: 1200000,
+		},
+		modelskill.Definition{ID: testLifeCubicHealSkillID, Level: 1, SkillType: "HEAL", Target: modelskill.TargetOne},
+	)
+
+	var deferred func()
+	l.afterFunc = func(_ time.Duration, fn func()) { deferred = fn } // captured, not run yet
+
+	capture := &frameCapture{}
+	live := newTestLivePlayer(t, 1, capture)
+	live.SetResourceValues(player.Resources{MaxHP: 1000, CurrentHP: 1, MaxMP: 30, CurrentMP: 30})
+	live.SetRollSource(func(int) int { return 0 })
+
+	def, _ := l.skills.Definition(modelskill.Ref{ID: testLifeCubicGrantSkillID, Level: 1})
+	l.syncCubicRuntime(live, cubic.Life, def)
+	clock.fireLast() // broadcasts MagicSkillUse and captures the deferred heal closure
+
+	if deferred == nil {
+		t.Fatal("fireCubic did not schedule a deferred effect closure")
+	}
+
+	l.expireCubic(live, cubic.Life) // the cubic's own lifetime elapses mid-delay; owner stays alive
+	beforeHP := live.CurrentHP()
+	deferred()
+
+	if got := live.CurrentHP(); got != beforeHP {
+		t.Fatalf("CurrentHP() after deferred heal on an expired cubic = %d, want unchanged %d", got, beforeHP)
+	}
+}
+
 func TestFireCubic_DeadOwnerStopsInsteadOfFiring(t *testing.T) {
 	clock := &fakeCubicClock{}
 	stance := &attackStanceRecorder{}
@@ -253,82 +342,7 @@ func TestLivePlayerStop_StopsLiveCubicRuntimes(t *testing.T) {
 	}
 }
 
-func TestCubicGrantedLevel(t *testing.T) {
-	tests := []struct {
-		name string
-		def  modelskill.Definition
-		want int
-	}{
-		{"regular skill passes level through", modelskill.Definition{ID: 10, Level: 5}, 5},
-		{"Life Cubic for Beginners forces level 8", modelskill.Definition{ID: 4338, Level: 1}, 8},
-		{"enchanted level above 100 collapses via the reference formula", modelskill.Definition{ID: 10, Level: 121}, 11},
-		{"non-exact-multiple truncates toward zero like Java int division", modelskill.Definition{ID: 10, Level: 125}, 11},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := cubicGrantedLevel(tt.def); got != tt.want {
-				t.Fatalf("cubicGrantedLevel(%+v) = %d, want %d", tt.def, got, tt.want)
-			}
-		})
-	}
-}
-
-type fakeCubicHealTarget struct {
-	healable      bool
-	effectiveness float64
-	added         float64
-}
-
-func (f *fakeCubicHealTarget) CanBeHealed() bool { return f.healable }
-func (f *fakeCubicHealTarget) AddHP(amount float64) float64 {
-	f.added = amount
-	return amount
-}
-func (f *fakeCubicHealTarget) HealEffectiveness() float64 { return f.effectiveness }
-
-func TestApplyCubicHeal_FlatFormulaNoCasterStats(t *testing.T) {
-	target := &fakeCubicHealTarget{healable: true, effectiveness: 150}
-	applyCubicHeal(modelskill.Definition{Power: 200}, target)
-
-	want := 200.0 * 150 / 100
-	if target.added != want {
-		t.Fatalf("AddHP amount = %v, want %v (power * effectiveness / 100, no caster stats)", target.added, want)
-	}
-}
-
-func TestApplyCubicHeal_SkipsUnhealableTarget(t *testing.T) {
-	target := &fakeCubicHealTarget{healable: false, effectiveness: 100}
-	applyCubicHeal(modelskill.Definition{Power: 200}, target)
-
-	if target.added != 0 {
-		t.Fatalf("AddHP called on an unhealable target, amount = %v", target.added)
-	}
-}
-
-type fakeCubicHealPlayerTarget struct {
-	fakeCubicHealTarget
-	capture *frameCapture
-}
-
-func (f *fakeCubicHealPlayerTarget) SendFrame(frame wire.Frame) bool {
-	return f.capture.send(frame)
-}
-
-func TestApplyCubicHeal_SendsRejuvenatingHPToPlayerTarget(t *testing.T) {
-	capture := &frameCapture{}
-	target := &fakeCubicHealPlayerTarget{
-		fakeCubicHealTarget: fakeCubicHealTarget{healable: true, effectiveness: 100},
-		capture:             capture,
-	}
-	applyCubicHeal(modelskill.Definition{Power: 200}, target)
-
-	found := false
-	for _, op := range frameOpcodes(capture.frames) {
-		if op == serverpackets.OpcodeSystemMessage {
-			found = true
-		}
-	}
-	if !found {
-		t.Fatalf("applyCubicHeal on a player-shaped target did not send SystemMessage (REJUVENATING_HP), frames = %v", frameOpcodes(capture.frames))
-	}
-}
+// cubicGrantedLevel and applyCubicHeal's pure decision logic moved to
+// model/actor/cast (cubic_fire.go / cubic_fire_test.go) per the network
+// package's orchestration-boundary rule: network calls those domain APIs
+// and only translates the outcome into packets.

@@ -37,8 +37,16 @@ type Runtime struct {
 	disappear        func()
 	afterFunc        AfterFunc
 
-	mu             sync.Mutex
-	running        bool
+	mu      sync.Mutex
+	running bool
+	// generation increments on every Action()/StopAction() call, so a tick
+	// scheduled by a now-superseded Action() call can tell it is stale and
+	// must not reschedule itself. Without this, a StopAction() immediately
+	// followed by an Action() while a tick's fire() is still running (a
+	// realistic race: the timer callback and an attack-stance-driven
+	// Action()/StopAction() call run on different goroutines) would leave
+	// two independent timer chains running, doubling the fire rate.
+	generation     int
 	actionTimer    Timer
 	disappearTimer Timer
 }
@@ -65,22 +73,24 @@ func (r *Runtime) Action() {
 		return
 	}
 	r.running = true
-	r.actionTimer = r.afterFunc(r.interval, r.tick)
+	r.generation++
+	gen := r.generation
+	r.actionTimer = r.afterFunc(r.interval, func() { r.tick(gen) })
 }
 
-func (r *Runtime) tick() {
+func (r *Runtime) tick(gen int) {
 	r.mu.Lock()
-	running := r.running
-	r.mu.Unlock()
-	if !running {
+	if !r.running || gen != r.generation {
+		r.mu.Unlock()
 		return
 	}
+	r.mu.Unlock()
 
 	r.fire()
 
 	r.mu.Lock()
-	if r.running {
-		r.actionTimer = r.afterFunc(r.interval, r.tick)
+	if r.running && gen == r.generation {
+		r.actionTimer = r.afterFunc(r.interval, func() { r.tick(gen) })
 	}
 	r.mu.Unlock()
 }
@@ -93,6 +103,7 @@ func (r *Runtime) StopAction() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.running = false
+	r.generation++
 	if r.actionTimer != nil {
 		r.actionTimer.Stop()
 	}
@@ -114,6 +125,7 @@ func (r *Runtime) Stop() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.running = false
+	r.generation++
 	if r.actionTimer != nil {
 		r.actionTimer.Stop()
 	}

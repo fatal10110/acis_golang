@@ -144,6 +144,48 @@ func TestRuntime_StopCancelsBothTimers(t *testing.T) {
 	}
 }
 
+// TestRuntime_StopActionThenActionDuringFireDoesNotOrphanATimer reproduces
+// the race where StopAction() immediately followed by Action() happens
+// while a tick's fire() callback is still running (a realistic sequence
+// since the timer callback and an attack-stance-driven Action()/
+// StopAction() call run on different goroutines in production). Without the
+// generation guard, the in-flight tick's own post-fire reschedule would run
+// unconditionally on r.running alone, creating a second independent timer
+// chain alongside the one Action() just started inside fire().
+func TestRuntime_StopActionThenActionDuringFireDoesNotOrphanATimer(t *testing.T) {
+	clock := &fakeClock{}
+	fireCount := 0
+	var r *Runtime
+	r = NewRuntime(Storm, 1, 30, time.Second, func() {
+		fireCount++
+		if fireCount == 1 {
+			r.StopAction()
+			r.Action()
+		}
+	}, func() {}, clock.after)
+
+	r.Action()
+	clock.fireLast() // first tick: fire() itself calls StopAction()+Action()
+
+	live := 0
+	for _, s := range clock.scheduled {
+		if !s.timer.stopped {
+			live++
+		}
+	}
+	if live != 1 {
+		t.Fatalf("live (unstopped) scheduled timers after StopAction()+Action() inside fire() = %d, want 1 (no orphaned duplicate chain)", live)
+	}
+
+	// The stale tick (if any survived) must not have rescheduled a second
+	// time from its own post-fire check; only Action()'s own fresh timer
+	// should still be pending.
+	clock.fireLast()
+	if fireCount != 2 {
+		t.Fatalf("fireCount after second fireLast() = %d, want 2 (single active chain, no duplicate fire rate)", fireCount)
+	}
+}
+
 func TestRuntime_ID(t *testing.T) {
 	r := NewRuntime(Vampiric, 1, 30, time.Second, func() {}, func() {}, nil)
 	if r.ID() != int(Vampiric) {

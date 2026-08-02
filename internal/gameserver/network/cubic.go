@@ -1,47 +1,19 @@
 package network
 
 import (
-	"math"
 	"time"
 
-	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cubic"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
-	"github.com/fatal10110/acis_golang/internal/commons/wire"
 )
-
-// cubicMaxMagicRange is Cubic.MAX_MAGIC_RANGE: the 3D range (collision radii
-// included) both pickEnemyTarget and pickFriendlyTarget scan within.
-const cubicMaxMagicRange = 900
 
 // cubicCastDelay is Cubic.CAST_DELAY: the fixed delay between a cubic's
 // visible MagicSkillUse broadcast and its effect actually landing.
 const cubicCastDelay = 2 * time.Second
-
-// cubicGrantedLevel resolves the level a granted cubic actually fires its
-// skills at, matching L2SkillSummon.useSkill's skillLevel adjustment: skill
-// 4338 (Life Cubic for Beginners) always grants level 8, and any
-// granting-skill level above 100 (enchanted skill levels) collapses through
-// the same rounding formula the reference applies before ever reaching
-// CubicList.addOrRefreshCubic.
-func cubicGrantedLevel(def modelskill.Definition) int {
-	switch {
-	case int(def.ID) == 4338:
-		return 8
-	case def.Level > 100:
-		// Java: Math.round(((getLevel() - 100) / 7) + 8) — all-int
-		// arithmetic, truncating toward zero; the Math.round call is a
-		// no-op since the operand is already an integer by then. Go's
-		// integer division truncates toward zero the same way.
-		return (def.Level-100)/7 + 8
-	default:
-		return def.Level
-	}
-}
 
 // syncCubicRuntime (re)synchronizes live's live cubic runtime for id after a
 // SUMMON cubic cast touched its cubic list, matching
@@ -64,7 +36,7 @@ func (l *GameClientLink) syncCubicRuntime(live *livePlayer, id cubic.ID, def mod
 	runtime, exists := live.cubics[id]
 	if !exists {
 		interval := time.Duration(def.CubicActivationTime) * time.Second
-		runtime = cubic.NewRuntime(id, cubicGrantedLevel(def), def.CubicActivationChance, interval, func() {
+		runtime = cubic.NewRuntime(id, actorcast.CubicGrantedLevel(def), def.CubicActivationChance, interval, func() {
 			l.fireCubic(live, id, runtime)
 		}, func() {
 			l.expireCubic(live, id)
@@ -110,13 +82,28 @@ func (live *livePlayer) Cubics() []task.AttackStanceCubic {
 	return out
 }
 
+// cubicStillActive reports whether id is still one of live's active
+// cubics, so a deferred effect scheduled cubicCastDelay ago can tell its
+// cubic wasn't stopped (owner death, logout, natural expiry) in the
+// meantime.
+func (live *livePlayer) cubicStillActive(id cubic.ID) bool {
+	live.cubicsMu.Lock()
+	defer live.cubicsMu.Unlock()
+	_, ok := live.cubics[id]
+	return ok
+}
+
 // fireCubic runs one action tick for live's cubic id, matching
-// Cubic.fireAction: for a non-Life cubic, going out of combat stance stops
-// the action tick outright (StopAction) rather than firing; otherwise it
-// rolls the granting skill's activation chance, picks a random skill among
-// the cubic's fixed set, and resolves a target. The Life Cubic instead
-// always tries its single heal skill against a friendly target and ignores
-// the combat-stance gate entirely.
+// Cubic.fireAction: a dead owner stops the cubic outright rather than
+// firing; for a non-Life cubic, going out of combat stance stops the action
+// tick outright (StopAction) rather than firing, otherwise the granting
+// skill's activation chance, a random skill among the cubic's fixed set,
+// and the target are resolved by cast.DecideCubicFire. The Life Cubic
+// instead always tries its single heal skill against cast.DecideLifeCubicTarget
+// and ignores the combat-stance gate entirely. Target selection, activation
+// rolls, and the heal formula are domain decisions (model/actor/cast); this
+// function only resolves session/world context, calls those decisions, and
+// translates the outcome into packets.
 func (l *GameClientLink) fireCubic(live *livePlayer, id cubic.ID, runtime *cubic.Runtime) {
 	if live == nil || runtime == nil {
 		return
@@ -133,6 +120,8 @@ func (l *GameClientLink) fireCubic(live *livePlayer, id cubic.ID, runtime *cubic
 		return
 	}
 
+	owner := cubicFireOwner{live}
+
 	var (
 		skillID int
 		target  actorcast.Target
@@ -140,17 +129,13 @@ func (l *GameClientLink) fireCubic(live *livePlayer, id cubic.ID, runtime *cubic
 	)
 	if id == cubic.Life {
 		skillID = skillIDs[0]
-		target, ok = l.pickCubicFriendlyTarget(live)
+		target, ok = actorcast.DecideLifeCubicTarget(owner)
 	} else {
 		if l.attackStance == nil || !l.attackStance.InAttackStance(live) {
 			runtime.StopAction()
 			return
 		}
-		if live.Roll(100) >= runtime.ActivationChance {
-			return
-		}
-		skillID = skillIDs[live.Roll(len(skillIDs))]
-		target, ok = l.pickCubicEnemyTarget(live)
+		skillID, target, ok = actorcast.DecideCubicFire(owner, skillIDs, runtime.ActivationChance)
 	}
 	if !ok {
 		return
@@ -179,122 +164,42 @@ func (l *GameClientLink) fireCubic(live *livePlayer, id cubic.ID, runtime *cubic
 	beforeVitals := live.Vitals()
 	if id == cubic.Life {
 		l.scheduleAfter(cubicCastDelay, func() {
-			applyCubicHeal(def, target)
+			// The reference's stop() cancels the in-flight cast task on a
+			// dead/stopped cubic; re-check here since fireCubic only
+			// gated on Dead() at the start of the tick, before this delay.
+			if live.Character.Dead() || !live.cubicStillActive(id) {
+				return
+			}
+			if healed := actorcast.ApplyCubicHeal(def.Power, target); healed {
+				if recipient, ok := target.(cubicHealMessageTarget); ok {
+					recipient.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageRejuvenatingHP))
+				}
+			}
 			sendMagicStatusUpdate(live, beforeVitals)
 		})
 		return
 	}
 	l.scheduleAfter(cubicCastDelay, func() {
-		l.skillHandlers.UseResult(handlerskill.Cast{Caster: live.Character, Skill: def, Targets: []any{target}})
+		if live.Character.Dead() || !live.cubicStillActive(id) {
+			return
+		}
+		actorcast.ApplyCubicEffect(l.skillHandlers, live.Character, def, target)
 		sendMagicStatusUpdate(live, beforeVitals)
 	})
 }
 
-// cubicHealTarget and cubicHealEffectiveness are the narrow surfaces
-// applyCubicHeal needs from a Life Cubic's heal target.
-type cubicHealTarget interface {
-	CanBeHealed() bool
-	AddHP(float64) float64
-}
-
-type cubicHealEffectiveness interface {
-	HealEffectiveness() float64
-}
-
-// cubicHealMessageTarget is the narrow surface applyCubicHeal sends the
-// heal feedback message to; only a player-shaped target gets it, matching
-// Cubic.useHealSkill's `if (target instanceof Player)` guard.
+// cubicHealMessageTarget is the narrow surface a Life Cubic heal target
+// sends the REJUVENATING_HP feedback message to; only a player-shaped
+// target gets it, matching Cubic.useHealSkill's
+// `if (target instanceof Player)` guard.
 type cubicHealMessageTarget interface {
 	SendFrame(wire.Frame) bool
 }
 
-// applyCubicHeal restores HP directly, matching Cubic.useHealSkill: a flat
-// skill.getPower() * target's HEAL_EFFECTIVNESS / 100, with no caster stat
-// or proficiency contribution — distinct from the generic HEAL skill
-// handler a player's own heal cast goes through, which scales by the
-// caster's own MATK and healing proficiency. A player-shaped target also
-// gets the REJUVENATING_HP feedback message.
-func applyCubicHeal(def modelskill.Definition, target any) {
-	healable, ok := target.(cubicHealTarget)
-	if !ok || !healable.CanBeHealed() {
-		return
-	}
-	effectiveness := 100.0
-	if eff, ok := target.(cubicHealEffectiveness); ok {
-		effectiveness = eff.HealEffectiveness()
-	}
-	healable.AddHP(float64(def.Power) * effectiveness / 100)
+// cubicFireOwner adapts *livePlayer to actorcast.CubicFireOwner: Roll,
+// CurrentHP and MaxHPValue already match through promotion from the
+// embedded Character, and ObjectID/Position are promoted too, so only
+// Target's return type needs boxing into the domain-facing `any`.
+type cubicFireOwner struct{ *livePlayer }
 
-	if recipient, ok := target.(cubicHealMessageTarget); ok {
-		recipient.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageRejuvenatingHP))
-	}
-}
-
-// pickCubicEnemyTarget mirrors Cubic.pickEnemyTarget: the owner's currently
-// selected target, if within range and not already dead. The reference's
-// full isAttackableWithoutForceBy alignment/karma matrix is not replicated
-// here — deferred, see #1129.
-func (l *GameClientLink) pickCubicEnemyTarget(live *livePlayer) (actorcast.Target, bool) {
-	selected := live.Target()
-	if selected == nil {
-		return nil, false
-	}
-	combatant, ok := selected.(attackable.Combatant)
-	if !ok || combatant.AlikeDead() {
-		return nil, false
-	}
-	target, ok := selected.(actorcast.Target)
-	if !ok || !cubicWithinRange(live, target) {
-		return nil, false
-	}
-	return target, true
-}
-
-// pickCubicFriendlyTarget mirrors Cubic.pickFriendlyTarget's no-party
-// fallback: heal the owner if under full HP, gated by the reference's
-// HP-ratio-banded probability roll. The party-scan branch needs the
-// milestone-M8 party system and isn't reachable yet — deferred, see #1129.
-func (l *GameClientLink) pickCubicFriendlyTarget(live *livePlayer) (actorcast.Target, bool) {
-	maxHP := live.MaxHPValue()
-	if maxHP <= 0 {
-		return nil, false
-	}
-	ratio := float64(live.CurrentHP()) / maxHP
-	if ratio >= 1.0 {
-		return nil, false
-	}
-
-	roll := live.Roll(100)
-	var chance int
-	switch {
-	case ratio > 0.6:
-		chance = 13
-	case ratio < 0.3:
-		chance = 53
-	default:
-		chance = 33
-	}
-	if roll > chance {
-		return nil, false
-	}
-	return live, true
-}
-
-func cubicWithinRange(a, b actorcast.Target) bool {
-	ax, ay, az := a.Position()
-	bx, by, bz := b.Position()
-	dx := float64(ax - bx)
-	dy := float64(ay - by)
-	dz := float64(az - bz)
-	dist := math.Sqrt(dx*dx + dy*dy + dz*dz)
-
-	total := float64(cubicMaxMagicRange) + cubicCollisionRadius(a) + cubicCollisionRadius(b)
-	return dist <= total
-}
-
-func cubicCollisionRadius(t actorcast.Target) float64 {
-	if cr, ok := t.(interface{ CollisionRadius() float64 }); ok {
-		return cr.CollisionRadius()
-	}
-	return 0
-}
+func (o cubicFireOwner) Target() any { return o.livePlayer.Target() }
