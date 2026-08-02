@@ -2,6 +2,7 @@ package network
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -188,6 +189,38 @@ func TestGetItemFromPetTransfersBackToOwner(t *testing.T) {
 		t.Fatalf("saved rows = %+v, want new player stack", store.saved)
 	}
 	_ = petInv
+}
+
+func TestGetItemFromPetCancelsActiveEnchantOnFailedTransfer(t *testing.T) {
+	templates := petTestTemplates()
+	capture := &frameCapture{}
+	live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
+	state := world.New()
+	state.Spawn(live, 0, 0, 0, 0)
+	attachTestPet(t, state, live, templates, 12077, nil)
+	capture.frames = nil
+	store := &recordingEnchantItemStore{}
+	ids := &sequentialIDs{next: 920}
+	gcl := &GameClientLink{world: state, ids: ids, items: store, petItems: petitem.NewService(ids)}
+	updates := wireInventoryUpdates(gcl, live)
+	scrollObjectID := int32(501)
+	gcl.enchantStateStore().Select(live.ObjectID(), scrollObjectID)
+
+	// No such object in the pet's inventory: the transfer fails, but the
+	// enchant cancel must still fire since the reference cancels
+	// unconditionally before attempting the transfer.
+	gcl.getItemFromPet(context.Background(), live, clientpackets.RequestGetItemFromPet{ObjectID: 9999, Count: 1})
+	updates.Tick()
+
+	if got := gcl.enchantStateStore().Active(live.ObjectID()); got != 0 {
+		t.Fatalf("active enchant scroll = %d, want cleared despite failed transfer", got)
+	}
+	assertOpcodeSequence(t, capture.frames,
+		serverpackets.OpcodeEnchantResult,
+		serverpackets.OpcodeSystemMessage,
+	)
+	assertEnchantResultFrame(t, capture.frames[0], serverpackets.EnchantResultCancelled)
+	assertStaticSystemMessageFrame(t, capture.frames[1], serverpackets.SystemMessageEnchantScrollCancelled)
 }
 
 func TestPetGetItemPicksUpGroundItem(t *testing.T) {
@@ -468,6 +501,49 @@ func TestGiveItemToPetCancelsActiveEnchantBeforeTransfer(t *testing.T) {
 		serverpackets.OpcodeSystemMessage,
 		serverpackets.OpcodePetInventoryUpdate,
 		serverpackets.OpcodeInventoryUpdate,
+	)
+	assertEnchantResultFrame(t, capture.frames[0], serverpackets.EnchantResultCancelled)
+	assertStaticSystemMessageFrame(t, capture.frames[1], serverpackets.SystemMessageEnchantScrollCancelled)
+}
+
+// failingIDs simulates an object-ID allocator that has run out of IDs, to
+// exercise a transfer-mutation failure after preconditions have passed.
+type failingIDs struct{}
+
+func (failingIDs) NextID() (int32, error) { return 0, errors.New("id allocator exhausted") }
+
+func TestGiveItemToPetCancelsActiveEnchantOnTransferFailure(t *testing.T) {
+	templates := petTestTemplates()
+	source := &item.Instance{ObjectID: 500, TemplateID: item.AdenaID, OwnerID: 1, Count: 100, Location: item.LocationInventory}
+	capture := &frameCapture{}
+	live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{source})
+	state := world.New()
+	state.Spawn(live, 0, 0, 0, 0)
+	attachTestPet(t, state, live, templates, 12077, nil)
+	capture.frames = nil
+	store := &recordingEnchantItemStore{}
+	ids := failingIDs{}
+	gcl := &GameClientLink{world: state, ids: ids, items: store, petItems: petitem.NewService(ids)}
+	updates := wireInventoryUpdates(gcl, live)
+	scrollObjectID := int32(501)
+	gcl.enchantStateStore().Select(live.ObjectID(), scrollObjectID)
+
+	// Partial transfer (30 of 100) needs a new object ID for the split
+	// stack; the allocator failure makes the mutation fail, but the
+	// reference cancels the enchant before attempting the transfer at
+	// all, so it must stay cancelled regardless.
+	gcl.giveItemToPet(context.Background(), live, clientpackets.RequestGiveItemToPet{ObjectID: source.ObjectID, Count: 30})
+	updates.Tick()
+
+	if got := gcl.enchantStateStore().Active(live.ObjectID()); got != 0 {
+		t.Fatalf("active enchant scroll = %d, want cleared despite failed transfer", got)
+	}
+	if source.Count != 100 {
+		t.Fatalf("source Count = %d, want unchanged 100 after failed transfer", source.Count)
+	}
+	assertOpcodeSequence(t, capture.frames,
+		serverpackets.OpcodeEnchantResult,
+		serverpackets.OpcodeSystemMessage,
 	)
 	assertEnchantResultFrame(t, capture.frames[0], serverpackets.EnchantResultCancelled)
 	assertStaticSystemMessageFrame(t, capture.frames[1], serverpackets.SystemMessageEnchantScrollCancelled)

@@ -118,12 +118,7 @@ func (l *GameClientLink) giveItemToPet(ctx context.Context, live *livePlayer, re
 	if playerInv == nil {
 		return
 	}
-	res, failure, err := l.petItems.GiveToPet(playerInv, petInv, pet, live, req.ObjectID, int(req.Count))
-	if err != nil {
-		l.log.Error().Err(err).Msg("transfer item to pet")
-		return
-	}
-	switch failure {
+	switch failure := l.petItems.CheckGive(playerInv, petInv, pet, live, req.ObjectID, int(req.Count)); failure {
 	case petitem.GiveNoop:
 		return
 	case petitem.GiveItemNotForPets:
@@ -143,7 +138,20 @@ func (l *GameClientLink) giveItemToPet(ctx context.Context, live *livePlayer, re
 		return
 	}
 
+	// Cancel before the mutation, matching the reference's
+	// Player.cancelActiveEnchant() call placed right before
+	// Player.transferItem(): a downstream transfer failure must not
+	// leave a stale enchant selection active.
 	l.cancelActiveEnchant(live)
+
+	res, ok, err := l.petItems.Transfer(playerInv, petInv, req.ObjectID, int(req.Count))
+	if err != nil {
+		l.log.Error().Err(err).Msg("transfer item to pet")
+		return
+	}
+	if !ok {
+		return
+	}
 	l.applyPersistActions(ctx, res.Persist)
 }
 
@@ -159,6 +167,13 @@ func (l *GameClientLink) getItemFromPet(ctx context.Context, live *livePlayer, r
 	if playerInv == nil {
 		return
 	}
+
+	// Cancel unconditionally before attempting the transfer, matching the
+	// reference's Player.cancelActiveEnchant() call which precedes
+	// Pet.transferItem() regardless of whether objectID resolves or the
+	// transfer subsequently fails.
+	l.cancelActiveEnchant(live)
+
 	res, ok, err := l.petItems.GetFromPet(petInv, playerInv, req.ObjectID, int(req.Count))
 	if err != nil {
 		l.log.Error().Err(err).Msg("transfer item from pet")
@@ -167,7 +182,6 @@ func (l *GameClientLink) getItemFromPet(ctx context.Context, live *livePlayer, r
 	if !ok {
 		return
 	}
-	l.cancelActiveEnchant(live)
 	l.applyPersistActions(ctx, res.Persist)
 }
 
