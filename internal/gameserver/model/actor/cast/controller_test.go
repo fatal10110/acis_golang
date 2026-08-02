@@ -492,6 +492,36 @@ func TestInterruptCastOnDamageBreaksActiveFusionChannel(t *testing.T) {
 	}
 }
 
+// TestInterruptCastOnDamageBreaksFusionBeforeScheduleFusion pins that the
+// fusion flag comes from the cast's own definition (c.current), not
+// c.fusionEnd. PlayerCast.doFusionCast creates FusionSkill synchronously in
+// the same call that flips isCastingNow=true (PlayerCast.java:79-82), so
+// Formulas.calcCastBreak's unconditional fusion break applies from the
+// moment the cast starts. In Go, ScheduleFusion (which used to gate the
+// flag via fusionEnd) is only called by the network handler several
+// statements after Start — deriving the flag from fusionEnd would leave
+// exactly that gap unprotected. Skill 426/427 are non-magic (no isMagic in
+// the datapack), so a false fusion reading here would additionally fall
+// through InterruptOnDamage's magic-only gate and never break at all.
+func TestInterruptCastOnDamageBreaksFusionBeforeScheduleFusion(t *testing.T) {
+	actor := &testActor{mp: 100, hp: 100, mAtkSpd: 333, pAtkSpd: 333, magicReuseRate: 1, physicalReuseRate: 1}
+	ctrl := NewController(actor)
+	now := time.Now()
+
+	def := modelskill.Definition{ID: 426, Level: 1, Magic: false, SkillType: "FUSION", HitTime: 15000}
+	if _, err := ctrl.Start(now, testTarget{}, def); err != nil {
+		t.Fatalf("Start() error: %v", err)
+	}
+
+	// ScheduleFusion has not run yet: c.fusionEnd is still nil.
+	if !ctrl.InterruptCastOnDamage(1, 99, func(base float64) float64 { return base }, 99, false) {
+		t.Fatal("InterruptCastOnDamage() = false before ScheduleFusion, want true")
+	}
+	if ctrl.CastingNow() {
+		t.Fatal("CastingNow() = true after a pre-ScheduleFusion damage break, want false")
+	}
+}
+
 func TestCanAbort(t *testing.T) {
 	actor := &testActor{mp: 100, hp: 100, mAtkSpd: 333, pAtkSpd: 333, magicReuseRate: 1, physicalReuseRate: 1}
 	ctrl := NewController(actor)

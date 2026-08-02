@@ -455,12 +455,16 @@ func (c *Controller) CurrentSkillIsMagic() bool {
 // InterruptCastOnDamage applies the damage-based cast-break rule
 // (Formulas.calcCastBreak) to the active cast using time.Now(), for callers
 // outside this package that don't hold a DamageInterrupt value already.
-// Fusion reflects whether the actor is currently channeling a FUSION cast
+// Fusion reflects whether the active cast is a FUSION skill
 // (target.getFusionSkill() != null in Formulas.calcCastBreak, Formulas.java:732),
-// which unconditionally interrupts on any damage — no rate roll, no MEN.
+// which unconditionally interrupts on any damage — no rate roll, no MEN. It
+// is read from c.current (set atomically with c.casting at Start) rather
+// than c.fusionEnd, which ScheduleFusion only sets a few statements later —
+// using fusionEnd would leave a window between cast start and channel
+// registration where damage on a live FUSION cast reads as non-fusion.
 func (c *Controller) InterruptCastOnDamage(damage float64, men int, attackCancel func(float64) float64, roll int, immune bool) bool {
 	c.mu.RLock()
-	fusion := c.fusionEnd != nil
+	fusion := c.casting && c.current.SkillType == "FUSION"
 	c.mu.RUnlock()
 	return c.InterruptOnDamage(time.Now(), DamageInterrupt{
 		Damage:       damage,
