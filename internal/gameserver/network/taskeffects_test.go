@@ -268,8 +268,18 @@ func TestTaskEffectsShadowItemExpiryDestroysAndUpdatesLivePlayer(t *testing.T) {
 	if inv.ItemByObjectID(inst.ObjectID) != nil {
 		t.Fatal("expired shadow item remains in inventory")
 	}
-	if len(capture.frames) != 2 || capture.frames[0][0] != serverpackets.OpcodeUserInfo || capture.frames[1][0] != serverpackets.OpcodeInventoryUpdate {
-		t.Fatalf("expiry frames = %x, want UserInfo then InventoryUpdate", capture.frames)
+	if len(capture.frames) != 3 || capture.frames[0][0] != serverpackets.OpcodeUserInfo || capture.frames[2][0] != serverpackets.OpcodeInventoryUpdate {
+		t.Fatalf("expiry frames = %x, want UserInfo, SystemMessage, InventoryUpdate", capture.frames)
+	}
+	msg := capture.frames[1]
+	if msg[0] != serverpackets.OpcodeSystemMessage {
+		t.Fatalf("opcode = %#x, want %#x", msg[0], serverpackets.OpcodeSystemMessage)
+	}
+	if id := binary.LittleEndian.Uint32(msg[1:5]); id != serverpackets.SystemMessageRemainingManaIsNow0 {
+		t.Fatalf("message id = %d, want %d", id, serverpackets.SystemMessageRemainingManaIsNow0)
+	}
+	if itemID := binary.LittleEndian.Uint32(msg[13:17]); itemID != uint32(shadow.ID) {
+		t.Fatalf("message item id = %d, want %d", itemID, shadow.ID)
 	}
 }
 
