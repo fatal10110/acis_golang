@@ -9,6 +9,7 @@ import (
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
@@ -211,6 +212,32 @@ func TestTaskEffectsDrownDamagesAndNotifiesLivePlayer(t *testing.T) {
 	}
 }
 
+// TestTaskEffectsDrownDoesNotBreakInFlightCast pins WaterTaskManager.java:53
+// (player.reduceCurrentHp(hp, player, false, false, null)) against
+// PlayerStatus.reduceHp (PlayerStatus.java:96-193): calcCastBreak is only
+// invoked from attack handlers (Pdam/Mdam/Blow/CreatureAttack/etc.), never
+// from reduceHp, so a drowning tick never rolls to interrupt an in-progress
+// cast. Drown must go through the DOT-style HP path (ReduceHPByDOT), not the
+// normal-hit path (ReduceHP, which runs breakCastOnDamage).
+func TestTaskEffectsDrownDoesNotBreakInFlightCast(t *testing.T) {
+	live := newTestLivePlayer(t, 100, &frameCapture{})
+	state := world.New()
+	state.AddPlayer(live)
+
+	gcl := &GameClientLink{log: zerolog.Nop()}
+	controller := gcl.castController(live)
+	castingDef := modelskill.Definition{ID: 9, Level: 1, HitTime: 5000, StaticHitTime: true, StaticReuse: true}
+	if _, err := controller.Start(time.Now(), skillCastObject(live), castingDef); err != nil {
+		t.Fatalf("Start() error: %v", err)
+	}
+
+	NewTaskEffects(state).Drown(live)
+
+	if !controller.CastingNow() {
+		t.Fatal("CastingNow() = false after drowning damage, want the in-flight cast to survive")
+	}
+}
+
 func TestTaskEffectsShadowItemExpiryDestroysAndUpdatesLivePlayer(t *testing.T) {
 	state := world.New()
 	capture := &frameCapture{}
@@ -241,8 +268,18 @@ func TestTaskEffectsShadowItemExpiryDestroysAndUpdatesLivePlayer(t *testing.T) {
 	if inv.ItemByObjectID(inst.ObjectID) != nil {
 		t.Fatal("expired shadow item remains in inventory")
 	}
-	if len(capture.frames) != 2 || capture.frames[0][0] != serverpackets.OpcodeUserInfo || capture.frames[1][0] != serverpackets.OpcodeInventoryUpdate {
-		t.Fatalf("expiry frames = %x, want UserInfo then InventoryUpdate", capture.frames)
+	if len(capture.frames) != 3 || capture.frames[0][0] != serverpackets.OpcodeUserInfo || capture.frames[2][0] != serverpackets.OpcodeInventoryUpdate {
+		t.Fatalf("expiry frames = %x, want UserInfo, SystemMessage, InventoryUpdate", capture.frames)
+	}
+	msg := capture.frames[1]
+	if msg[0] != serverpackets.OpcodeSystemMessage {
+		t.Fatalf("opcode = %#x, want %#x", msg[0], serverpackets.OpcodeSystemMessage)
+	}
+	if id := binary.LittleEndian.Uint32(msg[1:5]); id != serverpackets.SystemMessageRemainingManaIsNow0 {
+		t.Fatalf("message id = %d, want %d", id, serverpackets.SystemMessageRemainingManaIsNow0)
+	}
+	if itemID := binary.LittleEndian.Uint32(msg[13:17]); itemID != uint32(shadow.ID) {
+		t.Fatalf("message item id = %d, want %d", itemID, shadow.ID)
 	}
 }
 

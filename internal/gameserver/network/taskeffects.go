@@ -8,7 +8,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
-	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
@@ -106,8 +105,7 @@ func (e *TaskEffects) Drown(actor task.WaterActor) {
 		coefficient = 0.002698
 	}
 	damage := live.MaxHPValue() * live.Race.BreathMultiplier() * coefficient
-	live.ReduceHP(damage, live, modelskill.Definition{})
-	live.BroadcastStatus()
+	live.ReduceHPByDOT(damage, live)
 	live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageDrownDamage, int32(damage)))
 }
 
