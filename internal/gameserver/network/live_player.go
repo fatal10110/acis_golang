@@ -82,6 +82,15 @@ func (p *livePlayer) Stop() {
 	p.stopCubics()
 }
 
+// detached reports whether p's session has begun detaching (logout), the
+// same shadowExpiryMu-guarded flag taskeffects.go checks before applying a
+// deferred effect against an already-detached session.
+func (p *livePlayer) detached() bool {
+	p.shadowExpiryMu.RLock()
+	defer p.shadowExpiryMu.RUnlock()
+	return p.detaching
+}
+
 // stopCubics cancels every live cubic runtime's timers on detach, so a
 // recurring action tick never fires against a session that has already
 // logged out — the reference instead relies on fireAction's own

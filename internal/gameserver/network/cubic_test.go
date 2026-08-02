@@ -274,6 +274,54 @@ func TestFireCubic_CubicExpiresDuringCastDelaySkipsDeferredEffect(t *testing.T) 
 	}
 }
 
+// TestFireCubic_OwnerDetachesDuringCastDelaySkipsDeferredEffect covers a
+// player disconnecting inside the cast-delay window: stopCubics() (called
+// from livePlayer.Stop(), which lifecycle.go's detach path runs before
+// setting live.detaching) stops each runtime's timers but never removes it
+// from live.cubics, so cubicStillActive alone would still report true after
+// detach — the deferred closure needs its own detaching check too.
+func TestFireCubic_OwnerDetachesDuringCastDelaySkipsDeferredEffect(t *testing.T) {
+	clock := &fakeCubicClock{}
+	stance := &attackStanceRecorder{}
+	l := newCubicTestLink(t, clock, stance,
+		modelskill.Definition{
+			ID: testLifeCubicGrantSkillID, Level: 1, SkillType: "SUMMON", IsCubic: true, NpcID: int(cubic.Life),
+			CubicActivationTime: 8, CubicActivationChance: 30, SummonTotalLifeTime: 1200000,
+		},
+		modelskill.Definition{ID: testLifeCubicHealSkillID, Level: 1, SkillType: "HEAL", Target: modelskill.TargetOne},
+	)
+
+	var deferred func()
+	l.afterFunc = func(_ time.Duration, fn func()) { deferred = fn } // captured, not run yet
+
+	capture := &frameCapture{}
+	live := newTestLivePlayer(t, 1, capture)
+	live.SetResourceValues(player.Resources{MaxHP: 1000, CurrentHP: 1, MaxMP: 30, CurrentMP: 30})
+	live.SetRollSource(func(int) int { return 0 })
+
+	def, _ := l.skills.Definition(modelskill.Ref{ID: testLifeCubicGrantSkillID, Level: 1})
+	l.syncCubicRuntime(live, cubic.Life, def)
+	clock.fireLast() // broadcasts MagicSkillUse and captures the deferred heal closure
+
+	if deferred == nil {
+		t.Fatal("fireCubic did not schedule a deferred effect closure")
+	}
+
+	// Mirrors lifecycle.go's detachLivePlayer: Stop() first (stops the
+	// runtime's timers, but leaves it in live.cubics), then detaching=true.
+	live.Stop()
+	live.shadowExpiryMu.Lock()
+	live.detaching = true
+	live.shadowExpiryMu.Unlock()
+
+	beforeHP := live.CurrentHP()
+	deferred()
+
+	if got := live.CurrentHP(); got != beforeHP {
+		t.Fatalf("CurrentHP() after deferred heal on a detached owner = %d, want unchanged %d", got, beforeHP)
+	}
+}
+
 func TestFireCubic_DeadOwnerStopsInsteadOfFiring(t *testing.T) {
 	clock := &fakeCubicClock{}
 	stance := &attackStanceRecorder{}

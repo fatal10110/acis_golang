@@ -165,9 +165,13 @@ func (l *GameClientLink) fireCubic(live *livePlayer, id cubic.ID, runtime *cubic
 	if id == cubic.Life {
 		l.scheduleAfter(cubicCastDelay, func() {
 			// The reference's stop() cancels the in-flight cast task on a
-			// dead/stopped cubic; re-check here since fireCubic only
-			// gated on Dead() at the start of the tick, before this delay.
-			if live.Character.Dead() || !live.cubicStillActive(id) {
+			// dead/stopped cubic; re-check here since fireCubic only gated
+			// on Dead() at the start of the tick, before this delay.
+			// detached() also covers a logout inside the delay window:
+			// stopCubics() stops each runtime's timers but never removes
+			// it from live.cubics, so cubicStillActive alone would still
+			// report true after the session detached.
+			if live.Character.Dead() || live.detached() || !live.cubicStillActive(id) {
 				return
 			}
 			if healed := actorcast.ApplyCubicHeal(def.Power, target); healed {
@@ -180,7 +184,7 @@ func (l *GameClientLink) fireCubic(live *livePlayer, id cubic.ID, runtime *cubic
 		return
 	}
 	l.scheduleAfter(cubicCastDelay, func() {
-		if live.Character.Dead() || !live.cubicStillActive(id) {
+		if live.Character.Dead() || live.detached() || !live.cubicStillActive(id) {
 			return
 		}
 		actorcast.ApplyCubicEffect(l.skillHandlers, live.Character, def, target)
