@@ -57,6 +57,50 @@ func TestStartScalesTimingAndInstallsReuse(t *testing.T) {
 	}
 }
 
+// TestStartSkipsScalingForFusionSkills pins PlayerCast.doFusionCast
+// (PlayerCast.java:75-76,52), which reads skill.getHitTime()/getCoolTime()/
+// getReuseDelay() raw with no atkSpd or reuse-rate scaling. With the same
+// atkSpd fixture as TestStartScalesTimingAndInstallsReuse (which would
+// otherwise scale a 15000ms hitTime down to ~5250ms), a FUSION skill must
+// keep the raw values.
+func TestStartSkipsScalingForFusionSkills(t *testing.T) {
+	now := time.Unix(1000, 0)
+	actor := &testActor{
+		mp:             100,
+		hp:             1000,
+		mAtkSpd:        666,
+		pAtkSpd:        333,
+		magicReuseRate: 1.25,
+	}
+	ctrl := NewController(actor)
+	def := modelskill.Definition{
+		ID:         426,
+		Level:      1,
+		Magic:      true,
+		SkillType:  "FUSION",
+		HitTime:    15000,
+		ReuseDelay: 30000,
+	}
+
+	plan, err := ctrl.Start(now, testTarget{}, def)
+	if err != nil {
+		t.Fatalf("Start() error: %v", err)
+	}
+
+	if plan.HitTime != 15000*time.Millisecond {
+		t.Fatalf("HitTime = %s, want raw 15000ms unscaled", plan.HitTime)
+	}
+	if plan.ReuseDelay != 30000*time.Millisecond {
+		t.Fatalf("ReuseDelay = %s, want raw 30000ms unscaled", plan.ReuseDelay)
+	}
+	if plan.InterruptAfter != 14800*time.Millisecond {
+		t.Fatalf("InterruptAfter = %s, want 14800ms (raw hitTime-200)", plan.InterruptAfter)
+	}
+	if plan.LaunchDelay != 14600*time.Millisecond || plan.GaugeDuration != 15000*time.Millisecond {
+		t.Fatalf("LaunchDelay/GaugeDuration = %s/%s, want 14600ms/15000ms", plan.LaunchDelay, plan.GaugeDuration)
+	}
+}
+
 func TestStartUsesSharedReuseAndStoresLongCooldowns(t *testing.T) {
 	now := time.Unix(1000, 0)
 	actor := &testActor{mp: 100, hp: 1000, mAtkSpd: 333, pAtkSpd: 333, magicReuseRate: 1, physicalReuseRate: 1}
@@ -417,6 +461,64 @@ func TestInterruptOnDamageFusionBypassesMagicAndRollRules(t *testing.T) {
 	}
 	if ctrl.InterruptOnDamage(now.Add(900*time.Millisecond), DamageInterrupt{Damage: 1, MEN: 0, Roll: 0, Fusion: true}) {
 		t.Fatal("InterruptOnDamage() = true for a fusion break after the abort window, want false")
+	}
+}
+
+// TestInterruptCastOnDamageBreaksActiveFusionChannel pins the wiring
+// Formulas.calcCastBreak's fusion branch (Formulas.java:732-736) needs: any
+// damage to a caster mid fusion-channel interrupts unconditionally, with no
+// rate roll. InterruptCastOnDamage must derive DamageInterrupt.Fusion from
+// live ScheduleFusion state instead of always passing false.
+func TestInterruptCastOnDamageBreaksActiveFusionChannel(t *testing.T) {
+	actor := &testActor{mp: 100, hp: 100, mAtkSpd: 333, pAtkSpd: 333, magicReuseRate: 1, physicalReuseRate: 1}
+	ctrl := NewController(actor)
+	now := time.Now()
+
+	def := modelskill.Definition{ID: 426, Level: 1, Magic: true, SkillType: "FUSION", HitTime: 15000}
+	if _, err := ctrl.Start(now, testTarget{}, def); err != nil {
+		t.Fatalf("Start() error: %v", err)
+	}
+	if !ctrl.ScheduleFusion(ctrl.plan, 0, nil, func() {}) {
+		t.Fatal("ScheduleFusion() = false, want true")
+	}
+
+	// Roll 99 and MEN 99 would fail the ordinary magic cast-break rate
+	// check, but a fusion channel bypasses it entirely.
+	if !ctrl.InterruptCastOnDamage(1, 99, func(base float64) float64 { return base }, 99, false) {
+		t.Fatal("InterruptCastOnDamage() = false while channeling fusion, want true")
+	}
+	if ctrl.CastingNow() {
+		t.Fatal("CastingNow() = true after a fusion-channel damage break, want false")
+	}
+}
+
+// TestInterruptCastOnDamageBreaksFusionBeforeScheduleFusion pins that the
+// fusion flag comes from the cast's own definition (c.current), not
+// c.fusionEnd. PlayerCast.doFusionCast creates FusionSkill synchronously in
+// the same call that flips isCastingNow=true (PlayerCast.java:79-82), so
+// Formulas.calcCastBreak's unconditional fusion break applies from the
+// moment the cast starts. In Go, ScheduleFusion (which used to gate the
+// flag via fusionEnd) is only called by the network handler several
+// statements after Start — deriving the flag from fusionEnd would leave
+// exactly that gap unprotected. Skill 426/427 are non-magic (no isMagic in
+// the datapack), so a false fusion reading here would additionally fall
+// through InterruptOnDamage's magic-only gate and never break at all.
+func TestInterruptCastOnDamageBreaksFusionBeforeScheduleFusion(t *testing.T) {
+	actor := &testActor{mp: 100, hp: 100, mAtkSpd: 333, pAtkSpd: 333, magicReuseRate: 1, physicalReuseRate: 1}
+	ctrl := NewController(actor)
+	now := time.Now()
+
+	def := modelskill.Definition{ID: 426, Level: 1, Magic: false, SkillType: "FUSION", HitTime: 15000}
+	if _, err := ctrl.Start(now, testTarget{}, def); err != nil {
+		t.Fatalf("Start() error: %v", err)
+	}
+
+	// ScheduleFusion has not run yet: c.fusionEnd is still nil.
+	if !ctrl.InterruptCastOnDamage(1, 99, func(base float64) float64 { return base }, 99, false) {
+		t.Fatal("InterruptCastOnDamage() = false before ScheduleFusion, want true")
+	}
+	if ctrl.CastingNow() {
+		t.Fatal("CastingNow() = true after a pre-ScheduleFusion damage break, want false")
 	}
 }
 
