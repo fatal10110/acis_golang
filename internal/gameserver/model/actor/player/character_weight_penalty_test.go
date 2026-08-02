@@ -64,6 +64,56 @@ func TestRefreshWeightPenaltyChangesOnlyOnBandChange(t *testing.T) {
 	}
 }
 
+// TestWeightPenaltySpeedMultiplier pins the per-band speed multiplier to
+// WeightPenalty.java:5-9 (NONE 1, LEVEL_1 1, LEVEL_2 0.5, LEVEL_3 0.5,
+// LEVEL_4 0). LEVEL_4 must be 0, not 0.5 — a fully overloaded reference
+// player cannot move (PlayerStatus.getMoveSpeed, PlayerStatus.java:944-947).
+func TestWeightPenaltySpeedMultiplier(t *testing.T) {
+	tests := []struct {
+		band int
+		want float64
+	}{
+		{0, 1}, {1, 1}, {2, .5}, {3, .5}, {4, 0},
+	}
+	for _, tc := range tests {
+		c := &Character{}
+		c.stateMu.Lock()
+		c.weightPenalty = tc.band
+		c.stateMu.Unlock()
+		if got := c.weightPenaltySpeedMultiplier(); got != tc.want {
+			t.Errorf("band %d: weightPenaltySpeedMultiplier() = %v, want %v", tc.band, got, tc.want)
+		}
+	}
+}
+
+// TestAddLevelRefreshesWeightPenalty pins PlayerStatus.addLevel's direct
+// call to _actor.refreshWeightPenalty() on every level change
+// (PlayerStatus.java:644, before the UserInfo send at :648). The band is
+// forced stale beforehand so a passing test proves AddLevel actually
+// recomputed it rather than leaving it untouched.
+func TestAddLevelRefreshesWeightPenalty(t *testing.T) {
+	inv := itemcontainer.NewPlayerInventory(1, item.NewTable([]*item.Template{{ID: 1, Kind: item.KindEtcItem, Weight: 1, Stackable: true, EtcItem: &item.EtcItemDetail{}}}))
+	c := &Character{CharLevel: 1}
+	c.AttachRuntime(&Template{CON: 20}, inv)
+	c.SetWeightLimitMultiplier(1)
+	inv.AddNew(1, c.WeightLimit(), 1) // full overload -> band 4
+	inv.UpdateWeight()
+
+	c.stateMu.Lock()
+	c.weightPenalty = 0 // stale: as if never refreshed
+	c.stateMu.Unlock()
+
+	table, err := NewLevelTable(map[int]Level{1: {RequiredExpToLevelUp: 0}, 2: {RequiredExpToLevelUp: 100}, 3: {RequiredExpToLevelUp: 200}})
+	if err != nil {
+		t.Fatalf("NewLevelTable: %v", err)
+	}
+	c.AddLevel(table, nil, 1)
+
+	if got, want := c.WeightPenalty(), 4; got != want {
+		t.Fatalf("WeightPenalty() after AddLevel = %d, want %d (stale band never recomputed)", got, want)
+	}
+}
+
 func TestRefreshWeightPenaltyKeepsStateWhenLimitIsZero(t *testing.T) {
 	inv := itemcontainer.NewPlayerInventory(1, item.NewTable([]*item.Template{{ID: 1, Kind: item.KindEtcItem, Weight: 1, Stackable: true, EtcItem: &item.EtcItemDetail{}}}))
 	c := &Character{}

@@ -173,6 +173,11 @@ func (c *Character) AddLevel(table *LevelTable, tmpl *Template, delta int) bool 
 	}
 
 	c.refreshForLevel()
+	// PlayerStatus.addLevel calls _actor.refreshWeightPenalty() directly
+	// on every level change (PlayerStatus.java:644), before the UserInfo
+	// send below (:648) — the weight limit is CON-derived and therefore
+	// level-dependent.
+	c.RefreshWeightPenalty()
 	c.UpdateUserInfo()
 	return increased
 }
