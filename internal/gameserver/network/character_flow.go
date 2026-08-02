@@ -320,6 +320,9 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	c.SetStatusBroadcaster(func() {
 		l.broadcastLiveStatus(live)
 	})
+	c.SetMPStatusBroadcaster(func() {
+		l.broadcastLiveMPStatus(live)
+	})
 	c.SetAbnormalEffectUpdater(func() {
 		l.updateLiveAbnormalEffect(live)
 	})

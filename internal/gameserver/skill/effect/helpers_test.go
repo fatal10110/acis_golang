@@ -37,7 +37,10 @@ type liveEffectTarget struct {
 	validLocationFn   func(ox, oy, oz, tx, ty, tz int) location.Location
 	flightDest        location.Location
 	flightType        modelskill.Flight
+	mpBroadcasts      int
 }
+
+func (t *liveEffectTarget) BroadcastMPStatus() { t.mpBroadcasts++ }
 
 func (t *liveEffectTarget) EffectList() *List { return t.list }
 

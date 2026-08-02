@@ -365,6 +365,11 @@ func TestSilentMoveActionOnlyTicksContSkillsAndStopsOnLowMana(t *testing.T) {
 	if want := []string{"mpdot:4"}; !reflect.DeepEqual(target.events, want) {
 		t.Fatalf("events = %#v, want %#v", target.events, want)
 	}
+	// EffectSilentMove.java:35-41 drains MP through the same reduceMp/setMp
+	// chain as EffectManaDamOverTime; this tick must broadcast it too.
+	if target.mpBroadcasts != 1 {
+		t.Fatalf("mp broadcasts = %d, want 1", target.mpBroadcasts)
+	}
 
 	target.events = nil
 	target.mp = 2

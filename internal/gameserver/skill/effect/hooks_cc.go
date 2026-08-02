@@ -220,6 +220,7 @@ func silentMoveAction(e *Effect) bool {
 	}
 	if result.Damage > 0 {
 		target.ReduceMP(result.Damage)
+		broadcastMPStatus(e.Effected)
 	}
 	return result.Continue
 }
