@@ -389,7 +389,12 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 		})
 	}
 	if inv := c.Inventory(); inv != nil {
-		inv.SetWeightNotifier(c.RefreshWeightPenalty)
+		inv.SetWeightNotifier(func() {
+			live.SendFrame(serverpackets.FrameStatusUpdate(live.ObjectID(), []serverpackets.StatusAttribute{
+				{Type: serverpackets.StatusCurrentLoad, Value: inv.TotalWeight()},
+			}))
+			c.RefreshWeightPenalty()
+		})
 	}
 	// Register every item mutation with the lazy persistence task, matching
 	// the reference registering an item with ItemInstanceTaskManager from
