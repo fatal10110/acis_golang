@@ -40,8 +40,11 @@ func TestTaskEffectsWaterSendsCyanGauge(t *testing.T) {
 	if color := binary.LittleEndian.Uint32(got[1:5]); color != uint32(serverpackets.GaugeCyan) {
 		t.Fatalf("gauge color = %d, want %d", color, serverpackets.GaugeCyan)
 	}
+	if current := binary.LittleEndian.Uint32(got[5:9]); current != 10_000 {
+		t.Fatalf("gauge currentTime = %d, want 10000", current)
+	}
 	if duration := binary.LittleEndian.Uint32(got[9:13]); duration != 10_000 {
-		t.Fatalf("gauge duration = %d, want 10000", duration)
+		t.Fatalf("gauge maxTime = %d, want 10000", duration)
 	}
 }
 
@@ -70,11 +73,17 @@ func TestWaterZoneMovementUsesBreathStatAndClearsGaugeOnExit(t *testing.T) {
 	if len(capture.frames) != 2 {
 		t.Fatalf("water-zone frames = %d, want 2", len(capture.frames))
 	}
+	if current := binary.LittleEndian.Uint32(capture.frames[0][5:9]); current != 120_000 {
+		t.Fatalf("breath gauge currentTime = %d, want 120000", current)
+	}
 	if duration := binary.LittleEndian.Uint32(capture.frames[0][9:13]); duration != 120_000 {
-		t.Fatalf("breath gauge duration = %d, want 120000", duration)
+		t.Fatalf("breath gauge maxTime = %d, want 120000", duration)
+	}
+	if current := binary.LittleEndian.Uint32(capture.frames[1][5:9]); current != 0 {
+		t.Fatalf("exit gauge currentTime = %d, want 0", current)
 	}
 	if duration := binary.LittleEndian.Uint32(capture.frames[1][9:13]); duration != 0 {
-		t.Fatalf("exit gauge duration = %d, want 0", duration)
+		t.Fatalf("exit gauge maxTime = %d, want 0", duration)
 	}
 }
 
