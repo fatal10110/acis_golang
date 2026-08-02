@@ -218,8 +218,9 @@ func silentMoveAction(e *Effect) bool {
 			notifier.NotifyEffectRemovedDueLackMP(e)
 		}
 	}
-	if result.Damage > 0 {
-		target.ReduceMP(result.Damage)
+	// See manaDamageOverTimeAction: gate the broadcast on ReduceMP's applied
+	// amount, not the requested tick damage.
+	if result.Damage > 0 && target.ReduceMP(result.Damage) > 0 {
 		broadcastMPStatus(e.Effected)
 	}
 	return result.Continue

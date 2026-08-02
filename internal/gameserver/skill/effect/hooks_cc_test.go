@@ -379,6 +379,11 @@ func TestSilentMoveActionOnlyTicksContSkillsAndStopsOnLowMana(t *testing.T) {
 	if want := []string{"lack-mp"}; !reflect.DeepEqual(target.events, want) {
 		t.Fatalf("low-mana events = %#v, want %#v", target.events, want)
 	}
+	// A toggle stopped for lack of MP never calls ReduceMP, so it must not
+	// broadcast either — the count from the earlier successful tick stays.
+	if target.mpBroadcasts != 1 {
+		t.Fatalf("low-mana mp broadcasts = %d, want 1 (unchanged)", target.mpBroadcasts)
+	}
 
 	nonCont, err := New(Skill{ID: 1, SkillType: "BUFF"}, modelskill.EffectTemplate{Name: "SilentMove", Value: 4})
 	if err != nil {
