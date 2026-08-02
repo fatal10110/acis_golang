@@ -22,13 +22,18 @@ func (t *fakeCubicTimer) Stop() bool { wasRunning := !t.stopped; t.stopped = tru
 
 type fakeCubicClock struct {
 	scheduled []struct {
-		fn func()
+		fn    func()
+		timer *fakeCubicTimer
 	}
 }
 
 func (c *fakeCubicClock) after(_ time.Duration, fn func()) cubic.Timer {
-	c.scheduled = append(c.scheduled, struct{ fn func() }{fn})
-	return &fakeCubicTimer{}
+	t := &fakeCubicTimer{}
+	c.scheduled = append(c.scheduled, struct {
+		fn    func()
+		timer *fakeCubicTimer
+	}{fn, t})
+	return t
 }
 
 func (c *fakeCubicClock) fireLast() {
@@ -176,5 +181,124 @@ func TestFireCubic_NonLifeCubicFiresAgainstOwnerTargetInAttackStance(t *testing.
 	}
 	if !found {
 		t.Fatalf("cubic in attack stance with a valid target did not broadcast MagicSkillUse, frames = %v", frameOpcodes(capture.frames))
+	}
+}
+
+func TestFireCubic_DeadOwnerStopsInsteadOfFiring(t *testing.T) {
+	clock := &fakeCubicClock{}
+	stance := &attackStanceRecorder{}
+	l := newCubicTestLink(t, clock, stance,
+		modelskill.Definition{
+			ID: testLifeCubicGrantSkillID, Level: 1, SkillType: "SUMMON", IsCubic: true, NpcID: int(cubic.Life),
+			CubicActivationTime: 8, CubicActivationChance: 30, SummonTotalLifeTime: 1200000,
+		},
+		modelskill.Definition{ID: testLifeCubicHealSkillID, Level: 1, SkillType: "HEAL", Target: modelskill.TargetOne},
+	)
+
+	capture := &frameCapture{}
+	live := newTestLivePlayer(t, 1, capture)
+	live.SetResourceValues(player.Resources{MaxHP: 1000, CurrentHP: 1, MaxMP: 30, CurrentMP: 30})
+	live.SetRollSource(func(int) int { return 0 })
+
+	def, _ := l.skills.Definition(modelskill.Ref{ID: testLifeCubicGrantSkillID, Level: 1})
+	l.syncCubicRuntime(live, cubic.Life, def)
+	live.Character.Die(nil)
+
+	clock.fireLast()
+
+	for _, op := range frameOpcodes(capture.frames) {
+		if op == serverpackets.OpcodeMagicSkillUse {
+			t.Fatal("dead owner's cubic fired MagicSkillUse, want stopped instead")
+		}
+	}
+	if ids := live.Character.CubicIDs(); len(ids) != 0 {
+		t.Fatalf("CubicIDs() after dead-owner tick = %v, want empty (cubic stopped)", ids)
+	}
+	if len(live.Cubics()) != 0 {
+		t.Fatalf("Cubics() after dead-owner tick = %d, want 0 (runtime removed)", len(live.Cubics()))
+	}
+}
+
+func TestLivePlayerStop_StopsLiveCubicRuntimes(t *testing.T) {
+	clock := &fakeCubicClock{}
+	stance := &attackStanceRecorder{}
+	l := newCubicTestLink(t, clock, stance,
+		modelskill.Definition{
+			ID: testLifeCubicGrantSkillID, Level: 1, SkillType: "SUMMON", IsCubic: true, NpcID: int(cubic.Life),
+			CubicActivationTime: 8, CubicActivationChance: 30, SummonTotalLifeTime: 1200000,
+		},
+		modelskill.Definition{ID: testLifeCubicHealSkillID, Level: 1, SkillType: "HEAL", Target: modelskill.TargetOne},
+	)
+
+	capture := &frameCapture{}
+	live := newTestLivePlayer(t, 1, capture)
+	def, _ := l.skills.Definition(modelskill.Ref{ID: testLifeCubicGrantSkillID, Level: 1})
+	l.syncCubicRuntime(live, cubic.Life, def)
+
+	before := len(clock.scheduled)
+	if before == 0 {
+		t.Fatal("Life Cubic did not schedule any timer on grant")
+	}
+
+	live.Stop()
+
+	// Every timer scheduled up to detach must be cancelled; a tick that
+	// still fires after Stop() would keep the session's cubic alive past
+	// logout.
+	for i, s := range clock.scheduled[:before] {
+		if !s.timer.stopped {
+			t.Fatalf("scheduled[%d] not stopped after livePlayer.Stop()", i)
+		}
+	}
+}
+
+func TestCubicGrantedLevel(t *testing.T) {
+	tests := []struct {
+		name string
+		def  modelskill.Definition
+		want int
+	}{
+		{"regular skill passes level through", modelskill.Definition{ID: 10, Level: 5}, 5},
+		{"Life Cubic for Beginners forces level 8", modelskill.Definition{ID: 4338, Level: 1}, 8},
+		{"enchanted level above 100 collapses via the reference formula", modelskill.Definition{ID: 10, Level: 121}, 11},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := cubicGrantedLevel(tt.def); got != tt.want {
+				t.Fatalf("cubicGrantedLevel(%+v) = %d, want %d", tt.def, got, tt.want)
+			}
+		})
+	}
+}
+
+type fakeCubicHealTarget struct {
+	healable      bool
+	effectiveness float64
+	added         float64
+}
+
+func (f *fakeCubicHealTarget) CanBeHealed() bool { return f.healable }
+func (f *fakeCubicHealTarget) AddHP(amount float64) float64 {
+	f.added = amount
+	return amount
+}
+func (f *fakeCubicHealTarget) HealEffectiveness() float64 { return f.effectiveness }
+
+func TestApplyCubicHeal_FlatFormulaNoCasterStats(t *testing.T) {
+	target := &fakeCubicHealTarget{healable: true, effectiveness: 150}
+	applyCubicHeal(modelskill.Definition{Power: 200}, target)
+
+	want := 200.0 * 150 / 100
+	if target.added != want {
+		t.Fatalf("AddHP amount = %v, want %v (power * effectiveness / 100, no caster stats)", target.added, want)
+	}
+}
+
+func TestApplyCubicHeal_SkipsUnhealableTarget(t *testing.T) {
+	target := &fakeCubicHealTarget{healable: false, effectiveness: 100}
+	applyCubicHeal(modelskill.Definition{Power: 200}, target)
+
+	if target.added != 0 {
+		t.Fatalf("AddHP called on an unhealable target, amount = %v", target.added)
 	}
 }

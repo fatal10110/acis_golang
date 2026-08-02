@@ -79,6 +79,21 @@ func (p *livePlayer) Stop() {
 		p.stopAttack(p)
 	}
 	p.releaseChair()
+	p.stopCubics()
+}
+
+// stopCubics cancels every live cubic runtime's timers on detach, so a
+// recurring action tick never fires against a session that has already
+// logged out — the reference instead relies on fireAction's own
+// isDead()/isOnline() self-check on its next scheduled tick, but stopping
+// immediately here is equivalent and avoids a stale timer outliving the
+// session.
+func (p *livePlayer) stopCubics() {
+	p.cubicsMu.Lock()
+	defer p.cubicsMu.Unlock()
+	for _, r := range p.cubics {
+		r.Stop()
+	}
 }
 
 func (p *livePlayer) setPickup(ctx context.Context, target world.Tracked) {

@@ -22,6 +22,23 @@ const cubicMaxMagicRange = 900
 // visible MagicSkillUse broadcast and its effect actually landing.
 const cubicCastDelay = 2 * time.Second
 
+// cubicGrantedLevel resolves the level a granted cubic actually fires its
+// skills at, matching L2SkillSummon.useSkill's skillLevel adjustment: skill
+// 4338 (Life Cubic for Beginners) always grants level 8, and any
+// granting-skill level above 100 (enchanted skill levels) collapses through
+// the same rounding formula the reference applies before ever reaching
+// CubicList.addOrRefreshCubic.
+func cubicGrantedLevel(def modelskill.Definition) int {
+	switch {
+	case int(def.ID) == 4338:
+		return 8
+	case def.Level > 100:
+		return int(math.Round(float64(def.Level-100)/7 + 8))
+	default:
+		return def.Level
+	}
+}
+
 // syncCubicRuntime (re)synchronizes live's live cubic runtime for id after a
 // SUMMON cubic cast touched its cubic list, matching
 // CubicList.addOrRefreshCubic: a brand new id gets a fresh Runtime (self-
@@ -43,7 +60,7 @@ func (l *GameClientLink) syncCubicRuntime(live *livePlayer, id cubic.ID, def mod
 	runtime, exists := live.cubics[id]
 	if !exists {
 		interval := time.Duration(def.CubicActivationTime) * time.Second
-		runtime = cubic.NewRuntime(id, def.Level, def.CubicActivationChance, interval, func() {
+		runtime = cubic.NewRuntime(id, cubicGrantedLevel(def), def.CubicActivationChance, interval, func() {
 			l.fireCubic(live, id, runtime)
 		}, func() {
 			l.expireCubic(live, id)
@@ -100,6 +117,12 @@ func (l *GameClientLink) fireCubic(live *livePlayer, id cubic.ID, runtime *cubic
 	if live == nil || runtime == nil {
 		return
 	}
+	if live.Character.Dead() {
+		// Matches Cubic.fireAction's own isDead()/isOnline() self-check:
+		// a dead owner stops the cubic outright rather than firing.
+		l.expireCubic(live, id)
+		return
+	}
 
 	skillIDs := cubic.SkillIDs(id)
 	if len(skillIDs) == 0 {
@@ -134,19 +157,61 @@ func (l *GameClientLink) fireCubic(live *livePlayer, id cubic.ID, runtime *cubic
 		return
 	}
 
+	broadcastLevel := def.Level
+	if id == cubic.Life && broadcastLevel == 8 {
+		// Cubic.fireAction's Life-branch broadcast quirk: the granted
+		// level-8 heal skill displays as level 20 on the client.
+		broadcastLevel = 20
+	}
+
 	casterObject := skillCastObject(live)
 	targetObject := skillCastObject(target)
 	l.broadcastLiveFrame(live, func() wire.Frame {
 		return serverpackets.FrameMagicSkillUse(
-			casterObject, targetObject, int32(def.ID), int32(def.Level),
+			casterObject, targetObject, int32(def.ID), int32(broadcastLevel),
 			int(cubicCastDelay/time.Millisecond), int(cubicCastDelay/time.Millisecond), false)
 	})
 
 	beforeVitals := live.Vitals()
+	if id == cubic.Life {
+		l.scheduleAfter(cubicCastDelay, func() {
+			applyCubicHeal(def, target)
+			sendMagicStatusUpdate(live, beforeVitals)
+		})
+		return
+	}
 	l.scheduleAfter(cubicCastDelay, func() {
 		l.skillHandlers.UseResult(handlerskill.Cast{Caster: live.Character, Skill: def, Targets: []any{target}})
 		sendMagicStatusUpdate(live, beforeVitals)
 	})
+}
+
+// cubicHealTarget and cubicHealEffectiveness are the narrow surfaces
+// applyCubicHeal needs from a Life Cubic's heal target.
+type cubicHealTarget interface {
+	CanBeHealed() bool
+	AddHP(float64) float64
+}
+
+type cubicHealEffectiveness interface {
+	HealEffectiveness() float64
+}
+
+// applyCubicHeal restores HP directly, matching Cubic.useHealSkill: a flat
+// skill.getPower() * target's HEAL_EFFECTIVNESS / 100, with no caster stat
+// or proficiency contribution — distinct from the generic HEAL skill
+// handler a player's own heal cast goes through, which scales by the
+// caster's own MATK and healing proficiency.
+func applyCubicHeal(def modelskill.Definition, target any) {
+	healable, ok := target.(cubicHealTarget)
+	if !ok || !healable.CanBeHealed() {
+		return
+	}
+	effectiveness := 100.0
+	if eff, ok := target.(cubicHealEffectiveness); ok {
+		effectiveness = eff.HealEffectiveness()
+	}
+	healable.AddHP(float64(def.Power) * effectiveness / 100)
 }
 
 // pickCubicEnemyTarget mirrors Cubic.pickEnemyTarget: the owner's currently
