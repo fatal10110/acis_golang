@@ -41,8 +41,13 @@ func manaDamageOverTimeAction(e *Effect) bool {
 			notifier.NotifyEffectRemovedDueLackMP(e)
 		}
 	}
-	if result.Damage > 0 {
-		target.ReduceMP(result.Damage)
+	// reduceMp itself no-ops and skips the broadcast when the applied
+	// reduction would be zero (CreatureStatus.java:338-349, "Bypass set to
+	// avoid to send pointless packet") — gate on ReduceMP's returned
+	// applied amount, not the requested tick damage, so an already-empty
+	// target doesn't get a spurious broadcast.
+	if result.Damage > 0 && target.ReduceMP(result.Damage) > 0 {
+		broadcastMPStatus(e.Effected)
 	}
 	return result.Continue
 }
@@ -75,8 +80,10 @@ func manaDrainTick(e *Effect, target mpDotTarget) bool {
 			notifier.NotifyEffectRemovedDueLackMP(e)
 		}
 	}
-	if result.Damage > 0 {
-		target.ReduceMP(result.Damage)
+	// See manaDamageOverTimeAction: gate the broadcast on ReduceMP's applied
+	// amount, not the requested tick damage.
+	if result.Damage > 0 && target.ReduceMP(result.Damage) > 0 {
+		broadcastMPStatus(e.Effected)
 	}
 	return result.Continue
 }

@@ -166,6 +166,30 @@ func TestManaDamageOverTimeHookMutatesLiveTarget(t *testing.T) {
 	if want := []string{"mpdot:8"}; !reflect.DeepEqual(target.events, want) {
 		t.Fatalf("mana DoT events = %#v, want %#v", target.events, want)
 	}
+	if target.mpBroadcasts != 1 {
+		t.Fatalf("mp broadcasts = %d, want 1", target.mpBroadcasts)
+	}
+
+	// A target already at 0 MP: the non-toggle tick still requests damage
+	// (result.Damage > 0) but ReduceMP applies and returns 0, so no
+	// broadcast should fire — matching CreatureStatus.reduceMp's own
+	// "Bypass set to avoid to send pointless packet" early return
+	// (CreatureStatus.java:338-349) when the applied reduction is zero.
+	target.mp = 0
+	target.events = nil
+	target.mpBroadcasts = 0
+	if !e.ActionTime() {
+		t.Fatal("mana DoT action hook stopped on an already-empty target")
+	}
+	if target.mp != 0 {
+		t.Fatalf("empty target mp = %v, want unchanged 0", target.mp)
+	}
+	if len(target.events) != 0 {
+		t.Fatalf("empty-target mana DoT events = %#v, want none", target.events)
+	}
+	if target.mpBroadcasts != 0 {
+		t.Fatalf("empty-target mp broadcasts = %d, want 0", target.mpBroadcasts)
+	}
 
 	target.mp = 9
 	target.events = nil

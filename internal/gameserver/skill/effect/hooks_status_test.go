@@ -125,6 +125,13 @@ func TestRelaxEffectSitsOnStartAndDrainsMpWhileSeatedAndNotFull(t *testing.T) {
 	if target.mp != 8 {
 		t.Fatalf("target mp = %v, want 8", target.mp)
 	}
+	// EffectRelax.java:54 drains MP through the same reduceMp/setMp chain as
+	// EffectManaDamOverTime (CreatureStatus.java:338-355, 274-306), whose
+	// Player override unconditionally includes CUR_MP in the broadcast
+	// (PlayerStatus.java:408-416) — this tick must broadcast too.
+	if target.mpBroadcasts != 1 {
+		t.Fatalf("mp broadcasts = %d, want 1", target.mpBroadcasts)
+	}
 }
 
 func TestRelaxEffectActionEndsWhenStandingOrHpFullOrLackMp(t *testing.T) {
@@ -214,6 +221,12 @@ func TestFakeDeathEffectSitsOnStartAndDrainsMpEachTick(t *testing.T) {
 	}
 	if target.mp != 65 {
 		t.Fatalf("target mp = %v, want 65", target.mp)
+	}
+	// EffectFakeDeath.java:51 drains MP through the same reduceMp/setMp
+	// chain as EffectManaDamOverTime and EffectRelax; the shared manaDrainTick
+	// helper must broadcast it too (see the relax test for the full chain).
+	if target.mpBroadcasts != 1 {
+		t.Fatalf("mp broadcasts = %d, want 1", target.mpBroadcasts)
 	}
 }
 

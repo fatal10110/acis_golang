@@ -157,10 +157,17 @@ func (h *Hostile) ReduceHP(amount float64, attacker any, _ modelskill.Definition
 	h.Die(killer, h.rewards)
 }
 
-// ReduceHPByDOT applies periodic damage without adding attack hate.
+// ReduceHPByDOT applies periodic damage and records it in the threat table
+// at zero hate weight, matching Npc.reduceCurrentHp's unconditional
+// addDamageHate(attacker, damage, 0) — every HP reduction feeds the
+// AggroList, DOT included (Npc.java:390-395; no isDOT gate in the chain
+// Creature.reduceCurrentHpByDOT -> Npc.reduceCurrentHp -> reduceHp).
 func (h *Hostile) ReduceHPByDOT(amount float64, attacker any) {
 	if amount <= 0 || h.AlikeDead() {
 		return
+	}
+	if combatant, ok := attacker.(attackable.Combatant); ok {
+		h.AddDamageHate(combatant, amount, 0)
 	}
 	newlyDead := h.health.DamageValue(amount)
 	h.BroadcastStatus()

@@ -97,6 +97,7 @@ type Character struct {
 	broadcastStop            func()
 	broadcastDie             func()
 	broadcastStatus          func()
+	broadcastMPStatus        func()
 	broadcastStance          func(Stance)
 	broadcastFakeDeathRevive func()
 	updateAbnormalEffect     func()
