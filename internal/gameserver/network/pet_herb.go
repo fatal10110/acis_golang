@@ -21,6 +21,13 @@ func (l *GameClientLink) consumePetHerb(live *livePlayer, pet *summon.Actor, inv
 		Destroyer:   l.inventory,
 		IsPet:       true,
 	})
+	defer l.broadcastPetFrame(live, pet, func() wire.Frame {
+		return serverpackets.FrameStatusUpdate(pet.ObjectID(), []serverpackets.StatusAttribute{
+			{Type: serverpackets.StatusCurrentHP, Value: int(pet.HP())},
+			{Type: serverpackets.StatusCurrentMP, Value: int(pet.MPValue())},
+		})
+	})
+
 	switch res.Outcome {
 	case itemhandler.PetRejected:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageItemNotForPets))
@@ -40,12 +47,6 @@ func (l *GameClientLink) consumePetHerb(live *livePlayer, pet *summon.Actor, inv
 	})
 	res.Apply()
 	live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessagePetUsesS1, int32(res.Skill.ID), int32(res.Skill.Level)))
-	l.broadcastPetFrame(live, pet, func() wire.Frame {
-		return serverpackets.FrameStatusUpdate(pet.ObjectID(), []serverpackets.StatusAttribute{
-			{Type: serverpackets.StatusCurrentHP, Value: int(pet.HP())},
-			{Type: serverpackets.StatusCurrentMP, Value: int(pet.MPValue())},
-		})
-	})
 }
 
 func (l *GameClientLink) broadcastPetFrame(live *livePlayer, pet *summon.Actor, frame func() wire.Frame) {

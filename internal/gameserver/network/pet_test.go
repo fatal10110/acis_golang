@@ -360,6 +360,7 @@ func TestPetGetItemReportsNonTradableHerb(t *testing.T) {
 		serverpackets.OpcodeGetItem,
 		serverpackets.OpcodeDeleteObject,
 		serverpackets.OpcodeSystemMessage,
+		serverpackets.OpcodeStatusUpdate,
 	)
 	assertStaticSystemMessageFrame(t, capture.frames[2], serverpackets.SystemMessageItemNotForPets)
 	if effects := pet.EffectList().All(); len(effects) != 0 {
@@ -393,6 +394,7 @@ func TestPetGetItemReportsHerbReuse(t *testing.T) {
 		serverpackets.OpcodeGetItem,
 		serverpackets.OpcodeDeleteObject,
 		serverpackets.OpcodeSystemMessage,
+		serverpackets.OpcodeStatusUpdate,
 	)
 	assertSystemMessageSkillFrame(t, capture.frames[2], serverpackets.SystemMessageS1PreparedForReuse, 2278, 1)
 }
@@ -423,6 +425,7 @@ func TestPetGetItemAcknowledgesUnhandledHerb(t *testing.T) {
 		serverpackets.OpcodeGetItem,
 		serverpackets.OpcodeDeleteObject,
 		serverpackets.OpcodeActionFailed,
+		serverpackets.OpcodeStatusUpdate,
 	)
 }
 
