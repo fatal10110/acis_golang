@@ -86,6 +86,13 @@ func (c *Character) Sit() bool {
 	return changed
 }
 
+// StandUp changes to the standing stance and broadcasts it.
+func (c *Character) StandUp() bool {
+	changed := c.SetStanding(true)
+	c.broadcastStanceChange(StanceStanding)
+	return changed
+}
+
 // StartFakeDeath changes to the fake-death stance and broadcasts it.
 func (c *Character) StartFakeDeath() bool {
 	changed := c.SetStanding(false)
