@@ -19,13 +19,22 @@ func (c *Character) CubicListFull() bool {
 }
 
 // AddOrRefreshCubic admits id to c's active cubics, recording whether a
-// party member (rather than c itself) granted it, or resets an
-// already-active cubic's own disappear timer instead. added reports
-// whether a new cubic was actually admitted, so the caller knows whether
-// to refresh the character-info the client sees.
-func (c *Character) AddOrRefreshCubic(id cubic.ID, givenByOther bool) (added bool) {
+// party member (rather than c itself) granted it, or marks an already-active
+// cubic for a disappear-timer reset instead. touched reports whether id is
+// now active in c's list either way, so the caller can (re)sync its live
+// cubic runtime's disappear timer; added reports whether it was newly
+// admitted rather than refreshed, so the caller knows whether to refresh the
+// character-info the client sees.
+func (c *Character) AddOrRefreshCubic(id cubic.ID, givenByOther bool) (touched, added bool) {
 	refreshed, _, _ := c.cubics.AddOrRefresh(id, givenByOther, c.cubicMaxSlots())
-	return !refreshed
+	return true, !refreshed
+}
+
+// RemoveCubic deactivates the cubic of id, matching Cubic.stop() removing
+// itself from the owner's CubicList once its lifetime elapses or it is
+// otherwise stopped.
+func (c *Character) RemoveCubic(id cubic.ID) {
+	c.cubics.Remove(id)
 }
 
 // CubicIDs returns the ids of c's currently active cubics, in grant order,

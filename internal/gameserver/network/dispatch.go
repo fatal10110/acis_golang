@@ -15,6 +15,7 @@ import (
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cubic"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
@@ -49,6 +50,7 @@ type shortcutStore interface {
 
 type attackStanceTracker interface {
 	Add(task.AttackStanceActor)
+	InAttackStance(task.AttackStanceActor) bool
 }
 
 type idAllocator interface {
@@ -147,6 +149,13 @@ type GameClientLink struct {
 	// afterFunc schedules fn to run once after d; nil defaults to
 	// time.AfterFunc. Overridden in tests for deterministic timing.
 	afterFunc func(d time.Duration, fn func())
+
+	// cubicAfterFunc schedules a live cubic's recurring action tick and
+	// one-shot disappear timer; nil defaults to time.AfterFunc. Overridden
+	// in tests for deterministic cubic-runtime timing, distinct from
+	// afterFunc since a cubic timer must be individually cancelable
+	// (StopAction/RefreshDisappear/Stop) rather than fire-and-forget.
+	cubicAfterFunc cubic.AfterFunc
 }
 
 // GameClientLinkConfig contains the collaborators required by GameClientLink.

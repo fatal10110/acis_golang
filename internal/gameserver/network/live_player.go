@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cubic"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -43,6 +44,9 @@ type livePlayer struct {
 	pickup         *pickupIntention
 	deferredPickup *pickupIntention
 	pickupLocked   bool
+
+	cubicsMu sync.Mutex
+	cubics   map[cubic.ID]*cubic.Runtime
 }
 
 type pickupIntention struct {
@@ -75,6 +79,30 @@ func (p *livePlayer) Stop() {
 		p.stopAttack(p)
 	}
 	p.releaseChair()
+	p.stopCubics()
+}
+
+// detached reports whether p's session has begun detaching (logout), the
+// same shadowExpiryMu-guarded flag taskeffects.go checks before applying a
+// deferred effect against an already-detached session.
+func (p *livePlayer) detached() bool {
+	p.shadowExpiryMu.RLock()
+	defer p.shadowExpiryMu.RUnlock()
+	return p.detaching
+}
+
+// stopCubics cancels every live cubic runtime's timers on detach, so a
+// recurring action tick never fires against a session that has already
+// logged out — the reference instead relies on fireAction's own
+// isDead()/isOnline() self-check on its next scheduled tick, but stopping
+// immediately here is equivalent and avoids a stale timer outliving the
+// session.
+func (p *livePlayer) stopCubics() {
+	p.cubicsMu.Lock()
+	defer p.cubicsMu.Unlock()
+	for _, r := range p.cubics {
+		r.Stop()
+	}
 }
 
 func (p *livePlayer) setPickup(ctx context.Context, target world.Tracked) {

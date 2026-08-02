@@ -555,6 +555,7 @@ func TestGameClientLinkMagicSkillUseCubicCastBroadcastsCharacterInfo(t *testing.
 		{
 			ID: 10, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
 			SkillType: "SUMMON", IsCubic: true, NpcID: 1,
+			CubicActivationTime: 8, CubicActivationChance: 30, SummonTotalLifeTime: 1200000,
 			StaticHitTime: true, StaticReuse: true,
 		},
 	}), store)

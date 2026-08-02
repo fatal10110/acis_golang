@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cubic"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -32,6 +33,13 @@ type Handler interface {
 type Result struct {
 	AttackFailed int
 	CubicAdded   bool
+	// CubicTouched and CubicID report that a SUMMON cubic cast reached the
+	// caster's own cubic list, whether newly admitted or refreshed, so a
+	// caller can (re)sync the cubic's live action/disappear runtime either
+	// way — unlike CubicAdded, which only fires on a fresh admit and drives
+	// the character-info broadcast.
+	CubicTouched bool
+	CubicID      cubic.ID
 }
 
 type resultHandler interface {

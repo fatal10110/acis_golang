@@ -3,6 +3,7 @@ package cast
 import (
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cubic"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
@@ -19,6 +20,8 @@ type EffectResult struct {
 	Handled      bool
 	AttackFailed int
 	CubicAdded   bool
+	CubicTouched bool
+	CubicID      cubic.ID
 }
 
 // ApplyEffects resolves def's affected target set from caster and the
@@ -71,5 +74,11 @@ func ApplyEffectsResult(handlers EffectHandlers, caster any, resolved Target, de
 	if !ok {
 		return EffectResult{}
 	}
-	return EffectResult{Handled: true, AttackFailed: result.AttackFailed, CubicAdded: result.CubicAdded}
+	return EffectResult{
+		Handled:      true,
+		AttackFailed: result.AttackFailed,
+		CubicAdded:   result.CubicAdded,
+		CubicTouched: result.CubicTouched,
+		CubicID:      result.CubicID,
+	}
 }

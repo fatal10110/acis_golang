@@ -12,7 +12,7 @@ func TestCharacter_CubicListFull_DefaultCapIsOne(t *testing.T) {
 	if c.CubicListFull() {
 		t.Fatal("CubicListFull() on an empty list = true, want false")
 	}
-	if added := c.AddOrRefreshCubic(cubic.Storm, false); !added {
+	if _, added := c.AddOrRefreshCubic(cubic.Storm, false); !added {
 		t.Fatal("AddOrRefreshCubic() first add reported added=false")
 	}
 	// With no Cubic Mastery (skill 143), size(1) > level(0): full.
@@ -37,11 +37,11 @@ func TestCharacter_CubicListFull_MasteryRaisesCap(t *testing.T) {
 
 func TestCharacter_AddOrRefreshCubic_RefreshReportsNotAdded(t *testing.T) {
 	c := &Character{}
-	if added := c.AddOrRefreshCubic(cubic.Storm, false); !added {
+	if _, added := c.AddOrRefreshCubic(cubic.Storm, false); !added {
 		t.Fatal("first add reported added=false")
 	}
-	if added := c.AddOrRefreshCubic(cubic.Storm, false); added {
-		t.Fatal("re-adding the same cubic reported added=true, want false (refresh only)")
+	if touched, added := c.AddOrRefreshCubic(cubic.Storm, false); added || !touched {
+		t.Fatal("re-adding the same cubic reported added=true or touched=false, want added=false, touched=true (refresh only)")
 	}
 }
 

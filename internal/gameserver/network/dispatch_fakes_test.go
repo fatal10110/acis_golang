@@ -368,6 +368,15 @@ func (r *attackStanceRecorder) Add(actor task.AttackStanceActor) {
 	r.actors = append(r.actors, actor)
 }
 
+func (r *attackStanceRecorder) InAttackStance(actor task.AttackStanceActor) bool {
+	for _, a := range r.actors {
+		if a != nil && actor != nil && a.ObjectID() == actor.ObjectID() {
+			return true
+		}
+	}
+	return false
+}
+
 type recordedGroundDrop struct {
 	ground *grounditem.Item
 	opts   task.DropOptions

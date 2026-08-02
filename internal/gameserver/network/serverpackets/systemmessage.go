@@ -6,6 +6,7 @@ import "github.com/fatal10110/acis_golang/internal/commons/wire"
 const (
 	SystemMessageNotEnoughHP                      = 23
 	SystemMessageNotEnoughMP                      = 24
+	SystemMessageRejuvenatingHP                   = 25
 	SystemMessageWelcomeToLineage                 = 34
 	SystemMessageUseS1                            = 46
 	SystemMessageS1PreparedForReuse               = 48
