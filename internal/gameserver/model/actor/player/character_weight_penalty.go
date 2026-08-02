@@ -79,11 +79,18 @@ func (c *Character) SetWeightPenaltyUpdater(update func()) {
 	c.stateMu.Unlock()
 }
 
+// weightPenaltySpeedMultiplier mirrors WeightPenalty's per-band speed
+// multiplier (WeightPenalty.java:5-9): NONE/LEVEL_1 1, LEVEL_2/LEVEL_3 0.5,
+// LEVEL_4 0 — a fully overloaded player cannot move.
 func (c *Character) weightPenaltySpeedMultiplier() float64 {
-	if c.WeightPenalty() >= 2 {
+	switch c.WeightPenalty() {
+	case 2, 3:
 		return .5
+	case 4:
+		return 0
+	default:
+		return 1
 	}
-	return 1
 }
 
 func (c *Character) weightPenaltyRegenMultiplier() float64 {
