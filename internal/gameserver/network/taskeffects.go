@@ -85,7 +85,8 @@ func (e *TaskEffects) GaugeSet(actor task.WaterActor, remaining time.Duration) {
 	if !ok {
 		return
 	}
-	live.SendFrame(serverpackets.FrameSetupGauge(serverpackets.GaugeCyan, 0, int(remaining.Milliseconds())))
+	ms := int(remaining.Milliseconds())
+	live.SendFrame(serverpackets.FrameSetupGauge(serverpackets.GaugeCyan, ms, ms))
 }
 
 func (e *TaskEffects) Drown(actor task.WaterActor) {
