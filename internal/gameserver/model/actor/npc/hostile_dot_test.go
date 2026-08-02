@@ -35,6 +35,36 @@ func TestDamageOverTimeEffectTargetsHostile(t *testing.T) {
 	}
 }
 
+// TestDamageOverTimeEffectRecordsZeroHateThreat pins Finding 1 of the #1088
+// closed-PR review: ReduceHPByDOT must record the caster in the threat
+// table at zero hate weight, matching Npc.reduceCurrentHp's unconditional
+// addDamageHate(attacker, damage, 0) (Npc.java:390-395) — DOT feeds the
+// AggroList's damage/timestamp bookkeeping even though it never raises
+// hate above zero (so target selection is unaffected).
+func TestDamageOverTimeEffectRecordsZeroHateThreat(t *testing.T) {
+	h := newCombatHostile(t, 1, &Template{HPMax: 100, MPMax: 50})
+	caster := newCombatHostile(t, 2, &Template{HPMax: 100, MPMax: 50})
+	e, err := effect.New(effect.Skill{ID: 1}, skill.EffectTemplate{Name: "DamOverTime", Value: 4})
+	if err != nil {
+		t.Fatalf("effect.New() error: %v", err)
+	}
+	e.Effected = h
+	e.Effector = caster
+	if !e.ActionTime() {
+		t.Fatal("ActionTime() = false, want true")
+	}
+	threat, ok := h.AI().Threats().Get(caster)
+	if !ok {
+		t.Fatal("Threats().Get(caster) ok = false, want caster recorded")
+	}
+	if threat.Damage != 4 {
+		t.Fatalf("threat.Damage = %v, want 4", threat.Damage)
+	}
+	if threat.Hate != 0 {
+		t.Fatalf("threat.Hate = %v, want 0", threat.Hate)
+	}
+}
+
 func TestManaDamageOverTimeEffectTargetsHostile(t *testing.T) {
 	h := newCombatHostile(t, 1, &Template{HPMax: 100, MPMax: 50})
 	e, err := effect.New(effect.Skill{ID: 1}, skill.EffectTemplate{Name: "ManaDamOverTime", Value: 4})

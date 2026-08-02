@@ -57,6 +57,16 @@ func broadcastStatus(effected any) {
 	}
 }
 
+// broadcastMPStatus pushes an MP-carrying status update to effected, for
+// the actors whose broadcast actually includes MP (see mpStatusBroadcaster).
+// Actors with no such hook — every non-player target — are left alone,
+// matching the reference's Player-only unconditional CUR_MP broadcast.
+func broadcastMPStatus(effected any) {
+	if b, ok := effected.(mpStatusBroadcaster); ok {
+		b.BroadcastMPStatus()
+	}
+}
+
 func manaHealStart(e *Effect) bool {
 	target, ok := e.Effected.(manaHealTarget)
 	if !ok || !target.CanBeHealed() {

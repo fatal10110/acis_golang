@@ -305,6 +305,37 @@ func (l *GameClientLink) broadcastLiveStatus(live *livePlayer) {
 	})
 }
 
+// broadcastLiveMPStatus sends live's current HP and MP to its own session
+// and every currently known observer, matching PlayerStatus's
+// broadcastStatusUpdate() override, which unconditionally includes CUR_MP
+// alongside CUR_HP on every status packet (unlike the generic Creature/Npc
+// broadcast, which is HP-only and threshold-gated). Used for MP-only
+// changes — a mana-drain tick — where the generic HP broadcast alone would
+// leave the client's MP bar stale.
+func (l *GameClientLink) broadcastLiveMPStatus(live *livePlayer) {
+	if live == nil {
+		return
+	}
+	resources := live.ResourceValues()
+	attrs := []serverpackets.StatusAttribute{
+		{Type: serverpackets.StatusCurrentHP, Value: int(resources.CurrentHP)},
+		{Type: serverpackets.StatusCurrentMP, Value: int(resources.CurrentMP)},
+	}
+	broadcastFrame(func() wire.Frame {
+		return serverpackets.FrameStatusUpdate(live.ObjectID(), attrs)
+	}, func(send func(frameReceiver)) {
+		send(live)
+		if l.world == nil {
+			return
+		}
+		l.world.ForEachKnown(live, func(o world.Tracked) {
+			if receiver, ok := o.(frameReceiver); ok {
+				send(receiver)
+			}
+		})
+	})
+}
+
 // updateLiveAbnormalEffect sends live's own session its current active
 // abnormal-effect icon list. Unlike broadcastLiveStatus, this packet only
 // ever goes to the effected player's own client, matching the reference's

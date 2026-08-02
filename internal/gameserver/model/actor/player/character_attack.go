@@ -224,6 +224,30 @@ func (c *Character) BroadcastStatus() {
 	}
 }
 
+// SetMPStatusBroadcaster records the packet-layer hook that broadcasts this
+// character's current HP and MP to its own session whenever an MP-only
+// change (e.g. a mana-drain tick) needs to reach the client. Separate from
+// SetStatusBroadcaster because PlayerStatus.broadcastStatusUpdate()
+// (CreatureStatus.java's Player override) unconditionally includes CUR_MP
+// in every status packet it sends, unlike the generic HP-only,
+// threshold-gated broadcast the base Creature path uses.
+func (c *Character) SetMPStatusBroadcaster(broadcast func()) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	c.broadcastMPStatus = broadcast
+}
+
+// BroadcastMPStatus sends this character's current HP and MP through the
+// runtime packet hook.
+func (c *Character) BroadcastMPStatus() {
+	c.stateMu.RLock()
+	broadcast := c.broadcastMPStatus
+	c.stateMu.RUnlock()
+	if broadcast != nil {
+		broadcast()
+	}
+}
+
 // SendFrame sends frame to the connected client, if any.
 func (c *Character) SendFrame(frame wire.Frame) bool {
 	c.stateMu.RLock()

@@ -37,7 +37,10 @@ type liveEffectTarget struct {
 	validLocationFn   func(ox, oy, oz, tx, ty, tz int) location.Location
 	flightDest        location.Location
 	flightType        modelskill.Flight
+	mpBroadcasts      int
 }
+
+func (t *liveEffectTarget) BroadcastMPStatus() { t.mpBroadcasts++ }
 
 func (t *liveEffectTarget) EffectList() *List { return t.list }
 
@@ -54,7 +57,17 @@ func (t *liveEffectTarget) ReduceHPByDOT(damage float64, effector any) {
 	t.events = append(t.events, fmt.Sprintf("dot:%g:%v", damage, effector))
 }
 
+// ReduceMP mirrors the production actors' clamp-at-zero semantics (see
+// Character.ReduceMP/Hostile.ReduceMP): a target already at 0 MP applies
+// and returns 0 rather than going negative, so tests can exercise the
+// "nothing to apply, don't broadcast" guard alongside the real reducers.
 func (t *liveEffectTarget) ReduceMP(damage float64) float64 {
+	if damage <= 0 || t.mp <= 0 {
+		return 0
+	}
+	if damage > t.mp {
+		damage = t.mp
+	}
 	t.mp -= damage
 	t.events = append(t.events, fmt.Sprintf("mpdot:%g", damage))
 	return damage

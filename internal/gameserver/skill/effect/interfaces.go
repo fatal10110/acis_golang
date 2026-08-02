@@ -19,6 +19,14 @@ type statusBroadcaster interface {
 	BroadcastStatus()
 }
 
+// mpStatusBroadcaster is implemented only by actors whose status broadcast
+// includes MP, matching PlayerStatus.broadcastStatusUpdate()'s unconditional
+// CUR_MP inclusion (CreatureStatus.java's Player override) — the generic
+// Creature/Npc path sends HP only, so no NPC-side actor implements this.
+type mpStatusBroadcaster interface {
+	BroadcastMPStatus()
+}
+
 type regenMaxSender interface {
 	SendRegenMax(count, period int32, hpRegen float64)
 }

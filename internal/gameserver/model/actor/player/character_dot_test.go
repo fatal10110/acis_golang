@@ -45,11 +45,23 @@ func TestDamageOverTimeEffectTargetsCharacterAndBroadcastsStatus(t *testing.T) {
 	}
 }
 
+// TestManaDamageOverTimeEffectTargetsCharacter pins Finding 2 of the #1088
+// closed-PR review: a mana-DOT tick must broadcast a status update carrying
+// MP, matching PlayerStatus.broadcastStatusUpdate()'s unconditional CUR_MP
+// inclusion (EffectManaDamOverTime.java:35 -> CreatureStatus.reduceMp/setMp,
+// CreatureStatus.java:338-355, 274-306 -> the Player override at
+// PlayerStatus.java:408-416, which sends CUR_HP+CUR_MP+CUR_CP on every
+// call, unlike the generic HP-only, threshold-gated broadcast the base
+// Creature/Npc path uses). The generic statusBroadcaster hook is HP-only on
+// the wire (network/targeting.go's targetHPAttributes), so this must go
+// through the separate MP-carrying broadcaster, not the HP one.
 func TestManaDamageOverTimeEffectTargetsCharacter(t *testing.T) {
 	c, err := NewCharacter(1, humanFighterTemplate(), "acct", "dot", 0, 0, 0, SexMale)
 	if err != nil {
 		t.Fatalf("NewCharacter() error: %v", err)
 	}
+	mpStatusUpdates := 0
+	c.SetMPStatusBroadcaster(func() { mpStatusUpdates++ })
 	before := c.MPValue()
 	e, err := effect.New(effect.Skill{ID: 1}, skill.EffectTemplate{Name: "ManaDamOverTime", Value: 4})
 	if err != nil {
@@ -61,5 +73,8 @@ func TestManaDamageOverTimeEffectTargetsCharacter(t *testing.T) {
 	}
 	if got, want := c.MPValue(), before-4; got != want {
 		t.Fatalf("MPValue() = %v, want %v", got, want)
+	}
+	if mpStatusUpdates != 1 {
+		t.Fatalf("MP status updates = %d, want 1", mpStatusUpdates)
 	}
 }
