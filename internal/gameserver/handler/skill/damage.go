@@ -3,6 +3,7 @@ package skill
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 )
 
@@ -206,15 +207,16 @@ func (blowHandler) Use(cast Cast) {
 		if !ok {
 			continue
 		}
-		if !in.Landed {
-			continue
+		if in.Landed {
+			damage := int(formulas.BlowDamage(in))
+			if damage > 0 {
+				target.ReduceHP(float64(damage), cast.Caster, cast.Skill)
+				applyBlowEffects(cast, obj)
+			}
 		}
-		damage := int(formulas.BlowDamage(in))
-		if damage > 0 {
-			target.ReduceHP(float64(damage), cast.Caster, cast.Skill)
-			applyLethalHit(cast, target)
-			applyBlowEffects(cast, obj)
-		}
+		// Blow.java rolls the lethal chance unconditionally per target,
+		// outside the landing gate — a missed blow can still proc it.
+		applyLethalHit(cast, target)
 	}
 	applySelfEffects(cast.Caster, cast.Skill)
 }
@@ -281,12 +283,21 @@ func (manaDamageHandler) Use(cast Cast) {
 				applyEffects(cast.Caster, effected, cast.Skill, cast.Skill.Effects)
 			}
 		}
-		damage := formulas.ManaDamage(in)
-		if damage > target.MPValue() {
-			damage = target.MPValue()
+		rawDamage := formulas.ManaDamage(in)
+		mp := rawDamage
+		if mp > target.MPValue() {
+			mp = target.MPValue()
 		}
-		if damage > 0 {
-			target.ReduceMP(damage)
+		if mp > 0 {
+			target.ReduceMP(mp)
+		}
+		// Manadam.java stops SLEEP/IMMOBILE_UNTIL_ATTACKED once the raw
+		// (pre-clamp) damage is positive, after the drain.
+		if rawDamage > 0 {
+			if stopper, ok := target.(interface{ StopEffects(effect.Type) }); ok {
+				stopper.StopEffects(effect.TypeSleep)
+				stopper.StopEffects(effect.TypeImmobileUntilAttacked)
+			}
 		}
 	}
 	applySelfEffects(cast.Caster, cast.Skill)
