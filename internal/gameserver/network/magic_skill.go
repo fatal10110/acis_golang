@@ -103,6 +103,9 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 		Hit: func() {
 			result := actorcast.ApplyEffectsResult(actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers}, live.Character, target, def)
 			sendSkillHandlerResult(live, result)
+			if result.CubicTouched {
+				l.syncCubicRuntime(live, result.CubicID, def)
+			}
 			if result.CubicAdded {
 				l.broadcastCharacterInfo(live)
 			}

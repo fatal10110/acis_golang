@@ -128,6 +128,16 @@ type Definition struct {
 	IsCubic bool
 	NpcID   int
 
+	// CubicActivationTime and CubicActivationChance are a granting SUMMON
+	// skill's own "activationtime" (seconds between action ticks) and
+	// "activationchance" (percent roll gating each non-Life-Cubic tick),
+	// distinct from the unrelated ChanceSkillTrigger effect's
+	// "activationChance" attribute captured by ActivationChance above.
+	// SummonTotalLifeTime is the granted cubic's total lifetime in ms.
+	CubicActivationTime   int
+	CubicActivationChance int
+	SummonTotalLifeTime   int
+
 	// WeaponsAllowed is the raw comma-separated weapon/armor type list a
 	// level restricts casting to, or "" when unrestricted. Resolving a name
 	// to its equipment mask is the item-type data's job, not this loader's.
@@ -256,6 +266,10 @@ func NewDefinition(id ID, level int, name string, set *commons.StatSet) (Definit
 
 		IsCubic: f.BoolDefault("isCubic", false),
 		NpcID:   f.IntDefault("npcId", 0),
+
+		CubicActivationTime:   f.IntDefault("activationtime", 8),
+		CubicActivationChance: f.IntDefault("activationchance", 30),
+		SummonTotalLifeTime:   f.IntDefault("summonTotalLifeTime", 1200000),
 
 		WeaponsAllowed: f.StringDefault("weaponsAllowed", ""),
 

@@ -17,10 +17,10 @@ func newFakeCubicSummoner(nextAdded bool) *fakeCubicSummoner {
 	return &fakeCubicSummoner{added: map[cubic.ID]bool{}, givenByOther: map[cubic.ID]bool{}, nextAdded: nextAdded}
 }
 
-func (f *fakeCubicSummoner) AddOrRefreshCubic(id cubic.ID, givenByOther bool) bool {
+func (f *fakeCubicSummoner) AddOrRefreshCubic(id cubic.ID, givenByOther bool) (touched, added bool) {
 	f.added[id] = true
 	f.givenByOther[id] = givenByOther
-	return f.nextAdded
+	return true, f.nextAdded
 }
 
 func TestCubicHandlerAddsToSelfWhenSingleTarget(t *testing.T) {

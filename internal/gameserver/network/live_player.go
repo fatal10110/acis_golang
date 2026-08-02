@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cubic"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -43,6 +44,9 @@ type livePlayer struct {
 	pickup         *pickupIntention
 	deferredPickup *pickupIntention
 	pickupLocked   bool
+
+	cubicsMu sync.Mutex
+	cubics   map[cubic.ID]*cubic.Runtime
 }
 
 type pickupIntention struct {
