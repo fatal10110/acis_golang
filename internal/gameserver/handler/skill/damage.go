@@ -292,11 +292,15 @@ func (manaDamageHandler) Use(cast Cast) {
 			target.ReduceMP(mp)
 		}
 		// Manadam.java stops SLEEP/IMMOBILE_UNTIL_ATTACKED once the raw
-		// (pre-clamp) damage is positive, after the drain.
+		// (pre-clamp) damage is positive, after the drain. No production
+		// actor implements a StopEffects(Type) method, so this goes
+		// through the same effect-list removal path stopEffectsBySkillID
+		// uses rather than a type assertion that only test fakes satisfy.
 		if rawDamage > 0 {
-			if stopper, ok := target.(interface{ StopEffects(effect.Type) }); ok {
-				stopper.StopEffects(effect.TypeSleep)
-				stopper.StopEffects(effect.TypeImmobileUntilAttacked)
+			if elt, ok := effective.(effectListTarget); ok {
+				removeMatching(elt.EffectList(), 0, func(e *effect.Effect) bool {
+					return e.Type == effect.TypeSleep || e.Type == effect.TypeImmobileUntilAttacked
+				})
 			}
 		}
 	}

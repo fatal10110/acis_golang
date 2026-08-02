@@ -108,10 +108,10 @@ type skillTarget struct {
 
 	lethalOutcomes []formulas.LethalOutcome
 
-	stoppedEffects []effect.Type
+	effects *effect.List
 }
 
-func (t *skillTarget) StopEffects(typ effect.Type) { t.stoppedEffects = append(t.stoppedEffects, typ) }
+func (t *skillTarget) EffectList() *effect.List { return t.effects }
 
 func (t *skillTarget) AlikeDead() bool { return t.dead }
 func (t *skillTarget) Dead() bool      { return t.dead }
@@ -573,22 +573,32 @@ func TestBlowMissStillResolvesLethalHit(t *testing.T) {
 
 // TestManadamStopsSleepAndImmobileOnDrain guards Manadam.java:62-66, which
 // stops SLEEP and IMMOBILE_UNTIL_ATTACKED once the raw (pre-clamp) drain is
-// positive.
+// positive. mp is set to 0 so the clamped drain is 0 while raw damage stays
+// positive: a handler that (wrongly) gates on the post-clamp drain instead
+// of the reference's pre-clamp raw damage would fail this test.
 func TestManadamStopsSleepAndImmobileOnDrain(t *testing.T) {
 	registry := NewDefaultRegistry()
 	caster := &skillTarget{}
 	target := &skillTarget{
-		mp: 100,
+		mp: 0,
 		manaInput: formulas.ManaDamageInput{
 			MAtk: 400, MDef: 50, SkillPower: 20, TargetMaxMp: 970,
 			VulnMul: 1, Affected: true,
 		},
-		manaOK: true,
+		manaOK:  true,
+		effects: effect.NewList(noopStatOwner{}),
+	}
+	for _, name := range []string{"Sleep", "ImmobileUntilAttacked"} {
+		e, err := effect.New(effect.Skill{ID: 1}, modelskill.EffectTemplate{Name: name})
+		if err != nil {
+			t.Fatalf("build %s effect: %v", name, err)
+		}
+		target.effects.Add(e)
 	}
 
 	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "MANADAM"}, Targets: []any{target}})
 
-	if len(target.stoppedEffects) != 2 || target.stoppedEffects[0] != effect.TypeSleep || target.stoppedEffects[1] != effect.TypeImmobileUntilAttacked {
-		t.Fatalf("MANADAM stopped effects = %v, want [Sleep ImmobileUntilAttacked]", target.stoppedEffects)
+	if all := target.effects.All(); len(all) != 0 {
+		t.Fatalf("MANADAM drain left effects = %v, want none (Sleep and ImmobileUntilAttacked should be stopped)", all)
 	}
 }
