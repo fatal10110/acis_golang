@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 )
 
@@ -106,7 +107,11 @@ type skillTarget struct {
 	lethalImmune bool
 
 	lethalOutcomes []formulas.LethalOutcome
+
+	stoppedEffects []effect.Type
 }
+
+func (t *skillTarget) StopEffects(typ effect.Type) { t.stoppedEffects = append(t.stoppedEffects, typ) }
 
 func (t *skillTarget) AlikeDead() bool { return t.dead }
 func (t *skillTarget) Dead() bool      { return t.dead }
@@ -526,5 +531,64 @@ func TestPhysicalAndBlowHandlersResolveLethalHits(t *testing.T) {
 	}
 	if len(target.lethalOutcomes) != 1 || target.lethalOutcomes[0] != formulas.LethalHalf {
 		t.Fatalf("BLOW lethal outcomes = %v, want [LethalHalf]", target.lethalOutcomes)
+	}
+}
+
+// TestBlowMissStillResolvesLethalHit guards Blow.java:117-118, which rolls
+// calcLethalHit outside/after the landing-rate gate: a missed blow can
+// still proc a lethal strike.
+func TestBlowMissStillResolvesLethalHit(t *testing.T) {
+	registry := NewDefaultRegistry()
+	caster := &skillTarget{}
+	target := &skillTarget{
+		hp: 2000,
+		cp: 300,
+		blowInput: formulas.BlowInput{
+			AttackPower: 100, SkillPower: 50, Defence: 40,
+			RandomMul: 1, PosMul: 1.2,
+			CritDamageMul: 1.5, CritDamagePosMul: 1, CritVulnMul: 1, DaggerVulnMul: 1, CritDamageAddBase: 5,
+			Landed: false,
+		},
+		blowOK: true,
+		lethalInput: formulas.LethalInput{
+			AttackerLevel: 40,
+			TargetLevel:   40,
+			LethalMul:     1,
+		},
+		lethalOK: true,
+	}
+
+	registry.Use(Cast{
+		Caster:  caster,
+		Skill:   modelskill.Definition{SkillType: "BLOW", LethalChance2: 100},
+		Targets: []any{target},
+	})
+	if target.hp != 1 {
+		t.Fatalf("BLOW miss hp = %v, want 1 (lethal full still fires despite the miss)", target.hp)
+	}
+	if len(target.lethalOutcomes) != 1 || target.lethalOutcomes[0] != formulas.LethalFull {
+		t.Fatalf("BLOW miss lethal outcomes = %v, want [LethalFull]", target.lethalOutcomes)
+	}
+}
+
+// TestManadamStopsSleepAndImmobileOnDrain guards Manadam.java:62-66, which
+// stops SLEEP and IMMOBILE_UNTIL_ATTACKED once the raw (pre-clamp) drain is
+// positive.
+func TestManadamStopsSleepAndImmobileOnDrain(t *testing.T) {
+	registry := NewDefaultRegistry()
+	caster := &skillTarget{}
+	target := &skillTarget{
+		mp: 100,
+		manaInput: formulas.ManaDamageInput{
+			MAtk: 400, MDef: 50, SkillPower: 20, TargetMaxMp: 970,
+			VulnMul: 1, Affected: true,
+		},
+		manaOK: true,
+	}
+
+	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "MANADAM"}, Targets: []any{target}})
+
+	if len(target.stoppedEffects) != 2 || target.stoppedEffects[0] != effect.TypeSleep || target.stoppedEffects[1] != effect.TypeImmobileUntilAttacked {
+		t.Fatalf("MANADAM stopped effects = %v, want [Sleep ImmobileUntilAttacked]", target.stoppedEffects)
 	}
 }
