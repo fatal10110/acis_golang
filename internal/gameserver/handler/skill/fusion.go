@@ -16,8 +16,8 @@ func (fusionHandler) Types() []string { return []string{"FUSION"} }
 // IncreaseEffect, capped at that triggered skill's max level. A target with
 // no such effect gets the triggered skill's effects applied fresh. The
 // channel-abort DecreaseForce path (FusionSkill.onCastAbort, gated on a
-// geo-range check this port has no cast-channel tracking for) is out of this
-// handler's scope.
+// geo-range check) is wired via cast/schedule.go's ScheduleFusion, not this
+// Use handler — a Use handler does not run abort cleanup.
 func (h fusionHandler) Use(cast Cast) {
 	if h.defs == nil {
 		return
