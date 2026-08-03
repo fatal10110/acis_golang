@@ -2,6 +2,7 @@ package network
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -388,6 +389,76 @@ func TestPickupLiveGroundItemLocksAndReleasesTransientParalysis(t *testing.T) {
 
 	if live.Paralyzed() {
 		t.Fatal("Paralyzed() = true after the scheduled release ran")
+	}
+}
+
+// TestExitPickupLockIgnoresStaleGeneration is the regression test for
+// #1159: a scheduled unlock (exitPickupLock) that fires after a newer click
+// has already replaced the lock (enterPickupLock bumped the generation)
+// must not clear that newer lock or lift its paralysis — otherwise a
+// pending deferred pickup queued under the newer lock would wrongly see
+// pickupLockActive()==false and get discarded instead of re-deferred.
+func TestExitPickupLockIgnoresStaleGeneration(t *testing.T) {
+	capture := &frameCapture{}
+	live := newTestLivePlayer(t, 1, capture)
+
+	staleGen := live.enterPickupLock()
+	freshGen := live.enterPickupLock()
+
+	if ok := live.exitPickupLock(staleGen); ok {
+		t.Fatal("exitPickupLock succeeded for a stale generation")
+	}
+	if !live.pickupLockActive() {
+		t.Fatal("stale exitPickupLock cleared the fresh lock")
+	}
+	if !live.Paralyzed() {
+		t.Fatal("stale exitPickupLock lifted paralysis held by the fresh lock")
+	}
+
+	if ok := live.exitPickupLock(freshGen); !ok {
+		t.Fatal("exitPickupLock failed for the current generation")
+	}
+	if live.pickupLockActive() {
+		t.Fatal("fresh lock still active after its own exitPickupLock")
+	}
+	if live.Paralyzed() {
+		t.Fatal("paralysis still set after the fresh lock's own exitPickupLock")
+	}
+}
+
+// TestPickupBlockedDeferrableAtomicWithLockExit is the regression test for
+// the residual TOCTOU flagged in PR #1162 review: livePickupBlockedDeferrable
+// used to read pickupLockActive() in a second, separate pickupMu acquisition
+// after the blocked check, so a concurrent exitPickupLock could clear the
+// lock in between — observed as blocked=true, deferrable=false, which drops
+// the click instead of re-deferring it. Both reads now happen inside one
+// pickupMu section, the same one enterPickupLock/exitPickupLock use, so that
+// combination can no longer occur. Races enterPickupLock/exitPickupLock
+// against livePickupBlockedDeferrable many times under -race to catch both
+// the data race and the stale combination.
+func TestPickupBlockedDeferrableAtomicWithLockExit(t *testing.T) {
+	capture := &frameCapture{}
+	live := newTestLivePlayer(t, 1, capture)
+
+	for i := 0; i < 2000; i++ {
+		gen := live.enterPickupLock()
+
+		var blocked, deferrable bool
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			blocked, deferrable = livePickupBlockedDeferrable(live)
+		}()
+		go func() {
+			defer wg.Done()
+			live.exitPickupLock(gen)
+		}()
+		wg.Wait()
+
+		if blocked && !deferrable {
+			t.Fatalf("iteration %d: blocked=true deferrable=false — click would be discarded instead of deferred", i)
+		}
 	}
 }
 

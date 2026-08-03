@@ -39,11 +39,11 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return true
 	}
-	if livePickupBlocked(live) {
+	if blocked, deferrable := livePickupBlockedDeferrable(live); blocked {
 		// pickupLiveGroundItem is only reached with a shift-clicked target
 		// via a walk already in flight, and a shift click never starts one
 		// (see walkOrForwardPickup) — so shift is always false here.
-		l.deferOrFailPickup(ctx, live, ground, false)
+		l.deferOrFailPickup(ctx, live, ground, false, deferrable)
 		return true
 	}
 	if !groundPickupInRange(live, ground) {
@@ -122,23 +122,35 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 }
 
 // lockPickupParalysis briefly paralyzes live after a successful pickup,
-// clearing the lock once pickupParalyzeLock elapses.
+// clearing the lock once pickupParalyzeLock elapses. Entering and exiting
+// the lock are each a single atomic step (see enterPickupLock/
+// exitPickupLock) so a click racing the unlock can never observe paralysis
+// lifted with the lock still nominally held, or vice versa.
 func (l *GameClientLink) lockPickupParalysis(live *livePlayer) {
+	gen := live.enterPickupLock()
 	l.scheduleAfter(pickupParalyzeLock, func() {
-		live.SetParalyzed(false)
-		live.setPickupLocked(false)
+		if !live.exitPickupLock(gen) {
+			return
+		}
 		l.finishDeferredPickup(live)
 	})
-	live.setPickupLocked(true)
-	live.SetParalyzed(true)
 }
 
-func livePickupBlocked(live *livePlayer) bool {
-	return !liveItemOpsAllowed(live) || !live.Standing() || (live.attack != nil && live.attack.AttackingNow()) || (live.cast != nil && live.cast.CastingNow())
-}
-
-func livePickupDeferrable(live *livePlayer) bool {
-	return live != nil && ((live.attack != nil && live.attack.AttackingNow()) || live.pickupLockActive())
+// livePickupBlockedDeferrable atomically reports whether live is currently blocked
+// from picking up and, if so, whether that block is one finishDeferredPickup
+// will later lift. Both reads happen inside the single pickupMu-held section
+// enterPickupLock/exitPickupLock also use to flip pickupLocked and
+// Paralyzed together — so a concurrent exitPickupLock can never be observed
+// as still blocking by one read and already cleared by the other, which is
+// what let a click land in the unlock instant, read blocked, then read
+// not-deferrable, and get discarded instead of re-deferred (#1159).
+func livePickupBlockedDeferrable(live *livePlayer) (blocked, deferrable bool) {
+	live.pickupMu.Lock()
+	defer live.pickupMu.Unlock()
+	attacking := live.attack != nil && live.attack.AttackingNow()
+	blocked = !liveItemOpsAllowed(live) || !live.Standing() || attacking || (live.cast != nil && live.cast.CastingNow())
+	deferrable = attacking || live.pickupLocked
+	return
 }
 
 func groundPickupInRange(live *livePlayer, ground *grounditem.Item) bool {

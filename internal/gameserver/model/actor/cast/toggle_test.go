@@ -20,7 +20,7 @@ func toggleDef() modelskill.Definition {
 	}
 }
 
-func TestCanCastToggleOnlyChecksReuseDelay(t *testing.T) {
+func TestCanCastToggleOnlyChecksBlanketLockAndReuseDelay(t *testing.T) {
 	def := toggleDef()
 	actor := &testActor{mp: 0, hp: 0}
 	if err := NewController(actor).CanCastToggle(def); err != nil {
@@ -30,6 +30,20 @@ func TestCanCastToggleOnlyChecksReuseDelay(t *testing.T) {
 	actor.disabledKeys = map[int32]bool{ReuseKey(def): true}
 	if err := NewController(actor).CanCastToggle(def); !errors.Is(err, ErrSkillDisabled) {
 		t.Fatalf("CanCastToggle() error = %v, want ErrSkillDisabled", err)
+	}
+}
+
+// TestCanCastToggleRejectsAllSkillsDisabled covers Java's
+// RequestMagicSkillUse.java:24-68: there is no toggle branch, so a toggle
+// press goes through player.getAI().tryToCast just like any other skill and
+// is rejected by PlayableAI.tryToCast's denyAiAction() check
+// (PlayableAI.java:299-303) while the actor is CC'd — toggles get no
+// exemption from the blanket lock.
+func TestCanCastToggleRejectsAllSkillsDisabled(t *testing.T) {
+	def := toggleDef()
+	actor := &testActor{mp: 100, hp: 100, allDisabled: true}
+	if err := NewController(actor).CanCastToggle(def); !errors.Is(err, ErrAllSkillsDisabled) {
+		t.Fatalf("CanCastToggle() error = %v, want ErrAllSkillsDisabled", err)
 	}
 }
 

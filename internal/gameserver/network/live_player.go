@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -45,6 +46,7 @@ type livePlayer struct {
 	pickup         *pickupIntention
 	deferredPickup *pickupIntention
 	pickupLocked   bool
+	pickupLockGen  uint64
 
 	cubicsMu sync.Mutex
 	cubics   map[cubic.ID]*cubic.Runtime
@@ -141,16 +143,52 @@ func (p *livePlayer) takeDeferredPickup() *pickupIntention {
 	return pickup
 }
 
-func (p *livePlayer) setPickupLocked(locked bool) {
-	p.pickupMu.Lock()
-	defer p.pickupMu.Unlock()
-	p.pickupLocked = locked
-}
-
+// pickupLockActive has no production caller: livePickupBlockedDeferrable
+// reads pickupLocked directly under its own pickupMu section instead. Kept
+// for the generation-primitive regression tests, which check lock state
+// independently of that section.
 func (p *livePlayer) pickupLockActive() bool {
 	p.pickupMu.Lock()
 	defer p.pickupMu.Unlock()
 	return p.pickupLocked
+}
+
+// enterPickupLock starts a new pickup-paralysis lock, invalidating any lock
+// still owned by an earlier, not-yet-fired unlock, and reports the
+// generation the matching exitPickupLock must present to be honored.
+func (p *livePlayer) enterPickupLock() uint64 {
+	p.pickupMu.Lock()
+	defer p.pickupMu.Unlock()
+	p.pickupLockGen++
+	p.pickupLocked = true
+	p.SetParalyzed(true)
+	return p.pickupLockGen
+}
+
+// exitPickupLock clears the lock started by the matching enterPickupLock and
+// reports whether it did. It is a no-op when gen is stale — a later click
+// already replaced this lock with its own — so a delayed unlock can never
+// clear a fresher lock's state or its own paralysis mid-way through.
+//
+// Paralyzed is cleared before pickupLocked, not after: liveItemOpsAllowed
+// (the pickup gate) reads Paralyzed via a separate mutex (stateMu) than
+// pickupLockActive reads pickupLocked (pickupMu), so a concurrent click can
+// observe the two writes independently. Clearing pickupLocked first would
+// open a window where a click reads Paralyzed()==true (still blocked) and
+// then pickupLockActive()==false (not deferrable) — blocked but undeferrable,
+// so it gets discarded instead of re-deferred. Clearing Paralyzed first
+// means any click that still observes it true also still observes the lock
+// active, and any click that observes Paralyzed already false takes the
+// normal (non-blocked) path instead of consulting the lock at all.
+func (p *livePlayer) exitPickupLock(gen uint64) bool {
+	p.pickupMu.Lock()
+	defer p.pickupMu.Unlock()
+	if p.pickupLockGen != gen {
+		return false
+	}
+	p.SetParalyzed(false)
+	p.pickupLocked = false
+	return true
 }
 
 func (p *livePlayer) setFusionTarget(id int32) {
@@ -188,10 +226,20 @@ func (l *GameClientLink) castController(live *livePlayer) *actorcast.Controller 
 		live.cast = actorcast.NewController(actorcast.PlayerActor{Character: live.Character})
 		live.cast.SetLogger(live.log)
 		live.cast.SetOnAbort(func(interrupted bool) { l.broadcastCastAborted(live, interrupted) })
-		live.cast.SetOnFinish(func(bool) {
-			if live.combat != nil {
-				live.combat.Think()
+		live.cast.SetOnFinish(func(interrupted bool, def modelskill.Definition, _ any) {
+			if live.combat == nil {
+				return
 			}
+			// PlayableAI.onEvtFinishedCasting (PlayableAI.java:43-63): with
+			// no queued next intention (Go has no intention queue to
+			// resume from, tracked separately), a finished CAST intention
+			// only re-engages the attack when the skill carries
+			// nextActionAttack; anything else goes idle.
+			if def.NextActionIsAttack {
+				live.combat.Think()
+				return
+			}
+			live.combat.Stop()
 		})
 		live.Character.SetCastController(live.cast)
 	}
