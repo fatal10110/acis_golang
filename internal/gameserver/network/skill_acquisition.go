@@ -107,6 +107,7 @@ func (l *GameClientLink) learnGeneralAcquireSkill(ctx context.Context, live *liv
 
 	live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageLearnedSkill, req.SkillID, req.Level))
 	live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
+	l.refreshSkillShortcuts(ctx, live, req.SkillID, req.Level)
 	live.SendFrame(l.acquireSkillList(live))
 }
 
@@ -155,6 +156,7 @@ func (l *GameClientLink) learnFishingAcquireSkill(ctx context.Context, live *liv
 		live.SendFrame(serverpackets.FrameExStorageMaxCount(live.Character))
 	}
 	live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
+	l.refreshSkillShortcuts(ctx, live, req.SkillID, req.Level)
 	live.SendFrame(l.fishingAcquireSkillList(live))
 }
 

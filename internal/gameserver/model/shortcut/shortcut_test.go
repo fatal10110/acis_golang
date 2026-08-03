@@ -74,6 +74,30 @@ func TestNewRegistrationValidatesTypePageAndSkillLevel(t *testing.T) {
 	}
 }
 
+func TestListRefreshSkillLevelUpdatesOnlyMatchingSkillShortcuts(t *testing.T) {
+	list := NewList([]Shortcut{
+		{Slot: 0, Page: 0, Type: Skill, ID: 248, Level: 1, CharacterType: 1},
+		{Slot: 1, Page: 0, Type: Skill, ID: 248, Level: 1, CharacterType: 1},
+		{Slot: 2, Page: 0, Type: Skill, ID: 999, Level: 1, CharacterType: 1},
+		{Slot: 3, Page: 0, Type: Item, ID: 248, Level: -1, CharacterType: 1},
+	})
+
+	got := list.RefreshSkillLevel(248, 2)
+
+	want := []Shortcut{
+		{Slot: 0, Page: 0, Type: Skill, ID: 248, Level: 2, CharacterType: 1},
+		{Slot: 1, Page: 0, Type: Skill, ID: 248, Level: 2, CharacterType: 1},
+	}
+	if len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
+		t.Fatalf("RefreshSkillLevel() = %+v, want %+v", got, want)
+	}
+
+	all := list.All()
+	if all[2].Level != 1 || all[3].Level != -1 {
+		t.Fatalf("unrelated shortcuts mutated: %+v", all)
+	}
+}
+
 func TestTypeStringsRoundTrip(t *testing.T) {
 	for _, typ := range []Type{Item, Skill, Action, Macro, Recipe} {
 		got, ok := ParseType(typ.String())
