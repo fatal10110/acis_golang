@@ -116,7 +116,22 @@ func (l *GameClientLink) finishDeferredPickup(live *livePlayer) {
 	if target != pickup.target {
 		return
 	}
-	l.pickupLiveGroundItem(pickup.ctx, live, target)
+	ground, ok := target.(*grounditem.Item)
+	if !ok {
+		return
+	}
+	if livePickupBlocked(live) || groundPickupInRange(live, ground) || live.move == nil {
+		l.pickupLiveGroundItem(pickup.ctx, live, ground)
+		return
+	}
+	x, y, z := ground.Position()
+	live.setPickup(pickup.ctx, ground)
+	if live.move.MoveToLocation(location.Location{X: x, Y: y, Z: z}) {
+		return
+	}
+	live.takePickup()
+	live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetTooFar))
+	live.SendFrame(serverpackets.FrameActionFailed())
 }
 
 func (l *GameClientLink) resolveTarget(objectID int32) world.Tracked {
