@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -20,6 +21,35 @@ import (
 // interrupt.
 var castingDef = modelskill.Definition{
 	ID: 9, Level: 1, HitTime: 5000, StaticHitTime: true, StaticReuse: true,
+}
+
+// TestLiveMoveSpeedUsesSwimSpeedInWater pins PlayerStatus.getRealMoveSpeed:
+// while inside a water zone, move speed switches to the template's swim
+// speed regardless of the run/walk toggle, instead of the land run/walk
+// speed.
+func TestLiveMoveSpeedUsesSwimSpeedInWater(t *testing.T) {
+	live := newTestLivePlayer(t, 1, &frameCapture{})
+	live.zoneActor = &liveZoneActor{live: live}
+
+	live.SetRunning(true)
+	if got := liveMoveSpeed(live); got != live.RunSpeed() {
+		t.Fatalf("liveMoveSpeed() on land while running = %v, want RunSpeed() %v", got, live.RunSpeed())
+	}
+
+	live.zoneActor.ZoneFlags().Set(zone.FlagWater, true)
+	if got := liveMoveSpeed(live); got != live.SwimSpeed() {
+		t.Fatalf("liveMoveSpeed() in water = %v, want SwimSpeed() %v", got, live.SwimSpeed())
+	}
+
+	live.SetRunning(false)
+	if got := liveMoveSpeed(live); got != live.SwimSpeed() {
+		t.Fatalf("liveMoveSpeed() in water while walking = %v, want SwimSpeed() %v (swim speed ignores run/walk)", got, live.SwimSpeed())
+	}
+
+	live.zoneActor.ZoneFlags().Set(zone.FlagWater, false)
+	if got := liveMoveSpeed(live); got != live.template.WalkSpeed {
+		t.Fatalf("liveMoveSpeed() back on land while walking = %v, want WalkSpeed %v", got, live.template.WalkSpeed)
+	}
 }
 
 // TestMoveLivePlayerStopsInFlightCast pins PlayerAI.onEvtCancel: a
