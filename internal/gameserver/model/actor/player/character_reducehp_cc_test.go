@@ -73,6 +73,20 @@ func TestReduceHPSkipsCPAbsorptionForSelfAttacker(t *testing.T) {
 	}
 }
 
+func TestReduceHPSkipsCPAbsorptionForDirectHPDamageSkill(t *testing.T) {
+	c := liveCharacter(1, combatTemplate(), combatItems())
+	c.SetResourceValues(Resources{MaxHP: 500, CurrentHP: 500, MaxCP: 200, CurrentCP: 200})
+
+	c.ReduceHP(50, reduceHPPlayableAttacker{}, modelskill.Definition{DirectHPDamage: true})
+
+	if c.CP() != 200 {
+		t.Fatalf("CP() = %v, want 200 unchanged for a dmgDirectlyToHp skill (matches PlayerStatus.reduceHp's ignoreCP=skill.getDmgDirectlyToHP())", c.CP())
+	}
+	if c.HP() != 450 {
+		t.Fatalf("HP() = %v, want 450", c.HP())
+	}
+}
+
 // TestReduceHPBreaksCastOnRawDamageNotCPAbsorbedRemainder pins
 // Formulas.calcCastBreak's contract: every Java call site passes the skill's
 // raw computed damage, never a CP-reduced remainder. A fully CP-absorbed hit

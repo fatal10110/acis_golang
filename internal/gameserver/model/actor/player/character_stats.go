@@ -411,9 +411,12 @@ type playableAttacker interface {
 // ReduceHP applies skill HP damage and runs the once-only death path.
 // Mirrors PlayerStatus.reduceHp's CP absorption (PlayerStatus.java:166-184):
 // a Playable attacker other than the actor itself (PvP, pet/summon damage)
-// drains CP before HP. The sleep/immobile-stop, stand-up, and stun-break
-// side effects (PlayerStatus.java:118-134) are tracked separately in #1136.
-func (c *Character) ReduceHP(amount float64, attacker any, _ modelskill.Definition) {
+// drains CP before HP, unless the skill sets dmgDirectlyToHp
+// (Player.java:6152's ignoreCP argument). The sleep/immobile-stop,
+// stand-up, and stun-break side effects (PlayerStatus.java:118-134) are
+// tracked separately in #1136, as is extending CP absorption to melee
+// auto-attack and DOT damage (#1143).
+func (c *Character) ReduceHP(amount float64, attacker any, skill modelskill.Definition) {
 	if amount <= 0 {
 		return
 	}
@@ -424,7 +427,7 @@ func (c *Character) ReduceHP(amount float64, attacker any, _ modelskill.Definiti
 		c.vitalsMu.Unlock()
 		return
 	}
-	if attacker != nil && attacker != any(c) {
+	if !skill.DirectHPDamage && attacker != nil && attacker != any(c) {
 		if p, ok := attacker.(playableAttacker); ok && p.Playable() {
 			if c.curCP > 0 {
 				drained := math.Min(c.curCP, amount)
