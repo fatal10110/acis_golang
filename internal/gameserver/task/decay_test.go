@@ -101,6 +101,30 @@ func TestDecayTickAllocationIsFlat(t *testing.T) {
 	}
 }
 
+type decayPanicEffects struct{}
+
+func (decayPanicEffects) Decay(DecayActor) { panic("boom") }
+
+func TestDecayTickClearsScratchOnPanic(t *testing.T) {
+	now := time.UnixMilli(0)
+	decay, err := NewDecay(decayPanicEffects{}, func() time.Time { return now })
+	if err != nil {
+		t.Fatalf("NewDecay() error = %v", err)
+	}
+	decay.Add(&decayFakeActor{id: 1}, -time.Second)
+
+	func() {
+		defer func() { recover() }()
+		decay.Tick()
+	}()
+
+	for i, entry := range decay.scratch {
+		if entry.actor != nil {
+			t.Fatalf("scratch[%d] retains actor after panicking Tick", i)
+		}
+	}
+}
+
 func BenchmarkDecayTickManyActors(b *testing.B) {
 	now := time.UnixMilli(0)
 	decay, err := NewDecay(decayNoopEffects{}, func() time.Time { return now })

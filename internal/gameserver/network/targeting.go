@@ -72,8 +72,8 @@ func (l *GameClientLink) startPickupLiveGroundItem(ctx context.Context, live *li
 	if !ok {
 		return false
 	}
-	if livePickupBlocked(live) {
-		l.deferOrFailPickup(ctx, live, ground, shift)
+	if blocked, deferrable := livePickupBlockedDeferrable(live); blocked {
+		l.deferOrFailPickup(ctx, live, ground, shift, deferrable)
 		return true
 	}
 	if live.combat != nil {
@@ -82,13 +82,14 @@ func (l *GameClientLink) startPickupLiveGroundItem(ctx context.Context, live *li
 	return l.walkOrForwardPickup(ctx, live, ground, shift)
 }
 
-// deferOrFailPickup parks target for a later drain if live's current blocker
-// is one finishDeferredPickup will promote it past (attack, pickup lock), and
-// either way answers the click with ActionFailed so the client's pending
-// action releases immediately instead of waiting on a response that never
-// comes.
-func (l *GameClientLink) deferOrFailPickup(ctx context.Context, live *livePlayer, ground *grounditem.Item, shift bool) {
-	if livePickupDeferrable(live) {
+// deferOrFailPickup parks target for a later drain if deferrable (live's
+// current blocker, as decided atomically alongside blocked by
+// livePickupBlockedDeferrable, is one finishDeferredPickup will promote it
+// past — attack or pickup lock), and either way answers the click with
+// ActionFailed so the client's pending action releases immediately instead
+// of waiting on a response that never comes.
+func (l *GameClientLink) deferOrFailPickup(ctx context.Context, live *livePlayer, ground *grounditem.Item, shift, deferrable bool) {
+	if deferrable {
 		live.deferPickup(ctx, ground, shift)
 	}
 	live.SendFrame(serverpackets.FrameActionFailed())
@@ -144,8 +145,8 @@ func (l *GameClientLink) finishDeferredPickup(live *livePlayer) {
 	if !ok {
 		return
 	}
-	if livePickupBlocked(live) {
-		l.deferOrFailPickup(pickup.ctx, live, ground, pickup.shift)
+	if blocked, deferrable := livePickupBlockedDeferrable(live); blocked {
+		l.deferOrFailPickup(pickup.ctx, live, ground, pickup.shift, deferrable)
 		return
 	}
 	l.walkOrForwardPickup(pickup.ctx, live, ground, pickup.shift)

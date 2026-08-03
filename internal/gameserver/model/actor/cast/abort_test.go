@@ -94,6 +94,33 @@ func TestAbortObserverFiresOnlyForAnInFlightCast(t *testing.T) {
 	}
 }
 
+// TestFinishObserverReportsTheCastThatEnded pins that SetOnFinish's def and
+// target are the skill that just ended, not the zero value: the network
+// layer's PlayableAI.onEvtFinishedCasting (PlayableAI.java:43-63) port
+// gates attack resume on that skill's NextActionIsAttack, so a stale or
+// zero def would silently disable or wrongly enable the resume for every
+// cast.
+func TestFinishObserverReportsTheCastThatEnded(t *testing.T) {
+	ctrl, _, _ := newAbortController()
+	target := testTarget{}
+	var gotDef modelskill.Definition
+	var gotTarget any
+	ctrl.SetOnFinish(func(_ bool, def modelskill.Definition, tgt any) {
+		gotDef, gotTarget = def, tgt
+	})
+	if _, err := ctrl.Start(time.Unix(1000, 0), target, scalingDef); err != nil {
+		t.Fatalf("Start() error: %v", err)
+	}
+	ctrl.Finish()
+
+	if gotDef.ID != scalingDef.ID || gotDef.Level != scalingDef.Level {
+		t.Fatalf("finish observer def = %+v, want %+v", gotDef, scalingDef)
+	}
+	if gotTarget != target {
+		t.Fatalf("finish observer target = %v, want %v", gotTarget, target)
+	}
+}
+
 func TestFinishObserverReportsEveryInFlightCastOnce(t *testing.T) {
 	now := time.Unix(1000, 0)
 
@@ -112,7 +139,7 @@ func TestFinishObserverReportsEveryInFlightCastOnce(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl, _, _ := newAbortController()
 			var got []bool
-			ctrl.SetOnFinish(func(interrupted bool) { got = append(got, interrupted) })
+			ctrl.SetOnFinish(func(interrupted bool, _ modelskill.Definition, _ any) { got = append(got, interrupted) })
 			if tt.start {
 				if _, err := ctrl.Start(now, testTarget{}, scalingDef); err != nil {
 					t.Fatalf("Start() error: %v", err)

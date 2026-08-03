@@ -159,7 +159,7 @@ type Controller struct {
 	fusionEnd func()
 	afterFunc afterFunc
 	onAbort   func(interrupted bool)
-	onFinish  func(interrupted bool)
+	onFinish  func(interrupted bool, def modelskill.Definition, target any)
 	log       zerolog.Logger
 }
 
@@ -191,9 +191,12 @@ func (c *Controller) SetOnAbort(f func(interrupted bool)) {
 }
 
 // SetOnFinish registers the observer fired once whenever an in-flight cast
-// ends. interrupted distinguishes an abort from natural completion. The
-// observer runs after the controller lock is released.
-func (c *Controller) SetOnFinish(f func(interrupted bool)) {
+// ends. interrupted distinguishes an abort from natural completion; def and
+// target are the cast that just ended, letting the owner apply the
+// reference's nextActionAttack resume gate (PlayableAI.onEvtFinishedCasting,
+// PlayableAI.java:43-63). The observer runs after the controller lock is
+// released.
+func (c *Controller) SetOnFinish(f func(interrupted bool, def modelskill.Definition, target any)) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.onFinish = f
@@ -369,25 +372,31 @@ func (c *Controller) stopInternal(interrupted bool) {
 // once it has released mu, or nil when no cast was in flight.
 func (c *Controller) abortLocked() (func(bool), func(bool)) {
 	aborted := c.casting
+	current, target := c.current, c.target
 	fusionEnd, onAbort, onFinish := c.fusionEnd, c.onAbort, c.onFinish
 	c.clearLocked()
 	if !aborted {
 		return nil, nil
 	}
 	return func(interrupted bool) {
-		if fusionEnd != nil {
-			fusionEnd()
+			if fusionEnd != nil {
+				fusionEnd()
+			}
+			if onAbort != nil {
+				onAbort(interrupted)
+			}
+		}, func(interrupted bool) {
+			if onFinish != nil {
+				onFinish(interrupted, current, target)
+			}
 		}
-		if onAbort != nil {
-			onAbort(interrupted)
-		}
-	}, onFinish
 }
 
 func (c *Controller) finishLocked() func(bool) {
 	if !c.casting {
 		return nil
 	}
+	current, target := c.current, c.target
 	fusionEnd, onFinish := c.fusionEnd, c.onFinish
 	c.clearLocked()
 	return func(aborted bool) {
@@ -395,7 +404,7 @@ func (c *Controller) finishLocked() func(bool) {
 			fusionEnd()
 		}
 		if onFinish != nil {
-			onFinish(aborted)
+			onFinish(aborted, current, target)
 		}
 	}
 }

@@ -55,6 +55,23 @@ func TestAIManagerTickAllocationIsFlat(t *testing.T) {
 	}
 }
 
+func TestAIManagerTickClearsScratchOnPanic(t *testing.T) {
+	mgr := NewAI(nil)
+	a := &aiActorStub{id: 1, thinkFn: func() { panic("boom") }}
+	mgr.Add(a)
+
+	func() {
+		defer func() { recover() }()
+		mgr.Tick()
+	}()
+
+	for i, actor := range mgr.scratch {
+		if actor != nil {
+			t.Fatalf("scratch[%d] retains actor after panicking Tick", i)
+		}
+	}
+}
+
 func BenchmarkAIManagerTickManyActors(b *testing.B) {
 	mgr := NewAI(nil)
 	for i := 0; i < 4096; i++ {
