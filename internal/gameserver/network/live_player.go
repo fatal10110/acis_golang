@@ -45,6 +45,7 @@ type livePlayer struct {
 	pickup         *pickupIntention
 	deferredPickup *pickupIntention
 	pickupLocked   bool
+	pickupLockGen  uint64
 
 	cubicsMu sync.Mutex
 	cubics   map[cubic.ID]*cubic.Runtime
@@ -141,16 +142,52 @@ func (p *livePlayer) takeDeferredPickup() *pickupIntention {
 	return pickup
 }
 
-func (p *livePlayer) setPickupLocked(locked bool) {
-	p.pickupMu.Lock()
-	defer p.pickupMu.Unlock()
-	p.pickupLocked = locked
-}
-
+// pickupLockActive has no production caller: livePickupBlockedDeferrable
+// reads pickupLocked directly under its own pickupMu section instead. Kept
+// for the generation-primitive regression tests, which check lock state
+// independently of that section.
 func (p *livePlayer) pickupLockActive() bool {
 	p.pickupMu.Lock()
 	defer p.pickupMu.Unlock()
 	return p.pickupLocked
+}
+
+// enterPickupLock starts a new pickup-paralysis lock, invalidating any lock
+// still owned by an earlier, not-yet-fired unlock, and reports the
+// generation the matching exitPickupLock must present to be honored.
+func (p *livePlayer) enterPickupLock() uint64 {
+	p.pickupMu.Lock()
+	defer p.pickupMu.Unlock()
+	p.pickupLockGen++
+	p.pickupLocked = true
+	p.SetParalyzed(true)
+	return p.pickupLockGen
+}
+
+// exitPickupLock clears the lock started by the matching enterPickupLock and
+// reports whether it did. It is a no-op when gen is stale — a later click
+// already replaced this lock with its own — so a delayed unlock can never
+// clear a fresher lock's state or its own paralysis mid-way through.
+//
+// Paralyzed is cleared before pickupLocked, not after: liveItemOpsAllowed
+// (the pickup gate) reads Paralyzed via a separate mutex (stateMu) than
+// pickupLockActive reads pickupLocked (pickupMu), so a concurrent click can
+// observe the two writes independently. Clearing pickupLocked first would
+// open a window where a click reads Paralyzed()==true (still blocked) and
+// then pickupLockActive()==false (not deferrable) — blocked but undeferrable,
+// so it gets discarded instead of re-deferred. Clearing Paralyzed first
+// means any click that still observes it true also still observes the lock
+// active, and any click that observes Paralyzed already false takes the
+// normal (non-blocked) path instead of consulting the lock at all.
+func (p *livePlayer) exitPickupLock(gen uint64) bool {
+	p.pickupMu.Lock()
+	defer p.pickupMu.Unlock()
+	if p.pickupLockGen != gen {
+		return false
+	}
+	p.SetParalyzed(false)
+	p.pickupLocked = false
+	return true
 }
 
 func (p *livePlayer) setFusionTarget(id int32) {
