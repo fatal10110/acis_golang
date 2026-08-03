@@ -417,27 +417,21 @@ func (c *Character) ReduceHP(amount float64, attacker any, _ modelskill.Definiti
 	if amount <= 0 {
 		return
 	}
+	rawDamage := amount
+
 	c.vitalsMu.Lock()
 	if c.curHP <= 0 {
 		c.vitalsMu.Unlock()
 		return
 	}
-	c.vitalsMu.Unlock()
-
 	if attacker != nil && attacker != any(c) {
 		if p, ok := attacker.(playableAttacker); ok && p.Playable() {
-			if cp := c.CP(); cp > 0 {
-				drained := math.Min(cp, amount)
-				c.SetCP(cp - drained)
+			if c.curCP > 0 {
+				drained := math.Min(c.curCP, amount)
+				c.curCP -= drained
 				amount -= drained
 			}
 		}
-	}
-
-	c.vitalsMu.Lock()
-	if c.curHP <= 0 {
-		c.vitalsMu.Unlock()
-		return
 	}
 	c.curHP -= amount
 	dead := c.curHP <= 0
@@ -445,7 +439,11 @@ func (c *Character) ReduceHP(amount float64, attacker any, _ modelskill.Definiti
 		c.curHP = 0
 	}
 	c.vitalsMu.Unlock()
-	c.breakCastOnDamage(amount)
+	// calcCastBreak always runs on the raw pre-absorption damage in the
+	// reference (Formulas.java:725 callers pass the skill's computed
+	// damage, never a CP-reduced remainder), so breakCastOnDamage must
+	// too.
+	c.breakCastOnDamage(rawDamage)
 	if dead {
 		killer, _ := attacker.(creature.DeathActor)
 		c.Die(killer)

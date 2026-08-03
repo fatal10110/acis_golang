@@ -72,3 +72,25 @@ func TestReduceHPSkipsCPAbsorptionForSelfAttacker(t *testing.T) {
 		t.Fatalf("HP() = %v, want 450", c.HP())
 	}
 }
+
+// TestReduceHPBreaksCastOnRawDamageNotCPAbsorbedRemainder pins
+// Formulas.calcCastBreak's contract: every Java call site passes the skill's
+// raw computed damage, never a CP-reduced remainder. A fully CP-absorbed hit
+// (HP untouched) must still forward the full raw damage to the cast
+// controller.
+func TestReduceHPBreaksCastOnRawDamageNotCPAbsorbedRemainder(t *testing.T) {
+	c := liveCharacter(1, combatTemplate(), combatItems())
+	c.SetResourceValues(Resources{MaxHP: 500, CurrentHP: 500, MaxCP: 200, CurrentCP: 200})
+	c.SetRollSource(func(int) int { return 42 })
+	spy := &spyCastController{casting: true, magic: true}
+	c.SetCastController(spy)
+
+	c.ReduceHP(50, reduceHPPlayableAttacker{}, modelskill.Definition{})
+
+	if len(spy.damageCalls) != 1 {
+		t.Fatalf("InterruptCastOnDamage calls = %d, want 1", len(spy.damageCalls))
+	}
+	if got := spy.damageCalls[0].damage; got != 50 {
+		t.Fatalf("damage = %v, want 50 (raw damage, not the CP-absorbed remainder of 0)", got)
+	}
+}
