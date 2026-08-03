@@ -107,14 +107,20 @@ func (a *Actor) CanUseSkill() bool {
 
 // TryUseSkill dispatches an owner-commanded special-skill cast: resolves
 // skillID against this summon's own skill catalog, checks the level gate,
-// then forwards to the attached AI. It returns false wherever Java's
-// useSkill would return false (unknown skill, level gap, no attached AI).
+// then forwards to the attached AI. Matching Java's useSkill
+// (RequestActionUse.java:453-472), the AI's tryToCast is fire-and-forget:
+// its accept/reject decision (busy, cooldown, out of control, MP/mute —
+// PlayableAI.java:297, void return) does not feed back into the result
+// here. TryUseSkill returns false only wherever Java's useSkill would
+// (unknown skill, level gap, no attached AI); a dispatched cast reports
+// true even if the AI goes on to reject it.
 func (a *Actor) TryUseSkill(skillID int, target attackable.Combatant) bool {
 	ref, ok := a.GetSkill(skillID)
 	if !ok || !a.CanUseSkill() || a.brain == nil {
 		return false
 	}
-	return a.brain.TryToCast(target, ref)
+	a.brain.TryToCast(target, ref)
+	return true
 }
 
 // OutOfControl reports whether the owner cannot currently command this
