@@ -305,6 +305,10 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 
 	live := &livePlayer{Character: c, template: tmpl, items: items, attack: attackCtl, move: moveCtl, combat: combat, shortcuts: shortcut.NewList(shortcuts), isGM: resolveIsGM(l.admin, c.AccessLevel), visibilitySend: client.Session.trySendFrame, stopAttack: l.stopLiveAutoAttack, log: l.log}
 	live.zoneActor = &liveZoneActor{live: live}
+	// Build cast eagerly, like attackCtl above: pickup-lock's timer goroutine
+	// reads live.cast unguarded, so a lazy first write from the read-loop
+	// goroutine would race it (issue #1183).
+	l.castController(live)
 	c.SetZoneRevalidator(func(previous location.Location) {
 		l.revalidateZones(live, previous)
 	})
