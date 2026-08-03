@@ -129,7 +129,7 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 	client.Session.SendFrame(serverpackets.FrameQuestList(nil))
 	client.Session.SendFrame(serverpackets.FrameSkillList(skillList))
 	client.Session.SendFrame(serverpackets.FrameFriendList(nil))
-	client.Session.SendFrame(serverpackets.FrameUserInfo(serverpackets.UserInfoSnapshot{Character: c, Template: tmpl, Items: items}))
+	client.Session.SendFrame(serverpackets.FrameUserInfo(serverpackets.UserInfoSnapshot{Character: c, Template: tmpl, Items: items, IsGM: live.isGM}))
 	client.Session.SendFrame(itemListFrame)
 	client.Session.SendFrame(serverpackets.FrameShortCutInit(serverShortcutList(shortcuts)))
 	if c.Dead() {
@@ -348,7 +348,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	})
 	c.SetUserInfoUpdater(func() {
 		live.SendFrame(serverpackets.FrameUserInfo(serverpackets.UserInfoSnapshot{
-			Character: live.Character, Template: live.template, Items: live.inventoryItems(),
+			Character: live.Character, Template: live.template, Items: live.inventoryItems(), IsGM: live.isGM,
 		}))
 	})
 	c.SetGradePenaltyUpdater(func() {
@@ -357,7 +357,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	})
 	c.SetWeightPenaltyUpdater(func() {
 		items := live.inventoryItems()
-		live.SendFrame(serverpackets.FrameUserInfo(serverpackets.UserInfoSnapshot{Character: live.Character, Template: live.template, Items: items}))
+		live.SendFrame(serverpackets.FrameUserInfo(serverpackets.UserInfoSnapshot{Character: live.Character, Template: live.template, Items: items, IsGM: live.isGM}))
 		live.SendFrame(serverpackets.FrameEtcStatusUpdate(serverpackets.EtcStatus{WeightPenalty: int32(live.WeightPenalty()), GradePenalty: live.WeaponGradePenalty() || live.ArmorGradePenalty() > 0}))
 		if l.world != nil {
 			info := serverpackets.CharInfoSnapshot{Character: live.Character, Template: live.template, Items: items}

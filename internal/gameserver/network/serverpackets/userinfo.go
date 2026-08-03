@@ -60,6 +60,9 @@ type UserInfoSnapshot struct {
 	Character *player.Character
 	Template  *player.Template
 	Items     []*item.Instance
+	// IsGM is the accessLevels.xml isGM flag for Character's access level
+	// (Player.isGM() in the reference), not merely AccessLevel > 0.
+	IsGM bool
 }
 
 // EncodeUserInfo builds the UserInfo packet payload for an unframed send.
@@ -184,7 +187,7 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) {
 	w.WriteInt32(int32(c.HairStyle))
 	w.WriteInt32(int32(c.HairColor))
 	w.WriteInt32(int32(c.Face))
-	w.WriteInt32(boolInt32(c.AccessLevel > 0))
+	w.WriteInt32(boolInt32(s.IsGM))
 
 	w.WriteString(c.Title)
 

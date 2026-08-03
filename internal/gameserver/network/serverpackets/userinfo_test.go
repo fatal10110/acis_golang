@@ -41,7 +41,7 @@ func TestFrameUserInfo(t *testing.T) {
 		{ObjectID: 100, TemplateID: 2369, Location: item.LocationPaperdoll, LocationData: rhandPaperdollIndex, EnchantLevel: 200},
 	}
 
-	got := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: c, Template: tmpl, Items: items}))
+	got := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: c, Template: tmpl, Items: items, IsGM: true}))
 	resources := c.ResourceValues()
 
 	want := []byte{OpcodeUserInfo}
@@ -122,7 +122,7 @@ func TestFrameUserInfo(t *testing.T) {
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.HairStyle))
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.HairColor))
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.Face))
-	want = binary.LittleEndian.AppendUint32(want, 1) // access level > 0 -> GM flag
+	want = binary.LittleEndian.AppendUint32(want, 1) // IsGM flag
 
 	want = append(want, encodeUTF16Z(c.Title)...)
 
@@ -175,6 +175,23 @@ func TestFrameUserInfo(t *testing.T) {
 
 	if !bytes.Equal(got, want) {
 		t.Errorf("FrameUserInfo mismatch:\n got  %x\n want %x", got, want)
+	}
+}
+
+// TestFrameUserInfo_GMByteFollowsIsGMNotAccessLevel pins the GM byte to
+// UserInfoSnapshot.IsGM (accessLevels.xml's isGM flag) rather than a raw
+// AccessLevel > 0 check: a level 1-6 character (Chat Moderator .. Head GM,
+// isGM="false" in the reference data) must not broadcast the GM flag even
+// though its AccessLevel is positive.
+func TestFrameUserInfo_GMByteFollowsIsGMNotAccessLevel(t *testing.T) {
+	tmpl := &player.Template{}
+	c := &player.Character{Name: "M", AccessLevel: 3}
+
+	notGM := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: c, Template: tmpl, IsGM: false}))
+	gm := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: c, Template: tmpl, IsGM: true}))
+
+	if bytes.Equal(notGM, gm) {
+		t.Fatal("IsGM false/true encodings are identical, want the GM byte to differ")
 	}
 }
 
