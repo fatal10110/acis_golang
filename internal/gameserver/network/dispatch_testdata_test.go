@@ -207,5 +207,14 @@ func testItemTemplates() *item.Table {
 			Destroyable: true,
 			EtcItem:     &item.EtcItemDetail{Type: item.EtcItemQuest},
 		},
+		{
+			ID:        9500,
+			Name:      "Heavy Ingot",
+			Kind:      item.KindEtcItem,
+			Duration:  -1,
+			Stackable: true,
+			EtcItem:   &item.EtcItemDetail{},
+			Weight:    10,
+		},
 	})
 }

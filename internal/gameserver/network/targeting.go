@@ -121,9 +121,14 @@ func (l *GameClientLink) walkOrForwardPickup(ctx context.Context, live *livePlay
 
 func (l *GameClientLink) finishLiveGroundPickup(live *livePlayer) {
 	pickup := live.takePickup()
-	if pickup != nil {
-		l.pickupLiveGroundItem(pickup.ctx, live, pickup.target)
+	if pickup == nil || pickup.target == nil {
+		return
 	}
+	target := l.resolveTarget(pickup.target.ObjectID())
+	if target != pickup.target {
+		return
+	}
+	l.pickupLiveGroundItem(pickup.ctx, live, target)
 }
 
 func (l *GameClientLink) finishDeferredPickup(live *livePlayer) {
