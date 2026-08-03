@@ -7,6 +7,7 @@ import (
 	"time"
 
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -18,6 +19,50 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/rs/zerolog"
 )
+
+// TestResolveIsGMUsesAccessLevelsIsGMFlag pins liveZoneActor.GM() to
+// accessLevels.xml's isGM attribute (Player.isGM() / AccessLevel.isGm() in
+// the reference) rather than treating every positive access level as GM:
+// levels 1-6 (Chat Moderator .. Head GM) are not GM, only 7-8 (Admin,
+// Master) are.
+func TestResolveIsGMUsesAccessLevelsIsGMFlag(t *testing.T) {
+	levels := []admin.AccessLevel{
+		{Level: 0, IsGM: false},
+		{Level: 3, Name: "Head GM", IsGM: false},
+		{Level: 7, Name: "Admin", IsGM: true},
+		{Level: 8, Name: "Master", IsGM: true},
+	}
+	data, err := admin.NewData(levels, nil)
+	if err != nil {
+		t.Fatalf("admin.NewData() error: %v", err)
+	}
+
+	cases := []struct {
+		accessLevel int
+		want        bool
+	}{
+		{accessLevel: 0, want: false},
+		{accessLevel: 3, want: false},
+		{accessLevel: 7, want: true},
+		{accessLevel: 8, want: true},
+		{accessLevel: 99, want: false}, // undefined level: not found, not GM.
+	}
+	for _, c := range cases {
+		if got := resolveIsGM(data, c.accessLevel); got != c.want {
+			t.Errorf("resolveIsGM(data, %d) = %v, want %v", c.accessLevel, got, c.want)
+		}
+	}
+
+	if resolveIsGM(nil, 7) {
+		t.Error("resolveIsGM(nil, 7) = true, want false")
+	}
+
+	live := &livePlayer{isGM: true}
+	actor := &liveZoneActor{live: live}
+	if !actor.GM() {
+		t.Error("liveZoneActor.GM() = false, want true when live.isGM is true")
+	}
+}
 
 func TestTaskEffectsWaterSendsCyanGauge(t *testing.T) {
 	state := world.New()

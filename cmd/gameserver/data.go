@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/probe"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -39,6 +40,7 @@ type gameData struct {
 	Doors         *door.Table
 	Statics       *staticobject.Table
 	Restarts      *restart.Table
+	Admin         *admin.Data
 	Geo           *engine.Engine
 	Finder        *pathfind.Finder
 }
@@ -109,6 +111,10 @@ func loadGameData(paths gameServerPaths, cfg gameServerConfig, log zerolog.Logge
 	if err != nil {
 		return nil, err
 	}
+	adminData, err := gamexml.LoadAdminData(xmlRoot)
+	if err != nil {
+		return nil, err
+	}
 	geo, err := loadGeodata(paths)
 	if err != nil {
 		return nil, err
@@ -128,6 +134,7 @@ func loadGameData(paths gameServerPaths, cfg gameServerConfig, log zerolog.Logge
 		Doors:         doors,
 		Statics:       statics,
 		Restarts:      restarts,
+		Admin:         adminData,
 		Geo:           geo.Engine,
 		Finder:        geo.Finder,
 	}, nil

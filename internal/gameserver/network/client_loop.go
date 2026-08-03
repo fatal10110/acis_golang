@@ -703,6 +703,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 					Character: live.Character,
 					Template:  live.template,
 					Items:     live.inventoryItems(),
+					IsGM:      live.isGM,
 				}))
 			}
 
