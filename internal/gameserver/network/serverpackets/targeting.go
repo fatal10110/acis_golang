@@ -20,11 +20,13 @@ const (
 type StatusType int32
 
 const (
-	StatusCurrentHP StatusType = 9
-	StatusMaxHP     StatusType = 10
-	StatusCurrentMP StatusType = 11
-	StatusMaxMP     StatusType = 12
-	StatusSP        StatusType = 13
+	StatusCurrentHP   StatusType = 9
+	StatusMaxHP       StatusType = 10
+	StatusCurrentMP   StatusType = 11
+	StatusMaxMP       StatusType = 12
+	StatusSP          StatusType = 13
+	StatusCurrentLoad StatusType = 14
+	StatusMaxLoad     StatusType = 15
 )
 
 // StatusAttribute is one type/value pair in a StatusUpdate packet.
