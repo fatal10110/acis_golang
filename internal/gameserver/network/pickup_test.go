@@ -739,10 +739,9 @@ func TestPickupLiveGroundItemRejectsOutOfRange(t *testing.T) {
 
 	gcl.pickupLiveGroundItem(context.Background(), live, ground)
 
-	// ActionFailed must follow the system message, or the client's pending
-	// pickup action never resolves — the same "stuck, unresponsive to
-	// movement" bug reported for a rejected pickup click.
-	assertOpcodeSequence(t, capture.frames, serverpackets.OpcodeSystemMessage, serverpackets.OpcodeActionFailed)
+	// ActionFailed must lead, matching the reference's clientActionFailed()
+	// at thinkPickUp entry, before the rejection reason SystemMessage.
+	assertOpcodeSequence(t, capture.frames, serverpackets.OpcodeActionFailed, serverpackets.OpcodeSystemMessage)
 	if _, ok := state.Object(ground.ObjectID()); !ok {
 		t.Fatal("ground item removed after an out-of-range pickup attempt")
 	}
@@ -824,7 +823,7 @@ func TestPickupLiveGroundItemRejectsLootLockedByOtherOwner(t *testing.T) {
 
 	gcl.pickupLiveGroundItem(context.Background(), live, ground)
 
-	assertOpcodeSequence(t, capture.frames, serverpackets.OpcodeSystemMessage, serverpackets.OpcodeActionFailed)
+	assertOpcodeSequence(t, capture.frames, serverpackets.OpcodeActionFailed, serverpackets.OpcodeSystemMessage)
 	if _, ok := state.Object(ground.ObjectID()); !ok {
 		t.Fatal("loot-locked ground item removed by a non-owner pickup attempt")
 	}
@@ -847,15 +846,15 @@ func TestPickupLiveGroundItemRejectsWhenSlotsFull(t *testing.T) {
 
 	gcl.pickupLiveGroundItem(context.Background(), live, ground)
 
-	assertSystemMessageIDFrame(t, capture.frames[0], serverpackets.SystemMessageSlotsFull)
+	assertSystemMessageIDFrame(t, capture.frames[1], serverpackets.SystemMessageSlotsFull)
 	// This is the regression case for the reported bug: a full inventory
 	// (an easy state to reach while playtesting pickup) previously answered
 	// only with the system message, leaving the client's action pending
 	// forever — matching "item never disappears" (the pickup click that
 	// would have retried never got a chance) and "character stops
-	// responding to movement".
-	if got := frameOpcodes(capture.frames); string(got) != string([]byte{serverpackets.OpcodeSystemMessage, serverpackets.OpcodeActionFailed}) {
-		t.Fatalf("slots-full opcodes = %x, want SystemMessage, ActionFailed", got)
+	// responding to movement". ActionFailed leads (reference order).
+	if got := frameOpcodes(capture.frames); string(got) != string([]byte{serverpackets.OpcodeActionFailed, serverpackets.OpcodeSystemMessage}) {
+		t.Fatalf("slots-full opcodes = %x, want ActionFailed, SystemMessage", got)
 	}
 	if _, ok := state.Object(ground.ObjectID()); !ok {
 		t.Fatal("ground item removed after a slots-full pickup attempt")
