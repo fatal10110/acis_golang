@@ -135,6 +135,50 @@ func TestRefreshLiveLevelSkillsAutoLearnRefreshesShortcut(t *testing.T) {
 	}
 }
 
+// TestRefreshLiveLevelSkillsAutoLearnPullBackLeavesShortcutUntouched pins the
+// reward path's pull-back case: correctInvalidSkills lowers a skill the
+// character holds above what the profession currently grants, mirroring
+// Java's removeInvalidSkills, which calls the two-arg
+// addSkill(availableSkill.getSkill(), true) (Player.java:3333,3337), i.e.
+// updateShortcuts=false. Unlike the grant loop's own addSkill call
+// (Player.java:3283), a pull-back must not touch the shortcut bar: the
+// client and persisted shortcut keep the old level until re-dragged, even
+// though the known skill level itself just dropped.
+func TestRefreshLiveLevelSkillsAutoLearnPullBackLeavesShortcutUntouched(t *testing.T) {
+	frames := &frameCapture{}
+	live := newTestLivePlayer(t, 1, frames)
+	live.Character.CharLevel = 10
+	live.Character.SetSkillLevel(3, 3)
+	live.template = &player.Template{Skills: []player.SkillGrant{
+		{SkillID: 3, Level: 1, MinLevel: 5, Cost: 0},
+	}}
+	live.shortcuts = shortcut.NewList([]shortcut.Shortcut{
+		{Slot: 0, Page: 0, Type: shortcut.Skill, ID: 3, Level: 3, CharacterType: 1},
+	})
+	gcl := &GameClientLink{
+		skills: skillstate.NewPersistence(nil, skillTable(
+			modelskill.Definition{ID: 3, Level: 1},
+			modelskill.Definition{ID: 3, Level: 2},
+			modelskill.Definition{ID: 3, Level: 3},
+		)),
+		playerConfig: PlayerConfig{AutoLearnSkills: true},
+	}
+
+	gcl.refreshLiveLevelSkills(context.Background(), live)
+
+	if got := live.Character.SkillLevel(3); got != 1 {
+		t.Fatalf("SkillLevel(3) after refresh = %d, want 1 (pulled back to the granted level)", got)
+	}
+	if got := live.shortcuts.All()[0].Level; got != 3 {
+		t.Fatalf("shortcut level = %d, want 3 (untouched by the pull-back)", got)
+	}
+	for _, frame := range frames.frames {
+		if frame[0] == serverpackets.OpcodeShortCutRegister {
+			t.Fatal("ShortCutRegister sent, want none for a pull-back")
+		}
+	}
+}
+
 // TestRefreshLiveLevelSkillsWithoutSkillsIsSilent pins the guard: a link with
 // no skill persistence attached has nothing to reconcile and sends nothing,
 // rather than pushing an empty skill list that would wipe the client's copy.
