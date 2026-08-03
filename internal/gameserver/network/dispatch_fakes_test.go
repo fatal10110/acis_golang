@@ -326,6 +326,7 @@ func (s *sequentialIDs) NextID() (int32, error) {
 }
 
 type frameCapture struct {
+	mu     sync.Mutex
 	frames [][]byte
 }
 
@@ -334,8 +335,20 @@ func (c *frameCapture) send(frame wire.Frame) bool {
 	raw := frame.Bytes()
 	payload := make([]byte, len(raw)-2)
 	copy(payload, raw[2:])
+	c.mu.Lock()
 	c.frames = append(c.frames, payload)
+	c.mu.Unlock()
 	return true
+}
+
+// snapshot returns a safe copy of frames for a test that may race a
+// background goroutine still delivering frames (e.g. an in-flight
+// move-then-arrive callback) — direct field access is fine for every other
+// test here, which only reads after its own synchronous call returns.
+func (c *frameCapture) snapshot() [][]byte {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return append([][]byte(nil), c.frames...)
 }
 
 func frameOpcodes(frames [][]byte) []byte {
