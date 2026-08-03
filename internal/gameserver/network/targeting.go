@@ -109,7 +109,7 @@ func (l *GameClientLink) finishLiveGroundPickup(live *livePlayer) {
 	if target != pickup.target {
 		return
 	}
-	l.pickupLiveGroundItem(pickup.ctx, live, pickup.target)
+	l.pickupLiveGroundItem(pickup.ctx, live, target)
 }
 
 func (l *GameClientLink) finishDeferredPickup(live *livePlayer) {
