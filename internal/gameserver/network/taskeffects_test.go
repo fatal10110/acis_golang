@@ -110,7 +110,7 @@ func TestWaterZoneMovementUsesBreathStatAndClearsGaugeOnExit(t *testing.T) {
 	}
 	zones := zone.NewIndex()
 	zones.Add(zone.NewWater(1, zone.NewCuboid(1000, 2000, -100, 100, -100, 100)))
-	link := &GameClientLink{world: state, zones: zones, water: water}
+	link := &GameClientLink{world: state, zones: zones, water: water, playerConfig: PlayerConfig{AllowWater: true}}
 	link.wireWaterZones()
 
 	link.updateLivePlayerPosition(live, location.Location{X: 1500}, 0)
@@ -133,6 +133,32 @@ func TestWaterZoneMovementUsesBreathStatAndClearsGaugeOnExit(t *testing.T) {
 	}
 }
 
+func TestWaterZoneMovementNoOpWhenAllowWaterDisabled(t *testing.T) {
+	state := world.New()
+	capture := &frameCapture{}
+	live := newTestLivePlayer(t, 102, capture)
+	live.zoneActor = &liveZoneActor{live: live}
+	state.Spawn(live, 0, 0, 0, 0)
+	state.AddPlayer(live)
+
+	effects := NewTaskEffects(state)
+	water, err := task.NewWater(effects, time.Now)
+	if err != nil {
+		t.Fatalf("NewWater() error = %v", err)
+	}
+	zones := zone.NewIndex()
+	zones.Add(zone.NewWater(1, zone.NewCuboid(1000, 2000, -100, 100, -100, 100)))
+	link := &GameClientLink{world: state, zones: zones, water: water, playerConfig: PlayerConfig{AllowWater: false}}
+	link.wireWaterZones()
+
+	link.updateLivePlayerPosition(live, location.Location{X: 1500}, 0)
+	link.updateLivePlayerPosition(live, location.Location{}, 0)
+
+	if len(capture.frames) != 0 {
+		t.Fatalf("water-zone frames = %d, want 0 when AllowWater is disabled", len(capture.frames))
+	}
+}
+
 func TestWaterZoneMovementAcrossRegionKeepsCountdown(t *testing.T) {
 	state := world.New()
 	capture := &frameCapture{}
@@ -148,7 +174,7 @@ func TestWaterZoneMovementAcrossRegionKeepsCountdown(t *testing.T) {
 	}
 	zones := zone.NewIndex()
 	zones.Add(zone.NewWater(1, zone.NewCuboid(boundary-100, boundary+100, -100, 100, -100, 100)))
-	link := &GameClientLink{world: state, zones: zones, water: water}
+	link := &GameClientLink{world: state, zones: zones, water: water, playerConfig: PlayerConfig{AllowWater: true}}
 	link.wireWaterZones()
 
 	link.updateLivePlayerPosition(live, location.Location{X: boundary - 1}, 0)
@@ -174,7 +200,7 @@ func TestWaterZoneServerPositionSyncStartsCountdown(t *testing.T) {
 	}
 	zones := zone.NewIndex()
 	zones.Add(zone.NewWater(1, zone.NewCuboid(1000, 2000, -100, 100, -100, 100)))
-	link := &GameClientLink{world: state, zones: zones, water: water}
+	link := &GameClientLink{world: state, zones: zones, water: water, playerConfig: PlayerConfig{AllowWater: true}}
 	link.wireWaterZones()
 	live.SetZoneRevalidator(func(previous location.Location) { link.revalidateZones(live, previous) })
 

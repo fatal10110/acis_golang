@@ -170,7 +170,7 @@ func (e *TaskEffects) Expire(actorID int32, inst *item.Instance) {
 }
 
 func (l *GameClientLink) wireWaterZones() {
-	if l.zones == nil || l.water == nil {
+	if l.zones == nil || l.water == nil || !l.playerConfig.AllowWater {
 		return
 	}
 	for _, kind := range l.zones.All() {
