@@ -599,7 +599,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 			switch req.ActionID {
 			case actionSitStand:
-				l.changeLiveWaitType(live, !live.Standing())
+				l.requestChangeWaitType(live, !live.Standing())
 			case actionWalkRun:
 				l.changeLiveMoveType(live, !live.Running())
 			default:
@@ -659,7 +659,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				continue
 			}
 			if live != nil {
-				l.changeLiveWaitType(live, req.Stand)
+				l.requestChangeWaitType(live, req.Stand)
 			}
 
 		case clientpackets.OpcodeRequestLinkHtml:

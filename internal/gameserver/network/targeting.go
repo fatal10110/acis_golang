@@ -183,6 +183,28 @@ func (l *GameClientLink) showOwnedPetStatus(live *livePlayer, target world.Track
 	return true
 }
 
+// requestChangeWaitType handles the sit/stand key (RequestChangeWaitType)
+// and the action-bar sit/stand button (RequestActionUse action 0), which the
+// reference routes through the same tryToSit(target)/tryToStand() AI calls.
+// A sit request first tries the player's current target as a throne; an
+// invalid or unclaimable target (wrong type, busy, out of range) still falls
+// back to a plain sit, matching the reference's unconditional sitDown()
+// ahead of its chair check. Any rejection releases the client with
+// ActionFailed instead of silence.
+func (l *GameClientLink) requestChangeWaitType(live *livePlayer, stand bool) {
+	if live == nil {
+		return
+	}
+	if !stand {
+		if target := live.Target(); target != nil && l.sitLiveOnChair(live, target) {
+			return
+		}
+	}
+	if !l.changeLiveWaitType(live, stand) {
+		live.SendFrame(serverpackets.FrameActionFailed())
+	}
+}
+
 func (l *GameClientLink) sitLiveOnChair(live *livePlayer, target world.Tracked) bool {
 	if live == nil {
 		return false

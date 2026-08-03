@@ -3,8 +3,13 @@ package network
 import (
 	"testing"
 
+	"github.com/rs/zerolog"
+
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // TestGameClientLinkActionBarStanceCommandsToggleStance covers the
@@ -82,6 +87,91 @@ func TestGameClientLinkActionBarStanceCommandsToggleStance(t *testing.T) {
 	reply = c.read()
 	if reply[0] != serverpackets.OpcodeActionFailed {
 		t.Fatalf("unclaimed action opcode = %#x, want ActionFailed (%#x)", reply[0], serverpackets.OpcodeActionFailed)
+	}
+}
+
+// TestRequestChangeWaitTypeRejectionSendsActionFailed pins Gap 1: a rejected
+// sit/stand request (here, standing up while already standing, mirroring the
+// reference's thinkStand guard) must release the client with ActionFailed
+// instead of silently dropping the frame.
+func TestRequestChangeWaitTypeRejectionSendsActionFailed(t *testing.T) {
+	frames := &frameCapture{}
+	live := newTestLivePlayer(t, 1, frames)
+	gcl := &GameClientLink{log: zerolog.Nop()}
+
+	gcl.requestChangeWaitType(live, true)
+
+	if got := frameOpcodes(frames.frames); string(got) != string([]byte{serverpackets.OpcodeActionFailed}) {
+		t.Fatalf("rejected stand opcodes = %x, want ActionFailed", got)
+	}
+	if !live.Standing() {
+		t.Fatal("live player stopped standing after a rejected stand request")
+	}
+}
+
+// TestRequestChangeWaitTypeSitTargetsClaimableChair pins Gap 2: the sit key
+// (RequestChangeWaitType with Stand == false) must bind a claimable targeted
+// throne exactly like the click path does.
+func TestRequestChangeWaitTypeSitTargetsClaimableChair(t *testing.T) {
+	state := world.New()
+	frames := &frameCapture{}
+	live := newTestLivePlayer(t, 1, frames)
+	chair, err := staticobject.NewObject(2, &staticobject.Template{
+		ID:       777,
+		Location: location.Location{X: 100, Y: 0, Z: 0},
+		Type:     1,
+	})
+	if err != nil {
+		t.Fatalf("NewObject: %v", err)
+	}
+
+	state.Spawn(live, 0, 0, 0, 0)
+	state.Spawn(chair, 100, 0, 0, 0)
+	frames.frames = nil
+	live.SetTargetTracked(chair)
+
+	gcl := &GameClientLink{world: state, log: zerolog.Nop()}
+	gcl.requestChangeWaitType(live, false)
+
+	if got := frameOpcodes(frames.frames); string(got) != string([]byte{serverpackets.OpcodeChangeWaitType, serverpackets.OpcodeChairSit}) {
+		t.Fatalf("sit-key chair opcodes = %x, want ChangeWaitType, ChairSit", got)
+	}
+	if !chair.Busy() {
+		t.Fatal("chair was not marked busy after sit key targeted it")
+	}
+}
+
+// TestRequestChangeWaitTypeSitFallsBackWhenChairUnclaimable pins the
+// reference's unconditional sitDown() ahead of its chair check: an
+// unclaimable targeted chair (here, already busy) must not block the sit,
+// it just leaves the player sitting on the ground instead of the throne.
+func TestRequestChangeWaitTypeSitFallsBackWhenChairUnclaimable(t *testing.T) {
+	state := world.New()
+	frames := &frameCapture{}
+	live := newTestLivePlayer(t, 1, frames)
+	chair, err := staticobject.NewObject(2, &staticobject.Template{
+		ID:       777,
+		Location: location.Location{X: 100, Y: 0, Z: 0},
+		Type:     1,
+	})
+	if err != nil {
+		t.Fatalf("NewObject: %v", err)
+	}
+	chair.SetBusy(true)
+
+	state.Spawn(live, 0, 0, 0, 0)
+	state.Spawn(chair, 100, 0, 0, 0)
+	frames.frames = nil
+	live.SetTargetTracked(chair)
+
+	gcl := &GameClientLink{world: state, log: zerolog.Nop()}
+	gcl.requestChangeWaitType(live, false)
+
+	if got := frameOpcodes(frames.frames); string(got) != string([]byte{serverpackets.OpcodeChangeWaitType}) {
+		t.Fatalf("sit-key opcodes with unclaimable chair = %x, want plain ChangeWaitType only", got)
+	}
+	if live.Standing() {
+		t.Fatal("live player did not sit after an unclaimable chair target")
 	}
 }
 
