@@ -443,6 +443,25 @@ func TestActorGetSkillCanUseSkillTryUseSkill(t *testing.T) {
 			t.Fatalf("GetSkill(4139) = %+v, %v, want level 8, true", ref, ok)
 		}
 	})
+
+	t.Run("AI rejection of the dispatched cast does not flip the result", func(t *testing.T) {
+		// Matches Java's useSkill (RequestActionUse.java:453-472): it
+		// unconditionally returns true once the dispatch preconditions pass,
+		// because summon.getAI().tryToCast(...) (PlayableAI.java:297) is void
+		// and cannot feed a rejection (cooldown, out of control, no MP, ...)
+		// back into the return value.
+		actor := NewPet(PetConfig{ObjectID: 200, Owner: owner, Level: 40, Skills: map[int]int{4139: 8}})
+		brain := &rejectingSummonAI{}
+		actor.SetAI(brain)
+
+		if !actor.TryUseSkill(4139, target) {
+			t.Fatal("TryUseSkill = false, want true even though the AI rejected the cast")
+		}
+		want := []string{"cast:300"}
+		if !reflect.DeepEqual(brain.events, want) {
+			t.Fatalf("AI events = %v, want %v", brain.events, want)
+		}
+	})
 }
 
 type recordingSummonAI struct {
@@ -466,6 +485,18 @@ func (a *recordingSummonAI) TryToIdle() {
 func (a *recordingSummonAI) TryToCast(target attackable.Combatant, ref modelskill.Ref) bool {
 	a.events = append(a.events, "cast:"+objectIDString(target))
 	return true
+}
+
+// rejectingSummonAI records the cast dispatch like recordingSummonAI but
+// reports it rejected, simulating the AI declining the cast (cooldown,
+// out of control, no MP, ...) after the dispatch already happened.
+type rejectingSummonAI struct {
+	recordingSummonAI
+}
+
+func (a *rejectingSummonAI) TryToCast(target attackable.Combatant, ref modelskill.Ref) bool {
+	a.events = append(a.events, "cast:"+objectIDString(target))
+	return false
 }
 
 type liveCombatant struct {
