@@ -11,7 +11,7 @@ var (
 	_ interface {
 		Dead() bool
 		HP() float64
-		ReduceHPByDOT(float64, any)
+		ReduceHPByDOT(float64, any, bool)
 	} = (*Character)(nil)
 	_ interface {
 		Dead() bool
