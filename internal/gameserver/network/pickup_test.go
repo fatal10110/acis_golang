@@ -498,7 +498,10 @@ func TestFinishDeferredPickupWalksToOutOfRangeItem(t *testing.T) {
 	live.deferPickup(context.Background(), ground, false)
 	gcl.finishDeferredPickup(live)
 
-	assertOpcodeSequence(t, frames.frames, serverpackets.OpcodeMoveToLocation)
+	// snapshot(), not the frames field directly: the walk just started can
+	// arrive and deliver its own frames from a background timer goroutine
+	// concurrently with this read.
+	assertOpcodeSequence(t, frames.snapshot(), serverpackets.OpcodeMoveToLocation)
 
 	deadline := time.Now().Add(2 * time.Second)
 	for {
