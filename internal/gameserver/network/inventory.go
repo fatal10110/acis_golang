@@ -355,7 +355,7 @@ func (l *GameClientLink) broadcastEquipmentChange(live *livePlayer) {
 func (l *GameClientLink) broadcastCharacterInfo(live *livePlayer) {
 	items := live.inventoryItems()
 	live.SendFrame(serverpackets.FrameUserInfo(serverpackets.UserInfoSnapshot{
-		Character: live.Character, Template: live.template, Items: items,
+		Character: live.Character, Template: live.template, Items: items, IsGM: live.isGM,
 	}))
 	if l.world == nil {
 		return

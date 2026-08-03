@@ -110,6 +110,7 @@ func provideGameClientLink(
 		ItemInstances:    itemInstances,
 		Restarts:         data.Restarts,
 		Levels:           data.Levels,
+		Admin:            data.Admin,
 		PlayerConfig:     playerConfig,
 		PetConfig:        petCfg,
 		Log:              log,
