@@ -52,7 +52,7 @@ func (t *liveEffectTarget) HP() float64 { return t.hp }
 
 func (t *liveEffectTarget) MPValue() float64 { return t.mp }
 
-func (t *liveEffectTarget) ReduceHPByDOT(damage float64, effector any) {
+func (t *liveEffectTarget) ReduceHPByDOT(damage float64, effector any, isDOT bool) {
 	t.hp -= damage
 	t.events = append(t.events, fmt.Sprintf("dot:%g:%v", damage, effector))
 }

@@ -161,8 +161,13 @@ func (h *Hostile) ReduceHP(amount float64, attacker any, _ modelskill.Definition
 // at zero hate weight, matching Npc.reduceCurrentHp's unconditional
 // addDamageHate(attacker, damage, 0) — every HP reduction feeds the
 // AggroList, DOT included (Npc.java:390-395; no isDOT gate in the chain
-// Creature.reduceCurrentHpByDOT -> Npc.reduceCurrentHp -> reduceHp).
-func (h *Hostile) ReduceHPByDOT(amount float64, attacker any) {
+// Creature.reduceCurrentHpByDOT -> Npc.reduceCurrentHp -> reduceHp). isDOT
+// is unused here: NpcStatus inherits CreatureStatus.reduceHp's
+// SLEEP/IMMOBILE-stop and STUN-break block unchanged (only the sit/stand-up
+// clause is Player-only, PlayerStatus.java:124) — Hostile has no equivalent
+// wired up yet, a pre-existing gap out of this method's scope, tracked by
+// #1146.
+func (h *Hostile) ReduceHPByDOT(amount float64, attacker any, isDOT bool) {
 	if amount <= 0 || h.AlikeDead() {
 		return
 	}
