@@ -1,6 +1,7 @@
 package player
 
 import (
+	"math"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
@@ -353,12 +354,20 @@ func (c *Character) AttackSpeed() int {
 
 // MagicAttackSpeed returns the casting speed used by magic-skill timing.
 func (c *Character) MagicAttackSpeed() int {
-	return int(c.calcStat(stat.MagicAttackSpeed, defaultPlayerMagicAttackSpeed))
+	base := c.calcStat(stat.MagicAttackSpeed, defaultPlayerMagicAttackSpeed)
+	if agp := c.ArmorGradePenalty(); agp > 0 {
+		base *= math.Pow(0.84, float64(agp))
+	}
+	return int(base)
 }
 
 // Accuracy returns this player's physical accuracy rating.
 func (c *Character) Accuracy() int {
-	return int(c.calcStat(stat.AccuracyCombat, 0))
+	val := c.calcStat(stat.AccuracyCombat, 0)
+	if c.WeaponGradePenalty() {
+		val -= 20
+	}
+	return int(val)
 }
 
 // CriticalRate returns this player's physical critical rate.
@@ -377,7 +386,11 @@ func (c *Character) RunSpeed() float64 {
 	if tmpl == nil {
 		return 0
 	}
-	return c.calcStat(stat.RunSpeed, tmpl.RunSpeed) * c.weightPenaltySpeedMultiplier()
+	speed := c.calcStat(stat.RunSpeed, tmpl.RunSpeed) * c.weightPenaltySpeedMultiplier()
+	if agp := c.ArmorGradePenalty(); agp > 0 {
+		speed *= math.Pow(0.84, float64(agp))
+	}
+	return speed
 }
 
 // PhysicalAttackRange returns the attack range for the active weapon
@@ -575,7 +588,11 @@ func (c *Character) Evasion() int {
 	if tmpl == nil {
 		return c.CharLevel
 	}
-	return int(c.calcStat(stat.EvasionRate, 0))
+	val := c.calcStat(stat.EvasionRate, 0)
+	if agp := c.ArmorGradePenalty(); agp > 0 {
+		val -= 2 * float64(agp)
+	}
+	return int(val)
 }
 
 // CollisionRadius returns this player's body radius.
