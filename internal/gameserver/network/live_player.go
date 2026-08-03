@@ -189,7 +189,7 @@ func (l *GameClientLink) castController(live *livePlayer) *actorcast.Controller 
 		live.cast = actorcast.NewController(actorcast.PlayerActor{Character: live.Character})
 		live.cast.SetLogger(live.log)
 		live.cast.SetOnAbort(func(interrupted bool) { l.broadcastCastAborted(live, interrupted) })
-		live.cast.SetOnFinish(func(interrupted bool, def modelskill.Definition, target any) {
+		live.cast.SetOnFinish(func(interrupted bool, def modelskill.Definition, _ any) {
 			if live.combat == nil {
 				return
 			}
