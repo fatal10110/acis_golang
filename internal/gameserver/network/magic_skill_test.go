@@ -397,6 +397,66 @@ func TestGameClientLinkTogglesOnThenOff(t *testing.T) {
 	}
 }
 
+// TestGameClientLinkTogglesRejectAllSkillsDisabled covers the blanket-lock
+// gate on toggle activation (Controller.CanCastToggle, toggle.go). Java
+// routes toggle activation through the same RequestMagicSkillUse ->
+// tryToCast path as any other skill (RequestMagicSkillUse.java:24-68 has no
+// toggle branch), so a stunned caster is rejected by
+// PlayableAI.tryToCast's denyAiAction() check (PlayableAI.java:299-303)
+// before the toggle's own logic runs; toggles get no exemption from the
+// blanket lock in the reference.
+func TestGameClientLinkTogglesRejectAllSkillsDisabled(t *testing.T) {
+	store := newMemorySkillSaveStore()
+	skills := skillstate.NewPersistence(store, modelskill.NewTable([]modelskill.Definition{
+		{
+			ID: 288, Level: 1, Activation: modelskill.ActivationToggle, Target: modelskill.TargetSelf,
+			MPConsume: 12, SkillType: "BUFF",
+			Effects: []modelskill.EffectTemplate{{Name: "Buff", Time: 60}},
+		},
+	}), store)
+	var objID int32
+	c, _, _, state := newLinkedGameClientWithSkillsSeed(t, skills, func(chars *fakeCharStore, _ *fakeItemStore) {
+		objID = seedSelectableCharacter(t, chars, "player1", "Newbie", 5, 0)
+		store.seedKnown(objID, 0, player.SkillLevels{288: 1})
+	}, 1)
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	obj, ok := state.Player(objID)
+	if !ok {
+		t.Fatalf("player %d not found in world state", objID)
+	}
+	character, ok := obj.(*livePlayer)
+	if !ok {
+		t.Fatalf("world state player %d is not a *livePlayer", objID)
+	}
+
+	e, err := effect.New(effect.Skill{ID: 1}, modelskill.EffectTemplate{Name: "Stun"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	character.Character.EffectList().Add(e)
+	c.read() // AbnormalStatusUpdate from the Stun effect landing
+
+	beforeMP := character.MP()
+	c.send(encodeRequestMagicSkillUse(288, false, false))
+	if reply := c.read(); reply[0] != serverpackets.OpcodeActionFailed {
+		t.Fatalf("reply opcode = %#x, want ActionFailed only (%#x)", reply[0], serverpackets.OpcodeActionFailed)
+	}
+	c.expectNoFrame()
+
+	if got := character.MP(); got != beforeMP {
+		t.Fatalf("MP after rejected toggle = %d, want unchanged %d", got, beforeMP)
+	}
+	if effects := character.EffectList().All(); len(effects) != 1 {
+		t.Fatalf("effects after rejected toggle = %+v, want only the Stun effect", effects)
+	}
+}
+
 func assertEventuallyEffect(t *testing.T, character *livePlayer, skillID modelskill.ID, level int) {
 	t.Helper()
 	deadline := time.Now().Add(2 * time.Second)
@@ -636,11 +696,14 @@ func TestGameClientLinkMagicSkillUseRejectsCubicCastWhenListFull(t *testing.T) {
 	}
 }
 
-// TestGameClientLinkMagicSkillUseRejectsAllSkillsDisabled covers Java's
-// Creature.isSkillDisabled() short-circuit through isAllSkillsDisabled(): a
-// stunned caster with a skill already on cooldown gets the same
-// S1_PREPARED_FOR_REUSE rejection as an ordinary reuse-delay hit, for a
-// skill that has no reuse entry of its own.
+// TestGameClientLinkMagicSkillUseRejectsAllSkillsDisabled covers the
+// blanket-lock cast-start gate (Controller.CanCast, controller.go:226-228):
+// a stunned caster gets ActionFailed only, no reason message. Java's
+// PlayableAI.tryToCast (PlayableAI.java:299-303) rejects a CC'd caster via
+// denyAiAction() before canAttemptCast/isSkillDisabled ever run, so the
+// S1_PREPARED_FOR_REUSE branch (CreatureCast.java:324-327) never fires for
+// this case; PlayerAI.clientActionFailed() (PlayerAI.java:556-560) sends
+// only ActionFailed.
 func TestGameClientLinkMagicSkillUseRejectsAllSkillsDisabled(t *testing.T) {
 	store := newMemorySkillSaveStore()
 	skills := skillstate.NewPersistence(store, modelskill.NewTable([]modelskill.Definition{
@@ -669,10 +732,6 @@ func TestGameClientLinkMagicSkillUseRejectsAllSkillsDisabled(t *testing.T) {
 	if !ok {
 		t.Fatalf("world state player %d is not a *livePlayer", objID)
 	}
-	// isSkillDisabled()'s AllSkillsDisabled short-circuit only fires once at
-	// least one skill is already tracked as disabled; put an unrelated skill
-	// on cooldown first, matching Java's own emptiness quirk.
-	character.Character.DisableSkill(99, time.Minute)
 	e, err := effect.New(effect.Skill{ID: 1}, modelskill.EffectTemplate{Name: "Stun"})
 	if err != nil {
 		t.Fatal(err)
@@ -681,8 +740,7 @@ func TestGameClientLinkMagicSkillUseRejectsAllSkillsDisabled(t *testing.T) {
 	c.read() // AbnormalStatusUpdate from the Stun effect landing
 
 	c.send(encodeRequestMagicSkillUse(12, false, false))
-	assertSystemMessageSkillFrame(t, c.read(), serverpackets.SystemMessageS1PreparedForReuse, 12, 1)
 	if reply := c.read(); reply[0] != serverpackets.OpcodeActionFailed {
-		t.Fatalf("follow-up opcode = %#x, want ActionFailed (%#x)", reply[0], serverpackets.OpcodeActionFailed)
+		t.Fatalf("reply opcode = %#x, want ActionFailed only (%#x)", reply[0], serverpackets.OpcodeActionFailed)
 	}
 }

@@ -7,17 +7,27 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
-// CanCastToggle validates the one pre-cast check a toggle skill keeps: its
-// reuse-delay cooldown. A toggle skips every other check CanCast applies to
-// an ordinary cast — MP/HP, mute state, required items — because those
-// only ever apply when CastToggle activates it, never when it deactivates
-// an already-running instance.
+// CanCastToggle validates the pre-cast checks a toggle skill keeps: the
+// blanket skill lock and its reuse-delay cooldown. A toggle skips every
+// other check CanCast applies to an ordinary cast — MP/HP, mute state,
+// required items — because those only ever apply when CastToggle activates
+// it, never when it deactivates an already-running instance.
+//
+// Java routes toggle activation through the same entry point as any other
+// skill (RequestMagicSkillUse.java:24-68 has no toggle branch; it always
+// calls player.getAI().tryToCast), so a CC'd actor is rejected by
+// PlayableAI.tryToCast's denyAiAction() check (PlayableAI.java:299-303)
+// before the toggle skill's own logic runs — toggles get no exemption from
+// the blanket lock in the reference.
 func (c *Controller) CanCastToggle(def modelskill.Definition) error {
 	if c.actor == nil {
 		return ErrInvalidTarget
 	}
 	if def.Activation != modelskill.ActivationToggle {
 		return fmt.Errorf("cast: skill %d level %d is not a toggle skill", def.ID, def.Level)
+	}
+	if d, ok := c.actor.(allSkillsDisabler); ok && d.AllSkillsDisabled() {
+		return ErrAllSkillsDisabled
 	}
 	if c.actor.SkillDisabled(ReuseKey(def)) {
 		return ErrSkillDisabled
