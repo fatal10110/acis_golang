@@ -174,6 +174,7 @@ func TestMoveLivePlayerRejectsBlockedRouteWithActionFailed(t *testing.T) {
 	live.Character.SetMoveBroadcaster(func(move.Event) { moveBroadcasts++ })
 
 	origin := live.CurrentLocation()
+	originHeading := live.CurrentHeading()
 	gcl.moveLivePlayer(live, location.Location{X: origin.X + 500, Y: origin.Y, Z: origin.Z})
 
 	if moveBroadcasts != 0 {
@@ -185,6 +186,9 @@ func TestMoveLivePlayerRejectsBlockedRouteWithActionFailed(t *testing.T) {
 	}
 	if got := live.move.Position(); got != origin {
 		t.Fatalf("position after a rejected route = %+v, want unchanged %+v", got, origin)
+	}
+	if got := live.CurrentHeading(); got != originHeading {
+		t.Fatalf("heading after a rejected route = %d, want unchanged %d (a walk that never starts must not rotate the player)", got, originHeading)
 	}
 }
 

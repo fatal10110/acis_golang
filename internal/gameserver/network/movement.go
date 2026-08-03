@@ -20,16 +20,24 @@ func (l *GameClientLink) moveLivePlayer(live *livePlayer, target location.Locati
 	// an in-flight cast (PlayerAI.onEvtCancel).
 	live.Character.StopCast()
 
-	// Face the destination from the server-authoritative position, never
-	// the packet's claimed origin: the walk itself is simulated server-side
-	// (matching the reference's tryToMoveTo), so the client origin is
-	// nothing but a lag hint the server must not adopt.
-	live.Character.SetHeading(live.move.Position().HeadingTo(target))
+	// The server-authoritative position, never the packet's claimed origin,
+	// is what the walk simulates from (matching the reference's
+	// tryToMoveTo) — the client origin is nothing but a lag hint the
+	// server must not adopt.
+	origin := live.move.Position()
 	if !live.move.MoveToLocation(target) {
 		// A route that cannot make lateral progress (geo fully blocked) is
-		// rejected outright; answer it so the click never goes silent.
+		// rejected outright; answer it so the click never goes silent. The
+		// reference only ever rotates once a move is actually accepted
+		// (CreatureMove.moveToLocation sets heading after resolving a
+		// destination, never on an outright-rejected one), so a rejected
+		// route must leave heading untouched too.
 		live.SendFrame(serverpackets.FrameActionFailed())
+		return
 	}
+	// Face the destination from the same server-authoritative origin the
+	// walk itself started from.
+	live.Character.SetHeading(origin.HeadingTo(target))
 }
 
 func (l *GameClientLink) stopLivePlayer(live *livePlayer) {
