@@ -148,6 +148,8 @@ func (a *AttackStance) Tick() {
 	due := a.scratch
 	a.mu.Unlock()
 
+	defer clear(a.scratch)
+
 	for _, entry := range due {
 		a.effects.AutoAttackStop(entry.actor)
 		if s, ok := entry.actor.(attackStanceSummoner); ok {
@@ -156,7 +158,6 @@ func (a *AttackStance) Tick() {
 			}
 		}
 	}
-	clear(a.scratch)
 }
 
 func stanceOwner(actor AttackStanceActor) AttackStanceActor {
