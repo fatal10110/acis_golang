@@ -71,5 +71,6 @@ func (l *GameClientLink) applyEnchantSkill(ctx context.Context, live *livePlayer
 		Character: live.Character,
 		Template:  live.template,
 		Items:     live.inventoryItems(),
+		IsGM:      live.isGM,
 	}))
 }

@@ -21,6 +21,7 @@ import (
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -124,6 +125,7 @@ type GameClientLink struct {
 	itemInstances *task.ItemInstances
 	restarts      *restart.Table
 	levels        *player.LevelTable
+	admin         *admin.Data
 	playerConfig  PlayerConfig
 	petConfig     petmodel.Config // passed into summon.PetConfig by newPet.
 	inventory     *invops.Service
@@ -191,6 +193,7 @@ type GameClientLinkConfig struct {
 	ItemInstances *task.ItemInstances
 	Restarts      *restart.Table
 	Levels        *player.LevelTable
+	Admin         *admin.Data
 	PlayerConfig  PlayerConfig
 	PetConfig     petmodel.Config
 	Log           zerolog.Logger
@@ -231,6 +234,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) *GameClientLink {
 		itemInstances:    cfg.ItemInstances,
 		restarts:         cfg.Restarts,
 		levels:           cfg.Levels,
+		admin:            cfg.Admin,
 		playerConfig:     cfg.PlayerConfig,
 		petConfig:        cfg.PetConfig,
 		inventory:        invops.NewService(cfg.IDs),

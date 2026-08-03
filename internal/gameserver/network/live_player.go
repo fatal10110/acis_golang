@@ -30,6 +30,7 @@ type livePlayer struct {
 	combat    *ai.PlayerAttack
 	cast      *actorcast.Controller
 	shortcuts *shortcut.List
+	isGM      bool
 	log       zerolog.Logger
 
 	known          world.KnownBuffer
