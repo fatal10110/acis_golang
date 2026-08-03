@@ -393,6 +393,22 @@ func (c *Character) RunSpeed() float64 {
 	return c.calcStat(stat.RunSpeed, base)
 }
 
+// SwimSpeed returns the current move speed while in water. The reference
+// (PlayerStatus.getRealMoveSpeed) uses one swim speed regardless of the
+// run/walk toggle, but still runs it through the same weight/armor-grade
+// malus and calcStat(RUN_SPEED) pipeline as the land speeds.
+func (c *Character) SwimSpeed() float64 {
+	tmpl := c.template()
+	if tmpl == nil {
+		return 0
+	}
+	base := float64(tmpl.SwimSpeed) * c.weightPenaltySpeedMultiplier()
+	if agp := c.ArmorGradePenalty(); agp > 0 {
+		base *= math.Pow(0.84, float64(agp))
+	}
+	return c.calcStat(stat.RunSpeed, base)
+}
+
 // PhysicalAttackRange returns the attack range for the active weapon
 // family.
 func (c *Character) PhysicalAttackRange() int {

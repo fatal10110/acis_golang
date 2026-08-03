@@ -190,14 +190,34 @@ func (l *GameClientLink) refreshLiveLevelSkills(ctx context.Context, live *liveP
 		return
 	}
 	refresh := l.skills.GiveSkills
-	if l.playerConfig.AutoLearnSkills {
+	rewarding := l.playerConfig.AutoLearnSkills
+	if rewarding {
 		refresh = l.skills.RewardSkills
 	}
+	before := live.SkillLevels()
 	if err := refresh(ctx, live.Character, live.template); err != nil {
 		l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("level change: refresh level skills")
 	}
 	live.RefreshExpertisePenalty()
 	live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
+
+	// RewardSkills is the Go equivalent of Player.rewardSkills, whose grant
+	// loop calls addSkill(..., updateShortcuts=true) (Player.java:3283) only
+	// for skills the grant loop's own filter (getSkillLevel(i) < s.getValue(),
+	// Player.java:3423) restricts to level increases; GiveSkills's addSkill
+	// calls always pass false (Player.java:3262), and RewardSkills' own
+	// pull-back correction (correctInvalidSkills, mirroring
+	// removeInvalidSkills' addSkill(..., true) two-arg call at
+	// Player.java:3333,3337) also passes false. So only an actual level
+	// increase refreshes shortcuts; a pull-back's level decrease must not.
+	if rewarding {
+		after := live.SkillLevels()
+		for id, level := range after {
+			if level > before[id] {
+				l.refreshSkillShortcuts(ctx, live, int32(id), int32(level))
+			}
+		}
+	}
 }
 
 func skillCoolTimeEntries(timers []effect.ReuseTimer, now time.Time) []serverpackets.SkillCoolTimeEntry {

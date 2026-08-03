@@ -58,6 +58,29 @@ func (l *GameClientLink) deleteShortcut(ctx context.Context, live *livePlayer, r
 	live.SendFrame(serverpackets.FrameShortCutDelete(req.Slot, req.Page))
 }
 
+// refreshSkillShortcuts re-points every shortcut slot bound to skillID at its
+// new level and resends each one, mirroring Player.addSkill's
+// updateShortcuts=true branch (Player.java:4581-4582 ->
+// ShortcutList.refreshShortcuts): the reward-skill grant and the manual
+// learn-a-skill acquisition both pass that flag (Player.java:3283,
+// RequestAcquireSkill.java:95,125), so a skill upgrade there must not leave
+// the shortcut bar showing the previous level.
+func (l *GameClientLink) refreshSkillShortcuts(ctx context.Context, live *livePlayer, skillID, level int32) {
+	if live == nil || live.shortcuts == nil {
+		return
+	}
+	updated := live.shortcuts.RefreshSkillLevel(skillID, level)
+	for _, sc := range updated {
+		if l.shortcuts != nil {
+			if err := l.shortcuts.Save(ctx, live.ObjectID(), sc); err != nil {
+				l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("refresh skill shortcut")
+				continue
+			}
+		}
+		live.SendFrame(serverpackets.FrameShortCutRegister(serverShortcut(sc)))
+	}
+}
+
 func serverShortcutList(shortcuts []shortcut.Shortcut) []serverpackets.Shortcut {
 	out := make([]serverpackets.Shortcut, 0, len(shortcuts))
 	for _, sc := range shortcuts {

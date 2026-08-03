@@ -6,6 +6,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
@@ -85,6 +86,96 @@ func TestRefreshLiveLevelSkillsAutoLearnsBoughtSkills(t *testing.T) {
 	}
 	if got := live.Character.SkillLevel(249); got != 1 {
 		t.Errorf("SkillLevel(249) = %d, want 1 (free grant auto-learned)", got)
+	}
+}
+
+// TestRefreshLiveLevelSkillsAutoLearnRefreshesShortcut pins the fix for #1150:
+// Player.rewardSkills' addSkill calls pass updateShortcuts=true
+// (Player.java:3283), so a bought or free grant the reward path hands out
+// must re-point any shortcut bound to that skill at its new level instead of
+// leaving the client showing the stale one.
+func TestRefreshLiveLevelSkillsAutoLearnRefreshesShortcut(t *testing.T) {
+	frames := &frameCapture{}
+	live := newTestLivePlayer(t, 1, frames)
+	live.Character.CharLevel = 10
+	live.template = &player.Template{Skills: []player.SkillGrant{
+		{SkillID: 3, Level: 1, MinLevel: 5, Cost: 50},
+	}}
+	live.shortcuts = shortcut.NewList([]shortcut.Shortcut{
+		{Slot: 0, Page: 0, Type: shortcut.Skill, ID: 3, Level: -1, CharacterType: 1},
+	})
+	gcl := &GameClientLink{
+		skills: skillstate.NewPersistence(nil, skillTable(
+			modelskill.Definition{ID: 3, Level: 1},
+		)),
+		playerConfig: PlayerConfig{AutoLearnSkills: true},
+	}
+
+	gcl.refreshLiveLevelSkills(context.Background(), live)
+
+	if got := live.shortcuts.All()[0].Level; got != 1 {
+		t.Fatalf("shortcut level = %d, want 1 (refreshed to the granted skill level)", got)
+	}
+
+	var register []byte
+	for _, frame := range frames.frames {
+		if frame[0] == serverpackets.OpcodeShortCutRegister {
+			register = frame
+		}
+	}
+	if register == nil {
+		t.Fatal("frames sent, want a ShortCutRegister among them")
+	}
+	r := wire.NewReader(register[1:])
+	if typ, slot, id, level, marker, characterType := r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadUint8(), r.ReadInt32(); typ != int32(serverpackets.ShortcutSkill) || slot != 0 || id != 3 || level != 1 || marker != 0 || characterType != 1 {
+		t.Fatalf("ShortCutRegister = type %d slot %d id %d level %d marker %d charType %d, want skill slot 0 id 3 level 1 marker 0 charType 1", typ, slot, id, level, marker, characterType)
+	}
+	if err := r.Err(); err != nil {
+		t.Fatalf("read ShortCutRegister: %v", err)
+	}
+}
+
+// TestRefreshLiveLevelSkillsAutoLearnPullBackLeavesShortcutUntouched pins the
+// reward path's pull-back case: correctInvalidSkills lowers a skill the
+// character holds above what the profession currently grants, mirroring
+// Java's removeInvalidSkills, which calls the two-arg
+// addSkill(availableSkill.getSkill(), true) (Player.java:3333,3337), i.e.
+// updateShortcuts=false. Unlike the grant loop's own addSkill call
+// (Player.java:3283), a pull-back must not touch the shortcut bar: the
+// client and persisted shortcut keep the old level until re-dragged, even
+// though the known skill level itself just dropped.
+func TestRefreshLiveLevelSkillsAutoLearnPullBackLeavesShortcutUntouched(t *testing.T) {
+	frames := &frameCapture{}
+	live := newTestLivePlayer(t, 1, frames)
+	live.Character.CharLevel = 10
+	live.Character.SetSkillLevel(3, 3)
+	live.template = &player.Template{Skills: []player.SkillGrant{
+		{SkillID: 3, Level: 1, MinLevel: 5, Cost: 0},
+	}}
+	live.shortcuts = shortcut.NewList([]shortcut.Shortcut{
+		{Slot: 0, Page: 0, Type: shortcut.Skill, ID: 3, Level: 3, CharacterType: 1},
+	})
+	gcl := &GameClientLink{
+		skills: skillstate.NewPersistence(nil, skillTable(
+			modelskill.Definition{ID: 3, Level: 1},
+			modelskill.Definition{ID: 3, Level: 2},
+			modelskill.Definition{ID: 3, Level: 3},
+		)),
+		playerConfig: PlayerConfig{AutoLearnSkills: true},
+	}
+
+	gcl.refreshLiveLevelSkills(context.Background(), live)
+
+	if got := live.Character.SkillLevel(3); got != 1 {
+		t.Fatalf("SkillLevel(3) after refresh = %d, want 1 (pulled back to the granted level)", got)
+	}
+	if got := live.shortcuts.All()[0].Level; got != 3 {
+		t.Fatalf("shortcut level = %d, want 3 (untouched by the pull-back)", got)
+	}
+	for _, frame := range frames.frames {
+		if frame[0] == serverpackets.OpcodeShortCutRegister {
+			t.Fatal("ShortCutRegister sent, want none for a pull-back")
+		}
 	}
 }
 

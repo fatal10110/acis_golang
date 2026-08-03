@@ -4,6 +4,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -43,6 +44,9 @@ func (l *GameClientLink) validateLivePlayerPosition(live *livePlayer, reported l
 func liveMoveSpeed(live *livePlayer) float64 {
 	if live == nil || live.template == nil {
 		return 0
+	}
+	if live.zoneActor != nil && live.zoneActor.ZoneFlags().Has(zone.FlagWater) {
+		return live.SwimSpeed()
 	}
 	if live.Running() {
 		return live.RunSpeed()

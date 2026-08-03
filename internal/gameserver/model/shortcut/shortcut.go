@@ -156,6 +156,33 @@ func (l *List) All() []Shortcut {
 	return out
 }
 
+// RefreshSkillLevel sets level on every SKILL shortcut referencing skillID
+// and returns the updated entries, ordered by page then slot. It mirrors
+// Java's ShortcutList.refreshShortcuts(predicate, level) for the skill-id
+// predicate: callers use it to re-point shortcut slots at a skill's new
+// level after a grant or upgrade.
+func (l *List) RefreshSkillLevel(skillID, level int32) []Shortcut {
+	if l == nil || l.bySlot == nil {
+		return nil
+	}
+	var out []Shortcut
+	for key, sc := range l.bySlot {
+		if sc.Type != Skill || sc.ID != skillID {
+			continue
+		}
+		sc.Level = level
+		l.bySlot[key] = sc
+		out = append(out, sc)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Page != out[j].Page {
+			return out[i].Page < out[j].Page
+		}
+		return out[i].Slot < out[j].Slot
+	})
+	return out
+}
+
 func slotKey(slot, page int32) int32 {
 	return slot + page*12
 }
