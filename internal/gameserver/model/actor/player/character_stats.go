@@ -489,8 +489,8 @@ func (c *Character) ReduceHP(amount float64, attacker any, skill modelskill.Defi
 // (WaterTaskManager.java calls reduceCurrentHp(hp, player, false, false,
 // null)): both skip cast interruption, but only isDOT=false allows the
 // 1-in-10 STUN-break roll. No datapack DOT effect sets dmgDirectlyToHp (the
-// only skill that does, Triple Slash, is a direct PDAM hit), so ignoreCP is
-// always false here.
+// only skill that does, Backstab, is a BLOW burst hit, never delivered
+// through EffectDamOverTime), so ignoreCP is always false here.
 func (c *Character) ReduceHPByDOT(amount float64, attacker any, isDOT bool) {
 	if amount <= 0 {
 		return
