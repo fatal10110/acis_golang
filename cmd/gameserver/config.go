@@ -32,6 +32,7 @@ type gameServerConfig struct {
 	HexIDPath          string
 	Database           db.Config
 	AllowCursedWeapons bool
+	AllowWater         bool
 }
 
 func loadGameServerProperties(paths gameServerPaths) (*config.Properties, error) {
@@ -220,6 +221,7 @@ func gameServerConfigFromProperties(paths gameServerPaths, serverProps, hexProps
 			Password: serverProps.String("Password", ""),
 		},
 		AllowCursedWeapons: serverProps.Bool("AllowCursedWeapons", true),
+		AllowWater:         serverProps.Bool("AllowWater", true),
 	}, nil
 }
 

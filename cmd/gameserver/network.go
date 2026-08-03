@@ -44,6 +44,7 @@ func (s *loginLinkState) get() *network.LoginLink {
 }
 
 func provideGameClientLink(
+	cfg gameServerConfig,
 	data *gameData,
 	roster *manager.Roster,
 	items *gamesql.ItemStore,
@@ -79,6 +80,7 @@ func provideGameClientLink(
 		AutoLearnSkills:          bool(autoLearn),
 		WeightLimitMultiplier:    float64(weightLimit),
 		KarmaPlayerCanTeleport:   bool(karmaTeleport),
+		AllowWater:               cfg.AllowWater,
 	}
 	link := network.NewGameClientLink(network.GameClientLinkConfig{
 		Validator:     validator,

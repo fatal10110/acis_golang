@@ -69,11 +69,14 @@ const (
 	groundPickupInteractionDistance = 36
 )
 
-// PlayerConfig bundles the primitive players.properties-derived gameplay
-// flags GameClientLink needs, so its constructor doesn't grow one
+// PlayerConfig bundles the primitive server/players.properties-derived
+// gameplay flags GameClientLink needs, so its constructor doesn't grow one
 // bool/float parameter per config key.
 type PlayerConfig struct {
 	WeightLimitMultiplier float64
+	// AllowWater controls whether entering a water zone starts the
+	// drowning breath-gauge countdown at all.
+	AllowWater bool
 	// RespawnRestoreHP is the fraction of calculated max HP a non-percent
 	// revive restores.
 	RespawnRestoreHP float64
