@@ -468,6 +468,84 @@ func TestStartPickupLiveGroundItemDefersUntilAttackFinishes(t *testing.T) {
 	}
 }
 
+// TestFinishDeferredPickupWalksToOutOfRangeItem is the regression test for
+// PR 1074 finding 1: a pickup click deferred until its blocker (an attack
+// swing, here simulated directly by pre-populating the deferred slot) clears
+// must walk to the item on drain, exactly like a fresh click does, instead of
+// failing with TargetTooFar and discarding the deferred slot — matching the
+// reference's thinkPickUp, which runs maybeMoveToLocation(..., 36, false,
+// isShiftPressed) for both a fresh and a promoted/deferred PICK_UP intention
+// (PlayableAI.java:223, AbstractAI.java:238-246).
+func TestFinishDeferredPickupWalksToOutOfRangeItem(t *testing.T) {
+	templates := petTestTemplates()
+	frames := &frameCapture{}
+	live := newTestLivePlayer(t, 1, frames)
+	state := world.New()
+	drops := task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour}, time.Now)
+	gcl := &GameClientLink{world: state, groundItems: drops, inventory: invops.NewService(nil)}
+	wireLiveAttackHooks(gcl, live)
+	live.move.SetArrived(func() {
+		pos := live.move.Position()
+		gcl.updateLivePlayerPosition(live, pos, live.CurrentHeading())
+		gcl.finishLiveGroundPickup(live)
+	})
+	tmpl, _ := templates.Get(item.AdenaID)
+	ground := dropTestGround(t, state, drops, item.Instance{ObjectID: 900, TemplateID: item.AdenaID, Count: 1, ManaLeft: -1}, tmpl, 100+groundPickupInteractionDistance+50, 0, 0)
+	state.Spawn(live, 100, 0, 0, 0)
+	t.Cleanup(live.Stop)
+
+	frames.frames = nil
+	live.deferPickup(context.Background(), ground, false)
+	gcl.finishDeferredPickup(live)
+
+	// snapshot(), not the frames field directly: the walk just started can
+	// arrive and deliver its own frames from a background timer goroutine
+	// concurrently with this read.
+	assertOpcodeSequence(t, frames.snapshot(), serverpackets.OpcodeMoveToLocation)
+
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		if _, ok := state.Object(ground.ObjectID()); !ok {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("deferred pickup out of range never walked to and collected the item")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+// TestFinishDeferredPickupHonorsShiftAndFailsWithoutWalking is the follow-up
+// regression test for PR 1074 finding 1's review comment: a shift-clicked
+// pickup that gets deferred (blocked by an attack) must fail outright on
+// drain if still out of range, exactly like a fresh shift-click does, never
+// walking to the item — matching the reference, where
+// maybeMoveToLocation(..., isShiftPressed) skips the walk when shift is held
+// (CreatureMove.java:438-443) regardless of whether the PICK_UP intention
+// is fresh or promoted from the queue.
+func TestFinishDeferredPickupHonorsShiftAndFailsWithoutWalking(t *testing.T) {
+	templates := petTestTemplates()
+	frames := &frameCapture{}
+	live := newTestLivePlayer(t, 1, frames)
+	state := world.New()
+	drops := task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour}, time.Now)
+	gcl := &GameClientLink{world: state, groundItems: drops, inventory: invops.NewService(nil)}
+	wireLiveAttackHooks(gcl, live)
+	tmpl, _ := templates.Get(item.AdenaID)
+	ground := dropTestGround(t, state, drops, item.Instance{ObjectID: 900, TemplateID: item.AdenaID, Count: 1, ManaLeft: -1}, tmpl, 100+groundPickupInteractionDistance+50, 0, 0)
+	state.Spawn(live, 100, 0, 0, 0)
+	t.Cleanup(live.Stop)
+
+	frames.frames = nil
+	live.deferPickup(context.Background(), ground, true)
+	gcl.finishDeferredPickup(live)
+
+	assertOpcodeSequence(t, frames.frames, serverpackets.OpcodeActionFailed)
+	if _, ok := state.Object(ground.ObjectID()); !ok {
+		t.Fatal("shift-deferred out-of-range pickup was collected instead of failing outright")
+	}
+}
+
 func TestPickupLiveGroundItemMergesStackAndDeletesGroundRow(t *testing.T) {
 	templates := petTestTemplates()
 	existing := &item.Instance{ObjectID: 800, TemplateID: item.AdenaID, OwnerID: 1, Count: 10, Location: item.LocationInventory}

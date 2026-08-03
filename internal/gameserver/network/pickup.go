@@ -40,10 +40,10 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 		return true
 	}
 	if livePickupBlocked(live) {
-		if livePickupDeferrable(live) {
-			live.deferPickup(ctx, ground)
-		}
-		live.SendFrame(serverpackets.FrameActionFailed())
+		// pickupLiveGroundItem is only reached with a shift-clicked target
+		// via a walk already in flight, and a shift click never starts one
+		// (see walkOrForwardPickup) — so shift is always false here.
+		l.deferOrFailPickup(ctx, live, ground, false)
 		return true
 	}
 	if !groundPickupInRange(live, ground) {
