@@ -395,6 +395,11 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 			}))
 			c.RefreshWeightPenalty()
 		})
+		// Restored rows never queue update notifications, so totalWeight stays
+		// 0 unless recomputed here, matching the reference's ItemList
+		// constructor calling PcInventory.updateWeight() on every send
+		// (including the one EnterWorld makes right after this).
+		inv.UpdateWeight()
 	}
 	// Register every item mutation with the lazy persistence task, matching
 	// the reference registering an item with ItemInstanceTaskManager from
