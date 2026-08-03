@@ -409,14 +409,44 @@ type playableAttacker interface {
 	Playable() bool
 }
 
+// absorbCPThenReduceHP applies PlayerStatus.reduceHp's CP-first absorption
+// (PlayerStatus.java:166-184): a Playable attacker other than the actor
+// itself (PvP, pet/summon damage) drains CP before HP, unless ignoreCP is
+// set (Player.java:6152's ignoreCP argument, sourced from the skill's
+// dmgDirectlyToHp for skill-cast and DOT damage, and always false for
+// melee auto-attack, which passes no skill). Every damage route in the
+// reference converges on this block — melee (CreatureAttack.java:263), DOT
+// (EffectDamOverTime.java:48), and skill-cast (Player.java:6152/6154) — so
+// ReduceHP, ReduceHPByDOT, and TakeDamage all call it under vitalsMu, after
+// applyNonConsumptionDamageEffects's sleep/immobile-stop, stand-up, and
+// stun-break side effects (PlayerStatus.java:118-134), which run first in
+// the reference. Already-dead is a no-op, matching the prior curHP<=0
+// guards.
+func (c *Character) absorbCPThenReduceHP(amount float64, attacker any, ignoreCP bool) (dead bool) {
+	if amount < 0 {
+		amount = 0
+	}
+	if c.curHP <= 0 {
+		return false
+	}
+	if !ignoreCP && attacker != nil && attacker != any(c) {
+		if p, ok := attacker.(playableAttacker); ok && p.Playable() {
+			if c.curCP > 0 {
+				drained := math.Min(c.curCP, amount)
+				c.curCP -= drained
+				amount -= drained
+			}
+		}
+	}
+	c.curHP -= amount
+	dead = c.curHP <= 0
+	if dead {
+		c.curHP = 0
+	}
+	return dead
+}
+
 // ReduceHP applies skill HP damage and runs the once-only death path.
-// Mirrors PlayerStatus.reduceHp's CP absorption (PlayerStatus.java:166-184):
-// a Playable attacker other than the actor itself (PvP, pet/summon damage)
-// drains CP before HP, unless the skill sets dmgDirectlyToHp
-// (Player.java:6152's ignoreCP argument). The sleep/immobile-stop,
-// stand-up, and stun-break side effects (PlayerStatus.java:118-134) are
-// tracked separately in #1136, as is extending CP absorption to melee
-// auto-attack and DOT damage (#1143).
 func (c *Character) ReduceHP(amount float64, attacker any, skill modelskill.Definition) {
 	if amount <= 0 {
 		return
@@ -438,20 +468,7 @@ func (c *Character) ReduceHP(amount float64, attacker any, skill modelskill.Defi
 		c.vitalsMu.Unlock()
 		return
 	}
-	if !skill.DirectHPDamage && attacker != nil && attacker != any(c) {
-		if p, ok := attacker.(playableAttacker); ok && p.Playable() {
-			if c.curCP > 0 {
-				drained := math.Min(c.curCP, amount)
-				c.curCP -= drained
-				amount -= drained
-			}
-		}
-	}
-	c.curHP -= amount
-	dead := c.curHP <= 0
-	if dead {
-		c.curHP = 0
-	}
+	dead := c.absorbCPThenReduceHP(amount, attacker, skill.DirectHPDamage)
 	c.vitalsMu.Unlock()
 	// calcCastBreak always runs on the raw pre-absorption damage in the
 	// reference (Formulas.java:725 callers pass the skill's computed
@@ -471,7 +488,9 @@ func (c *Character) ReduceHP(amount float64, attacker any, skill modelskill.Defi
 // through reduceCurrentHp with isDOT=false, such as drowning
 // (WaterTaskManager.java calls reduceCurrentHp(hp, player, false, false,
 // null)): both skip cast interruption, but only isDOT=false allows the
-// 1-in-10 STUN-break roll.
+// 1-in-10 STUN-break roll. No datapack DOT effect sets dmgDirectlyToHp (the
+// only skill that does, Backstab, is a BLOW burst hit, never delivered
+// through EffectDamOverTime), so ignoreCP is always false here.
 func (c *Character) ReduceHPByDOT(amount float64, attacker any, isDOT bool) {
 	if amount <= 0 {
 		return
@@ -488,11 +507,7 @@ func (c *Character) ReduceHPByDOT(amount float64, attacker any, isDOT bool) {
 		c.vitalsMu.Unlock()
 		return
 	}
-	c.curHP -= amount
-	dead := c.curHP <= 0
-	if dead {
-		c.curHP = 0
-	}
+	dead := c.absorbCPThenReduceHP(amount, attacker, false)
 	c.vitalsMu.Unlock()
 	c.BroadcastStatus()
 	if dead {

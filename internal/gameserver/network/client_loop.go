@@ -468,6 +468,11 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			if live == nil {
 				continue
 			}
+			// The reference's ItemList constructor recomputes carried weight
+			// on every send, not only at login.
+			if inv := live.Inventory(); inv != nil {
+				inv.UpdateWeight()
+			}
 			frame, err := serverpackets.FrameItemList(live.inventoryItems(), l.itemTemplates, false)
 			if err != nil {
 				l.log.Error().Err(err).Msg("build ItemList")
