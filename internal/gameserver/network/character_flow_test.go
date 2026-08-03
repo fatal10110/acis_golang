@@ -6,6 +6,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
@@ -98,6 +99,49 @@ func TestGameClientLinkEnterWorldRecomputesRestoredWeight(t *testing.T) {
 	}
 	if got := live.(*livePlayer).Inventory().TotalWeight(); got != 50 {
 		t.Fatalf("TotalWeight() = %d, want 50", got)
+	}
+}
+
+// TestGameClientLinkRequestItemListRecomputesWeight covers issue #1144's
+// second scope item: the reference's ItemList constructor invokes
+// PcInventory.updateWeight() on every send, not only at login
+// (ItemList.java:14-24, PcInventory.java:101-113), so RequestItemList must
+// recompute totalWeight too. Weight-change notification for an ordinary
+// pickup is issue #1137's separate scope, so this test bypasses that path
+// entirely and adds the weight directly to the live inventory, the same way
+// weight_notifier_test.go's unit-level tests do, to isolate the
+// RequestItemList handler's own recompute.
+func TestGameClientLinkRequestItemListRecomputesWeight(t *testing.T) {
+	c, chars, _, state := newLinkedGameClient(t)
+
+	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.read() // CharCreateOk
+	c.read() // CharSelectInfo
+	objID := chars.soleObjectID(t)
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	live, ok := state.Player(objID)
+	if !ok {
+		t.Fatalf("world.Player(%d) missing after EnterWorld", objID)
+	}
+	live.(*livePlayer).Inventory().AddNew(9500, 5, 501)
+
+	c.send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeStatusUpdate {
+		t.Fatalf("opcode = %#x, want StatusUpdate (%#x) for the RequestItemList weight recompute", reply[0], serverpackets.OpcodeStatusUpdate)
+	}
+	assertStatusAttrs(t, reply, objID, []serverpackets.StatusAttribute{
+		{Type: serverpackets.StatusCurrentLoad, Value: 50},
+	})
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodeItemList {
+		t.Fatalf("opcode = %#x, want ItemList (%#x)", reply[0], serverpackets.OpcodeItemList)
 	}
 }
 
