@@ -435,13 +435,11 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				continue
 			}
 			l.moveLivePlayer(live,
-				location.Location{X: int(req.OriginX), Y: int(req.OriginY), Z: int(req.OriginZ)},
 				location.Location{X: int(req.TargetX), Y: int(req.TargetY), Z: int(req.TargetZ)},
 			)
 
 		case clientpackets.OpcodeCannotMoveAnymore:
-			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeCannotMoveAnymore)
-			if err != nil {
+			if _, err := decodeClientPacket(l, client, payload, clientpackets.DecodeCannotMoveAnymore); err != nil {
 				if errors.Is(err, errMalformedPacketDisconnect) {
 					return
 				}
@@ -450,7 +448,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			if live == nil {
 				continue
 			}
-			l.stopLivePlayer(live, location.Location{X: int(req.X), Y: int(req.Y), Z: int(req.Z)}, int(req.Heading))
+			l.stopLivePlayer(live)
 
 		case clientpackets.OpcodeValidatePosition:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeValidatePosition)
@@ -461,7 +459,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				continue
 			}
 			if live != nil {
-				l.validateLivePlayerPosition(live, location.Location{X: int(req.X), Y: int(req.Y), Z: int(req.Z)}, int(req.Heading))
+				l.validateLivePlayerPosition(live, location.Location{X: int(req.X), Y: int(req.Y), Z: int(req.Z)})
 			}
 
 		case clientpackets.OpcodeRequestItemList:
