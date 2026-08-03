@@ -182,9 +182,16 @@ func TestGameClientLinkLogoutLeavesWorld(t *testing.T) {
 	readEnterWorldBurst(t, c, false)
 
 	savedAt := location.Location{X: 80, Y: 70, Z: 30}
-	c.send(encodeValidatePosition(savedAt, 32768))
-	c.send(encodeSingleOpcode(clientpackets.OpcodeLogout))
+	spawn := location.Location{X: 10, Y: 20, Z: 30}
+	c.send(encodeMoveBackwardToLocation(savedAt, spawn, 1))
 	reply := c.read()
+	if reply[0] != serverpackets.OpcodeMoveToLocation {
+		t.Fatalf("walk opcode = %#x, want MoveToLocation (%#x)", reply[0], serverpackets.OpcodeMoveToLocation)
+	}
+	waitForWorldPosition(t, state, objID, savedAt)
+	walkHeading := spawn.HeadingTo(savedAt)
+	c.send(encodeSingleOpcode(clientpackets.OpcodeLogout))
+	reply = c.read()
 	if reply[0] != serverpackets.OpcodeLeaveWorld {
 		t.Fatalf("logout opcode = %#x, want LeaveWorld (%#x)", reply[0], serverpackets.OpcodeLeaveWorld)
 	}
@@ -193,8 +200,8 @@ func TestGameClientLinkLogoutLeavesWorld(t *testing.T) {
 		t.Fatalf("world.Player(%d) still present after logout", objID)
 	}
 	pos := chars.savedPosition(t, objID)
-	if pos.location != savedAt || pos.heading != 32768 {
-		t.Fatalf("saved position after logout = %+v/%d, want %+v/32768", pos.location, pos.heading, savedAt)
+	if pos.location != savedAt || pos.heading != walkHeading {
+		t.Fatalf("saved position after logout = %+v/%d, want %+v/%d", pos.location, pos.heading, savedAt, walkHeading)
 	}
 }
 
@@ -212,9 +219,16 @@ func TestGameClientLinkRestartReturnsToCharacterSelect(t *testing.T) {
 	readEnterWorldBurst(t, c, false)
 
 	savedAt := location.Location{X: 80, Y: 70, Z: 30}
-	c.send(encodeValidatePosition(savedAt, 32768))
-	c.send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
+	spawn := location.Location{X: 10, Y: 20, Z: 30}
+	c.send(encodeMoveBackwardToLocation(savedAt, spawn, 1))
 	reply := c.read()
+	if reply[0] != serverpackets.OpcodeMoveToLocation {
+		t.Fatalf("walk opcode = %#x, want MoveToLocation (%#x)", reply[0], serverpackets.OpcodeMoveToLocation)
+	}
+	waitForWorldPosition(t, state, objID, savedAt)
+	walkHeading := spawn.HeadingTo(savedAt)
+	c.send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
+	reply = c.read()
 	if reply[0] != serverpackets.OpcodeRestartResponse {
 		t.Fatalf("restart opcode = %#x, want RestartResponse (%#x)", reply[0], serverpackets.OpcodeRestartResponse)
 	}
@@ -229,13 +243,40 @@ func TestGameClientLinkRestartReturnsToCharacterSelect(t *testing.T) {
 		t.Fatalf("world.Player(%d) still present after restart", objID)
 	}
 	pos := chars.savedPosition(t, objID)
-	if pos.location != savedAt || pos.heading != 32768 {
-		t.Fatalf("saved position after restart = %+v/%d, want %+v/32768", pos.location, pos.heading, savedAt)
+	if pos.location != savedAt || pos.heading != walkHeading {
+		t.Fatalf("saved position after restart = %+v/%d, want %+v/%d", pos.location, pos.heading, savedAt, walkHeading)
 	}
 
 	c.send(encodeRequestGameStart(0))
 	reply = c.read()
 	if reply[0] != serverpackets.OpcodeSSQInfo {
 		t.Fatalf("second select opcode = %#x, want SSQInfo (%#x)", reply[0], serverpackets.OpcodeSSQInfo)
+	}
+}
+
+// waitForWorldPosition polls until the world-grid presence reaches want,
+// which happens when the simulated walk arrives. The walk duration is
+// driven by the move controller's arrival timer, so the test waits
+// event-style instead of sleeping a fixed amount.
+func waitForWorldPosition(t *testing.T, state *world.State, objID int32, want location.Location) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		obj, ok := state.Player(objID)
+		if !ok {
+			t.Fatal("world player missing while waiting for walk arrival")
+		}
+		positioned, ok := obj.(interface{ Position() (int, int, int) })
+		if !ok {
+			t.Fatal("world player has no Position method")
+		}
+		x, y, z := positioned.Position()
+		if x == want.X && y == want.Y && z == want.Z {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("player position after walk = (%d,%d,%d), want %+v", x, y, z, want)
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
 }

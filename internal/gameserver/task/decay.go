@@ -130,8 +130,9 @@ func (d *Decay) Tick() {
 	due := d.scratch
 	d.mu.Unlock()
 
+	defer clear(d.scratch)
+
 	for _, entry := range due {
 		d.effects.Decay(entry.actor)
 	}
-	clear(d.scratch)
 }
