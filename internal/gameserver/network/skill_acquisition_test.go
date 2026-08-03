@@ -7,6 +7,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
@@ -248,6 +249,45 @@ func TestGameClientLinkAcquireSkillInfoAndLearnGeneralSkill(t *testing.T) {
 	known := store.knownFor(objID, 0)
 	if known[3] != 1 {
 		t.Fatalf("persisted skill 3 = %d, want 1", known[3])
+	}
+}
+
+// TestGameClientLinkLearnGeneralSkillRefreshesShortcut pins the fix for
+// #1150: RequestAcquireSkill.java calls addSkill(skill, true, true)
+// (RequestAcquireSkill.java:95), so learning a skill must re-point any
+// shortcut bound to it at the newly learned level instead of leaving the
+// shortcut bar showing a stale one.
+func TestGameClientLinkLearnGeneralSkillRefreshesShortcut(t *testing.T) {
+	store := newMemorySkillSaveStore()
+	skills := skillstate.NewPersistence(store, modelskill.NewTable([]modelskill.Definition{
+		{ID: 3, Level: 1, Activation: modelskill.ActivationActive},
+	}), store)
+	var objID int32
+	c, _, _, _, _ := newLinkedGameClientWithSkillsShortcutsSeed(t, skills, func(shortcuts *fakeShortcutStore) {
+		shortcuts.seed(objID, shortcut.Shortcut{Slot: 3, Page: 0, Type: shortcut.Skill, ID: 3, Level: -1, CharacterType: 1})
+	}, func(chars *fakeCharStore, _ *fakeItemStore) {
+		objID = seedSelectableCharacter(t, chars, "player1", "Newbie", 5, 50)
+	}, 1)
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	c.send(encodeRequestAcquireSkill(3, 1, 0))
+	assertSPStatus(t, c.read(), objID, 0)
+	c.read() // SP-decreased SystemMessage
+	c.read() // LearnedSkill SystemMessage
+	c.read() // SkillList
+
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeShortCutRegister {
+		t.Fatalf("opcode = %#x, want ShortCutRegister (%#x)", reply[0], serverpackets.OpcodeShortCutRegister)
+	}
+	r := wire.NewReader(reply[1:])
+	if typ, slot, id, level := r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32(); typ != int32(serverpackets.ShortcutSkill) || slot != 3 || id != 3 || level != 1 {
+		t.Fatalf("ShortCutRegister = type %d slot %d id %d level %d, want skill slot 3 id 3 level 1", typ, slot, id, level)
 	}
 }
 

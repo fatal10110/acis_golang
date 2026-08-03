@@ -6,6 +6,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
@@ -85,6 +86,45 @@ func TestRefreshLiveLevelSkillsAutoLearnsBoughtSkills(t *testing.T) {
 	}
 	if got := live.Character.SkillLevel(249); got != 1 {
 		t.Errorf("SkillLevel(249) = %d, want 1 (free grant auto-learned)", got)
+	}
+}
+
+// TestRefreshLiveLevelSkillsAutoLearnRefreshesShortcut pins the fix for #1150:
+// Player.rewardSkills' addSkill calls pass updateShortcuts=true
+// (Player.java:3283), so a bought or free grant the reward path hands out
+// must re-point any shortcut bound to that skill at its new level instead of
+// leaving the client showing the stale one.
+func TestRefreshLiveLevelSkillsAutoLearnRefreshesShortcut(t *testing.T) {
+	frames := &frameCapture{}
+	live := newTestLivePlayer(t, 1, frames)
+	live.Character.CharLevel = 10
+	live.template = &player.Template{Skills: []player.SkillGrant{
+		{SkillID: 3, Level: 1, MinLevel: 5, Cost: 50},
+	}}
+	live.shortcuts = shortcut.NewList([]shortcut.Shortcut{
+		{Slot: 0, Page: 0, Type: shortcut.Skill, ID: 3, Level: -1, CharacterType: 1},
+	})
+	gcl := &GameClientLink{
+		skills: skillstate.NewPersistence(nil, skillTable(
+			modelskill.Definition{ID: 3, Level: 1},
+		)),
+		playerConfig: PlayerConfig{AutoLearnSkills: true},
+	}
+
+	gcl.refreshLiveLevelSkills(context.Background(), live)
+
+	if got := live.shortcuts.All()[0].Level; got != 1 {
+		t.Fatalf("shortcut level = %d, want 1 (refreshed to the granted skill level)", got)
+	}
+
+	var sawRegister bool
+	for _, frame := range frames.frames {
+		if frame[0] == serverpackets.OpcodeShortCutRegister {
+			sawRegister = true
+		}
+	}
+	if !sawRegister {
+		t.Fatal("frames sent, want a ShortCutRegister among them")
 	}
 }
 
