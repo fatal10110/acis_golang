@@ -146,10 +146,10 @@ func (h *Hostile) ReduceHP(amount float64, attacker any, _ modelskill.Definition
 	if amount <= 0 || h.AlikeDead() {
 		return
 	}
-	h.applyNonConsumptionDamageEffects(false)
 	if combatant, ok := attacker.(attackable.Combatant); ok {
 		h.AddDamageHate(combatant, amount, amount)
 	}
+	h.applyNonConsumptionDamageEffects(false)
 	newlyDead := h.health.DamageValue(amount)
 	h.BroadcastStatus()
 	if !newlyDead {
@@ -168,10 +168,10 @@ func (h *Hostile) ReduceHPByDOT(amount float64, attacker any, isDOT bool) {
 	if amount <= 0 || h.AlikeDead() {
 		return
 	}
-	h.applyNonConsumptionDamageEffects(isDOT)
 	if combatant, ok := attacker.(attackable.Combatant); ok {
 		h.AddDamageHate(combatant, amount, 0)
 	}
+	h.applyNonConsumptionDamageEffects(isDOT)
 	newlyDead := h.health.DamageValue(amount)
 	h.BroadcastStatus()
 	if !newlyDead {
@@ -189,7 +189,12 @@ func (h *Hostile) ReduceHPByDOT(amount float64, attacker any, isDOT bool) {
 // isDOT gate on the whole block — unlike PlayerStatus, which overrides the
 // gate to !isHPConsumption alone and stun-breaks separately on !isDOT
 // (PlayerStatus.java:118-134). There is no isHPConsumption concept for NPCs
-// and no sit/stand-up clause (Player-only, PlayerStatus.java:124).
+// and no sit/stand-up clause (Player-only, PlayerStatus.java:124). Callers
+// must run this after AddDamageHate, matching Npc.reduceCurrentHp
+// (Npc.java:395, 468): the hate lands before super.reduceCurrentHp reaches
+// this block, so a sleep-stop's synchronous wake-think (EffectSleep.java:37-44
+// -> hooks_cc.go's thinkAndRefreshExit) always sees the hit's hate already
+// in the threat table.
 func (h *Hostile) applyNonConsumptionDamageEffects(isDOT bool) {
 	if isDOT {
 		return
