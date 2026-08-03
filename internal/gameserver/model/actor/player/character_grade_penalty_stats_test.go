@@ -10,6 +10,7 @@ func TestGradePenaltyAppliesToDependentStats(t *testing.T) {
 	c := liveCharacter(1, tmpl, combatItems())
 
 	baseRunSpeed := c.RunSpeed()
+	baseSwimSpeed := c.SwimSpeed()
 	baseMAtkSpd := c.MagicAttackSpeed()
 	baseEvasion := c.Evasion()
 	baseAccuracy := c.Accuracy()
@@ -20,6 +21,11 @@ func TestGradePenaltyAppliesToDependentStats(t *testing.T) {
 	wantRunSpeed := baseRunSpeed * math.Pow(0.84, 4)
 	if got := c.RunSpeed(); !closeFloat(got, wantRunSpeed) {
 		t.Fatalf("RunSpeed() with armor penalty 4 = %v, want %v", got, wantRunSpeed)
+	}
+
+	wantSwimSpeed := baseSwimSpeed * math.Pow(0.84, 4)
+	if got := c.SwimSpeed(); !closeFloat(got, wantSwimSpeed) {
+		t.Fatalf("SwimSpeed() with armor penalty 4 = %v, want %v", got, wantSwimSpeed)
 	}
 
 	wantMAtkSpd := int(float64(baseMAtkSpd) * math.Pow(0.84, 4))
@@ -42,6 +48,9 @@ func TestGradePenaltyAppliesToDependentStats(t *testing.T) {
 
 	if got := c.RunSpeed(); !closeFloat(got, baseRunSpeed) {
 		t.Fatalf("RunSpeed() with no penalty = %v, want %v", got, baseRunSpeed)
+	}
+	if got := c.SwimSpeed(); !closeFloat(got, baseSwimSpeed) {
+		t.Fatalf("SwimSpeed() with no penalty = %v, want %v", got, baseSwimSpeed)
 	}
 	if got := c.MagicAttackSpeed(); got != baseMAtkSpd {
 		t.Fatalf("MagicAttackSpeed() with no penalty = %v, want %v", got, baseMAtkSpd)

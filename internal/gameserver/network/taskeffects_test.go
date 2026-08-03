@@ -116,21 +116,39 @@ func TestWaterZoneMovementUsesBreathStatAndClearsGaugeOnExit(t *testing.T) {
 	link.updateLivePlayerPosition(live, location.Location{X: 1500}, 0)
 	link.updateLivePlayerPosition(live, location.Location{}, 0)
 
-	if len(capture.frames) != 2 {
-		t.Fatalf("water-zone frames = %d, want 2", len(capture.frames))
+	if len(capture.frames) != 4 {
+		t.Fatalf("water-zone frames = %d, want 4 (UserInfo+gauge on enter, UserInfo+gauge on exit)", len(capture.frames))
 	}
-	if current := binary.LittleEndian.Uint32(capture.frames[0][5:9]); current != 120_000 {
+	gauges := framesWithOpcode(capture.frames, serverpackets.OpcodeSetupGauge)
+	if len(gauges) != 2 {
+		t.Fatalf("gauge frames = %d, want 2", len(gauges))
+	}
+	if current := binary.LittleEndian.Uint32(gauges[0][5:9]); current != 120_000 {
 		t.Fatalf("breath gauge currentTime = %d, want 120000", current)
 	}
-	if duration := binary.LittleEndian.Uint32(capture.frames[0][9:13]); duration != 120_000 {
+	if duration := binary.LittleEndian.Uint32(gauges[0][9:13]); duration != 120_000 {
 		t.Fatalf("breath gauge maxTime = %d, want 120000", duration)
 	}
-	if current := binary.LittleEndian.Uint32(capture.frames[1][5:9]); current != 0 {
+	if current := binary.LittleEndian.Uint32(gauges[1][5:9]); current != 0 {
 		t.Fatalf("exit gauge currentTime = %d, want 0", current)
 	}
-	if duration := binary.LittleEndian.Uint32(capture.frames[1][9:13]); duration != 0 {
+	if duration := binary.LittleEndian.Uint32(gauges[1][9:13]); duration != 0 {
 		t.Fatalf("exit gauge maxTime = %d, want 0", duration)
 	}
+	userInfos := framesWithOpcode(capture.frames, serverpackets.OpcodeUserInfo)
+	if len(userInfos) != 2 {
+		t.Fatalf("UserInfo frames = %d, want 2 (broadcastUserInfo on enter and exit)", len(userInfos))
+	}
+}
+
+func framesWithOpcode(frames [][]byte, opcode byte) [][]byte {
+	var out [][]byte
+	for _, f := range frames {
+		if len(f) > 0 && f[0] == opcode {
+			out = append(out, f)
+		}
+	}
+	return out
 }
 
 func TestWaterZoneMovementNoOpWhenAllowWaterDisabled(t *testing.T) {
@@ -180,8 +198,8 @@ func TestWaterZoneMovementAcrossRegionKeepsCountdown(t *testing.T) {
 	link.updateLivePlayerPosition(live, location.Location{X: boundary - 1}, 0)
 	link.updateLivePlayerPosition(live, location.Location{X: boundary + 1}, 0)
 
-	if len(capture.frames) != 1 {
-		t.Fatalf("cross-region water frames = %d, want 1", len(capture.frames))
+	if len(capture.frames) != 2 {
+		t.Fatalf("cross-region water frames = %d, want 2 (UserInfo+gauge)", len(capture.frames))
 	}
 }
 
@@ -206,8 +224,8 @@ func TestWaterZoneServerPositionSyncStartsCountdown(t *testing.T) {
 
 	live.SyncPosition(location.Location{X: 1500})
 
-	if len(capture.frames) != 1 {
-		t.Fatalf("server-sync water frames = %d, want 1", len(capture.frames))
+	if len(capture.frames) != 2 {
+		t.Fatalf("server-sync water frames = %d, want 2 (UserInfo+gauge)", len(capture.frames))
 	}
 }
 
