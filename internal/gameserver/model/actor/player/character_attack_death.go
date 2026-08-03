@@ -12,6 +12,9 @@ func (c *Character) TakeDamage(dmg int, attacker creature.DeathActor) bool {
 	if c.AlikeDead() {
 		return false
 	}
+	if dmg > 0 {
+		c.applyNonConsumptionDamageEffects(false)
+	}
 	newlyDead := c.ReduceCurrentHP(dmg)
 	c.breakCastOnDamage(float64(dmg))
 	c.BroadcastStatus()

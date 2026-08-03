@@ -56,6 +56,19 @@ func (l *List) Remove(e *Effect) {
 	l.notifyAbnormalUpdate()
 }
 
+// StopByType removes every active effect of the given type, running each
+// removed instance's exit hook, matching Creature.stopEffects(EffectType).
+func (l *List) StopByType(t Type) {
+	if l == nil {
+		return
+	}
+	for _, e := range l.All() {
+		if e.Type == t {
+			l.Remove(e)
+		}
+	}
+}
+
 // notifyAbnormalUpdate tells l's owner to refresh its abnormal-effect icon
 // state, mirroring Creature.addEffect()/removeEffect() unconditionally
 // queueing an EffectList icon update on every add or remove attempt,

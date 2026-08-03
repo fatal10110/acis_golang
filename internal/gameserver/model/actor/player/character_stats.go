@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/funcs"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
@@ -427,6 +428,16 @@ func (c *Character) ReduceHP(amount float64, attacker any, skill modelskill.Defi
 		c.vitalsMu.Unlock()
 		return
 	}
+	c.vitalsMu.Unlock()
+	// PlayerStatus.reduceHp runs the sleep/stand-up/stun-break block
+	// (PlayerStatus.java:118-134) before the CP-absorption/duel block
+	// (136-193), both of which run before the actual HP subtraction.
+	c.applyNonConsumptionDamageEffects(false)
+	c.vitalsMu.Lock()
+	if c.curHP <= 0 {
+		c.vitalsMu.Unlock()
+		return
+	}
 	if !skill.DirectHPDamage && attacker != nil && attacker != any(c) {
 		if p, ok := attacker.(playableAttacker); ok && p.Playable() {
 			if c.curCP > 0 {
@@ -453,11 +464,25 @@ func (c *Character) ReduceHP(amount float64, attacker any, skill modelskill.Defi
 	}
 }
 
-// ReduceHPByDOT applies periodic damage without the normal-hit cast interruption.
-func (c *Character) ReduceHPByDOT(amount float64, attacker any) {
+// ReduceHPByDOT applies periodic damage without the normal-hit cast
+// interruption. isDOT distinguishes a real damage-over-time skill tick
+// (true, e.g. Poison/Bleed — Creature.reduceCurrentHpByDOT hardcodes this)
+// from other periodic, non-attack damage sources the reference still routes
+// through reduceCurrentHp with isDOT=false, such as drowning
+// (WaterTaskManager.java calls reduceCurrentHp(hp, player, false, false,
+// null)): both skip cast interruption, but only isDOT=false allows the
+// 1-in-10 STUN-break roll.
+func (c *Character) ReduceHPByDOT(amount float64, attacker any, isDOT bool) {
 	if amount <= 0 {
 		return
 	}
+	c.vitalsMu.Lock()
+	if c.curHP <= 0 {
+		c.vitalsMu.Unlock()
+		return
+	}
+	c.vitalsMu.Unlock()
+	c.applyNonConsumptionDamageEffects(isDOT)
 	c.vitalsMu.Lock()
 	if c.curHP <= 0 {
 		c.vitalsMu.Unlock()
@@ -473,6 +498,27 @@ func (c *Character) ReduceHPByDOT(amount float64, attacker any) {
 	if dead {
 		killer, _ := attacker.(creature.DeathActor)
 		c.Die(killer)
+	}
+}
+
+// applyNonConsumptionDamageEffects mirrors PlayerStatus.reduceHp's
+// !isHPConsumption block: every normal-hit or DOT damage source stops SLEEP
+// and IMMOBILE_UNTIL_ATTACKED, stands the character up unless it is in shop
+// mode, and — for non-DOT damage only — has a 1-in-10 chance to break STUN.
+// HP spent as a skill's own resource cost (isHPConsumption=true in the
+// reference) never routes through here.
+func (c *Character) applyNonConsumptionDamageEffects(isDOT bool) {
+	live := c.liveLocked()
+	list := live.EffectList()
+	list.StopByType(effect.TypeSleep)
+	list.StopByType(effect.TypeImmobileUntilAttacked)
+
+	if !c.Standing() && !c.Operating() {
+		c.StandUp()
+	}
+
+	if !isDOT && live.Stunned() && c.Roll(10) == 0 {
+		list.StopByType(effect.TypeStun)
 	}
 }
 

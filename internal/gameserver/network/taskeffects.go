@@ -117,7 +117,10 @@ func (e *TaskEffects) Drown(actor task.WaterActor) {
 		coefficient = 0.002698
 	}
 	damage := live.MaxHPValue() * live.Race.BreathMultiplier() * coefficient
-	live.ReduceHPByDOT(damage, live)
+	// WaterTaskManager.java calls reduceCurrentHp(hp, player, false, false,
+	// null): isDOT=false, so drowning still allows the 1-in-10 STUN-break
+	// roll, unlike a real damage-over-time skill tick.
+	live.ReduceHPByDOT(damage, live, false)
 	live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageDrownDamage, int32(damage)))
 }
 
