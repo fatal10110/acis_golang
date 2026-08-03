@@ -73,15 +73,34 @@ func (l *GameClientLink) startPickupLiveGroundItem(ctx context.Context, live *li
 		return false
 	}
 	if livePickupBlocked(live) {
-		if livePickupDeferrable(live) {
-			live.deferPickup(ctx, ground)
-		}
-		live.SendFrame(serverpackets.FrameActionFailed())
+		l.deferOrFailPickup(ctx, live, ground, shift)
 		return true
 	}
 	if live.combat != nil {
 		live.combat.Stop()
 	}
+	return l.walkOrForwardPickup(ctx, live, ground, shift)
+}
+
+// deferOrFailPickup parks target for a later drain if live's current blocker
+// is one finishDeferredPickup will promote it past (attack, pickup lock), and
+// either way answers the click with ActionFailed so the client's pending
+// action releases immediately instead of waiting on a response that never
+// comes.
+func (l *GameClientLink) deferOrFailPickup(ctx context.Context, live *livePlayer, ground *grounditem.Item, shift bool) {
+	if livePickupDeferrable(live) {
+		live.deferPickup(ctx, ground, shift)
+	}
+	live.SendFrame(serverpackets.FrameActionFailed())
+}
+
+// walkOrForwardPickup is the click-time decision shared by a fresh click
+// (startPickupLiveGroundItem) and a drained deferred click
+// (finishDeferredPickup): collect immediately if already in range, otherwise
+// walk to it unless shift was held — a shift-click never walks, matching the
+// reference's maybeMoveToLocation(..., isShiftPressed) (CreatureMove.java:
+// 438-443, the walk is skipped when isShiftPressed).
+func (l *GameClientLink) walkOrForwardPickup(ctx context.Context, live *livePlayer, ground *grounditem.Item, shift bool) bool {
 	if groundPickupInRange(live, ground) {
 		return l.pickupLiveGroundItem(ctx, live, ground)
 	}
@@ -121,7 +140,15 @@ func (l *GameClientLink) finishDeferredPickup(live *livePlayer) {
 	if target != pickup.target {
 		return
 	}
-	l.pickupLiveGroundItem(pickup.ctx, live, target)
+	ground, ok := target.(*grounditem.Item)
+	if !ok {
+		return
+	}
+	if livePickupBlocked(live) {
+		l.deferOrFailPickup(pickup.ctx, live, ground, pickup.shift)
+		return
+	}
+	l.walkOrForwardPickup(pickup.ctx, live, ground, pickup.shift)
 }
 
 func (l *GameClientLink) resolveTarget(objectID int32) world.Tracked {
