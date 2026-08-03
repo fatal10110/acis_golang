@@ -237,7 +237,7 @@ func TestMoveLivePlayerStopsAttackIntention(t *testing.T) {
 		t.Fatal("attack intention did not latch onto the distant target")
 	}
 
-	gcl.moveLivePlayer(attacker, location.Location{X: 0, Y: 0, Z: 0}, location.Location{X: -500, Y: 0, Z: 0})
+	gcl.moveLivePlayer(attacker, location.Location{X: -500, Y: 0, Z: 0})
 
 	if attacker.combat.Target() != nil {
 		t.Fatalf("attack intention target = %v after a player-initiated walk, want nil", attacker.combat.Target())

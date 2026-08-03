@@ -9,7 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
-func (l *GameClientLink) moveLivePlayer(live *livePlayer, origin, target location.Location) {
+func (l *GameClientLink) moveLivePlayer(live *livePlayer, target location.Location) {
 	// A client-initiated walk overrides any attack-driven chase movement —
 	// otherwise the server's own MaybeStartOffensiveFollow re-think would
 	// fight the player's own steering back toward the old target.
@@ -20,25 +20,35 @@ func (l *GameClientLink) moveLivePlayer(live *livePlayer, origin, target locatio
 	// an in-flight cast (PlayerAI.onEvtCancel).
 	live.Character.StopCast()
 
-	heading := origin.HeadingTo(target)
-	l.updateLivePlayerPosition(live, origin, heading)
-	l.broadcastLiveFrame(live, func() wire.Frame {
-		return serverpackets.FrameMoveToLocation(live.ObjectID(), target, origin)
-	})
+	// Face the destination from the server-authoritative position, never
+	// the packet's claimed origin: the walk itself is simulated server-side
+	// (matching the reference's tryToMoveTo), so the client origin is
+	// nothing but a lag hint the server must not adopt.
+	live.Character.SetHeading(live.move.Position().HeadingTo(target))
+	if !live.move.MoveToLocation(target) {
+		// A route that cannot make lateral progress (geo fully blocked) is
+		// rejected outright; answer it so the click never goes silent.
+		live.SendFrame(serverpackets.FrameActionFailed())
+	}
 }
 
-func (l *GameClientLink) stopLivePlayer(live *livePlayer, at location.Location, heading int) {
-	l.updateLivePlayerPosition(live, at, heading)
-	l.broadcastLiveStopMove(live, at, heading)
+func (l *GameClientLink) stopLivePlayer(live *livePlayer) {
+	// CannotMoveAnymore is a stop report, not a position report. The walk
+	// is simulated server-side, so the stop point is wherever that
+	// simulation stands; the client-reported coordinates and heading are
+	// discarded exactly like the reference's getMove().stop() does.
+	live.move.Stop()
 }
 
-func (l *GameClientLink) validateLivePlayerPosition(live *livePlayer, reported location.Location, heading int) {
+func (l *GameClientLink) validateLivePlayerPosition(live *livePlayer, reported location.Location) {
+	// ValidatePosition only corrects excessive divergence: a client that
+	// drifted beyond a second's worth of movement gets the server position
+	// back, while a report within the threshold changes nothing. The walk
+	// simulation owns the position, so a valid report is never adopted.
 	current := live.CurrentLocation()
 	if current.Distance2D(reported) > liveMoveSpeed(live) {
 		live.SendFrame(serverpackets.FrameValidateLocation(live.ObjectID(), current, live.CurrentHeading()))
-		return
 	}
-	l.updateLivePlayerPosition(live, reported, heading)
 }
 
 func liveMoveSpeed(live *livePlayer) float64 {
