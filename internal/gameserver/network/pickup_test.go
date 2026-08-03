@@ -181,6 +181,46 @@ func TestPickupLiveGroundItemMovesItemAndDespawns(t *testing.T) {
 	}
 }
 
+// TestFinishLiveGroundPickupRevalidatesAfterArrival is the regression test
+// for the arrival-pickup race: the reference re-resolves the target and
+// checks isTargetLost/ItemLocation.VOID on every think (PlayableAI.java:209-220),
+// so a walked-to item that despawned or was picked up by someone else mid-walk
+// never gets collected. finishLiveGroundPickup previously replayed the stale
+// pointer captured at click time straight into pickupLiveGroundItem, which
+// gates only on Template/Count — so a despawned item (e.g. consumed by
+// another player, or its decay timer) still passed and awarded a duplicate
+// stack. This pins the same re-resolve-and-identity-check finishDeferredPickup
+// already does (targeting.go:110-120) applied to the arrival path too.
+func TestFinishLiveGroundPickupRevalidatesAfterArrival(t *testing.T) {
+	templates := petTestTemplates()
+	capture := &frameCapture{}
+	live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
+	state := world.New()
+	state.Spawn(live, 100, 0, 0, 0)
+	drops := task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour}, time.Now)
+	tmpl, _ := templates.Get(item.AdenaID)
+	ground := dropTestGround(t, state, drops, item.Instance{ObjectID: 900, TemplateID: item.AdenaID, Count: 40, ManaLeft: -1}, tmpl, 100, 0, 0)
+
+	gcl := &GameClientLink{world: state, groundItems: drops}
+	live.setPickup(context.Background(), ground)
+
+	// The item vanishes mid-walk (consumed by another player, or decayed) —
+	// same effect either way: it's gone from the world registry the arrival
+	// think must re-resolve against.
+	state.Despawn(ground)
+	drops.Remove(ground)
+
+	capture.frames = nil
+	gcl.finishLiveGroundPickup(live)
+
+	if len(capture.frames) != 0 {
+		t.Fatalf("finishLiveGroundPickup frames = %v, want none — a vanished target must not be collected", frameOpcodes(capture.frames))
+	}
+	if stack := live.Inventory().ItemByTemplateID(item.AdenaID); stack != nil {
+		t.Fatalf("inventory stack = %+v, want no pickup for a target that vanished mid-walk", stack)
+	}
+}
+
 // herbTestTemplates is one herb template carrying herbTestSkill.
 func herbTestTemplates() *item.Table {
 	return item.NewTable([]*item.Template{{

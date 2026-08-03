@@ -7,7 +7,9 @@ import (
 // TakeDamage applies physical damage, broadcasts the resulting HP to nearby
 // observers, and runs the once-only death path when HP reaches zero. A hit
 // against an already-dead character is a no-op: no damage is applied and no
-// status is broadcast.
+// status is broadcast. A Playable attacker other than the actor itself
+// drains CP before HP (CreatureAttack.java:263 -> PlayerStatus.reduceHp,
+// PlayerStatus.java:166-184); melee never sets ignoreCP (Player.java:6154).
 func (c *Character) TakeDamage(dmg int, attacker creature.DeathActor) bool {
 	if c.AlikeDead() {
 		return false
@@ -15,7 +17,9 @@ func (c *Character) TakeDamage(dmg int, attacker creature.DeathActor) bool {
 	if dmg > 0 {
 		c.applyNonConsumptionDamageEffects(false)
 	}
-	newlyDead := c.ReduceCurrentHP(dmg)
+	c.vitalsMu.Lock()
+	newlyDead := c.absorbCPThenReduceHP(float64(dmg), attacker, false)
+	c.vitalsMu.Unlock()
 	c.breakCastOnDamage(float64(dmg))
 	c.BroadcastStatus()
 	if !newlyDead {

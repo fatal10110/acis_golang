@@ -165,10 +165,11 @@ func (inv *Inventory) Restore(items []*item.Instance) {
 		inst.SetPersistNotifier(inv.Container.persist)
 		inv.Container.items[inst.ObjectID] = inst
 
+		// totalWeight is left at 0 here, matching the reference's restore()
+		// (Inventory.java:108-154), which populates _items via addBasicItem()
+		// without ever touching _totalWeight: only an explicit updateWeight()
+		// call (as ItemList's constructor makes) computes and reports it.
 		tmpl, _ := inv.Templates().Get(inst.TemplateID)
-		if tmpl != nil {
-			inv.totalWeight += int(tmpl.Weight) * st.Count
-		}
 		if st.Location != inv.equipLocation || st.LocationData < 0 || st.LocationData >= item.PaperdollSlots {
 			continue
 		}
