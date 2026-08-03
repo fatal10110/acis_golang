@@ -391,6 +391,40 @@ func TestPickupLiveGroundItemLocksAndReleasesTransientParalysis(t *testing.T) {
 	}
 }
 
+// TestExitPickupLockIgnoresStaleGeneration is the regression test for
+// #1159: a scheduled unlock (exitPickupLock) that fires after a newer click
+// has already replaced the lock (enterPickupLock bumped the generation)
+// must not clear that newer lock or lift its paralysis — otherwise a
+// pending deferred pickup queued under the newer lock would wrongly see
+// pickupLockActive()==false and get discarded instead of re-deferred.
+func TestExitPickupLockIgnoresStaleGeneration(t *testing.T) {
+	capture := &frameCapture{}
+	live := newTestLivePlayer(t, 1, capture)
+
+	staleGen := live.enterPickupLock()
+	freshGen := live.enterPickupLock()
+
+	if ok := live.exitPickupLock(staleGen); ok {
+		t.Fatal("exitPickupLock succeeded for a stale generation")
+	}
+	if !live.pickupLockActive() {
+		t.Fatal("stale exitPickupLock cleared the fresh lock")
+	}
+	if !live.Paralyzed() {
+		t.Fatal("stale exitPickupLock lifted paralysis held by the fresh lock")
+	}
+
+	if ok := live.exitPickupLock(freshGen); !ok {
+		t.Fatal("exitPickupLock failed for the current generation")
+	}
+	if live.pickupLockActive() {
+		t.Fatal("fresh lock still active after its own exitPickupLock")
+	}
+	if live.Paralyzed() {
+		t.Fatal("paralysis still set after the fresh lock's own exitPickupLock")
+	}
+}
+
 func TestPickupLiveGroundItemDefersLatestClickUntilParalysisReleases(t *testing.T) {
 	templates := petTestTemplates()
 	capture := &frameCapture{}

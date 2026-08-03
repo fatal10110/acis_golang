@@ -45,6 +45,7 @@ type livePlayer struct {
 	pickup         *pickupIntention
 	deferredPickup *pickupIntention
 	pickupLocked   bool
+	pickupLockGen  uint64
 
 	cubicsMu sync.Mutex
 	cubics   map[cubic.ID]*cubic.Runtime
@@ -141,16 +142,37 @@ func (p *livePlayer) takeDeferredPickup() *pickupIntention {
 	return pickup
 }
 
-func (p *livePlayer) setPickupLocked(locked bool) {
-	p.pickupMu.Lock()
-	defer p.pickupMu.Unlock()
-	p.pickupLocked = locked
-}
-
 func (p *livePlayer) pickupLockActive() bool {
 	p.pickupMu.Lock()
 	defer p.pickupMu.Unlock()
 	return p.pickupLocked
+}
+
+// enterPickupLock starts a new pickup-paralysis lock, invalidating any lock
+// still owned by an earlier, not-yet-fired unlock, and reports the
+// generation the matching exitPickupLock must present to be honored.
+func (p *livePlayer) enterPickupLock() uint64 {
+	p.pickupMu.Lock()
+	defer p.pickupMu.Unlock()
+	p.pickupLockGen++
+	p.pickupLocked = true
+	p.SetParalyzed(true)
+	return p.pickupLockGen
+}
+
+// exitPickupLock clears the lock started by the matching enterPickupLock and
+// reports whether it did. It is a no-op when gen is stale — a later click
+// already replaced this lock with its own — so a delayed unlock can never
+// clear a fresher lock's state or its own paralysis mid-way through.
+func (p *livePlayer) exitPickupLock(gen uint64) bool {
+	p.pickupMu.Lock()
+	defer p.pickupMu.Unlock()
+	if p.pickupLockGen != gen {
+		return false
+	}
+	p.pickupLocked = false
+	p.SetParalyzed(false)
+	return true
 }
 
 func (p *livePlayer) setFusionTarget(id int32) {

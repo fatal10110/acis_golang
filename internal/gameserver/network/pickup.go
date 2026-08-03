@@ -122,15 +122,18 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 }
 
 // lockPickupParalysis briefly paralyzes live after a successful pickup,
-// clearing the lock once pickupParalyzeLock elapses.
+// clearing the lock once pickupParalyzeLock elapses. Entering and exiting
+// the lock are each a single atomic step (see enterPickupLock/
+// exitPickupLock) so a click racing the unlock can never observe paralysis
+// lifted with the lock still nominally held, or vice versa.
 func (l *GameClientLink) lockPickupParalysis(live *livePlayer) {
+	gen := live.enterPickupLock()
 	l.scheduleAfter(pickupParalyzeLock, func() {
-		live.SetParalyzed(false)
-		live.setPickupLocked(false)
+		if !live.exitPickupLock(gen) {
+			return
+		}
 		l.finishDeferredPickup(live)
 	})
-	live.setPickupLocked(true)
-	live.SetParalyzed(true)
 }
 
 func livePickupBlocked(live *livePlayer) bool {
