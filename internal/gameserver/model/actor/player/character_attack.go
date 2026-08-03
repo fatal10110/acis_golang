@@ -354,11 +354,11 @@ func (c *Character) AttackSpeed() int {
 
 // MagicAttackSpeed returns the casting speed used by magic-skill timing.
 func (c *Character) MagicAttackSpeed() int {
-	base := c.calcStat(stat.MagicAttackSpeed, defaultPlayerMagicAttackSpeed)
+	base := float64(defaultPlayerMagicAttackSpeed)
 	if agp := c.ArmorGradePenalty(); agp > 0 {
 		base *= math.Pow(0.84, float64(agp))
 	}
-	return int(base)
+	return int(c.calcStat(stat.MagicAttackSpeed, base))
 }
 
 // Accuracy returns this player's physical accuracy rating.
@@ -386,11 +386,11 @@ func (c *Character) RunSpeed() float64 {
 	if tmpl == nil {
 		return 0
 	}
-	speed := c.calcStat(stat.RunSpeed, tmpl.RunSpeed) * c.weightPenaltySpeedMultiplier()
+	base := tmpl.RunSpeed * c.weightPenaltySpeedMultiplier()
 	if agp := c.ArmorGradePenalty(); agp > 0 {
-		speed *= math.Pow(0.84, float64(agp))
+		base *= math.Pow(0.84, float64(agp))
 	}
-	return speed
+	return c.calcStat(stat.RunSpeed, base)
 }
 
 // PhysicalAttackRange returns the attack range for the active weapon
