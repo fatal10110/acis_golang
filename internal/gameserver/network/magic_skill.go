@@ -253,7 +253,8 @@ func sendMagicCastFailureReason(live *livePlayer, def modelskill.Definition, err
 		// ever sees the actor, so the S1_PREPARED_FOR_REUSE branch
 		// (CreatureCast.java:324-327) is unreachable for a CC'd caster.
 		// PlayerAI.clientActionFailed() (PlayerAI.java:556-560) sends only
-		// ActionFailed, which sendMagicCastFailure below still does.
+		// ActionFailed, which sendMagicCastFailure (above) still sends via
+		// sendMagicActionFailed after this reason switch returns.
 	case errors.Is(err, actorcast.ErrInvalidTarget):
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageInvalidTarget))
 	case errors.Is(err, actorcast.ErrCubicListFull):
