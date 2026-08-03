@@ -402,15 +402,39 @@ func (c *Character) ReduceMP(amount float64) float64 {
 	return amount
 }
 
+// playableAttacker is satisfied by any attacker that counts as a Playable
+// for CP-absorption purposes (Player and Summon actors).
+type playableAttacker interface {
+	Playable() bool
+}
+
 // ReduceHP applies skill HP damage and runs the once-only death path.
-func (c *Character) ReduceHP(amount float64, attacker any, _ modelskill.Definition) {
+// Mirrors PlayerStatus.reduceHp's CP absorption (PlayerStatus.java:166-184):
+// a Playable attacker other than the actor itself (PvP, pet/summon damage)
+// drains CP before HP, unless the skill sets dmgDirectlyToHp
+// (Player.java:6152's ignoreCP argument). The sleep/immobile-stop,
+// stand-up, and stun-break side effects (PlayerStatus.java:118-134) are
+// tracked separately in #1136, as is extending CP absorption to melee
+// auto-attack and DOT damage (#1143).
+func (c *Character) ReduceHP(amount float64, attacker any, skill modelskill.Definition) {
 	if amount <= 0 {
 		return
 	}
+	rawDamage := amount
+
 	c.vitalsMu.Lock()
 	if c.curHP <= 0 {
 		c.vitalsMu.Unlock()
 		return
+	}
+	if !skill.DirectHPDamage && attacker != nil && attacker != any(c) {
+		if p, ok := attacker.(playableAttacker); ok && p.Playable() {
+			if c.curCP > 0 {
+				drained := math.Min(c.curCP, amount)
+				c.curCP -= drained
+				amount -= drained
+			}
+		}
 	}
 	c.curHP -= amount
 	dead := c.curHP <= 0
@@ -418,7 +442,11 @@ func (c *Character) ReduceHP(amount float64, attacker any, _ modelskill.Definiti
 		c.curHP = 0
 	}
 	c.vitalsMu.Unlock()
-	c.breakCastOnDamage(amount)
+	// calcCastBreak always runs on the raw pre-absorption damage in the
+	// reference (Formulas.java:725 callers pass the skill's computed
+	// damage, never a CP-reduced remainder), so breakCastOnDamage must
+	// too.
+	c.breakCastOnDamage(rawDamage)
 	if dead {
 		killer, _ := attacker.(creature.DeathActor)
 		c.Die(killer)
