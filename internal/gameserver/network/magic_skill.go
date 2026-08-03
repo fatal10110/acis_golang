@@ -245,8 +245,15 @@ func sendMagicCastFailureReason(live *livePlayer, def modelskill.Definition, err
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotEnoughHP))
 	case errors.Is(err, actorcast.ErrNotEnoughItems):
 		live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1CannotBeUsed, int32(def.ID), int32(def.Level)))
-	case errors.Is(err, actorcast.ErrSkillDisabled), errors.Is(err, actorcast.ErrAllSkillsDisabled):
+	case errors.Is(err, actorcast.ErrSkillDisabled):
 		live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1PreparedForReuse, int32(def.ID), int32(def.Level)))
+	case errors.Is(err, actorcast.ErrAllSkillsDisabled):
+		// No reason message: PlayableAI.tryToCast's denyAiAction() check (Java
+		// PlayableAI.java:299-303) runs before canAttemptCast/isSkillDisabled
+		// ever sees the actor, so the S1_PREPARED_FOR_REUSE branch
+		// (CreatureCast.java:324-327) is unreachable for a CC'd caster.
+		// PlayerAI.clientActionFailed() (PlayerAI.java:556-560) sends only
+		// ActionFailed, which sendMagicCastFailure below still does.
 	case errors.Is(err, actorcast.ErrInvalidTarget):
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageInvalidTarget))
 	case errors.Is(err, actorcast.ErrCubicListFull):
