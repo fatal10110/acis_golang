@@ -433,8 +433,15 @@ func (c *Character) ReduceHP(amount float64, attacker any, _ modelskill.Definiti
 	}
 }
 
-// ReduceHPByDOT applies periodic damage without the normal-hit cast interruption.
-func (c *Character) ReduceHPByDOT(amount float64, attacker any) {
+// ReduceHPByDOT applies periodic damage without the normal-hit cast
+// interruption. isDOT distinguishes a real damage-over-time skill tick
+// (true, e.g. Poison/Bleed — Creature.reduceCurrentHpByDOT hardcodes this)
+// from other periodic, non-attack damage sources the reference still routes
+// through reduceCurrentHp with isDOT=false, such as drowning
+// (WaterTaskManager.java calls reduceCurrentHp(hp, player, false, false,
+// null)): both skip cast interruption, but only isDOT=false allows the
+// 1-in-10 STUN-break roll.
+func (c *Character) ReduceHPByDOT(amount float64, attacker any, isDOT bool) {
 	if amount <= 0 {
 		return
 	}
@@ -444,7 +451,7 @@ func (c *Character) ReduceHPByDOT(amount float64, attacker any) {
 		return
 	}
 	c.vitalsMu.Unlock()
-	c.applyNonConsumptionDamageEffects(true)
+	c.applyNonConsumptionDamageEffects(isDOT)
 	c.vitalsMu.Lock()
 	if c.curHP <= 0 {
 		c.vitalsMu.Unlock()

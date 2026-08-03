@@ -10,7 +10,7 @@ import (
 type dotTarget interface {
 	Dead() bool
 	HP() float64
-	ReduceHPByDOT(damage float64, effector any)
+	ReduceHPByDOT(damage float64, effector any, isDOT bool)
 }
 
 // statusBroadcaster is implemented by an actor that can push its current

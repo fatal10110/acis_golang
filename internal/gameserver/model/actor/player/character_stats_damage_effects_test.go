@@ -86,7 +86,8 @@ func TestReduceHPBreaksStunOnOneInTenRollForNonDOTDamage(t *testing.T) {
 }
 
 // TestReduceHPByDOTNeverBreaksStunEvenOnWinningRoll mirrors the reference's
-// !isDOT gate: DOT damage stops SLEEP/IMMOBILE_UNTIL_ATTACKED and stands the
+// !isDOT gate for a real damage-over-time skill tick (isDOT=true, e.g.
+// Poison/Bleed): it stops SLEEP/IMMOBILE_UNTIL_ATTACKED and stands the
 // character up like any other hit, but never rolls to break STUN.
 func TestReduceHPByDOTNeverBreaksStunEvenOnWinningRoll(t *testing.T) {
 	c := liveCharacter(1, combatTemplate(), combatItems())
@@ -96,13 +97,31 @@ func TestReduceHPByDOTNeverBreaksStunEvenOnWinningRoll(t *testing.T) {
 	addCharacterEffect(t, c, "Sleep")
 	c.SetRollSource(func(int) int { return 0 })
 
-	c.ReduceHPByDOT(10, nil)
+	c.ReduceHPByDOT(10, nil, true)
 
 	if !c.Stunned() {
-		t.Fatal("Stunned() = false after ReduceHPByDOT, want STUN untouched on DOT damage")
+		t.Fatal("Stunned() = false after ReduceHPByDOT(isDOT=true), want STUN untouched on a real DOT tick")
 	}
 	if c.Sleeping() {
 		t.Fatal("Sleeping() = true after ReduceHPByDOT, want the sleep effect stopped")
+	}
+}
+
+// TestReduceHPByDOTBreaksStunWhenNotARealDOTTick covers drowning's exact
+// reference call (WaterTaskManager.java: reduceCurrentHp(hp, player, false,
+// false, null), isDOT=false): periodic non-attack damage that still allows
+// the 1-in-10 STUN-break roll, unlike a real DOT skill tick.
+func TestReduceHPByDOTBreaksStunWhenNotARealDOTTick(t *testing.T) {
+	c := liveCharacter(1, combatTemplate(), combatItems())
+	c.SetHP(100)
+	attachTestLive(t, c)
+	addCharacterEffect(t, c, "Stun")
+	c.SetRollSource(func(int) int { return 0 })
+
+	c.ReduceHPByDOT(10, nil, false)
+
+	if c.Stunned() {
+		t.Fatal("Stunned() = true after ReduceHPByDOT(isDOT=false) with a winning roll, want STUN broken")
 	}
 }
 
@@ -136,7 +155,7 @@ func TestReduceHPByDOTSkipsDamageEffectsOnAlreadyDeadCharacter(t *testing.T) {
 	addCharacterEffect(t, c, "Sleep")
 	c.Sit()
 
-	c.ReduceHPByDOT(10, nil)
+	c.ReduceHPByDOT(10, nil, true)
 
 	if !c.Sleeping() {
 		t.Fatal("Sleeping() = false after ReduceHPByDOT on an already-dead character, want the sleep effect untouched")
@@ -162,5 +181,28 @@ func TestTakeDamageAppliesNonConsumptionDamageEffects(t *testing.T) {
 	}
 	if !c.Standing() {
 		t.Fatal("Standing() = false after TakeDamage, want the character stood up")
+	}
+}
+
+// TestTakeDamageSkipsDamageEffectsOnZeroDamage covers a zero-damage hit
+// (currently unreachable from attack.Controller.deliverHit, which filters
+// hit.Damage <= 0 before calling TakeDamage, but TakeDamage is exported and
+// exercised directly by other tests): it must not wake, unstun, or stand the
+// character up, matching the existing convention ReduceHP/ReduceHPByDOT
+// already use for a non-positive amount.
+func TestTakeDamageSkipsDamageEffectsOnZeroDamage(t *testing.T) {
+	c := liveCharacter(1, combatTemplate(), combatItems())
+	c.SetHP(100)
+	attachTestLive(t, c)
+	addCharacterEffect(t, c, "Sleep")
+	c.Sit()
+
+	c.TakeDamage(0, nil)
+
+	if !c.Sleeping() {
+		t.Fatal("Sleeping() = false after a zero-damage TakeDamage, want the sleep effect untouched")
+	}
+	if c.Standing() {
+		t.Fatal("Standing() = true after a zero-damage TakeDamage, want it left seated")
 	}
 }

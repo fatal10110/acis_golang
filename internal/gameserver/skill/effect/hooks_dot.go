@@ -19,7 +19,11 @@ func damageOverTimeAction(e *Effect) bool {
 		}
 	}
 	if result.Damage > 0 {
-		target.ReduceHPByDOT(result.Damage, e.Effector)
+		// A skill's own damage-over-time tick is always isDOT=true in the
+		// reference (Creature.reduceCurrentHpByDOT hardcodes it), unlike
+		// drowning's periodic damage, which reduceCurrentHp (isDOT=false)
+		// routes through the same Go method (see taskeffects.go's Drown).
+		target.ReduceHPByDOT(result.Damage, e.Effector, true)
 	}
 	return result.Continue
 }
