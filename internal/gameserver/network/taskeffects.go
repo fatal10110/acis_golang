@@ -190,6 +190,7 @@ func (l *GameClientLink) wireWaterZones() {
 			if !ok {
 				return
 			}
+			l.broadcastCharacterInfo(live)
 			if swimming {
 				breath := time.Duration(live.CalcStat(stat.Breath, float64(time.Minute)*live.Race.BreathMultiplier()))
 				l.water.Add(live, breath)

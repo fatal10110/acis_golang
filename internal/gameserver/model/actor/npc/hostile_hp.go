@@ -36,6 +36,7 @@ func (h *Hostile) TakeDamage(dmg int, attacker creature.DeathActor) bool {
 		if combatant, ok := attacker.(attackable.Combatant); ok {
 			h.AddDamageHate(combatant, float64(dmg), float64(dmg))
 		}
+		h.applyNonConsumptionDamageEffects(false)
 	}
 	newlyDead := h.health.Damage(dmg)
 	h.BroadcastStatus()

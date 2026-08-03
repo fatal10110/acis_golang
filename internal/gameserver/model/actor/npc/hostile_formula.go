@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
@@ -148,6 +149,7 @@ func (h *Hostile) ReduceHP(amount float64, attacker any, _ modelskill.Definition
 	if combatant, ok := attacker.(attackable.Combatant); ok {
 		h.AddDamageHate(combatant, amount, amount)
 	}
+	h.applyNonConsumptionDamageEffects(false)
 	newlyDead := h.health.DamageValue(amount)
 	h.BroadcastStatus()
 	if !newlyDead {
@@ -161,12 +163,7 @@ func (h *Hostile) ReduceHP(amount float64, attacker any, _ modelskill.Definition
 // at zero hate weight, matching Npc.reduceCurrentHp's unconditional
 // addDamageHate(attacker, damage, 0) — every HP reduction feeds the
 // AggroList, DOT included (Npc.java:390-395; no isDOT gate in the chain
-// Creature.reduceCurrentHpByDOT -> Npc.reduceCurrentHp -> reduceHp). isDOT
-// is unused here: NpcStatus inherits CreatureStatus.reduceHp's
-// SLEEP/IMMOBILE-stop and STUN-break block unchanged (only the sit/stand-up
-// clause is Player-only, PlayerStatus.java:124) — Hostile has no equivalent
-// wired up yet, a pre-existing gap out of this method's scope, tracked by
-// #1146.
+// Creature.reduceCurrentHpByDOT -> Npc.reduceCurrentHp -> reduceHp).
 func (h *Hostile) ReduceHPByDOT(amount float64, attacker any, isDOT bool) {
 	if amount <= 0 || h.AlikeDead() {
 		return
@@ -174,6 +171,7 @@ func (h *Hostile) ReduceHPByDOT(amount float64, attacker any, isDOT bool) {
 	if combatant, ok := attacker.(attackable.Combatant); ok {
 		h.AddDamageHate(combatant, amount, 0)
 	}
+	h.applyNonConsumptionDamageEffects(isDOT)
 	newlyDead := h.health.DamageValue(amount)
 	h.BroadcastStatus()
 	if !newlyDead {
@@ -181,6 +179,33 @@ func (h *Hostile) ReduceHPByDOT(amount float64, attacker any, isDOT bool) {
 	}
 	killer, _ := attacker.(creature.DeathActor)
 	h.Die(killer, h.rewards)
+}
+
+// applyNonConsumptionDamageEffects mirrors NpcStatus.reduceHp's inherited
+// CreatureStatus block (CreatureStatus.java:228-248): non-DOT HP reduction
+// stops SLEEP and IMMOBILE_UNTIL_ATTACKED, and has a 1-in-10 chance to break
+// STUN. NpcStatus.reduceHp (NpcStatus.java:21-35) adds only a duel-interrupt
+// check on the attacker and otherwise delegates unchanged, including the
+// isDOT gate on the whole block — unlike PlayerStatus, which overrides the
+// gate to !isHPConsumption alone and stun-breaks separately on !isDOT
+// (PlayerStatus.java:118-134). There is no isHPConsumption concept for NPCs
+// and no sit/stand-up clause (Player-only, PlayerStatus.java:124). Callers
+// must run this after AddDamageHate, matching Npc.reduceCurrentHp
+// (Npc.java:395, 468): the hate lands before super.reduceCurrentHp reaches
+// this block, so a sleep-stop's synchronous wake-think (EffectSleep.java:37-44
+// -> hooks_cc.go's thinkAndRefreshExit) always sees the hit's hate already
+// in the threat table.
+func (h *Hostile) applyNonConsumptionDamageEffects(isDOT bool) {
+	if isDOT {
+		return
+	}
+	list := h.EffectList()
+	list.StopByType(effect.TypeSleep)
+	list.StopByType(effect.TypeImmobileUntilAttacked)
+
+	if h.Stunned() && h.Roll(10) == 0 {
+		list.StopByType(effect.TypeStun)
+	}
 }
 
 // CanBeHealed reports whether h may receive HP/MP restoration.
