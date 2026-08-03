@@ -158,6 +158,26 @@ func expSpGainMessage(exp int64, sp int) wire.Frame {
 	}
 }
 
+// sendExpSpLossFrames tells live's own client how much experience and SP a
+// removal took. PlayerStatus.setSp sends StatusUpdate(SP) synchronously
+// during PlayableStatus.removeExpAndSp, before removeExpAndSp's own system
+// messages go out, so a combined removal orders StatusUpdate(SP) ahead of
+// EXP_DECREASED_BY_S1 (PlayerStatus.java:583-603, PlayableStatus.java:133-145,
+// PlayerStatus.java:881-891).
+func sendExpSpLossFrames(live *livePlayer, exp int64, sp int) {
+	if sp > 0 {
+		live.SendFrame(serverpackets.FrameStatusUpdate(live.ObjectID(), []serverpackets.StatusAttribute{
+			{Type: serverpackets.StatusSP, Value: live.SP},
+		}))
+	}
+	if exp > 0 {
+		live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageExpDecreasedByS1, int32(exp)))
+	}
+	if sp > 0 {
+		live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageSPDecreasedS1, int32(sp)))
+	}
+}
+
 // refreshLiveLevelSkills re-derives the skills live's new level entitles it
 // to and hands the client the resulting list. It runs on every level change,
 // up or down, as the level refresher attachLivePlayer registers.
@@ -330,15 +350,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 		live.SendFrame(expSpGainMessage(exp, sp))
 	})
 	c.SetExpSpLossNotifier(func(exp int64, sp int) {
-		if exp > 0 {
-			live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageExpDecreasedByS1, int32(exp)))
-		}
-		if sp > 0 {
-			live.SendFrame(serverpackets.FrameStatusUpdate(live.ObjectID(), []serverpackets.StatusAttribute{
-				{Type: serverpackets.StatusSP, Value: live.SP},
-			}))
-			live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageSPDecreasedS1, int32(sp)))
-		}
+		sendExpSpLossFrames(live, exp, sp)
 	})
 	c.SetLevelUpBroadcaster(func() {
 		l.broadcastLiveFrame(live, func() wire.Frame {

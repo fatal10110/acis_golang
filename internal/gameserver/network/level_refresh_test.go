@@ -106,6 +106,33 @@ func TestRefreshLiveLevelSkillsWithoutSkillsIsSilent(t *testing.T) {
 	}
 }
 
+// TestSendExpSpLossFramesOrdersStatusBeforeExpMessage pins the combined
+// exp+SP removal order the skill-enchant path hits: StatusUpdate(SP) goes
+// out before EXP_DECREASED_BY_S1, matching PlayerStatus.setSp firing
+// synchronously inside removeExpAndSp ahead of its own system messages
+// (PlayerStatus.java:583-603, PlayableStatus.java:133-145).
+func TestSendExpSpLossFramesOrdersStatusBeforeExpMessage(t *testing.T) {
+	frames := &frameCapture{}
+	live := newTestLivePlayer(t, 1, frames)
+	live.Character.SP = 100
+
+	sendExpSpLossFrames(live, 10, 25)
+
+	sent := frames.frames
+	if len(sent) != 3 {
+		t.Fatalf("frames sent = %d, want 3", len(sent))
+	}
+	if sent[0][0] != serverpackets.OpcodeStatusUpdate {
+		t.Fatalf("frame[0] opcode = %#x, want StatusUpdate (%#x)", sent[0][0], serverpackets.OpcodeStatusUpdate)
+	}
+	if sent[1][0] != serverpackets.OpcodeSystemMessage {
+		t.Fatalf("frame[1] opcode = %#x, want SystemMessage (%#x)", sent[1][0], serverpackets.OpcodeSystemMessage)
+	}
+	if sent[2][0] != serverpackets.OpcodeSystemMessage {
+		t.Fatalf("frame[2] opcode = %#x, want SystemMessage (%#x)", sent[2][0], serverpackets.OpcodeSystemMessage)
+	}
+}
+
 // TestAddLevelRunsTheRegisteredRefresher pins the domain-to-network join: a
 // level change is what drives the refresher, in either direction.
 func TestAddLevelRunsTheRegisteredRefresher(t *testing.T) {
