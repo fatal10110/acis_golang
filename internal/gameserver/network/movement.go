@@ -76,8 +76,9 @@ func (l *GameClientLink) changeLiveMoveType(live *livePlayer, run bool) {
 	if !live.SetRunning(run) {
 		return
 	}
+	swimming := live.zoneActor != nil && live.zoneActor.ZoneFlags().Has(zone.FlagWater)
 	l.broadcastLiveFrame(live, func() wire.Frame {
-		return serverpackets.FrameChangeMoveType(live.ObjectID(), live.Running(), false)
+		return serverpackets.FrameChangeMoveType(live.ObjectID(), live.Running(), swimming)
 	})
 }
 
