@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -225,10 +226,20 @@ func (l *GameClientLink) castController(live *livePlayer) *actorcast.Controller 
 		live.cast = actorcast.NewController(actorcast.PlayerActor{Character: live.Character})
 		live.cast.SetLogger(live.log)
 		live.cast.SetOnAbort(func(interrupted bool) { l.broadcastCastAborted(live, interrupted) })
-		live.cast.SetOnFinish(func(bool) {
-			if live.combat != nil {
-				live.combat.Think()
+		live.cast.SetOnFinish(func(interrupted bool, def modelskill.Definition, _ any) {
+			if live.combat == nil {
+				return
 			}
+			// PlayableAI.onEvtFinishedCasting (PlayableAI.java:43-63): with
+			// no queued next intention (Go has no intention queue to
+			// resume from, tracked separately), a finished CAST intention
+			// only re-engages the attack when the skill carries
+			// nextActionAttack; anything else goes idle.
+			if def.NextActionIsAttack {
+				live.combat.Think()
+				return
+			}
+			live.combat.Stop()
 		})
 		live.Character.SetCastController(live.cast)
 	}

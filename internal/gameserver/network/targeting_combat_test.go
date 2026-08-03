@@ -245,25 +245,33 @@ func TestMoveLivePlayerStopsAttackIntention(t *testing.T) {
 }
 
 // TestCastFinishResumesPendingAttackIntention pins issue #1016's remaining
-// acceptance criterion: the cast-finish notification wired in castController
-// (live_player.go) must resume a pending attack intention, matching what the
-// reference's FINISHED_CASTING AI event does for a player. A cast pauses the
-// in-flight swing (attack.Stop(), mirroring what starting a cast does to the
-// attack controller) while combat's queued target survives untouched; on
-// both natural completion and abort the finish observer must re-think and
-// land a fresh swing instead of leaving the intention stalled.
+// acceptance criterion, gated the way the reference actually gates it:
+// PlayableAI.onEvtFinishedCasting (PlayableAI.java:43-63) only resumes the
+// attack when the just-finished skill has nextActionIsAttack() set (Go:
+// modelskill.Definition.NextActionIsAttack); any other skill goes idle. The
+// manual attacker.attack.Stop() below does not mirror a real production
+// call site — the swing loop has no cast-awareness of its own yet (that gap
+// is tracked separately, #1174) — it only isolates the finish-observer gate
+// under test from that unrelated, still-open pause behavior.
 func TestCastFinishResumesPendingAttackIntention(t *testing.T) {
-	def := modelskill.Definition{
+	gatedDef := modelskill.Definition{
 		ID: 3, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
 		HitTime: 5000, ReuseDelay: 1200, StaticHitTime: true, StaticReuse: true,
+		NextActionIsAttack: true,
 	}
+	ungatedDef := gatedDef
+	ungatedDef.NextActionIsAttack = false
 
 	tests := []struct {
-		name string
-		end  func(*actorcast.Controller)
+		name       string
+		end        func(*actorcast.Controller)
+		def        modelskill.Definition
+		wantResume bool
 	}{
-		{name: "natural finish", end: func(c *actorcast.Controller) { c.Finish() }},
-		{name: "abort", end: func(c *actorcast.Controller) { c.Stop() }},
+		{name: "natural finish, nextActionAttack", end: func(c *actorcast.Controller) { c.Finish() }, def: gatedDef, wantResume: true},
+		{name: "abort, nextActionAttack", end: func(c *actorcast.Controller) { c.Stop() }, def: gatedDef, wantResume: true},
+		{name: "natural finish, no nextActionAttack", end: func(c *actorcast.Controller) { c.Finish() }, def: ungatedDef, wantResume: false},
+		{name: "abort, no nextActionAttack", end: func(c *actorcast.Controller) { c.Stop() }, def: ungatedDef, wantResume: false},
 	}
 
 	for _, tt := range tests {
@@ -290,13 +298,13 @@ func TestCastFinishResumesPendingAttackIntention(t *testing.T) {
 				t.Fatal("expected the first swing to be in flight")
 			}
 
-			// A cast pauses the in-flight swing but leaves the queued
-			// target intention alone, the way starting a cast does.
+			// Isolates the finish-observer gate: see the doc comment above
+			// on why this doesn't reflect a real cast-start call site yet.
 			attacker.attack.Stop()
 			attackerFrames.frames = nil
 
 			controller := gcl.castController(attacker)
-			if _, err := controller.Start(time.Now(), skillCastObject(attacker), def); err != nil {
+			if _, err := controller.Start(time.Now(), skillCastObject(attacker), tt.def); err != nil {
 				t.Fatalf("Start() error: %v", err)
 			}
 			if attacker.combat.Target() != target {
@@ -305,16 +313,27 @@ func TestCastFinishResumesPendingAttackIntention(t *testing.T) {
 
 			tt.end(controller)
 
-			// The abort path additionally broadcasts MagicSkillCanceled and
-			// ActionFailed ahead of the resumed swing; AutoAttackStart does
-			// not repeat since the actor never left combat stance. In both
-			// cases the last frame must be the resumed swing's Attack.
-			frames := frameOpcodes(attackerFrames.frames)
-			if len(frames) == 0 || frames[len(frames)-1] != serverpackets.OpcodeAttack {
-				t.Fatalf("attack opcodes after cast %s = %#x, want the last frame to be Attack (the resumed intention)", tt.name, frames)
+			if tt.wantResume {
+				// The abort path additionally broadcasts MagicSkillCanceled
+				// and ActionFailed ahead of the resumed swing; AutoAttackStart
+				// does not repeat since the actor never left combat stance.
+				// In both cases the last frame must be the resumed swing's
+				// Attack.
+				frames := frameOpcodes(attackerFrames.frames)
+				if len(frames) == 0 || frames[len(frames)-1] != serverpackets.OpcodeAttack {
+					t.Fatalf("attack opcodes after cast %s = %#x, want the last frame to be Attack (the resumed intention)", tt.name, frames)
+				}
+				if !attacker.attack.AttackingNow() {
+					t.Fatal("attack intention did not resume after the cast ended")
+				}
+				return
 			}
-			if !attacker.attack.AttackingNow() {
-				t.Fatal("attack intention did not resume after the cast ended")
+
+			if attacker.attack.AttackingNow() {
+				t.Fatal("attack intention resumed after a cast whose skill has no nextActionAttack, want idle")
+			}
+			if attacker.combat.Target() != nil {
+				t.Fatalf("attack intention target = %v after a cast with no nextActionAttack, want nil (idle)", attacker.combat.Target())
 			}
 		})
 	}
