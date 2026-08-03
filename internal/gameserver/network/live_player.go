@@ -142,6 +142,10 @@ func (p *livePlayer) takeDeferredPickup() *pickupIntention {
 	return pickup
 }
 
+// pickupLockActive has no production caller: livePickupBlockedDeferrable
+// reads pickupLocked directly under its own pickupMu section instead. Kept
+// for the generation-primitive regression tests, which check lock state
+// independently of that section.
 func (p *livePlayer) pickupLockActive() bool {
 	p.pickupMu.Lock()
 	defer p.pickupMu.Unlock()
