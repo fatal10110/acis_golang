@@ -323,6 +323,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 		pos := moveCtl.Position()
 		l.updateLivePlayerPosition(live, pos, live.CurrentHeading())
 		l.finishLiveGroundPickup(live)
+		l.finishPetInteract(live)
 		combat.Think()
 	})
 	c.SetAttackBroadcaster(func(snapshot attack.Snapshot) {

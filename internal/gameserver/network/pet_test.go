@@ -749,6 +749,31 @@ func TestHandleTargetActionShowsPetStatusForOwnerPet(t *testing.T) {
 	}
 }
 
+func TestHandleTargetActionDeniesPetStatusOutOfRange(t *testing.T) {
+	templates := petTestTemplates()
+	capture := &frameCapture{}
+	live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
+	state := world.New()
+	state.Spawn(live, 0, 0, 0, 0)
+	pet, _ := attachTestPet(t, state, live, templates, 12077, nil)
+	if err := state.Move(pet, summonInteractRange+1, 0, 0); err != nil {
+		t.Fatalf("move pet out of range: %v", err)
+	}
+	capture.frames = nil
+	gcl := &GameClientLink{world: state}
+
+	gcl.handleTargetAction(context.Background(), live, pet.ObjectID(), false, false)
+	capture.frames = nil
+	gcl.handleTargetAction(context.Background(), live, pet.ObjectID(), true, false)
+
+	// Out of range and with no move controller wired (live.move == nil), the
+	// click only releases the pending action — it must not open the status
+	// window instantly the way the pre-fix code did for any distance.
+	if got := frameOpcodes(capture.frames); string(got) != string([]byte{serverpackets.OpcodeActionFailed}) {
+		t.Fatalf("opcodes = %x, want only ActionFailed", got)
+	}
+}
+
 func encodeRequestGiveItemToPet(objectID, count int32) []byte {
 	w := wire.NewPacketWriter(clientpackets.OpcodeRequestGiveItemToPet)
 	w.WriteInt32(objectID)
