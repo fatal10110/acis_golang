@@ -40,6 +40,7 @@ ServerListAgeLimit = 18
 TestServer = True
 PvpServer = False
 AllowCursedWeapons = False
+AllowWater = False
 `)
 	if err != nil {
 		t.Fatalf("ParseString server: %v", err)
@@ -93,6 +94,31 @@ HexID = -7fff
 	}
 	if cfg.AllowCursedWeapons {
 		t.Error("AllowCursedWeapons = true, want false")
+	}
+	if cfg.AllowWater {
+		t.Error("AllowWater = true, want false")
+	}
+}
+
+func TestGameServerConfigFromPropertiesAllowWaterDefaultsTrue(t *testing.T) {
+	serverProps, err := config.ParseString("")
+	if err != nil {
+		t.Fatalf("ParseString server: %v", err)
+	}
+	hexProps, err := config.ParseString(`
+ServerID = 3
+HexID = -7fff
+`)
+	if err != nil {
+		t.Fatalf("ParseString hexid: %v", err)
+	}
+
+	cfg, err := gameServerConfigFromProperties(gameServerPaths{}, serverProps, hexProps)
+	if err != nil {
+		t.Fatalf("gameServerConfigFromProperties: %v", err)
+	}
+	if !cfg.AllowWater {
+		t.Error("AllowWater = false, want true default")
 	}
 }
 

@@ -21,6 +21,7 @@ import (
 func TestProvideGameClientLinkUsesGameDataSkillTrees(t *testing.T) {
 	err := fx.ValidateApp(
 		fx.Provide(
+			func() gameServerConfig { return gameServerConfig{} },
 			func() *gameData { return &gameData{} },
 			func() *manager.Roster { return nil },
 			func() *gamesql.ItemStore { return nil },
