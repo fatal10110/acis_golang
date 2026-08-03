@@ -408,6 +408,12 @@ func (c *Character) ReduceHP(amount float64, attacker any, _ modelskill.Definiti
 	if amount <= 0 {
 		return
 	}
+	c.vitalsMu.Lock()
+	if c.curHP <= 0 {
+		c.vitalsMu.Unlock()
+		return
+	}
+	c.vitalsMu.Unlock()
 	c.applyNonConsumptionDamageEffects(false)
 	c.vitalsMu.Lock()
 	if c.curHP <= 0 {
@@ -432,6 +438,12 @@ func (c *Character) ReduceHPByDOT(amount float64, attacker any) {
 	if amount <= 0 {
 		return
 	}
+	c.vitalsMu.Lock()
+	if c.curHP <= 0 {
+		c.vitalsMu.Unlock()
+		return
+	}
+	c.vitalsMu.Unlock()
 	c.applyNonConsumptionDamageEffects(true)
 	c.vitalsMu.Lock()
 	if c.curHP <= 0 {

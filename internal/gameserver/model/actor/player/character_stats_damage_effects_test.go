@@ -106,6 +106,46 @@ func TestReduceHPByDOTNeverBreaksStunEvenOnWinningRoll(t *testing.T) {
 	}
 }
 
+// TestReduceHPSkipsDamageEffectsOnAlreadyDeadCharacter mirrors the
+// reference's top-of-method isDead() early return: an already-dead
+// character (curHP already clamped to 0) must not have its SLEEP effect
+// stopped or get stood up by a stray hit landing after death.
+func TestReduceHPSkipsDamageEffectsOnAlreadyDeadCharacter(t *testing.T) {
+	c := liveCharacter(1, combatTemplate(), combatItems())
+	c.SetHP(0)
+	attachTestLive(t, c)
+	addCharacterEffect(t, c, "Sleep")
+	c.Sit()
+
+	c.ReduceHP(10, nil, modelskill.Definition{})
+
+	if !c.Sleeping() {
+		t.Fatal("Sleeping() = false after ReduceHP on an already-dead character, want the sleep effect untouched")
+	}
+	if c.Standing() {
+		t.Fatal("Standing() = true after ReduceHP on an already-dead character, want it left seated")
+	}
+}
+
+// TestReduceHPByDOTSkipsDamageEffectsOnAlreadyDeadCharacter is
+// ReduceHPByDOT's counterpart to the above.
+func TestReduceHPByDOTSkipsDamageEffectsOnAlreadyDeadCharacter(t *testing.T) {
+	c := liveCharacter(1, combatTemplate(), combatItems())
+	c.SetHP(0)
+	attachTestLive(t, c)
+	addCharacterEffect(t, c, "Sleep")
+	c.Sit()
+
+	c.ReduceHPByDOT(10, nil)
+
+	if !c.Sleeping() {
+		t.Fatal("Sleeping() = false after ReduceHPByDOT on an already-dead character, want the sleep effect untouched")
+	}
+	if c.Standing() {
+		t.Fatal("Standing() = true after ReduceHPByDOT on an already-dead character, want it left seated")
+	}
+}
+
 // TestTakeDamageAppliesNonConsumptionDamageEffects covers the melee-hit
 // entrypoint, which reuses the same non-DOT hook as ReduceHP.
 func TestTakeDamageAppliesNonConsumptionDamageEffects(t *testing.T) {
