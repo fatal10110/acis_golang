@@ -117,14 +117,21 @@ func TestRefreshLiveLevelSkillsAutoLearnRefreshesShortcut(t *testing.T) {
 		t.Fatalf("shortcut level = %d, want 1 (refreshed to the granted skill level)", got)
 	}
 
-	var sawRegister bool
+	var register []byte
 	for _, frame := range frames.frames {
 		if frame[0] == serverpackets.OpcodeShortCutRegister {
-			sawRegister = true
+			register = frame
 		}
 	}
-	if !sawRegister {
+	if register == nil {
 		t.Fatal("frames sent, want a ShortCutRegister among them")
+	}
+	r := wire.NewReader(register[1:])
+	if typ, slot, id, level, marker, characterType := r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadUint8(), r.ReadInt32(); typ != int32(serverpackets.ShortcutSkill) || slot != 0 || id != 3 || level != 1 || marker != 0 || characterType != 1 {
+		t.Fatalf("ShortCutRegister = type %d slot %d id %d level %d marker %d charType %d, want skill slot 0 id 3 level 1 marker 0 charType 1", typ, slot, id, level, marker, characterType)
+	}
+	if err := r.Err(); err != nil {
+		t.Fatalf("read ShortCutRegister: %v", err)
 	}
 }
 
