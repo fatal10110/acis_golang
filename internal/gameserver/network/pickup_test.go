@@ -455,7 +455,7 @@ func TestFinishDeferredPickupWalksToOutOfRangeItem(t *testing.T) {
 	t.Cleanup(live.Stop)
 
 	frames.frames = nil
-	live.deferPickup(context.Background(), ground)
+	live.deferPickup(context.Background(), ground, false)
 	gcl.finishDeferredPickup(live)
 
 	assertOpcodeSequence(t, frames.frames, serverpackets.OpcodeMoveToLocation)
@@ -469,6 +469,37 @@ func TestFinishDeferredPickupWalksToOutOfRangeItem(t *testing.T) {
 			t.Fatal("deferred pickup out of range never walked to and collected the item")
 		}
 		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+// TestFinishDeferredPickupHonorsShiftAndFailsWithoutWalking is the follow-up
+// regression test for PR 1074 finding 1's review comment: a shift-clicked
+// pickup that gets deferred (blocked by an attack) must fail outright on
+// drain if still out of range, exactly like a fresh shift-click does, never
+// walking to the item — matching the reference, where
+// maybeMoveToLocation(..., isShiftPressed) skips the walk when shift is held
+// (CreatureMove.java:438-443) regardless of whether the PICK_UP intention
+// is fresh or promoted from the queue.
+func TestFinishDeferredPickupHonorsShiftAndFailsWithoutWalking(t *testing.T) {
+	templates := petTestTemplates()
+	frames := &frameCapture{}
+	live := newTestLivePlayer(t, 1, frames)
+	state := world.New()
+	drops := task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour}, time.Now)
+	gcl := &GameClientLink{world: state, groundItems: drops, inventory: invops.NewService(nil)}
+	wireLiveAttackHooks(gcl, live)
+	tmpl, _ := templates.Get(item.AdenaID)
+	ground := dropTestGround(t, state, drops, item.Instance{ObjectID: 900, TemplateID: item.AdenaID, Count: 1, ManaLeft: -1}, tmpl, 100+groundPickupInteractionDistance+50, 0, 0)
+	state.Spawn(live, 100, 0, 0, 0)
+	t.Cleanup(live.Stop)
+
+	frames.frames = nil
+	live.deferPickup(context.Background(), ground, true)
+	gcl.finishDeferredPickup(live)
+
+	assertOpcodeSequence(t, frames.frames, serverpackets.OpcodeActionFailed)
+	if _, ok := state.Object(ground.ObjectID()); !ok {
+		t.Fatal("shift-deferred out-of-range pickup was collected instead of failing outright")
 	}
 }
 

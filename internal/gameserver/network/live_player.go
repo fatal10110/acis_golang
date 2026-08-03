@@ -53,6 +53,13 @@ type livePlayer struct {
 type pickupIntention struct {
 	ctx    context.Context
 	target world.Tracked
+	// shift is only meaningful on deferredPickup: it is the original click's
+	// shift-modifier, needed at drain time to decide walk-vs-fail exactly as
+	// a fresh click would (CreatureMove.java:438, !isShiftPressed gates the
+	// walk). pickup (the in-flight walk-then-collect intention) is only ever
+	// set for a non-shift click — a shift click fails outright instead of
+	// walking — so it never needs this field.
+	shift bool
 }
 
 func (p *livePlayer) SendFrame(frame wire.Frame) bool {
@@ -120,10 +127,10 @@ func (p *livePlayer) takePickup() *pickupIntention {
 	return pickup
 }
 
-func (p *livePlayer) deferPickup(ctx context.Context, target world.Tracked) {
+func (p *livePlayer) deferPickup(ctx context.Context, target world.Tracked, shift bool) {
 	p.pickupMu.Lock()
 	defer p.pickupMu.Unlock()
-	p.deferredPickup = &pickupIntention{ctx: ctx, target: target}
+	p.deferredPickup = &pickupIntention{ctx: ctx, target: target, shift: shift}
 }
 
 func (p *livePlayer) takeDeferredPickup() *pickupIntention {
