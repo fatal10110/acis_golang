@@ -121,8 +121,8 @@ func (l *GameClientLink) walkOrForwardPickup(ctx context.Context, live *livePlay
 		return true
 	}
 	live.takePickup()
-	live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetTooFar))
 	live.SendFrame(serverpackets.FrameActionFailed())
+	live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetTooFar))
 	return true
 }
 
