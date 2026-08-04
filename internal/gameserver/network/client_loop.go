@@ -26,13 +26,15 @@ const (
 
 var errMalformedPacketDisconnect = errors.New("malformed packet requires disconnect")
 
-// decodeClientPacket disconnects malformed handshake, authentication, and
-// character-select packets. Malformed in-game packets are logged and dropped.
+// decodeClientPacket disconnects malformed pre-auth packets immediately.
+// Once authenticated, malformed packets (char-select or in-game) are
+// tolerated up to maxUnderflowsPerMin within a 60s sliding window, then
+// disconnect, mirroring GameClient.onBufferUnderflow.
 func decodeClientPacket[T any](l *GameClientLink, client *Client, payload []byte, decode func([]byte) (T, error)) (T, error) {
 	req, err := decode(payload)
 	if err != nil {
 		l.log.Warn().Err(err).Msg("game client")
-		if client.State() != StateInGame {
+		if client.State() == StateConnected || client.countUnderflow() {
 			return req, errMalformedPacketDisconnect
 		}
 	}
@@ -88,7 +90,13 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 		}
 		if !client.Accept(opcode) {
 			l.log.Warn().Str("state", client.State().String()).Str("opcode", hex.EncodeToString(payload)).Msg("Accept opcode")
-			return
+			// Pre-auth, any rejected opcode disconnects immediately; once
+			// authenticated, tolerate up to maxUnknownPerMin within a 60s
+			// sliding window, mirroring GameClient.onUnknownPacket.
+			if client.State() == StateConnected || client.countUnknownPacket() {
+				return
+			}
+			continue
 		}
 
 		switch opcode {
