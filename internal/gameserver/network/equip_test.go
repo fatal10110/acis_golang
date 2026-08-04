@@ -2,6 +2,7 @@ package network
 
 import (
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
@@ -188,8 +189,63 @@ func TestUnequipItemBySlot(t *testing.T) {
 	if chest.Equipped() {
 		t.Fatal("chest piece still equipped after RequestUnEquipItem")
 	}
-	if len(capture.frames) != 2 || capture.frames[0][0] != serverpackets.OpcodeUserInfo || capture.frames[1][0] != serverpackets.OpcodeInventoryUpdate {
-		t.Fatalf("frames after unequip = %x, want UserInfo then InventoryUpdate", capture.frames)
+	if len(capture.frames) != 3 || capture.frames[0][0] != serverpackets.OpcodeUserInfo || capture.frames[1][0] != serverpackets.OpcodeSystemMessage || capture.frames[2][0] != serverpackets.OpcodeInventoryUpdate {
+		t.Fatalf("frames after unequip = %x, want UserInfo, S1_DISARMED SystemMessage, then InventoryUpdate", capture.frames)
+	}
+	if r := wire.NewReader(capture.frames[1][1:]); r.ReadInt32() != serverpackets.SystemMessageS1Disarmed {
+		t.Fatalf("unenchanted unequip message id != S1_DISARMED")
+	}
+}
+
+// TestUnequipItemEnchantedSendsEquipmentRemoved pins RequestUnEquipItem.java's
+// success branch on an enchanted item: EQUIPMENT_S1_S2_REMOVED (enchant
+// level + item name), not S1_DISARMED.
+func TestUnequipItemEnchantedSendsEquipmentRemoved(t *testing.T) {
+	templates := item.NewTable([]*item.Template{{ID: 20, Kind: item.KindArmor, Slot: item.SlotChest, Armor: &item.ArmorDetail{Type: item.ArmorLight}}})
+	chest := &item.Instance{ObjectID: 501, TemplateID: 20, EnchantLevel: 6, Location: item.LocationPaperdoll, LocationData: itemcontainer.Chest}
+	capture := &frameCapture{}
+	live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{chest})
+	gcl := &GameClientLink{}
+	updates := wireInventoryUpdates(gcl, live)
+
+	gcl.unequipItem(live, int32(item.SlotChest))
+	updates.Tick()
+
+	if len(capture.frames) != 3 || capture.frames[1][0] != serverpackets.OpcodeSystemMessage {
+		t.Fatalf("frames after enchanted unequip = %x, want UserInfo, EQUIPMENT_S1_S2_REMOVED SystemMessage, then InventoryUpdate", capture.frames)
+	}
+	r := wire.NewReader(capture.frames[1][1:])
+	if id := r.ReadInt32(); id != serverpackets.SystemMessageEquipmentS1S2Removed {
+		t.Fatalf("enchanted unequip message id = %d, want EQUIPMENT_S1_S2_REMOVED", id)
+	}
+}
+
+// TestUnequipItemDuringCastIsRejected pins RequestUnEquipItem.java:37's
+// casting gate: unequip while mid-cast is rejected with S1_CANNOT_BE_USED,
+// the same as the other crowd-control states, instead of silently applying.
+func TestUnequipItemDuringCastIsRejected(t *testing.T) {
+	templates := item.NewTable([]*item.Template{{ID: 20, Kind: item.KindArmor, Slot: item.SlotChest, Armor: &item.ArmorDetail{Type: item.ArmorLight}}})
+	chest := &item.Instance{ObjectID: 501, TemplateID: 20, Location: item.LocationPaperdoll, LocationData: itemcontainer.Chest}
+	capture := &frameCapture{}
+	live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{chest})
+	state := world.New()
+	state.Spawn(live, 0, 0, 0, 0)
+	capture.frames = nil
+
+	gcl := &GameClientLink{world: state, geo: testGeo{}}
+	controller := gcl.castController(live)
+	if _, err := controller.Start(time.Now(), skillCastObject(live), castingDef); err != nil {
+		t.Fatalf("Start() error: %v", err)
+	}
+
+	gcl.unequipItem(live, int32(item.SlotChest))
+
+	if !chest.Equipped() || len(capture.frames) != 2 || capture.frames[0][0] != serverpackets.OpcodeSystemMessage || capture.frames[1][0] != serverpackets.OpcodeActionFailed {
+		t.Fatalf("mid-cast RequestUnEquipItem mutated item=%+v frames=%x, want unchanged item and S1_CANNOT_BE_USED SystemMessage then ActionFailed", chest, capture.frames)
+	}
+	r := wire.NewReader(capture.frames[0][1:])
+	if id := r.ReadInt32(); id != serverpackets.SystemMessageS1CannotBeUsed {
+		t.Fatalf("mid-cast unequip message id = %d, want S1_CANNOT_BE_USED", id)
 	}
 }
 
@@ -257,8 +313,8 @@ func TestDeadPlayerItemOpsAreNoops(t *testing.T) {
 
 		(&GameClientLink{}).unequipItem(live, int32(item.SlotChest))
 
-		if !chest.Equipped() || len(capture.frames) != 1 || capture.frames[0][0] != serverpackets.OpcodeActionFailed {
-			t.Fatalf("dead RequestUnEquipItem mutated item=%+v frames=%x, want unchanged item and ActionFailed only", chest, capture.frames)
+		if !chest.Equipped() || len(capture.frames) != 2 || capture.frames[0][0] != serverpackets.OpcodeSystemMessage || capture.frames[1][0] != serverpackets.OpcodeActionFailed {
+			t.Fatalf("dead RequestUnEquipItem mutated item=%+v frames=%x, want unchanged item and S1_CANNOT_BE_USED SystemMessage then ActionFailed", chest, capture.frames)
 		}
 	})
 
@@ -319,8 +375,8 @@ func TestCrowdControlledPlayerItemOpsAreNoops(t *testing.T) {
 
 			(&GameClientLink{}).unequipItem(live, int32(item.SlotChest))
 
-			if !chest.Equipped() || len(capture.frames) != 1 || capture.frames[0][0] != serverpackets.OpcodeActionFailed {
-				t.Fatalf("%s RequestUnEquipItem mutated item=%+v frames=%x, want unchanged item and ActionFailed only", effectName, chest, capture.frames)
+			if !chest.Equipped() || len(capture.frames) != 2 || capture.frames[0][0] != serverpackets.OpcodeSystemMessage || capture.frames[1][0] != serverpackets.OpcodeActionFailed {
+				t.Fatalf("%s RequestUnEquipItem mutated item=%+v frames=%x, want unchanged item and S1_CANNOT_BE_USED SystemMessage then ActionFailed", effectName, chest, capture.frames)
 			}
 		})
 	}

@@ -8,6 +8,12 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
@@ -63,10 +69,187 @@ func TestMoveLivePlayerStopsInFlightCast(t *testing.T) {
 		t.Fatalf("Start() error: %v", err)
 	}
 
-	gcl.moveLivePlayer(live, live.CurrentLocation(), location.Location{X: 100})
+	gcl.moveLivePlayer(live, location.Location{X: 100})
 
 	if controller.CastingNow() {
 		t.Fatal("CastingNow() = true after a client-initiated walk, want cleared")
+	}
+}
+
+// blockedTestGeo is a move.Geo double that rejects every straight-line move
+// and finds no pathfinding alternative, matching the move package's own
+// "no-progress fall-back" fixture: a fully geo-blocked destination.
+type blockedTestGeo struct{}
+
+func (blockedTestGeo) CanMove(int, int, int, int, int, int) bool { return false }
+func (blockedTestGeo) Height(_, _, z int) int16                  { return int16(z) }
+func (blockedTestGeo) FindPath(_, _ location.Location) ([]location.Location, bool) {
+	return nil, false
+}
+func (blockedTestGeo) ValidLocation(ox, oy, oz, _, _, _ int) location.Location {
+	return location.Location{X: ox, Y: oy, Z: oz}
+}
+
+// newTestLivePlayerWithGeo builds a live player identical to
+// newTestLivePlayer but wired to a caller-supplied move.Geo, so a test can
+// exercise a geo-rejected route without touching the always-passable
+// default.
+func newTestLivePlayerWithGeo(t *testing.T, id int32, capture *frameCapture, geo move.Geo) *livePlayer {
+	t.Helper()
+	tmpl, ok := testTemplates(t).Get(0)
+	if !ok {
+		t.Fatal("missing test class template")
+	}
+	ch := &player.Character{
+		ID: id, Name: "Player", ClassID: 0, BaseClassID: 0,
+		Race: player.RaceHuman, Sex: player.SexMale,
+		CharLevel: 1,
+		Location:  location.Location{X: int(id) * 100, Y: 0, Z: 0},
+	}
+	ch.SetResourceValues(player.Resources{MaxHP: 80, CurrentHP: 80, MaxMP: 30, CurrentMP: 30})
+	ch.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventory(ch.ID, testItemTemplates(), nil))
+	ch.SetFrameSender(capture.send)
+
+	x, y, z := ch.Position()
+	live, err := creature.NewLive(location.Location{X: x, Y: y, Z: z}, tmpl.RunSpeed, geo, ch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ch.Live = live
+	moveCtl, err := move.NewController(ch.Move(), ch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	attackCtl := attack.NewPlayer(ch)
+	combat := ai.NewPlayerAttack(ch, moveCtl, attackCtl)
+	moveCtl.SetArrived(combat.Think)
+	attackCtl.SetFinished(combat.Think)
+
+	return &livePlayer{Character: ch, template: tmpl, attack: attackCtl, move: moveCtl, combat: combat, visibilitySend: capture.send}
+}
+
+// TestMoveLivePlayerSimulatesWalkServerSide pins the fix for #1168: the walk
+// is driven through the move controller from the server-authoritative
+// position, not the packet's claimed origin, so the broadcast MoveToLocation
+// event always carries the server's own position as origin.
+func TestMoveLivePlayerSimulatesWalkServerSide(t *testing.T) {
+	live := newTestLivePlayer(t, 1, &frameCapture{})
+	gcl := &GameClientLink{log: zerolog.Nop()}
+
+	var got move.Event
+	events := 0
+	live.Character.SetMoveBroadcaster(func(event move.Event) {
+		events++
+		got = event
+	})
+
+	origin := live.CurrentLocation()
+	target := location.Location{X: origin.X + 8192, Y: origin.Y, Z: origin.Z}
+	gcl.moveLivePlayer(live, target)
+
+	if events != 1 {
+		t.Fatalf("move broadcasts = %d, want 1", events)
+	}
+	if got.Origin != origin {
+		t.Fatalf("broadcast origin = %+v, want server position %+v", got.Origin, origin)
+	}
+	if got.Destination != target {
+		t.Fatalf("broadcast destination = %+v, want %+v", got.Destination, target)
+	}
+	if heading := live.CurrentHeading(); heading != origin.HeadingTo(target) {
+		t.Fatalf("heading = %d, want %d (facing target from server position)", heading, origin.HeadingTo(target))
+	}
+}
+
+// TestMoveLivePlayerRejectsBlockedRouteWithActionFailed pins the rejection
+// half of the fix: a route the move controller cannot simulate at all (geo
+// fully blocked) must answer ActionFailed instead of going silent, and must
+// not broadcast a move the server never actually started.
+func TestMoveLivePlayerRejectsBlockedRouteWithActionFailed(t *testing.T) {
+	capture := &frameCapture{}
+	live := newTestLivePlayerWithGeo(t, 1, capture, blockedTestGeo{})
+	gcl := &GameClientLink{log: zerolog.Nop()}
+
+	moveBroadcasts := 0
+	live.Character.SetMoveBroadcaster(func(move.Event) { moveBroadcasts++ })
+
+	origin := live.CurrentLocation()
+	originHeading := live.CurrentHeading()
+	gcl.moveLivePlayer(live, location.Location{X: origin.X + 500, Y: origin.Y, Z: origin.Z})
+
+	if moveBroadcasts != 0 {
+		t.Fatalf("move broadcasts on a blocked route = %d, want 0", moveBroadcasts)
+	}
+	opcodes := frameOpcodes(capture.frames)
+	if len(opcodes) != 1 || opcodes[0] != serverpackets.OpcodeActionFailed {
+		t.Fatalf("frames sent = %x, want a single ActionFailed (%#x)", opcodes, serverpackets.OpcodeActionFailed)
+	}
+	if got := live.move.Position(); got != origin {
+		t.Fatalf("position after a rejected route = %+v, want unchanged %+v", got, origin)
+	}
+	if got := live.CurrentHeading(); got != originHeading {
+		t.Fatalf("heading after a rejected route = %d, want unchanged %d (a walk that never starts must not rotate the player)", got, originHeading)
+	}
+}
+
+// TestStopLivePlayerStopsSimulatedWalk pins CannotMoveAnymore's new
+// semantics: it stops the server-simulated walk at wherever the simulation
+// stands and never adopts client-reported coordinates (there are none to
+// adopt — the handler no longer accepts any).
+func TestStopLivePlayerStopsSimulatedWalk(t *testing.T) {
+	live := newTestLivePlayer(t, 1, &frameCapture{})
+	gcl := &GameClientLink{log: zerolog.Nop()}
+
+	origin := live.CurrentLocation()
+	live.Character.SetMoveBroadcaster(func(move.Event) {})
+	gcl.moveLivePlayer(live, location.Location{X: origin.X + 8192, Y: origin.Y, Z: origin.Z})
+
+	stops := 0
+	live.Character.SetStopBroadcaster(func() { stops++ })
+
+	gcl.stopLivePlayer(live)
+	if stops != 1 {
+		t.Fatalf("stop broadcasts after stopping an in-flight walk = %d, want 1", stops)
+	}
+	if got := live.move.Position(); got != origin {
+		t.Fatalf("position after stop = %+v, want the simulation's own position %+v (no ticks elapsed)", got, origin)
+	}
+
+	// A second stop with nothing in flight must not re-broadcast: matches
+	// the reference's stop() being a no-op once already stopped.
+	gcl.stopLivePlayer(live)
+	if stops != 1 {
+		t.Fatalf("stop broadcasts after a redundant stop = %d, want still 1", stops)
+	}
+}
+
+// TestValidateLivePlayerPositionNeverAdoptsAValidReport pins ValidatePosition's
+// new semantics: a report within the movement-speed threshold changes
+// nothing server-side, and even a divergent report that does trigger a
+// correction is never adopted as the new server position.
+func TestValidateLivePlayerPositionNeverAdoptsAValidReport(t *testing.T) {
+	capture := &frameCapture{}
+	live := newTestLivePlayer(t, 1, capture)
+	gcl := &GameClientLink{log: zerolog.Nop()}
+	origin := live.CurrentLocation()
+
+	nearReport := location.Location{X: origin.X + 1, Y: origin.Y, Z: origin.Z}
+	gcl.validateLivePlayerPosition(live, nearReport)
+	if len(capture.frames) != 0 {
+		t.Fatalf("frames sent for an in-threshold report = %d, want 0", len(capture.frames))
+	}
+	if got := live.CurrentLocation(); got != origin {
+		t.Fatalf("position after an in-threshold report = %+v, want unchanged %+v", got, origin)
+	}
+
+	farReport := location.Location{X: origin.X + 8192, Y: origin.Y, Z: origin.Z}
+	gcl.validateLivePlayerPosition(live, farReport)
+	opcodes := frameOpcodes(capture.frames)
+	if len(opcodes) != 1 || opcodes[0] != serverpackets.OpcodeValidateLocation {
+		t.Fatalf("frames sent for an out-of-threshold report = %x, want a single ValidateLocation (%#x)", opcodes, serverpackets.OpcodeValidateLocation)
+	}
+	if got := live.CurrentLocation(); got != origin {
+		t.Fatalf("position after an out-of-threshold report = %+v, want unchanged server position %+v (never adopted)", got, origin)
 	}
 }
 
@@ -327,9 +510,18 @@ func TestGameClientLinkWireSafeMovementAndRefreshPacketsInGame(t *testing.T) {
 	c.send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
+	// spawn is the new character's actual server-authoritative position
+	// (matching TestGameClientLinkLogoutLeavesWorld's default spawn). The
+	// walk target is deliberately far enough away that, since this test
+	// harness never wires a PositionUpdates ticker, the simulated walk
+	// never arrives during the test — position stays pinned at spawn for
+	// every check below, exactly like the reference never adopting a
+	// client-reported position mid-walk.
+	spawn := location.Location{X: 10, Y: 20, Z: 30}
 	target := location.Location{X: 46160, Y: 41237, Z: -3534}
-	origin := location.Location{X: 46117, Y: 41247, Z: -3532}
-	c.send(encodeMoveBackwardToLocation(target, origin, 1))
+	claimedOrigin := location.Location{X: 46117, Y: 41247, Z: -3532}
+	walkHeading := spawn.HeadingTo(target)
+	c.send(encodeMoveBackwardToLocation(target, claimedOrigin, 1))
 	reply := c.read()
 	if reply[0] != serverpackets.OpcodeMoveToLocation {
 		t.Fatalf("move reply opcode = %#x, want MoveToLocation (%#x)", reply[0], serverpackets.OpcodeMoveToLocation)
@@ -343,8 +535,8 @@ func TestGameClientLinkWireSafeMovementAndRefreshPacketsInGame(t *testing.T) {
 		t.Fatalf("MoveToLocation target = %+v, want %+v", gotTarget, target)
 	}
 	gotOrigin := location.Location{X: int(r.ReadInt32()), Y: int(r.ReadInt32()), Z: int(r.ReadInt32())}
-	if gotOrigin != origin {
-		t.Fatalf("MoveToLocation origin = %+v, want %+v", gotOrigin, origin)
+	if gotOrigin != spawn {
+		t.Fatalf("MoveToLocation origin = %+v, want server position %+v (not the client's claimed origin %+v)", gotOrigin, spawn, claimedOrigin)
 	}
 	obj, ok := state.Player(objID)
 	if !ok {
@@ -355,21 +547,28 @@ func TestGameClientLinkWireSafeMovementAndRefreshPacketsInGame(t *testing.T) {
 		t.Fatalf("world.Player(%d) has no Position method", objID)
 	}
 	x, y, z := positioned.Position()
-	if x != origin.X || y != origin.Y || z != origin.Z {
-		t.Fatalf("player position after MoveBackwardToLocation = (%d,%d,%d), want origin (%d,%d,%d)", x, y, z, origin.X, origin.Y, origin.Z)
+	if x != spawn.X || y != spawn.Y || z != spawn.Z {
+		t.Fatalf("player position after MoveBackwardToLocation = (%d,%d,%d), want spawn (%d,%d,%d) (the walk is simulated, not instantaneous)", x, y, z, spawn.X, spawn.Y, spawn.Z)
 	}
 
-	c.send(encodeValidatePosition(target, 32768))
+	// A ValidatePosition report close to the server's actual (still-spawn)
+	// position is within a second's travel and must not be adopted or
+	// answered.
+	nearClientPosition := location.Location{X: spawn.X + 1, Y: spawn.Y, Z: spawn.Z}
+	c.send(encodeValidatePosition(nearClientPosition, 32768))
 	c.send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
 	reply = c.read()
 	if reply[0] != serverpackets.OpcodeItemList {
 		t.Fatalf("item refresh opcode = %#x, want ItemList (%#x)", reply[0], serverpackets.OpcodeItemList)
 	}
 	x, y, z = positioned.Position()
-	if x != target.X || y != target.Y || z != target.Z {
-		t.Fatalf("player position after ValidatePosition = (%d,%d,%d), want (%d,%d,%d)", x, y, z, target.X, target.Y, target.Z)
+	if x != spawn.X || y != spawn.Y || z != spawn.Z {
+		t.Fatalf("player position after in-threshold ValidatePosition = (%d,%d,%d), want unchanged spawn (%d,%d,%d)", x, y, z, spawn.X, spawn.Y, spawn.Z)
 	}
 
+	// A report far from the server's actual position exceeds the
+	// divergence threshold: the server corrects the client back to its
+	// own (still-spawn) position, but never adopts the client's report.
 	farClientPosition := location.Location{X: target.X + 500, Y: target.Y, Z: target.Z}
 	c.send(encodeValidatePosition(farClientPosition, 32768))
 	reply = c.read()
@@ -381,19 +580,23 @@ func TestGameClientLinkWireSafeMovementAndRefreshPacketsInGame(t *testing.T) {
 		t.Fatalf("ValidateLocation object id = %d, want %d", got, objID)
 	}
 	gotCorrection := location.Location{X: int(r.ReadInt32()), Y: int(r.ReadInt32()), Z: int(r.ReadInt32())}
-	if gotCorrection != target {
-		t.Fatalf("ValidateLocation location = %+v, want server position %+v", gotCorrection, target)
+	if gotCorrection != spawn {
+		t.Fatalf("ValidateLocation location = %+v, want server position %+v", gotCorrection, spawn)
 	}
-	if heading := r.ReadInt32(); heading != 32768 {
-		t.Fatalf("ValidateLocation heading = %d, want 32768", heading)
+	if heading := r.ReadInt32(); heading != int32(walkHeading) {
+		t.Fatalf("ValidateLocation heading = %d, want walk heading %d", heading, walkHeading)
 	}
 	x, y, z = positioned.Position()
-	if x != target.X || y != target.Y || z != target.Z {
-		t.Fatalf("player position after desync ValidatePosition = (%d,%d,%d), want server position (%d,%d,%d)", x, y, z, target.X, target.Y, target.Z)
+	if x != spawn.X || y != spawn.Y || z != spawn.Z {
+		t.Fatalf("player position after desync ValidatePosition = (%d,%d,%d), want unchanged server position (%d,%d,%d)", x, y, z, spawn.X, spawn.Y, spawn.Z)
 	}
 
-	stoppedAt := location.Location{X: 46155, Y: 41240, Z: -3534}
-	c.send(encodeCannotMoveAnymore(stoppedAt, 12345))
+	// CannotMoveAnymore is a stop report, not a position report: the
+	// client-claimed stop coordinates and heading below must be discarded
+	// entirely, and StopMove must carry the server's own (still-spawn,
+	// still-mid-walk) position and heading instead.
+	claimedStopAt := location.Location{X: 46155, Y: 41240, Z: -3534}
+	c.send(encodeCannotMoveAnymore(claimedStopAt, 12345))
 	reply = c.read()
 	if reply[0] != serverpackets.OpcodeStopMove {
 		t.Fatalf("stop reply opcode = %#x, want StopMove (%#x)", reply[0], serverpackets.OpcodeStopMove)
@@ -403,15 +606,15 @@ func TestGameClientLinkWireSafeMovementAndRefreshPacketsInGame(t *testing.T) {
 		t.Fatalf("StopMove object id = %d, want %d", got, objID)
 	}
 	gotStoppedAt := location.Location{X: int(r.ReadInt32()), Y: int(r.ReadInt32()), Z: int(r.ReadInt32())}
-	if gotStoppedAt != stoppedAt {
-		t.Fatalf("StopMove location = %+v, want %+v", gotStoppedAt, stoppedAt)
+	if gotStoppedAt != spawn {
+		t.Fatalf("StopMove location = %+v, want server position %+v (not the client's claimed stop point %+v)", gotStoppedAt, spawn, claimedStopAt)
 	}
-	if heading := r.ReadInt32(); heading != 12345 {
-		t.Fatalf("StopMove heading = %d, want 12345", heading)
+	if heading := r.ReadInt32(); heading != int32(walkHeading) {
+		t.Fatalf("StopMove heading = %d, want walk heading %d (not the client's claimed heading 12345)", heading, walkHeading)
 	}
 	x, y, z = positioned.Position()
-	if x != stoppedAt.X || y != stoppedAt.Y || z != stoppedAt.Z {
-		t.Fatalf("player position after CannotMoveAnymore = (%d,%d,%d), want (%d,%d,%d)", x, y, z, stoppedAt.X, stoppedAt.Y, stoppedAt.Z)
+	if x != spawn.X || y != spawn.Y || z != spawn.Z {
+		t.Fatalf("player position after CannotMoveAnymore = (%d,%d,%d), want unchanged server position (%d,%d,%d)", x, y, z, spawn.X, spawn.Y, spawn.Z)
 	}
 
 	c.send(encodeStartRotating(32768, 1))

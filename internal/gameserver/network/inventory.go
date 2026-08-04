@@ -222,12 +222,23 @@ func (l *GameClientLink) activeSummonTarget(live *livePlayer) actorcast.Target {
 // bodySlot (a Slot bitmask value from the item's own template) resolves
 // to. An empty or unresolvable slot is a silent no-op.
 func (l *GameClientLink) unequipItem(live *livePlayer, bodySlot int32) {
-	if !liveItemOpsAllowed(live) {
+	inv := live.Inventory()
+	if inv == nil {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
-	inv := live.Inventory()
-	if inv == nil {
+	paperdollSlot, ok := item.Slot(bodySlot).PaperdollIndex()
+	if !ok {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return
+	}
+	worn := inv.ItemAt(paperdollSlot)
+	if worn == nil {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return
+	}
+	if !liveItemOpsAllowed(live) || (live.cast != nil && live.cast.CastingNow()) {
+		live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageS1CannotBeUsed, worn.TemplateID))
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
@@ -238,6 +249,15 @@ func (l *GameClientLink) unequipItem(live *livePlayer, bodySlot int32) {
 	}
 	l.applyEquipStatChanges(live, inv, res)
 	l.broadcastEquipmentChange(live)
+
+	if len(res.Changed) > 0 {
+		unequipped := res.Changed[0]
+		if unequipped.EnchantLevel > 0 {
+			live.SendFrame(serverpackets.FrameSystemMessageNumberItemName(serverpackets.SystemMessageEquipmentS1S2Removed, int32(unequipped.EnchantLevel), unequipped.TemplateID))
+		} else {
+			live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageS1Disarmed, unequipped.TemplateID))
+		}
+	}
 }
 
 func (l *GameClientLink) dropLiveItem(live *livePlayer, req clientpackets.RequestDropItem) {
