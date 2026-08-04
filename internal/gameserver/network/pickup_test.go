@@ -17,6 +17,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
+	tradebook "github.com/fatal10110/acis_golang/internal/gameserver/trade"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -747,6 +748,34 @@ func TestPickupLiveGroundItemRejectsOutOfRange(t *testing.T) {
 	}
 }
 
+// TestStartPickupLiveGroundItemRejectsBlockedWalkWithActionFailedFirst covers
+// walkOrForwardPickup's own out-of-range rejection (targeting.go:117-119),
+// reached when a pickup click can't collect immediately and the walk toward
+// the item is itself geo-blocked. ActionFailed must still lead the
+// SystemMessage, same as every other pickup rejection branch.
+func TestStartPickupLiveGroundItemRejectsBlockedWalkWithActionFailedFirst(t *testing.T) {
+	templates := petTestTemplates()
+	capture := &frameCapture{}
+	live := newTestLivePlayerWithGeo(t, 1, capture, blockedTestGeo{})
+	state := world.New()
+	state.Spawn(live, 100, 0, 0, 0)
+	drops := task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour}, time.Now)
+	tmpl, _ := templates.Get(item.AdenaID)
+	ground := dropTestGround(t, state, drops, item.Instance{ObjectID: 900, TemplateID: item.AdenaID, Count: 40, ManaLeft: -1}, tmpl, 100+groundPickupInteractionDistance+50, 0, 0)
+
+	capture.frames = nil
+	gcl := &GameClientLink{world: state, groundItems: drops}
+
+	if !gcl.startPickupLiveGroundItem(context.Background(), live, ground, false) {
+		t.Fatal("startPickupLiveGroundItem returned false for a ground item target")
+	}
+
+	assertOpcodeSequence(t, capture.frames, serverpackets.OpcodeActionFailed, serverpackets.OpcodeSystemMessage)
+	if _, ok := state.Object(ground.ObjectID()); !ok {
+		t.Fatal("ground item removed after a blocked-walk pickup attempt")
+	}
+}
+
 func pickupAttentionTestTemplates() *item.Table {
 	return item.NewTable([]*item.Template{
 		{ID: item.AdenaID, Name: "Adena", Kind: item.KindEtcItem, Duration: -1, Stackable: true, Dropable: true, Tradable: true, Destroyable: true, EtcItem: &item.EtcItemDetail{}},
@@ -826,6 +855,60 @@ func TestPickupLiveGroundItemRejectsLootLockedByOtherOwner(t *testing.T) {
 	assertOpcodeSequence(t, capture.frames, serverpackets.OpcodeActionFailed, serverpackets.OpcodeSystemMessage)
 	if _, ok := state.Object(ground.ObjectID()); !ok {
 		t.Fatal("loot-locked ground item removed by a non-owner pickup attempt")
+	}
+}
+
+// TestPickupLiveGroundItemRejectsWhenTrading covers the trading-block
+// rejection branch (pickup.go:54-57): ActionFailed must lead the
+// CannotPickupOrUseItemTrading SystemMessage, same as every other pickup
+// rejection.
+func TestPickupLiveGroundItemRejectsWhenTrading(t *testing.T) {
+	templates := petTestTemplates()
+	capture := &frameCapture{}
+	live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
+	state := world.New()
+	state.Spawn(live, 100, 0, 0, 0)
+	drops := task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour}, time.Now)
+	tmpl, _ := templates.Get(item.AdenaID)
+	ground := dropTestGround(t, state, drops, item.Instance{ObjectID: 900, TemplateID: item.AdenaID, Count: 40, ManaLeft: -1}, tmpl, 100, 0, 0)
+
+	trades := tradebook.NewBook(time.Now)
+	trades.Request(live.ObjectID(), 2)
+	trades.Answer(2, true)
+
+	capture.frames = nil
+	gcl := &GameClientLink{world: state, groundItems: drops, trades: trades}
+
+	gcl.pickupLiveGroundItem(context.Background(), live, ground)
+
+	assertOpcodeSequence(t, capture.frames, serverpackets.OpcodeActionFailed, serverpackets.OpcodeSystemMessage)
+	if _, ok := state.Object(ground.ObjectID()); !ok {
+		t.Fatal("ground item removed while its picker was trading")
+	}
+}
+
+// TestPickupLiveGroundItemRejectsHerbLootLockedByOtherOwner covers the
+// herb-path loot-locked rejection branch (pickup.go:77-80): ActionFailed
+// must lead the failedPickupFrame SystemMessage.
+func TestPickupLiveGroundItemRejectsHerbLootLockedByOtherOwner(t *testing.T) {
+	const herbTemplate int32 = 8600
+	templates := herbTestTemplates()
+	capture := &frameCapture{}
+	live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
+	state := world.New()
+	state.Spawn(live, 100, 0, 0, 0)
+	drops := task.NewGroundItems(state, task.GroundItemOptions{HerbAutoDestroy: time.Hour}, time.Now)
+	tmpl, _ := templates.Get(herbTemplate)
+	ground := dropTestGround(t, state, drops, item.Instance{ObjectID: 900, TemplateID: herbTemplate, OwnerID: 99, Count: 1, ManaLeft: -1}, tmpl, 100, 0, 0)
+
+	capture.frames = nil
+	gcl := &GameClientLink{world: state, groundItems: drops}
+
+	gcl.pickupLiveGroundItem(context.Background(), live, ground)
+
+	assertOpcodeSequence(t, capture.frames, serverpackets.OpcodeActionFailed, serverpackets.OpcodeSystemMessage)
+	if _, ok := state.Object(ground.ObjectID()); !ok {
+		t.Fatal("loot-locked herb removed by a non-owner pickup attempt")
 	}
 }
 
