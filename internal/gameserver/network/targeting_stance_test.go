@@ -6,9 +6,12 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -172,6 +175,64 @@ func TestRequestChangeWaitTypeSitFallsBackWhenChairUnclaimable(t *testing.T) {
 	}
 	if live.Standing() {
 		t.Fatal("live player did not sit after an unclaimable chair target")
+	}
+}
+
+// TestRequestChangeWaitTypeStandStopsFakeDeath pins the reference's
+// thinkStand fake-death branch: a stand request while fake-dead must stop
+// the FAKE_DEATH toggle effect (broadcasting the revive visual) instead of
+// being rejected as if the player were really dead. The fake-death
+// stance/revive broadcasts run through the hooks attachLivePlayer wires in
+// production (character_flow.go); wire them the same way here rather than
+// through the full client-packet dispatch loop, to keep the frame sequence
+// deterministic.
+func TestRequestChangeWaitTypeStandStopsFakeDeath(t *testing.T) {
+	frames := &frameCapture{}
+	live := newTestLivePlayer(t, 1, frames)
+	gcl := &GameClientLink{log: zerolog.Nop()}
+	live.SetStanceBroadcaster(func(stance player.Stance) {
+		waitType := serverpackets.WaitSitting
+		switch stance {
+		case player.StanceStanding:
+			waitType = serverpackets.WaitStanding
+		case player.StanceFakeDeathStart:
+			waitType = serverpackets.WaitFakeDeathStart
+		case player.StanceFakeDeathStop:
+			waitType = serverpackets.WaitFakeDeathStop
+		}
+		x, y, z := live.Position()
+		gcl.broadcastLiveFrame(live, func() wire.Frame {
+			return serverpackets.FrameChangeWaitType(live.ObjectID(), waitType, location.Location{X: x, Y: y, Z: z})
+		})
+	})
+	live.SetFakeDeathReviveBroadcaster(func() { gcl.broadcastLiveRevive(live) })
+
+	e, err := effect.New(effect.Skill{}, modelskill.EffectTemplate{Name: "FakeDeath"})
+	if err != nil {
+		t.Fatalf("effect.New(FakeDeath): %v", err)
+	}
+	e.Effected = live.Character
+	live.EffectList().Add(e)
+	if !live.FakeDead() {
+		t.Fatal("live player not fake-dead after FakeDeath effect start")
+	}
+	frames.frames = nil
+
+	gcl.requestChangeWaitType(live, true)
+
+	if got := frameOpcodes(frames.frames); string(got) != string([]byte{serverpackets.OpcodeChangeWaitType, serverpackets.OpcodeRevive}) {
+		t.Fatalf("stand-during-fake-death opcodes = %x, want ChangeWaitType, Revive", got)
+	}
+	r := wire.NewReader(frames.frames[0][1:])
+	r.ReadInt32()
+	if got := r.ReadInt32(); got != int32(serverpackets.WaitFakeDeathStop) {
+		t.Fatalf("stand-during-fake-death wait type = %d, want %d", got, serverpackets.WaitFakeDeathStop)
+	}
+	if live.FakeDead() {
+		t.Fatal("live player still fake-dead after a stand request")
+	}
+	if !live.Standing() {
+		t.Fatal("live player did not stand after stopping fake death")
 	}
 }
 

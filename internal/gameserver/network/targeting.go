@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -193,6 +194,14 @@ func (l *GameClientLink) showOwnedPetStatus(live *livePlayer, target world.Track
 // ActionFailed instead of silence.
 func (l *GameClientLink) requestChangeWaitType(live *livePlayer, stand bool) {
 	if live == nil {
+		return
+	}
+	// The reference's thinkStand rejects only on real death (denyAiAction),
+	// not fake death, and instead stops the fake-death toggle: stopFakeDeath
+	// removes the FAKE_DEATH effect, whose exit hook stands the player back
+	// up and broadcasts the revive visual (PlayerAI.java:490-501).
+	if stand && !live.Dead() && live.FakeDead() {
+		live.EffectList().StopByType(effect.TypeFakeDeath)
 		return
 	}
 	if !stand {
