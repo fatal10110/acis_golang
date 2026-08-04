@@ -62,6 +62,24 @@ func (s *CharacterStore) Create(ctx context.Context, c *player.Character) error 
 	return nil
 }
 
+// Save persists c's full in-memory stats — level, exp, sp, and cur/max
+// HP/CP/MP — the same column set Create writes at character creation, so a
+// later reload reflects everything gained since the last save instead of
+// the row's creation-time values.
+func (s *CharacterStore) Save(ctx context.Context, c *player.Character) error {
+	resources := c.ResourceValues()
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE characters SET level = ?, maxHp = ?, curHp = ?, maxCp = ?, curCp = ?, maxMp = ?, curMp = ?, exp = ?, sp = ?
+			 WHERE obj_Id = ?`,
+		c.CharLevel, resources.MaxHP, resources.CurrentHP, resources.MaxCP, resources.CurrentCP, resources.MaxMP, resources.CurrentMP,
+		c.Exp, c.SP, c.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("save character %d: %w", c.ID, err)
+	}
+	return nil
+}
+
 // Get returns the character with the given object id, or
 // ErrCharacterNotFound if no such row exists.
 func (s *CharacterStore) Get(ctx context.Context, objectID int32) (*player.Character, error) {
