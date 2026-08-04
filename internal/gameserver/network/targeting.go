@@ -110,6 +110,12 @@ func (l *GameClientLink) walkOrForwardPickup(ctx context.Context, live *livePlay
 		return true
 	}
 	x, y, z := ground.Position()
+	// This walk redirects live.move's single in-flight target away from any
+	// pending pet-interact approach (showOwnedPetStatus) — drop it, or its
+	// stale SetArrived callback would fire a range recheck against wherever
+	// this walk actually lands instead of the pet it was originally aimed
+	// at.
+	live.takePetInteract()
 	live.setPickup(ctx, ground)
 	if live.move.MoveToLocation(location.Location{X: x, Y: y, Z: z}) {
 		return true
@@ -199,6 +205,10 @@ func (l *GameClientLink) showOwnedPetStatus(live *livePlayer, target world.Track
 		return true
 	}
 	px, py, pz := pet.Position()
+	// Symmetric to walkOrForwardPickup's cancellation above: this walk also
+	// redirects live.move's single in-flight target, so any pending pickup
+	// walk that target was still driving toward has to go too.
+	live.takePickup()
 	live.setPetInteract(pet)
 	if !live.move.MoveToLocation(location.Location{X: px, Y: py, Z: pz}) {
 		live.takePetInteract()

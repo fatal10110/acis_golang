@@ -774,6 +774,110 @@ func TestHandleTargetActionDeniesPetStatusOutOfRange(t *testing.T) {
 	}
 }
 
+// TestShowOwnedPetStatusShiftOutOfRangeDoesNotWalk proves the shift gate on
+// showOwnedPetStatus's approach walk (matching maybeMoveToPawn's
+// isShiftPressed check, CreatureMove.java's PlayerMove.maybeMoveToPawn) fires
+// even when a real move controller is wired — not merely because live.move
+// happened to be nil, as the pre-existing out-of-range regression test only
+// proved.
+func TestShowOwnedPetStatusShiftOutOfRangeDoesNotWalk(t *testing.T) {
+	templates := petTestTemplates()
+	frames := &frameCapture{}
+	live := newTestLivePlayer(t, 1, frames)
+	state := world.New()
+	gcl := &GameClientLink{world: state}
+	wireLiveAttackHooks(gcl, live)
+	state.Spawn(live, 0, 0, 0, 0)
+	pet, _ := attachTestPet(t, state, live, templates, 12077, nil)
+	if err := state.Move(pet, summonInteractRange+50, 0, 0); err != nil {
+		t.Fatalf("move pet out of range: %v", err)
+	}
+	t.Cleanup(live.Stop)
+
+	frames.frames = nil
+	gcl.handleTargetAction(context.Background(), live, pet.ObjectID(), false, false)
+	frames.frames = nil
+	gcl.handleTargetAction(context.Background(), live, pet.ObjectID(), true, true)
+
+	if got := frameOpcodes(frames.frames); string(got) != string([]byte{serverpackets.OpcodeActionFailed}) {
+		t.Fatalf("opcodes = %x, want only ActionFailed — a shift-click out of range must not walk", got)
+	}
+}
+
+// TestShowOwnedPetStatusWalksToOutOfRangePetAndOpensOnArrival is the
+// end-to-end regression test for the gap reported in #1172: an out-of-range,
+// non-shift click on an owned summon must approach it and only then open
+// PetStatusShow (PlayerAI.java:437-459), not open it instantly at any
+// distance. It drives a real move.Controller so the walk actually arrives.
+func TestShowOwnedPetStatusWalksToOutOfRangePetAndOpensOnArrival(t *testing.T) {
+	templates := petTestTemplates()
+	frames := &frameCapture{}
+	live := newTestLivePlayer(t, 1, frames)
+	state := world.New()
+	gcl := &GameClientLink{world: state}
+	wireLiveAttackHooks(gcl, live)
+	live.move.SetArrived(func() {
+		pos := live.move.Position()
+		gcl.updateLivePlayerPosition(live, pos, live.CurrentHeading())
+		gcl.finishPetInteract(live)
+		live.combat.Think()
+	})
+	state.Spawn(live, 0, 0, 0, 0)
+	pet, _ := attachTestPet(t, state, live, templates, 12077, nil)
+	if err := state.Move(pet, summonInteractRange+50, 0, 0); err != nil {
+		t.Fatalf("move pet out of range: %v", err)
+	}
+	t.Cleanup(live.Stop)
+
+	frames.frames = nil
+	gcl.handleTargetAction(context.Background(), live, pet.ObjectID(), false, false)
+	frames.frames = nil
+	gcl.handleTargetAction(context.Background(), live, pet.ObjectID(), true, false)
+
+	assertOpcodeSequence(t, frames.snapshot(), serverpackets.OpcodeActionFailed, serverpackets.OpcodeMoveToLocation)
+
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		for _, f := range frames.snapshot() {
+			if f[0] == serverpackets.OpcodePetStatusShow {
+				return
+			}
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("approach walk never opened the pet status window on arrival")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+// TestFinishPetInteractStaysClosedWhenNowOutOfRange proves the arrival-time
+// recheck in finishPetInteract, not just the click-time one: if the pet (or
+// owner) has moved again by the time the approach walk arrives, the status
+// window must stay closed instead of opening off a stale range check —
+// matching thinkInteract's canDoInteract recheck after the move completes
+// (PlayerAI.java:445).
+func TestFinishPetInteractStaysClosedWhenNowOutOfRange(t *testing.T) {
+	templates := petTestTemplates()
+	capture := &frameCapture{}
+	live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
+	state := world.New()
+	state.Spawn(live, 0, 0, 0, 0)
+	pet, _ := attachTestPet(t, state, live, templates, 12077, nil)
+	gcl := &GameClientLink{world: state}
+
+	live.setPetInteract(pet)
+	if err := state.Move(pet, summonInteractRange+1, 0, 0); err != nil {
+		t.Fatalf("move pet out of range: %v", err)
+	}
+	capture.frames = nil
+
+	gcl.finishPetInteract(live)
+
+	if len(capture.frames) != 0 {
+		t.Fatalf("frames = %v, want none — an arrival that's now out of range must stay silent", capture.frames)
+	}
+}
+
 func encodeRequestGiveItemToPet(objectID, count int32) []byte {
 	w := wire.NewPacketWriter(clientpackets.OpcodeRequestGiveItemToPet)
 	w.WriteInt32(objectID)
