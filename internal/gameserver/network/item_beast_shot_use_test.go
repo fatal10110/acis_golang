@@ -79,8 +79,8 @@ func TestGameClientLinkUseBeastSoulshotChargesSummonAndConsumes(t *testing.T) {
 
 // TestGameClientLinkUseBeastSoulshotNoSummonAnswersRejection verifies a
 // beast soulshot used without an active summon answers
-// PETS_ARE_NOT_AVAILABLE_AT_THIS_TIME plus ActionFailed and consumes
-// nothing.
+// PETS_ARE_NOT_AVAILABLE_AT_THIS_TIME only (no ActionFailed, matching
+// BeastSoulShots.java) and consumes nothing.
 func TestGameClientLinkUseBeastSoulshotNoSummonAnswersRejection(t *testing.T) {
 	const shotObjectID int32 = 901
 	c, _, _, _ := newLinkedGameClientWithSkillsSeed(t, nil, beastShotSeed(t, 6645, shotObjectID, 10), 1)
@@ -99,8 +99,5 @@ func TestGameClientLinkUseBeastSoulshotNoSummonAnswersRejection(t *testing.T) {
 	r := wire.NewReader(reply[1:])
 	if id := r.ReadInt32(); id != serverpackets.SystemMessagePetsNotAvailableAtThisTime {
 		t.Fatalf("SystemMessage id = %d, want PetsNotAvailableAtThisTime (%d)", id, serverpackets.SystemMessagePetsNotAvailableAtThisTime)
-	}
-	if reply := c.read(); reply[0] != serverpackets.OpcodeActionFailed {
-		t.Fatalf("opcode = %#x, want ActionFailed (%#x)", reply[0], serverpackets.OpcodeActionFailed)
 	}
 }
