@@ -67,6 +67,42 @@ func TestCharacterStoreCreatePersistsInitialPosition(t *testing.T) {
 	}
 }
 
+func TestCharacterStoreSavePersistsFullStats(t *testing.T) {
+	rec := &characterStoreRecorder{}
+	db := sql.OpenDB(characterStoreConnector{rec: rec})
+	t.Cleanup(func() { _ = db.Close() })
+	store := NewCharacterStore(db)
+
+	c := &player.Character{
+		ID:        0x10000001,
+		CharLevel: 5,
+		Exp:       12345,
+		SP:        67,
+	}
+	c.SetResourceValues(player.Resources{
+		MaxHP: 200, CurrentHP: 150,
+		MaxCP: 90, CurrentCP: 45,
+		MaxMP: 70, CurrentMP: 60,
+	})
+
+	if err := store.Save(context.Background(), c); err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+
+	if !strings.Contains(rec.query, "SET level = ?, maxHp = ?, curHp = ?, maxCp = ?, curCp = ?, maxMp = ?, curMp = ?, exp = ?, sp = ?") {
+		t.Fatalf("Save() query = %q, missing full-stat columns", rec.query)
+	}
+	want := []any{int64(5), 200.0, 150.0, 90.0, 45.0, 70.0, 60.0, int64(12345), int64(67), int64(0x10000001)}
+	if len(rec.args) != len(want) {
+		t.Fatalf("Save() args = %#v, want %d args", rec.args, len(want))
+	}
+	for i, arg := range rec.args {
+		if arg.Value != want[i] {
+			t.Fatalf("Save() arg %d = %v, want %v; args=%#v", i, arg.Value, want[i], rec.args)
+		}
+	}
+}
+
 func TestCharacterStoreSetPositionPersistsCoordinates(t *testing.T) {
 	rec := &characterStoreRecorder{}
 	db := sql.OpenDB(characterStoreConnector{rec: rec})
