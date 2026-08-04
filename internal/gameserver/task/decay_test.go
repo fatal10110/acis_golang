@@ -125,6 +125,38 @@ func TestDecayTickClearsScratchOnPanic(t *testing.T) {
 	}
 }
 
+type decayReentrantEffects struct {
+	decay      *Decay
+	innerPanic any
+}
+
+func (e *decayReentrantEffects) Decay(DecayActor) {
+	func() {
+		defer func() { e.innerPanic = recover() }()
+		e.decay.Tick()
+	}()
+}
+
+func TestDecayTickPanicsOnReentrantCall(t *testing.T) {
+	now := time.UnixMilli(0)
+	effects := &decayReentrantEffects{}
+	decay, err := NewDecay(effects, func() time.Time { return now })
+	if err != nil {
+		t.Fatalf("NewDecay() error = %v", err)
+	}
+	effects.decay = decay
+	decay.Add(&decayFakeActor{id: 1}, -time.Second)
+
+	decay.Tick()
+
+	if effects.innerPanic == nil {
+		t.Fatal("reentrant Tick call did not panic")
+	}
+	if decay.ticking.Load() {
+		t.Fatal("ticking guard left set after outer Tick returned")
+	}
+}
+
 func BenchmarkDecayTickManyActors(b *testing.B) {
 	now := time.UnixMilli(0)
 	decay, err := NewDecay(decayNoopEffects{}, func() time.Time { return now })

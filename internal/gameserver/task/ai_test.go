@@ -72,6 +72,28 @@ func TestAIManagerTickClearsScratchOnPanic(t *testing.T) {
 	}
 }
 
+func TestAIManagerTickPanicsOnReentrantCall(t *testing.T) {
+	mgr := NewAI(nil)
+	var innerPanic any
+	a := &aiActorStub{id: 1}
+	a.thinkFn = func() {
+		func() {
+			defer func() { innerPanic = recover() }()
+			mgr.Tick()
+		}()
+	}
+	mgr.Add(a)
+
+	mgr.Tick()
+
+	if innerPanic == nil {
+		t.Fatal("reentrant Tick call did not panic")
+	}
+	if mgr.ticking.Load() {
+		t.Fatal("ticking guard left set after outer Tick returned")
+	}
+}
+
 func BenchmarkAIManagerTickManyActors(b *testing.B) {
 	mgr := NewAI(nil)
 	for i := 0; i < 4096; i++ {

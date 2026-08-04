@@ -152,6 +152,39 @@ func TestAttackStanceTickClearsScratchOnPanic(t *testing.T) {
 	}
 }
 
+type attackStanceReentrantEffects struct {
+	stance     *AttackStance
+	innerPanic any
+}
+
+func (e *attackStanceReentrantEffects) AutoAttackStop(AttackStanceActor) {
+	func() {
+		defer func() { e.innerPanic = recover() }()
+		e.stance.Tick()
+	}()
+}
+
+func TestAttackStanceTickPanicsOnReentrantCall(t *testing.T) {
+	now := time.UnixMilli(0)
+	effects := &attackStanceReentrantEffects{}
+	stance, err := NewAttackStance(effects, func() time.Time { return now })
+	if err != nil {
+		t.Fatalf("NewAttackStance() error = %v", err)
+	}
+	effects.stance = stance
+	stance.Add(&attackStanceFakeActor{id: 1})
+	now = now.Add(AttackStancePeriod)
+
+	stance.Tick()
+
+	if effects.innerPanic == nil {
+		t.Fatal("reentrant Tick call did not panic")
+	}
+	if stance.ticking.Load() {
+		t.Fatal("ticking guard left set after outer Tick returned")
+	}
+}
+
 func BenchmarkAttackStanceTickManyActors(b *testing.B) {
 	now := time.UnixMilli(0)
 	stance, err := NewAttackStance(attackStanceNoopEffects{}, func() time.Time { return now })

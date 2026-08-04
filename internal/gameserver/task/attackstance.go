@@ -3,6 +3,7 @@ package task
 import (
 	"errors"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -59,7 +60,8 @@ type attackStanceEntry struct {
 //
 // Add, Remove, and InAttackStance are safe to call concurrently with Tick. mu
 // guards entries and the scratch refill. Tick only ever runs on the scheduler
-// ticker's single goroutine, one call at a time.
+// ticker's single goroutine, one call at a time; ticking enforces that
+// contract by panicking on reentrant or concurrent Tick calls.
 type AttackStance struct {
 	effects AttackStanceEffects
 	now     func() time.Time
@@ -67,6 +69,8 @@ type AttackStance struct {
 	mu      sync.Mutex
 	entries map[int32]attackStanceEntry
 	scratch []attackStanceEntry
+
+	ticking atomic.Bool
 }
 
 // NewAttackStance returns an empty combat-stance tracker.
@@ -134,6 +138,11 @@ func (a *AttackStance) InAttackStance(actor AttackStanceActor) bool {
 
 // Tick stops combat stance for actors whose inactivity period has elapsed.
 func (a *AttackStance) Tick() {
+	if !a.ticking.CompareAndSwap(false, true) {
+		panic("task: AttackStance.Tick called concurrently; Tick is single-goroutine only")
+	}
+	defer a.ticking.Store(false)
+
 	now := a.now()
 
 	a.mu.Lock()

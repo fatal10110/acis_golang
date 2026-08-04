@@ -3,6 +3,7 @@ package task
 import (
 	"errors"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -34,7 +35,8 @@ type decayEntry struct {
 //
 // Add, Cancel, Tracked, and Deadline are safe to call concurrently with Tick.
 // mu guards entries and the scratch refill. Tick only ever runs on the
-// scheduler ticker's single goroutine, one call at a time.
+// scheduler ticker's single goroutine, one call at a time; ticking enforces
+// that contract by panicking on reentrant or concurrent Tick calls.
 type Decay struct {
 	effects DecayEffects
 	now     func() time.Time
@@ -42,6 +44,8 @@ type Decay struct {
 	mu      sync.Mutex
 	entries map[int32]decayEntry
 	scratch []decayEntry
+
+	ticking atomic.Bool
 }
 
 // NewDecay returns an empty corpse-decay tracker.
@@ -116,6 +120,11 @@ func (d *Decay) Deadline(actor DecayActor) (time.Time, bool) {
 
 // Tick removes and decays every actor whose deadline has passed.
 func (d *Decay) Tick() {
+	if !d.ticking.CompareAndSwap(false, true) {
+		panic("task: Decay.Tick called concurrently; Tick is single-goroutine only")
+	}
+	defer d.ticking.Store(false)
+
 	now := d.now()
 
 	d.mu.Lock()

@@ -2,6 +2,7 @@ package task
 
 import (
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -24,13 +25,16 @@ type AIActor interface {
 //
 // Add and Remove are safe to call concurrently with Tick. mu guards actors and
 // the scratch refill. Tick only ever runs on the scheduler ticker's single
-// goroutine, one call at a time.
+// goroutine, one call at a time; ticking enforces that contract by panicking
+// on reentrant or concurrent Tick calls.
 type AI struct {
 	state *world.State
 
 	mu      sync.Mutex
 	actors  map[int32]AIActor
 	scratch []AIActor
+
+	ticking atomic.Bool
 }
 
 // NewAI returns an empty active-AI registry. A nil state treats every actor
@@ -71,6 +75,11 @@ func (a *AI) Remove(actor AIActor) {
 // Tick runs one AI cycle for every registered actor in an active region,
 // and for inactive-region actors that explicitly opt out of sleeping.
 func (a *AI) Tick() {
+	if !a.ticking.CompareAndSwap(false, true) {
+		panic("task: AI.Tick called concurrently; Tick is single-goroutine only")
+	}
+	defer a.ticking.Store(false)
+
 	a.mu.Lock()
 	a.scratch = a.scratch[:0]
 	for _, actor := range a.actors {
