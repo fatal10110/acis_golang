@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cubic"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
@@ -48,6 +49,9 @@ type livePlayer struct {
 	pickupLocked   bool
 	pickupLockGen  uint64
 
+	petInteractMu sync.Mutex
+	petInteract   *summon.Actor
+
 	cubicsMu sync.Mutex
 	cubics   map[cubic.ID]*cubic.Runtime
 }
@@ -79,6 +83,7 @@ func (p *livePlayer) sendVisibilityFrame(frame wire.Frame) bool {
 func (p *livePlayer) Stop() {
 	p.takePickup()
 	p.takeDeferredPickup()
+	p.takePetInteract()
 	if p.combat != nil {
 		p.combat.Stop()
 	}
@@ -141,6 +146,20 @@ func (p *livePlayer) takeDeferredPickup() *pickupIntention {
 	pickup := p.deferredPickup
 	p.deferredPickup = nil
 	return pickup
+}
+
+func (p *livePlayer) setPetInteract(pet *summon.Actor) {
+	p.petInteractMu.Lock()
+	defer p.petInteractMu.Unlock()
+	p.petInteract = pet
+}
+
+func (p *livePlayer) takePetInteract() *summon.Actor {
+	p.petInteractMu.Lock()
+	defer p.petInteractMu.Unlock()
+	pet := p.petInteract
+	p.petInteract = nil
+	return pet
 }
 
 // pickupLockActive has no production caller: livePickupBlockedDeferrable

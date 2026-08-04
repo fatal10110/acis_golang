@@ -463,6 +463,38 @@ func TestPickupBlockedDeferrableAtomicWithLockExit(t *testing.T) {
 	}
 }
 
+// TestAttachLivePlayerBuildsCastControllerEagerly is the regression test for
+// issue #1183: live.cast used to be built lazily on the read-loop goroutine's
+// first cast, while pickup-lock's scheduleAfter timer goroutine reads it
+// unguarded (livePickupBlockedDeferrable). attachLivePlayer now builds it
+// eagerly, alongside attackCtl, so it is fully initialized — with a
+// happens-before edge to every later goroutine that touches live — before any
+// read-loop or timer goroutine can race its first write.
+func TestAttachLivePlayerBuildsCastControllerEagerly(t *testing.T) {
+	c, chars, _, state := newLinkedGameClient(t)
+
+	c.send(encodeRequestCharacterCreate("Caster", 0, 0, 0, 1, 0, 0))
+	c.read() // CharCreateOk
+	c.read() // CharSelectInfo
+	objID := chars.soleObjectID(t)
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	playerObj, ok := state.Player(objID)
+	if !ok {
+		t.Fatalf("world.Player(%d) missing", objID)
+	}
+	live := playerObj.(*livePlayer)
+
+	if live.cast == nil {
+		t.Fatal("live.cast is nil after attach — cast controller must be built eagerly, not lazily on first cast, to avoid racing the pickup-lock timer goroutine")
+	}
+}
+
 func TestPickupLiveGroundItemDefersLatestClickUntilParalysisReleases(t *testing.T) {
 	templates := petTestTemplates()
 	capture := &frameCapture{}
