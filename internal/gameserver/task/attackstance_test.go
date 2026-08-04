@@ -126,6 +126,32 @@ func TestAttackStanceTickAllocationIsFlat(t *testing.T) {
 	}
 }
 
+type attackStancePanicEffects struct{}
+
+func (attackStancePanicEffects) AutoAttackStop(AttackStanceActor) { panic("boom") }
+
+func TestAttackStanceTickClearsScratchOnPanic(t *testing.T) {
+	base := time.UnixMilli(0)
+	now := base
+	stance, err := NewAttackStance(attackStancePanicEffects{}, func() time.Time { return now })
+	if err != nil {
+		t.Fatalf("NewAttackStance() error = %v", err)
+	}
+	stance.Add(&attackStanceFakeActor{id: 1})
+	now = base.Add(AttackStancePeriod)
+
+	func() {
+		defer func() { recover() }()
+		stance.Tick()
+	}()
+
+	for i, entry := range stance.scratch {
+		if entry.actor != nil {
+			t.Fatalf("scratch[%d] retains actor after panicking Tick", i)
+		}
+	}
+}
+
 func BenchmarkAttackStanceTickManyActors(b *testing.B) {
 	now := time.UnixMilli(0)
 	stance, err := NewAttackStance(attackStanceNoopEffects{}, func() time.Time { return now })

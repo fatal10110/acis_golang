@@ -79,6 +79,8 @@ func (a *AI) Tick() {
 	actors := a.scratch
 	a.mu.Unlock()
 
+	defer clear(a.scratch)
+
 	for _, actor := range actors {
 		placed, active := regionActivity(a.state, actor)
 		switch {
@@ -93,5 +95,4 @@ func (a *AI) Tick() {
 		actor.Tick()
 		actor.Think()
 	}
-	clear(a.scratch)
 }
