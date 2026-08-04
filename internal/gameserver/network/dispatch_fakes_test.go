@@ -25,10 +25,11 @@ type fakeCharStore struct {
 	names          map[string]bool
 	savedPositions map[int32]savedPosition
 	offline        map[int32]int64
+	saveCount      map[int32]int
 }
 
 func newFakeCharStore() *fakeCharStore {
-	return &fakeCharStore{byID: map[int32]*player.Character{}, names: map[string]bool{}, savedPositions: map[int32]savedPosition{}, offline: map[int32]int64{}}
+	return &fakeCharStore{byID: map[int32]*player.Character{}, names: map[string]bool{}, savedPositions: map[int32]savedPosition{}, offline: map[int32]int64{}, saveCount: map[int32]int{}}
 }
 
 type savedPosition struct {
@@ -45,6 +46,19 @@ func (s *fakeCharStore) Create(_ context.Context, c *player.Character) error {
 	s.byID[c.ID] = c
 	s.names[c.Name] = true
 	return nil
+}
+
+func (s *fakeCharStore) Save(_ context.Context, c *player.Character) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.saveCount[c.ID]++
+	return nil
+}
+
+func (s *fakeCharStore) saves(id int32) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.saveCount[id]
 }
 
 func (s *fakeCharStore) ListByAccount(_ context.Context, account string) ([]*player.Character, error) {

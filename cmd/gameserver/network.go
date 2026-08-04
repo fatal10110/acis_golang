@@ -65,6 +65,7 @@ func provideGameClientLink(
 	itemInstances *task.ItemInstances,
 	water *task.Water,
 	shadowItems *task.ShadowItems,
+	autosave *task.Autosave,
 	effects *network.TaskEffects,
 	respawnHP respawnRestoreHP,
 	spBookNeeded skillEnchantSPBookNeeded,
@@ -107,6 +108,7 @@ func provideGameClientLink(
 		PlayerClock:   playerClock,
 		Water:         water,
 		ShadowItems:   shadowItems,
+		Autosave:      autosave,
 
 		InventoryUpdates: inventoryUpdates,
 		ItemInstances:    itemInstances,
