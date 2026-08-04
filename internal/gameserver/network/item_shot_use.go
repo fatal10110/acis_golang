@@ -147,13 +147,10 @@ func (l *GameClientLink) useBeastShotItem(live *livePlayer, inv *itemcontainer.I
 		// message, no ActionFailed.
 	case itemhandler.BeastShotCallerIsSummon:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessagePetCannotUseItem))
-		live.SendFrame(serverpackets.FrameActionFailed())
 	case itemhandler.BeastShotNoSummon:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessagePetsNotAvailableAtThisTime))
-		live.SendFrame(serverpackets.FrameActionFailed())
 	case itemhandler.BeastShotSummonDead:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageShotsNotAvailableForDeadPet))
-		live.SendFrame(serverpackets.FrameActionFailed())
 	case itemhandler.BeastShotNotEnoughItems:
 		l.replyShotRejection(live, res.AutoEnabled, notEnoughMsg)
 	case itemhandler.BeastShotApplied:
