@@ -346,6 +346,7 @@ func (l *GameClientLink) crystallizeLiveItem(live *livePlayer, req clientpackets
 		return
 	case invops.CrystallizeGradeTooHigh:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCrystallizeLevelTooLow))
+		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	default:
 		live.SendFrame(serverpackets.FrameActionFailed())
