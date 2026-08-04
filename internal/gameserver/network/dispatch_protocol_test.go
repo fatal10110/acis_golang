@@ -41,6 +41,25 @@ func TestGameClientLinkBadProtocolVersionClosesSilently(t *testing.T) {
 	c.expectClosed()
 }
 
+func TestGameClientLinkUnknownOpcodeTolerantAfterAuthDisconnectsPastThreshold(t *testing.T) {
+	c, _, _, _ := newLinkedGameClient(t)
+
+	// OpcodeRequestItemList is only valid in-game, not from the char-select
+	// (AUTHED) state this client is in: maxUnknownPerMin (5) rejections
+	// tolerate, the 6th disconnects.
+	for range maxUnknownPerMin {
+		c.send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
+	}
+	c.send(encodeRequestPledgeCrest(1))
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodePledgeCrest {
+		t.Fatalf("post-tolerated-unknown opcode = %#x, want PledgeCrest (%#x)", reply[0], serverpackets.OpcodePledgeCrest)
+	}
+
+	c.send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
+	c.expectClosed()
+}
+
 func TestGameClientLinkOpcodeBeforeAuthCloses(t *testing.T) {
 	addr, _, _, _ := newTestGameClientLink(t, func() *LoginLink { return nil }, NewSessionValidator())
 	c := dialGameClient(t, addr)
@@ -110,10 +129,17 @@ func TestGameClientLinkMalformedLivePacketsDoNotDisconnect(t *testing.T) {
 	}
 }
 
-func TestGameClientLinkMalformedCharacterSelectPacketCloses(t *testing.T) {
+func TestGameClientLinkMalformedCharacterSelectPacketToleratesFirstDisconnectsOnSecond(t *testing.T) {
 	c, _, _, _ := newLinkedGameClient(t)
-	c.send(encodeSingleOpcode(clientpackets.OpcodeRequestPledgeCrest))
 
+	c.send(encodeSingleOpcode(clientpackets.OpcodeRequestPledgeCrest))
+	c.send(encodeRequestPledgeCrest(1))
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodePledgeCrest {
+		t.Fatalf("post-first-malformed opcode = %#x, want PledgeCrest (%#x)", reply[0], serverpackets.OpcodePledgeCrest)
+	}
+
+	c.send(encodeSingleOpcode(clientpackets.OpcodeRequestPledgeCrest))
 	c.conn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
 	if _, err := c.conn.Read(make([]byte, 1)); !errors.Is(err, io.EOF) {
 		t.Fatalf("malformed character-select packet read error = %v, want EOF", err)
