@@ -17,6 +17,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -253,6 +254,35 @@ func TestGameClientLinkRestartReturnsToCharacterSelect(t *testing.T) {
 		t.Fatalf("second select opcode = %#x, want SSQInfo (%#x)", reply[0], serverpackets.OpcodeSSQInfo)
 	}
 }
+
+// TestDetachLivePlayerStopsAutosave pins detachLivePlayer to
+// GameClient.closeNetConnection stopping the periodic autosave alongside
+// every other per-connection timer: a session that already logged out must
+// never resurface in a later autosave tick.
+func TestDetachLivePlayerStopsAutosave(t *testing.T) {
+	saveCount := 0
+	effects := autosaveCountingEffects(func(task.AutosaveActor) { saveCount++ })
+	now := time.UnixMilli(0)
+	autosave, err := task.NewAutosave(effects, func() time.Time { return now })
+	if err != nil {
+		t.Fatalf("NewAutosave() error = %v", err)
+	}
+	live := newTestLivePlayer(t, 101, &frameCapture{})
+	autosave.Add(live)
+
+	gcl := &GameClientLink{autosave: autosave, log: zerolog.Nop()}
+	gcl.detachLivePlayer(context.Background(), live)
+
+	now = now.Add(task.AutosaveInitialDelay)
+	autosave.Tick()
+	if saveCount != 0 {
+		t.Fatalf("saves after detach = %d, want 0", saveCount)
+	}
+}
+
+type autosaveCountingEffects func(task.AutosaveActor)
+
+func (f autosaveCountingEffects) Save(actor task.AutosaveActor) { f(actor) }
 
 // waitForWorldPosition polls until the world-grid presence reaches want,
 // which happens when the simulated walk arrives. The walk duration is

@@ -55,6 +55,9 @@ func (l *GameClientLink) detachLivePlayer(ctx context.Context, live *livePlayer)
 	if l.playerClock != nil {
 		l.playerClock.Remove(live.ObjectID())
 	}
+	if l.autosave != nil {
+		l.autosave.Remove(live.ObjectID())
+	}
 	if l.water != nil {
 		l.water.Remove(live)
 	}
