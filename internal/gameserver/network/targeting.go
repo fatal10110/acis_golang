@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -239,6 +240,36 @@ func (l *GameClientLink) finishPetInteract(live *livePlayer) {
 		return
 	}
 	live.SendFrame(serverpackets.FramePetStatusShow(pet.SummonType()))
+}
+
+// requestChangeWaitType handles the sit/stand key (RequestChangeWaitType)
+// and the action-bar sit/stand button (RequestActionUse action 0), which the
+// reference routes through the same tryToSit(target)/tryToStand() AI calls.
+// A sit request first tries the player's current target as a throne; an
+// invalid or unclaimable target (wrong type, busy, out of range) still falls
+// back to a plain sit, matching the reference's unconditional sitDown()
+// ahead of its chair check. Any rejection releases the client with
+// ActionFailed instead of silence.
+func (l *GameClientLink) requestChangeWaitType(live *livePlayer, stand bool) {
+	if live == nil {
+		return
+	}
+	// The reference's thinkStand rejects only on real death (denyAiAction),
+	// not fake death, and instead stops the fake-death toggle: stopFakeDeath
+	// removes the FAKE_DEATH effect, whose exit hook stands the player back
+	// up and broadcasts the revive visual (PlayerAI.java:490-501).
+	if stand && !live.Dead() && live.FakeDead() {
+		live.EffectList().StopByType(effect.TypeFakeDeath)
+		return
+	}
+	if !stand {
+		if target := live.Target(); target != nil && l.sitLiveOnChair(live, target) {
+			return
+		}
+	}
+	if !l.changeLiveWaitType(live, stand) {
+		live.SendFrame(serverpackets.FrameActionFailed())
+	}
 }
 
 func (l *GameClientLink) sitLiveOnChair(live *livePlayer, target world.Tracked) bool {
