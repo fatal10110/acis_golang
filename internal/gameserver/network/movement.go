@@ -16,9 +16,6 @@ func (l *GameClientLink) moveLivePlayer(live *livePlayer, target location.Locati
 	if live.combat != nil {
 		live.combat.Stop()
 	}
-	// A client-initiated walk cancels the AI's current intention, including
-	// an in-flight cast (PlayerAI.onEvtCancel).
-	live.Character.StopCast()
 
 	// The server-authoritative position, never the packet's claimed origin,
 	// is what the walk simulates from (matching the reference's
@@ -85,9 +82,6 @@ func (l *GameClientLink) changeLiveMoveType(live *livePlayer, run bool) {
 func (l *GameClientLink) changeLiveWaitType(live *livePlayer, stand bool) bool {
 	if live == nil || live.AlikeDead() || !live.SetStanding(stand) {
 		return false
-	}
-	if !stand {
-		live.Character.StopCast()
 	}
 	x, y, z := live.Position()
 	waitType := serverpackets.WaitSitting

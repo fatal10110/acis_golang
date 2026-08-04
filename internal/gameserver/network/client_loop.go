@@ -691,14 +691,15 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			l.requestBypassToServer(live, req)
 
 		case clientpackets.OpcodeRequestTargetCancel:
-			if _, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestTargetCancel); err != nil {
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestTargetCancel)
+			if err != nil {
 				if errors.Is(err, errMalformedPacketDisconnect) {
 					return
 				}
 				continue
 			}
 			if live != nil {
-				l.clearLiveTarget(live)
+				l.requestTargetCancel(live, req)
 			}
 
 		case clientpackets.OpcodeAppearing:
