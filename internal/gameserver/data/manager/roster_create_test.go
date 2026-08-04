@@ -36,6 +36,10 @@ func (s *rosterTestCharacters) Create(_ context.Context, c *player.Character) er
 	return nil
 }
 
+func (s *rosterTestCharacters) Save(context.Context, *player.Character) error {
+	return nil
+}
+
 func (s *rosterTestCharacters) ListByAccount(_ context.Context, accountName string) ([]*player.Character, error) {
 	return append([]*player.Character(nil), s.byAccount[accountName]...), nil
 }

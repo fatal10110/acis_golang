@@ -6,7 +6,9 @@ import (
 	"testing"
 	"time"
 
+	gamemanager "github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -425,4 +427,61 @@ func TestShadowItemExpiryWaitsForDetach(t *testing.T) {
 	if shadows.Tracked(inst) {
 		t.Fatal("expired shadow item remains tracked")
 	}
+}
+
+func TestTaskEffectsSavePersistsOnlineLivePlayer(t *testing.T) {
+	state := world.New()
+	chars := newFakeCharStore()
+	items := newFakeItemStore()
+	roster := gamemanager.NewRoster(chars, items, nil, testTemplates(t), testItemTemplates(), npc.NewTable(nil), &sequentialIDs{next: 100}, gamemanager.DefaultDeleteAfter, time.Now)
+	live := newTestLivePlayer(t, 101, &frameCapture{})
+	if err := chars.Create(context.Background(), live.Character); err != nil {
+		t.Fatalf("Create() unexpected error: %v", err)
+	}
+	state.AddPlayer(live)
+
+	effects := NewTaskEffects(state)
+	effects.SetAutosave(roster, zerolog.Nop())
+	autosave, err := task.NewAutosave(effects, time.Now)
+	if err != nil {
+		t.Fatalf("NewAutosave() error = %v", err)
+	}
+	autosave.Add(live)
+
+	effects.Save(live)
+
+	if got := chars.saves(live.ObjectID()); got != 1 {
+		t.Fatalf("saves(%d) = %d, want 1", live.ObjectID(), got)
+	}
+}
+
+func TestTaskEffectsSaveSkipsDetachedLivePlayer(t *testing.T) {
+	state := world.New()
+	chars := newFakeCharStore()
+	items := newFakeItemStore()
+	roster := gamemanager.NewRoster(chars, items, nil, testTemplates(t), testItemTemplates(), npc.NewTable(nil), &sequentialIDs{next: 100}, gamemanager.DefaultDeleteAfter, time.Now)
+	live := newTestLivePlayer(t, 101, &frameCapture{})
+	state.AddPlayer(live)
+	live.shadowExpiryMu.Lock()
+	live.detaching = true
+	live.shadowExpiryMu.Unlock()
+
+	effects := NewTaskEffects(state)
+	effects.SetAutosave(roster, zerolog.Nop())
+
+	effects.Save(live)
+
+	if got := chars.saves(live.ObjectID()); got != 0 {
+		t.Fatalf("saves(%d) = %d, want 0 for a detached session", live.ObjectID(), got)
+	}
+}
+
+func TestTaskEffectsSaveWithoutRosterIsNoop(t *testing.T) {
+	state := world.New()
+	live := newTestLivePlayer(t, 101, &frameCapture{})
+	state.AddPlayer(live)
+
+	effects := NewTaskEffects(state)
+	// SetAutosave never called: roster stays nil.
+	effects.Save(live)
 }

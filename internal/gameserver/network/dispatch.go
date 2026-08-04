@@ -119,6 +119,7 @@ type GameClientLink struct {
 	playerClock   *task.PlayerClock
 	water         *task.Water
 	shadowItems   *task.ShadowItems
+	autosave      *task.Autosave
 	// inventoryUpdates batches InventoryUpdate packets for inventory
 	// changes the server makes on its own, outside a client request.
 	inventoryUpdates *task.InventoryUpdates
@@ -189,6 +190,7 @@ type GameClientLinkConfig struct {
 	PlayerClock   *task.PlayerClock
 	Water         *task.Water
 	ShadowItems   *task.ShadowItems
+	Autosave      *task.Autosave
 	// InventoryUpdates batches InventoryUpdate packets for inventory
 	// changes the server makes on its own, outside a client request.
 	InventoryUpdates *task.InventoryUpdates
@@ -232,6 +234,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) *GameClientLink {
 		playerClock:   cfg.PlayerClock,
 		water:         cfg.Water,
 		shadowItems:   cfg.ShadowItems,
+		autosave:      cfg.Autosave,
 
 		inventoryUpdates: cfg.InventoryUpdates,
 		itemInstances:    cfg.ItemInstances,

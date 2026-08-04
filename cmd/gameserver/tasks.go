@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/scheduler"
+	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
@@ -137,6 +138,15 @@ func provideShadowItems(effects *network.TaskEffects) (*task.ShadowItems, error)
 
 func startShadowItems(lc fx.Lifecycle, items *task.ShadowItems, log zerolog.Logger) {
 	startTicker(lc, log, items.Start)
+}
+
+func provideAutosave(effects *network.TaskEffects, roster *manager.Roster, log zerolog.Logger) (*task.Autosave, error) {
+	effects.SetAutosave(roster, log)
+	return task.NewAutosave(effects, time.Now)
+}
+
+func startAutosave(lc fx.Lifecycle, a *task.Autosave, log zerolog.Logger) {
+	startTicker(lc, log, a.Start)
 }
 
 // worldDecayEffects removes a decayed actor from the world once its corpse
