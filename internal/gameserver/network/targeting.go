@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -308,6 +309,25 @@ func (l *GameClientLink) selectLiveTarget(live *livePlayer, target world.Tracked
 	}
 	l.broadcastTargetSelected(live, target)
 	return true
+}
+
+// requestTargetCancel handles a RequestTargetCancel packet, matching
+// RequestTargetCancel.java:23-29's split between the unselect flag and an
+// in-flight cast: unselect != 0 always clears the target; unselect == 0
+// clears the target only when not casting, and while casting only fires
+// the Esc cast-cancel (PlayerAI.java:160-165 onEvtCancel -> unconditional
+// getCast().stop(), MagicSkillCanceled broadcast, no CASTING_INTERRUPTED,
+// target left untouched) when still inside the interrupt window
+// (canAbortCast() at RequestTargetCancel.java:26) — outside the window Esc
+// is a no-op.
+func (l *GameClientLink) requestTargetCancel(live *livePlayer, req clientpackets.RequestTargetCancel) {
+	if req.Unselect == 0 && live.Character.CastingNow() {
+		if live.Character.CanAbortCast() {
+			live.Character.StopCast()
+		}
+		return
+	}
+	l.clearLiveTarget(live)
 }
 
 func (l *GameClientLink) clearLiveTarget(live *livePlayer) {

@@ -453,6 +453,15 @@ func (c *Controller) StopCast() {
 	c.Stop()
 }
 
+// CanAbortCast reports whether the active cast is still inside its
+// interrupt window, for callers that don't already hold `now` — the Esc
+// cast-cancel path (RequestTargetCancel.java:26, only fires
+// AiEventType.CANCEL when canAbortCast() is true) uses this to decide
+// whether onEvtCancel's unconditional stop() applies at all.
+func (c *Controller) CanAbortCast() bool {
+	return c.CanAbort(time.Now())
+}
+
 // CurrentSkillIsMagic reports whether the active cast's skill is a magic
 // skill, letting a caller distinguish Mute (magic-only) from PhysicalMute
 // (physical-only) without holding the skill definition itself.

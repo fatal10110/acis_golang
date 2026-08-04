@@ -96,7 +96,12 @@ func TestChangeLiveMoveTypeReportsSwimmingInWaterZone(t *testing.T) {
 // TestMoveLivePlayerStopsInFlightCast pins PlayerAI.onEvtCancel: a
 // client-initiated walk cancels the AI's current intention, including an
 // in-flight cast.
-func TestMoveLivePlayerStopsInFlightCast(t *testing.T) {
+// TestMoveLivePlayerLeavesInFlightCastRunning pins PlayableAI.tryToMoveTo
+// (PlayableAI.java:392-409): a walk request never touches getCast() — only
+// RequestTargetCancel's Esc path (PlayerAI.onEvtCancel) can abort a cast.
+// The PR under review (#1021) wrongly stopped the cast here, misattributing
+// it to onEvtCancel; this pins the reference behavior instead.
+func TestMoveLivePlayerLeavesInFlightCastRunning(t *testing.T) {
 	live := newTestLivePlayer(t, 1, &frameCapture{})
 	gcl := &GameClientLink{log: zerolog.Nop()}
 	controller := gcl.castController(live)
@@ -106,8 +111,8 @@ func TestMoveLivePlayerStopsInFlightCast(t *testing.T) {
 
 	gcl.moveLivePlayer(live, location.Location{X: 100})
 
-	if controller.CastingNow() {
-		t.Fatal("CastingNow() = true after a client-initiated walk, want cleared")
+	if !controller.CastingNow() {
+		t.Fatal("CastingNow() = false after a client-initiated walk, want cast left running")
 	}
 }
 
@@ -291,7 +296,12 @@ func TestValidateLivePlayerPositionNeverAdoptsAValidReport(t *testing.T) {
 // TestChangeLiveWaitTypeSitStopsInFlightCast pins the sit-down half of the
 // reference's cast-abort surface: sitting down stops an in-flight cast,
 // standing up does not.
-func TestChangeLiveWaitTypeSitStopsInFlightCast(t *testing.T) {
+// TestChangeLiveWaitTypeSitLeavesInFlightCastRunning pins Player.sitDown()
+// (Player.java:1542-1565) and PlayerAI.thinkSit (PlayerAI.java:464-487):
+// neither touches getCast() — a cast lands while seated in the reference.
+// The PR under review (#1021) wrongly stopped the cast here; this pins the
+// reference behavior instead.
+func TestChangeLiveWaitTypeSitLeavesInFlightCastRunning(t *testing.T) {
 	live := newTestLivePlayer(t, 1, &frameCapture{})
 	gcl := &GameClientLink{log: zerolog.Nop()}
 	controller := gcl.castController(live)
@@ -302,8 +312,8 @@ func TestChangeLiveWaitTypeSitStopsInFlightCast(t *testing.T) {
 	if !gcl.changeLiveWaitType(live, false) {
 		t.Fatal("changeLiveWaitType(sit) = false, want true")
 	}
-	if controller.CastingNow() {
-		t.Fatal("CastingNow() = true after sitting down, want cleared")
+	if !controller.CastingNow() {
+		t.Fatal("CastingNow() = false after sitting down, want cast left running")
 	}
 }
 

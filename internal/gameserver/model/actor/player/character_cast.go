@@ -12,6 +12,10 @@ type CastController interface {
 	CurrentSkillIsMagic() bool
 	InterruptCast()
 	StopCast()
+	// CanAbortCast reports whether the active cast is still inside its
+	// interrupt window — the Esc cast-cancel path only fires at all when
+	// this is true (RequestTargetCancel.java:26 canAbortCast() gate).
+	CanAbortCast() bool
 	// InterruptCastOnDamage applies the damage-based cast-break rule to the
 	// live cast, using men/attackCancel/roll/immune resolved from the
 	// character taking the damage — the reference always resolves these
@@ -64,15 +68,21 @@ func (c *Character) StopCast() {
 	}
 }
 
+// CanAbortCast reports whether c's active cast is still inside its
+// interrupt window, matching CreatureCast.canAbortCast().
+func (c *Character) CanAbortCast() bool {
+	cast := c.castController()
+	return cast != nil && cast.CanAbortCast()
+}
+
 // breakCastOnDamage applies the reference's damage-based cast-interrupt
 // check (Formulas.calcCastBreak) to c's own in-progress cast. MEN and
 // ATTACK_CANCEL are always resolved from c, the creature taking the
 // damage, never the attacker — matching Formulas.calcCastBreak(target, dmg)
-// reading everything off target.
+// reading everything off target. calcCastBreak has no damage guard: even a
+// 0-damage hit rolls at rate clamped to [1,99], so this never short-circuits
+// on damage <= 0.
 func (c *Character) breakCastOnDamage(damage float64) {
-	if damage <= 0 {
-		return
-	}
 	cast := c.castController()
 	if cast == nil {
 		return
