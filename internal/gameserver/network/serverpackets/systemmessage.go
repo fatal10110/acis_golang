@@ -22,6 +22,8 @@ const (
 	SystemMessageFailedToPickupS1                 = 56
 	SystemMessageFailedToPickupS2S1S              = 57
 	SystemMessageS1CannotBeUsed                   = 113
+	SystemMessageS1Disarmed                       = 417
+	SystemMessageEquipmentS1S2Removed             = 1064
 	SystemMessageRequestS1ForTrade                = 118
 	SystemMessageS1DeniedTradeRequest             = 119
 	SystemMessageBeginTradeWithS1                 = 120

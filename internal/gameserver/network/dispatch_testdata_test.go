@@ -21,7 +21,16 @@ func testTemplates(t testing.TB) *player.TemplateTable {
 		RunSpeed:  120,
 		WalkSpeed: 60,
 		SwimSpeed: 50,
-		Skills:    []player.SkillGrant{{SkillID: 3, Level: 1, MinLevel: 5, Cost: 50}},
+		// Skill 3 is a bought grant every acquire-skill test exercises at
+		// level 5. Skill 900001's MinLevel of 50 keeps it out of every other
+		// test's reach; only issue #1149's enter-world regression test uses
+		// a character old enough to receive this free grant. Its id is
+		// outside the low range other tests seed as directly-known skills,
+		// so GiveSkills' correctInvalidSkills pull-back never touches them.
+		Skills: []player.SkillGrant{
+			{SkillID: 3, Level: 1, MinLevel: 5, Cost: 50},
+			{SkillID: 900001, Level: 1, MinLevel: 50, Cost: 0},
+		},
 	}
 	table, err := player.NewTemplateTable(map[int]*player.Template{0: tmpl})
 	if err != nil {
