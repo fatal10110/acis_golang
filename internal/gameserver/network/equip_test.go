@@ -240,8 +240,8 @@ func TestUnequipItemDuringCastIsRejected(t *testing.T) {
 
 	gcl.unequipItem(live, int32(item.SlotChest))
 
-	if !chest.Equipped() || len(capture.frames) != 2 || capture.frames[0][0] != serverpackets.OpcodeSystemMessage || capture.frames[1][0] != serverpackets.OpcodeActionFailed {
-		t.Fatalf("mid-cast RequestUnEquipItem mutated item=%+v frames=%x, want unchanged item and S1_CANNOT_BE_USED SystemMessage then ActionFailed", chest, capture.frames)
+	if !chest.Equipped() || len(capture.frames) != 1 || capture.frames[0][0] != serverpackets.OpcodeSystemMessage {
+		t.Fatalf("mid-cast RequestUnEquipItem mutated item=%+v frames=%x, want unchanged item and S1_CANNOT_BE_USED SystemMessage only", chest, capture.frames)
 	}
 	r := wire.NewReader(capture.frames[0][1:])
 	if id := r.ReadInt32(); id != serverpackets.SystemMessageS1CannotBeUsed {
@@ -313,8 +313,8 @@ func TestDeadPlayerItemOpsAreNoops(t *testing.T) {
 
 		(&GameClientLink{}).unequipItem(live, int32(item.SlotChest))
 
-		if !chest.Equipped() || len(capture.frames) != 2 || capture.frames[0][0] != serverpackets.OpcodeSystemMessage || capture.frames[1][0] != serverpackets.OpcodeActionFailed {
-			t.Fatalf("dead RequestUnEquipItem mutated item=%+v frames=%x, want unchanged item and S1_CANNOT_BE_USED SystemMessage then ActionFailed", chest, capture.frames)
+		if !chest.Equipped() || len(capture.frames) != 1 || capture.frames[0][0] != serverpackets.OpcodeSystemMessage {
+			t.Fatalf("dead RequestUnEquipItem mutated item=%+v frames=%x, want unchanged item and S1_CANNOT_BE_USED SystemMessage only", chest, capture.frames)
 		}
 	})
 
@@ -375,8 +375,8 @@ func TestCrowdControlledPlayerItemOpsAreNoops(t *testing.T) {
 
 			(&GameClientLink{}).unequipItem(live, int32(item.SlotChest))
 
-			if !chest.Equipped() || len(capture.frames) != 2 || capture.frames[0][0] != serverpackets.OpcodeSystemMessage || capture.frames[1][0] != serverpackets.OpcodeActionFailed {
-				t.Fatalf("%s RequestUnEquipItem mutated item=%+v frames=%x, want unchanged item and S1_CANNOT_BE_USED SystemMessage then ActionFailed", effectName, chest, capture.frames)
+			if !chest.Equipped() || len(capture.frames) != 1 || capture.frames[0][0] != serverpackets.OpcodeSystemMessage {
+				t.Fatalf("%s RequestUnEquipItem mutated item=%+v frames=%x, want unchanged item and S1_CANNOT_BE_USED SystemMessage only", effectName, chest, capture.frames)
 			}
 		})
 	}
@@ -414,8 +414,8 @@ func TestDropLiveItemRejectsFarCoordinatesBeforeInventoryMutation(t *testing.T) 
 	if stack.Count != 100 || len(drops.drops) != 0 {
 		t.Fatalf("far drop mutated count=%d drops=%d", stack.Count, len(drops.drops))
 	}
-	if got := frameOpcodes(capture.frames); string(got) != string([]byte{serverpackets.OpcodeSystemMessage, serverpackets.OpcodeActionFailed}) {
-		t.Fatalf("far drop opcodes = %x, want SystemMessage, ActionFailed", got)
+	if got := frameOpcodes(capture.frames); string(got) != string([]byte{serverpackets.OpcodeSystemMessage}) {
+		t.Fatalf("far drop opcodes = %x, want SystemMessage only", got)
 	}
 	r := wire.NewReader(capture.frames[0][1:])
 	if id := r.ReadInt32(); id != 151 {

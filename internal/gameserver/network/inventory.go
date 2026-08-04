@@ -239,7 +239,6 @@ func (l *GameClientLink) unequipItem(live *livePlayer, bodySlot int32) {
 	}
 	if !liveItemOpsAllowed(live) || (live.cast != nil && live.cast.CastingNow()) {
 		live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageS1CannotBeUsed, worn.TemplateID))
-		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
 	res, ok := l.inventory.UnequipBodySlot(inv, bodySlot)
@@ -273,7 +272,6 @@ func (l *GameClientLink) dropLiveItem(live *livePlayer, req clientpackets.Reques
 	count := int(req.Count)
 	if !dropInRange(live, int(req.X), int(req.Y), int(req.Z)) {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotDiscardDistanceTooFar))
-		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
 
@@ -345,7 +343,6 @@ func (l *GameClientLink) crystallizeLiveItem(live *livePlayer, req clientpackets
 	case invops.CrystallizeOK:
 	case invops.CrystallizeNoSkill:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCrystallizeLevelTooLow))
-		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	case invops.CrystallizeGradeTooHigh:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCrystallizeLevelTooLow))
