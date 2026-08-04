@@ -253,6 +253,16 @@ func NewGameClientLink(cfg GameClientLinkConfig) *GameClientLink {
 		log:          cfg.Log,
 		newCipherKey: randomCipherKey,
 	}
+	link.cubicAfterFunc = func(d time.Duration, fn func()) cubic.Timer {
+		return time.AfterFunc(d, func() {
+			defer func() {
+				if r := recover(); r != nil {
+					link.log.Error().Interface("panic", r).Msg("cubic: recovered panic in scheduled callback")
+				}
+			}()
+			fn()
+		})
+	}
 	link.wireWaterZones()
 	return link
 }
