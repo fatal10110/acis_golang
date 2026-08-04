@@ -1,6 +1,10 @@
 package clientpackets
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
+)
 
 const itemRequestSize = 2 * 4
 
@@ -59,7 +63,7 @@ func DecodeSendWarehouseWithdrawList(payload []byte) (SendWarehouseWithdrawList,
 func DecodeRequestPackageSendableItemList(payload []byte) (RequestPackageSendableItemList, error) {
 	r := newReader(payload)
 	if r.Remaining() < 4 {
-		return RequestPackageSendableItemList{}, fmt.Errorf("clientpackets: RequestPackageSendableItemList: need 4 bytes, got %d", r.Remaining())
+		return RequestPackageSendableItemList{}, fmt.Errorf("clientpackets: RequestPackageSendableItemList: need 4 bytes, got %d: %w", r.Remaining(), wire.ErrShortPacket)
 	}
 	req := RequestPackageSendableItemList{ObjectID: r.ReadInt32()}
 	if err := r.Err(); err != nil {
@@ -73,7 +77,7 @@ func DecodeRequestPackageSendableItemList(payload []byte) (RequestPackageSendabl
 func DecodeRequestPackageSend(payload []byte) (RequestPackageSend, error) {
 	r := newReader(payload)
 	if r.Remaining() < 8 {
-		return RequestPackageSend{}, fmt.Errorf("clientpackets: RequestPackageSend: need 8 bytes, got %d", r.Remaining())
+		return RequestPackageSend{}, fmt.Errorf("clientpackets: RequestPackageSend: need 8 bytes, got %d: %w", r.Remaining(), wire.ErrShortPacket)
 	}
 	req := RequestPackageSend{ObjectID: r.ReadInt32()}
 	count := r.ReadInt32()
@@ -81,7 +85,7 @@ func DecodeRequestPackageSend(payload []byte) (RequestPackageSend, error) {
 		return RequestPackageSend{}, fmt.Errorf("clientpackets: RequestPackageSend: negative item count %d", count)
 	}
 	if r.Remaining() < int(count)*itemRequestSize {
-		return RequestPackageSend{}, fmt.Errorf("clientpackets: RequestPackageSend: need %d item bytes, got %d", int(count)*itemRequestSize, r.Remaining())
+		return RequestPackageSend{}, fmt.Errorf("clientpackets: RequestPackageSend: need %d item bytes, got %d: %w", int(count)*itemRequestSize, r.Remaining(), wire.ErrShortPacket)
 	}
 	req.Items = make([]ItemRequest, int(count))
 	for i := range req.Items {
@@ -96,14 +100,14 @@ func DecodeRequestPackageSend(payload []byte) (RequestPackageSend, error) {
 func decodeExactItemRequestBatch(payload []byte, name string) ([]ItemRequest, error) {
 	r := newReader(payload)
 	if r.Remaining() < 4 {
-		return nil, fmt.Errorf("clientpackets: %s: need 4 bytes, got %d", name, r.Remaining())
+		return nil, fmt.Errorf("clientpackets: %s: need 4 bytes, got %d: %w", name, r.Remaining(), wire.ErrShortPacket)
 	}
 	count := r.ReadInt32()
 	if count <= 0 {
 		return nil, fmt.Errorf("clientpackets: %s: invalid item count %d", name, count)
 	}
 	if r.Remaining() != int(count)*itemRequestSize {
-		return nil, fmt.Errorf("clientpackets: %s: item bytes = %d, want %d", name, r.Remaining(), int(count)*itemRequestSize)
+		return nil, fmt.Errorf("clientpackets: %s: item bytes = %d, want %d: %w", name, r.Remaining(), int(count)*itemRequestSize, wire.ErrShortPacket)
 	}
 
 	items := make([]ItemRequest, int(count))

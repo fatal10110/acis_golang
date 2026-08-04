@@ -1,6 +1,10 @@
 package clientpackets
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
+)
 
 // OpcodeCharacterRestore is the wire opcode for CharacterRestore, valid once
 // a client is authenticated.
@@ -19,7 +23,7 @@ type CharacterRestore struct {
 func DecodeCharacterRestore(payload []byte) (CharacterRestore, error) {
 	r := newReader(payload)
 	if r.Remaining() < characterRestoreSize {
-		return CharacterRestore{}, fmt.Errorf("clientpackets: CharacterRestore: need %d bytes, got %d", characterRestoreSize, r.Remaining())
+		return CharacterRestore{}, fmt.Errorf("clientpackets: CharacterRestore: need %d bytes, got %d: %w", characterRestoreSize, r.Remaining(), wire.ErrShortPacket)
 	}
 	return CharacterRestore{Slot: r.ReadInt32()}, nil
 }

@@ -1,6 +1,10 @@
 package clientpackets
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
+)
 
 const requestMagicSkillUseSize = 4 + 4 + 1
 
@@ -16,7 +20,7 @@ type RequestMagicSkillUse struct {
 func DecodeRequestMagicSkillUse(payload []byte) (RequestMagicSkillUse, error) {
 	r := newReader(payload)
 	if r.Remaining() < requestMagicSkillUseSize {
-		return RequestMagicSkillUse{}, fmt.Errorf("clientpackets: RequestMagicSkillUse: need %d bytes, got %d", requestMagicSkillUseSize, r.Remaining())
+		return RequestMagicSkillUse{}, fmt.Errorf("clientpackets: RequestMagicSkillUse: need %d bytes, got %d: %w", requestMagicSkillUseSize, r.Remaining(), wire.ErrShortPacket)
 	}
 	req := RequestMagicSkillUse{
 		SkillID:      r.ReadInt32(),

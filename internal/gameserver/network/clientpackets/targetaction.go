@@ -1,6 +1,10 @@
 package clientpackets
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
+)
 
 const targetActionSize = 4*4 + 1
 
@@ -42,7 +46,7 @@ type targetAction struct {
 func decodeTargetAction(payload []byte, name string) (targetAction, error) {
 	r := newReader(payload)
 	if r.Remaining() < targetActionSize {
-		return targetAction{}, fmt.Errorf("clientpackets: %s: need %d bytes, got %d", name, targetActionSize, r.Remaining())
+		return targetAction{}, fmt.Errorf("clientpackets: %s: need %d bytes, got %d: %w", name, targetActionSize, r.Remaining(), wire.ErrShortPacket)
 	}
 	req := targetAction{
 		ObjectID: r.ReadInt32(),
@@ -67,7 +71,7 @@ type RequestTargetCancel struct {
 func DecodeRequestTargetCancel(payload []byte) (RequestTargetCancel, error) {
 	r := newReader(payload)
 	if r.Remaining() < 2 {
-		return RequestTargetCancel{}, fmt.Errorf("clientpackets: RequestTargetCancel: need 2 bytes, got %d", r.Remaining())
+		return RequestTargetCancel{}, fmt.Errorf("clientpackets: RequestTargetCancel: need 2 bytes, got %d: %w", r.Remaining(), wire.ErrShortPacket)
 	}
 	req := RequestTargetCancel{Unselect: r.ReadUint16()}
 	if err := r.Err(); err != nil {

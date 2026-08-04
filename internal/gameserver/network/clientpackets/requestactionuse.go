@@ -1,6 +1,10 @@
 package clientpackets
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
+)
 
 const requestActionUseSize = 4 + 4 + 1
 
@@ -16,7 +20,7 @@ type RequestActionUse struct {
 func DecodeRequestActionUse(payload []byte) (RequestActionUse, error) {
 	r := newReader(payload)
 	if r.Remaining() < requestActionUseSize {
-		return RequestActionUse{}, fmt.Errorf("clientpackets: RequestActionUse: need %d bytes, got %d", requestActionUseSize, r.Remaining())
+		return RequestActionUse{}, fmt.Errorf("clientpackets: RequestActionUse: need %d bytes, got %d: %w", requestActionUseSize, r.Remaining(), wire.ErrShortPacket)
 	}
 	req := RequestActionUse{
 		ActionID:     r.ReadInt32(),
