@@ -1,10 +1,12 @@
 package network
 
 import (
+	"context"
 	"sync"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -14,10 +16,16 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+	"github.com/rs/zerolog"
 )
 
 var _ task.WaterEffects = (*TaskEffects)(nil)
 var _ task.ShadowItemEffects = (*TaskEffects)(nil)
+var _ task.AutosaveEffects = (*TaskEffects)(nil)
+
+// autosaveSaveTimeout bounds one periodic full-stat save; unrelated to and
+// independent from the disconnect-time save budget.
+const autosaveSaveTimeout = 5 * time.Second
 
 // liveZoneActor adapts a live player to the zone package without changing
 // Character's world.Position method signature.
@@ -68,9 +76,11 @@ func (a *liveZoneActor) removeFrom(ix *zone.Index, x, y int) {
 // TaskEffects routes periodic task effects to their current live player.
 type TaskEffects struct {
 	state *world.State
+	log   zerolog.Logger
 
 	mu     sync.RWMutex
 	expire func(*livePlayer, *item.Instance)
+	roster *manager.Roster
 }
 
 func NewTaskEffects(state *world.State) *TaskEffects {
@@ -82,6 +92,17 @@ func (e *TaskEffects) SetShadowItemExpiry(expire func(*livePlayer, *item.Instanc
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.expire = expire
+}
+
+// SetAutosave connects the periodic autosave task's Save effect to the
+// character persistence roster and error logger. Autosave is wired after
+// construction (like SetShadowItemExpiry above) since TaskEffects itself is
+// what task.Autosave needs to be built.
+func (e *TaskEffects) SetAutosave(roster *manager.Roster, log zerolog.Logger) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.roster = roster
+	e.log = log
 }
 
 func (e *TaskEffects) GaugeSet(actor task.WaterActor, remaining time.Duration) {
@@ -122,6 +143,36 @@ func (e *TaskEffects) Drown(actor task.WaterActor) {
 	// roll, unlike a real damage-over-time skill tick.
 	live.ReduceHPByDOT(damage, live, false)
 	live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageDrownDamage, int32(damage)))
+}
+
+// Save persists actor's full character stats, matching GameClient's
+// periodic autosave. It still saves for a session mid-detach (detaching set
+// but not yet removed from world state): detachLivePlayer itself does not
+// persist level/exp/sp/HP-CP-MP (issue #1198 is still open), so skipping
+// here would silently drop whatever this tick's window would have caught,
+// with nothing else to catch it. detachLivePlayer's saves target disjoint
+// columns (position, death-penalty level, offline recency, skills), so a
+// concurrent write here is safe.
+func (e *TaskEffects) Save(actor task.AutosaveActor) {
+	e.mu.RLock()
+	roster, log := e.roster, e.log
+	e.mu.RUnlock()
+	if actor == nil || e.state == nil || roster == nil {
+		return
+	}
+	obj, ok := e.state.Player(actor.ObjectID())
+	if !ok {
+		return
+	}
+	live, ok := obj.(*livePlayer)
+	if !ok {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), autosaveSaveTimeout)
+	defer cancel()
+	if err := roster.Save(ctx, live.Character); err != nil {
+		log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("autosave player stats")
+	}
 }
 
 func (e *TaskEffects) ManaThreshold(actorID int32, inst *item.Instance, secondsLeft int) {

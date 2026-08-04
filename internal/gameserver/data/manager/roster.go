@@ -65,6 +65,7 @@ type idAllocator interface {
 // Satisfied by *sql.CharacterStore.
 type characterStore interface {
 	Create(ctx context.Context, c *player.Character) error
+	Save(ctx context.Context, c *player.Character) error
 	ListByAccount(ctx context.Context, accountName string) ([]*player.Character, error)
 	CountByAccount(ctx context.Context, accountName string) (int, error)
 	NameTaken(ctx context.Context, name string) (bool, error)
@@ -296,6 +297,13 @@ func (r *Roster) MarkForDeletion(ctx context.Context, objectID int32) error {
 // Restore clears objectID's scheduled deletion.
 func (r *Roster) Restore(ctx context.Context, objectID int32) error {
 	return r.characters.SetDeleteAt(ctx, objectID, 0)
+}
+
+// Save persists the live character's full in-memory stats (level, exp, sp,
+// cur/max HP/CP/MP), matching GameClient's periodic and disconnect
+// autosaves.
+func (r *Roster) Save(ctx context.Context, c *player.Character) error {
+	return r.characters.Save(ctx, c)
 }
 
 // SavePosition persists the live character's latest world position and
