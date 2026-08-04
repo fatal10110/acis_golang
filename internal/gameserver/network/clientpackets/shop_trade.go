@@ -239,8 +239,12 @@ func validateShopRows(name string, count int32, rowSize, remaining int) error {
 	if count <= 0 {
 		return fmt.Errorf("clientpackets: %s: invalid item count %d", name, count)
 	}
+	// A row-count/remaining-length mismatch mirrors the reference's silent
+	// readImpl() return (RequestBuyItem/RequestSellItem: "count * BATCH_LENGTH
+	// != _buf.remaining()"), not a BufferUnderflowException: it never counts
+	// toward the underflow threshold, so this stays unwrapped.
 	if int64(count)*int64(rowSize) != int64(remaining) {
-		return fmt.Errorf("clientpackets: %s: %d item rows need %d bytes, got %d: %w", name, count, int64(count)*int64(rowSize), remaining, wire.ErrShortPacket)
+		return fmt.Errorf("clientpackets: %s: %d item rows need %d bytes, got %d", name, count, int64(count)*int64(rowSize), remaining)
 	}
 	return nil
 }

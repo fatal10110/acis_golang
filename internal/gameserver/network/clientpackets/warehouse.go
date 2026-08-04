@@ -106,8 +106,12 @@ func decodeExactItemRequestBatch(payload []byte, name string) ([]ItemRequest, er
 	if count <= 0 {
 		return nil, fmt.Errorf("clientpackets: %s: invalid item count %d", name, count)
 	}
+	// A row-count/remaining-length mismatch mirrors the reference's silent
+	// readImpl() return (SendWarehouseDepositList/WithdrawList: "count *
+	// BATCH_LENGTH != _buf.remaining()"), not a BufferUnderflowException: it
+	// never counts toward the underflow threshold, so this stays unwrapped.
 	if r.Remaining() != int(count)*itemRequestSize {
-		return nil, fmt.Errorf("clientpackets: %s: item bytes = %d, want %d: %w", name, r.Remaining(), int(count)*itemRequestSize, wire.ErrShortPacket)
+		return nil, fmt.Errorf("clientpackets: %s: item bytes = %d, want %d", name, r.Remaining(), int(count)*itemRequestSize)
 	}
 
 	items := make([]ItemRequest, int(count))

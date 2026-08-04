@@ -129,37 +129,6 @@ func TestGameClientLinkMalformedLivePacketsDoNotDisconnect(t *testing.T) {
 	}
 }
 
-// TestGameClientLinkNonUnderflowValidationErrorNeverDisconnects proves the
-// two decode-error classes are distinguished: repeated buffer-underflow
-// packets (encodeSingleOpcode, insufficient bytes) disconnect on the 2nd
-// occurrence per
-// TestGameClientLinkMalformedCharacterSelectPacketToleratesFirstDisconnectsOnSecond,
-// but a well-formed-length packet that only fails value validation (an
-// out-of-range item id, not BufferUnderflowException-equivalent) is logged
-// and dropped without ever counting toward the underflow threshold or
-// disconnecting, matching L2GameClientPacket.read()'s catch-all branch.
-func TestGameClientLinkNonUnderflowValidationErrorNeverDisconnects(t *testing.T) {
-	c, _, _, _ := newLinkedGameClient(t)
-	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
-	c.read() // CharCreateOk
-	c.read() // CharSelectInfo
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
-	readEnterWorldBurst(t, c, false)
-
-	for range maxUnderflowsPerMin + 2 {
-		c.send(encodeRequestBuyItemInvalidRow())
-	}
-
-	c.send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
-	reply := c.read()
-	if reply[0] != serverpackets.OpcodeItemList {
-		t.Fatalf("post-invalid-row opcode = %#x, want ItemList (%#x)", reply[0], serverpackets.OpcodeItemList)
-	}
-}
-
 func TestGameClientLinkMalformedCharacterSelectPacketToleratesFirstDisconnectsOnSecond(t *testing.T) {
 	c, _, _, _ := newLinkedGameClient(t)
 

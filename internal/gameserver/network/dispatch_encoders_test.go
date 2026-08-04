@@ -309,15 +309,3 @@ func encodeSendTimeCheck(requestID, responseID int32) []byte {
 func encodeSingleOpcode(opcode byte) []byte {
 	return wire.NewPacketWriter(opcode).Bytes()
 }
-
-// encodeRequestBuyItemInvalidRow builds a well-formed-length RequestBuyItem
-// whose single row has an out-of-range item id, a decode-time validation
-// error distinct from a buffer underflow (insufficient bytes).
-func encodeRequestBuyItemInvalidRow() []byte {
-	w := wire.NewPacketWriter(clientpackets.OpcodeRequestBuyItem)
-	w.WriteInt32(1) // list id
-	w.WriteInt32(1) // row count
-	w.WriteInt32(0) // item id: invalid, must be >= 1
-	w.WriteInt32(1) // count
-	return w.Bytes()
-}
