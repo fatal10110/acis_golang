@@ -156,10 +156,12 @@ type GameClientLink struct {
 	afterFunc func(d time.Duration, fn func())
 
 	// cubicAfterFunc schedules a live cubic's recurring action tick and
-	// one-shot disappear timer; nil defaults to time.AfterFunc. Overridden
-	// in tests for deterministic cubic-runtime timing, distinct from
-	// afterFunc since a cubic timer must be individually cancelable
-	// (StopAction/RefreshDisappear/Stop) rather than fire-and-forget.
+	// one-shot disappear timer; always set by NewGameClientLink (the raw,
+	// unrecovered time.AfterFunc default in cubic.NewRuntime is never
+	// reached in production). Overridden in tests for deterministic
+	// cubic-runtime timing, distinct from afterFunc since a cubic timer
+	// must be individually cancelable (StopAction/RefreshDisappear/Stop)
+	// rather than fire-and-forget.
 	cubicAfterFunc cubic.AfterFunc
 }
 
