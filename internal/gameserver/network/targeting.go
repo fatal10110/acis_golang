@@ -57,7 +57,7 @@ func (l *GameClientLink) handleTargetAction(ctx context.Context, live *livePlaye
 		l.selectLiveTarget(live, target)
 		return
 	}
-	if selected && l.showOwnedPetStatus(live, target) {
+	if selected && l.showOwnedPetStatus(live, target, shift) {
 		return
 	}
 	if selected && l.sitLiveOnChair(live, target) {
@@ -111,13 +111,19 @@ func (l *GameClientLink) walkOrForwardPickup(ctx context.Context, live *livePlay
 		return true
 	}
 	x, y, z := ground.Position()
+	// This walk redirects live.move's single in-flight target away from any
+	// pending pet-interact approach (showOwnedPetStatus) — drop it, or its
+	// stale SetArrived callback would fire a range recheck against wherever
+	// this walk actually lands instead of the pet it was originally aimed
+	// at.
+	live.takePetInteract()
 	live.setPickup(ctx, ground)
 	if live.move.MoveToLocation(location.Location{X: x, Y: y, Z: z}) {
 		return true
 	}
 	live.takePickup()
-	live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetTooFar))
 	live.SendFrame(serverpackets.FrameActionFailed())
+	live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetTooFar))
 	return true
 }
 
@@ -171,7 +177,19 @@ func (l *GameClientLink) resolveTarget(objectID int32) world.Tracked {
 	return target
 }
 
-func (l *GameClientLink) showOwnedPetStatus(live *livePlayer, target world.Tracked) bool {
+const (
+	// summonInteractApproachRange mirrors PlayerAI.thinkInteract's
+	// maybeMoveToPawn(target, 100, isShiftPressed) offset
+	// (PlayerAI.java:437): already this close skips the walk and opens the
+	// pet status window immediately.
+	summonInteractApproachRange = 100
+	// summonInteractRange mirrors Npc.INTERACTION_DISTANCE, the gate
+	// canDoInteract re-checks once an approach walk arrives
+	// (PlayerAI.java:538, Npc.java:89).
+	summonInteractRange = 150
+)
+
+func (l *GameClientLink) showOwnedPetStatus(live *livePlayer, target world.Tracked, shift bool) bool {
 	pet, ok := target.(*summon.Actor)
 	if !ok || live == nil || !pet.IsPet() || pet.OwnerID() != live.ObjectID() {
 		return false
@@ -180,8 +198,48 @@ func (l *GameClientLink) showOwnedPetStatus(live *livePlayer, target world.Track
 	// registered for the click before showing the status window; PetStatusShow
 	// alone leaves that action outstanding and locks further input.
 	live.SendFrame(serverpackets.FrameActionFailed())
-	live.SendFrame(serverpackets.FramePetStatusShow(pet.SummonType()))
+	if summonInRange(live, pet, summonInteractApproachRange) {
+		live.SendFrame(serverpackets.FramePetStatusShow(pet.SummonType()))
+		return true
+	}
+	if shift || live.move == nil {
+		return true
+	}
+	px, py, pz := pet.Position()
+	// Symmetric to walkOrForwardPickup's cancellation above: this walk also
+	// redirects live.move's single in-flight target, so any pending pickup
+	// walk that target was still driving toward has to go too.
+	live.takePickup()
+	live.setPetInteract(pet)
+	if !live.move.MoveToLocation(location.Location{X: px, Y: py, Z: pz}) {
+		live.takePetInteract()
+	}
 	return true
+}
+
+func summonInRange(live *livePlayer, pet *summon.Actor, radius int) bool {
+	lx, ly, lz := live.Position()
+	px, py, pz := pet.Position()
+	return location.In3DRange(lx, ly, lz, px, py, pz, radius)
+}
+
+// finishPetInteract fires once an approach walk started by showOwnedPetStatus
+// arrives (wired through move.Controller.SetArrived), mirroring
+// thinkInteract's post-move canDoInteract recheck (PlayerAI.java:445): the
+// owner or pet may have moved again meanwhile, so the range and ownership
+// gates run again before the status window opens.
+func (l *GameClientLink) finishPetInteract(live *livePlayer) {
+	pet := live.takePetInteract()
+	if pet == nil {
+		return
+	}
+	if l.resolveTarget(pet.ObjectID()) != world.Tracked(pet) {
+		return
+	}
+	if pet.OwnerID() != live.ObjectID() || !summonInRange(live, pet, summonInteractRange) {
+		return
+	}
+	live.SendFrame(serverpackets.FramePetStatusShow(pet.SummonType()))
 }
 
 // requestChangeWaitType handles the sit/stand key (RequestChangeWaitType)

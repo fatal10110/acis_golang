@@ -58,6 +58,41 @@ func TestLiveMoveSpeedUsesSwimSpeedInWater(t *testing.T) {
 	}
 }
 
+// TestChangeLiveMoveTypeReportsSwimmingInWaterZone pins ChangeMoveType.java:
+// the swimming byte reflects Creature.isInWater() at the moment of the
+// run/walk toggle, not a hardcoded land value.
+func TestChangeLiveMoveTypeReportsSwimmingInWaterZone(t *testing.T) {
+	capture := &frameCapture{}
+	live := newTestLivePlayer(t, 1, capture)
+	live.zoneActor = &liveZoneActor{live: live}
+	gcl := &GameClientLink{log: zerolog.Nop()}
+
+	gcl.changeLiveMoveType(live, false)
+	frames := capture.snapshot()
+	if len(frames) != 1 {
+		t.Fatalf("frames captured = %d, want 1", len(frames))
+	}
+	r := wire.NewReader(frames[0][1:])
+	r.ReadInt32() // objectID
+	r.ReadInt32() // running
+	if swimming := r.ReadInt32(); swimming != 0 {
+		t.Fatalf("ChangeMoveType swimming on land = %d, want 0", swimming)
+	}
+
+	live.zoneActor.ZoneFlags().Set(zone.FlagWater, true)
+	gcl.changeLiveMoveType(live, true)
+	frames = capture.snapshot()
+	if len(frames) != 2 {
+		t.Fatalf("frames captured = %d, want 2", len(frames))
+	}
+	r = wire.NewReader(frames[1][1:])
+	r.ReadInt32()
+	r.ReadInt32()
+	if swimming := r.ReadInt32(); swimming != 1 {
+		t.Fatalf("ChangeMoveType swimming in water = %d, want 1", swimming)
+	}
+}
+
 // TestMoveLivePlayerStopsInFlightCast pins PlayerAI.onEvtCancel: a
 // client-initiated walk cancels the AI's current intention, including an
 // in-flight cast.

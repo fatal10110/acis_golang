@@ -6,8 +6,10 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 )
 
 func TestGameClientLinkFullFlow(t *testing.T) {
@@ -143,6 +145,43 @@ func TestGameClientLinkRequestItemListRecomputesWeight(t *testing.T) {
 	if reply[0] != serverpackets.OpcodeItemList {
 		t.Fatalf("opcode = %#x, want ItemList (%#x)", reply[0], serverpackets.OpcodeItemList)
 	}
+}
+
+// TestGameClientLinkEnterWorldReGrantsFreeSkills is the regression test for
+// issue #1149: Player.giveSkills() runs again on every login, right after
+// restoreCharData() (Player.java:4139), so a free level-unlocked grant —
+// which a prior in-session level-up handed out in memory only, per
+// GiveSkills's own doc comment — comes back on relog instead of staying
+// dropped. testTemplates' template grants skill 900001 for free from level
+// 50; no other test's character reaches that level, so this is the only
+// enter-world path affected by the added grant.
+func TestGameClientLinkEnterWorldReGrantsFreeSkills(t *testing.T) {
+	skills := skillstate.NewPersistence(nil, skillTable(modelskill.Definition{ID: 900001, Level: 1}))
+	c, _, _, _ := newLinkedGameClientWithSkillsSeed(t, skills, func(chars *fakeCharStore, items *fakeItemStore) {
+		seedSelectableCharacter(t, chars, "player1", "Newbie", 50, 0)
+	}, 1)
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	frames := readEnterWorldBurst(t, c, false)
+
+	skillList := frames[5]
+	if skillList[0] != serverpackets.OpcodeSkillList {
+		t.Fatalf("frame[5] opcode = %#x, want SkillList (%#x)", skillList[0], serverpackets.OpcodeSkillList)
+	}
+	r := wire.NewReader(skillList[1:])
+	count := r.ReadInt32()
+	for range count {
+		if _, level, id := r.ReadInt32(), r.ReadInt32(), r.ReadInt32(); id == 900001 {
+			if level != 1 {
+				t.Fatalf("skill 900001 level = %d, want 1", level)
+			}
+			return
+		}
+	}
+	t.Fatalf("SkillList (%d entries) missing free grant skill 900001 re-derived on login", count)
 }
 
 func TestGameClientLinkCreateInvalidNameKeepsConnectionOpen(t *testing.T) {

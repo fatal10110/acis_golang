@@ -47,13 +47,13 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 		return true
 	}
 	if !groundPickupInRange(live, ground) {
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetTooFar))
 		live.SendFrame(serverpackets.FrameActionFailed())
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetTooFar))
 		return true
 	}
 	if l.trades != nil && l.trades.HasActive(live.ObjectID()) {
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotPickupOrUseItemTrading))
 		live.SendFrame(serverpackets.FrameActionFailed())
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotPickupOrUseItemTrading))
 		return true
 	}
 	inv := live.Inventory()
@@ -70,13 +70,13 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 	if ground.Herb() {
 		groundState := ground.Instance.Snapshot()
 		if !inv.ValidateCapacity(inv.SlotsNeededFor(&ground.Instance, ground.Template)) {
-			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSlotsFull))
 			live.SendFrame(serverpackets.FrameActionFailed())
+			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSlotsFull))
 			return true
 		}
 		if invops.LootLocked(groundState.OwnerID, live.ObjectID()) {
-			live.SendFrame(failedPickupFrame(ground.ItemID(), ground.Count()))
 			live.SendFrame(serverpackets.FrameActionFailed())
+			live.SendFrame(failedPickupFrame(ground.ItemID(), ground.Count()))
 			return true
 		}
 		live.SendFrame(serverpackets.FrameActionFailed())
@@ -92,12 +92,12 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 	switch failure {
 	case invops.PickupOK:
 	case invops.PickupSlotsFull:
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSlotsFull))
 		live.SendFrame(serverpackets.FrameActionFailed())
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSlotsFull))
 		return true
 	case invops.PickupLootLocked:
-		live.SendFrame(failedPickupFrame(ground.ItemID(), ground.Count()))
 		live.SendFrame(serverpackets.FrameActionFailed())
+		live.SendFrame(failedPickupFrame(ground.ItemID(), ground.Count()))
 		return true
 	default: // invops.PickupNoop and any other unhandled failure
 		live.SendFrame(serverpackets.FrameActionFailed())
