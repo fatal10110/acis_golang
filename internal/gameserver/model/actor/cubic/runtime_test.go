@@ -107,6 +107,53 @@ func TestRuntime_StopActionCancelsAndTickDoesNothingAfter(t *testing.T) {
 	}
 }
 
+// TestRuntime_TickRecoversPanicAndAllowsActionToRestart proves a panicking
+// fire() doesn't leave running stuck true: without the reset, Action()'s
+// no-op-if-already-active guard would permanently block every future
+// stance re-entry, silently stalling the cubic for the rest of its grant.
+// The panic must still reach the caller (recovered/logged by the
+// production afterFunc, e.g. GameClientLink's cubicAfterFunc) rather than
+// being swallowed here.
+func TestRuntime_TickRecoversPanicAndAllowsActionToRestart(t *testing.T) {
+	clock := &fakeClock{}
+	fireCount := 0
+	r := NewRuntime(Storm, 1, 30, time.Second, func() {
+		fireCount++
+		if fireCount == 1 {
+			panic("boom")
+		}
+	}, func() {}, clock.after)
+
+	r.Action()
+
+	func() {
+		defer func() {
+			if p := recover(); p == nil {
+				t.Fatal("tick did not propagate the panic to the caller")
+			} else if p != "boom" {
+				t.Fatalf("recovered panic = %v, want boom", p)
+			}
+		}()
+		clock.fireLast()
+	}()
+
+	if len(clock.scheduled) != 1 {
+		t.Fatalf("scheduled after a panicking tick = %d, want 1 (no reschedule)", len(clock.scheduled))
+	}
+
+	// Action() must be able to restart it after the panic, like it can
+	// after StopAction() — otherwise the cubic stays dead until expiry.
+	r.Action()
+	if len(clock.scheduled) != 2 {
+		t.Fatalf("Action() after a recovered panic did not restart: scheduled = %d, want 2", len(clock.scheduled))
+	}
+
+	clock.fireLast()
+	if fireCount != 2 {
+		t.Fatalf("fireCount after restart = %d, want 2", fireCount)
+	}
+}
+
 func TestRuntime_RefreshDisappearReplacesPendingTimer(t *testing.T) {
 	clock := &fakeClock{}
 	disappeared := 0
