@@ -86,6 +86,23 @@ func (r *Runtime) tick(gen int) {
 	}
 	r.mu.Unlock()
 
+	// fire() panicking must not leave running stuck true: that would make
+	// Action()'s no-op-if-already-active guard silently block every future
+	// stance re-entry, stalling this cubic for the rest of its grant even
+	// though the panic itself gets contained and logged by the caller's
+	// recovered afterFunc. Reset state like StopAction() before re-panicking
+	// so the caller's recover still logs the value.
+	defer func() {
+		if p := recover(); p != nil {
+			r.mu.Lock()
+			if gen == r.generation {
+				r.running = false
+			}
+			r.mu.Unlock()
+			panic(p)
+		}
+	}()
+
 	r.fire()
 
 	r.mu.Lock()

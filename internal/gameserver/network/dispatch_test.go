@@ -81,6 +81,35 @@ func TestScheduleAfterRecoversPanickingCallback(t *testing.T) {
 	}
 }
 
+// TestNewGameClientLinkCubicAfterFuncRecoversPanickingCallback proves the
+// production cubicAfterFunc wired by NewGameClientLink (issue #830's
+// acceptance criteria: "no remaining unrecovered time.AfterFunc callbacks
+// in production code paths") recovers a panicking cubic fire/disappear
+// callback and still runs a subsequently scheduled one, matching the
+// attack/move recover-and-log pattern this closes the gap for.
+func TestNewGameClientLinkCubicAfterFuncRecoversPanickingCallback(t *testing.T) {
+	buf := &syncBuffer{}
+	link := NewGameClientLink(GameClientLinkConfig{Log: zerolog.New(buf)})
+
+	link.cubicAfterFunc(time.Millisecond, func() { panic("boom") })
+
+	deadline := time.Now().Add(time.Second)
+	for !strings.Contains(buf.String(), "cubic: recovered panic") {
+		if time.Now().After(deadline) {
+			t.Fatalf("panic was not recovered and logged, got: %s", buf.String())
+		}
+		time.Sleep(time.Millisecond)
+	}
+
+	fired := make(chan struct{})
+	link.cubicAfterFunc(time.Millisecond, func() { close(fired) })
+	select {
+	case <-fired:
+	case <-time.After(time.Second):
+		t.Fatal("cubicAfterFunc did not fire a subsequent callback after a recovered panic")
+	}
+}
+
 // syncBuffer is a mutex-guarded bytes.Buffer safe for a test's polling
 // goroutine to read while a background goroutine writes to it.
 type syncBuffer struct {
