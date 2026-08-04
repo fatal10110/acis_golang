@@ -227,11 +227,9 @@ func (l *GameClientLink) petGetItem(ctx context.Context, live *livePlayer, req c
 		return
 	case petitem.PickupItemNotForPets:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageItemNotForPets))
-		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	case petitem.PickupPetCannotCarryMore:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessagePetCannotCarryMoreItems))
-		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	case petitem.PickupPetTooEncumbered:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessagePetTooEncumbered))
