@@ -75,6 +75,14 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 			l.log.Error().Err(err).Int32("object_id", c.ID).Msg("enter world: restore skill state")
 			return nil, false
 		}
+		// Re-derive level-unlocked skills on every login (Player.java:4139
+		// calls giveSkills() right after restoreCharData()), so a free grant
+		// added by an in-session level-up — which lives in memory only —
+		// comes back instead of vanishing on relog.
+		if err := l.giveOrRewardSkills(ctx, c, tmpl); err != nil {
+			l.log.Error().Err(err).Int32("object_id", c.ID).Msg("enter world: give skills")
+			return nil, false
+		}
 	}
 	if c.ResourceValues().CurrentHP < 0.5 {
 		c.MarkDead()
@@ -178,6 +186,17 @@ func sendExpSpLossFrames(live *livePlayer, exp int64, sp int) {
 	}
 }
 
+// giveOrRewardSkills re-derives c's level-unlocked skills, calling
+// RewardSkills instead of GiveSkills whenever the server grants every
+// available skill automatically (Player.java:3256-3257).
+func (l *GameClientLink) giveOrRewardSkills(ctx context.Context, c *player.Character, tmpl *player.Template) error {
+	refresh := l.skills.GiveSkills
+	if l.playerConfig.AutoLearnSkills {
+		refresh = l.skills.RewardSkills
+	}
+	return refresh(ctx, c, tmpl)
+}
+
 // refreshLiveLevelSkills re-derives the skills live's new level entitles it
 // to and hands the client the resulting list. It runs on every level change,
 // up or down, as the level refresher attachLivePlayer registers.
@@ -189,13 +208,9 @@ func (l *GameClientLink) refreshLiveLevelSkills(ctx context.Context, live *liveP
 	if l.skills == nil || live == nil {
 		return
 	}
-	refresh := l.skills.GiveSkills
 	rewarding := l.playerConfig.AutoLearnSkills
-	if rewarding {
-		refresh = l.skills.RewardSkills
-	}
 	before := live.SkillLevels()
-	if err := refresh(ctx, live.Character, live.template); err != nil {
+	if err := l.giveOrRewardSkills(ctx, live.Character, live.template); err != nil {
 		l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("level change: refresh level skills")
 	}
 	live.RefreshExpertisePenalty()
