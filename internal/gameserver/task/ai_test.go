@@ -1,6 +1,7 @@
 package task
 
 import (
+	"errors"
 	"sync"
 	"testing"
 
@@ -50,7 +51,7 @@ func TestAIManagerTickAllocationIsFlat(t *testing.T) {
 		}
 	}
 
-	if allocs := testing.AllocsPerRun(100, mgr.Tick); allocs != 0 {
+	if allocs := testing.AllocsPerRun(100, func() { mgr.Tick() }); allocs != 0 {
 		t.Fatalf("AllocsPerRun(128 actors) = %v, want 0", allocs)
 	}
 }
@@ -72,22 +73,19 @@ func TestAIManagerTickClearsScratchOnPanic(t *testing.T) {
 	}
 }
 
-func TestAIManagerTickPanicsOnReentrantCall(t *testing.T) {
+func TestAIManagerTickReturnsErrorOnReentrantCall(t *testing.T) {
 	mgr := NewAI(nil)
-	var innerPanic any
+	var innerErr error
 	a := &aiActorStub{id: 1}
-	a.thinkFn = func() {
-		func() {
-			defer func() { innerPanic = recover() }()
-			mgr.Tick()
-		}()
-	}
+	a.thinkFn = func() { innerErr = mgr.Tick() }
 	mgr.Add(a)
 
-	mgr.Tick()
+	if err := mgr.Tick(); err != nil {
+		t.Fatalf("outer Tick() error = %v, want nil", err)
+	}
 
-	if innerPanic == nil {
-		t.Fatal("reentrant Tick call did not panic")
+	if !errors.Is(innerErr, ErrReentrantTick) {
+		t.Fatalf("reentrant Tick() error = %v, want ErrReentrantTick", innerErr)
 	}
 	if mgr.ticking.Load() {
 		t.Fatal("ticking guard left set after outer Tick returned")

@@ -36,7 +36,8 @@ type decayEntry struct {
 // Add, Cancel, Tracked, and Deadline are safe to call concurrently with Tick.
 // mu guards entries and the scratch refill. Tick only ever runs on the
 // scheduler ticker's single goroutine, one call at a time; ticking enforces
-// that contract by panicking on reentrant or concurrent Tick calls.
+// that contract by returning ErrReentrantTick on reentrant or concurrent
+// Tick calls instead of running.
 type Decay struct {
 	effects DecayEffects
 	now     func() time.Time
@@ -61,7 +62,11 @@ func NewDecay(effects DecayEffects, now func() time.Time) (*Decay, error) {
 
 // Start launches the fixed one-second corpse-decay task.
 func (d *Decay) Start(log zerolog.Logger) *scheduler.Ticker {
-	return scheduler.Start(DecayTick, d.Tick, log)
+	return scheduler.Start(DecayTick, func() {
+		if err := d.Tick(); err != nil {
+			log.Error().Err(err).Msg("task: Decay.Tick")
+		}
+	}, log)
 }
 
 // Add schedules actor's corpse for removal after interval elapses,
@@ -118,10 +123,12 @@ func (d *Decay) Deadline(actor DecayActor) (time.Time, bool) {
 	return entry.deadline, true
 }
 
-// Tick removes and decays every actor whose deadline has passed.
-func (d *Decay) Tick() {
+// Tick removes and decays every actor whose deadline has passed. It returns
+// ErrReentrantTick and does nothing else if another Tick call is already in
+// flight.
+func (d *Decay) Tick() error {
 	if !d.ticking.CompareAndSwap(false, true) {
-		panic("task: Decay.Tick called concurrently; Tick is single-goroutine only")
+		return ErrReentrantTick
 	}
 	defer d.ticking.Store(false)
 
@@ -144,4 +151,5 @@ func (d *Decay) Tick() {
 	for _, entry := range due {
 		d.effects.Decay(entry.actor)
 	}
+	return nil
 }

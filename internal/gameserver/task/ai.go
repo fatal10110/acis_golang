@@ -1,6 +1,7 @@
 package task
 
 import (
+	"errors"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -10,6 +11,14 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/scheduler"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
+
+// ErrReentrantTick is returned by AI, Decay, and AttackStance's Tick when a
+// call arrives while another Tick on the same registry is still running.
+// Each of those types documents a single-goroutine, one-call-at-a-time
+// contract; a caller that bypasses their Start wiring and invokes Tick from
+// more than one goroutine gets this error instead of silently corrupting the
+// in-flight tick's shared scratch buffer.
+var ErrReentrantTick = errors.New("task: Tick called concurrently; Tick is single-goroutine only")
 
 // AITick is the fixed hostile-NPC AI interval.
 const AITick = time.Second
@@ -25,8 +34,8 @@ type AIActor interface {
 //
 // Add and Remove are safe to call concurrently with Tick. mu guards actors and
 // the scratch refill. Tick only ever runs on the scheduler ticker's single
-// goroutine, one call at a time; ticking enforces that contract by panicking
-// on reentrant or concurrent Tick calls.
+// goroutine, one call at a time; ticking enforces that contract by returning
+// ErrReentrantTick on reentrant or concurrent Tick calls instead of running.
 type AI struct {
 	state *world.State
 
@@ -49,7 +58,11 @@ func NewAI(state *world.State) *AI {
 
 // Start launches the fixed one-second AI task.
 func (a *AI) Start(log zerolog.Logger) *scheduler.Ticker {
-	return scheduler.Start(AITick, a.Tick, log)
+	return scheduler.Start(AITick, func() {
+		if err := a.Tick(); err != nil {
+			log.Error().Err(err).Msg("task: AI.Tick")
+		}
+	}, log)
 }
 
 // Add registers actor for recurring AI ticks.
@@ -73,10 +86,12 @@ func (a *AI) Remove(actor AIActor) {
 }
 
 // Tick runs one AI cycle for every registered actor in an active region,
-// and for inactive-region actors that explicitly opt out of sleeping.
-func (a *AI) Tick() {
+// and for inactive-region actors that explicitly opt out of sleeping. It
+// returns ErrReentrantTick and does nothing else if another Tick call is
+// already in flight.
+func (a *AI) Tick() error {
 	if !a.ticking.CompareAndSwap(false, true) {
-		panic("task: AI.Tick called concurrently; Tick is single-goroutine only")
+		return ErrReentrantTick
 	}
 	defer a.ticking.Store(false)
 
@@ -104,4 +119,5 @@ func (a *AI) Tick() {
 		actor.Tick()
 		actor.Think()
 	}
+	return nil
 }

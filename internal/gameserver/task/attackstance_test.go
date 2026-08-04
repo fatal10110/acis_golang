@@ -1,6 +1,7 @@
 package task
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"sync"
@@ -153,18 +154,15 @@ func TestAttackStanceTickClearsScratchOnPanic(t *testing.T) {
 }
 
 type attackStanceReentrantEffects struct {
-	stance     *AttackStance
-	innerPanic any
+	stance   *AttackStance
+	innerErr error
 }
 
 func (e *attackStanceReentrantEffects) AutoAttackStop(AttackStanceActor) {
-	func() {
-		defer func() { e.innerPanic = recover() }()
-		e.stance.Tick()
-	}()
+	e.innerErr = e.stance.Tick()
 }
 
-func TestAttackStanceTickPanicsOnReentrantCall(t *testing.T) {
+func TestAttackStanceTickReturnsErrorOnReentrantCall(t *testing.T) {
 	now := time.UnixMilli(0)
 	effects := &attackStanceReentrantEffects{}
 	stance, err := NewAttackStance(effects, func() time.Time { return now })
@@ -175,10 +173,12 @@ func TestAttackStanceTickPanicsOnReentrantCall(t *testing.T) {
 	stance.Add(&attackStanceFakeActor{id: 1})
 	now = now.Add(AttackStancePeriod)
 
-	stance.Tick()
+	if err := stance.Tick(); err != nil {
+		t.Fatalf("outer Tick() error = %v, want nil", err)
+	}
 
-	if effects.innerPanic == nil {
-		t.Fatal("reentrant Tick call did not panic")
+	if !errors.Is(effects.innerErr, ErrReentrantTick) {
+		t.Fatalf("reentrant Tick() error = %v, want ErrReentrantTick", effects.innerErr)
 	}
 	if stance.ticking.Load() {
 		t.Fatal("ticking guard left set after outer Tick returned")

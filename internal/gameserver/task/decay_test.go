@@ -1,6 +1,7 @@
 package task
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"sync"
@@ -126,18 +127,15 @@ func TestDecayTickClearsScratchOnPanic(t *testing.T) {
 }
 
 type decayReentrantEffects struct {
-	decay      *Decay
-	innerPanic any
+	decay    *Decay
+	innerErr error
 }
 
 func (e *decayReentrantEffects) Decay(DecayActor) {
-	func() {
-		defer func() { e.innerPanic = recover() }()
-		e.decay.Tick()
-	}()
+	e.innerErr = e.decay.Tick()
 }
 
-func TestDecayTickPanicsOnReentrantCall(t *testing.T) {
+func TestDecayTickReturnsErrorOnReentrantCall(t *testing.T) {
 	now := time.UnixMilli(0)
 	effects := &decayReentrantEffects{}
 	decay, err := NewDecay(effects, func() time.Time { return now })
@@ -147,10 +145,12 @@ func TestDecayTickPanicsOnReentrantCall(t *testing.T) {
 	effects.decay = decay
 	decay.Add(&decayFakeActor{id: 1}, -time.Second)
 
-	decay.Tick()
+	if err := decay.Tick(); err != nil {
+		t.Fatalf("outer Tick() error = %v, want nil", err)
+	}
 
-	if effects.innerPanic == nil {
-		t.Fatal("reentrant Tick call did not panic")
+	if !errors.Is(effects.innerErr, ErrReentrantTick) {
+		t.Fatalf("reentrant Tick() error = %v, want ErrReentrantTick", effects.innerErr)
 	}
 	if decay.ticking.Load() {
 		t.Fatal("ticking guard left set after outer Tick returned")

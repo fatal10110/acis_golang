@@ -61,7 +61,8 @@ type attackStanceEntry struct {
 // Add, Remove, and InAttackStance are safe to call concurrently with Tick. mu
 // guards entries and the scratch refill. Tick only ever runs on the scheduler
 // ticker's single goroutine, one call at a time; ticking enforces that
-// contract by panicking on reentrant or concurrent Tick calls.
+// contract by returning ErrReentrantTick on reentrant or concurrent Tick
+// calls instead of running.
 type AttackStance struct {
 	effects AttackStanceEffects
 	now     func() time.Time
@@ -86,7 +87,11 @@ func NewAttackStance(effects AttackStanceEffects, now func() time.Time) (*Attack
 
 // Start launches the fixed one-second combat-stance task.
 func (a *AttackStance) Start(log zerolog.Logger) *scheduler.Ticker {
-	return scheduler.Start(AttackStanceTick, a.Tick, log)
+	return scheduler.Start(AttackStanceTick, func() {
+		if err := a.Tick(); err != nil {
+			log.Error().Err(err).Msg("task: AttackStance.Tick")
+		}
+	}, log)
 }
 
 // Add refreshes actor's combat stance timeout.
@@ -137,9 +142,11 @@ func (a *AttackStance) InAttackStance(actor AttackStanceActor) bool {
 }
 
 // Tick stops combat stance for actors whose inactivity period has elapsed.
-func (a *AttackStance) Tick() {
+// It returns ErrReentrantTick and does nothing else if another Tick call is
+// already in flight.
+func (a *AttackStance) Tick() error {
 	if !a.ticking.CompareAndSwap(false, true) {
-		panic("task: AttackStance.Tick called concurrently; Tick is single-goroutine only")
+		return ErrReentrantTick
 	}
 	defer a.ticking.Store(false)
 
@@ -167,6 +174,7 @@ func (a *AttackStance) Tick() {
 			}
 		}
 	}
+	return nil
 }
 
 func stanceOwner(actor AttackStanceActor) AttackStanceActor {
