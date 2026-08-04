@@ -146,9 +146,13 @@ func (e *TaskEffects) Drown(actor task.WaterActor) {
 }
 
 // Save persists actor's full character stats, matching GameClient's
-// periodic autosave. A session that detached between the tick firing and
-// this running is silently skipped: detachLivePlayer's own save (issue
-// #1198) is authoritative for whatever state it last saw.
+// periodic autosave. It still saves for a session mid-detach (detaching set
+// but not yet removed from world state): detachLivePlayer itself does not
+// persist level/exp/sp/HP-CP-MP (issue #1198 is still open), so skipping
+// here would silently drop whatever this tick's window would have caught,
+// with nothing else to catch it. detachLivePlayer's saves target disjoint
+// columns (position, death-penalty level, offline recency, skills), so a
+// concurrent write here is safe.
 func (e *TaskEffects) Save(actor task.AutosaveActor) {
 	e.mu.RLock()
 	roster, log := e.roster, e.log
@@ -161,7 +165,7 @@ func (e *TaskEffects) Save(actor task.AutosaveActor) {
 		return
 	}
 	live, ok := obj.(*livePlayer)
-	if !ok || live.detached() {
+	if !ok {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), autosaveSaveTimeout)

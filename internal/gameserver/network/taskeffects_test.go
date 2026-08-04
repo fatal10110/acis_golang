@@ -455,12 +455,21 @@ func TestTaskEffectsSavePersistsOnlineLivePlayer(t *testing.T) {
 	}
 }
 
-func TestTaskEffectsSaveSkipsDetachedLivePlayer(t *testing.T) {
+// TestTaskEffectsSaveStillPersistsMidDetachLivePlayer pins Save to still
+// running for a session that started detaching but hasn't yet left world
+// state: detachLivePlayer itself never persists level/exp/sp/HP-CP-MP
+// (issue #1198 is still open), so an autosave tick landing in that window
+// is the only thing that would catch it. Skipping here, as an earlier
+// revision did, silently dropped that state instead.
+func TestTaskEffectsSaveStillPersistsMidDetachLivePlayer(t *testing.T) {
 	state := world.New()
 	chars := newFakeCharStore()
 	items := newFakeItemStore()
 	roster := gamemanager.NewRoster(chars, items, nil, testTemplates(t), testItemTemplates(), npc.NewTable(nil), &sequentialIDs{next: 100}, gamemanager.DefaultDeleteAfter, time.Now)
 	live := newTestLivePlayer(t, 101, &frameCapture{})
+	if err := chars.Create(context.Background(), live.Character); err != nil {
+		t.Fatalf("Create() unexpected error: %v", err)
+	}
 	state.AddPlayer(live)
 	live.shadowExpiryMu.Lock()
 	live.detaching = true
@@ -471,8 +480,28 @@ func TestTaskEffectsSaveSkipsDetachedLivePlayer(t *testing.T) {
 
 	effects.Save(live)
 
+	if got := chars.saves(live.ObjectID()); got != 1 {
+		t.Fatalf("saves(%d) = %d, want 1 for a mid-detach session", live.ObjectID(), got)
+	}
+}
+
+// TestTaskEffectsSaveSkipsRemovedLivePlayer pins the real "gone" gate:
+// once RemovePlayer has actually run (world.State no longer resolves the
+// actor), Save has nothing to save against and must not look one up.
+func TestTaskEffectsSaveSkipsRemovedLivePlayer(t *testing.T) {
+	state := world.New()
+	chars := newFakeCharStore()
+	items := newFakeItemStore()
+	roster := gamemanager.NewRoster(chars, items, nil, testTemplates(t), testItemTemplates(), npc.NewTable(nil), &sequentialIDs{next: 100}, gamemanager.DefaultDeleteAfter, time.Now)
+	live := newTestLivePlayer(t, 101, &frameCapture{})
+
+	effects := NewTaskEffects(state)
+	effects.SetAutosave(roster, zerolog.Nop())
+
+	effects.Save(live)
+
 	if got := chars.saves(live.ObjectID()); got != 0 {
-		t.Fatalf("saves(%d) = %d, want 0 for a detached session", live.ObjectID(), got)
+		t.Fatalf("saves(%d) = %d, want 0 once removed from world state", live.ObjectID(), got)
 	}
 }
 
