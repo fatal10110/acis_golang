@@ -69,18 +69,15 @@ func degenerateShapeIntersectsRect(s geometry.Shape, x1, x2, y1, y2 int) bool {
 
 // NewCuboid builds an axis-aligned box form from two opposite corners;
 // coordinates may be given in either order on each axis.
-func NewCuboid(x1, x2, y1, y2, z1, z2 int) Form {
+func NewCuboid(x1, x2, y1, y2, z1, z2 int) (Form, error) {
 	if z1 > z2 {
 		z1, z2 = z2, z1
 	}
 	t, err := geometry.NewTerritory(z1, z2, geometry.NewRectangle(x1, x2, y1, y2))
 	if err != nil {
-		// Unreachable: z1 <= z2 is enforced above and a Rectangle is
-		// always supplied, so NewTerritory's only failure modes can't
-		// trigger here.
-		panic(err)
+		return nil, fmt.Errorf("zone: %w", err)
 	}
-	return zoneForm{t}
+	return zoneForm{t}, nil
 }
 
 // NewCylinder builds a vertical circular column form centered on (x, y)
