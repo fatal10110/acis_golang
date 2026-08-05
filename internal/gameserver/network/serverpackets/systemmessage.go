@@ -111,6 +111,8 @@ const (
 	SystemMessageSPDecreasedS1          = 538  // number parameter
 	SystemMessageExpDecreasedByS1       = 539  // number parameter
 	SystemMessageDrownDamage            = 297  // number parameter
+	SystemMessageSkillRemovedDueLackHP  = 610  // no parameter
+	SystemMessageSkillRemovedDueLackMP  = 140  // no parameter
 	SystemMessageRemainingMana10Minutes = 1979 // item-name parameter
 	SystemMessageRemainingMana5Minutes  = 1980 // item-name parameter
 	SystemMessageRemainingMana1Minute   = 1981 // item-name parameter
