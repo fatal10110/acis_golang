@@ -1,9 +1,13 @@
 package task
 
 import (
+	"bytes"
 	"errors"
+	"strings"
 	"sync"
 	"testing"
+
+	"github.com/rs/zerolog"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world/worldtest"
@@ -92,6 +96,22 @@ func TestAIManagerTickReturnsErrorOnReentrantCall(t *testing.T) {
 	}
 	if mgr.ticking.Load() {
 		t.Fatal("ticking guard left set after outer Tick returned")
+	}
+}
+
+func TestAIManagerTickLogsReentrantCall(t *testing.T) {
+	mgr := NewAI(nil)
+	var buf bytes.Buffer
+	mgr.log = zerolog.New(&buf)
+
+	a := &aiActorStub{id: 1}
+	a.thinkFn = func() { mgr.Tick() }
+	mgr.Add(a)
+
+	mgr.Tick()
+
+	if !strings.Contains(buf.String(), "AI.Tick") || !strings.Contains(buf.String(), ErrReentrantTick.Error()) {
+		t.Fatalf("reentrant Tick call was not logged, got %q", buf.String())
 	}
 }
 

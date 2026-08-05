@@ -1,12 +1,16 @@
 package task
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/rs/zerolog"
 )
 
 type attackStanceFakeActor struct {
@@ -185,6 +189,26 @@ func TestAttackStanceTickReturnsErrorOnReentrantCall(t *testing.T) {
 	}
 	if stance.ticking.Load() {
 		t.Fatal("ticking guard left set after outer Tick returned")
+	}
+}
+
+func TestAttackStanceTickLogsReentrantCall(t *testing.T) {
+	now := time.UnixMilli(0)
+	effects := &attackStanceReentrantEffects{}
+	stance, err := NewAttackStance(effects, func() time.Time { return now })
+	if err != nil {
+		t.Fatalf("NewAttackStance() error = %v", err)
+	}
+	effects.stance = stance
+	var buf bytes.Buffer
+	stance.log = zerolog.New(&buf)
+	stance.Add(&attackStanceFakeActor{id: 1})
+	now = now.Add(AttackStancePeriod)
+
+	stance.Tick()
+
+	if !strings.Contains(buf.String(), "AttackStance.Tick") || !strings.Contains(buf.String(), ErrReentrantTick.Error()) {
+		t.Fatalf("reentrant Tick call was not logged, got %q", buf.String())
 	}
 }
 

@@ -1,12 +1,16 @@
 package task
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/rs/zerolog"
 )
 
 type decayFakeActor struct {
@@ -157,6 +161,25 @@ func TestDecayTickReturnsErrorOnReentrantCall(t *testing.T) {
 	}
 	if decay.ticking.Load() {
 		t.Fatal("ticking guard left set after outer Tick returned")
+	}
+}
+
+func TestDecayTickLogsReentrantCall(t *testing.T) {
+	now := time.UnixMilli(0)
+	effects := &decayReentrantEffects{}
+	decay, err := NewDecay(effects, func() time.Time { return now })
+	if err != nil {
+		t.Fatalf("NewDecay() error = %v", err)
+	}
+	effects.decay = decay
+	var buf bytes.Buffer
+	decay.log = zerolog.New(&buf)
+	decay.Add(&decayFakeActor{id: 1}, -time.Second)
+
+	decay.Tick()
+
+	if !strings.Contains(buf.String(), "Decay.Tick") || !strings.Contains(buf.String(), ErrReentrantTick.Error()) {
+		t.Fatalf("reentrant Tick call was not logged, got %q", buf.String())
 	}
 }
 

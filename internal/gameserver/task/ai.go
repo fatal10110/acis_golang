@@ -34,10 +34,13 @@ type AIActor interface {
 //
 // Add and Remove are safe to call concurrently with Tick. mu guards actors and
 // the scratch refill. Tick only ever runs on the scheduler ticker's single
-// goroutine, one call at a time; ticking enforces that contract by returning
-// ErrReentrantTick on reentrant or concurrent Tick calls instead of running.
+// goroutine, one call at a time; ticking enforces that contract by logging
+// and returning ErrReentrantTick on reentrant or concurrent Tick calls
+// instead of running, since Start's caller is the only reliable place that
+// can act on the returned error.
 type AI struct {
 	state *world.State
+	log   zerolog.Logger
 
 	mu      sync.Mutex
 	actors  map[int32]AIActor
@@ -58,11 +61,8 @@ func NewAI(state *world.State) *AI {
 
 // Start launches the fixed one-second AI task.
 func (a *AI) Start(log zerolog.Logger) *scheduler.Ticker {
-	return scheduler.Start(AITick, func() {
-		if err := a.Tick(); err != nil {
-			log.Error().Err(err).Msg("task: AI.Tick")
-		}
-	}, log)
+	a.log = log
+	return scheduler.Start(AITick, func() { a.Tick() }, log)
 }
 
 // Add registers actor for recurring AI ticks.
@@ -87,10 +87,11 @@ func (a *AI) Remove(actor AIActor) {
 
 // Tick runs one AI cycle for every registered actor in an active region,
 // and for inactive-region actors that explicitly opt out of sleeping. It
-// returns ErrReentrantTick and does nothing else if another Tick call is
+// logs and returns ErrReentrantTick without doing anything else if another Tick call is
 // already in flight.
 func (a *AI) Tick() error {
 	if !a.ticking.CompareAndSwap(false, true) {
+		a.log.Error().Err(ErrReentrantTick).Msg("task: AI.Tick")
 		return ErrReentrantTick
 	}
 	defer a.ticking.Store(false)
