@@ -25,8 +25,15 @@ client-action-failed send sits **before** the guards or **inside** one:
 
 | Shape | Flows | Rule |
 |---|---|---|
-| Unconditional — first statement of the think method | pickup, interact (including clicking an owned summon), follow | Release on success **and** rejection |
-| Inside a guard | attack, cast, sit, stand, move-to, fake death | Release on rejection **only**; success answers with its own packets (`ChangeWaitType` + `ChairSit`, an attack frame, and so on) |
+| Unconditional — first statement of the think method | pickup, interact (including clicking an owned summon and click-driven chair sit), follow | Release on success **and** rejection |
+| Inside a guard | attack, cast, sit key / action-bar sit, stand, move-to, fake death | Release on rejection **only**; success answers with its own packets (`ChangeWaitType` + `ChairSit`, an attack frame, and so on) |
+
+Chair sit has two entry points with different shapes: a second Action click on the chair routes
+through `StaticObject.onAction` -> `tryToInteract` -> `thinkInteract`, whose first statement is an
+unconditional `clientActionFailed()` (PlayerAI.java:415) — the click-driven sit belongs in the
+unconditional row. The sit key and action-bar sit button route through `tryToSit`
+(PlayerAI.java:430), which only sends `clientActionFailed()` on a `denyAiAction()` rejection, never
+on success — that path stays in the guard row.
 
 Two traps:
 

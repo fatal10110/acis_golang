@@ -70,8 +70,8 @@ func TestGameClientLinkActionSitsOnSelectedChairStaticObject(t *testing.T) {
 	gcl := &GameClientLink{world: state, log: zerolog.Nop()}
 	gcl.handleTargetAction(context.Background(), live, chair.ObjectID(), true, false)
 
-	if got := frameOpcodes(frames.frames); string(got) != string([]byte{serverpackets.OpcodeChangeWaitType, serverpackets.OpcodeChairSit}) {
-		t.Fatalf("chair action opcodes = %x, want ChangeWaitType, ChairSit", got)
+	if got := frameOpcodes(frames.frames); string(got) != string([]byte{serverpackets.OpcodeChangeWaitType, serverpackets.OpcodeActionFailed, serverpackets.OpcodeChairSit}) {
+		t.Fatalf("chair action opcodes = %x, want ChangeWaitType, ActionFailed, ChairSit", got)
 	}
 	if live.Standing() {
 		t.Fatal("live player remained standing after chair action")
@@ -80,7 +80,7 @@ func TestGameClientLinkActionSitsOnSelectedChairStaticObject(t *testing.T) {
 		t.Fatal("chair was not marked busy")
 	}
 
-	r := wire.NewReader(frames.frames[1][1:])
+	r := wire.NewReader(frames.frames[2][1:])
 	if got := r.ReadInt32(); got != live.ObjectID() {
 		t.Fatalf("ChairSit player id = %d, want %d", got, live.ObjectID())
 	}

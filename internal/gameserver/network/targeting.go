@@ -61,7 +61,7 @@ func (l *GameClientLink) handleTargetAction(ctx context.Context, live *livePlaye
 	if selected && l.showOwnedPetStatus(live, target, shift) {
 		return
 	}
-	if selected && l.sitLiveOnChair(live, target) {
+	if selected && l.sitLiveOnChair(live, target, true) {
 		return
 	}
 	if selected {
@@ -264,7 +264,7 @@ func (l *GameClientLink) requestChangeWaitType(live *livePlayer, stand bool) {
 		return
 	}
 	if !stand {
-		if target := live.Target(); target != nil && l.sitLiveOnChair(live, target) {
+		if target := live.Target(); target != nil && l.sitLiveOnChair(live, target, false) {
 			return
 		}
 	}
@@ -273,7 +273,15 @@ func (l *GameClientLink) requestChangeWaitType(live *livePlayer, stand bool) {
 	}
 }
 
-func (l *GameClientLink) sitLiveOnChair(live *livePlayer, target world.Tracked) bool {
+// sitLiveOnChair claims target as a throne and sits live on it. viaClick
+// distinguishes the two reference entry points that share this logic: a
+// second Action click routes through StaticObject.onAction ->
+// tryToInteract -> thinkInteract, whose first statement is an unconditional
+// clientActionFailed() (PlayerAI.java:415) — so a successful click-driven
+// sit still has to release the pending action here. The sit key and
+// action-bar button route through tryToSit (PlayerAI.java:430), which only
+// sends clientActionFailed on a denyAiAction rejection, never on success.
+func (l *GameClientLink) sitLiveOnChair(live *livePlayer, target world.Tracked, viaClick bool) bool {
 	if live == nil {
 		return false
 	}
@@ -288,6 +296,9 @@ func (l *GameClientLink) sitLiveOnChair(live *livePlayer, target world.Tracked) 
 	if !l.changeLiveWaitType(live, false) {
 		live.releaseChair()
 		return false
+	}
+	if viaClick {
+		live.SendFrame(serverpackets.FrameActionFailed())
 	}
 	l.broadcastLiveFrame(live, func() wire.Frame {
 		return serverpackets.FrameChairSit(live.ObjectID(), chair.StaticObjectID())
