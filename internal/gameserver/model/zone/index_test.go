@@ -9,10 +9,10 @@ import (
 func TestIndexAttachAndLookup(t *testing.T) {
 	ix := NewIndex()
 	// A zone comfortably inside one region.
-	small := NewPeace(1, NewCuboid(100, 200, 100, 200, -100, 100))
+	small := NewPeace(1, mustCuboid(100, 200, 100, 200, -100, 100))
 	// A zone crossing a region boundary (regions are 2048 wide, so this
 	// spans the x boundary at 2048).
-	wide := NewScript(2, NewCuboid(2000, 2100, 100, 200, -100, 100))
+	wide := NewScript(2, mustCuboid(2000, 2100, 100, 200, -100, 100))
 	ix.Add(small)
 	ix.Add(wide)
 
@@ -44,8 +44,8 @@ func TestIndexAttachAndLookup(t *testing.T) {
 
 func TestIndexFindAndKindQueries(t *testing.T) {
 	ix := NewIndex()
-	peace := NewPeace(1, NewCuboid(0, 1000, 0, 1000, -100, 100))
-	script := NewScript(2, NewCuboid(0, 1000, 0, 1000, -100, 100))
+	peace := NewPeace(1, mustCuboid(0, 1000, 0, 1000, -100, 100))
+	script := NewScript(2, mustCuboid(0, 1000, 0, 1000, -100, 100))
 	ix.Add(peace)
 	ix.Add(script)
 
@@ -65,7 +65,7 @@ func TestIndexFindAndKindQueries(t *testing.T) {
 
 func TestIndexEffectRangeInPeaceZone(t *testing.T) {
 	ix := NewIndex()
-	peace := NewPeace(1, NewCuboid(0, 100, 0, 100, -100, 100))
+	peace := NewPeace(1, mustCuboid(0, 100, 0, 100, -100, 100))
 	ix.Add(peace)
 
 	// Region anchor (caster position) far away, in a region the peace zone
@@ -86,7 +86,7 @@ func TestIndexEffectRangeInPeaceZone(t *testing.T) {
 
 func TestIndexRevalidateAndRemoveFrom(t *testing.T) {
 	ix := NewIndex()
-	peace := NewPeace(1, NewCuboid(0, 1000, 0, 1000, -100, 100))
+	peace := NewPeace(1, mustCuboid(0, 1000, 0, 1000, -100, 100))
 	ix.Add(peace)
 
 	a := newFakePlayer(7, location.Location{X: 500, Y: 500, Z: 0})

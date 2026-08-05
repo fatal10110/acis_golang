@@ -88,7 +88,7 @@ func parseOracleForm(fields []string) (Form, error) {
 			}
 			v[i] = n
 		}
-		return NewCuboid(v[0], v[1], v[2], v[3], v[4], v[5]), nil
+		return NewCuboid(v[0], v[1], v[2], v[3], v[4], v[5])
 	case "cylinder":
 		if len(fields) != 8 {
 			return nil, fmt.Errorf("cylinder wants 5 values, got %d fields", len(fields))
@@ -175,8 +175,14 @@ func TestInvertedZPolygonIntersectsRectNeverFullyContains(t *testing.T) {
 }
 
 func TestCuboidNormalizesCorners(t *testing.T) {
-	a := NewCuboid(0, 100, 0, 200, -50, 50)
-	b := NewCuboid(100, 0, 200, 0, 50, -50)
+	a, err := NewCuboid(0, 100, 0, 200, -50, 50)
+	if err != nil {
+		t.Fatalf("NewCuboid: %v", err)
+	}
+	b, err := NewCuboid(100, 0, 200, 0, 50, -50)
+	if err != nil {
+		t.Fatalf("NewCuboid: %v", err)
+	}
 	if a.LowZ() != -50 || a.HighZ() != 50 {
 		t.Errorf("a z bounds = %d..%d, want -50..50", a.LowZ(), a.HighZ())
 	}

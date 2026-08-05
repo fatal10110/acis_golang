@@ -170,7 +170,7 @@ func buildZoneForm(attrs *commons.StatSet, nodeEls []attrsElement) (zone.Form, e
 		if len(nodes) != 2 {
 			return nil, fmt.Errorf("cuboid zone wants 2 nodes, has %d", len(nodes))
 		}
-		return zone.NewCuboid(nodes[0].X, nodes[1].X, nodes[0].Y, nodes[1].Y, minZ, maxZ), nil
+		return zone.NewCuboid(nodes[0].X, nodes[1].X, nodes[0].Y, nodes[1].Y, minZ, maxZ)
 	case "NPoly":
 		if len(nodes) <= 2 {
 			return nil, fmt.Errorf("polygon zone wants more than 2 nodes, has %d", len(nodes))

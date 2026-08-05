@@ -49,10 +49,20 @@ func newFakeSummon(id int32, pos location.Location, owner *fakePlayer) *fakeSumm
 func (s *fakeSummon) Owner() (Player, bool) { return s.owner, s.owner != nil }
 
 var (
-	testForm = NewCuboid(0, 1000, 0, 1000, -100, 100)
+	testForm = mustCuboid(0, 1000, 0, 1000, -100, 100)
 	insideAt = location.Location{X: 500, Y: 500, Z: 0}
 	outside  = location.Location{X: 5000, Y: 5000, Z: 0}
 )
+
+// mustCuboid panics on error, only for fixed test-literal coordinates known
+// valid at compile time.
+func mustCuboid(x1, x2, y1, y2, z1, z2 int) Form {
+	f, err := NewCuboid(x1, x2, y1, y2, z1, z2)
+	if err != nil {
+		panic(err)
+	}
+	return f
+}
 
 func TestRevalidateEnterOnceAndExit(t *testing.T) {
 	z := NewPeace(1, testForm)

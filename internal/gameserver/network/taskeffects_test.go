@@ -22,6 +22,16 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// mustCuboid panics on error, only for fixed test-literal coordinates known
+// valid at compile time.
+func mustCuboid(x1, x2, y1, y2, z1, z2 int) zone.Form {
+	f, err := zone.NewCuboid(x1, x2, y1, y2, z1, z2)
+	if err != nil {
+		panic(err)
+	}
+	return f
+}
+
 // TestResolveIsGMUsesAccessLevelsIsGMFlag pins liveZoneActor.GM() to
 // accessLevels.xml's isGM attribute (Player.isGM() / AccessLevel.isGm() in
 // the reference) rather than treating every positive access level as GM:
@@ -111,7 +121,7 @@ func TestWaterZoneMovementUsesBreathStatAndClearsGaugeOnExit(t *testing.T) {
 		t.Fatalf("NewWater() error = %v", err)
 	}
 	zones := zone.NewIndex()
-	zones.Add(zone.NewWater(1, zone.NewCuboid(1000, 2000, -100, 100, -100, 100)))
+	zones.Add(zone.NewWater(1, mustCuboid(1000, 2000, -100, 100, -100, 100)))
 	link := &GameClientLink{world: state, zones: zones, water: water, playerConfig: PlayerConfig{AllowWater: true}}
 	link.wireWaterZones()
 
@@ -167,7 +177,7 @@ func TestWaterZoneMovementNoOpWhenAllowWaterDisabled(t *testing.T) {
 		t.Fatalf("NewWater() error = %v", err)
 	}
 	zones := zone.NewIndex()
-	zones.Add(zone.NewWater(1, zone.NewCuboid(1000, 2000, -100, 100, -100, 100)))
+	zones.Add(zone.NewWater(1, mustCuboid(1000, 2000, -100, 100, -100, 100)))
 	link := &GameClientLink{world: state, zones: zones, water: water, playerConfig: PlayerConfig{AllowWater: false}}
 	link.wireWaterZones()
 
@@ -193,7 +203,7 @@ func TestWaterZoneMovementAcrossRegionKeepsCountdown(t *testing.T) {
 		t.Fatalf("NewWater() error = %v", err)
 	}
 	zones := zone.NewIndex()
-	zones.Add(zone.NewWater(1, zone.NewCuboid(boundary-100, boundary+100, -100, 100, -100, 100)))
+	zones.Add(zone.NewWater(1, mustCuboid(boundary-100, boundary+100, -100, 100, -100, 100)))
 	link := &GameClientLink{world: state, zones: zones, water: water, playerConfig: PlayerConfig{AllowWater: true}}
 	link.wireWaterZones()
 
@@ -219,7 +229,7 @@ func TestWaterZoneServerPositionSyncStartsCountdown(t *testing.T) {
 		t.Fatalf("NewWater() error = %v", err)
 	}
 	zones := zone.NewIndex()
-	zones.Add(zone.NewWater(1, zone.NewCuboid(1000, 2000, -100, 100, -100, 100)))
+	zones.Add(zone.NewWater(1, mustCuboid(1000, 2000, -100, 100, -100, 100)))
 	link := &GameClientLink{world: state, zones: zones, water: water, playerConfig: PlayerConfig{AllowWater: true}}
 	link.wireWaterZones()
 	live.SetZoneRevalidator(func(previous location.Location) { link.revalidateZones(live, previous) })
@@ -241,7 +251,7 @@ func TestZoneRevalidationSerializesClientAndServerPositions(t *testing.T) {
 
 	entered := make(chan struct{})
 	releaseEnter := make(chan struct{})
-	water := zone.NewWater(1, zone.NewCuboid(1000, 2000, -100, 100, -100, 100))
+	water := zone.NewWater(1, mustCuboid(1000, 2000, -100, 100, -100, 100))
 	water.OnEnter(func(zone.Actor) {
 		close(entered)
 		<-releaseEnter
