@@ -1,11 +1,16 @@
 package task
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/rs/zerolog"
 )
 
 type decayFakeActor struct {
@@ -122,6 +127,59 @@ func TestDecayTickClearsScratchOnPanic(t *testing.T) {
 		if entry.actor != nil {
 			t.Fatalf("scratch[%d] retains actor after panicking Tick", i)
 		}
+	}
+	if decay.ticking.Load() {
+		t.Fatal("ticking guard left set after panicking Tick")
+	}
+}
+
+type decayReentrantEffects struct {
+	decay    *Decay
+	innerErr error
+}
+
+func (e *decayReentrantEffects) Decay(DecayActor) {
+	e.innerErr = e.decay.Tick()
+}
+
+func TestDecayTickReturnsErrorOnReentrantCall(t *testing.T) {
+	now := time.UnixMilli(0)
+	effects := &decayReentrantEffects{}
+	decay, err := NewDecay(effects, func() time.Time { return now })
+	if err != nil {
+		t.Fatalf("NewDecay() error = %v", err)
+	}
+	effects.decay = decay
+	decay.Add(&decayFakeActor{id: 1}, -time.Second)
+
+	if err := decay.Tick(); err != nil {
+		t.Fatalf("outer Tick() error = %v, want nil", err)
+	}
+
+	if !errors.Is(effects.innerErr, ErrReentrantTick) {
+		t.Fatalf("reentrant Tick() error = %v, want ErrReentrantTick", effects.innerErr)
+	}
+	if decay.ticking.Load() {
+		t.Fatal("ticking guard left set after outer Tick returned")
+	}
+}
+
+func TestDecayTickLogsReentrantCall(t *testing.T) {
+	now := time.UnixMilli(0)
+	effects := &decayReentrantEffects{}
+	decay, err := NewDecay(effects, func() time.Time { return now })
+	if err != nil {
+		t.Fatalf("NewDecay() error = %v", err)
+	}
+	effects.decay = decay
+	var buf bytes.Buffer
+	decay.log = zerolog.New(&buf)
+	decay.Add(&decayFakeActor{id: 1}, -time.Second)
+
+	decay.Tick()
+
+	if !strings.Contains(buf.String(), "Decay.Tick") || !strings.Contains(buf.String(), ErrReentrantTick.Error()) {
+		t.Fatalf("reentrant Tick call was not logged, got %q", buf.String())
 	}
 }
 

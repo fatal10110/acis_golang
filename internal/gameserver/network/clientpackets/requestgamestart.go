@@ -1,6 +1,10 @@
 package clientpackets
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
+)
 
 // OpcodeRequestGameStart is the wire opcode for RequestGameStart, valid once
 // a client is authenticated; it picks the character slot to enter the world
@@ -22,7 +26,7 @@ type RequestGameStart struct {
 func DecodeRequestGameStart(payload []byte) (RequestGameStart, error) {
 	r := newReader(payload)
 	if r.Remaining() < requestGameStartSize {
-		return RequestGameStart{}, fmt.Errorf("clientpackets: RequestGameStart: need %d bytes, got %d", requestGameStartSize, r.Remaining())
+		return RequestGameStart{}, fmt.Errorf("clientpackets: RequestGameStart: need %d bytes, got %d: %w", requestGameStartSize, r.Remaining(), wire.ErrShortPacket)
 	}
 	slot := r.ReadInt32()
 	r.ReadUint16()

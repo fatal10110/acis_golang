@@ -1,11 +1,16 @@
 package task
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/rs/zerolog"
 )
 
 type attackStanceFakeActor struct {
@@ -149,6 +154,61 @@ func TestAttackStanceTickClearsScratchOnPanic(t *testing.T) {
 		if entry.actor != nil {
 			t.Fatalf("scratch[%d] retains actor after panicking Tick", i)
 		}
+	}
+	if stance.ticking.Load() {
+		t.Fatal("ticking guard left set after panicking Tick")
+	}
+}
+
+type attackStanceReentrantEffects struct {
+	stance   *AttackStance
+	innerErr error
+}
+
+func (e *attackStanceReentrantEffects) AutoAttackStop(AttackStanceActor) {
+	e.innerErr = e.stance.Tick()
+}
+
+func TestAttackStanceTickReturnsErrorOnReentrantCall(t *testing.T) {
+	now := time.UnixMilli(0)
+	effects := &attackStanceReentrantEffects{}
+	stance, err := NewAttackStance(effects, func() time.Time { return now })
+	if err != nil {
+		t.Fatalf("NewAttackStance() error = %v", err)
+	}
+	effects.stance = stance
+	stance.Add(&attackStanceFakeActor{id: 1})
+	now = now.Add(AttackStancePeriod)
+
+	if err := stance.Tick(); err != nil {
+		t.Fatalf("outer Tick() error = %v, want nil", err)
+	}
+
+	if !errors.Is(effects.innerErr, ErrReentrantTick) {
+		t.Fatalf("reentrant Tick() error = %v, want ErrReentrantTick", effects.innerErr)
+	}
+	if stance.ticking.Load() {
+		t.Fatal("ticking guard left set after outer Tick returned")
+	}
+}
+
+func TestAttackStanceTickLogsReentrantCall(t *testing.T) {
+	now := time.UnixMilli(0)
+	effects := &attackStanceReentrantEffects{}
+	stance, err := NewAttackStance(effects, func() time.Time { return now })
+	if err != nil {
+		t.Fatalf("NewAttackStance() error = %v", err)
+	}
+	effects.stance = stance
+	var buf bytes.Buffer
+	stance.log = zerolog.New(&buf)
+	stance.Add(&attackStanceFakeActor{id: 1})
+	now = now.Add(AttackStancePeriod)
+
+	stance.Tick()
+
+	if !strings.Contains(buf.String(), "AttackStance.Tick") || !strings.Contains(buf.String(), ErrReentrantTick.Error()) {
+		t.Fatalf("reentrant Tick call was not logged, got %q", buf.String())
 	}
 }
 

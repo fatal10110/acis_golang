@@ -1,6 +1,10 @@
 package clientpackets
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
+)
 
 // OpcodeValidatePosition is the wire opcode for the client's periodic
 // position report.
@@ -20,7 +24,7 @@ type ValidatePosition struct {
 func DecodeValidatePosition(payload []byte) (ValidatePosition, error) {
 	r := newReader(payload)
 	if r.Remaining() < validatePositionSize {
-		return ValidatePosition{}, fmt.Errorf("clientpackets: ValidatePosition: need %d bytes, got %d", validatePositionSize, r.Remaining())
+		return ValidatePosition{}, fmt.Errorf("clientpackets: ValidatePosition: need %d bytes, got %d: %w", validatePositionSize, r.Remaining(), wire.ErrShortPacket)
 	}
 	req := ValidatePosition{
 		X:       r.ReadInt32(),

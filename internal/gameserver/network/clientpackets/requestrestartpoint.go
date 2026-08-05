@@ -1,6 +1,10 @@
 package clientpackets
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
+)
 
 // OpcodeRequestRestartPoint is the wire opcode for RequestRestartPoint,
 // sent by a dead client picking a restart option.
@@ -19,7 +23,7 @@ type RequestRestartPoint struct {
 func DecodeRequestRestartPoint(payload []byte) (RequestRestartPoint, error) {
 	r := newReader(payload)
 	if r.Remaining() < requestRestartPointSize {
-		return RequestRestartPoint{}, fmt.Errorf("clientpackets: RequestRestartPoint: need %d bytes, got %d", requestRestartPointSize, r.Remaining())
+		return RequestRestartPoint{}, fmt.Errorf("clientpackets: RequestRestartPoint: need %d bytes, got %d: %w", requestRestartPointSize, r.Remaining(), wire.ErrShortPacket)
 	}
 	return RequestRestartPoint{RequestType: r.ReadInt32()}, nil
 }

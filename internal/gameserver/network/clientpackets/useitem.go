@@ -1,6 +1,10 @@
 package clientpackets
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
+)
 
 // OpcodeUseItem is the wire opcode for using or toggling the equip state
 // of an inventory item.
@@ -18,7 +22,7 @@ type UseItem struct {
 func DecodeUseItem(payload []byte) (UseItem, error) {
 	r := newReader(payload)
 	if r.Remaining() < useItemSize {
-		return UseItem{}, fmt.Errorf("clientpackets: UseItem: need %d bytes, got %d", useItemSize, r.Remaining())
+		return UseItem{}, fmt.Errorf("clientpackets: UseItem: need %d bytes, got %d: %w", useItemSize, r.Remaining(), wire.ErrShortPacket)
 	}
 	req := UseItem{
 		ObjectID:    r.ReadInt32(),
