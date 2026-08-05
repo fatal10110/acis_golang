@@ -34,6 +34,43 @@ func TestTeleportLivePlayerStopsInFlightCast(t *testing.T) {
 	}
 }
 
+// TestTeleportLivePlayerSendsActionFailedOnce pins the review-comment
+// regression on PR #1227: teleportLivePlayer used to call both live.Stop()
+// (which now reaches the cast controller, live_player.go:99-101) and
+// live.Character.StopCast() (restartpoint.go) — the same *actorcast.Controller
+// instance (castController wires live.Character's cast controller to
+// live.cast, live_player.go:270), so an in-flight cast was stopped twice.
+// Controller.stopInternal fires its stop-ack observer unconditionally on
+// every call (controller.go:366-384), and clearLocked never resets it, so
+// the second Stop() sent a second FrameActionFailed — a wire divergence
+// from PlayerCast.stop()'s single, unconditional clientActionFailed()
+// (PlayerCast.java:382-387).
+func TestTeleportLivePlayerSendsActionFailedOnce(t *testing.T) {
+	state := world.New()
+	frames := &frameCapture{}
+	live := newTestLivePlayer(t, 1, frames)
+	state.Spawn(live, 0, 0, 0, 0)
+
+	gcl := &GameClientLink{world: state, geo: testGeo{}, log: zerolog.Nop()}
+	controller := gcl.castController(live)
+	if _, err := controller.Start(time.Now(), skillCastObject(live), castingDef); err != nil {
+		t.Fatalf("Start() error: %v", err)
+	}
+	frames.frames = nil
+
+	gcl.teleportLivePlayer(live, location.Location{X: 5000, Y: 5000, Z: 100}, 0)
+
+	count := 0
+	for _, f := range frames.frames {
+		if f[0] == serverpackets.OpcodeActionFailed {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Fatalf("ActionFailed frames after teleporting mid-cast = %d, want 1", count)
+	}
+}
+
 // townRestartTable returns a restart table whose only point covers the map
 // region a player spawned near the world origin falls into.
 func townRestartTable() *restart.Table {
