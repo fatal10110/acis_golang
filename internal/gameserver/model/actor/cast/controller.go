@@ -160,6 +160,7 @@ type Controller struct {
 	afterFunc afterFunc
 	onAbort   func(interrupted bool)
 	onFinish  func(interrupted bool, def modelskill.Definition, target any)
+	onStopAck func()
 	log       zerolog.Logger
 }
 
@@ -200,6 +201,18 @@ func (c *Controller) SetOnFinish(f func(interrupted bool, def modelskill.Definit
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.onFinish = f
+}
+
+// SetOnStopAck registers the observer fired once on every Stop/Interrupt
+// call, regardless of whether a cast was actually in flight — matching
+// PlayerCast.stop()'s unconditional _actor.getAI().clientActionFailed()
+// (PlayerCast.java:381-387), which runs after super.stop()'s own
+// isCastingNow()-gated cancel broadcast rather than being gated by it. The
+// observer runs after the controller lock is released.
+func (c *Controller) SetOnStopAck(f func()) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.onStopAck = f
 }
 
 // CastingNow reports whether the actor currently has an active cast.
@@ -346,9 +359,10 @@ func (c *Controller) Finish() {
 // abort reason passes through, which is what lets "abort for any reason"
 // behave uniformly without each call site enumerating its own cleanup.
 //
-// The two owner-state steps run unconditionally, as the reference does them
-// ahead of its own casting check; only the abort observer is reserved for a
-// cast that was really in flight.
+// The two owner-state steps and the stop-ack observer run unconditionally,
+// as the reference does them ahead of (owner state) or regardless of
+// (clientActionFailed) its own casting check; only the abort observer is
+// reserved for a cast that was really in flight.
 func (c *Controller) Stop() {
 	c.stopInternal(false)
 }
@@ -359,9 +373,13 @@ func (c *Controller) stopInternal(interrupted bool) {
 
 	c.mu.Lock()
 	abort, finish := c.abortLocked()
+	stopAck := c.onStopAck
 	c.mu.Unlock()
 	if abort != nil {
 		abort(interrupted)
+	}
+	if stopAck != nil {
+		stopAck()
 	}
 	if finish != nil {
 		finish(true)
