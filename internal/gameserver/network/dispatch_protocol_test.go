@@ -85,6 +85,14 @@ func TestGameClientLinkUnknownExtendedOpcodeTolerantDisconnectsPastThreshold(t *
 	}
 
 	c.send(encodeUnknownExtendedOpcode())
+	if reply := c.read(); reply[0] != serverpackets.OpcodeActionFailed {
+		// detachLivePlayer's Stop() now reaches the cast controller
+		// (Player.cleanup -> abortAll(true) -> _cast.stop(),
+		// Creature.java:1298-1302), and PlayerCast.stop() sends
+		// clientActionFailed unconditionally, cast or no cast in flight
+		// (PlayerCast.java:382-387).
+		t.Fatalf("pre-close opcode = %#x, want ActionFailed from detach's unconditional cast-stop ack (%#x)", reply[0], serverpackets.OpcodeActionFailed)
+	}
 	c.expectClosed()
 }
 
