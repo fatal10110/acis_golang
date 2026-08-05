@@ -94,6 +94,28 @@ func TestDetachLivePlayerPersistsOfflineRecency(t *testing.T) {
 	}
 }
 
+// TestDetachLivePlayerSavesFullStats pins detachLivePlayer to
+// GameClient.closeNetConnection calling store() on disconnect: level, exp,
+// sp, and cur/max HP/CP/MP must be persisted alongside the existing
+// position/death-penalty/offline-recency saves, or progress since the last
+// autosave is lost on logout.
+func TestDetachLivePlayerSavesFullStats(t *testing.T) {
+	chars := newFakeCharStore()
+	items := newFakeItemStore()
+	roster := gamemanager.NewRoster(chars, items, nil, testTemplates(t), testItemTemplates(), npc.NewTable(nil), &sequentialIDs{next: 100}, gamemanager.DefaultDeleteAfter, time.Now)
+	live := newTestLivePlayer(t, 101, &frameCapture{})
+	if err := chars.Create(context.Background(), live.Character); err != nil {
+		t.Fatalf("Create() unexpected error: %v", err)
+	}
+
+	gcl := &GameClientLink{roster: roster, log: zerolog.Nop()}
+	gcl.detachLivePlayer(context.Background(), live)
+
+	if got := chars.saves(live.ObjectID()); got != 1 {
+		t.Fatalf("full-stat saves after detach = %d, want 1", got)
+	}
+}
+
 // TestDetachLivePlayerStopsAttackIntention is the regression test for the
 // "disconnect mid-fight leaves timers running" review finding: detaching a
 // live player mid-swing must stop the attack intention before the frame
