@@ -370,6 +370,13 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 					Uint16("opcode2", second).
 					Str("state", client.State().String()).
 					Msg("game client: accepted extended opcode not implemented yet")
+				// OpcodeExtended is only ever allowed in StateEntering/StateInGame
+				// (see allowedOpcodes), so unlike the top-level Accept gate there is
+				// no pre-auth immediate-disconnect case here; just count toward the
+				// same sliding-60s threshold as GameClient.onUnknownPacket.
+				if client.countUnknownPacket() {
+					return
+				}
 			}
 
 		case clientpackets.OpcodeRequestSkillCoolTime:

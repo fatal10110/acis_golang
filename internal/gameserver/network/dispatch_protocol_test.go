@@ -60,6 +60,34 @@ func TestGameClientLinkUnknownOpcodeTolerantAfterAuthDisconnectsPastThreshold(t 
 	c.expectClosed()
 }
 
+func TestGameClientLinkUnknownExtendedOpcodeTolerantDisconnectsPastThreshold(t *testing.T) {
+	c, _, _, _ := newLinkedGameClient(t)
+
+	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.read() // CharCreateOk
+	c.read() // CharSelectInfo
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	// An unmapped extended second-opcode counts toward the same sliding-60s
+	// maxUnknownPerMin threshold as a top-level unknown opcode: the first
+	// maxUnknownPerMin are tolerated, the next one disconnects.
+	for range maxUnknownPerMin {
+		c.send(encodeUnknownExtendedOpcode())
+	}
+	c.send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeItemList {
+		t.Fatalf("post-tolerated-unknown-extended opcode = %#x, want ItemList (%#x)", reply[0], serverpackets.OpcodeItemList)
+	}
+
+	c.send(encodeUnknownExtendedOpcode())
+	c.expectClosed()
+}
+
 func TestGameClientLinkOpcodeBeforeAuthCloses(t *testing.T) {
 	addr, _, _, _ := newTestGameClientLink(t, func() *LoginLink { return nil }, NewSessionValidator())
 	c := dialGameClient(t, addr)
