@@ -12,9 +12,11 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	gamemanager "github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
+	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
@@ -153,6 +155,44 @@ func TestDetachLivePlayerStopsAttackIntention(t *testing.T) {
 	}
 }
 
+// TestDetachLivePlayerStopsInFlightCast is the regression test for the
+// "logout leaves an in-flight cast to land after detach" review finding:
+// Player.cleanup -> abortAll(true) -> _cast.stop() (Creature.java:1298-1302)
+// cancels the pending cast task on logout (CreatureCast.java:416-426), so a
+// skill committed just before disconnect must never apply its effects or
+// consume its final MP/HP cost against an already-detached character.
+func TestDetachLivePlayerStopsInFlightCast(t *testing.T) {
+	live := newTestLivePlayer(t, 1, &frameCapture{})
+	gcl := &GameClientLink{log: zerolog.Nop()}
+	ctrl := gcl.castController(live)
+
+	def := modelskill.Definition{
+		ID: 1, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+		StaticHitTime: true, HitTime: 1000, StaticReuse: true, ReuseDelay: 1000,
+		MPConsume: 5, SkillType: "DUMMY",
+	}
+	plan, err := ctrl.Start(time.Now(), live, def)
+	if err != nil {
+		t.Fatalf("Start() error: %v", err)
+	}
+
+	hitCalled := false
+	ctrl.Schedule(plan, actorcast.Hooks{
+		Hit: func() { hitCalled = true },
+	})
+
+	gcl.detachLivePlayer(context.Background(), live)
+
+	if ctrl.CastingNow() {
+		t.Fatal("CastingNow() = true after detach, want stopped")
+	}
+
+	time.Sleep(1200 * time.Millisecond)
+	if hitCalled {
+		t.Fatal("Hit hook ran after detach, want the pending cast cancelled before it could land")
+	}
+}
+
 func TestDetachLivePlayerRacesNoHookAccess(t *testing.T) {
 	state := world.New()
 	gcl := &GameClientLink{world: state, log: zerolog.Nop()}
@@ -218,6 +258,13 @@ func TestGameClientLinkLogoutLeavesWorld(t *testing.T) {
 	if reply[0] != serverpackets.OpcodeLeaveWorld {
 		t.Fatalf("logout opcode = %#x, want LeaveWorld (%#x)", reply[0], serverpackets.OpcodeLeaveWorld)
 	}
+	// detachLivePlayer's Stop() now reaches the cast controller
+	// (Player.cleanup -> abortAll(true) -> _cast.stop(), Creature.java:1298-1302),
+	// and PlayerCast.stop() sends clientActionFailed unconditionally, cast or
+	// no cast in flight (PlayerCast.java:382-387).
+	if reply := c.read(); reply[0] != serverpackets.OpcodeActionFailed {
+		t.Fatalf("post-logout opcode = %#x, want ActionFailed from detach's unconditional cast-stop ack (%#x)", reply[0], serverpackets.OpcodeActionFailed)
+	}
 	c.expectClosed()
 	if _, ok := state.Player(objID); ok {
 		t.Fatalf("world.Player(%d) still present after logout", objID)
@@ -251,6 +298,13 @@ func TestGameClientLinkRestartReturnsToCharacterSelect(t *testing.T) {
 	waitForWorldPosition(t, state, objID, savedAt)
 	walkHeading := spawn.HeadingTo(savedAt)
 	c.send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
+	// detachLivePlayer's Stop() now reaches the cast controller
+	// (Player.cleanup -> abortAll(true) -> _cast.stop(), Creature.java:1298-1302),
+	// and PlayerCast.stop() sends clientActionFailed unconditionally, cast or
+	// no cast in flight (PlayerCast.java:382-387), ahead of RestartResponse.
+	if reply := c.read(); reply[0] != serverpackets.OpcodeActionFailed {
+		t.Fatalf("pre-restart opcode = %#x, want ActionFailed from detach's unconditional cast-stop ack (%#x)", reply[0], serverpackets.OpcodeActionFailed)
+	}
 	reply = c.read()
 	if reply[0] != serverpackets.OpcodeRestartResponse {
 		t.Fatalf("restart opcode = %#x, want RestartResponse (%#x)", reply[0], serverpackets.OpcodeRestartResponse)

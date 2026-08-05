@@ -93,6 +93,12 @@ func (p *livePlayer) Stop() {
 	if p.stopAttack != nil {
 		p.stopAttack(p)
 	}
+	// Player.cleanup -> abortAll(true) -> _cast.stop() (Creature.java:1298-1302)
+	// cancels the pending cast task on logout/deletion (CreatureCast.java:416-426),
+	// so an in-flight cast never lands against an already-detached character.
+	if p.cast != nil {
+		p.cast.Stop()
+	}
 	p.releaseChair()
 	p.stopCubics()
 }
