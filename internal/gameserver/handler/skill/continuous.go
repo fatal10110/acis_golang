@@ -37,10 +37,19 @@ type continuousHandler struct {
 	defs Definitions
 }
 
-// Types lists the 13 skill types the reference continuous handler covers.
-// FUSION is dispatched separately by fusionHandler: Java applies it via
-// startFusionSkill at cast start, bypassing this handler's landing checks
-// entirely (PlayerCast.java:81-84).
+// Types lists 13 of the 14 skill types the reference continuous handler's
+// SKILL_IDS covers (Continuous.java:28-44); FUSION is the 14th but is
+// omitted here. For a player caster it's a dead entry in Java too — PlayerAI
+// routes FUSION to PlayerCast.doFusionCast before callSkill ever runs
+// (PlayerAI.java:300-301), applying it via startFusionSkill at cast start
+// instead (PlayerCast.java:81-84), matched here by fusionHandler. A
+// non-player caster has no such diversion — CreatureCast.doFusionCast is an
+// uncalled stub (CreatureCast.java:81-84) — so its hit-time callSkill()
+// dispatches FUSION straight into Continuous.SKILL_IDS' entry, same as any
+// other skill type (CreatureCast.java:493-497). It applies the caster
+// skill's own effects, which every datapack FUSION skill (e.g. 3626-3628,
+// skills/3600-3699.xml) carries none of, so the observable result is a
+// no-op rather than the entry never firing at all.
 func (continuousHandler) Types() []string {
 	return []string{
 		"BUFF", "DEBUFF", "DOT", "MDOT", "POISON", "BLEED",

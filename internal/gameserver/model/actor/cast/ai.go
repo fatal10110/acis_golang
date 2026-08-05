@@ -147,6 +147,16 @@ func (a *AIController) Cast(target attackable.Combatant, ref modelskill.Ref) {
 			if broadcaster != nil {
 				broadcaster.BroadcastSkillLaunched(int32(def.ID), int32(def.Level), []int32{castTarget.ObjectID()})
 			}
+			// FUSION is dispatched to PlayerCast.doFusionCast only for
+			// player casters (PlayerAI.java:300-301); CreatureCast's
+			// override is an empty stub — "Non-Player Creatures cannot use
+			// FUSION or SIGNETS" (CreatureCast.java:81-84). AIController
+			// drives every non-player-initiated cast, so it must skip
+			// FUSION here rather than let it reach fusionHandler, which
+			// has no caster-type gate of its own.
+			if def.SkillType == "FUSION" {
+				return
+			}
 			ApplyEffects(a.Effects, a.Caster, castTarget, def)
 		},
 	})
