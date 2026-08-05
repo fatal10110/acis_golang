@@ -32,8 +32,8 @@ Chair sit has two entry points with different shapes: a second Action click on t
 through `StaticObject.onAction` -> `tryToInteract` -> `thinkInteract`, whose first statement is an
 unconditional `clientActionFailed()` (PlayerAI.java:415) — the click-driven sit belongs in the
 unconditional row. The sit key and action-bar sit button route through `tryToSit`
-(PlayerAI.java:430), which only sends `clientActionFailed()` on a `denyAiAction()` rejection, never
-on success — that path stays in the guard row.
+(`PlayableAI.java:430`, inherited by `PlayerAI`), which only sends `clientActionFailed()` on a
+`denyAiAction()` rejection, never on success — that path stays in the guard row.
 
 Two traps:
 

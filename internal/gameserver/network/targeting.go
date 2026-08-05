@@ -279,7 +279,7 @@ func (l *GameClientLink) requestChangeWaitType(live *livePlayer, stand bool) {
 // tryToInteract -> thinkInteract, whose first statement is an unconditional
 // clientActionFailed() (PlayerAI.java:415) — so a successful click-driven
 // sit still has to release the pending action here. The sit key and
-// action-bar button route through tryToSit (PlayerAI.java:430), which only
+// action-bar button route through tryToSit (PlayableAI.java:430), which only
 // sends clientActionFailed on a denyAiAction rejection, never on success.
 func (l *GameClientLink) sitLiveOnChair(live *livePlayer, target world.Tracked, viaClick bool) bool {
 	if live == nil {
