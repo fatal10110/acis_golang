@@ -281,6 +281,82 @@ func TestPetGetItemPicksUpGroundItem(t *testing.T) {
 	}
 }
 
+// Java's SummonAI.thinkPickUp() validates only slot capacity, never weight,
+// before pet ground-item pickup (issue #1200) — a pet already over its
+// weight limit must still pick up and get no encumbered rejection.
+func TestPetGetItemPicksUpGroundItemOverPetWeightLimit(t *testing.T) {
+	const heavyID int32 = 9010
+	templates := item.NewTable([]*item.Template{
+		{ID: item.AdenaID, Name: "Adena", Kind: item.KindEtcItem, Duration: -1, Stackable: true, Dropable: true, Tradable: true, Destroyable: true, EtcItem: &item.EtcItemDetail{}},
+		{ID: 2375, Name: "Wolf Tooth", Kind: item.KindWeapon, Slot: item.SlotWolf, Duration: -1, Dropable: true, Tradable: true, Destroyable: true, Weapon: &item.WeaponDetail{Type: item.WeaponPet}},
+		{
+			ID: heavyID, Name: "Heavy Etc", Kind: item.KindEtcItem, Duration: -1,
+			Stackable: false, Dropable: true, Tradable: true, Destroyable: true,
+			Weight: 50, EtcItem: &item.EtcItemDetail{},
+		},
+	})
+	capture := &frameCapture{}
+	live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
+	state := world.New()
+	state.Spawn(live, 0, 0, 0, 0)
+	carried := &item.Instance{ObjectID: 800, TemplateID: heavyID, OwnerID: 0x20000001, Count: 1, Location: item.LocationPet}
+	pet, petInv := attachTestPet(t, state, live, templates, 12077, []*item.Instance{carried})
+	petInv.WeightLimit = 1
+	petInv.UpdateWeight()
+	if got := petInv.TotalWeight(); got <= petInv.WeightLimit {
+		t.Fatalf("pet TotalWeight = %d, want already over WeightLimit %d before pickup", got, petInv.WeightLimit)
+	}
+
+	tmpl, ok := templates.Get(heavyID)
+	if !ok {
+		t.Fatal("heavy template missing")
+	}
+	ground, err := grounditem.New(item.Instance{ObjectID: 900, TemplateID: heavyID, Count: 1, ManaLeft: -1}, tmpl)
+	if err != nil {
+		t.Fatalf("ground item: %v", err)
+	}
+	drops := task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour}, time.Now)
+	drops.Drop(ground, task.DropOptions{X: 10, Y: 20, Z: 30})
+
+	capture.frames = nil
+	store := &recordingEnchantItemStore{}
+	gcl := &GameClientLink{world: state, groundItems: drops, items: store}
+	updates := wireInventoryUpdates(gcl, live)
+
+	gcl.petGetItem(context.Background(), live, clientpackets.RequestPetGetItem{ObjectID: ground.ObjectID()})
+	updates.Tick()
+
+	assertOpcodeSequence(t, capture.frames,
+		serverpackets.OpcodeGetItem,
+		serverpackets.OpcodeDeleteObject,
+		serverpackets.OpcodePetInventoryUpdate,
+	)
+	r := wire.NewReader(capture.frames[0][1:])
+	if got := r.ReadInt32(); got != pet.ObjectID() {
+		t.Fatalf("GetItem picker id = %d, want pet id %d", got, pet.ObjectID())
+	}
+	if got := r.ReadInt32(); got != ground.ObjectID() {
+		t.Fatalf("GetItem ground id = %d, want %d", got, ground.ObjectID())
+	}
+	x, y, z := r.ReadInt32(), r.ReadInt32(), r.ReadInt32()
+	if x != 10 || y != 20 || z != 30 {
+		t.Fatalf("GetItem location = (%d,%d,%d), want (10,20,30)", x, y, z)
+	}
+	if _, ok := state.Object(ground.ObjectID()); ok {
+		t.Fatalf("world.Object(%d) still present after pickup", ground.ObjectID())
+	}
+	if got := drops.Len(); got != 0 {
+		t.Fatalf("ground item tracker Len = %d, want 0", got)
+	}
+	petStack := petInv.ItemByObjectID(ground.ObjectID())
+	if petStack == nil || petStack.TemplateID != heavyID || petStack.Count != 1 || petStack.OwnerID != pet.ObjectID() || petStack.Location != item.LocationPet {
+		t.Fatalf("pet stack = %+v, want picked up ground item despite over weight limit", petStack)
+	}
+	if len(store.saved) != 1 || store.saved[0].ObjectID != ground.ObjectID() || store.saved[0].OwnerID != pet.ObjectID() || store.saved[0].Location != item.LocationPet {
+		t.Fatalf("saved rows = %+v, want ground row moved to pet inventory", store.saved)
+	}
+}
+
 func TestPetGetItemConsumesHerb(t *testing.T) {
 	const herbTemplate int32 = 8600
 	templates := herbTestTemplates()

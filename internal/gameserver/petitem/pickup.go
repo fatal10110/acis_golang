@@ -22,8 +22,6 @@ const (
 	PickupItemNotForPets
 	// PickupPetCannotCarryMore means the pet lacks free inventory slots.
 	PickupPetCannotCarryMore
-	// PickupPetTooEncumbered means the pet lacks remaining weight capacity.
-	PickupPetTooEncumbered
 )
 
 // PickupResult carries item-store operations for a pet ground-item pickup.
@@ -55,9 +53,6 @@ func PickupGround(pet *summon.Actor, petInv *itemcontainer.Inventory, ground *gr
 	}
 	if !petInv.ValidateCapacity(petInv.SlotsNeededFor(picked, ground.Template)) {
 		return PickupResult{}, PickupPetCannotCarryMore
-	}
-	if !petInv.ValidateWeight(int(ground.Template.Weight) * picked.Snapshot().Count) {
-		return PickupResult{}, PickupPetTooEncumbered
 	}
 
 	result, absorbed := petInv.Add(picked)

@@ -122,6 +122,39 @@ func TestPickupGroundItemAddsToPetAndReportsPersistence(t *testing.T) {
 	}
 }
 
+// Java's SummonAI.thinkPickUp() validates only slot capacity, never weight,
+// before pet ground-item pickup (issue #1200) — a pet already over its
+// weight limit must still succeed.
+func TestPickupGroundItemSucceedsOverPetWeightLimit(t *testing.T) {
+	templates := item.NewTable([]*item.Template{
+		{ID: 9002, Kind: item.KindEtcItem, Stackable: true, Dropable: true, Tradable: true, Destroyable: true, Duration: -1, Weight: 50, EtcItem: &item.EtcItemDetail{}},
+	})
+	petInv := itemcontainer.NewPetInventory(2, templates)
+	petInv.WeightLimit = 1
+	pet := summon.NewPet(summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv})
+	tmpl, ok := templates.Get(9002)
+	if !ok {
+		t.Fatal("template missing")
+	}
+	ground, err := grounditem.New(item.Instance{ObjectID: 900, TemplateID: 9002, Count: 1, ManaLeft: -1}, tmpl)
+	if err != nil {
+		t.Fatalf("ground item: %v", err)
+	}
+
+	res, failure := PickupGround(pet, petInv, ground)
+
+	if failure != PickupOK {
+		t.Fatalf("PickupGround failure = %v, want OK (Java has no weight gate on pet pickup)", failure)
+	}
+	petStack := petInv.ItemByTemplateID(9002)
+	if petStack == nil || petStack.ObjectID != ground.ObjectID() {
+		t.Fatalf("pet stack = %+v, want picked ground item", petStack)
+	}
+	if len(res.Persist) != 1 || res.Persist[0].Action != inventory.PersistSave {
+		t.Fatalf("persist actions = %+v, want save picked stack", res.Persist)
+	}
+}
+
 func TestPickupGroundHerbStaysOutOfPetInventory(t *testing.T) {
 	templates := item.NewTable([]*item.Template{{
 		ID:          9001,
