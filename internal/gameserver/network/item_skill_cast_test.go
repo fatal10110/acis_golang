@@ -229,10 +229,9 @@ func TestGameClientLinkUseScrollHitPhaseCostFailureSendsReasonAndStatusUpdate(t 
 		t.Fatalf("SystemMessage id = %d, want not enough MP", id)
 	}
 
-	reply = c.read()
-	if reply[0] != serverpackets.OpcodeStatusUpdate {
-		t.Fatalf("next opcode = %#x, want StatusUpdate reflecting the drained MP (%#x)", reply[0], serverpackets.OpcodeStatusUpdate)
-	}
+	assertStatusAttrs(t, c.read(), live.ObjectID(), []serverpackets.StatusAttribute{
+		{Type: serverpackets.StatusCurrentMP, Value: 0},
+	})
 
 	deadline := time.Now().Add(2 * time.Second)
 	for live.cast.CastingNow() {
