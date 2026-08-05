@@ -220,7 +220,8 @@ func (l *GameClientLink) activeSummonTarget(live *livePlayer) actorcast.Target {
 
 // unequipItem clears whatever item occupies the paperdoll position that
 // bodySlot (a Slot bitmask value from the item's own template) resolves
-// to. An empty or unresolvable slot is a silent no-op.
+// to. An empty or unresolvable slot answers FrameActionFailed per the
+// packet-impact rule (#829); it is not a silent no-op.
 func (l *GameClientLink) unequipItem(live *livePlayer, bodySlot int32) {
 	inv := live.Inventory()
 	if inv == nil {
