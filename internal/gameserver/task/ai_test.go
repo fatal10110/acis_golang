@@ -1,8 +1,13 @@
 package task
 
 import (
+	"bytes"
+	"errors"
+	"strings"
 	"sync"
 	"testing"
+
+	"github.com/rs/zerolog"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world/worldtest"
@@ -50,7 +55,7 @@ func TestAIManagerTickAllocationIsFlat(t *testing.T) {
 		}
 	}
 
-	if allocs := testing.AllocsPerRun(100, mgr.Tick); allocs != 0 {
+	if allocs := testing.AllocsPerRun(100, func() { mgr.Tick() }); allocs != 0 {
 		t.Fatalf("AllocsPerRun(128 actors) = %v, want 0", allocs)
 	}
 }
@@ -69,6 +74,44 @@ func TestAIManagerTickClearsScratchOnPanic(t *testing.T) {
 		if actor != nil {
 			t.Fatalf("scratch[%d] retains actor after panicking Tick", i)
 		}
+	}
+	if mgr.ticking.Load() {
+		t.Fatal("ticking guard left set after panicking Tick")
+	}
+}
+
+func TestAIManagerTickReturnsErrorOnReentrantCall(t *testing.T) {
+	mgr := NewAI(nil)
+	var innerErr error
+	a := &aiActorStub{id: 1}
+	a.thinkFn = func() { innerErr = mgr.Tick() }
+	mgr.Add(a)
+
+	if err := mgr.Tick(); err != nil {
+		t.Fatalf("outer Tick() error = %v, want nil", err)
+	}
+
+	if !errors.Is(innerErr, ErrReentrantTick) {
+		t.Fatalf("reentrant Tick() error = %v, want ErrReentrantTick", innerErr)
+	}
+	if mgr.ticking.Load() {
+		t.Fatal("ticking guard left set after outer Tick returned")
+	}
+}
+
+func TestAIManagerTickLogsReentrantCall(t *testing.T) {
+	mgr := NewAI(nil)
+	var buf bytes.Buffer
+	mgr.log = zerolog.New(&buf)
+
+	a := &aiActorStub{id: 1}
+	a.thinkFn = func() { mgr.Tick() }
+	mgr.Add(a)
+
+	mgr.Tick()
+
+	if !strings.Contains(buf.String(), "AI.Tick") || !strings.Contains(buf.String(), ErrReentrantTick.Error()) {
+		t.Fatalf("reentrant Tick call was not logged, got %q", buf.String())
 	}
 }
 
