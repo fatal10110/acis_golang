@@ -291,7 +291,7 @@ func TestPetGetItemPicksUpGroundItemOverPetWeightLimit(t *testing.T) {
 		{ID: 2375, Name: "Wolf Tooth", Kind: item.KindWeapon, Slot: item.SlotWolf, Duration: -1, Dropable: true, Tradable: true, Destroyable: true, Weapon: &item.WeaponDetail{Type: item.WeaponPet}},
 		{
 			ID: heavyID, Name: "Heavy Etc", Kind: item.KindEtcItem, Duration: -1,
-			Stackable: true, Dropable: true, Tradable: true, Destroyable: true,
+			Stackable: false, Dropable: true, Tradable: true, Destroyable: true,
 			Weight: 50, EtcItem: &item.EtcItemDetail{},
 		},
 	})
@@ -299,8 +299,13 @@ func TestPetGetItemPicksUpGroundItemOverPetWeightLimit(t *testing.T) {
 	live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
 	state := world.New()
 	state.Spawn(live, 0, 0, 0, 0)
-	pet, petInv := attachTestPet(t, state, live, templates, 12077, nil)
+	carried := &item.Instance{ObjectID: 800, TemplateID: heavyID, OwnerID: 0x20000001, Count: 1, Location: item.LocationPet}
+	pet, petInv := attachTestPet(t, state, live, templates, 12077, []*item.Instance{carried})
 	petInv.WeightLimit = 1
+	petInv.UpdateWeight()
+	if got := petInv.TotalWeight(); got <= petInv.WeightLimit {
+		t.Fatalf("pet TotalWeight = %d, want already over WeightLimit %d before pickup", got, petInv.WeightLimit)
+	}
 
 	tmpl, ok := templates.Get(heavyID)
 	if !ok {
@@ -326,9 +331,29 @@ func TestPetGetItemPicksUpGroundItemOverPetWeightLimit(t *testing.T) {
 		serverpackets.OpcodeDeleteObject,
 		serverpackets.OpcodePetInventoryUpdate,
 	)
-	petStack := petInv.ItemByTemplateID(heavyID)
-	if petStack == nil || petStack.ObjectID != ground.ObjectID() || petStack.OwnerID != pet.ObjectID() {
+	r := wire.NewReader(capture.frames[0][1:])
+	if got := r.ReadInt32(); got != pet.ObjectID() {
+		t.Fatalf("GetItem picker id = %d, want pet id %d", got, pet.ObjectID())
+	}
+	if got := r.ReadInt32(); got != ground.ObjectID() {
+		t.Fatalf("GetItem ground id = %d, want %d", got, ground.ObjectID())
+	}
+	x, y, z := r.ReadInt32(), r.ReadInt32(), r.ReadInt32()
+	if x != 10 || y != 20 || z != 30 {
+		t.Fatalf("GetItem location = (%d,%d,%d), want (10,20,30)", x, y, z)
+	}
+	if _, ok := state.Object(ground.ObjectID()); ok {
+		t.Fatalf("world.Object(%d) still present after pickup", ground.ObjectID())
+	}
+	if got := drops.Len(); got != 0 {
+		t.Fatalf("ground item tracker Len = %d, want 0", got)
+	}
+	petStack := petInv.ItemByObjectID(ground.ObjectID())
+	if petStack == nil || petStack.TemplateID != heavyID || petStack.Count != 1 || petStack.OwnerID != pet.ObjectID() || petStack.Location != item.LocationPet {
 		t.Fatalf("pet stack = %+v, want picked up ground item despite over weight limit", petStack)
+	}
+	if len(store.saved) != 1 || store.saved[0].ObjectID != ground.ObjectID() || store.saved[0].OwnerID != pet.ObjectID() || store.saved[0].Location != item.LocationPet {
+		t.Fatalf("saved rows = %+v, want ground row moved to pet inventory", store.saved)
 	}
 }
 
