@@ -281,6 +281,48 @@ func TestPetGetItemPicksUpGroundItem(t *testing.T) {
 	}
 }
 
+// Java's SummonAI.thinkPickUp() validates only slot capacity, never weight,
+// before pet ground-item pickup (issue #1200) — a pet already over its
+// weight limit must still pick up and get no encumbered rejection.
+func TestPetGetItemPicksUpGroundItemOverPetWeightLimit(t *testing.T) {
+	templates := petTestTemplates()
+	capture := &frameCapture{}
+	live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
+	state := world.New()
+	state.Spawn(live, 0, 0, 0, 0)
+	pet, petInv := attachTestPet(t, state, live, templates, 12077, nil)
+	petInv.WeightLimit = 1
+
+	tmpl, ok := templates.Get(item.AdenaID)
+	if !ok {
+		t.Fatal("adena template missing")
+	}
+	ground, err := grounditem.New(item.Instance{ObjectID: 900, TemplateID: item.AdenaID, Count: 40, ManaLeft: -1}, tmpl)
+	if err != nil {
+		t.Fatalf("ground item: %v", err)
+	}
+	drops := task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour}, time.Now)
+	drops.Drop(ground, task.DropOptions{X: 10, Y: 20, Z: 30})
+
+	capture.frames = nil
+	store := &recordingEnchantItemStore{}
+	gcl := &GameClientLink{world: state, groundItems: drops, items: store}
+	updates := wireInventoryUpdates(gcl, live)
+
+	gcl.petGetItem(context.Background(), live, clientpackets.RequestPetGetItem{ObjectID: ground.ObjectID()})
+	updates.Tick()
+
+	assertOpcodeSequence(t, capture.frames,
+		serverpackets.OpcodeGetItem,
+		serverpackets.OpcodeDeleteObject,
+		serverpackets.OpcodePetInventoryUpdate,
+	)
+	petStack := petInv.ItemByTemplateID(item.AdenaID)
+	if petStack == nil || petStack.ObjectID != ground.ObjectID() || petStack.OwnerID != pet.ObjectID() {
+		t.Fatalf("pet stack = %+v, want picked up ground adena despite over weight limit", petStack)
+	}
+}
+
 func TestPetGetItemConsumesHerb(t *testing.T) {
 	const herbTemplate int32 = 8600
 	templates := herbTestTemplates()
