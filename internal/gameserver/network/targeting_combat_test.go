@@ -300,17 +300,7 @@ func TestCastFinishResumesPendingAttackIntention(t *testing.T) {
 
 			// Isolates the finish-observer gate: see the doc comment above
 			// on why this doesn't reflect a real cast-start call site yet.
-			// Stop() now fires the finished hook for an aborted in-flight
-			// swing too (#1158), which would otherwise let this manual
-			// pause immediately re-trigger combat.Think() and resume the
-			// swing before the cast under test even starts; detach the
-			// hook for this one call and restore it right after.
-			attacker.attack.SetFinished(nil)
 			attacker.attack.Stop()
-			attacker.attack.SetFinished(func() {
-				gcl.finishDeferredPickup(attacker)
-				attacker.combat.Think()
-			})
 			attackerFrames.frames = nil
 
 			controller := gcl.castController(attacker)

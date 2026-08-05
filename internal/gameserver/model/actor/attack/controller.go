@@ -295,21 +295,14 @@ func (c *Controller) DoAttack(target attackable.Combatant) {
 	}
 }
 
-// Stop aborts the current attack and clears any pending bow cooldown. Like
-// the completion paths (finishAttack/finishBow/clearBowCooldown), it fires
-// the finished callback when it aborts an actor that was still mid-swing or
-// bow-cooling, so a deferred intention blocked on the swing (e.g. a queued
-// ground-item pickup) is promoted on abort exactly as it is on natural
-// completion — the reference has no "only on natural completion" gate.
+// Stop aborts the current attack and clears any pending bow cooldown.
 func (c *Controller) Stop() {
 	c.mu.Lock()
 	c.stopTimerLocked()
-	wasBusy := c.attacking || c.bowCooling
 	c.attackSeq++
 	c.attacking = false
 	c.inHitAnimation = false
 	c.bowCooling = false
-	finished := c.finished
 	c.mu.Unlock()
 
 	if c.playable != nil {
@@ -317,13 +310,6 @@ func (c *Controller) Stop() {
 	}
 	if c.player != nil {
 		c.player.ClientActionFailed()
-	}
-
-	// Fired last: finished may itself start a new attack (e.g. a promoted
-	// intention re-evaluating and re-attacking), which must land after the
-	// abort notifications above, not race them.
-	if wasBusy && finished != nil {
-		finished()
 	}
 }
 
