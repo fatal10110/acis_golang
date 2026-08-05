@@ -36,6 +36,9 @@ func (l *GameClientLink) detachLivePlayer(ctx context.Context, live *livePlayer)
 
 	if l.roster != nil || l.skills != nil {
 		if l.roster != nil {
+			if err := l.roster.Save(saveCtx, live.Character); err != nil {
+				l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("save player full stats")
+			}
 			if err := l.roster.SavePosition(saveCtx, live.Character); err != nil {
 				l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("save player position")
 			}

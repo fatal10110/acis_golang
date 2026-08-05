@@ -147,12 +147,10 @@ func (e *TaskEffects) Drown(actor task.WaterActor) {
 
 // Save persists actor's full character stats, matching GameClient's
 // periodic autosave. It still saves for a session mid-detach (detaching set
-// but not yet removed from world state): detachLivePlayer itself does not
-// persist level/exp/sp/HP-CP-MP (issue #1198 is still open), so skipping
-// here would silently drop whatever this tick's window would have caught,
-// with nothing else to catch it. detachLivePlayer's saves target disjoint
-// columns (position, death-penalty level, offline recency, skills), so a
-// concurrent write here is safe.
+// but not yet removed from world state, autosave.Remove not yet called):
+// detachLivePlayer also calls Roster.Save on the same columns, but both
+// reads pull from the same in-memory character values, so a concurrent
+// write here is redundant, not unsafe.
 func (e *TaskEffects) Save(actor task.AutosaveActor) {
 	e.mu.RLock()
 	roster, log := e.roster, e.log
