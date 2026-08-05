@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"sync"
 )
 
 // FrameHeaderSize is the length of a length-prefixed frame's own header,
@@ -107,4 +108,38 @@ func (fr *FrameReader) ReadFrame() ([]byte, error) {
 func WriteFrame(w io.Writer, payload []byte) error {
 	_, err := w.Write(FrameBytes(payload))
 	return err
+}
+
+const (
+	copyFrameWriterCapacity = 256
+	// maxCopyFrameWriterCapacity keeps routine copies pooled while
+	// preventing outliers from pinning buffers near the uint16 frame-size
+	// limit.
+	maxCopyFrameWriterCapacity = 8 * 1024
+)
+
+var copyFramePool = sync.Pool{
+	New: func() any {
+		return NewFrameWriter(copyFrameWriterCapacity)
+	},
+}
+
+func releaseCopyFrameWriter(w *Writer) {
+	if w.Cap() > maxCopyFrameWriterCapacity {
+		return
+	}
+	copyFramePool.Put(w)
+}
+
+// CopyFrame returns an independently owned pooled copy of frame, for a
+// recipient that encrypts or otherwise mutates its outgoing bytes in place.
+// It reports false when frame does not contain a complete header.
+func CopyFrame(frame Frame) (Frame, bool) {
+	if len(frame.Bytes()) < FrameHeaderSize {
+		return Frame{}, false
+	}
+	w := copyFramePool.Get().(*Writer)
+	w.ResetFrame(copyFrameWriterCapacity)
+	w.WriteBytes(frame.Bytes()[FrameHeaderSize:])
+	return OwnedFrame(w.Frame(), w, releaseCopyFrameWriter), true
 }

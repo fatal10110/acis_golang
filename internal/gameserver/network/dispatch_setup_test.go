@@ -369,6 +369,7 @@ func newTestHostileNPC(t *testing.T, id int32) *npc.Hostile {
 	if err != nil {
 		t.Fatal(err)
 	}
+	hostile.SetFrameBuilder(serverpackets.NpcFrameBuilder{})
 	return hostile
 }
 

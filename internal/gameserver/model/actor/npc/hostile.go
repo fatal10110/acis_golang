@@ -47,9 +47,10 @@ type Hostile struct {
 
 	Instance *Instance
 
-	brain *ai.Attackable
-	move  ai.MoveController
-	world *world.State
+	brain  *ai.Attackable
+	move   ai.MoveController
+	world  *world.State
+	frames FrameBuilder
 
 	known world.KnownBuffer
 
@@ -178,6 +179,14 @@ func shotCounts(tpl *Template) (soulshots, spiritshots int, err error) {
 // fixes its signature to the snapshot alone.
 func (h *Hostile) SetWorld(state *world.State) {
 	h.world = state
+}
+
+// SetFrameBuilder records the network-layer hook that translates this NPC's
+// broadcast-worthy state changes into wire frames, keeping serverpackets and
+// wire-encoding knowledge out of the model layer. Broadcast* is a no-op
+// until both SetWorld and SetFrameBuilder have been called.
+func (h *Hostile) SetFrameBuilder(b FrameBuilder) {
+	h.frames = b
 }
 
 // SyncPosition moves this NPC's world-grid presence to position. A no-op

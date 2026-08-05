@@ -10,7 +10,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
-	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -199,11 +198,11 @@ func (h *Hostile) RechargeShots(physical, magic bool) {
 }
 
 func (h *Hostile) broadcastShotRecharge(skillID int32) {
-	if h.world == nil {
+	if h.world == nil || h.frames == nil {
 		return
 	}
 	x, y, z := h.Position()
-	self := serverpackets.SkillCastObject{ObjectID: h.ObjectID(), Location: location.Location{X: x, Y: y, Z: z}}
+	self := location.Location{X: x, Y: y, Z: z}
 	var frame wire.Frame
 	built := false
 	defer func() { frame.Release() }()
@@ -211,10 +210,10 @@ func (h *Hostile) broadcastShotRecharge(skillID int32) {
 		receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
 		if ok {
 			if !built {
-				frame = serverpackets.FrameMagicSkillUse(self, self, skillID, 1, 0, 0, false)
+				frame = h.frames.SkillUse(h.ObjectID(), self, h.ObjectID(), self, skillID, 1, 0, 0, false)
 				built = true
 			}
-			owned, copied := serverpackets.CopyFrame(frame)
+			owned, copied := wire.CopyFrame(frame)
 			if copied {
 				receiver.SendFrame(owned)
 			}
@@ -317,8 +316,11 @@ func (h *Hostile) MakeAttackHit(target attackable.Combatant, split bool) attack.
 // observer capable of receiving one (i.e. a connected player session). It
 // is a no-op until SetWorld has been called.
 func (h *Hostile) BroadcastAttack(snapshot attack.Snapshot) {
+	if h.frames == nil {
+		return
+	}
 	h.broadcastFrame(func() wire.Frame {
-		return serverpackets.FrameAttack(snapshot)
+		return h.frames.Attack(snapshot)
 	})
 }
 
@@ -327,13 +329,14 @@ func (h *Hostile) BroadcastAttack(snapshot attack.Snapshot) {
 // observer capable of receiving one. It is a no-op until SetWorld has been
 // called.
 func (h *Hostile) BroadcastSkillUse(targetID int32, targetX, targetY, targetZ int, skillID, level int32, hitTime, reuseDelay int) {
+	if h.frames == nil {
+		return
+	}
 	sx, sy, sz := h.Position()
+	origin := location.Location{X: sx, Y: sy, Z: sz}
+	targetAt := location.Location{X: targetX, Y: targetY, Z: targetZ}
 	h.broadcastFrame(func() wire.Frame {
-		return serverpackets.FrameMagicSkillUse(
-			serverpackets.SkillCastObject{ObjectID: h.ObjectID(), Location: location.Location{X: sx, Y: sy, Z: sz}},
-			serverpackets.SkillCastObject{ObjectID: targetID, Location: location.Location{X: targetX, Y: targetY, Z: targetZ}},
-			skillID, level, hitTime, reuseDelay, false,
-		)
+		return h.frames.SkillUse(h.ObjectID(), origin, targetID, targetAt, skillID, level, hitTime, reuseDelay, false)
 	})
 }
 
@@ -341,8 +344,11 @@ func (h *Hostile) BroadcastSkillUse(targetID int32, targetX, targetY, targetZ in
 // level, listing targetIDs, to every currently known observer capable of
 // receiving one. It is a no-op until SetWorld has been called.
 func (h *Hostile) BroadcastSkillLaunched(skillID, level int32, targetIDs []int32) {
+	if h.frames == nil {
+		return
+	}
 	h.broadcastFrame(func() wire.Frame {
-		return serverpackets.FrameMagicSkillLaunched(h.ObjectID(), skillID, level, targetIDs)
+		return h.frames.SkillLaunched(h.ObjectID(), skillID, level, targetIDs)
 	})
 }
 
@@ -351,8 +357,11 @@ func (h *Hostile) BroadcastSkillLaunched(skillID, level int32, targetIDs []int32
 // instead of leaving this NPC standing until its corpse decays. It is a
 // no-op until SetWorld has been called.
 func (h *Hostile) BroadcastDie() {
+	if h.frames == nil {
+		return
+	}
 	h.broadcastFrame(func() wire.Frame {
-		return serverpackets.FrameDie(h.ObjectID(), serverpackets.DieOptions{})
+		return h.frames.Die(h.ObjectID())
 	})
 }
 
@@ -360,7 +369,10 @@ func (h *Hostile) BroadcastDie() {
 // known observer capable of receiving one. It is a no-op until SetWorld has
 // been called.
 func (h *Hostile) BroadcastMove(event move.Event) {
-	h.broadcastFrame(func() wire.Frame { return serverpackets.FrameMove(h.ObjectID(), event) })
+	if h.frames == nil {
+		return
+	}
+	h.broadcastFrame(func() wire.Frame { return h.frames.Move(h.ObjectID(), event) })
 }
 
 // BroadcastMoveToPawn sends a rotation-only MoveToPawn notice toward target
@@ -369,7 +381,7 @@ func (h *Hostile) BroadcastMove(event move.Event) {
 // has already turned the actor toward target. It is a no-op until SetWorld
 // has been called or if target exposes no position.
 func (h *Hostile) BroadcastMoveToPawn(target attackable.Combatant) {
-	if h.world == nil {
+	if h.world == nil || h.frames == nil {
 		return
 	}
 	located, ok := target.(interface{ Position() (int, int, int) })
@@ -383,7 +395,7 @@ func (h *Hostile) BroadcastMoveToPawn(target attackable.Combatant) {
 	distance := int(origin.Distance3D(dest))
 
 	h.broadcastFrame(func() wire.Frame {
-		return serverpackets.FrameMoveToPawn(h.ObjectID(), target.ObjectID(), distance, origin)
+		return h.frames.MoveToPawn(h.ObjectID(), target.ObjectID(), distance, origin)
 	})
 }
 
@@ -391,12 +403,12 @@ func (h *Hostile) BroadcastMoveToPawn(target attackable.Combatant) {
 // observer capable of receiving one. It is a no-op until SetWorld has been
 // called.
 func (h *Hostile) BroadcastStop() {
-	if h.world == nil {
+	if h.world == nil || h.frames == nil {
 		return
 	}
 	x, y, z := h.Position()
 	at := location.Location{X: x, Y: y, Z: z}
-	h.broadcastFrame(func() wire.Frame { return serverpackets.FrameStopMove(h.ObjectID(), at, h.Heading()) })
+	h.broadcastFrame(func() wire.Frame { return h.frames.Stop(h.ObjectID(), at, h.Heading()) })
 }
 
 // BroadcastStatus sends this NPC's current/max HP to every currently known
@@ -404,14 +416,11 @@ func (h *Hostile) BroadcastStop() {
 // damage as it lands rather than only the moment it dies. It is a no-op
 // until SetWorld has been called.
 func (h *Hostile) BroadcastStatus() {
-	if h.world == nil {
+	if h.world == nil || h.frames == nil {
 		return
 	}
-	attrs := []serverpackets.StatusAttribute{
-		{Type: serverpackets.StatusMaxHP, Value: h.MaxHP()},
-		{Type: serverpackets.StatusCurrentHP, Value: h.CurrentHP()},
-	}
-	h.broadcastFrame(func() wire.Frame { return serverpackets.FrameStatusUpdate(h.ObjectID(), attrs) })
+	maxHP, curHP := h.MaxHP(), h.CurrentHP()
+	h.broadcastFrame(func() wire.Frame { return h.frames.Status(h.ObjectID(), maxHP, curHP) })
 }
 
 func (h *Hostile) broadcastFrame(build func() wire.Frame) {
@@ -429,7 +438,7 @@ func (h *Hostile) broadcastFrame(build func() wire.Frame) {
 				frame = build()
 				built = true
 			}
-			owned, copied := serverpackets.CopyFrame(frame)
+			owned, copied := wire.CopyFrame(frame)
 			if copied {
 				receiver.SendFrame(owned)
 			}

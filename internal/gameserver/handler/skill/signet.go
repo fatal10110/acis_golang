@@ -171,6 +171,7 @@ func (h signetHandler) spawnActor(caster any, def modelskill.Definition) (*npc.E
 		return nil, false
 	}
 	actor.SetWorld(h.world)
+	actor.SetFrameBuilder(serverpackets.NpcFrameBuilder{})
 
 	pos, ok := caster.(signetPositioned)
 	if !ok {
