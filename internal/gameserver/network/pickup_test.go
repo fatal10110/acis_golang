@@ -572,6 +572,57 @@ func TestStartPickupLiveGroundItemDefersUntilAttackFinishes(t *testing.T) {
 	}
 }
 
+// TestStartPickupLiveGroundItemDefersUntilAttackAborted is the regression
+// test for issue #1158: a deferred pickup must drain when its blocking swing
+// is aborted (attack.Controller.Stop()), not only when it lands naturally —
+// the reference promotes the next intention whenever the current one ends,
+// aborted or not, with no "only on natural completion" gate.
+func TestStartPickupLiveGroundItemDefersUntilAttackAborted(t *testing.T) {
+	templates := petTestTemplates()
+	frames := &frameCapture{}
+	live := newTestLivePlayer(t, 1, frames)
+	state := world.New()
+	drops := task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour}, time.Now)
+	gcl := &GameClientLink{world: state, groundItems: drops, inventory: invops.NewService(nil)}
+	wireLiveAttackHooks(gcl, live)
+	target := newTestHostileNPC(t, 2)
+	target.Instance.Template.PDef = 1
+	target.Instance.Template.DEX = 30
+	target.SetRollSource(func(int) int { return 0 })
+	tmpl, _ := templates.Get(item.AdenaID)
+	ground := dropTestGround(t, state, drops, item.Instance{ObjectID: 900, TemplateID: item.AdenaID, Count: 1, ManaLeft: -1}, tmpl, 100, 0, 0)
+	state.Spawn(live, 100, 0, 0, 0)
+	state.Spawn(target, 130, 0, 0, 0)
+	t.Cleanup(live.Stop)
+
+	if !gcl.attackLiveTarget(live, target) {
+		t.Fatal("attackLiveTarget returned false")
+	}
+	if !gcl.startPickupLiveGroundItem(context.Background(), live, ground, false) {
+		t.Fatal("startPickupLiveGroundItem returned false")
+	}
+	live.Character.SetFrameSender(func(frame wire.Frame) bool {
+		frame.Release()
+		return true
+	})
+
+	// Abort the in-flight swing (movement/stun/another action's Stop()) —
+	// the deferred pickup must drain right away instead of waiting for a
+	// swing that will never complete naturally.
+	live.attack.Stop()
+
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		if _, ok := state.Object(ground.ObjectID()); !ok {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("deferred pickup did not run when the attack was aborted")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
 // TestFinishDeferredPickupWalksToOutOfRangeItem is the regression test for
 // PR 1074 finding 1: a pickup click deferred until its blocker (an attack
 // swing, here simulated directly by pre-populating the deferred slot) clears

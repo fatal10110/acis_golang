@@ -208,6 +208,77 @@ func TestCreatureAttackStopCancelsPendingHit(t *testing.T) {
 	}
 }
 
+func TestCreatureAttackStopFiresFinishedForInFlightSwing(t *testing.T) {
+	clock := &fakeAttackClock{}
+	actor := attackActor{
+		id:          100,
+		known:       map[int32]bool{200: true},
+		canSee:      true,
+		canReach:    true,
+		attackType:  item.WeaponSword,
+		attackSpeed: 500,
+		hit:         Hit{TargetID: 200, Damage: 37},
+	}
+	target := attackTarget{id: 200, attackable: true}
+	ctrl := NewCreature(&actor)
+	ctrl.afterFunc = clock.AfterFunc
+	finishedCalls := 0
+	ctrl.SetFinished(func() { finishedCalls++ })
+
+	ctrl.DoAttack(&target)
+	ctrl.Stop()
+	if finishedCalls != 1 {
+		t.Fatalf("finished calls after Stop() mid-swing = %d, want 1", finishedCalls)
+	}
+
+	// The aborted timers must not fire finished a second time.
+	clock.fire(time.Second)
+	if finishedCalls != 1 {
+		t.Fatalf("finished calls after aborted timers fire = %d, want 1", finishedCalls)
+	}
+}
+
+func TestCreatureAttackStopFiresFinishedDuringBowCooldown(t *testing.T) {
+	clock := &fakeAttackClock{}
+	actor := attackActor{
+		id:          100,
+		known:       map[int32]bool{200: true},
+		canSee:      true,
+		canReach:    true,
+		attackType:  item.WeaponBow,
+		attackSpeed: 500,
+		weaponReuse: time.Second,
+		hit:         Hit{TargetID: 200, Damage: 37},
+	}
+	target := attackTarget{id: 200, attackable: true}
+	ctrl := NewCreature(&actor)
+	ctrl.afterFunc = clock.AfterFunc
+	finishedCalls := 0
+	ctrl.SetFinished(func() { finishedCalls++ })
+
+	ctrl.DoAttack(&target)
+	clock.fire(time.Second) // swing lands, bow enters its reuse cooldown
+	if finishedCalls != 0 {
+		t.Fatalf("finished calls while still cooling = %d, want 0", finishedCalls)
+	}
+
+	ctrl.Stop()
+	if finishedCalls != 1 {
+		t.Fatalf("finished calls after Stop() mid-cooldown = %d, want 1", finishedCalls)
+	}
+}
+
+func TestCreatureAttackStopWithoutActiveSwingDoesNotFireFinished(t *testing.T) {
+	ctrl := NewCreature(&attackActor{})
+	finishedCalls := 0
+	ctrl.SetFinished(func() { finishedCalls++ })
+
+	ctrl.Stop()
+	if finishedCalls != 0 {
+		t.Fatalf("finished calls from idle Stop() = %d, want 0", finishedCalls)
+	}
+}
+
 func TestCreatureAttackRejectsNewAttackWhileBusy(t *testing.T) {
 	clock := &fakeAttackClock{}
 	actor := attackActor{
