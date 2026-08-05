@@ -780,12 +780,14 @@ func TestPickupLiveGroundItemRejectsOutOfRange(t *testing.T) {
 	}
 }
 
-// TestStartPickupLiveGroundItemRejectsBlockedWalkWithActionFailedFirst covers
-// walkOrForwardPickup's own out-of-range rejection (targeting.go:117-119),
+// TestStartPickupLiveGroundItemRejectsBlockedWalkWithActionFailedOnly covers
+// walkOrForwardPickup's own approach-move-fails branch (targeting.go),
 // reached when a pickup click can't collect immediately and the walk toward
-// the item is itself geo-blocked. ActionFailed must still lead the
-// SystemMessage, same as every other pickup rejection branch.
-func TestStartPickupLiveGroundItemRejectsBlockedWalkWithActionFailedFirst(t *testing.T) {
+// the item is itself geo-blocked. Only ActionFailed is sent, matching the
+// reference's thinkPickUp: maybeMoveToLocation returns without moving and no
+// system message follows (CreatureMove.java:433-447, PlayableAI.java:
+// 225-228).
+func TestStartPickupLiveGroundItemRejectsBlockedWalkWithActionFailedOnly(t *testing.T) {
 	templates := petTestTemplates()
 	capture := &frameCapture{}
 	live := newTestLivePlayerWithGeo(t, 1, capture, blockedTestGeo{})
@@ -802,7 +804,7 @@ func TestStartPickupLiveGroundItemRejectsBlockedWalkWithActionFailedFirst(t *tes
 		t.Fatal("startPickupLiveGroundItem returned false for a ground item target")
 	}
 
-	assertOpcodeSequence(t, capture.frames, serverpackets.OpcodeActionFailed, serverpackets.OpcodeSystemMessage)
+	assertOpcodeSequence(t, capture.frames, serverpackets.OpcodeActionFailed)
 	if _, ok := state.Object(ground.ObjectID()); !ok {
 		t.Fatal("ground item removed after a blocked-walk pickup attempt")
 	}
