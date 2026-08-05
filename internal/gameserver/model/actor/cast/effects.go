@@ -45,6 +45,19 @@ func ApplyEffects(handlers EffectHandlers, caster any, resolved Target, def mode
 // ApplyEffectsResult resolves def's affected targets and returns any
 // caster-visible result the selected skill handler produced.
 func ApplyEffectsResult(handlers EffectHandlers, caster any, resolved Target, def modelskill.Definition) EffectResult {
+	return applyEffectsResult(handlers, caster, resolved, def, nil)
+}
+
+// ApplyItemEffectsResult is ApplyEffectsResult for a skill cast that carries
+// the item it was cast with (e.g. a pet-collar's SUMMON_CREATURE cast),
+// threading item through to the skill handler as handlerskill.Cast.Item —
+// ApplyEffectsResult itself never sets Item, matching every other skill
+// type, which has no use for it.
+func ApplyItemEffectsResult(handlers EffectHandlers, caster any, resolved Target, def modelskill.Definition, item any) EffectResult {
+	return applyEffectsResult(handlers, caster, resolved, def, item)
+}
+
+func applyEffectsResult(handlers EffectHandlers, caster any, resolved Target, def modelskill.Definition, item any) EffectResult {
 	casterCreature, ok := caster.(skilltarget.Creature)
 	if !ok || handlers.Targets == nil || handlers.Skills == nil {
 		return EffectResult{}
@@ -70,6 +83,7 @@ func ApplyEffectsResult(handlers EffectHandlers, caster any, resolved Target, de
 		Caster:  caster,
 		Skill:   def,
 		Targets: castTargets,
+		Item:    item,
 	})
 	if !ok {
 		return EffectResult{}

@@ -1,0 +1,170 @@
+package network
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/worldobject"
+	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+)
+
+type fakePetStoreNoSaved struct{}
+
+func (fakePetStoreNoSaved) Get(context.Context, int32) (petmodel.State, bool, error) {
+	return petmodel.State{}, false, nil
+}
+
+type fakeSummonIDs struct{ next int32 }
+
+func (f *fakeSummonIDs) NextID() (int32, error) {
+	f.next++
+	return f.next, nil
+}
+
+const summonTestCollarTemplateID = 91000
+
+func summonTestPetNPCTemplate() *npc.Template {
+	return &npc.Template{
+		ID: 12500, Name: "Wolf", Level: 10,
+		STR: 40, CON: 43, DEX: 30, INT: 22, WIT: 20, MEN: 20,
+		BaseAttackRange: 40,
+		Pet: &npc.PetData{
+			Food1: 2515, Food2: 2516,
+			AutoFeedLimit: 55, HungryLimit: 30, UnsummonLimit: 10,
+			Levels: map[int]npc.PetLevelStats{
+				10: {MaxHP: 400, MaxMP: 80, PAtk: 100, PDef: 90, MAtk: 20, MDef: 40, MaxMeal: 3000, MealInNormal: 5, MealInBattle: 10},
+			},
+		},
+		Skills: map[int]int{2046: 1},
+	}
+}
+
+// newSummonTestLink builds a GameClientLink whose npcs/summonItems/petStore
+// are wired for gameSummonSpawner.SpawnPet, sharing state with the caller
+// so the caller can assert against it.
+func newSummonTestLink(t *testing.T) (*GameClientLink, *world.State) {
+	t.Helper()
+	npcs := npc.NewTable([]*npc.Template{summonTestPetNPCTemplate()})
+	summonItems, err := item.NewSummonItemTable([]item.SummonItem{
+		{ItemID: summonTestCollarTemplateID, NPCID: 12500, SummonType: summonItemTypePet},
+	})
+	if err != nil {
+		t.Fatalf("build summon item table: %v", err)
+	}
+	state := world.New()
+	link := NewGameClientLink(GameClientLinkConfig{
+		World:         state,
+		NPCs:          npcs,
+		SummonItems:   summonItems,
+		PetStore:      fakePetStoreNoSaved{},
+		IDs:           &fakeSummonIDs{},
+		Skills:        summonTestSkillTable(t),
+		ItemTemplates: testItemTemplates(),
+	})
+	return link, state
+}
+
+// summonTestSkillTable registers SUMMON_CREATURE (2046,1) with a zero hit
+// time so a test can drive its Launch/Hit phases synchronously without a
+// fake clock, mirroring itemAICastSkillTable's TELEPORT fixture.
+func summonTestSkillTable(t *testing.T) *skillstate.Persistence {
+	t.Helper()
+	store := newMemorySkillSaveStore()
+	return skillstate.NewPersistence(store, modelskill.NewTable([]modelskill.Definition{
+		{
+			ID: 2046, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+			SkillType: "SUMMON_CREATURE", StaticHitTime: true, HitTime: 0, StaticReuse: true, ReuseDelay: 0,
+		},
+	}), store)
+}
+
+func TestGameSummonSpawnerSpawnPetRegistersLiveActor(t *testing.T) {
+	link, state := newSummonTestLink(t)
+	live := newTestLivePlayer(t, 1, &frameCapture{})
+	inst := &item.Instance{ObjectID: 500, TemplateID: summonTestCollarTemplateID, OwnerID: live.ObjectID()}
+
+	spawner := &gameSummonSpawner{link: link, live: live}
+	if !spawner.SpawnPet(live.Character, inst) {
+		t.Fatalf("SpawnPet returned false")
+	}
+
+	obj, ok := state.Summon(live.ObjectID())
+	if !ok {
+		t.Fatalf("pet not registered in world.State as the owner's active summon")
+	}
+	pet, ok := obj.(*summon.Actor)
+	if !ok {
+		t.Fatalf("registered summon is %T, want *summon.Actor", obj)
+	}
+	if pet.NPCID() != 12500 {
+		t.Fatalf("NPCID() = %d, want 12500", pet.NPCID())
+	}
+
+	// TryUseSkill previously short-circuited to false whenever no AI was
+	// attached (Actor.brain == nil); SpawnPet must leave it non-nil so an
+	// owner-commanded skill dispatch actually reaches the AI layer, even
+	// though the cast controller itself is wired by a follow-up.
+	if !pet.TryUseSkill(2046, live.Character) {
+		t.Fatalf("TryUseSkill(2046) = false after spawn, want true (AI must be attached)")
+	}
+}
+
+// TestUseSummonItemSpawnsPetEndToEnd drives the pet-collar item-use trigger
+// itself (rather than gameSummonSpawner.SpawnPet directly), proving the
+// whole chain from a client's item-use action through the timed
+// Launch/Hit cast to a live, AI-attached pet in the world.
+func TestUseSummonItemSpawnsPetEndToEnd(t *testing.T) {
+	link, state := newSummonTestLink(t)
+	live := newTestLivePlayer(t, 1, &frameCapture{})
+	inst := &item.Instance{ObjectID: 500, TemplateID: summonTestCollarTemplateID, OwnerID: live.ObjectID()}
+	live.Inventory().Restore([]*item.Instance{inst})
+
+	if !link.useSummonItem(live, live.Inventory(), inst) {
+		t.Fatalf("useSummonItem returned false, want true (handled)")
+	}
+
+	// The Hit phase fires on a real time.AfterFunc(0, ...) timer (the cast
+	// controller has no injectable clock at this layer, matching every
+	// other production cast path); poll briefly instead of asserting
+	// synchronously.
+	var obj worldobject.Object
+	var ok bool
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		if obj, ok = state.Summon(live.ObjectID()); ok {
+			break
+		}
+		time.Sleep(time.Millisecond)
+	}
+	if !ok {
+		t.Fatalf("pet not registered in world.State after item use")
+	}
+	pet, ok := obj.(*summon.Actor)
+	if !ok {
+		t.Fatalf("registered summon is %T, want *summon.Actor", obj)
+	}
+	if !pet.TryUseSkill(2046, live.Character) {
+		t.Fatalf("TryUseSkill(2046) = false after item-use spawn, want true")
+	}
+}
+
+func TestGameSummonSpawnerSpawnPetRejectsSecondSummon(t *testing.T) {
+	link, _ := newSummonTestLink(t)
+	live := newTestLivePlayer(t, 1, &frameCapture{})
+	inst := &item.Instance{ObjectID: 500, TemplateID: summonTestCollarTemplateID, OwnerID: live.ObjectID()}
+
+	spawner := &gameSummonSpawner{link: link, live: live}
+	if !spawner.SpawnPet(live.Character, inst) {
+		t.Fatalf("first SpawnPet returned false")
+	}
+	if spawner.SpawnPet(live.Character, inst) {
+		t.Fatalf("second SpawnPet returned true, want false (SUMMON_ONLY_ONE)")
+	}
+}

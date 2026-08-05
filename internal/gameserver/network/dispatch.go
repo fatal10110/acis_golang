@@ -49,6 +49,12 @@ type shortcutStore interface {
 	Delete(ctx context.Context, ownerID int32, slot, page int32) error
 }
 
+// petStore is the narrow persistence surface a pet-collar restore needs:
+// the saved row for a collar's pet, if any (data/sql.PetStore.Get).
+type petStore interface {
+	Get(ctx context.Context, itemObjectID int32) (petmodel.State, bool, error)
+}
+
 type attackStanceTracker interface {
 	Add(task.AttackStanceActor)
 	InAttackStance(task.AttackStanceActor) bool
@@ -110,6 +116,8 @@ type GameClientLink struct {
 	cursedWeapons *entity.CursedWeaponTable
 	world         *world.State
 	npcs          *npc.Table
+	summonItems   *item.SummonItemTable
+	petStore      petStore
 	geo           move.Geo
 	zones         *zone.Index
 	ids           idAllocator
@@ -183,6 +191,8 @@ type GameClientLinkConfig struct {
 	CursedWeapons *entity.CursedWeaponTable
 	World         *world.State
 	NPCs          *npc.Table
+	SummonItems   *item.SummonItemTable
+	PetStore      petStore
 	Geo           move.Geo
 	Zones         *zone.Index
 	IDs           idAllocator
@@ -227,6 +237,8 @@ func NewGameClientLink(cfg GameClientLinkConfig) *GameClientLink {
 		cursedWeapons: cfg.CursedWeapons,
 		world:         cfg.World,
 		npcs:          cfg.NPCs,
+		summonItems:   cfg.SummonItems,
+		petStore:      cfg.PetStore,
 		geo:           cfg.Geo,
 		zones:         cfg.Zones,
 		ids:           cfg.IDs,

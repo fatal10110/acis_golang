@@ -225,5 +225,13 @@ func testItemTemplates() *item.Table {
 			EtcItem:   &item.EtcItemDetail{},
 			Weight:    10,
 		},
+		{
+			ID:          91000,
+			Name:        "Wolf Collar",
+			Kind:        item.KindEtcItem,
+			Duration:    -1,
+			Destroyable: true,
+			EtcItem:     &item.EtcItemDetail{Handler: SummonItemsHandler},
+		},
 	})
 }
