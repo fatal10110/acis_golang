@@ -1,6 +1,10 @@
 package clientpackets
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
+)
 
 // RequestChangeMoveType asks the server to toggle walking/running.
 type RequestChangeMoveType struct {
@@ -41,7 +45,7 @@ func DecodeRequestSocialAction(payload []byte) (RequestSocialAction, error) {
 func decodeSingleInt32(payload []byte, name string) (int32, error) {
 	r := newReader(payload)
 	if r.Remaining() < 4 {
-		return 0, fmt.Errorf("clientpackets: %s: need 4 bytes, got %d", name, r.Remaining())
+		return 0, fmt.Errorf("clientpackets: %s: need 4 bytes, got %d: %w", name, r.Remaining(), wire.ErrShortPacket)
 	}
 	v := r.ReadInt32()
 	if err := r.Err(); err != nil {

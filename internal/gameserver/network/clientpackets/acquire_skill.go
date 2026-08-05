@@ -1,6 +1,10 @@
 package clientpackets
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
+)
 
 const requestAcquireSkillSize = 3 * 4
 
@@ -24,7 +28,7 @@ type RequestAcquireSkill struct {
 func DecodeRequestAcquireSkillInfo(payload []byte) (RequestAcquireSkillInfo, error) {
 	r := newReader(payload)
 	if r.Remaining() < requestAcquireSkillSize {
-		return RequestAcquireSkillInfo{}, fmt.Errorf("clientpackets: RequestAcquireSkillInfo: need %d bytes, got %d", requestAcquireSkillSize, r.Remaining())
+		return RequestAcquireSkillInfo{}, fmt.Errorf("clientpackets: RequestAcquireSkillInfo: need %d bytes, got %d: %w", requestAcquireSkillSize, r.Remaining(), wire.ErrShortPacket)
 	}
 	req := RequestAcquireSkillInfo{
 		SkillID:   r.ReadInt32(),
@@ -42,7 +46,7 @@ func DecodeRequestAcquireSkillInfo(payload []byte) (RequestAcquireSkillInfo, err
 func DecodeRequestAcquireSkill(payload []byte) (RequestAcquireSkill, error) {
 	r := newReader(payload)
 	if r.Remaining() < requestAcquireSkillSize {
-		return RequestAcquireSkill{}, fmt.Errorf("clientpackets: RequestAcquireSkill: need %d bytes, got %d", requestAcquireSkillSize, r.Remaining())
+		return RequestAcquireSkill{}, fmt.Errorf("clientpackets: RequestAcquireSkill: need %d bytes, got %d: %w", requestAcquireSkillSize, r.Remaining(), wire.ErrShortPacket)
 	}
 	req := RequestAcquireSkill{
 		SkillID:   r.ReadInt32(),

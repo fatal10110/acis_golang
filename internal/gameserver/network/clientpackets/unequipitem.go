@@ -1,6 +1,10 @@
 package clientpackets
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
+)
 
 // OpcodeRequestUnEquipItem is the wire opcode for unequipping the item
 // occupying a given body slot.
@@ -19,7 +23,7 @@ type UnequipItem struct {
 func DecodeUnequipItem(payload []byte) (UnequipItem, error) {
 	r := newReader(payload)
 	if r.Remaining() < unequipItemSize {
-		return UnequipItem{}, fmt.Errorf("clientpackets: UnequipItem: need %d bytes, got %d", unequipItemSize, r.Remaining())
+		return UnequipItem{}, fmt.Errorf("clientpackets: UnequipItem: need %d bytes, got %d: %w", unequipItemSize, r.Remaining(), wire.ErrShortPacket)
 	}
 	req := UnequipItem{BodySlot: r.ReadInt32()}
 	if err := r.Err(); err != nil {

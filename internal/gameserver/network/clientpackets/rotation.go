@@ -1,6 +1,10 @@
 package clientpackets
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
+)
 
 const rotatingSize = 2 * 4
 
@@ -15,7 +19,7 @@ type StartRotating struct {
 func DecodeStartRotating(payload []byte) (StartRotating, error) {
 	r := newReader(payload)
 	if r.Remaining() < rotatingSize {
-		return StartRotating{}, fmt.Errorf("clientpackets: StartRotating: need %d bytes, got %d", rotatingSize, r.Remaining())
+		return StartRotating{}, fmt.Errorf("clientpackets: StartRotating: need %d bytes, got %d: %w", rotatingSize, r.Remaining(), wire.ErrShortPacket)
 	}
 	req := StartRotating{
 		Degree: r.ReadInt32(),
@@ -38,7 +42,7 @@ type FinishRotating struct {
 func DecodeFinishRotating(payload []byte) (FinishRotating, error) {
 	r := newReader(payload)
 	if r.Remaining() < rotatingSize {
-		return FinishRotating{}, fmt.Errorf("clientpackets: FinishRotating: need %d bytes, got %d", rotatingSize, r.Remaining())
+		return FinishRotating{}, fmt.Errorf("clientpackets: FinishRotating: need %d bytes, got %d: %w", rotatingSize, r.Remaining(), wire.ErrShortPacket)
 	}
 	req := FinishRotating{
 		Degree: r.ReadInt32(),

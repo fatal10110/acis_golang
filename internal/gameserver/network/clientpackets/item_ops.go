@@ -1,6 +1,10 @@
 package clientpackets
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
+)
 
 const (
 	requestDropItemSize     = 5 * 4
@@ -30,7 +34,7 @@ type RequestDropItem struct {
 func DecodeRequestDropItem(payload []byte) (RequestDropItem, error) {
 	r := newReader(payload)
 	if r.Remaining() < requestDropItemSize {
-		return RequestDropItem{}, fmt.Errorf("clientpackets: RequestDropItem: need %d bytes, got %d", requestDropItemSize, r.Remaining())
+		return RequestDropItem{}, fmt.Errorf("clientpackets: RequestDropItem: need %d bytes, got %d: %w", requestDropItemSize, r.Remaining(), wire.ErrShortPacket)
 	}
 	req := RequestDropItem{
 		ObjectID: r.ReadInt32(),
@@ -56,7 +60,7 @@ type RequestDestroyItem struct {
 func DecodeRequestDestroyItem(payload []byte) (RequestDestroyItem, error) {
 	r := newReader(payload)
 	if r.Remaining() < requestDestroyItemSize {
-		return RequestDestroyItem{}, fmt.Errorf("clientpackets: RequestDestroyItem: need %d bytes, got %d", requestDestroyItemSize, r.Remaining())
+		return RequestDestroyItem{}, fmt.Errorf("clientpackets: RequestDestroyItem: need %d bytes, got %d: %w", requestDestroyItemSize, r.Remaining(), wire.ErrShortPacket)
 	}
 	req := RequestDestroyItem{
 		ObjectID: r.ReadInt32(),
@@ -80,7 +84,7 @@ type RequestCrystallizeItem struct {
 func DecodeRequestCrystallizeItem(payload []byte) (RequestCrystallizeItem, error) {
 	r := newReader(payload)
 	if r.Remaining() < requestCrystallizeSize {
-		return RequestCrystallizeItem{}, fmt.Errorf("clientpackets: RequestCrystallizeItem: need %d bytes, got %d", requestCrystallizeSize, r.Remaining())
+		return RequestCrystallizeItem{}, fmt.Errorf("clientpackets: RequestCrystallizeItem: need %d bytes, got %d: %w", requestCrystallizeSize, r.Remaining(), wire.ErrShortPacket)
 	}
 	req := RequestCrystallizeItem{
 		ObjectID: r.ReadInt32(),
@@ -103,7 +107,7 @@ type RequestEnchantItem struct {
 func DecodeRequestEnchantItem(payload []byte) (RequestEnchantItem, error) {
 	r := newReader(payload)
 	if r.Remaining() < requestEnchantItemSize {
-		return RequestEnchantItem{}, fmt.Errorf("clientpackets: RequestEnchantItem: need %d bytes, got %d", requestEnchantItemSize, r.Remaining())
+		return RequestEnchantItem{}, fmt.Errorf("clientpackets: RequestEnchantItem: need %d bytes, got %d: %w", requestEnchantItemSize, r.Remaining(), wire.ErrShortPacket)
 	}
 	req := RequestEnchantItem{ObjectID: r.ReadInt32()}
 	if err := r.Err(); err != nil {
@@ -122,7 +126,7 @@ type RequestPetUseItem struct {
 func DecodeRequestPetUseItem(payload []byte) (RequestPetUseItem, error) {
 	r := newReader(payload)
 	if r.Remaining() < requestPetUseItemSize {
-		return RequestPetUseItem{}, fmt.Errorf("clientpackets: RequestPetUseItem: need %d bytes, got %d", requestPetUseItemSize, r.Remaining())
+		return RequestPetUseItem{}, fmt.Errorf("clientpackets: RequestPetUseItem: need %d bytes, got %d: %w", requestPetUseItemSize, r.Remaining(), wire.ErrShortPacket)
 	}
 	req := RequestPetUseItem{ObjectID: r.ReadInt32()}
 	if err := r.Err(); err != nil {
@@ -143,7 +147,7 @@ type RequestGiveItemToPet struct {
 func DecodeRequestGiveItemToPet(payload []byte) (RequestGiveItemToPet, error) {
 	r := newReader(payload)
 	if r.Remaining() < requestGiveItemToPet {
-		return RequestGiveItemToPet{}, fmt.Errorf("clientpackets: RequestGiveItemToPet: need %d bytes, got %d", requestGiveItemToPet, r.Remaining())
+		return RequestGiveItemToPet{}, fmt.Errorf("clientpackets: RequestGiveItemToPet: need %d bytes, got %d: %w", requestGiveItemToPet, r.Remaining(), wire.ErrShortPacket)
 	}
 	req := RequestGiveItemToPet{
 		ObjectID: r.ReadInt32(),
@@ -168,7 +172,7 @@ type RequestGetItemFromPet struct {
 func DecodeRequestGetItemFromPet(payload []byte) (RequestGetItemFromPet, error) {
 	r := newReader(payload)
 	if r.Remaining() < requestGetItemFromPet {
-		return RequestGetItemFromPet{}, fmt.Errorf("clientpackets: RequestGetItemFromPet: need %d bytes, got %d", requestGetItemFromPet, r.Remaining())
+		return RequestGetItemFromPet{}, fmt.Errorf("clientpackets: RequestGetItemFromPet: need %d bytes, got %d: %w", requestGetItemFromPet, r.Remaining(), wire.ErrShortPacket)
 	}
 	req := RequestGetItemFromPet{
 		ObjectID: r.ReadInt32(),
@@ -191,7 +195,7 @@ type RequestPetGetItem struct {
 func DecodeRequestPetGetItem(payload []byte) (RequestPetGetItem, error) {
 	r := newReader(payload)
 	if r.Remaining() < requestPetGetItem {
-		return RequestPetGetItem{}, fmt.Errorf("clientpackets: RequestPetGetItem: need %d bytes, got %d", requestPetGetItem, r.Remaining())
+		return RequestPetGetItem{}, fmt.Errorf("clientpackets: RequestPetGetItem: need %d bytes, got %d: %w", requestPetGetItem, r.Remaining(), wire.ErrShortPacket)
 	}
 	req := RequestPetGetItem{ObjectID: r.ReadInt32()}
 	if err := r.Err(); err != nil {
@@ -212,7 +216,7 @@ type SendTimeCheck struct {
 func DecodeSendTimeCheck(payload []byte) (SendTimeCheck, error) {
 	r := newReader(payload)
 	if r.Remaining() < sendTimeCheckSize {
-		return SendTimeCheck{}, fmt.Errorf("clientpackets: SendTimeCheck: need %d bytes, got %d", sendTimeCheckSize, r.Remaining())
+		return SendTimeCheck{}, fmt.Errorf("clientpackets: SendTimeCheck: need %d bytes, got %d: %w", sendTimeCheckSize, r.Remaining(), wire.ErrShortPacket)
 	}
 	req := SendTimeCheck{
 		RequestID:  r.ReadInt32(),
@@ -236,7 +240,7 @@ type RequestAutoSoulShot struct {
 func DecodeRequestAutoSoulShot(payload []byte) (RequestAutoSoulShot, error) {
 	r := newReader(payload)
 	if r.Remaining() < requestAutoSoulShotSize {
-		return RequestAutoSoulShot{}, fmt.Errorf("clientpackets: RequestAutoSoulShot: need %d bytes, got %d", requestAutoSoulShotSize, r.Remaining())
+		return RequestAutoSoulShot{}, fmt.Errorf("clientpackets: RequestAutoSoulShot: need %d bytes, got %d: %w", requestAutoSoulShotSize, r.Remaining(), wire.ErrShortPacket)
 	}
 	if second := r.ReadUint16(); second != OpcodeRequestAutoSoulShot {
 		return RequestAutoSoulShot{}, fmt.Errorf("clientpackets: RequestAutoSoulShot: extended opcode %#x", second)

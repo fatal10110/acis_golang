@@ -1,6 +1,10 @@
 package clientpackets
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
+)
 
 const (
 	tradeRequestSize       = 4
@@ -24,7 +28,7 @@ type TradeRequest struct {
 func DecodeTradeRequest(payload []byte) (TradeRequest, error) {
 	r := newReader(payload)
 	if r.Remaining() < tradeRequestSize {
-		return TradeRequest{}, fmt.Errorf("clientpackets: TradeRequest: need %d bytes, got %d", tradeRequestSize, r.Remaining())
+		return TradeRequest{}, fmt.Errorf("clientpackets: TradeRequest: need %d bytes, got %d: %w", tradeRequestSize, r.Remaining(), wire.ErrShortPacket)
 	}
 	req := TradeRequest{ObjectID: r.ReadInt32()}
 	if err := r.Err(); err != nil {
@@ -46,7 +50,7 @@ type AddTradeItem struct {
 func DecodeAddTradeItem(payload []byte) (AddTradeItem, error) {
 	r := newReader(payload)
 	if r.Remaining() < addTradeItemSize {
-		return AddTradeItem{}, fmt.Errorf("clientpackets: AddTradeItem: need %d bytes, got %d", addTradeItemSize, r.Remaining())
+		return AddTradeItem{}, fmt.Errorf("clientpackets: AddTradeItem: need %d bytes, got %d: %w", addTradeItemSize, r.Remaining(), wire.ErrShortPacket)
 	}
 	req := AddTradeItem{
 		TradeID:  r.ReadInt32(),
@@ -68,7 +72,7 @@ type TradeDone struct {
 func DecodeTradeDone(payload []byte) (TradeDone, error) {
 	r := newReader(payload)
 	if r.Remaining() < tradeDoneSize {
-		return TradeDone{}, fmt.Errorf("clientpackets: TradeDone: need %d bytes, got %d", tradeDoneSize, r.Remaining())
+		return TradeDone{}, fmt.Errorf("clientpackets: TradeDone: need %d bytes, got %d: %w", tradeDoneSize, r.Remaining(), wire.ErrShortPacket)
 	}
 	req := TradeDone{Response: r.ReadInt32()}
 	if err := r.Err(); err != nil {
@@ -87,7 +91,7 @@ type AnswerTradeRequest struct {
 func DecodeAnswerTradeRequest(payload []byte) (AnswerTradeRequest, error) {
 	r := newReader(payload)
 	if r.Remaining() < answerTradeRequestSize {
-		return AnswerTradeRequest{}, fmt.Errorf("clientpackets: AnswerTradeRequest: need %d bytes, got %d", answerTradeRequestSize, r.Remaining())
+		return AnswerTradeRequest{}, fmt.Errorf("clientpackets: AnswerTradeRequest: need %d bytes, got %d: %w", answerTradeRequestSize, r.Remaining(), wire.ErrShortPacket)
 	}
 	req := AnswerTradeRequest{Response: r.ReadInt32()}
 	if err := r.Err(); err != nil {
@@ -110,7 +114,7 @@ type RequestShortCutReg struct {
 func DecodeRequestShortCutReg(payload []byte) (RequestShortCutReg, error) {
 	r := newReader(payload)
 	if r.Remaining() < shortcutRegSize {
-		return RequestShortCutReg{}, fmt.Errorf("clientpackets: RequestShortCutReg: need %d bytes, got %d", shortcutRegSize, r.Remaining())
+		return RequestShortCutReg{}, fmt.Errorf("clientpackets: RequestShortCutReg: need %d bytes, got %d: %w", shortcutRegSize, r.Remaining(), wire.ErrShortPacket)
 	}
 	req := RequestShortCutReg{
 		Type: r.ReadInt32(),
@@ -137,7 +141,7 @@ type RequestShortCutDel struct {
 func DecodeRequestShortCutDel(payload []byte) (RequestShortCutDel, error) {
 	r := newReader(payload)
 	if r.Remaining() < shortcutDelSize {
-		return RequestShortCutDel{}, fmt.Errorf("clientpackets: RequestShortCutDel: need %d bytes, got %d", shortcutDelSize, r.Remaining())
+		return RequestShortCutDel{}, fmt.Errorf("clientpackets: RequestShortCutDel: need %d bytes, got %d: %w", shortcutDelSize, r.Remaining(), wire.ErrShortPacket)
 	}
 	slot := r.ReadInt32()
 	req := RequestShortCutDel{Slot: slot % 12, Page: slot / 12}
@@ -165,7 +169,7 @@ type RequestBuyItem struct {
 func DecodeRequestBuyItem(payload []byte) (RequestBuyItem, error) {
 	r := newReader(payload)
 	if r.Remaining() < shopHeaderSize {
-		return RequestBuyItem{}, fmt.Errorf("clientpackets: RequestBuyItem: need at least %d bytes, got %d", shopHeaderSize, r.Remaining())
+		return RequestBuyItem{}, fmt.Errorf("clientpackets: RequestBuyItem: need at least %d bytes, got %d: %w", shopHeaderSize, r.Remaining(), wire.ErrShortPacket)
 	}
 	req := RequestBuyItem{ListID: r.ReadInt32()}
 	count := r.ReadInt32()
@@ -206,7 +210,7 @@ type RequestSellItem struct {
 func DecodeRequestSellItem(payload []byte) (RequestSellItem, error) {
 	r := newReader(payload)
 	if r.Remaining() < shopHeaderSize {
-		return RequestSellItem{}, fmt.Errorf("clientpackets: RequestSellItem: need at least %d bytes, got %d", shopHeaderSize, r.Remaining())
+		return RequestSellItem{}, fmt.Errorf("clientpackets: RequestSellItem: need at least %d bytes, got %d: %w", shopHeaderSize, r.Remaining(), wire.ErrShortPacket)
 	}
 	req := RequestSellItem{ListID: r.ReadInt32()}
 	count := r.ReadInt32()
@@ -235,6 +239,10 @@ func validateShopRows(name string, count int32, rowSize, remaining int) error {
 	if count <= 0 {
 		return fmt.Errorf("clientpackets: %s: invalid item count %d", name, count)
 	}
+	// A row-count/remaining-length mismatch mirrors the reference's silent
+	// readImpl() return (RequestBuyItem/RequestSellItem: "count * BATCH_LENGTH
+	// != _buf.remaining()"), not a BufferUnderflowException: it never counts
+	// toward the underflow threshold, so this stays unwrapped.
 	if int64(count)*int64(rowSize) != int64(remaining) {
 		return fmt.Errorf("clientpackets: %s: %d item rows need %d bytes, got %d", name, count, int64(count)*int64(rowSize), remaining)
 	}
