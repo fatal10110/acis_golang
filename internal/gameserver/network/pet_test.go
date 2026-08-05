@@ -285,7 +285,16 @@ func TestPetGetItemPicksUpGroundItem(t *testing.T) {
 // before pet ground-item pickup (issue #1200) — a pet already over its
 // weight limit must still pick up and get no encumbered rejection.
 func TestPetGetItemPicksUpGroundItemOverPetWeightLimit(t *testing.T) {
-	templates := petTestTemplates()
+	const heavyID int32 = 9010
+	templates := item.NewTable([]*item.Template{
+		{ID: item.AdenaID, Name: "Adena", Kind: item.KindEtcItem, Duration: -1, Stackable: true, Dropable: true, Tradable: true, Destroyable: true, EtcItem: &item.EtcItemDetail{}},
+		{ID: 2375, Name: "Wolf Tooth", Kind: item.KindWeapon, Slot: item.SlotWolf, Duration: -1, Dropable: true, Tradable: true, Destroyable: true, Weapon: &item.WeaponDetail{Type: item.WeaponPet}},
+		{
+			ID: heavyID, Name: "Heavy Etc", Kind: item.KindEtcItem, Duration: -1,
+			Stackable: true, Dropable: true, Tradable: true, Destroyable: true,
+			Weight: 50, EtcItem: &item.EtcItemDetail{},
+		},
+	})
 	capture := &frameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
 	state := world.New()
@@ -293,11 +302,11 @@ func TestPetGetItemPicksUpGroundItemOverPetWeightLimit(t *testing.T) {
 	pet, petInv := attachTestPet(t, state, live, templates, 12077, nil)
 	petInv.WeightLimit = 1
 
-	tmpl, ok := templates.Get(item.AdenaID)
+	tmpl, ok := templates.Get(heavyID)
 	if !ok {
-		t.Fatal("adena template missing")
+		t.Fatal("heavy template missing")
 	}
-	ground, err := grounditem.New(item.Instance{ObjectID: 900, TemplateID: item.AdenaID, Count: 40, ManaLeft: -1}, tmpl)
+	ground, err := grounditem.New(item.Instance{ObjectID: 900, TemplateID: heavyID, Count: 1, ManaLeft: -1}, tmpl)
 	if err != nil {
 		t.Fatalf("ground item: %v", err)
 	}
@@ -317,9 +326,9 @@ func TestPetGetItemPicksUpGroundItemOverPetWeightLimit(t *testing.T) {
 		serverpackets.OpcodeDeleteObject,
 		serverpackets.OpcodePetInventoryUpdate,
 	)
-	petStack := petInv.ItemByTemplateID(item.AdenaID)
+	petStack := petInv.ItemByTemplateID(heavyID)
 	if petStack == nil || petStack.ObjectID != ground.ObjectID() || petStack.OwnerID != pet.ObjectID() {
-		t.Fatalf("pet stack = %+v, want picked up ground adena despite over weight limit", petStack)
+		t.Fatalf("pet stack = %+v, want picked up ground item despite over weight limit", petStack)
 	}
 }
 
