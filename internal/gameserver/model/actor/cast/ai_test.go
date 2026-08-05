@@ -238,7 +238,7 @@ func TestAIControllerCastSkipsEffectsForFusionSkill(t *testing.T) {
 	def.SkillType = "FUSION"
 
 	rec := &recordingSkillHandler{}
-	caster := &fakeCastCreature{id: 1, category: skilltarget.CategoryAttackable}
+	caster := &fakeBroadcastingCaster{fakeCastCreature: fakeCastCreature{id: 1, category: skilltarget.CategoryAttackable}}
 	target := &fakeCastCreature{id: 2, category: skilltarget.CategoryAttackable}
 
 	ai := &AIController{
@@ -250,9 +250,17 @@ func TestAIControllerCastSkipsEffectsForFusionSkill(t *testing.T) {
 
 	ai.Cast(target, ref)
 
-	clock.fire(125 * time.Millisecond)
+	// buildPlan skips atkSpd scaling for FUSION (controller.go:533-534,
+	// matching PlayerCast.doFusionCast's raw getHitTime() read), so unlike
+	// the atkSpd-scaled 125/400 choreography in the non-FUSION Hit test,
+	// scalingDef's raw 1500ms HitTime yields LaunchDelay 1100ms, HitDelay
+	// 400ms (controller.go:564-566).
+	clock.fire(1100 * time.Millisecond)
 	clock.fire(400 * time.Millisecond)
 
+	if len(caster.skillLaunchedCalls) != 1 {
+		t.Fatalf("BroadcastSkillLaunched calls = %d, want 1 (Hit phase must actually run for this test to prove anything)", len(caster.skillLaunchedCalls))
+	}
 	if len(rec.calls) != 0 {
 		t.Fatalf("skill handler calls after FUSION Hit phase = %d, want 0 (CreatureCast.doFusionCast is a no-op)", len(rec.calls))
 	}

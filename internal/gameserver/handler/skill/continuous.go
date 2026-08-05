@@ -43,9 +43,13 @@ type continuousHandler struct {
 // routes FUSION to PlayerCast.doFusionCast before callSkill ever runs
 // (PlayerAI.java:300-301), applying it via startFusionSkill at cast start
 // instead (PlayerCast.java:81-84), matched here by fusionHandler. A
-// non-player caster falls through to CreatureCast.doFusionCast, an empty
-// stub (CreatureCast.java:81-84), so Continuous.SKILL_IDS' FUSION entry
-// never actually fires for any caster in the reference either.
+// non-player caster has no such diversion — CreatureCast.doFusionCast is an
+// uncalled stub (CreatureCast.java:81-84) — so its hit-time callSkill()
+// dispatches FUSION straight into Continuous.SKILL_IDS' entry, same as any
+// other skill type (CreatureCast.java:493-497). It applies the caster
+// skill's own effects, which every datapack FUSION skill (e.g. 3626-3628,
+// skills/3600-3699.xml) carries none of, so the observable result is a
+// no-op rather than the entry never firing at all.
 func (continuousHandler) Types() []string {
 	return []string{
 		"BUFF", "DEBUFF", "DOT", "MDOT", "POISON", "BLEED",
