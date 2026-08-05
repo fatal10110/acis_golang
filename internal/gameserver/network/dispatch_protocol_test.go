@@ -60,6 +60,42 @@ func TestGameClientLinkUnknownOpcodeTolerantAfterAuthDisconnectsPastThreshold(t 
 	c.expectClosed()
 }
 
+func TestGameClientLinkUnknownExtendedOpcodeTolerantDisconnectsPastThreshold(t *testing.T) {
+	c, _, _, _ := newLinkedGameClient(t)
+
+	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.read() // CharCreateOk
+	c.read() // CharSelectInfo
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	// An unmapped extended second-opcode counts toward the same sliding-60s
+	// maxUnknownPerMin threshold as a top-level unknown opcode: the first
+	// maxUnknownPerMin are tolerated, the next one disconnects.
+	for range maxUnknownPerMin {
+		c.send(encodeUnknownExtendedOpcode())
+	}
+	c.send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeItemList {
+		t.Fatalf("post-tolerated-unknown-extended opcode = %#x, want ItemList (%#x)", reply[0], serverpackets.OpcodeItemList)
+	}
+
+	c.send(encodeUnknownExtendedOpcode())
+	if reply := c.read(); reply[0] != serverpackets.OpcodeActionFailed {
+		// detachLivePlayer's Stop() now reaches the cast controller
+		// (Player.cleanup -> abortAll(true) -> _cast.stop(),
+		// Creature.java:1298-1302), and PlayerCast.stop() sends
+		// clientActionFailed unconditionally, cast or no cast in flight
+		// (PlayerCast.java:382-387).
+		t.Fatalf("pre-close opcode = %#x, want ActionFailed from detach's unconditional cast-stop ack (%#x)", reply[0], serverpackets.OpcodeActionFailed)
+	}
+	c.expectClosed()
+}
+
 func TestGameClientLinkOpcodeBeforeAuthCloses(t *testing.T) {
 	addr, _, _, _ := newTestGameClientLink(t, func() *LoginLink { return nil }, NewSessionValidator())
 	c := dialGameClient(t, addr)

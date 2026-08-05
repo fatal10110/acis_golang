@@ -220,6 +220,52 @@ func TestAIControllerCastBroadcastsSkillUseOnLaunchAndLaunchedOnHit(t *testing.T
 	}
 }
 
+// TestAIControllerCastSkipsEffectsForFusionSkill matches
+// CreatureCast.doFusionCast (CreatureCast.java:81-84), an empty stub for
+// every non-player caster ("Non-Player Creatures cannot use FUSION or
+// SIGNETS") — AIController drives exactly that non-player-initiated path, so
+// a FUSION-skillType Hit must never reach the effect handlers, unlike a
+// same-shaped non-FUSION skill.
+func TestAIControllerCastSkipsEffectsForFusionSkill(t *testing.T) {
+	clock := &fakeCastClock{}
+	actor := scalingActor()
+	ctrl := NewController(actor)
+	ctrl.afterFunc = clock.AfterFunc
+
+	ref := modelskill.Ref{ID: scalingDef.ID, Level: scalingDef.Level}
+	def := scalingDef
+	def.Target = modelskill.TargetOne
+	def.SkillType = "FUSION"
+
+	rec := &recordingSkillHandler{}
+	caster := &fakeBroadcastingCaster{fakeCastCreature: fakeCastCreature{id: 1, category: skilltarget.CategoryAttackable}}
+	target := &fakeCastCreature{id: 2, category: skilltarget.CategoryAttackable}
+
+	ai := &AIController{
+		Controller:  ctrl,
+		Definitions: fakeDefinitions{ref: def},
+		Effects:     newEffectHandlers(effectsKnown{}, "FUSION", rec),
+		Caster:      caster,
+	}
+
+	ai.Cast(target, ref)
+
+	// buildPlan skips atkSpd scaling for FUSION (controller.go:533-534,
+	// matching PlayerCast.doFusionCast's raw getHitTime() read), so unlike
+	// the atkSpd-scaled 125/400 choreography in the non-FUSION Hit test,
+	// scalingDef's raw 1500ms HitTime yields LaunchDelay 1100ms, HitDelay
+	// 400ms (controller.go:564-566).
+	clock.fire(1100 * time.Millisecond)
+	clock.fire(400 * time.Millisecond)
+
+	if len(caster.skillLaunchedCalls) != 1 {
+		t.Fatalf("BroadcastSkillLaunched calls = %d, want 1 (Hit phase must actually run for this test to prove anything)", len(caster.skillLaunchedCalls))
+	}
+	if len(rec.calls) != 0 {
+		t.Fatalf("skill handler calls after FUSION Hit phase = %d, want 0 (CreatureCast.doFusionCast is a no-op)", len(rec.calls))
+	}
+}
+
 func TestAIControllerCastNoOpsForUnknownSkill(t *testing.T) {
 	actor := &testActor{mp: 100, hp: 100}
 	ctrl := NewController(actor)

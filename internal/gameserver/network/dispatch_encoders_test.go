@@ -70,6 +70,12 @@ func encodeRequestManorList() []byte {
 	return w.Bytes()
 }
 
+func encodeUnknownExtendedOpcode() []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeExtended)
+	w.WriteUint16(0xffff) // unmapped second-opcode, must count as unknown
+	return w.Bytes()
+}
+
 func encodeRequestCursedWeaponList() []byte {
 	w := wire.NewPacketWriter(clientpackets.OpcodeExtended)
 	w.WriteUint16(clientpackets.OpcodeRequestCursedWeaponList)
