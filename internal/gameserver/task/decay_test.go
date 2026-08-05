@@ -124,6 +124,9 @@ func TestDecayTickClearsScratchOnPanic(t *testing.T) {
 			t.Fatalf("scratch[%d] retains actor after panicking Tick", i)
 		}
 	}
+	if decay.ticking.Load() {
+		t.Fatal("ticking guard left set after panicking Tick")
+	}
 }
 
 type decayReentrantEffects struct {

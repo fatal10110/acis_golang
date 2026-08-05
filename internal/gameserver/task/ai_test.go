@@ -71,6 +71,9 @@ func TestAIManagerTickClearsScratchOnPanic(t *testing.T) {
 			t.Fatalf("scratch[%d] retains actor after panicking Tick", i)
 		}
 	}
+	if mgr.ticking.Load() {
+		t.Fatal("ticking guard left set after panicking Tick")
+	}
 }
 
 func TestAIManagerTickReturnsErrorOnReentrantCall(t *testing.T) {

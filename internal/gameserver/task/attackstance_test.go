@@ -151,6 +151,9 @@ func TestAttackStanceTickClearsScratchOnPanic(t *testing.T) {
 			t.Fatalf("scratch[%d] retains actor after panicking Tick", i)
 		}
 	}
+	if stance.ticking.Load() {
+		t.Fatal("ticking guard left set after panicking Tick")
+	}
 }
 
 type attackStanceReentrantEffects struct {
