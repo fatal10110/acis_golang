@@ -1,6 +1,10 @@
 package clientpackets
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
+)
 
 // OpcodeMoveBackwardToLocation is the wire opcode for a client click/keyboard
 // movement request.
@@ -22,7 +26,7 @@ type MoveBackwardToLocation struct {
 func DecodeMoveBackwardToLocation(payload []byte) (MoveBackwardToLocation, error) {
 	r := newReader(payload)
 	if r.Remaining() < moveBackwardToLocationSize {
-		return MoveBackwardToLocation{}, fmt.Errorf("clientpackets: MoveBackwardToLocation: need %d bytes, got %d", moveBackwardToLocationSize, r.Remaining())
+		return MoveBackwardToLocation{}, fmt.Errorf("clientpackets: MoveBackwardToLocation: need %d bytes, got %d: %w", moveBackwardToLocationSize, r.Remaining(), wire.ErrShortPacket)
 	}
 	req := MoveBackwardToLocation{
 		TargetX: r.ReadInt32(),

@@ -1,6 +1,10 @@
 package clientpackets
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
+)
 
 const cannotMoveAnymoreSize = 4 * 4
 
@@ -15,7 +19,7 @@ type CannotMoveAnymore struct {
 func DecodeCannotMoveAnymore(payload []byte) (CannotMoveAnymore, error) {
 	r := newReader(payload)
 	if r.Remaining() < cannotMoveAnymoreSize {
-		return CannotMoveAnymore{}, fmt.Errorf("clientpackets: CannotMoveAnymore: need %d bytes, got %d", cannotMoveAnymoreSize, r.Remaining())
+		return CannotMoveAnymore{}, fmt.Errorf("clientpackets: CannotMoveAnymore: need %d bytes, got %d: %w", cannotMoveAnymoreSize, r.Remaining(), wire.ErrShortPacket)
 	}
 	req := CannotMoveAnymore{
 		X:       r.ReadInt32(),

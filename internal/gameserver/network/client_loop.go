@@ -26,15 +26,19 @@ const (
 
 var errMalformedPacketDisconnect = errors.New("malformed packet requires disconnect")
 
-// decodeClientPacket disconnects malformed pre-auth packets immediately.
-// Once authenticated, malformed packets (char-select or in-game) are
+// decodeClientPacket disconnects buffer-underflow-equivalent pre-auth
+// packets (insufficient bytes, wire.ErrShortPacket) immediately. Once
+// authenticated, that same error class (char-select or in-game) is
 // tolerated up to maxUnderflowsPerMin within a 60s sliding window, then
-// disconnect, mirroring GameClient.onBufferUnderflow.
+// disconnect, mirroring GameClient.onBufferUnderflow. Other decode
+// validation errors (e.g. an out-of-range field) are logged and the packet
+// dropped without counting or disconnecting, matching
+// L2GameClientPacket.read()'s catch-all branch.
 func decodeClientPacket[T any](l *GameClientLink, client *Client, payload []byte, decode func([]byte) (T, error)) (T, error) {
 	req, err := decode(payload)
 	if err != nil {
 		l.log.Warn().Err(err).Msg("game client")
-		if client.State() == StateConnected || client.countUnderflow() {
+		if errors.Is(err, wire.ErrShortPacket) && (client.State() == StateConnected || client.countUnderflow()) {
 			return req, errMalformedPacketDisconnect
 		}
 	}

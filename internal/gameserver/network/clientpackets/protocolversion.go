@@ -1,6 +1,10 @@
 package clientpackets
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
+)
 
 // OpcodeProtocolVersion is the wire opcode for SendProtocolVersion, valid
 // right after a client connects, before authentication.
@@ -18,7 +22,7 @@ type ProtocolVersion struct {
 func DecodeProtocolVersion(payload []byte) (ProtocolVersion, error) {
 	r := newReader(payload)
 	if r.Remaining() < protocolVersionSize {
-		return ProtocolVersion{}, fmt.Errorf("clientpackets: ProtocolVersion: need %d bytes, got %d", protocolVersionSize, r.Remaining())
+		return ProtocolVersion{}, fmt.Errorf("clientpackets: ProtocolVersion: need %d bytes, got %d: %w", protocolVersionSize, r.Remaining(), wire.ErrShortPacket)
 	}
 	return ProtocolVersion{Revision: r.ReadInt32()}, nil
 }
