@@ -8,6 +8,11 @@ import (
 
 const itemRequestSize = 2 * 4
 
+// maxItemInPacket mirrors Config.MAX_ITEM_IN_PACKET, the larger of the
+// (file-configurable, but not yet plumbed here) MaximumSlotsForNoDwarf/
+// MaximumSlotsForDwarf player.properties defaults (80/100).
+const maxItemInPacket = 100
+
 // ItemRequest identifies one item object and the requested unit count.
 type ItemRequest struct {
 	ObjectID int32
@@ -81,8 +86,16 @@ func DecodeRequestPackageSend(payload []byte) (RequestPackageSend, error) {
 	}
 	req := RequestPackageSend{ObjectID: r.ReadInt32()}
 	count := r.ReadInt32()
+	// The reference guards the row loop with a silent readImpl() return for
+	// count < 0 or count > MAX_ITEM_IN_PACKET, before ever attempting a row
+	// read: neither case can throw BufferUnderflowException, so neither
+	// counts toward the underflow threshold. Only a count inside that range
+	// can genuinely underflow reading its rows below.
 	if count < 0 {
 		return RequestPackageSend{}, fmt.Errorf("clientpackets: RequestPackageSend: negative item count %d", count)
+	}
+	if count > maxItemInPacket {
+		return RequestPackageSend{}, fmt.Errorf("clientpackets: RequestPackageSend: item count %d exceeds max %d", count, maxItemInPacket)
 	}
 	if r.Remaining() < int(count)*itemRequestSize {
 		return RequestPackageSend{}, fmt.Errorf("clientpackets: RequestPackageSend: need %d item bytes, got %d: %w", int(count)*itemRequestSize, r.Remaining(), wire.ErrShortPacket)
