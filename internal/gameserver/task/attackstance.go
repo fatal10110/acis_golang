@@ -3,6 +3,7 @@ package task
 import (
 	"errors"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -59,14 +60,20 @@ type attackStanceEntry struct {
 //
 // Add, Remove, and InAttackStance are safe to call concurrently with Tick. mu
 // guards entries and the scratch refill. Tick only ever runs on the scheduler
-// ticker's single goroutine, one call at a time.
+// ticker's single goroutine, one call at a time; ticking enforces that
+// contract by logging and returning ErrReentrantTick on reentrant or
+// concurrent Tick calls instead of running, since Start's caller is the only
+// reliable place that can act on the returned error.
 type AttackStance struct {
 	effects AttackStanceEffects
 	now     func() time.Time
+	log     zerolog.Logger
 
 	mu      sync.Mutex
 	entries map[int32]attackStanceEntry
 	scratch []attackStanceEntry
+
+	ticking atomic.Bool
 }
 
 // NewAttackStance returns an empty combat-stance tracker.
@@ -82,7 +89,8 @@ func NewAttackStance(effects AttackStanceEffects, now func() time.Time) (*Attack
 
 // Start launches the fixed one-second combat-stance task.
 func (a *AttackStance) Start(log zerolog.Logger) *scheduler.Ticker {
-	return scheduler.Start(AttackStanceTick, a.Tick, log)
+	a.log = log
+	return scheduler.Start(AttackStanceTick, func() { a.Tick() }, log)
 }
 
 // Add refreshes actor's combat stance timeout.
@@ -133,7 +141,15 @@ func (a *AttackStance) InAttackStance(actor AttackStanceActor) bool {
 }
 
 // Tick stops combat stance for actors whose inactivity period has elapsed.
-func (a *AttackStance) Tick() {
+// It logs and returns ErrReentrantTick without doing anything else if another Tick call is
+// already in flight.
+func (a *AttackStance) Tick() error {
+	if !a.ticking.CompareAndSwap(false, true) {
+		a.log.Error().Err(ErrReentrantTick).Msg("task: AttackStance.Tick")
+		return ErrReentrantTick
+	}
+	defer a.ticking.Store(false)
+
 	now := a.now()
 
 	a.mu.Lock()
@@ -158,6 +174,7 @@ func (a *AttackStance) Tick() {
 			}
 		}
 	}
+	return nil
 }
 
 func stanceOwner(actor AttackStanceActor) AttackStanceActor {

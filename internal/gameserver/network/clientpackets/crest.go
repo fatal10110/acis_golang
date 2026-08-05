@@ -1,6 +1,10 @@
 package clientpackets
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
+)
 
 const (
 	// OpcodeRequestPledgeCrest is the wire opcode for RequestPledgeCrest,
@@ -37,7 +41,7 @@ type RequestExPledgeCrestLarge struct {
 func DecodeRequestPledgeCrest(payload []byte) (RequestPledgeCrest, error) {
 	r := newReader(payload)
 	if r.Remaining() < requestCrestIDSize {
-		return RequestPledgeCrest{}, fmt.Errorf("clientpackets: RequestPledgeCrest: need %d bytes, got %d", requestCrestIDSize, r.Remaining())
+		return RequestPledgeCrest{}, fmt.Errorf("clientpackets: RequestPledgeCrest: need %d bytes, got %d: %w", requestCrestIDSize, r.Remaining(), wire.ErrShortPacket)
 	}
 	return RequestPledgeCrest{CrestID: r.ReadInt32()}, nil
 }
@@ -47,7 +51,7 @@ func DecodeRequestPledgeCrest(payload []byte) (RequestPledgeCrest, error) {
 func DecodeRequestAllyCrest(payload []byte) (RequestAllyCrest, error) {
 	r := newReader(payload)
 	if r.Remaining() < requestCrestIDSize {
-		return RequestAllyCrest{}, fmt.Errorf("clientpackets: RequestAllyCrest: need %d bytes, got %d", requestCrestIDSize, r.Remaining())
+		return RequestAllyCrest{}, fmt.Errorf("clientpackets: RequestAllyCrest: need %d bytes, got %d: %w", requestCrestIDSize, r.Remaining(), wire.ErrShortPacket)
 	}
 	return RequestAllyCrest{CrestID: r.ReadInt32()}, nil
 }
@@ -57,7 +61,7 @@ func DecodeRequestAllyCrest(payload []byte) (RequestAllyCrest, error) {
 func DecodeRequestExPledgeCrestLarge(payload []byte) (RequestExPledgeCrestLarge, error) {
 	r := newReader(payload)
 	if r.Remaining() < requestExPledgeCrestLargeSize {
-		return RequestExPledgeCrestLarge{}, fmt.Errorf("clientpackets: RequestExPledgeCrestLarge: need %d bytes, got %d", requestExPledgeCrestLargeSize, r.Remaining())
+		return RequestExPledgeCrestLarge{}, fmt.Errorf("clientpackets: RequestExPledgeCrestLarge: need %d bytes, got %d: %w", requestExPledgeCrestLargeSize, r.Remaining(), wire.ErrShortPacket)
 	}
 	if second := r.ReadUint16(); second != OpcodeRequestExPledgeCrestLarge {
 		return RequestExPledgeCrestLarge{}, fmt.Errorf("clientpackets: RequestExPledgeCrestLarge: extended opcode %#x", second)

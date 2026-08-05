@@ -1,6 +1,10 @@
 package clientpackets
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
+)
 
 // OpcodeRequestCharacterDelete is the wire opcode for RequestCharacterDelete,
 // valid once a client is authenticated.
@@ -19,7 +23,7 @@ type RequestCharacterDelete struct {
 func DecodeRequestCharacterDelete(payload []byte) (RequestCharacterDelete, error) {
 	r := newReader(payload)
 	if r.Remaining() < requestCharacterDeleteSize {
-		return RequestCharacterDelete{}, fmt.Errorf("clientpackets: RequestCharacterDelete: need %d bytes, got %d", requestCharacterDeleteSize, r.Remaining())
+		return RequestCharacterDelete{}, fmt.Errorf("clientpackets: RequestCharacterDelete: need %d bytes, got %d: %w", requestCharacterDeleteSize, r.Remaining(), wire.ErrShortPacket)
 	}
 	return RequestCharacterDelete{Slot: r.ReadInt32()}, nil
 }

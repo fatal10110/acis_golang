@@ -1,6 +1,11 @@
 package clientpackets
 
-import "testing"
+import (
+	"errors"
+	"testing"
+
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
+)
 
 func TestDecodeWarehouseItemBatchPackets(t *testing.T) {
 	payload := []byte{
@@ -91,6 +96,29 @@ func TestDecodeRequestPackageSendAllowsEmptyList(t *testing.T) {
 	}
 	if got.ObjectID != 0x12345678 || len(got.Items) != 0 {
 		t.Fatalf("DecodeRequestPackageSend = %+v, want object id with no items", got)
+	}
+}
+
+// TestDecodeRequestPackageSendCountAboveMaxIsNotShortPacket proves a
+// count exceeding maxItemInPacket (mirroring Config.MAX_ITEM_IN_PACKET,
+// whose readImpl() guard returns silently before any row read, so it can
+// never throw BufferUnderflowException) is a plain validation error, not
+// classified as a buffer-underflow-equivalent wire.ErrShortPacket -- even
+// though its trailing byte count is also short for that count, matching
+// the reference's guard order (count bound checked first, silently).
+func TestDecodeRequestPackageSendCountAboveMaxIsNotShortPacket(t *testing.T) {
+	payload := []byte{
+		OpcodeRequestPackageSend,
+		0x78, 0x56, 0x34, 0x12,
+		0x65, 0x00, 0x00, 0x00, // count = 101, exceeds maxItemInPacket (100)
+	}
+
+	_, err := DecodeRequestPackageSend(payload)
+	if err == nil {
+		t.Fatal("DecodeRequestPackageSend: want error for count above max")
+	}
+	if errors.Is(err, wire.ErrShortPacket) {
+		t.Fatalf("DecodeRequestPackageSend() error = %v, want a non-short-packet validation error", err)
 	}
 }
 
