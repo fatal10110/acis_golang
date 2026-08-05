@@ -188,9 +188,12 @@ func (l *GameClientLink) handleToggleSkillUse(live *livePlayer, req clientpacket
 
 // broadcastCastAborted tells the caster and everyone watching it that an
 // in-flight cast was cancelled: the cancel animation goes to the whole
-// known list, while the action-failed acknowledgement is the caster's
-// alone. interrupted additionally sends CASTING_INTERRUPTED to the caster
-// alone, matching CreatureCast.interrupt() vs the unconditional stop().
+// known list. interrupted additionally sends CASTING_INTERRUPTED to the
+// caster alone, matching CreatureCast.interrupt() vs the unconditional
+// stop(). The action-failed acknowledgement is not sent here: it belongs to
+// every Stop call, idle or in-flight (PlayerCast.stop()'s unconditional
+// clientActionFailed(), PlayerCast.java:381-387), so it is wired through
+// Controller.SetOnStopAck instead of gated behind this in-flight-only path.
 func (l *GameClientLink) broadcastCastAborted(live *livePlayer, interrupted bool) {
 	if live == nil {
 		return
@@ -201,7 +204,6 @@ func (l *GameClientLink) broadcastCastAborted(live *livePlayer, interrupted bool
 	if interrupted {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCastingInterrupted))
 	}
-	sendMagicActionFailed(live)
 }
 
 func skillCastObject(obj actorcast.Target) serverpackets.SkillCastObject {

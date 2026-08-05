@@ -571,10 +571,14 @@ func TestAbortedCastSendsCancelAndActionFailed(t *testing.T) {
 		t.Fatalf("MagicSkillCanceled caster = %d, want %d", caster, live.ObjectID())
 	}
 
+	// An idle Stop still owes the caster ActionFailed: PlayerCast.stop()
+	// calls clientActionFailed() unconditionally, after (and regardless of)
+	// super.stop()'s isCastingNow()-gated cancel broadcast
+	// (PlayerCast.java:381-387, PlayerAI.java:556-560).
 	capture.frames = nil
 	controller.Stop()
-	if len(capture.frames) != 0 {
-		t.Fatalf("idle Stop sent %#x, want nothing", frameOpcodes(capture.frames))
+	if got, want := frameOpcodes(capture.frames), []byte{serverpackets.OpcodeActionFailed}; !bytes.Equal(got, want) {
+		t.Fatalf("idle Stop opcodes = %#x, want ActionFailed only (%#x)", got, want)
 	}
 }
 
