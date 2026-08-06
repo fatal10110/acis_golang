@@ -71,6 +71,40 @@ func TestTeleportLivePlayerSendsActionFailedOnce(t *testing.T) {
 	}
 }
 
+// TestTeleportLivePlayerDoesNotAbortFusionChannel pins issue #1115: the
+// reference has no teleport hook for fusion channels (only death, class
+// change, logout, and party leave/expel/disperse — Player.java:2663,5847,6302;
+// Party.java:202,428), relying instead on the existing 1s FusionChannelValid
+// range+LOS recheck (FusionSkill.java:45-49) to catch an out-of-range
+// teleport. Before this fix, teleportLivePlayer called abortFusionTargeting
+// unconditionally, killing any channel targeting the teleporting player
+// immediately, including a short in-range hop that Java would leave intact.
+func TestTeleportLivePlayerDoesNotAbortFusionChannel(t *testing.T) {
+	state := world.New()
+	caster := newTestLivePlayer(t, 1, &frameCapture{})
+	target := newTestLivePlayer(t, 2, &frameCapture{})
+	state.Spawn(caster, 0, 0, 0, 0)
+	state.Spawn(target, 100, 0, 0, 0)
+
+	gcl := &GameClientLink{world: state, geo: testGeo{}, log: zerolog.Nop()}
+	controller := gcl.castController(caster)
+	if _, err := controller.Start(time.Now(), skillCastObject(caster), castingDef); err != nil {
+		t.Fatalf("Start() error: %v", err)
+	}
+	caster.setFusionTarget(target.ObjectID())
+
+	// A short in-range hop stays within castRange + collision radii and LOS,
+	// so the channel must survive it.
+	gcl.teleportLivePlayer(target, location.Location{X: 150, Y: 0, Z: 0}, 0)
+
+	if !controller.CastingNow() {
+		t.Fatal("CastingNow() = false after target's in-range teleport, want fusion channel to survive (no reference teleport-abort hook)")
+	}
+	if !caster.fusesTarget(target.ObjectID()) {
+		t.Fatal("fusesTarget() = false after target's in-range teleport, want fusion target unchanged")
+	}
+}
+
 // townRestartTable returns a restart table whose only point covers the map
 // region a player spawned near the world origin falls into.
 func townRestartTable() *restart.Table {
