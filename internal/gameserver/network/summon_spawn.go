@@ -2,6 +2,7 @@ package network
 
 import (
 	"context"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
@@ -25,6 +26,13 @@ type gameSummonSpawner struct {
 var _ player.SummonSpawner = (*gameSummonSpawner)(nil)
 
 const petSpawnOffset = 40
+
+// petRestoreTimeout bounds the pet-restore DB read: it runs on the cast's
+// Hit-phase timer, not a request goroutine, so there's no connection-scoped
+// context to cancel it if the owner disconnects mid-cast. Mirrors
+// taskeffects.go's autosaveSaveTimeout for the same "bound an off-request
+// DB read" shape.
+const petRestoreTimeout = 5 * time.Second
 
 // SpawnPet resolves controlItem's saved or default pet state, spawns it
 // beside the owner, and registers it as the owner's active summon,
@@ -65,7 +73,9 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 		return false
 	}
 
-	state, hasSaved, err := link.petStore.Get(context.Background(), controlItem.ObjectID)
+	restoreCtx, cancel := context.WithTimeout(context.Background(), petRestoreTimeout)
+	defer cancel()
+	state, hasSaved, err := link.petStore.Get(restoreCtx, controlItem.ObjectID)
 	if err != nil {
 		link.log.Error().Err(err).Int32("item_obj_id", controlItem.ObjectID).Msg("summon: pet restore failed")
 		return false

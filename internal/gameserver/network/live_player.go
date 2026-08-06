@@ -31,6 +31,11 @@ type livePlayer struct {
 	move      *move.Controller
 	combat    *ai.PlayerAttack
 	cast      *actorcast.Controller
+	// summonSpawner caches the pet/servitor spawner wired onto p.Character,
+	// so useSummonItem only allocates and wires one on the first pet-collar
+	// use rather than on every use — link/live are stable for p's whole
+	// connection lifetime, so it never needs to change.
+	summonSpawner *gameSummonSpawner
 	shortcuts *shortcut.List
 	isGM      bool
 	log       zerolog.Logger
