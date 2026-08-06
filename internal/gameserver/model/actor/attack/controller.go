@@ -58,7 +58,7 @@ type CreatureActor interface {
 	Position() (int, int, int)
 	SetHeadingTo(attackable.Combatant)
 	MakeAttackHit(target attackable.Combatant, split bool) Hit
-	BroadcastAttack(Snapshot)
+	BroadcastAttack(Snapshot) error
 }
 
 // PlayableActor is a creature controlled by a player or owned by one.
@@ -250,10 +250,14 @@ func (c *Controller) CanAttack(target attackable.Combatant) bool {
 	return true
 }
 
-// DoAttack starts one physical attack animation against target.
-func (c *Controller) DoAttack(target attackable.Combatant) {
+// DoAttack starts one physical attack animation against target. The attack
+// itself is never aborted by a broadcast failure — c.start has already
+// scheduled the hit landings by the time BroadcastAttack runs — but a
+// non-nil return still reports that the animation packet didn't reach
+// observers.
+func (c *Controller) DoAttack(target attackable.Combatant) error {
 	if target == nil || c.actor == nil {
-		return
+		return nil
 	}
 
 	c.mu.RLock()
@@ -288,11 +292,12 @@ func (c *Controller) DoAttack(target attackable.Combatant) {
 	}
 
 	c.start(attackType, attackTime, landings)
-	c.actor.BroadcastAttack(c.snapshot(hits))
+	err := c.actor.BroadcastAttack(c.snapshot(hits))
 
 	if c.player != nil {
 		c.player.ClearRecentFakeDeath()
 	}
+	return err
 }
 
 // Stop aborts the current attack and clears any pending bow cooldown.

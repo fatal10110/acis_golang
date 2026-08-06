@@ -64,7 +64,7 @@ func fearExit(e *Effect) {
 
 func thinkAndRefreshExit(e *Effect) {
 	if target, ok := e.Effected.(thinkTarget); ok {
-		target.Think()
+		_ = target.Think()
 	}
 	refresh(e.Effected)
 }
@@ -97,7 +97,7 @@ func immobileUntilAttackedExit(e *Effect) {
 		target.StopSkillEffectsByID(e.Skill.ID)
 	}
 	if target, ok := e.Effected.(thinkTarget); ok {
-		target.Think()
+		_ = target.Think()
 	}
 	refresh(e.Effected)
 }
@@ -159,7 +159,7 @@ func paralyzeStart(e *Effect) bool {
 
 func paralyzeExit(e *Effect) {
 	if target, ok := e.Effected.(thinkTarget); ok {
-		target.Think()
+		_ = target.Think()
 	}
 }
 
@@ -173,7 +173,7 @@ func petrificationStart(e *Effect) bool {
 
 func petrificationExit(e *Effect) {
 	if target, ok := e.Effected.(thinkTarget); ok {
-		target.Think()
+		_ = target.Think()
 	}
 	if target, ok := e.Effected.(invulnerabilityTarget); ok {
 		target.SetInvul(false)

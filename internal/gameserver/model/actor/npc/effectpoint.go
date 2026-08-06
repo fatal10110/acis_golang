@@ -105,9 +105,12 @@ type skillCastTarget interface {
 // BroadcastSkillUse sends a cast-start animation packet from this actor to
 // target, to every currently known observer capable of receiving one. It
 // is a no-op until SetWorld has been called.
-func (ep *EffectPoint) BroadcastSkillUse(target skillCastTarget, skillID, level int32) {
-	if ep.world == nil || ep.frames == nil {
-		return
+func (ep *EffectPoint) BroadcastSkillUse(target skillCastTarget, skillID, level int32) error {
+	if ep.world == nil {
+		return ErrNoWorld
+	}
+	if ep.frames == nil {
+		return ErrNoFrameBuilder
 	}
 	ax, ay, az := ep.Position()
 	tx, ty, tz := target.Position()
@@ -116,16 +119,21 @@ func (ep *EffectPoint) BroadcastSkillUse(target skillCastTarget, skillID, level 
 		target.ObjectID(), location.Location{X: tx, Y: ty, Z: tz},
 		skillID, level, 0, 0, true,
 	))
+	return nil
 }
 
 // BroadcastSkillLaunched sends the cast-launch target packet for skillID at
 // level, listing targetIDs, to every currently known observer capable of
 // receiving one. It is a no-op until SetWorld has been called.
-func (ep *EffectPoint) BroadcastSkillLaunched(skillID, level int32, targetIDs []int32) {
-	if ep.world == nil || ep.frames == nil {
-		return
+func (ep *EffectPoint) BroadcastSkillLaunched(skillID, level int32, targetIDs []int32) error {
+	if ep.world == nil {
+		return ErrNoWorld
+	}
+	if ep.frames == nil {
+		return ErrNoFrameBuilder
 	}
 	ep.broadcastFrame(ep.frames.SkillLaunched(ep.ObjectID(), skillID, level, targetIDs))
+	return nil
 }
 
 func (ep *EffectPoint) broadcastFrame(fr wire.Frame) {

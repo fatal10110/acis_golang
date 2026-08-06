@@ -3,6 +3,8 @@ package ai
 import (
 	"sync"
 
+	"github.com/rs/zerolog"
+
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 )
 
@@ -30,6 +32,7 @@ type PlayerAttack struct {
 	actor  PlayerAttackActor
 	move   MoveController
 	attack AttackController
+	log    zerolog.Logger
 
 	mu     sync.Mutex
 	target attackable.Combatant
@@ -38,6 +41,15 @@ type PlayerAttack struct {
 // NewPlayerAttack builds an idle player attack intention loop.
 func NewPlayerAttack(actor PlayerAttackActor, move MoveController, attack AttackController) *PlayerAttack {
 	return &PlayerAttack{actor: actor, move: move, attack: attack}
+}
+
+// SetLogger records where a broadcast error surfaced from a movement-arrived
+// or attack-finished hook (with no caller left to return it to) is logged.
+// The zero value discards it.
+func (p *PlayerAttack) SetLogger(log zerolog.Logger) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.log = log
 }
 
 // Start sets target as the attack intention and evaluates it once. It
@@ -50,7 +62,11 @@ func (p *PlayerAttack) Start(target attackable.Combatant) bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.target = target
-	return p.thinkLocked()
+	accepted, err := p.thinkLocked()
+	if err != nil {
+		p.log.Warn().Err(err).Msg("ai: player attack broadcast")
+	}
+	return accepted
 }
 
 // Stop clears the attack intention and stops any movement toward it.
@@ -68,47 +84,57 @@ func (p *PlayerAttack) Target() attackable.Combatant {
 }
 
 // Think re-evaluates the current attack intention once. Safe to call from
-// a movement-arrived or attack-finished hook as well as from Start.
+// a movement-arrived or attack-finished hook as well as from Start. Any
+// broadcast error is logged through SetLogger — Think's own callers are
+// void hooks with no return path of their own.
 func (p *PlayerAttack) Think() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.thinkLocked()
+	if _, err := p.thinkLocked(); err != nil {
+		p.log.Warn().Err(err).Msg("ai: player attack broadcast")
+	}
 }
 
 // thinkLocked runs the full attack-intention decision. Callers hold mu for
 // its entire body so a concurrent Start/Think can't interleave with it and
 // reach DoAttack twice for the same swing.
-func (p *PlayerAttack) thinkLocked() bool {
+func (p *PlayerAttack) thinkLocked() (bool, error) {
 	if p.target == nil {
-		return false
+		return false, nil
 	}
 
 	if p.actor.AttackDisabled() || p.targetLost(p.target) {
 		p.stopLocked()
-		return false
+		return false, nil
 	}
 
-	if p.move.MaybeStartOffensiveFollow(p.target, p.actor.PhysicalAttackRange()) {
-		return true
+	following, err := p.move.MaybeStartOffensiveFollow(p.target, p.actor.PhysicalAttackRange())
+	if following {
+		return true, err
 	}
 
 	if p.attack.BowCoolingDown() || p.attack.AttackingNow() {
-		return false
+		return false, nil
 	}
 
 	if !p.attack.CanAttack(p.target) {
 		p.stopLocked()
-		return false
+		return false, nil
 	}
 
-	p.move.Stop()
-	p.attack.DoAttack(p.target)
-	return true
+	stopErr := p.move.Stop()
+	attackErr := p.attack.DoAttack(p.target)
+	if stopErr != nil {
+		return true, stopErr
+	}
+	return true, attackErr
 }
 
 func (p *PlayerAttack) stopLocked() {
 	p.target = nil
-	p.move.Stop()
+	if err := p.move.Stop(); err != nil {
+		p.log.Warn().Err(err).Msg("ai: player attack broadcast")
+	}
 }
 
 func (p *PlayerAttack) targetLost(target attackable.Combatant) bool {

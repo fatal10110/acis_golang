@@ -180,8 +180,8 @@ type summonMove struct {
 	friendlyRange  int
 }
 
-func (m *summonMove) MaybeStartFriendlyFollow(target attackable.Combatant, offset int) bool {
+func (m *summonMove) MaybeStartFriendlyFollow(target attackable.Combatant, offset int) (bool, error) {
 	m.friendlyTarget = target
 	m.friendlyRange = offset
-	return true
+	return true, nil
 }

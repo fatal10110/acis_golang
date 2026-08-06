@@ -18,8 +18,11 @@ type fakeSelf struct {
 func (f *fakeSelf) ObjectID() int32           { return f.id }
 func (f *fakeSelf) Position() (int, int, int) { return f.x, f.y, f.z }
 func (f *fakeSelf) CollisionRadius() float64  { return f.radius }
-func (f *fakeSelf) BroadcastMove(event Event) { f.broadcasts = append(f.broadcasts, event) }
-func (f *fakeSelf) BroadcastStop()            { f.stopCalls++ }
+func (f *fakeSelf) BroadcastMove(event Event) error {
+	f.broadcasts = append(f.broadcasts, event)
+	return nil
+}
+func (f *fakeSelf) BroadcastStop() error { f.stopCalls++; return nil }
 func (f *fakeSelf) SyncPosition(position location.Location) {
 	f.x, f.y, f.z = position.X, position.Y, position.Z
 }
@@ -68,7 +71,7 @@ func TestControllerMaybeStartOffensiveFollowStartsWhenOutOfRange(t *testing.T) {
 	c := newTestController(t, self)
 	target := &fakeTarget{id: 7, x: 1000, y: 0, radius: 5}
 
-	if !c.MaybeStartOffensiveFollow(target, 40) {
+	if ok, _ := c.MaybeStartOffensiveFollow(target, 40); !ok {
 		t.Fatal("MaybeStartOffensiveFollow() = false, want true for out-of-range target")
 	}
 	if !c.move.Following() || c.move.FollowMode() != FollowOffensive {
@@ -81,7 +84,7 @@ func TestControllerMaybeStartFriendlyFollowStartsWhenOutOfRange(t *testing.T) {
 	c := newTestController(t, self)
 	target := &fakeTarget{id: 7, x: 1000, y: 0, radius: 5}
 
-	if !c.MaybeStartFriendlyFollow(target, 70) {
+	if ok, _ := c.MaybeStartFriendlyFollow(target, 70); !ok {
 		t.Fatal("MaybeStartFriendlyFollow() = false, want true for out-of-range target")
 	}
 	if !c.move.Following() || c.move.FollowMode() != FollowFriendly {
@@ -101,7 +104,7 @@ func TestControllerMaybeStartOffensiveFollowStopsWhenInRange(t *testing.T) {
 	c.move.StartOffensiveFollow(7, 40)
 
 	target := &fakeTarget{id: 7, x: 10, y: 0, radius: 5}
-	if c.MaybeStartOffensiveFollow(target, 40) {
+	if ok, _ := c.MaybeStartOffensiveFollow(target, 40); ok {
 		t.Fatal("MaybeStartOffensiveFollow() = true, want false for in-range target")
 	}
 	if c.move.Following() {
@@ -114,7 +117,7 @@ func TestControllerMaybeStartOffensiveFollowRejectsNegativeRange(t *testing.T) {
 	c := newTestController(t, self)
 	target := &fakeTarget{id: 7, x: 1000, y: 0}
 
-	if c.MaybeStartOffensiveFollow(target, -1) {
+	if ok, _ := c.MaybeStartOffensiveFollow(target, -1); ok {
 		t.Fatal("MaybeStartOffensiveFollow() = true, want false for negative range")
 	}
 }
@@ -127,7 +130,7 @@ func TestControllerMaybeStartOffensiveFollowIgnoresUnlocatedTarget(t *testing.T)
 	// Wrap in a type without Position/CollisionRadius to simulate an
 	// opaque combatant.
 	type bare struct{ attackable.Combatant }
-	if c.MaybeStartOffensiveFollow(bare{target}, 40) {
+	if ok, _ := c.MaybeStartOffensiveFollow(bare{target}, 40); ok {
 		t.Fatal("MaybeStartOffensiveFollow() = true, want false for a target with no known footprint")
 	}
 }
@@ -144,7 +147,7 @@ func TestControllerMaybeStartOffensiveFollowReportsFalseWhenRouteIsBlocked(t *te
 	}
 	target := &fakeTarget{id: 7, x: 1000, y: 0, radius: 5}
 
-	if c.MaybeStartOffensiveFollow(target, 40) {
+	if ok, _ := c.MaybeStartOffensiveFollow(target, 40); ok {
 		t.Fatal("MaybeStartOffensiveFollow() = true, want false when the route is blocked — a caller must not wait forever on movement that will never happen")
 	}
 	if c.move.Moving() {
@@ -186,7 +189,7 @@ func TestControllerMaybeStartOffensiveFollowIssuesMovementTowardTarget(t *testin
 	c := newTestController(t, self)
 	target := &fakeTarget{id: 7, x: 1000, y: 0, radius: 5}
 
-	if !c.MaybeStartOffensiveFollow(target, 40) {
+	if ok, _ := c.MaybeStartOffensiveFollow(target, 40); !ok {
 		t.Fatal("MaybeStartOffensiveFollow() = false, want true for out-of-range target")
 	}
 	if !c.move.Moving() {
@@ -208,14 +211,14 @@ func TestControllerMaybeStartOffensiveFollowDoesNotReissueAnAlreadyConvergingMov
 	c := newTestController(t, self)
 	target := &fakeTarget{id: 7, x: 1000, y: 0, radius: 5}
 
-	if !c.MaybeStartOffensiveFollow(target, 40) {
+	if ok, _ := c.MaybeStartOffensiveFollow(target, 40); !ok {
 		t.Fatal("first MaybeStartOffensiveFollow() = false, want true")
 	}
 	firstDestination := c.move.Destination()
 
 	// A second re-evaluation of the same stationary target before arrival
 	// must not restart the in-flight move (which would reset its timer).
-	if !c.MaybeStartOffensiveFollow(target, 40) {
+	if ok, _ := c.MaybeStartOffensiveFollow(target, 40); !ok {
 		t.Fatal("second MaybeStartOffensiveFollow() = false, want true")
 	}
 	if got := c.move.Destination(); got != firstDestination {
@@ -242,7 +245,7 @@ func TestControllerSetArrivedFiresOnceMovementCompletes(t *testing.T) {
 	c.SetArrived(func() { arrivedCalls++ })
 
 	target := &fakeTarget{id: 7, x: 1000, y: 0, radius: 5}
-	if !c.MaybeStartOffensiveFollow(target, 40) {
+	if ok, _ := c.MaybeStartOffensiveFollow(target, 40); !ok {
 		t.Fatal("MaybeStartOffensiveFollow() = false, want true")
 	}
 
@@ -265,7 +268,7 @@ func TestControllerRegistersPositionUpdatesOnMoveStart(t *testing.T) {
 	c.SetPositionUpdates(updates)
 
 	target := &fakeTarget{id: 7, x: 1000, y: 0, radius: 5}
-	if !c.MaybeStartOffensiveFollow(target, 40) {
+	if ok, _ := c.MaybeStartOffensiveFollow(target, 40); !ok {
 		t.Fatal("MaybeStartOffensiveFollow() = false, want true")
 	}
 
@@ -281,7 +284,7 @@ func TestControllerRemovesPositionUpdatesOnStop(t *testing.T) {
 	c.SetPositionUpdates(updates)
 
 	target := &fakeTarget{id: 7, x: 1000, y: 0, radius: 5}
-	if !c.MaybeStartOffensiveFollow(target, 40) {
+	if ok, _ := c.MaybeStartOffensiveFollow(target, 40); !ok {
 		t.Fatal("MaybeStartOffensiveFollow() = false, want true")
 	}
 	c.Stop()
@@ -296,7 +299,7 @@ func TestControllerPositionUpdateAdvancesPositionWithoutRebroadcasting(t *testin
 	c := newTestController(t, self)
 
 	target := &fakeTarget{id: 7, x: 1000, y: 0, radius: 5}
-	if !c.MaybeStartOffensiveFollow(target, 40) {
+	if ok, _ := c.MaybeStartOffensiveFollow(target, 40); !ok {
 		t.Fatal("MaybeStartOffensiveFollow() = false, want true")
 	}
 
@@ -327,7 +330,7 @@ func TestControllerPositionUpdateRemovesOnArrival(t *testing.T) {
 	c.SetPositionUpdates(updates)
 
 	target := &fakeTarget{id: 7, x: 10, y: 0}
-	if !c.MaybeStartOffensiveFollow(target, 0) {
+	if ok, _ := c.MaybeStartOffensiveFollow(target, 0); !ok {
 		t.Fatal("MaybeStartOffensiveFollow() = false, want true")
 	}
 
@@ -346,7 +349,7 @@ func TestControllerPositionUpdateKeepsRegistrationWhenArrivedHookRestartsMovemen
 	c.SetPositionUpdates(updates)
 
 	firstTarget := &fakeTarget{id: 7, x: 10, y: 0}
-	if !c.MaybeStartOffensiveFollow(firstTarget, 0) {
+	if ok, _ := c.MaybeStartOffensiveFollow(firstTarget, 0); !ok {
 		t.Fatal("MaybeStartOffensiveFollow() = false, want true")
 	}
 
@@ -356,7 +359,7 @@ func TestControllerPositionUpdateKeepsRegistrationWhenArrivedHookRestartsMovemen
 	// returns.
 	secondTarget := &fakeTarget{id: 8, x: 1000, y: 0, radius: 5}
 	c.SetArrived(func() {
-		if !c.MaybeStartOffensiveFollow(secondTarget, 40) {
+		if ok, _ := c.MaybeStartOffensiveFollow(secondTarget, 40); !ok {
 			t.Fatal("arrived hook: MaybeStartOffensiveFollow() = false, want true")
 		}
 	})
@@ -379,7 +382,7 @@ func TestControllerStopCancelsInFlightMovement(t *testing.T) {
 	self := &fakeSelf{x: 0, y: 0, radius: 5}
 	c := newTestController(t, self)
 	target := &fakeTarget{id: 7, x: 1000, y: 0, radius: 5}
-	if !c.MaybeStartOffensiveFollow(target, 40) {
+	if ok, _ := c.MaybeStartOffensiveFollow(target, 40); !ok {
 		t.Fatal("MaybeStartOffensiveFollow() = false, want true")
 	}
 

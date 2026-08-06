@@ -199,7 +199,7 @@ func (a *stagedAttack) AttackingNow() bool   { return false }
 func (a *stagedAttack) CanAttack(attackable.Combatant) bool {
 	return a.canAttack
 }
-func (a *stagedAttack) DoAttack(attackable.Combatant) {
+func (a *stagedAttack) DoAttack(attackable.Combatant) error {
 	if !atomic.CompareAndSwapInt32(&a.inFlight, 0, 1) {
 		atomic.StoreInt32(&a.overlapped, 1)
 	}
@@ -211,6 +211,7 @@ func (a *stagedAttack) DoAttack(attackable.Combatant) {
 	}
 	<-a.release
 	atomic.StoreInt32(&a.inFlight, 0)
+	return nil
 }
 
 // TestPlayerAttackThinkDoesNotDoubleAttackWhileASwingIsInFlight proves

@@ -564,8 +564,9 @@ func (a *attackActor) MakeAttackHit(target attackable.Combatant, split bool) Hit
 	}
 	return hit
 }
-func (a *attackActor) BroadcastAttack(snapshot Snapshot) {
+func (a *attackActor) BroadcastAttack(snapshot Snapshot) error {
 	a.broadcasts = append(a.broadcasts, snapshot)
+	return nil
 }
 func (a *attackActor) InPeaceZone() bool { return a.peace }
 func (a *attackActor) TryToIdle()        { a.idleCalls++ }

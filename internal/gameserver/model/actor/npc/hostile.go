@@ -357,11 +357,11 @@ func (h *Hostile) Tick() {
 }
 
 // Think runs one hostile AI decision cycle.
-func (h *Hostile) Think() {
+func (h *Hostile) Think() error {
 	if !h.canRunAI() {
-		return
+		return nil
 	}
-	h.brain.Think()
+	return h.brain.Think()
 }
 
 // OnInactiveRegion applies the hostile-NPC reset that aCis runs when the
@@ -461,7 +461,7 @@ func (h *Hostile) Die(killer creature.DeathActor, rewards creature.Rewarder) boo
 	if !creature.Die(h, killer, rewards) {
 		return false
 	}
-	h.BroadcastDie()
+	_ = h.BroadcastDie()
 	return true
 }
 

@@ -385,13 +385,15 @@ func (testHostileGeo) ValidLocation(ox, oy, oz, _, _, _ int) location.Location {
 
 type testHostileMove struct{}
 
-func (testHostileMove) MaybeStartOffensiveFollow(attackable.Combatant, int) bool { return false }
-func (testHostileMove) MoveHome(location.Location)                               {}
-func (testHostileMove) Stop()                                                    {}
+func (testHostileMove) MaybeStartOffensiveFollow(attackable.Combatant, int) (bool, error) {
+	return false, nil
+}
+func (testHostileMove) MoveHome(location.Location) error { return nil }
+func (testHostileMove) Stop() error                      { return nil }
 
 type testHostileAttack struct{}
 
 func (testHostileAttack) BowCoolingDown() bool                { return false }
 func (testHostileAttack) AttackingNow() bool                  { return false }
 func (testHostileAttack) CanAttack(attackable.Combatant) bool { return false }
-func (testHostileAttack) DoAttack(attackable.Combatant)       {}
+func (testHostileAttack) DoAttack(attackable.Combatant) error { return nil }

@@ -22,8 +22,8 @@ type Actor interface {
 	Located
 	ObjectID() int32
 	SyncPosition(location.Location)
-	BroadcastMove(Event)
-	BroadcastStop()
+	BroadcastMove(Event) error
+	BroadcastStop() error
 }
 
 // PositionUpdater is the moving actor surface consumed by the position
@@ -72,7 +72,7 @@ func NewController(move *CreatureMove, self Actor) (*Controller, error) {
 	// advance, not just the first: without it, clients keep predicting the
 	// original straight-line walk and visibly cut through obstacles the
 	// server itself routed around.
-	move.SetSegmentAdvancedHook(func(event Event) { self.BroadcastMove(event) })
+	move.SetSegmentAdvancedHook(func(event Event) error { return self.BroadcastMove(event) })
 	return &Controller{move: move, self: self}, nil
 }
 
@@ -116,7 +116,7 @@ func (c *Controller) SetPositionUpdates(updates PositionUpdateRegistry) {
 // which is enough to converge on a stationary target and is re-issued
 // naturally the next time the caller re-evaluates (on arrival, or on the
 // next attack attempt).
-func (c *Controller) MaybeStartOffensiveFollow(target attackable.Combatant, attackRange int) bool {
+func (c *Controller) MaybeStartOffensiveFollow(target attackable.Combatant, attackRange int) (bool, error) {
 	return c.maybeStartFollow(target, attackRange, FollowOffensive)
 }
 
@@ -124,18 +124,18 @@ func (c *Controller) MaybeStartOffensiveFollow(target attackable.Combatant, atta
 // toward target when it sits farther than offset plus both actors'
 // footprints. Friendly follow broadcasts a plain movement request; follow
 // identity stays server-side for the follow tick.
-func (c *Controller) MaybeStartFriendlyFollow(target attackable.Combatant, offset int) bool {
+func (c *Controller) MaybeStartFriendlyFollow(target attackable.Combatant, offset int) (bool, error) {
 	return c.maybeStartFollow(target, offset, FollowFriendly)
 }
 
-func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, mode FollowMode) bool {
+func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, mode FollowMode) (bool, error) {
 	if offset < 0 {
-		return false
+		return false, nil
 	}
 
 	other, ok := target.(Located)
 	if !ok {
-		return false
+		return false, nil
 	}
 
 	sx, sy, sz := c.self.Position()
@@ -146,7 +146,7 @@ func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, m
 	totalRadius := followRange(offset, c.self.CollisionRadius(), other.CollisionRadius())
 	if in2DRange(origin, dest, totalRadius) {
 		c.move.CancelFollow()
-		return false
+		return false, nil
 	}
 
 	switch mode {
@@ -155,7 +155,7 @@ func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, m
 	case FollowOffensive:
 		c.move.StartOffensiveFollow(target.ObjectID(), offset)
 	default:
-		return false
+		return false, nil
 	}
 	if !c.move.Moving() || c.move.Destination() != dest {
 		event, err := c.move.MoveToLocation(dest)
@@ -164,16 +164,17 @@ func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, m
 			// report "still moving" — that would strand the caller waiting
 			// on progress that will never happen.
 			c.move.CancelFollow()
-			return false
+			return false, nil
 		}
 		if mode == FollowOffensive {
 			event.FollowTarget = target.ObjectID()
 			event.FollowOffset = offset
 		}
-		c.self.BroadcastMove(event)
+		broadcastErr := c.self.BroadcastMove(event)
 		c.addPositionUpdate()
+		return true, broadcastErr
 	}
-	return true
+	return true, nil
 }
 
 // MoveHome requests movement toward home, broadcasts the move, and
@@ -182,39 +183,41 @@ func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, m
 // stale pre-move cell for the entire walk back. A blocked or unreachable
 // route is silently dropped — matching a return-home attempt that simply
 // can't make progress this tick, not an application error.
-func (c *Controller) MoveHome(home location.Location) {
+func (c *Controller) MoveHome(home location.Location) error {
 	event, err := c.move.MoveToLocation(home)
 	if err != nil {
-		return
+		return nil
 	}
-	c.self.BroadcastMove(event)
+	broadcastErr := c.self.BroadcastMove(event)
 	c.addPositionUpdate()
+	return broadcastErr
 }
 
 // MoveToLocation starts a direct movement request and reports whether it was
 // accepted.
-func (c *Controller) MoveToLocation(target location.Location) bool {
+func (c *Controller) MoveToLocation(target location.Location) (bool, error) {
 	event, err := c.move.MoveToLocation(target)
 	if err != nil {
-		return false
+		return false, nil
 	}
-	c.self.BroadcastMove(event)
+	broadcastErr := c.self.BroadcastMove(event)
 	c.addPositionUpdate()
-	return true
+	return true, broadcastErr
 }
 
 // Stop cancels any active follow task and any movement already under way,
 // broadcasting a stop-in-place packet when there was movement to cancel —
 // otherwise a client that already received the move request keeps walking
 // toward the stale destination until it separately resyncs.
-func (c *Controller) Stop() {
+func (c *Controller) Stop() error {
 	wasMoving := c.move.Moving() || c.move.Following()
 	c.move.CancelFollow()
 	c.move.CancelMove()
 	c.removePositionUpdate()
 	if wasMoving {
-		c.self.BroadcastStop()
+		return c.self.BroadcastStop()
 	}
+	return nil
 }
 
 // SetArrived records the callback invoked once movement this controller

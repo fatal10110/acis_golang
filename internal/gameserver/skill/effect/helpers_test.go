@@ -97,8 +97,9 @@ func (t *liveEffectTarget) UpdateAbnormalEffect() {
 	t.events = append(t.events, "abnormal")
 }
 
-func (t *liveEffectTarget) Think() {
+func (t *liveEffectTarget) Think() error {
 	t.events = append(t.events, "think")
+	return nil
 }
 
 func (t *liveEffectTarget) Afraid() bool { return t.afraid }

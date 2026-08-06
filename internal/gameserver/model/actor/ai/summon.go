@@ -3,6 +3,8 @@ package ai
 import (
 	"sync"
 
+	"github.com/rs/zerolog"
+
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
@@ -20,7 +22,7 @@ type SummonActor interface {
 // SummonMoveController controls movement requests emitted by a summon AI.
 type SummonMoveController interface {
 	MoveController
-	MaybeStartFriendlyFollow(target attackable.Combatant, offset int) bool
+	MaybeStartFriendlyFollow(target attackable.Combatant, offset int) (bool, error)
 }
 
 // Summon drives one pet or servitor's owner-directed intentions.
@@ -29,6 +31,7 @@ type Summon struct {
 	move   SummonMoveController
 	attack AttackController
 	cast   CastController
+	log    zerolog.Logger
 
 	mu      sync.Mutex // guards current and next.
 	current intention
@@ -43,6 +46,14 @@ func NewSummon(actor SummonActor, move SummonMoveController, attack AttackContro
 		attack:  attack,
 		current: intention{kind: IntentionIdle},
 	}
+}
+
+// SetLogger records where a broadcast error surfaced from Think (with no
+// caller left to return it to) is logged. The zero value discards it.
+func (s *Summon) SetLogger(log zerolog.Logger) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.log = log
 }
 
 // SetCastController wires the AI loop's TryToCast handling to controller.
@@ -84,7 +95,11 @@ func (s *Summon) TryToAttack(target attackable.Combatant) bool {
 		return true
 	}
 	s.current = intention{kind: IntentionAttack, target: target}
-	return s.thinkAttackLocked()
+	accepted, err := s.thinkAttackLocked()
+	if err != nil {
+		s.log.Warn().Err(err).Msg("ai: summon broadcast")
+	}
+	return accepted
 }
 
 // TryToFollow sets target as the follow intention and evaluates it once.
@@ -100,7 +115,11 @@ func (s *Summon) TryToFollow(target attackable.Combatant) bool {
 		return true
 	}
 	s.current = intention{kind: IntentionFollow, target: target}
-	return s.thinkFollowLocked()
+	accepted, err := s.thinkFollowLocked()
+	if err != nil {
+		s.log.Warn().Err(err).Msg("ai: summon broadcast")
+	}
+	return accepted
 }
 
 // TryToCast sets target/ref as the cast intention and evaluates it once,
@@ -120,7 +139,11 @@ func (s *Summon) TryToCast(target attackable.Combatant, ref skill.Ref) bool {
 		return true
 	}
 	s.current = intention{kind: IntentionCast, target: target, skill: ref}
-	return s.thinkCastLocked()
+	accepted, err := s.thinkCastLocked()
+	if err != nil {
+		s.log.Warn().Err(err).Msg("ai: summon broadcast")
+	}
+	return accepted
 }
 
 // TryToIdle clears active and queued intentions, then stops movement.
@@ -129,22 +152,30 @@ func (s *Summon) TryToIdle() {
 	defer s.mu.Unlock()
 	s.current = intention{kind: IntentionIdle}
 	s.next = intention{}
-	s.move.Stop()
+	if err := s.move.Stop(); err != nil {
+		s.log.Warn().Err(err).Msg("ai: summon broadcast")
+	}
 }
 
-// Think advances the current summon intention once.
+// Think advances the current summon intention once. Any broadcast error is
+// logged through SetLogger — Think's own callers (the periodic AI task) have
+// no per-actor error path of their own.
 func (s *Summon) Think() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	s.promoteNextLocked()
+	var err error
 	switch s.current.kind {
 	case IntentionAttack:
-		s.thinkAttackLocked()
+		_, err = s.thinkAttackLocked()
 	case IntentionFollow:
-		s.thinkFollowLocked()
+		_, err = s.thinkFollowLocked()
 	case IntentionCast:
-		s.thinkCastLocked()
+		_, err = s.thinkCastLocked()
+	}
+	if err != nil {
+		s.log.Warn().Err(err).Msg("ai: summon broadcast")
 	}
 }
 
@@ -156,69 +187,73 @@ func (s *Summon) promoteNextLocked() {
 	s.next = intention{}
 }
 
-func (s *Summon) thinkAttackLocked() bool {
+func (s *Summon) thinkAttackLocked() (bool, error) {
 	if s.actor.DenyAIAction() {
 		s.current = intention{kind: IntentionIdle}
-		return false
+		return false, nil
 	}
 
 	target := s.current.target
 	if s.targetLostLocked(target) {
-		return false
+		return false, nil
 	}
 
-	if s.move.MaybeStartOffensiveFollow(target, s.actor.PhysicalAttackRange()) {
-		return true
+	following, err := s.move.MaybeStartOffensiveFollow(target, s.actor.PhysicalAttackRange())
+	if following {
+		return true, err
 	}
 
 	if s.busyLocked() {
-		return false
+		return false, nil
 	}
 
-	s.move.Stop()
+	stopErr := s.move.Stop()
 	if !s.attack.CanAttack(target) {
 		s.current = intention{kind: IntentionIdle}
-		return false
+		return false, stopErr
 	}
 
-	s.attack.DoAttack(target)
-	return true
+	attackErr := s.attack.DoAttack(target)
+	if stopErr != nil {
+		return true, stopErr
+	}
+	return true, attackErr
 }
 
-func (s *Summon) thinkCastLocked() bool {
+func (s *Summon) thinkCastLocked() (bool, error) {
 	if s.actor.DenyAIAction() || s.cast == nil {
 		s.current = intention{kind: IntentionIdle}
-		return false
+		return false, nil
 	}
 
 	target := s.current.target
 	ref := s.current.skill
 	if s.targetLostLocked(target) {
-		return false
+		return false, nil
 	}
 
 	if !s.cast.CanCast(target, ref) {
 		s.current = intention{kind: IntentionIdle}
-		return false
+		return false, nil
 	}
 
 	s.cast.Cast(target, ref)
 	s.current = intention{kind: IntentionIdle}
-	return true
+	return true, nil
 }
 
-func (s *Summon) thinkFollowLocked() bool {
+func (s *Summon) thinkFollowLocked() (bool, error) {
 	if s.actor.DenyAIAction() {
-		return false
+		return false, nil
 	}
 
 	target := s.current.target
 	if s.targetLostLocked(target) {
-		return false
+		return false, nil
 	}
 
-	s.move.MaybeStartFriendlyFollow(target, summonFollowOffset)
-	return true
+	_, err := s.move.MaybeStartFriendlyFollow(target, summonFollowOffset)
+	return true, err
 }
 
 func (s *Summon) busyLocked() bool {
