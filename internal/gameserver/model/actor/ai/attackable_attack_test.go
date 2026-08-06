@@ -1,6 +1,7 @@
 package ai
 
 import (
+	"errors"
 	"testing"
 )
 
@@ -29,6 +30,32 @@ func TestAttackableAIChoosesMostHatedTargetToAttack(t *testing.T) {
 	}
 	if move.followTarget != high || move.followRange != 40 {
 		t.Fatalf("follow check = (%v, %d), want (%v, 40)", move.followTarget, move.followRange, high)
+	}
+}
+
+// TestAttackableThinkJoinsStopAndAttackBroadcastErrors is the regression
+// test for the review finding that thinkAttack's `if stopErr != nil {
+// return stopErr }` masked attackErr whenever both move.Stop's and
+// attack.DoAttack's broadcasts failed in the same tick: only one of the two
+// failures ever reached the log. Both errors must now surface.
+func TestAttackableThinkJoinsStopAndAttackBroadcastErrors(t *testing.T) {
+	owner := actor(1)
+	target := actor(2)
+	owner.known = map[int32]bool{target.ObjectID(): true}
+	stopErr := errors.New("stop broadcast failed")
+	attackErr := errors.New("attack broadcast failed")
+	move := &recordingMove{stopErr: stopErr}
+	strike := &recordingAttack{canAttack: true, doAttackErr: attackErr}
+	ai := NewAttackable(owner, move, strike)
+
+	ai.AddDamageHate(target, 0, 10)
+	err := ai.Think()
+
+	if !errors.Is(err, stopErr) {
+		t.Fatalf("Think() error = %v, want it to wrap stopErr (%v)", err, stopErr)
+	}
+	if !errors.Is(err, attackErr) {
+		t.Fatalf("Think() error = %v, want it to wrap attackErr (%v)", err, attackErr)
 	}
 }
 

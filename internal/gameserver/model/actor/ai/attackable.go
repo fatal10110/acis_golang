@@ -1,6 +1,7 @@
 package ai
 
 import (
+	"errors"
 	"sync"
 	"time"
 
@@ -360,10 +361,7 @@ func (a *Attackable) thinkAttack() (bool, error) {
 
 	stopErr := a.move.Stop()
 	attackErr := a.attack.DoAttack(target)
-	if stopErr != nil {
-		return false, stopErr
-	}
-	return false, attackErr
+	return false, errors.Join(stopErr, attackErr)
 }
 
 // thinkCast advances an IntentionCast desire once it has been promoted to
@@ -403,12 +401,11 @@ func (a *Attackable) thinkCast() (bool, error) {
 	}
 
 	if !a.cast.CanCast(target, ref) {
+		var pawnErr error
 		if target.ObjectID() != a.actor.ObjectID() {
-			if pawnErr := a.actor.BroadcastMoveToPawn(target); pawnErr != nil {
-				return false, pawnErr
-			}
+			pawnErr = a.actor.BroadcastMoveToPawn(target)
 		}
-		return false, stopErr
+		return false, errors.Join(stopErr, pawnErr)
 	}
 
 	a.cast.Cast(target, ref)

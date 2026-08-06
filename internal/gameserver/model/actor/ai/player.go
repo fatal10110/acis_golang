@@ -1,6 +1,7 @@
 package ai
 
 import (
+	"errors"
 	"sync"
 
 	"github.com/rs/zerolog"
@@ -124,10 +125,7 @@ func (p *PlayerAttack) thinkLocked() (bool, error) {
 
 	stopErr := p.move.Stop()
 	attackErr := p.attack.DoAttack(p.target)
-	if stopErr != nil {
-		return true, stopErr
-	}
-	return true, attackErr
+	return true, errors.Join(stopErr, attackErr)
 }
 
 func (p *PlayerAttack) stopLocked() {

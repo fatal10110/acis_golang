@@ -1,6 +1,7 @@
 package ai
 
 import (
+	"errors"
 	"sync"
 
 	"github.com/rs/zerolog"
@@ -214,10 +215,7 @@ func (s *Summon) thinkAttackLocked() (bool, error) {
 	}
 
 	attackErr := s.attack.DoAttack(target)
-	if stopErr != nil {
-		return true, stopErr
-	}
-	return true, attackErr
+	return true, errors.Join(stopErr, attackErr)
 }
 
 func (s *Summon) thinkCastLocked() (bool, error) {

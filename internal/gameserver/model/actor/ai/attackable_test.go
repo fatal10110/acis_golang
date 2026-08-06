@@ -19,6 +19,7 @@ type fakeActor struct {
 	headingTarget   attackable.Combatant
 	moveToPawnCalls int
 	moveToPawnTo    attackable.Combatant
+	moveToPawnErr   error
 }
 
 func actor(id int32) *fakeActor {
@@ -47,7 +48,7 @@ func (a *fakeActor) SetHeadingTo(target attackable.Combatant) {
 func (a *fakeActor) BroadcastMoveToPawn(target attackable.Combatant) error {
 	a.moveToPawnCalls++
 	a.moveToPawnTo = target
-	return nil
+	return a.moveToPawnErr
 }
 
 type recordingMove struct {
@@ -55,6 +56,7 @@ type recordingMove struct {
 	followTarget  attackable.Combatant
 	followRange   int
 	stopCount     int
+	stopErr       error
 }
 
 func (m *recordingMove) MaybeStartOffensiveFollow(target attackable.Combatant, attackRange int) (bool, error) {
@@ -67,7 +69,7 @@ func (m *recordingMove) MoveHome(location.Location) error { return nil }
 
 func (m *recordingMove) Stop() error {
 	m.stopCount++
-	return nil
+	return m.stopErr
 }
 
 type recordingAttack struct {
@@ -76,6 +78,7 @@ type recordingAttack struct {
 	attackingNow    bool
 	bowCooling      bool
 	target          attackable.Combatant
+	doAttackErr     error
 }
 
 func (a *recordingAttack) BowCoolingDown() bool { return a.bowCooling }
@@ -88,7 +91,7 @@ func (a *recordingAttack) CanAttack(target attackable.Combatant) bool {
 }
 func (a *recordingAttack) DoAttack(target attackable.Combatant) error {
 	a.target = target
-	return nil
+	return a.doAttackErr
 }
 
 type recordingCast struct {

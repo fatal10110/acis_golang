@@ -1,6 +1,7 @@
 package ai
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -137,6 +138,34 @@ func TestAttackableAICastRespectsFinalCastGate(t *testing.T) {
 	}
 	if owner.moveToPawnCalls != 1 || owner.moveToPawnTo != target {
 		t.Fatalf("BroadcastMoveToPawn calls = (%d, %v), want (1, target)", owner.moveToPawnCalls, owner.moveToPawnTo)
+	}
+}
+
+// TestAttackableThinkCastJoinsStopAndMoveToPawnBroadcastErrors is the
+// regression test for the review finding that thinkCast's early
+// `if pawnErr != nil { return pawnErr }` masked stopErr whenever both
+// move.Stop's and BroadcastMoveToPawn's broadcasts failed in the same tick.
+func TestAttackableThinkCastJoinsStopAndMoveToPawnBroadcastErrors(t *testing.T) {
+	owner := actor(1)
+	target := actor(2)
+	owner.known = map[int32]bool{target.ObjectID(): true}
+	stopErr := errors.New("stop broadcast failed")
+	pawnErr := errors.New("move-to-pawn broadcast failed")
+	owner.moveToPawnErr = pawnErr
+	move := &recordingMove{stopErr: stopErr}
+	ref := skill.Ref{ID: 4, Level: 1}
+	cast := &recordingCast{canAttempt: true, canCast: false, stopsMove: true}
+	ai := NewAttackable(owner, move, &recordingAttack{})
+	ai.SetCastController(cast)
+
+	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionCast, FinalTarget: target, Skill: ref, Weight: 10})
+	err := ai.Think()
+
+	if !errors.Is(err, stopErr) {
+		t.Fatalf("Think() error = %v, want it to wrap stopErr (%v)", err, stopErr)
+	}
+	if !errors.Is(err, pawnErr) {
+		t.Fatalf("Think() error = %v, want it to wrap pawnErr (%v)", err, pawnErr)
 	}
 }
 
