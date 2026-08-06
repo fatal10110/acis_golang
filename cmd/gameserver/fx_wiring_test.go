@@ -26,6 +26,7 @@ func TestProvideGameClientLinkUsesGameDataSkillTrees(t *testing.T) {
 			func() *manager.Roster { return nil },
 			func() *gamesql.ItemStore { return nil },
 			func() *gamesql.ShortcutStore { return nil },
+			func() *gamesql.PetStore { return nil },
 			func() *datacache.HTML { return nil },
 			func() *datacache.Crests { return nil },
 			func() *network.SessionValidator { return nil },

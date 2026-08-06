@@ -23,6 +23,7 @@ type CombatStats struct {
 	MaxHP, MaxMP                 float64
 	BaseRandomDamage             int
 	SSCount, SPSCount            int
+	AttackRange                  int
 }
 
 type summonVitals struct {

@@ -37,6 +37,7 @@ type gameData struct {
 	Zones         *zone.Index
 	Routes        route.WalkerRoutes
 	NPCs          *npc.Table
+	SummonItems   *item.SummonItemTable
 	Doors         *door.Table
 	Statics       *staticobject.Table
 	Restarts      *restart.Table
@@ -99,6 +100,10 @@ func loadGameData(paths gameServerPaths, cfg gameServerConfig, log zerolog.Logge
 	if err != nil {
 		return nil, err
 	}
+	summonItems, err := gamexml.LoadSummonItems(filepath.Join(xmlRoot, "summonItems.xml"))
+	if err != nil {
+		return nil, err
+	}
 	doors, err := gamexml.LoadDoors(filepath.Join(xmlRoot, "doors.xml"))
 	if err != nil {
 		return nil, err
@@ -131,6 +136,7 @@ func loadGameData(paths gameServerPaths, cfg gameServerConfig, log zerolog.Logge
 		Zones:         zones,
 		Routes:        routes,
 		NPCs:          npcs,
+		SummonItems:   summonItems,
 		Doors:         doors,
 		Statics:       statics,
 		Restarts:      restarts,

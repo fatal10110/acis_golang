@@ -6,6 +6,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 func (a *Actor) ObjectID() int32 { return a.id }
@@ -77,6 +78,19 @@ func (a *Actor) AlikeDead() bool { return a.dead }
 // SiegeGuard always reports false: pets and servitors are never defensive
 // siege guards.
 func (a *Actor) SiegeGuard() bool { return false }
+
+// DenyAIAction reports whether this summon is unable to act on an owner
+// command: dead or out of the owner's control.
+func (a *Actor) DenyAIAction() bool { return a.AlikeDead() || a.OutOfControl() }
+
+// Knows reports whether target is currently visible to this summon.
+func (a *Actor) Knows(target attackable.Combatant) bool {
+	tracked, ok := target.(world.Tracked)
+	return ok && world.Knows(a, tracked)
+}
+
+// PhysicalAttackRange returns this summon's melee attack range.
+func (a *Actor) PhysicalAttackRange() int { return a.stats.AttackRange }
 
 // GetSkill returns the skill this summon's npc template grants at skillID,
 // matching Java's Summon.getSkill. ok is false when the template doesn't
