@@ -104,8 +104,8 @@ func (a *AIController) CanCast(target attackable.Combatant, ref modelskill.Ref) 
 // A caster that doesn't implement it (e.g. in tests) simply broadcasts
 // nothing.
 type magicCastBroadcaster interface {
-	BroadcastSkillUse(targetID int32, targetX, targetY, targetZ int, skillID, level int32, hitTime, reuseDelay int)
-	BroadcastSkillLaunched(skillID, level int32, targetIDs []int32)
+	BroadcastSkillUse(targetID int32, targetX, targetY, targetZ int, skillID, level int32, hitTime, reuseDelay int) error
+	BroadcastSkillLaunched(skillID, level int32, targetIDs []int32) error
 }
 
 // Cast starts the cast against target and schedules its Launch, Hit and
@@ -138,14 +138,18 @@ func (a *AIController) Cast(target attackable.Combatant, ref modelskill.Ref) {
 			}
 			if broadcaster != nil {
 				tx, ty, tz := castTarget.Position()
-				broadcaster.BroadcastSkillUse(castTarget.ObjectID(), tx, ty, tz, int32(def.ID), int32(def.Level),
-					int(plan.HitTime/time.Millisecond), int(plan.ReuseDelay/time.Millisecond))
+				if err := broadcaster.BroadcastSkillUse(castTarget.ObjectID(), tx, ty, tz, int32(def.ID), int32(def.Level),
+					int(plan.HitTime/time.Millisecond), int(plan.ReuseDelay/time.Millisecond)); err != nil {
+					a.Controller.log.Warn().Err(err).Msg("cast: skill-use broadcast")
+				}
 			}
 			return true
 		},
 		Hit: func() {
 			if broadcaster != nil {
-				broadcaster.BroadcastSkillLaunched(int32(def.ID), int32(def.Level), []int32{castTarget.ObjectID()})
+				if err := broadcaster.BroadcastSkillLaunched(int32(def.ID), int32(def.Level), []int32{castTarget.ObjectID()}); err != nil {
+					a.Controller.log.Warn().Err(err).Msg("cast: skill-launched broadcast")
+				}
 			}
 			// FUSION is dispatched to PlayerCast.doFusionCast only for
 			// player casters (PlayerAI.java:300-301); CreatureCast's

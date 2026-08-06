@@ -3,7 +3,6 @@ package npc
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
-	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -22,6 +21,7 @@ type EffectPoint struct {
 
 	effects *effect.List
 	world   *world.State
+	frames  FrameBuilder
 }
 
 // NewEffectPoint creates an unspawned EffectPoint from template, attributed
@@ -60,6 +60,11 @@ func (ep *EffectPoint) MaxBuffCount() int            { return 0 }
 // SetWorld attaches the world state this actor spawns into and broadcasts
 // through.
 func (ep *EffectPoint) SetWorld(state *world.State) { ep.world = state }
+
+// SetFrameBuilder records the network-layer hook that translates this
+// actor's broadcast-worthy state changes into wire frames, keeping
+// serverpackets and wire-encoding knowledge out of the model layer.
+func (ep *EffectPoint) SetFrameBuilder(b FrameBuilder) { ep.frames = b }
 
 // Spawn places the actor in the world at (x, y, z), facing heading. It is a
 // no-op until SetWorld has been called.
@@ -100,27 +105,35 @@ type skillCastTarget interface {
 // BroadcastSkillUse sends a cast-start animation packet from this actor to
 // target, to every currently known observer capable of receiving one. It
 // is a no-op until SetWorld has been called.
-func (ep *EffectPoint) BroadcastSkillUse(target skillCastTarget, skillID, level int32) {
+func (ep *EffectPoint) BroadcastSkillUse(target skillCastTarget, skillID, level int32) error {
 	if ep.world == nil {
-		return
+		return ErrNoWorld
+	}
+	if ep.frames == nil {
+		return ErrNoFrameBuilder
 	}
 	ax, ay, az := ep.Position()
 	tx, ty, tz := target.Position()
-	ep.broadcastFrame(serverpackets.FrameMagicSkillUse(
-		serverpackets.SkillCastObject{ObjectID: ep.ObjectID(), Location: location.Location{X: ax, Y: ay, Z: az}},
-		serverpackets.SkillCastObject{ObjectID: target.ObjectID(), Location: location.Location{X: tx, Y: ty, Z: tz}},
+	ep.broadcastFrame(ep.frames.SkillUse(
+		ep.ObjectID(), location.Location{X: ax, Y: ay, Z: az},
+		target.ObjectID(), location.Location{X: tx, Y: ty, Z: tz},
 		skillID, level, 0, 0, true,
 	))
+	return nil
 }
 
 // BroadcastSkillLaunched sends the cast-launch target packet for skillID at
 // level, listing targetIDs, to every currently known observer capable of
 // receiving one. It is a no-op until SetWorld has been called.
-func (ep *EffectPoint) BroadcastSkillLaunched(skillID, level int32, targetIDs []int32) {
+func (ep *EffectPoint) BroadcastSkillLaunched(skillID, level int32, targetIDs []int32) error {
 	if ep.world == nil {
-		return
+		return ErrNoWorld
 	}
-	ep.broadcastFrame(serverpackets.FrameMagicSkillLaunched(ep.ObjectID(), skillID, level, targetIDs))
+	if ep.frames == nil {
+		return ErrNoFrameBuilder
+	}
+	ep.broadcastFrame(ep.frames.SkillLaunched(ep.ObjectID(), skillID, level, targetIDs))
+	return nil
 }
 
 func (ep *EffectPoint) broadcastFrame(fr wire.Frame) {

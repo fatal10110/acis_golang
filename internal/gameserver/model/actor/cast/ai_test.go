@@ -330,12 +330,14 @@ type fakeBroadcastingCaster struct {
 	skillLaunchedCalls []skillLaunchedCall
 }
 
-func (f *fakeBroadcastingCaster) BroadcastSkillUse(targetID int32, targetX, targetY, targetZ int, skillID, level int32, hitTime, reuseDelay int) {
+func (f *fakeBroadcastingCaster) BroadcastSkillUse(targetID int32, targetX, targetY, targetZ int, skillID, level int32, hitTime, reuseDelay int) error {
 	f.skillUseCalls = append(f.skillUseCalls, skillUseCall{targetID, targetX, targetY, targetZ, skillID, level, hitTime, reuseDelay})
+	return nil
 }
 
-func (f *fakeBroadcastingCaster) BroadcastSkillLaunched(skillID, level int32, targetIDs []int32) {
+func (f *fakeBroadcastingCaster) BroadcastSkillLaunched(skillID, level int32, targetIDs []int32) error {
 	f.skillLaunchedCalls = append(f.skillLaunchedCalls, skillLaunchedCall{skillID, level, targetIDs})
+	return nil
 }
 
 var _ magicCastBroadcaster = (*fakeBroadcastingCaster)(nil)

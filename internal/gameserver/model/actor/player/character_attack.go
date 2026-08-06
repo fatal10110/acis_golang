@@ -481,34 +481,42 @@ func (c *Character) SetHeadingTo(target attackable.Combatant) {
 // MakeAttackHit resolves one physical attack result.
 
 // BroadcastAttack sends an attack snapshot through the runtime packet hook.
-func (c *Character) BroadcastAttack(snapshot attack.Snapshot) {
+// A nil hook (the player is between sessions) is normal, not a failure, so
+// this always reports nil — unlike npc.Hostile, a live player's broadcast
+// hooks come and go with its connection by design.
+func (c *Character) BroadcastAttack(snapshot attack.Snapshot) error {
 	c.stateMu.RLock()
 	broadcast := c.broadcastAttack
 	c.stateMu.RUnlock()
 	if broadcast != nil {
 		broadcast(snapshot)
 	}
+	return nil
 }
 
-// BroadcastMove sends a movement event through the runtime packet hook.
-func (c *Character) BroadcastMove(event move.Event) {
+// BroadcastMove sends a movement event through the runtime packet hook. See
+// BroadcastAttack: a nil hook is expected, not reported as an error.
+func (c *Character) BroadcastMove(event move.Event) error {
 	c.stateMu.RLock()
 	broadcast := c.broadcastMove
 	c.stateMu.RUnlock()
 	if broadcast != nil {
 		broadcast(event)
 	}
+	return nil
 }
 
 // BroadcastStop sends a stop-in-place notice through the runtime packet
-// hook.
-func (c *Character) BroadcastStop() {
+// hook. See BroadcastAttack: a nil hook is expected, not reported as an
+// error.
+func (c *Character) BroadcastStop() error {
 	c.stateMu.RLock()
 	broadcast := c.broadcastStop
 	c.stateMu.RUnlock()
 	if broadcast != nil {
 		broadcast()
 	}
+	return nil
 }
 
 // BroadcastDie sends the death packet through the runtime packet hook.

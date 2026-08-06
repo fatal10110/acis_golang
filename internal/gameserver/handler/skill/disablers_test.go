@@ -404,16 +404,18 @@ func (disablerHostileGeo) ValidLocation(ox, oy, oz, _, _, _ int) location.Locati
 
 type disablerHostileMove struct{}
 
-func (disablerHostileMove) MaybeStartOffensiveFollow(attackable.Combatant, int) bool { return false }
-func (disablerHostileMove) MoveHome(location.Location)                               {}
-func (disablerHostileMove) Stop()                                                    {}
+func (disablerHostileMove) MaybeStartOffensiveFollow(attackable.Combatant, int) (bool, error) {
+	return false, nil
+}
+func (disablerHostileMove) MoveHome(location.Location) error { return nil }
+func (disablerHostileMove) Stop() error                      { return nil }
 
 type disablerHostileAttack struct{}
 
 func (disablerHostileAttack) BowCoolingDown() bool                { return false }
 func (disablerHostileAttack) AttackingNow() bool                  { return false }
 func (disablerHostileAttack) CanAttack(attackable.Combatant) bool { return false }
-func (disablerHostileAttack) DoAttack(attackable.Combatant)       {}
+func (disablerHostileAttack) DoAttack(attackable.Combatant) error { return nil }
 
 func TestCheckSkillSuccessFailsOnPerfectShieldBlockDespiteGuaranteedRate(t *testing.T) {
 	registry := NewDefaultRegistry()

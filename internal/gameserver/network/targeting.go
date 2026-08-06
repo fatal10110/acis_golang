@@ -119,7 +119,11 @@ func (l *GameClientLink) walkOrForwardPickup(ctx context.Context, live *livePlay
 	// at.
 	live.takePetInteract()
 	live.setPickup(ctx, ground)
-	if live.move.MoveToLocation(location.Location{X: x, Y: y, Z: z}) {
+	accepted, err := live.move.MoveToLocation(location.Location{X: x, Y: y, Z: z})
+	if err != nil {
+		l.log.Warn().Err(err).Msg("move: broadcast")
+	}
+	if accepted {
 		return true
 	}
 	live.takePickup()
@@ -211,7 +215,11 @@ func (l *GameClientLink) showOwnedPetStatus(live *livePlayer, target world.Track
 	// walk that target was still driving toward has to go too.
 	live.takePickup()
 	live.setPetInteract(pet)
-	if !live.move.MoveToLocation(location.Location{X: px, Y: py, Z: pz}) {
+	accepted, err := live.move.MoveToLocation(location.Location{X: px, Y: py, Z: pz})
+	if err != nil {
+		l.log.Warn().Err(err).Msg("move: broadcast")
+	}
+	if !accepted {
 		live.takePetInteract()
 	}
 	return true

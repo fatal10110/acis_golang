@@ -39,7 +39,7 @@ func (h *Hostile) TakeDamage(dmg int, attacker creature.DeathActor) bool {
 		h.applyNonConsumptionDamageEffects(false)
 	}
 	newlyDead := h.health.Damage(dmg)
-	h.BroadcastStatus()
+	_ = h.BroadcastStatus()
 	if !newlyDead {
 		return false
 	}

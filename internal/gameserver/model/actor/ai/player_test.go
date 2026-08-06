@@ -1,9 +1,14 @@
 package ai
 
 import (
+	"bytes"
+	"errors"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
+
+	"github.com/rs/zerolog"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 )
@@ -45,6 +50,36 @@ func TestPlayerAttackStartsSwingWhenAlreadyInRange(t *testing.T) {
 	}
 	if move.stopCount != 1 {
 		t.Fatalf("move stop count = %d, want 1", move.stopCount)
+	}
+}
+
+// TestPlayerAttackStartLogsBothStopAndAttackBroadcastErrors is the
+// regression test for the review finding that thinkLocked's masking
+// pattern (mirroring Attackable.thinkAttack) dropped attackErr from the log
+// whenever both move.Stop's and attack.DoAttack's broadcasts failed in the
+// same tick.
+func TestPlayerAttackStartLogsBothStopAndAttackBroadcastErrors(t *testing.T) {
+	owner := playerActor(1)
+	target := actor(2)
+	owner.known[target.ObjectID()] = true
+	stopErr := errors.New("stop broadcast failed")
+	attackErr := errors.New("attack broadcast failed")
+	move := &recordingMove{stopErr: stopErr}
+	strike := &recordingAttack{canAttack: true, doAttackErr: attackErr}
+	p := NewPlayerAttack(owner, move, strike)
+	var buf bytes.Buffer
+	p.SetLogger(zerolog.New(&buf))
+
+	if !p.Start(target) {
+		t.Fatal("Start() = false, want true for an in-range target")
+	}
+
+	logged := buf.String()
+	if !strings.Contains(logged, stopErr.Error()) {
+		t.Fatalf("logged error = %q, want it to contain stopErr (%v)", logged, stopErr)
+	}
+	if !strings.Contains(logged, attackErr.Error()) {
+		t.Fatalf("logged error = %q, want it to contain attackErr (%v)", logged, attackErr)
 	}
 }
 
@@ -199,7 +234,7 @@ func (a *stagedAttack) AttackingNow() bool   { return false }
 func (a *stagedAttack) CanAttack(attackable.Combatant) bool {
 	return a.canAttack
 }
-func (a *stagedAttack) DoAttack(attackable.Combatant) {
+func (a *stagedAttack) DoAttack(attackable.Combatant) error {
 	if !atomic.CompareAndSwapInt32(&a.inFlight, 0, 1) {
 		atomic.StoreInt32(&a.overlapped, 1)
 	}
@@ -211,6 +246,7 @@ func (a *stagedAttack) DoAttack(attackable.Combatant) {
 	}
 	<-a.release
 	atomic.StoreInt32(&a.inFlight, 0)
+	return nil
 }
 
 // TestPlayerAttackThinkDoesNotDoubleAttackWhileASwingIsInFlight proves

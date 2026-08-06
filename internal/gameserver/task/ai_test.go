@@ -301,7 +301,7 @@ func (a *aiActorStub) Tick() {
 	a.ticks++
 }
 
-func (a *aiActorStub) Think() {
+func (a *aiActorStub) Think() error {
 	a.mu.Lock()
 	a.thinks++
 	fn := a.thinkFn
@@ -309,6 +309,7 @@ func (a *aiActorStub) Think() {
 	if fn != nil {
 		fn()
 	}
+	return nil
 }
 
 func (a *aiActorStub) OnInactiveRegion() {

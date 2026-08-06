@@ -91,6 +91,7 @@ func TestEffectPointBroadcastSkillUseAndLaunched(t *testing.T) {
 		t.Fatalf("NewEffectPoint: %v", err)
 	}
 	ep.SetWorld(state)
+	ep.SetFrameBuilder(serverpackets.NpcFrameBuilder{})
 	ep.Spawn(100, 100, 0, 0)
 
 	observer := &frameReceiver{trackedID: 55}

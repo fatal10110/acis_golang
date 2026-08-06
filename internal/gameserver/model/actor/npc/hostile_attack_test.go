@@ -27,6 +27,7 @@ func newCombatHostile(t testing.TB, id int32, tpl *Template) *Hostile {
 	if err != nil {
 		t.Fatal(err)
 	}
+	h.SetFrameBuilder(serverpackets.NpcFrameBuilder{})
 	return h
 }
 

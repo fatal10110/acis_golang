@@ -170,13 +170,13 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 // — see gameSummonSpawner.SpawnPet's own comment.
 type inertSummonMoveController struct{}
 
-func (inertSummonMoveController) MaybeStartOffensiveFollow(attackable.Combatant, int) bool {
-	return false
+func (inertSummonMoveController) MaybeStartOffensiveFollow(attackable.Combatant, int) (bool, error) {
+	return false, nil
 }
-func (inertSummonMoveController) MoveHome(location.Location) {}
-func (inertSummonMoveController) Stop()                      {}
-func (inertSummonMoveController) MaybeStartFriendlyFollow(attackable.Combatant, int) bool {
-	return false
+func (inertSummonMoveController) MoveHome(location.Location) error { return nil }
+func (inertSummonMoveController) Stop() error                      { return nil }
+func (inertSummonMoveController) MaybeStartFriendlyFollow(attackable.Combatant, int) (bool, error) {
+	return false, nil
 }
 
 type inertSummonAttackController struct{}
@@ -184,4 +184,4 @@ type inertSummonAttackController struct{}
 func (inertSummonAttackController) BowCoolingDown() bool                { return false }
 func (inertSummonAttackController) AttackingNow() bool                  { return false }
 func (inertSummonAttackController) CanAttack(attackable.Combatant) bool { return false }
-func (inertSummonAttackController) DoAttack(attackable.Combatant)       {}
+func (inertSummonAttackController) DoAttack(attackable.Combatant) error { return nil }

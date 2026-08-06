@@ -171,6 +171,7 @@ func (h signetHandler) spawnActor(caster any, def modelskill.Definition) (*npc.E
 		return nil, false
 	}
 	actor.SetWorld(h.world)
+	actor.SetFrameBuilder(serverpackets.NpcFrameBuilder{})
 
 	pos, ok := caster.(signetPositioned)
 	if !ok {
@@ -233,12 +234,12 @@ func (h signetHandler) newSignetBuffEffect(def modelskill.Definition, meta effec
 		h.forEachSignetTarget(actor, def.Radius, func(target signetNearby) {
 			applyEffects(actor, target, sub, sub.Effects)
 			if ct, ok := target.(signetCastTarget); ok {
-				actor.BroadcastSkillUse(ct, int32(sub.ID), int32(sub.Level))
+				_ = actor.BroadcastSkillUse(ct, int32(sub.ID), int32(sub.Level))
 				ids = append(ids, ct.ObjectID())
 			}
 		})
 		if len(ids) > 0 {
-			actor.BroadcastSkillLaunched(int32(sub.ID), int32(sub.Level), ids)
+			_ = actor.BroadcastSkillLaunched(int32(sub.ID), int32(sub.Level), ids)
 		}
 		return true
 	}
@@ -271,12 +272,12 @@ func (h signetHandler) newSignetNoiseEffect(def modelskill.Definition, meta effe
 				}
 			}
 			if ct, ok := target.(signetCastTarget); ok {
-				actor.BroadcastSkillUse(ct, int32(sub.ID), int32(sub.Level))
+				_ = actor.BroadcastSkillUse(ct, int32(sub.ID), int32(sub.Level))
 				ids = append(ids, ct.ObjectID())
 			}
 		})
 		if len(ids) > 0 {
-			actor.BroadcastSkillLaunched(int32(sub.ID), int32(sub.Level), ids)
+			_ = actor.BroadcastSkillLaunched(int32(sub.ID), int32(sub.Level), ids)
 		}
 		return true
 	}
@@ -310,7 +311,7 @@ func (h signetHandler) newSignetAntiSummonEffect(def modelskill.Definition, meta
 			summon.Unsummon()
 		})
 		if len(ids) > 0 {
-			actor.BroadcastSkillLaunched(int32(def.ID), int32(def.Level), ids)
+			_ = actor.BroadcastSkillLaunched(int32(def.ID), int32(def.Level), ids)
 		}
 		return true
 	}
@@ -367,12 +368,12 @@ func (h signetHandler) newSignetMDamEffect(caster any, def modelskill.Definition
 				dmgTarget.ReduceHP(float64(damage), caster, def)
 			}
 			if ct, ok := target.(signetCastTarget); ok {
-				actor.BroadcastSkillUse(ct, int32(def.ID), int32(def.Level))
+				_ = actor.BroadcastSkillUse(ct, int32(def.ID), int32(def.Level))
 				ids = append(ids, ct.ObjectID())
 			}
 		})
 		if len(ids) > 0 {
-			actor.BroadcastSkillLaunched(int32(def.ID), int32(def.Level), ids)
+			_ = actor.BroadcastSkillLaunched(int32(def.ID), int32(def.Level), ids)
 		}
 		return true
 	}

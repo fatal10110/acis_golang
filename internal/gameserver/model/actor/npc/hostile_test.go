@@ -480,17 +480,18 @@ type hostileMove struct {
 	stopCount    int
 }
 
-func (m *hostileMove) MaybeStartOffensiveFollow(target attackable.Combatant, attackRange int) bool {
+func (m *hostileMove) MaybeStartOffensiveFollow(target attackable.Combatant, attackRange int) (bool, error) {
 	m.followTarget = target
 	m.followRange = attackRange
-	return false
+	return false, nil
 }
 
-func (m *hostileMove) MoveHome(home location.Location) {
+func (m *hostileMove) MoveHome(home location.Location) error {
 	m.home = home
+	return nil
 }
 
-func (m *hostileMove) Stop() { m.stopCount++ }
+func (m *hostileMove) Stop() error { m.stopCount++; return nil }
 
 type hostileAttack struct {
 	canAttack bool
@@ -502,8 +503,9 @@ func (a *hostileAttack) AttackingNow() bool   { return false }
 func (a *hostileAttack) CanAttack(attackable.Combatant) bool {
 	return a.canAttack
 }
-func (a *hostileAttack) DoAttack(target attackable.Combatant) {
+func (a *hostileAttack) DoAttack(target attackable.Combatant) error {
 	a.target = target
+	return nil
 }
 
 // hostileEffectTarget satisfies the flee hook a Fear effect's runtime needs,

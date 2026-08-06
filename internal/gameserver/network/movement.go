@@ -22,7 +22,11 @@ func (l *GameClientLink) moveLivePlayer(live *livePlayer, target location.Locati
 	// tryToMoveTo) — the client origin is nothing but a lag hint the
 	// server must not adopt.
 	origin := live.move.Position()
-	if !live.move.MoveToLocation(target) {
+	accepted, err := live.move.MoveToLocation(target)
+	if err != nil {
+		l.log.Warn().Err(err).Msg("move: broadcast")
+	}
+	if !accepted {
 		// A route that cannot make lateral progress (geo fully blocked) is
 		// rejected outright; answer it so the click never goes silent. The
 		// reference only ever rotates once a move is actually accepted

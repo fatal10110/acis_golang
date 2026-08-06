@@ -1,7 +1,12 @@
 package ai
 
 import (
+	"bytes"
+	"errors"
+	"strings"
 	"testing"
+
+	"github.com/rs/zerolog"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -73,6 +78,36 @@ func TestSummonAIThinkPreservesQueuedRetargetWhileCurrentAttackIsBusy(t *testing
 
 	if kind, queuedTarget, ok := brain.NextIntention(); !ok || kind != IntentionAttack || queuedTarget != secondTarget {
 		t.Fatalf("NextIntention() = (%v,%v,%v), want attack,second target,true", kind, queuedTarget, ok)
+	}
+}
+
+// TestSummonThinkLogsBothStopAndAttackBroadcastErrors is the regression
+// test for the review finding that thinkAttackLocked's masking pattern
+// (mirroring Attackable.thinkAttack) dropped attackErr from the log
+// whenever both move.Stop's and attack.DoAttack's broadcasts failed in the
+// same tick.
+func TestSummonThinkLogsBothStopAndAttackBroadcastErrors(t *testing.T) {
+	owner := actor(100)
+	target := actor(200)
+	stopErr := errors.New("stop broadcast failed")
+	attackErr := errors.New("attack broadcast failed")
+	move := &summonMove{}
+	move.stopErr = stopErr
+	strike := &recordingAttack{canAttack: true, doAttackErr: attackErr}
+	brain := NewSummon(owner, move, strike)
+	var buf bytes.Buffer
+	brain.SetLogger(zerolog.New(&buf))
+
+	if !brain.TryToAttack(target) {
+		t.Fatal("TryToAttack() = false, want accepted attack")
+	}
+
+	logged := buf.String()
+	if !strings.Contains(logged, stopErr.Error()) {
+		t.Fatalf("logged error = %q, want it to contain stopErr (%v)", logged, stopErr)
+	}
+	if !strings.Contains(logged, attackErr.Error()) {
+		t.Fatalf("logged error = %q, want it to contain attackErr (%v)", logged, attackErr)
 	}
 }
 
@@ -180,8 +215,8 @@ type summonMove struct {
 	friendlyRange  int
 }
 
-func (m *summonMove) MaybeStartFriendlyFollow(target attackable.Combatant, offset int) bool {
+func (m *summonMove) MaybeStartFriendlyFollow(target attackable.Combatant, offset int) (bool, error) {
 	m.friendlyTarget = target
 	m.friendlyRange = offset
-	return true
+	return true, nil
 }

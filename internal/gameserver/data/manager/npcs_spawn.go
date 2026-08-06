@@ -7,6 +7,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
 func isOnStartMaker(maker *spawn.Maker) bool {
@@ -143,6 +144,7 @@ func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, lo
 
 	hostile.SetCurrentHP(hp)
 	hostile.SetWorld(n.state)
+	hostile.SetFrameBuilder(serverpackets.NpcFrameBuilder{})
 	hostile.SetWeapon(n.items)
 	hostile.SetRewarder(n.rewarderFor(hostile, tmpl))
 

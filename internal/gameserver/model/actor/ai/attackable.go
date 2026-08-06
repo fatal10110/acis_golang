@@ -1,6 +1,7 @@
 package ai
 
 import (
+	"errors"
 	"sync"
 	"time"
 
@@ -25,14 +26,14 @@ type AttackableActor interface {
 	// BroadcastMoveToPawn sends a rotation-only MoveToPawn notice toward
 	// target, used when a final cast attempt is rejected after movement so
 	// observers still see the actor face its target.
-	BroadcastMoveToPawn(target attackable.Combatant)
+	BroadcastMoveToPawn(target attackable.Combatant) error
 }
 
 // MoveController controls movement requests emitted by the AI loop.
 type MoveController interface {
-	MaybeStartOffensiveFollow(target attackable.Combatant, attackRange int) bool
-	MoveHome(location.Location)
-	Stop()
+	MaybeStartOffensiveFollow(target attackable.Combatant, attackRange int) (bool, error)
+	MoveHome(location.Location) error
+	Stop() error
 }
 
 // AttackController controls attack requests emitted by the AI loop.
@@ -40,7 +41,7 @@ type AttackController interface {
 	BowCoolingDown() bool
 	AttackingNow() bool
 	CanAttack(attackable.Combatant) bool
-	DoAttack(attackable.Combatant)
+	DoAttack(attackable.Combatant) error
 }
 
 // CastController controls skill-cast requests emitted by the AI loop,
@@ -266,8 +267,10 @@ func (a *Attackable) NextIntention() (Intention, attackable.Combatant, bool) {
 }
 
 // Think advances the current intention once. Safe to call from the periodic
-// AI task as well as from a movement-arrived or attack-finished hook.
-func (a *Attackable) Think() {
+// AI task as well as from a movement-arrived or attack-finished hook. A
+// non-nil return reports that an intention step ran but a broadcast within
+// it failed; the intention itself still advanced.
+func (a *Attackable) Think() error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
@@ -276,18 +279,23 @@ func (a *Attackable) Think() {
 		a.promoteNext()
 		switch a.current.kind {
 		case IntentionAttack:
-			if a.thinkAttack() {
+			again, err := a.thinkAttack()
+			if again {
 				continue
 			}
+			return err
 		case IntentionCast:
-			if a.thinkCast() {
+			again, err := a.thinkCast()
+			if again {
 				continue
 			}
+			return err
 		case IntentionWander:
 			a.thinkWander()
 		}
-		return
+		return nil
 	}
+	return nil
 }
 
 func (a *Attackable) promoteNext() {
@@ -322,33 +330,38 @@ func (a *Attackable) Tick() {
 	a.step = 0
 }
 
-func (a *Attackable) thinkAttack() bool {
+// thinkAttack advances one IntentionAttack step. The first return reports
+// whether Think's caller should immediately re-promote and continue (true)
+// or stop for this cycle (false); the second is any broadcast error from a
+// synchronous call this step made, only meaningful when the first is false.
+func (a *Attackable) thinkAttack() (bool, error) {
 	if a.actor.DenyAIAction() {
-		return false
+		return false, nil
 	}
 
 	target := a.current.target
 	if a.dropLostTarget(target) {
-		return true
+		return true, nil
 	}
 
-	if a.move.MaybeStartOffensiveFollow(target, a.actor.PhysicalAttackRange()) {
-		return false
+	following, err := a.move.MaybeStartOffensiveFollow(target, a.actor.PhysicalAttackRange())
+	if following {
+		return false, err
 	}
 
 	if a.attack.BowCoolingDown() || a.attack.AttackingNow() {
 		a.next = a.current
-		return false
+		return false, nil
 	}
 
 	if !a.attack.CanAttack(target) {
 		a.skipAttackTarget(target)
-		return true
+		return true, nil
 	}
 
-	a.move.Stop()
-	a.attack.DoAttack(target)
-	return false
+	stopErr := a.move.Stop()
+	attackErr := a.attack.DoAttack(target)
+	return false, errors.Join(stopErr, attackErr)
 }
 
 // thinkCast advances an IntentionCast desire once it has been promoted to
@@ -356,44 +369,47 @@ func (a *Attackable) thinkAttack() bool {
 // target, planting and facing it once the cast animation is long enough to
 // warrant it, then the final cast attempt. It mirrors thinkAttack's shape
 // for skill casts instead of physical attacks.
-func (a *Attackable) thinkCast() bool {
+func (a *Attackable) thinkCast() (bool, error) {
 	if a.actor.DenyAIAction() || a.cast == nil {
-		return false
+		return false, nil
 	}
 	if a.cast.Disabled() {
-		return false
+		return false, nil
 	}
 
 	target := a.current.target
 	ref := a.current.skill
 	if a.dropLostCastTarget(target, a.cast.SkillType(ref)) {
-		return true
+		return true, nil
 	}
 
 	if !a.cast.CanAttempt(target, ref) {
-		return false
+		return false, nil
 	}
 
-	if a.move.MaybeStartOffensiveFollow(target, a.cast.Range(ref)) {
-		return false
+	following, err := a.move.MaybeStartOffensiveFollow(target, a.cast.Range(ref))
+	if following {
+		return false, err
 	}
 
+	var stopErr error
 	if a.cast.StopsMovement(ref) {
-		a.move.Stop()
+		stopErr = a.move.Stop()
 		if target.ObjectID() != a.actor.ObjectID() {
 			a.actor.SetHeadingTo(target)
 		}
 	}
 
 	if !a.cast.CanCast(target, ref) {
+		var pawnErr error
 		if target.ObjectID() != a.actor.ObjectID() {
-			a.actor.BroadcastMoveToPawn(target)
+			pawnErr = a.actor.BroadcastMoveToPawn(target)
 		}
-		return false
+		return false, errors.Join(stopErr, pawnErr)
 	}
 
 	a.cast.Cast(target, ref)
-	return false
+	return false, stopErr
 }
 
 func (a *Attackable) thinkWander() {

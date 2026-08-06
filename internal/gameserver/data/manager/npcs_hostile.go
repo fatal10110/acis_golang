@@ -59,9 +59,15 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 	moveCtl.SetArrived(func() {
 		pos := moveCtl.Position()
 		hostile.SyncPosition(pos)
-		hostile.Think()
+		if err := hostile.Think(); err != nil {
+			log.Warn().Err(err).Msg("ai: hostile think")
+		}
 	})
-	attackCtl.SetFinished(hostile.Think)
+	attackCtl.SetFinished(func() {
+		if err := hostile.Think(); err != nil {
+			log.Warn().Err(err).Msg("ai: hostile think")
+		}
+	})
 
 	return hostile, nil
 }

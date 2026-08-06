@@ -27,7 +27,7 @@ const AITick = time.Second
 type AIActor interface {
 	world.Tracked
 	Tick()
-	Think()
+	Think() error
 }
 
 // AI runs active actor brains once per tick.
@@ -118,7 +118,9 @@ func (a *AI) Tick() error {
 			}
 		}
 		actor.Tick()
-		actor.Think()
+		if err := actor.Think(); err != nil {
+			a.log.Warn().Err(err).Int32("actor_id", actor.ObjectID()).Msg("ai: think")
+		}
 	}
 	return nil
 }

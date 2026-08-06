@@ -73,7 +73,7 @@ type CreatureMove struct {
 	followOffset         int
 	followMode           FollowMode
 	arrived              func()
-	segmentAdvanced      func(Event)
+	segmentAdvanced      func(Event) error
 	timer                scheduledTimer
 	moveSeq              uint64
 	afterFunc            func(time.Duration, func()) scheduledTimer
@@ -145,7 +145,7 @@ func (m *CreatureMove) SetLogger(log zerolog.Logger) {
 // segment (already reported by MoveToLocation's own return value) or for the
 // final segment's completion (that's the arrived hook's job). A nil hook
 // (the default) makes segment advancement a no-op.
-func (m *CreatureMove) SetSegmentAdvancedHook(segmentAdvanced func(Event)) {
+func (m *CreatureMove) SetSegmentAdvancedHook(segmentAdvanced func(Event) error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.segmentAdvanced = segmentAdvanced
@@ -359,7 +359,12 @@ func (m *CreatureMove) finishLocked() func() {
 		if segmentAdvanced == nil {
 			return nil
 		}
-		return func() { segmentAdvanced(event) }
+		log := m.log
+		return func() {
+			if err := segmentAdvanced(event); err != nil {
+				log.Warn().Err(err).Msg("move: segment-advance broadcast")
+			}
+		}
 	}
 
 	m.moving = false

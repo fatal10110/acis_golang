@@ -70,7 +70,7 @@ type abnormalUpdater interface {
 }
 
 type thinkTarget interface {
-	Think()
+	Think() error
 }
 
 type afraidTarget interface {
