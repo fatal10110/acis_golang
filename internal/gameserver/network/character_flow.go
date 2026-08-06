@@ -488,6 +488,12 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	c.SetRegenMaxSender(func(count, period int32, hpRegen float64) {
 		live.SendFrame(serverpackets.FrameExRegenMax(count, period, hpRegen))
 	})
+	c.SetLackHPNotifier(func() {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSkillRemovedDueLackHP))
+	})
+	c.SetLackMPNotifier(func() {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSkillRemovedDueLackMP))
+	})
 	c.SetAttackTargetHook(func(target world.Tracked) {
 		l.attackLiveTarget(live, target)
 	})
