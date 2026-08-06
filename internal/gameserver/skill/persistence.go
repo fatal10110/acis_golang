@@ -108,6 +108,36 @@ func (p *Persistence) Restore(ctx context.Context, c *player.Character) error {
 	return nil
 }
 
+// ReplayEffects reinstates every effect Restore recorded into c's restore
+// registry (via RestoreSkillEffect) onto c's live effect list, at the tick
+// count and elapsed time it had at logout. Call once c.EffectList() is
+// attached, after Restore itself: Restore runs before the live player (and
+// its effect list) exists, so it can only record restored effects into the
+// registry — this replay is what actually fires their OnStart, schedules
+// their ticks, and surfaces their icons, mirroring
+// Player.restoreEffects()'s template.getEffect(this, this, skill) ->
+// setCount/setTime -> scheduleEffect() chain.
+func (p *Persistence) ReplayEffects(c *player.Character) {
+	if p == nil || c == nil {
+		return
+	}
+	list := c.EffectList()
+	if list == nil {
+		return
+	}
+	for _, eff := range c.ActiveSkillEffects() {
+		def, ok := p.definition(eff.Skill)
+		if !ok {
+			continue
+		}
+		templates := def.Effects
+		if len(def.SelfEffects) > 0 {
+			templates = append(append([]modelskill.EffectTemplate{}, templates...), def.SelfEffects...)
+		}
+		effect.ApplyRestored(list, c, c, effect.SkillFromDefinition(def), templates, eff.Count, eff.Time)
+	}
+}
+
 // SetKnownSkill records one learned skill on the character and, when the
 // backing store can write character_skills, persists it first. When the
 // skill is passive, its stat functions are (re)attached to the character's

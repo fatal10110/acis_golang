@@ -137,6 +137,14 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 
 	client.Session.SendFrame(serverpackets.FrameExStorageMaxCount(c))
 	client.Session.SendFrame(serverpackets.FrameHennaInfo(c.ClassID))
+	// Replay restored buffs into the live effect list here, matching
+	// EnterWorld.java:100's player.updateEffectIcons() position: List.Add's
+	// notifyAbnormalUpdate hook fires the resulting AbnormalStatusUpdate
+	// frame (if any effect was restored) right where the reference sends it,
+	// ahead of EtcStatusUpdate.
+	if l.skills != nil {
+		l.skills.ReplayEffects(c)
+	}
 	client.Session.SendFrame(serverpackets.FrameEtcStatusUpdate(serverpackets.EtcStatus{WeightPenalty: int32(c.WeightPenalty()), GradePenalty: c.WeaponGradePenalty() || c.ArmorGradePenalty() > 0}))
 	client.Session.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageWelcomeToLineage))
 	client.Session.SendFrame(serverpackets.FrameQuestList(nil))

@@ -46,6 +46,31 @@ type Effect struct {
 	scheduleMu sync.Mutex
 	remaining  int
 	nextAction time.Time
+	// restore, when set, tells the next startSchedule call to resume from a
+	// persisted tick count and elapsed time instead of starting fresh from
+	// the template, for an effect reinstated by a relog restore. Consumed
+	// (set back to nil) the first time startSchedule runs.
+	restore *restoreSeed
+}
+
+// restoreSeed carries the tick count and time-since-last-tick a persisted
+// effect had at logout, mirroring the effect_count/effect_cur_time columns
+// AbstractEffect.setCount/setTime seed before Player.restoreEffects() calls
+// scheduleEffect().
+type restoreSeed struct {
+	count   int32
+	elapsed int32
+}
+
+// seedRestore marks e to resume from count and elapsedSeconds on its next
+// startSchedule call rather than starting fresh.
+func (e *Effect) seedRestore(count, elapsedSeconds int32) {
+	if e == nil {
+		return
+	}
+	e.scheduleMu.Lock()
+	e.restore = &restoreSeed{count: count, elapsed: elapsedSeconds}
+	e.scheduleMu.Unlock()
 }
 
 // InUse reports whether e is the active member of its stack group.
@@ -87,12 +112,41 @@ func (e *Effect) startSchedule(now time.Time) {
 	e.scheduleMu.Lock()
 	defer e.scheduleMu.Unlock()
 
+	if r := e.restore; r != nil {
+		e.restore = nil
+		e.startScheduleFromRestoreLocked(r, now)
+		return
+	}
+
 	e.remaining = e.Template.Count
 	if period := e.period(); period > 0 {
 		e.nextAction = now.Add(period)
 		return
 	}
 	e.nextAction = time.Time{}
+}
+
+// startScheduleFromRestoreLocked seeds e.remaining and e.nextAction from a
+// persisted tick count and elapsed time, mirroring
+// AbstractEffect.setCount(newCount)/setTime(newTime) ahead of a restored
+// effect's scheduleEffect() call: the tick count is clamped to the
+// template's own count, and the elapsed time (seconds since the effect's
+// last tick at logout) is clamped to the template's period before being
+// subtracted from it to find the delay until the next tick. Called with
+// e.scheduleMu already held.
+func (e *Effect) startScheduleFromRestoreLocked(r *restoreSeed, now time.Time) {
+	e.remaining = int(min(r.count, int32(e.Template.Count)))
+
+	period := e.period()
+	if period <= 0 {
+		e.nextAction = time.Time{}
+		return
+	}
+
+	periodSeconds := int32(e.Template.Time)
+	elapsed := min(r.elapsed, periodSeconds)
+	delay := max(time.Duration(periodSeconds-elapsed)*time.Second, 0)
+	e.nextAction = now.Add(delay)
 }
 
 func (e *Effect) stopSchedule() {
