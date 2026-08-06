@@ -49,19 +49,13 @@ func (l *GameClientLink) useSummonItem(live *livePlayer, inv *itemcontainer.Inve
 		return false
 	}
 
-	// SummonItems.java:37 (isAllSkillsDisabled/castingNow) precondition —
-	// a silent drop, matching the reference's bare return. isSitting,
-	// isInObserverMode, isAttackingNow and isInBoat are the same
-	// reference method's other guards; this port has no sitting/observer/
-	// attack-state/boat model yet for a player to be summoning from, so
-	// those states cannot currently occur here.
-	if live.AllSkillsDisabled() || live.CastingNow() {
-		return true
-	}
-
 	def, ok := l.skills.Definition(summonCreatureSkillRef)
 	if !ok {
-		return true
+		// SUMMON_CREATURE isn't loaded — a server-data gap, not a normal
+		// rejection. Fall through unhandled so the caller's equip-toggle
+		// fallback still answers the client, matching useItemAICast's own
+		// unresolved-skill fallback.
+		return false
 	}
 
 	// SetSummonSpawner is wired here rather than at world-enter time

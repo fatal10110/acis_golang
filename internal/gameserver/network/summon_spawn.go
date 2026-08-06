@@ -32,6 +32,16 @@ const petSpawnOffset = 40
 // false if the owner already has a pet or servitor tracked — the reference
 // re-checks this at the handler layer even though SummonItems.java already
 // gated it once before the cast started.
+//
+// Every other rejection below (missing template, unmapped or non-pet
+// summon item, missing npc template, a restore-state error, ID exhaustion,
+// an unresolvable level) sends no further packet and only reports false.
+// This runs inside the cast's already-committed Hit phase — MagicSkillUse,
+// the SUMMON_A_PET system message and MagicSkillLaunched are already sent
+// by the caller before SpawnPet runs — and Java's own handler is silent
+// for the identical set of conditions (SummonCreature.java:36,40,44,49,54,
+// 59 are all bare `return;`, with no packet beyond what the cast itself
+// already sent).
 func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.Instance) bool {
 	link, live := s.link, s.live
 	if link == nil || live == nil || controlItem == nil {
@@ -66,16 +76,21 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 	// follow-up — see this PR's linked issue. Level/Fed/HP/MP are restored
 	// here because summon.Actor already exposes somewhere to put them.
 	level := petmodel.InitialLevel(int(summonItem.NPCID), npcTmpl.Level, live.LevelValue())
-	fed := npcTmpl.Pet.Levels[level].MaxMeal
-	var curHP, curMP float64
 	if hasSaved {
 		level = state.Level
-		fed = state.Fed
-		curHP, curMP = state.CurHP, state.CurMP
 	}
-	levelStats := npcTmpl.Pet.Levels[level]
-	if !hasSaved {
-		curHP, curMP = levelStats.MaxHP, levelStats.MaxMP
+	levelStats, ok := npcTmpl.Pet.Levels[level]
+	if !ok {
+		// A corrupted/out-of-range saved level, or a template with no
+		// stat row for its own declared level: reject rather than spawn
+		// with zero-value combat/feeding stats, matching Pet.restore
+		// returning null on bad data (SummonCreature.java:59's pet==null
+		// check, itself a silent no-op — see this file's own SpawnPet doc).
+		return false
+	}
+	fed, curHP, curMP := levelStats.MaxMeal, levelStats.MaxHP, levelStats.MaxMP
+	if hasSaved {
+		fed, curHP, curMP = state.Fed, state.CurHP, state.CurMP
 	}
 
 	objID, err := link.ids.NextID()
