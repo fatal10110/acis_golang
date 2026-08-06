@@ -74,6 +74,9 @@ func (l *GameClientLink) useItem(live *livePlayer, objectID int32) {
 	if l.useItemAICast(live, inv, inst) {
 		return
 	}
+	if l.useSummonItem(live, inv, inst) {
+		return
+	}
 	if l.useShotItem(live, inv, inst) {
 		return
 	}

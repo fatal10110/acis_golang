@@ -129,6 +129,13 @@ type Character struct {
 	castMu sync.RWMutex
 	cast   CastController
 
+	// summonSpawnMu guards summonSpawner, the network-owned pet/servitor
+	// spawner wired back onto this character the same way cast is, so the
+	// SUMMON_CREATURE skill handler can reach it without this domain
+	// package importing the network package.
+	summonSpawnMu sync.RWMutex
+	summonSpawner SummonSpawner
+
 	// statMu guards statCalcs map creation. Each Calculator owns its Funcs.
 	statMu    sync.Mutex
 	statCalcs map[stat.Stat]*basefunc.Calculator
