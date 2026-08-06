@@ -73,6 +73,7 @@ func provideGameClientLink(
 	weightLimit weightLimitMultiplier,
 	karmaTeleport karmaPlayerCanTeleport,
 	petCfg pet.Config,
+	petStore *gamesql.PetStore,
 	log zerolog.Logger,
 ) *network.GameClientLink {
 	playerConfig := network.PlayerConfig{
@@ -99,6 +100,8 @@ func provideGameClientLink(
 		CursedWeapons: data.CursedWeapons,
 		World:         state,
 		NPCs:          data.NPCs,
+		SummonItems:   data.SummonItems,
+		PetStore:      petStore,
 		Geo:           move.NewGeo(data.Geo, data.Finder),
 		Zones:         data.Zones,
 		IDs:           ids,
