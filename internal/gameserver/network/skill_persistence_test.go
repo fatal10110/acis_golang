@@ -223,7 +223,33 @@ func TestGameClientLinkEnterWorldRestoresPersistedSkillState(t *testing.T) {
 	c.read() // SSQInfo
 	c.read() // CharSelected
 	c.send(encodeEnterWorld())
-	readEnterWorldBurst(t, c, false)
+
+	// ReplayEffects adds the restored buff to the live effect list between
+	// HennaInfo and EtcStatusUpdate (mirroring EnterWorld.java:100's
+	// player.updateEffectIcons() call), so List.Add's notifyAbnormalUpdate
+	// hook fires one AbnormalStatusUpdate frame there that a plain
+	// readEnterWorldBurst call doesn't expect.
+	want := []byte{
+		serverpackets.OpcodeExtended,
+		serverpackets.OpcodeHennaInfo,
+		serverpackets.OpcodeAbnormalStatusUpdate,
+		serverpackets.OpcodeEtcStatusUpdate,
+		serverpackets.OpcodeSystemMessage,
+		serverpackets.OpcodeQuestList,
+		serverpackets.OpcodeSkillList,
+		serverpackets.OpcodeFriendList,
+		serverpackets.OpcodeUserInfo,
+		serverpackets.OpcodeItemList,
+		serverpackets.OpcodeShortCutInit,
+		serverpackets.OpcodeSkillCoolTime,
+		serverpackets.OpcodeActionFailed,
+	}
+	for i, opcode := range want {
+		frame := c.read()
+		if frame[0] != opcode {
+			t.Fatalf("EnterWorld frame %d opcode = %#x, want %#x", i, frame[0], opcode)
+		}
+	}
 
 	char := chars.character(t, objID)
 	if !char.SkillDisabled(1040*256 + 3) {
@@ -236,6 +262,9 @@ func TestGameClientLinkEnterWorldRestoresPersistedSkillState(t *testing.T) {
 	}
 	if got := store.rowsFor(objID, 0); len(got) != 0 {
 		t.Fatalf("persisted rows after EnterWorld = %+v, want consumed", got)
+	}
+	if _, ok := char.EffectList().ActiveBySkillID(1040); !ok {
+		t.Fatal("EnterWorld restored effect never entered the live effect list")
 	}
 }
 
