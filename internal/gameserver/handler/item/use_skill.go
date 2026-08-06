@@ -60,6 +60,13 @@ type UseResult struct {
 	// matching the reference's send-then-apply cast sequencing.
 	Apply func()
 
+	// MirroredSummon is the servitor the herb's effect was mirrored onto,
+	// set only when that mirror happened. The caller broadcasts its own
+	// MagicSkillUse for it (caster and target both the servitor), matching
+	// the reference's mirrored `doInstantCast` broadcasting independently
+	// of the caster's own cast packet (`PlayerCast.java:104`).
+	MirroredSummon actorcast.Target
+
 	HasShortBuff             bool
 	ShortBuffSkillID         int32
 	ShortBuffLevel           int32
@@ -109,11 +116,12 @@ type UseRequest struct {
 	// caster; ItemSkillsHandler items do not distinguish on this field.
 	IsPet bool
 
-	// Summon is the caster's active pet or servitor, if any. A herb's
-	// effect is mirrored onto it in addition to Caster, matching the
-	// reference's `player.getSummon().getCast().doInstantCast(...)`. Nil
-	// when the caster has no active summon, or is itself one (IsPet),
-	// leaves the mirror unapplied.
+	// Summon is the caster's active servitor, if any — never a pet, matching
+	// the reference's `player.hasServitor()` gate. A herb's effect is
+	// mirrored onto it in addition to Caster, matching the reference's
+	// `player.getSummon().getCast().doInstantCast(...)`. Nil when the caster
+	// has no active servitor, or is itself one (IsPet), leaves the mirror
+	// unapplied.
 	Summon actorcast.Target
 }
 
@@ -177,6 +185,9 @@ func Use(req UseRequest) UseResult {
 	}
 
 	result := UseResult{Outcome: Applied, Skill: def, Apply: apply, SharedReuseGroup: tmpl.EtcItem.SharedReuseGroup, ReuseMillis: reuse}
+	if mirrorToSummon {
+		result.MirroredSummon = req.Summon
+	}
 	result.HasShortBuff, result.ShortBuffSkillID, result.ShortBuffLevel, result.ShortBuffDurationSeconds = shortBuffDecision(req.Caster, def)
 	return result
 }

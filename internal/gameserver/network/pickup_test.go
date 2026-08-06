@@ -10,6 +10,7 @@ import (
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -333,6 +334,69 @@ func TestConsumeHerbRejectsNonHerbTemplate(t *testing.T) {
 	if effects := live.EffectList().All(); len(effects) != 0 {
 		t.Fatalf("installed effects = %+v, want none", effects)
 	}
+}
+
+// TestConsumeHerbMirrorsOntoServitorOnly is the regression test for issue
+// #1246: consumeHerb mirrors the herb's effect and broadcasts a second
+// MagicSkillUse for an active servitor, but not for a pet — matching the
+// reference's `player.hasServitor()` gate (`Player.java:2986-2990`) and its
+// mirrored cast's own broadcast (`PlayerCast.java:104`).
+func TestConsumeHerbMirrorsOntoServitorOnly(t *testing.T) {
+	const herbTemplate int32 = 8600
+	templates := herbTestTemplates()
+
+	t.Run("active servitor", func(t *testing.T) {
+		capture := &frameCapture{}
+		live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
+		state := world.New()
+		state.Spawn(live, 100, 0, 0, 0)
+		servitor := summon.NewServitor(summon.ServitorConfig{ObjectID: 500, Level: 44, Stats: summon.CombatStats{MaxHP: 500, MaxMP: 200}})
+		state.AddSummon(live.ObjectID(), servitor)
+		gcl := &GameClientLink{
+			world:         state,
+			skills:        herbTestSkill(t),
+			targets:       skilltarget.NewRegistry(skilltarget.WorldKnown{State: state}),
+			skillHandlers: handlerskill.NewDefaultRegistry(),
+		}
+
+		capture.frames = nil
+		gcl.consumeHerb(live, herbTemplate)
+
+		assertOpcodeSequence(t, capture.frames,
+			serverpackets.OpcodeMagicSkillUse,
+			serverpackets.OpcodeMagicSkillUse,
+		)
+		r := wire.NewReader(capture.frames[1][1:])
+		if caster, target := r.ReadInt32(), r.ReadInt32(); caster != servitor.ObjectID() || target != servitor.ObjectID() {
+			t.Fatalf("second MagicSkillUse caster/target = %d/%d, want servitor %d/%d", caster, target, servitor.ObjectID(), servitor.ObjectID())
+		}
+		if effects := servitor.EffectList().All(); len(effects) != 1 || effects[0].Skill.ID != 2278 {
+			t.Fatalf("servitor installed effects = %+v, want one effect from skill 2278", effects)
+		}
+	})
+
+	t.Run("active pet, no mirror", func(t *testing.T) {
+		capture := &frameCapture{}
+		live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
+		state := world.New()
+		state.Spawn(live, 100, 0, 0, 0)
+		pet := summon.NewPet(summon.PetConfig{ObjectID: 501, Level: 44, Stats: summon.CombatStats{MaxHP: 500, MaxMP: 200}})
+		state.AddSummon(live.ObjectID(), pet)
+		gcl := &GameClientLink{
+			world:         state,
+			skills:        herbTestSkill(t),
+			targets:       skilltarget.NewRegistry(skilltarget.WorldKnown{State: state}),
+			skillHandlers: handlerskill.NewDefaultRegistry(),
+		}
+
+		capture.frames = nil
+		gcl.consumeHerb(live, herbTemplate)
+
+		assertOpcodeSequence(t, capture.frames, serverpackets.OpcodeMagicSkillUse)
+		if effects := pet.EffectList().All(); len(effects) != 0 {
+			t.Fatalf("pet installed effects = %+v, want none (herb never mirrors onto a pet)", effects)
+		}
+	})
 }
 
 // fakeAfterFuncs records scheduled delayed calls so a test can trigger them
