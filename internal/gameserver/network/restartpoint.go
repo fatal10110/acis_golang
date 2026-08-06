@@ -62,9 +62,21 @@ func (l *GameClientLink) teleportLivePlayer(live *livePlayer, target location.Lo
 	if !live.SetTeleporting(true) {
 		return
 	}
-	l.abortFusionTargeting(live)
+	// Fusion channels targeting live are left alone here: the reference has
+	// no teleport hook for fusion, only death/class-change/logout/party
+	// abort triggers (Player.java:2663,5847,6302; Party.java:202,428). An
+	// out-of-range/LOS teleport is instead caught within ≤1s by the existing
+	// fixed-rate FusionChannelValid recheck (FusionSkill.java:45-49), same as
+	// Java.
+	// live.Stop() already reaches the cast controller (live_player.go's
+	// Stop() calls p.cast.Stop()), so a second StopCast() here would hit
+	// the same Controller instance twice — castController wires
+	// live.Character's cast controller to the identical *actorcast.Controller
+	// stored in live.cast (live_player.go:270) — and double the
+	// unconditional clientActionFailed() ack (PlayerCast.java:382-387,
+	// controller.go's stopInternal fires onStopAck on every call
+	// regardless of whether a cast was in flight).
 	live.Stop()
-	live.Character.StopCast()
 	target = move.RandomNearbyLocation(l.geo, target, randomOffset)
 	l.updateLivePlayerPosition(live, target, live.CurrentHeading())
 	l.broadcastLiveFrame(live, func() wire.Frame {
