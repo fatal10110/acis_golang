@@ -41,6 +41,8 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 		Selected:    live.Target(),
 		SkillID:     int(req.SkillID),
 		Definitions: l.skills,
+		Ctrl:        req.CtrlPressed,
+		Shift:       req.ShiftPressed,
 	})
 	if err != nil {
 		if errors.Is(err, actorcast.ErrInvalidTarget) && started.Target == nil {
