@@ -281,6 +281,56 @@ var fearHalvedDurationPlayableSkillIDs = map[modelskill.ID]bool{
 	1169: true,
 }
 
+// SkillFromDefinition builds the effect-list metadata a skill definition
+// contributes to every effect instance it applies, shared by a live cast's
+// applyEffects and a relog restore's effect replay.
+func SkillFromDefinition(def modelskill.Definition) Skill {
+	return Skill{
+		ID:                  def.ID,
+		Level:               def.Level,
+		SkillType:           def.SkillType,
+		Debuff:              def.Debuff,
+		Toggle:              def.Activation == modelskill.ActivationToggle,
+		KillByDOT:           def.KillByDOT,
+		Dance:               def.Dance,
+		CanBeDispelled:      def.CanBeDispelled,
+		MagicLevel:          def.MagicLevel,
+		LevelDepend:         def.LevelDepend,
+		AbnormalLevel:       def.AbnormalLevel,
+		EffectAbnormalLevel: def.EffectAbnormalLevel,
+		EffectType:          def.EffectType,
+		MaxNegatedEffects:   def.MaxNegatedEffects,
+		NegateLevel:         def.NegateLevel,
+		NegateIDs:           def.NegateIDs,
+		NegateTypes:         def.NegateTypes,
+		FlyRadius:           def.FlyRadius,
+	}
+}
+
+// ApplyRestored instantiates each of templates and adds it to list, seeded to
+// resume from count and elapsedSeconds — the tick count and time-since-last-
+// tick a persisted effect had at logout — instead of starting fresh from the
+// template, mirroring Player.restoreEffects()'s
+// template.getEffect(this, this, skill) -> setCount/setTime ->
+// scheduleEffect() chain. effector and effected are both the relogging
+// character: the original caster identity is not persisted, so every
+// reinstated effect is treated as self-applied, matching the reference.
+func ApplyRestored(list *List, effector, effected any, meta Skill, templates []modelskill.EffectTemplate, count, elapsedSeconds int32) {
+	if list == nil {
+		return
+	}
+	for _, tmpl := range templates {
+		e, err := New(meta, tmpl)
+		if err != nil {
+			continue
+		}
+		e.Effector = effector
+		e.Effected = effected
+		e.seedRestore(count, elapsedSeconds)
+		list.Add(e)
+	}
+}
+
 // New builds a runtime effect from a parsed core effect template.
 func New(skill Skill, tmpl modelskill.EffectTemplate) (*Effect, error) {
 	k, ok := coreKinds[tmpl.Name]
