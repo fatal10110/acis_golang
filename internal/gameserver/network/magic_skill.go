@@ -55,6 +55,7 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 	def := started.Definition
 	target := started.Target
 	plan := started.Plan
+	live.Character.SetCastModifiers(started.Ctrl, started.Shift)
 
 	casterObject := skillCastObject(live)
 	targetObject := skillCastObject(target)

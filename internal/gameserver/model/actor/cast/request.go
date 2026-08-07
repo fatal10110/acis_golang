@@ -15,9 +15,9 @@ type Definitions interface {
 // PlayerSkillRequest is one live player skill-cast request after the network
 // packet has been decoded. Ctrl and Shift are the client's cast modifiers,
 // carried through unconsumed for the domain cast-condition check and the
-// post-cast offensive-follow decision to read once those rules exist
-// (RequestMagicSkillUse.java forwards them the same way); today neither
-// consumer exists, so StartPlayerSkill only copies them onto StartedSkill.
+// post-cast offensive-follow decision to read once those rules exist; today
+// neither consumer exists, so StartPlayerSkill only copies them onto
+// StartedSkill.
 type PlayerSkillRequest struct {
 	Now         time.Time
 	Controller  *Controller

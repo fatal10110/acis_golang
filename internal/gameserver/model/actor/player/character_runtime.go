@@ -65,6 +65,24 @@ func (c *Character) GroundTarget() (x, y, z int) {
 	return c.groundTarget.X, c.groundTarget.Y, c.groundTarget.Z
 }
 
+// SetCastModifiers records the Ctrl/Shift state of the client's most recent
+// skill-cast request, reused across casts until the next request overwrites
+// it — the domain cast-condition check and post-cast offensive-follow
+// decision read it from here once those rules exist.
+func (c *Character) SetCastModifiers(ctrl, shift bool) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	c.castCtrl = ctrl
+	c.castShift = shift
+}
+
+// CastModifiers returns the last recorded Ctrl/Shift cast-request state.
+func (c *Character) CastModifiers() (ctrl, shift bool) {
+	c.stateMu.RLock()
+	defer c.stateMu.RUnlock()
+	return c.castCtrl, c.castShift
+}
+
 // CanSeePoint reports whether an arbitrary world point is visible to this
 // player: a geodata line-of-sight query from this player's position and eye
 // height to the raw point (no height offset on the point end, matching the
