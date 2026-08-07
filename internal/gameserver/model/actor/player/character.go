@@ -109,6 +109,7 @@ type Character struct {
 	refreshItemStats         func()
 	notifyExpSpGain          func(exp int64, sp int)
 	notifyExpSpLoss          func(exp int64, sp int)
+	notifyKarmaChange        func(karma int)
 	broadcastLevelUp         func()
 	refreshLevel             func()
 	broadcastShortBuff       func(ShortBuffUpdate)
