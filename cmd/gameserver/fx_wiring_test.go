@@ -37,6 +37,7 @@ func TestProvideGameClientLinkUsesGameDataSkillTrees(t *testing.T) {
 			func() *idfactory.Allocator { return nil },
 			func() *task.GroundItems { return nil },
 			func() *task.AttackStance { return nil },
+			func() *task.PvPFlags { return nil },
 			func() *task.PositionUpdates { return nil },
 			func() *task.InventoryUpdates { return nil },
 			func() *task.ItemInstances { return nil },
