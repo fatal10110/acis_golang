@@ -32,6 +32,8 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 		}
 	}
 
+	live.Character.SetCastModifiers(req.CtrlPressed, req.ShiftPressed)
+
 	beforeVitals := live.Vitals()
 	controller := l.castController(live)
 	started, err := actorcast.StartPlayerSkill(actorcast.PlayerSkillRequest{
@@ -55,7 +57,6 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 	def := started.Definition
 	target := started.Target
 	plan := started.Plan
-	live.Character.SetCastModifiers(started.Ctrl, started.Shift)
 
 	casterObject := skillCastObject(live)
 	targetObject := skillCastObject(target)
