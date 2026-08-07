@@ -199,6 +199,17 @@ func sendExpSpLossFrames(live *livePlayer, exp int64, sp int) {
 	}
 }
 
+// sendKarmaChangeFrames tells live's own client its new karma total:
+// SystemMessage(YOUR_KARMA_HAS_BEEN_CHANGED_TO_S1) followed by
+// StatusUpdate(KARMA), the same order Player.setKarma sends them in
+// (Player.java:1076-1080).
+func sendKarmaChangeFrames(live *livePlayer, karma int) {
+	live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageYourKarmaHasBeenChangedToS1, int32(karma)))
+	live.SendFrame(serverpackets.FrameStatusUpdate(live.ObjectID(), []serverpackets.StatusAttribute{
+		{Type: serverpackets.StatusKarma, Value: karma},
+	}))
+}
+
 // giveOrRewardSkills re-derives c's level-unlocked skills, calling
 // RewardSkills instead of GiveSkills whenever the server grants every
 // available skill automatically (Player.java:3256-3257).
@@ -404,6 +415,9 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	})
 	c.SetExpSpLossNotifier(func(exp int64, sp int) {
 		sendExpSpLossFrames(live, exp, sp)
+	})
+	c.SetKarmaChangeNotifier(func(karma int) {
+		sendKarmaChangeFrames(live, karma)
 	})
 	c.SetLevelUpBroadcaster(func() {
 		l.broadcastLiveFrame(live, func() wire.Frame {

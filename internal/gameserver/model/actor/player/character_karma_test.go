@@ -25,6 +25,8 @@ func TestCalculatePKKillKarmaGainMatchesReferenceFormula(t *testing.T) {
 func TestAwardKillerPKKarmaAwardsInnocentVictimKill(t *testing.T) {
 	victim := &Character{ID: 1}
 	killer := &Character{ID: 2}
+	var notified []int
+	killer.SetKarmaChangeNotifier(func(karma int) { notified = append(notified, karma) })
 
 	victim.awardKillerPKKarma(killer)
 
@@ -33,6 +35,9 @@ func TestAwardKillerPKKarmaAwardsInnocentVictimKill(t *testing.T) {
 	}
 	if killer.KarmaPoints != 240 {
 		t.Fatalf("killer.KarmaPoints = %d, want 240", killer.KarmaPoints)
+	}
+	if want := []int{240}; len(notified) != 1 || notified[0] != want[0] {
+		t.Fatalf("karma-change notifications = %v, want %v", notified, want)
 	}
 }
 
@@ -53,11 +58,16 @@ func TestAwardKillerPKKarmaAccumulatesAcrossKills(t *testing.T) {
 func TestAwardKillerPKKarmaSkipsWhenVictimAlreadyHadKarma(t *testing.T) {
 	victim := &Character{ID: 1, KarmaPoints: 500}
 	killer := &Character{ID: 2}
+	notified := false
+	killer.SetKarmaChangeNotifier(func(int) { notified = true })
 
 	victim.awardKillerPKKarma(killer)
 
 	if killer.PKKills != 0 || killer.KarmaPoints != 0 {
 		t.Fatalf("killer = (PKKills=%d, KarmaPoints=%d), want (0, 0)", killer.PKKills, killer.KarmaPoints)
+	}
+	if notified {
+		t.Fatalf("karma-change notifier fired, want no notification when the award is skipped")
 	}
 }
 
