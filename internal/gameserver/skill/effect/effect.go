@@ -149,6 +149,28 @@ func (e *Effect) startScheduleFromRestoreLocked(r *restoreSeed, now time.Time) {
 	e.nextAction = now.Add(delay)
 }
 
+// SaveState reports the tick count and elapsed-seconds-since-last-tick e
+// should persist at now, the inverse of startScheduleFromRestoreLocked:
+// elapsed is the template period minus the time remaining until e's next
+// scheduled tick, clamped to [0, period]. An effect with no period (a
+// single unscheduled or permanent effect) reports zero elapsed.
+func (e *Effect) SaveState(now time.Time) (count, elapsed int32) {
+	if e == nil {
+		return 0, 0
+	}
+	e.scheduleMu.Lock()
+	defer e.scheduleMu.Unlock()
+
+	count = int32(e.remaining)
+	period := e.period()
+	if period <= 0 || e.nextAction.IsZero() {
+		return count, 0
+	}
+	remaining := max(e.nextAction.Sub(now), 0)
+	elapsed = int32(e.Template.Time) - int32(remaining/time.Second)
+	return count, min(max(elapsed, 0), int32(e.Template.Time))
+}
+
 func (e *Effect) stopSchedule() {
 	e.scheduleMu.Lock()
 	e.remaining = 0
