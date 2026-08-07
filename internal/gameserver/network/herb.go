@@ -41,7 +41,7 @@ func (l *GameClientLink) consumeHerb(live *livePlayer, itemID int32) {
 		Definitions: l.skills,
 		Effects:     actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers},
 		Destroyer:   l.inventory,
-		Summon:      l.activeSummonTarget(live),
+		Summon:      l.activeServitorTarget(live),
 	})
 	if res.Outcome == itemhandler.ReuseRejected {
 		// The herb is already gone by the time its skill is dispatched, so a
@@ -57,6 +57,12 @@ func (l *GameClientLink) consumeHerb(live *livePlayer, itemID int32) {
 	l.broadcastLiveFrame(live, func() wire.Frame {
 		return serverpackets.FrameMagicSkillUse(self, self, int32(res.Skill.ID), int32(res.Skill.Level), 0, 0, false)
 	})
+	if res.MirroredSummon != nil {
+		summonObject := skillCastObject(res.MirroredSummon)
+		l.broadcastLiveFrame(live, func() wire.Frame {
+			return serverpackets.FrameMagicSkillUse(summonObject, summonObject, int32(res.Skill.ID), int32(res.Skill.Level), 0, 0, false)
+		})
+	}
 	res.Apply()
 	sendMagicStatusUpdate(live, beforeVitals)
 }

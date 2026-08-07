@@ -27,6 +27,7 @@ const (
 	StatusSP          StatusType = 13
 	StatusCurrentLoad StatusType = 14
 	StatusMaxLoad     StatusType = 15
+	StatusKarma       StatusType = 27
 )
 
 // StatusAttribute is one type/value pair in a StatusUpdate packet.

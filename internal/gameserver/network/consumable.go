@@ -31,7 +31,7 @@ func (l *GameClientLink) useConsumableSkillItem(live *livePlayer, inv *itemconta
 		Definitions: l.skills,
 		Effects:     actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers},
 		Destroyer:   l.inventory,
-		Summon:      l.activeSummonTarget(live),
+		Summon:      l.activeServitorTarget(live),
 	})
 	switch res.Outcome {
 	case itemhandler.NotHandled:
@@ -53,6 +53,12 @@ func (l *GameClientLink) useConsumableSkillItem(live *livePlayer, inv *itemconta
 		l.broadcastLiveFrame(live, func() wire.Frame {
 			return serverpackets.FrameMagicSkillUse(self, self, int32(res.Skill.ID), int32(res.Skill.Level), 0, 0, false)
 		})
+		if res.MirroredSummon != nil {
+			summonObject := skillCastObject(res.MirroredSummon)
+			l.broadcastLiveFrame(live, func() wire.Frame {
+				return serverpackets.FrameMagicSkillUse(summonObject, summonObject, int32(res.Skill.ID), int32(res.Skill.Level), 0, 0, false)
+			})
+		}
 		live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageUseS1, int32(res.Skill.ID), int32(res.Skill.Level)))
 		res.Apply()
 		sendMagicStatusUpdate(live, beforeVitals)

@@ -112,6 +112,58 @@ func TestUse(t *testing.T) {
 		}
 	})
 
+	t.Run("herb with a summon reports it as MirroredSummon", func(t *testing.T) {
+		caster := &fakeCaster{}
+		destroyer := &fakeDestroyer{}
+		req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemHerb, potion, caster, destroyer, false)
+		summon := &fakeCaster{}
+		req.Summon = summon
+
+		res := Use(req)
+
+		if res.MirroredSummon != summon {
+			t.Fatalf("MirroredSummon = %v, want summon", res.MirroredSummon)
+		}
+	})
+
+	t.Run("herb with no summon reports no MirroredSummon", func(t *testing.T) {
+		caster := &fakeCaster{}
+		destroyer := &fakeDestroyer{}
+		req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemHerb, potion, caster, destroyer, false)
+
+		res := Use(req)
+
+		if res.MirroredSummon != nil {
+			t.Fatalf("MirroredSummon = %v, want nil", res.MirroredSummon)
+		}
+	})
+
+	t.Run("potion (non-herb) with a summon does not mirror", func(t *testing.T) {
+		caster := &fakeCaster{}
+		destroyer := &fakeDestroyer{}
+		req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemPotion, potion, caster, destroyer, false)
+		req.Summon = &fakeCaster{}
+
+		res := Use(req)
+
+		if res.MirroredSummon != nil {
+			t.Fatalf("MirroredSummon = %v, want nil (non-herb never mirrors)", res.MirroredSummon)
+		}
+	})
+
+	t.Run("herb used by a pet caster does not mirror", func(t *testing.T) {
+		caster := &fakeCaster{}
+		destroyer := &fakeDestroyer{}
+		req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemHerb, potion, caster, destroyer, true)
+		req.Summon = &fakeCaster{}
+
+		res := Use(req)
+
+		if res.MirroredSummon != nil {
+			t.Fatalf("MirroredSummon = %v, want nil (pet caster never mirrors)", res.MirroredSummon)
+		}
+	})
+
 	t.Run("herb not enough items never rejects (no consume attempted)", func(t *testing.T) {
 		caster := &fakeCaster{}
 		destroyer := &fakeDestroyer{fail: true}

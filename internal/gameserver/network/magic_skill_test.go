@@ -396,7 +396,11 @@ func TestGameClientLinkMagicSkillUseAppliesReferencedEffectSkillAtFallbackLevel(
 // only the one MagicSkillUse packet (caster and target both the caster,
 // hitTime/reuseDelay both 0) — no SystemMessage, SetupGauge, or
 // MagicSkillLaunched, since a toggle's cast window is instantaneous and
-// carries no cast bar.
+// carries no cast bar. On both directions the MagicSkillUse ack lands
+// before any AbnormalStatusUpdate the effect add/remove triggers, matching
+// PlayerCast.doToggleCast's broadcast at PlayerCast.java:127 preceding
+// either callSkill's effect application or effect.exit() at
+// PlayerCast.java:135-137.
 func TestGameClientLinkTogglesOnThenOff(t *testing.T) {
 	store := newMemorySkillSaveStore()
 	skills := skillstate.NewPersistence(store, modelskill.NewTable([]modelskill.Definition{
@@ -454,15 +458,18 @@ func TestGameClientLinkTogglesOnThenOff(t *testing.T) {
 	}
 
 	// Second cast: an instance is already active, so this turns it off
-	// instead of reapplying it, and never touches MP.
+	// instead of reapplying it, and never touches MP. The reference
+	// broadcasts MagicSkillUse before effect.exit() on the deactivation
+	// path too (PlayerCast.java:127 vs 135-137), so the ack packet must
+	// land before the effect-exit AbnormalStatusUpdate here as well.
 	beforeMP := character.MP()
 	c.send(encodeRequestMagicSkillUse(288, false, false))
-	if entries := readAbnormalStatusUpdateFrame(t, c); len(entries) != 0 {
-		t.Fatalf("AbnormalStatusUpdate entries after deactivation = %+v, want none (test skill has no icon)", entries)
-	}
 	reply = c.read()
 	if reply[0] != serverpackets.OpcodeMagicSkillUse {
 		t.Fatalf("magic use opcode = %#x, want MagicSkillUse (%#x)", reply[0], serverpackets.OpcodeMagicSkillUse)
+	}
+	if entries := readAbnormalStatusUpdateFrame(t, c); len(entries) != 0 {
+		t.Fatalf("AbnormalStatusUpdate entries after deactivation = %+v, want none (test skill has no icon)", entries)
 	}
 	c.expectNoFrame()
 

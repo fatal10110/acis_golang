@@ -82,6 +82,7 @@ func (c *Character) Die(killer creature.DeathActor) bool {
 	c.StopCast()
 	c.ClearCharges()
 	c.RaiseDeathPenaltyLevel(killer, c.rollValue(100)+1)
+	c.awardKillerPKKarma(killer)
 	c.BroadcastDie()
 	return true
 }
