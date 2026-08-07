@@ -157,9 +157,11 @@ func (l *GameClientLink) handleMagicSkillUseGround(live *livePlayer, req clientp
 // turns on. A toggle's cast window is instantaneous — there is no cast bar,
 // no launch packet, and activating one never installs a reuse delay — so
 // this bypasses the timed Start/Hit/Finish sequence handleMagicSkillUse
-// drives for an ordinary active skill. The on/off decision and effect
-// application both happen inside actorcast.ApplyToggle; this handler only
-// translates the outcome into packets.
+// drives for an ordinary active skill. The on/off decision happens inside
+// actorcast.ApplyToggle, but effect application/removal is this handler's
+// job, done only after the MagicSkillUse ack goes out — on both branches,
+// matching PlayerCast.doToggleCast broadcasting before either callSkill or
+// effect.exit() (PlayerCast.java:127 vs 135-137).
 func (l *GameClientLink) handleToggleSkillUse(live *livePlayer, req clientpackets.RequestMagicSkillUse) {
 	handlers := actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers}
 	def, target, activated, err := actorcast.ApplyToggle(
@@ -183,6 +185,8 @@ func (l *GameClientLink) handleToggleSkillUse(live *livePlayer, req clientpacket
 	})
 	if activated {
 		actorcast.ApplyEffects(handlers, live.Character, target, def)
+	} else {
+		skillhandler.StopEffect(live.Character, def.ID)
 	}
 }
 

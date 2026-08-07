@@ -836,9 +836,11 @@ func TestPickupLiveGroundItemRejectsOutOfRange(t *testing.T) {
 
 	gcl.pickupLiveGroundItem(context.Background(), live, ground)
 
-	// ActionFailed must lead, matching the reference's clientActionFailed()
-	// at thinkPickUp entry, before the rejection reason SystemMessage.
-	assertOpcodeSequence(t, capture.frames, serverpackets.OpcodeActionFailed, serverpackets.OpcodeSystemMessage)
+	// Only ActionFailed, matching the reference's thinkPickUp: it sends
+	// clientActionFailed() unconditionally and then re-evaluates the move,
+	// but never a rejection SystemMessage from this branch (PlayableAI.java:
+	// 199-234).
+	assertOpcodeSequence(t, capture.frames, serverpackets.OpcodeActionFailed)
 	if _, ok := state.Object(ground.ObjectID()); !ok {
 		t.Fatal("ground item removed after an out-of-range pickup attempt")
 	}
