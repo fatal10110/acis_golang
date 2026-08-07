@@ -147,9 +147,6 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 		pet.AddMP(curMP - levelStats.MaxMP)
 	}
 
-	offset := location.Location{X: petSpawnOffset, Y: 0, Z: 0}
-	summon.SpawnBesideOwner(link.world, pet, live, offset)
-
 	// Combat AI wiring (owner-commanded attack/follow execution against a
 	// real move/attack controller, and the cast controller that would let
 	// TryUseSkill's dispatched cast actually resolve) is deferred — see
@@ -158,7 +155,17 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 	// contract: "a dispatched cast reports true even if the AI goes on to
 	// reject it" (live_accessors.go), which is exactly what a cast
 	// controller-less ai.Summon already does by design.
+	//
+	// SetAI must run before SpawnBesideOwner publishes pet into world.State:
+	// SpawnBesideOwner's registry writes take a mutex, giving a
+	// happens-before edge to any other goroutine's registry read (e.g. the
+	// connection goroutine looking the pet up to dispatch TryUseSkill).
+	// Setting brain first means that edge also covers the brain field,
+	// instead of leaving it as an unsynchronized write racing that read.
 	pet.SetAI(ai.NewSummon(pet, inertSummonMoveController{}, inertSummonAttackController{}))
+
+	offset := location.Location{X: petSpawnOffset, Y: 0, Z: 0}
+	summon.SpawnBesideOwner(link.world, pet, live, offset)
 
 	return true
 }
