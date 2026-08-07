@@ -48,7 +48,6 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 	}
 	if !groundPickupInRange(live, ground) {
 		live.SendFrame(serverpackets.FrameActionFailed())
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetTooFar))
 		return true
 	}
 	if l.trades != nil && l.trades.HasActive(live.ObjectID()) {
