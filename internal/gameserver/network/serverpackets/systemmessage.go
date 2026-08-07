@@ -122,6 +122,9 @@ const (
 	SystemMessageRemainingMana1Minute   = 1981 // item-name parameter
 	SystemMessageRemainingManaIsNow0    = 1982 // item-name parameter
 
+	// Karma change feedback.
+	SystemMessageYourKarmaHasBeenChangedToS1 = 1282 // number parameter
+
 	// Periodic in-game clock messages.
 	SystemMessagePlayingForLongTime       = 764  // no parameter
 	SystemMessageNightSkillEffectApplies  = 1131 // skill-name parameter
