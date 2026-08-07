@@ -204,14 +204,20 @@ func (l *GameClientLink) hasActiveSummon(live *livePlayer) bool {
 	return ok
 }
 
-// activeSummonTarget returns live's active pet or servitor as an
-// actorcast.Target, or nil if it has none or doesn't expose that surface.
-func (l *GameClientLink) activeSummonTarget(live *livePlayer) actorcast.Target {
+// activeServitorTarget returns live's active servitor as an
+// actorcast.Target, or nil if it has none, has a pet instead, or doesn't
+// expose that surface. Matches the reference's `player.hasServitor()` gate
+// (`Player.java:2986-2990`, checking `_summon instanceof Servitor`): a pet
+// alone does not qualify.
+func (l *GameClientLink) activeServitorTarget(live *livePlayer) actorcast.Target {
 	if l.world == nil || live == nil {
 		return nil
 	}
 	obj, ok := l.world.Summon(live.ObjectID())
 	if !ok {
+		return nil
+	}
+	if pet, ok := obj.(interface{ IsPet() bool }); ok && pet.IsPet() {
 		return nil
 	}
 	target, ok := obj.(actorcast.Target)
