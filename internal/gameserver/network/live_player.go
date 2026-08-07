@@ -10,6 +10,7 @@ import (
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cubic"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -25,6 +26,7 @@ import (
 type livePlayer struct {
 	*player.Character
 	template  *player.Template
+	npcs      *npc.Table
 	items     []*item.Instance
 	throne    staticobject.Chair
 	attack    *attack.Controller
