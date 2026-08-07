@@ -36,6 +36,12 @@ func (l *GameClientLink) moveLivePlayer(live *livePlayer, target location.Locati
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
+	// The redirect just overwrote move's in-flight destination and arrival
+	// timer, so a parked ground-pickup approach loses its ride here — drop
+	// it now or it fires stale against whatever this new walk arrives at
+	// (#1155). A rejected route above never reaches this: the old move (and
+	// its pickup) is left untouched.
+	live.takePickup()
 	// Face the destination from the same server-authoritative origin the
 	// walk itself started from.
 	live.Character.SetHeading(origin.HeadingTo(target))

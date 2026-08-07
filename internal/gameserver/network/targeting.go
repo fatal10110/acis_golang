@@ -374,6 +374,11 @@ func (l *GameClientLink) attackLiveTarget(live *livePlayer, target world.Tracked
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return false
 	}
+	// Start always ends up cancelling any move already in flight (chase
+	// redirect, immediate-swing move.Stop(), or a rejection's stopLocked) —
+	// so a parked ground-pickup approach the click interrupts must drop here
+	// too, or it fires stale against whatever arrival comes next (#1155).
+	live.takePickup()
 	if !live.combat.Start(combatant) {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return false
