@@ -74,6 +74,84 @@ func TestGameClientLinkMagicSkillUseStartsKnownActiveSkill(t *testing.T) {
 	assertStatusAttrs(t, reply, objID, []serverpackets.StatusAttribute{{Type: serverpackets.StatusCurrentMP, Value: 25}})
 }
 
+func TestGameClientLinkMagicSkillUseRecordsCtrlShiftModifiers(t *testing.T) {
+	store := newMemorySkillSaveStore()
+	skills := skillstate.NewPersistence(store, modelskill.NewTable([]modelskill.Definition{
+		{
+			ID: 3, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+			HitTime: 500, ReuseDelay: 1200, StaticHitTime: true, StaticReuse: true,
+			MPInitialConsume: 2, MPConsume: 3, SkillType: "DUMMY",
+		},
+	}), store)
+	var objID int32
+	c, _, _, state := newLinkedGameClientWithSkillsSeed(t, skills, func(chars *fakeCharStore, _ *fakeItemStore) {
+		objID = seedSelectableCharacter(t, chars, "player1", "Newbie", 5, 0)
+		store.seedKnown(objID, 0, player.SkillLevels{3: 1})
+	}, 1)
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	c.send(encodeRequestMagicSkillUse(3, true, true))
+	c.read() // MagicSkillUse
+	c.read() // SystemMessage
+	c.read() // SetupGauge
+	c.read() // MagicSkillLaunched
+	c.read() // StatusUpdate
+
+	obj, ok := state.Player(objID)
+	if !ok {
+		t.Fatalf("player %d not found in world state after cast", objID)
+	}
+	character, ok := obj.(*livePlayer)
+	if !ok {
+		t.Fatalf("world state player %d is not a *livePlayer", objID)
+	}
+	if ctrl, shift := character.CastModifiers(); !ctrl || !shift {
+		t.Fatalf("CastModifiers() = (%v,%v), want (true,true)", ctrl, shift)
+	}
+}
+
+func TestGameClientLinkMagicSkillUseRecordsCtrlShiftModifiersOnRejection(t *testing.T) {
+	store := newMemorySkillSaveStore()
+	skills := skillstate.NewPersistence(store, modelskill.NewTable([]modelskill.Definition{
+		{
+			ID: 3, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+			MPConsume: 100, SkillType: "DUMMY",
+		},
+	}), store)
+	var objID int32
+	c, _, _, state := newLinkedGameClientWithSkillsSeed(t, skills, func(chars *fakeCharStore, _ *fakeItemStore) {
+		objID = seedSelectableCharacter(t, chars, "player1", "Newbie", 5, 0)
+		store.seedKnown(objID, 0, player.SkillLevels{3: 1})
+	}, 1)
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	c.send(encodeRequestMagicSkillUse(3, true, true))
+	c.read() // SystemMessage (not enough MP)
+	c.read() // ActionFailed
+
+	obj, ok := state.Player(objID)
+	if !ok {
+		t.Fatalf("player %d not found in world state after rejected cast", objID)
+	}
+	character, ok := obj.(*livePlayer)
+	if !ok {
+		t.Fatalf("world state player %d is not a *livePlayer", objID)
+	}
+	if ctrl, shift := character.CastModifiers(); !ctrl || !shift {
+		t.Fatalf("CastModifiers() after rejected cast = (%v,%v), want (true,true)", ctrl, shift)
+	}
+}
+
 func TestGameClientLinkMagicSkillUseAppliesBuffEffectToSelf(t *testing.T) {
 	store := newMemorySkillSaveStore()
 	skills := skillstate.NewPersistence(store, modelskill.NewTable([]modelskill.Definition{

@@ -161,6 +161,8 @@ type Character struct {
 	shortBuffTimer       *time.Timer
 	recentFakeDeathUntil time.Time
 	groundTarget         location.Location
+	castCtrl             bool
+	castShift            bool
 	target               world.Tracked
 	log                  zerolog.Logger
 

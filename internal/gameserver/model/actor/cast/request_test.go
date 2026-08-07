@@ -28,6 +28,8 @@ func TestStartPlayerSkillAcceptsKnownActiveSkill(t *testing.T) {
 		Selected:    target,
 		SkillID:     3,
 		Definitions: defs,
+		Ctrl:        true,
+		Shift:       true,
 	})
 	if err != nil {
 		t.Fatalf("StartPlayerSkill() error: %v", err)
@@ -37,6 +39,9 @@ func TestStartPlayerSkillAcceptsKnownActiveSkill(t *testing.T) {
 	}
 	if started.Target != target {
 		t.Fatalf("Target = %v, want selected target", started.Target)
+	}
+	if !started.Ctrl || !started.Shift {
+		t.Fatalf("Ctrl = %v, Shift = %v, want both true", started.Ctrl, started.Shift)
 	}
 	if started.Plan.HitTime != 500*time.Millisecond || started.Plan.ReuseDelay != 1200*time.Millisecond {
 		t.Fatalf("Plan timing = hit %s reuse %s, want 500ms/1.2s", started.Plan.HitTime, started.Plan.ReuseDelay)

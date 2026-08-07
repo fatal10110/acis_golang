@@ -13,7 +13,11 @@ type Definitions interface {
 }
 
 // PlayerSkillRequest is one live player skill-cast request after the network
-// packet has been decoded.
+// packet has been decoded. Ctrl and Shift are the client's cast modifiers,
+// carried through unconsumed for the domain cast-condition check and the
+// post-cast offensive-follow decision to read once those rules exist; today
+// neither consumer exists, so StartPlayerSkill only copies them onto
+// StartedSkill.
 type PlayerSkillRequest struct {
 	Now         time.Time
 	Controller  *Controller
@@ -21,6 +25,8 @@ type PlayerSkillRequest struct {
 	Selected    any
 	SkillID     int
 	Definitions Definitions
+	Ctrl        bool
+	Shift       bool
 }
 
 // StartedSkill is a player skill request accepted by the cast controller.
@@ -28,6 +34,8 @@ type StartedSkill struct {
 	Definition modelskill.Definition
 	Target     Target
 	Plan       Plan
+	Ctrl       bool
+	Shift      bool
 }
 
 // StartPlayerSkill validates and starts a live player skill cast.
@@ -46,7 +54,10 @@ func StartPlayerSkill(req PlayerSkillRequest) (StartedSkill, error) {
 		return StartedSkill{}, ErrSkillUnavailable
 	}
 
-	return startResolvedSkill(req.Now, req.Controller, req.Caster, req.Selected, def)
+	started, err := startResolvedSkill(req.Now, req.Controller, req.Caster, req.Selected, def)
+	started.Ctrl = req.Ctrl
+	started.Shift = req.Shift
+	return started, err
 }
 
 // ItemSkillRequest is one item-carried skill cast request, routed through

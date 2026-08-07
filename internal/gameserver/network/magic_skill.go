@@ -32,6 +32,8 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 		}
 	}
 
+	live.Character.SetCastModifiers(req.CtrlPressed, req.ShiftPressed)
+
 	beforeVitals := live.Vitals()
 	controller := l.castController(live)
 	started, err := actorcast.StartPlayerSkill(actorcast.PlayerSkillRequest{
@@ -41,6 +43,8 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 		Selected:    live.Target(),
 		SkillID:     int(req.SkillID),
 		Definitions: l.skills,
+		Ctrl:        req.CtrlPressed,
+		Shift:       req.ShiftPressed,
 	})
 	if err != nil {
 		if errors.Is(err, actorcast.ErrInvalidTarget) && started.Target == nil {
