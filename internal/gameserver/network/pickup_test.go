@@ -73,6 +73,10 @@ func TestGameClientLinkPickupGroundItemFullClientFlow(t *testing.T) {
 	origin := location.Location{X: px, Y: py, Z: pz}
 	c.send(encodeAction(ground.ObjectID(), origin, false))
 	reply := c.read()
+	if reply[0] != serverpackets.OpcodeActionFailed {
+		t.Fatalf("Action opcode = %#x, want ActionFailed (%#x) — an out-of-range pickup must release the client's pending action before approaching", reply[0], serverpackets.OpcodeActionFailed)
+	}
+	reply = c.read()
 	if reply[0] != serverpackets.OpcodeMoveToLocation {
 		t.Fatalf("Action opcode = %#x, want MoveToLocation (%#x) — an out-of-range pickup must approach before collecting", reply[0], serverpackets.OpcodeMoveToLocation)
 	}
