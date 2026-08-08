@@ -10,9 +10,9 @@ var _ task.PvPFlagActor = (*Character)(nil)
 // the client redraws the name color/PvP icon. The reference also sends a
 // RelationChanged packet for an owned summon and broadcasts the relation
 // change to nearby observers on every change; neither summon messaging nor
-// an observer relation/name-color broadcast exists in this port yet (see
-// the #1249 tracking comment), so this only ever covers the self-only
-// UserInfo refresh.
+// an observer relation/name-color broadcast exists in this port yet — see
+// the #1267 follow-up — so this only ever covers the self-only UserInfo
+// refresh.
 func (c *Character) UpdatePvPFlag(flag task.PvPFlagState) {
 	c.stateMu.Lock()
 	if c.pvpFlag == flag {

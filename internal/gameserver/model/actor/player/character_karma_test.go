@@ -1,6 +1,10 @@
 package player
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
+)
 
 func TestCalculatePKKillKarmaGainMatchesReferenceFormula(t *testing.T) {
 	cases := []struct {
@@ -87,6 +91,23 @@ func TestAwardKillerPKKarmaSkipsNilKiller(t *testing.T) {
 	victim := &Character{ID: 1}
 
 	victim.awardKillerPKKarma(nil)
+}
+
+func TestAwardKillerPKKarmaSkipsWhenVictimIsPvPFlagged(t *testing.T) {
+	victim := &Character{ID: 1}
+	victim.UpdatePvPFlag(task.PvPFlagOn)
+	killer := &Character{ID: 2}
+	notified := false
+	killer.SetKarmaChangeNotifier(func(int) { notified = true })
+
+	victim.awardKillerPKKarma(killer)
+
+	if killer.PKKills != 0 || killer.KarmaPoints != 0 {
+		t.Fatalf("killer = (PKKills=%d, KarmaPoints=%d), want (0, 0): killing an actively-flagged, karma-free victim is a PvP kill, not a PK", killer.PKKills, killer.KarmaPoints)
+	}
+	if notified {
+		t.Fatalf("karma-change notifier fired, want no notification when the award is skipped")
+	}
 }
 
 func TestAwardKillerPKKarmaSkipsSelfKill(t *testing.T) {
