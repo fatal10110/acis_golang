@@ -374,6 +374,14 @@ func (l *GameClientLink) attackLiveTarget(live *livePlayer, target world.Tracked
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return false
 	}
+	// The reference's single intention slot drops PICK_UP on any subsequent
+	// attack click regardless of which thinkAttack branch it takes — most
+	// branches here also cancel or redirect the move itself (chase redirect,
+	// immediate-swing move.Stop(), a rejection's stopLocked), but even the
+	// bow-cooldown branch that leaves the move untouched still replaces the
+	// intention. Clear it unconditionally, or a parked ground-pickup
+	// approach fires stale against whatever arrival comes next (#1155).
+	live.takePickup()
 	if !live.combat.Start(combatant) {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return false
