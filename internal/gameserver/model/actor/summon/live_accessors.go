@@ -36,6 +36,14 @@ func (a *Actor) SummonType() int {
 // NPCID returns the template id backing this summon.
 func (a *Actor) NPCID() int { return a.npcID }
 
+// Name returns this summon's display name: the npc template name it was
+// spawned with, or a saved pet's own restored name.
+func (a *Actor) Name() string { return a.name }
+
+// SetName overrides this summon's display name, e.g. from a restored save
+// row or an owner-issued rename.
+func (a *Actor) SetName(name string) { a.name = name }
+
 // ScaledExpGain returns rawExp multiplied by this pet's configured
 // experience rate.
 func (a *Actor) ScaledExpGain(rawExp int64) int64 {

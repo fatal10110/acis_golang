@@ -21,6 +21,12 @@ func (fakePetStoreNoSaved) Get(context.Context, int32) (petmodel.State, bool, er
 	return petmodel.State{}, false, nil
 }
 
+type fakePetStoreSaved struct{ state petmodel.State }
+
+func (f fakePetStoreSaved) Get(context.Context, int32) (petmodel.State, bool, error) {
+	return f.state, true, nil
+}
+
 type fakeSummonIDs struct{ next int32 }
 
 func (f *fakeSummonIDs) NextID() (int32, error) {
@@ -106,6 +112,9 @@ func TestGameSummonSpawnerSpawnPetRegistersLiveActor(t *testing.T) {
 	if pet.NPCID() != 12500 {
 		t.Fatalf("NPCID() = %d, want 12500", pet.NPCID())
 	}
+	if pet.Name() != "Wolf" {
+		t.Fatalf("Name() = %q, want template name %q (no saved row)", pet.Name(), "Wolf")
+	}
 
 	// TryUseSkill previously short-circuited to false whenever no AI was
 	// attached (Actor.brain == nil); SpawnPet must leave it non-nil so an
@@ -113,6 +122,26 @@ func TestGameSummonSpawnerSpawnPetRegistersLiveActor(t *testing.T) {
 	// though the cast controller itself is wired by a follow-up.
 	if !pet.TryUseSkill(2046, live.Character) {
 		t.Fatalf("TryUseSkill(2046) = false after spawn, want true (AI must be attached)")
+	}
+}
+
+func TestGameSummonSpawnerSpawnPetRestoresSavedName(t *testing.T) {
+	link, state := newSummonTestLink(t)
+	link.petStore = fakePetStoreSaved{state: petmodel.State{
+		Name: "Fang", Level: 10, CurHP: 400, CurMP: 80, Fed: 3000,
+	}}
+	live := newTestLivePlayer(t, 1, &frameCapture{})
+	inst := &item.Instance{ObjectID: 500, TemplateID: summonTestCollarTemplateID, OwnerID: live.ObjectID()}
+
+	spawner := &gameSummonSpawner{link: link, live: live}
+	if !spawner.SpawnPet(live.Character, inst) {
+		t.Fatalf("SpawnPet returned false")
+	}
+
+	obj, _ := state.Summon(live.ObjectID())
+	pet := obj.(*summon.Actor)
+	if pet.Name() != "Fang" {
+		t.Fatalf("Name() = %q, want restored saved name %q", pet.Name(), "Fang")
 	}
 }
 

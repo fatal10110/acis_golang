@@ -6,6 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -108,6 +111,38 @@ func TestLivePlayerVisibilityRendersHostileNPC(t *testing.T) {
 	state.Despawn(hostile)
 	if len(frames.frames) != 2 || frames.frames[1][0] != serverpackets.OpcodeDeleteObject {
 		t.Fatalf("frames after NPC despawn = %x, want DeleteObject after NPCInfo", frames.frames)
+	}
+}
+
+func TestLivePlayerVisibilitySendsPetInfoOnlyToOwner(t *testing.T) {
+	state := world.New()
+	ownerFrames := &frameCapture{}
+	bystanderFrames := &frameCapture{}
+	owner := newTestLivePlayer(t, 1, ownerFrames)
+	bystander := newTestLivePlayer(t, 2, bystanderFrames)
+	owner.npcs = npc.NewTable([]*npc.Template{{
+		ID: 12077, TemplateID: 12077, Name: "Wolf",
+		AtkSpd: 300, RunSpeed: 120, WalkSpeed: 60,
+		CollisionRadius: 8, CollisionHeight: 20,
+	}})
+	bystander.npcs = owner.npcs
+
+	state.Spawn(owner, 0, 0, 0, 0)
+	state.Spawn(bystander, 500, 0, 0, 0)
+
+	pet := summon.NewPet(summon.PetConfig{
+		ObjectID: 20, Owner: owner, NPCID: 12077, Name: "Wolf", Level: 5,
+		Stats: summon.CombatStats{MaxHP: 100, MaxMP: 30},
+	})
+	summon.SpawnBesideOwner(state, pet, owner, location.Location{X: 10})
+
+	if n := len(ownerFrames.frames); n == 0 || ownerFrames.frames[n-1][0] != serverpackets.OpcodePetInfo {
+		t.Fatalf("owner last frame opcode = %x, want PetInfo (%#x) last", ownerFrames.frames, serverpackets.OpcodePetInfo)
+	}
+	for _, f := range bystanderFrames.frames {
+		if f[0] == serverpackets.OpcodePetInfo {
+			t.Fatalf("bystander frames = %x, want no PetInfo (SummonInfo not ported yet)", bystanderFrames.frames)
+		}
 	}
 }
 
