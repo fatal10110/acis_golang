@@ -154,7 +154,10 @@ func TestSaveExcludesToggleHerbContinuousAndHealOverTimeEffects(t *testing.T) {
 	toggleDef := modelskill.Definition{ID: 2, Level: 1, Activation: modelskill.ActivationToggle, Effects: []modelskill.EffectTemplate{{Name: "Buff", Count: 1, Time: 30}}}
 	continuousDef := modelskill.Definition{ID: 3, Level: 1, SkillType: "CONT", Effects: []modelskill.EffectTemplate{{Name: "Buff", Count: 1, Time: 30}}}
 	hotDef := modelskill.Definition{ID: 4, Level: 1, Effects: []modelskill.EffectTemplate{{Name: "HealOverTime", Count: 1, Time: 30}}}
-	herbDef := modelskill.Definition{ID: 5, Level: 1, Effects: []modelskill.EffectTemplate{{Name: "Buff", Count: 1, Time: 30}}}
+	// Name (not an explicit flag) is what marks a herb effect, mirroring
+	// AbstractEffect._isHerbEffect = _skill.getName().contains("Herb") — the
+	// same derivation effect.New applies on every real herb-item cast.
+	herbDef := modelskill.Definition{ID: 5, Level: 1, Name: "Herb of Life", Effects: []modelskill.EffectTemplate{{Name: "Buff", Count: 1, Time: 30}}}
 
 	table := modelskill.NewTable([]modelskill.Definition{plainDef, toggleDef, continuousDef, hotDef, herbDef})
 	store := &fakeSkillSaveStore{}
@@ -171,9 +174,6 @@ func TestSaveExcludesToggleHerbContinuousAndHealOverTimeEffects(t *testing.T) {
 		e, err := effect.New(effect.SkillFromDefinition(def), def.Effects[0])
 		if err != nil {
 			t.Fatalf("effect.New(%d) error: %v", def.ID, err)
-		}
-		if def.ID == 5 {
-			e.Herb = true
 		}
 		e.Effector, e.Effected = ch, ch
 		ch.EffectList().Add(e)

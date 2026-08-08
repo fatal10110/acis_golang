@@ -63,7 +63,11 @@ func (p *Persistence) Save(ctx context.Context, c *player.Character, includeEffe
 		return nil
 	}
 	classIndex := c.SkillSaveClassIndex()
-	rows := effect.BuildSaveRows(p.liveActiveEffects(c), c.SkillReuseTimers(p.currentTime()), classIndex, includeEffects)
+	var liveEffects []effect.ActiveEffect
+	if includeEffects {
+		liveEffects = p.liveActiveEffects(c)
+	}
+	rows := effect.BuildSaveRows(liveEffects, c.SkillReuseTimers(p.currentTime()), classIndex, includeEffects)
 	if err := p.store.Replace(ctx, c.ID, classIndex, rows); err != nil {
 		return fmt.Errorf("save skill state for character %d: %w", c.ID, err)
 	}
