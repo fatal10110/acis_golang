@@ -660,3 +660,40 @@ func TestListIconEntriesReportsToggleAndRepeatCountDurations(t *testing.T) {
 		t.Fatalf("toggle entry = %+v, want id 20, toggle, duration -1", entries[1])
 	}
 }
+
+// TestIconDurationRepeatCountDecrementsEverySecond is the count=7/time=2 HOT
+// case from AbstractEffect.addIcon's repeat-count branch (AbstractEffect.java
+// :340-353): (getCounter()*_period - getTaskTime()) * 1000, where
+// getTaskTime() (AbstractEffect.java:146-152) is elapsed whole seconds since
+// the current tick started. The reference counts down 14,13,12,...,1 —
+// one second at a time — never holding flat for a whole 2s tick window the
+// way Remaining()*Template.Time*1000 alone would.
+func TestIconDurationRepeatCountDecrementsEverySecond(t *testing.T) {
+	e := &Effect{Template: modelskill.EffectTemplate{Name: "dot", Time: 2, Count: 7, Icon: true}}
+	start := time.Unix(0, 0)
+	e.startSchedule(start)
+
+	cases := []struct {
+		offset time.Duration
+		want   int32
+	}{
+		{0, 14000},
+		{1 * time.Second, 13000},
+		{2 * time.Second, 12000}, // first tick claimed exactly here, below
+	}
+	for _, c := range cases[:2] {
+		if got, ok := e.iconDuration(start.Add(c.offset)); !ok || got != c.want {
+			t.Fatalf("iconDuration(+%s) = %d, %v; want %d, true", c.offset, got, ok, c.want)
+		}
+	}
+
+	if run, remove := e.claimAction(start.Add(2 * time.Second)); !run || remove {
+		t.Fatalf("claimAction at 2s = run %v remove %v, want run=true remove=false (6 ticks remain)", run, remove)
+	}
+	if got, ok := e.iconDuration(start.Add(2 * time.Second)); !ok || got != 12000 {
+		t.Fatalf("iconDuration(+2s, post-tick) = %d, %v; want 12000, true", got, ok)
+	}
+	if got, ok := e.iconDuration(start.Add(3 * time.Second)); !ok || got != 11000 {
+		t.Fatalf("iconDuration(+3s) = %d, %v; want 11000, true (old formula held flat at 12000 here)", got, ok)
+	}
+}
