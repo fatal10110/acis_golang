@@ -754,6 +754,76 @@ func TestAttackClickDuringPickupApproachDropsStaleIntention(t *testing.T) {
 	}
 }
 
+// TestWalkClickDuringPickupApproachDropsStaleIntention is the walk-redirect
+// half of the #1155 regression coverage: a client-initiated walk click that
+// redirects an in-flight ground-pickup approach must also drop the parked
+// pickup intention (moveLivePlayer's live.takePickup()), not just an attack
+// click — the reference's single intention slot silently replaces PICK_UP on
+// any subsequent click, walk included.
+func TestWalkClickDuringPickupApproachDropsStaleIntention(t *testing.T) {
+	state := world.New()
+	frames := &frameCapture{}
+	live := newTestLivePlayer(t, 1, frames)
+	live.Character.SetWorld(state)
+	gcl := &GameClientLink{world: state, log: zerolog.Nop(), inventory: invops.NewService(nil)}
+	wireLiveAttackHooks(gcl, live)
+	live.move.SetArrived(func() {
+		pos := live.move.Position()
+		gcl.updateLivePlayerPosition(live, pos, live.CurrentHeading())
+		gcl.finishLiveGroundPickup(live)
+		live.combat.Think()
+	})
+
+	tmpl, _ := petTestTemplates().Get(item.AdenaID)
+	ground, err := grounditem.New(item.Instance{ObjectID: 901, TemplateID: item.AdenaID, Count: 1, ManaLeft: -1}, tmpl)
+	if err != nil {
+		t.Fatalf("ground item: %v", err)
+	}
+
+	state.Spawn(live, 0, 0, 0, 0)
+	// The item and the walk redirect target sit in different directions, so
+	// the redirected walk's own arrival lands nowhere near the parked item —
+	// any surviving pickup intention fires against a stale, unreachable
+	// location on that arrival.
+	state.Spawn(ground, 0, -(groundPickupInteractionDistance + 50), 0, 0)
+
+	frames.frames = nil
+	if !gcl.startPickupLiveGroundItem(context.Background(), live, ground, false) {
+		t.Fatal("startPickupLiveGroundItem returned false for a ground item target")
+	}
+	if got := frameOpcodes(frames.frames); string(got) != string([]byte{serverpackets.OpcodeMoveToLocation}) {
+		t.Fatalf("pickup-approach opcodes = %x, want MoveToLocation only", got)
+	}
+
+	frames.frames = nil
+	gcl.moveLivePlayer(live, location.Location{X: 200, Y: 0, Z: 0})
+	if got := frameOpcodes(frames.frames); string(got) != string([]byte{serverpackets.OpcodeMoveToLocation}) {
+		t.Fatalf("walk-redirect opcodes = %x, want MoveToLocation only", got)
+	}
+
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		x, _, _ := live.Position()
+		if x >= 200 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("redirected walk never arrived")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	// Give the arrival's own hook chain (finishLiveGroundPickup, combat.Think)
+	// a moment to run before asserting on its side effects.
+	time.Sleep(50 * time.Millisecond)
+
+	if got := frameOpcodes(frames.snapshot()); bytes.Contains(got, []byte{serverpackets.OpcodeActionFailed}) {
+		t.Fatalf("walk-redirect arrival opcodes = %x, must not contain ActionFailed from the stale pickup", got)
+	}
+	if _, ok := state.Object(ground.ObjectID()); !ok {
+		t.Fatal("ground item vanished — stale pickup intention collected it at the unrelated arrival")
+	}
+}
+
 // TestFinishDeferredPickupHonorsShiftAndFailsWithoutWalking is the follow-up
 // regression test for PR 1074 finding 1's review comment: a shift-clicked
 // pickup that gets deferred (blocked by an attack) must fail outright on

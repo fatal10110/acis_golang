@@ -36,11 +36,14 @@ func (l *GameClientLink) moveLivePlayer(live *livePlayer, target location.Locati
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
-	// The redirect just overwrote move's in-flight destination and arrival
-	// timer, so a parked ground-pickup approach loses its ride here — drop
-	// it now or it fires stale against whatever this new walk arrives at
-	// (#1155). A rejected route above never reaches this: the old move (and
-	// its pickup) is left untouched.
+	// combat.Stop() above already cancelled any move in flight (accepted or
+	// not — PlayerAttack.stopLocked unconditionally calls move.Stop()), so a
+	// parked ground-pickup approach loses its ride regardless of how this
+	// click's own route resolves. Only the accepted branch reaches here: a
+	// rejected route leaves the intention parked but inert, since no arrival
+	// can fire without a new move initiation, and every initiation path
+	// clears or overwrites it. Drop it now or it fires stale against
+	// whatever this new walk arrives at (#1155).
 	live.takePickup()
 	// Face the destination from the same server-authoritative origin the
 	// walk itself started from.
