@@ -146,6 +146,54 @@ func TestLivePlayerVisibilitySendsPetInfoOnlyToOwner(t *testing.T) {
 	}
 }
 
+func TestPetInfoSnapshotPetUsesPerLevelShotCounts(t *testing.T) {
+	owner := newTestLivePlayer(t, 1, &frameCapture{})
+	npcs := npc.NewTable([]*npc.Template{{
+		ID: 12077, TemplateID: 12077, Name: "Wolf",
+		AtkSpd: 300, RunSpeed: 120, WalkSpeed: 60,
+		SSCount: 2, SPSCount: 2, // template (servitor) shot counts
+	}})
+	pet := summon.NewPet(summon.PetConfig{
+		ObjectID: 20, Owner: owner, NPCID: 12077, Level: 5,
+		Stats: summon.CombatStats{MaxHP: 100, MaxMP: 30, SSCount: 1, SPSCount: 1}, // per-level pet-row shot counts
+	})
+
+	snap, ok := petInfoSnapshot(pet, owner, npcs)
+	if !ok {
+		t.Fatalf("petInfoSnapshot() ok = false")
+	}
+	if snap.SoulShotsPerHit != 1 || snap.SpiritShotsPerHit != 1 {
+		t.Fatalf("SoulShotsPerHit/SpiritShotsPerHit = %d/%d, want the per-level pet-row values 1/1 (not the template's 2/2)",
+			snap.SoulShotsPerHit, snap.SpiritShotsPerHit)
+	}
+}
+
+func TestPetInfoSnapshotServitorUsesTemplateShotCountsAndLifetimeFed(t *testing.T) {
+	owner := newTestLivePlayer(t, 1, &frameCapture{})
+	npcs := npc.NewTable([]*npc.Template{{
+		ID: 14, TemplateID: 14, Name: "Servitor",
+		AtkSpd: 300, RunSpeed: 120, WalkSpeed: 60,
+		SSCount: 3, SPSCount: 4,
+	}})
+	servitor := summon.NewServitor(summon.ServitorConfig{
+		ObjectID: 21, Owner: owner, NPCID: 14, Level: 40,
+		Lifetime: summon.LifetimeState{TimeRemaining: 900, TotalLifeTime: 1200},
+		Stats:    summon.CombatStats{MaxHP: 500, MaxMP: 200},
+	})
+
+	snap, ok := petInfoSnapshot(servitor, owner, npcs)
+	if !ok {
+		t.Fatalf("petInfoSnapshot() ok = false")
+	}
+	if snap.SoulShotsPerHit != 3 || snap.SpiritShotsPerHit != 4 {
+		t.Fatalf("SoulShotsPerHit/SpiritShotsPerHit = %d/%d, want the template values 3/4 (servitors have no per-level row)",
+			snap.SoulShotsPerHit, snap.SpiritShotsPerHit)
+	}
+	if snap.CurFed != 900 || snap.MaxFed != 1200 {
+		t.Fatalf("CurFed/MaxFed = %d/%d, want the servitor's TimeRemaining/TotalLifeTime 900/1200", snap.CurFed, snap.MaxFed)
+	}
+}
+
 func TestLivePlayerForgetSkipsObjectsItWouldNotDiscover(t *testing.T) {
 	state := world.New()
 	frames := &frameCapture{}

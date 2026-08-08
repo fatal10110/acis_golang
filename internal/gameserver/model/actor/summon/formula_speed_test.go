@@ -24,6 +24,13 @@ func TestActorMAtkSpdHungryHalvesBase(t *testing.T) {
 	}
 }
 
+func TestActorCriticalRateCapsAt500(t *testing.T) {
+	pet := NewPet(PetConfig{ObjectID: 1, Level: 10, Roll: zeroSummonRoll})
+	if got := pet.CriticalRate(600); got != 500 {
+		t.Fatalf("CriticalRate(600) = %v, want capped at 500", got)
+	}
+}
+
 func TestActorMAtkSpdServitorNeverHalved(t *testing.T) {
 	// A servitor has no feeding state at all (isPet is false), so its
 	// magic attack speed must equal a well-fed pet's, never a hungry one's.

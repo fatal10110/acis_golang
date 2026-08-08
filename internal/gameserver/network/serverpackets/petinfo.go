@@ -123,7 +123,7 @@ func FramePetInfo(s PetInfoSnapshot) wire.Frame {
 	// (PetInfo.java:103) is out of scope until this is wired.
 	w.WriteInt32(0)
 	w.WriteUint16(uint16(boolInt32(s.Mountable)))
-	w.WriteUint8(0) // move type: a summon always follows at run speed, matching this file's MoveSpeed/RunSpd choice
+	w.WriteUint8(0) // move type: 0 is MoveType.GROUND, the default _moveTypes state (CreatureMove.java:76-84); no swim/fly state is modeled for summons yet
 
 	w.WriteUint16(0)
 	w.WriteUint8(uint8(s.Team)) // team/CTF system is not ported yet; always 0 (TeamType.NONE)

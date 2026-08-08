@@ -97,7 +97,13 @@ func petInfoSnapshot(a *summon.Actor, owner *livePlayer, npcs *npc.Table) (serve
 	curFed, maxFed := 0, 0
 	var expForThisLevel, expForNextLevel int64
 	totalWeight, weightLimit := 0, 0
+	// Pet.getSoulShotsPerHit/getSpiritShotsPerHit (Pet.java:396-405) use the
+	// per-level pet-data row, not the npc template's base Summon.java
+	// (506-514) value that servitors use — those two can differ (e.g. Wolf
+	// 12077: template ssCount=2, level-row ssCount=1).
+	ssCount, spsCount := tmpl.SSCount, tmpl.SPSCount
 	if a.IsPet() {
+		ssCount, spsCount = a.SSCount(), a.SPSCount()
 		curFed, maxFed = a.Fed(), 0
 		if tmpl.Pet != nil {
 			if row, ok := tmpl.Pet.Levels[a.Level()]; ok {
@@ -114,6 +120,9 @@ func petInfoSnapshot(a *summon.Actor, owner *livePlayer, npcs *npc.Table) (serve
 			totalWeight = inv.TotalWeight()
 			weightLimit = inv.WeightLimit
 		}
+	} else {
+		lifetime := a.Lifetime()
+		curFed, maxFed = lifetime.TimeRemaining, lifetime.TotalLifeTime
 	}
 
 	return serverpackets.PetInfoSnapshot{
@@ -153,11 +162,11 @@ func petInfoSnapshot(a *summon.Actor, owner *livePlayer, npcs *npc.Table) (serve
 		MDef:              int(a.MDef()),
 		Accuracy:          int(a.Accuracy()),
 		EvasionRate:       int(a.EvasionRate()),
-		CriticalHit:       int(a.CriticalRate()),
+		CriticalHit:       int(a.CriticalRate(tmpl.CritRate)),
 		MoveSpeed:         int(a.MoveSpeed(tmpl.RunSpeed)),
 		Mountable:         petmodel.IsMountable(a.NPCID()),
-		SoulShotsPerHit:   tmpl.SSCount,
-		SpiritShotsPerHit: tmpl.SPSCount,
+		SoulShotsPerHit:   ssCount,
+		SpiritShotsPerHit: spsCount,
 	}, true
 }
 
