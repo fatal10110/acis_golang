@@ -119,6 +119,7 @@ func (l *GameClientLink) walkOrForwardPickup(ctx context.Context, live *livePlay
 	// at.
 	live.takePetInteract()
 	live.setPickup(ctx, ground)
+	live.SendFrame(serverpackets.FrameActionFailed())
 	accepted, err := live.move.MoveToLocation(location.Location{X: x, Y: y, Z: z})
 	if err != nil {
 		l.log.Warn().Err(err).Msg("move: broadcast")
@@ -127,7 +128,6 @@ func (l *GameClientLink) walkOrForwardPickup(ctx context.Context, live *livePlay
 		return true
 	}
 	live.takePickup()
-	live.SendFrame(serverpackets.FrameActionFailed())
 	return true
 }
 
