@@ -95,6 +95,26 @@ func TestSaveStateOnAFreshEffectReportsNoElapsedTime(t *testing.T) {
 	}
 }
 
+// TestSaveStateFloorsSubSecondElapsedInsteadOfRoundingUp guards against
+// truncating the remaining-until-next-tick duration to whole seconds before
+// subtracting it from the period: doing so floors "remaining" (rounding it
+// down) and so rounds the derived elapsed time up, over-reporting by up to a
+// full second right after a fresh cast. SaveState must floor the elapsed
+// duration itself instead, matching the whole-seconds-so-far semantic
+// startScheduleFromRestoreLocked's delay computation expects on restore.
+func TestSaveStateFloorsSubSecondElapsedInsteadOfRoundingUp(t *testing.T) {
+	e := &Effect{Template: modelskill.EffectTemplate{Count: 1, Time: 30}}
+	start := time.Unix(7000, 0)
+	e.startSchedule(start)
+
+	if _, elapsed := e.SaveState(start.Add(time.Millisecond)); elapsed != 0 {
+		t.Fatalf("SaveState() 1ms after cast = elapsed %d, want 0 (not rounded up to 1)", elapsed)
+	}
+	if _, elapsed := e.SaveState(start.Add(29*time.Second + 999*time.Millisecond)); elapsed != 29 {
+		t.Fatalf("SaveState() just before the tick = elapsed %d, want 29 (not rounded up to 30, which would restore as an immediate tick)", elapsed)
+	}
+}
+
 func TestSaveStateOnANonPeriodicEffectReportsNoElapsedTime(t *testing.T) {
 	e := &Effect{Template: modelskill.EffectTemplate{Count: 1}}
 	now := time.Unix(6000, 0)

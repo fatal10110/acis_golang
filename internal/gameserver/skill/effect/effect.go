@@ -166,9 +166,8 @@ func (e *Effect) SaveState(now time.Time) (count, elapsed int32) {
 	if period <= 0 || e.nextAction.IsZero() {
 		return count, 0
 	}
-	remaining := max(e.nextAction.Sub(now), 0)
-	elapsed = int32(e.Template.Time) - int32(remaining/time.Second)
-	return count, min(max(elapsed, 0), int32(e.Template.Time))
+	remaining := min(max(e.nextAction.Sub(now), 0), period)
+	return count, int32((period - remaining) / time.Second)
 }
 
 func (e *Effect) stopSchedule() {
