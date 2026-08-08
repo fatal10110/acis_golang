@@ -1,7 +1,6 @@
 package npc
 
 import (
-	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -114,11 +113,12 @@ func (ep *EffectPoint) BroadcastSkillUse(target skillCastTarget, skillID, level 
 	}
 	ax, ay, az := ep.Position()
 	tx, ty, tz := target.Position()
-	ep.broadcastFrame(ep.frames.SkillUse(
+	ep.frames.SkillUse(
+		ep.collectKnown(),
 		ep.ObjectID(), location.Location{X: ax, Y: ay, Z: az},
 		target.ObjectID(), location.Location{X: tx, Y: ty, Z: tz},
 		skillID, level, 0, 0, true,
-	))
+	)
 	return nil
 }
 
@@ -132,16 +132,16 @@ func (ep *EffectPoint) BroadcastSkillLaunched(skillID, level int32, targetIDs []
 	if ep.frames == nil {
 		return ErrNoFrameBuilder
 	}
-	ep.broadcastFrame(ep.frames.SkillLaunched(ep.ObjectID(), skillID, level, targetIDs))
+	ep.frames.SkillLaunched(ep.collectKnown(), ep.ObjectID(), skillID, level, targetIDs)
 	return nil
 }
 
-func (ep *EffectPoint) broadcastFrame(fr wire.Frame) {
+// collectKnown snapshots every world object currently known to this actor,
+// for a FrameBuilder call to filter and deliver to.
+func (ep *EffectPoint) collectKnown() []world.Tracked {
+	var known []world.Tracked
 	ep.world.ForEachKnown(ep, func(o world.Tracked) {
-		receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
-		if !ok {
-			return
-		}
-		receiver.SendFrame(fr)
+		known = append(known, o)
 	})
+	return known
 }
