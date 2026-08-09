@@ -37,12 +37,12 @@ type Owner interface {
 
 // Actor is a live pet or servitor placed in world.State next to its owner.
 //
-// State methods guard the embedded Presence. level, name, fed, and
-// belowUnsummonLimit are guarded by statusMu and safe to read from any
-// goroutine, including the world-visibility goroutine driving Discover. The
-// remaining fields are mutated by the goroutine handling the owner
-// connection or by the actor's own tick callback, so callers must serialize
-// command and tick calls per actor.
+// State methods guard the embedded Presence. level, name, fed,
+// belowUnsummonLimit, and lifetime are guarded by statusMu and safe to read
+// from any goroutine, including the world-visibility goroutine driving
+// Discover. The remaining fields are mutated by the goroutine handling the
+// owner connection or by the actor's own tick callback, so callers must
+// serialize command and tick calls per actor.
 type Actor struct {
 	world.Presence
 
@@ -53,14 +53,16 @@ type Actor struct {
 	npcID   int
 	passive bool
 
-	// statusMu guards level, name, fed, and belowUnsummonLimit: petInfoSnapshot
-	// (internal/gameserver/network/visibility.go) reads them from the
-	// world-visibility goroutine via Level/Name/Fed while the owner-connection
-	// and tick goroutines write them, per world.Observer's concurrency
-	// contract (internal/gameserver/world/visibility.go).
+	// statusMu guards level, name, fed, belowUnsummonLimit, and lifetime:
+	// petInfoSnapshot (internal/gameserver/network/visibility.go) reads them
+	// from the world-visibility goroutine via Level/Name/Fed/Lifetime while
+	// the owner-connection and tick goroutines write them, per
+	// world.Observer's concurrency contract
+	// (internal/gameserver/world/visibility.go).
 	statusMu sync.RWMutex
 	level    int
 	name     string
+	lifetime LifetimeState
 	dead     bool
 	disabled bool
 	combat   bool
@@ -77,7 +79,6 @@ type Actor struct {
 	target             worldobject.Object
 
 	ownerInventory   *itemcontainer.Inventory
-	lifetime         LifetimeState
 	timeLostIdle     int
 	timeLostActive   int
 	itemConsumeID    int32
