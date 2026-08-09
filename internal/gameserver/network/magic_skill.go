@@ -144,6 +144,12 @@ func (l *GameClientLink) handleMagicSkillUseGround(live *livePlayer, req clientp
 		sendMagicActionFailed(live)
 		return
 	}
+	level := live.SkillLevel(int(req.SkillID))
+	def, ok := l.skills.Definition(modelskill.Ref{ID: modelskill.ID(req.SkillID), Level: level})
+	// RequestExMagicSkillUseGround silently ignores unknown/non-GROUND skills before a pending action or point is recorded.
+	if level == 0 || !ok || def.Target != modelskill.TargetGround {
+		return
+	}
 	z := int(req.Z)
 	if l.geo != nil {
 		z = int(l.geo.Height(int(req.X), int(req.Y), int(req.Z)))
