@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
@@ -12,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 )
 
 const (
@@ -679,8 +681,13 @@ func (c *Character) SiegeGuard() bool { return false }
 func (c *Character) Playable() bool { return true }
 
 // AttackableBy reports whether attacker may attack this player.
-func (c *Character) AttackableBy(attack.CreatureActor) bool {
+func (c *Character) AttackableBy(target.Creature) bool {
 	return !c.AlikeDead()
+}
+
+// AttackableWithoutForceBy reports whether caster may attack c without force.
+func (c *Character) AttackableWithoutForceBy(caster target.Creature) bool {
+	return caster.ObjectID() != c.ID && (c.Karma() > 0 || c.PvPFlagState() != task.PvPFlagNone)
 }
 
 // Roll draws a uniform random integer in [0, n) from c's combat random source.
