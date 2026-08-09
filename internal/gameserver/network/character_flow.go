@@ -314,6 +314,7 @@ func skillListEntries(c *player.Character, skills *skillstate.Persistence) []ser
 func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c *player.Character, tmpl *player.Template, items []*item.Instance, shortcuts []shortcut.Shortcut) (*livePlayer, error) {
 	c.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventory(c.ID, l.itemTemplates, items))
 	c.SetWeightLimitMultiplier(l.playerConfig.WeightLimitMultiplier)
+	c.SetDeathPenaltyChance(l.playerConfig.DeathPenaltyChance)
 	c.RefreshWeightPenalty()
 	c.RefreshExpertisePenalty()
 	c.SetWorld(l.world)
