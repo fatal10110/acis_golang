@@ -81,10 +81,11 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 		return false
 	}
 
-	// Name/Exp/SP restore and persistence writeback (Pet.java's other
-	// saved fields) are deferred with the rest of the pet-relog-persistence
-	// follow-up — see this PR's linked issue. Level/Fed/HP/MP are restored
-	// here because summon.Actor already exposes somewhere to put them.
+	// Exp/SP restore and persistence writeback (Pet.java's other saved
+	// fields) are deferred with the rest of the pet-relog-persistence
+	// follow-up — see this PR's linked issue. Level/Name/Fed/HP/MP are
+	// restored here because summon.Actor already exposes somewhere to put
+	// them.
 	level := petmodel.InitialLevel(int(summonItem.NPCID), npcTmpl.Level, live.LevelValue())
 	if hasSaved {
 		level = state.Level
@@ -108,10 +109,16 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 		return false
 	}
 
+	name := npcTmpl.Name
+	if hasSaved && state.Name != "" {
+		name = state.Name
+	}
+
 	pet := link.newPet(summon.PetConfig{
 		ObjectID: objID,
 		Owner:    live,
 		NPCID:    int(summonItem.NPCID),
+		Name:     name,
 		Level:    level,
 		CON:      npcTmpl.CON,
 		Config:   nil, // set by newPet from link.petConfig

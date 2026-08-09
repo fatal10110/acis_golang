@@ -31,14 +31,16 @@ func (l *GameClientLink) handleSummonActionUse(ctx context.Context, live *livePl
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return true
 	}
-	summonType := actor.SummonType()
-	objectID := actor.ObjectID()
 	result := actor.ApplyCommand(l.summonCommandContext(live, command))
 	if id, ok := systemMessageForSummonFeedback(result.Feedback); ok {
 		live.SendFrame(serverpackets.FrameSystemMessage(id))
 	}
 	if result.Outcome == summon.OutcomeApplied && (command == summon.CommandReturnPet || command == summon.CommandUnsummonServitor) {
-		live.SendFrame(serverpackets.FramePetDelete(summonType, objectID))
+		// ApplyCommand's despawn (inside CommandReturnPet/CommandUnsummonServitor)
+		// synchronously triggers world visibility's Forget callback, which
+		// sends the owner PetDelete (network/visibility.go) — no explicit
+		// send needed here.
+		//
 		// Unsummoning detaches the pet inventory's notifier so its closure
 		// stops holding live; lifecycle.go does the same for a still-active
 		// pet on logout. The pet's container also goes away here, so its

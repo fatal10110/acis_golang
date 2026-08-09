@@ -67,6 +67,12 @@ func (l *GameClientLink) detachLivePlayer(ctx context.Context, live *livePlayer)
 	if l.shadowItems != nil {
 		l.shadowItems.Remove(live.ObjectID())
 	}
+	if l.pvpFlags != nil {
+		// reset=false, matching Player.java:6293's deleteMe cleanup: a
+		// disconnecting character's flag isn't persisted, so there's
+		// nothing to reset it to — just stop tracking it.
+		l.pvpFlags.Remove(live.Character, false)
+	}
 	if l.zones != nil && live.zoneActor != nil {
 		position := live.CurrentLocation()
 		live.zoneActor.removeFrom(l.zones, position.X, position.Y)
@@ -99,6 +105,7 @@ func (l *GameClientLink) detachLivePlayer(ctx context.Context, live *livePlayer)
 	live.Character.SetLackHPNotifier(nil)
 	live.Character.SetLackMPNotifier(nil)
 	live.Character.SetUserInfoUpdater(nil)
+	live.Character.SetPvPFlagHook(nil)
 	live.Character.SetLevelRefresher(nil)
 	live.Character.SetWeightPenaltyUpdater(nil)
 	if inv := live.Character.Inventory(); inv != nil {

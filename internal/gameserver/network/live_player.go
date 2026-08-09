@@ -10,6 +10,7 @@ import (
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cubic"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -25,6 +26,7 @@ import (
 type livePlayer struct {
 	*player.Character
 	template  *player.Template
+	npcs      *npc.Table
 	items     []*item.Instance
 	throne    staticobject.Chair
 	attack    *attack.Controller
@@ -36,9 +38,9 @@ type livePlayer struct {
 	// use rather than on every use — link/live are stable for p's whole
 	// connection lifetime, so it never needs to change.
 	summonSpawner *gameSummonSpawner
-	shortcuts *shortcut.List
-	isGM      bool
-	log       zerolog.Logger
+	shortcuts     *shortcut.List
+	isGM          bool
+	log           zerolog.Logger
 
 	known          world.KnownBuffer
 	zoneActor      *liveZoneActor

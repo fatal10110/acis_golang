@@ -36,6 +36,27 @@ func TestCharacterReduceDeathPenaltyLevelDecrementsToFloorZero(t *testing.T) {
 	}
 }
 
+// TestCharacterReduceDeathPenaltyLevelFiresReducedUpdater matches the
+// reference's reduceDeathPenaltyBuffLevel (Player.java:6544-6553): the
+// packet-layer notification fires with the resulting level on every actual
+// decrement (so the caller can tell the S1_ADDED reapply case, level > 0,
+// from the LIFTED case, level == 0), and does not fire on the no-op at
+// zero (Player.java:6537-6538).
+func TestCharacterReduceDeathPenaltyLevelFiresReducedUpdater(t *testing.T) {
+	c := &Character{ID: 1}
+	c.SetDeathPenaltyLevel(1)
+
+	var got []int
+	c.SetDeathPenaltyReducedUpdater(func(level int) { got = append(got, level) })
+
+	c.ReduceDeathPenaltyLevel() // 1 -> 0: reapply-message branch never fires, LIFTED does.
+	c.ReduceDeathPenaltyLevel() // already 0: no-op, updater must not fire again.
+
+	if want := []int{0}; len(got) != len(want) || got[0] != want[0] {
+		t.Fatalf("reduced-updater calls = %v, want %v", got, want)
+	}
+}
+
 // deathPenaltyKiller is a minimal killer double: a non-Player actor whose
 // raid-relation is fixed at construction.
 type deathPenaltyKiller struct {
@@ -82,6 +103,25 @@ func TestRaiseDeathPenaltyLevelKarmaBypassesChanceRoll(t *testing.T) {
 
 	if got, changed := c.RaiseDeathPenaltyLevel(deathPenaltyKiller{}, 100); !changed || got != 1 {
 		t.Fatalf("RaiseDeathPenaltyLevel(karma, highRoll) = (%d, %v), want (1, true)", got, changed)
+	}
+}
+
+// TestRaiseDeathPenaltyLevelFiresRaisedUpdaterOnlyOnPass matches the
+// reference's calculateDeathPenaltyBuffLevel (Player.java:6518-6528): the
+// packet-layer notification fires with the new level only when the gate
+// passes, never on a blocked attempt.
+func TestRaiseDeathPenaltyLevelFiresRaisedUpdaterOnlyOnPass(t *testing.T) {
+	c := &Character{ID: 1}
+	c.KarmaPoints = 1
+
+	var got []int
+	c.SetDeathPenaltyRaisedUpdater(func(level int) { got = append(got, level) })
+
+	c.RaiseDeathPenaltyLevel(&Character{ID: 2}, 100) // blocked: player killer, must not fire.
+	c.RaiseDeathPenaltyLevel(deathPenaltyKiller{}, 100)
+
+	if want := []int{1}; len(got) != len(want) || got[0] != want[0] {
+		t.Fatalf("raised-updater calls = %v, want %v", got, want)
 	}
 }
 
