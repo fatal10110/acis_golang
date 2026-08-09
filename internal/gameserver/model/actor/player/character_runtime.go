@@ -41,6 +41,16 @@ func (c *Character) SetZones(zones PeaceZoneQuery) {
 	c.zones = zones
 }
 
+// SetInPvPZone records the live zone engine's current PvP membership.
+func (c *Character) SetInPvPZone(inside bool) {
+	c.insidePvPZone.Store(inside)
+}
+
+// InPvPZone reports whether the character is currently in a PvP zone.
+func (c *Character) InPvPZone() bool {
+	return c.insidePvPZone.Load()
+}
+
 // SetZoneRevalidator records the runtime hook that updates zone occupancy
 // whenever the player's server-authoritative position changes.
 func (c *Character) SetZoneRevalidator(revalidate func(location.Location)) {
