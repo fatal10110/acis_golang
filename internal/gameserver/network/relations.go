@@ -9,10 +9,11 @@ import (
 
 // relationBits returns the subset of RelationChanged's bitmask this port
 // can compute from a Character's own state: pvp-flag and karma. Clan
-// leadership, siege, and clan-war bits (Player.java:816-838) require
-// clan/siege subsystems this port doesn't have yet — see milestone issues
-// #232/#234 (siege core/engine) and #155 (ClanWarsList) — and are always
-// zero here.
+// leadership and clan-war bits (Player.java:816-838) require the clan/pledge
+// subsystem tracked in #149 (Clan/pledge: creation, wars, subpledges, clan
+// skills, privileges); the siege bits require #232/#234 (siege core/engine).
+// Neither subsystem exists in this port yet, so those bits are always zero
+// here.
 func relationBits(karma int, pvpFlag task.PvPFlagState) int32 {
 	var bits int32
 	if pvpFlag != task.PvPFlagNone {
