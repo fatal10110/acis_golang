@@ -35,8 +35,7 @@ func calculatePKKillKarmaGain(pkKills int) int {
 // targetPlayer.getPvpFlag() == 0`): a player killing a karma-free,
 // non-flagged player gains karma and a PK-kill count. An actively-flagged,
 // karma-free victim instead takes the reference's PvP-point branch
-// (checkIfPvP) — no karma change — which has no Go implementation yet; see
-// the #1265 follow-up.
+// (checkIfPvP); see awardKillerPvPKill.
 //
 // The reference also routes a kill through other karma-free outcomes when
 // either side is dueling, when the kill happens in a PvP/siege zone, when
@@ -53,17 +52,37 @@ func (c *Character) awardKillerPKKarma(killer creature.DeathActor) {
 	pk.KarmaPoints += calculatePKKillKarmaGain(pk.PKKills)
 	pk.notifyKarmaChanged()
 	pk.UpdateUserInfo()
+	pk.BroadcastRelations()
+}
+
+// awardKillerPvPKill grants the killer a PvP-kill point when both killer
+// and victim (c, who just died) are karma-free and c was actively
+// PvP-flagged, mirroring the reference's onKillUpdatePvPKarma checkIfPvP
+// branch (Player.java:2802-2812, Playable.checkIfPvP at Playable.java:
+// 215-227): a karma-free duel-less PvP fight, not a PK. Only the killer's
+// own UserInfo is resent (Player.java:2811, "Send UserInfo packet to
+// attacker with its Karma and PK Counter"); no karma change and no
+// relation broadcast, since neither karma nor PvP flag state changed.
+//
+// The reference gates the whole method behind cursed-weapon, duel, and
+// PvP/siege-zone early returns, and this branch's own condition also
+// allows an at-war clan kill or a karma>0 victim under
+// Config.KARMA_AWARD_PK_KILL. None of those states are tracked on
+// Character yet, matching awardKillerPKKarma's existing dormant-state
+// deferral; this only reproduces the plain checkIfPvP case.
+func (c *Character) awardKillerPvPKill(killer creature.DeathActor) {
+	pk, ok := killer.(*Character)
+	if !ok || pk == c || pk.KarmaPoints != 0 || c.KarmaPoints != 0 || c.PvPFlagState() == task.PvPFlagNone {
+		return
+	}
+	pk.PvPKills++
+	pk.UpdateUserInfo()
 }
 
 // SetKarmaChangeNotifier records the packet-layer hook that tells this
 // character's own client its new karma total, mirroring setKarma's
 // SystemMessage(YOUR_KARMA_HAS_BEEN_CHANGED_TO_S1) + StatusUpdate(KARMA)
-// pair (Player.java:1076-1080). The reference also sends a RelationChanged
-// packet for an owned summon and broadcasts the relation change to nearby
-// observers (so their client recolors this player's name); neither summon
-// messaging nor a relation/name-color broadcast exists in this port yet —
-// see the #1267 follow-up — so this hook only ever covers the self-only
-// feedback.
+// pair (Player.java:1076-1080).
 func (c *Character) SetKarmaChangeNotifier(notify func(karma int)) {
 	c.stateMu.Lock()
 	defer c.stateMu.Unlock()

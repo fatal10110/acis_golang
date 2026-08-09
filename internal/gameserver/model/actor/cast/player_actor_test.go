@@ -11,7 +11,9 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
 // permissiveGeo is a test-only move.Geo that permits every move, needed
@@ -84,6 +86,42 @@ func TestPlayerActorMPCostAppliesDanceSurcharge(t *testing.T) {
 	nonDance := modelskill.Definition{MPConsume: 10, NextDanceCost: 4}
 	if got := actor.MPCost(nonDance); got != 10 {
 		t.Fatalf("MPCost() for non-dance skill = %d, want 10, unaffected by active dances", got)
+	}
+}
+
+func TestPlayerActorMPCostAppliesSkillMPConsumeRates(t *testing.T) {
+	ch := &player.Character{ID: 1}
+	live, err := creature.NewLive(location.Location{}, 100, permissiveGeo{}, ch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ch.Live = live
+	owner := &struct{}{}
+	ch.AddStatFuncs([]basefunc.Func{
+		basefunc.NewMul(owner, stat.MagicalMpConsumeRate, 0.9, nil),
+		basefunc.NewMul(owner, stat.PhysicalMpConsumeRate, 3, nil),
+		basefunc.NewMul(owner, stat.DanceMpConsumeRate, 2, nil),
+	})
+	actor := PlayerActor{Character: ch}
+
+	for _, tt := range []struct {
+		name string
+		def  modelskill.Definition
+		init int
+		cost int
+	}{
+		{name: "magic", def: modelskill.Definition{Magic: true, MPInitialConsume: 11, MPConsume: 21}, init: 9, cost: 18},
+		{name: "physical", def: modelskill.Definition{MPInitialConsume: 11, MPConsume: 21}, init: 33, cost: 63},
+		{name: "dance takes precedence", def: modelskill.Definition{Dance: true, Magic: true, MPInitialConsume: 11, MPConsume: 21}, init: 22, cost: 42},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := actor.MPInitialCost(tt.def); got != tt.init {
+				t.Fatalf("MPInitialCost() = %d, want %d", got, tt.init)
+			}
+			if got := actor.MPCost(tt.def); got != tt.cost {
+				t.Fatalf("MPCost() = %d, want %d", got, tt.cost)
+			}
+		})
 	}
 }
 

@@ -67,8 +67,10 @@ func (a *Actor) TickServitor(state *world.State) TickResult {
 	if a.combat {
 		cost = a.timeLostActive
 	}
+	a.statusMu.Lock()
 	next, expired, upkeep := Tick(a.lifetime, cost)
 	a.lifetime = next
+	a.statusMu.Unlock()
 
 	result := TickResult{
 		TimeRemaining: next.TimeRemaining,

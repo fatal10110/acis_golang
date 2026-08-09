@@ -31,6 +31,8 @@ func TestAwardKillerPKKarmaAwardsInnocentVictimKill(t *testing.T) {
 	killer := &Character{ID: 2}
 	var notified []int
 	killer.SetKarmaChangeNotifier(func(karma int) { notified = append(notified, karma) })
+	broadcasts := 0
+	killer.SetRelationBroadcaster(func() { broadcasts++ })
 
 	victim.awardKillerPKKarma(killer)
 
@@ -42,6 +44,9 @@ func TestAwardKillerPKKarmaAwardsInnocentVictimKill(t *testing.T) {
 	}
 	if want := []int{240}; len(notified) != 1 || notified[0] != want[0] {
 		t.Fatalf("karma-change notifications = %v, want %v", notified, want)
+	}
+	if broadcasts != 1 {
+		t.Fatalf("relation broadcasts = %d, want 1", broadcasts)
 	}
 }
 
@@ -64,6 +69,8 @@ func TestAwardKillerPKKarmaSkipsWhenVictimAlreadyHadKarma(t *testing.T) {
 	killer := &Character{ID: 2}
 	notified := false
 	killer.SetKarmaChangeNotifier(func(int) { notified = true })
+	broadcast := false
+	killer.SetRelationBroadcaster(func() { broadcast = true })
 
 	victim.awardKillerPKKarma(killer)
 
@@ -72,6 +79,9 @@ func TestAwardKillerPKKarmaSkipsWhenVictimAlreadyHadKarma(t *testing.T) {
 	}
 	if notified {
 		t.Fatalf("karma-change notifier fired, want no notification when the award is skipped")
+	}
+	if broadcast {
+		t.Fatalf("relation broadcaster fired, want no broadcast when the award is skipped")
 	}
 }
 
@@ -117,5 +127,75 @@ func TestAwardKillerPKKarmaSkipsSelfKill(t *testing.T) {
 
 	if c.PKKills != 0 || c.KarmaPoints != 0 {
 		t.Fatalf("self-kill: (PKKills=%d, KarmaPoints=%d), want (0, 0)", c.PKKills, c.KarmaPoints)
+	}
+}
+
+func TestAwardKillerPvPKillAwardsFlaggedVictimKill(t *testing.T) {
+	victim := &Character{ID: 1}
+	victim.UpdatePvPFlag(task.PvPFlagOn)
+	killer := &Character{ID: 2}
+	updates := 0
+	killer.updateUserInfo = func() { updates++ }
+
+	victim.awardKillerPvPKill(killer)
+
+	if killer.PvPKills != 1 {
+		t.Fatalf("killer.PvPKills = %d, want 1", killer.PvPKills)
+	}
+	if killer.KarmaPoints != 0 {
+		t.Fatalf("killer.KarmaPoints = %d, want 0", killer.KarmaPoints)
+	}
+	if updates != 1 {
+		t.Fatalf("UserInfo updates = %d, want 1", updates)
+	}
+}
+
+func TestAwardKillerPvPKillSkipsUnflaggedVictim(t *testing.T) {
+	victim := &Character{ID: 1}
+	killer := &Character{ID: 2}
+
+	victim.awardKillerPvPKill(killer)
+
+	if killer.PvPKills != 0 {
+		t.Fatalf("killer.PvPKills = %d, want 0", killer.PvPKills)
+	}
+}
+
+func TestAwardKillerPvPKillSkipsWhenVictimHasKarma(t *testing.T) {
+	victim := &Character{ID: 1, KarmaPoints: 500}
+	victim.UpdatePvPFlag(task.PvPFlagOn)
+	killer := &Character{ID: 2}
+
+	victim.awardKillerPvPKill(killer)
+
+	if killer.PvPKills != 0 {
+		t.Fatalf("killer.PvPKills = %d, want 0", killer.PvPKills)
+	}
+}
+
+func TestAwardKillerPvPKillSkipsWhenKillerHasKarma(t *testing.T) {
+	victim := &Character{ID: 1}
+	victim.UpdatePvPFlag(task.PvPFlagOn)
+	killer := &Character{ID: 2, KarmaPoints: 500}
+
+	victim.awardKillerPvPKill(killer)
+
+	if killer.PvPKills != 0 {
+		t.Fatalf("killer.PvPKills = %d, want 0", killer.PvPKills)
+	}
+}
+
+func TestAwardKillerPvPKillSkipsNonPlayerAndNilAndSelf(t *testing.T) {
+	victim := &Character{ID: 1}
+	victim.UpdatePvPFlag(task.PvPFlagOn)
+
+	victim.awardKillerPvPKill(npcKiller{id: 99})
+	victim.awardKillerPvPKill(nil)
+
+	self := &Character{ID: 2}
+	self.UpdatePvPFlag(task.PvPFlagOn)
+	self.awardKillerPvPKill(self)
+	if self.PvPKills != 0 {
+		t.Fatalf("self-kill: PvPKills = %d, want 0", self.PvPKills)
 	}
 }
