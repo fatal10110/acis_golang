@@ -353,6 +353,42 @@ func TestStartServitorTicksSchedulesLifetimeExpiry(t *testing.T) {
 	waitForNoSummon(t, state, owner.ObjectID())
 }
 
+// TestServitorLifetimeConcurrentTickAndRead overlaps TickServitor's writes
+// (via StartServitorTicks) with concurrent Lifetime() reads, the same
+// producer/consumer pattern petInfoSnapshot uses from the world-visibility
+// goroutine. Run with -race: without statusMu guarding lifetime, this
+// detects the race #1282 fixed.
+func TestServitorLifetimeConcurrentTickAndRead(t *testing.T) {
+	state := world.New()
+	owner := &liveOwnerStub{id: 100, level: 40}
+	state.Spawn(owner, 1000, 2000, -50, 32768)
+	actor := NewServitor(ServitorConfig{
+		ObjectID:     200,
+		Owner:        owner,
+		Level:        44,
+		TimeLostIdle: 1,
+		Lifetime: LifetimeState{
+			TimeRemaining:       100000,
+			TotalLifeTime:       100000,
+			NextItemConsumeTime: -1,
+		},
+	})
+	SpawnBesideOwner(state, actor, owner, location.Location{})
+
+	ticker := actor.StartServitorTicks(time.Millisecond, state, zerolog.Nop())
+	defer ticker.Stop()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		deadline := time.Now().Add(20 * time.Millisecond)
+		for time.Now().Before(deadline) {
+			_ = actor.Lifetime()
+		}
+	}()
+	<-done
+}
+
 func TestStartPetFeedSchedulesStarvation(t *testing.T) {
 	state := world.New()
 	owner := &liveOwnerStub{id: 100, level: 40}
