@@ -73,7 +73,7 @@ func (c *Character) awardKillerPvPKill(killer creature.DeathActor) {
 	pk.stateMu.RLock()
 	awardPKKillPVPPoint := pk.awardPKKillPVPPoint
 	pk.stateMu.RUnlock()
-	if pk == c || (c.KarmaPoints != 0 && !awardPKKillPVPPoint) || (c.KarmaPoints == 0 && (pk.KarmaPoints != 0 || c.PvPFlagState() == task.PvPFlagNone)) {
+	if pk == c || c.KarmaPoints < 0 || (c.KarmaPoints > 0 && !awardPKKillPVPPoint) || (c.KarmaPoints == 0 && (pk.KarmaPoints != 0 || c.PvPFlagState() == task.PvPFlagNone)) {
 		return
 	}
 	pk.PvPKills++
