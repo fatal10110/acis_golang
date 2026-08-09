@@ -113,6 +113,7 @@ type Character struct {
 	notifyExpSpGain           func(exp int64, sp int)
 	notifyExpSpLoss           func(exp int64, sp int)
 	notifyKarmaChange         func(karma int)
+	awardPKKillPVPPoint       bool
 	broadcastLevelUp          func()
 	refreshLevel              func()
 	broadcastShortBuff        func(ShortBuffUpdate)

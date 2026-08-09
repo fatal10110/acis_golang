@@ -419,6 +419,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	c.SetKarmaChangeNotifier(func(karma int) {
 		sendKarmaChangeFrames(live, karma)
 	})
+	c.SetAwardPKKillPVPPoint(l.playerConfig.AwardPKKillPVPPoint)
 	c.SetRelationBroadcaster(func() {
 		l.broadcastRelations(live)
 	})

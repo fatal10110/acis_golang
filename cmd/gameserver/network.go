@@ -60,6 +60,7 @@ func provideGameClientLink(
 	ground *task.GroundItems,
 	attackStance *task.AttackStance,
 	pvpFlags *task.PvPFlags,
+	pvpOptions task.PvPFlagOptions,
 	positions *task.PositionUpdates,
 	playerClock *task.PlayerClock,
 	inventoryUpdates *task.InventoryUpdates,
@@ -83,6 +84,7 @@ func provideGameClientLink(
 		AutoLearnSkills:          bool(autoLearn),
 		WeightLimitMultiplier:    float64(weightLimit),
 		KarmaPlayerCanTeleport:   bool(karmaTeleport),
+		AwardPKKillPVPPoint:      pvpOptions.AwardPKKillPVPPoint,
 		AllowWater:               cfg.AllowWater,
 	}
 	link := network.NewGameClientLink(network.GameClientLinkConfig{
