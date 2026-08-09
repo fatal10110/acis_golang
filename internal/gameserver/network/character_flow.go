@@ -476,6 +476,13 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 		}
 		live.SendFrame(serverpackets.FrameEtcStatusUpdate(serverpackets.EtcStatus{WeightPenalty: int32(live.WeightPenalty()), GradePenalty: live.WeaponGradePenalty() || live.ArmorGradePenalty() > 0, DeathPenaltyLevel: int32(level)}))
 	})
+	if l.skills != nil {
+		c.SetDeathPenaltySkillUpdater(func(oldLevel, level int) {
+			if err := l.skills.ApplyTransientPassiveSkill(c, 5076, oldLevel, level); err != nil {
+				l.log.Error().Err(err).Int32("object_id", c.ID).Msg("update death-penalty passive stats")
+			}
+		})
+	}
 	c.SetItemStatsRefresher(func() {
 		if l.skills == nil {
 			return
