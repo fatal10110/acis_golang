@@ -1,6 +1,7 @@
 package network
 
 import (
+	"bytes"
 	"context"
 	"testing"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/worldobject"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -181,6 +183,54 @@ func TestUseSummonItemSpawnsPetEndToEnd(t *testing.T) {
 	}
 	if !pet.TryUseSkill(2046, live.Character) {
 		t.Fatalf("TryUseSkill(2046) = false after item-use spawn, want true")
+	}
+}
+
+// TestGameSummonSpawnerSpawnPetBroadcastsSpawnRelation covers Summon.onSpawn's
+// two RelationChanged origins (Summon.java:336-349, 351-355): the owner gets
+// a self-view for the newly spawned pet, and every nearby observer gets the
+// pet's own RelationChanged — but not a resend of the owner's own relation,
+// since spawning a pet doesn't change the owner's karma/pvp-flag state.
+func TestGameSummonSpawnerSpawnPetBroadcastsSpawnRelation(t *testing.T) {
+	link, state := newSummonTestLink(t)
+	link.ids = &fakeSummonIDs{next: 100}
+	selfFrames := &frameCapture{}
+	observerFrames := &frameCapture{}
+	live := newTestLivePlayer(t, 1, selfFrames)
+	observer := newTestLivePlayer(t, 2, observerFrames)
+	live.Character.KarmaPoints = 500
+	state.Spawn(live, 0, 0, 0, 0)
+	state.Spawn(observer, 100, 0, 0, 0)
+	// Spawn's mutual Discover already exchanged CharInfo frames between the
+	// two; clear those before exercising SpawnPet's relation broadcast.
+	selfFrames.frames = nil
+	observerFrames.frames = nil
+
+	inst := &item.Instance{ObjectID: 500, TemplateID: summonTestCollarTemplateID, OwnerID: live.ObjectID()}
+	spawner := &gameSummonSpawner{link: link, live: live}
+	if !spawner.SpawnPet(live.Character, inst) {
+		t.Fatalf("SpawnPet returned false")
+	}
+	obj, ok := state.Summon(live.ObjectID())
+	if !ok {
+		t.Fatalf("pet not registered in world.State")
+	}
+	pet := obj.(*summon.Actor)
+
+	if len(selfFrames.frames) != 1 {
+		t.Fatalf("self frames = %d, want 1 (summon self-view)", len(selfFrames.frames))
+	}
+	wantSelf := relationChangedPayload(pet.ObjectID(), serverpackets.RelationHasKarma, 0, 500, 0)
+	if !bytes.Equal(selfFrames.frames[0], wantSelf) {
+		t.Fatalf("self frame = %x, want %x", selfFrames.frames[0], wantSelf)
+	}
+
+	if len(observerFrames.frames) != 1 {
+		t.Fatalf("observer frames = %d, want 1 (summon only, no owner resend)", len(observerFrames.frames))
+	}
+	wantObserver := relationChangedPayload(pet.ObjectID(), serverpackets.RelationHasKarma, 1, 500, 0)
+	if !bytes.Equal(observerFrames.frames[0], wantObserver) {
+		t.Fatalf("observer frame = %x, want %x", observerFrames.frames[0], wantObserver)
 	}
 }
 
