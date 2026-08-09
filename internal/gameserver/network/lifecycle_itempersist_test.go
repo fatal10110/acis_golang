@@ -123,11 +123,10 @@ func (failingItemPersistence) Flush(context.Context, item.FlushBatch) error {
 	return errors.New("flush failed")
 }
 
-// TestUnsummonFlushesPetInventoryPersistence covers the reference's
-// PetInstance.deleteMe calling its inventory's deleteMe: a returned pet's
-// container goes away, so its items must be written and unregistered right
-// there rather than lingering in the pending set behind a despawned pet.
-func TestUnsummonFlushesPetInventoryPersistence(t *testing.T) {
+// TestUnsummonPersistsTransferredPetInventoryItems covers the reference's
+// PetInstance.deleteMe: a returned pet's items move into the owner's
+// inventory, and their already-pending persistence follows that new state.
+func TestUnsummonPersistsTransferredPetInventoryItems(t *testing.T) {
 	store := &recordingItemPersistence{}
 	items := task.NewItemInstances(store, petTestTemplates())
 
@@ -154,15 +153,17 @@ func TestUnsummonFlushesPetInventoryPersistence(t *testing.T) {
 		t.Fatal("handleSummonActionUse returned false for the pet-return command")
 	}
 
-	if _, ok := store.savedCount(0x20000002); !ok {
-		t.Fatal("unsummon did not save the pet inventory's pending item")
+	ownerItem := live.Inventory().ItemByObjectID(inst.ObjectID)
+	if ownerItem == nil {
+		t.Fatal("unsummon did not return the pending pet item to its owner")
 	}
-	if items.Contains(inst) {
-		t.Error("pet item still pending after unsummon")
+	if !items.Contains(inst) {
+		t.Fatal("transferred owner item is no longer pending")
 	}
-
-	inst.AddCount(1)
-	if items.Contains(inst) {
-		t.Error("unsummoned pet inventory still registers mutations")
+	if err := items.Save(context.Background()); err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+	if got, ok := store.savedCount(inst.ObjectID); !ok || got != 25 {
+		t.Fatalf("saved owner item = (%d, %t), want (25, true)", got, ok)
 	}
 }

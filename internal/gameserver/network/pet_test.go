@@ -722,7 +722,7 @@ func TestGameClientLinkRequestGiveItemToPetDispatch(t *testing.T) {
 	if reply[0] != serverpackets.OpcodeInventoryUpdate {
 		t.Fatalf("second reply opcode = %#x, want InventoryUpdate (%#x)", reply[0], serverpackets.OpcodeInventoryUpdate)
 	}
-	if stack := petInv.ItemByTemplateID(item.AdenaID); stack == nil || stack.Count != 25 {
+	if stack := petInv.ItemByTemplateID(item.AdenaID); stack == nil || stack.Snapshot().Count != 25 {
 		t.Fatalf("pet stack = %+v, want 25 adena", stack)
 	}
 }
