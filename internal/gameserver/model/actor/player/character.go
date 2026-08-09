@@ -17,6 +17,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/statbonus"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/rs/zerolog"
 )
@@ -165,6 +166,13 @@ type Character struct {
 	castShift            bool
 	target               world.Tracked
 	log                  zerolog.Logger
+
+	// pvpFlag is the client-visible PvP flag state. pvpFlagHook is the
+	// runtime hook that registers this character with the PvP flag tracker
+	// after it lands a hit on a karma-free victim; see UpdatePvPFlag and
+	// SetPvPFlagHook.
+	pvpFlag     task.PvPFlagState
+	pvpFlagHook func(useFlaggedDuration bool)
 
 	// charges is the Force/Soul charge counter (increaseCharges/
 	// decreaseCharges/clearCharges), auto-cleared by chargeTimer after

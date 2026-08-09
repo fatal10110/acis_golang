@@ -419,6 +419,16 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	c.SetKarmaChangeNotifier(func(karma int) {
 		sendKarmaChangeFrames(live, karma)
 	})
+	c.SetPvPFlagHook(func(useFlaggedDuration bool) {
+		if l.pvpFlags == nil {
+			return
+		}
+		if useFlaggedDuration {
+			l.pvpFlags.AddFlagged(c)
+			return
+		}
+		l.pvpFlags.AddNormal(c)
+	})
 	c.SetLevelUpBroadcaster(func() {
 		l.broadcastLiveFrame(live, func() wire.Frame {
 			return serverpackets.FrameSocialAction(live.ObjectID(), socialActionLevelUp)
