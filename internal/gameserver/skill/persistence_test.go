@@ -50,6 +50,40 @@ func TestSetKnownSkillAttachesPassiveStatsAndReplacesOnRelearn(t *testing.T) {
 	}
 }
 
+func TestApplyTransientPassiveSkillReplacesStatsWithoutLearningSkill(t *testing.T) {
+	table := modelskill.NewTable([]modelskill.Definition{
+		{ID: 5076, Level: 1, Activation: modelskill.ActivationPassive, Funcs: []modelskill.FuncTemplate{{Op: modelskill.FuncAdd, Stat: "pAtk", Value: 7}}},
+		{ID: 5076, Level: 2, Activation: modelskill.ActivationPassive, Funcs: []modelskill.FuncTemplate{{Op: modelskill.FuncAdd, Stat: "pAtk", Value: 15}}},
+	})
+	p := NewPersistence(nil, table)
+	ch := &player.Character{ID: 1}
+	base := ch.PAtk()
+
+	if err := p.ApplyTransientPassiveSkill(ch, 5076, 0, 1); err != nil {
+		t.Fatalf("ApplyTransientPassiveSkill() level 1 error: %v", err)
+	}
+	if got, want := ch.PAtk(), base+7; got != want {
+		t.Fatalf("PAtk() at transient level 1 = %v, want %v", got, want)
+	}
+	if got := ch.SkillLevel(5076); got != 0 {
+		t.Fatalf("SkillLevel(5076) = %d, want 0 for transient passive", got)
+	}
+
+	if err := p.ApplyTransientPassiveSkill(ch, 5076, 1, 2); err != nil {
+		t.Fatalf("ApplyTransientPassiveSkill() level 2 error: %v", err)
+	}
+	if got, want := ch.PAtk(), base+15; got != want {
+		t.Fatalf("PAtk() at transient level 2 = %v, want %v", got, want)
+	}
+
+	if err := p.ApplyTransientPassiveSkill(ch, 5076, 2, 0); err != nil {
+		t.Fatalf("ApplyTransientPassiveSkill() removal error: %v", err)
+	}
+	if got := ch.PAtk(); got != base {
+		t.Fatalf("PAtk() after transient removal = %v, want %v", got, base)
+	}
+}
+
 func TestSetKnownSkillDoesNotApplyStatsForNonPassiveOrUnloadedSkill(t *testing.T) {
 	table := modelskill.NewTable([]modelskill.Definition{
 		{ID: 60, Level: 1, Activation: modelskill.ActivationToggle},

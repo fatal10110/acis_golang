@@ -193,8 +193,9 @@ type Character struct {
 
 	// deathPenaltyLevel is the persisted death-penalty debuff level (skill
 	// 5076), capped at maxDeathPenaltyLevel.
-	deathPenaltyLevel  int
-	deathPenaltyChance int
+	deathPenaltyLevel       int
+	deathPenaltyChance      int
+	updateDeathPenaltySkill func(oldLevel, newLevel int)
 
 	skills skillState
 	cubics cubic.List
