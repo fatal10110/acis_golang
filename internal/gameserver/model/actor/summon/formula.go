@@ -236,6 +236,64 @@ func (a *Actor) MagicCriticalRate() float64 {
 	return a.calcStat(stat.MCriticalRate, 8)
 }
 
+// Accuracy returns this summon's physical accuracy stat.
+func (a *Actor) Accuracy() float64 {
+	return a.calcStat(stat.AccuracyCombat, 0)
+}
+
+// EvasionRate returns this summon's physical evasion stat.
+func (a *Actor) EvasionRate() float64 {
+	return a.calcStat(stat.EvasionRate, 0)
+}
+
+// CriticalRate returns this summon's physical critical rate, given
+// baseCritRate from its npc template, capped at 500 (CreatureStatus.java:
+// 551-554), matching the same cap already used at npc/hostile_attack.go:277.
+func (a *Actor) CriticalRate(baseCritRate float64) float64 {
+	return math.Min(a.calcStat(stat.CriticalRate, baseCritRate), 500)
+}
+
+// MoveSpeed returns this summon's current move speed, matching its run
+// speed: a summon always moves at its run speed, mirroring
+// PetStatus.getMoveSpeed()/SummonStatus's shared run-speed basis.
+func (a *Actor) MoveSpeed(baseRunSpeed float64) float64 {
+	return a.calcStat(stat.RunSpeed, baseRunSpeed)
+}
+
+// hungryHalved reports whether a pet's attack speed should be halved for
+// being under-fed, matching Pet.checkHungryState. Servitors have no feeding
+// state and are never halved.
+func (a *Actor) hungryHalved() bool {
+	if !a.isPet || a.maxMeal <= 0 {
+		return false
+	}
+	return float64(a.fed) < float64(a.maxMeal)*a.hungryLimit
+}
+
+// PAtkSpd returns this summon's physical attack speed, given baseAtkSpd from
+// its npc template (Pet.getStatus().getPAtkSpd() / SummonStatus's shared
+// basis), halved while hungry.
+func (a *Actor) PAtkSpd(baseAtkSpd float64) float64 {
+	if a.hungryHalved() {
+		baseAtkSpd /= 2
+	}
+	return a.calcStat(stat.PowerAttackSpeed, baseAtkSpd)
+}
+
+// magicAtkSpdBase is the fixed magic-attack-speed base every pet and
+// servitor uses (PetStatus.getMAtkSpd / base SummonStatus), independent of
+// npc template.
+const magicAtkSpdBase = 333
+
+// MAtkSpd returns this summon's magic attack speed, halved while hungry.
+func (a *Actor) MAtkSpd() float64 {
+	base := float64(magicAtkSpdBase)
+	if a.hungryHalved() {
+		base /= 2
+	}
+	return a.calcStat(stat.MagicAttackSpeed, base)
+}
+
 // AttackType returns this summon's current physical attack style.
 func (a *Actor) AttackType() item.WeaponType { return item.WeaponFist }
 
