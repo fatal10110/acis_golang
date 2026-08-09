@@ -129,3 +129,73 @@ func TestAwardKillerPKKarmaSkipsSelfKill(t *testing.T) {
 		t.Fatalf("self-kill: (PKKills=%d, KarmaPoints=%d), want (0, 0)", c.PKKills, c.KarmaPoints)
 	}
 }
+
+func TestAwardKillerPvPKillAwardsFlaggedVictimKill(t *testing.T) {
+	victim := &Character{ID: 1}
+	victim.UpdatePvPFlag(task.PvPFlagOn)
+	killer := &Character{ID: 2}
+	updates := 0
+	killer.updateUserInfo = func() { updates++ }
+
+	victim.awardKillerPvPKill(killer)
+
+	if killer.PvPKills != 1 {
+		t.Fatalf("killer.PvPKills = %d, want 1", killer.PvPKills)
+	}
+	if killer.KarmaPoints != 0 {
+		t.Fatalf("killer.KarmaPoints = %d, want 0", killer.KarmaPoints)
+	}
+	if updates != 1 {
+		t.Fatalf("UserInfo updates = %d, want 1", updates)
+	}
+}
+
+func TestAwardKillerPvPKillSkipsUnflaggedVictim(t *testing.T) {
+	victim := &Character{ID: 1}
+	killer := &Character{ID: 2}
+
+	victim.awardKillerPvPKill(killer)
+
+	if killer.PvPKills != 0 {
+		t.Fatalf("killer.PvPKills = %d, want 0", killer.PvPKills)
+	}
+}
+
+func TestAwardKillerPvPKillSkipsWhenVictimHasKarma(t *testing.T) {
+	victim := &Character{ID: 1, KarmaPoints: 500}
+	victim.UpdatePvPFlag(task.PvPFlagOn)
+	killer := &Character{ID: 2}
+
+	victim.awardKillerPvPKill(killer)
+
+	if killer.PvPKills != 0 {
+		t.Fatalf("killer.PvPKills = %d, want 0", killer.PvPKills)
+	}
+}
+
+func TestAwardKillerPvPKillSkipsWhenKillerHasKarma(t *testing.T) {
+	victim := &Character{ID: 1}
+	victim.UpdatePvPFlag(task.PvPFlagOn)
+	killer := &Character{ID: 2, KarmaPoints: 500}
+
+	victim.awardKillerPvPKill(killer)
+
+	if killer.PvPKills != 0 {
+		t.Fatalf("killer.PvPKills = %d, want 0", killer.PvPKills)
+	}
+}
+
+func TestAwardKillerPvPKillSkipsNonPlayerAndNilAndSelf(t *testing.T) {
+	victim := &Character{ID: 1}
+	victim.UpdatePvPFlag(task.PvPFlagOn)
+
+	victim.awardKillerPvPKill(npcKiller{id: 99})
+	victim.awardKillerPvPKill(nil)
+
+	self := &Character{ID: 2}
+	self.UpdatePvPFlag(task.PvPFlagOn)
+	self.awardKillerPvPKill(self)
+	if self.PvPKills != 0 {
+		t.Fatalf("self-kill: PvPKills = %d, want 0", self.PvPKills)
+	}
+}
