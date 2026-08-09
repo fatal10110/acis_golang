@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	gamemanager "github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -113,6 +114,33 @@ func TestPvPZoneMembershipTracksZoneTransitions(t *testing.T) {
 	link.detachLivePlayer(context.Background(), live)
 	if live.InPvPZone() {
 		t.Fatal("detach retained PvP-zone membership")
+	}
+}
+
+func TestSiegeZoneMembershipTracksZoneTransitions(t *testing.T) {
+	state := world.New()
+	live := newTestLivePlayer(t, 100, &frameCapture{})
+	live.zoneActor = &liveZoneActor{live: live}
+	state.Spawn(live, 125, 0, 0, 0)
+	state.AddPlayer(live)
+
+	siege, err := zone.NewSiege(1, mustCuboid(100, 200, -100, 100, -100, 100), commons.NewStatSet())
+	if err != nil {
+		t.Fatal(err)
+	}
+	siege.SetActive(true)
+	zones := zone.NewIndex()
+	zones.Add(siege)
+	link := &GameClientLink{world: state, zones: zones, log: zerolog.Nop()}
+
+	live.zoneActor.revalidate(zones)
+	if !live.InSiegeZone() {
+		t.Fatal("spawning in a siege zone did not set membership")
+	}
+
+	link.updateLivePlayerPosition(live, location.Location{X: 500}, 0)
+	if live.InSiegeZone() {
+		t.Fatal("leaving siege zone retained membership")
 	}
 }
 

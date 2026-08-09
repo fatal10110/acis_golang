@@ -107,10 +107,9 @@ func (c *Character) SetDeathPenaltySkillUpdater(update func(oldLevel, newLevel i
 // Gate, matching the reference's calculateDeathPenaltyBuffLevel: blocked by
 // a Player killer, blocked by Charm of Luck unless the killer is unknown or
 // raid-related, blocked by Phoenix Blessing, and — absent karma — only
-// passes on the chance roll. The reference's additional PvP/siege-zone
-// exemption isn't evaluated here: no zone-membership state exists on
-// Character yet (tracked as a follow-up gap). On a passing gate it fires
-// the raised-updater with the new level, matching the reference's
+// passes on the chance roll. It is also blocked in PvP and siege zones. On a
+// passing gate it fires the raised-updater with the new level, matching the
+// reference's
 // EtcStatusUpdate + DEATH_PENALTY_LEVEL_S1_ADDED send (Player.java:6527-6528).
 func (c *Character) RaiseDeathPenaltyLevel(killer any, roll int) (int, bool) {
 	c.stateMu.Lock()
@@ -120,6 +119,10 @@ func (c *Character) RaiseDeathPenaltyLevel(killer any, roll int) (int, bool) {
 		return c.deathPenaltyLevel, false
 	}
 	if _, byPlayer := killer.(*Character); byPlayer {
+		c.stateMu.Unlock()
+		return c.deathPenaltyLevel, false
+	}
+	if c.InPvPZone() || c.InSiegeZone() {
 		c.stateMu.Unlock()
 		return c.deathPenaltyLevel, false
 	}

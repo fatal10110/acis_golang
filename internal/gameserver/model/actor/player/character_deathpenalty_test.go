@@ -142,6 +142,27 @@ func TestRaiseDeathPenaltyLevelKarmaBypassesChanceRoll(t *testing.T) {
 	}
 }
 
+func TestRaiseDeathPenaltyLevelExemptsPvPAndSiegeZones(t *testing.T) {
+	tests := []struct {
+		name string
+		set  func(*Character)
+	}{
+		{name: "pvp", set: func(c *Character) { c.SetInPvPZone(true) }},
+		{name: "siege", set: func(c *Character) { c.SetInSiegeZone(true) }},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &Character{ID: 1, KarmaPoints: 1}
+			tt.set(c)
+
+			if got, changed := c.RaiseDeathPenaltyLevel(deathPenaltyKiller{}, 100); changed || got != 0 {
+				t.Fatalf("RaiseDeathPenaltyLevel() = (%d, %v), want (0, false)", got, changed)
+			}
+		})
+	}
+}
+
 // TestRaiseDeathPenaltyLevelFiresRaisedUpdaterOnlyOnPass matches the
 // reference's calculateDeathPenaltyBuffLevel (Player.java:6518-6528): the
 // packet-layer notification fires with the new level only when the gate
