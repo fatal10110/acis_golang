@@ -5,8 +5,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
 
 func TestStartPlayerSkillAcceptsKnownActiveSkill(t *testing.T) {
@@ -303,6 +306,79 @@ func TestResolvePlayerToggleRejectsInvalidTarget(t *testing.T) {
 	if def.ID != 288 || target != nil {
 		t.Fatalf("resolved = %+v/%v, want definition with nil target", def, target)
 	}
+}
+
+// TestResolvePlayerToggleAllowsFakeDeathSkillWhileFaking matches
+// PlayerCast.canAttemptCast's exception: `if (_actor.isFakeDeath() &&
+// skill.getId() != 60)` (PlayerCast.java:218-222) rejects every cast while
+// fake-dead except skill 60 itself, so a faking player can always re-cast
+// the toggle to un-fake.
+func TestResolvePlayerToggleAllowsFakeDeathSkillWhileFaking(t *testing.T) {
+	ch := requestCharacterFakingDeath(t)
+	ch.SetSkillLevel(fakeDeathSkillID, 1)
+	defs := requestDefinitions{
+		{ID: fakeDeathSkillID, Level: 1}: {ID: fakeDeathSkillID, Level: 1, Activation: modelskill.ActivationToggle, Target: modelskill.TargetSelf},
+	}
+
+	def, target, err := ResolvePlayerToggle(PlayerToggleRequest{
+		Caster:      ch,
+		SkillID:     fakeDeathSkillID,
+		Definitions: defs,
+	})
+	if err != nil {
+		t.Fatalf("ResolvePlayerToggle() error: %v, want nil while faking for skill %d", err, fakeDeathSkillID)
+	}
+	if def.ID != fakeDeathSkillID || target != ch {
+		t.Fatalf("resolved = %+v/%v, want skill %d targeting the caster", def, target, fakeDeathSkillID)
+	}
+}
+
+// TestResolvePlayerToggleRejectsOtherSkillsWhileFakeDeath asserts the
+// exception above is scoped to skill 60 only: any other toggle stays
+// rejected while faking, matching the same Java condition.
+func TestResolvePlayerToggleRejectsOtherSkillsWhileFakeDeath(t *testing.T) {
+	ch := requestCharacterFakingDeath(t)
+	ch.SetSkillLevel(288, 1)
+	defs := requestDefinitions{
+		{ID: 288, Level: 1}: {ID: 288, Level: 1, Activation: modelskill.ActivationToggle, Target: modelskill.TargetSelf},
+	}
+
+	if _, _, err := ResolvePlayerToggle(PlayerToggleRequest{
+		Caster:      ch,
+		SkillID:     288,
+		Definitions: defs,
+	}); !errors.Is(err, ErrSkillUnavailable) {
+		t.Fatalf("ResolvePlayerToggle() error = %v, want ErrSkillUnavailable while faking for a non-60 skill", err)
+	}
+}
+
+func requestCharacterFakingDeath(t *testing.T) *player.Character {
+	t.Helper()
+	ch := newRequestCharacter(10)
+	live, err := creature.NewLive(location.Location{}, 0, requestGeo{}, ch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ch.Live = live
+
+	e, err := effect.New(effect.Skill{ID: fakeDeathSkillID}, modelskill.EffectTemplate{Name: "FakeDeath"})
+	if err != nil {
+		t.Fatalf("effect.New(FakeDeath) error: %v", err)
+	}
+	e.Effected = ch
+	ch.EffectList().Add(e)
+	return ch
+}
+
+type requestGeo struct{}
+
+func (requestGeo) CanMove(_, _, _, _, _, _ int) bool { return true }
+func (requestGeo) Height(_, _, _ int) int16          { return 0 }
+func (requestGeo) FindPath(_, _ location.Location) ([]location.Location, bool) {
+	return nil, false
+}
+func (requestGeo) ValidLocation(ox, oy, oz, _, _, _ int) location.Location {
+	return location.Location{X: ox, Y: oy, Z: oz}
 }
 
 type requestDefinitions map[modelskill.Ref]modelskill.Definition
