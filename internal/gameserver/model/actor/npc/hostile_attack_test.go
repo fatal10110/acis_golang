@@ -492,8 +492,8 @@ func TestHostileCanSeeQueriesLineOfSightWithActorHeights(t *testing.T) {
 	los := &fakeHostileLineOfSight{result: false}
 	h.SetLineOfSight(los)
 
-	if got := h.CanSee(target); got != false {
-		t.Fatalf("CanSee() = %v, want false (from line-of-sight query result)", got)
+	if got := h.CanSeeTarget(target); got != false {
+		t.Fatalf("CanSeeTarget() = %v, want false (from line-of-sight query result)", got)
 	}
 
 	ox, oy, oz := h.Position()
