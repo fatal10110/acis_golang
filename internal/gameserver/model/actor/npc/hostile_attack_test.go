@@ -1,6 +1,8 @@
 package npc
 
 import (
+	"bytes"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,6 +16,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+	"github.com/rs/zerolog"
 )
 
 // zeroRoll always returns 0, pinning MakeAttackHit's hit/crit/damage-spread
@@ -404,6 +407,32 @@ func TestHostileDieBroadcastsDieToKnownReceivers(t *testing.T) {
 	}
 	if len(observer.frames) != 1 {
 		t.Fatalf("observer received %d frames after a repeat kill, want still 1", len(observer.frames))
+	}
+}
+
+// TestHostileBroadcastFailuresAreLoggedWithoutWorld covers #1241: Hostile's
+// status/die broadcasts, unlike the AI-driven broadcast paths #1236 wired
+// through task.AI.Tick's a.log.Warn(), previously discarded ErrNoWorld
+// silently. TakeDamage on a lethal hit exercises both BroadcastStatus (via
+// ReduceHP's callers) and BroadcastDie in one call.
+func TestHostileBroadcastFailuresAreLoggedWithoutWorld(t *testing.T) {
+	victim := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", HPMax: 10})
+	buf := &bytes.Buffer{}
+	victim.SetLogger(zerolog.New(buf))
+
+	// SetWorld was never called: both broadcasts must fail with
+	// ErrNoWorld, and both failures must be logged instead of discarded.
+	victim.TakeDamage(10, &hostileTarget{id: 2})
+
+	if !victim.Dead() {
+		t.Fatal("victim.Dead() = false after a lethal hit, want true")
+	}
+	got := buf.String()
+	if !strings.Contains(got, "npc: status broadcast") {
+		t.Fatalf("log = %q, want it to contain %q", got, "npc: status broadcast")
+	}
+	if !strings.Contains(got, "npc: die broadcast") {
+		t.Fatalf("log = %q, want it to contain %q", got, "npc: die broadcast")
 	}
 }
 

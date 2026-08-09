@@ -17,6 +17,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+	"github.com/rs/zerolog"
 )
 
 const defaultDriftRange = 200
@@ -51,6 +52,7 @@ type Hostile struct {
 	move   ai.MoveController
 	world  *world.State
 	frames FrameBuilder
+	log    zerolog.Logger
 
 	known world.KnownBuffer
 
@@ -187,6 +189,13 @@ func (h *Hostile) SetWorld(state *world.State) {
 // until both SetWorld and SetFrameBuilder have been called.
 func (h *Hostile) SetFrameBuilder(b FrameBuilder) {
 	h.frames = b
+}
+
+// SetLogger records where a broadcast failure from an internally-triggered
+// status/death update (not routed through the AI think loop) is logged.
+// The zero value discards it.
+func (h *Hostile) SetLogger(log zerolog.Logger) {
+	h.log = log
 }
 
 // SyncPosition moves this NPC's world-grid presence to position. A no-op
@@ -461,7 +470,9 @@ func (h *Hostile) Die(killer creature.DeathActor, rewards creature.Rewarder) boo
 	if !creature.Die(h, killer, rewards) {
 		return false
 	}
-	_ = h.BroadcastDie()
+	if err := h.BroadcastDie(); err != nil {
+		h.log.Warn().Err(err).Msg("npc: die broadcast")
+	}
 	return true
 }
 
