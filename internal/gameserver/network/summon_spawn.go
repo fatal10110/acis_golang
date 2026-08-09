@@ -173,6 +173,7 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 
 	offset := location.Location{X: petSpawnOffset, Y: 0, Z: 0}
 	summon.SpawnBesideOwner(link.world, pet, live, offset)
+	link.broadcastSummonSpawnRelation(live, pet)
 
 	return true
 }
