@@ -16,6 +16,7 @@ func (c *Character) TakeDamage(dmg int, attacker creature.DeathActor) bool {
 	}
 	if dmg > 0 {
 		c.applyNonConsumptionDamageEffects(false)
+		c.notePvPHitFromAttacker(attacker)
 	}
 	c.vitalsMu.Lock()
 	newlyDead := c.absorbCPThenReduceHP(float64(dmg), attacker, false)

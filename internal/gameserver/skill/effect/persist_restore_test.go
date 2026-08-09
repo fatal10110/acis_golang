@@ -62,6 +62,70 @@ func TestSeedRestoreNonPeriodicEffectNeverClaims(t *testing.T) {
 // its OnStart hook (icons, stat application, ExRegenMax, ...) never fired
 // on relog. ApplyRestored is what Persistence.ReplayEffects now calls to
 // replay it through List.Add like a live cast would.
+// TestSaveStateIsTheInverseOfSeedRestore proves SaveState and seedRestore
+// round-trip: an effect scheduled with a persisted count/elapsed reports
+// that same count/elapsed back out once time has actually advanced by the
+// elapsed amount, the way a logout mid-period should re-persist the buff's
+// remaining state rather than resetting or losing it.
+func TestSaveStateIsTheInverseOfSeedRestore(t *testing.T) {
+	e := &Effect{Template: modelskill.EffectTemplate{Count: 5, Time: 10}}
+	e.seedRestore(3, 4) // 3 ticks left, 4s elapsed since the last tick at logout
+	start := time.Unix(1000, 0)
+	e.startSchedule(start)
+
+	count, elapsed := e.SaveState(start)
+	if count != 3 || elapsed != 4 {
+		t.Fatalf("SaveState() at the seeded instant = (%d, %d), want (3, 4)", count, elapsed)
+	}
+
+	count, elapsed = e.SaveState(start.Add(2 * time.Second))
+	if count != 3 || elapsed != 6 {
+		t.Fatalf("SaveState() 2s later = (%d, %d), want (3, 6)", count, elapsed)
+	}
+}
+
+func TestSaveStateOnAFreshEffectReportsNoElapsedTime(t *testing.T) {
+	e := &Effect{Template: modelskill.EffectTemplate{Count: 2, Time: 30}}
+	now := time.Unix(5000, 0)
+	e.startSchedule(now)
+
+	count, elapsed := e.SaveState(now)
+	if count != 2 || elapsed != 0 {
+		t.Fatalf("SaveState() right after a fresh cast = (%d, %d), want (2, 0)", count, elapsed)
+	}
+}
+
+// TestSaveStateFloorsSubSecondElapsedInsteadOfRoundingUp guards against
+// truncating the remaining-until-next-tick duration to whole seconds before
+// subtracting it from the period: doing so floors "remaining" (rounding it
+// down) and so rounds the derived elapsed time up, over-reporting by up to a
+// full second right after a fresh cast. SaveState must floor the elapsed
+// duration itself instead, matching the whole-seconds-so-far semantic
+// startScheduleFromRestoreLocked's delay computation expects on restore.
+func TestSaveStateFloorsSubSecondElapsedInsteadOfRoundingUp(t *testing.T) {
+	e := &Effect{Template: modelskill.EffectTemplate{Count: 1, Time: 30}}
+	start := time.Unix(7000, 0)
+	e.startSchedule(start)
+
+	if _, elapsed := e.SaveState(start.Add(time.Millisecond)); elapsed != 0 {
+		t.Fatalf("SaveState() 1ms after cast = elapsed %d, want 0 (not rounded up to 1)", elapsed)
+	}
+	if _, elapsed := e.SaveState(start.Add(29*time.Second + 999*time.Millisecond)); elapsed != 29 {
+		t.Fatalf("SaveState() just before the tick = elapsed %d, want 29 (not rounded up to 30, which would restore as an immediate tick)", elapsed)
+	}
+}
+
+func TestSaveStateOnANonPeriodicEffectReportsNoElapsedTime(t *testing.T) {
+	e := &Effect{Template: modelskill.EffectTemplate{Count: 1}}
+	now := time.Unix(6000, 0)
+	e.startSchedule(now)
+
+	count, elapsed := e.SaveState(now.Add(time.Hour))
+	if count != 1 || elapsed != 0 {
+		t.Fatalf("SaveState() on a non-periodic effect = (%d, %d), want (1, 0)", count, elapsed)
+	}
+}
+
 func TestApplyRestoredDeliversOnStartToLiveEffectList(t *testing.T) {
 	target := &fakeChargesTarget{}
 	events := []string{}
