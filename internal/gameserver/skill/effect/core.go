@@ -352,12 +352,19 @@ func New(skill Skill, tmpl modelskill.EffectTemplate) (*Effect, error) {
 	}
 
 	skill.Debuff = skill.Debuff || k.debuff
+	// A seed effect's Level is a charge counter (IncreasePower), not the
+	// applied skill level: EffectSeed.java:10 hardcodes _power = 1 at
+	// construction regardless of skill.getLevel().
+	level := skill.Level
+	if k.typ == TypeSeed {
+		level = 1
+	}
 	e := &Effect{
 		Skill:             skill,
 		Template:          tmpl,
 		Type:              k.typ,
 		Flag:              k.flag,
-		Level:             skill.Level,
+		Level:             level,
 		RejectsIfAffected: k.rejectsIfAffected,
 		// Mirrors AbstractEffect._isHerbEffect = _skill.getName().contains("Herb"):
 		// a herb buff is identified by its owning skill's name, not by how it
@@ -540,6 +547,19 @@ func (e *Effect) IncreasePower() {
 		return
 	}
 	e.Level++
+}
+
+// iconLevel reports the level to send on this effect's abnormal-status
+// icon. AbnormalStatusUpdate.addEffect() -> EffectHolder(skill, period)
+// (EffectHolder.java) always uses skill.getLevel(), never a seed's grown
+// _power: a seed's Level field doubles as its charge counter, so its icon
+// must read the fixed skill level instead, unlike every other kind whose
+// Level is the applied skill level already.
+func (e *Effect) iconLevel() int {
+	if e.Type == TypeSeed {
+		return e.Skill.Level
+	}
+	return e.Level
 }
 
 // chanceTriggerTarget is implemented by an actor that tracks its own set of
