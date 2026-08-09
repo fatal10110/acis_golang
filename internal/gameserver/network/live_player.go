@@ -260,6 +260,16 @@ func (l *GameClientLink) castController(live *livePlayer) *actorcast.Controller 
 		live.cast.SetOnAbort(func(interrupted bool) { l.broadcastCastAborted(live, interrupted) })
 		live.cast.SetOnStopAck(func() { sendMagicActionFailed(live) })
 		live.cast.SetOnFinish(func(interrupted bool, def modelskill.Definition, _ any) {
+			// PlayerCast.doCast clears the post-fake-death grace
+			// unconditionally on every completed non-toggle cast
+			// (_actor.clearRecentFakeDeath(), PlayerCast.java:181-185),
+			// never on an aborted/stopped cast. Toggle casts route
+			// through CastToggle/ApplyToggle instead of this observer,
+			// so they never reach here, matching doToggleCast's lack of
+			// a clear.
+			if !interrupted {
+				live.ClearRecentFakeDeath()
+			}
 			if live.combat == nil {
 				return
 			}
