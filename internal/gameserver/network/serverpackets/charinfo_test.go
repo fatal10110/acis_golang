@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 )
 
 func TestFrameCharInfoCoreFields(t *testing.T) {
@@ -41,6 +42,19 @@ func TestFrameCharInfoCoreFields(t *testing.T) {
 	offset += 2 + 4 + 4 + 4
 	if v := binary.LittleEndian.Uint32(got[offset+2*4:]); v != 2369 {
 		t.Fatalf("right-hand template id = %d, want 2369", v)
+	}
+}
+
+func TestFrameCharInfoMirrorsPvPFlag(t *testing.T) {
+	c := &player.Character{Name: "Observer"}
+	c.UpdatePvPFlag(task.PvPFlagOn)
+
+	got := framePayload(t, FrameCharInfo(CharInfoSnapshot{Character: c, Template: &player.Template{}}))
+	offset := 1 + 5*4 + (len(c.Name)+1)*2 + 3*4 + len(charInfoPaperdollOrder)*4 + 4*2 + 4 + 12*2 + 4 + 4*2
+	for _, fieldOffset := range []int{offset, offset + 4*4} {
+		if v := binary.LittleEndian.Uint32(got[fieldOffset:]); v != uint32(task.PvPFlagOn) {
+			t.Fatalf("PvP flag at offset %d = %d, want %d", fieldOffset, v, task.PvPFlagOn)
+		}
 	}
 }
 
