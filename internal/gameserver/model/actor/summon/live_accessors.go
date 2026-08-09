@@ -218,7 +218,11 @@ func (a *Actor) Fed() int {
 // Lifetime returns a servitor's current time-remaining/total-lifetime state,
 // the servitor analogue of a pet's Fed/maxMeal (Servitor.getTimeRemaining/
 // getTotalLifeTime, mirrored by PetInfo.java:26-30's non-Pet branch).
-func (a *Actor) Lifetime() LifetimeState { return a.lifetime }
+func (a *Actor) Lifetime() LifetimeState {
+	a.statusMu.RLock()
+	defer a.statusMu.RUnlock()
+	return a.lifetime
+}
 
 // FollowActive reports whether this actor is following its owner.
 func (a *Actor) FollowActive() bool { return a.followActive }
