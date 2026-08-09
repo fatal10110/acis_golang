@@ -100,6 +100,7 @@ func TestEquipItemStatsWithholdsWeaponPassiveBelowExpertise(t *testing.T) {
 	baseMAtk, basePAtk := ch.MAtk(), ch.PAtk()
 	tmpl, _ := templates.Get(swordTemplateID)
 	inst := inv.AddNew(swordTemplateID, 1, 100)
+	inv.SetEnchantLevel(inst, 4)
 	inv.EquipItem(inst, tmpl)
 
 	if err := p.EquipItemStats(ch, inst, tmpl); err != nil {
@@ -118,6 +119,9 @@ func TestEquipItemStatsWithholdsWeaponPassiveBelowExpertise(t *testing.T) {
 	}
 	if got, want := ch.MAtk(), baseMAtk+8; got != want {
 		t.Fatalf("MAtk() at Expertise grade = %v, want %v (weapon passive restored)", got, want)
+	}
+	if got, want := ch.PAtk(), basePAtk+20+40; got != want {
+		t.Fatalf("PAtk() at +4 and Expertise grade = %v, want %v (weapon +4 passive restored)", got, want)
 	}
 }
 
