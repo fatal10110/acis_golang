@@ -51,6 +51,16 @@ func (c *Character) InPvPZone() bool {
 	return c.insidePvPZone.Load()
 }
 
+// SetInSiegeZone records the live zone engine's current siege membership.
+func (c *Character) SetInSiegeZone(inside bool) {
+	c.insideSiegeZone.Store(inside)
+}
+
+// InSiegeZone reports whether the character is currently in a siege zone.
+func (c *Character) InSiegeZone() bool {
+	return c.insideSiegeZone.Load()
+}
+
 // SetZoneRevalidator records the runtime hook that updates zone occupancy
 // whenever the player's server-authoritative position changes.
 func (c *Character) SetZoneRevalidator(revalidate func(location.Location)) {

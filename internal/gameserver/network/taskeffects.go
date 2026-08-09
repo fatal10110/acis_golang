@@ -60,6 +60,7 @@ func (a *liveZoneActor) revalidate(ix *zone.Index) {
 	defer a.mu.Unlock()
 	ix.Revalidate(a)
 	a.live.SetInPvPZone(a.flags.Has(zone.FlagPvP))
+	a.live.SetInSiegeZone(a.flags.Has(zone.FlagSiege))
 }
 
 func (a *liveZoneActor) revalidateMove(ix *zone.Index, previous location.Location) {
@@ -67,6 +68,7 @@ func (a *liveZoneActor) revalidateMove(ix *zone.Index, previous location.Locatio
 	defer a.mu.Unlock()
 	ix.RevalidateMove(a, previous)
 	a.live.SetInPvPZone(a.flags.Has(zone.FlagPvP))
+	a.live.SetInSiegeZone(a.flags.Has(zone.FlagSiege))
 }
 
 func (a *liveZoneActor) removeFrom(ix *zone.Index, x, y int) {
@@ -74,6 +76,7 @@ func (a *liveZoneActor) removeFrom(ix *zone.Index, x, y int) {
 	defer a.mu.Unlock()
 	ix.RemoveFrom(a, x, y)
 	a.live.SetInPvPZone(a.flags.Has(zone.FlagPvP))
+	a.live.SetInSiegeZone(a.flags.Has(zone.FlagSiege))
 }
 
 // TaskEffects routes periodic task effects to their current live player.
