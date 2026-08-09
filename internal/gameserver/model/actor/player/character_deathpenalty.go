@@ -38,14 +38,45 @@ func (c *Character) SetDeathPenaltyLevel(level int) {
 // ReduceDeathPenaltyLevel lowers the death-penalty debuff level by one, no
 // lower than zero, and reports the resulting level. It is a no-op reporting
 // the unchanged level (0) when already at zero, matching the reference's
-// reduceDeathPenaltyBuffLevel().
+// reduceDeathPenaltyBuffLevel() guard (Player.java:6537-6538). On an actual
+// decrement it fires the reduced-updater with the new level, matching the
+// reference's DEATH_PENALTY_LEVEL_S1_ADDED/DEATH_PENALTY_LIFTED + EtcStatusUpdate
+// send (Player.java:6544-6553).
 func (c *Character) ReduceDeathPenaltyLevel() int {
 	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	if c.deathPenaltyLevel > 0 {
-		c.deathPenaltyLevel--
+	if c.deathPenaltyLevel <= 0 {
+		c.stateMu.Unlock()
+		return c.deathPenaltyLevel
 	}
-	return c.deathPenaltyLevel
+	c.deathPenaltyLevel--
+	level := c.deathPenaltyLevel
+	update := c.updateDeathPenaltyReduced
+	c.stateMu.Unlock()
+
+	if update != nil {
+		update(level)
+	}
+	return level
+}
+
+// SetDeathPenaltyRaisedUpdater records the packet-layer notification fired
+// when a death raises the death-penalty debuff level, matching the
+// reference's EtcStatusUpdate + DEATH_PENALTY_LEVEL_S1_ADDED send inside
+// calculateDeathPenaltyBuffLevel (Player.java:6527-6528).
+func (c *Character) SetDeathPenaltyRaisedUpdater(update func(level int)) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	c.updateDeathPenaltyRaised = update
+}
+
+// SetDeathPenaltyReducedUpdater records the packet-layer notification fired
+// when a Recovery effect reduces the death-penalty debuff level, matching
+// the reference's DEATH_PENALTY_LEVEL_S1_ADDED/DEATH_PENALTY_LIFTED +
+// EtcStatusUpdate send in reduceDeathPenaltyBuffLevel (Player.java:6544-6553).
+func (c *Character) SetDeathPenaltyReducedUpdater(update func(level int)) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	c.updateDeathPenaltyReduced = update
 }
 
 // RaiseDeathPenaltyLevel evaluates the death-penalty increment gate for a
@@ -61,32 +92,45 @@ func (c *Character) ReduceDeathPenaltyLevel() int {
 // raid-related, blocked by Phoenix Blessing, and — absent karma — only
 // passes on the chance roll. The reference's additional PvP/siege-zone
 // exemption isn't evaluated here: no zone-membership state exists on
-// Character yet (tracked as a follow-up gap).
+// Character yet (tracked as a follow-up gap). On a passing gate it fires
+// the raised-updater with the new level, matching the reference's
+// EtcStatusUpdate + DEATH_PENALTY_LEVEL_S1_ADDED send (Player.java:6527-6528).
 func (c *Character) RaiseDeathPenaltyLevel(killer any, roll int) (int, bool) {
 	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
 
 	if c.deathPenaltyLevel >= maxDeathPenaltyLevel {
+		c.stateMu.Unlock()
 		return c.deathPenaltyLevel, false
 	}
 	if _, byPlayer := killer.(*Character); byPlayer {
+		c.stateMu.Unlock()
 		return c.deathPenaltyLevel, false
 	}
 	if c.KarmaPoints <= 0 && roll > deathPenaltyChance {
+		c.stateMu.Unlock()
 		return c.deathPenaltyLevel, false
 	}
 	if c.EffectList().IsAffected(effect.FlagCharmOfLuck) {
 		rr, _ := killer.(raidRelatedKiller)
 		if killer == nil || (rr != nil && rr.RaidRelated()) {
+			c.stateMu.Unlock()
 			return c.deathPenaltyLevel, false
 		}
 	}
 	if c.EffectList().IsAffected(effect.FlagPhoenixBlessing) {
+		c.stateMu.Unlock()
 		return c.deathPenaltyLevel, false
 	}
 
 	c.deathPenaltyLevel++
-	return c.deathPenaltyLevel, true
+	level := c.deathPenaltyLevel
+	update := c.updateDeathPenaltyRaised
+	c.stateMu.Unlock()
+
+	if update != nil {
+		update(level)
+	}
+	return level, true
 }
 
 func clampDeathPenaltyLevel(level int) int {
