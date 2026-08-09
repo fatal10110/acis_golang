@@ -172,15 +172,30 @@ func newTestGameClientLinkWithSkillsShortcutsCrestsKarmaAndLog(t *testing.T, log
 		t.Fatalf("listen: %v", err)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	var handlers sync.WaitGroup
+	var handlers struct {
+		sync.Mutex
+		count int
+	}
+	handlersDone := sync.NewCond(&handlers.Mutex)
 	t.Cleanup(func() {
 		cancel()
 		ln.Close()
-		handlers.Wait()
+		handlers.Lock()
+		defer handlers.Unlock()
+		for handlers.count > 0 {
+			handlersDone.Wait()
+		}
 	})
 	go Serve(ctx, ln, func(ctx context.Context, conn *Conn) {
-		handlers.Add(1)
-		defer handlers.Done()
+		handlers.Lock()
+		handlers.count++
+		handlers.Unlock()
+		defer func() {
+			handlers.Lock()
+			handlers.count--
+			handlersDone.Broadcast()
+			handlers.Unlock()
+		}()
 		gcl.Handle(ctx, conn)
 	}, zerolog.Nop())
 
