@@ -29,6 +29,13 @@ type PlayerSkillRequest struct {
 	Shift       bool
 }
 
+// fakeDeathSkillID is the Fake Death toggle skill. Recasting it while
+// faking must be let through even though the caster is FakeDead(): Java's
+// PlayerCast.canAttemptCast rejects every cast during fake death except this
+// one skill id — `if (_actor.isFakeDeath() && skill.getId() != 60)`
+// (PlayerCast.java:218-222) — so the player can un-toggle it.
+const fakeDeathSkillID = 60
+
 // StartedSkill is a player skill request accepted by the cast controller.
 type StartedSkill struct {
 	Definition modelskill.Definition
@@ -125,7 +132,7 @@ type PlayerToggleRequest struct {
 // looks up the caster's live effect list to decide the on/off branch and
 // drives Controller.CastToggle with the result.
 func ResolvePlayerToggle(req PlayerToggleRequest) (modelskill.Definition, Target, error) {
-	if req.Caster == nil || req.Caster.AlikeDead() || req.SkillID <= 0 || req.Definitions == nil {
+	if req.Caster == nil || req.Caster.Dead() || (req.Caster.FakeDead() && req.SkillID != fakeDeathSkillID) || req.SkillID <= 0 || req.Definitions == nil {
 		return modelskill.Definition{}, nil, ErrSkillUnavailable
 	}
 

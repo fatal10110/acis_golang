@@ -63,17 +63,17 @@ func (s *CharacterStore) Create(ctx context.Context, c *player.Character) error 
 }
 
 // Save persists c's full in-memory stats — level, exp, sp, cur/max
-// HP/CP/MP, and karma/pvpkills/pkkills — the same column set Create writes
-// at character creation plus the reference's storeCharBase columns, so a
-// later reload reflects everything gained since the last save instead of
-// the row's creation-time values.
+// HP/CP/MP, karma/pvpkills/pkkills, and death_penalty_level — the same
+// column set Create writes at character creation plus the reference's
+// storeCharBase columns, so a later reload reflects everything gained
+// since the last save instead of the row's creation-time values.
 func (s *CharacterStore) Save(ctx context.Context, c *player.Character) error {
 	resources := c.ResourceValues()
 	_, err := s.db.ExecContext(ctx,
-		`UPDATE characters SET level = ?, maxHp = ?, curHp = ?, maxCp = ?, curCp = ?, maxMp = ?, curMp = ?, exp = ?, sp = ?, karma = ?, pvpkills = ?, pkkills = ?
+		`UPDATE characters SET level = ?, maxHp = ?, curHp = ?, maxCp = ?, curCp = ?, maxMp = ?, curMp = ?, exp = ?, sp = ?, karma = ?, pvpkills = ?, pkkills = ?, death_penalty_level = ?
 			 WHERE obj_Id = ?`,
 		c.CharLevel, resources.MaxHP, resources.CurrentHP, resources.MaxCP, resources.CurrentCP, resources.MaxMP, resources.CurrentMP,
-		c.Exp, c.SP, c.KarmaPoints, c.PvPKills, c.PKKills, c.ID,
+		c.Exp, c.SP, c.KarmaPoints, c.PvPKills, c.PKKills, c.DeathPenaltyLevel(), c.ID,
 	)
 	if err != nil {
 		return fmt.Errorf("save character %d: %w", c.ID, err)

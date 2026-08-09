@@ -5,6 +5,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+	"github.com/rs/zerolog"
 )
 
 // EffectPoint is a short-lived, invulnerable world actor a signet skill
@@ -21,6 +22,7 @@ type EffectPoint struct {
 	effects *effect.List
 	world   *world.State
 	frames  FrameBuilder
+	log     zerolog.Logger
 }
 
 // NewEffectPoint creates an unspawned EffectPoint from template, attributed
@@ -64,6 +66,11 @@ func (ep *EffectPoint) SetWorld(state *world.State) { ep.world = state }
 // actor's broadcast-worthy state changes into wire frames, keeping
 // serverpackets and wire-encoding knowledge out of the model layer.
 func (ep *EffectPoint) SetFrameBuilder(b FrameBuilder) { ep.frames = b }
+
+// SetLogger records where a broadcast failure from this actor's own
+// periodic tick (not routed through an AI think loop) is logged. The zero
+// value discards it.
+func (ep *EffectPoint) SetLogger(log zerolog.Logger) { ep.log = log }
 
 // Spawn places the actor in the world at (x, y, z), facing heading. It is a
 // no-op until SetWorld has been called.
