@@ -55,6 +55,15 @@ func TestSpawnBesideOwnerRegistersLiveSummon(t *testing.T) {
 	}
 }
 
+func TestActorActingPlayerReturnsDeathActorOwner(t *testing.T) {
+	owner := &liveOwnerStub{id: 100, level: 44}
+	actor := NewServitor(ServitorConfig{ObjectID: 200, Owner: owner, Level: 44})
+
+	if got := actor.ActingPlayer(); got != owner {
+		t.Fatalf("ActingPlayer() = %v, want owner %v", got, owner)
+	}
+}
+
 func TestPetTracksItemSkillReuse(t *testing.T) {
 	pet := NewPet(PetConfig{ObjectID: 2, NPCID: 12077})
 	ref := modelskill.Ref{ID: 2278, Level: 1}

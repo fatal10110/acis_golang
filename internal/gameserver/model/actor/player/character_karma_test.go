@@ -3,6 +3,7 @@ package player
 import (
 	"testing"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 )
 
@@ -50,6 +51,18 @@ func TestAwardKillerPKKarmaAwardsInnocentVictimKill(t *testing.T) {
 	}
 }
 
+func TestAwardKillerPKKarmaAttributesSummonKillToOwner(t *testing.T) {
+	victim := &Character{ID: 1}
+	owner := &Character{ID: 2}
+	killer := summonKiller{owner: owner}
+
+	victim.awardKillerPKKarma(killer)
+
+	if owner.PKKills != 1 || owner.KarmaPoints != 240 {
+		t.Fatalf("owner = (PKKills=%d, KarmaPoints=%d), want (1, 240)", owner.PKKills, owner.KarmaPoints)
+	}
+}
+
 func TestAwardKillerPKKarmaAccumulatesAcrossKills(t *testing.T) {
 	killer := &Character{ID: 2}
 
@@ -89,6 +102,11 @@ func TestAwardKillerPKKarmaSkipsWhenVictimAlreadyHadKarma(t *testing.T) {
 type npcKiller struct{ id int32 }
 
 func (k npcKiller) ObjectID() int32 { return k.id }
+
+type summonKiller struct{ owner creature.DeathActor }
+
+func (k summonKiller) ObjectID() int32                   { return 3 }
+func (k summonKiller) ActingPlayer() creature.DeathActor { return k.owner }
 
 func TestAwardKillerPKKarmaSkipsNonPlayerKiller(t *testing.T) {
 	victim := &Character{ID: 1}
@@ -147,6 +165,19 @@ func TestAwardKillerPvPKillAwardsFlaggedVictimKill(t *testing.T) {
 	}
 	if updates != 1 {
 		t.Fatalf("UserInfo updates = %d, want 1", updates)
+	}
+}
+
+func TestAwardKillerPvPKillAttributesSummonKillToOwner(t *testing.T) {
+	victim := &Character{ID: 1}
+	victim.UpdatePvPFlag(task.PvPFlagOn)
+	owner := &Character{ID: 2}
+	killer := summonKiller{owner: owner}
+
+	victim.awardKillerPvPKill(killer)
+
+	if owner.PvPKills != 1 {
+		t.Fatalf("owner.PvPKills = %d, want 1", owner.PvPKills)
 	}
 }
 
