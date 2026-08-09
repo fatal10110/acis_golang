@@ -103,6 +103,29 @@ func TestStartPlayerSkillClearsRecentFakeDeath(t *testing.T) {
 			t.Fatal("RecentFakeDeath() = false after a rejected cast start, want still running")
 		}
 	})
+
+	t.Run("FUSION start leaves the grace running", func(t *testing.T) {
+		fusionDef := def
+		fusionDef.SkillType = "FUSION"
+		ch := newRequestCharacter(10)
+		ch.SetSkillLevel(3, 1)
+		ch.MarkRecentFakeDeath()
+		ctrl := NewController(&testActor{mp: 100, hp: 100})
+		defs := requestDefinitions{{ID: 3, Level: 1}: fusionDef}
+
+		if _, err := StartPlayerSkill(PlayerSkillRequest{
+			Now: time.Unix(1000, 0), Controller: ctrl, Caster: ch,
+			Selected: requestTarget{id: 20}, SkillID: 3, Definitions: defs,
+		}); err != nil {
+			t.Fatalf("StartPlayerSkill() error: %v", err)
+		}
+		// PlayerAI dispatches FUSION (and SIGNET_CASTTIME) to
+		// doFusionCast instead of doCast (PlayerAI.java:299-301), which
+		// never calls clearRecentFakeDeath.
+		if !ch.RecentFakeDeath() {
+			t.Fatal("RecentFakeDeath() = false after a FUSION cast start, want still running")
+		}
+	})
 }
 
 func TestStartPlayerSkillRejectsUnavailableSkill(t *testing.T) {

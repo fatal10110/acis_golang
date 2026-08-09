@@ -116,13 +116,17 @@ func startResolvedSkill(now time.Time, controller *Controller, caster *player.Ch
 	started.Plan = plan
 
 	// PlayerCast.doCast clears the post-fake-death grace unconditionally
-	// on every successfully started ActivationActive cast — including
-	// FUSION, whose effect landing is scheduled inside the same
-	// super.doCast() call — right after committing to the cast
+	// right after committing to a successfully started cast
 	// (_actor.clearRecentFakeDeath(), PlayerCast.java:181-185). It never
 	// runs for doInstantCast (potions) or doToggleCast, which
 	// startResolvedSkill's ActivationActive-only callers already exclude.
-	caster.ClearRecentFakeDeath()
+	// FUSION and SIGNET_CASTTIME never reach doCast at all — PlayerAI
+	// dispatches them to doFusionCast instead (PlayerAI.java:299-301),
+	// which never calls clearRecentFakeDeath — so they're excluded here
+	// too.
+	if def.SkillType != "FUSION" && def.SkillType != "SIGNET_CASTTIME" {
+		caster.ClearRecentFakeDeath()
+	}
 	return started, nil
 }
 
