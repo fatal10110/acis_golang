@@ -346,6 +346,11 @@ func TestGameClientLinkMagicSkillUseGroundSilentlyIgnoresNonGroundSkill(t *testi
 	if x, y, z := character.GroundTarget(); x != 0 || y != 0 || z != 0 {
 		t.Fatalf("GroundTarget() = (%d,%d,%d), want unchanged (0,0,0)", x, y, z)
 	}
+
+	c.send(encodeRequestExMagicSkillUseGround(1000, 2000, 300, 9999, false, false))
+	if reply := c.readWithTimeout(300 * time.Millisecond); reply != nil {
+		t.Fatalf("unlearned ground-cast reply = opcode %#x, want no reply", reply[0])
+	}
 }
 
 func TestGameClientLinkMagicSkillUseSendsAttackFailedWhenContinuousSkillDoesNotLand(t *testing.T) {
