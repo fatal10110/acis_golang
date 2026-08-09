@@ -4,7 +4,10 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	gameskill "github.com/fatal10110/acis_golang/internal/gameserver/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
 
 func TestLoadSkillDefinitions(t *testing.T) {
@@ -53,6 +56,29 @@ func TestLoadSkillDefinitions(t *testing.T) {
 		}
 		if table.MaxLevel(3) != 9 {
 			t.Fatalf("MaxLevel(3) = %d, want 9", table.MaxLevel(3))
+		}
+	})
+
+	t.Run("death penalty passive resolves at every level", func(t *testing.T) {
+		for level := 1; level <= 15; level++ {
+			def, ok := table.Get(5076, level)
+			if !ok {
+				t.Fatalf("skill 5076 level %d not loaded", level)
+			}
+			if def.Activation != skill.ActivationPassive {
+				t.Fatalf("skill 5076 level %d activation = %v, want passive", level, def.Activation)
+			}
+			funcs, err := effect.PassiveFuncs(def)
+			if err != nil {
+				t.Fatalf("PassiveFuncs(skill 5076 level %d) error: %v", level, err)
+			}
+			if got, want := len(funcs), 9; got != want {
+				t.Fatalf("PassiveFuncs(skill 5076 level %d) = %d funcs, want %d", level, got, want)
+			}
+		}
+
+		if err := gameskill.NewPersistence(nil, table).ApplyTransientPassiveSkill(&player.Character{}, 5076, 0, 15); err != nil {
+			t.Fatalf("ApplyTransientPassiveSkill(skill 5076 level 15) error: %v", err)
 		}
 	})
 
