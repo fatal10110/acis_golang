@@ -360,12 +360,13 @@ func TestPetGetItemPicksUpGroundItemOverPetWeightLimit(t *testing.T) {
 func TestPetGetItemConsumesHerb(t *testing.T) {
 	const herbTemplate int32 = 8600
 	templates := herbTestTemplates()
+	tmpl, _ := templates.Get(herbTemplate)
+	tmpl.AttachedSkills = append(tmpl.AttachedSkills, item.SkillRef{ID: 2279, Level: 1})
 	capture := &frameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
 	state := world.New()
 	state.Spawn(live, 0, 0, 0, 0)
 	pet, petInv := attachTestPet(t, state, live, templates, 12077, nil)
-	tmpl, _ := templates.Get(herbTemplate)
 	ground, err := grounditem.New(item.Instance{ObjectID: 900, TemplateID: herbTemplate, Count: 1, ManaLeft: -1}, tmpl)
 	if err != nil {
 		t.Fatalf("ground item: %v", err)
@@ -379,7 +380,7 @@ func TestPetGetItemConsumesHerb(t *testing.T) {
 		world:         state,
 		groundItems:   drops,
 		items:         store,
-		skills:        herbTestSkill(t),
+		skills:        multiHerbTestSkill(t),
 		targets:       skilltarget.NewRegistry(skilltarget.WorldKnown{State: state}),
 		skillHandlers: handlerskill.NewDefaultRegistry(),
 	}
@@ -391,13 +392,17 @@ func TestPetGetItemConsumesHerb(t *testing.T) {
 		serverpackets.OpcodeDeleteObject,
 		serverpackets.OpcodeMagicSkillUse,
 		serverpackets.OpcodeSystemMessage,
+		serverpackets.OpcodeMagicSkillUse,
+		serverpackets.OpcodeSystemMessage,
 		serverpackets.OpcodeStatusUpdate,
 	)
+	assertSystemMessageSkillFrame(t, capture.frames[3], serverpackets.SystemMessagePetUsesS1, 2278, 1)
+	assertSystemMessageSkillFrame(t, capture.frames[5], serverpackets.SystemMessagePetUsesS1, 2279, 1)
 	if petInv.ItemByTemplateID(herbTemplate) != nil || len(store.saved) != 0 || len(store.updated) != 0 {
 		t.Fatalf("pet inventory/store retained herb: item=%+v saved=%+v updated=%+v", petInv.ItemByTemplateID(herbTemplate), store.saved, store.updated)
 	}
-	if effects := pet.EffectList().All(); len(effects) != 1 || effects[0].Skill.ID != 2278 {
-		t.Fatalf("pet effects = %+v, want herb skill 2278", effects)
+	if effects := pet.EffectList().All(); len(effects) != 2 || effects[0].Skill.ID != 2278 || effects[1].Skill.ID != 2279 {
+		t.Fatalf("pet effects = %+v, want herb skills 2278 then 2279", effects)
 	}
 	if effects := live.EffectList().All(); len(effects) != 0 {
 		t.Fatalf("owner effects = %+v, want none", effects)

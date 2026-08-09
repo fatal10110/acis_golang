@@ -24,7 +24,7 @@ func (l *GameClientLink) useConsumableSkillItem(live *livePlayer, inv *itemconta
 		return false
 	}
 	beforeVitals := live.Vitals()
-	res := itemhandler.Use(itemhandler.UseRequest{
+	results := itemhandler.UseAll(itemhandler.UseRequest{
 		Caster:      live.Character,
 		Inventory:   inv,
 		Item:        inst,
@@ -33,39 +33,40 @@ func (l *GameClientLink) useConsumableSkillItem(live *livePlayer, inv *itemconta
 		Destroyer:   l.inventory,
 		Summon:      l.activeServitorTarget(live),
 	})
-	switch res.Outcome {
-	case itemhandler.NotHandled:
-		return false
-	case itemhandler.PetRejected:
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageItemNotForPets))
-		return true
-	case itemhandler.ReuseRejected:
-		sendMagicCastFailure(live, res.Skill, actorcast.ErrSkillDisabled)
-		return true
-	case itemhandler.NotEnoughItems:
-		sendItemConsumeFailure(live)
-		return true
-	case itemhandler.Applied:
-		if res.SharedReuseGroup >= 0 {
-			live.SendFrame(serverpackets.FrameExUseSharedGroupItem(inst.TemplateID, res.SharedReuseGroup, res.ReuseMillis, res.ReuseMillis))
-		}
-		self := skillCastObject(live)
-		l.broadcastLiveFrame(live, func() wire.Frame {
-			return serverpackets.FrameMagicSkillUse(self, self, int32(res.Skill.ID), int32(res.Skill.Level), 0, 0, false)
-		})
-		if res.MirroredSummon != nil {
-			summonObject := skillCastObject(res.MirroredSummon)
+	for _, res := range results {
+		switch res.Outcome {
+		case itemhandler.NotHandled:
+			return false
+		case itemhandler.PetRejected:
+			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageItemNotForPets))
+			return true
+		case itemhandler.ReuseRejected:
+			sendMagicCastFailure(live, res.Skill, actorcast.ErrSkillDisabled)
+			return true
+		case itemhandler.NotEnoughItems:
+			sendItemConsumeFailure(live)
+			return true
+		case itemhandler.Applied:
+			if res.SharedReuseGroup >= 0 {
+				live.SendFrame(serverpackets.FrameExUseSharedGroupItem(inst.TemplateID, res.SharedReuseGroup, res.ReuseMillis, res.ReuseMillis))
+			}
+			self := skillCastObject(live)
 			l.broadcastLiveFrame(live, func() wire.Frame {
-				return serverpackets.FrameMagicSkillUse(summonObject, summonObject, int32(res.Skill.ID), int32(res.Skill.Level), 0, 0, false)
+				return serverpackets.FrameMagicSkillUse(self, self, int32(res.Skill.ID), int32(res.Skill.Level), 0, 0, false)
 			})
+			if res.MirroredSummon != nil {
+				summonObject := skillCastObject(res.MirroredSummon)
+				l.broadcastLiveFrame(live, func() wire.Frame {
+					return serverpackets.FrameMagicSkillUse(summonObject, summonObject, int32(res.Skill.ID), int32(res.Skill.Level), 0, 0, false)
+				})
+			}
+			live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageUseS1, int32(res.Skill.ID), int32(res.Skill.Level)))
+			res.Apply()
+			sendMagicStatusUpdate(live, beforeVitals)
+			if res.HasShortBuff {
+				live.Character.UpdateShortBuff(res.ShortBuffSkillID, res.ShortBuffLevel, res.ShortBuffDurationSeconds)
+			}
 		}
-		live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageUseS1, int32(res.Skill.ID), int32(res.Skill.Level)))
-		res.Apply()
-		sendMagicStatusUpdate(live, beforeVitals)
-		if res.HasShortBuff {
-			live.Character.UpdateShortBuff(res.ShortBuffSkillID, res.ShortBuffLevel, res.ShortBuffDurationSeconds)
-		}
-		return true
 	}
-	return false
+	return true
 }

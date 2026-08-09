@@ -40,6 +40,13 @@ func (f fakeDefinitions) Definition(ref modelskill.Ref) (modelskill.Definition, 
 	return f.def, true
 }
 
+type fakeDefinitionTable map[modelskill.Ref]modelskill.Definition
+
+func (f fakeDefinitionTable) Definition(ref modelskill.Ref) (modelskill.Definition, bool) {
+	def, ok := f[ref]
+	return def, ok
+}
+
 type fakeDestroyer struct {
 	calls int
 	fail  bool
@@ -305,6 +312,51 @@ func TestUse(t *testing.T) {
 
 		if res.Outcome != NotHandled {
 			t.Fatalf("Outcome = %v, want NotHandled", res.Outcome)
+		}
+	})
+}
+
+func TestUseAll(t *testing.T) {
+	first := modelskill.Definition{ID: 100, Level: 1, Potion: true, ReuseDelay: 1}
+	second := modelskill.Definition{ID: 101, Level: 1, Potion: true, ReuseDelay: 1}
+
+	t.Run("applies each attached instant skill in order", func(t *testing.T) {
+		caster := &fakeCaster{}
+		req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemHerb, first, caster, &fakeDestroyer{}, false)
+		tmpl, _ := req.Inventory.Templates().Get(req.Item.TemplateID)
+		tmpl.AttachedSkills = []modelitem.SkillRef{{ID: int32(first.ID), Level: int32(first.Level)}, {ID: int32(second.ID), Level: int32(second.Level)}}
+		req.Definitions = fakeDefinitionTable{
+			{ID: first.ID, Level: first.Level}:   first,
+			{ID: second.ID, Level: second.Level}: second,
+		}
+
+		results := UseAll(req)
+
+		if len(results) != 2 || results[0].Skill.ID != first.ID || results[1].Skill.ID != second.ID {
+			t.Fatalf("results = %#v, want both skills in attached order", results)
+		}
+		if caster.reuseCalls != 2 {
+			t.Fatalf("AddSkillReuse calls = %d, want 2", caster.reuseCalls)
+		}
+	})
+
+	t.Run("stops at the first reuse-disabled skill", func(t *testing.T) {
+		caster := &fakeCaster{disabled: map[int32]bool{actorcast.ReuseKey(first): true}}
+		req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemHerb, first, caster, &fakeDestroyer{}, false)
+		tmpl, _ := req.Inventory.Templates().Get(req.Item.TemplateID)
+		tmpl.AttachedSkills = []modelitem.SkillRef{{ID: int32(first.ID), Level: int32(first.Level)}, {ID: int32(second.ID), Level: int32(second.Level)}}
+		req.Definitions = fakeDefinitionTable{
+			{ID: first.ID, Level: first.Level}:   first,
+			{ID: second.ID, Level: second.Level}: second,
+		}
+
+		results := UseAll(req)
+
+		if len(results) != 1 || results[0].Outcome != ReuseRejected || results[0].Skill.ID != first.ID {
+			t.Fatalf("results = %#v, want first skill reuse rejection only", results)
+		}
+		if caster.reuseCalls != 0 {
+			t.Fatalf("AddSkillReuse calls = %d, want 0", caster.reuseCalls)
 		}
 	})
 }

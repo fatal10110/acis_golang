@@ -34,7 +34,7 @@ func (l *GameClientLink) consumeHerb(live *livePlayer, itemID int32) {
 	// reads only its template.
 	herb := &item.Instance{TemplateID: itemID, Count: 1, Location: item.LocationVoid}
 	beforeVitals := live.Vitals()
-	res := itemhandler.Use(itemhandler.UseRequest{
+	results := itemhandler.UseAll(itemhandler.UseRequest{
 		Caster:      live.Character,
 		Inventory:   inv,
 		Item:        herb,
@@ -43,26 +43,28 @@ func (l *GameClientLink) consumeHerb(live *livePlayer, itemID int32) {
 		Destroyer:   l.inventory,
 		Summon:      l.activeServitorTarget(live),
 	})
-	if res.Outcome == itemhandler.ReuseRejected {
-		// The herb is already gone by the time its skill is dispatched, so a
-		// still-cooling reuse only reports the reason — the pickup that
-		// consumed it owns the action acknowledgement.
-		sendMagicCastFailureReason(live, res.Skill, actorcast.ErrSkillDisabled)
-		return
-	}
-	if res.Outcome != itemhandler.Applied {
-		return
-	}
-	self := skillCastObject(live)
-	l.broadcastLiveFrame(live, func() wire.Frame {
-		return serverpackets.FrameMagicSkillUse(self, self, int32(res.Skill.ID), int32(res.Skill.Level), 0, 0, false)
-	})
-	if res.MirroredSummon != nil {
-		summonObject := skillCastObject(res.MirroredSummon)
+	for _, res := range results {
+		if res.Outcome == itemhandler.ReuseRejected {
+			// The herb is already gone by the time its skill is dispatched, so a
+			// still-cooling reuse only reports the reason — the pickup that
+			// consumed it owns the action acknowledgement.
+			sendMagicCastFailureReason(live, res.Skill, actorcast.ErrSkillDisabled)
+			return
+		}
+		if res.Outcome != itemhandler.Applied {
+			return
+		}
+		self := skillCastObject(live)
 		l.broadcastLiveFrame(live, func() wire.Frame {
-			return serverpackets.FrameMagicSkillUse(summonObject, summonObject, int32(res.Skill.ID), int32(res.Skill.Level), 0, 0, false)
+			return serverpackets.FrameMagicSkillUse(self, self, int32(res.Skill.ID), int32(res.Skill.Level), 0, 0, false)
 		})
+		if res.MirroredSummon != nil {
+			summonObject := skillCastObject(res.MirroredSummon)
+			l.broadcastLiveFrame(live, func() wire.Frame {
+				return serverpackets.FrameMagicSkillUse(summonObject, summonObject, int32(res.Skill.ID), int32(res.Skill.Level), 0, 0, false)
+			})
+		}
+		res.Apply()
+		sendMagicStatusUpdate(live, beforeVitals)
 	}
-	res.Apply()
-	sendMagicStatusUpdate(live, beforeVitals)
 }

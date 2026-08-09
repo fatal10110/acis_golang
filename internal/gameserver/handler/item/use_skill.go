@@ -125,71 +125,75 @@ type UseRequest struct {
 	Summon actorcast.Target
 }
 
-// Use runs the ItemSkills instant-cast path for one etc item: it
-// discriminates an etc consumable whose handler is ItemSkills or Elixirs,
-// resolves the first carried skill flagged as a potion or
-// simultaneous-cast, rejects a still-cooling reuse, consumes one unit
-// from the clicked stack (skipped for herbs, which apply without
-// consuming), installs the item-driven reuse delay, and applies the
-// skill's effects to the caster, mirroring a herb's effect onto req.Summon
-// when present.
-//
-// It reports NotHandled for anything that isn't such an instant-cast
-// consumable, so the caller's next branch (equip-toggle, etc.) still gets
-// a chance to answer the client.
+// Use preserves the first result for callers that handle one instant-cast
+// skill. New item-use paths should use UseAll.
 func Use(req UseRequest) UseResult {
+	return UseAll(req)[0]
+}
+
+// UseAll runs the ItemSkills instant-cast path for every attached instant
+// skill in template order. Processing stops at the first rejected skill.
+func UseAll(req UseRequest) []UseResult {
 	if req.Caster == nil || req.Inventory == nil || req.Item == nil {
-		return UseResult{Outcome: NotHandled}
+		return []UseResult{{Outcome: NotHandled}}
 	}
 	tmpl, ok := req.Inventory.Templates().Get(req.Item.TemplateID)
 	if !ok || tmpl.Kind != modelitem.KindEtcItem || tmpl.EtcItem == nil {
-		return UseResult{Outcome: NotHandled}
+		return []UseResult{{Outcome: NotHandled}}
 	}
 	handler := tmpl.EtcItem.Handler
 	if handler != ItemSkillsHandler && handler != ElixirsHandler {
-		return UseResult{Outcome: NotHandled}
+		return []UseResult{{Outcome: NotHandled}}
 	}
 	if handler == ElixirsHandler && req.IsPet {
-		return UseResult{Outcome: PetRejected}
+		return []UseResult{{Outcome: PetRejected}}
 	}
 	if req.IsPet && !tmpl.Tradable {
-		return UseResult{Outcome: PetRejected}
+		return []UseResult{{Outcome: PetRejected}}
 	}
 	if len(tmpl.AttachedSkills) == 0 {
-		return UseResult{Outcome: NotHandled}
+		return []UseResult{{Outcome: NotHandled}}
 	}
 
-	def, ok := resolveInstantItemSkill(tmpl.AttachedSkills, req.Definitions)
-	if !ok {
-		return UseResult{Outcome: NotHandled}
-	}
-
-	reuseKey := actorcast.ReuseKey(def)
-	if req.Caster.SkillDisabled(reuseKey) {
-		return UseResult{Outcome: ReuseRejected, Skill: def}
-	}
-
-	if tmpl.EtcItem.Type != modelitem.EtcItemHerb {
-		if _, ok := req.Destroyer.DestroyItem(req.Inventory, req.Item.ObjectID, 1); !ok {
-			return UseResult{Outcome: NotEnoughItems, Skill: def}
+	results := make([]UseResult, 0, len(tmpl.AttachedSkills))
+	consumed := tmpl.EtcItem.Type == modelitem.EtcItemHerb
+	for _, ref := range tmpl.AttachedSkills {
+		def, ok := resolveInstantItemSkillRef(ref, req.Definitions)
+		if !ok {
+			continue
 		}
-	}
 
-	reuse := installItemReuse(req.Caster, def, reuseKey, tmpl.EtcItem.ReuseDelay)
-	mirrorToSummon := tmpl.EtcItem.Type == modelitem.EtcItemHerb && !req.IsPet && req.Summon != nil
-	apply := func() {
-		actorcast.ApplyEffects(req.Effects, req.Caster, req.Caster, def)
+		reuseKey := actorcast.ReuseKey(def)
+		if req.Caster.SkillDisabled(reuseKey) {
+			return append(results, UseResult{Outcome: ReuseRejected, Skill: def})
+		}
+		if !consumed {
+			if _, ok := req.Destroyer.DestroyItem(req.Inventory, req.Item.ObjectID, 1); !ok {
+				return append(results, UseResult{Outcome: NotEnoughItems, Skill: def})
+			}
+			consumed = true
+		}
+
+		reuse := installItemReuse(req.Caster, def, reuseKey, tmpl.EtcItem.ReuseDelay)
+		mirrorToSummon := tmpl.EtcItem.Type == modelitem.EtcItemHerb && !req.IsPet && req.Summon != nil
+		apply := func() {
+			actorcast.ApplyEffects(req.Effects, req.Caster, req.Caster, def)
+			if mirrorToSummon {
+				actorcast.ApplyEffects(req.Effects, req.Summon, req.Summon, def)
+			}
+		}
+
+		result := UseResult{Outcome: Applied, Skill: def, Apply: apply, SharedReuseGroup: tmpl.EtcItem.SharedReuseGroup, ReuseMillis: reuse}
 		if mirrorToSummon {
-			actorcast.ApplyEffects(req.Effects, req.Summon, req.Summon, def)
+			result.MirroredSummon = req.Summon
 		}
+		result.HasShortBuff, result.ShortBuffSkillID, result.ShortBuffLevel, result.ShortBuffDurationSeconds = shortBuffDecision(req.Caster, def)
+		results = append(results, result)
 	}
-
-	result := UseResult{Outcome: Applied, Skill: def, Apply: apply, SharedReuseGroup: tmpl.EtcItem.SharedReuseGroup, ReuseMillis: reuse}
-	if mirrorToSummon {
-		result.MirroredSummon = req.Summon
+	if len(results) == 0 {
+		return []UseResult{{Outcome: NotHandled}}
 	}
-	result.HasShortBuff, result.ShortBuffSkillID, result.ShortBuffLevel, result.ShortBuffDurationSeconds = shortBuffDecision(req.Caster, def)
-	return result
+	return results
 }
 
 // shortBuffDecision decides whether def should drive the item-window
@@ -214,19 +218,23 @@ func shortBuffDecision(caster SkillCaster, def modelskill.Definition) (ok bool, 
 // resolves to a potion or simultaneous-cast definition. None matching
 // leaves the item to the caller's fallback.
 func resolveInstantItemSkill(refs []modelitem.SkillRef, defs actorcast.Definitions) (modelskill.Definition, bool) {
-	if defs == nil {
-		return modelskill.Definition{}, false
-	}
 	for _, ref := range refs {
-		def, ok := defs.Definition(modelskill.Ref{ID: modelskill.ID(ref.ID), Level: int(ref.Level)})
-		if !ok {
-			continue
-		}
-		if def.Potion || def.SimultaneousCast {
+		if def, ok := resolveInstantItemSkillRef(ref, defs); ok {
 			return def, true
 		}
 	}
 	return modelskill.Definition{}, false
+}
+
+func resolveInstantItemSkillRef(ref modelitem.SkillRef, defs actorcast.Definitions) (modelskill.Definition, bool) {
+	if defs == nil {
+		return modelskill.Definition{}, false
+	}
+	def, ok := defs.Definition(modelskill.Ref{ID: modelskill.ID(ref.ID), Level: int(ref.Level)})
+	if !ok || (!def.Potion && !def.SimultaneousCast) {
+		return modelskill.Definition{}, false
+	}
+	return def, true
 }
 
 // ResolveAICastSkill returns the first carried skill of tmpl that resolves
