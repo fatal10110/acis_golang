@@ -176,6 +176,12 @@ type Character struct {
 	pvpFlag     task.PvPFlagState
 	pvpFlagHook func(useFlaggedDuration bool)
 
+	// broadcastRelations is the runtime hook fired after pvpFlag or
+	// KarmaPoints actually changes, mirroring updatePvPFlag/setKarma's
+	// shared tail: notify an owned summon and every nearby observer that
+	// this character's relation icon changed. See SetRelationBroadcaster.
+	broadcastRelations func()
+
 	// charges is the Force/Soul charge counter (increaseCharges/
 	// decreaseCharges/clearCharges), auto-cleared by chargeTimer after
 	// chargeAutoClearDelay of inactivity.

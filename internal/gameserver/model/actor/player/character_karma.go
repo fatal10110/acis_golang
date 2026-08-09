@@ -53,17 +53,13 @@ func (c *Character) awardKillerPKKarma(killer creature.DeathActor) {
 	pk.KarmaPoints += calculatePKKillKarmaGain(pk.PKKills)
 	pk.notifyKarmaChanged()
 	pk.UpdateUserInfo()
+	pk.BroadcastRelations()
 }
 
 // SetKarmaChangeNotifier records the packet-layer hook that tells this
 // character's own client its new karma total, mirroring setKarma's
 // SystemMessage(YOUR_KARMA_HAS_BEEN_CHANGED_TO_S1) + StatusUpdate(KARMA)
-// pair (Player.java:1076-1080). The reference also sends a RelationChanged
-// packet for an owned summon and broadcasts the relation change to nearby
-// observers (so their client recolors this player's name); neither summon
-// messaging nor a relation/name-color broadcast exists in this port yet —
-// see the #1267 follow-up — so this hook only ever covers the self-only
-// feedback.
+// pair (Player.java:1076-1080).
 func (c *Character) SetKarmaChangeNotifier(notify func(karma int)) {
 	c.stateMu.Lock()
 	defer c.stateMu.Unlock()

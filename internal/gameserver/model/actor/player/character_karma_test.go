@@ -31,6 +31,8 @@ func TestAwardKillerPKKarmaAwardsInnocentVictimKill(t *testing.T) {
 	killer := &Character{ID: 2}
 	var notified []int
 	killer.SetKarmaChangeNotifier(func(karma int) { notified = append(notified, karma) })
+	broadcasts := 0
+	killer.SetRelationBroadcaster(func() { broadcasts++ })
 
 	victim.awardKillerPKKarma(killer)
 
@@ -42,6 +44,9 @@ func TestAwardKillerPKKarmaAwardsInnocentVictimKill(t *testing.T) {
 	}
 	if want := []int{240}; len(notified) != 1 || notified[0] != want[0] {
 		t.Fatalf("karma-change notifications = %v, want %v", notified, want)
+	}
+	if broadcasts != 1 {
+		t.Fatalf("relation broadcasts = %d, want 1", broadcasts)
 	}
 }
 
@@ -64,6 +69,8 @@ func TestAwardKillerPKKarmaSkipsWhenVictimAlreadyHadKarma(t *testing.T) {
 	killer := &Character{ID: 2}
 	notified := false
 	killer.SetKarmaChangeNotifier(func(int) { notified = true })
+	broadcast := false
+	killer.SetRelationBroadcaster(func() { broadcast = true })
 
 	victim.awardKillerPKKarma(killer)
 
@@ -72,6 +79,9 @@ func TestAwardKillerPKKarmaSkipsWhenVictimAlreadyHadKarma(t *testing.T) {
 	}
 	if notified {
 		t.Fatalf("karma-change notifier fired, want no notification when the award is skipped")
+	}
+	if broadcast {
+		t.Fatalf("relation broadcaster fired, want no broadcast when the award is skipped")
 	}
 }
 
