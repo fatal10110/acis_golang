@@ -43,6 +43,18 @@ func (p *livePlayer) Discover(obj world.Tracked) {
 }
 
 func (p *livePlayer) Forget(obj world.Tracked) {
+	if o, ok := obj.(*summon.Actor); ok {
+		// A summon's removal signal to its owner is always PetDelete
+		// (Summon.java's doUnsummon sends it unconditionally before
+		// decayMe(), regardless of why the summon is leaving), not the
+		// generic DeleteObject other Tracked kinds get. Mirrors Discover's
+		// ownership rule: a non-owner observer never got a PetInfo/spawn
+		// frame for this summon, so it gets no delete frame either.
+		if o.OwnerID() == p.ObjectID() {
+			p.sendVisibilityFrame(serverpackets.FramePetDelete(o.SummonType(), o.ObjectID()))
+		}
+		return
+	}
 	if !rendersObject(obj) {
 		return
 	}

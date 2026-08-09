@@ -144,6 +144,16 @@ func TestLivePlayerVisibilitySendsPetInfoOnlyToOwner(t *testing.T) {
 			t.Fatalf("bystander frames = %x, want no PetInfo (SummonInfo not ported yet)", bystanderFrames.frames)
 		}
 	}
+
+	state.Despawn(pet)
+	if n := len(ownerFrames.frames); n == 0 || ownerFrames.frames[n-1][0] != serverpackets.OpcodePetDelete {
+		t.Fatalf("owner last frame after pet despawn = %x, want PetDelete (%#x) last", ownerFrames.frames, serverpackets.OpcodePetDelete)
+	}
+	for _, f := range bystanderFrames.frames {
+		if f[0] == serverpackets.OpcodePetDelete {
+			t.Fatalf("bystander frames after pet despawn = %x, want no PetDelete (it never saw the pet spawn)", bystanderFrames.frames)
+		}
+	}
 }
 
 func TestPetInfoSnapshotPetUsesPerLevelShotCounts(t *testing.T) {
