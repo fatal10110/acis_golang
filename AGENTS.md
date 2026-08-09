@@ -7,14 +7,16 @@ structure.
 ## Working directory contract
 
 - Launch and keep the shell at the outer `acis_public/` workspace containing `acis_golang/`,
-  `aCis_gameserver/`, and `aCis_datapack/`. Do not persistently `cd acis_golang` or retry commands by
-  alternately adding and removing that prefix.
-- Shell paths and command examples are outer-root-relative. Use `git -C acis_golang ...` for Git and
-  `rtk go -C acis_golang ...` (or `go -C acis_golang ...`) for Go. Root tools and caches remain
-  `scripts/...`, `.claude/...`, and `.agent-cache/...`.
+  `aCis_gameserver/`, and `aCis_datapack/`. Do not persistently `cd` into a Go checkout or retry
+  commands by alternately adding and removing its prefix.
+- Shell paths and command examples are outer-root-relative. Let `<go-root>` be `acis_golang/` for the
+  primary checkout or its linked-worktree path (for example, `acis_golang-worktrees/issue-1313/`); use
+  `git -C <go-root> ...` and `rtk go -C <go-root> ...` (or `go -C <go-root> ...`). The shared datapack
+  is always `aCis_datapack/` at the outer root—never derive it relative to `<go-root>`. Root tools and
+  caches remain `scripts/...`, `.claude/...`, and `.agent-cache/...`.
 - Bare Go paths in prose, such as `internal/...` or `cmd/...`, identify locations inside
-  `acis_golang/`; prefix them with `acis_golang/` for shell file operations unless the command uses
-  `-C acis_golang`.
+  `<go-root>`; prefix them with the active outer-root-relative Go checkout for shell file operations
+  unless the command uses `-C <go-root>`.
 
 ## Authority and scope
 
