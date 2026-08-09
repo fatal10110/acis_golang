@@ -51,11 +51,11 @@ func TestSeedHandlerRecastGrowsExistingEffectInPlaceInsteadOfDuplicating(t *test
 	}
 }
 
-// Recasting the same seed skill restarting the duration of every other
-// currently active seed effect (List.RescheduleSeeds) is verified precisely
-// in the effect package's own tests, which have access to the unexported
-// schedule state; here we only check that an unrelated seed on the same
-// target survives untouched (not removed or leveled) by the recast.
+// Recasting one seed skill must not disturb an unrelated seed already
+// active on the same target — no reschedule, no level change. That the
+// recast also leaves the recast seed's own deadline unmoved is verified in
+// the effect package's own tests, which have access to the unexported
+// schedule state.
 func TestSeedHandlerRecastLeavesOtherActiveSeedsInPlace(t *testing.T) {
 	target := newContinuousFake(1)
 	fire := Cast{Caster: newContinuousFake(2), Skill: seedOfFire(), Targets: []any{target}}

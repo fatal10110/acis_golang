@@ -628,6 +628,30 @@ func TestListIconEntriesSkipsEffectsWithoutShowIconOrNotActive(t *testing.T) {
 	}
 }
 
+// TestListIconEntriesSeedShowsSkillLevelNotGrownPower guards
+// AbnormalStatusUpdate.addEffect(skill, ...) -> EffectHolder(skill, period)
+// (EffectHolder.java), which always sends skill.getLevel() for the icon —
+// never EffectSeed._power. A seed's Level field doubles as its charge
+// counter (grown by IncreasePower), so the icon must read Skill.Level
+// instead of the grown Level.
+func TestListIconEntriesSeedShowsSkillLevelNotGrownPower(t *testing.T) {
+	list := NewList(nil)
+
+	seed := &Effect{
+		Skill:    Skill{ID: 1285, Level: 1},
+		Type:     TypeSeed,
+		Template: modelskill.EffectTemplate{Name: "Seed", Time: 5, Icon: true},
+		Level:    4, // grown via three IncreasePower() calls
+	}
+	seed.OnStart = func(*Effect) bool { return true }
+	list.Add(seed)
+
+	entries := list.IconEntries(time.Now())
+	if len(entries) != 1 || entries[0].Level != 1 {
+		t.Fatalf("IconEntries() = %+v, want skill level 1, not grown power 4", entries)
+	}
+}
+
 func TestListIconEntriesReportsToggleAndRepeatCountDurations(t *testing.T) {
 	list := NewList(nil)
 

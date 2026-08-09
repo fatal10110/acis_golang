@@ -110,27 +110,34 @@ func (a *Actor) TickPet(state *world.State) PetTickResult {
 	if a.combat {
 		consume = a.mealInBattle
 	}
+
+	a.statusMu.Lock()
 	a.fed = petmodel.NextFed(a.fed, consume)
 	a.belowUnsummonLimit = petmodel.BelowShare(a.fed, a.maxMeal, a.unsummonLimit)
+	fed := a.fed
+	a.statusMu.Unlock()
 
-	result := PetTickResult{Fed: a.fed}
-	if a.petInventory != nil && petmodel.BelowShare(a.fed, a.maxMeal, a.autoFeedLimit) {
+	result := PetTickResult{Fed: fed}
+	if a.petInventory != nil && petmodel.BelowShare(fed, a.maxMeal, a.autoFeedLimit) {
 		food := a.petInventory.ItemByTemplateID(a.food1)
 		if food == nil && a.food2 != 0 {
 			food = a.petInventory.ItemByTemplateID(a.food2)
 		}
 		if food != nil && a.petInventory.DestroyItem(food, 1) != nil {
+			a.statusMu.Lock()
 			a.fed += a.foodRestore
 			if a.fed > a.maxMeal {
 				a.fed = a.maxMeal
 			}
 			a.belowUnsummonLimit = petmodel.BelowShare(a.fed, a.maxMeal, a.unsummonLimit)
+			fed = a.fed
+			a.statusMu.Unlock()
 			result.AutoFed = true
-			result.Fed = a.fed
+			result.Fed = fed
 			return result
 		}
 	}
-	result.Starvation = petmodel.Classify(a.fed, a.maxMeal)
+	result.Starvation = petmodel.Classify(fed, a.maxMeal)
 	if result.Starvation != petmodel.StarvationNone && a.roll(100) < result.Starvation.LeaveChancePercent() {
 		a.despawn(state)
 		result.LeftOwner = true
@@ -167,6 +174,9 @@ func (a *Actor) resolveRequest(ctx CommandContext) Request {
 	if a.owner != nil {
 		ownerLevel = a.owner.LevelValue()
 	}
+	a.statusMu.RLock()
+	level, belowUnsummonLimit := a.level, a.belowUnsummonLimit
+	a.statusMu.RUnlock()
 	return Request{
 		Command:                ctx.Command,
 		HasSummon:              a != nil,
@@ -182,8 +192,8 @@ func (a *Actor) resolveRequest(ctx CommandContext) Request {
 		IsPassiveSummon:        a.passive,
 		FollowActive:           a.followActive,
 		OwnerWithinFollowRange: a.ownerWithinFollowRange(),
-		SummonLevel:            a.level,
+		SummonLevel:            level,
 		OwnerLevel:             ownerLevel,
-		BelowUnsummonFeedShare: a.belowUnsummonLimit,
+		BelowUnsummonFeedShare: belowUnsummonLimit,
 	}
 }

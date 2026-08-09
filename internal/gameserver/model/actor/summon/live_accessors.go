@@ -20,7 +20,11 @@ func (a *Actor) OwnerID() int32 {
 }
 
 // Level returns the summon's current level.
-func (a *Actor) Level() int { return a.level }
+func (a *Actor) Level() int {
+	a.statusMu.RLock()
+	defer a.statusMu.RUnlock()
+	return a.level
+}
 
 // IsPet reports whether this live summon is a pet rather than a servitor.
 func (a *Actor) IsPet() bool { return a.isPet }
@@ -38,11 +42,19 @@ func (a *Actor) NPCID() int { return a.npcID }
 
 // Name returns this summon's display name: the npc template name it was
 // spawned with, or a saved pet's own restored name.
-func (a *Actor) Name() string { return a.name }
+func (a *Actor) Name() string {
+	a.statusMu.RLock()
+	defer a.statusMu.RUnlock()
+	return a.name
+}
 
 // SetName overrides this summon's display name, e.g. from a restored save
 // row or an owner-issued rename.
-func (a *Actor) SetName(name string) { a.name = name }
+func (a *Actor) SetName(name string) {
+	a.statusMu.Lock()
+	defer a.statusMu.Unlock()
+	a.name = name
+}
 
 // ScaledExpGain returns rawExp multiplied by this pet's configured
 // experience rate.
@@ -124,7 +136,7 @@ func (a *Actor) CanUseSkill() bool {
 	if a.owner != nil {
 		ownerLevel = a.owner.LevelValue()
 	}
-	return a.level-ownerLevel <= 20
+	return a.Level()-ownerLevel <= 20
 }
 
 // TryUseSkill dispatches an owner-commanded special-skill cast: resolves
@@ -197,7 +209,11 @@ func (a *Actor) PetInventory() *itemcontainer.Inventory {
 }
 
 // Fed returns a pet's current meal gauge.
-func (a *Actor) Fed() int { return a.fed }
+func (a *Actor) Fed() int {
+	a.statusMu.RLock()
+	defer a.statusMu.RUnlock()
+	return a.fed
+}
 
 // Lifetime returns a servitor's current time-remaining/total-lifetime state,
 // the servitor analogue of a pet's Fed/maxMeal (Servitor.getTimeRemaining/

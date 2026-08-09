@@ -302,7 +302,7 @@ func (l *List) IconEntries(now time.Time) []IconEntry {
 		if !ok {
 			continue
 		}
-		entries = append(entries, IconEntry{ID: int32(e.Skill.ID), Level: e.Level, Toggle: e.Skill.Toggle, Duration: duration})
+		entries = append(entries, IconEntry{ID: int32(e.Skill.ID), Level: e.iconLevel(), Toggle: e.Skill.Toggle, Duration: duration})
 	}
 	return entries
 }

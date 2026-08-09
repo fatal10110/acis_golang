@@ -573,9 +573,16 @@ func (c *Character) MP() int {
 	return c.CurrentMP()
 }
 
-// ClearRecentFakeDeath clears the recent fake-death state. Fake death is not
-// modeled yet, so this is a no-op.
-func (c *Character) ClearRecentFakeDeath() {}
+// ClearRecentFakeDeath cancels the post-fake-death grace period. An attack
+// or completed cast zeroes it unconditionally, matching
+// Player.clearRecentFakeDeath() (`_recentFakeDeathEndTime = 0;`,
+// Player.java:2130-2133), called unconditionally from PlayerAttack.doAttack
+// (PlayerAttack.java:23) and PlayerCast.doCast (PlayerCast.java:184).
+func (c *Character) ClearRecentFakeDeath() {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	c.recentFakeDeathUntil = time.Time{}
+}
 
 // ClientActionFailed sends the client-action-failed notification. The packet
 // is not modeled yet, so this is a no-op.
