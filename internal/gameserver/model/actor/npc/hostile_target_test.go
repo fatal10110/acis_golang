@@ -29,6 +29,13 @@ func (t *gateTarget) InPeaceZone() bool     { return t.peace }
 func (t *gateTarget) Karma() int            { return t.karma }
 func (t *gateTarget) RecentFakeDeath() bool { return t.recentFakeDeath }
 
+type ownedGateTarget struct {
+	*gateTarget
+	owner attackable.Combatant
+}
+
+func (t *ownedGateTarget) OwnerCombatant() attackable.Combatant { return t.owner }
+
 func newKindHostile(t testing.TB, id int32, tpl *Template, kind InstanceKind) *Hostile {
 	t.Helper()
 	h, err := NewHostile(&Instance{ObjectID: id, Template: tpl, Kind: kind}, newHostileLive(t), &hostileMove{}, &hostileAttack{})
@@ -138,6 +145,22 @@ func TestHostileAutoAttackTargetValid(t *testing.T) {
 				t.Fatalf("AutoAttackTargetValid() = %v, want %v", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestHostileAutoAttackTargetValidExcludesOwnedSummonWhileOwnerRecentFakeDeath(t *testing.T) {
+	state := world.New()
+	attacker := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", AggroRange: 10})
+	state.Spawn(attacker, 100, 100, 0, 0)
+
+	target := &ownedGateTarget{
+		gateTarget: &gateTarget{id: 3},
+		owner:      &gateTarget{id: 2, recentFakeDeath: true},
+	}
+	state.Spawn(target, 100, 100, 0, 0)
+
+	if attacker.AutoAttackTargetValid(target, 500, true) {
+		t.Fatal("AutoAttackTargetValid() = true for summon with a recently revived owner, want false")
 	}
 }
 

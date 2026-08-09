@@ -52,7 +52,11 @@ func (h *Hostile) AutoAttackTargetValid(target attackable.Combatant, rangeVal in
 
 	_, targetIsNPC := target.(*Hostile)
 	if !targetIsNPC {
-		if recent, ok := target.(interface{ RecentFakeDeath() bool }); ok && recent.RecentFakeDeath() {
+		graceTarget := target
+		if owned, ok := target.(interface{ OwnerCombatant() attackable.Combatant }); ok {
+			graceTarget = owned.OwnerCombatant()
+		}
+		if recent, ok := graceTarget.(interface{ RecentFakeDeath() bool }); ok && recent.RecentFakeDeath() {
 			return false
 		}
 	}
