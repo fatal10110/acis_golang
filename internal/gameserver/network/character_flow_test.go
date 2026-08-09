@@ -184,6 +184,67 @@ func TestGameClientLinkEnterWorldReGrantsFreeSkills(t *testing.T) {
 	t.Fatalf("SkillList (%d entries) missing free grant skill 900001 re-derived on login", count)
 }
 
+func TestGameClientLinkEnterWorldRestoresDeathPenaltyPassiveStats(t *testing.T) {
+	skills := skillstate.NewPersistence(nil, skillTable(modelskill.Definition{
+		ID: 5076, Level: 2, Activation: modelskill.ActivationPassive,
+		Funcs: []modelskill.FuncTemplate{{Op: modelskill.FuncAdd, Stat: "pAtk", Value: 7}},
+	}))
+	var basePAtk float64
+	c, chars, _, state := newLinkedGameClientWithSkillsSeed(t, skills, func(chars *fakeCharStore, _ *fakeItemStore) {
+		objID := seedSelectableCharacter(t, chars, "player1", "Newbie", 1, 0)
+		chars.byID[objID].SetDeathPenaltyLevel(2)
+		basePAtk = chars.byID[objID].PAtk()
+	}, 1)
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	live, ok := state.Player(chars.soleObjectID(t))
+	if !ok {
+		t.Fatal("world player missing after EnterWorld")
+	}
+	character := live.(*livePlayer).Character
+	if got, want := character.PAtk(), basePAtk+7; got != want {
+		t.Fatalf("PAtk() after restoring death penalty = %v, want %v", got, want)
+	}
+	if got := character.SkillLevel(5076); got != 0 {
+		t.Fatalf("SkillLevel(5076) = %d, want 0 for transient death penalty", got)
+	}
+}
+
+func TestGameClientLinkEnterWorldSkipsDeathPenaltyPassiveAtZero(t *testing.T) {
+	skills := skillstate.NewPersistence(nil, skillTable(modelskill.Definition{
+		ID: 5076, Level: 1, Activation: modelskill.ActivationPassive,
+		Funcs: []modelskill.FuncTemplate{{Op: modelskill.FuncAdd, Stat: "pAtk", Value: 7}},
+	}))
+	var basePAtk float64
+	c, chars, _, state := newLinkedGameClientWithSkillsSeed(t, skills, func(chars *fakeCharStore, _ *fakeItemStore) {
+		objID := seedSelectableCharacter(t, chars, "player1", "Newbie", 1, 0)
+		basePAtk = chars.byID[objID].PAtk()
+	}, 1)
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	live, ok := state.Player(chars.soleObjectID(t))
+	if !ok {
+		t.Fatal("world player missing after EnterWorld")
+	}
+	character := live.(*livePlayer).Character
+	if got := character.PAtk(); got != basePAtk {
+		t.Fatalf("PAtk() at death penalty level 0 = %v, want %v", got, basePAtk)
+	}
+	if got := character.SkillLevel(5076); got != 0 {
+		t.Fatalf("SkillLevel(5076) = %d, want 0 for transient death penalty", got)
+	}
+}
+
 func TestGameClientLinkCreateInvalidNameKeepsConnectionOpen(t *testing.T) {
 	c, _, _, _ := newLinkedGameClient(t)
 
