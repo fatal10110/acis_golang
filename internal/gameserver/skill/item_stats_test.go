@@ -33,7 +33,10 @@ func itemStatsTestTemplates() *item.Table {
 			Kind:    item.KindWeapon,
 			Slot:    item.SlotRHand,
 			Crystal: item.CrystalD,
-			Weapon:  &item.WeaponDetail{Type: item.WeaponSword},
+			Weapon: &item.WeaponDetail{
+				Type:          item.WeaponSword,
+				Enchant4Skill: &item.SkillRef{ID: 301, Level: 1},
+			},
 			Modifiers: []item.StatModifier{
 				{Op: item.FuncAdd, Stat: "pAtk", Value: 20},
 			},
@@ -58,6 +61,9 @@ func itemStatsTestSkills() *modelskill.Table {
 	return modelskill.NewTable([]modelskill.Definition{
 		{ID: 300, Level: 1, Activation: modelskill.ActivationPassive, Funcs: []modelskill.FuncTemplate{
 			{Op: modelskill.FuncAdd, Stat: "mAtk", Value: 8},
+		}},
+		{ID: 301, Level: 1, Activation: modelskill.ActivationPassive, Funcs: []modelskill.FuncTemplate{
+			{Op: modelskill.FuncAdd, Stat: "pAtk", Value: 40},
 		}},
 	})
 }
@@ -170,6 +176,36 @@ func TestEquipItemStatsEnchantFuncReadsLiveEnchantLevel(t *testing.T) {
 	inv.SetEnchantLevel(inst, 5)
 	if got := ch.PDef(); got <= afterEnchant {
 		t.Fatalf("PDef() at +5 enchant = %v, want more than the +2 result %v", got, afterEnchant)
+	}
+}
+
+func TestEquipItemStatsEnchant4SkillReadsLiveEnchantLevel(t *testing.T) {
+	templates := itemStatsTestTemplates()
+	inv := itemcontainer.NewPlayerInventory(1, templates)
+	p := NewPersistence(nil, itemStatsTestSkills())
+	ch := &player.Character{ID: 1}
+	ch.SetSkillLevel(239, int(item.CrystalD))
+	basePAtk := ch.PAtk()
+	tmpl, _ := templates.Get(swordTemplateID)
+
+	inst := inv.AddNew(swordTemplateID, 1, 200)
+	inv.SetEnchantLevel(inst, 3)
+	inv.EquipItem(inst, tmpl)
+	if err := p.EquipItemStats(ch, inst, tmpl); err != nil {
+		t.Fatalf("EquipItemStats() error: %v", err)
+	}
+	if got, want := ch.PAtk(), basePAtk+20; got != want {
+		t.Fatalf("PAtk() at +3 = %v, want %v without the +4 skill", got, want)
+	}
+
+	inv.SetEnchantLevel(inst, 4)
+	if got, want := ch.PAtk(), basePAtk+20+40; got != want {
+		t.Fatalf("PAtk() at +4 = %v, want %v with the +4 skill", got, want)
+	}
+
+	inv.SetEnchantLevel(inst, 3)
+	if got, want := ch.PAtk(), basePAtk+20; got != want {
+		t.Fatalf("PAtk() after dropping below +4 = %v, want %v without the +4 skill", got, want)
 	}
 }
 

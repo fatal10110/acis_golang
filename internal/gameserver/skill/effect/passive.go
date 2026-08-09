@@ -23,5 +23,5 @@ func PassiveFuncs(def modelskill.Definition) ([]basefunc.Func, error) {
 		return nil, fmt.Errorf("effect: skill %d level %d is not a passive skill", def.ID, def.Level)
 	}
 	owner := modelskill.Ref{ID: def.ID, Level: def.Level}
-	return statFuncs(owner, def.Funcs)
+	return statFuncs(owner, def.Funcs, nil)
 }
