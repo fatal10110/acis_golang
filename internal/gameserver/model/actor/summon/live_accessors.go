@@ -95,12 +95,16 @@ func (a *Actor) CanWearPetItem(tmpl *item.Template) bool {
 }
 
 // Dead reports whether the summon is dead.
-func (a *Actor) Dead() bool { return a.dead }
+func (a *Actor) Dead() bool {
+	a.vitals.mu.RLock()
+	defer a.vitals.mu.RUnlock()
+	return a.dead
+}
 
 // AlikeDead reports whether this summon is dead, satisfying
 // attackable.Combatant so a summon can be targeted by its own owner-
 // commanded skills (e.g. a self-cast special skill).
-func (a *Actor) AlikeDead() bool { return a.dead }
+func (a *Actor) AlikeDead() bool { return a.Dead() }
 
 // SiegeGuard always reports false: pets and servitors are never defensive
 // siege guards.
