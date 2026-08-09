@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
@@ -92,6 +93,13 @@ func (h *Hostile) CanSee(target attackable.Combatant) bool {
 	ox, oy, oz := h.Position()
 	tx, ty, tz := other.Position()
 	return h.los.CanSeeActor(ox, oy, oz, h.CollisionHeight(), tx, ty, tz, theight)
+}
+
+// CanSeeTarget adapts NPC line-of-sight to the launch revalidation target
+// surface.
+func (h *Hostile) CanSeeTarget(target skilltarget.Creature) bool {
+	combatant, ok := target.(attackable.Combatant)
+	return ok && h.CanSee(combatant)
 }
 
 // CollisionRadius returns this NPC's body radius, used to resolve attack
