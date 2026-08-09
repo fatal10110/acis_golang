@@ -235,15 +235,10 @@ func (e *Effect) iconDuration(now time.Time) (millis int32, ok bool) {
 	e.scheduleMu.Unlock()
 
 	if e.Template.Count > 1 {
-		// AbstractEffect.addIcon (AbstractEffect.java:340-353): repeat-count
-		// branch is (getCounter()*_period - getTaskTime()) * 1000, all int32
-		// arithmetic. getTaskTime() (AbstractEffect.java:146-152) reduces to
-		// elapsed whole seconds since the current tick's period started
-		// (_periodStartTime, reset every tick in startEffect()), plus the
-		// ticks already consumed times the period; substituting _count for
-		// (getCounter() - ticksConsumed) collapses the formula to
-		// (Remaining()*Template.Time - elapsedSecondsThisTick) * 1000, which
-		// decrements every second instead of holding flat for a whole tick.
+		// Mirrors AbstractEffect.addIcon's repeat-count branch: elapsed is
+		// the whole seconds since the current tick's period started, so the
+		// value decrements every second instead of holding flat for a whole
+		// tick.
 		var elapsed int64
 		if period := e.period(); period > 0 && !next.IsZero() {
 			elapsed = int64(now.Sub(next.Add(-period)) / time.Second)
