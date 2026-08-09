@@ -18,6 +18,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/rs/zerolog"
@@ -25,14 +26,14 @@ import (
 
 type livePlayer struct {
 	*player.Character
-	template  *player.Template
-	npcs      *npc.Table
-	items     []*item.Instance
-	throne    staticobject.Chair
-	attack    *attack.Controller
-	move      *move.Controller
-	combat    *ai.PlayerAttack
-	cast      *actorcast.Controller
+	template *player.Template
+	npcs     *npc.Table
+	items    []*item.Instance
+	throne   staticobject.Chair
+	attack   *attack.Controller
+	move     *move.Controller
+	combat   *ai.PlayerAttack
+	cast     *actorcast.Controller
 	// summonSpawner caches the pet/servitor spawner wired onto p.Character,
 	// so useSummonItem only allocates and wires one on the first pet-collar
 	// use rather than on every use — link/live are stable for p's whole
@@ -48,11 +49,12 @@ type livePlayer struct {
 	stopAttack     func(*livePlayer)
 	shadowExpiryMu sync.RWMutex
 	detaching      bool
-	pickupMu       sync.Mutex // guards pickup, deferredPickup, and pickupLocked
+	pickupMu       sync.Mutex // guards deferred player intentions and pickup state
 	fusionMu       sync.Mutex // guards fusionTargetID
 	fusionTargetID int32
 	pickup         *pickupIntention
 	deferredPickup *pickupIntention
+	deferredMagic  *clientpackets.RequestMagicSkillUse
 	pickupLocked   bool
 	pickupLockGen  uint64
 
@@ -90,6 +92,7 @@ func (p *livePlayer) sendVisibilityFrame(frame wire.Frame) bool {
 func (p *livePlayer) Stop() {
 	p.takePickup()
 	p.takeDeferredPickup()
+	p.takeDeferredMagicSkill()
 	p.takePetInteract()
 	if p.combat != nil {
 		p.combat.Stop()
@@ -150,6 +153,7 @@ func (p *livePlayer) takePickup() *pickupIntention {
 func (p *livePlayer) deferPickup(ctx context.Context, target world.Tracked, shift bool) {
 	p.pickupMu.Lock()
 	defer p.pickupMu.Unlock()
+	p.deferredMagic = nil
 	p.deferredPickup = &pickupIntention{ctx: ctx, target: target, shift: shift}
 }
 
@@ -159,6 +163,21 @@ func (p *livePlayer) takeDeferredPickup() *pickupIntention {
 	pickup := p.deferredPickup
 	p.deferredPickup = nil
 	return pickup
+}
+
+func (p *livePlayer) deferMagicSkill(req clientpackets.RequestMagicSkillUse) {
+	p.pickupMu.Lock()
+	defer p.pickupMu.Unlock()
+	p.deferredPickup = nil
+	p.deferredMagic = &req
+}
+
+func (p *livePlayer) takeDeferredMagicSkill() *clientpackets.RequestMagicSkillUse {
+	p.pickupMu.Lock()
+	defer p.pickupMu.Unlock()
+	req := p.deferredMagic
+	p.deferredMagic = nil
+	return req
 }
 
 func (p *livePlayer) setPetInteract(pet *summon.Actor) {

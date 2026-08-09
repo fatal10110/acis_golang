@@ -673,6 +673,39 @@ func TestGameClientLinkMagicSkillUseMissingOneTargetSendsActionFailedOnly(t *tes
 	}
 }
 
+func TestGameClientLinkMagicSkillUseDefersUntilAttackFinishes(t *testing.T) {
+	capture := &frameCapture{}
+	live := newTestLivePlayer(t, 7, capture)
+	live.Character.SetSkillLevel(3, 1)
+	link := &GameClientLink{skills: skillstate.NewPersistence(nil, modelskill.NewTable([]modelskill.Definition{{
+		ID: 3, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+		HitTime: 500, ReuseDelay: 1200, StaticHitTime: true, StaticReuse: true,
+	}}), nil)}
+
+	if err := live.attack.DoAttack(newTestHostileNPC(t, 100)); err != nil {
+		t.Fatalf("start attack: %v", err)
+	}
+	capture.frames = nil
+
+	link.handleMagicSkillUse(live, clientpackets.RequestMagicSkillUse{SkillID: 3})
+	if link.castController(live).CastingNow() {
+		t.Fatal("cast started before the active attack finished")
+	}
+	if got, want := frameOpcodes(capture.frames), []byte{serverpackets.OpcodeActionFailed}; !bytes.Equal(got, want) {
+		t.Fatalf("deferred cast opcodes = %#x, want ActionFailed (%#x)", got, want)
+	}
+
+	live.attack.Stop()
+	capture.frames = nil
+	link.finishDeferredMagicSkill(live)
+	if !link.castController(live).CastingNow() {
+		t.Fatal("deferred cast did not start after the attack finished")
+	}
+	if got, want := frameOpcodes(capture.frames), []byte{serverpackets.OpcodeMagicSkillUse, serverpackets.OpcodeSystemMessage, serverpackets.OpcodeSetupGauge}; !bytes.Equal(got, want) {
+		t.Fatalf("drained cast opcodes = %#x, want MagicSkillUse, SystemMessage, SetupGauge (%#x)", got, want)
+	}
+}
+
 // TestAbortedCastSendsCancelAndActionFailed pins the two packets an aborted
 // in-flight cast owes the client. The abort triggers themselves (damage,
 // mute, death, ...) are wired separately, so this drives the funnel

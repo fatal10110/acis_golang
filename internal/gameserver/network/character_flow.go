@@ -354,6 +354,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	})
 	attackCtl.SetFinished(func() {
 		l.finishDeferredPickup(live)
+		l.finishDeferredMagicSkill(live)
 		combat.Think()
 	})
 	attackCtl.SetStarted(func() {
