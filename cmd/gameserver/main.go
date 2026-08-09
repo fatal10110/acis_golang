@@ -54,6 +54,7 @@ func newGameServerApp(paths gameServerPaths) *fx.App {
 			loadGameServerProperties,
 			loadPvPFlagOptions,
 			loadRespawnRestoreHP,
+			loadDeathPenaltyChance,
 			loadSkillEnchantSPBookNeeded,
 			loadAutoLearnSkills,
 			loadWeightLimitMultiplier,

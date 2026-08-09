@@ -86,14 +86,24 @@ func TestRaiseDeathPenaltyLevelRejectsPlayerKiller(t *testing.T) {
 
 func TestRaiseDeathPenaltyLevelNoKarmaFailsChanceRoll(t *testing.T) {
 	c := &Character{ID: 1}
+	c.SetDeathPenaltyChance(20)
 
-	// roll above deathPenaltyChance, no karma: blocked.
-	if got, changed := c.RaiseDeathPenaltyLevel(deathPenaltyKiller{}, deathPenaltyChance+1); changed || got != 0 {
+	// roll above the configured chance, no karma: blocked.
+	if got, changed := c.RaiseDeathPenaltyLevel(deathPenaltyKiller{}, 21); changed || got != 0 {
 		t.Fatalf("RaiseDeathPenaltyLevel(highRoll) = (%d, %v), want (0, false)", got, changed)
 	}
-	// roll at or below deathPenaltyChance, no karma: passes.
-	if got, changed := c.RaiseDeathPenaltyLevel(deathPenaltyKiller{}, deathPenaltyChance); !changed || got != 1 {
+	// roll at or below the configured chance, no karma: passes.
+	if got, changed := c.RaiseDeathPenaltyLevel(deathPenaltyKiller{}, 20); !changed || got != 1 {
 		t.Fatalf("RaiseDeathPenaltyLevel(lowRoll) = (%d, %v), want (1, true)", got, changed)
+	}
+}
+
+func TestRaiseDeathPenaltyLevelUsesConfiguredChance(t *testing.T) {
+	c := &Character{ID: 1}
+	c.SetDeathPenaltyChance(0)
+
+	if got, changed := c.RaiseDeathPenaltyLevel(deathPenaltyKiller{}, 1); changed || got != 0 {
+		t.Fatalf("RaiseDeathPenaltyLevel(configured chance) = (%d, %v), want (0, false)", got, changed)
 	}
 }
 

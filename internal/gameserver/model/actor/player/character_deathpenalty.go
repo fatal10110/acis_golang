@@ -17,6 +17,14 @@ type raidRelatedKiller interface {
 	RaidRelated() bool
 }
 
+// SetDeathPenaltyChance records the players.properties chance used by the
+// non-karma death-penalty gate.
+func (c *Character) SetDeathPenaltyChance(chance int) {
+	c.stateMu.Lock()
+	c.deathPenaltyChance = chance
+	c.stateMu.Unlock()
+}
+
 // DeathPenaltyLevel returns the current death-penalty debuff level.
 func (c *Character) DeathPenaltyLevel() int {
 	c.stateMu.RLock()
@@ -106,7 +114,7 @@ func (c *Character) RaiseDeathPenaltyLevel(killer any, roll int) (int, bool) {
 		c.stateMu.Unlock()
 		return c.deathPenaltyLevel, false
 	}
-	if c.KarmaPoints <= 0 && roll > deathPenaltyChance {
+	if c.KarmaPoints <= 0 && roll > c.deathPenaltyChance {
 		c.stateMu.Unlock()
 		return c.deathPenaltyLevel, false
 	}
