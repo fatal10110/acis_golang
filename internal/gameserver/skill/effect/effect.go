@@ -251,13 +251,22 @@ func (e *Effect) stackType() string {
 // when none of those apply (an unscheduled, non-repeating, non-permanent
 // effect), meaning it is omitted from the icon list entirely.
 func (e *Effect) iconDuration(now time.Time) (millis int32, ok bool) {
-	if e.Template.Count > 1 {
-		return int32(e.Remaining() * e.Template.Time * 1000), true
-	}
-
 	e.scheduleMu.Lock()
 	next := e.nextAction
 	e.scheduleMu.Unlock()
+
+	if e.Template.Count > 1 {
+		// Mirrors AbstractEffect.addIcon's repeat-count branch: elapsed is
+		// the whole seconds since the current tick's period started, so the
+		// value decrements every second instead of holding flat for a whole
+		// tick.
+		var elapsed int64
+		if period := e.period(); period > 0 && !next.IsZero() {
+			elapsed = int64(now.Sub(next.Add(-period)) / time.Second)
+		}
+		return int32((int64(e.Remaining())*int64(e.Template.Time) - elapsed) * 1000), true
+	}
+
 	if !next.IsZero() {
 		remaining := max(next.Sub(now), 0)
 		return int32(remaining.Milliseconds()), true
