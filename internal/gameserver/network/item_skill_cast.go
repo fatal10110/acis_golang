@@ -37,6 +37,11 @@ func (l *GameClientLink) useItemAICast(live *livePlayer, inv *itemcontainer.Inve
 	if !ok {
 		return false
 	}
+	if live.attack != nil && live.attack.AttackingNow() {
+		live.deferItemAICast(inv, inst)
+		sendMagicActionFailed(live)
+		return true
+	}
 
 	beforeVitals := live.Vitals()
 	controller := l.castController(live)
@@ -114,4 +119,13 @@ func (l *GameClientLink) useItemAICast(live *livePlayer, inv *itemcontainer.Inve
 		},
 	})
 	return true
+}
+
+func (l *GameClientLink) finishDeferredItemAICast(live *livePlayer) {
+	if live == nil || live.detached() {
+		return
+	}
+	if itemCast := live.takeDeferredItemAICast(); itemCast != nil {
+		l.useItemAICast(live, itemCast.inventory, itemCast.item)
+	}
 }
