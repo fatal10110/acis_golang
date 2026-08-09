@@ -107,16 +107,36 @@ func ItemPassiveFuncs(skills *modelskill.Table, owner ItemOwner) ([]basefunc.Fun
 		return nil, nil
 	}
 	var funcs []basefunc.Func
-	for _, ref := range owner.Tmpl.AttachedSkills {
+	add := func(ref item.SkillRef, cond basefunc.Condition) error {
 		def, ok := skills.Get(modelskill.ID(ref.ID), int(ref.Level))
 		if !ok || def.Activation != modelskill.ActivationPassive {
-			continue
+			return nil
 		}
-		fns, err := statFuncs(owner, def.Funcs)
+		fns, err := statFuncs(owner, def.Funcs, cond)
 		if err != nil {
-			return nil, fmt.Errorf("item %d passive skill %d level %d: %w", owner.Tmpl.ID, ref.ID, ref.Level, err)
+			return fmt.Errorf("item %d passive skill %d level %d: %w", owner.Tmpl.ID, ref.ID, ref.Level, err)
 		}
 		funcs = append(funcs, fns...)
+		return nil
+	}
+	for _, ref := range owner.Tmpl.AttachedSkills {
+		if err := add(ref, nil); err != nil {
+			return nil, err
+		}
+	}
+	if weapon := owner.Tmpl.Weapon; weapon != nil && weapon.Enchant4Skill != nil {
+		if err := add(*weapon.Enchant4Skill, enchantAtLeast{owner: owner, level: 4}); err != nil {
+			return nil, err
+		}
 	}
 	return funcs, nil
+}
+
+type enchantAtLeast struct {
+	owner ItemOwner
+	level int
+}
+
+func (c enchantAtLeast) Test(any, any, any) bool {
+	return c.owner.EnchantLevel() >= c.level
 }
