@@ -73,6 +73,10 @@ func TestGameClientLinkPickupGroundItemFullClientFlow(t *testing.T) {
 	origin := location.Location{X: px, Y: py, Z: pz}
 	c.send(encodeAction(ground.ObjectID(), origin, false))
 	reply := c.read()
+	if reply[0] != serverpackets.OpcodeActionFailed {
+		t.Fatalf("Action opcode = %#x, want ActionFailed (%#x) — an out-of-range pickup must release the client's pending action before approaching", reply[0], serverpackets.OpcodeActionFailed)
+	}
+	reply = c.read()
 	if reply[0] != serverpackets.OpcodeMoveToLocation {
 		t.Fatalf("Action opcode = %#x, want MoveToLocation (%#x) — an out-of-range pickup must approach before collecting", reply[0], serverpackets.OpcodeMoveToLocation)
 	}
@@ -672,7 +676,7 @@ func TestFinishDeferredPickupWalksToOutOfRangeItem(t *testing.T) {
 	// snapshot(), not the frames field directly: the walk just started can
 	// arrive and deliver its own frames from a background timer goroutine
 	// concurrently with this read.
-	assertOpcodeSequence(t, frames.snapshot(), serverpackets.OpcodeMoveToLocation)
+	assertOpcodeSequence(t, frames.snapshot(), serverpackets.OpcodeActionFailed, serverpackets.OpcodeMoveToLocation)
 
 	deadline := time.Now().Add(2 * time.Second)
 	for {
@@ -729,8 +733,8 @@ func TestAttackClickDuringPickupApproachDropsStaleIntention(t *testing.T) {
 	if !gcl.startPickupLiveGroundItem(context.Background(), attacker, ground, false) {
 		t.Fatal("startPickupLiveGroundItem returned false for a ground item target")
 	}
-	if got := frameOpcodes(frames.frames); string(got) != string([]byte{serverpackets.OpcodeMoveToLocation}) {
-		t.Fatalf("pickup-approach opcodes = %x, want MoveToLocation only", got)
+	if got := frameOpcodes(frames.frames); string(got) != string([]byte{serverpackets.OpcodeActionFailed, serverpackets.OpcodeMoveToLocation}) {
+		t.Fatalf("pickup-approach opcodes = %x, want ActionFailed then MoveToLocation", got)
 	}
 
 	frames.frames = nil
@@ -791,8 +795,8 @@ func TestWalkClickDuringPickupApproachDropsStaleIntention(t *testing.T) {
 	if !gcl.startPickupLiveGroundItem(context.Background(), live, ground, false) {
 		t.Fatal("startPickupLiveGroundItem returned false for a ground item target")
 	}
-	if got := frameOpcodes(frames.frames); string(got) != string([]byte{serverpackets.OpcodeMoveToLocation}) {
-		t.Fatalf("pickup-approach opcodes = %x, want MoveToLocation only", got)
+	if got := frameOpcodes(frames.frames); string(got) != string([]byte{serverpackets.OpcodeActionFailed, serverpackets.OpcodeMoveToLocation}) {
+		t.Fatalf("pickup-approach opcodes = %x, want ActionFailed then MoveToLocation", got)
 	}
 
 	frames.frames = nil
