@@ -38,11 +38,12 @@ type Owner interface {
 // Actor is a live pet or servitor placed in world.State next to its owner.
 //
 // State methods guard the embedded Presence. level, name, fed,
-// belowUnsummonLimit, and lifetime are guarded by statusMu and safe to read
-// from any goroutine, including the world-visibility goroutine driving
-// Discover. The remaining fields are mutated by the goroutine handling the
-// owner connection or by the actor's own tick callback, so callers must
-// serialize command and tick calls per actor.
+// belowUnsummonLimit, and lifetime are guarded by statusMu; HP, MP, and dead
+// are guarded by vitals.mu. Both are safe to read from any goroutine,
+// including the world-visibility goroutine driving Discover. The remaining
+// fields are mutated by the goroutine handling the owner connection or by the
+// actor's own tick callback, so callers must serialize command and tick calls
+// per actor.
 type Actor struct {
 	world.Presence
 

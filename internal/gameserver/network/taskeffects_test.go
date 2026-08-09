@@ -76,6 +76,46 @@ func TestResolveIsGMUsesAccessLevelsIsGMFlag(t *testing.T) {
 	}
 }
 
+func TestPvPZoneMembershipTracksZoneTransitions(t *testing.T) {
+	state := world.New()
+	live := newTestLivePlayer(t, 100, &frameCapture{})
+	live.zoneActor = &liveZoneActor{live: live}
+	state.Spawn(live, 125, 0, 0, 0)
+	state.AddPlayer(live)
+
+	zones := zone.NewIndex()
+	zones.Add(zone.NewArena(1, mustCuboid(100, 200, -100, 100, -100, 100)))
+	zones.Add(zone.NewArena(2, mustCuboid(150, 250, -100, 100, -100, 100)))
+	zones.Add(zone.NewPeace(3, mustCuboid(175, 225, -100, 100, -100, 100)))
+	link := &GameClientLink{world: state, zones: zones, log: zerolog.Nop()}
+
+	live.zoneActor.revalidate(zones)
+	if !live.InPvPZone() {
+		t.Fatal("spawning in a PvP zone did not set membership")
+	}
+
+	link.updateLivePlayerPosition(live, location.Location{X: 175}, 0)
+	if live.InPvPZone() {
+		t.Fatal("overlapping peace zone did not suppress PvP membership")
+	}
+
+	link.updateLivePlayerPosition(live, location.Location{X: 226}, 0)
+	if !live.InPvPZone() {
+		t.Fatal("leaving overlapping peace zone cleared PvP membership")
+	}
+
+	link.updateLivePlayerPosition(live, location.Location{X: 500}, 0)
+	if live.InPvPZone() {
+		t.Fatal("leaving all PvP zones retained membership")
+	}
+
+	link.updateLivePlayerPosition(live, location.Location{X: 125}, 0)
+	link.detachLivePlayer(context.Background(), live)
+	if live.InPvPZone() {
+		t.Fatal("detach retained PvP-zone membership")
+	}
+}
+
 func TestTaskEffectsWaterSendsCyanGauge(t *testing.T) {
 	state := world.New()
 	capture := &frameCapture{}
