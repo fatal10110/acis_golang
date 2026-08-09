@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -33,6 +34,21 @@ func TestLivePlayerVisibilitySendsCharInfoAndDeleteObject(t *testing.T) {
 	state.Despawn(second)
 	if got := firstFrames.frames[len(firstFrames.frames)-1][0]; got != serverpackets.OpcodeDeleteObject {
 		t.Fatalf("last first-player frame opcode = %#x, want DeleteObject (%#x)", got, serverpackets.OpcodeDeleteObject)
+	}
+}
+
+func TestPetInfoSnapshotMirrorsOwnerPvPFlag(t *testing.T) {
+	owner := newTestLivePlayer(t, 1, &frameCapture{})
+	owner.UpdatePvPFlag(task.PvPFlagBlinking)
+	npcs := npc.NewTable([]*npc.Template{{ID: 12077, TemplateID: 12077}})
+	pet := summon.NewPet(summon.PetConfig{ObjectID: 20, Owner: owner, NPCID: 12077})
+
+	snapshot, ok := petInfoSnapshot(pet, owner, npcs)
+	if !ok {
+		t.Fatal("petInfoSnapshot() returned no snapshot")
+	}
+	if snapshot.PvpFlag != int(task.PvPFlagBlinking) {
+		t.Fatalf("PvpFlag = %d, want %d", snapshot.PvpFlag, task.PvPFlagBlinking)
 	}
 }
 
