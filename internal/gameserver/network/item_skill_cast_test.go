@@ -96,6 +96,57 @@ func TestGameClientLinkUseScrollRunsAICastAndConsumes(t *testing.T) {
 	}
 }
 
+func TestGameClientLinkUseScrollDefersUntilAttackFinishes(t *testing.T) {
+	skills := itemAICastSkillTable(t)
+	const scrollTemplate int32 = 736
+	const objectID int32 = 708
+	c, chars, _, state := newLinkedGameClientWithSkillsSeed(t, skills, func(chars *fakeCharStore, items *fakeItemStore) {
+		objID := seedSelectableCharacter(t, chars, "player1", "Newbie", 5, 0)
+		if err := items.Create(context.Background(), objID, item.Instance{
+			ObjectID: objectID, TemplateID: scrollTemplate, OwnerID: objID,
+			Count: 3, Location: item.LocationInventory, ManaLeft: -1,
+		}); err != nil {
+			t.Fatalf("seed scroll: %v", err)
+		}
+	}, 1)
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	obj, ok := state.Player(chars.soleObjectID(t))
+	if !ok {
+		t.Fatal("player not in world state after enter")
+	}
+	live, ok := obj.(*livePlayer)
+	if !ok {
+		t.Fatal("world player is not a *livePlayer")
+	}
+	if err := live.attack.DoAttack(newTestHostileNPC(t, 709)); err != nil {
+		t.Fatalf("start attack: %v", err)
+	}
+	c.send(encodeUseItem(objectID, false))
+	for {
+		reply := c.read()
+		if reply[0] == serverpackets.OpcodeMagicSkillUse {
+			t.Fatal("item cast started before the active attack finished")
+		}
+		if reply[0] == serverpackets.OpcodeActionFailed {
+			break
+		}
+	}
+	if got := live.Inventory().ItemByObjectID(objectID).Snapshot().Count; got != 3 {
+		t.Fatalf("scroll stack during deferred cast = %d, want 3", got)
+	}
+
+	readMagicSkillUseSelfWithReuse(t, c, live.ObjectID(), 2013, 1, 5000)
+	if got := live.Inventory().ItemByObjectID(objectID).Snapshot().Count; got != 2 {
+		t.Fatalf("scroll stack after deferred cast starts = %d, want 2", got)
+	}
+}
+
 // TestGameClientLinkUseScrollWithSharedGroupSendsExUseSharedGroupItem
 // verifies an item-carried skill from an item with a shared-reuse group
 // drives the client's shared-reuse HUD packet, carrying the longer of the

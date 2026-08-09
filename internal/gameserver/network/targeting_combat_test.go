@@ -26,6 +26,7 @@ func wireLiveAttackHooks(gcl *GameClientLink, live *livePlayer) {
 	live.attack.SetFinished(func() {
 		gcl.finishDeferredPickup(live)
 		gcl.finishDeferredMagicSkill(live)
+		gcl.finishDeferredItemAICast(live)
 		live.combat.Think()
 	})
 	live.attack.SetStarted(func() {

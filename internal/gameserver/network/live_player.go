@@ -55,6 +55,7 @@ type livePlayer struct {
 	pickup         *pickupIntention
 	deferredPickup *pickupIntention
 	deferredMagic  *clientpackets.RequestMagicSkillUse
+	deferredItem   *itemAICastIntention
 	pickupLocked   bool
 	pickupLockGen  uint64
 
@@ -75,6 +76,11 @@ type pickupIntention struct {
 	// set for a non-shift click — a shift click fails outright instead of
 	// walking — so it never needs this field.
 	shift bool
+}
+
+type itemAICastIntention struct {
+	inventory *itemcontainer.Inventory
+	item      *item.Instance
 }
 
 func (p *livePlayer) SendFrame(frame wire.Frame) bool {
@@ -154,6 +160,7 @@ func (p *livePlayer) deferPickup(ctx context.Context, target world.Tracked, shif
 	p.pickupMu.Lock()
 	defer p.pickupMu.Unlock()
 	p.deferredMagic = nil
+	p.deferredItem = nil
 	p.deferredPickup = &pickupIntention{ctx: ctx, target: target, shift: shift}
 }
 
@@ -169,6 +176,7 @@ func (p *livePlayer) deferMagicSkill(req clientpackets.RequestMagicSkillUse) {
 	p.pickupMu.Lock()
 	defer p.pickupMu.Unlock()
 	p.deferredPickup = nil
+	p.deferredItem = nil
 	p.deferredMagic = &req
 }
 
@@ -178,6 +186,22 @@ func (p *livePlayer) takeDeferredMagicSkill() *clientpackets.RequestMagicSkillUs
 	req := p.deferredMagic
 	p.deferredMagic = nil
 	return req
+}
+
+func (p *livePlayer) deferItemAICast(inventory *itemcontainer.Inventory, inst *item.Instance) {
+	p.pickupMu.Lock()
+	defer p.pickupMu.Unlock()
+	p.deferredPickup = nil
+	p.deferredMagic = nil
+	p.deferredItem = &itemAICastIntention{inventory: inventory, item: inst}
+}
+
+func (p *livePlayer) takeDeferredItemAICast() *itemAICastIntention {
+	p.pickupMu.Lock()
+	defer p.pickupMu.Unlock()
+	itemCast := p.deferredItem
+	p.deferredItem = nil
+	return itemCast
 }
 
 func (p *livePlayer) setPetInteract(pet *summon.Actor) {
