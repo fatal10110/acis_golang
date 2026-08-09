@@ -93,6 +93,15 @@ func (c *Character) ActiveSkillEffects() []effect.ActiveEffect {
 	return append([]effect.ActiveEffect(nil), c.skills.effects...)
 }
 
+// ClearActiveSkillEffects drops every entry staged by RestoreSkillEffect.
+// Call once ReplayEffects has moved them onto the live effect list, which
+// becomes the sole source Persistence.Save reads from afterward.
+func (c *Character) ClearActiveSkillEffects() {
+	c.skills.mu.Lock()
+	defer c.skills.mu.Unlock()
+	c.skills.effects = nil
+}
+
 // RestoreSkillEffect records one effect restored from persisted skill state.
 func (c *Character) RestoreSkillEffect(plan effect.EffectPlan, reuseGroup int32) {
 	c.AddActiveSkillEffect(effect.ActiveEffect{

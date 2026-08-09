@@ -142,6 +142,28 @@ func TestNewBuildsCoreEffectMetadata(t *testing.T) {
 	}
 }
 
+// TestNewDerivesHerbFromSkillName mirrors AbstractEffect._isHerbEffect =
+// _skill.getName().contains("Herb"): Herb is a property of the skill's name,
+// not of how the effect was applied, so a skill named "Herb of Life" is a
+// herb effect on any cast path, and an unrelated buff never is.
+func TestNewDerivesHerbFromSkillName(t *testing.T) {
+	e, err := New(Skill{ID: 1, Name: "Herb of Life"}, modelskill.EffectTemplate{Name: "Buff"})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	if !e.Herb {
+		t.Fatal("Herb = false, want true for a skill named \"Herb of Life\"")
+	}
+
+	e, err = New(Skill{ID: 2, Name: "Wind Strike"}, modelskill.EffectTemplate{Name: "Buff"})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	if e.Herb {
+		t.Fatal("Herb = true, want false for an unrelated skill name")
+	}
+}
+
 func TestClassTagPrefersAttributeThenKind(t *testing.T) {
 	// A marker effect loaded from a datapack <effect name="BlockBuff"> carries
 	// no effectType attribute, so its classification is the runtime kind.
