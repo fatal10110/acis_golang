@@ -179,6 +179,23 @@ func TestSummonFormulaInputsResolveStatsAndResources(t *testing.T) {
 	}
 }
 
+func TestDeadConcurrentReduceHPAndRead(t *testing.T) {
+	actor := NewPet(PetConfig{Stats: CombatStats{MaxHP: 1}})
+	started := make(chan struct{})
+	done := make(chan struct{})
+	go func() {
+		close(started)
+		actor.ReduceHP(1, nil, modelskill.Definition{})
+		close(done)
+	}()
+	<-started
+	for range 1000 {
+		_ = actor.Dead()
+		_ = actor.AlikeDead()
+	}
+	<-done
+}
+
 func zeroSummonRoll(int) int { return 0 }
 
 func closeSummonFloat(a, b float64) bool {
