@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 )
 
 func TestFrameUserInfo(t *testing.T) {
@@ -102,7 +103,7 @@ func TestFrameUserInfo(t *testing.T) {
 	want = binary.LittleEndian.AppendUint32(want, 0) // m.atk speed
 	want = binary.LittleEndian.AppendUint32(want, 0) // p.atk speed (repeated)
 	want = binary.LittleEndian.AppendUint32(want, uint32(int32(tmpl.MDef)))
-	want = binary.LittleEndian.AppendUint32(want, 0) // pvp flag
+	want = binary.LittleEndian.AppendUint32(want, uint32(c.PvPFlagState()))
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.Karma()))
 
 	want = binary.LittleEndian.AppendUint32(want, uint32(int32(tmpl.RunSpeed)))
@@ -175,6 +176,24 @@ func TestFrameUserInfo(t *testing.T) {
 
 	if !bytes.Equal(got, want) {
 		t.Errorf("FrameUserInfo mismatch:\n got  %x\n want %x", got, want)
+	}
+}
+
+// TestFrameUserInfo_PvPFlagByteFollowsPvPFlagState is the regression test
+// for the pvp-flag field staying hardcoded to 0: the byte at that slot must
+// track Character.PvPFlagState() (0/1/2 for none/on/blinking), or the
+// client never redraws the name color/PvP icon UpdatePvPFlag is supposed
+// to refresh.
+func TestFrameUserInfo_PvPFlagByteFollowsPvPFlagState(t *testing.T) {
+	tmpl := &player.Template{}
+	c := &player.Character{Name: "M"}
+
+	unflagged := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: c, Template: tmpl}))
+	c.UpdatePvPFlag(task.PvPFlagOn)
+	flagged := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: c, Template: tmpl}))
+
+	if bytes.Equal(unflagged, flagged) {
+		t.Fatal("unflagged/flagged encodings are identical, want the pvp-flag byte to differ")
 	}
 }
 
