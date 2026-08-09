@@ -158,6 +158,27 @@ func TestCharacterRecentFakeDeathTracksGracePeriodAfterMarking(t *testing.T) {
 	}
 }
 
+// TestCharacterClearRecentFakeDeathCancelsGrace matches
+// Player.clearRecentFakeDeath() zeroing `_recentFakeDeathEndTime`
+// (Player.java:2130-2133), called unconditionally from
+// PlayerAttack.doAttack (PlayerAttack.java:23) and PlayerCast.doCast
+// (PlayerCast.java:184): an attack or completed cast cancels the grace
+// immediately instead of letting it run out on its own.
+func TestCharacterClearRecentFakeDeathCancelsGrace(t *testing.T) {
+	c := &Character{ID: 1}
+	attachTestLive(t, c)
+
+	c.MarkRecentFakeDeath()
+	if !c.RecentFakeDeath() {
+		t.Fatal("RecentFakeDeath() = false right after MarkRecentFakeDeath, want true")
+	}
+
+	c.ClearRecentFakeDeath()
+	if c.RecentFakeDeath() {
+		t.Fatal("RecentFakeDeath() = true after ClearRecentFakeDeath, want false")
+	}
+}
+
 func TestCharacterEffectListAndCrowdControlGettersAreSafeBeforeLiveIsAttached(t *testing.T) {
 	c := &Character{ID: 1}
 	if c.EffectList() != nil {
