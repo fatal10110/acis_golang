@@ -185,6 +185,24 @@ func TestCreatureAttackDropsInvalidPendingHit(t *testing.T) {
 	}
 }
 
+func TestPlayerAttackFlagsOnMiss(t *testing.T) {
+	actor := playerAttackActor{attackActor: attackActor{
+		id:    100,
+		known: map[int32]bool{200: true},
+	}}
+	target := attackTarget{id: 200}
+	ctrl := NewPlayer(&actor)
+
+	ctrl.deliverHit(0, Hit{Target: &target, Miss: true})
+
+	if len(actor.pvpTargets) != 1 || actor.pvpTargets[0] != &target {
+		t.Fatalf("PvP targets = %v, want missed target", actor.pvpTargets)
+	}
+	if target.damageTaken != 0 {
+		t.Fatalf("miss damage = %d, want 0", target.damageTaken)
+	}
+}
+
 func TestCreatureAttackStopCancelsPendingHit(t *testing.T) {
 	clock := &fakeAttackClock{}
 	actor := attackActor{
@@ -583,6 +601,7 @@ type playerAttackActor struct {
 	mp                  int
 	clearFakeDeathCalls int
 	actionFailedCalls   int
+	pvpTargets          []any
 }
 
 func (a *playerAttackActor) CheckAndEquipArrows() bool { return a.arrows }
@@ -590,6 +609,7 @@ func (a *playerAttackActor) WeaponMPConsume() int      { return a.mpConsume }
 func (a *playerAttackActor) MP() int                   { return a.mp }
 func (a *playerAttackActor) ClearRecentFakeDeath()     { a.clearFakeDeathCalls++ }
 func (a *playerAttackActor) ClientActionFailed()       { a.actionFailedCalls++ }
+func (a *playerAttackActor) NotePvPAttack(target any)  { a.pvpTargets = append(a.pvpTargets, target) }
 
 type attackTarget struct {
 	id          int32

@@ -1,6 +1,10 @@
 package player
 
-import "github.com/fatal10110/acis_golang/internal/gameserver/task"
+import (
+	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
+)
 
 var _ task.PvPFlagActor = (*Character)(nil)
 
@@ -48,8 +52,57 @@ func (c *Character) flagPvP(useFlaggedDuration bool) {
 	}
 }
 
-// notePvPHitFromAttacker flags attacker with the PvP flag tracker after it
-// damages c, mirroring Player.updatePvPStatus(Creature target)/
+// NotePvPAttack records one resolved physical attack against target.
+func (c *Character) NotePvPAttack(target any) {
+	if victim := pvpTargetPlayer(target); victim != nil {
+		victim.notePvPHitFromAttacker(c)
+	}
+}
+
+// NotePvPSkillTargets records a resolved skill cast against targets.
+func (c *Character) NotePvPSkillTargets(targets []any, offensive bool, skillType string) {
+	for _, target := range targets {
+		if offensive {
+			c.NotePvPAttack(target)
+			continue
+		}
+		if c.skillTargetFlagsPvP(target, skillType) {
+			c.flagPvP(false)
+		}
+	}
+}
+
+func (c *Character) skillTargetFlagsPvP(target any, skillType string) bool {
+	if c.InPvPZone() {
+		return false
+	}
+	if victim := pvpTargetPlayer(target); victim != nil {
+		return victim != c && (victim.PvPFlagState() != task.PvPFlagNone || victim.KarmaPoints > 0)
+	}
+	if skillType == "SUMMON" || skillType == "BEAST_FEED" || skillType == "UNLOCK" || skillType == "UNLOCK_SPECIAL" || skillType == "DELUXE_KEY_UNLOCK" {
+		return false
+	}
+	actor, ok := target.(interface{ Category() skilltarget.Category })
+	if !ok || actor.Category() != skilltarget.CategoryAttackable {
+		return false
+	}
+	guard, _ := target.(interface{ Guard() bool })
+	return guard == nil || !guard.Guard()
+}
+
+func pvpTargetPlayer(target any) *Character {
+	if player, ok := target.(*Character); ok {
+		return player
+	}
+	if summon, ok := target.(interface{ ActingPlayer() creature.DeathActor }); ok {
+		player, _ := summon.ActingPlayer().(*Character)
+		return player
+	}
+	return nil
+}
+
+// notePvPHitFromAttacker flags attacker with the PvP flag tracker after a
+// resolved physical or offensive-skill attack, mirroring Player.updatePvPStatus(Creature target)/
 // Playable.checkIfPvP: a karma'd victim (c) never flags its attacker —
 // hitting a PKer is PK territory, not PvP — and attacking oneself is a
 // no-op. When it does flag, the shorter PvP-vs-PvP duration applies only
@@ -58,13 +111,13 @@ func (c *Character) flagPvP(useFlaggedDuration bool) {
 // attacker resolves through *Character, so only a live player attacker can
 // ever be flagged — an NPC/monster attacker (which never satisfies this
 // assertion) is always a no-op, matching the reference's
-// target.getActingPlayer() == null bail. The PvP-zone and duel exemptions,
-// the miss-still-flags physical-attack timing, and the non-offensive-skill/
-// NPC-target flag branches from the same reference method aren't ported
-// here; see the #1249 follow-up (#1256) tracking those.
+// target.getActingPlayer() == null bail.
 func (c *Character) notePvPHitFromAttacker(attacker any) {
 	pk, ok := attacker.(*Character)
 	if !ok || pk == c || c.KarmaPoints != 0 {
+		return
+	}
+	if pk.InPvPZone() && c.InPvPZone() {
 		return
 	}
 	useFlagged := pk.KarmaPoints == 0 && c.PvPFlagState() != task.PvPFlagNone
