@@ -409,14 +409,24 @@ type damageReceiver interface {
 	TakeDamage(int, creature.DeathActor) bool
 }
 
+type pvpAttackNotifier interface {
+	NotePvPAttack(any)
+}
+
 func (c *Controller) deliverHit(seq uint64, hit Hit) {
 	c.mu.RLock()
 	active := seq == c.attackSeq
 	c.mu.RUnlock()
-	if !active || hit.Target == nil || hit.Miss || hit.Damage <= 0 {
+	if !active || hit.Target == nil {
 		return
 	}
 	if c.actor.AlikeDead() || !c.actor.Knows(hit.Target) || hit.Target.AlikeDead() {
+		return
+	}
+	if notifier, ok := c.player.(pvpAttackNotifier); ok {
+		notifier.NotePvPAttack(hit.Target)
+	}
+	if hit.Miss || hit.Damage <= 0 {
 		return
 	}
 	target, ok := hit.Target.(damageReceiver)
