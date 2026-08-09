@@ -43,12 +43,22 @@ func loadGameServerProperties(paths gameServerPaths) (*config.Properties, error)
 // revive restores, read from players.properties.
 type respawnRestoreHP float64
 
+type deathPenaltyChance int
+
 func loadRespawnRestoreHP(paths gameServerPaths) (respawnRestoreHP, error) {
 	props, err := config.LoadFile(paths.PlayersConfigPath)
 	if err != nil {
 		return 0, err
 	}
 	return respawnRestoreHP(config.NewFields(props, "respawn restore hp").Float64("RespawnRestoreHP", 0.7)), nil
+}
+
+func loadDeathPenaltyChance(paths gameServerPaths) (deathPenaltyChance, error) {
+	props, err := config.LoadFile(paths.PlayersConfigPath)
+	if err != nil {
+		return 0, err
+	}
+	return deathPenaltyChance(config.NewFields(props, "death penalty chance").Int("DeathPenaltyChance", 20)), nil
 }
 
 // skillEnchantSPBookNeeded controls whether enchanting a skill above level
