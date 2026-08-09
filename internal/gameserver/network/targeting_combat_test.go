@@ -25,6 +25,7 @@ func wireLiveAttackHooks(gcl *GameClientLink, live *livePlayer) {
 	live.stopAttack = gcl.stopLiveAutoAttack
 	live.attack.SetFinished(func() {
 		gcl.finishDeferredPickup(live)
+		gcl.finishDeferredMagicSkill(live)
 		live.combat.Think()
 	})
 	live.attack.SetStarted(func() {
