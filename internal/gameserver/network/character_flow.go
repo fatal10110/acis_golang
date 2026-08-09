@@ -83,6 +83,12 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 			l.log.Error().Err(err).Int32("object_id", c.ID).Msg("enter world: give skills")
 			return nil, false
 		}
+		if level := c.DeathPenaltyLevel(); level > 0 {
+			if err := l.skills.ApplyTransientPassiveSkill(c, 5076, 0, level); err != nil {
+				l.log.Error().Err(err).Int32("object_id", c.ID).Msg("enter world: restore death-penalty passive stats")
+				return nil, false
+			}
+		}
 	}
 	if c.ResourceValues().CurrentHP < 0.5 {
 		c.MarkDead()
