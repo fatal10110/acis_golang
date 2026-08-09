@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
@@ -92,6 +93,7 @@ type Character struct {
 	los                       LineOfSight
 	zones                     PeaceZoneQuery
 	revalidateZones           func(location.Location)
+	insidePvPZone             atomic.Bool
 	sendFrame                 func(wire.Frame) bool
 	broadcastAttack           func(attack.Snapshot)
 	broadcastMove             func(move.Event)
