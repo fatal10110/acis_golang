@@ -1,6 +1,9 @@
 package player
 
-import "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
+)
 
 // pkKillKarmaPlateau is the karma gain once a killer's PK-kill count
 // reaches the formula's flat-rate ceiling, matching
@@ -26,21 +29,24 @@ func calculatePKKillKarmaGain(pkKills int) int {
 }
 
 // awardKillerPKKarma grants killer PK-kill karma when c (the victim who
-// just died) had zero karma of its own, mirroring the reference's
-// onKillUpdatePvPKarma innocent-victim branch: a player killing a
-// karma-free, non-flagged player gains karma and a PK-kill count.
+// just died) had zero karma and no PvP flag of its own, mirroring the
+// reference's onKillUpdatePvPKarma "otherwise, killer is considered as a
+// PKer" branch (Player.java:2814: `targetPlayer.getKarma() == 0 &&
+// targetPlayer.getPvpFlag() == 0`): a player killing a karma-free,
+// non-flagged player gains karma and a PK-kill count. An actively-flagged,
+// karma-free victim instead takes the reference's PvP-point branch
+// (checkIfPvP) — no karma change — which has no Go implementation yet; see
+// the #1265 follow-up.
 //
-// The reference also routes a kill through a different, karma-free
-// outcome when the victim carries karma or PvP flag, when either side is
-// dueling, when the kill happens in a PvP/siege zone, when the killer
-// wields a cursed weapon, or when the kill is a clan-war kill. None of
-// those states are tracked on Character yet — c.KarmaPoints == 0 is the
-// only gate this port can evaluate — so this only ever reproduces the
-// innocent-victim branch; the others stay dormant until their owning
-// subsystems land.
+// The reference also routes a kill through other karma-free outcomes when
+// either side is dueling, when the kill happens in a PvP/siege zone, when
+// the killer wields a cursed weapon, or when the kill is a clan-war kill.
+// None of those states are tracked on Character yet, so this only ever
+// reproduces the innocent-victim and already-flagged-victim gates; the
+// others stay dormant until their owning subsystems land.
 func (c *Character) awardKillerPKKarma(killer creature.DeathActor) {
 	pk, ok := killer.(*Character)
-	if !ok || pk == c || c.KarmaPoints != 0 {
+	if !ok || pk == c || c.KarmaPoints != 0 || c.PvPFlagState() != task.PvPFlagNone {
 		return
 	}
 	pk.PKKills++
@@ -55,8 +61,9 @@ func (c *Character) awardKillerPKKarma(killer creature.DeathActor) {
 // pair (Player.java:1076-1080). The reference also sends a RelationChanged
 // packet for an owned summon and broadcasts the relation change to nearby
 // observers (so their client recolors this player's name); neither summon
-// messaging nor a relation/name-color broadcast exists in this port yet,
-// so this hook only ever covers the self-only feedback.
+// messaging nor a relation/name-color broadcast exists in this port yet —
+// see the #1267 follow-up — so this hook only ever covers the self-only
+// feedback.
 func (c *Character) SetKarmaChangeNotifier(notify func(karma int)) {
 	c.stateMu.Lock()
 	defer c.stateMu.Unlock()
