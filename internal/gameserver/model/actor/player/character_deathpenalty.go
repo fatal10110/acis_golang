@@ -6,10 +6,6 @@ import "github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 // debuff level (skill 5076).
 const maxDeathPenaltyLevel = 15
 
-// deathPenaltyChance is the reference's default per-death percent chance to
-// raise the death-penalty debuff level for a death that carries no karma.
-const deathPenaltyChance = 20
-
 // raidRelatedKiller is implemented by a killer that can identify as tied to
 // a raid encounter, exempting a Charm-of-Luck death from the penalty even
 // without an identified killer.
