@@ -12,6 +12,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/worldobject"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -23,10 +24,30 @@ func (fakePetStoreNoSaved) Get(context.Context, int32) (petmodel.State, bool, er
 	return petmodel.State{}, false, nil
 }
 
+func (fakePetStoreNoSaved) Save(context.Context, int32, petmodel.State) error { return nil }
+
 type fakePetStoreSaved struct{ state petmodel.State }
 
 func (f fakePetStoreSaved) Get(context.Context, int32) (petmodel.State, bool, error) {
 	return f.state, true, nil
+}
+
+func (fakePetStoreSaved) Save(context.Context, int32, petmodel.State) error { return nil }
+
+type recordingPetStore struct {
+	savedItemObjectID int32
+	savedState        petmodel.State
+	restoreState      petmodel.State
+}
+
+func (s *recordingPetStore) Get(context.Context, int32) (petmodel.State, bool, error) {
+	return s.restoreState, s.restoreState != (petmodel.State{}), nil
+}
+
+func (s *recordingPetStore) Save(_ context.Context, itemObjectID int32, state petmodel.State) error {
+	s.savedItemObjectID = itemObjectID
+	s.savedState = state
+	return nil
 }
 
 type fakeSummonIDs struct{ next int32 }
@@ -117,6 +138,9 @@ func TestGameSummonSpawnerSpawnPetRegistersLiveActor(t *testing.T) {
 	if pet.Name() != "Wolf" {
 		t.Fatalf("Name() = %q, want template name %q (no saved row)", pet.Name(), "Wolf")
 	}
+	if pet.PetInventory() == nil {
+		t.Fatal("PetInventory() = nil, want a dedicated carried-item inventory")
+	}
 
 	// TryUseSkill previously short-circuited to false whenever no AI was
 	// attached (Actor.brain == nil); SpawnPet must leave it non-nil so an
@@ -144,6 +168,101 @@ func TestGameSummonSpawnerSpawnPetRestoresSavedName(t *testing.T) {
 	pet := obj.(*summon.Actor)
 	if pet.Name() != "Fang" {
 		t.Fatalf("Name() = %q, want restored saved name %q", pet.Name(), "Fang")
+	}
+}
+
+func TestGameClientLinkReturnPetSavesCollarState(t *testing.T) {
+	link, _ := newSummonTestLink(t)
+	want := petmodel.State{Name: "Fang", Level: 10, Exp: 1234, SP: 56, CurHP: 200, CurMP: 40, Fed: 2500}
+	store := &recordingPetStore{restoreState: want}
+	link.petStore = store
+	live := newTestLivePlayer(t, 1, &frameCapture{})
+	inst := &item.Instance{ObjectID: 500, TemplateID: summonTestCollarTemplateID, OwnerID: live.ObjectID()}
+	if !(&gameSummonSpawner{link: link, live: live}).SpawnPet(live.Character, inst) {
+		t.Fatal("SpawnPet returned false")
+	}
+
+	link.handleSummonActionUse(context.Background(), live, clientpackets.RequestActionUse{ActionID: 19})
+
+	if store.savedItemObjectID != inst.ObjectID {
+		t.Fatalf("saved collar = %d, want %d", store.savedItemObjectID, inst.ObjectID)
+	}
+	if got := store.savedState; got != want {
+		t.Fatalf("saved state = %+v, want %+v", got, want)
+	}
+}
+
+func TestGameClientLinkDetachLivePlayerSavesPetCollarState(t *testing.T) {
+	link, state := newSummonTestLink(t)
+	store := &recordingPetStore{}
+	link.petStore = store
+	live := newTestLivePlayer(t, 1, &frameCapture{})
+	inst := &item.Instance{ObjectID: 500, TemplateID: summonTestCollarTemplateID, OwnerID: live.ObjectID()}
+	if !(&gameSummonSpawner{link: link, live: live}).SpawnPet(live.Character, inst) {
+		t.Fatal("SpawnPet returned false")
+	}
+	obj, _ := state.Summon(live.ObjectID())
+	if got := obj.(*summon.Actor).PetInventory().AddNew(20, 1, 900); got == nil {
+		t.Fatal("add carried pet potion")
+	}
+
+	link.detachLivePlayer(context.Background(), live)
+
+	if store.savedItemObjectID != inst.ObjectID {
+		t.Fatalf("saved collar = %d, want %d", store.savedItemObjectID, inst.ObjectID)
+	}
+	if got := live.Inventory().ItemCount(20, -1, true); got != 1 {
+		t.Fatalf("owner pet potion count = %d, want 1", got)
+	}
+}
+
+func TestGameClientLinkReturnPetTransfersCarriedItemsToOwner(t *testing.T) {
+	link, state := newSummonTestLink(t)
+	live := newTestLivePlayer(t, 1, &frameCapture{})
+	inst := &item.Instance{ObjectID: 500, TemplateID: summonTestCollarTemplateID, OwnerID: live.ObjectID()}
+	if !(&gameSummonSpawner{link: link, live: live}).SpawnPet(live.Character, inst) {
+		t.Fatal("SpawnPet returned false")
+	}
+	obj, ok := state.Summon(live.ObjectID())
+	if !ok {
+		t.Fatal("spawned pet missing from world")
+	}
+	pet := obj.(*summon.Actor)
+	if got := pet.PetInventory().AddNew(20, 1, 900); got == nil {
+		t.Fatal("add carried pet potion")
+	}
+
+	link.handleSummonActionUse(context.Background(), live, clientpackets.RequestActionUse{ActionID: 19})
+
+	if got := live.Inventory().ItemCount(20, -1, true); got != 1 {
+		t.Fatalf("owner pet potion count = %d, want 1", got)
+	}
+}
+
+func TestGameClientLinkReturnPetDropsCarriedItemsWhenOwnerInventoryIsFull(t *testing.T) {
+	link, state := newSummonTestLink(t)
+	drops := &recordingGroundDropper{}
+	link.groundItems = drops
+	live := newTestLivePlayer(t, 1, &frameCapture{})
+	live.Inventory().SlotLimit = 1
+	live.Inventory().AddNew(30, 1, 800)
+	inst := &item.Instance{ObjectID: 500, TemplateID: summonTestCollarTemplateID, OwnerID: live.ObjectID()}
+	if !(&gameSummonSpawner{link: link, live: live}).SpawnPet(live.Character, inst) {
+		t.Fatal("SpawnPet returned false")
+	}
+	obj, _ := state.Summon(live.ObjectID())
+	pet := obj.(*summon.Actor)
+	if got := pet.PetInventory().AddNew(20, 1, 900); got == nil {
+		t.Fatal("add carried pet potion")
+	}
+
+	link.handleSummonActionUse(context.Background(), live, clientpackets.RequestActionUse{ActionID: 19})
+
+	if len(drops.drops) != 1 {
+		t.Fatalf("ground drops = %d, want 1", len(drops.drops))
+	}
+	if got := drops.drops[0].ground.Instance.TemplateID; got != 20 {
+		t.Fatalf("dropped template = %d, want 20", got)
 	}
 }
 
@@ -184,6 +303,22 @@ func TestUseSummonItemSpawnsPetEndToEnd(t *testing.T) {
 	if !pet.TryUseSkill(2046, live.Character) {
 		t.Fatalf("TryUseSkill(2046) = false after item-use spawn, want true")
 	}
+}
+
+func TestUseSummonItemRejectsSittingOwner(t *testing.T) {
+	link, _ := newSummonTestLink(t)
+	frames := &frameCapture{}
+	live := newTestLivePlayer(t, 1, frames)
+	live.Character.SetStanding(false)
+	inst := &item.Instance{ObjectID: 500, TemplateID: summonTestCollarTemplateID, OwnerID: live.ObjectID()}
+
+	if !link.useSummonItem(live, live.Inventory(), inst) {
+		t.Fatal("useSummonItem returned false, want handled rejection")
+	}
+	if len(frames.frames) != 1 {
+		t.Fatalf("frames = %d, want exactly one rejection", len(frames.frames))
+	}
+	assertSystemMessageIDFrame(t, frames.frames[0], 31)
 }
 
 // TestGameSummonSpawnerSpawnPetBroadcastsSpawnRelation covers Summon.onSpawn's

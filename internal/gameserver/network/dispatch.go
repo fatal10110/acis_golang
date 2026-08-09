@@ -53,6 +53,7 @@ type shortcutStore interface {
 // the saved row for a collar's pet, if any (data/sql.PetStore.Get).
 type petStore interface {
 	Get(ctx context.Context, itemObjectID int32) (petmodel.State, bool, error)
+	Save(ctx context.Context, itemObjectID int32, state petmodel.State) error
 }
 
 type attackStanceTracker interface {

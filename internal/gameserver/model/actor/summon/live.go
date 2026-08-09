@@ -87,6 +87,9 @@ type Actor struct {
 
 	petInventory  *itemcontainer.Inventory
 	petConfig     *petmodel.Config
+	controlItemID int32
+	exp           int64
+	sp            int
 	fed           int
 	maxMeal       int
 	mealInNormal  int
@@ -190,14 +193,17 @@ type PetTickResult struct {
 
 // PetConfig carries the minimum state needed to create a live pet.
 type PetConfig struct {
-	ObjectID int32
-	Owner    Owner
-	NPCID    int
-	Name     string
-	Level    int
-	CON      int
-	Passive  bool
-	Config   *petmodel.Config
+	ObjectID      int32
+	Owner         Owner
+	ControlItemID int32
+	NPCID         int
+	Name          string
+	Level         int
+	Exp           int64
+	SP            int
+	CON           int
+	Passive       bool
+	Config        *petmodel.Config
 
 	Inventory     *itemcontainer.Inventory
 	Fed           int
@@ -285,6 +291,9 @@ func NewPet(cfg PetConfig) *Actor {
 		intent:        IntentFollowOwner,
 		petInventory:  cfg.Inventory,
 		petConfig:     petCfg,
+		controlItemID: cfg.ControlItemID,
+		exp:           cfg.Exp,
+		sp:            cfg.SP,
 		fed:           cfg.Fed,
 		maxMeal:       cfg.MaxMeal,
 		mealInNormal:  cfg.MealInNormal,

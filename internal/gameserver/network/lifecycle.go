@@ -5,7 +5,9 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 )
 
 const livePlayerDetachSaveTimeout = 2 * time.Second
@@ -84,6 +86,8 @@ func (l *GameClientLink) detachLivePlayer(ctx context.Context, live *livePlayer)
 		// detached player.
 		if obj, ok := l.world.Summon(live.ObjectID()); ok {
 			if pet, ok := obj.(*summon.Actor); ok {
+				l.savePet(saveCtx, pet)
+				l.transferPetInventory(pet, live.Inventory())
 				if inv := pet.PetInventory(); inv != nil {
 					inv.SetUpdateNotifier(nil)
 					l.flushItemPersistence(saveCtx, inv)
@@ -114,6 +118,58 @@ func (l *GameClientLink) detachLivePlayer(ctx context.Context, live *livePlayer)
 		inv.SetWeightNotifier(nil)
 		l.flushItemPersistence(saveCtx, inv)
 	}
+}
+
+func (l *GameClientLink) savePet(ctx context.Context, actor *summon.Actor) {
+	if l.petStore == nil {
+		return
+	}
+	itemObjectID, state, ok := actor.PetState()
+	if !ok {
+		return
+	}
+	if err := l.petStore.Save(ctx, itemObjectID, state); err != nil {
+		l.log.Error().Err(err).Int32("item_obj_id", itemObjectID).Msg("save pet")
+	}
+}
+
+func (l *GameClientLink) transferPetInventory(actor *summon.Actor, owner *itemcontainer.Inventory) {
+	if actor == nil || owner == nil {
+		return
+	}
+	petInventory := actor.PetInventory()
+	if petInventory == nil {
+		return
+	}
+	for _, inst := range petInventory.Items() {
+		state := inst.Snapshot()
+		if !owner.ValidateCapacity(1) {
+			l.dropPetItem(actor, petInventory, state.ObjectID, state.Count)
+			continue
+		}
+		petInventory.TransferItem(state.ObjectID, state.Count, owner, 0)
+	}
+}
+
+func (l *GameClientLink) dropPetItem(actor *summon.Actor, inv *itemcontainer.Inventory, objectID int32, count int) {
+	if l.inventory == nil || l.groundItems == nil {
+		return
+	}
+	res, ok, err := l.inventory.DropItem(inv, objectID, count)
+	if err != nil {
+		l.log.Error().Err(err).Int32("object_id", objectID).Msg("allocate pet inventory overflow drop")
+		return
+	}
+	if !ok {
+		return
+	}
+	ground, err := grounditem.New(*res.Dropped, res.Template)
+	if err != nil {
+		l.log.Error().Err(err).Int32("object_id", objectID).Msg("build pet inventory overflow drop")
+		return
+	}
+	x, y, z := actor.Position()
+	l.groundItems.Drop(ground, task.DropOptions{X: x, Y: y, Z: z, DropperID: actor.ObjectID()})
 }
 
 // flushItemPersistence unwires inv's items from the lazy persistence task
