@@ -8,6 +8,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -18,6 +19,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/rs/zerolog"
 )
+
+var _ skilltarget.SightChecker = (*Hostile)(nil)
 
 // zeroRoll always returns 0, pinning MakeAttackHit's hit/crit/damage-spread
 // rolls to a deterministic outcome: with any positive hit rate and
@@ -489,8 +492,8 @@ func TestHostileCanSeeQueriesLineOfSightWithActorHeights(t *testing.T) {
 	los := &fakeHostileLineOfSight{result: false}
 	h.SetLineOfSight(los)
 
-	if got := h.CanSee(target); got != false {
-		t.Fatalf("CanSee() = %v, want false (from line-of-sight query result)", got)
+	if got := h.CanSeeTarget(target); got != false {
+		t.Fatalf("CanSeeTarget() = %v, want false (from line-of-sight query result)", got)
 	}
 
 	ox, oy, oz := h.Position()

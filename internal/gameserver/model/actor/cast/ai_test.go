@@ -220,6 +220,35 @@ func TestAIControllerCastBroadcastsSkillUseOnLaunchAndLaunchedOnHit(t *testing.T
 	}
 }
 
+func TestAIControllerCastReportsLaunchAbort(t *testing.T) {
+	clock := &fakeCastClock{}
+	ctrl := NewController(scalingActor())
+	ctrl.afterFunc = clock.AfterFunc
+
+	ref := modelskill.Ref{ID: scalingDef.ID, Level: scalingDef.Level}
+	def := scalingDef
+	def.Target = modelskill.TargetOne
+	def.SkillType = "DUMMYCAST"
+	def.EffectRange = 100
+
+	var got LaunchAbortReason
+	ai := &AIController{
+		Controller:  ctrl,
+		Definitions: fakeDefinitions{ref: def},
+		Caster:      &fakeCastCreature{id: 1, category: skilltarget.CategoryAttackable},
+		OnLaunchAbort: func(reason LaunchAbortReason) {
+			got = reason
+		},
+	}
+
+	ai.Cast(&fakeCastCreature{id: 2, x: 200, category: skilltarget.CategoryAttackable}, ref)
+	clock.fire(125 * time.Millisecond)
+
+	if got != LaunchAbortTooFar {
+		t.Fatalf("launch abort = %v, want LaunchAbortTooFar", got)
+	}
+}
+
 // TestAIControllerCastSkipsEffectsForFusionSkill matches
 // CreatureCast.doFusionCast (CreatureCast.java:81-84), an empty stub for
 // every non-player caster ("Non-Player Creatures cannot use FUSION or
