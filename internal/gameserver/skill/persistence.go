@@ -194,6 +194,30 @@ func (p *Persistence) SetKnownSkill(ctx context.Context, c *player.Character, sk
 	return p.setKnownSkill(ctx, c, skillID, level, true)
 }
 
+// ApplyTransientPassiveSkill replaces a skill's passive stat functions
+// without adding it to the character's learned-skill state or persistence.
+func (p *Persistence) ApplyTransientPassiveSkill(c *player.Character, skillID, oldLevel, level int) error {
+	if c == nil {
+		return nil
+	}
+	if oldLevel > 0 {
+		c.RemoveStatsByOwner(modelskill.Ref{ID: modelskill.ID(skillID), Level: oldLevel})
+	}
+	if level <= 0 {
+		return nil
+	}
+	def, ok := p.definition(modelskill.Ref{ID: modelskill.ID(skillID), Level: level})
+	if !ok || def.Activation != modelskill.ActivationPassive {
+		return nil
+	}
+	fns, err := effect.PassiveFuncs(def)
+	if err != nil {
+		return fmt.Errorf("apply transient passive stats for character %d skill %d level %d: %w", c.ID, skillID, level, err)
+	}
+	c.AddStatFuncs(fns)
+	return nil
+}
+
 // setKnownSkill is SetKnownSkill with control over whether the change
 // reaches character_skills. A skill the server hands out purely from the
 // character's level is re-derived on every level change, so it is held in
