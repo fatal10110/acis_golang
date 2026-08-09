@@ -63,11 +63,51 @@ func (p *Persistence) Save(ctx context.Context, c *player.Character, includeEffe
 		return nil
 	}
 	classIndex := c.SkillSaveClassIndex()
-	rows := effect.BuildSaveRows(c.ActiveSkillEffects(), c.SkillReuseTimers(p.currentTime()), classIndex, includeEffects)
+	var liveEffects []effect.ActiveEffect
+	if includeEffects {
+		liveEffects = p.liveActiveEffects(c)
+	}
+	rows := effect.BuildSaveRows(liveEffects, c.SkillReuseTimers(p.currentTime()), classIndex, includeEffects)
 	if err := p.store.Replace(ctx, c.ID, classIndex, rows); err != nil {
 		return fmt.Errorf("save skill state for character %d: %w", c.ID, err)
 	}
 	return nil
+}
+
+// liveActiveEffects snapshots c's live effect list into the ActiveEffect view
+// BuildSaveRows needs, mirroring Player.storeEffect()'s use of
+// getAllEffects(): the effect list itself is the single source of truth for
+// what gets saved, not a separate write-only registry. An effect whose skill
+// definition no longer resolves is dropped, matching a stale datapack change.
+func (p *Persistence) liveActiveEffects(c *player.Character) []effect.ActiveEffect {
+	list := c.EffectList()
+	if list == nil {
+		return nil
+	}
+	now := p.currentTime()
+	var out []effect.ActiveEffect
+	for _, e := range list.All() {
+		if !e.InUse() {
+			continue
+		}
+		ref := modelskill.Ref{ID: e.Skill.ID, Level: e.Level}
+		def, ok := p.definition(ref)
+		if !ok {
+			continue
+		}
+		count, elapsed := e.SaveState(now)
+		out = append(out, effect.ActiveEffect{
+			Skill:        ref,
+			ReuseGroup:   cast.ReuseKey(def),
+			Count:        count,
+			Time:         elapsed,
+			Toggle:       e.Skill.Toggle,
+			Herb:         e.Herb,
+			Continuous:   e.Skill.SkillType == "CONT",
+			HealOverTime: e.Type == effect.TypeHealOverTime,
+		})
+	}
+	return out
 }
 
 // Restore consumes c's persisted skill state, reinstating pending reuse timers
@@ -136,6 +176,12 @@ func (p *Persistence) ReplayEffects(c *player.Character) {
 		}
 		effect.ApplyRestored(list, c, c, effect.SkillFromDefinition(def), templates, eff.Count, eff.Time)
 	}
+	// The registry's only purpose is staging Restore's effects until the live
+	// effect list exists to receive them; Save now reads that live list
+	// directly (see liveActiveEffects), so a stale, already-replayed entry
+	// left behind here would never be read again — clear it so it can't
+	// linger as dead state.
+	c.ClearActiveSkillEffects()
 }
 
 // SetKnownSkill records one learned skill on the character and, when the

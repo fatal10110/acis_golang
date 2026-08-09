@@ -38,9 +38,9 @@ type livePlayer struct {
 	// use rather than on every use — link/live are stable for p's whole
 	// connection lifetime, so it never needs to change.
 	summonSpawner *gameSummonSpawner
-	shortcuts *shortcut.List
-	isGM      bool
-	log       zerolog.Logger
+	shortcuts     *shortcut.List
+	isGM          bool
+	log           zerolog.Logger
 
 	known          world.KnownBuffer
 	zoneActor      *liveZoneActor
