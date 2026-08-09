@@ -14,6 +14,7 @@ import (
 type PlayerAttackActor interface {
 	attackable.Combatant
 	AttackDisabled() bool
+	CastingNow() bool
 	Knows(attackable.Combatant) bool
 	PhysicalAttackRange() int
 }
@@ -101,6 +102,9 @@ func (p *PlayerAttack) Think() {
 // reach DoAttack twice for the same swing.
 func (p *PlayerAttack) thinkLocked() (bool, error) {
 	if p.target == nil {
+		return false, nil
+	}
+	if p.actor.CastingNow() {
 		return false, nil
 	}
 
