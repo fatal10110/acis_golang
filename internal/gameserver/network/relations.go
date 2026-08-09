@@ -2,6 +2,7 @@ package network
 
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/worldobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -87,4 +88,42 @@ func (l *GameClientLink) broadcastRelations(live *livePlayer) {
 		}
 		broadcastFrame(func() wire.Frame { return serverpackets.FrameRelationChanged(petInfo) }, nearby)
 	}
+}
+
+// broadcastSummonSpawnRelation sends live a self-view RelationChanged for its
+// just-spawned pet, then broadcasts that same relation to every nearby
+// observer, mirroring Summon.onSpawn (Summon.java:336-349) together with
+// Summon's own broadcastRelationsChanges override (Summon.java:351-355).
+// Unlike broadcastRelations (Player.updatePvPFlag/setKarma's shared tail),
+// Summon's override only ever sends the summon's own RelationChanged to
+// nearby observers — the owner's relation hasn't changed, so it is not
+// resent here. Call after the pet is registered in world state (world.AddSummon),
+// since it must already be resolvable as live's summon.
+func (l *GameClientLink) broadcastSummonSpawnRelation(live *livePlayer, pet worldobject.Object) {
+	if l.world == nil || pet == nil {
+		return
+	}
+	karma := live.KarmaPoints
+	pvpFlag := live.PvPFlagState()
+	relation := relationBits(karma, pvpFlag)
+	autoAttackable := relationAutoAttackable(karma, pvpFlag)
+
+	live.SendFrame(serverpackets.FrameRelationChanged(serverpackets.RelationChangedInfo{
+		ObjectID: pet.ObjectID(),
+		Relation: relation,
+		Karma:    int32(karma),
+		PvPFlag:  int32(pvpFlag),
+	}))
+
+	petInfo := serverpackets.RelationChangedInfo{
+		ObjectID: pet.ObjectID(), Relation: relation, IsAutoAttackable: autoAttackable,
+		Karma: int32(karma), PvPFlag: int32(pvpFlag),
+	}
+	broadcastFrame(func() wire.Frame { return serverpackets.FrameRelationChanged(petInfo) }, func(send func(frameReceiver)) {
+		l.world.ForEachKnown(live, func(o world.Tracked) {
+			if receiver, ok := o.(frameReceiver); ok {
+				send(receiver)
+			}
+		})
+	})
 }
