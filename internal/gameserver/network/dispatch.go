@@ -97,6 +97,7 @@ type PlayerConfig struct {
 	// KarmaPlayerCanTeleport controls whether a karma-carrying player may
 	// use a TELEPORT/RECALL-type skill, direct or item-attached.
 	KarmaPlayerCanTeleport bool
+	AwardPKKillPVPPoint    bool
 }
 
 // GameClientLink accepts and drives connections from Interlude game

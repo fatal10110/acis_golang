@@ -204,6 +204,54 @@ func TestAwardKillerPvPKillSkipsWhenVictimHasKarma(t *testing.T) {
 	}
 }
 
+func TestAwardKillerPvPKillAwardsKarmaVictimWhenConfigured(t *testing.T) {
+	victim := &Character{ID: 1, KarmaPoints: 500}
+	killer := &Character{ID: 2}
+	killer.SetAwardPKKillPVPPoint(true)
+
+	victim.awardKillerPvPKill(killer)
+
+	if killer.PvPKills != 1 {
+		t.Fatalf("killer.PvPKills = %d, want 1", killer.PvPKills)
+	}
+}
+
+func TestAwardKillerPvPKillAwardsKarmaVictimForKarmaKillerWhenConfigured(t *testing.T) {
+	victim := &Character{ID: 1, KarmaPoints: 500}
+	killer := &Character{ID: 2, KarmaPoints: 100}
+	killer.SetAwardPKKillPVPPoint(true)
+
+	victim.awardKillerPvPKill(killer)
+
+	if killer.PvPKills != 1 {
+		t.Fatalf("killer.PvPKills = %d, want 1", killer.PvPKills)
+	}
+}
+
+func TestAwardKillerPvPKillSkipsKarmaVictimWhenDisabled(t *testing.T) {
+	victim := &Character{ID: 1, KarmaPoints: 500}
+	killer := &Character{ID: 2}
+	killer.SetAwardPKKillPVPPoint(false)
+
+	victim.awardKillerPvPKill(killer)
+
+	if killer.PvPKills != 0 {
+		t.Fatalf("killer.PvPKills = %d, want 0", killer.PvPKills)
+	}
+}
+
+func TestAwardKillerPvPKillSkipsNegativeKarmaVictim(t *testing.T) {
+	victim := &Character{ID: 1, KarmaPoints: -1}
+	killer := &Character{ID: 2}
+	killer.SetAwardPKKillPVPPoint(true)
+
+	victim.awardKillerPvPKill(killer)
+
+	if killer.PvPKills != 0 {
+		t.Fatalf("killer.PvPKills = %d, want 0", killer.PvPKills)
+	}
+}
+
 func TestAwardKillerPvPKillSkipsWhenKillerHasKarma(t *testing.T) {
 	victim := &Character{ID: 1}
 	victim.UpdatePvPFlag(task.PvPFlagOn)

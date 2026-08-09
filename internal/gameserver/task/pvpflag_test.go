@@ -128,7 +128,10 @@ AwardPKKillPVPPoint = False
 	if opts.Normal != 40*time.Second || opts.Flagged != 20*time.Second {
 		t.Fatalf("durations = normal %s flagged %s, want 40s/20s", opts.Normal, opts.Flagged)
 	}
-	wantUnsupported := []string{"AwardPKKillPVPPoint", "KarmaPlayerCanShop"}
+	if opts.AwardPKKillPVPPoint {
+		t.Fatal("AwardPKKillPVPPoint = true, want false")
+	}
+	wantUnsupported := []string{"KarmaPlayerCanShop"}
 	if !slices.Equal(opts.UnsupportedKeys, wantUnsupported) {
 		t.Fatalf("UnsupportedKeys = %v, want %v", opts.UnsupportedKeys, wantUnsupported)
 	}
@@ -141,6 +144,9 @@ func TestPvPFlagOptionsDefaultsAndInvalidValues(t *testing.T) {
 	}
 	if opts.Normal != 40*time.Second || opts.Flagged != 20*time.Second {
 		t.Fatalf("default durations = normal %s flagged %s, want 40s/20s", opts.Normal, opts.Flagged)
+	}
+	if !opts.AwardPKKillPVPPoint {
+		t.Fatal("default AwardPKKillPVPPoint = false, want true")
 	}
 
 	props, err := config.ParseString(`PvPVsNormalTime = nope`)

@@ -34,8 +34,9 @@ type PvPFlagActor interface {
 
 // PvPFlagOptions controls how long each PvP flag source lasts.
 type PvPFlagOptions struct {
-	Normal  time.Duration
-	Flagged time.Duration
+	Normal              time.Duration
+	Flagged             time.Duration
+	AwardPKKillPVPPoint bool
 
 	UnsupportedKeys []string
 }
@@ -43,13 +44,13 @@ type PvPFlagOptions struct {
 // DefaultPvPFlagOptions returns the shipped players.properties defaults.
 func DefaultPvPFlagOptions() PvPFlagOptions {
 	return PvPFlagOptions{
-		Normal:  40 * time.Second,
-		Flagged: 20 * time.Second,
+		Normal:              40 * time.Second,
+		Flagged:             20 * time.Second,
+		AwardPKKillPVPPoint: true,
 	}
 }
 
 var unsupportedPvPFlagKeys = []string{
-	"AwardPKKillPVPPoint",
 	"CanGMDropEquipment",
 	"KarmaPlayerCanShop",
 	"KarmaPlayerCanTrade",
@@ -76,6 +77,7 @@ func PvPFlagOptionsFromProperties(props *config.Properties) (PvPFlagOptions, err
 	}
 	opts.Normal = time.Duration(normal) * time.Millisecond
 	opts.Flagged = time.Duration(flagged) * time.Millisecond
+	opts.AwardPKKillPVPPoint = f.Bool("AwardPKKillPVPPoint", opts.AwardPKKillPVPPoint)
 
 	for _, key := range unsupportedPvPFlagKeys {
 		if _, ok := props.Lookup(key); ok {
