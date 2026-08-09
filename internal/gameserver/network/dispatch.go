@@ -269,6 +269,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) *GameClientLink {
 			Templates: cfg.NPCs,
 			IDs:       cfg.IDs,
 			World:     cfg.World,
+			Log:       cfg.Log,
 		}),
 		log:          cfg.Log,
 		newCipherKey: randomCipherKey,

@@ -39,7 +39,9 @@ func (h *Hostile) TakeDamage(dmg int, attacker creature.DeathActor) bool {
 		h.applyNonConsumptionDamageEffects(false)
 	}
 	newlyDead := h.health.Damage(dmg)
-	_ = h.BroadcastStatus()
+	if err := h.BroadcastStatus(); err != nil {
+		h.log.Warn().Err(err).Msg("npc: status broadcast")
+	}
 	if !newlyDead {
 		return false
 	}

@@ -41,6 +41,7 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 	if err != nil {
 		return nil, err
 	}
+	hostile.SetLogger(log)
 	if los, ok := geo.(npc.LineOfSight); ok {
 		hostile.SetLineOfSight(los)
 	}
