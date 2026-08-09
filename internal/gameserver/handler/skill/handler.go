@@ -7,6 +7,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cubic"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+	"github.com/rs/zerolog"
 )
 
 // Cast carries the already-resolved inputs a skill handler needs.
@@ -109,6 +110,7 @@ type SignetDeps struct {
 	Templates signetTemplates
 	IDs       signetIDAllocator
 	World     *world.State
+	Log       zerolog.Logger
 }
 
 // NewDefaultRegistryWithSignet returns the same handlers as
@@ -116,7 +118,7 @@ type SignetDeps struct {
 // signet's own world-spawning collaborators.
 func NewDefaultRegistryWithSignet(defs Definitions, signet SignetDeps) *Registry {
 	r := NewDefaultRegistryWithDefinitions(defs)
-	r.Register(signetHandler{defs: defs, templates: signet.Templates, ids: signet.IDs, world: signet.World})
+	r.Register(signetHandler{defs: defs, templates: signet.Templates, ids: signet.IDs, world: signet.World, log: signet.Log})
 	return r
 }
 
