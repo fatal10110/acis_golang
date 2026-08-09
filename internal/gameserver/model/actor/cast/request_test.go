@@ -54,6 +54,57 @@ func TestStartPlayerSkillAcceptsKnownActiveSkill(t *testing.T) {
 	}
 }
 
+// TestStartPlayerSkillClearsRecentFakeDeath covers PlayerCast.doCast's
+// unconditional _actor.clearRecentFakeDeath() (PlayerCast.java:181-185),
+// which runs right after super.doCast() commits to the cast — at cast
+// start, not cast finish. A rejected start (invalid target here) never
+// reaches that line in Java either, so the grace must survive it.
+func TestStartPlayerSkillClearsRecentFakeDeath(t *testing.T) {
+	def := modelskill.Definition{
+		ID: 3, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
+		StaticHitTime: true, HitTime: 500, StaticReuse: true, ReuseDelay: 1200,
+	}
+
+	t.Run("accepted start clears the grace", func(t *testing.T) {
+		ch := newRequestCharacter(10)
+		ch.SetSkillLevel(3, 1)
+		ch.MarkRecentFakeDeath()
+		if !ch.RecentFakeDeath() {
+			t.Fatal("MarkRecentFakeDeath did not set the grace")
+		}
+		ctrl := NewController(&testActor{mp: 100, hp: 100})
+		defs := requestDefinitions{{ID: 3, Level: 1}: def}
+
+		if _, err := StartPlayerSkill(PlayerSkillRequest{
+			Now: time.Unix(1000, 0), Controller: ctrl, Caster: ch,
+			Selected: requestTarget{id: 20}, SkillID: 3, Definitions: defs,
+		}); err != nil {
+			t.Fatalf("StartPlayerSkill() error: %v", err)
+		}
+		if ch.RecentFakeDeath() {
+			t.Fatal("RecentFakeDeath() = true after an accepted cast start, want cleared")
+		}
+	})
+
+	t.Run("rejected start leaves the grace running", func(t *testing.T) {
+		ch := newRequestCharacter(10)
+		ch.SetSkillLevel(3, 1)
+		ch.MarkRecentFakeDeath()
+		ctrl := NewController(&testActor{mp: 100, hp: 100})
+		defs := requestDefinitions{{ID: 3, Level: 1}: def}
+
+		if _, err := StartPlayerSkill(PlayerSkillRequest{
+			Now: time.Unix(1000, 0), Controller: ctrl, Caster: ch,
+			Selected: struct{}{}, SkillID: 3, Definitions: defs,
+		}); !errors.Is(err, ErrInvalidTarget) {
+			t.Fatalf("StartPlayerSkill() error = %v, want ErrInvalidTarget", err)
+		}
+		if !ch.RecentFakeDeath() {
+			t.Fatal("RecentFakeDeath() = false after a rejected cast start, want still running")
+		}
+	})
+}
+
 func TestStartPlayerSkillRejectsUnavailableSkill(t *testing.T) {
 	active := modelskill.Definition{ID: 3, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf}
 	inactive := active
