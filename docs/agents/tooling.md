@@ -3,8 +3,10 @@
 Use the smallest local tool that answers the question and bound its output. The command forms below
 were verified against the installed tools on 2026-07-26.
 
-Run every example from the outer `acis_public/` root. Go commands use `-C acis_golang`; Git commands
-use `git -C acis_golang`. Do not change the persistent shell directory.
+Run every example from the outer `acis_public/` root. Examples use `acis_golang` for the primary
+checkout; in a linked worktree, substitute its outer-root-relative path as `<go-root>` in
+`rtk go -C <go-root>` and `git -C <go-root>`. The datapack remains `aCis_datapack/` at the outer root;
+never resolve it as a sibling of `<go-root>`. Do not change the persistent shell directory.
 
 Choose the search primitive before writing a command. Do not default to `find`, POSIX `grep`, or
 `sed` for repository discovery, code search, or file reading:
