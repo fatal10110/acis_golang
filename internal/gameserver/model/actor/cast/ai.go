@@ -21,6 +21,9 @@ type AIController struct {
 	// and, when it also satisfies skilltarget.Creature, as ApplyEffects'
 	// caster.
 	Caster Target
+	// OnLaunchAbort sends the caster-visible result of a launch-phase gate
+	// failure. Network wiring owns the system-message encoding.
+	OnLaunchAbort func(LaunchAbortReason)
 }
 
 // Disabled reports whether the actor cannot attempt a new cast right now:
@@ -133,7 +136,10 @@ func (a *AIController) Cast(target attackable.Combatant, ref modelskill.Ref) {
 
 	a.Controller.Schedule(plan, Hooks{
 		Launch: func() bool {
-			if RevalidateLaunch(a.Caster, castTarget, def) != LaunchAbortNone {
+			if reason := RevalidateLaunch(a.Caster, castTarget, def); reason != LaunchAbortNone {
+				if a.OnLaunchAbort != nil && reason != LaunchAbortTargetLost {
+					a.OnLaunchAbort(reason)
+				}
 				return false
 			}
 			if broadcaster != nil {

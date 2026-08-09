@@ -2,6 +2,7 @@ package summon
 
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
@@ -10,6 +11,12 @@ import (
 )
 
 func (a *Actor) ObjectID() int32 { return a.id }
+
+// ActingPlayer returns the owner for player-attributed outcomes.
+func (a *Actor) ActingPlayer() creature.DeathActor {
+	owner, _ := a.owner.(creature.DeathActor)
+	return owner
+}
 
 // OwnerID returns the owning player's world object id.
 func (a *Actor) OwnerID() int32 {

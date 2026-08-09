@@ -70,6 +70,7 @@ func provideGameClientLink(
 	autosave *task.Autosave,
 	effects *network.TaskEffects,
 	respawnHP respawnRestoreHP,
+	deathPenalty deathPenaltyChance,
 	spBookNeeded skillEnchantSPBookNeeded,
 	autoLearn autoLearnSkills,
 	weightLimit weightLimitMultiplier,
@@ -80,6 +81,7 @@ func provideGameClientLink(
 ) *network.GameClientLink {
 	playerConfig := network.PlayerConfig{
 		RespawnRestoreHP:         float64(respawnHP),
+		DeathPenaltyChance:       int(deathPenalty),
 		SkillEnchantSPBookNeeded: bool(spBookNeeded),
 		AutoLearnSkills:          bool(autoLearn),
 		WeightLimitMultiplier:    float64(weightLimit),

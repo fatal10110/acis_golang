@@ -159,6 +159,36 @@ func TestLoadAutoLearnSkillsUsesPlayersProperties(t *testing.T) {
 	}
 }
 
+func TestLoadDeathPenaltyChanceUsesPlayersProperties(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "players.properties")
+	if err := os.WriteFile(configPath, []byte("DeathPenaltyChance = 73\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := loadDeathPenaltyChance(gameServerPaths{PlayersConfigPath: configPath})
+	if err != nil {
+		t.Fatalf("loadDeathPenaltyChance() error = %v", err)
+	}
+	if got != 73 {
+		t.Fatalf("loadDeathPenaltyChance() = %d, want 73", got)
+	}
+}
+
+func TestLoadDeathPenaltyChanceDefaultsToTwenty(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "players.properties")
+	if err := os.WriteFile(configPath, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := loadDeathPenaltyChance(gameServerPaths{PlayersConfigPath: configPath})
+	if err != nil {
+		t.Fatalf("loadDeathPenaltyChance() error = %v", err)
+	}
+	if got != 20 {
+		t.Fatalf("loadDeathPenaltyChance() = %d, want 20", got)
+	}
+}
+
 func TestLoadPetConfigUsesServerAndPlayersProperties(t *testing.T) {
 	dir := t.TempDir()
 	serverPath := filepath.Join(dir, "server.properties")

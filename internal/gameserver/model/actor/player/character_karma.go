@@ -44,8 +44,8 @@ func calculatePKKillKarmaGain(pkKills int) int {
 // reproduces the innocent-victim and already-flagged-victim gates; the
 // others stay dormant until their owning subsystems land.
 func (c *Character) awardKillerPKKarma(killer creature.DeathActor) {
-	pk, ok := killer.(*Character)
-	if !ok || pk == c || c.KarmaPoints != 0 || c.PvPFlagState() != task.PvPFlagNone {
+	pk := killerPlayer(killer)
+	if pk == nil || pk == c || c.KarmaPoints != 0 || c.PvPFlagState() != task.PvPFlagNone {
 		return
 	}
 	pk.PKKills++
@@ -66,14 +66,14 @@ func (c *Character) awardKillerPKKarma(killer creature.DeathActor) {
 // allows an at-war clan kill. That state is not tracked on Character yet;
 // it remains owned by the clan subsystem.
 func (c *Character) awardKillerPvPKill(killer creature.DeathActor) {
-	pk, ok := killer.(*Character)
-	if !ok || pk == nil {
+	pk := killerPlayer(killer)
+	if pk == nil || pk == c {
 		return
 	}
 	pk.stateMu.RLock()
 	awardPKKillPVPPoint := pk.awardPKKillPVPPoint
 	pk.stateMu.RUnlock()
-	if pk == c || c.KarmaPoints < 0 || (c.KarmaPoints > 0 && !awardPKKillPVPPoint) || (c.KarmaPoints == 0 && (pk.KarmaPoints != 0 || c.PvPFlagState() == task.PvPFlagNone)) {
+	if c.KarmaPoints < 0 || (c.KarmaPoints > 0 && !awardPKKillPVPPoint) || (c.KarmaPoints == 0 && (pk.KarmaPoints != 0 || c.PvPFlagState() == task.PvPFlagNone)) {
 		return
 	}
 	pk.PvPKills++
@@ -86,6 +86,14 @@ func (c *Character) SetAwardPKKillPVPPoint(enabled bool) {
 	c.stateMu.Lock()
 	defer c.stateMu.Unlock()
 	c.awardPKKillPVPPoint = enabled
+}
+
+func killerPlayer(killer creature.DeathActor) *Character {
+	if summon, ok := killer.(interface{ ActingPlayer() creature.DeathActor }); ok {
+		killer = summon.ActingPlayer()
+	}
+	pk, _ := killer.(*Character)
+	return pk
 }
 
 // SetKarmaChangeNotifier records the packet-layer hook that tells this
