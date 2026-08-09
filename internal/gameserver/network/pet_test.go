@@ -722,7 +722,7 @@ func TestGameClientLinkRequestGiveItemToPetDispatch(t *testing.T) {
 	if reply[0] != serverpackets.OpcodeInventoryUpdate {
 		t.Fatalf("second reply opcode = %#x, want InventoryUpdate (%#x)", reply[0], serverpackets.OpcodeInventoryUpdate)
 	}
-	if stack := petInv.ItemByTemplateID(item.AdenaID); stack == nil || stack.Count != 25 {
+	if stack := petInv.ItemByTemplateID(item.AdenaID); stack == nil || stack.Snapshot().Count != 25 {
 		t.Fatalf("pet stack = %+v, want 25 adena", stack)
 	}
 }
@@ -795,8 +795,13 @@ func TestGameClientLinkRequestPetGetItemDispatch(t *testing.T) {
 	if _, ok := state.Object(groundID); ok {
 		t.Fatalf("world.Object(%d) still present after pickup", groundID)
 	}
-	if stack := petInv.ItemByTemplateID(item.AdenaID); stack == nil || stack.Count != 40 || stack.OwnerID != pet.ObjectID() {
-		t.Fatalf("pet stack = %+v, want 40 adena", stack)
+	stack := petInv.ItemByTemplateID(item.AdenaID)
+	if stack == nil {
+		t.Fatal("pet stack = nil, want 40 adena")
+	}
+	stackState := stack.Snapshot()
+	if stackState.Count != 40 || stackState.OwnerID != pet.ObjectID() {
+		t.Fatalf("pet stack = %+v, want 40 adena", stackState)
 	}
 }
 

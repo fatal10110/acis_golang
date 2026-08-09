@@ -20,6 +20,21 @@ type effectsActor struct {
 	summon   *effectsActor
 }
 
+type pvpEffectsActor struct {
+	effectsActor
+	calls []pvpSkillCall
+}
+
+type pvpSkillCall struct {
+	targets   []any
+	offensive bool
+	skillType string
+}
+
+func (a *pvpEffectsActor) NotePvPSkillTargets(targets []any, offensive bool, skillType string) {
+	a.calls = append(a.calls, pvpSkillCall{targets: append([]any(nil), targets...), offensive: offensive, skillType: skillType})
+}
+
 func (a *effectsActor) ObjectID() int32                { return a.id }
 func (a *effectsActor) Position() (int, int, int)      { return a.x, a.y, a.z }
 func (a *effectsActor) Heading() int                   { return 0 }
@@ -88,6 +103,25 @@ func TestApplyEffectsResultCarriesSkillHandlerAttackFailed(t *testing.T) {
 	}
 	if result.AttackFailed != 2 {
 		t.Fatalf("AttackFailed = %d, want 2", result.AttackFailed)
+	}
+}
+
+func TestApplyEffectsNotifiesPvPStatusBeforeSkillHandling(t *testing.T) {
+	caster := &pvpEffectsActor{effectsActor: effectsActor{id: 1, category: skilltarget.CategoryPlayable}}
+	target := &effectsActor{id: 2, category: skilltarget.CategoryPlayable}
+	rec := &recordingSkillHandler{}
+	handlers := newEffectHandlers(effectsKnown{}, "DUMMY", rec)
+	def := modelskill.Definition{ID: 100, Target: modelskill.TargetOne, Offensive: true, SkillType: "DUMMY"}
+
+	if !ApplyEffects(handlers, caster, target, def) {
+		t.Fatal("ApplyEffects() = false, want true")
+	}
+	if len(caster.calls) != 1 {
+		t.Fatalf("PvP status calls = %d, want 1", len(caster.calls))
+	}
+	call := caster.calls[0]
+	if !call.offensive || call.skillType != "DUMMY" || len(call.targets) != 1 || call.targets[0] != target {
+		t.Fatalf("PvP status call = %+v, want offensive selected target", call)
 	}
 }
 

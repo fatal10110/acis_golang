@@ -48,6 +48,10 @@ func (l *GameClientLink) useSummonItem(live *livePlayer, inv *itemcontainer.Inve
 	if !ok || summonItem.SummonType != summonItemTypePet {
 		return false
 	}
+	if !live.Character.Standing() {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotMoveWhileSitting))
+		return true
+	}
 
 	def, ok := l.skills.Definition(summonCreatureSkillRef)
 	if !ok {

@@ -4,6 +4,7 @@ import "github.com/fatal10110/acis_golang/internal/commons/wire"
 
 // Static system message ids used by focused packet helpers.
 const (
+	SystemMessageCannotMoveWhileSitting           = 31
 	SystemMessageNotEnoughHP                      = 23
 	SystemMessageNotEnoughMP                      = 24
 	SystemMessageRejuvenatingHP                   = 25
