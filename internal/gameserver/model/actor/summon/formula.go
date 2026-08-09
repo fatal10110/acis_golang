@@ -153,10 +153,10 @@ func (s summonStatActor) WIT() int { return defaultInt(s.a.stats.WIT, 43) }
 func (s summonStatActor) MEN() int { return defaultInt(s.a.stats.MEN, 20) }
 
 func (s summonStatActor) Level() int {
-	if s.a.level <= 0 {
-		return 1
+	if lvl := s.a.Level(); lvl > 0 {
+		return lvl
 	}
-	return s.a.level
+	return 1
 }
 
 func (s summonStatActor) LevelMod() float64 {
@@ -267,7 +267,7 @@ func (a *Actor) hungryHalved() bool {
 	if !a.isPet || a.maxMeal <= 0 {
 		return false
 	}
-	return float64(a.fed) < float64(a.maxMeal)*a.hungryLimit
+	return float64(a.Fed()) < float64(a.maxMeal)*a.hungryLimit
 }
 
 // PAtkSpd returns this summon's physical attack speed, given baseAtkSpd from
