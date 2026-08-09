@@ -53,10 +53,15 @@ func (c *Character) ReduceDeathPenaltyLevel() int {
 		return c.deathPenaltyLevel
 	}
 	c.deathPenaltyLevel--
+	oldLevel := c.deathPenaltyLevel + 1
 	level := c.deathPenaltyLevel
+	skillUpdate := c.updateDeathPenaltySkill
 	update := c.updateDeathPenaltyReduced
 	c.stateMu.Unlock()
 
+	if skillUpdate != nil {
+		skillUpdate(oldLevel, level)
+	}
 	if update != nil {
 		update(level)
 	}
@@ -81,6 +86,14 @@ func (c *Character) SetDeathPenaltyReducedUpdater(update func(level int)) {
 	c.stateMu.Lock()
 	defer c.stateMu.Unlock()
 	c.updateDeathPenaltyReduced = update
+}
+
+// SetDeathPenaltySkillUpdater records the runtime hook that replaces the
+// death-penalty skill's transient passive stats after each level change.
+func (c *Character) SetDeathPenaltySkillUpdater(update func(oldLevel, newLevel int)) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	c.updateDeathPenaltySkill = update
 }
 
 // RaiseDeathPenaltyLevel evaluates the death-penalty increment gate for a
@@ -126,11 +139,16 @@ func (c *Character) RaiseDeathPenaltyLevel(killer any, roll int) (int, bool) {
 		return c.deathPenaltyLevel, false
 	}
 
+	oldLevel := c.deathPenaltyLevel
 	c.deathPenaltyLevel++
 	level := c.deathPenaltyLevel
+	skillUpdate := c.updateDeathPenaltySkill
 	update := c.updateDeathPenaltyRaised
 	c.stateMu.Unlock()
 
+	if skillUpdate != nil {
+		skillUpdate(oldLevel, level)
+	}
 	if update != nil {
 		update(level)
 	}
