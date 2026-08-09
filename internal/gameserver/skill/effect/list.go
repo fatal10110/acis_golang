@@ -2,7 +2,6 @@ package effect
 
 import (
 	"sync"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
 )
@@ -149,19 +148,6 @@ func (l *List) DanceCount() int {
 		}
 	}
 	return count
-}
-
-// RescheduleSeeds restarts the duration timer of every currently active seed
-// effect, matching L2SkillSeed.useSkill()'s behavior of refreshing every
-// live EffectSeed on the target whenever any seed skill lands on it, not
-// just the one instance that grew.
-func (l *List) RescheduleSeeds() {
-	now := time.Now()
-	for _, e := range l.active() {
-		if e.Type == TypeSeed {
-			e.startSchedule(now)
-		}
-	}
 }
 
 // Tick runs periodic actions due at the current time and removes effects

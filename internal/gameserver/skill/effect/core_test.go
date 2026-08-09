@@ -3,6 +3,7 @@ package effect
 import (
 	"reflect"
 	"testing"
+	"time"
 
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
@@ -334,6 +335,20 @@ func TestSeedEffectStartsAtSkillLevel(t *testing.T) {
 	}
 }
 
+// TestSeedEffectPowerIgnoresSkillLevel guards EffectSeed.java:10's
+// unconditional `_power = 1`: the initial charge must stay 1 even for a
+// higher-level SEED skill, not track skill.getLevel() the way every other
+// effect kind's Level does.
+func TestSeedEffectPowerIgnoresSkillLevel(t *testing.T) {
+	e, err := New(Skill{Level: 3}, modelskill.EffectTemplate{Name: "Seed", Time: 5})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	if e.Level != 1 {
+		t.Fatalf("initial Level = %d, want 1 regardless of skill level 3 (EffectSeed._power = 1 is hardcoded)", e.Level)
+	}
+}
+
 func TestSeedEffectIncreasePowerGrowsLevelInPlace(t *testing.T) {
 	target := &liveEffectTarget{list: NewList(nil)}
 	e, err := New(Skill{Level: 1}, modelskill.EffectTemplate{Name: "Seed", Time: 5})
@@ -353,37 +368,34 @@ func TestSeedEffectIncreasePowerGrowsLevelInPlace(t *testing.T) {
 	}
 }
 
-func TestListRescheduleSeedsRestartsOnlyActiveSeedEffects(t *testing.T) {
-	list := NewList(nil)
-	target := &liveEffectTarget{list: list}
-
-	seed, err := New(Skill{Level: 1}, modelskill.EffectTemplate{Name: "Seed", Time: 5})
+// TestSeedRecastDoesNotExtendDeadline guards against reintroducing a
+// reschedule-on-recast call. AbstractEffect.rescheduleEffect() ->
+// startEffectTask()'s initialDelay = max((_period - getTime())*1000, 5) is
+// derived from the effect's construction-time _periodStartTime, which
+// rescheduleEffect() never mutates (AbstractEffect.java:264-270, 186-206,
+// 138-141) — so a recast reproduces the same original deadline instead of
+// granting a fresh full period. In this port that means growing a seed's
+// power in place must leave its already-set nextAction/remaining alone.
+func TestSeedRecastDoesNotExtendDeadline(t *testing.T) {
+	target := &liveEffectTarget{list: NewList(nil)}
+	e, err := New(Skill{Level: 1}, modelskill.EffectTemplate{Name: "Seed", Time: 5})
 	if err != nil {
-		t.Fatalf("New(Seed) error: %v", err)
+		t.Fatalf("New() error: %v", err)
 	}
-	seed.Effected = target
-	list.Add(seed)
+	e.Effected = target
+	target.list.Add(e)
 
-	buff, err := New(Skill{Level: 1}, modelskill.EffectTemplate{Name: "Buff", Time: 600})
-	if err != nil {
-		t.Fatalf("New(Buff) error: %v", err)
+	t0 := time.Now()
+	e.startSchedule(t0)
+	wantDeadline := e.nextAction
+	wantRemaining := e.remaining
+
+	e.IncreasePower()
+
+	if e.nextAction != wantDeadline {
+		t.Fatalf("nextAction after recast = %v, want unchanged %v (reference pins the deadline)", e.nextAction, wantDeadline)
 	}
-	buff.Effected = target
-	list.Add(buff)
-
-	seed.scheduleMu.Lock()
-	seed.remaining = 0
-	seed.scheduleMu.Unlock()
-	buff.scheduleMu.Lock()
-	buff.remaining = 0
-	buff.scheduleMu.Unlock()
-
-	list.RescheduleSeeds()
-
-	if got := seed.Remaining(); got != seed.Template.Count {
-		t.Fatalf("seed Remaining() after RescheduleSeeds = %d, want reset to %d", got, seed.Template.Count)
-	}
-	if got := buff.Remaining(); got != 0 {
-		t.Fatalf("buff Remaining() after RescheduleSeeds = %d, want left untouched at 0", got)
+	if e.remaining != wantRemaining {
+		t.Fatalf("remaining after recast = %d, want unchanged %d", e.remaining, wantRemaining)
 	}
 }
