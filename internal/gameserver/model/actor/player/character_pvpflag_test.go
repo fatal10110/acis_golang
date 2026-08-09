@@ -31,6 +31,34 @@ func TestUpdatePvPFlagRefreshesUserInfoOnlyOnChange(t *testing.T) {
 	}
 }
 
+func TestUpdatePvPFlagBroadcastsRelationsOnlyOnChange(t *testing.T) {
+	c := &Character{ID: 1}
+	broadcasts := 0
+	c.SetRelationBroadcaster(func() { broadcasts++ })
+
+	c.UpdatePvPFlag(task.PvPFlagOn)
+	if broadcasts != 1 {
+		t.Fatalf("broadcasts after first change = %d, want 1", broadcasts)
+	}
+
+	c.UpdatePvPFlag(task.PvPFlagOn)
+	if broadcasts != 1 {
+		t.Fatalf("broadcasts after unchanged state = %d, want 1 (no-op)", broadcasts)
+	}
+
+	c.UpdatePvPFlag(task.PvPFlagBlinking)
+	if broadcasts != 2 {
+		t.Fatalf("broadcasts after second change = %d, want 2", broadcasts)
+	}
+}
+
+func TestUpdatePvPFlagNoopWithoutRelationBroadcaster(t *testing.T) {
+	c := &Character{ID: 1}
+
+	// Should not panic when no hook is wired.
+	c.UpdatePvPFlag(task.PvPFlagOn)
+}
+
 func TestNotePvPHitFromAttackerFlagsInnocentVictimHit(t *testing.T) {
 	attacker := &Character{ID: 1}
 	victim := &Character{ID: 2}

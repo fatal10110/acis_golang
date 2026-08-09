@@ -419,6 +419,9 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	c.SetKarmaChangeNotifier(func(karma int) {
 		sendKarmaChangeFrames(live, karma)
 	})
+	c.SetRelationBroadcaster(func() {
+		l.broadcastRelations(live)
+	})
 	c.SetPvPFlagHook(func(useFlaggedDuration bool) {
 		if l.pvpFlags == nil {
 			return

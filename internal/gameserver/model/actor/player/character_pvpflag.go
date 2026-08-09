@@ -6,13 +6,10 @@ var _ task.PvPFlagActor = (*Character)(nil)
 
 // UpdatePvPFlag records the PvP flag state visible to this character's own
 // client, mirroring Player.updatePvPFlag(int): a no-op when the state is
-// unchanged, otherwise it persists the new state and resends UserInfo so
-// the client redraws the name color/PvP icon. The reference also sends a
-// RelationChanged packet for an owned summon and broadcasts the relation
-// change to nearby observers on every change; neither summon messaging nor
-// an observer relation/name-color broadcast exists in this port yet — see
-// the #1267 follow-up — so this only ever covers the self-only UserInfo
-// refresh.
+// unchanged, otherwise it persists the new state, resends UserInfo so the
+// client redraws the name color/PvP icon, sends an owned summon a
+// self-view RelationChanged, and broadcasts the relation change to nearby
+// observers.
 func (c *Character) UpdatePvPFlag(flag task.PvPFlagState) {
 	c.stateMu.Lock()
 	if c.pvpFlag == flag {
@@ -22,6 +19,7 @@ func (c *Character) UpdatePvPFlag(flag task.PvPFlagState) {
 	c.pvpFlag = flag
 	c.stateMu.Unlock()
 	c.UpdateUserInfo()
+	c.BroadcastRelations()
 }
 
 // PvPFlagState returns this character's current PvP flag state.
