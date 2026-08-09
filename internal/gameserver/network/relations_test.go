@@ -55,6 +55,64 @@ func TestBroadcastRelationsWithoutSummonNotifiesObserverOnly(t *testing.T) {
 	}
 }
 
+func TestBroadcastRelationsPvPZoneIsPerObserver(t *testing.T) {
+	state := world.New()
+	selfFrames := &frameCapture{}
+	insideFrames := &frameCapture{}
+	outsideFrames := &frameCapture{}
+	self := newTestLivePlayer(t, 1, selfFrames)
+	inside := newTestLivePlayer(t, 2, insideFrames)
+	outside := newTestLivePlayer(t, 3, outsideFrames)
+	self.SetInPvPZone(true)
+	inside.SetInPvPZone(true)
+	state.Spawn(self, 0, 0, 0, 0)
+	state.Spawn(inside, 100, 0, 0, 0)
+	state.Spawn(outside, -100, 0, 0, 0)
+	selfFrames.frames = nil
+	insideFrames.frames = nil
+	outsideFrames.frames = nil
+
+	(&GameClientLink{world: state}).broadcastRelations(self)
+
+	wantInside := relationChangedPayload(self.ObjectID(), 0, 1, 0, 0)
+	if len(insideFrames.frames) != 1 || !bytes.Equal(insideFrames.frames[0], wantInside) {
+		t.Fatalf("inside observer frames = %x, want %x", insideFrames.frames, wantInside)
+	}
+	wantOutside := relationChangedPayload(self.ObjectID(), 0, 0, 0, 0)
+	if len(outsideFrames.frames) != 1 || !bytes.Equal(outsideFrames.frames[0], wantOutside) {
+		t.Fatalf("outside observer frames = %x, want %x", outsideFrames.frames, wantOutside)
+	}
+}
+
+func TestBroadcastSummonSpawnRelationPvPZoneIsPerObserver(t *testing.T) {
+	state := world.New()
+	selfFrames := &frameCapture{}
+	insideFrames := &frameCapture{}
+	outsideFrames := &frameCapture{}
+	self := newTestLivePlayer(t, 1, selfFrames)
+	inside := newTestLivePlayer(t, 2, insideFrames)
+	outside := newTestLivePlayer(t, 3, outsideFrames)
+	self.SetInPvPZone(true)
+	inside.SetInPvPZone(true)
+	state.Spawn(self, 0, 0, 0, 0)
+	state.Spawn(inside, 100, 0, 0, 0)
+	state.Spawn(outside, -100, 0, 0, 0)
+	selfFrames.frames = nil
+	insideFrames.frames = nil
+	outsideFrames.frames = nil
+
+	(&GameClientLink{world: state}).broadcastSummonSpawnRelation(self, testSummon{id: 77})
+
+	wantInside := relationChangedPayload(77, 0, 1, 0, 0)
+	if len(insideFrames.frames) != 1 || !bytes.Equal(insideFrames.frames[0], wantInside) {
+		t.Fatalf("inside observer frames = %x, want %x", insideFrames.frames, wantInside)
+	}
+	wantOutside := relationChangedPayload(77, 0, 0, 0, 0)
+	if len(outsideFrames.frames) != 1 || !bytes.Equal(outsideFrames.frames[0], wantOutside) {
+		t.Fatalf("outside observer frames = %x, want %x", outsideFrames.frames, wantOutside)
+	}
+}
+
 func TestBroadcastRelationsWithSummonNotifiesSelfAndBroadcastsBoth(t *testing.T) {
 	state := world.New()
 	selfFrames := &frameCapture{}

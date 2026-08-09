@@ -1,7 +1,6 @@
 package network
 
 import (
-	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/worldobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
@@ -26,15 +25,12 @@ func relationBits(karma int, pvpFlag task.PvPFlagState) int32 {
 	return bits
 }
 
-// relationAutoAttackable mirrors the terminal branch of
-// Playable.isAttackableWithoutForceBy (Playable.java:526-528): "CTRL is
-// not needed if the target is flagged/PK". The party, clan, ally,
-// Olympiad, duel, siege-side, and PVP-zone exemptions earlier in that
-// method depend on subsystems this port doesn't have yet, so this always
-// reduces to the flagged/karma check — every relation observer sees the
-// same value for a given subject.
-func relationAutoAttackable(karma int, pvpFlag task.PvPFlagState) bool {
-	return karma > 0 || pvpFlag != task.PvPFlagNone
+// relationAutoAttackable mirrors the PvP-zone and terminal branches of
+// Playable.isAttackableWithoutForceBy. Party and command-channel exemptions
+// remain unavailable until #146; other earlier branches are tracked by their
+// respective subsystems.
+func relationAutoAttackable(karma int, pvpFlag task.PvPFlagState, subjectInPvPZone, observerInPvPZone bool) bool {
+	return subjectInPvPZone && observerInPvPZone || karma > 0 || pvpFlag != task.PvPFlagNone
 }
 
 // broadcastRelations sends live's owned summon a self-view RelationChanged,
@@ -52,7 +48,6 @@ func (l *GameClientLink) broadcastRelations(live *livePlayer) {
 	karma := live.KarmaPoints
 	pvpFlag := live.PvPFlagState()
 	relation := relationBits(karma, pvpFlag)
-	autoAttackable := relationAutoAttackable(karma, pvpFlag)
 
 	pet, hasPet := l.world.Summon(live.ObjectID())
 	if hasPet {
@@ -68,26 +63,23 @@ func (l *GameClientLink) broadcastRelations(live *livePlayer) {
 		}))
 	}
 
-	nearby := func(send func(frameReceiver)) {
-		l.world.ForEachKnown(live, func(o world.Tracked) {
-			if receiver, ok := o.(frameReceiver); ok {
-				send(receiver)
-			}
-		})
-	}
-	ownerInfo := serverpackets.RelationChangedInfo{
-		ObjectID: live.ObjectID(), Relation: relation, IsAutoAttackable: autoAttackable,
-		Karma: int32(karma), PvPFlag: int32(pvpFlag),
-	}
-	broadcastFrame(func() wire.Frame { return serverpackets.FrameRelationChanged(ownerInfo) }, nearby)
-
-	if hasPet {
-		petInfo := serverpackets.RelationChangedInfo{
-			ObjectID: pet.ObjectID(), Relation: relation, IsAutoAttackable: autoAttackable,
-			Karma: int32(karma), PvPFlag: int32(pvpFlag),
+	l.world.ForEachKnown(live, func(o world.Tracked) {
+		observer, ok := o.(*livePlayer)
+		if !ok {
+			return
 		}
-		broadcastFrame(func() wire.Frame { return serverpackets.FrameRelationChanged(petInfo) }, nearby)
-	}
+		autoAttackable := relationAutoAttackable(karma, pvpFlag, live.InPvPZone(), observer.InPvPZone())
+		observer.SendFrame(serverpackets.FrameRelationChanged(serverpackets.RelationChangedInfo{
+			ObjectID: live.ObjectID(), Relation: relation, IsAutoAttackable: autoAttackable,
+			Karma: int32(karma), PvPFlag: int32(pvpFlag),
+		}))
+		if hasPet {
+			observer.SendFrame(serverpackets.FrameRelationChanged(serverpackets.RelationChangedInfo{
+				ObjectID: pet.ObjectID(), Relation: relation, IsAutoAttackable: autoAttackable,
+				Karma: int32(karma), PvPFlag: int32(pvpFlag),
+			}))
+		}
+	})
 }
 
 // broadcastSummonSpawnRelation sends live a self-view RelationChanged for its
@@ -106,7 +98,6 @@ func (l *GameClientLink) broadcastSummonSpawnRelation(live *livePlayer, pet worl
 	karma := live.KarmaPoints
 	pvpFlag := live.PvPFlagState()
 	relation := relationBits(karma, pvpFlag)
-	autoAttackable := relationAutoAttackable(karma, pvpFlag)
 
 	live.SendFrame(serverpackets.FrameRelationChanged(serverpackets.RelationChangedInfo{
 		ObjectID: pet.ObjectID(),
@@ -115,15 +106,15 @@ func (l *GameClientLink) broadcastSummonSpawnRelation(live *livePlayer, pet worl
 		PvPFlag:  int32(pvpFlag),
 	}))
 
-	petInfo := serverpackets.RelationChangedInfo{
-		ObjectID: pet.ObjectID(), Relation: relation, IsAutoAttackable: autoAttackable,
-		Karma: int32(karma), PvPFlag: int32(pvpFlag),
-	}
-	broadcastFrame(func() wire.Frame { return serverpackets.FrameRelationChanged(petInfo) }, func(send func(frameReceiver)) {
-		l.world.ForEachKnown(live, func(o world.Tracked) {
-			if receiver, ok := o.(frameReceiver); ok {
-				send(receiver)
-			}
-		})
+	l.world.ForEachKnown(live, func(o world.Tracked) {
+		observer, ok := o.(*livePlayer)
+		if !ok {
+			return
+		}
+		observer.SendFrame(serverpackets.FrameRelationChanged(serverpackets.RelationChangedInfo{
+			ObjectID: pet.ObjectID(), Relation: relation,
+			IsAutoAttackable: relationAutoAttackable(karma, pvpFlag, live.InPvPZone(), observer.InPvPZone()),
+			Karma:            int32(karma), PvPFlag: int32(pvpFlag),
+		}))
 	})
 }
