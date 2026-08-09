@@ -57,6 +57,9 @@ type CreatureActor interface {
 	SoulshotCharged() bool
 
 	Position() (int, int, int)
+	Heading() int
+	Dead() bool
+	Category() skilltarget.Category
 	SetHeadingTo(attackable.Combatant)
 	MakeAttackHit(target attackable.Combatant, split bool) Hit
 	BroadcastAttack(Snapshot) error
@@ -210,13 +213,9 @@ func (c *Controller) CanAttack(target attackable.Combatant) bool {
 	if !c.actor.Knows(target) {
 		return false
 	}
-	caster, ok := c.actor.(skilltarget.Creature)
-	if !ok {
-		return false
-	}
 	if t, ok := target.(interface {
 		AttackableBy(skilltarget.Creature) bool
-	}); !ok || !t.AttackableBy(caster) {
+	}); !ok || !t.AttackableBy(c.actor) {
 		return false
 	}
 	if !c.actor.CanSee(target) {
