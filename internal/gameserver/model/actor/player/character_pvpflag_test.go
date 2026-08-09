@@ -3,7 +3,7 @@ package player
 import (
 	"testing"
 
-	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 )
 
@@ -71,6 +71,26 @@ func TestNotePvPHitFromAttackerFlagsInnocentVictimHit(t *testing.T) {
 		t.Fatalf("hook calls = %v, want [false] (normal duration)", calls)
 	}
 }
+
+func TestNotePvPHitFromAttackerSkipsMutualPvPZone(t *testing.T) {
+	attacker := &Character{ID: 1}
+	victim := &Character{ID: 2}
+	attacker.SetInPvPZone(true)
+	victim.SetInPvPZone(true)
+	called := false
+	attacker.SetPvPFlagHook(func(bool) { called = true })
+
+	victim.notePvPHitFromAttacker(attacker)
+
+	if called {
+		t.Fatal("hook fired for two PvP-zone players")
+	}
+}
+
+type pvpFlagNPC struct{ guard bool }
+
+func (pvpFlagNPC) Category() skilltarget.Category { return skilltarget.CategoryAttackable }
+func (n pvpFlagNPC) Guard() bool                  { return n.guard }
 
 func TestNotePvPHitFromAttackerUsesFlaggedDurationForOngoingPvPFight(t *testing.T) {
 	attacker := &Character{ID: 1}
@@ -147,11 +167,7 @@ func TestNotePvPHitFromAttackerNoopWithoutHook(t *testing.T) {
 	victim.notePvPHitFromAttacker(attacker)
 }
 
-// TestCharacterTakeDamageFlagsAttackerOnInnocentHit is the end-to-end
-// regression test for the #1249 gap: a live physical hit against a
-// karma-free victim must reach the attacker's registered PvP-flag hook, not
-// just the lower-level notePvPHitFromAttacker helper.
-func TestCharacterTakeDamageFlagsAttackerOnInnocentHit(t *testing.T) {
+func TestCharacterNotePvPAttackFlagsInnocentVictim(t *testing.T) {
 	tmpl := combatTemplate()
 	items := combatItems()
 	attacker := liveCharacter(1, tmpl, items)
@@ -159,28 +175,53 @@ func TestCharacterTakeDamageFlagsAttackerOnInnocentHit(t *testing.T) {
 	var calls []bool
 	attacker.SetPvPFlagHook(func(useFlagged bool) { calls = append(calls, useFlagged) })
 
-	victim.TakeDamage(10, attacker)
+	attacker.NotePvPAttack(victim)
 
 	if len(calls) != 1 || calls[0] != false {
-		t.Fatalf("hook calls after TakeDamage = %v, want [false]", calls)
+		t.Fatalf("hook calls after NotePvPAttack = %v, want [false]", calls)
 	}
 }
 
-// TestCharacterReduceHPFlagsAttackerOnInnocentHit mirrors the above for
-// skill (magic) damage, which lands on Character.ReduceHP rather than
-// TakeDamage.
-func TestCharacterReduceHPFlagsAttackerOnInnocentHit(t *testing.T) {
-	tmpl := combatTemplate()
-	items := combatItems()
-	attacker := liveCharacter(1, tmpl, items)
-	victim := liveCharacter(2, tmpl, items)
+func TestCharacterNotePvPAttackFlagsOwnerOfSummonedTarget(t *testing.T) {
+	attacker := &Character{ID: 1}
+	victim := &Character{ID: 2}
 	var calls []bool
 	attacker.SetPvPFlagHook(func(useFlagged bool) { calls = append(calls, useFlagged) })
 
-	victim.ReduceHP(10, attacker, modelskill.Definition{})
+	attacker.NotePvPAttack(summonKiller{owner: victim})
 
-	if len(calls) != 1 || calls[0] != false {
-		t.Fatalf("hook calls after ReduceHP = %v, want [false]", calls)
+	if len(calls) != 1 || calls[0] {
+		t.Fatalf("hook calls after summoned target = %v, want [false]", calls)
+	}
+}
+
+func TestCharacterNotePvPSkillTargetsFlagsEligibleNonOffensiveTargets(t *testing.T) {
+	tmpl := combatTemplate()
+	items := combatItems()
+	attacker := liveCharacter(1, tmpl, items)
+	flagged := liveCharacter(2, tmpl, items)
+	flagged.UpdatePvPFlag(task.PvPFlagOn)
+	var calls []bool
+	attacker.SetPvPFlagHook(func(useFlagged bool) { calls = append(calls, useFlagged) })
+
+	attacker.NotePvPSkillTargets([]any{flagged, pvpFlagNPC{}}, false, "DUMMY")
+
+	if len(calls) != 2 || calls[0] || calls[1] {
+		t.Fatalf("hook calls after NotePvPSkillTargets = %v, want [false false]", calls)
+	}
+}
+
+func TestCharacterNotePvPSkillTargetsFlagsOwnerOfFlaggedSummon(t *testing.T) {
+	attacker := &Character{ID: 1}
+	victim := &Character{ID: 2}
+	victim.UpdatePvPFlag(task.PvPFlagOn)
+	called := false
+	attacker.SetPvPFlagHook(func(bool) { called = true })
+
+	attacker.NotePvPSkillTargets([]any{summonKiller{owner: victim}}, false, "DUMMY")
+
+	if !called {
+		t.Fatal("non-offensive cast at a flagged summon did not flag its owner")
 	}
 }
 

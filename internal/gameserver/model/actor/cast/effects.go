@@ -24,6 +24,10 @@ type EffectResult struct {
 	CubicID      cubic.ID
 }
 
+type pvpSkillNotifier interface {
+	NotePvPSkillTargets([]any, bool, string)
+}
+
 // ApplyEffects resolves def's affected target set from caster and the
 // already cast-validated single selection, then routes the skill's effects
 // to the resolved set. It reports whether a skill handler actually ran.
@@ -77,6 +81,9 @@ func applyEffectsResult(handlers EffectHandlers, caster any, resolved Target, de
 	castTargets := make([]any, len(affected))
 	for i, t := range affected {
 		castTargets[i] = t
+	}
+	if notifier, ok := caster.(pvpSkillNotifier); ok {
+		notifier.NotePvPSkillTargets(castTargets, def.Offensive, def.SkillType)
 	}
 
 	result, ok := handlers.Skills.UseResult(handlerskill.Cast{
