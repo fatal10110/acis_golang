@@ -63,6 +63,20 @@ func (a *Actor) SetName(name string) {
 	a.name = name
 }
 
+// PetState returns the collar id and durable state for a live pet.
+func (a *Actor) PetState() (int32, petmodel.State, bool) {
+	if a == nil || !a.isPet || a.controlItemID == 0 {
+		return 0, petmodel.State{}, false
+	}
+	a.statusMu.RLock()
+	state := petmodel.State{Name: a.name, Level: a.level, Exp: a.exp, SP: a.sp, Fed: a.fed}
+	a.statusMu.RUnlock()
+	a.vitals.mu.RLock()
+	state.CurHP, state.CurMP = a.vitals.hp, a.vitals.mp
+	a.vitals.mu.RUnlock()
+	return a.controlItemID, state, true
+}
+
 // ScaledExpGain returns rawExp multiplied by this pet's configured
 // experience rate.
 func (a *Actor) ScaledExpGain(rawExp int64) int64 {

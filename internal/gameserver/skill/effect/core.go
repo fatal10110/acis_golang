@@ -372,7 +372,7 @@ func New(skill Skill, tmpl modelskill.EffectTemplate) (*Effect, error) {
 		Herb: strings.Contains(skill.Name, "Herb"),
 	}
 
-	funcs, err := statFuncs(e, tmpl.Funcs)
+	funcs, err := statFuncs(e, tmpl.Funcs, nil)
 	if err != nil {
 		return nil, fmt.Errorf("effect %s: %w", tmpl.Name, err)
 	}

@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
@@ -115,16 +116,17 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 	}
 
 	pet := link.newPet(summon.PetConfig{
-		ObjectID: objID,
-		Owner:    live,
-		NPCID:    int(summonItem.NPCID),
-		Name:     name,
-		Level:    level,
-		CON:      npcTmpl.CON,
-		Config:   nil, // set by newPet from link.petConfig
-		// Inventory is left nil: the pet's own carried-item inventory
-		// (paperdoll/warehouse-adjacent, separate from the collar) is
-		// deferred — see this PR's linked follow-up.
+		ObjectID:      objID,
+		Owner:         live,
+		ControlItemID: controlItem.ObjectID,
+		NPCID:         int(summonItem.NPCID),
+		Name:          name,
+		Level:         level,
+		Exp:           state.Exp,
+		SP:            state.SP,
+		CON:           npcTmpl.CON,
+		Config:        nil, // set by newPet from link.petConfig
+		Inventory:     itemcontainer.NewPetInventory(objID, live.Inventory().Templates()),
 		Fed:           fed,
 		MaxMeal:       levelStats.MaxMeal,
 		MealInNormal:  levelStats.MealInNormal,
@@ -151,7 +153,11 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 	// current HP/MP at max, so a restored value only needs applying when
 	// it differs from that default.
 	if hasSaved {
-		pet.AddMP(curMP - levelStats.MaxMP)
+		if curMP < pet.MPValue() {
+			pet.ReduceMP(pet.MPValue() - curMP)
+		} else {
+			pet.AddMP(curMP - pet.MPValue())
+		}
 	}
 
 	// Combat AI wiring (owner-commanded attack/follow execution against a
