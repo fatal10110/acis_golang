@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -209,7 +210,13 @@ func (c *Controller) CanAttack(target attackable.Combatant) bool {
 	if !c.actor.Knows(target) {
 		return false
 	}
-	if t, ok := target.(interface{ AttackableBy(CreatureActor) bool }); !ok || !t.AttackableBy(c.actor) {
+	caster, ok := c.actor.(skilltarget.Creature)
+	if !ok {
+		return false
+	}
+	if t, ok := target.(interface {
+		AttackableBy(skilltarget.Creature) bool
+	}); !ok || !t.AttackableBy(caster) {
 		return false
 	}
 	if !c.actor.CanSee(target) {

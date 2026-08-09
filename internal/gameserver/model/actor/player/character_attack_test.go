@@ -5,14 +5,50 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
+var _ target.AttackRules = (*Character)(nil)
+
 func zeroRoll(int) int { return 0 }
+
+func TestCharacterAttackableWithoutForceBy(t *testing.T) {
+	target := &Character{ID: 1}
+	other := &Character{ID: 2}
+
+	tests := []struct {
+		name string
+		set  func()
+		by   *Character
+		want bool
+	}{
+		{name: "self", by: target, want: false},
+		{name: "unported membership systems", by: other, want: false},
+		{name: "default", by: other, want: false},
+		{name: "karma", set: func() { target.KarmaPoints = 1 }, by: other, want: true},
+		{name: "pvp flag", set: func() { target.UpdatePvPFlag(task.PvPFlagOn) }, by: other, want: true},
+		{name: "blinking pvp flag", set: func() { target.UpdatePvPFlag(task.PvPFlagBlinking) }, by: other, want: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			target.KarmaPoints = 0
+			target.UpdatePvPFlag(task.PvPFlagNone)
+			if tt.set != nil {
+				tt.set()
+			}
+			if got := target.AttackableWithoutForceBy(tt.by); got != tt.want {
+				t.Fatalf("AttackableWithoutForceBy() = %t, want %t", got, tt.want)
+			}
+		})
+	}
+}
 
 func combatTemplate() *Template {
 	return &Template{

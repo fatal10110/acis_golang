@@ -3,7 +3,7 @@ package network
 import (
 	"context"
 
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
+	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
@@ -223,7 +223,7 @@ func summonTargetAttackable(live *livePlayer, target attackable.Combatant) bool 
 		return false
 	}
 	attackableTarget, ok := target.(interface {
-		AttackableBy(attack.CreatureActor) bool
+		AttackableBy(skilltarget.Creature) bool
 	})
 	return ok && attackableTarget.AttackableBy(live.Character)
 }

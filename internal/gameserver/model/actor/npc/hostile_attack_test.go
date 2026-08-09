@@ -20,6 +20,8 @@ import (
 	"github.com/rs/zerolog"
 )
 
+var _ skilltarget.AttackRules = (*Hostile)(nil)
+
 var _ skilltarget.SightChecker = (*Hostile)(nil)
 
 // zeroRoll always returns 0, pinning MakeAttackHit's hit/crit/damage-spread
@@ -212,12 +214,21 @@ func TestHostileAttackableByLiveAttacker(t *testing.T) {
 	if !target.AttackableBy(attacker) {
 		t.Fatal("live hostile target is not attackable")
 	}
+	if !target.AttackableWithoutForceBy(attacker) {
+		t.Fatal("live hostile target is not attackable without force")
+	}
 	if target.AttackableBy(target) {
 		t.Fatal("hostile target is attackable by itself")
+	}
+	if target.AttackableWithoutForceBy(target) {
+		t.Fatal("hostile target is attackable by itself without force")
 	}
 	target.MarkDead()
 	if target.AttackableBy(attacker) {
 		t.Fatal("dead hostile target is attackable")
+	}
+	if target.AttackableWithoutForceBy(attacker) {
+		t.Fatal("dead hostile target is attackable without force")
 	}
 }
 
