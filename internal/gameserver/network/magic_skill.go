@@ -31,6 +31,14 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 			return
 		}
 	}
+	// PlayableAI.tryToCast (aCis:297-317) stores the requested cast as the
+	// next intention while a swing is active; starting it here would consume
+	// cast resources and broadcast MagicSkillUse before that swing finishes.
+	if live.attack != nil && live.attack.AttackingNow() {
+		live.deferMagicSkill(req)
+		sendMagicActionFailed(live)
+		return
+	}
 
 	live.Character.SetCastModifiers(req.CtrlPressed, req.ShiftPressed)
 
@@ -122,6 +130,15 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 	})
 }
 
+func (l *GameClientLink) finishDeferredMagicSkill(live *livePlayer) {
+	if live == nil || live.detached() {
+		return
+	}
+	if req := live.takeDeferredMagicSkill(); req != nil {
+		l.handleMagicSkillUse(live, *req)
+	}
+}
+
 func (l *GameClientLink) abortFusionTargeting(target *livePlayer) {
 	if l == nil || l.world == nil || target == nil {
 		return
@@ -142,6 +159,12 @@ func (l *GameClientLink) abortFusionTargeting(target *livePlayer) {
 func (l *GameClientLink) handleMagicSkillUseGround(live *livePlayer, req clientpackets.RequestExMagicSkillUseGround) {
 	if live == nil {
 		sendMagicActionFailed(live)
+		return
+	}
+	level := live.SkillLevel(int(req.SkillID))
+	def, ok := l.skills.Definition(modelskill.Ref{ID: modelskill.ID(req.SkillID), Level: level})
+	// RequestExMagicSkillUseGround silently ignores unknown/non-GROUND skills before a pending action or point is recorded.
+	if level == 0 || !ok || def.Target != modelskill.TargetGround {
 		return
 	}
 	z := int(req.Z)

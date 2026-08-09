@@ -308,6 +308,51 @@ func TestGameClientLinkMagicSkillUseGroundRecordsGroundTargetAndAppliesEffect(t 
 	}
 }
 
+func TestGameClientLinkMagicSkillUseGroundSilentlyIgnoresNonGroundSkill(t *testing.T) {
+	store := newMemorySkillSaveStore()
+	skills := skillstate.NewPersistence(store, modelskill.NewTable([]modelskill.Definition{
+		{
+			ID: 5, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+			HitTime: 500, ReuseDelay: 1200, StaticHitTime: true, StaticReuse: true,
+			MPInitialConsume: 2, MPConsume: 3, SkillType: "BUFF",
+			Effects: []modelskill.EffectTemplate{{Name: "Buff", Time: 60}},
+		},
+	}), store)
+	var objID int32
+	c, _, _, state := newLinkedGameClientWithSkillsSeed(t, skills, func(chars *fakeCharStore, _ *fakeItemStore) {
+		objID = seedSelectableCharacter(t, chars, "player1", "Newbie", 5, 0)
+		store.seedKnown(objID, 0, player.SkillLevels{5: 1})
+	}, 1)
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	c.send(encodeRequestExMagicSkillUseGround(1000, 2000, 300, 5, false, false))
+	if reply := c.readWithTimeout(300 * time.Millisecond); reply != nil {
+		t.Fatalf("non-ground ground-cast reply = opcode %#x, want no reply", reply[0])
+	}
+
+	obj, ok := state.Player(objID)
+	if !ok {
+		t.Fatalf("player %d not found in world state after request", objID)
+	}
+	character, ok := obj.(*livePlayer)
+	if !ok {
+		t.Fatalf("world state player %d is not a *livePlayer", objID)
+	}
+	if x, y, z := character.GroundTarget(); x != 0 || y != 0 || z != 0 {
+		t.Fatalf("GroundTarget() = (%d,%d,%d), want unchanged (0,0,0)", x, y, z)
+	}
+
+	c.send(encodeRequestExMagicSkillUseGround(1000, 2000, 300, 9999, false, false))
+	if reply := c.readWithTimeout(300 * time.Millisecond); reply != nil {
+		t.Fatalf("unlearned ground-cast reply = opcode %#x, want no reply", reply[0])
+	}
+}
+
 func TestGameClientLinkMagicSkillUseSendsAttackFailedWhenContinuousSkillDoesNotLand(t *testing.T) {
 	store := newMemorySkillSaveStore()
 	skills := skillstate.NewPersistence(store, modelskill.NewTable([]modelskill.Definition{
@@ -625,6 +670,39 @@ func TestGameClientLinkMagicSkillUseMissingOneTargetSendsActionFailedOnly(t *tes
 
 	if got, want := frameOpcodes(capture.frames), []byte{serverpackets.OpcodeActionFailed}; !bytes.Equal(got, want) {
 		t.Fatalf("missing-target cast opcodes = %#x, want ActionFailed only (%#x)", got, want)
+	}
+}
+
+func TestGameClientLinkMagicSkillUseDefersUntilAttackFinishes(t *testing.T) {
+	capture := &frameCapture{}
+	live := newTestLivePlayer(t, 7, capture)
+	live.Character.SetSkillLevel(3, 1)
+	link := &GameClientLink{skills: skillstate.NewPersistence(nil, modelskill.NewTable([]modelskill.Definition{{
+		ID: 3, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+		HitTime: 500, ReuseDelay: 1200, StaticHitTime: true, StaticReuse: true,
+	}}), nil)}
+
+	if err := live.attack.DoAttack(newTestHostileNPC(t, 100)); err != nil {
+		t.Fatalf("start attack: %v", err)
+	}
+	capture.frames = nil
+
+	link.handleMagicSkillUse(live, clientpackets.RequestMagicSkillUse{SkillID: 3})
+	if link.castController(live).CastingNow() {
+		t.Fatal("cast started before the active attack finished")
+	}
+	if got, want := frameOpcodes(capture.frames), []byte{serverpackets.OpcodeActionFailed}; !bytes.Equal(got, want) {
+		t.Fatalf("deferred cast opcodes = %#x, want ActionFailed (%#x)", got, want)
+	}
+
+	live.attack.Stop()
+	capture.frames = nil
+	link.finishDeferredMagicSkill(live)
+	if !link.castController(live).CastingNow() {
+		t.Fatal("deferred cast did not start after the attack finished")
+	}
+	if got, want := frameOpcodes(capture.frames), []byte{serverpackets.OpcodeMagicSkillUse, serverpackets.OpcodeSystemMessage, serverpackets.OpcodeSetupGauge}; !bytes.Equal(got, want) {
+		t.Fatalf("drained cast opcodes = %#x, want MagicSkillUse, SystemMessage, SetupGauge (%#x)", got, want)
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
@@ -92,6 +93,7 @@ type Character struct {
 	los                       LineOfSight
 	zones                     PeaceZoneQuery
 	revalidateZones           func(location.Location)
+	insidePvPZone             atomic.Bool
 	sendFrame                 func(wire.Frame) bool
 	broadcastAttack           func(attack.Snapshot)
 	broadcastMove             func(move.Event)
@@ -113,6 +115,7 @@ type Character struct {
 	notifyExpSpGain           func(exp int64, sp int)
 	notifyExpSpLoss           func(exp int64, sp int)
 	notifyKarmaChange         func(karma int)
+	awardPKKillPVPPoint       bool
 	broadcastLevelUp          func()
 	refreshLevel              func()
 	broadcastShortBuff        func(ShortBuffUpdate)
@@ -190,7 +193,9 @@ type Character struct {
 
 	// deathPenaltyLevel is the persisted death-penalty debuff level (skill
 	// 5076), capped at maxDeathPenaltyLevel.
-	deathPenaltyLevel int
+	deathPenaltyLevel       int
+	deathPenaltyChance      int
+	updateDeathPenaltySkill func(oldLevel, newLevel int)
 
 	skills skillState
 	cubics cubic.List

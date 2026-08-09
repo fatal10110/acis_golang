@@ -6,15 +6,19 @@ import "github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 // debuff level (skill 5076).
 const maxDeathPenaltyLevel = 15
 
-// deathPenaltyChance is the reference's default per-death percent chance to
-// raise the death-penalty debuff level for a death that carries no karma.
-const deathPenaltyChance = 20
-
 // raidRelatedKiller is implemented by a killer that can identify as tied to
 // a raid encounter, exempting a Charm-of-Luck death from the penalty even
 // without an identified killer.
 type raidRelatedKiller interface {
 	RaidRelated() bool
+}
+
+// SetDeathPenaltyChance records the players.properties chance used by the
+// non-karma death-penalty gate.
+func (c *Character) SetDeathPenaltyChance(chance int) {
+	c.stateMu.Lock()
+	c.deathPenaltyChance = chance
+	c.stateMu.Unlock()
 }
 
 // DeathPenaltyLevel returns the current death-penalty debuff level.
@@ -49,10 +53,15 @@ func (c *Character) ReduceDeathPenaltyLevel() int {
 		return c.deathPenaltyLevel
 	}
 	c.deathPenaltyLevel--
+	oldLevel := c.deathPenaltyLevel + 1
 	level := c.deathPenaltyLevel
+	skillUpdate := c.updateDeathPenaltySkill
 	update := c.updateDeathPenaltyReduced
 	c.stateMu.Unlock()
 
+	if skillUpdate != nil {
+		skillUpdate(oldLevel, level)
+	}
 	if update != nil {
 		update(level)
 	}
@@ -77,6 +86,14 @@ func (c *Character) SetDeathPenaltyReducedUpdater(update func(level int)) {
 	c.stateMu.Lock()
 	defer c.stateMu.Unlock()
 	c.updateDeathPenaltyReduced = update
+}
+
+// SetDeathPenaltySkillUpdater records the runtime hook that replaces the
+// death-penalty skill's transient passive stats after each level change.
+func (c *Character) SetDeathPenaltySkillUpdater(update func(oldLevel, newLevel int)) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	c.updateDeathPenaltySkill = update
 }
 
 // RaiseDeathPenaltyLevel evaluates the death-penalty increment gate for a
@@ -106,7 +123,7 @@ func (c *Character) RaiseDeathPenaltyLevel(killer any, roll int) (int, bool) {
 		c.stateMu.Unlock()
 		return c.deathPenaltyLevel, false
 	}
-	if c.KarmaPoints <= 0 && roll > deathPenaltyChance {
+	if c.KarmaPoints <= 0 && roll > c.deathPenaltyChance {
 		c.stateMu.Unlock()
 		return c.deathPenaltyLevel, false
 	}
@@ -122,11 +139,16 @@ func (c *Character) RaiseDeathPenaltyLevel(killer any, roll int) (int, bool) {
 		return c.deathPenaltyLevel, false
 	}
 
+	oldLevel := c.deathPenaltyLevel
 	c.deathPenaltyLevel++
 	level := c.deathPenaltyLevel
+	skillUpdate := c.updateDeathPenaltySkill
 	update := c.updateDeathPenaltyRaised
 	c.stateMu.Unlock()
 
+	if skillUpdate != nil {
+		skillUpdate(oldLevel, level)
+	}
 	if update != nil {
 		update(level)
 	}

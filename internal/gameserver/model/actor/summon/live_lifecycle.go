@@ -82,7 +82,7 @@ func (a *Actor) TickServitor(state *world.State) TickResult {
 		result.Unsummoned = true
 		return result
 	}
-	if !upkeep || a.itemConsumeID == 0 || a.itemConsumeCount <= 0 || a.dead {
+	if !upkeep || a.itemConsumeID == 0 || a.itemConsumeCount <= 0 || a.Dead() {
 		return result
 	}
 	if a.ownerInventory == nil || a.ownerInventory.DestroyByTemplateID(a.itemConsumeID, a.itemConsumeCount) == nil {
@@ -179,11 +179,12 @@ func (a *Actor) resolveRequest(ctx CommandContext) Request {
 	a.statusMu.RLock()
 	level, belowUnsummonLimit := a.level, a.belowUnsummonLimit
 	a.statusMu.RUnlock()
+	dead := a.Dead()
 	return Request{
 		Command:                ctx.Command,
 		HasSummon:              a != nil,
 		IsPet:                  a.isPet,
-		SummonIsDead:           a.dead,
+		SummonIsDead:           dead,
 		OutOfControl:           a.disabled,
 		InCombat:               a.combat,
 		IsAttackingNow:         a.attack,

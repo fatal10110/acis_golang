@@ -60,6 +60,7 @@ func provideGameClientLink(
 	ground *task.GroundItems,
 	attackStance *task.AttackStance,
 	pvpFlags *task.PvPFlags,
+	pvpOptions task.PvPFlagOptions,
 	positions *task.PositionUpdates,
 	playerClock *task.PlayerClock,
 	inventoryUpdates *task.InventoryUpdates,
@@ -69,6 +70,7 @@ func provideGameClientLink(
 	autosave *task.Autosave,
 	effects *network.TaskEffects,
 	respawnHP respawnRestoreHP,
+	deathPenalty deathPenaltyChance,
 	spBookNeeded skillEnchantSPBookNeeded,
 	autoLearn autoLearnSkills,
 	weightLimit weightLimitMultiplier,
@@ -79,10 +81,12 @@ func provideGameClientLink(
 ) *network.GameClientLink {
 	playerConfig := network.PlayerConfig{
 		RespawnRestoreHP:         float64(respawnHP),
+		DeathPenaltyChance:       int(deathPenalty),
 		SkillEnchantSPBookNeeded: bool(spBookNeeded),
 		AutoLearnSkills:          bool(autoLearn),
 		WeightLimitMultiplier:    float64(weightLimit),
 		KarmaPlayerCanTeleport:   bool(karmaTeleport),
+		AwardPKKillPVPPoint:      pvpOptions.AwardPKKillPVPPoint,
 		AllowWater:               cfg.AllowWater,
 	}
 	link := network.NewGameClientLink(network.GameClientLinkConfig{

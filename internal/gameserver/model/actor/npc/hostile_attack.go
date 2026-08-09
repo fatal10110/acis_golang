@@ -4,6 +4,7 @@ import (
 	"math"
 	"time"
 
+	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
@@ -91,6 +92,13 @@ func (h *Hostile) CanSee(target attackable.Combatant) bool {
 	ox, oy, oz := h.Position()
 	tx, ty, tz := other.Position()
 	return h.los.CanSeeActor(ox, oy, oz, h.CollisionHeight(), tx, ty, tz, theight)
+}
+
+// CanSeeTarget adapts NPC line-of-sight to the launch revalidation target
+// surface.
+func (h *Hostile) CanSeeTarget(target skilltarget.Creature) bool {
+	combatant, ok := target.(attackable.Combatant)
+	return ok && h.CanSee(combatant)
 }
 
 // CollisionRadius returns this NPC's body radius, used to resolve attack
@@ -458,6 +466,11 @@ func (h *Hostile) releaseKnown() {
 }
 
 // AttackableBy reports whether attacker may physically attack this NPC.
-func (h *Hostile) AttackableBy(attacker attack.CreatureActor) bool {
-	return attacker != nil && attacker != h && !h.AlikeDead()
+func (h *Hostile) AttackableBy(attacker skilltarget.Creature) bool {
+	return attacker != nil && attacker.ObjectID() != h.ObjectID() && !h.AlikeDead()
+}
+
+// AttackableWithoutForceBy uses the ordinary NPC attackability rule.
+func (h *Hostile) AttackableWithoutForceBy(caster skilltarget.Creature) bool {
+	return h.AttackableBy(caster)
 }

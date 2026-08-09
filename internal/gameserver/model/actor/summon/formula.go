@@ -27,7 +27,7 @@ type CombatStats struct {
 }
 
 type summonVitals struct {
-	// mu guards hp and mp.
+	// mu guards hp, mp, and Actor.dead.
 	mu     sync.RWMutex
 	hp, mp float64
 }
@@ -439,12 +439,12 @@ func (a *Actor) ReduceMP(amount float64) float64 {
 
 // ReduceHP applies skill HP damage and marks the summon dead at zero HP.
 func (a *Actor) ReduceHP(amount float64, _ any, _ modelskill.Definition) {
-	if amount <= 0 || a.Dead() {
+	if amount <= 0 {
 		return
 	}
 	a.vitals.mu.Lock()
 	defer a.vitals.mu.Unlock()
-	if a.vitals.hp <= 0 {
+	if a.dead || a.vitals.hp <= 0 {
 		return
 	}
 	a.vitals.hp -= amount

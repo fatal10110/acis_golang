@@ -83,6 +83,12 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 			l.log.Error().Err(err).Int32("object_id", c.ID).Msg("enter world: give skills")
 			return nil, false
 		}
+		if level := c.DeathPenaltyLevel(); level > 0 {
+			if err := l.skills.ApplyTransientPassiveSkill(c, 5076, 0, level); err != nil {
+				l.log.Error().Err(err).Int32("object_id", c.ID).Msg("enter world: restore death-penalty passive stats")
+				return nil, false
+			}
+		}
 	}
 	if c.ResourceValues().CurrentHP < 0.5 {
 		c.MarkDead()
@@ -314,6 +320,7 @@ func skillListEntries(c *player.Character, skills *skillstate.Persistence) []ser
 func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c *player.Character, tmpl *player.Template, items []*item.Instance, shortcuts []shortcut.Shortcut) (*livePlayer, error) {
 	c.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventory(c.ID, l.itemTemplates, items))
 	c.SetWeightLimitMultiplier(l.playerConfig.WeightLimitMultiplier)
+	c.SetDeathPenaltyChance(l.playerConfig.DeathPenaltyChance)
 	c.RefreshWeightPenalty()
 	c.RefreshExpertisePenalty()
 	c.SetWorld(l.world)
@@ -353,6 +360,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	})
 	attackCtl.SetFinished(func() {
 		l.finishDeferredPickup(live)
+		l.finishDeferredMagicSkill(live)
 		combat.Think()
 	})
 	attackCtl.SetStarted(func() {
@@ -419,6 +427,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	c.SetKarmaChangeNotifier(func(karma int) {
 		sendKarmaChangeFrames(live, karma)
 	})
+	c.SetAwardPKKillPVPPoint(l.playerConfig.AwardPKKillPVPPoint)
 	c.SetRelationBroadcaster(func() {
 		l.broadcastRelations(live)
 	})
@@ -474,6 +483,13 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 		}
 		live.SendFrame(serverpackets.FrameEtcStatusUpdate(serverpackets.EtcStatus{WeightPenalty: int32(live.WeightPenalty()), GradePenalty: live.WeaponGradePenalty() || live.ArmorGradePenalty() > 0, DeathPenaltyLevel: int32(level)}))
 	})
+	if l.skills != nil {
+		c.SetDeathPenaltySkillUpdater(func(oldLevel, level int) {
+			if err := l.skills.ApplyTransientPassiveSkill(c, 5076, oldLevel, level); err != nil {
+				l.log.Error().Err(err).Int32("object_id", c.ID).Msg("update death-penalty passive stats")
+			}
+		})
+	}
 	c.SetItemStatsRefresher(func() {
 		if l.skills == nil {
 			return

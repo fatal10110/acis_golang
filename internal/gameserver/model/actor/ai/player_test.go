@@ -17,6 +17,7 @@ type fakePlayerActor struct {
 	id          int32
 	alikeDead   bool
 	disabled    bool
+	casting     bool
 	attackRange int
 	known       map[int32]bool
 }
@@ -29,6 +30,7 @@ func (a *fakePlayerActor) ObjectID() int32      { return a.id }
 func (a *fakePlayerActor) SiegeGuard() bool     { return false }
 func (a *fakePlayerActor) AlikeDead() bool      { return a.alikeDead }
 func (a *fakePlayerActor) AttackDisabled() bool { return a.disabled }
+func (a *fakePlayerActor) CastingNow() bool     { return a.casting }
 func (a *fakePlayerActor) Knows(target attackable.Combatant) bool {
 	return a.known[target.ObjectID()]
 }
@@ -120,6 +122,29 @@ func TestPlayerAttackReportsFailureWhenAlreadyAttacking(t *testing.T) {
 	// once the in-progress swing finishes) should retry the same target.
 	if p.Target() != target {
 		t.Fatalf("Target() = %v after a busy rejection, want %v retained", p.Target(), target)
+	}
+}
+
+func TestPlayerAttackDefersWhileCasting(t *testing.T) {
+	owner := playerActor(1)
+	owner.casting = true
+	target := actor(2)
+	owner.known[target.ObjectID()] = true
+	move := &recordingMove{}
+	strike := &recordingAttack{canAttack: true}
+	p := NewPlayerAttack(owner, move, strike)
+
+	if p.Start(target) {
+		t.Fatal("Start() = true, want false while a cast is in progress")
+	}
+	if strike.target != nil {
+		t.Fatalf("attacked target = %v, want no swing during cast", strike.target)
+	}
+	if move.followTarget != nil || move.stopCount != 0 {
+		t.Fatalf("movement during cast = target %v, stops %d, want no movement", move.followTarget, move.stopCount)
+	}
+	if p.Target() != target {
+		t.Fatalf("Target() = %v after cast deferral, want %v retained", p.Target(), target)
 	}
 }
 

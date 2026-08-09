@@ -59,18 +59,21 @@ func (a *liveZoneActor) revalidate(ix *zone.Index) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	ix.Revalidate(a)
+	a.live.SetInPvPZone(a.flags.Has(zone.FlagPvP))
 }
 
 func (a *liveZoneActor) revalidateMove(ix *zone.Index, previous location.Location) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	ix.RevalidateMove(a, previous)
+	a.live.SetInPvPZone(a.flags.Has(zone.FlagPvP))
 }
 
 func (a *liveZoneActor) removeFrom(ix *zone.Index, x, y int) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	ix.RemoveFrom(a, x, y)
+	a.live.SetInPvPZone(a.flags.Has(zone.FlagPvP))
 }
 
 // TaskEffects routes periodic task effects to their current live player.

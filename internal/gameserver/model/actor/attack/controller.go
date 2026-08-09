@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -56,6 +57,9 @@ type CreatureActor interface {
 	SoulshotCharged() bool
 
 	Position() (int, int, int)
+	Heading() int
+	Dead() bool
+	Category() skilltarget.Category
 	SetHeadingTo(attackable.Combatant)
 	MakeAttackHit(target attackable.Combatant, split bool) Hit
 	BroadcastAttack(Snapshot) error
@@ -209,7 +213,9 @@ func (c *Controller) CanAttack(target attackable.Combatant) bool {
 	if !c.actor.Knows(target) {
 		return false
 	}
-	if t, ok := target.(interface{ AttackableBy(CreatureActor) bool }); !ok || !t.AttackableBy(c.actor) {
+	if t, ok := target.(interface {
+		AttackableBy(skilltarget.Creature) bool
+	}); !ok || !t.AttackableBy(c.actor) {
 		return false
 	}
 	if !c.actor.CanSee(target) {

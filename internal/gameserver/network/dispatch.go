@@ -86,6 +86,9 @@ type PlayerConfig struct {
 	// RespawnRestoreHP is the fraction of calculated max HP a non-percent
 	// revive restores.
 	RespawnRestoreHP float64
+	// DeathPenaltyChance is the percentage chance for a non-karma player to
+	// receive a death-penalty level.
+	DeathPenaltyChance int
 	// SkillEnchantSPBookNeeded controls whether enchanting a skill above
 	// level 76 also consumes the tree's configured spellbook item.
 	SkillEnchantSPBookNeeded bool
@@ -94,6 +97,7 @@ type PlayerConfig struct {
 	// KarmaPlayerCanTeleport controls whether a karma-carrying player may
 	// use a TELEPORT/RECALL-type skill, direct or item-attached.
 	KarmaPlayerCanTeleport bool
+	AwardPKKillPVPPoint    bool
 }
 
 // GameClientLink accepts and drives connections from Interlude game

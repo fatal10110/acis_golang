@@ -2,6 +2,7 @@ package summon
 
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
@@ -10,6 +11,12 @@ import (
 )
 
 func (a *Actor) ObjectID() int32 { return a.id }
+
+// ActingPlayer returns the owner for player-attributed outcomes.
+func (a *Actor) ActingPlayer() creature.DeathActor {
+	owner, _ := a.owner.(creature.DeathActor)
+	return owner
+}
 
 // OwnerID returns the owning player's world object id.
 func (a *Actor) OwnerID() int32 {
@@ -88,12 +95,16 @@ func (a *Actor) CanWearPetItem(tmpl *item.Template) bool {
 }
 
 // Dead reports whether the summon is dead.
-func (a *Actor) Dead() bool { return a.dead }
+func (a *Actor) Dead() bool {
+	a.vitals.mu.RLock()
+	defer a.vitals.mu.RUnlock()
+	return a.dead
+}
 
 // AlikeDead reports whether this summon is dead, satisfying
 // attackable.Combatant so a summon can be targeted by its own owner-
 // commanded skills (e.g. a self-cast special skill).
-func (a *Actor) AlikeDead() bool { return a.dead }
+func (a *Actor) AlikeDead() bool { return a.Dead() }
 
 // SiegeGuard always reports false: pets and servitors are never defensive
 // siege guards.

@@ -57,6 +57,32 @@ func TestCharacterReduceDeathPenaltyLevelFiresReducedUpdater(t *testing.T) {
 	}
 }
 
+func TestCharacterDeathPenaltySkillUpdaterReplacesLevelOnEachChange(t *testing.T) {
+	c := &Character{ID: 1}
+	c.SetDeathPenaltyChance(100)
+
+	var got [][2]int
+	c.SetDeathPenaltySkillUpdater(func(oldLevel, newLevel int) {
+		got = append(got, [2]int{oldLevel, newLevel})
+	})
+
+	c.RaiseDeathPenaltyLevel(nil, 1)
+	c.RaiseDeathPenaltyLevel(nil, 1)
+	c.ReduceDeathPenaltyLevel()
+	c.ReduceDeathPenaltyLevel()
+	c.ReduceDeathPenaltyLevel()
+
+	want := [][2]int{{0, 1}, {1, 2}, {2, 1}, {1, 0}}
+	if len(got) != len(want) {
+		t.Fatalf("death-penalty skill updates = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("death-penalty skill update %d = %v, want %v", i, got[i], want[i])
+		}
+	}
+}
+
 // deathPenaltyKiller is a minimal killer double: a non-Player actor whose
 // raid-relation is fixed at construction.
 type deathPenaltyKiller struct {
@@ -86,14 +112,24 @@ func TestRaiseDeathPenaltyLevelRejectsPlayerKiller(t *testing.T) {
 
 func TestRaiseDeathPenaltyLevelNoKarmaFailsChanceRoll(t *testing.T) {
 	c := &Character{ID: 1}
+	c.SetDeathPenaltyChance(20)
 
-	// roll above deathPenaltyChance, no karma: blocked.
-	if got, changed := c.RaiseDeathPenaltyLevel(deathPenaltyKiller{}, deathPenaltyChance+1); changed || got != 0 {
+	// roll above the configured chance, no karma: blocked.
+	if got, changed := c.RaiseDeathPenaltyLevel(deathPenaltyKiller{}, 21); changed || got != 0 {
 		t.Fatalf("RaiseDeathPenaltyLevel(highRoll) = (%d, %v), want (0, false)", got, changed)
 	}
-	// roll at or below deathPenaltyChance, no karma: passes.
-	if got, changed := c.RaiseDeathPenaltyLevel(deathPenaltyKiller{}, deathPenaltyChance); !changed || got != 1 {
+	// roll at or below the configured chance, no karma: passes.
+	if got, changed := c.RaiseDeathPenaltyLevel(deathPenaltyKiller{}, 20); !changed || got != 1 {
 		t.Fatalf("RaiseDeathPenaltyLevel(lowRoll) = (%d, %v), want (1, true)", got, changed)
+	}
+}
+
+func TestRaiseDeathPenaltyLevelUsesConfiguredChance(t *testing.T) {
+	c := &Character{ID: 1}
+	c.SetDeathPenaltyChance(0)
+
+	if got, changed := c.RaiseDeathPenaltyLevel(deathPenaltyKiller{}, 1); changed || got != 0 {
+		t.Fatalf("RaiseDeathPenaltyLevel(configured chance) = (%d, %v), want (0, false)", got, changed)
 	}
 }
 
