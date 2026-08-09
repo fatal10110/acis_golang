@@ -73,11 +73,11 @@ type fakeCubicFireOwner struct {
 	maxHP    float64
 }
 
-func (f *fakeCubicFireOwner) ObjectID() int32          { return f.objectID }
+func (f *fakeCubicFireOwner) ObjectID() int32           { return f.objectID }
 func (f *fakeCubicFireOwner) Position() (int, int, int) { return f.x, f.y, f.z }
 func (f *fakeCubicFireOwner) Target() any               { return f.target }
-func (f *fakeCubicFireOwner) CurrentHP() int             { return f.hp }
-func (f *fakeCubicFireOwner) MaxHPValue() float64        { return f.maxHP }
+func (f *fakeCubicFireOwner) CurrentHP() int            { return f.hp }
+func (f *fakeCubicFireOwner) MaxHPValue() float64       { return f.maxHP }
 func (f *fakeCubicFireOwner) Roll(n int) int {
 	if f.rollIdx >= len(f.rolls) {
 		return 0

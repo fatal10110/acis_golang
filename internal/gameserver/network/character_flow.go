@@ -145,7 +145,7 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 	if l.skills != nil {
 		l.skills.ReplayEffects(c)
 	}
-	client.Session.SendFrame(serverpackets.FrameEtcStatusUpdate(serverpackets.EtcStatus{WeightPenalty: int32(c.WeightPenalty()), GradePenalty: c.WeaponGradePenalty() || c.ArmorGradePenalty() > 0}))
+	client.Session.SendFrame(serverpackets.FrameEtcStatusUpdate(serverpackets.EtcStatus{WeightPenalty: int32(c.WeightPenalty()), GradePenalty: c.WeaponGradePenalty() || c.ArmorGradePenalty() > 0, DeathPenaltyLevel: int32(c.DeathPenaltyLevel())}))
 	client.Session.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageWelcomeToLineage))
 	client.Session.SendFrame(serverpackets.FrameQuestList(nil))
 	client.Session.SendFrame(serverpackets.FrameSkillList(skillList))
@@ -342,7 +342,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	attackCtl.SetLogger(l.log)
 	combat := ai.NewPlayerAttack(c, moveCtl, attackCtl)
 
-	live := &livePlayer{Character: c, template: tmpl, items: items, attack: attackCtl, move: moveCtl, combat: combat, shortcuts: shortcut.NewList(shortcuts), isGM: resolveIsGM(l.admin, c.AccessLevel), visibilitySend: client.Session.trySendFrame, stopAttack: l.stopLiveAutoAttack, log: l.log}
+	live := &livePlayer{Character: c, template: tmpl, npcs: l.npcs, items: items, attack: attackCtl, move: moveCtl, combat: combat, shortcuts: shortcut.NewList(shortcuts), isGM: resolveIsGM(l.admin, c.AccessLevel), visibilitySend: client.Session.trySendFrame, stopAttack: l.stopLiveAutoAttack, log: l.log}
 	live.zoneActor = &liveZoneActor{live: live}
 	// Build cast eagerly, like attackCtl above: pickup-lock's timer goroutine
 	// reads live.cast unguarded, so a lazy first write from the read-loop
@@ -419,6 +419,16 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	c.SetKarmaChangeNotifier(func(karma int) {
 		sendKarmaChangeFrames(live, karma)
 	})
+	c.SetPvPFlagHook(func(useFlaggedDuration bool) {
+		if l.pvpFlags == nil {
+			return
+		}
+		if useFlaggedDuration {
+			l.pvpFlags.AddFlagged(c)
+			return
+		}
+		l.pvpFlags.AddNormal(c)
+	})
 	c.SetLevelUpBroadcaster(func() {
 		l.broadcastLiveFrame(live, func() wire.Frame {
 			return serverpackets.FrameSocialAction(live.ObjectID(), socialActionLevelUp)
@@ -432,12 +442,12 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	})
 	c.SetGradePenaltyUpdater(func() {
 		live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
-		live.SendFrame(serverpackets.FrameEtcStatusUpdate(serverpackets.EtcStatus{GradePenalty: live.WeaponGradePenalty() || live.ArmorGradePenalty() > 0}))
+		live.SendFrame(serverpackets.FrameEtcStatusUpdate(serverpackets.EtcStatus{GradePenalty: live.WeaponGradePenalty() || live.ArmorGradePenalty() > 0, DeathPenaltyLevel: int32(live.DeathPenaltyLevel())}))
 	})
 	c.SetWeightPenaltyUpdater(func() {
 		items := live.inventoryItems()
 		live.SendFrame(serverpackets.FrameUserInfo(serverpackets.UserInfoSnapshot{Character: live.Character, Template: live.template, Items: items, IsGM: live.isGM}))
-		live.SendFrame(serverpackets.FrameEtcStatusUpdate(serverpackets.EtcStatus{WeightPenalty: int32(live.WeightPenalty()), GradePenalty: live.WeaponGradePenalty() || live.ArmorGradePenalty() > 0}))
+		live.SendFrame(serverpackets.FrameEtcStatusUpdate(serverpackets.EtcStatus{WeightPenalty: int32(live.WeightPenalty()), GradePenalty: live.WeaponGradePenalty() || live.ArmorGradePenalty() > 0, DeathPenaltyLevel: int32(live.DeathPenaltyLevel())}))
 		if l.world != nil {
 			info := serverpackets.CharInfoSnapshot{Character: live.Character, Template: live.template, Items: items}
 			broadcastFrame(func() wire.Frame { return serverpackets.FrameCharInfo(info) }, func(send func(frameReceiver)) {
@@ -448,6 +458,18 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 				})
 			})
 		}
+	})
+	c.SetDeathPenaltyRaisedUpdater(func(level int) {
+		live.SendFrame(serverpackets.FrameEtcStatusUpdate(serverpackets.EtcStatus{WeightPenalty: int32(live.WeightPenalty()), GradePenalty: live.WeaponGradePenalty() || live.ArmorGradePenalty() > 0, DeathPenaltyLevel: int32(level)}))
+		live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageDeathPenaltyLevelS1Added, int32(level)))
+	})
+	c.SetDeathPenaltyReducedUpdater(func(level int) {
+		if level > 0 {
+			live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageDeathPenaltyLevelS1Added, int32(level)))
+		} else {
+			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageDeathPenaltyLifted))
+		}
+		live.SendFrame(serverpackets.FrameEtcStatusUpdate(serverpackets.EtcStatus{WeightPenalty: int32(live.WeightPenalty()), GradePenalty: live.WeaponGradePenalty() || live.ArmorGradePenalty() > 0, DeathPenaltyLevel: int32(level)}))
 	})
 	c.SetItemStatsRefresher(func() {
 		if l.skills == nil {

@@ -8,6 +8,8 @@ const (
 	SystemMessageNotEnoughMP                      = 24
 	SystemMessageRejuvenatingHP                   = 25
 	SystemMessageWelcomeToLineage                 = 34
+	SystemMessageDeathPenaltyLevelS1Added         = 1916
+	SystemMessageDeathPenaltyLifted               = 1917
 	SystemMessageUseS1                            = 46
 	SystemMessageS1PreparedForReuse               = 48
 	SystemMessageEarnedS2S1S                      = 53

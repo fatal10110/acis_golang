@@ -6,6 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -108,6 +111,96 @@ func TestLivePlayerVisibilityRendersHostileNPC(t *testing.T) {
 	state.Despawn(hostile)
 	if len(frames.frames) != 2 || frames.frames[1][0] != serverpackets.OpcodeDeleteObject {
 		t.Fatalf("frames after NPC despawn = %x, want DeleteObject after NPCInfo", frames.frames)
+	}
+}
+
+func TestLivePlayerVisibilitySendsPetInfoOnlyToOwner(t *testing.T) {
+	state := world.New()
+	ownerFrames := &frameCapture{}
+	bystanderFrames := &frameCapture{}
+	owner := newTestLivePlayer(t, 1, ownerFrames)
+	bystander := newTestLivePlayer(t, 2, bystanderFrames)
+	owner.npcs = npc.NewTable([]*npc.Template{{
+		ID: 12077, TemplateID: 12077, Name: "Wolf",
+		AtkSpd: 300, RunSpeed: 120, WalkSpeed: 60,
+		CollisionRadius: 8, CollisionHeight: 20,
+	}})
+	bystander.npcs = owner.npcs
+
+	state.Spawn(owner, 0, 0, 0, 0)
+	state.Spawn(bystander, 500, 0, 0, 0)
+
+	pet := summon.NewPet(summon.PetConfig{
+		ObjectID: 20, Owner: owner, NPCID: 12077, Name: "Wolf", Level: 5,
+		Stats: summon.CombatStats{MaxHP: 100, MaxMP: 30},
+	})
+	summon.SpawnBesideOwner(state, pet, owner, location.Location{X: 10})
+
+	if n := len(ownerFrames.frames); n == 0 || ownerFrames.frames[n-1][0] != serverpackets.OpcodePetInfo {
+		t.Fatalf("owner last frame opcode = %x, want PetInfo (%#x) last", ownerFrames.frames, serverpackets.OpcodePetInfo)
+	}
+	for _, f := range bystanderFrames.frames {
+		if f[0] == serverpackets.OpcodePetInfo {
+			t.Fatalf("bystander frames = %x, want no PetInfo (SummonInfo not ported yet)", bystanderFrames.frames)
+		}
+	}
+
+	state.Despawn(pet)
+	if n := len(ownerFrames.frames); n == 0 || ownerFrames.frames[n-1][0] != serverpackets.OpcodePetDelete {
+		t.Fatalf("owner last frame after pet despawn = %x, want PetDelete (%#x) last", ownerFrames.frames, serverpackets.OpcodePetDelete)
+	}
+	for _, f := range bystanderFrames.frames {
+		if f[0] == serverpackets.OpcodePetDelete {
+			t.Fatalf("bystander frames after pet despawn = %x, want no PetDelete (it never saw the pet spawn)", bystanderFrames.frames)
+		}
+	}
+}
+
+func TestPetInfoSnapshotPetUsesPerLevelShotCounts(t *testing.T) {
+	owner := newTestLivePlayer(t, 1, &frameCapture{})
+	npcs := npc.NewTable([]*npc.Template{{
+		ID: 12077, TemplateID: 12077, Name: "Wolf",
+		AtkSpd: 300, RunSpeed: 120, WalkSpeed: 60,
+		SSCount: 2, SPSCount: 2, // template (servitor) shot counts
+	}})
+	pet := summon.NewPet(summon.PetConfig{
+		ObjectID: 20, Owner: owner, NPCID: 12077, Level: 5,
+		Stats: summon.CombatStats{MaxHP: 100, MaxMP: 30, SSCount: 1, SPSCount: 1}, // per-level pet-row shot counts
+	})
+
+	snap, ok := petInfoSnapshot(pet, owner, npcs)
+	if !ok {
+		t.Fatalf("petInfoSnapshot() ok = false")
+	}
+	if snap.SoulShotsPerHit != 1 || snap.SpiritShotsPerHit != 1 {
+		t.Fatalf("SoulShotsPerHit/SpiritShotsPerHit = %d/%d, want the per-level pet-row values 1/1 (not the template's 2/2)",
+			snap.SoulShotsPerHit, snap.SpiritShotsPerHit)
+	}
+}
+
+func TestPetInfoSnapshotServitorUsesTemplateShotCountsAndLifetimeFed(t *testing.T) {
+	owner := newTestLivePlayer(t, 1, &frameCapture{})
+	npcs := npc.NewTable([]*npc.Template{{
+		ID: 14, TemplateID: 14, Name: "Servitor",
+		AtkSpd: 300, RunSpeed: 120, WalkSpeed: 60,
+		SSCount: 3, SPSCount: 4,
+	}})
+	servitor := summon.NewServitor(summon.ServitorConfig{
+		ObjectID: 21, Owner: owner, NPCID: 14, Level: 40,
+		Lifetime: summon.LifetimeState{TimeRemaining: 900, TotalLifeTime: 1200},
+		Stats:    summon.CombatStats{MaxHP: 500, MaxMP: 200},
+	})
+
+	snap, ok := petInfoSnapshot(servitor, owner, npcs)
+	if !ok {
+		t.Fatalf("petInfoSnapshot() ok = false")
+	}
+	if snap.SoulShotsPerHit != 3 || snap.SpiritShotsPerHit != 4 {
+		t.Fatalf("SoulShotsPerHit/SpiritShotsPerHit = %d/%d, want the template values 3/4 (servitors have no per-level row)",
+			snap.SoulShotsPerHit, snap.SpiritShotsPerHit)
+	}
+	if snap.CurFed != 900 || snap.MaxFed != 1200 {
+		t.Fatalf("CurFed/MaxFed = %d/%d, want the servitor's TimeRemaining/TotalLifeTime 900/1200", snap.CurFed, snap.MaxFed)
 	}
 }
 

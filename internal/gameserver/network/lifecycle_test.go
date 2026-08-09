@@ -360,6 +360,30 @@ type autosaveCountingEffects func(task.AutosaveActor)
 
 func (f autosaveCountingEffects) Save(actor task.AutosaveActor) { f(actor) }
 
+// TestDetachLivePlayerStopsPvPFlagTracking is the regression test for a
+// disconnected character's PvP flag task entry outliving its session: a
+// live entry left behind after detach keeps ticking UpdatePvPFlag calls
+// (harmless once SetUserInfoUpdater(nil) unwires them below, but a
+// resource leak until the timer naturally expires), mirroring
+// Player.java:6293's deleteMe cleanup (PvpFlagTaskManager.remove(this,
+// false)).
+func TestDetachLivePlayerStopsPvPFlagTracking(t *testing.T) {
+	now := time.UnixMilli(0)
+	flags := task.NewPvPFlags(task.PvPFlagOptions{Normal: 40 * time.Second, Flagged: 20 * time.Second}, func() time.Time { return now })
+	live := newTestLivePlayer(t, 101, &frameCapture{})
+	flags.AddNormal(live)
+	if flags.Len() != 1 {
+		t.Fatalf("PvPFlags.Len() after AddNormal = %d, want 1", flags.Len())
+	}
+
+	gcl := &GameClientLink{pvpFlags: flags, log: zerolog.Nop()}
+	gcl.detachLivePlayer(context.Background(), live)
+
+	if flags.Len() != 0 {
+		t.Fatalf("PvPFlags.Len() after detach = %d, want 0", flags.Len())
+	}
+}
+
 // waitForWorldPosition polls until the world-grid presence reaches want,
 // which happens when the simulated walk arrives. The walk duration is
 // driven by the move controller's arrival timer, so the test waits

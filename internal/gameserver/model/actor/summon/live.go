@@ -50,6 +50,7 @@ type Actor struct {
 	level    int
 	isPet    bool
 	npcID    int
+	name     string
 	passive  bool
 	dead     bool
 	disabled bool
@@ -181,6 +182,7 @@ type PetConfig struct {
 	ObjectID int32
 	Owner    Owner
 	NPCID    int
+	Name     string
 	Level    int
 	CON      int
 	Passive  bool
@@ -209,6 +211,7 @@ type ServitorConfig struct {
 	ObjectID int32
 	Owner    Owner
 	NPCID    int
+	Name     string
 	Level    int
 	Passive  bool
 
@@ -232,6 +235,7 @@ func NewServitor(cfg ServitorConfig) *Actor {
 		owner:            cfg.Owner,
 		level:            cfg.Level,
 		npcID:            cfg.NPCID,
+		name:             cfg.Name,
 		passive:          cfg.Passive,
 		followActive:     true,
 		intent:           IntentFollowOwner,
@@ -264,6 +268,7 @@ func NewPet(cfg PetConfig) *Actor {
 		level:         cfg.Level,
 		isPet:         true,
 		npcID:         cfg.NPCID,
+		name:          cfg.Name,
 		passive:       cfg.Passive,
 		followActive:  true,
 		intent:        IntentFollowOwner,

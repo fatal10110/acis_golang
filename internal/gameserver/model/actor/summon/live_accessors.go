@@ -36,6 +36,14 @@ func (a *Actor) SummonType() int {
 // NPCID returns the template id backing this summon.
 func (a *Actor) NPCID() int { return a.npcID }
 
+// Name returns this summon's display name: the npc template name it was
+// spawned with, or a saved pet's own restored name.
+func (a *Actor) Name() string { return a.name }
+
+// SetName overrides this summon's display name, e.g. from a restored save
+// row or an owner-issued rename.
+func (a *Actor) SetName(name string) { a.name = name }
+
 // ScaledExpGain returns rawExp multiplied by this pet's configured
 // experience rate.
 func (a *Actor) ScaledExpGain(rawExp int64) int64 {
@@ -190,6 +198,11 @@ func (a *Actor) PetInventory() *itemcontainer.Inventory {
 
 // Fed returns a pet's current meal gauge.
 func (a *Actor) Fed() int { return a.fed }
+
+// Lifetime returns a servitor's current time-remaining/total-lifetime state,
+// the servitor analogue of a pet's Fed/maxMeal (Servitor.getTimeRemaining/
+// getTotalLifeTime, mirrored by PetInfo.java:26-30's non-Pet branch).
+func (a *Actor) Lifetime() LifetimeState { return a.lifetime }
 
 // FollowActive reports whether this actor is following its owner.
 func (a *Actor) FollowActive() bool { return a.followActive }

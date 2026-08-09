@@ -17,6 +17,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/statbonus"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/rs/zerolog"
 )
@@ -85,40 +86,42 @@ type Character struct {
 	DeleteAt   int64
 	LastAccess int64
 
-	runtimeTemplate          *Template
-	inventory                *itemcontainer.Inventory
-	world                    *world.State
-	los                      LineOfSight
-	zones                    PeaceZoneQuery
-	revalidateZones          func(location.Location)
-	sendFrame                func(wire.Frame) bool
-	broadcastAttack          func(attack.Snapshot)
-	broadcastMove            func(move.Event)
-	broadcastStop            func()
-	broadcastDie             func()
-	broadcastStatus          func()
-	broadcastMPStatus        func()
-	broadcastStance          func(Stance)
-	broadcastFakeDeathRevive func()
-	updateAbnormalEffect     func()
-	updateWeightPenalty      func()
-	weightPenalty            int
-	weightLimitMultiplier    float64
-	updateUserInfo           func()
-	updateGradePenalty       func()
-	refreshItemStats         func()
-	notifyExpSpGain          func(exp int64, sp int)
-	notifyExpSpLoss          func(exp int64, sp int)
-	notifyKarmaChange        func(karma int)
-	broadcastLevelUp         func()
-	refreshLevel             func()
-	broadcastShortBuff       func(ShortBuffUpdate)
-	sendRegenMax             func(count, period int32, hpRegen float64)
-	sendLackHPNotice         func()
-	sendLackMPNotice         func()
-	consumeHerb              func(itemID int32)
-	roll                     func(int) int
-	attackTarget             func(world.Tracked)
+	runtimeTemplate           *Template
+	inventory                 *itemcontainer.Inventory
+	world                     *world.State
+	los                       LineOfSight
+	zones                     PeaceZoneQuery
+	revalidateZones           func(location.Location)
+	sendFrame                 func(wire.Frame) bool
+	broadcastAttack           func(attack.Snapshot)
+	broadcastMove             func(move.Event)
+	broadcastStop             func()
+	broadcastDie              func()
+	broadcastStatus           func()
+	broadcastMPStatus         func()
+	broadcastStance           func(Stance)
+	broadcastFakeDeathRevive  func()
+	updateAbnormalEffect      func()
+	updateWeightPenalty       func()
+	weightPenalty             int
+	weightLimitMultiplier     float64
+	updateUserInfo            func()
+	updateGradePenalty        func()
+	refreshItemStats          func()
+	updateDeathPenaltyRaised  func(level int)
+	updateDeathPenaltyReduced func(level int)
+	notifyExpSpGain           func(exp int64, sp int)
+	notifyExpSpLoss           func(exp int64, sp int)
+	notifyKarmaChange         func(karma int)
+	broadcastLevelUp          func()
+	refreshLevel              func()
+	broadcastShortBuff        func(ShortBuffUpdate)
+	sendRegenMax              func(count, period int32, hpRegen float64)
+	sendLackHPNotice          func()
+	sendLackMPNotice          func()
+	consumeHerb               func(itemID int32)
+	roll                      func(int) int
+	attackTarget              func(world.Tracked)
 
 	deathMu sync.Mutex
 	dead    bool
@@ -165,6 +168,13 @@ type Character struct {
 	castShift            bool
 	target               world.Tracked
 	log                  zerolog.Logger
+
+	// pvpFlag is the client-visible PvP flag state. pvpFlagHook is the
+	// runtime hook that registers this character with the PvP flag tracker
+	// after it lands a hit on a karma-free victim; see UpdatePvPFlag and
+	// SetPvPFlagHook.
+	pvpFlag     task.PvPFlagState
+	pvpFlagHook func(useFlaggedDuration bool)
 
 	// charges is the Force/Soul charge counter (increaseCharges/
 	// decreaseCharges/clearCharges), auto-cleared by chargeTimer after

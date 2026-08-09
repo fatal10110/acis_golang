@@ -149,6 +149,27 @@ func (e *Effect) startScheduleFromRestoreLocked(r *restoreSeed, now time.Time) {
 	e.nextAction = now.Add(delay)
 }
 
+// SaveState reports the tick count and elapsed-seconds-since-last-tick e
+// should persist at now, the inverse of startScheduleFromRestoreLocked:
+// elapsed is the template period minus the time remaining until e's next
+// scheduled tick, clamped to [0, period]. An effect with no period (a
+// single unscheduled or permanent effect) reports zero elapsed.
+func (e *Effect) SaveState(now time.Time) (count, elapsed int32) {
+	if e == nil {
+		return 0, 0
+	}
+	e.scheduleMu.Lock()
+	defer e.scheduleMu.Unlock()
+
+	count = int32(e.remaining)
+	period := e.period()
+	if period <= 0 || e.nextAction.IsZero() {
+		return count, 0
+	}
+	remaining := min(max(e.nextAction.Sub(now), 0), period)
+	return count, int32((period - remaining) / time.Second)
+}
+
 func (e *Effect) stopSchedule() {
 	e.scheduleMu.Lock()
 	e.remaining = 0
@@ -230,13 +251,22 @@ func (e *Effect) stackType() string {
 // when none of those apply (an unscheduled, non-repeating, non-permanent
 // effect), meaning it is omitted from the icon list entirely.
 func (e *Effect) iconDuration(now time.Time) (millis int32, ok bool) {
-	if e.Template.Count > 1 {
-		return int32(e.Remaining() * e.Template.Time * 1000), true
-	}
-
 	e.scheduleMu.Lock()
 	next := e.nextAction
 	e.scheduleMu.Unlock()
+
+	if e.Template.Count > 1 {
+		// Mirrors AbstractEffect.addIcon's repeat-count branch: elapsed is
+		// the whole seconds since the current tick's period started, so the
+		// value decrements every second instead of holding flat for a whole
+		// tick.
+		var elapsed int64
+		if period := e.period(); period > 0 && !next.IsZero() {
+			elapsed = int64(now.Sub(next.Add(-period)) / time.Second)
+		}
+		return int32((int64(e.Remaining())*int64(e.Template.Time) - elapsed) * 1000), true
+	}
+
 	if !next.IsZero() {
 		remaining := max(next.Sub(now), 0)
 		return int32(remaining.Milliseconds()), true

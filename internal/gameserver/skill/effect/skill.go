@@ -32,6 +32,10 @@ type Skill struct {
 	// Level is the applied level of the skill that owns this effect
 	// instance's template.
 	Level int
+	// Name is the skill's datapack display name, consulted only to derive
+	// Effect.Herb (a name containing "Herb"), mirroring
+	// AbstractEffect._isHerbEffect = _skill.getName().contains("Herb").
+	Name string
 	// SkillType is the raw datapack skill-type tag (e.g. "BUFF", "REFLECT").
 	// It drives the buff-slot family used by the list's cap enforcement.
 	SkillType      string

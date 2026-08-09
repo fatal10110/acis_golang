@@ -2,6 +2,7 @@ package effect
 
 import (
 	"fmt"
+	"strings"
 
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
@@ -288,6 +289,7 @@ func SkillFromDefinition(def modelskill.Definition) Skill {
 	return Skill{
 		ID:                  def.ID,
 		Level:               def.Level,
+		Name:                def.Name,
 		SkillType:           def.SkillType,
 		Debuff:              def.Debuff,
 		Toggle:              def.Activation == modelskill.ActivationToggle,
@@ -357,6 +359,10 @@ func New(skill Skill, tmpl modelskill.EffectTemplate) (*Effect, error) {
 		Flag:              k.flag,
 		Level:             skill.Level,
 		RejectsIfAffected: k.rejectsIfAffected,
+		// Mirrors AbstractEffect._isHerbEffect = _skill.getName().contains("Herb"):
+		// a herb buff is identified by its owning skill's name, not by how it
+		// was cast, so this applies uniformly to every application path.
+		Herb: strings.Contains(skill.Name, "Herb"),
 	}
 
 	funcs, err := statFuncs(e, tmpl.Funcs)
