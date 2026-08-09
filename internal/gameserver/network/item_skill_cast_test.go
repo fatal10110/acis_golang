@@ -237,6 +237,54 @@ func TestGameClientLinkUseScrollHitPhaseCostFailureSendsReasonAndStatusUpdate(t 
 	}
 }
 
+func TestGameClientLinkUseScrollRevalidatesTargetAtLaunch(t *testing.T) {
+	store := newMemorySkillSaveStore()
+	skills := skillstate.NewPersistence(store, modelskill.NewTable([]modelskill.Definition{{
+		ID: 2013, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
+		SkillType: "PDAM", StaticHitTime: true, HitTime: 500, StaticReuse: true, ReuseDelay: 5000,
+		EffectRange: 1,
+	}}), store)
+	const scrollTemplate int32 = 736
+	const objectID int32 = 706
+	c, chars, _, state := newLinkedGameClientWithSkillsSeed(t, skills, func(chars *fakeCharStore, items *fakeItemStore) {
+		objID := seedSelectableCharacter(t, chars, "player1", "Newbie", 5, 0)
+		if err := items.Create(context.Background(), objID, item.Instance{
+			ObjectID: objectID, TemplateID: scrollTemplate, OwnerID: objID,
+			Count: 1, Location: item.LocationInventory, ManaLeft: -1,
+		}); err != nil {
+			t.Fatalf("seed scroll: %v", err)
+		}
+	}, 1)
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	obj, ok := state.Player(chars.soleObjectID(t))
+	if !ok {
+		t.Fatal("player not in world state after enter")
+	}
+	live, ok := obj.(*livePlayer)
+	if !ok {
+		t.Fatal("world player is not a *livePlayer")
+	}
+	target := newTestHostileNPC(t, 707)
+	state.Spawn(target, 100, 0, 0, 0)
+	live.SetTargetTracked(target)
+	c.read() // NPCInfo
+
+	c.send(encodeUseItem(objectID, false))
+	if reply := c.read(); reply[0] != serverpackets.OpcodeMagicSkillUse {
+		t.Fatalf("opcode = %#x, want MagicSkillUse (%#x)", reply[0], serverpackets.OpcodeMagicSkillUse)
+	}
+	if reply := c.read(); reply[0] != serverpackets.OpcodeSetupGauge {
+		t.Fatalf("opcode = %#x, want SetupGauge (%#x)", reply[0], serverpackets.OpcodeSetupGauge)
+	}
+	assertStaticSystemMessageFrame(t, c.read(), serverpackets.SystemMessageDistTooFarCastingStopped)
+}
+
 // TestGameClientLinkUseScrollRejectsReuse verifies a still-cooling
 // item-carried skill answers the same reuse rejection a player skill cast
 // produces, and does not consume the item.
