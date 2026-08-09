@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -550,6 +551,9 @@ func (a *attackActor) WeaponReuseDelay() time.Duration { return a.weaponReuse }
 func (a *attackActor) WeaponGrade() int                { return a.weaponGrade }
 func (a *attackActor) SoulshotCharged() bool           { return a.soulshot }
 func (a *attackActor) Position() (int, int, int)       { return 10, 20, -30 }
+func (*attackActor) Heading() int                      { return 0 }
+func (*attackActor) Dead() bool                        { return false }
+func (*attackActor) Category() skilltarget.Category    { return skilltarget.CategoryPlayable }
 func (a *attackActor) SetHeadingTo(target attackable.Combatant) {
 	a.headingTarget = target
 }
@@ -601,7 +605,7 @@ type attackTarget struct {
 func (t *attackTarget) ObjectID() int32  { return t.id }
 func (t *attackTarget) SiegeGuard() bool { return t.siegeGuard }
 func (t *attackTarget) AlikeDead() bool  { return t.alikeDead }
-func (t *attackTarget) AttackableBy(CreatureActor) bool {
+func (t *attackTarget) AttackableBy(skilltarget.Creature) bool {
 	return t.attackable
 }
 func (t *attackTarget) Playable() bool    { return t.playable }

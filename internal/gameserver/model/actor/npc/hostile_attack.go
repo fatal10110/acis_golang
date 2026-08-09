@@ -473,6 +473,11 @@ func (h *Hostile) releaseKnown() {
 }
 
 // AttackableBy reports whether attacker may physically attack this NPC.
-func (h *Hostile) AttackableBy(attacker attack.CreatureActor) bool {
-	return attacker != nil && attacker != h && !h.AlikeDead()
+func (h *Hostile) AttackableBy(attacker skilltarget.Creature) bool {
+	return attacker != nil && attacker.ObjectID() != h.ObjectID() && !h.AlikeDead()
+}
+
+// AttackableWithoutForceBy uses the ordinary NPC attackability rule.
+func (h *Hostile) AttackableWithoutForceBy(caster skilltarget.Creature) bool {
+	return h.AttackableBy(caster)
 }
