@@ -69,8 +69,8 @@ func (c *Character) SetChargeMessageSender(send func(charges int, maxed bool)) {
 // split.
 func (c *Character) DecreaseCharges(count int) bool {
 	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
 	if c.charges < count {
+		c.stateMu.Unlock()
 		return false
 	}
 	c.charges -= count
@@ -78,6 +78,11 @@ func (c *Character) DecreaseCharges(count int) bool {
 		c.stopChargeTimerLocked()
 	} else {
 		c.restartChargeTimerLocked()
+	}
+	update := c.updateCharges
+	c.stateMu.Unlock()
+	if update != nil {
+		update()
 	}
 	return true
 }
@@ -87,9 +92,14 @@ func (c *Character) DecreaseCharges(count int) bool {
 // subclass change.
 func (c *Character) ClearCharges() {
 	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
+	changed := c.charges > 0
 	c.charges = 0
 	c.stopChargeTimerLocked()
+	update := c.updateCharges
+	c.stateMu.Unlock()
+	if changed && update != nil {
+		update()
+	}
 }
 
 func (c *Character) restartChargeTimerLocked() {
