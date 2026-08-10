@@ -23,7 +23,6 @@ func (l *GameClientLink) useConsumableSkillItem(live *livePlayer, inv *itemconta
 	if live == nil || inv == nil || inst == nil {
 		return false
 	}
-	beforeVitals := live.Vitals()
 	results := itemhandler.UseAll(itemhandler.UseRequest{
 		Caster:      live.Character,
 		Inventory:   inv,
@@ -61,6 +60,7 @@ func (l *GameClientLink) useConsumableSkillItem(live *livePlayer, inv *itemconta
 				})
 			}
 			live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageUseS1, int32(res.Skill.ID), int32(res.Skill.Level)))
+			beforeVitals := live.Vitals()
 			res.Apply()
 			sendMagicStatusUpdate(live, beforeVitals)
 			if res.HasShortBuff {

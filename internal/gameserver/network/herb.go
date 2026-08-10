@@ -33,7 +33,6 @@ func (l *GameClientLink) consumeHerb(live *livePlayer, itemID int32) {
 	// A transient off-inventory instance is enough: the instant-cast path
 	// reads only its template.
 	herb := &item.Instance{TemplateID: itemID, Count: 1, Location: item.LocationVoid}
-	beforeVitals := live.Vitals()
 	results := itemhandler.UseAll(itemhandler.UseRequest{
 		Caster:      live.Character,
 		Inventory:   inv,
@@ -64,6 +63,7 @@ func (l *GameClientLink) consumeHerb(live *livePlayer, itemID int32) {
 				return serverpackets.FrameMagicSkillUse(summonObject, summonObject, int32(res.Skill.ID), int32(res.Skill.Level), 0, 0, false)
 			})
 		}
+		beforeVitals := live.Vitals()
 		res.Apply()
 		sendMagicStatusUpdate(live, beforeVitals)
 	}
