@@ -12,7 +12,7 @@ import (
 )
 
 func (l *GameClientLink) consumePetHerb(live *livePlayer, pet *summon.Actor, inv *itemcontainer.Inventory, herb *item.Instance) {
-	res := itemhandler.Use(itemhandler.UseRequest{
+	results := itemhandler.UseAll(itemhandler.UseRequest{
 		Caster:      pet,
 		Inventory:   inv,
 		Item:        herb,
@@ -28,25 +28,27 @@ func (l *GameClientLink) consumePetHerb(live *livePlayer, pet *summon.Actor, inv
 		})
 	})
 
-	switch res.Outcome {
-	case itemhandler.PetRejected:
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageItemNotForPets))
-		return
-	case itemhandler.ReuseRejected:
-		live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1PreparedForReuse, int32(res.Skill.ID), int32(res.Skill.Level)))
-		return
-	case itemhandler.Applied:
-	default:
-		live.SendFrame(serverpackets.FrameActionFailed())
-		return
-	}
+	for _, res := range results {
+		switch res.Outcome {
+		case itemhandler.PetRejected:
+			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageItemNotForPets))
+			return
+		case itemhandler.ReuseRejected:
+			live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1PreparedForReuse, int32(res.Skill.ID), int32(res.Skill.Level)))
+			return
+		case itemhandler.Applied:
+		default:
+			live.SendFrame(serverpackets.FrameActionFailed())
+			return
+		}
 
-	self := skillCastObject(pet)
-	l.broadcastPetFrame(live, pet, func() wire.Frame {
-		return serverpackets.FrameMagicSkillUse(self, self, int32(res.Skill.ID), int32(res.Skill.Level), 0, 0, false)
-	})
-	res.Apply()
-	live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessagePetUsesS1, int32(res.Skill.ID), int32(res.Skill.Level)))
+		self := skillCastObject(pet)
+		l.broadcastPetFrame(live, pet, func() wire.Frame {
+			return serverpackets.FrameMagicSkillUse(self, self, int32(res.Skill.ID), int32(res.Skill.Level), 0, 0, false)
+		})
+		res.Apply()
+		live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessagePetUsesS1, int32(res.Skill.ID), int32(res.Skill.Level)))
+	}
 }
 
 func (l *GameClientLink) broadcastPetFrame(live *livePlayer, pet *summon.Actor, frame func() wire.Frame) {
