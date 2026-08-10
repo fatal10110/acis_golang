@@ -19,14 +19,15 @@ type Definitions interface {
 // neither consumer exists, so StartPlayerSkill only copies them onto
 // StartedSkill.
 type PlayerSkillRequest struct {
-	Now         time.Time
-	Controller  *Controller
-	Caster      *player.Character
-	Selected    any
-	SkillID     int
-	Definitions Definitions
-	Ctrl        bool
-	Shift       bool
+	Now           time.Time
+	Controller    *Controller
+	Caster        *player.Character
+	Selected      any
+	SkillID       int
+	Definitions   Definitions
+	Ctrl          bool
+	Shift         bool
+	ResolveTarget func(Target, any, modelskill.Definition, bool) (Target, bool)
 }
 
 // fakeDeathSkillID is the Fake Death toggle skill. Recasting it while
@@ -61,7 +62,7 @@ func StartPlayerSkill(req PlayerSkillRequest) (StartedSkill, error) {
 		return StartedSkill{}, ErrSkillUnavailable
 	}
 
-	started, err := startResolvedSkill(req.Now, req.Controller, req.Caster, req.Selected, def)
+	started, err := startResolvedSkill(req.Now, req.Controller, req.Caster, req.Selected, def, req.Ctrl, req.ResolveTarget)
 	started.Ctrl = req.Ctrl
 	started.Shift = req.Shift
 	return started, err
@@ -93,14 +94,17 @@ func StartItemSkill(req ItemSkillRequest) (StartedSkill, error) {
 		return StartedSkill{}, ErrSkillUnavailable
 	}
 
-	return startResolvedSkill(req.Now, req.Controller, req.Caster, req.Selected, def)
+	return startResolvedSkill(req.Now, req.Controller, req.Caster, req.Selected, def, false, nil)
 }
 
 // startResolvedSkill runs the shared target-resolution and cost/reuse start
 // sequence once a caller has already resolved def, regardless of whether
 // def came from the caster's own skill list or an item's attached skill.
-func startResolvedSkill(now time.Time, controller *Controller, caster *player.Character, selected any, def modelskill.Definition) (StartedSkill, error) {
+func startResolvedSkill(now time.Time, controller *Controller, caster *player.Character, selected any, def modelskill.Definition, ctrl bool, resolveTarget func(Target, any, modelskill.Definition, bool) (Target, bool)) (StartedSkill, error) {
 	target, ok := SelectTarget(caster, selected, def)
+	if !ok && resolveTarget != nil {
+		target, ok = resolveTarget(caster, selected, def, ctrl)
+	}
 	started := StartedSkill{Definition: def, Target: target}
 	if !ok {
 		return started, ErrInvalidTarget
