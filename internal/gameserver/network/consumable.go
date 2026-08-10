@@ -31,6 +31,7 @@ func (l *GameClientLink) useConsumableSkillItem(live *livePlayer, inv *itemconta
 		Effects:     actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers},
 		Destroyer:   l.inventory,
 		Summon:      l.activeServitorTarget(live),
+		Target:      live.Character.CurrentTarget(),
 	})
 	for _, res := range results {
 		switch res.Outcome {
@@ -44,6 +45,8 @@ func (l *GameClientLink) useConsumableSkillItem(live *livePlayer, inv *itemconta
 			return true
 		case itemhandler.NotEnoughItems:
 			sendItemConsumeFailure(live)
+			return true
+		case itemhandler.ConditionRejected:
 			return true
 		case itemhandler.Applied:
 			if res.SharedReuseGroup >= 0 {

@@ -9,6 +9,7 @@ import (
 	modelitem "github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 )
 
 // ItemSkillsHandler is the etc-item handler name that routes a consumable
@@ -36,6 +37,8 @@ const (
 	NotEnoughItems
 	// PetRejected means an elixir was used by a non-player caster.
 	PetRejected
+	// ConditionRejected means the attached skill's conditions do not permit this cast.
+	ConditionRejected
 )
 
 // UseResult is the outcome of one ItemSkills instant-cast use. Skill is the
@@ -123,6 +126,9 @@ type UseRequest struct {
 	// has no active servitor, or is itself one (IsPet), leaves the mirror
 	// unapplied.
 	Summon actorcast.Target
+
+	// Target is the caster's selected target, used by attached-skill conditions.
+	Target any
 }
 
 // Use preserves the first result for callers that handle one instant-cast
@@ -161,6 +167,9 @@ func UseAll(req UseRequest) []UseResult {
 		def, ok := resolveInstantItemSkillRef(ref, req.Definitions)
 		if !ok {
 			continue
+		}
+		if !conditions.EvaluateSkill(def, req.Caster, req.Target) {
+			return append(results, UseResult{Outcome: ConditionRejected, Skill: def})
 		}
 
 		reuseKey := actorcast.ReuseKey(def)

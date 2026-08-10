@@ -16,6 +16,7 @@ type fakeCaster struct {
 	disableCalls         int
 	reuseCalls           int
 	shortBuffTaskSkillID int32
+	flying               bool
 }
 
 func (f *fakeCaster) ObjectID() int32              { return 1 }
@@ -28,6 +29,7 @@ func (f *fakeCaster) AddSkillReuse(ref modelskill.Ref, key int32, d time.Duratio
 	f.reuseCalls++
 }
 func (f *fakeCaster) ShortBuffTaskSkillID() int32 { return f.shortBuffTaskSkillID }
+func (f *fakeCaster) IsFlying() bool              { return f.flying }
 
 type fakeDefinitions struct {
 	def modelskill.Definition
@@ -359,4 +361,36 @@ func TestUseAll(t *testing.T) {
 			t.Fatalf("AddSkillReuse calls = %d, want 0", caster.reuseCalls)
 		}
 	})
+}
+
+func TestUseAllStopsWhenSkillConditionFails(t *testing.T) {
+	first := modelskill.Definition{
+		ID: 100, Level: 1, Potion: true,
+		Conditions: []modelskill.ConditionClause{{
+			Root: modelskill.Condition{Kind: "player", Attrs: map[string]string{"flying": "false"}},
+		}},
+	}
+	second := modelskill.Definition{ID: 101, Level: 1, Potion: true}
+	for _, isPet := range []bool{false, true} {
+		t.Run(map[bool]string{false: "player herb", true: "pet herb"}[isPet], func(t *testing.T) {
+			caster := &fakeCaster{flying: true}
+			destroyer := &fakeDestroyer{}
+			req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemHerb, first, caster, destroyer, isPet)
+			tmpl, _ := req.Inventory.Templates().Get(req.Item.TemplateID)
+			tmpl.AttachedSkills = []modelitem.SkillRef{{ID: int32(first.ID), Level: int32(first.Level)}, {ID: int32(second.ID), Level: int32(second.Level)}}
+			req.Definitions = fakeDefinitionTable{
+				{ID: first.ID, Level: first.Level}:   first,
+				{ID: second.ID, Level: second.Level}: second,
+			}
+
+			results := UseAll(req)
+
+			if len(results) != 1 || results[0].Outcome != ConditionRejected || results[0].Skill.ID != first.ID {
+				t.Fatalf("results = %#v, want first skill condition rejection only", results)
+			}
+			if destroyer.calls != 0 || caster.reuseCalls != 0 {
+				t.Fatalf("condition failure consumed=%d reuse=%d, want neither", destroyer.calls, caster.reuseCalls)
+			}
+		})
+	}
 }

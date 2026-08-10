@@ -41,6 +41,7 @@ func (l *GameClientLink) consumeHerb(live *livePlayer, itemID int32) {
 		Effects:     actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers},
 		Destroyer:   l.inventory,
 		Summon:      l.activeServitorTarget(live),
+		Target:      live.Character.CurrentTarget(),
 	})
 	for _, res := range results {
 		if res.Outcome == itemhandler.ReuseRejected {

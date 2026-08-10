@@ -36,6 +36,8 @@ func (l *GameClientLink) consumePetHerb(live *livePlayer, pet *summon.Actor, inv
 		case itemhandler.ReuseRejected:
 			live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1PreparedForReuse, int32(res.Skill.ID), int32(res.Skill.Level)))
 			return
+		case itemhandler.ConditionRejected:
+			return
 		case itemhandler.Applied:
 		default:
 			live.SendFrame(serverpackets.FrameActionFailed())
