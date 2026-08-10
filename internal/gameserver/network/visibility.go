@@ -26,12 +26,12 @@ func (p *livePlayer) Discover(obj world.Tracked) {
 			if snap, ok := petInfoSnapshot(o, p, p.npcs); ok {
 				p.sendVisibilityFrame(serverpackets.FramePetInfo(snap))
 				if inv := o.PetInventory(); inv != nil {
-					frame, err := serverpackets.FramePetItemList(inv.Items(), inv.Templates())
+					items, _ := inv.ItemsAndDrainUpdates()
+					frame, err := serverpackets.FramePetItemList(items, inv.Templates())
 					if err != nil {
 						p.log.Error().Err(err).Msg("build PetItemList")
 						return
 					}
-					inv.DrainUpdates()
 					p.sendVisibilityFrame(frame)
 				}
 			}

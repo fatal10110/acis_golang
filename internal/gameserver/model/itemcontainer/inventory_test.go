@@ -2,6 +2,7 @@ package itemcontainer
 
 import (
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 )
@@ -475,6 +476,53 @@ func TestInventory_DrainUpdates_CoalescesStackableCounts(t *testing.T) {
 	}
 	if remaining := inv.DrainUpdates(); len(remaining) != 0 {
 		t.Errorf("DrainUpdates() should clear the queue, got %+v", remaining)
+	}
+}
+
+// TestInventory_ItemsAndDrainUpdates_BlocksConcurrentAdd guards against the
+// lost-delta window a separate Items()+DrainUpdates() call pair opens: with
+// two independent critical sections, an Add() landing between them is
+// captured by neither the snapshot nor the drain. ItemsAndDrainUpdates
+// closes that window by holding Container.mu and inv.mu for the whole
+// operation, so a concurrent Add() (which needs Container.mu first) cannot
+// even start until the atomic call finishes. This test proves that
+// serialization directly: it grabs the same two locks in the same order
+// ItemsAndDrainUpdates does and asserts a concurrent AddNew stays blocked
+// until they're released.
+func TestInventory_ItemsAndDrainUpdates_BlocksConcurrentAdd(t *testing.T) {
+	templates := item.NewTable([]*item.Template{
+		{ID: 1, Kind: item.KindEtcItem, Stackable: true, EtcItem: &item.EtcItemDetail{}},
+	})
+	inv := NewPetInventory(1, templates)
+
+	inv.Container.mu.RLock()
+	inv.mu.Lock()
+
+	addDone := make(chan struct{})
+	go func() {
+		inv.AddNew(1, 1, 2)
+		close(addDone)
+	}()
+
+	select {
+	case <-addDone:
+		t.Fatal("AddNew completed while Container.mu and inv.mu were held together; a concurrent change can straddle the snapshot/drain boundary")
+	case <-time.After(50 * time.Millisecond):
+		// Expected: AddNew is blocked on Container.mu.
+	}
+
+	inv.mu.Unlock()
+	inv.Container.mu.RUnlock()
+
+	select {
+	case <-addDone:
+	case <-time.After(time.Second):
+		t.Fatal("AddNew never completed after the locks were released")
+	}
+
+	items, updates := inv.ItemsAndDrainUpdates()
+	if len(items) != 1 || len(updates) != 1 {
+		t.Fatalf("ItemsAndDrainUpdates() = items %+v updates %+v, want 1 item and 1 queued update", items, updates)
 	}
 }
 

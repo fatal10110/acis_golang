@@ -645,6 +645,26 @@ func (inv *Inventory) DrainUpdates() []Update {
 	return out
 }
 
+// ItemsAndDrainUpdates atomically returns a full item snapshot together with
+// the pending update queue, then clears the queue, all under one critical
+// section. A separate Items() call followed by DrainUpdates() would open a
+// window between the two locks in which a concurrent change (e.g. the
+// auto-feed ticker or a give/pickup on another goroutine) is queued after the
+// snapshot but drained away before it's ever sent, silently losing the
+// delta. Used where a full-list snapshot must double as the update
+// checkpoint, e.g. sending PetItemList on discover.
+func (inv *Inventory) ItemsAndDrainUpdates() (items []*item.Instance, updates []Update) {
+	inv.Container.mu.RLock()
+	defer inv.Container.mu.RUnlock()
+	inv.mu.Lock()
+	defer inv.mu.Unlock()
+
+	items = inv.itemsLocked()
+	updates = inv.updates
+	inv.updates = nil
+	return items, updates
+}
+
 // SetUpdateNotifier records the hook fired on every queued inventory
 // change, matching the reference's Inventory.addUpdate registering with
 // InventoryUpdateTaskManager unconditionally. Passing nil detaches the
