@@ -352,10 +352,15 @@ func TestSiegeZoneLifecycle(t *testing.T) {
 	z.FlagPvP = func(Actor) { pvpFlags++ }
 	z.CombatNotice = func(_ Actor, _ bool) { notices++ }
 
-	// Inactive siege: entering imposes nothing.
+	// Inactive siege: entering marks raw zone membership but imposes no
+	// combat state (matches the reference's isInsideZone(SIEGE) check,
+	// which is independent of whether a siege is running).
 	a := newFakePlayer(7, insideAt)
 	Revalidate(z, a)
-	if a.flags.Has(FlagSiege) || a.flags.Has(FlagPvP) {
+	if !a.flags.Has(FlagSiege) {
+		t.Fatal("inactive siege did not mark raw zone membership")
+	}
+	if a.flags.Has(FlagPvP) {
 		t.Fatal("inactive siege imposed combat state")
 	}
 
@@ -375,11 +380,15 @@ func TestSiegeZoneLifecycle(t *testing.T) {
 		t.Fatal("siege flag survived the exit")
 	}
 
-	// Deactivation strips combat state without the pvp flag.
+	// Deactivation strips combat state without the pvp flag, but the
+	// occupant never left the battlefield so raw membership stays set.
 	b := newFakePlayer(8, insideAt)
 	Revalidate(z, b)
 	z.SetActive(false)
-	if b.flags.Has(FlagSiege) || b.flags.Has(FlagPvP) {
+	if !b.flags.Has(FlagSiege) {
+		t.Fatal("deactivation cleared raw zone membership for an occupant still inside")
+	}
+	if b.flags.Has(FlagPvP) {
 		t.Fatal("deactivation left combat state on occupants")
 	}
 	if pvpFlags != 1 {
