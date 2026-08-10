@@ -4,7 +4,6 @@ import (
 	"math"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
@@ -211,22 +210,11 @@ func (h *Hostile) broadcastShotRecharge(skillID int32) {
 	}
 	x, y, z := h.Position()
 	self := location.Location{X: x, Y: y, Z: z}
-	var frame wire.Frame
-	built := false
-	defer func() { frame.Release() }()
+	var receivers []world.Tracked
 	h.world.ForEachKnownInRadius(h, 600, func(o world.Tracked) {
-		receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
-		if ok {
-			if !built {
-				frame = h.frames.SkillUse(h.ObjectID(), self, h.ObjectID(), self, skillID, 1, 0, 0, false)
-				built = true
-			}
-			owned, copied := wire.CopyFrame(frame)
-			if copied {
-				receiver.SendFrame(owned)
-			}
-		}
+		receivers = append(receivers, o)
 	})
+	h.frames.SkillUse(receivers, h.ObjectID(), self, h.ObjectID(), self, skillID, 1, 0, 0, false)
 }
 
 // SetHeadingTo orients this NPC toward target. A target with no known
@@ -327,9 +315,13 @@ func (h *Hostile) BroadcastAttack(snapshot attack.Snapshot) error {
 	if h.frames == nil {
 		return ErrNoFrameBuilder
 	}
-	return h.broadcastFrame(func() wire.Frame {
-		return h.frames.Attack(snapshot)
-	})
+	if h.world == nil {
+		return ErrNoWorld
+	}
+	known := h.appendKnown()
+	defer h.releaseKnown()
+	h.frames.Attack(known, snapshot)
+	return nil
 }
 
 // BroadcastSkillUse sends a cast-start animation packet from this actor to
@@ -340,12 +332,16 @@ func (h *Hostile) BroadcastSkillUse(targetID int32, targetX, targetY, targetZ in
 	if h.frames == nil {
 		return ErrNoFrameBuilder
 	}
+	if h.world == nil {
+		return ErrNoWorld
+	}
 	sx, sy, sz := h.Position()
 	origin := location.Location{X: sx, Y: sy, Z: sz}
 	targetAt := location.Location{X: targetX, Y: targetY, Z: targetZ}
-	return h.broadcastFrame(func() wire.Frame {
-		return h.frames.SkillUse(h.ObjectID(), origin, targetID, targetAt, skillID, level, hitTime, reuseDelay, false)
-	})
+	known := h.appendKnown()
+	defer h.releaseKnown()
+	h.frames.SkillUse(known, h.ObjectID(), origin, targetID, targetAt, skillID, level, hitTime, reuseDelay, false)
+	return nil
 }
 
 // BroadcastSkillLaunched sends the cast-launch target packet for skillID at
@@ -355,9 +351,13 @@ func (h *Hostile) BroadcastSkillLaunched(skillID, level int32, targetIDs []int32
 	if h.frames == nil {
 		return ErrNoFrameBuilder
 	}
-	return h.broadcastFrame(func() wire.Frame {
-		return h.frames.SkillLaunched(h.ObjectID(), skillID, level, targetIDs)
-	})
+	if h.world == nil {
+		return ErrNoWorld
+	}
+	known := h.appendKnown()
+	defer h.releaseKnown()
+	h.frames.SkillLaunched(known, h.ObjectID(), skillID, level, targetIDs)
+	return nil
 }
 
 // BroadcastDie sends the death packet to every currently known observer
@@ -368,9 +368,13 @@ func (h *Hostile) BroadcastDie() error {
 	if h.frames == nil {
 		return ErrNoFrameBuilder
 	}
-	return h.broadcastFrame(func() wire.Frame {
-		return h.frames.Die(h.ObjectID())
-	})
+	if h.world == nil {
+		return ErrNoWorld
+	}
+	known := h.appendKnown()
+	defer h.releaseKnown()
+	h.frames.Die(known, h.ObjectID())
+	return nil
 }
 
 // BroadcastMove sends a MoveToLocation packet for event to every currently
@@ -380,7 +384,13 @@ func (h *Hostile) BroadcastMove(event move.Event) error {
 	if h.frames == nil {
 		return ErrNoFrameBuilder
 	}
-	return h.broadcastFrame(func() wire.Frame { return h.frames.Move(h.ObjectID(), event) })
+	if h.world == nil {
+		return ErrNoWorld
+	}
+	known := h.appendKnown()
+	defer h.releaseKnown()
+	h.frames.Move(known, h.ObjectID(), event)
+	return nil
 }
 
 // BroadcastMoveToPawn sends a rotation-only MoveToPawn notice toward target
@@ -405,9 +415,10 @@ func (h *Hostile) BroadcastMoveToPawn(target attackable.Combatant) error {
 	dest := location.Location{X: tx, Y: ty, Z: tz}
 	distance := int(origin.Distance3D(dest))
 
-	return h.broadcastFrame(func() wire.Frame {
-		return h.frames.MoveToPawn(h.ObjectID(), target.ObjectID(), distance, origin)
-	})
+	known := h.appendKnown()
+	defer h.releaseKnown()
+	h.frames.MoveToPawn(known, h.ObjectID(), target.ObjectID(), distance, origin)
+	return nil
 }
 
 // BroadcastStop sends a stop-in-place notice to every currently known
@@ -422,7 +433,10 @@ func (h *Hostile) BroadcastStop() error {
 	}
 	x, y, z := h.Position()
 	at := location.Location{X: x, Y: y, Z: z}
-	return h.broadcastFrame(func() wire.Frame { return h.frames.Stop(h.ObjectID(), at, h.Heading()) })
+	known := h.appendKnown()
+	defer h.releaseKnown()
+	h.frames.Stop(known, h.ObjectID(), at, h.Heading())
+	return nil
 }
 
 // BroadcastStatus sends this NPC's current/max HP to every currently known
@@ -437,30 +451,9 @@ func (h *Hostile) BroadcastStatus() error {
 		return ErrNoFrameBuilder
 	}
 	maxHP, curHP := h.MaxHP(), h.CurrentHP()
-	return h.broadcastFrame(func() wire.Frame { return h.frames.Status(h.ObjectID(), maxHP, curHP) })
-}
-
-func (h *Hostile) broadcastFrame(build func() wire.Frame) error {
-	if h.world == nil {
-		return ErrNoWorld
-	}
 	known := h.appendKnown()
 	defer h.releaseKnown()
-	var frame wire.Frame
-	built := false
-	defer func() { frame.Release() }()
-	for _, o := range known {
-		if receiver, ok := o.(interface{ SendFrame(wire.Frame) bool }); ok {
-			if !built {
-				frame = build()
-				built = true
-			}
-			owned, copied := wire.CopyFrame(frame)
-			if copied {
-				receiver.SendFrame(owned)
-			}
-		}
-	}
+	h.frames.Status(known, h.ObjectID(), maxHP, curHP)
 	return nil
 }
 

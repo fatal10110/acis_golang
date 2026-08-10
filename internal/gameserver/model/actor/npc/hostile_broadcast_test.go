@@ -7,44 +7,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
-func TestHostileBroadcastFrameBuildsOnceForKnownObservers(t *testing.T) {
-	hostile, receivers := newRetainedBroadcastFixture(t, 2)
-	builds := 0
-	hostile.broadcastFrame(func() wire.Frame {
-		builds++
-		return wire.BorrowedFrame(wire.FrameBytes([]byte{1, 2, 3}))
-	})
-	if builds != 1 {
-		t.Fatalf("frame builds = %d, want 1", builds)
-	}
-	for _, receiver := range receivers {
-		defer receiver.frame.Release()
-		if receiver.frames != 1 {
-			t.Fatalf("receiver %d frames = %d, want 1", receiver.id, receiver.frames)
-		}
-	}
-}
-
-func TestHostileBroadcastFrameSkipsBuildWithoutObservers(t *testing.T) {
-	hostile, _ := newRetainedBroadcastFixture(t, 0)
-	builds := 0
-	hostile.broadcastFrame(func() wire.Frame {
-		builds++
-		return wire.BorrowedFrame(wire.FrameBytes([]byte{1, 2, 3}))
-	})
-	if builds != 0 {
-		t.Fatalf("frame builds = %d, want 0", builds)
-	}
-}
-
-func TestHostileBroadcastFrameGivesObserversIndependentBuffers(t *testing.T) {
-	hostile, receivers := newRetainedBroadcastFixture(t, 2)
-	hostile.broadcastFrame(func() wire.Frame {
-		return wire.BorrowedFrame(wire.FrameBytes([]byte{1, 2, 3}))
-	})
-	assertIndependentFrames(t, receivers[0].frame, receivers[1].frame)
-}
-
 func TestHostileBroadcastShotRechargeGivesObserversIndependentBuffers(t *testing.T) {
 	hostile, receivers := newRetainedBroadcastFixture(t, 2)
 	hostile.broadcastShotRecharge(123)
