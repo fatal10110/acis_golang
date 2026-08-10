@@ -6,12 +6,9 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons"
 )
 
-// Siege covers a besiegeable residence's battlefield. FlagSiege marks raw
-// membership in the battlefield geometry regardless of whether a siege is
-// running, matching the reference's isInsideZone(SIEGE) check. While a
-// siege is actually running, everyone inside is additionally in open
-// combat, cannot summon friends, and flying players are grounded; leaving
-// the battlefield then flags the player for pvp.
+// Siege covers a besiegeable residence's battlefield. While a siege runs,
+// everyone inside is in open combat, cannot summon friends, and flying
+// players are grounded; leaving the battlefield flags the player for pvp.
 type Siege struct {
 	Zone
 	// ResidenceID is the besiegeable residence (castle or clan hall) the
@@ -64,17 +61,11 @@ func (z *Siege) Active() bool {
 }
 
 func (z *Siege) enter(a Actor) {
-	a.ZoneFlags().Set(FlagSiege, true)
-	if z.Active() {
-		z.applyCombatEntry(a)
+	if !z.Active() {
+		return
 	}
-}
-
-// applyCombatEntry imposes the active-siege combat state on an occupant.
-// Callable both from enter (fresh membership, siege already active) and
-// from SetActive(true) (existing occupants when the siege starts).
-func (z *Siege) applyCombatEntry(a Actor) {
 	a.ZoneFlags().Set(FlagPvP, true)
+	a.ZoneFlags().Set(FlagSiege, true)
 	a.ZoneFlags().Set(FlagNoSummonFriend, true)
 	if a.Class() == ClassPlayer {
 		if z.CombatNotice != nil {
@@ -110,22 +101,21 @@ func (z *Siege) exit(a Actor) {
 	}
 }
 
-// SetActive switches the siege on or off. Turning it on imposes the combat
-// rules on everyone already inside (their FlagSiege membership is
-// untouched, they never left the battlefield); turning it off strips the
-// combat state from them (without the leave-battlefield pvp flag) while
-// leaving FlagSiege set, since they are still standing in the battlefield.
+// SetActive switches the siege on or off. Turning it on replays the entry
+// rules for everyone already inside; turning it off strips the combat
+// state from them (without the leave-battlefield pvp flag).
 func (z *Siege) SetActive(v bool) {
 	z.active.Store(v)
 
 	if v {
 		for _, a := range z.Occupants() {
-			z.applyCombatEntry(a)
+			z.enter(a)
 		}
 		return
 	}
 	for _, a := range z.Occupants() {
 		a.ZoneFlags().Set(FlagPvP, false)
+		a.ZoneFlags().Set(FlagSiege, false)
 		a.ZoneFlags().Set(FlagNoSummonFriend, false)
 		switch a.Class() {
 		case ClassPlayer:
