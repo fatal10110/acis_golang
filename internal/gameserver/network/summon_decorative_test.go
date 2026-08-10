@@ -26,6 +26,16 @@ func TestUseSummonItemSpawnsDecorativeNPCAndPreventsNearbyDuplicate(t *testing.T
 	frames := &frameCapture{}
 	live := newTestLivePlayer(t, 1, frames)
 	state.Spawn(live, 100, 200, 300, 400)
+	nonTreeInstance, err := npc.NewInstance(99, &npc.Template{ID: 9000, TemplateID: 9000, Type: "Folk"})
+	if err != nil {
+		t.Fatalf("build non-tree instance: %v", err)
+	}
+	nonTree, err := npc.NewDecoration(nonTreeInstance, "")
+	if err != nil {
+		t.Fatalf("build non-tree decoration: %v", err)
+	}
+	state.Spawn(nonTree, 200, 200, 300, 0)
+	frames.frames = nil
 	first := &item.Instance{ObjectID: 500, TemplateID: summonTestCollarTemplateID, OwnerID: live.ObjectID(), Count: 1, Location: item.LocationInventory}
 	live.Inventory().Restore([]*item.Instance{first})
 
