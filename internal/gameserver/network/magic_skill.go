@@ -7,6 +7,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	itemhandler "github.com/fatal10110/acis_golang/internal/gameserver/handler/item"
 	skillhandler "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
+	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -45,14 +46,15 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 	beforeVitals := live.Vitals()
 	controller := l.castController(live)
 	started, err := actorcast.StartPlayerSkill(actorcast.PlayerSkillRequest{
-		Now:         time.Now(),
-		Controller:  controller,
-		Caster:      live.Character,
-		Selected:    live.Target(),
-		SkillID:     int(req.SkillID),
-		Definitions: l.skills,
-		Ctrl:        req.CtrlPressed,
-		Shift:       req.ShiftPressed,
+		Now:           time.Now(),
+		Controller:    controller,
+		Caster:        live.Character,
+		Selected:      live.Target(),
+		SkillID:       int(req.SkillID),
+		Definitions:   l.skills,
+		Ctrl:          req.CtrlPressed,
+		Shift:         req.ShiftPressed,
+		ResolveTarget: l.resolveMagicSkillTarget,
 	})
 	if err != nil {
 		if errors.Is(err, actorcast.ErrInvalidTarget) && started.Target == nil {
@@ -128,6 +130,23 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 			sendMagicStatusUpdate(live, beforeVitals)
 		},
 	})
+}
+
+func (l *GameClientLink) resolveMagicSkillTarget(caster actorcast.Target, selected any, def modelskill.Definition, ctrl bool) (actorcast.Target, bool) {
+	casterCreature, ok := caster.(skilltarget.Creature)
+	if !ok {
+		return nil, false
+	}
+	selectedCreature, _ := selected.(skilltarget.Creature)
+	handler, ok := l.targets.Handler(def.Target)
+	if !ok {
+		return nil, false
+	}
+	target := handler.FinalTarget(casterCreature, selectedCreature, &def)
+	if target == nil || !handler.CanCast(casterCreature, target, &def, ctrl) {
+		return nil, false
+	}
+	return target, true
 }
 
 func (l *GameClientLink) finishDeferredMagicSkill(live *livePlayer) {

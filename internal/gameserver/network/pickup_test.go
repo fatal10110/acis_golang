@@ -256,6 +256,15 @@ func herbTestSkill(t *testing.T) *skillstate.Persistence {
 	}}), store)
 }
 
+func multiHerbTestSkill(t *testing.T) *skillstate.Persistence {
+	t.Helper()
+	store := newMemorySkillSaveStore()
+	return skillstate.NewPersistence(store, modelskill.NewTable([]modelskill.Definition{
+		{ID: 2278, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf, SkillType: "HOT", Potion: true, Effects: []modelskill.EffectTemplate{{Name: "HealOverTime", Count: 5, Time: 3, Value: 12, Icon: true}}},
+		{ID: 2279, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf, SkillType: "HOT", Potion: true, Effects: []modelskill.EffectTemplate{{Name: "HealOverTime", Count: 5, Time: 3, Value: 12, Icon: true}}},
+	}), store)
+}
+
 // TestPickupLiveGroundItemConsumesHerbWithoutStoringIt is the regression
 // test for a herb looted from a mob showing up as a blank inventory square:
 // a herb carries no inventory icon, is used the instant it is picked up, and
@@ -267,12 +276,13 @@ func herbTestSkill(t *testing.T) *skillstate.Persistence {
 func TestPickupLiveGroundItemConsumesHerbWithoutStoringIt(t *testing.T) {
 	const herbTemplate int32 = 8600
 	templates := herbTestTemplates()
+	tmpl, _ := templates.Get(herbTemplate)
+	tmpl.AttachedSkills = append(tmpl.AttachedSkills, item.SkillRef{ID: 2279, Level: 1})
 	capture := &frameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
 	state := world.New()
 	state.Spawn(live, 100, 0, 0, 0)
 	drops := task.NewGroundItems(state, task.GroundItemOptions{HerbAutoDestroy: time.Hour}, time.Now)
-	tmpl, _ := templates.Get(herbTemplate)
 	ground := dropTestGround(t, state, drops, item.Instance{ObjectID: 900, TemplateID: herbTemplate, Count: 1, ManaLeft: -1}, tmpl, 100, 0, 0)
 
 	capture.frames = nil
@@ -281,7 +291,7 @@ func TestPickupLiveGroundItemConsumesHerbWithoutStoringIt(t *testing.T) {
 		world:         state,
 		groundItems:   drops,
 		items:         store,
-		skills:        herbTestSkill(t),
+		skills:        multiHerbTestSkill(t),
 		targets:       skilltarget.NewRegistry(skilltarget.WorldKnown{State: state}),
 		skillHandlers: handlerskill.NewDefaultRegistry(),
 	}
@@ -294,6 +304,7 @@ func TestPickupLiveGroundItemConsumesHerbWithoutStoringIt(t *testing.T) {
 		serverpackets.OpcodeActionFailed,
 		serverpackets.OpcodeGetItem,
 		serverpackets.OpcodeDeleteObject,
+		serverpackets.OpcodeMagicSkillUse,
 		serverpackets.OpcodeMagicSkillUse,
 	)
 	if _, ok := state.Object(ground.ObjectID()); ok {
@@ -309,8 +320,8 @@ func TestPickupLiveGroundItemConsumesHerbWithoutStoringIt(t *testing.T) {
 		t.Fatalf("store rows saved = %+v updated = %+v, want none for a consumed herb", store.saved, store.updated)
 	}
 	effects := live.EffectList().All()
-	if len(effects) != 1 || effects[0].Skill.ID != 2278 {
-		t.Fatalf("installed effects = %+v, want one effect from the herb's skill 2278", effects)
+	if len(effects) != 2 || effects[0].Skill.ID != 2278 || effects[1].Skill.ID != 2279 {
+		t.Fatalf("installed effects = %+v, want herb skills 2278 then 2279", effects)
 	}
 }
 
