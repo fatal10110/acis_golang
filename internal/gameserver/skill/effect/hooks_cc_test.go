@@ -526,6 +526,31 @@ func TestThrowUpEffectTruncatesDistanceBeforeAddingFlyRadius(t *testing.T) {
 	}
 }
 
+type flightResolverOnly struct{ x, y, z int }
+
+func (t *flightResolverOnly) X() int { return t.x }
+func (t *flightResolverOnly) Y() int { return t.y }
+func (t *flightResolverOnly) Z() int { return t.z }
+func (t *flightResolverOnly) ValidLocation(_, _, _, x, y, z int) location.Location {
+	return location.Location{X: x, Y: y, Z: z}
+}
+
+func TestThrowUpEffectRejectsTargetWithoutFlightMover(t *testing.T) {
+	effector := &liveEffectTarget{x: 100}
+	effected := &flightResolverOnly{}
+
+	e, err := New(Skill{ID: 1, FlyRadius: 600}, modelskill.EffectTemplate{Name: "ThrowUp"})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e.Effector = effector
+	e.Effected = effected
+
+	if e.OnStart(e) {
+		t.Fatal("throw-up effect started without a mover to deliver its flight and landing")
+	}
+}
+
 func TestThrowUpEffectAppliesGeoCorrectedXYButKeepsOriginalZ(t *testing.T) {
 	effector := &liveEffectTarget{x: 100, y: 0, z: 500}
 	effected := &liveEffectTarget{x: 0, y: 0, z: 0}

@@ -280,6 +280,10 @@ func throwUpStart(e *Effect) bool {
 	if !ok {
 		return false
 	}
+	mover, ok := e.Effected.(flightMover)
+	if !ok {
+		return false
+	}
 
 	ox, oy, oz := target.X(), target.Y(), target.Z()
 	dx := float64(source.X() - ox)
@@ -307,9 +311,7 @@ func throwUpStart(e *Effect) bool {
 	e.landing = location.Location{X: x, Y: y, Z: z}
 	refresh(e.Effected)
 
-	if mover, ok := e.Effected.(flightMover); ok {
-		mover.FlyTo(e.landing, modelskill.FlightThrowUp)
-	}
+	mover.FlyTo(e.landing, modelskill.FlightThrowUp)
 	return true
 }
 
