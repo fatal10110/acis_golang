@@ -50,6 +50,26 @@ func TestCharacterDecreaseChargesReportsInsufficientCharges(t *testing.T) {
 	}
 }
 
+func TestCharacterDecreaseChargesNotifiesStatusOnlyAfterSuccessfulRemoval(t *testing.T) {
+	c := &Character{ID: 1}
+	c.IncreaseCharges(2, 5)
+	var updates int
+	c.SetChargesUpdater(func() { updates++ })
+
+	if !c.DecreaseCharges(1) {
+		t.Fatal("DecreaseCharges() = false, want true")
+	}
+	if updates != 1 {
+		t.Fatalf("updates after successful removal = %d, want 1", updates)
+	}
+	if c.DecreaseCharges(2) {
+		t.Fatal("DecreaseCharges() = true with insufficient charges, want false")
+	}
+	if updates != 1 {
+		t.Fatalf("updates after failed removal = %d, want 1", updates)
+	}
+}
+
 func TestCharacterClearChargesResetsToZero(t *testing.T) {
 	c := &Character{ID: 1}
 	c.IncreaseCharges(4, 5)
@@ -58,6 +78,22 @@ func TestCharacterClearChargesResetsToZero(t *testing.T) {
 
 	if got := c.Charges(); got != 0 {
 		t.Fatalf("Charges() after ClearCharges = %d, want 0", got)
+	}
+}
+
+func TestCharacterClearChargesNotifiesStatusOnlyWhenChargesChange(t *testing.T) {
+	c := &Character{ID: 1}
+	c.IncreaseCharges(4, 5)
+	var updates int
+	c.SetChargesUpdater(func() { updates++ })
+
+	c.ClearCharges()
+	if updates != 1 {
+		t.Fatalf("updates after clearing charges = %d, want 1", updates)
+	}
+	c.ClearCharges()
+	if updates != 1 {
+		t.Fatalf("updates after clearing empty charges = %d, want 1", updates)
 	}
 }
 
