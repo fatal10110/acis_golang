@@ -68,6 +68,13 @@ func TestFramePetItemList(t *testing.T) {
 	}
 }
 
+func TestFramePetItemListRejectsOversizedCount(t *testing.T) {
+	items := make([]*item.Instance, 1<<16)
+	if _, err := FramePetItemList(items, item.NewTable(nil)); err == nil {
+		t.Fatal("FramePetItemList oversized count error = nil, want error")
+	}
+}
+
 func TestFramePetInventoryUpdate(t *testing.T) {
 	templates := petPacketTemplates()
 	items := []*item.Instance{{ObjectID: 0x01020304, TemplateID: 57, Count: 10, Location: item.LocationPet}}

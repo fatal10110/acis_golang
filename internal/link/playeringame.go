@@ -1,6 +1,10 @@
 package link
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
+)
 
 // OpcodePlayerInGame is the wire opcode for PlayerInGame, reporting accounts
 // that just entered the game on this server.
@@ -23,11 +27,15 @@ func DecodePlayerInGame(payload []byte) ([]string, error) {
 
 // EncodePlayerInGame builds the PlayerInGame packet reporting accounts that
 // just entered the game on this server.
-func EncodePlayerInGame(accounts []string) []byte {
+func EncodePlayerInGame(accounts []string) ([]byte, error) {
+	count, err := wire.Uint16Count(len(accounts))
+	if err != nil {
+		return nil, err
+	}
 	w := newWriter(OpcodePlayerInGame)
-	w.WriteUint16(uint16(len(accounts)))
+	w.WriteUint16(count)
 	for _, account := range accounts {
 		w.WriteString(account)
 	}
-	return w.Bytes()
+	return w.Bytes(), nil
 }
