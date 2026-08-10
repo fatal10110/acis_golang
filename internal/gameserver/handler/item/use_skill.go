@@ -56,6 +56,8 @@ const (
 type UseResult struct {
 	Outcome Outcome
 	Skill   modelskill.Definition
+	// Condition is set only when Outcome is ConditionRejected.
+	Condition modelskill.ConditionClause
 
 	// Apply runs the skill's effects on the caster (and the mirrored
 	// summon, for a herb). It is set only on Applied and is the caller's
@@ -168,8 +170,8 @@ func UseAll(req UseRequest) []UseResult {
 		if !ok {
 			continue
 		}
-		if !conditions.EvaluateSkill(def, req.Caster, req.Target) {
-			return append(results, UseResult{Outcome: ConditionRejected, Skill: def})
+		if failed, ok := conditions.EvaluateSkill(def, req.Caster, req.Target); !ok {
+			return append(results, UseResult{Outcome: ConditionRejected, Skill: def, Condition: failed})
 		}
 
 		reuseKey := actorcast.ReuseKey(def)

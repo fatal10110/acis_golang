@@ -7,16 +7,16 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
-// EvaluateSkill reports whether every condition clause on def accepts the
-// supplied caster and target. Conditions are data-driven, so an unknown
-// predicate rejects instead of silently bypassing a restriction.
-func EvaluateSkill(def modelskill.Definition, caster, target any) bool {
+// EvaluateSkill reports the first condition clause that rejects the supplied
+// caster and target. The returned clause carries the feedback configured by
+// its <cond> element.
+func EvaluateSkill(def modelskill.Definition, caster, target any) (modelskill.ConditionClause, bool) {
 	for _, clause := range def.Conditions {
 		if !evaluate(clause.Root, caster, target) {
-			return false
+			return clause, false
 		}
 	}
-	return true
+	return modelskill.ConditionClause{}, true
 }
 
 func evaluate(cond modelskill.Condition, caster, target any) bool {
@@ -55,6 +55,8 @@ func evaluatePlayer(attrs map[string]string, caster any) bool {
 			flying := false
 			if state, ok := caster.(interface{ IsFlying() bool }); ok {
 				flying = state.IsFlying()
+			} else if state, ok := caster.(interface{ Flying() bool }); ok {
+				flying = state.Flying()
 			}
 			if flying != want {
 				return false

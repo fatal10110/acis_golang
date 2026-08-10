@@ -51,6 +51,10 @@ func (l *GameClientLink) consumeHerb(live *livePlayer, itemID int32) {
 			sendMagicCastFailureReason(live, res.Skill, actorcast.ErrSkillDisabled)
 			return
 		}
+		if res.Outcome == itemhandler.ConditionRejected {
+			sendItemSkillConditionFailure(live, res)
+			return
+		}
 		if res.Outcome != itemhandler.Applied {
 			return
 		}

@@ -47,6 +47,7 @@ func (l *GameClientLink) useConsumableSkillItem(live *livePlayer, inv *itemconta
 			sendItemConsumeFailure(live)
 			return true
 		case itemhandler.ConditionRejected:
+			sendItemSkillConditionFailure(live, res)
 			return true
 		case itemhandler.Applied:
 			if res.SharedReuseGroup >= 0 {
@@ -72,4 +73,15 @@ func (l *GameClientLink) useConsumableSkillItem(live *livePlayer, inv *itemconta
 		}
 	}
 	return true
+}
+
+func sendItemSkillConditionFailure(live *livePlayer, res itemhandler.UseResult) {
+	if live == nil || res.Condition.MessageID <= 0 {
+		return
+	}
+	if res.Condition.AddName {
+		live.SendFrame(serverpackets.FrameSystemMessageSkillName(int(res.Condition.MessageID), int32(res.Skill.ID), int32(res.Skill.Level)))
+		return
+	}
+	live.SendFrame(serverpackets.FrameSystemMessage(int(res.Condition.MessageID)))
 }

@@ -388,6 +388,9 @@ func TestUseAllStopsWhenSkillConditionFails(t *testing.T) {
 			if len(results) != 1 || results[0].Outcome != ConditionRejected || results[0].Skill.ID != first.ID {
 				t.Fatalf("results = %#v, want first skill condition rejection only", results)
 			}
+			if results[0].Condition.Root.Kind != "player" {
+				t.Fatalf("failed condition = %#v, want the skill's player condition", results[0].Condition)
+			}
 			if destroyer.calls != 0 || caster.reuseCalls != 0 {
 				t.Fatalf("condition failure consumed=%d reuse=%d, want neither", destroyer.calls, caster.reuseCalls)
 			}
