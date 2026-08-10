@@ -5,21 +5,27 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	skillref "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // SummonItemsHandler is the etc-item handler name a pet-collar's
 // <item handler="SummonItems"> attribute carries (SummonItems.java).
 const SummonItemsHandler = "SummonItems"
 
-// summonItemTypePet is SummonItemData's summonType value for "summon pet
-// through an item" (SummonItems.java case 1). Types 0 (static decorative
-// spawn, e.g. Christmas tree) and 2 (wyvern mount) are a different cast
-// shape entirely and are not this handler's concern.
-const summonItemTypePet = 1
+const (
+	summonItemTypeDecorative = 0
+	summonItemTypePet        = 1
+)
+
+const (
+	decorativeSummonRadius         = 1200
+	systemMessageCannotSummonAgain = 1142
+)
 
 // summonCreatureSkillRef is the hardcoded SUMMON_CREATURE skill id/level
 // SummonItems.java always casts for a pet-collar item
@@ -45,7 +51,13 @@ func (l *GameClientLink) useSummonItem(live *livePlayer, inv *itemcontainer.Inve
 		return false
 	}
 	summonItem, ok := l.summonItems.Item(inst.TemplateID)
-	if !ok || summonItem.SummonType != summonItemTypePet {
+	if !ok {
+		return false
+	}
+	if summonItem.SummonType == summonItemTypeDecorative {
+		return l.useDecorativeSummonItem(live, inv, inst, summonItem)
+	}
+	if summonItem.SummonType != summonItemTypePet {
 		return false
 	}
 	if !live.Character.Standing() {
@@ -124,5 +136,51 @@ func (l *GameClientLink) useSummonItem(live *livePlayer, inv *itemcontainer.Inve
 			sendMagicCastFailureReason(live, def, err)
 		},
 	})
+	return true
+}
+
+func (l *GameClientLink) useDecorativeSummonItem(live *livePlayer, inv *itemcontainer.Inventory, inst *item.Instance, summonItem item.SummonItem) bool {
+	if !live.Character.Standing() {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotMoveWhileSitting))
+		return true
+	}
+	if l.world == nil || l.ids == nil || l.npcs == nil {
+		return false
+	}
+	template, ok := l.npcs.Get(int(summonItem.NPCID))
+	if !ok {
+		return false
+	}
+	var duplicate *npc.Decoration
+	l.world.ForEachKnownInRadius(live, decorativeSummonRadius, func(obj world.Tracked) {
+		if decoration, ok := obj.(*npc.Decoration); ok && duplicate == nil {
+			duplicate = decoration
+		}
+	})
+	if duplicate != nil {
+		live.SendFrame(serverpackets.FrameSystemMessageString(systemMessageCannotSummonAgain, duplicate.Name()))
+		return true
+	}
+	if inv.DestroyItem(inst, 1) == nil {
+		return true
+	}
+	live.move.Stop()
+	objectID, err := l.ids.NextID()
+	if err != nil {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetNotFound))
+		return true
+	}
+	instance, err := npc.NewInstance(objectID, template)
+	if err != nil {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetNotFound))
+		return true
+	}
+	decoration, err := npc.NewDecoration(instance, live.Character.Name)
+	if err != nil {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetNotFound))
+		return true
+	}
+	x, y, z := live.Position()
+	l.world.Spawn(decoration, x, y, z, live.Heading())
 	return true
 }
