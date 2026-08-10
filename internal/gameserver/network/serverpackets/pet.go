@@ -47,7 +47,11 @@ func FramePetItemList(items []*item.Instance, templates *item.Table) (wire.Frame
 }
 
 func writePetItemList(w *wire.Writer, items []*item.Instance, templates *item.Table) error {
-	w.WriteUint16(uint16(len(items)))
+	count, err := wire.Uint16Count(len(items))
+	if err != nil {
+		return err
+	}
+	w.WriteUint16(count)
 	for _, inst := range items {
 		if err := writePetItem(w, inst, templates, itemcontainer.Update{ObjectID: inst.ObjectID}); err != nil {
 			return err
@@ -75,7 +79,11 @@ func writePetInventoryUpdate(w *wire.Writer, updates []itemcontainer.Update, ite
 		}
 	}
 
-	w.WriteUint16(uint16(len(updates)))
+	count, err := wire.Uint16Count(len(updates))
+	if err != nil {
+		return err
+	}
+	w.WriteUint16(count)
 	for _, update := range updates {
 		inst := byObjectID[update.ObjectID]
 		w.WriteUint16(uint16(update.State))

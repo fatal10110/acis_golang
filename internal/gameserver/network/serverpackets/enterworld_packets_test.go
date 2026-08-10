@@ -103,6 +103,12 @@ func TestFrameQuestList(t *testing.T) {
 	}
 }
 
+func TestFrameQuestListRejectsOversizedCount(t *testing.T) {
+	if err := FrameQuestList(make([]QuestListEntry, 1<<16)).Err(); err == nil {
+		t.Fatal("FrameQuestList oversized count error = nil, want error")
+	}
+}
+
 func TestFrameFriendList(t *testing.T) {
 	got := framePayload(t, FrameFriendList([]FriendListEntry{{ObjectID: 11, Name: "Buddy", Online: true}}))
 	want := []byte{OpcodeFriendList}

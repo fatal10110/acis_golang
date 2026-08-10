@@ -21,11 +21,14 @@ type CharInfoSnapshot struct {
 // FrameCharInfo builds a CharInfo packet for a visible player.
 func FrameCharInfo(s CharInfoSnapshot) wire.Frame {
 	w := newFrameWriter(OpcodeCharInfo)
-	writeCharInfo(w, s)
+	if err := writeCharInfo(w, s); err != nil {
+		releaseFrameWriter(w)
+		return wire.InvalidFrame(err)
+	}
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
 }
 
-func writeCharInfo(w *wire.Writer, s CharInfoSnapshot) {
+func writeCharInfo(w *wire.Writer, s CharInfoSnapshot) error {
 	c, t := s.Character, s.Template
 	x, y, z := c.Position()
 	resources := c.ResourceValues()
@@ -103,7 +106,11 @@ func writeCharInfo(w *wire.Writer, s CharInfoSnapshot) {
 	w.WriteUint8(0) // mount type
 	w.WriteUint8(0) // private store/craft mode
 	cubicIDs := c.CubicIDs()
-	w.WriteUint16(uint16(len(cubicIDs)))
+	count, err := wire.Uint16Count(len(cubicIDs))
+	if err != nil {
+		return err
+	}
+	w.WriteUint16(count)
 	for _, id := range cubicIDs {
 		w.WriteUint16(uint16(id))
 	}
@@ -129,6 +136,7 @@ func writeCharInfo(w *wire.Writer, s CharInfoSnapshot) {
 	w.WriteInt32(0) // pledge type
 	w.WriteInt32(defaultTitleColor)
 	w.WriteInt32(0) // cursed weapon stage
+	return nil
 }
 
 func boolUint8(v bool) uint8 {

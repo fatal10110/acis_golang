@@ -464,6 +464,9 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 			Character: live.Character, Template: live.template, Items: live.inventoryItems(), IsGM: live.isGM,
 		}))
 	})
+	c.SetChargesUpdater(func() {
+		live.SendFrame(serverpackets.FrameEtcStatusUpdate(serverpackets.EtcStatus{Charges: int32(live.Charges()), WeightPenalty: int32(live.WeightPenalty()), GradePenalty: live.WeaponGradePenalty() || live.ArmorGradePenalty() > 0, DeathPenaltyLevel: int32(live.DeathPenaltyLevel())}))
+	})
 	c.SetGradePenaltyUpdater(func() {
 		live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
 		live.SendFrame(serverpackets.FrameEtcStatusUpdate(serverpackets.EtcStatus{GradePenalty: live.WeaponGradePenalty() || live.ArmorGradePenalty() > 0, DeathPenaltyLevel: int32(live.DeathPenaltyLevel())}))

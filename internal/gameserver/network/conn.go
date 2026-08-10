@@ -138,6 +138,10 @@ func (c *Conn) releaseQueued() {
 // SendFrame queues a frame and calls release exactly once after the frame is
 // written or dropped because the connection is closed.
 func (c *Conn) SendFrame(frame wire.Frame) bool {
+	if frame.Err() != nil {
+		frame.Release()
+		return false
+	}
 	if c.send(queuedWrite{frame: frame}) {
 		return true
 	}
@@ -148,6 +152,10 @@ func (c *Conn) SendFrame(frame wire.Frame) bool {
 // trySendFrame queues a frame only when the outbound queue has capacity. It
 // takes ownership of frame and releases it when the queue is full or closed.
 func (c *Conn) trySendFrame(frame wire.Frame) bool {
+	if frame.Err() != nil {
+		frame.Release()
+		return false
+	}
 	if c.trySend(queuedWrite{frame: frame}) {
 		return true
 	}

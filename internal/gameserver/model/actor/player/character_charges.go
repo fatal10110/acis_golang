@@ -20,8 +20,8 @@ func (c *Character) Charges() int {
 // FORCE_MAXLEVEL_REACHED short-circuit.
 func (c *Character) IncreaseCharges(count, max int) bool {
 	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
 	if c.charges >= max {
+		c.stateMu.Unlock()
 		return false
 	}
 	c.charges += count
@@ -29,7 +29,19 @@ func (c *Character) IncreaseCharges(count, max int) bool {
 		c.charges = max
 	}
 	c.restartChargeTimerLocked()
+	update := c.updateCharges
+	c.stateMu.Unlock()
+	if update != nil {
+		update()
+	}
 	return true
+}
+
+// SetChargesUpdater records the packet-layer hook that refreshes the Force/Soul charge display.
+func (c *Character) SetChargesUpdater(update func()) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	c.updateCharges = update
 }
 
 // DecreaseCharges removes count charges, reporting whether there were

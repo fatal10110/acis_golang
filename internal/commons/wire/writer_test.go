@@ -2,8 +2,23 @@ package wire
 
 import (
 	"bytes"
+	"math"
 	"testing"
 )
+
+func TestUint16Count(t *testing.T) {
+	count, err := Uint16Count(math.MaxUint16)
+	if err != nil {
+		t.Fatalf("Uint16Count(max) error = %v", err)
+	}
+	if count != math.MaxUint16 {
+		t.Fatalf("Uint16Count(max) = %d, want %d", count, math.MaxUint16)
+	}
+
+	if _, err := Uint16Count(math.MaxUint16 + 1); err == nil {
+		t.Fatal("Uint16Count(max + 1) error = nil, want overflow error")
+	}
+}
 
 func TestWriterPrimitives(t *testing.T) {
 	var w Writer
