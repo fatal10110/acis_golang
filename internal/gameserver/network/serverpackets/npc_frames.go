@@ -6,6 +6,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npcinfo"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
 // NpcFrameBuilder builds the wire frames for npc.Hostile and
@@ -22,6 +23,16 @@ func (NpcFrameBuilder) Info(snapshot npcinfo.Snapshot) wire.Frame {
 // Attack builds the attack packet for snapshot.
 func (NpcFrameBuilder) Attack(snapshot attack.Snapshot) wire.Frame {
 	return FrameAttack(snapshot)
+}
+
+// FlyTo builds a forced-flight animation packet.
+func (NpcFrameBuilder) FlyTo(objectID int32, dest, at location.Location, flight modelskill.Flight) wire.Frame {
+	return FrameFlyToLocation(objectID, dest, at, flight)
+}
+
+// ValidateLocation builds a forced-location correction packet.
+func (NpcFrameBuilder) ValidateLocation(objectID int32, at location.Location, heading int) wire.Frame {
+	return FrameValidateLocation(objectID, at, heading)
 }
 
 // SkillUse builds the cast-start animation packet from caster to target.

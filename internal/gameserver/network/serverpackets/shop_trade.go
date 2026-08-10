@@ -60,7 +60,11 @@ func FrameBuyList(list buylist.List, currentMoney int, taxRate float64, template
 func writeBuyList(w *wire.Writer, list buylist.List, currentMoney int, taxRate float64, templates *item.Table) error {
 	w.WriteInt32(int32(currentMoney))
 	w.WriteInt32(int32(list.ID))
-	w.WriteUint16(uint16(len(list.Products)))
+	count, err := wire.Uint16Count(len(list.Products))
+	if err != nil {
+		return err
+	}
+	w.WriteUint16(count)
 	for _, product := range list.Products {
 		if product.LimitedStock() && product.MaxCount <= 0 {
 			continue
@@ -93,7 +97,11 @@ func FrameSellList(currentMoney int, items []*item.Instance, templates *item.Tab
 func writeSellList(w *wire.Writer, currentMoney int, items []*item.Instance, templates *item.Table) error {
 	w.WriteInt32(int32(currentMoney))
 	w.WriteInt32(0)
-	w.WriteUint16(uint16(len(items)))
+	count, err := wire.Uint16Count(len(items))
+	if err != nil {
+		return err
+	}
+	w.WriteUint16(count)
 	for _, inst := range items {
 		st := inst.Snapshot()
 		tmpl, ok := templates.Get(st.TemplateID)
@@ -150,7 +158,11 @@ func writeTradeStart(w *wire.Writer, partnerID int32, items []*item.Instance, te
 		return err
 	}
 	w.WriteInt32(partnerID)
-	w.WriteUint16(uint16(len(available)))
+	count, err := wire.Uint16Count(len(available))
+	if err != nil {
+		return err
+	}
+	w.WriteUint16(count)
 	for _, row := range available {
 		inst := row.inst
 		tmpl := row.tmpl
@@ -197,7 +209,11 @@ func FrameTradeItemUpdate(entries []TradeItemUpdateEntry, templates *item.Table)
 }
 
 func writeTradeItemUpdate(w *wire.Writer, entries []TradeItemUpdateEntry, templates *item.Table) error {
-	w.WriteUint16(uint16(len(entries)))
+	count, err := wire.Uint16Count(len(entries))
+	if err != nil {
+		return err
+	}
+	w.WriteUint16(count)
 	for _, entry := range entries {
 		tmpl, ok := templates.Get(entry.Item.TemplateID)
 		if !ok {

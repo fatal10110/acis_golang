@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npcinfo"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
 // ErrNoWorld is returned by a Broadcast* method when SetWorld has not been
@@ -34,4 +35,6 @@ type FrameBuilder interface {
 	MoveToPawn(objectID, targetID int32, distance int, origin location.Location) wire.Frame
 	Stop(objectID int32, at location.Location, heading int) wire.Frame
 	Status(objectID int32, maxHP, curHP int) wire.Frame
+	FlyTo(objectID int32, dest, at location.Location, flight modelskill.Flight) wire.Frame
+	ValidateLocation(objectID int32, at location.Location, heading int) wire.Frame
 }

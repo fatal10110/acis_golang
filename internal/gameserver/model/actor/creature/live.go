@@ -39,6 +39,15 @@ func (l *Live) Move() *move.CreatureMove {
 	return &l.movement
 }
 
+// ValidLocation resolves a destination against this creature's movement
+// geodata without starting an ordinary move.
+func (l *Live) ValidLocation(ox, oy, oz, tx, ty, tz int) location.Location {
+	if l == nil {
+		return location.Location{X: ox, Y: oy, Z: oz}
+	}
+	return l.movement.ValidLocation(ox, oy, oz, tx, ty, tz)
+}
+
 // EffectList returns this creature's active buffs and debuffs.
 func (l *Live) EffectList() *effect.List {
 	if l == nil {

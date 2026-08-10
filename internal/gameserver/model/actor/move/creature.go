@@ -174,6 +174,15 @@ func (m *CreatureMove) SetPosition(position location.Location) {
 	}
 }
 
+// ValidLocation resolves a destination against this creature's movement
+// geodata without starting an ordinary move.
+func (m *CreatureMove) ValidLocation(ox, oy, oz, tx, ty, tz int) location.Location {
+	m.mu.Lock()
+	geo := m.geo
+	m.mu.Unlock()
+	return geo.ValidLocation(ox, oy, oz, tx, ty, tz)
+}
+
 // MoveToLocation records an accepted, height-normalized ground-movement
 // request and, once its Duration elapses, advances the actor's position to
 // destination and fires the arrived hook.

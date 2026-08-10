@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
@@ -105,6 +106,8 @@ type Character struct {
 	broadcastStance           func(Stance)
 	broadcastFakeDeathRevive  func()
 	updateAbnormalEffect      func()
+	broadcastFlight           func(location.Location, modelskill.Flight)
+	broadcastPosition         func()
 	updateWeightPenalty       func()
 	weightPenalty             int
 	weightLimitMultiplier     float64
@@ -189,8 +192,9 @@ type Character struct {
 	// charges is the Force/Soul charge counter (increaseCharges/
 	// decreaseCharges/clearCharges), auto-cleared by chargeTimer after
 	// chargeAutoClearDelay of inactivity.
-	charges     int
-	chargeTimer *time.Timer
+	charges       int
+	chargeTimer   *time.Timer
+	updateCharges func()
 
 	// deathPenaltyLevel is the persisted death-penalty debuff level (skill
 	// 5076), capped at maxDeathPenaltyLevel.

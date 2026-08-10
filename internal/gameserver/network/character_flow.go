@@ -384,6 +384,17 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	c.SetMoveBroadcaster(func(event move.Event) {
 		l.broadcastLiveMoveEvent(live, event)
 	})
+	c.SetFlightBroadcaster(func(dest location.Location, flight modelskill.Flight) {
+		at := live.CurrentLocation()
+		l.broadcastLiveFrame(live, func() wire.Frame {
+			return serverpackets.FrameFlyToLocation(live.ObjectID(), dest, at, flight)
+		})
+	})
+	c.SetPositionBroadcaster(func() {
+		l.broadcastLiveFrame(live, func() wire.Frame {
+			return serverpackets.FrameValidateLocation(live.ObjectID(), live.CurrentLocation(), live.CurrentHeading())
+		})
+	})
 	c.SetStopBroadcaster(func() {
 		x, y, z := live.Position()
 		l.broadcastLiveStopMove(live, location.Location{X: x, Y: y, Z: z}, live.CurrentHeading())
@@ -452,6 +463,9 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 		live.SendFrame(serverpackets.FrameUserInfo(serverpackets.UserInfoSnapshot{
 			Character: live.Character, Template: live.template, Items: live.inventoryItems(), IsGM: live.isGM,
 		}))
+	})
+	c.SetChargesUpdater(func() {
+		live.SendFrame(serverpackets.FrameEtcStatusUpdate(serverpackets.EtcStatus{Charges: int32(live.Charges()), WeightPenalty: int32(live.WeightPenalty()), GradePenalty: live.WeaponGradePenalty() || live.ArmorGradePenalty() > 0, DeathPenaltyLevel: int32(live.DeathPenaltyLevel())}))
 	})
 	c.SetGradePenaltyUpdater(func() {
 		live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))

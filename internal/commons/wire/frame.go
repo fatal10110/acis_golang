@@ -18,6 +18,17 @@ type Frame struct {
 	bytes   []byte
 	writer  *Writer
 	release func(*Writer)
+	err     error
+}
+
+// InvalidFrame returns a frame that must not be sent.
+func InvalidFrame(err error) Frame {
+	return Frame{err: err}
+}
+
+// Err reports why a frame must not be sent.
+func (f Frame) Err() error {
+	return f.err
 }
 
 // BorrowedFrame returns a frame whose storage is not owned by a pool.

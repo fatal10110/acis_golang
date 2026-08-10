@@ -38,7 +38,11 @@ func writeItemList(w *wire.Writer, items []*item.Instance, templates *item.Table
 	}
 
 	w.WriteUint16(uint16(boolInt32(showWindow)))
-	w.WriteUint16(uint16(len(owned)))
+	count, err := wire.Uint16Count(len(owned))
+	if err != nil {
+		return err
+	}
+	w.WriteUint16(count)
 
 	for _, it := range owned {
 		tmpl, ok := templates.Get(it.TemplateID)

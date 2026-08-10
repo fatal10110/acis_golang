@@ -19,6 +19,25 @@ func TestCharacterIncreaseChargesClampsToMax(t *testing.T) {
 	}
 }
 
+func TestCharacterIncreaseChargesNotifiesStatusOnlyAfterSuccessfulAdd(t *testing.T) {
+	c := &Character{ID: 1}
+	var updates int
+	c.SetChargesUpdater(func() { updates++ })
+
+	if !c.IncreaseCharges(5, 5) {
+		t.Fatal("IncreaseCharges() = false, want true")
+	}
+	if updates != 1 {
+		t.Fatalf("updates after clamped add = %d, want 1", updates)
+	}
+	if c.IncreaseCharges(1, 5) {
+		t.Fatal("IncreaseCharges() = true at max, want false")
+	}
+	if updates != 1 {
+		t.Fatalf("updates after at-max no-op = %d, want 1", updates)
+	}
+}
+
 func TestCharacterDecreaseChargesReportsInsufficientCharges(t *testing.T) {
 	c := &Character{ID: 1}
 	c.IncreaseCharges(2, 5)

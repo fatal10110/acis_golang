@@ -75,11 +75,14 @@ func EncodeUserInfo(s UserInfoSnapshot) []byte {
 // FrameUserInfo builds the UserInfo packet for s as an owned frame.
 func FrameUserInfo(s UserInfoSnapshot) wire.Frame {
 	w := newFrameWriter(OpcodeUserInfo)
-	writeUserInfo(w, s)
+	if err := writeUserInfo(w, s); err != nil {
+		releaseFrameWriter(w)
+		return wire.InvalidFrame(err)
+	}
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
 }
 
-func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) {
+func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) error {
 	c, t := s.Character, s.Template
 	x, y, z := c.Position()
 	resources := c.ResourceValues()
@@ -204,7 +207,11 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) {
 	w.WriteInt32(int32(c.PvPKills))
 
 	cubicIDs := c.CubicIDs()
-	w.WriteUint16(uint16(len(cubicIDs)))
+	count, err := wire.Uint16Count(len(cubicIDs))
+	if err != nil {
+		return err
+	}
+	w.WriteUint16(count)
 	for _, id := range cubicIDs {
 		w.WriteUint16(uint16(id))
 	}
@@ -236,4 +243,5 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) {
 	w.WriteInt32(0) // pledge type: clans are not modeled
 	w.WriteInt32(defaultTitleColor)
 	w.WriteInt32(0) // cursed weapon stage: cursed weapons are not modeled
+	return nil
 }

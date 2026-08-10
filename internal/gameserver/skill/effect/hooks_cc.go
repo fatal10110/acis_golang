@@ -284,6 +284,10 @@ func throwUpStart(e *Effect) bool {
 	if !ok {
 		return false
 	}
+	mover, ok := e.Effected.(flightMover)
+	if !ok {
+		return false
+	}
 
 	ox, oy, oz := target.X(), target.Y(), target.Z()
 	dx := float64(source.X() - ox)
@@ -293,7 +297,7 @@ func throwUpStart(e *Effect) bool {
 		return false
 	}
 
-	offset := math.Min(distance+float64(e.Skill.FlyRadius), 1400)
+	offset := float64(min(int(distance)+e.Skill.FlyRadius, 1400))
 	offset += math.Abs(float64(source.Z() - oz))
 	if offset < 5 {
 		offset = 5
@@ -311,9 +315,7 @@ func throwUpStart(e *Effect) bool {
 	e.landing = location.Location{X: x, Y: y, Z: z}
 	refresh(e.Effected)
 
-	if mover, ok := e.Effected.(flightMover); ok {
-		mover.FlyTo(e.landing, modelskill.FlightThrowUp)
-	}
+	mover.FlyTo(e.landing, modelskill.FlightThrowUp)
 	return true
 }
 
