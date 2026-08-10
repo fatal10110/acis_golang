@@ -214,18 +214,9 @@ func shortBuffDecision(caster SkillCaster, def modelskill.Definition) (ok bool, 
 	return true, int32(def.ID), int32(def.Level), duration
 }
 
-// resolveInstantItemSkill returns the first carried skill of refs that
-// resolves to a potion or simultaneous-cast definition. None matching
-// leaves the item to the caller's fallback.
-func resolveInstantItemSkill(refs []modelitem.SkillRef, defs actorcast.Definitions) (modelskill.Definition, bool) {
-	for _, ref := range refs {
-		if def, ok := resolveInstantItemSkillRef(ref, defs); ok {
-			return def, true
-		}
-	}
-	return modelskill.Definition{}, false
-}
-
+// resolveInstantItemSkillRef resolves ref to a potion or simultaneous-cast
+// definition. Anything else (unknown ref, or a non-instant skill) reports
+// not-ok so the caller can skip it.
 func resolveInstantItemSkillRef(ref modelitem.SkillRef, defs actorcast.Definitions) (modelskill.Definition, bool) {
 	if defs == nil {
 		return modelskill.Definition{}, false
