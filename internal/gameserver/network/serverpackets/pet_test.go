@@ -42,6 +42,32 @@ func TestFramePetDelete(t *testing.T) {
 	}
 }
 
+func TestFramePetItemList(t *testing.T) {
+	items := []*item.Instance{{ObjectID: 0x01020304, TemplateID: 57, Count: 10, Location: item.LocationPet}}
+	frame, err := FramePetItemList(items, petPacketTemplates())
+	if err != nil {
+		t.Fatalf("FramePetItemList: %v", err)
+	}
+	got := framePayload(t, frame)
+	want := []byte{
+		OpcodePetItemList,
+		0x01, 0x00,
+		0x04, 0x00,
+		0x04, 0x03, 0x02, 0x01,
+		0x39, 0x00, 0x00, 0x00,
+		0x0a, 0x00, 0x00, 0x00,
+		0x04, 0x00,
+		0x00, 0x00,
+		0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00,
+		0x00, 0x00,
+	}
+	if !bytes.Equal(got, want) {
+		t.Fatalf("FramePetItemList() = %x, want %x", got, want)
+	}
+}
+
 func TestFramePetInventoryUpdate(t *testing.T) {
 	templates := petPacketTemplates()
 	items := []*item.Instance{{ObjectID: 0x01020304, TemplateID: 57, Count: 10, Location: item.LocationPet}}
