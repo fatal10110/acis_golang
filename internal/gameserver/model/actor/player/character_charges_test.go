@@ -1,6 +1,10 @@
 package player
 
-import "testing"
+import (
+	"fmt"
+	"reflect"
+	"testing"
+)
 
 func TestCharacterIncreaseChargesClampsToMax(t *testing.T) {
 	c := &Character{ID: 1}
@@ -35,6 +39,24 @@ func TestCharacterIncreaseChargesNotifiesStatusOnlyAfterSuccessfulAdd(t *testing
 	}
 	if updates != 1 {
 		t.Fatalf("updates after at-max no-op = %d, want 1", updates)
+	}
+}
+
+func TestCharacterIncreaseChargesNotifiesForceMessageBeforeStatus(t *testing.T) {
+	c := &Character{ID: 1}
+	var events []string
+	c.SetChargeMessageSender(func(charges int, maxed bool) {
+		events = append(events, fmt.Sprintf("message:%d:%t", charges, maxed))
+	})
+	c.SetChargesUpdater(func() { events = append(events, "status") })
+
+	c.IncreaseCharges(2, 5)
+	c.IncreaseCharges(3, 5)
+	c.IncreaseCharges(1, 5)
+
+	want := []string{"message:2:false", "status", "message:5:true", "status", "message:5:true"}
+	if !reflect.DeepEqual(events, want) {
+		t.Fatalf("charge notifications = %v, want %v", events, want)
 	}
 }
 
