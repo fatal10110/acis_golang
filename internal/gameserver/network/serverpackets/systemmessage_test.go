@@ -17,6 +17,34 @@ func TestFrameSystemMessage(t *testing.T) {
 	}
 }
 
+func TestFrameSystemMessageForceChargeFeedback(t *testing.T) {
+	t.Run("increased", func(t *testing.T) {
+		got := framePayload(t, FrameSystemMessageNumber(SystemMessageForceIncreasedToS1, 3))
+		want := []byte{
+			OpcodeSystemMessage,
+			0x43, 0x01, 0x00, 0x00, // 323
+			0x01, 0x00, 0x00, 0x00, // one parameter
+			0x01, 0x00, 0x00, 0x00, // number parameter
+			0x03, 0x00, 0x00, 0x00, // three charges
+		}
+		if !bytes.Equal(got, want) {
+			t.Fatalf("force-increased frame = %x, want %x", got, want)
+		}
+	})
+
+	t.Run("maximum", func(t *testing.T) {
+		got := framePayload(t, FrameSystemMessage(SystemMessageForceMaxLevelReached))
+		want := []byte{
+			OpcodeSystemMessage,
+			0x44, 0x01, 0x00, 0x00, // 324
+			0x00, 0x00, 0x00, 0x00, // no parameters
+		}
+		if !bytes.Equal(got, want) {
+			t.Fatalf("force-maximum frame = %x, want %x", got, want)
+		}
+	})
+}
+
 func TestFrameSystemMessageTwoNumbers(t *testing.T) {
 	got := framePayload(t, FrameSystemMessageTwoNumbers(SystemMessageYouEarnedS1ExpAndS2SP, 1000, 25))
 	want := []byte{
