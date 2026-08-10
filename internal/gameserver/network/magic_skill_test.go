@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
+	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -13,7 +15,15 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
+
+type recordingSkillHandler struct{ applied chan []any }
+
+func (h recordingSkillHandler) Types() []string { return []string{"TEST_AREA"} }
+func (h recordingSkillHandler) Use(cast handlerskill.Cast) {
+	h.applied <- append([]any(nil), cast.Targets...)
+}
 
 func TestGameClientLinkMagicSkillUseStartsKnownActiveSkill(t *testing.T) {
 	store := newMemorySkillSaveStore()
@@ -670,6 +680,45 @@ func TestGameClientLinkMagicSkillUseMissingOneTargetSendsActionFailedOnly(t *tes
 
 	if got, want := frameOpcodes(capture.frames), []byte{serverpackets.OpcodeActionFailed}; !bytes.Equal(got, want) {
 		t.Fatalf("missing-target cast opcodes = %#x, want ActionFailed only (%#x)", got, want)
+	}
+}
+
+func TestGameClientLinkMagicSkillUseAppliesAreaSkillToResolvedTargets(t *testing.T) {
+	state := world.New()
+	casterCapture := &frameCapture{}
+	caster := newTestLivePlayer(t, 7, casterCapture)
+	aimed := newTestHostileNPC(t, 8)
+	nearby := newTestHostileNPC(t, 9)
+	state.Spawn(caster, 0, 0, 0, 0)
+	state.AddPlayer(caster)
+	state.Spawn(aimed, 100, 0, 0, 0)
+	state.Spawn(nearby, 200, 0, 0, 0)
+	caster.Character.SetSkillLevel(3, 1)
+	caster.SetTargetTracked(aimed)
+
+	recorded := recordingSkillHandler{applied: make(chan []any, 1)}
+	link := &GameClientLink{
+		skills: skillstate.NewPersistence(nil, modelskill.NewTable([]modelskill.Definition{{
+			ID: 3, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetArea,
+			Radius: 150, SkillType: "TEST_AREA",
+		}}), nil),
+		targets:       skilltarget.NewRegistry(skilltarget.WorldKnown{State: state}),
+		skillHandlers: handlerskill.NewRegistry(recorded),
+	}
+
+	link.handleMagicSkillUse(caster, clientpackets.RequestMagicSkillUse{SkillID: 3})
+
+	select {
+	case targets := <-recorded.applied:
+		got := map[int32]bool{}
+		for _, target := range targets {
+			got[target.(interface{ ObjectID() int32 }).ObjectID()] = true
+		}
+		if len(got) != 2 || !got[aimed.ObjectID()] || !got[nearby.ObjectID()] {
+			t.Fatalf("area effect targets = %v, want %d and %d", got, aimed.ObjectID(), nearby.ObjectID())
+		}
+	case <-time.After(time.Second):
+		t.Fatalf("area cast did not reach its skill handler; frames = %#x", frameOpcodes(casterCapture.frames))
 	}
 }
 
