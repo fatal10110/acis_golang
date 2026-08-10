@@ -289,7 +289,7 @@ func throwUpStart(e *Effect) bool {
 		return false
 	}
 
-	offset := math.Min(distance+float64(e.Skill.FlyRadius), 1400)
+	offset := float64(min(int(distance)+e.Skill.FlyRadius, 1400))
 	offset += math.Abs(float64(source.Z() - oz))
 	if offset < 5 {
 		offset = 5

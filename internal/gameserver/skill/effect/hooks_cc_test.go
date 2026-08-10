@@ -508,6 +508,24 @@ func TestThrowUpEffectComputesLandingAndFliesThenTeleportsOnExit(t *testing.T) {
 	}
 }
 
+func TestThrowUpEffectTruncatesDistanceBeforeAddingFlyRadius(t *testing.T) {
+	effector := &liveEffectTarget{x: 1, y: 1}
+	effected := &liveEffectTarget{}
+
+	e, err := New(Skill{ID: 1, FlyRadius: 600}, modelskill.EffectTemplate{Name: "ThrowUp"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.Effector, e.Effected = effector, effected
+	if !e.OnStart(e) {
+		t.Fatal("throw-up effect start rejected a valid range")
+	}
+
+	if want := (location.Location{X: -423, Y: -423}); e.landing != want {
+		t.Fatalf("landing = %+v, want %+v", e.landing, want)
+	}
+}
+
 func TestThrowUpEffectAppliesGeoCorrectedXYButKeepsOriginalZ(t *testing.T) {
 	effector := &liveEffectTarget{x: 100, y: 0, z: 500}
 	effected := &liveEffectTarget{x: 0, y: 0, z: 0}

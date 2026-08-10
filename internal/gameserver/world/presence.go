@@ -33,6 +33,24 @@ func (p *Presence) Position() (x, y, z int) {
 	return p.x, p.y, p.z
 }
 
+// X returns the current world X coordinate.
+func (p *Presence) X() int {
+	x, _, _ := p.Position()
+	return x
+}
+
+// Y returns the current world Y coordinate.
+func (p *Presence) Y() int {
+	_, y, _ := p.Position()
+	return y
+}
+
+// Z returns the current world Z coordinate.
+func (p *Presence) Z() int {
+	_, _, z := p.Position()
+	return z
+}
+
 // Heading returns the direction the object faces.
 func (p *Presence) Heading() int {
 	p.mu.RLock()
