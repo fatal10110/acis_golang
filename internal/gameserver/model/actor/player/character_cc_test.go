@@ -84,6 +84,40 @@ func TestCharacterCrowdControlGettersTrackActiveEffectsAndClearOnRemoval(t *test
 	}
 }
 
+func TestCharacterThrowUpEffectActivatesAndMovesToLanding(t *testing.T) {
+	effector := &Character{ID: 1}
+	effector.SetLastKnownPosition(location.Location{X: 100, Y: 0, Z: 0}, 0)
+	attachThrowUpTestLive(t, effector)
+
+	effected := &Character{ID: 2}
+	effected.SetLastKnownPosition(location.Location{}, 0)
+	attachThrowUpTestLive(t, effected)
+
+	e, err := effect.New(effect.Skill{ID: 1, FlyRadius: 600}, modelskill.EffectTemplate{Name: "ThrowUp"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.Effector, e.Effected = effector, effected
+	effected.EffectList().Add(e)
+	if !effected.Stunned() {
+		t.Fatal("ThrowUp was rejected instead of applying its stunned state")
+	}
+
+	effected.EffectList().Remove(e)
+	if got := effected.CurrentLocation(); got != (location.Location{X: -600, Y: 0, Z: 0}) {
+		t.Fatalf("landing = %+v, want {-600 0 0}", got)
+	}
+}
+
+func attachThrowUpTestLive(t *testing.T, c *Character) {
+	t.Helper()
+	live, err := creature.NewLive(location.Location{}, 100, permissiveGeo{}, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.Live = live
+}
+
 func TestCharacterParalyzedUnionsManualLockAndActiveEffect(t *testing.T) {
 	c := &Character{ID: 1}
 	attachTestLive(t, c)

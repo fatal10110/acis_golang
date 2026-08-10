@@ -583,7 +583,33 @@ func TestHostileDenyAIActionReflectsCrowdControlAndDeath(t *testing.T) {
 	})
 }
 
+func TestHostileThrowUpEffectActivatesAndMovesToLanding(t *testing.T) {
+	state := world.New()
+	effector := newTestHostileOfKindWithLive(t, state, InstanceKind("Monster"), 1, 100, 0, newFlightHostileLive(t))
+	effected := newTestHostileOfKindWithLive(t, state, InstanceKind("Monster"), 2, 0, 0, newFlightHostileLive(t))
+
+	e, err := effect.New(effect.Skill{ID: 1, FlyRadius: 600}, modelskill.EffectTemplate{Name: "ThrowUp"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.Effector, e.Effected = effector, effected
+	effected.EffectList().Add(e)
+	if !effected.Stunned() {
+		t.Fatal("ThrowUp was rejected instead of applying its stunned state")
+	}
+
+	effected.EffectList().Remove(e)
+	x, y, z := effected.Position()
+	if got := (location.Location{X: x, Y: y, Z: z}); got != (location.Location{X: -600, Y: 0, Z: 0}) {
+		t.Fatalf("landing = %+v, want {-600 0 0}", got)
+	}
+}
+
 func newTestHostileOfKind(t *testing.T, state *world.State, kind InstanceKind, objectID int32, x, y int) *Hostile {
+	return newTestHostileOfKindWithLive(t, state, kind, objectID, x, y, newHostileLive(t))
+}
+
+func newTestHostileOfKindWithLive(t *testing.T, state *world.State, kind InstanceKind, objectID int32, x, y int, live *creature.Live) *Hostile {
 	t.Helper()
 	hostile, err := NewHostile(&Instance{
 		ObjectID: objectID,
@@ -593,13 +619,28 @@ func newTestHostileOfKind(t *testing.T, state *world.State, kind InstanceKind, o
 			BaseAttackRange: 80,
 		},
 		Kind: kind,
-	}, newHostileLive(t), &hostileMove{}, &hostileAttack{})
+	}, live, &hostileMove{}, &hostileAttack{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	hostile.SetWorld(state)
 	state.Spawn(hostile, x, y, 0, 0)
 	return hostile
+}
+
+type flightHostileGeo struct{ hostileGeo }
+
+func (flightHostileGeo) ValidLocation(_, _, _, tx, ty, tz int) location.Location {
+	return location.Location{X: tx, Y: ty, Z: tz}
+}
+
+func newFlightHostileLive(t testing.TB) *creature.Live {
+	t.Helper()
+	live, err := creature.NewLive(location.Location{}, 100, flightHostileGeo{}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return live
 }
 
 func TestHostileMonsterKind(t *testing.T) {
