@@ -14,6 +14,8 @@ const (
 	OpcodePetStatusShow = 0xb0
 	// OpcodePetInventoryUpdate is the wire opcode for pet inventory deltas.
 	OpcodePetInventoryUpdate = 0xb3
+	// OpcodePetItemList is the wire opcode for a full pet inventory snapshot.
+	OpcodePetItemList = 0xb2
 	// OpcodePetDelete tells the owner to remove a pet/servitor object from
 	// the client.
 	OpcodePetDelete = 0xb6
@@ -32,6 +34,26 @@ func FramePetDelete(summonType int, objectID int32) wire.Frame {
 	w.WriteInt32(int32(summonType))
 	w.WriteInt32(objectID)
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
+}
+
+// FramePetItemList builds a full pet inventory snapshot.
+func FramePetItemList(items []*item.Instance, templates *item.Table) (wire.Frame, error) {
+	w := newFrameWriter(OpcodePetItemList)
+	if err := writePetItemList(w, items, templates); err != nil {
+		releaseFrameWriter(w)
+		return wire.Frame{}, err
+	}
+	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter), nil
+}
+
+func writePetItemList(w *wire.Writer, items []*item.Instance, templates *item.Table) error {
+	w.WriteUint16(uint16(len(items)))
+	for _, inst := range items {
+		if err := writePetItem(w, inst, templates, itemcontainer.Update{ObjectID: inst.ObjectID}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // FramePetInventoryUpdate builds a PetInventoryUpdate packet for queued pet

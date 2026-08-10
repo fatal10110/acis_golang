@@ -645,6 +645,31 @@ func (inv *Inventory) DrainUpdates() []Update {
 	return out
 }
 
+// BuildAndDrainUpdates atomically snapshots inv's items, passes them to
+// build, and clears the pending-update queue only if build succeeds. Doing
+// the snapshot, build, and drain in one critical section closes two gaps at
+// once: a separate Items() call followed by DrainUpdates() would let a
+// concurrent change (the auto-feed ticker, a give/pickup on another
+// goroutine) land between the two locks and be lost, captured by neither
+// the snapshot nor a later drain; and draining before build succeeds would
+// throw away real queued deltas on a failed build (e.g. a persisted item
+// whose template never loaded), with no way to retry them later. Used
+// where a full-list snapshot must double as the update checkpoint, e.g.
+// sending PetItemList on discover.
+func (inv *Inventory) BuildAndDrainUpdates(build func(items []*item.Instance) error) error {
+	inv.Container.mu.RLock()
+	defer inv.Container.mu.RUnlock()
+	inv.mu.Lock()
+	defer inv.mu.Unlock()
+
+	items := inv.itemsLocked()
+	if err := build(items); err != nil {
+		return err
+	}
+	inv.updates = nil
+	return nil
+}
+
 // SetUpdateNotifier records the hook fired on every queued inventory
 // change, matching the reference's Inventory.addUpdate registering with
 // InventoryUpdateTaskManager unconditionally. Passing nil detaches the

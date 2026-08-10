@@ -8,6 +8,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
@@ -146,18 +147,26 @@ func TestLivePlayerVisibilitySendsPetInfoOnlyToOwner(t *testing.T) {
 	state.Spawn(owner, 0, 0, 0, 0)
 	state.Spawn(bystander, 500, 0, 0, 0)
 
+	petInventory := itemcontainer.NewPetInventory(20, petTestTemplates())
+	if petInventory.AddNew(57, 1, 21) == nil {
+		t.Fatal("add pet inventory item")
+	}
 	pet := summon.NewPet(summon.PetConfig{
 		ObjectID: 20, Owner: owner, NPCID: 12077, Name: "Wolf", Level: 5,
-		Stats: summon.CombatStats{MaxHP: 100, MaxMP: 30},
+		Inventory: petInventory,
+		Stats:     summon.CombatStats{MaxHP: 100, MaxMP: 30},
 	})
 	summon.SpawnBesideOwner(state, pet, owner, location.Location{X: 10})
 
-	if n := len(ownerFrames.frames); n == 0 || ownerFrames.frames[n-1][0] != serverpackets.OpcodePetInfo {
-		t.Fatalf("owner last frame opcode = %x, want PetInfo (%#x) last", ownerFrames.frames, serverpackets.OpcodePetInfo)
+	if n := len(ownerFrames.frames); n < 2 || ownerFrames.frames[n-2][0] != serverpackets.OpcodePetInfo || ownerFrames.frames[n-1][0] != serverpackets.OpcodePetItemList {
+		t.Fatalf("owner last frames = %x, want PetInfo then PetItemList", ownerFrames.frames)
+	}
+	if updates := petInventory.DrainUpdates(); len(updates) != 0 {
+		t.Fatalf("pet inventory updates after full snapshot = %v, want cleared", updates)
 	}
 	for _, f := range bystanderFrames.frames {
-		if f[0] == serverpackets.OpcodePetInfo {
-			t.Fatalf("bystander frames = %x, want no PetInfo (SummonInfo not ported yet)", bystanderFrames.frames)
+		if f[0] == serverpackets.OpcodePetInfo || f[0] == serverpackets.OpcodePetItemList {
+			t.Fatalf("bystander frames = %x, want no owner pet packets (SummonInfo not ported yet)", bystanderFrames.frames)
 		}
 	}
 
