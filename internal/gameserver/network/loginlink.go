@@ -308,7 +308,11 @@ func (l *LoginLink) SendPlayerLogout(account string) error {
 // SendPlayerInGame reports accounts that just entered the game on this
 // server.
 func (l *LoginLink) SendPlayerInGame(accounts []string) error {
-	return l.send(link.EncodePlayerInGame(accounts))
+	payload, err := link.EncodePlayerInGame(accounts)
+	if err != nil {
+		return err
+	}
+	return l.send(payload)
 }
 
 // SendAccessLevelChange asks the login server to change account's access

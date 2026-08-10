@@ -41,7 +41,11 @@ func TestDecodePlayerInGameShort(t *testing.T) {
 
 func TestEncodePlayerInGameRoundTrip(t *testing.T) {
 	want := []string{"alice", "bob"}
-	got, err := DecodePlayerInGame(EncodePlayerInGame(want))
+	payload, err := EncodePlayerInGame(want)
+	if err != nil {
+		t.Fatalf("EncodePlayerInGame: %v", err)
+	}
+	got, err := DecodePlayerInGame(payload)
 	if err != nil {
 		t.Fatalf("DecodePlayerInGame(EncodePlayerInGame()): %v", err)
 	}
@@ -52,11 +56,21 @@ func TestEncodePlayerInGameRoundTrip(t *testing.T) {
 
 func TestEncodePlayerInGameSingle(t *testing.T) {
 	want := []string{"alice"}
-	got, err := DecodePlayerInGame(EncodePlayerInGame(want))
+	payload, err := EncodePlayerInGame(want)
+	if err != nil {
+		t.Fatalf("EncodePlayerInGame: %v", err)
+	}
+	got, err := DecodePlayerInGame(payload)
 	if err != nil {
 		t.Fatalf("DecodePlayerInGame(EncodePlayerInGame()): %v", err)
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("round trip = %v, want %v", got, want)
+	}
+}
+
+func TestEncodePlayerInGameRejectsOversizedCount(t *testing.T) {
+	if _, err := EncodePlayerInGame(make([]string, 1<<16)); err == nil {
+		t.Fatal("EncodePlayerInGame oversized count error = nil, want error")
 	}
 }

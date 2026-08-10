@@ -13,8 +13,12 @@ type QuestListEntry struct {
 
 // FrameQuestList builds the quest list packet.
 func FrameQuestList(quests []QuestListEntry) wire.Frame {
+	count, err := wire.Uint16Count(len(quests))
+	if err != nil {
+		return wire.InvalidFrame(err)
+	}
 	w := newFrameWriter(OpcodeQuestList)
-	w.WriteUint16(uint16(len(quests)))
+	w.WriteUint16(count)
 	for _, q := range quests {
 		w.WriteInt32(q.QuestID)
 		w.WriteInt32(q.Flags)

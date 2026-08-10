@@ -2,9 +2,18 @@ package wire
 
 import (
 	"encoding/binary"
+	"fmt"
 	"math"
 	"unicode/utf16"
 )
+
+// Uint16Count validates a count encoded in an unsigned 16-bit packet field.
+func Uint16Count(n int) (uint16, error) {
+	if n < 0 || n > math.MaxUint16 {
+		return 0, fmt.Errorf("wire: uint16 count out of range: %d", n)
+	}
+	return uint16(n), nil
+}
 
 // Writer assembles little-endian primitives into a packet payload. The zero
 // value is ready to use.

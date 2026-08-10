@@ -30,7 +30,11 @@ func writeInventoryUpdate(w *wire.Writer, updates []itemcontainer.Update, items 
 		}
 	}
 
-	w.WriteUint16(uint16(len(updates)))
+	count, err := wire.Uint16Count(len(updates))
+	if err != nil {
+		return err
+	}
+	w.WriteUint16(count)
 	for _, update := range updates {
 		inst := byObjectID[update.ObjectID]
 		templateID := update.TemplateID

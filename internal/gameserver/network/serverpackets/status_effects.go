@@ -24,9 +24,13 @@ type AbnormalStatusEffect struct {
 // FrameAbnormalStatusUpdate builds the active abnormal effect list packet.
 func FrameAbnormalStatusUpdate(effects []AbnormalStatusEffect) wire.Frame {
 	normal, toggles := splitAbnormalEffects(effects)
+	count, err := wire.Uint16Count(len(normal) + len(toggles))
+	if err != nil {
+		return wire.InvalidFrame(err)
+	}
 
 	w := newFrameWriter(OpcodeAbnormalStatusUpdate)
-	w.WriteUint16(uint16(len(normal) + len(toggles)))
+	w.WriteUint16(count)
 	for _, e := range normal {
 		writeAbnormalStatusEffect(w, e, e.DurationMillis == -1)
 	}

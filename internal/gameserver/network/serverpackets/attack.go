@@ -28,13 +28,20 @@ type AttackSnapshot = attack.Snapshot
 // FrameAttack builds an Attack packet as an owned frame.
 func FrameAttack(s AttackSnapshot) wire.Frame {
 	w := newFrameWriter(OpcodeAttack)
-	writeAttack(w, s)
+	if err := writeAttack(w, s); err != nil {
+		releaseFrameWriter(w)
+		return wire.InvalidFrame(err)
+	}
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
 }
 
-func writeAttack(w *wire.Writer, s AttackSnapshot) {
+func writeAttack(w *wire.Writer, s AttackSnapshot) error {
 	if len(s.Hits) == 0 {
-		return
+		return nil
+	}
+	count, err := wire.Uint16Count(len(s.Hits) - 1)
+	if err != nil {
+		return err
 	}
 
 	first := s.Hits[0]
@@ -45,11 +52,12 @@ func writeAttack(w *wire.Writer, s AttackSnapshot) {
 	w.WriteInt32(int32(s.X))
 	w.WriteInt32(int32(s.Y))
 	w.WriteInt32(int32(s.Z))
-	w.WriteUint16(uint16(len(s.Hits) - 1))
+	w.WriteUint16(count)
 
 	for _, hit := range s.Hits[1:] {
 		w.WriteInt32(hit.TargetID)
 		w.WriteInt32(int32(hit.Damage))
 		w.WriteUint8(hit.Flags)
 	}
+	return nil
 }
