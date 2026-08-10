@@ -478,6 +478,12 @@ func wireHooks(e *Effect) {
 		e.OnExit = chanceSkillTriggerExit
 	case TypeSpoil:
 		e.OnStart = spoilStart
+	case TypeBigHead:
+		e.OnStart = func(e *Effect) bool {
+			startAbnormalEffect(e.Effected, 0x002000)
+			return true
+		}
+		e.OnExit = func(e *Effect) { stopAbnormalEffect(e.Effected, 0x002000) }
 	case TypeCancelDebuff:
 		e.OnStart = cancelDebuffStart
 	case TypeRelax:

@@ -4,6 +4,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npcinfo"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
 
@@ -12,6 +13,11 @@ import (
 // construction and wire encoding. Stateless: one value serves every live
 // NPC.
 type NpcFrameBuilder struct{}
+
+// Info builds the current NPCInfo frame from snapshot.
+func (NpcFrameBuilder) Info(snapshot npcinfo.Snapshot) wire.Frame {
+	return FrameNPCInfo(snapshot)
+}
 
 // Attack builds the attack packet for snapshot.
 func (NpcFrameBuilder) Attack(snapshot attack.Snapshot) wire.Frame {

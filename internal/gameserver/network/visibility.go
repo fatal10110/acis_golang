@@ -19,7 +19,7 @@ func (p *livePlayer) Discover(obj world.Tracked) {
 			Items:     o.inventoryItems(),
 		}))
 	case *npc.Hostile:
-		p.sendVisibilityFrame(serverpackets.FrameNPCInfo(npcInfoSnapshot(o)))
+		p.sendVisibilityFrame(serverpackets.FrameNPCInfo(o.NPCInfoSnapshot()))
 	case *summon.Actor:
 		// Only the owner gets PetInfo; a non-owner observer would get
 		// SummonInfo instead, which isn't ported yet (tracked separately —
@@ -196,38 +196,4 @@ func petInfoSnapshot(a *summon.Actor, owner *livePlayer, npcs *npc.Table) (serve
 		SoulShotsPerHit:   ssCount,
 		SpiritShotsPerHit: spsCount,
 	}, true
-}
-
-func npcInfoSnapshot(n *npc.Hostile) serverpackets.NPCInfoSnapshot {
-	tmpl := n.Instance.Template
-	x, y, z := n.Position()
-	name, title := "", ""
-	if tmpl.UsingServerSideName {
-		name = tmpl.Name
-	}
-	if tmpl.UsingServerSideTitle {
-		title = tmpl.Title
-	}
-	return serverpackets.NPCInfoSnapshot{
-		ObjectID:        n.ObjectID(),
-		TemplateID:      tmpl.TemplateID,
-		Attackable:      true,
-		X:               x,
-		Y:               y,
-		Z:               z,
-		Heading:         n.Heading(),
-		MAtkSpd:         int(tmpl.AtkSpd),
-		PAtkSpd:         n.AttackSpeed(),
-		RunSpd:          int(tmpl.RunSpeed),
-		WalkSpd:         int(tmpl.WalkSpeed),
-		CollisionRadius: tmpl.CollisionRadius,
-		CollisionHeight: tmpl.CollisionHeight,
-		RightHand:       tmpl.RightHand,
-		LeftHand:        tmpl.LeftHand,
-		Running:         true,
-		AlikeDead:       n.AlikeDead(),
-		SummonAnimation: 2,
-		Name:            name,
-		Title:           title,
-	}
 }

@@ -77,7 +77,7 @@ func growStart(e *Effect) bool {
 		return false
 	}
 	target.SetCollisionRadius(target.CollisionRadius() * growRadiusScale)
-	refresh(e.Effected)
+	startAbnormalEffect(e.Effected, 0x010000)
 	return true
 }
 
@@ -89,7 +89,7 @@ func growExit(e *Effect) {
 		return
 	}
 	target.ResetCollisionRadius()
-	refresh(e.Effected)
+	stopAbnormalEffect(e.Effected, 0x010000)
 }
 
 // recoveryTarget is implemented by a player-shaped actor that tracks a

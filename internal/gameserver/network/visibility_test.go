@@ -131,6 +131,37 @@ func TestLivePlayerVisibilityRendersHostileNPC(t *testing.T) {
 	}
 }
 
+func TestHostileAbnormalEffectRefreshResendsLiveNPCInfo(t *testing.T) {
+	state := world.New()
+	frames := &frameCapture{}
+	viewer := newTestLivePlayer(t, 1, frames)
+	state.Spawn(viewer, 0, 0, 0, 0)
+
+	hostile := newTestHostileNPC(t, 20)
+	hostile.SetWorld(state)
+	state.Spawn(hostile, 100, 0, -50, 123)
+	frames.frames = nil
+
+	hostile.SetCollisionRadius(9 * 1.19)
+	hostile.StartAbnormalEffect(0x010000)
+	snapshot := hostile.NPCInfoSnapshot()
+	if snapshot.CollisionRadius != 9*1.19 {
+		t.Fatalf("collision radius = %v, want %v", snapshot.CollisionRadius, 9*1.19)
+	}
+	if snapshot.AbnormalEffect != 0x010000 {
+		t.Fatalf("abnormal effect = %#x, want %#x", snapshot.AbnormalEffect, 0x010000)
+	}
+	hostile.UpdateAbnormalEffect()
+
+	if len(frames.frames) != 1 {
+		t.Fatalf("frames = %x, want one refreshed NPCInfo", frames.frames)
+	}
+	got := frames.frames[0]
+	if got[0] != serverpackets.OpcodeNPCInfo {
+		t.Fatalf("opcode = %#x, want NPCInfo (%#x)", got[0], serverpackets.OpcodeNPCInfo)
+	}
+}
+
 func TestLivePlayerVisibilitySendsPetInfoOnlyToOwner(t *testing.T) {
 	state := world.New()
 	ownerFrames := &frameCapture{}

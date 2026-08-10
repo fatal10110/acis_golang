@@ -2,33 +2,14 @@ package serverpackets
 
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npcinfo"
 )
 
 // OpcodeNPCInfo is the wire opcode for a visible NPC entering sight.
 const OpcodeNPCInfo = 0x16
 
 // NPCInfoSnapshot is everything NPCInfo needs for one visible NPC.
-type NPCInfoSnapshot struct {
-	ObjectID                   int32
-	TemplateID                 int
-	Attackable                 bool
-	X, Y, Z, Heading           int
-	MAtkSpd, PAtkSpd           int
-	RunSpd, WalkSpd            int
-	CollisionRadius            float64
-	CollisionHeight            float64
-	RightHand, Chest, LeftHand int
-	Running, InCombat          bool
-	AlikeDead                  bool
-	SummonAnimation            int
-	Name, Title                string
-	AbnormalEffect             int
-	ClanID, ClanCrest          int
-	AllyID, AllyCrest          int
-	MoveType, Team             int
-	EnchantEffect              int
-	Flying                     bool
-}
+type NPCInfoSnapshot = npcinfo.Snapshot
 
 // FrameNPCInfo builds the NPC info packet sent when a live NPC enters a
 // player's visible region.

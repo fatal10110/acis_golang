@@ -31,13 +31,13 @@ func TestDisablerEffectsRunLiveStartExitHooks(t *testing.T) {
 		},
 		{
 			name:      "Paralyze",
-			wantStart: []string{"abort:false"},
-			wantExit:  []string{"think"},
+			wantStart: []string{"abnormal", "abort:false"},
+			wantExit:  []string{"abnormal", "think"},
 		},
 		{
 			name:      "Petrification",
-			wantStart: []string{"abort:false", "invul:true"},
-			wantExit:  []string{"think", "invul:false"},
+			wantStart: []string{"abnormal", "abort:false", "invul:true"},
+			wantExit:  []string{"abnormal", "think", "invul:false"},
 		},
 	}
 

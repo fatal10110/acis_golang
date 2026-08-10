@@ -153,17 +153,20 @@ func physicalMuteStart(e *Effect) bool {
 }
 
 func paralyzeStart(e *Effect) bool {
+	startAbnormalEffect(e.Effected, 0x000400)
 	abortAll(e.Effected)
 	return true
 }
 
 func paralyzeExit(e *Effect) {
+	stopAbnormalEffect(e.Effected, 0x000400)
 	if target, ok := e.Effected.(thinkTarget); ok {
 		_ = target.Think()
 	}
 }
 
 func petrificationStart(e *Effect) bool {
+	startAbnormalEffect(e.Effected, 0x000800)
 	abortAll(e.Effected)
 	if target, ok := e.Effected.(invulnerabilityTarget); ok {
 		target.SetInvul(true)
@@ -172,6 +175,7 @@ func petrificationStart(e *Effect) bool {
 }
 
 func petrificationExit(e *Effect) {
+	stopAbnormalEffect(e.Effected, 0x000800)
 	if target, ok := e.Effected.(thinkTarget); ok {
 		_ = target.Think()
 	}
