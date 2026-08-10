@@ -9,9 +9,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npcinfo"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
@@ -67,6 +69,7 @@ type Hostile struct {
 	decayed bool
 
 	regionInactive atomic.Bool
+	abnormalEffect atomic.Int32
 
 	// raidRelated marks this NPC as tied to a raid encounter (a raid boss
 	// or one of its minions), set per-instance rather than derived from
@@ -189,6 +192,56 @@ func (h *Hostile) SetWorld(state *world.State) {
 // until both SetWorld and SetFrameBuilder have been called.
 func (h *Hostile) SetFrameBuilder(b FrameBuilder) {
 	h.frames = b
+}
+
+// StartAbnormalEffect adds mask to this NPC's client-visible abnormal state.
+func (h *Hostile) StartAbnormalEffect(mask int) {
+	h.abnormalEffect.Or(int32(mask))
+}
+
+// StopAbnormalEffect removes mask from this NPC's client-visible abnormal state.
+func (h *Hostile) StopAbnormalEffect(mask int) {
+	for {
+		current := h.abnormalEffect.Load()
+		if h.abnormalEffect.CompareAndSwap(current, current&^int32(mask)) {
+			return
+		}
+	}
+}
+
+// AbnormalEffect returns this NPC's client-visible abnormal-effect bitmask.
+func (h *Hostile) AbnormalEffect() int {
+	return int(h.abnormalEffect.Load())
+}
+
+// NPCInfoSnapshot captures this NPC's current client-visible state.
+func (h *Hostile) NPCInfoSnapshot() npcinfo.Snapshot {
+	tmpl := h.Instance.Template
+	x, y, z := h.Position()
+	name, title := "", ""
+	if tmpl.UsingServerSideName {
+		name = tmpl.Name
+	}
+	if tmpl.UsingServerSideTitle {
+		title = tmpl.Title
+	}
+	return npcinfo.Snapshot{
+		ObjectID: h.ObjectID(), TemplateID: tmpl.TemplateID, Attackable: true,
+		X: x, Y: y, Z: z, Heading: h.Heading(),
+		MAtkSpd: int(tmpl.AtkSpd), PAtkSpd: h.AttackSpeed(),
+		RunSpd: int(tmpl.RunSpeed), WalkSpd: int(tmpl.WalkSpeed),
+		CollisionRadius: h.CollisionRadius(), CollisionHeight: tmpl.CollisionHeight,
+		RightHand: tmpl.RightHand, LeftHand: tmpl.LeftHand,
+		Running: true, AlikeDead: h.AlikeDead(), SummonAnimation: 2,
+		AbnormalEffect: h.AbnormalEffect(), Name: name, Title: title,
+	}
+}
+
+// UpdateAbnormalEffect re-announces this NPC's current visible state.
+func (h *Hostile) UpdateAbnormalEffect() {
+	if err := h.broadcastFrame(func() wire.Frame { return h.frames.Info(h.NPCInfoSnapshot()) }); err != nil {
+		h.log.Debug().Err(err).Int32("object_id", h.ObjectID()).Msg("broadcast npc abnormal effect")
+	}
 }
 
 // SetLogger records where a broadcast failure from an internally-triggered

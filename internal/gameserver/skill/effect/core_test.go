@@ -200,13 +200,13 @@ func TestPolearmTargetSingleEffectCarriesNoHooks(t *testing.T) {
 	}
 }
 
-func TestBigHeadEffectCarriesFlagWithNoHooks(t *testing.T) {
+func TestBigHeadEffectCarriesVisibleAbnormalHooks(t *testing.T) {
 	e, err := New(Skill{}, modelskill.EffectTemplate{Name: "BigHead"})
 	if err != nil {
 		t.Fatalf("New() error: %v", err)
 	}
-	if e.OnStart != nil || e.OnExit != nil {
-		t.Fatal("BigHead must carry no start/exit hooks: the abnormal-effect broadcast isn't wired anywhere yet")
+	if e.OnStart == nil || e.OnExit == nil {
+		t.Fatal("BigHead must start and stop its visible abnormal effect")
 	}
 	if e.Flag == FlagNone {
 		t.Fatal("BigHead must carry a distinct, non-zero flag")

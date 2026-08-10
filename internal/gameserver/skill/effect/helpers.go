@@ -12,6 +12,20 @@ func refresh(target any) {
 	}
 }
 
+func startAbnormalEffect(target any, mask int) {
+	if target, ok := target.(interface{ StartAbnormalEffect(int) }); ok {
+		target.StartAbnormalEffect(mask)
+	}
+	refresh(target)
+}
+
+func stopAbnormalEffect(target any, mask int) {
+	if target, ok := target.(interface{ StopAbnormalEffect(int) }); ok {
+		target.StopAbnormalEffect(mask)
+	}
+	refresh(target)
+}
+
 func fearImmune(target any) bool {
 	t, ok := target.(fearImmuneTarget)
 	return ok && t.FearImmune()

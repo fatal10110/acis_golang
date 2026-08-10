@@ -515,6 +515,14 @@ func (t *growEffectTarget) ResetCollisionRadius() {
 	t.events = append(t.events, "reset")
 }
 
+func (t *growEffectTarget) StartAbnormalEffect(mask int) {
+	t.events = append(t.events, fmt.Sprintf("start:%#x", mask))
+}
+
+func (t *growEffectTarget) StopAbnormalEffect(mask int) {
+	t.events = append(t.events, fmt.Sprintf("stop:%#x", mask))
+}
+
 func (t *growEffectTarget) UpdateAbnormalEffect() {
 	t.events = append(t.events, "abnormal")
 }
@@ -537,7 +545,7 @@ func TestGrowEffectScalesCollisionRadiusAndRestoresOnExit(t *testing.T) {
 	}
 
 	e.OnExit(e)
-	if wantEvents := []string{fmt.Sprintf("set:%g", want), "abnormal", "reset", "abnormal"}; !reflect.DeepEqual(target.events, wantEvents) {
+	if wantEvents := []string{fmt.Sprintf("set:%g", want), "start:0x10000", "abnormal", "reset", "stop:0x10000", "abnormal"}; !reflect.DeepEqual(target.events, wantEvents) {
 		t.Fatalf("events = %#v, want %#v", target.events, wantEvents)
 	}
 }
