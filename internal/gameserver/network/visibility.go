@@ -1,9 +1,11 @@
 package network
 
 import (
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -26,8 +28,12 @@ func (p *livePlayer) Discover(obj world.Tracked) {
 			if snap, ok := petInfoSnapshot(o, p, p.npcs); ok {
 				p.sendVisibilityFrame(serverpackets.FramePetInfo(snap))
 				if inv := o.PetInventory(); inv != nil {
-					items, _ := inv.ItemsAndDrainUpdates()
-					frame, err := serverpackets.FramePetItemList(items, inv.Templates())
+					var frame wire.Frame
+					err := inv.BuildAndDrainUpdates(func(items []*item.Instance) error {
+						var buildErr error
+						frame, buildErr = serverpackets.FramePetItemList(items, inv.Templates())
+						return buildErr
+					})
 					if err != nil {
 						p.log.Error().Err(err).Msg("build PetItemList")
 						return

@@ -645,24 +645,29 @@ func (inv *Inventory) DrainUpdates() []Update {
 	return out
 }
 
-// ItemsAndDrainUpdates atomically returns a full item snapshot together with
-// the pending update queue, then clears the queue, all under one critical
-// section. A separate Items() call followed by DrainUpdates() would open a
-// window between the two locks in which a concurrent change (e.g. the
-// auto-feed ticker or a give/pickup on another goroutine) is queued after the
-// snapshot but drained away before it's ever sent, silently losing the
-// delta. Used where a full-list snapshot must double as the update
-// checkpoint, e.g. sending PetItemList on discover.
-func (inv *Inventory) ItemsAndDrainUpdates() (items []*item.Instance, updates []Update) {
+// BuildAndDrainUpdates atomically snapshots inv's items, passes them to
+// build, and clears the pending-update queue only if build succeeds. Doing
+// the snapshot, build, and drain in one critical section closes two gaps at
+// once: a separate Items() call followed by DrainUpdates() would let a
+// concurrent change (the auto-feed ticker, a give/pickup on another
+// goroutine) land between the two locks and be lost, captured by neither
+// the snapshot nor a later drain; and draining before build succeeds would
+// throw away real queued deltas on a failed build (e.g. a persisted item
+// whose template never loaded), with no way to retry them later. Used
+// where a full-list snapshot must double as the update checkpoint, e.g.
+// sending PetItemList on discover.
+func (inv *Inventory) BuildAndDrainUpdates(build func(items []*item.Instance) error) error {
 	inv.Container.mu.RLock()
 	defer inv.Container.mu.RUnlock()
 	inv.mu.Lock()
 	defer inv.mu.Unlock()
 
-	items = inv.itemsLocked()
-	updates = inv.updates
+	items := inv.itemsLocked()
+	if err := build(items); err != nil {
+		return err
+	}
 	inv.updates = nil
-	return items, updates
+	return nil
 }
 
 // SetUpdateNotifier records the hook fired on every queued inventory

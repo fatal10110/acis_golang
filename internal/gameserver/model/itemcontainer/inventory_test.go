@@ -1,6 +1,7 @@
 package itemcontainer
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -479,17 +480,17 @@ func TestInventory_DrainUpdates_CoalescesStackableCounts(t *testing.T) {
 	}
 }
 
-// TestInventory_ItemsAndDrainUpdates_BlocksConcurrentAdd guards against the
+// TestInventory_BuildAndDrainUpdates_BlocksConcurrentAdd guards against the
 // lost-delta window a separate Items()+DrainUpdates() call pair opens: with
 // two independent critical sections, an Add() landing between them is
-// captured by neither the snapshot nor the drain. ItemsAndDrainUpdates
+// captured by neither the snapshot nor the drain. BuildAndDrainUpdates
 // closes that window by holding Container.mu and inv.mu for the whole
 // operation, so a concurrent Add() (which needs Container.mu first) cannot
-// even start until the atomic call finishes. This test proves that
-// serialization directly: it grabs the same two locks in the same order
-// ItemsAndDrainUpdates does and asserts a concurrent AddNew stays blocked
+// even start until the call finishes. This test proves that serialization
+// directly: it grabs the same two locks in the same order
+// BuildAndDrainUpdates does and asserts a concurrent AddNew stays blocked
 // until they're released.
-func TestInventory_ItemsAndDrainUpdates_BlocksConcurrentAdd(t *testing.T) {
+func TestInventory_BuildAndDrainUpdates_BlocksConcurrentAdd(t *testing.T) {
 	templates := item.NewTable([]*item.Template{
 		{ID: 1, Kind: item.KindEtcItem, Stackable: true, EtcItem: &item.EtcItemDetail{}},
 	})
@@ -520,9 +521,45 @@ func TestInventory_ItemsAndDrainUpdates_BlocksConcurrentAdd(t *testing.T) {
 		t.Fatal("AddNew never completed after the locks were released")
 	}
 
-	items, updates := inv.ItemsAndDrainUpdates()
-	if len(items) != 1 || len(updates) != 1 {
-		t.Fatalf("ItemsAndDrainUpdates() = items %+v updates %+v, want 1 item and 1 queued update", items, updates)
+	var gotItems []*item.Instance
+	err := inv.BuildAndDrainUpdates(func(items []*item.Instance) error {
+		gotItems = items
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("BuildAndDrainUpdates() error = %v, want nil", err)
+	}
+	if len(gotItems) != 1 {
+		t.Fatalf("BuildAndDrainUpdates() items = %+v, want 1 item", gotItems)
+	}
+	if inv.HasUpdates() {
+		t.Fatal("BuildAndDrainUpdates() left updates queued after a successful build")
+	}
+}
+
+// TestInventory_BuildAndDrainUpdates_KeepsQueueOnBuildError guards against
+// silently losing queued deltas when the frame build fails (e.g. an item
+// whose template isn't loaded): draining before build succeeds would throw
+// the pending updates away with nothing sent and no way to retry them.
+func TestInventory_BuildAndDrainUpdates_KeepsQueueOnBuildError(t *testing.T) {
+	templates := item.NewTable([]*item.Template{
+		{ID: 1, Kind: item.KindEtcItem, Stackable: true, EtcItem: &item.EtcItemDetail{}},
+	})
+	inv := NewPetInventory(1, templates)
+	inv.AddNew(1, 1, 1)
+	if !inv.HasUpdates() {
+		t.Fatal("expected AddNew to queue an update")
+	}
+
+	buildErr := errors.New("boom")
+	err := inv.BuildAndDrainUpdates(func(items []*item.Instance) error {
+		return buildErr
+	})
+	if !errors.Is(err, buildErr) {
+		t.Fatalf("BuildAndDrainUpdates() error = %v, want %v", err, buildErr)
+	}
+	if !inv.HasUpdates() {
+		t.Fatal("BuildAndDrainUpdates() drained the queue despite a failed build")
 	}
 }
 
