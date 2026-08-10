@@ -12,38 +12,38 @@ const OpcodePetInfo = 0xb1
 // sent only to its owner (a non-owner observer gets SummonInfo instead,
 // tracked separately).
 type PetInfoSnapshot struct {
-	SummonType       int
-	ObjectID         int32
-	TemplateID       int
-	X, Y, Z, Heading int
-	MAtkSpd, PAtkSpd int
-	RunSpd, WalkSpd  int
-	CollisionRadius  float64
-	CollisionHeight  float64
-	InCombat         bool
-	AlikeDead        bool
-	Name, Title      string
-	PvpFlag          int
-	Karma            int
-	CurFed, MaxFed   int
-	CurHP, MaxHP     int
-	CurMP, MaxMP     int
-	SP               int
-	Level            int
-	Exp              int64
-	ExpForThisLevel  int64
-	ExpForNextLevel  int64
-	TotalWeight      int
-	WeightLimit      int
-	PAtk, PDef       int
-	MAtk, MDef       int
-	Accuracy         int
-	EvasionRate      int
-	CriticalHit      int
-	MoveSpeed        int
-	Mountable        bool
-	Team             int
-	SoulShotsPerHit  int
+	SummonType        int
+	ObjectID          int32
+	TemplateID        int
+	X, Y, Z, Heading  int
+	MAtkSpd, PAtkSpd  int
+	RunSpd, WalkSpd   int
+	CollisionRadius   float64
+	CollisionHeight   float64
+	InCombat          bool
+	AlikeDead         bool
+	Name, Title       string
+	PvpFlag           int
+	Karma             int
+	CurFed, MaxFed    int
+	CurHP, MaxHP      int
+	CurMP, MaxMP      int
+	SP                int
+	Level             int
+	Exp               int64
+	ExpForThisLevel   int64
+	ExpForNextLevel   int64
+	TotalWeight       int
+	WeightLimit       int
+	PAtk, PDef        int
+	MAtk, MDef        int
+	Accuracy          int
+	EvasionRate       int
+	CriticalHit       int
+	MoveSpeed         int
+	Mountable         bool
+	Team              int
+	SoulShotsPerHit   int
 	SpiritShotsPerHit int
 }
 
