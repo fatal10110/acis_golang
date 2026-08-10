@@ -1,6 +1,10 @@
 package player
 
-import "testing"
+import (
+	"fmt"
+	"reflect"
+	"testing"
+)
 
 func TestCharacterIncreaseChargesClampsToMax(t *testing.T) {
 	c := &Character{ID: 1}
@@ -38,6 +42,24 @@ func TestCharacterIncreaseChargesNotifiesStatusOnlyAfterSuccessfulAdd(t *testing
 	}
 }
 
+func TestCharacterIncreaseChargesNotifiesForceMessageBeforeStatus(t *testing.T) {
+	c := &Character{ID: 1}
+	var events []string
+	c.SetChargeMessageSender(func(charges int, maxed bool) {
+		events = append(events, fmt.Sprintf("message:%d:%t", charges, maxed))
+	})
+	c.SetChargesUpdater(func() { events = append(events, "status") })
+
+	c.IncreaseCharges(2, 5)
+	c.IncreaseCharges(3, 5)
+	c.IncreaseCharges(1, 5)
+
+	want := []string{"message:2:false", "status", "message:5:true", "status", "message:5:true"}
+	if !reflect.DeepEqual(events, want) {
+		t.Fatalf("charge notifications = %v, want %v", events, want)
+	}
+}
+
 func TestCharacterDecreaseChargesReportsInsufficientCharges(t *testing.T) {
 	c := &Character{ID: 1}
 	c.IncreaseCharges(2, 5)
@@ -50,6 +72,26 @@ func TestCharacterDecreaseChargesReportsInsufficientCharges(t *testing.T) {
 	}
 }
 
+func TestCharacterDecreaseChargesNotifiesStatusOnlyAfterSuccessfulRemoval(t *testing.T) {
+	c := &Character{ID: 1}
+	c.IncreaseCharges(2, 5)
+	var updates int
+	c.SetChargesUpdater(func() { updates++ })
+
+	if !c.DecreaseCharges(1) {
+		t.Fatal("DecreaseCharges() = false, want true")
+	}
+	if updates != 1 {
+		t.Fatalf("updates after successful removal = %d, want 1", updates)
+	}
+	if c.DecreaseCharges(2) {
+		t.Fatal("DecreaseCharges() = true with insufficient charges, want false")
+	}
+	if updates != 1 {
+		t.Fatalf("updates after failed removal = %d, want 1", updates)
+	}
+}
+
 func TestCharacterClearChargesResetsToZero(t *testing.T) {
 	c := &Character{ID: 1}
 	c.IncreaseCharges(4, 5)
@@ -58,6 +100,22 @@ func TestCharacterClearChargesResetsToZero(t *testing.T) {
 
 	if got := c.Charges(); got != 0 {
 		t.Fatalf("Charges() after ClearCharges = %d, want 0", got)
+	}
+}
+
+func TestCharacterClearChargesNotifiesStatusOnlyWhenChargesChange(t *testing.T) {
+	c := &Character{ID: 1}
+	c.IncreaseCharges(4, 5)
+	var updates int
+	c.SetChargesUpdater(func() { updates++ })
+
+	c.ClearCharges()
+	if updates != 1 {
+		t.Fatalf("updates after clearing charges = %d, want 1", updates)
+	}
+	c.ClearCharges()
+	if updates != 1 {
+		t.Fatalf("updates after clearing empty charges = %d, want 1", updates)
 	}
 }
 

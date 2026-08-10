@@ -58,6 +58,60 @@ func TestGameClientLinkFullFlow(t *testing.T) {
 	}
 }
 
+func TestGameClientLinkChargeFeedbackFrames(t *testing.T) {
+	c, chars, _, state := newLinkedGameClient(t)
+	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.read() // CharCreateOk
+	c.read() // CharSelectInfo
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	live, ok := state.Player(chars.soleObjectID(t))
+	if !ok {
+		t.Fatal("world player missing after EnterWorld")
+	}
+	character := live.(*livePlayer).Character
+
+	character.IncreaseCharges(2, 5)
+	assertForceChargeMessage(t, c.read(), serverpackets.SystemMessageForceIncreasedToS1, 2)
+	if frame := c.read(); frame[0] != serverpackets.OpcodeEtcStatusUpdate {
+		t.Fatalf("partial-add frame opcode = %#x, want EtcStatusUpdate (%#x)", frame[0], serverpackets.OpcodeEtcStatusUpdate)
+	}
+
+	character.IncreaseCharges(3, 5)
+	assertForceChargeMessage(t, c.read(), serverpackets.SystemMessageForceMaxLevelReached, 0)
+	if frame := c.read(); frame[0] != serverpackets.OpcodeEtcStatusUpdate {
+		t.Fatalf("clamped-add frame opcode = %#x, want EtcStatusUpdate (%#x)", frame[0], serverpackets.OpcodeEtcStatusUpdate)
+	}
+
+	character.IncreaseCharges(1, 5)
+	assertForceChargeMessage(t, c.read(), serverpackets.SystemMessageForceMaxLevelReached, 0)
+}
+
+func assertForceChargeMessage(t *testing.T, frame []byte, messageID int, charges int32) {
+	t.Helper()
+	if frame[0] != serverpackets.OpcodeSystemMessage {
+		t.Fatalf("message opcode = %#x, want SystemMessage (%#x)", frame[0], serverpackets.OpcodeSystemMessage)
+	}
+	r := wire.NewReader(frame[1:])
+	if got := r.ReadInt32(); got != int32(messageID) {
+		t.Fatalf("message id = %d, want %d", got, messageID)
+	}
+	params := r.ReadInt32()
+	if messageID == serverpackets.SystemMessageForceIncreasedToS1 {
+		if params != 1 || r.ReadInt32() != serverpackets.SystemMessageParamNumber || r.ReadInt32() != charges {
+			t.Fatalf("force-increased message params = %d, want one number %d", params, charges)
+		}
+		return
+	}
+	if params != 0 {
+		t.Fatalf("force-max message params = %d, want 0", params)
+	}
+}
+
 // TestGameClientLinkEnterWorldRecomputesRestoredWeight is the regression test
 // for issue #1144: RestorePlayerInventory rebuilds the inventory from
 // persisted rows without queuing update notifications, so totalWeight stays

@@ -21,16 +21,27 @@ func (c *Character) Charges() int {
 func (c *Character) IncreaseCharges(count, max int) bool {
 	c.stateMu.Lock()
 	if c.charges >= max {
+		send := c.sendChargeMessage
+		charges := c.charges
 		c.stateMu.Unlock()
+		if send != nil {
+			send(charges, true)
+		}
 		return false
 	}
 	c.charges += count
-	if c.charges > max {
+	maxed := c.charges >= max
+	if maxed {
 		c.charges = max
 	}
 	c.restartChargeTimerLocked()
 	update := c.updateCharges
+	send := c.sendChargeMessage
+	charges := c.charges
 	c.stateMu.Unlock()
+	if send != nil {
+		send(charges, maxed)
+	}
 	if update != nil {
 		update()
 	}
@@ -44,14 +55,22 @@ func (c *Character) SetChargesUpdater(update func()) {
 	c.updateCharges = update
 }
 
+// SetChargeMessageSender records the packet-layer hook that reports Force/Soul
+// charge changes and the maximum-capacity outcome to the owning client.
+func (c *Character) SetChargeMessageSender(send func(charges int, maxed bool)) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	c.sendChargeMessage = send
+}
+
 // DecreaseCharges removes count charges, reporting whether there were
 // enough to remove. Charges hitting zero stop the auto-clear timer instead
 // of restarting it, matching the reference's stopChargeTask/restartChargeTask
 // split.
 func (c *Character) DecreaseCharges(count int) bool {
 	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
 	if c.charges < count {
+		c.stateMu.Unlock()
 		return false
 	}
 	c.charges -= count
@@ -59,6 +78,11 @@ func (c *Character) DecreaseCharges(count int) bool {
 		c.stopChargeTimerLocked()
 	} else {
 		c.restartChargeTimerLocked()
+	}
+	update := c.updateCharges
+	c.stateMu.Unlock()
+	if update != nil {
+		update()
 	}
 	return true
 }
@@ -68,9 +92,14 @@ func (c *Character) DecreaseCharges(count int) bool {
 // subclass change.
 func (c *Character) ClearCharges() {
 	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
+	changed := c.charges > 0
 	c.charges = 0
 	c.stopChargeTimerLocked()
+	update := c.updateCharges
+	c.stateMu.Unlock()
+	if changed && update != nil {
+		update()
+	}
 }
 
 func (c *Character) restartChargeTimerLocked() {
