@@ -83,6 +83,7 @@ func frameWarehouseList(opcode byte, whType WarehouseType, playerAdena int32, it
 	w.WriteInt32(playerAdena)
 	count, err := wire.Uint16Count(len(items))
 	if err != nil {
+		releaseFrameWriter(w)
 		return wire.Frame{}, err
 	}
 	w.WriteUint16(count)
