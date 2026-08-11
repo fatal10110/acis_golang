@@ -209,6 +209,27 @@ func TestBlowUsesOneShieldOutcomeForDamageAndEffects(t *testing.T) {
 	}
 }
 
+func TestPdamPerfectShieldBlocksDamageAndEffects(t *testing.T) {
+	registry := NewDefaultRegistry()
+	caster := newDamageEffectFake()
+	target := newDamageEffectFake()
+	target.hp = 2000
+	target.physicalOK = true
+	target.physicalInput = formulas.PhysicalSkillInput{
+		AttackPower: 100, SkillPower: 50, Defence: 40,
+		RandomMul: 1, RaceMul: 1, WeaponVulnMul: 1, PvPMul: 1, ElementalMul: 1,
+		Shield: formulas.ShieldPerfect,
+	}
+
+	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{ID: 321, SkillType: "PDAM", Effects: targetEffect()}, Targets: []any{target}})
+	if target.hp != 1999 {
+		t.Fatalf("perfect-shield PDAM hp = %v, want 1999", target.hp)
+	}
+	if got := len(target.EffectList().All()); got != 0 {
+		t.Fatalf("perfect-shield PDAM effects = %d, want 0", got)
+	}
+}
+
 func TestBlowMissSkipsDamageAndEffects(t *testing.T) {
 	registry := NewDefaultRegistry()
 	caster := newDamageEffectFake()

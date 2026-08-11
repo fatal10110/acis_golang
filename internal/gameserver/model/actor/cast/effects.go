@@ -17,11 +17,13 @@ type EffectHandlers struct {
 // EffectResult reports whether effect dispatch reached a skill handler and
 // which caster-visible outcomes that handler produced.
 type EffectResult struct {
-	Handled      bool
-	AttackFailed int
-	CubicAdded   bool
-	CubicTouched bool
-	CubicID      cubic.ID
+	Handled           bool
+	AttackFailed      int
+	CubicAdded        bool
+	CubicTargets      []any
+	CubicAddedTargets []any
+	CubicTouched      bool
+	CubicID           cubic.ID
 }
 
 type pvpSkillNotifier interface {
@@ -96,10 +98,12 @@ func applyEffectsResult(handlers EffectHandlers, caster any, resolved Target, de
 		return EffectResult{}
 	}
 	return EffectResult{
-		Handled:      true,
-		AttackFailed: result.AttackFailed,
-		CubicAdded:   result.CubicAdded,
-		CubicTouched: result.CubicTouched,
-		CubicID:      result.CubicID,
+		Handled:           true,
+		AttackFailed:      result.AttackFailed,
+		CubicAdded:        result.CubicAdded,
+		CubicTargets:      result.CubicTargets,
+		CubicAddedTargets: result.CubicAddedTargets,
+		CubicTouched:      result.CubicTouched,
+		CubicID:           result.CubicID,
 	}
 }

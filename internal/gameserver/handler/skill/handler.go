@@ -34,6 +34,10 @@ type Handler interface {
 type Result struct {
 	AttackFailed int
 	CubicAdded   bool
+	// CubicTargets are non-caster targets whose cubic runtime was touched.
+	CubicTargets []any
+	// CubicAddedTargets are the non-caster targets whose visible cubic list changed.
+	CubicAddedTargets []any
 	// CubicTouched and CubicID report that a SUMMON cubic cast reached the
 	// caster's own cubic list, whether newly admitted or refreshed, so a
 	// caller can (re)sync the cubic's live action/disappear runtime either

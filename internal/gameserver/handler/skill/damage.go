@@ -113,11 +113,11 @@ func (pdamHandler) UseResult(cast Cast) Result {
 		if !ok || target.Dead() {
 			continue
 		}
-		applyPdamEffects(cast, obj)
 		in, ok := target.PhysicalSkillInput(cast.Caster, cast.Skill)
 		if !ok {
 			continue
 		}
+		applyPdamEffects(cast, obj, in.Shield)
 		damage := formulas.PhysicalSkillDamage(in)
 		if damage > 0 {
 			target.ReduceHP(damage, cast.Caster, cast.Skill)
@@ -135,8 +135,11 @@ func (pdamHandler) UseResult(cast Cast) Result {
 // skipped, a reflecting target sends the effects back onto the caster
 // instead, and the destination's prior instance of the same skill is
 // dropped first so a repeat cast doesn't stack. Unlike Mdam/Blow, PDAM
-// applies these unconditionally — no landing-rate roll gates activation.
-func applyPdamEffects(cast Cast, obj any) {
+// applies these unconditionally unless the shared shield outcome is perfect.
+func applyPdamEffects(cast Cast, obj any, shield formulas.ShieldDefense) {
+	if shield == formulas.ShieldPerfect {
+		return
+	}
 	if len(cast.Skill.Effects) == 0 {
 		return
 	}

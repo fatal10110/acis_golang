@@ -106,6 +106,25 @@ func TestApplyEffectsResultCarriesSkillHandlerAttackFailed(t *testing.T) {
 	}
 }
 
+func TestApplyEffectsResultCarriesCubicTargets(t *testing.T) {
+	caster := &effectsActor{id: 1, category: skilltarget.CategoryPlayable}
+	other := &effectsActor{id: 2, category: skilltarget.CategoryPlayable}
+	rec := &recordingSkillHandler{result: handlerskill.Result{
+		CubicTargets:      []any{other},
+		CubicAddedTargets: []any{other},
+	}}
+	handlers := newEffectHandlers(effectsKnown{}, "DUMMY", rec)
+	def := modelskill.Definition{ID: 99, Target: modelskill.TargetSelf, SkillType: "DUMMY"}
+
+	result := ApplyEffectsResult(handlers, caster, caster, def)
+	if got := result.CubicTargets; len(got) != 1 || got[0] != other {
+		t.Fatalf("CubicTargets = %v, want other", got)
+	}
+	if got := result.CubicAddedTargets; len(got) != 1 || got[0] != other {
+		t.Fatalf("CubicAddedTargets = %v, want other", got)
+	}
+}
+
 func TestApplyEffectsNotifiesPvPStatusBeforeSkillHandling(t *testing.T) {
 	caster := &pvpEffectsActor{effectsActor: effectsActor{id: 1, category: skilltarget.CategoryPlayable}}
 	target := &effectsActor{id: 2, category: skilltarget.CategoryPlayable}
