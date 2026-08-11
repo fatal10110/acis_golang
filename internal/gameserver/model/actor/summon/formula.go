@@ -447,8 +447,8 @@ func (a *Actor) ReduceHP(amount float64, _ any, _ modelskill.Definition) {
 		return
 	}
 	a.vitals.mu.Lock()
-	defer a.vitals.mu.Unlock()
 	if a.dead || a.vitals.hp <= 0 {
+		a.vitals.mu.Unlock()
 		return
 	}
 	a.vitals.hp -= amount
@@ -456,6 +456,8 @@ func (a *Actor) ReduceHP(amount float64, _ any, _ modelskill.Definition) {
 		a.vitals.hp = 0
 		a.dead = true
 	}
+	a.vitals.mu.Unlock()
+	a.UpdateStatus()
 }
 
 // ReduceHPByDOT applies periodic HP damage without normal-hit side effects.
@@ -464,8 +466,8 @@ func (a *Actor) ReduceHPByDOT(amount float64, _ any, _ bool) {
 		return
 	}
 	a.vitals.mu.Lock()
-	defer a.vitals.mu.Unlock()
 	if a.dead || a.vitals.hp <= 0 {
+		a.vitals.mu.Unlock()
 		return
 	}
 	a.vitals.hp -= amount
@@ -473,6 +475,8 @@ func (a *Actor) ReduceHPByDOT(amount float64, _ any, _ bool) {
 		a.vitals.hp = 0
 		a.dead = true
 	}
+	a.vitals.mu.Unlock()
+	a.UpdateStatus()
 }
 
 // CanBeHealed reports whether a may receive HP/MP restoration.

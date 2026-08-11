@@ -6,10 +6,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -205,6 +207,83 @@ func TestLivePlayerVisibilitySendsOwnerPetInfoAndBystanderSummonInfo(t *testing.
 	}
 	if n := len(bystanderFrames.frames); n == 0 || bystanderFrames.frames[n-1][0] != serverpackets.OpcodeDeleteObject {
 		t.Fatalf("bystander last frame after pet despawn = %x, want DeleteObject", bystanderFrames.frames)
+	}
+}
+
+func TestSummonDamagePublishesPetStatusToOwnerAndSummonInfoToObservers(t *testing.T) {
+	state := world.New()
+	ownerFrames := &frameCapture{}
+	bystanderFrames := &frameCapture{}
+	owner := newTestLivePlayer(t, 1, ownerFrames)
+	bystander := newTestLivePlayer(t, 2, bystanderFrames)
+	owner.npcs = npc.NewTable([]*npc.Template{{
+		ID: 12077, TemplateID: 12077, Name: "Wolf",
+		AtkSpd: 300, RunSpeed: 120, WalkSpeed: 60,
+		CollisionRadius: 8, CollisionHeight: 20,
+	}})
+	bystander.npcs = owner.npcs
+	state.Spawn(owner, 0, 0, 0, 0)
+	state.Spawn(bystander, 500, 0, 0, 0)
+	pet := summon.NewPet(summon.PetConfig{
+		ObjectID: 20, Owner: owner, NPCID: 12077, Level: 5,
+		Stats: summon.CombatStats{MaxHP: 100, MaxMP: 30},
+	})
+	gcl := &GameClientLink{world: state}
+	gcl.wireSummonAI(pet)
+	summon.SpawnBesideOwner(state, pet, owner, location.Location{X: 10})
+	ownerFrames.frames = nil
+	bystanderFrames.frames = nil
+
+	for _, damage := range []struct {
+		name  string
+		apply func()
+	}{
+		{"direct", func() { pet.ReduceHP(10, nil, modelskill.Definition{}) }},
+		{"dot", func() { pet.ReduceHPByDOT(10, nil, true) }},
+	} {
+		t.Run(damage.name, func(t *testing.T) {
+			ownerFrames.frames = nil
+			bystanderFrames.frames = nil
+			damage.apply()
+
+			if got := frameOpcodes(ownerFrames.frames); string(got) != string([]byte{serverpackets.OpcodePetStatusUpdate}) {
+				t.Fatalf("owner opcodes = %x, want PetStatusUpdate", got)
+			}
+			if got := frameOpcodes(bystanderFrames.frames); string(got) != string([]byte{serverpackets.OpcodeNPCInfo}) {
+				t.Fatalf("bystander opcodes = %x, want SummonInfo", got)
+			}
+		})
+	}
+}
+
+func TestSummonStatusObserverFramesAreIndependent(t *testing.T) {
+	state := world.New()
+	owner := newTestLivePlayer(t, 1, &frameCapture{})
+	first := newTestLivePlayer(t, 2, &frameCapture{})
+	second := newTestLivePlayer(t, 3, &frameCapture{})
+	owner.npcs = npc.NewTable([]*npc.Template{{ID: 12077, TemplateID: 12077, AtkSpd: 300}})
+	state.Spawn(owner, 0, 0, 0, 0)
+	state.Spawn(first, 100, 0, 0, 0)
+	state.Spawn(second, 200, 0, 0, 0)
+	pet := summon.NewPet(summon.PetConfig{ObjectID: 20, Owner: owner, NPCID: 12077, Stats: summon.CombatStats{MaxHP: 100}})
+	gcl := &GameClientLink{world: state}
+	gcl.wireSummonAI(pet)
+	summon.SpawnBesideOwner(state, pet, owner, location.Location{X: 10})
+
+	var firstFrame, secondFrame wire.Frame
+	first.Character.SetFrameSender(func(frame wire.Frame) bool { firstFrame = frame; return true })
+	second.Character.SetFrameSender(func(frame wire.Frame) bool { secondFrame = frame; return true })
+	pet.ReduceHP(10, nil, modelskill.Definition{})
+	defer firstFrame.Release()
+	defer secondFrame.Release()
+
+	if len(firstFrame.Bytes()) <= wire.FrameHeaderSize || len(secondFrame.Bytes()) <= wire.FrameHeaderSize {
+		t.Fatal("observers did not receive status frames")
+	}
+	secondPayload := secondFrame.Bytes()[wire.FrameHeaderSize]
+	firstFrame.Bytes()[wire.FrameHeaderSize] ^= 0xff
+	if secondFrame.Bytes()[wire.FrameHeaderSize] != secondPayload {
+		t.Fatal("mutating one observer frame changed another")
 	}
 }
 

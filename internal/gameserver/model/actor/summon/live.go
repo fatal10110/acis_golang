@@ -55,21 +55,23 @@ type Actor struct {
 	radius  float64
 	passive bool
 
-	// statusMu guards level, name, fed, belowUnsummonLimit, and lifetime:
+	// statusMu guards level, name, fed, belowUnsummonLimit, lifetime, and
+	// statusUpdater:
 	// petInfoSnapshot (internal/gameserver/network/visibility.go) reads them
 	// from the world-visibility goroutine via Level/Name/Fed/Lifetime while
 	// the owner-connection and tick goroutines write them, per
 	// world.Observer's concurrency contract
 	// (internal/gameserver/world/visibility.go).
-	statusMu sync.RWMutex
-	level    int
-	name     string
-	lifetime LifetimeState
-	dead     bool
-	disabled bool
-	combat   bool
-	attack   bool
-	brain    AI
+	statusMu      sync.RWMutex
+	level         int
+	name          string
+	lifetime      LifetimeState
+	statusUpdater func()
+	dead          bool
+	disabled      bool
+	combat        bool
+	attack        bool
+	brain         AI
 	// skills maps skill id to the level this summon's npc template grants
 	// it, used by TryUseSkill to resolve an owner-commanded action-bar
 	// skill shortcut, matching Java's Summon.getSkill.
