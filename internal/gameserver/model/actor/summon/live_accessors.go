@@ -73,6 +73,9 @@ func (a *Actor) Name() string {
 	return a.name
 }
 
+// CharacterName returns this summon's display name for character-name packets.
+func (a *Actor) CharacterName() string { return a.Name() }
+
 // SetName overrides this summon's display name, e.g. from a restored save
 // row or an owner-issued rename.
 func (a *Actor) SetName(name string) {
