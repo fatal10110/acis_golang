@@ -115,6 +115,7 @@ type BlowInput struct {
 	AttackPower float64
 	SkillPower  float64 // includes any per-skill SoulShot power boost when SoulShot is true
 	Defence     float64
+	Shield      ShieldDefense
 
 	SoulShot bool
 	IsPvP    bool

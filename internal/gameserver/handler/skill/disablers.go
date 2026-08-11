@@ -161,11 +161,14 @@ func checkSkillSuccess(caster any, target any, def modelskill.Definition) (succe
 // Blow.java hardcodes this input to true regardless of the caster's actual
 // charge, unlike every other landing-rate roll in the reference.
 func checkSkillSuccessBSS(caster any, target any, def modelskill.Definition, bss bool) (succeeded, ok bool) {
+	return checkSkillSuccessBSSWithShield(caster, target, def, bss, resolveShieldDefense(caster, target, def))
+}
+
+func checkSkillSuccessBSSWithShield(caster any, target any, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (succeeded, ok bool) {
 	src, ok := target.(skillSuccessSource)
 	if !ok {
 		return false, false
 	}
-	shield := resolveShieldDefense(caster, target, def)
 	in, ok := src.SkillSuccessInput(caster, def, bss, shield)
 	if !ok {
 		return false, false

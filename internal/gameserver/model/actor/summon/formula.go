@@ -24,7 +24,11 @@ type CombatStats struct {
 	BaseRandomDamage             int
 	SSCount, SPSCount            int
 	AttackRange                  int
+	AttackSpeed                  float64
 }
+
+// PhysicalAttackSpeed returns this summon's physical attack speed from its NPC template.
+func (a *Actor) PhysicalAttackSpeed() float64 { return a.PAtkSpd(a.stats.AttackSpeed) }
 
 type summonVitals struct {
 	// mu guards hp, mp, and Actor.dead.
@@ -439,6 +443,23 @@ func (a *Actor) ReduceMP(amount float64) float64 {
 
 // ReduceHP applies skill HP damage and marks the summon dead at zero HP.
 func (a *Actor) ReduceHP(amount float64, _ any, _ modelskill.Definition) {
+	if amount <= 0 {
+		return
+	}
+	a.vitals.mu.Lock()
+	defer a.vitals.mu.Unlock()
+	if a.dead || a.vitals.hp <= 0 {
+		return
+	}
+	a.vitals.hp -= amount
+	if a.vitals.hp <= 0 {
+		a.vitals.hp = 0
+		a.dead = true
+	}
+}
+
+// ReduceHPByDOT applies periodic HP damage without normal-hit side effects.
+func (a *Actor) ReduceHPByDOT(amount float64, _ any, _ bool) {
 	if amount <= 0 {
 		return
 	}

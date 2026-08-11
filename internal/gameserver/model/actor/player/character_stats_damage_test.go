@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
@@ -126,6 +127,69 @@ func TestCharacterBlowInputCarriesResolvedLandingRoll(t *testing.T) {
 	}
 	if !in.Landed {
 		t.Fatal("BlowInput().Landed = false, want true for a capped ordinary blow")
+	}
+}
+
+func TestCharacterBlowInputCarriesShieldDefense(t *testing.T) {
+	tmpl := combatTemplate()
+	items := shieldDefenseItems()
+	caster := liveCharacter(1, tmpl, items)
+	target := liveCharacter(2, tmpl, items, equippedShield())
+	caster.SetLastKnownPosition(location.Location{X: 80, Y: 0, Z: 0}, 0)
+	target.SetLastKnownPosition(location.Location{}, 0)
+	target.AddStatFuncs([]basefunc.Func{
+		basefunc.NewSet(target, stat.ShieldRate, 100, nil),
+		basefunc.NewSet(target, stat.ShieldDefenceAngle, 360, nil),
+		basefunc.NewSet(target, stat.ShieldDefence, 30, nil),
+	})
+	target.SetRollSource(func(n int) int {
+		if n != 100 {
+			t.Fatalf("shield roll bound = %d, want 100", n)
+		}
+		return 10
+	})
+
+	in, ok := target.BlowInput(caster, modelskill.Definition{SkillType: "BLOW", BaseLandRate: 1000})
+	if !ok {
+		t.Fatal("BlowInput() ok = false")
+	}
+	if in.Shield != formulas.ShieldSuccess {
+		t.Fatalf("BlowInput shield = %v, want ShieldSuccess", in.Shield)
+	}
+	if want := target.PDef() + target.CalcStat(stat.ShieldDefence, 0); !closeFloat(in.Defence, want) {
+		t.Fatalf("BlowInput defence = %v, want %v", in.Defence, want)
+	}
+}
+
+func TestCharacterBlowInputSkipsShieldRollOnMiss(t *testing.T) {
+	tmpl := combatTemplate()
+	items := shieldDefenseItems()
+	caster := liveCharacter(1, tmpl, items)
+	target := liveCharacter(2, tmpl, items, equippedShield())
+	caster.SetRollSource(func(n int) int {
+		if n == 1000 {
+			return 999
+		}
+		return 0
+	})
+	target.AddStatFuncs([]basefunc.Func{
+		basefunc.NewSet(target, stat.ShieldRate, 100, nil),
+		basefunc.NewSet(target, stat.ShieldDefenceAngle, 360, nil),
+	})
+	target.SetRollSource(func(n int) int {
+		t.Fatalf("shield roll bound = %d, want no shield roll after a miss", n)
+		return 0
+	})
+
+	in, ok := target.BlowInput(caster, modelskill.Definition{SkillType: "BLOW", BaseLandRate: 1000})
+	if !ok {
+		t.Fatal("BlowInput() ok = false")
+	}
+	if in.Landed {
+		t.Fatal("BlowInput().Landed = true, want false")
+	}
+	if in.Shield != formulas.ShieldFailed {
+		t.Fatalf("BlowInput shield = %v, want ShieldFailed", in.Shield)
 	}
 }
 
