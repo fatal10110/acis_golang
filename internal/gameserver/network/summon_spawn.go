@@ -225,7 +225,13 @@ func (s *gameSummonSpawner) SpawnServitor(owner *player.Character, def modelskil
 		Stats: summon.CombatStats{
 			STR: npcTmpl.STR, CON: npcTmpl.CON, DEX: npcTmpl.DEX,
 			INT: npcTmpl.INT, WIT: npcTmpl.WIT, MEN: npcTmpl.MEN,
-			AttackRange: npcTmpl.BaseAttackRange, AttackSpeed: npcTmpl.AtkSpd,
+			PAtk: npcTmpl.PAtk, PDef: npcTmpl.PDef, MAtk: npcTmpl.MAtk, MDef: npcTmpl.MDef,
+			MaxHP: npcTmpl.HPMax, MaxMP: npcTmpl.MPMax,
+			BaseRandomDamage: npcTmpl.BaseRandomDamage,
+			SSCount:          npcTmpl.SSCount,
+			SPSCount:         npcTmpl.SPSCount,
+			AttackRange:      npcTmpl.BaseAttackRange,
+			AttackSpeed:      npcTmpl.AtkSpd,
 		},
 		Skills: npcTmpl.Skills,
 	})

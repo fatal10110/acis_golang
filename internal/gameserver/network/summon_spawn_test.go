@@ -245,7 +245,9 @@ func TestGameSummonSpawnerSpawnServitorRegistersLiveActor(t *testing.T) {
 	link.npcs = npc.NewTable([]*npc.Template{{
 		ID: 14848, Name: "Cat", Level: 40,
 		STR: 40, CON: 43, DEX: 30, INT: 22, WIT: 20, MEN: 20,
-		BaseAttackRange: 40, CollisionRadius: 12.5,
+		HPMax: 800, MPMax: 200, PAtk: 100, PDef: 80, MAtk: 60, MDef: 50,
+		BaseAttackRange: 40, BaseRandomDamage: 7, CollisionRadius: 12.5,
+		SSCount: 2, SPSCount: 1,
 		Skills: map[int]int{1126: 1},
 	}})
 	live := newTestLivePlayer(t, 1, &frameCapture{})
@@ -268,6 +270,15 @@ func TestGameSummonSpawnerSpawnServitorRegistersLiveActor(t *testing.T) {
 	}
 	if got := servitor.CollisionRadius(); got != 12.5 {
 		t.Fatalf("CollisionRadius() = %v, want 12.5", got)
+	}
+	if got := servitor.MaxHPValue(); got <= 0 {
+		t.Fatalf("MaxHPValue() = %v, want a positive value from template HPMax", got)
+	}
+	if got := servitor.MaxMPValue(); got <= 0 {
+		t.Fatalf("MaxMPValue() = %v, want a positive value from template MPMax", got)
+	}
+	if !servitor.TryUseSkill(1126, live.Character) {
+		t.Fatal("TryUseSkill(1126) = false after spawn, want cast-controller reachability")
 	}
 }
 
