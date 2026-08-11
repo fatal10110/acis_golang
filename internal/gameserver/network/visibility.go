@@ -23,9 +23,6 @@ func (p *livePlayer) Discover(obj world.Tracked) {
 	case *npc.Decoration:
 		p.sendVisibilityFrame(serverpackets.FrameNPCInfo(o.NPCInfoSnapshot()))
 	case *summon.Actor:
-		// Only the owner gets PetInfo; a non-owner observer would get
-		// SummonInfo instead, which isn't ported yet (tracked separately —
-		// see this PR's linked follow-up), so it silently sees nothing.
 		if o.OwnerID() == p.ObjectID() {
 			if snap, ok := petInfoSnapshot(o, p, p.npcs); ok {
 				p.sendVisibilityFrame(serverpackets.FramePetInfo(snap))
@@ -43,6 +40,10 @@ func (p *livePlayer) Discover(obj world.Tracked) {
 					p.sendVisibilityFrame(frame)
 				}
 			}
+			return
+		}
+		if snap, ok := summonInfoSnapshot(o, p.npcs); ok {
+			p.sendVisibilityFrame(serverpackets.FrameNPCInfo(snap))
 		}
 	case groundItemObject:
 		if dropped, ok := o.(interface{ DropperID() int32 }); ok {
@@ -64,13 +65,12 @@ func (p *livePlayer) Forget(obj world.Tracked) {
 		// A summon's removal signal to its owner is always PetDelete
 		// (Summon.java's doUnsummon sends it unconditionally before
 		// decayMe(), regardless of why the summon is leaving), not the
-		// generic DeleteObject other Tracked kinds get. Mirrors Discover's
-		// ownership rule: a non-owner observer never got a PetInfo/spawn
-		// frame for this summon, so it gets no delete frame either.
+		// generic DeleteObject other Tracked kinds get. Non-owners received
+		// SummonInfo, so they receive the corresponding DeleteObject below.
 		if o.OwnerID() == p.ObjectID() {
 			p.sendVisibilityFrame(serverpackets.FramePetDelete(o.SummonType(), o.ObjectID()))
+			return
 		}
-		return
 	}
 	if !rendersObject(obj) {
 		return
@@ -102,11 +102,36 @@ type staticObject interface {
 
 func rendersObject(obj world.Tracked) bool {
 	switch obj.(type) {
-	case *livePlayer, *npc.Hostile, groundItemObject, doorObject, staticObject:
+	case *livePlayer, *npc.Hostile, *summon.Actor, groundItemObject, doorObject, staticObject:
 		return true
 	default:
 		return false
 	}
+}
+
+func summonInfoSnapshot(a *summon.Actor, npcs *npc.Table) (serverpackets.NPCInfoSnapshot, bool) {
+	if npcs == nil {
+		return serverpackets.NPCInfoSnapshot{}, false
+	}
+	tmpl, ok := npcs.Get(a.NPCID())
+	if !ok {
+		return serverpackets.NPCInfoSnapshot{}, false
+	}
+	x, y, z := a.Position()
+	title := ""
+	if owner, ok := a.ActingPlayer().(*livePlayer); ok {
+		title = owner.Name
+	}
+	return serverpackets.NPCInfoSnapshot{
+		ObjectID: a.ObjectID(), TemplateID: tmpl.TemplateID,
+		X: x, Y: y, Z: z, Heading: a.Heading(),
+		MAtkSpd: int(a.MAtkSpd()), PAtkSpd: int(a.PAtkSpd(tmpl.AtkSpd)),
+		RunSpd: int(tmpl.RunSpeed), WalkSpd: int(tmpl.WalkSpeed),
+		CollisionRadius: a.CollisionRadius(), CollisionHeight: tmpl.CollisionHeight,
+		Running: true, AlikeDead: a.AlikeDead(),
+		RightHand: tmpl.RightHand, LeftHand: tmpl.LeftHand,
+		Name: a.Name(), Title: title,
+	}, true
 }
 
 // petInfoSnapshot resolves a's owner-visible PetInfo fields, given owner
