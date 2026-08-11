@@ -13,8 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
-// SummonItemsHandler is the etc-item handler name a pet-collar's
-// <item handler="SummonItems"> attribute carries (SummonItems.java).
+// SummonItemsHandler is the etc-item handler name carried by a pet collar.
 const SummonItemsHandler = "SummonItems"
 
 const (
