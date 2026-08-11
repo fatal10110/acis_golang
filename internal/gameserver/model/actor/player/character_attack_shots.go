@@ -22,6 +22,20 @@ func (c *Character) BlessedSpiritshotCharged() bool {
 	return weapon.inst != nil && weapon.inst.ChargedShot(item.ShotBlessedSpirit)
 }
 
+// ChargedShot reports whether kind is currently charged on the active weapon.
+func (c *Character) ChargedShot(kind item.ShotKind) bool {
+	weapon := c.activeWeapon()
+	return weapon.inst != nil && weapon.inst.ChargedShot(kind)
+}
+
+// SetChargedShot charges or discharges kind on the active weapon.
+func (c *Character) SetChargedShot(kind item.ShotKind, charged bool) {
+	weapon := c.activeWeapon()
+	if weapon.inst != nil {
+		weapon.inst.SetChargedShot(kind, charged)
+	}
+}
+
 // ChargeShotResult distinguishes why a direct-use shot charge attempt did
 // or didn't take, so the network layer can pick the matching client
 // message (or suppress it for an auto-shot-enabled item, the way the
