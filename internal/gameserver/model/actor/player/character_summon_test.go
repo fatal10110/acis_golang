@@ -15,10 +15,16 @@ type spySummonSpawner struct {
 type spySpawnCall struct {
 	owner *Character
 	item  *item.Instance
+	def   modelskill.Definition
 }
 
 func (s *spySummonSpawner) SpawnPet(owner *Character, controlItem *item.Instance) bool {
 	s.calls = append(s.calls, spySpawnCall{owner: owner, item: controlItem})
+	return s.ok
+}
+
+func (s *spySummonSpawner) SpawnServitor(owner *Character, def modelskill.Definition) bool {
+	s.calls = append(s.calls, spySpawnCall{owner: owner, def: def})
 	return s.ok
 }
 
@@ -38,6 +44,21 @@ func TestCharacterSummonCreatureDelegatesToSpawner(t *testing.T) {
 	}
 	if spy.calls[0].item != inst {
 		t.Fatalf("SpawnPet item = %v, want %v", spy.calls[0].item, inst)
+	}
+}
+
+func TestCharacterSummonServitorDelegatesToSpawner(t *testing.T) {
+	c := &Character{}
+	spy := &spySummonSpawner{ok: true}
+	c.SetSummonSpawner(spy)
+
+	c.SummonServitor(modelskill.Definition{NpcID: 14848})
+
+	if len(spy.calls) != 1 {
+		t.Fatalf("SpawnServitor calls = %d, want 1", len(spy.calls))
+	}
+	if spy.calls[0].owner != c || spy.calls[0].def.NpcID != 14848 {
+		t.Fatalf("SpawnServitor call = %+v, want owner and NpcID 14848", spy.calls[0])
 	}
 }
 
