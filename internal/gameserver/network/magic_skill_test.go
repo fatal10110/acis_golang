@@ -775,24 +775,33 @@ func TestGameClientLinkMagicSkillUseMassCubicRefreshesEachRecipient(t *testing.T
 	link.targets = skilltarget.NewRegistry(skilltarget.WorldKnown{State: state})
 
 	link.handleMagicSkillUse(caster, clientpackets.RequestMagicSkillUse{SkillID: 10})
+	var firstSent, secondSent, casterSent [][]byte
 	deadline := time.Now().Add(time.Second)
-	for len(first.Character.CubicIDs()) == 0 && time.Now().Before(deadline) {
+	for time.Now().Before(deadline) {
+		firstSent = firstFrames.snapshot()
+		secondSent = secondFrames.snapshot()
+		casterSent = casterFrames.snapshot()
+		if len(framesWithOpcode(firstSent, serverpackets.OpcodeUserInfo)) == 1 &&
+			len(framesWithOpcode(secondSent, serverpackets.OpcodeUserInfo)) == 1 &&
+			len(framesWithOpcode(casterSent, serverpackets.OpcodeCharInfo)) == 2 {
+			break
+		}
 		time.Sleep(time.Millisecond)
 	}
 
 	for _, recipient := range []struct {
 		name   string
 		live   *livePlayer
-		frames *frameCapture
-	}{{"first", first, firstFrames}, {"second", second, secondFrames}} {
+		frames [][]byte
+	}{{"first", first, firstSent}, {"second", second, secondSent}} {
 		if ids := recipient.live.Character.CubicIDs(); len(ids) != 1 || ids[0] != int(cubic.Storm) {
 			t.Fatalf("%s cubic IDs = %v, want [%d]", recipient.name, ids, cubic.Storm)
 		}
-		if got := framesWithOpcode(recipient.frames.frames, serverpackets.OpcodeUserInfo); len(got) != 1 {
+		if got := framesWithOpcode(recipient.frames, serverpackets.OpcodeUserInfo); len(got) != 1 {
 			t.Fatalf("%s UserInfo frames = %d, want 1", recipient.name, len(got))
 		}
 	}
-	if got := framesWithOpcode(casterFrames.frames, serverpackets.OpcodeCharInfo); len(got) != 2 {
+	if got := framesWithOpcode(casterSent, serverpackets.OpcodeCharInfo); len(got) != 2 {
 		t.Fatalf("caster CharInfo frames = %d, want 2 for the two cubic recipients", len(got))
 	}
 }
