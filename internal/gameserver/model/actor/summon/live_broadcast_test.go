@@ -101,3 +101,14 @@ func TestActorBroadcastFrameNoopsWithoutWorld(t *testing.T) {
 	self := serverpackets.SkillCastObject{ObjectID: actor.ObjectID()}
 	actor.BroadcastFrame(serverpackets.FrameMagicSkillUse(self, self, 1, 1, 0, 0, false))
 }
+
+func TestActorUpdateAbnormalEffectCallsUpdater(t *testing.T) {
+	actor := NewServitor(ServitorConfig{ObjectID: 200, Level: 44})
+	called := 0
+	actor.SetAbnormalEffectUpdater(func() { called++ })
+	actor.UpdateAbnormalEffect()
+
+	if called != 1 {
+		t.Fatalf("updater calls = %d, want 1", called)
+	}
+}
