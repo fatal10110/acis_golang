@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cubic"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -24,6 +25,54 @@ type recordingSkillHandler struct{ applied chan []any }
 func (h recordingSkillHandler) Types() []string { return []string{"TEST_AREA"} }
 func (h recordingSkillHandler) Use(cast handlerskill.Cast) {
 	h.applied <- append([]any(nil), cast.Targets...)
+}
+
+func TestGameClientLinkSendsCounterattackFeedbackToPlayerParticipants(t *testing.T) {
+	attackerFrames := &frameCapture{}
+	defenderFrames := &frameCapture{}
+	attacker := newTestLivePlayer(t, 1, attackerFrames)
+	attacker.Name = "Attacker"
+	defender := newTestLivePlayer(t, 2, defenderFrames)
+	defender.Name = "Defender"
+	state := world.New()
+	state.AddPlayer(attacker)
+	state.AddPlayer(defender)
+	link := &GameClientLink{world: state}
+
+	link.sendSkillHandlerResult(attacker, actorcast.EffectResult{
+		Counterattacks: []handlerskill.Counterattack{{
+			AttackerID: attacker.ObjectID(), DefenderID: defender.ObjectID(),
+		}},
+		AttackFailed: 1,
+	})
+
+	if len(attackerFrames.frames) != 2 {
+		t.Fatalf("attacker frames = %d, want 2", len(attackerFrames.frames))
+	}
+	assertSystemMessageStringFrame(t, attackerFrames.frames[0], serverpackets.SystemMessageS1PerformingCounterattack, defender.Name)
+	assertStaticSystemMessageFrame(t, attackerFrames.frames[1], serverpackets.SystemMessageAttackFailed)
+	if len(defenderFrames.frames) != 1 {
+		t.Fatalf("defender frames = %d, want 1", len(defenderFrames.frames))
+	}
+	assertSystemMessageStringFrame(t, defenderFrames.frames[0], serverpackets.SystemMessageCounteredS1Attack, attacker.Name)
+}
+
+func TestGameClientLinkSendsCounterattackFeedbackWithNonPlayerName(t *testing.T) {
+	frames := &frameCapture{}
+	attacker := newTestLivePlayer(t, 1, frames)
+	attacker.Name = "Attacker"
+	state := world.New()
+	state.AddPlayer(attacker)
+	link := &GameClientLink{world: state}
+
+	link.sendSkillHandlerResult(attacker, actorcast.EffectResult{Counterattacks: []handlerskill.Counterattack{{
+		AttackerID: attacker.ObjectID(), DefenderID: 2, DefenderName: "Countering NPC",
+	}}})
+
+	if len(frames.frames) != 1 {
+		t.Fatalf("attacker frames = %d, want 1", len(frames.frames))
+	}
+	assertSystemMessageStringFrame(t, frames.frames[0], serverpackets.SystemMessageS1PerformingCounterattack, "Countering NPC")
 }
 
 func TestGameClientLinkMagicSkillUseStartsKnownActiveSkill(t *testing.T) {

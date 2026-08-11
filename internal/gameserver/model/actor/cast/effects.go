@@ -15,10 +15,11 @@ type EffectHandlers struct {
 }
 
 // EffectResult reports whether effect dispatch reached a skill handler and
-// which caster-visible outcomes that handler produced.
+// which player-visible outcomes that handler produced.
 type EffectResult struct {
 	Handled           bool
 	AttackFailed      int
+	Counterattacks    []handlerskill.Counterattack
 	CubicAdded        bool
 	CubicTargets      []any
 	CubicAddedTargets []any
@@ -100,6 +101,7 @@ func applyEffectsResult(handlers EffectHandlers, caster any, resolved Target, de
 	return EffectResult{
 		Handled:           true,
 		AttackFailed:      result.AttackFailed,
+		Counterattacks:    result.Counterattacks,
 		CubicAdded:        result.CubicAdded,
 		CubicTargets:      result.CubicTargets,
 		CubicAddedTargets: result.CubicAddedTargets,

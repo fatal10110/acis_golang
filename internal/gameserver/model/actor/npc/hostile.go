@@ -114,6 +114,9 @@ type Hostile struct {
 	collisionRadiusOverride atomic.Pointer[float64]
 }
 
+// CharacterName returns this NPC's display name for character-name packets.
+func (h *Hostile) CharacterName() string { return h.Instance.Template.Name }
+
 // Attackable reports whether inst's instance type belongs to the set of
 // combat-capable NPC kinds NewHostile accepts. Callers deciding whether to
 // build a live Hostile at all (rather than handling NewHostile's error)
