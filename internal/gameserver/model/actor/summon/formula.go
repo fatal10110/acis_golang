@@ -24,7 +24,11 @@ type CombatStats struct {
 	BaseRandomDamage             int
 	SSCount, SPSCount            int
 	AttackRange                  int
+	AttackSpeed                  float64
 }
+
+// PhysicalAttackSpeed returns this summon's physical attack speed from its NPC template.
+func (a *Actor) PhysicalAttackSpeed() float64 { return a.PAtkSpd(a.stats.AttackSpeed) }
 
 type summonVitals struct {
 	// mu guards hp, mp, and Actor.dead.

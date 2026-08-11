@@ -6,12 +6,14 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
@@ -144,7 +146,7 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 			MAtk: levelStats.MAtk, MDef: levelStats.MDef,
 			MaxHP: levelStats.MaxHP, MaxMP: levelStats.MaxMP,
 			SSCount: levelStats.SSCount, SPSCount: levelStats.SPSCount,
-			AttackRange: npcTmpl.BaseAttackRange,
+			AttackRange: npcTmpl.BaseAttackRange, AttackSpeed: npcTmpl.AtkSpd,
 		},
 		Skills: npcTmpl.Skills,
 	})
@@ -177,13 +179,78 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 	// connection goroutine looking the pet up to dispatch TryUseSkill).
 	// Setting brain first means that edge also covers the brain field,
 	// instead of leaving it as an unsynchronized write racing that read.
-	pet.SetAI(ai.NewSummon(pet, inertSummonMoveController{}, inertSummonAttackController{}))
+	link.wireSummonAI(pet)
 
 	offset := location.Location{X: petSpawnOffset, Y: 0, Z: 0}
 	summon.SpawnBesideOwner(link.world, pet, live, offset)
 	link.broadcastSummonSpawnRelation(live, pet)
 
 	return true
+}
+
+// SpawnServitor creates the non-cubic SUMMON skill's live servitor beside its
+// owner. The cast handler supplies the skill definition, whose NpcID selects
+// the servitor template.
+func (s *gameSummonSpawner) SpawnServitor(owner *player.Character, def modelskill.Definition) bool {
+	link, live := s.link, s.live
+	if link == nil || live == nil || owner == nil || def.NpcID == 0 {
+		return false
+	}
+	if _, ok := link.world.Summon(live.ObjectID()); ok {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSummonOnlyOne))
+		return false
+	}
+	npcTmpl, ok := link.npcs.Get(def.NpcID)
+	if !ok {
+		return false
+	}
+	objID, err := link.ids.NextID()
+	if err != nil {
+		return false
+	}
+
+	servitor := summon.NewServitor(summon.ServitorConfig{
+		ObjectID:        objID,
+		Owner:           live,
+		NPCID:           def.NpcID,
+		CollisionRadius: npcTmpl.CollisionRadius,
+		Name:            npcTmpl.Name,
+		Level:           npcTmpl.Level,
+		OwnerInventory:  live.Inventory(),
+		Lifetime: summon.LifetimeState{
+			TimeRemaining:    def.SummonTotalLifeTime,
+			TotalLifeTime:    def.SummonTotalLifeTime,
+			ItemConsumeSteps: 0,
+		},
+		Stats: summon.CombatStats{
+			STR: npcTmpl.STR, CON: npcTmpl.CON, DEX: npcTmpl.DEX,
+			INT: npcTmpl.INT, WIT: npcTmpl.WIT, MEN: npcTmpl.MEN,
+			PAtk: npcTmpl.PAtk, PDef: npcTmpl.PDef, MAtk: npcTmpl.MAtk, MDef: npcTmpl.MDef,
+			MaxHP: npcTmpl.HPMax, MaxMP: npcTmpl.MPMax,
+			BaseRandomDamage: npcTmpl.BaseRandomDamage,
+			SSCount:          npcTmpl.SSCount,
+			SPSCount:         npcTmpl.SPSCount,
+			AttackRange:      npcTmpl.BaseAttackRange,
+			AttackSpeed:      npcTmpl.AtkSpd,
+		},
+		Skills: npcTmpl.Skills,
+	})
+	servitor.SetZones(link.zones)
+	link.wireSummonAI(servitor)
+	summon.SpawnBesideOwner(link.world, servitor, live, location.Location{X: petSpawnOffset})
+	link.broadcastSummonSpawnRelation(live, servitor)
+	return true
+}
+
+func (l *GameClientLink) wireSummonAI(actor *summon.Actor) {
+	brain := ai.NewSummon(actor, inertSummonMoveController{}, inertSummonAttackController{})
+	brain.SetCastController(&actorcast.AIController{
+		Controller:  actorcast.NewController(actorcast.SummonActor{Summon: actor}),
+		Definitions: l.skills,
+		Effects:     actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers},
+		Caster:      actor,
+	})
+	actor.SetAI(brain)
 }
 
 // inertSummonMoveController and inertSummonAttackController satisfy

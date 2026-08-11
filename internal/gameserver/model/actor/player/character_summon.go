@@ -16,6 +16,8 @@ type SummonSpawner interface {
 	// instance the SUMMON_CREATURE cast was cast with. It reports whether a
 	// pet was actually spawned.
 	SpawnPet(owner *Character, controlItem *item.Instance) bool
+	// SpawnServitor summons a servitor selected by a non-cubic SUMMON skill.
+	SpawnServitor(owner *Character, def modelskill.Definition) bool
 }
 
 // SetSummonSpawner wires c's live summon spawner, called once by the
@@ -47,4 +49,12 @@ func (c *Character) SummonCreature(_ modelskill.Definition, itemArg any) {
 		return
 	}
 	spawner.SpawnPet(c, inst)
+}
+
+// SummonServitor is the non-cubic SUMMON skill handler's entry point.
+func (c *Character) SummonServitor(def modelskill.Definition) {
+	spawner := c.summonSpawnerLocked()
+	if spawner != nil {
+		spawner.SpawnServitor(c, def)
+	}
 }

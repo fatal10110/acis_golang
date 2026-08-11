@@ -11,6 +11,7 @@ type fakeCubicSummoner struct {
 	added        map[cubic.ID]bool
 	givenByOther map[cubic.ID]bool
 	nextAdded    bool
+	servitor     modelskill.Definition
 }
 
 func newFakeCubicSummoner(nextAdded bool) *fakeCubicSummoner {
@@ -21,6 +22,10 @@ func (f *fakeCubicSummoner) AddOrRefreshCubic(id cubic.ID, givenByOther bool) (t
 	f.added[id] = true
 	f.givenByOther[id] = givenByOther
 	return true, f.nextAdded
+}
+
+func (f *fakeCubicSummoner) SummonServitor(def modelskill.Definition) {
+	f.servitor = def
 }
 
 func TestCubicHandlerAddsToSelfWhenSingleTarget(t *testing.T) {
@@ -43,12 +48,11 @@ func TestCubicHandlerAddsToSelfWhenSingleTarget(t *testing.T) {
 	}
 }
 
-func TestCubicHandlerNoOpForServitorBranch(t *testing.T) {
+func TestCubicHandlerDelegatesServitorBranch(t *testing.T) {
 	caster := newFakeCubicSummoner(true)
 
 	result := cubicHandler{}.UseResult(Cast{
-		Caster: caster,
-		// IsCubic false: the servitor branch, out of this handler's scope.
+		Caster:  caster,
 		Skill:   modelskill.Definition{SkillType: "SUMMON", IsCubic: false, NpcID: 14848},
 		Targets: []any{caster},
 	})
@@ -58,6 +62,9 @@ func TestCubicHandlerNoOpForServitorBranch(t *testing.T) {
 	}
 	if len(caster.added) != 0 {
 		t.Fatal("servitor-branch cast touched the cubic list, want untouched")
+	}
+	if caster.servitor.NpcID != 14848 {
+		t.Fatalf("SummonServitor() NpcID = %d, want 14848", caster.servitor.NpcID)
 	}
 }
 
