@@ -720,6 +720,25 @@ func TestGameClientLinkMagicSkillUseAppliesAreaSkillToResolvedTargets(t *testing
 	case <-time.After(time.Second):
 		t.Fatalf("area cast did not reach its skill handler; frames = %#x", frameOpcodes(casterCapture.frames))
 	}
+
+	for _, frame := range casterCapture.snapshot() {
+		if frame[0] != serverpackets.OpcodeMagicSkillLaunched {
+			continue
+		}
+		r := wire.NewReader(frame[1:])
+		r.ReadInt32() // caster
+		r.ReadInt32() // skill ID
+		r.ReadInt32() // level
+		if count := r.ReadInt32(); count != 2 {
+			t.Fatalf("MagicSkillLaunched target count = %d, want 2", count)
+		}
+		got := map[int32]bool{r.ReadInt32(): true, r.ReadInt32(): true}
+		if !got[aimed.ObjectID()] || !got[nearby.ObjectID()] {
+			t.Fatalf("MagicSkillLaunched targets = %v, want %d and %d", got, aimed.ObjectID(), nearby.ObjectID())
+		}
+		return
+	}
+	t.Fatal("area cast did not send MagicSkillLaunched")
 }
 
 func TestGameClientLinkMagicSkillUseDefersUntilAttackFinishes(t *testing.T) {
