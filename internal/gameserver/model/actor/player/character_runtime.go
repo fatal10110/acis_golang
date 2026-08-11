@@ -195,6 +195,9 @@ func (c *Character) ObjectID() int32 {
 	return c.ID
 }
 
+// CharacterName returns this player's display name for character-name packets.
+func (c *Character) CharacterName() string { return c.Name }
+
 // WorldPlayer satisfies world.Player: a Character's presence keeps its
 // world Region active.
 func (c *Character) WorldPlayer() {}

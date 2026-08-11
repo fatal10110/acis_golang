@@ -36,6 +36,10 @@ type objectIDTarget interface {
 	ObjectID() int32
 }
 
+type characterNameTarget interface {
+	CharacterName() string
+}
+
 type manaDamageTarget interface {
 	Dead() bool
 	MPValue() float64
@@ -248,8 +252,10 @@ func (blowHandler) UseResult(cast Cast) Result {
 							caster.ReduceHP(float64(damage)*counter/100, target, cast.Skill)
 						}
 						result.Counterattacks = append(result.Counterattacks, Counterattack{
-							AttackerID: counterattackObjectID(cast.Caster),
-							DefenderID: counterattackObjectID(target),
+							AttackerID:   counterattackObjectID(cast.Caster),
+							AttackerName: counterattackName(cast.Caster),
+							DefenderID:   counterattackObjectID(target),
+							DefenderName: counterattackName(target),
 						})
 					}
 				}
@@ -275,6 +281,13 @@ func counterattackObjectID(obj any) int32 {
 		return target.ObjectID()
 	}
 	return 0
+}
+
+func counterattackName(obj any) string {
+	if target, ok := obj.(characterNameTarget); ok {
+		return target.CharacterName()
+	}
+	return ""
 }
 
 func counterSkillReflects(def modelskill.Definition, counter float64) bool {

@@ -57,6 +57,24 @@ func TestGameClientLinkSendsCounterattackFeedbackToPlayerParticipants(t *testing
 	assertSystemMessageStringFrame(t, defenderFrames.frames[0], serverpackets.SystemMessageCounteredS1Attack, attacker.Name)
 }
 
+func TestGameClientLinkSendsCounterattackFeedbackWithNonPlayerName(t *testing.T) {
+	frames := &frameCapture{}
+	attacker := newTestLivePlayer(t, 1, frames)
+	attacker.Name = "Attacker"
+	state := world.New()
+	state.AddPlayer(attacker)
+	link := &GameClientLink{world: state}
+
+	link.sendSkillHandlerResult(attacker, actorcast.EffectResult{Counterattacks: []handlerskill.Counterattack{{
+		AttackerID: attacker.ObjectID(), DefenderID: 2, DefenderName: "Countering NPC",
+	}}})
+
+	if len(frames.frames) != 1 {
+		t.Fatalf("attacker frames = %d, want 1", len(frames.frames))
+	}
+	assertSystemMessageStringFrame(t, frames.frames[0], serverpackets.SystemMessageS1PerformingCounterattack, "Countering NPC")
+}
+
 func TestGameClientLinkMagicSkillUseStartsKnownActiveSkill(t *testing.T) {
 	store := newMemorySkillSaveStore()
 	skills := skillstate.NewPersistence(store, modelskill.NewTable([]modelskill.Definition{

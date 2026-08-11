@@ -16,6 +16,7 @@ import (
 type damageEffectFake struct {
 	*skillTarget
 	id                   int32
+	name                 string
 	list                 *effect.List
 	successOK            bool
 	reflects             bool
@@ -60,6 +61,8 @@ func (d *damageEffectFake) SkillReflectInput(def modelskill.Definition) formulas
 func (d *damageEffectFake) CounterSkillPhysical() float64 { return d.counterSkillPhysical }
 
 func (d *damageEffectFake) ObjectID() int32 { return d.id }
+
+func (d *damageEffectFake) CharacterName() string { return d.name }
 
 func targetEffect() []modelskill.EffectTemplate {
 	return []modelskill.EffectTemplate{{Name: "Buff", Time: 600}}
@@ -288,9 +291,9 @@ func TestBlowCounterSkillDamagesCasterInsteadOfTarget(t *testing.T) {
 func TestBlowCounterSkillReportsCounterattackParticipants(t *testing.T) {
 	registry := NewDefaultRegistry()
 	caster := newDamageEffectFake()
-	caster.id, caster.hp = 1, 2000
+	caster.id, caster.name, caster.hp = 1, "Attacker", 2000
 	target := newDamageEffectFake()
-	target.id, target.hp = 2, 2000
+	target.id, target.name, target.hp = 2, "Countering NPC", 2000
 	target.counterSkillPhysical = 50
 	target.blowOK = true
 	target.blowInput = formulas.BlowInput{
@@ -308,8 +311,8 @@ func TestBlowCounterSkillReportsCounterattackParticipants(t *testing.T) {
 	if !ok {
 		t.Fatal("UseResult() handled = false, want true")
 	}
-	if got := result.Counterattacks; len(got) != 1 || got[0].AttackerID != caster.id || got[0].DefenderID != target.id {
-		t.Fatalf("Counterattacks = %+v, want caster and target IDs", got)
+	if got := result.Counterattacks; len(got) != 1 || got[0].AttackerID != caster.id || got[0].AttackerName != caster.name || got[0].DefenderID != target.id || got[0].DefenderName != target.name {
+		t.Fatalf("Counterattacks = %+v, want caster and target IDs and names", got)
 	}
 }
 
