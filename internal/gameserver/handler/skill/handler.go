@@ -30,10 +30,19 @@ type Handler interface {
 	Use(Cast)
 }
 
-// Result reports caster-visible outcomes produced while a skill handler ran.
+// Counterattack reports the two participants in a countered physical skill.
+type Counterattack struct {
+	AttackerID   int32
+	AttackerName string
+	DefenderID   int32
+	DefenderName string
+}
+
+// Result reports player-visible outcomes produced while a skill handler ran.
 type Result struct {
-	AttackFailed int
-	CubicAdded   bool
+	AttackFailed   int
+	Counterattacks []Counterattack
+	CubicAdded     bool
 	// CubicTargets are non-caster targets whose cubic runtime was touched.
 	CubicTargets []any
 	// CubicAddedTargets are the non-caster targets whose visible cubic list changed.

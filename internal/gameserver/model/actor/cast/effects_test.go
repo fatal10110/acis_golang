@@ -125,6 +125,20 @@ func TestApplyEffectsResultCarriesCubicTargets(t *testing.T) {
 	}
 }
 
+func TestApplyEffectsResultCarriesSkillHandlerCounterattack(t *testing.T) {
+	caster := &effectsActor{id: 1, category: skilltarget.CategoryPlayable}
+	rec := &recordingSkillHandler{result: handlerskill.Result{Counterattacks: []handlerskill.Counterattack{{
+		AttackerID: 1, AttackerName: "Attacker", DefenderID: 2, DefenderName: "Defender",
+	}}}}
+	handlers := newEffectHandlers(effectsKnown{}, "DUMMY", rec)
+	def := modelskill.Definition{ID: 99, Target: modelskill.TargetSelf, SkillType: "DUMMY"}
+
+	result := ApplyEffectsResult(handlers, caster, caster, def)
+	if got := result.Counterattacks; len(got) != 1 || got[0].AttackerName != "Attacker" || got[0].DefenderName != "Defender" {
+		t.Fatalf("Counterattacks = %+v, want attacker and defender", got)
+	}
+}
+
 func TestApplyEffectsNotifiesPvPStatusBeforeSkillHandling(t *testing.T) {
 	caster := &pvpEffectsActor{effectsActor: effectsActor{id: 1, category: skilltarget.CategoryPlayable}}
 	target := &effectsActor{id: 2, category: skilltarget.CategoryPlayable}

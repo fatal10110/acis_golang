@@ -92,7 +92,7 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 			live.clearFusionTarget(target.ObjectID())
 		}
 		result := actorcast.ApplyEffectsResult(actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers}, live.Character, target, def)
-		sendSkillHandlerResult(live, result)
+		l.sendSkillHandlerResult(live, result)
 		l.syncCubicTargets(live, result, def)
 		sendMagicStatusUpdate(live, beforeVitals)
 		if !controller.ScheduleFusion(plan, time.Second, func() bool {
@@ -129,7 +129,7 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 		},
 		Hit: func() {
 			result := actorcast.ApplyEffectsResult(actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers}, live.Character, target, def)
-			sendSkillHandlerResult(live, result)
+			l.sendSkillHandlerResult(live, result)
 			l.syncCubicTargets(live, result, def)
 			sendMagicStatusUpdate(live, beforeVitals)
 		},
@@ -347,9 +347,17 @@ func sendMagicActionFailed(live *livePlayer) {
 	}
 }
 
-func sendSkillHandlerResult(live *livePlayer, result actorcast.EffectResult) {
+func (l *GameClientLink) sendSkillHandlerResult(live *livePlayer, result actorcast.EffectResult) {
 	if live == nil {
 		return
+	}
+	for _, counterattack := range result.Counterattacks {
+		if defender, ok := l.livePlayerByID(counterattack.DefenderID); ok {
+			defender.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageCounteredS1Attack, counterattack.AttackerName))
+		}
+		if attacker, ok := l.livePlayerByID(counterattack.AttackerID); ok {
+			attacker.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1PerformingCounterattack, counterattack.DefenderName))
+		}
 	}
 	for i := 0; i < result.AttackFailed; i++ {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageAttackFailed))
