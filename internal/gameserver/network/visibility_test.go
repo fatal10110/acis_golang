@@ -162,7 +162,7 @@ func TestHostileAbnormalEffectRefreshResendsLiveNPCInfo(t *testing.T) {
 	}
 }
 
-func TestLivePlayerVisibilitySendsPetInfoOnlyToOwner(t *testing.T) {
+func TestLivePlayerVisibilitySendsOwnerPetInfoAndBystanderSummonInfo(t *testing.T) {
 	state := world.New()
 	ownerFrames := &frameCapture{}
 	bystanderFrames := &frameCapture{}
@@ -195,20 +195,16 @@ func TestLivePlayerVisibilitySendsPetInfoOnlyToOwner(t *testing.T) {
 	if updates := petInventory.DrainUpdates(); len(updates) != 0 {
 		t.Fatalf("pet inventory updates after full snapshot = %v, want cleared", updates)
 	}
-	for _, f := range bystanderFrames.frames {
-		if f[0] == serverpackets.OpcodePetInfo || f[0] == serverpackets.OpcodePetItemList {
-			t.Fatalf("bystander frames = %x, want no owner pet packets (SummonInfo not ported yet)", bystanderFrames.frames)
-		}
+	if n := len(bystanderFrames.frames); n == 0 || bystanderFrames.frames[n-1][0] != serverpackets.OpcodeNPCInfo {
+		t.Fatalf("bystander last frame = %x, want SummonInfo (%#x)", bystanderFrames.frames, serverpackets.OpcodeNPCInfo)
 	}
 
 	state.Despawn(pet)
 	if n := len(ownerFrames.frames); n == 0 || ownerFrames.frames[n-1][0] != serverpackets.OpcodePetDelete {
 		t.Fatalf("owner last frame after pet despawn = %x, want PetDelete (%#x) last", ownerFrames.frames, serverpackets.OpcodePetDelete)
 	}
-	for _, f := range bystanderFrames.frames {
-		if f[0] == serverpackets.OpcodePetDelete {
-			t.Fatalf("bystander frames after pet despawn = %x, want no PetDelete (it never saw the pet spawn)", bystanderFrames.frames)
-		}
+	if n := len(bystanderFrames.frames); n == 0 || bystanderFrames.frames[n-1][0] != serverpackets.OpcodeDeleteObject {
+		t.Fatalf("bystander last frame after pet despawn = %x, want DeleteObject", bystanderFrames.frames)
 	}
 }
 

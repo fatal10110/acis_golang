@@ -464,6 +464,8 @@ func TestGameSummonSpawnerSpawnPetBroadcastsSpawnRelation(t *testing.T) {
 	observerFrames := &frameCapture{}
 	live := newTestLivePlayer(t, 1, selfFrames)
 	observer := newTestLivePlayer(t, 2, observerFrames)
+	live.npcs = link.npcs
+	observer.npcs = link.npcs
 	live.Character.KarmaPoints = 500
 	state.Spawn(live, 0, 0, 0, 0)
 	state.Spawn(observer, 100, 0, 0, 0)
@@ -483,20 +485,29 @@ func TestGameSummonSpawnerSpawnPetBroadcastsSpawnRelation(t *testing.T) {
 	}
 	pet := obj.(*summon.Actor)
 
-	if len(selfFrames.frames) != 1 {
-		t.Fatalf("self frames = %d, want 1 (summon self-view)", len(selfFrames.frames))
+	if len(selfFrames.frames) != 3 {
+		t.Fatalf("self frames = %d, want PetInfo, PetItemList, then summon self-view", len(selfFrames.frames))
+	}
+	if selfFrames.frames[0][0] != serverpackets.OpcodePetInfo {
+		t.Fatalf("self first frame opcode = %#x, want PetInfo (%#x)", selfFrames.frames[0][0], serverpackets.OpcodePetInfo)
+	}
+	if selfFrames.frames[1][0] != serverpackets.OpcodePetItemList {
+		t.Fatalf("self second frame opcode = %#x, want PetItemList (%#x)", selfFrames.frames[1][0], serverpackets.OpcodePetItemList)
 	}
 	wantSelf := relationChangedPayload(pet.ObjectID(), serverpackets.RelationHasKarma, 0, 500, 0)
-	if !bytes.Equal(selfFrames.frames[0], wantSelf) {
-		t.Fatalf("self frame = %x, want %x", selfFrames.frames[0], wantSelf)
+	if !bytes.Equal(selfFrames.frames[2], wantSelf) {
+		t.Fatalf("self relation frame = %x, want %x", selfFrames.frames[2], wantSelf)
 	}
 
-	if len(observerFrames.frames) != 1 {
-		t.Fatalf("observer frames = %d, want 1 (summon only, no owner resend)", len(observerFrames.frames))
+	if len(observerFrames.frames) != 2 {
+		t.Fatalf("observer frames = %d, want SummonInfo then relation", len(observerFrames.frames))
+	}
+	if observerFrames.frames[0][0] != serverpackets.OpcodeNPCInfo {
+		t.Fatalf("observer first frame opcode = %#x, want SummonInfo (%#x)", observerFrames.frames[0][0], serverpackets.OpcodeNPCInfo)
 	}
 	wantObserver := relationChangedPayload(pet.ObjectID(), serverpackets.RelationHasKarma, 1, 500, 0)
-	if !bytes.Equal(observerFrames.frames[0], wantObserver) {
-		t.Fatalf("observer frame = %x, want %x", observerFrames.frames[0], wantObserver)
+	if !bytes.Equal(observerFrames.frames[1], wantObserver) {
+		t.Fatalf("observer relation frame = %x, want %x", observerFrames.frames[1], wantObserver)
 	}
 }
 
