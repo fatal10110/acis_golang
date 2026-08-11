@@ -79,6 +79,7 @@ type PhysicalSkillInput struct {
 	AttackPower float64
 	SkillPower  float64 // includes any per-skill SoulShot power boost when SoulShot is true
 	Defence     float64
+	Shield      ShieldDefense
 
 	Crit     bool
 	SoulShot bool
@@ -95,6 +96,9 @@ type PhysicalSkillInput struct {
 
 // PhysicalSkillDamage computes a physical skill's damage.
 func PhysicalSkillDamage(in PhysicalSkillInput) float64 {
+	if in.Shield == ShieldPerfect {
+		return 1
+	}
 	ssMul := 1.0
 	if in.SoulShot {
 		ssMul = 2.04

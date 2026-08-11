@@ -38,12 +38,8 @@ func (cubicHandler) UseResult(cast Cast) Result {
 		// Mass-cubic cast: every targeted player except the caster
 		// receives the cubic as "given by another player". No shipped
 		// cubic skill in the reference data actually resolves more than
-		// one target (every one declares target SELF), so a recipient
-		// other than the caster never gets its own character-info
-		// refresh or live cubic runtime synced here — only the caster's
-		// CubicAdded/CubicTouched is reported, matching what an actual
-		// multi-target cubic skill would need if one existed.
-		var result Result
+		// one target (every one declares target SELF).
+		result := Result{CubicID: id}
 		for _, target := range cast.Targets {
 			summoner, ok := target.(cubicSummoner)
 			if !ok {
@@ -51,9 +47,19 @@ func (cubicHandler) UseResult(cast Cast) Result {
 			}
 			givenByOther := !sameObject(cast.Caster, target)
 			touched, added := summoner.AddOrRefreshCubic(id, givenByOther)
-			if touched && !givenByOther {
-				result = Result{CubicTouched: true, CubicID: id, CubicAdded: added}
+			if !touched {
+				continue
 			}
+			if givenByOther {
+				result.CubicTargets = append(result.CubicTargets, target)
+				if added {
+					result.CubicAddedTargets = append(result.CubicAddedTargets, target)
+				}
+				continue
+			}
+			result.CubicTouched = true
+			result.CubicID = id
+			result.CubicAdded = added
 		}
 		return result
 	}

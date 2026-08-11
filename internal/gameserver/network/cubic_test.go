@@ -5,11 +5,13 @@ import (
 	"time"
 
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
+	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cubic"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // fakeCubicTimer/fakeCubicClock give cubic.AfterFunc a deterministic,
@@ -64,6 +66,28 @@ const (
 	testStormCubicGrantID     = 901
 	testStormFireSkillID      = 4049
 )
+
+func TestSyncCubicTargetsRefreshesNonCasterCharacterInfo(t *testing.T) {
+	state := world.New()
+	casterFrames := &frameCapture{}
+	recipientFrames := &frameCapture{}
+	caster := newTestLivePlayer(t, 1, casterFrames)
+	recipient := newTestLivePlayer(t, 2, recipientFrames)
+	state.Spawn(caster, 0, 0, 0, 0)
+	state.Spawn(recipient, 100, 0, 0, 0)
+	casterFrames.frames = nil
+	recipientFrames.frames = nil
+
+	l := &GameClientLink{world: state}
+	l.syncCubicTargets(caster, actorcast.EffectResult{CubicAddedTargets: []any{recipient}}, modelskill.Definition{})
+
+	if got := frameOpcodes(recipientFrames.frames); len(got) != 1 || got[0] != serverpackets.OpcodeUserInfo {
+		t.Fatalf("recipient opcodes = %x, want UserInfo", got)
+	}
+	if got := frameOpcodes(casterFrames.frames); len(got) != 1 || got[0] != serverpackets.OpcodeCharInfo {
+		t.Fatalf("caster opcodes = %x, want CharInfo", got)
+	}
+}
 
 func TestFireCubic_LifeCubicSelfStartsAndFiresWithoutAttackStance(t *testing.T) {
 	clock := &fakeCubicClock{}
