@@ -58,6 +58,10 @@ func (l *GameClientLink) useSummonItem(live *livePlayer, inv *itemcontainer.Inve
 		return l.useDecorativeSummonItem(live, inv, inst, summonItem)
 	}
 	if summonItem.SummonType == summonItemTypeWyvern {
+		if !live.Character.Standing() {
+			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotMoveWhileSitting))
+			return true
+		}
 		live.move.Stop()
 		if !live.Character.Mount(summonItem.NPCID, inst.ObjectID) {
 			return true

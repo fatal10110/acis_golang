@@ -112,7 +112,7 @@ func TestUseSummonItemMountsWyvern(t *testing.T) {
 	live.Character.SetUserInfoUpdater(func() {
 		live.SendFrame(serverpackets.FrameUserInfo(serverpackets.UserInfoSnapshot{Character: live.Character, Template: live.template}))
 	})
-	inst := &item.Instance{ObjectID: 501, TemplateID: summonTestWyvernTemplateID, OwnerID: live.ObjectID()}
+	inst := &item.Instance{ObjectID: 501, TemplateID: summonTestWyvernTemplateID, OwnerID: live.ObjectID(), Count: 1, Location: item.LocationInventory}
 	live.Inventory().Restore([]*item.Instance{inst})
 
 	if !link.useSummonItem(live, live.Inventory(), inst) {
@@ -132,6 +132,23 @@ func TestUseSummonItemMountsWyvern(t *testing.T) {
 		t.Fatal("destroying mounted control item removed it")
 	}
 	assertOpcodeSequence(t, frames.frames, serverpackets.OpcodeActionFailed)
+}
+
+func TestUseSummonItemRejectsWyvernWhileSitting(t *testing.T) {
+	link, _ := newSummonTestLink(t)
+	frames := &frameCapture{}
+	live := newTestLivePlayer(t, 1, frames)
+	live.Character.SetStanding(false)
+	inst := &item.Instance{ObjectID: 502, TemplateID: summonTestWyvernTemplateID, OwnerID: live.ObjectID(), Count: 1, Location: item.LocationInventory}
+	live.Inventory().Restore([]*item.Instance{inst})
+
+	if !link.useSummonItem(live, live.Inventory(), inst) {
+		t.Fatal("useSummonItem returned false, want handled rejection")
+	}
+	if got := live.Character.MountType(); got != 0 {
+		t.Fatalf("MountType() = %d, want 0", got)
+	}
+	assertOpcodeSequence(t, frames.frames, serverpackets.OpcodeSystemMessage)
 }
 
 // summonTestSkillTable registers SUMMON_CREATURE (2046,1) with a zero hit
