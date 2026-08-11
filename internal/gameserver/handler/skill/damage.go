@@ -208,10 +208,13 @@ func (blowHandler) Use(cast Cast) {
 			continue
 		}
 		if in.Landed {
-			damage := int(formulas.BlowDamage(in))
+			damage := 1
+			if in.Shield != formulas.ShieldPerfect {
+				damage = int(formulas.BlowDamage(in))
+			}
 			if damage > 0 {
 				target.ReduceHP(float64(damage), cast.Caster, cast.Skill)
-				applyBlowEffects(cast, obj)
+				applyBlowEffects(cast, obj, in.Shield)
 			}
 		}
 		// Blow.java rolls the lethal chance unconditionally per target,
@@ -227,7 +230,7 @@ func (blowHandler) Use(cast Cast) {
 // landing-rate roll gates activation with the blessed-spiritshot input
 // forced true — Blow.java hardcodes that argument regardless of the
 // caster's real charge state.
-func applyBlowEffects(cast Cast, obj any) {
+func applyBlowEffects(cast Cast, obj any, shield formulas.ShieldDefense) {
 	if len(cast.Skill.Effects) == 0 {
 		return
 	}
@@ -235,7 +238,7 @@ func applyBlowEffects(cast Cast, obj any) {
 	if effected == nil {
 		return
 	}
-	succeeded, ok := checkSkillSuccessBSS(cast.Caster, effected, cast.Skill, true)
+	succeeded, ok := checkSkillSuccessBSSWithShield(cast.Caster, effected, cast.Skill, true, shield)
 	if !ok || !succeeded {
 		return
 	}

@@ -14,10 +14,11 @@ import (
 // roll by default, and an opt-in reflect.
 type damageEffectFake struct {
 	*skillTarget
-	list      *effect.List
-	successOK bool
-	reflects  bool
-	lastBss   bool
+	list       *effect.List
+	successOK  bool
+	reflects   bool
+	lastBss    bool
+	lastShield formulas.ShieldDefense
 }
 
 func newDamageEffectFake() *damageEffectFake {
@@ -28,7 +29,8 @@ func (d *damageEffectFake) EffectList() *effect.List { return d.list }
 
 func (d *damageEffectFake) SkillSuccessInput(caster any, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
 	d.lastBss = bss
-	return formulas.SkillSuccessInput{IgnoreResists: true, BaseChance: 100}, d.successOK
+	d.lastShield = shield
+	return formulas.SkillSuccessInput{IgnoreResists: true, BaseChance: 100, Shield: shield}, d.successOK
 }
 
 func (d *damageEffectFake) SkillReflectInput(def modelskill.Definition) formulas.SkillReflectInput {
@@ -126,6 +128,31 @@ func TestBlowAppliesEffectsWithForcedBlessedSpiritshotInput(t *testing.T) {
 	}
 	if !target.lastBss {
 		t.Fatal("BLOW landing roll bss = false, want true (Blow.java hardcodes this input)")
+	}
+}
+
+func TestBlowUsesOneShieldOutcomeForDamageAndEffects(t *testing.T) {
+	registry := NewDefaultRegistry()
+	caster := newDamageEffectFake()
+	target := newDamageEffectFake()
+	target.hp = 2000
+	target.blowOK = true
+	target.blowInput = formulas.BlowInput{
+		AttackPower: 100, SkillPower: 50, Defence: 40,
+		RandomMul: 1, PosMul: 1.2,
+		CritDamageMul: 1.5, CritDamagePosMul: 1, CritVulnMul: 1, DaggerVulnMul: 1, CritDamageAddBase: 5,
+		Landed: true, Shield: formulas.ShieldPerfect,
+	}
+
+	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{ID: 409, SkillType: "BLOW", Effects: targetEffect()}, Targets: []any{target}})
+	if target.hp != 1999 {
+		t.Fatalf("perfect-shield BLOW hp = %v, want 1999", target.hp)
+	}
+	if got := len(target.EffectList().All()); got != 0 {
+		t.Fatalf("perfect-shield BLOW effects = %d, want 0", got)
+	}
+	if target.lastShield != formulas.ShieldPerfect {
+		t.Fatalf("BLOW effect shield = %v, want ShieldPerfect", target.lastShield)
 	}
 }
 

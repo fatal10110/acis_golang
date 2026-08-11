@@ -43,6 +43,10 @@ type FormulaActor interface {
 	Roll(int) int
 }
 
+type shieldDefenseActor interface {
+	ShieldDefense(caster any, def modelskill.Definition, isCrit bool) formulas.ShieldDefense
+}
+
 // ResolvePhysicalSkillInput builds a physical-skill damage input from the
 // caster/target pair. raceMul is supplied by NPC targets whose template race
 // has a matching attack/resistance stat pair.
@@ -126,10 +130,21 @@ func ResolveBlowInput(caster any, target FormulaActor, def modelskill.Definition
 		Front:    front,
 		Backstab: def.ID == 30,
 	}, attacker.Roll(1000))
+	shield := formulas.ShieldFailed
+	if landed && !def.IgnoreShield {
+		if resolver, ok := any(target).(shieldDefenseActor); ok {
+			shield = resolver.ShieldDefense(caster, def, false)
+		}
+	}
+	defence := target.PDef()
+	if shield == formulas.ShieldSuccess {
+		defence += target.CalcStat(stat.ShieldDefence, 0)
+	}
 	return formulas.BlowInput{
 		AttackPower:       attacker.PAtk(),
 		SkillPower:        skillPower,
-		Defence:           Positive(target.PDef()),
+		Defence:           Positive(defence),
+		Shield:            shield,
 		SoulShot:          soulshot,
 		IsPvP:             pvp,
 		RandomMul:         float64(95+attacker.Roll(11)) / 100,
