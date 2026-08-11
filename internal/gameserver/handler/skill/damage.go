@@ -28,6 +28,10 @@ type blowDamageTarget interface {
 	BlowInput(caster any, skill modelskill.Definition) (formulas.BlowInput, bool)
 }
 
+type counterSkillPhysicalTarget interface {
+	CounterSkillPhysical() float64
+}
+
 type manaDamageTarget interface {
 	Dead() bool
 	MPValue() float64
@@ -226,7 +230,19 @@ func (blowHandler) Use(cast Cast) {
 				damage = int(formulas.BlowDamage(in))
 			}
 			if damage > 0 {
-				target.ReduceHP(float64(damage), cast.Caster, cast.Skill)
+				countered := false
+				if source, ok := target.(counterSkillPhysicalTarget); ok {
+					counter := source.CounterSkillPhysical()
+					countered = counterSkillReflects(cast.Skill, counter)
+					if countered {
+						if caster, ok := cast.Caster.(hpDamageTarget); ok {
+							caster.ReduceHP(float64(damage)*counter/100, target, cast.Skill)
+						}
+					}
+				}
+				if !countered {
+					target.ReduceHP(float64(damage), cast.Caster, cast.Skill)
+				}
 				applyBlowEffects(cast, obj, in.Shield)
 			}
 			if caster, ok := cast.Caster.(shotCharger); ok {
@@ -238,6 +254,13 @@ func (blowHandler) Use(cast Cast) {
 		applyLethalHit(cast, target)
 	}
 	applySelfEffects(cast.Caster, cast.Skill)
+}
+
+func counterSkillReflects(def modelskill.Definition, counter float64) bool {
+	if def.IgnoreResists || !def.CanBeReflected || counter <= 0 {
+		return false
+	}
+	return def.Magic || (def.CastRange != -1 && def.CastRange <= 40)
 }
 
 // applyBlowEffects applies a BLOW skill's target effect list to obj after a
