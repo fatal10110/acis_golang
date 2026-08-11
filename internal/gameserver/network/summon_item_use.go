@@ -19,6 +19,7 @@ const SummonItemsHandler = "SummonItems"
 const (
 	summonItemTypeDecorative = 0
 	summonItemTypePet        = 1
+	summonItemTypeWyvern     = 2
 )
 
 const (
@@ -55,6 +56,32 @@ func (l *GameClientLink) useSummonItem(live *livePlayer, inv *itemcontainer.Inve
 	}
 	if summonItem.SummonType == summonItemTypeDecorative {
 		return l.useDecorativeSummonItem(live, inv, inst, summonItem)
+	}
+	if summonItem.SummonType == summonItemTypeWyvern {
+		if !live.Character.Standing() {
+			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotMoveWhileSitting))
+			return true
+		}
+		if live.Character.AllSkillsDisabled() || live.Character.CastingNow() {
+			return true
+		}
+		if live.Character.MountType() != 0 || l.hasActiveSummon(live) {
+			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSummonOnlyOne))
+			return true
+		}
+		if live.Character.InCombat() {
+			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageYouCannotSummonInCombat))
+			return true
+		}
+		live.move.Stop()
+		if !live.Character.Mount(summonItem.NPCID, inst.ObjectID) {
+			return true
+		}
+		l.broadcastLiveFrame(live, func() wire.Frame {
+			return serverpackets.FrameRide(live.ObjectID(), summonItem.NPCID)
+		})
+		live.Character.UpdateUserInfo()
+		return true
 	}
 	if summonItem.SummonType != summonItemTypePet {
 		return false

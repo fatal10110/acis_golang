@@ -160,6 +160,9 @@ type Character struct {
 	inCombat             bool
 	autoSoulShots        map[int32]bool
 	flying               bool
+	mountType            int32
+	mountNPCID           int32
+	mountObjectID        int32
 	transformed          bool
 	operating            bool
 	fishing              bool

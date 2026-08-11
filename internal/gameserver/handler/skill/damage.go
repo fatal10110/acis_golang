@@ -2,6 +2,7 @@ package skill
 
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
+	modelitem "github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
@@ -32,6 +33,15 @@ type manaDamageTarget interface {
 	MPValue() float64
 	ReduceMP(float64) float64
 	ManaDamageInput(caster any, skill modelskill.Definition) (formulas.ManaDamageInput, bool)
+}
+
+type shotCharger interface {
+	SetChargedShot(modelitem.ShotKind, bool)
+}
+
+type chargedShotUser interface {
+	shotCharger
+	ChargedShot(modelitem.ShotKind) bool
 }
 
 type lethalTarget interface {
@@ -182,11 +192,11 @@ func applyMdamEffects(cast Cast, obj any) {
 	if effected == nil {
 		return
 	}
+	stopEffectsBySkillID(effected.EffectList(), cast.Skill.ID)
 	succeeded, ok := checkSkillSuccess(cast.Caster, effected, cast.Skill)
 	if !ok || !succeeded {
 		return
 	}
-	stopEffectsBySkillID(effected.EffectList(), cast.Skill.ID)
 	applyEffects(cast.Caster, effected, cast.Skill, cast.Skill.Effects)
 }
 
@@ -213,6 +223,9 @@ func (blowHandler) Use(cast Cast) {
 				target.ReduceHP(float64(damage), cast.Caster, cast.Skill)
 				applyBlowEffects(cast, obj)
 			}
+			if caster, ok := cast.Caster.(shotCharger); ok {
+				caster.SetChargedShot(modelitem.ShotSoul, cast.Skill.StaticReuse)
+			}
 		}
 		// Blow.java rolls the lethal chance unconditionally per target,
 		// outside the landing gate — a missed blow can still proc it.
@@ -235,11 +248,11 @@ func applyBlowEffects(cast Cast, obj any) {
 	if effected == nil {
 		return
 	}
+	stopEffectsBySkillID(effected.EffectList(), cast.Skill.ID)
 	succeeded, ok := checkSkillSuccessBSS(cast.Caster, effected, cast.Skill, true)
 	if !ok || !succeeded {
 		return
 	}
-	stopEffectsBySkillID(effected.EffectList(), cast.Skill.ID)
 	applyEffects(cast.Caster, effected, cast.Skill, cast.Skill.Effects)
 }
 
@@ -277,9 +290,9 @@ func (manaDamageHandler) Use(cast Cast) {
 			continue
 		}
 		if effected != nil && len(cast.Skill.Effects) > 0 {
+			stopEffectsBySkillID(effected.EffectList(), cast.Skill.ID)
 			succeeded, ok := checkSkillSuccess(cast.Caster, effected, cast.Skill)
 			if ok && succeeded {
-				stopEffectsBySkillID(effected.EffectList(), cast.Skill.ID)
 				applyEffects(cast.Caster, effected, cast.Skill, cast.Skill.Effects)
 			}
 		}
@@ -305,6 +318,13 @@ func (manaDamageHandler) Use(cast Cast) {
 		}
 	}
 	applySelfEffects(cast.Caster, cast.Skill)
+	if caster, ok := cast.Caster.(chargedShotUser); ok {
+		kind := modelitem.ShotSpirit
+		if caster.ChargedShot(modelitem.ShotBlessedSpirit) {
+			kind = modelitem.ShotBlessedSpirit
+		}
+		caster.SetChargedShot(kind, cast.Skill.StaticReuse)
+	}
 }
 
 func applyLethalHit(cast Cast, obj any) {
