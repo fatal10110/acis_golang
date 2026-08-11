@@ -15,6 +15,7 @@ import (
 // roll by default, and an opt-in reflect.
 type damageEffectFake struct {
 	*skillTarget
+	id                   int32
 	list                 *effect.List
 	successOK            bool
 	reflects             bool
@@ -57,6 +58,8 @@ func (d *damageEffectFake) SkillReflectInput(def modelskill.Definition) formulas
 }
 
 func (d *damageEffectFake) CounterSkillPhysical() float64 { return d.counterSkillPhysical }
+
+func (d *damageEffectFake) ObjectID() int32 { return d.id }
 
 func targetEffect() []modelskill.EffectTemplate {
 	return []modelskill.EffectTemplate{{Name: "Buff", Time: 600}}
@@ -279,6 +282,34 @@ func TestBlowCounterSkillDamagesCasterInsteadOfTarget(t *testing.T) {
 	}
 	if got := target.hp; got != 2000 {
 		t.Fatalf("countered BLOW target hp = %v, want unchanged 2000", got)
+	}
+}
+
+func TestBlowCounterSkillReportsCounterattackParticipants(t *testing.T) {
+	registry := NewDefaultRegistry()
+	caster := newDamageEffectFake()
+	caster.id, caster.hp = 1, 2000
+	target := newDamageEffectFake()
+	target.id, target.hp = 2, 2000
+	target.counterSkillPhysical = 50
+	target.blowOK = true
+	target.blowInput = formulas.BlowInput{
+		AttackPower: 100, SkillPower: 50, Defence: 40,
+		RandomMul: 1, PosMul: 1.2,
+		CritDamageMul: 1.5, CritDamagePosMul: 1, CritVulnMul: 1, DaggerVulnMul: 1, CritDamageAddBase: 5,
+		Landed: true,
+	}
+
+	result, ok := registry.UseResult(Cast{
+		Caster:  caster,
+		Skill:   modelskill.Definition{ID: 409, SkillType: "BLOW", CanBeReflected: true},
+		Targets: []any{target},
+	})
+	if !ok {
+		t.Fatal("UseResult() handled = false, want true")
+	}
+	if got := result.Counterattacks; len(got) != 1 || got[0].AttackerID != caster.id || got[0].DefenderID != target.id {
+		t.Fatalf("Counterattacks = %+v, want caster and target IDs", got)
 	}
 }
 

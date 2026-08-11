@@ -41,8 +41,7 @@ func TestGameClientLinkSendsCounterattackFeedbackToPlayerParticipants(t *testing
 
 	link.sendSkillHandlerResult(attacker, actorcast.EffectResult{
 		Counterattacks: []handlerskill.Counterattack{{
-			AttackerID: attacker.ObjectID(), AttackerName: attacker.Name,
-			DefenderID: defender.ObjectID(), DefenderName: defender.Name,
+			AttackerID: attacker.ObjectID(), DefenderID: defender.ObjectID(),
 		}},
 		AttackFailed: 1,
 	})
