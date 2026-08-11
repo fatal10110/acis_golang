@@ -1,6 +1,8 @@
 package player
 
 import (
+	"strings"
+
 	"github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -69,7 +71,14 @@ func (c *Character) SkillSuccessInput(caster any, def modelskill.Definition, bss
 }
 
 func (c *Character) EffectSuccessInput(caster any, def modelskill.Definition, tmpl modelskill.EffectTemplate, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
+	if tmpl.EffectType == "" {
+		return formulas.SkillSuccessInput{BaseChance: tmpl.EffectPower, IgnoreResists: true, Shield: shield}, true
+	}
+	if strings.EqualFold(tmpl.EffectType, "CANCEL") {
+		return formulas.SkillSuccessInput{BaseChance: 100, IgnoreResists: true, Shield: shield}, true
+	}
 	def.EffectType = tmpl.EffectType
+	def.IgnoreResists = false
 	in, ok := c.SkillSuccessInput(caster, def, bss, shield)
 	in.BaseChance = tmpl.EffectPower
 	return in, ok
