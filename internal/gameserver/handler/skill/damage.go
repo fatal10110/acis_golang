@@ -152,7 +152,7 @@ func applyPdamEffects(cast Cast, obj any, shield formulas.ShieldDefense) {
 		return
 	}
 	stopEffectsBySkillID(effected.EffectList(), cast.Skill.ID)
-	applyEffects(cast.Caster, effected, cast.Skill, cast.Skill.Effects)
+	applyEffectsWithLanding(cast.Caster, effected, cast.Skill, cast.Skill.Effects, shield, false)
 }
 
 type mdamHandler struct{}
@@ -175,7 +175,7 @@ func (mdamHandler) Use(cast Cast) {
 		damage := int(formulas.MagicDamage(in))
 		if damage > 0 {
 			target.ReduceHP(float64(damage), cast.Caster, cast.Skill)
-			applyMdamEffects(cast, obj)
+			applyMdamEffects(cast, obj, in.BlessedSoulShot)
 		}
 	}
 	applySelfEffects(cast.Caster, cast.Skill)
@@ -187,7 +187,7 @@ func (mdamHandler) Use(cast Cast) {
 // disablers.go's own reflect+landing-roll shape (checkSkillSuccess run
 // once against whichever side ends up effected) — a landing-rate roll
 // gates activation regardless of which side that is.
-func applyMdamEffects(cast Cast, obj any) {
+func applyMdamEffects(cast Cast, obj any, bss bool) {
 	if len(cast.Skill.Effects) == 0 {
 		return
 	}
@@ -204,7 +204,7 @@ func applyMdamEffects(cast Cast, obj any) {
 	if !ok || !succeeded {
 		return
 	}
-	applyEffects(cast.Caster, effected, cast.Skill, cast.Skill.Effects)
+	applyEffectsWithLanding(cast.Caster, effected, cast.Skill, cast.Skill.Effects, formulas.ShieldFailed, bss)
 }
 
 type blowHandler struct{}
@@ -282,7 +282,7 @@ func applyBlowEffects(cast Cast, obj any, shield formulas.ShieldDefense) {
 	if !ok || !succeeded {
 		return
 	}
-	applyEffects(cast.Caster, effected, cast.Skill, cast.Skill.Effects)
+	applyEffectsWithLanding(cast.Caster, effected, cast.Skill, cast.Skill.Effects, shield, false)
 }
 
 type manaDamageHandler struct{}

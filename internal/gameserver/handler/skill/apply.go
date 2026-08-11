@@ -1,14 +1,20 @@
 package skill
 
 import (
+	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 )
 
 // effectListTarget is implemented by anything that owns a live effect list:
 // a target an effect-applying or effect-cancelling skill can act on.
 type effectListTarget interface {
 	EffectList() *effect.List
+}
+
+type effectSuccessSource interface {
+	EffectSuccessInput(any, modelskill.Definition, modelskill.EffectTemplate, bool, formulas.ShieldDefense) (formulas.SkillSuccessInput, bool)
 }
 
 // applyEffects instantiates each of templates and adds it to effected's
@@ -18,6 +24,10 @@ type effectListTarget interface {
 // failing the whole batch, matching how partially-modeled skill data
 // degrades elsewhere in this package.
 func applyEffects(effector, effected any, def modelskill.Definition, templates []modelskill.EffectTemplate) {
+	applyEffectsWithLanding(effector, effected, def, templates, formulas.ShieldFailed, false)
+}
+
+func applyEffectsWithLanding(effector, effected any, def modelskill.Definition, templates []modelskill.EffectTemplate, shield formulas.ShieldDefense, bss bool) {
 	if len(templates) == 0 {
 		return
 	}
@@ -31,7 +41,17 @@ func applyEffects(effector, effected any, def modelskill.Definition, templates [
 	}
 
 	meta := effect.SkillFromDefinition(def)
+	if shield == formulas.ShieldPerfect {
+		return
+	}
+	source, canRoll := effected.(effectSuccessSource)
 	for _, tmpl := range templates {
+		if tmpl.EffectPowerSet && tmpl.EffectPower >= 0 && canRoll {
+			in, ok := source.EffectSuccessInput(effector, def, tmpl, bss, shield)
+			if !ok || !formulas.SkillSucceeds(formulas.SkillSuccessRate(in), rnd.Get(100)) {
+				continue
+			}
+		}
 		e, err := effect.New(meta, tmpl)
 		if err != nil {
 			continue

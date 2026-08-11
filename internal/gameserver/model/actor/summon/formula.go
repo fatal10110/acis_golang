@@ -537,6 +537,13 @@ func (a *Actor) SkillSuccessInput(caster any, def modelskill.Definition, bss boo
 	return creature.ResolveSkillSuccessInput(caster, a, def, bss, shield)
 }
 
+func (a *Actor) EffectSuccessInput(caster any, def modelskill.Definition, tmpl modelskill.EffectTemplate, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
+	def.EffectType = tmpl.EffectType
+	in, ok := a.SkillSuccessInput(caster, def, bss, shield)
+	in.BaseChance = tmpl.EffectPower
+	return in, ok
+}
+
 func defaultInt(value, fallback int) int {
 	if value > 0 {
 		return value

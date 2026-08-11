@@ -5,7 +5,40 @@ import (
 
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 )
+
+type effectLandingFake struct {
+	list *effect.List
+}
+
+func (f *effectLandingFake) EffectList() *effect.List { return f.list }
+
+func (*effectLandingFake) EffectSuccessInput(_ any, _ modelskill.Definition, tmpl modelskill.EffectTemplate, _ bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
+	return formulas.SkillSuccessInput{BaseChance: tmpl.EffectPower, IgnoreResists: true, Shield: shield}, true
+}
+
+func TestApplyEffectsRollsEachConfiguredTemplate(t *testing.T) {
+	target := &effectLandingFake{list: effect.NewList(nil)}
+	templates := []modelskill.EffectTemplate{
+		{Name: "Buff", Time: 60, EffectPower: 100, EffectPowerSet: true},
+		{Name: "Buff", Time: 60, EffectPower: 0, EffectPowerSet: true},
+	}
+	applyEffects(nil, target, modelskill.Definition{}, templates)
+
+	if got := len(target.list.All()); got != 1 {
+		t.Fatalf("landed effects = %d, want 1", got)
+	}
+}
+
+func TestApplyEffectsRejectsPerfectShieldBeforeTemplates(t *testing.T) {
+	target := &effectLandingFake{list: effect.NewList(nil)}
+	applyEffectsWithLanding(nil, target, modelskill.Definition{}, []modelskill.EffectTemplate{{Name: "Buff", Time: 60, EffectPower: 100, EffectPowerSet: true}}, formulas.ShieldPerfect, false)
+
+	if got := len(target.list.All()); got != 0 {
+		t.Fatalf("landed effects after perfect shield = %d, want 0", got)
+	}
+}
 
 func TestActiveEffectFindsAMatchingLiveInstance(t *testing.T) {
 	target := newCancelFakeActor(10)
