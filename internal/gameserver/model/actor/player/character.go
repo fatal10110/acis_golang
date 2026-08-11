@@ -192,9 +192,10 @@ type Character struct {
 	// charges is the Force/Soul charge counter (increaseCharges/
 	// decreaseCharges/clearCharges), auto-cleared by chargeTimer after
 	// chargeAutoClearDelay of inactivity.
-	charges       int
-	chargeTimer   *time.Timer
-	updateCharges func()
+	charges           int
+	chargeTimer       *time.Timer
+	updateCharges     func()
+	sendChargeMessage func(charges int, maxed bool)
 
 	// deathPenaltyLevel is the persisted death-penalty debuff level (skill
 	// 5076), capped at maxDeathPenaltyLevel.

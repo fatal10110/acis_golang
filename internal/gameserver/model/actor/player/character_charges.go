@@ -21,16 +21,27 @@ func (c *Character) Charges() int {
 func (c *Character) IncreaseCharges(count, max int) bool {
 	c.stateMu.Lock()
 	if c.charges >= max {
+		send := c.sendChargeMessage
+		charges := c.charges
 		c.stateMu.Unlock()
+		if send != nil {
+			send(charges, true)
+		}
 		return false
 	}
 	c.charges += count
-	if c.charges > max {
+	maxed := c.charges >= max
+	if maxed {
 		c.charges = max
 	}
 	c.restartChargeTimerLocked()
 	update := c.updateCharges
+	send := c.sendChargeMessage
+	charges := c.charges
 	c.stateMu.Unlock()
+	if send != nil {
+		send(charges, maxed)
+	}
 	if update != nil {
 		update()
 	}
@@ -42,6 +53,14 @@ func (c *Character) SetChargesUpdater(update func()) {
 	c.stateMu.Lock()
 	defer c.stateMu.Unlock()
 	c.updateCharges = update
+}
+
+// SetChargeMessageSender records the packet-layer hook that reports Force/Soul
+// charge changes and the maximum-capacity outcome to the owning client.
+func (c *Character) SetChargeMessageSender(send func(charges int, maxed bool)) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	c.sendChargeMessage = send
 }
 
 // DecreaseCharges removes count charges, reporting whether there were

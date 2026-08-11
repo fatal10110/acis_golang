@@ -49,6 +49,8 @@ const (
 	SystemMessageLearnedSkill                     = 277
 	SystemMessageNotEnoughSPToLearnSkill          = 278
 	SystemMessageSelectItemToEnchant              = 303
+	SystemMessageForceIncreasedToS1               = 323
+	SystemMessageForceMaxLevelReached             = 324
 	SystemMessageNotEnoughItems                   = 351
 	SystemMessageInappropriateEnchantCondition    = 355
 	SystemMessageEnchantScrollCancelled           = 423
