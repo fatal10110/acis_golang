@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	itemhandler "github.com/fatal10110/acis_golang/internal/gameserver/handler/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -235,6 +236,24 @@ func TestGameClientLinkUseHealingPotionRejectsFlyingCondition(t *testing.T) {
 	if effects := live.EffectList().All(); len(effects) != 0 {
 		t.Fatalf("flying-condition rejection installed effects = %+v, want none", effects)
 	}
+}
+
+func TestSendItemSkillConditionFailureAddsSkillName(t *testing.T) {
+	capture := &frameCapture{}
+	live := newTestLivePlayer(t, 7, capture)
+
+	sendItemSkillConditionFailure(live, itemhandler.UseResult{
+		Skill: modelskill.Definition{ID: 2278, Level: 1},
+		Condition: modelskill.ConditionClause{
+			MessageID: serverpackets.SystemMessageS1CannotBeUsed,
+			AddName:   true,
+		},
+	})
+
+	if len(capture.frames) != 1 {
+		t.Fatalf("frames = %d, want 1", len(capture.frames))
+	}
+	assertSystemMessageSkillFrame(t, capture.frames[0], serverpackets.SystemMessageS1CannotBeUsed, 2278, 1)
 }
 
 // TestGameClientLinkUsePotionNotEnoughItemsSendsNotEnoughItems verifies a
