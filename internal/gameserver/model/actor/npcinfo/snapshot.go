@@ -15,6 +15,8 @@ type Snapshot struct {
 	RightHand, Chest, LeftHand   int
 	Running, InCombat, AlikeDead bool
 	SummonAnimation              int
+	Summon                       bool
+	PvpFlag, Karma               int
 	AbnormalEffect               int
 	ClanID, ClanCrest            int
 	AllyID, AllyCrest            int
