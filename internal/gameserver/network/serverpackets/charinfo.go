@@ -81,8 +81,13 @@ func writeCharInfo(w *wire.Writer, s CharInfoSnapshot) error {
 	w.WriteInt32(swimSpd)
 	w.WriteInt32(runSpd)
 	w.WriteInt32(walkSpd)
-	w.WriteInt32(0) // flying run speed
-	w.WriteInt32(0) // flying walk speed
+	if c.Flying() {
+		w.WriteInt32(runSpd)
+		w.WriteInt32(walkSpd)
+	} else {
+		w.WriteInt32(0)
+		w.WriteInt32(0)
+	}
 
 	w.WriteFloat64(1)
 	w.WriteFloat64(1)
@@ -103,7 +108,7 @@ func writeCharInfo(w *wire.Writer, s CharInfoSnapshot) error {
 	w.WriteUint8(boolUint8(c.InCombat()))
 	w.WriteUint8(boolUint8(c.AlikeDead()))
 	w.WriteUint8(0) // invisible
-	w.WriteUint8(0) // mount type
+	w.WriteUint8(uint8(c.MountType()))
 	w.WriteUint8(0) // private store/craft mode
 	cubicIDs := c.CubicIDs()
 	count, err := wire.Uint16Count(len(cubicIDs))

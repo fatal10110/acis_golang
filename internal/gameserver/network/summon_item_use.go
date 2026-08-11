@@ -19,6 +19,7 @@ const SummonItemsHandler = "SummonItems"
 const (
 	summonItemTypeDecorative = 0
 	summonItemTypePet        = 1
+	summonItemTypeWyvern     = 2
 )
 
 const (
@@ -55,6 +56,17 @@ func (l *GameClientLink) useSummonItem(live *livePlayer, inv *itemcontainer.Inve
 	}
 	if summonItem.SummonType == summonItemTypeDecorative {
 		return l.useDecorativeSummonItem(live, inv, inst, summonItem)
+	}
+	if summonItem.SummonType == summonItemTypeWyvern {
+		live.move.Stop()
+		if !live.Character.Mount(summonItem.NPCID, inst.ObjectID) {
+			return true
+		}
+		l.broadcastLiveFrame(live, func() wire.Frame {
+			return serverpackets.FrameRide(live.ObjectID(), summonItem.NPCID)
+		})
+		live.Character.UpdateUserInfo()
+		return true
 	}
 	if summonItem.SummonType != summonItemTypePet {
 		return false

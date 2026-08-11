@@ -57,7 +57,10 @@ func (f *fakeSummonIDs) NextID() (int32, error) {
 	return f.next, nil
 }
 
-const summonTestCollarTemplateID = 91000
+const (
+	summonTestCollarTemplateID = 91000
+	summonTestWyvernTemplateID = 91001
+)
 
 func summonTestPetNPCTemplate() *npc.Template {
 	return &npc.Template{
@@ -83,6 +86,7 @@ func newSummonTestLink(t *testing.T) (*GameClientLink, *world.State) {
 	npcs := npc.NewTable([]*npc.Template{summonTestPetNPCTemplate()})
 	summonItems, err := item.NewSummonItemTable([]item.SummonItem{
 		{ItemID: summonTestCollarTemplateID, NPCID: 12500, SummonType: summonItemTypePet},
+		{ItemID: summonTestWyvernTemplateID, NPCID: 12621, SummonType: summonItemTypeWyvern},
 	})
 	if err != nil {
 		t.Fatalf("build summon item table: %v", err)
@@ -98,6 +102,36 @@ func newSummonTestLink(t *testing.T) (*GameClientLink, *world.State) {
 		ItemTemplates: testItemTemplates(),
 	})
 	return link, state
+}
+
+func TestUseSummonItemMountsWyvern(t *testing.T) {
+	link, state := newSummonTestLink(t)
+	frames := &frameCapture{}
+	live := newTestLivePlayer(t, 1, frames)
+	state.Spawn(live, 0, 0, 0, 0)
+	live.Character.SetUserInfoUpdater(func() {
+		live.SendFrame(serverpackets.FrameUserInfo(serverpackets.UserInfoSnapshot{Character: live.Character, Template: live.template}))
+	})
+	inst := &item.Instance{ObjectID: 501, TemplateID: summonTestWyvernTemplateID, OwnerID: live.ObjectID()}
+	live.Inventory().Restore([]*item.Instance{inst})
+
+	if !link.useSummonItem(live, live.Inventory(), inst) {
+		t.Fatal("useSummonItem returned false, want handled wyvern")
+	}
+	if got := live.Character.MountType(); got != 2 {
+		t.Fatalf("MountType() = %d, want 2", got)
+	}
+	if got := live.Character.MountObjectID(); got != inst.ObjectID {
+		t.Fatalf("MountObjectID() = %d, want %d", got, inst.ObjectID)
+	}
+	assertOpcodeSequence(t, frames.frames, serverpackets.OpcodeRide, serverpackets.OpcodeUserInfo)
+
+	frames.frames = nil
+	link.destroyLiveItem(live, inst.ObjectID, 1)
+	if got := live.Inventory().ItemByObjectID(inst.ObjectID); got == nil {
+		t.Fatal("destroying mounted control item removed it")
+	}
+	assertOpcodeSequence(t, frames.frames, serverpackets.OpcodeActionFailed)
 }
 
 // summonTestSkillTable registers SUMMON_CREATURE (2046,1) with a zero hit

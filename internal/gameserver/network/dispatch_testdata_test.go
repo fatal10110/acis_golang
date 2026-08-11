@@ -233,5 +233,13 @@ func testItemTemplates() *item.Table {
 			Destroyable: true,
 			EtcItem:     &item.EtcItemDetail{Handler: SummonItemsHandler},
 		},
+		{
+			ID:          91001,
+			Name:        "Wyvern Collar",
+			Kind:        item.KindEtcItem,
+			Duration:    -1,
+			Destroyable: true,
+			EtcItem:     &item.EtcItemDetail{Handler: SummonItemsHandler},
+		},
 	})
 }
