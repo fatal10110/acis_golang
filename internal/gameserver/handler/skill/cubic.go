@@ -2,6 +2,7 @@ package skill
 
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cubic"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
 // cubicSummoner is the narrow surface a cubic-granting SUMMON skill needs
@@ -10,12 +11,12 @@ type cubicSummoner interface {
 	AddOrRefreshCubic(id cubic.ID, givenByOther bool) (touched, added bool)
 }
 
-// cubicHandler applies the cubic branch of a SkillType.SUMMON cast: adding
-// or refreshing a cubic on the caster's cubic list, or on every targeted
-// player's for a mass-cubic skill. The servitor branch of the same skill
-// type (def.IsCubic false) is out of this handler's scope — tracked by
-// #960 — and is a silent no-op here, matching how an unregistered skill
-// type produces no effect elsewhere in this registry.
+type servitorSummoner interface {
+	SummonServitor(modelskill.Definition)
+}
+
+// cubicHandler applies either branch of a SkillType.SUMMON cast: a servitor
+// for non-cubic skills, or a cubic refresh for cubic skills.
 type cubicHandler struct{}
 
 func (cubicHandler) Types() []string { return []string{"SUMMON"} }
@@ -26,6 +27,9 @@ func (cubicHandler) Use(cast Cast) {
 
 func (cubicHandler) UseResult(cast Cast) Result {
 	if !cast.Skill.IsCubic {
+		if summoner, ok := cast.Caster.(servitorSummoner); ok {
+			summoner.SummonServitor(cast.Skill)
+		}
 		return Result{}
 	}
 	id := cubic.ID(cast.Skill.NpcID)

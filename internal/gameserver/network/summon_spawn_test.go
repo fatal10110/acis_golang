@@ -240,6 +240,37 @@ func TestGameSummonSpawnerSpawnPetRegistersLiveActor(t *testing.T) {
 	}
 }
 
+func TestGameSummonSpawnerSpawnServitorRegistersLiveActor(t *testing.T) {
+	link, state := newSummonTestLink(t)
+	link.npcs = npc.NewTable([]*npc.Template{{
+		ID: 14848, Name: "Cat", Level: 40,
+		STR: 40, CON: 43, DEX: 30, INT: 22, WIT: 20, MEN: 20,
+		BaseAttackRange: 40, CollisionRadius: 12.5,
+		Skills: map[int]int{1126: 1},
+	}})
+	live := newTestLivePlayer(t, 1, &frameCapture{})
+
+	spawner := &gameSummonSpawner{link: link, live: live}
+	if !spawner.SpawnServitor(live.Character, modelskill.Definition{NpcID: 14848}) {
+		t.Fatal("SpawnServitor returned false")
+	}
+
+	obj, ok := state.Summon(live.ObjectID())
+	if !ok {
+		t.Fatal("servitor not registered in world.State as the owner's active summon")
+	}
+	servitor, ok := obj.(*summon.Actor)
+	if !ok {
+		t.Fatalf("registered summon is %T, want *summon.Actor", obj)
+	}
+	if servitor.NPCID() != 14848 {
+		t.Fatalf("NPCID() = %d, want 14848", servitor.NPCID())
+	}
+	if got := servitor.CollisionRadius(); got != 12.5 {
+		t.Fatalf("CollisionRadius() = %v, want 12.5", got)
+	}
+}
+
 func TestGameSummonSpawnerSpawnPetRestoresSavedName(t *testing.T) {
 	link, state := newSummonTestLink(t)
 	link.petStore = fakePetStoreSaved{state: petmodel.State{
