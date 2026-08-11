@@ -64,11 +64,21 @@ func ResolvePhysicalSkillInput(caster any, target FormulaActor, def modelskill.D
 	if pvp {
 		pvpMul = attacker.CalcStat(stat.PvPPhysSkillDmg, 1)
 	}
+	crit := PhysicalSkillCrit(attacker, def)
+	shield := formulas.ShieldFailed
+	if resolver, ok := any(target).(shieldDefenseActor); ok {
+		shield = resolver.ShieldDefense(caster, def, crit)
+	}
+	defence := target.PDef()
+	if shield == formulas.ShieldSuccess {
+		defence += target.CalcStat(stat.ShieldDefence, 0)
+	}
 	return formulas.PhysicalSkillInput{
 		AttackPower:   attacker.PAtk(),
 		SkillPower:    skillPower,
-		Defence:       Positive(target.PDef()),
-		Crit:          PhysicalSkillCrit(attacker, def),
+		Defence:       Positive(defence),
+		Shield:        shield,
+		Crit:          crit,
 		SoulShot:      soulshot,
 		RandomMul:     RandomDamageMultiplier(attacker, def),
 		ElementalMul:  ElementalSkillModifier(target, def),

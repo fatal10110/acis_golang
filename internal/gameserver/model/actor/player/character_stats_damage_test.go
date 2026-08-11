@@ -161,6 +161,49 @@ func TestCharacterBlowInputCarriesShieldDefense(t *testing.T) {
 	}
 }
 
+func TestCharacterPhysicalSkillInputCarriesShieldDefense(t *testing.T) {
+	tmpl := combatTemplate()
+	items := shieldDefenseItems()
+	caster := liveCharacter(1, tmpl, items)
+	target := liveCharacter(2, tmpl, items, equippedShield())
+	caster.SetLastKnownPosition(location.Location{X: 80, Y: 0, Z: 0}, 0)
+	target.SetLastKnownPosition(location.Location{}, 0)
+	target.AddStatFuncs([]basefunc.Func{
+		basefunc.NewSet(target, stat.ShieldRate, 100, nil),
+		basefunc.NewSet(target, stat.ShieldDefenceAngle, 360, nil),
+		basefunc.NewSet(target, stat.ShieldDefence, 30, nil),
+	})
+
+	for _, tt := range []struct {
+		name    string
+		roll    int
+		shield  formulas.ShieldDefense
+		defence float64
+	}{
+		{"success", 10, formulas.ShieldSuccess, target.PDef() + target.CalcStat(stat.ShieldDefence, 0)},
+		{"perfect", 0, formulas.ShieldPerfect, target.PDef()},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			target.SetRollSource(func(n int) int {
+				if n != 100 {
+					t.Fatalf("shield roll bound = %d, want 100", n)
+				}
+				return tt.roll
+			})
+			in, ok := target.PhysicalSkillInput(caster, modelskill.Definition{SkillType: "PDAM"})
+			if !ok {
+				t.Fatal("PhysicalSkillInput() ok = false")
+			}
+			if in.Shield != tt.shield {
+				t.Fatalf("PhysicalSkillInput shield = %v, want %v", in.Shield, tt.shield)
+			}
+			if !closeFloat(in.Defence, tt.defence) {
+				t.Fatalf("PhysicalSkillInput defence = %v, want %v", in.Defence, tt.defence)
+			}
+		})
+	}
+}
+
 func TestCharacterBlowInputSkipsShieldRollOnMiss(t *testing.T) {
 	tmpl := combatTemplate()
 	items := shieldDefenseItems()
