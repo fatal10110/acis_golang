@@ -80,6 +80,15 @@ func TestCubicHandlerMassCubicMarksOthersGivenByOther(t *testing.T) {
 	if !other.givenByOther[cubic.Storm] {
 		t.Fatal("other recipient's admission reported givenByOther=false, want true")
 	}
+	if got := result.CubicTargets; len(got) != 1 || got[0] != other {
+		t.Fatalf("CubicTargets = %v, want other", got)
+	}
+	if got := result.CubicAddedTargets; len(got) != 1 || got[0] != other {
+		t.Fatalf("CubicAddedTargets = %v, want other", got)
+	}
+	if result.CubicID != cubic.Storm {
+		t.Fatalf("CubicID = %d, want %d", result.CubicID, cubic.Storm)
+	}
 }
 
 func TestCubicHandlerRegisteredForSummonType(t *testing.T) {
