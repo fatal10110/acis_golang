@@ -20,6 +20,8 @@ func (p *livePlayer) Discover(obj world.Tracked) {
 		}))
 	case *npc.Hostile:
 		p.sendVisibilityFrame(serverpackets.FrameNPCInfo(o.NPCInfoSnapshot()))
+	case *npc.Decoration:
+		p.sendVisibilityFrame(serverpackets.FrameNPCInfo(o.NPCInfoSnapshot()))
 	case *summon.Actor:
 		// Only the owner gets PetInfo; a non-owner observer would get
 		// SummonInfo instead, which isn't ported yet (tracked separately —
