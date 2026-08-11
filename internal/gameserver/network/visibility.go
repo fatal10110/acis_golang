@@ -118,9 +118,11 @@ func summonInfoSnapshot(a *summon.Actor, npcs *npc.Table) (serverpackets.NPCInfo
 		return serverpackets.NPCInfoSnapshot{}, false
 	}
 	x, y, z := a.Position()
-	title := ""
+	title, pvpFlag, karma := "", 0, 0
 	if owner, ok := a.ActingPlayer().(*livePlayer); ok {
 		title = owner.Name
+		pvpFlag = int(owner.PvPFlagState())
+		karma = owner.Karma()
 	}
 	return serverpackets.NPCInfoSnapshot{
 		ObjectID: a.ObjectID(), TemplateID: tmpl.TemplateID,
@@ -130,7 +132,7 @@ func summonInfoSnapshot(a *summon.Actor, npcs *npc.Table) (serverpackets.NPCInfo
 		CollisionRadius: a.CollisionRadius(), CollisionHeight: tmpl.CollisionHeight,
 		Running: true, AlikeDead: a.AlikeDead(),
 		RightHand: tmpl.RightHand, LeftHand: tmpl.LeftHand,
-		Name: a.Name(), Title: title,
+		Name: a.Name(), Title: title, Summon: true, PvpFlag: pvpFlag, Karma: karma,
 	}, true
 }
 
