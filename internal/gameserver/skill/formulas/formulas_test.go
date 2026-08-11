@@ -196,6 +196,12 @@ func TestPhysicalSkillDamage(t *testing.T) {
 	if got := PhysicalSkillDamage(critSS); !almostEqual(got, 651.9333333333333) {
 		t.Errorf("crit+ss: PhysicalSkillDamage() = %v, want 651.9333333333333", got)
 	}
+
+	perfectBlock := noCrit
+	perfectBlock.Shield = ShieldPerfect
+	if got := PhysicalSkillDamage(perfectBlock); got != 1 {
+		t.Errorf("perfect-block: PhysicalSkillDamage() = %v, want 1", got)
+	}
 }
 
 func TestBlowDamage(t *testing.T) {
