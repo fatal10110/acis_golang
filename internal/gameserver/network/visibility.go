@@ -24,6 +24,7 @@ func (p *livePlayer) Discover(obj world.Tracked) {
 		p.sendVisibilityFrame(serverpackets.FrameNPCInfo(o.NPCInfoSnapshot()))
 	case *summon.Actor:
 		if o.OwnerID() == p.ObjectID() {
+			o.SetAbnormalEffectUpdater(func() { refreshSummonAbnormalEffect(o) })
 			if snap, ok := petInfoSnapshot(o, p, p.npcs); ok {
 				p.sendVisibilityFrame(serverpackets.FramePetInfo(snap))
 				if inv := o.PetInventory(); inv != nil {
@@ -58,6 +59,18 @@ func (p *livePlayer) Discover(obj world.Tracked) {
 	case staticObject:
 		p.sendVisibilityFrame(serverpackets.FrameStaticObjectInfo(o))
 	}
+}
+
+func refreshSummonAbnormalEffect(a *summon.Actor) {
+	a.ForEachKnown(func(obj world.Tracked) {
+		p, ok := obj.(*livePlayer)
+		if !ok || p.ObjectID() == a.OwnerID() {
+			return
+		}
+		if snap, ok := summonInfoSnapshot(a, p.npcs); ok {
+			p.sendVisibilityFrame(serverpackets.FrameNPCInfo(snap))
+		}
+	})
 }
 
 func (p *livePlayer) Forget(obj world.Tracked) {
@@ -133,6 +146,7 @@ func summonInfoSnapshot(a *summon.Actor, npcs *npc.Table) (serverpackets.NPCInfo
 		Running: true, AlikeDead: a.AlikeDead(),
 		RightHand: tmpl.RightHand, LeftHand: tmpl.LeftHand,
 		Name: a.Name(), Title: title, Summon: true, PvpFlag: pvpFlag, Karma: karma,
+		AbnormalEffect: a.AbnormalEffect(),
 	}, true
 }
 
