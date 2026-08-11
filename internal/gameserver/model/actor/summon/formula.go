@@ -522,6 +522,10 @@ func (a *Actor) BlowInput(caster any, def modelskill.Definition) (formulas.BlowI
 	return creature.ResolveBlowInput(caster, a, def, creature.Playable(caster) && a.Playable())
 }
 
+func (a *Actor) CounterSkillPhysical() float64 {
+	return a.CalcStat(stat.CounterSkillPhysical, 0)
+}
+
 // ManaDamageInput resolves the MP-damage formula input for a magic skill cast
 // by caster against a.
 func (a *Actor) ManaDamageInput(caster any, def modelskill.Definition) (formulas.ManaDamageInput, bool) {
