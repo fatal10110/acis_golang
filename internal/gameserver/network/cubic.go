@@ -15,6 +15,25 @@ import (
 // visible MagicSkillUse broadcast and its effect actually landing.
 const cubicCastDelay = 2 * time.Second
 
+func (l *GameClientLink) syncCubicTargets(caster *livePlayer, result actorcast.EffectResult, def modelskill.Definition) {
+	if result.CubicTouched {
+		l.syncCubicRuntime(caster, result.CubicID, def)
+	}
+	if result.CubicAdded {
+		l.broadcastCharacterInfo(caster)
+	}
+	for _, target := range result.CubicTargets {
+		if live, ok := target.(*livePlayer); ok {
+			l.syncCubicRuntime(live, result.CubicID, def)
+		}
+	}
+	for _, target := range result.CubicAddedTargets {
+		if live, ok := target.(*livePlayer); ok {
+			l.broadcastCharacterInfo(live)
+		}
+	}
+}
+
 // syncCubicRuntime (re)synchronizes live's live cubic runtime for id after a
 // SUMMON cubic cast touched its cubic list, matching
 // CubicList.addOrRefreshCubic: a brand new id gets a fresh Runtime (self-

@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cubic"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -739,6 +740,70 @@ func TestGameClientLinkMagicSkillUseAppliesAreaSkillToResolvedTargets(t *testing
 		return
 	}
 	t.Fatal("area cast did not send MagicSkillLaunched")
+}
+
+func TestGameClientLinkMagicSkillUseMassCubicRefreshesEachRecipient(t *testing.T) {
+	state := world.New()
+	casterFrames := &frameCapture{}
+	firstFrames := &frameCapture{}
+	secondFrames := &frameCapture{}
+	caster := newTestLivePlayer(t, 7, casterFrames)
+	first := newTestLivePlayer(t, 8, firstFrames)
+	second := newTestLivePlayer(t, 9, secondFrames)
+	state.Spawn(caster, 0, 0, 0, 0)
+	state.Spawn(first, 100, 0, 0, 0)
+	state.Spawn(second, 200, 0, 0, 0)
+	state.AddPlayer(caster)
+	state.AddPlayer(first)
+	state.AddPlayer(second)
+	caster.Character.SetSkillLevel(10, 1)
+	caster.SetTargetTracked(first)
+	first.KarmaPoints = 1
+	second.KarmaPoints = 1
+	casterFrames.frames = nil
+	firstFrames.frames = nil
+	secondFrames.frames = nil
+
+	clock := &fakeCubicClock{}
+	link := newCubicTestLink(t, clock, &attackStanceRecorder{}, modelskill.Definition{
+		ID: 10, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetArea,
+		Radius: 150, SkillType: "SUMMON", IsCubic: true, NpcID: int(cubic.Storm),
+		CubicActivationTime: 8, CubicActivationChance: 30, SummonTotalLifeTime: 1200000,
+		HitTime: 1, StaticHitTime: true, StaticReuse: true,
+	})
+	link.world = state
+	link.targets = skilltarget.NewRegistry(skilltarget.WorldKnown{State: state})
+
+	link.handleMagicSkillUse(caster, clientpackets.RequestMagicSkillUse{SkillID: 10})
+	var firstSent, secondSent, casterSent [][]byte
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		firstSent = firstFrames.snapshot()
+		secondSent = secondFrames.snapshot()
+		casterSent = casterFrames.snapshot()
+		if len(framesWithOpcode(firstSent, serverpackets.OpcodeUserInfo)) == 1 &&
+			len(framesWithOpcode(secondSent, serverpackets.OpcodeUserInfo)) == 1 &&
+			len(framesWithOpcode(casterSent, serverpackets.OpcodeCharInfo)) == 2 {
+			break
+		}
+		time.Sleep(time.Millisecond)
+	}
+
+	for _, recipient := range []struct {
+		name   string
+		live   *livePlayer
+		frames [][]byte
+	}{{"first", first, firstSent}, {"second", second, secondSent}} {
+		if ids := recipient.live.Character.CubicIDs(); len(ids) != 1 || ids[0] != int(cubic.Storm) {
+			t.Fatalf("%s cubic IDs = %v, want [%d]", recipient.name, ids, cubic.Storm)
+		}
+		if got := framesWithOpcode(recipient.frames, serverpackets.OpcodeUserInfo); len(got) != 1 {
+			t.Fatalf("%s UserInfo frames = %d, want 1", recipient.name, len(got))
+		}
+	}
+	if got := framesWithOpcode(casterSent, serverpackets.OpcodeCharInfo); len(got) != 2 {
+		t.Fatalf("caster CharInfo frames = %d, want 2 for the two cubic recipients", len(got))
+	}
 }
 
 func TestGameClientLinkMagicSkillUseDefersUntilAttackFinishes(t *testing.T) {

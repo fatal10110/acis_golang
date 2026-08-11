@@ -157,6 +157,7 @@ func (l *GameClientLink) useSummonItem(live *livePlayer, inv *itemcontainer.Inve
 			// other skill's Hit-phase effects.
 			result := actorcast.ApplyItemEffectsResult(actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers}, live.Character, target, def, inst)
 			sendSkillHandlerResult(live, result)
+			l.syncCubicTargets(live, result, def)
 		},
 		Failed: func(err error) {
 			sendMagicCastFailureReason(live, def, err)
