@@ -103,6 +103,12 @@ func TestMdamAppliesEffectsOnlyOnDamageAndLandingRoll(t *testing.T) {
 	if got := len(target.EffectList().All()); got != 1 {
 		t.Fatalf("MDAM effects with guaranteed landing roll = %d, want 1", got)
 	}
+
+	target.successOK = false
+	registry.Use(Cast{Caster: caster, Skill: def, Targets: []any{target}})
+	if got := len(target.EffectList().All()); got != 0 {
+		t.Fatalf("MDAM effects after resisted recast = %d, want 0", got)
+	}
 }
 
 func TestBlowAppliesEffectsWithForcedBlessedSpiritshotInput(t *testing.T) {
@@ -126,6 +132,12 @@ func TestBlowAppliesEffectsWithForcedBlessedSpiritshotInput(t *testing.T) {
 	}
 	if !target.lastBss {
 		t.Fatal("BLOW landing roll bss = false, want true (Blow.java hardcodes this input)")
+	}
+
+	target.successOK = false
+	registry.Use(Cast{Caster: caster, Skill: def, Targets: []any{target}})
+	if got := len(target.EffectList().All()); got != 0 {
+		t.Fatalf("BLOW effects after resisted recast = %d, want 0", got)
 	}
 }
 
