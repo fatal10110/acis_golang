@@ -51,7 +51,7 @@ const (
 // UserInfoSnapshot is everything UserInfo needs about one character at the
 // moment of encoding. It is deliberately narrower than the client's full
 // field list: systems this server hasn't built yet (clans,
-// hero/noble status, mounts, fishing, recommendations, and the
+// hero/noble status, fishing, recommendations, and the
 // formula-derived combat stats — attack/cast speed, evasion, accuracy,
 // critical rate) always report their at-rest default, matching a freshly
 // entered character that has none of them. Base P.Atk/P.Def/M.Atk/M.Def come
@@ -179,8 +179,13 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) error {
 	w.WriteInt32(swimSpd)
 	w.WriteInt32(0)
 	w.WriteInt32(0)
-	w.WriteInt32(0) // flying run speed: flight is not modeled
-	w.WriteInt32(0) // flying walk speed: flight is not modeled
+	if c.Flying() {
+		w.WriteInt32(runSpd)
+		w.WriteInt32(walkSpd)
+	} else {
+		w.WriteInt32(0)
+		w.WriteInt32(0)
+	}
 
 	w.WriteFloat64(1) // movement speed multiplier: no active haste/slow effect
 	w.WriteFloat64(1) // attack speed multiplier: no active haste/slow effect
@@ -199,7 +204,7 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) error {
 	w.WriteInt32(0) // ally id: clans are not modeled
 	w.WriteInt32(0) // ally crest id: clans are not modeled
 	w.WriteInt32(0) // relation flags: clan leadership/siege state is not modeled
-	w.WriteUint8(0) // mount type: mounts are not modeled
+	w.WriteUint8(uint8(c.MountType()))
 	w.WriteUint8(0) // operate type: shops/crafting are not modeled
 	w.WriteUint8(0) // crystallize flag: not modeled
 
@@ -222,7 +227,7 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) error {
 	w.WriteInt32(0)  // clan privileges: clans are not modeled
 	w.WriteUint16(0) // recommendations left: recommendations are not modeled
 	w.WriteUint16(0) // recommendations received: recommendations are not modeled
-	w.WriteInt32(0)  // mount npc id: mounts are not modeled
+	w.WriteInt32(c.MountNPCID())
 	w.WriteUint16(uint16(inventoryLimit))
 	w.WriteInt32(int32(c.ClassID))
 	w.WriteInt32(0)
