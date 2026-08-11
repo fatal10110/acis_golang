@@ -15,11 +15,12 @@ import (
 // roll by default, and an opt-in reflect.
 type damageEffectFake struct {
 	*skillTarget
-	list       *effect.List
-	successOK  bool
-	reflects   bool
-	lastBss    bool
-	lastShield formulas.ShieldDefense
+	list                 *effect.List
+	successOK            bool
+	reflects             bool
+	counterSkillPhysical float64
+	lastBss              bool
+	lastShield           formulas.ShieldDefense
 }
 
 func newDamageEffectFake() *damageEffectFake {
@@ -54,6 +55,8 @@ func (d *damageEffectFake) SkillReflectInput(def modelskill.Definition) formulas
 	}
 	return formulas.SkillReflectInput{}
 }
+
+func (d *damageEffectFake) CounterSkillPhysical() float64 { return d.counterSkillPhysical }
 
 func targetEffect() []modelskill.EffectTemplate {
 	return []modelskill.EffectTemplate{{Name: "Buff", Time: 600}}
@@ -225,6 +228,36 @@ func TestBlowMissSkipsDamageAndEffects(t *testing.T) {
 	}
 	if got := len(target.EffectList().All()); got != 0 {
 		t.Fatalf("BLOW miss effects = %d, want 0", got)
+	}
+}
+
+func TestBlowCounterSkillDamagesCasterInsteadOfTarget(t *testing.T) {
+	registry := NewDefaultRegistry()
+	caster := newDamageEffectFake()
+	caster.hp = 2000
+	target := newDamageEffectFake()
+	target.hp = 2000
+	target.counterSkillPhysical = 50
+	target.blowOK = true
+	target.blowInput = formulas.BlowInput{
+		AttackPower: 100, SkillPower: 50, Defence: 40,
+		RandomMul: 1, PosMul: 1.2,
+		CritDamageMul: 1.5, CritDamagePosMul: 1, CritVulnMul: 1, DaggerVulnMul: 1, CritDamageAddBase: 5,
+		Landed: true,
+	}
+
+	registry.Use(Cast{
+		Caster:  caster,
+		Skill:   modelskill.Definition{ID: 409, SkillType: "BLOW", CanBeReflected: true},
+		Targets: []any{target},
+	})
+
+	wantDamage := float64(int(formulas.BlowDamage(target.blowInput))) * .5
+	if got := caster.hp; got != 2000-wantDamage {
+		t.Fatalf("countered BLOW caster hp = %v, want %v", got, 2000-wantDamage)
+	}
+	if got := target.hp; got != 2000 {
+		t.Fatalf("countered BLOW target hp = %v, want unchanged 2000", got)
 	}
 }
 
