@@ -2,6 +2,7 @@ package summon
 
 import (
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
@@ -108,6 +109,10 @@ type Actor struct {
 	statCalc summonStatCalcs
 	vitals   summonVitals
 	effects  *effect.List
+
+	abnormalEffect   atomic.Int32
+	abnormalMu       sync.RWMutex
+	onAbnormalUpdate func()
 
 	shotsMu        sync.Mutex
 	shotsMask      int32
