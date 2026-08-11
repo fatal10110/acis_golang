@@ -62,6 +62,17 @@ func (l *GameClientLink) useSummonItem(live *livePlayer, inv *itemcontainer.Inve
 			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotMoveWhileSitting))
 			return true
 		}
+		if live.Character.AllSkillsDisabled() || live.Character.CastingNow() {
+			return true
+		}
+		if live.Character.MountType() != 0 || l.hasActiveSummon(live) {
+			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSummonOnlyOne))
+			return true
+		}
+		if live.Character.InCombat() {
+			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageYouCannotSummonInCombat))
+			return true
+		}
 		live.move.Stop()
 		if !live.Character.Mount(summonItem.NPCID, inst.ObjectID) {
 			return true

@@ -151,6 +151,44 @@ func TestUseSummonItemRejectsWyvernWhileSitting(t *testing.T) {
 	assertOpcodeSequence(t, frames.frames, serverpackets.OpcodeSystemMessage)
 }
 
+func TestUseSummonItemRejectsWyvernInCombat(t *testing.T) {
+	link, _ := newSummonTestLink(t)
+	frames := &frameCapture{}
+	live := newTestLivePlayer(t, 1, frames)
+	live.Character.SetInCombat(true)
+	inst := &item.Instance{ObjectID: 503, TemplateID: summonTestWyvernTemplateID, OwnerID: live.ObjectID(), Count: 1, Location: item.LocationInventory}
+	live.Inventory().Restore([]*item.Instance{inst})
+
+	if !link.useSummonItem(live, live.Inventory(), inst) {
+		t.Fatal("useSummonItem returned false, want handled rejection")
+	}
+	if got := live.Character.MountType(); got != 0 {
+		t.Fatalf("MountType() = %d, want 0", got)
+	}
+	assertOpcodeSequence(t, frames.frames, serverpackets.OpcodeSystemMessage)
+}
+
+func TestUseSummonItemRejectsSecondWyvern(t *testing.T) {
+	link, state := newSummonTestLink(t)
+	frames := &frameCapture{}
+	live := newTestLivePlayer(t, 1, frames)
+	state.Spawn(live, 0, 0, 0, 0)
+	first := &item.Instance{ObjectID: 504, TemplateID: summonTestWyvernTemplateID, OwnerID: live.ObjectID(), Count: 1, Location: item.LocationInventory}
+	second := &item.Instance{ObjectID: 505, TemplateID: summonTestWyvernTemplateID, OwnerID: live.ObjectID(), Count: 1, Location: item.LocationInventory}
+	live.Inventory().Restore([]*item.Instance{first, second})
+	if !live.Character.Mount(12621, first.ObjectID) {
+		t.Fatal("Mount() = false, want true")
+	}
+
+	if !link.useSummonItem(live, live.Inventory(), second) {
+		t.Fatal("useSummonItem returned false, want handled rejection")
+	}
+	if got := live.Character.MountObjectID(); got != first.ObjectID {
+		t.Fatalf("MountObjectID() = %d, want %d", got, first.ObjectID)
+	}
+	assertOpcodeSequence(t, frames.frames, serverpackets.OpcodeSystemMessage)
+}
+
 // summonTestSkillTable registers SUMMON_CREATURE (2046,1) with a zero hit
 // time so a test can drive its Launch/Hit phases synchronously without a
 // fake clock, mirroring itemAICastSkillTable's TELEPORT fixture.
