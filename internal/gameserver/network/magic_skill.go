@@ -102,12 +102,24 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 		return
 	}
 
-	targetIDs := []int32{target.ObjectID()}
 	controller.Schedule(plan, actorcast.Hooks{
 		Launch: func() bool {
 			if reason := actorcast.RevalidateLaunch(live.Character, target, def); reason != actorcast.LaunchAbortNone {
 				sendLaunchAbort(live, reason)
 				return false
+			}
+			handler, ok := l.targets.Handler(def.Target)
+			if !ok {
+				return false
+			}
+			resolvedTarget, ok := target.(skilltarget.Creature)
+			if !ok {
+				return false
+			}
+			affected := handler.Targets(live.Character, resolvedTarget, &def)
+			targetIDs := make([]int32, 0, len(affected))
+			for _, affectedTarget := range affected {
+				targetIDs = append(targetIDs, affectedTarget.ObjectID())
 			}
 			l.broadcastLiveFrame(live, func() wire.Frame {
 				return serverpackets.FrameMagicSkillLaunched(live.ObjectID(), int32(def.ID), int32(def.Level), targetIDs)
