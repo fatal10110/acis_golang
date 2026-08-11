@@ -5,6 +5,7 @@ import (
 
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
@@ -172,6 +173,20 @@ func TestRevalidateLaunchPeaceZone(t *testing.T) {
 		t.Fatalf("RevalidateLaunch(target in peace zone) = %v, want LaunchAbortTargetPeaceZone", got)
 	}
 }
+
+func TestRevalidateLaunchSummonTargetInPeaceZone(t *testing.T) {
+	caster := &launchActor{id: 1, knows: true, sees: true, category: skilltarget.CategoryPlayable}
+	target := summon.NewPet(summon.PetConfig{ObjectID: 2})
+	target.SetZones(launchZoneQuery(true))
+
+	if got := RevalidateLaunch(caster, target, modelskill.Definition{Offensive: true}); got != LaunchAbortTargetPeaceZone {
+		t.Fatalf("RevalidateLaunch(summon target in peace zone) = %v, want LaunchAbortTargetPeaceZone", got)
+	}
+}
+
+type launchZoneQuery bool
+
+func (q launchZoneQuery) EffectRangeInPeaceZone(_, _, _, _, _, _ int) bool { return bool(q) }
 
 func TestRevalidateLaunchPeaceZoneOnlyGatesOffensivePlayableVsPlayable(t *testing.T) {
 	caster := &launchActor{id: 1, knows: true, sees: true, category: skilltarget.CategoryPlayable, inPeaceZone: true}

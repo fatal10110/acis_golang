@@ -52,6 +52,7 @@ type Actor struct {
 	world   *world.State
 	isPet   bool
 	npcID   int
+	radius  float64
 	passive bool
 
 	// statusMu guards level, name, fed, belowUnsummonLimit, and lifetime:
@@ -73,6 +74,7 @@ type Actor struct {
 	// it, used by TryUseSkill to resolve an owner-commanded action-bar
 	// skill shortcut, matching Java's Summon.getSkill.
 	skills map[int]int
+	zones  peaceZoneQuery
 
 	followActive       bool
 	belowUnsummonLimit bool
@@ -193,17 +195,18 @@ type PetTickResult struct {
 
 // PetConfig carries the minimum state needed to create a live pet.
 type PetConfig struct {
-	ObjectID      int32
-	Owner         Owner
-	ControlItemID int32
-	NPCID         int
-	Name          string
-	Level         int
-	Exp           int64
-	SP            int
-	CON           int
-	Passive       bool
-	Config        *petmodel.Config
+	ObjectID        int32
+	Owner           Owner
+	ControlItemID   int32
+	NPCID           int
+	CollisionRadius float64
+	Name            string
+	Level           int
+	Exp             int64
+	SP              int
+	CON             int
+	Passive         bool
+	Config          *petmodel.Config
 
 	Inventory     *itemcontainer.Inventory
 	Fed           int
@@ -225,12 +228,13 @@ type PetConfig struct {
 
 // ServitorConfig carries the minimum state needed to create a live servitor.
 type ServitorConfig struct {
-	ObjectID int32
-	Owner    Owner
-	NPCID    int
-	Name     string
-	Level    int
-	Passive  bool
+	ObjectID        int32
+	Owner           Owner
+	NPCID           int
+	CollisionRadius float64
+	Name            string
+	Level           int
+	Passive         bool
 
 	OwnerInventory   *itemcontainer.Inventory
 	Lifetime         LifetimeState
@@ -252,6 +256,7 @@ func NewServitor(cfg ServitorConfig) *Actor {
 		owner:            cfg.Owner,
 		level:            cfg.Level,
 		npcID:            cfg.NPCID,
+		radius:           cfg.CollisionRadius,
 		name:             cfg.Name,
 		passive:          cfg.Passive,
 		followActive:     true,
@@ -285,6 +290,7 @@ func NewPet(cfg PetConfig) *Actor {
 		level:         cfg.Level,
 		isPet:         true,
 		npcID:         cfg.NPCID,
+		radius:        cfg.CollisionRadius,
 		name:          cfg.Name,
 		passive:       cfg.Passive,
 		followActive:  true,

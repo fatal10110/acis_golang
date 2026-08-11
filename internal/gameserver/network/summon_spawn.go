@@ -116,26 +116,27 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 	}
 
 	pet := link.newPet(summon.PetConfig{
-		ObjectID:      objID,
-		Owner:         live,
-		ControlItemID: controlItem.ObjectID,
-		NPCID:         int(summonItem.NPCID),
-		Name:          name,
-		Level:         level,
-		Exp:           state.Exp,
-		SP:            state.SP,
-		CON:           npcTmpl.CON,
-		Config:        nil, // set by newPet from link.petConfig
-		Inventory:     itemcontainer.NewPetInventory(objID, live.Inventory().Templates()),
-		Fed:           fed,
-		MaxMeal:       levelStats.MaxMeal,
-		MealInNormal:  levelStats.MealInNormal,
-		MealInBattle:  levelStats.MealInBattle,
-		Food1:         int32(npcTmpl.Pet.Food1),
-		Food2:         int32(npcTmpl.Pet.Food2),
-		AutoFeedLimit: npcTmpl.Pet.AutoFeedLimit,
-		HungryLimit:   npcTmpl.Pet.HungryLimit,
-		UnsummonLimit: npcTmpl.Pet.UnsummonLimit,
+		ObjectID:        objID,
+		Owner:           live,
+		ControlItemID:   controlItem.ObjectID,
+		NPCID:           int(summonItem.NPCID),
+		CollisionRadius: npcTmpl.CollisionRadius,
+		Name:            name,
+		Level:           level,
+		Exp:             state.Exp,
+		SP:              state.SP,
+		CON:             npcTmpl.CON,
+		Config:          nil, // set by newPet from link.petConfig
+		Inventory:       itemcontainer.NewPetInventory(objID, live.Inventory().Templates()),
+		Fed:             fed,
+		MaxMeal:         levelStats.MaxMeal,
+		MealInNormal:    levelStats.MealInNormal,
+		MealInBattle:    levelStats.MealInBattle,
+		Food1:           int32(npcTmpl.Pet.Food1),
+		Food2:           int32(npcTmpl.Pet.Food2),
+		AutoFeedLimit:   npcTmpl.Pet.AutoFeedLimit,
+		HungryLimit:     npcTmpl.Pet.HungryLimit,
+		UnsummonLimit:   npcTmpl.Pet.UnsummonLimit,
 		Stats: summon.CombatStats{
 			STR: npcTmpl.STR, CON: npcTmpl.CON, DEX: npcTmpl.DEX,
 			INT: npcTmpl.INT, WIT: npcTmpl.WIT, MEN: npcTmpl.MEN,
@@ -147,6 +148,7 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 		},
 		Skills: npcTmpl.Skills,
 	})
+	pet.SetZones(link.zones)
 	pet.SetHP(curHP)
 	// Java's Servitor/Pet construction sets max HP/MP before restoring
 	// saved current values (Pet.java:552-556); NewPet already seeds

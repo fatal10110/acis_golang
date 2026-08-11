@@ -3,6 +3,7 @@ package skill
 import (
 	"testing"
 
+	modelitem "github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
@@ -23,6 +24,20 @@ type damageEffectFake struct {
 
 func newDamageEffectFake() *damageEffectFake {
 	return &damageEffectFake{skillTarget: &skillTarget{}, list: effect.NewList(nil), successOK: true}
+}
+
+type shotCaster struct {
+	*damageEffectFake
+	charged map[modelitem.ShotKind]bool
+}
+
+func newShotCaster() *shotCaster {
+	return &shotCaster{damageEffectFake: newDamageEffectFake(), charged: make(map[modelitem.ShotKind]bool)}
+}
+
+func (c *shotCaster) ChargedShot(kind modelitem.ShotKind) bool { return c.charged[kind] }
+func (c *shotCaster) SetChargedShot(kind modelitem.ShotKind, charged bool) {
+	c.charged[kind] = charged
 }
 
 func (d *damageEffectFake) EffectList() *effect.List { return d.list }
@@ -105,6 +120,12 @@ func TestMdamAppliesEffectsOnlyOnDamageAndLandingRoll(t *testing.T) {
 	if got := len(target.EffectList().All()); got != 1 {
 		t.Fatalf("MDAM effects with guaranteed landing roll = %d, want 1", got)
 	}
+
+	target.successOK = false
+	registry.Use(Cast{Caster: caster, Skill: def, Targets: []any{target}})
+	if got := len(target.EffectList().All()); got != 0 {
+		t.Fatalf("MDAM effects after resisted recast = %d, want 0", got)
+	}
 }
 
 func TestBlowAppliesEffectsWithForcedBlessedSpiritshotInput(t *testing.T) {
@@ -128,6 +149,35 @@ func TestBlowAppliesEffectsWithForcedBlessedSpiritshotInput(t *testing.T) {
 	}
 	if !target.lastBss {
 		t.Fatal("BLOW landing roll bss = false, want true (Blow.java hardcodes this input)")
+	}
+
+	target.successOK = false
+	registry.Use(Cast{Caster: caster, Skill: def, Targets: []any{target}})
+	if got := len(target.EffectList().All()); got != 0 {
+		t.Fatalf("BLOW effects after resisted recast = %d, want 0", got)
+	}
+}
+
+func TestManadamRemovesEffectsBeforeResistedRecast(t *testing.T) {
+	registry := NewDefaultRegistry()
+	caster := newDamageEffectFake()
+	target := newDamageEffectFake()
+	target.manaOK = true
+	target.manaInput = formulas.ManaDamageInput{
+		MAtk: 400, MDef: 50, SkillPower: 20, TargetMaxMp: 970,
+		VulnMul: 1, Affected: true,
+	}
+	def := modelskill.Definition{ID: 1234, SkillType: "MANADAM", Effects: targetEffect()}
+
+	registry.Use(Cast{Caster: caster, Skill: def, Targets: []any{target}})
+	if got := len(target.EffectList().All()); got != 1 {
+		t.Fatalf("MANADAM effects with guaranteed landing roll = %d, want 1", got)
+	}
+
+	target.successOK = false
+	registry.Use(Cast{Caster: caster, Skill: def, Targets: []any{target}})
+	if got := len(target.EffectList().All()); got != 0 {
+		t.Fatalf("MANADAM effects after resisted recast = %d, want 0", got)
 	}
 }
 
@@ -175,6 +225,57 @@ func TestBlowMissSkipsDamageAndEffects(t *testing.T) {
 	}
 	if got := len(target.EffectList().All()); got != 0 {
 		t.Fatalf("BLOW miss effects = %d, want 0", got)
+	}
+}
+
+func TestBlowDischargesSoulshotOnlyAfterLanding(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		landed      bool
+		staticReuse bool
+		wantCharged bool
+	}{
+		{name: "landed", landed: true},
+		{name: "missed", wantCharged: true},
+		{name: "static reuse", landed: true, staticReuse: true, wantCharged: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			caster := newShotCaster()
+			caster.charged[modelitem.ShotSoul] = true
+			target := newDamageEffectFake()
+			target.blowOK = true
+			target.blowInput = formulas.BlowInput{Landed: tc.landed}
+
+			NewDefaultRegistry().Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "BLOW", StaticReuse: tc.staticReuse}, Targets: []any{target}})
+
+			if got := caster.ChargedShot(modelitem.ShotSoul); got != tc.wantCharged {
+				t.Fatalf("SoulshotCharged() = %v, want %v", got, tc.wantCharged)
+			}
+		})
+	}
+}
+
+func TestManadamDischargesLoadedSpiritshotAfterCast(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		kind        modelitem.ShotKind
+		staticReuse bool
+		wantCharged bool
+	}{
+		{name: "spirit", kind: modelitem.ShotSpirit},
+		{name: "blessed spirit", kind: modelitem.ShotBlessedSpirit},
+		{name: "static reuse", kind: modelitem.ShotBlessedSpirit, staticReuse: true, wantCharged: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			caster := newShotCaster()
+			caster.charged[tc.kind] = true
+
+			NewDefaultRegistry().Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "MANADAM", StaticReuse: tc.staticReuse}})
+
+			if got := caster.ChargedShot(tc.kind); got != tc.wantCharged {
+				t.Fatalf("ChargedShot(%v) = %v, want %v", tc.kind, got, tc.wantCharged)
+			}
+		})
 	}
 }
 

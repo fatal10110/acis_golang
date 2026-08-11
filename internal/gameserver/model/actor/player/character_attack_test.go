@@ -473,6 +473,18 @@ func TestCharacterChargeSoulshot(t *testing.T) {
 	}
 }
 
+func TestCharacterSetChargedShot(t *testing.T) {
+	c := shotWeaponCharacter(t)
+	c.SetChargedShot(item.ShotSoul, true)
+	if !c.ChargedShot(item.ShotSoul) {
+		t.Fatal("ChargedShot(ShotSoul) = false after charging")
+	}
+	c.SetChargedShot(item.ShotSoul, false)
+	if c.ChargedShot(item.ShotSoul) {
+		t.Fatal("ChargedShot(ShotSoul) = true after discharging")
+	}
+}
+
 func TestCharacterChargeSoulshotRejectsGradeMismatchBeforeCharged(t *testing.T) {
 	c := shotWeaponCharacter(t)
 
