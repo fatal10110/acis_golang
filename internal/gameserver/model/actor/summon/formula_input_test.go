@@ -196,6 +196,20 @@ func TestDeadConcurrentReduceHPAndRead(t *testing.T) {
 	<-done
 }
 
+func TestSummonReduceHPByDOT(t *testing.T) {
+	actor := NewPet(PetConfig{Stats: CombatStats{MaxHP: 10}})
+	want := actor.HP() - 4
+
+	actor.ReduceHPByDOT(4, nil, true)
+
+	if got := actor.HP(); got != want {
+		t.Fatalf("HP() = %v, want %v", got, want)
+	}
+	if actor.Dead() {
+		t.Fatal("Dead() = true, want false")
+	}
+}
+
 func zeroSummonRoll(int) int { return 0 }
 
 func closeSummonFloat(a, b float64) bool {
