@@ -279,6 +279,10 @@ func (l *GameClientLink) dropLiveItem(live *livePlayer, req clientpackets.Reques
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
+	if req.ObjectID == live.Character.MountObjectID() {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return
+	}
 	count := int(req.Count)
 	if !dropInRange(live, int(req.X), int(req.Y), int(req.Z)) {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotDiscardDistanceTooFar))
@@ -323,6 +327,10 @@ func (l *GameClientLink) destroyLiveItem(live *livePlayer, objectID int32, count
 	}
 	inv := live.Inventory()
 	if inv == nil {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return
+	}
+	if objectID == live.Character.MountObjectID() {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}

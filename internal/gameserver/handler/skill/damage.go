@@ -192,11 +192,11 @@ func applyMdamEffects(cast Cast, obj any) {
 	if effected == nil {
 		return
 	}
+	stopEffectsBySkillID(effected.EffectList(), cast.Skill.ID)
 	succeeded, ok := checkSkillSuccess(cast.Caster, effected, cast.Skill)
 	if !ok || !succeeded {
 		return
 	}
-	stopEffectsBySkillID(effected.EffectList(), cast.Skill.ID)
 	applyEffects(cast.Caster, effected, cast.Skill, cast.Skill.Effects)
 }
 
@@ -248,11 +248,11 @@ func applyBlowEffects(cast Cast, obj any) {
 	if effected == nil {
 		return
 	}
+	stopEffectsBySkillID(effected.EffectList(), cast.Skill.ID)
 	succeeded, ok := checkSkillSuccessBSS(cast.Caster, effected, cast.Skill, true)
 	if !ok || !succeeded {
 		return
 	}
-	stopEffectsBySkillID(effected.EffectList(), cast.Skill.ID)
 	applyEffects(cast.Caster, effected, cast.Skill, cast.Skill.Effects)
 }
 
@@ -290,9 +290,9 @@ func (manaDamageHandler) Use(cast Cast) {
 			continue
 		}
 		if effected != nil && len(cast.Skill.Effects) > 0 {
+			stopEffectsBySkillID(effected.EffectList(), cast.Skill.ID)
 			succeeded, ok := checkSkillSuccess(cast.Caster, effected, cast.Skill)
 			if ok && succeeded {
-				stopEffectsBySkillID(effected.EffectList(), cast.Skill.ID)
 				applyEffects(cast.Caster, effected, cast.Skill, cast.Skill.Effects)
 			}
 		}
