@@ -46,7 +46,10 @@ func applyEffectsWithLanding(effector, effected any, def modelskill.Definition, 
 	}
 	source, canRoll := effected.(effectSuccessSource)
 	for _, tmpl := range templates {
-		if tmpl.EffectPowerSet && tmpl.EffectPower >= 0 && canRoll {
+		if tmpl.EffectPowerSet && tmpl.EffectPower >= 0 {
+			if !canRoll {
+				continue
+			}
 			in, ok := source.EffectSuccessInput(effector, def, tmpl, bss, shield)
 			if !ok || !formulas.SkillSucceeds(formulas.SkillSuccessRate(in), rnd.Get(100)) {
 				continue

@@ -14,6 +14,12 @@ type effectLandingFake struct {
 
 func (f *effectLandingFake) EffectList() *effect.List { return f.list }
 
+type effectListOnlyFake struct {
+	list *effect.List
+}
+
+func (f *effectListOnlyFake) EffectList() *effect.List { return f.list }
+
 func (*effectLandingFake) EffectSuccessInput(_ any, _ modelskill.Definition, tmpl modelskill.EffectTemplate, _ bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
 	return formulas.SkillSuccessInput{BaseChance: tmpl.EffectPower, IgnoreResists: true, Shield: shield}, true
 }
@@ -37,6 +43,18 @@ func TestApplyEffectsRejectsPerfectShieldBeforeTemplates(t *testing.T) {
 
 	if got := len(target.list.All()); got != 0 {
 		t.Fatalf("landed effects after perfect shield = %d, want 0", got)
+	}
+}
+
+func TestApplyEffectsRejectsConfiguredTemplateWithoutLandingInput(t *testing.T) {
+	target := &effectListOnlyFake{list: effect.NewList(nil)}
+	applyEffects(nil, target, modelskill.Definition{}, []modelskill.EffectTemplate{
+		{Name: "Buff", Time: 60, EffectPower: 100, EffectPowerSet: true},
+		{Name: "Buff", Time: 60},
+	})
+
+	if got := len(target.list.All()); got != 1 {
+		t.Fatalf("landed effects = %d, want 1 unconfigured template", got)
 	}
 }
 
