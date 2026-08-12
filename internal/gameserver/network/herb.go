@@ -68,6 +68,9 @@ func (l *GameClientLink) consumeHerb(live *livePlayer, itemID int32) {
 				return serverpackets.FrameMagicSkillUse(summonObject, summonObject, int32(res.Skill.ID), int32(res.Skill.Level), 0, 0, false)
 			})
 		}
+		// USE_S1 is sent unconditionally in doInstantCast (PlayerCast.java:106);
+		// the isHerb guard at :96 only skips the item destroy, not this message.
+		live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageUseS1, int32(res.Skill.ID), int32(res.Skill.Level)))
 		applyItemCastCharges(live, res)
 		beforeVitals := live.Vitals()
 		res.Apply()
