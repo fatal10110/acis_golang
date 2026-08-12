@@ -112,6 +112,7 @@ type EffectTemplate struct {
 	StackType        string
 	StackOrder       float64
 	EffectPower      float64
+	EffectPowerSet   bool
 	EffectType       string
 	TriggeredID      int
 	TriggeredLevel   int
