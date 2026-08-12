@@ -49,6 +49,43 @@ func TestSelectAndClearLiveTargetSendsTargetPackets(t *testing.T) {
 	}
 }
 
+// TestSelectLiveTargetOmitsValidateLocationForStaticObject is the
+// regression test for a PR #1378 review comment: selectLiveTarget's
+// ValidateLocation gate originally duck-typed on Position() alone, which
+// staticobject.Chair satisfies (model/staticobject/chair.go:14-22) despite
+// having no Heading() — so a first click on a chair sent a spurious
+// ValidateLocation with a meaningless zero heading. The reference's
+// ValidateLocation leg sits strictly inside Player.setTarget's
+// `else if (newTarget instanceof Creature)` branch (Player.java:2474-2475);
+// the preceding StaticObject branch (Player.java:2465-2470) sends only
+// MyTargetSelected + StaticObjectInfo, never ValidateLocation. The gate now
+// requires both Position() and Heading(), which excludes Chair.
+func TestSelectLiveTargetOmitsValidateLocationForStaticObject(t *testing.T) {
+	state := world.New()
+	frames := &frameCapture{}
+	live := newTestLivePlayer(t, 1, frames)
+	chair, err := staticobject.NewObject(2, &staticobject.Template{
+		ID:       777,
+		Location: location.Location{X: 100, Y: 0, Z: 0},
+		Type:     1,
+	})
+	if err != nil {
+		t.Fatalf("NewObject: %v", err)
+	}
+
+	state.Spawn(live, 0, 0, 0, 0)
+	state.Spawn(chair, 100, 0, 0, 0)
+	frames.frames = nil
+
+	gcl := &GameClientLink{world: state, log: zerolog.Nop()}
+	if !gcl.selectLiveTarget(live, chair) {
+		t.Fatal("selectLiveTarget returned false")
+	}
+	if got := frameOpcodes(frames.frames); string(got) != string([]byte{serverpackets.OpcodeMyTargetSelected}) {
+		t.Fatalf("chair select opcodes = %x, want MyTargetSelected only (no ValidateLocation)", got)
+	}
+}
+
 func TestGameClientLinkActionSitsOnSelectedChairStaticObject(t *testing.T) {
 	state := world.New()
 	frames := &frameCapture{}
