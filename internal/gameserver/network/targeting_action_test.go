@@ -50,8 +50,11 @@ func TestGameClientLinkSecondActionClickAttacksSelectedTarget(t *testing.T) {
 
 	origin := location.Location{X: px, Y: py, Z: pz}
 	c.send(encodeAction(target.ObjectID(), origin, false))
+	if reply := c.read(); reply[0] != serverpackets.OpcodeValidateLocation {
+		t.Fatalf("first Action opcode = %#x, want ValidateLocation (%#x)", reply[0], serverpackets.OpcodeValidateLocation)
+	}
 	if reply := c.read(); reply[0] != serverpackets.OpcodeMyTargetSelected {
-		t.Fatalf("first Action opcode = %#x, want MyTargetSelected (%#x)", reply[0], serverpackets.OpcodeMyTargetSelected)
+		t.Fatalf("first Action second frame opcode = %#x, want MyTargetSelected (%#x)", reply[0], serverpackets.OpcodeMyTargetSelected)
 	}
 	c.read() // StatusUpdate
 
@@ -102,8 +105,11 @@ func TestGameClientLinkSecondActionClickWalksTowardDistantTarget(t *testing.T) {
 
 	origin := location.Location{X: px, Y: py, Z: pz}
 	c.send(encodeAction(target.ObjectID(), origin, false))
+	if reply := c.read(); reply[0] != serverpackets.OpcodeValidateLocation {
+		t.Fatalf("first Action opcode = %#x, want ValidateLocation (%#x)", reply[0], serverpackets.OpcodeValidateLocation)
+	}
 	if reply := c.read(); reply[0] != serverpackets.OpcodeMyTargetSelected {
-		t.Fatalf("first Action opcode = %#x, want MyTargetSelected (%#x)", reply[0], serverpackets.OpcodeMyTargetSelected)
+		t.Fatalf("first Action second frame opcode = %#x, want MyTargetSelected (%#x)", reply[0], serverpackets.OpcodeMyTargetSelected)
 	}
 	c.read() // StatusUpdate
 
@@ -136,8 +142,12 @@ func TestGameClientLinkAttackRequestFirstSelectsOnly(t *testing.T) {
 	origin := location.Location{X: 10, Y: 20, Z: 30}
 	c.send(encodeAttackRequest(target.ObjectID(), origin, false))
 	reply := c.read()
+	if reply[0] != serverpackets.OpcodeValidateLocation {
+		t.Fatalf("first AttackRequest opcode = %#x, want ValidateLocation (%#x)", reply[0], serverpackets.OpcodeValidateLocation)
+	}
+	reply = c.read()
 	if reply[0] != serverpackets.OpcodeMyTargetSelected {
-		t.Fatalf("first AttackRequest opcode = %#x, want MyTargetSelected (%#x)", reply[0], serverpackets.OpcodeMyTargetSelected)
+		t.Fatalf("first AttackRequest second frame opcode = %#x, want MyTargetSelected (%#x)", reply[0], serverpackets.OpcodeMyTargetSelected)
 	}
 	reply = c.read()
 	assertTargetHPStatus(t, reply, target.ObjectID(), target.MaxHP(), target.CurrentHP())

@@ -5,6 +5,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -170,6 +171,47 @@ func TestLiveTargetReflectsDomainLevelRetarget(t *testing.T) {
 	}
 	if got := live.CurrentTarget(); got != any(world.Tracked(caster)) {
 		t.Fatalf("CurrentTarget() = %v, want %v", got, caster)
+	}
+}
+
+// TestRetargetHookSendsPlayerSetTargetPackets is the regression test for
+// Finding 1 of pr-reviews/975.md: the AGGDEBUFF retarget branch
+// (retargetableOnAggression.SetTarget) reduced to a silent field write, with
+// none of Player.setTarget's packet funnel (Player.java:2439-2510) that the
+// click path already sends via selectLiveTarget — the retargeted player's
+// client kept the old selection, and witnesses never saw a TargetSelected
+// broadcast. character_flow.go's attachLivePlayer now wires SetRetargetHook
+// to the same selectLiveTarget the click path uses, so a domain-level
+// retarget reproduces that funnel instead of only updating the field.
+func TestRetargetHookSendsPlayerSetTargetPackets(t *testing.T) {
+	state := world.New()
+	retargetedFrames := &frameCapture{}
+	observerFrames := &frameCapture{}
+	retargeted := newTestLivePlayer(t, 1, retargetedFrames)
+	observer := newTestLivePlayer(t, 2, observerFrames)
+	caster := newTestHostileNPC(t, 3)
+
+	gcl := &GameClientLink{world: state, log: zerolog.Nop()}
+	retargeted.Character.SetRetargetHook(func(target world.Tracked) {
+		gcl.selectLiveTarget(retargeted, target)
+	})
+
+	state.Spawn(retargeted, 0, 0, 0, 0)
+	state.Spawn(observer, 100, 0, 0, 0)
+	state.Spawn(caster, 150, 0, 0, 0)
+	retargetedFrames.frames = nil
+	observerFrames.frames = nil
+
+	retargeted.Character.SetTarget(any(world.Tracked(caster)))
+
+	if got := retargeted.Target(); got != world.Tracked(caster) {
+		t.Fatalf("Target() after domain-level retarget = %v, want %v", got, caster)
+	}
+	if got := frameOpcodes(retargetedFrames.frames); string(got) != string([]byte{serverpackets.OpcodeValidateLocation, serverpackets.OpcodeMyTargetSelected, serverpackets.OpcodeStatusUpdate}) {
+		t.Fatalf("retargeted player opcodes = %x, want ValidateLocation, MyTargetSelected, StatusUpdate", got)
+	}
+	if got := frameOpcodes(observerFrames.frames); string(got) != string([]byte{serverpackets.OpcodeTargetSelected}) {
+		t.Fatalf("observer opcodes = %x, want TargetSelected", got)
 	}
 }
 

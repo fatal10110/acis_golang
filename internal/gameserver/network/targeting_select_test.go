@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -31,8 +32,8 @@ func TestSelectAndClearLiveTargetSendsTargetPackets(t *testing.T) {
 	if !gcl.selectLiveTarget(attacker, target) {
 		t.Fatal("selectLiveTarget returned false")
 	}
-	if got := frameOpcodes(attackerFrames.frames); string(got) != string([]byte{serverpackets.OpcodeMyTargetSelected, serverpackets.OpcodeStatusUpdate}) {
-		t.Fatalf("attacker select opcodes = %x, want MyTargetSelected, StatusUpdate", got)
+	if got := frameOpcodes(attackerFrames.frames); string(got) != string([]byte{serverpackets.OpcodeValidateLocation, serverpackets.OpcodeMyTargetSelected, serverpackets.OpcodeStatusUpdate}) {
+		t.Fatalf("attacker select opcodes = %x, want ValidateLocation, MyTargetSelected, StatusUpdate", got)
 	}
 	if got := frameOpcodes(observerFrames.frames); string(got) != string([]byte{serverpackets.OpcodeTargetSelected}) {
 		t.Fatalf("observer select opcodes = %x, want TargetSelected", got)
@@ -46,6 +47,73 @@ func TestSelectAndClearLiveTargetSendsTargetPackets(t *testing.T) {
 	}
 	if got := frameOpcodes(observerFrames.frames); string(got) != string([]byte{serverpackets.OpcodeTargetUnselected}) {
 		t.Fatalf("observer clear opcodes = %x, want TargetUnselected", got)
+	}
+}
+
+// TestSelectLiveTargetOmitsValidateLocationForStaticObject is the
+// regression test for a PR #1378 review comment: selectLiveTarget's
+// ValidateLocation gate originally duck-typed on Position() alone, which
+// staticobject.Chair satisfies (model/staticobject/chair.go:14-22) despite
+// having no Heading() — so a first click on a chair sent a spurious
+// ValidateLocation with a meaningless zero heading. The reference's
+// ValidateLocation leg sits strictly inside Player.setTarget's
+// `else if (newTarget instanceof Creature)` branch (Player.java:2474-2475);
+// the preceding StaticObject branch (Player.java:2465-2470) sends only
+// MyTargetSelected + StaticObjectInfo, never ValidateLocation. The gate now
+// requires both Position() and Heading(), which excludes Chair.
+func TestSelectLiveTargetOmitsValidateLocationForStaticObject(t *testing.T) {
+	state := world.New()
+	frames := &frameCapture{}
+	live := newTestLivePlayer(t, 1, frames)
+	chair, err := staticobject.NewObject(2, &staticobject.Template{
+		ID:       777,
+		Location: location.Location{X: 100, Y: 0, Z: 0},
+		Type:     1,
+	})
+	if err != nil {
+		t.Fatalf("NewObject: %v", err)
+	}
+
+	state.Spawn(live, 0, 0, 0, 0)
+	state.Spawn(chair, 100, 0, 0, 0)
+	frames.frames = nil
+
+	gcl := &GameClientLink{world: state, log: zerolog.Nop()}
+	if !gcl.selectLiveTarget(live, chair) {
+		t.Fatal("selectLiveTarget returned false")
+	}
+	if got := frameOpcodes(frames.frames); string(got) != string([]byte{serverpackets.OpcodeMyTargetSelected}) {
+		t.Fatalf("chair select opcodes = %x, want MyTargetSelected only (no ValidateLocation)", got)
+	}
+}
+
+// TestSelectLiveTargetSendsValidateLocationForSummon is the regression test
+// for a follow-up to the Chair fix above: gating ValidateLocation on
+// AttackableBy(skilltarget.Creature) (targetColor's Creature discriminator)
+// under-matches, since only npc.Hostile and player.Character implement it —
+// summon.Actor doesn't, so that gate would silently drop ValidateLocation
+// for a pet/servitor target too, even though Summon is a Creature in the
+// reference (no override of setTarget in the Summon hierarchy) and belongs
+// in the same branch as Hostile/Player targets (Player.java:2474-2493). The
+// gate now excludes only staticobject.Chair, so a summon target (which has
+// Position()/Heading() via its embedded world.Presence, same as Hostile and
+// livePlayer) still gets ValidateLocation.
+func TestSelectLiveTargetSendsValidateLocationForSummon(t *testing.T) {
+	state := world.New()
+	frames := &frameCapture{}
+	attacker := newTestLivePlayer(t, 1, frames)
+	pet := summon.NewPet(summon.PetConfig{ObjectID: 501, Level: 44, Stats: summon.CombatStats{MaxHP: 500, MaxMP: 200}})
+
+	state.Spawn(attacker, 0, 0, 0, 0)
+	state.Spawn(pet, 100, 0, 0, 0)
+	frames.frames = nil
+
+	gcl := &GameClientLink{world: state, log: zerolog.Nop()}
+	if !gcl.selectLiveTarget(attacker, pet) {
+		t.Fatal("selectLiveTarget returned false")
+	}
+	if got := frameOpcodes(frames.frames); len(got) == 0 || got[0] != serverpackets.OpcodeValidateLocation {
+		t.Fatalf("summon select opcodes = %x, want leading ValidateLocation", got)
 	}
 }
 
@@ -150,8 +218,12 @@ func TestGameClientLinkActionAttackAndTargetCancel(t *testing.T) {
 	origin := location.Location{X: px, Y: py, Z: pz}
 	c.send(encodeAction(target.ObjectID(), origin, false))
 	reply := c.read()
+	if reply[0] != serverpackets.OpcodeValidateLocation {
+		t.Fatalf("Action first opcode = %#x, want ValidateLocation (%#x)", reply[0], serverpackets.OpcodeValidateLocation)
+	}
+	reply = c.read()
 	if reply[0] != serverpackets.OpcodeMyTargetSelected {
-		t.Fatalf("Action first opcode = %#x, want MyTargetSelected (%#x)", reply[0], serverpackets.OpcodeMyTargetSelected)
+		t.Fatalf("Action second opcode = %#x, want MyTargetSelected (%#x)", reply[0], serverpackets.OpcodeMyTargetSelected)
 	}
 	reply = c.read()
 	assertTargetHPStatus(t, reply, target.ObjectID(), target.MaxHP(), target.CurrentHP())

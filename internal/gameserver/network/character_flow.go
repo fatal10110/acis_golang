@@ -574,6 +574,13 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	c.SetAttackTargetHook(func(target world.Tracked) {
 		l.attackLiveTarget(live, target)
 	})
+	c.SetRetargetHook(func(target world.Tracked) {
+		if target == nil {
+			l.clearLiveTarget(live)
+			return
+		}
+		l.selectLiveTarget(live, target)
+	})
 	c.SetHerbConsumer(func(itemID int32) {
 		l.consumeHerb(live, itemID)
 	})
