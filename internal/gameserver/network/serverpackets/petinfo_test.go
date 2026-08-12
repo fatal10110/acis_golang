@@ -48,6 +48,7 @@ func TestFramePetInfo(t *testing.T) {
 		PAtk: 10, PDef: 20, MAtk: 5, MDef: 15,
 		Accuracy: 30, EvasionRate: 25, CriticalHit: 4, MoveSpeed: 120,
 		Mountable:         true,
+		AbnormalEffect:    0x010000,
 		Team:              0,
 		SoulShotsPerHit:   1,
 		SpiritShotsPerHit: 1,
@@ -111,7 +112,7 @@ func TestFramePetInfo(t *testing.T) {
 	want = appendPetInfoInt32(want, int32(s.MoveSpeed))
 	want = appendPetInfoInt32(want, int32(s.PAtkSpd))
 	want = appendPetInfoInt32(want, int32(s.MAtkSpd))
-	want = appendPetInfoInt32(want, 0)  // abnormal effect: not wired yet
+	want = appendPetInfoInt32(want, int32(s.AbnormalEffect))
 	want = appendPetInfoUint16(want, 1) // mountable
 	want = append(want, 0)              // move type
 	want = appendPetInfoUint16(want, 0)
