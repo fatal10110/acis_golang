@@ -33,6 +33,24 @@ func (a *Actor) Level() int {
 	return a.level
 }
 
+// SetStatusUpdater records the runtime hook that publishes this summon's
+// changed status to connected clients.
+func (a *Actor) SetStatusUpdater(update func()) {
+	a.statusMu.Lock()
+	defer a.statusMu.Unlock()
+	a.statusUpdater = update
+}
+
+// UpdateStatus publishes this summon's current status through its runtime hook.
+func (a *Actor) UpdateStatus() {
+	a.statusMu.RLock()
+	update := a.statusUpdater
+	a.statusMu.RUnlock()
+	if update != nil {
+		update()
+	}
+}
+
 // IsPet reports whether this live summon is a pet rather than a servitor.
 func (a *Actor) IsPet() bool { return a.isPet }
 

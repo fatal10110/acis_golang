@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
@@ -15,6 +16,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // gameSummonSpawner is the network layer's player.SummonSpawner: it has the
@@ -251,6 +253,41 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor) {
 		Caster:      actor,
 	})
 	actor.SetAI(brain)
+	actor.SetStatusUpdater(func() { l.broadcastSummonStatus(actor) })
+}
+
+func (l *GameClientLink) broadcastSummonStatus(actor *summon.Actor) {
+	if actor == nil {
+		return
+	}
+	owner, ok := actor.ActingPlayer().(*livePlayer)
+	if !ok {
+		return
+	}
+	status, ok := petInfoSnapshot(actor, owner, owner.npcs)
+	if !ok {
+		return
+	}
+	owner.SendFrame(serverpackets.FramePetStatusUpdate(status))
+	if l.world == nil {
+		return
+	}
+	info, ok := summonInfoSnapshot(actor, owner.npcs)
+	if !ok {
+		return
+	}
+	broadcastFrame(func() wire.Frame {
+		return serverpackets.FrameNPCInfo(info)
+	}, func(send func(frameReceiver)) {
+		l.world.ForEachKnown(actor, func(object world.Tracked) {
+			if object.ObjectID() == owner.ObjectID() {
+				return
+			}
+			if receiver, ok := object.(frameReceiver); ok {
+				send(receiver)
+			}
+		})
+	})
 }
 
 // inertSummonMoveController and inertSummonAttackController satisfy
