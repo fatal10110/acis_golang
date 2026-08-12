@@ -160,6 +160,70 @@ func TestUseItemAttachesAndUnequipDetachesItemStats(t *testing.T) {
 	}
 }
 
+// TestUseItemGrantsNonPassiveAttachedSkillAndSendsSkillListAndCoolTime pins
+// issue 1398: equipping an item whose AttachedSkills entry is an ACTIVE
+// (non-passive) item_skill must grant it and reach the client via SkillList
+// and, since it has a positive equip delay, SkillCoolTime — mirroring
+// ItemPassiveSkillsListener.onEquip. Unequipping must resend SkillList only.
+func TestUseItemGrantsNonPassiveAttachedSkillAndSendsSkillListAndCoolTime(t *testing.T) {
+	const itemSkillID = 3264
+	templates := item.NewTable([]*item.Template{{
+		ID: 9184, Kind: item.KindArmor, Slot: item.SlotHairAll,
+		Armor:          &item.ArmorDetail{Type: item.ArmorLight},
+		AttachedSkills: []item.SkillRef{{ID: itemSkillID, Level: 1}},
+	}})
+	hat := &item.Instance{ObjectID: 500, TemplateID: 9184, Location: item.LocationInventory}
+	capture := &frameCapture{}
+	live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{hat})
+	skills := modelskill.NewTable([]modelskill.Definition{
+		{ID: itemSkillID, Level: 1, Activation: modelskill.ActivationActive, EquipDelay: 30000},
+	})
+	gcl := &GameClientLink{skills: skillstate.NewPersistence(nil, skills)}
+
+	gcl.useItem(live, hat.ObjectID)
+
+	if got := live.SkillLevel(itemSkillID); got != 1 {
+		t.Fatalf("SkillLevel(%d) after equip = %d, want 1", itemSkillID, got)
+	}
+	var sawSkillList, sawCoolTime bool
+	for _, f := range capture.frames {
+		switch f[0] {
+		case serverpackets.OpcodeSkillList:
+			sawSkillList = true
+		case serverpackets.OpcodeSkillCoolTime:
+			sawCoolTime = true
+		}
+	}
+	if !sawSkillList {
+		t.Fatalf("frames after equip = %x, want a SkillList frame", capture.frames)
+	}
+	if !sawCoolTime {
+		t.Fatalf("frames after equip = %x, want a SkillCoolTime frame (equip delay armed)", capture.frames)
+	}
+	capture.frames = nil
+
+	gcl.useItem(live, hat.ObjectID)
+
+	if got := live.SkillLevel(itemSkillID); got != 0 {
+		t.Fatalf("SkillLevel(%d) after unequip = %d, want 0 (revoked)", itemSkillID, got)
+	}
+	sawSkillList, sawCoolTime = false, false
+	for _, f := range capture.frames {
+		switch f[0] {
+		case serverpackets.OpcodeSkillList:
+			sawSkillList = true
+		case serverpackets.OpcodeSkillCoolTime:
+			sawCoolTime = true
+		}
+	}
+	if !sawSkillList {
+		t.Fatalf("frames after unequip = %x, want a SkillList frame", capture.frames)
+	}
+	if sawCoolTime {
+		t.Fatalf("frames after unequip = %x, want no SkillCoolTime frame (reference sends none on unequip)", capture.frames)
+	}
+}
+
 func TestUseItemUnknownObjectIDIsNoop(t *testing.T) {
 	templates := item.NewTable(nil)
 	capture := &frameCapture{}

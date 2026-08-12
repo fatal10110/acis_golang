@@ -283,38 +283,94 @@ func (p *Persistence) persistKnownSkill(ctx context.Context, c *player.Character
 
 // EquipItemStats attaches the stat functions inst's template contributes
 // while equipped — item.Template.AttachedSkills passives and
-// item.Template.Modifiers equip bonuses — to c's live stat calculators.
-// Call once per instance, right after it becomes equipped.
-func (p *Persistence) EquipItemStats(c *player.Character, inst *item.Instance, tmpl *item.Template) error {
+// item.Template.Modifiers equip bonuses — to c's live stat calculators, and
+// grants every item.Template.AttachedSkills entry (any activation) to c's
+// known-skill set, mirroring ItemPassiveSkillsListener.onEquip. Call once
+// per instance, right after it becomes equipped. skillsChanged and
+// timersChanged report whether the caller must resend SkillList and
+// SkillCoolTime respectively.
+func (p *Persistence) EquipItemStats(c *player.Character, inst *item.Instance, tmpl *item.Template) (skillsChanged, timersChanged bool, err error) {
 	if p == nil || c == nil || inst == nil || tmpl == nil {
-		return nil
+		return false, false, nil
 	}
 	owner := effect.ItemOwner{Inst: inst, Tmpl: tmpl}
 	modFns, err := effect.ItemModifierFuncs(owner)
 	if err != nil {
-		return fmt.Errorf("apply equip modifiers for character %d item %d: %w", c.ID, inst.ObjectID, err)
+		return false, false, fmt.Errorf("apply equip modifiers for character %d item %d: %w", c.ID, inst.ObjectID, err)
 	}
 	var passiveFns []basefunc.Func
+	// A weapon whose crystal grade the character's Expertise doesn't yet
+	// allow skips its whole item_skill loop in the reference (the grade
+	// penalty check returns before that loop runs), so neither its passive
+	// stat funcs nor any of its granted skills apply until Expertise catches
+	// up.
 	if tmpl.Weapon == nil || c.WeaponSkillsAllowed(tmpl.Crystal) {
 		passiveFns, err = effect.ItemPassiveFuncs(p.skills, owner)
 		if err != nil {
-			return fmt.Errorf("apply equip passives for character %d item %d: %w", c.ID, inst.ObjectID, err)
+			return false, false, fmt.Errorf("apply equip passives for character %d item %d: %w", c.ID, inst.ObjectID, err)
 		}
+		skillsChanged, timersChanged = p.grantItemSkills(c, tmpl)
 	}
 	c.AddStatFuncs(modFns)
 	c.AddStatFuncs(passiveFns)
-	return nil
+	return skillsChanged, timersChanged, nil
+}
+
+// grantItemSkills grants every tmpl.AttachedSkills entry to c's known-skill
+// set, regardless of activation type, without persisting it and without
+// attaching its stat functions (ItemPassiveFuncs already attaches a passive
+// entry's stat functions, owned by the item instance). An ACTIVE entry with
+// a positive equip delay and no already-armed reuse timer for its reuse key
+// gets one armed, matching ItemPassiveSkillsListener.onEquip:58-72.
+func (p *Persistence) grantItemSkills(c *player.Character, tmpl *item.Template) (skillsChanged, timersChanged bool) {
+	for _, ref := range tmpl.AttachedSkills {
+		def, ok := p.definition(modelskill.Ref{ID: modelskill.ID(ref.ID), Level: int(ref.Level)})
+		if !ok {
+			continue
+		}
+		c.SetSkillLevel(int(ref.ID), int(ref.Level))
+		skillsChanged = true
+		if def.Activation != modelskill.ActivationActive {
+			continue
+		}
+		key := cast.ReuseKey(def)
+		if def.EquipDelay > 0 && !c.HasSkillReuse(key) {
+			c.AddSkillReuse(modelskill.Ref{ID: def.ID, Level: def.Level}, key, time.Duration(def.EquipDelay)*time.Millisecond)
+		}
+		timersChanged = true
+	}
+	return skillsChanged, timersChanged
 }
 
 // UnequipItemStats removes every stat function inst previously contributed
-// via EquipItemStats. tmpl must be the same template instance EquipItemStats
-// was called with, so the owner identity used to attach the functions
-// matches the one used to remove them.
-func (p *Persistence) UnequipItemStats(c *player.Character, inst *item.Instance, tmpl *item.Template) {
+// via EquipItemStats, and revokes every tmpl.AttachedSkills entry from c's
+// known-skill set unless inv still has another equipped item sharing tmpl's
+// id, mirroring ItemPassiveSkillsListener.onUnequip. tmpl must be the same
+// template instance EquipItemStats was called with, so the owner identity
+// used to attach the functions matches the one used to remove them.
+// skillsChanged reports whether the caller must resend SkillList; no reuse
+// timer armed by the equip-delay grant is cleared, matching the reference.
+func (p *Persistence) UnequipItemStats(c *player.Character, inv *itemcontainer.Inventory, inst *item.Instance, tmpl *item.Template) (skillsChanged bool) {
 	if c == nil || inst == nil {
-		return
+		return false
 	}
 	c.RemoveStatsByOwner(effect.ItemOwner{Inst: inst, Tmpl: tmpl})
+	if tmpl == nil || inv == nil {
+		return false
+	}
+	for _, other := range inv.PaperdollItems() {
+		if other.TemplateID == tmpl.ID {
+			return false
+		}
+	}
+	for _, ref := range tmpl.AttachedSkills {
+		if c.SkillLevel(int(ref.ID)) <= 0 {
+			continue
+		}
+		c.SetSkillLevel(int(ref.ID), 0)
+		skillsChanged = true
+	}
+	return skillsChanged
 }
 
 // RestoreEquippedItemStats attaches the stat functions every item currently
@@ -330,30 +386,37 @@ func (p *Persistence) RestoreEquippedItemStats(c *player.Character, inv *itemcon
 		if !ok {
 			continue
 		}
-		if err := p.EquipItemStats(c, inst, tmpl); err != nil {
+		if _, _, err := p.EquipItemStats(c, inst, tmpl); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// RefreshEquippedItemStats reapplies equipped item modifiers and passives
-// after a state gate changes which passives may be active.
-func (p *Persistence) RefreshEquippedItemStats(c *player.Character, inv *itemcontainer.Inventory) error {
+// RefreshEquippedItemStats reapplies equipped item modifiers and passives,
+// and item-granted skills, after a state gate changes which of them may be
+// active (e.g. an Expertise level change). skillsChanged and timersChanged
+// report whether the caller must resend SkillList and SkillCoolTime.
+func (p *Persistence) RefreshEquippedItemStats(c *player.Character, inv *itemcontainer.Inventory) (skillsChanged, timersChanged bool, err error) {
 	if c == nil || inv == nil {
-		return nil
+		return false, false, nil
 	}
 	for _, inst := range inv.PaperdollItems() {
 		tmpl, ok := inv.Templates().Get(inst.TemplateID)
 		if !ok {
 			continue
 		}
-		p.UnequipItemStats(c, inst, tmpl)
-		if err := p.EquipItemStats(c, inst, tmpl); err != nil {
-			return err
+		if p.UnequipItemStats(c, inv, inst, tmpl) {
+			skillsChanged = true
 		}
+		equipSkills, equipTimers, err := p.EquipItemStats(c, inst, tmpl)
+		if err != nil {
+			return false, false, err
+		}
+		skillsChanged = skillsChanged || equipSkills
+		timersChanged = timersChanged || equipTimers
 	}
-	return nil
+	return skillsChanged, timersChanged, nil
 }
 
 // Definition returns a loaded skill definition.

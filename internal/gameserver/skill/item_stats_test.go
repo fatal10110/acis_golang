@@ -1,11 +1,13 @@
 package skill
 
 import (
+	"testing"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-	"testing"
 )
 
 const (
@@ -79,14 +81,14 @@ func TestEquipItemStatsAttachesModifiersAndAttachedSkillPassives(t *testing.T) {
 	tmpl, _ := templates.Get(ringTemplateID)
 	inv.EquipItem(inst, tmpl)
 
-	if err := p.EquipItemStats(ch, inst, tmpl); err != nil {
+	if _, _, err := p.EquipItemStats(ch, inst, tmpl); err != nil {
 		t.Fatalf("EquipItemStats() error: %v", err)
 	}
 	if got, want := ch.MAtk(), baseMAtk+5+8; got != want {
 		t.Fatalf("MAtk() after equip = %v, want %v (modifier +5, attached passive +8)", got, want)
 	}
 
-	p.UnequipItemStats(ch, inst, tmpl)
+	p.UnequipItemStats(ch, inv, inst, tmpl)
 	if got := ch.MAtk(); got != baseMAtk {
 		t.Fatalf("MAtk() after unequip = %v, want unchanged %v", got, baseMAtk)
 	}
@@ -103,7 +105,7 @@ func TestEquipItemStatsWithholdsWeaponPassiveBelowExpertise(t *testing.T) {
 	inv.SetEnchantLevel(inst, 4)
 	inv.EquipItem(inst, tmpl)
 
-	if err := p.EquipItemStats(ch, inst, tmpl); err != nil {
+	if _, _, err := p.EquipItemStats(ch, inst, tmpl); err != nil {
 		t.Fatalf("EquipItemStats() error: %v", err)
 	}
 	if got, want := ch.MAtk(), baseMAtk; got != want {
@@ -114,7 +116,7 @@ func TestEquipItemStatsWithholdsWeaponPassiveBelowExpertise(t *testing.T) {
 	}
 
 	ch.SetSkillLevel(239, int(item.CrystalD))
-	if err := p.RefreshEquippedItemStats(ch, inv); err != nil {
+	if _, _, err := p.RefreshEquippedItemStats(ch, inv); err != nil {
 		t.Fatalf("RefreshEquippedItemStats() error: %v", err)
 	}
 	if got, want := ch.MAtk(), baseMAtk+8; got != want {
@@ -135,13 +137,13 @@ func TestUnequipItemStatsOnlyRemovesTheUnequippedInstance(t *testing.T) {
 
 	ring1 := inv.AddNew(ringTemplateID, 1, 100)
 	inv.EquipItem(ring1, tmpl)
-	if err := p.EquipItemStats(ch, ring1, tmpl); err != nil {
+	if _, _, err := p.EquipItemStats(ch, ring1, tmpl); err != nil {
 		t.Fatalf("EquipItemStats(ring1) error: %v", err)
 	}
 
 	ring2 := inv.AddNew(ringTemplateID, 1, 101)
 	inv.EquipItem(ring2, tmpl)
-	if err := p.EquipItemStats(ch, ring2, tmpl); err != nil {
+	if _, _, err := p.EquipItemStats(ch, ring2, tmpl); err != nil {
 		t.Fatalf("EquipItemStats(ring2) error: %v", err)
 	}
 	afterBoth := ch.MAtk()
@@ -150,7 +152,7 @@ func TestUnequipItemStatsOnlyRemovesTheUnequippedInstance(t *testing.T) {
 	}
 
 	inv.UnequipSlot(inv.ItemByObjectID(ring1.ObjectID).Snapshot().LocationData)
-	p.UnequipItemStats(ch, ring1, tmpl)
+	p.UnequipItemStats(ch, inv, ring1, tmpl)
 
 	if got, want := ch.MAtk(), baseMAtk+5+8; got != want {
 		t.Fatalf("MAtk() after unequipping ring1 only = %v, want %v (ring2's own funcs must survive)", got, want)
@@ -166,7 +168,7 @@ func TestEquipItemStatsEnchantFuncReadsLiveEnchantLevel(t *testing.T) {
 
 	inst := inv.AddNew(enchantArmorID, 1, 200)
 	inv.EquipItem(inst, tmpl)
-	if err := p.EquipItemStats(ch, inst, tmpl); err != nil {
+	if _, _, err := p.EquipItemStats(ch, inst, tmpl); err != nil {
 		t.Fatalf("EquipItemStats() error: %v", err)
 	}
 	unenchanted := ch.PDef()
@@ -195,7 +197,7 @@ func TestEquipItemStatsEnchant4SkillReadsLiveEnchantLevel(t *testing.T) {
 	inst := inv.AddNew(swordTemplateID, 1, 200)
 	inv.SetEnchantLevel(inst, 3)
 	inv.EquipItem(inst, tmpl)
-	if err := p.EquipItemStats(ch, inst, tmpl); err != nil {
+	if _, _, err := p.EquipItemStats(ch, inst, tmpl); err != nil {
 		t.Fatalf("EquipItemStats() error: %v", err)
 	}
 	if got, want := ch.PAtk(), basePAtk+20; got != want {
@@ -229,5 +231,133 @@ func TestRestoreEquippedItemStatsReattachesOnRelogin(t *testing.T) {
 	}
 	if got, want := ch.MAtk(), baseMAtk+5+8; got != want {
 		t.Fatalf("MAtk() after restore = %v, want %v", got, want)
+	}
+}
+
+// TestEquipItemStatsGrantsNonPassiveAttachedSkillsAndArmsEquipDelay pins
+// Gap 1 and Gap 2 of issue 1398 against the real shipped carriers named in
+// the issue: 9184 (Teddy Bear Hat, grants ACTIVE skill 3264 "Blessed
+// Escape" with a 30s equip delay), 9140 (Salvation Bow, grants ACTIVE skill
+// 3261 "Forgiveness" with a 30s equip delay), and 6841 (The Lord's Crown,
+// grants ACTIVE skill 3632 "Clan Gate" with no equip delay). Before this
+// fix these skills never reached the player's known-skill set at all.
+func TestEquipItemStatsGrantsNonPassiveAttachedSkillsAndArmsEquipDelay(t *testing.T) {
+	cases := []struct {
+		name       string
+		itemID     int32
+		skillID    int
+		equipDelay int
+	}{
+		{"9184 Teddy Bear Hat / 3264 Blessed Escape", 9184, 3264, 30000},
+		{"9140 Salvation Bow / 3261 Forgiveness", 9140, 3261, 30000},
+		{"6841 The Lord's Crown / 3632 Clan Gate", 6841, 3632, 0},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tmpl := &item.Template{
+				ID:             tc.itemID,
+				Kind:           item.KindArmor,
+				Slot:           item.SlotChest,
+				Armor:          &item.ArmorDetail{Type: item.ArmorLight},
+				AttachedSkills: []item.SkillRef{{ID: int32(tc.skillID), Level: 1}},
+			}
+			templates := item.NewTable([]*item.Template{tmpl})
+			skills := modelskill.NewTable([]modelskill.Definition{
+				{ID: modelskill.ID(tc.skillID), Level: 1, Activation: modelskill.ActivationActive, EquipDelay: tc.equipDelay},
+			})
+			inv := itemcontainer.NewPlayerInventory(1, templates)
+			p := NewPersistence(nil, skills)
+			ch := &player.Character{ID: 1}
+			inst := inv.AddNew(tc.itemID, 1, 100)
+			inv.EquipItem(inst, tmpl)
+
+			skillsChanged, timersChanged, err := p.EquipItemStats(ch, inst, tmpl)
+			if err != nil {
+				t.Fatalf("EquipItemStats() error: %v", err)
+			}
+			if !skillsChanged {
+				t.Fatal("skillsChanged = false, want true (SkillList must be resent)")
+			}
+			if !timersChanged {
+				t.Fatal("timersChanged = false, want true (an ACTIVE item skill was granted)")
+			}
+			if got := ch.SkillLevel(tc.skillID); got != 1 {
+				t.Fatalf("SkillLevel(%d) after equip = %d, want 1", tc.skillID, got)
+			}
+
+			def, _ := skills.Get(modelskill.ID(tc.skillID), 1)
+			key := cast.ReuseKey(def)
+			if got, want := ch.HasSkillReuse(key), tc.equipDelay > 0; got != want {
+				t.Fatalf("HasSkillReuse() after equip = %v, want %v (equipDelay=%d)", got, want, tc.equipDelay)
+			}
+
+			inv.UnequipSlot(inv.ItemByObjectID(inst.ObjectID).Snapshot().LocationData)
+			skillsChanged = p.UnequipItemStats(ch, inv, inst, tmpl)
+			if !skillsChanged {
+				t.Fatal("UnequipItemStats() skillsChanged = false, want true")
+			}
+			if got := ch.SkillLevel(tc.skillID); got != 0 {
+				t.Fatalf("SkillLevel(%d) after unequip = %d, want 0 (revoked)", tc.skillID, got)
+			}
+			// The reuse timer armed at equip time is never cleared by
+			// unequip in the reference.
+			if !ch.HasSkillReuse(key) != (tc.equipDelay == 0) {
+				t.Fatalf("HasSkillReuse() after unequip changed unexpectedly for equipDelay=%d", tc.equipDelay)
+			}
+		})
+	}
+}
+
+// TestUnequipItemStatsKeepsGrantWhileAnotherEquippedItemSharesTemplateID
+// pins onUnequip's item-id-scoped sharing check (Java
+// ItemPassiveSkillsListener.java:126-128): unequipping one instance of a
+// dual-wielded item must not revoke the skill while a second instance of
+// the same template is still equipped.
+func TestUnequipItemStatsKeepsGrantWhileAnotherEquippedItemSharesTemplateID(t *testing.T) {
+	const earringTemplateID int32 = 42
+	tmpl := &item.Template{
+		ID:             earringTemplateID,
+		Kind:           item.KindArmor,
+		Slot:           item.SlotLREar,
+		Armor:          &item.ArmorDetail{Type: item.ArmorLight},
+		AttachedSkills: []item.SkillRef{{ID: 900, Level: 1}},
+	}
+	templates := item.NewTable([]*item.Template{tmpl})
+	skills := modelskill.NewTable([]modelskill.Definition{
+		{ID: 900, Level: 1, Activation: modelskill.ActivationActive},
+	})
+	inv := itemcontainer.NewPlayerInventory(1, templates)
+	p := NewPersistence(nil, skills)
+	ch := &player.Character{ID: 1}
+
+	earring1 := inv.AddNew(earringTemplateID, 1, 100)
+	inv.EquipItem(earring1, tmpl)
+	if _, _, err := p.EquipItemStats(ch, earring1, tmpl); err != nil {
+		t.Fatalf("EquipItemStats(earring1) error: %v", err)
+	}
+	earring2 := inv.AddNew(earringTemplateID, 1, 101)
+	inv.EquipItem(earring2, tmpl)
+	if _, _, err := p.EquipItemStats(ch, earring2, tmpl); err != nil {
+		t.Fatalf("EquipItemStats(earring2) error: %v", err)
+	}
+	if got := ch.SkillLevel(900); got != 1 {
+		t.Fatalf("SkillLevel(900) with both earrings equipped = %d, want 1", got)
+	}
+
+	inv.UnequipSlot(inv.ItemByObjectID(earring1.ObjectID).Snapshot().LocationData)
+	if changed := p.UnequipItemStats(ch, inv, earring1, tmpl); changed {
+		t.Fatal("UnequipItemStats(earring1) skillsChanged = true, want false (earring2 still grants the skill)")
+	}
+	if got := ch.SkillLevel(900); got != 1 {
+		t.Fatalf("SkillLevel(900) after unequipping earring1 only = %d, want 1 (earring2 still equipped)", got)
+	}
+
+	inv.UnequipSlot(inv.ItemByObjectID(earring2.ObjectID).Snapshot().LocationData)
+	if changed := p.UnequipItemStats(ch, inv, earring2, tmpl); !changed {
+		t.Fatal("UnequipItemStats(earring2) skillsChanged = false, want true (no more earring grants the skill)")
+	}
+	if got := ch.SkillLevel(900); got != 0 {
+		t.Fatalf("SkillLevel(900) after unequipping both earrings = %d, want 0", got)
 	}
 }

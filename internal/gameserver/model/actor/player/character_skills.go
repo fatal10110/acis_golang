@@ -120,6 +120,17 @@ func (c *Character) AddSkillReuse(ref modelskill.Ref, key int32, delay time.Dura
 	c.disableSkillUntil(key, expiresAt)
 }
 
+// HasSkillReuse reports whether a reuse timer is currently recorded for key,
+// regardless of whether it has already expired. Matches Java's
+// Player.getReuseTimeStamp().containsKey(hash) guard against re-arming an
+// equip-delay timer that is already present.
+func (c *Character) HasSkillReuse(key int32) bool {
+	c.skills.mu.Lock()
+	defer c.skills.mu.Unlock()
+	_, ok := c.skills.reuses[key]
+	return ok
+}
+
 // SetSkillReuse records a reuse timer with an explicit expiration time.
 func (c *Character) SetSkillReuse(ref modelskill.Ref, key int32, delay time.Duration, expiresAt time.Time) {
 	if delay <= 0 {
