@@ -110,7 +110,7 @@ func TestEffectPointBroadcastSkillUseAndLaunched(t *testing.T) {
 	wantUse := serverpackets.FrameMagicSkillUse(
 		serverpackets.SkillCastObject{ObjectID: ep.ObjectID(), Location: location.Location{X: 100, Y: 100, Z: 0}},
 		serverpackets.SkillCastObject{ObjectID: target.ObjectID(), Location: location.Location{X: 150, Y: 100, Z: 0}},
-		454, 1, 0, 0, true,
+		454, 1, 0, 0, false,
 	)
 	if !bytes.Equal(observer.frames[0], wantUse.Bytes()[2:]) {
 		t.Fatalf("frame[0] = %x, want %x", observer.frames[0], wantUse.Bytes()[2:])
