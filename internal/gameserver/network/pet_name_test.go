@@ -30,7 +30,7 @@ func TestRenamePetPersistsCollarAndRefreshesOwner(t *testing.T) {
 	state := world.New()
 	live := newTestLivePlayer(t, 1, &frameCapture{})
 	state.Spawn(live, 0, 0, 0, 0)
-	collar := &item.Instance{ObjectID: 77}
+	collar := &item.Instance{ObjectID: 77, Location: item.LocationInventory}
 	live.Inventory().Restore([]*item.Instance{collar})
 	actor := summon.NewPet(summon.PetConfig{ObjectID: 2, Owner: live, ControlItemID: 77, Name: "Wolf", Level: 1})
 	summon.SpawnBesideOwner(state, actor, live, location.Location{})
