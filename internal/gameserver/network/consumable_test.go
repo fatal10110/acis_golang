@@ -32,6 +32,10 @@ func consumableSkillTable(t *testing.T) *skillstate.Persistence {
 			ID: 2279, Level: 2, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
 			SkillType: "MANAHEAL_PERCENT", Potion: true, Power: 20, HitTime: 0,
 		},
+		{
+			ID: 2165, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+			SkillType: "UNLOCK", Potion: true, HitTime: 0, NumCharges: 1, MaxCharges: 2,
+		},
 	}), store)
 }
 
@@ -386,5 +390,73 @@ func TestGameClientLinkUseManaPotionRestoresAndConsumes(t *testing.T) {
 	}
 	if got := live.Inventory().ItemByObjectID(objectID).Snapshot().Count; got != 2 {
 		t.Fatalf("mana potion stack count = %d, want 2", got)
+	}
+}
+
+// TestGameClientLinkUseEnergyStoneIncreasesForceCharges pins the deferred
+// wiring PR 959's own issue (#850, "charge count handling
+// (numCharges/maxCharges)") committed to: PlayerCast.doInstantCast applies
+// the item-carried skill's Force/Soul charges (PlayerCast.java:108-114)
+// after its own cast packets and before the skill's effects apply. Energy
+// Stone (item 5589 -> skill 2165, numCharges 1 / maxCharges 2) must raise
+// the player's Force charge count by one per use, capping at 2.
+func TestGameClientLinkUseEnergyStoneIncreasesForceCharges(t *testing.T) {
+	skills := consumableSkillTable(t)
+	const stoneTemplate int32 = 5589
+	const objectID int32 = 702
+	c, chars, _, state := newLinkedGameClientWithSkillsSeed(t, skills, func(chars *fakeCharStore, items *fakeItemStore) {
+		objID := seedSelectableCharacter(t, chars, "player1", "Newbie", 5, 0)
+		if err := items.Create(context.Background(), objID, item.Instance{
+			ObjectID: objectID, TemplateID: stoneTemplate, OwnerID: objID,
+			Count: 2, Location: item.LocationInventory, ManaLeft: -1,
+		}); err != nil {
+			t.Fatalf("seed energy stone: %v", err)
+		}
+	}, 1)
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	obj, ok := state.Player(chars.soleObjectID(t))
+	if !ok {
+		t.Fatal("player not in world state after enter")
+	}
+	live, ok := obj.(*livePlayer)
+	if !ok {
+		t.Fatal("world player is not a *livePlayer")
+	}
+	if got := live.Character.Charges(); got != 0 {
+		t.Fatalf("charges before use = %d, want 0", got)
+	}
+
+	c.send(encodeUseItem(objectID, false))
+	readMagicSkillUseSelf(t, c, live.ObjectID(), 2165, 1)
+	assertSystemMessageSkillFrame(t, c.read(), serverpackets.SystemMessageUseS1, 2165, 1)
+	assertForceChargeMessage(t, c.read(), serverpackets.SystemMessageForceIncreasedToS1, 1)
+	if frame := c.read(); frame[0] != serverpackets.OpcodeEtcStatusUpdate {
+		t.Fatalf("charge feedback frame opcode = %#x, want EtcStatusUpdate (%#x)", frame[0], serverpackets.OpcodeEtcStatusUpdate)
+	}
+	inventoryUpdatesFor(t, state).Tick()
+	readInventoryUpdate(t, c, objectID, 1)
+	if got := live.Character.Charges(); got != 1 {
+		t.Fatalf("charges after first energy stone = %d, want 1", got)
+	}
+
+	c.send(encodeUseItem(objectID, false))
+	readMagicSkillUseSelf(t, c, live.ObjectID(), 2165, 1)
+	assertSystemMessageSkillFrame(t, c.read(), serverpackets.SystemMessageUseS1, 2165, 1)
+	// Reaching maxCharges on this call reports ForceMaxLevelReached instead
+	// of ForceIncreasedToS1, matching character_charges.go's IncreaseCharges
+	// (the "maxed" outcome fires the moment the cap is hit, not only when
+	// already-full short-circuits the call).
+	assertForceChargeMessage(t, c.read(), serverpackets.SystemMessageForceMaxLevelReached, 0)
+	if frame := c.read(); frame[0] != serverpackets.OpcodeEtcStatusUpdate {
+		t.Fatalf("charge feedback frame opcode = %#x, want EtcStatusUpdate (%#x)", frame[0], serverpackets.OpcodeEtcStatusUpdate)
+	}
+	if got := live.Character.Charges(); got != 2 {
+		t.Fatalf("charges after second energy stone = %d, want 2 (capped at maxCharges)", got)
 	}
 }

@@ -305,7 +305,9 @@ func TestPickupLiveGroundItemConsumesHerbWithoutStoringIt(t *testing.T) {
 		serverpackets.OpcodeGetItem,
 		serverpackets.OpcodeDeleteObject,
 		serverpackets.OpcodeMagicSkillUse,
+		serverpackets.OpcodeSystemMessage,
 		serverpackets.OpcodeMagicSkillUse,
+		serverpackets.OpcodeSystemMessage,
 	)
 	if _, ok := state.Object(ground.ObjectID()); ok {
 		t.Fatalf("world.Object(%d) still present after herb pickup", ground.ObjectID())
@@ -323,6 +325,8 @@ func TestPickupLiveGroundItemConsumesHerbWithoutStoringIt(t *testing.T) {
 	if len(effects) != 2 || effects[0].Skill.ID != 2278 || effects[1].Skill.ID != 2279 {
 		t.Fatalf("installed effects = %+v, want herb skills 2278 then 2279", effects)
 	}
+	assertSystemMessageSkillFrame(t, capture.frames[4], serverpackets.SystemMessageUseS1, 2278, 1)
+	assertSystemMessageSkillFrame(t, capture.frames[6], serverpackets.SystemMessageUseS1, 2279, 1)
 }
 
 // TestConsumeHerbRejectsNonHerbTemplate pins the precondition consumeHerb
@@ -383,6 +387,7 @@ func TestConsumeHerbMirrorsOntoServitorOnly(t *testing.T) {
 		assertOpcodeSequence(t, capture.frames,
 			serverpackets.OpcodeMagicSkillUse,
 			serverpackets.OpcodeMagicSkillUse,
+			serverpackets.OpcodeSystemMessage,
 		)
 		r := wire.NewReader(capture.frames[1][1:])
 		if caster, target := r.ReadInt32(), r.ReadInt32(); caster != servitor.ObjectID() || target != servitor.ObjectID() {
@@ -410,7 +415,7 @@ func TestConsumeHerbMirrorsOntoServitorOnly(t *testing.T) {
 		capture.frames = nil
 		gcl.consumeHerb(live, herbTemplate)
 
-		assertOpcodeSequence(t, capture.frames, serverpackets.OpcodeMagicSkillUse)
+		assertOpcodeSequence(t, capture.frames, serverpackets.OpcodeMagicSkillUse, serverpackets.OpcodeSystemMessage)
 		if effects := pet.EffectList().All(); len(effects) != 0 {
 			t.Fatalf("pet installed effects = %+v, want none (herb never mirrors onto a pet)", effects)
 		}
