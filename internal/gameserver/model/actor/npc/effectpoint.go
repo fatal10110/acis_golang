@@ -124,7 +124,7 @@ func (ep *EffectPoint) BroadcastSkillUse(target skillCastTarget, skillID, level 
 	ep.broadcastFrame(ep.frames.SkillUse(
 		ep.ObjectID(), location.Location{X: ax, Y: ay, Z: az},
 		target.ObjectID(), location.Location{X: tx, Y: ty, Z: tz},
-		skillID, level, 0, 0, true,
+		skillID, level, 0, 0, false,
 	))
 	return nil
 }

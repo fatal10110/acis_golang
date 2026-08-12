@@ -36,9 +36,9 @@ func (cubicHandler) UseResult(cast Cast) Result {
 
 	if len(cast.Targets) > 1 {
 		// Mass-cubic cast: every targeted player except the caster
-		// receives the cubic as "given by another player". No shipped
-		// cubic skill in the reference data actually resolves more than
-		// one target (every one declares target SELF).
+		// receives the cubic as "given by another player". Mass Summon
+		// cubics 1328/1329/1330 declare target PARTY in the reference
+		// data, so this branch is exercised by shipped skills.
 		result := Result{CubicID: id}
 		for _, target := range cast.Targets {
 			summoner, ok := target.(cubicSummoner)
