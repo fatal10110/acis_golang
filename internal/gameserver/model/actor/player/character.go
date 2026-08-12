@@ -129,6 +129,7 @@ type Character struct {
 	consumeHerb               func(itemID int32)
 	roll                      func(int) int
 	attackTarget              func(world.Tracked)
+	retargetTarget            func(world.Tracked)
 
 	deathMu sync.Mutex
 	dead    bool
