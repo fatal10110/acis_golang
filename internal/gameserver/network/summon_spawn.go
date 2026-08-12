@@ -244,25 +244,22 @@ func (s *gameSummonSpawner) SpawnServitor(owner *player.Character, def modelskil
 	return true
 }
 
-// summonCastController builds the cast controller wireSummonAI installs on
-// a summon's AI brain, wired with l.log so a panic recovered from a
-// scheduled Launch/Hit/Finish callback (Controller.scheduleLocked's
-// recover wrapper) is logged instead of silently discarded — the same
-// wiring the player-owned cast controller gets (live.cast.SetLogger).
-func (l *GameClientLink) summonCastController(actor *summon.Actor) *actorcast.AIController {
+func (l *GameClientLink) wireSummonAI(actor *summon.Actor) {
+	brain := ai.NewSummon(actor, inertSummonMoveController{}, inertSummonAttackController{})
+	// SetLogger records where a panic recovered from a scheduled
+	// Launch/Hit/Finish callback (Controller.scheduleLocked's recover
+	// wrapper, unconditional for every Controller) is logged; left unset,
+	// it's silently discarded through the zero-value zerolog.Logger.
+	// Player-owned controllers get the same wiring (live.cast.SetLogger /
+	// c.SetLogger).
 	castController := actorcast.NewController(actorcast.SummonActor{Summon: actor})
 	castController.SetLogger(l.log)
-	return &actorcast.AIController{
+	brain.SetCastController(&actorcast.AIController{
 		Controller:  castController,
 		Definitions: l.skills,
 		Effects:     actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers},
 		Caster:      actor,
-	}
-}
-
-func (l *GameClientLink) wireSummonAI(actor *summon.Actor) {
-	brain := ai.NewSummon(actor, inertSummonMoveController{}, inertSummonAttackController{})
-	brain.SetCastController(l.summonCastController(actor))
+	})
 	actor.SetAI(brain)
 	actor.SetStatusUpdater(func() { l.broadcastSummonStatus(actor) })
 	actor.SetDamageNotifier(func(attackerName string, damage int32) {
