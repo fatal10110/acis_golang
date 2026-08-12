@@ -170,3 +170,16 @@ func (a PlayerActor) AllSkillsDisabled() bool {
 // which clears only the raw Duel-defeat lock. This port doesn't model that
 // lock since Duel isn't ported, so there is nothing to clear yet.
 func (PlayerActor) EnableAllSkills() {}
+
+// IncreaseCharges and DecreaseCharges satisfy the chargeHolder interface
+// Controller.hitLocked probes for, matching CreatureCast.onMagicHitTimer's
+// `_actor instanceof Player` gate (CreatureCast.java:274-282): only a
+// PlayerActor implements this, so an NPC/summon timed cast never applies
+// Force/Soul charges.
+func (a PlayerActor) IncreaseCharges(count, max int) bool {
+	return a.Character != nil && a.Character.IncreaseCharges(count, max)
+}
+
+func (a PlayerActor) DecreaseCharges(count int) bool {
+	return a.Character != nil && a.Character.DecreaseCharges(count)
+}
