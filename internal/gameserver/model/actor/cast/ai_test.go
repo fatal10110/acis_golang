@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -277,6 +278,150 @@ func TestAIControllerCastBroadcastsSkillLaunchedWithFullTargetList(t *testing.T)
 	}
 }
 
+// mutableKnown is effectsKnown with a swappable roster, so a test can prove
+// a value resolved once at Launch survives unchanged through Hit even if
+// the underlying known-creature set has since moved on.
+type mutableKnown struct {
+	creatures []skilltarget.Creature
+}
+
+func (k *mutableKnown) ForEachKnownCreatureInRadius(anchor skilltarget.Creature, _ int, fn func(skilltarget.Creature)) {
+	for _, c := range k.creatures {
+		if c.ObjectID() == anchor.ObjectID() {
+			continue
+		}
+		fn(c)
+	}
+}
+
+// TestAIControllerCastReusesLaunchResolvedTargetsAtHit verifies Hit applies
+// effects to the exact target set Launch already resolved and broadcast,
+// not a fresh resolution 400ms later — matching CreatureCast.java's
+// `_targets` field, assigned once in onMagicLaunch (:232) and read again
+// unchanged by onMagicHitTimer's callSkill (:291, NpcCast.java:52). A
+// bystander that leaves the known set between Launch and Hit must still be
+// affected, because the set was already frozen at Launch.
+func TestAIControllerCastReusesLaunchResolvedTargetsAtHit(t *testing.T) {
+	clock := &fakeCastClock{}
+	actor := scalingActor()
+	ctrl := NewController(actor)
+	ctrl.afterFunc = clock.AfterFunc
+
+	ref := modelskill.Ref{ID: scalingDef.ID, Level: scalingDef.Level}
+	def := scalingDef
+	def.Target = modelskill.TargetArea
+	def.Offensive = true
+	def.Radius = 900
+	def.SkillType = "DUMMYCAST"
+
+	rec := &recordingSkillHandler{skillTypes: []string{"DUMMYCAST"}}
+	caster := &fakeBroadcastingCaster{fakeCastCreature: fakeCastCreature{id: 1, category: skilltarget.CategoryAttackable}}
+	selected := &fakeCastCreature{id: 2, x: 10, category: skilltarget.CategoryPlayable}
+	bystander := &fakeCastCreature{id: 3, x: 20, category: skilltarget.CategoryPlayable}
+
+	known := &mutableKnown{creatures: []skilltarget.Creature{caster, selected, bystander}}
+	ai := &AIController{
+		Controller:  ctrl,
+		Definitions: fakeDefinitions{ref: def},
+		Effects:     EffectHandlers{Targets: skilltarget.NewRegistry(known), Skills: handlerskill.NewRegistry(rec)},
+		Caster:      caster,
+	}
+
+	ai.Cast(selected, ref)
+	clock.fire(125 * time.Millisecond) // Launch — resolves & broadcasts [selected, bystander]
+
+	if len(caster.skillLaunchedCalls) != 1 || len(caster.skillLaunchedCalls[0].targetIDs) != 2 {
+		t.Fatalf("BroadcastSkillLaunched calls = %+v, want 1 call with 2 targets", caster.skillLaunchedCalls)
+	}
+
+	// bystander leaves the known set entirely before Hit fires — a fresh
+	// resolution at Hit would miss it.
+	known.creatures = []skilltarget.Creature{caster, selected}
+
+	clock.fire(400 * time.Millisecond) // Hit
+
+	if len(rec.calls) != 1 {
+		t.Fatalf("skill handler calls = %d, want 1", len(rec.calls))
+	}
+	if len(rec.calls[0].Targets) != 2 {
+		t.Fatalf("effect targets = %v, want 2 (the launch-frozen set, bystander included despite leaving known)", rec.calls[0].Targets)
+	}
+}
+
+// TestAIControllerCastBroadcastsEmptyTargetListWhenLaunchResolutionFails
+// verifies that when launch-time target resolution fails (no registered
+// target handler here), MagicSkillLaunched broadcasts the empty list
+// rather than synthesizing the single preselected target — matching
+// CreatureCast.java:232-234's unconditional broadcast of whatever
+// getTargetList returned, empty included, with no fallback.
+func TestAIControllerCastBroadcastsEmptyTargetListWhenLaunchResolutionFails(t *testing.T) {
+	clock := &fakeCastClock{}
+	actor := scalingActor()
+	ctrl := NewController(actor)
+	ctrl.afterFunc = clock.AfterFunc
+
+	ref := modelskill.Ref{ID: scalingDef.ID, Level: scalingDef.Level}
+	def := scalingDef
+	def.Target = modelskill.TargetOne
+	def.SkillType = "DUMMYCAST"
+
+	caster := &fakeBroadcastingCaster{fakeCastCreature: fakeCastCreature{id: 1, category: skilltarget.CategoryAttackable}}
+	target := &fakeCastCreature{id: 2, category: skilltarget.CategoryAttackable}
+
+	ai := &AIController{
+		Controller:  ctrl,
+		Definitions: fakeDefinitions{ref: def},
+		Effects:     EffectHandlers{}, // no Targets registry: resolution always fails
+		Caster:      caster,
+	}
+
+	ai.Cast(target, ref)
+	clock.fire(125 * time.Millisecond) // Launch
+
+	if len(caster.skillLaunchedCalls) != 1 {
+		t.Fatalf("BroadcastSkillLaunched calls = %d, want 1", len(caster.skillLaunchedCalls))
+	}
+	if ids := caster.skillLaunchedCalls[0].targetIDs; len(ids) != 0 {
+		t.Fatalf("BroadcastSkillLaunched targetIDs = %v, want empty (no synthesized fallback target)", ids)
+	}
+}
+
+// TestAIControllerCastBroadcastsSkillCanceledOnLaunchAbort verifies an
+// aborted cast broadcasts MagicSkillCanceled, closing the loop this PR
+// opened by making cast start observable — matching CreatureCast.stop()'s
+// `if (isCastingNow()) _actor.broadcastPacket(new
+// MagicSkillCanceled(...))` (CreatureCast.java:416-419), the common exit
+// every abort path (Launch revalidation failure here; also insufficient
+// MP/HP at Hit and a damage-break interrupt) routes through.
+func TestAIControllerCastBroadcastsSkillCanceledOnLaunchAbort(t *testing.T) {
+	clock := &fakeCastClock{}
+	ctrl := NewController(scalingActor())
+	ctrl.afterFunc = clock.AfterFunc
+
+	ref := modelskill.Ref{ID: scalingDef.ID, Level: scalingDef.Level}
+	def := scalingDef
+	def.Target = modelskill.TargetOne
+	def.SkillType = "DUMMYCAST"
+	def.EffectRange = 100
+
+	caster := &fakeBroadcastingCaster{fakeCastCreature: fakeCastCreature{id: 1, category: skilltarget.CategoryAttackable}}
+	ai := &AIController{
+		Controller:  ctrl,
+		Definitions: fakeDefinitions{ref: def},
+		Caster:      caster,
+	}
+
+	ai.Cast(&fakeCastCreature{id: 2, x: 200, category: skilltarget.CategoryAttackable}, ref)
+	clock.fire(125 * time.Millisecond) // Launch — RevalidateLaunch rejects (too far), aborts
+
+	if len(caster.skillCanceledObjects) != 1 || caster.skillCanceledObjects[0] != 1 {
+		t.Fatalf("BroadcastSkillCanceled objects = %v, want [1] (the caster's own id)", caster.skillCanceledObjects)
+	}
+	if len(caster.skillLaunchedCalls) != 0 {
+		t.Fatal("BroadcastSkillLaunched called on an aborted launch")
+	}
+}
+
 func TestAIControllerCastReportsLaunchAbort(t *testing.T) {
 	clock := &fakeCastClock{}
 	ctrl := NewController(scalingActor())
@@ -414,8 +559,9 @@ type skillLaunchedCall struct {
 // assert the Launch/Hit packet sequence AIController.Cast wires.
 type fakeBroadcastingCaster struct {
 	fakeCastCreature
-	skillUseCalls      []skillUseCall
-	skillLaunchedCalls []skillLaunchedCall
+	skillUseCalls        []skillUseCall
+	skillLaunchedCalls   []skillLaunchedCall
+	skillCanceledObjects []int32
 }
 
 func (f *fakeBroadcastingCaster) BroadcastSkillUse(targetID int32, targetX, targetY, targetZ int, skillID, level int32, hitTime, reuseDelay int) error {
@@ -425,6 +571,11 @@ func (f *fakeBroadcastingCaster) BroadcastSkillUse(targetID int32, targetX, targ
 
 func (f *fakeBroadcastingCaster) BroadcastSkillLaunched(skillID, level int32, targetIDs []int32) error {
 	f.skillLaunchedCalls = append(f.skillLaunchedCalls, skillLaunchedCall{skillID, level, targetIDs})
+	return nil
+}
+
+func (f *fakeBroadcastingCaster) BroadcastSkillCanceled(objectID int32) error {
+	f.skillCanceledObjects = append(f.skillCanceledObjects, objectID)
 	return nil
 }
 
