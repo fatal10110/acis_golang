@@ -62,6 +62,11 @@ func (p *livePlayer) Discover(obj world.Tracked) {
 }
 
 func refreshSummonAbnormalEffect(a *summon.Actor) {
+	if owner, ok := a.ActingPlayer().(*livePlayer); ok {
+		if snap, ok := petInfoSnapshot(a, owner, owner.npcs); ok {
+			owner.sendVisibilityFrame(serverpackets.FramePetInfo(snap))
+		}
+	}
 	a.ForEachKnown(func(obj world.Tracked) {
 		p, ok := obj.(*livePlayer)
 		if !ok || p.ObjectID() == a.OwnerID() {
@@ -235,6 +240,7 @@ func petInfoSnapshot(a *summon.Actor, owner *livePlayer, npcs *npc.Table) (serve
 		EvasionRate:       int(a.EvasionRate()),
 		CriticalHit:       int(a.CriticalRate(tmpl.CritRate)),
 		MoveSpeed:         int(a.MoveSpeed(tmpl.RunSpeed)),
+		AbnormalEffect:    a.AbnormalEffect(),
 		Mountable:         petmodel.IsMountable(a.NPCID()),
 		SoulShotsPerHit:   ssCount,
 		SpiritShotsPerHit: spsCount,
