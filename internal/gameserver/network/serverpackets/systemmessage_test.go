@@ -100,3 +100,19 @@ func TestFrameSystemMessageSkillName(t *testing.T) {
 		t.Fatalf("FrameSystemMessageSkillName() = %x, want %x", got, want)
 	}
 }
+
+func TestFrameSystemMessageStringNumber(t *testing.T) {
+	got := framePayload(t, FrameSystemMessageStringNumber(1016, "Attacker", 12))
+	want := []byte{
+		OpcodeSystemMessage,
+		0xf8, 0x03, 0x00, 0x00, // 1016
+		0x02, 0x00, 0x00, 0x00, // two params
+		0x00, 0x00, 0x00, 0x00, // text parameter
+		'A', 0x00, 't', 0x00, 't', 0x00, 'a', 0x00, 'c', 0x00, 'k', 0x00, 'e', 0x00, 'r', 0x00, 0x00, 0x00,
+		0x01, 0x00, 0x00, 0x00, // number parameter
+		0x0c, 0x00, 0x00, 0x00, // 12
+	}
+	if !bytes.Equal(got, want) {
+		t.Fatalf("FrameSystemMessageStringNumber() = %x, want %x", got, want)
+	}
+}
