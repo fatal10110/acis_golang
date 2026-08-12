@@ -327,17 +327,23 @@ func (l *GameClientLink) selectLiveTarget(live *livePlayer, target world.Tracked
 	// player itself or aboard a boat (Player.java:2477-2479). Boats aren't a
 	// ported feature, so every target here is treated as never in one.
 	if target.ObjectID() != live.ObjectID() {
-		// AttackableBy is the Creature discriminator targetColor already uses
-		// below; a Chair or other StaticObject never implements it, matching
-		// Player.java's ValidateLocation leg sitting strictly inside the
-		// `instanceof Creature` branch, never the StaticObject one.
-		if creatureLike, ok := target.(interface {
-			AttackableBy(skilltarget.Creature) bool
-			Position() (int, int, int)
-			Heading() int
-		}); ok {
-			x, y, z := creatureLike.Position()
-			live.SendFrame(serverpackets.FrameValidateLocation(target.ObjectID(), location.Location{X: x, Y: y, Z: z}, creatureLike.Heading()))
+		// staticobject.Chair excludes the StaticObject branch, which sends no
+		// ValidateLocation in the reference (Player.java:2465-2470); every
+		// other target reaching this point is Creature-ish (Hostile,
+		// player.Character, summon.Actor) and gets Position()/Heading() via
+		// its embedded world.Presence, matching Player.setTarget's
+		// ValidateLocation leg sitting strictly inside the `instanceof
+		// Creature` branch (Player.java:2474-2475). AttackableBy alone would
+		// under-match here: only Hostile and player.Character implement it,
+		// silently excluding summon.Actor.
+		if _, isStatic := target.(staticobject.Chair); !isStatic {
+			if creatureLike, ok := target.(interface {
+				Position() (int, int, int)
+				Heading() int
+			}); ok {
+				x, y, z := creatureLike.Position()
+				live.SendFrame(serverpackets.FrameValidateLocation(target.ObjectID(), location.Location{X: x, Y: y, Z: z}, creatureLike.Heading()))
+			}
 		}
 	}
 	live.SendFrame(serverpackets.FrameMyTargetSelected(target.ObjectID(), targetColor(live.Character, target)))

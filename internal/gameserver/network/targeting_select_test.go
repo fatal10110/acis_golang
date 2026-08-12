@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -83,6 +84,36 @@ func TestSelectLiveTargetOmitsValidateLocationForStaticObject(t *testing.T) {
 	}
 	if got := frameOpcodes(frames.frames); string(got) != string([]byte{serverpackets.OpcodeMyTargetSelected}) {
 		t.Fatalf("chair select opcodes = %x, want MyTargetSelected only (no ValidateLocation)", got)
+	}
+}
+
+// TestSelectLiveTargetSendsValidateLocationForSummon is the regression test
+// for a follow-up to the Chair fix above: gating ValidateLocation on
+// AttackableBy(skilltarget.Creature) (targetColor's Creature discriminator)
+// under-matches, since only npc.Hostile and player.Character implement it —
+// summon.Actor doesn't, so that gate would silently drop ValidateLocation
+// for a pet/servitor target too, even though Summon is a Creature in the
+// reference (no override of setTarget in the Summon hierarchy) and belongs
+// in the same branch as Hostile/Player targets (Player.java:2474-2493). The
+// gate now excludes only staticobject.Chair, so a summon target (which has
+// Position()/Heading() via its embedded world.Presence, same as Hostile and
+// livePlayer) still gets ValidateLocation.
+func TestSelectLiveTargetSendsValidateLocationForSummon(t *testing.T) {
+	state := world.New()
+	frames := &frameCapture{}
+	attacker := newTestLivePlayer(t, 1, frames)
+	pet := summon.NewPet(summon.PetConfig{ObjectID: 501, Level: 44, Stats: summon.CombatStats{MaxHP: 500, MaxMP: 200}})
+
+	state.Spawn(attacker, 0, 0, 0, 0)
+	state.Spawn(pet, 100, 0, 0, 0)
+	frames.frames = nil
+
+	gcl := &GameClientLink{world: state, log: zerolog.Nop()}
+	if !gcl.selectLiveTarget(attacker, pet) {
+		t.Fatal("selectLiveTarget returned false")
+	}
+	if got := frameOpcodes(frames.frames); len(got) == 0 || got[0] != serverpackets.OpcodeValidateLocation {
+		t.Fatalf("summon select opcodes = %x, want leading ValidateLocation", got)
 	}
 }
 
