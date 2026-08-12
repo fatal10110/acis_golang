@@ -238,6 +238,24 @@ func (a *Actor) SetAI(brain AI) {
 	a.brain = brain
 }
 
+// CurrentTarget returns the summon target selected by its current command.
+func (a *Actor) CurrentTarget() any { return a.target }
+
+// SetTarget updates the summon target without issuing an owner-visible packet.
+func (a *Actor) SetTarget(target any) {
+	if target == nil {
+		a.target = nil
+		return
+	}
+	tracked, ok := target.(world.Tracked)
+	if ok {
+		a.target = tracked
+	}
+}
+
+// AttackTarget forwards an aggression-triggered attack to the summon AI.
+func (a *Actor) AttackTarget(target any) { a.TryToAttack(target) }
+
 // TryToAttack forwards an attack request to the attached AI when target is
 // a live combatant.
 func (a *Actor) TryToAttack(target any) {
