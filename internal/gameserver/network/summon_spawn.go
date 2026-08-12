@@ -244,7 +244,11 @@ func (s *gameSummonSpawner) SpawnServitor(owner *player.Character, def modelskil
 	return true
 }
 
-func (l *GameClientLink) wireSummonAI(actor *summon.Actor) {
+// wireSummonAI attaches actor's AI brain, cast controller, status/damage
+// notifiers, and returns the installed cast controller so a caller (or a
+// test) can drive it directly rather than reaching into the brain's
+// unexported state.
+func (l *GameClientLink) wireSummonAI(actor *summon.Actor) *actorcast.AIController {
 	brain := ai.NewSummon(actor, inertSummonMoveController{}, inertSummonAttackController{})
 	// SetLogger records where a panic recovered from a scheduled
 	// Launch/Hit/Finish callback (Controller.scheduleLocked's recover
@@ -254,12 +258,13 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor) {
 	// c.SetLogger).
 	castController := actorcast.NewController(actorcast.SummonActor{Summon: actor})
 	castController.SetLogger(l.log)
-	brain.SetCastController(&actorcast.AIController{
+	aiController := &actorcast.AIController{
 		Controller:  castController,
 		Definitions: l.skills,
 		Effects:     actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers},
 		Caster:      actor,
-	})
+	}
+	brain.SetCastController(aiController)
 	actor.SetAI(brain)
 	actor.SetStatusUpdater(func() { l.broadcastSummonStatus(actor) })
 	actor.SetDamageNotifier(func(attackerName string, damage int32) {
@@ -273,6 +278,7 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor) {
 		}
 		owner.SendFrame(serverpackets.FrameSystemMessageStringNumber(messageID, attackerName, damage))
 	})
+	return aiController
 }
 
 func (l *GameClientLink) broadcastSummonStatus(actor *summon.Actor) {

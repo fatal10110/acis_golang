@@ -3,15 +3,12 @@ package network
 import (
 	"bytes"
 	"context"
-	"reflect"
 	"strings"
 	"testing"
 	"time"
-	"unsafe"
 
 	"github.com/rs/zerolog"
 
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
@@ -532,30 +529,6 @@ func TestGameSummonSpawnerSpawnPetRejectsSecondSummon(t *testing.T) {
 	}
 }
 
-// summonInstalledCastController extracts the *actorcast.AIController
-// wireSummonAI actually installed on actor's AI brain (ai.Summon.cast, set
-// via SetCastController), so a test can drive the real production wiring
-// instead of a separately built stand-in that a regression in wireSummonAI
-// itself wouldn't touch. Neither ai.Summon nor summon.Actor exposes an
-// accessor for these fields, so this reads them via reflection.
-func summonInstalledCastController(t *testing.T, actor *summon.Actor) *actorcast.AIController {
-	t.Helper()
-	brainField := reflect.ValueOf(actor).Elem().FieldByName("brain")
-	brainField = reflect.NewAt(brainField.Type(), unsafe.Pointer(brainField.UnsafeAddr())).Elem()
-	brain, ok := brainField.Interface().(*ai.Summon)
-	if !ok {
-		t.Fatalf("actor.brain = %T, want *ai.Summon", brainField.Interface())
-	}
-
-	castField := reflect.ValueOf(brain).Elem().FieldByName("cast")
-	castField = reflect.NewAt(castField.Type(), unsafe.Pointer(castField.UnsafeAddr())).Elem()
-	ctrl, ok := castField.Interface().(*actorcast.AIController)
-	if !ok {
-		t.Fatalf("brain.cast = %T, want *actorcast.AIController", castField.Interface())
-	}
-	return ctrl
-}
-
 // TestSummonCastControllerRecoversPanickingHook is the regression test for
 // #1396: wireSummonAI built every summon's cast controller without
 // SetLogger, so a panic recovered from a scheduled Launch/Hit/Finish
@@ -564,9 +537,9 @@ func summonInstalledCastController(t *testing.T, actor *summon.Actor) *actorcast
 // silently discarded, matching the network/dispatch_test.go
 // (TestScheduleAfterRecoversPanickingCallback) and cast/schedule_test.go
 // (TestScheduleRecoversPanickingHook) recover-and-log proof pattern. It
-// drives the exact controller wireSummonAI installs (see
-// summonInstalledCastController), so reverting wireSummonAI to build its
-// cast controller without SetLogger fails this test.
+// drives wireSummonAI's own returned controller — a compiler-checked seam,
+// not a reflection-based reach into unexported AI state — so reverting
+// wireSummonAI's SetLogger call fails this test.
 func TestSummonCastControllerRecoversPanickingHook(t *testing.T) {
 	link, state := newSummonTestLink(t)
 	buf := &syncBuffer{}
@@ -583,7 +556,12 @@ func TestSummonCastControllerRecoversPanickingHook(t *testing.T) {
 	}
 	actor := obj.(*summon.Actor)
 
-	ctrl := summonInstalledCastController(t, actor)
+	// wireSummonAI is idempotent enough for this: re-wiring the same actor
+	// replaces its AI brain and cast controller (both plain field
+	// assignments) with a freshly built one carrying the same l.log,
+	// giving the test direct, compiler-checked access to what SpawnServitor
+	// itself installed instead of reaching into unexported AI state.
+	ctrl := link.wireSummonAI(actor)
 	plan, err := ctrl.Controller.Start(time.Now(), actorcast.SummonActor{Summon: actor}, modelskill.Definition{ID: 1, Level: 1, HitTime: 0})
 	if err != nil {
 		t.Fatalf("Start() error: %v", err)
