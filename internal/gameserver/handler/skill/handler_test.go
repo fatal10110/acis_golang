@@ -447,7 +447,7 @@ func TestPhysicalMagicBlowAndManaDamageHandlersUseFormulaInputs(t *testing.T) {
 			AttackPower: 100, SkillPower: 50, Defence: 40,
 			RandomMul: 1, PosMul: 1.2,
 			CritDamageMul: 1.5, CritDamagePosMul: 1, CritVulnMul: 1, DaggerVulnMul: 1, CritDamageAddBase: 5,
-			Landed: true,
+			Landed: true, Crit: true,
 		},
 		blowOK: true,
 		manaInput: formulas.ManaDamageInput{
@@ -468,8 +468,8 @@ func TestPhysicalMagicBlowAndManaDamageHandlersUseFormulaInputs(t *testing.T) {
 	}
 
 	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "BLOW"}, Targets: []any{target}})
-	if !almost(target.hp, 2000-192.5-728-577) {
-		t.Fatalf("BLOW hp = %v, want %v", target.hp, 2000-192.5-728-577)
+	if !almost(target.hp, 2000-192.5-728-1154) {
+		t.Fatalf("BLOW critical hp = %v, want %v", target.hp, 2000-192.5-728-1154)
 	}
 
 	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "MANADAM"}, Targets: []any{target}})

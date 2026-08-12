@@ -143,10 +143,11 @@ func ResolveBlowInput(caster any, target FormulaActor, def modelskill.Definition
 	if landed && !def.Magic && float64(target.Roll(100)) < target.CalcStat(stat.PSkillEvasion, 0) {
 		return formulas.BlowInput{Landed: true, Evaded: true}, true
 	}
+	crit := landed && PhysicalSkillCrit(attacker, def)
 	shield := formulas.ShieldFailed
 	if landed && !def.IgnoreShield {
 		if resolver, ok := any(target).(shieldDefenseActor); ok {
-			shield = resolver.ShieldDefense(caster, def, false)
+			shield = resolver.ShieldDefense(caster, def, crit)
 		}
 	}
 	defence := target.PDef()
@@ -169,6 +170,7 @@ func ResolveBlowInput(caster any, target FormulaActor, def modelskill.Definition
 		DaggerVulnMul:     target.CalcStat(stat.DaggerWpnVuln, 1),
 		CritDamageAddBase: attacker.CalcStat(stat.CriticalDamageAdd, 0),
 		Landed:            landed,
+		Crit:              crit,
 	}, true
 }
 

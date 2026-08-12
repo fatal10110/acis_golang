@@ -121,12 +121,15 @@ func TestCharacterBlowInputCarriesResolvedLandingRoll(t *testing.T) {
 		return 799
 	})
 
-	in, ok := target.BlowInput(caster, modelskill.Definition{ID: 1, Power: 30, SkillType: "BLOW", BaseLandRate: 1000})
+	in, ok := target.BlowInput(caster, modelskill.Definition{ID: 1, Power: 30, SkillType: "BLOW", BaseLandRate: 1000, BaseCritRate: 100})
 	if !ok {
 		t.Fatal("BlowInput() ok = false")
 	}
 	if !in.Landed {
 		t.Fatal("BlowInput().Landed = false, want true for a capped ordinary blow")
+	}
+	if !in.Crit {
+		t.Fatal("BlowInput().Crit = false, want true for a successful critical roll")
 	}
 }
 
