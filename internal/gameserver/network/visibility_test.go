@@ -162,6 +162,37 @@ func TestHostileAbnormalEffectRefreshResendsLiveNPCInfo(t *testing.T) {
 	}
 }
 
+func TestSummonAbnormalEffectRefreshesBystanderSummonInfoOnly(t *testing.T) {
+	state := world.New()
+	ownerFrames := &frameCapture{}
+	bystanderFrames := &frameCapture{}
+	owner := newTestLivePlayer(t, 1, ownerFrames)
+	bystander := newTestLivePlayer(t, 2, bystanderFrames)
+	owner.npcs = npc.NewTable([]*npc.Template{{ID: 12077, TemplateID: 12077, Name: "Wolf", AtkSpd: 300, RunSpeed: 120, WalkSpeed: 60}})
+	bystander.npcs = owner.npcs
+	state.Spawn(owner, 0, 0, 0, 0)
+	state.Spawn(bystander, 500, 0, 0, 0)
+
+	pet := summon.NewPet(summon.PetConfig{ObjectID: 20, Owner: owner, NPCID: 12077, Name: "Wolf", Level: 5, Stats: summon.CombatStats{MaxHP: 100, MaxMP: 30}})
+	summon.SpawnBesideOwner(state, pet, owner, location.Location{X: 10})
+	ownerFrames.frames = nil
+	bystanderFrames.frames = nil
+
+	pet.StartAbnormalEffect(0x010000)
+	pet.UpdateAbnormalEffect()
+
+	if len(ownerFrames.frames) != 0 {
+		t.Fatalf("owner refresh frames = %x, want none", ownerFrames.frames)
+	}
+	if len(bystanderFrames.frames) != 1 || bystanderFrames.frames[0][0] != serverpackets.OpcodeNPCInfo {
+		t.Fatalf("bystander refresh frames = %x, want one SummonInfo (%#x)", bystanderFrames.frames, serverpackets.OpcodeNPCInfo)
+	}
+	snap, ok := summonInfoSnapshot(pet, bystander.npcs)
+	if !ok || snap.AbnormalEffect != 0x010000 {
+		t.Fatalf("SummonInfo abnormal effect = %#x, %v; want %#x, true", snap.AbnormalEffect, ok, 0x010000)
+	}
+}
+
 func TestLivePlayerVisibilitySendsOwnerPetInfoAndBystanderSummonInfo(t *testing.T) {
 	state := world.New()
 	ownerFrames := &frameCapture{}

@@ -156,7 +156,7 @@ func (l *GameClientLink) useSummonItem(live *livePlayer, inv *itemcontainer.Inve
 			// ApplyEffectsResult drives that the same way it drives every
 			// other skill's Hit-phase effects.
 			result := actorcast.ApplyItemEffectsResult(actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers}, live.Character, target, def, inst)
-			sendSkillHandlerResult(live, result)
+			l.sendSkillHandlerResult(live, result)
 			l.syncCubicTargets(live, result, def)
 		},
 		Failed: func(err error) {

@@ -32,6 +32,14 @@ type counterSkillPhysicalTarget interface {
 	CounterSkillPhysical() float64
 }
 
+type objectIDTarget interface {
+	ObjectID() int32
+}
+
+type characterNameTarget interface {
+	CharacterName() string
+}
+
 type manaDamageTarget interface {
 	Dead() bool
 	MPValue() float64
@@ -211,9 +219,14 @@ type blowHandler struct{}
 
 func (blowHandler) Types() []string { return []string{"BLOW"} }
 
-func (blowHandler) Use(cast Cast) {
+func (h blowHandler) Use(cast Cast) {
+	h.UseResult(cast)
+}
+
+func (blowHandler) UseResult(cast Cast) Result {
+	var result Result
 	if alikeDead(cast.Caster) {
-		return
+		return result
 	}
 	for _, obj := range cast.Targets {
 		target, ok := obj.(blowDamageTarget)
@@ -238,6 +251,12 @@ func (blowHandler) Use(cast Cast) {
 						if caster, ok := cast.Caster.(hpDamageTarget); ok {
 							caster.ReduceHP(float64(damage)*counter/100, target, cast.Skill)
 						}
+						result.Counterattacks = append(result.Counterattacks, Counterattack{
+							AttackerID:   counterattackObjectID(cast.Caster),
+							AttackerName: counterattackName(cast.Caster),
+							DefenderID:   counterattackObjectID(target),
+							DefenderName: counterattackName(target),
+						})
 					}
 				}
 				if !countered {
@@ -254,6 +273,21 @@ func (blowHandler) Use(cast Cast) {
 		applyLethalHit(cast, target)
 	}
 	applySelfEffects(cast.Caster, cast.Skill)
+	return result
+}
+
+func counterattackObjectID(obj any) int32 {
+	if target, ok := obj.(objectIDTarget); ok {
+		return target.ObjectID()
+	}
+	return 0
+}
+
+func counterattackName(obj any) string {
+	if target, ok := obj.(characterNameTarget); ok {
+		return target.CharacterName()
+	}
+	return ""
 }
 
 func counterSkillReflects(def modelskill.Definition, counter float64) bool {

@@ -17,6 +17,31 @@ func TestFrameSystemMessage(t *testing.T) {
 	}
 }
 
+func TestFrameSystemMessageCounterattackFeedback(t *testing.T) {
+	tests := []struct {
+		name string
+		id   int
+	}{
+		{name: "performing", id: SystemMessageS1PerformingCounterattack},
+		{name: "countered", id: SystemMessageCounteredS1Attack},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := framePayload(t, FrameSystemMessageString(tt.id, "Target"))
+			want := []byte{
+				OpcodeSystemMessage,
+				byte(tt.id), byte(tt.id >> 8), 0x00, 0x00,
+				0x01, 0x00, 0x00, 0x00,
+				SystemMessageParamText, 0x00, 0x00, 0x00,
+				'T', 0x00, 'a', 0x00, 'r', 0x00, 'g', 0x00, 'e', 0x00, 't', 0x00, 0x00, 0x00,
+			}
+			if !bytes.Equal(got, want) {
+				t.Fatalf("counterattack frame = %x, want %x", got, want)
+			}
+		})
+	}
+}
+
 func TestFrameSystemMessageForceChargeFeedback(t *testing.T) {
 	t.Run("increased", func(t *testing.T) {
 		got := framePayload(t, FrameSystemMessageNumber(SystemMessageForceIncreasedToS1, 3))

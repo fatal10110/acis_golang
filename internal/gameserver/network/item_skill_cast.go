@@ -107,7 +107,7 @@ func (l *GameClientLink) useItemAICast(live *livePlayer, inv *itemcontainer.Inve
 		},
 		Hit: func() {
 			result := actorcast.ApplyEffectsResult(actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers}, live.Character, target, def)
-			sendSkillHandlerResult(live, result)
+			l.sendSkillHandlerResult(live, result)
 			l.syncCubicTargets(live, result, def)
 			sendMagicStatusUpdate(live, beforeVitals)
 		},

@@ -43,6 +43,8 @@ const (
 	SystemMessageCannotPickupOrUseItemTrading     = 149
 	SystemMessageS1IsBusyTryLater                 = 153
 	SystemMessageAttackFailed                     = 158
+	SystemMessageS1PerformingCounterattack        = 1997
+	SystemMessageCounteredS1Attack                = 1998
 	SystemMessageInvalidTarget                    = 109
 	SystemMessageCannotDiscardDistanceTooFar      = 151
 	SystemMessageItemMissingToLearnSkill          = 276
