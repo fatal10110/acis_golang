@@ -221,6 +221,11 @@ func TestAttackableAIReconsiderTargetSwapsAndDropsPreviousDesire(t *testing.T) {
 	if desire.FinalTarget != low {
 		t.Fatalf("queued desire target = %v, want low", desire.FinalTarget)
 	}
+	if desire.Weight != 10 {
+		t.Fatalf("queued desire weight = %v, want 10 (unchanged from AddDamageHate; "+
+			"AggroList.java:169-177 never re-queues the chosen's desire, so "+
+			"ReconsiderTarget must not double it via AddOrUpdate's accumulation)", desire.Weight)
+	}
 }
 
 func TestAttackableAIReconsiderTargetNoopWithSingleAttacker(t *testing.T) {

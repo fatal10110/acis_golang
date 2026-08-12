@@ -168,7 +168,7 @@ func TestHostileAbnormalEffectRefreshResendsLiveNPCInfo(t *testing.T) {
 	}
 }
 
-func TestSummonAbnormalEffectRefreshesBystanderSummonInfoOnly(t *testing.T) {
+func TestSummonAbnormalEffectRefreshesOwnerPetInfoThenBystanderSummonInfo(t *testing.T) {
 	state := world.New()
 	ownerFrames := &frameCapture{}
 	bystanderFrames := &frameCapture{}
@@ -187,8 +187,12 @@ func TestSummonAbnormalEffectRefreshesBystanderSummonInfoOnly(t *testing.T) {
 	pet.StartAbnormalEffect(0x010000)
 	pet.UpdateAbnormalEffect()
 
-	if len(ownerFrames.frames) != 0 {
-		t.Fatalf("owner refresh frames = %x, want none", ownerFrames.frames)
+	snapshot, ok := petInfoSnapshot(pet, owner, owner.npcs)
+	if !ok || snapshot.AbnormalEffect != 0x010000 {
+		t.Fatalf("PetInfo abnormal effect = %#x, %v; want %#x, true", snapshot.AbnormalEffect, ok, 0x010000)
+	}
+	if len(ownerFrames.frames) != 1 || ownerFrames.frames[0][0] != serverpackets.OpcodePetInfo {
+		t.Fatalf("owner refresh frames = %x, want one PetInfo (%#x)", ownerFrames.frames, serverpackets.OpcodePetInfo)
 	}
 	if len(bystanderFrames.frames) != 1 || bystanderFrames.frames[0][0] != serverpackets.OpcodeNPCInfo {
 		t.Fatalf("bystander refresh frames = %x, want one SummonInfo (%#x)", bystanderFrames.frames, serverpackets.OpcodeNPCInfo)

@@ -44,6 +44,7 @@ type PetInfoSnapshot struct {
 	EvasionRate       int
 	CriticalHit       int
 	MoveSpeed         int
+	AbnormalEffect    int
 	Mountable         bool
 	Team              int
 	SoulShotsPerHit   int
@@ -143,11 +144,7 @@ func FramePetInfo(s PetInfoSnapshot) wire.Frame {
 	w.WriteInt32(int32(s.PAtkSpd))
 	w.WriteInt32(int32(s.MAtkSpd))
 
-	// Abnormal-effect icon bitmask: not computed yet, matching NpcInfo's
-	// own unwired AbnormalEffect field (npcInfoSnapshot never sets it
-	// either). The owner-invisible stealth-mask special case
-	// (PetInfo.java:103) is out of scope until this is wired.
-	w.WriteInt32(0)
+	w.WriteInt32(int32(s.AbnormalEffect))
 	w.WriteUint16(uint16(boolInt32(s.Mountable)))
 	w.WriteUint8(0) // move type: 0 is MoveType.GROUND, the default _moveTypes state (CreatureMove.java:76-84); no swim/fly state is modeled for summons yet
 
