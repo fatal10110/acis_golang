@@ -22,7 +22,8 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 		return
 	}
 
-	if def, ok := l.skills.Definition(modelskill.Ref{ID: modelskill.ID(req.SkillID), Level: live.SkillLevel(int(req.SkillID))}); ok {
+	def, known := l.skills.Definition(modelskill.Ref{ID: modelskill.ID(req.SkillID), Level: live.SkillLevel(int(req.SkillID))})
+	if known {
 		if itemhandler.RecallCastBlockedByKarma(def.SkillType, live.Karma(), l.playerConfig.KarmaPlayerCanTeleport) {
 			sendMagicActionFailed(live)
 			return
@@ -42,6 +43,9 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 	}
 
 	live.Character.SetCastModifiers(req.CtrlPressed, req.ShiftPressed)
+	if def.Target == modelskill.TargetGround && l.walkToGroundCast(live, req, def.CastRange) {
+		return
+	}
 
 	beforeVitals := live.Vitals()
 	controller := l.castController(live)
@@ -64,7 +68,7 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 		sendMagicCastFailure(live, started.Definition, err)
 		return
 	}
-	def := started.Definition
+	def = started.Definition
 	target := started.Target
 	plan := started.Plan
 
@@ -138,6 +142,35 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 			sendMagicStatusUpdate(live, beforeVitals)
 		},
 	})
+}
+
+func (l *GameClientLink) walkToGroundCast(live *livePlayer, req clientpackets.RequestMagicSkillUse, castRange int) bool {
+	x, y, z := live.GroundTarget()
+	sx, sy, sz := live.Position()
+	if location.In3DRange(sx, sy, sz, x, y, z, castRange) {
+		return false
+	}
+	if req.ShiftPressed {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetTooFar))
+		return true
+	}
+	if live.move == nil {
+		sendMagicActionFailed(live)
+		return true
+	}
+	live.takePickup()
+	live.takePetInteract()
+	live.deferMagicSkill(req)
+	accepted, err := live.move.MoveToLocation(location.Location{X: x, Y: y, Z: z})
+	if err != nil {
+		l.log.Warn().Err(err).Msg("move: broadcast")
+	}
+	if accepted {
+		return true
+	}
+	live.takeDeferredMagicSkill()
+	sendMagicActionFailed(live)
+	return true
 }
 
 func (l *GameClientLink) resolveMagicSkillTarget(caster actorcast.Target, selected any, def modelskill.Definition, ctrl bool) (actorcast.Target, bool) {
