@@ -350,7 +350,7 @@ func TestGameClientLinkMagicSkillUseGroundRecordsGroundTargetAndAppliesEffect(t 
 	skills := skillstate.NewPersistence(store, modelskill.NewTable([]modelskill.Definition{
 		{
 			ID: 5, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetGround,
-			HitTime: 500, ReuseDelay: 1200, StaticHitTime: true, StaticReuse: true,
+			CastRange: 3000, HitTime: 500, ReuseDelay: 1200, StaticHitTime: true, StaticReuse: true,
 			MPInitialConsume: 2, MPConsume: 3, SkillType: "BUFF",
 			Effects: []modelskill.EffectTemplate{{Name: "Buff", Time: 60}},
 		},
@@ -389,6 +389,59 @@ func TestGameClientLinkMagicSkillUseGroundRecordsGroundTargetAndAppliesEffect(t 
 	if len(effects) != 1 || effects[0].Skill.ID != 5 {
 		t.Fatalf("effects after ground-target cast = %+v, want one effect from skill 5", effects)
 	}
+}
+
+func TestGameClientLinkMagicSkillUseGroundWalksIntoCastRange(t *testing.T) {
+	store := newMemorySkillSaveStore()
+	skills := skillstate.NewPersistence(store, modelskill.NewTable([]modelskill.Definition{{
+		ID: 5, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetGround,
+		CastRange: 900, HitTime: 500, StaticHitTime: true, SkillType: "SIGNET",
+	}}), store)
+	var id int32
+	c, _, _, state := newLinkedGameClientWithSkillsSeed(t, skills, func(chars *fakeCharStore, _ *fakeItemStore) {
+		id = seedSelectableCharacter(t, chars, "player1", "Newbie", 5, 0)
+		store.seedKnown(id, 0, player.SkillLevels{5: 1})
+	}, 1)
+
+	c.send(encodeRequestGameStart(0))
+	c.read()
+	c.read()
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+	obj, ok := state.Player(id)
+	if !ok {
+		t.Fatalf("player %d not found in world state", id)
+	}
+	obj.(*livePlayer).Move().SetSpeed(100000)
+
+	c.send(encodeRequestExMagicSkillUseGround(5000, 0, 0, 5, false, false))
+	if reply := c.read(); reply[0] != serverpackets.OpcodeMoveToLocation {
+		t.Fatalf("out-of-range ground cast opcode = %#x, want MoveToLocation (%#x)", reply[0], serverpackets.OpcodeMoveToLocation)
+	}
+	if reply := c.read(); reply[0] != serverpackets.OpcodeMagicSkillUse {
+		t.Fatalf("post-walk ground cast opcode = %#x, want MagicSkillUse (%#x)", reply[0], serverpackets.OpcodeMagicSkillUse)
+	}
+}
+
+func TestGameClientLinkMagicSkillUseGroundShiftRejectsOutOfRangeTarget(t *testing.T) {
+	store := newMemorySkillSaveStore()
+	skills := skillstate.NewPersistence(store, modelskill.NewTable([]modelskill.Definition{{
+		ID: 5, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetGround,
+		CastRange: 900, HitTime: 500, StaticHitTime: true, SkillType: "SIGNET",
+	}}), store)
+	c, _, _, _ := newLinkedGameClientWithSkillsSeed(t, skills, func(chars *fakeCharStore, _ *fakeItemStore) {
+		id := seedSelectableCharacter(t, chars, "player1", "Newbie", 5, 0)
+		store.seedKnown(id, 0, player.SkillLevels{5: 1})
+	}, 1)
+
+	c.send(encodeRequestGameStart(0))
+	c.read()
+	c.read()
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	c.send(encodeRequestExMagicSkillUseGround(5000, 0, 0, 5, false, true))
+	assertStaticSystemMessageFrame(t, c.read(), serverpackets.SystemMessageTargetTooFar)
 }
 
 func TestGameClientLinkMagicSkillUseGroundSilentlyIgnoresNonGroundSkill(t *testing.T) {
