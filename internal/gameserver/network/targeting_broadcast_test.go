@@ -55,6 +55,7 @@ func TestGameClientLinkAttackBroadcastsTargetHPStatusOnEveryHit(t *testing.T) {
 
 	origin := location.Location{X: px, Y: py, Z: pz}
 	c.send(encodeAction(target.ObjectID(), origin, false))
+	c.read() // ValidateLocation
 	c.read() // MyTargetSelected
 	c.read() // StatusUpdate (selection snapshot, still full HP)
 

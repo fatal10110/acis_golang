@@ -31,8 +31,8 @@ func TestSelectAndClearLiveTargetSendsTargetPackets(t *testing.T) {
 	if !gcl.selectLiveTarget(attacker, target) {
 		t.Fatal("selectLiveTarget returned false")
 	}
-	if got := frameOpcodes(attackerFrames.frames); string(got) != string([]byte{serverpackets.OpcodeMyTargetSelected, serverpackets.OpcodeStatusUpdate}) {
-		t.Fatalf("attacker select opcodes = %x, want MyTargetSelected, StatusUpdate", got)
+	if got := frameOpcodes(attackerFrames.frames); string(got) != string([]byte{serverpackets.OpcodeValidateLocation, serverpackets.OpcodeMyTargetSelected, serverpackets.OpcodeStatusUpdate}) {
+		t.Fatalf("attacker select opcodes = %x, want ValidateLocation, MyTargetSelected, StatusUpdate", got)
 	}
 	if got := frameOpcodes(observerFrames.frames); string(got) != string([]byte{serverpackets.OpcodeTargetSelected}) {
 		t.Fatalf("observer select opcodes = %x, want TargetSelected", got)
@@ -150,8 +150,12 @@ func TestGameClientLinkActionAttackAndTargetCancel(t *testing.T) {
 	origin := location.Location{X: px, Y: py, Z: pz}
 	c.send(encodeAction(target.ObjectID(), origin, false))
 	reply := c.read()
+	if reply[0] != serverpackets.OpcodeValidateLocation {
+		t.Fatalf("Action first opcode = %#x, want ValidateLocation (%#x)", reply[0], serverpackets.OpcodeValidateLocation)
+	}
+	reply = c.read()
 	if reply[0] != serverpackets.OpcodeMyTargetSelected {
-		t.Fatalf("Action first opcode = %#x, want MyTargetSelected (%#x)", reply[0], serverpackets.OpcodeMyTargetSelected)
+		t.Fatalf("Action second opcode = %#x, want MyTargetSelected (%#x)", reply[0], serverpackets.OpcodeMyTargetSelected)
 	}
 	reply = c.read()
 	assertTargetHPStatus(t, reply, target.ObjectID(), target.MaxHP(), target.CurrentHP())

@@ -322,6 +322,20 @@ func (l *GameClientLink) selectLiveTarget(live *livePlayer, target world.Tracked
 		return true
 	}
 	live.SetTargetTracked(target)
+	// Reference: Player.setTarget sends ValidateLocation for the new target
+	// before MyTargetSelected, skipped only when the target is the selecting
+	// player itself or aboard a boat (Player.java:2477-2479). Boats aren't a
+	// ported feature, so every target here is treated as never in one.
+	if target.ObjectID() != live.ObjectID() {
+		if positioned, ok := target.(interface{ Position() (int, int, int) }); ok {
+			x, y, z := positioned.Position()
+			heading := 0
+			if headed, ok := target.(interface{ Heading() int }); ok {
+				heading = headed.Heading()
+			}
+			live.SendFrame(serverpackets.FrameValidateLocation(target.ObjectID(), location.Location{X: x, Y: y, Z: z}, heading))
+		}
+	}
 	live.SendFrame(serverpackets.FrameMyTargetSelected(target.ObjectID(), targetColor(live.Character, target)))
 	if attrs, ok := targetHPAttributes(target); ok {
 		live.SendFrame(serverpackets.FrameStatusUpdate(target.ObjectID(), attrs))

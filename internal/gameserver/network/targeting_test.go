@@ -207,8 +207,8 @@ func TestRetargetHookSendsPlayerSetTargetPackets(t *testing.T) {
 	if got := retargeted.Target(); got != world.Tracked(caster) {
 		t.Fatalf("Target() after domain-level retarget = %v, want %v", got, caster)
 	}
-	if got := frameOpcodes(retargetedFrames.frames); string(got) != string([]byte{serverpackets.OpcodeMyTargetSelected, serverpackets.OpcodeStatusUpdate}) {
-		t.Fatalf("retargeted player opcodes = %x, want MyTargetSelected, StatusUpdate", got)
+	if got := frameOpcodes(retargetedFrames.frames); string(got) != string([]byte{serverpackets.OpcodeValidateLocation, serverpackets.OpcodeMyTargetSelected, serverpackets.OpcodeStatusUpdate}) {
+		t.Fatalf("retargeted player opcodes = %x, want ValidateLocation, MyTargetSelected, StatusUpdate", got)
 	}
 	if got := frameOpcodes(observerFrames.frames); string(got) != string([]byte{serverpackets.OpcodeTargetSelected}) {
 		t.Fatalf("observer opcodes = %x, want TargetSelected", got)
