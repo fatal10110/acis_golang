@@ -3,9 +3,13 @@ package network
 import (
 	"bytes"
 	"context"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
+
+	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
@@ -522,5 +526,47 @@ func TestGameSummonSpawnerSpawnPetRejectsSecondSummon(t *testing.T) {
 	}
 	if spawner.SpawnPet(live.Character, inst) {
 		t.Fatalf("second SpawnPet returned true, want false (SUMMON_ONLY_ONE)")
+	}
+}
+
+// TestSummonCastControllerRecoversPanickingHook is the regression test for
+// #1396: wireSummonAI built every summon's cast controller without
+// SetLogger, so a panic recovered from a scheduled Launch/Hit/Finish
+// callback (Controller.scheduleLocked's recover wrapper, unconditional for
+// every Controller) logged through a zero-value zerolog.Logger and was
+// silently discarded, matching the network/dispatch_test.go
+// (TestScheduleAfterRecoversPanickingCallback) and cast/schedule_test.go
+// (TestScheduleRecoversPanickingHook) recover-and-log proof pattern.
+// summonCastController is the exact helper wireSummonAI installs on every
+// summon's AI brain.
+func TestSummonCastControllerRecoversPanickingHook(t *testing.T) {
+	link, state := newSummonTestLink(t)
+	buf := &syncBuffer{}
+	link.log = zerolog.New(buf)
+	live := newTestLivePlayer(t, 1, &frameCapture{})
+
+	spawner := &gameSummonSpawner{link: link, live: live}
+	if !spawner.SpawnServitor(live.Character, modelskill.Definition{NpcID: 12500}) {
+		t.Fatal("SpawnServitor returned false")
+	}
+	obj, ok := state.Summon(live.ObjectID())
+	if !ok {
+		t.Fatal("servitor not registered in world.State")
+	}
+	actor := obj.(*summon.Actor)
+
+	ctrl := link.summonCastController(actor)
+	plan, err := ctrl.Controller.Start(time.Now(), actorcast.SummonActor{Summon: actor}, modelskill.Definition{ID: 1, Level: 1, HitTime: 0})
+	if err != nil {
+		t.Fatalf("Start() error: %v", err)
+	}
+	ctrl.Controller.Schedule(plan, actorcast.Hooks{Launch: func() bool { panic("boom") }})
+
+	deadline := time.Now().Add(time.Second)
+	for !strings.Contains(buf.String(), "boom") {
+		if time.Now().After(deadline) {
+			t.Fatalf("panic was not recovered and logged, got: %s", buf.String())
+		}
+		time.Sleep(time.Millisecond)
 	}
 }
