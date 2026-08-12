@@ -246,8 +246,10 @@ func (s *gameSummonSpawner) SpawnServitor(owner *player.Character, def modelskil
 
 func (l *GameClientLink) wireSummonAI(actor *summon.Actor) {
 	brain := ai.NewSummon(actor, inertSummonMoveController{}, inertSummonAttackController{})
+	castController := actorcast.NewController(actorcast.SummonActor{Summon: actor})
+	castController.SetLogger(l.log)
 	brain.SetCastController(&actorcast.AIController{
-		Controller:  actorcast.NewController(actorcast.SummonActor{Summon: actor}),
+		Controller:  castController,
 		Definitions: l.skills,
 		Effects:     actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers},
 		Caster:      actor,
