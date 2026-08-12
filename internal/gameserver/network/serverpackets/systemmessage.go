@@ -106,6 +106,8 @@ const (
 	SystemMessageEnabledSpiritshot                = 533
 	SystemMessagePetsNotAvailableAtThisTime       = 574
 	SystemMessagePetUsesS1                        = 1018
+	SystemMessagePetReceivedS2DamageByS1          = 1016
+	SystemMessageSummonReceivedS2ByS1             = 1027
 	SystemMessageShotsNotAvailableForDeadPet      = 1598
 	SystemMessageNotEnoughSpiritshotsForPet       = 1700
 	SystemMessageNotEnoughSoulshotsForPet         = 1701
@@ -199,6 +201,18 @@ func FrameSystemMessageNumber(id int, number int32) wire.Frame {
 	w := newFrameWriter(OpcodeSystemMessage)
 	w.WriteInt32(int32(id))
 	w.WriteInt32(1)
+	w.WriteInt32(SystemMessageParamNumber)
+	w.WriteInt32(number)
+	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
+}
+
+// FrameSystemMessageStringNumber builds a SystemMessage packet with text and number parameters.
+func FrameSystemMessageStringNumber(id int, text string, number int32) wire.Frame {
+	w := newFrameWriter(OpcodeSystemMessage)
+	w.WriteInt32(int32(id))
+	w.WriteInt32(2)
+	w.WriteInt32(SystemMessageParamText)
+	w.WriteString(text)
 	w.WriteInt32(SystemMessageParamNumber)
 	w.WriteInt32(number)
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)

@@ -442,7 +442,7 @@ func (a *Actor) ReduceMP(amount float64) float64 {
 }
 
 // ReduceHP applies skill HP damage and marks the summon dead at zero HP.
-func (a *Actor) ReduceHP(amount float64, _ any, _ modelskill.Definition) {
+func (a *Actor) ReduceHP(amount float64, attacker any, _ modelskill.Definition) {
 	if amount <= 0 {
 		return
 	}
@@ -458,6 +458,9 @@ func (a *Actor) ReduceHP(amount float64, _ any, _ modelskill.Definition) {
 	}
 	a.vitals.mu.Unlock()
 	a.UpdateStatus()
+	if attacker != nil {
+		a.notifyDamage(attacker, amount)
+	}
 }
 
 // ReduceHPByDOT applies periodic HP damage without normal-hit side effects.

@@ -51,6 +51,26 @@ func (a *Actor) UpdateStatus() {
 	}
 }
 
+// SetDamageNotifier records the runtime hook for owner-facing direct damage feedback.
+func (a *Actor) SetDamageNotifier(notify func(string, int32)) {
+	a.statusMu.Lock()
+	defer a.statusMu.Unlock()
+	a.damageNotifier = notify
+}
+
+func (a *Actor) notifyDamage(attacker any, amount float64) {
+	named, ok := attacker.(interface{ CharacterName() string })
+	if !ok {
+		return
+	}
+	a.statusMu.RLock()
+	notify := a.damageNotifier
+	a.statusMu.RUnlock()
+	if notify != nil {
+		notify(named.CharacterName(), int32(amount))
+	}
+}
+
 // IsPet reports whether this live summon is a pet rather than a servitor.
 func (a *Actor) IsPet() bool { return a.isPet }
 

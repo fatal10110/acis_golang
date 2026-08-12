@@ -17,6 +17,10 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
+type summonDamageAttacker struct{ name string }
+
+func (a summonDamageAttacker) CharacterName() string { return a.name }
+
 func TestLivePlayerVisibilitySendsCharInfoAndDeleteObject(t *testing.T) {
 	state := world.New()
 	firstFrames := &frameCapture{}
@@ -284,6 +288,73 @@ func TestSummonDamagePublishesPetStatusToOwnerAndSummonInfoToObservers(t *testin
 				t.Fatalf("bystander opcodes = %x, want SummonInfo", got)
 			}
 		})
+	}
+}
+
+func TestSummonDamageSendsOwnerSystemMessageForPetAndServitor(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		message int
+		new     func(*livePlayer) *summon.Actor
+	}{
+		{"pet", serverpackets.SystemMessagePetReceivedS2DamageByS1, func(owner *livePlayer) *summon.Actor {
+			return summon.NewPet(summon.PetConfig{ObjectID: 20, Owner: owner, NPCID: 12077, Stats: summon.CombatStats{MaxHP: 100}})
+		}},
+		{"servitor", serverpackets.SystemMessageSummonReceivedS2ByS1, func(owner *livePlayer) *summon.Actor {
+			return summon.NewServitor(summon.ServitorConfig{ObjectID: 21, Owner: owner, NPCID: 12077, Stats: summon.CombatStats{MaxHP: 100}})
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			state := world.New()
+			ownerFrames := &frameCapture{}
+			owner := newTestLivePlayer(t, 1, ownerFrames)
+			attacker := newTestLivePlayer(t, 2, &frameCapture{})
+			owner.npcs = npc.NewTable([]*npc.Template{{ID: 12077, TemplateID: 12077, Name: "Wolf", AtkSpd: 300, RunSpeed: 120, WalkSpeed: 60, CollisionRadius: 8, CollisionHeight: 20}})
+			state.AddPlayer(owner)
+			state.AddPlayer(attacker)
+			state.Spawn(owner, 0, 0, 0, 0)
+			state.Spawn(attacker, 100, 0, 0, 0)
+			actor := tc.new(owner)
+			link := &GameClientLink{world: state}
+			link.wireSummonAI(actor)
+			ownerFrames.frames = nil
+
+			actor.ReduceHP(12.9, summonDamageAttacker{name: "Attacker"}, modelskill.Definition{})
+
+			if len(ownerFrames.frames) != 2 {
+				t.Fatalf("owner frames = %d, want status update and damage message", len(ownerFrames.frames))
+			}
+			assertSystemMessageStringNumberFrame(t, ownerFrames.frames[1], tc.message, "Attacker", 12)
+		})
+	}
+}
+
+func assertSystemMessageStringNumberFrame(t *testing.T, frame []byte, messageID int, text string, number int32) {
+	t.Helper()
+	if frame[0] != serverpackets.OpcodeSystemMessage {
+		t.Fatalf("SystemMessage opcode = %#x, want %#x", frame[0], serverpackets.OpcodeSystemMessage)
+	}
+	r := wire.NewReader(frame[1:])
+	if got := r.ReadInt32(); got != int32(messageID) {
+		t.Fatalf("SystemMessage id = %d, want %d", got, messageID)
+	}
+	if got := r.ReadInt32(); got != 2 {
+		t.Fatalf("SystemMessage params = %d, want 2", got)
+	}
+	if got := r.ReadInt32(); got != serverpackets.SystemMessageParamText {
+		t.Fatalf("SystemMessage first param type = %d, want text", got)
+	}
+	if got := r.ReadString(); got != text {
+		t.Fatalf("SystemMessage text = %q, want %q", got, text)
+	}
+	if got := r.ReadInt32(); got != serverpackets.SystemMessageParamNumber {
+		t.Fatalf("SystemMessage second param type = %d, want number", got)
+	}
+	if got := r.ReadInt32(); got != number {
+		t.Fatalf("SystemMessage number = %d, want %d", got, number)
+	}
+	if err := r.Err(); err != nil {
+		t.Fatalf("read SystemMessage: %v", err)
 	}
 }
 

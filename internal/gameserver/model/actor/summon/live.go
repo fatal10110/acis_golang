@@ -63,16 +63,17 @@ type Actor struct {
 	// the owner-connection and tick goroutines write them, per
 	// world.Observer's concurrency contract
 	// (internal/gameserver/world/visibility.go).
-	statusMu      sync.RWMutex
-	level         int
-	name          string
-	lifetime      LifetimeState
-	statusUpdater func()
-	dead          bool
-	disabled      bool
-	combat        bool
-	attack        bool
-	brain         AI
+	statusMu       sync.RWMutex
+	level          int
+	name           string
+	lifetime       LifetimeState
+	statusUpdater  func()
+	damageNotifier func(string, int32)
+	dead           bool
+	disabled       bool
+	combat         bool
+	attack         bool
+	brain          AI
 	// skills maps skill id to the level this summon's npc template grants
 	// it, used by TryUseSkill to resolve an owner-commanded action-bar
 	// skill shortcut, matching Java's Summon.getSkill.
