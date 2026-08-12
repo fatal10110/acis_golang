@@ -369,6 +369,24 @@ func (l *GameClientLink) sendSkillHandlerResult(live *livePlayer, result actorca
 			attacker.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1PerformingCounterattack, defenderName))
 		}
 	}
+	for _, dodge := range result.Dodges {
+		attacker, attackerOnline := l.livePlayerByID(dodge.AttackerID)
+		defender, defenderOnline := l.livePlayerByID(dodge.DefenderID)
+		attackerName := dodge.AttackerName
+		if attackerOnline {
+			attackerName = attacker.Name
+		}
+		defenderName := dodge.DefenderName
+		if defenderOnline {
+			defenderName = defender.Name
+		}
+		if attackerOnline {
+			attacker.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1DodgesAttack, defenderName))
+		}
+		if defenderOnline {
+			defender.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageAvoidedS1Attack, attackerName))
+		}
+	}
 	for i := 0; i < result.AttackFailed; i++ {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageAttackFailed))
 	}

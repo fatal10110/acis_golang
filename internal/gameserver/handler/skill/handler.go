@@ -38,10 +38,19 @@ type Counterattack struct {
 	DefenderName string
 }
 
+// Dodge reports a blow evasion and its two participants.
+type Dodge struct {
+	AttackerID   int32
+	AttackerName string
+	DefenderID   int32
+	DefenderName string
+}
+
 // Result reports player-visible outcomes produced while a skill handler ran.
 type Result struct {
 	AttackFailed   int
 	Counterattacks []Counterattack
+	Dodges         []Dodge
 	CubicAdded     bool
 	// CubicTargets are non-caster targets whose cubic runtime was touched.
 	CubicTargets []any

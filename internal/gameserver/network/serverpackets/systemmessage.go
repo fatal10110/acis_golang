@@ -45,6 +45,8 @@ const (
 	SystemMessageAttackFailed                     = 158
 	SystemMessageS1PerformingCounterattack        = 1997
 	SystemMessageCounteredS1Attack                = 1998
+	SystemMessageS1DodgesAttack                   = 1999
+	SystemMessageAvoidedS1Attack                  = 42
 	SystemMessageInvalidTarget                    = 109
 	SystemMessageCannotDiscardDistanceTooFar      = 151
 	SystemMessageItemMissingToLearnSkill          = 276

@@ -237,6 +237,15 @@ func (blowHandler) UseResult(cast Cast) Result {
 		if !ok {
 			continue
 		}
+		if in.Evaded {
+			result.Dodges = append(result.Dodges, Dodge{
+				AttackerID:   counterattackObjectID(cast.Caster),
+				AttackerName: counterattackName(cast.Caster),
+				DefenderID:   counterattackObjectID(target),
+				DefenderName: counterattackName(target),
+			})
+			continue
+		}
 		if in.Landed {
 			damage := 1
 			if in.Shield != formulas.ShieldPerfect {
