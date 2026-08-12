@@ -36,6 +36,19 @@ func (s *PetStore) Get(ctx context.Context, itemObjectID int32) (pet.State, bool
 	return st, true, nil
 }
 
+// NameTaken reports whether a saved pet already has name. Matching is
+// case-insensitive, since pet names share the client's case-insensitive name
+// namespace.
+func (s *PetStore) NameTaken(ctx context.Context, name string) (bool, error) {
+	var n int
+	if err := s.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM pets WHERE LOWER(name) = LOWER(?)`, name,
+	).Scan(&n); err != nil {
+		return false, fmt.Errorf("check pet name %q: %w", name, err)
+	}
+	return n > 0, nil
+}
+
 // Save inserts or updates the row for the pet whose collar is itemObjectID.
 func (s *PetStore) Save(ctx context.Context, itemObjectID int32, st pet.State) error {
 	_, err := s.db.ExecContext(ctx,

@@ -64,6 +64,25 @@ func TestActorActingPlayerReturnsDeathActorOwner(t *testing.T) {
 	}
 }
 
+func TestActorAggressionTargetingRetargetsAndAttacksCurrentTarget(t *testing.T) {
+	actor := NewServitor(ServitorConfig{ObjectID: 200, Level: 44})
+	other := &liveOwnerCombatant{liveOwnerStub: liveOwnerStub{id: 300}}
+	caster := &liveOwnerCombatant{liveOwnerStub: liveOwnerStub{id: 301}}
+	brain := &recordingSummonAI{}
+	actor.SetAI(brain)
+
+	actor.SetTarget(other)
+	if got := actor.CurrentTarget(); got != other {
+		t.Fatalf("CurrentTarget() = %v, want %v", got, other)
+	}
+
+	actor.SetTarget(caster)
+	actor.AttackTarget(caster)
+	if want := []string{"attack:301"}; !reflect.DeepEqual(brain.events, want) {
+		t.Fatalf("AI events = %v, want %v", brain.events, want)
+	}
+}
+
 func TestPetTracksItemSkillReuse(t *testing.T) {
 	pet := NewPet(PetConfig{ObjectID: 2, NPCID: 12077})
 	ref := modelskill.Ref{ID: 2278, Level: 1}
