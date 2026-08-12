@@ -279,6 +279,13 @@ func buildSkillEffect(tables map[string][]string, op funcElement, attachCond *sk
 	noIcon := f.Int32LiteralDefault("noicon", 0)
 	stackOrder := f.Float64Default("stackOrder", 0)
 	effectPower := f.Float64Default("effectPower", -1)
+	effectPowerSet := false
+	for _, attr := range attrs {
+		if attr.Name.Local == "effectPower" {
+			effectPowerSet = true
+			break
+		}
+	}
 	triggeredID := f.Int32LiteralDefault("triggeredId", 0)
 	triggeredLevel := f.Int32LiteralDefault("triggeredLevel", 1)
 	activationChance := f.Int32LiteralDefault("activationChance", -1)
@@ -296,6 +303,7 @@ func buildSkillEffect(tables map[string][]string, op funcElement, attachCond *sk
 		StackType:        f.StringDefault("stackType", "none"),
 		StackOrder:       stackOrder,
 		EffectPower:      effectPower,
+		EffectPowerSet:   effectPowerSet,
 		EffectType:       f.StringDefault("effectType", ""),
 		TriggeredID:      int(triggeredID),
 		TriggeredLevel:   int(triggeredLevel),

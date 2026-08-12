@@ -49,6 +49,27 @@ func TestCharacterSkillSuccessInputUsesStatsAndCasterMagicAttack(t *testing.T) {
 	}
 }
 
+func TestCharacterEffectSuccessInputRespectsTemplateResistance(t *testing.T) {
+	tmpl := combatTemplate()
+	tmpl.MAtk = 100
+	tmpl.MDef = 50
+	caster := liveCharacter(1, tmpl, combatItems())
+	target := liveCharacter(2, tmpl, combatItems())
+	target.AddStatFuncs([]basefunc.Func{basefunc.NewMul(&struct{}{}, stat.StunVuln, 0.5, nil)})
+	def := modelskill.Definition{IgnoreResists: true, Magic: true, MagicLevel: 40, EffectType: "ROOT"}
+
+	in, ok := target.EffectSuccessInput(caster, def, modelskill.EffectTemplate{EffectPower: 50, EffectType: "STUN"}, false, formulas.ShieldFailed)
+	if !ok {
+		t.Fatal("EffectSuccessInput() ok = false")
+	}
+	if in.IgnoreResists {
+		t.Fatal("EffectSuccessInput() ignored template resistance")
+	}
+	if in.BaseChance != 50 || !closeFloat(in.VulnModifier, 0.5) {
+		t.Fatalf("EffectSuccessInput() = %+v, want template power and STUN resistance", in)
+	}
+}
+
 func TestCharacterSkillSuccessInputFoldsElementalResistanceIntoVulnerability(t *testing.T) {
 	tmpl := combatTemplate()
 	tmpl.MAtk = 100

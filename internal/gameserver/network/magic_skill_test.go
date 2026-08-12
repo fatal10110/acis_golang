@@ -57,6 +57,29 @@ func TestGameClientLinkSendsCounterattackFeedbackToPlayerParticipants(t *testing
 	assertSystemMessageStringFrame(t, defenderFrames.frames[0], serverpackets.SystemMessageCounteredS1Attack, attacker.Name)
 }
 
+func TestGameClientLinkSendsBlowEvasionFeedbackToPlayerParticipants(t *testing.T) {
+	attackerFrames := &frameCapture{}
+	defenderFrames := &frameCapture{}
+	attacker := newTestLivePlayer(t, 1, attackerFrames)
+	attacker.Name = "Attacker"
+	defender := newTestLivePlayer(t, 2, defenderFrames)
+	defender.Name = "Defender"
+	state := world.New()
+	state.AddPlayer(attacker)
+	state.AddPlayer(defender)
+	link := &GameClientLink{world: state}
+
+	link.sendSkillHandlerResult(attacker, actorcast.EffectResult{Dodges: []handlerskill.Dodge{{
+		AttackerID: attacker.ObjectID(), DefenderID: defender.ObjectID(),
+	}}})
+
+	if len(attackerFrames.frames) != 1 || len(defenderFrames.frames) != 1 {
+		t.Fatalf("evasion frames = attacker %d defender %d, want 1 each", len(attackerFrames.frames), len(defenderFrames.frames))
+	}
+	assertSystemMessageStringFrame(t, attackerFrames.frames[0], serverpackets.SystemMessageS1DodgesAttack, "Defender")
+	assertSystemMessageStringFrame(t, defenderFrames.frames[0], serverpackets.SystemMessageAvoidedS1Attack, "Attacker")
+}
+
 func TestGameClientLinkSendsCounterattackFeedbackWithNonPlayerName(t *testing.T) {
 	frames := &frameCapture{}
 	attacker := newTestLivePlayer(t, 1, frames)

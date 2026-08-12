@@ -133,6 +133,30 @@ func TestCharacterBlowInputCarriesResolvedLandingRoll(t *testing.T) {
 	}
 }
 
+func TestCharacterBlowInputCarriesPhysicalSkillEvasion(t *testing.T) {
+	tmpl := combatTemplate()
+	caster := liveCharacter(1, tmpl, combatItems())
+	target := liveCharacter(2, tmpl, combatItems())
+	target.AddStatFuncs([]basefunc.Func{basefunc.NewSet(target, stat.PSkillEvasion, 1, nil)})
+	caster.SetRollSource(func(n int) int {
+		if n != 1000 {
+			t.Fatalf("blow roll bound = %d, want 1000", n)
+		}
+		return 0
+	})
+	target.SetRollSource(func(n int) int {
+		if n != 100 {
+			t.Fatalf("skill-evasion roll bound = %d, want 100", n)
+		}
+		return 0
+	})
+
+	in, ok := target.BlowInput(caster, modelskill.Definition{SkillType: "BLOW", BaseLandRate: 1000})
+	if !ok || !in.Landed || !in.Evaded {
+		t.Fatalf("BlowInput() = %+v, %v; want landed evasion", in, ok)
+	}
+}
+
 func TestCharacterBlowInputCarriesShieldDefense(t *testing.T) {
 	tmpl := combatTemplate()
 	items := shieldDefenseItems()

@@ -3,6 +3,7 @@ package summon
 import (
 	"math"
 	"math/rand/v2"
+	"strings"
 	"sync"
 
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
@@ -442,7 +443,7 @@ func (a *Actor) ReduceMP(amount float64) float64 {
 }
 
 // ReduceHP applies skill HP damage and marks the summon dead at zero HP.
-func (a *Actor) ReduceHP(amount float64, _ any, _ modelskill.Definition) {
+func (a *Actor) ReduceHP(amount float64, attacker any, _ modelskill.Definition) {
 	if amount <= 0 {
 		return
 	}
@@ -458,6 +459,9 @@ func (a *Actor) ReduceHP(amount float64, _ any, _ modelskill.Definition) {
 	}
 	a.vitals.mu.Unlock()
 	a.UpdateStatus()
+	if attacker != nil {
+		a.notifyDamage(attacker, amount)
+	}
 }
 
 // ReduceHPByDOT applies periodic HP damage without normal-hit side effects.
@@ -539,6 +543,20 @@ func (a *Actor) ManaDamageInput(caster any, def modelskill.Definition) (formulas
 // SkillSuccessInput returns the effect-landing roll input for def cast against a.
 func (a *Actor) SkillSuccessInput(caster any, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
 	return creature.ResolveSkillSuccessInput(caster, a, def, bss, shield)
+}
+
+func (a *Actor) EffectSuccessInput(caster any, def modelskill.Definition, tmpl modelskill.EffectTemplate, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
+	if tmpl.EffectType == "" {
+		return formulas.SkillSuccessInput{BaseChance: tmpl.EffectPower, IgnoreResists: true, Shield: shield}, true
+	}
+	if strings.EqualFold(tmpl.EffectType, "CANCEL") {
+		return formulas.SkillSuccessInput{BaseChance: 100, IgnoreResists: true, Shield: shield}, true
+	}
+	def.EffectType = tmpl.EffectType
+	def.IgnoreResists = false
+	in, ok := a.SkillSuccessInput(caster, def, bss, shield)
+	in.BaseChance = tmpl.EffectPower
+	return in, ok
 }
 
 func defaultInt(value, fallback int) int {

@@ -140,6 +140,9 @@ func ResolveBlowInput(caster any, target FormulaActor, def modelskill.Definition
 		Front:    front,
 		Backstab: def.ID == 30,
 	}, attacker.Roll(1000))
+	if landed && !def.Magic && float64(target.Roll(100)) < target.CalcStat(stat.PSkillEvasion, 0) {
+		return formulas.BlowInput{Landed: true, Evaded: true}, true
+	}
 	crit := landed && PhysicalSkillCrit(attacker, def)
 	shield := formulas.ShieldFailed
 	if landed && !def.IgnoreShield {

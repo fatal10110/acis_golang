@@ -138,6 +138,7 @@ type BlowInput struct {
 	CritDamageAddBase float64 // raw critical-damage-add stat, pre ×6 scaling
 	Landed            bool
 	Crit              bool
+	Evaded            bool
 }
 
 // BlowRateInput is the resolved state for a blow's independent landing roll.
