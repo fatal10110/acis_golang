@@ -65,20 +65,50 @@ func ApplyItemEffectsResult(handlers EffectHandlers, caster any, resolved Target
 	return applyEffectsResult(handlers, caster, resolved, def, item)
 }
 
-func applyEffectsResult(handlers EffectHandlers, caster any, resolved Target, def modelskill.Definition, item any) EffectResult {
+// ResolveTargetIDs returns the object IDs def's affected target set would
+// resolve to from caster and resolved — the same target-resolution surface
+// applyEffectsResult uses, exposed for callers (the launch-phase
+// MagicSkillLaunched broadcast) that need the affected list before Hit
+// applies effects. Returns nil if resolution fails for any reason
+// (unresolvable caster/target, no registered handler, or CanCast rejects
+// the cast).
+func ResolveTargetIDs(handlers EffectHandlers, caster any, resolved Target, def modelskill.Definition) []int32 {
+	affected, ok := resolveAffected(handlers, caster, resolved, def)
+	if !ok {
+		return nil
+	}
+	ids := make([]int32, len(affected))
+	for i, t := range affected {
+		ids[i] = t.ObjectID()
+	}
+	return ids
+}
+
+func resolveAffected(handlers EffectHandlers, caster any, resolved Target, def modelskill.Definition) ([]skilltarget.Creature, bool) {
 	casterCreature, ok := caster.(skilltarget.Creature)
-	if !ok || handlers.Targets == nil || handlers.Skills == nil {
-		return EffectResult{}
+	if !ok || handlers.Targets == nil {
+		return nil, false
 	}
 	selected, _ := resolved.(skilltarget.Creature)
 
 	handler, ok := handlers.Targets.Handler(def.Target)
 	if !ok || !handler.CanCast(casterCreature, selected, &def, false) {
-		return EffectResult{}
+		return nil, false
 	}
 
 	affected := handler.Targets(casterCreature, selected, &def)
 	if len(affected) == 0 {
+		return nil, false
+	}
+	return affected, true
+}
+
+func applyEffectsResult(handlers EffectHandlers, caster any, resolved Target, def modelskill.Definition, item any) EffectResult {
+	if handlers.Skills == nil {
+		return EffectResult{}
+	}
+	affected, ok := resolveAffected(handlers, caster, resolved, def)
+	if !ok {
 		return EffectResult{}
 	}
 

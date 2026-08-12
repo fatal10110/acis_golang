@@ -156,13 +156,17 @@ func TestAIControllerCastStartsSchedulesAndAppliesEffectsOnHit(t *testing.T) {
 	}
 }
 
-// TestAIControllerCastBroadcastsSkillUseOnLaunchAndLaunchedOnHit verifies
-// the observer packet sequence #856 wires: MagicSkillUse fires once the
-// scheduled cast reaches its Launch phase, and MagicSkillLaunched fires
-// once the Hit phase resolves — matching the player-cast packet order in
-// network/magic_skill.go, just driven by Schedule's timers instead of a
-// client round trip.
-func TestAIControllerCastBroadcastsSkillUseOnLaunchAndLaunchedOnHit(t *testing.T) {
+// TestAIControllerCastBroadcastsSkillUseAtStartAndLaunchedOnLaunch verifies
+// the observer packet sequence CreatureCast.java wires: MagicSkillUse
+// broadcasts the instant the cast starts, with the computed
+// hitTime/reuseDelay (CreatureCast.java:148, inside doCast, before the
+// launch timer at :165 is even scheduled), and MagicSkillLaunched
+// broadcasts at the Launch phase — hitTime-400ms — not at Hit
+// (CreatureCast.java:165,234). PlayerCast.doCast chains into this same
+// CreatureCast path via super.doCast, so the live-player packet order in
+// network/magic_skill.go (MagicSkillUse at cast start, MagicSkillLaunched
+// in the Launch hook) is the same sequence this asserts for AI casters.
+func TestAIControllerCastBroadcastsSkillUseAtStartAndLaunchedOnLaunch(t *testing.T) {
 	clock := &fakeCastClock{}
 	actor := scalingActor()
 	ctrl := NewController(actor)
@@ -186,14 +190,8 @@ func TestAIControllerCastBroadcastsSkillUseOnLaunchAndLaunchedOnHit(t *testing.T
 
 	ai.Cast(target, ref)
 
-	if len(caster.skillUseCalls) != 0 {
-		t.Fatal("BroadcastSkillUse called before the Launch phase")
-	}
-
-	clock.fire(125 * time.Millisecond) // Launch
-
 	if len(caster.skillUseCalls) != 1 {
-		t.Fatalf("BroadcastSkillUse calls after Launch = %d, want 1", len(caster.skillUseCalls))
+		t.Fatalf("BroadcastSkillUse calls at cast start = %d, want 1", len(caster.skillUseCalls))
 	}
 	use := caster.skillUseCalls[0]
 	if use.targetID != 2 || use.targetX != 10 || use.targetY != 20 || use.targetZ != 30 {
@@ -203,13 +201,16 @@ func TestAIControllerCastBroadcastsSkillUseOnLaunchAndLaunchedOnHit(t *testing.T
 		t.Fatalf("BroadcastSkillUse skill = (%d,%d), want (%d,%d)", use.skillID, use.level, def.ID, def.Level)
 	}
 	if len(caster.skillLaunchedCalls) != 0 {
-		t.Fatal("BroadcastSkillLaunched called before the Hit phase")
+		t.Fatal("BroadcastSkillLaunched called before the Launch phase")
 	}
 
-	clock.fire(400 * time.Millisecond) // Hit
+	clock.fire(125 * time.Millisecond) // Launch
 
+	if len(caster.skillUseCalls) != 1 {
+		t.Fatalf("BroadcastSkillUse calls after Launch = %d, want still 1 (no re-broadcast)", len(caster.skillUseCalls))
+	}
 	if len(caster.skillLaunchedCalls) != 1 {
-		t.Fatalf("BroadcastSkillLaunched calls after Hit = %d, want 1", len(caster.skillLaunchedCalls))
+		t.Fatalf("BroadcastSkillLaunched calls after Launch = %d, want 1", len(caster.skillLaunchedCalls))
 	}
 	launched := caster.skillLaunchedCalls[0]
 	if launched.skillID != int32(def.ID) || launched.level != int32(def.Level) {
@@ -217,6 +218,62 @@ func TestAIControllerCastBroadcastsSkillUseOnLaunchAndLaunchedOnHit(t *testing.T
 	}
 	if len(launched.targetIDs) != 1 || launched.targetIDs[0] != 2 {
 		t.Fatalf("BroadcastSkillLaunched targetIDs = %v, want [2]", launched.targetIDs)
+	}
+
+	clock.fire(400 * time.Millisecond) // Hit
+
+	if len(caster.skillLaunchedCalls) != 1 {
+		t.Fatalf("BroadcastSkillLaunched calls after Hit = %d, want still 1 (no re-broadcast)", len(caster.skillLaunchedCalls))
+	}
+}
+
+// TestAIControllerCastBroadcastsSkillLaunchedWithFullTargetList verifies
+// MagicSkillLaunched carries every affected target from the launch-resolved
+// target list, not just the AI's preselected target — matching
+// CreatureCast.java:232-234's `_targets = _skill.getTargetList(_actor,
+// _target)` recompute and `broadcastPacket(new MagicSkillLaunched(_actor,
+// _skill, _targets))` broadcast of the full array.
+func TestAIControllerCastBroadcastsSkillLaunchedWithFullTargetList(t *testing.T) {
+	clock := &fakeCastClock{}
+	actor := scalingActor()
+	ctrl := NewController(actor)
+	ctrl.afterFunc = clock.AfterFunc
+
+	ref := modelskill.Ref{ID: scalingDef.ID, Level: scalingDef.Level}
+	def := scalingDef
+	def.Target = modelskill.TargetArea
+	def.Offensive = true
+	def.Radius = 900
+	def.SkillType = "DUMMYCAST"
+
+	rec := &recordingSkillHandler{}
+	caster := &fakeBroadcastingCaster{fakeCastCreature: fakeCastCreature{id: 1, category: skilltarget.CategoryAttackable}}
+	selected := &fakeCastCreature{id: 2, x: 10, category: skilltarget.CategoryPlayable}
+	bystander := &fakeCastCreature{id: 3, x: 20, category: skilltarget.CategoryPlayable}
+
+	ai := &AIController{
+		Controller:  ctrl,
+		Definitions: fakeDefinitions{ref: def},
+		Effects:     newEffectHandlers(effectsKnown{caster, selected, bystander}, "DUMMYCAST", rec),
+		Caster:      caster,
+	}
+
+	ai.Cast(selected, ref)
+	clock.fire(125 * time.Millisecond) // Launch
+
+	if len(caster.skillLaunchedCalls) != 1 {
+		t.Fatalf("BroadcastSkillLaunched calls after Launch = %d, want 1", len(caster.skillLaunchedCalls))
+	}
+	ids := caster.skillLaunchedCalls[0].targetIDs
+	if len(ids) != 2 {
+		t.Fatalf("BroadcastSkillLaunched targetIDs = %v, want 2 ids (selected + bystander)", ids)
+	}
+	seen := map[int32]bool{}
+	for _, id := range ids {
+		seen[id] = true
+	}
+	if !seen[2] || !seen[3] {
+		t.Fatalf("BroadcastSkillLaunched targetIDs = %v, want to contain 2 and 3", ids)
 	}
 }
 
@@ -326,13 +383,15 @@ type fakeCastCreature struct {
 	category skilltarget.Category
 }
 
-func (f *fakeCastCreature) ObjectID() int32                { return f.id }
-func (f *fakeCastCreature) Position() (int, int, int)      { return f.x, f.y, f.z }
-func (f *fakeCastCreature) Heading() int                   { return 0 }
-func (f *fakeCastCreature) Dead() bool                     { return f.dead }
-func (f *fakeCastCreature) Category() skilltarget.Category { return f.category }
-func (f *fakeCastCreature) SiegeGuard() bool               { return false }
-func (f *fakeCastCreature) AlikeDead() bool                { return f.dead }
+func (f *fakeCastCreature) ObjectID() int32                                    { return f.id }
+func (f *fakeCastCreature) Position() (int, int, int)                          { return f.x, f.y, f.z }
+func (f *fakeCastCreature) Heading() int                                       { return 0 }
+func (f *fakeCastCreature) Dead() bool                                         { return f.dead }
+func (f *fakeCastCreature) Category() skilltarget.Category                     { return f.category }
+func (f *fakeCastCreature) SiegeGuard() bool                                   { return false }
+func (f *fakeCastCreature) AlikeDead() bool                                    { return f.dead }
+func (f *fakeCastCreature) AttackableBy(skilltarget.Creature) bool             { return true }
+func (f *fakeCastCreature) AttackableWithoutForceBy(skilltarget.Creature) bool { return true }
 
 var _ attackable.Combatant = (*fakeCastCreature)(nil)
 var _ skilltarget.Creature = (*fakeCastCreature)(nil)

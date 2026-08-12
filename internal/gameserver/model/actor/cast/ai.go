@@ -101,11 +101,14 @@ func (a *AIController) CanCast(target attackable.Combatant, ref modelskill.Ref) 
 }
 
 // magicCastBroadcaster is the observer-broadcast surface an AI-initiated
-// cast's caster optionally exposes, mirroring the packet pair a live
-// player cast sends through network/magic_skill.go: MagicSkillUse at the
-// cast's launch point and MagicSkillLaunched once the hit phase resolves.
-// A caster that doesn't implement it (e.g. in tests) simply broadcasts
-// nothing.
+// cast's caster optionally exposes, mirroring the reference sequence in
+// CreatureCast.java (the same doCast/onMagicLaunch path PlayerCast chains
+// into via super.doCast, so player and AI casts share it): MagicSkillUse
+// broadcasts at cast start with the computed hitTime/reuseDelay
+// (CreatureCast.java:148), and MagicSkillLaunched broadcasts at the launch
+// timer — hitTime-400ms — with the full launch-resolved target list
+// (CreatureCast.java:165,232-234). A caster that doesn't implement it (e.g.
+// in tests) simply broadcasts nothing.
 type magicCastBroadcaster interface {
 	BroadcastSkillUse(targetID int32, targetX, targetY, targetZ int, skillID, level int32, hitTime, reuseDelay int) error
 	BroadcastSkillLaunched(skillID, level int32, targetIDs []int32) error
@@ -134,6 +137,17 @@ func (a *AIController) Cast(target attackable.Combatant, ref modelskill.Ref) {
 
 	broadcaster, _ := a.Caster.(magicCastBroadcaster)
 
+	// MagicSkillUse broadcasts the instant the cast starts, matching
+	// CreatureCast.doCast's broadcastPacket call before the launch timer is
+	// even scheduled (CreatureCast.java:148,165).
+	if broadcaster != nil {
+		tx, ty, tz := castTarget.Position()
+		if err := broadcaster.BroadcastSkillUse(castTarget.ObjectID(), tx, ty, tz, int32(def.ID), int32(def.Level),
+			int(plan.HitTime/time.Millisecond), int(plan.ReuseDelay/time.Millisecond)); err != nil {
+			a.Controller.log.Warn().Err(err).Msg("cast: skill-use broadcast")
+		}
+	}
+
 	a.Controller.Schedule(plan, Hooks{
 		Launch: func() bool {
 			if reason := RevalidateLaunch(a.Caster, castTarget, def); reason != LaunchAbortNone {
@@ -143,20 +157,21 @@ func (a *AIController) Cast(target attackable.Combatant, ref modelskill.Ref) {
 				return false
 			}
 			if broadcaster != nil {
-				tx, ty, tz := castTarget.Position()
-				if err := broadcaster.BroadcastSkillUse(castTarget.ObjectID(), tx, ty, tz, int32(def.ID), int32(def.Level),
-					int(plan.HitTime/time.Millisecond), int(plan.ReuseDelay/time.Millisecond)); err != nil {
-					a.Controller.log.Warn().Err(err).Msg("cast: skill-use broadcast")
+				// The reference recomputes _targets = getTargetList(...) at
+				// the launch timer and broadcasts that full set
+				// (CreatureCast.java:232-234), not just the preselected
+				// single target.
+				targetIDs := ResolveTargetIDs(a.Effects, a.Caster, castTarget, def)
+				if targetIDs == nil {
+					targetIDs = []int32{castTarget.ObjectID()}
+				}
+				if err := broadcaster.BroadcastSkillLaunched(int32(def.ID), int32(def.Level), targetIDs); err != nil {
+					a.Controller.log.Warn().Err(err).Msg("cast: skill-launched broadcast")
 				}
 			}
 			return true
 		},
 		Hit: func() {
-			if broadcaster != nil {
-				if err := broadcaster.BroadcastSkillLaunched(int32(def.ID), int32(def.Level), []int32{castTarget.ObjectID()}); err != nil {
-					a.Controller.log.Warn().Err(err).Msg("cast: skill-launched broadcast")
-				}
-			}
 			// FUSION is dispatched to PlayerCast.doFusionCast only for
 			// player casters (PlayerAI.java:300-301); CreatureCast's
 			// override is an empty stub — "Non-Player Creatures cannot use
