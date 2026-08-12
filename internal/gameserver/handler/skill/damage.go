@@ -251,6 +251,9 @@ func (blowHandler) UseResult(cast Cast) Result {
 			if in.Shield != formulas.ShieldPerfect {
 				damage = int(formulas.BlowDamage(in))
 			}
+			if in.Crit {
+				damage *= 2
+			}
 			if damage > 0 {
 				countered := false
 				if source, ok := target.(counterSkillPhysicalTarget); ok {

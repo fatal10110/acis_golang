@@ -3,6 +3,7 @@ package cast
 import (
 	"time"
 
+	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
@@ -101,14 +102,21 @@ func (a *AIController) CanCast(target attackable.Combatant, ref modelskill.Ref) 
 }
 
 // magicCastBroadcaster is the observer-broadcast surface an AI-initiated
-// cast's caster optionally exposes, mirroring the packet pair a live
-// player cast sends through network/magic_skill.go: MagicSkillUse at the
-// cast's launch point and MagicSkillLaunched once the hit phase resolves.
-// A caster that doesn't implement it (e.g. in tests) simply broadcasts
-// nothing.
+// cast's caster optionally exposes, mirroring the reference sequence in
+// CreatureCast.java (the same doCast/onMagicLaunch/stop path PlayerCast
+// chains into via super.doCast/super.stop, so player and AI casts share
+// it): MagicSkillUse broadcasts at cast start with the computed
+// hitTime/reuseDelay (CreatureCast.java:148), MagicSkillLaunched broadcasts
+// at the launch timer — hitTime-400ms — with the full launch-resolved
+// target list (CreatureCast.java:165,232-234), and MagicSkillCanceled
+// broadcasts whenever an in-flight cast aborts (CreatureCast.java:416-419,
+// `if (isCastingNow()) _actor.broadcastPacket(new
+// MagicSkillCanceled(...))`, unmodified by NpcCast). A caster that doesn't
+// implement it (e.g. in tests) simply broadcasts nothing.
 type magicCastBroadcaster interface {
 	BroadcastSkillUse(targetID int32, targetX, targetY, targetZ int, skillID, level int32, hitTime, reuseDelay int) error
 	BroadcastSkillLaunched(skillID, level int32, targetIDs []int32) error
+	BroadcastSkillCanceled(objectID int32) error
 }
 
 // Cast starts the cast against target and schedules its Launch, Hit and
@@ -134,6 +142,41 @@ func (a *AIController) Cast(target attackable.Combatant, ref modelskill.Ref) {
 
 	broadcaster, _ := a.Caster.(magicCastBroadcaster)
 
+	if broadcaster != nil {
+		// Every abort path (Launch revalidation failure, insufficient
+		// MP/HP at Hit, a damage-break interrupt) routes through
+		// Controller.Stop/Interrupt, which fires the abort observer only
+		// when a cast was actually in flight — matching CreatureCast.stop()
+		// broadcasting MagicSkillCanceled behind the same isCastingNow()
+		// guard (CreatureCast.java:416-419), inherited unmodified by
+		// NpcCast. This PR is what first makes the cast start observable
+		// (MagicSkillUse below), so an abort must now close that loop too.
+		a.Controller.SetOnAbort(func(bool) {
+			if err := broadcaster.BroadcastSkillCanceled(a.Caster.ObjectID()); err != nil {
+				a.Controller.log.Warn().Err(err).Msg("cast: skill-canceled broadcast")
+			}
+		})
+
+		// MagicSkillUse broadcasts the instant the cast starts, matching
+		// CreatureCast.doCast's broadcastPacket call before the launch
+		// timer is even scheduled (CreatureCast.java:148,165).
+		tx, ty, tz := castTarget.Position()
+		if err := broadcaster.BroadcastSkillUse(castTarget.ObjectID(), tx, ty, tz, int32(def.ID), int32(def.Level),
+			int(plan.HitTime/time.Millisecond), int(plan.ReuseDelay/time.Millisecond)); err != nil {
+			a.Controller.log.Warn().Err(err).Msg("cast: skill-use broadcast")
+		}
+	}
+
+	// launchTargets is resolved once, in the Launch hook, and reused
+	// unchanged by Hit — mirroring CreatureCast.java's `_targets` field,
+	// assigned once in onMagicLaunch (:232) and read again by
+	// onMagicHitTimer's callSkill (:291, NpcCast.java:52) rather than
+	// re-derived. That keeps the MagicSkillLaunched broadcast and the
+	// effect-affected set as one snapshot instead of two independent
+	// resolutions 400ms apart.
+	var launchTargets []skilltarget.Creature
+	var launchResolved bool
+
 	a.Controller.Schedule(plan, Hooks{
 		Launch: func() bool {
 			if reason := RevalidateLaunch(a.Caster, castTarget, def); reason != LaunchAbortNone {
@@ -142,21 +185,25 @@ func (a *AIController) Cast(target attackable.Combatant, ref modelskill.Ref) {
 				}
 				return false
 			}
+			launchTargets, launchResolved = ResolveAffected(a.Effects, a.Caster, castTarget, def)
 			if broadcaster != nil {
-				tx, ty, tz := castTarget.Position()
-				if err := broadcaster.BroadcastSkillUse(castTarget.ObjectID(), tx, ty, tz, int32(def.ID), int32(def.Level),
-					int(plan.HitTime/time.Millisecond), int(plan.ReuseDelay/time.Millisecond)); err != nil {
-					a.Controller.log.Warn().Err(err).Msg("cast: skill-use broadcast")
+				// The reference recomputes _targets = getTargetList(...) at
+				// the launch timer and broadcasts that full set
+				// (CreatureCast.java:232-234); when resolution finds no
+				// affected targets, it broadcasts the empty list as-is
+				// (no skip, no synthesized fallback target) — the wire
+				// builder already writes that form (0,0) unconditionally.
+				targetIDs := make([]int32, len(launchTargets))
+				for i, t := range launchTargets {
+					targetIDs[i] = t.ObjectID()
+				}
+				if err := broadcaster.BroadcastSkillLaunched(int32(def.ID), int32(def.Level), targetIDs); err != nil {
+					a.Controller.log.Warn().Err(err).Msg("cast: skill-launched broadcast")
 				}
 			}
 			return true
 		},
 		Hit: func() {
-			if broadcaster != nil {
-				if err := broadcaster.BroadcastSkillLaunched(int32(def.ID), int32(def.Level), []int32{castTarget.ObjectID()}); err != nil {
-					a.Controller.log.Warn().Err(err).Msg("cast: skill-launched broadcast")
-				}
-			}
 			// FUSION is dispatched to PlayerCast.doFusionCast only for
 			// player casters (PlayerAI.java:300-301); CreatureCast's
 			// override is an empty stub — "Non-Player Creatures cannot use
@@ -164,10 +211,10 @@ func (a *AIController) Cast(target attackable.Combatant, ref modelskill.Ref) {
 			// drives every non-player-initiated cast, so it must skip
 			// FUSION here rather than let it reach fusionHandler, which
 			// has no caster-type gate of its own.
-			if def.SkillType == "FUSION" {
+			if def.SkillType == "FUSION" || !launchResolved {
 				return
 			}
-			ApplyEffects(a.Effects, a.Caster, castTarget, def)
+			ApplyResolvedEffectsResult(a.Effects, a.Caster, launchTargets, def)
 		},
 	})
 }

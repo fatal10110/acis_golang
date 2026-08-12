@@ -49,6 +49,11 @@ func (NpcFrameBuilder) SkillLaunched(objectID, skillID, level int32, targetIDs [
 	return FrameMagicSkillLaunched(objectID, skillID, level, targetIDs)
 }
 
+// SkillCanceled builds the cast-cancel animation packet.
+func (NpcFrameBuilder) SkillCanceled(objectID int32) wire.Frame {
+	return FrameMagicSkillCanceled(objectID)
+}
+
 // Die builds the death packet.
 func (NpcFrameBuilder) Die(objectID int32) wire.Frame {
 	return FrameDie(objectID, DieOptions{})

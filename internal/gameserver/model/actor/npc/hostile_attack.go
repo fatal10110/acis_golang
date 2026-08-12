@@ -360,6 +360,18 @@ func (h *Hostile) BroadcastSkillLaunched(skillID, level int32, targetIDs []int32
 	})
 }
 
+// BroadcastSkillCanceled sends the cast-cancel animation packet for
+// objectID to every currently known observer capable of receiving one. It
+// is a no-op until SetWorld has been called.
+func (h *Hostile) BroadcastSkillCanceled(objectID int32) error {
+	if h.frames == nil {
+		return ErrNoFrameBuilder
+	}
+	return h.broadcastFrame(func() wire.Frame {
+		return h.frames.SkillCanceled(objectID)
+	})
+}
+
 // BroadcastDie sends the death packet to every currently known observer
 // capable of receiving one, so clients play the corpse-fall animation
 // instead of leaving this NPC standing until its corpse decays. It is a
