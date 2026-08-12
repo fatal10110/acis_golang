@@ -263,23 +263,22 @@ func TestLoadNPCTemplates(t *testing.T) {
 		}
 	})
 
-	t.Run("skills map carries every id/level pair a template's <skills> block grants", func(t *testing.T) {
+	t.Run("skills map excludes passive and race-marker skills, matching NpcData.java/NpcTemplate.getSkills", func(t *testing.T) {
 		table := withNoItems
 		sinEater, ok := table.Get(12564)
 		if !ok {
 			t.Fatal("npc 12564 (Sin Eater) not loaded")
 		}
-		want := map[int]int{4121: 1, 4416: 13}
-		if len(sinEater.Skills) != len(want) {
-			t.Fatalf("Sin Eater Skills = %v, want %v", sinEater.Skills, want)
+		// Sin Eater's <skills> block is 4121 (type="PASSIVE") and 4416
+		// (type="PASSIVE", also the race-marker skill). Java's
+		// NpcData.java routes race markers to an early return and
+		// PASSIVE entries to a separate passives list, so neither ever
+		// reaches NpcTemplate._skills / Summon.getSkill's search space.
+		if len(sinEater.Skills) != 0 {
+			t.Fatalf("Sin Eater Skills = %v, want empty", sinEater.Skills)
 		}
-		for id, level := range want {
-			if sinEater.Skills[id] != level {
-				t.Fatalf("Sin Eater Skills = %v, want %v", sinEater.Skills, want)
-			}
-		}
-		// The race-marker skill (4416) is still resolved into Race
-		// alongside being recorded in the raw Skills map.
+		// The race-marker skill (4416) is still resolved into Race even
+		// though it's excluded from the Skills map.
 		if sinEater.Race != npc.RaceFairy {
 			t.Fatalf("Sin Eater Race = %v, want RaceFairy", sinEater.Race)
 		}
