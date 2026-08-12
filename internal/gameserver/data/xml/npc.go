@@ -161,6 +161,11 @@ func buildNPCTemplate(el npcElement, items *item.Table, log zerolog.Logger) (*np
 	// XML with no skill-engine lookup) and the raw id/level pairs
 	// themselves, which Summon.getSkill-equivalent lookups need to know
 	// which skills a pet/servitor template grants at all.
+	//
+	// Matching NpcData.java: a race-marker skill id (secondary or the
+	// dedicated primary race skill) resolves race and never enters the
+	// skills map; a type="PASSIVE" skill also never enters it (Java routes
+	// it to a separate passives list that Summon.getSkill never searches).
 	if len(el.Skills) > 0 {
 		skills := make(map[int]int, len(el.Skills))
 		for _, s := range el.Skills {
@@ -173,7 +178,6 @@ func buildNPCTemplate(el npcElement, items *item.Table, log zerolog.Logger) (*np
 			if err != nil {
 				return nil, fmt.Errorf("npc %d: skill: %w", npcID, err)
 			}
-			skills[skillID] = level
 
 			if race := npc.RaceBySecondarySkillID(skillID); race != npc.RaceDummy {
 				set.Set("race", race)
@@ -185,7 +189,12 @@ func buildNPCTemplate(el npcElement, items *item.Table, log zerolog.Logger) (*np
 					return nil, fmt.Errorf("npc %d: race skill level %d out of range", npcID, level)
 				}
 				set.Set("race", race)
+				continue
 			}
+			if skillSet.GetStringDefault("type", "") == "PASSIVE" {
+				continue
+			}
+			skills[skillID] = level
 		}
 		set.Set("skills", skills)
 	}
