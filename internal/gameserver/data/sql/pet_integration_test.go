@@ -65,6 +65,30 @@ func TestPetStore_SaveAndGet(t *testing.T) {
 	}
 }
 
+func TestPetStore_NameTakenIsCaseInsensitive(t *testing.T) {
+	ctx := context.Background()
+	store := NewPetStore(sqltest.NewDB(t))
+	if err := store.Save(ctx, 0x10000101, pet.State{Name: "Wolf", Level: 1}); err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+
+	for _, tt := range []struct {
+		name string
+		want bool
+	}{
+		{name: "WOLF", want: true},
+		{name: "Hatchling", want: false},
+	} {
+		got, err := store.NameTaken(ctx, tt.name)
+		if err != nil {
+			t.Fatalf("NameTaken(%q) error = %v", tt.name, err)
+		}
+		if got != tt.want {
+			t.Errorf("NameTaken(%q) = %v, want %v", tt.name, got, tt.want)
+		}
+	}
+}
+
 func TestPetStore_SaveUpserts(t *testing.T) {
 	ctx := context.Background()
 	conn := sqltest.NewDB(t)
