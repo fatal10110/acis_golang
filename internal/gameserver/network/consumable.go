@@ -64,6 +64,7 @@ func (l *GameClientLink) useConsumableSkillItem(live *livePlayer, inv *itemconta
 				})
 			}
 			live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageUseS1, int32(res.Skill.ID), int32(res.Skill.Level)))
+			applyItemCastCharges(live, res)
 			beforeVitals := live.Vitals()
 			res.Apply()
 			sendMagicStatusUpdate(live, beforeVitals)
@@ -73,6 +74,24 @@ func (l *GameClientLink) useConsumableSkillItem(live *livePlayer, inv *itemconta
 		}
 	}
 	return true
+}
+
+// applyItemCastCharges applies the item-carried skill's Force/Soul charges
+// to live, matching PlayableCast<Player>.doInstantCast's override
+// (PlayerCast.java:108-114): charges run after the cast's own packets
+// (shared-reuse, MagicSkillUse, USE_S1) and before the skill's effects
+// apply. Only the player who used the item — never the pet/summon herb
+// path (network/pet_herb.go) — reaches this, matching PlayableCast.java's
+// base doInstantCast having no charge handling at all.
+func applyItemCastCharges(live *livePlayer, res itemhandler.UseResult) {
+	if res.Skill.NumCharges <= 0 {
+		return
+	}
+	if res.Skill.MaxCharges > 0 {
+		live.Character.IncreaseCharges(res.Skill.NumCharges, res.Skill.MaxCharges)
+	} else {
+		live.Character.DecreaseCharges(res.Skill.NumCharges)
+	}
 }
 
 func sendItemSkillConditionFailure(live *livePlayer, res itemhandler.UseResult) {

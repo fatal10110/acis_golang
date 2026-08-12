@@ -69,6 +69,16 @@ type allSkillsDisabler interface {
 	EnableAllSkills()
 }
 
+// chargeHolder is the optional owner surface for a skill's Force/Soul
+// charge apply at hit time, matching CreatureCast.onMagicHitTimer's
+// `_actor instanceof Player` gate (CreatureCast.java:274-282): only a
+// player-backed actor implements this, so an NPC/summon timed cast is a
+// silent no-op instead of applying charges.
+type chargeHolder interface {
+	IncreaseCharges(count, max int) bool
+	DecreaseCharges(count int) bool
+}
+
 // Actor is the owner state a cast controller reads and updates while
 // validating and advancing casts. Status implementations own stat
 // calculation; the controller only consumes already-resolved costs, speeds,
@@ -341,6 +351,19 @@ func (c *Controller) hitLocked() error {
 			return ErrNotEnoughHP
 		}
 		c.actor.ReduceHP(hp)
+	}
+
+	// Force/Soul charge apply, matching CreatureCast.onMagicHitTimer
+	// (CreatureCast.java:276-282): runs after the MP/HP consume above and
+	// before the caller's Hooks.Hit applies the skill's effects.
+	if c.current.NumCharges > 0 {
+		if ch, ok := c.actor.(chargeHolder); ok {
+			if c.current.MaxCharges > 0 {
+				ch.IncreaseCharges(c.current.NumCharges, c.current.MaxCharges)
+			} else {
+				ch.DecreaseCharges(c.current.NumCharges)
+			}
+		}
 	}
 	return nil
 }

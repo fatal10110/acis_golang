@@ -244,6 +244,61 @@ func TestHitConsumesFinalCostsAndAllowsExactHP(t *testing.T) {
 	}
 }
 
+// TestHitAppliesForceSoulCharges pins CreatureCast.onMagicHitTimer's charge
+// block (CreatureCast.java:276-282): a skill with NumCharges > 0 and
+// MaxCharges > 0 increases the caster's charges at hit time; NumCharges > 0
+// with MaxCharges == 0 decreases instead — both before Hooks.Hit would
+// apply the skill's own effects.
+func TestHitAppliesForceSoulCharges(t *testing.T) {
+	t.Run("increase", func(t *testing.T) {
+		actor := &chargingTestActor{testActor: testActor{mp: 30, hp: 30}}
+		ctrl := NewController(actor)
+		def := modelskill.Definition{ID: 461, Level: 1, NumCharges: 1, MaxCharges: 2}
+		if _, err := ctrl.Start(time.Unix(1000, 0), testTarget{}, def); err != nil {
+			t.Fatalf("Start() error: %v", err)
+		}
+		if err := ctrl.Hit(); err != nil {
+			t.Fatalf("Hit() error: %v", err)
+		}
+		if actor.increaseCalls != 1 || actor.increaseCount != 1 || actor.maxCount != 2 {
+			t.Fatalf("IncreaseCharges calls=%d count=%d max=%d, want 1/1/2", actor.increaseCalls, actor.increaseCount, actor.maxCount)
+		}
+		if actor.decreaseCalls != 0 {
+			t.Fatalf("DecreaseCharges calls = %d, want 0", actor.decreaseCalls)
+		}
+	})
+
+	t.Run("decrease", func(t *testing.T) {
+		actor := &chargingTestActor{testActor: testActor{mp: 30, hp: 30}}
+		ctrl := NewController(actor)
+		def := modelskill.Definition{ID: 462, Level: 1, NumCharges: 1}
+		if _, err := ctrl.Start(time.Unix(1000, 0), testTarget{}, def); err != nil {
+			t.Fatalf("Start() error: %v", err)
+		}
+		if err := ctrl.Hit(); err != nil {
+			t.Fatalf("Hit() error: %v", err)
+		}
+		if actor.decreaseCalls != 1 || actor.decreaseCount != 1 {
+			t.Fatalf("DecreaseCharges calls=%d count=%d, want 1/1", actor.decreaseCalls, actor.decreaseCount)
+		}
+		if actor.increaseCalls != 0 {
+			t.Fatalf("IncreaseCharges calls = %d, want 0", actor.increaseCalls)
+		}
+	})
+
+	t.Run("non-player actor is a no-op", func(t *testing.T) {
+		actor := &testActor{mp: 30, hp: 30}
+		ctrl := NewController(actor)
+		def := modelskill.Definition{ID: 463, Level: 1, NumCharges: 1, MaxCharges: 2}
+		if _, err := ctrl.Start(time.Unix(1000, 0), testTarget{}, def); err != nil {
+			t.Fatalf("Start() error: %v", err)
+		}
+		if err := ctrl.Hit(); err != nil {
+			t.Fatalf("Hit() error: %v", err)
+		}
+	})
+}
+
 // TestHitReportsUnpayableFinalCosts pins Hit's half of the contract only:
 // it reports why the cast cannot be paid for and charges nothing, leaving
 // the cast in flight for the abort funnel to cancel. The scheduled path
@@ -703,5 +758,31 @@ func (a *testActor) ConsumeItem(itemID, count int) bool {
 		return false
 	}
 	a.items[itemID] -= count
+	return true
+}
+
+// chargingTestActor adds the chargeHolder surface on top of testActor, for
+// pinning that Controller.Hit applies Force/Soul charges — and that a bare
+// testActor (an NPC/summon stand-in, which never implements chargeHolder)
+// silently skips them, matching CreatureCast.onMagicHitTimer's
+// `_actor instanceof Player` gate.
+type chargingTestActor struct {
+	testActor
+	charges                 int
+	increaseCount, maxCount int
+	decreaseCount           int
+	increaseCalls           int
+	decreaseCalls           int
+}
+
+func (a *chargingTestActor) IncreaseCharges(count, max int) bool {
+	a.increaseCalls++
+	a.increaseCount, a.maxCount = count, max
+	return true
+}
+
+func (a *chargingTestActor) DecreaseCharges(count int) bool {
+	a.decreaseCalls++
+	a.decreaseCount = count
 	return true
 }
