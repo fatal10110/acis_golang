@@ -254,6 +254,17 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor) {
 	})
 	actor.SetAI(brain)
 	actor.SetStatusUpdater(func() { l.broadcastSummonStatus(actor) })
+	actor.SetDamageNotifier(func(attackerName string, damage int32) {
+		owner, ok := l.livePlayerByID(actor.OwnerID())
+		if !ok {
+			return
+		}
+		messageID := serverpackets.SystemMessageSummonReceivedS2ByS1
+		if actor.IsPet() {
+			messageID = serverpackets.SystemMessagePetReceivedS2DamageByS1
+		}
+		owner.SendFrame(serverpackets.FrameSystemMessageStringNumber(messageID, attackerName, damage))
+	})
 }
 
 func (l *GameClientLink) broadcastSummonStatus(actor *summon.Actor) {
