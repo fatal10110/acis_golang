@@ -93,3 +93,8 @@ func (c *Character) AttackTarget(t any) {
 		attack(tracked)
 	}
 }
+
+// TryToAttack implements targetRedirectTarget's attack trigger.
+func (c *Character) TryToAttack(t any) {
+	c.AttackTarget(t)
+}
