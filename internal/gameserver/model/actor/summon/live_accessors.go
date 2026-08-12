@@ -26,6 +26,9 @@ func (a *Actor) OwnerID() int32 {
 	return a.owner.ObjectID()
 }
 
+// ControlItemID returns the collar item object id backing this pet.
+func (a *Actor) ControlItemID() int32 { return a.controlItemID }
+
 // Level returns the summon's current level.
 func (a *Actor) Level() int {
 	a.statusMu.RLock()

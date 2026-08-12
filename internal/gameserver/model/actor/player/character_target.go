@@ -31,16 +31,44 @@ func (c *Character) CurrentTarget() any {
 
 // SetTarget implements retargetableOnAggression's setter. t must be a
 // world.Tracked (or nil); any other type is ignored.
+//
+// Reference: Player.setTarget (Player.java:2439-2510) is the single packet
+// funnel for every selection, click-driven or domain-driven alike — a
+// non-null Creature target gets ValidateLocation (conditional)/
+// MyTargetSelected/StatusUpdate/broadcast TargetSelected (:2474-2493), a
+// null target gets ActionFailed and a conditional broadcast TargetUnselected
+// (:2495-2503). Creature.setTarget's plain field write (Creature.java:
+// 1353-1358) is only what the Summon runtime path hits, since no Playable
+// subclass overrides it. retargetTarget is the network-owned hook that
+// reproduces that funnel (see network.selectLiveTarget/clearLiveTarget);
+// SetTargetTracked is the fallback for callers with no live session wired
+// (e.g. tests).
 func (c *Character) SetTarget(t any) {
-	if t == nil {
-		c.SetTargetTracked(nil)
-		return
+	var tracked world.Tracked
+	if t != nil {
+		var ok bool
+		tracked, ok = t.(world.Tracked)
+		if !ok {
+			return
+		}
 	}
-	tracked, ok := t.(world.Tracked)
-	if !ok {
+	c.stateMu.RLock()
+	retarget := c.retargetTarget
+	c.stateMu.RUnlock()
+	if retarget != nil {
+		retarget(tracked)
 		return
 	}
 	c.SetTargetTracked(tracked)
+}
+
+// SetRetargetHook records the packet-layer hook engaged when a domain
+// retarget (AGGDEBUFF, TargetMe) needs to reproduce Player.setTarget's
+// packet funnel instead of a plain field write.
+func (c *Character) SetRetargetHook(retarget func(world.Tracked)) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	c.retargetTarget = retarget
 }
 
 // SetAttackTargetHook records the packet-layer hook engaged when an
@@ -64,4 +92,9 @@ func (c *Character) AttackTarget(t any) {
 	if attack != nil {
 		attack(tracked)
 	}
+}
+
+// TryToAttack implements targetRedirectTarget's attack trigger.
+func (c *Character) TryToAttack(t any) {
+	c.AttackTarget(t)
 }

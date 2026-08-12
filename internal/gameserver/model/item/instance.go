@@ -284,6 +284,21 @@ func (inst *Instance) SetEnchantLevel(level int) bool {
 	return true
 }
 
+// SetCustomType2 changes the second custom-type flag and schedules persistence.
+func (inst *Instance) SetCustomType2(value int) bool {
+	mu := inst.lock()
+	mu.Lock()
+	if inst.CustomType2 == value {
+		mu.Unlock()
+		return false
+	}
+	inst.CustomType2 = value
+	mu.Unlock()
+
+	inst.persisted()
+	return true
+}
+
 // DecreaseMana reduces a shadow item's remaining mana by amount, floored at
 // zero, and returns the resulting mana value.
 func (inst *Instance) DecreaseMana(amount int) int {
