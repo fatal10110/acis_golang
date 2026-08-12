@@ -65,23 +65,64 @@ func ApplyItemEffectsResult(handlers EffectHandlers, caster any, resolved Target
 	return applyEffectsResult(handlers, caster, resolved, def, item)
 }
 
-func applyEffectsResult(handlers EffectHandlers, caster any, resolved Target, def modelskill.Definition, item any) EffectResult {
+func resolveAffected(handlers EffectHandlers, caster any, resolved Target, def modelskill.Definition) ([]skilltarget.Creature, bool) {
 	casterCreature, ok := caster.(skilltarget.Creature)
-	if !ok || handlers.Targets == nil || handlers.Skills == nil {
-		return EffectResult{}
+	if !ok || handlers.Targets == nil {
+		return nil, false
 	}
 	selected, _ := resolved.(skilltarget.Creature)
 
 	handler, ok := handlers.Targets.Handler(def.Target)
 	if !ok || !handler.CanCast(casterCreature, selected, &def, false) {
-		return EffectResult{}
+		return nil, false
 	}
 
 	affected := handler.Targets(casterCreature, selected, &def)
 	if len(affected) == 0 {
+		return nil, false
+	}
+	return affected, true
+}
+
+func applyEffectsResult(handlers EffectHandlers, caster any, resolved Target, def modelskill.Definition, item any) EffectResult {
+	if handlers.Skills == nil {
 		return EffectResult{}
 	}
+	affected, ok := resolveAffected(handlers, caster, resolved, def)
+	if !ok {
+		return EffectResult{}
+	}
+	return dispatchEffects(handlers, caster, affected, def, item)
+}
 
+// ResolveAffected exposes the same target-resolution surface
+// applyEffectsResult uses, for a caller that must broadcast the affected
+// set (e.g. MagicSkillLaunched) at launch and then reuse that exact,
+// already-resolved list — not a fresh resolution — when Hit dispatches
+// effects, matching CreatureCast.java: onMagicLaunch assigns
+// `_targets = _skill.getTargetList(...)` once (:232) and the hit timer's
+// `callSkill(_skill, _targets, _item)` (:291, NpcCast.java:52) reuses that
+// same field rather than re-deriving it. ok is false if resolution failed
+// for any reason (unresolvable caster/target, no registered handler,
+// CanCast rejection, or an empty affected set); affected is nil in that
+// case.
+func ResolveAffected(handlers EffectHandlers, caster any, resolved Target, def modelskill.Definition) (affected []skilltarget.Creature, ok bool) {
+	return resolveAffected(handlers, caster, resolved, def)
+}
+
+// ApplyResolvedEffectsResult dispatches def's effects to affected — an
+// already-resolved target set, typically the one ResolveAffected returned
+// at launch and frozen for reuse at Hit — instead of re-resolving from a
+// single selection. See ResolveAffected's doc for why a caller needs this
+// split.
+func ApplyResolvedEffectsResult(handlers EffectHandlers, caster any, affected []skilltarget.Creature, def modelskill.Definition) EffectResult {
+	if handlers.Skills == nil || len(affected) == 0 {
+		return EffectResult{}
+	}
+	return dispatchEffects(handlers, caster, affected, def, nil)
+}
+
+func dispatchEffects(handlers EffectHandlers, caster any, affected []skilltarget.Creature, def modelskill.Definition, item any) EffectResult {
 	castTargets := make([]any, len(affected))
 	for i, t := range affected {
 		castTargets[i] = t
