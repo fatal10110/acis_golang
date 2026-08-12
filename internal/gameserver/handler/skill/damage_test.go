@@ -258,6 +258,31 @@ func TestBlowMissSkipsDamageAndEffects(t *testing.T) {
 	}
 }
 
+func TestBlowEvasionSkipsDamageAndReportsParticipants(t *testing.T) {
+	registry := NewDefaultRegistry()
+	caster := newDamageEffectFake()
+	caster.id, caster.name, caster.hp = 1, "Attacker", 2000
+	target := newDamageEffectFake()
+	target.id, target.name, target.hp = 2, "Defender", 2000
+	target.blowOK = true
+	target.blowInput = formulas.BlowInput{Landed: true, Evaded: true}
+
+	result, ok := registry.UseResult(Cast{
+		Caster:  caster,
+		Skill:   modelskill.Definition{ID: 409, SkillType: "BLOW", Effects: targetEffect()},
+		Targets: []any{target},
+	})
+	if !ok {
+		t.Fatal("UseResult() handled = false, want true")
+	}
+	if target.hp != 2000 || len(target.EffectList().All()) != 0 {
+		t.Fatalf("evaded BLOW target = hp %v effects %d, want unchanged", target.hp, len(target.EffectList().All()))
+	}
+	if got := result.Dodges; len(got) != 1 || got[0].AttackerID != caster.id || got[0].AttackerName != caster.name || got[0].DefenderID != target.id || got[0].DefenderName != target.name {
+		t.Fatalf("Dodges = %+v, want caster and target IDs and names", got)
+	}
+}
+
 func TestBlowCounterSkillDamagesCasterInsteadOfTarget(t *testing.T) {
 	registry := NewDefaultRegistry()
 	caster := newDamageEffectFake()
@@ -320,10 +345,12 @@ func TestBlowDischargesSoulshotOnlyAfterLanding(t *testing.T) {
 	for _, tc := range []struct {
 		name        string
 		landed      bool
+		evaded      bool
 		staticReuse bool
 		wantCharged bool
 	}{
 		{name: "landed", landed: true},
+		{name: "evaded", landed: true, evaded: true, wantCharged: true},
 		{name: "missed", wantCharged: true},
 		{name: "static reuse", landed: true, staticReuse: true, wantCharged: true},
 	} {
@@ -332,7 +359,7 @@ func TestBlowDischargesSoulshotOnlyAfterLanding(t *testing.T) {
 			caster.charged[modelitem.ShotSoul] = true
 			target := newDamageEffectFake()
 			target.blowOK = true
-			target.blowInput = formulas.BlowInput{Landed: tc.landed}
+			target.blowInput = formulas.BlowInput{Landed: tc.landed, Evaded: tc.evaded}
 
 			NewDefaultRegistry().Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "BLOW", StaticReuse: tc.staticReuse}, Targets: []any{target}})
 

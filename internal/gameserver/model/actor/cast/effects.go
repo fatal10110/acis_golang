@@ -20,6 +20,7 @@ type EffectResult struct {
 	Handled           bool
 	AttackFailed      int
 	Counterattacks    []handlerskill.Counterattack
+	Dodges            []handlerskill.Dodge
 	CubicAdded        bool
 	CubicTargets      []any
 	CubicAddedTargets []any
@@ -102,6 +103,7 @@ func applyEffectsResult(handlers EffectHandlers, caster any, resolved Target, de
 		Handled:           true,
 		AttackFailed:      result.AttackFailed,
 		Counterattacks:    result.Counterattacks,
+		Dodges:            result.Dodges,
 		CubicAdded:        result.CubicAdded,
 		CubicTargets:      result.CubicTargets,
 		CubicAddedTargets: result.CubicAddedTargets,
