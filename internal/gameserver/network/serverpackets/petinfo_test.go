@@ -123,3 +123,27 @@ func TestFramePetInfo(t *testing.T) {
 		t.Fatalf("FramePetInfo() =\n% x\nwant\n% x", got, want)
 	}
 }
+
+func TestFramePetStatusUpdate(t *testing.T) {
+	s := PetInfoSnapshot{
+		SummonType: 2, ObjectID: 20, X: 100, Y: 200, Z: -50, Title: "Companion",
+		CurFed: 80, MaxFed: 120, CurHP: 450, MaxHP: 500, CurMP: 90, MaxMP: 100,
+		Level: 44, Exp: 1_000, ExpForThisLevel: 900, ExpForNextLevel: 1_100,
+	}
+	got := framePayload(t, FramePetStatusUpdate(s))
+
+	want := []byte{OpcodePetStatusUpdate}
+	for _, value := range []int32{2, 20, 100, 200, -50} {
+		want = appendPetInfoInt32(want, value)
+	}
+	want = appendPetInfoString(want, "Companion")
+	for _, value := range []int32{80, 120, 450, 500, 90, 100, 44} {
+		want = appendPetInfoInt32(want, value)
+	}
+	for _, value := range []int64{1_000, 900, 1_100} {
+		want = appendPetInfoInt64(want, value)
+	}
+	if !bytes.Equal(got, want) {
+		t.Fatalf("FramePetStatusUpdate() = %x, want %x", got, want)
+	}
+}

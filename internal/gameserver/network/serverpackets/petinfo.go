@@ -6,7 +6,10 @@ import (
 
 // OpcodePetInfo is the wire opcode for the owner-only pet/servitor spawn and
 // refresh window.
-const OpcodePetInfo = 0xb1
+const (
+	OpcodePetInfo         = 0xb1
+	OpcodePetStatusUpdate = 0xb5
+)
 
 // PetInfoSnapshot is everything PetInfo needs for one live pet or servitor,
 // sent only to its owner (a non-owner observer gets SummonInfo instead,
@@ -45,6 +48,29 @@ type PetInfoSnapshot struct {
 	Team              int
 	SoulShotsPerHit   int
 	SpiritShotsPerHit int
+}
+
+// FramePetStatusUpdate builds the owner-only status refresh for a pet or
+// servitor after its HP changes.
+func FramePetStatusUpdate(s PetInfoSnapshot) wire.Frame {
+	w := newFrameWriter(OpcodePetStatusUpdate)
+	w.WriteInt32(int32(s.SummonType))
+	w.WriteInt32(s.ObjectID)
+	w.WriteInt32(int32(s.X))
+	w.WriteInt32(int32(s.Y))
+	w.WriteInt32(int32(s.Z))
+	w.WriteString(s.Title)
+	w.WriteInt32(int32(s.CurFed))
+	w.WriteInt32(int32(s.MaxFed))
+	w.WriteInt32(int32(s.CurHP))
+	w.WriteInt32(int32(s.MaxHP))
+	w.WriteInt32(int32(s.CurMP))
+	w.WriteInt32(int32(s.MaxMP))
+	w.WriteInt32(int32(s.Level))
+	w.WriteInt64(s.Exp)
+	w.WriteInt64(s.ExpForThisLevel)
+	w.WriteInt64(s.ExpForNextLevel)
+	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
 }
 
 // FramePetInfo builds a PetInfo packet for s, sent to a pet/servitor's owner
