@@ -84,6 +84,33 @@ func TestEffectPointForEachNearbyExcludesSelfAndFindsOthers(t *testing.T) {
 	}
 }
 
+func TestEffectPointForEachNearbyWidensByOwnCollisionRadius(t *testing.T) {
+	state := world.New()
+	ep, err := NewEffectPoint(1, &Template{ID: 13018, Type: "EffectPoint", CollisionRadius: 5}, 0)
+	if err != nil {
+		t.Fatalf("NewEffectPoint: %v", err)
+	}
+	if got := ep.CollisionRadius(); got != 5 {
+		t.Fatalf("CollisionRadius() = %v, want 5", got)
+	}
+	ep.SetWorld(state)
+	ep.Spawn(100, 100, 0, 0)
+
+	// Sits exactly 203 units out: inside radius(200)+5 only when the
+	// actor's own collision radius widens the scan.
+	edge := &frameReceiver{trackedID: 55}
+	state.Spawn(edge, 303, 100, 0, 0)
+
+	var found []int32
+	ep.ForEachNearby(200, func(o world.Tracked) {
+		found = append(found, o.ObjectID())
+	})
+
+	if len(found) != 1 || found[0] != 55 {
+		t.Fatalf("ForEachNearby found %v, want [55]", found)
+	}
+}
+
 func TestEffectPointBroadcastSkillUseAndLaunched(t *testing.T) {
 	state := world.New()
 	ep, err := NewEffectPoint(1, &Template{ID: 13018, Type: "EffectPoint"}, 0)

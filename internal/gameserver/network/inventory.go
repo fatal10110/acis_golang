@@ -1,6 +1,8 @@
 package network
 
 import (
+	"time"
+
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	itemhandler "github.com/fatal10110/acis_golang/internal/gameserver/handler/item"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
@@ -103,18 +105,34 @@ func (l *GameClientLink) applyEquipStatChanges(live *livePlayer, inv *itemcontai
 		return
 	}
 	if l.skills != nil {
+		var skillsChanged, timersChanged bool
 		for _, inst := range res.Changed {
 			tmpl, ok := inv.Templates().Get(inst.TemplateID)
 			if !ok {
 				continue
 			}
 			if inst.Equipped() {
-				if err := l.skills.EquipItemStats(live.Character, inst, tmpl); err != nil {
+				changed, timers, err := l.skills.EquipItemStats(live.Character, inst, tmpl)
+				if err != nil {
 					l.log.Error().Err(err).Int32("object_id", inst.ObjectID).Msg("equip item stats")
 				}
+				skillsChanged = skillsChanged || changed
+				timersChanged = timersChanged || timers
 				continue
 			}
-			l.skills.UnequipItemStats(live.Character, inst, tmpl)
+			if l.skills.UnequipItemStats(live.Character, inv, inst, tmpl) {
+				skillsChanged = true
+			}
+		}
+		// Mirrors ItemPassiveSkillsListener: SkillList always precedes
+		// SkillCoolTime, and SkillCoolTime is only ever sent when an
+		// item-granted skill's reuse timer needs to reach the client.
+		if skillsChanged {
+			live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
+		}
+		if timersChanged {
+			now := time.Now()
+			live.SendFrame(serverpackets.FrameSkillCoolTime(skillCoolTimeEntries(live.SkillReuseTimers(now), now)))
 		}
 	}
 	if l.shadowItems != nil {

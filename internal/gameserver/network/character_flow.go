@@ -107,8 +107,6 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 		l.log.Error().Err(err).Msg("enter world: build ItemList")
 		return nil, false
 	}
-	now := time.Now()
-	coolTimes := skillCoolTimeEntries(c.SkillReuseTimers(now), now)
 	live, err := l.attachLivePlayer(ctx, client, c, tmpl, items, shortcuts)
 	if err != nil {
 		l.log.Error().Err(err).Msg("enter world: attach live player")
@@ -120,6 +118,11 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 			return nil, false
 		}
 	}
+	// Computed after RestoreEquippedItemStats so an item's equip-delay reuse
+	// timer, armed by that restore, is included in the login SkillCoolTime
+	// snapshot rather than missed.
+	now := time.Now()
+	coolTimes := skillCoolTimeEntries(c.SkillReuseTimers(now), now)
 	c.RefreshWeightPenalty()
 	skillList := skillListEntries(c, l.skills)
 	if l.world != nil {
@@ -517,8 +520,16 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 		if l.skills == nil {
 			return
 		}
-		if err := l.skills.RefreshEquippedItemStats(live.Character, live.Inventory()); err != nil {
+		skillsChanged, timersChanged, err := l.skills.RefreshEquippedItemStats(live.Character, live.Inventory())
+		if err != nil {
 			l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("refresh grade-penalty item stats")
+		}
+		if skillsChanged {
+			live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
+		}
+		if timersChanged {
+			now := time.Now()
+			live.SendFrame(serverpackets.FrameSkillCoolTime(skillCoolTimeEntries(live.SkillReuseTimers(now), now)))
 		}
 	})
 	c.SetLevelRefresher(func() { l.refreshLiveLevelSkills(ctx, live) })
