@@ -340,3 +340,38 @@ func TestCastFinishResumesPendingAttackIntention(t *testing.T) {
 		})
 	}
 }
+
+func TestCastFinishResumesAttackQueuedDuringCast(t *testing.T) {
+	state := world.New()
+	frames := &frameCapture{}
+	attacker := newTestLivePlayer(t, 1, frames)
+	attacker.Character.SetWorld(state)
+	attacker.Character.SetRollSource(func(int) int { return 0 })
+	gcl := &GameClientLink{world: state, log: zerolog.Nop()}
+	wireLiveAttackHooks(gcl, attacker)
+	target := newTestHostileNPC(t, 3200)
+	target.Instance.Template.PDef = 1
+	target.Instance.Template.DEX = 30
+	target.SetRollSource(func(int) int { return 0 })
+	state.Spawn(attacker, 0, 0, 0, 0)
+	state.Spawn(target, 30, 0, 0, 0)
+
+	controller := gcl.castController(attacker)
+	def := modelskill.Definition{
+		ID: 3, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+		HitTime: 5000, ReuseDelay: 1200, StaticHitTime: true, StaticReuse: true,
+	}
+	if _, err := controller.Start(time.Now(), skillCastObject(attacker), def); err != nil {
+		t.Fatalf("Start() error: %v", err)
+	}
+	if gcl.attackLiveTarget(attacker, target) {
+		t.Fatal("attackLiveTarget() = true during a cast, want the attack queued")
+	}
+
+	controller.Finish()
+
+	opcodes := frameOpcodes(frames.frames)
+	if len(opcodes) == 0 || opcodes[len(opcodes)-1] != serverpackets.OpcodeAttack {
+		t.Fatalf("attack opcodes after cast completion = %#x, want the last frame to be Attack", opcodes)
+	}
+}

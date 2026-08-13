@@ -7,6 +7,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -193,9 +194,50 @@ func (a *Actor) AlikeDead() bool { return a.Dead() }
 // siege guards.
 func (a *Actor) SiegeGuard() bool { return false }
 
-// DenyAIAction reports whether this summon is unable to act on an owner
-// command: dead or out of the owner's control.
-func (a *Actor) DenyAIAction() bool { return a.AlikeDead() || a.OutOfControl() }
+// DenyAIAction reports whether this summon cannot act now.
+func (a *Actor) DenyAIAction() bool {
+	return a.AlikeDead() || a.Paralyzed() || a.Teleporting() || a.effects.IsAffected(
+		effect.FlagStunned|effect.FlagMeditating|effect.FlagSleep|effect.FlagFear,
+	)
+}
+
+// Paralyzed reports whether this summon is temporarily paralyzed or carries
+// an active paralyze effect.
+func (a *Actor) Paralyzed() bool {
+	a.stateMu.RLock()
+	paralyzed := a.paralyzed
+	a.stateMu.RUnlock()
+	return paralyzed || a.effects.IsAffected(effect.FlagParalyzed)
+}
+
+// SetParalyzed sets or clears this summon's transient paralysis lock.
+func (a *Actor) SetParalyzed(v bool) bool {
+	a.stateMu.Lock()
+	defer a.stateMu.Unlock()
+	if a.paralyzed == v {
+		return false
+	}
+	a.paralyzed = v
+	return true
+}
+
+// Teleporting reports whether this summon is in a teleport transition.
+func (a *Actor) Teleporting() bool {
+	a.stateMu.RLock()
+	defer a.stateMu.RUnlock()
+	return a.teleporting
+}
+
+// SetTeleporting sets or clears this summon's teleport transition.
+func (a *Actor) SetTeleporting(v bool) bool {
+	a.stateMu.Lock()
+	defer a.stateMu.Unlock()
+	if a.teleporting == v {
+		return false
+	}
+	a.teleporting = v
+	return true
+}
 
 // Knows reports whether target is currently visible to this summon.
 func (a *Actor) Knows(target attackable.Combatant) bool {
@@ -237,7 +279,7 @@ func (a *Actor) CanUseSkill() bool {
 // skillID against this summon's own skill catalog, checks the level gate,
 // then forwards to the attached AI. Matching Java's useSkill
 // (RequestActionUse.java:453-472), the AI's tryToCast is fire-and-forget:
-// its accept/reject decision (busy, cooldown, out of control, MP/mute —
+// its accept/reject decision (busy, cooldown, MP/mute —
 // PlayableAI.java:297, void return) does not feed back into the result
 // here. TryUseSkill returns false only wherever Java's useSkill would
 // (unknown skill, level gap, no attached AI); a dispatched cast reports

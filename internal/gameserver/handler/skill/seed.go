@@ -31,6 +31,6 @@ func (seedHandler) Use(cast Cast) {
 			continue
 		}
 
-		applyEffects(cast.Caster, target, cast.Skill, cast.Skill.Effects)
+		applyCastEffects(cast, target, cast.Skill, cast.Skill.Effects)
 	}
 }

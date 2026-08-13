@@ -12,10 +12,15 @@ import (
 
 // Cast carries the already-resolved inputs a skill handler needs.
 type Cast struct {
-	Caster  any
-	Skill   modelskill.Definition
-	Targets []any
-	Item    any
+	Caster   any
+	Skill    modelskill.Definition
+	Targets  []any
+	Item     any
+	resisted *Result
+}
+
+func (c Cast) reportResisted(target any, def modelskill.Definition, count int) {
+	appendResistedCount(c.resisted, target, def, count)
 }
 
 // Definitions resolves loaded skill definitions.
@@ -46,11 +51,19 @@ type Dodge struct {
 	DefenderName string
 }
 
+// Resisted reports a target that resisted a skill effect.
+type Resisted struct {
+	TargetName string
+	SkillID    modelskill.ID
+	SkillLevel int
+}
+
 // Result reports player-visible outcomes produced while a skill handler ran.
 type Result struct {
 	AttackFailed   int
 	Counterattacks []Counterattack
 	Dodges         []Dodge
+	Resisted       []Resisted
 	CubicAdded     bool
 	// CubicTargets are non-caster targets whose cubic runtime was touched.
 	CubicTargets []any
@@ -178,15 +191,19 @@ func (r *Registry) Use(cast Cast) bool {
 
 // UseResult dispatches cast and returns any caster-visible handler result.
 func (r *Registry) UseResult(cast Cast) (Result, bool) {
+	var reported Result
+	cast.resisted = &reported
 	h, ok := r.Handler(cast.Skill.SkillType)
 	if !ok {
 		return Result{}, false
 	}
 	if rh, ok := h.(resultHandler); ok {
-		return rh.UseResult(cast), true
+		result := rh.UseResult(cast)
+		result.Resisted = append(result.Resisted, reported.Resisted...)
+		return result, true
 	}
 	h.Use(cast)
-	return Result{}, true
+	return reported, true
 }
 
 func skillTypeKey(skillType string) string {

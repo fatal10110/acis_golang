@@ -19,6 +19,7 @@ type damageEffectFake struct {
 	name                 string
 	list                 *effect.List
 	successOK            bool
+	successRate          float64
 	reflects             bool
 	counterSkillPhysical float64
 	lastBss              bool
@@ -26,7 +27,7 @@ type damageEffectFake struct {
 }
 
 func newDamageEffectFake() *damageEffectFake {
-	return &damageEffectFake{skillTarget: &skillTarget{}, list: effect.NewList(nil), successOK: true}
+	return &damageEffectFake{skillTarget: &skillTarget{}, list: effect.NewList(nil), successOK: true, successRate: 100}
 }
 
 type shotCaster struct {
@@ -48,13 +49,13 @@ func (d *damageEffectFake) EffectList() *effect.List { return d.list }
 func (d *damageEffectFake) SkillSuccessInput(caster any, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
 	d.lastBss = bss
 	d.lastShield = shield
-	return formulas.SkillSuccessInput{IgnoreResists: true, BaseChance: 100, Shield: shield}, d.successOK
+	return formulas.SkillSuccessInput{IgnoreResists: true, BaseChance: d.successRate, Shield: shield}, d.successOK
 }
 
 func (d *damageEffectFake) EffectSuccessInput(_ any, _ modelskill.Definition, _ modelskill.EffectTemplate, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
 	d.lastBss = bss
 	d.lastShield = shield
-	return formulas.SkillSuccessInput{IgnoreResists: true, BaseChance: 100, Shield: shield}, d.successOK
+	return formulas.SkillSuccessInput{IgnoreResists: true, BaseChance: d.successRate, Shield: shield}, d.successOK
 }
 
 func (d *damageEffectFake) SkillReflectInput(def modelskill.Definition) formulas.SkillReflectInput {
@@ -193,6 +194,62 @@ func TestManadamRemovesEffectsBeforeResistedRecast(t *testing.T) {
 	registry.Use(Cast{Caster: caster, Skill: def, Targets: []any{target}})
 	if got := len(target.EffectList().All()); got != 0 {
 		t.Fatalf("MANADAM effects after resisted recast = %d, want 0", got)
+	}
+}
+
+func TestDamageSkillResistedRollReportsTargetAndSkill(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		skill modelskill.Definition
+		setup func(*damageEffectFake)
+	}{
+		{
+			name:  "PDAM icon effect",
+			skill: modelskill.Definition{ID: 1230, Level: 1, SkillType: "PDAM", Effects: []modelskill.EffectTemplate{{Name: "Buff", Time: 600, Icon: true, EffectPower: 100, EffectPowerSet: true}}},
+			setup: func(target *damageEffectFake) {
+				target.hp, target.physicalOK = 2000, true
+				target.physicalInput = formulas.PhysicalSkillInput{AttackPower: 100, Defence: 40, RandomMul: 1, RaceMul: 1, PvPMul: 1, ElementalMul: 1, WeaponVulnMul: 1}
+			},
+		},
+		{
+			name:  "MDAM",
+			skill: modelskill.Definition{ID: 1231, Level: 2, SkillType: "MDAM", Effects: targetEffect()},
+			setup: func(target *damageEffectFake) {
+				target.hp, target.magicOK = 2000, true
+				target.magicInput = formulas.MagicDamageInput{MAtk: 400, MDef: 50, SkillPower: 20, PvPMul: 1, ElementalMul: 1}
+			},
+		},
+		{
+			name:  "BLOW",
+			skill: modelskill.Definition{ID: 1232, Level: 3, SkillType: "BLOW", Effects: targetEffect()},
+			setup: func(target *damageEffectFake) {
+				target.hp, target.blowOK = 2000, true
+				target.blowInput = formulas.BlowInput{Landed: true, AttackPower: 100, SkillPower: 50, Defence: 40, RandomMul: 1, PosMul: 1}
+			},
+		},
+		{
+			name:  "MANADAM",
+			skill: modelskill.Definition{ID: 1233, Level: 4, SkillType: "MANADAM", Effects: targetEffect()},
+			setup: func(target *damageEffectFake) {
+				target.manaOK = true
+				target.manaInput = formulas.ManaDamageInput{MAtk: 400, MDef: 50, SkillPower: 20, TargetMaxMp: 970, VulnMul: 1, Affected: true}
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			caster := newDamageEffectFake()
+			target := newDamageEffectFake()
+			target.name, target.successRate = "Target", 0
+			tc.setup(target)
+
+			result, handled := NewDefaultRegistry().UseResult(Cast{Caster: caster, Skill: tc.skill, Targets: []any{target}})
+			if !handled {
+				t.Fatal("UseResult() handled = false")
+			}
+			if got := result.Resisted; len(got) != 1 || got[0].TargetName != "Target" || got[0].SkillID != tc.skill.ID || got[0].SkillLevel != tc.skill.Level {
+				t.Fatalf("Resisted = %+v, want target and skill", got)
+			}
+		})
 	}
 }
 

@@ -32,6 +32,42 @@ func TestSummonEffectListHoldsAppliedEffects(t *testing.T) {
 	}
 }
 
+func TestSummonDenyAIActionHonorsCrowdControlEffects(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		flag effect.Flag
+	}{
+		{"stun", effect.FlagStunned},
+		{"immobile until attacked", effect.FlagMeditating},
+		{"sleep", effect.FlagSleep},
+		{"paralyze", effect.FlagParalyzed},
+		{"fear", effect.FlagFear},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			summon := NewServitor(ServitorConfig{ObjectID: 1})
+			summon.EffectList().Add(&effect.Effect{Flag: tt.flag})
+
+			if !summon.DenyAIAction() {
+				t.Fatal("DenyAIAction() = false while crowd controlled")
+			}
+		})
+	}
+}
+
+func TestSummonDenyAIActionHonorsTransientControlStates(t *testing.T) {
+	summon := NewServitor(ServitorConfig{ObjectID: 1})
+
+	if !summon.SetParalyzed(true) || !summon.DenyAIAction() {
+		t.Fatal("paralyzed summon must deny AI actions")
+	}
+	if !summon.SetParalyzed(false) || summon.DenyAIAction() {
+		t.Fatal("clearing paralysis must allow AI actions")
+	}
+	if !summon.SetTeleporting(true) || !summon.DenyAIAction() {
+		t.Fatal("teleporting summon must deny AI actions")
+	}
+}
+
 func TestPetEffectListHoldsAppliedEffects(t *testing.T) {
 	pet := NewPet(PetConfig{ObjectID: 1, Level: 40, Stats: CombatStats{MaxHP: 500, MaxMP: 200}, Roll: zeroSummonRoll})
 
