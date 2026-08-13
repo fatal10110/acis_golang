@@ -49,6 +49,29 @@ func TestCharacterSkillSuccessInputUsesStatsAndCasterMagicAttack(t *testing.T) {
 	}
 }
 
+func TestCharacterSkillReflectInputUsesMagicSpecificStat(t *testing.T) {
+	target := liveCharacter(1, combatTemplate(), combatItems())
+	target.AddStatFuncs([]basefunc.Func{
+		basefunc.NewSet(target, stat.ReflectSkillMagic, 17, nil),
+		basefunc.NewSet(target, stat.ReflectSkillPhysic, 29, nil),
+	})
+
+	magic := target.SkillReflectInput(modelskill.Definition{Magic: true, CanBeReflected: true, CastRange: 900})
+	if magic.ReflectChance != 17 || !magic.CanBeReflected || magic.CastRange != 900 {
+		t.Fatalf("magic SkillReflectInput() = %+v", magic)
+	}
+	if !formulas.SkillReflects(magic, 0) {
+		t.Fatal("magic SkillReflectInput() does not reflect")
+	}
+	physical := target.SkillReflectInput(modelskill.Definition{CanBeReflected: true, CastRange: 40, IgnoreResists: true})
+	if physical.ReflectChance != 29 || !physical.IgnoreResists || !physical.CanBeReflected || physical.CastRange != 40 {
+		t.Fatalf("physical SkillReflectInput() = %+v", physical)
+	}
+	if formulas.SkillReflects(physical, 0) {
+		t.Fatal("physical SkillReflectInput() reflects despite IgnoreResists")
+	}
+}
+
 func TestCharacterEffectSuccessInputRespectsTemplateResistance(t *testing.T) {
 	tmpl := combatTemplate()
 	tmpl.MAtk = 100
