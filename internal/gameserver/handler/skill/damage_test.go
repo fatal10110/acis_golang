@@ -197,6 +197,32 @@ func TestManadamRemovesEffectsBeforeResistedRecast(t *testing.T) {
 	}
 }
 
+func TestManadamReflectRedirectsDrainAndEffectsToCaster(t *testing.T) {
+	registry := NewDefaultRegistry()
+	caster := newDamageEffectFake()
+	target := newDamageEffectFake()
+	caster.mp, caster.manaOK = 1000, true
+	caster.manaInput = formulas.ManaDamageInput{
+		MAtk: 400, MDef: 50, SkillPower: 20, TargetMaxMp: 970,
+		VulnMul: 1, Affected: true,
+	}
+	target.mp, target.manaOK, target.reflects = 1000, true, true
+	target.manaInput = caster.manaInput
+	def := modelskill.Definition{ID: 1234, SkillType: "MANADAM", CanBeReflected: true, Effects: targetEffect()}
+
+	registry.Use(Cast{Caster: caster, Skill: def, Targets: []any{target}})
+
+	if caster.mp >= 1000 || target.mp != 1000 {
+		t.Fatalf("MANADAM reflect mp = %v/%v, want caster drained and target unchanged", caster.mp, target.mp)
+	}
+	if got := len(caster.EffectList().All()); got != 1 {
+		t.Fatalf("MANADAM reflected caster effects = %d, want 1", got)
+	}
+	if got := len(target.EffectList().All()); got != 0 {
+		t.Fatalf("MANADAM reflected target effects = %d, want 0", got)
+	}
+}
+
 func TestDamageSkillResistedRollReportsTargetAndSkill(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
