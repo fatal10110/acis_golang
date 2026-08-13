@@ -51,6 +51,12 @@ func (d *damageEffectFake) SkillSuccessInput(caster any, def modelskill.Definiti
 	return formulas.SkillSuccessInput{IgnoreResists: true, BaseChance: 100, Shield: shield}, d.successOK
 }
 
+func (d *damageEffectFake) EffectSuccessInput(_ any, _ modelskill.Definition, _ modelskill.EffectTemplate, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
+	d.lastBss = bss
+	d.lastShield = shield
+	return formulas.SkillSuccessInput{IgnoreResists: true, BaseChance: 100, Shield: shield}, d.successOK
+}
+
 func (d *damageEffectFake) SkillReflectInput(def modelskill.Definition) formulas.SkillReflectInput {
 	if d.reflects {
 		return formulas.SkillReflectInput{CanBeReflected: true, CastRange: 40, ReflectChance: 100}
@@ -412,6 +418,43 @@ func TestMdamReflectAppliesEffectsUnconditionallyWithNoLandingRoll(t *testing.T)
 	}
 	if got := len(caster.EffectList().All()); got != 1 {
 		t.Fatalf("MDAM reflected caster effects with failed landing roll = %d, want 1 (Mdam.java's reflect branch never rolls)", got)
+	}
+}
+
+func mdamEffectPowerTemplate() []modelskill.EffectTemplate {
+	return []modelskill.EffectTemplate{{Name: "Buff", Time: 600, EffectPower: 100, EffectPowerSet: true}}
+}
+
+func TestMdamReflectHardcodesBssFalseForEffectLanding(t *testing.T) {
+	registry := NewDefaultRegistry()
+	caster := newDamageEffectFake()
+	target := newDamageEffectFake()
+	target.hp = 2000
+	target.magicOK = true
+	target.magicInput = formulas.MagicDamageInput{MAtk: 400, MDef: 50, SkillPower: 20, PvPMul: 1, ElementalMul: 1, BlessedSoulShot: true}
+	target.reflects = true
+
+	def := modelskill.Definition{ID: 1231, SkillType: "MDAM", Effects: mdamEffectPowerTemplate()}
+	registry.Use(Cast{Caster: caster, Skill: def, Targets: []any{target}})
+
+	if caster.lastBss {
+		t.Fatalf("MDAM reflect branch EffectSuccessInput bss = true, want false (Mdam.java's 2-arg getEffects hardcodes false)")
+	}
+}
+
+func TestMdamNonReflectPassesRealBssForEffectLanding(t *testing.T) {
+	registry := NewDefaultRegistry()
+	caster := newDamageEffectFake()
+	target := newDamageEffectFake()
+	target.hp = 2000
+	target.magicOK = true
+	target.magicInput = formulas.MagicDamageInput{MAtk: 400, MDef: 50, SkillPower: 20, PvPMul: 1, ElementalMul: 1, BlessedSoulShot: true}
+
+	def := modelskill.Definition{ID: 1231, SkillType: "MDAM", Effects: mdamEffectPowerTemplate()}
+	registry.Use(Cast{Caster: caster, Skill: def, Targets: []any{target}})
+
+	if !target.lastBss {
+		t.Fatalf("MDAM non-reflect branch EffectSuccessInput bss = false, want true (caster's real blessed-spiritshot charge)")
 	}
 }
 
