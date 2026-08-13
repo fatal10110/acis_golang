@@ -129,9 +129,9 @@ func (h signetHandler) useSignet(cast Cast) {
 	}
 }
 
-// useCasttime applies a self-targeted effect (SignetMDam) whose own
-// onStart spawns the actor, since the caster - not a pre-spawned actor -
-// is the effect's target.
+// useCasttime applies every self-targeted effect template def carries; each
+// recognized kind's own onStart spawns the actor, since the caster - not a
+// pre-spawned actor - is the effect's target.
 func (h signetHandler) useCasttime(cast Cast) {
 	target, ok := cast.Caster.(effectListTarget)
 	if !ok {
@@ -144,11 +144,24 @@ func (h signetHandler) useCasttime(cast Cast) {
 
 	meta := signetEffectMeta(cast.Skill)
 	for _, tmpl := range cast.Skill.SelfEffects {
-		if tmpl.Name != "SignetMDam" {
+		e := h.newSelfEffect(cast.Caster, cast.Skill, meta, tmpl)
+		if e == nil {
 			continue
 		}
-		e := h.newSignetMDamEffect(cast.Caster, cast.Skill, meta, tmpl)
 		list.Add(e)
+	}
+}
+
+// newSelfEffect builds the caster-hosted tick effect for one of def's
+// self-effect templates, dispatching by the template's core-effect name. It
+// returns nil for a template this port doesn't carry a signet self-effect
+// kind for, matching newActorEffect's dispatch for actor-hosted templates.
+func (h signetHandler) newSelfEffect(caster any, def modelskill.Definition, meta effect.Skill, tmpl modelskill.EffectTemplate) *effect.Effect {
+	switch tmpl.Name {
+	case "SignetMDam":
+		return h.newSignetMDamEffect(caster, def, meta, tmpl)
+	default:
+		return nil
 	}
 }
 
