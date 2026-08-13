@@ -394,6 +394,27 @@ func TestManadamDischargesLoadedSpiritshotAfterCast(t *testing.T) {
 	}
 }
 
+func TestMdamReflectAppliesEffectsUnconditionallyWithNoLandingRoll(t *testing.T) {
+	registry := NewDefaultRegistry()
+	caster := newDamageEffectFake()
+	target := newDamageEffectFake()
+	target.hp = 2000
+	target.magicOK = true
+	target.magicInput = formulas.MagicDamageInput{MAtk: 400, MDef: 50, SkillPower: 20, PvPMul: 1, ElementalMul: 1}
+	target.reflects = true
+	target.successOK = false
+
+	def := modelskill.Definition{ID: 1231, SkillType: "MDAM", Effects: targetEffect()}
+	registry.Use(Cast{Caster: caster, Skill: def, Targets: []any{target}})
+
+	if got := len(target.EffectList().All()); got != 0 {
+		t.Fatalf("MDAM reflected target effects = %d, want 0", got)
+	}
+	if got := len(caster.EffectList().All()); got != 1 {
+		t.Fatalf("MDAM reflected caster effects with failed landing roll = %d, want 1 (Mdam.java's reflect branch never rolls)", got)
+	}
+}
+
 func TestDamageSkillEffectsRedirectOntoCasterOnReflect(t *testing.T) {
 	registry := NewDefaultRegistry()
 	caster := newDamageEffectFake()
