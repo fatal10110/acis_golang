@@ -109,10 +109,12 @@ type Actor struct {
 	unsummonLimit float64
 	roll          func(int) int
 
-	stats    CombatStats
-	statCalc summonStatCalcs
-	vitals   summonVitals
-	effects  *effect.List
+	stats                  CombatStats
+	statCalc               summonStatCalcs
+	vitals                 summonVitals
+	effects                *effect.List
+	stateMu                sync.RWMutex
+	paralyzed, teleporting bool
 
 	abnormalEffect   atomic.Int32
 	abnormalMu       sync.RWMutex
