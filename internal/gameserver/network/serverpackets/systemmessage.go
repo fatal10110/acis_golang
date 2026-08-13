@@ -144,6 +144,10 @@ const (
 	SystemMessagePlayingForLongTime       = 764  // no parameter
 	SystemMessageNightSkillEffectApplies  = 1131 // skill-name parameter
 	SystemMessageDaySkillEffectDisappears = 1132 // skill-name parameter
+
+	// Shield-block feedback.
+	SystemMessageShieldDefenceSuccessful       = 111  // no parameter
+	SystemMessageExcellentShieldDefenseSuccess = 1281 // no parameter
 )
 
 // SystemMessage parameter types used by focused packet helpers.

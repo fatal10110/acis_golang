@@ -583,6 +583,11 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	c.SetLackMPNotifier(func() {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSkillRemovedDueLackMP))
 	})
+	c.SetShieldBlockNotifiers(func() {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageShieldDefenceSuccessful))
+	}, func() {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageExcellentShieldDefenseSuccess))
+	})
 	c.SetAttackTargetHook(func(target world.Tracked) {
 		l.attackLiveTarget(live, target)
 	})
