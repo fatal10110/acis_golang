@@ -145,9 +145,10 @@ func TestHostileAttackTypeAndWeaponReuseDelay(t *testing.T) {
 	const bowReuseMillis = 1500
 
 	bow := &item.Template{
-		ID:     bowItemID,
-		Kind:   item.KindWeapon,
-		Weapon: &item.WeaponDetail{Type: item.WeaponBow, ReuseDelay: bowReuseMillis},
+		ID:      bowItemID,
+		Kind:    item.KindWeapon,
+		Crystal: item.CrystalB,
+		Weapon:  &item.WeaponDetail{Type: item.WeaponBow, ReuseDelay: bowReuseMillis},
 	}
 	notAWeapon := &item.Template{ID: 501, Kind: item.KindEtcItem}
 	items := item.NewTable([]*item.Template{bow, notAWeapon})
@@ -158,6 +159,7 @@ func TestHostileAttackTypeAndWeaponReuseDelay(t *testing.T) {
 		items          *item.Table
 		wantAttackType item.WeaponType
 		wantReuseDelay time.Duration
+		wantGrade      int
 	}{
 		{
 			name:           "no right-hand item id stays unarmed",
@@ -184,11 +186,12 @@ func TestHostileAttackTypeAndWeaponReuseDelay(t *testing.T) {
 			wantAttackType: item.WeaponFist,
 		},
 		{
-			name:           "right-hand weapon item resolves its type and reuse delay",
+			name:           "right-hand weapon item resolves its type, reuse delay and crystal grade",
 			rightHand:      bowItemID,
 			items:          items,
 			wantAttackType: item.WeaponBow,
 			wantReuseDelay: bowReuseMillis * time.Millisecond,
+			wantGrade:      int(item.CrystalB),
 		},
 	}
 
@@ -202,6 +205,9 @@ func TestHostileAttackTypeAndWeaponReuseDelay(t *testing.T) {
 			}
 			if got := h.WeaponReuseDelay(); got != tc.wantReuseDelay {
 				t.Fatalf("WeaponReuseDelay() = %v, want %v", got, tc.wantReuseDelay)
+			}
+			if got := h.WeaponGrade(); got != tc.wantGrade {
+				t.Fatalf("WeaponGrade() = %v, want %v", got, tc.wantGrade)
 			}
 		})
 	}
