@@ -92,6 +92,10 @@ type Hostile struct {
 	// overwhelming majority of monster templates carry no weapon item id.
 	weapon *item.WeaponDetail
 
+	// weaponCrystal is the resolved right-hand weapon's crystal grade,
+	// recorded by SetWeapon alongside weapon. CrystalNone when unarmed.
+	weaponCrystal item.CrystalType
+
 	// roll draws a uniform integer in [0, n) for MakeAttackHit's hit/crit/
 	// damage-spread rolls. It defaults to math/rand's global source; tests
 	// substitute a fixed function for deterministic combat outcomes.
@@ -277,6 +281,7 @@ func (h *Hostile) SetWeapon(items *item.Table) {
 		return
 	}
 	h.weapon = tmpl.Weapon
+	h.weaponCrystal = tmpl.Crystal
 }
 
 // SetRollSource overrides the random source MakeAttackHit uses for its
