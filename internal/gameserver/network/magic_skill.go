@@ -48,12 +48,12 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 	}
 	if def.Target == modelskill.TargetGround {
 		x, y, z := live.GroundTarget()
-		if !live.CanSeePoint(x, y, z) {
+		switch skilltarget.GroundCastFailureFor(live.Character, &def) {
+		case skilltarget.GroundCastNoLineOfSight:
 			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCantSeeTarget))
 			sendMagicActionFailed(live)
 			return
-		}
-		if live.EffectRangeInPeaceZone(x, y, z, def.EffectRange) {
+		case skilltarget.GroundCastPeaceZone:
 			live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1CannotBeUsed, int32(def.ID), int32(def.Level)))
 			sendMagicActionFailed(live)
 			return

@@ -10,6 +10,15 @@ type GroundTargeter interface {
 	EffectRangeInPeaceZone(x, y, z, effectRange int) bool
 }
 
+// GroundCastFailure identifies why a ground-targeted cast cannot start.
+type GroundCastFailure uint8
+
+const (
+	GroundCastAllowed GroundCastFailure = iota
+	GroundCastNoLineOfSight
+	GroundCastPeaceZone
+)
+
 type groundHandler struct{}
 
 func (groundHandler) Target() modelskill.Target { return modelskill.TargetGround }
@@ -22,24 +31,31 @@ func (groundHandler) FinalTarget(caster, _ Creature, _ *modelskill.Definition) C
 	return caster
 }
 
-// CanCast gates a ground-targeted cast on the caster's last ground-click
+// GroundCastFailureFor checks the caster's last ground-click
 // point: real line of sight from the caster to that point, then whether the
 // skill's effect range around that point overlaps a peace zone attached to
 // the caster's own region. A caster that doesn't track a ground-click point
 // (e.g. a test double, or a non-player caster) is permissive, matching the
 // reference restricting this target type to players.
-func (groundHandler) CanCast(caster, _ Creature, skill *modelskill.Definition, _ bool) bool {
+func GroundCastFailureFor(caster Creature, skill *modelskill.Definition) GroundCastFailure {
 	gt, ok := caster.(GroundTargeter)
 	if !ok {
-		return true
+		return GroundCastAllowed
 	}
 	x, y, z := gt.GroundTarget()
 	if !gt.CanSeePoint(x, y, z) {
-		return false
+		return GroundCastNoLineOfSight
 	}
 	var effectRange int
 	if skill != nil {
 		effectRange = skill.EffectRange
 	}
-	return !gt.EffectRangeInPeaceZone(x, y, z, effectRange)
+	if gt.EffectRangeInPeaceZone(x, y, z, effectRange) {
+		return GroundCastPeaceZone
+	}
+	return GroundCastAllowed
+}
+
+func (groundHandler) CanCast(caster, _ Creature, skill *modelskill.Definition, _ bool) bool {
+	return GroundCastFailureFor(caster, skill) == GroundCastAllowed
 }
