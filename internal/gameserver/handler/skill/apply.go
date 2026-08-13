@@ -27,31 +27,41 @@ func applyEffects(effector, effected any, def modelskill.Definition, templates [
 	applyEffectsWithLanding(effector, effected, def, templates, formulas.ShieldFailed, false)
 }
 
-func applyEffectsWithLanding(effector, effected any, def modelskill.Definition, templates []modelskill.EffectTemplate, shield formulas.ShieldDefense, bss bool) {
+func applyCastEffects(cast Cast, effected any, def modelskill.Definition, templates []modelskill.EffectTemplate) {
+	cast.reportResisted(effected, def, applyEffectsWithLanding(cast.Caster, effected, def, templates, formulas.ShieldFailed, false))
+}
+
+func applyEffectsWithLanding(effector, effected any, def modelskill.Definition, templates []modelskill.EffectTemplate, shield formulas.ShieldDefense, bss bool) (resisted int) {
 	if len(templates) == 0 {
-		return
+		return 0
 	}
 	target, ok := effected.(effectListTarget)
 	if !ok {
-		return
+		return 0
 	}
 	list := target.EffectList()
 	if list == nil {
-		return
+		return 0
 	}
 
 	meta := effect.SkillFromDefinition(def)
 	if shield == formulas.ShieldPerfect {
-		return
+		return 0
 	}
 	source, canRoll := effected.(effectSuccessSource)
 	for _, tmpl := range templates {
 		if tmpl.EffectPowerSet && tmpl.EffectPower >= 0 {
 			if !canRoll {
+				if tmpl.Icon {
+					resisted++
+				}
 				continue
 			}
 			in, ok := source.EffectSuccessInput(effector, def, tmpl, bss, shield)
 			if !ok || !formulas.SkillSucceeds(formulas.SkillSuccessRate(in), rnd.Get(100)) {
+				if tmpl.Icon {
+					resisted++
+				}
 				continue
 			}
 		}
@@ -63,6 +73,7 @@ func applyEffectsWithLanding(effector, effected any, def modelskill.Definition, 
 		e.Effected = effected
 		list.Add(e)
 	}
+	return resisted
 }
 
 // stopEffectsBySkillID removes every active effect in list owned by the
@@ -133,15 +144,15 @@ func removeMatching(list *effect.List, limit int, remove func(*effect.Effect) bo
 // applySelfEffects refreshes and (re)applies def's self-targeted effects on
 // caster: an existing self effect from the same skill is dropped first, so
 // re-triggering the skill doesn't stack a duplicate of it.
-func applySelfEffects(caster any, def modelskill.Definition) {
+func applySelfEffects(cast Cast, def modelskill.Definition) {
 	if len(def.SelfEffects) == 0 {
 		return
 	}
-	if target, ok := caster.(effectListTarget); ok {
+	if target, ok := cast.Caster.(effectListTarget); ok {
 		list := target.EffectList()
 		if e := firstEffectByID(list, def.ID); e != nil && e.Template.Self {
 			list.Remove(e)
 		}
 	}
-	applyEffects(caster, caster, def, def.SelfEffects)
+	applyCastEffects(cast, cast.Caster, def, def.SelfEffects)
 }

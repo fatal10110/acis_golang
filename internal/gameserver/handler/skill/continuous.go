@@ -125,14 +125,14 @@ func (h continuousHandler) UseResult(cast Cast) Result {
 			stopEffectsBySkillID(effected.EffectList(), def.ID)
 		}
 
-		applyEffects(cast.Caster, effected, def, def.Effects)
+		applyCastEffects(cast, effected, def, def.Effects)
 
 		if skillType == "AGGDEBUFF" {
 			fireAggressionEvent(cast.Caster, effected, def)
 		}
 	}
 
-	applySelfEffects(cast.Caster, def)
+	applySelfEffects(cast, def)
 	return result
 }
 

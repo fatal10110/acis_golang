@@ -306,6 +306,9 @@ func (l *GameClientLink) castController(live *livePlayer) *actorcast.Controller 
 			if live.combat == nil {
 				return
 			}
+			if live.combat.ResumeAfterCast() {
+				return
+			}
 			// PlayableAI.onEvtFinishedCasting (PlayableAI.java:43-63): with
 			// no queued next intention (Go has no intention queue to
 			// resume from, tracked separately), a finished CAST intention

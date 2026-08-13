@@ -49,6 +49,7 @@ func newContinuousFake(id int32) *continuousFake {
 }
 
 func (f *continuousFake) ObjectID() int32                { return f.id }
+func (*continuousFake) CharacterName() string            { return "Target" }
 func (f *continuousFake) Dead() bool                     { return f.dead }
 func (f *continuousFake) Invul() bool                    { return f.invul }
 func (f *continuousFake) Playable() bool                 { return f.playable }
@@ -393,6 +394,24 @@ func TestContinuousDebuffNoLandingSourceDoesNotLand(t *testing.T) {
 
 	if got := len(target.list.All()); got != 0 {
 		t.Fatalf("effect list = %d, want 0 (no resolved landing-rate source => not applied)", got)
+	}
+}
+
+func TestContinuousIconEffectFailureReportsResistance(t *testing.T) {
+	registry := NewDefaultRegistry()
+	target := newContinuousFake(2)
+	target.successInput = formulas.SkillSuccessInput{IgnoreResists: true, BaseChance: 0}
+
+	result, handled := registry.UseResult(Cast{
+		Caster:  newContinuousFake(1),
+		Skill:   modelskill.Definition{ID: 321, Level: 2, SkillType: "BUFF", Effects: []modelskill.EffectTemplate{{Name: "Buff", Time: 60, Icon: true, EffectPower: 100, EffectPowerSet: true}}},
+		Targets: []any{target},
+	})
+	if !handled {
+		t.Fatal("UseResult() handled = false")
+	}
+	if got := result.Resisted; len(got) != 1 || got[0].TargetName != "Target" || got[0].SkillID != 321 || got[0].SkillLevel != 2 {
+		t.Fatalf("Resisted = %+v, want target and skill", got)
 	}
 }
 

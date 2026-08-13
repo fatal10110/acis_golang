@@ -46,6 +46,23 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 	if def.Target == modelskill.TargetGround && l.walkToGroundCast(live, req, def.CastRange) {
 		return
 	}
+	if def.Target == modelskill.TargetGround {
+		x, y, z := live.GroundTarget()
+		switch skilltarget.GroundCastFailureFor(live.Character, &def) {
+		case skilltarget.GroundCastNoLineOfSight:
+			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCantSeeTarget))
+			sendMagicActionFailed(live)
+			return
+		case skilltarget.GroundCastPeaceZone:
+			live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1CannotBeUsed, int32(def.ID), int32(def.Level)))
+			sendMagicActionFailed(live)
+			return
+		}
+		live.Character.SetHeading(live.CurrentLocation().HeadingTo(location.Location{X: x, Y: y, Z: z}))
+		l.broadcastLiveFrame(live, func() wire.Frame {
+			return serverpackets.FrameValidateLocation(live.ObjectID(), live.CurrentLocation(), live.CurrentHeading())
+		})
+	}
 
 	beforeVitals := live.Vitals()
 	controller := l.castController(live)
@@ -419,6 +436,9 @@ func (l *GameClientLink) sendSkillHandlerResult(live *livePlayer, result actorca
 		if defenderOnline {
 			defender.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageAvoidedS1Attack, attackerName))
 		}
+	}
+	for _, resisted := range result.Resisted {
+		live.SendFrame(serverpackets.FrameSystemMessageStringSkillName(serverpackets.SystemMessageS1ResistedYourS2, resisted.TargetName, int32(resisted.SkillID), int32(resisted.SkillLevel)))
 	}
 	for i := 0; i < result.AttackFailed; i++ {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageAttackFailed))
