@@ -18,6 +18,8 @@ type SummonActor interface {
 	DenyAIAction() bool
 	Knows(attackable.Combatant) bool
 	PhysicalAttackRange() int
+	SetHeadingTo(attackable.Combatant)
+	BroadcastMoveToPawn(attackable.Combatant) error
 }
 
 // SummonMoveController controls movement requests emitted by a summon AI.
@@ -129,7 +131,7 @@ func (s *Summon) TryToCast(target attackable.Combatant, ref skill.Ref) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if target == nil || s.actor.DenyAIAction() || s.cast == nil || s.cast.Disabled() {
+	if target == nil || s.actor.DenyAIAction() || s.cast == nil {
 		return false
 	}
 	if !s.cast.CanAttempt(target, ref) {
@@ -223,6 +225,10 @@ func (s *Summon) thinkCastLocked() (bool, error) {
 		s.current = intention{kind: IntentionIdle}
 		return false, nil
 	}
+	if s.cast.Disabled() {
+		s.current = intention{kind: IntentionIdle}
+		return false, nil
+	}
 
 	target := s.current.target
 	ref := s.current.skill
@@ -230,14 +236,35 @@ func (s *Summon) thinkCastLocked() (bool, error) {
 		return false, nil
 	}
 
+	if !s.cast.CanAttempt(target, ref) {
+		return false, nil
+	}
+
+	following, err := s.move.MaybeStartOffensiveFollow(target, s.cast.Range(ref))
+	if following {
+		return true, err
+	}
+
+	var stopErr error
+	if s.cast.StopsMovement(ref) {
+		stopErr = s.move.Stop()
+		if target.ObjectID() != s.actor.ObjectID() {
+			s.actor.SetHeadingTo(target)
+		}
+	}
+
 	if !s.cast.CanCast(target, ref) {
 		s.current = intention{kind: IntentionIdle}
-		return false, nil
+		var pawnErr error
+		if target.ObjectID() != s.actor.ObjectID() {
+			pawnErr = s.actor.BroadcastMoveToPawn(target)
+		}
+		return false, errors.Join(stopErr, pawnErr)
 	}
 
 	s.cast.Cast(target, ref)
 	s.current = intention{kind: IntentionIdle}
-	return true, nil
+	return true, stopErr
 }
 
 func (s *Summon) thinkFollowLocked() (bool, error) {
@@ -255,7 +282,7 @@ func (s *Summon) thinkFollowLocked() (bool, error) {
 }
 
 func (s *Summon) busyLocked() bool {
-	return s.attack.BowCoolingDown() || s.attack.AttackingNow()
+	return s.attack.BowCoolingDown() || s.attack.AttackingNow() || (s.cast != nil && s.cast.CastingNow())
 }
 
 func (s *Summon) targetLostLocked(target attackable.Combatant) bool {

@@ -52,6 +52,10 @@ type CastController interface {
 	// Disabled reports whether the actor cannot attempt a cast at all right
 	// now: already mid-cast, or every skill disabled.
 	Disabled() bool
+	// CastingNow reports whether a cast is currently in flight. It is kept
+	// separate from Disabled because skill-disable effects do not delay attack
+	// or follow intentions.
+	CastingNow() bool
 	// Range returns ref's cast range, used to decide whether the actor must
 	// close distance on target before attempting the cast.
 	Range(ref skill.Ref) int

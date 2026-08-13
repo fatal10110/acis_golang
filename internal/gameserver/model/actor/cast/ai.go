@@ -43,6 +43,10 @@ func (a *AIController) Disabled() bool {
 	return false
 }
 
+func (a *AIController) CastingNow() bool {
+	return a.Controller != nil && a.Controller.CastingNow()
+}
+
 // Range returns ref's cast range, used to decide whether the actor must
 // close distance on the target before attempting the cast.
 func (a *AIController) Range(ref modelskill.Ref) int {

@@ -147,6 +147,77 @@ func TestSummonAITryToCastExecutesImmediately(t *testing.T) {
 	}
 }
 
+func TestSummonAITryToCastApproachesBeforeCasting(t *testing.T) {
+	owner := actor(100)
+	target := actor(200)
+	move := &summonMove{recordingMove: recordingMove{followStarted: true}}
+	cast := &recordingCast{canAttempt: true, canCast: true, castRange: 400}
+	brain := NewSummon(owner, move, &recordingAttack{})
+	brain.SetCastController(cast)
+
+	brain.TryToCast(target, skill.Ref{ID: 4139, Level: 8})
+	if cast.castCalled {
+		t.Fatal("Cast() called while summon is closing distance")
+	}
+	if move.followTarget != target || move.followRange != 400 {
+		t.Fatalf("offensive follow = (%v, %d), want (%v, 400)", move.followTarget, move.followRange, target)
+	}
+}
+
+func TestSummonAITryToCastStopsFacesAndReportsFinalFailure(t *testing.T) {
+	owner := actor(100)
+	target := actor(200)
+	move := &summonMove{}
+	cast := &recordingCast{canAttempt: true, canCast: false, stopsMove: true}
+	brain := NewSummon(owner, move, &recordingAttack{})
+	brain.SetCastController(cast)
+
+	brain.TryToCast(target, skill.Ref{ID: 4139, Level: 8})
+	if move.stopCount != 1 {
+		t.Fatalf("Stop calls = %d, want 1", move.stopCount)
+	}
+	if owner.headingTarget != target {
+		t.Fatalf("heading target = %v, want target", owner.headingTarget)
+	}
+	if owner.moveToPawnCalls != 1 || owner.moveToPawnTo != target {
+		t.Fatalf("BroadcastMoveToPawn calls = (%d, %v), want (1, target)", owner.moveToPawnCalls, owner.moveToPawnTo)
+	}
+}
+
+func TestSummonAITryToCastDropsBusyCastIntention(t *testing.T) {
+	owner := actor(100)
+	target := actor(200)
+	strike := &recordingAttack{attackingNow: true}
+	cast := &recordingCast{canAttempt: true, canCast: true}
+	brain := NewSummon(owner, &summonMove{}, strike)
+	brain.SetCastController(cast)
+
+	if !brain.TryToCast(target, skill.Ref{ID: 4139, Level: 8}) {
+		t.Fatal("TryToCast() = false, want queued cast intention")
+	}
+	strike.attackingNow = false
+	cast.disabled = true
+	brain.Think()
+	if got := brain.CurrentIntention(); got != IntentionIdle {
+		t.Fatalf("CurrentIntention() = %v, want idle while cast controller is busy", got)
+	}
+}
+
+func TestSummonAITryToAttackDoesNotWaitForDisabledSkills(t *testing.T) {
+	owner := actor(100)
+	target := actor(200)
+	strike := &recordingAttack{canAttack: true}
+	brain := NewSummon(owner, &summonMove{}, strike)
+	brain.SetCastController(&recordingCast{disabled: true})
+
+	if !brain.TryToAttack(target) {
+		t.Fatal("TryToAttack() = false, want attack accepted while skills are disabled")
+	}
+	if strike.target != target {
+		t.Fatalf("attack target = %v, want target without a queued wait", strike.target)
+	}
+}
+
 func TestSummonAITryToCastQueuesWhileBusyAndExecutesOnThink(t *testing.T) {
 	owner := actor(100)
 	target := actor(200)
