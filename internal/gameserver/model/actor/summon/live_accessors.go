@@ -107,6 +107,22 @@ func (a *Actor) SetName(name string) {
 	a.name = name
 }
 
+// IsNamed reports whether this pet has a player-assigned custom name, as
+// opposed to falling back to its npc template's name (Pet.getName() != null
+// in the reference).
+func (a *Actor) IsNamed() bool {
+	a.statusMu.RLock()
+	defer a.statusMu.RUnlock()
+	return a.named
+}
+
+// SetNamed marks whether this pet has a player-assigned custom name.
+func (a *Actor) SetNamed(named bool) {
+	a.statusMu.Lock()
+	defer a.statusMu.Unlock()
+	a.named = named
+}
+
 // PetState returns the collar id and durable state for a live pet.
 func (a *Actor) PetState() (int32, petmodel.State, bool) {
 	if a == nil || !a.isPet || a.controlItemID == 0 {

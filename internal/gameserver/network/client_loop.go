@@ -908,6 +908,18 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				l.deleteShortcut(ctx, live, req)
 			}
 
+		case clientpackets.OpcodeRequestChangePetName:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestChangePetName)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				l.handleRequestChangePetName(ctx, live, req)
+			}
+
 		case clientpackets.OpcodeDummy1A,
 			clientpackets.OpcodeRequestSellItem,
 			clientpackets.OpcodeRequestBuyItem,
@@ -923,7 +935,6 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			clientpackets.OpcodeCannotMoveInVehicle,
 			clientpackets.OpcodeRequestQuestListInGame,
 			clientpackets.OpcodeRequestQuestAbort,
-			clientpackets.OpcodeRequestChangePetName,
 			clientpackets.OpcodeRequestPackageSend,
 			clientpackets.OpcodeDlgAnswer,
 			clientpackets.OpcodeGameGuardReply,

@@ -9,6 +9,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -78,4 +80,127 @@ func TestRenamePetRejectsTakenAndNPCNames(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestHandleRequestChangePetNameGates(t *testing.T) {
+	newActor := func(state *world.State, live *livePlayer, named bool) *summon.Actor {
+		actor := summon.NewPet(summon.PetConfig{ObjectID: 2, Owner: live, ControlItemID: 77, Name: "Wolf", Named: named})
+		summon.SpawnBesideOwner(state, actor, live, location.Location{})
+		return actor
+	}
+
+	t.Run("no active pet is silent", func(t *testing.T) {
+		state := world.New()
+		capture := &frameCapture{}
+		live := newTestLivePlayer(t, 1, capture)
+		state.Spawn(live, 0, 0, 0, 0)
+		link := &GameClientLink{world: state, npcs: npc.NewTable(nil), petStore: &petNameStoreStub{}}
+		link.handleRequestChangePetName(context.Background(), live, clientpackets.RequestChangePetName{Name: "Rex"})
+		if len(capture.snapshot()) != 0 {
+			t.Fatalf("frames sent = %d, want 0", len(capture.snapshot()))
+		}
+	})
+
+	t.Run("invalid length rejects before already-named gate", func(t *testing.T) {
+		state := world.New()
+		capture := &frameCapture{}
+		live := newTestLivePlayer(t, 1, capture)
+		state.Spawn(live, 0, 0, 0, 0)
+		newActor(state, live, true)
+		link := &GameClientLink{world: state, npcs: npc.NewTable(nil), petStore: &petNameStoreStub{}}
+		link.handleRequestChangePetName(context.Background(), live, clientpackets.RequestChangePetName{Name: ""})
+		frames := capture.snapshot()
+		if len(frames) != 1 || !isSystemMessage(frames[0], serverpackets.SystemMessageNamingCharnameUpTo16Chars) {
+			t.Fatalf("frames = %v, want NAMING_CHARNAME_UP_TO_16CHARS", frames)
+		}
+	})
+
+	t.Run("already named rejects before pattern check", func(t *testing.T) {
+		state := world.New()
+		capture := &frameCapture{}
+		live := newTestLivePlayer(t, 1, capture)
+		state.Spawn(live, 0, 0, 0, 0)
+		actor := newActor(state, live, true)
+		link := &GameClientLink{world: state, npcs: npc.NewTable(nil), petStore: &petNameStoreStub{}}
+		link.handleRequestChangePetName(context.Background(), live, clientpackets.RequestChangePetName{Name: "!!!"})
+		frames := capture.snapshot()
+		if len(frames) != 1 || !isSystemMessage(frames[0], serverpackets.SystemMessageNamingYouCannotSetNameOfThePet) {
+			t.Fatalf("frames = %v, want NAMING_YOU_CANNOT_SET_NAME_OF_THE_PET", frames)
+		}
+		if actor.Name() != "Wolf" {
+			t.Fatalf("Name() = %q, want unchanged", actor.Name())
+		}
+	})
+
+	t.Run("invalid pattern rejected", func(t *testing.T) {
+		state := world.New()
+		capture := &frameCapture{}
+		live := newTestLivePlayer(t, 1, capture)
+		state.Spawn(live, 0, 0, 0, 0)
+		newActor(state, live, false)
+		link := &GameClientLink{world: state, npcs: npc.NewTable(nil), petStore: &petNameStoreStub{}}
+		link.handleRequestChangePetName(context.Background(), live, clientpackets.RequestChangePetName{Name: "Re x!"})
+		frames := capture.snapshot()
+		if len(frames) != 1 || !isSystemMessage(frames[0], serverpackets.SystemMessageNamingPetnameContainsInvalidChars) {
+			t.Fatalf("frames = %v, want NAMING_PETNAME_CONTAINS_INVALID_CHARS", frames)
+		}
+	})
+
+	t.Run("npc name collision is silent", func(t *testing.T) {
+		state := world.New()
+		capture := &frameCapture{}
+		live := newTestLivePlayer(t, 1, capture)
+		state.Spawn(live, 0, 0, 0, 0)
+		actor := newActor(state, live, false)
+		link := &GameClientLink{world: state, npcs: npc.NewTable([]*npc.Template{{ID: 1, Name: "Rex"}}), petStore: &petNameStoreStub{}}
+		link.handleRequestChangePetName(context.Background(), live, clientpackets.RequestChangePetName{Name: "Rex"})
+		if len(capture.snapshot()) != 0 {
+			t.Fatalf("frames sent = %d, want 0 (silent npc-name reject)", len(capture.snapshot()))
+		}
+		if actor.Name() != "Wolf" {
+			t.Fatalf("Name() = %q after silent rejection", actor.Name())
+		}
+	})
+
+	t.Run("taken name rejected with message", func(t *testing.T) {
+		state := world.New()
+		capture := &frameCapture{}
+		live := newTestLivePlayer(t, 1, capture)
+		state.Spawn(live, 0, 0, 0, 0)
+		newActor(state, live, false)
+		link := &GameClientLink{world: state, npcs: npc.NewTable(nil), petStore: &petNameStoreStub{taken: true}}
+		link.handleRequestChangePetName(context.Background(), live, clientpackets.RequestChangePetName{Name: "Rex"})
+		frames := capture.snapshot()
+		if len(frames) != 1 || !isSystemMessage(frames[0], serverpackets.SystemMessageNamingAlreadyInUseByAnotherPet) {
+			t.Fatalf("frames = %v, want NAMING_ALREADY_IN_USE_BY_ANOTHER_PET", frames)
+		}
+	})
+
+	t.Run("applied renames and refreshes owner PetInfo", func(t *testing.T) {
+		state := world.New()
+		capture := &frameCapture{}
+		live := newTestLivePlayer(t, 1, capture)
+		live.npcs = npc.NewTable([]*npc.Template{{ID: 0}})
+		state.Spawn(live, 0, 0, 0, 0)
+		actor := newActor(state, live, false)
+		link := &GameClientLink{world: state, npcs: live.npcs, petStore: &petNameStoreStub{}}
+		link.handleRequestChangePetName(context.Background(), live, clientpackets.RequestChangePetName{Name: "Rex"})
+		if actor.Name() != "Rex" || !actor.IsNamed() {
+			t.Fatalf("Name() = %q, IsNamed() = %v, want Rex/true", actor.Name(), actor.IsNamed())
+		}
+		// Spawning already sent one PetInfo frame (owner discovering its own
+		// pet); the rename must send a second, refreshed one.
+		frames := capture.snapshot()
+		if len(frames) != 2 || frames[1][0] != serverpackets.OpcodePetInfo {
+			t.Fatalf("frames = %v, want spawn PetInfo + refreshed PetInfo", frames)
+		}
+	})
+}
+
+func isSystemMessage(frame []byte, id int) bool {
+	if len(frame) < 5 || frame[0] != serverpackets.OpcodeSystemMessage {
+		return false
+	}
+	got := int(frame[1]) | int(frame[2])<<8 | int(frame[3])<<16 | int(frame[4])<<24
+	return got == id
 }
