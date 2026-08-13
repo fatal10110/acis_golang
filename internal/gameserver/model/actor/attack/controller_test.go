@@ -203,6 +203,98 @@ func TestPlayerAttackFlagsOnMiss(t *testing.T) {
 	}
 }
 
+func TestDeliverHitDischargesSoulshotOnLandedHitOnly(t *testing.T) {
+	tests := []struct {
+		name     string
+		hit      Hit
+		wantShot []shotCall
+		wantSoul bool
+	}{
+		{
+			name:     "landed hit discharges soulshot, leaves spiritshot untouched",
+			hit:      Hit{TargetID: 200, Damage: 37},
+			wantShot: []shotCall{{kind: item.ShotSoul, charged: false}},
+			wantSoul: false,
+		},
+		{
+			name:     "miss does not discharge",
+			hit:      Hit{TargetID: 200, Miss: true},
+			wantShot: nil,
+			wantSoul: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			actor := attackActor{
+				id:       100,
+				known:    map[int32]bool{200: true},
+				soulshot: true,
+			}
+			target := attackTarget{id: 200}
+			ctrl := NewCreature(&actor)
+
+			hit := test.hit
+			hit.Target = &target
+			ctrl.deliverHit(0, hit)
+
+			if len(actor.shotCalls) != len(test.wantShot) {
+				t.Fatalf("SetChargedShot calls = %+v, want %+v", actor.shotCalls, test.wantShot)
+			}
+			for i, want := range test.wantShot {
+				if actor.shotCalls[i] != want {
+					t.Fatalf("SetChargedShot call %d = %+v, want %+v", i, actor.shotCalls[i], want)
+				}
+			}
+			if actor.soulshot != test.wantSoul {
+				t.Fatalf("soulshot charged after deliverHit = %v, want %v", actor.soulshot, test.wantSoul)
+			}
+		})
+	}
+}
+
+func TestDeliverHitSkipsDischargeWhenTargetInvalid(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(*attackActor, *attackTarget)
+	}{
+		{
+			name: "target unknown",
+			mutate: func(actor *attackActor, target *attackTarget) {
+				actor.known[target.ObjectID()] = false
+			},
+		},
+		{
+			name: "target dead",
+			mutate: func(actor *attackActor, target *attackTarget) {
+				target.alikeDead = true
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			actor := attackActor{
+				id:       100,
+				known:    map[int32]bool{200: true},
+				soulshot: true,
+			}
+			target := attackTarget{id: 200}
+			ctrl := NewCreature(&actor)
+			test.mutate(&actor, &target)
+
+			ctrl.deliverHit(0, Hit{TargetID: 200, Damage: 37, Target: &target})
+
+			if len(actor.shotCalls) != 0 {
+				t.Fatalf("SetChargedShot calls = %+v, want none (target invalid guard mirrors Java's mainTarget.isDead() gate)", actor.shotCalls)
+			}
+			if !actor.soulshot {
+				t.Fatal("soulshot charged = false, want unchanged true when discharge is skipped")
+			}
+		})
+	}
+}
+
 func TestCreatureAttackStopCancelsPendingHit(t *testing.T) {
 	clock := &fakeAttackClock{}
 	actor := attackActor{
@@ -534,6 +626,12 @@ type attackActor struct {
 	headingTarget attackable.Combatant
 	broadcasts    []Snapshot
 	idleCalls     int
+	shotCalls     []shotCall
+}
+
+type shotCall struct {
+	kind    item.ShotKind
+	charged bool
 }
 
 func (a *attackActor) ObjectID() int32 {
@@ -568,10 +666,16 @@ func (a *attackActor) AttackSpeed() int {
 func (a *attackActor) WeaponReuseDelay() time.Duration { return a.weaponReuse }
 func (a *attackActor) WeaponGrade() int                { return a.weaponGrade }
 func (a *attackActor) SoulshotCharged() bool           { return a.soulshot }
-func (a *attackActor) Position() (int, int, int)       { return 10, 20, -30 }
-func (*attackActor) Heading() int                      { return 0 }
-func (*attackActor) Dead() bool                        { return false }
-func (*attackActor) Category() skilltarget.Category    { return skilltarget.CategoryPlayable }
+func (a *attackActor) SetChargedShot(kind item.ShotKind, charged bool) {
+	a.shotCalls = append(a.shotCalls, shotCall{kind: kind, charged: charged})
+	if kind == item.ShotSoul {
+		a.soulshot = charged
+	}
+}
+func (a *attackActor) Position() (int, int, int)    { return 10, 20, -30 }
+func (*attackActor) Heading() int                   { return 0 }
+func (*attackActor) Dead() bool                     { return false }
+func (*attackActor) Category() skilltarget.Category { return skilltarget.CategoryPlayable }
 func (a *attackActor) SetHeadingTo(target attackable.Combatant) {
 	a.headingTarget = target
 }

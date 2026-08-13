@@ -106,6 +106,24 @@ func TestHostileRechargeShotsUsesTemplateCountersAndBroadcasts(t *testing.T) {
 	}
 }
 
+func TestHostileSetChargedShotDischargesIndependentlyPerKind(t *testing.T) {
+	hostile := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster"})
+
+	hostile.SetChargedShot(item.ShotSoul, true)
+	hostile.SetChargedShot(item.ShotSpirit, true)
+	if !hostile.SoulshotCharged() || !hostile.SpiritshotCharged() {
+		t.Fatalf("charged state = soul %v spirit %v, want both true", hostile.SoulshotCharged(), hostile.SpiritshotCharged())
+	}
+
+	hostile.SetChargedShot(item.ShotSoul, false)
+	if hostile.SoulshotCharged() {
+		t.Fatal("SoulshotCharged() = true after SetChargedShot(ShotSoul, false)")
+	}
+	if !hostile.SpiritshotCharged() {
+		t.Fatal("discharging ShotSoul must not discharge ShotSpirit")
+	}
+}
+
 func TestHostileStatFuncsAdjustFinalizedCombatStats(t *testing.T) {
 	tpl := &Template{ID: 1, Type: "Monster", PAtk: 100, PDef: 50, STR: 40, DEX: 30, Level: 1}
 	h := newCombatHostile(t, 1, tpl)

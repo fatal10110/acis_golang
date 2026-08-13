@@ -55,6 +55,7 @@ type CreatureActor interface {
 	WeaponReuseDelay() time.Duration
 	WeaponGrade() int
 	SoulshotCharged() bool
+	SetChargedShot(kind item.ShotKind, charged bool)
 
 	Position() (int, int, int)
 	Heading() int
@@ -422,6 +423,14 @@ func (c *Controller) deliverHit(seq uint64, hit Hit) {
 	}
 	if c.actor.AlikeDead() || !c.actor.Knows(hit.Target) || hit.Target.AlikeDead() {
 		return
+	}
+	if !hit.Miss {
+		// CreatureAttack.onHitTimer, CreatureAttack.java:134-137: a landed
+		// physical hit discharges the actor's soulshot charge, independent
+		// of actor type and of damage dealt, once the target-liveness guard
+		// above (mirroring Java's own mainTarget.isDead() check at line 115)
+		// passes.
+		c.actor.SetChargedShot(item.ShotSoul, false)
 	}
 	if notifier, ok := c.player.(pvpAttackNotifier); ok {
 		notifier.NotePvPAttack(hit.Target)
