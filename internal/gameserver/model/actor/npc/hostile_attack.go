@@ -8,9 +8,11 @@ import (
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -313,10 +315,7 @@ func (h *Hostile) MakeAttackHit(target attackable.Combatant, split bool) attack.
 	critRate := math.Min(h.calcStat(stat.CriticalRate, tpl.CritRate), 500)
 	crit := formulas.CritSucceeds(critRate, h.roll(1000))
 
-	randomMul := 1.0
-	if spread := tpl.BaseRandomDamage; spread > 0 {
-		randomMul = 1 + float64(h.roll(2*spread+1)-spread)/100
-	}
+	randomMul := creature.RandomDamageMultiplier(h, modelskill.Definition{})
 
 	defence := other.PDef()
 	if defence <= 0 {
