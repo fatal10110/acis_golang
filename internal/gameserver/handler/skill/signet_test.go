@@ -261,6 +261,32 @@ func TestSignetCasttimeMDamSpawnsPaysMPAndDamagesOnItsLiveTick(t *testing.T) {
 	}
 }
 
+func TestSignetCasttimeAppliesEveryRecognizedSelfEffectTemplate(t *testing.T) {
+	h, state := newTestSignetHandler(nil)
+	caster := newSignetFakeCaster(1, 100, 100, 0, 100)
+
+	def := modelskill.Definition{
+		ID: 1419, Level: 1, SkillType: "SIGNET_CASTTIME", EffectNpcID: 13018, Radius: 180, MPConsume: 10,
+		SelfEffects: []modelskill.EffectTemplate{
+			// An unrecognized template ahead of SignetMDam must not stop
+			// dispatch from reaching it: useCasttime walks every self
+			// effect template rather than filtering the slice down to one
+			// known name before iterating.
+			{Name: "SomeUnimplementedSelfEffect", Self: true, Count: 3, Time: 1},
+			{Name: "SignetMDam", Self: true, Count: 3, Time: 1},
+		},
+	}
+
+	h.Use(Cast{Caster: caster, Skill: def})
+
+	if got := len(caster.EffectList().All()); got != 1 {
+		t.Fatalf("caster active effects = %d, want 1 (only the recognized SignetMDam template)", got)
+	}
+	if actors := findEffectPointObjects(state); len(actors) != 1 {
+		t.Fatalf("spawned actors = %d, want 1 (SignetMDam's own onStart spawn)", len(actors))
+	}
+}
+
 func TestSignetCasttimeMDamDropsOnLackOfMP(t *testing.T) {
 	h, _ := newTestSignetHandler(nil)
 
