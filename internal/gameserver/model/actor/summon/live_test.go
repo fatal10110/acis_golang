@@ -512,7 +512,7 @@ func TestActorGetSkillCanUseSkillTryUseSkill(t *testing.T) {
 		// Matches Java's useSkill (RequestActionUse.java:453-472): it
 		// unconditionally returns true once the dispatch preconditions pass,
 		// because summon.getAI().tryToCast(...) (PlayableAI.java:297) is void
-		// and cannot feed a rejection (cooldown, out of control, no MP, ...)
+		// and cannot feed a rejection (cooldown, no MP, ...)
 		// back into the return value.
 		actor := NewPet(PetConfig{ObjectID: 200, Owner: owner, Level: 40, Skills: map[int]int{4139: 8}})
 		brain := &rejectingSummonAI{}
@@ -526,6 +526,15 @@ func TestActorGetSkillCanUseSkillTryUseSkill(t *testing.T) {
 			t.Fatalf("AI events = %v, want %v", brain.events, want)
 		}
 	})
+}
+
+func TestActorDenyAIActionDoesNotTreatOutOfControlAsAnAIBlock(t *testing.T) {
+	actor := NewPet(PetConfig{ObjectID: 200})
+	actor.disabled = true
+
+	if actor.DenyAIAction() {
+		t.Fatal("DenyAIAction() = true while out of control, want false")
+	}
 }
 
 type recordingSummonAI struct {
