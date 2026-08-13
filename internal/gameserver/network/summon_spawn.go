@@ -115,7 +115,8 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 	}
 
 	name := npcTmpl.Name
-	if hasSaved && state.Name != "" {
+	named := hasSaved && state.Name != ""
+	if named {
 		name = state.Name
 	}
 
@@ -126,6 +127,7 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 		NPCID:           int(summonItem.NPCID),
 		CollisionRadius: npcTmpl.CollisionRadius,
 		Name:            name,
+		Named:           named,
 		Level:           level,
 		Exp:             state.Exp,
 		SP:              state.SP,
