@@ -209,7 +209,9 @@ func applyMdamEffects(cast Cast, obj any, bss bool) {
 		return
 	}
 	stopEffectsBySkillID(effected.EffectList(), cast.Skill.ID)
-	if !reflected {
+	if reflected {
+		bss = false
+	} else {
 		succeeded, ok := checkSkillSuccess(cast.Caster, effected, cast.Skill)
 		if !ok || !succeeded {
 			return
