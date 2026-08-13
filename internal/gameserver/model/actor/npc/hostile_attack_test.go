@@ -52,9 +52,12 @@ func TestHostileMakeAttackHitResolvesDamage(t *testing.T) {
 	// 100*1.2*0.9=108 and defender.PDef to 50*0.9=45. An even accuracy/
 	// evasion match (same DEX/level on both sides) and a guaranteed
 	// critical hit (zeroRoll) then resolve through the physical-attack
-	// formula (already verified against the reference implementation) to:
-	//   (108*2 * 1(posMul) * 1(randomMul) + 0) * 77/45 = 369 (truncated)
-	const wantDamage = 369
+	// formula (already verified against the reference implementation).
+	// The template sets no BaseRandomDamage, so RandomDamageMultiplier
+	// falls back to the weaponless spread `5+sqrt(level)`=6 (level 1);
+	// zeroRoll always returns 0, giving randomMul=1+(0-6)/100=0.94:
+	//   (108*2 * 1(posMul) * 0.94(randomMul) + 0) * 77/45 = 347 (truncated)
+	const wantDamage = 347
 	if hit.Miss || hit.Damage != wantDamage {
 		t.Fatalf("MakeAttackHit() = %+v, want %d damage", hit, wantDamage)
 	}

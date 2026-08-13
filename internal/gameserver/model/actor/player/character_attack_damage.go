@@ -5,6 +5,8 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 )
 
@@ -44,12 +46,7 @@ func (c *Character) MakeAttackHit(target attackable.Combatant, split bool) attac
 	critRate := c.CriticalRate()
 	crit := formulas.CritSucceeds(critRate, c.rollValue(1000))
 
-	randomMul := 1.0
-	if weapon.tmpl != nil && weapon.tmpl.Weapon != nil {
-		if spread := int(weapon.tmpl.Weapon.RandomDamage); spread > 0 {
-			randomMul = 1 + float64(c.rollValue(2*spread+1)-spread)/100
-		}
-	}
+	randomMul := creature.RandomDamageMultiplier(c, modelskill.Definition{})
 
 	defence := other.PDef()
 	if defence <= 0 {
