@@ -57,6 +57,37 @@ func TestGameClientLinkSendsCounterattackFeedbackToPlayerParticipants(t *testing
 	assertSystemMessageStringFrame(t, defenderFrames.frames[0], serverpackets.SystemMessageCounteredS1Attack, attacker.Name)
 }
 
+func TestGameClientLinkSendsResistedSkillFeedbackToCaster(t *testing.T) {
+	frames := &frameCapture{}
+	caster := newTestLivePlayer(t, 1, frames)
+	link := &GameClientLink{}
+
+	link.sendSkillHandlerResult(caster, actorcast.EffectResult{Resisted: []handlerskill.Resisted{{
+		TargetName: "Target", SkillID: 123, SkillLevel: 1,
+	}}})
+
+	if len(frames.frames) != 1 {
+		t.Fatalf("caster frames = %d, want 1", len(frames.frames))
+	}
+	frame := frames.frames[0]
+	if frame[0] != serverpackets.OpcodeSystemMessage {
+		t.Fatalf("opcode = %#x, want SystemMessage", frame[0])
+	}
+	r := wire.NewReader(frame[1:])
+	if id := r.ReadInt32(); id != serverpackets.SystemMessageS1ResistedYourS2 {
+		t.Fatalf("message ID = %d, want resisted skill", id)
+	}
+	if params := r.ReadInt32(); params != 2 {
+		t.Fatalf("parameters = %d, want 2", params)
+	}
+	if typ := r.ReadInt32(); typ != serverpackets.SystemMessageParamText || r.ReadString() != "Target" {
+		t.Fatalf("first parameter = text Target")
+	}
+	if typ := r.ReadInt32(); typ != serverpackets.SystemMessageParamSkillName || r.ReadInt32() != 123 || r.ReadInt32() != 1 {
+		t.Fatalf("second parameter = skill 123 level 1")
+	}
+}
+
 func TestGameClientLinkSendsBlowEvasionFeedbackToPlayerParticipants(t *testing.T) {
 	attackerFrames := &frameCapture{}
 	defenderFrames := &frameCapture{}
