@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
@@ -183,7 +184,7 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 	// connection goroutine looking the pet up to dispatch TryUseSkill).
 	// Setting brain first means that edge also covers the brain field,
 	// instead of leaving it as an unsynchronized write racing that read.
-	link.wireSummonAI(pet)
+	link.wireSummonAI(pet, npcTmpl.RunSpeed)
 
 	offset := location.Location{X: petSpawnOffset, Y: 0, Z: 0}
 	summon.SpawnBesideOwner(link.world, pet, live, offset)
@@ -240,7 +241,7 @@ func (s *gameSummonSpawner) SpawnServitor(owner *player.Character, def modelskil
 		Skills: npcTmpl.Skills,
 	})
 	servitor.SetZones(link.zones)
-	link.wireSummonAI(servitor)
+	link.wireSummonAI(servitor, npcTmpl.RunSpeed)
 	summon.SpawnBesideOwner(link.world, servitor, live, location.Location{X: petSpawnOffset})
 	link.broadcastSummonSpawnRelation(live, servitor)
 	return true
@@ -250,8 +251,31 @@ func (s *gameSummonSpawner) SpawnServitor(owner *player.Character, def modelskil
 // notifiers, and returns the installed cast controller so a caller (or a
 // test) can drive it directly rather than reaching into the brain's
 // unexported state.
-func (l *GameClientLink) wireSummonAI(actor *summon.Actor) *actorcast.AIController {
-	brain := ai.NewSummon(actor, inertSummonMoveController{}, inertSummonAttackController{})
+func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *actorcast.AIController {
+	runSpeed := 0.0
+	if len(speed) != 0 {
+		runSpeed = speed[0]
+	}
+	moveController := ai.SummonMoveController(inertSummonMoveController{})
+	if actor != nil && l.geo != nil {
+		x, y, z := actor.Position()
+		creatureMove, err := move.NewCreatureMove(location.Location{X: x, Y: y, Z: z}, runSpeed, l.geo)
+		if err != nil {
+			l.log.Warn().Err(err).Msg("summon: create movement controller")
+		} else if controller, err := move.NewController(creatureMove, actor); err != nil {
+			l.log.Warn().Err(err).Msg("summon: attach movement controller")
+		} else {
+			controller.SetPositionUpdates(l.positions)
+			moveController = controller
+		}
+	}
+	brain := ai.NewSummon(actor, moveController, inertSummonAttackController{})
+	if controller, ok := moveController.(*move.Controller); ok {
+		controller.SetArrived(func() {
+			actor.SyncPosition(controller.Position())
+			brain.Think()
+		})
+	}
 	// SetLogger records broadcast errors from TryToAttack/TryToFollow/TryToIdle/Think
 	// that have no caller left to return them to; left unset, they're silently
 	// discarded through the zero-value zerolog.Logger.
