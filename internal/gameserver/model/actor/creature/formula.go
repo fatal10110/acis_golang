@@ -238,14 +238,16 @@ func PhysicalSkillCrit(attacker FormulaActor, def modelskill.Definition) bool {
 }
 
 // RandomDamageMultiplier returns the attacker's random damage multiplier for
-// physical skills.
+// physical skills. Mirrors Creature.getRandomDamageMultiplier
+// (Creature.java:1699-1710): weapon-random spread when a weapon supplies
+// one, else the weaponless fallback `5 + sqrt(level)`.
 func RandomDamageMultiplier(attacker FormulaActor, def modelskill.Definition) float64 {
 	if attacker == nil || SkillTypeKey(def.EffectType) == "CHARGEDAM" {
 		return 1
 	}
 	spread := attacker.RandomDamageSpread()
 	if spread <= 0 {
-		return 1
+		spread = 5 + int(math.Sqrt(float64(attacker.Level())))
 	}
 	return 1 + float64(attacker.Roll(2*spread+1)-spread)/100
 }
