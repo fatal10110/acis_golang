@@ -172,6 +172,17 @@ func (h *Hostile) SoulshotCharged() bool {
 	return h.shotsMask&item.ShotSoul.Mask() != 0
 }
 
+// SetChargedShot charges or discharges kind on this NPC's shot mask.
+func (h *Hostile) SetChargedShot(kind item.ShotKind, charged bool) {
+	h.shotsMu.Lock()
+	defer h.shotsMu.Unlock()
+	if charged {
+		h.shotsMask |= kind.Mask()
+	} else {
+		h.shotsMask &^= kind.Mask()
+	}
+}
+
 // CurrentSoulshotCount reports the remaining per-spawn soulshot charges.
 func (h *Hostile) CurrentSoulshotCount() int {
 	h.shotsMu.RLock()
