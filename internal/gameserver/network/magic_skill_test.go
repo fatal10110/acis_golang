@@ -399,6 +399,7 @@ func TestGameClientLinkMagicSkillUseGroundRecordsGroundTargetAndAppliesEffect(t 
 	readEnterWorldBurst(t, c, false)
 
 	c.send(encodeRequestExMagicSkillUseGround(1000, 2000, 300, 5, false, false))
+	c.read() // ValidateLocation
 	c.read() // MagicSkillUse
 	c.read() // SystemMessage
 	c.read() // SetupGauge
@@ -448,6 +449,9 @@ func TestGameClientLinkMagicSkillUseGroundWalksIntoCastRange(t *testing.T) {
 	c.send(encodeRequestExMagicSkillUseGround(5000, 0, 0, 5, false, false))
 	if reply := c.read(); reply[0] != serverpackets.OpcodeMoveToLocation {
 		t.Fatalf("out-of-range ground cast opcode = %#x, want MoveToLocation (%#x)", reply[0], serverpackets.OpcodeMoveToLocation)
+	}
+	if reply := c.read(); reply[0] != serverpackets.OpcodeValidateLocation {
+		t.Fatalf("post-walk ground cast opcode = %#x, want ValidateLocation (%#x)", reply[0], serverpackets.OpcodeValidateLocation)
 	}
 	if reply := c.read(); reply[0] != serverpackets.OpcodeMagicSkillUse {
 		t.Fatalf("post-walk ground cast opcode = %#x, want MagicSkillUse (%#x)", reply[0], serverpackets.OpcodeMagicSkillUse)
@@ -838,6 +842,96 @@ func TestGameClientLinkMagicSkillUseMissingOneTargetSendsActionFailedOnly(t *tes
 	if got, want := frameOpcodes(capture.frames), []byte{serverpackets.OpcodeActionFailed}; !bytes.Equal(got, want) {
 		t.Fatalf("missing-target cast opcodes = %#x, want ActionFailed only (%#x)", got, want)
 	}
+}
+
+type groundCastLOS bool
+
+func (g groundCastLOS) CanSeeActor(int, int, int, float64, int, int, int, float64) bool {
+	return bool(g)
+}
+
+type groundCastPeaceZone bool
+
+func (g groundCastPeaceZone) EffectRangeInPeaceZone(int, int, int, int, int, int) bool {
+	return bool(g)
+}
+
+func TestGameClientLinkMagicSkillUseGroundCastFailuresSendReason(t *testing.T) {
+	tests := []struct {
+		name      string
+		configure func(*livePlayer)
+		assert    func(*testing.T, []byte)
+	}{
+		{
+			name: "line of sight",
+			configure: func(live *livePlayer) {
+				live.Character.SetLineOfSight(groundCastLOS(false))
+			},
+			assert: func(t *testing.T, frame []byte) {
+				assertSystemMessageIDFrame(t, frame, serverpackets.SystemMessageCantSeeTarget)
+			},
+		},
+		{
+			name: "peace zone",
+			configure: func(live *livePlayer) {
+				live.Character.SetZones(groundCastPeaceZone(true))
+			},
+			assert: func(t *testing.T, frame []byte) {
+				assertSystemMessageSkillFrame(t, frame, serverpackets.SystemMessageS1CannotBeUsed, 3, 1)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			capture := &frameCapture{}
+			live := newTestLivePlayer(t, 7, capture)
+			live.Character.SetSkillLevel(3, 1)
+			live.Character.SetGroundTarget(800, 100, 0)
+			tt.configure(live)
+			link := &GameClientLink{
+				skills: skillstate.NewPersistence(nil, modelskill.NewTable([]modelskill.Definition{{
+					ID: 3, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetGround, CastRange: 3000,
+				}}), nil),
+				targets: skilltarget.NewRegistry(nil),
+			}
+
+			link.handleMagicSkillUse(live, clientpackets.RequestMagicSkillUse{SkillID: 3})
+
+			if got, want := frameOpcodes(capture.frames), []byte{serverpackets.OpcodeSystemMessage, serverpackets.OpcodeActionFailed}; !bytes.Equal(got, want) {
+				t.Fatalf("ground cast rejection opcodes = %#x, want SystemMessage then ActionFailed (%#x)", got, want)
+			}
+			tt.assert(t, capture.frames[0])
+		})
+	}
+}
+
+func TestGameClientLinkMagicSkillUseGroundCastFacesPointAndBroadcastsPosition(t *testing.T) {
+	capture := &frameCapture{}
+	live := newTestLivePlayer(t, 7, capture)
+	state := world.New()
+	live.SetWorld(state)
+	state.Spawn(live, 700, 0, 0, 0)
+	state.AddPlayer(live)
+	live.Character.SetSkillLevel(3, 1)
+	live.Character.SetGroundTarget(700, 100, 0)
+	link := &GameClientLink{
+		skills: skillstate.NewPersistence(nil, modelskill.NewTable([]modelskill.Definition{{
+			ID: 3, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetGround, CastRange: 3000, HitTime: int(time.Hour / time.Millisecond),
+		}}), nil),
+		targets: skilltarget.NewRegistry(nil),
+	}
+
+	link.handleMagicSkillUse(live, clientpackets.RequestMagicSkillUse{SkillID: 3})
+
+	frames := capture.snapshot()
+	if got, want := frameOpcodes(frames)[:2], []byte{serverpackets.OpcodeValidateLocation, serverpackets.OpcodeMagicSkillUse}; !bytes.Equal(got, want) {
+		t.Fatalf("ground cast opening opcodes = %#x, want ValidateLocation then MagicSkillUse (%#x)", got, want)
+	}
+	if got := live.CurrentHeading(); got != 16384 {
+		t.Fatalf("heading after ground cast = %d, want 16384", got)
+	}
+	live.cast.Stop()
 }
 
 func TestGameClientLinkMagicSkillUseAppliesAreaSkillToResolvedTargets(t *testing.T) {
