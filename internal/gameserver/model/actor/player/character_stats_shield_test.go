@@ -149,6 +149,49 @@ func TestCharacterShieldDefenseGatesEquipStatsAndFacing(t *testing.T) {
 	}
 }
 
+func TestCharacterShieldDefenseNotifiesDefendingPlayerBySDefOnly(t *testing.T) {
+	tmpl := combatTemplate()
+	items := shieldDefenseItems()
+	def := modelskill.Definition{SkillType: "STUN"}
+
+	tests := []struct {
+		name        string
+		roll        int
+		wantSuccess bool
+		wantPerfect bool
+	}{
+		{name: "perfect block notifies excellent message", roll: 0, wantPerfect: true},
+		{name: "ordinary block notifies success message", roll: 5, wantSuccess: true},
+		{name: "failed block sends no message", roll: 99},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			caster := liveCharacter(1, tmpl, items)
+			target := liveCharacter(2, tmpl, items, equippedShield())
+			caster.SetLastKnownPosition(location.Location{X: 80, Y: 0, Z: 0}, 0)
+			target.SetLastKnownPosition(location.Location{X: 0, Y: 0, Z: 0}, 0)
+			target.AddStatFuncs([]basefunc.Func{
+				basefunc.NewSet(target, stat.ShieldRate, 20, nil),
+				basefunc.NewSet(target, stat.ShieldDefenceAngle, 120, nil),
+			})
+			target.SetRollSource(func(int) int { return tt.roll })
+
+			var gotSuccess, gotPerfect bool
+			target.SetShieldBlockNotifiers(func() { gotSuccess = true }, func() { gotPerfect = true })
+
+			target.ShieldDefense(caster, def, false)
+
+			if gotSuccess != tt.wantSuccess {
+				t.Fatalf("shield block success notice fired = %v, want %v", gotSuccess, tt.wantSuccess)
+			}
+			if gotPerfect != tt.wantPerfect {
+				t.Fatalf("shield block perfect notice fired = %v, want %v", gotPerfect, tt.wantPerfect)
+			}
+		})
+	}
+}
+
 func shieldDefenseItems() *item.Table {
 	return item.NewTable([]*item.Template{
 		{ID: 1, Kind: item.KindWeapon, Slot: item.SlotRHand, Weapon: &item.WeaponDetail{Type: item.WeaponFist}},
