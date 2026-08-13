@@ -250,6 +250,10 @@ func (s *gameSummonSpawner) SpawnServitor(owner *player.Character, def modelskil
 // unexported state.
 func (l *GameClientLink) wireSummonAI(actor *summon.Actor) *actorcast.AIController {
 	brain := ai.NewSummon(actor, inertSummonMoveController{}, inertSummonAttackController{})
+	// SetLogger records broadcast errors from TryToAttack/TryToFollow/TryToIdle/Think
+	// that have no caller left to return them to; left unset, they're silently
+	// discarded through the zero-value zerolog.Logger.
+	brain.SetLogger(l.log)
 	// SetLogger records where a panic recovered from a scheduled
 	// Launch/Hit/Finish callback (Controller.scheduleLocked's recover
 	// wrapper, unconditional for every Controller) is logged; left unset,
