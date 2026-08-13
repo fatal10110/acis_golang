@@ -107,13 +107,38 @@ func (a *Actor) SetName(name string) {
 	a.name = name
 }
 
-// PetState returns the collar id and durable state for a live pet.
+// IsNamed reports whether this pet has a player-assigned custom name, as
+// opposed to falling back to its npc template's name (Pet.getName() != null
+// in the reference).
+func (a *Actor) IsNamed() bool {
+	a.statusMu.RLock()
+	defer a.statusMu.RUnlock()
+	return a.named
+}
+
+// SetNamed marks whether this pet has a player-assigned custom name.
+func (a *Actor) SetNamed(named bool) {
+	a.statusMu.Lock()
+	defer a.statusMu.Unlock()
+	a.named = named
+}
+
+// PetState returns the collar id and durable state for a live pet. Name is
+// persisted only once the pet has been explicitly named (IsNamed): the
+// npc-template fallback name must never round-trip through storage as a
+// saved custom name, or a later restore would misread "has a saved display
+// name" as "was explicitly named" (Pet.getName() != null in the reference
+// stays null until an actual rename).
 func (a *Actor) PetState() (int32, petmodel.State, bool) {
 	if a == nil || !a.isPet || a.controlItemID == 0 {
 		return 0, petmodel.State{}, false
 	}
 	a.statusMu.RLock()
-	state := petmodel.State{Name: a.name, Level: a.level, Exp: a.exp, SP: a.sp, Fed: a.fed}
+	name := ""
+	if a.named {
+		name = a.name
+	}
+	state := petmodel.State{Name: name, Level: a.level, Exp: a.exp, SP: a.sp, Fed: a.fed}
 	a.statusMu.RUnlock()
 	a.vitals.mu.RLock()
 	state.CurHP, state.CurMP = a.vitals.hp, a.vitals.mp

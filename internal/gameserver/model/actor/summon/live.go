@@ -66,6 +66,7 @@ type Actor struct {
 	statusMu       sync.RWMutex
 	level          int
 	name           string
+	named          bool
 	lifetime       LifetimeState
 	statusUpdater  func()
 	damageNotifier func(string, int32)
@@ -209,12 +210,16 @@ type PetConfig struct {
 	NPCID           int
 	CollisionRadius float64
 	Name            string
-	Level           int
-	Exp             int64
-	SP              int
-	CON             int
-	Passive         bool
-	Config          *petmodel.Config
+	// Named reports whether Name is a player-assigned custom name rather
+	// than a fallback to the npc template's name; it gates RequestChangePetName's
+	// "pet is already named" rejection (Pet.getName() != null in the reference).
+	Named   bool
+	Level   int
+	Exp     int64
+	SP      int
+	CON     int
+	Passive bool
+	Config  *petmodel.Config
 
 	Inventory     *itemcontainer.Inventory
 	Fed           int
@@ -300,6 +305,7 @@ func NewPet(cfg PetConfig) *Actor {
 		npcID:         cfg.NPCID,
 		radius:        cfg.CollisionRadius,
 		name:          cfg.Name,
+		named:         cfg.Named,
 		passive:       cfg.Passive,
 		followActive:  true,
 		intent:        IntentFollowOwner,

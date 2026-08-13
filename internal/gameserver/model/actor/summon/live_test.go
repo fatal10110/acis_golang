@@ -579,6 +579,23 @@ func objectIDString(target attackable.Combatant) string {
 	return strconv.FormatInt(int64(target.ObjectID()), 10)
 }
 
+// TestPetStateOmitsTemplateFallbackName guards against a pet that was never
+// explicitly renamed getting persisted with its npc-template fallback name:
+// a later restore's "hasSaved && state.Name != \"\"" check would then
+// misread that as "this pet was explicitly named" and permanently block
+// RequestChangePetName after a single save/restore cycle.
+func TestPetStateOmitsTemplateFallbackName(t *testing.T) {
+	unnamed := NewPet(PetConfig{ObjectID: 1, ControlItemID: 5, Name: "Wolf", Named: false})
+	if _, state, ok := unnamed.PetState(); !ok || state.Name != "" {
+		t.Fatalf("PetState().Name = %q, want empty for an unnamed pet", state.Name)
+	}
+
+	named := NewPet(PetConfig{ObjectID: 2, ControlItemID: 6, Name: "Fenrir", Named: true})
+	if _, state, ok := named.PetState(); !ok || state.Name != "Fenrir" {
+		t.Fatalf("PetState().Name = %q, want Fenrir for an explicitly named pet", state.Name)
+	}
+}
+
 func waitForNoSummon(t *testing.T, state *world.State, ownerID int32) {
 	t.Helper()
 	deadline := time.After(time.Second)
