@@ -41,17 +41,18 @@ func (a *randomDamageTestActor) Roll(int) int                        { return a.
 var _ FormulaActor = (*randomDamageTestActor)(nil)
 
 // Mirrors Creature.getRandomDamageMultiplier (Creature.java:1699-1710):
-// weaponless attackers roll `5 + sqrt(level)` spread, not a fixed 1x.
+// weaponless attackers (spread == -1, the sentinel) roll `5 + sqrt(level)`
+// spread, not a fixed 1x.
 func TestRandomDamageMultiplierWeaponlessUsesLevelSpread(t *testing.T) {
 	// level 50 -> spread = 5 + int(sqrt(50)) = 5 + 7 = 12
-	attacker := &randomDamageTestActor{level: 50, spread: 0, roll: 2*12 + 1 - 1} // max roll
+	attacker := &randomDamageTestActor{level: 50, spread: -1, roll: 2*12 + 1 - 1} // max roll
 	got := RandomDamageMultiplier(attacker, modelskill.Definition{})
 	want := 1 + float64(12)/100
 	if got != want {
 		t.Fatalf("RandomDamageMultiplier() = %v, want %v (max-roll bound for level 50 weaponless)", got, want)
 	}
 
-	attacker = &randomDamageTestActor{level: 50, spread: 0, roll: 0} // min roll
+	attacker = &randomDamageTestActor{level: 50, spread: -1, roll: 0} // min roll
 	got = RandomDamageMultiplier(attacker, modelskill.Definition{})
 	want = 1 - float64(12)/100
 	if got != want {
@@ -66,5 +67,17 @@ func TestRandomDamageMultiplierWeaponSpreadTakesPriority(t *testing.T) {
 	want := 1 - float64(20)/100
 	if got != want {
 		t.Fatalf("RandomDamageMultiplier() = %v, want %v (weapon spread should win over level fallback)", got, want)
+	}
+}
+
+// A weapon with an explicit or defaulted 0 random-damage spread (e.g. item
+// 8763 "Elrokian Trap", which has no random_damage attribute) must resolve
+// to a neutral 1x, NOT the level fallback — Java's gate is
+// `activeWeapon != null`, not "spread > 0" (Creature.java:1699-1709).
+func TestRandomDamageMultiplierZeroSpreadWeaponStaysNeutral(t *testing.T) {
+	attacker := &randomDamageTestActor{level: 50, spread: 0, roll: 0}
+	got := RandomDamageMultiplier(attacker, modelskill.Definition{})
+	if got != 1 {
+		t.Fatalf("RandomDamageMultiplier() = %v, want 1 (0-spread weapon must not trigger the level fallback)", got)
 	}
 }

@@ -113,14 +113,7 @@ func TestCharacterFormulaInputsResolveLiveStats(t *testing.T) {
 	if got, want := phys.Defence, 45.0; !closeFloat(got, want) {
 		t.Fatalf("PhysicalSkillInput Defence = %v, want %v", got, want)
 	}
-	// caster's test fist template carries no random_damage, so it falls
-	// back to Creature.getRandomDamageMultiplier's weaponless spread
-	// `5 + sqrt(level)` (Creature.java:1699-1710); level 1 -> spread 6,
-	// and zeroRoll pins the roll at the bottom of the range: 1 - 6/100.
-	if got, want := phys.RandomMul, 0.94; !closeFloat(got, want) {
-		t.Fatalf("PhysicalSkillInput RandomMul = %v, want %v", got, want)
-	}
-	if phys.ElementalMul != 1 || phys.RaceMul != 1 || phys.WeaponVulnMul != 1 || phys.PvPMul != 1 {
+	if phys.RandomMul != 1 || phys.ElementalMul != 1 || phys.RaceMul != 1 || phys.WeaponVulnMul != 1 || phys.PvPMul != 1 {
 		t.Fatalf("PhysicalSkillInput neutral multipliers = %+v", phys)
 	}
 
