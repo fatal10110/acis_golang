@@ -91,7 +91,7 @@ func (sweepHandler) Use(cast Cast) {
 		}
 	}
 
-	applyEffects(cast.Caster, cast.Caster, cast.Skill, cast.Skill.SelfEffects)
+	applyCastEffects(cast, cast.Caster, cast.Skill, cast.Skill.SelfEffects)
 }
 
 func rewardSweep(caster any, itemID, count int32) {

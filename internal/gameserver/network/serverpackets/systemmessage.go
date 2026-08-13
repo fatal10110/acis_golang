@@ -43,6 +43,7 @@ const (
 	SystemMessageCannotPickupOrUseItemTrading      = 149
 	SystemMessageS1IsBusyTryLater                  = 153
 	SystemMessageAttackFailed                      = 158
+	SystemMessageS1ResistedYourS2                  = 139
 	SystemMessageS1PerformingCounterattack         = 1997
 	SystemMessageCounteredS1Attack                 = 1998
 	SystemMessageS1DodgesAttack                    = 1999
@@ -288,6 +289,20 @@ func FrameSystemMessageSkillName(id int, skillID, level int32) wire.Frame {
 	w := newFrameWriter(OpcodeSystemMessage)
 	w.WriteInt32(int32(id))
 	w.WriteInt32(1)
+	w.WriteInt32(SystemMessageParamSkillName)
+	w.WriteInt32(skillID)
+	w.WriteInt32(level)
+	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
+}
+
+// FrameSystemMessageStringSkillName builds a SystemMessage with text followed
+// by a skill-name parameter.
+func FrameSystemMessageStringSkillName(id int, text string, skillID, level int32) wire.Frame {
+	w := newFrameWriter(OpcodeSystemMessage)
+	w.WriteInt32(int32(id))
+	w.WriteInt32(2)
+	w.WriteInt32(SystemMessageParamText)
+	w.WriteString(text)
 	w.WriteInt32(SystemMessageParamSkillName)
 	w.WriteInt32(skillID)
 	w.WriteInt32(level)

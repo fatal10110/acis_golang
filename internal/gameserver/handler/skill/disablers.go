@@ -120,7 +120,7 @@ func (disablersHandler) Use(cast Cast) {
 		case "BETRAY":
 			disableWithSuccessCheck(cast, target)
 		case "FAKE_DEATH":
-			applyEffects(cast.Caster, target, cast.Skill, cast.Skill.Effects)
+			applyCastEffects(cast, target, cast.Skill, cast.Skill.Effects)
 		case "ROOT", "STUN", "SLEEP", "PARALYZE":
 			disableReflectable(cast, target)
 		case "MUTE":
@@ -144,7 +144,7 @@ func (disablersHandler) Use(cast Cast) {
 		}
 	}
 
-	applySelfEffects(cast.Caster, cast.Skill)
+	applySelfEffects(cast, cast.Skill)
 }
 
 // checkSkillSuccess rolls an effect-landing attempt of def against target,
@@ -207,7 +207,7 @@ func disableAggDamage(cast Cast, target disablerTarget) {
 			}
 		}
 	}
-	applyEffects(cast.Caster, target, cast.Skill, cast.Skill.Effects)
+	applyCastEffects(cast, target, cast.Skill, cast.Skill.Effects)
 }
 
 func disableErase(cast Cast, target disablerTarget) {
@@ -255,7 +255,7 @@ func disableWithSuccessCheck(cast Cast, target disablerTarget) {
 	if !ok || !succeeded {
 		return
 	}
-	applyEffects(cast.Caster, target, cast.Skill, cast.Skill.Effects)
+	applyCastEffects(cast, target, cast.Skill, cast.Skill.Effects)
 }
 
 func disableReflectable(cast Cast, target disablerTarget) {
@@ -267,7 +267,7 @@ func disableReflectable(cast Cast, target disablerTarget) {
 	if !ok || !succeeded {
 		return
 	}
-	applyEffects(cast.Caster, effected, cast.Skill, cast.Skill.Effects)
+	applyCastEffects(cast, effected, cast.Skill, cast.Skill.Effects)
 }
 
 func disableMute(cast Cast, target disablerTarget) {
@@ -280,7 +280,7 @@ func disableMute(cast Cast, target disablerTarget) {
 		return
 	}
 	stopSkillType(effected.EffectList(), skillTypeKey(cast.Skill.SkillType))
-	applyEffects(cast.Caster, effected, cast.Skill, cast.Skill.Effects)
+	applyCastEffects(cast, effected, cast.Skill, cast.Skill.Effects)
 }
 
 func disableConfusion(cast Cast, target disablerTarget) {
@@ -293,7 +293,7 @@ func disableConfusion(cast Cast, target disablerTarget) {
 		return
 	}
 	stopSkillType(target.EffectList(), skillTypeKey(cast.Skill.SkillType))
-	applyEffects(cast.Caster, target, cast.Skill, cast.Skill.Effects)
+	applyCastEffects(cast, target, cast.Skill, cast.Skill.Effects)
 }
 
 // disableAggReduce applies the skill's effects and, for a positive skill
@@ -306,7 +306,7 @@ func disableAggReduce(cast Cast, target disablerTarget) {
 	if !ok {
 		return
 	}
-	applyEffects(cast.Caster, target, cast.Skill, cast.Skill.Effects)
+	applyCastEffects(cast, target, cast.Skill, cast.Skill.Effects)
 	if cast.Skill.Power > 0 {
 		at.AggroList().ReduceAllHate(float64(cast.Skill.Power))
 	}
@@ -323,7 +323,7 @@ func disableAggReduceChar(cast Cast, target disablerTarget) {
 			at.HateList().StopHate(attacker)
 		}
 	}
-	applyEffects(cast.Caster, target, cast.Skill, cast.Skill.Effects)
+	applyCastEffects(cast, target, cast.Skill, cast.Skill.Effects)
 }
 
 func disableAggRemove(cast Cast, target disablerTarget) {
@@ -380,7 +380,7 @@ func disableNegate(cast Cast, target disablerTarget) {
 		}
 	}
 
-	applyEffects(cast.Caster, effected, cast.Skill, cast.Skill.Effects)
+	applyCastEffects(cast, effected, cast.Skill, cast.Skill.Effects)
 }
 
 func disableCancelDebuff(cast Cast, target disablerTarget) {
