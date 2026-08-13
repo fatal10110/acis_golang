@@ -32,6 +32,10 @@ type counterSkillPhysicalTarget interface {
 	CounterSkillPhysical() float64
 }
 
+type chargeDamageCaster interface {
+	Charges() int
+}
+
 type objectIDTarget interface {
 	ObjectID() int32
 }
@@ -129,10 +133,51 @@ func (pdamHandler) UseResult(cast Cast) Result {
 		applyPdamEffects(cast, obj, in.Shield, &result)
 		damage := formulas.PhysicalSkillDamage(in)
 		if damage > 0 {
-			target.ReduceHP(damage, cast.Caster, cast.Skill)
+			if !applyPhysicalSkillCounter(cast, target, damage, &result) {
+				target.ReduceHP(damage, cast.Caster, cast.Skill)
+			}
 			applyLethalHit(cast, target)
 		} else {
 			result.AttackFailed++
+		}
+	}
+	applySelfEffects(cast, cast.Skill)
+	return result
+}
+
+type chargeDamHandler struct{}
+
+func (chargeDamHandler) Types() []string { return []string{"CHARGEDAM"} }
+
+func (chargeDamHandler) Use(cast Cast) {
+	chargeDamHandler{}.UseResult(cast)
+}
+
+func (chargeDamHandler) UseResult(cast Cast) Result {
+	var result Result
+	if alikeDead(cast.Caster) {
+		return result
+	}
+	modifier := 0.0
+	if caster, ok := cast.Caster.(chargeDamageCaster); ok {
+		modifier = .8 + .2*float64(caster.Charges()+cast.Skill.NumCharges)
+	}
+	for _, obj := range cast.Targets {
+		target, ok := obj.(physicalSkillTarget)
+		if !ok || target.Dead() {
+			continue
+		}
+		in, ok := target.PhysicalSkillInput(cast.Caster, cast.Skill)
+		if !ok {
+			continue
+		}
+		applyChargeDamEffects(cast, obj, in.Shield, &result)
+		damage := formulas.PhysicalSkillDamage(in) * modifier
+		if damage <= 0 {
+			continue
+		}
+		if !applyPhysicalSkillCounter(cast, target, damage, &result) {
+			target.ReduceHP(damage, cast.Caster, cast.Skill)
 		}
 	}
 	applySelfEffects(cast, cast.Skill)
@@ -270,26 +315,11 @@ func (blowHandler) UseResult(cast Cast) Result {
 				damage *= 2
 			}
 			if damage > 0 {
-				countered := false
-				if source, ok := target.(counterSkillPhysicalTarget); ok {
-					counter := source.CounterSkillPhysical()
-					countered = counterSkillReflects(cast.Skill, counter)
-					if countered {
-						if caster, ok := cast.Caster.(hpDamageTarget); ok {
-							caster.ReduceHP(float64(damage)*counter/100, target, cast.Skill)
-						}
-						result.Counterattacks = append(result.Counterattacks, Counterattack{
-							AttackerID:   counterattackObjectID(cast.Caster),
-							AttackerName: counterattackName(cast.Caster),
-							DefenderID:   counterattackObjectID(target),
-							DefenderName: counterattackName(target),
-						})
-					}
-				}
+				countered := applyPhysicalSkillCounter(cast, target, float64(damage), &result)
 				if !countered {
 					target.ReduceHP(float64(damage), cast.Caster, cast.Skill)
 				}
-				applyBlowEffects(cast, obj, in.Shield, &result)
+				applyBlowEffects(cast, obj, in.Shield, countered, &result)
 			}
 			if caster, ok := cast.Caster.(shotCharger); ok {
 				caster.SetChargedShot(modelitem.ShotSoul, cast.Skill.StaticReuse)
@@ -301,6 +331,29 @@ func (blowHandler) UseResult(cast Cast) Result {
 	}
 	applySelfEffects(cast, cast.Skill)
 	return result
+}
+
+func applyPhysicalSkillCounter(cast Cast, target hpDamageTarget, damage float64, result *Result) bool {
+	source, ok := target.(counterSkillPhysicalTarget)
+	if !ok {
+		return false
+	}
+	counter := source.CounterSkillPhysical()
+	if !counterSkillReflects(cast.Skill, counter) {
+		return false
+	}
+	if caster, ok := cast.Caster.(hpDamageTarget); ok {
+		caster.ReduceHP(damage*counter/100, target, cast.Skill)
+	}
+	if result != nil {
+		result.Counterattacks = append(result.Counterattacks, Counterattack{
+			AttackerID:   counterattackObjectID(cast.Caster),
+			AttackerName: counterattackName(cast.Caster),
+			DefenderID:   counterattackObjectID(target),
+			DefenderName: counterattackName(target),
+		})
+	}
+	return true
 }
 
 func counterattackObjectID(obj any) int32 {
@@ -340,16 +393,20 @@ func counterSkillReflects(def modelskill.Definition, counter float64) bool {
 }
 
 // applyBlowEffects applies a BLOW skill's target effect list to obj after a
-// successful hit, mirroring Blow.java: reflect redirects it onto the
-// caster (unlike Pdam/Mdam, Blow never checks BLOCK_DEBUFF), and a
+// successful hit: only a normal reflection redirects it onto the caster;
+// a combined normal-reflect and counter outcome keeps effects on the target.
+// Unlike PDAM/MDAM, BLOW never checks BLOCK_DEBUFF, and a
 // landing-rate roll gates activation with the blessed-spiritshot input
 // forced true — Blow.java hardcodes that argument regardless of the
 // caster's real charge state.
-func applyBlowEffects(cast Cast, obj any, shield formulas.ShieldDefense, result *Result) {
+func applyBlowEffects(cast Cast, obj any, shield formulas.ShieldDefense, countered bool, result *Result) {
 	if len(cast.Skill.Effects) == 0 {
 		return
 	}
-	effected, _ := reflectEffectTarget(cast, obj)
+	effected, reflected := reflectEffectTarget(cast, obj)
+	if countered && reflected {
+		effected, _ = obj.(effectListTarget)
+	}
 	if effected == nil {
 		return
 	}
@@ -361,6 +418,28 @@ func applyBlowEffects(cast Cast, obj any, shield formulas.ShieldDefense, result 
 	if !succeeded {
 		appendResisted(result, effected, cast.Skill)
 		return
+	}
+	appendResistedCount(result, effected, cast.Skill, applyEffectsWithLanding(cast.Caster, effected, cast.Skill, cast.Skill.Effects, shield, false))
+}
+
+func applyChargeDamEffects(cast Cast, obj any, shield formulas.ShieldDefense, result *Result) {
+	if len(cast.Skill.Effects) == 0 {
+		return
+	}
+	effected, reflected := reflectEffectTarget(cast, obj)
+	if effected == nil {
+		return
+	}
+	stopEffectsBySkillID(effected.EffectList(), cast.Skill.ID)
+	if !reflected {
+		succeeded, ok := checkSkillSuccessBSSWithShield(cast.Caster, effected, cast.Skill, true, shield)
+		if !ok {
+			return
+		}
+		if !succeeded {
+			appendResisted(result, effected, cast.Skill)
+			return
+		}
 	}
 	appendResistedCount(result, effected, cast.Skill, applyEffectsWithLanding(cast.Caster, effected, cast.Skill, cast.Skill.Effects, shield, false))
 }

@@ -536,3 +536,68 @@ func TestDamageSkillEffectsRedirectOntoCasterOnReflect(t *testing.T) {
 		t.Fatalf("PDAM reflected caster effects = %d, want 1", got)
 	}
 }
+
+type chargeCaster struct {
+	*damageEffectFake
+	charges int
+}
+
+func (c *chargeCaster) Charges() int { return c.charges }
+
+func TestPdamAndChargeDamCounterSkillDamageCaster(t *testing.T) {
+	input := formulas.PhysicalSkillInput{AttackPower: 100, SkillPower: 50, Defence: 40, RandomMul: 1, RaceMul: 1, WeaponVulnMul: 1, PvPMul: 1, ElementalMul: 1}
+	for _, tc := range []struct {
+		name   string
+		caster func() (any, *damageEffectFake)
+		skill  modelskill.Definition
+		mul    float64
+	}{
+		{"PDAM", func() (any, *damageEffectFake) { caster := newDamageEffectFake(); return caster, caster }, modelskill.Definition{ID: 321, SkillType: "PDAM", CanBeReflected: true, Effects: targetEffect()}, 1},
+		{"CHARGEDAM", func() (any, *damageEffectFake) {
+			caster := &chargeCaster{damageEffectFake: newDamageEffectFake(), charges: 2}
+			return caster, caster.damageEffectFake
+		}, modelskill.Definition{ID: 214, SkillType: "CHARGEDAM", CanBeReflected: true, NumCharges: 1, Effects: targetEffect()}, 1.4},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, outcome := range []struct {
+				name          string
+				reflects      bool
+				casterEffects int
+			}{
+				{name: "counter only"},
+				{name: "counter and reflect", reflects: true, casterEffects: 1},
+			} {
+				t.Run(outcome.name, func(t *testing.T) {
+					caster, health := tc.caster()
+					health.hp = 2000
+					target := newDamageEffectFake()
+					target.hp, target.physicalOK, target.physicalInput, target.counterSkillPhysical = 2000, true, input, 50
+					target.reflects = outcome.reflects
+
+					result, _ := NewDefaultRegistry().UseResult(Cast{Caster: caster, Skill: tc.skill, Targets: []any{target}})
+
+					want := formulas.PhysicalSkillDamage(input) * tc.mul * .5
+					if health.hp != 2000-want || target.hp != 2000 || len(result.Counterattacks) != 1 || len(health.EffectList().All()) != outcome.casterEffects || len(target.EffectList().All()) != 1-outcome.casterEffects {
+						t.Fatalf("counter %s hp = %v/%v, reports/effects = %d/%d/%d; want %v/2000, 1/%d/%d", tc.name, health.hp, target.hp, len(result.Counterattacks), len(health.EffectList().All()), len(target.EffectList().All()), 2000-want, outcome.casterEffects, 1-outcome.casterEffects)
+					}
+				})
+			}
+		})
+	}
+}
+
+func TestBlowCounterAndReflectKeepsEffectsOnTarget(t *testing.T) {
+	caster := newDamageEffectFake()
+	target := newDamageEffectFake()
+	target.hp, target.blowOK, target.counterSkillPhysical, target.reflects = 2000, true, 50, true
+	target.blowInput = formulas.BlowInput{AttackPower: 100, SkillPower: 50, Defence: 40, RandomMul: 1, PosMul: 1.2, CritDamageMul: 1.5, CritDamagePosMul: 1, CritVulnMul: 1, DaggerVulnMul: 1, Landed: true}
+
+	NewDefaultRegistry().Use(Cast{Caster: caster, Skill: modelskill.Definition{ID: 409, SkillType: "BLOW", CanBeReflected: true, Effects: targetEffect()}, Targets: []any{target}})
+
+	if got := len(target.EffectList().All()); got != 1 {
+		t.Fatalf("combined-counter BLOW target effects = %d, want 1", got)
+	}
+	if got := len(caster.EffectList().All()); got != 0 {
+		t.Fatalf("combined-counter BLOW caster effects = %d, want 0", got)
+	}
+}
