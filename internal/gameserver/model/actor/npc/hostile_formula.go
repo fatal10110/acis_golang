@@ -278,7 +278,13 @@ func (h *Hostile) SkillReflectInput(def modelskill.Definition) formulas.SkillRef
 	if def.Magic {
 		reflectStat = stat.ReflectSkillMagic
 	}
-	return formulas.SkillReflectInput{Magic: def.Magic, ReflectChance: h.CalcStat(reflectStat, 0)}
+	return formulas.SkillReflectInput{
+		IgnoreResists:  def.IgnoreResists,
+		CanBeReflected: def.CanBeReflected,
+		Magic:          def.Magic,
+		CastRange:      def.CastRange,
+		ReflectChance:  h.CalcStat(reflectStat, 0),
+	}
 }
 
 // ManaDamageInput resolves the MP-damage formula input for a magic skill cast

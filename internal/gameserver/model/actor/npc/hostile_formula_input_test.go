@@ -199,11 +199,19 @@ func TestHostileSkillReflectInputUsesMagicSpecificStat(t *testing.T) {
 		basefunc.NewSet(target, stat.ReflectSkillPhysic, 29, nil),
 	})
 
-	if got := target.SkillReflectInput(modelskill.Definition{Magic: true}).ReflectChance; got != 17 {
-		t.Fatalf("magic ReflectChance = %v, want 17", got)
+	magic := target.SkillReflectInput(modelskill.Definition{Magic: true, CanBeReflected: true, CastRange: 900})
+	if magic.ReflectChance != 17 || !magic.CanBeReflected || magic.CastRange != 900 {
+		t.Fatalf("magic SkillReflectInput() = %+v", magic)
 	}
-	if got := target.SkillReflectInput(modelskill.Definition{}).ReflectChance; got != 29 {
-		t.Fatalf("physical ReflectChance = %v, want 29", got)
+	if !formulas.SkillReflects(magic, 0) {
+		t.Fatal("magic SkillReflectInput() does not reflect")
+	}
+	physical := target.SkillReflectInput(modelskill.Definition{CanBeReflected: true, CastRange: 40, IgnoreResists: true})
+	if physical.ReflectChance != 29 || !physical.IgnoreResists || !physical.CanBeReflected || physical.CastRange != 40 {
+		t.Fatalf("physical SkillReflectInput() = %+v", physical)
+	}
+	if formulas.SkillReflects(physical, 0) {
+		t.Fatal("physical SkillReflectInput() reflects despite IgnoreResists")
 	}
 }
 
