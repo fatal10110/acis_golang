@@ -640,6 +640,15 @@ func (c *Character) CounterSkillPhysical() float64 {
 	return c.CalcStat(stat.CounterSkillPhysical, 0)
 }
 
+// SkillReflectInput resolves c's reflected-skill chance for def.
+func (c *Character) SkillReflectInput(def modelskill.Definition) formulas.SkillReflectInput {
+	reflectStat := stat.ReflectSkillPhysic
+	if def.Magic {
+		reflectStat = stat.ReflectSkillMagic
+	}
+	return formulas.SkillReflectInput{Magic: def.Magic, ReflectChance: c.CalcStat(reflectStat, 0)}
+}
+
 // ManaDamageInput resolves the MP-damage formula input for a magic skill
 // cast by caster against c.
 func (c *Character) ManaDamageInput(caster any, def modelskill.Definition) (formulas.ManaDamageInput, bool) {

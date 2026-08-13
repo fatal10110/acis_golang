@@ -192,6 +192,21 @@ func TestHostileFormulaInputsResolveStatsAndRaceMultiplier(t *testing.T) {
 	}
 }
 
+func TestHostileSkillReflectInputUsesMagicSpecificStat(t *testing.T) {
+	target := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", Level: 1})
+	target.AddStatFuncs([]basefunc.Func{
+		basefunc.NewSet(target, stat.ReflectSkillMagic, 17, nil),
+		basefunc.NewSet(target, stat.ReflectSkillPhysic, 29, nil),
+	})
+
+	if got := target.SkillReflectInput(modelskill.Definition{Magic: true}).ReflectChance; got != 17 {
+		t.Fatalf("magic ReflectChance = %v, want 17", got)
+	}
+	if got := target.SkillReflectInput(modelskill.Definition{}).ReflectChance; got != 29 {
+		t.Fatalf("physical ReflectChance = %v, want 29", got)
+	}
+}
+
 func closeNPCFormulaFloat(a, b float64) bool {
 	return math.Abs(a-b) < 1e-9
 }
