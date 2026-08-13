@@ -81,26 +81,27 @@ type lethalableTarget interface {
 // Dead()/evasion checks already cover before this runs. Returns nil when
 // reflect fires but the caster doesn't expose an effect list to redirect
 // onto — a duck-typing gap safer to drop than to guess through, matching
-// reflectTarget's own behavior.
-func reflectEffectTarget(cast Cast, obj any) effectListTarget {
+// reflectTarget's own behavior. The second return reports whether reflect
+// fired.
+func reflectEffectTarget(cast Cast, obj any) (effectListTarget, bool) {
 	target, ok := obj.(effectListTarget)
 	if !ok {
-		return nil
+		return nil, false
 	}
 	src, ok := obj.(skillReflectSource)
 	if !ok {
-		return target
+		return target, false
 	}
 	in := src.SkillReflectInput(cast.Skill)
 	in.SkillType = skillTypeKey(cast.Skill.SkillType)
 	if !formulas.SkillReflects(in, rnd.Get(100)) {
-		return target
+		return target, false
 	}
 	caster, ok := cast.Caster.(effectListTarget)
 	if !ok {
-		return nil
+		return nil, true
 	}
-	return caster
+	return caster, true
 }
 
 type pdamHandler struct{}
@@ -155,7 +156,7 @@ func applyPdamEffects(cast Cast, obj any, shield formulas.ShieldDefense) {
 	if !ok || hasEffectType(elt.EffectList(), "BLOCK_DEBUFF") {
 		return
 	}
-	effected := reflectEffectTarget(cast, obj)
+	effected, _ := reflectEffectTarget(cast, obj)
 	if effected == nil {
 		return
 	}
@@ -191,10 +192,10 @@ func (mdamHandler) Use(cast Cast) {
 
 // applyMdamEffects applies an MDAM/DEATHLINK skill's target effect list to
 // obj after a successful damage tick, mirroring Mdam.java: BLOCK_DEBUFF
-// skips it, reflect redirects it onto the caster, and — matching
-// disablers.go's own reflect+landing-roll shape (checkSkillSuccess run
-// once against whichever side ends up effected) — a landing-rate roll
-// gates activation regardless of which side that is.
+// skips it, reflect redirects it onto the caster, and unlike
+// disablers.go's shared reflect+roll shape, Mdam.java only rolls
+// calcSkillSuccess on the non-reflect branch — the reflect branch applies
+// effects unconditionally with no landing check.
 func applyMdamEffects(cast Cast, obj any, bss bool) {
 	if len(cast.Skill.Effects) == 0 {
 		return
@@ -203,14 +204,16 @@ func applyMdamEffects(cast Cast, obj any, bss bool) {
 	if !ok || hasEffectType(elt.EffectList(), "BLOCK_DEBUFF") {
 		return
 	}
-	effected := reflectEffectTarget(cast, obj)
+	effected, reflected := reflectEffectTarget(cast, obj)
 	if effected == nil {
 		return
 	}
 	stopEffectsBySkillID(effected.EffectList(), cast.Skill.ID)
-	succeeded, ok := checkSkillSuccess(cast.Caster, effected, cast.Skill)
-	if !ok || !succeeded {
-		return
+	if !reflected {
+		succeeded, ok := checkSkillSuccess(cast.Caster, effected, cast.Skill)
+		if !ok || !succeeded {
+			return
+		}
 	}
 	applyEffectsWithLanding(cast.Caster, effected, cast.Skill, cast.Skill.Effects, formulas.ShieldFailed, bss)
 }
@@ -319,7 +322,7 @@ func applyBlowEffects(cast Cast, obj any, shield formulas.ShieldDefense) {
 	if len(cast.Skill.Effects) == 0 {
 		return
 	}
-	effected := reflectEffectTarget(cast, obj)
+	effected, _ := reflectEffectTarget(cast, obj)
 	if effected == nil {
 		return
 	}
@@ -347,7 +350,7 @@ func (manaDamageHandler) Use(cast Cast) {
 		var effected effectListTarget
 		effective := any(target)
 		if _, ok := obj.(effectListTarget); ok {
-			effected = reflectEffectTarget(cast, obj)
+			effected, _ = reflectEffectTarget(cast, obj)
 			if effected == nil {
 				continue
 			}
