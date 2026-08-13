@@ -153,6 +153,7 @@ func (h *Hostile) ReduceHP(amount float64, attacker any, _ modelskill.Definition
 	}
 	if combatant, ok := attacker.(attackable.Combatant); ok {
 		h.AddDamageHate(combatant, amount, amount)
+		h.RollAttackedShotRecharge()
 	}
 	h.applyNonConsumptionDamageEffects(false)
 	newlyDead := h.health.DamageValue(amount)
@@ -177,6 +178,7 @@ func (h *Hostile) ReduceHPByDOT(amount float64, attacker any, isDOT bool) {
 	}
 	if combatant, ok := attacker.(attackable.Combatant); ok {
 		h.AddDamageHate(combatant, amount, 0)
+		h.RollAttackedShotRecharge()
 	}
 	h.applyNonConsumptionDamageEffects(isDOT)
 	newlyDead := h.health.DamageValue(amount)

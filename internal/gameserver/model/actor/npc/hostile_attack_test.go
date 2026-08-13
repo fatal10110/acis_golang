@@ -109,6 +109,35 @@ func TestHostileRechargeShotsUsesTemplateCountersAndBroadcasts(t *testing.T) {
 	}
 }
 
+// TestHostileTakeDamageRollsAttackedShotRecharge ports MonsterBehavior/
+// WarriorBase/WizardBase.onAttacked (aCis Java generic monster AI): a
+// landed hit rolls the defender's SoulShotRate/SpiritShotRate AI parameters
+// and recharges the matching shot type on success. A forced roll of 0
+// always beats a 100% rate and never beats a 0% rate, so this pins the
+// trigger deterministically instead of relying on real RNG.
+func TestHostileTakeDamageRollsAttackedShotRecharge(t *testing.T) {
+	ai := commons.NewStatSet()
+	ai.Set("SoulShot", 1)
+	ai.Set("SoulShotRate", 100)
+	ai.Set("SpiritShot", 1)
+	ai.Set("SpiritShotRate", 0)
+	defender := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", HPMax: 1000, AIParams: ai})
+	defender.SetRollSource(zeroRoll)
+	attacker := newCombatHostile(t, 2, &Template{ID: 2, Type: "Monster"})
+
+	defender.TakeDamage(10, attacker)
+
+	if !defender.SoulshotCharged() {
+		t.Fatal("SoulshotCharged() = false, want true: a 100% SoulShotRate must trigger on a landed hit")
+	}
+	if defender.SpiritshotCharged() {
+		t.Fatal("SpiritshotCharged() = true, want false: a 0% SpiritShotRate must never trigger")
+	}
+	if got := defender.CurrentSoulshotCount(); got != 0 {
+		t.Fatalf("CurrentSoulshotCount() = %d, want 0", got)
+	}
+}
+
 func TestHostileSetChargedShotDischargesIndependentlyPerKind(t *testing.T) {
 	hostile := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster"})
 
