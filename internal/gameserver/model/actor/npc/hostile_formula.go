@@ -62,8 +62,13 @@ func (h *Hostile) Roll(n int) int {
 	return rand.Intn(n)
 }
 
-// RandomDamageSpread returns the template-defined random-damage spread.
+// RandomDamageSpread returns the template-defined random-damage spread, or
+// -1 (RandomDamageMultiplier's "use the weaponless fallback" sentinel) when
+// no spread is configured.
 func (h *Hostile) RandomDamageSpread() int {
+	if h.Instance.Template.BaseRandomDamage <= 0 {
+		return -1
+	}
 	return h.Instance.Template.BaseRandomDamage
 }
 

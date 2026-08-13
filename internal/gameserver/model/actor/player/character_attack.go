@@ -692,11 +692,14 @@ func (c *Character) AttackableWithoutForceBy(caster target.Creature) bool {
 
 // Roll draws a uniform random integer in [0, n) from c's combat random source.
 
-// RandomDamageSpread returns the active weapon's random-damage spread.
+// RandomDamageSpread returns the active weapon's random-damage spread, or
+// -1 if no weapon is active. A weapon can legitimately have a 0 spread
+// (e.g. item 8763 "Elrokian Trap", which sets no random_damage attribute),
+// which must stay distinct from "no weapon" for RandomDamageMultiplier.
 func (c *Character) RandomDamageSpread() int {
 	weapon := c.activeWeapon()
 	if weapon.tmpl == nil || weapon.tmpl.Weapon == nil {
-		return 0
+		return -1
 	}
 	return int(weapon.tmpl.Weapon.RandomDamage)
 }

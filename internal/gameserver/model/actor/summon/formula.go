@@ -346,8 +346,13 @@ func (a *Actor) Roll(n int) int {
 	return rand.IntN(n)
 }
 
-// RandomDamageSpread returns the summon's random-damage spread.
+// RandomDamageSpread returns the summon's random-damage spread, or -1
+// (RandomDamageMultiplier's "use the weaponless fallback" sentinel) when no
+// spread is configured.
 func (a *Actor) RandomDamageSpread() int {
+	if a.stats.BaseRandomDamage <= 0 {
+		return -1
+	}
 	return a.stats.BaseRandomDamage
 }
 
