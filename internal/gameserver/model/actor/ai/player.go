@@ -36,8 +36,9 @@ type PlayerAttack struct {
 	attack AttackController
 	log    zerolog.Logger
 
-	mu     sync.Mutex
-	target attackable.Combatant
+	mu       sync.Mutex
+	target   attackable.Combatant
+	deferred bool
 }
 
 // NewPlayerAttack builds an idle player attack intention loop.
@@ -64,11 +65,30 @@ func (p *PlayerAttack) Start(target attackable.Combatant) bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.target = target
+	if p.actor.CastingNow() {
+		p.deferred = true
+		return false
+	}
 	accepted, err := p.thinkLocked()
 	if err != nil {
 		p.log.Warn().Err(err).Msg("ai: player attack broadcast")
 	}
 	return accepted
+}
+
+// ResumeAfterCast runs an attack intention that was requested while casting.
+// It reports whether such an intention was waiting.
+func (p *PlayerAttack) ResumeAfterCast() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if !p.deferred {
+		return false
+	}
+	p.deferred = false
+	if _, err := p.thinkLocked(); err != nil {
+		p.log.Warn().Err(err).Msg("ai: player attack broadcast")
+	}
+	return true
 }
 
 // Stop clears the attack intention and stops any movement toward it.
@@ -134,6 +154,7 @@ func (p *PlayerAttack) thinkLocked() (bool, error) {
 
 func (p *PlayerAttack) stopLocked() {
 	p.target = nil
+	p.deferred = false
 	if err := p.move.Stop(); err != nil {
 		p.log.Warn().Err(err).Msg("ai: player attack broadcast")
 	}
