@@ -94,6 +94,7 @@ func NewDefaultRegistry() *Registry {
 func NewDefaultRegistryWithDefinitions(defs Definitions) *Registry {
 	return NewRegistry(
 		pdamHandler{},
+		chargeDamHandler{},
 		mdamHandler{},
 		blowHandler{},
 		manaDamageHandler{},
