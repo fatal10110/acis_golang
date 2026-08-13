@@ -49,6 +49,11 @@ func (ep *EffectPoint) OwnerID() int32 { return ep.ownerID }
 // invulnerable.
 func (ep *EffectPoint) Dead() bool { return false }
 
+// CollisionRadius returns the actor's template collision radius, widening
+// world.inRange scans by this actor's own body just like every other
+// tracked NPC.
+func (ep *EffectPoint) CollisionRadius() float64 { return ep.Instance.Template.CollisionRadius }
+
 // EffectList returns the actor's own live effect list, driven by the
 // server's shared effect scheduler exactly like any other actor.
 func (ep *EffectPoint) EffectList() *effect.List { return ep.effects }
