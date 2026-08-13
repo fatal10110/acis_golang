@@ -96,6 +96,7 @@ func (a *recordingAttack) DoAttack(target attackable.Combatant) error {
 
 type recordingCast struct {
 	disabled   bool
+	casting    bool
 	canAttempt bool
 	canCast    bool
 	stopsMove  bool
@@ -108,6 +109,7 @@ type recordingCast struct {
 }
 
 func (c *recordingCast) Disabled() bool               { return c.disabled }
+func (c *recordingCast) CastingNow() bool             { return c.casting }
 func (c *recordingCast) Range(ref skill.Ref) int      { return c.castRange }
 func (c *recordingCast) StopsMovement(skill.Ref) bool { return c.stopsMove }
 func (c *recordingCast) SkillType(skill.Ref) string   { return c.skillType }
