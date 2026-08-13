@@ -126,6 +126,8 @@ type Character struct {
 	sendRegenMax              func(count, period int32, hpRegen float64)
 	sendLackHPNotice          func()
 	sendLackMPNotice          func()
+	sendShieldBlockSuccess    func()
+	sendShieldBlockPerfect    func()
 	consumeHerb               func(itemID int32)
 	roll                      func(int) int
 	attackTarget              func(world.Tracked)

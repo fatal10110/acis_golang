@@ -237,7 +237,28 @@ func (c *Character) ShieldDefense(caster any, def modelskill.Definition, isCrit 
 		return formulas.ShieldFailed
 	}
 
-	return formulas.ShieldUse(baseRate, c.DEX(), attackerUsesBow(caster), isCrit, perfectShieldBlockRate, c.rollValue(100))
+	result := formulas.ShieldUse(baseRate, c.DEX(), attackerUsesBow(caster), isCrit, perfectShieldBlockRate, c.rollValue(100))
+	c.notifyShieldBlock(result)
+	return result
+}
+
+// notifyShieldBlock sends this defending player's client feedback for a
+// shield-block roll: no message on a failed block (Formulas.java:866-879).
+func (c *Character) notifyShieldBlock(result formulas.ShieldDefense) {
+	c.stateMu.RLock()
+	success, perfect := c.sendShieldBlockSuccess, c.sendShieldBlockPerfect
+	c.stateMu.RUnlock()
+
+	switch result {
+	case formulas.ShieldSuccess:
+		if success != nil {
+			success()
+		}
+	case formulas.ShieldPerfect:
+		if perfect != nil {
+			perfect()
+		}
+	}
 }
 
 func (c *Character) secondaryShieldEquipped() bool {

@@ -156,14 +156,11 @@ func (h *Hostile) WeaponReuseDelay() time.Duration {
 	return time.Duration(h.weapon.ReuseDelay) * time.Millisecond
 }
 
-// WeaponGrade is unconditionally 0: the resolved weapon detail carries no
-// crystal grade yet (WeaponDetail has no Crystal field; Template.Crystal is
-// available at the SetWeapon call site — see #1416). Reference:
-// Npc.getActiveWeaponItem, Npc.java:371-375. SoulshotCharged now reports
-// real per-spawn charge state, so this value does feed the charged-hit wire
-// byte once a caller lights up the shot state (see RechargeShots).
+// WeaponGrade returns this NPC's resolved right-hand weapon's crystal
+// grade, recorded by SetWeapon. Zero (CrystalNone) when unarmed. Reference:
+// Npc.getActiveWeaponItem, Npc.java:371-375.
 func (h *Hostile) WeaponGrade() int {
-	return 0
+	return int(h.weaponCrystal)
 }
 
 func (h *Hostile) SoulshotCharged() bool {
