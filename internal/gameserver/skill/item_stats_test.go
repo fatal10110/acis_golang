@@ -372,6 +372,55 @@ func TestEquipItemStatsWithholdsNonPassiveAttachedSkillBelowWeaponExpertise(t *t
 	}
 }
 
+// TestRefreshEquippedItemStatsRevokesNonPassiveAttachedSkillWhenGateIsLost
+// pins the reverse direction of the Expertise gate: RefreshEquippedItemStats
+// calls UnequipItemStats while inst is still in the paperdoll (unlike the
+// real equip/unequip flow, which removes it first), so the shared-template
+// scan must exclude inst itself — otherwise it always matches "itself" and
+// never reaches the revoke loop, leaving a skill granted after the gate that
+// granted it is lost.
+func TestRefreshEquippedItemStatsRevokesNonPassiveAttachedSkillWhenGateIsLost(t *testing.T) {
+	const weaponTemplateID int32 = 51
+	const grantedSkillID = 951
+	tmpl := &item.Template{
+		ID: weaponTemplateID, Kind: item.KindWeapon, Slot: item.SlotRHand,
+		Crystal:        item.CrystalD,
+		Weapon:         &item.WeaponDetail{Type: item.WeaponBow},
+		AttachedSkills: []item.SkillRef{{ID: grantedSkillID, Level: 1}},
+	}
+	templates := item.NewTable([]*item.Template{tmpl})
+	skills := modelskill.NewTable([]modelskill.Definition{
+		{ID: grantedSkillID, Level: 1, Activation: modelskill.ActivationActive, EquipDelay: 30000},
+	})
+	inv := itemcontainer.NewPlayerInventory(1, templates)
+	p := NewPersistence(nil, skills)
+	ch := &player.Character{ID: 1}
+	ch.SetSkillLevel(239, int(item.CrystalD))
+	inst := inv.AddNew(weaponTemplateID, 1, 100)
+	inv.EquipItem(inst, tmpl)
+
+	if _, _, err := p.EquipItemStats(ch, inst, tmpl); err != nil {
+		t.Fatalf("EquipItemStats() error: %v", err)
+	}
+	if got := ch.SkillLevel(grantedSkillID); got != 1 {
+		t.Fatalf("SkillLevel(%d) at Expertise grade = %d, want 1 (granted)", grantedSkillID, got)
+	}
+
+	// The character loses the Expertise level that allowed this weapon's
+	// grant (e.g. a grade-penalty state change), so the refresh must revoke.
+	ch.SetSkillLevel(239, 0)
+	skillsChanged, _, err := p.RefreshEquippedItemStats(ch, inv)
+	if err != nil {
+		t.Fatalf("RefreshEquippedItemStats() error: %v", err)
+	}
+	if !skillsChanged {
+		t.Fatal("RefreshEquippedItemStats() skillsChanged = false, want true (grant must be revoked)")
+	}
+	if got := ch.SkillLevel(grantedSkillID); got != 0 {
+		t.Fatalf("SkillLevel(%d) after losing Expertise = %d, want 0 (revoked)", grantedSkillID, got)
+	}
+}
+
 // TestUnequipItemStatsKeepsGrantWhileAnotherEquippedItemSharesTemplateID
 // pins onUnequip's item-id-scoped sharing check (Java
 // ItemPassiveSkillsListener.java:126-128): unequipping one instance of a

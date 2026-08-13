@@ -359,6 +359,9 @@ func (p *Persistence) UnequipItemStats(c *player.Character, inv *itemcontainer.I
 		return false
 	}
 	for _, other := range inv.PaperdollItems() {
+		if other == inst {
+			continue
+		}
 		if other.TemplateID == tmpl.ID {
 			return false
 		}

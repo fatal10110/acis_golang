@@ -132,7 +132,7 @@ func (l *GameClientLink) applyEquipStatChanges(live *livePlayer, inv *itemcontai
 		}
 		if timersChanged {
 			now := time.Now()
-			live.SendFrame(serverpackets.FrameSkillCoolTime(skillCoolTimeEntries(live.Character.SkillReuseTimers(now), now)))
+			live.SendFrame(serverpackets.FrameSkillCoolTime(skillCoolTimeEntries(live.SkillReuseTimers(now), now)))
 		}
 	}
 	if l.shadowItems != nil {

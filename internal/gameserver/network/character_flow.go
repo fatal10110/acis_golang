@@ -529,7 +529,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 		}
 		if timersChanged {
 			now := time.Now()
-			live.SendFrame(serverpackets.FrameSkillCoolTime(skillCoolTimeEntries(live.Character.SkillReuseTimers(now), now)))
+			live.SendFrame(serverpackets.FrameSkillCoolTime(skillCoolTimeEntries(live.SkillReuseTimers(now), now)))
 		}
 	})
 	c.SetLevelRefresher(func() { l.refreshLiveLevelSkills(ctx, live) })
