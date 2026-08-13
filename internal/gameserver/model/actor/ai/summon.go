@@ -282,7 +282,7 @@ func (s *Summon) thinkFollowLocked() (bool, error) {
 }
 
 func (s *Summon) busyLocked() bool {
-	return s.attack.BowCoolingDown() || s.attack.AttackingNow() || (s.cast != nil && s.cast.Disabled())
+	return s.attack.BowCoolingDown() || s.attack.AttackingNow() || (s.cast != nil && s.cast.CastingNow())
 }
 
 func (s *Summon) targetLostLocked(target attackable.Combatant) bool {

@@ -203,6 +203,21 @@ func TestSummonAITryToCastDropsBusyCastIntention(t *testing.T) {
 	}
 }
 
+func TestSummonAITryToAttackDoesNotWaitForDisabledSkills(t *testing.T) {
+	owner := actor(100)
+	target := actor(200)
+	strike := &recordingAttack{canAttack: true}
+	brain := NewSummon(owner, &summonMove{}, strike)
+	brain.SetCastController(&recordingCast{disabled: true})
+
+	if !brain.TryToAttack(target) {
+		t.Fatal("TryToAttack() = false, want attack accepted while skills are disabled")
+	}
+	if strike.target != target {
+		t.Fatalf("attack target = %v, want target without a queued wait", strike.target)
+	}
+}
+
 func TestSummonAITryToCastQueuesWhileBusyAndExecutesOnThink(t *testing.T) {
 	owner := actor(100)
 	target := actor(200)
