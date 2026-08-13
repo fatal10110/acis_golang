@@ -247,20 +247,33 @@ func TestEquipItemStatsGrantsNonPassiveAttachedSkillsAndArmsEquipDelay(t *testin
 		itemID     int32
 		skillID    int
 		equipDelay int
+		weapon     bool
 	}{
-		{"9184 Teddy Bear Hat / 3264 Blessed Escape", 9184, 3264, 30000},
-		{"9140 Salvation Bow / 3261 Forgiveness", 9140, 3261, 30000},
-		{"6841 The Lord's Crown / 3632 Clan Gate", 6841, 3632, 0},
+		{"9184 Teddy Bear Hat / 3264 Blessed Escape", 9184, 3264, 30000, false},
+		// 9140 Salvation Bow is a Weapon in the shipped datapack
+		// (aCis_datapack/data/xml/items/9100-9199.xml:379, no crystal_type
+		// set, so its grade defaults to CrystalNone and the Expertise gate
+		// in EquipItemStats never withholds it); model it as a weapon here
+		// so this case actually exercises the weapon branch of
+		// EquipItemStats's gate, not just the armor branch.
+		{"9140 Salvation Bow / 3261 Forgiveness", 9140, 3261, 30000, true},
+		{"6841 The Lord's Crown / 3632 Clan Gate", 6841, 3632, 0, false},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			tmpl := &item.Template{
 				ID:             tc.itemID,
-				Kind:           item.KindArmor,
 				Slot:           item.SlotChest,
-				Armor:          &item.ArmorDetail{Type: item.ArmorLight},
 				AttachedSkills: []item.SkillRef{{ID: int32(tc.skillID), Level: 1}},
+			}
+			if tc.weapon {
+				tmpl.Kind = item.KindWeapon
+				tmpl.Slot = item.SlotRHand
+				tmpl.Weapon = &item.WeaponDetail{Type: item.WeaponBow}
+			} else {
+				tmpl.Kind = item.KindArmor
+				tmpl.Armor = &item.ArmorDetail{Type: item.ArmorLight}
 			}
 			templates := item.NewTable([]*item.Template{tmpl})
 			skills := modelskill.NewTable([]modelskill.Definition{
@@ -306,6 +319,56 @@ func TestEquipItemStatsGrantsNonPassiveAttachedSkillsAndArmsEquipDelay(t *testin
 				t.Fatalf("HasSkillReuse() after unequip changed unexpectedly for equipDelay=%d", tc.equipDelay)
 			}
 		})
+	}
+}
+
+// TestEquipItemStatsWithholdsNonPassiveAttachedSkillBelowWeaponExpertise pins
+// the same Expertise gate for a granted (non-passive) AttachedSkills entry
+// that TestEquipItemStatsWithholdsWeaponPassiveBelowExpertise already pins
+// for a weapon's passive stat funcs: a weapon whose crystal grade exceeds
+// the character's Expertise skips the whole item_skill loop in the
+// reference (ItemPassiveSkillsListener.onEquip's grade-penalty early
+// return), so the granted skill must not appear until Expertise catches up.
+func TestEquipItemStatsWithholdsNonPassiveAttachedSkillBelowWeaponExpertise(t *testing.T) {
+	const weaponTemplateID int32 = 50
+	const grantedSkillID = 950
+	tmpl := &item.Template{
+		ID: weaponTemplateID, Kind: item.KindWeapon, Slot: item.SlotRHand,
+		Crystal:        item.CrystalD,
+		Weapon:         &item.WeaponDetail{Type: item.WeaponBow},
+		AttachedSkills: []item.SkillRef{{ID: grantedSkillID, Level: 1}},
+	}
+	templates := item.NewTable([]*item.Template{tmpl})
+	skills := modelskill.NewTable([]modelskill.Definition{
+		{ID: grantedSkillID, Level: 1, Activation: modelskill.ActivationActive, EquipDelay: 30000},
+	})
+	inv := itemcontainer.NewPlayerInventory(1, templates)
+	p := NewPersistence(nil, skills)
+	ch := &player.Character{ID: 1}
+	inst := inv.AddNew(weaponTemplateID, 1, 100)
+	inv.EquipItem(inst, tmpl)
+
+	skillsChanged, timersChanged, err := p.EquipItemStats(ch, inst, tmpl)
+	if err != nil {
+		t.Fatalf("EquipItemStats() error: %v", err)
+	}
+	if skillsChanged || timersChanged {
+		t.Fatalf("skillsChanged=%v timersChanged=%v below Expertise, want both false (grant withheld)", skillsChanged, timersChanged)
+	}
+	if got := ch.SkillLevel(grantedSkillID); got != 0 {
+		t.Fatalf("SkillLevel(%d) below Expertise = %d, want 0 (withheld)", grantedSkillID, got)
+	}
+
+	ch.SetSkillLevel(239, int(item.CrystalD))
+	skillsChanged, timersChanged, err = p.RefreshEquippedItemStats(ch, inv)
+	if err != nil {
+		t.Fatalf("RefreshEquippedItemStats() error: %v", err)
+	}
+	if !skillsChanged || !timersChanged {
+		t.Fatalf("skillsChanged=%v timersChanged=%v at Expertise grade, want both true (grant restored)", skillsChanged, timersChanged)
+	}
+	if got := ch.SkillLevel(grantedSkillID); got != 1 {
+		t.Fatalf("SkillLevel(%d) at Expertise grade = %d, want 1 (restored)", grantedSkillID, got)
 	}
 }
 
