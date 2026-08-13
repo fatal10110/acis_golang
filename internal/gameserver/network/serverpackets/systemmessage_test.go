@@ -101,6 +101,23 @@ func TestFrameSystemMessageSkillName(t *testing.T) {
 	}
 }
 
+func TestFrameSystemMessageStringSkillName(t *testing.T) {
+	got := framePayload(t, FrameSystemMessageStringSkillName(SystemMessageS1ResistedYourS2, "Target", 123, 1))
+	want := []byte{
+		OpcodeSystemMessage,
+		0x8b, 0x00, 0x00, 0x00, // 139
+		0x02, 0x00, 0x00, 0x00, // two params
+		0x00, 0x00, 0x00, 0x00, // text parameter
+		'T', 0x00, 'a', 0x00, 'r', 0x00, 'g', 0x00, 'e', 0x00, 't', 0x00, 0x00, 0x00,
+		0x04, 0x00, 0x00, 0x00, // skill-name parameter
+		0x7b, 0x00, 0x00, 0x00, // skill 123
+		0x01, 0x00, 0x00, 0x00, // level 1
+	}
+	if !bytes.Equal(got, want) {
+		t.Fatalf("FrameSystemMessageStringSkillName() = %x, want %x", got, want)
+	}
+}
+
 func TestFrameSystemMessageStringNumber(t *testing.T) {
 	got := framePayload(t, FrameSystemMessageStringNumber(1016, "Attacker", 12))
 	want := []byte{

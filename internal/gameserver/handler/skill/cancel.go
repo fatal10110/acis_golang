@@ -52,7 +52,7 @@ func (cancelHandler) Use(cast Cast) {
 		cancelOne(cast, target, skillType, minRate, maxRate)
 	}
 
-	applySelfEffects(cast.Caster, cast.Skill)
+	applySelfEffects(cast, cast.Skill)
 }
 
 func cancelOne(cast Cast, target cancelTarget, skillType string, minRate, maxRate int) {

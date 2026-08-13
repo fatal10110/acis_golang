@@ -437,6 +437,9 @@ func (l *GameClientLink) sendSkillHandlerResult(live *livePlayer, result actorca
 			defender.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageAvoidedS1Attack, attackerName))
 		}
 	}
+	for _, resisted := range result.Resisted {
+		live.SendFrame(serverpackets.FrameSystemMessageStringSkillName(serverpackets.SystemMessageS1ResistedYourS2, resisted.TargetName, int32(resisted.SkillID), int32(resisted.SkillLevel)))
+	}
 	for i := 0; i < result.AttackFailed; i++ {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageAttackFailed))
 	}

@@ -126,7 +126,7 @@ func (pdamHandler) UseResult(cast Cast) Result {
 		if !ok {
 			continue
 		}
-		applyPdamEffects(cast, obj, in.Shield)
+		applyPdamEffects(cast, obj, in.Shield, &result)
 		damage := formulas.PhysicalSkillDamage(in)
 		if damage > 0 {
 			target.ReduceHP(damage, cast.Caster, cast.Skill)
@@ -135,7 +135,7 @@ func (pdamHandler) UseResult(cast Cast) Result {
 			result.AttackFailed++
 		}
 	}
-	applySelfEffects(cast.Caster, cast.Skill)
+	applySelfEffects(cast, cast.Skill)
 	return result
 }
 
@@ -145,7 +145,7 @@ func (pdamHandler) UseResult(cast Cast) Result {
 // instead, and the destination's prior instance of the same skill is
 // dropped first so a repeat cast doesn't stack. Unlike Mdam/Blow, PDAM
 // applies these unconditionally unless the shared shield outcome is perfect.
-func applyPdamEffects(cast Cast, obj any, shield formulas.ShieldDefense) {
+func applyPdamEffects(cast Cast, obj any, shield formulas.ShieldDefense, result *Result) {
 	if shield == formulas.ShieldPerfect {
 		return
 	}
@@ -161,16 +161,21 @@ func applyPdamEffects(cast Cast, obj any, shield formulas.ShieldDefense) {
 		return
 	}
 	stopEffectsBySkillID(effected.EffectList(), cast.Skill.ID)
-	applyEffectsWithLanding(cast.Caster, effected, cast.Skill, cast.Skill.Effects, shield, false)
+	appendResistedCount(result, effected, cast.Skill, applyEffectsWithLanding(cast.Caster, effected, cast.Skill, cast.Skill.Effects, shield, false))
 }
 
 type mdamHandler struct{}
 
 func (mdamHandler) Types() []string { return []string{"MDAM", "DEATHLINK"} }
 
-func (mdamHandler) Use(cast Cast) {
+func (h mdamHandler) Use(cast Cast) {
+	h.UseResult(cast)
+}
+
+func (mdamHandler) UseResult(cast Cast) Result {
+	var result Result
 	if alikeDead(cast.Caster) {
-		return
+		return result
 	}
 	for _, obj := range cast.Targets {
 		target, ok := obj.(magicDamageTarget)
@@ -184,10 +189,11 @@ func (mdamHandler) Use(cast Cast) {
 		damage := int(formulas.MagicDamage(in))
 		if damage > 0 {
 			target.ReduceHP(float64(damage), cast.Caster, cast.Skill)
-			applyMdamEffects(cast, obj, in.BlessedSoulShot)
+			applyMdamEffects(cast, obj, in.BlessedSoulShot, &result)
 		}
 	}
-	applySelfEffects(cast.Caster, cast.Skill)
+	applySelfEffects(cast, cast.Skill)
+	return result
 }
 
 // applyMdamEffects applies an MDAM/DEATHLINK skill's target effect list to
@@ -196,7 +202,7 @@ func (mdamHandler) Use(cast Cast) {
 // disablers.go's shared reflect+roll shape, Mdam.java only rolls
 // calcSkillSuccess on the non-reflect branch — the reflect branch applies
 // effects unconditionally with no landing check.
-func applyMdamEffects(cast Cast, obj any, bss bool) {
+func applyMdamEffects(cast Cast, obj any, bss bool, result *Result) {
 	if len(cast.Skill.Effects) == 0 {
 		return
 	}
@@ -213,11 +219,15 @@ func applyMdamEffects(cast Cast, obj any, bss bool) {
 		bss = false
 	} else {
 		succeeded, ok := checkSkillSuccess(cast.Caster, effected, cast.Skill)
-		if !ok || !succeeded {
+		if !ok {
+			return
+		}
+		if !succeeded {
+			appendResisted(result, effected, cast.Skill)
 			return
 		}
 	}
-	applyEffectsWithLanding(cast.Caster, effected, cast.Skill, cast.Skill.Effects, formulas.ShieldFailed, bss)
+	appendResistedCount(result, effected, cast.Skill, applyEffectsWithLanding(cast.Caster, effected, cast.Skill, cast.Skill.Effects, formulas.ShieldFailed, bss))
 }
 
 type blowHandler struct{}
@@ -279,7 +289,7 @@ func (blowHandler) UseResult(cast Cast) Result {
 				if !countered {
 					target.ReduceHP(float64(damage), cast.Caster, cast.Skill)
 				}
-				applyBlowEffects(cast, obj, in.Shield)
+				applyBlowEffects(cast, obj, in.Shield, &result)
 			}
 			if caster, ok := cast.Caster.(shotCharger); ok {
 				caster.SetChargedShot(modelitem.ShotSoul, cast.Skill.StaticReuse)
@@ -289,7 +299,7 @@ func (blowHandler) UseResult(cast Cast) Result {
 		// outside the landing gate — a missed blow can still proc it.
 		applyLethalHit(cast, target)
 	}
-	applySelfEffects(cast.Caster, cast.Skill)
+	applySelfEffects(cast, cast.Skill)
 	return result
 }
 
@@ -307,6 +317,21 @@ func counterattackName(obj any) string {
 	return ""
 }
 
+func appendResisted(result *Result, target any, def modelskill.Definition) {
+	if result == nil {
+		return
+	}
+	if name := counterattackName(target); name != "" {
+		result.Resisted = append(result.Resisted, Resisted{TargetName: name, SkillID: def.ID, SkillLevel: def.Level})
+	}
+}
+
+func appendResistedCount(result *Result, target any, def modelskill.Definition, count int) {
+	for range count {
+		appendResisted(result, target, def)
+	}
+}
+
 func counterSkillReflects(def modelskill.Definition, counter float64) bool {
 	if def.IgnoreResists || !def.CanBeReflected || counter <= 0 {
 		return false
@@ -320,7 +345,7 @@ func counterSkillReflects(def modelskill.Definition, counter float64) bool {
 // landing-rate roll gates activation with the blessed-spiritshot input
 // forced true — Blow.java hardcodes that argument regardless of the
 // caster's real charge state.
-func applyBlowEffects(cast Cast, obj any, shield formulas.ShieldDefense) {
+func applyBlowEffects(cast Cast, obj any, shield formulas.ShieldDefense, result *Result) {
 	if len(cast.Skill.Effects) == 0 {
 		return
 	}
@@ -330,19 +355,28 @@ func applyBlowEffects(cast Cast, obj any, shield formulas.ShieldDefense) {
 	}
 	stopEffectsBySkillID(effected.EffectList(), cast.Skill.ID)
 	succeeded, ok := checkSkillSuccessBSSWithShield(cast.Caster, effected, cast.Skill, true, shield)
-	if !ok || !succeeded {
+	if !ok {
 		return
 	}
-	applyEffectsWithLanding(cast.Caster, effected, cast.Skill, cast.Skill.Effects, shield, false)
+	if !succeeded {
+		appendResisted(result, effected, cast.Skill)
+		return
+	}
+	appendResistedCount(result, effected, cast.Skill, applyEffectsWithLanding(cast.Caster, effected, cast.Skill, cast.Skill.Effects, shield, false))
 }
 
 type manaDamageHandler struct{}
 
 func (manaDamageHandler) Types() []string { return []string{"MANADAM"} }
 
-func (manaDamageHandler) Use(cast Cast) {
+func (h manaDamageHandler) Use(cast Cast) {
+	h.UseResult(cast)
+}
+
+func (manaDamageHandler) UseResult(cast Cast) Result {
+	var result Result
 	if alikeDead(cast.Caster) {
-		return
+		return result
 	}
 	for _, obj := range cast.Targets {
 		target, ok := obj.(manaDamageTarget)
@@ -373,7 +407,9 @@ func (manaDamageHandler) Use(cast Cast) {
 			stopEffectsBySkillID(effected.EffectList(), cast.Skill.ID)
 			succeeded, ok := checkSkillSuccess(cast.Caster, effected, cast.Skill)
 			if ok && succeeded {
-				applyEffects(cast.Caster, effected, cast.Skill, cast.Skill.Effects)
+				appendResistedCount(&result, effected, cast.Skill, applyEffectsWithLanding(cast.Caster, effected, cast.Skill, cast.Skill.Effects, formulas.ShieldFailed, false))
+			} else if ok {
+				appendResisted(&result, effected, cast.Skill)
 			}
 		}
 		rawDamage := formulas.ManaDamage(in)
@@ -397,7 +433,7 @@ func (manaDamageHandler) Use(cast Cast) {
 			}
 		}
 	}
-	applySelfEffects(cast.Caster, cast.Skill)
+	applySelfEffects(cast, cast.Skill)
 	if caster, ok := cast.Caster.(chargedShotUser); ok {
 		kind := modelitem.ShotSpirit
 		if caster.ChargedShot(modelitem.ShotBlessedSpirit) {
@@ -405,6 +441,7 @@ func (manaDamageHandler) Use(cast Cast) {
 		}
 		caster.SetChargedShot(kind, cast.Skill.StaticReuse)
 	}
+	return result
 }
 
 func applyLethalHit(cast Cast, obj any) {
