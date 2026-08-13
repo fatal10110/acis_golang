@@ -109,6 +109,14 @@ type Hostile struct {
 	currentSpiritshots int
 	shotsMask          int32
 
+	// soulshotRate and spiritshotRate are the template's SoulShotRate/
+	// SpiritShotRate AI parameters (percent, 0-100), read-only after
+	// construction. RollAttackedShotRecharge uses them together with
+	// currentSoulshots/currentSpiritshots to decide whether a landed hit
+	// recharges shots.
+	soulshotRate   int
+	spiritshotRate int
+
 	// statMu guards statCalcs, this NPC's per-stat finalization chains.
 	statMu    sync.Mutex
 	statCalcs map[stat.Stat]*basefunc.Calculator
@@ -155,6 +163,10 @@ func NewHostile(inst *Instance, live *creature.Live, movement ai.MoveController,
 	if err != nil {
 		return nil, err
 	}
+	soulshotRate, spiritshotRate, err := shotRates(inst.Template)
+	if err != nil {
+		return nil, err
+	}
 
 	h := &Hostile{
 		Instance:           inst,
@@ -165,6 +177,8 @@ func NewHostile(inst *Instance, live *creature.Live, movement ai.MoveController,
 		roll:               rand.Intn,
 		currentSoulshots:   currentSoulshots,
 		currentSpiritshots: currentSpiritshots,
+		soulshotRate:       soulshotRate,
+		spiritshotRate:     spiritshotRate,
 	}
 	h.health = creature.NewHealth(&h.hp)
 	h.brain = ai.NewAttackable(h, movement, attack)
@@ -182,6 +196,21 @@ func shotCounts(tpl *Template) (soulshots, spiritshots int, err error) {
 		return 0, 0, fmt.Errorf("npc %d: SpiritShot AI parameter: %w", tpl.ID, err)
 	}
 	return soulshots, spiritshots, nil
+}
+
+// shotRates reads the template's SoulShotRate/SpiritShotRate AI parameters,
+// the percent chance RollAttackedShotRecharge rolls on each landed hit.
+func shotRates(tpl *Template) (soulshotRate, spiritshotRate int, err error) {
+	if tpl.AIParams == nil {
+		return 0, 0, nil
+	}
+	if soulshotRate, err = tpl.AIParams.GetIntDefault("SoulShotRate", 0); err != nil {
+		return 0, 0, fmt.Errorf("npc %d: SoulShotRate AI parameter: %w", tpl.ID, err)
+	}
+	if spiritshotRate, err = tpl.AIParams.GetIntDefault("SpiritShotRate", 0); err != nil {
+		return 0, 0, fmt.Errorf("npc %d: SpiritShotRate AI parameter: %w", tpl.ID, err)
+	}
+	return soulshotRate, spiritshotRate, nil
 }
 
 // SetWorld records the world registry BroadcastAttack reaches nearby

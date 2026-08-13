@@ -217,6 +217,22 @@ func (h *Hostile) RechargeShots(physical, magic bool) {
 	}
 }
 
+// RollAttackedShotRecharge ports the generic monster AI's onAttacked shot
+// roll (MonsterBehavior/WarriorBase/WizardBase.onAttacked in the aCis Java
+// reference): on every landed hit, an NPC configured with a nonzero
+// SoulShot/SpiritShot AI parameter rolls its matching *Rate parameter
+// (percent, [0,100)) and recharges that shot type on success. Callers are
+// the same three HP-reduction paths that record attacker hate — TakeDamage,
+// ReduceHP, and ReduceHPByDOT — matching Npc.reduceCurrentHp's unconditional
+// (isDOT included) addDamageHate-then-onAttacked sequence.
+func (h *Hostile) RollAttackedShotRecharge() {
+	physical := h.CurrentSoulshotCount() > 0 && h.soulshotRate > 0 && h.Roll(100) < h.soulshotRate
+	magic := h.CurrentSpiritshotCount() > 0 && h.spiritshotRate > 0 && h.Roll(100) < h.spiritshotRate
+	if physical || magic {
+		h.RechargeShots(physical, magic)
+	}
+}
+
 func (h *Hostile) broadcastShotRecharge(skillID int32) {
 	if h.world == nil || h.frames == nil {
 		return
