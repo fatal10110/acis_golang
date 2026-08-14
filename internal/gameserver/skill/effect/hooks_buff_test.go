@@ -320,6 +320,10 @@ type chanceTriggerFakeActor struct {
 	tracked []*Effect
 }
 
+func (a *chanceTriggerFakeActor) ObjectID() int32 { return 0 }
+
+func (a *chanceTriggerFakeActor) Dead() bool { return false }
+
 func (a *chanceTriggerFakeActor) AddChanceTrigger(e *Effect) {
 	a.tracked = append(a.tracked, e)
 }
@@ -495,7 +499,7 @@ func TestIncreaseChargesEffectRejectsNonChargesTarget(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error: %v", err)
 	}
-	e.Effected = &struct{}{}
+	e.Effected = namedActor("")
 
 	if e.OnStart(e) {
 		t.Fatal("increase charges effect start accepted a target without IncreaseCharges")

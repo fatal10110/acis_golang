@@ -20,6 +20,10 @@ type betraySummon struct {
 	events []string
 }
 
+func (s *betraySummon) ObjectID() int32 { return 0 }
+
+func (s *betraySummon) Dead() bool { return false }
+
 func (s *betraySummon) OwnerCombatant() attackable.Combatant { return s.owner }
 
 func (s *betraySummon) TryToAttack(target any) {

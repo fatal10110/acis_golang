@@ -25,6 +25,10 @@ func (t *regenMaxTarget) SendRegenMax(count, period int32, hpRegen float64) {
 	t.updates = append(t.updates, [3]float64{float64(count), float64(period), hpRegen})
 }
 
+func (t *noBonusHealTarget) ObjectID() int32 { return 0 }
+
+func (t *noBonusHealTarget) Dead() bool { return false }
+
 func (t *noBonusHealTarget) CanBeHealed() bool { return t.canBeHealed }
 
 func (t *noBonusHealTarget) AddHP(amount float64) float64 {

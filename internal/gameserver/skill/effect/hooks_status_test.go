@@ -17,6 +17,8 @@ type spoilFakeCaster struct {
 
 func (c *spoilFakeCaster) ObjectID() int32 { return c.id }
 
+func (c *spoilFakeCaster) Dead() bool { return false }
+
 func (c *spoilFakeCaster) Level() int { return c.level }
 
 type spoilFakeTarget struct {
@@ -26,6 +28,8 @@ type spoilFakeTarget struct {
 }
 
 func (t *spoilFakeTarget) Dead() bool { return t.dead }
+
+func (t *spoilFakeTarget) ObjectID() int32 { return 0 }
 
 func (t *spoilFakeTarget) Level() int { return t.level }
 
@@ -304,6 +308,10 @@ type hostileEffectTarget struct {
 	hasCandidate bool
 }
 
+func (t *hostileEffectTarget) ObjectID() int32 { return 0 }
+
+func (t *hostileEffectTarget) Dead() bool { return false }
+
 func (t *hostileEffectTarget) Level() int { return t.level }
 
 func (t *hostileEffectTarget) MonsterKind() bool { return t.monsterKind }
@@ -456,6 +464,10 @@ type growEffectTarget struct {
 	radius float64
 }
 
+func (t *growEffectTarget) ObjectID() int32 { return 0 }
+
+func (t *growEffectTarget) Dead() bool { return false }
+
 func (t *growEffectTarget) CollisionRadius() float64 { return t.radius }
 
 func (t *growEffectTarget) SetCollisionRadius(radius float64) {
@@ -521,6 +533,10 @@ func TestGrowEffectRejectsNonNpcTarget(t *testing.T) {
 type recoveryEffectTarget struct {
 	level int
 }
+
+func (t *recoveryEffectTarget) ObjectID() int32 { return 0 }
+
+func (t *recoveryEffectTarget) Dead() bool { return false }
 
 func (t *recoveryEffectTarget) ReduceDeathPenaltyLevel() int {
 	if t.level > 0 {

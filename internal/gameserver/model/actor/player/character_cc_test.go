@@ -26,6 +26,8 @@ func (ccGeo) ValidLocation(ox, oy, oz, _, _, _ int) location.Location {
 // activates regardless of what its actual effected actor is.
 type ccFleeTarget struct{}
 
+func (ccFleeTarget) ObjectID() int32                     { return 0 }
+func (ccFleeTarget) Dead() bool                          { return false }
 func (ccFleeTarget) FleeFrom(effector any, distance int) {}
 
 func attachTestLive(t *testing.T, c *Character) {

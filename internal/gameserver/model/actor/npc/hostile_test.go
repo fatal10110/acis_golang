@@ -512,6 +512,8 @@ func (a *hostileAttack) DoAttack(target attackable.Combatant) error {
 // so it activates regardless of what its actual effected actor is.
 type hostileEffectTarget struct{}
 
+func (hostileEffectTarget) ObjectID() int32                     { return 0 }
+func (hostileEffectTarget) Dead() bool                          { return false }
 func (hostileEffectTarget) FleeFrom(effector any, distance int) {}
 
 func addHostileEffect(t *testing.T, hostile *Hostile, name string) *effect.Effect {
