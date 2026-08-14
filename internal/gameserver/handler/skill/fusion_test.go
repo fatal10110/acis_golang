@@ -30,7 +30,7 @@ func TestFusionHandlerAppliesTriggeredSkillFreshWhenTargetHasNone(t *testing.T) 
 	target := newContinuousFake(1)
 	registry := NewDefaultRegistryWithDefinitions(battleForceDefs())
 
-	registry.Use(Cast{Caster: newContinuousFake(2), Skill: battleForce(1), Targets: []any{target}})
+	registry.Use(Cast{Caster: newContinuousFake(2), Skill: battleForce(1), Targets: []Actor{target}})
 
 	e := firstEffectByID(target.list, 5104)
 	if e == nil {
@@ -44,7 +44,7 @@ func TestFusionHandlerAppliesTriggeredSkillFreshWhenTargetHasNone(t *testing.T) 
 func TestFusionHandlerRecastGrowsExistingEffectInPlace(t *testing.T) {
 	target := newContinuousFake(1)
 	registry := NewDefaultRegistryWithDefinitions(battleForceDefs())
-	cast := Cast{Caster: newContinuousFake(2), Skill: battleForce(1), Targets: []any{target}}
+	cast := Cast{Caster: newContinuousFake(2), Skill: battleForce(1), Targets: []Actor{target}}
 
 	registry.Use(cast)
 	first := firstEffectByID(target.list, 5104)
@@ -66,7 +66,7 @@ func TestFusionHandlerRecastGrowsExistingEffectInPlace(t *testing.T) {
 func TestFusionHandlerCapsGrowthAtMaxLevel(t *testing.T) {
 	target := newContinuousFake(1)
 	registry := NewDefaultRegistryWithDefinitions(battleForceDefs())
-	cast := Cast{Caster: newContinuousFake(2), Skill: battleForce(1), Targets: []any{target}}
+	cast := Cast{Caster: newContinuousFake(2), Skill: battleForce(1), Targets: []Actor{target}}
 
 	registry.Use(cast) // level 1
 	registry.Use(cast) // level 2
@@ -86,7 +86,7 @@ func TestDecreaseFusionShrinksTriggeredEffectWhenChannelEnds(t *testing.T) {
 	target := newContinuousFake(1)
 	defs := battleForceDefs()
 	registry := NewDefaultRegistryWithDefinitions(defs)
-	cast := Cast{Caster: newContinuousFake(2), Skill: battleForce(1), Targets: []any{target}}
+	cast := Cast{Caster: newContinuousFake(2), Skill: battleForce(1), Targets: []Actor{target}}
 
 	registry.Use(cast)
 	registry.Use(cast)
@@ -102,7 +102,7 @@ func TestDecreaseFusionRemovesLevelOneTriggeredEffect(t *testing.T) {
 	target := newContinuousFake(1)
 	defs := battleForceDefs()
 	registry := NewDefaultRegistryWithDefinitions(defs)
-	cast := Cast{Caster: newContinuousFake(2), Skill: battleForce(1), Targets: []any{target}}
+	cast := Cast{Caster: newContinuousFake(2), Skill: battleForce(1), Targets: []Actor{target}}
 
 	registry.Use(cast)
 	DecreaseFusion(defs, cast.Caster, target, cast.Skill)

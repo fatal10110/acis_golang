@@ -175,9 +175,17 @@ func ApplyCubicHeal(power float32, target any) (healed bool) {
 // resolution phase ApplyEffectsResult runs (the cubic already picked its
 // own target via DecideCubicFire), matching Cubic.fireAction's default
 // SkillHandler dispatch.
-func ApplyCubicEffect(skills *handlerskill.Registry, caster any, def modelskill.Definition, target any) {
+// A cubic's own target selection resolves world objects rather than the
+// cast-participant surface a skill handler acts on, so a target that isn't
+// actor-shaped is dropped here instead of reaching the handlers as a value
+// none of their assertions can match.
+func ApplyCubicEffect(skills *handlerskill.Registry, caster handlerskill.Actor, def modelskill.Definition, target Target) {
 	if skills == nil {
 		return
 	}
-	skills.UseResult(handlerskill.Cast{Caster: caster, Skill: def, Targets: []any{target}})
+	actor, ok := target.(handlerskill.Actor)
+	if !ok {
+		return
+	}
+	skills.UseResult(handlerskill.Cast{Caster: caster, Skill: def, Targets: []handlerskill.Actor{actor}})
 }

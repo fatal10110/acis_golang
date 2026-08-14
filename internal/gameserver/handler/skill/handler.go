@@ -10,16 +10,26 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// Actor is the surface every participant in a cast — the caster and each
+// resolved target — shares. Handlers narrow it further with focused
+// assertions for the capabilities the skill type at hand needs; typing the
+// boundary itself keeps a value that is not an actor from reaching a handler
+// as an inert `any` that every one of those assertions then misses.
+type Actor interface {
+	ObjectID() int32
+	Dead() bool
+}
+
 // Cast carries the already-resolved inputs a skill handler needs.
 type Cast struct {
-	Caster   any
+	Caster   Actor
 	Skill    modelskill.Definition
-	Targets  []any
+	Targets  []Actor
 	Item     any
 	resisted *Result
 }
 
-func (c Cast) reportResisted(target any, def modelskill.Definition, count int) {
+func (c Cast) reportResisted(target Actor, def modelskill.Definition, count int) {
 	appendResistedCount(c.resisted, target, def, count)
 }
 
@@ -73,9 +83,9 @@ type Result struct {
 	Resisted       []Resisted
 	CubicAdded     bool
 	// CubicTargets are non-caster targets whose cubic runtime was touched.
-	CubicTargets []any
+	CubicTargets []Actor
 	// CubicAddedTargets are the non-caster targets whose visible cubic list changed.
-	CubicAddedTargets []any
+	CubicAddedTargets []Actor
 	// CubicTouched and CubicID report that a SUMMON cubic cast reached the
 	// caster's own cubic list, whether newly admitted or refreshed, so a
 	// caller can (re)sync the cubic's live action/disappear runtime either
@@ -223,17 +233,26 @@ func (dummyHandler) Types() []string { return []string{"DUMMY", "BEAST_FEED"} }
 
 func (dummyHandler) Use(Cast) {}
 
-func alikeDead(v any) bool {
-	if d, ok := v.(interface{ AlikeDead() bool }); ok {
-		return d.AlikeDead()
-	}
-	if d, ok := v.(interface{ Dead() bool }); ok {
-		return d.Dead()
-	}
-	return false
+// alikeDeadSource optionally reports an actor's death-like state (fake
+// death, a pending resurrect) on top of plain death; an actor without one
+// is alike-dead exactly when it is dead.
+type alikeDeadSource interface {
+	AlikeDead() bool
 }
 
-func sameObject(a, b any) bool {
+// alikeDead reports whether a is dead or in a death-like state, matching the
+// reference's isAlikeDead() default of falling back to isDead().
+func alikeDead(a Actor) bool {
+	if a == nil {
+		return false
+	}
+	if d, ok := a.(alikeDeadSource); ok {
+		return d.AlikeDead()
+	}
+	return a.Dead()
+}
+
+func sameObject(a, b Actor) bool {
 	if a == nil || b == nil {
 		return a == b
 	}
@@ -247,7 +266,13 @@ func sameObject(a, b any) bool {
 	return a == b
 }
 
-func cursed(v any) bool {
-	c, ok := v.(interface{ CursedWeaponEquipped() bool })
+// cursedWeaponHolder optionally reports whether an actor currently wields a
+// cursed weapon; an actor without one never does.
+type cursedWeaponHolder interface {
+	CursedWeaponEquipped() bool
+}
+
+func cursed(a Actor) bool {
+	c, ok := a.(cursedWeaponHolder)
 	return ok && c.CursedWeaponEquipped()
 }

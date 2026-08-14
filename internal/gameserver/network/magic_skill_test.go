@@ -20,11 +20,13 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
-type recordingSkillHandler struct{ applied chan []any }
+type recordingSkillHandler struct {
+	applied chan []handlerskill.Actor
+}
 
 func (h recordingSkillHandler) Types() []string { return []string{"TEST_AREA"} }
 func (h recordingSkillHandler) Use(cast handlerskill.Cast) {
-	h.applied <- append([]any(nil), cast.Targets...)
+	h.applied <- append([]handlerskill.Actor(nil), cast.Targets...)
 }
 
 func TestGameClientLinkSendsCounterattackFeedbackToPlayerParticipants(t *testing.T) {
@@ -971,7 +973,7 @@ func TestGameClientLinkMagicSkillUseAppliesAreaSkillToResolvedTargets(t *testing
 	caster.Character.SetSkillLevel(3, 1)
 	caster.SetTargetTracked(aimed)
 
-	recorded := recordingSkillHandler{applied: make(chan []any, 1)}
+	recorded := recordingSkillHandler{applied: make(chan []handlerskill.Actor, 1)}
 	link := &GameClientLink{
 		skills: skillstate.NewPersistence(nil, modelskill.NewTable([]modelskill.Definition{{
 			ID: 3, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetArea,

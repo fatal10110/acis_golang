@@ -16,8 +16,8 @@ var fearImmunePlayableSkillIDs = map[modelskill.ID]bool{98: true, 1272: true, 13
 // continuousTarget is the surface a continuous (buff/debuff/over-time) skill
 // acts on: an alive actor carrying a live effect list.
 type continuousTarget interface {
+	Actor
 	effectListTarget
-	Dead() bool
 }
 
 // invulnerableCaster is implemented by casters that can report invulnerability,
@@ -154,7 +154,7 @@ func (h continuousHandler) effectSkill(def modelskill.Definition) modelskill.Def
 // the caster when the target reflects the skill back. It returns nil when the
 // skill reflects but the caster isn't itself a valid continuous target, which
 // is safer dropped than guessed through.
-func (continuousHandler) reflectTarget(caster any, def modelskill.Definition, target continuousTarget) continuousTarget {
+func (continuousHandler) reflectTarget(caster Actor, def modelskill.Definition, target continuousTarget) continuousTarget {
 	src, ok := target.(skillReflectSource)
 	if !ok {
 		return target
@@ -194,7 +194,7 @@ type retargetableOnAggression interface {
 // provoked into attacking the caster if it was already targeting it, or
 // retargeted onto the caster otherwise. A target implementing neither
 // optional surface is left as-is.
-func fireAggressionEvent(caster, effected any, def modelskill.Definition) {
+func fireAggressionEvent(caster, effected Actor, def modelskill.Definition) {
 	if am, ok := effected.(attackableMarker); ok && am.Attackable() {
 		if n, ok := effected.(aggressionNotifiable); ok {
 			n.NotifyAggression(caster, int(def.Power))
@@ -206,7 +206,8 @@ func fireAggressionEvent(caster, effected any, def modelskill.Definition) {
 		if !ok {
 			return
 		}
-		if sameObject(r.CurrentTarget(), caster) {
+		current, _ := r.CurrentTarget().(Actor)
+		if sameObject(current, caster) {
 			r.AttackTarget(caster)
 		} else {
 			r.SetTarget(caster)

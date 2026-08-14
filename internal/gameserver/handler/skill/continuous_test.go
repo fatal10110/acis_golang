@@ -124,7 +124,7 @@ func TestContinuousBuffLandsOnCleanTarget(t *testing.T) {
 	registry.Use(Cast{
 		Caster:  newContinuousFake(1),
 		Skill:   modelskill.Definition{SkillType: "BUFF", Effects: buffEffect()},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 
 	if got := len(target.list.All()); got != 1 {
@@ -156,7 +156,7 @@ func TestContinuousAppliesReferencedEffectSkill(t *testing.T) {
 					ID: 454, Level: 1, SkillType: "BUFF",
 					EffectID: 5123, EffectLevel: tt.effectLevel,
 				},
-				Targets: []any{target},
+				Targets: []Actor{target},
 			})
 
 			effects := target.list.All()
@@ -175,7 +175,7 @@ func TestContinuousBuffSkipsBlockedBuffImmuneTarget(t *testing.T) {
 	registry.Use(Cast{
 		Caster:  newContinuousFake(1),
 		Skill:   modelskill.Definition{SkillType: "BUFF", Effects: buffEffect()},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 
 	if got := len(target.list.All()); got != 1 {
@@ -200,7 +200,7 @@ func TestContinuousBuffSkipsBlockedBuffFromRealMarkerEffect(t *testing.T) {
 	registry.Use(Cast{
 		Caster:  newContinuousFake(1),
 		Skill:   modelskill.Definition{SkillType: "BUFF", Effects: buffEffect()},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 
 	if got := len(target.list.All()); got != 1 {
@@ -224,7 +224,7 @@ func TestContinuousDebuffSkipsBlockedDebuffFromRealMarkerEffect(t *testing.T) {
 	registry.Use(Cast{
 		Caster:  newContinuousFake(1),
 		Skill:   modelskill.Definition{SkillType: "DEBUFF", Offensive: true, Debuff: true, Effects: []modelskill.EffectTemplate{{Name: "Debuff", Time: 600}}},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 
 	if got := len(target.list.All()); got != 1 {
@@ -241,7 +241,7 @@ func TestContinuousBuffSkipsCursedOther(t *testing.T) {
 	registry.Use(Cast{
 		Caster:  caster,
 		Skill:   modelskill.Definition{SkillType: "BUFF", Effects: buffEffect()},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 
 	if got := len(target.list.All()); got != 0 {
@@ -257,7 +257,7 @@ func TestContinuousBuffLandsOnCursedSelf(t *testing.T) {
 	registry.Use(Cast{
 		Caster:  self,
 		Skill:   modelskill.Definition{SkillType: "BUFF", Effects: buffEffect()},
-		Targets: []any{self},
+		Targets: []Actor{self},
 	})
 
 	if got := len(self.list.All()); got != 1 {
@@ -274,7 +274,7 @@ func TestContinuousHOTSkippedWhenCasterInvulnerable(t *testing.T) {
 	registry.Use(Cast{
 		Caster:  caster,
 		Skill:   modelskill.Definition{SkillType: "HOT", Effects: buffEffect()},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 
 	if got := len(target.list.All()); got != 0 {
@@ -291,7 +291,7 @@ func TestContinuousFearImmunePlayableSkillIDsSkipped(t *testing.T) {
 		registry.Use(Cast{
 			Caster:  newContinuousFake(1),
 			Skill:   modelskill.Definition{ID: id, SkillType: "FEAR", Effects: buffEffect()},
-			Targets: []any{target},
+			Targets: []Actor{target},
 		})
 
 		if got := len(target.list.All()); got != 0 {
@@ -308,7 +308,7 @@ func TestContinuousFearLandsOnPlayableForOtherSkill(t *testing.T) {
 	registry.Use(Cast{
 		Caster:  newContinuousFake(1),
 		Skill:   modelskill.Definition{ID: 9999, SkillType: "FEAR", Effects: buffEffect()},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 
 	if got := len(target.list.All()); got != 1 {
@@ -324,7 +324,7 @@ func TestContinuousOffensiveDebuffSkipsBlockedDebuffTarget(t *testing.T) {
 	registry.Use(Cast{
 		Caster:  newContinuousFake(1),
 		Skill:   modelskill.Definition{SkillType: "DEBUFF", Offensive: true, Effects: buffEffect()},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 
 	if got := len(target.list.All()); got != 1 {
@@ -340,7 +340,7 @@ func TestContinuousDebuffFailRollDoesNotLand(t *testing.T) {
 	registry.Use(Cast{
 		Caster:  newContinuousFake(1),
 		Skill:   modelskill.Definition{SkillType: "DEBUFF", Debuff: true, Effects: buffEffect()},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 
 	if got := len(target.list.All()); got != 0 {
@@ -356,7 +356,7 @@ func TestContinuousDebuffFailRollReportsAttackFailed(t *testing.T) {
 	result, ok := registry.UseResult(Cast{
 		Caster:  newContinuousFake(1),
 		Skill:   modelskill.Definition{SkillType: "DEBUFF", Debuff: true, Effects: buffEffect()},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 	if !ok {
 		t.Fatal("UseResult() handled = false, want true for DEBUFF")
@@ -373,7 +373,7 @@ func TestContinuousDebuffSuccessRollLands(t *testing.T) {
 	registry.Use(Cast{
 		Caster:  newContinuousFake(1),
 		Skill:   modelskill.Definition{SkillType: "DEBUFF", Debuff: true, Effects: buffEffect()},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 
 	if got := len(target.list.All()); got != 1 {
@@ -389,7 +389,7 @@ func TestContinuousDebuffNoLandingSourceDoesNotLand(t *testing.T) {
 	registry.Use(Cast{
 		Caster:  newContinuousFake(1),
 		Skill:   modelskill.Definition{SkillType: "DEBUFF", Debuff: true, Effects: buffEffect()},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 
 	if got := len(target.list.All()); got != 0 {
@@ -405,7 +405,7 @@ func TestContinuousIconEffectFailureReportsResistance(t *testing.T) {
 	result, handled := registry.UseResult(Cast{
 		Caster:  newContinuousFake(1),
 		Skill:   modelskill.Definition{ID: 321, Level: 2, SkillType: "BUFF", Effects: []modelskill.EffectTemplate{{Name: "Buff", Time: 60, Icon: true, EffectPower: 100, EffectPowerSet: true}}},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 	if !handled {
 		t.Fatal("UseResult() handled = false")
@@ -433,7 +433,7 @@ func TestContinuousToggleDropsPriorSameSkillBeforeReapplying(t *testing.T) {
 			ID: 555, SkillType: "BUFF", Activation: modelskill.ActivationToggle,
 			Effects: buffEffect(),
 		},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 
 	if hasEffect(target.list, stale) {
@@ -456,7 +456,7 @@ func TestContinuousAppliesSelfEffectsOnCaster(t *testing.T) {
 			Effects:     buffEffect(),
 			SelfEffects: []modelskill.EffectTemplate{{Name: "Buff", Time: 600, Self: true}},
 		},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 
 	if got := len(target.list.All()); got != 1 {
@@ -479,7 +479,7 @@ func TestContinuousReflectsOffensiveBackToCaster(t *testing.T) {
 	registry.Use(Cast{
 		Caster:  caster,
 		Skill:   modelskill.Definition{SkillType: "DEBUFF", Offensive: true, Magic: true, Effects: buffEffect()},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 
 	if got := len(target.list.All()); got != 0 {
@@ -512,7 +512,7 @@ func TestContinuousAGGDEBUFFNotifiesAttackableTarget(t *testing.T) {
 	registry.Use(Cast{
 		Caster:  caster,
 		Skill:   modelskill.Definition{SkillType: "AGGDEBUFF", Power: 42, Effects: buffEffect()},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 
 	if got := len(target.list.All()); got != 1 {
@@ -540,7 +540,7 @@ func TestContinuousAGGDEBUFFRetargetsPlayableNotAlreadyTargetingCaster(t *testin
 	registry.Use(Cast{
 		Caster:  caster,
 		Skill:   modelskill.Definition{SkillType: "AGGDEBUFF", Power: 10, Effects: buffEffect()},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 
 	if len(target.setTargetCalls) != 1 || target.setTargetCalls[0] != any(caster) {
@@ -561,7 +561,7 @@ func TestContinuousAGGDEBUFFAttacksPlayableAlreadyTargetingCaster(t *testing.T) 
 	registry.Use(Cast{
 		Caster:  caster,
 		Skill:   modelskill.Definition{SkillType: "AGGDEBUFF", Power: 10, Effects: buffEffect()},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 
 	if len(target.attackTargetCalls) != 1 || target.attackTargetCalls[0] != any(caster) {
@@ -585,7 +585,7 @@ func TestContinuousDebuffUsesCasterBlessedSpiritshotCharge(t *testing.T) {
 	registry.Use(Cast{
 		Caster:  caster,
 		Skill:   modelskill.Definition{SkillType: "DEBUFF", Debuff: true, Effects: buffEffect()},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 
 	if !seenBss {

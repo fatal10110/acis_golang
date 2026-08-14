@@ -7,11 +7,17 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 )
 
-type reviveFakeCaster struct{ wit float64 }
+type reviveFakeCaster struct {
+	fakeActor
+	wit float64
+}
 
 func (c reviveFakeCaster) WITBonus() float64 { return c.wit }
 
-type reviveFakeTarget struct{ percent float64 }
+type reviveFakeTarget struct {
+	fakeActor
+	percent float64
+}
 
 func (t *reviveFakeTarget) Revive(percent float64) { t.percent = percent }
 
@@ -24,7 +30,7 @@ func TestResurrectRevivesEveryTarget(t *testing.T) {
 	if !registry.Use(Cast{
 		Caster:  caster,
 		Skill:   modelskill.Definition{SkillType: "RESURRECT", Power: 40},
-		Targets: []any{a, b, "not revivable"},
+		Targets: []Actor{a, b, fakeActor{}},
 	}) {
 		t.Fatal("Use() returned false for RESURRECT")
 	}
@@ -41,7 +47,7 @@ func TestResurrectWithoutCasterInterfaceIsNoop(t *testing.T) {
 
 	registry.Use(Cast{
 		Skill:   modelskill.Definition{SkillType: "RESURRECT"},
-		Targets: []any{a},
+		Targets: []Actor{a},
 	})
 	if a.percent != 0 {
 		t.Fatalf("revive percent = %v, want unchanged 0", a.percent)

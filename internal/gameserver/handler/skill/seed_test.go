@@ -17,7 +17,7 @@ func seedOfFire() modelskill.Definition {
 
 func TestSeedHandlerAppliesFreshEffectWhenTargetHasNone(t *testing.T) {
 	target := newContinuousFake(1)
-	cast := Cast{Caster: newContinuousFake(2), Skill: seedOfFire(), Targets: []any{target}}
+	cast := Cast{Caster: newContinuousFake(2), Skill: seedOfFire(), Targets: []Actor{target}}
 
 	seedHandler{}.Use(cast)
 
@@ -32,7 +32,7 @@ func TestSeedHandlerAppliesFreshEffectWhenTargetHasNone(t *testing.T) {
 
 func TestSeedHandlerRecastGrowsExistingEffectInPlaceInsteadOfDuplicating(t *testing.T) {
 	target := newContinuousFake(1)
-	cast := Cast{Caster: newContinuousFake(2), Skill: seedOfFire(), Targets: []any{target}}
+	cast := Cast{Caster: newContinuousFake(2), Skill: seedOfFire(), Targets: []Actor{target}}
 
 	seedHandler{}.Use(cast)
 	first := firstEffectByID(target.list, 1285)
@@ -58,11 +58,11 @@ func TestSeedHandlerRecastGrowsExistingEffectInPlaceInsteadOfDuplicating(t *test
 // schedule state.
 func TestSeedHandlerRecastLeavesOtherActiveSeedsInPlace(t *testing.T) {
 	target := newContinuousFake(1)
-	fire := Cast{Caster: newContinuousFake(2), Skill: seedOfFire(), Targets: []any{target}}
+	fire := Cast{Caster: newContinuousFake(2), Skill: seedOfFire(), Targets: []Actor{target}}
 	water := Cast{Caster: fire.Caster, Skill: modelskill.Definition{
 		ID: 1286, Level: 1, SkillType: "SEED",
 		Effects: []modelskill.EffectTemplate{{Name: "Seed", Time: 5}},
-	}, Targets: []any{target}}
+	}, Targets: []Actor{target}}
 
 	seedHandler{}.Use(fire)
 	seedHandler{}.Use(water)

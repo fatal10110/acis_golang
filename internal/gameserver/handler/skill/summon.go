@@ -80,7 +80,7 @@ func (summonFriendHandler) Use(cast Cast) {
 			return
 		}
 		for _, target := range party.PartyMembers() {
-			if sameObject(cast.Caster, target) || !canBeSummoned(cast.Caster, target) {
+			if !canBeSummoned(cast.Caster, target) {
 				continue
 			}
 			teleportSummonedFriend(caster, target, cast.Skill)
@@ -109,8 +109,13 @@ func canSummonFriend(actor summonFriendActorState) bool {
 	return !actor.Mounted() && !actor.OlympiadMode() && !actor.ObserverMode() && !actor.NoSummonFriendZone()
 }
 
-func canBeSummoned(caster, target any) bool {
-	if sameObject(caster, target) {
+// canBeSummoned takes target untyped because a SUMMON_PARTY cast walks the
+// caster's own party list rather than a resolved target set; a party member
+// that isn't actor-shaped fails the self-exclusion check the same way an
+// unrelated value did before.
+func canBeSummoned(caster Actor, target any) bool {
+	other, _ := target.(Actor)
+	if sameObject(caster, other) {
 		return false
 	}
 	state, ok := target.(summonFriendTargetState)

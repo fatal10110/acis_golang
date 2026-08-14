@@ -87,7 +87,7 @@ func TestPdamAppliesTargetAndSelfEffectsUnconditionally(t *testing.T) {
 	}
 
 	def := modelskill.Definition{ID: 321, SkillType: "PDAM", Effects: targetEffect(), SelfEffects: buffEffect()}
-	registry.Use(Cast{Caster: caster, Skill: def, Targets: []any{target}})
+	registry.Use(Cast{Caster: caster, Skill: def, Targets: []Actor{target}})
 
 	if got := len(target.EffectList().All()); got != 1 {
 		t.Fatalf("PDAM target effects = %d, want 1", got)
@@ -109,7 +109,7 @@ func TestPdamSkipsEffectsWhenTargetBlocksDebuff(t *testing.T) {
 	target.EffectList().Add(blocker)
 
 	def := modelskill.Definition{ID: 321, SkillType: "PDAM", Effects: targetEffect()}
-	registry.Use(Cast{Caster: caster, Skill: def, Targets: []any{target}})
+	registry.Use(Cast{Caster: caster, Skill: def, Targets: []Actor{target}})
 
 	if got := len(target.EffectList().All()); got != 1 {
 		t.Fatalf("PDAM target effects with BLOCK_DEBUFF = %d, want 1 (only the blocker)", got)
@@ -126,19 +126,19 @@ func TestMdamAppliesEffectsOnlyOnDamageAndLandingRoll(t *testing.T) {
 	target.successOK = false
 
 	def := modelskill.Definition{ID: 1231, SkillType: "MDAM", Effects: targetEffect()}
-	registry.Use(Cast{Caster: caster, Skill: def, Targets: []any{target}})
+	registry.Use(Cast{Caster: caster, Skill: def, Targets: []Actor{target}})
 	if got := len(target.EffectList().All()); got != 0 {
 		t.Fatalf("MDAM effects with failed landing roll = %d, want 0", got)
 	}
 
 	target.successOK = true
-	registry.Use(Cast{Caster: caster, Skill: def, Targets: []any{target}})
+	registry.Use(Cast{Caster: caster, Skill: def, Targets: []Actor{target}})
 	if got := len(target.EffectList().All()); got != 1 {
 		t.Fatalf("MDAM effects with guaranteed landing roll = %d, want 1", got)
 	}
 
 	target.successOK = false
-	registry.Use(Cast{Caster: caster, Skill: def, Targets: []any{target}})
+	registry.Use(Cast{Caster: caster, Skill: def, Targets: []Actor{target}})
 	if got := len(target.EffectList().All()); got != 0 {
 		t.Fatalf("MDAM effects after resisted recast = %d, want 0", got)
 	}
@@ -158,7 +158,7 @@ func TestBlowAppliesEffectsWithForcedBlessedSpiritshotInput(t *testing.T) {
 	}
 
 	def := modelskill.Definition{ID: 409, SkillType: "BLOW", Effects: targetEffect()}
-	registry.Use(Cast{Caster: caster, Skill: def, Targets: []any{target}})
+	registry.Use(Cast{Caster: caster, Skill: def, Targets: []Actor{target}})
 
 	if got := len(target.EffectList().All()); got != 1 {
 		t.Fatalf("BLOW target effects = %d, want 1", got)
@@ -168,7 +168,7 @@ func TestBlowAppliesEffectsWithForcedBlessedSpiritshotInput(t *testing.T) {
 	}
 
 	target.successOK = false
-	registry.Use(Cast{Caster: caster, Skill: def, Targets: []any{target}})
+	registry.Use(Cast{Caster: caster, Skill: def, Targets: []Actor{target}})
 	if got := len(target.EffectList().All()); got != 0 {
 		t.Fatalf("BLOW effects after resisted recast = %d, want 0", got)
 	}
@@ -185,13 +185,13 @@ func TestManadamRemovesEffectsBeforeResistedRecast(t *testing.T) {
 	}
 	def := modelskill.Definition{ID: 1234, SkillType: "MANADAM", Effects: targetEffect()}
 
-	registry.Use(Cast{Caster: caster, Skill: def, Targets: []any{target}})
+	registry.Use(Cast{Caster: caster, Skill: def, Targets: []Actor{target}})
 	if got := len(target.EffectList().All()); got != 1 {
 		t.Fatalf("MANADAM effects with guaranteed landing roll = %d, want 1", got)
 	}
 
 	target.successOK = false
-	registry.Use(Cast{Caster: caster, Skill: def, Targets: []any{target}})
+	registry.Use(Cast{Caster: caster, Skill: def, Targets: []Actor{target}})
 	if got := len(target.EffectList().All()); got != 0 {
 		t.Fatalf("MANADAM effects after resisted recast = %d, want 0", got)
 	}
@@ -210,7 +210,7 @@ func TestManadamReflectRedirectsDrainAndEffectsToCaster(t *testing.T) {
 	target.manaInput = caster.manaInput
 	def := modelskill.Definition{ID: 1234, SkillType: "MANADAM", CanBeReflected: true, Effects: targetEffect()}
 
-	registry.Use(Cast{Caster: caster, Skill: def, Targets: []any{target}})
+	registry.Use(Cast{Caster: caster, Skill: def, Targets: []Actor{target}})
 
 	if caster.mp >= 1000 || target.mp != 1000 {
 		t.Fatalf("MANADAM reflect mp = %v/%v, want caster drained and target unchanged", caster.mp, target.mp)
@@ -268,7 +268,7 @@ func TestDamageSkillResistedRollReportsTargetAndSkill(t *testing.T) {
 			target.name, target.successRate = "Target", 0
 			tc.setup(target)
 
-			result, handled := NewDefaultRegistry().UseResult(Cast{Caster: caster, Skill: tc.skill, Targets: []any{target}})
+			result, handled := NewDefaultRegistry().UseResult(Cast{Caster: caster, Skill: tc.skill, Targets: []Actor{target}})
 			if !handled {
 				t.Fatal("UseResult() handled = false")
 			}
@@ -292,7 +292,7 @@ func TestBlowUsesOneShieldOutcomeForDamageAndEffects(t *testing.T) {
 		Landed: true, Shield: formulas.ShieldPerfect,
 	}
 
-	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{ID: 409, SkillType: "BLOW", Effects: targetEffect()}, Targets: []any{target}})
+	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{ID: 409, SkillType: "BLOW", Effects: targetEffect()}, Targets: []Actor{target}})
 	if target.hp != 1999 {
 		t.Fatalf("perfect-shield BLOW hp = %v, want 1999", target.hp)
 	}
@@ -316,7 +316,7 @@ func TestPdamPerfectShieldBlocksDamageAndEffects(t *testing.T) {
 		Shield: formulas.ShieldPerfect,
 	}
 
-	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{ID: 321, SkillType: "PDAM", Effects: targetEffect()}, Targets: []any{target}})
+	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{ID: 321, SkillType: "PDAM", Effects: targetEffect()}, Targets: []Actor{target}})
 	if target.hp != 1999 {
 		t.Fatalf("perfect-shield PDAM hp = %v, want 1999", target.hp)
 	}
@@ -340,7 +340,7 @@ func TestPdamLethalReportsCasterAndTarget(t *testing.T) {
 	result, handled := NewDefaultRegistry().UseResult(Cast{
 		Caster:  caster,
 		Skill:   modelskill.Definition{SkillType: "PDAM", LethalChance2: 1},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 	if !handled {
 		t.Fatal("UseResult() handled = false")
@@ -363,7 +363,7 @@ func TestBlowMissSkipsDamageAndEffects(t *testing.T) {
 		Landed: false,
 	}
 
-	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{ID: 409, SkillType: "BLOW", Effects: targetEffect()}, Targets: []any{target}})
+	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{ID: 409, SkillType: "BLOW", Effects: targetEffect()}, Targets: []Actor{target}})
 	if target.hp != 2000 {
 		t.Fatalf("BLOW miss hp = %v, want unchanged 2000", target.hp)
 	}
@@ -384,7 +384,7 @@ func TestBlowEvasionSkipsDamageAndReportsParticipants(t *testing.T) {
 	result, ok := registry.UseResult(Cast{
 		Caster:  caster,
 		Skill:   modelskill.Definition{ID: 409, SkillType: "BLOW", Effects: targetEffect()},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 	if !ok {
 		t.Fatal("UseResult() handled = false, want true")
@@ -415,7 +415,7 @@ func TestBlowCounterSkillDamagesCasterInsteadOfTarget(t *testing.T) {
 	registry.Use(Cast{
 		Caster:  caster,
 		Skill:   modelskill.Definition{ID: 409, SkillType: "BLOW", CanBeReflected: true},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 
 	wantDamage := float64(int(formulas.BlowDamage(target.blowInput))) * .5
@@ -445,7 +445,7 @@ func TestBlowCounterSkillReportsCounterattackParticipants(t *testing.T) {
 	result, ok := registry.UseResult(Cast{
 		Caster:  caster,
 		Skill:   modelskill.Definition{ID: 409, SkillType: "BLOW", CanBeReflected: true},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 	if !ok {
 		t.Fatal("UseResult() handled = false, want true")
@@ -475,7 +475,7 @@ func TestBlowDischargesSoulshotOnlyAfterLanding(t *testing.T) {
 			target.blowOK = true
 			target.blowInput = formulas.BlowInput{Landed: tc.landed, Evaded: tc.evaded}
 
-			NewDefaultRegistry().Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "BLOW", StaticReuse: tc.staticReuse}, Targets: []any{target}})
+			NewDefaultRegistry().Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "BLOW", StaticReuse: tc.staticReuse}, Targets: []Actor{target}})
 
 			if got := caster.ChargedShot(modelitem.ShotSoul); got != tc.wantCharged {
 				t.Fatalf("SoulshotCharged() = %v, want %v", got, tc.wantCharged)
@@ -519,7 +519,7 @@ func TestMdamReflectAppliesEffectsUnconditionallyWithNoLandingRoll(t *testing.T)
 	target.successOK = false
 
 	def := modelskill.Definition{ID: 1231, SkillType: "MDAM", Effects: targetEffect()}
-	registry.Use(Cast{Caster: caster, Skill: def, Targets: []any{target}})
+	registry.Use(Cast{Caster: caster, Skill: def, Targets: []Actor{target}})
 
 	if got := len(target.EffectList().All()); got != 0 {
 		t.Fatalf("MDAM reflected target effects = %d, want 0", got)
@@ -543,7 +543,7 @@ func TestMdamReflectHardcodesBssFalseForEffectLanding(t *testing.T) {
 	target.reflects = true
 
 	def := modelskill.Definition{ID: 1231, SkillType: "MDAM", Effects: mdamEffectPowerTemplate()}
-	registry.Use(Cast{Caster: caster, Skill: def, Targets: []any{target}})
+	registry.Use(Cast{Caster: caster, Skill: def, Targets: []Actor{target}})
 
 	if caster.lastBss {
 		t.Fatalf("MDAM reflect branch EffectSuccessInput bss = true, want false (Mdam.java's 2-arg getEffects hardcodes false)")
@@ -559,7 +559,7 @@ func TestMdamNonReflectPassesRealBssForEffectLanding(t *testing.T) {
 	target.magicInput = formulas.MagicDamageInput{MAtk: 400, MDef: 50, SkillPower: 20, PvPMul: 1, ElementalMul: 1, BlessedSoulShot: true}
 
 	def := modelskill.Definition{ID: 1231, SkillType: "MDAM", Effects: mdamEffectPowerTemplate()}
-	registry.Use(Cast{Caster: caster, Skill: def, Targets: []any{target}})
+	registry.Use(Cast{Caster: caster, Skill: def, Targets: []Actor{target}})
 
 	if !target.lastBss {
 		t.Fatalf("MDAM non-reflect branch EffectSuccessInput bss = false, want true (caster's real blessed-spiritshot charge)")
@@ -578,7 +578,7 @@ func TestDamageSkillEffectsRedirectOntoCasterOnReflect(t *testing.T) {
 	target.reflects = true
 
 	def := modelskill.Definition{ID: 321, SkillType: "PDAM", Effects: targetEffect()}
-	registry.Use(Cast{Caster: caster, Skill: def, Targets: []any{target}})
+	registry.Use(Cast{Caster: caster, Skill: def, Targets: []Actor{target}})
 
 	if got := len(target.EffectList().All()); got != 0 {
 		t.Fatalf("PDAM reflected target effects = %d, want 0", got)
@@ -599,12 +599,12 @@ func TestPdamAndChargeDamCounterSkillDamageCaster(t *testing.T) {
 	input := formulas.PhysicalSkillInput{AttackPower: 100, SkillPower: 50, Defence: 40, RandomMul: 1, RaceMul: 1, WeaponVulnMul: 1, PvPMul: 1, ElementalMul: 1}
 	for _, tc := range []struct {
 		name   string
-		caster func() (any, *damageEffectFake)
+		caster func() (Actor, *damageEffectFake)
 		skill  modelskill.Definition
 		mul    float64
 	}{
-		{"PDAM", func() (any, *damageEffectFake) { caster := newDamageEffectFake(); return caster, caster }, modelskill.Definition{ID: 321, SkillType: "PDAM", CanBeReflected: true, Effects: targetEffect()}, 1},
-		{"CHARGEDAM", func() (any, *damageEffectFake) {
+		{"PDAM", func() (Actor, *damageEffectFake) { caster := newDamageEffectFake(); return caster, caster }, modelskill.Definition{ID: 321, SkillType: "PDAM", CanBeReflected: true, Effects: targetEffect()}, 1},
+		{"CHARGEDAM", func() (Actor, *damageEffectFake) {
 			caster := &chargeCaster{damageEffectFake: newDamageEffectFake(), charges: 2}
 			return caster, caster.damageEffectFake
 		}, modelskill.Definition{ID: 214, SkillType: "CHARGEDAM", CanBeReflected: true, NumCharges: 1, Effects: targetEffect()}, 1.4},
@@ -625,7 +625,7 @@ func TestPdamAndChargeDamCounterSkillDamageCaster(t *testing.T) {
 					target.hp, target.physicalOK, target.physicalInput, target.counterSkillPhysical = 2000, true, input, 50
 					target.reflects = outcome.reflects
 
-					result, _ := NewDefaultRegistry().UseResult(Cast{Caster: caster, Skill: tc.skill, Targets: []any{target}})
+					result, _ := NewDefaultRegistry().UseResult(Cast{Caster: caster, Skill: tc.skill, Targets: []Actor{target}})
 
 					want := formulas.PhysicalSkillDamage(input) * tc.mul * .5
 					if health.hp != 2000-want || target.hp != 2000 || len(result.Counterattacks) != 1 || len(health.EffectList().All()) != outcome.casterEffects || len(target.EffectList().All()) != 1-outcome.casterEffects {
@@ -643,12 +643,60 @@ func TestBlowCounterAndReflectKeepsEffectsOnTarget(t *testing.T) {
 	target.hp, target.blowOK, target.counterSkillPhysical, target.reflects = 2000, true, 50, true
 	target.blowInput = formulas.BlowInput{AttackPower: 100, SkillPower: 50, Defence: 40, RandomMul: 1, PosMul: 1.2, CritDamageMul: 1.5, CritDamagePosMul: 1, CritVulnMul: 1, DaggerVulnMul: 1, Landed: true}
 
-	NewDefaultRegistry().Use(Cast{Caster: caster, Skill: modelskill.Definition{ID: 409, SkillType: "BLOW", CanBeReflected: true, Effects: targetEffect()}, Targets: []any{target}})
+	NewDefaultRegistry().Use(Cast{Caster: caster, Skill: modelskill.Definition{ID: 409, SkillType: "BLOW", CanBeReflected: true, Effects: targetEffect()}, Targets: []Actor{target}})
 
 	if got := len(target.EffectList().All()); got != 1 {
 		t.Fatalf("combined-counter BLOW target effects = %d, want 1", got)
 	}
 	if got := len(caster.EffectList().All()); got != 0 {
 		t.Fatalf("combined-counter BLOW caster effects = %d, want 0", got)
+	}
+}
+
+// TestPdamDamagesRealActorTargets casts PDAM with real actors on both ends of
+// the Cast boundary rather than doubles, so the whole path is exercised as it
+// runs in the server: Cast.Targets carries the real NPC, the handler narrows
+// it to physicalSkillTarget, the target resolves its own formula input from
+// the real caster, and the resulting damage lands on the target's real HP.
+// A double can keep this passing while a real actor has quietly stopped
+// satisfying one of those surfaces; this cannot.
+func TestPdamDamagesRealActorTargets(t *testing.T) {
+	caster := newTestHostile(t, 300, 500)
+	target := newTestHostile(t, 301, 0)
+	before, casterBefore := target.HP(), caster.HP()
+
+	NewDefaultRegistry().Use(Cast{
+		Caster:  caster,
+		Skill:   modelskill.Definition{ID: 1, SkillType: "PDAM", Power: 100, CastRange: -1},
+		Targets: []Actor{target},
+	})
+
+	if target.HP() >= before {
+		t.Fatalf("target HP = %v, want less than %v after a PDAM cast by a real actor", target.HP(), before)
+	}
+	if caster.HP() != casterBefore {
+		t.Fatalf("caster HP = %v, want %v: an uncountered PDAM must not damage its caster", caster.HP(), casterBefore)
+	}
+}
+
+// TestPdamSkipsRealDeadTarget pins the aliveness gate on a real actor: the
+// handler reads Dead() through the Actor surface now, so a dead target must
+// still be skipped rather than damaged.
+func TestPdamSkipsRealDeadTarget(t *testing.T) {
+	caster := newTestHostile(t, 302, 500)
+	target := newTestHostile(t, 303, 0)
+	target.ReduceHP(target.MaxHPValue(), caster, modelskill.Definition{})
+	if !target.Dead() {
+		t.Fatalf("target should be dead after losing its full HP pool")
+	}
+
+	NewDefaultRegistry().Use(Cast{
+		Caster:  caster,
+		Skill:   modelskill.Definition{ID: 1, SkillType: "PDAM", Power: 100, CastRange: -1},
+		Targets: []Actor{target},
+	})
+
+	if target.HP() != 0 {
+		t.Fatalf("dead target HP = %v, want 0: a PDAM cast must skip it", target.HP())
 	}
 }

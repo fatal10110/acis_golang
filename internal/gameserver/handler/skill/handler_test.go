@@ -48,7 +48,7 @@ func TestRegistryReportsAttackFailedForPhysicalSkillWithNoDamage(t *testing.T) {
 
 	result, ok := registry.UseResult(Cast{
 		Skill:   modelskill.Definition{SkillType: "PDAM"},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 	if !ok {
 		t.Fatal("UseResult() handled = false, want true for PDAM")
@@ -75,6 +75,7 @@ func TestDefaultRegistryHasRepresentativeHandlers(t *testing.T) {
 }
 
 type skillTarget struct {
+	fakeActor
 	hp, maxHP float64
 	mp, maxMP float64
 	cp, maxCP float64
@@ -255,7 +256,7 @@ func TestHealPercentRestoresHPOrMP(t *testing.T) {
 
 	registry.Use(Cast{
 		Skill:   modelskill.Definition{SkillType: "HEAL_PERCENT", Power: 25},
-		Targets: []any{target, dead, "not a creature"},
+		Targets: []Actor{target, dead, fakeActor{}},
 	})
 	if target.hp != 75 {
 		t.Fatalf("HEAL_PERCENT hp = %v, want 75", target.hp)
@@ -266,7 +267,7 @@ func TestHealPercentRestoresHPOrMP(t *testing.T) {
 
 	registry.Use(Cast{
 		Skill:   modelskill.Definition{SkillType: "MANAHEAL_PERCENT", Power: 40},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 	if target.mp != 30 {
 		t.Fatalf("MANAHEAL_PERCENT mp = %v, want 30", target.mp)
@@ -282,7 +283,7 @@ func TestHealRestoresResolvedAmount(t *testing.T) {
 	if !registry.Use(Cast{
 		Caster:  caster,
 		Skill:   modelskill.Definition{SkillType: "HEAL", Power: 30},
-		Targets: []any{target, dead, "not a creature"},
+		Targets: []Actor{target, dead, fakeActor{}},
 	}) {
 		t.Fatal("Use() returned false for HEAL")
 	}
@@ -297,7 +298,7 @@ func TestHealRestoresResolvedAmount(t *testing.T) {
 	registry.Use(Cast{
 		Caster:  caster,
 		Skill:   modelskill.Definition{SkillType: "HEAL_STATIC", Power: 30},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 	if target.hp != 200 {
 		t.Fatalf("HEAL_STATIC hp = %v, want clamped to 200", target.hp)
@@ -310,7 +311,7 @@ func TestManaHealAndRecharge(t *testing.T) {
 
 	registry.Use(Cast{
 		Skill:   modelskill.Definition{SkillType: "MANAHEAL", Power: 50},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 	if target.mp != 100 {
 		t.Fatalf("MANAHEAL mp = %v, want clamped to 100", target.mp)
@@ -319,7 +320,7 @@ func TestManaHealAndRecharge(t *testing.T) {
 	target.mp = 10
 	registry.Use(Cast{
 		Skill:   modelskill.Definition{SkillType: "MANARECHARGE", Power: 50},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 	if target.mp != 35 {
 		t.Fatalf("MANARECHARGE mp = %v, want 35", target.mp)
@@ -334,7 +335,7 @@ func TestCombatPointHealClampsAndSkipsInvalidTargets(t *testing.T) {
 
 	registry.Use(Cast{
 		Skill:   modelskill.Definition{SkillType: "COMBATPOINTHEAL", Power: 40},
-		Targets: []any{target, dead, invulnerable},
+		Targets: []Actor{target, dead, invulnerable},
 	})
 	if target.cp != 100 {
 		t.Fatalf("cp = %v, want clamped to 100", target.cp)
@@ -354,7 +355,7 @@ func TestCPDamagePercentReducesCurrentCP(t *testing.T) {
 	if !registry.Use(Cast{
 		Caster:  caster,
 		Skill:   modelskill.Definition{SkillType: "CPDAMPERCENT", Power: 35},
-		Targets: []any{target, dead, invulnerable, "not a player"},
+		Targets: []Actor{target, dead, invulnerable, fakeActor{}},
 	}) {
 		t.Fatal("Use() returned false for CPDAMPERCENT")
 	}
@@ -376,7 +377,7 @@ func TestBalanceLifeEqualizesLivingTargets(t *testing.T) {
 	registry.Use(Cast{
 		Caster:  caster,
 		Skill:   modelskill.Definition{SkillType: "BALANCE_LIFE"},
-		Targets: []any{a, b, dead},
+		Targets: []Actor{a, b, dead},
 	})
 
 	if !almost(a.hp, 100.0/3.0) || !almost(b.hp, 200.0/3.0) {
@@ -394,7 +395,7 @@ func TestGiveSPRealDamageAndDummy(t *testing.T) {
 
 	registry.Use(Cast{
 		Skill:   modelskill.Definition{SkillType: "GIVE_SP", Power: 42.9},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 	if target.sp != 42 {
 		t.Fatalf("sp = %d, want truncated skill power 42", target.sp)
@@ -403,7 +404,7 @@ func TestGiveSPRealDamageAndDummy(t *testing.T) {
 	registry.Use(Cast{
 		Caster:  caster,
 		Skill:   modelskill.Definition{SkillType: "REAL_DAMAGE", Power: 10},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 	if target.hp != 15 || target.dead {
 		t.Fatalf("after nonlethal real damage hp=%v dead=%v, want 15/false", target.hp, target.dead)
@@ -412,7 +413,7 @@ func TestGiveSPRealDamageAndDummy(t *testing.T) {
 	registry.Use(Cast{
 		Caster:  caster,
 		Skill:   modelskill.Definition{SkillType: "REAL_DAMAGE", Power: 20},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 	if !target.dead || target.diedBy != caster {
 		t.Fatalf("lethal real damage dead=%v diedBy=%p, want caster %p", target.dead, target.diedBy, caster)
@@ -420,7 +421,7 @@ func TestGiveSPRealDamageAndDummy(t *testing.T) {
 
 	registry.Use(Cast{
 		Skill:   modelskill.Definition{SkillType: "DUMMY", Power: 1000},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 	if target.hp != 15 {
 		t.Fatalf("dummy changed hp to %v, want unchanged 15", target.hp)
@@ -457,22 +458,22 @@ func TestPhysicalMagicBlowAndManaDamageHandlersUseFormulaInputs(t *testing.T) {
 		manaOK: true,
 	}
 
-	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "PDAM"}, Targets: []any{target}})
+	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "PDAM"}, Targets: []Actor{target}})
 	if !almost(target.hp, 2000-192.5) {
 		t.Fatalf("PDAM hp = %v, want %v", target.hp, 2000-192.5)
 	}
 
-	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "MDAM"}, Targets: []any{target}})
+	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "MDAM"}, Targets: []Actor{target}})
 	if !almost(target.hp, 2000-192.5-728) {
 		t.Fatalf("MDAM hp = %v, want %v", target.hp, 2000-192.5-728)
 	}
 
-	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "BLOW"}, Targets: []any{target}})
+	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "BLOW"}, Targets: []Actor{target}})
 	if !almost(target.hp, 2000-192.5-728-1154) {
 		t.Fatalf("BLOW critical hp = %v, want %v", target.hp, 2000-192.5-728-1154)
 	}
 
-	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "MANADAM"}, Targets: []any{target}})
+	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "MANADAM"}, Targets: []Actor{target}})
 	if target.mp != 20 {
 		t.Fatalf("MANADAM mp = %v, want 20", target.mp)
 	}
@@ -508,7 +509,7 @@ func TestPhysicalAndBlowHandlersResolveLethalHits(t *testing.T) {
 	registry.Use(Cast{
 		Caster:  caster,
 		Skill:   modelskill.Definition{SkillType: "PDAM", LethalChance2: 100},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 	if target.hp != 1 || target.cp != 1 {
 		t.Fatalf("PDAM lethal2 hp/cp = %v/%v, want 1/1", target.hp, target.cp)
@@ -524,7 +525,7 @@ func TestPhysicalAndBlowHandlersResolveLethalHits(t *testing.T) {
 	registry.Use(Cast{
 		Caster:  caster,
 		Skill:   modelskill.Definition{SkillType: "BLOW", LethalChance1: 100},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 	if !almost(target.hp, 1423) || target.cp != 1 {
 		t.Fatalf("BLOW lethal1 hp/cp = %v/%v, want 1423/1", target.hp, target.cp)
@@ -561,7 +562,7 @@ func TestBlowMissStillResolvesLethalHit(t *testing.T) {
 	registry.Use(Cast{
 		Caster:  caster,
 		Skill:   modelskill.Definition{SkillType: "BLOW", LethalChance2: 100},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 	if target.hp != 1 {
 		t.Fatalf("BLOW miss hp = %v, want 1 (lethal full still fires despite the miss)", target.hp)
@@ -596,7 +597,7 @@ func TestManadamStopsSleepAndImmobileOnDrain(t *testing.T) {
 		target.effects.Add(e)
 	}
 
-	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "MANADAM"}, Targets: []any{target}})
+	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "MANADAM"}, Targets: []Actor{target}})
 
 	if all := target.effects.All(); len(all) != 0 {
 		t.Fatalf("MANADAM drain left effects = %v, want none (Sleep and ImmobileUntilAttacked should be stopped)", all)

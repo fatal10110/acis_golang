@@ -7,13 +7,13 @@ import (
 )
 
 type spoilableTarget interface {
-	Dead() bool
+	Actor
 	Level() int
 	SpoilPool() *item.SpoilPool
 }
 
 type magicCaster interface {
-	ObjectID() int32
+	Actor
 	Level() int
 }
 
@@ -94,7 +94,7 @@ func (sweepHandler) Use(cast Cast) {
 	applyCastEffects(cast, cast.Caster, cast.Skill, cast.Skill.SelfEffects)
 }
 
-func rewardSweep(caster any, itemID, count int32) {
+func rewardSweep(caster Actor, itemID, count int32) {
 	if pd, ok := caster.(partyDistributor); ok && pd.InParty() {
 		pd.DistributeItem(itemID, count)
 		return

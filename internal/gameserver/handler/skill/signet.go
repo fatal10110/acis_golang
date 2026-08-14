@@ -30,32 +30,24 @@ type signetPositioned interface {
 	Position() (x, y, z int)
 }
 
-// signetIdentified optionally reports a caster's world object id, recorded
-// as the spawned actor's owner; a caster without one spawns an unowned
-// actor.
-type signetIdentified interface {
-	ObjectID() int32
-}
-
 // signetHeaded optionally reports a caster's facing, applied to the
 // spawned actor; a caster without one spawns facing 0.
 type signetHeaded interface {
 	Heading() int
 }
 
+// signetGrounded optionally reports the ground point a caster picked for a
+// ground-targeted signet; a caster without one spawns the actor on itself.
+type signetGrounded interface {
+	GroundTarget() (int, int, int)
+}
+
 // signetCastTarget is the minimal surface a found signet target must
 // expose to appear as the target endpoint of a broadcast skill-use/launch
 // packet pair.
 type signetCastTarget interface {
-	ObjectID() int32
+	Actor
 	Position() (x, y, z int)
-}
-
-// signetNearby is implemented by a world object a signet tick's radius
-// scan can find: alive, and not itself a door or ground item, since
-// neither implements Dead().
-type signetNearby interface {
-	Dead() bool
 }
 
 // signetPeaceZoned optionally reports whether a found object sits in a
@@ -74,9 +66,8 @@ type signetDancer interface {
 // signetUnsummonable is implemented by a found summon actor the
 // SignetAntiSummon family can dismiss.
 type signetUnsummonable interface {
-	Dead() bool
+	Actor
 	Unsummon()
-	ObjectID() int32
 	Position() (x, y, z int)
 	BroadcastFrame(wire.Frame)
 }
@@ -156,7 +147,7 @@ func (h signetHandler) useCasttime(cast Cast) {
 // self-effect templates, dispatching by the template's core-effect name. It
 // returns nil for a template this port doesn't carry a signet self-effect
 // kind for, matching newActorEffect's dispatch for actor-hosted templates.
-func (h signetHandler) newSelfEffect(caster any, def modelskill.Definition, meta effect.Skill, tmpl modelskill.EffectTemplate) *effect.Effect {
+func (h signetHandler) newSelfEffect(caster Actor, def modelskill.Definition, meta effect.Skill, tmpl modelskill.EffectTemplate) *effect.Effect {
 	switch tmpl.Name {
 	case "SignetMDam":
 		return h.newSignetMDamEffect(caster, def, meta, tmpl)
@@ -167,7 +158,7 @@ func (h signetHandler) newSelfEffect(caster any, def modelskill.Definition, meta
 
 // spawnActor builds and spawns the world actor a signet-family skill
 // carries its area effect on, attributed to and positioned at caster.
-func (h signetHandler) spawnActor(caster any, def modelskill.Definition) (*npc.EffectPoint, bool) {
+func (h signetHandler) spawnActor(caster Actor, def modelskill.Definition) (*npc.EffectPoint, bool) {
 	tmpl, ok := h.templates.Get(def.EffectNpcID)
 	if !ok {
 		return nil, false
@@ -177,10 +168,7 @@ func (h signetHandler) spawnActor(caster any, def modelskill.Definition) (*npc.E
 		return nil, false
 	}
 
-	var ownerID int32
-	if oid, ok := caster.(signetIdentified); ok {
-		ownerID = oid.ObjectID()
-	}
+	ownerID := caster.ObjectID()
 	actor, err := npc.NewEffectPoint(id, tmpl, ownerID)
 	if err != nil {
 		return nil, false
@@ -195,7 +183,7 @@ func (h signetHandler) spawnActor(caster any, def modelskill.Definition) (*npc.E
 	}
 	x, y, z := pos.Position()
 	if def.Target == modelskill.TargetGround {
-		if ground, ok := caster.(interface{ GroundTarget() (int, int, int) }); ok {
+		if ground, ok := caster.(signetGrounded); ok {
 			x, y, z = ground.GroundTarget()
 		}
 	}
@@ -247,7 +235,7 @@ func (h signetHandler) newSignetBuffEffect(def modelskill.Definition, meta effec
 			return true
 		}
 		var ids []int32
-		h.forEachSignetTarget(actor, def.Radius, func(target signetNearby) {
+		h.forEachSignetTarget(actor, def.Radius, func(target Actor) {
 			applyEffects(actor, target, sub, sub.Effects)
 			if ct, ok := target.(signetCastTarget); ok {
 				if err := actor.BroadcastSkillUse(ct, int32(sub.ID), int32(sub.Level)); err != nil {
@@ -282,7 +270,7 @@ func (h signetHandler) newSignetNoiseEffect(def modelskill.Definition, meta effe
 			return true
 		}
 		var ids []int32
-		h.forEachSignetTarget(actor, def.Radius, func(target signetNearby) {
+		h.forEachSignetTarget(actor, def.Radius, func(target Actor) {
 			if dancer, ok := target.(signetDancer); ok {
 				list := dancer.EffectList()
 				for _, cand := range list.All() {
@@ -323,7 +311,7 @@ func (h signetHandler) newSignetAntiSummonEffect(def modelskill.Definition, meta
 			return true
 		}
 		var ids []int32
-		h.forEachSignetTarget(actor, def.Radius, func(target signetNearby) {
+		h.forEachSignetTarget(actor, def.Radius, func(target Actor) {
 			summon, ok := target.(signetUnsummonable)
 			if !ok {
 				return
@@ -351,7 +339,7 @@ func (h signetHandler) newSignetAntiSummonEffect(def modelskill.Definition, meta
 // the caster can't afford it) then deals magic damage, using the skill's
 // own formula inputs, to every living, non-peace-zone creature the actor
 // finds within skill radius.
-func (h signetHandler) newSignetMDamEffect(caster any, def modelskill.Definition, meta effect.Skill, tmpl modelskill.EffectTemplate) *effect.Effect {
+func (h signetHandler) newSignetMDamEffect(caster Actor, def modelskill.Definition, meta effect.Skill, tmpl modelskill.EffectTemplate) *effect.Effect {
 	e := &effect.Effect{Skill: meta, Template: tmpl, Type: effect.TypeSignetGround, Effector: caster, Effected: caster}
 	var actor *npc.EffectPoint
 	e.OnStart = func(*effect.Effect) bool {
@@ -380,7 +368,7 @@ func (h signetHandler) newSignetMDamEffect(caster any, def modelskill.Definition
 		mp.ReduceMP(float64(def.MPConsume))
 
 		var ids []int32
-		h.forEachSignetTarget(actor, def.Radius, func(target signetNearby) {
+		h.forEachSignetTarget(actor, def.Radius, func(target Actor) {
 			dmgTarget, ok := target.(magicDamageTarget)
 			if !ok {
 				return
@@ -424,10 +412,10 @@ type mpPayer interface {
 
 // forEachSignetTarget calls fn for every living, non-peace-zone object
 // actor's radius scan finds, excluding doors and ground items (neither
-// implements Dead()).
-func (h signetHandler) forEachSignetTarget(actor *npc.EffectPoint, radius int, fn func(signetNearby)) {
+// implements Dead(), so neither is actor-shaped).
+func (h signetHandler) forEachSignetTarget(actor *npc.EffectPoint, radius int, fn func(Actor)) {
 	actor.ForEachNearby(radius, func(o world.Tracked) {
-		target, ok := o.(signetNearby)
+		target, ok := o.(Actor)
 		if !ok || target.Dead() {
 			return
 		}

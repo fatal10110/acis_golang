@@ -6,7 +6,10 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
-type doorFake struct{ unlockable, opened bool }
+type doorFake struct {
+	fakeActor
+	unlockable, opened bool
+}
 
 func (d *doorFake) Unlockable() bool { return d.unlockable }
 func (d *doorFake) Opened() bool     { return d.opened }
@@ -18,7 +21,7 @@ func TestUnlockDoorSpecialGuaranteedSuccess(t *testing.T) {
 
 	registry.Use(Cast{
 		Skill:   modelskill.Definition{SkillType: "UNLOCK_SPECIAL", Power: 150},
-		Targets: []any{door},
+		Targets: []Actor{door},
 	})
 	if !door.opened {
 		t.Fatal("UNLOCK_SPECIAL with power >= 100 should always open, even an unlockable=false door")
@@ -31,7 +34,7 @@ func TestUnlockDoorLevelZeroNeverOpens(t *testing.T) {
 
 	registry.Use(Cast{
 		Skill:   modelskill.Definition{SkillType: "UNLOCK", Level: 0},
-		Targets: []any{door},
+		Targets: []Actor{door},
 	})
 	if door.opened {
 		t.Fatal("level 0 unlock should never open a door")
@@ -44,7 +47,7 @@ func TestUnlockDoorNotUnlockableIsSkipped(t *testing.T) {
 
 	registry.Use(Cast{
 		Skill:   modelskill.Definition{SkillType: "UNLOCK", Level: 4},
-		Targets: []any{door},
+		Targets: []Actor{door},
 	})
 	if door.opened {
 		t.Fatal("a non-unlockable door should not open via a regular UNLOCK")
@@ -52,6 +55,7 @@ func TestUnlockDoorNotUnlockableIsSkipped(t *testing.T) {
 }
 
 type chestFake struct {
+	fakeActor
 	dead, interacted, box bool
 	level                 int
 
@@ -74,7 +78,7 @@ func TestUnlockChestNotBoxAddsAttackDesire(t *testing.T) {
 	registry := NewDefaultRegistry()
 	chest := &chestFake{box: false}
 
-	registry.Use(Cast{Skill: modelskill.Definition{SkillType: "UNLOCK"}, Targets: []any{chest}})
+	registry.Use(Cast{Skill: modelskill.Definition{SkillType: "UNLOCK"}, Targets: []Actor{chest}})
 	if !chest.desireAdded {
 		t.Fatal("expected an attack desire for a non-box chest")
 	}
@@ -89,7 +93,7 @@ func TestUnlockChestDeluxeKeyExactLevelMatchGuaranteedOpen(t *testing.T) {
 
 	registry.Use(Cast{
 		Skill:   modelskill.Definition{SkillType: "DELUXE_KEY_UNLOCK", ID: 9999, Level: 10},
-		Targets: []any{chest},
+		Targets: []Actor{chest},
 	})
 	if !chest.interacted {
 		t.Fatal("chest should be marked interacted")
@@ -105,7 +109,7 @@ func TestUnlockChestAboveBracketTooLowSkillGuaranteedFail(t *testing.T) {
 
 	registry.Use(Cast{
 		Skill:   modelskill.Definition{SkillType: "UNLOCK", Level: 5},
-		Targets: []any{chest},
+		Targets: []Actor{chest},
 	})
 	if chest.died {
 		t.Fatal("a level 5 unlock skill should never open a level-70 chest")
