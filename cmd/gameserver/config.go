@@ -295,6 +295,10 @@ func provideKillRewardConfig(paths gameServerPaths, serverProps *config.Properti
 	if err != nil {
 		return manager.KillRewardConfig{}, err
 	}
+	partyRange, err := playersProps.Int("PartyRange", 1500)
+	if err != nil {
+		return manager.KillRewardConfig{}, err
+	}
 
 	return manager.KillRewardConfig{
 		Rates: item.Rates{
@@ -309,6 +313,7 @@ func provideKillRewardConfig(paths gameServerPaths, serverProps *config.Properti
 		AutoLootHerbs:     serverProps.Bool("AutoLootHerbs", false),
 		DeepBlueDropRules: playersProps.Bool("UseDeepBlueDropRules", true),
 		PlayerLevels:      data.Levels,
+		PartyRange:        partyRange,
 	}, nil
 }
 

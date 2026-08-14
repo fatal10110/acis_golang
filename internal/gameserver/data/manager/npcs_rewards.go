@@ -150,7 +150,7 @@ func (d *deathRewards) grantExpAndSp(entries []playerRewardEntry, totalDamage fl
 				entry.pet, _ = obj.(*summon.Actor)
 			}
 		}
-		if entry.pet != nil && !entry.pet.Dead() {
+		if entry.pet != nil && entry.pet.CanReceiveKillReward(d.config.PartyRange) {
 			petExp, petSp := petReward(entry.pet.ExpType(), entry.petDamage, entry.ownerDamage, exp, sp)
 			exp -= petExp
 			sp -= petSp

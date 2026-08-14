@@ -38,6 +38,7 @@ type KillRewardConfig struct {
 	AutoLootHerbs     bool
 	DeepBlueDropRules bool
 	PlayerLevels      *player.LevelTable
+	PartyRange        int
 }
 
 // Npcs owns every live NPC instantiated from the spawn table at boot,
