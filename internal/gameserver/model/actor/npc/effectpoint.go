@@ -150,10 +150,14 @@ func (ep *EffectPoint) BroadcastSkillLaunched(skillID, level int32, targetIDs []
 
 func (ep *EffectPoint) broadcastFrame(fr wire.Frame) {
 	ep.world.ForEachKnown(ep, func(o world.Tracked) {
-		receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
+		receiver, ok := o.(interface{ BroadcastFrame(wire.Frame) bool })
 		if !ok {
 			return
 		}
-		receiver.SendFrame(fr)
+		frame, ok := wire.CopyFrame(fr)
+		if ok {
+			receiver.BroadcastFrame(frame)
+		}
 	})
+	fr.Release()
 }

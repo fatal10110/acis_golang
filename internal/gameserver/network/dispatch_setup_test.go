@@ -348,6 +348,7 @@ func newTestLivePlayer(t testing.TB, id int32, capture *frameCapture) *livePlaye
 	ch.SetResourceValues(player.Resources{MaxHP: 80, CurrentHP: 80, MaxMP: 30, CurrentMP: 30})
 	ch.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventory(ch.ID, testItemTemplates(), nil))
 	ch.SetFrameSender(capture.send)
+	ch.SetBroadcastFrameSender(capture.send)
 
 	x, y, z := ch.Position()
 	live, err := creature.NewLive(location.Location{X: x, Y: y, Z: z}, tmpl.RunSpeed, testGeo{}, ch)

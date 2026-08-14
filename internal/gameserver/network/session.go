@@ -39,10 +39,14 @@ func (s *Session) SendFrame(frame wire.Frame) bool {
 	return s.sendFrame(frame, s.conn.SendFrame)
 }
 
-// trySendFrame encrypts and queues frame only when the connection's outbound
+// TrySendFrame encrypts and queues frame only when the connection's outbound
 // queue has capacity. A full queue disconnects the client before encryption,
 // because dropping an ordered frame would desynchronize its cipher. It takes
 // ownership of frame in every outcome.
+func (s *Session) TrySendFrame(frame wire.Frame) bool {
+	return s.trySendFrame(frame)
+}
+
 func (s *Session) trySendFrame(frame wire.Frame) bool {
 	frameBytes := frame.Bytes()
 	if len(frameBytes) < frameHeaderSize {

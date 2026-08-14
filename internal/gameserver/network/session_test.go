@@ -107,6 +107,36 @@ func TestSessionTrySendFrameDropsAndReleasesOwnedFrameWhenQueueFull(t *testing.T
 	}
 }
 
+func TestSessionTrySendFrameDisconnectsFullQueueWithoutBlocking(t *testing.T) {
+	key := bytes.Repeat([]byte{0x11}, keySize)
+	cipher, err := NewCipher(key)
+	if err != nil {
+		t.Fatalf("NewCipher: %v", err)
+	}
+	conn := fullQueueConn(t)
+	s := NewSession(conn, cipher)
+
+	done := make(chan bool, 1)
+	go func() {
+		done <- s.TrySendFrame(wire.BorrowedFrame(wire.FrameBytes([]byte{0x02, 0x00})))
+	}()
+	select {
+	case sent := <-done:
+		if sent {
+			t.Fatal("TrySendFrame returned true with a full outbound queue")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("TrySendFrame blocked on a full outbound queue")
+	}
+
+	conn.mu.RLock()
+	closed := conn.closed
+	conn.mu.RUnlock()
+	if !closed {
+		t.Fatal("full outbound queue did not disconnect the session")
+	}
+}
+
 func TestSessionSendFrameArmsCipherSoFirstPacketIsCleartext(t *testing.T) {
 	s, client := pipeSessions(t)
 

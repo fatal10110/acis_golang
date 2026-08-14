@@ -245,7 +245,7 @@ func (h *Hostile) broadcastShotRecharge(skillID int32) {
 	built := false
 	defer func() { frame.Release() }()
 	h.world.ForEachKnownInRadius(h, 600, func(o world.Tracked) {
-		receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
+		receiver, ok := o.(interface{ BroadcastFrame(wire.Frame) bool })
 		if ok {
 			if !built {
 				frame = h.frames.SkillUse(h.ObjectID(), self, h.ObjectID(), self, skillID, 1, 0, 0, false)
@@ -253,7 +253,7 @@ func (h *Hostile) broadcastShotRecharge(skillID int32) {
 			}
 			owned, copied := wire.CopyFrame(frame)
 			if copied {
-				receiver.SendFrame(owned)
+				receiver.BroadcastFrame(owned)
 			}
 		}
 	})
@@ -483,20 +483,20 @@ func (h *Hostile) broadcastFrame(build func() wire.Frame) error {
 	if h.world == nil {
 		return ErrNoWorld
 	}
-	known := h.appendKnown()
-	defer h.releaseKnown()
+	known := append([]world.Tracked(nil), h.appendKnown()...)
+	h.releaseKnown()
 	var frame wire.Frame
 	built := false
 	defer func() { frame.Release() }()
 	for _, o := range known {
-		if receiver, ok := o.(interface{ SendFrame(wire.Frame) bool }); ok {
+		if receiver, ok := o.(interface{ BroadcastFrame(wire.Frame) bool }); ok {
 			if !built {
 				frame = build()
 				built = true
 			}
 			owned, copied := wire.CopyFrame(frame)
 			if copied {
-				receiver.SendFrame(owned)
+				receiver.BroadcastFrame(owned)
 			}
 		}
 	}

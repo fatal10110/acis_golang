@@ -169,8 +169,8 @@ func (l *GameClientLink) broadcastLiveFrame(live *livePlayer, frame func() wire.
 		if l.world == nil {
 			return
 		}
-		known := live.appendKnown(l.world)
-		defer live.releaseKnown()
+		known := append([]world.Tracked(nil), live.appendKnown(l.world)...)
+		live.releaseKnown()
 		for _, o := range known {
 			if receiver, ok := o.(frameReceiver); ok {
 				send(receiver)
@@ -180,7 +180,7 @@ func (l *GameClientLink) broadcastLiveFrame(live *livePlayer, frame func() wire.
 }
 
 type frameReceiver interface {
-	SendFrame(wire.Frame) bool
+	BroadcastFrame(wire.Frame) bool
 }
 
 func broadcastFrame(build func() wire.Frame, recipients func(func(frameReceiver))) {
@@ -194,7 +194,7 @@ func broadcastFrame(build func() wire.Frame, recipients func(func(frameReceiver)
 		}
 		frame, ok := serverpackets.CopyFrame(serialized)
 		if ok {
-			receiver.SendFrame(frame)
+			receiver.BroadcastFrame(frame)
 		}
 	})
 }

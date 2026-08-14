@@ -97,6 +97,7 @@ type Character struct {
 	insidePvPZone             atomic.Bool
 	insideSiegeZone           atomic.Bool
 	sendFrame                 func(wire.Frame) bool
+	broadcastFrame            func(wire.Frame) bool
 	broadcastAttack           func(attack.Snapshot)
 	broadcastMove             func(move.Event)
 	broadcastStop             func()

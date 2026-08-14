@@ -130,6 +130,14 @@ func (c *Character) SetFrameSender(send func(wire.Frame) bool) {
 	c.sendFrame = send
 }
 
+// SetBroadcastFrameSender records the non-blocking session hook for frames
+// delivered by a broadcast fan-out. Passing nil disconnects broadcasts.
+func (c *Character) SetBroadcastFrameSender(send func(wire.Frame) bool) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	c.broadcastFrame = send
+}
+
 // SetAttackBroadcaster records the packet-layer hook that broadcasts attack
 // snapshots to nearby connected clients.
 func (c *Character) SetAttackBroadcaster(broadcast func(attack.Snapshot)) {
@@ -255,6 +263,18 @@ func (c *Character) BroadcastMPStatus() {
 func (c *Character) SendFrame(frame wire.Frame) bool {
 	c.stateMu.RLock()
 	send := c.sendFrame
+	c.stateMu.RUnlock()
+	if send == nil {
+		frame.Release()
+		return false
+	}
+	return send(frame)
+}
+
+// BroadcastFrame sends frame through the broadcast-only session hook, if any.
+func (c *Character) BroadcastFrame(frame wire.Frame) bool {
+	c.stateMu.RLock()
+	send := c.broadcastFrame
 	c.stateMu.RUnlock()
 	if send == nil {
 		frame.Release()
