@@ -146,6 +146,8 @@ Load only the guide needed for the current work:
   and ast-grep selection with verified bounded commands and fallbacks.
 - [`docs/agents/verification.md`](docs/agents/verification.md): focused checks, final gates, independent
   fixtures, configuration-only validation, and the definition of done.
+- [`docs/agents/test-strategy.md`](docs/agents/test-strategy.md): when to replace a hand-rolled test
+  double with the real production type or a real DB/socket boundary, and when to keep it.
 - [`docs/agents/server-initiated-updates.md`](docs/agents/server-initiated-updates.md): delivering
   state the server changes without a client request, runtime hooks instead of `serverpackets`
   imports in domain packages, and wire-through of ported tasks and adapters.
