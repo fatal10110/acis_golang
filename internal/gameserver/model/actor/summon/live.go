@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -70,6 +71,7 @@ type Actor struct {
 	lifetime       LifetimeState
 	statusUpdater  func()
 	damageNotifier func(string, int32)
+	expNotifier    func(int64)
 	dead           bool
 	disabled       bool
 	combat         bool
@@ -94,6 +96,7 @@ type Actor struct {
 
 	petInventory  *itemcontainer.Inventory
 	petConfig     *petmodel.Config
+	growth        *npc.PetData
 	controlItemID int32
 	exp           int64
 	sp            int
@@ -224,6 +227,7 @@ type PetConfig struct {
 	CON     int
 	Passive bool
 	Config  *petmodel.Config
+	Growth  *npc.PetData
 
 	Inventory     *itemcontainer.Inventory
 	Fed           int
@@ -315,6 +319,7 @@ func NewPet(cfg PetConfig) *Actor {
 		intent:        IntentFollowOwner,
 		petInventory:  cfg.Inventory,
 		petConfig:     petCfg,
+		growth:        cfg.Growth,
 		controlItemID: cfg.ControlItemID,
 		exp:           cfg.Exp,
 		sp:            cfg.SP,

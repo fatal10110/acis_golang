@@ -6,6 +6,7 @@ import (
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -60,6 +61,13 @@ func (a *Actor) SetDamageNotifier(notify func(string, int32)) {
 	a.statusMu.Lock()
 	defer a.statusMu.Unlock()
 	a.damageNotifier = notify
+}
+
+// SetExpNotifier records the owner-facing pet experience feedback hook.
+func (a *Actor) SetExpNotifier(notify func(int64)) {
+	a.statusMu.Lock()
+	defer a.statusMu.Unlock()
+	a.expNotifier = notify
 }
 
 func (a *Actor) notifyDamage(attacker any, amount float64) {
@@ -168,17 +176,103 @@ func (a *Actor) ExpType() int {
 	return a.expType
 }
 
+// CanReceiveKillReward reports whether this pet meets the reference's
+// maximum-experience, life, and owner-distance reward gate.
+func (a *Actor) CanReceiveKillReward(partyRange int) bool {
+	if a == nil || !a.isPet || a.Dead() || a.owner == nil {
+		return false
+	}
+	a.statusMu.RLock()
+	max, ok := int64(0), false
+	if a.growth != nil {
+		if row, found := a.growth.Levels[81]; found {
+			max, ok = row.MaxExp, true
+		}
+	}
+	exp := a.exp
+	a.statusMu.RUnlock()
+	if !ok || exp > max+10_000 {
+		return false
+	}
+	ax, ay, az := a.Position()
+	ox, oy, oz := a.owner.Position()
+	return location.In3DRange(ax, ay, az, ox, oy, oz, partyRange)
+}
+
+// Exp returns this pet's durable total experience.
+func (a *Actor) Exp() int64 {
+	a.statusMu.RLock()
+	defer a.statusMu.RUnlock()
+	return a.exp
+}
+
+// SP returns this pet's durable skill points.
+func (a *Actor) SP() int {
+	a.statusMu.RLock()
+	defer a.statusMu.RUnlock()
+	return a.sp
+}
+
 // AddExpAndSp grants a pet its raw kill-reward share. Experience uses the
 // pet-specific configured rate; SP is deliberately unscaled.
 func (a *Actor) AddExpAndSp(rawExp int64, sp int) {
 	if a == nil || !a.isPet {
 		return
 	}
+	expGain := a.ScaledExpGain(rawExp)
 	a.statusMu.Lock()
-	a.exp += a.ScaledExpGain(rawExp)
+	a.exp += expGain
 	a.sp += sp
+	leveled := a.refreshGrowthLocked()
 	a.statusMu.Unlock()
+	if leveled {
+		a.resetVitals()
+	}
 	a.UpdateStatus()
+	a.statusMu.RLock()
+	notify := a.expNotifier
+	a.statusMu.RUnlock()
+	if notify != nil {
+		notify(expGain)
+	}
+}
+
+func (a *Actor) refreshGrowthLocked() bool {
+	if a.growth == nil {
+		return false
+	}
+	oldLevel := a.level
+	for {
+		next, ok := a.growth.Levels[a.level+1]
+		if !ok || a.exp < next.MaxExp {
+			break
+		}
+		a.level++
+	}
+	row, ok := a.growth.Levels[a.level]
+	if !ok {
+		return a.level != oldLevel
+	}
+	a.expType = row.ExpType
+	a.maxMeal = row.MaxMeal
+	a.mealInBattle = row.MealInBattle
+	a.mealInNormal = row.MealInNormal
+	a.stats.PAtk = row.PAtk
+	a.stats.PDef = row.PDef
+	a.stats.MAtk = row.MAtk
+	a.stats.MDef = row.MDef
+	a.stats.MaxHP = row.MaxHP
+	a.stats.MaxMP = row.MaxMP
+	a.stats.SSCount = row.SSCount
+	a.stats.SPSCount = row.SPSCount
+	return a.level != oldLevel
+}
+
+func (a *Actor) resetVitals() {
+	hp, mp := a.MaxHPValue(), a.MaxMPValue()
+	a.vitals.mu.Lock()
+	a.vitals.hp, a.vitals.mp = hp, mp
+	a.vitals.mu.Unlock()
 }
 
 // CanWearPetItem reports whether this pet can equip tmpl.

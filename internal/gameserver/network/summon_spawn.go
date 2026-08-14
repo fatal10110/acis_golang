@@ -134,6 +134,7 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 		Exp:             state.Exp,
 		SP:              state.SP,
 		ExpType:         levelStats.ExpType,
+		Growth:          npcTmpl.Pet,
 		CON:             npcTmpl.CON,
 		Config:          nil, // set by newPet from link.petConfig
 		Inventory:       itemcontainer.NewPetInventory(objID, live.Inventory().Templates()),
@@ -307,6 +308,11 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 		l.ai.Add(summonAIActor{Actor: actor, brain: brain})
 	}
 	actor.SetStatusUpdater(func() { l.broadcastSummonStatus(actor) })
+	actor.SetExpNotifier(func(exp int64) {
+		if owner, ok := l.livePlayerByID(actor.OwnerID()); ok {
+			owner.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessagePetEarnedS1Exp, int32(exp)))
+		}
+	})
 	actor.SetDamageNotifier(func(attackerName string, damage int32) {
 		owner, ok := l.livePlayerByID(actor.OwnerID())
 		if !ok {
