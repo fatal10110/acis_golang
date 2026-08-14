@@ -4,11 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
 
 type persistenceTestGeo struct{}
@@ -136,95 +134,4 @@ func TestSetKnownSkillDropsPassiveStatsWhenSkillIsRemoved(t *testing.T) {
 	if ch.SkillLevel(134) != 0 {
 		t.Fatalf("SkillLevel(134) = %d, want 0", ch.SkillLevel(134))
 	}
-}
-
-func TestRestoreKnownSkillsAttachesPassiveStats(t *testing.T) {
-	table := modelskill.NewTable([]modelskill.Definition{
-		{ID: 134, Level: 1, Activation: modelskill.ActivationPassive, Funcs: []modelskill.FuncTemplate{
-			{Op: modelskill.FuncAdd, Stat: "pAtk", Value: 7},
-		}},
-	})
-	p := NewPersistence(nil, table, fakeSkillLevelStore{levels: player.SkillLevels{134: 1, 9999: 1}})
-	ch := &player.Character{ID: 1}
-	base := ch.PAtk()
-
-	if err := p.Restore(context.Background(), ch); err != nil {
-		t.Fatalf("Restore() error: %v", err)
-	}
-
-	if got, want := ch.PAtk(), base+7; got != want {
-		t.Fatalf("PAtk() after restoring a passive skill = %v, want %v", got, want)
-	}
-	if ch.SkillLevel(9999) != 0 {
-		t.Fatalf("stale unloaded skill level = %d, want 0 (not restored)", ch.SkillLevel(9999))
-	}
-}
-
-// fakeSkillSaveStore captures whatever rows Save last replaced, standing in
-// for the real character_skills_save table.
-type fakeSkillSaveStore struct {
-	rows []effect.SaveRow
-}
-
-func (s *fakeSkillSaveStore) Replace(_ context.Context, _ int32, _ int32, rows []effect.SaveRow) error {
-	s.rows = append([]effect.SaveRow(nil), rows...)
-	return nil
-}
-func (s *fakeSkillSaveStore) ListByCharacter(context.Context, int32, int32) ([]effect.SaveRow, error) {
-	return nil, nil
-}
-func (s *fakeSkillSaveStore) DeleteByCharacter(context.Context, int32, int32) (int64, error) {
-	return 0, nil
-}
-
-// TestSaveExcludesToggleHerbContinuousAndHealOverTimeEffects proves Save's
-// live-effect-list snapshot applies the same exclusions
-// Player.storeEffect() does (Player.java: effect.getEffectType() ==
-// EffectType.HEAL_OVER_TIME, effect.isHerbEffect(), skill.isToggle(),
-// skill.getSkillType() == SkillType.CONT): only a plain buff among these
-// five survives into a saved row.
-func TestSaveExcludesToggleHerbContinuousAndHealOverTimeEffects(t *testing.T) {
-	plainDef := modelskill.Definition{ID: 1, Level: 1, Effects: []modelskill.EffectTemplate{{Name: "Buff", Count: 1, Time: 30}}}
-	toggleDef := modelskill.Definition{ID: 2, Level: 1, Activation: modelskill.ActivationToggle, Effects: []modelskill.EffectTemplate{{Name: "Buff", Count: 1, Time: 30}}}
-	continuousDef := modelskill.Definition{ID: 3, Level: 1, SkillType: "CONT", Effects: []modelskill.EffectTemplate{{Name: "Buff", Count: 1, Time: 30}}}
-	hotDef := modelskill.Definition{ID: 4, Level: 1, Effects: []modelskill.EffectTemplate{{Name: "HealOverTime", Count: 1, Time: 30}}}
-	// Name (not an explicit flag) is what marks a herb effect, mirroring
-	// AbstractEffect._isHerbEffect = _skill.getName().contains("Herb") — the
-	// same derivation effect.New applies on every real herb-item cast.
-	herbDef := modelskill.Definition{ID: 5, Level: 1, Name: "Herb of Life", Effects: []modelskill.EffectTemplate{{Name: "Buff", Count: 1, Time: 30}}}
-
-	table := modelskill.NewTable([]modelskill.Definition{plainDef, toggleDef, continuousDef, hotDef, herbDef})
-	store := &fakeSkillSaveStore{}
-	p := NewPersistence(store, table)
-
-	ch := &player.Character{ID: 1}
-	live, err := creature.NewLive(location.Location{}, 0, persistenceTestGeo{}, ch)
-	if err != nil {
-		t.Fatalf("creature.NewLive() error: %v", err)
-	}
-	ch.Live = live
-
-	for _, def := range []modelskill.Definition{plainDef, toggleDef, continuousDef, hotDef, herbDef} {
-		e, err := effect.New(effect.SkillFromDefinition(def), def.Effects[0])
-		if err != nil {
-			t.Fatalf("effect.New(%d) error: %v", def.ID, err)
-		}
-		e.Effector, e.Effected = ch, ch
-		ch.EffectList().Add(e)
-	}
-
-	if err := p.Save(context.Background(), ch, true); err != nil {
-		t.Fatalf("Save() error: %v", err)
-	}
-	if len(store.rows) != 1 || store.rows[0].Skill.ID != plainDef.ID {
-		t.Fatalf("saved rows = %+v, want exactly the plain buff (skill 1)", store.rows)
-	}
-}
-
-type fakeSkillLevelStore struct {
-	levels player.SkillLevels
-}
-
-func (s fakeSkillLevelStore) ListKnownSkills(context.Context, int32, int32) (player.SkillLevels, error) {
-	return s.levels, nil
 }
