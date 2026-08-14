@@ -37,7 +37,7 @@ type Decay struct {
 	now     func() time.Time
 	log     zerolog.Logger
 
-	*deadlineRegistry[int32, DecayActor]
+	*serialDeadlineRegistry[int32, DecayActor]
 }
 
 // NewDecay returns an empty corpse-decay tracker.
@@ -48,7 +48,7 @@ func NewDecay(effects DecayEffects, now func() time.Time) (*Decay, error) {
 	if now == nil {
 		now = time.Now
 	}
-	return &Decay{effects: effects, now: now, deadlineRegistry: newDeadlineRegistry[int32, DecayActor]()}, nil
+	return &Decay{effects: effects, now: now, serialDeadlineRegistry: newSerialDeadlineRegistry[int32, DecayActor]()}, nil
 }
 
 // Start launches the fixed one-second corpse-decay task.
@@ -98,11 +98,10 @@ func (d *Decay) Deadline(actor DecayActor) (time.Time, bool) {
 // returns ErrReentrantTick without doing anything else if another Tick call
 // is already in flight.
 func (d *Decay) Tick() error {
-	if !d.ticking.CompareAndSwap(false, true) {
-		d.log.Error().Err(ErrReentrantTick).Msg("task: Decay.Tick")
+	if !d.beginTick(d.log, "task: Decay.Tick") {
 		return ErrReentrantTick
 	}
-	defer d.ticking.Store(false)
+	defer d.endTick()
 
 	d.tickDue(d.now(), d.effects.Decay)
 	return nil

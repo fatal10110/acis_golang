@@ -63,6 +63,37 @@ func TestPvPFlagsTickUpdatesBlinksAndExpires(t *testing.T) {
 	}
 }
 
+// TestPvPFlagsTickDueAllocationDoesNotScaleWithTrackedCount guards against
+// tickExpiry pre-sizing its due partition to the full tracked count on
+// every sweep (as opposed to allocating only when something is actually
+// due). With every flag non-expiring, the sweep's own work — appending
+// every entry to pending — necessarily costs more allocations at 128
+// tracked flags than at 8, since growing that slice needs more
+// reallocations; a pre-sized due slice would add a second, much larger
+// N-proportional allocation on top of that on every single call. Comparing
+// the two counts' ratio against the tracked-count ratio catches that
+// second source without asserting an exact, Go-version-fragile count.
+func TestPvPFlagsTickDueAllocationDoesNotScaleWithTrackedCount(t *testing.T) {
+	newFlags := func(n int) *PvPFlags {
+		now := time.UnixMilli(0)
+		flags := NewPvPFlags(DefaultPvPFlagOptions(), func() time.Time { return now })
+		for i := 0; i < n; i++ {
+			flags.Add(&pvpFlagFakeActor{id: int32(i + 1)}, time.Hour)
+		}
+		return flags
+	}
+
+	small := newFlags(8)
+	large := newFlags(128)
+
+	smallAllocs := testing.AllocsPerRun(50, small.Tick)
+	largeAllocs := testing.AllocsPerRun(50, large.Tick)
+
+	if largeAllocs > smallAllocs*4 {
+		t.Fatalf("allocs at 128 tracked flags (16x more than 8) = %v, want at most 4x the 8-flag allocs (%v); due partition may be pre-sized to the full tracked count even though nothing is due", largeAllocs, smallAllocs)
+	}
+}
+
 func TestPvPFlagsRemoveCanLeaveCurrentFlag(t *testing.T) {
 	now := time.UnixMilli(1_000)
 	flags := NewPvPFlags(DefaultPvPFlagOptions(), func() time.Time { return now })
@@ -155,5 +186,19 @@ func TestPvPFlagOptionsDefaultsAndInvalidValues(t *testing.T) {
 	}
 	if _, err := PvPFlagOptionsFromProperties(props); err == nil {
 		t.Fatal("PvPFlagOptionsFromProperties() with bad int: expected error")
+	}
+}
+
+func BenchmarkPvPFlagsTickManyNonExpiringFlags(b *testing.B) {
+	now := time.UnixMilli(0)
+	flags := NewPvPFlags(DefaultPvPFlagOptions(), func() time.Time { return now })
+	for i := 0; i < 128; i++ {
+		flags.Add(&pvpFlagFakeActor{id: int32(i + 1)}, time.Hour)
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		flags.Tick()
 	}
 }

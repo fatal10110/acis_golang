@@ -4,6 +4,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/rs/zerolog"
 )
 
 type deadlineEntry[V any] struct {
@@ -11,21 +13,25 @@ type deadlineEntry[V any] struct {
 	deadline time.Time
 }
 
-// deadlineRegistry is the shared mutex+map+ticker-sweep structure behind
-// Decay, AttackStance, Respawn, and PvPFlags: a map keyed by K holding a
-// value V and a deadline, with scratch-slice reuse across sweeps so a
-// tick's due (and, for tickExpiry, pending) partitions do not allocate.
+// deadlineRegistry is the shared mutex+map structure behind Decay,
+// AttackStance, Respawn, and PvPFlags: a map keyed by K holding a value V
+// and a deadline. Its own sweeps (tickDueConcurrent, tickExpiry) allocate a
+// fresh due/pending partition on every call, so they are safe to call from
+// multiple goroutines at once with no other coordination — required by
+// Respawn and PvPFlags, whose Tick has no reentrancy guard.
 //
-// entries and the scratch buffers are guarded by mu. ticking is available
-// for callers that need to enforce a single-goroutine Tick contract; it is
-// unused by types that never guarded reentrancy before this registry
-// existed.
+// Decay and AttackStance additionally serialize Tick via a reentrancy
+// guard, so they use serialDeadlineRegistry instead, which layers a
+// reused scratch buffer and the ticking guard on top of this type. Its
+// scratch-reusing tickDue is deliberately not a method of deadlineRegistry
+// itself, so Respawn/PvPFlags (embedding this type directly) cannot reach
+// it and reintroduce the backing-array race that reuse requires a guard
+// against.
+//
+// entries is guarded by mu.
 type deadlineRegistry[K comparable, V any] struct {
 	mu      sync.Mutex
 	entries map[K]deadlineEntry[V]
-	scratch []deadlineEntry[V]
-
-	ticking atomic.Bool
 }
 
 func newDeadlineRegistry[K comparable, V any]() *deadlineRegistry[K, V] {
@@ -76,15 +82,14 @@ func (r *deadlineRegistry[K, V]) len() int {
 	return len(r.entries)
 }
 
-// tickDueConcurrent behaves like tickDue but allocates its due partition
-// fresh on every call instead of reusing the shared scratch buffer. Use it
-// for registries whose Tick has no reentrancy guard (Respawn): tickDue's
-// scratch reuse is only safe when the caller serializes Tick calls, since
-// two overlapping sweeps would otherwise mutate the same backing array
-// while one is still being iterated by the other.
+// tickDueConcurrent sweeps entries whose deadline is not after now, removes
+// them, and invokes fire for each removed value. The due partition is
+// allocated fresh on every call (starting nil, growing only when something
+// is actually due) so this is safe to call from multiple goroutines at
+// once with no other coordination.
 func (r *deadlineRegistry[K, V]) tickDueConcurrent(now time.Time, fire func(V)) {
 	r.mu.Lock()
-	due := make([]V, 0, len(r.entries))
+	var due []V
 	for key, entry := range r.entries {
 		if now.Before(entry.deadline) {
 			continue
@@ -99,12 +104,72 @@ func (r *deadlineRegistry[K, V]) tickDueConcurrent(now time.Time, fire func(V)) 
 	}
 }
 
+// tickExpiry partitions entries into due (now strictly after deadline,
+// removed and passed to expire) and pending (left tracked, passed with
+// their deadline to update). Matches PvPFlags's blink semantics, where an
+// entry exactly at its deadline is still pending, not yet due. Like
+// tickDueConcurrent, both partitions are allocated fresh on every call,
+// starting nil, so an all-pending or all-due tick costs nothing for the
+// partition that stays empty; this is what makes it safe to call from
+// multiple goroutines at once with no other coordination.
+func (r *deadlineRegistry[K, V]) tickExpiry(now time.Time, expire func(V), update func(V, time.Time)) {
+	r.mu.Lock()
+	var due, pending []deadlineEntry[V]
+	for key, entry := range r.entries {
+		if now.After(entry.deadline) {
+			due = append(due, entry)
+			delete(r.entries, key)
+			continue
+		}
+		pending = append(pending, entry)
+	}
+	r.mu.Unlock()
+
+	for _, entry := range due {
+		expire(entry.actor)
+	}
+	for _, entry := range pending {
+		update(entry.actor, entry.deadline)
+	}
+}
+
+// serialDeadlineRegistry layers a reused scratch buffer and a
+// single-goroutine Tick guard on top of deadlineRegistry, for callers that
+// already serialize Tick themselves (Decay, AttackStance). Reusing a
+// scratch buffer across sweeps is only safe when overlapping sweeps cannot
+// happen; beginTick/endTick enforce that.
+type serialDeadlineRegistry[K comparable, V any] struct {
+	*deadlineRegistry[K, V]
+
+	scratch []deadlineEntry[V]
+	ticking atomic.Bool
+}
+
+func newSerialDeadlineRegistry[K comparable, V any]() *serialDeadlineRegistry[K, V] {
+	return &serialDeadlineRegistry[K, V]{deadlineRegistry: newDeadlineRegistry[K, V]()}
+}
+
+// beginTick claims the single-goroutine Tick contract, or logs msg via log
+// and reports false if another Tick is already running.
+func (r *serialDeadlineRegistry[K, V]) beginTick(log zerolog.Logger, msg string) bool {
+	if !r.ticking.CompareAndSwap(false, true) {
+		log.Error().Err(ErrReentrantTick).Msg(msg)
+		return false
+	}
+	return true
+}
+
+// endTick releases the guard claimed by a successful beginTick.
+func (r *serialDeadlineRegistry[K, V]) endTick() {
+	r.ticking.Store(false)
+}
+
 // tickDue sweeps entries whose deadline is not after now, removes them, and
 // invokes fire for each removed value. The due partition is a reused
-// scratch slice, cleared after fire returns (including on panic) so it does
-// not retain values between calls. Safe only when the caller serializes
-// Tick calls (e.g. via a ticking guard); see tickDueConcurrent otherwise.
-func (r *deadlineRegistry[K, V]) tickDue(now time.Time, fire func(V)) {
+// scratch slice, cleared after fire returns (including on panic) so it
+// does not retain values between calls. The caller must hold the
+// beginTick/endTick guard for the duration of the call.
+func (r *serialDeadlineRegistry[K, V]) tickDue(now time.Time, fire func(V)) {
 	r.mu.Lock()
 	r.scratch = r.scratch[:0]
 	for key, entry := range r.entries {
@@ -121,35 +186,5 @@ func (r *deadlineRegistry[K, V]) tickDue(now time.Time, fire func(V)) {
 
 	for _, entry := range due {
 		fire(entry.actor)
-	}
-}
-
-// tickExpiry partitions entries into due (now strictly after deadline,
-// removed and passed to expire) and pending (left tracked, passed with
-// their deadline to update). Matches PvPFlags's blink semantics, where an
-// entry exactly at its deadline is still pending, not yet due. Like
-// tickDueConcurrent, both partitions are allocated fresh on every call
-// rather than reusing a shared scratch buffer, since PvPFlags's Tick has no
-// reentrancy guard and concurrent sweeps would otherwise race on shared
-// backing arrays.
-func (r *deadlineRegistry[K, V]) tickExpiry(now time.Time, expire func(V), update func(V, time.Time)) {
-	r.mu.Lock()
-	due := make([]deadlineEntry[V], 0, len(r.entries))
-	var pending []deadlineEntry[V]
-	for key, entry := range r.entries {
-		if now.After(entry.deadline) {
-			due = append(due, entry)
-			delete(r.entries, key)
-			continue
-		}
-		pending = append(pending, entry)
-	}
-	r.mu.Unlock()
-
-	for _, entry := range due {
-		expire(entry.actor)
-	}
-	for _, entry := range pending {
-		update(entry.actor, entry.deadline)
 	}
 }

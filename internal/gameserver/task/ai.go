@@ -76,12 +76,10 @@ func (a *AI) Remove(actor AIActor) {
 // logs and returns ErrReentrantTick without doing anything else if another Tick call is
 // already in flight.
 func (a *AI) Tick() error {
-	if !a.ticking.CompareAndSwap(false, true) {
-		a.log.Error().Err(ErrReentrantTick).Msg("task: AI.Tick")
+	if !a.beginTick(a.log, "task: AI.Tick") {
 		return ErrReentrantTick
 	}
-	defer a.ticking.Store(false)
-	defer a.release()
+	defer a.endTick()
 
 	for _, actor := range a.snapshot() {
 		placed, active := regionActivity(a.state, actor)

@@ -62,7 +62,7 @@ type AttackStance struct {
 	now     func() time.Time
 	log     zerolog.Logger
 
-	*deadlineRegistry[int32, AttackStanceActor]
+	*serialDeadlineRegistry[int32, AttackStanceActor]
 }
 
 // NewAttackStance returns an empty combat-stance tracker.
@@ -73,7 +73,7 @@ func NewAttackStance(effects AttackStanceEffects, now func() time.Time) (*Attack
 	if now == nil {
 		now = time.Now
 	}
-	return &AttackStance{effects: effects, now: now, deadlineRegistry: newDeadlineRegistry[int32, AttackStanceActor]()}, nil
+	return &AttackStance{effects: effects, now: now, serialDeadlineRegistry: newSerialDeadlineRegistry[int32, AttackStanceActor]()}, nil
 }
 
 // Start launches the fixed one-second combat-stance task.
@@ -120,11 +120,10 @@ func (a *AttackStance) InAttackStance(actor AttackStanceActor) bool {
 // It logs and returns ErrReentrantTick without doing anything else if another Tick call is
 // already in flight.
 func (a *AttackStance) Tick() error {
-	if !a.ticking.CompareAndSwap(false, true) {
-		a.log.Error().Err(ErrReentrantTick).Msg("task: AttackStance.Tick")
+	if !a.beginTick(a.log, "task: AttackStance.Tick") {
 		return ErrReentrantTick
 	}
-	defer a.ticking.Store(false)
+	defer a.endTick()
 
 	a.tickDue(a.now(), func(actor AttackStanceActor) {
 		a.effects.AutoAttackStop(actor)

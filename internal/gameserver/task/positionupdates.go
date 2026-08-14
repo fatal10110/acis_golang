@@ -70,12 +70,10 @@ func (p *PositionUpdates) Contains(actor move.PositionUpdater) bool {
 // out from under it. It logs and returns without doing anything else if
 // another Tick call is already in flight.
 func (p *PositionUpdates) Tick() {
-	if !p.ticking.CompareAndSwap(false, true) {
-		p.log.Error().Err(ErrReentrantTick).Msg("task: PositionUpdates.Tick")
+	if !p.beginTick(p.log, "task: PositionUpdates.Tick") {
 		return
 	}
-	defer p.ticking.Store(false)
-	defer p.release()
+	defer p.endTick()
 
 	for _, actor := range p.snapshot() {
 		if !p.canUpdate(actor) {

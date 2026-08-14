@@ -3,6 +3,8 @@ package task
 import (
 	"sync"
 	"sync/atomic"
+
+	"github.com/rs/zerolog"
 )
 
 // activeRegistry is the shared mutex+map+ticker-snapshot structure behind
@@ -47,17 +49,27 @@ func (r *activeRegistry[K, V]) contains(key K) bool {
 	return ok
 }
 
-// len returns the number of registered entries.
-func (r *activeRegistry[K, V]) len() int {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return len(r.entries)
+// beginTick claims the single-goroutine Tick contract, or logs msg via log
+// and reports false if another Tick is already running.
+func (r *activeRegistry[K, V]) beginTick(log zerolog.Logger, msg string) bool {
+	if !r.ticking.CompareAndSwap(false, true) {
+		log.Error().Err(ErrReentrantTick).Msg(msg)
+		return false
+	}
+	return true
+}
+
+// endTick releases the guard claimed by a successful beginTick and clears
+// the scratch buffer from the tick just finished.
+func (r *activeRegistry[K, V]) endTick() {
+	clear(r.scratch)
+	r.ticking.Store(false)
 }
 
 // snapshot copies the current entries into the reused scratch buffer under
 // lock and returns it for the caller to range over outside the lock. The
-// caller must call release once done iterating, even on panic, so the
-// snapshot does not retain values between ticks.
+// caller must hold the beginTick/endTick guard for the duration of the
+// call, since endTick clears this same buffer.
 func (r *activeRegistry[K, V]) snapshot() []V {
 	r.mu.Lock()
 	r.scratch = r.scratch[:0]
@@ -67,10 +79,4 @@ func (r *activeRegistry[K, V]) snapshot() []V {
 	values := r.scratch
 	r.mu.Unlock()
 	return values
-}
-
-// release clears the scratch buffer's element references after a snapshot
-// has been consumed.
-func (r *activeRegistry[K, V]) release() {
-	clear(r.scratch)
 }
