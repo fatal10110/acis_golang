@@ -483,53 +483,12 @@ func TestCancelDebuffEffectAutoStripsASameSkillIDCandidateWithoutItsOwnRoll(t *t
 	}
 }
 
-type fakeChargesTarget struct {
-	charges, max int
-}
-
-func (t *fakeChargesTarget) IncreaseCharges(count, max int) bool {
-	t.max = max
-	if t.charges >= max {
-		return false
-	}
-	t.charges += count
-	if t.charges > max {
-		t.charges = max
-	}
-	return true
-}
-
-func TestIncreaseChargesEffectAddsUpToTemplateCountCap(t *testing.T) {
-	target := &fakeChargesTarget{}
-	e, err := New(Skill{ID: 1}, modelskill.EffectTemplate{Name: "IncreaseCharges", Value: 1, Count: 7})
-	if err != nil {
-		t.Fatalf("New() error: %v", err)
-	}
-	e.Effected = target
-
-	if !e.OnStart(e) {
-		t.Fatal("increase charges effect start rejected a valid target")
-	}
-	if target.charges != 1 || target.max != 7 {
-		t.Fatalf("target charges/max = %d/%d, want 1/7", target.charges, target.max)
-	}
-}
-
-func TestIncreaseChargesEffectReportsSuccessEvenAtCap(t *testing.T) {
-	target := &fakeChargesTarget{charges: 7}
-	e, err := New(Skill{ID: 1}, modelskill.EffectTemplate{Name: "IncreaseCharges", Value: 1, Count: 7})
-	if err != nil {
-		t.Fatalf("New() error: %v", err)
-	}
-	e.Effected = target
-
-	if !e.OnStart(e) {
-		t.Fatal("increase charges effect start should still report success when the target is already at its cap")
-	}
-	if target.charges != 7 {
-		t.Fatalf("target charges = %d, want unchanged 7", target.charges)
-	}
-}
+// TestIncreaseChargesEffectAddsUpToTemplateCountCap and
+// TestIncreaseChargesEffectReportsSuccessEvenAtCap moved to
+// hooks_buff_player_test.go (package effect_test): fakeChargesTarget's
+// IncreaseCharges reimplemented the same cap/overflow logic already on the
+// real (*player.Character).IncreaseCharges, risking silent drift between
+// the two. See docs/agents/test-strategy.md.
 
 func TestIncreaseChargesEffectRejectsNonChargesTarget(t *testing.T) {
 	e, err := New(Skill{ID: 1}, modelskill.EffectTemplate{Name: "IncreaseCharges", Value: 1, Count: 7})
