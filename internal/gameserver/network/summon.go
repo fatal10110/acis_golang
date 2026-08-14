@@ -31,7 +31,7 @@ func (l *GameClientLink) handleSummonActionUse(ctx context.Context, live *livePl
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return true
 	}
-	result := actor.ApplyCommand(l.summonCommandContext(live, command))
+	result := actor.ApplyCommand(l.summonCommandContext(live, command, req.CtrlPressed))
 	if id, ok := systemMessageForSummonFeedback(result.Feedback); ok {
 		live.SendFrame(serverpackets.FrameSystemMessage(id))
 	}
@@ -204,7 +204,7 @@ func (l *GameClientLink) summonSkillTarget(live *livePlayer, actor *summon.Actor
 	}
 }
 
-func (l *GameClientLink) summonCommandContext(live *livePlayer, command summon.Command) summon.CommandContext {
+func (l *GameClientLink) summonCommandContext(live *livePlayer, command summon.Command, ctrlPressed bool) summon.CommandContext {
 	ctx := summon.CommandContext{Command: command, World: l.world}
 	if live == nil || live.Target() == nil {
 		return ctx
@@ -215,19 +215,35 @@ func (l *GameClientLink) summonCommandContext(live *livePlayer, command summon.C
 		return ctx
 	}
 	ctx.TargetIsCreature = true
-	ctx.TargetIsDeadCreature = target.AlikeDead()
-	ctx.TargetAttackable = summonTargetAttackable(live, target)
+	ctx.TargetIsDeadCreature = summonTargetIsDead(target)
+	ctx.TargetAttackable = summonTargetAttackable(live, target, ctrlPressed)
 	return ctx
 }
 
-func summonTargetAttackable(live *livePlayer, target attackable.Combatant) bool {
+// summonTargetIsDead reports true death only, matching
+// RequestActionUse.java:155-156 ("Fake Death is handled elsewhere (attack
+// task)") — AlikeDead() would also reject a fake-dead target, which Java's
+// attack command does not.
+func summonTargetIsDead(target attackable.Combatant) bool {
+	dead, ok := target.(interface{ Dead() bool })
+	return ok && dead.Dead()
+}
+
+// summonTargetAttackable decides attack-vs-follow the way
+// RequestActionUse.java:177 does: targetCreature.isAttackableWithoutForceBy(player)
+// || (_isCtrlPressed && targetCreature.isAttackableBy(player)). A plain
+// AttackableBy check alone (the previous implementation) routes every
+// living player target to ATTACK, including party members Java would
+// instead have the summon follow.
+func summonTargetAttackable(live *livePlayer, target attackable.Combatant, ctrlPressed bool) bool {
 	if live == nil || target == nil {
 		return false
 	}
-	attackableTarget, ok := target.(interface {
-		AttackableBy(skilltarget.Creature) bool
-	})
-	return ok && attackableTarget.AttackableBy(live.Character)
+	rules, ok := target.(skilltarget.AttackRules)
+	if !ok {
+		return false
+	}
+	return rules.AttackableWithoutForceBy(live.Character) || (ctrlPressed && rules.AttackableBy(live.Character))
 }
 
 func summonCommandForActionID(actionID int32) (summon.Command, bool) {
