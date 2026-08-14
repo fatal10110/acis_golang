@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
@@ -270,6 +271,23 @@ func TestPetRewardSharesAndRoundsBeforeRateScaling(t *testing.T) {
 				t.Fatalf("petReward() = (%d, %d), want (%d, %d)", exp, sp, tt.wantExp, tt.wantSP)
 			}
 		})
+	}
+}
+
+func TestRewardLeaderUsesCombinedOwnerAndPetDamage(t *testing.T) {
+	a := &player.Character{CharLevel: 10}
+	b := &player.Character{CharLevel: 20}
+	entries := []playerRewardEntry{
+		{actor: a, damage: 100},
+		{actor: b, damage: 120},
+	}
+
+	dealer, level := rewardLeader(entries)
+	if dealer != b {
+		t.Fatalf("max dealer = %p, want player with combined 120 damage", dealer)
+	}
+	if level != b.CharLevel {
+		t.Fatalf("highest level = %d, want %d", level, b.CharLevel)
 	}
 }
 

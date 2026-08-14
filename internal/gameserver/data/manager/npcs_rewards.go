@@ -27,10 +27,11 @@ type deathRewards struct {
 }
 
 type playerRewardEntry struct {
-	actor     *player.Character
-	damage    float64
-	pet       *summon.Actor
-	petDamage float64
+	actor       *player.Character
+	damage      float64
+	ownerDamage float64
+	pet         *summon.Actor
+	petDamage   float64
 }
 
 // CalculateRewards implements creature.Rewarder.
@@ -57,9 +58,6 @@ func (d *deathRewards) scheduleDecay() {
 func (d *deathRewards) rewardEntries() ([]playerRewardEntry, float64, *player.Character, int) {
 	var entries []playerRewardEntry
 	var totalDamage float64
-	var maxDealer *player.Character
-	var maxDamage float64
-	var highestLevel int
 
 	for _, threat := range d.hostile.AI().Threats().Snapshot() {
 		if threat.Damage <= 1 {
@@ -92,18 +90,30 @@ func (d *deathRewards) rewardEntries() ([]playerRewardEntry, float64, *player.Ch
 		if pet != nil {
 			entries[entry].pet = pet
 			entries[entry].petDamage += threat.Damage
+		} else {
+			entries[entry].ownerDamage += threat.Damage
 		}
 		totalDamage += threat.Damage
-		if maxDealer == nil || threat.Damage > maxDamage {
-			maxDealer = attacker
-			maxDamage = threat.Damage
-		}
-		if attacker.CharLevel > highestLevel {
-			highestLevel = attacker.CharLevel
-		}
 	}
 
+	maxDealer, highestLevel := rewardLeader(entries)
 	return entries, totalDamage, maxDealer, highestLevel
+}
+
+func rewardLeader(entries []playerRewardEntry) (*player.Character, int) {
+	var maxDealer *player.Character
+	var maxDamage float64
+	var highestLevel int
+	for _, entry := range entries {
+		if maxDealer == nil || entry.damage > maxDamage {
+			maxDealer = entry.actor
+			maxDamage = entry.damage
+		}
+		if entry.actor.CharLevel > highestLevel {
+			highestLevel = entry.actor.CharLevel
+		}
+	}
+	return maxDealer, highestLevel
 }
 
 func (d *deathRewards) rollDrops(killer creature.DeathActor, maxDealer *player.Character, highestLevel int) {
@@ -141,7 +151,7 @@ func (d *deathRewards) grantExpAndSp(entries []playerRewardEntry, totalDamage fl
 			}
 		}
 		if entry.pet != nil && !entry.pet.Dead() {
-			petExp, petSp := petReward(entry.pet.ExpType(), entry.petDamage, entry.damage, exp, sp)
+			petExp, petSp := petReward(entry.pet.ExpType(), entry.petDamage, entry.ownerDamage, exp, sp)
 			exp -= petExp
 			sp -= petSp
 			entry.pet.AddExpAndSp(petExp, petSp)
