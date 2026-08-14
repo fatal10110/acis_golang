@@ -128,7 +128,7 @@ type GameClientLink struct {
 	ids           idAllocator
 	groundItems   groundItemDropper
 	attackStance  attackStanceTracker
-	ai            *task.AI
+	ai            AIRegistry
 	pvpFlags      *task.PvPFlags
 	positions     *task.PositionUpdates
 	playerClock   *task.PlayerClock
@@ -181,6 +181,12 @@ type GameClientLink struct {
 	cubicAfterFunc cubic.AfterFunc
 }
 
+// AIRegistry owns recurring actor-AI registrations.
+type AIRegistry interface {
+	Add(task.AIActor)
+	Remove(task.AIActor)
+}
+
 // GameClientLinkConfig contains the collaborators required by GameClientLink.
 type GameClientLinkConfig struct {
 	Validator     *SessionValidator
@@ -205,7 +211,7 @@ type GameClientLinkConfig struct {
 	IDs           idAllocator
 	GroundItems   groundItemDropper
 	AttackStance  attackStanceTracker
-	AI            *task.AI
+	AI            AIRegistry
 	PvPFlags      *task.PvPFlags
 	Positions     *task.PositionUpdates
 	PlayerClock   *task.PlayerClock

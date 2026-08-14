@@ -25,6 +25,14 @@ import (
 
 type fakePetStoreNoSaved struct{}
 
+type recordingAIRegistry struct {
+	added   []task.AIActor
+	removed []task.AIActor
+}
+
+func (r *recordingAIRegistry) Add(actor task.AIActor)    { r.added = append(r.added, actor) }
+func (r *recordingAIRegistry) Remove(actor task.AIActor) { r.removed = append(r.removed, actor) }
+
 func (fakePetStoreNoSaved) Get(context.Context, int32) (petmodel.State, bool, error) {
 	return petmodel.State{}, false, nil
 }
@@ -124,10 +132,35 @@ func TestGameSummonSpawnerRegistersPetWithAITask(t *testing.T) {
 		t.Fatal("pet not registered in world.State")
 	}
 
-	link.ai.Tick()
+	brains, ok := link.ai.(*task.AI)
+	if !ok {
+		t.Fatalf("AI registry = %T, want *task.AI", link.ai)
+	}
+	brains.Tick()
 
 	if _, ok := state.Object(pet.ObjectID()); !ok {
 		t.Fatal("AI task removed the live pet")
+	}
+}
+
+func TestGameSummonSpawnerUnregistersPetAIOnDespawn(t *testing.T) {
+	link, state := newSummonTestLink(t)
+	registry := &recordingAIRegistry{}
+	link.ai = registry
+	live := newTestLivePlayer(t, 1, &frameCapture{})
+	inst := &item.Instance{ObjectID: 500, TemplateID: summonTestCollarTemplateID, OwnerID: live.ObjectID()}
+
+	if !(&gameSummonSpawner{link: link, live: live}).SpawnPet(live.Character, inst) {
+		t.Fatal("SpawnPet returned false")
+	}
+	pet, ok := state.Summon(live.ObjectID())
+	if !ok {
+		t.Fatal("pet not registered in world.State")
+	}
+	pet.(*summon.Actor).Unsummon()
+
+	if len(registry.removed) != 1 {
+		t.Fatalf("AI removals = %d, want 1 after pet despawn", len(registry.removed))
 	}
 }
 

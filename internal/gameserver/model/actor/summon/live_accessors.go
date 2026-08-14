@@ -308,6 +308,10 @@ func (a *Actor) SetAI(brain AI) {
 	a.brain = brain
 }
 
+// SetOnDespawn records runtime cleanup that must run exactly when this summon
+// leaves world state. It is configured before the summon is published.
+func (a *Actor) SetOnDespawn(f func()) { a.onDespawn = f }
+
 // CurrentTarget returns the summon target selected by its current command.
 func (a *Actor) CurrentTarget() any { return a.target }
 

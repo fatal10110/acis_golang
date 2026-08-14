@@ -303,7 +303,9 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 	brain.SetCastController(aiController)
 	actor.SetAI(brain)
 	if l.ai != nil {
-		l.ai.Add(summonAIActor{Actor: actor, brain: brain})
+		runner := summonAIActor{Actor: actor, brain: brain}
+		l.ai.Add(runner)
+		actor.SetOnDespawn(func() { l.ai.Remove(runner) })
 	}
 	actor.SetStatusUpdater(func() { l.broadcastSummonStatus(actor) })
 	actor.SetDamageNotifier(func(attackerName string, damage int32) {
