@@ -39,7 +39,7 @@ type shieldDefenseSource interface {
 	ShieldDefense(caster any, def modelskill.Definition, isCrit bool) formulas.ShieldDefense
 }
 
-func blessedSpiritshotCharged(caster any) bool {
+func blessedSpiritshotCharged(caster Actor) bool {
 	c, ok := caster.(blessedSpiritshotCaster)
 	return ok && c.BlessedSpiritshotCharged()
 }
@@ -47,7 +47,7 @@ func blessedSpiritshotCharged(caster any) bool {
 // resolveShieldDefense returns def's shield-block outcome against target,
 // or ShieldFailed when the skill ignores shields entirely or target exposes
 // no resolved shield-block source yet.
-func resolveShieldDefense(caster, target any, def modelskill.Definition) formulas.ShieldDefense {
+func resolveShieldDefense(caster, target Actor, def modelskill.Definition) formulas.ShieldDefense {
 	if def.IgnoreShield {
 		return formulas.ShieldFailed
 	}
@@ -152,7 +152,7 @@ func (disablersHandler) Use(cast Cast) {
 // shield-block outcome against this cast. ok is false when target exposes
 // no resolved-landing-rate source, letting a caller decide whether to treat
 // that as "doesn't apply" or fall back.
-func checkSkillSuccess(caster any, target any, def modelskill.Definition) (succeeded, ok bool) {
+func checkSkillSuccess(caster, target Actor, def modelskill.Definition) (succeeded, ok bool) {
 	return checkSkillSuccessBSS(caster, target, def, blessedSpiritshotCharged(caster))
 }
 
@@ -160,11 +160,11 @@ func checkSkillSuccess(caster any, target any, def modelskill.Definition) (succe
 // input forced to bss rather than read from caster's real charge state —
 // Blow.java hardcodes this input to true regardless of the caster's actual
 // charge, unlike every other landing-rate roll in the reference.
-func checkSkillSuccessBSS(caster any, target any, def modelskill.Definition, bss bool) (succeeded, ok bool) {
+func checkSkillSuccessBSS(caster, target Actor, def modelskill.Definition, bss bool) (succeeded, ok bool) {
 	return checkSkillSuccessBSSWithShield(caster, target, def, bss, resolveShieldDefense(caster, target, def))
 }
 
-func checkSkillSuccessBSSWithShield(caster any, target any, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (succeeded, ok bool) {
+func checkSkillSuccessBSSWithShield(caster, target Actor, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (succeeded, ok bool) {
 	src, ok := target.(skillSuccessSource)
 	if !ok {
 		return false, false

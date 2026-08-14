@@ -9,7 +9,7 @@ import (
 )
 
 type hpDamageTarget interface {
-	Dead() bool
+	Actor
 	ReduceHP(amount float64, attacker any, skill modelskill.Definition)
 }
 
@@ -36,16 +36,12 @@ type chargeDamageCaster interface {
 	Charges() int
 }
 
-type objectIDTarget interface {
-	ObjectID() int32
-}
-
 type characterNameTarget interface {
 	CharacterName() string
 }
 
 type manaDamageTarget interface {
-	Dead() bool
+	Actor
 	MPValue() float64
 	ReduceMP(float64) float64
 	ManaDamageInput(caster any, skill modelskill.Definition) (formulas.ManaDamageInput, bool)
@@ -87,7 +83,7 @@ type lethalableTarget interface {
 // onto — a duck-typing gap safer to drop than to guess through, matching
 // reflectTarget's own behavior. The second return reports whether reflect
 // fired.
-func reflectEffectTarget(cast Cast, obj any) (effectListTarget, bool) {
+func reflectEffectTarget(cast Cast, obj Actor) (effectListTarget, bool) {
 	target, ok := obj.(effectListTarget)
 	if !ok {
 		return nil, false
@@ -190,7 +186,7 @@ func (chargeDamHandler) UseResult(cast Cast) Result {
 // instead, and the destination's prior instance of the same skill is
 // dropped first so a repeat cast doesn't stack. Unlike Mdam/Blow, PDAM
 // applies these unconditionally unless the shared shield outcome is perfect.
-func applyPdamEffects(cast Cast, obj any, shield formulas.ShieldDefense, result *Result) {
+func applyPdamEffects(cast Cast, obj Actor, shield formulas.ShieldDefense, result *Result) {
 	if shield == formulas.ShieldPerfect {
 		return
 	}
@@ -247,7 +243,7 @@ func (mdamHandler) UseResult(cast Cast) Result {
 // disablers.go's shared reflect+roll shape, Mdam.java only rolls
 // calcSkillSuccess on the non-reflect branch — the reflect branch applies
 // effects unconditionally with no landing check.
-func applyMdamEffects(cast Cast, obj any, bss bool, result *Result) {
+func applyMdamEffects(cast Cast, obj Actor, bss bool, result *Result) {
 	if len(cast.Skill.Effects) == 0 {
 		return
 	}
@@ -356,21 +352,21 @@ func applyPhysicalSkillCounter(cast Cast, target hpDamageTarget, damage float64,
 	return true
 }
 
-func counterattackObjectID(obj any) int32 {
-	if target, ok := obj.(objectIDTarget); ok {
-		return target.ObjectID()
+func counterattackObjectID(obj Actor) int32 {
+	if obj == nil {
+		return 0
 	}
-	return 0
+	return obj.ObjectID()
 }
 
-func counterattackName(obj any) string {
+func counterattackName(obj Actor) string {
 	if target, ok := obj.(characterNameTarget); ok {
 		return target.CharacterName()
 	}
 	return ""
 }
 
-func appendResisted(result *Result, target any, def modelskill.Definition) {
+func appendResisted(result *Result, target Actor, def modelskill.Definition) {
 	if result == nil {
 		return
 	}
@@ -379,7 +375,7 @@ func appendResisted(result *Result, target any, def modelskill.Definition) {
 	}
 }
 
-func appendResistedCount(result *Result, target any, def modelskill.Definition, count int) {
+func appendResistedCount(result *Result, target Actor, def modelskill.Definition, count int) {
 	for range count {
 		appendResisted(result, target, def)
 	}
@@ -399,7 +395,7 @@ func counterSkillReflects(def modelskill.Definition, counter float64) bool {
 // landing-rate roll gates activation with the blessed-spiritshot input
 // forced true — Blow.java hardcodes that argument regardless of the
 // caster's real charge state.
-func applyBlowEffects(cast Cast, obj any, shield formulas.ShieldDefense, countered bool, result *Result) {
+func applyBlowEffects(cast Cast, obj Actor, shield formulas.ShieldDefense, countered bool, result *Result) {
 	if len(cast.Skill.Effects) == 0 {
 		return
 	}
@@ -422,7 +418,7 @@ func applyBlowEffects(cast Cast, obj any, shield formulas.ShieldDefense, counter
 	appendResistedCount(result, effected, cast.Skill, applyEffectsWithLanding(cast.Caster, effected, cast.Skill, cast.Skill.Effects, shield, false))
 }
 
-func applyChargeDamEffects(cast Cast, obj any, shield formulas.ShieldDefense, result *Result) {
+func applyChargeDamEffects(cast Cast, obj Actor, shield formulas.ShieldDefense, result *Result) {
 	if len(cast.Skill.Effects) == 0 {
 		return
 	}
@@ -523,7 +519,7 @@ func (manaDamageHandler) UseResult(cast Cast) Result {
 	return result
 }
 
-func applyLethalHit(cast Cast, obj any, result *Result) {
+func applyLethalHit(cast Cast, obj Actor, result *Result) {
 	target, ok := obj.(lethalTarget)
 	if !ok {
 		return

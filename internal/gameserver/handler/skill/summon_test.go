@@ -8,6 +8,7 @@ import (
 )
 
 type creatureSummonCaster struct {
+	fakeActor
 	calls int
 	skill modelskill.Definition
 	item  any
@@ -40,6 +41,7 @@ func TestSummonCreatureDelegatesToCasterRuntime(t *testing.T) {
 }
 
 type summonFriendActor struct {
+	fakeActor
 	mounted, olympiad, observer, noSummonFriend bool
 	dead, operating, rooted, inCombat, festival bool
 
@@ -123,7 +125,7 @@ func TestSummonFriendTeleportsTargetAndConsumesRequiredItem(t *testing.T) {
 	registry.Use(Cast{
 		Caster:  caster,
 		Skill:   modelskill.Definition{ID: 1400, SkillType: "SUMMON_FRIEND", TargetConsumeID: 57, TargetConsumeCount: 2},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 
 	if target.requests != 1 || target.requestCaster != caster {
@@ -148,7 +150,7 @@ func TestSummonFriendConfirmationSkillDefersTeleport(t *testing.T) {
 	registry.Use(Cast{
 		Caster:  caster,
 		Skill:   modelskill.Definition{ID: 1403, SkillType: "SUMMON_FRIEND"},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 
 	if target.confirms != 1 || target.confirmCaster != caster || target.confirmTimeout != 30*time.Second {
@@ -168,7 +170,7 @@ func TestSummonFriendRefusesBlockedSummonerOrTarget(t *testing.T) {
 	registry.Use(Cast{
 		Caster:  blockedCaster,
 		Skill:   modelskill.Definition{SkillType: "SUMMON_FRIEND"},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 	if target.requests != 0 || target.teleported {
 		t.Fatal("blocked summoner should not request or teleport a target")
@@ -180,7 +182,7 @@ func TestSummonFriendRefusesBlockedSummonerOrTarget(t *testing.T) {
 	registry.Use(Cast{
 		Caster:  caster,
 		Skill:   modelskill.Definition{SkillType: "SUMMON_FRIEND"},
-		Targets: []any{deadTarget},
+		Targets: []Actor{deadTarget},
 	})
 	if deadTarget.requests != 0 || deadTarget.teleported {
 		t.Fatal("blocked target should not receive a teleport request")
@@ -238,7 +240,7 @@ func TestEraseUnsummonsNonSiegeSummonAndNotifiesOwner(t *testing.T) {
 	registry.Use(Cast{
 		Caster:  newDisablerFake(1),
 		Skill:   modelskill.Definition{SkillType: "ERASE"},
-		Targets: []any{summon},
+		Targets: []Actor{summon},
 	})
 
 	if summon.unsummonedBy != owner {
@@ -258,7 +260,7 @@ func TestEraseSkipsSiegeSummon(t *testing.T) {
 	registry.Use(Cast{
 		Caster:  newDisablerFake(1),
 		Skill:   modelskill.Definition{SkillType: "ERASE"},
-		Targets: []any{summon},
+		Targets: []Actor{summon},
 	})
 
 	if summon.unsummonedBy != nil || owner.vanished != 0 {

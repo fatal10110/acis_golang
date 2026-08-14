@@ -24,8 +24,8 @@ type EffectResult struct {
 	Dodges            []handlerskill.Dodge
 	Resisted          []handlerskill.Resisted
 	CubicAdded        bool
-	CubicTargets      []any
-	CubicAddedTargets []any
+	CubicTargets      []handlerskill.Actor
+	CubicAddedTargets []handlerskill.Actor
 	CubicTouched      bool
 	CubicID           cubic.ID
 }
@@ -125,16 +125,28 @@ func ApplyResolvedEffectsResult(handlers EffectHandlers, caster any, affected []
 }
 
 func dispatchEffects(handlers EffectHandlers, caster any, affected []skilltarget.Creature, def modelskill.Definition, item any) EffectResult {
-	castTargets := make([]any, len(affected))
+	// A caster that reached target resolution already satisfies
+	// skilltarget.Creature, which covers handlerskill.Actor; the guard keeps
+	// a caster that somehow doesn't out of the handlers entirely rather than
+	// letting it in as an inert value every handler assertion would miss.
+	castCaster, ok := caster.(handlerskill.Actor)
+	if !ok {
+		return EffectResult{}
+	}
+	castTargets := make([]handlerskill.Actor, len(affected))
 	for i, t := range affected {
 		castTargets[i] = t
 	}
 	if notifier, ok := caster.(pvpSkillNotifier); ok {
-		notifier.NotePvPSkillTargets(castTargets, def.Offensive, def.SkillType)
+		notifyTargets := make([]any, len(affected))
+		for i, t := range affected {
+			notifyTargets[i] = t
+		}
+		notifier.NotePvPSkillTargets(notifyTargets, def.Offensive, def.SkillType)
 	}
 
 	result, ok := handlers.Skills.UseResult(handlerskill.Cast{
-		Caster:  caster,
+		Caster:  castCaster,
 		Skill:   def,
 		Targets: castTargets,
 		Item:    item,

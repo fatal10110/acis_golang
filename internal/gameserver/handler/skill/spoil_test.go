@@ -8,6 +8,7 @@ import (
 )
 
 type spoilFakeTarget struct {
+	fakeActor
 	dead  bool
 	level int
 	pool  *item.SpoilPool
@@ -18,6 +19,7 @@ func (s *spoilFakeTarget) Level() int                 { return s.level }
 func (s *spoilFakeTarget) SpoilPool() *item.SpoilPool { return s.pool }
 
 type spoilFakeCaster struct {
+	fakeActor
 	id       int32
 	level    int
 	inParty  bool
@@ -50,7 +52,7 @@ func TestSpoilEventuallyMarksTarget(t *testing.T) {
 		registry.Use(Cast{
 			Caster:  caster,
 			Skill:   modelskill.Definition{SkillType: "SPOIL", MagicLevel: 40},
-			Targets: []any{target},
+			Targets: []Actor{target},
 		})
 		if target.pool.IsSpoiled() {
 			if !target.pool.IsSpoiler(42) {
@@ -68,7 +70,7 @@ func TestSpoilAlreadySpoiledIsSkipped(t *testing.T) {
 	target := &spoilFakeTarget{level: 40, pool: &item.SpoilPool{}}
 	target.pool.Mark(99)
 
-	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "SPOIL", MagicLevel: 40}, Targets: []any{target}})
+	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "SPOIL", MagicLevel: 40}, Targets: []Actor{target}})
 	if !target.pool.IsSpoiler(99) {
 		t.Fatal("an already-spoiled pool should keep its original spoiler")
 	}
@@ -81,7 +83,7 @@ func TestSweepDistributesPooledItemsAndClearsPool(t *testing.T) {
 	target.pool.Mark(1)
 	target.pool.Add(57, 10)
 
-	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "SWEEP"}, Targets: []any{target}})
+	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "SWEEP"}, Targets: []Actor{target}})
 
 	if caster.items[57] != 10 {
 		t.Fatalf("caster earned items = %v, want {57: 10}", caster.items)
@@ -98,7 +100,7 @@ func TestSweepDistributesThroughParty(t *testing.T) {
 	target.pool.Mark(1)
 	target.pool.Add(57, 10)
 
-	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "SWEEP"}, Targets: []any{target}})
+	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "SWEEP"}, Targets: []Actor{target}})
 
 	if caster.distItem != 57 || caster.distCnt != 10 {
 		t.Fatalf("party distribution = (%d, %d), want (57, 10)", caster.distItem, caster.distCnt)
@@ -113,7 +115,7 @@ func TestSweepEmptyPoolIsNoop(t *testing.T) {
 	caster := &spoilFakeCaster{id: 1}
 	target := &spoilFakeTarget{pool: &item.SpoilPool{}}
 
-	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "SWEEP"}, Targets: []any{target}})
+	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "SWEEP"}, Targets: []Actor{target}})
 	if len(caster.items) != 0 {
 		t.Fatalf("nothing to sweep should reward nothing, got %v", caster.items)
 	}

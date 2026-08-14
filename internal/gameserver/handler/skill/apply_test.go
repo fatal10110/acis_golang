@@ -9,12 +9,14 @@ import (
 )
 
 type effectLandingFake struct {
+	fakeActor
 	list *effect.List
 }
 
 func (f *effectLandingFake) EffectList() *effect.List { return f.list }
 
 type effectListOnlyFake struct {
+	fakeActor
 	list *effect.List
 }
 
@@ -71,7 +73,7 @@ func TestActiveEffectFindsAMatchingLiveInstance(t *testing.T) {
 }
 
 func TestActiveEffectOnATargetWithNoEffectListIsFalse(t *testing.T) {
-	if ActiveEffect(struct{}{}, 288) {
+	if ActiveEffect(fakeActor{}, 288) {
 		t.Fatal("ActiveEffect() = true, want false for a target with no effect list")
 	}
 }
@@ -92,5 +94,5 @@ func TestStopEffectRemovesTheMatchingLiveInstance(t *testing.T) {
 }
 
 func TestStopEffectOnATargetWithNoEffectListIsANoop(t *testing.T) {
-	StopEffect(struct{}{}, 288)
+	StopEffect(fakeActor{}, 288)
 }

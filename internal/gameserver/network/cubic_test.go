@@ -79,7 +79,7 @@ func TestSyncCubicTargetsRefreshesNonCasterCharacterInfo(t *testing.T) {
 	recipientFrames.frames = nil
 
 	l := &GameClientLink{world: state}
-	l.syncCubicTargets(caster, actorcast.EffectResult{CubicAddedTargets: []any{recipient}}, modelskill.Definition{})
+	l.syncCubicTargets(caster, actorcast.EffectResult{CubicAddedTargets: []handlerskill.Actor{recipient}}, modelskill.Definition{})
 
 	if got := frameOpcodes(recipientFrames.frames); len(got) != 1 || got[0] != serverpackets.OpcodeUserInfo {
 		t.Fatalf("recipient opcodes = %x, want UserInfo", got)

@@ -19,6 +19,7 @@ var (
 )
 
 type cancelFakeActor struct {
+	fakeActor
 	dead  bool
 	level int
 	list  *effect.List
@@ -61,7 +62,7 @@ func TestCancelNeverStripsToggleOrDebuffEffects(t *testing.T) {
 
 	registry.Use(Cast{
 		Skill:   modelskill.Definition{SkillType: "CANCEL", Power: 50, MaxNegatedEffects: 10, MagicLevel: 40},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 
 	if !hasEffect(target.list, toggle) {
@@ -80,7 +81,7 @@ func TestCancelNeverStripsNonCancellableEffectType(t *testing.T) {
 
 	registry.Use(Cast{
 		Skill:   modelskill.Definition{SkillType: "CANCEL", Power: 50, MaxNegatedEffects: 10, MagicLevel: 40},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 
 	if !hasEffect(target.list, blessing) {
@@ -99,7 +100,7 @@ func TestCancelNeverStripsProtectionBlessingMarkerEffect(t *testing.T) {
 
 	registry.Use(Cast{
 		Skill:   modelskill.Definition{SkillType: "CANCEL", Power: 50, MaxNegatedEffects: 10, MagicLevel: 40},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 
 	if !hasEffect(target.list, protection) {
@@ -115,7 +116,7 @@ func TestMageBaneOnlyConsidersMatchingStackTypes(t *testing.T) {
 
 	registry.Use(Cast{
 		Skill:   modelskill.Definition{SkillType: "MAGE_BANE", Power: 50, MaxNegatedEffects: 10, MagicLevel: 40},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 
 	if !hasEffect(target.list, unrelated) {

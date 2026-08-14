@@ -95,7 +95,7 @@ func TestDisablersSkipsDeadAndUnparalyzedInvulTargets(t *testing.T) {
 
 	registry.Use(Cast{
 		Skill:   modelskill.Definition{SkillType: "FAKE_DEATH", Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 10}}},
-		Targets: []any{dead, invul},
+		Targets: []Actor{dead, invul},
 	})
 
 	if len(dead.list.All()) != 0 || len(invul.list.All()) != 0 {
@@ -115,7 +115,7 @@ func TestDisablersRespectsBlockDebuffForOffensiveSkills(t *testing.T) {
 
 	registry.Use(Cast{
 		Skill:   modelskill.Definition{SkillType: "FAKE_DEATH", Offensive: true, Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 10}}},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 
 	if len(target.list.All()) != 1 {
@@ -138,7 +138,7 @@ func TestDisablersRespectsBlockDebuffFromRealMarkerEffect(t *testing.T) {
 
 	registry.Use(Cast{
 		Skill:   modelskill.Definition{SkillType: "FAKE_DEATH", Offensive: true, Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 10}}},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 
 	if len(target.list.All()) != 1 {
@@ -153,7 +153,7 @@ func TestFakeDeathAppliesUnconditionally(t *testing.T) {
 
 	registry.Use(Cast{
 		Skill:   modelskill.Definition{SkillType: "FAKE_DEATH", Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 10}}},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 	if len(target.list.All()) != 1 {
 		t.Fatal("FAKE_DEATH should apply its effects with no success check")
@@ -166,7 +166,7 @@ func TestStunAppliesOnGuaranteedSuccess(t *testing.T) {
 
 	registry.Use(Cast{
 		Skill:   modelskill.Definition{SkillType: "STUN", Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 10}}},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 	if len(target.list.All()) != 1 {
 		t.Fatal("STUN should apply its effect on a guaranteed-success roll")
@@ -201,7 +201,7 @@ func TestControlDisablersApplyToHostileNPC(t *testing.T) {
 						Time: 10,
 					}},
 				},
-				Targets: []any{target},
+				Targets: []Actor{target},
 			})
 
 			if len(target.EffectList().All()) != 1 {
@@ -229,7 +229,7 @@ func TestCancelDebuffStripsOnlyDispellableDebuffsUpToLimit(t *testing.T) {
 
 	registry.Use(Cast{
 		Skill:   modelskill.Definition{SkillType: "CANCEL_DEBUFF", MaxNegatedEffects: 1},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 
 	remaining := target.list.All()
@@ -259,7 +259,7 @@ func TestNegateByIDStripsMatchingEffect(t *testing.T) {
 
 	registry.Use(Cast{
 		Skill:   modelskill.Definition{SkillType: "NEGATE", NegateIDs: []int{42}},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 
 	if hasEffect(target.list, targeted) {
@@ -283,7 +283,7 @@ func TestAggRemoveSkipsNonAttackableAndRaidRelatedTargets(t *testing.T) {
 
 	registry.Use(Cast{
 		Skill:   modelskill.Definition{SkillType: "AGGREMOVE"},
-		Targets: []any{notAttackable, raidRelated},
+		Targets: []Actor{notAttackable, raidRelated},
 	})
 
 	if notAttackable.aggro.IsEmpty() {
@@ -305,7 +305,7 @@ func TestAggDamageNotifiesAttackableTargetAndAppliesEffectsUnconditionally(t *te
 	registry.Use(Cast{
 		Caster:  caster,
 		Skill:   modelskill.Definition{SkillType: "AGGDAMAGE", Power: 100, Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 10}}},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 
 	if target.aggressionSource != caster {
@@ -328,7 +328,7 @@ func TestAggDamageSkipsAggroNotificationForNonAttackableTarget(t *testing.T) {
 	registry.Use(Cast{
 		Caster:  caster,
 		Skill:   modelskill.Definition{SkillType: "AGGDAMAGE", Power: 100, Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 10}}},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 
 	if target.aggressionSource != nil {
@@ -349,7 +349,7 @@ func TestAggRemoveClearsBothTablesOnSuccess(t *testing.T) {
 
 	registry.Use(Cast{
 		Skill:   modelskill.Definition{SkillType: "AGGREMOVE"},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 
 	if !target.aggro.IsEmpty() || !target.hate.IsEmpty() {
@@ -359,7 +359,10 @@ func TestAggRemoveClearsBothTablesOnSuccess(t *testing.T) {
 
 // bssCasterFake exposes a fixed blessed-spiritshot charge state for tests
 // asserting checkSkillSuccess resolves it from the caster.
-type bssCasterFake struct{ bss bool }
+type bssCasterFake struct {
+	fakeActor
+	bss bool
+}
 
 func (c *bssCasterFake) BlessedSpiritshotCharged() bool { return c.bss }
 
@@ -424,7 +427,7 @@ func TestCheckSkillSuccessFailsOnPerfectShieldBlockDespiteGuaranteedRate(t *test
 
 	registry.Use(Cast{
 		Skill:   modelskill.Definition{SkillType: "STUN", Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 10}}},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 
 	if len(target.list.All()) != 0 {
@@ -475,7 +478,7 @@ func TestCheckSkillSuccessUsesLivePlayerShieldDefense(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			registry.Use(Cast{Caster: caster, Skill: skill, Targets: []any{tt.target}})
+			registry.Use(Cast{Caster: caster, Skill: skill, Targets: []Actor{tt.target}})
 			if got := len(tt.target.EffectList().All()); got != tt.want {
 				t.Fatalf("target effects = %d, want %d", got, tt.want)
 			}
@@ -538,7 +541,7 @@ func TestCheckSkillSuccessResolvesCasterBlessedSpiritshotCharge(t *testing.T) {
 	registry.Use(Cast{
 		Caster:  caster,
 		Skill:   modelskill.Definition{SkillType: "STUN", Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 10}}},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 
 	if !target.lastBss {

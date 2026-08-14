@@ -10,6 +10,7 @@ import (
 // effectListTarget is implemented by anything that owns a live effect list:
 // a target an effect-applying or effect-cancelling skill can act on.
 type effectListTarget interface {
+	Actor
 	EffectList() *effect.List
 }
 
@@ -23,15 +24,15 @@ type effectSuccessSource interface {
 // this port hasn't wired yet (see effect.New) is skipped rather than
 // failing the whole batch, matching how partially-modeled skill data
 // degrades elsewhere in this package.
-func applyEffects(effector, effected any, def modelskill.Definition, templates []modelskill.EffectTemplate) {
+func applyEffects(effector, effected Actor, def modelskill.Definition, templates []modelskill.EffectTemplate) {
 	applyEffectsWithLanding(effector, effected, def, templates, formulas.ShieldFailed, false)
 }
 
-func applyCastEffects(cast Cast, effected any, def modelskill.Definition, templates []modelskill.EffectTemplate) {
+func applyCastEffects(cast Cast, effected Actor, def modelskill.Definition, templates []modelskill.EffectTemplate) {
 	cast.reportResisted(effected, def, applyEffectsWithLanding(cast.Caster, effected, def, templates, formulas.ShieldFailed, false))
 }
 
-func applyEffectsWithLanding(effector, effected any, def modelskill.Definition, templates []modelskill.EffectTemplate, shield formulas.ShieldDefense, bss bool) (resisted int) {
+func applyEffectsWithLanding(effector, effected Actor, def modelskill.Definition, templates []modelskill.EffectTemplate, shield formulas.ShieldDefense, bss bool) (resisted int) {
 	if len(templates) == 0 {
 		return 0
 	}
@@ -102,7 +103,7 @@ func firstEffectByID(list *effect.List, id modelskill.ID) *effect.Effect {
 // ActiveEffect reports whether target's live effect list currently holds an
 // active instance of skill id — the caller-side lookup a toggle skill's
 // on/off decision needs before driving cast.Controller.CastToggle.
-func ActiveEffect(target any, id modelskill.ID) bool {
+func ActiveEffect(target Actor, id modelskill.ID) bool {
 	t, ok := target.(effectListTarget)
 	if !ok {
 		return false
@@ -113,7 +114,7 @@ func ActiveEffect(target any, id modelskill.ID) bool {
 // StopEffect removes target's active instance of skill id from its live
 // effect list, if one exists, running that instance's exit hook. This is
 // how deactivating an already-active toggle turns it off.
-func StopEffect(target any, id modelskill.ID) {
+func StopEffect(target Actor, id modelskill.ID) {
 	t, ok := target.(effectListTarget)
 	if !ok {
 		return
