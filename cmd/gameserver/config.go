@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/db"
 	"github.com/fatal10110/acis_golang/internal/config"
@@ -44,6 +45,16 @@ func loadGameServerProperties(paths gameServerPaths) (*config.Properties, error)
 type respawnRestoreHP float64
 
 type deathPenaltyChance int
+
+type playerSpawnProtection time.Duration
+
+func loadPlayerSpawnProtection(paths gameServerPaths) (playerSpawnProtection, error) {
+	props, err := config.LoadFile(paths.PlayersConfigPath)
+	if err != nil {
+		return 0, err
+	}
+	return playerSpawnProtection(time.Duration(config.NewFields(props, "player spawn protection").Int("PlayerSpawnProtection", 0)) * time.Second), nil
+}
 
 func loadRespawnRestoreHP(paths gameServerPaths) (respawnRestoreHP, error) {
 	props, err := config.LoadFile(paths.PlayersConfigPath)

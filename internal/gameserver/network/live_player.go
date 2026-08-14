@@ -43,21 +43,23 @@ type livePlayer struct {
 	isGM          bool
 	log           zerolog.Logger
 
-	known          world.KnownBuffer
-	zoneActor      *liveZoneActor
-	visibilitySend func(wire.Frame) bool
-	stopAttack     func(*livePlayer)
-	shadowExpiryMu sync.RWMutex
-	detaching      bool
-	pickupMu       sync.Mutex // guards deferred player intentions and pickup state
-	fusionMu       sync.Mutex // guards fusionTargetID
-	fusionTargetID int32
-	pickup         *pickupIntention
-	deferredPickup *pickupIntention
-	deferredMagic  *clientpackets.RequestMagicSkillUse
-	deferredItem   *itemAICastIntention
-	pickupLocked   bool
-	pickupLockGen  uint64
+	known              world.KnownBuffer
+	zoneActor          *liveZoneActor
+	visibilitySend     func(wire.Frame) bool
+	stopAttack         func(*livePlayer)
+	shadowExpiryMu     sync.RWMutex
+	spawnProtectionMu  sync.Mutex
+	spawnProtectionGen uint64
+	detaching          bool
+	pickupMu           sync.Mutex // guards deferred player intentions and pickup state
+	fusionMu           sync.Mutex // guards fusionTargetID
+	fusionTargetID     int32
+	pickup             *pickupIntention
+	deferredPickup     *pickupIntention
+	deferredMagic      *clientpackets.RequestMagicSkillUse
+	deferredItem       *itemAICastIntention
+	pickupLocked       bool
+	pickupLockGen      uint64
 
 	petInteractMu sync.Mutex
 	petInteract   *summon.Actor

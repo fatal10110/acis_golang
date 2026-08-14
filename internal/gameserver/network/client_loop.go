@@ -103,6 +103,9 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			continue
 		}
 
+		if opcode != clientpackets.OpcodeAppearing {
+			l.clearSpawnProtectionOnAction(live)
+		}
 		switch opcode {
 		case clientpackets.OpcodeProtocolVersion:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeProtocolVersion)
@@ -722,6 +725,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 			if live != nil {
 				live.SetTeleporting(false)
+				l.activateSpawnProtection(live)
 				live.SendFrame(serverpackets.FrameUserInfo(serverpackets.UserInfoSnapshot{
 					Character: live.Character,
 					Template:  live.template,

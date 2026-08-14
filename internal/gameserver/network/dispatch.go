@@ -90,6 +90,7 @@ type PlayerConfig struct {
 	// DeathPenaltyChance is the percentage chance for a non-karma player to
 	// receive a death-penalty level.
 	DeathPenaltyChance int
+	SpawnProtection    time.Duration
 	// SkillEnchantSPBookNeeded controls whether enchanting a skill above
 	// level 76 also consumes the tree's configured spellbook item.
 	SkillEnchantSPBookNeeded bool
