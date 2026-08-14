@@ -325,6 +325,31 @@ func TestPdamPerfectShieldBlocksDamageAndEffects(t *testing.T) {
 	}
 }
 
+func TestPdamLethalReportsCasterAndTarget(t *testing.T) {
+	caster := newDamageEffectFake()
+	caster.id = 1
+	target := newDamageEffectFake()
+	target.id, target.hp, target.physicalOK = 2, 2000, true
+	target.physicalInput = formulas.PhysicalSkillInput{
+		AttackPower: 100, SkillPower: 50, Defence: 40,
+		RandomMul: 1, RaceMul: 1, WeaponVulnMul: 1, PvPMul: 1, ElementalMul: 1,
+	}
+	target.lethalOK = true
+	target.lethalInput = formulas.LethalInput{AttackerLevel: 1, TargetLevel: 1, LethalMul: 1000}
+
+	result, handled := NewDefaultRegistry().UseResult(Cast{
+		Caster:  caster,
+		Skill:   modelskill.Definition{SkillType: "PDAM", LethalChance2: 1},
+		Targets: []any{target},
+	})
+	if !handled {
+		t.Fatal("UseResult() handled = false")
+	}
+	if got := result.Lethals; len(got) != 1 || got[0].AttackerID != caster.id || got[0].TargetID != target.id {
+		t.Fatalf("Lethals = %+v, want caster %d and target %d", got, caster.id, target.id)
+	}
+}
+
 func TestBlowMissSkipsDamageAndEffects(t *testing.T) {
 	registry := NewDefaultRegistry()
 	caster := newDamageEffectFake()

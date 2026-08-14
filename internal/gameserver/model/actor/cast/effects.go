@@ -20,6 +20,7 @@ type EffectResult struct {
 	Handled           bool
 	AttackFailed      int
 	Counterattacks    []handlerskill.Counterattack
+	Lethals           []handlerskill.Lethal
 	Dodges            []handlerskill.Dodge
 	Resisted          []handlerskill.Resisted
 	CubicAdded        bool
@@ -145,6 +146,7 @@ func dispatchEffects(handlers EffectHandlers, caster any, affected []skilltarget
 		Handled:           true,
 		AttackFailed:      result.AttackFailed,
 		Counterattacks:    result.Counterattacks,
+		Lethals:           result.Lethals,
 		Dodges:            result.Dodges,
 		Resisted:          result.Resisted,
 		CubicAdded:        result.CubicAdded,

@@ -136,7 +136,7 @@ func (pdamHandler) UseResult(cast Cast) Result {
 			if !applyPhysicalSkillCounter(cast, target, damage, &result) {
 				target.ReduceHP(damage, cast.Caster, cast.Skill)
 			}
-			applyLethalHit(cast, target)
+			applyLethalHit(cast, target, &result)
 		} else {
 			result.AttackFailed++
 		}
@@ -327,7 +327,7 @@ func (blowHandler) UseResult(cast Cast) Result {
 		}
 		// Blow.java rolls the lethal chance unconditionally per target,
 		// outside the landing gate — a missed blow can still proc it.
-		applyLethalHit(cast, target)
+		applyLethalHit(cast, target, &result)
 	}
 	applySelfEffects(cast, cast.Skill)
 	return result
@@ -523,7 +523,7 @@ func (manaDamageHandler) UseResult(cast Cast) Result {
 	return result
 }
 
-func applyLethalHit(cast Cast, obj any) {
+func applyLethalHit(cast Cast, obj any, result *Result) {
 	target, ok := obj.(lethalTarget)
 	if !ok {
 		return
@@ -547,5 +547,11 @@ func applyLethalHit(cast Cast, obj any) {
 	outcome := formulas.LethalHit(in, rnd.Get)
 	if outcome != formulas.LethalNone {
 		target.ApplyLethalOutcome(outcome, cast.Caster, cast.Skill)
+		if result != nil {
+			result.Lethals = append(result.Lethals, Lethal{
+				AttackerID: counterattackObjectID(cast.Caster),
+				TargetID:   counterattackObjectID(obj),
+			})
+		}
 	}
 }
