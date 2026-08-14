@@ -138,8 +138,8 @@ func dispatchEffects(handlers EffectHandlers, caster any, affected []skilltarget
 		castTargets[i] = t
 	}
 	if notifier, ok := caster.(pvpSkillNotifier); ok {
-		notifyTargets := make([]any, len(affected))
-		for i, t := range affected {
+		notifyTargets := make([]any, len(castTargets))
+		for i, t := range castTargets {
 			notifyTargets[i] = t
 		}
 		notifier.NotePvPSkillTargets(notifyTargets, def.Offensive, def.SkillType)
