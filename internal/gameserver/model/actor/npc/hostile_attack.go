@@ -503,14 +503,6 @@ func (h *Hostile) broadcastFrame(build func() wire.Frame) error {
 	return nil
 }
 
-func (h *Hostile) appendKnown() []world.Tracked {
-	return h.known.Snapshot(h.world, h)
-}
-
-func (h *Hostile) releaseKnown() {
-	h.known.Release()
-}
-
 // AttackableBy reports whether attacker may physically attack this NPC.
 func (h *Hostile) AttackableBy(attacker skilltarget.Creature) bool {
 	return attacker != nil && attacker.ObjectID() != h.ObjectID() && !h.AlikeDead()

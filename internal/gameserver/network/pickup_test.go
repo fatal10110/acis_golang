@@ -646,6 +646,10 @@ func TestStartPickupLiveGroundItemDefersUntilAttackFinishes(t *testing.T) {
 		frame.Release()
 		return true
 	})
+	live.Character.SetBroadcastFrameSender(func(frame wire.Frame) bool {
+		frame.Release()
+		return true
+	})
 
 	deadline := time.Now().Add(2 * time.Second)
 	for {

@@ -6,7 +6,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
-	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 func (l *GameClientLink) moveLivePlayer(live *livePlayer, target location.Location) {
@@ -197,14 +196,6 @@ func broadcastFrame(build func() wire.Frame, recipients func(func(frameReceiver)
 			receiver.BroadcastFrame(frame)
 		}
 	})
-}
-
-func (p *livePlayer) appendKnown(state *world.State) []world.Tracked {
-	return p.known.Snapshot(state, p)
-}
-
-func (p *livePlayer) releaseKnown() {
-	p.known.Release()
 }
 
 func (l *GameClientLink) updateLivePlayerPosition(live *livePlayer, position location.Location, heading int) {

@@ -59,7 +59,11 @@ func (s *Session) trySendFrame(frame wire.Frame) bool {
 		s.conn.abort()
 		return false
 	}
-	s.mu.Lock()
+	if !s.mu.TryLock() {
+		frame.Release()
+		s.conn.abort()
+		return false
+	}
 	defer s.mu.Unlock()
 	if s.conn.queueFull() {
 		frame.Release()

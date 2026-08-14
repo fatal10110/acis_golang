@@ -3,6 +3,7 @@ package network
 import (
 	"net"
 	"sync"
+	"sync/atomic"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/rs/zerolog"
@@ -21,8 +22,9 @@ type Conn struct {
 	log      zerolog.Logger
 	mu       sync.RWMutex
 	out      chan queuedWrite
-	closed   bool
+	closed   atomic.Bool
 	stopping chan struct{}
+	stopOnce sync.Once
 	stopped  chan struct{}
 	closeErr error
 }
@@ -63,7 +65,7 @@ func (c *Conn) writeLoop() {
 		if r := recover(); r != nil {
 			c.log.Error().Interface("panic", r).Msg("game connection writer panic")
 		}
-		close(c.stopping)
+		c.stop()
 		c.releaseQueued()
 		c.closeErr = c.Conn.Close()
 		close(c.stopped)
@@ -72,7 +74,17 @@ func (c *Conn) writeLoop() {
 	// owner, so no other goroutine ever sees them.
 	var batch []queuedWrite
 	var bufs net.Buffers
-	for queued := range c.out {
+	for {
+		var queued queuedWrite
+		var ok bool
+		select {
+		case <-c.stopping:
+			return
+		case queued, ok = <-c.out:
+			if !ok {
+				return
+			}
+		}
 		batch = c.drainBatch(batch[:0], queued)
 		var err error
 		if bufs, err = c.writeBatch(batch, bufs); err != nil {
@@ -166,28 +178,25 @@ func (c *Conn) trySendFrame(frame wire.Frame) bool {
 // abort closes a connection without waiting for its writer to drain. It is
 // used when a client can no longer decode its ordered packet stream.
 func (c *Conn) abort() {
-	c.mu.Lock()
-	if !c.closed {
-		c.log.Warn().Msg("visibility queue full, aborting connection")
-		c.closed = true
-		close(c.out)
+	if c.closed.CompareAndSwap(false, true) {
+		c.log.Warn().Msg("outbound queue full, aborting connection")
+		c.stop()
+		_ = c.Conn.Close()
 	}
-	c.mu.Unlock()
-	_ = c.Conn.Close()
 }
 
-func (c *Conn) send(queued queuedWrite) (ok bool) {
-	defer func() {
-		if recover() != nil {
-			ok = false
-		}
-	}()
+func (c *Conn) stop() {
+	if c.stopping != nil {
+		c.stopOnce.Do(func() { close(c.stopping) })
+	}
+}
+
+func (c *Conn) send(queued queuedWrite) bool {
 	c.mu.RLock()
-	if c.closed {
-		c.mu.RUnlock()
+	defer c.mu.RUnlock()
+	if c.closed.Load() {
 		return false
 	}
-	c.mu.RUnlock()
 	select {
 	case <-c.stopping:
 		return false
@@ -201,18 +210,12 @@ func (c *Conn) send(queued queuedWrite) (ok bool) {
 	}
 }
 
-func (c *Conn) trySend(queued queuedWrite) (ok bool) {
-	defer func() {
-		if recover() != nil {
-			ok = false
-		}
-	}()
+func (c *Conn) trySend(queued queuedWrite) bool {
 	c.mu.RLock()
-	if c.closed {
-		c.mu.RUnlock()
+	defer c.mu.RUnlock()
+	if c.closed.Load() {
 		return false
 	}
-	c.mu.RUnlock()
 	select {
 	case <-c.stopping:
 		return false
@@ -229,7 +232,7 @@ func (c *Conn) trySend(queued queuedWrite) (ok bool) {
 func (c *Conn) queueFull() bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return c.closed || len(c.out) == cap(c.out)
+	return c.closed.Load() || len(c.out) == cap(c.out)
 }
 
 // Close stops accepting new sends, flushes any already queued, then
@@ -237,8 +240,8 @@ func (c *Conn) queueFull() bool {
 // call blocks until the underlying connection is actually closed.
 func (c *Conn) Close() error {
 	c.mu.Lock()
-	if !c.closed {
-		c.closed = true
+	if !c.closed.Load() {
+		c.closed.Store(true)
 		close(c.out)
 	}
 	c.mu.Unlock()

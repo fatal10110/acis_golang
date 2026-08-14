@@ -129,27 +129,22 @@ func TestSessionTrySendFrameDisconnectsFullQueueWithoutBlocking(t *testing.T) {
 		t.Fatal("TrySendFrame blocked on a full outbound queue")
 	}
 
-	conn.mu.RLock()
-	closed := conn.closed
-	conn.mu.RUnlock()
-	if !closed {
+	if !conn.closed.Load() {
 		t.Fatal("full outbound queue did not disconnect the session")
 	}
 }
 
-func TestSessionTrySendFrameDoesNotWaitForBlockedSendFrame(t *testing.T) {
+func TestSessionTrySendFrameDoesNotWaitForBusySession(t *testing.T) {
 	key := bytes.Repeat([]byte{0x11}, keySize)
 	cipher, err := NewCipher(key)
 	if err != nil {
 		t.Fatalf("NewCipher: %v", err)
 	}
-	s := NewSession(fullQueueConn(t), cipher)
-	blocked := make(chan struct{})
-	go func() {
-		close(blocked)
-		s.SendFrame(wire.BorrowedFrame(wire.FrameBytes([]byte{0x02, 0x00})))
-	}()
-	<-blocked
+	conn := fullQueueConn(t)
+	(<-conn.out).frame.Release()
+	s := NewSession(conn, cipher)
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	done := make(chan bool, 1)
 	go func() { done <- s.TrySendFrame(wire.BorrowedFrame(wire.FrameBytes([]byte{0x02, 0x00}))) }()
@@ -159,7 +154,7 @@ func TestSessionTrySendFrameDoesNotWaitForBlockedSendFrame(t *testing.T) {
 			t.Fatal("TrySendFrame returned true with a full queue")
 		}
 	case <-time.After(time.Second):
-		t.Fatal("TrySendFrame waited for blocked SendFrame")
+		t.Fatal("TrySendFrame waited for a busy session")
 	}
 }
 

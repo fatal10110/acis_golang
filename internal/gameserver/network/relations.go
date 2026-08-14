@@ -55,7 +55,7 @@ func (l *GameClientLink) broadcastRelations(live *livePlayer) {
 		// karma/pvp-flag: Summon has no independent karma/pvp-flag state
 		// of its own, matching Summon.getKarma()/getPvpFlag() delegating
 		// to their owner.
-		live.SendFrame(serverpackets.FrameRelationChanged(serverpackets.RelationChangedInfo{
+		live.BroadcastFrame(serverpackets.FrameRelationChanged(serverpackets.RelationChangedInfo{
 			ObjectID: pet.ObjectID(),
 			Relation: relation,
 			Karma:    int32(karma),
@@ -99,7 +99,7 @@ func (l *GameClientLink) broadcastSummonSpawnRelation(live *livePlayer, pet worl
 	pvpFlag := live.PvPFlagState()
 	relation := relationBits(karma, pvpFlag)
 
-	live.SendFrame(serverpackets.FrameRelationChanged(serverpackets.RelationChangedInfo{
+	live.BroadcastFrame(serverpackets.FrameRelationChanged(serverpackets.RelationChangedInfo{
 		ObjectID: pet.ObjectID(),
 		Relation: relation,
 		Karma:    int32(karma),

@@ -198,7 +198,7 @@ func TestConnSendFrameAfterCloseReleasesFrame(t *testing.T) {
 	}
 }
 
-func TestConnAbortLogsVisibilityQueueOverflow(t *testing.T) {
+func TestConnAbortLogsOutboundQueueOverflow(t *testing.T) {
 	server, client := net.Pipe()
 	defer client.Close()
 
@@ -210,8 +210,8 @@ func TestConnAbortLogsVisibilityQueueOverflow(t *testing.T) {
 	}
 	conn.abort()
 
-	if got := logs.String(); !strings.Contains(got, "visibility queue full, aborting connection") {
-		t.Fatalf("abort log = %q, want visibility queue overflow diagnostic", got)
+	if got := logs.String(); !strings.Contains(got, "outbound queue full, aborting connection") {
+		t.Fatalf("abort log = %q, want outbound queue overflow diagnostic", got)
 	}
 }
 
