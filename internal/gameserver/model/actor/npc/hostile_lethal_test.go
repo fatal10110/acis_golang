@@ -7,6 +7,10 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 )
 
+type deniedLethalCaster struct{ *Hostile }
+
+func (deniedLethalCaster) CanGiveDamage() bool { return false }
+
 func TestHostileLethalSurfaceBuildsInputAndAppliesOutcomes(t *testing.T) {
 	caster := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", Level: 40, HPMax: 500})
 	target := newCombatHostile(t, 2, &Template{ID: 2, Type: "Monster", Level: 45, HPMax: 500})
@@ -31,6 +35,20 @@ func TestHostileLethalSurfaceBuildsInputAndAppliesOutcomes(t *testing.T) {
 	target.ApplyLethalOutcome(formulas.LethalFull, caster, skill)
 	if got := target.HP(); got != 1 {
 		t.Fatalf("full lethal HP = %v, want 1", got)
+	}
+}
+
+func TestHostileLethalInputRejectsGuardedDamage(t *testing.T) {
+	caster := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", Level: 40, HPMax: 500})
+	target := newCombatHostile(t, 2, &Template{ID: 2, Type: "Monster", Level: 45, HPMax: 500})
+	skill := modelskill.Definition{LethalChance1: 30}
+	target.SetInvul(true)
+	if _, ok := target.LethalInput(caster, skill); ok {
+		t.Fatal("LethalInput accepted an invulnerable hostile")
+	}
+	target.SetInvul(false)
+	if _, ok := target.LethalInput(deniedLethalCaster{caster}, skill); ok {
+		t.Fatal("LethalInput accepted an attacker without damage permission")
 	}
 }
 

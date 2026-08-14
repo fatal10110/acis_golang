@@ -307,6 +307,11 @@ func TestCharacterLethalInputRejectsAttackerWithoutDamagePermission(t *testing.T
 	if _, ok := target.LethalInput(caster, modelskill.Definition{LethalChance1: 100}); ok {
 		t.Fatal("LethalInput accepted an attacker without damage permission")
 	}
+	caster.SetCanGiveDamage(true)
+	target.SetSpawnProtection(true)
+	if _, ok := target.LethalInput(caster, modelskill.Definition{LethalChance1: 100}); ok {
+		t.Fatal("LethalInput accepted an invulnerable target")
+	}
 }
 
 func TestCharacterReduceHPIgnoresInvulnerableTargetAndNoDamagePermission(t *testing.T) {

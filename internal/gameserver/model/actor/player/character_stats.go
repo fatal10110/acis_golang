@@ -668,7 +668,7 @@ func (c *Character) LethalRate() float64 {
 
 // LethalInput resolves a lethal-strike roll against c.
 func (c *Character) LethalInput(caster any, def modelskill.Definition) (formulas.LethalInput, bool) {
-	if attacker, ok := caster.(interface{ CanGiveDamage() bool }); ok && !attacker.CanGiveDamage() {
+	if c.Invul() || !creature.CanDealDamage(caster) {
 		return formulas.LethalInput{}, false
 	}
 	attacker, ok := caster.(interface {

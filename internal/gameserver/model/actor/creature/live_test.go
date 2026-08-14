@@ -241,6 +241,12 @@ func TestLiveInvulReportsChange(t *testing.T) {
 	if !live.SetInvul(false) || live.Invul() {
 		t.Fatal("SetInvul(false) did not disable invulnerability")
 	}
+	if !live.SetTeleporting(true) || !live.Invul() {
+		t.Fatal("teleporting creature was not invulnerable")
+	}
+	if !live.SetTeleporting(false) || live.Invul() {
+		t.Fatal("cleared teleport protection left creature invulnerable")
+	}
 }
 
 func TestLiveNilReceiverGettersDoNotPanic(t *testing.T) {
