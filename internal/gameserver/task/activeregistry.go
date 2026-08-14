@@ -2,9 +2,6 @@ package task
 
 import (
 	"sync"
-	"sync/atomic"
-
-	"github.com/rs/zerolog"
 )
 
 // activeRegistry is the shared mutex+map+ticker-snapshot structure behind
@@ -13,14 +10,19 @@ import (
 // iterating it outside the lock so Add/Remove stay safe to call from within
 // a tick's per-actor callback.
 //
-// entries and scratch are guarded by mu. ticking enforces the documented
-// single-goroutine, one-call-at-a-time Tick contract.
+// entries and scratch are guarded by mu. The embedded tickGuard enforces
+// the documented single-goroutine, one-call-at-a-time Tick contract;
+// endTick (promoted from tickGuard) only releases that guard, so a
+// successful Tick must also call releaseSnapshot to clear scratch — the
+// two are separate steps on purpose, since tickGuard is shared with
+// serialDeadlineRegistry, whose tickDue clears its own scratch internally
+// and has no equivalent of releaseSnapshot.
 type activeRegistry[K comparable, V any] struct {
 	mu      sync.Mutex
 	entries map[K]V
 	scratch []V
 
-	ticking atomic.Bool
+	tickGuard
 }
 
 func newActiveRegistry[K comparable, V any]() *activeRegistry[K, V] {
@@ -49,21 +51,11 @@ func (r *activeRegistry[K, V]) contains(key K) bool {
 	return ok
 }
 
-// beginTick claims the single-goroutine Tick contract, or logs msg via log
-// and reports false if another Tick is already running.
-func (r *activeRegistry[K, V]) beginTick(log zerolog.Logger, msg string) bool {
-	if !r.ticking.CompareAndSwap(false, true) {
-		log.Error().Err(ErrReentrantTick).Msg(msg)
-		return false
-	}
-	return true
-}
-
-// endTick releases the guard claimed by a successful beginTick and clears
-// the scratch buffer from the tick just finished.
-func (r *activeRegistry[K, V]) endTick() {
+// releaseSnapshot clears the scratch buffer's element references after a
+// snapshot has been consumed. It is distinct from endTick (promoted from
+// tickGuard, which only releases the guard) since a Tick must call both.
+func (r *activeRegistry[K, V]) releaseSnapshot() {
 	clear(r.scratch)
-	r.ticking.Store(false)
 }
 
 // snapshot copies the current entries into the reused scratch buffer under

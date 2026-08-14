@@ -74,6 +74,7 @@ func (p *PositionUpdates) Tick() {
 		return
 	}
 	defer p.endTick()
+	defer p.releaseSnapshot()
 
 	for _, actor := range p.snapshot() {
 		if !p.canUpdate(actor) {

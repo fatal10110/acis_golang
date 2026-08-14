@@ -2,10 +2,7 @@ package task
 
 import (
 	"sync"
-	"sync/atomic"
 	"time"
-
-	"github.com/rs/zerolog"
 )
 
 type deadlineEntry[V any] struct {
@@ -140,28 +137,13 @@ func (r *deadlineRegistry[K, V]) tickExpiry(now time.Time, expire func(V), updat
 // happen; beginTick/endTick enforce that.
 type serialDeadlineRegistry[K comparable, V any] struct {
 	*deadlineRegistry[K, V]
+	tickGuard
 
 	scratch []deadlineEntry[V]
-	ticking atomic.Bool
 }
 
 func newSerialDeadlineRegistry[K comparable, V any]() *serialDeadlineRegistry[K, V] {
 	return &serialDeadlineRegistry[K, V]{deadlineRegistry: newDeadlineRegistry[K, V]()}
-}
-
-// beginTick claims the single-goroutine Tick contract, or logs msg via log
-// and reports false if another Tick is already running.
-func (r *serialDeadlineRegistry[K, V]) beginTick(log zerolog.Logger, msg string) bool {
-	if !r.ticking.CompareAndSwap(false, true) {
-		log.Error().Err(ErrReentrantTick).Msg(msg)
-		return false
-	}
-	return true
-}
-
-// endTick releases the guard claimed by a successful beginTick.
-func (r *serialDeadlineRegistry[K, V]) endTick() {
-	r.ticking.Store(false)
 }
 
 // tickDue sweeps entries whose deadline is not after now, removes them, and

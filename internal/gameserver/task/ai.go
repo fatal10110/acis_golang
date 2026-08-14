@@ -10,12 +10,14 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
-// ErrReentrantTick is returned by AI, Decay, and AttackStance's Tick when a
-// call arrives while another Tick on the same registry is still running.
-// Each of those types documents a single-goroutine, one-call-at-a-time
-// contract; a caller that bypasses their Start wiring and invokes Tick from
-// more than one goroutine gets this error instead of silently corrupting the
-// in-flight tick's shared scratch buffer.
+// ErrReentrantTick is returned by AI, Decay, and AttackStance's Tick, and
+// logged (but not returned, since its Tick signature predates this guard)
+// by PositionUpdates's Tick, when a call arrives while another Tick on the
+// same registry is still running. Each of those types documents a
+// single-goroutine, one-call-at-a-time contract; a caller that bypasses
+// their Start wiring and invokes Tick from more than one goroutine gets
+// this error instead of silently corrupting the in-flight tick's shared
+// scratch buffer.
 var ErrReentrantTick = errors.New("task: Tick called concurrently; Tick is single-goroutine only")
 
 // AITick is the fixed hostile-NPC AI interval.
@@ -80,6 +82,7 @@ func (a *AI) Tick() error {
 		return ErrReentrantTick
 	}
 	defer a.endTick()
+	defer a.releaseSnapshot()
 
 	for _, actor := range a.snapshot() {
 		placed, active := regionActivity(a.state, actor)
