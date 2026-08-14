@@ -19,7 +19,10 @@ const trySendLockAttempts = 64
 // a frame and queueing it for send must happen as one step in send order —
 // mu is the only thing allowed to call cipher.Encrypt or conn.SendFrame, so two
 // goroutines calling SendFrame concurrently can never queue frames in an order
-// that disagrees with the order their bytes were encrypted in.
+// that disagrees with the order their bytes were encrypted in. SendFrame is
+// the only path that can hold mu while blocking, and it can do so only after
+// the outbound queue is full; TrySendFrame checks that condition before it
+// waits for mu and aborts the connection instead.
 type Session struct {
 	conn   *Conn
 	cipher *Cipher
@@ -65,13 +68,7 @@ func (s *Session) trySendFrame(frame wire.Frame) bool {
 	for range trySendLockAttempts {
 		if s.mu.TryLock() {
 			defer s.mu.Unlock()
-			if s.conn.queueFull() {
-				frame.Release()
-				s.conn.abort()
-				return false
-			}
-			s.cipher.Encrypt(frameBytes[frameHeaderSize:])
-			return s.conn.trySendFrame(frame)
+			return s.encryptAndTrySend(frame, frameBytes)
 		}
 		if s.conn.queueFull() {
 			frame.Release()
@@ -82,6 +79,11 @@ func (s *Session) trySendFrame(frame wire.Frame) bool {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.encryptAndTrySend(frame, frameBytes)
+}
+
+// encryptAndTrySend runs with s.mu held.
+func (s *Session) encryptAndTrySend(frame wire.Frame, frameBytes []byte) bool {
 	if s.conn.queueFull() {
 		frame.Release()
 		s.conn.abort()

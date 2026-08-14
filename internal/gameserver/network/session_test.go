@@ -137,14 +137,13 @@ func TestSessionTrySendFrameDisconnectsFullQueueWithoutBlocking(t *testing.T) {
 	}
 }
 
-func TestSessionTrySendFrameDoesNotWaitForBusySession(t *testing.T) {
+func TestSessionTrySendFrameChecksFullQueueBeforeSessionLock(t *testing.T) {
 	key := bytes.Repeat([]byte{0x11}, keySize)
 	cipher, err := NewCipher(key)
 	if err != nil {
 		t.Fatalf("NewCipher: %v", err)
 	}
 	conn := fullQueueConn(t)
-	(<-conn.out).frame.Release()
 	s := NewSession(conn, cipher)
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -157,7 +156,7 @@ func TestSessionTrySendFrameDoesNotWaitForBusySession(t *testing.T) {
 			t.Fatal("TrySendFrame returned true with a full queue")
 		}
 	case <-time.After(time.Second):
-		t.Fatal("TrySendFrame waited for a busy session")
+		t.Fatal("TrySendFrame waited for a busy session despite a full queue")
 	}
 }
 
