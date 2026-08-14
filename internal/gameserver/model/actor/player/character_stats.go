@@ -469,7 +469,7 @@ func (c *Character) absorbCPThenReduceHP(amount float64, attacker any, ignoreCP 
 
 // ReduceHP applies skill HP damage and runs the once-only death path.
 func (c *Character) ReduceHP(amount float64, attacker any, skill modelskill.Definition) {
-	if amount <= 0 {
+	if amount <= 0 || c.Invul() || !creature.CanDealDamage(attacker) {
 		return
 	}
 	rawDamage := amount
@@ -513,7 +513,7 @@ func (c *Character) ReduceHP(amount float64, attacker any, skill modelskill.Defi
 // only skill that does, Backstab, is a BLOW burst hit, never delivered
 // through EffectDamOverTime), so ignoreCP is always false here.
 func (c *Character) ReduceHPByDOT(amount float64, attacker any, isDOT bool) {
-	if amount <= 0 {
+	if amount <= 0 || c.Invul() || !creature.CanDealDamage(attacker) {
 		return
 	}
 	c.vitalsMu.Lock()
@@ -668,6 +668,9 @@ func (c *Character) LethalRate() float64 {
 
 // LethalInput resolves a lethal-strike roll against c.
 func (c *Character) LethalInput(caster any, def modelskill.Definition) (formulas.LethalInput, bool) {
+	if c.Invul() || !creature.CanDealDamage(caster) {
+		return formulas.LethalInput{}, false
+	}
 	attacker, ok := caster.(interface {
 		Level() int
 		LethalRate() float64

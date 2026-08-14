@@ -55,6 +55,14 @@ func resolveIsGM(data *admin.Data, accessLevel int) bool {
 	return ok && level.IsGM
 }
 
+func resolveCanGiveDamage(data *admin.Data, accessLevel int) bool {
+	if data == nil {
+		return true
+	}
+	level, ok := data.AccessLevel(accessLevel)
+	return ok && level.GiveDamage
+}
+
 func (a *liveZoneActor) revalidate(ix *zone.Index) {
 	a.mu.Lock()
 	defer a.mu.Unlock()

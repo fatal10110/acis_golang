@@ -26,7 +26,7 @@ func (h *Hostile) Attackable() bool { return true }
 func (h *Hostile) Playable() bool { return false }
 
 // Invul reports whether h is currently invulnerable.
-func (h *Hostile) Invul() bool { return false }
+func (h *Hostile) Invul() bool { return h != nil && h.Live != nil && h.Live.Invul() }
 
 // Invulnerable reports whether h ignores direct resource effects.
 func (h *Hostile) Invulnerable() bool { return h.Invul() }
@@ -157,7 +157,7 @@ func (h *Hostile) ReduceMP(amount float64) float64 {
 
 // ReduceHP applies skill HP damage and runs the once-only death path.
 func (h *Hostile) ReduceHP(amount float64, attacker any, _ modelskill.Definition) {
-	if amount <= 0 || h.AlikeDead() {
+	if amount <= 0 || h.AlikeDead() || h.Invul() || !creature.CanDealDamage(attacker) {
 		return
 	}
 	if combatant, ok := attacker.(attackable.Combatant); ok {
@@ -182,7 +182,7 @@ func (h *Hostile) ReduceHP(amount float64, attacker any, _ modelskill.Definition
 // AggroList, DOT included (Npc.java:390-395; no isDOT gate in the chain
 // Creature.reduceCurrentHpByDOT -> Npc.reduceCurrentHp -> reduceHp).
 func (h *Hostile) ReduceHPByDOT(amount float64, attacker any, isDOT bool) {
-	if amount <= 0 || h.AlikeDead() {
+	if amount <= 0 || h.AlikeDead() || h.Invul() || !creature.CanDealDamage(attacker) {
 		return
 	}
 	if combatant, ok := attacker.(attackable.Combatant); ok {
@@ -309,6 +309,9 @@ func (h *Hostile) LethalRate() float64 {
 
 // LethalInput resolves a lethal-strike roll against h.
 func (h *Hostile) LethalInput(caster any, def modelskill.Definition) (formulas.LethalInput, bool) {
+	if h.Invul() || !creature.CanDealDamage(caster) {
+		return formulas.LethalInput{}, false
+	}
 	attacker, ok := caster.(interface {
 		Level() int
 		LethalRate() float64

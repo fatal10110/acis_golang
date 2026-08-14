@@ -217,7 +217,38 @@ func (a *Actor) MaxBuffCount() int {
 func (a *Actor) Playable() bool { return true }
 
 // Invul reports whether a is currently invulnerable.
-func (a *Actor) Invul() bool { return false }
+func (a *Actor) Invul() bool {
+	if a == nil {
+		return false
+	}
+	a.statusMu.RLock()
+	invul := a.invul
+	a.statusMu.RUnlock()
+	if invul {
+		return true
+	}
+	owner, ok := a.owner.(interface{ SpawnProtected() bool })
+	return ok && owner.SpawnProtected()
+}
+
+// SetInvul sets or clears this summon's invulnerability flag.
+func (a *Actor) SetInvul(v bool) {
+	if a == nil {
+		return
+	}
+	a.statusMu.Lock()
+	a.invul = v
+	a.statusMu.Unlock()
+}
+
+// CanGiveDamage reports whether the owner may inflict damage through this summon.
+func (a *Actor) CanGiveDamage() bool {
+	if a == nil {
+		return false
+	}
+	owner, ok := a.owner.(interface{ CanGiveDamage() bool })
+	return !ok || owner.CanGiveDamage()
+}
 
 // Invulnerable reports whether a ignores direct resource effects.
 func (a *Actor) Invulnerable() bool { return a.Invul() }
@@ -459,7 +490,7 @@ func (a *Actor) ReduceMP(amount float64) float64 {
 
 // ReduceHP applies skill HP damage and marks the summon dead at zero HP.
 func (a *Actor) ReduceHP(amount float64, attacker any, _ modelskill.Definition) {
-	if amount <= 0 {
+	if amount <= 0 || a.Invul() || !creature.CanDealDamage(attacker) {
 		return
 	}
 	a.vitals.mu.Lock()
@@ -480,8 +511,8 @@ func (a *Actor) ReduceHP(amount float64, attacker any, _ modelskill.Definition) 
 }
 
 // ReduceHPByDOT applies periodic HP damage without normal-hit side effects.
-func (a *Actor) ReduceHPByDOT(amount float64, _ any, _ bool) {
-	if amount <= 0 {
+func (a *Actor) ReduceHPByDOT(amount float64, attacker any, _ bool) {
+	if amount <= 0 || a.Invul() || !creature.CanDealDamage(attacker) {
 		return
 	}
 	a.vitals.mu.Lock()
@@ -577,6 +608,9 @@ func (a *Actor) LethalRate() float64 {
 
 // LethalInput resolves a lethal-strike roll against a.
 func (a *Actor) LethalInput(caster any, def modelskill.Definition) (formulas.LethalInput, bool) {
+	if a.Invul() || !creature.CanDealDamage(caster) {
+		return formulas.LethalInput{}, false
+	}
 	attacker, ok := caster.(interface {
 		Level() int
 		LethalRate() float64

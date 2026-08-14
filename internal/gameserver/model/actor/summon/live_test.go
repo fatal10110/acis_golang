@@ -19,12 +19,30 @@ import (
 
 type liveOwnerStub struct {
 	world.Presence
-	id    int32
-	level int
+	id             int32
+	level          int
+	spawnProtected bool
 }
 
-func (o *liveOwnerStub) ObjectID() int32 { return o.id }
-func (o *liveOwnerStub) LevelValue() int { return o.level }
+func (o *liveOwnerStub) ObjectID() int32      { return o.id }
+func (o *liveOwnerStub) LevelValue() int      { return o.level }
+func (o *liveOwnerStub) SpawnProtected() bool { return o.spawnProtected }
+
+func TestActorInvulIncludesOwnerSpawnProtection(t *testing.T) {
+	owner := &liveOwnerStub{spawnProtected: true}
+	actor := &Actor{owner: owner}
+	if !actor.Invul() {
+		t.Fatal("Invul() = false while owner has spawn protection")
+	}
+	owner.spawnProtected = false
+	if actor.Invul() {
+		t.Fatal("Invul() = true after owner spawn protection cleared")
+	}
+	actor.SetInvul(true)
+	if !actor.Invul() {
+		t.Fatal("SetInvul(true) did not enable summon invulnerability")
+	}
+}
 
 type liveOwnerCombatant struct {
 	liveOwnerStub

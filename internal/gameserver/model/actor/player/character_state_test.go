@@ -5,6 +5,21 @@ import (
 	"time"
 )
 
+func TestCharacterSpawnProtectionMakesItInvulnerable(t *testing.T) {
+	c := &Character{}
+	if c.Invul() {
+		t.Fatal("Invul() = true without protection")
+	}
+	c.SetSpawnProtection(true)
+	if !c.SpawnProtected() || !c.Invul() {
+		t.Fatal("spawn protection did not make the character invulnerable")
+	}
+	c.SetSpawnProtection(false)
+	if c.SpawnProtected() || c.Invul() {
+		t.Fatal("cleared spawn protection left the character invulnerable")
+	}
+}
+
 func TestCharacterStopFakeDeathDoesNotBroadcastAfterDeath(t *testing.T) {
 	c := &Character{ID: 1}
 	c.SetStanding(false)

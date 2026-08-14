@@ -227,6 +227,28 @@ func TestLiveTeleportingReportsChange(t *testing.T) {
 	}
 }
 
+func TestLiveInvulReportsChange(t *testing.T) {
+	live := newTestLive(t)
+	if live.Invul() {
+		t.Fatal("Invul() = true on a fresh creature")
+	}
+	if !live.SetInvul(true) || !live.Invul() {
+		t.Fatal("SetInvul(true) did not enable invulnerability")
+	}
+	if live.SetInvul(true) {
+		t.Fatal("repeating SetInvul(true) reported a change")
+	}
+	if !live.SetInvul(false) || live.Invul() {
+		t.Fatal("SetInvul(false) did not disable invulnerability")
+	}
+	if !live.SetTeleporting(true) || !live.Invul() {
+		t.Fatal("teleporting creature was not invulnerable")
+	}
+	if !live.SetTeleporting(false) || live.Invul() {
+		t.Fatal("cleared teleport protection left creature invulnerable")
+	}
+}
+
 func TestLiveNilReceiverGettersDoNotPanic(t *testing.T) {
 	var live *Live
 

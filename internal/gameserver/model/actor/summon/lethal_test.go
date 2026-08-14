@@ -7,6 +7,10 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 )
 
+type deniedLethalCaster struct{ *Actor }
+
+func (deniedLethalCaster) CanGiveDamage() bool { return false }
+
 func TestActorLethalSurfaceBuildsInputAndAppliesOutcomes(t *testing.T) {
 	caster := NewServitor(ServitorConfig{ObjectID: 1, Level: 40, Stats: CombatStats{MaxHP: 500}})
 	target := NewServitor(ServitorConfig{ObjectID: 2, Level: 45, Stats: CombatStats{MaxHP: 500}})
@@ -31,5 +35,19 @@ func TestActorLethalSurfaceBuildsInputAndAppliesOutcomes(t *testing.T) {
 	target.ApplyLethalOutcome(formulas.LethalFull, caster, skill)
 	if got := target.HP(); got != 1 {
 		t.Fatalf("full lethal HP = %v, want 1", got)
+	}
+}
+
+func TestActorLethalInputRejectsGuardedDamage(t *testing.T) {
+	caster := NewServitor(ServitorConfig{ObjectID: 1, Level: 40, Stats: CombatStats{MaxHP: 500}})
+	target := NewServitor(ServitorConfig{ObjectID: 2, Level: 45, Stats: CombatStats{MaxHP: 500}})
+	skill := modelskill.Definition{LethalChance1: 30}
+	target.SetInvul(true)
+	if _, ok := target.LethalInput(caster, skill); ok {
+		t.Fatal("LethalInput accepted an invulnerable summon")
+	}
+	target.SetInvul(false)
+	if _, ok := target.LethalInput(deniedLethalCaster{caster}, skill); ok {
+		t.Fatal("LethalInput accepted an attacker without damage permission")
 	}
 }

@@ -56,11 +56,50 @@ func (c *Character) Category() target.Category {
 	return target.CategoryPlayable
 }
 
-// Invul reports whether c is currently invulnerable. Always false: the
-// invulnerability effect that would set this state isn't wired onto
-// Character yet.
+// Invul reports whether c is currently invulnerable.
 func (c *Character) Invul() bool {
-	return false
+	return c != nil && (c.SpawnProtected() || c.Live != nil && c.Live.Invul())
+}
+
+// SpawnProtected reports whether c currently has spawn protection.
+func (c *Character) SpawnProtected() bool {
+	if c == nil {
+		return false
+	}
+	c.stateMu.RLock()
+	defer c.stateMu.RUnlock()
+	return c.spawnProtected
+}
+
+// SetSpawnProtection sets or clears c's spawn protection.
+func (c *Character) SetSpawnProtection(v bool) {
+	if c == nil {
+		return
+	}
+	c.stateMu.Lock()
+	c.spawnProtected = v
+	c.stateMu.Unlock()
+}
+
+// CanGiveDamage reports whether c's access level permits damage.
+func (c *Character) CanGiveDamage() bool {
+	if c == nil {
+		return false
+	}
+	c.stateMu.RLock()
+	defer c.stateMu.RUnlock()
+	return !c.damagePermissionSet || c.canGiveDamage
+}
+
+// SetCanGiveDamage sets the damage permission resolved from c's access level.
+func (c *Character) SetCanGiveDamage(v bool) {
+	if c == nil {
+		return
+	}
+	c.stateMu.Lock()
+	c.damagePermissionSet = true
+	c.canGiveDamage = v
+	c.stateMu.Unlock()
 }
 
 // SkillSuccessInput returns the effect-landing roll input for def cast

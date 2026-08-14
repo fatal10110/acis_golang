@@ -352,6 +352,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	attackCtl.SetLogger(l.log)
 	combat := ai.NewPlayerAttack(c, moveCtl, attackCtl)
 
+	c.SetCanGiveDamage(resolveCanGiveDamage(l.admin, c.AccessLevel))
 	live := &livePlayer{Character: c, template: tmpl, npcs: l.npcs, items: items, attack: attackCtl, move: moveCtl, combat: combat, shortcuts: shortcut.NewList(shortcuts), isGM: resolveIsGM(l.admin, c.AccessLevel), visibilitySend: client.Session.trySendFrame, stopAttack: l.stopLiveAutoAttack, log: l.log}
 	live.zoneActor = &liveZoneActor{live: live}
 	// Build cast eagerly, like attackCtl above: pickup-lock's timer goroutine
