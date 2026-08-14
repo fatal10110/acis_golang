@@ -128,6 +128,7 @@ type GameClientLink struct {
 	ids           idAllocator
 	groundItems   groundItemDropper
 	attackStance  attackStanceTracker
+	ai            *task.AI
 	pvpFlags      *task.PvPFlags
 	positions     *task.PositionUpdates
 	playerClock   *task.PlayerClock
@@ -204,6 +205,7 @@ type GameClientLinkConfig struct {
 	IDs           idAllocator
 	GroundItems   groundItemDropper
 	AttackStance  attackStanceTracker
+	AI            *task.AI
 	PvPFlags      *task.PvPFlags
 	Positions     *task.PositionUpdates
 	PlayerClock   *task.PlayerClock
@@ -251,6 +253,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) *GameClientLink {
 		ids:           cfg.IDs,
 		groundItems:   cfg.GroundItems,
 		attackStance:  cfg.AttackStance,
+		ai:            cfg.AI,
 		pvpFlags:      cfg.PvPFlags,
 		positions:     cfg.Positions,
 		playerClock:   cfg.PlayerClock,

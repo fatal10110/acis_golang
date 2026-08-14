@@ -6,6 +6,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
@@ -132,6 +133,7 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 		Level:           level,
 		Exp:             state.Exp,
 		SP:              state.SP,
+		ExpType:         levelStats.ExpType,
 		CON:             npcTmpl.CON,
 		Config:          nil, // set by newPet from link.petConfig
 		Inventory:       itemcontainer.NewPetInventory(objID, live.Inventory().Templates()),
@@ -188,6 +190,7 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 
 	offset := location.Location{X: petSpawnOffset, Y: 0, Z: 0}
 	summon.SpawnBesideOwner(link.world, pet, live, offset)
+	pet.TryToFollow(live)
 	link.broadcastSummonSpawnRelation(live, pet)
 
 	return true
@@ -243,6 +246,7 @@ func (s *gameSummonSpawner) SpawnServitor(owner *player.Character, def modelskil
 	servitor.SetZones(link.zones)
 	link.wireSummonAI(servitor, npcTmpl.RunSpeed)
 	summon.SpawnBesideOwner(link.world, servitor, live, location.Location{X: petSpawnOffset})
+	servitor.TryToFollow(live)
 	link.broadcastSummonSpawnRelation(live, servitor)
 	return true
 }
@@ -269,7 +273,10 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 			moveController = controller
 		}
 	}
-	brain := ai.NewSummon(actor, moveController, inertSummonAttackController{})
+	attackController := attack.NewPlayable(actor)
+	attackController.SetLogger(l.log)
+	brain := ai.NewSummon(actor, moveController, attackController)
+	attackController.SetFinished(brain.Think)
 	if controller, ok := moveController.(*move.Controller); ok {
 		controller.SetArrived(func() {
 			actor.SyncPosition(controller.Position())
@@ -296,6 +303,9 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 	}
 	brain.SetCastController(aiController)
 	actor.SetAI(brain)
+	if l.ai != nil {
+		l.ai.Add(summonAIActor{Actor: actor, brain: brain})
+	}
 	actor.SetStatusUpdater(func() { l.broadcastSummonStatus(actor) })
 	actor.SetDamageNotifier(func(attackerName string, damage int32) {
 		owner, ok := l.livePlayerByID(actor.OwnerID())
@@ -345,11 +355,9 @@ func (l *GameClientLink) broadcastSummonStatus(actor *summon.Actor) {
 	})
 }
 
-// inertSummonMoveController and inertSummonAttackController satisfy
-// ai.Summon's move/attack surfaces with safe no-op behavior: every method
-// reports "can't/didn't act". Real combat AI (tryToAttack/tryToFollow
-// actually moving and swinging) is deferred to the follow-up this PR links
-// — see gameSummonSpawner.SpawnPet's own comment.
+// inertSummonMoveController is the fallback when a test or incomplete
+// composition root has no geodata collaborator. Production wires a real
+// move.Controller above.
 type inertSummonMoveController struct{}
 
 func (inertSummonMoveController) MaybeStartOffensiveFollow(attackable.Combatant, int) (bool, error) {
@@ -361,9 +369,16 @@ func (inertSummonMoveController) MaybeStartFriendlyFollow(attackable.Combatant, 
 	return false, nil
 }
 
-type inertSummonAttackController struct{}
+// summonAIActor adapts a live summon to the shared periodic AI task. The
+// task owns tick scheduling; the summon AI owns its intention state.
+type summonAIActor struct {
+	*summon.Actor
+	brain *ai.Summon
+}
 
-func (inertSummonAttackController) BowCoolingDown() bool                { return false }
-func (inertSummonAttackController) AttackingNow() bool                  { return false }
-func (inertSummonAttackController) CanAttack(attackable.Combatant) bool { return false }
-func (inertSummonAttackController) DoAttack(attackable.Combatant) error { return nil }
+func (summonAIActor) Tick() {}
+
+func (a summonAIActor) Think() error {
+	a.brain.Think()
+	return nil
+}

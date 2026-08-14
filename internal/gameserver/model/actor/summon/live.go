@@ -97,6 +97,7 @@ type Actor struct {
 	controlItemID int32
 	exp           int64
 	sp            int
+	expType       int
 	fed           int
 	maxMeal       int
 	mealInNormal  int
@@ -219,6 +220,7 @@ type PetConfig struct {
 	Level   int
 	Exp     int64
 	SP      int
+	ExpType int
 	CON     int
 	Passive bool
 	Config  *petmodel.Config
@@ -316,6 +318,7 @@ func NewPet(cfg PetConfig) *Actor {
 		controlItemID: cfg.ControlItemID,
 		exp:           cfg.Exp,
 		sp:            cfg.SP,
+		expType:       cfg.ExpType,
 		fed:           cfg.Fed,
 		maxMeal:       cfg.MaxMeal,
 		mealInNormal:  cfg.MealInNormal,
