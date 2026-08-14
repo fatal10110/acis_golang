@@ -3,7 +3,6 @@ package effect
 import (
 	"fmt"
 	"reflect"
-	"strconv"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
@@ -269,30 +268,21 @@ func TestFakeDeathEffectExitStandsUpAndStartsRecentFakeDeathGrace(t *testing.T) 
 	}
 }
 
-func TestBetrayEffectAttacksSummonOwnerAndFollowsOnExit(t *testing.T) {
-	owner := &betrayOwner{id: 42}
-	summon := &betraySummon{owner: owner}
-	e, err := New(Skill{}, modelskill.EffectTemplate{Name: "Betray"})
-	if err != nil {
-		t.Fatalf("New() error: %v", err)
-	}
-	e.Effected = summon
-
-	if !e.OnStart(e) {
-		t.Fatal("betray effect start rejected a summon with an owner")
-	}
-	if want := []string{"attack:42"}; !reflect.DeepEqual(summon.events, want) {
-		t.Fatalf("events after OnStart = %#v, want %#v", summon.events, want)
-	}
-
-	e.OnExit(e)
-	if want := []string{"attack:42", "follow:42"}; !reflect.DeepEqual(summon.events, want) {
-		t.Fatalf("events after OnExit = %#v, want %#v", summon.events, want)
-	}
-}
+// TestBetrayEffectAttacksSummonOwnerAndFollowsOnExit moved to
+// hooks_status_player_test.go (package effect_test): it needs a real
+// attackable.Combatant owner, and *player.Character already implements
+// that interface, so it uses the real type instead of a hand-rolled fake.
+// See docs/agents/test-strategy.md.
 
 // fakeCombatant is a minimal attackable.Combatant used as the redirect
-// candidate/attacker argument in hostility-redirect effect tests.
+// candidate/attacker argument in the hostileEffectTarget-based tests below.
+// hostileEffectTarget is itself an internal-package-only test double (no
+// real production equivalent conveniently constructible here), so moving
+// these particular tests to use a real *player.Character candidate would
+// require duplicating hostileEffectTarget across the package boundary for
+// no drift-risk reduction (fakeCombatant has no logic to drift: it's a
+// pure ID/false-false stub). Left as-is per the "keep, document why" rule
+// in docs/agents/test-strategy.md.
 
 type fakeCombatant struct {
 	id int32
@@ -301,37 +291,6 @@ type fakeCombatant struct {
 func (f *fakeCombatant) ObjectID() int32  { return f.id }
 func (f *fakeCombatant) SiegeGuard() bool { return false }
 func (f *fakeCombatant) AlikeDead() bool  { return false }
-
-type betrayOwner struct {
-	id int32
-}
-
-func (o *betrayOwner) ObjectID() int32  { return o.id }
-func (o *betrayOwner) SiegeGuard() bool { return false }
-func (o *betrayOwner) AlikeDead() bool  { return false }
-
-type betraySummon struct {
-	owner  attackable.Combatant
-	events []string
-}
-
-func (s *betraySummon) OwnerCombatant() attackable.Combatant { return s.owner }
-
-func (s *betraySummon) TryToAttack(target any) {
-	s.events = append(s.events, "attack:"+effectObjectID(target))
-}
-
-func (s *betraySummon) TryToFollow(target any) {
-	s.events = append(s.events, "follow:"+effectObjectID(target))
-}
-
-func effectObjectID(target any) string {
-	o, ok := target.(interface{ ObjectID() int32 })
-	if !ok || o == nil {
-		return "nil"
-	}
-	return strconv.FormatInt(int64(o.ObjectID()), 10)
-}
 
 // hostileEffectTarget is a minimal actor implementing only the interfaces
 // a hostility-redirect effect needs, standing in for the npc package's
@@ -463,17 +422,10 @@ func TestRandomizeHateEffectDelegatesToTheThreatTableSwap(t *testing.T) {
 	}
 }
 
-func TestRandomizeHateEffectRejectsATargetWithNoThreatTable(t *testing.T) {
-	e, err := New(Skill{}, modelskill.EffectTemplate{Name: "RandomizeHate"})
-	if err != nil {
-		t.Fatalf("New() error: %v", err)
-	}
-	e.Effected = &fakeCombatant{id: 1}
-
-	if e.OnStart(e) {
-		t.Fatal("randomize-hate effect started against a target with no RandomizeHate method")
-	}
-}
+// TestRandomizeHateEffectRejectsATargetWithNoThreatTable moved to
+// hooks_status_player_test.go (package effect_test): it needs a real
+// non-RandomizeHate-capable target, and *player.Character already lacks
+// that method, so it uses the real type instead of a hand-rolled fake.
 
 func TestConfusionEffectLeavesAPlayerTargetEntirelyUntouched(t *testing.T) {
 	target := &liveEffectTarget{isPlayer: true}
