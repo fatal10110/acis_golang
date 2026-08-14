@@ -207,6 +207,9 @@ func (c *Conn) send(queued queuedWrite) bool {
 }
 
 func (c *Conn) trySend(queued queuedWrite) bool {
+	// Only Close writes c.mu. If it wins this race, the connection is already
+	// being torn down, so dropping an encrypted frame cannot desynchronize a
+	// live client.
 	if !c.mu.TryRLock() {
 		return false
 	}

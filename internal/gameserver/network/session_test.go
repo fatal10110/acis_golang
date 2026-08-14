@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -199,10 +200,13 @@ func TestHealthySessionSurvivesConcurrentBroadcasts(t *testing.T) {
 	}
 	s := NewSession(conn, cipher)
 	var wg sync.WaitGroup
-	for range 2 {
+	var dropped atomic.Int64
+	for range 16 {
 		wg.Go(func() {
 			for range 500 {
-				s.TrySendFrame(wire.BorrowedFrame(wire.FrameBytes([]byte{0x04, 0x00, 0x01, 0x02})))
+				if !s.TrySendFrame(wire.BorrowedFrame(wire.FrameBytes([]byte{0x04, 0x00, 0x01, 0x02}))) {
+					dropped.Add(1)
+				}
 				time.Sleep(time.Millisecond)
 			}
 		})
@@ -210,6 +214,9 @@ func TestHealthySessionSurvivesConcurrentBroadcasts(t *testing.T) {
 	wg.Wait()
 	if conn.closed.Load() {
 		t.Fatal("healthy session disconnected with no saturation")
+	}
+	if n := dropped.Load(); n != 0 {
+		t.Fatalf("%d broadcasts dropped on a healthy session", n)
 	}
 }
 

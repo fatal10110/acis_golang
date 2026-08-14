@@ -80,8 +80,15 @@ func (s *Session) trySendFrame(frame wire.Frame) bool {
 		}
 		runtime.Gosched()
 	}
-	frame.Release()
-	return false
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.conn.queueFull() {
+		frame.Release()
+		s.conn.abort()
+		return false
+	}
+	s.cipher.Encrypt(frameBytes[frameHeaderSize:])
+	return s.conn.trySendFrame(frame)
 }
 
 func (s *Session) sendFrame(frame wire.Frame, send func(wire.Frame) bool) bool {
