@@ -51,9 +51,11 @@ type Actor struct {
 	id      int32
 	owner   Owner
 	world   *world.State
+	los     LineOfSight
 	isPet   bool
 	npcID   int
 	radius  float64
+	height  float64
 	passive bool
 
 	// statusMu guards level, name, fed, belowUnsummonLimit, lifetime, invul, and
@@ -214,6 +216,7 @@ type PetConfig struct {
 	ControlItemID   int32
 	NPCID           int
 	CollisionRadius float64
+	CollisionHeight float64
 	Name            string
 	// Named reports whether Name is a player-assigned custom name rather
 	// than a fallback to the npc template's name; it gates RequestChangePetName's
@@ -251,6 +254,7 @@ type ServitorConfig struct {
 	Owner           Owner
 	NPCID           int
 	CollisionRadius float64
+	CollisionHeight float64
 	Name            string
 	Level           int
 	Passive         bool
@@ -276,6 +280,7 @@ func NewServitor(cfg ServitorConfig) *Actor {
 		level:            cfg.Level,
 		npcID:            cfg.NPCID,
 		radius:           cfg.CollisionRadius,
+		height:           cfg.CollisionHeight,
 		name:             cfg.Name,
 		passive:          cfg.Passive,
 		followActive:     true,
@@ -310,6 +315,7 @@ func NewPet(cfg PetConfig) *Actor {
 		isPet:         true,
 		npcID:         cfg.NPCID,
 		radius:        cfg.CollisionRadius,
+		height:        cfg.CollisionHeight,
 		name:          cfg.Name,
 		named:         cfg.Named,
 		passive:       cfg.Passive,

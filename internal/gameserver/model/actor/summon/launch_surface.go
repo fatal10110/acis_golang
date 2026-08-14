@@ -23,3 +23,9 @@ func (a *Actor) EffectRangeInPeaceZone(x, y, z, effectRange int) bool {
 func (a *Actor) CollisionRadius() float64 {
 	return a.radius
 }
+
+// CollisionHeight returns this summon's template body height for line-of-sight
+// eye-height calculations.
+func (a *Actor) CollisionHeight() float64 {
+	return a.height
+}

@@ -98,6 +98,19 @@ func TestControllerMaybeStartFriendlyFollowStartsWhenOutOfRange(t *testing.T) {
 	}
 }
 
+func TestControllerMaybeStartFriendlyFollowStaysArmedWhenInRange(t *testing.T) {
+	self := &fakeSelf{x: 0, y: 0, radius: 5}
+	c := newTestController(t, self)
+	target := &fakeTarget{id: 7, x: 10, y: 0, radius: 5}
+
+	if ok, _ := c.MaybeStartFriendlyFollow(target, 70); ok {
+		t.Fatal("MaybeStartFriendlyFollow() = true, want false while already in range")
+	}
+	if !c.move.Following() || c.move.FollowMode() != FollowFriendly {
+		t.Fatalf("follow state = (%v, %v), want friendly follow active for the next AI tick", c.move.Following(), c.move.FollowMode())
+	}
+}
+
 func TestControllerMaybeStartOffensiveFollowStopsWhenInRange(t *testing.T) {
 	self := &fakeSelf{x: 0, y: 0, radius: 5}
 	c := newTestController(t, self)
