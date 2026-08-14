@@ -128,6 +128,7 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 		ControlItemID:   controlItem.ObjectID,
 		NPCID:           int(summonItem.NPCID),
 		CollisionRadius: npcTmpl.CollisionRadius,
+		CollisionHeight: npcTmpl.CollisionHeight,
 		Name:            name,
 		Named:           named,
 		Level:           level,
@@ -223,6 +224,7 @@ func (s *gameSummonSpawner) SpawnServitor(owner *player.Character, def modelskil
 		Owner:           live,
 		NPCID:           def.NpcID,
 		CollisionRadius: npcTmpl.CollisionRadius,
+		CollisionHeight: npcTmpl.CollisionHeight,
 		Name:            npcTmpl.Name,
 		Level:           npcTmpl.Level,
 		OwnerInventory:  live.Inventory(),
@@ -275,6 +277,9 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 		}
 	}
 	attackController := attack.NewPlayable(actor)
+	if los, ok := l.geo.(summon.LineOfSight); ok {
+		actor.SetLineOfSight(los)
+	}
 	attackController.SetLogger(l.log)
 	brain := ai.NewSummon(actor, moveController, attackController)
 	attackController.SetFinished(brain.Think)
@@ -305,7 +310,9 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 	brain.SetCastController(aiController)
 	actor.SetAI(brain)
 	if l.ai != nil {
-		l.ai.Add(summonAIActor{Actor: actor, brain: brain})
+		runner := summonAIActor{Actor: actor, brain: brain}
+		l.ai.Add(runner)
+		actor.SetOnDespawn(func() { l.ai.Remove(runner) })
 	}
 	actor.SetStatusUpdater(func() { l.broadcastSummonStatus(actor) })
 	actor.SetExpNotifier(func(exp int64) {
