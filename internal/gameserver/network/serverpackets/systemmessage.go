@@ -111,6 +111,7 @@ const (
 	SystemMessageEnabledSpiritshot                 = 533
 	SystemMessagePetsNotAvailableAtThisTime        = 574
 	SystemMessagePetUsesS1                         = 1018
+	SystemMessagePetEarnedS1Exp                    = 1014
 	SystemMessagePetReceivedS2DamageByS1           = 1016
 	SystemMessageSummonReceivedS2ByS1              = 1027
 	SystemMessageShotsNotAvailableForDeadPet       = 1598
