@@ -1,8 +1,6 @@
 package task
 
 import (
-	"sync"
-
 	"github.com/rs/zerolog"
 
 	"github.com/fatal10110/acis_golang/internal/commons/scheduler"
@@ -15,26 +13,27 @@ const PositionUpdateTick = move.PositionUpdateInterval
 
 // PositionUpdates runs correction ticks for actors with movement in flight.
 //
-// mu guards entries and scratch. Tick only ever runs on the scheduler
-// ticker's single goroutine, one call at a time, so no separate lock is
-// needed to serialize it.
+// Add, Remove, and Contains are safe to call concurrently with Tick. Tick
+// only ever runs on the scheduler ticker's single goroutine, one call at a
+// time; ticking enforces that contract by logging and returning without
+// doing anything else on a reentrant or concurrent Tick call, since Start's
+// caller is the only reliable place that owns the scheduler goroutine.
 type PositionUpdates struct {
 	state *world.State
+	log   zerolog.Logger
 
-	mu sync.Mutex
-
-	entries map[int32]move.PositionUpdater
-	scratch []move.PositionUpdater
+	*activeRegistry[int32, move.PositionUpdater]
 }
 
 // NewPositionUpdates returns an empty movement-correction registry. A nil
 // state treats every mover as active.
 func NewPositionUpdates(state *world.State) *PositionUpdates {
-	return &PositionUpdates{state: state, entries: make(map[int32]move.PositionUpdater)}
+	return &PositionUpdates{state: state, activeRegistry: newActiveRegistry[int32, move.PositionUpdater]()}
 }
 
 // Start launches the fixed movement-correction task.
 func (p *PositionUpdates) Start(log zerolog.Logger) *scheduler.Ticker {
+	p.log = log
 	return scheduler.Start(PositionUpdateTick, p.Tick, log)
 }
 
@@ -43,9 +42,7 @@ func (p *PositionUpdates) Add(actor move.PositionUpdater) {
 	if actor == nil {
 		return
 	}
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	p.entries[actor.ObjectID()] = actor
+	p.add(actor.ObjectID(), actor)
 }
 
 // Remove unregisters actor from movement-correction ticks.
@@ -53,9 +50,7 @@ func (p *PositionUpdates) Remove(actor move.PositionUpdater) {
 	if actor == nil {
 		return
 	}
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	delete(p.entries, actor.ObjectID())
+	p.remove(actor.ObjectID())
 }
 
 // Contains reports whether actor is currently registered.
@@ -63,10 +58,7 @@ func (p *PositionUpdates) Contains(actor move.PositionUpdater) bool {
 	if actor == nil {
 		return false
 	}
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	_, ok := p.entries[actor.ObjectID()]
-	return ok
+	return p.contains(actor.ObjectID())
 }
 
 // Tick advances every registered in-flight movement once. A PositionUpdate
@@ -75,17 +67,17 @@ func (p *PositionUpdates) Contains(actor move.PositionUpdater) bool {
 // again, since by the time PositionUpdate returns, a concurrent goroutine
 // may have already re-added the same actor for a new move, and a
 // second, redundant removal here would strip that fresh registration
-// out from under it.
+// out from under it. It logs and returns without doing anything else if
+// another Tick call is already in flight.
 func (p *PositionUpdates) Tick() {
-	p.mu.Lock()
-	p.scratch = p.scratch[:0]
-	for _, actor := range p.entries {
-		p.scratch = append(p.scratch, actor)
+	if !p.ticking.CompareAndSwap(false, true) {
+		p.log.Error().Err(ErrReentrantTick).Msg("task: PositionUpdates.Tick")
+		return
 	}
-	actors := p.scratch
-	p.mu.Unlock()
+	defer p.ticking.Store(false)
+	defer p.release()
 
-	for _, actor := range actors {
+	for _, actor := range p.snapshot() {
 		if !p.canUpdate(actor) {
 			continue
 		}

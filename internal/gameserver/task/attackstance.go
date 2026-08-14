@@ -2,8 +2,6 @@ package task
 
 import (
 	"errors"
-	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -50,30 +48,21 @@ type attackStanceCubics interface {
 	Cubics() []AttackStanceCubic
 }
 
-type attackStanceEntry struct {
-	actor    AttackStanceActor
-	deadline time.Time
-}
-
 // AttackStance tracks actors whose combat animation should remain active
 // until the inactivity period expires.
 //
-// Add, Remove, and InAttackStance are safe to call concurrently with Tick. mu
-// guards entries and the scratch refill. Tick only ever runs on the scheduler
-// ticker's single goroutine, one call at a time; ticking enforces that
-// contract by logging and returning ErrReentrantTick on reentrant or
-// concurrent Tick calls instead of running, since Start's caller is the only
-// reliable place that can act on the returned error.
+// Add, Remove, and InAttackStance are safe to call concurrently with Tick.
+// Tick only ever runs on the scheduler ticker's single goroutine, one call
+// at a time; ticking enforces that contract by logging and returning
+// ErrReentrantTick on reentrant or concurrent Tick calls instead of
+// running, since Start's caller is the only reliable place that can act on
+// the returned error.
 type AttackStance struct {
 	effects AttackStanceEffects
 	now     func() time.Time
 	log     zerolog.Logger
 
-	mu      sync.Mutex
-	entries map[int32]attackStanceEntry
-	scratch []attackStanceEntry
-
-	ticking atomic.Bool
+	*deadlineRegistry[int32, AttackStanceActor]
 }
 
 // NewAttackStance returns an empty combat-stance tracker.
@@ -84,7 +73,7 @@ func NewAttackStance(effects AttackStanceEffects, now func() time.Time) (*Attack
 	if now == nil {
 		now = time.Now
 	}
-	return &AttackStance{effects: effects, now: now, entries: make(map[int32]attackStanceEntry)}, nil
+	return &AttackStance{effects: effects, now: now, deadlineRegistry: newDeadlineRegistry[int32, AttackStanceActor]()}, nil
 }
 
 // Start launches the fixed one-second combat-stance task.
@@ -106,9 +95,7 @@ func (a *AttackStance) Add(actor AttackStanceActor) {
 		}
 	}
 
-	a.mu.Lock()
-	a.entries[actor.ObjectID()] = attackStanceEntry{actor: actor, deadline: a.now().Add(AttackStancePeriod)}
-	a.mu.Unlock()
+	a.add(actor.ObjectID(), actor, a.now().Add(AttackStancePeriod))
 }
 
 // Remove stops tracking actor and reports whether it had been tracked.
@@ -117,14 +104,7 @@ func (a *AttackStance) Remove(actor AttackStanceActor) bool {
 	if actor == nil {
 		return false
 	}
-
-	a.mu.Lock()
-	_, tracked := a.entries[actor.ObjectID()]
-	if tracked {
-		delete(a.entries, actor.ObjectID())
-	}
-	a.mu.Unlock()
-	return tracked
+	return a.remove(actor.ObjectID())
 }
 
 // InAttackStance reports whether actor is currently tracked.
@@ -133,11 +113,7 @@ func (a *AttackStance) InAttackStance(actor AttackStanceActor) bool {
 	if actor == nil {
 		return false
 	}
-
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	_, ok := a.entries[actor.ObjectID()]
-	return ok
+	return a.tracked(actor.ObjectID())
 }
 
 // Tick stops combat stance for actors whose inactivity period has elapsed.
@@ -150,30 +126,14 @@ func (a *AttackStance) Tick() error {
 	}
 	defer a.ticking.Store(false)
 
-	now := a.now()
-
-	a.mu.Lock()
-	a.scratch = a.scratch[:0]
-	for id, entry := range a.entries {
-		if now.Before(entry.deadline) {
-			continue
-		}
-		a.scratch = append(a.scratch, entry)
-		delete(a.entries, id)
-	}
-	due := a.scratch
-	a.mu.Unlock()
-
-	defer clear(a.scratch)
-
-	for _, entry := range due {
-		a.effects.AutoAttackStop(entry.actor)
-		if s, ok := entry.actor.(attackStanceSummoner); ok {
+	a.tickDue(a.now(), func(actor AttackStanceActor) {
+		a.effects.AutoAttackStop(actor)
+		if s, ok := actor.(attackStanceSummoner); ok {
 			if summon := s.Summon(); summon != nil {
 				a.effects.AutoAttackStop(summon)
 			}
 		}
-	}
+	})
 	return nil
 }
 

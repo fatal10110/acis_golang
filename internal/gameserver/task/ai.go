@@ -2,8 +2,6 @@ package task
 
 import (
 	"errors"
-	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -32,31 +30,23 @@ type AIActor interface {
 
 // AI runs active actor brains once per tick.
 //
-// Add and Remove are safe to call concurrently with Tick. mu guards actors and
-// the scratch refill. Tick only ever runs on the scheduler ticker's single
-// goroutine, one call at a time; ticking enforces that contract by logging
-// and returning ErrReentrantTick on reentrant or concurrent Tick calls
-// instead of running, since Start's caller is the only reliable place that
-// can act on the returned error.
+// Add and Remove are safe to call concurrently with Tick. Tick only ever
+// runs on the scheduler ticker's single goroutine, one call at a time;
+// ticking enforces that contract by logging and returning ErrReentrantTick
+// on reentrant or concurrent Tick calls instead of running, since Start's
+// caller is the only reliable place that can act on the returned error.
 type AI struct {
 	state *world.State
 	log   zerolog.Logger
 
-	mu      sync.Mutex
-	actors  map[int32]AIActor
-	scratch []AIActor
-
-	ticking atomic.Bool
+	*activeRegistry[int32, AIActor]
 }
 
 // NewAI returns an empty active-AI registry. A nil state treats every actor
 // as active. When state is non-nil, registered actors must already be
 // spawned into it; off-grid actors are not ticked.
 func NewAI(state *world.State) *AI {
-	return &AI{
-		state:  state,
-		actors: make(map[int32]AIActor),
-	}
+	return &AI{state: state, activeRegistry: newActiveRegistry[int32, AIActor]()}
 }
 
 // Start launches the fixed one-second AI task.
@@ -70,9 +60,7 @@ func (a *AI) Add(actor AIActor) {
 	if actor == nil {
 		return
 	}
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	a.actors[actor.ObjectID()] = actor
+	a.add(actor.ObjectID(), actor)
 }
 
 // Remove unregisters actor from recurring AI ticks.
@@ -80,9 +68,7 @@ func (a *AI) Remove(actor AIActor) {
 	if actor == nil {
 		return
 	}
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	delete(a.actors, actor.ObjectID())
+	a.remove(actor.ObjectID())
 }
 
 // Tick runs one AI cycle for every registered actor in an active region,
@@ -95,18 +81,9 @@ func (a *AI) Tick() error {
 		return ErrReentrantTick
 	}
 	defer a.ticking.Store(false)
+	defer a.release()
 
-	a.mu.Lock()
-	a.scratch = a.scratch[:0]
-	for _, actor := range a.actors {
-		a.scratch = append(a.scratch, actor)
-	}
-	actors := a.scratch
-	a.mu.Unlock()
-
-	defer clear(a.scratch)
-
-	for _, actor := range actors {
+	for _, actor := range a.snapshot() {
 		placed, active := regionActivity(a.state, actor)
 		switch {
 		case !placed:
