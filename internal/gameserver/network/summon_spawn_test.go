@@ -9,6 +9,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
@@ -24,6 +25,18 @@ import (
 )
 
 type fakePetStoreNoSaved struct{}
+
+type blockedSummonLOSGeo struct {
+	testGeo
+	originHeight float64
+	targetHeight float64
+}
+
+func (g *blockedSummonLOSGeo) CanSeeActor(_ int, _ int, _ int, originHeight float64, _ int, _ int, _ int, targetHeight float64) bool {
+	g.originHeight = originHeight
+	g.targetHeight = targetHeight
+	return false
+}
 
 type recordingAIRegistry struct {
 	added   []task.AIActor
@@ -339,6 +352,37 @@ func TestGameSummonSpawnerSpawnServitorRegistersLiveActor(t *testing.T) {
 	}
 	if !servitor.TryUseSkill(1126, live.Character) {
 		t.Fatal("TryUseSkill(1126) = false after spawn, want cast-controller reachability")
+	}
+}
+
+func TestGameSummonSpawnerRejectsServitorAttackThroughBlockedLineOfSight(t *testing.T) {
+	link, state := newSummonTestLink(t)
+	template := summonTestPetNPCTemplate()
+	template.CollisionHeight = 25
+	link.npcs = npc.NewTable([]*npc.Template{template})
+	geo := &blockedSummonLOSGeo{}
+	link.geo = geo
+	live := newTestLivePlayer(t, 1, &frameCapture{})
+	target := newTestLivePlayer(t, 2, &frameCapture{})
+	state.Spawn(target.Character, 160, 0, 0, 0)
+
+	spawner := &gameSummonSpawner{link: link, live: live}
+	if !spawner.SpawnServitor(live.Character, modelskill.Definition{NpcID: 12500}) {
+		t.Fatal("SpawnServitor returned false")
+	}
+	object, ok := state.Summon(live.ObjectID())
+	if !ok {
+		t.Fatal("active servitor missing from world state")
+	}
+
+	if attack.NewPlayable(object.(*summon.Actor)).CanAttack(target.Character) {
+		t.Fatal("CanAttack() = true through blocked geodata")
+	}
+	if geo.originHeight != 25 {
+		t.Fatalf("line-of-sight origin height = %v, want 25", geo.originHeight)
+	}
+	if geo.targetHeight != target.Character.CollisionHeight() {
+		t.Fatalf("line-of-sight target height = %v, want %v", geo.targetHeight, target.Character.CollisionHeight())
 	}
 }
 
