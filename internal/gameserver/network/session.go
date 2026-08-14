@@ -1,6 +1,7 @@
 package network
 
 import (
+	"runtime"
 	"sync"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
@@ -11,6 +12,8 @@ import (
 // a uint16, a frame can never exceed 65535 bytes — the wire format itself
 // bounds the allocation ReadFrame makes for a frame's payload.
 const frameHeaderSize = wire.FrameHeaderSize
+
+const trySendLockAttempts = 64
 
 // Session pairs a connection with the rolling cipher securing it. Encrypting
 // a frame and queueing it for send must happen as one step in send order —
@@ -59,19 +62,26 @@ func (s *Session) trySendFrame(frame wire.Frame) bool {
 		s.conn.abort()
 		return false
 	}
-	if !s.mu.TryLock() {
-		frame.Release()
-		s.conn.abort()
-		return false
+	for range trySendLockAttempts {
+		if s.mu.TryLock() {
+			defer s.mu.Unlock()
+			if s.conn.queueFull() {
+				frame.Release()
+				s.conn.abort()
+				return false
+			}
+			s.cipher.Encrypt(frameBytes[frameHeaderSize:])
+			return s.conn.trySendFrame(frame)
+		}
+		if s.conn.queueFull() {
+			frame.Release()
+			s.conn.abort()
+			return false
+		}
+		runtime.Gosched()
 	}
-	defer s.mu.Unlock()
-	if s.conn.queueFull() {
-		frame.Release()
-		s.conn.abort()
-		return false
-	}
-	s.cipher.Encrypt(frameBytes[frameHeaderSize:])
-	return s.conn.trySendFrame(frame)
+	frame.Release()
+	return false
 }
 
 func (s *Session) sendFrame(frame wire.Frame, send func(wire.Frame) bool) bool {

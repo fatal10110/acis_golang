@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
-	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -79,27 +78,6 @@ func TestHostileBroadcastFrameReleasesKnownBufferBeforeDelivery(t *testing.T) {
 	}
 }
 
-func TestAITickCompletesWhenBroadcastRecipientRejectsFrame(t *testing.T) {
-	state := world.New()
-	hostile := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster"})
-	hostile.SetWorld(state)
-	state.Spawn(hostile, 0, 0, 0, 0)
-	state.Spawn(&rejectedFrameReceiver{id: 2}, 100, 0, 0, 0)
-
-	ai := task.NewAI(nil)
-	ai.Add(&broadcastAIActor{id: 3, hostile: hostile})
-	done := make(chan error, 1)
-	go func() { done <- ai.Tick() }()
-	select {
-	case err := <-done:
-		if err != nil {
-			t.Fatalf("AI.Tick() error = %v", err)
-		}
-	case <-time.After(time.Second):
-		t.Fatal("AI.Tick blocked on a rejected broadcast recipient")
-	}
-}
-
 func TestHostileBroadcastShotRechargeGivesObserversIndependentBuffers(t *testing.T) {
 	hostile, receivers := newRetainedBroadcastFixture(t, 2)
 	hostile.broadcastShotRecharge(123)
@@ -118,32 +96,6 @@ type nestedFrameReceiver struct {
 	id     int32
 	once   atomic.Bool
 	nested func()
-}
-
-type rejectedFrameReceiver struct {
-	world.Presence
-	id int32
-}
-
-func (r *rejectedFrameReceiver) ObjectID() int32 { return r.id }
-
-func (r *rejectedFrameReceiver) BroadcastFrame(frame wire.Frame) bool {
-	frame.Release()
-	return false
-}
-
-type broadcastAIActor struct {
-	world.Presence
-	id      int32
-	hostile *Hostile
-}
-
-func (a *broadcastAIActor) ObjectID() int32 { return a.id }
-func (*broadcastAIActor) Tick()             {}
-func (a *broadcastAIActor) Think() error {
-	return a.hostile.broadcastFrame(func() wire.Frame {
-		return wire.BorrowedFrame(wire.FrameBytes([]byte{1, 2, 3}))
-	})
 }
 
 func (r *nestedFrameReceiver) ObjectID() int32 { return r.id }

@@ -204,9 +204,10 @@ func TestConnAbortLogsOutboundQueueOverflow(t *testing.T) {
 
 	var logs bytes.Buffer
 	conn := &Conn{
-		Conn: server,
-		log:  zerolog.New(&logs),
-		out:  make(chan queuedWrite),
+		Conn:     server,
+		log:      zerolog.New(&logs),
+		out:      make(chan queuedWrite),
+		stopping: make(chan struct{}),
 	}
 	conn.abort()
 
@@ -376,7 +377,7 @@ func TestConnDrainBatchBoundedByOutboundBuffer(t *testing.T) {
 // error and never attempts the rest of the batch, but every frame in
 // the batch - written or not - must still be released back to the pool.
 func TestConnWriteBatchReleasesAllOnError(t *testing.T) {
-	conn := &Conn{Conn: alwaysFailConn{}}
+	conn := &Conn{Conn: alwaysFailConn{}, stopping: make(chan struct{})}
 
 	var released [2]int32
 	batch := []queuedWrite{

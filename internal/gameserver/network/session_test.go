@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/rs/zerolog"
 )
 
@@ -156,6 +158,72 @@ func TestSessionTrySendFrameDoesNotWaitForBusySession(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("TrySendFrame waited for a busy session")
 	}
+}
+
+func TestAITickCompletesWithSaturatedSession(t *testing.T) {
+	key := bytes.Repeat([]byte{0x11}, keySize)
+	cipher, err := NewCipher(key)
+	if err != nil {
+		t.Fatalf("NewCipher: %v", err)
+	}
+	conn := fullQueueConn(t)
+	ai := task.NewAI(nil)
+	ai.Add(&sessionBroadcastActor{id: 1, session: NewSession(conn, cipher)})
+
+	done := make(chan error, 1)
+	go func() { done <- ai.Tick() }()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("AI.Tick() error = %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("AI.Tick blocked on a saturated session")
+	}
+	if !conn.closed.Load() {
+		t.Fatal("saturated session was not disconnected")
+	}
+}
+
+func TestHealthySessionSurvivesConcurrentBroadcasts(t *testing.T) {
+	serverRaw, clientRaw := net.Pipe()
+	t.Cleanup(func() { serverRaw.Close(); clientRaw.Close() })
+	go io.Copy(io.Discard, clientRaw)
+	conn := newConn(serverRaw, zerolog.Nop())
+	defer conn.Close()
+
+	key := bytes.Repeat([]byte{0x11}, keySize)
+	cipher, err := NewCipher(key)
+	if err != nil {
+		t.Fatalf("NewCipher: %v", err)
+	}
+	s := NewSession(conn, cipher)
+	var wg sync.WaitGroup
+	for range 2 {
+		wg.Go(func() {
+			for range 500 {
+				s.TrySendFrame(wire.BorrowedFrame(wire.FrameBytes([]byte{0x04, 0x00, 0x01, 0x02})))
+				time.Sleep(time.Millisecond)
+			}
+		})
+	}
+	wg.Wait()
+	if conn.closed.Load() {
+		t.Fatal("healthy session disconnected with no saturation")
+	}
+}
+
+type sessionBroadcastActor struct {
+	world.Presence
+	id      int32
+	session *Session
+}
+
+func (a *sessionBroadcastActor) ObjectID() int32 { return a.id }
+func (*sessionBroadcastActor) Tick()             {}
+func (a *sessionBroadcastActor) Think() error {
+	a.session.TrySendFrame(wire.BorrowedFrame(wire.FrameBytes([]byte{0x04, 0x00, 0x01, 0x02})))
+	return nil
 }
 
 func TestSessionSendFrameArmsCipherSoFirstPacketIsCleartext(t *testing.T) {

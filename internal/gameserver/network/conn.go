@@ -45,10 +45,9 @@ func newConn(c net.Conn, log zerolog.Logger) *Conn {
 	return conn
 }
 
-// writeLoop drains queued sends in order and only closes the
-// underlying connection once the queue is empty and Close has been
-// called (or a write fails), so a frame queued right before Close is
-// never dropped. A panic while writing is recovered and logged so it
+// writeLoop drains queued sends in order for Close, so a frame queued right
+// before Close is never dropped. abort instead stops this loop immediately
+// and releases the backlog. A panic while writing is recovered and logged so it
 // disconnects only this client, never the process; the deferred
 // cleanup still runs so Close never blocks forever waiting on stopped.
 //
@@ -58,8 +57,7 @@ func newConn(c net.Conn, log zerolog.Logger) *Conn {
 // Each iteration greedily drains c.out (bounded by outboundBuffer) after
 // its first queued frame so a burst coalesces into one vectored
 // net.Buffers write instead of one Write syscall per frame. Idle
-// behavior is unchanged: with nothing queued, the loop blocks on the
-// range receive.
+// behavior is unchanged: with nothing queued, the loop blocks in its select.
 func (c *Conn) writeLoop() {
 	defer func() {
 		if r := recover(); r != nil {
@@ -186,9 +184,7 @@ func (c *Conn) abort() {
 }
 
 func (c *Conn) stop() {
-	if c.stopping != nil {
-		c.stopOnce.Do(func() { close(c.stopping) })
-	}
+	c.stopOnce.Do(func() { close(c.stopping) })
 }
 
 func (c *Conn) send(queued queuedWrite) bool {
@@ -211,7 +207,9 @@ func (c *Conn) send(queued queuedWrite) bool {
 }
 
 func (c *Conn) trySend(queued queuedWrite) bool {
-	c.mu.RLock()
+	if !c.mu.TryRLock() {
+		return false
+	}
 	defer c.mu.RUnlock()
 	if c.closed.Load() {
 		return false
@@ -230,8 +228,6 @@ func (c *Conn) trySend(queued queuedWrite) bool {
 }
 
 func (c *Conn) queueFull() bool {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
 	return c.closed.Load() || len(c.out) == cap(c.out)
 }
 
