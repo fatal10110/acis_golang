@@ -4,6 +4,7 @@ import (
 	"math"
 	"testing"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
@@ -197,32 +198,32 @@ func (t *skillTarget) SetCP(v float64) {
 
 func (t *skillTarget) AddExpAndSP(exp, sp int) { t.sp += sp }
 
-func (t *skillTarget) Die(killer any) {
+func (t *skillTarget) Die(killer creature.DeathActor) {
 	t.dead = true
 	t.diedBy = killer
 }
 
-func (t *skillTarget) ReduceHP(v float64, attacker any, skill modelskill.Definition) {
+func (t *skillTarget) ReduceHP(v float64, attacker creature.DeathActor, skill modelskill.Definition) {
 	t.hp -= v
 }
 
-func (t *skillTarget) PhysicalSkillInput(caster any, skill modelskill.Definition) (formulas.PhysicalSkillInput, bool) {
+func (t *skillTarget) PhysicalSkillInput(caster creature.DeathActor, skill modelskill.Definition) (formulas.PhysicalSkillInput, bool) {
 	return t.physicalInput, t.physicalOK
 }
 
-func (t *skillTarget) MagicDamageInput(caster any, skill modelskill.Definition) (formulas.MagicDamageInput, bool) {
+func (t *skillTarget) MagicDamageInput(caster creature.DeathActor, skill modelskill.Definition) (formulas.MagicDamageInput, bool) {
 	return t.magicInput, t.magicOK
 }
 
-func (t *skillTarget) BlowInput(caster any, skill modelskill.Definition) (formulas.BlowInput, bool) {
+func (t *skillTarget) BlowInput(caster creature.DeathActor, skill modelskill.Definition) (formulas.BlowInput, bool) {
 	return t.blowInput, t.blowOK
 }
 
-func (t *skillTarget) ManaDamageInput(caster any, skill modelskill.Definition) (formulas.ManaDamageInput, bool) {
+func (t *skillTarget) ManaDamageInput(caster creature.DeathActor, skill modelskill.Definition) (formulas.ManaDamageInput, bool) {
 	return t.manaInput, t.manaOK
 }
 
-func (t *skillTarget) LethalInput(caster any, skill modelskill.Definition) (formulas.LethalInput, bool) {
+func (t *skillTarget) LethalInput(caster creature.DeathActor, skill modelskill.Definition) (formulas.LethalInput, bool) {
 	in := t.lethalInput
 	in.Chance1 = skill.LethalChance1
 	in.Chance2 = skill.LethalChance2
@@ -230,7 +231,7 @@ func (t *skillTarget) LethalInput(caster any, skill modelskill.Definition) (form
 	return in, t.lethalOK
 }
 
-func (t *skillTarget) ApplyLethalOutcome(outcome formulas.LethalOutcome, caster any, skill modelskill.Definition) {
+func (t *skillTarget) ApplyLethalOutcome(outcome formulas.LethalOutcome, caster creature.DeathActor, skill modelskill.Definition) {
 	t.lethalOutcomes = append(t.lethalOutcomes, outcome)
 	switch outcome {
 	case formulas.LethalFull:

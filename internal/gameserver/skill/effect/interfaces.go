@@ -5,12 +5,17 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/worldobject"
 )
 
-// participant is the surface every cast participant shares: what
+// Participant is the surface every cast participant shares: what
 // Effect.Effector and Effect.Effected are set from. Individual hooks assert
-// it to one of the narrower interfaces below for the capability they need.
-type participant interface {
+// it to one of the narrower interfaces below for the capability they need. It
+// is exported so cross-package method contracts consumed only by this
+// package (ReduceHPByDOT, FleeFrom) can declare it without an import cycle —
+// this package is imported by model/actor/creature, so it cannot import
+// creature's own DeathActor back.
+type Participant interface {
 	ObjectID() int32
 	Dead() bool
 }
@@ -18,7 +23,7 @@ type participant interface {
 type dotTarget interface {
 	Dead() bool
 	HP() float64
-	ReduceHPByDOT(damage float64, effector any, isDOT bool)
+	ReduceHPByDOT(damage float64, effector Participant, isDOT bool)
 }
 
 // statusBroadcaster is implemented by an actor that can push its current
@@ -94,7 +99,7 @@ type playableTarget interface {
 }
 
 type fleeTarget interface {
-	FleeFrom(effector any, distance int)
+	FleeFrom(effector Participant, distance int)
 }
 
 type effectStopper interface {
@@ -187,9 +192,9 @@ type rechargeRateTarget interface {
 // targetRedirectTarget is implemented by an actor whose current target can
 // be read or replaced, or turned into an attack.
 type targetRedirectTarget interface {
-	CurrentTarget() any
-	SetTarget(any)
-	TryToAttack(any)
+	CurrentTarget() worldobject.Object
+	SetTarget(worldobject.Object)
+	TryToAttack(worldobject.Object)
 }
 
 // headingTarget is implemented by an actor whose facing can be read or set.
@@ -371,8 +376,8 @@ type summonOwnerCombatant interface {
 // summonOwnerAttacker is implemented by a summon that can redirect its AI
 // toward and away from its owner.
 type summonOwnerAttacker interface {
-	TryToAttack(any)
-	TryToFollow(any)
+	TryToAttack(worldobject.Object)
+	TryToFollow(worldobject.Object)
 }
 
 type chargesTarget interface {

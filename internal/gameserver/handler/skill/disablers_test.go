@@ -81,7 +81,7 @@ func (d *disablerFake) AggroList() *attackable.ThreatTable { return d.aggro }
 func (d *disablerFake) HateList() *attackable.HateTable    { return d.hate }
 func (d *disablerFake) Level() int                         { return d.level }
 
-func (d *disablerFake) NotifyAggression(source any, power int) {
+func (d *disablerFake) NotifyAggression(source creature.DeathActor, power int) {
 	d.aggressionSource = source
 	d.aggressionPower = power
 }

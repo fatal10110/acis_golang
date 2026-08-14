@@ -99,9 +99,9 @@ func newTestLive(t *testing.T) *Live {
 // which one is under test.
 type ccTestTarget struct{}
 
-func (ccTestTarget) ObjectID() int32                     { return 0 }
-func (ccTestTarget) Dead() bool                          { return false }
-func (ccTestTarget) FleeFrom(effector any, distance int) {}
+func (ccTestTarget) ObjectID() int32                                    { return 0 }
+func (ccTestTarget) Dead() bool                                         { return false }
+func (ccTestTarget) FleeFrom(effector effect.Participant, distance int) {}
 
 func addTestEffect(t *testing.T, live *Live, name string) *effect.Effect {
 	t.Helper()

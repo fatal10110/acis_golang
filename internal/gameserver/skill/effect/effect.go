@@ -16,8 +16,8 @@ type Effect struct {
 	Flag     Flag
 	Funcs    []basefunc.Func
 	Herb     bool
-	Effector participant
-	Effected participant
+	Effector Participant
+	Effected Participant
 
 	// RejectsIfAffected marks an effect that must not be added at all
 	// (only its stop-task hook runs) when the owner is already affected by

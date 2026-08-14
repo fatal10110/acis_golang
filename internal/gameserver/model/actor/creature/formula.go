@@ -69,7 +69,7 @@ func CanDealDamage(attacker any) bool {
 // ResolvePhysicalSkillInput builds a physical-skill damage input from the
 // caster/target pair. raceMul is supplied by NPC targets whose template race
 // has a matching attack/resistance stat pair.
-func ResolvePhysicalSkillInput(caster any, target FormulaActor, def modelskill.Definition, pvp bool, raceMul float64) (formulas.PhysicalSkillInput, bool) {
+func ResolvePhysicalSkillInput(caster DeathActor, target FormulaActor, def modelskill.Definition, pvp bool, raceMul float64) (formulas.PhysicalSkillInput, bool) {
 	attacker, ok := caster.(FormulaActor)
 	if !ok || attacker == nil || target == nil {
 		return formulas.PhysicalSkillInput{}, false
@@ -112,7 +112,7 @@ func ResolvePhysicalSkillInput(caster any, target FormulaActor, def modelskill.D
 
 // ResolveMagicDamageInput builds a magic-damage input from the caster/target
 // pair.
-func ResolveMagicDamageInput(caster any, target FormulaActor, def modelskill.Definition, pvp bool) (formulas.MagicDamageInput, bool) {
+func ResolveMagicDamageInput(caster DeathActor, target FormulaActor, def modelskill.Definition, pvp bool) (formulas.MagicDamageInput, bool) {
 	attacker, ok := caster.(FormulaActor)
 	if !ok || attacker == nil || target == nil {
 		return formulas.MagicDamageInput{}, false
@@ -134,7 +134,7 @@ func ResolveMagicDamageInput(caster any, target FormulaActor, def modelskill.Def
 }
 
 // ResolveBlowInput builds a blow-damage input from the caster/target pair.
-func ResolveBlowInput(caster any, target FormulaActor, def modelskill.Definition, pvp bool) (formulas.BlowInput, bool) {
+func ResolveBlowInput(caster DeathActor, target FormulaActor, def modelskill.Definition, pvp bool) (formulas.BlowInput, bool) {
 	attacker, ok := caster.(FormulaActor)
 	if !ok || attacker == nil || target == nil {
 		return formulas.BlowInput{}, false
@@ -204,7 +204,7 @@ func ResolveBlowInput(caster any, target FormulaActor, def modelskill.Definition
 
 // ResolveManaDamageInput builds a mana-damage input from the caster/target
 // pair.
-func ResolveManaDamageInput(caster any, target FormulaActor, maxMP float64, def modelskill.Definition) (formulas.ManaDamageInput, bool) {
+func ResolveManaDamageInput(caster DeathActor, target FormulaActor, maxMP float64, def modelskill.Definition) (formulas.ManaDamageInput, bool) {
 	attacker, ok := caster.(FormulaActor)
 	if !ok || attacker == nil || target == nil {
 		return formulas.ManaDamageInput{}, false

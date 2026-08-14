@@ -5,6 +5,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/worldobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -164,12 +165,12 @@ func TestLiveTargetReflectsDomainLevelRetarget(t *testing.T) {
 		t.Fatalf("Target() after click-select = %v, want %v", live.Target(), other)
 	}
 
-	live.Character.SetTarget(any(world.Tracked(caster)))
+	live.Character.SetTarget(world.Tracked(caster))
 
 	if got := live.Target(); got != world.Tracked(caster) {
 		t.Fatalf("Target() after domain-level retarget = %v, want %v", got, caster)
 	}
-	if got := live.CurrentTarget(); got != any(world.Tracked(caster)) {
+	if got := live.CurrentTarget(); got != worldobject.Object(world.Tracked(caster)) {
 		t.Fatalf("CurrentTarget() = %v, want %v", got, caster)
 	}
 }
@@ -202,7 +203,7 @@ func TestRetargetHookSendsPlayerSetTargetPackets(t *testing.T) {
 	retargetedFrames.frames = nil
 	observerFrames.frames = nil
 
-	retargeted.Character.SetTarget(any(world.Tracked(caster)))
+	retargeted.Character.SetTarget(world.Tracked(caster))
 
 	if got := retargeted.Target(); got != world.Tracked(caster) {
 		t.Fatalf("Target() after domain-level retarget = %v, want %v", got, caster)
@@ -239,7 +240,7 @@ func TestAttackTargetHookStartsLiveAttackIntention(t *testing.T) {
 	state.Spawn(live, 0, 0, 0, 0)
 	state.Spawn(target, 30, 0, 0, 0)
 
-	live.Character.AttackTarget(any(world.Tracked(target)))
+	live.Character.AttackTarget(world.Tracked(target))
 
 	if live.combat.Target() != target {
 		t.Fatal("AttackTarget hook did not start the live attack intention on the caster")

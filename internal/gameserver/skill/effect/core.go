@@ -317,7 +317,7 @@ func SkillFromDefinition(def modelskill.Definition) Skill {
 // scheduleEffect() chain. effector and effected are both the relogging
 // character: the original caster identity is not persisted, so every
 // reinstated effect is treated as self-applied, matching the reference.
-func ApplyRestored(list *List, effector, effected participant, meta Skill, templates []modelskill.EffectTemplate, count, elapsedSeconds int32) {
+func ApplyRestored(list *List, effector, effected Participant, meta Skill, templates []modelskill.EffectTemplate, count, elapsedSeconds int32) {
 	if list == nil {
 		return
 	}

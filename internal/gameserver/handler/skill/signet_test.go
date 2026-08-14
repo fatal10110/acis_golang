@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
@@ -92,11 +93,11 @@ func (t *signetFakeTarget) EffectList() *effect.List        { return t.list }
 func (t *signetFakeTarget) Unsummon()                       { t.unsummoned = true }
 func (t *signetFakeTarget) BroadcastFrame(frame wire.Frame) { frame.Release() }
 
-func (t *signetFakeTarget) MagicDamageInput(caster any, skill modelskill.Definition) (formulas.MagicDamageInput, bool) {
+func (t *signetFakeTarget) MagicDamageInput(caster creature.DeathActor, skill modelskill.Definition) (formulas.MagicDamageInput, bool) {
 	return t.magicInput, t.magicOK
 }
 
-func (t *signetFakeTarget) ReduceHP(v float64, attacker any, skill modelskill.Definition) {
+func (t *signetFakeTarget) ReduceHP(v float64, attacker creature.DeathActor, skill modelskill.Definition) {
 	t.hp -= v
 }
 

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 )
 
@@ -89,6 +90,7 @@ func TestNotePvPHitFromAttackerSkipsMutualPvPZone(t *testing.T) {
 
 type pvpFlagNPC struct{ guard bool }
 
+func (pvpFlagNPC) ObjectID() int32                { return 4 }
 func (pvpFlagNPC) Category() skilltarget.Category { return skilltarget.CategoryAttackable }
 func (n pvpFlagNPC) Guard() bool                  { return n.guard }
 
@@ -204,7 +206,7 @@ func TestCharacterNotePvPSkillTargetsFlagsEligibleNonOffensiveTargets(t *testing
 	var calls []bool
 	attacker.SetPvPFlagHook(func(useFlagged bool) { calls = append(calls, useFlagged) })
 
-	attacker.NotePvPSkillTargets([]any{flagged, pvpFlagNPC{}}, false, "DUMMY")
+	attacker.NotePvPSkillTargets([]creature.DeathActor{flagged, pvpFlagNPC{}}, false, "DUMMY")
 
 	if len(calls) != 2 || calls[0] || calls[1] {
 		t.Fatalf("hook calls after NotePvPSkillTargets = %v, want [false false]", calls)
@@ -218,7 +220,7 @@ func TestCharacterNotePvPSkillTargetsFlagsOwnerOfFlaggedSummon(t *testing.T) {
 	called := false
 	attacker.SetPvPFlagHook(func(bool) { called = true })
 
-	attacker.NotePvPSkillTargets([]any{summonKiller{owner: victim}}, false, "DUMMY")
+	attacker.NotePvPSkillTargets([]creature.DeathActor{summonKiller{owner: victim}}, false, "DUMMY")
 
 	if !called {
 		t.Fatal("non-offensive cast at a flagged summon did not flag its owner")

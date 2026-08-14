@@ -1,6 +1,9 @@
 package player
 
-import "github.com/fatal10110/acis_golang/internal/gameserver/world"
+import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/worldobject"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+)
 
 // Target returns the character's currently selected target, or nil if none.
 // This is the authoritative selected-target state; the network layer reads
@@ -22,7 +25,7 @@ func (c *Character) SetTargetTracked(t world.Tracked) {
 // CurrentTarget implements the retargetableOnAggression capability the
 // AGGDEBUFF continuous-effect handler consults to decide whether to retarget
 // or attack a playable target hit by a landed aggression-debuff effect.
-func (c *Character) CurrentTarget() any {
+func (c *Character) CurrentTarget() worldobject.Object {
 	if t := c.Target(); t != nil {
 		return t
 	}
@@ -43,7 +46,7 @@ func (c *Character) CurrentTarget() any {
 // reproduces that funnel (see network.selectLiveTarget/clearLiveTarget);
 // SetTargetTracked is the fallback for callers with no live session wired
 // (e.g. tests).
-func (c *Character) SetTarget(t any) {
+func (c *Character) SetTarget(t worldobject.Object) {
 	var tracked world.Tracked
 	if t != nil {
 		var ok bool
@@ -81,7 +84,7 @@ func (c *Character) SetAttackTargetHook(attack func(world.Tracked)) {
 }
 
 // AttackTarget implements retargetableOnAggression's attack trigger.
-func (c *Character) AttackTarget(t any) {
+func (c *Character) AttackTarget(t worldobject.Object) {
 	tracked, ok := t.(world.Tracked)
 	if !ok {
 		return
@@ -95,6 +98,6 @@ func (c *Character) AttackTarget(t any) {
 }
 
 // TryToAttack implements targetRedirectTarget's attack trigger.
-func (c *Character) TryToAttack(t any) {
+func (c *Character) TryToAttack(t worldobject.Object) {
 	c.AttackTarget(t)
 }

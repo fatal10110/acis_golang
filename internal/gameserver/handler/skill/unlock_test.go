@@ -3,6 +3,7 @@ package skill
 import (
 	"testing"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
@@ -63,16 +64,20 @@ type chestFake struct {
 	desireAdded, hateAdded bool
 }
 
-func (c *chestFake) Dead() bool       { return c.dead }
-func (c *chestFake) Interacted() bool { return c.interacted }
-func (c *chestFake) SetInteracted()   { c.interacted = true }
-func (c *chestFake) Box() bool        { return c.box }
-func (c *chestFake) Level() int       { return c.level }
-func (c *chestFake) Die(killer any)   { c.died = true }
-func (c *chestFake) DeleteMe()        { c.deleted = true }
+func (c *chestFake) Dead() bool                     { return c.dead }
+func (c *chestFake) Interacted() bool               { return c.interacted }
+func (c *chestFake) SetInteracted()                 { c.interacted = true }
+func (c *chestFake) Box() bool                      { return c.box }
+func (c *chestFake) Level() int                     { return c.level }
+func (c *chestFake) Die(killer creature.DeathActor) { c.died = true }
+func (c *chestFake) DeleteMe()                      { c.deleted = true }
 
-func (c *chestFake) AddAttackDesire(attacker any, weight float64)     { c.desireAdded = true }
-func (c *chestFake) AddDamageHate(attacker any, damage, hate float64) { c.hateAdded = true }
+func (c *chestFake) AddAttackDesire(attacker creature.DeathActor, weight float64) {
+	c.desireAdded = true
+}
+func (c *chestFake) AddDamageHate(attacker creature.DeathActor, damage, hate float64) {
+	c.hateAdded = true
+}
 
 func TestUnlockChestNotBoxAddsAttackDesire(t *testing.T) {
 	registry := NewDefaultRegistry()

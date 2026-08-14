@@ -2,6 +2,7 @@ package skill
 
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	modelitem "github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -10,22 +11,22 @@ import (
 
 type hpDamageTarget interface {
 	Actor
-	ReduceHP(amount float64, attacker any, skill modelskill.Definition)
+	ReduceHP(amount float64, attacker creature.DeathActor, skill modelskill.Definition)
 }
 
 type physicalSkillTarget interface {
 	hpDamageTarget
-	PhysicalSkillInput(caster any, skill modelskill.Definition) (formulas.PhysicalSkillInput, bool)
+	PhysicalSkillInput(caster creature.DeathActor, skill modelskill.Definition) (formulas.PhysicalSkillInput, bool)
 }
 
 type magicDamageTarget interface {
 	hpDamageTarget
-	MagicDamageInput(caster any, skill modelskill.Definition) (formulas.MagicDamageInput, bool)
+	MagicDamageInput(caster creature.DeathActor, skill modelskill.Definition) (formulas.MagicDamageInput, bool)
 }
 
 type blowDamageTarget interface {
 	hpDamageTarget
-	BlowInput(caster any, skill modelskill.Definition) (formulas.BlowInput, bool)
+	BlowInput(caster creature.DeathActor, skill modelskill.Definition) (formulas.BlowInput, bool)
 }
 
 type counterSkillPhysicalTarget interface {
@@ -44,7 +45,7 @@ type manaDamageTarget interface {
 	Actor
 	MPValue() float64
 	ReduceMP(float64) float64
-	ManaDamageInput(caster any, skill modelskill.Definition) (formulas.ManaDamageInput, bool)
+	ManaDamageInput(caster creature.DeathActor, skill modelskill.Definition) (formulas.ManaDamageInput, bool)
 }
 
 type shotCharger interface {
@@ -57,8 +58,8 @@ type chargedShotUser interface {
 }
 
 type lethalTarget interface {
-	LethalInput(caster any, skill modelskill.Definition) (formulas.LethalInput, bool)
-	ApplyLethalOutcome(formulas.LethalOutcome, any, modelskill.Definition)
+	LethalInput(caster creature.DeathActor, skill modelskill.Definition) (formulas.LethalInput, bool)
+	ApplyLethalOutcome(formulas.LethalOutcome, creature.DeathActor, modelskill.Definition)
 }
 
 type lethalInvulnerableTarget interface {

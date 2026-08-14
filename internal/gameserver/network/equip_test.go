@@ -85,9 +85,9 @@ func wireInventoryUpdates(gcl *GameClientLink, live *livePlayer) *task.Inventory
 // it activates regardless of what its actual effected actor is.
 type equipFleeTarget struct{}
 
-func (equipFleeTarget) ObjectID() int32                     { return 0 }
-func (equipFleeTarget) Dead() bool                          { return false }
-func (equipFleeTarget) FleeFrom(effector any, distance int) {}
+func (equipFleeTarget) ObjectID() int32                                    { return 0 }
+func (equipFleeTarget) Dead() bool                                         { return false }
+func (equipFleeTarget) FleeFrom(effector effect.Participant, distance int) {}
 
 // addEquipTestEffect installs an active core effect of name on live, for
 // exercising crowd-control gating without wiring a full skill cast.

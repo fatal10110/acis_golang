@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
@@ -64,7 +65,7 @@ type summonFriendActor struct {
 	confirmSkill   modelskill.Definition
 	confirmTimeout time.Duration
 
-	party []any
+	party []creature.DeathActor
 }
 
 func newSummonFriendActor() *summonFriendActor {
@@ -113,7 +114,7 @@ func (a *summonFriendActor) ConfirmSummon(caster any, skill modelskill.Definitio
 	a.confirmTimeout = timeout
 }
 
-func (a *summonFriendActor) PartyMembers() []any { return a.party }
+func (a *summonFriendActor) PartyMembers() []creature.DeathActor { return a.party }
 
 func TestSummonFriendTeleportsTargetAndConsumesRequiredItem(t *testing.T) {
 	registry := NewDefaultRegistry()
@@ -195,7 +196,7 @@ func TestSummonPartyTeleportsPartyMembersWithoutRequest(t *testing.T) {
 	caster.x, caster.y, caster.z = 3, 4, 5
 	member := newSummonFriendActor()
 	member.items[57] = 1
-	caster.party = []any{caster, member}
+	caster.party = []creature.DeathActor{caster, member}
 
 	registry.Use(Cast{
 		Caster: caster,

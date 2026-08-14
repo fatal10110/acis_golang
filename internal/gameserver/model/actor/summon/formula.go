@@ -489,7 +489,7 @@ func (a *Actor) ReduceMP(amount float64) float64 {
 }
 
 // ReduceHP applies skill HP damage and marks the summon dead at zero HP.
-func (a *Actor) ReduceHP(amount float64, attacker any, _ modelskill.Definition) {
+func (a *Actor) ReduceHP(amount float64, attacker creature.DeathActor, _ modelskill.Definition) {
 	if amount <= 0 || a.Invul() || !creature.CanDealDamage(attacker) {
 		return
 	}
@@ -511,7 +511,7 @@ func (a *Actor) ReduceHP(amount float64, attacker any, _ modelskill.Definition) 
 }
 
 // ReduceHPByDOT applies periodic HP damage without normal-hit side effects.
-func (a *Actor) ReduceHPByDOT(amount float64, attacker any, _ bool) {
+func (a *Actor) ReduceHPByDOT(amount float64, attacker effect.Participant, _ bool) {
 	if amount <= 0 || a.Invul() || !creature.CanDealDamage(attacker) {
 		return
 	}
@@ -560,19 +560,19 @@ func (a *Actor) HealAmount(def modelskill.Definition) (float64, bool) {
 
 // PhysicalSkillInput resolves the damage formula input for a physical skill
 // cast by caster against a.
-func (a *Actor) PhysicalSkillInput(caster any, def modelskill.Definition) (formulas.PhysicalSkillInput, bool) {
+func (a *Actor) PhysicalSkillInput(caster creature.DeathActor, def modelskill.Definition) (formulas.PhysicalSkillInput, bool) {
 	return creature.ResolvePhysicalSkillInput(caster, a, def, creature.Playable(caster) && a.Playable(), 1)
 }
 
 // MagicDamageInput resolves the damage formula input for a magic skill cast by
 // caster against a.
-func (a *Actor) MagicDamageInput(caster any, def modelskill.Definition) (formulas.MagicDamageInput, bool) {
+func (a *Actor) MagicDamageInput(caster creature.DeathActor, def modelskill.Definition) (formulas.MagicDamageInput, bool) {
 	return creature.ResolveMagicDamageInput(caster, a, def, creature.Playable(caster) && a.Playable())
 }
 
 // BlowInput resolves the damage formula input for a blow skill cast by caster
 // against a.
-func (a *Actor) BlowInput(caster any, def modelskill.Definition) (formulas.BlowInput, bool) {
+func (a *Actor) BlowInput(caster creature.DeathActor, def modelskill.Definition) (formulas.BlowInput, bool) {
 	return creature.ResolveBlowInput(caster, a, def, creature.Playable(caster) && a.Playable())
 }
 
@@ -597,7 +597,7 @@ func (a *Actor) SkillReflectInput(def modelskill.Definition) formulas.SkillRefle
 
 // ManaDamageInput resolves the MP-damage formula input for a magic skill cast
 // by caster against a.
-func (a *Actor) ManaDamageInput(caster any, def modelskill.Definition) (formulas.ManaDamageInput, bool) {
+func (a *Actor) ManaDamageInput(caster creature.DeathActor, def modelskill.Definition) (formulas.ManaDamageInput, bool) {
 	return creature.ResolveManaDamageInput(caster, a, a.MaxMPValue(), def)
 }
 
@@ -607,7 +607,7 @@ func (a *Actor) LethalRate() float64 {
 }
 
 // LethalInput resolves a lethal-strike roll against a.
-func (a *Actor) LethalInput(caster any, def modelskill.Definition) (formulas.LethalInput, bool) {
+func (a *Actor) LethalInput(caster creature.DeathActor, def modelskill.Definition) (formulas.LethalInput, bool) {
 	if a.Invul() || !creature.CanDealDamage(caster) {
 		return formulas.LethalInput{}, false
 	}
@@ -629,7 +629,7 @@ func (a *Actor) LethalInput(caster any, def modelskill.Definition) (formulas.Let
 }
 
 // ApplyLethalOutcome applies a lethal-strike tier to a.
-func (a *Actor) ApplyLethalOutcome(outcome formulas.LethalOutcome, caster any, def modelskill.Definition) {
+func (a *Actor) ApplyLethalOutcome(outcome formulas.LethalOutcome, caster creature.DeathActor, def modelskill.Definition) {
 	switch outcome {
 	case formulas.LethalFull:
 		a.ReduceHP(a.HP()-1, caster, def)

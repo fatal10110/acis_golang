@@ -19,6 +19,7 @@ import (
 
 type summonDamageAttacker struct{ name string }
 
+func (a summonDamageAttacker) ObjectID() int32       { return 1 }
 func (a summonDamageAttacker) CharacterName() string { return a.name }
 
 func TestLivePlayerVisibilitySendsCharInfoAndDeleteObject(t *testing.T) {

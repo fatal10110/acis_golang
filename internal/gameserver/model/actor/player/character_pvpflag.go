@@ -60,7 +60,7 @@ func (c *Character) NotePvPAttack(target any) {
 }
 
 // NotePvPSkillTargets records a resolved skill cast against targets.
-func (c *Character) NotePvPSkillTargets(targets []any, offensive bool, skillType string) {
+func (c *Character) NotePvPSkillTargets(targets []creature.DeathActor, offensive bool, skillType string) {
 	for _, target := range targets {
 		if offensive {
 			c.NotePvPAttack(target)
