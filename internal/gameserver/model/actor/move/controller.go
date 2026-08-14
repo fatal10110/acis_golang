@@ -120,7 +120,7 @@ func (c *Controller) MaybeStartOffensiveFollow(target attackable.Combatant, atta
 	return c.maybeStartFollow(target, attackRange, FollowOffensive)
 }
 
-// MaybeStartFriendlyFollow starts or refreshes a friendly follow task
+// MaybeStartFriendlyFollow arms a friendly follow task and starts moving
 // toward target when it sits farther than offset plus both actors'
 // footprints. Friendly follow broadcasts a plain movement request; follow
 // identity stays server-side for the follow tick.
@@ -145,7 +145,11 @@ func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, m
 
 	totalRadius := followRange(offset, c.self.CollisionRadius(), other.CollisionRadius())
 	if in2DRange(origin, dest, totalRadius) {
-		c.move.CancelFollow()
+		if mode == FollowFriendly {
+			c.move.StartFriendlyFollow(target.ObjectID(), offset)
+		} else {
+			c.move.CancelFollow()
+		}
 		return false, nil
 	}
 

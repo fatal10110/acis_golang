@@ -31,6 +31,15 @@ func (h *Hostile) Invul() bool { return false }
 // Invulnerable reports whether h ignores direct resource effects.
 func (h *Hostile) Invulnerable() bool { return h.Invul() }
 
+// Lethalable reports whether h may receive lethal strikes.
+func (h *Hostile) Lethalable() bool {
+	switch h.Instance.Template.ID {
+	case 22215, 22216, 22217, 35062, 35410, 35368, 35375, 35629:
+		return false
+	}
+	return true
+}
+
 // PAtk returns this NPC's physical attack stat.
 func (h *Hostile) PAtk() float64 {
 	return h.calcStat(stat.PowerAttack, h.Instance.Template.PAtk)
@@ -291,6 +300,40 @@ func (h *Hostile) SkillReflectInput(def modelskill.Definition) formulas.SkillRef
 // by caster against h.
 func (h *Hostile) ManaDamageInput(caster any, def modelskill.Definition) (formulas.ManaDamageInput, bool) {
 	return creature.ResolveManaDamageInput(caster, h, h.MaxMPValue(), def)
+}
+
+// LethalRate returns h's lethal-strike rate multiplier.
+func (h *Hostile) LethalRate() float64 {
+	return h.calcStat(stat.LethalRate, 1)
+}
+
+// LethalInput resolves a lethal-strike roll against h.
+func (h *Hostile) LethalInput(caster any, def modelskill.Definition) (formulas.LethalInput, bool) {
+	attacker, ok := caster.(interface {
+		Level() int
+		LethalRate() float64
+	})
+	if !ok {
+		return formulas.LethalInput{}, false
+	}
+	return formulas.LethalInput{
+		Chance1:       def.LethalChance1,
+		Chance2:       def.LethalChance2,
+		MagicLevel:    def.MagicLevel,
+		AttackerLevel: attacker.Level(),
+		TargetLevel:   h.Level(),
+		LethalMul:     attacker.LethalRate(),
+	}, true
+}
+
+// ApplyLethalOutcome applies a lethal-strike tier to h.
+func (h *Hostile) ApplyLethalOutcome(outcome formulas.LethalOutcome, caster any, def modelskill.Definition) {
+	switch outcome {
+	case formulas.LethalFull:
+		h.ReduceHP(h.HP()-1, caster, def)
+	case formulas.LethalHalf:
+		h.ReduceHP(h.HP()/2, caster, def)
+	}
 }
 
 func (h *Hostile) raceMultiplier(attacker creature.FormulaActor) float64 {
