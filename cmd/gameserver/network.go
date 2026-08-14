@@ -7,6 +7,7 @@ import (
 	"net"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/idfactory"
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
@@ -72,6 +73,7 @@ func provideGameClientLink(
 	effects *network.TaskEffects,
 	respawnHP respawnRestoreHP,
 	deathPenalty deathPenaltyChance,
+	spawnProtection playerSpawnProtection,
 	spBookNeeded skillEnchantSPBookNeeded,
 	autoLearn autoLearnSkills,
 	weightLimit weightLimitMultiplier,
@@ -83,6 +85,7 @@ func provideGameClientLink(
 	playerConfig := network.PlayerConfig{
 		RespawnRestoreHP:         float64(respawnHP),
 		DeathPenaltyChance:       int(deathPenalty),
+		SpawnProtection:          time.Duration(spawnProtection),
 		SkillEnchantSPBookNeeded: bool(spBookNeeded),
 		AutoLearnSkills:          bool(autoLearn),
 		WeightLimitMultiplier:    float64(weightLimit),
