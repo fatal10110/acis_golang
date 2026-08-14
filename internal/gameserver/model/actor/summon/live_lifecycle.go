@@ -169,6 +169,9 @@ func (a *Actor) despawn(state *world.State) {
 	}
 	state.Despawn(a)
 	state.RemoveSummon(a.OwnerID())
+	if a.onDespawn != nil {
+		a.onDespawn()
+	}
 }
 
 func (a *Actor) resolveRequest(ctx CommandContext) Request {

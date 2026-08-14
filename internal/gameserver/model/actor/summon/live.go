@@ -75,6 +75,7 @@ type Actor struct {
 	combat         bool
 	attack         bool
 	brain          AI
+	onDespawn      func()
 	// skills maps skill id to the level this summon's npc template grants
 	// it, used by TryUseSkill to resolve an owner-commanded action-bar
 	// skill shortcut, matching Java's Summon.getSkill.
