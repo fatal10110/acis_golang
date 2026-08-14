@@ -1,17 +1,21 @@
 package manager
 
 import (
+	"math"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 type deathRewards struct {
 	hostile    *npc.Hostile
+	state      *world.State
 	tmpl       *npc.Template
 	categories []item.DropCategory
 	config     KillRewardConfig
@@ -23,8 +27,11 @@ type deathRewards struct {
 }
 
 type playerRewardEntry struct {
-	actor  *player.Character
-	damage float64
+	actor       *player.Character
+	damage      float64
+	ownerDamage float64
+	pet         *summon.Actor
+	petDamage   float64
 }
 
 // CalculateRewards implements creature.Rewarder.
@@ -51,30 +58,62 @@ func (d *deathRewards) scheduleDecay() {
 func (d *deathRewards) rewardEntries() ([]playerRewardEntry, float64, *player.Character, int) {
 	var entries []playerRewardEntry
 	var totalDamage float64
-	var maxDealer *player.Character
-	var maxDamage float64
-	var highestLevel int
 
 	for _, threat := range d.hostile.AI().Threats().Snapshot() {
 		if threat.Damage <= 1 {
 			continue
 		}
 		attacker, ok := threat.Attacker.(*player.Character)
+		var pet *summon.Actor
+		if !ok {
+			pet, ok = threat.Attacker.(*summon.Actor)
+			if !ok || !pet.IsPet() {
+				continue
+			}
+			attacker, ok = pet.ActingPlayer().(*player.Character)
+		}
 		if !ok || attacker.AlikeDead() || !attacker.Knows(d.hostile) {
 			continue
 		}
-		entries = append(entries, playerRewardEntry{actor: attacker, damage: threat.Damage})
+		entry := -1
+		for i := range entries {
+			if entries[i].actor == attacker {
+				entry = i
+				break
+			}
+		}
+		if entry < 0 {
+			entries = append(entries, playerRewardEntry{actor: attacker})
+			entry = len(entries) - 1
+		}
+		entries[entry].damage += threat.Damage
+		if pet != nil {
+			entries[entry].pet = pet
+			entries[entry].petDamage += threat.Damage
+		} else {
+			entries[entry].ownerDamage += threat.Damage
+		}
 		totalDamage += threat.Damage
-		if maxDealer == nil || threat.Damage > maxDamage {
-			maxDealer = attacker
-			maxDamage = threat.Damage
-		}
-		if attacker.CharLevel > highestLevel {
-			highestLevel = attacker.CharLevel
-		}
 	}
 
+	maxDealer, highestLevel := rewardLeader(entries)
 	return entries, totalDamage, maxDealer, highestLevel
+}
+
+func rewardLeader(entries []playerRewardEntry) (*player.Character, int) {
+	var maxDealer *player.Character
+	var maxDamage float64
+	var highestLevel int
+	for _, entry := range entries {
+		if maxDealer == nil || entry.damage > maxDamage {
+			maxDealer = entry.actor
+			maxDamage = entry.damage
+		}
+		if entry.actor.CharLevel > highestLevel {
+			highestLevel = entry.actor.CharLevel
+		}
+	}
+	return maxDealer, highestLevel
 }
 
 func (d *deathRewards) rollDrops(killer creature.DeathActor, maxDealer *player.Character, highestLevel int) {
@@ -106,6 +145,32 @@ func (d *deathRewards) grantExpAndSp(entries []playerRewardEntry, totalDamage fl
 	}
 	for _, entry := range entries {
 		exp, sp := player.KillRewardExpAndSp(d.tmpl.RewardExp, d.tmpl.RewardSp, entry.damage, totalDamage, entry.actor.CharLevel-d.tmpl.Level)
+		if entry.pet == nil && d.state != nil {
+			if obj, ok := d.state.Summon(entry.actor.ObjectID()); ok {
+				entry.pet, _ = obj.(*summon.Actor)
+			}
+		}
+		if entry.pet != nil && !entry.pet.Dead() {
+			petExp, petSp := petReward(entry.pet.ExpType(), entry.petDamage, entry.ownerDamage, exp, sp)
+			exp -= petExp
+			sp -= petSp
+			entry.pet.AddExpAndSp(petExp, petSp)
+		}
 		entry.actor.RewardExpAndSp(d.config.PlayerLevels, exp, sp)
 	}
+}
+
+func petReward(expType int, petDamage, totalDamage float64, exp int64, sp int) (int64, int) {
+	if expType == -1 {
+		if totalDamage <= 0 {
+			return 0, 0
+		}
+		share := petDamage / totalDamage
+		return int64(float64(exp) * share), int(float64(sp) * share)
+	}
+	if expType > 100 {
+		expType = 100
+	}
+	share := 1 - float64(expType)/100
+	return int64(math.Round(float64(exp) * share)), int(math.Round(float64(sp) * share))
 }

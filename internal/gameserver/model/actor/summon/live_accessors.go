@@ -159,6 +159,28 @@ func (a *Actor) ScaledExpGain(rawExp int64) int64 {
 	return a.petConfig.ScaledExpGain(a.npcID, rawExp)
 }
 
+func (a *Actor) ExpType() int {
+	if a == nil || !a.isPet {
+		return 0
+	}
+	a.statusMu.RLock()
+	defer a.statusMu.RUnlock()
+	return a.expType
+}
+
+// AddExpAndSp grants a pet its raw kill-reward share. Experience uses the
+// pet-specific configured rate; SP is deliberately unscaled.
+func (a *Actor) AddExpAndSp(rawExp int64, sp int) {
+	if a == nil || !a.isPet {
+		return
+	}
+	a.statusMu.Lock()
+	a.exp += a.ScaledExpGain(rawExp)
+	a.sp += sp
+	a.statusMu.Unlock()
+	a.UpdateStatus()
+}
+
 // CanWearPetItem reports whether this pet can equip tmpl.
 func (a *Actor) CanWearPetItem(tmpl *item.Template) bool {
 	if a == nil || tmpl == nil {
@@ -294,8 +316,11 @@ func (a *Actor) TryUseSkill(skillID int, target attackable.Combatant) bool {
 }
 
 // OutOfControl reports whether the owner cannot currently command this
-// summon.
-func (a *Actor) OutOfControl() bool { return a.disabled }
+// summon, matching Summon.isOutOfControl (Summon.java:296-298):
+// super.isOutOfControl() || isBetrayed().
+func (a *Actor) OutOfControl() bool {
+	return a.disabled || a.effects.IsAffected(effect.FlagBetrayed)
+}
 
 // OwnerCombatant returns the owning player when it can be targeted by AI.
 func (a *Actor) OwnerCombatant() attackable.Combatant {

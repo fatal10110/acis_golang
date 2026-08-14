@@ -133,6 +133,7 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 		Level:           level,
 		Exp:             state.Exp,
 		SP:              state.SP,
+		ExpType:         levelStats.ExpType,
 		CON:             npcTmpl.CON,
 		Config:          nil, // set by newPet from link.petConfig
 		Inventory:       itemcontainer.NewPetInventory(objID, live.Inventory().Templates()),
