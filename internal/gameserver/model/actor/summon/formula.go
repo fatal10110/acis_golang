@@ -560,6 +560,40 @@ func (a *Actor) ManaDamageInput(caster any, def modelskill.Definition) (formulas
 	return creature.ResolveManaDamageInput(caster, a, a.MaxMPValue(), def)
 }
 
+// LethalRate returns a's lethal-strike rate multiplier.
+func (a *Actor) LethalRate() float64 {
+	return a.calcStat(stat.LethalRate, 1)
+}
+
+// LethalInput resolves a lethal-strike roll against a.
+func (a *Actor) LethalInput(caster any, def modelskill.Definition) (formulas.LethalInput, bool) {
+	attacker, ok := caster.(interface {
+		Level() int
+		LethalRate() float64
+	})
+	if !ok {
+		return formulas.LethalInput{}, false
+	}
+	return formulas.LethalInput{
+		Chance1:       def.LethalChance1,
+		Chance2:       def.LethalChance2,
+		MagicLevel:    def.MagicLevel,
+		AttackerLevel: attacker.Level(),
+		TargetLevel:   a.Level(),
+		LethalMul:     attacker.LethalRate(),
+	}, true
+}
+
+// ApplyLethalOutcome applies a lethal-strike tier to a.
+func (a *Actor) ApplyLethalOutcome(outcome formulas.LethalOutcome, caster any, def modelskill.Definition) {
+	switch outcome {
+	case formulas.LethalFull:
+		a.ReduceHP(a.HP()-1, caster, def)
+	case formulas.LethalHalf:
+		a.ReduceHP(a.HP()/2, caster, def)
+	}
+}
+
 // SkillSuccessInput returns the effect-landing roll input for def cast against a.
 func (a *Actor) SkillSuccessInput(caster any, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
 	return creature.ResolveSkillSuccessInput(caster, a, def, bss, shield)
