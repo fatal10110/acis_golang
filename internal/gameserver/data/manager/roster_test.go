@@ -15,15 +15,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
 
-// sequentialIDs is a minimal idAllocator for tests: ids count up from a
-// fixed start with no reuse, since these tests never delete and re-create
-// enough objects for id reuse to matter.
-type sequentialIDs struct{ next int32 }
-
-func (s *sequentialIDs) NextID() (int32, error) {
-	s.next++
-	return s.next, nil
-}
+// sequentialIDs (a minimal idAllocator: ids count up from a fixed start
+// with no reuse) is defined once for the package in killrewards_test.go.
 
 func humanFighterTemplate(t *testing.T) *player.TemplateTable {
 	t.Helper()
@@ -59,12 +52,16 @@ func starterItemTable() *item.Table {
 	})
 }
 
-func newTestRoster(t *testing.T, deleteAfter time.Duration, now func() time.Time) (*Roster, *sql.CharacterStore, *sql.ItemStore) {
+func newTestRoster(t *testing.T, deleteAfter time.Duration, now func() time.Time, npcs ...*npc.Table) (*Roster, *sql.CharacterStore, *sql.ItemStore) {
 	t.Helper()
+	table := npc.NewTable(nil)
+	if len(npcs) > 0 {
+		table = npcs[0]
+	}
 	db := sqltest.NewDB(t)
 	characters := sql.NewCharacterStore(db)
 	items := sql.NewItemStore(db)
-	roster := NewRoster(characters, items, nil, humanFighterTemplate(t), starterItemTable(), npc.NewTable(nil), &sequentialIDs{next: 0x10000000}, deleteAfter, now)
+	roster := NewRoster(characters, items, nil, humanFighterTemplate(t), starterItemTable(), table, &sequentialIDs{next: 0x10000000}, deleteAfter, now)
 	return roster, characters, items
 }
 
@@ -294,5 +291,56 @@ func TestRoster_MarkForDeletion_Immediate(t *testing.T) {
 	}
 	if len(remaining) != 0 {
 		t.Errorf("items after immediate deletion = %v, want none", remaining)
+	}
+}
+
+func TestRoster_Create_RejectsNPCNameCollision(t *testing.T) {
+	ctx := context.Background()
+	npcs := npc.NewTable([]*npc.Template{{ID: 30001, Name: "Gatekeeper"}})
+	roster, _, _ := newTestRoster(t, DefaultDeleteAfter, nil, npcs)
+
+	_, outcome, err := roster.Create(ctx, "acct1", CreateRequest{
+		Name: "Gatekeeper", ClassID: 0, Race: 0, Sex: player.SexMale,
+	})
+	if err != nil {
+		t.Fatalf("Create() unexpected error: %v", err)
+	}
+	if outcome != CreateInvalidName {
+		t.Fatalf("Create() outcome = %v, want CreateInvalidName", outcome)
+	}
+}
+
+func TestRoster_Create_RejectsNPCNameCollisionCaseInsensitive(t *testing.T) {
+	ctx := context.Background()
+	npcs := npc.NewTable([]*npc.Template{{ID: 30001, Name: "Gatekeeper"}})
+	roster, _, _ := newTestRoster(t, DefaultDeleteAfter, nil, npcs)
+
+	_, outcome, err := roster.Create(ctx, "acct1", CreateRequest{
+		Name: "gatekeeper", ClassID: 0, Race: 0, Sex: player.SexMale,
+	})
+	if err != nil {
+		t.Fatalf("Create() unexpected error: %v", err)
+	}
+	if outcome != CreateInvalidName {
+		t.Fatalf("Create() outcome = %v, want CreateInvalidName", outcome)
+	}
+}
+
+func TestRoster_Create_AcceptsValidNonNPCName(t *testing.T) {
+	ctx := context.Background()
+	npcs := npc.NewTable([]*npc.Template{{ID: 30001, Name: "Gatekeeper"}})
+	roster, _, _ := newTestRoster(t, DefaultDeleteAfter, nil, npcs)
+
+	c, outcome, err := roster.Create(ctx, "acct1", CreateRequest{
+		Name: "Newbie", ClassID: 0, Race: 0, Sex: player.SexMale,
+	})
+	if err != nil {
+		t.Fatalf("Create() unexpected error: %v", err)
+	}
+	if outcome != CreateOK {
+		t.Fatalf("Create() outcome = %v, want CreateOK", outcome)
+	}
+	if c.Name != "Newbie" {
+		t.Fatalf("Create() character name = %q, want Newbie", c.Name)
 	}
 }
