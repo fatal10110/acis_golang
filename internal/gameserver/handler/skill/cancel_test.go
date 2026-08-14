@@ -3,22 +3,12 @@ package skill
 import (
 	"testing"
 
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
 
-// *player.Character must satisfy cancelTarget (and the sibling caster
-// shapes that share the same Level() int requirement): it couldn't, before
-// Character's persisted level field was renamed off of Level to make room
-// for the method (see player.Character.CharLevel).
-var (
-	_ cancelTarget = (*player.Character)(nil)
-	_ sowCaster    = (*player.Character)(nil)
-	_ magicCaster  = (*player.Character)(nil)
-)
-
 type cancelFakeActor struct {
+	fakeActor
 	dead  bool
 	level int
 	list  *effect.List
@@ -61,7 +51,7 @@ func TestCancelNeverStripsToggleOrDebuffEffects(t *testing.T) {
 
 	registry.Use(Cast{
 		Skill:   modelskill.Definition{SkillType: "CANCEL", Power: 50, MaxNegatedEffects: 10, MagicLevel: 40},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 
 	if !hasEffect(target.list, toggle) {
@@ -80,7 +70,7 @@ func TestCancelNeverStripsNonCancellableEffectType(t *testing.T) {
 
 	registry.Use(Cast{
 		Skill:   modelskill.Definition{SkillType: "CANCEL", Power: 50, MaxNegatedEffects: 10, MagicLevel: 40},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 
 	if !hasEffect(target.list, blessing) {
@@ -99,7 +89,7 @@ func TestCancelNeverStripsProtectionBlessingMarkerEffect(t *testing.T) {
 
 	registry.Use(Cast{
 		Skill:   modelskill.Definition{SkillType: "CANCEL", Power: 50, MaxNegatedEffects: 10, MagicLevel: 40},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 
 	if !hasEffect(target.list, protection) {
@@ -115,7 +105,7 @@ func TestMageBaneOnlyConsidersMatchingStackTypes(t *testing.T) {
 
 	registry.Use(Cast{
 		Skill:   modelskill.Definition{SkillType: "MAGE_BANE", Power: 50, MaxNegatedEffects: 10, MagicLevel: 40},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	})
 
 	if !hasEffect(target.list, unrelated) {

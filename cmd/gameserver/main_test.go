@@ -189,6 +189,36 @@ func TestLoadDeathPenaltyChanceDefaultsToTwenty(t *testing.T) {
 	}
 }
 
+func TestLoadPlayerSpawnProtectionUsesPlayersProperties(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "players.properties")
+	if err := os.WriteFile(configPath, []byte("PlayerSpawnProtection = 12\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := loadPlayerSpawnProtection(gameServerPaths{PlayersConfigPath: configPath})
+	if err != nil {
+		t.Fatalf("loadPlayerSpawnProtection() error = %v", err)
+	}
+	if got != playerSpawnProtection(12*time.Second) {
+		t.Fatalf("loadPlayerSpawnProtection() = %v, want 12s", got)
+	}
+}
+
+func TestLoadPlayerSpawnProtectionDefaultsToDisabled(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "players.properties")
+	if err := os.WriteFile(configPath, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := loadPlayerSpawnProtection(gameServerPaths{PlayersConfigPath: configPath})
+	if err != nil {
+		t.Fatalf("loadPlayerSpawnProtection() error = %v", err)
+	}
+	if got != playerSpawnProtection(0) {
+		t.Fatalf("loadPlayerSpawnProtection() = %v, want disabled", got)
+	}
+}
+
 func TestLoadPetConfigUsesServerAndPlayersProperties(t *testing.T) {
 	dir := t.TempDir()
 	serverPath := filepath.Join(dir, "server.properties")

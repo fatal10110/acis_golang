@@ -1,6 +1,7 @@
 package network
 
 import (
+	"runtime"
 	"sync"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
@@ -12,11 +13,18 @@ import (
 // bounds the allocation ReadFrame makes for a frame's payload.
 const frameHeaderSize = wire.FrameHeaderSize
 
+// trySendLockAttempts lets brief healthy contention clear before the blocking
+// fallback; each retry checks for saturation and aborts a slow peer instead.
+const trySendLockAttempts = 64
+
 // Session pairs a connection with the rolling cipher securing it. Encrypting
 // a frame and queueing it for send must happen as one step in send order —
 // mu is the only thing allowed to call cipher.Encrypt or conn.SendFrame, so two
 // goroutines calling SendFrame concurrently can never queue frames in an order
-// that disagrees with the order their bytes were encrypted in.
+// that disagrees with the order their bytes were encrypted in. SendFrame is
+// the only path that can hold mu while blocking, and it can do so only after
+// the outbound queue is full; TrySendFrame checks that condition before it
+// waits for mu and aborts the connection instead.
 type Session struct {
 	conn   *Conn
 	cipher *Cipher
@@ -39,10 +47,14 @@ func (s *Session) SendFrame(frame wire.Frame) bool {
 	return s.sendFrame(frame, s.conn.SendFrame)
 }
 
-// trySendFrame encrypts and queues frame only when the connection's outbound
+// TrySendFrame encrypts and queues frame only when the connection's outbound
 // queue has capacity. A full queue disconnects the client before encryption,
 // because dropping an ordered frame would desynchronize its cipher. It takes
 // ownership of frame in every outcome.
+func (s *Session) TrySendFrame(frame wire.Frame) bool {
+	return s.trySendFrame(frame)
+}
+
 func (s *Session) trySendFrame(frame wire.Frame) bool {
 	frameBytes := frame.Bytes()
 	if len(frameBytes) < frameHeaderSize {
@@ -50,9 +62,31 @@ func (s *Session) trySendFrame(frame wire.Frame) bool {
 		return false
 	}
 
+	if s.conn.queueFull() {
+		frame.Release()
+		s.conn.abort()
+		return false
+	}
+	for range trySendLockAttempts {
+		if s.mu.TryLock() {
+			defer s.mu.Unlock()
+			return s.encryptAndTrySend(frame, frameBytes)
+		}
+		if s.conn.queueFull() {
+			frame.Release()
+			s.conn.abort()
+			return false
+		}
+		runtime.Gosched()
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if len(s.conn.out) == cap(s.conn.out) {
+	return s.encryptAndTrySend(frame, frameBytes)
+}
+
+// encryptAndTrySend runs with s.mu held.
+func (s *Session) encryptAndTrySend(frame wire.Frame, frameBytes []byte) bool {
+	if s.conn.queueFull() {
 		frame.Release()
 		s.conn.abort()
 		return false

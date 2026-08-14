@@ -19,13 +19,13 @@ func (a *Actor) BroadcastFrame(frame wire.Frame) {
 		return
 	}
 	a.world.ForEachKnown(a, func(o world.Tracked) {
-		receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
+		receiver, ok := o.(interface{ BroadcastFrame(wire.Frame) bool })
 		if !ok {
 			return
 		}
 		owned, ok := serverpackets.CopyFrame(frame)
 		if ok {
-			receiver.SendFrame(owned)
+			receiver.BroadcastFrame(owned)
 		}
 	})
 }

@@ -16,7 +16,7 @@ type doorTarget interface {
 }
 
 type chestTarget interface {
-	Dead() bool
+	Actor
 	Interacted() bool
 	SetInteracted()
 	Box() bool

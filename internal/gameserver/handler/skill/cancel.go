@@ -19,7 +19,6 @@ var effectNotCancellable = map[string]bool{
 
 type cancelTarget interface {
 	effectListTarget
-	Dead() bool
 	Level() int
 }
 

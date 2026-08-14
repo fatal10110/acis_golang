@@ -49,6 +49,7 @@ func TestProvideGameClientLinkUsesGameDataSkillTrees(t *testing.T) {
 			func() *task.Autosave { return nil },
 			func() *network.TaskEffects { return nil },
 			func() respawnRestoreHP { return 0.7 },
+			func() playerSpawnProtection { return 0 },
 			func() deathPenaltyChance { return 20 },
 			func() skillEnchantSPBookNeeded { return true },
 			func() autoLearnSkills { return false },

@@ -98,6 +98,7 @@ func (l *GameClientLink) detachLivePlayer(ctx context.Context, live *livePlayer)
 		l.world.RemovePlayer(live.ObjectID())
 	}
 	live.Character.SetFrameSender(nil)
+	live.Character.SetBroadcastFrameSender(nil)
 	live.Character.SetAttackBroadcaster(nil)
 	live.Character.SetDieBroadcaster(nil)
 	// The herb consumer reaches skill reuse and effect application without

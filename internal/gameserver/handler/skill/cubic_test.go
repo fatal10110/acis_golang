@@ -8,6 +8,7 @@ import (
 )
 
 type fakeCubicSummoner struct {
+	fakeActor
 	added        map[cubic.ID]bool
 	givenByOther map[cubic.ID]bool
 	nextAdded    bool
@@ -34,7 +35,7 @@ func TestCubicHandlerAddsToSelfWhenSingleTarget(t *testing.T) {
 	result := cubicHandler{}.UseResult(Cast{
 		Caster:  caster,
 		Skill:   modelskill.Definition{SkillType: "SUMMON", IsCubic: true, NpcID: int(cubic.Storm)},
-		Targets: []any{caster},
+		Targets: []Actor{caster},
 	})
 
 	if !result.CubicAdded {
@@ -54,7 +55,7 @@ func TestCubicHandlerDelegatesServitorBranch(t *testing.T) {
 	result := cubicHandler{}.UseResult(Cast{
 		Caster:  caster,
 		Skill:   modelskill.Definition{SkillType: "SUMMON", IsCubic: false, NpcID: 14848},
-		Targets: []any{caster},
+		Targets: []Actor{caster},
 	})
 
 	if result.CubicAdded {
@@ -75,7 +76,7 @@ func TestCubicHandlerMassCubicMarksOthersGivenByOther(t *testing.T) {
 	result := cubicHandler{}.UseResult(Cast{
 		Caster:  caster,
 		Skill:   modelskill.Definition{SkillType: "SUMMON", IsCubic: true, NpcID: int(cubic.Storm)},
-		Targets: []any{caster, other},
+		Targets: []Actor{caster, other},
 	})
 
 	if !result.CubicAdded {
@@ -105,7 +106,7 @@ func TestCubicHandlerRegisteredForSummonType(t *testing.T) {
 	if !registry.Use(Cast{
 		Caster:  caster,
 		Skill:   modelskill.Definition{SkillType: "SUMMON", IsCubic: true, NpcID: int(cubic.Vampiric)},
-		Targets: []any{caster},
+		Targets: []Actor{caster},
 	}) {
 		t.Fatal("Use() returned false for SUMMON")
 	}

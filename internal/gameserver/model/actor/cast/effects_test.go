@@ -110,8 +110,8 @@ func TestApplyEffectsResultCarriesCubicTargets(t *testing.T) {
 	caster := &effectsActor{id: 1, category: skilltarget.CategoryPlayable}
 	other := &effectsActor{id: 2, category: skilltarget.CategoryPlayable}
 	rec := &recordingSkillHandler{result: handlerskill.Result{
-		CubicTargets:      []any{other},
-		CubicAddedTargets: []any{other},
+		CubicTargets:      []handlerskill.Actor{other},
+		CubicAddedTargets: []handlerskill.Actor{other},
 	}}
 	handlers := newEffectHandlers(effectsKnown{}, "DUMMY", rec)
 	def := modelskill.Definition{ID: 99, Target: modelskill.TargetSelf, SkillType: "DUMMY"}

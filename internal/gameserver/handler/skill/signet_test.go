@@ -22,6 +22,7 @@ const tickInterval = 1100 * time.Millisecond
 // tests: it can be positioned and identified, owns its own live effect
 // list (for the self-targeted SIGNET_CASTTIME family), and can pay MP.
 type signetFakeCaster struct {
+	fakeActor
 	id         int32
 	x, y, z    int
 	gx, gy, gz int

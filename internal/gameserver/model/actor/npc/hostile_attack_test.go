@@ -523,6 +523,8 @@ func (f *frameReceiver) SendFrame(frame wire.Frame) bool {
 	return true
 }
 
+func (f *frameReceiver) BroadcastFrame(frame wire.Frame) bool { return f.SendFrame(frame) }
+
 var _ creature.DeathActor = (*Hostile)(nil)
 
 // fakeHostileLineOfSight is a LineOfSight double that records the query it

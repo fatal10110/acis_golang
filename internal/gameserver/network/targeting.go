@@ -29,8 +29,8 @@ func (l *GameClientLink) broadcastAttack(attacker *livePlayer, snapshot attack.S
 	encoded := append([]byte(nil), frame.Bytes()...)
 	frame.Release()
 
-	send := func(receiver interface{ SendFrame(wire.Frame) bool }) {
-		receiver.SendFrame(wire.BorrowedFrame(append([]byte(nil), encoded...)))
+	send := func(receiver interface{ BroadcastFrame(wire.Frame) bool }) {
+		receiver.BroadcastFrame(wire.BorrowedFrame(append([]byte(nil), encoded...)))
 	}
 	send(attacker)
 
@@ -38,7 +38,7 @@ func (l *GameClientLink) broadcastAttack(attacker *livePlayer, snapshot attack.S
 		return
 	}
 	l.world.ForEachKnown(attacker, func(o world.Tracked) {
-		receiver, ok := o.(interface{ SendFrame(wire.Frame) bool })
+		receiver, ok := o.(interface{ BroadcastFrame(wire.Frame) bool })
 		if !ok {
 			return
 		}

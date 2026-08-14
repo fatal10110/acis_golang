@@ -7,6 +7,7 @@ import (
 )
 
 type extractableFakeCaster struct {
+	fakeActor
 	granted  map[int32]int
 	capacity bool
 }
@@ -27,7 +28,7 @@ func TestExtractableGrantsTheOnlyGuaranteedProduct(t *testing.T) {
 	registry.Use(Cast{
 		Caster:  caster,
 		Skill:   modelskill.Definition{SkillType: "EXTRACTABLE", ExtractableItems: "57,10,100.0"},
-		Targets: []any{},
+		Targets: []Actor{},
 	})
 
 	if caster.granted[57] != 10 {
@@ -42,7 +43,7 @@ func TestExtractableFullInventoryGrantsNothing(t *testing.T) {
 	registry.Use(Cast{
 		Caster:  caster,
 		Skill:   modelskill.Definition{SkillType: "EXTRACTABLE", ExtractableItems: "57,10,100.0"},
-		Targets: []any{},
+		Targets: []Actor{},
 	})
 
 	if len(caster.granted) != 0 {
@@ -57,7 +58,7 @@ func TestExtractableNoDataIsNoop(t *testing.T) {
 	registry.Use(Cast{
 		Caster:  caster,
 		Skill:   modelskill.Definition{SkillType: "EXTRACTABLE_FISH"},
-		Targets: []any{},
+		Targets: []Actor{},
 	})
 	if len(caster.granted) != 0 {
 		t.Fatalf("granted = %v, want none without extractable data", caster.granted)

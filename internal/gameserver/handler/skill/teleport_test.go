@@ -6,7 +6,10 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
-type jumpFakeTarget struct{ heading, x, y, z int }
+type jumpFakeTarget struct {
+	fakeActor
+	heading, x, y, z int
+}
 
 func (t jumpFakeTarget) Heading() int { return t.heading }
 func (t jumpFakeTarget) X() int       { return t.x }
@@ -14,6 +17,7 @@ func (t jumpFakeTarget) Y() int       { return t.y }
 func (t jumpFakeTarget) Z() int       { return t.z }
 
 type jumpFakeCaster struct {
+	fakeActor
 	aborted     bool
 	broadcasted bool
 	x, y, z     int
@@ -33,7 +37,7 @@ func TestInstantJumpRepositionsBehindTarget(t *testing.T) {
 	if !registry.Use(Cast{
 		Caster:  caster,
 		Skill:   modelskill.Definition{SkillType: "INSTANT_JUMP"},
-		Targets: []any{target},
+		Targets: []Actor{target},
 	}) {
 		t.Fatal("Use() returned false for INSTANT_JUMP")
 	}
@@ -57,12 +61,16 @@ func TestInstantJumpNoTargetsIsNoop(t *testing.T) {
 	}
 }
 
-type getPlayerFakeCaster struct{ x, y, z int }
+type getPlayerFakeCaster struct {
+	fakeActor
+	x, y, z int
+}
 
 func (c getPlayerFakeCaster) AlikeDead() bool           { return false }
 func (c getPlayerFakeCaster) Position() (int, int, int) { return c.x, c.y, c.z }
 
 type getPlayerFakeTarget struct {
+	fakeActor
 	dead       bool
 	teleported bool
 	tx, ty, tz int
@@ -83,7 +91,7 @@ func TestGetPlayerPullsLivingTargetsToCaster(t *testing.T) {
 	registry.Use(Cast{
 		Caster:  caster,
 		Skill:   modelskill.Definition{SkillType: "GET_PLAYER"},
-		Targets: []any{target, deadTarget},
+		Targets: []Actor{target, deadTarget},
 	})
 
 	if !target.teleported || target.tx != 1 || target.ty != 2 || target.tz != 3 {

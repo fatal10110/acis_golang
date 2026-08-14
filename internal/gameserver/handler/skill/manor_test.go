@@ -28,6 +28,7 @@ func (s *manorFakeSeedState) Sow(sowerID int32, seed manor.Seed) {
 }
 
 type manorFakeTarget struct {
+	fakeActor
 	dead  bool
 	level int
 	state *manorFakeSeedState
@@ -45,6 +46,7 @@ type manorFakeItem struct {
 func (i manorFakeItem) Seed() (manor.Seed, bool) { return i.seed, i.ok }
 
 type manorFakeCaster struct {
+	fakeActor
 	id    int32
 	level int
 	items map[int32]int
@@ -74,7 +76,7 @@ func TestSowEventuallySucceedsAndMarksSeeded(t *testing.T) {
 			Caster:  caster,
 			Item:    item,
 			Skill:   modelskill.Definition{SkillType: "SOW"},
-			Targets: []any{target},
+			Targets: []Actor{target},
 		}) {
 			t.Fatal("Use() returned false for SOW")
 		}
@@ -94,7 +96,7 @@ func TestSowAlreadySeededIsNoop(t *testing.T) {
 	target := &manorFakeTarget{level: 40, state: &manorFakeSeedState{seeded: true, sownBy: 3}}
 	item := manorFakeItem{seed: manor.Seed{Level: 40}, ok: true}
 
-	registry.Use(Cast{Caster: caster, Item: item, Skill: modelskill.Definition{SkillType: "SOW"}, Targets: []any{target}})
+	registry.Use(Cast{Caster: caster, Item: item, Skill: modelskill.Definition{SkillType: "SOW"}, Targets: []Actor{target}})
 	if target.state.sownBy != 3 {
 		t.Fatalf("already-seeded target should be untouched, sownBy = %d", target.state.sownBy)
 	}
@@ -105,7 +107,7 @@ func TestHarvestRewardsAllowedHarvester(t *testing.T) {
 	caster := &manorFakeCaster{id: 7, level: 40}
 	target := &manorFakeTarget{level: 40, state: &manorFakeSeedState{seeded: true, allowed: true, cropID: 5001, cropCount: 12}}
 
-	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "HARVEST"}, Targets: []any{target}})
+	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "HARVEST"}, Targets: []Actor{target}})
 
 	if !target.state.harvested {
 		t.Error("target should be marked harvested")
@@ -120,7 +122,7 @@ func TestHarvestDisallowedHarvesterGetsNothing(t *testing.T) {
 	caster := &manorFakeCaster{id: 7, level: 40}
 	target := &manorFakeTarget{level: 40, state: &manorFakeSeedState{seeded: true, allowed: false, cropID: 5001, cropCount: 12}}
 
-	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "HARVEST"}, Targets: []any{target}})
+	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "HARVEST"}, Targets: []Actor{target}})
 
 	if target.state.harvested {
 		t.Error("a disallowed harvester should not mark the target harvested")
@@ -135,7 +137,7 @@ func TestHarvestAlreadyHarvestedIsNoop(t *testing.T) {
 	caster := &manorFakeCaster{id: 7, level: 40}
 	target := &manorFakeTarget{level: 40, state: &manorFakeSeedState{seeded: true, harvested: true, allowed: true, cropID: 5001, cropCount: 12}}
 
-	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "HARVEST"}, Targets: []any{target}})
+	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "HARVEST"}, Targets: []Actor{target}})
 	if len(caster.items) != 0 {
 		t.Fatalf("caster earned items = %v, want none", caster.items)
 	}

@@ -55,7 +55,7 @@ func (l *GameClientLink) broadcastRelations(live *livePlayer) {
 		// karma/pvp-flag: Summon has no independent karma/pvp-flag state
 		// of its own, matching Summon.getKarma()/getPvpFlag() delegating
 		// to their owner.
-		live.SendFrame(serverpackets.FrameRelationChanged(serverpackets.RelationChangedInfo{
+		live.BroadcastFrame(serverpackets.FrameRelationChanged(serverpackets.RelationChangedInfo{
 			ObjectID: pet.ObjectID(),
 			Relation: relation,
 			Karma:    int32(karma),
@@ -69,12 +69,12 @@ func (l *GameClientLink) broadcastRelations(live *livePlayer) {
 			return
 		}
 		autoAttackable := relationAutoAttackable(karma, pvpFlag, live.InPvPZone(), observer.InPvPZone())
-		observer.SendFrame(serverpackets.FrameRelationChanged(serverpackets.RelationChangedInfo{
+		observer.BroadcastFrame(serverpackets.FrameRelationChanged(serverpackets.RelationChangedInfo{
 			ObjectID: live.ObjectID(), Relation: relation, IsAutoAttackable: autoAttackable,
 			Karma: int32(karma), PvPFlag: int32(pvpFlag),
 		}))
 		if hasPet {
-			observer.SendFrame(serverpackets.FrameRelationChanged(serverpackets.RelationChangedInfo{
+			observer.BroadcastFrame(serverpackets.FrameRelationChanged(serverpackets.RelationChangedInfo{
 				ObjectID: pet.ObjectID(), Relation: relation, IsAutoAttackable: autoAttackable,
 				Karma: int32(karma), PvPFlag: int32(pvpFlag),
 			}))
@@ -99,7 +99,7 @@ func (l *GameClientLink) broadcastSummonSpawnRelation(live *livePlayer, pet worl
 	pvpFlag := live.PvPFlagState()
 	relation := relationBits(karma, pvpFlag)
 
-	live.SendFrame(serverpackets.FrameRelationChanged(serverpackets.RelationChangedInfo{
+	live.BroadcastFrame(serverpackets.FrameRelationChanged(serverpackets.RelationChangedInfo{
 		ObjectID: pet.ObjectID(),
 		Relation: relation,
 		Karma:    int32(karma),
@@ -111,7 +111,7 @@ func (l *GameClientLink) broadcastSummonSpawnRelation(live *livePlayer, pet worl
 		if !ok {
 			return
 		}
-		observer.SendFrame(serverpackets.FrameRelationChanged(serverpackets.RelationChangedInfo{
+		observer.BroadcastFrame(serverpackets.FrameRelationChanged(serverpackets.RelationChangedInfo{
 			ObjectID: pet.ObjectID(), Relation: relation,
 			IsAutoAttackable: relationAutoAttackable(karma, pvpFlag, live.InPvPZone(), observer.InPvPZone()),
 			Karma:            int32(karma), PvPFlag: int32(pvpFlag),

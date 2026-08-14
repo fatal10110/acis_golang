@@ -1,8 +1,12 @@
 package task
 
 import (
+	"bytes"
+	"strings"
 	"sync"
 	"testing"
+
+	"github.com/rs/zerolog"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world/worldtest"
@@ -56,6 +60,45 @@ func TestPositionUpdatesTickAllowsMutationDuringTick(t *testing.T) {
 	updates.Tick()
 	if b.ticks != 1 {
 		t.Fatalf("actor b after removal = %d, want still 1", b.ticks)
+	}
+}
+
+func TestPositionUpdatesTickClearsScratchAfterTick(t *testing.T) {
+	updates := NewPositionUpdates(nil)
+	updates.Add(&positionUpdateActorStub{id: 1, moving: true})
+
+	updates.Tick()
+
+	for i, actor := range updates.scratch {
+		if actor != nil {
+			t.Fatalf("scratch[%d] retains actor after Tick", i)
+		}
+	}
+}
+
+func TestPositionUpdatesTickSkipsReentrantCall(t *testing.T) {
+	updates := NewPositionUpdates(nil)
+	var buf bytes.Buffer
+	updates.log = zerolog.New(&buf)
+
+	a := &positionUpdateActorStub{id: 1, moving: true}
+	reentered := false
+	a.tickFn = func() {
+		reentered = true
+		updates.Tick()
+	}
+	updates.Add(a)
+
+	updates.Tick()
+
+	if !reentered {
+		t.Fatal("reentrant Tick was not attempted")
+	}
+	if a.ticks != 1 {
+		t.Fatalf("ticks = %d, want 1 (reentrant call must be a no-op)", a.ticks)
+	}
+	if !strings.Contains(buf.String(), "PositionUpdates.Tick") || !strings.Contains(buf.String(), ErrReentrantTick.Error()) {
+		t.Fatalf("reentrant Tick call was not logged, got %q", buf.String())
 	}
 }
 

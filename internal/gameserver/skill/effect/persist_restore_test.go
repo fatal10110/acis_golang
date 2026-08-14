@@ -56,12 +56,6 @@ func TestSeedRestoreNonPeriodicEffectNeverClaims(t *testing.T) {
 	}
 }
 
-// TestApplyRestoredDeliversOnStartToLiveEffectList is the regression case
-// for the reported gap: a restored effect used to sit inert in
-// Persistence's save registry and never reached the live effect list, so
-// its OnStart hook (icons, stat application, ExRegenMax, ...) never fired
-// on relog. ApplyRestored is what Persistence.ReplayEffects now calls to
-// replay it through List.Add like a live cast would.
 // TestSaveStateIsTheInverseOfSeedRestore proves SaveState and seedRestore
 // round-trip: an effect scheduled with a persisted count/elapsed reports
 // that same count/elapsed back out once time has actually advanced by the
@@ -126,40 +120,8 @@ func TestSaveStateOnANonPeriodicEffectReportsNoElapsedTime(t *testing.T) {
 	}
 }
 
-func TestApplyRestoredDeliversOnStartToLiveEffectList(t *testing.T) {
-	target := &fakeChargesTarget{}
-	events := []string{}
-	list := NewList(eventOwner{events: &events})
-	meta := Skill{ID: 7, Level: 3}
-	templates := []modelskill.EffectTemplate{{Name: "IncreaseCharges", Value: 2, Count: 5}}
-
-	ApplyRestored(list, target, target, meta, templates, 5, 0)
-
-	if target.charges != 2 || target.max != 5 {
-		t.Fatalf("ApplyRestored charges/max = %d/%d, want 2/5 (OnStart delivered on restore, like a live cast)", target.charges, target.max)
-	}
-	active := list.All()
-	if len(active) != 1 || !active[0].InUse() {
-		t.Fatal("ApplyRestored effect never became active in the live list")
-	}
-	if got := active[0].Remaining(); got != 5 {
-		t.Fatalf("Remaining() = %d, want 5 (persisted count == template count, no clamp)", got)
-	}
-}
-
-func TestApplyRestoredSkipsUnsupportedTemplatesWithoutFailingTheRest(t *testing.T) {
-	target := &fakeChargesTarget{}
-	events := []string{}
-	list := NewList(eventOwner{events: &events})
-	meta := Skill{ID: 8}
-	templates := []modelskill.EffectTemplate{
-		{Name: "not-a-real-effect"},
-		{Name: "IncreaseCharges", Value: 1, Count: 3},
-	}
-
-	ApplyRestored(list, target, target, meta, templates, 3, 0)
-
-	if len(list.All()) != 1 {
-		t.Fatalf("ApplyRestored added %d effects, want 1 (unsupported template skipped)", len(list.All()))
-	}
-}
+// TestApplyRestoredDeliversOnStartToLiveEffectList and
+// TestApplyRestoredSkipsUnsupportedTemplatesWithoutFailingTheRest moved to
+// persist_restore_player_test.go (package effect_test): fakeChargesTarget's
+// IncreaseCharges reimplemented the same cap/overflow logic already on the
+// real (*player.Character).IncreaseCharges. See docs/agents/test-strategy.md.

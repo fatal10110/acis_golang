@@ -2,7 +2,6 @@ package task
 
 import (
 	"sort"
-	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -88,21 +87,13 @@ func PvPFlagOptionsFromProperties(props *config.Properties) (PvPFlagOptions, err
 	return opts, nil
 }
 
-type pvpFlagEntry struct {
-	actor     PvPFlagActor
-	expiresAt time.Time
-}
-
 // PvPFlags tracks timed PvP flags and clears or blinks them on the fixed
 // one-second task.
-//
-// mu guards entries.
 type PvPFlags struct {
 	opts PvPFlagOptions
 	now  func() time.Time
 
-	mu      sync.Mutex
-	entries map[int32]pvpFlagEntry
+	*deadlineRegistry[int32, PvPFlagActor]
 }
 
 // NewPvPFlags returns an empty PvP flag tracker.
@@ -110,7 +101,7 @@ func NewPvPFlags(opts PvPFlagOptions, now func() time.Time) *PvPFlags {
 	if now == nil {
 		now = time.Now
 	}
-	return &PvPFlags{opts: opts, now: now, entries: make(map[int32]pvpFlagEntry)}
+	return &PvPFlags{opts: opts, now: now, deadlineRegistry: newDeadlineRegistry[int32, PvPFlagActor]()}
 }
 
 // Start launches the fixed one-second PvP flag task.
@@ -140,9 +131,7 @@ func (p *PvPFlags) Add(actor PvPFlagActor, duration time.Duration) {
 	if actor == nil {
 		return
 	}
-	p.mu.Lock()
-	p.entries[actor.ObjectID()] = pvpFlagEntry{actor: actor, expiresAt: p.now().Add(duration)}
-	p.mu.Unlock()
+	p.add(actor.ObjectID(), actor, p.now().Add(duration))
 }
 
 // Remove stops tracking actor. If reset is true, actor's flag is cleared.
@@ -150,9 +139,7 @@ func (p *PvPFlags) Remove(actor PvPFlagActor, reset bool) {
 	if actor == nil {
 		return
 	}
-	p.mu.Lock()
-	delete(p.entries, actor.ObjectID())
-	p.mu.Unlock()
+	p.remove(actor.ObjectID())
 	if reset {
 		actor.UpdatePvPFlag(PvPFlagNone)
 	}
@@ -162,35 +149,21 @@ func (p *PvPFlags) Remove(actor PvPFlagActor, reset bool) {
 // and clearing the flag only after the deadline has passed.
 func (p *PvPFlags) Tick() {
 	now := p.now()
-	var updates []pvpFlagEntry
-	var expired []PvPFlagActor
-
-	p.mu.Lock()
-	for id, entry := range p.entries {
-		if now.After(entry.expiresAt) {
-			delete(p.entries, id)
-			expired = append(expired, entry.actor)
-			continue
-		}
-		updates = append(updates, entry)
-	}
-	p.mu.Unlock()
-
-	for _, actor := range expired {
-		actor.UpdatePvPFlag(PvPFlagNone)
-	}
-	for _, entry := range updates {
-		if now.After(entry.expiresAt.Add(-5 * time.Second)) {
-			entry.actor.UpdatePvPFlag(PvPFlagBlinking)
-			continue
-		}
-		entry.actor.UpdatePvPFlag(PvPFlagOn)
-	}
+	p.tickExpiry(now,
+		func(actor PvPFlagActor) {
+			actor.UpdatePvPFlag(PvPFlagNone)
+		},
+		func(actor PvPFlagActor, expiresAt time.Time) {
+			if now.After(expiresAt.Add(-5 * time.Second)) {
+				actor.UpdatePvPFlag(PvPFlagBlinking)
+				return
+			}
+			actor.UpdatePvPFlag(PvPFlagOn)
+		},
+	)
 }
 
 // Len returns the number of tracked actors.
 func (p *PvPFlags) Len() int {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	return len(p.entries)
+	return p.len()
 }
