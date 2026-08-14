@@ -57,6 +57,30 @@ func TestGameClientLinkSendsCounterattackFeedbackToPlayerParticipants(t *testing
 	assertSystemMessageStringFrame(t, defenderFrames.frames[0], serverpackets.SystemMessageCounteredS1Attack, attacker.Name)
 }
 
+func TestGameClientLinkSendsLethalFeedbackToPlayerParticipants(t *testing.T) {
+	attackerFrames := &frameCapture{}
+	targetFrames := &frameCapture{}
+	attacker := newTestLivePlayer(t, 1, attackerFrames)
+	target := newTestLivePlayer(t, 2, targetFrames)
+	state := world.New()
+	state.AddPlayer(attacker)
+	state.AddPlayer(target)
+	link := &GameClientLink{world: state}
+
+	link.sendSkillHandlerResult(attacker, actorcast.EffectResult{Lethals: []handlerskill.Lethal{{
+		AttackerID: attacker.ObjectID(), TargetID: target.ObjectID(),
+	}}})
+
+	if len(attackerFrames.frames) != 1 {
+		t.Fatalf("attacker frames = %d, want 1", len(attackerFrames.frames))
+	}
+	assertStaticSystemMessageFrame(t, attackerFrames.frames[0], 1668)
+	if len(targetFrames.frames) != 1 {
+		t.Fatalf("target frames = %d, want 1", len(targetFrames.frames))
+	}
+	assertStaticSystemMessageFrame(t, targetFrames.frames[0], 1667)
+}
+
 func TestGameClientLinkSendsResistedSkillFeedbackToCaster(t *testing.T) {
 	frames := &frameCapture{}
 	caster := newTestLivePlayer(t, 1, frames)

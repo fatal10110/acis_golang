@@ -43,6 +43,12 @@ type Counterattack struct {
 	DefenderName string
 }
 
+// Lethal reports the participants in a successful lethal strike.
+type Lethal struct {
+	AttackerID int32
+	TargetID   int32
+}
+
 // Dodge reports a blow evasion and its two participants.
 type Dodge struct {
 	AttackerID   int32
@@ -62,6 +68,7 @@ type Resisted struct {
 type Result struct {
 	AttackFailed   int
 	Counterattacks []Counterattack
+	Lethals        []Lethal
 	Dodges         []Dodge
 	Resisted       []Resisted
 	CubicAdded     bool
