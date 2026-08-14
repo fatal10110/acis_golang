@@ -291,10 +291,10 @@ func TestGameClientLinkUsePotionNotEnoughItemsSendsNotEnoughItems(t *testing.T) 
 	assertSystemMessageIDFrame(t, capture.frames[0], serverpackets.SystemMessageNotEnoughItems)
 }
 
-// TestGameClientLinkUseDisabledPotionRejectsBeforeConsume verifies the
+// TestGameClientLinkUseDisabledPotionReturnsSilentlyBeforeConsume verifies the
 // item-window path honors per-item reuse disables before the consumable
-// handler can consume from the stack.
-func TestGameClientLinkUseDisabledPotionRejectsBeforeConsume(t *testing.T) {
+// handler can consume from the stack, without sending a response.
+func TestGameClientLinkUseDisabledPotionReturnsSilentlyBeforeConsume(t *testing.T) {
 	skills := consumableSkillTable(t)
 	const potionTemplate int32 = 1060
 	const objectID int32 = 703
@@ -325,10 +325,7 @@ func TestGameClientLinkUseDisabledPotionRejectsBeforeConsume(t *testing.T) {
 	live.DisableItem(objectID, time.Minute)
 
 	c.send(encodeUseItem(objectID, false))
-	assertSystemMessageSkillFrame(t, c.read(), serverpackets.SystemMessageS1PreparedForReuse, 2031, 1)
-	if reply := c.read(); reply[0] != serverpackets.OpcodeActionFailed {
-		t.Fatalf("disabled-item follow-up opcode = %#x, want ActionFailed (%#x)", reply[0], serverpackets.OpcodeActionFailed)
-	}
+	assertNoReply(t, c)
 
 	if got := live.Inventory().ItemByObjectID(objectID).Snapshot().Count; got != 5 {
 		t.Fatalf("stack count after disabled-item rejection = %d, want 5 (unchanged)", got)
