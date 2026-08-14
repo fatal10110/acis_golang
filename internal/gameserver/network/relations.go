@@ -69,12 +69,12 @@ func (l *GameClientLink) broadcastRelations(live *livePlayer) {
 			return
 		}
 		autoAttackable := relationAutoAttackable(karma, pvpFlag, live.InPvPZone(), observer.InPvPZone())
-		observer.SendFrame(serverpackets.FrameRelationChanged(serverpackets.RelationChangedInfo{
+		observer.BroadcastFrame(serverpackets.FrameRelationChanged(serverpackets.RelationChangedInfo{
 			ObjectID: live.ObjectID(), Relation: relation, IsAutoAttackable: autoAttackable,
 			Karma: int32(karma), PvPFlag: int32(pvpFlag),
 		}))
 		if hasPet {
-			observer.SendFrame(serverpackets.FrameRelationChanged(serverpackets.RelationChangedInfo{
+			observer.BroadcastFrame(serverpackets.FrameRelationChanged(serverpackets.RelationChangedInfo{
 				ObjectID: pet.ObjectID(), Relation: relation, IsAutoAttackable: autoAttackable,
 				Karma: int32(karma), PvPFlag: int32(pvpFlag),
 			}))
@@ -111,7 +111,7 @@ func (l *GameClientLink) broadcastSummonSpawnRelation(live *livePlayer, pet worl
 		if !ok {
 			return
 		}
-		observer.SendFrame(serverpackets.FrameRelationChanged(serverpackets.RelationChangedInfo{
+		observer.BroadcastFrame(serverpackets.FrameRelationChanged(serverpackets.RelationChangedInfo{
 			ObjectID: pet.ObjectID(), Relation: relation,
 			IsAutoAttackable: relationAutoAttackable(karma, pvpFlag, live.InPvPZone(), observer.InPvPZone()),
 			Karma:            int32(karma), PvPFlag: int32(pvpFlag),

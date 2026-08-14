@@ -97,3 +97,5 @@ func (r *allocFrameReceiver) SendFrame(frame wire.Frame) bool {
 	r.frames++
 	return true
 }
+
+func (r *allocFrameReceiver) BroadcastFrame(frame wire.Frame) bool { return r.SendFrame(frame) }

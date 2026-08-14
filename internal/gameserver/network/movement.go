@@ -169,9 +169,9 @@ func (l *GameClientLink) broadcastLiveFrame(live *livePlayer, frame func() wire.
 		if l.world == nil {
 			return
 		}
-		known := append([]world.Tracked(nil), live.appendKnown(l.world)...)
-		live.releaseKnown()
-		for _, o := range known {
+		known := live.known.SnapshotCopy(l.world, live)
+		defer known.Release()
+		for _, o := range known.Tracked() {
 			if receiver, ok := o.(frameReceiver); ok {
 				send(receiver)
 			}

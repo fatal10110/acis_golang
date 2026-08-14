@@ -176,12 +176,18 @@ func (c *Conn) abort() {
 	_ = c.Conn.Close()
 }
 
-func (c *Conn) send(queued queuedWrite) bool {
+func (c *Conn) send(queued queuedWrite) (ok bool) {
+	defer func() {
+		if recover() != nil {
+			ok = false
+		}
+	}()
 	c.mu.RLock()
-	defer c.mu.RUnlock()
 	if c.closed {
+		c.mu.RUnlock()
 		return false
 	}
+	c.mu.RUnlock()
 	select {
 	case <-c.stopping:
 		return false
@@ -195,12 +201,18 @@ func (c *Conn) send(queued queuedWrite) bool {
 	}
 }
 
-func (c *Conn) trySend(queued queuedWrite) bool {
+func (c *Conn) trySend(queued queuedWrite) (ok bool) {
+	defer func() {
+		if recover() != nil {
+			ok = false
+		}
+	}()
 	c.mu.RLock()
-	defer c.mu.RUnlock()
 	if c.closed {
+		c.mu.RUnlock()
 		return false
 	}
+	c.mu.RUnlock()
 	select {
 	case <-c.stopping:
 		return false
@@ -212,6 +224,12 @@ func (c *Conn) trySend(queued queuedWrite) bool {
 	default:
 		return false
 	}
+}
+
+func (c *Conn) queueFull() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.closed || len(c.out) == cap(c.out)
 }
 
 // Close stops accepting new sends, flushes any already queued, then

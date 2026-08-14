@@ -483,12 +483,12 @@ func (h *Hostile) broadcastFrame(build func() wire.Frame) error {
 	if h.world == nil {
 		return ErrNoWorld
 	}
-	known := append([]world.Tracked(nil), h.appendKnown()...)
-	h.releaseKnown()
+	known := h.known.SnapshotCopy(h.world, h)
+	defer known.Release()
 	var frame wire.Frame
 	built := false
 	defer func() { frame.Release() }()
-	for _, o := range known {
+	for _, o := range known.Tracked() {
 		if receiver, ok := o.(interface{ BroadcastFrame(wire.Frame) bool }); ok {
 			if !built {
 				frame = build()

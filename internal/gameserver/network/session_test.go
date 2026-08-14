@@ -137,6 +137,32 @@ func TestSessionTrySendFrameDisconnectsFullQueueWithoutBlocking(t *testing.T) {
 	}
 }
 
+func TestSessionTrySendFrameDoesNotWaitForBlockedSendFrame(t *testing.T) {
+	key := bytes.Repeat([]byte{0x11}, keySize)
+	cipher, err := NewCipher(key)
+	if err != nil {
+		t.Fatalf("NewCipher: %v", err)
+	}
+	s := NewSession(fullQueueConn(t), cipher)
+	blocked := make(chan struct{})
+	go func() {
+		close(blocked)
+		s.SendFrame(wire.BorrowedFrame(wire.FrameBytes([]byte{0x02, 0x00})))
+	}()
+	<-blocked
+
+	done := make(chan bool, 1)
+	go func() { done <- s.TrySendFrame(wire.BorrowedFrame(wire.FrameBytes([]byte{0x02, 0x00}))) }()
+	select {
+	case sent := <-done:
+		if sent {
+			t.Fatal("TrySendFrame returned true with a full queue")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("TrySendFrame waited for blocked SendFrame")
+	}
+}
+
 func TestSessionSendFrameArmsCipherSoFirstPacketIsCleartext(t *testing.T) {
 	s, client := pipeSessions(t)
 
