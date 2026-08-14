@@ -284,7 +284,7 @@ func fakeDeathExit(e *Effect) {
 	refresh(e.Effected)
 }
 
-func sit(effected any) {
+func sit(effected participant) {
 	if target, ok := effected.(stanceTarget); ok {
 		target.Sit()
 	} else if target, ok := effected.(sitTarget); ok {
