@@ -294,8 +294,11 @@ func (a *Actor) TryUseSkill(skillID int, target attackable.Combatant) bool {
 }
 
 // OutOfControl reports whether the owner cannot currently command this
-// summon.
-func (a *Actor) OutOfControl() bool { return a.disabled }
+// summon, matching Summon.isOutOfControl (Summon.java:296-298):
+// super.isOutOfControl() || isBetrayed().
+func (a *Actor) OutOfControl() bool {
+	return a.disabled || a.effects.IsAffected(effect.FlagBetrayed)
+}
 
 // OwnerCombatant returns the owning player when it can be targeted by AI.
 func (a *Actor) OwnerCombatant() attackable.Combatant {
