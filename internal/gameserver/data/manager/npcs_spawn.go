@@ -161,6 +161,7 @@ func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, lo
 func (n *Npcs) rewarderFor(hostile *npc.Hostile, tmpl *npc.Template) *deathRewards {
 	return &deathRewards{
 		hostile:    hostile,
+		state:      n.state,
 		tmpl:       tmpl,
 		categories: tmpl.Drops,
 		config:     n.rewards,

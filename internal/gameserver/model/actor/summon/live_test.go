@@ -605,6 +605,24 @@ func TestPetStateOmitsTemplateFallbackName(t *testing.T) {
 	}
 }
 
+func TestPetAddExpAndSpScalesExpOnlyAndPublishesStatus(t *testing.T) {
+	cfg := petmodel.DefaultConfig()
+	cfg.ExpRate = 1.5
+	pet := NewPet(PetConfig{ObjectID: 1, ControlItemID: 5, NPCID: 12077, Exp: 10, SP: 3, Config: &cfg})
+	updates := 0
+	pet.SetStatusUpdater(func() { updates++ })
+
+	pet.AddExpAndSp(10, 7)
+
+	_, state, ok := pet.PetState()
+	if !ok || state.Exp != 25 || state.SP != 10 {
+		t.Fatalf("PetState() = %+v, %v; want exp=25 sp=10", state, ok)
+	}
+	if updates != 1 {
+		t.Fatalf("status updates = %d, want 1", updates)
+	}
+}
+
 func waitForNoSummon(t *testing.T, state *world.State, ownerID int32) {
 	t.Helper()
 	deadline := time.After(time.Second)

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
@@ -247,6 +248,46 @@ func TestKillReward_SkipsItemOnIDExhaustion(t *testing.T) {
 
 	if len(ground.items) != 0 {
 		t.Fatalf("dropped %d items after id allocation failure, want 0", len(ground.items))
+	}
+}
+
+func TestPetRewardSharesAndRoundsBeforeRateScaling(t *testing.T) {
+	tests := []struct {
+		name                   string
+		expType                int
+		petDamage, totalDamage float64
+		exp                    int64
+		sp                     int
+		wantExp, wantSP        int
+	}{
+		{"damage share", -1, 1, 3, 100, 10, 33, 3},
+		{"configured share", 25, 0, 1, 100, 10, 75, 8},
+		{"ratio capped", 150, 0, 1, 100, 10, 0, 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			exp, sp := petReward(tt.expType, tt.petDamage, tt.totalDamage, tt.exp, tt.sp)
+			if exp != int64(tt.wantExp) || sp != tt.wantSP {
+				t.Fatalf("petReward() = (%d, %d), want (%d, %d)", exp, sp, tt.wantExp, tt.wantSP)
+			}
+		})
+	}
+}
+
+func TestRewardLeaderUsesCombinedOwnerAndPetDamage(t *testing.T) {
+	a := &player.Character{CharLevel: 10}
+	b := &player.Character{CharLevel: 20}
+	entries := []playerRewardEntry{
+		{actor: a, damage: 100},
+		{actor: b, damage: 120},
+	}
+
+	dealer, level := rewardLeader(entries)
+	if dealer != b {
+		t.Fatalf("max dealer = %p, want player with combined 120 damage", dealer)
+	}
+	if level != b.CharLevel {
+		t.Fatalf("highest level = %d, want %d", level, b.CharLevel)
 	}
 }
 

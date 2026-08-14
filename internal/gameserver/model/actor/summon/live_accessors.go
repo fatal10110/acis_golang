@@ -159,6 +159,28 @@ func (a *Actor) ScaledExpGain(rawExp int64) int64 {
 	return a.petConfig.ScaledExpGain(a.npcID, rawExp)
 }
 
+func (a *Actor) ExpType() int {
+	if a == nil || !a.isPet {
+		return 0
+	}
+	a.statusMu.RLock()
+	defer a.statusMu.RUnlock()
+	return a.expType
+}
+
+// AddExpAndSp grants a pet its raw kill-reward share. Experience uses the
+// pet-specific configured rate; SP is deliberately unscaled.
+func (a *Actor) AddExpAndSp(rawExp int64, sp int) {
+	if a == nil || !a.isPet {
+		return
+	}
+	a.statusMu.Lock()
+	a.exp += a.ScaledExpGain(rawExp)
+	a.sp += sp
+	a.statusMu.Unlock()
+	a.UpdateStatus()
+}
+
 // CanWearPetItem reports whether this pet can equip tmpl.
 func (a *Actor) CanWearPetItem(tmpl *item.Template) bool {
 	if a == nil || tmpl == nil {
