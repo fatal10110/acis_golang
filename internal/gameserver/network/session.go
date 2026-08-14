@@ -13,6 +13,8 @@ import (
 // bounds the allocation ReadFrame makes for a frame's payload.
 const frameHeaderSize = wire.FrameHeaderSize
 
+// trySendLockAttempts lets brief healthy contention clear before the blocking
+// fallback; each retry checks for saturation and aborts a slow peer instead.
 const trySendLockAttempts = 64
 
 // Session pairs a connection with the rolling cipher securing it. Encrypting
