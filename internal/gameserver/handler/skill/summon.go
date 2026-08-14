@@ -3,6 +3,7 @@ package skill
 import (
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
@@ -61,7 +62,7 @@ type summonFriendItemConsumer interface {
 }
 
 type summonPartyProvider interface {
-	PartyMembers() []any
+	PartyMembers() []creature.DeathActor
 }
 
 type summonFriendHandler struct{}
@@ -109,11 +110,11 @@ func canSummonFriend(actor summonFriendActorState) bool {
 	return !actor.Mounted() && !actor.OlympiadMode() && !actor.ObserverMode() && !actor.NoSummonFriendZone()
 }
 
-// canBeSummoned takes target untyped because a SUMMON_PARTY cast walks the
-// caster's own party list rather than a resolved target set; a party member
-// that isn't actor-shaped fails the self-exclusion check the same way an
-// unrelated value did before.
-func canBeSummoned(caster Actor, target any) bool {
+// canBeSummoned takes target as creature.DeathActor because a SUMMON_PARTY
+// cast walks the caster's own party list rather than a resolved target set;
+// a party member that isn't actor-shaped fails the self-exclusion check the
+// same way an unrelated value did before.
+func canBeSummoned(caster Actor, target creature.DeathActor) bool {
 	other, _ := target.(Actor)
 	if sameObject(caster, other) {
 		return false
@@ -131,7 +132,7 @@ func canBeSummoned(caster Actor, target any) bool {
 	return !state.ObserverMode() && !state.NoSummonFriendZone()
 }
 
-func teleportSummonedFriend(caster summonFriendCaster, target any, skill modelskill.Definition) {
+func teleportSummonedFriend(caster summonFriendCaster, target creature.DeathActor, skill modelskill.Definition) {
 	if skill.TargetConsumeID > 0 && skill.TargetConsumeCount > 0 {
 		consumer, ok := target.(summonFriendItemConsumer)
 		if !ok || consumer.ItemCount(skill.TargetConsumeID) < skill.TargetConsumeCount {

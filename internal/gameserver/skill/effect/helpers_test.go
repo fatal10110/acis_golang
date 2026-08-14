@@ -5,6 +5,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/worldobject"
 )
 
 // namedActor is a minimal participant with a fixed String() so tests that
@@ -31,7 +32,7 @@ type liveEffectTarget struct {
 	healProficiency   float64
 	healEffectiveness float64
 	rechargeRate      func(float64) float64
-	target            any
+	target            worldobject.Object
 	heading           int
 	bluffExempt       bool
 	isPlayer          bool
@@ -61,7 +62,7 @@ func (t *liveEffectTarget) HP() float64 { return t.hp }
 
 func (t *liveEffectTarget) MPValue() float64 { return t.mp }
 
-func (t *liveEffectTarget) ReduceHPByDOT(damage float64, effector any, isDOT bool) {
+func (t *liveEffectTarget) ReduceHPByDOT(damage float64, effector Participant, isDOT bool) {
 	t.hp -= damage
 	t.events = append(t.events, fmt.Sprintf("dot:%g:%v", damage, effector))
 }
@@ -117,7 +118,7 @@ func (t *liveEffectTarget) FearImmune() bool { return t.fearImmune }
 
 func (t *liveEffectTarget) Playable() bool { return t.playable }
 
-func (t *liveEffectTarget) FleeFrom(effector any, distance int) {
+func (t *liveEffectTarget) FleeFrom(effector Participant, distance int) {
 	t.events = append(t.events, fmt.Sprintf("flee:%v:%d", effector, distance))
 }
 
@@ -181,14 +182,14 @@ func (t *liveEffectTarget) RechargeMP(base float64) float64 {
 	return t.rechargeRate(base)
 }
 
-func (t *liveEffectTarget) CurrentTarget() any { return t.target }
+func (t *liveEffectTarget) CurrentTarget() worldobject.Object { return t.target }
 
-func (t *liveEffectTarget) SetTarget(target any) {
+func (t *liveEffectTarget) SetTarget(target worldobject.Object) {
 	t.target = target
 	t.events = append(t.events, fmt.Sprintf("set-target:%v", target))
 }
 
-func (t *liveEffectTarget) TryToAttack(target any) {
+func (t *liveEffectTarget) TryToAttack(target worldobject.Object) {
 	t.events = append(t.events, fmt.Sprintf("try-attack:%v", target))
 }
 

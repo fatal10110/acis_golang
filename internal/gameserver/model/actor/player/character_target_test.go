@@ -41,10 +41,10 @@ func TestCharacterRetargetableOnAggressionRetargetsWhenNotAlreadyTargetingCaster
 	var attacked bool
 	target.SetAttackTargetHook(func(world.Tracked) { attacked = true })
 
-	if got := target.CurrentTarget(); got != any(world.Tracked(other)) {
+	if got := target.CurrentTarget(); got != world.Tracked(other) {
 		t.Fatalf("CurrentTarget() = %v, want %v", got, other)
 	}
-	target.SetTarget(any(caster))
+	target.SetTarget(caster)
 
 	if got := target.Target(); got != world.Tracked(caster) {
 		t.Fatalf("Target() after SetTarget = %v, want caster", got)
@@ -66,9 +66,9 @@ func TestCharacterRetargetableOnAggressionAttacksWhenAlreadyTargetingCaster(t *t
 	var attackedWith any
 	target.SetAttackTargetHook(func(t world.Tracked) { attackedWith = t })
 
-	target.AttackTarget(any(caster))
+	target.AttackTarget(caster)
 
-	if attackedWith != any(world.Tracked(caster)) {
+	if attackedWith != world.Tracked(caster) {
 		t.Fatalf("AttackTarget hook called with %v, want caster", attackedWith)
 	}
 	if got := target.Target(); got != world.Tracked(caster) {
@@ -84,7 +84,7 @@ func TestCharacterTryToAttackDelegatesToAttackTarget(t *testing.T) {
 
 	target.TryToAttack(caster)
 
-	if attackedWith != any(world.Tracked(caster)) {
+	if attackedWith != world.Tracked(caster) {
 		t.Fatalf("attack target hook called with %v, want caster", attackedWith)
 	}
 }

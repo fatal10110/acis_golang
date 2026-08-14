@@ -1,47 +1,47 @@
 package effect
 
-func abortAll(target participant) {
+func abortAll(target Participant) {
 	if target, ok := target.(aborter); ok {
 		target.AbortAll(false)
 	}
 }
 
-func refresh(target participant) {
+func refresh(target Participant) {
 	if target, ok := target.(abnormalUpdater); ok {
 		target.UpdateAbnormalEffect()
 	}
 }
 
-func startAbnormalEffect(target participant, mask int) {
+func startAbnormalEffect(target Participant, mask int) {
 	if target, ok := target.(interface{ StartAbnormalEffect(int) }); ok {
 		target.StartAbnormalEffect(mask)
 	}
 	refresh(target)
 }
 
-func stopAbnormalEffect(target participant, mask int) {
+func stopAbnormalEffect(target Participant, mask int) {
 	if target, ok := target.(interface{ StopAbnormalEffect(int) }); ok {
 		target.StopAbnormalEffect(mask)
 	}
 	refresh(target)
 }
 
-func fearImmune(target participant) bool {
+func fearImmune(target Participant) bool {
 	t, ok := target.(fearImmuneTarget)
 	return ok && t.FearImmune()
 }
 
-func isAfraid(target participant) bool {
+func isAfraid(target Participant) bool {
 	t, ok := target.(afraidTarget)
 	return ok && t.Afraid()
 }
 
-func isPlayable(target participant) bool {
+func isPlayable(target Participant) bool {
 	t, ok := target.(playableTarget)
 	return ok && t.Playable()
 }
 
-func isPlayer(target participant) bool {
+func isPlayer(target Participant) bool {
 	t, ok := target.(playerTarget)
 	return ok && t.IsPlayer()
 }

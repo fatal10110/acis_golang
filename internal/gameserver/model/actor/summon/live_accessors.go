@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/worldobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -432,10 +433,10 @@ func (a *Actor) SetAI(brain AI) {
 func (a *Actor) SetOnDespawn(f func()) { a.onDespawn = f }
 
 // CurrentTarget returns the summon target selected by its current command.
-func (a *Actor) CurrentTarget() any { return a.target }
+func (a *Actor) CurrentTarget() worldobject.Object { return a.target }
 
 // SetTarget updates the summon target without issuing an owner-visible packet.
-func (a *Actor) SetTarget(target any) {
+func (a *Actor) SetTarget(target worldobject.Object) {
 	if target == nil {
 		a.target = nil
 		return
@@ -447,11 +448,11 @@ func (a *Actor) SetTarget(target any) {
 }
 
 // AttackTarget forwards an aggression-triggered attack to the summon AI.
-func (a *Actor) AttackTarget(target any) { a.TryToAttack(target) }
+func (a *Actor) AttackTarget(target worldobject.Object) { a.TryToAttack(target) }
 
 // TryToAttack forwards an attack request to the attached AI when target is
 // a live combatant.
-func (a *Actor) TryToAttack(target any) {
+func (a *Actor) TryToAttack(target worldobject.Object) {
 	combatant, ok := target.(attackable.Combatant)
 	if !ok || a.brain == nil {
 		return
@@ -461,7 +462,7 @@ func (a *Actor) TryToAttack(target any) {
 
 // TryToFollow forwards a follow request to the attached AI when target is
 // a live combatant.
-func (a *Actor) TryToFollow(target any) {
+func (a *Actor) TryToFollow(target worldobject.Object) {
 	combatant, ok := target.(attackable.Combatant)
 	if !ok || a.brain == nil {
 		return

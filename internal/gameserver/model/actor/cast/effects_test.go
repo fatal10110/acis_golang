@@ -5,6 +5,7 @@ import (
 
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
@@ -26,13 +27,13 @@ type pvpEffectsActor struct {
 }
 
 type pvpSkillCall struct {
-	targets   []any
+	targets   []creature.DeathActor
 	offensive bool
 	skillType string
 }
 
-func (a *pvpEffectsActor) NotePvPSkillTargets(targets []any, offensive bool, skillType string) {
-	a.calls = append(a.calls, pvpSkillCall{targets: append([]any(nil), targets...), offensive: offensive, skillType: skillType})
+func (a *pvpEffectsActor) NotePvPSkillTargets(targets []creature.DeathActor, offensive bool, skillType string) {
+	a.calls = append(a.calls, pvpSkillCall{targets: append([]creature.DeathActor(nil), targets...), offensive: offensive, skillType: skillType})
 }
 
 func (a *effectsActor) ObjectID() int32                { return a.id }

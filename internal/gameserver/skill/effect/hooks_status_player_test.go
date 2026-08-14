@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/worldobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
 
@@ -26,11 +27,11 @@ func (s *betraySummon) Dead() bool { return false }
 
 func (s *betraySummon) OwnerCombatant() attackable.Combatant { return s.owner }
 
-func (s *betraySummon) TryToAttack(target any) {
+func (s *betraySummon) TryToAttack(target worldobject.Object) {
 	s.events = append(s.events, "attack:"+effectObjectID(target))
 }
 
-func (s *betraySummon) TryToFollow(target any) {
+func (s *betraySummon) TryToFollow(target worldobject.Object) {
 	s.events = append(s.events, "follow:"+effectObjectID(target))
 }
 

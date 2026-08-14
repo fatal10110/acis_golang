@@ -51,7 +51,7 @@ func healOverTimeStart(e *Effect) bool {
 // cast and item paths — which send their own batched StatusUpdate at the
 // call site — nothing else would tell the client the tick happened. Actors
 // with no broadcast hook are left alone.
-func broadcastStatus(effected participant) {
+func broadcastStatus(effected Participant) {
 	if b, ok := effected.(statusBroadcaster); ok {
 		b.BroadcastStatus()
 	}
@@ -61,7 +61,7 @@ func broadcastStatus(effected participant) {
 // the actors whose broadcast actually includes MP (see mpStatusBroadcaster).
 // Actors with no such hook — every non-player target — are left alone,
 // matching the reference's Player-only unconditional CUR_MP broadcast.
-func broadcastMPStatus(effected participant) {
+func broadcastMPStatus(effected Participant) {
 	if b, ok := effected.(mpStatusBroadcaster); ok {
 		b.BroadcastMPStatus()
 	}

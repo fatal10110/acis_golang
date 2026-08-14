@@ -3,6 +3,7 @@ package cast
 import (
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cubic"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
@@ -31,7 +32,7 @@ type EffectResult struct {
 }
 
 type pvpSkillNotifier interface {
-	NotePvPSkillTargets([]any, bool, string)
+	NotePvPSkillTargets([]creature.DeathActor, bool, string)
 }
 
 // ApplyEffects resolves def's affected target set from caster and the
@@ -138,7 +139,7 @@ func dispatchEffects(handlers EffectHandlers, caster any, affected []skilltarget
 		castTargets[i] = t
 	}
 	if notifier, ok := caster.(pvpSkillNotifier); ok {
-		notifyTargets := make([]any, len(castTargets))
+		notifyTargets := make([]creature.DeathActor, len(castTargets))
 		for i, t := range castTargets {
 			notifyTargets[i] = t
 		}

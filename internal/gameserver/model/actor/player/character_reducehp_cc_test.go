@@ -10,12 +10,16 @@ import (
 // absorption tests (a distinct actor from the target, unlike self-damage).
 type reduceHPPlayableAttacker struct{}
 
-func (reduceHPPlayableAttacker) Playable() bool { return true }
+func (reduceHPPlayableAttacker) ObjectID() int32 { return 99 }
+func (reduceHPPlayableAttacker) Dead() bool      { return false }
+func (reduceHPPlayableAttacker) Playable() bool  { return true }
 
 // reduceHPNpcAttacker is a non-Playable attacker stub.
 type reduceHPNpcAttacker struct{}
 
-func (reduceHPNpcAttacker) Playable() bool { return false }
+func (reduceHPNpcAttacker) ObjectID() int32 { return 98 }
+func (reduceHPNpcAttacker) Dead() bool      { return false }
+func (reduceHPNpcAttacker) Playable() bool  { return false }
 
 func TestReduceHPDrainsCPBeforeHPForPlayableAttacker(t *testing.T) {
 	c := liveCharacter(1, combatTemplate(), combatItems())

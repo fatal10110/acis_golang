@@ -3,7 +3,9 @@ package skill
 import (
 	"testing"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/worldobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 )
@@ -33,9 +35,9 @@ type continuousFake struct {
 	// what arguments.
 	aggressionSource  any
 	aggressionPower   int
-	currentTarget     any
-	setTargetCalls    []any
-	attackTargetCalls []any
+	currentTarget     worldobject.Object
+	setTargetCalls    []worldobject.Object
+	attackTargetCalls []worldobject.Object
 }
 
 func newContinuousFake(id int32) *continuousFake {
@@ -69,18 +71,18 @@ func (f *continuousFake) SkillReflectInput(modelskill.Definition) formulas.Skill
 	return f.skillReflectInput
 }
 
-func (f *continuousFake) NotifyAggression(source any, power int) {
+func (f *continuousFake) NotifyAggression(source creature.DeathActor, power int) {
 	f.aggressionSource = source
 	f.aggressionPower = power
 }
 
-func (f *continuousFake) CurrentTarget() any { return f.currentTarget }
+func (f *continuousFake) CurrentTarget() worldobject.Object { return f.currentTarget }
 
-func (f *continuousFake) SetTarget(target any) {
+func (f *continuousFake) SetTarget(target worldobject.Object) {
 	f.setTargetCalls = append(f.setTargetCalls, target)
 }
 
-func (f *continuousFake) AttackTarget(target any) {
+func (f *continuousFake) AttackTarget(target worldobject.Object) {
 	f.attackTargetCalls = append(f.attackTargetCalls, target)
 }
 
