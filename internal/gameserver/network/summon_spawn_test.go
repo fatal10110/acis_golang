@@ -19,6 +19,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -98,6 +99,7 @@ func newSummonTestLink(t *testing.T) (*GameClientLink, *world.State) {
 	state := world.New()
 	link := NewGameClientLink(GameClientLinkConfig{
 		World:         state,
+		AI:            task.NewAI(state),
 		NPCs:          npcs,
 		SummonItems:   summonItems,
 		PetStore:      fakePetStoreNoSaved{},
@@ -106,6 +108,27 @@ func newSummonTestLink(t *testing.T) (*GameClientLink, *world.State) {
 		ItemTemplates: testItemTemplates(),
 	})
 	return link, state
+}
+
+func TestGameSummonSpawnerRegistersPetWithAITask(t *testing.T) {
+	link, state := newSummonTestLink(t)
+	live := newTestLivePlayer(t, 1, &frameCapture{})
+	state.Spawn(live, 0, 0, 0, 0)
+	inst := &item.Instance{ObjectID: 500, TemplateID: summonTestCollarTemplateID, OwnerID: live.ObjectID()}
+
+	if !(&gameSummonSpawner{link: link, live: live}).SpawnPet(live.Character, inst) {
+		t.Fatal("SpawnPet returned false")
+	}
+	pet, ok := state.Summon(live.ObjectID())
+	if !ok {
+		t.Fatal("pet not registered in world.State")
+	}
+
+	link.ai.Tick()
+
+	if _, ok := state.Object(pet.ObjectID()); !ok {
+		t.Fatal("AI task removed the live pet")
+	}
 }
 
 func TestUseSummonItemMountsWyvern(t *testing.T) {
