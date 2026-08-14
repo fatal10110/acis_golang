@@ -15,10 +15,11 @@ type Live struct {
 	movement move.CreatureMove
 	effects  *effect.List
 
-	// stateMu guards paralyzed, immobilized and teleporting.
+	// stateMu guards paralyzed, immobilized, invul and teleporting.
 	stateMu     sync.RWMutex
 	paralyzed   bool
 	immobilized bool
+	invul       bool
 	teleporting bool
 }
 
@@ -157,7 +158,27 @@ func (l *Live) SetParalyzed(v bool) bool {
 
 // Invul reports whether this creature is currently invulnerable.
 func (l *Live) Invul() bool {
-	return false
+	if l == nil {
+		return false
+	}
+	l.stateMu.RLock()
+	defer l.stateMu.RUnlock()
+	return l.invul || l.teleporting
+}
+
+// SetInvul sets or clears this creature's invulnerability flag and reports
+// whether it changed. Teleporting creatures remain invulnerable.
+func (l *Live) SetInvul(v bool) bool {
+	if l == nil {
+		return false
+	}
+	l.stateMu.Lock()
+	defer l.stateMu.Unlock()
+	if l.invul == v {
+		return false
+	}
+	l.invul = v
+	return true
 }
 
 // Immobilized reports whether this creature's movement-lock flag is set.

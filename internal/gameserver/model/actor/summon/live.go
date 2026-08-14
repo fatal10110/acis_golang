@@ -39,7 +39,7 @@ type Owner interface {
 // Actor is a live pet or servitor placed in world.State next to its owner.
 //
 // State methods guard the embedded Presence. level, name, fed,
-// belowUnsummonLimit, and lifetime are guarded by statusMu; HP, MP, and dead
+// belowUnsummonLimit, lifetime, and invul are guarded by statusMu; HP, MP, and dead
 // are guarded by vitals.mu. Both are safe to read from any goroutine,
 // including the world-visibility goroutine driving Discover. The remaining
 // fields are mutated by the goroutine handling the owner connection or by the
@@ -56,7 +56,7 @@ type Actor struct {
 	radius  float64
 	passive bool
 
-	// statusMu guards level, name, fed, belowUnsummonLimit, lifetime, and
+	// statusMu guards level, name, fed, belowUnsummonLimit, lifetime, invul, and
 	// statusUpdater:
 	// petInfoSnapshot (internal/gameserver/network/visibility.go) reads them
 	// from the world-visibility goroutine via Level/Name/Fed/Lifetime while
@@ -64,6 +64,7 @@ type Actor struct {
 	// world.Observer's concurrency contract
 	// (internal/gameserver/world/visibility.go).
 	statusMu       sync.RWMutex
+	invul          bool
 	level          int
 	name           string
 	named          bool

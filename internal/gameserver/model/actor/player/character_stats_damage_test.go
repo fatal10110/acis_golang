@@ -263,6 +263,71 @@ func TestCharacterBlowInputSkipsShieldRollOnMiss(t *testing.T) {
 	}
 }
 
+func TestCharacterDamageInputsRejectInvulnerableTargetAndNoDamagePermission(t *testing.T) {
+	tmpl := combatTemplate()
+	caster := liveCharacter(1, tmpl, combatItems())
+	target := liveCharacter(2, tmpl, combatItems())
+	def := modelskill.Definition{Power: 100, Magic: true}
+
+	target.SetSpawnProtection(true)
+	if _, ok := target.PhysicalSkillInput(caster, def); ok {
+		t.Fatal("PhysicalSkillInput accepted an invulnerable target")
+	}
+	if _, ok := target.MagicDamageInput(caster, def); ok {
+		t.Fatal("MagicDamageInput accepted an invulnerable target")
+	}
+	if _, ok := target.BlowInput(caster, def); ok {
+		t.Fatal("BlowInput accepted an invulnerable target")
+	}
+	if _, ok := target.ManaDamageInput(caster, def); ok {
+		t.Fatal("ManaDamageInput accepted an invulnerable target")
+	}
+
+	target.SetSpawnProtection(false)
+	caster.SetCanGiveDamage(false)
+	if _, ok := target.PhysicalSkillInput(caster, def); ok {
+		t.Fatal("PhysicalSkillInput accepted an attacker without damage permission")
+	}
+	if _, ok := target.MagicDamageInput(caster, def); ok {
+		t.Fatal("MagicDamageInput accepted an attacker without damage permission")
+	}
+	if _, ok := target.BlowInput(caster, def); ok {
+		t.Fatal("BlowInput accepted an attacker without damage permission")
+	}
+	if _, ok := target.ManaDamageInput(caster, def); ok {
+		t.Fatal("ManaDamageInput accepted an attacker without damage permission")
+	}
+}
+
+func TestCharacterLethalInputRejectsAttackerWithoutDamagePermission(t *testing.T) {
+	tmpl := combatTemplate()
+	caster := liveCharacter(1, tmpl, combatItems())
+	target := liveCharacter(2, tmpl, combatItems())
+	caster.SetCanGiveDamage(false)
+	if _, ok := target.LethalInput(caster, modelskill.Definition{LethalChance1: 100}); ok {
+		t.Fatal("LethalInput accepted an attacker without damage permission")
+	}
+}
+
+func TestCharacterReduceHPIgnoresInvulnerableTargetAndNoDamagePermission(t *testing.T) {
+	tmpl := combatTemplate()
+	caster := liveCharacter(1, tmpl, combatItems())
+	target := liveCharacter(2, tmpl, combatItems())
+	target.SetHP(100)
+	target.SetSpawnProtection(true)
+	target.ReduceHP(10, caster, modelskill.Definition{})
+	if got := target.HP(); got != 100 {
+		t.Fatalf("HP after invulnerable damage = %v, want 100", got)
+	}
+
+	target.SetSpawnProtection(false)
+	caster.SetCanGiveDamage(false)
+	target.ReduceHP(10, caster, modelskill.Definition{})
+	if got := target.HP(); got != 100 {
+		t.Fatalf("HP after denied attacker damage = %v, want 100", got)
+	}
+}
+
 func TestCharacterDamageInputsUseChargedShots(t *testing.T) {
 	tmpl := combatTemplate()
 	tmpl.MAtk = 25

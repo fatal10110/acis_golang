@@ -47,12 +47,34 @@ type shieldDefenseActor interface {
 	ShieldDefense(caster any, def modelskill.Definition, isCrit bool) formulas.ShieldDefense
 }
 
+type invulnerableActor interface{ Invul() bool }
+type damagePermissionActor interface{ CanGiveDamage() bool }
+
+func damageBlocked(attacker, target any) bool {
+	if target, ok := target.(invulnerableActor); ok && target.Invul() {
+		return true
+	}
+	return !CanDealDamage(attacker)
+}
+
+// CanDealDamage reports whether attacker is permitted to inflict damage.
+// Actors without an access-level permission surface are ordinary combatants.
+func CanDealDamage(attacker any) bool {
+	if attacker, ok := attacker.(damagePermissionActor); ok {
+		return attacker.CanGiveDamage()
+	}
+	return true
+}
+
 // ResolvePhysicalSkillInput builds a physical-skill damage input from the
 // caster/target pair. raceMul is supplied by NPC targets whose template race
 // has a matching attack/resistance stat pair.
 func ResolvePhysicalSkillInput(caster any, target FormulaActor, def modelskill.Definition, pvp bool, raceMul float64) (formulas.PhysicalSkillInput, bool) {
 	attacker, ok := caster.(FormulaActor)
 	if !ok || attacker == nil || target == nil {
+		return formulas.PhysicalSkillInput{}, false
+	}
+	if damageBlocked(attacker, target) {
 		return formulas.PhysicalSkillInput{}, false
 	}
 	soulshot := attacker.SoulshotCharged()
@@ -95,6 +117,9 @@ func ResolveMagicDamageInput(caster any, target FormulaActor, def modelskill.Def
 	if !ok || attacker == nil || target == nil {
 		return formulas.MagicDamageInput{}, false
 	}
+	if damageBlocked(attacker, target) {
+		return formulas.MagicDamageInput{}, false
+	}
 	sps, bsps := SpiritshotFlags(attacker)
 	return formulas.MagicDamageInput{
 		MAtk:            attacker.MAtk(),
@@ -112,6 +137,9 @@ func ResolveMagicDamageInput(caster any, target FormulaActor, def modelskill.Def
 func ResolveBlowInput(caster any, target FormulaActor, def modelskill.Definition, pvp bool) (formulas.BlowInput, bool) {
 	attacker, ok := caster.(FormulaActor)
 	if !ok || attacker == nil || target == nil {
+		return formulas.BlowInput{}, false
+	}
+	if damageBlocked(attacker, target) {
 		return formulas.BlowInput{}, false
 	}
 	soulshot := attacker.SoulshotCharged()
@@ -179,6 +207,9 @@ func ResolveBlowInput(caster any, target FormulaActor, def modelskill.Definition
 func ResolveManaDamageInput(caster any, target FormulaActor, maxMP float64, def modelskill.Definition) (formulas.ManaDamageInput, bool) {
 	attacker, ok := caster.(FormulaActor)
 	if !ok || attacker == nil || target == nil {
+		return formulas.ManaDamageInput{}, false
+	}
+	if damageBlocked(attacker, target) {
 		return formulas.ManaDamageInput{}, false
 	}
 	sps, bsps := SpiritshotFlags(attacker)

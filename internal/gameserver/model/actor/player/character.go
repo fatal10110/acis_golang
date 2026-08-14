@@ -167,6 +167,9 @@ type Character struct {
 	mountNPCID           int32
 	mountObjectID        int32
 	transformed          bool
+	spawnProtected       bool
+	damagePermissionSet  bool
+	canGiveDamage        bool
 	operating            bool
 	fishing              bool
 	hero                 bool

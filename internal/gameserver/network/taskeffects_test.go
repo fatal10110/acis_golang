@@ -77,6 +77,22 @@ func TestResolveIsGMUsesAccessLevelsIsGMFlag(t *testing.T) {
 	}
 }
 
+func TestResolveCanGiveDamageUsesAccessLevelFlag(t *testing.T) {
+	data, err := admin.NewData([]admin.AccessLevel{
+		{Level: 0, GiveDamage: true},
+		{Level: 2, GiveDamage: false},
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !resolveCanGiveDamage(data, 0) {
+		t.Fatal("user access level was denied damage permission")
+	}
+	if resolveCanGiveDamage(data, 2) {
+		t.Fatal("restricted access level was granted damage permission")
+	}
+}
+
 func TestPvPZoneMembershipTracksZoneTransitions(t *testing.T) {
 	state := world.New()
 	live := newTestLivePlayer(t, 100, &frameCapture{})
