@@ -7,6 +7,14 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
+// participant is the surface every cast participant shares: what
+// Effect.Effector and Effect.Effected are set from. Individual hooks assert
+// it to one of the narrower interfaces below for the capability they need.
+type participant interface {
+	ObjectID() int32
+	Dead() bool
+}
+
 type dotTarget interface {
 	Dead() bool
 	HP() float64

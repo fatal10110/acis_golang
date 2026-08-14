@@ -60,7 +60,7 @@ func TestDamageOverTimeHookMutatesLiveTarget(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error: %v", err)
 	}
-	e.Effector = "caster"
+	e.Effector = namedActor("caster")
 	e.Effected = target
 
 	if !e.ActionTime() {

@@ -71,7 +71,7 @@ func TestFearEffectHooksFleeAndRejectImmuneTargets(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error: %v", err)
 	}
-	e.Effector = "caster"
+	e.Effector = namedActor("caster")
 	e.Effected = target
 
 	list := NewList(nil)
@@ -152,7 +152,7 @@ func TestFearEffectHalvesTickCountAgainstPlayableForListedSkillsOnly(t *testing.
 			if err != nil {
 				t.Fatalf("New() error: %v", err)
 			}
-			e.Effector = "caster"
+			e.Effector = namedActor("caster")
 			e.Effected = target
 
 			e.OnStart(e)
@@ -212,7 +212,7 @@ func TestAbortCastEffectHook(t *testing.T) {
 			if tt.selfCast {
 				e.Effector = target
 			} else {
-				e.Effector = "caster"
+				e.Effector = namedActor("caster")
 			}
 
 			NewList(nil).Add(e)
@@ -528,9 +528,11 @@ func TestThrowUpEffectTruncatesDistanceBeforeAddingFlyRadius(t *testing.T) {
 
 type flightResolverOnly struct{ x, y, z int }
 
-func (t *flightResolverOnly) X() int { return t.x }
-func (t *flightResolverOnly) Y() int { return t.y }
-func (t *flightResolverOnly) Z() int { return t.z }
+func (t *flightResolverOnly) ObjectID() int32 { return 0 }
+func (t *flightResolverOnly) Dead() bool      { return false }
+func (t *flightResolverOnly) X() int          { return t.x }
+func (t *flightResolverOnly) Y() int          { return t.y }
+func (t *flightResolverOnly) Z() int          { return t.z }
 func (t *flightResolverOnly) ValidLocation(_, _, _, x, y, z int) location.Location {
 	return location.Location{X: x, Y: y, Z: z}
 }
