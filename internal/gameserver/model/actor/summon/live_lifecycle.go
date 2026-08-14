@@ -185,7 +185,7 @@ func (a *Actor) resolveRequest(ctx CommandContext) Request {
 		HasSummon:              a != nil,
 		IsPet:                  a.isPet,
 		SummonIsDead:           dead,
-		OutOfControl:           a.disabled,
+		OutOfControl:           a.OutOfControl(),
 		InCombat:               a.combat,
 		IsAttackingNow:         a.attack,
 		HasTarget:              ctx.Target != nil,
