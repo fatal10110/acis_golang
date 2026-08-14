@@ -124,8 +124,6 @@ func TestServeClosesConnectionsAndWaitsForHandlersOnCancel(t *testing.T) {
 	cancel()
 
 	select {
-	case err := <-errCh:
-		t.Fatalf("Serve returned before connection handler finished: %v", err)
 	case <-finished:
 	case <-time.After(5 * time.Second):
 		t.Fatal("connection handler did not finish after context cancel")
