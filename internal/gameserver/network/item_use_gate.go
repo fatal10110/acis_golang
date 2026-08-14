@@ -4,32 +4,9 @@ import (
 	"strconv"
 	"strings"
 
-	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
-	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
-
-func (l *GameClientLink) rejectDisabledItemUse(live *livePlayer, tmpl *item.Template) {
-	if def, ok := l.firstAttachedItemSkill(tmpl); ok {
-		sendMagicCastFailure(live, def, actorcast.ErrSkillDisabled)
-		return
-	}
-	live.SendFrame(serverpackets.FrameActionFailed())
-}
-
-func (l *GameClientLink) firstAttachedItemSkill(tmpl *item.Template) (modelskill.Definition, bool) {
-	if l == nil || l.skills == nil || tmpl == nil {
-		return modelskill.Definition{}, false
-	}
-	for _, ref := range tmpl.AttachedSkills {
-		def, ok := l.skills.Definition(modelskill.Ref{ID: modelskill.ID(ref.ID), Level: int(ref.Level)})
-		if ok {
-			return def, true
-		}
-	}
-	return modelskill.Definition{}, false
-}
 
 func rejectUseItemConditions(live *livePlayer, tmpl *item.Template) bool {
 	if live == nil || tmpl == nil || len(tmpl.UseConditions) == 0 {
