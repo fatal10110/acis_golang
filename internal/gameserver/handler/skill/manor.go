@@ -24,7 +24,7 @@ type seedState interface {
 }
 
 type seedableTarget interface {
-	Dead() bool
+	Actor
 	Level() int
 	SeedState() seedState
 }
@@ -38,7 +38,7 @@ type seedItem interface {
 }
 
 type sowCaster interface {
-	ObjectID() int32
+	Actor
 	Level() int
 }
 
@@ -84,7 +84,7 @@ func (sowHandler) Use(cast Cast) {
 }
 
 type harvestCaster interface {
-	ObjectID() int32
+	Actor
 	Level() int
 }
 

@@ -37,7 +37,7 @@ type rechargeTarget interface {
 }
 
 type cpHealTarget interface {
-	Dead() bool
+	Actor
 	Invulnerable() bool
 	CP() float64
 	MaxCPValue() float64
@@ -45,14 +45,14 @@ type cpHealTarget interface {
 }
 
 type cpDamagePercentTarget interface {
-	Dead() bool
+	Actor
 	Invulnerable() bool
 	CP() float64
 	SetCP(float64)
 }
 
 type balanceLifeTarget interface {
-	Dead() bool
+	Actor
 	HP() float64
 	MaxHPValue() float64
 	SetHP(float64)
@@ -63,7 +63,7 @@ type expSPTarget interface {
 }
 
 type realDamageTarget interface {
-	Dead() bool
+	Actor
 	HP() float64
 	SetHP(float64)
 	Die(killer any)

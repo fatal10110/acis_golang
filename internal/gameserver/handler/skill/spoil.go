@@ -7,13 +7,13 @@ import (
 )
 
 type spoilableTarget interface {
-	Dead() bool
+	Actor
 	Level() int
 	SpoilPool() *item.SpoilPool
 }
 
 type magicCaster interface {
-	ObjectID() int32
+	Actor
 	Level() int
 }
 

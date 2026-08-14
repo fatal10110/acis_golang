@@ -12,7 +12,6 @@ import (
 
 type disablerTarget interface {
 	effectListTarget
-	Dead() bool
 	Invul() bool
 	Paralyzed() bool
 }

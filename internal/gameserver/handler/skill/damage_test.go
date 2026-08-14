@@ -652,3 +652,51 @@ func TestBlowCounterAndReflectKeepsEffectsOnTarget(t *testing.T) {
 		t.Fatalf("combined-counter BLOW caster effects = %d, want 0", got)
 	}
 }
+
+// TestPdamDamagesRealActorTargets casts PDAM with real actors on both ends of
+// the Cast boundary rather than doubles, so the whole path is exercised as it
+// runs in the server: Cast.Targets carries the real NPC, the handler narrows
+// it to physicalSkillTarget, the target resolves its own formula input from
+// the real caster, and the resulting damage lands on the target's real HP.
+// A double can keep this passing while a real actor has quietly stopped
+// satisfying one of those surfaces; this cannot.
+func TestPdamDamagesRealActorTargets(t *testing.T) {
+	caster := newTestHostile(t, 300, 500)
+	target := newTestHostile(t, 301, 0)
+	before, casterBefore := target.HP(), caster.HP()
+
+	NewDefaultRegistry().Use(Cast{
+		Caster:  caster,
+		Skill:   modelskill.Definition{ID: 1, SkillType: "PDAM", Power: 100, CastRange: -1},
+		Targets: []Actor{target},
+	})
+
+	if target.HP() >= before {
+		t.Fatalf("target HP = %v, want less than %v after a PDAM cast by a real actor", target.HP(), before)
+	}
+	if caster.HP() != casterBefore {
+		t.Fatalf("caster HP = %v, want %v: an uncountered PDAM must not damage its caster", caster.HP(), casterBefore)
+	}
+}
+
+// TestPdamSkipsRealDeadTarget pins the aliveness gate on a real actor: the
+// handler reads Dead() through the Actor surface now, so a dead target must
+// still be skipped rather than damaged.
+func TestPdamSkipsRealDeadTarget(t *testing.T) {
+	caster := newTestHostile(t, 302, 500)
+	target := newTestHostile(t, 303, 0)
+	target.ReduceHP(target.MaxHPValue(), caster, modelskill.Definition{})
+	if !target.Dead() {
+		t.Fatalf("target should be dead after losing its full HP pool")
+	}
+
+	NewDefaultRegistry().Use(Cast{
+		Caster:  caster,
+		Skill:   modelskill.Definition{ID: 1, SkillType: "PDAM", Power: 100, CastRange: -1},
+		Targets: []Actor{target},
+	})
+
+	if target.HP() != 0 {
+		t.Fatalf("dead target HP = %v, want 0: a PDAM cast must skip it", target.HP())
+	}
+}

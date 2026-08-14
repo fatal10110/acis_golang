@@ -187,7 +187,7 @@ func TestControlDisablersApplyToHostileNPC(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.skillType, func(t *testing.T) {
-			target := newDisablerHostile(t, 100)
+			target := newTestHostile(t, 100, 0)
 
 			registry.Use(Cast{
 				Caster: &bssCasterFake{},
@@ -366,7 +366,11 @@ type bssCasterFake struct {
 
 func (c *bssCasterFake) BlessedSpiritshotCharged() bool { return c.bss }
 
-func newDisablerHostile(t testing.TB, id int32) *npc.Hostile {
+// newTestHostile builds a real Monster-kind NPC, for the cases that are
+// about what a handler does to an actor rather than about one narrow
+// surface of it. pAtk is the one stat a physical-skill damage roll needs
+// from its caster; a target can leave it at 0.
+func newTestHostile(t testing.TB, id int32, pAtk float64) *npc.Hostile {
 	t.Helper()
 	live, err := creature.NewLive(location.Location{}, 100, disablerHostileGeo{}, nil)
 	if err != nil {
@@ -381,7 +385,9 @@ func newDisablerHostile(t testing.TB, id int32) *npc.Hostile {
 			Level:           1,
 			CON:             40,
 			MEN:             40,
-			HPMax:           100,
+			HPMax:           1000,
+			PAtk:            pAtk,
+			PDef:            1,
 			MAtk:            1,
 			MDef:            1,
 			BaseAttackRange: 40,

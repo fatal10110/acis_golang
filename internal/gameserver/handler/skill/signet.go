@@ -30,24 +30,23 @@ type signetPositioned interface {
 	Position() (x, y, z int)
 }
 
-// signetIdentified optionally reports a caster's world object id, recorded
-// as the spawned actor's owner; a caster without one spawns an unowned
-// actor.
-type signetIdentified interface {
-	ObjectID() int32
-}
-
 // signetHeaded optionally reports a caster's facing, applied to the
 // spawned actor; a caster without one spawns facing 0.
 type signetHeaded interface {
 	Heading() int
 }
 
+// signetGrounded optionally reports the ground point a caster picked for a
+// ground-targeted signet; a caster without one spawns the actor on itself.
+type signetGrounded interface {
+	GroundTarget() (int, int, int)
+}
+
 // signetCastTarget is the minimal surface a found signet target must
 // expose to appear as the target endpoint of a broadcast skill-use/launch
 // packet pair.
 type signetCastTarget interface {
-	ObjectID() int32
+	Actor
 	Position() (x, y, z int)
 }
 
@@ -67,9 +66,8 @@ type signetDancer interface {
 // signetUnsummonable is implemented by a found summon actor the
 // SignetAntiSummon family can dismiss.
 type signetUnsummonable interface {
-	Dead() bool
+	Actor
 	Unsummon()
-	ObjectID() int32
 	Position() (x, y, z int)
 	BroadcastFrame(wire.Frame)
 }
@@ -170,10 +168,7 @@ func (h signetHandler) spawnActor(caster Actor, def modelskill.Definition) (*npc
 		return nil, false
 	}
 
-	var ownerID int32
-	if oid, ok := caster.(signetIdentified); ok {
-		ownerID = oid.ObjectID()
-	}
+	ownerID := caster.ObjectID()
 	actor, err := npc.NewEffectPoint(id, tmpl, ownerID)
 	if err != nil {
 		return nil, false
@@ -188,7 +183,7 @@ func (h signetHandler) spawnActor(caster Actor, def modelskill.Definition) (*npc
 	}
 	x, y, z := pos.Position()
 	if def.Target == modelskill.TargetGround {
-		if ground, ok := caster.(interface{ GroundTarget() (int, int, int) }); ok {
+		if ground, ok := caster.(signetGrounded); ok {
 			x, y, z = ground.GroundTarget()
 		}
 	}

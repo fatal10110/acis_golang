@@ -233,14 +233,20 @@ func (dummyHandler) Types() []string { return []string{"DUMMY", "BEAST_FEED"} }
 
 func (dummyHandler) Use(Cast) {}
 
-// alikeDead reports whether a is dead or in a death-like state. An actor
-// without its own alike-dead notion falls back to plain death, matching the
-// reference's isAlikeDead() default.
+// alikeDeadSource optionally reports an actor's death-like state (fake
+// death, a pending resurrect) on top of plain death; an actor without one
+// is alike-dead exactly when it is dead.
+type alikeDeadSource interface {
+	AlikeDead() bool
+}
+
+// alikeDead reports whether a is dead or in a death-like state, matching the
+// reference's isAlikeDead() default of falling back to isDead().
 func alikeDead(a Actor) bool {
 	if a == nil {
 		return false
 	}
-	if d, ok := a.(interface{ AlikeDead() bool }); ok {
+	if d, ok := a.(alikeDeadSource); ok {
 		return d.AlikeDead()
 	}
 	return a.Dead()
@@ -260,7 +266,13 @@ func sameObject(a, b Actor) bool {
 	return a == b
 }
 
+// cursedWeaponHolder optionally reports whether an actor currently wields a
+// cursed weapon; an actor without one never does.
+type cursedWeaponHolder interface {
+	CursedWeaponEquipped() bool
+}
+
 func cursed(a Actor) bool {
-	c, ok := a.(interface{ CursedWeaponEquipped() bool })
+	c, ok := a.(cursedWeaponHolder)
 	return ok && c.CursedWeaponEquipped()
 }

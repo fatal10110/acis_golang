@@ -459,7 +459,7 @@ func (manaDamageHandler) UseResult(cast Cast) Result {
 			continue
 		}
 		var effected effectListTarget
-		effective := any(target)
+		var effective Actor = target
 		if _, ok := obj.(effectListTarget); ok {
 			effected, _ = reflectEffectTarget(cast, obj)
 			if effected == nil {
@@ -475,7 +475,7 @@ func (manaDamageHandler) UseResult(cast Cast) Result {
 		if !ok {
 			continue
 		}
-		if invul, ok := target.(interface{ Invul() bool }); ok && invul.Invul() || !in.Affected {
+		if invul, ok := target.(lethalInvulTarget); ok && invul.Invul() || !in.Affected {
 			continue
 		}
 		if effected != nil && len(cast.Skill.Effects) > 0 {
