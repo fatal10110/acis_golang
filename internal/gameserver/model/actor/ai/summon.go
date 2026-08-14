@@ -285,8 +285,13 @@ func (s *Summon) busyLocked() bool {
 	return s.attack.BowCoolingDown() || s.attack.AttackingNow() || (s.cast != nil && s.cast.CastingNow())
 }
 
+// targetLostLocked matches AbstractAI.isTargetLost (AbstractAI.java:586-594,
+// unmodified by SummonAI's override at SummonAI.java:275-281): only a nil or
+// no-longer-known target counts as lost. Death (true or fake) is not a loss
+// condition here — a dead target keeps the attack/follow intention until it
+// despawns, same as the reference.
 func (s *Summon) targetLostLocked(target attackable.Combatant) bool {
-	if target == nil || target.AlikeDead() || !s.actor.Knows(target) {
+	if target == nil || !s.actor.Knows(target) {
 		s.current = intention{kind: IntentionIdle}
 		if sameCombatant(s.next.target, target) {
 			s.next = intention{}

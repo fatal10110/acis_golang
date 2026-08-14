@@ -111,6 +111,29 @@ func TestSummonThinkLogsBothStopAndAttackBroadcastErrors(t *testing.T) {
 	}
 }
 
+// TestSummonAITryToAttackContinuesAgainstFakeDeadTarget is the regression
+// test for the review finding that targetLostLocked treated AlikeDead()
+// (fake death included) as target loss, dropping the attack intention the
+// moment a target entered fake death. AbstractAI.isTargetLost
+// (AbstractAI.java:586-594) and SummonAI's override (SummonAI.java:275-281)
+// have no death check at all — only a nil or no-longer-known target is
+// "lost".
+func TestSummonAITryToAttackContinuesAgainstFakeDeadTarget(t *testing.T) {
+	owner := actor(100)
+	target := actor(200)
+	target.alikeDead = true
+	move := &summonMove{}
+	strike := &recordingAttack{canAttack: true}
+	brain := NewSummon(owner, move, strike)
+
+	if !brain.TryToAttack(target) {
+		t.Fatal("TryToAttack() = false against a fake-dead target, want the swing to proceed")
+	}
+	if strike.target != target {
+		t.Fatalf("attack target = %v, want target despite fake death", strike.target)
+	}
+}
+
 func TestSummonAITryToFollowStartsFriendlyFollow(t *testing.T) {
 	owner := actor(100)
 	target := actor(200)

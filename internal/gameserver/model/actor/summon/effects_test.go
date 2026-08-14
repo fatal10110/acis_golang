@@ -68,6 +68,30 @@ func TestSummonDenyAIActionHonorsTransientControlStates(t *testing.T) {
 	}
 }
 
+// TestSummonOutOfControlHonorsBetrayedFlag is the regression test for the
+// review finding that OutOfControl only read a.disabled, so a betrayed
+// summon kept accepting owner commands instead of refusing them with
+// PET_REFUSING_ORDER, matching Summon.isOutOfControl (Summon.java:296-298):
+// super.isOutOfControl() || isBetrayed().
+func TestSummonOutOfControlHonorsBetrayedFlag(t *testing.T) {
+	summon := NewServitor(ServitorConfig{ObjectID: 1})
+
+	if summon.OutOfControl() {
+		t.Fatal("OutOfControl() = true before any betray effect, want false")
+	}
+
+	summon.EffectList().Add(&effect.Effect{Flag: effect.FlagBetrayed})
+
+	if !summon.OutOfControl() {
+		t.Fatal("OutOfControl() = false while betrayed, want true")
+	}
+
+	result := summon.ApplyCommand(CommandContext{Command: CommandStop})
+	if result.Outcome != OutcomeRefusedOutOfControl {
+		t.Fatalf("ApplyCommand(Stop) outcome = %v while betrayed, want OutcomeRefusedOutOfControl", result.Outcome)
+	}
+}
+
 func TestPetEffectListHoldsAppliedEffects(t *testing.T) {
 	pet := NewPet(PetConfig{ObjectID: 1, Level: 40, Stats: CombatStats{MaxHP: 500, MaxMP: 200}, Roll: zeroSummonRoll})
 
