@@ -46,7 +46,6 @@ func (l *GameClientLink) useItem(live *livePlayer, objectID int32) {
 		return
 	}
 	if live.ItemDisabled(objectID) {
-		l.rejectDisabledItemUse(live, tmpl)
 		return
 	}
 	if inst.QuestItem(tmpl) {
