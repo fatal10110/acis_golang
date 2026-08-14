@@ -103,7 +103,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			continue
 		}
 
-		if opcode != clientpackets.OpcodeAppearing {
+		if clearsSpawnProtection(opcode) {
 			l.clearSpawnProtectionOnAction(live)
 		}
 		switch opcode {
@@ -950,6 +950,16 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			l.log.Info().Str("opcode", fmt.Sprintf("%#x", opcode)).Str("state", client.State().String()).
 				Msg("game client: accepted opcode not implemented yet")
 		}
+	}
+}
+
+func clearsSpawnProtection(opcode byte) bool {
+	switch opcode {
+	case clientpackets.OpcodeEnterWorld, clientpackets.OpcodeAction,
+		clientpackets.OpcodeRequestPledgeCrest, clientpackets.OpcodeAppearing:
+		return false
+	default:
+		return true
 	}
 }
 

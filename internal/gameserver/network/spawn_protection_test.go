@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
@@ -36,4 +37,17 @@ func TestSpawnProtectionExpiresAndActionCancelsTimer(t *testing.T) {
 		t.Fatalf("messages after cancelled expiry = %d, want 2", got)
 	}
 	assertSystemMessageStringFrame(t, frames.frames[1], serverpackets.SystemMessageS1, spawnProtectionActed)
+}
+
+func TestSpawnProtectionActionExemptions(t *testing.T) {
+	for _, opcode := range []byte{
+		clientpackets.OpcodeEnterWorld,
+		clientpackets.OpcodeAction,
+		clientpackets.OpcodeRequestPledgeCrest,
+		clientpackets.OpcodeAppearing,
+	} {
+		if clearsSpawnProtection(opcode) {
+			t.Fatalf("clearsSpawnProtection(%#x) = true, want false", opcode)
+		}
+	}
 }
