@@ -29,7 +29,13 @@ type CombatStats struct {
 }
 
 // PhysicalAttackSpeed returns this summon's physical attack speed from its NPC template.
-func (a *Actor) PhysicalAttackSpeed() float64 { return a.PAtkSpd(a.stats.AttackSpeed) }
+func (a *Actor) PhysicalAttackSpeed() float64 { return a.PAtkSpd(a.combatStats().AttackSpeed) }
+
+func (a *Actor) combatStats() CombatStats {
+	a.statusMu.RLock()
+	defer a.statusMu.RUnlock()
+	return a.stats
+}
 
 type summonVitals struct {
 	// mu guards hp, mp, and Actor.dead.
@@ -150,12 +156,12 @@ type summonStatActor struct{ a *Actor }
 
 var _ funcs.Actor = summonStatActor{}
 
-func (s summonStatActor) STR() int { return defaultInt(s.a.stats.STR, 40) }
-func (s summonStatActor) CON() int { return defaultInt(s.a.stats.CON, 21) }
-func (s summonStatActor) DEX() int { return defaultInt(s.a.stats.DEX, 30) }
-func (s summonStatActor) INT() int { return defaultInt(s.a.stats.INT, 20) }
-func (s summonStatActor) WIT() int { return defaultInt(s.a.stats.WIT, 43) }
-func (s summonStatActor) MEN() int { return defaultInt(s.a.stats.MEN, 20) }
+func (s summonStatActor) STR() int { return defaultInt(s.a.combatStats().STR, 40) }
+func (s summonStatActor) CON() int { return defaultInt(s.a.combatStats().CON, 21) }
+func (s summonStatActor) DEX() int { return defaultInt(s.a.combatStats().DEX, 30) }
+func (s summonStatActor) INT() int { return defaultInt(s.a.combatStats().INT, 20) }
+func (s summonStatActor) WIT() int { return defaultInt(s.a.combatStats().WIT, 43) }
+func (s summonStatActor) MEN() int { return defaultInt(s.a.combatStats().MEN, 20) }
 
 func (s summonStatActor) Level() int {
 	if lvl := s.a.Level(); lvl > 0 {
@@ -218,22 +224,22 @@ func (a *Actor) Invulnerable() bool { return a.Invul() }
 
 // PAtk returns this summon's physical attack stat.
 func (a *Actor) PAtk() float64 {
-	return a.calcStat(stat.PowerAttack, positiveBase(a.stats.PAtk))
+	return a.calcStat(stat.PowerAttack, positiveBase(a.combatStats().PAtk))
 }
 
 // PDef returns this summon's physical defence stat.
 func (a *Actor) PDef() float64 {
-	return a.calcStat(stat.PowerDefence, positiveBase(a.stats.PDef))
+	return a.calcStat(stat.PowerDefence, positiveBase(a.combatStats().PDef))
 }
 
 // MAtk returns this summon's magic attack stat.
 func (a *Actor) MAtk() float64 {
-	return a.calcStat(stat.MagicAttack, positiveBase(a.stats.MAtk))
+	return a.calcStat(stat.MagicAttack, positiveBase(a.combatStats().MAtk))
 }
 
 // MDef returns this summon's magic defence stat.
 func (a *Actor) MDef() float64 {
-	return a.calcStat(stat.MagicDefence, positiveBase(a.stats.MDef))
+	return a.calcStat(stat.MagicDefence, positiveBase(a.combatStats().MDef))
 }
 
 // MagicCriticalRate returns this summon's magic critical rate.
@@ -269,10 +275,13 @@ func (a *Actor) MoveSpeed(baseRunSpeed float64) float64 {
 // being under-fed, matching Pet.checkHungryState. Servitors have no feeding
 // state and are never halved.
 func (a *Actor) hungryHalved() bool {
-	if !a.isPet || a.maxMeal <= 0 {
+	a.statusMu.RLock()
+	fed, maxMeal := a.fed, a.maxMeal
+	a.statusMu.RUnlock()
+	if !a.isPet || maxMeal <= 0 {
 		return false
 	}
-	return float64(a.Fed()) < float64(a.maxMeal)*a.hungryLimit
+	return float64(fed) < float64(maxMeal)*a.hungryLimit
 }
 
 // PAtkSpd returns this summon's physical attack speed, given baseAtkSpd from
@@ -330,10 +339,10 @@ func (a *Actor) SetChargedShot(kind item.ShotKind, charged bool) {
 }
 
 // SSCount returns the beast soulshot count this summon consumes per charge.
-func (a *Actor) SSCount() int { return a.stats.SSCount }
+func (a *Actor) SSCount() int { return a.combatStats().SSCount }
 
 // SPSCount returns the beast spiritshot count this summon consumes per charge.
-func (a *Actor) SPSCount() int { return a.stats.SPSCount }
+func (a *Actor) SPSCount() int { return a.combatStats().SPSCount }
 
 // Roll draws a uniform random integer in [0, n) from a's combat random source.
 func (a *Actor) Roll(n int) int {
@@ -350,10 +359,11 @@ func (a *Actor) Roll(n int) int {
 // (RandomDamageMultiplier's "use the weaponless fallback" sentinel) when no
 // spread is configured.
 func (a *Actor) RandomDamageSpread() int {
-	if a.stats.BaseRandomDamage <= 0 {
+	spread := a.combatStats().BaseRandomDamage
+	if spread <= 0 {
 		return -1
 	}
-	return a.stats.BaseRandomDamage
+	return spread
 }
 
 // HP returns current HP as a floating-point skill-resource value.
@@ -365,7 +375,7 @@ func (a *Actor) HP() float64 {
 
 // MaxHPValue returns maximum HP as a floating-point skill-resource value.
 func (a *Actor) MaxHPValue() float64 {
-	return a.calcStat(stat.MaxHP, a.stats.MaxHP)
+	return a.calcStat(stat.MaxHP, a.combatStats().MaxHP)
 }
 
 // MPValue returns current MP as a floating-point skill-resource value.
@@ -377,7 +387,7 @@ func (a *Actor) MPValue() float64 {
 
 // MaxMPValue returns maximum MP as a floating-point skill-resource value.
 func (a *Actor) MaxMPValue() float64 {
-	return a.calcStat(stat.MaxMP, a.stats.MaxMP)
+	return a.calcStat(stat.MaxMP, a.combatStats().MaxMP)
 }
 
 // SetHP sets current HP, clamped to [0, MaxHP].

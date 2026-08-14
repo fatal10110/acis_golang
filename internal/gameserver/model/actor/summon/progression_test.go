@@ -1,6 +1,7 @@
 package summon
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -46,6 +47,38 @@ func TestPetAddExpAndSpLevelsAndRefreshesGrowthStats(t *testing.T) {
 	if earned != 10 {
 		t.Fatalf("earned exp = %d, want 10", earned)
 	}
+}
+
+func TestPetGrowthRefreshIsSafeWithCombatStatReads(t *testing.T) {
+	growth := &npc.PetData{Levels: map[int]npc.PetLevelStats{
+		1: {MaxExp: 0, MaxMeal: 10, PAtk: 10, PDef: 10, MAtk: 10, MDef: 10, MaxHP: 100, MaxMP: 50, SSCount: 1, SPSCount: 1},
+		2: {MaxExp: 1, MaxMeal: 20, PAtk: 20, PDef: 20, MAtk: 20, MDef: 20, MaxHP: 200, MaxMP: 100, SSCount: 2, SPSCount: 2},
+	}}
+	pet := NewPet(PetConfig{Level: 1, Growth: growth, Stats: CombatStats{AttackSpeed: 300}})
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		for range 1_000 {
+			pet.AddExpAndSp(1, 0)
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for range 1_000 {
+			pet.PAtk()
+			pet.PDef()
+			pet.MAtk()
+			pet.MDef()
+			pet.MaxHPValue()
+			pet.MaxMPValue()
+			pet.SSCount()
+			pet.SPSCount()
+			pet.PhysicalAttackSpeed()
+		}
+	}()
+	wg.Wait()
 }
 
 func TestPetCanReceiveKillRewardRejectsExpPastLevel81Limit(t *testing.T) {

@@ -108,19 +108,18 @@ func (a *Actor) TickPet(state *world.State) PetTickResult {
 		return PetTickResult{}
 	}
 
+	a.statusMu.Lock()
 	consume := a.mealInNormal
 	if a.combat {
 		consume = a.mealInBattle
 	}
-
-	a.statusMu.Lock()
 	a.fed = petmodel.NextFed(a.fed, consume)
 	a.belowUnsummonLimit = petmodel.BelowShare(a.fed, a.maxMeal, a.unsummonLimit)
-	fed := a.fed
+	fed, maxMeal := a.fed, a.maxMeal
 	a.statusMu.Unlock()
 
 	result := PetTickResult{Fed: fed}
-	if a.petInventory != nil && petmodel.BelowShare(fed, a.maxMeal, a.autoFeedLimit) {
+	if a.petInventory != nil && petmodel.BelowShare(fed, maxMeal, a.autoFeedLimit) {
 		food := a.petInventory.ItemByTemplateID(a.food1)
 		if food == nil && a.food2 != 0 {
 			food = a.petInventory.ItemByTemplateID(a.food2)
@@ -139,7 +138,7 @@ func (a *Actor) TickPet(state *world.State) PetTickResult {
 			return result
 		}
 	}
-	result.Starvation = petmodel.Classify(fed, a.maxMeal)
+	result.Starvation = petmodel.Classify(fed, maxMeal)
 	if result.Starvation != petmodel.StarvationNone && a.roll(100) < result.Starvation.LeaveChancePercent() {
 		a.despawn(state)
 		result.LeftOwner = true

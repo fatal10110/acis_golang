@@ -362,7 +362,7 @@ func (a *Actor) Knows(target attackable.Combatant) bool {
 }
 
 // PhysicalAttackRange returns this summon's melee attack range.
-func (a *Actor) PhysicalAttackRange() int { return a.stats.AttackRange }
+func (a *Actor) PhysicalAttackRange() int { return a.combatStats().AttackRange }
 
 // GetSkill returns the skill this summon's npc template grants at skillID,
 // matching Java's Summon.getSkill. ok is false when the template doesn't
