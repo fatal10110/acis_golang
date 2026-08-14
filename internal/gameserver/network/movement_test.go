@@ -2,6 +2,7 @@ package network
 
 import (
 	"bytes"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -149,6 +150,7 @@ func newTestLivePlayerWithGeo(t *testing.T, id int32, capture *frameCapture, geo
 	ch.SetResourceValues(player.Resources{MaxHP: 80, CurrentHP: 80, MaxMP: 30, CurrentMP: 30})
 	ch.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventory(ch.ID, testItemTemplates(), nil))
 	ch.SetFrameSender(capture.send)
+	ch.SetBroadcastFrameSender(capture.send)
 
 	x, y, z := ch.Position()
 	live, err := creature.NewLive(location.Location{X: x, Y: y, Z: z}, tmpl.RunSpeed, geo, ch)
@@ -367,6 +369,38 @@ func TestBroadcastLiveDieSendsDieToOwnSessionAndObservers(t *testing.T) {
 	}
 }
 
+func TestBroadcastLiveFrameReleasesKnownBufferBeforeDelivery(t *testing.T) {
+	state := world.New()
+	self := newTestLivePlayer(t, 1, &frameCapture{})
+	observer := newTestLivePlayer(t, 2, &frameCapture{})
+	state.Spawn(self, 0, 0, 0, 0)
+	state.Spawn(observer, 100, 0, 0, 0)
+	link := &GameClientLink{world: state, log: zerolog.Nop()}
+	var nested atomic.Bool
+	observer.Character.SetBroadcastFrameSender(func(frame wire.Frame) bool {
+		frame.Release()
+		if nested.CompareAndSwap(false, true) {
+			link.broadcastLiveFrame(self, func() wire.Frame {
+				return serverpackets.FrameRevive(self.ObjectID())
+			})
+		}
+		return true
+	})
+
+	done := make(chan struct{})
+	go func() {
+		link.broadcastLiveFrame(self, func() wire.Frame {
+			return serverpackets.FrameRevive(self.ObjectID())
+		})
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("broadcast held KnownBuffer while delivering a frame")
+	}
+}
+
 func TestBroadcastLiveFrameBuildsOnceForAllRecipients(t *testing.T) {
 	state := world.New()
 	selfFrames := &frameCapture{}
@@ -405,7 +439,15 @@ func TestBroadcastLiveFrameGivesRecipientsIndependentFrames(t *testing.T) {
 		selfFrame = frame
 		return true
 	})
+	self.Character.SetBroadcastFrameSender(func(frame wire.Frame) bool {
+		selfFrame = frame
+		return true
+	})
 	observer.Character.SetFrameSender(func(frame wire.Frame) bool {
+		observerFrame = frame
+		return true
+	})
+	observer.Character.SetBroadcastFrameSender(func(frame wire.Frame) bool {
 		observerFrame = frame
 		return true
 	})
@@ -476,10 +518,18 @@ func BenchmarkBroadcastLiveFrameKnownObservers(b *testing.B) {
 		frame.Release()
 		return true
 	})
+	self.Character.SetBroadcastFrameSender(func(frame wire.Frame) bool {
+		frame.Release()
+		return true
+	})
 	state.Spawn(self, 0, 0, 0, 0)
 	for i := 0; i < 50; i++ {
 		observer := newTestLivePlayer(b, int32(i+2), &frameCapture{})
 		observer.Character.SetFrameSender(func(frame wire.Frame) bool {
+			frame.Release()
+			return true
+		})
+		observer.Character.SetBroadcastFrameSender(func(frame wire.Frame) bool {
 			frame.Release()
 			return true
 		})
@@ -504,10 +554,18 @@ func BenchmarkBroadcastCharacterInfoKnownObservers(b *testing.B) {
 		frame.Release()
 		return true
 	})
+	self.Character.SetBroadcastFrameSender(func(frame wire.Frame) bool {
+		frame.Release()
+		return true
+	})
 	state.Spawn(self, 0, 0, 0, 0)
 	for i := 0; i < 50; i++ {
 		observer := newTestLivePlayer(b, int32(i+2), &frameCapture{})
 		observer.Character.SetFrameSender(func(frame wire.Frame) bool {
+			frame.Release()
+			return true
+		})
+		observer.Character.SetBroadcastFrameSender(func(frame wire.Frame) bool {
 			frame.Release()
 			return true
 		})

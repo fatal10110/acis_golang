@@ -3,6 +3,7 @@ package network
 import (
 	"net"
 	"sync"
+	"sync/atomic"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/rs/zerolog"
@@ -21,8 +22,9 @@ type Conn struct {
 	log      zerolog.Logger
 	mu       sync.RWMutex
 	out      chan queuedWrite
-	closed   bool
+	closed   atomic.Bool
 	stopping chan struct{}
+	stopOnce sync.Once
 	stopped  chan struct{}
 	closeErr error
 }
@@ -43,10 +45,9 @@ func newConn(c net.Conn, log zerolog.Logger) *Conn {
 	return conn
 }
 
-// writeLoop drains queued sends in order and only closes the
-// underlying connection once the queue is empty and Close has been
-// called (or a write fails), so a frame queued right before Close is
-// never dropped. A panic while writing is recovered and logged so it
+// writeLoop drains queued sends in order for Close, so a frame queued right
+// before Close is never dropped. abort instead stops this loop immediately
+// and releases the backlog. A panic while writing is recovered and logged so it
 // disconnects only this client, never the process; the deferred
 // cleanup still runs so Close never blocks forever waiting on stopped.
 //
@@ -56,14 +57,13 @@ func newConn(c net.Conn, log zerolog.Logger) *Conn {
 // Each iteration greedily drains c.out (bounded by outboundBuffer) after
 // its first queued frame so a burst coalesces into one vectored
 // net.Buffers write instead of one Write syscall per frame. Idle
-// behavior is unchanged: with nothing queued, the loop blocks on the
-// range receive.
+// behavior is unchanged: with nothing queued, the loop blocks in its select.
 func (c *Conn) writeLoop() {
 	defer func() {
 		if r := recover(); r != nil {
 			c.log.Error().Interface("panic", r).Msg("game connection writer panic")
 		}
-		close(c.stopping)
+		c.stop()
 		c.releaseQueued()
 		c.closeErr = c.Conn.Close()
 		close(c.stopped)
@@ -72,7 +72,17 @@ func (c *Conn) writeLoop() {
 	// owner, so no other goroutine ever sees them.
 	var batch []queuedWrite
 	var bufs net.Buffers
-	for queued := range c.out {
+	for {
+		var queued queuedWrite
+		var ok bool
+		select {
+		case <-c.stopping:
+			return
+		case queued, ok = <-c.out:
+			if !ok {
+				return
+			}
+		}
 		batch = c.drainBatch(batch[:0], queued)
 		var err error
 		if bufs, err = c.writeBatch(batch, bufs); err != nil {
@@ -166,20 +176,21 @@ func (c *Conn) trySendFrame(frame wire.Frame) bool {
 // abort closes a connection without waiting for its writer to drain. It is
 // used when a client can no longer decode its ordered packet stream.
 func (c *Conn) abort() {
-	c.mu.Lock()
-	if !c.closed {
-		c.log.Warn().Msg("visibility queue full, aborting connection")
-		c.closed = true
-		close(c.out)
+	if c.closed.CompareAndSwap(false, true) {
+		c.log.Warn().Msg("outbound queue full, aborting connection")
+		c.stop()
+		_ = c.Conn.Close()
 	}
-	c.mu.Unlock()
-	_ = c.Conn.Close()
+}
+
+func (c *Conn) stop() {
+	c.stopOnce.Do(func() { close(c.stopping) })
 }
 
 func (c *Conn) send(queued queuedWrite) bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	if c.closed {
+	if c.closed.Load() {
 		return false
 	}
 	select {
@@ -196,9 +207,14 @@ func (c *Conn) send(queued queuedWrite) bool {
 }
 
 func (c *Conn) trySend(queued queuedWrite) bool {
-	c.mu.RLock()
+	// Only Close writes c.mu. If it wins this race, the connection is already
+	// being torn down, so dropping an encrypted frame cannot desynchronize a
+	// live client.
+	if !c.mu.TryRLock() {
+		return false
+	}
 	defer c.mu.RUnlock()
-	if c.closed {
+	if c.closed.Load() {
 		return false
 	}
 	select {
@@ -214,13 +230,17 @@ func (c *Conn) trySend(queued queuedWrite) bool {
 	}
 }
 
+func (c *Conn) queueFull() bool {
+	return c.closed.Load() || len(c.out) == cap(c.out)
+}
+
 // Close stops accepting new sends, flushes any already queued, then
 // closes the underlying connection. Safe to call more than once; every
 // call blocks until the underlying connection is actually closed.
 func (c *Conn) Close() error {
 	c.mu.Lock()
-	if !c.closed {
-		c.closed = true
+	if !c.closed.Load() {
+		c.closed.Store(true)
 		close(c.out)
 	}
 	c.mu.Unlock()

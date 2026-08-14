@@ -379,6 +379,8 @@ func TestSummonStatusObserverFramesAreIndependent(t *testing.T) {
 	var firstFrame, secondFrame wire.Frame
 	first.Character.SetFrameSender(func(frame wire.Frame) bool { firstFrame = frame; return true })
 	second.Character.SetFrameSender(func(frame wire.Frame) bool { secondFrame = frame; return true })
+	first.Character.SetBroadcastFrameSender(func(frame wire.Frame) bool { firstFrame = frame; return true })
+	second.Character.SetBroadcastFrameSender(func(frame wire.Frame) bool { secondFrame = frame; return true })
 	pet.ReduceHP(10, nil, modelskill.Definition{})
 	defer firstFrame.Release()
 	defer secondFrame.Release()

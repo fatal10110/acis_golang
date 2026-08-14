@@ -28,6 +28,10 @@ func (f *retainedBroadcastFrameReceiver) SendFrame(frame wire.Frame) bool {
 	return true
 }
 
+func (f *retainedBroadcastFrameReceiver) BroadcastFrame(frame wire.Frame) bool {
+	return f.SendFrame(frame)
+}
+
 func (f *broadcastFrameReceiver) ObjectID() int32 { return f.trackedID }
 
 func (f *broadcastFrameReceiver) SendFrame(frame wire.Frame) bool {
@@ -37,6 +41,10 @@ func (f *broadcastFrameReceiver) SendFrame(frame wire.Frame) bool {
 	copy(payload, raw[2:])
 	f.frames = append(f.frames, payload)
 	return true
+}
+
+func (f *broadcastFrameReceiver) BroadcastFrame(frame wire.Frame) bool {
+	return f.SendFrame(frame)
 }
 
 func TestActorBroadcastFrameReachesOwnKnownObservers(t *testing.T) {

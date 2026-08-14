@@ -6,7 +6,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
-	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 func (l *GameClientLink) moveLivePlayer(live *livePlayer, target location.Location) {
@@ -169,9 +168,9 @@ func (l *GameClientLink) broadcastLiveFrame(live *livePlayer, frame func() wire.
 		if l.world == nil {
 			return
 		}
-		known := live.appendKnown(l.world)
-		defer live.releaseKnown()
-		for _, o := range known {
+		known := live.known.SnapshotCopy(l.world, live)
+		defer known.Release()
+		for _, o := range known.Tracked() {
 			if receiver, ok := o.(frameReceiver); ok {
 				send(receiver)
 			}
@@ -180,7 +179,7 @@ func (l *GameClientLink) broadcastLiveFrame(live *livePlayer, frame func() wire.
 }
 
 type frameReceiver interface {
-	SendFrame(wire.Frame) bool
+	BroadcastFrame(wire.Frame) bool
 }
 
 func broadcastFrame(build func() wire.Frame, recipients func(func(frameReceiver))) {
@@ -194,17 +193,9 @@ func broadcastFrame(build func() wire.Frame, recipients func(func(frameReceiver)
 		}
 		frame, ok := serverpackets.CopyFrame(serialized)
 		if ok {
-			receiver.SendFrame(frame)
+			receiver.BroadcastFrame(frame)
 		}
 	})
-}
-
-func (p *livePlayer) appendKnown(state *world.State) []world.Tracked {
-	return p.known.Snapshot(state, p)
-}
-
-func (p *livePlayer) releaseKnown() {
-	p.known.Release()
 }
 
 func (l *GameClientLink) updateLivePlayerPosition(live *livePlayer, position location.Location, heading int) {

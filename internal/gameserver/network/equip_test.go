@@ -35,6 +35,7 @@ func newEquipTestLivePlayer(t *testing.T, id int32, capture *frameCapture, templ
 	ch.SetResourceValues(player.Resources{MaxHP: 80, CurrentHP: 80, MaxMP: 30, CurrentMP: 30})
 	ch.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventory(ch.ID, templates, items))
 	ch.SetFrameSender(capture.send)
+	ch.SetBroadcastFrameSender(capture.send)
 
 	live, err := creature.NewLive(ch.Location, tmpl.RunSpeed, testGeo{}, ch)
 	if err != nil {
