@@ -169,6 +169,6 @@ type enchantAtLeast struct {
 	level int
 }
 
-func (c enchantAtLeast) Test(any, any, any) bool {
+func (c enchantAtLeast) Test(stat.Actor) bool {
 	return c.owner.EnchantLevel() >= c.level
 }

@@ -9,18 +9,14 @@ import (
 )
 
 // levelGate is a minimal basefunc.Condition mirroring skill/effect's
-// conditionGate: it resolves effected (falling back to effector) to a
-// conditions.Actor and requires its Level() to meet min. Before #1509,
-// hostileStatActor didn't implement conditions.Actor, so this always
-// resolved to false regardless of min — a conditional stat func on an
-// NPC-owned skill silently never applied.
+// conditionGate: it resolves effector to a conditions.Actor and requires
+// its Level() to meet min. Before #1509, hostileStatActor didn't implement
+// conditions.Actor, so this always resolved to false regardless of min — a
+// conditional stat func on an NPC-owned skill silently never applied.
 type levelGate struct{ min int }
 
-func (g levelGate) Test(effector, effected, skill any) bool {
-	actor, ok := effected.(conditions.Actor)
-	if !ok {
-		actor, ok = effector.(conditions.Actor)
-	}
+func (g levelGate) Test(effector stat.Actor) bool {
+	actor, ok := effector.(conditions.Actor)
 	return ok && actor.Level() >= g.min
 }
 

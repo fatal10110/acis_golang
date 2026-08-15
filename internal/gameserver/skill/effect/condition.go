@@ -9,6 +9,7 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
 // funcCondition builds the basefunc.Condition gate for one stat func from
@@ -43,24 +44,18 @@ func funcCondition(direct *modelskill.Condition, attach *modelskill.ConditionCla
 }
 
 // conditionGate adapts one built conditions.Condition into a
-// basefunc.Condition: it resolves effector/effected (as passed to Func.Calc)
-// to a conditions.Actor, trying effected first and falling back to
-// effector. In every Calc call site today, effected is the raw owner
-// (*player.Character/*npc.Hostile/*summon.Actor) and effector is a thinner
+// basefunc.Condition: it resolves effector (as passed to Func.Calc) to a
+// conditions.Actor. In every Calc call site today, effector is the
 // calculation-only wrapper (characterStatActor/hostileStatActor/
-// summonStatActor) around that same owner; only the wrapper types
-// implement conditions.Actor, never the raw owner (see model/actor/player/
-// character_conditions.go, model/actor/npc/hostile_conditions.go,
-// model/actor/summon/conditions.go), so in practice it is always the
-// effector fallback that succeeds. Both roles then test as that one owner,
-// matching this package's doc: a stat func is gated by its owner alone.
+// summonStatActor) around a creature, which also implements
+// conditions.Actor (see model/actor/player/character_conditions.go,
+// model/actor/npc/hostile_conditions.go, model/actor/summon/conditions.go),
+// so this always resolves to that same owner, matching this package's doc:
+// a stat func is gated by its owner alone.
 type conditionGate struct{ cond conditions.Condition }
 
-func (g conditionGate) Test(effector, effected, skill any) bool {
-	actor, ok := effected.(conditions.Actor)
-	if !ok {
-		actor, ok = effector.(conditions.Actor)
-	}
+func (g conditionGate) Test(effector stat.Actor) bool {
+	actor, ok := effector.(conditions.Actor)
 	if !ok {
 		return false
 	}
@@ -184,8 +179,8 @@ func andCond(a, b basefunc.Condition) basefunc.Condition {
 
 type bothCond struct{ a, b basefunc.Condition }
 
-func (c bothCond) Test(effector, effected, skill any) bool {
-	return c.a.Test(effector, effected, skill) && c.b.Test(effector, effected, skill)
+func (c bothCond) Test(effector stat.Actor) bool {
+	return c.a.Test(effector) && c.b.Test(effector)
 }
 
 func parseBool(v string) bool {

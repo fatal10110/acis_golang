@@ -15,7 +15,7 @@ import (
 // check is unaffected either way.
 type uncomparableCondition struct{ ids []int }
 
-func (c uncomparableCondition) Test(effector, effected, skill any) bool { return false }
+func (c uncomparableCondition) Test(effector stat.Actor) bool { return false }
 
 func TestCalculatorOrdering(t *testing.T) {
 	var c Calculator
@@ -26,7 +26,7 @@ func TestCalculatorOrdering(t *testing.T) {
 	c.AddFunc(basefunc.NewBaseAdd(nil, stat.PowerAttack, 3, nil)) // order 2
 
 	// base=10: BaseAdd -> 13, Mul -> 26, Add -> 31.
-	got := c.Calc(nil, nil, nil, 10)
+	got := c.Calc(nil, 10)
 	if got != 31 {
 		t.Errorf("Calc() = %v, want 31", got)
 	}
@@ -43,7 +43,7 @@ func TestCalculatorSetOverridesBase(t *testing.T) {
 	// Set (order 0) runs first, replacing base with 100 (value=100). Then
 	// BaseMul (order 1) adds base*0.1 = 100*0.1 = 10 to the running value:
 	// 100 + 10 = 110.
-	got := c.Calc(nil, nil, nil, 5)
+	got := c.Calc(nil, 5)
 	if got != 110 {
 		t.Errorf("Calc() = %v, want 110", got)
 	}
@@ -59,7 +59,7 @@ func TestCalculatorRemoveFunc(t *testing.T) {
 	if c.Size() != 1 {
 		t.Fatalf("Size() = %d, want 1", c.Size())
 	}
-	if got := c.Calc(nil, nil, nil, 0); got != 7 {
+	if got := c.Calc(nil, 0); got != 7 {
 		t.Errorf("Calc() = %v, want 7", got)
 	}
 }
@@ -77,7 +77,7 @@ func TestCalculatorRemoveFuncUsesIdentity(t *testing.T) {
 	if c.Size() != 1 {
 		t.Fatalf("Size() = %d, want 1", c.Size())
 	}
-	if got := c.Calc(nil, nil, nil, 0); got != 5 {
+	if got := c.Calc(nil, 0); got != 5 {
 		t.Errorf("Calc() = %v, want 5", got)
 	}
 }
@@ -115,14 +115,14 @@ func TestCalculatorRemoveOwner(t *testing.T) {
 	if c.Size() != 1 {
 		t.Fatalf("Size() = %d, want 1", c.Size())
 	}
-	if got := c.Calc(nil, nil, nil, 0); got != 7 {
+	if got := c.Calc(nil, 0); got != 7 {
 		t.Errorf("Calc() = %v, want 7 (only ownerB's func left)", got)
 	}
 }
 
 func TestCalculatorEmpty(t *testing.T) {
 	var c Calculator
-	if got := c.Calc(nil, nil, nil, 42); got != 42 {
+	if got := c.Calc(nil, 42); got != 42 {
 		t.Errorf("Calc() on empty chain = %v, want base unchanged 42", got)
 	}
 }

@@ -87,14 +87,14 @@ func (c *Calculator) RemoveOwner(owner any) []stat.Stat {
 // from base. A Set overrides the base value seen by every later Func,
 // mirroring how a template override (e.g. a weapon's flat P.Atk) replaces
 // rather than augments the starting point for what follows.
-func (c *Calculator) Calc(effector, effected, skill any, base float64) float64 {
+func (c *Calculator) Calc(effector stat.Actor, base float64) float64 {
 	c.mu.RLock()
 	funcs := c.funcs
 	c.mu.RUnlock()
 
 	value := base
 	for _, f := range funcs {
-		value = f.Calc(effector, effected, skill, base, value)
+		value = f.Calc(effector, base, value)
 		if _, ok := f.(*Set); ok {
 			base = value
 		}

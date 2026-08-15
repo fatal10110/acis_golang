@@ -33,12 +33,10 @@ const (
 	OrderAddMul   = 40 // multiply the running value by a percentage
 )
 
-// Condition gates whether a Func's calculation applies. effector, effected
-// and skill are opaque here (any concrete data they need belongs to the
-// condition implementation, not to this package) — matching how a Func
-// itself never inspects them beyond passing them through.
+// Condition gates whether a Func's calculation applies against effector,
+// the only side of a stat calculation basefunc ever reads.
 type Condition interface {
-	Test(effector, effected, skill any) bool
+	Test(effector stat.Actor) bool
 }
 
 // Func is one node of a calculation chain: given the value computed so far
@@ -47,7 +45,7 @@ type Condition interface {
 // skill, …) so a Calculator can later remove every Func a given owner
 // attached; it is opaque to this package.
 type Func interface {
-	Calc(effector, effected, skill any, base, value float64) float64
+	Calc(effector stat.Actor, base, value float64) float64
 	Stat() stat.Stat
 	Order() int
 	Owner() any
@@ -74,6 +72,6 @@ func (b *base) Cond() Condition { return b.cond }
 
 // passes reports whether b's Condition (if any) allows the calculation to
 // proceed; an absent Condition always passes.
-func (b *base) passes(effector, effected, skill any) bool {
-	return b.cond == nil || b.cond.Test(effector, effected, skill)
+func (b *base) passes(effector stat.Actor) bool {
+	return b.cond == nil || b.cond.Test(effector)
 }
