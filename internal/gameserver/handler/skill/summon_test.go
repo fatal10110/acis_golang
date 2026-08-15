@@ -5,7 +5,10 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 type creatureSummonCaster struct {
@@ -214,38 +217,52 @@ func TestSummonPartyTeleportsPartyMembersWithoutRequest(t *testing.T) {
 	}
 }
 
-type eraseOwner struct{ vanished int }
-
-func (o *eraseOwner) ServitorVanished() { o.vanished++ }
-
-type erasableSummonFake struct {
-	*disablerFake
-	owner        any
-	siege        bool
-	unsummonedBy any
+// eraseOwnerFake is a minimal summon.Owner (world.Tracked via the embedded
+// Presence, plus LevelValue) that also implements servitorVanishNotifier,
+// standing in for the network-wired player.Character in this domain-level
+// test.
+type eraseOwnerFake struct {
+	world.Presence
+	id       int32
+	level    int
+	vanished int
 }
 
-func newErasableSummonFake(owner any) *erasableSummonFake {
-	return &erasableSummonFake{disablerFake: newDisablerFake(2), owner: owner}
-}
+func (o *eraseOwnerFake) ObjectID() int32   { return o.id }
+func (o *eraseOwnerFake) LevelValue() int   { return o.level }
+func (o *eraseOwnerFake) ServitorVanished() { o.vanished++ }
 
-func (s *erasableSummonFake) SummonOwner() any   { return s.owner }
-func (s *erasableSummonFake) SiegeSummon() bool  { return s.siege }
-func (s *erasableSummonFake) UnSummon(owner any) { s.unsummonedBy = owner }
+// newEraseServitor spawns a real *summon.Actor servitor beside owner in
+// state, exercising the production erasableSummon surface disableErase
+// asserts against rather than a fake that could satisfy an interface the
+// production type does not (see #1518).
+func newEraseServitor(t *testing.T, state *world.State, owner *eraseOwnerFake, npcID int) *summon.Actor {
+	t.Helper()
+	actor := summon.NewServitor(summon.ServitorConfig{
+		ObjectID: 2,
+		Owner:    owner,
+		NPCID:    npcID,
+		Stats:    summon.CombatStats{MaxHP: 100, MaxMP: 100},
+	})
+	summon.SpawnBesideOwner(state, actor, owner, location.Location{})
+	return actor
+}
 
 func TestEraseUnsummonsNonSiegeSummonAndNotifiesOwner(t *testing.T) {
 	registry := NewDefaultRegistry()
-	owner := &eraseOwner{}
-	summon := newErasableSummonFake(owner)
+	state := world.New()
+	owner := &eraseOwnerFake{id: 1}
+	state.Spawn(owner, 0, 0, 0, 0)
+	target := newEraseServitor(t, state, owner, 100)
 
 	registry.Use(Cast{
 		Caster:  newDisablerFake(1),
-		Skill:   modelskill.Definition{SkillType: "ERASE"},
-		Targets: []Actor{summon},
+		Skill:   modelskill.Definition{SkillType: "ERASE", IgnoreResists: true, BaseLandRate: 100},
+		Targets: []Actor{target},
 	})
 
-	if summon.unsummonedBy != owner {
-		t.Fatalf("summon unsummoned by %v, want owner", summon.unsummonedBy)
+	if _, ok := state.Summon(owner.ObjectID()); ok {
+		t.Fatal("erased servitor still registered in world.State")
 	}
 	if owner.vanished != 1 {
 		t.Fatalf("owner vanish notices = %d, want 1", owner.vanished)
@@ -254,17 +271,21 @@ func TestEraseUnsummonsNonSiegeSummonAndNotifiesOwner(t *testing.T) {
 
 func TestEraseSkipsSiegeSummon(t *testing.T) {
 	registry := NewDefaultRegistry()
-	owner := &eraseOwner{}
-	summon := newErasableSummonFake(owner)
-	summon.siege = true
+	state := world.New()
+	owner := &eraseOwnerFake{id: 1}
+	state.Spawn(owner, 0, 0, 0, 0)
+	target := newEraseServitor(t, state, owner, 14737) // Siege Golem
 
 	registry.Use(Cast{
 		Caster:  newDisablerFake(1),
-		Skill:   modelskill.Definition{SkillType: "ERASE"},
-		Targets: []Actor{summon},
+		Skill:   modelskill.Definition{SkillType: "ERASE", IgnoreResists: true, BaseLandRate: 100},
+		Targets: []Actor{target},
 	})
 
-	if summon.unsummonedBy != nil || owner.vanished != 0 {
-		t.Fatalf("siege summon was affected: unsummonedBy=%v notices=%d", summon.unsummonedBy, owner.vanished)
+	if _, ok := state.Summon(owner.ObjectID()); !ok {
+		t.Fatal("siege summon was unsummoned")
+	}
+	if owner.vanished != 0 {
+		t.Fatalf("owner vanish notices = %d, want 0", owner.vanished)
 	}
 }
