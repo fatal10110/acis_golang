@@ -224,7 +224,7 @@ func (c *Character) MEN() int { return characterStatActor{c: c}.MEN() }
 func (c *Character) LevelMod() float64 { return characterStatActor{c: c}.LevelMod() }
 
 // ShieldDefense resolves c's shield-block outcome against an incoming skill.
-func (c *Character) ShieldDefense(caster any, def modelskill.Definition, isCrit bool) formulas.ShieldDefense {
+func (c *Character) ShieldDefense(caster creature.DeathActor, def modelskill.Definition, isCrit bool) formulas.ShieldDefense {
 	if def.IgnoreShield || !c.secondaryShieldEquipped() {
 		return formulas.ShieldFailed
 	}

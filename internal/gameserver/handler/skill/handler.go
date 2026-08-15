@@ -22,9 +22,12 @@ type Actor interface {
 
 // Cast carries the already-resolved inputs a skill handler needs.
 type Cast struct {
-	Caster   Actor
-	Skill    modelskill.Definition
-	Targets  []Actor
+	Caster  Actor
+	Skill   modelskill.Definition
+	Targets []Actor
+	// Item is a genuinely heterogeneous payload with unrelated consumers
+	// (manor.go asserts it to a seed item, summon.go forwards it untouched),
+	// left untyped deliberately rather than typed against one of them.
 	Item     any
 	resisted *Result
 }

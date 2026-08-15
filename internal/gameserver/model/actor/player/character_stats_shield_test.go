@@ -3,6 +3,7 @@ package player
 import (
 	"testing"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -13,7 +14,7 @@ import (
 )
 
 type shieldDefenseResolver interface {
-	ShieldDefense(caster any, def modelskill.Definition, isCrit bool) formulas.ShieldDefense
+	ShieldDefense(caster creature.DeathActor, def modelskill.Definition, isCrit bool) formulas.ShieldDefense
 }
 
 func TestCharacterShieldDefenseUsesLiveShieldStatsFacingAndRoll(t *testing.T) {

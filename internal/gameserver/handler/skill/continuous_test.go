@@ -60,7 +60,7 @@ func (f *continuousFake) CursedWeaponEquipped() bool     { return f.cursed }
 func (f *continuousFake) EffectList() *effect.List       { return f.list }
 func (f *continuousFake) BlessedSpiritshotCharged() bool { return f.bss }
 
-func (f *continuousFake) SkillSuccessInput(caster any, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
+func (f *continuousFake) SkillSuccessInput(caster creature.DeathActor, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
 	if f.recordSuccessInput != nil {
 		f.recordSuccessInput(caster, def, bss, shield)
 	}

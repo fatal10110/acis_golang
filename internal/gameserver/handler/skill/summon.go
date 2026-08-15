@@ -9,6 +9,9 @@ import (
 
 const summonFriendConfirmTimeout = 30 * time.Second
 
+// item is cast.Item, a genuinely heterogeneous payload forwarded untouched
+// here (see Cast.Item's own doc comment for the other consumer); left
+// untyped deliberately.
 type creatureSummonRuntime interface {
 	SummonCreature(skill modelskill.Definition, item any)
 }
@@ -46,6 +49,11 @@ type summonFriendTargetState interface {
 	FestivalParticipant() bool
 }
 
+// summonFriendRequester has no production implementor: no player type wires
+// TeleportRequest/ClearTeleportRequest/ConfirmSummon, so this assertion
+// always fails against a real target and SUMMON_FRIEND/SUMMON_PARTY are
+// silent no-ops end to end. caster stays untyped pending that fix. Tracked
+// in #1525; do not type around a missing implementor.
 type summonFriendRequester interface {
 	TeleportRequest(caster any, skill modelskill.Definition) bool
 	ClearTeleportRequest()

@@ -44,7 +44,7 @@ type FormulaActor interface {
 }
 
 type shieldDefenseActor interface {
-	ShieldDefense(caster any, def modelskill.Definition, isCrit bool) formulas.ShieldDefense
+	ShieldDefense(caster DeathActor, def modelskill.Definition, isCrit bool) formulas.ShieldDefense
 }
 
 type invulnerableActor interface{ Invul() bool }
