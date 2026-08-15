@@ -277,45 +277,6 @@ func newLinkedGameClientWithSkillsShortcutsCrestsSeed(t *testing.T, skills *skil
 	return c, chars, items, shortcuts, state
 }
 
-// newLinkedGameClientWithKarmaPlayerCanTeleport is
-// newLinkedGameClientWithSkillsShortcutsCrestsSeed with an explicit
-// KarmaPlayerCanTeleport value, for the karma-teleport-rejection tests.
-func newLinkedGameClientWithKarmaPlayerCanTeleport(t *testing.T, karmaPlayerCanTeleport bool, skills *skillstate.Persistence, seed func(*fakeCharStore, *fakeItemStore), wantChars int) (c *fakeGameClient, chars *fakeCharStore, items *fakeItemStore, state *world.State) {
-	t.Helper()
-
-	loginAddr, servers, sessions := newTestLoginServer(t, false)
-	servers.Register(1, testHexID)
-
-	validator := NewSessionValidator()
-	auth := LoginServerAuth{ServerID: 1, HexID: testHexID, HostName: "*", Port: 7777, MaxPlayers: 300}
-	loginLink, err := DialLoginLink(context.Background(), loginAddr, auth, LoginLinkHandlers{PlayerAuthResponse: validator.Resolve}, zerolog.Nop())
-	if err != nil {
-		t.Fatalf("DialLoginLink: %v", err)
-	}
-	t.Cleanup(func() { loginLink.Close() })
-
-	addr, chars, items, _, state := newTestGameClientLinkWithSkillsShortcutsCrestsKarmaAndLog(t, func() *LoginLink { return loginLink }, validator, skills, nil, modelskill.BookPolicy{}, nil, karmaPlayerCanTeleport, zerolog.Nop())
-	if seed != nil {
-		seed(chars, items)
-	}
-
-	c = dialGameClient(t, addr)
-	c.sendProtocolVersion(746)
-
-	key := link.SessionKey{LoginKey1: 11, LoginKey2: 22, PlayKey1: 33, PlayKey2: 44}
-	sessions.Put("player1", key)
-	c.send(encodeAuthLogin("player1", key))
-
-	reply := c.read()
-	if reply[0] != serverpackets.OpcodeCharSelectInfo {
-		t.Fatalf("opcode = %#x, want CharSelectInfo (%#x)", reply[0], serverpackets.OpcodeCharSelectInfo)
-	}
-	if count := wire.NewReader(reply[1:]).ReadInt32(); count != int32(wantChars) {
-		t.Fatalf("initial char count = %d, want %d", count, wantChars)
-	}
-	return c, chars, items, state
-}
-
 func seedSelectableCharacter(t *testing.T, chars *fakeCharStore, account, name string, level, sp int) int32 {
 	t.Helper()
 	tmpl, ok := testTemplates(t).Get(0)
