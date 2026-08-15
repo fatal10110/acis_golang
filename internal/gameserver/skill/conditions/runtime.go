@@ -7,6 +7,12 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
+// caster/target here stay any: this is the separate data-driven
+// modelskill.Condition interpreter (<cond> XML clauses), not this package's
+// typed Condition contract. No production type implements conditions.Actor
+// yet, so this path can't be typed against it until #1087 lands; that's
+// #885's job.
+
 // EvaluateSkill reports the first condition clause that rejects the supplied
 // caster and target. The returned clause carries the feedback configured by
 // its <cond> element.

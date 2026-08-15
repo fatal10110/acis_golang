@@ -20,7 +20,7 @@ type SeedActor interface {
 // and the three remaining charges must sum to at least Required[4].
 type ElementSeed struct{ Required [5]int }
 
-func (c ElementSeed) Test(effector, effected, skill any) bool {
+func (c ElementSeed) Test(effector, effected Actor, skill Skill) bool {
 	sa, _ := effector.(SeedActor)
 
 	var seeds [3]int
@@ -83,7 +83,7 @@ type ForceBuff struct {
 	SpellForce  int
 }
 
-func (c ForceBuff) Test(effector, effected, skill any) bool {
+func (c ForceBuff) Test(effector, effected Actor, skill Skill) bool {
 	fa, hasForces := effector.(ForceActor)
 
 	if c.BattleForce > 0 {

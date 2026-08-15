@@ -8,31 +8,31 @@ import (
 // Level requires the effector to be at least the given level.
 type Level struct{ Level int }
 
-func (c Level) Test(effector, effected, skill any) bool {
-	return effector.(Actor).Level() >= c.Level
+func (c Level) Test(effector, effected Actor, skill Skill) bool {
+	return effector.Level() >= c.Level
 }
 
 // Hp requires the effector's current HP to be at or below the given
 // percentage (0-100).
 type Hp struct{ Percent int }
 
-func (c Hp) Test(effector, effected, skill any) bool {
-	return effector.(Actor).HPRatio()*100 <= float64(c.Percent)
+func (c Hp) Test(effector, effected Actor, skill Skill) bool {
+	return effector.HPRatio()*100 <= float64(c.Percent)
 }
 
 // Mp requires the effector's current MP to be at or below the given
 // percentage (0-100).
 type Mp struct{ Percent int }
 
-func (c Mp) Test(effector, effected, skill any) bool {
-	return effector.(Actor).MPRatio()*100 <= float64(c.Percent)
+func (c Mp) Test(effector, effected Actor, skill Skill) bool {
+	return effector.MPRatio()*100 <= float64(c.Percent)
 }
 
 // PkCount requires the effector to be a player with at most the given
 // number of PK kills.
 type PkCount struct{ Max int }
 
-func (c PkCount) Test(effector, effected, skill any) bool {
+func (c PkCount) Test(effector, effected Actor, skill Skill) bool {
 	p, ok := asPlayer(effector)
 	return ok && p.PkKills() <= c.Max
 }
@@ -42,7 +42,7 @@ func (c PkCount) Test(effector, effected, skill any) bool {
 // castle at all (CastleID == 0, the default when the player has no clan).
 type HasCastle struct{ CastleID int }
 
-func (c HasCastle) Test(effector, effected, skill any) bool {
+func (c HasCastle) Test(effector, effected Actor, skill Skill) bool {
 	p, ok := asPlayer(effector)
 	if !ok {
 		return false
@@ -62,7 +62,7 @@ func (c HasCastle) Test(effector, effected, skill any) bool {
 // clan).
 type HasClanHall struct{ ClanHallIDs []int }
 
-func (c HasClanHall) Test(effector, effected, skill any) bool {
+func (c HasClanHall) Test(effector, effected Actor, skill Skill) bool {
 	p, ok := asPlayer(effector)
 	if !ok {
 		return false
@@ -86,7 +86,7 @@ func (c HasClanHall) Test(effector, effected, skill any) bool {
 // slots. A non-player effector always passes.
 type InvSize struct{ Size int }
 
-func (c InvSize) Test(effector, effected, skill any) bool {
+func (c InvSize) Test(effector, effected Actor, skill Skill) bool {
 	p, ok := asPlayer(effector)
 	if !ok {
 		return true
@@ -98,7 +98,7 @@ func (c InvSize) Test(effector, effected, skill any) bool {
 // Want.
 type IsHero struct{ Want bool }
 
-func (c IsHero) Test(effector, effected, skill any) bool {
+func (c IsHero) Test(effector, effected Actor, skill Skill) bool {
 	p, ok := asPlayer(effector)
 	return ok && p.IsHero() == c.Want
 }
@@ -107,7 +107,7 @@ func (c IsHero) Test(effector, effected, skill any) bool {
 // leader (Class == -1), or at least the given pledge class.
 type PledgeClass struct{ Class int }
 
-func (c PledgeClass) Test(effector, effected, skill any) bool {
+func (c PledgeClass) Test(effector, effected Actor, skill Skill) bool {
 	p, ok := asPlayer(effector)
 	if !ok || !p.HasClan() {
 		return false
@@ -121,7 +121,7 @@ func (c PledgeClass) Test(effector, effected, skill any) bool {
 // Race requires the effector to be a player of the given race.
 type Race struct{ Race player.Race }
 
-func (c Race) Test(effector, effected, skill any) bool {
+func (c Race) Test(effector, effected Actor, skill Skill) bool {
 	p, ok := asPlayer(effector)
 	return ok && p.Race() == c.Race
 }
@@ -130,7 +130,7 @@ func (c Race) Test(effector, effected, skill any) bool {
 // (0 male, 1 female).
 type Sex struct{ Sex int }
 
-func (c Sex) Test(effector, effected, skill any) bool {
+func (c Sex) Test(effector, effected Actor, skill Skill) bool {
 	p, ok := asPlayer(effector)
 	return ok && int(p.Sex()) == c.Sex
 }
@@ -158,8 +158,8 @@ type PlayerState struct {
 	Required bool
 }
 
-func (c PlayerState) Test(effector, effected, skill any) bool {
-	a := effector.(Actor)
+func (c PlayerState) Test(effector, effected Actor, skill Skill) bool {
+	a := effector
 	switch c.Check {
 	case StateResting:
 		if p, ok := asPlayer(effector); ok {
@@ -175,9 +175,9 @@ func (c PlayerState) Test(effector, effected, skill any) bool {
 	case StateFlying:
 		return a.IsFlying() == c.Required
 	case StateBehind:
-		return a.IsBehind(effected.(Actor)) == c.Required
+		return a.IsBehind(effected) == c.Required
 	case StateFront:
-		return a.IsInFrontOf(effected.(Actor)) == c.Required
+		return a.IsInFrontOf(effected) == c.Required
 	case StateOlympiad:
 		if p, ok := asPlayer(effector); ok {
 			return p.IsInOlympiadMode() == c.Required
@@ -191,7 +191,7 @@ func (c PlayerState) Test(effector, effected, skill any) bool {
 // given tier. A non-player effector always passes.
 type Weight struct{ Tier int }
 
-func (c Weight) Test(effector, effected, skill any) bool {
+func (c Weight) Test(effector, effected Actor, skill Skill) bool {
 	p, ok := asPlayer(effector)
 	if !ok {
 		return true
@@ -202,7 +202,7 @@ func (c Weight) Test(effector, effected, skill any) bool {
 // Charges requires a player to have at least the given number of charges.
 type Charges struct{ Min int }
 
-func (c Charges) Test(effector, effected, skill any) bool {
+func (c Charges) Test(effector, effected Actor, skill Skill) bool {
 	p, ok := asPlayer(effector)
 	return ok && p.Charges() >= c.Min
 }
@@ -214,8 +214,8 @@ type ActiveEffectID struct {
 	Level    int
 }
 
-func (c ActiveEffectID) Test(effector, effected, skill any) bool {
-	level, ok := effector.(Actor).ActiveEffectLevel(c.EffectID)
+func (c ActiveEffectID) Test(effector, effected Actor, skill Skill) bool {
+	level, ok := effector.ActiveEffectLevel(c.EffectID)
 	return ok && c.Level <= level
 }
 
@@ -226,8 +226,8 @@ type ActiveSkillID struct {
 	Level   int
 }
 
-func (c ActiveSkillID) Test(effector, effected, skill any) bool {
-	level, ok := effector.(Actor).ActiveSkillLevel(c.SkillID)
+func (c ActiveSkillID) Test(effector, effected Actor, skill Skill) bool {
+	level, ok := effector.ActiveSkillLevel(c.SkillID)
 	return ok && c.Level <= level
 }
 
@@ -238,8 +238,8 @@ type InsidePoly struct {
 	CheckInside bool
 }
 
-func (c InsidePoly) Test(effector, effected, skill any) bool {
-	a := effector.(Actor)
+func (c InsidePoly) Test(effector, effected Actor, skill Skill) bool {
+	a := effector
 	inside := c.Zone.Contains(a.X(), a.Y(), a.Z())
 	if c.CheckInside {
 		return inside

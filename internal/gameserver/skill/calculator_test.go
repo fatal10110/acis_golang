@@ -4,9 +4,18 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
+
+// uncomparableCondition is a stand-in basefunc.Condition for tests that
+// attach a condition to a Func without exercising Test. Its slice field
+// makes the struct itself uncomparable with ==, matching what a real
+// condition (e.g. a *_id-list condition) looks like; RemoveFunc compares
+// the *Add/*Mul/... pointers Func wraps, not this struct, so that identity
+// check is unaffected either way.
+type uncomparableCondition struct{ ids []int }
+
+func (c uncomparableCondition) Test(effector, effected, skill any) bool { return false }
 
 func TestCalculatorOrdering(t *testing.T) {
 	var c Calculator
@@ -76,8 +85,8 @@ func TestCalculatorRemoveFuncUsesIdentity(t *testing.T) {
 func TestCalculatorRemoveFuncWithUncomparableCondition(t *testing.T) {
 	var c Calculator
 	owner1, owner2 := new(int), new(int)
-	fn1 := basefunc.NewAdd(owner1, stat.PowerAttack, 10, conditions.TargetNpcID{IDs: []int{1}})
-	fn2 := basefunc.NewAdd(owner2, stat.PowerAttack, 20, conditions.TargetNpcID{IDs: []int{2}})
+	fn1 := basefunc.NewAdd(owner1, stat.PowerAttack, 10, uncomparableCondition{ids: []int{1}})
+	fn2 := basefunc.NewAdd(owner2, stat.PowerAttack, 20, uncomparableCondition{ids: []int{2}})
 	c.AddFunc(fn1)
 	c.AddFunc(fn2)
 

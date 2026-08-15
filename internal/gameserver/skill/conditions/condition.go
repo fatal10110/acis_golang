@@ -6,10 +6,17 @@ package conditions
 // model/item.UseCondition, which already owns it. Nothing in this package
 // duplicates that.
 
+// Condition is this package's own cast-time gate contract, decoupled from
+// basefunc.Condition: a stat function is gated by its owner alone, while a
+// cast condition needs both sides of the cast plus the skill being cast.
+type Condition interface {
+	Test(effector, effected Actor, skill Skill) bool
+}
+
 // asPlayer asserts effector to PlayerActor, reporting ok=false rather than
 // panicking. A non-player effector is a normal condition result: most
 // player-only conditions simply fail instead of treating it as a wiring bug.
-func asPlayer(effector any) (PlayerActor, bool) {
+func asPlayer(effector Actor) (PlayerActor, bool) {
 	p, ok := effector.(PlayerActor)
 	return p, ok
 }
