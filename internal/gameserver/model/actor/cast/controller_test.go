@@ -645,6 +645,9 @@ func TestInterruptOnDamageWindowBoundaryTable(t *testing.T) {
 
 type testTarget struct{}
 
+func (testTarget) ObjectID() int32         { return 1 }
+func (testTarget) Position() (x, y, z int) { return 0, 0, 0 }
+
 type testActor struct {
 	mp, hp int
 

@@ -14,6 +14,7 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets.RequestMagicSkillUse) {
@@ -190,7 +191,7 @@ func (l *GameClientLink) walkToGroundCast(live *livePlayer, req clientpackets.Re
 	return true
 }
 
-func (l *GameClientLink) resolveMagicSkillTarget(caster actorcast.Target, selected any, def modelskill.Definition, ctrl bool) (actorcast.Target, bool) {
+func (l *GameClientLink) resolveMagicSkillTarget(caster actorcast.Target, selected world.Tracked, def modelskill.Definition, ctrl bool) (actorcast.Target, bool) {
 	casterCreature, ok := caster.(skilltarget.Creature)
 	if !ok {
 		return nil, false

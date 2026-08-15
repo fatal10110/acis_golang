@@ -412,7 +412,7 @@ func TestTaskEffectsDrownDoesNotBreakInFlightCast(t *testing.T) {
 	gcl := &GameClientLink{log: zerolog.Nop()}
 	controller := gcl.castController(live)
 	castingDef := modelskill.Definition{ID: 9, Level: 1, HitTime: 5000, StaticHitTime: true, StaticReuse: true}
-	if _, err := controller.Start(time.Now(), skillCastObject(live), castingDef); err != nil {
+	if _, err := controller.Start(time.Now(), live, castingDef); err != nil {
 		t.Fatalf("Start() error: %v", err)
 	}
 

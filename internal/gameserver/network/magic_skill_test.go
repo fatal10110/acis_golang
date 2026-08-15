@@ -1129,7 +1129,7 @@ func TestAbortedCastSendsCancelAndActionFailed(t *testing.T) {
 		ID: 3, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
 		HitTime: 5000, ReuseDelay: 1200, StaticHitTime: true, StaticReuse: true,
 	}
-	if _, err := controller.Start(time.Now(), skillCastObject(live), def); err != nil {
+	if _, err := controller.Start(time.Now(), live, def); err != nil {
 		t.Fatalf("Start() error: %v", err)
 	}
 	capture.frames = nil
@@ -1170,7 +1170,7 @@ func TestInterruptedCastSendsCancelCastingInterruptedAndActionFailed(t *testing.
 		HitTime: 5000, ReuseDelay: 1200, StaticHitTime: true, StaticReuse: true,
 	}
 	now := time.Now()
-	if _, err := controller.Start(now, skillCastObject(live), def); err != nil {
+	if _, err := controller.Start(now, live, def); err != nil {
 		t.Fatalf("Start() error: %v", err)
 	}
 	capture.frames = nil

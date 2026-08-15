@@ -5,6 +5,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // Definitions resolves loaded skill definitions.
@@ -22,12 +23,12 @@ type PlayerSkillRequest struct {
 	Now           time.Time
 	Controller    *Controller
 	Caster        *player.Character
-	Selected      any
+	Selected      world.Tracked
 	SkillID       int
 	Definitions   Definitions
 	Ctrl          bool
 	Shift         bool
-	ResolveTarget func(Target, any, modelskill.Definition, bool) (Target, bool)
+	ResolveTarget func(Target, world.Tracked, modelskill.Definition, bool) (Target, bool)
 }
 
 // fakeDeathSkillID is the Fake Death toggle skill. Recasting it while
@@ -76,7 +77,7 @@ type ItemSkillRequest struct {
 	Now         time.Time
 	Controller  *Controller
 	Caster      *player.Character
-	Selected    any
+	Selected    world.Tracked
 	Skill       modelskill.Ref
 	Definitions Definitions
 }
@@ -100,7 +101,7 @@ func StartItemSkill(req ItemSkillRequest) (StartedSkill, error) {
 // startResolvedSkill runs the shared target-resolution and cost/reuse start
 // sequence once a caller has already resolved def, regardless of whether
 // def came from the caster's own skill list or an item's attached skill.
-func startResolvedSkill(now time.Time, controller *Controller, caster *player.Character, selected any, def modelskill.Definition, ctrl bool, resolveTarget func(Target, any, modelskill.Definition, bool) (Target, bool)) (StartedSkill, error) {
+func startResolvedSkill(now time.Time, controller *Controller, caster *player.Character, selected world.Tracked, def modelskill.Definition, ctrl bool, resolveTarget func(Target, world.Tracked, modelskill.Definition, bool) (Target, bool)) (StartedSkill, error) {
 	target, ok := SelectTarget(caster, selected, def)
 	if !ok && resolveTarget != nil {
 		target, ok = resolveTarget(caster, selected, def, ctrl)
@@ -138,7 +139,7 @@ func startResolvedSkill(now time.Time, controller *Controller, caster *player.Ch
 // network packet has been decoded.
 type PlayerToggleRequest struct {
 	Caster      *player.Character
-	Selected    any
+	Selected    world.Tracked
 	SkillID     int
 	Definitions Definitions
 }

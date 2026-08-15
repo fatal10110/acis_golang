@@ -106,7 +106,7 @@ func TestMoveLivePlayerLeavesInFlightCastRunning(t *testing.T) {
 	live := newTestLivePlayer(t, 1, &frameCapture{})
 	gcl := &GameClientLink{log: zerolog.Nop()}
 	controller := gcl.castController(live)
-	if _, err := controller.Start(time.Now(), skillCastObject(live), castingDef); err != nil {
+	if _, err := controller.Start(time.Now(), live, castingDef); err != nil {
 		t.Fatalf("Start() error: %v", err)
 	}
 
@@ -307,7 +307,7 @@ func TestChangeLiveWaitTypeSitLeavesInFlightCastRunning(t *testing.T) {
 	live := newTestLivePlayer(t, 1, &frameCapture{})
 	gcl := &GameClientLink{log: zerolog.Nop()}
 	controller := gcl.castController(live)
-	if _, err := controller.Start(time.Now(), skillCastObject(live), castingDef); err != nil {
+	if _, err := controller.Start(time.Now(), live, castingDef); err != nil {
 		t.Fatalf("Start() error: %v", err)
 	}
 

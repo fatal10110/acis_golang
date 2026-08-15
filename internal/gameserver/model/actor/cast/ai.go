@@ -19,9 +19,8 @@ type AIController struct {
 	Definitions Definitions
 	Effects     EffectHandlers
 	// Caster is the actor casting the skill, used both to start the cast
-	// and, when it also satisfies skilltarget.Creature, as ApplyEffects'
-	// caster.
-	Caster Target
+	// and as ApplyEffects' caster.
+	Caster skilltarget.Creature
 	// OnLaunchAbort sends the caster-visible result of a launch-phase gate
 	// failure. Network wiring owns the system-message encoding.
 	OnLaunchAbort func(LaunchAbortReason)

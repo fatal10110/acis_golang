@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 func TestCubicGrantedLevel(t *testing.T) {
@@ -32,7 +33,9 @@ type fakeCubicHealTarget struct {
 	added         float64
 }
 
-func (f *fakeCubicHealTarget) CanBeHealed() bool { return f.healable }
+func (f *fakeCubicHealTarget) ObjectID() int32           { return 1 }
+func (f *fakeCubicHealTarget) Position() (int, int, int) { return 0, 0, 0 }
+func (f *fakeCubicHealTarget) CanBeHealed() bool         { return f.healable }
 func (f *fakeCubicHealTarget) AddHP(amount float64) float64 {
 	f.added = amount
 	return amount
@@ -66,7 +69,7 @@ func TestApplyCubicHeal_SkipsUnhealableTarget(t *testing.T) {
 type fakeCubicFireOwner struct {
 	objectID int32
 	x, y, z  int
-	target   any
+	target   world.Tracked
 	rolls    []int
 	rollIdx  int
 	hp       int
@@ -75,7 +78,7 @@ type fakeCubicFireOwner struct {
 
 func (f *fakeCubicFireOwner) ObjectID() int32           { return f.objectID }
 func (f *fakeCubicFireOwner) Position() (int, int, int) { return f.x, f.y, f.z }
-func (f *fakeCubicFireOwner) Target() any               { return f.target }
+func (f *fakeCubicFireOwner) Target() world.Tracked     { return f.target }
 func (f *fakeCubicFireOwner) CurrentHP() int            { return f.hp }
 func (f *fakeCubicFireOwner) MaxHPValue() float64       { return f.maxHP }
 func (f *fakeCubicFireOwner) Roll(n int) int {
@@ -91,6 +94,7 @@ func (f *fakeCubicFireOwner) Roll(n int) int {
 }
 
 type fakeCubicTarget struct {
+	world.Presence
 	objectID   int32
 	x, y, z    int
 	alikeDead  bool

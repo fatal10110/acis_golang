@@ -104,8 +104,8 @@ func TestFinishObserverReportsTheCastThatEnded(t *testing.T) {
 	ctrl, _, _ := newAbortController()
 	target := testTarget{}
 	var gotDef modelskill.Definition
-	var gotTarget any
-	ctrl.SetOnFinish(func(_ bool, def modelskill.Definition, tgt any) {
+	var gotTarget Target
+	ctrl.SetOnFinish(func(_ bool, def modelskill.Definition, tgt Target) {
 		gotDef, gotTarget = def, tgt
 	})
 	if _, err := ctrl.Start(time.Unix(1000, 0), target, scalingDef); err != nil {
@@ -139,7 +139,7 @@ func TestFinishObserverReportsEveryInFlightCastOnce(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl, _, _ := newAbortController()
 			var got []bool
-			ctrl.SetOnFinish(func(interrupted bool, _ modelskill.Definition, _ any) { got = append(got, interrupted) })
+			ctrl.SetOnFinish(func(interrupted bool, _ modelskill.Definition, _ Target) { got = append(got, interrupted) })
 			if tt.start {
 				if _, err := ctrl.Start(now, testTarget{}, scalingDef); err != nil {
 					t.Fatalf("Start() error: %v", err)

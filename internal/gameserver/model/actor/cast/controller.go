@@ -155,7 +155,7 @@ type Controller struct {
 	mu             sync.RWMutex
 	casting        bool
 	current        modelskill.Definition
-	target         any
+	target         Target
 	plan           Plan
 	startedAt      time.Time
 	interruptUntil time.Time
@@ -169,7 +169,7 @@ type Controller struct {
 	fusionEnd func()
 	afterFunc afterFunc
 	onAbort   func(interrupted bool)
-	onFinish  func(interrupted bool, def modelskill.Definition, target any)
+	onFinish  func(interrupted bool, def modelskill.Definition, target Target)
 	onStopAck func()
 	log       zerolog.Logger
 }
@@ -207,7 +207,7 @@ func (c *Controller) SetOnAbort(f func(interrupted bool)) {
 // reference's nextActionAttack resume gate (PlayableAI.onEvtFinishedCasting,
 // PlayableAI.java:43-63). The observer runs after the controller lock is
 // released.
-func (c *Controller) SetOnFinish(f func(interrupted bool, def modelskill.Definition, target any)) {
+func (c *Controller) SetOnFinish(f func(interrupted bool, def modelskill.Definition, target Target)) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.onFinish = f
@@ -245,7 +245,7 @@ func (c *Controller) CurrentSkill() (modelskill.Definition, bool) {
 
 // CanCast validates the reusable pre-cast checks for target, reuse, current
 // MP/HP, mute state, and required skill items.
-func (c *Controller) CanCast(target any, def modelskill.Definition) error {
+func (c *Controller) CanCast(target Target, def modelskill.Definition) error {
 	if c.actor == nil || target == nil {
 		return ErrInvalidTarget
 	}
@@ -286,7 +286,7 @@ func (c *Controller) CanCast(target any, def modelskill.Definition) error {
 // Start accepts a cast, applies the start-of-cast costs and cooldowns, and
 // stores the active cast state. The caller owns scheduling Launch, Hit and
 // Finish according to the returned Plan.
-func (c *Controller) Start(now time.Time, target any, def modelskill.Definition) (Plan, error) {
+func (c *Controller) Start(now time.Time, target Target, def modelskill.Definition) (Plan, error) {
 	if err := c.CanCast(target, def); err != nil {
 		return Plan{}, err
 	}
