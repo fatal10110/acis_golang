@@ -64,6 +64,25 @@ rtk go -C acis_golang test -tags=integration -count=1 ./...
 
 CI runs `-race` and `-tags=integration` as separate jobs; run both locally before claiming completion.
 
+### Colima: `-tags=integration` needs an explicit Docker host and Ryuk disabled
+
+`-tags=integration` spins up mariadb via testcontainers-go. On a machine running Colima instead of
+Docker Desktop, the default socket discovery fails with `rootless Docker not found`, and even after
+pointing at the Colima socket, testcontainers' Ryuk reaper sidecar fails to start (`error while
+creating mount source path .../docker.sock: operation not supported`) because it bind-mounts the
+socket the way Docker Desktop's layout expects, which Colima's does not match. Set both before
+running the integration gate:
+
+```bash
+export DOCKER_HOST=unix://$HOME/.colima/default/docker.sock
+export TESTCONTAINERS_RYUK_DISABLED=true
+rtk go -C acis_golang test -tags=integration -count=1 ./...
+```
+
+Confirm the actual socket path with `docker context ls` first — `default/docker.sock` assumes the
+default Colima profile. Disabling Ryuk only skips its container-cleanup sidecar; testcontainers still
+tears down each container it starts.
+
 ### Datapack oracle tests are local-only — CI cannot run them
 
 `aCis_datapack` is a separate checkout that is never pushed, and `.github/workflows/go.yml` checks
