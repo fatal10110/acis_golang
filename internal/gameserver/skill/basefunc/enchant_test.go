@@ -75,7 +75,7 @@ func TestEnchantCalc(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			fn := NewEnchant(tt.owner, tt.s, 0, nil)
-			got := fn.Calc(nil, nil, nil, 0, 0)
+			got := fn.Calc(nil, 0, 0)
 			if got != tt.want {
 				t.Errorf("Calc() = %v, want %v", got, tt.want)
 			}
@@ -86,7 +86,7 @@ func TestEnchantCalc(t *testing.T) {
 func TestEnchantConditionGate(t *testing.T) {
 	failing := &fakeCond{result: false}
 	fn := NewEnchant(fakeEnchantedItem{enchant: 5}, stat.PowerDefence, 0, failing)
-	if got := fn.Calc(nil, nil, nil, 0, 10); got != 10 {
+	if got := fn.Calc(nil, 0, 10); got != 10 {
 		t.Errorf("Calc() with failing condition = %v, want unchanged 10", got)
 	}
 	if !failing.invoked {

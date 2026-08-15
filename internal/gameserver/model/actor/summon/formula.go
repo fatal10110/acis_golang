@@ -103,7 +103,7 @@ func (a *Actor) statCalcLocked(s stat.Stat) *basefunc.Calculator {
 }
 
 func (a *Actor) calcStat(s stat.Stat, base float64) float64 {
-	value := a.statCalculator(s).Calc(summonStatActor{a: a}, a, nil, base)
+	value := a.statCalculator(s).Calc(summonStatActor{a: a}, base)
 	if s.CantBeNegative() && value < 0 {
 		return 0
 	}
@@ -154,7 +154,7 @@ func defaultStatFuncs(s stat.Stat) []basefunc.Func {
 
 type summonStatActor struct{ a *Actor }
 
-var _ funcs.Actor = summonStatActor{}
+var _ stat.Actor = summonStatActor{}
 
 func (s summonStatActor) STR() int { return defaultInt(s.a.combatStats().STR, 40) }
 func (s summonStatActor) CON() int { return defaultInt(s.a.combatStats().CON, 21) }

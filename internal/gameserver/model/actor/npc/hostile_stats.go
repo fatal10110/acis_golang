@@ -69,7 +69,7 @@ func (h *Hostile) statCalcLocked(s stat.Stat) *basefunc.Calculator {
 // plus any buff/debuff funcs an active effect has added) starting from
 // base, clamping to zero for a stat that can't go negative.
 func (h *Hostile) calcStat(s stat.Stat, base float64) float64 {
-	value := h.statCalc(s).Calc(hostileStatActor{h: h}, h, nil, base)
+	value := h.statCalc(s).Calc(hostileStatActor{h: h}, base)
 	if s.CantBeNegative() && value < 0 {
 		return 0
 	}
@@ -125,7 +125,7 @@ func defaultStatFuncs(s stat.Stat) []basefunc.Func {
 // the shared attack/defense/regen/speed funcs read from their effector.
 type hostileStatActor struct{ h *Hostile }
 
-var _ funcs.Actor = hostileStatActor{}
+var _ stat.Actor = hostileStatActor{}
 
 func (a hostileStatActor) STR() int { return a.h.Instance.Template.STR }
 func (a hostileStatActor) CON() int { return a.h.Instance.Template.CON }

@@ -12,8 +12,8 @@ func NewSet(owner any, s stat.Stat, value float64, cond Condition) *Set {
 	return &Set{base{owner, s, OrderSet, value, cond}}
 }
 
-func (f *Set) Calc(effector, effected, skill any, base, value float64) float64 {
-	if !f.passes(effector, effected, skill) {
+func (f *Set) Calc(effector stat.Actor, base, value float64) float64 {
+	if !f.passes(effector) {
 		return value
 	}
 	return f.value
@@ -27,8 +27,8 @@ func NewBaseMul(owner any, s stat.Stat, value float64, cond Condition) *BaseMul 
 	return &BaseMul{base{owner, s, OrderBaseMul, value, cond}}
 }
 
-func (f *BaseMul) Calc(effector, effected, skill any, base, value float64) float64 {
-	if !f.passes(effector, effected, skill) {
+func (f *BaseMul) Calc(effector stat.Actor, base, value float64) float64 {
+	if !f.passes(effector) {
 		return value
 	}
 	return value + base*f.value
@@ -42,8 +42,8 @@ func NewBaseAdd(owner any, s stat.Stat, value float64, cond Condition) *BaseAdd 
 	return &BaseAdd{base{owner, s, OrderBaseAdd, value, cond}}
 }
 
-func (f *BaseAdd) Calc(effector, effected, skill any, base, value float64) float64 {
-	if !f.passes(effector, effected, skill) {
+func (f *BaseAdd) Calc(effector stat.Actor, base, value float64) float64 {
+	if !f.passes(effector) {
 		return value
 	}
 	return value + f.value
@@ -57,8 +57,8 @@ func NewMul(owner any, s stat.Stat, value float64, cond Condition) *Mul {
 	return &Mul{base{owner, s, OrderMulDiv, value, cond}}
 }
 
-func (f *Mul) Calc(effector, effected, skill any, base, value float64) float64 {
-	if !f.passes(effector, effected, skill) {
+func (f *Mul) Calc(effector stat.Actor, base, value float64) float64 {
+	if !f.passes(effector) {
 		return value
 	}
 	return value * f.value
@@ -71,8 +71,8 @@ func NewDiv(owner any, s stat.Stat, value float64, cond Condition) *Div {
 	return &Div{base{owner, s, OrderMulDiv, value, cond}}
 }
 
-func (f *Div) Calc(effector, effected, skill any, base, value float64) float64 {
-	if !f.passes(effector, effected, skill) {
+func (f *Div) Calc(effector stat.Actor, base, value float64) float64 {
+	if !f.passes(effector) {
 		return value
 	}
 	return value / f.value
@@ -86,8 +86,8 @@ func NewAdd(owner any, s stat.Stat, value float64, cond Condition) *Add {
 	return &Add{base{owner, s, OrderAddSub, value, cond}}
 }
 
-func (f *Add) Calc(effector, effected, skill any, base, value float64) float64 {
-	if !f.passes(effector, effected, skill) {
+func (f *Add) Calc(effector stat.Actor, base, value float64) float64 {
+	if !f.passes(effector) {
 		return value
 	}
 	return value + f.value
@@ -101,8 +101,8 @@ func NewSub(owner any, s stat.Stat, value float64, cond Condition) *Sub {
 	return &Sub{base{owner, s, OrderAddSub, value, cond}}
 }
 
-func (f *Sub) Calc(effector, effected, skill any, base, value float64) float64 {
-	if !f.passes(effector, effected, skill) {
+func (f *Sub) Calc(effector stat.Actor, base, value float64) float64 {
+	if !f.passes(effector) {
 		return value
 	}
 	return value - f.value
@@ -116,8 +116,8 @@ func NewAddMul(owner any, s stat.Stat, value float64, cond Condition) *AddMul {
 	return &AddMul{base{owner, s, OrderAddMul, value, cond}}
 }
 
-func (f *AddMul) Calc(effector, effected, skill any, base, value float64) float64 {
-	if !f.passes(effector, effected, skill) {
+func (f *AddMul) Calc(effector stat.Actor, base, value float64) float64 {
+	if !f.passes(effector) {
 		return value
 	}
 	return value * (1 - f.value/100)
@@ -131,8 +131,8 @@ func NewSubDiv(owner any, s stat.Stat, value float64, cond Condition) *SubDiv {
 	return &SubDiv{base{owner, s, OrderAddMul, value, cond}}
 }
 
-func (f *SubDiv) Calc(effector, effected, skill any, base, value float64) float64 {
-	if !f.passes(effector, effected, skill) {
+func (f *SubDiv) Calc(effector stat.Actor, base, value float64) float64 {
+	if !f.passes(effector) {
 		return value
 	}
 	return value / (1 - f.value/100)

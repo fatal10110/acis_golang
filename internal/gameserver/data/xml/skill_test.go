@@ -9,14 +9,23 @@ import (
 	gameskill "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
-// fakeWearingActor is a minimal conditions.Actor/PlayerActor double: only
-// IsWearingType reports anything meaningful, which is all
+// fakeWearingActor is a minimal stat.Actor+conditions.Actor/PlayerActor
+// double: only IsWearingType reports anything meaningful, which is all
 // TestConditionalStatFuncsBuildForEveryShippedSkill's using-kind assertion
 // needs.
 type fakeWearingActor struct{ mask int }
 
+func (fakeWearingActor) STR() int                          { return 0 }
+func (fakeWearingActor) CON() int                          { return 0 }
+func (fakeWearingActor) DEX() int                          { return 0 }
+func (fakeWearingActor) INT() int                          { return 0 }
+func (fakeWearingActor) WIT() int                          { return 0 }
+func (fakeWearingActor) MEN() int                          { return 0 }
+func (fakeWearingActor) LevelMod() float64                 { return 1 }
+func (fakeWearingActor) IsSummon() bool                    { return false }
 func (fakeWearingActor) Level() int                        { return 1 }
 func (fakeWearingActor) HPRatio() float64                  { return 1 }
 func (fakeWearingActor) MPRatio() float64                  { return 1 }
@@ -49,6 +58,8 @@ func (fakeWearingActor) InventorySize() int                { return 0 }
 func (fakeWearingActor) InventoryLimit() int               { return 0 }
 func (fakeWearingActor) Charges() int                      { return 0 }
 func (a fakeWearingActor) IsWearingType(mask int) bool     { return a.mask&mask != 0 }
+
+var _ stat.Actor = fakeWearingActor{}
 
 // TestConditionalStatFuncsBuildForEveryShippedSkill covers issue #1499's
 // acceptance criteria directly against the real datapack: every shipped
@@ -108,10 +119,10 @@ func TestConditionalStatFuncsBuildForEveryShippedSkill(t *testing.T) {
 			}
 			rEvasFunc = true
 			const lightMask = 1 << 15 // item.ArmorLight.Mask()
-			if !fn.Cond().Test(fakeWearingActor{mask: lightMask}, fakeWearingActor{mask: lightMask}, nil) {
+			if !fn.Cond().Test(fakeWearingActor{mask: lightMask}) {
 				t.Error("rEvas bonus should apply while wearing light armor")
 			}
-			if fn.Cond().Test(fakeWearingActor{mask: 0}, fakeWearingActor{mask: 0}, nil) {
+			if fn.Cond().Test(fakeWearingActor{mask: 0}) {
 				t.Error("rEvas bonus should not apply while not wearing light armor")
 			}
 		}

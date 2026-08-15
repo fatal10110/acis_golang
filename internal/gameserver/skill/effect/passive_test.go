@@ -40,7 +40,7 @@ func TestPassiveFuncsBuildsFuncsOwnedByTheSkillLevel(t *testing.T) {
 	if funcs[0].Stat() != stat.RootVuln {
 		t.Fatalf("funcs[0].Stat() = %s, want %s", funcs[0].Stat(), stat.RootVuln)
 	}
-	if got := funcs[0].Calc(nil, nil, nil, 100, 100); got != 80 {
+	if got := funcs[0].Calc(nil, 100, 100); got != 80 {
 		t.Fatalf("funcs[0].Calc() = %v, want 80", got)
 	}
 }

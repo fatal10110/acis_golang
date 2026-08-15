@@ -26,8 +26,8 @@ func NewEnchant(owner any, s stat.Stat, value float64, cond Condition) *Enchant 
 	return &Enchant{base{owner, s, OrderEnchant, value, cond}}
 }
 
-func (f *Enchant) Calc(effector, effected, skill any, calcBase, value float64) float64 {
-	if !f.passes(effector, effected, skill) {
+func (f *Enchant) Calc(effector stat.Actor, calcBase, value float64) float64 {
+	if !f.passes(effector) {
 		return value
 	}
 

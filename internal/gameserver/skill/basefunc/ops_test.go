@@ -13,7 +13,7 @@ type fakeCond struct {
 	invoked bool
 }
 
-func (f *fakeCond) Test(effector, effected, skill any) bool {
+func (f *fakeCond) Test(effector stat.Actor) bool {
 	f.invoked = true
 	return f.result
 }
@@ -41,7 +41,7 @@ func TestOpsCalc(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := tt.fn.Calc(nil, nil, nil, tt.base, tt.value)
+			got := tt.fn.Calc(nil, tt.base, tt.value)
 			if got != tt.want {
 				t.Errorf("Calc() = %v, want %v", got, tt.want)
 			}
@@ -82,7 +82,7 @@ func TestOpsOrder(t *testing.T) {
 func TestConditionGate(t *testing.T) {
 	failing := &fakeCond{result: false}
 	add := NewAdd(nil, stat.PowerAttack, 5, failing)
-	if got := add.Calc("effector", "effected", "skill", 10, 20); got != 20 {
+	if got := add.Calc(nil, 10, 20); got != 20 {
 		t.Errorf("Calc() with failing condition = %v, want unchanged 20", got)
 	}
 	if !failing.invoked {
@@ -91,7 +91,7 @@ func TestConditionGate(t *testing.T) {
 
 	passing := &fakeCond{result: true}
 	add2 := NewAdd(nil, stat.PowerAttack, 5, passing)
-	if got := add2.Calc(nil, nil, nil, 10, 20); got != 25 {
+	if got := add2.Calc(nil, 10, 20); got != 25 {
 		t.Errorf("Calc() with passing condition = %v, want 25", got)
 	}
 }

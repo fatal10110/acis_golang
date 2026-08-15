@@ -57,7 +57,7 @@ func TestNewBuildsBuffWithRuntimeStatFuncs(t *testing.T) {
 	if e.Funcs[0].Stat() != stat.RunSpeed {
 		t.Fatalf("first func stat = %s, want runSpd", e.Funcs[0].Stat())
 	}
-	if got := e.Funcs[0].Calc(nil, nil, nil, 100, 100); got != 133 {
+	if got := e.Funcs[0].Calc(nil, 100, 100); got != 133 {
 		t.Fatalf("first func Calc() = %v, want 133", got)
 	}
 

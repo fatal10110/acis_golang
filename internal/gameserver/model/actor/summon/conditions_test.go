@@ -24,17 +24,14 @@ func (openGeo) ValidLocation(ox, oy, oz, tx, ty, tz int) location.Location {
 }
 
 // movingGate is a minimal basefunc.Condition mirroring skill/effect's
-// conditionGate for a <player moving="true"/> tag: it resolves effected
-// (falling back to effector) to a conditions.Actor and requires IsMoving().
-// Exercises #1510: before it, summonStatActor.IsMoving() was hardcoded
-// false, so this gate could never pass regardless of real movement state.
+// conditionGate for a <player moving="true"/> tag: it resolves effector to
+// a conditions.Actor and requires IsMoving(). Exercises #1510: before it,
+// summonStatActor.IsMoving() was hardcoded false, so this gate could never
+// pass regardless of real movement state.
 type movingGate struct{}
 
-func (g movingGate) Test(effector, effected, skill any) bool {
-	actor, ok := effected.(conditions.Actor)
-	if !ok {
-		actor, ok = effector.(conditions.Actor)
-	}
+func (g movingGate) Test(effector stat.Actor) bool {
+	actor, ok := effector.(conditions.Actor)
 	return ok && actor.IsMoving()
 }
 
@@ -76,18 +73,14 @@ func TestSummonConditionalStatFuncGatesOnRealMovement(t *testing.T) {
 }
 
 // levelGate is a minimal basefunc.Condition mirroring skill/effect's
-// conditionGate: it resolves effected (falling back to effector) to a
-// conditions.Actor and requires its Level() to meet min. Before #1509,
-// summonStatActor didn't implement conditions.Actor, so this always
-// resolved to false regardless of min — a conditional stat func on a
-// summon-owned skill silently never applied.
+// conditionGate: it resolves effector to a conditions.Actor and requires
+// its Level() to meet min. Before #1509, summonStatActor didn't implement
+// conditions.Actor, so this always resolved to false regardless of min — a
+// conditional stat func on a summon-owned skill silently never applied.
 type levelGate struct{ min int }
 
-func (g levelGate) Test(effector, effected, skill any) bool {
-	actor, ok := effected.(conditions.Actor)
-	if !ok {
-		actor, ok = effector.(conditions.Actor)
-	}
+func (g levelGate) Test(effector stat.Actor) bool {
+	actor, ok := effector.(conditions.Actor)
 	return ok && actor.Level() >= g.min
 }
 

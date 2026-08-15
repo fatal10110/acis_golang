@@ -6,8 +6,8 @@ import "github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 // attributes; a non-player effector is unaffected.
 type henna struct{ fixed }
 
-func (h *henna) Calc(effector, effected, skill any, base, value float64) float64 {
-	if p, ok := effector.(PlayerActor); ok {
+func (h *henna) Calc(effector stat.Actor, base, value float64) float64 {
+	if p, ok := effector.(stat.PlayerActor); ok {
 		return value + p.HennaBonus(h.s)
 	}
 	return value

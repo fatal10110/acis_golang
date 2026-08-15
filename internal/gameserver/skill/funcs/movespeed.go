@@ -10,6 +10,6 @@ type moveSpeed struct{ fixed }
 
 var MoveSpeed = &moveSpeed{fixed{stat.RunSpeed}}
 
-func (*moveSpeed) Calc(effector, effected, skill any, base, value float64) float64 {
-	return value * statbonus.DEXBonus[actorOf(effector).DEX()]
+func (*moveSpeed) Calc(effector stat.Actor, base, value float64) float64 {
+	return value * statbonus.DEXBonus[effector.DEX()]
 }
