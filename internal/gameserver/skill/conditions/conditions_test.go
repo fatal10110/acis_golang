@@ -6,43 +6,42 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
 // Static interface-satisfaction checks: every leaf/logic condition type
-// must be usable as a basefunc.Condition (what a Func's Cond() carries).
+// must be usable as this package's own Condition.
 var (
-	_ basefunc.Condition = Level{}
-	_ basefunc.Condition = Hp{}
-	_ basefunc.Condition = Mp{}
-	_ basefunc.Condition = PkCount{}
-	_ basefunc.Condition = HasCastle{}
-	_ basefunc.Condition = HasClanHall{}
-	_ basefunc.Condition = InvSize{}
-	_ basefunc.Condition = IsHero{}
-	_ basefunc.Condition = PledgeClass{}
-	_ basefunc.Condition = Race{}
-	_ basefunc.Condition = Sex{}
-	_ basefunc.Condition = PlayerState{}
-	_ basefunc.Condition = Weight{}
-	_ basefunc.Condition = Charges{}
-	_ basefunc.Condition = ActiveEffectID{}
-	_ basefunc.Condition = ActiveSkillID{}
-	_ basefunc.Condition = InsidePoly{}
-	_ basefunc.Condition = TargetActiveSkillID{}
-	_ basefunc.Condition = TargetHpMinMax{}
-	_ basefunc.Condition = TargetNpcID{}
-	_ basefunc.Condition = TargetRaceID{}
-	_ basefunc.Condition = SkillStats{}
-	_ basefunc.Condition = UsingItemType{}
-	_ basefunc.Condition = GameChance{}
-	_ basefunc.Condition = GameTime{}
-	_ basefunc.Condition = ElementSeed{}
-	_ basefunc.Condition = ForceBuff{}
-	_ basefunc.Condition = &And{}
-	_ basefunc.Condition = &Or{}
-	_ basefunc.Condition = Not{}
+	_ Condition = Level{}
+	_ Condition = Hp{}
+	_ Condition = Mp{}
+	_ Condition = PkCount{}
+	_ Condition = HasCastle{}
+	_ Condition = HasClanHall{}
+	_ Condition = InvSize{}
+	_ Condition = IsHero{}
+	_ Condition = PledgeClass{}
+	_ Condition = Race{}
+	_ Condition = Sex{}
+	_ Condition = PlayerState{}
+	_ Condition = Weight{}
+	_ Condition = Charges{}
+	_ Condition = ActiveEffectID{}
+	_ Condition = ActiveSkillID{}
+	_ Condition = InsidePoly{}
+	_ Condition = TargetActiveSkillID{}
+	_ Condition = TargetHpMinMax{}
+	_ Condition = TargetNpcID{}
+	_ Condition = TargetRaceID{}
+	_ Condition = SkillStats{}
+	_ Condition = UsingItemType{}
+	_ Condition = GameChance{}
+	_ Condition = GameTime{}
+	_ Condition = ElementSeed{}
+	_ Condition = ForceBuff{}
+	_ Condition = &And{}
+	_ Condition = &Or{}
+	_ Condition = Not{}
 )
 
 type fakeActor struct {
@@ -354,15 +353,24 @@ func TestTargetConditions(t *testing.T) {
 	}
 }
 
-type fakeNpcTarget struct{ id int32 }
+type fakeNpcTarget struct {
+	fakeActor
+	id int32
+}
 
 func (f fakeNpcTarget) NpcID() int32 { return f.id }
 
-type fakeDoorTarget struct{ id int }
+type fakeDoorTarget struct {
+	fakeActor
+	id int
+}
 
 func (f fakeDoorTarget) DoorID() int { return f.id }
 
-type fakeRaceTarget struct{ race int }
+type fakeRaceTarget struct {
+	fakeActor
+	race int
+}
 
 func (f fakeRaceTarget) RaceOrdinal() int { return f.race }
 
@@ -376,7 +384,7 @@ func TestTargetNpcAndRaceID(t *testing.T) {
 	if !(TargetNpcID{IDs: []int{7}}).Test(nil, fakeDoorTarget{id: 7}, nil) {
 		t.Error("door id in list should pass")
 	}
-	if (TargetNpcID{IDs: []int{7}}).Test(nil, "not-a-target", nil) {
+	if (TargetNpcID{IDs: []int{7}}).Test(nil, fakeActor{}, nil) {
 		t.Error("neither npc nor door should fail")
 	}
 
@@ -441,7 +449,10 @@ func TestGameTime(t *testing.T) {
 	}
 }
 
-type fakeSeedActor struct{ powers map[int]int }
+type fakeSeedActor struct {
+	fakeActor
+	powers map[int]int
+}
 
 func (s fakeSeedActor) SeedPower(id int) int { return s.powers[id] }
 
@@ -477,7 +488,10 @@ func TestElementSeed(t *testing.T) {
 	}
 }
 
-type fakeForceActor struct{ forces map[int]int }
+type fakeForceActor struct {
+	fakeActor
+	forces map[int]int
+}
 
 func (f fakeForceActor) ForceLevel(id int) (int, bool) {
 	lv, ok := f.forces[id]

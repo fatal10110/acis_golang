@@ -18,8 +18,8 @@ type raceTarget interface{ RaceOrdinal() int }
 // skill of the given id, at any level.
 type TargetActiveSkillID struct{ SkillID int }
 
-func (c TargetActiveSkillID) Test(effector, effected, skill any) bool {
-	_, ok := effected.(Actor).ActiveSkillLevel(c.SkillID)
+func (c TargetActiveSkillID) Test(effector, effected Actor, skill Skill) bool {
+	_, ok := effected.ActiveSkillLevel(c.SkillID)
 	return ok
 }
 
@@ -27,11 +27,11 @@ func (c TargetActiveSkillID) Test(effector, effected, skill any) bool {
 // (0-100) to fall within [Min, Max]. A nil effected always fails.
 type TargetHpMinMax struct{ Min, Max int }
 
-func (c TargetHpMinMax) Test(effector, effected, skill any) bool {
+func (c TargetHpMinMax) Test(effector, effected Actor, skill Skill) bool {
 	if effected == nil {
 		return false
 	}
-	hp := effected.(Actor).HPRatio() * 100
+	hp := effected.HPRatio() * 100
 	return hp >= float64(c.Min) && hp <= float64(c.Max)
 }
 
@@ -39,7 +39,7 @@ func (c TargetHpMinMax) Test(effector, effected, skill any) bool {
 // is in the given list.
 type TargetNpcID struct{ IDs []int }
 
-func (c TargetNpcID) Test(effector, effected, skill any) bool {
+func (c TargetNpcID) Test(effector, effected Actor, skill Skill) bool {
 	if npc, ok := effected.(npcTarget); ok {
 		return slices.Contains(c.IDs, int(npc.NpcID()))
 	}
@@ -53,7 +53,7 @@ func (c TargetNpcID) Test(effector, effected, skill any) bool {
 // race ordinal is in the given list.
 type TargetRaceID struct{ IDs []int }
 
-func (c TargetRaceID) Test(effector, effected, skill any) bool {
+func (c TargetRaceID) Test(effector, effected Actor, skill Skill) bool {
 	npc, ok := effected.(raceTarget)
 	if !ok {
 		return false
