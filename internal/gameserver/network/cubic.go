@@ -221,9 +221,10 @@ type cubicHealMessageTarget interface {
 }
 
 // cubicFireOwner adapts *livePlayer to actorcast.CubicFireOwner: Roll,
-// CurrentHP and MaxHPValue already match through promotion from the
-// embedded Character, and ObjectID/Position are promoted too, so only
-// Target's return type needs boxing into the domain-facing `any`.
+// CurrentHP, MaxHPValue, ObjectID and Position already match through
+// promotion from the embedded Character. Target() below is a plain
+// passthrough, not a boxing conversion — Character.Target() already returns
+// world.Tracked, the same type CubicFireOwner's Target() wants.
 type cubicFireOwner struct{ *livePlayer }
 
 func (o cubicFireOwner) Target() world.Tracked { return o.livePlayer.Target() }
