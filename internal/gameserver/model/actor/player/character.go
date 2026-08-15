@@ -127,6 +127,7 @@ type Character struct {
 	sendRegenMax              func(count, period int32, hpRegen float64)
 	sendLackHPNotice          func()
 	sendLackMPNotice          func()
+	sendServitorVanished      func()
 	sendShieldBlockSuccess    func()
 	sendShieldBlockPerfect    func()
 	consumeHerb               func(itemID int32)

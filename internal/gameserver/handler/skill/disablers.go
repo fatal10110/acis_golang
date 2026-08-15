@@ -5,6 +5,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
@@ -177,9 +178,9 @@ func checkSkillSuccessBSSWithShield(caster, target Actor, def modelskill.Definit
 }
 
 type erasableSummon interface {
-	SummonOwner() any
+	SummonOwner() summon.Owner
 	SiegeSummon() bool
-	UnSummon(owner any)
+	UnSummon(owner summon.Owner)
 }
 
 type servitorVanishNotifier interface {
@@ -214,15 +215,15 @@ func disableErase(cast Cast, target disablerTarget) {
 	if !ok || !succeeded {
 		return
 	}
-	summon, ok := target.(erasableSummon)
-	if !ok || summon.SiegeSummon() {
+	servitor, ok := target.(erasableSummon)
+	if !ok || servitor.SiegeSummon() {
 		return
 	}
-	owner := summon.SummonOwner()
+	owner := servitor.SummonOwner()
 	if owner == nil {
 		return
 	}
-	summon.UnSummon(owner)
+	servitor.UnSummon(owner)
 	if notifier, ok := owner.(servitorVanishNotifier); ok {
 		notifier.ServitorVanished()
 	}

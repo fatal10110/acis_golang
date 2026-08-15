@@ -586,6 +586,9 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	c.SetLackMPNotifier(func() {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSkillRemovedDueLackMP))
 	})
+	c.SetServitorVanishedNotifier(func() {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageServitorHasVanished))
+	})
 	c.SetShieldBlockNotifiers(func() {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageShieldDefenceSuccessful))
 	}, func() {

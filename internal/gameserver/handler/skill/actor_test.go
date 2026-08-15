@@ -67,6 +67,11 @@ var (
 	_ signetUnsummonable  = (*summon.Actor)(nil)
 	_ spoilableTarget     = (*npc.Hostile)(nil)
 	_ effectSuccessSource = (*npc.Hostile)(nil)
+
+	// Erase: the servitor surface disableErase reaches through, and the
+	// owner-facing notification it fires once erased.
+	_ erasableSummon         = (*summon.Actor)(nil)
+	_ servitorVanishNotifier = (*player.Character)(nil)
 )
 
 // fakeActor supplies the Actor surface every cast participant carries, so a

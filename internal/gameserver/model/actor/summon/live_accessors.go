@@ -327,6 +327,31 @@ func (a *Actor) AlikeDead() bool { return a.Dead() }
 // siege guards.
 func (a *Actor) SiegeGuard() bool { return false }
 
+// siegeSummonNPCIDs are the Siege Golem, Hog Cannon, and Swoop Cannon
+// servitor templates SiegeSummon.java identifies (SIEGE_GOLEM_ID,
+// HOG_CANNON_ID, SWOOP_CANNON_ID), the summons the ERASE skill exempts
+// (Disablers.java: `!(targetCreature instanceof SiegeSummon)`).
+var siegeSummonNPCIDs = map[int]struct{}{
+	14737: {},
+	14768: {},
+	14839: {},
+}
+
+// SiegeSummon reports whether this servitor is a siege-assault summon,
+// exempt from the ERASE skill.
+func (a *Actor) SiegeSummon() bool {
+	_, ok := siegeSummonNPCIDs[a.npcID]
+	return ok
+}
+
+// SummonOwner returns this summon's owning player.
+func (a *Actor) SummonOwner() Owner { return a.owner }
+
+// UnSummon despawns this summon as an owner-directed removal, matching
+// Java's Summon.unSummon(Player owner) (this actor already knows its own
+// owner, so the parameter only satisfies that contract).
+func (a *Actor) UnSummon(Owner) { a.Unsummon() }
+
 // DenyAIAction reports whether this summon cannot act now.
 func (a *Actor) DenyAIAction() bool {
 	return a.AlikeDead() || a.Paralyzed() || a.Teleporting() || a.effects.IsAffected(
