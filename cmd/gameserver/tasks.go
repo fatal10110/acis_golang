@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/rs/zerolog"
@@ -96,6 +97,13 @@ func startGroundItemPersistence(lc fx.Lifecycle, items *task.GroundItems, store 
 
 func provideGameClock() *task.GameClock {
 	return task.NewGameClock(time.Now)
+}
+
+// wireGameClock installs clock as the source <game night=.../> stat-func
+// conditions read (see skill/effect.SetGameClock), before any character can
+// log in and reach one.
+func wireGameClock(clock *task.GameClock) {
+	effect.SetGameClock(clock)
 }
 
 func startGameClock(lc fx.Lifecycle, clock *task.GameClock, log zerolog.Logger) {

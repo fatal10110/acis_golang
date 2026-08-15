@@ -3,9 +3,6 @@ package conditions
 import (
 	"testing"
 
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
@@ -93,8 +90,8 @@ type fakePlayer struct {
 	anyCastle   bool
 	clanHall    int
 	anyClanHall bool
-	race        player.Race
-	sex         player.Sex
+	race        int
+	sex         int
 	weightTier  int
 	invSize     int
 	invLimit    int
@@ -113,8 +110,8 @@ func (p fakePlayer) ClanCastleID() int           { return p.clanCastle }
 func (p fakePlayer) ClanHasAnyCastle() bool      { return p.anyCastle }
 func (p fakePlayer) ClanHallID() int             { return p.clanHall }
 func (p fakePlayer) ClanHasAnyClanHall() bool    { return p.anyClanHall }
-func (p fakePlayer) Race() player.Race           { return p.race }
-func (p fakePlayer) Sex() player.Sex             { return p.sex }
+func (p fakePlayer) Race() int                   { return p.race }
+func (p fakePlayer) Sex() int                    { return p.sex }
 func (p fakePlayer) WeightPenalty() int          { return p.weightTier }
 func (p fakePlayer) InventorySize() int          { return p.invSize }
 func (p fakePlayer) InventoryLimit() int         { return p.invLimit }
@@ -228,15 +225,17 @@ func TestIsHeroPledgeClassRaceSex(t *testing.T) {
 		t.Error("PledgeClass{4} should fail at pledge class 3")
 	}
 
-	orc := fakePlayer{race: player.RaceOrc}
-	if !(Race{Race: player.RaceOrc}).Test(orc, nil, nil) {
+	const raceOrc, raceElf = 3, 1 // model/actor/player.RaceOrc, RaceElf
+	orc := fakePlayer{race: raceOrc}
+	if !(Race{Race: raceOrc}).Test(orc, nil, nil) {
 		t.Error("Race{Orc} should pass for an orc")
 	}
-	if (Race{Race: player.RaceElf}).Test(orc, nil, nil) {
+	if (Race{Race: raceElf}).Test(orc, nil, nil) {
 		t.Error("Race{Elf} should fail for an orc")
 	}
 
-	female := fakePlayer{sex: player.SexFemale}
+	const sexFemale = 1 // model/actor/player.SexFemale
+	female := fakePlayer{sex: sexFemale}
 	if !(Sex{Sex: 1}).Test(female, nil, nil) {
 		t.Error("Sex{1} should pass for a female")
 	}
@@ -315,11 +314,18 @@ func TestWeightChargesActiveIDs(t *testing.T) {
 	}
 }
 
+// fakeBoxZone is a minimal ZoneForm for TestInsidePoly: an axis-aligned box,
+// standing in for a real model/zone.Form without importing that package
+// (which this package's production Actor implementers must stay free of;
+// see ZoneForm's doc comment).
+type fakeBoxZone struct{ x1, y1, x2, y2, z1, z2 int }
+
+func (b fakeBoxZone) Contains(x, y, z int) bool {
+	return x >= b.x1 && x <= b.x2 && y >= b.y1 && y <= b.y2 && z >= b.z1 && z <= b.z2
+}
+
 func TestInsidePoly(t *testing.T) {
-	poly, err := zone.NewPolygon([]location.Point{{X: 0, Y: 0}, {X: 0, Y: 10}, {X: 10, Y: 10}, {X: 10, Y: 0}}, 0, 100)
-	if err != nil {
-		t.Fatalf("NewPolygon: %v", err)
-	}
+	poly := fakeBoxZone{x1: 0, y1: 0, x2: 10, y2: 10, z1: 0, z2: 100}
 	inside := fakeActor{x: 5, y: 5, z: 50}
 	outside := fakeActor{x: 50, y: 50, z: 50}
 

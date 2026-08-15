@@ -1,10 +1,5 @@
 package conditions
 
-import (
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
-)
-
 // Level requires the effector to be at least the given level.
 type Level struct{ Level int }
 
@@ -118,8 +113,9 @@ func (c PledgeClass) Test(effector, effected Actor, skill Skill) bool {
 	return p.PledgeClass() >= c.Class
 }
 
-// Race requires the effector to be a player of the given race.
-type Race struct{ Race player.Race }
+// Race requires the effector to be a player of the given race (the ordinal
+// from model/actor/player.Race).
+type Race struct{ Race int }
 
 func (c Race) Test(effector, effected Actor, skill Skill) bool {
 	p, ok := asPlayer(effector)
@@ -231,10 +227,18 @@ func (c ActiveSkillID) Test(effector, effected Actor, skill Skill) bool {
 	return ok && c.Level <= level
 }
 
+// ZoneForm is the geometric footprint InsidePoly tests a position against —
+// shaped to match model/zone.Form's Contains method without importing that
+// package (which pulls in model/actor/player transitively, and player needs
+// to import this package for its own Actor/PlayerActor implementation).
+type ZoneForm interface {
+	Contains(x, y, z int) bool
+}
+
 // InsidePoly requires the effector's position to be inside (or, if
 // CheckInside is false, outside) the given zone form.
 type InsidePoly struct {
-	Zone        zone.Form
+	Zone        ZoneForm
 	CheckInside bool
 }
 

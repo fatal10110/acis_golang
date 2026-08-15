@@ -7,7 +7,6 @@
 package conditions
 
 import (
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
@@ -64,8 +63,11 @@ type PlayerActor interface {
 	ClanHallID() int
 	ClanHasAnyClanHall() bool
 
-	Race() player.Race
-	Sex() player.Sex
+	// Race and Sex report the player's ordinal race/sex value, matching
+	// model/actor/player.Race/Sex's own int encoding — kept as plain int
+	// here so this package doesn't depend on the player package.
+	Race() int
+	Sex() int
 
 	// WeightPenalty is the ordinal of the player's current weight-penalty
 	// tier (0 = none, increasing with how overloaded the inventory is).
