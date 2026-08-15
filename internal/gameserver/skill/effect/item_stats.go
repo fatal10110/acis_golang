@@ -54,14 +54,15 @@ func ItemModifierFuncs(owner ItemOwner) ([]basefunc.Func, error) {
 	}
 	funcs := make([]basefunc.Func, 0, len(owner.Tmpl.Modifiers))
 	for _, mod := range owner.Tmpl.Modifiers {
-		if mod.AttachCondition != nil || mod.Condition != nil {
-			return nil, fmt.Errorf("item %d: conditional stat modifiers are not wired yet", owner.Tmpl.ID)
+		gate, err := itemModifierCondition(mod)
+		if err != nil {
+			return nil, fmt.Errorf("item %d: %w", owner.Tmpl.ID, err)
 		}
 		s, err := stat.ByName(mod.Stat)
 		if err != nil {
 			return nil, fmt.Errorf("item %d: %w", owner.Tmpl.ID, err)
 		}
-		fn, err := itemStatFunc(owner, s, mod)
+		fn, err := itemStatFunc(owner, s, mod, gate)
 		if err != nil {
 			return nil, fmt.Errorf("item %d: %w", owner.Tmpl.ID, err)
 		}
@@ -70,28 +71,59 @@ func ItemModifierFuncs(owner ItemOwner) ([]basefunc.Func, error) {
 	return funcs, nil
 }
 
-func itemStatFunc(owner ItemOwner, s stat.Stat, mod item.StatModifier) (basefunc.Func, error) {
+// itemModifierCondition builds the same effector-side gate as
+// funcCondition, converting item.StatModifier's own Condition/
+// AttachCondition (an XML-shape twin of modelskill.Condition/
+// ConditionClause, parsed independently for item templates) to the shared
+// tree first.
+func itemModifierCondition(mod item.StatModifier) (basefunc.Condition, error) {
+	var direct *modelskill.Condition
+	if mod.Condition != nil {
+		c := convertItemCondition(*mod.Condition)
+		direct = &c
+	}
+	var attach *modelskill.ConditionClause
+	if mod.AttachCondition != nil {
+		attach = &modelskill.ConditionClause{
+			Root:      convertItemCondition(mod.AttachCondition.Root),
+			Message:   mod.AttachCondition.Message,
+			MessageID: mod.AttachCondition.MessageID,
+			AddName:   mod.AttachCondition.AddName,
+		}
+	}
+	return funcCondition(direct, attach)
+}
+
+func convertItemCondition(c item.Condition) modelskill.Condition {
+	out := modelskill.Condition{Kind: c.Kind, Attrs: c.Attrs}
+	for _, ch := range c.Children {
+		out.Children = append(out.Children, convertItemCondition(ch))
+	}
+	return out
+}
+
+func itemStatFunc(owner ItemOwner, s stat.Stat, mod item.StatModifier, cond basefunc.Condition) (basefunc.Func, error) {
 	switch mod.Op {
 	case item.FuncAdd:
-		return basefunc.NewAdd(owner, s, mod.Value, nil), nil
+		return basefunc.NewAdd(owner, s, mod.Value, cond), nil
 	case item.FuncAddMul:
-		return basefunc.NewAddMul(owner, s, mod.Value, nil), nil
+		return basefunc.NewAddMul(owner, s, mod.Value, cond), nil
 	case item.FuncSub:
-		return basefunc.NewSub(owner, s, mod.Value, nil), nil
+		return basefunc.NewSub(owner, s, mod.Value, cond), nil
 	case item.FuncSubDiv:
-		return basefunc.NewSubDiv(owner, s, mod.Value, nil), nil
+		return basefunc.NewSubDiv(owner, s, mod.Value, cond), nil
 	case item.FuncMul:
-		return basefunc.NewMul(owner, s, mod.Value, nil), nil
+		return basefunc.NewMul(owner, s, mod.Value, cond), nil
 	case item.FuncBaseMul:
-		return basefunc.NewBaseMul(owner, s, mod.Value, nil), nil
+		return basefunc.NewBaseMul(owner, s, mod.Value, cond), nil
 	case item.FuncDiv:
-		return basefunc.NewDiv(owner, s, mod.Value, nil), nil
+		return basefunc.NewDiv(owner, s, mod.Value, cond), nil
 	case item.FuncSet:
-		return basefunc.NewSet(owner, s, mod.Value, nil), nil
+		return basefunc.NewSet(owner, s, mod.Value, cond), nil
 	case item.FuncBaseAdd:
-		return basefunc.NewBaseAdd(owner, s, mod.Value, nil), nil
+		return basefunc.NewBaseAdd(owner, s, mod.Value, cond), nil
 	case item.FuncEnchant:
-		return basefunc.NewEnchant(owner, s, mod.Value, nil), nil
+		return basefunc.NewEnchant(owner, s, mod.Value, cond), nil
 	default:
 		return nil, fmt.Errorf("unknown item stat modifier op %s", mod.Op)
 	}

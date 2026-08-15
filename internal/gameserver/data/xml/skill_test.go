@@ -7,8 +7,123 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	gameskill "github.com/fatal10110/acis_golang/internal/gameserver/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
+
+// fakeWearingActor is a minimal conditions.Actor/PlayerActor double: only
+// IsWearingType reports anything meaningful, which is all
+// TestConditionalStatFuncsBuildForEveryShippedSkill's using-kind assertion
+// needs.
+type fakeWearingActor struct{ mask int }
+
+func (fakeWearingActor) Level() int                        { return 1 }
+func (fakeWearingActor) HPRatio() float64                  { return 1 }
+func (fakeWearingActor) MPRatio() float64                  { return 1 }
+func (fakeWearingActor) X() int                            { return 0 }
+func (fakeWearingActor) Y() int                            { return 0 }
+func (fakeWearingActor) Z() int                            { return 0 }
+func (fakeWearingActor) IsMoving() bool                    { return false }
+func (fakeWearingActor) IsRunning() bool                   { return false }
+func (fakeWearingActor) IsRiding() bool                    { return false }
+func (fakeWearingActor) IsFlying() bool                    { return false }
+func (fakeWearingActor) IsBehind(conditions.Actor) bool    { return false }
+func (fakeWearingActor) IsInFrontOf(conditions.Actor) bool { return false }
+func (fakeWearingActor) ActiveSkillLevel(int) (int, bool)  { return 0, false }
+func (fakeWearingActor) ActiveEffectLevel(int) (int, bool) { return 0, false }
+func (fakeWearingActor) IsSitting() bool                   { return false }
+func (fakeWearingActor) IsInOlympiadMode() bool            { return false }
+func (fakeWearingActor) IsHero() bool                      { return false }
+func (fakeWearingActor) PkKills() int                      { return 0 }
+func (fakeWearingActor) PledgeClass() int                  { return 0 }
+func (fakeWearingActor) IsClanLeader() bool                { return false }
+func (fakeWearingActor) HasClan() bool                     { return false }
+func (fakeWearingActor) ClanCastleID() int                 { return 0 }
+func (fakeWearingActor) ClanHasAnyCastle() bool            { return false }
+func (fakeWearingActor) ClanHallID() int                   { return 0 }
+func (fakeWearingActor) ClanHasAnyClanHall() bool          { return false }
+func (fakeWearingActor) Race() int                         { return 0 }
+func (fakeWearingActor) Sex() int                          { return 0 }
+func (fakeWearingActor) WeightPenalty() int                { return 0 }
+func (fakeWearingActor) InventorySize() int                { return 0 }
+func (fakeWearingActor) InventoryLimit() int               { return 0 }
+func (fakeWearingActor) Charges() int                      { return 0 }
+func (a fakeWearingActor) IsWearingType(mask int) bool     { return a.mask&mask != 0 }
+
+// TestConditionalStatFuncsBuildForEveryShippedSkill covers issue #1499's
+// acceptance criteria directly against the real datapack: every shipped
+// skill's conditional stat funcs (statFuncs' <using>/<player>/<and>/<not>/
+// <game> predicates) build without the former "not wired yet" refusal, and
+// a character holding one of the affected core masteries enters the world
+// (ApplyTransientPassiveSkill succeeds) with the bonus gated correctly by
+// its equipped item type.
+func TestConditionalStatFuncsBuildForEveryShippedSkill(t *testing.T) {
+	dir := datapackPath(t, filepath.Join("data", "xml", "skills"))
+	table, err := LoadSkillDefinitions(dir)
+	if err != nil {
+		t.Fatalf("LoadSkillDefinitions(%q) error: %v", dir, err)
+	}
+
+	built := 0
+	for _, def := range table.All() {
+		switch def.Activation {
+		case skill.ActivationPassive:
+			if _, err := effect.PassiveFuncs(def); err != nil {
+				t.Fatalf("PassiveFuncs(skill %d level %d %q): %v", def.ID, def.Level, def.Name, err)
+			}
+			built++
+		default:
+			for _, eff := range def.Effects {
+				if _, err := effect.New(effect.SkillFromDefinition(def), eff); err != nil {
+					t.Fatalf("effect.New(skill %d level %d %q, effect %q): %v", def.ID, def.Level, def.Name, eff.Name, err)
+				}
+				built++
+			}
+			for _, eff := range def.SelfEffects {
+				if _, err := effect.New(effect.SkillFromDefinition(def), eff); err != nil {
+					t.Fatalf("effect.New(skill %d level %d %q, self-effect %q): %v", def.ID, def.Level, def.Name, eff.Name, err)
+				}
+				built++
+			}
+		}
+	}
+	if built == 0 {
+		t.Fatal("expected at least one built skill/effect, got 0 — datapack may not have loaded")
+	}
+
+	t.Run("Armor Mastery rEvas applies only while wearing light armor", func(t *testing.T) {
+		def, ok := table.Get(142, 5)
+		if !ok {
+			t.Fatal("skill 142 level 5 not loaded")
+		}
+		funcs, err := effect.PassiveFuncs(def)
+		if err != nil {
+			t.Fatalf("PassiveFuncs(skill 142 level 5): %v", err)
+		}
+		var rEvasFunc, pDefFunc bool
+		for _, fn := range funcs {
+			if fn.Cond() == nil {
+				pDefFunc = true
+				continue
+			}
+			rEvasFunc = true
+			const lightMask = 1 << 15 // item.ArmorLight.Mask()
+			if !fn.Cond().Test(fakeWearingActor{mask: lightMask}, fakeWearingActor{mask: lightMask}, nil) {
+				t.Error("rEvas bonus should apply while wearing light armor")
+			}
+			if fn.Cond().Test(fakeWearingActor{mask: 0}, fakeWearingActor{mask: 0}, nil) {
+				t.Error("rEvas bonus should not apply while not wearing light armor")
+			}
+		}
+		if !rEvasFunc || !pDefFunc {
+			t.Fatalf("expected both an unconditional pDef func and a conditional rEvas func, got funcs=%+v", funcs)
+		}
+
+		if err := gameskill.NewPersistence(nil, table).ApplyTransientPassiveSkill(&player.Character{}, 142, 0, 5); err != nil {
+			t.Fatalf("ApplyTransientPassiveSkill(skill 142 level 5) error: %v", err)
+		}
+	})
+}
 
 func TestLoadSkillDefinitions(t *testing.T) {
 	dir := datapackPath(t, filepath.Join("data", "xml", "skills"))

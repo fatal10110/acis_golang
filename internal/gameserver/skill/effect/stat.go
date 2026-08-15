@@ -11,14 +11,16 @@ import (
 func statFuncs(owner any, templates []modelskill.FuncTemplate, cond basefunc.Condition) ([]basefunc.Func, error) {
 	funcs := make([]basefunc.Func, 0, len(templates))
 	for _, tmpl := range templates {
-		if tmpl.AttachCondition != nil || tmpl.Condition != nil {
-			return nil, fmt.Errorf("conditional stat funcs are not wired yet")
+		gate, err := funcCondition(tmpl.Condition, tmpl.AttachCondition)
+		if err != nil {
+			return nil, err
 		}
+		funcCond := andCond(cond, gate)
 		s, err := stat.ByName(tmpl.Stat)
 		if err != nil {
 			return nil, err
 		}
-		fn, err := statFunc(owner, s, tmpl, cond)
+		fn, err := statFunc(owner, s, tmpl, funcCond)
 		if err != nil {
 			return nil, err
 		}

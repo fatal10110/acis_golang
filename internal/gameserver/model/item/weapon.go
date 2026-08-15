@@ -63,6 +63,26 @@ var weaponTypeNames = commons.ReverseMap(weaponTypeStrings)
 // families share one bitmask space without colliding.
 const weaponTypeCount = int(weaponTypeEnd)
 
+// ParseWornKindMask resolves a skill <using kind="..."/> attribute — a
+// comma-separated list of WeaponType and/or ArmorType names — to the OR of
+// their worn-mask bits, for a direct intersect check against
+// Inventory.wornMask. An unrecognized token contributes no bits, matching
+// DocumentBase.parseUsingCondition's silent-skip behavior in the Java
+// reference (a typoed kind name is logged there, never rejected).
+func ParseWornKindMask(kind string) int32 {
+	var mask int32
+	for _, tok := range strings.Split(kind, ",") {
+		name := strings.TrimSpace(tok)
+		if w, ok := weaponTypeNames[name]; ok {
+			mask |= w.Mask()
+		}
+		if a, ok := armorTypeNames[name]; ok {
+			mask |= a.Mask()
+		}
+	}
+	return mask
+}
+
 // Mask returns the worn-item bit w occupies in an inventory's worn-type
 // mask.
 func (w WeaponType) Mask() int32 {

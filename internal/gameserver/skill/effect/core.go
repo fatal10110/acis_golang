@@ -339,9 +339,6 @@ func New(skill Skill, tmpl modelskill.EffectTemplate) (*Effect, error) {
 	if !ok {
 		return nil, fmt.Errorf("effect: unsupported core effect %q", tmpl.Name)
 	}
-	if tmpl.AttachCondition != nil {
-		return nil, fmt.Errorf("effect %s: attach conditions are not wired yet", tmpl.Name)
-	}
 	if k.typ == TypeChanceSkillTrigger {
 		if _, _, err := modelskill.ParseChanceCondition(tmpl.ChanceType, tmpl.ActivationChance); err != nil {
 			return nil, fmt.Errorf("effect %s: %w", tmpl.Name, err)
@@ -372,7 +369,16 @@ func New(skill Skill, tmpl modelskill.EffectTemplate) (*Effect, error) {
 		Herb: strings.Contains(skill.Name, "Herb"),
 	}
 
-	funcs, err := statFuncs(e, tmpl.Funcs, nil)
+	// tmpl.AttachCondition is the <cond> sibling gating the whole <effect>
+	// block (not any one func's own predicate); AND it onto every func this
+	// effect contributes, matching the Java reference's per-func attach-
+	// condition propagation (DocumentBase's cond stays in scope for every
+	// stat element until the next cond resets it).
+	attachGate, err := funcCondition(nil, tmpl.AttachCondition)
+	if err != nil {
+		return nil, fmt.Errorf("effect %s: %w", tmpl.Name, err)
+	}
+	funcs, err := statFuncs(e, tmpl.Funcs, attachGate)
 	if err != nil {
 		return nil, fmt.Errorf("effect %s: %w", tmpl.Name, err)
 	}
