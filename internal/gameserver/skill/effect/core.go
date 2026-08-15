@@ -1,11 +1,17 @@
 package effect
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
+
+// ErrUnsupportedCoreEffect marks New's rejection of an effect template whose
+// name has no entry in coreKinds — a missing effect kind (or an unresolved
+// #table name reference), tracked separately from stat-func construction.
+var ErrUnsupportedCoreEffect = errors.New("effect: unsupported core effect")
 
 // Flag is the bitmask exposed by an active effect to live actor state.
 type Flag uint32
@@ -337,7 +343,7 @@ func ApplyRestored(list *List, effector, effected Participant, meta Skill, templ
 func New(skill Skill, tmpl modelskill.EffectTemplate) (*Effect, error) {
 	k, ok := coreKinds[tmpl.Name]
 	if !ok {
-		return nil, fmt.Errorf("effect: unsupported core effect %q", tmpl.Name)
+		return nil, fmt.Errorf("%w %q", ErrUnsupportedCoreEffect, tmpl.Name)
 	}
 	if k.typ == TypeChanceSkillTrigger {
 		if _, _, err := modelskill.ParseChanceCondition(tmpl.ChanceType, tmpl.ActivationChance); err != nil {
