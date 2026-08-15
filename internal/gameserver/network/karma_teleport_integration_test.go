@@ -1,3 +1,5 @@
+//go:build integration
+
 package network
 
 import (
@@ -5,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -16,7 +19,7 @@ import (
 // before the character is stored, so the karma-teleport guard tests set
 // karma during single-threaded seeding instead of racing the connection's
 // own goroutine by mutating live.Character after EnterWorld.
-func seedSelectableKarmaCharacter(t *testing.T, chars *fakeCharStore, account, name string, level, karma int) int32 {
+func seedSelectableKarmaCharacter(t *testing.T, chars *gamesql.CharacterStore, account, name string, level, karma int) int32 {
 	t.Helper()
 	tmpl, ok := testTemplates(t).Get(0)
 	if !ok {
@@ -30,6 +33,12 @@ func seedSelectableKarmaCharacter(t *testing.T, chars *fakeCharStore, account, n
 	ch.KarmaPoints = karma
 	if err := chars.Create(context.Background(), ch); err != nil {
 		t.Fatalf("seed character store: %v", err)
+	}
+	// Create's INSERT omits karma (a character never starts play with karma
+	// set; it's earned in-game and written by Save) — Save it explicitly so
+	// this test's pre-set karma survives the store round-trip.
+	if err := chars.Save(context.Background(), ch); err != nil {
+		t.Fatalf("seed character karma: %v", err)
 	}
 	return ch.ID
 }
@@ -57,8 +66,9 @@ func TestGameClientLinkUseItemBlockedByKarmaTeleport(t *testing.T) {
 	skills, _ := recallSkillTable(t)
 	const potionTemplate int32 = 1060
 	const objectID int32 = 700
-	c, chars, _, state := newLinkedGameClientWithKarmaPlayerCanTeleport(t, false, skills, func(chars *fakeCharStore, items *fakeItemStore) {
-		playerObjID := seedSelectableKarmaCharacter(t, chars, "player1", "Newbie", 5, 1)
+	var playerObjID int32
+	c, _, _, state := newLinkedSQLGameClientWithKarmaPlayerCanTeleport(t, false, skills, func(chars *gamesql.CharacterStore, items *gamesql.ItemStore) {
+		playerObjID = seedSelectableKarmaCharacter(t, chars, "player1", "Newbie", 5, 1)
 		if err := items.Create(context.Background(), playerObjID, item.Instance{
 			ObjectID: objectID, TemplateID: potionTemplate, OwnerID: playerObjID,
 			Count: 5, Location: item.LocationInventory, ManaLeft: -1,
@@ -73,7 +83,7 @@ func TestGameClientLinkUseItemBlockedByKarmaTeleport(t *testing.T) {
 	c.send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
-	obj, ok := state.Player(chars.soleObjectID(t))
+	obj, ok := state.Player(playerObjID)
 	if !ok {
 		t.Fatal("player not in world state after enter")
 	}
@@ -97,7 +107,7 @@ func TestGameClientLinkUseItemBlockedByKarmaTeleport(t *testing.T) {
 // false: the client gets ActionFailed and no cast starts.
 func TestGameClientLinkMagicSkillUseRecallBlockedByKarma(t *testing.T) {
 	skills, store := recallSkillTable(t)
-	c, _, _, _ := newLinkedGameClientWithKarmaPlayerCanTeleport(t, false, skills, func(chars *fakeCharStore, _ *fakeItemStore) {
+	c, _, _, _ := newLinkedSQLGameClientWithKarmaPlayerCanTeleport(t, false, skills, func(chars *gamesql.CharacterStore, _ *gamesql.ItemStore) {
 		objID := seedSelectableKarmaCharacter(t, chars, "player1", "Newbie", 5, 1)
 		store.seedKnown(objID, 0, player.SkillLevels{2031: 1})
 	}, 1)
