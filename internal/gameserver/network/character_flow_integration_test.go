@@ -1,3 +1,5 @@
+//go:build integration
+
 package network
 
 import (
@@ -5,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
@@ -13,7 +17,7 @@ import (
 )
 
 func TestGameClientLinkFullFlow(t *testing.T) {
-	c, chars, _, state := newLinkedGameClient(t)
+	c, chars, _, _, _, state := newLinkedSQLGameClient(t, nil, nil, 0)
 
 	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
 	reply := c.read()
@@ -27,7 +31,7 @@ func TestGameClientLinkFullFlow(t *testing.T) {
 	if count := wire.NewReader(reply[1:]).ReadInt32(); count != 1 {
 		t.Fatalf("char count = %d, want 1", count)
 	}
-	objID := chars.soleObjectID(t)
+	objID := sqlSoleObjectID(t, chars)
 
 	c.send(encodeRequestGameStart(0))
 	reply = c.read()
@@ -59,7 +63,7 @@ func TestGameClientLinkFullFlow(t *testing.T) {
 }
 
 func TestGameClientLinkChargeFeedbackFrames(t *testing.T) {
-	c, chars, _, state := newLinkedGameClient(t)
+	c, chars, _, _, _, state := newLinkedSQLGameClient(t, nil, nil, 0)
 	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
 	c.read() // CharCreateOk
 	c.read() // CharSelectInfo
@@ -69,7 +73,7 @@ func TestGameClientLinkChargeFeedbackFrames(t *testing.T) {
 	c.send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
-	live, ok := state.Player(chars.soleObjectID(t))
+	live, ok := state.Player(sqlSoleObjectID(t, chars))
 	if !ok {
 		t.Fatal("world player missing after EnterWorld")
 	}
@@ -91,27 +95,6 @@ func TestGameClientLinkChargeFeedbackFrames(t *testing.T) {
 	assertForceChargeMessage(t, c.read(), serverpackets.SystemMessageForceMaxLevelReached, 0)
 }
 
-func assertForceChargeMessage(t *testing.T, frame []byte, messageID int, charges int32) {
-	t.Helper()
-	if frame[0] != serverpackets.OpcodeSystemMessage {
-		t.Fatalf("message opcode = %#x, want SystemMessage (%#x)", frame[0], serverpackets.OpcodeSystemMessage)
-	}
-	r := wire.NewReader(frame[1:])
-	if got := r.ReadInt32(); got != int32(messageID) {
-		t.Fatalf("message id = %d, want %d", got, messageID)
-	}
-	params := r.ReadInt32()
-	if messageID == serverpackets.SystemMessageForceIncreasedToS1 {
-		if params != 1 || r.ReadInt32() != serverpackets.SystemMessageParamNumber || r.ReadInt32() != charges {
-			t.Fatalf("force-increased message params = %d, want one number %d", params, charges)
-		}
-		return
-	}
-	if params != 0 {
-		t.Fatalf("force-max message params = %d, want 0", params)
-	}
-}
-
 // TestGameClientLinkEnterWorldRecomputesRestoredWeight is the regression test
 // for issue #1144: RestorePlayerInventory rebuilds the inventory from
 // persisted rows without queuing update notifications, so totalWeight stays
@@ -120,8 +103,8 @@ func assertForceChargeMessage(t *testing.T, frame []byte, messageID int, charges
 // including the one EnterWorld makes at login (ItemList.java:14-24,
 // PcInventory.java:101-113, EnterWorld.java:223).
 func TestGameClientLinkEnterWorldRecomputesRestoredWeight(t *testing.T) {
-	c, chars, _, state := newLinkedGameClientWithSkillsSeed(t, nil, func(chars *fakeCharStore, items *fakeItemStore) {
-		objID := seedSelectableCharacter(t, chars, "player1", "Newbie", 1, 0)
+	c, chars, _, _, _, state := newLinkedSQLGameClient(t, nil, func(chars *gamesql.CharacterStore, items *gamesql.ItemStore) {
+		objID := seedSelectableSQLCharacter(t, chars, "player1", "Newbie", 1, 0).ID
 		if err := items.Create(context.Background(), objID, item.Instance{
 			ObjectID: 500, TemplateID: 9500, OwnerID: objID, Count: 5, Location: item.LocationInventory,
 		}); err != nil {
@@ -133,7 +116,7 @@ func TestGameClientLinkEnterWorldRecomputesRestoredWeight(t *testing.T) {
 	c.read() // SSQInfo
 	c.read() // CharSelected
 
-	objID := chars.soleObjectID(t)
+	objID := sqlSoleObjectID(t, chars)
 
 	// attachLivePlayer's explicit weight recompute detects restore's still-
 	// zero totalWeight changing to the real carried weight and fires the
@@ -168,12 +151,12 @@ func TestGameClientLinkEnterWorldRecomputesRestoredWeight(t *testing.T) {
 // weight_notifier_test.go's unit-level tests do, to isolate the
 // RequestItemList handler's own recompute.
 func TestGameClientLinkRequestItemListRecomputesWeight(t *testing.T) {
-	c, chars, _, state := newLinkedGameClient(t)
+	c, chars, _, _, _, state := newLinkedSQLGameClient(t, nil, nil, 0)
 
 	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
 	c.read() // CharCreateOk
 	c.read() // CharSelectInfo
-	objID := chars.soleObjectID(t)
+	objID := sqlSoleObjectID(t, chars)
 
 	c.send(encodeRequestGameStart(0))
 	c.read() // SSQInfo
@@ -211,8 +194,8 @@ func TestGameClientLinkRequestItemListRecomputesWeight(t *testing.T) {
 // enter-world path affected by the added grant.
 func TestGameClientLinkEnterWorldReGrantsFreeSkills(t *testing.T) {
 	skills := skillstate.NewPersistence(nil, skillTable(modelskill.Definition{ID: 900001, Level: 1}))
-	c, _, _, _ := newLinkedGameClientWithSkillsSeed(t, skills, func(chars *fakeCharStore, items *fakeItemStore) {
-		seedSelectableCharacter(t, chars, "player1", "Newbie", 50, 0)
+	c, _, _, _, _, _ := newLinkedSQLGameClient(t, skills, func(chars *gamesql.CharacterStore, _ *gamesql.ItemStore) {
+		seedSelectableSQLCharacter(t, chars, "player1", "Newbie", 50, 0)
 	}, 1)
 
 	c.send(encodeRequestGameStart(0))
@@ -244,10 +227,13 @@ func TestGameClientLinkEnterWorldRestoresDeathPenaltyPassiveStats(t *testing.T) 
 		Funcs: []modelskill.FuncTemplate{{Op: modelskill.FuncAdd, Stat: "pAtk", Value: 7}},
 	}))
 	var basePAtk float64
-	c, chars, _, state := newLinkedGameClientWithSkillsSeed(t, skills, func(chars *fakeCharStore, _ *fakeItemStore) {
-		objID := seedSelectableCharacter(t, chars, "player1", "Newbie", 1, 0)
-		chars.byID[objID].SetDeathPenaltyLevel(2)
-		basePAtk = chars.byID[objID].PAtk()
+	c, chars, _, _, _, state := newLinkedSQLGameClient(t, skills, func(chars *gamesql.CharacterStore, _ *gamesql.ItemStore) {
+		ch := seedSelectableSQLCharacter(t, chars, "player1", "Newbie", 1, 0)
+		ch.SetDeathPenaltyLevel(2)
+		basePAtk = ch.PAtk()
+		if err := chars.Save(context.Background(), ch); err != nil {
+			t.Fatalf("save death penalty: %v", err)
+		}
 	}, 1)
 
 	c.send(encodeRequestGameStart(0))
@@ -256,7 +242,7 @@ func TestGameClientLinkEnterWorldRestoresDeathPenaltyPassiveStats(t *testing.T) 
 	c.send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
-	live, ok := state.Player(chars.soleObjectID(t))
+	live, ok := state.Player(sqlSoleObjectID(t, chars))
 	if !ok {
 		t.Fatal("world player missing after EnterWorld")
 	}
@@ -275,9 +261,9 @@ func TestGameClientLinkEnterWorldSkipsDeathPenaltyPassiveAtZero(t *testing.T) {
 		Funcs: []modelskill.FuncTemplate{{Op: modelskill.FuncAdd, Stat: "pAtk", Value: 7}},
 	}))
 	var basePAtk float64
-	c, chars, _, state := newLinkedGameClientWithSkillsSeed(t, skills, func(chars *fakeCharStore, _ *fakeItemStore) {
-		objID := seedSelectableCharacter(t, chars, "player1", "Newbie", 1, 0)
-		basePAtk = chars.byID[objID].PAtk()
+	c, chars, _, _, _, state := newLinkedSQLGameClient(t, skills, func(chars *gamesql.CharacterStore, _ *gamesql.ItemStore) {
+		ch := seedSelectableSQLCharacter(t, chars, "player1", "Newbie", 1, 0)
+		basePAtk = ch.PAtk()
 	}, 1)
 
 	c.send(encodeRequestGameStart(0))
@@ -286,7 +272,7 @@ func TestGameClientLinkEnterWorldSkipsDeathPenaltyPassiveAtZero(t *testing.T) {
 	c.send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
-	live, ok := state.Player(chars.soleObjectID(t))
+	live, ok := state.Player(sqlSoleObjectID(t, chars))
 	if !ok {
 		t.Fatal("world player missing after EnterWorld")
 	}
@@ -300,7 +286,7 @@ func TestGameClientLinkEnterWorldSkipsDeathPenaltyPassiveAtZero(t *testing.T) {
 }
 
 func TestGameClientLinkCreateInvalidNameKeepsConnectionOpen(t *testing.T) {
-	c, _, _, _ := newLinkedGameClient(t)
+	c, _, _, _, _, _ := newLinkedSQLGameClient(t, nil, nil, 0)
 
 	c.send(encodeRequestCharacterCreate("bad name!", 0, 0, 0, 1, 0, 0))
 	reply := c.read()
@@ -317,13 +303,13 @@ func TestGameClientLinkCreateInvalidNameKeepsConnectionOpen(t *testing.T) {
 }
 
 func TestGameClientLinkDeleteAndRestore(t *testing.T) {
-	c, chars, _, _ := newLinkedGameClient(t)
+	c, chars, _, _, _, _ := newLinkedSQLGameClient(t, nil, nil, 0)
 
 	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
 	c.read() // CharCreateOk
 	c.read() // CharSelectInfo
 
-	objID := chars.soleObjectID(t)
+	objID := sqlSoleObjectID(t, chars)
 
 	c.send(encodeRequestCharacterDelete(0))
 	reply := c.read()
@@ -332,14 +318,52 @@ func TestGameClientLinkDeleteAndRestore(t *testing.T) {
 	}
 	c.read() // CharSelectInfo refresh
 
-	if chars.deleteAt(objID) == 0 {
+	ch, err := chars.Get(context.Background(), objID)
+	if err != nil {
+		t.Fatalf("load deleted character: %v", err)
+	}
+	if ch.DeleteAt == 0 {
 		t.Fatal("expected character to be scheduled for deletion")
 	}
 
 	c.send(encodeCharacterRestore(0))
 	c.read() // CharSelectInfo refresh
 
-	if chars.deleteAt(objID) != 0 {
+	ch, err = chars.Get(context.Background(), objID)
+	if err != nil {
+		t.Fatalf("load restored character: %v", err)
+	}
+	if ch.DeleteAt != 0 {
 		t.Fatal("expected character's scheduled deletion to be cleared")
 	}
+}
+
+func seedSelectableSQLCharacter(t *testing.T, chars *gamesql.CharacterStore, account, name string, level, sp int) *player.Character {
+	t.Helper()
+	tmpl, ok := testTemplates(t).Get(0)
+	if !ok {
+		t.Fatal("missing test class template")
+	}
+	ch, err := player.NewCharacter(100, tmpl, account, name, 1, 0, 0, player.SexMale)
+	if err != nil {
+		t.Fatalf("seed character: %v", err)
+	}
+	ch.CharLevel = level
+	ch.SP = sp
+	if err := chars.Create(context.Background(), ch); err != nil {
+		t.Fatalf("seed character store: %v", err)
+	}
+	return ch
+}
+
+func sqlSoleObjectID(t *testing.T, chars *gamesql.CharacterStore) int32 {
+	t.Helper()
+	characters, err := chars.ListByAccount(context.Background(), "player1")
+	if err != nil {
+		t.Fatalf("list characters: %v", err)
+	}
+	if len(characters) != 1 {
+		t.Fatalf("character count = %d, want 1", len(characters))
+	}
+	return characters[0].ID
 }
