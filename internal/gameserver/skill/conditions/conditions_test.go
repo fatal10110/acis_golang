@@ -351,6 +351,9 @@ func TestTargetConditions(t *testing.T) {
 	if (TargetActiveSkillID{SkillID: 51}).Test(nil, target, nil) {
 		t.Error("unknown target skill should fail")
 	}
+	if (TargetActiveSkillID{SkillID: 50}).Test(nil, nil, nil) {
+		t.Error("nil effected should always fail")
+	}
 }
 
 type fakeNpcTarget struct {

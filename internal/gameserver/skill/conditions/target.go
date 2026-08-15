@@ -15,10 +15,13 @@ type doorTarget interface{ DoorID() int }
 type raceTarget interface{ RaceOrdinal() int }
 
 // TargetActiveSkillID requires the effected creature to currently know a
-// skill of the given id, at any level.
+// skill of the given id, at any level. A nil effected always fails.
 type TargetActiveSkillID struct{ SkillID int }
 
 func (c TargetActiveSkillID) Test(effector, effected Actor, skill Skill) bool {
+	if effected == nil {
+		return false
+	}
 	_, ok := effected.ActiveSkillLevel(c.SkillID)
 	return ok
 }

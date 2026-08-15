@@ -7,9 +7,12 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
-// uncomparableCondition is a basefunc.Condition whose slice field makes it
-// uncomparable with ==, for testing that RemoveFunc uses identity rather
-// than equality.
+// uncomparableCondition is a stand-in basefunc.Condition for tests that
+// attach a condition to a Func without exercising Test. Its slice field
+// makes the struct itself uncomparable with ==, matching what a real
+// condition (e.g. a *_id-list condition) looks like; RemoveFunc compares
+// the *Add/*Mul/... pointers Func wraps, not this struct, so that identity
+// check is unaffected either way.
 type uncomparableCondition struct{ ids []int }
 
 func (c uncomparableCondition) Test(effector, effected, skill any) bool { return false }
