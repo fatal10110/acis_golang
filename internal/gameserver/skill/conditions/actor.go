@@ -2,8 +2,8 @@
 // effect is allowed to apply: level/hp/mp/weight thresholds, player state
 // (moving, riding, resting, …), target identity/race/hp, and the day/night
 // or dice-roll gates a few skills use. Each concrete condition here is a
-// basefunc.Condition; combine them with And/Or/Not the same way skill/item
-// data attaches more than one requirement to the same effect.
+// Condition; combine them with And/Or/Not the same way skill/item data
+// attaches more than one requirement to the same effect.
 package conditions
 
 import (

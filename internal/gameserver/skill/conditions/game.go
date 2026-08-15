@@ -6,7 +6,7 @@ import "github.com/fatal10110/acis_golang/internal/commons/rnd"
 // re-rolled independently each time, not cached per attempt.
 type GameChance struct{ Percent int }
 
-func (c GameChance) Test(effector, effected, skill any) bool {
+func (c GameChance) Test(effector, effected Actor, skill Skill) bool {
 	return rnd.Get(100) < c.Percent
 }
 
@@ -23,6 +23,6 @@ type GameTime struct {
 	Night bool
 }
 
-func (c GameTime) Test(effector, effected, skill any) bool {
+func (c GameTime) Test(effector, effected Actor, skill Skill) bool {
 	return c.Clock.IsNight() == c.Night
 }
