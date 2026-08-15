@@ -5,8 +5,8 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	itemhandler "github.com/fatal10110/acis_golang/internal/gameserver/handler/item"
+	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
-	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -221,12 +221,12 @@ func (l *GameClientLink) hasActiveSummon(live *livePlayer) bool {
 	return ok
 }
 
-// activeServitorTarget returns live's active servitor as an
-// actorcast.Target, or nil if it has none, has a pet instead, or doesn't
+// activeServitorTarget returns live's active servitor as a
+// skilltarget.Creature, or nil if it has none, has a pet instead, or doesn't
 // expose that surface. Matches the reference's `player.hasServitor()` gate
 // (`Player.java:2986-2990`, checking `_summon instanceof Servitor`): a pet
 // alone does not qualify.
-func (l *GameClientLink) activeServitorTarget(live *livePlayer) actorcast.Target {
+func (l *GameClientLink) activeServitorTarget(live *livePlayer) skilltarget.Creature {
 	if l.world == nil || live == nil {
 		return nil
 	}
@@ -237,7 +237,7 @@ func (l *GameClientLink) activeServitorTarget(live *livePlayer) actorcast.Target
 	if pet, ok := obj.(interface{ IsPet() bool }); ok && pet.IsPet() {
 		return nil
 	}
-	target, ok := obj.(actorcast.Target)
+	target, ok := obj.(skilltarget.Creature)
 	if !ok {
 		return nil
 	}

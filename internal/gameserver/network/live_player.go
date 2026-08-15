@@ -304,7 +304,7 @@ func (l *GameClientLink) castController(live *livePlayer) *actorcast.Controller 
 		live.cast.SetLogger(live.log)
 		live.cast.SetOnAbort(func(interrupted bool) { l.broadcastCastAborted(live, interrupted) })
 		live.cast.SetOnStopAck(func() { sendMagicActionFailed(live) })
-		live.cast.SetOnFinish(func(interrupted bool, def modelskill.Definition, _ any) {
+		live.cast.SetOnFinish(func(interrupted bool, def modelskill.Definition, _ actorcast.Target) {
 			if live.combat == nil {
 				return
 			}

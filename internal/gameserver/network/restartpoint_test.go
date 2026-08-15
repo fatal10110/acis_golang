@@ -23,7 +23,7 @@ func TestTeleportLivePlayerStopsInFlightCast(t *testing.T) {
 
 	gcl := &GameClientLink{world: state, geo: testGeo{}, log: zerolog.Nop()}
 	controller := gcl.castController(live)
-	if _, err := controller.Start(time.Now(), skillCastObject(live), castingDef); err != nil {
+	if _, err := controller.Start(time.Now(), live, castingDef); err != nil {
 		t.Fatalf("Start() error: %v", err)
 	}
 
@@ -53,7 +53,7 @@ func TestTeleportLivePlayerSendsActionFailedOnce(t *testing.T) {
 
 	gcl := &GameClientLink{world: state, geo: testGeo{}, log: zerolog.Nop()}
 	controller := gcl.castController(live)
-	if _, err := controller.Start(time.Now(), skillCastObject(live), castingDef); err != nil {
+	if _, err := controller.Start(time.Now(), live, castingDef); err != nil {
 		t.Fatalf("Start() error: %v", err)
 	}
 	frames.frames = nil
@@ -88,7 +88,7 @@ func TestTeleportLivePlayerDoesNotAbortFusionChannel(t *testing.T) {
 
 	gcl := &GameClientLink{world: state, geo: testGeo{}, log: zerolog.Nop()}
 	controller := gcl.castController(caster)
-	if _, err := controller.Start(time.Now(), skillCastObject(caster), castingDef); err != nil {
+	if _, err := controller.Start(time.Now(), caster, castingDef); err != nil {
 		t.Fatalf("Start() error: %v", err)
 	}
 	caster.setFusionTarget(target.ObjectID())

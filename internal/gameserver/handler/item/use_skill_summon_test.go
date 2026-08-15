@@ -56,14 +56,14 @@ func TestUseMirrorsHerbEffectOntoSummon(t *testing.T) {
 			t.Fatalf("Outcome = %v, want Applied", res.Outcome)
 		}
 		res.Apply()
-		// fakeCaster doesn't implement skilltarget.Creature, so its own
-		// ApplyEffects call is a no-op here (as in every other Use test);
-		// only the summon mirror, which does satisfy that surface, records.
-		if len(rec.calls) != 1 {
-			t.Fatalf("skill handler calls = %d, want 1 (summon mirror)", len(rec.calls))
+		// caster and summon both satisfy skilltarget.Creature, so both
+		// their own effect application (caster) and the mirror (summon)
+		// record a call.
+		if len(rec.calls) != 2 {
+			t.Fatalf("skill handler calls = %d, want 2 (caster + summon mirror)", len(rec.calls))
 		}
-		if rec.calls[0].Caster != any(summon) {
-			t.Fatalf("recorded call caster = %v, want the summon", rec.calls[0].Caster)
+		if !mirroredTo(rec.calls, summon) {
+			t.Fatalf("recorded calls = %v, want one with the summon as caster", rec.calls)
 		}
 	})
 
@@ -80,8 +80,8 @@ func TestUseMirrorsHerbEffectOntoSummon(t *testing.T) {
 			t.Fatalf("Outcome = %v, want Applied", res.Outcome)
 		}
 		res.Apply()
-		if len(rec.calls) != 0 {
-			t.Fatalf("skill handler calls = %d, want 0 (no summon to mirror onto)", len(rec.calls))
+		if len(rec.calls) != 1 {
+			t.Fatalf("skill handler calls = %d, want 1 (caster only, no summon to mirror onto)", len(rec.calls))
 		}
 	})
 
@@ -99,8 +99,8 @@ func TestUseMirrorsHerbEffectOntoSummon(t *testing.T) {
 			t.Fatalf("Outcome = %v, want Applied", res.Outcome)
 		}
 		res.Apply()
-		if len(rec.calls) != 0 {
-			t.Fatalf("skill handler calls = %d, want 0 (IsPet caster must not mirror)", len(rec.calls))
+		if len(rec.calls) != 1 || mirroredTo(rec.calls, summon) {
+			t.Fatalf("recorded calls = %v, want caster only (IsPet caster must not mirror)", rec.calls)
 		}
 	})
 
@@ -118,10 +118,19 @@ func TestUseMirrorsHerbEffectOntoSummon(t *testing.T) {
 			t.Fatalf("Outcome = %v, want Applied", res.Outcome)
 		}
 		res.Apply()
-		if len(rec.calls) != 0 {
-			t.Fatalf("skill handler calls = %d, want 0 (non-herb must not mirror)", len(rec.calls))
+		if len(rec.calls) != 1 || mirroredTo(rec.calls, summon) {
+			t.Fatalf("recorded calls = %v, want caster only (non-herb must not mirror)", rec.calls)
 		}
 	})
+}
+
+func mirroredTo(calls []handlerskill.Cast, summon *fakeSummon) bool {
+	for _, c := range calls {
+		if c.Caster == any(summon) {
+			return true
+		}
+	}
+	return false
 }
 
 type noKnownCreatures struct{}

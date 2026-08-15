@@ -10,12 +10,13 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 func TestStartPlayerSkillAcceptsKnownActiveSkill(t *testing.T) {
 	ch := newRequestCharacter(10)
 	ch.SetSkillLevel(3, 1)
-	target := requestTarget{id: 20}
+	target := &requestTarget{id: 20}
 	ctrl := NewController(&testActor{mp: 100, hp: 100})
 	defs := requestDefinitions{
 		{ID: 3, Level: 1}: {
@@ -77,7 +78,7 @@ func TestStartPlayerSkillClearsRecentFakeDeath(t *testing.T) {
 
 		if _, err := StartPlayerSkill(PlayerSkillRequest{
 			Now: time.Unix(1000, 0), Controller: ctrl, Caster: ch,
-			Selected: requestTarget{id: 20}, SkillID: 3, Definitions: defs,
+			Selected: &requestTarget{id: 20}, SkillID: 3, Definitions: defs,
 		}); err != nil {
 			t.Fatalf("StartPlayerSkill() error: %v", err)
 		}
@@ -95,7 +96,7 @@ func TestStartPlayerSkillClearsRecentFakeDeath(t *testing.T) {
 
 		if _, err := StartPlayerSkill(PlayerSkillRequest{
 			Now: time.Unix(1000, 0), Controller: ctrl, Caster: ch,
-			Selected: struct{}{}, SkillID: 3, Definitions: defs,
+			SkillID: 3, Definitions: defs,
 		}); !errors.Is(err, ErrInvalidTarget) {
 			t.Fatalf("StartPlayerSkill() error = %v, want ErrInvalidTarget", err)
 		}
@@ -115,7 +116,7 @@ func TestStartPlayerSkillClearsRecentFakeDeath(t *testing.T) {
 
 		if _, err := StartPlayerSkill(PlayerSkillRequest{
 			Now: time.Unix(1000, 0), Controller: ctrl, Caster: ch,
-			Selected: requestTarget{id: 20}, SkillID: 3, Definitions: defs,
+			Selected: &requestTarget{id: 20}, SkillID: 3, Definitions: defs,
 		}); err != nil {
 			t.Fatalf("StartPlayerSkill() error: %v", err)
 		}
@@ -184,7 +185,6 @@ func TestStartPlayerSkillRejectsInvalidTarget(t *testing.T) {
 		Now:         time.Unix(1000, 0),
 		Controller:  ctrl,
 		Caster:      ch,
-		Selected:    struct{}{},
 		SkillID:     3,
 		Definitions: defs,
 	})
@@ -201,7 +201,7 @@ func TestStartPlayerSkillRejectsInvalidTarget(t *testing.T) {
 
 func TestStartItemSkillAcceptsResolvedSkill(t *testing.T) {
 	ch := newRequestCharacter(10)
-	target := requestTarget{id: 20}
+	target := &requestTarget{id: 20}
 	ctrl := NewController(&testActor{mp: 100, hp: 100})
 	def := modelskill.Definition{
 		ID: 7, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
@@ -285,7 +285,6 @@ func TestStartItemSkillRejectsInvalidTarget(t *testing.T) {
 		Now:         time.Unix(1000, 0),
 		Controller:  ctrl,
 		Caster:      ch,
-		Selected:    struct{}{},
 		Skill:       modelskill.Ref{ID: 7, Level: 1},
 		Definitions: defs,
 	})
@@ -370,7 +369,6 @@ func TestResolvePlayerToggleRejectsInvalidTarget(t *testing.T) {
 
 	def, target, err := ResolvePlayerToggle(PlayerToggleRequest{
 		Caster:      ch,
-		Selected:    struct{}{},
 		SkillID:     288,
 		Definitions: defs,
 	})
@@ -469,9 +467,8 @@ func (d requestDefinitions) Definition(ref modelskill.Ref) (modelskill.Definitio
 }
 
 type requestTarget struct {
+	world.Presence
 	id int32
 }
 
-func (t requestTarget) ObjectID() int32 { return t.id }
-
-func (requestTarget) Position() (int, int, int) { return 1, 2, 3 }
+func (t *requestTarget) ObjectID() int32 { return t.id }

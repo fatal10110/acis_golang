@@ -301,7 +301,7 @@ func TestUnequipItemDuringCastIsRejected(t *testing.T) {
 
 	gcl := &GameClientLink{world: state, geo: testGeo{}}
 	controller := gcl.castController(live)
-	if _, err := controller.Start(time.Now(), skillCastObject(live), castingDef); err != nil {
+	if _, err := controller.Start(time.Now(), live, castingDef); err != nil {
 		t.Fatalf("Start() error: %v", err)
 	}
 

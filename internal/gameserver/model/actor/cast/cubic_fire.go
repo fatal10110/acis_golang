@@ -6,6 +6,7 @@ import (
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // cubicMaxMagicRange is Cubic.MAX_MAGIC_RANGE: the 3D range (collision radii
@@ -16,7 +17,7 @@ const cubicMaxMagicRange = 900
 // from: its currently selected target, its own RNG roll, and its own vitals
 // for the Life Cubic's self-heal gate.
 type CubicFireOwner interface {
-	Target() any
+	Target() world.Tracked
 	Roll(n int) int
 	CurrentHP() int
 	MaxHPValue() float64
@@ -157,7 +158,7 @@ type cubicHealEffectiveness interface {
 // player's own heal cast goes through, which scales by the caster's own
 // MATK and healing proficiency. healed reports whether the target actually
 // received HP, so the caller knows whether to send the heal feedback packet.
-func ApplyCubicHeal(power float32, target any) (healed bool) {
+func ApplyCubicHeal(power float32, target Target) (healed bool) {
 	healable, ok := target.(cubicHealTarget)
 	if !ok || !healable.CanBeHealed() {
 		return false

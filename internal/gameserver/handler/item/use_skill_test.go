@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	modelitem "github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -19,9 +20,12 @@ type fakeCaster struct {
 	flying               bool
 }
 
-func (f *fakeCaster) ObjectID() int32              { return 1 }
-func (f *fakeCaster) Position() (int, int, int)    { return 0, 0, 0 }
-func (f *fakeCaster) SkillDisabled(key int32) bool { return f.disabled != nil && f.disabled[key] }
+func (f *fakeCaster) ObjectID() int32                { return 1 }
+func (f *fakeCaster) Position() (int, int, int)      { return 0, 0, 0 }
+func (f *fakeCaster) Heading() int                   { return 0 }
+func (f *fakeCaster) Dead() bool                     { return false }
+func (f *fakeCaster) Category() skilltarget.Category { return skilltarget.CategoryPlayable }
+func (f *fakeCaster) SkillDisabled(key int32) bool   { return f.disabled != nil && f.disabled[key] }
 func (f *fakeCaster) DisableSkill(key int32, d time.Duration) {
 	f.disableCalls++
 }

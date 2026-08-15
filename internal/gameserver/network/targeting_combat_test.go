@@ -306,7 +306,7 @@ func TestCastFinishResumesPendingAttackIntention(t *testing.T) {
 			attackerFrames.frames = nil
 
 			controller := gcl.castController(attacker)
-			if _, err := controller.Start(time.Now(), skillCastObject(attacker), tt.def); err != nil {
+			if _, err := controller.Start(time.Now(), attacker, tt.def); err != nil {
 				t.Fatalf("Start() error: %v", err)
 			}
 			if attacker.combat.Target() != target {
@@ -361,7 +361,7 @@ func TestCastFinishResumesAttackQueuedDuringCast(t *testing.T) {
 		ID: 3, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
 		HitTime: 5000, ReuseDelay: 1200, StaticHitTime: true, StaticReuse: true,
 	}
-	if _, err := controller.Start(time.Now(), skillCastObject(attacker), def); err != nil {
+	if _, err := controller.Start(time.Now(), attacker, def); err != nil {
 		t.Fatalf("Start() error: %v", err)
 	}
 	if gcl.attackLiveTarget(attacker, target) {

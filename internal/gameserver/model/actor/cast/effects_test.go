@@ -7,6 +7,7 @@ import (
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // effectsActor is a minimal skilltarget.Creature usable as a non-player
@@ -273,7 +274,44 @@ func TestApplyEffectsNilRegistriesAreNoop(t *testing.T) {
 	if ApplyEffects(EffectHandlers{}, caster, nil, def) {
 		t.Fatal("ApplyEffects(zero-value handlers) = true, want false")
 	}
-	if ApplyEffects(EffectHandlers{}, "not a creature", nil, def) {
-		t.Fatal("ApplyEffects(non-Creature caster) = true, want false")
+	if ApplyEffects(EffectHandlers{}, nil, nil, def) {
+		t.Fatal("ApplyEffects(nil caster) = true, want false")
+	}
+}
+
+// nonCreatureSelection is a world.Tracked value that does not satisfy
+// skilltarget.Creature — a door, static object, or similar world object a
+// player can select but that carries no combat-relevant state.
+type nonCreatureSelection struct {
+	world.Presence
+	id int32
+}
+
+func (s *nonCreatureSelection) ObjectID() int32 { return s.id }
+
+var _ world.Tracked = (*nonCreatureSelection)(nil)
+var _ Target = (*nonCreatureSelection)(nil)
+
+// TestApplyEffectsRejectsNonCreatureSelection pins the quirk #1502 preserves:
+// typing Selected to world.Tracked doesn't tighten what TargetOne admits at
+// selection time (a door still satisfies cast.Target, so SelectTarget still
+// accepts it), but resolveAffected's skilltarget.Creature narrowing still
+// rejects it before any skill handler runs — the same branch as before the
+// caster/selection types were tightened.
+func TestApplyEffectsRejectsNonCreatureSelection(t *testing.T) {
+	caster := &effectsActor{id: 1, category: skilltarget.CategoryPlayable}
+	door := &nonCreatureSelection{id: 2}
+	rec := &recordingSkillHandler{}
+	handlers := newEffectHandlers(effectsKnown{}, "DUMMY", rec)
+	def := modelskill.Definition{ID: 106, Target: modelskill.TargetOne, SkillType: "DUMMY"}
+
+	if _, ok := SelectTarget(caster, door, def); !ok {
+		t.Fatal("SelectTarget(door) ok = false, want true: a non-creature Tracked value still selects")
+	}
+	if ApplyEffects(handlers, caster, door, def) {
+		t.Fatal("ApplyEffects(door selection) = true, want false")
+	}
+	if len(rec.calls) != 0 {
+		t.Fatalf("skill handler calls = %d, want 0 (door never reaches a skill handler)", len(rec.calls))
 	}
 }

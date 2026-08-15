@@ -662,7 +662,7 @@ func TestSummonCastControllerRecoversPanickingHook(t *testing.T) {
 	// giving the test direct, compiler-checked access to what SpawnServitor
 	// itself installed instead of reaching into unexported AI state.
 	ctrl := link.wireSummonAI(actor)
-	plan, err := ctrl.Controller.Start(time.Now(), actorcast.SummonActor{Summon: actor}, modelskill.Definition{ID: 1, Level: 1, HitTime: 0})
+	plan, err := ctrl.Controller.Start(time.Now(), actor, modelskill.Definition{ID: 1, Level: 1, HitTime: 0})
 	if err != nil {
 		t.Fatalf("Start() error: %v", err)
 	}

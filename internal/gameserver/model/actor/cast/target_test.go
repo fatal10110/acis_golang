@@ -4,16 +4,17 @@ import (
 	"testing"
 
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 func TestSelectTarget(t *testing.T) {
-	caster := castTarget{id: 1}
-	selected := castTarget{id: 2}
+	caster := &castTarget{id: 1}
+	selected := &castTarget{id: 2}
 
 	tests := []struct {
 		name     string
 		target   modelskill.Target
-		selected any
+		selected world.Tracked
 		want     Target
 		wantOK   bool
 	}{
@@ -21,7 +22,7 @@ func TestSelectTarget(t *testing.T) {
 		{name: "none", target: modelskill.TargetNone, selected: selected, want: caster, wantOK: true},
 		{name: "ground", target: modelskill.TargetGround, selected: selected, want: caster, wantOK: true},
 		{name: "one", target: modelskill.TargetOne, selected: selected, want: selected, wantOK: true},
-		{name: "one invalid", target: modelskill.TargetOne, selected: struct{}{}, wantOK: false},
+		{name: "one no selection", target: modelskill.TargetOne, wantOK: false},
 		{name: "unsupported", target: modelskill.TargetParty, selected: selected, wantOK: false},
 	}
 
@@ -36,9 +37,8 @@ func TestSelectTarget(t *testing.T) {
 }
 
 type castTarget struct {
+	world.Presence
 	id int32
 }
 
-func (t castTarget) ObjectID() int32 { return t.id }
-
-func (castTarget) Position() (int, int, int) { return 0, 0, 0 }
+func (t *castTarget) ObjectID() int32 { return t.id }

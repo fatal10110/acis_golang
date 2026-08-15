@@ -4,6 +4,7 @@ package item
 import (
 	"time"
 
+	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	modelitem "github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -89,7 +90,7 @@ var hpPotionSkillIDs = map[int32]bool{2031: true, 2032: true, 2037: true}
 // itself (for the cast animation and effect resolution) and owns its own
 // skill reuse/cooldown state.
 type SkillCaster interface {
-	actorcast.Target
+	skilltarget.Creature
 	SkillDisabled(key int32) bool
 	DisableSkill(key int32, delay time.Duration)
 	AddSkillReuse(ref modelskill.Ref, key int32, delay time.Duration)
@@ -127,7 +128,7 @@ type UseRequest struct {
 	// `player.getSummon().getCast().doInstantCast(...)`. Nil when the caster
 	// has no active servitor, or is itself one (IsPet), leaves the mirror
 	// unapplied.
-	Summon actorcast.Target
+	Summon skilltarget.Creature
 
 	// Target is the caster's selected target, used by attached-skill conditions.
 	Target any

@@ -9,6 +9,7 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // cubicCastDelay is Cubic.CAST_DELAY: the fixed delay between a cubic's
@@ -225,4 +226,4 @@ type cubicHealMessageTarget interface {
 // Target's return type needs boxing into the domain-facing `any`.
 type cubicFireOwner struct{ *livePlayer }
 
-func (o cubicFireOwner) Target() any { return o.livePlayer.Target() }
+func (o cubicFireOwner) Target() world.Tracked { return o.livePlayer.Target() }
