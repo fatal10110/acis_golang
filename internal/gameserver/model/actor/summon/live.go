@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
@@ -49,6 +50,12 @@ type Owner interface {
 // per actor.
 type Actor struct {
 	world.Presence
+
+	// movement is this summon's lifetime move state, matching
+	// creature.Live.movement (internal/gameserver/model/actor/creature/live.go):
+	// zero-value until InitMovement wires real geodata/speed, so Move().Moving()
+	// stays false (not an error) for a summon with no movement controller.
+	movement move.CreatureMove
 
 	id      int32
 	owner   Owner

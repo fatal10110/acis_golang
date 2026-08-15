@@ -42,10 +42,12 @@ func (s summonStatActor) Y() int { return s.a.Y() }
 // Z satisfies conditions.Actor.
 func (s summonStatActor) Z() int { return s.a.Z() }
 
-// IsMoving satisfies conditions.Actor. Always false: unlike *player.Character
-// and *npc.Hostile, *Actor carries no move controller or in-motion state at
-// all yet (tracked in #1510), so there is nothing to report.
-func (s summonStatActor) IsMoving() bool { return false }
+// IsMoving satisfies conditions.Actor, matching hostileStatActor: reads the
+// real in-motion state off the move.CreatureMove a wired move.Controller
+// drives (see Actor.Move, Actor.InitMovement). A summon spawned without
+// geodata (InitMovement never called) keeps its zero-value, never-moving
+// CreatureMove, so this correctly reports false rather than erroring.
+func (s summonStatActor) IsMoving() bool { return s.a.Move().Moving() }
 
 // IsRunning satisfies conditions.Actor. Always true, matching
 // hostileStatActor: Java's Creature walk/run toggle defaults to run stance
