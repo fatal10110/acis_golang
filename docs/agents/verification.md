@@ -64,6 +64,30 @@ rtk go -C acis_golang test -tags=integration -count=1 ./...
 
 CI runs `-race` and `-tags=integration` as separate jobs; run both locally before claiming completion.
 
+### Datapack oracle tests are local-only — CI cannot run them
+
+`aCis_datapack` is a separate checkout that is never pushed, and `.github/workflows/go.yml` checks
+out only `acis_golang`. Every test that reads the shared datapack resolves its path through a helper
+that calls `t.Skip` when the datapack is absent, so **all datapack oracle tests silently skip in CI
+and a green CI run proves nothing about them.**
+
+This makes the local run the only gate for them. Before every push:
+
+- run the full suite from the outer `acis_public/` root, with `aCis_datapack/` present, so the
+  oracle tests actually execute;
+- confirm the run did not skip them — a skip reading `aCis_datapack not checked out near the module
+  root` means the gate did not run and completion cannot be claimed;
+- never treat a green CI check as covering a datapack-backed acceptance criterion.
+
+```bash
+# from acis_public/, with aCis_datapack/ checked out alongside acis_golang/
+rtk go -C acis_golang test -race ./...
+rtk go -C acis_golang test -run 'Datapack|Oracle|Shipped' -v ./... | rg -i 'SKIP|FAIL'
+```
+
+An issue whose acceptance criteria name real datapack content is not verified until its oracle test
+is observed passing locally.
+
 The installed `rtk` version exposes compact `go test`, `go build`, and `go vet` wrappers.
 `golangci-lint` is not currently installed or configured as a repository gate. Run
 `rtk err golangci-lint run` only when the task or CI requires it and the binary is available;
