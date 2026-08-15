@@ -47,13 +47,13 @@ func funcCondition(direct *modelskill.Condition, attach *modelskill.ConditionCla
 // to a conditions.Actor, trying effected first and falling back to
 // effector. In every Calc call site today, effected is the raw owner
 // (*player.Character/*npc.Hostile/*summon.Actor) and effector is a thinner
-// calculation-only wrapper (characterStatActor and friends) around that
-// same owner; only the wrapper types implement conditions.Actor, and today
-// only characterStatActor does (see model/actor/player/
-// character_conditions.go), so in practice it is always the effector
-// fallback that succeeds — see #1509 for extending this to NPC/summon
-// owners. Both roles then test as that one owner, matching this package's
-// doc: a stat func is gated by its owner alone.
+// calculation-only wrapper (characterStatActor/hostileStatActor/
+// summonStatActor) around that same owner; only the wrapper types
+// implement conditions.Actor, never the raw owner (see model/actor/player/
+// character_conditions.go, model/actor/npc/hostile_conditions.go,
+// model/actor/summon/conditions.go), so in practice it is always the
+// effector fallback that succeeds. Both roles then test as that one owner,
+// matching this package's doc: a stat func is gated by its owner alone.
 type conditionGate struct{ cond conditions.Condition }
 
 func (g conditionGate) Test(effector, effected, skill any) bool {
