@@ -11,6 +11,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	gamemanager "github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
@@ -25,7 +26,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/link"
 )
 
-func newLinkedSQLGameClientWithShortcuts(t *testing.T) (*fakeGameClient, *gamesql.CharacterStore, *gamesql.ShortcutStore, *gamesql.CharacterSkillStore) {
+func newLinkedSQLGameClient(t *testing.T, skills *skillstate.Persistence, seed func(*gamesql.CharacterStore, *gamesql.ItemStore), wantChars int) (*fakeGameClient, *gamesql.CharacterStore, *gamesql.ItemStore, *gamesql.ShortcutStore, *gamesql.CharacterSkillStore, *world.State) {
 	t.Helper()
 
 	db := sqltest.NewDB(t)
@@ -33,7 +34,12 @@ func newLinkedSQLGameClientWithShortcuts(t *testing.T) (*fakeGameClient, *gamesq
 	items := gamesql.NewItemStore(db)
 	shortcuts := gamesql.NewShortcutStore(db)
 	knownSkills := gamesql.NewCharacterSkillStore(db)
-	skills := skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), skill.NewTable([]skill.Definition{{ID: 248, Level: 3}}), knownSkills)
+	if skills == nil {
+		skills = skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), skill.NewTable([]skill.Definition{{ID: 248, Level: 3}}), knownSkills)
+	}
+	if seed != nil {
+		seed(chars, items)
+	}
 	loginAddr, servers, sessions := newTestLoginServer(t, false)
 	servers.Register(1, testHexID)
 	validator := NewSessionValidator()
@@ -110,6 +116,14 @@ func newLinkedSQLGameClientWithShortcuts(t *testing.T) (*fakeGameClient, *gamesq
 	c.send(encodeAuthLogin("player1", key))
 	if reply := c.read(); reply[0] != serverpackets.OpcodeCharSelectInfo {
 		t.Fatalf("opcode = %#x, want CharSelectInfo (%#x)", reply[0], serverpackets.OpcodeCharSelectInfo)
+	} else if count := wire.NewReader(reply[1:]).ReadInt32(); count != int32(wantChars) {
+		t.Fatalf("initial char count = %d, want %d", count, wantChars)
 	}
+	return c, chars, items, shortcuts, knownSkills, state
+}
+
+func newLinkedSQLGameClientWithShortcuts(t *testing.T) (*fakeGameClient, *gamesql.CharacterStore, *gamesql.ShortcutStore, *gamesql.CharacterSkillStore) {
+	t.Helper()
+	c, chars, _, shortcuts, knownSkills, _ := newLinkedSQLGameClient(t, nil, nil, 0)
 	return c, chars, shortcuts, knownSkills
 }
