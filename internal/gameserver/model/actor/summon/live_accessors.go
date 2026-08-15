@@ -3,6 +3,7 @@ package summon
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
@@ -14,6 +15,21 @@ import (
 )
 
 func (a *Actor) ObjectID() int32 { return a.id }
+
+// Move returns this summon's lifetime movement state, mirroring
+// creature.Live.Move (internal/gameserver/model/actor/creature/live.go):
+// the same *move.CreatureMove a wired move.Controller drives, so
+// Move().Moving() reflects real in-motion state once InitMovement has run.
+func (a *Actor) Move() *move.CreatureMove { return &a.movement }
+
+// InitMovement wires real geodata/speed into this summon's movement state,
+// matching creature.NewLive's Init call. Call it once, before building a
+// move.Controller over Move() (see GameClientLink.wireSummonAI); a summon
+// left uninitialized (no geodata available) keeps a stationary, never-moving
+// zero-value CreatureMove.
+func (a *Actor) InitMovement(origin location.Location, speed float64, geo move.Geo) error {
+	return a.movement.Init(origin, speed, geo)
+}
 
 // ActingPlayer returns the owner for player-attributed outcomes.
 func (a *Actor) ActingPlayer() creature.DeathActor {
