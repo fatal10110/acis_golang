@@ -61,6 +61,20 @@ func (c *Character) InSiegeZone() bool {
 	return c.insideSiegeZone.Load()
 }
 
+// SetInNoSummonFriendZone records the live zone engine's current
+// NoSummonFriend membership (zone.FlagNoSummonFriend), the same way
+// SetInPvPZone/SetInSiegeZone track their flags.
+func (c *Character) SetInNoSummonFriendZone(inside bool) {
+	c.insideNoSummonFriendZone.Store(inside)
+}
+
+// NoSummonFriendZone reports whether the character currently stands inside
+// a zone that blocks SUMMON_FRIEND/SUMMON_PARTY, matching
+// isInsideZone(ZoneId.NO_SUMMON_FRIEND) (SummonFriend.java:113,138).
+func (c *Character) NoSummonFriendZone() bool {
+	return c.insideNoSummonFriendZone.Load()
+}
+
 // SetZoneRevalidator records the runtime hook that updates zone occupancy
 // whenever the player's server-authoritative position changes.
 func (c *Character) SetZoneRevalidator(revalidate func(location.Location)) {

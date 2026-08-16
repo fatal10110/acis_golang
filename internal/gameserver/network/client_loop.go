@@ -924,6 +924,18 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				l.handleRequestChangePetName(ctx, live, req)
 			}
 
+		case clientpackets.OpcodeDlgAnswer:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeDlgAnswer)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				l.handleDlgAnswer(live, req)
+			}
+
 		case clientpackets.OpcodeDummy1A,
 			clientpackets.OpcodeRequestSellItem,
 			clientpackets.OpcodeRequestBuyItem,
@@ -940,7 +952,6 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			clientpackets.OpcodeRequestQuestListInGame,
 			clientpackets.OpcodeRequestQuestAbort,
 			clientpackets.OpcodeRequestPackageSend,
-			clientpackets.OpcodeDlgAnswer,
 			clientpackets.OpcodeGameGuardReply,
 			clientpackets.OpcodeRequestShowMiniMap:
 			l.log.Warn().Str("opcode", fmt.Sprintf("%#x", opcode)).Msg("Opcode not wired")

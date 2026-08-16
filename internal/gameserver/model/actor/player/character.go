@@ -96,6 +96,7 @@ type Character struct {
 	revalidateZones           func(location.Location)
 	insidePvPZone             atomic.Bool
 	insideSiegeZone           atomic.Bool
+	insideNoSummonFriendZone  atomic.Bool
 	sendFrame                 func(wire.Frame) bool
 	broadcastFrame            func(wire.Frame) bool
 	broadcastAttack           func(attack.Snapshot)
@@ -151,6 +152,17 @@ type Character struct {
 	// package importing the network package.
 	summonSpawnMu sync.RWMutex
 	summonSpawner SummonSpawner
+
+	// summonFriendMu guards the pending SUMMON_FRIEND/SUMMON_PARTY
+	// teleport-confirm request state and its client-facing send hook,
+	// matching Player._summonTargetRequest/_summonSkillRequest
+	// (Player.java:452-453).
+	summonFriendMu    sync.Mutex
+	summonRequester   any
+	summonRequesterID int32
+	summonSkill       modelskill.Definition
+	sendSummonConfirm func(casterName string, casterID int32, x, y, z int, timeout time.Duration)
+	teleportHook      func(x, y, z, radius int)
 
 	// statMu guards statCalcs map creation. Each Calculator owns its Funcs.
 	statMu    sync.Mutex

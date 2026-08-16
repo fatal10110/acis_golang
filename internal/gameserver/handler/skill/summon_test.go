@@ -5,7 +5,10 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -287,5 +290,133 @@ func TestEraseSkipsSiegeSummon(t *testing.T) {
 	}
 	if owner.vanished != 0 {
 		t.Fatalf("owner vanish notices = %d, want 0", owner.vanished)
+	}
+}
+
+// summonFriendGeo is a permissive move.Geo stub, enough to attach a real
+// *player.Character's creature.Live for these domain-level tests.
+type summonFriendGeo struct{}
+
+func (summonFriendGeo) CanMove(_, _, _, _, _, _ int) bool { return true }
+func (summonFriendGeo) Height(_, _, _ int) int16          { return 0 }
+func (summonFriendGeo) FindPath(_, _ location.Location) ([]location.Location, bool) {
+	return nil, false
+}
+func (summonFriendGeo) ValidLocation(ox, oy, oz, _, _, _ int) location.Location {
+	return location.Location{X: ox, Y: oy, Z: oz}
+}
+
+func summonFriendTemplate() *player.Template {
+	return &player.Template{
+		ID:          0,
+		FistsItemID: 1,
+		STR:         40, CON: 43, DEX: 30, INT: 21, WIT: 11, MEN: 25,
+		PAtk: 5, PDef: 50, MAtk: 25, MDef: 40,
+		CollisionRadius: 9, CollisionHeight: 23,
+		HPTable: []float64{100}, MPTable: []float64{30}, CPTable: []float64{0},
+	}
+}
+
+// summonFriendCharacter builds a real, live-attached *player.Character at
+// (x, y, z), matching disablers_test.go's liveShieldCharacter helper. Used
+// in place of the summonFriendActor fake wherever a summon-friend assertion
+// itself is under test, per docs/agents/test-strategy.md — a fake
+// satisfying an interface the production type doesn't is exactly what hid
+// #1525.
+func summonFriendCharacter(t *testing.T, id int32, x, y, z int, carried ...*item.Instance) *player.Character {
+	t.Helper()
+	tmpl := summonFriendTemplate()
+	c := &player.Character{
+		ID: id, Name: "char", ClassID: tmpl.ID, BaseClassID: tmpl.ID,
+		Race: player.RaceHuman, Sex: player.SexMale, CharLevel: 1,
+		Location: location.Location{X: x, Y: y, Z: z},
+	}
+	c.SetResourceValues(player.Resources{MaxHP: 100, CurrentHP: 100, MaxMP: 30, CurrentMP: 30})
+	items := item.NewTable([]*item.Template{{ID: 1, Kind: item.KindWeapon, Slot: item.SlotRHand, Weapon: &item.WeaponDetail{Type: item.WeaponFist}}, {ID: 57, Stackable: true}})
+	c.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventory(c.ID, items, carried))
+	live, err := creature.NewLive(c.Location, 0, summonFriendGeo{}, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.Live = live
+	return c
+}
+
+func TestSummonFriendRealPlayerTargetTeleportsAndConsumesItem(t *testing.T) {
+	registry := NewDefaultRegistry()
+	caster := summonFriendCharacter(t, 1, 10, 20, 30)
+	target := summonFriendCharacter(t, 2, 0, 0, 0, &item.Instance{ObjectID: 1, TemplateID: 57, OwnerID: 2, Count: 2, Location: item.LocationInventory})
+
+	var teleported bool
+	var tx, ty, tz, tr int
+	target.SetTeleportHook(func(x, y, z, radius int) {
+		teleported = true
+		tx, ty, tz, tr = x, y, z, radius
+	})
+
+	registry.Use(Cast{
+		Caster:  caster,
+		Skill:   modelskill.Definition{ID: 1400, SkillType: "SUMMON_FRIEND", TargetConsumeID: 57, TargetConsumeCount: 2},
+		Targets: []Actor{target},
+	})
+
+	if !teleported || tx != 10 || ty != 20 || tz != 30 || tr != 20 {
+		t.Fatalf("target teleport = %v to (%d,%d,%d,%d), want caster position with radius 20", teleported, tx, ty, tz, tr)
+	}
+	if got := target.ItemCount(57); got != 0 {
+		t.Fatalf("target remaining item count = %d, want 0", got)
+	}
+}
+
+func TestSummonFriendConfirmDialogAcceptTeleportsRealPlayerTarget(t *testing.T) {
+	registry := NewDefaultRegistry()
+	caster := summonFriendCharacter(t, 1, 10, 20, 30)
+	target := summonFriendCharacter(t, 2, 0, 0, 0)
+
+	var confirmedName string
+	var confirmedCasterID int32
+	var confirmedTimeout time.Duration
+	target.SetSummonConfirmSender(func(casterName string, casterID int32, x, y, z int, timeout time.Duration) {
+		confirmedName, confirmedCasterID, confirmedTimeout = casterName, casterID, timeout
+	})
+	var teleported bool
+	target.SetTeleportHook(func(x, y, z, radius int) { teleported = true })
+
+	registry.Use(Cast{
+		Caster:  caster,
+		Skill:   modelskill.Definition{ID: 1403, SkillType: "SUMMON_FRIEND"},
+		Targets: []Actor{target},
+	})
+
+	if confirmedName != "char" || confirmedCasterID != caster.ObjectID() || confirmedTimeout != 30*time.Second {
+		t.Fatalf("confirm dialog = name %q casterID %d timeout %s, want caster's name/id and 30s", confirmedName, confirmedCasterID, confirmedTimeout)
+	}
+	if teleported {
+		t.Fatal("confirmation summon should not teleport until the target accepts")
+	}
+
+	target.TeleportAnswer(1, caster.ObjectID())
+	if !teleported {
+		t.Fatal("accepting the confirm dialog should teleport the target")
+	}
+}
+
+func TestSummonFriendConfirmDialogDeclineDoesNotTeleport(t *testing.T) {
+	registry := NewDefaultRegistry()
+	caster := summonFriendCharacter(t, 1, 10, 20, 30)
+	target := summonFriendCharacter(t, 2, 0, 0, 0)
+	target.SetSummonConfirmSender(func(string, int32, int, int, int, time.Duration) {})
+	var teleported bool
+	target.SetTeleportHook(func(x, y, z, radius int) { teleported = true })
+
+	registry.Use(Cast{
+		Caster:  caster,
+		Skill:   modelskill.Definition{ID: 1403, SkillType: "SUMMON_FRIEND"},
+		Targets: []Actor{target},
+	})
+
+	target.TeleportAnswer(0, caster.ObjectID())
+	if teleported {
+		t.Fatal("declining the confirm dialog should not teleport the target")
 	}
 }
