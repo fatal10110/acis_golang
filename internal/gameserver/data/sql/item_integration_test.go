@@ -12,7 +12,7 @@ import (
 
 func TestItemStore_CreateAndListByOwner(t *testing.T) {
 	ctx := context.Background()
-	store := NewItemStore(sqltest.NewDB(t))
+	store := NewItemStore(sqltest.SharedDB(t))
 
 	chest := item.Instance{
 		ObjectID: 0x10000101, TemplateID: 1146, Count: 1,
@@ -53,7 +53,7 @@ func TestItemStore_CreateAndListByOwner(t *testing.T) {
 
 func TestItemStore_ListByOwner_Empty(t *testing.T) {
 	ctx := context.Background()
-	store := NewItemStore(sqltest.NewDB(t))
+	store := NewItemStore(sqltest.SharedDB(t))
 
 	got, err := store.ListByOwner(ctx, 0x10000999)
 	if err != nil {
@@ -66,7 +66,7 @@ func TestItemStore_ListByOwner_Empty(t *testing.T) {
 
 func TestItemStore_Update(t *testing.T) {
 	ctx := context.Background()
-	store := NewItemStore(sqltest.NewDB(t))
+	store := NewItemStore(sqltest.SharedDB(t))
 
 	inst := item.Instance{
 		ObjectID: 0x10000101, TemplateID: 1146, Count: 1,
@@ -100,7 +100,7 @@ func TestItemStore_Update(t *testing.T) {
 
 func TestItemStore_SaveUpserts(t *testing.T) {
 	ctx := context.Background()
-	store := NewItemStore(sqltest.NewDB(t))
+	store := NewItemStore(sqltest.SharedDB(t))
 
 	inst := &item.Instance{
 		ObjectID: 0x10000101, TemplateID: 1146, OwnerID: 0x10000001, Count: 1,
@@ -133,7 +133,7 @@ func TestItemStore_SaveUpserts(t *testing.T) {
 
 func TestItemStore_Delete(t *testing.T) {
 	ctx := context.Background()
-	store := NewItemStore(sqltest.NewDB(t))
+	store := NewItemStore(sqltest.SharedDB(t))
 
 	inst := item.Instance{ObjectID: 0x10000101, TemplateID: 1146, Count: 1, Location: item.LocationInventory, ManaLeft: -1}
 	if err := store.Create(ctx, 0x10000001, inst); err != nil {
@@ -155,7 +155,7 @@ func TestItemStore_Delete(t *testing.T) {
 
 func TestItemStore_ListByOwnerAndLocations(t *testing.T) {
 	ctx := context.Background()
-	store := NewItemStore(sqltest.NewDB(t))
+	store := NewItemStore(sqltest.SharedDB(t))
 
 	for _, inst := range []item.Instance{
 		{ObjectID: 0x10000101, TemplateID: 1146, Count: 1, Location: item.LocationPaperdoll, LocationData: 10, ManaLeft: -1},
@@ -183,7 +183,7 @@ func TestItemStore_ListByOwnerAndLocations(t *testing.T) {
 
 func TestItemStore_DeleteByOwner(t *testing.T) {
 	ctx := context.Background()
-	store := NewItemStore(sqltest.NewDB(t))
+	store := NewItemStore(sqltest.SharedDB(t))
 
 	for _, inst := range []item.Instance{
 		{ObjectID: 0x10000101, TemplateID: 1146, Count: 1, Location: item.LocationInventory, ManaLeft: -1},

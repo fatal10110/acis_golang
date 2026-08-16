@@ -12,7 +12,7 @@ import (
 
 func TestAugmentationStore_CreateAndGet(t *testing.T) {
 	ctx := context.Background()
-	store := NewAugmentationStore(sqltest.NewDB(t))
+	store := NewAugmentationStore(sqltest.SharedDB(t))
 
 	aug := item.Augmentation{Attributes: 12345, SkillID: 2621, SkillLevel: 1}
 	if err := store.Create(ctx, 0x10000101, aug); err != nil {
@@ -33,7 +33,7 @@ func TestAugmentationStore_CreateAndGet(t *testing.T) {
 
 func TestAugmentationStore_SaveUpserts(t *testing.T) {
 	ctx := context.Background()
-	store := NewAugmentationStore(sqltest.NewDB(t))
+	store := NewAugmentationStore(sqltest.SharedDB(t))
 
 	if err := store.Save(ctx, 0x10000101, item.Augmentation{Attributes: 12345, SkillID: 2621, SkillLevel: 1}); err != nil {
 		t.Fatalf("Save(insert) unexpected error: %v", err)
@@ -57,7 +57,7 @@ func TestAugmentationStore_SaveUpserts(t *testing.T) {
 
 func TestAugmentationStore_Get_NotFound(t *testing.T) {
 	ctx := context.Background()
-	store := NewAugmentationStore(sqltest.NewDB(t))
+	store := NewAugmentationStore(sqltest.SharedDB(t))
 
 	_, ok, err := store.Get(ctx, 0x10000999)
 	if err != nil {
@@ -70,7 +70,7 @@ func TestAugmentationStore_Get_NotFound(t *testing.T) {
 
 func TestAugmentationStore_Delete(t *testing.T) {
 	ctx := context.Background()
-	store := NewAugmentationStore(sqltest.NewDB(t))
+	store := NewAugmentationStore(sqltest.SharedDB(t))
 
 	if err := store.Create(ctx, 0x10000101, item.Augmentation{Attributes: 1}); err != nil {
 		t.Fatalf("Create() unexpected error: %v", err)

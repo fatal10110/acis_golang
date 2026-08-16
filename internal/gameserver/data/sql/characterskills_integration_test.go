@@ -11,7 +11,7 @@ import (
 
 func TestCharacterSkillStore_ListKnownSkills(t *testing.T) {
 	ctx := context.Background()
-	db := sqltest.NewDB(t)
+	db := sqltest.SharedDB(t)
 	if _, err := db.ExecContext(ctx,
 		`INSERT INTO character_skills (char_obj_id, skill_id, skill_level, class_index) VALUES
 			(?, ?, ?, ?), (?, ?, ?, ?)`,
@@ -32,7 +32,7 @@ func TestCharacterSkillStore_ListKnownSkills(t *testing.T) {
 
 func TestCharacterSkillStore_SetKnownSkill(t *testing.T) {
 	ctx := context.Background()
-	db := sqltest.NewDB(t)
+	db := sqltest.SharedDB(t)
 	store := NewCharacterSkillStore(db)
 
 	if err := store.SetKnownSkill(ctx, 0x10000001, 0, 3, 1); err != nil {

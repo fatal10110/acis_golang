@@ -12,7 +12,7 @@ import (
 
 func TestShortcutStoreRoundTrip(t *testing.T) {
 	ctx := context.Background()
-	db := sqltest.NewDB(t)
+	db := sqltest.SharedDB(t)
 	store := NewShortcutStore(db)
 
 	first := shortcut.Shortcut{Slot: 3, Page: 1, Type: shortcut.Skill, ID: 248, Level: 1, CharacterType: 1}

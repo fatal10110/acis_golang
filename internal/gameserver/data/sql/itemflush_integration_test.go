@@ -19,6 +19,9 @@ import (
 // back rather than leave the item rows committed.
 func TestItemFlushStore_Flush_Atomic(t *testing.T) {
 	ctx := context.Background()
+	// Uses its own container, not SharedDB: this test drops a table out
+	// from under the schema, which would corrupt every other test sharing
+	// the package's container.
 	db := sqltest.NewDB(t)
 	store := NewItemFlushStore(db)
 
@@ -54,7 +57,7 @@ func TestItemFlushStore_Flush_Atomic(t *testing.T) {
 // augmentation saves/deletes, and a pet delete lands in one call.
 func TestItemFlushStore_Flush_MultiRow(t *testing.T) {
 	ctx := context.Background()
-	db := sqltest.NewDB(t)
+	db := sqltest.SharedDB(t)
 	store := NewItemFlushStore(db)
 
 	// Seed rows the batch's deletes must remove.
@@ -132,7 +135,7 @@ func TestItemFlushStore_Flush_MultiRow(t *testing.T) {
 // than failing outright or dropping rows past the chunk boundary.
 func TestItemFlushStore_Flush_ChunksLargeBatches(t *testing.T) {
 	ctx := context.Background()
-	db := sqltest.NewDB(t)
+	db := sqltest.SharedDB(t)
 	store := NewItemFlushStore(db)
 
 	const n = itemFlushChunkSize + 250

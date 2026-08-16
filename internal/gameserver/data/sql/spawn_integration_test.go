@@ -13,7 +13,7 @@ import (
 
 func TestSpawnStoreRoundTrip(t *testing.T) {
 	ctx := context.Background()
-	store := NewSpawnStore(sqltest.NewDB(t))
+	store := NewSpawnStore(sqltest.SharedDB(t))
 
 	initial, err := store.LoadStates(ctx)
 	if err != nil {

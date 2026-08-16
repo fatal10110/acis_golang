@@ -22,7 +22,7 @@ import (
 // boot-time restore and shutdown-time save wired into cmd/gameserver
 // actually round-trip instead of only type-checking.
 func TestGroundItemsBootWiringRoundTrip(t *testing.T) {
-	db := sqltest.NewDB(t)
+	db := sqltest.SharedDB(t)
 	ctx := context.Background()
 
 	tmpl := &item.Template{ID: 57, Kind: item.KindEtcItem, Duration: -1}
