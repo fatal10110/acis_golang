@@ -18,6 +18,10 @@ const baseBuffSlots = 20
 // Character satisfies the actor surface skill target resolution needs.
 var _ target.Creature = (*Character)(nil)
 
+// Character satisfies the identity surface SkillSuccessInput/EffectSuccessInput/
+// ShieldDefense/DecreaseFusion take their caster/effected parameter as.
+var _ creature.DeathActor = (*Character)(nil)
+
 // MaxBuffCount is the number of non-toggle, non-seven-signs buffs c can
 // hold at once. See baseBuffSlots.
 func (c *Character) MaxBuffCount() int {
