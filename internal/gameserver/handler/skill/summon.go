@@ -49,11 +49,12 @@ type summonFriendTargetState interface {
 	FestivalParticipant() bool
 }
 
-// summonFriendRequester has no production implementor: no player type wires
-// TeleportRequest/ClearTeleportRequest/ConfirmSummon, so this assertion
-// always fails against a real target and SUMMON_FRIEND/SUMMON_PARTY are
-// silent no-ops end to end. caster stays untyped pending that fix. Tracked
-// in #1525; do not type around a missing implementor.
+// summonFriendRequester is *player.Character's teleport-request/confirm-summon
+// surface (see actor_test.go's compile-time assertion). caster stays untyped
+// (any) rather than a Character-typed parameter: the plain
+// SUMMON_FRIEND/SUMMON_PARTY path also calls TeleportRequest/ConfirmSummon
+// with the caster forwarded opaquely, matching #1519/#1497's precedent for a
+// value used only for identity/state, not behavior, at this layer.
 type summonFriendRequester interface {
 	TeleportRequest(caster any, skill modelskill.Definition) bool
 	ClearTeleportRequest()

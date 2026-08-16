@@ -357,6 +357,12 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	c.SetCanGiveDamage(resolveCanGiveDamage(l.admin, c.AccessLevel))
 	live := &livePlayer{Character: c, template: tmpl, npcs: l.npcs, items: items, attack: attackCtl, move: moveCtl, combat: combat, shortcuts: shortcut.NewList(shortcuts), isGM: resolveIsGM(l.admin, c.AccessLevel), visibilitySend: client.Session.TrySendFrame, stopAttack: l.stopLiveAutoAttack, log: l.log}
 	live.zoneActor = &liveZoneActor{live: live}
+	c.SetSummonConfirmSender(func(casterName string, casterID int32, x, y, z int, timeout time.Duration) {
+		live.SendFrame(serverpackets.FrameConfirmDlgSummonFriendRequest(casterName, casterID, int32(x), int32(y), int32(z), timeout))
+	})
+	c.SetTeleportHook(func(x, y, z, radius int) {
+		l.teleportLivePlayer(live, location.Location{X: x, Y: y, Z: z}, radius)
+	})
 	// Build cast eagerly, like attackCtl above: pickup-lock's timer goroutine
 	// reads live.cast unguarded, so a lazy first write from the read-loop
 	// goroutine would race it (issue #1183).

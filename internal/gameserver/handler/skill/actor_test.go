@@ -72,6 +72,15 @@ var (
 	// owner-facing notification it fires once erased.
 	_ erasableSummon         = (*summon.Actor)(nil)
 	_ servitorVanishNotifier = (*player.Character)(nil)
+
+	// SummonFriend/SummonParty: the caster-side gate, the target-side gate,
+	// the pending teleport-request/confirm-summon surface, the required-item
+	// check, and the teleport itself.
+	_ summonFriendCaster       = (*player.Character)(nil)
+	_ summonFriendTargetState  = (*player.Character)(nil)
+	_ summonFriendRequester    = (*player.Character)(nil)
+	_ summonFriendItemConsumer = (*player.Character)(nil)
+	_ summonFriendTraveler     = (*player.Character)(nil)
 )
 
 // fakeActor supplies the Actor surface every cast participant carries, so a

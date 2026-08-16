@@ -760,12 +760,16 @@ func TestGameClientLinkWireSafeMovementAndRefreshPacketsInGame(t *testing.T) {
 		clientpackets.OpcodeSendWarehouseDeposit,
 		clientpackets.OpcodeRequestQuestListInGame,
 		clientpackets.OpcodeRequestPackageItemList,
-		clientpackets.OpcodeDlgAnswer,
 		clientpackets.OpcodeGameGuardReply,
 		clientpackets.OpcodeRequestShowMiniMap,
 	} {
 		c.send(encodeSingleOpcode(opcode))
 	}
+	// DlgAnswer is wired (unlike the still-unwired opcodes above), so it
+	// needs a well-formed body; a messageId with no pending dialog behind
+	// it is still a no-op, matching DlgAnswer.runImpl's unmatched-id
+	// fall-through (DlgAnswer.java:20-37).
+	c.send(encodeDlgAnswer(0, 0, 0))
 	c.send(encodeRequestManorList())
 	reply = c.read()
 	if reply[0] != serverpackets.OpcodeExtended {

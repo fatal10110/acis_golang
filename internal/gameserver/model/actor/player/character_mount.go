@@ -42,3 +42,9 @@ func (c *Character) MountObjectID() int32 {
 	defer c.stateMu.RUnlock()
 	return c.mountObjectID
 }
+
+// Mounted reports whether this character currently rides a mount, matching
+// Player.isMounted() (checkSummoner's gate, SummonFriend.java:107).
+func (c *Character) Mounted() bool {
+	return c.MountNPCID() != 0
+}

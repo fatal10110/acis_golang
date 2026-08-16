@@ -315,3 +315,11 @@ func encodeSendTimeCheck(requestID, responseID int32) []byte {
 func encodeSingleOpcode(opcode byte) []byte {
 	return wire.NewPacketWriter(opcode).Bytes()
 }
+
+func encodeDlgAnswer(messageID, answer, requesterID int32) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeDlgAnswer)
+	w.WriteInt32(messageID)
+	w.WriteInt32(answer)
+	w.WriteInt32(requesterID)
+	return w.Bytes()
+}
