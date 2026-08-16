@@ -17,6 +17,26 @@ type summonFriendCasterInfo interface {
 	Position() (int, int, int)
 }
 
+// summonFriendRequesterState is what TeleportAnswer's accept path needs to
+// re-validate the pending requester, matching SummonFriend.teleportTo's own
+// defensive checkSummoner/checkSummoned re-check at accept time
+// (Player.java:6919 calling SummonFriend.java:183-199): teleportTo's
+// `player` parameter (the one being teleported — the accepting character,
+// `c` itself here) is re-checked via checkSummoner, and its `target`
+// parameter (the original requester) via checkSummoned.
+type summonFriendRequesterState interface {
+	summonFriendCasterInfo
+	AlikeDead() bool
+	Operating() bool
+	Rooted() bool
+	InCombat() bool
+	OlympiadMode() bool
+	FestivalParticipant() bool
+	Mounted() bool
+	ObserverMode() bool
+	NoSummonFriendZone() bool
+}
+
 // OlympiadMode always reports false: Olympiad (#216) isn't ported yet, so
 // no character can be a participant.
 func (c *Character) OlympiadMode() bool { return false }
@@ -139,6 +159,11 @@ func (c *Character) ConfirmSummon(caster any, skill modelskill.Definition, timeo
 // matching Player.teleportAnswer (Player.java:6912-6922): pending state is
 // cleared unconditionally, and the summon only completes on accept
 // (answer == 1) with requesterID matching the stored requester's object id.
+// The accept path re-validates the full summoner/summoned gate — not just
+// the item-consume check — since there is no server-side timeout on the
+// pending request and either side's eligibility may have changed while the
+// dialog sat open, matching teleportTo's own defensive re-check
+// (SummonFriend.java:183-186).
 func (c *Character) TeleportAnswer(answer, requesterID int32) {
 	c.summonFriendMu.Lock()
 	requester := c.summonRequester
@@ -152,8 +177,20 @@ func (c *Character) TeleportAnswer(answer, requesterID int32) {
 	if requester == nil || answer != 1 || storedID != requesterID {
 		return
 	}
-	info, ok := requester.(summonFriendCasterInfo)
+	info, ok := requester.(summonFriendRequesterState)
 	if !ok {
+		return
+	}
+	if c.Mounted() || c.OlympiadMode() || c.ObserverMode() || c.NoSummonFriendZone() {
+		return
+	}
+	if info.AlikeDead() || info.Operating() || info.Rooted() || info.InCombat() {
+		return
+	}
+	if info.OlympiadMode() || info.FestivalParticipant() || info.Mounted() {
+		return
+	}
+	if info.ObserverMode() || info.NoSummonFriendZone() {
 		return
 	}
 	if skill.TargetConsumeID > 0 && skill.TargetConsumeCount > 0 {

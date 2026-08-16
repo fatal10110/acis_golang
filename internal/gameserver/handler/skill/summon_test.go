@@ -401,6 +401,37 @@ func TestSummonFriendConfirmDialogAcceptTeleportsRealPlayerTarget(t *testing.T) 
 	}
 }
 
+// TestSummonFriendConfirmDialogAcceptRevalidatesGateAtAcceptTime covers the
+// window between ConfirmSummon (dialog sent) and TeleportAnswer (accept):
+// since there's no server-side timeout on the pending request, either side's
+// eligibility can change while the dialog is open. Java re-runs the full
+// checkSummoner/checkSummoned gate in teleportTo at accept time
+// (SummonFriend.java:183-186); this proves the target's own Mounted() state
+// (checkSummoner's gate, applied to the accepting character) blocks the
+// teleport the same way, even though it passed when the dialog was sent.
+func TestSummonFriendConfirmDialogAcceptRevalidatesGateAtAcceptTime(t *testing.T) {
+	registry := NewDefaultRegistry()
+	caster := summonFriendCharacter(t, 1, 10, 20, 30)
+	target := summonFriendCharacter(t, 2, 0, 0, 0)
+	target.SetSummonConfirmSender(func(string, int32, int, int, int, time.Duration) {})
+	var teleported bool
+	target.SetTeleportHook(func(x, y, z, radius int) { teleported = true })
+
+	registry.Use(Cast{
+		Caster:  caster,
+		Skill:   modelskill.Definition{ID: 1403, SkillType: "SUMMON_FRIEND"},
+		Targets: []Actor{target},
+	})
+
+	// The target mounts after the dialog was sent but before answering.
+	target.Mount(12621, 1)
+
+	target.TeleportAnswer(1, caster.ObjectID())
+	if teleported {
+		t.Fatal("accepting while mounted should not teleport the target (re-validated at accept time)")
+	}
+}
+
 func TestSummonFriendConfirmDialogDeclineDoesNotTeleport(t *testing.T) {
 	registry := NewDefaultRegistry()
 	caster := summonFriendCharacter(t, 1, 10, 20, 30)
