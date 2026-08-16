@@ -1,6 +1,7 @@
 package effect
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -210,6 +211,47 @@ func TestBigHeadEffectCarriesVisibleAbnormalHooks(t *testing.T) {
 	}
 	if e.Flag == FlagNone {
 		t.Fatal("BigHead must carry a distinct, non-zero flag")
+	}
+}
+
+func TestSignetGroundKindsAcceptButDeclineToStartOutsideALiveCast(t *testing.T) {
+	for _, name := range []string{"Signet", "SignetNoise", "SignetAntiSummon", "SignetMDam"} {
+		e, err := New(Skill{}, modelskill.EffectTemplate{Name: name})
+		if err != nil {
+			t.Fatalf("New(%q) error: %v, want a shipped signet template to be accepted", name, err)
+		}
+		if e.Type != TypeSignetGround {
+			t.Fatalf("New(%q).Type = %s, want %s", name, e.Type, TypeSignetGround)
+		}
+		if e.OnStart == nil {
+			t.Fatalf("New(%q) carries no OnStart hook", name)
+		}
+		if e.OnStart(e) {
+			t.Fatalf("New(%q).OnStart() = true, want false: no actor exists to drive it outside handler/skill/signet.go's live-cast dispatch", name)
+		}
+	}
+}
+
+func TestClanGateEffectStartsAndStopsMagicCircle(t *testing.T) {
+	target := &growEffectTarget{}
+	e, err := New(Skill{}, modelskill.EffectTemplate{Name: "ClanGate"})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e.Effected = target
+
+	if !e.OnStart(e) {
+		t.Fatal("ClanGate OnStart() = false, want true")
+	}
+	want := []string{fmt.Sprintf("start:%#x", magicCircleAbnormalMask), "abnormal"}
+	if !reflect.DeepEqual(target.events, want) {
+		t.Fatalf("start events = %#v, want %#v", target.events, want)
+	}
+
+	e.OnExit(e)
+	want = append(want, fmt.Sprintf("stop:%#x", magicCircleAbnormalMask), "abnormal")
+	if !reflect.DeepEqual(target.events, want) {
+		t.Fatalf("events after exit = %#v, want %#v", target.events, want)
 	}
 }
 
