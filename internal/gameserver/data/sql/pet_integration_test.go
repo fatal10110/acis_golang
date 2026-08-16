@@ -12,7 +12,7 @@ import (
 
 func TestPetStore_DeleteByItemObjectID(t *testing.T) {
 	ctx := context.Background()
-	db := sqltest.NewDB(t)
+	db := sqltest.SharedDB(t)
 	store := NewPetStore(db)
 
 	if _, err := db.ExecContext(ctx, `INSERT INTO pets (item_obj_id, name, level) VALUES (?,?,?)`, 0x10000101, "Wolf", 1); err != nil {
@@ -33,7 +33,7 @@ func TestPetStore_DeleteByItemObjectID(t *testing.T) {
 
 func TestPetStore_Get_NotFound(t *testing.T) {
 	ctx := context.Background()
-	store := NewPetStore(sqltest.NewDB(t))
+	store := NewPetStore(sqltest.SharedDB(t))
 
 	_, ok, err := store.Get(ctx, 0x10000999)
 	if err != nil {
@@ -46,7 +46,7 @@ func TestPetStore_Get_NotFound(t *testing.T) {
 
 func TestPetStore_SaveAndGet(t *testing.T) {
 	ctx := context.Background()
-	store := NewPetStore(sqltest.NewDB(t))
+	store := NewPetStore(sqltest.SharedDB(t))
 
 	st := pet.State{Name: "Wolf", Level: 15, CurHP: 250, CurMP: 40, Exp: 123456, SP: 7, Fed: 88}
 	if err := store.Save(ctx, 0x10000101, st); err != nil {
@@ -67,7 +67,7 @@ func TestPetStore_SaveAndGet(t *testing.T) {
 
 func TestPetStore_NameTakenIsCaseInsensitive(t *testing.T) {
 	ctx := context.Background()
-	store := NewPetStore(sqltest.NewDB(t))
+	store := NewPetStore(sqltest.SharedDB(t))
 	if err := store.Save(ctx, 0x10000101, pet.State{Name: "Wolf", Level: 1}); err != nil {
 		t.Fatalf("Save() error = %v", err)
 	}
@@ -91,7 +91,7 @@ func TestPetStore_NameTakenIsCaseInsensitive(t *testing.T) {
 
 func TestPetStore_SaveUpserts(t *testing.T) {
 	ctx := context.Background()
-	conn := sqltest.NewDB(t)
+	conn := sqltest.SharedDB(t)
 	store := NewPetStore(conn)
 
 	if err := store.Save(ctx, 0x10000101, pet.State{Name: "Wolf", Level: 1, Fed: 100}); err != nil {

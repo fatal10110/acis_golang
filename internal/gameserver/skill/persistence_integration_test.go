@@ -30,7 +30,7 @@ func TestSaveExcludesToggleHerbContinuousAndHealOverTimeEffects_RealStore(t *tes
 	herbDef := modelskill.Definition{ID: 5, Level: 1, Name: "Herb of Life", Effects: []modelskill.EffectTemplate{{Name: "Buff", Count: 1, Time: 30}}}
 
 	table := modelskill.NewTable([]modelskill.Definition{plainDef, toggleDef, continuousDef, hotDef, herbDef})
-	store := sql.NewSkillSaveStore(sqltest.NewDB(t))
+	store := sql.NewSkillSaveStore(sqltest.SharedDB(t))
 	p := NewPersistence(store, table)
 
 	ch := &player.Character{ID: 1}
@@ -74,7 +74,7 @@ func TestRestoreKnownSkillsAttachesPassiveStats_RealStore(t *testing.T) {
 		}},
 	})
 	ch := &player.Character{ID: 1}
-	levels := sql.NewCharacterSkillStore(sqltest.NewDB(t))
+	levels := sql.NewCharacterSkillStore(sqltest.SharedDB(t))
 	if err := levels.SetKnownSkill(context.Background(), ch.ID, ch.SkillSaveClassIndex(), 134, 1); err != nil {
 		t.Fatalf("SetKnownSkill(134) error: %v", err)
 	}

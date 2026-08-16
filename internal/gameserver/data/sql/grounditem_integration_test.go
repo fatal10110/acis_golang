@@ -12,7 +12,7 @@ import (
 
 func TestGroundItemStoreRoundTrip(t *testing.T) {
 	ctx := context.Background()
-	store := NewGroundItemStore(sqltest.NewDB(t))
+	store := NewGroundItemStore(sqltest.SharedDB(t))
 
 	initial, err := store.Load(ctx)
 	if err != nil {

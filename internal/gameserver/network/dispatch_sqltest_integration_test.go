@@ -29,7 +29,7 @@ import (
 func newLinkedSQLGameClient(t *testing.T, skills *skillstate.Persistence, seed func(*gamesql.CharacterStore, *gamesql.ItemStore), wantChars int) (*fakeGameClient, *gamesql.CharacterStore, *gamesql.ItemStore, *gamesql.ShortcutStore, *gamesql.CharacterSkillStore, *world.State) {
 	t.Helper()
 
-	db := sqltest.NewDB(t)
+	db := sqltest.SharedDB(t)
 	chars := gamesql.NewCharacterStore(db)
 	items := gamesql.NewItemStore(db)
 	shortcuts := gamesql.NewShortcutStore(db)
@@ -135,7 +135,7 @@ func newLinkedSQLGameClientWithShortcuts(t *testing.T) (*fakeGameClient, *gamesq
 func newLinkedSQLGameClientWithKarmaPlayerCanTeleport(t *testing.T, karmaPlayerCanTeleport bool, skills *skillstate.Persistence, seed func(*gamesql.CharacterStore, *gamesql.ItemStore), wantChars int) (c *fakeGameClient, chars *gamesql.CharacterStore, items *gamesql.ItemStore, state *world.State) {
 	t.Helper()
 
-	db := sqltest.NewDB(t)
+	db := sqltest.SharedDB(t)
 	chars = gamesql.NewCharacterStore(db)
 	items = gamesql.NewItemStore(db)
 	shortcuts := gamesql.NewShortcutStore(db)

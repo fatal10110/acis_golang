@@ -83,6 +83,35 @@ Confirm the actual socket path with `docker context ls` first — `default/docke
 default Colima profile. Disabling Ryuk only skips its container-cleanup sidecar; testcontainers still
 tears down each container it starts.
 
+### `sqltest.SharedDB`: one container per package instead of one per test
+
+`sqltest.NewDB(t)` boots a fresh MariaDB container for that single test. For a package with many
+integration tests this means many container boots, which dominates the `-tags=integration` job's
+wall-clock time. `sqltest.SharedDB(tb)` boots one container per package instead: a package-level
+`sync.Once` starts it lazily on the first call within that test binary (Go compiles each package's
+tests into its own binary, so "once per binary" is "once per package"), and every caller gets the
+package's tables truncated via `tb.Cleanup` after its own test so tests don't see rows left behind
+by earlier tests in the package.
+
+Because the container isn't torn down per test, a package using `SharedDB` must add a `TestMain`
+under the `integration` build tag that terminates it once, after every test in the package has run:
+
+```go
+//go:build integration
+
+func TestMain(m *testing.M) { os.Exit(sqltest.Main(m)) }
+```
+
+Without this, the container leaks — harmless on CI where Ryuk normally reaps it, but on Colima
+(Ryuk disabled, see above) leaked containers accumulate across local runs and can OOM-kill each
+other on a memory-constrained VM. All five packages migrated to `SharedDB` (`cmd/gameserver`,
+`internal/gameserver/data/manager`, `internal/gameserver/data/sql`, `internal/gameserver/network`,
+`internal/gameserver/skill`) have this `TestMain`; add one to any new package that adopts `SharedDB`.
+
+Use `NewDB` instead of `SharedDB` for a test that mutates the schema itself (e.g. dropping a table to
+force a downstream failure) — that would corrupt the shared container for every other test in the
+package.
+
 ### Datapack oracle tests are local-only — CI cannot run them
 
 `aCis_datapack` is a separate checkout that is never pushed, and `.github/workflows/go.yml` checks

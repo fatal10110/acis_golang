@@ -26,7 +26,7 @@ func itemPersistenceTestData() *gameData {
 // provideItemInstances installs: an inventory item mutated with no client
 // request involved must reach the items table on the task's own tick.
 func TestItemInstancesBootWiringPersistsServerSideMutation(t *testing.T) {
-	db := sqltest.NewDB(t)
+	db := sqltest.SharedDB(t)
 	ctx := context.Background()
 
 	data := itemPersistenceTestData()
@@ -79,7 +79,7 @@ func TestItemInstancesBootWiringPersistsServerSideMutation(t *testing.T) {
 // an item mutated between ticks must be written by the shutdown hook rather
 // than lost with the process.
 func TestItemInstancesShutdownFlushesPending(t *testing.T) {
-	db := sqltest.NewDB(t)
+	db := sqltest.SharedDB(t)
 	ctx := context.Background()
 
 	data := itemPersistenceTestData()
@@ -112,7 +112,7 @@ func TestItemInstancesShutdownFlushesPending(t *testing.T) {
 // TestItemInstancesPersistsDestruction proves a consumed item's row is
 // deleted rather than left behind as a phantom stack after a restart.
 func TestItemInstancesPersistsDestruction(t *testing.T) {
-	db := sqltest.NewDB(t)
+	db := sqltest.SharedDB(t)
 	ctx := context.Background()
 
 	data := itemPersistenceTestData()

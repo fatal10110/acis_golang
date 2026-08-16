@@ -13,7 +13,7 @@ import (
 
 func TestSkillSaveStore_ReplaceAndListByCharacter(t *testing.T) {
 	ctx := context.Background()
-	store := NewSkillSaveStore(sqltest.NewDB(t))
+	store := NewSkillSaveStore(sqltest.SharedDB(t))
 
 	rows := []effect.SaveRow{
 		{
@@ -57,7 +57,7 @@ func TestSkillSaveStore_ReplaceAndListByCharacter(t *testing.T) {
 
 func TestSkillSaveStore_ReplaceClearsPreviousRows(t *testing.T) {
 	ctx := context.Background()
-	store := NewSkillSaveStore(sqltest.NewDB(t))
+	store := NewSkillSaveStore(sqltest.SharedDB(t))
 
 	first := []effect.SaveRow{{Skill: modelskill.Ref{ID: 1001, Level: 1}, RestoreType: effect.RestoreTypeReuseOnly, BuffIndex: 1}}
 	if err := store.Replace(ctx, 0x10000001, 0, first); err != nil {
@@ -80,7 +80,7 @@ func TestSkillSaveStore_ReplaceClearsPreviousRows(t *testing.T) {
 
 func TestSkillSaveStore_ReplaceScopesByClassIndex(t *testing.T) {
 	ctx := context.Background()
-	store := NewSkillSaveStore(sqltest.NewDB(t))
+	store := NewSkillSaveStore(sqltest.SharedDB(t))
 
 	rowsClass0 := []effect.SaveRow{{Skill: modelskill.Ref{ID: 1001, Level: 1}, RestoreType: effect.RestoreTypeReuseOnly, BuffIndex: 1}}
 	rowsClass1 := []effect.SaveRow{{Skill: modelskill.Ref{ID: 2002, Level: 1}, RestoreType: effect.RestoreTypeReuseOnly, BuffIndex: 1}}
@@ -111,7 +111,7 @@ func TestSkillSaveStore_ReplaceScopesByClassIndex(t *testing.T) {
 
 func TestSkillSaveStore_ListByCharacter_Empty(t *testing.T) {
 	ctx := context.Background()
-	store := NewSkillSaveStore(sqltest.NewDB(t))
+	store := NewSkillSaveStore(sqltest.SharedDB(t))
 
 	got, err := store.ListByCharacter(ctx, 0x10000999, 0)
 	if err != nil {
@@ -124,7 +124,7 @@ func TestSkillSaveStore_ListByCharacter_Empty(t *testing.T) {
 
 func TestSkillSaveStore_DeleteByCharacter(t *testing.T) {
 	ctx := context.Background()
-	store := NewSkillSaveStore(sqltest.NewDB(t))
+	store := NewSkillSaveStore(sqltest.SharedDB(t))
 
 	rows := []effect.SaveRow{
 		{Skill: modelskill.Ref{ID: 1001, Level: 1}, RestoreType: effect.RestoreTypeReuseOnly, BuffIndex: 1},
@@ -153,7 +153,7 @@ func TestSkillSaveStore_DeleteByCharacter(t *testing.T) {
 
 func TestSkillSaveStore_ReplaceEmptyRowsOnlyClears(t *testing.T) {
 	ctx := context.Background()
-	store := NewSkillSaveStore(sqltest.NewDB(t))
+	store := NewSkillSaveStore(sqltest.SharedDB(t))
 
 	rows := []effect.SaveRow{{Skill: modelskill.Ref{ID: 1001, Level: 1}, RestoreType: effect.RestoreTypeReuseOnly, BuffIndex: 1}}
 	if err := store.Replace(ctx, 0x10000001, 0, rows); err != nil {

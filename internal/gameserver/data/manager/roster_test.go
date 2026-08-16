@@ -58,7 +58,7 @@ func newTestRoster(t *testing.T, deleteAfter time.Duration, now func() time.Time
 	if len(npcs) > 0 {
 		table = npcs[0]
 	}
-	db := sqltest.NewDB(t)
+	db := sqltest.SharedDB(t)
 	characters := sql.NewCharacterStore(db)
 	items := sql.NewItemStore(db)
 	roster := NewRoster(characters, items, nil, humanFighterTemplate(t), starterItemTable(), table, &sequentialIDs{next: 0x10000000}, deleteAfter, now)

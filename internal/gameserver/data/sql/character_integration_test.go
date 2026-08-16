@@ -38,7 +38,7 @@ func testCharacter(objectID int32, name string) *player.Character {
 
 func TestCharacterStore_Get_NotFound(t *testing.T) {
 	ctx := context.Background()
-	store := NewCharacterStore(sqltest.NewDB(t))
+	store := NewCharacterStore(sqltest.SharedDB(t))
 
 	_, err := store.Get(ctx, 0x10000001)
 	if !errors.Is(err, ErrCharacterNotFound) {
@@ -48,7 +48,7 @@ func TestCharacterStore_Get_NotFound(t *testing.T) {
 
 func TestCharacterStore_CreateAndReadBack(t *testing.T) {
 	ctx := context.Background()
-	store := NewCharacterStore(sqltest.NewDB(t))
+	store := NewCharacterStore(sqltest.SharedDB(t))
 
 	c := testCharacter(0x10000001, "Newbie")
 	if err := store.Create(ctx, c); err != nil {
@@ -80,7 +80,7 @@ func TestCharacterStore_CreateAndReadBack(t *testing.T) {
 // the first one wrote.
 func TestCharacterStore_RestartReload(t *testing.T) {
 	ctx := context.Background()
-	db := sqltest.NewDB(t)
+	db := sqltest.SharedDB(t)
 	first := NewCharacterStore(db)
 
 	c := testCharacter(0x10000001, "Newbie")
@@ -100,7 +100,7 @@ func TestCharacterStore_RestartReload(t *testing.T) {
 
 func TestCharacterStore_ListByAccount(t *testing.T) {
 	ctx := context.Background()
-	store := NewCharacterStore(sqltest.NewDB(t))
+	store := NewCharacterStore(sqltest.SharedDB(t))
 
 	a1 := testCharacter(0x10000001, "Alpha")
 	a2 := testCharacter(0x10000002, "Beta")
@@ -128,7 +128,7 @@ func TestCharacterStore_ListByAccount(t *testing.T) {
 
 func TestCharacterStore_ListByAccount_Empty(t *testing.T) {
 	ctx := context.Background()
-	store := NewCharacterStore(sqltest.NewDB(t))
+	store := NewCharacterStore(sqltest.SharedDB(t))
 
 	got, err := store.ListByAccount(ctx, "ghost")
 	if err != nil {
@@ -141,7 +141,7 @@ func TestCharacterStore_ListByAccount_Empty(t *testing.T) {
 
 func TestCharacterStore_CountByAccount_CaseInsensitive(t *testing.T) {
 	ctx := context.Background()
-	store := NewCharacterStore(sqltest.NewDB(t))
+	store := NewCharacterStore(sqltest.SharedDB(t))
 
 	c := testCharacter(0x10000001, "Newbie")
 	c.AccountName = "Player1"
@@ -160,7 +160,7 @@ func TestCharacterStore_CountByAccount_CaseInsensitive(t *testing.T) {
 
 func TestCharacterStore_NameTaken_CaseInsensitive(t *testing.T) {
 	ctx := context.Background()
-	store := NewCharacterStore(sqltest.NewDB(t))
+	store := NewCharacterStore(sqltest.SharedDB(t))
 
 	c := testCharacter(0x10000001, "Newbie")
 	if err := store.Create(ctx, c); err != nil {
@@ -186,7 +186,7 @@ func TestCharacterStore_NameTaken_CaseInsensitive(t *testing.T) {
 
 func TestCharacterStore_SetDeleteAt(t *testing.T) {
 	ctx := context.Background()
-	store := NewCharacterStore(sqltest.NewDB(t))
+	store := NewCharacterStore(sqltest.SharedDB(t))
 
 	c := testCharacter(0x10000001, "Newbie")
 	if err := store.Create(ctx, c); err != nil {
@@ -218,7 +218,7 @@ func TestCharacterStore_SetDeleteAt(t *testing.T) {
 
 func TestCharacterStore_Delete(t *testing.T) {
 	ctx := context.Background()
-	store := NewCharacterStore(sqltest.NewDB(t))
+	store := NewCharacterStore(sqltest.SharedDB(t))
 
 	c := testCharacter(0x10000001, "Newbie")
 	if err := store.Create(ctx, c); err != nil {

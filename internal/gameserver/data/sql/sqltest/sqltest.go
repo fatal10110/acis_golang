@@ -8,11 +8,23 @@ package sqltest
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"os"
+	"sync"
 	"testing"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/testcontainers/testcontainers-go/modules/mariadb"
 )
+
+// sharedTables lists every table SharedDB truncates between tests, in an
+// order safe for TRUNCATE (no cross-table FKs today, so order doesn't
+// matter, but keep it in sync with the CREATE TABLE calls below).
+var sharedTables = []string{
+	"characters", "items", "augmentations", "spawn_data",
+	"items_on_ground", "character_skills", "character_shortcuts",
+	"pets", "character_skills_save",
+}
 
 // charactersSchema mirrors the shipped characters table definition verbatim.
 const charactersSchema = "CREATE TABLE IF NOT EXISTS characters (\n" +
@@ -195,43 +207,94 @@ func NewDB(t *testing.T) *sql.DB {
 		}
 	})
 
+	db, err := openSchema(ctx, container)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+	return db
+}
+
+func openSchema(ctx context.Context, container *mariadb.MariaDBContainer) (*sql.DB, error) {
 	dsn, err := container.ConnectionString(ctx)
 	if err != nil {
-		t.Fatalf("connection string: %v", err)
+		return nil, fmt.Errorf("connection string: %w", err)
 	}
 
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
-		t.Fatalf("open db: %v", err)
+		return nil, fmt.Errorf("open db: %w", err)
 	}
-	t.Cleanup(func() { db.Close() })
 
-	if _, err := db.ExecContext(ctx, charactersSchema); err != nil {
-		t.Fatalf("create characters table: %v", err)
+	for _, stmt := range []string{
+		charactersSchema, itemsSchema, augmentationsSchema, spawnDataSchema,
+		itemsOnGroundSchema, characterSkillsSchema, characterShortcutsSchema,
+		petsSchema, characterSkillsSaveSchema,
+	} {
+		if _, err := db.ExecContext(ctx, stmt); err != nil {
+			db.Close()
+			return nil, fmt.Errorf("create table: %w", err)
+		}
 	}
-	if _, err := db.ExecContext(ctx, itemsSchema); err != nil {
-		t.Fatalf("create items table: %v", err)
+	return db, nil
+}
+
+var (
+	sharedOnce      sync.Once
+	sharedDB        *sql.DB
+	sharedContainer *mariadb.MariaDBContainer
+	sharedErr       error
+)
+
+// SharedDB returns a MariaDB pool shared by every test in the current test
+// binary, i.e. one container per package (Go compiles each package's tests
+// into its own binary, so the sync.Once below fires exactly once per
+// package). The package's TestMain must call Main so the container is
+// terminated once, after every test in the package has run, instead of
+// leaking for a reaper to clean up.
+//
+// Each caller gets the tables truncated after its own test via tb.Cleanup,
+// so tests don't see rows left behind by earlier tests in the package.
+func SharedDB(tb testing.TB) *sql.DB {
+	tb.Helper()
+	sharedOnce.Do(func() {
+		container, err := mariadb.Run(context.Background(), "mariadb:11")
+		if err != nil {
+			sharedErr = fmt.Errorf("start mariadb container: %w", err)
+			return
+		}
+		sharedContainer = container
+		sharedDB, sharedErr = openSchema(context.Background(), container)
+	})
+	if sharedErr != nil {
+		tb.Fatalf("shared mariadb db: %v", sharedErr)
 	}
-	if _, err := db.ExecContext(ctx, augmentationsSchema); err != nil {
-		t.Fatalf("create augmentations table: %v", err)
+
+	tb.Cleanup(func() {
+		ctx := context.Background()
+		for _, table := range sharedTables {
+			if _, err := sharedDB.ExecContext(ctx, "TRUNCATE TABLE `"+table+"`"); err != nil {
+				tb.Fatalf("truncate %s: %v", table, err)
+			}
+		}
+	})
+	return sharedDB
+}
+
+// Main runs a package's tests and terminates the SharedDB container
+// afterward, if one was started. Every package using SharedDB must call it
+// from a TestMain:
+//
+//	func TestMain(m *testing.M) { os.Exit(sqltest.Main(m)) }
+func Main(m *testing.M) int {
+	code := m.Run()
+	if sharedDB != nil {
+		sharedDB.Close()
 	}
-	if _, err := db.ExecContext(ctx, spawnDataSchema); err != nil {
-		t.Fatalf("create spawn_data table: %v", err)
+	if sharedContainer != nil {
+		if err := sharedContainer.Terminate(context.Background()); err != nil {
+			fmt.Fprintf(os.Stderr, "terminate shared mariadb container: %v\n", err)
+		}
 	}
-	if _, err := db.ExecContext(ctx, itemsOnGroundSchema); err != nil {
-		t.Fatalf("create items_on_ground table: %v", err)
-	}
-	if _, err := db.ExecContext(ctx, characterSkillsSchema); err != nil {
-		t.Fatalf("create character_skills table: %v", err)
-	}
-	if _, err := db.ExecContext(ctx, characterShortcutsSchema); err != nil {
-		t.Fatalf("create character_shortcuts table: %v", err)
-	}
-	if _, err := db.ExecContext(ctx, petsSchema); err != nil {
-		t.Fatalf("create pets table: %v", err)
-	}
-	if _, err := db.ExecContext(ctx, characterSkillsSaveSchema); err != nil {
-		t.Fatalf("create character_skills_save table: %v", err)
-	}
-	return db
+	return code
 }
