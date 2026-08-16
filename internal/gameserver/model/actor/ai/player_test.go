@@ -13,6 +13,12 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 )
 
+// fakePlayerActor stands in for PlayerAttackActor. player.Character
+// implements AttackDisabled/CastingNow/PhysicalAttackRange trivially, but
+// its Knows requires a world.Tracked target and a live world.State
+// visibility query, which these player-attack-intention decision tests have
+// no reason to wire up. Disproportionate per docs/agents/test-strategy.md.
+// Kept as-is.
 type fakePlayerActor struct {
 	id          int32
 	alikeDead   bool

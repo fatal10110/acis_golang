@@ -6,6 +6,10 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
+// fakeActor stands in for AttackableActor. npc.Hostile implements every
+// method, but npc imports ai (hostile.go uses ai.Attackable/MoveController),
+// so ai's own test package cannot import npc back without an import cycle.
+// Kept as-is per docs/agents/test-strategy.md.
 type fakeActor struct {
 	id              int32
 	siegeGuard      bool
@@ -51,6 +55,15 @@ func (a *fakeActor) BroadcastMoveToPawn(target attackable.Combatant) error {
 	return a.moveToPawnErr
 }
 
+// recordingMove/recordingAttack/recordingCast (below) stand in for
+// MoveController/AttackController/CastController. move.Controller,
+// attack.Controller and cast.AIController each satisfy the respective
+// interface with no import cycle, but their internal state (attacking,
+// bowCooling, disabled, ...) is only reachable by driving the real
+// movement/attack/cast subsystem end-to-end, not by setting a field. These
+// tests target Attackable's decision branches, so building the real
+// controllers is disproportionate per docs/agents/test-strategy.md. Kept
+// as-is.
 type recordingMove struct {
 	followStarted bool
 	followTarget  attackable.Combatant
