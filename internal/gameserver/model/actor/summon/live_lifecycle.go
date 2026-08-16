@@ -166,8 +166,14 @@ func (a *Actor) despawn(state *world.State) {
 	if state == nil {
 		return
 	}
-	state.Despawn(a)
+	// RemoveSummon runs before Despawn: Despawn's relocate step synchronously
+	// fires the owner's Forget callback, which sends the client-visible
+	// PetDelete frame. A caller (or a test synchronizing on that frame, as
+	// TestGameClientLinkRoutesSummonActionUseToLiveSummon does) must never
+	// observe world.State.Summon still reporting this actor active once the
+	// client has been told it's gone.
 	state.RemoveSummon(a.OwnerID())
+	state.Despawn(a)
 	if a.onDespawn != nil {
 		a.onDespawn()
 	}
