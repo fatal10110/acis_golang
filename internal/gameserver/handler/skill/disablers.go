@@ -5,6 +5,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -22,7 +23,7 @@ type disablerTarget interface {
 // state and the target's shield-block outcome against this cast; ok is
 // false when the target can't be rolled against at all.
 type skillSuccessSource interface {
-	SkillSuccessInput(caster any, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (in formulas.SkillSuccessInput, ok bool)
+	SkillSuccessInput(caster creature.DeathActor, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (in formulas.SkillSuccessInput, ok bool)
 }
 
 // blessedSpiritshotCaster optionally reports whether a caster currently has
@@ -36,7 +37,7 @@ type blessedSpiritshotCaster interface {
 // critical hit. A target without one never blocks with a shield, matching a
 // target whose shield equip/facing resolution isn't wired yet.
 type shieldDefenseSource interface {
-	ShieldDefense(caster any, def modelskill.Definition, isCrit bool) formulas.ShieldDefense
+	ShieldDefense(caster creature.DeathActor, def modelskill.Definition, isCrit bool) formulas.ShieldDefense
 }
 
 func blessedSpiritshotCharged(caster Actor) bool {

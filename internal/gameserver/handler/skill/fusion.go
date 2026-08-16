@@ -1,6 +1,9 @@
 package skill
 
-import modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+)
 
 // fusionHandler ports FusionSkill's constructor (java FusionSkill.java:27-43):
 // a FUSION-skillType cast grows an existing live Fusion effect from its
@@ -56,10 +59,10 @@ func (h fusionHandler) applyTriggered(caster, effected Actor, triggeredID models
 
 // DecreaseFusion removes one level from the target's triggered fusion effect.
 // It is called when the owning FUSION cast channel ends or aborts. effected
-// stays untyped because the channel's caller holds its target as a
-// world-object selection rather than a resolved cast participant; a
+// takes creature.DeathActor because the channel's caller holds its target as
+// a world-object selection rather than a resolved cast participant; a
 // selection that owns no effect list is dropped below either way.
-func DecreaseFusion(defs Definitions, caster Actor, effected any, castSkill modelskill.Definition) {
+func DecreaseFusion(defs Definitions, caster Actor, effected creature.DeathActor, castSkill modelskill.Definition) {
 	target, ok := effected.(effectListTarget)
 	if !ok || defs == nil {
 		return

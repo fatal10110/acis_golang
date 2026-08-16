@@ -638,12 +638,16 @@ func (a *Actor) ApplyLethalOutcome(outcome formulas.LethalOutcome, caster creatu
 	}
 }
 
+// Actor satisfies the identity surface SkillSuccessInput/EffectSuccessInput/
+// DecreaseFusion take their caster/effected parameter as.
+var _ creature.DeathActor = (*Actor)(nil)
+
 // SkillSuccessInput returns the effect-landing roll input for def cast against a.
-func (a *Actor) SkillSuccessInput(caster any, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
+func (a *Actor) SkillSuccessInput(caster creature.DeathActor, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
 	return creature.ResolveSkillSuccessInput(caster, a, def, bss, shield)
 }
 
-func (a *Actor) EffectSuccessInput(caster any, def modelskill.Definition, tmpl modelskill.EffectTemplate, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
+func (a *Actor) EffectSuccessInput(caster creature.DeathActor, def modelskill.Definition, tmpl modelskill.EffectTemplate, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
 	if tmpl.EffectType == "" {
 		return formulas.SkillSuccessInput{BaseChance: tmpl.EffectPower, IgnoreResists: true, Shield: shield}, true
 	}

@@ -3,6 +3,7 @@ package skill
 import (
 	"testing"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	modelitem "github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -46,13 +47,13 @@ func (c *shotCaster) SetChargedShot(kind modelitem.ShotKind, charged bool) {
 
 func (d *damageEffectFake) EffectList() *effect.List { return d.list }
 
-func (d *damageEffectFake) SkillSuccessInput(caster any, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
+func (d *damageEffectFake) SkillSuccessInput(caster creature.DeathActor, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
 	d.lastBss = bss
 	d.lastShield = shield
 	return formulas.SkillSuccessInput{IgnoreResists: true, BaseChance: d.successRate, Shield: shield}, d.successOK
 }
 
-func (d *damageEffectFake) EffectSuccessInput(_ any, _ modelskill.Definition, _ modelskill.EffectTemplate, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
+func (d *damageEffectFake) EffectSuccessInput(_ creature.DeathActor, _ modelskill.Definition, _ modelskill.EffectTemplate, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
 	d.lastBss = bss
 	d.lastShield = shield
 	return formulas.SkillSuccessInput{IgnoreResists: true, BaseChance: d.successRate, Shield: shield}, d.successOK

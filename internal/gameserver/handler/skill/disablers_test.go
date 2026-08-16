@@ -62,7 +62,7 @@ func (d *disablerFake) Invul() bool              { return d.invul }
 func (d *disablerFake) Paralyzed() bool          { return d.paralyzed }
 func (d *disablerFake) EffectList() *effect.List { return d.list }
 
-func (d *disablerFake) SkillSuccessInput(caster any, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
+func (d *disablerFake) SkillSuccessInput(caster creature.DeathActor, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
 	d.lastBss = bss
 	d.lastShield = shield
 	return formulas.SkillSuccessInput{IgnoreResists: true, BaseChance: 100, Shield: shield}, d.successOK
@@ -70,7 +70,7 @@ func (d *disablerFake) SkillSuccessInput(caster any, def modelskill.Definition, 
 
 // ShieldDefense reports d's pre-set shield-block outcome, letting tests
 // exercise checkSkillSuccess's shield-block threading.
-func (d *disablerFake) ShieldDefense(caster any, def modelskill.Definition, isCrit bool) formulas.ShieldDefense {
+func (d *disablerFake) ShieldDefense(caster creature.DeathActor, def modelskill.Definition, isCrit bool) formulas.ShieldDefense {
 	return d.shield
 }
 

@@ -18,6 +18,10 @@ const baseBuffSlots = 20
 // Character satisfies the actor surface skill target resolution needs.
 var _ target.Creature = (*Character)(nil)
 
+// Character satisfies the identity surface SkillSuccessInput/EffectSuccessInput/
+// ShieldDefense/DecreaseFusion take their caster/effected parameter as.
+var _ creature.DeathActor = (*Character)(nil)
+
 // MaxBuffCount is the number of non-toggle, non-seven-signs buffs c can
 // hold at once. See baseBuffSlots.
 func (c *Character) MaxBuffCount() int {
@@ -105,11 +109,11 @@ func (c *Character) SetCanGiveDamage(v bool) {
 // SkillSuccessInput returns the effect-landing roll input for def cast
 // against c, given the caster's blessed-spiritshot charge state (bss) and
 // this cast's already-resolved shield-block outcome (shield).
-func (c *Character) SkillSuccessInput(caster any, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
+func (c *Character) SkillSuccessInput(caster creature.DeathActor, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
 	return creature.ResolveSkillSuccessInput(caster, c, def, bss, shield)
 }
 
-func (c *Character) EffectSuccessInput(caster any, def modelskill.Definition, tmpl modelskill.EffectTemplate, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
+func (c *Character) EffectSuccessInput(caster creature.DeathActor, def modelskill.Definition, tmpl modelskill.EffectTemplate, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
 	if tmpl.EffectType == "" {
 		return formulas.SkillSuccessInput{BaseChance: tmpl.EffectPower, IgnoreResists: true, Shield: shield}, true
 	}
