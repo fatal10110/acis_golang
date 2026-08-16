@@ -1,3 +1,5 @@
+//go:build integration
+
 package loginserver
 
 import (
@@ -22,6 +24,12 @@ import (
 )
 
 // --- fake game-server client, driving the wire protocol from the other side ---
+//
+// Test-strategy.md (docs/agents/test-strategy.md): this is a test-harness
+// actor, not a stand-in for a production interface — it plays the remote
+// game server's side of the wire so GameServerLink's own real handshake/auth
+// code runs end-to-end over a real TCP socket. There is no production type
+// to substitute; keep as-is.
 
 type fakeGameServer struct {
 	t     *testing.T
@@ -251,6 +259,12 @@ func (f *fakeGameServer) readPlayerAuthResponse() (account string, ok bool) {
 	return account, r.readByte() != 0
 }
 
+// Test-strategy.md: sql.GameServerStore already satisfies registrationStore
+// (CreateGameServer) and is used by the DB-backed scenarios in
+// gameserverlink_integration_test.go. Kept as a fake here because
+// TestGameServerLinkRegistrationGates asserts server-id gate/allocation
+// logic, not persistence — routing it through a real MariaDB container
+// would be disproportionate to what the test verifies.
 type fakeRegistrationStore struct {
 	created []model.GameServer
 }
