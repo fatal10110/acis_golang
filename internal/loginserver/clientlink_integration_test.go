@@ -1,3 +1,5 @@
+//go:build integration
+
 package loginserver
 
 import (
@@ -22,6 +24,14 @@ import (
 )
 
 // --- fake account store: no DB needed to exercise ClientLink's own logic ---
+//
+// Test-strategy.md: loginsql.AccountStore already satisfies the same
+// Account/CreateAccount/SetLastServer method set and is exercised for real
+// in internal/loginserver/data/sql/account_integration_test.go. Kept as a
+// fake here because these tests are about ClientLink's protocol/session
+// logic (auth flow, rejections, session lifecycle), not SQL persistence —
+// routing every one of them through a MariaDB container would be
+// disproportionate to what they verify.
 
 type fakeAccountStore struct {
 	mu       sync.Mutex
@@ -88,6 +98,11 @@ func mustHashPassword(t *testing.T, password string) string {
 // doc comment). It only discards the Init frame and talks dynamic-key
 // Blowfish+checksum from then on, exactly like a real client does for every
 // packet after Init.
+//
+// Test-strategy.md: this is a test-harness actor, not a stand-in for a
+// production interface — it plays the real L2 client's side of the wire so
+// ClientLink's own real auth/session code runs end-to-end over a real TCP
+// socket. There is no production type to substitute; keep as-is.
 
 var testSessionKey = []byte("0123456789abcdef")
 
