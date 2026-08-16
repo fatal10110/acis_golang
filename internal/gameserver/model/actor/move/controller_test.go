@@ -7,6 +7,11 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
 
+// fakeSelf/fakeTarget stand in for Actor/Located. player.Character and
+// npc.Hostile both implement these methods, but both packages import move
+// (character_attack.go, hostile_attack.go), so move's own test package
+// cannot import either back without an import cycle. Kept as-is per
+// docs/agents/test-strategy.md.
 type fakeSelf struct {
 	id         int32
 	x, y, z    int
@@ -516,6 +521,10 @@ func TestControllerBroadcastsMoveOnEachSegmentAdvance(t *testing.T) {
 	}
 }
 
+// fakePositionUpdates stands in for PositionUpdateRegistry. The real
+// implementation, task.PositionUpdates, imports move (it's typed over
+// move.PositionUpdater), so move's own test package cannot import task
+// without an import cycle. Kept as-is per docs/agents/test-strategy.md.
 type fakePositionUpdates struct {
 	added   []PositionUpdater
 	removed []PositionUpdater

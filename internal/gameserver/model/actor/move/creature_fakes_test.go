@@ -18,6 +18,10 @@ type validLocationCall struct {
 	origin, target location.Location
 }
 
+// recordingGeo stands in for the geo/pathfind boundary; per
+// docs/agents/test-strategy.md's pure-algorithm/no-boundary exception,
+// EngineGeo needs a real geodata engine and pathfinder to construct, which
+// is disproportionate for these move-resolution unit tests. Kept as-is.
 type recordingGeo struct {
 	canMove            bool
 	height             int16
@@ -83,6 +87,9 @@ func (g staticGeo) ValidLocation(ox, oy, oz, _, _, _ int) location.Location {
 	return location.Location{X: ox, Y: oy, Z: oz}
 }
 
+// fakeMoveClock/fakeMoveTimer are the sanctioned clock/timer infra-seam
+// exception (docs/agents/test-strategy.md): determinism is the point, not
+// integration coverage. Kept as-is.
 type fakeMoveClock struct {
 	timers []*fakeMoveTimer
 }
