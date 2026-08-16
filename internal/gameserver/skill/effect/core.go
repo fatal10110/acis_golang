@@ -55,6 +55,10 @@ const (
 	FlagFakeDeath
 )
 
+// magicCircleAbnormalMask is AbnormalEffect.MAGIC_CIRCLE's client bitmask,
+// ClanGate's abnormal-effect icon.
+const magicCircleAbnormalMask = 0x800000
+
 // TypeManaDamOverTime is a periodic MP-drain effect: a toggle skill's
 // upkeep tick, or a plain continuous mana-drain buff. Declared here rather
 // than alongside the other Type constants so this file's additions stay
@@ -146,6 +150,9 @@ const (
 	// Aborting the caster's cast drops it, which is how the signet it
 	// carries stops existing.
 	TypeSignetGround Type = "SIGNET_GROUND"
+	// TypeClanGate is a court-magician portal buff: it marks its target with
+	// the magic-circle abnormal effect for the buff's duration.
+	TypeClanGate Type = "CLAN_GATE"
 	// TypeChanceSkillTrigger installs a live chance-to-trigger-another-skill
 	// condition on its target for as long as the effect is active.
 	TypeChanceSkillTrigger Type = "CHANCE_SKILL_TRIGGER"
@@ -272,6 +279,23 @@ var coreKinds = map[string]kind{
 	"Grow":                  {typ: TypeGrow},
 	"FakeDeath":             {typ: TypeFakeDeath, flag: FlagFakeDeath},
 	"Seed":                  {typ: TypeSeed},
+	// Signet, SignetNoise, SignetAntiSummon, and SignetMDam are the effect-
+	// template names the datapack attaches to signet-family skills
+	// (454-460, 1419-1424). handler/skill/signet.go builds their real
+	// per-tick ground-actor behavior directly — spawning the EffectPoint
+	// actor, applying the linked sub-skill, stripping dances, unsummoning
+	// pets, or dealing magic damage — bypassing New/coreKinds entirely,
+	// because that needs the caster's npc-template registry, id allocator,
+	// and world, none of which New's signature carries. These entries exist
+	// only so New() (relog restore's generic replay, and shipped-template
+	// load validation) accepts the name instead of rejecting it; reached
+	// that way — never during a live cast — TypeSignetGround's OnStart
+	// declines outright, since there is no actor for it to drive.
+	"Signet":           {typ: TypeSignetGround},
+	"SignetNoise":      {typ: TypeSignetGround},
+	"SignetAntiSummon": {typ: TypeSignetGround},
+	"SignetMDam":       {typ: TypeSignetGround},
+	"ClanGate":         {typ: TypeClanGate},
 }
 
 var fearSkippedPlayableSkillIDs = map[modelskill.ID]bool{
@@ -529,6 +553,17 @@ func wireHooks(e *Effect) {
 		e.OnExit = fakeDeathExit
 	case TypeRecovery:
 		e.OnStart = recoveryStart
+	case TypeSignetGround:
+		// Only reached via New() (relog restore, load validation), never a
+		// live cast — see the coreKinds comment above. No actor exists to
+		// drive it here, so it declines rather than fake-apply.
+		e.OnStart = func(*Effect) bool { return false }
+	case TypeClanGate:
+		e.OnStart = func(e *Effect) bool {
+			startAbnormalEffect(e.Effected, magicCircleAbnormalMask)
+			return true
+		}
+		e.OnExit = func(e *Effect) { stopAbnormalEffect(e.Effected, magicCircleAbnormalMask) }
 	}
 }
 
