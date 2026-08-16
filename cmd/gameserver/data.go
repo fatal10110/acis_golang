@@ -23,8 +23,38 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/rs/zerolog"
 )
+
+// logUnsupportedSkillEffects warns once per shipped skill effect template
+// whose name effect.New doesn't recognize, so a coreKinds gap (#1517) is
+// visible at boot instead of silently degrading a cast to a no-op the way
+// an unlogged effect.New rejection does at apply/restore time. A name
+// starting with "#" is the unresolved-<table> loader defect tracked by
+// #1516, not a coreKinds gap, so it doesn't warn here.
+func logUnsupportedSkillEffects(table *skill.Table, log zerolog.Logger) {
+	check := func(def skill.Definition, effects []skill.EffectTemplate, kind string) {
+		for _, eff := range effects {
+			if strings.HasPrefix(eff.Name, "#") {
+				continue
+			}
+			if _, err := effect.New(effect.SkillFromDefinition(def), eff); err != nil && errors.Is(err, effect.ErrUnsupportedCoreEffect) {
+				log.Warn().
+					Int("skill", int(def.ID)).
+					Int("level", def.Level).
+					Str("skillName", def.Name).
+					Str("effect", eff.Name).
+					Str("kind", kind).
+					Msg("skill effect template names an unsupported core effect kind; casts using it apply nothing")
+			}
+		}
+	}
+	for _, def := range table.All() {
+		check(def, def.Effects, "effect")
+		check(def, def.SelfEffects, "self-effect")
+	}
+}
 
 type gameData struct {
 	Players       *player.TemplateTable
@@ -73,6 +103,7 @@ func loadGameData(paths gameServerPaths, cfg gameServerConfig, log zerolog.Logge
 	if err != nil {
 		return nil, err
 	}
+	logUnsupportedSkillEffects(skills, log)
 	trees, err := gamexml.LoadSkillTrees(filepath.Join(xmlRoot, "skillstrees"))
 	if err != nil {
 		return nil, err
