@@ -63,16 +63,10 @@ func NewTemplate(set *commons.StatSet) (*Template, error) {
 	if err := idf.Err(); err != nil {
 		return nil, err
 	}
-	wrap := func(err error) error { return fmt.Errorf("static object %d: %w", id, err) }
-
-	loc, err := location.NewLocation(set)
-	if err != nil {
-		return nil, wrap(err)
-	}
 	f := commons.NewFields(set, fmt.Sprintf("static object %d", id))
 	t := &Template{
 		ID:       id,
-		Location: loc,
+		Location: location.Location{X: f.Int("x"), Y: f.Int("y"), Z: f.Int("z")},
 		Type:     f.Int("type"),
 		Texture:  f.String("texture"),
 		MapX:     f.Int("mapX"),

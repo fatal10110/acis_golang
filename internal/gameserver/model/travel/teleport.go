@@ -57,10 +57,6 @@ type Teleport struct {
 // NewTeleport builds a Teleport from set. desc, priceId, priceCount, x, y,
 // and z are required; type defaults to STANDARD and castleId defaults to 0.
 func NewTeleport(set *commons.StatSet) (Teleport, error) {
-	loc, err := location.NewLocation(set)
-	if err != nil {
-		return Teleport{}, fmt.Errorf("travel: teleport: %w", err)
-	}
 	df := commons.NewFields(set, "travel: teleport")
 	desc := df.String("desc")
 	if err := df.Err(); err != nil {
@@ -69,7 +65,7 @@ func NewTeleport(set *commons.StatSet) (Teleport, error) {
 
 	f := commons.NewFields(set, fmt.Sprintf("travel: teleport %q", desc))
 	teleport := Teleport{
-		Location:    loc,
+		Location:    location.Location{X: f.Int("x"), Y: f.Int("y"), Z: f.Int("z")},
 		Description: desc,
 		Kind:        commons.FieldEnumDefault[Kind](f, "type", kindNames, KindStandard),
 		PriceID:     f.Int("priceId"),

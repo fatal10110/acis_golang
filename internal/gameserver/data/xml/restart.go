@@ -65,7 +65,7 @@ func LoadRestartPoints(path string) (*restart.Table, error) {
 func buildRestartArea(el restartAreaElement) (restart.Area, error) {
 	nodes := make([]location.Point, 0, len(el.Nodes))
 	for _, node := range el.Nodes {
-		point, err := location.NewPoint(commons.StatSetFromXMLAttrs(node.Attrs))
+		point, err := attrPoint(commons.StatSetFromXMLAttrs(node.Attrs))
 		if err != nil {
 			return restart.Area{}, err
 		}

@@ -56,7 +56,7 @@ func LoadInstantTeleports(path string) (travel.InstantTable, error) {
 		}
 		teleports := make([]location.Location, 0, len(list.Locs))
 		for _, loc := range list.Locs {
-			t, err := location.NewLocation(commons.StatSetFromXMLAttrs(loc.Attrs))
+			t, err := attrLocation(commons.StatSetFromXMLAttrs(loc.Attrs))
 			if err != nil {
 				return nil, fmt.Errorf("xml: %s: npc %d: %w", path, list.NPCID, err)
 			}

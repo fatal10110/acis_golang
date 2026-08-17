@@ -110,7 +110,7 @@ func buildTemplate(c classElement) (*player.Template, error) {
 	if len(c.Spawns) > 0 {
 		spawns := make([]location.Location, 0, len(c.Spawns))
 		for _, node := range c.Spawns {
-			spawn, err := location.NewLocation(commons.StatSetFromXMLAttrs(node.Attrs))
+			spawn, err := attrLocation(commons.StatSetFromXMLAttrs(node.Attrs))
 			if err != nil {
 				return nil, fmt.Errorf("spawn point: %w", err)
 			}

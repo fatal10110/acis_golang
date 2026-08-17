@@ -8,6 +8,7 @@ import (
 	"sort"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
 
 type xmlDocument[T any] struct {
@@ -50,6 +51,23 @@ func buildAll[T any](path string, els []attrsElement, ctor func(*commons.StatSet
 		out = append(out, v)
 	}
 	return out, nil
+}
+
+// attrLocation reads the required x/y/z attributes of set as a world
+// location. Coordinates ride along on elements that describe something else
+// (a spawn, a door, a teleport destination), so the loader parses them here
+// rather than pushing an attribute bag into the location package.
+func attrLocation(set *commons.StatSet) (location.Location, error) {
+	f := commons.NewFields(set, "location")
+	loc := location.Location{X: f.Int("x"), Y: f.Int("y"), Z: f.Int("z")}
+	return loc, f.Err()
+}
+
+// attrPoint reads the required x/y attributes of set as a 2D world point.
+func attrPoint(set *commons.StatSet) (location.Point, error) {
+	f := commons.NewFields(set, "point")
+	p := location.Point{X: f.Int("x"), Y: f.Int("y")}
+	return p, f.Err()
 }
 
 func readXML(path string, dst any) error {

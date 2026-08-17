@@ -187,18 +187,13 @@ func NewTemplate(set *commons.StatSet) (*Template, error) {
 	if err := idf.Err(); err != nil {
 		return nil, err
 	}
-	wrap := func(err error) error { return fmt.Errorf("door: template %d: %w", id, err) }
-
 	f := commons.NewFields(set, fmt.Sprintf("door: template %d", id))
 	kind := commons.FieldEnum[Kind](f, "type", kindNames)
 	level := f.Int("level")
 	if err := f.Err(); err != nil {
 		return nil, err
 	}
-	position, err := location.NewLocation(commons.NewStatSetFrom(set))
-	if err != nil {
-		return nil, wrap(err)
-	}
+	position := location.Location{X: f.Int("x"), Y: f.Int("y"), Z: f.Int("z")}
 	coords := commons.FieldList[location.Point](f, "coords")
 	if len(coords) < 3 {
 		f.Fail(fmt.Errorf("coords requires at least 3 points"))

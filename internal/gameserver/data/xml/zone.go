@@ -155,7 +155,7 @@ func buildZoneForm(attrs *commons.StatSet, nodeEls []attrsElement) (zone.Form, e
 
 	nodes := make([]location.Point, 0, len(nodeEls))
 	for _, el := range nodeEls {
-		point, err := location.NewPoint(commons.StatSetFromXMLAttrs(el.Attrs))
+		point, err := attrPoint(commons.StatSetFromXMLAttrs(el.Attrs))
 		if err != nil {
 			return nil, err
 		}
@@ -200,7 +200,7 @@ func addZoneSpawn(site zone.SpawnSite, el attrsElement) error {
 	if err != nil {
 		return err
 	}
-	loc, err := location.NewLocation(set)
+	loc, err := attrLocation(set)
 	if err != nil {
 		return err
 	}

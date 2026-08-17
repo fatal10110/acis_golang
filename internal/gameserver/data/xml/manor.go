@@ -69,7 +69,7 @@ func LoadManorAreas(path string) (manor.AreaTable, error) {
 	for _, el := range doc.Areas {
 		nodes := make([]location.Point, 0, len(el.Nodes))
 		for _, node := range el.Nodes {
-			point, err := location.NewPoint(commons.StatSetFromXMLAttrs(node.Attrs))
+			point, err := attrPoint(commons.StatSetFromXMLAttrs(node.Attrs))
 			if err != nil {
 				return nil, fmt.Errorf("xml: %s: manor area %q: %w", path, el.Name, err)
 			}

@@ -217,7 +217,7 @@ func buildResidenceZones(elems []residenceZoneElement) ([]residence.Zone, error)
 		}
 		nodes := make([]location.Point, 0, len(el.Nodes))
 		for _, nodeEl := range el.Nodes {
-			node, err := location.NewPoint(commons.StatSetFromXMLAttrs(nodeEl.Attrs))
+			node, err := attrPoint(commons.StatSetFromXMLAttrs(nodeEl.Attrs))
 			if err != nil {
 				return nil, err
 			}
@@ -244,7 +244,7 @@ func buildResidenceSpawns(elems []attrsElement) (map[residence.SpawnType][]locat
 		if err != nil {
 			return nil, err
 		}
-		loc, err := location.NewLocation(set)
+		loc, err := attrLocation(set)
 		if err != nil {
 			return nil, err
 		}
