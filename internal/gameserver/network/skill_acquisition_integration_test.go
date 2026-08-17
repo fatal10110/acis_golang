@@ -1,3 +1,5 @@
+//go:build integration
+
 package network
 
 import (
@@ -5,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
@@ -28,11 +31,11 @@ func testBookPolicy(t *testing.T) modelskill.BookPolicy {
 
 // newAcquireSkillClient wires a linked client with a spellbook policy and one
 // selectable character at level 5 with sp sp.
-func newAcquireSkillClient(t *testing.T, skills *skillstate.Persistence, policy modelskill.BookPolicy, trees *modelskill.Trees, sp int, seedItems func(*fakeItemStore, int32)) *fakeGameClient {
+func newAcquireSkillClient(t *testing.T, skills *skillstate.Persistence, policy modelskill.BookPolicy, trees *modelskill.Trees, sp int, seedItems func(*gamesql.ItemStore, int32)) *fakeGameClient {
 	t.Helper()
 	var objID int32
-	c, _, _, _, _ := newLinkedGameClientWithSkillsShortcutsCrestsSeed(t, skills, nil, nil, policy, trees, func(chars *fakeCharStore, items *fakeItemStore) {
-		objID = seedSelectableCharacter(t, chars, "player1", "Newbie", 5, sp)
+	c, _, _, _, _, _ := newLinkedSQLGameClientFull(t, skills, nil, nil, policy, trees, true, func(chars *gamesql.CharacterStore, items *gamesql.ItemStore) {
+		objID = seedSelectableSQLCharacter(t, chars, "player1", "Newbie", 5, sp).ID
 		if seedItems != nil {
 			seedItems(items, objID)
 		}
@@ -105,7 +108,7 @@ func TestAcquireSkillLearnBlockedByMissingSpellbook(t *testing.T) {
 }
 
 func TestGameClientLinkSendsSkillCoolTimeInGame(t *testing.T) {
-	c, _, _, _ := newLinkedGameClient(t)
+	c, _, _, _, _, _ := newLinkedSQLGameClient(t, nil, nil, 0)
 
 	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
 	c.read() // CharCreateOk
@@ -140,8 +143,8 @@ func TestGameClientLinkSendsCursedWeaponListAndEmptyLocations(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewCursedWeaponTable: %v", err)
 	}
-	c, _, _, _, _ := newLinkedGameClientWithSkillsShortcutsCrestsSeed(t, nil, nil, nil, modelskill.BookPolicy{}, nil, func(chars *fakeCharStore, _ *fakeItemStore) {
-		seedSelectableCharacter(t, chars, "player1", "Newbie", 5, 0)
+	c, _, _, _, _, _ := newLinkedSQLGameClientFull(t, nil, nil, nil, modelskill.BookPolicy{}, nil, true, func(chars *gamesql.CharacterStore, _ *gamesql.ItemStore) {
+		seedSelectableSQLCharacter(t, chars, "player1", "Newbie", 5, 0)
 	}, 1, table)
 
 	c.send(encodeRequestGameStart(0))
@@ -179,8 +182,8 @@ func TestGameClientLinkAcquireSkillInfoAndLearnGeneralSkill(t *testing.T) {
 		{ID: 3, Level: 1, Activation: modelskill.ActivationActive},
 	}), store)
 	var objID int32
-	c, _, _, _ := newLinkedGameClientWithSkillsSeed(t, skills, func(chars *fakeCharStore, _ *fakeItemStore) {
-		objID = seedSelectableCharacter(t, chars, "player1", "Newbie", 5, 50)
+	c, _, _, _, _, _ := newLinkedSQLGameClient(t, skills, func(chars *gamesql.CharacterStore, _ *gamesql.ItemStore) {
+		objID = seedSelectableSQLCharacter(t, chars, "player1", "Newbie", 5, 50).ID
 	}, 1)
 
 	c.send(encodeRequestGameStart(0))
@@ -263,10 +266,12 @@ func TestGameClientLinkLearnGeneralSkillRefreshesShortcut(t *testing.T) {
 		{ID: 3, Level: 1, Activation: modelskill.ActivationActive},
 	}), store)
 	var objID int32
-	c, _, _, _, _ := newLinkedGameClientWithSkillsShortcutsSeed(t, skills, func(shortcuts *fakeShortcutStore) {
-		shortcuts.seed(objID, shortcut.Shortcut{Slot: 3, Page: 0, Type: shortcut.Skill, ID: 3, Level: -1, CharacterType: 1})
-	}, func(chars *fakeCharStore, _ *fakeItemStore) {
-		objID = seedSelectableCharacter(t, chars, "player1", "Newbie", 5, 50)
+	c, _, _, _, _, _ := newLinkedSQLGameClientFull(t, skills, func(shortcuts *gamesql.ShortcutStore) {
+		if err := shortcuts.Save(context.Background(), objID, shortcut.Shortcut{Slot: 3, Page: 0, Type: shortcut.Skill, ID: 3, Level: -1, CharacterType: 1}); err != nil {
+			t.Fatalf("seed shortcut: %v", err)
+		}
+	}, nil, modelskill.BookPolicy{}, nil, true, func(chars *gamesql.CharacterStore, _ *gamesql.ItemStore) {
+		objID = seedSelectableSQLCharacter(t, chars, "player1", "Newbie", 5, 50).ID
 	}, 1)
 
 	c.send(encodeRequestGameStart(0))
@@ -297,8 +302,8 @@ func TestGameClientLinkAcquireSkillNeedsSP(t *testing.T) {
 		{ID: 3, Level: 1, Activation: modelskill.ActivationActive},
 	}), store)
 	var objID int32
-	c, _, _, _ := newLinkedGameClientWithSkillsSeed(t, skills, func(chars *fakeCharStore, _ *fakeItemStore) {
-		objID = seedSelectableCharacter(t, chars, "player1", "Newbie", 5, 49)
+	c, _, _, _, _, _ := newLinkedSQLGameClient(t, skills, func(chars *gamesql.CharacterStore, _ *gamesql.ItemStore) {
+		objID = seedSelectableSQLCharacter(t, chars, "player1", "Newbie", 5, 49).ID
 	}, 1)
 
 	c.send(encodeRequestGameStart(0))
@@ -351,15 +356,15 @@ func fishingSkills(t *testing.T) *skillstate.Persistence {
 	}), store)
 }
 
-func enterFishingClient(t *testing.T, trees *modelskill.Trees, skills *skillstate.Persistence, seedItems func(*fakeItemStore, int32)) (*fakeGameClient, *memorySkillSaveStore, int32) {
+func enterFishingClient(t *testing.T, trees *modelskill.Trees, skills *skillstate.Persistence, seedItems func(*gamesql.ItemStore, int32)) (*fakeGameClient, *memorySkillSaveStore, int32) {
 	t.Helper()
 	store := newMemorySkillSaveStore()
 	pers := skillstate.NewPersistence(store, modelskill.NewTable([]modelskill.Definition{
 		{ID: 1368, Level: 1, Activation: modelskill.ActivationActive},
 	}), store)
 	var objID int32
-	c, _, _, _, _ := newLinkedGameClientWithSkillsShortcutsCrestsSeed(t, pers, nil, nil, modelskill.BookPolicy{}, trees, func(chars *fakeCharStore, items *fakeItemStore) {
-		objID = seedSelectableCharacter(t, chars, "player1", "Newbie", 5, 50)
+	c, _, _, _, _, _ := newLinkedSQLGameClientFull(t, pers, nil, nil, modelskill.BookPolicy{}, trees, true, func(chars *gamesql.CharacterStore, items *gamesql.ItemStore) {
+		objID = seedSelectableSQLCharacter(t, chars, "player1", "Newbie", 5, 50).ID
 		if seedItems != nil {
 			seedItems(items, objID)
 		}
@@ -400,7 +405,7 @@ func TestAcquireFishingSkillInfo(t *testing.T) {
 // TestLearnFishingSkill verifies consuming the fishing item lets the skill
 // land, sends ExStorageMaxCount for the storage-sync range, and persists.
 func TestLearnFishingSkill(t *testing.T) {
-	c, store, objID := enterFishingClient(t, fishingTrees(), fishingSkills(t), func(items *fakeItemStore, owner int32) {
+	c, store, objID := enterFishingClient(t, fishingTrees(), fishingSkills(t), func(items *gamesql.ItemStore, owner int32) {
 		if err := items.Create(context.Background(), owner, item.Instance{
 			ObjectID: 700, TemplateID: 57, OwnerID: owner, Count: 5, Location: item.LocationInventory,
 		}); err != nil {

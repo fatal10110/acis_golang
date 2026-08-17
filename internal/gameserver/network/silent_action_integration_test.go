@@ -1,37 +1,17 @@
+//go:build integration
+
 package network
 
 import (
 	"context"
-	"net"
 	"testing"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
-
-// readWithTimeout reads one frame within d, returning nil on timeout instead
-// of failing the test. Used by TestGameClientLinkNeverGoesSilentOnActionRequests
-// to drain however many frames a rejected request produces (a system message
-// plus ActionFailed, or ActionFailed alone) without hard-coding an exact
-// count, while still treating "nothing at all" as a failure.
-func (f *fakeGameClient) readWithTimeout(d time.Duration) []byte {
-	f.t.Helper()
-	f.conn.SetReadDeadline(time.Now().Add(d))
-	payload, err := wire.ReadFrame(f.conn)
-	if err != nil {
-		if ne, ok := err.(net.Error); ok && ne.Timeout() {
-			return nil
-		}
-		f.t.Fatalf("ReadFrame: %v", err)
-	}
-	if f.cipher != nil {
-		f.cipher.Decrypt(payload)
-	}
-	return payload
-}
 
 // TestGameClientLinkNeverGoesSilentOnActionRequests is the guardrail against
 // the bug class behind #828/#829/#873: an accepted client action packet that
@@ -52,12 +32,12 @@ func (f *fakeGameClient) readWithTimeout(d time.Duration) []byte {
 // docs/agents/action-response-contract.md) assert that release in their own
 // success-path tests instead.
 func TestGameClientLinkNeverGoesSilentOnActionRequests(t *testing.T) {
-	c, chars, _, _ := newLinkedGameClient(t)
+	c, chars, _, _, _, _ := newLinkedSQLGameClient(t, nil, nil, 0)
 
 	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
 	c.read() // CharCreateOk
 	c.read() // CharSelectInfo
-	chars.soleObjectID(t)
+	sqlSoleObjectID(t, chars)
 
 	c.send(encodeRequestGameStart(0))
 	c.read() // SSQInfo
@@ -116,8 +96,8 @@ func TestGameClientLinkNeverGoesSilentOnActionRequests(t *testing.T) {
 func TestGameClientLinkUseItemPotionRejectionReplies(t *testing.T) {
 	skills := consumableSkillTable(t)
 	const objectID int32 = 720
-	c, chars, _, _ := newLinkedGameClientWithSkillsSeed(t, skills, func(chars *fakeCharStore, items *fakeItemStore) {
-		objID := seedSelectableCharacter(t, chars, "player1", "Newbie", 5, 0)
+	c, chars, _, _, _, _ := newLinkedSQLGameClient(t, skills, func(chars *gamesql.CharacterStore, items *gamesql.ItemStore) {
+		objID := seedSelectableSQLCharacter(t, chars, "player1", "Newbie", 5, 0).ID
 		if err := items.Create(context.Background(), objID, item.Instance{
 			ObjectID: objectID, TemplateID: 1060, OwnerID: objID,
 			Count: 5, Location: item.LocationInventory, ManaLeft: -1,
@@ -155,8 +135,8 @@ func TestGameClientLinkUseItemPotionRejectionReplies(t *testing.T) {
 func TestGameClientLinkUseItemQuestItemRejectionReplies(t *testing.T) {
 	const objectID int32 = 721
 	const questItemID int32 = 9001
-	c, _, _, _ := newLinkedGameClientWithSkillsSeed(t, nil, func(chars *fakeCharStore, items *fakeItemStore) {
-		objID := seedSelectableCharacter(t, chars, "player1", "Newbie", 5, 0)
+	c, _, _, _, _, _ := newLinkedSQLGameClient(t, nil, func(chars *gamesql.CharacterStore, items *gamesql.ItemStore) {
+		objID := seedSelectableSQLCharacter(t, chars, "player1", "Newbie", 5, 0).ID
 		if err := items.Create(context.Background(), objID, item.Instance{
 			ObjectID: objectID, TemplateID: questItemID, OwnerID: objID,
 			Count: 1, Location: item.LocationInventory, ManaLeft: -1,
