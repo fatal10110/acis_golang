@@ -5,7 +5,6 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
 )
 
 func TestItemModifierFuncsBuildsAddSetAndEnchantFuncs(t *testing.T) {
@@ -29,12 +28,12 @@ func TestItemModifierFuncsBuildsAddSetAndEnchantFuncs(t *testing.T) {
 	if len(fns) != 3 {
 		t.Fatalf("len(fns) = %d, want 3", len(fns))
 	}
-	if _, ok := fns[2].(*basefunc.Enchant); !ok {
-		t.Fatalf("fns[2] = %T, want *basefunc.Enchant", fns[2])
+	if fns[2].Op != OpEnchant {
+		t.Fatalf("fns[2].Op = %v, want OpEnchant", fns[2].Op)
 	}
 	for _, fn := range fns {
-		if fn.Owner() != owner {
-			t.Fatalf("Owner() = %v, want %v", fn.Owner(), owner)
+		if fn.Owner != ModOwnerItem(owner) {
+			t.Fatalf("Owner = %v, want %v", fn.Owner, ModOwnerItem(owner))
 		}
 	}
 }
@@ -91,7 +90,7 @@ func TestItemPassiveFuncsOnlyAppliesLoadedPassiveSkills(t *testing.T) {
 	if len(fns) != 1 {
 		t.Fatalf("len(fns) = %d, want 1", len(fns))
 	}
-	if fns[0].Owner() != owner {
-		t.Fatalf("Owner() = %v, want %v", fns[0].Owner(), owner)
+	if fns[0].Owner != ModOwnerItem(owner) {
+		t.Fatalf("Owner = %v, want %v", fns[0].Owner, ModOwnerItem(owner))
 	}
 }

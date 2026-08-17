@@ -68,7 +68,7 @@ func (a characterStatActor) IsFlying() bool { return a.c.Flying() }
 // heading, which decides which side of it counts as front. Every conditions
 // caller this codebase's Calc() call sites can produce is, in practice, this
 // same characterStatActor (a stat func's effector and effected both resolve
-// to the buff's own owner — see the package doc on basefunc.Condition), so
+// to the buff's own owner — see the package doc on effect.Condition), so
 // the type assertion below always succeeds today; a target-side facing
 // condition (none exist in the shipped datapack) would fail it and read as
 // "not behind/in front" rather than panic.

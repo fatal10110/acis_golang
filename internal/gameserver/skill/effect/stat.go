@@ -4,55 +4,62 @@ import (
 	"fmt"
 
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
-func statFuncs(owner any, templates []modelskill.FuncTemplate, cond basefunc.Condition) ([]basefunc.Func, error) {
-	funcs := make([]basefunc.Func, 0, len(templates))
+func statFuncs(owner ModOwner, templates []modelskill.FuncTemplate, cond Condition) ([]Mod, error) {
+	mods := make([]Mod, 0, len(templates))
 	for _, tmpl := range templates {
 		gate, err := funcCondition(tmpl.Condition, tmpl.AttachCondition)
 		if err != nil {
 			return nil, err
 		}
-		funcCond := andCond(cond, gate)
+		modCond := andCond(cond, gate)
 		s, err := stat.ByName(tmpl.Stat)
 		if err != nil {
 			return nil, err
 		}
-		fn, err := statFunc(owner, s, tmpl, funcCond)
+		m, err := statFunc(owner, s, tmpl, modCond)
 		if err != nil {
 			return nil, err
 		}
-		funcs = append(funcs, fn)
+		mods = append(mods, m)
 	}
-	return funcs, nil
+	return mods, nil
 }
 
-func statFunc(owner any, s stat.Stat, tmpl modelskill.FuncTemplate, cond basefunc.Condition) (basefunc.Func, error) {
-	switch tmpl.Op {
+func statFunc(owner ModOwner, s stat.Stat, tmpl modelskill.FuncTemplate, cond Condition) (Mod, error) {
+	op, err := statOp(tmpl.Op)
+	if err != nil {
+		return Mod{}, err
+	}
+	return Mod{Stat: s, Op: op, Value: tmpl.Value, Cond: cond, Owner: owner}, nil
+}
+
+func statOp(op modelskill.FuncOp) (Op, error) {
+	switch op {
 	case modelskill.FuncAdd:
-		return basefunc.NewAdd(owner, s, tmpl.Value, cond), nil
+		return OpAdd, nil
 	case modelskill.FuncAddMul:
-		return basefunc.NewAddMul(owner, s, tmpl.Value, cond), nil
+		return OpAddMul, nil
 	case modelskill.FuncSub:
-		return basefunc.NewSub(owner, s, tmpl.Value, cond), nil
+		return OpSub, nil
 	case modelskill.FuncSubDiv:
-		return basefunc.NewSubDiv(owner, s, tmpl.Value, cond), nil
+		return OpSubDiv, nil
 	case modelskill.FuncMul:
-		return basefunc.NewMul(owner, s, tmpl.Value, cond), nil
+		return OpMul, nil
 	case modelskill.FuncBaseMul:
-		return basefunc.NewBaseMul(owner, s, tmpl.Value, cond), nil
+		return OpBaseMul, nil
 	case modelskill.FuncDiv:
-		return basefunc.NewDiv(owner, s, tmpl.Value, cond), nil
+		return OpDiv, nil
 	case modelskill.FuncSet:
-		return basefunc.NewSet(owner, s, tmpl.Value, cond), nil
+		return OpSet, nil
 	case modelskill.FuncBaseAdd:
-		return basefunc.NewBaseAdd(owner, s, tmpl.Value, cond), nil
+		return OpBaseAdd, nil
 	case modelskill.FuncEnchant:
-		return nil, fmt.Errorf("enchant stat funcs need an item owner")
+		return 0, fmt.Errorf("enchant stat funcs need an item owner")
 	default:
-		return nil, fmt.Errorf("unknown stat func op %s", tmpl.Op)
+		return 0, fmt.Errorf("unknown stat func op %s", op)
 	}
 }
 

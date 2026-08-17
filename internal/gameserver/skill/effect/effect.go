@@ -6,7 +6,6 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
 )
 
 type Effect struct {
@@ -14,7 +13,7 @@ type Effect struct {
 	Template modelskill.EffectTemplate
 	Type     Type
 	Flag     Flag
-	Funcs    []basefunc.Func
+	Funcs    []Mod
 	Herb     bool
 	Effector Participant
 	Effected Participant

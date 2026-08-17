@@ -7,7 +7,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
@@ -26,26 +26,24 @@ func goldenHostileScenarios(t testing.TB) map[string]float64 {
 	}
 
 	{
-		ownerA, ownerB, ownerC := &struct{ n int }{1}, &struct{ n int }{2}, &struct{ n int }{3}
 		h1 := newCombatHostile(t, 1, tpl())
-		h1.AddStatFuncs([]basefunc.Func{basefunc.NewAdd(ownerA, stat.PowerDefence, 1e16, nil)})
-		h1.AddStatFuncs([]basefunc.Func{basefunc.NewAdd(ownerB, stat.PowerDefence, 1, nil)})
-		h1.AddStatFuncs([]basefunc.Func{basefunc.NewAdd(ownerC, stat.PowerDefence, 1, nil)})
+		h1.AddStatFuncs([]effect.Mod{{Stat: stat.PowerDefence, Op: effect.OpAdd, Value: 1e16}})
+		h1.AddStatFuncs([]effect.Mod{{Stat: stat.PowerDefence, Op: effect.OpAdd, Value: 1}})
+		h1.AddStatFuncs([]effect.Mod{{Stat: stat.PowerDefence, Op: effect.OpAdd, Value: 1}})
 		out["order30_forward"] = h1.PDef()
 
 		h2 := newCombatHostile(t, 2, tpl())
-		h2.AddStatFuncs([]basefunc.Func{basefunc.NewAdd(ownerC, stat.PowerDefence, 1, nil)})
-		h2.AddStatFuncs([]basefunc.Func{basefunc.NewAdd(ownerB, stat.PowerDefence, 1, nil)})
-		h2.AddStatFuncs([]basefunc.Func{basefunc.NewAdd(ownerA, stat.PowerDefence, 1e16, nil)})
+		h2.AddStatFuncs([]effect.Mod{{Stat: stat.PowerDefence, Op: effect.OpAdd, Value: 1}})
+		h2.AddStatFuncs([]effect.Mod{{Stat: stat.PowerDefence, Op: effect.OpAdd, Value: 1}})
+		h2.AddStatFuncs([]effect.Mod{{Stat: stat.PowerDefence, Op: effect.OpAdd, Value: 1e16}})
 		out["order30_reverse"] = h2.PDef()
 	}
 
 	{
 		h := newCombatHostile(t, 3, tpl())
-		owner := &struct{}{}
-		h.AddStatFuncs([]basefunc.Func{
-			basefunc.NewSet(owner, stat.MagicDefence, 500, nil),
-			basefunc.NewBaseMul(owner, stat.MagicDefence, 0.5, nil),
+		h.AddStatFuncs([]effect.Mod{
+			{Stat: stat.MagicDefence, Op: effect.OpSet, Value: 500},
+			{Stat: stat.MagicDefence, Op: effect.OpBaseMul, Value: 0.5},
 		})
 		out["set_rebase_mdef"] = h.MDef()
 	}
@@ -53,10 +51,10 @@ func goldenHostileScenarios(t testing.TB) map[string]float64 {
 	{
 		h := newCombatHostile(t, 4, tpl())
 		base := h.PAtk()
-		owner := &struct{}{}
-		h.AddStatFuncs([]basefunc.Func{
-			basefunc.NewAdd(owner, stat.PowerAttack, 7, nil),
-			basefunc.NewMul(owner, stat.PowerAttack, 1.25, nil),
+		owner := effect.ModOwnerEffect(&effect.Effect{})
+		h.AddStatFuncs([]effect.Mod{
+			{Stat: stat.PowerAttack, Op: effect.OpAdd, Value: 7, Owner: owner},
+			{Stat: stat.PowerAttack, Op: effect.OpMul, Value: 1.25, Owner: owner},
 		})
 		out["attach_detach_before"] = base
 		out["attach_detach_during"] = h.PAtk()

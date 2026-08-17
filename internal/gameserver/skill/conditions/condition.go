@@ -7,7 +7,7 @@ package conditions
 // duplicates that.
 
 // Condition is this package's own cast-time gate contract, decoupled from
-// basefunc.Condition: a stat function is gated by its owner alone, while a
+// effect.Condition: a stat function is gated by its owner alone, while a
 // cast condition needs both sides of the cast plus the skill being cast.
 type Condition interface {
 	Test(effector, effected Actor, skill Skill) bool

@@ -47,6 +47,6 @@ func isPlayer(target Participant) bool {
 }
 
 // statFuncs builds the stat functions templates describes, attributed to
-// owner. owner is opaque here (see basefunc.Func.Owner): a running buff
+// owner. owner identifies whatever attached the Mod (see ModOwner): a running buff
 // passes itself, a passive skill passes an identity stable for as long as
 // it stays learned.

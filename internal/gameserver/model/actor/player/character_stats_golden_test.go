@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
@@ -30,17 +29,16 @@ func goldenPlayerScenarios(t testing.TB) map[string]float64 {
 	{
 		tmpl := combatTemplate()
 		c := liveCharacter(1, tmpl, combatItems())
-		ownerA, ownerB, ownerC := &struct{ n int }{1}, &struct{ n int }{2}, &struct{ n int }{3}
-		c.AddStatFuncs([]basefunc.Func{basefunc.NewAdd(ownerA, stat.PowerAttack, 1e16, nil)})
-		c.AddStatFuncs([]basefunc.Func{basefunc.NewAdd(ownerB, stat.PowerAttack, 1, nil)})
-		c.AddStatFuncs([]basefunc.Func{basefunc.NewAdd(ownerC, stat.PowerAttack, 1, nil)})
+		c.AddStatFuncs([]effect.Mod{{Stat: stat.PowerAttack, Op: effect.OpAdd, Value: 1e16}})
+		c.AddStatFuncs([]effect.Mod{{Stat: stat.PowerAttack, Op: effect.OpAdd, Value: 1}})
+		c.AddStatFuncs([]effect.Mod{{Stat: stat.PowerAttack, Op: effect.OpAdd, Value: 1}})
 		out["order30_forward"] = c.PAtk()
 
 		tmpl2 := combatTemplate()
 		c2 := liveCharacter(2, tmpl2, combatItems())
-		c2.AddStatFuncs([]basefunc.Func{basefunc.NewAdd(ownerC, stat.PowerAttack, 1, nil)})
-		c2.AddStatFuncs([]basefunc.Func{basefunc.NewAdd(ownerB, stat.PowerAttack, 1, nil)})
-		c2.AddStatFuncs([]basefunc.Func{basefunc.NewAdd(ownerA, stat.PowerAttack, 1e16, nil)})
+		c2.AddStatFuncs([]effect.Mod{{Stat: stat.PowerAttack, Op: effect.OpAdd, Value: 1}})
+		c2.AddStatFuncs([]effect.Mod{{Stat: stat.PowerAttack, Op: effect.OpAdd, Value: 1}})
+		c2.AddStatFuncs([]effect.Mod{{Stat: stat.PowerAttack, Op: effect.OpAdd, Value: 1e16}})
 		out["order30_reverse"] = c2.PAtk()
 	}
 
@@ -49,10 +47,9 @@ func goldenPlayerScenarios(t testing.TB) map[string]float64 {
 	{
 		tmpl := combatTemplate()
 		c := liveCharacter(3, tmpl, combatItems())
-		owner := &struct{}{}
-		c.AddStatFuncs([]basefunc.Func{
-			basefunc.NewSet(owner, stat.MagicDefence, 500, nil),
-			basefunc.NewBaseMul(owner, stat.MagicDefence, 0.5, nil),
+		c.AddStatFuncs([]effect.Mod{
+			{Stat: stat.MagicDefence, Op: effect.OpSet, Value: 500},
+			{Stat: stat.MagicDefence, Op: effect.OpBaseMul, Value: 0.5},
 		})
 		out["set_rebase_mdef"] = c.MDef()
 	}
@@ -63,10 +60,10 @@ func goldenPlayerScenarios(t testing.TB) map[string]float64 {
 		tmpl := combatTemplate()
 		c := liveCharacter(4, tmpl, combatItems())
 		base := c.PAtk()
-		owner := &struct{}{}
-		c.AddStatFuncs([]basefunc.Func{
-			basefunc.NewAdd(owner, stat.PowerAttack, 7, nil),
-			basefunc.NewMul(owner, stat.PowerAttack, 1.25, nil),
+		owner := effect.ModOwnerEffect(&effect.Effect{})
+		c.AddStatFuncs([]effect.Mod{
+			{Stat: stat.PowerAttack, Op: effect.OpAdd, Value: 7, Owner: owner},
+			{Stat: stat.PowerAttack, Op: effect.OpMul, Value: 1.25, Owner: owner},
 		})
 		out["attach_detach_before"] = base
 		out["attach_detach_during"] = c.PAtk()
@@ -80,13 +77,12 @@ func goldenPlayerScenarios(t testing.TB) map[string]float64 {
 		tmpl := combatTemplate()
 		tmpl.MAtk = 20
 		c := liveCharacter(5, tmpl, combatItems())
-		owner := &struct{}{}
-		c.AddStatFuncs([]basefunc.Func{
-			basefunc.NewBaseAdd(owner, stat.PowerDefence, 4, nil),
-			basefunc.NewMul(owner, stat.PowerDefence, 1.1, nil),
-			basefunc.NewAdd(owner, stat.MagicAttack, 6, nil),
-			basefunc.NewAddMul(owner, stat.MagicAttack, 10, nil), // -10%
-			basefunc.NewSubDiv(owner, stat.RunSpeed, 20, nil),    // /(1-0.2)
+		c.AddStatFuncs([]effect.Mod{
+			{Stat: stat.PowerDefence, Op: effect.OpBaseAdd, Value: 4},
+			{Stat: stat.PowerDefence, Op: effect.OpMul, Value: 1.1},
+			{Stat: stat.MagicAttack, Op: effect.OpAdd, Value: 6},
+			{Stat: stat.MagicAttack, Op: effect.OpAddMul, Value: 10}, // -10%
+			{Stat: stat.RunSpeed, Op: effect.OpSubDiv, Value: 20},    // /(1-0.2)
 		})
 		out["mixed_pdef"] = c.PDef()
 		out["mixed_matk"] = c.MAtk()
@@ -104,15 +100,15 @@ func goldenPlayerScenarios(t testing.TB) map[string]float64 {
 		inst := &item.Instance{ObjectID: 900, TemplateID: 50, Location: item.LocationPaperdoll, LocationData: 0, EnchantLevel: 7}
 		c := liveCharacter(6, tmpl, items, inst)
 		tmplRef, _ := items.Get(50)
-		owner := effect.ItemOwner{Inst: inst, Tmpl: tmplRef}
-		c.AddStatFuncs([]basefunc.Func{basefunc.NewEnchant(owner, stat.PowerAttack, 0, nil)})
+		owner := effect.ModOwnerItem(effect.ItemOwner{Inst: inst, Tmpl: tmplRef})
+		c.AddStatFuncs([]effect.Mod{{Stat: stat.PowerAttack, Op: effect.OpEnchant, Owner: owner}})
 		out["enchant_patk_s_over3"] = c.PAtk()
 
 		inst2 := &item.Instance{ObjectID: 901, TemplateID: 50, Location: item.LocationPaperdoll, LocationData: 0, EnchantLevel: 2}
 		c2 := liveCharacter(7, tmpl, items, inst2)
 		tmplRef2, _ := items.Get(50)
-		owner2 := effect.ItemOwner{Inst: inst2, Tmpl: tmplRef2}
-		c2.AddStatFuncs([]basefunc.Func{basefunc.NewEnchant(owner2, stat.PowerAttack, 0, nil)})
+		owner2 := effect.ModOwnerItem(effect.ItemOwner{Inst: inst2, Tmpl: tmplRef2})
+		c2.AddStatFuncs([]effect.Mod{{Stat: stat.PowerAttack, Op: effect.OpEnchant, Owner: owner2}})
 		out["enchant_patk_s_under3"] = c2.PAtk()
 	}
 

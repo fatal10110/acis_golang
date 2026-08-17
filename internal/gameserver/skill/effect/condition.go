@@ -7,17 +7,16 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
-// funcCondition builds the basefunc.Condition gate for one stat func from
+// funcCondition builds the Condition gate for one stat func from
 // its own direct predicate (a func element's child, e.g. <add ...><using
 // .../></add>) and/or the <cond> block attached to its enclosing <for>/
 // <effect> group, ANDing both when both are present. Returns (nil, nil)
 // when neither is set, matching every unconditional stat func today.
-func funcCondition(direct *modelskill.Condition, attach *modelskill.ConditionClause) (basefunc.Condition, error) {
+func funcCondition(direct *modelskill.Condition, attach *modelskill.ConditionClause) (Condition, error) {
 	var conds []conditions.Condition
 	if attach != nil {
 		c, err := buildCondition(attach.Root)
@@ -44,7 +43,7 @@ func funcCondition(direct *modelskill.Condition, attach *modelskill.ConditionCla
 }
 
 // conditionGate adapts one built conditions.Condition into a
-// basefunc.Condition: it resolves effector (as passed to Func.Calc) to a
+// Condition: it resolves effector (as passed to Func.Calc) to a
 // conditions.Actor. In every Calc call site today, effector is the
 // calculation-only wrapper (characterStatActor/hostileStatActor/
 // summonStatActor) around a creature, which also implements
@@ -163,10 +162,10 @@ func buildGameCondition(attrs map[string]string) (conditions.Condition, error) {
 	return nil, fmt.Errorf("skill: game: no recognized attribute in %v", attrs)
 }
 
-// andCond combines two optional basefunc.Condition gates, either of which
+// andCond combines two optional Condition gates, either of which
 // may be nil, into one that requires both (when both are set) or whichever
 // one is set (when only one is).
-func andCond(a, b basefunc.Condition) basefunc.Condition {
+func andCond(a, b Condition) Condition {
 	switch {
 	case a == nil:
 		return b
@@ -177,7 +176,7 @@ func andCond(a, b basefunc.Condition) basefunc.Condition {
 	}
 }
 
-type bothCond struct{ a, b basefunc.Condition }
+type bothCond struct{ a, b Condition }
 
 func (c bothCond) Test(effector stat.Actor) bool {
 	return c.a.Test(effector) && c.b.Test(effector)

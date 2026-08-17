@@ -11,7 +11,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
@@ -455,9 +454,10 @@ func TestCheckSkillSuccessUsesLivePlayerShieldDefense(t *testing.T) {
 	caster.SetLastKnownPosition(location.Location{X: 80, Y: 0, Z: 0}, 0)
 	for _, target := range []*player.Character{unblocked, blocked} {
 		target.SetLastKnownPosition(location.Location{X: 0, Y: 0, Z: 0}, 0)
-		target.AddStatFuncs([]basefunc.Func{
-			basefunc.NewSet(target, stat.ShieldRate, 20, nil),
-			basefunc.NewSet(target, stat.ShieldDefenceAngle, 120, nil),
+		owner := effect.ModOwnerSkill(modelskill.Ref{ID: 1, Level: 1})
+		target.AddStatFuncs([]effect.Mod{
+			{Stat: stat.ShieldRate, Op: effect.OpSet, Value: 20, Owner: owner},
+			{Stat: stat.ShieldDefenceAngle, Op: effect.OpSet, Value: 120, Owner: owner},
 		})
 	}
 	blocked.SetRollSource(func(n int) int {

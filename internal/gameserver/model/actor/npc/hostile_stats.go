@@ -1,7 +1,7 @@
 package npc
 
 import (
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/funcs"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
@@ -12,29 +12,24 @@ import (
 const maxBuffCount = 20
 
 // AddStatFuncs attaches fns to h's live stat calculators.
-func (h *Hostile) AddStatFuncs(fns []basefunc.Func) {
-	if len(fns) == 0 {
-		return
-	}
-	h.statMu.Lock()
-	defer h.statMu.Unlock()
+func (h *Hostile) AddStatFuncs(fns []effect.Mod) {
 	for _, fn := range fns {
-		if fn == nil {
-			continue
-		}
-		h.statCalcLocked(fn.Stat()).AddFunc(fn)
+		h.statCalcLocked(fn.Stat).AddMod(fn)
 	}
 }
 
 // RemoveStatsByOwner drops every stat func previously added for owner.
-func (h *Hostile) RemoveStatsByOwner(owner any) {
-	if owner == nil {
+func (h *Hostile) RemoveStatsByOwner(owner effect.ModOwner) {
+	if owner == (effect.ModOwner{}) {
 		return
 	}
-	h.statMu.Lock()
-	defer h.statMu.Unlock()
-	for _, calc := range h.statCalcs {
-		calc.RemoveOwner(owner)
+	h.statMu.RLock()
+	calcs := h.statCalcs
+	h.statMu.RUnlock()
+	for _, calc := range calcs {
+		if calc != nil {
+			calc.RemoveOwner(owner)
+		}
 	}
 }
 
@@ -44,25 +39,28 @@ func (h *Hostile) MaxBuffCount() int {
 	return maxBuffCount
 }
 
-func (h *Hostile) statCalc(s stat.Stat) *basefunc.Calculator {
-	h.statMu.Lock()
-	defer h.statMu.Unlock()
+// statCalc returns s's live Calculator, creating it (with its builtin
+// finalize step) on first touch. The common warm case only takes statMu's
+// read lock; the slot is created at most once per Stat per Hostile.
+func (h *Hostile) statCalc(s stat.Stat) *effect.Calculator {
+	h.statMu.RLock()
+	if calc := h.statCalcs[s]; calc != nil {
+		h.statMu.RUnlock()
+		return calc
+	}
+	h.statMu.RUnlock()
 	return h.statCalcLocked(s)
 }
 
-func (h *Hostile) statCalcLocked(s stat.Stat) *basefunc.Calculator {
-	if h.statCalcs == nil {
-		h.statCalcs = make(map[stat.Stat]*basefunc.Calculator)
-	}
+func (h *Hostile) statCalcLocked(s stat.Stat) *effect.Calculator {
+	h.statMu.Lock()
+	defer h.statMu.Unlock()
 	if calc := h.statCalcs[s]; calc != nil {
 		return calc
 	}
-	calc := &basefunc.Calculator{}
-	for _, fn := range defaultStatFuncs(s) {
-		calc.AddFunc(fn)
-	}
-	h.statCalcs[s] = calc
-	return calc
+	calc := effect.NewCalculator(defaultBuiltin(s))
+	h.statCalcs[s] = &calc
+	return &calc
 }
 
 // calcStat runs s's finalization chain (the base funcs every NPC attaches
@@ -81,41 +79,42 @@ func (h *Hostile) CalcStat(s stat.Stat, base float64) float64 {
 	return h.calcStat(s, base)
 }
 
-// defaultStatFuncs returns the base stat-finalization funcs every NPC
-// attaches for s. Unlike a player, an NPC gets no henna or CP funcs — the
+// defaultBuiltin returns the static, attribute-driven finalize step every
+// NPC's calculation chain for s runs at order 10, or nil for a Stat with no
+// builtin. Unlike a player, an NPC gets no henna or CP funcs — the
 // reference AI only ever adds the shared creature set to a monster.
-func defaultStatFuncs(s stat.Stat) []basefunc.Func {
+func defaultBuiltin(s stat.Stat) funcs.Func {
 	switch s {
 	case stat.MaxHP:
-		return []basefunc.Func{funcs.MaxHpMul}
+		return funcs.MaxHpMul
 	case stat.MaxMP:
-		return []basefunc.Func{funcs.MaxMpMul}
+		return funcs.MaxMpMul
 	case stat.RegenerateHPRate:
-		return []basefunc.Func{funcs.RegenHpMul}
+		return funcs.RegenHpMul
 	case stat.RegenerateMPRate:
-		return []basefunc.Func{funcs.RegenMpMul}
+		return funcs.RegenMpMul
 	case stat.PowerAttack:
-		return []basefunc.Func{funcs.PAtkMod}
+		return funcs.PAtkMod
 	case stat.PowerDefence:
-		return []basefunc.Func{funcs.PDefMod}
+		return funcs.PDefMod
 	case stat.MagicAttack:
-		return []basefunc.Func{funcs.MAtkMod}
+		return funcs.MAtkMod
 	case stat.MagicDefence:
-		return []basefunc.Func{funcs.MDefMod}
+		return funcs.MDefMod
 	case stat.PowerAttackSpeed:
-		return []basefunc.Func{funcs.PAtkSpeed}
+		return funcs.PAtkSpeed
 	case stat.MagicAttackSpeed:
-		return []basefunc.Func{funcs.MAtkSpeed}
+		return funcs.MAtkSpeed
 	case stat.AccuracyCombat:
-		return []basefunc.Func{funcs.AtkAccuracy}
+		return funcs.AtkAccuracy
 	case stat.EvasionRate:
-		return []basefunc.Func{funcs.AtkEvasion}
+		return funcs.AtkEvasion
 	case stat.CriticalRate:
-		return []basefunc.Func{funcs.AtkCritical}
+		return funcs.AtkCritical
 	case stat.MCriticalRate:
-		return []basefunc.Func{funcs.MAtkCritical}
+		return funcs.MAtkCritical
 	case stat.RunSpeed:
-		return []basefunc.Func{funcs.MoveSpeed}
+		return funcs.MoveSpeed
 	default:
 		return nil
 	}

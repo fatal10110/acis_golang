@@ -16,7 +16,7 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -197,7 +197,7 @@ func TestWaterZoneMovementUsesBreathStatAndClearsGaugeOnExit(t *testing.T) {
 	live.zoneActor = &liveZoneActor{live: live}
 	state.Spawn(live, 0, 0, 0, 0)
 	state.AddPlayer(live)
-	live.AddStatFuncs([]basefunc.Func{basefunc.NewMul(nil, stat.Breath, 2, nil)})
+	live.AddStatFuncs([]effect.Mod{{Stat: stat.Breath, Op: effect.OpMul, Value: 2}})
 
 	effects := NewTaskEffects(state)
 	water, err := task.NewWater(effects, time.Now)

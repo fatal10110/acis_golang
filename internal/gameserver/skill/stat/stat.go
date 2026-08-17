@@ -1,5 +1,6 @@
 // Package stat identifies the named quantities the calculation chain
-// (basefunc/funcs) and skill/item data can target: hp/mp/cp, attack and
+// (skill/effect's Mod pipeline plus skill/funcs) and skill/item data can
+// target: hp/mp/cp, attack and
 // defense values, rates, resistances, and the six base attributes. A Stat is
 // just a key — computing or applying one is the calculation chain's job.
 package stat
@@ -339,6 +340,11 @@ func (s Stat) CantBeNegative() bool {
 	}
 	return table[s].cantBeNegative
 }
+
+// Count is the number of distinct Stat values, so a caller that wants a
+// dense per-Stat array (e.g. one calculation chain per Stat) can size it
+// without reaching into this package's own unexported table.
+const Count = int(numStats)
 
 // ByName resolves name (an exact, case-sensitive data-file spelling, e.g.
 // from a skill or item XML attribute) to its Stat. It reports an error for

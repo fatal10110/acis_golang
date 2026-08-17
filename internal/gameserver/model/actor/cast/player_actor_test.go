@@ -11,7 +11,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
@@ -96,11 +95,11 @@ func TestPlayerActorMPCostAppliesSkillMPConsumeRates(t *testing.T) {
 		t.Fatal(err)
 	}
 	ch.Live = live
-	owner := &struct{}{}
-	ch.AddStatFuncs([]basefunc.Func{
-		basefunc.NewMul(owner, stat.MagicalMpConsumeRate, 0.9, nil),
-		basefunc.NewMul(owner, stat.PhysicalMpConsumeRate, 3, nil),
-		basefunc.NewMul(owner, stat.DanceMpConsumeRate, 2, nil),
+	owner := effect.ModOwnerSkill(modelskill.Ref{ID: 1, Level: 1})
+	ch.AddStatFuncs([]effect.Mod{
+		{Stat: stat.MagicalMpConsumeRate, Op: effect.OpMul, Value: 0.9, Owner: owner},
+		{Stat: stat.PhysicalMpConsumeRate, Op: effect.OpMul, Value: 3, Owner: owner},
+		{Stat: stat.DanceMpConsumeRate, Op: effect.OpMul, Value: 2, Owner: owner},
 	})
 	actor := PlayerActor{Character: ch}
 

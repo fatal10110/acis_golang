@@ -6,7 +6,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 )
 
@@ -29,29 +29,24 @@ func (c *Character) MaxBuffCount() int {
 }
 
 // AddStatFuncs attaches fns to c's live stat calculators.
-func (c *Character) AddStatFuncs(fns []basefunc.Func) {
-	if len(fns) == 0 {
-		return
-	}
-	c.statMu.Lock()
-	defer c.statMu.Unlock()
+func (c *Character) AddStatFuncs(fns []effect.Mod) {
 	for _, fn := range fns {
-		if fn == nil {
-			continue
-		}
-		c.statCalcLocked(fn.Stat()).AddFunc(fn)
+		c.statCalcLocked(fn.Stat).AddMod(fn)
 	}
 }
 
 // RemoveStatsByOwner drops every stat func previously added for owner.
-func (c *Character) RemoveStatsByOwner(owner any) {
-	if owner == nil {
+func (c *Character) RemoveStatsByOwner(owner effect.ModOwner) {
+	if owner == (effect.ModOwner{}) {
 		return
 	}
-	c.statMu.Lock()
-	defer c.statMu.Unlock()
-	for _, calc := range c.statCalcs {
-		calc.RemoveOwner(owner)
+	c.statMu.RLock()
+	calcs := c.statCalcs
+	c.statMu.RUnlock()
+	for _, calc := range calcs {
+		if calc != nil {
+			calc.RemoveOwner(owner)
+		}
 	}
 }
 

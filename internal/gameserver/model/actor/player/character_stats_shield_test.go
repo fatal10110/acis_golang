@@ -8,7 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
@@ -24,9 +24,9 @@ func TestCharacterShieldDefenseUsesLiveShieldStatsFacingAndRoll(t *testing.T) {
 	target := liveCharacter(2, tmpl, items, equippedShield())
 	caster.SetLastKnownPosition(location.Location{X: 80, Y: 0, Z: 0}, 0)
 	target.SetLastKnownPosition(location.Location{X: 0, Y: 0, Z: 0}, 0)
-	target.AddStatFuncs([]basefunc.Func{
-		basefunc.NewSet(target, stat.ShieldRate, 20, nil),
-		basefunc.NewSet(target, stat.ShieldDefenceAngle, 120, nil),
+	target.AddStatFuncs([]effect.Mod{
+		{Stat: stat.ShieldRate, Op: effect.OpSet, Value: 20, Owner: testModOwner()},
+		{Stat: stat.ShieldDefenceAngle, Op: effect.OpSet, Value: 120, Owner: testModOwner()},
 	})
 
 	src, ok := any(target).(shieldDefenseResolver)
@@ -59,7 +59,7 @@ func TestCharacterShieldDefenseUsesLiveShieldStatsFacingAndRoll(t *testing.T) {
 	}
 
 	caster.SetLastKnownPosition(location.Location{X: -80, Y: 0, Z: 0}, 0)
-	target.AddStatFuncs([]basefunc.Func{basefunc.NewSet(target, stat.ShieldDefenceAngle, 360, nil)})
+	target.AddStatFuncs([]effect.Mod{{Stat: stat.ShieldDefenceAngle, Op: effect.OpSet, Value: 360, Owner: testModOwner()}})
 	target.SetRollSource(func(int) int { return 0 })
 	if got := src.ShieldDefense(caster, modelskill.Definition{SkillType: "STUN"}, false); got != formulas.ShieldPerfect {
 		t.Fatalf("ShieldDefense() with 360-degree stat = %v, want ShieldPerfect", got)
@@ -134,9 +134,9 @@ func TestCharacterShieldDefenseGatesEquipStatsAndFacing(t *testing.T) {
 			caster.SetLastKnownPosition(tt.casterLoc, 0)
 			target.SetLastKnownPosition(location.Location{X: 0, Y: 0, Z: 0}, 0)
 			target.SetRollSource(func(int) int { return 0 })
-			target.AddStatFuncs([]basefunc.Func{
-				basefunc.NewSet(target, stat.ShieldRate, tt.rate, nil),
-				basefunc.NewSet(target, stat.ShieldDefenceAngle, tt.angle, nil),
+			target.AddStatFuncs([]effect.Mod{
+				{Stat: stat.ShieldRate, Op: effect.OpSet, Value: tt.rate, Owner: testModOwner()},
+				{Stat: stat.ShieldDefenceAngle, Op: effect.OpSet, Value: tt.angle, Owner: testModOwner()},
 			})
 
 			src, ok := any(target).(shieldDefenseResolver)
@@ -172,9 +172,9 @@ func TestCharacterShieldDefenseNotifiesDefendingPlayerBySDefOnly(t *testing.T) {
 			target := liveCharacter(2, tmpl, items, equippedShield())
 			caster.SetLastKnownPosition(location.Location{X: 80, Y: 0, Z: 0}, 0)
 			target.SetLastKnownPosition(location.Location{X: 0, Y: 0, Z: 0}, 0)
-			target.AddStatFuncs([]basefunc.Func{
-				basefunc.NewSet(target, stat.ShieldRate, 20, nil),
-				basefunc.NewSet(target, stat.ShieldDefenceAngle, 120, nil),
+			target.AddStatFuncs([]effect.Mod{
+				{Stat: stat.ShieldRate, Op: effect.OpSet, Value: 20, Owner: testModOwner()},
+				{Stat: stat.ShieldDefenceAngle, Op: effect.OpSet, Value: 120, Owner: testModOwner()},
 			})
 			target.SetRollSource(func(int) int { return tt.roll })
 

@@ -6,7 +6,6 @@ import (
 	"time"
 
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
 )
 
 type eventOwner struct {
@@ -14,12 +13,12 @@ type eventOwner struct {
 	maxBuff int
 }
 
-func (o eventOwner) AddStatFuncs([]basefunc.Func) {
+func (o eventOwner) AddStatFuncs([]Mod) {
 	*o.events = append(*o.events, "owner:add")
 }
 
-func (o eventOwner) RemoveStatsByOwner(owner any) {
-	e := owner.(*Effect)
+func (o eventOwner) RemoveStatsByOwner(owner ModOwner) {
+	e := owner.effect
 	*o.events = append(*o.events, "owner:remove:"+e.Template.Name)
 }
 

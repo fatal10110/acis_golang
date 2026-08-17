@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
@@ -12,8 +12,7 @@ func TestCharacterHealAmountUsesMagicAttackAndHealProficiency(t *testing.T) {
 	tmpl := combatTemplate()
 	tmpl.MAtk = 49
 	c := liveCharacter(1, tmpl, combatItems())
-	owner := &struct{}{}
-	c.AddStatFuncs([]basefunc.Func{basefunc.NewAdd(owner, stat.HealProficiency, 11, nil)})
+	c.AddStatFuncs([]effect.Mod{{Stat: stat.HealProficiency, Op: effect.OpAdd, Value: 11, Owner: testModOwner()}})
 
 	amount, ok := c.HealAmount(modelskill.Definition{SkillType: "HEAL", Power: 25})
 	if !ok {

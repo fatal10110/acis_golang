@@ -7,7 +7,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
@@ -18,8 +18,7 @@ func TestCharacterSkillDamageInputsUseElementalSkillModifier(t *testing.T) {
 	tmpl.MDef = 40
 	caster := liveCharacter(1, tmpl, combatItems())
 	target := liveCharacter(2, tmpl, combatItems())
-	owner := &struct{}{}
-	target.AddStatFuncs([]basefunc.Func{basefunc.NewMul(owner, stat.FireRes, 0.75, nil)})
+	target.AddStatFuncs([]effect.Mod{{Stat: stat.FireRes, Op: effect.OpMul, Value: 0.75, Owner: testModOwner()}})
 
 	phys, ok := target.PhysicalSkillInput(caster, modelskill.Definition{Power: 30, SkillType: "PDAM", Element: modelskill.ElementFire})
 	if !ok {
@@ -137,7 +136,7 @@ func TestCharacterBlowInputCarriesPhysicalSkillEvasion(t *testing.T) {
 	tmpl := combatTemplate()
 	caster := liveCharacter(1, tmpl, combatItems())
 	target := liveCharacter(2, tmpl, combatItems())
-	target.AddStatFuncs([]basefunc.Func{basefunc.NewSet(target, stat.PSkillEvasion, 1, nil)})
+	target.AddStatFuncs([]effect.Mod{{Stat: stat.PSkillEvasion, Op: effect.OpSet, Value: 1, Owner: testModOwner()}})
 	caster.SetRollSource(func(n int) int {
 		if n != 1000 {
 			t.Fatalf("blow roll bound = %d, want 1000", n)
@@ -164,10 +163,10 @@ func TestCharacterBlowInputCarriesShieldDefense(t *testing.T) {
 	target := liveCharacter(2, tmpl, items, equippedShield())
 	caster.SetLastKnownPosition(location.Location{X: 80, Y: 0, Z: 0}, 0)
 	target.SetLastKnownPosition(location.Location{}, 0)
-	target.AddStatFuncs([]basefunc.Func{
-		basefunc.NewSet(target, stat.ShieldRate, 100, nil),
-		basefunc.NewSet(target, stat.ShieldDefenceAngle, 360, nil),
-		basefunc.NewSet(target, stat.ShieldDefence, 30, nil),
+	target.AddStatFuncs([]effect.Mod{
+		{Stat: stat.ShieldRate, Op: effect.OpSet, Value: 100, Owner: testModOwner()},
+		{Stat: stat.ShieldDefenceAngle, Op: effect.OpSet, Value: 360, Owner: testModOwner()},
+		{Stat: stat.ShieldDefence, Op: effect.OpSet, Value: 30, Owner: testModOwner()},
 	})
 	target.SetRollSource(func(n int) int {
 		if n != 100 {
@@ -195,10 +194,10 @@ func TestCharacterPhysicalSkillInputCarriesShieldDefense(t *testing.T) {
 	target := liveCharacter(2, tmpl, items, equippedShield())
 	caster.SetLastKnownPosition(location.Location{X: 80, Y: 0, Z: 0}, 0)
 	target.SetLastKnownPosition(location.Location{}, 0)
-	target.AddStatFuncs([]basefunc.Func{
-		basefunc.NewSet(target, stat.ShieldRate, 100, nil),
-		basefunc.NewSet(target, stat.ShieldDefenceAngle, 360, nil),
-		basefunc.NewSet(target, stat.ShieldDefence, 30, nil),
+	target.AddStatFuncs([]effect.Mod{
+		{Stat: stat.ShieldRate, Op: effect.OpSet, Value: 100, Owner: testModOwner()},
+		{Stat: stat.ShieldDefenceAngle, Op: effect.OpSet, Value: 360, Owner: testModOwner()},
+		{Stat: stat.ShieldDefence, Op: effect.OpSet, Value: 30, Owner: testModOwner()},
 	})
 
 	for _, tt := range []struct {
@@ -242,9 +241,9 @@ func TestCharacterBlowInputSkipsShieldRollOnMiss(t *testing.T) {
 		}
 		return 0
 	})
-	target.AddStatFuncs([]basefunc.Func{
-		basefunc.NewSet(target, stat.ShieldRate, 100, nil),
-		basefunc.NewSet(target, stat.ShieldDefenceAngle, 360, nil),
+	target.AddStatFuncs([]effect.Mod{
+		{Stat: stat.ShieldRate, Op: effect.OpSet, Value: 100, Owner: testModOwner()},
+		{Stat: stat.ShieldDefenceAngle, Op: effect.OpSet, Value: 360, Owner: testModOwner()},
 	})
 	target.SetRollSource(func(n int) int {
 		t.Fatalf("shield roll bound = %d, want no shield roll after a miss", n)
@@ -401,10 +400,9 @@ func TestCharacterDamageInputsUsePvPMultipliers(t *testing.T) {
 	tmpl.MDef = 40
 	caster := liveCharacter(1, tmpl, combatItems())
 	target := liveCharacter(2, tmpl, combatItems())
-	owner := &struct{}{}
-	caster.AddStatFuncs([]basefunc.Func{
-		basefunc.NewMul(owner, stat.PvPPhysSkillDmg, 0.8, nil),
-		basefunc.NewMul(owner, stat.PvPMagicalDmg, 1.3, nil),
+	caster.AddStatFuncs([]effect.Mod{
+		{Stat: stat.PvPPhysSkillDmg, Op: effect.OpMul, Value: 0.8, Owner: testModOwner()},
+		{Stat: stat.PvPMagicalDmg, Op: effect.OpMul, Value: 1.3, Owner: testModOwner()},
 	})
 
 	phys, ok := target.PhysicalSkillInput(caster, modelskill.Definition{Power: 30, SkillType: "PDAM"})

@@ -1,6 +1,6 @@
 package stat
 
-// Actor is the live combat data every basefunc.Func/Condition reads from
+// Actor is the live combat data every skill/effect Mod/Condition reads from
 // its effector. It stands in for the not-yet-built creature runtime; a
 // future concrete actor type satisfies it structurally.
 type Actor interface {

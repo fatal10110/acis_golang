@@ -31,17 +31,17 @@ func TestPassiveFuncsBuildsFuncsOwnedByTheSkillLevel(t *testing.T) {
 		t.Fatalf("Funcs length = %d, want 3", len(funcs))
 	}
 
-	wantOwner := modelskill.Ref{ID: 134, Level: 1}
+	wantOwner := ModOwnerSkill(modelskill.Ref{ID: 134, Level: 1})
 	for i, fn := range funcs {
-		if fn.Owner() != wantOwner {
-			t.Fatalf("funcs[%d].Owner() = %v, want %v", i, fn.Owner(), wantOwner)
+		if fn.Owner != wantOwner {
+			t.Fatalf("funcs[%d].Owner = %v, want %v", i, fn.Owner, wantOwner)
 		}
 	}
-	if funcs[0].Stat() != stat.RootVuln {
-		t.Fatalf("funcs[0].Stat() = %s, want %s", funcs[0].Stat(), stat.RootVuln)
+	if funcs[0].Stat != stat.RootVuln {
+		t.Fatalf("funcs[0].Stat = %s, want %s", funcs[0].Stat, stat.RootVuln)
 	}
-	if got := funcs[0].Calc(nil, 100, 100); got != 80 {
-		t.Fatalf("funcs[0].Calc() = %v, want 80", got)
+	if got := apply(funcs[0], nil, 100, 100); got != 80 {
+		t.Fatalf("apply(funcs[0]) = %v, want 80", got)
 	}
 }
 

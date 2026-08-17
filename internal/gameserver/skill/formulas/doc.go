@@ -7,7 +7,7 @@
 // power, defense, elemental/positional/race/pvp multipliers, …) rather than
 // a creature and target — deriving those numbers from a live creature's
 // gear, buffs and target is the calculation chain's job (see skill/funcs
-// and skill.Calculator), not this package's. This keeps the fidelity-
+// and effect.Calculator), not this package's. This keeps the fidelity-
 // critical arithmetic testable in isolation with committed expected
 // values, and defers wiring it to real actors until that actor exists.
 //

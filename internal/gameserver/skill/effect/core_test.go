@@ -7,19 +7,18 @@ import (
 	"time"
 
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
 type funcOwner struct {
-	funcs []basefunc.Func
+	funcs []Mod
 }
 
-func (o *funcOwner) AddStatFuncs(funcs []basefunc.Func) {
+func (o *funcOwner) AddStatFuncs(funcs []Mod) {
 	o.funcs = append(o.funcs, funcs...)
 }
 
-func (o *funcOwner) RemoveStatsByOwner(any) {}
+func (o *funcOwner) RemoveStatsByOwner(ModOwner) {}
 
 func (o *funcOwner) MaxBuffCount() int { return 20 }
 
@@ -52,14 +51,14 @@ func TestNewBuildsBuffWithRuntimeStatFuncs(t *testing.T) {
 	if len(e.Funcs) != 2 {
 		t.Fatalf("Funcs length = %d, want 2", len(e.Funcs))
 	}
-	if e.Funcs[0].Owner() != e {
+	if e.Funcs[0].Owner != ModOwnerEffect(e) {
 		t.Fatal("compiled func owner is not the runtime effect")
 	}
-	if e.Funcs[0].Stat() != stat.RunSpeed {
-		t.Fatalf("first func stat = %s, want runSpd", e.Funcs[0].Stat())
+	if e.Funcs[0].Stat != stat.RunSpeed {
+		t.Fatalf("first func stat = %s, want runSpd", e.Funcs[0].Stat)
 	}
-	if got := e.Funcs[0].Calc(nil, 100, 100); got != 133 {
-		t.Fatalf("first func Calc() = %v, want 133", got)
+	if got := apply(e.Funcs[0], nil, 100, 100); got != 133 {
+		t.Fatalf("first func apply() = %v, want 133", got)
 	}
 
 	owner := &funcOwner{}

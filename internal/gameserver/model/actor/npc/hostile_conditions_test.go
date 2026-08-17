@@ -3,12 +3,12 @@ package npc
 import (
 	"testing"
 
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
-// levelGate is a minimal basefunc.Condition mirroring skill/effect's
+// levelGate is a minimal effect.Condition mirroring skill/effect's
 // conditionGate: it resolves effector to a conditions.Actor and requires
 // its Level() to meet min. Before #1509, hostileStatActor didn't implement
 // conditions.Actor, so this always resolved to false regardless of min — a
@@ -37,11 +37,11 @@ func TestHostileConditionalStatFuncGatesOnRealLevel(t *testing.T) {
 	// HealEffectiveness carries no default NPC stat func (see
 	// defaultStatFuncs), so its finalized value is driven purely by what
 	// AddStatFuncs attaches here.
-	hostile.AddStatFuncs([]basefunc.Func{
-		basefunc.NewAdd(nil, stat.HealEffectiveness, 25, levelGate{min: 10}),
+	hostile.AddStatFuncs([]effect.Mod{
+		{Stat: stat.HealEffectiveness, Op: effect.OpAdd, Value: 25, Cond: levelGate{min: 10}},
 	})
-	hostile.AddStatFuncs([]basefunc.Func{
-		basefunc.NewAdd(nil, stat.RechargeMPRate, 25, levelGate{min: 100}),
+	hostile.AddStatFuncs([]effect.Mod{
+		{Stat: stat.RechargeMPRate, Op: effect.OpAdd, Value: 25, Cond: levelGate{min: 100}},
 	})
 
 	if got := hostile.CalcStat(stat.HealEffectiveness, 100); got != 125 {

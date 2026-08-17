@@ -7,7 +7,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
@@ -26,26 +26,24 @@ func goldenSummonScenarios(t testing.TB) map[string]float64 {
 	}
 
 	{
-		ownerA, ownerB, ownerC := &struct{ n int }{1}, &struct{ n int }{2}, &struct{ n int }{3}
 		a1 := NewServitor(ServitorConfig{ObjectID: 1, Level: 44, Stats: stats, Roll: zeroSummonRoll})
-		a1.AddStatFuncs([]basefunc.Func{basefunc.NewAdd(ownerA, stat.PowerDefence, 1e16, nil)})
-		a1.AddStatFuncs([]basefunc.Func{basefunc.NewAdd(ownerB, stat.PowerDefence, 1, nil)})
-		a1.AddStatFuncs([]basefunc.Func{basefunc.NewAdd(ownerC, stat.PowerDefence, 1, nil)})
+		a1.AddStatFuncs([]effect.Mod{{Stat: stat.PowerDefence, Op: effect.OpAdd, Value: 1e16}})
+		a1.AddStatFuncs([]effect.Mod{{Stat: stat.PowerDefence, Op: effect.OpAdd, Value: 1}})
+		a1.AddStatFuncs([]effect.Mod{{Stat: stat.PowerDefence, Op: effect.OpAdd, Value: 1}})
 		out["order30_forward"] = a1.PDef()
 
 		a2 := NewServitor(ServitorConfig{ObjectID: 2, Level: 44, Stats: stats, Roll: zeroSummonRoll})
-		a2.AddStatFuncs([]basefunc.Func{basefunc.NewAdd(ownerC, stat.PowerDefence, 1, nil)})
-		a2.AddStatFuncs([]basefunc.Func{basefunc.NewAdd(ownerB, stat.PowerDefence, 1, nil)})
-		a2.AddStatFuncs([]basefunc.Func{basefunc.NewAdd(ownerA, stat.PowerDefence, 1e16, nil)})
+		a2.AddStatFuncs([]effect.Mod{{Stat: stat.PowerDefence, Op: effect.OpAdd, Value: 1}})
+		a2.AddStatFuncs([]effect.Mod{{Stat: stat.PowerDefence, Op: effect.OpAdd, Value: 1}})
+		a2.AddStatFuncs([]effect.Mod{{Stat: stat.PowerDefence, Op: effect.OpAdd, Value: 1e16}})
 		out["order30_reverse"] = a2.PDef()
 	}
 
 	{
 		a := NewPet(PetConfig{ObjectID: 3, Level: 44, Stats: stats, Roll: zeroSummonRoll})
-		owner := &struct{}{}
-		a.AddStatFuncs([]basefunc.Func{
-			basefunc.NewSet(owner, stat.MagicDefence, 500, nil),
-			basefunc.NewBaseMul(owner, stat.MagicDefence, 0.5, nil),
+		a.AddStatFuncs([]effect.Mod{
+			{Stat: stat.MagicDefence, Op: effect.OpSet, Value: 500},
+			{Stat: stat.MagicDefence, Op: effect.OpBaseMul, Value: 0.5},
 		})
 		out["set_rebase_mdef"] = a.MDef()
 	}
@@ -53,10 +51,10 @@ func goldenSummonScenarios(t testing.TB) map[string]float64 {
 	{
 		a := NewPet(PetConfig{ObjectID: 4, Level: 44, Stats: stats, Roll: zeroSummonRoll})
 		base := a.PAtk()
-		owner := &struct{}{}
-		a.AddStatFuncs([]basefunc.Func{
-			basefunc.NewAdd(owner, stat.PowerAttack, 7, nil),
-			basefunc.NewMul(owner, stat.PowerAttack, 1.25, nil),
+		owner := effect.ModOwnerEffect(&effect.Effect{})
+		a.AddStatFuncs([]effect.Mod{
+			{Stat: stat.PowerAttack, Op: effect.OpAdd, Value: 7, Owner: owner},
+			{Stat: stat.PowerAttack, Op: effect.OpMul, Value: 1.25, Owner: owner},
 		})
 		out["attach_detach_before"] = base
 		out["attach_detach_during"] = a.PAtk()
