@@ -32,8 +32,10 @@ func (c *Character) MaxBuffCount() int {
 // published independently under its own Calculator's lock — the batch is
 // not atomic against a concurrent CalcStat, which may observe fns partially
 // applied. Callers that need a batch to appear all-or-nothing to readers
-// must serialize at a higher level (see effect.List, which does this for
-// effect-driven adds).
+// must serialize at a higher level; nothing in this package does, and
+// effect.List does not either — it holds its own mutex across
+// addStatFuncs but drains removeStats outside it, and no lock is shared
+// with the CalcStat read path.
 func (c *Character) AddStatFuncs(fns []effect.Mod) {
 	for _, fn := range fns {
 		c.statCalcOrCreate(fn.Stat).AddMod(fn)
