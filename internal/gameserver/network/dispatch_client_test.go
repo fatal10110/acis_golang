@@ -33,6 +33,27 @@ func dialGameClient(t *testing.T, addr string) *fakeGameClient {
 	return &fakeGameClient{t: t, conn: conn}
 }
 
+// readWithTimeout reads one frame within d, returning nil on timeout instead
+// of failing the test. Used by TestGameClientLinkNeverGoesSilentOnActionRequests
+// to drain however many frames a rejected request produces (a system message
+// plus ActionFailed, or ActionFailed alone) without hard-coding an exact
+// count, while still treating "nothing at all" as a failure.
+func (f *fakeGameClient) readWithTimeout(d time.Duration) []byte {
+	f.t.Helper()
+	f.conn.SetReadDeadline(time.Now().Add(d))
+	payload, err := wire.ReadFrame(f.conn)
+	if err != nil {
+		if ne, ok := err.(net.Error); ok && ne.Timeout() {
+			return nil
+		}
+		f.t.Fatalf("ReadFrame: %v", err)
+	}
+	if f.cipher != nil {
+		f.cipher.Decrypt(payload)
+	}
+	return payload
+}
+
 func (f *fakeGameClient) sendProtocolVersion(revision int32) {
 	f.t.Helper()
 	if err := wire.WriteFrame(f.conn, encodeProtocolVersion(revision)); err != nil {
