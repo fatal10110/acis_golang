@@ -1,3 +1,5 @@
+//go:build integration
+
 package network
 
 import (
@@ -17,12 +19,12 @@ import (
 // the character walks up client-side, never swings, and stops responding
 // to further input.
 func TestGameClientLinkSecondActionClickAttacksSelectedTarget(t *testing.T) {
-	c, chars, _, state := newLinkedGameClient(t)
+	c, chars, _, _, _, state := newLinkedSQLGameClient(t, nil, nil, 0)
 
 	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
 	c.read() // CharCreateOk
 	c.read() // CharSelectInfo
-	objID := chars.soleObjectID(t)
+	objID := sqlCharacterID(t, chars)
 
 	c.send(encodeRequestGameStart(0))
 	c.read() // SSQInfo
@@ -77,12 +79,12 @@ func TestGameClientLinkSecondActionClickAttacksSelectedTarget(t *testing.T) {
 // out-of-range half of the same regression: the second plain click on a far
 // mob must answer with MoveToPawn (the walk into range), not silence.
 func TestGameClientLinkSecondActionClickWalksTowardDistantTarget(t *testing.T) {
-	c, chars, _, state := newLinkedGameClient(t)
+	c, chars, _, _, _, state := newLinkedSQLGameClient(t, nil, nil, 0)
 
 	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
 	c.read() // CharCreateOk
 	c.read() // CharSelectInfo
-	objID := chars.soleObjectID(t)
+	objID := sqlCharacterID(t, chars)
 
 	c.send(encodeRequestGameStart(0))
 	c.read() // SSQInfo
@@ -121,7 +123,7 @@ func TestGameClientLinkSecondActionClickWalksTowardDistantTarget(t *testing.T) {
 }
 
 func TestGameClientLinkAttackRequestFirstSelectsOnly(t *testing.T) {
-	c, _, _, state := newLinkedGameClient(t)
+	c, _, _, _, _, state := newLinkedSQLGameClient(t, nil, nil, 0)
 
 	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
 	c.read() // CharCreateOk
