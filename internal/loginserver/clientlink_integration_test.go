@@ -25,7 +25,7 @@ import (
 
 // --- fake account store: no DB needed to exercise ClientLink's own logic ---
 //
-// Test-strategy.md: loginsql.AccountStore already satisfies the same
+// docs/agents/test-strategy.md: loginsql.AccountStore already satisfies the same
 // Account/CreateAccount/SetLastServer method set and is exercised for real
 // in internal/loginserver/data/sql/account_integration_test.go. Kept as a
 // fake here because these tests are about ClientLink's protocol/session
@@ -99,7 +99,7 @@ func mustHashPassword(t *testing.T, password string) string {
 // Blowfish+checksum from then on, exactly like a real client does for every
 // packet after Init.
 //
-// Test-strategy.md: this is a test-harness actor, not a stand-in for a
+// docs/agents/test-strategy.md: this is a test-harness actor, not a stand-in for a
 // production interface — it plays the real L2 client's side of the wire so
 // ClientLink's own real auth/session code runs end-to-end over a real TCP
 // socket. There is no production type to substitute; keep as-is.
