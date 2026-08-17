@@ -13,7 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -163,8 +163,8 @@ func TestHostileStatFuncsAdjustFinalizedCombatStats(t *testing.T) {
 	basePAtk := h.calcStat(stat.PowerAttack, tpl.PAtk)
 	basePDef := h.PDef()
 
-	owner := "test-buff"
-	h.AddStatFuncs([]basefunc.Func{basefunc.NewMul(owner, stat.PowerAttack, 1.5, nil)})
+	owner := effect.ModOwnerEffect(&effect.Effect{})
+	h.AddStatFuncs([]effect.Mod{{Stat: stat.PowerAttack, Op: effect.OpMul, Value: 1.5, Owner: owner}})
 
 	if got, want := h.calcStat(stat.PowerAttack, tpl.PAtk), basePAtk*1.5; got != want {
 		t.Fatalf("P.Atk after buff = %v, want %v", got, want)

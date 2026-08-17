@@ -5,11 +5,10 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
-// ItemOwner is the owner and basefunc.EnchantedItem source for stat
+// ItemOwner is the owner and item enchant-data source for stat
 // functions one equipped item instance contributes (its AttachedSkills
 // passives and Modifiers). Equality between two ItemOwner values compares
 // Inst and Tmpl, so RemoveStatsByOwner drops only the functions attached for
@@ -22,7 +21,7 @@ type ItemOwner struct {
 	Tmpl *item.Template
 }
 
-// EnchantLevel satisfies basefunc.EnchantedItem.
+// EnchantLevel reads Inst's live enchant level for applyEnchant.
 func (o ItemOwner) EnchantLevel() int {
 	if o.Inst == nil {
 		return 0
@@ -30,7 +29,7 @@ func (o ItemOwner) EnchantLevel() int {
 	return o.Inst.Snapshot().EnchantLevel
 }
 
-// Weapon satisfies basefunc.EnchantedItem.
+// Weapon reports Tmpl's weapon type, if any, for applyEnchant.
 func (o ItemOwner) Weapon() (item.WeaponType, bool) {
 	if o.Tmpl == nil || o.Tmpl.Weapon == nil {
 		return 0, false
@@ -38,7 +37,7 @@ func (o ItemOwner) Weapon() (item.WeaponType, bool) {
 	return o.Tmpl.Weapon.Type, true
 }
 
-// Crystal satisfies basefunc.EnchantedItem.
+// Crystal reports Tmpl's crystal grade for applyEnchant.
 func (o ItemOwner) Crystal() item.CrystalType {
 	if o.Tmpl == nil {
 		return item.CrystalNone
@@ -48,11 +47,11 @@ func (o ItemOwner) Crystal() item.CrystalType {
 
 // ItemModifierFuncs builds the stat functions owner.Tmpl.Modifiers
 // contributes while equipped, attributed to owner.
-func ItemModifierFuncs(owner ItemOwner) ([]basefunc.Func, error) {
+func ItemModifierFuncs(owner ItemOwner) ([]Mod, error) {
 	if owner.Tmpl == nil {
 		return nil, nil
 	}
-	funcs := make([]basefunc.Func, 0, len(owner.Tmpl.Modifiers))
+	mods := make([]Mod, 0, len(owner.Tmpl.Modifiers))
 	for _, mod := range owner.Tmpl.Modifiers {
 		gate, err := itemModifierCondition(mod)
 		if err != nil {
@@ -62,13 +61,13 @@ func ItemModifierFuncs(owner ItemOwner) ([]basefunc.Func, error) {
 		if err != nil {
 			return nil, fmt.Errorf("item %d: %w", owner.Tmpl.ID, err)
 		}
-		fn, err := itemStatFunc(owner, s, mod, gate)
+		m, err := itemStatFunc(owner, s, mod, gate)
 		if err != nil {
 			return nil, fmt.Errorf("item %d: %w", owner.Tmpl.ID, err)
 		}
-		funcs = append(funcs, fn)
+		mods = append(mods, m)
 	}
-	return funcs, nil
+	return mods, nil
 }
 
 // itemModifierCondition builds the same effector-side gate as
@@ -76,7 +75,7 @@ func ItemModifierFuncs(owner ItemOwner) ([]basefunc.Func, error) {
 // AttachCondition (an XML-shape twin of modelskill.Condition/
 // ConditionClause, parsed independently for item templates) to the shared
 // tree first.
-func itemModifierCondition(mod item.StatModifier) (basefunc.Condition, error) {
+func itemModifierCondition(mod item.StatModifier) (Condition, error) {
 	var direct *modelskill.Condition
 	if mod.Condition != nil {
 		c := convertItemCondition(*mod.Condition)
@@ -102,30 +101,39 @@ func convertItemCondition(c item.Condition) modelskill.Condition {
 	return out
 }
 
-func itemStatFunc(owner ItemOwner, s stat.Stat, mod item.StatModifier, cond basefunc.Condition) (basefunc.Func, error) {
-	switch mod.Op {
+func itemStatFunc(owner ItemOwner, s stat.Stat, mod item.StatModifier, cond Condition) (Mod, error) {
+	modOwner := ModOwnerItem(owner)
+	op, err := itemOp(mod.Op)
+	if err != nil {
+		return Mod{}, err
+	}
+	return Mod{Stat: s, Op: op, Value: mod.Value, Cond: cond, Owner: modOwner}, nil
+}
+
+func itemOp(op item.FuncOp) (Op, error) {
+	switch op {
 	case item.FuncAdd:
-		return basefunc.NewAdd(owner, s, mod.Value, cond), nil
+		return OpAdd, nil
 	case item.FuncAddMul:
-		return basefunc.NewAddMul(owner, s, mod.Value, cond), nil
+		return OpAddMul, nil
 	case item.FuncSub:
-		return basefunc.NewSub(owner, s, mod.Value, cond), nil
+		return OpSub, nil
 	case item.FuncSubDiv:
-		return basefunc.NewSubDiv(owner, s, mod.Value, cond), nil
+		return OpSubDiv, nil
 	case item.FuncMul:
-		return basefunc.NewMul(owner, s, mod.Value, cond), nil
+		return OpMul, nil
 	case item.FuncBaseMul:
-		return basefunc.NewBaseMul(owner, s, mod.Value, cond), nil
+		return OpBaseMul, nil
 	case item.FuncDiv:
-		return basefunc.NewDiv(owner, s, mod.Value, cond), nil
+		return OpDiv, nil
 	case item.FuncSet:
-		return basefunc.NewSet(owner, s, mod.Value, cond), nil
+		return OpSet, nil
 	case item.FuncBaseAdd:
-		return basefunc.NewBaseAdd(owner, s, mod.Value, cond), nil
+		return OpBaseAdd, nil
 	case item.FuncEnchant:
-		return basefunc.NewEnchant(owner, s, mod.Value, cond), nil
+		return OpEnchant, nil
 	default:
-		return nil, fmt.Errorf("unknown item stat modifier op %s", mod.Op)
+		return 0, fmt.Errorf("unknown item stat modifier op %s", op)
 	}
 }
 
@@ -134,21 +142,22 @@ func itemStatFunc(owner ItemOwner, s stat.Stat, mod item.StatModifier, cond base
 // definition contribute, mirroring persistence.SetKnownSkill's
 // learned-passive path. A missing or non-passive entry is silently
 // skipped — a template may name an active-use item skill in the same list.
-func ItemPassiveFuncs(skills *modelskill.Table, owner ItemOwner) ([]basefunc.Func, error) {
+func ItemPassiveFuncs(skills *modelskill.Table, owner ItemOwner) ([]Mod, error) {
 	if owner.Tmpl == nil || skills == nil {
 		return nil, nil
 	}
-	var funcs []basefunc.Func
-	add := func(ref item.SkillRef, cond basefunc.Condition) error {
+	var mods []Mod
+	modOwner := ModOwnerItem(owner)
+	add := func(ref item.SkillRef, cond Condition) error {
 		def, ok := skills.Get(modelskill.ID(ref.ID), int(ref.Level))
 		if !ok || def.Activation != modelskill.ActivationPassive {
 			return nil
 		}
-		fns, err := statFuncs(owner, def.Funcs, cond)
+		fns, err := statFuncs(modOwner, def.Funcs, cond)
 		if err != nil {
 			return fmt.Errorf("item %d passive skill %d level %d: %w", owner.Tmpl.ID, ref.ID, ref.Level, err)
 		}
-		funcs = append(funcs, fns...)
+		mods = append(mods, fns...)
 		return nil
 	}
 	for _, ref := range owner.Tmpl.AttachedSkills {
@@ -161,7 +170,7 @@ func ItemPassiveFuncs(skills *modelskill.Table, owner ItemOwner) ([]basefunc.Fun
 			return nil, err
 		}
 	}
-	return funcs, nil
+	return mods, nil
 }
 
 type enchantAtLeast struct {

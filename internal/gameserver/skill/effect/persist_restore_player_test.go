@@ -5,7 +5,6 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
 
@@ -14,9 +13,9 @@ import (
 // effect's own state and the live list it lands in.
 type noopStatOwner struct{}
 
-func (noopStatOwner) AddStatFuncs([]basefunc.Func) {}
-func (noopStatOwner) RemoveStatsByOwner(owner any) {}
-func (noopStatOwner) MaxBuffCount() int            { return 20 }
+func (noopStatOwner) AddStatFuncs([]effect.Mod)          {}
+func (noopStatOwner) RemoveStatsByOwner(effect.ModOwner) {}
+func (noopStatOwner) MaxBuffCount() int                  { return 20 }
 
 // TestApplyRestoredDeliversOnStartToLiveEffectList is the regression case
 // for the reported gap: a restored effect used to sit inert in

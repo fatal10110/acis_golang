@@ -198,6 +198,6 @@ func (l *List) addStatFuncs(e *Effect) {
 
 func (l *List) removeStats(e *Effect) {
 	if l.owner != nil {
-		l.owner.RemoveStatsByOwner(e)
+		l.owner.RemoveStatsByOwner(ModOwnerEffect(e))
 	}
 }

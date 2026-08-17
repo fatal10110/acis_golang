@@ -8,7 +8,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -56,9 +55,9 @@ func (c *signetFakeCaster) ReduceMP(v float64) float64 {
 
 type noopStatOwner struct{}
 
-func (noopStatOwner) AddStatFuncs([]basefunc.Func) {}
-func (noopStatOwner) RemoveStatsByOwner(any)       {}
-func (noopStatOwner) MaxBuffCount() int            { return 0 }
+func (noopStatOwner) AddStatFuncs([]effect.Mod)          {}
+func (noopStatOwner) RemoveStatsByOwner(effect.ModOwner) {}
+func (noopStatOwner) MaxBuffCount() int                  { return 0 }
 
 // signetFakeTarget is a minimal nearby-creature fixture: identifiable,
 // positioned (once spawned into a world.State via its embedded Presence),

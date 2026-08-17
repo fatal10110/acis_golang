@@ -16,7 +16,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npcinfo"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/rs/zerolog"
@@ -117,9 +117,11 @@ type Hostile struct {
 	soulshotRate   int
 	spiritshotRate int
 
-	// statMu guards statCalcs, this NPC's per-stat finalization chains.
-	statMu    sync.Mutex
-	statCalcs map[stat.Stat]*basefunc.Calculator
+	// statMu guards statCalcs slot creation; each slot's own Calculator
+	// then guards its own Mods independently, so a warm read only ever
+	// takes statMu's read lock.
+	statMu    sync.RWMutex
+	statCalcs [stat.Count]*effect.Calculator
 
 	// collisionRadiusOverride is the runtime body-radius override a live
 	// effect (e.g. Grow) installs; nil means "use the template value".

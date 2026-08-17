@@ -408,7 +408,7 @@ func New(skill Skill, tmpl modelskill.EffectTemplate) (*Effect, error) {
 	if err != nil {
 		return nil, fmt.Errorf("effect %s: %w", tmpl.Name, err)
 	}
-	funcs, err := statFuncs(e, tmpl.Funcs, attachGate)
+	funcs, err := statFuncs(ModOwnerEffect(e), tmpl.Funcs, attachGate)
 	if err != nil {
 		return nil, fmt.Errorf("effect %s: %w", tmpl.Name, err)
 	}

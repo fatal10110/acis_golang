@@ -49,20 +49,20 @@ func TestAtkAccuracy(t *testing.T) {
 	npc := fakeActor{dex: 40, level: 20}
 	// BaseEvasionAccuracy[40] = sqrt(40)*6.
 	want := math.Sqrt(40)*6 + 20
-	got := AtkAccuracy.Calc(npc, 0, 0)
+	got := AtkAccuracy(npc, 0, 0)
 	if !almostEqual(got, want) {
 		t.Errorf("npc: Calc() = %v, want %v", got, want)
 	}
 
 	summonLow := fakeActor{dex: 40, level: 59, isSummon: true}
 	wantSummonLow := math.Sqrt(40)*6 + 59 + 4
-	if got := AtkAccuracy.Calc(summonLow, 0, 0); !almostEqual(got, wantSummonLow) {
+	if got := AtkAccuracy(summonLow, 0, 0); !almostEqual(got, wantSummonLow) {
 		t.Errorf("summon<60: Calc() = %v, want %v", got, wantSummonLow)
 	}
 
 	summonHigh := fakeActor{dex: 40, level: 60, isSummon: true}
 	wantSummonHigh := math.Sqrt(40)*6 + 60 + 5
-	if got := AtkAccuracy.Calc(summonHigh, 0, 0); !almostEqual(got, wantSummonHigh) {
+	if got := AtkAccuracy(summonHigh, 0, 0); !almostEqual(got, wantSummonHigh) {
 		t.Errorf("summon>=60: Calc() = %v, want %v", got, wantSummonHigh)
 	}
 }
@@ -70,14 +70,14 @@ func TestAtkAccuracy(t *testing.T) {
 func TestAtkCritical(t *testing.T) {
 	npc := fakeActor{dex: 40}
 	// value(1) * DEXBonus[40] * 10.
-	got := AtkCritical.Calc(npc, 0, 1)
+	got := AtkCritical(npc, 0, 1)
 	want := statbonus.DEXBonus[40] * 10
 	if !almostEqual(got, want) {
 		t.Errorf("npc: Calc() = %v, want %v", got, want)
 	}
 
 	summon := fakeActor{dex: 40, isSummon: true}
-	if got := AtkCritical.Calc(summon, 0, 1); got != 10 {
+	if got := AtkCritical(summon, 0, 1); got != 10 {
 		t.Errorf("summon: Calc() = %v, want 10 (no DEX multiplier)", got)
 	}
 }
@@ -85,27 +85,27 @@ func TestAtkCritical(t *testing.T) {
 func TestMAtkCriticalWeaponGate(t *testing.T) {
 	npc := fakeActor{wit: 30}
 	want := statbonus.WITBonus[30]
-	if got := MAtkCritical.Calc(npc, 0, 1); !almostEqual(got, want) {
+	if got := MAtkCritical(npc, 0, 1); !almostEqual(got, want) {
 		t.Errorf("npc: Calc() = %v, want %v", got, want)
 	}
 
 	armedPlayer := fakePlayer{fakeActor: fakeActor{wit: 30}, hasWeapon: true}
-	if got := MAtkCritical.Calc(armedPlayer, 0, 1); !almostEqual(got, want) {
+	if got := MAtkCritical(armedPlayer, 0, 1); !almostEqual(got, want) {
 		t.Errorf("armed player: Calc() = %v, want %v", got, want)
 	}
 
 	bareHandedPlayer := fakePlayer{fakeActor: fakeActor{wit: 30}, hasWeapon: false}
-	if got := MAtkCritical.Calc(bareHandedPlayer, 0, 1); got != 1 {
+	if got := MAtkCritical(bareHandedPlayer, 0, 1); got != 1 {
 		t.Errorf("bare-handed player: Calc() = %v, want unchanged 1", got)
 	}
 }
 
 func TestMDefModAccessoryPenalty(t *testing.T) {
 	bare := fakePlayer{fakeActor: fakeActor{men: 10, levelMod: 1}}
-	baseGot := MDefMod.Calc(bare, 0, 100)
+	baseGot := MDefMod(bare, 0, 100)
 
 	ringed := fakePlayer{fakeActor: fakeActor{men: 10, levelMod: 1}, equipped: SlotLFinger | SlotRFinger}
-	ringedGot := MDefMod.Calc(ringed, 0, 100)
+	ringedGot := MDefMod(ringed, 0, 100)
 
 	wantDelta := -10 * statbonus.MENBonus[10] * 1 // two rings, -5 each, times the MEN/level multiplier
 	if !almostEqual(ringedGot-baseGot, wantDelta) {
@@ -117,8 +117,8 @@ func TestPDefModMageVsFighter(t *testing.T) {
 	mage := fakePlayer{fakeActor: fakeActor{levelMod: 1}, mage: true, equipped: SlotChest}
 	fighter := fakePlayer{fakeActor: fakeActor{levelMod: 1}, mage: false, equipped: SlotChest}
 
-	mageGot := PDefMod.Calc(mage, 0, 100)
-	fighterGot := PDefMod.Calc(fighter, 0, 100)
+	mageGot := PDefMod(mage, 0, 100)
+	fighterGot := PDefMod(fighter, 0, 100)
 
 	if !almostEqual(mageGot, 85) {
 		t.Errorf("mage chest: Calc() = %v, want 85", mageGot)
@@ -135,8 +135,8 @@ func TestPDefModFullBodyArmorAddsBothPenalties(t *testing.T) {
 	fullBody := fakePlayer{fakeActor: fakeActor{levelMod: 1}, equipped: SlotChest | FullBodyArmor}
 	legsOnly := fakePlayer{fakeActor: fakeActor{levelMod: 1}, equipped: SlotLegs}
 
-	fullBodyGot := PDefMod.Calc(fullBody, 0, 100)
-	legsGot := PDefMod.Calc(legsOnly, 0, 100)
+	fullBodyGot := PDefMod(fullBody, 0, 100)
+	legsGot := PDefMod(legsOnly, 0, 100)
 
 	// Fighter: chest -31, plus the legs-equivalent -18 = 100-49 = 51.
 	if !almostEqual(fullBodyGot, 51) {
@@ -150,12 +150,12 @@ func TestPDefModFullBodyArmorAddsBothPenalties(t *testing.T) {
 
 func TestHennaBonus(t *testing.T) {
 	p := fakePlayer{henna: map[stat.Stat]float64{stat.StatSTR: 3}}
-	if got := HennaSTR.Calc(p, 0, 40); got != 43 {
+	if got := HennaSTR(p, 0, 40); got != 43 {
 		t.Errorf("player with henna: Calc() = %v, want 43", got)
 	}
 
 	npc := fakeActor{}
-	if got := HennaSTR.Calc(npc, 0, 40); got != 40 {
+	if got := HennaSTR(npc, 0, 40); got != 40 {
 		t.Errorf("npc: Calc() = %v, want unchanged 40", got)
 	}
 }
@@ -163,13 +163,13 @@ func TestHennaBonus(t *testing.T) {
 func TestVitalsMultipliers(t *testing.T) {
 	a := fakeActor{con: 20, men: 30, levelMod: 1.5}
 
-	if got, want := MaxHpMul.Calc(a, 0, 100), 100*statbonus.CONBonus[20]; !almostEqual(got, want) {
+	if got, want := MaxHpMul(a, 0, 100), 100*statbonus.CONBonus[20]; !almostEqual(got, want) {
 		t.Errorf("MaxHpMul: Calc() = %v, want %v", got, want)
 	}
-	if got, want := MaxMpMul.Calc(a, 0, 100), 100*statbonus.MENBonus[30]; !almostEqual(got, want) {
+	if got, want := MaxMpMul(a, 0, 100), 100*statbonus.MENBonus[30]; !almostEqual(got, want) {
 		t.Errorf("MaxMpMul: Calc() = %v, want %v", got, want)
 	}
-	if got, want := RegenCpMul.Calc(a, 0, 100), 100*statbonus.CONBonus[20]*1.5; !almostEqual(got, want) {
+	if got, want := RegenCpMul(a, 0, 100), 100*statbonus.CONBonus[20]*1.5; !almostEqual(got, want) {
 		t.Errorf("RegenCpMul: Calc() = %v, want %v", got, want)
 	}
 }
@@ -177,7 +177,7 @@ func TestVitalsMultipliers(t *testing.T) {
 func TestMoveSpeed(t *testing.T) {
 	a := fakeActor{dex: 50}
 	want := 1.0 * statbonus.DEXBonus[50]
-	if got := MoveSpeed.Calc(a, 0, 1); !almostEqual(got, want) {
+	if got := MoveSpeed(a, 0, 1); !almostEqual(got, want) {
 		t.Errorf("Calc() = %v, want %v", got, want)
 	}
 }

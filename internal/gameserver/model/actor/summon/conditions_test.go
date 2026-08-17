@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
@@ -23,7 +23,7 @@ func (openGeo) ValidLocation(ox, oy, oz, tx, ty, tz int) location.Location {
 	return location.Location{X: tx, Y: ty, Z: tz}
 }
 
-// movingGate is a minimal basefunc.Condition mirroring skill/effect's
+// movingGate is a minimal effect.Condition mirroring skill/effect's
 // conditionGate for a <player moving="true"/> tag: it resolves effector to
 // a conditions.Actor and requires IsMoving(). Exercises #1510: before it,
 // summonStatActor.IsMoving() was hardcoded false, so this gate could never
@@ -41,8 +41,8 @@ func TestSummonConditionalStatFuncGatesOnRealMovement(t *testing.T) {
 	// HealEffectiveness carries no default summon stat func (see
 	// defaultStatFuncs), so its finalized value is driven purely by what
 	// AddStatFuncs attaches here.
-	a.AddStatFuncs([]basefunc.Func{
-		basefunc.NewAdd(nil, stat.HealEffectiveness, 25, movingGate{}),
+	a.AddStatFuncs([]effect.Mod{
+		{Stat: stat.HealEffectiveness, Op: effect.OpAdd, Value: 25, Cond: movingGate{}},
 	})
 
 	if err := a.InitMovement(location.Location{X: 0, Y: 0, Z: 0}, 100, openGeo{}); err != nil {
@@ -72,7 +72,7 @@ func TestSummonConditionalStatFuncGatesOnRealMovement(t *testing.T) {
 	}
 }
 
-// levelGate is a minimal basefunc.Condition mirroring skill/effect's
+// levelGate is a minimal effect.Condition mirroring skill/effect's
 // conditionGate: it resolves effector to a conditions.Actor and requires
 // its Level() to meet min. Before #1509, summonStatActor didn't implement
 // conditions.Actor, so this always resolved to false regardless of min — a
@@ -90,11 +90,11 @@ func TestSummonConditionalStatFuncGatesOnRealLevel(t *testing.T) {
 	// HealEffectiveness carries no default summon stat func (see
 	// defaultStatFuncs), so its finalized value is driven purely by what
 	// AddStatFuncs attaches here.
-	a.AddStatFuncs([]basefunc.Func{
-		basefunc.NewAdd(nil, stat.HealEffectiveness, 25, levelGate{min: 10}),
+	a.AddStatFuncs([]effect.Mod{
+		{Stat: stat.HealEffectiveness, Op: effect.OpAdd, Value: 25, Cond: levelGate{min: 10}},
 	})
-	a.AddStatFuncs([]basefunc.Func{
-		basefunc.NewAdd(nil, stat.RechargeMPRate, 25, levelGate{min: 100}),
+	a.AddStatFuncs([]effect.Mod{
+		{Stat: stat.RechargeMPRate, Op: effect.OpAdd, Value: 25, Cond: levelGate{min: 100}},
 	})
 
 	if got := a.CalcStat(stat.HealEffectiveness, 100); got != 125 {

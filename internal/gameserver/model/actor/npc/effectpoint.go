@@ -3,7 +3,6 @@ package npc
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/rs/zerolog"
@@ -60,9 +59,9 @@ func (ep *EffectPoint) EffectList() *effect.List { return ep.effects }
 
 // AddStatFuncs, RemoveStatsByOwner, and MaxBuffCount satisfy
 // effect.StatOwner; an EffectPoint carries no stats and no buff slots.
-func (ep *EffectPoint) AddStatFuncs([]basefunc.Func) {}
-func (ep *EffectPoint) RemoveStatsByOwner(any)       {}
-func (ep *EffectPoint) MaxBuffCount() int            { return 0 }
+func (ep *EffectPoint) AddStatFuncs([]effect.Mod)          {}
+func (ep *EffectPoint) RemoveStatsByOwner(effect.ModOwner) {}
+func (ep *EffectPoint) MaxBuffCount() int                  { return 0 }
 
 // SetWorld attaches the world state this actor spawns into and broadcasts
 // through.

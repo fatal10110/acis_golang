@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
 )
 
 // PassiveFuncs builds the stat functions a passive skill contributes for as
@@ -18,10 +17,10 @@ import (
 // The returned Funcs share one owner identity — def's skill and level — so
 // a caller can later remove every one of them together the same way a
 // buff's Funcs are removed by their owning Effect.
-func PassiveFuncs(def modelskill.Definition) ([]basefunc.Func, error) {
+func PassiveFuncs(def modelskill.Definition) ([]Mod, error) {
 	if def.Activation != modelskill.ActivationPassive {
 		return nil, fmt.Errorf("effect: skill %d level %d is not a passive skill", def.ID, def.Level)
 	}
-	owner := modelskill.Ref{ID: def.ID, Level: def.Level}
+	owner := ModOwnerSkill(modelskill.Ref{ID: def.ID, Level: def.Level})
 	return statFuncs(owner, def.Funcs, nil)
 }

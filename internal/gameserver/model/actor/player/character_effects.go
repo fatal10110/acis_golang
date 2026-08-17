@@ -6,7 +6,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 )
 
@@ -28,30 +28,30 @@ func (c *Character) MaxBuffCount() int {
 	return baseBuffSlots
 }
 
-// AddStatFuncs attaches fns to c's live stat calculators.
-func (c *Character) AddStatFuncs(fns []basefunc.Func) {
-	if len(fns) == 0 {
-		return
-	}
-	c.statMu.Lock()
-	defer c.statMu.Unlock()
+// AddStatFuncs attaches fns to c's live stat calculators. Each Mod is
+// published independently under its own Calculator's lock — the batch is
+// not atomic against a concurrent CalcStat, which may observe fns partially
+// applied. Callers that need a batch to appear all-or-nothing to readers
+// must serialize at a higher level (see effect.List, which does this for
+// effect-driven adds).
+func (c *Character) AddStatFuncs(fns []effect.Mod) {
 	for _, fn := range fns {
-		if fn == nil {
-			continue
-		}
-		c.statCalcLocked(fn.Stat()).AddFunc(fn)
+		c.statCalcOrCreate(fn.Stat).AddMod(fn)
 	}
 }
 
 // RemoveStatsByOwner drops every stat func previously added for owner.
-func (c *Character) RemoveStatsByOwner(owner any) {
-	if owner == nil {
+func (c *Character) RemoveStatsByOwner(owner effect.ModOwner) {
+	if owner == (effect.ModOwner{}) {
 		return
 	}
-	c.statMu.Lock()
-	defer c.statMu.Unlock()
-	for _, calc := range c.statCalcs {
-		calc.RemoveOwner(owner)
+	c.statMu.RLock()
+	calcs := c.statCalcs
+	c.statMu.RUnlock()
+	for _, calc := range calcs {
+		if calc != nil {
+			calc.RemoveOwner(owner)
+		}
 	}
 }
 

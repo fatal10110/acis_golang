@@ -15,7 +15,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/statbonus"
@@ -164,9 +163,11 @@ type Character struct {
 	sendSummonConfirm func(casterName string, casterID int32, x, y, z int, timeout time.Duration)
 	teleportHook      func(x, y, z, radius int)
 
-	// statMu guards statCalcs map creation. Each Calculator owns its Funcs.
-	statMu    sync.Mutex
-	statCalcs map[stat.Stat]*basefunc.Calculator
+	// statMu guards statCalcs slot creation; each slot's own Calculator
+	// then guards its own Mods independently, so a warm read only ever
+	// takes statMu's read lock.
+	statMu    sync.RWMutex
+	statCalcs [stat.Count]*effect.Calculator
 
 	// stateMu guards transient live flags, item-use disabled timestamps, and
 	// runtime send/broadcast hooks.

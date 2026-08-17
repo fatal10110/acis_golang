@@ -10,7 +10,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/funcs"
@@ -44,9 +43,11 @@ type summonVitals struct {
 }
 
 type summonStatCalcs struct {
-	// mu guards calcs.
-	mu    sync.Mutex
-	calcs map[stat.Stat]*basefunc.Calculator
+	// mu guards calcs slot creation; each slot's own Calculator then
+	// guards its own Mods independently, so a warm read only ever takes
+	// mu's read lock.
+	mu    sync.RWMutex
+	calcs [stat.Count]*effect.Calculator
 }
 
 func (a *Actor) initVitals() {
@@ -54,52 +55,52 @@ func (a *Actor) initVitals() {
 	a.vitals.mp = a.MaxMPValue()
 }
 
-// AddStatFuncs attaches fns to a's live stat calculators.
-func (a *Actor) AddStatFuncs(fns []basefunc.Func) {
-	if len(fns) == 0 {
-		return
-	}
-	a.statCalc.mu.Lock()
-	defer a.statCalc.mu.Unlock()
+// AddStatFuncs attaches fns to a's live stat calculators. Each Mod is
+// published independently under its own Calculator's lock — the batch is
+// not atomic against a concurrent CalcStat, which may observe fns partially
+// applied. Callers that need a batch to appear all-or-nothing to readers
+// must serialize at a higher level (see effect.List, which does this for
+// effect-driven adds).
+func (a *Actor) AddStatFuncs(fns []effect.Mod) {
 	for _, fn := range fns {
-		if fn == nil {
-			continue
-		}
-		a.statCalcLocked(fn.Stat()).AddFunc(fn)
+		a.statCalcOrCreate(fn.Stat).AddMod(fn)
 	}
 }
 
 // RemoveStatsByOwner drops every stat func previously added for owner.
-func (a *Actor) RemoveStatsByOwner(owner any) {
-	if owner == nil {
+func (a *Actor) RemoveStatsByOwner(owner effect.ModOwner) {
+	if owner == (effect.ModOwner{}) {
 		return
 	}
-	a.statCalc.mu.Lock()
-	defer a.statCalc.mu.Unlock()
-	for _, calc := range a.statCalc.calcs {
-		calc.RemoveOwner(owner)
+	a.statCalc.mu.RLock()
+	calcs := a.statCalc.calcs
+	a.statCalc.mu.RUnlock()
+	for _, calc := range calcs {
+		if calc != nil {
+			calc.RemoveOwner(owner)
+		}
 	}
 }
 
-func (a *Actor) statCalculator(s stat.Stat) *basefunc.Calculator {
-	a.statCalc.mu.Lock()
-	defer a.statCalc.mu.Unlock()
-	return a.statCalcLocked(s)
+func (a *Actor) statCalculator(s stat.Stat) *effect.Calculator {
+	a.statCalc.mu.RLock()
+	if calc := a.statCalc.calcs[s]; calc != nil {
+		a.statCalc.mu.RUnlock()
+		return calc
+	}
+	a.statCalc.mu.RUnlock()
+	return a.statCalcOrCreate(s)
 }
 
-func (a *Actor) statCalcLocked(s stat.Stat) *basefunc.Calculator {
-	if a.statCalc.calcs == nil {
-		a.statCalc.calcs = make(map[stat.Stat]*basefunc.Calculator)
-	}
+func (a *Actor) statCalcOrCreate(s stat.Stat) *effect.Calculator {
+	a.statCalc.mu.Lock()
+	defer a.statCalc.mu.Unlock()
 	if calc := a.statCalc.calcs[s]; calc != nil {
 		return calc
 	}
-	calc := &basefunc.Calculator{}
-	for _, fn := range defaultStatFuncs(s) {
-		calc.AddFunc(fn)
-	}
-	a.statCalc.calcs[s] = calc
-	return calc
+	calc := effect.NewCalculator(defaultBuiltin(s))
+	a.statCalc.calcs[s] = &calc
+	return &calc
 }
 
 func (a *Actor) calcStat(s stat.Stat, base float64) float64 {
@@ -115,38 +116,41 @@ func (a *Actor) CalcStat(s stat.Stat, base float64) float64 {
 	return a.calcStat(s, base)
 }
 
-func defaultStatFuncs(s stat.Stat) []basefunc.Func {
+// defaultBuiltin returns the static, attribute-driven finalize step every
+// summon's calculation chain for s runs at order 10, or nil for a Stat with
+// no builtin.
+func defaultBuiltin(s stat.Stat) funcs.Func {
 	switch s {
 	case stat.MaxHP:
-		return []basefunc.Func{funcs.MaxHpMul}
+		return funcs.MaxHpMul
 	case stat.MaxMP:
-		return []basefunc.Func{funcs.MaxMpMul}
+		return funcs.MaxMpMul
 	case stat.RegenerateHPRate:
-		return []basefunc.Func{funcs.RegenHpMul}
+		return funcs.RegenHpMul
 	case stat.RegenerateMPRate:
-		return []basefunc.Func{funcs.RegenMpMul}
+		return funcs.RegenMpMul
 	case stat.PowerAttack:
-		return []basefunc.Func{funcs.PAtkMod}
+		return funcs.PAtkMod
 	case stat.PowerDefence:
-		return []basefunc.Func{funcs.PDefMod}
+		return funcs.PDefMod
 	case stat.MagicAttack:
-		return []basefunc.Func{funcs.MAtkMod}
+		return funcs.MAtkMod
 	case stat.MagicDefence:
-		return []basefunc.Func{funcs.MDefMod}
+		return funcs.MDefMod
 	case stat.PowerAttackSpeed:
-		return []basefunc.Func{funcs.PAtkSpeed}
+		return funcs.PAtkSpeed
 	case stat.MagicAttackSpeed:
-		return []basefunc.Func{funcs.MAtkSpeed}
+		return funcs.MAtkSpeed
 	case stat.AccuracyCombat:
-		return []basefunc.Func{funcs.AtkAccuracy}
+		return funcs.AtkAccuracy
 	case stat.EvasionRate:
-		return []basefunc.Func{funcs.AtkEvasion}
+		return funcs.AtkEvasion
 	case stat.CriticalRate:
-		return []basefunc.Func{funcs.AtkCritical}
+		return funcs.AtkCritical
 	case stat.MCriticalRate:
-		return []basefunc.Func{funcs.MAtkCritical}
+		return funcs.MAtkCritical
 	case stat.RunSpeed:
-		return []basefunc.Func{funcs.MoveSpeed}
+		return funcs.MoveSpeed
 	default:
 		return nil
 	}

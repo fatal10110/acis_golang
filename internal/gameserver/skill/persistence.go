@@ -10,7 +10,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
 
@@ -201,7 +200,7 @@ func (p *Persistence) ApplyTransientPassiveSkill(c *player.Character, skillID, o
 		return nil
 	}
 	if oldLevel > 0 {
-		c.RemoveStatsByOwner(modelskill.Ref{ID: modelskill.ID(skillID), Level: oldLevel})
+		c.RemoveStatsByOwner(effect.ModOwnerSkill(modelskill.Ref{ID: modelskill.ID(skillID), Level: oldLevel}))
 	}
 	if level <= 0 {
 		return nil
@@ -235,7 +234,7 @@ func (p *Persistence) setKnownSkill(ctx context.Context, c *player.Character, sk
 	oldLevel := c.SkillLevel(skillID)
 	c.SetSkillLevel(skillID, level)
 	if oldLevel > 0 {
-		c.RemoveStatsByOwner(modelskill.Ref{ID: modelskill.ID(skillID), Level: oldLevel})
+		c.RemoveStatsByOwner(effect.ModOwnerSkill(modelskill.Ref{ID: modelskill.ID(skillID), Level: oldLevel}))
 	}
 	if level <= 0 {
 		return nil
@@ -298,7 +297,7 @@ func (p *Persistence) EquipItemStats(c *player.Character, inst *item.Instance, t
 	if err != nil {
 		return false, false, fmt.Errorf("apply equip modifiers for character %d item %d: %w", c.ID, inst.ObjectID, err)
 	}
-	var passiveFns []basefunc.Func
+	var passiveFns []effect.Mod
 	// A weapon whose crystal grade the character's Expertise doesn't yet
 	// allow skips its whole item_skill loop in the reference (the grade
 	// penalty check returns before that loop runs), so neither its passive
@@ -354,7 +353,7 @@ func (p *Persistence) UnequipItemStats(c *player.Character, inv *itemcontainer.I
 	if c == nil || inst == nil {
 		return false
 	}
-	c.RemoveStatsByOwner(effect.ItemOwner{Inst: inst, Tmpl: tmpl})
+	c.RemoveStatsByOwner(effect.ModOwnerItem(effect.ItemOwner{Inst: inst, Tmpl: tmpl}))
 	if tmpl == nil || inv == nil {
 		return false
 	}

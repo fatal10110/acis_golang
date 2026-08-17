@@ -6,7 +6,7 @@ import (
 
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
@@ -27,18 +27,18 @@ func TestHostileFormulaInputsResolveStatsAndRaceMultiplier(t *testing.T) {
 	caster.SetRollSource(zeroRoll)
 	target.SetRollSource(zeroRoll)
 
-	owner := &struct{}{}
-	caster.AddStatFuncs([]basefunc.Func{
-		basefunc.NewAdd(owner, stat.PAtkBeasts, 24, nil),
-		basefunc.NewAdd(owner, stat.HealProficiency, 11, nil),
+	owner := effect.ModOwnerEffect(&effect.Effect{})
+	caster.AddStatFuncs([]effect.Mod{
+		{Stat: stat.PAtkBeasts, Op: effect.OpAdd, Value: 24, Owner: owner},
+		{Stat: stat.HealProficiency, Op: effect.OpAdd, Value: 11, Owner: owner},
 	})
-	target.AddStatFuncs([]basefunc.Func{
-		basefunc.NewAdd(owner, stat.PDefBeasts, 4, nil),
-		basefunc.NewMul(owner, stat.FireRes, 0.36, nil),
-		basefunc.NewMul(owner, stat.StunVuln, 0.5, nil),
-		basefunc.NewMul(owner, stat.DaggerWpnVuln, 0.8, nil),
-		basefunc.NewMul(owner, stat.RechargeMPRate, 1.5, nil),
-		basefunc.NewMul(owner, stat.HealEffectiveness, 1.2, nil),
+	target.AddStatFuncs([]effect.Mod{
+		{Stat: stat.PDefBeasts, Op: effect.OpAdd, Value: 4, Owner: owner},
+		{Stat: stat.FireRes, Op: effect.OpMul, Value: 0.36, Owner: owner},
+		{Stat: stat.StunVuln, Op: effect.OpMul, Value: 0.5, Owner: owner},
+		{Stat: stat.DaggerWpnVuln, Op: effect.OpMul, Value: 0.8, Owner: owner},
+		{Stat: stat.RechargeMPRate, Op: effect.OpMul, Value: 1.5, Owner: owner},
+		{Stat: stat.HealEffectiveness, Op: effect.OpMul, Value: 1.2, Owner: owner},
 	})
 
 	if got := target.Category(); got != skilltarget.CategoryAttackable {
@@ -194,9 +194,10 @@ func TestHostileFormulaInputsResolveStatsAndRaceMultiplier(t *testing.T) {
 
 func TestHostileSkillReflectInputUsesMagicSpecificStat(t *testing.T) {
 	target := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", Level: 1})
-	target.AddStatFuncs([]basefunc.Func{
-		basefunc.NewSet(target, stat.ReflectSkillMagic, 17, nil),
-		basefunc.NewSet(target, stat.ReflectSkillPhysic, 29, nil),
+	refOwner := effect.ModOwnerEffect(&effect.Effect{})
+	target.AddStatFuncs([]effect.Mod{
+		{Stat: stat.ReflectSkillMagic, Op: effect.OpSet, Value: 17, Owner: refOwner},
+		{Stat: stat.ReflectSkillPhysic, Op: effect.OpSet, Value: 29, Owner: refOwner},
 	})
 
 	magic := target.SkillReflectInput(modelskill.Definition{Magic: true, CanBeReflected: true, CastRange: 900})

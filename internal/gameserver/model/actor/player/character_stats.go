@@ -8,7 +8,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/funcs"
@@ -17,25 +16,28 @@ import (
 
 const perfectShieldBlockRate = 5
 
-func (c *Character) statCalc(s stat.Stat) *basefunc.Calculator {
-	c.statMu.Lock()
-	defer c.statMu.Unlock()
-	return c.statCalcLocked(s)
+// statCalc returns s's live Calculator, creating it (with its builtin
+// finalize step) on first touch. The common warm case only takes statMu's
+// read lock; the slot is created at most once per Stat per Character.
+func (c *Character) statCalc(s stat.Stat) *effect.Calculator {
+	c.statMu.RLock()
+	if calc := c.statCalcs[s]; calc != nil {
+		c.statMu.RUnlock()
+		return calc
+	}
+	c.statMu.RUnlock()
+	return c.statCalcOrCreate(s)
 }
 
-func (c *Character) statCalcLocked(s stat.Stat) *basefunc.Calculator {
-	if c.statCalcs == nil {
-		c.statCalcs = make(map[stat.Stat]*basefunc.Calculator)
-	}
+func (c *Character) statCalcOrCreate(s stat.Stat) *effect.Calculator {
+	c.statMu.Lock()
+	defer c.statMu.Unlock()
 	if calc := c.statCalcs[s]; calc != nil {
 		return calc
 	}
-	calc := &basefunc.Calculator{}
-	for _, fn := range defaultStatFuncs(s) {
-		calc.AddFunc(fn)
-	}
-	c.statCalcs[s] = calc
-	return calc
+	calc := effect.NewCalculator(defaultBuiltin(s))
+	c.statCalcs[s] = &calc
+	return &calc
 }
 
 func (c *Character) calcStat(s stat.Stat, base float64) float64 {
@@ -51,54 +53,57 @@ func (c *Character) CalcStat(s stat.Stat, base float64) float64 {
 	return c.calcStat(s, base)
 }
 
-func defaultStatFuncs(s stat.Stat) []basefunc.Func {
+// defaultBuiltin returns the static, attribute-driven finalize step every
+// player's calculation chain for s runs at order 10, or nil for a Stat with
+// no builtin.
+func defaultBuiltin(s stat.Stat) funcs.Func {
 	switch s {
 	case stat.MaxHP:
-		return []basefunc.Func{funcs.MaxHpMul}
+		return funcs.MaxHpMul
 	case stat.MaxMP:
-		return []basefunc.Func{funcs.MaxMpMul}
+		return funcs.MaxMpMul
 	case stat.MaxCP:
-		return []basefunc.Func{funcs.MaxCpMul}
+		return funcs.MaxCpMul
 	case stat.RegenerateHPRate:
-		return []basefunc.Func{funcs.RegenHpMul}
+		return funcs.RegenHpMul
 	case stat.RegenerateMPRate:
-		return []basefunc.Func{funcs.RegenMpMul}
+		return funcs.RegenMpMul
 	case stat.RegenerateCPRate:
-		return []basefunc.Func{funcs.RegenCpMul}
+		return funcs.RegenCpMul
 	case stat.PowerAttack:
-		return []basefunc.Func{funcs.PAtkMod}
+		return funcs.PAtkMod
 	case stat.PowerDefence:
-		return []basefunc.Func{funcs.PDefMod}
+		return funcs.PDefMod
 	case stat.MagicAttack:
-		return []basefunc.Func{funcs.MAtkMod}
+		return funcs.MAtkMod
 	case stat.MagicDefence:
-		return []basefunc.Func{funcs.MDefMod}
+		return funcs.MDefMod
 	case stat.PowerAttackSpeed:
-		return []basefunc.Func{funcs.PAtkSpeed}
+		return funcs.PAtkSpeed
 	case stat.MagicAttackSpeed:
-		return []basefunc.Func{funcs.MAtkSpeed}
+		return funcs.MAtkSpeed
 	case stat.AccuracyCombat:
-		return []basefunc.Func{funcs.AtkAccuracy}
+		return funcs.AtkAccuracy
 	case stat.EvasionRate:
-		return []basefunc.Func{funcs.AtkEvasion}
+		return funcs.AtkEvasion
 	case stat.CriticalRate:
-		return []basefunc.Func{funcs.AtkCritical}
+		return funcs.AtkCritical
 	case stat.MCriticalRate:
-		return []basefunc.Func{funcs.MAtkCritical}
+		return funcs.MAtkCritical
 	case stat.RunSpeed:
-		return []basefunc.Func{funcs.MoveSpeed}
+		return funcs.MoveSpeed
 	case stat.StatSTR:
-		return []basefunc.Func{funcs.HennaSTR}
+		return funcs.HennaSTR
 	case stat.StatCON:
-		return []basefunc.Func{funcs.HennaCON}
+		return funcs.HennaCON
 	case stat.StatDEX:
-		return []basefunc.Func{funcs.HennaDEX}
+		return funcs.HennaDEX
 	case stat.StatINT:
-		return []basefunc.Func{funcs.HennaINT}
+		return funcs.HennaINT
 	case stat.StatWIT:
-		return []basefunc.Func{funcs.HennaWIT}
+		return funcs.HennaWIT
 	case stat.StatMEN:
-		return []basefunc.Func{funcs.HennaMEN}
+		return funcs.HennaMEN
 	default:
 		return nil
 	}

@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
@@ -16,8 +16,7 @@ func TestCharacterSkillSuccessInputUsesStatsAndCasterMagicAttack(t *testing.T) {
 	caster := liveCharacter(1, tmpl, combatItems())
 	target := liveCharacter(2, tmpl, combatItems())
 	target.CharLevel = 44
-	owner := &struct{}{}
-	target.AddStatFuncs([]basefunc.Func{basefunc.NewMul(owner, stat.StunVuln, 0.5, nil)})
+	target.AddStatFuncs([]effect.Mod{{Stat: stat.StunVuln, Op: effect.OpMul, Value: 0.5, Owner: testModOwner()}})
 	def := modelskill.Definition{
 		SkillType:    "STUN",
 		EffectType:   "STUN",
@@ -51,9 +50,9 @@ func TestCharacterSkillSuccessInputUsesStatsAndCasterMagicAttack(t *testing.T) {
 
 func TestCharacterSkillReflectInputUsesMagicSpecificStat(t *testing.T) {
 	target := liveCharacter(1, combatTemplate(), combatItems())
-	target.AddStatFuncs([]basefunc.Func{
-		basefunc.NewSet(target, stat.ReflectSkillMagic, 17, nil),
-		basefunc.NewSet(target, stat.ReflectSkillPhysic, 29, nil),
+	target.AddStatFuncs([]effect.Mod{
+		{Stat: stat.ReflectSkillMagic, Op: effect.OpSet, Value: 17, Owner: testModOwner()},
+		{Stat: stat.ReflectSkillPhysic, Op: effect.OpSet, Value: 29, Owner: testModOwner()},
 	})
 
 	magic := target.SkillReflectInput(modelskill.Definition{Magic: true, CanBeReflected: true, CastRange: 900})
@@ -78,7 +77,7 @@ func TestCharacterEffectSuccessInputRespectsTemplateResistance(t *testing.T) {
 	tmpl.MDef = 50
 	caster := liveCharacter(1, tmpl, combatItems())
 	target := liveCharacter(2, tmpl, combatItems())
-	target.AddStatFuncs([]basefunc.Func{basefunc.NewMul(&struct{}{}, stat.StunVuln, 0.5, nil)})
+	target.AddStatFuncs([]effect.Mod{{Stat: stat.StunVuln, Op: effect.OpMul, Value: 0.5, Owner: testModOwner()}})
 	def := modelskill.Definition{IgnoreResists: true, Magic: true, MagicLevel: 40, EffectType: "ROOT"}
 
 	in, ok := target.EffectSuccessInput(caster, def, modelskill.EffectTemplate{EffectPower: 50, EffectType: "STUN"}, false, formulas.ShieldFailed)
@@ -99,10 +98,9 @@ func TestCharacterSkillSuccessInputFoldsElementalResistanceIntoVulnerability(t *
 	tmpl.MDef = 50
 	caster := liveCharacter(1, tmpl, combatItems())
 	target := liveCharacter(2, tmpl, combatItems())
-	owner := &struct{}{}
-	target.AddStatFuncs([]basefunc.Func{
-		basefunc.NewMul(owner, stat.FireRes, 0.36, nil),
-		basefunc.NewMul(owner, stat.StunVuln, 0.5, nil),
+	target.AddStatFuncs([]effect.Mod{
+		{Stat: stat.FireRes, Op: effect.OpMul, Value: 0.36, Owner: testModOwner()},
+		{Stat: stat.StunVuln, Op: effect.OpMul, Value: 0.5, Owner: testModOwner()},
 	})
 
 	in, ok := target.SkillSuccessInput(caster, modelskill.Definition{
@@ -129,8 +127,7 @@ func TestCharacterManaDamageInputFoldsElementalResistanceIntoVulnerability(t *te
 	tmpl.MDef = 50
 	caster := liveCharacter(1, tmpl, combatItems())
 	target := liveCharacter(2, tmpl, combatItems())
-	owner := &struct{}{}
-	target.AddStatFuncs([]basefunc.Func{basefunc.NewMul(owner, stat.FireRes, 0.36, nil)})
+	target.AddStatFuncs([]effect.Mod{{Stat: stat.FireRes, Op: effect.OpMul, Value: 0.36, Owner: testModOwner()}})
 
 	mana, ok := target.ManaDamageInput(caster, modelskill.Definition{
 		SkillType: "MANADAM",
@@ -154,8 +151,7 @@ func TestCharacterSkillSuccessInputDoesNotFallbackToSkillType(t *testing.T) {
 	tmpl.MDef = 50
 	caster := liveCharacter(1, tmpl, combatItems())
 	target := liveCharacter(2, tmpl, combatItems())
-	owner := &struct{}{}
-	target.AddStatFuncs([]basefunc.Func{basefunc.NewMul(owner, stat.StunVuln, 0.5, nil)})
+	target.AddStatFuncs([]effect.Mod{{Stat: stat.StunVuln, Op: effect.OpMul, Value: 0.5, Owner: testModOwner()}})
 
 	in, ok := target.SkillSuccessInput(caster, modelskill.Definition{
 		SkillType:    "STUN",

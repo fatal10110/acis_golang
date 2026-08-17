@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
@@ -26,17 +26,17 @@ func TestCharacterStatFuncsAffectCombatStatsAndCanBeRemoved(t *testing.T) {
 	baseAttackSpeed := c.AttackSpeed()
 	baseRunSpeed := c.RunSpeed()
 	baseHPRegen := c.HPRegenRate()
-	owner := &struct{}{}
+	owner := effect.ModOwnerEffect(&effect.Effect{})
 
-	c.AddStatFuncs([]basefunc.Func{
-		basefunc.NewAdd(owner, stat.PowerAttack, 7, nil),
-		basefunc.NewMul(owner, stat.PowerDefence, 2, nil),
-		basefunc.NewAdd(owner, stat.MagicAttack, 3, nil),
-		basefunc.NewMul(owner, stat.MagicDefence, 2, nil),
-		basefunc.NewMul(owner, stat.MaxHP, 2, nil),
-		basefunc.NewAdd(owner, stat.PowerAttackSpeed, 10, nil),
-		basefunc.NewAdd(owner, stat.RunSpeed, 5, nil),
-		basefunc.NewAdd(owner, stat.RegenerateHPRate, 1, nil),
+	c.AddStatFuncs([]effect.Mod{
+		{Stat: stat.PowerAttack, Op: effect.OpAdd, Value: 7, Owner: owner},
+		{Stat: stat.PowerDefence, Op: effect.OpMul, Value: 2, Owner: owner},
+		{Stat: stat.MagicAttack, Op: effect.OpAdd, Value: 3, Owner: owner},
+		{Stat: stat.MagicDefence, Op: effect.OpMul, Value: 2, Owner: owner},
+		{Stat: stat.MaxHP, Op: effect.OpMul, Value: 2, Owner: owner},
+		{Stat: stat.PowerAttackSpeed, Op: effect.OpAdd, Value: 10, Owner: owner},
+		{Stat: stat.RunSpeed, Op: effect.OpAdd, Value: 5, Owner: owner},
+		{Stat: stat.RegenerateHPRate, Op: effect.OpAdd, Value: 1, Owner: owner},
 	})
 
 	if got, want := c.PAtk(), basePAtk+7; !closeFloat(got, want) {
@@ -89,6 +89,28 @@ func TestCharacterStatFuncsAffectCombatStatsAndCanBeRemoved(t *testing.T) {
 	}
 	if got := c.HPRegenRate(); !closeFloat(got, baseHPRegen) {
 		t.Fatalf("HPRegenRate() after stat removal = %v, want %v", got, baseHPRegen)
+	}
+}
+
+// TestCharacterRemoveStatsByOwnerZeroValueIsNoop pins the "unowned Mod is
+// unremovable" contract carried over from the pre-#1527 Func design, where
+// RemoveStatsByOwner returned early on a nil owner (a builtin's owner):
+// removal keyed by the zero ModOwner must never sweep every Mod with no
+// real owner.
+func TestCharacterRemoveStatsByOwnerZeroValueIsNoop(t *testing.T) {
+	tmpl := combatTemplate()
+	c := liveCharacter(1, tmpl, combatItems())
+	basePAtk := c.PAtk()
+	c.AddStatFuncs([]effect.Mod{{Stat: stat.PowerAttack, Op: effect.OpAdd, Value: 7}})
+	withMod := c.PAtk()
+
+	c.RemoveStatsByOwner(effect.ModOwner{})
+
+	if got := c.PAtk(); !closeFloat(got, withMod) {
+		t.Fatalf("PAtk() after RemoveStatsByOwner(zero value) = %v, want unchanged %v (unowned Mod must survive)", got, withMod)
+	}
+	if closeFloat(withMod, basePAtk) {
+		t.Fatal("test setup did not actually attach a Mod (withMod == basePAtk)")
 	}
 }
 
@@ -160,8 +182,8 @@ func TestCharacterLethalInputAndOutcomes(t *testing.T) {
 	})
 	caster.CharLevel = 40
 	target.CharLevel = 45
-	caster.AddStatFuncs([]basefunc.Func{
-		basefunc.NewMul(&struct{}{}, stat.LethalRate, 1.5, nil),
+	caster.AddStatFuncs([]effect.Mod{
+		{Stat: stat.LethalRate, Op: effect.OpMul, Value: 1.5},
 	})
 
 	skill := modelskill.Definition{MagicLevel: 40, LethalChance1: 30, LethalChance2: 10}

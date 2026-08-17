@@ -6,7 +6,7 @@ import (
 
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
@@ -20,18 +20,18 @@ func TestSummonFormulaInputsResolveStatsAndResources(t *testing.T) {
 	caster := NewServitor(ServitorConfig{ObjectID: 1, Level: 44, Stats: stats, Roll: zeroSummonRoll})
 	target := NewPet(PetConfig{ObjectID: 2, Level: 44, Stats: stats, Roll: zeroSummonRoll})
 
-	owner := &struct{}{}
-	caster.AddStatFuncs([]basefunc.Func{
-		basefunc.NewMul(owner, stat.PvPPhysSkillDmg, 0.8, nil),
-		basefunc.NewMul(owner, stat.PvPMagicalDmg, 1.3, nil),
-		basefunc.NewAdd(owner, stat.HealProficiency, 11, nil),
+	owner := effect.ModOwnerEffect(&effect.Effect{})
+	caster.AddStatFuncs([]effect.Mod{
+		{Stat: stat.PvPPhysSkillDmg, Op: effect.OpMul, Value: 0.8, Owner: owner},
+		{Stat: stat.PvPMagicalDmg, Op: effect.OpMul, Value: 1.3, Owner: owner},
+		{Stat: stat.HealProficiency, Op: effect.OpAdd, Value: 11, Owner: owner},
 	})
-	target.AddStatFuncs([]basefunc.Func{
-		basefunc.NewMul(owner, stat.FireRes, 0.36, nil),
-		basefunc.NewMul(owner, stat.StunVuln, 0.5, nil),
-		basefunc.NewMul(owner, stat.DaggerWpnVuln, 0.8, nil),
-		basefunc.NewMul(owner, stat.RechargeMPRate, 1.5, nil),
-		basefunc.NewMul(owner, stat.HealEffectiveness, 1.2, nil),
+	target.AddStatFuncs([]effect.Mod{
+		{Stat: stat.FireRes, Op: effect.OpMul, Value: 0.36, Owner: owner},
+		{Stat: stat.StunVuln, Op: effect.OpMul, Value: 0.5, Owner: owner},
+		{Stat: stat.DaggerWpnVuln, Op: effect.OpMul, Value: 0.8, Owner: owner},
+		{Stat: stat.RechargeMPRate, Op: effect.OpMul, Value: 1.5, Owner: owner},
+		{Stat: stat.HealEffectiveness, Op: effect.OpMul, Value: 1.2, Owner: owner},
 	})
 
 	if got := target.Category(); got != skilltarget.CategoryPlayable {
@@ -181,9 +181,10 @@ func TestSummonFormulaInputsResolveStatsAndResources(t *testing.T) {
 
 func TestSummonSkillReflectInputUsesMagicSpecificStat(t *testing.T) {
 	target := NewPet(PetConfig{ObjectID: 1, Stats: CombatStats{}})
-	target.AddStatFuncs([]basefunc.Func{
-		basefunc.NewSet(target, stat.ReflectSkillMagic, 17, nil),
-		basefunc.NewSet(target, stat.ReflectSkillPhysic, 29, nil),
+	refOwner := effect.ModOwnerEffect(&effect.Effect{})
+	target.AddStatFuncs([]effect.Mod{
+		{Stat: stat.ReflectSkillMagic, Op: effect.OpSet, Value: 17, Owner: refOwner},
+		{Stat: stat.ReflectSkillPhysic, Op: effect.OpSet, Value: 29, Owner: refOwner},
 	})
 
 	magic := target.SkillReflectInput(modelskill.Definition{Magic: true, CanBeReflected: true, CastRange: 900})

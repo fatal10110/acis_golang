@@ -2,13 +2,11 @@ package effect
 
 import (
 	"sync"
-
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/basefunc"
 )
 
 type StatOwner interface {
-	AddStatFuncs([]basefunc.Func)
-	RemoveStatsByOwner(owner any)
+	AddStatFuncs([]Mod)
+	RemoveStatsByOwner(owner ModOwner)
 	// MaxBuffCount is the number of non-toggle, non-seven-signs buffs the
 	// owner can hold at once (base slot count plus any bonus the owner
 	// grants, e.g. from a known passive).
