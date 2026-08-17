@@ -266,8 +266,6 @@ func TestSkillPersistenceRestoreLoadsKnownSkillLevels(t *testing.T) {
 	}
 }
 
-
-
 func skillPersistenceCharacter(id int32) *player.Character {
 	return &player.Character{ID: id, Name: "char", ClassID: 0, BaseClassID: 0}
 }
