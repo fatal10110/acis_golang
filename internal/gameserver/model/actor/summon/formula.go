@@ -55,10 +55,15 @@ func (a *Actor) initVitals() {
 	a.vitals.mp = a.MaxMPValue()
 }
 
-// AddStatFuncs attaches fns to a's live stat calculators.
+// AddStatFuncs attaches fns to a's live stat calculators. Each Mod is
+// published independently under its own Calculator's lock — the batch is
+// not atomic against a concurrent CalcStat, which may observe fns partially
+// applied. Callers that need a batch to appear all-or-nothing to readers
+// must serialize at a higher level (see effect.List, which does this for
+// effect-driven adds).
 func (a *Actor) AddStatFuncs(fns []effect.Mod) {
 	for _, fn := range fns {
-		a.statCalcLocked(fn.Stat).AddMod(fn)
+		a.statCalcOrCreate(fn.Stat).AddMod(fn)
 	}
 }
 
@@ -84,10 +89,10 @@ func (a *Actor) statCalculator(s stat.Stat) *effect.Calculator {
 		return calc
 	}
 	a.statCalc.mu.RUnlock()
-	return a.statCalcLocked(s)
+	return a.statCalcOrCreate(s)
 }
 
-func (a *Actor) statCalcLocked(s stat.Stat) *effect.Calculator {
+func (a *Actor) statCalcOrCreate(s stat.Stat) *effect.Calculator {
 	a.statCalc.mu.Lock()
 	defer a.statCalc.mu.Unlock()
 	if calc := a.statCalc.calcs[s]; calc != nil {

@@ -11,10 +11,15 @@ import (
 // it is also the permanent cap (compare player.Character's baseBuffSlots).
 const maxBuffCount = 20
 
-// AddStatFuncs attaches fns to h's live stat calculators.
+// AddStatFuncs attaches fns to h's live stat calculators. Each Mod is
+// published independently under its own Calculator's lock — the batch is
+// not atomic against a concurrent CalcStat, which may observe fns partially
+// applied. Callers that need a batch to appear all-or-nothing to readers
+// must serialize at a higher level (see effect.List, which does this for
+// effect-driven adds).
 func (h *Hostile) AddStatFuncs(fns []effect.Mod) {
 	for _, fn := range fns {
-		h.statCalcLocked(fn.Stat).AddMod(fn)
+		h.statCalcOrCreate(fn.Stat).AddMod(fn)
 	}
 }
 
@@ -49,10 +54,10 @@ func (h *Hostile) statCalc(s stat.Stat) *effect.Calculator {
 		return calc
 	}
 	h.statMu.RUnlock()
-	return h.statCalcLocked(s)
+	return h.statCalcOrCreate(s)
 }
 
-func (h *Hostile) statCalcLocked(s stat.Stat) *effect.Calculator {
+func (h *Hostile) statCalcOrCreate(s stat.Stat) *effect.Calculator {
 	h.statMu.Lock()
 	defer h.statMu.Unlock()
 	if calc := h.statCalcs[s]; calc != nil {

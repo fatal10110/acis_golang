@@ -28,10 +28,15 @@ func (c *Character) MaxBuffCount() int {
 	return baseBuffSlots
 }
 
-// AddStatFuncs attaches fns to c's live stat calculators.
+// AddStatFuncs attaches fns to c's live stat calculators. Each Mod is
+// published independently under its own Calculator's lock — the batch is
+// not atomic against a concurrent CalcStat, which may observe fns partially
+// applied. Callers that need a batch to appear all-or-nothing to readers
+// must serialize at a higher level (see effect.List, which does this for
+// effect-driven adds).
 func (c *Character) AddStatFuncs(fns []effect.Mod) {
 	for _, fn := range fns {
-		c.statCalcLocked(fn.Stat).AddMod(fn)
+		c.statCalcOrCreate(fn.Stat).AddMod(fn)
 	}
 }
 

@@ -26,10 +26,10 @@ func (c *Character) statCalc(s stat.Stat) *effect.Calculator {
 		return calc
 	}
 	c.statMu.RUnlock()
-	return c.statCalcLocked(s)
+	return c.statCalcOrCreate(s)
 }
 
-func (c *Character) statCalcLocked(s stat.Stat) *effect.Calculator {
+func (c *Character) statCalcOrCreate(s stat.Stat) *effect.Calculator {
 	c.statMu.Lock()
 	defer c.statMu.Unlock()
 	if calc := c.statCalcs[s]; calc != nil {

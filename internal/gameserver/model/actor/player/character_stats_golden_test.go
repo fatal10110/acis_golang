@@ -30,14 +30,14 @@ func goldenPlayerScenarios(t testing.TB) map[string]float64 {
 		tmpl := combatTemplate()
 		c := liveCharacter(1, tmpl, combatItems())
 		c.AddStatFuncs([]effect.Mod{{Stat: stat.PowerAttack, Op: effect.OpAdd, Value: 1e16}})
-		c.AddStatFuncs([]effect.Mod{{Stat: stat.PowerAttack, Op: effect.OpAdd, Value: 1}})
+		c.AddStatFuncs([]effect.Mod{{Stat: stat.PowerAttack, Op: effect.OpSub, Value: 1e16}})
 		c.AddStatFuncs([]effect.Mod{{Stat: stat.PowerAttack, Op: effect.OpAdd, Value: 1}})
 		out["order30_forward"] = c.PAtk()
 
 		tmpl2 := combatTemplate()
 		c2 := liveCharacter(2, tmpl2, combatItems())
 		c2.AddStatFuncs([]effect.Mod{{Stat: stat.PowerAttack, Op: effect.OpAdd, Value: 1}})
-		c2.AddStatFuncs([]effect.Mod{{Stat: stat.PowerAttack, Op: effect.OpAdd, Value: 1}})
+		c2.AddStatFuncs([]effect.Mod{{Stat: stat.PowerAttack, Op: effect.OpSub, Value: 1e16}})
 		c2.AddStatFuncs([]effect.Mod{{Stat: stat.PowerAttack, Op: effect.OpAdd, Value: 1e16}})
 		out["order30_reverse"] = c2.PAtk()
 	}
@@ -76,6 +76,7 @@ func goldenPlayerScenarios(t testing.TB) map[string]float64 {
 	{
 		tmpl := combatTemplate()
 		tmpl.MAtk = 20
+		tmpl.RunSpeed = 100
 		c := liveCharacter(5, tmpl, combatItems())
 		c.AddStatFuncs([]effect.Mod{
 			{Stat: stat.PowerDefence, Op: effect.OpBaseAdd, Value: 4},

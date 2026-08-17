@@ -14,16 +14,18 @@ import (
 type Op int
 
 const (
-	OpSet     Op = iota // override the base (template) value entirely
-	OpBaseMul           // add a flat ratio of the base value
-	OpBaseAdd           // add a flat amount to the base value
-	OpEnchant           // add an enchant-level-driven amount
-	OpMul               // multiply the running value
-	OpDiv               // divide the running value
-	OpAdd               // add a flat amount to the running value
-	OpSub               // subtract a flat amount from the running value
-	OpAddMul            // reduce the running value by a percentage
-	OpSubDiv            // AddMul's inverse: divide by the percentage complement
+	OpInvalid Op = iota // zero value: not a real op, so a Mod{} that forgot
+	// to set Op is a silent no-op rather than a silent, base-discarding Set
+	OpSet     // override the base (template) value entirely
+	OpBaseMul // add a flat ratio of the base value
+	OpBaseAdd // add a flat amount to the base value
+	OpEnchant // add an enchant-level-driven amount
+	OpMul     // multiply the running value
+	OpDiv     // divide the running value
+	OpAdd     // add a flat amount to the running value
+	OpSub     // subtract a flat amount from the running value
+	OpAddMul  // reduce the running value by a percentage
+	OpSubDiv  // AddMul's inverse: divide by the percentage complement
 )
 
 // Calculation-order phases a Calculator runs in, lowest first. The values
