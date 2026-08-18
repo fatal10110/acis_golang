@@ -1,3 +1,5 @@
+//go:build integration
+
 package network
 
 import (
@@ -6,6 +8,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -55,8 +58,8 @@ func TestGameClientLinkUseScrollRunsAICastAndConsumes(t *testing.T) {
 	skills := itemAICastSkillTable(t)
 	const scrollTemplate int32 = 736
 	const objectID int32 = 702
-	c, chars, _, state := newLinkedGameClientWithSkillsSeed(t, skills, func(chars *fakeCharStore, items *fakeItemStore) {
-		objID := seedSelectableCharacter(t, chars, "player1", "Newbie", 5, 0)
+	c, chars, _, _, _, state := newLinkedSQLGameClient(t, skills, func(chars *gamesql.CharacterStore, items *gamesql.ItemStore) {
+		objID := seedSelectableSQLCharacter(t, chars, "player1", "Newbie", 5, 0).ID
 		if err := items.Create(context.Background(), objID, item.Instance{
 			ObjectID: objectID, TemplateID: scrollTemplate, OwnerID: objID,
 			Count: 3, Location: item.LocationInventory, ManaLeft: -1,
@@ -71,7 +74,7 @@ func TestGameClientLinkUseScrollRunsAICastAndConsumes(t *testing.T) {
 	c.send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
-	obj, ok := state.Player(chars.soleObjectID(t))
+	obj, ok := state.Player(sqlSoleObjectID(t, chars))
 	if !ok {
 		t.Fatal("player not in world state after enter")
 	}
@@ -100,8 +103,8 @@ func TestGameClientLinkUseScrollDefersUntilAttackFinishes(t *testing.T) {
 	skills := itemAICastSkillTable(t)
 	const scrollTemplate int32 = 736
 	const objectID int32 = 708
-	c, chars, _, state := newLinkedGameClientWithSkillsSeed(t, skills, func(chars *fakeCharStore, items *fakeItemStore) {
-		objID := seedSelectableCharacter(t, chars, "player1", "Newbie", 5, 0)
+	c, chars, _, _, _, state := newLinkedSQLGameClient(t, skills, func(chars *gamesql.CharacterStore, items *gamesql.ItemStore) {
+		objID := seedSelectableSQLCharacter(t, chars, "player1", "Newbie", 5, 0).ID
 		if err := items.Create(context.Background(), objID, item.Instance{
 			ObjectID: objectID, TemplateID: scrollTemplate, OwnerID: objID,
 			Count: 3, Location: item.LocationInventory, ManaLeft: -1,
@@ -116,7 +119,7 @@ func TestGameClientLinkUseScrollDefersUntilAttackFinishes(t *testing.T) {
 	c.send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
-	obj, ok := state.Player(chars.soleObjectID(t))
+	obj, ok := state.Player(sqlSoleObjectID(t, chars))
 	if !ok {
 		t.Fatal("player not in world state after enter")
 	}
@@ -155,8 +158,8 @@ func TestGameClientLinkUseScrollWithSharedGroupSendsExUseSharedGroupItem(t *test
 	skills := itemAICastSkillTable(t)
 	const scrollTemplate int32 = 737 // shared group 5, item reuse 9000ms > skill's 5000ms
 	const objectID int32 = 704
-	c, chars, _, state := newLinkedGameClientWithSkillsSeed(t, skills, func(chars *fakeCharStore, items *fakeItemStore) {
-		objID := seedSelectableCharacter(t, chars, "player1", "Newbie", 5, 0)
+	c, chars, _, _, _, state := newLinkedSQLGameClient(t, skills, func(chars *gamesql.CharacterStore, items *gamesql.ItemStore) {
+		objID := seedSelectableSQLCharacter(t, chars, "player1", "Newbie", 5, 0).ID
 		if err := items.Create(context.Background(), objID, item.Instance{
 			ObjectID: objectID, TemplateID: scrollTemplate, OwnerID: objID,
 			Count: 3, Location: item.LocationInventory, ManaLeft: -1,
@@ -170,7 +173,7 @@ func TestGameClientLinkUseScrollWithSharedGroupSendsExUseSharedGroupItem(t *test
 	c.read() // CharSelected
 	c.send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
-	chars.soleObjectID(t)
+	sqlSoleObjectID(t, chars)
 
 	c.send(encodeUseItem(objectID, false))
 	reply := c.read()
@@ -225,8 +228,8 @@ func TestGameClientLinkUseScrollHitPhaseCostFailureSendsReasonAndStatusUpdate(t 
 	}), store)
 	const scrollTemplate int32 = 736
 	const objectID int32 = 705
-	c, chars, _, state := newLinkedGameClientWithSkillsSeed(t, skills, func(chars *fakeCharStore, items *fakeItemStore) {
-		objID := seedSelectableCharacter(t, chars, "player1", "Newbie", 5, 0)
+	c, chars, _, _, _, state := newLinkedSQLGameClient(t, skills, func(chars *gamesql.CharacterStore, items *gamesql.ItemStore) {
+		objID := seedSelectableSQLCharacter(t, chars, "player1", "Newbie", 5, 0).ID
 		if err := items.Create(context.Background(), objID, item.Instance{
 			ObjectID: objectID, TemplateID: scrollTemplate, OwnerID: objID,
 			Count: 1, Location: item.LocationInventory, ManaLeft: -1,
@@ -241,7 +244,7 @@ func TestGameClientLinkUseScrollHitPhaseCostFailureSendsReasonAndStatusUpdate(t 
 	c.send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
-	obj, ok := state.Player(chars.soleObjectID(t))
+	obj, ok := state.Player(sqlSoleObjectID(t, chars))
 	if !ok {
 		t.Fatal("player not in world state after enter")
 	}
@@ -297,8 +300,8 @@ func TestGameClientLinkUseScrollRevalidatesTargetAtLaunch(t *testing.T) {
 	}}), store)
 	const scrollTemplate int32 = 736
 	const objectID int32 = 706
-	c, chars, _, state := newLinkedGameClientWithSkillsSeed(t, skills, func(chars *fakeCharStore, items *fakeItemStore) {
-		objID := seedSelectableCharacter(t, chars, "player1", "Newbie", 5, 0)
+	c, chars, _, _, _, state := newLinkedSQLGameClient(t, skills, func(chars *gamesql.CharacterStore, items *gamesql.ItemStore) {
+		objID := seedSelectableSQLCharacter(t, chars, "player1", "Newbie", 5, 0).ID
 		if err := items.Create(context.Background(), objID, item.Instance{
 			ObjectID: objectID, TemplateID: scrollTemplate, OwnerID: objID,
 			Count: 1, Location: item.LocationInventory, ManaLeft: -1,
@@ -313,7 +316,7 @@ func TestGameClientLinkUseScrollRevalidatesTargetAtLaunch(t *testing.T) {
 	c.send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
-	obj, ok := state.Player(chars.soleObjectID(t))
+	obj, ok := state.Player(sqlSoleObjectID(t, chars))
 	if !ok {
 		t.Fatal("player not in world state after enter")
 	}
@@ -343,8 +346,8 @@ func TestGameClientLinkUseScrollRejectsReuse(t *testing.T) {
 	skills := itemAICastSkillTable(t)
 	const scrollTemplate int32 = 736
 	const objectID int32 = 703
-	c, chars, _, state := newLinkedGameClientWithSkillsSeed(t, skills, func(chars *fakeCharStore, items *fakeItemStore) {
-		objID := seedSelectableCharacter(t, chars, "player1", "Newbie", 5, 0)
+	c, chars, _, _, _, state := newLinkedSQLGameClient(t, skills, func(chars *gamesql.CharacterStore, items *gamesql.ItemStore) {
+		objID := seedSelectableSQLCharacter(t, chars, "player1", "Newbie", 5, 0).ID
 		if err := items.Create(context.Background(), objID, item.Instance{
 			ObjectID: objectID, TemplateID: scrollTemplate, OwnerID: objID,
 			Count: 3, Location: item.LocationInventory, ManaLeft: -1,
@@ -359,7 +362,7 @@ func TestGameClientLinkUseScrollRejectsReuse(t *testing.T) {
 	c.send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
-	obj, ok := state.Player(chars.soleObjectID(t))
+	obj, ok := state.Player(sqlSoleObjectID(t, chars))
 	if !ok {
 		t.Fatal("player not in world state after enter")
 	}
