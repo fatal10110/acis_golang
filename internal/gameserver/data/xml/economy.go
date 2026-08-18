@@ -3,6 +3,7 @@ package xml
 import (
 	stdxml "encoding/xml"
 	"fmt"
+	"math"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -42,12 +43,40 @@ type fishFile struct {
 }
 
 type augmentationFile struct {
-	Skills []attrsElement           `xml:"augmentation"`
-	Sets   []augmentationSetElement `xml:"set"`
+	Skills []augmentationSkillElement `xml:"augmentation"`
+	Sets   []augmentationSetElement   `xml:"set"`
+}
+
+// augmentationSkillElement is required because zero is a legal skill/level
+// id: a plain int cannot tell an absent attribute from "0", so id, skillId,
+// and skillLevel use coord to reject that ambiguity the same way the
+// StatSet bag being replaced did.
+type augmentationSkillElement struct {
+	ID         *coord `xml:"id,attr"`
+	SkillID    *coord `xml:"skillId,attr"`
+	SkillLevel *coord `xml:"skillLevel,attr"`
+	Type       string `xml:"type,attr"`
+}
+
+func (e augmentationSkillElement) skill() (augmentation.Skill, error) {
+	if e.ID == nil {
+		return augmentation.Skill{}, fmt.Errorf("augmentation skill: id is required")
+	}
+	if e.SkillID == nil {
+		return augmentation.Skill{}, fmt.Errorf("augmentation skill %d: skillId is required", *e.ID)
+	}
+	if e.SkillLevel == nil {
+		return augmentation.Skill{}, fmt.Errorf("augmentation skill %d: skillLevel is required", *e.ID)
+	}
+	skillID := int(*e.SkillID)
+	if skillID < math.MinInt32 || skillID > math.MaxInt32 {
+		return augmentation.Skill{}, fmt.Errorf("augmentation skill %d: skillId %d overflows int32", *e.ID, skillID)
+	}
+	return augmentation.NewSkill(int(*e.ID), int32(skillID), int(*e.SkillLevel), e.Type)
 }
 
 type augmentationSetElement struct {
-	Attrs []stdxml.Attr             `xml:",any,attr"`
+	Order *coord                    `xml:"order,attr"`
 	Stats []augmentationStatElement `xml:"stat"`
 }
 
@@ -151,7 +180,7 @@ func LoadAugmentations(dir string) (*augmentation.Table, error) {
 	var skills []augmentation.Skill
 	for _, doc := range docs {
 		for _, el := range doc.Data.Skills {
-			skill, err := augmentation.NewSkill(commons.StatSetFromXMLAttrs(el.Attrs))
+			skill, err := el.skill()
 			if err != nil {
 				return nil, fmt.Errorf("xml: %s: %w", doc.Path, err)
 			}
@@ -196,7 +225,10 @@ func buildAugmentationStatGroup(el augmentationSetElement) (augmentation.StatGro
 		}
 		stats = append(stats, stat)
 	}
-	return augmentation.NewStatGroup(commons.StatSetFromXMLAttrs(el.Attrs), stats)
+	if el.Order == nil {
+		return augmentation.StatGroup{}, fmt.Errorf("augmentation stat group: order is required")
+	}
+	return augmentation.NewStatGroup(int(*el.Order), stats)
 }
 
 func parseFloatTable(raw string) ([]float32, error) {
