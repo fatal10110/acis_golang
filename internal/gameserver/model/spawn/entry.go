@@ -2,6 +2,7 @@ package spawn
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -127,33 +128,26 @@ func ParsePositions(raw string) ([]Position, error) {
 }
 
 func parsePosition(parts []string, weighted bool) (Position, error) {
-	set := commons.NewStatSetWithCapacity(4)
-	set.Set("x", parts[0])
-	set.Set("y", parts[1])
-	set.Set("z", parts[2])
-	loc, err := location.NewLocation(set)
-	if err != nil {
-		return Position{}, err
-	}
-
-	set = commons.NewStatSetWithCapacity(2)
-	set.Set("heading", parts[3])
-	heading, err := set.GetInt("heading")
-	if err != nil {
-		return Position{}, err
+	nums := make([]int, 4)
+	for i, name := range []string{"x", "y", "z", "heading"} {
+		n, err := strconv.Atoi(parts[i])
+		if err != nil {
+			return Position{}, fmt.Errorf("spawn: pos %s: %w", name, err)
+		}
+		nums[i] = n
 	}
 	chance := 0
 	if weighted {
-		set.Set("chance", strings.TrimSuffix(parts[4], "%"))
-		chance, err = set.GetInt("chance")
+		n, err := strconv.Atoi(strings.TrimSuffix(parts[4], "%"))
 		if err != nil {
-			return Position{}, err
+			return Position{}, fmt.Errorf("spawn: pos chance: %w", err)
 		}
+		chance = n
 	}
 
 	return Position{
-		Location: loc,
-		Heading:  heading,
+		Location: location.Location{X: nums[0], Y: nums[1], Z: nums[2]},
+		Heading:  nums[3],
 		Chance:   chance,
 	}, nil
 }

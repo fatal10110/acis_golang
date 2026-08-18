@@ -58,12 +58,8 @@ type BoatLocation struct {
 // NewBoatLocation builds a BoatLocation from set. x, y and z are required;
 // speed defaults to 350 and rotation defaults to 4000.
 func NewBoatLocation(set *commons.StatSet) (BoatLocation, error) {
-	loc, err := location.NewLocation(set)
-	if err != nil {
-		return BoatLocation{}, fmt.Errorf("route: boat location: %w", err)
-	}
-
 	f := commons.NewFields(set, "route: boat location")
+	loc := location.Location{X: f.Int("x"), Y: f.Int("y"), Z: f.Int("z")}
 	speed := f.IntDefault("speed", 350)
 	rotation := f.IntDefault("rotation", 4000)
 	busy := f.IntDefault("busy", 0)
@@ -168,13 +164,9 @@ type WalkerLocation struct {
 // NewWalkerLocation builds a WalkerLocation from set. x, y and z are
 // required; delay seconds are converted to milliseconds.
 func NewWalkerLocation(set *commons.StatSet) (WalkerLocation, error) {
-	loc, err := location.NewLocation(set)
-	if err != nil {
-		return WalkerLocation{}, fmt.Errorf("route: walker location: %w", err)
-	}
 	f := commons.NewFields(set, "route: walker location")
 	walker := WalkerLocation{
-		Location:    loc,
+		Location:    location.Location{X: f.Int("x"), Y: f.Int("y"), Z: f.Int("z")},
 		DelayMillis: f.IntDefault("delay", 0) * 1000,
 		NPCStringID: f.IntDefault("fstring", 0),
 		SocialID:    f.IntDefault("socialId", 0),

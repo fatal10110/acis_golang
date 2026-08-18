@@ -3,6 +3,7 @@ package castle
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
@@ -108,14 +109,10 @@ func NewControlTower(set *commons.StatSet) (ControlTower, error) {
 	if err := f.Err(); err != nil {
 		return ControlTower{}, err
 	}
-	pos, err := location.NewLocation(commons.NewStatSetFrom(set))
-	if err != nil {
-		return ControlTower{}, fmt.Errorf("castle: control tower %q: %w", alias, err)
-	}
 	tower := ControlTower{
 		Alias:    alias,
 		Type:     towerType,
-		Position: pos,
+		Position: location.Location{X: f.Int("x"), Y: f.Int("y"), Z: f.Int("z")},
 		HP:       f.Float64("hp"),
 		PDef:     f.Float64("pDef"),
 		MDef:     f.Float64("mDef"),
@@ -292,19 +289,13 @@ func parseSpawnLocation(raw string) (location.Location, int, error) {
 	if len(parts) != 4 {
 		return location.Location{}, 0, fmt.Errorf("pos requires x;y;z;heading")
 	}
-	set := commons.NewStatSetWithCapacity(4)
-	set.Set("x", parts[0])
-	set.Set("y", parts[1])
-	set.Set("z", parts[2])
-	pos, err := location.NewLocation(set)
-	if err != nil {
-		return location.Location{}, 0, err
+	var nums [4]int
+	for i, name := range []string{"x", "y", "z", "heading"} {
+		n, err := strconv.Atoi(parts[i])
+		if err != nil {
+			return location.Location{}, 0, fmt.Errorf("castle: pos %s: %w", name, err)
+		}
+		nums[i] = n
 	}
-	set = commons.NewStatSetWithCapacity(1)
-	set.Set("heading", parts[3])
-	heading, err := set.GetInt("heading")
-	if err != nil {
-		return location.Location{}, 0, err
-	}
-	return pos, heading, nil
+	return location.Location{X: nums[0], Y: nums[1], Z: nums[2]}, nums[3], nil
 }

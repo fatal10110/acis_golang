@@ -27,17 +27,10 @@ func NewLocation(set *commons.StatSet) (Location, error) {
 	if err := idf.Err(); err != nil {
 		return Location{}, err
 	}
-	wrap := func(err error) error { return fmt.Errorf("observer location %d: %w", id, err) }
-
-	loc, err := location.NewLocation(set)
-	if err != nil {
-		return Location{}, wrap(err)
-	}
-
 	f := commons.NewFields(set, fmt.Sprintf("observer location %d", id))
-	location := Location{
+	entry := Location{
 		ID:       id,
-		Location: loc,
+		Location: location.Location{X: f.Int("x"), Y: f.Int("y"), Z: f.Int("z")},
 		Yaw:      f.Int("yaw"),
 		Pitch:    f.Int("pitch"),
 		Cost:     f.Int("cost"),
@@ -46,7 +39,7 @@ func NewLocation(set *commons.StatSet) (Location, error) {
 	if err := f.Err(); err != nil {
 		return Location{}, err
 	}
-	return location, nil
+	return entry, nil
 }
 
 // Spawn is one observer NPC spawn entry with its allowed group ids.
@@ -64,9 +57,10 @@ func NewSpawn(set *commons.StatSet) (Spawn, error) {
 	}
 	wrap := func(err error) error { return fmt.Errorf("observer spawn %d: %w", npcID, err) }
 
-	loc, err := location.NewLocation(set)
-	if err != nil {
-		return Spawn{}, wrap(err)
+	f := commons.NewFields(set, fmt.Sprintf("observer spawn %d", npcID))
+	loc := location.Location{X: f.Int("x"), Y: f.Int("y"), Z: f.Int("z")}
+	if err := f.Err(); err != nil {
+		return Spawn{}, err
 	}
 	groupText, err := set.GetString("groups")
 	if err != nil {

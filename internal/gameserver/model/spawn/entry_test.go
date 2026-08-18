@@ -13,4 +13,13 @@ func TestParsePositionsAllowsTrailingWeightedSeparator(t *testing.T) {
 	if got, want := positions[1].Chance, 40; got != want {
 		t.Fatalf("positions[1].Chance = %d, want %d", got, want)
 	}
+	if got := positions[0]; got.Location.X != 1 || got.Location.Y != 2 || got.Location.Z != 3 || got.Heading != 4 {
+		t.Fatalf("positions[0] = %+v, want x/y/z/heading 1/2/3/4", got)
+	}
+}
+
+func TestParsePositionsRejectsMalformedCoordinate(t *testing.T) {
+	if _, err := ParsePositions("1;x;3;4;60%"); err == nil {
+		t.Fatal("ParsePositions error = nil, want a parse failure for a non-numeric y")
+	}
 }

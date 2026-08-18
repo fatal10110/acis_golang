@@ -55,7 +55,7 @@ type manorAreaElement struct {
 	CastleID int            `xml:"castleId,attr"`
 	MinZ     int            `xml:"minZ,attr"`
 	MaxZ     int            `xml:"maxZ,attr"`
-	Nodes    []attrsElement `xml:"node"`
+	Nodes    []pointElement `xml:"node"`
 }
 
 // LoadManorAreas parses manor area polygons.
@@ -69,7 +69,7 @@ func LoadManorAreas(path string) (manor.AreaTable, error) {
 	for _, el := range doc.Areas {
 		nodes := make([]location.Point, 0, len(el.Nodes))
 		for _, node := range el.Nodes {
-			point, err := location.NewPoint(commons.StatSetFromXMLAttrs(node.Attrs))
+			point, err := node.point()
 			if err != nil {
 				return nil, fmt.Errorf("xml: %s: manor area %q: %w", path, el.Name, err)
 			}
