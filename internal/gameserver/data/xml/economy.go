@@ -3,6 +3,7 @@ package xml
 import (
 	stdxml "encoding/xml"
 	"fmt"
+	"math"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -67,7 +68,11 @@ func (e augmentationSkillElement) skill() (augmentation.Skill, error) {
 	if e.SkillLevel == nil {
 		return augmentation.Skill{}, fmt.Errorf("augmentation skill %d: skillLevel is required", *e.ID)
 	}
-	return augmentation.NewSkill(int(*e.ID), int32(*e.SkillID), int(*e.SkillLevel), e.Type)
+	skillID := int(*e.SkillID)
+	if skillID < math.MinInt32 || skillID > math.MaxInt32 {
+		return augmentation.Skill{}, fmt.Errorf("augmentation skill %d: skillId %d overflows int32", *e.ID, skillID)
+	}
+	return augmentation.NewSkill(int(*e.ID), int32(skillID), int(*e.SkillLevel), e.Type)
 }
 
 type augmentationSetElement struct {
