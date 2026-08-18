@@ -3,8 +3,6 @@ package augmentation
 
 import (
 	"fmt"
-
-	"github.com/fatal10110/acis_golang/internal/commons"
 )
 
 const (
@@ -32,21 +30,8 @@ type Skill struct {
 	Level      int
 }
 
-// NewSkill builds a Skill from one folded <augmentation> element.
-func NewSkill(set *commons.StatSet) (Skill, error) {
-	idf := commons.NewFields(set, "augmentation skill")
-	id := idf.Int("id")
-	if err := idf.Err(); err != nil {
-		return Skill{}, err
-	}
-
-	f := commons.NewFields(set, fmt.Sprintf("augmentation skill %d", id))
-	skillID := f.Int32("skillId")
-	skillLevel := f.Int("skillLevel")
-	rawColor := f.String("type")
-	if err := f.Err(); err != nil {
-		return Skill{}, err
-	}
+// NewSkill builds a Skill from one <augmentation> element's decoded attributes.
+func NewSkill(id int, skillID int32, skillLevel int, rawColor string) (Skill, error) {
 	color := Color(rawColor)
 	if color != Blue && color != Purple && color != Red {
 		return Skill{}, fmt.Errorf("augmentation skill %d: unknown color %q", id, rawColor)
@@ -85,12 +70,8 @@ type StatGroup struct {
 	Stats []Stat
 }
 
-// NewStatGroup builds a StatGroup from one <set> element.
-func NewStatGroup(set *commons.StatSet, stats []Stat) (StatGroup, error) {
-	order, err := set.GetInt("order")
-	if err != nil {
-		return StatGroup{}, fmt.Errorf("augmentation stat group: %w", err)
-	}
+// NewStatGroup builds a StatGroup from one <set> element's decoded order.
+func NewStatGroup(order int, stats []Stat) (StatGroup, error) {
 	return StatGroup{Order: order, Stats: stats}, nil
 }
 
