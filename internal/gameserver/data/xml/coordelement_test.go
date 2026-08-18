@@ -29,7 +29,7 @@ func TestCoordinateElementsDecodeEveryShippedNode(t *testing.T) {
 	}{
 		{
 			name: "zone nodes and spawns",
-			rel:  "data/xml/zones/TownZone.xml",
+			rel:  "data/xml/zones/OlympiadStadiumZone.xml",
 			decode: func(t *testing.T, data []byte) [][3]string {
 				var doc zoneFile
 				mustUnmarshal(t, data, &doc)
@@ -313,4 +313,61 @@ func attr(attrs []xml.Attr, name string) string {
 
 func itoa(v int) string {
 	return strconv.Itoa(v)
+}
+
+// TestCoordinateAttrRejectsMalformedValues pins the accepted input set of a
+// coordinate attribute to the one the attribute bag enforced before the
+// typed elements replaced it: absent is distinguishable, a value that is not
+// a bare base-10 integer is rejected. The decoder's own int conversion does
+// neither — it stores an empty value as 0 and trims surrounding space — so
+// without coord's UnmarshalXMLAttr an empty coordinate would silently place
+// the point at the world origin.
+func TestCoordinateAttrRejectsMalformedValues(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		doc     string
+		wantErr bool
+		wantNil bool
+		wantX   int
+	}{
+		{name: "plain value", doc: `<n><node x="12" y="5"/></n>`, wantX: 12},
+		{name: "zero is a legal coordinate", doc: `<n><node x="0" y="5"/></n>`, wantX: 0},
+		{name: "negative value", doc: `<n><node x="-12" y="5"/></n>`, wantX: -12},
+		{name: "absent stays distinguishable", doc: `<n><node y="5"/></n>`, wantNil: true},
+		{name: "empty value is rejected", doc: `<n><node x="" y="5"/></n>`, wantErr: true},
+		{name: "padded value is rejected", doc: `<n><node x=" 12 " y="5"/></n>`, wantErr: true},
+		{name: "non-numeric value is rejected", doc: `<n><node x="abc" y="5"/></n>`, wantErr: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var doc struct {
+				Nodes []pointElement `xml:"node"`
+			}
+			err := xml.Unmarshal([]byte(tc.doc), &doc)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("Unmarshal(%s) error = nil, want a rejection", tc.doc)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Unmarshal(%s) error: %v", tc.doc, err)
+			}
+			got := doc.Nodes[0]
+			if tc.wantNil {
+				if got.X != nil {
+					t.Fatalf("X = %d, want nil for an absent attribute", int(*got.X))
+				}
+				if _, err := got.point(); err == nil {
+					t.Fatal("point() error = nil, want a required-attribute failure")
+				}
+				return
+			}
+			if got.X == nil {
+				t.Fatalf("X = nil, want %d", tc.wantX)
+			}
+			if int(*got.X) != tc.wantX {
+				t.Fatalf("X = %d, want %d", int(*got.X), tc.wantX)
+			}
+		})
+	}
 }

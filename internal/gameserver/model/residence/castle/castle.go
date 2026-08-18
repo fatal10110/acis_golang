@@ -289,11 +289,11 @@ func parseSpawnLocation(raw string) (location.Location, int, error) {
 	if len(parts) != 4 {
 		return location.Location{}, 0, fmt.Errorf("pos requires x;y;z;heading")
 	}
-	nums := make([]int, 4)
-	for i, p := range parts {
-		n, err := strconv.Atoi(p)
+	var nums [4]int
+	for i, name := range []string{"x", "y", "z", "heading"} {
+		n, err := strconv.Atoi(parts[i])
 		if err != nil {
-			return location.Location{}, 0, err
+			return location.Location{}, 0, fmt.Errorf("castle: pos %s: %w", name, err)
 		}
 		nums[i] = n
 	}
