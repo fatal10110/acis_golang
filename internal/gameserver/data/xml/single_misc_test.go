@@ -305,11 +305,47 @@ func TestSingleMiscLoadersErrors(t *testing.T) {
 			},
 		},
 		{
+			name:    "heal sps malformed correction",
+			path:    filepath.Join(dir, "healSps.xml"),
+			content: `<list><healSps magicLevel="1" correction="abc" neededMatk="6"/></list>`,
+			load: func(path string) error {
+				_, err := LoadHealSps(path)
+				return err
+			},
+		},
+		{
+			name:    "heal sps skillId without skillLevel",
+			path:    filepath.Join(dir, "healSps.xml"),
+			content: `<list><healSps skillId="1401" correction="286" neededMatk="875"/></list>`,
+			load: func(path string) error {
+				_, err := LoadHealSps(path)
+				return err
+			},
+		},
+		{
 			name:    "newbie buff missing upperLevel",
 			path:    filepath.Join(dir, "newbieBuffs.xml"),
 			content: `<list><buff skillId="4322" skillLevel="1" lowerLevel="8" isMagicClass="false"/></list>`,
 			load: func(path string) error {
 				_, err := LoadNewbieBuffs(path)
+				return err
+			},
+		},
+		{
+			name:    "newbie buff malformed skillId",
+			path:    filepath.Join(dir, "newbieBuffs.xml"),
+			content: `<list><buff skillId="abc" skillLevel="1" lowerLevel="8" upperLevel="24"/></list>`,
+			load: func(path string) error {
+				_, err := LoadNewbieBuffs(path)
+				return err
+			},
+		},
+		{
+			name:    "spellbook missing itemId",
+			path:    filepath.Join(dir, "spellbooks2.xml"),
+			content: `<list><book skillId="2"/></list>`,
+			load: func(path string) error {
+				_, err := LoadSpellbooks(path)
 				return err
 			},
 		},

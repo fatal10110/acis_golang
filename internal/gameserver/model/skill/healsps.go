@@ -2,8 +2,6 @@ package skill
 
 import (
 	"fmt"
-
-	"github.com/fatal10110/acis_golang/internal/commons"
 )
 
 type HealSps struct {
@@ -14,35 +12,21 @@ type HealSps struct {
 	NeededMAtk int
 }
 
-func NewHealSps(set *commons.StatSet) (HealSps, error) {
-	f := commons.NewFields(set, "skill: heal sps")
-	entry := HealSps{
-		Correction: f.Float64("correction"),
-		NeededMAtk: f.Int("neededMatk"),
-	}
-	if err := f.Err(); err != nil {
-		return HealSps{}, err
-	}
+// NewHealSps builds a HealSps from one <healSps> element's decoded
+// attributes. skillID and skillLevel are set together (both nil, or both
+// present); at least one of the skill selector or magicLevel is required.
+func NewHealSps(correction float64, neededMAtk int, skillID *int32, skillLevel *int, magicLevel *int) (HealSps, error) {
+	entry := HealSps{Correction: correction, NeededMAtk: neededMAtk}
 
-	if f.Has("skillId") {
-		sf := commons.NewFields(set, "skill: heal sps skill selector")
-		skillID := sf.Int32("skillId")
-		if err := sf.Err(); err != nil {
-			return HealSps{}, err
+	if skillID != nil {
+		if skillLevel == nil {
+			return HealSps{}, fmt.Errorf("skill: heal sps %d: skillLevel is required", *skillID)
 		}
-		lf := commons.NewFields(set, fmt.Sprintf("skill: heal sps %d", skillID))
-		entry.SkillID = ID(skillID)
-		entry.SkillLevel = lf.Int("skillLevel")
-		if err := lf.Err(); err != nil {
-			return HealSps{}, err
-		}
+		entry.SkillID = ID(*skillID)
+		entry.SkillLevel = *skillLevel
 	}
-	if f.Has("magicLevel") {
-		mf := commons.NewFields(set, "skill: heal sps magic selector")
-		entry.MagicLevel = mf.Int("magicLevel")
-		if err := mf.Err(); err != nil {
-			return HealSps{}, err
-		}
+	if magicLevel != nil {
+		entry.MagicLevel = *magicLevel
 	}
 	if entry.SkillID == 0 && entry.MagicLevel == 0 {
 		return HealSps{}, fmt.Errorf("skill: heal sps: need skillId/skillLevel or magicLevel")

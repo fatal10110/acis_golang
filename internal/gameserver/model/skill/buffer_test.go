@@ -2,22 +2,32 @@ package skill
 
 import (
 	"testing"
-
-	"github.com/fatal10110/acis_golang/internal/commons"
 )
 
 func TestNewBufferSkillDefaultsLevelFromTable(t *testing.T) {
-	set := commons.NewStatSet()
-	set.Set("id", "1035")
-	set.Set("type", "Buffs")
-	set.Set("desc", "desc")
-
-	entry, err := NewBufferSkill(set, NewTable([]Definition{{ID: 1035, Level: 4}}))
+	entry, err := NewBufferSkill(1035, "Buffs", nil, 0, "desc", NewTable([]Definition{{ID: 1035, Level: 4}}))
 	if err != nil {
 		t.Fatalf("NewBufferSkill() error: %v", err)
 	}
 	if entry.Skill.ID != 1035 || entry.Skill.Level != 4 || entry.Price != 0 {
 		t.Fatalf("NewBufferSkill() = %+v", entry)
+	}
+}
+
+func TestNewBufferSkillExplicitLevel(t *testing.T) {
+	level := 7
+	entry, err := NewBufferSkill(1035, "Buffs", &level, 100, "desc", nil)
+	if err != nil {
+		t.Fatalf("NewBufferSkill() error: %v", err)
+	}
+	if entry.Skill.Level != 7 || entry.Price != 100 {
+		t.Fatalf("NewBufferSkill() = %+v", entry)
+	}
+}
+
+func TestNewBufferSkillMissingSkill(t *testing.T) {
+	if _, err := NewBufferSkill(1035, "Buffs", nil, 0, "desc", NewTable(nil)); err == nil {
+		t.Fatal("expected an error for a skill not found in the table, got nil")
 	}
 }
 

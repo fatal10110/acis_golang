@@ -1,11 +1,5 @@
 package skill
 
-import (
-	"fmt"
-
-	"github.com/fatal10110/acis_golang/internal/commons"
-)
-
 // FishingSkill is one entry in the fishing skill tree: the level of a
 // fishing-related skill a character can learn once they reach MinLevel, and
 // the item and quantity spent to learn it. Deciding whether a specific
@@ -21,29 +15,13 @@ type FishingSkill struct {
 	Dwarven   bool
 }
 
-// NewFishingSkill builds a FishingSkill from set, the folded attributes of
-// one <fishingSkill> element. id, lvl, minLvl, itemId and itemCount are all
-// required; isDwarven defaults to false.
-func NewFishingSkill(set *commons.StatSet) (FishingSkill, error) {
-	idf := commons.NewFields(set, "skill: fishing skill")
-	id := idf.Int32("id")
-	if err := idf.Err(); err != nil {
-		return FishingSkill{}, err
+// NewFishingSkill builds a FishingSkill from one <fishingSkill> element's
+// decoded attributes.
+func NewFishingSkill(id ID, level, minLevel int, itemID int32, itemCount int, dwarven bool) FishingSkill {
+	return FishingSkill{
+		ID: id, Level: level, MinLevel: minLevel,
+		ItemID: itemID, ItemCount: itemCount, Dwarven: dwarven,
 	}
-
-	f := commons.NewFields(set, fmt.Sprintf("skill: fishing skill %d", id))
-	entry := FishingSkill{
-		ID:        ID(id),
-		Level:     f.Int("lvl"),
-		MinLevel:  f.Int("minLvl"),
-		ItemID:    f.Int32("itemId"),
-		ItemCount: f.Int("itemCount"),
-		Dwarven:   f.BoolDefault("isDwarven", false),
-	}
-	if err := f.Err(); err != nil {
-		return FishingSkill{}, err
-	}
-	return entry, nil
 }
 
 // ClanSkill is one entry in the clan skill tree: the level of a clan skill a
@@ -58,27 +36,10 @@ type ClanSkill struct {
 	ItemID   int32
 }
 
-// NewClanSkill builds a ClanSkill from set, the folded attributes of one
-// <clanSkill> element. Every attribute is required.
-func NewClanSkill(set *commons.StatSet) (ClanSkill, error) {
-	idf := commons.NewFields(set, "skill: clan skill")
-	id := idf.Int32("id")
-	if err := idf.Err(); err != nil {
-		return ClanSkill{}, err
-	}
-
-	f := commons.NewFields(set, fmt.Sprintf("skill: clan skill %d", id))
-	entry := ClanSkill{
-		ID:       ID(id),
-		Level:    f.Int("lvl"),
-		MinLevel: f.Int("minLvl"),
-		Cost:     f.Int("cost"),
-		ItemID:   f.Int32("itemId"),
-	}
-	if err := f.Err(); err != nil {
-		return ClanSkill{}, err
-	}
-	return entry, nil
+// NewClanSkill builds a ClanSkill from one <clanSkill> element's decoded
+// attributes.
+func NewClanSkill(id ID, level, minLevel, cost int, itemID int32) ClanSkill {
+	return ClanSkill{ID: id, Level: level, MinLevel: minLevel, Cost: cost, ItemID: itemID}
 }
 
 // SkillLevels maps a known skill id to its current level.
@@ -147,44 +108,15 @@ const LuckySkillMaxLevel = 10
 // lookahead every other skill gets.
 const ExpertiseSkillID ID = 239
 
-// NewEnchantSkill builds an EnchantSkill from set, the folded attributes of
-// one <enchantSkill> element. id, lvl, exp, sp and the five rate attributes
-// are all required; itemNeeded ("itemId-count") is optional.
-func NewEnchantSkill(set *commons.StatSet) (EnchantSkill, error) {
-	idf := commons.NewFields(set, "skill: enchant skill")
-	id := idf.Int32("id")
-	if err := idf.Err(); err != nil {
-		return EnchantSkill{}, err
+// NewEnchantSkill builds an EnchantSkill from one <enchantSkill> element's
+// decoded attributes. itemID and itemCount are both zero when the level
+// carries no item requirement.
+func NewEnchantSkill(id ID, level, exp, sp, rate76, rate77, rate78, rate79, rate80 int, itemID int32, itemCount int) EnchantSkill {
+	return EnchantSkill{
+		ID: id, Level: level, Exp: exp, SP: sp,
+		Rate76: rate76, Rate77: rate77, Rate78: rate78, Rate79: rate79, Rate80: rate80,
+		ItemID: itemID, ItemCount: itemCount,
 	}
-
-	f := commons.NewFields(set, fmt.Sprintf("skill: enchant skill %d", id))
-	level := f.Int("lvl")
-	exp := f.Int("exp")
-	sp := f.Int("sp")
-
-	rates := make([]int, 5)
-	for i, key := range [...]string{"rate76", "rate77", "rate78", "rate79", "rate80"} {
-		rates[i] = f.Int(key)
-	}
-
-	e := EnchantSkill{
-		ID: ID(id), Level: level, Exp: exp, SP: sp,
-		Rate76: rates[0], Rate77: rates[1], Rate78: rates[2], Rate79: rates[3], Rate80: rates[4],
-	}
-
-	if f.Has("itemNeeded") {
-		raw := f.String("itemNeeded")
-		if itemID, count, err := parseItemNeeded(raw); err != nil {
-			f.Fail(fmt.Errorf("itemNeeded %q: %w", raw, err))
-		} else {
-			e.ItemID, e.ItemCount = itemID, count
-		}
-	}
-
-	if err := f.Err(); err != nil {
-		return EnchantSkill{}, err
-	}
-	return e, nil
 }
 
 // SuccessRateForLevel returns the success-rate percentage for a character
@@ -230,11 +162,6 @@ func (e EnchantSkill) RouteStep() int {
 	default:
 		return 0
 	}
-}
-
-// parseItemNeeded parses an "itemNeeded" attribute's "itemId-count" form.
-func parseItemNeeded(raw string) (itemID int32, count int, err error) {
-	return parseDashPair(raw)
 }
 
 // Trees holds every skill tree a character or clan learns from: the three

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -66,6 +67,69 @@ func (c *coord) UnmarshalXMLAttr(attr xml.Attr) error {
 		return fmt.Errorf("%s: %w", attr.Name.Local, err)
 	}
 	*c = coord(n)
+	return nil
+}
+
+// coord32 is like coord but for an attribute that must fit int32 (a skill,
+// item, or npc id read directly as int32 rather than widened at the call
+// site), rejecting the same malformed, empty, padded, and out-of-range input
+// commons.StatSet.GetInt32 did.
+type coord32 int32
+
+func (c *coord32) UnmarshalXMLAttr(attr xml.Attr) error {
+	n, err := strconv.ParseInt(attr.Value, 10, 32)
+	if err != nil {
+		return fmt.Errorf("%s: %w", attr.Name.Local, err)
+	}
+	*c = coord32(n)
+	return nil
+}
+
+// floatAttr is a required float64 attribute, rejecting the same malformed
+// input commons.StatSet.GetFloat64 did.
+type floatAttr float64
+
+func (f *floatAttr) UnmarshalXMLAttr(attr xml.Attr) error {
+	v, err := strconv.ParseFloat(attr.Value, 64)
+	if err != nil {
+		return fmt.Errorf("%s: %w", attr.Name.Local, err)
+	}
+	*f = floatAttr(v)
+	return nil
+}
+
+// boolAttr coerces an attribute value the same permissive way
+// commons.StatSet.GetBoolDefault did: case-insensitively "true" is true,
+// anything else present is false. It never fails to parse, matching that
+// laxness exactly rather than encoding/xml's stricter native bool decode.
+type boolAttr bool
+
+func (b *boolAttr) UnmarshalXMLAttr(attr xml.Attr) error {
+	*b = boolAttr(strings.EqualFold(attr.Value, "true"))
+	return nil
+}
+
+// dashPairAttr is a "left-right" attribute (an item requirement or a
+// shared-reuse skill reference): a 32-bit id and a plain count/level.
+type dashPairAttr struct {
+	ID    int32
+	Count int
+}
+
+func (d *dashPairAttr) UnmarshalXMLAttr(attr xml.Attr) error {
+	parts := strings.Split(attr.Value, "-")
+	if len(parts) != 2 {
+		return fmt.Errorf("%s: want \"left-right\"", attr.Name.Local)
+	}
+	id, err := strconv.ParseInt(parts[0], 10, 32)
+	if err != nil {
+		return fmt.Errorf("%s: %w", attr.Name.Local, err)
+	}
+	count, err := strconv.Atoi(parts[1])
+	if err != nil {
+		return fmt.Errorf("%s: %w", attr.Name.Local, err)
+	}
+	d.ID, d.Count = int32(id), count
 	return nil
 }
 
