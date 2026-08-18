@@ -53,21 +53,38 @@ func buildAll[T any](path string, els []attrsElement, ctor func(*commons.StatSet
 	return out, nil
 }
 
-// attrLocation reads the required x/y/z attributes of set as a world
-// location. Coordinates ride along on elements that describe something else
-// (a spawn, a door, a teleport destination), so the loader parses them here
-// rather than pushing an attribute bag into the location package.
-func attrLocation(set *commons.StatSet) (location.Location, error) {
-	f := commons.NewFields(set, "location")
-	loc := location.Location{X: f.Int("x"), Y: f.Int("y"), Z: f.Int("z")}
-	return loc, f.Err()
+// pointElement is an element whose x/y attributes are a 2D world point, and
+// locationElement one whose x/y/z attributes are a world location. Both are
+// embedded into the element types that carry coordinates alongside their own
+// attributes, so the decoder converts them like any other tagged field.
+//
+// The coordinates are pointers because they are required and zero is a legal
+// coordinate: a plain int cannot tell an absent attribute from x="0", and a
+// missing coordinate silently reading as the world origin is exactly the
+// data-file corruption the loaders are meant to reject.
+type pointElement struct {
+	X *int `xml:"x,attr"`
+	Y *int `xml:"y,attr"`
 }
 
-// attrPoint reads the required x/y attributes of set as a 2D world point.
-func attrPoint(set *commons.StatSet) (location.Point, error) {
-	f := commons.NewFields(set, "point")
-	p := location.Point{X: f.Int("x"), Y: f.Int("y")}
-	return p, f.Err()
+func (e pointElement) point() (location.Point, error) {
+	if e.X == nil || e.Y == nil {
+		return location.Point{}, fmt.Errorf("x and y are required")
+	}
+	return location.Point{X: *e.X, Y: *e.Y}, nil
+}
+
+type locationElement struct {
+	X *int `xml:"x,attr"`
+	Y *int `xml:"y,attr"`
+	Z *int `xml:"z,attr"`
+}
+
+func (e locationElement) loc() (location.Location, error) {
+	if e.X == nil || e.Y == nil || e.Z == nil {
+		return location.Location{}, fmt.Errorf("x, y and z are required")
+	}
+	return location.Location{X: *e.X, Y: *e.Y, Z: *e.Z}, nil
 }
 
 func readXML(path string, dst any) error {

@@ -19,10 +19,10 @@ type classFile struct {
 // readability; buildTemplate merges them before handing the result to the
 // model constructor.
 type classElement struct {
-	Sets   []attrsElement `xml:"set"`
-	Items  []attrsElement `xml:"items>item"`
-	Skills []attrsElement `xml:"skills>skill"`
-	Spawns []attrsElement `xml:"spawns>spawn"`
+	Sets   []attrsElement    `xml:"set"`
+	Items  []attrsElement    `xml:"items>item"`
+	Skills []attrsElement    `xml:"skills>skill"`
+	Spawns []locationElement `xml:"spawns>spawn"`
 }
 
 // attrsElement captures every attribute of an element, whatever their
@@ -110,7 +110,7 @@ func buildTemplate(c classElement) (*player.Template, error) {
 	if len(c.Spawns) > 0 {
 		spawns := make([]location.Location, 0, len(c.Spawns))
 		for _, node := range c.Spawns {
-			spawn, err := attrLocation(commons.StatSetFromXMLAttrs(node.Attrs))
+			spawn, err := node.loc()
 			if err != nil {
 				return nil, fmt.Errorf("spawn point: %w", err)
 			}

@@ -16,7 +16,7 @@ type doorFile struct {
 type doorElement struct {
 	Attrs       []xml.Attr     `xml:",any,attr"`
 	Position    attrsElement   `xml:"position"`
-	Coordinates []attrsElement `xml:"coordinates>loc"`
+	Coordinates []pointElement `xml:"coordinates>loc"`
 	Stats       attrsElement   `xml:"stats"`
 	Function    attrsElement   `xml:"function"`
 }
@@ -53,7 +53,7 @@ func buildDoorTemplate(el doorElement) (*door.Template, error) {
 
 	coords := make([]location.Point, 0, len(el.Coordinates))
 	for _, coord := range el.Coordinates {
-		point, err := attrPoint(commons.StatSetFromXMLAttrs(coord.Attrs))
+		point, err := coord.point()
 		if err != nil {
 			return nil, err
 		}

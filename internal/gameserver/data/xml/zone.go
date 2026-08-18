@@ -16,10 +16,17 @@ type zoneFile struct {
 }
 
 type zoneElement struct {
-	Attrs  []xml.Attr        `xml:",any,attr"`
-	Nodes  []attrsElement    `xml:"node"`
-	Stats  []zoneStatElement `xml:"stat"`
-	Spawns []attrsElement    `xml:"spawn"`
+	Attrs  []xml.Attr         `xml:",any,attr"`
+	Nodes  []pointElement     `xml:"node"`
+	Stats  []zoneStatElement  `xml:"stat"`
+	Spawns []zoneSpawnElement `xml:"spawn"`
+}
+
+// zoneSpawnElement is one <spawn> under a zone: a kind plus the coordinates
+// it applies to.
+type zoneSpawnElement struct {
+	Type string `xml:"type,attr"`
+	locationElement
 }
 
 type zoneStatElement struct {
@@ -144,7 +151,7 @@ func buildZone(build func(int, zone.Form, *commons.StatSet) (zone.Kind, error), 
 	return k, nil
 }
 
-func buildZoneForm(attrs *commons.StatSet, nodeEls []attrsElement) (zone.Form, error) {
+func buildZoneForm(attrs *commons.StatSet, nodeEls []pointElement) (zone.Form, error) {
 	f := commons.NewFields(attrs, "zone form")
 	shape := f.String("shape")
 	minZ := f.Int("minZ")
@@ -155,7 +162,7 @@ func buildZoneForm(attrs *commons.StatSet, nodeEls []attrsElement) (zone.Form, e
 
 	nodes := make([]location.Point, 0, len(nodeEls))
 	for _, el := range nodeEls {
-		point, err := attrPoint(commons.StatSetFromXMLAttrs(el.Attrs))
+		point, err := el.point()
 		if err != nil {
 			return nil, err
 		}
@@ -190,17 +197,12 @@ func buildZoneForm(attrs *commons.StatSet, nodeEls []attrsElement) (zone.Form, e
 	}
 }
 
-func addZoneSpawn(site zone.SpawnSite, el attrsElement) error {
-	set := commons.StatSetFromXMLAttrs(el.Attrs)
-	kindName, err := set.GetString("type")
+func addZoneSpawn(site zone.SpawnSite, el zoneSpawnElement) error {
+	kind, err := zone.ParseSpawnKind(el.Type)
 	if err != nil {
 		return err
 	}
-	kind, err := zone.ParseSpawnKind(kindName)
-	if err != nil {
-		return err
-	}
-	loc, err := attrLocation(set)
+	loc, err := el.loc()
 	if err != nil {
 		return err
 	}

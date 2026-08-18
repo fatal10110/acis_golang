@@ -17,6 +17,18 @@ type teleportListElement struct {
 	Locs  []attrsElement `xml:"loc"`
 }
 
+// Instant teleports decode into their own types: a <loc> there is nothing
+// but coordinates, while a gatekeeper <loc> above carries a description and
+// a price that travel.Teleport reads for itself.
+type instantTeleportFile struct {
+	Lists []instantTeleportListElement `xml:"telPosList"`
+}
+
+type instantTeleportListElement struct {
+	NPCID int               `xml:"npcId,attr"`
+	Locs  []locationElement `xml:"loc"`
+}
+
 // LoadTeleports parses regular gatekeeper teleport destinations.
 func LoadTeleports(path string) (travel.TeleportTable, error) {
 	var doc teleportFile
@@ -44,7 +56,7 @@ func LoadTeleports(path string) (travel.TeleportTable, error) {
 
 // LoadInstantTeleports parses instant teleport destinations keyed by npc id.
 func LoadInstantTeleports(path string) (travel.InstantTable, error) {
-	var doc teleportFile
+	var doc instantTeleportFile
 	if err := readXML(path, &doc); err != nil {
 		return nil, fmt.Errorf("instant teleports: %w", err)
 	}
@@ -56,7 +68,7 @@ func LoadInstantTeleports(path string) (travel.InstantTable, error) {
 		}
 		teleports := make([]location.Location, 0, len(list.Locs))
 		for _, loc := range list.Locs {
-			t, err := attrLocation(commons.StatSetFromXMLAttrs(loc.Attrs))
+			t, err := loc.loc()
 			if err != nil {
 				return nil, fmt.Errorf("xml: %s: npc %d: %w", path, list.NPCID, err)
 			}

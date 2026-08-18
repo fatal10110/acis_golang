@@ -16,15 +16,15 @@ type castleFile struct {
 }
 
 type castleElement struct {
-	Attrs         []xml.Attr             `xml:",any,attr"`
-	Artifacts     []attrsElement         `xml:"artifacts>artifact"`
-	ControlTowers []castleTowerElement   `xml:"controlTowers>controlTower"`
-	Gates         []attrsElement         `xml:"gates"`
-	NPCs          []attrsElement         `xml:"npcs"`
-	Spawns        []attrsElement         `xml:"spawns>spawn"`
-	Taxes         []attrsElement         `xml:"tax"`
-	Tickets       []attrsElement         `xml:"tickets>ticket"`
-	Zones         []residenceZoneElement `xml:"zones>zone"`
+	Attrs         []xml.Attr              `xml:",any,attr"`
+	Artifacts     []attrsElement          `xml:"artifacts>artifact"`
+	ControlTowers []castleTowerElement    `xml:"controlTowers>controlTower"`
+	Gates         []attrsElement          `xml:"gates"`
+	NPCs          []attrsElement          `xml:"npcs"`
+	Spawns        []residenceSpawnElement `xml:"spawns>spawn"`
+	Taxes         []attrsElement          `xml:"tax"`
+	Tickets       []attrsElement          `xml:"tickets>ticket"`
+	Zones         []residenceZoneElement  `xml:"zones>zone"`
 }
 
 type castleTowerElement struct {
@@ -39,13 +39,13 @@ type clanHallFile struct {
 }
 
 type clanHallElement struct {
-	Attrs  []xml.Attr             `xml:",any,attr"`
-	Agits  []attrsElement         `xml:"agit"`
-	Gates  []attrsElement         `xml:"gates"`
-	NPCs   []attrsElement         `xml:"npcs"`
-	Spawns []attrsElement         `xml:"spawns>spawn"`
-	Taxes  []attrsElement         `xml:"tax"`
-	Zones  []residenceZoneElement `xml:"zones>zone"`
+	Attrs  []xml.Attr              `xml:",any,attr"`
+	Agits  []attrsElement          `xml:"agit"`
+	Gates  []attrsElement          `xml:"gates"`
+	NPCs   []attrsElement          `xml:"npcs"`
+	Spawns []residenceSpawnElement `xml:"spawns>spawn"`
+	Taxes  []attrsElement          `xml:"tax"`
+	Zones  []residenceZoneElement  `xml:"zones>zone"`
 }
 
 type clanHallDecoFile struct {
@@ -54,7 +54,14 @@ type clanHallDecoFile struct {
 
 type residenceZoneElement struct {
 	Attrs []xml.Attr     `xml:",any,attr"`
-	Nodes []attrsElement `xml:"node"`
+	Nodes []pointElement `xml:"node"`
+}
+
+// residenceSpawnElement is one <spawn> under a castle or clan hall: a spawn
+// kind plus the coordinates it applies to.
+type residenceSpawnElement struct {
+	Type string `xml:"type,attr"`
+	locationElement
 }
 
 // LoadCastles parses castles.xml into static castle data.
@@ -217,7 +224,7 @@ func buildResidenceZones(elems []residenceZoneElement) ([]residence.Zone, error)
 		}
 		nodes := make([]location.Point, 0, len(el.Nodes))
 		for _, nodeEl := range el.Nodes {
-			node, err := attrPoint(commons.StatSetFromXMLAttrs(nodeEl.Attrs))
+			node, err := nodeEl.point()
 			if err != nil {
 				return nil, err
 			}
@@ -233,18 +240,17 @@ func buildResidenceZones(elems []residenceZoneElement) ([]residence.Zone, error)
 	return zones, nil
 }
 
-func buildResidenceSpawns(elems []attrsElement) (map[residence.SpawnType][]location.Location, error) {
+func buildResidenceSpawns(elems []residenceSpawnElement) (map[residence.SpawnType][]location.Location, error) {
 	if len(elems) == 0 {
 		return nil, nil
 	}
 	out := make(map[residence.SpawnType][]location.Location)
 	for _, el := range elems {
-		set := commons.StatSetFromXMLAttrs(el.Attrs)
-		kind, err := commons.GetEnum(set, "type", residence.SpawnTypeNames)
-		if err != nil {
-			return nil, err
+		kind, ok := residence.SpawnTypeNames[el.Type]
+		if !ok {
+			return nil, fmt.Errorf("unknown residence spawn type %q", el.Type)
 		}
-		loc, err := attrLocation(set)
+		loc, err := el.loc()
 		if err != nil {
 			return nil, err
 		}
