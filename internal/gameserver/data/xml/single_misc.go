@@ -308,8 +308,48 @@ func LoadStaticObjects(path string) (*staticobject.Table, error) {
 	return staticobject.NewTable(templates)
 }
 
+// cursedWeaponElement is one <item> element. Every attribute is required.
+type cursedWeaponElement struct {
+	ID              *coord32 `xml:"id,attr"`
+	SkillID         *coord32 `xml:"skillId,attr"`
+	Name            *string  `xml:"name,attr"`
+	DropRate        *coord   `xml:"dropRate,attr"`
+	Duration        *coord   `xml:"duration,attr"`
+	DurationLost    *coord   `xml:"durationLost,attr"`
+	DisappearChance *coord   `xml:"dissapearChance,attr"`
+	StageKills      *coord   `xml:"stageKills,attr"`
+}
+
+func (e cursedWeaponElement) build(skills *skill.Table) (entity.CursedWeapon, error) {
+	if e.ID == nil {
+		return entity.CursedWeapon{}, fmt.Errorf("cursed weapon: id is required")
+	}
+	if e.SkillID == nil {
+		return entity.CursedWeapon{}, fmt.Errorf("cursed weapon %d: skillId is required", *e.ID)
+	}
+	if e.Name == nil {
+		return entity.CursedWeapon{}, fmt.Errorf("cursed weapon %d: name is required", *e.ID)
+	}
+	if e.DropRate == nil {
+		return entity.CursedWeapon{}, fmt.Errorf("cursed weapon %d: dropRate is required", *e.ID)
+	}
+	if e.Duration == nil {
+		return entity.CursedWeapon{}, fmt.Errorf("cursed weapon %d: duration is required", *e.ID)
+	}
+	if e.DurationLost == nil {
+		return entity.CursedWeapon{}, fmt.Errorf("cursed weapon %d: durationLost is required", *e.ID)
+	}
+	if e.DisappearChance == nil {
+		return entity.CursedWeapon{}, fmt.Errorf("cursed weapon %d: dissapearChance is required", *e.ID)
+	}
+	if e.StageKills == nil {
+		return entity.CursedWeapon{}, fmt.Errorf("cursed weapon %d: stageKills is required", *e.ID)
+	}
+	return entity.NewCursedWeapon(int32(*e.ID), int32(*e.SkillID), *e.Name, int(*e.DropRate), int(*e.Duration), int(*e.DurationLost), int(*e.DisappearChance), int(*e.StageKills), skills)
+}
+
 type cursedWeaponFile struct {
-	Items []attrsElement `xml:"item"`
+	Items []cursedWeaponElement `xml:"item"`
 }
 
 func LoadCursedWeapons(path string, skills *skill.Table) (*entity.CursedWeaponTable, error) {
@@ -318,11 +358,13 @@ func LoadCursedWeapons(path string, skills *skill.Table) (*entity.CursedWeaponTa
 		return nil, fmt.Errorf("cursed weapons: %w", err)
 	}
 
-	weapons, err := buildAll(path, doc.Items, func(set *commons.StatSet) (entity.CursedWeapon, error) {
-		return entity.NewCursedWeapon(set, skills)
-	})
-	if err != nil {
-		return nil, err
+	weapons := make([]entity.CursedWeapon, 0, len(doc.Items))
+	for _, el := range doc.Items {
+		weapon, err := el.build(skills)
+		if err != nil {
+			return nil, fmt.Errorf("xml: %s: %w", path, err)
+		}
+		weapons = append(weapons, weapon)
 	}
 	return entity.NewCursedWeaponTable(weapons)
 }
