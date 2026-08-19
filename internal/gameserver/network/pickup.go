@@ -143,11 +143,20 @@ func (l *GameClientLink) lockPickupParalysis(live *livePlayer) {
 // as still blocking by one read and already cleared by the other, which is
 // what let a click land in the unlock instant, read blocked, then read
 // not-deferrable, and get discarded instead of re-deferred (#1159).
+//
+// Crowd control is deliberately absent from the block set: the reference's
+// pickup path gates nothing but flying (ItemInstance.java:145-184,
+// PlayerAI.java:327-414), so a stunned, sleeping, paralyzed, or afraid
+// player picks items up immediately. Only death (via liveItemOpsAllowed's
+// dead-only check), the transient pickup lock (pickupLocked, the
+// PlayerAI.java:412-413 200ms anti-mash gate), a non-standing pose,
+// attacking, and casting defer — those are the busy states the reference's
+// AI retries on its next think.
 func livePickupBlockedDeferrable(live *livePlayer) (blocked, deferrable bool) {
 	live.pickupMu.Lock()
 	defer live.pickupMu.Unlock()
 	attacking := live.attack != nil && live.attack.AttackingNow()
-	blocked = !liveItemOpsAllowed(live) || !live.Standing() || attacking || (live.cast != nil && live.cast.CastingNow())
+	blocked = !liveItemOpsAllowed(live) || live.pickupLocked || !live.Standing() || attacking || (live.cast != nil && live.cast.CastingNow())
 	deferrable = attacking || live.pickupLocked
 	return
 }

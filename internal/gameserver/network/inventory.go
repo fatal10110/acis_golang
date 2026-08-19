@@ -52,7 +52,7 @@ func (l *GameClientLink) useItem(live *livePlayer, objectID int32) {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotUseQuestItems))
 		return
 	}
-	if !liveItemOpsAllowed(live) {
+	if !liveItemInteractionAllowed(live) {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
@@ -264,7 +264,7 @@ func (l *GameClientLink) unequipItem(live *livePlayer, bodySlot int32) {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
-	if !liveItemOpsAllowed(live) || (live.cast != nil && live.cast.CastingNow()) {
+	if !liveItemInteractionAllowed(live) || (live.cast != nil && live.cast.CastingNow()) {
 		live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageS1CannotBeUsed, worn.TemplateID))
 		return
 	}
@@ -424,12 +424,22 @@ func (l *GameClientLink) broadcastCharacterInfo(live *livePlayer) {
 	})
 }
 
-// liveItemOpsAllowed reports whether live may currently use, equip, or
-// unequip an item: not gone, not dead, and free of every crowd-control
-// state that locks item interaction (stunned, sleeping, paralyzed, or
-// afraid).
+// liveItemOpsAllowed reports whether live may currently manipulate items at
+// all: not gone and not dead. The reference only adds crowd-control gates on
+// the use/unequip flows (UseItem.java:66, RequestUnEquipItem.java:37), so
+// drop/destroy/crystallize/enchant/pet-use/pickup gate on this alone.
 func liveItemOpsAllowed(live *livePlayer) bool {
-	return live != nil && !live.AlikeDead() && !live.Stunned() && !live.Sleeping() && !live.Paralyzed() && !live.Afraid()
+	return live != nil && !live.AlikeDead()
+}
+
+// liveItemInteractionAllowed reports whether live may currently use, equip,
+// or unequip an item: not gone, not dead, and free of every crowd-control
+// state that locks item interaction (stunned, sleeping, paralyzed, or
+// afraid). This is the exact union the reference applies to the UseItem and
+// RequestUnEquipItem handlers (UseItem.java:66, RequestUnEquipItem.java:37)
+// and to no other item flow.
+func liveItemInteractionAllowed(live *livePlayer) bool {
+	return liveItemOpsAllowed(live) && !live.Stunned() && !live.Sleeping() && !live.Paralyzed() && !live.Afraid()
 }
 
 func dropInRange(live *livePlayer, x, y, z int) bool {

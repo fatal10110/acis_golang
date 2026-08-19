@@ -1,10 +1,12 @@
 package network
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
@@ -459,6 +461,108 @@ func TestCrowdControlledPlayerItemOpsAreNoops(t *testing.T) {
 
 		if weapon.Equipped() || len(capture.frames) != 1 || capture.frames[0][0] != serverpackets.OpcodeActionFailed {
 			t.Fatalf("paralyzed UseItem mutated item=%+v frames=%x, want unchanged item and ActionFailed only", weapon, capture.frames)
+		}
+	})
+}
+
+// TestCrowdControlledPlayerCanStillDropDestroyAndPickUp is the other half
+// of TestCrowdControlledPlayerItemOpsAreNoops: the reference only gates
+// UseItem and RequestUnEquipItem on crowd control (UseItem.java:66,
+// RequestUnEquipItem.java:37). RequestDropItem.java:36 gates dead-only,
+// RequestDestroyItem gates nothing, and the ground-item pickup path gates
+// nothing (ItemInstance.java:145-184, PlayerAI.java:327-414) — so the same
+// effects that block use/unequip must leave drop, destroy, and pickup
+// reachable.
+func TestCrowdControlledPlayerCanStillDropDestroyAndPickUp(t *testing.T) {
+	effectNames := []string{"Stun", "Sleep", "Paralyze", "Fear"}
+
+	for _, effectName := range effectNames {
+		t.Run(effectName+"/drop", func(t *testing.T) {
+			templates := testItemTemplates()
+			stack := &item.Instance{ObjectID: 500, TemplateID: item.AdenaID, Count: 100, Location: item.LocationInventory}
+			capture := &frameCapture{}
+			live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{stack})
+			addEquipTestEffect(t, live, effectName)
+			drops := &recordingGroundDropper{}
+
+			(&GameClientLink{ids: &sequentialIDs{next: 200}, groundItems: drops, inventory: invops.NewService(&sequentialIDs{next: 300})}).dropLiveItem(live, clientpackets.RequestDropItem{
+				ObjectID: stack.ObjectID,
+				Count:    40,
+				X:        110,
+				Y:        0,
+				Z:        0,
+			})
+
+			if stack.Count != 60 || len(drops.drops) != 1 {
+				t.Fatalf("%s drop mutated count=%d drops=%d, want count 60 and 1 drop", effectName, stack.Count, len(drops.drops))
+			}
+			if len(capture.frames) != 0 {
+				t.Fatalf("%s drop frames=%x, want none (no rejection)", effectName, capture.frames)
+			}
+		})
+
+		t.Run(effectName+"/destroy", func(t *testing.T) {
+			templates := testItemTemplates()
+			stack := &item.Instance{ObjectID: 500, TemplateID: item.AdenaID, Count: 5, Location: item.LocationInventory}
+			capture := &frameCapture{}
+			live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{stack})
+			addEquipTestEffect(t, live, effectName)
+
+			(&GameClientLink{inventory: invops.NewService(&sequentialIDs{next: 300})}).destroyLiveItem(live, stack.ObjectID, 2)
+
+			if stack.Count != 3 {
+				t.Fatalf("%s destroy mutated count=%d, want 3", effectName, stack.Count)
+			}
+			if len(capture.frames) != 0 {
+				t.Fatalf("%s destroy frames=%x, want none (no rejection)", effectName, capture.frames)
+			}
+		})
+
+		t.Run(effectName+"/pickup", func(t *testing.T) {
+			templates := petTestTemplates()
+			capture := &frameCapture{}
+			live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
+			state := world.New()
+			state.Spawn(live, 100, 0, 0, 0)
+			drops := task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour}, time.Now)
+			tmpl, _ := templates.Get(item.AdenaID)
+			ground := dropTestGround(t, state, drops, item.Instance{ObjectID: 900, TemplateID: item.AdenaID, Count: 40, ManaLeft: -1}, tmpl, 100, 0, 0)
+			addEquipTestEffect(t, live, effectName)
+			store := &recordingEnchantItemStore{}
+
+			gcl := &GameClientLink{world: state, groundItems: drops, items: store}
+			if !gcl.pickupLiveGroundItem(context.Background(), live, ground) {
+				t.Fatal(effectName + " pickupLiveGroundItem returned false for a ground item target")
+			}
+
+			stack := live.Inventory().ItemByTemplateID(item.AdenaID)
+			if stack == nil || stack.ObjectID != ground.ObjectID() || stack.Count != 40 {
+				t.Fatalf("%s pickup inventory stack = %+v, want picked up ground adena", effectName, stack)
+			}
+			if got := drops.Len(); got != 0 {
+				t.Fatalf("%s pickup ground item tracker Len = %d, want 0", effectName, got)
+			}
+		})
+	}
+
+	t.Run("manual paralysis lock/drop", func(t *testing.T) {
+		templates := testItemTemplates()
+		stack := &item.Instance{ObjectID: 500, TemplateID: item.AdenaID, Count: 100, Location: item.LocationInventory}
+		capture := &frameCapture{}
+		live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{stack})
+		live.SetParalyzed(true)
+		drops := &recordingGroundDropper{}
+
+		(&GameClientLink{ids: &sequentialIDs{next: 200}, groundItems: drops, inventory: invops.NewService(&sequentialIDs{next: 300})}).dropLiveItem(live, clientpackets.RequestDropItem{
+			ObjectID: stack.ObjectID,
+			Count:    40,
+			X:        110,
+			Y:        0,
+			Z:        0,
+		})
+
+		if stack.Count != 60 || len(drops.drops) != 1 || len(capture.frames) != 0 {
+			t.Fatalf("paralyzed drop mutated count=%d drops=%d frames=%x, want count 60, 1 drop, no frames", stack.Count, len(drops.drops), capture.frames)
 		}
 	})
 }
