@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
@@ -96,14 +95,15 @@ func buildSkillDefinitions(el skillElement) ([]skill.Definition, error) {
 	defs := make([]skill.Definition, 0, levels+enchant1+enchant2)
 
 	for i := 1; i <= levels; i++ {
-		set, err := resolveSkillLevel(tables, el.Sets, i)
+		vals, err := resolveSkillLevel(tables, el.Sets, i)
 		if err != nil {
 			return nil, fmt.Errorf("skill %d level %d: %w", id, i, err)
 		}
-		def, err := skill.NewDefinition(id, i, el.Name, set)
+		attrs, err := buildSkillDefinitionAttrs(id, i, vals)
 		if err != nil {
-			return nil, fmt.Errorf("skill %d level %d: %w", id, i, err)
+			return nil, err
 		}
+		def := skill.NewDefinition(id, i, el.Name, attrs)
 		if err := applySkillTemplates(&def, tables, el.Cond, el.For, i, i); err != nil {
 			return nil, fmt.Errorf("skill %d level %d: %w", id, i, err)
 		}
@@ -114,17 +114,18 @@ func buildSkillDefinitions(el skillElement) ([]skill.Definition, error) {
 	// level's table row; only its <enchantN> values vary per enchant level.
 	for i := 0; i < enchant1; i++ {
 		level := i + 101
-		set, err := resolveSkillLevel(tables, el.Sets, levels)
+		vals, err := resolveSkillLevel(tables, el.Sets, levels)
 		if err != nil {
 			return nil, fmt.Errorf("skill %d level %d: %w", id, level, err)
 		}
-		if err := applySkillAttrs(set, tables, el.Enchant1, i+1); err != nil {
+		if err := applySkillAttrs(vals, tables, el.Enchant1, i+1); err != nil {
 			return nil, fmt.Errorf("skill %d level %d: %w", id, level, err)
 		}
-		def, err := skill.NewDefinition(id, level, el.Name, set)
+		attrs, err := buildSkillDefinitionAttrs(id, level, vals)
 		if err != nil {
-			return nil, fmt.Errorf("skill %d level %d: %w", id, level, err)
+			return nil, err
 		}
+		def := skill.NewDefinition(id, level, el.Name, attrs)
 		condIndex := i + 1
 		conds := el.Enchant1Cond
 		if len(conds) == 0 {
@@ -145,17 +146,18 @@ func buildSkillDefinitions(el skillElement) ([]skill.Definition, error) {
 
 	for i := 0; i < enchant2; i++ {
 		level := i + 141
-		set, err := resolveSkillLevel(tables, el.Sets, levels)
+		vals, err := resolveSkillLevel(tables, el.Sets, levels)
 		if err != nil {
 			return nil, fmt.Errorf("skill %d level %d: %w", id, level, err)
 		}
-		if err := applySkillAttrs(set, tables, el.Enchant2, i+1); err != nil {
+		if err := applySkillAttrs(vals, tables, el.Enchant2, i+1); err != nil {
 			return nil, fmt.Errorf("skill %d level %d: %w", id, level, err)
 		}
-		def, err := skill.NewDefinition(id, level, el.Name, set)
+		attrs, err := buildSkillDefinitionAttrs(id, level, vals)
 		if err != nil {
-			return nil, fmt.Errorf("skill %d level %d: %w", id, level, err)
+			return nil, err
 		}
+		def := skill.NewDefinition(id, level, el.Name, attrs)
 		condIndex := i + 1
 		conds := el.Enchant2Cond
 		if len(conds) == 0 {
@@ -177,27 +179,27 @@ func buildSkillDefinitions(el skillElement) ([]skill.Definition, error) {
 	return defs, nil
 }
 
-// resolveSkillLevel builds the StatSet for one level by applying attrs in
-// order, resolving any table-referencing value against row tableIndex (the
-// level within the referenced table, 1-based).
-func resolveSkillLevel(tables map[string][]string, attrs []setElem, tableIndex int) (*commons.StatSet, error) {
-	set := commons.NewStatSetWithCapacity(len(attrs))
-	if err := applySkillAttrs(set, tables, attrs, tableIndex); err != nil {
+// resolveSkillLevel builds the raw attribute values for one level by
+// applying attrs in order, resolving any table-referencing value against row
+// tableIndex (the level within the referenced table, 1-based).
+func resolveSkillLevel(tables map[string][]string, attrs []setElem, tableIndex int) (map[string]string, error) {
+	vals := make(map[string]string, len(attrs))
+	if err := applySkillAttrs(vals, tables, attrs, tableIndex); err != nil {
 		return nil, err
 	}
-	return set, nil
+	return vals, nil
 }
 
-// applySkillAttrs applies attrs to set in order, resolving any
+// applySkillAttrs applies attrs to vals in order, resolving any
 // table-referencing value ("#name") against row tableIndex and overwriting
 // whatever the same attribute name already held.
-func applySkillAttrs(set *commons.StatSet, tables map[string][]string, attrs []setElem, tableIndex int) error {
+func applySkillAttrs(vals map[string]string, tables map[string][]string, attrs []setElem, tableIndex int) error {
 	for _, a := range attrs {
 		v, err := resolveTableValue(tables, a.Name, a.Val, tableIndex)
 		if err != nil {
 			return err
 		}
-		set.Set(a.Name, v)
+		vals[a.Name] = v
 	}
 	return nil
 }
@@ -261,55 +263,38 @@ func applyTemplateNodes(def *skill.Definition, tables map[string][]string, ops [
 }
 
 func buildSkillEffect(tables map[string][]string, op funcElement, attachCond *skill.ConditionClause, tableIndex int) (skill.EffectTemplate, error) {
-	attrs, err := resolvedAttrs(tables, op.Attrs, tableIndex)
+	vals, err := resolveAttrMap(tables, op.Attrs, tableIndex)
 	if err != nil {
 		return skill.EffectTemplate{}, err
 	}
-	set := commons.StatSetFromXMLAttrs(attrs)
-	base := commons.NewFields(set, "effect")
-	name := base.String("name")
-	if err := base.Err(); err != nil {
+	a := newAttrValues(vals, "effect")
+	name := a.str("name")
+	if err := a.Err(); err != nil {
 		return skill.EffectTemplate{}, err
 	}
-	f := commons.NewFields(set, "effect "+name)
-	value := f.Float64("val")
-	count := f.Int32LiteralDefault("count", 1)
-	time := f.Int32LiteralDefault("time", 1)
-	self := f.Int32LiteralDefault("self", 0)
-	noIcon := f.Int32LiteralDefault("noicon", 0)
-	stackOrder := f.Float64Default("stackOrder", 0)
-	effectPower := f.Float64Default("effectPower", -1)
-	effectPowerSet := false
-	for _, attr := range attrs {
-		if attr.Name.Local == "effectPower" {
-			effectPowerSet = true
-			break
-		}
-	}
-	triggeredID := f.Int32LiteralDefault("triggeredId", 0)
-	triggeredLevel := f.Int32LiteralDefault("triggeredLevel", 1)
-	activationChance := f.Int32LiteralDefault("activationChance", -1)
-	if err := f.Err(); err != nil {
-		return skill.EffectTemplate{}, err
-	}
+	a.prefix = "effect " + name
+
 	eff := skill.EffectTemplate{
 		Name:             name,
-		Value:            value,
-		Count:            int(count),
-		Time:             int(time),
-		Self:             self == 1,
-		Icon:             noIcon != 1,
-		Abnormal:         f.StringDefault("abnormal", "NULL"),
-		StackType:        f.StringDefault("stackType", "none"),
-		StackOrder:       stackOrder,
-		EffectPower:      effectPower,
-		EffectPowerSet:   effectPowerSet,
-		EffectType:       f.StringDefault("effectType", ""),
-		TriggeredID:      int(triggeredID),
-		TriggeredLevel:   int(triggeredLevel),
-		ChanceType:       f.StringDefault("chanceType", ""),
-		ActivationChance: int(activationChance),
+		Value:            a.float64("val"),
+		Count:            int(a.int32LiteralDefault("count", 1)),
+		Time:             int(a.int32LiteralDefault("time", 1)),
+		Self:             a.int32LiteralDefault("self", 0) == 1,
+		Icon:             a.int32LiteralDefault("noicon", 0) != 1,
+		Abnormal:         a.strDefault("abnormal", "NULL"),
+		StackType:        a.strDefault("stackType", "none"),
+		StackOrder:       a.float64Default("stackOrder", 0),
+		EffectPower:      a.float64Default("effectPower", -1),
+		EffectPowerSet:   a.has("effectPower"),
+		EffectType:       a.strDefault("effectType", ""),
+		TriggeredID:      int(a.int32LiteralDefault("triggeredId", 0)),
+		TriggeredLevel:   int(a.int32LiteralDefault("triggeredLevel", 1)),
+		ChanceType:       a.strDefault("chanceType", ""),
+		ActivationChance: int(a.int32LiteralDefault("activationChance", -1)),
 		AttachCondition:  attachCond,
+	}
+	if err := a.Err(); err != nil {
+		return skill.EffectTemplate{}, err
 	}
 	if err := buildNestedEffectTemplates(&eff, tables, op.Children, tableIndex); err != nil {
 		return skill.EffectTemplate{}, fmt.Errorf("effect %s: %w", name, err)
@@ -343,19 +328,18 @@ func buildSkillFunc(tables map[string][]string, tag string, attrs []xml.Attr, ch
 	if err != nil {
 		return skill.FuncTemplate{}, err
 	}
-	resolved, err := resolvedAttrs(tables, attrs, tableIndex)
+	vals, err := resolveAttrMap(tables, attrs, tableIndex)
 	if err != nil {
 		return skill.FuncTemplate{}, err
 	}
-	set := commons.StatSetFromXMLAttrs(resolved)
-	base := commons.NewFields(set, tag)
-	stat := base.String("stat")
-	if err := base.Err(); err != nil {
+	a := newAttrValues(vals, tag)
+	stat := a.str("stat")
+	if err := a.Err(); err != nil {
 		return skill.FuncTemplate{}, err
 	}
-	f := commons.NewFields(set, tag+" "+stat)
-	value := f.Float64("val")
-	if err := f.Err(); err != nil {
+	a.prefix = tag + " " + stat
+	value := a.float64("val")
+	if err := a.Err(); err != nil {
 		return skill.FuncTemplate{}, err
 	}
 	fn := skill.FuncTemplate{Op: op, Stat: stat, Value: value, AttachCondition: attachCond}
@@ -373,34 +357,29 @@ func buildSkillConditionClause(tables map[string][]string, attrs []xml.Attr, chi
 	if len(children) == 0 {
 		return skill.ConditionClause{}, fmt.Errorf("cond: no predicate defined")
 	}
-	resolved, err := resolvedAttrs(tables, attrs, tableIndex)
+	vals, err := resolveAttrMap(tables, attrs, tableIndex)
 	if err != nil {
 		return skill.ConditionClause{}, err
 	}
-	set := commons.StatSetFromXMLAttrs(resolved)
 	root, err := buildSkillCondition(tables, children[0], tableIndex)
 	if err != nil {
 		return skill.ConditionClause{}, err
 	}
+	a := newAttrValues(vals, "cond")
 	clause := skill.ConditionClause{Root: root}
-	f := commons.NewFields(set, "cond")
-	clause.Message = f.StringDefault("msg", "")
-	clause.MessageID = f.Int32LiteralDefault("msgId", 0)
-	clause.AddName = f.Has("addName") && clause.MessageID > 0
-	if err := f.Err(); err != nil {
+	clause.Message = a.strDefault("msg", "")
+	clause.MessageID = a.int32LiteralDefault("msgId", 0)
+	clause.AddName = a.has("addName") && clause.MessageID > 0
+	if err := a.Err(); err != nil {
 		return skill.ConditionClause{}, err
 	}
 	return clause, nil
 }
 
 func buildSkillCondition(tables map[string][]string, n condNode, tableIndex int) (skill.Condition, error) {
-	attrs := make(map[string]string, len(n.Attrs))
-	for _, a := range n.Attrs {
-		v, err := resolveTableValue(tables, a.Name.Local, a.Value, tableIndex)
-		if err != nil {
-			return skill.Condition{}, err
-		}
-		attrs[a.Name.Local] = v
+	attrs, err := resolveAttrMap(tables, n.Attrs, tableIndex)
+	if err != nil {
+		return skill.Condition{}, err
 	}
 	var children []skill.Condition
 	for _, c := range n.Children {
@@ -417,21 +396,173 @@ func buildSkillCondition(tables map[string][]string, n condNode, tableIndex int)
 	}, nil
 }
 
-func resolvedAttrs(tables map[string][]string, attrs []xml.Attr, tableIndex int) ([]xml.Attr, error) {
-	resolved := attrs
-	copied := false
-	for i, a := range attrs {
-		v, err := resolveTableValue(tables, a.Name.Local, a.Value, tableIndex)
+// buildSkillDefinitionAttrs resolves one level's raw <set> values into the
+// typed attributes skill.NewDefinition takes. Every attribute is parsed and
+// defaulted here: a level's values come from a per-level substitution of one
+// shared attribute list, so there is no fixed element per attribute for the
+// model package to decode itself.
+func buildSkillDefinitionAttrs(id skill.ID, level int, vals map[string]string) (skill.DefinitionAttrs, error) {
+	a := newAttrValues(vals, fmt.Sprintf("skill %d level %d", id, level))
+
+	attrs := skill.DefinitionAttrs{
+		Activation: attrEnum(a, "operateType", skill.ParseActivation),
+		Magic:      a.boolDefault("isMagic", false),
+		Potion:     a.boolDefault("isPotion", false),
+
+		MPConsume:        a.intDefault("mpConsume", 0),
+		MPInitialConsume: a.intDefault("mpInitialConsume", 0),
+		HPConsume:        a.intDefault("hpConsume", 0),
+
+		TargetConsumeCount: a.intDefault("targetConsumeCount", 0),
+		TargetConsumeID:    a.intDefault("targetConsumeId", 0),
+		ItemConsumeCount:   a.intDefault("itemConsumeCount", 0),
+		ItemConsumeID:      a.intDefault("itemConsumeId", 0),
+
+		CastRange:           a.intDefault("castRange", 0),
+		EffectRange:         a.intDefault("effectRange", -1),
+		AbnormalLevel:       a.intDefault("abnormalLvl", -1),
+		EffectAbnormalLevel: a.intDefault("effectAbnormalLvl", -1),
+		NegateLevel:         a.intDefault("negateLvl", -1),
+
+		HitTime:    a.intDefault("hitTime", 0),
+		CoolTime:   a.intDefault("coolTime", 0),
+		ReuseDelay: a.intDefault("reuseDelay", 0),
+		EquipDelay: a.intDefault("equipDelay", 0),
+
+		Radius: a.intDefault("skillRadius", 80),
+
+		Target: attrEnum(a, "target", skill.ParseTarget),
+		Power:  a.float32Default("power", 0),
+
+		Attribute: a.strDefault("attribute", ""),
+
+		MaxNegatedEffects: a.intDefault("maxNegated", 0),
+		MagicLevel:        a.intDefault("magicLvl", 0),
+		LevelDepend:       a.intDefault("lvlDepend", 0),
+		IgnoreResists:     a.boolDefault("ignoreResists", false),
+		StaticReuse:       a.boolDefault("staticReuse", false),
+		StaticHitTime:     a.boolDefault("staticHitTime", false),
+
+		Stat:         a.strDefault("stat", ""),
+		IgnoreShield: a.boolDefault("ignoreShld", false),
+
+		SkillType:  a.str("skillType"),
+		EffectType: a.strDefault("effectType", ""),
+
+		EffectID:    a.intDefault("effectId", 0),
+		EffectPower: a.intDefault("effectPower", 0),
+		EffectLevel: a.intDefault("effectLevel", 0),
+		EffectNpcID: a.intDefault("effectNpcId", -1),
+
+		Element:      attrEnumDefault(a, "element", skill.ParseElement, skill.ElementNone),
+		BaseLandRate: a.intDefault("baseLandRate", 0),
+
+		Overhit:          a.boolDefault("overHit", false),
+		KillByDOT:        a.boolDefault("killByDOT", false),
+		SuicideAttack:    a.boolDefault("isSuicideAttack", false),
+		SiegeSummonSkill: a.boolDefault("isSiegeSummonSkill", false),
+
+		IsCubic: a.boolDefault("isCubic", false),
+		NpcID:   a.intDefault("npcId", 0),
+
+		CubicActivationTime:   a.intDefault("activationtime", 8),
+		CubicActivationChance: a.intDefault("activationchance", 30),
+		SummonTotalLifeTime:   a.intDefault("summonTotalLifeTime", 1200000),
+
+		WeaponsAllowed: a.strDefault("weaponsAllowed", ""),
+
+		NextActionIsAttack: a.boolDefault("nextActionAttack", false),
+		MinPledgeClass:     a.intDefault("minPledgeClass", 0),
+
+		TriggeredID:      a.intDefault("triggeredId", 0),
+		TriggeredLevel:   a.intDefault("triggeredLevel", 0),
+		ChanceType:       a.strDefault("chanceType", ""),
+		ActivationChance: a.intDefault("activationChance", -1),
+
+		Debuff:     a.boolDefault("isDebuff", false),
+		MaxCharges: a.intDefault("maxCharges", 0),
+		NumCharges: a.intDefault("numCharges", 0),
+
+		LethalChance1: a.intDefault("lethal1", 0),
+		LethalChance2: a.intDefault("lethal2", 0),
+
+		DirectHPDamage: a.boolDefault("dmgDirectlyToHp", false),
+		Dance:          a.boolDefault("isDance", false),
+		NextDanceCost:  a.intDefault("nextDanceCost", 0),
+		SoulShotBoost:  a.float32Default("SSBoost", 0),
+		AggroPoints:    a.intDefault("aggroPoints", 0),
+
+		StayAfterDeath: a.boolDefault("stayAfterDeath", false),
+
+		FlyRadius: a.intDefault("flyRadius", 0),
+		FlyCourse: a.float32Default("flyCourse", 0),
+
+		Feed: a.intDefault("feed", 0),
+
+		CanBeReflected:   a.boolDefault("canBeReflected", true),
+		CanBeDispelled:   a.boolDefault("canBeDispeled", true),
+		ClanSkill:        a.boolDefault("isClanSkill", false),
+		SimultaneousCast: a.boolDefault("simultaneousCast", false),
+
+		ExtractableItems: a.strDefault("capsuled_items_skill", ""),
+	}
+
+	if negate := a.strDefault("negateStats", ""); negate != "" {
+		attrs.NegateTypes = strings.Fields(negate)
+	}
+
+	if a.has("sharedReuse") {
+		raw := a.str("sharedReuse")
+		ref, err := skill.ParseRef(raw)
+		if err != nil {
+			a.fail(fmt.Errorf("sharedReuse %q: %w", raw, err))
+		} else {
+			attrs.SharedReuse = &ref
+		}
+	}
+
+	if a.has("negateId") {
+		raw := a.str("negateId")
+		ids, err := parseCommaInts(raw)
+		if err != nil {
+			a.fail(fmt.Errorf("negateId %q: %w", raw, err))
+		} else {
+			attrs.NegateIDs = ids
+		}
+	}
+
+	// offensive and baseCritRate stay unset when the level's data omits
+	// them, so NewDefinition can derive each from the level's skill type.
+	if a.has("offensive") {
+		offensive := a.boolDefault("offensive", false)
+		attrs.Offensive = &offensive
+	}
+	if a.has("baseCritRate") {
+		rate := a.intDefault("baseCritRate", 0)
+		attrs.BaseCritRate = &rate
+	}
+
+	if a.has("flyType") {
+		flight := attrEnum(a, "flyType", skill.ParseFlight)
+		attrs.Flight = &flight
+	}
+
+	if err := a.Err(); err != nil {
+		return skill.DefinitionAttrs{}, err
+	}
+	return attrs, nil
+}
+
+// parseCommaInts parses a comma-separated list of integers.
+func parseCommaInts(raw string) ([]int, error) {
+	parts := strings.Split(raw, ",")
+	out := make([]int, len(parts))
+	for i, p := range parts {
+		n, err := strconv.Atoi(p)
 		if err != nil {
 			return nil, err
 		}
-		if v != a.Value {
-			if !copied {
-				resolved = append([]xml.Attr(nil), attrs...)
-				copied = true
-			}
-			resolved[i].Value = v
-		}
+		out[i] = n
 	}
-	return resolved, nil
+	return out, nil
 }

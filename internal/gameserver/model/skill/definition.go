@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-
-	"github.com/fatal10110/acis_golang/internal/commons"
 )
 
 // ID identifies a skill, independent of its level.
@@ -196,155 +194,259 @@ type Definition struct {
 	SelfEffects []EffectTemplate
 }
 
-// NewDefinition builds one level's Definition from id, level, name (the
-// <skill> element's own id/name, shared by every level) and set, the
-// resolved attributes of that specific level. name, target, skillType and
-// operateType are required; every other attribute defaults the way an
-// absent one does in the shipped data.
-func NewDefinition(id ID, level int, name string, set *commons.StatSet) (Definition, error) {
-	f := commons.NewFields(set, fmt.Sprintf("skill %d level %d", id, level))
+// DefinitionAttrs holds one skill level's static attributes after the data
+// loader has resolved each to a concrete Go value: a level's raw source is
+// a per-level substitution of a shared attribute list, so there is no fixed
+// element per attribute for this package to decode itself. Parsing and
+// defaulting happen at the loader; this type is the typed handoff into
+// NewDefinition, which adds only the fields derived from other fields.
+//
+// Offensive and BaseCritRate are pointers because their default is derived
+// rather than fixed: nil means the level's data didn't set one, and
+// NewDefinition fills it in from the level's other attributes.
+type DefinitionAttrs struct {
+	Activation Activation
+	Magic      bool
+	Potion     bool
 
+	MPConsume        int
+	MPInitialConsume int
+	HPConsume        int
+
+	TargetConsumeCount int
+	TargetConsumeID    int
+	ItemConsumeCount   int
+	ItemConsumeID      int
+
+	CastRange   int
+	EffectRange int
+
+	AbnormalLevel       int
+	EffectAbnormalLevel int
+	NegateLevel         int
+
+	HitTime  int
+	CoolTime int
+
+	ReuseDelay  int
+	EquipDelay  int
+	SharedReuse *Ref
+
+	Radius int
+
+	Target Target
+	Power  float32
+
+	Attribute   string
+	NegateTypes []string
+	NegateIDs   []int
+
+	MaxNegatedEffects int
+	MagicLevel        int
+	LevelDepend       int
+
+	IgnoreResists bool
+	StaticReuse   bool
+	StaticHitTime bool
+
+	Stat string
+
+	IgnoreShield bool
+
+	SkillType  string
+	EffectType string
+
+	EffectID    int
+	EffectPower int
+	EffectLevel int
+	EffectNpcID int
+
+	Element      Element
+	BaseLandRate int
+
+	Overhit          bool
+	KillByDOT        bool
+	SuicideAttack    bool
+	SiegeSummonSkill bool
+
+	IsCubic bool
+	NpcID   int
+
+	CubicActivationTime   int
+	CubicActivationChance int
+	SummonTotalLifeTime   int
+
+	WeaponsAllowed string
+
+	NextActionIsAttack bool
+	MinPledgeClass     int
+
+	TriggeredID      int
+	TriggeredLevel   int
+	ChanceType       string
+	ActivationChance int
+
+	Debuff     bool
+	MaxCharges int
+	NumCharges int
+
+	Offensive    *bool
+	BaseCritRate *int
+
+	LethalChance1 int
+	LethalChance2 int
+
+	DirectHPDamage bool
+	Dance          bool
+	NextDanceCost  int
+	SoulShotBoost  float32
+	AggroPoints    int
+
+	StayAfterDeath bool
+
+	Flight    *Flight
+	FlyRadius int
+	FlyCourse float32
+
+	Feed int
+
+	CanBeReflected bool
+	CanBeDispelled bool
+	ClanSkill      bool
+
+	SimultaneousCast bool
+
+	ExtractableItems string
+}
+
+// NewDefinition builds one level's Definition from id, level, name (the
+// skill's own id and name, shared by every level) and a, that specific
+// level's already-resolved attributes. It adds the fields a level's own
+// data never carries: hero-skill membership, and the Offensive and
+// BaseCritRate defaults derived from the level's other attributes when a
+// leaves them unset.
+func NewDefinition(id ID, level int, name string, a DefinitionAttrs) Definition {
 	d := Definition{
 		ID: id, Level: level, Name: name, HeroSkill: heroSkillIDs[id],
 
-		Activation: commons.FieldEnum[Activation](f, "operateType", activationNames),
-		Magic:      f.BoolDefault("isMagic", false),
-		Potion:     f.BoolDefault("isPotion", false),
+		Activation: a.Activation,
+		Magic:      a.Magic,
+		Potion:     a.Potion,
 
-		MPConsume:        f.IntDefault("mpConsume", 0),
-		MPInitialConsume: f.IntDefault("mpInitialConsume", 0),
-		HPConsume:        f.IntDefault("hpConsume", 0),
+		MPConsume:        a.MPConsume,
+		MPInitialConsume: a.MPInitialConsume,
+		HPConsume:        a.HPConsume,
 
-		TargetConsumeCount: f.IntDefault("targetConsumeCount", 0),
-		TargetConsumeID:    f.IntDefault("targetConsumeId", 0),
-		ItemConsumeCount:   f.IntDefault("itemConsumeCount", 0),
-		ItemConsumeID:      f.IntDefault("itemConsumeId", 0),
+		TargetConsumeCount: a.TargetConsumeCount,
+		TargetConsumeID:    a.TargetConsumeID,
+		ItemConsumeCount:   a.ItemConsumeCount,
+		ItemConsumeID:      a.ItemConsumeID,
 
-		CastRange:           f.IntDefault("castRange", 0),
-		EffectRange:         f.IntDefault("effectRange", -1),
-		AbnormalLevel:       f.IntDefault("abnormalLvl", -1),
-		EffectAbnormalLevel: f.IntDefault("effectAbnormalLvl", -1),
-		NegateLevel:         f.IntDefault("negateLvl", -1),
+		CastRange:           a.CastRange,
+		EffectRange:         a.EffectRange,
+		AbnormalLevel:       a.AbnormalLevel,
+		EffectAbnormalLevel: a.EffectAbnormalLevel,
+		NegateLevel:         a.NegateLevel,
 
-		HitTime:    f.IntDefault("hitTime", 0),
-		CoolTime:   f.IntDefault("coolTime", 0),
-		ReuseDelay: f.IntDefault("reuseDelay", 0),
-		EquipDelay: f.IntDefault("equipDelay", 0),
+		HitTime:    a.HitTime,
+		CoolTime:   a.CoolTime,
+		ReuseDelay: a.ReuseDelay,
+		EquipDelay: a.EquipDelay,
 
-		Radius: f.IntDefault("skillRadius", 80),
+		SharedReuse: a.SharedReuse,
 
-		Target: commons.FieldEnum[Target](f, "target", targetNames),
-		Power:  f.Float32Default("power", 0),
+		Radius: a.Radius,
 
-		Attribute: f.StringDefault("attribute", ""),
+		Target: a.Target,
+		Power:  a.Power,
 
-		MaxNegatedEffects: f.IntDefault("maxNegated", 0),
-		MagicLevel:        f.IntDefault("magicLvl", 0),
-		LevelDepend:       f.IntDefault("lvlDepend", 0),
-		IgnoreResists:     f.BoolDefault("ignoreResists", false),
-		StaticReuse:       f.BoolDefault("staticReuse", false),
-		StaticHitTime:     f.BoolDefault("staticHitTime", false),
+		Attribute:   a.Attribute,
+		NegateTypes: a.NegateTypes,
+		NegateIDs:   a.NegateIDs,
 
-		Stat:         f.StringDefault("stat", ""),
-		IgnoreShield: f.BoolDefault("ignoreShld", false),
+		MaxNegatedEffects: a.MaxNegatedEffects,
+		MagicLevel:        a.MagicLevel,
+		LevelDepend:       a.LevelDepend,
+		IgnoreResists:     a.IgnoreResists,
+		StaticReuse:       a.StaticReuse,
+		StaticHitTime:     a.StaticHitTime,
 
-		SkillType:  f.String("skillType"),
-		EffectType: f.StringDefault("effectType", ""),
+		Stat:         a.Stat,
+		IgnoreShield: a.IgnoreShield,
 
-		EffectID:    f.IntDefault("effectId", 0),
-		EffectPower: f.IntDefault("effectPower", 0),
-		EffectLevel: f.IntDefault("effectLevel", 0),
-		EffectNpcID: f.IntDefault("effectNpcId", -1),
+		SkillType:  a.SkillType,
+		EffectType: a.EffectType,
 
-		Element:      commons.FieldEnumDefault[Element](f, "element", elementNames, ElementNone),
-		BaseLandRate: f.IntDefault("baseLandRate", 0),
+		EffectID:    a.EffectID,
+		EffectPower: a.EffectPower,
+		EffectLevel: a.EffectLevel,
+		EffectNpcID: a.EffectNpcID,
 
-		Overhit:          f.BoolDefault("overHit", false),
-		KillByDOT:        f.BoolDefault("killByDOT", false),
-		SuicideAttack:    f.BoolDefault("isSuicideAttack", false),
-		SiegeSummonSkill: f.BoolDefault("isSiegeSummonSkill", false),
+		Element:      a.Element,
+		BaseLandRate: a.BaseLandRate,
 
-		IsCubic: f.BoolDefault("isCubic", false),
-		NpcID:   f.IntDefault("npcId", 0),
+		Overhit:          a.Overhit,
+		KillByDOT:        a.KillByDOT,
+		SuicideAttack:    a.SuicideAttack,
+		SiegeSummonSkill: a.SiegeSummonSkill,
 
-		CubicActivationTime:   f.IntDefault("activationtime", 8),
-		CubicActivationChance: f.IntDefault("activationchance", 30),
-		SummonTotalLifeTime:   f.IntDefault("summonTotalLifeTime", 1200000),
+		IsCubic: a.IsCubic,
+		NpcID:   a.NpcID,
 
-		WeaponsAllowed: f.StringDefault("weaponsAllowed", ""),
+		CubicActivationTime:   a.CubicActivationTime,
+		CubicActivationChance: a.CubicActivationChance,
+		SummonTotalLifeTime:   a.SummonTotalLifeTime,
 
-		NextActionIsAttack: f.BoolDefault("nextActionAttack", false),
-		MinPledgeClass:     f.IntDefault("minPledgeClass", 0),
+		WeaponsAllowed: a.WeaponsAllowed,
 
-		TriggeredID:      f.IntDefault("triggeredId", 0),
-		TriggeredLevel:   f.IntDefault("triggeredLevel", 0),
-		ChanceType:       f.StringDefault("chanceType", ""),
-		ActivationChance: f.IntDefault("activationChance", -1),
+		NextActionIsAttack: a.NextActionIsAttack,
+		MinPledgeClass:     a.MinPledgeClass,
 
-		Debuff:     f.BoolDefault("isDebuff", false),
-		MaxCharges: f.IntDefault("maxCharges", 0),
-		NumCharges: f.IntDefault("numCharges", 0),
+		TriggeredID:      a.TriggeredID,
+		TriggeredLevel:   a.TriggeredLevel,
+		ChanceType:       a.ChanceType,
+		ActivationChance: a.ActivationChance,
 
-		LethalChance1: f.IntDefault("lethal1", 0),
-		LethalChance2: f.IntDefault("lethal2", 0),
+		Debuff:     a.Debuff,
+		MaxCharges: a.MaxCharges,
+		NumCharges: a.NumCharges,
 
-		DirectHPDamage: f.BoolDefault("dmgDirectlyToHp", false),
-		Dance:          f.BoolDefault("isDance", false),
-		NextDanceCost:  f.IntDefault("nextDanceCost", 0),
-		SoulShotBoost:  f.Float32Default("SSBoost", 0),
-		AggroPoints:    f.IntDefault("aggroPoints", 0),
+		LethalChance1: a.LethalChance1,
+		LethalChance2: a.LethalChance2,
 
-		StayAfterDeath: f.BoolDefault("stayAfterDeath", false),
+		DirectHPDamage: a.DirectHPDamage,
+		Dance:          a.Dance,
+		NextDanceCost:  a.NextDanceCost,
+		SoulShotBoost:  a.SoulShotBoost,
+		AggroPoints:    a.AggroPoints,
 
-		FlyRadius: f.IntDefault("flyRadius", 0),
-		FlyCourse: f.Float32Default("flyCourse", 0),
+		StayAfterDeath: a.StayAfterDeath,
 
-		Feed: f.IntDefault("feed", 0),
+		Flight:    a.Flight,
+		FlyRadius: a.FlyRadius,
+		FlyCourse: a.FlyCourse,
 
-		CanBeReflected:   f.BoolDefault("canBeReflected", true),
-		CanBeDispelled:   f.BoolDefault("canBeDispeled", true),
-		ClanSkill:        f.BoolDefault("isClanSkill", false),
-		SimultaneousCast: f.BoolDefault("simultaneousCast", false),
+		Feed: a.Feed,
 
-		ExtractableItems: f.StringDefault("capsuled_items_skill", ""),
+		CanBeReflected:   a.CanBeReflected,
+		CanBeDispelled:   a.CanBeDispelled,
+		ClanSkill:        a.ClanSkill,
+		SimultaneousCast: a.SimultaneousCast,
+
+		ExtractableItems: a.ExtractableItems,
 	}
 
-	if negate := f.StringDefault("negateStats", ""); negate != "" {
-		d.NegateTypes = strings.Fields(negate)
+	d.Offensive = isTypeOffensive(d.SkillType) || d.Debuff || d.Target == TargetCorpseMob
+	if a.Offensive != nil {
+		d.Offensive = *a.Offensive
 	}
 
-	if f.Has("sharedReuse") {
-		raw := f.String("sharedReuse")
-		ref, err := parseSharedReuse(raw)
-		if err != nil {
-			f.Fail(fmt.Errorf("sharedReuse %q: %w", raw, err))
-		} else {
-			d.SharedReuse = &ref
-		}
+	d.BaseCritRate = defaultBaseCritRate(d.SkillType)
+	if a.BaseCritRate != nil {
+		d.BaseCritRate = *a.BaseCritRate
 	}
 
-	if f.Has("negateId") {
-		raw := f.String("negateId")
-		ids, err := parseCommaInts(raw)
-		if err != nil {
-			f.Fail(fmt.Errorf("negateId %q: %w", raw, err))
-		} else {
-			d.NegateIDs = ids
-		}
-	}
-
-	d.Offensive = f.BoolDefault("offensive", isTypeOffensive(d.SkillType) || d.Debuff || d.Target == TargetCorpseMob)
-	d.BaseCritRate = f.IntDefault("baseCritRate", defaultBaseCritRate(d.SkillType))
-
-	if f.Has("flyType") {
-		flight := commons.FieldEnum[Flight](f, "flyType", flightNames)
-		d.Flight = &flight
-	}
-
-	if err := f.Err(); err != nil {
-		return Definition{}, err
-	}
-	return d, nil
+	return d
 }
 
 // isTypeOffensive reports whether skillType is one of the raw effect tags
@@ -364,45 +466,20 @@ func defaultBaseCritRate(skillType string) int {
 	return -1
 }
 
-// parseDashPair parses a "left-right" pair of integers, the shape a few
-// unrelated attributes across this package share (a shared-reuse skill
-// reference, a required-item id and count). left is always an id and so is
-// parsed with a 32-bit bound; right is a plain count/level.
-func parseDashPair(raw string) (int32, int, error) {
-	parts := strings.Split(raw, "-")
-	if len(parts) != 2 {
-		return 0, 0, fmt.Errorf("want \"left-right\"")
+// ParseRef parses a skill reference in its "skillId-level" data-file form,
+// the shape a "sharedReuse" attribute carries.
+func ParseRef(raw string) (Ref, error) {
+	id, level, ok := strings.Cut(raw, "-")
+	if !ok {
+		return Ref{}, fmt.Errorf("want \"skillId-level\"")
 	}
-	left, err := strconv.ParseInt(parts[0], 10, 32)
-	if err != nil {
-		return 0, 0, err
-	}
-	right, err := strconv.Atoi(parts[1])
-	if err != nil {
-		return 0, 0, err
-	}
-	return int32(left), right, nil
-}
-
-// parseSharedReuse parses a "sharedReuse" attribute's "skillId-level" form.
-func parseSharedReuse(raw string) (Ref, error) {
-	id, level, err := parseDashPair(raw)
+	rawID, err := strconv.ParseInt(id, 10, 32)
 	if err != nil {
 		return Ref{}, err
 	}
-	return Ref{ID: ID(id), Level: level}, nil
-}
-
-// parseCommaInts parses a comma-separated list of integers.
-func parseCommaInts(raw string) ([]int, error) {
-	parts := strings.Split(raw, ",")
-	out := make([]int, len(parts))
-	for i, p := range parts {
-		n, err := strconv.Atoi(p)
-		if err != nil {
-			return nil, err
-		}
-		out[i] = n
+	lvl, err := strconv.Atoi(level)
+	if err != nil {
+		return Ref{}, err
 	}
-	return out, nil
+	return Ref{ID: ID(rawID), Level: lvl}, nil
 }

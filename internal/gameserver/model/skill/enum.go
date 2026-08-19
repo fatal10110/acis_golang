@@ -127,3 +127,34 @@ func (f Flight) String() string {
 	}
 	return fmt.Sprintf("Flight(%d)", uint8(f))
 }
+
+// parseEnum resolves an XML tag spelling to its enum value, naming kind in
+// the error so a mangled attribute says which enum it failed to match.
+func parseEnum[E any](kind, tag string, names map[string]E) (E, error) {
+	e, ok := names[tag]
+	if !ok {
+		var zero E
+		return zero, fmt.Errorf("skill: unknown %s %q", kind, tag)
+	}
+	return e, nil
+}
+
+// ParseActivation resolves an "operateType" spelling to its Activation.
+func ParseActivation(tag string) (Activation, error) {
+	return parseEnum("operateType", tag, activationNames)
+}
+
+// ParseTarget resolves a "target" spelling to its Target.
+func ParseTarget(tag string) (Target, error) {
+	return parseEnum("target", tag, targetNames)
+}
+
+// ParseElement resolves an "element" spelling to its Element.
+func ParseElement(tag string) (Element, error) {
+	return parseEnum("element", tag, elementNames)
+}
+
+// ParseFlight resolves a "flyType" spelling to its Flight.
+func ParseFlight(tag string) (Flight, error) {
+	return parseEnum("flyType", tag, flightNames)
+}

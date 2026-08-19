@@ -419,6 +419,13 @@ func TestLoadSkillDefinitions(t *testing.T) {
 	})
 }
 
+// skillFixture wraps extra as the only non-required content of a one-level
+// <skill> element that is otherwise valid, so an error case isolates the
+// attribute or child under test.
+func skillFixture(extra string) string {
+	return `<list><skill id="1" name="x" levels="1"><set name="target" val="ONE"/><set name="skillType" val="PDAM"/><set name="operateType" val="ACTIVE"/>` + extra + `</skill></list>`
+}
+
 func TestLoadSkillDefinitionsErrors(t *testing.T) {
 	dir := t.TempDir()
 
@@ -457,6 +464,54 @@ func TestLoadSkillDefinitionsErrors(t *testing.T) {
 		{
 			name:    "non-numeric level count",
 			content: `<list><skill id="1" name="x" levels="oops"><set name="target" val="ONE"/><set name="skillType" val="PDAM"/><set name="operateType" val="ACTIVE"/></skill></list>`,
+		},
+		{
+			name:    "unknown operateType tag",
+			content: skillFixture(`<set name="operateType" val="NOT_AN_OPERATE_TYPE"/>`),
+		},
+		{
+			name:    "malformed integer attribute",
+			content: skillFixture(`<set name="mpConsume" val="oops"/>`),
+		},
+		{
+			name:    "malformed float attribute",
+			content: skillFixture(`<set name="power" val="oops"/>`),
+		},
+		{
+			name:    "unknown element tag",
+			content: skillFixture(`<set name="element" val="NOT_AN_ELEMENT"/>`),
+		},
+		{
+			name:    "unknown flyType tag",
+			content: skillFixture(`<set name="flyType" val="NOT_A_FLY_TYPE"/>`),
+		},
+		{
+			name:    "malformed sharedReuse pair",
+			content: skillFixture(`<set name="sharedReuse" val="not-a-pair-of-ints"/>`),
+		},
+		{
+			name:    "malformed negateId list",
+			content: skillFixture(`<set name="negateId" val="1,oops"/>`),
+		},
+		{
+			name:    "effect without a name",
+			content: skillFixture(`<for><effect count="1" time="1" val="0"/></for>`),
+		},
+		{
+			name:    "effect without a value",
+			content: skillFixture(`<for><effect name="Buff" count="1" time="1"/></for>`),
+		},
+		{
+			name:    "malformed effect count literal",
+			content: skillFixture(`<for><effect name="Buff" val="0" count="oops"/></for>`),
+		},
+		{
+			name:    "stat func without a value",
+			content: skillFixture(`<for><add stat="runSpd"/></for>`),
+		},
+		{
+			name:    "malformed condition msgId literal",
+			content: skillFixture(`<cond msgId="oops"><player Charges="1"/></cond>`),
 		},
 	}
 
