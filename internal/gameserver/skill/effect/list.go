@@ -49,10 +49,18 @@ func NewList(owner StatOwner, opts ...Option) *List {
 	return l
 }
 
-// Flags returns the union of every held effect's flag bits, across both
-// active and stacked-but-not-yet-active members. It is recomputed from the
-// current buffs and debuffs on every call rather than cached, matching how
-// rarely a caller needs it compared to how often the list itself changes.
+// Flags returns the union of every visible held effect's flag bits — the
+// active member of each stack group. Stacked-but-inactive members live only
+// in the stacks map and contribute nothing, unlike the reference, whose
+// computeEffectFlags() ORs every entry in _buffs/_debuffs including
+// stacked-but-not-in-use ones (EffectList.java:896-921). The difference is
+// unreachable for the crowd-control flags that consume this surface: the
+// kinds carrying them either reject same-flag re-application
+// (rejectsIfAffected) or activate the next stack member the instant the
+// active one leaves, so the union stays continuous either way. It is
+// recomputed from the current buffs and debuffs on every call rather than
+// cached, matching how rarely a caller needs it compared to how often the
+// list itself changes.
 func (l *List) Flags() Flag {
 	if l == nil {
 		return 0
