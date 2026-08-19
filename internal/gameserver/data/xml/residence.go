@@ -288,14 +288,17 @@ func buildControlTower(t castleTowerElement) (castle.ControlTower, error) {
 	if len(t.Position) == 0 {
 		return castle.ControlTower{}, fmt.Errorf("castle: control tower %q: position is required", t.Alias)
 	}
-	loc, err := t.Position[0].loc()
+	// Last element wins: the StatSet this replaced was built by merging every
+	// <position>/<stats> child in document order, so a later child's attrs
+	// overwrote an earlier one's, matching the Java reference loader.
+	loc, err := t.Position[len(t.Position)-1].loc()
 	if err != nil {
 		return castle.ControlTower{}, fmt.Errorf("castle: control tower %q: %w", t.Alias, err)
 	}
 	if len(t.Stats) == 0 {
 		return castle.ControlTower{}, fmt.Errorf("castle: control tower %q: stats is required", t.Alias)
 	}
-	stats := t.Stats[0]
+	stats := t.Stats[len(t.Stats)-1]
 	if stats.HP == nil || stats.PDef == nil || stats.MDef == nil {
 		return castle.ControlTower{}, fmt.Errorf("castle: control tower %q: stats hp, pDef and mDef are required", t.Alias)
 	}
