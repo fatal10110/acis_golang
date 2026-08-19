@@ -117,6 +117,15 @@ func TestResidenceLoadersErrors(t *testing.T) {
 			},
 		},
 		{
+			name:    "castle tax missing tributeRate",
+			path:    filepath.Join(dir, "castles.xml"),
+			content: `<list><castle id="1" alias="gludio" parentId="0" name="Gludio" circletId="1"><npcs val="1"/><tax taxRate="15" taxSysgetRate="40"/><spawns><spawn type="OWNER" x="1" y="2" z="3"/></spawns></castle></list>`,
+			load: func(path string) error {
+				_, err := LoadCastles(path)
+				return err
+			},
+		},
+		{
 			name:    "clan hall bad schedule config",
 			path:    filepath.Join(dir, "clanHalls.xml"),
 			content: `<list><clanHall id="21" alias="hall" parentId="0" name="Hall"><agit desc="Contestable Clan Hall" loc="Dion" siegeLength="3600000" scheduleConfig="14;bad;0;12;0" auctionMin="0" deposit="0" lease="0" size="0" grade="2"/><npcs val="1"/><tax taxRate="0" taxSysgetRate="0" tributeRate="50"/></clanHall></list>`,

@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/residence"
 )
@@ -81,117 +80,84 @@ type Castle struct {
 	Tickets       []Ticket
 }
 
-// NewArtifact builds an Artifact from set.
-func NewArtifact(set *commons.StatSet) (Artifact, error) {
-	npcID, err := set.GetInt("id")
-	if err != nil {
-		return Artifact{}, fmt.Errorf("castle: artifact: %w", err)
-	}
-	posRaw := set.GetStringDefault("pos", "")
-	if posRaw == "" {
+// NewArtifact builds an Artifact from its already-decoded npc id and its
+// "x;y;z;heading" pos attribute.
+func NewArtifact(npcID int, pos string) (Artifact, error) {
+	if pos == "" {
 		return Artifact{}, fmt.Errorf("castle: artifact %d: pos is required", npcID)
 	}
-	pos, heading, err := parseSpawnLocation(posRaw)
+	position, heading, err := parseSpawnLocation(pos)
 	if err != nil {
 		return Artifact{}, fmt.Errorf("castle: artifact %d: %w", npcID, err)
 	}
-	return Artifact{NPCID: npcID, Position: pos, Heading: heading}, nil
+	return Artifact{NPCID: npcID, Position: position, Heading: heading}, nil
 }
 
-// NewControlTower builds a ControlTower from set.
-func NewControlTower(set *commons.StatSet) (ControlTower, error) {
-	alias := commons.NewFields(set, "castle: control tower").StringDefault("alias", "")
+// NewControlTower builds a ControlTower from its already-decoded attributes.
+func NewControlTower(alias, towerType string, x, y, z int, hp, pDef, mDef float64, zones []string) (ControlTower, error) {
 	if alias == "" {
 		return ControlTower{}, fmt.Errorf("castle: control tower: alias is required")
 	}
-	f := commons.NewFields(set, fmt.Sprintf("castle: control tower %q", alias))
-	towerType := commons.FieldEnum[TowerType](f, "type", towerTypeNames)
-	if err := f.Err(); err != nil {
-		return ControlTower{}, err
+	kind, ok := towerTypeNames[towerType]
+	if !ok {
+		return ControlTower{}, fmt.Errorf("castle: control tower %q: type: unrecognized %q", alias, towerType)
 	}
-	tower := ControlTower{
+	return ControlTower{
 		Alias:    alias,
-		Type:     towerType,
-		Position: location.Location{X: f.Int("x"), Y: f.Int("y"), Z: f.Int("z")},
-		HP:       f.Float64("hp"),
-		PDef:     f.Float64("pDef"),
-		MDef:     f.Float64("mDef"),
-		Zones:    cleanStrings(f.StringArrayDefault("zones", nil)),
-	}
-	if err := f.Err(); err != nil {
-		return ControlTower{}, err
-	}
-	return tower, nil
+		Type:     kind,
+		Position: location.Location{X: x, Y: y, Z: z},
+		HP:       hp,
+		PDef:     pDef,
+		MDef:     mDef,
+		Zones:    zones,
+	}, nil
 }
 
-// NewTicket builds a Ticket from set.
-func NewTicket(set *commons.StatSet) (Ticket, error) {
-	idf := commons.NewFields(set, "castle: ticket")
-	itemID := idf.Int("itemId")
-	if err := idf.Err(); err != nil {
-		return Ticket{}, err
-	}
-
-	f := commons.NewFields(set, fmt.Sprintf("castle: ticket %d", itemID))
-	kind := f.StringDefault("type", "")
+// NewTicket builds a Ticket from its already-decoded attributes.
+func NewTicket(itemID int, kind string, stationary bool, npcID, maxAmount int, ssq []string) (Ticket, error) {
 	if kind == "" {
-		f.Fail(fmt.Errorf("type is required"))
+		return Ticket{}, fmt.Errorf("castle: ticket %d: type is required", itemID)
 	}
-	ticket := Ticket{
+	return Ticket{
 		ItemID:     itemID,
 		Kind:       kind,
-		Stationary: f.BoolDefault("stationary", false),
-		NPCID:      f.Int("npcId"),
-		MaxAmount:  f.Int("maxAmount"),
-		SSQ:        cleanStrings(f.StringArrayDefault("ssq", nil)),
-	}
-	if err := f.Err(); err != nil {
-		return Ticket{}, err
-	}
-	return ticket, nil
+		Stationary: stationary,
+		NPCID:      npcID,
+		MaxAmount:  maxAmount,
+		SSQ:        ssq,
+	}, nil
 }
 
-// NewCastle builds a Castle from its XML attrs plus already-decoded child data.
-func NewCastle(set *commons.StatSet, artifacts []Artifact, towers []ControlTower, tickets []Ticket, zones []residence.Zone, spawns map[residence.SpawnType][]location.Location) (*Castle, error) {
-	idf := commons.NewFields(set, "castle")
-	id := idf.Int("id")
-	if err := idf.Err(); err != nil {
-		return nil, err
-	}
+// CastleAttrs holds a Castle's own decoded XML attributes, separate from its
+// already-decoded child collections (artifacts, towers, tickets, zones,
+// spawns) passed alongside to NewCastle.
+type CastleAttrs struct {
+	ID, ParentID, CircletID int
+	Alias, Name             string
+	Tax                     residence.Tax
+	Gates                   []string
+	NPCs                    []int
+}
 
-	f := commons.NewFields(set, fmt.Sprintf("castle %d", id))
-	parentID := f.Int("parentId")
-	circletID := f.Int("circletId")
-	taxRate := f.Int("taxRate")
-	taxSysgetRate := f.Int("taxSysgetRate")
-	tributeRate := f.Int("tributeRate")
-	alias := f.StringDefault("alias", "")
-	if alias == "" {
-		f.Fail(fmt.Errorf("alias is required"))
+// NewCastle builds a Castle from its decoded attrs plus already-decoded
+// child data.
+func NewCastle(attrs CastleAttrs, artifacts []Artifact, towers []ControlTower, tickets []Ticket, zones []residence.Zone, spawns map[residence.SpawnType][]location.Location) (*Castle, error) {
+	if attrs.Alias == "" {
+		return nil, fmt.Errorf("castle %d: alias is required", attrs.ID)
 	}
-	name := f.StringDefault("name", "")
-	if name == "" {
-		f.Fail(fmt.Errorf("name is required"))
-	}
-	npcs := f.IntArray("npcs")
-	gates := cleanStrings(f.StringArrayDefault("gates", nil))
-	if err := f.Err(); err != nil {
-		return nil, err
+	if attrs.Name == "" {
+		return nil, fmt.Errorf("castle %d: name is required", attrs.ID)
 	}
 
 	return &Castle{
-		ID:        id,
-		ParentID:  parentID,
-		Alias:     alias,
-		Name:      name,
-		CircletID: circletID,
-		Tax: residence.Tax{
-			Rate:        taxRate,
-			SysgetRate:  taxSysgetRate,
-			TributeRate: tributeRate,
-		},
-		Gates:         gates,
-		NPCs:          append([]int(nil), npcs...),
+		ID:            attrs.ID,
+		ParentID:      attrs.ParentID,
+		Alias:         attrs.Alias,
+		Name:          attrs.Name,
+		CircletID:     attrs.CircletID,
+		Tax:           attrs.Tax,
+		Gates:         attrs.Gates,
+		NPCs:          append([]int(nil), attrs.NPCs...),
 		Spawns:        residence.CopySpawns(spawns),
 		Zones:         append([]residence.Zone(nil), zones...),
 		Artifacts:     append([]Artifact(nil), artifacts...),
@@ -264,24 +230,6 @@ func (t *Table) All() []*Castle {
 		return nil
 	}
 	return append([]*Castle(nil), t.order...)
-}
-
-func cleanStrings(in []string) []string {
-	if len(in) == 0 {
-		return nil
-	}
-	out := make([]string, 0, len(in))
-	for _, s := range in {
-		s = strings.TrimSpace(s)
-		if s == "" {
-			continue
-		}
-		out = append(out, s)
-	}
-	if len(out) == 0 {
-		return nil
-	}
-	return out
 }
 
 func parseSpawnLocation(raw string) (location.Location, int, error) {
