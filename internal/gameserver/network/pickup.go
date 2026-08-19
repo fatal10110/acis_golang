@@ -144,19 +144,24 @@ func (l *GameClientLink) lockPickupParalysis(live *livePlayer) {
 // what let a click land in the unlock instant, read blocked, then read
 // not-deferrable, and get discarded instead of re-deferred (#1159).
 //
-// Crowd control is deliberately absent from the block set: the reference's
-// pickup path gates nothing but flying (ItemInstance.java:145-184,
-// PlayerAI.java:327-414), so a stunned, sleeping, paralyzed, or afraid
-// player picks items up immediately. Only death (via liveItemOpsAllowed's
-// dead-only check), the transient pickup lock (pickupLocked, the
-// PlayerAI.java:412-413 200ms anti-mash gate), a non-standing pose,
-// attacking, and casting defer — those are the busy states the reference's
-// AI retries on its next think.
+// Crowd control IS in the block set here: ItemInstance.onAction routes pickup
+// through player.getAI().tryToPickUp (PlayerAI.java:327-414 is a red herring —
+// PlayableAI.tryToPickUp, PlayableAI.java:411-428, is the actual entry point)
+// which opens with denyAiAction() before it ever reaches the flying-only
+// check further down. Creature.denyAiAction() (Creature.java:636-639) unions
+// stunned/sleeping/paralyzed/afraid with teleporting, immobile-until-attacked
+// and dead; this port models the CC quartet via liveItemInteractionAllowed
+// (matching use/unequip) and leaves teleporting/immobile-until-attacked as
+// the same documented deferred gaps noted for those two handlers. The
+// transient pickup lock (pickupLocked, the PlayerAI.java:406-407 200ms
+// anti-mash gate), a non-standing pose, attacking, and casting still defer
+// rather than reject outright — those are the busy states the reference's AI
+// retries on its next think.
 func livePickupBlockedDeferrable(live *livePlayer) (blocked, deferrable bool) {
 	live.pickupMu.Lock()
 	defer live.pickupMu.Unlock()
 	attacking := live.attack != nil && live.attack.AttackingNow()
-	blocked = !liveItemOpsAllowed(live) || live.pickupLocked || !live.Standing() || attacking || (live.cast != nil && live.cast.CastingNow())
+	blocked = !liveItemInteractionAllowed(live) || live.pickupLocked || !live.Standing() || attacking || (live.cast != nil && live.cast.CastingNow())
 	deferrable = attacking || live.pickupLocked
 	return
 }

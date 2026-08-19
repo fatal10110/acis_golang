@@ -425,19 +425,26 @@ func (l *GameClientLink) broadcastCharacterInfo(live *livePlayer) {
 }
 
 // liveItemOpsAllowed reports whether live may currently manipulate items at
-// all: not gone and not dead. The reference only adds crowd-control gates on
-// the use/unequip flows (UseItem.java:66, RequestUnEquipItem.java:37), so
-// drop/destroy/crystallize/enchant/pet-use/pickup gate on this alone.
+// all: not gone and not dead. Drop/destroy/crystallize/enchant/pet-use gate
+// on this alone — RequestDropItem.java:36 checks isDead() only,
+// RequestDestroyItem.java/RequestEnchantItem.java check nothing, and
+// RequestPetUseItem.java:34 checks isAlikeDead()||pet.isDead(). Pickup does
+// not gate on this alone; see liveItemInteractionAllowed and
+// livePickupBlockedDeferrable's comment (pickup.go).
 func liveItemOpsAllowed(live *livePlayer) bool {
 	return live != nil && !live.AlikeDead()
 }
 
-// liveItemInteractionAllowed reports whether live may currently use, equip,
-// or unequip an item: not gone, not dead, and free of every crowd-control
-// state that locks item interaction (stunned, sleeping, paralyzed, or
-// afraid). This is the exact union the reference applies to the UseItem and
-// RequestUnEquipItem handlers (UseItem.java:66, RequestUnEquipItem.java:37)
-// and to no other item flow.
+// liveItemInteractionAllowed reports whether live may currently use or
+// equip/unequip an item, or pick one up off the ground: not gone, not dead,
+// and free of the crowd-control quartet that locks item interaction
+// (stunned, sleeping, paralyzed, or afraid). This is the union the reference
+// applies to UseItem.java:66 and RequestUnEquipItem.java:37 directly, and to
+// pickup indirectly via PlayableAI.tryToPickUp's denyAiAction() gate
+// (PlayableAI.java:411-417, Creature.java:636-639) — denyAiAction also folds
+// in teleporting/immobile-until-attacked/dead, which this port doesn't model
+// for pickup any more than it does for use/unequip (documented deferred
+// gaps).
 func liveItemInteractionAllowed(live *livePlayer) bool {
 	return liveItemOpsAllowed(live) && !live.Stunned() && !live.Sleeping() && !live.Paralyzed() && !live.Afraid()
 }

@@ -466,13 +466,14 @@ func TestCrowdControlledPlayerItemOpsAreNoops(t *testing.T) {
 }
 
 // TestCrowdControlledPlayerCanStillDropDestroyAndPickUp is the other half
-// of TestCrowdControlledPlayerItemOpsAreNoops: the reference only gates
-// UseItem and RequestUnEquipItem on crowd control (UseItem.java:66,
-// RequestUnEquipItem.java:37). RequestDropItem.java:36 gates dead-only,
-// RequestDestroyItem gates nothing, and the ground-item pickup path gates
-// nothing (ItemInstance.java:145-184, PlayerAI.java:327-414) — so the same
-// effects that block use/unequip must leave drop, destroy, and pickup
-// reachable.
+// of TestCrowdControlledPlayerItemOpsAreNoops: RequestDropItem.java:36 gates
+// dead-only and RequestDestroyItem gates nothing, so the same crowd-control
+// effects that block use/unequip must leave drop and destroy reachable.
+// Pickup is the exception, not a third example of the pattern: it routes
+// through PlayableAI.tryToPickUp's denyAiAction() gate (PlayableAI.java:
+// 411-417, Creature.java:636-639) before the flying-only check in
+// thinkPickUp ever runs, so it's CC-gated the same as use/unequip — see the
+// separate pickup subtest below.
 func TestCrowdControlledPlayerCanStillDropDestroyAndPickUp(t *testing.T) {
 	effectNames := []string{"Stun", "Sleep", "Paralyze", "Fear"}
 
@@ -518,31 +519,6 @@ func TestCrowdControlledPlayerCanStillDropDestroyAndPickUp(t *testing.T) {
 			}
 		})
 
-		t.Run(effectName+"/pickup", func(t *testing.T) {
-			templates := petTestTemplates()
-			capture := &frameCapture{}
-			live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
-			state := world.New()
-			state.Spawn(live, 100, 0, 0, 0)
-			drops := task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour}, time.Now)
-			tmpl, _ := templates.Get(item.AdenaID)
-			ground := dropTestGround(t, state, drops, item.Instance{ObjectID: 900, TemplateID: item.AdenaID, Count: 40, ManaLeft: -1}, tmpl, 100, 0, 0)
-			addEquipTestEffect(t, live, effectName)
-			store := &recordingEnchantItemStore{}
-
-			gcl := &GameClientLink{world: state, groundItems: drops, items: store}
-			if !gcl.pickupLiveGroundItem(context.Background(), live, ground) {
-				t.Fatal(effectName + " pickupLiveGroundItem returned false for a ground item target")
-			}
-
-			stack := live.Inventory().ItemByTemplateID(item.AdenaID)
-			if stack == nil || stack.ObjectID != ground.ObjectID() || stack.Count != 40 {
-				t.Fatalf("%s pickup inventory stack = %+v, want picked up ground adena", effectName, stack)
-			}
-			if got := drops.Len(); got != 0 {
-				t.Fatalf("%s pickup ground item tracker Len = %d, want 0", effectName, got)
-			}
-		})
 	}
 
 	t.Run("manual paralysis lock/drop", func(t *testing.T) {
@@ -565,6 +541,46 @@ func TestCrowdControlledPlayerCanStillDropDestroyAndPickUp(t *testing.T) {
 			t.Fatalf("paralyzed drop mutated count=%d drops=%d frames=%x, want count 60, 1 drop, no frames", stack.Count, len(drops.drops), capture.frames)
 		}
 	})
+}
+
+// TestCrowdControlledPlayerCannotPickUp mirrors
+// TestCrowdControlledPlayerItemOpsAreNoops: pickup routes through
+// PlayableAI.tryToPickUp's denyAiAction() gate (PlayableAI.java:411-417,
+// Creature.java:636-639) before the flying-only check in thinkPickUp ever
+// runs, so — unlike drop/destroy — it's CC-gated the same as use/unequip.
+func TestCrowdControlledPlayerCannotPickUp(t *testing.T) {
+	effectNames := []string{"Stun", "Sleep", "Paralyze", "Fear"}
+
+	for _, effectName := range effectNames {
+		t.Run(effectName, func(t *testing.T) {
+			templates := petTestTemplates()
+			capture := &frameCapture{}
+			live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
+			state := world.New()
+			state.Spawn(live, 100, 0, 0, 0)
+			drops := task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour}, time.Now)
+			tmpl, _ := templates.Get(item.AdenaID)
+			ground := dropTestGround(t, state, drops, item.Instance{ObjectID: 900, TemplateID: item.AdenaID, Count: 40, ManaLeft: -1}, tmpl, 100, 0, 0)
+			addEquipTestEffect(t, live, effectName)
+			store := &recordingEnchantItemStore{}
+			capture.frames = nil // drop the setup-time SpawnItem broadcast
+
+			gcl := &GameClientLink{world: state, groundItems: drops, items: store}
+			if !gcl.pickupLiveGroundItem(context.Background(), live, ground) {
+				t.Fatal(effectName + " pickupLiveGroundItem returned false for a ground item target")
+			}
+
+			if stack := live.Inventory().ItemByTemplateID(item.AdenaID); stack != nil {
+				t.Fatalf("%s pickup mutated inventory = %+v, want no pickup", effectName, stack)
+			}
+			if got := drops.Len(); got != 1 {
+				t.Fatalf("%s pickup ground item tracker Len = %d, want 1 (item still on ground)", effectName, got)
+			}
+			if len(capture.frames) != 1 || capture.frames[0][0] != serverpackets.OpcodeActionFailed {
+				t.Fatalf("%s pickup frames=%x, want ActionFailed only", effectName, capture.frames)
+			}
+		})
+	}
 }
 
 func TestDropLiveItemRejectsFarCoordinatesBeforeInventoryMutation(t *testing.T) {
