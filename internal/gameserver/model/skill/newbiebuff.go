@@ -1,11 +1,5 @@
 package skill
 
-import (
-	"fmt"
-
-	"github.com/fatal10110/acis_golang/internal/commons"
-)
-
 type NewbieBuff struct {
 	Skill        Ref
 	LowerLevel   int
@@ -13,24 +7,15 @@ type NewbieBuff struct {
 	IsMagicClass bool
 }
 
-func NewNewbieBuff(set *commons.StatSet) (NewbieBuff, error) {
-	idf := commons.NewFields(set, "skill: newbie buff")
-	skillID := idf.Int32("skillId")
-	if err := idf.Err(); err != nil {
-		return NewbieBuff{}, err
+// NewNewbieBuff builds a NewbieBuff from one <buff> element's decoded
+// attributes.
+func NewNewbieBuff(skillID int32, skillLevel, lowerLevel, upperLevel int, isMagicClass bool) NewbieBuff {
+	return NewbieBuff{
+		Skill:        Ref{ID: ID(skillID), Level: skillLevel},
+		LowerLevel:   lowerLevel,
+		UpperLevel:   upperLevel,
+		IsMagicClass: isMagicClass,
 	}
-
-	f := commons.NewFields(set, fmt.Sprintf("skill: newbie buff %d", skillID))
-	buff := NewbieBuff{
-		Skill:        Ref{ID: ID(skillID), Level: f.Int("skillLevel")},
-		LowerLevel:   f.Int("lowerLevel"),
-		UpperLevel:   f.Int("upperLevel"),
-		IsMagicClass: f.BoolDefault("isMagicClass", false),
-	}
-	if err := f.Err(); err != nil {
-		return NewbieBuff{}, err
-	}
-	return buff, nil
 }
 
 type NewbieBuffTable struct {

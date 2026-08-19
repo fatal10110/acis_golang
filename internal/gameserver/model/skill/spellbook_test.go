@@ -2,19 +2,10 @@ package skill
 
 import (
 	"testing"
-
-	"github.com/fatal10110/acis_golang/internal/commons"
 )
 
 func TestNewSpellbook(t *testing.T) {
-	set := commons.NewStatSet()
-	set.Set("skillId", "2")
-	set.Set("itemId", "1512")
-
-	got, err := NewSpellbook(set)
-	if err != nil {
-		t.Fatalf("NewSpellbook() error: %v", err)
-	}
+	got := NewSpellbook(2, 1512)
 	want := Spellbook{SkillID: 2, ItemID: 1512}
 	if got != want {
 		t.Fatalf("NewSpellbook() = %+v, want %+v", got, want)

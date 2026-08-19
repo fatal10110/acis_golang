@@ -2,22 +2,10 @@ package skill
 
 import (
 	"testing"
-
-	"github.com/fatal10110/acis_golang/internal/commons"
 )
 
 func TestNewNewbieBuff(t *testing.T) {
-	set := commons.NewStatSet()
-	set.Set("skillId", "4322")
-	set.Set("skillLevel", "1")
-	set.Set("lowerLevel", "8")
-	set.Set("upperLevel", "24")
-	set.Set("isMagicClass", "false")
-
-	got, err := NewNewbieBuff(set)
-	if err != nil {
-		t.Fatalf("NewNewbieBuff() error: %v", err)
-	}
+	got := NewNewbieBuff(4322, 1, 8, 24, false)
 	if got.Skill.ID != 4322 || got.Skill.Level != 1 || got.LowerLevel != 8 || got.UpperLevel != 24 || got.IsMagicClass {
 		t.Fatalf("NewNewbieBuff() = %+v", got)
 	}
