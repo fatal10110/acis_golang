@@ -2,17 +2,11 @@ package skill
 
 import (
 	"testing"
-
-	"github.com/fatal10110/acis_golang/internal/commons"
 )
 
 func TestNewHealSps(t *testing.T) {
-	set := commons.NewStatSet()
-	set.Set("magicLevel", "76")
-	set.Set("correction", "292")
-	set.Set("neededMatk", "900")
-
-	got, err := NewHealSps(set)
+	magicLevel := 76
+	got, err := NewHealSps(292, 900, nil, nil, &magicLevel)
 	if err != nil {
 		t.Fatalf("NewHealSps() error: %v", err)
 	}
@@ -20,10 +14,13 @@ func TestNewHealSps(t *testing.T) {
 		t.Fatalf("NewHealSps() = %+v", got)
 	}
 
-	set = commons.NewStatSet()
-	set.Set("correction", "17")
-	if _, err := NewHealSps(set); err == nil {
-		t.Fatal("expected an error for missing neededMatk and selectors, got nil")
+	if _, err := NewHealSps(17, 0, nil, nil, nil); err == nil {
+		t.Fatal("expected an error for missing skillId/magicLevel selectors, got nil")
+	}
+
+	skillID := int32(1401)
+	if _, err := NewHealSps(17, 0, &skillID, nil, nil); err == nil {
+		t.Fatal("expected an error for skillId without skillLevel, got nil")
 	}
 }
 

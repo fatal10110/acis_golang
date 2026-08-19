@@ -147,6 +147,18 @@ func TestLoadSkillTreesErrors(t *testing.T) {
 			name:    "enchant skill missing a required rate attribute",
 			content: `<list><enchantSkill id="1" lvl="101" exp="1" sp="1" rate76="1" rate77="1" rate78="1" rate79="1"/></list>`,
 		},
+		{
+			name:    "fishing skill malformed itemId attribute",
+			content: `<list><fishingSkill id="1" lvl="1" minLvl="1" itemId="abc" itemCount="1"/></list>`,
+		},
+		{
+			name:    "fishing skill itemId attribute overflows int32",
+			content: `<list><fishingSkill id="1" lvl="1" minLvl="1" itemId="99999999999" itemCount="1"/></list>`,
+		},
+		{
+			name:    "enchant skill malformed itemNeeded attribute",
+			content: `<list><enchantSkill id="1" lvl="101" exp="1" sp="1" rate76="1" rate77="1" rate78="1" rate79="1" rate80="1" itemNeeded="not-a-pair"/></list>`,
+		},
 	}
 
 	for _, c := range cases {

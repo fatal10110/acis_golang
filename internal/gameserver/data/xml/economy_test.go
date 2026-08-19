@@ -242,6 +242,17 @@ func TestLoadEconomyDataErrors(t *testing.T) {
 			t.Fatal("expected an error, got nil")
 		}
 	})
+
+	t.Run("augmentation skillId overflows int32", func(t *testing.T) {
+		augDir := filepath.Join(dir, "augmentation-overflow")
+		if err := os.MkdirAll(augDir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		writeXMLFixture(t, filepath.Join(augDir, "skills.xml"), `<list><augmentation id="14561" skillId="5000000000" skillLevel="1" type="blue"/></list>`)
+		if _, err := LoadAugmentations(augDir); err == nil {
+			t.Fatal("expected an error for an out-of-int32-range skillId, got nil")
+		}
+	})
 }
 
 func bucketCount(buckets [10][]int) int {

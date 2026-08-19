@@ -3,8 +3,6 @@ package skill
 import (
 	"fmt"
 	"strings"
-
-	"github.com/fatal10110/acis_golang/internal/commons"
 )
 
 // BufferSkill is one scheme-buffer skill entry loaded from bufferSkills.xml.
@@ -15,45 +13,30 @@ type BufferSkill struct {
 	Description string
 }
 
-// NewBufferSkill builds a BufferSkill from one folded XML buff element.
-func NewBufferSkill(set *commons.StatSet, skills *Table) (BufferSkill, error) {
-	idf := commons.NewFields(set, "skill: buffer skill")
-	skillID := idf.Int32("id")
-	if err := idf.Err(); err != nil {
-		return BufferSkill{}, err
-	}
-
-	f := commons.NewFields(set, fmt.Sprintf("skill: buffer skill %d", skillID))
-	category := f.String("type")
-	if err := f.Err(); err != nil {
-		return BufferSkill{}, err
-	}
-	level := 0
-	if f.Has("level") {
-		level = f.Int("level")
-		if err := f.Err(); err != nil {
-			return BufferSkill{}, err
-		}
+// NewBufferSkill builds a BufferSkill from one <buff> element's decoded
+// attributes and its parent <category>'s type. level is nil when the
+// element omits it, in which case it is looked up as the skill's max level
+// in skills.
+func NewBufferSkill(skillID int32, category string, level *int, price int, description string, skills *Table) (BufferSkill, error) {
+	lvl := 0
+	if level != nil {
+		lvl = *level
 	} else {
 		if skills == nil {
 			return BufferSkill{}, fmt.Errorf("skill: buffer skill %d: missing skill table", skillID)
 		}
-		level = skills.MaxLevel(ID(skillID))
-		if level <= 0 {
+		lvl = skills.MaxLevel(ID(skillID))
+		if lvl <= 0 {
 			return BufferSkill{}, fmt.Errorf("skill: buffer skill %d: skill not found", skillID)
 		}
 	}
 
-	entry := BufferSkill{
-		Skill:       Ref{ID: ID(skillID), Level: level},
-		Price:       f.IntDefault("price", 0),
+	return BufferSkill{
+		Skill:       Ref{ID: ID(skillID), Level: lvl},
+		Price:       price,
 		Category:    category,
-		Description: f.StringDefault("desc", ""),
-	}
-	if err := f.Err(); err != nil {
-		return BufferSkill{}, err
-	}
-	return entry, nil
+		Description: description,
+	}, nil
 }
 
 // BufferTable is an in-memory lookup of scheme-buffer skills by id.

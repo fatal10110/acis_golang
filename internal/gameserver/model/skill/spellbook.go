@@ -2,8 +2,6 @@ package skill
 
 import (
 	"fmt"
-
-	"github.com/fatal10110/acis_golang/internal/commons"
 )
 
 const DivineInspirationSkillID ID = 1405
@@ -13,16 +11,10 @@ type Spellbook struct {
 	ItemID  int32
 }
 
-func NewSpellbook(set *commons.StatSet) (Spellbook, error) {
-	skillID, err := set.GetInt32("skillId")
-	if err != nil {
-		return Spellbook{}, fmt.Errorf("skill: spellbook: %w", err)
-	}
-	itemID, err := set.GetInt32("itemId")
-	if err != nil {
-		return Spellbook{}, fmt.Errorf("skill: spellbook %d: %w", skillID, err)
-	}
-	return Spellbook{SkillID: ID(skillID), ItemID: itemID}, nil
+// NewSpellbook builds a Spellbook from one <book> element's decoded
+// attributes.
+func NewSpellbook(skillID, itemID int32) Spellbook {
+	return Spellbook{SkillID: ID(skillID), ItemID: itemID}
 }
 
 type SpellbookTable struct {
