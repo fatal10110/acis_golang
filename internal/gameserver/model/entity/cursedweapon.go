@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
@@ -20,35 +19,14 @@ type CursedWeapon struct {
 	StageKills      int
 }
 
-// NewCursedWeapon builds a CursedWeapon from one XML item attribute set.
-func NewCursedWeapon(set *commons.StatSet, skills *skill.Table) (CursedWeapon, error) {
-	idf := commons.NewFields(set, "entity: cursed weapon")
-	itemID := idf.Int32("id")
-	if err := idf.Err(); err != nil {
-		return CursedWeapon{}, err
-	}
-
-	f := commons.NewFields(set, fmt.Sprintf("entity: cursed weapon %d", itemID))
-	skillID := f.Int32("skillId")
-	if err := f.Err(); err != nil {
-		return CursedWeapon{}, err
-	}
+// NewCursedWeapon builds a CursedWeapon from one XML item's decoded attributes.
+func NewCursedWeapon(itemID int32, skillID int32, name string, dropRate, duration, durationLost, disappearChance, stageKills int, skills *skill.Table) (CursedWeapon, error) {
 	if skills == nil {
 		return CursedWeapon{}, fmt.Errorf("entity: cursed weapon %d: missing skill table", itemID)
 	}
 	skillLevel := skills.MaxLevel(skill.ID(skillID))
 	if skillLevel <= 0 {
 		return CursedWeapon{}, fmt.Errorf("entity: cursed weapon %d: skill %d not found", itemID, skillID)
-	}
-
-	name := f.String("name")
-	dropRate := f.Int("dropRate")
-	duration := f.Int("duration")
-	durationLost := f.Int("durationLost")
-	disappearChance := f.Int("dissapearChance")
-	stageKills := f.Int("stageKills")
-	if err := f.Err(); err != nil {
-		return CursedWeapon{}, err
 	}
 
 	return CursedWeapon{
