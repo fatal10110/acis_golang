@@ -1,3 +1,5 @@
+//go:build integration
+
 package network
 
 import (
@@ -8,6 +10,8 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
+	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
@@ -149,7 +153,7 @@ func TestDirectTradeCancelClearsSession(t *testing.T) {
 }
 
 func TestDirectTradeClientLoopDispatchesInGame(t *testing.T) {
-	c, _, _, _ := newLinkedGameClient(t)
+	c, _, _, _, _, _ := newLinkedSQLGameClient(t, nil, nil, 0)
 
 	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
 	c.read() // CharCreateOk
@@ -178,7 +182,7 @@ func TestDirectTradeClientLoopDispatchesInGame(t *testing.T) {
 	}
 }
 
-func newStartedDirectTradeFixture(t *testing.T) (*GameClientLink, *fakeItemStore, *frameCapture, *frameCapture, *livePlayer, *livePlayer) {
+func newStartedDirectTradeFixture(t *testing.T) (*GameClientLink, *gamesql.ItemStore, *frameCapture, *frameCapture, *livePlayer, *livePlayer) {
 	t.Helper()
 	link, store, firstCap, secondCap, first, second := newDirectTradeFixture(t)
 	link.handleTradeRequest(first, clientpackets.TradeRequest{ObjectID: second.ObjectID()})
@@ -186,7 +190,7 @@ func newStartedDirectTradeFixture(t *testing.T) (*GameClientLink, *fakeItemStore
 	return link, store, firstCap, secondCap, first, second
 }
 
-func newDirectTradeFixture(t *testing.T) (*GameClientLink, *fakeItemStore, *frameCapture, *frameCapture, *livePlayer, *livePlayer) {
+func newDirectTradeFixture(t *testing.T) (*GameClientLink, *gamesql.ItemStore, *frameCapture, *frameCapture, *livePlayer, *livePlayer) {
 	t.Helper()
 	state := world.New()
 	firstCap, secondCap := &frameCapture{}, &frameCapture{}
@@ -200,7 +204,7 @@ func newDirectTradeFixture(t *testing.T) (*GameClientLink, *fakeItemStore, *fram
 	state.AddPlayer(second)
 	resetCapture(firstCap, secondCap)
 
-	store := newFakeItemStore()
+	store := gamesql.NewItemStore(sqltest.SharedDB(t))
 	ids := &sequentialIDs{next: 1000}
 	updates := task.NewInventoryUpdates()
 	link := &GameClientLink{
@@ -229,43 +233,6 @@ func seedLiveItem(t *testing.T, live *livePlayer, objectID, templateID int32, co
 	result, _ := live.Inventory().Add(inst)
 	live.Inventory().DrainUpdates()
 	return result
-}
-
-func resetCapture(captures ...*frameCapture) {
-	for _, capture := range captures {
-		capture.frames = nil
-	}
-}
-
-func assertOpcodeSequence(t *testing.T, frames [][]byte, want ...byte) {
-	t.Helper()
-	got := frameOpcodes(frames)
-	if string(got) != string(want) {
-		t.Fatalf("opcodes = %x, want %x", got, want)
-	}
-}
-
-func assertSystemMessageStringFrame(t *testing.T, frame []byte, messageID int, text string) {
-	t.Helper()
-	if frame[0] != serverpackets.OpcodeSystemMessage {
-		t.Fatalf("SystemMessage opcode = %#x, want %#x", frame[0], serverpackets.OpcodeSystemMessage)
-	}
-	r := wire.NewReader(frame[1:])
-	if id := r.ReadInt32(); id != int32(messageID) {
-		t.Fatalf("SystemMessage id = %d, want %d", id, messageID)
-	}
-	if params := r.ReadInt32(); params != 1 {
-		t.Fatalf("SystemMessage params = %d, want 1", params)
-	}
-	if typ := r.ReadInt32(); typ != serverpackets.SystemMessageParamText {
-		t.Fatalf("SystemMessage param type = %d, want text", typ)
-	}
-	if got := r.ReadString(); got != text {
-		t.Fatalf("SystemMessage text = %q, want %q", got, text)
-	}
-	if err := r.Err(); err != nil {
-		t.Fatalf("read SystemMessage: %v", err)
-	}
 }
 
 func assertTradeUpdateCount(t *testing.T, frame []byte, want int32) {

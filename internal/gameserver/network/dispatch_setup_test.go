@@ -90,6 +90,47 @@ func syncBarrier(t *testing.T, c *fakeGameClient, send func(), wantOpcode byte) 
 	}
 }
 
+// resetCapture clears every capture's recorded frames.
+func resetCapture(captures ...*frameCapture) {
+	for _, capture := range captures {
+		capture.frames = nil
+	}
+}
+
+// assertOpcodeSequence checks that frames carry exactly the given opcodes,
+// in order. Shared by unit and integration tests across the package.
+func assertOpcodeSequence(t *testing.T, frames [][]byte, want ...byte) {
+	t.Helper()
+	got := frameOpcodes(frames)
+	if string(got) != string(want) {
+		t.Fatalf("opcodes = %x, want %x", got, want)
+	}
+}
+
+// assertSystemMessageStringFrame checks a single-param text SystemMessage.
+func assertSystemMessageStringFrame(t *testing.T, frame []byte, messageID int, text string) {
+	t.Helper()
+	if frame[0] != serverpackets.OpcodeSystemMessage {
+		t.Fatalf("SystemMessage opcode = %#x, want %#x", frame[0], serverpackets.OpcodeSystemMessage)
+	}
+	r := wire.NewReader(frame[1:])
+	if id := r.ReadInt32(); id != int32(messageID) {
+		t.Fatalf("SystemMessage id = %d, want %d", id, messageID)
+	}
+	if params := r.ReadInt32(); params != 1 {
+		t.Fatalf("SystemMessage params = %d, want 1", params)
+	}
+	if typ := r.ReadInt32(); typ != serverpackets.SystemMessageParamText {
+		t.Fatalf("SystemMessage param type = %d, want text", typ)
+	}
+	if got := r.ReadString(); got != text {
+		t.Fatalf("SystemMessage text = %q, want %q", got, text)
+	}
+	if err := r.Err(); err != nil {
+		t.Fatalf("read SystemMessage: %v", err)
+	}
+}
+
 func newTestGameClientLink(t *testing.T, loginLink func() *LoginLink, validator *SessionValidator) (addr string, chars *fakeCharStore, items *fakeItemStore, state *world.State) {
 	t.Helper()
 	return newTestGameClientLinkWithLog(t, loginLink, validator, zerolog.Nop())
