@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
 func TestLoadSoulCrystalData(t *testing.T) {
@@ -382,6 +384,33 @@ func TestSingleMiscLoadersErrors(t *testing.T) {
 			content: `<list><item id="8190" name="Zariche" dropRate="1" duration="72" durationLost="24" dissapearChance="50" stageKills="10"/></list>`,
 			load: func(path string) error {
 				_, err := LoadCursedWeapons(path, nil)
+				return err
+			},
+		},
+		{
+			name:    "cursed weapon missing name",
+			path:    filepath.Join(dir, "cursedWeapons2.xml"),
+			content: `<list><item id="8190" skillId="3603" dropRate="1" duration="72" durationLost="24" dissapearChance="50" stageKills="10"/></list>`,
+			load: func(path string) error {
+				_, err := LoadCursedWeapons(path, nil)
+				return err
+			},
+		},
+		{
+			name:    "cursed weapon empty dropRate",
+			path:    filepath.Join(dir, "cursedWeapons3.xml"),
+			content: `<list><item id="8190" skillId="3603" name="Zariche" dropRate="" duration="72" durationLost="24" dissapearChance="50" stageKills="10"/></list>`,
+			load: func(path string) error {
+				_, err := LoadCursedWeapons(path, skill.NewTable([]skill.Definition{{ID: 3603, Level: 1}}))
+				return err
+			},
+		},
+		{
+			name:    "cursed weapon whitespace-padded stageKills",
+			path:    filepath.Join(dir, "cursedWeapons4.xml"),
+			content: `<list><item id="8190" skillId="3603" name="Zariche" dropRate="1" duration="72" durationLost="24" dissapearChance="50" stageKills=" 10 "/></list>`,
+			load: func(path string) error {
+				_, err := LoadCursedWeapons(path, skill.NewTable([]skill.Definition{{ID: 3603, Level: 1}}))
 				return err
 			},
 		},
