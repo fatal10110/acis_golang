@@ -10,16 +10,16 @@ import (
 // full line is walkable and the target cell's floor matches the walked floor,
 // the target itself is returned with its resolved geodata Z. When the actor
 // cannot step off the origin cell (route closes immediately) or the target
-// cell sits on a different floor, the origin is returned unchanged.
+// cell sits on a different floor, the origin is returned unchanged. A target
+// outside the geodata grid does not short-circuit: the walk runs toward it
+// and stops at the grid border it exits through, same as any other stop
+// condition (GeoEngine.java getValidLocation, GEO_CELLS_X/GEO_CELLS_Y bounds
+// check inside the loop).
 //
 // Used as the no-path fallback for movement requests: rather than refusing to
 // move at all when no pathfinder route exists, the actor advances as far as
 // the terrain allows in the requested direction.
 func (e *Engine) ValidLocation(ox, oy, oz, tx, ty, tz int) location.Location {
-	if OutOfWorld(tx, ty) {
-		return location.Location{X: ox, Y: oy, Z: oz}
-	}
-
 	gox := GeoX(ox)
 	goy := GeoY(oy)
 	goz := int(e.heightNearest(gox, goy, oz))
@@ -44,6 +44,8 @@ func (e *Engine) ValidLocation(ox, oy, oz, tx, ty, tz int) location.Location {
 	gridY := alignCell(oy)
 	nx := gox
 	ny := goy
+	maxGeoX := GeoX(WorldXMax)
+	maxGeoY := GeoY(WorldYMax)
 	for gox != gtx || goy != gty {
 		checkX := gridX + dir.offsetX
 		checkY := int(float64(oy) + m*float64(checkX-ox))
@@ -58,6 +60,14 @@ func (e *Engine) ValidLocation(ox, oy, oz, tx, ty, tz int) location.Location {
 			checkX = min(max(int(float64(ox)+float64(checkY-oy)/m), gridX), gridX+block.CellSize-1)
 			gridY += dir.stepY
 			ny += dir.signumY
+		}
+
+		// The next cell falls outside the geodata grid: the walk stops at
+		// this border, same as a blocked edge (GeoEngine.getValidLocation
+		// GEO_CELLS_X/GEO_CELLS_Y bounds check, checked before the NSWE
+		// obstacle test).
+		if nx < 0 || nx > maxGeoX || ny < 0 || ny > maxGeoY {
+			return location.Location{X: checkX, Y: checkY, Z: goz}
 		}
 
 		// A blocked edge or an unservable next cell ends the walk at this

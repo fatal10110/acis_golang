@@ -61,14 +61,19 @@ func TestValidLocation(t *testing.T) {
 		}
 	})
 
-	t.Run("out of world target returns origin", func(t *testing.T) {
+	t.Run("out of world target walks to the grid border, not the origin", func(t *testing.T) {
 		e := newTestEngine(t, complexBlock(func(x, y int) block.Cell {
 			return block.Cell{Height: 0, NSWE: block.AllDirections}
 		}))
 
 		ox, oy, oz := worldX(0), worldY(0), 0
 		got := e.ValidLocation(ox, oy, oz, WorldXMin-1, oy, oz)
-		want := location.Location{X: ox, Y: oy, Z: oz}
+		// Cell (0,0) is open on every side, so the first step west leaves the
+		// geodata grid (nx < 0) before any NSWE/obstacle check applies. The
+		// reference has no early out-of-world bail-out for the target — it
+		// walks the line and stops at the border it exits through
+		// (GeoEngine.getValidLocation, GEO_CELLS_X/GEO_CELLS_Y bounds check).
+		want := location.Location{X: WorldXMin, Y: oy, Z: oz}
 		if got != want {
 			t.Fatalf("ValidLocation() = %+v, want %+v", got, want)
 		}
