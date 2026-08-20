@@ -720,3 +720,92 @@ func TestIconDurationRepeatCountDecrementsEverySecond(t *testing.T) {
 		t.Fatalf("iconDuration(+3s) = %d, %v; want 11000, true (old formula held flat at 12000 here)", got, ok)
 	}
 }
+
+// TestListDisplacedStackedEffectDrainsCountWithoutActingAndResumesWithoutRestartOnPromotion
+// proves a stacked-out loser's tick schedule keeps draining while displaced —
+// mirroring AbstractEffect.scheduleEffect()'s ACTING case, which decrements
+// _count on every tick regardless of getInUse() and only runs
+// onActionTime() when getInUse() is true (AbstractEffect.java:291-306) — and
+// that a promoted loser resumes from that drained count instead of
+// restarting from the template.
+func TestListDisplacedStackedEffectDrainsCountWithoutActingAndResumesWithoutRestartOnPromotion(t *testing.T) {
+	var events []string
+	list := NewList(eventOwner{events: &events}, WithCancelLesser(false))
+
+	weak := namedEffect("weak", 1, "speed", 1, false, &events)
+	weak.Template.Count, weak.Template.Time = 5, 2
+	weak.OnAction = func(*Effect) bool { events = append(events, "weak:action"); return true }
+
+	strong := namedEffect("strong", 2, "speed", 2, false, &events)
+	strong.Template.Count, strong.Template.Time = 1, 2
+	strong.OnAction = func(*Effect) bool { events = append(events, "strong:action"); return true }
+
+	list.Add(weak)
+	start := time.Unix(1000, 0)
+	weak.startSchedule(start) // pin weak's schedule to a deterministic clock
+
+	list.Add(strong)
+	strong.startSchedule(start) // strong displaces weak; pin its schedule too
+
+	// weak is buffs[0] (added first), so tickAt claims weak's action before
+	// strong's on every sweep — see List.All()'s buffs-then-debuffs order.
+	// strong's count (1) exhausts on this same tick, so it is removed and
+	// weak is promoted in its place within the same tickAt call.
+	list.tickAt(start.Add(2 * time.Second))
+
+	requireNames(t, list.All(), []string{"weak"})
+	if !weak.InUse() {
+		t.Fatal("weak was not promoted after strong (its only stack winner) was removed")
+	}
+	if weak.Remaining() != 4 {
+		t.Fatalf("weak.Remaining() after promotion = %d, want 4 (resumed from the drained count, not restarted to template count 5)", weak.Remaining())
+	}
+	for _, e := range events {
+		if e == "weak:action" {
+			t.Fatal("weak fired its periodic action while still displaced")
+		}
+	}
+}
+
+// TestListDisplacedStackedEffectSelfRemovesOnCountExhaustionWithoutEverActivating
+// proves a stacked-out loser that never gets promoted still self-removes once
+// its own count drains to zero, mirroring scheduleEffect()'s ACTING case
+// falling through to FINISHING (and stopEffectTask() removing the effect)
+// once _count reaches 0, regardless of getInUse() (AbstractEffect.java:
+// 291-313).
+func TestListDisplacedStackedEffectSelfRemovesOnCountExhaustionWithoutEverActivating(t *testing.T) {
+	var events []string
+	list := NewList(eventOwner{events: &events}, WithCancelLesser(false))
+
+	weak := namedEffect("weak", 1, "speed", 1, false, &events)
+	weak.Template.Count, weak.Template.Time = 2, 2
+	weak.OnAction = func(*Effect) bool { events = append(events, "weak:action"); return true }
+
+	strong := namedEffect("strong", 2, "speed", 2, false, &events)
+	strong.Template.Count, strong.Template.Time = 100, 2
+	strong.OnAction = func(*Effect) bool { events = append(events, "strong:action"); return true }
+
+	list.Add(weak)
+	start := time.Unix(2000, 0)
+	weak.startSchedule(start)
+
+	list.Add(strong)
+	strong.startSchedule(start)
+
+	list.tickAt(start.Add(2 * time.Second))
+	if weak.Remaining() != 1 {
+		t.Fatalf("weak.Remaining() after one tick = %d, want 1", weak.Remaining())
+	}
+	requireNames(t, list.All(), []string{"weak", "strong"})
+
+	list.tickAt(start.Add(4 * time.Second))
+	requireNames(t, list.All(), []string{"strong"})
+	if weak.InUse() {
+		t.Fatal("weak reports in-use after self-removing while displaced")
+	}
+	for _, e := range events {
+		if e == "weak:action" {
+			t.Fatal("weak fired its periodic action even though it was never promoted")
+		}
+	}
+}
