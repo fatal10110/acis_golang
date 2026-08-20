@@ -123,10 +123,11 @@ const confusionRadius = 1000
 // confusionStart aborts a non-player target's current move, then redirects
 // its aggression toward a random nearby attackable actor found within
 // confusionRadius. A player target is left untouched entirely. Unlike the
-// reference effect's own 2D-only distance check, the radius search this
-// port reuses (world.State.ForEachKnownInRadius) filters in 3D — a
-// documented simplification, not a byte-exact match, since no 2D-only
-// radius query exists in this port yet.
+// reference effect's own 2D-only distance check (EffectConfusion.java:43,
+// wo.distance2D(getEffected()) <= 1000), the radius search this port
+// reuses (world.State.ForEachKnownInPlainRadius, unwidened by collision
+// radius) filters in 3D — a documented simplification, not a byte-exact
+// match, since no 2D-only radius query exists in this port yet.
 func confusionStart(e *Effect) bool {
 	if isPlayer(e.Effected) {
 		return true
