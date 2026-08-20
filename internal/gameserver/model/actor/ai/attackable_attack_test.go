@@ -124,31 +124,41 @@ func TestAttackableAIIgnoresLostTarget(t *testing.T) {
 	}
 }
 
-func TestAttackableAIReselectsWhenTopAttackTargetCannotBeUsed(t *testing.T) {
+// TestAttackableAIKeepsTargetWhenCanAttackFails is the regression test for
+// PR #936's skipAttackTarget: on a CanAttack failure the reference
+// (CreatureAI.thinkAttack, `if (!_actor.getAttack().canAttack(target)) return;`)
+// leaves the current target, its hate and its ATTACK desire untouched and
+// retries next tick. The removed skipAttackTarget instead zeroed the
+// blocked target's hate, dropped its desire, and transferred the hate to
+// the next most-hated attacker with no validity filter.
+func TestAttackableAIKeepsTargetWhenCanAttackFails(t *testing.T) {
 	owner := actor(1)
 	blocked := actor(2)
-	reachable := actor(3)
-	owner.known = map[int32]bool{blocked.ObjectID(): true, reachable.ObjectID(): true}
+	other := actor(3)
+	owner.known = map[int32]bool{blocked.ObjectID(): true, other.ObjectID(): true}
 	move := &recordingMove{}
 	strike := &recordingAttack{
 		canAttackTarget: map[int32]bool{
-			blocked.ObjectID():   false,
-			reachable.ObjectID(): true,
+			blocked.ObjectID(): false,
+			other.ObjectID():   true,
 		},
 	}
 	ai := NewAttackable(owner, move, strike)
 
-	ai.AddDamageHate(reachable, 0, 25)
+	ai.AddDamageHate(other, 0, 25)
 	ai.AddDamageHate(blocked, 0, 100)
 	ai.Think()
 
-	if strike.target != reachable {
-		t.Fatalf("attacked target = %v, want reachable fallback target", strike.target)
+	if strike.target != nil {
+		t.Fatalf("attacked target = %v, want none while blocked target is retried", strike.target)
 	}
-	if got := ai.Threats().Hate(blocked); got != 0 {
-		t.Fatalf("blocked target hate = %v, want stopped", got)
+	if got := ai.CurrentIntention(); got != IntentionAttack {
+		t.Fatalf("CurrentIntention() = %v, want %v (kept committed to blocked target)", got, IntentionAttack)
 	}
-	if got := ai.Threats().Hate(reachable); got <= 25 {
-		t.Fatalf("reachable target hate = %v, want reselection hate transferred above original 25", got)
+	if got := ai.Threats().Hate(blocked); got != 100 {
+		t.Fatalf("blocked target hate = %v, want untouched 100", got)
+	}
+	if got := ai.Threats().Hate(other); got != 25 {
+		t.Fatalf("other target hate = %v, want untouched 25 (no hate transfer)", got)
 	}
 }
