@@ -118,6 +118,8 @@ func (l *List) addStacked(e *Effect, pending *[]func()) {
 }
 
 func (l *List) removeRejectedStacked(e *Effect) {
+	e.stopSchedule()
+
 	stackType := e.stackType()
 	queue := l.stacks[stackType]
 	if index := slices.Index(queue, e); index >= 0 {
@@ -131,7 +133,14 @@ func (l *List) removeRejectedStacked(e *Effect) {
 	l.removeFromVisible(e)
 }
 
+// remove drops e from the list for good — the only place e's tick schedule
+// stops, mirroring stopEffectTask() firing once scheduleEffect() reaches
+// FINISHING (AbstractEffect.java:308-320). Mere stacking displacement (see
+// addStacked) does not call remove: a displaced member stays queued and its
+// schedule keeps draining.
 func (l *List) remove(e *Effect, pending *[]func()) {
+	e.stopSchedule()
+
 	if e.stackType() == "none" {
 		if l.removeFromVisible(e) && e.InUse() {
 			*pending = append(*pending, func() { l.removeStats(e) })

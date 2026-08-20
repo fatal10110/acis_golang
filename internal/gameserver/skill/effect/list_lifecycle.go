@@ -9,8 +9,14 @@ func (l *List) Tick() {
 	l.tickAt(time.Now())
 }
 
+// tickAt claims a due action from every held effect, active or displaced —
+// AbstractEffect.scheduleEffect()'s ACTING case runs (and decrements _count)
+// for every scheduled effect regardless of getInUse() (AbstractEffect.java:
+// 291-306) — but only runs the periodic hook for the currently active member
+// of each stack group; a displaced member silently drains its count and
+// self-removes on exhaustion without ever firing its action.
 func (l *List) tickAt(now time.Time) {
-	for _, e := range l.active() {
+	for _, e := range l.All() {
 		run, remove := e.claimAction(now)
 		if !run {
 			if remove {
@@ -18,7 +24,7 @@ func (l *List) tickAt(now time.Time) {
 			}
 			continue
 		}
-		if !e.ActionTime() {
+		if e.InUse() && !e.ActionTime() {
 			remove = true
 		}
 		if remove {
@@ -105,7 +111,12 @@ func appendThunk(pending *[]func(), thunk func()) {
 // beginActivate returns a thunk that runs e's on-start hook once the
 // caller's lock is released, then briefly re-acquires l.mu to apply the
 // result: e activates and gains its stat funcs on success, or onReject
-// runs (still under l.mu) on failure.
+// runs (still under l.mu) on failure. It does not (re)start e's tick
+// schedule: that starts once, in add, when e is first created — matching
+// L2Skill.getEffects() calling scheduleEffect() unconditionally for every
+// created effect (L2Skill.java:1188-1191) — so a promoted stack loser
+// resumes with whatever count it drained down to while displaced instead of
+// restarting from the template.
 func (l *List) beginActivate(e *Effect, onReject func(*Effect)) func() {
 	return func() {
 		ok := true
@@ -116,7 +127,6 @@ func (l *List) beginActivate(e *Effect, onReject func(*Effect)) func() {
 		l.mu.Lock()
 		if ok {
 			e.inUse = true
-			e.startSchedule(time.Now())
 			l.addStatFuncs(e)
 		} else {
 			onReject(e)
@@ -125,13 +135,18 @@ func (l *List) beginActivate(e *Effect, onReject func(*Effect)) func() {
 	}
 }
 
-// add inserts e. A RejectsIfAffected effect that finds its own Flag bit
+// add inserts e, starting its tick schedule unconditionally first — matching
+// how the reference schedules every created effect's periodic task up front,
+// before any stacking/activation outcome is known. A RejectsIfAffected
+// effect that finds its own Flag bit
 // already set by any currently held effect is dropped outright before any
 // buff/debuff handling: its stop-task hook fires and it never reaches the
 // identical-effect replace/reject logic below, so a same-skill-id recast
 // while the flag is already active is rejected here rather than treated as
 // a replacement.
 func (l *List) add(e *Effect, pending *[]func()) {
+	e.startSchedule(time.Now())
+
 	if e.RejectsIfAffected && l.flagsLocked()&e.Flag != 0 {
 		appendThunk(pending, e.stopTaskThunk())
 		return
