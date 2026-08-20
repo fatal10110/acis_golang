@@ -1,15 +1,18 @@
+//go:build integration
+
 package network
 
 import (
 	"testing"
 
+	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
 func TestGameClientLinkAppearingSendsUserInfo(t *testing.T) {
-	c, chars, _, state := newLinkedGameClientWithSkillsSeed(t, nil, func(chars *fakeCharStore, _ *fakeItemStore) {
-		seedSelectableCharacter(t, chars, "player1", "Newbie", 1, 0)
+	c, chars, _, _, _, state := newLinkedSQLGameClient(t, nil, func(chars *gamesql.CharacterStore, _ *gamesql.ItemStore) {
+		seedSelectableSQLCharacter(t, chars, "player1", "Newbie", 1, 0)
 	}, 1)
 
 	c.send(encodeRequestGameStart(0))
@@ -17,7 +20,7 @@ func TestGameClientLinkAppearingSendsUserInfo(t *testing.T) {
 	c.read() // CharSelected
 	c.send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
-	obj, ok := state.Player(chars.soleObjectID(t))
+	obj, ok := state.Player(sqlSoleObjectID(t, chars))
 	if !ok {
 		t.Fatal("entered player missing from world")
 	}

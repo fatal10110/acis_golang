@@ -11,65 +11,9 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
-	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
-
-func TestGameClientLinkRequestPledgeCrestDispatch(t *testing.T) {
-	data := bytes.Repeat([]byte{0x5a}, 256)
-	c, _, _, _ := newLinkedGameClientWithCrests(t, testCrestCache(t, map[int][]byte{101: data}))
-
-	c.send(encodeRequestPledgeCrest(101))
-
-	reply := c.read()
-	assertPledgeCrestFrame(t, reply, 101, data)
-}
-
-func TestGameClientLinkRequestPledgeCrestDispatchMissingData(t *testing.T) {
-	c, _, _, _ := newLinkedGameClientWithCrests(t, datacache.NewCrests())
-
-	c.send(encodeRequestPledgeCrest(999))
-
-	reply := c.read()
-	assertPledgeCrestFrame(t, reply, 999, nil)
-}
-
-func TestGameClientLinkRequestAllyCrestDispatch(t *testing.T) {
-	data := bytes.Repeat([]byte{0x7b}, 192)
-	c := newInGameClientWithCrests(t, testAllyCrestCache(t, map[int][]byte{103: data}))
-
-	c.send(encodeRequestAllyCrest(103))
-
-	reply := c.read()
-	assertAllyCrestFrame(t, reply, 103, data)
-}
-
-func TestGameClientLinkRequestAllyCrestDispatchMissingData(t *testing.T) {
-	c := newInGameClientWithCrests(t, datacache.NewCrests())
-
-	c.send(encodeRequestAllyCrest(999))
-
-	assertNoReply(t, c)
-}
-
-func TestGameClientLinkRequestExPledgeCrestLargeDispatch(t *testing.T) {
-	data := bytes.Repeat([]byte{0x6c}, 2176)
-	c := newInGameClientWithCrests(t, testLargePledgeCrestCache(t, map[int][]byte{105: data}))
-
-	c.send(encodeRequestExPledgeCrestLarge(105))
-
-	reply := c.read()
-	assertExPledgeCrestLargeFrame(t, reply, 105, data)
-}
-
-func TestGameClientLinkRequestExPledgeCrestLargeDispatchMissingData(t *testing.T) {
-	c := newInGameClientWithCrests(t, datacache.NewCrests())
-
-	c.send(encodeRequestExPledgeCrestLarge(999))
-
-	assertNoReply(t, c)
-}
 
 func TestAllowedGatesRequestPledgeCrest(t *testing.T) {
 	if !Allowed(StateAuthed, clientpackets.OpcodeRequestPledgeCrest) {
@@ -160,19 +104,6 @@ func testAllyCrestCache(t *testing.T, crests map[int][]byte) *datacache.Crests {
 		t.Fatalf("LoadCrests: %v", err)
 	}
 	return cache
-}
-
-func newInGameClientWithCrests(t *testing.T, crests *datacache.Crests) *fakeGameClient {
-	t.Helper()
-	c, _, _, _, _ := newLinkedGameClientWithSkillsShortcutsCrestsSeed(t, nil, nil, crests, modelskill.BookPolicy{}, nil, func(chars *fakeCharStore, items *fakeItemStore) {
-		seedSelectableCharacter(t, chars, "player1", "CrestTester", 1, 0)
-	}, 1)
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
-	readEnterWorldBurst(t, c, false)
-	return c
 }
 
 func assertPledgeCrestFrame(t *testing.T, frame []byte, crestID int32, data []byte) {
