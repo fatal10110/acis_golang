@@ -1,26 +1,32 @@
 package skill
 
-import (
-	"testing"
+import "testing"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
-)
-
-// minimalSet returns a StatSet holding only the attributes NewDefinition
-// requires unconditionally.
-func minimalSet() *commons.StatSet {
-	set := commons.NewStatSet()
-	set.Set("target", "ONE")
-	set.Set("skillType", "BUFF")
-	set.Set("operateType", "ACTIVE")
-	return set
+// minimalAttrs returns the attributes a level carries when its data sets
+// only the classification tags every skill has.
+func minimalAttrs() DefinitionAttrs {
+	return DefinitionAttrs{
+		Activation:            ActivationActive,
+		Target:                TargetOne,
+		SkillType:             "BUFF",
+		EffectRange:           -1,
+		AbnormalLevel:         -1,
+		EffectAbnormalLevel:   -1,
+		NegateLevel:           -1,
+		Radius:                80,
+		EffectNpcID:           -1,
+		Element:               ElementNone,
+		CubicActivationTime:   8,
+		CubicActivationChance: 30,
+		SummonTotalLifeTime:   1200000,
+		ActivationChance:      -1,
+		CanBeReflected:        true,
+		CanBeDispelled:        true,
+	}
 }
 
-func TestNewDefinitionDefaults(t *testing.T) {
-	d, err := NewDefinition(7, 1, "Test Skill", minimalSet())
-	if err != nil {
-		t.Fatalf("NewDefinition() error: %v", err)
-	}
+func TestNewDefinitionCarriesAttrs(t *testing.T) {
+	d := NewDefinition(7, 1, "Test Skill", minimalAttrs())
 	if d.ID != 7 || d.Level != 1 || d.Name != "Test Skill" {
 		t.Fatalf("NewDefinition() identity = %+v", d)
 	}
@@ -28,7 +34,7 @@ func TestNewDefinitionDefaults(t *testing.T) {
 		t.Fatalf("NewDefinition() tags = %+v", d)
 	}
 	if d.EffectRange != -1 || d.AbnormalLevel != -1 || d.NegateLevel != -1 {
-		t.Fatalf("NewDefinition() (-1)-defaulted fields = %+v", d)
+		t.Fatalf("NewDefinition() (-1)-carrying fields = %+v", d)
 	}
 	if d.Radius != 80 {
 		t.Fatalf("NewDefinition() Radius = %d, want 80", d.Radius)
@@ -36,8 +42,8 @@ func TestNewDefinitionDefaults(t *testing.T) {
 	if d.Element != ElementNone {
 		t.Fatalf("NewDefinition() Element = %v, want ElementNone", d.Element)
 	}
-	if d.CanBeReflected != true || d.CanBeDispelled != true {
-		t.Fatalf("NewDefinition() reflect/dispel defaults = %+v", d)
+	if !d.CanBeReflected || !d.CanBeDispelled {
+		t.Fatalf("NewDefinition() reflect/dispel = %+v", d)
 	}
 	// BUFF isn't a classified-offensive type, and target isn't CORPSE_MOB.
 	if d.Offensive {
@@ -56,29 +62,36 @@ func TestNewDefinitionDefaults(t *testing.T) {
 }
 
 func TestNewDefinitionOffensiveAndCritDefaults(t *testing.T) {
-	set := minimalSet()
-	set.Set("skillType", "PDAM")
-	d, err := NewDefinition(1, 1, "x", set)
-	if err != nil {
-		t.Fatalf("NewDefinition() error: %v", err)
-	}
+	a := minimalAttrs()
+	a.SkillType = "PDAM"
+	d := NewDefinition(1, 1, "x", a)
 	if !d.Offensive {
 		t.Fatal("PDAM: Offensive = false, want true")
 	}
 	if d.BaseCritRate != 0 {
 		t.Fatalf("PDAM: BaseCritRate = %d, want 0", d.BaseCritRate)
 	}
+
+	// A debuff or a corpse-mob target is offensive whatever its skill type.
+	a = minimalAttrs()
+	a.Debuff = true
+	if !NewDefinition(1, 1, "x", a).Offensive {
+		t.Fatal("debuff: Offensive = false, want true")
+	}
+	a = minimalAttrs()
+	a.Target = TargetCorpseMob
+	if !NewDefinition(1, 1, "x", a).Offensive {
+		t.Fatal("CORPSE_MOB target: Offensive = false, want true")
+	}
 }
 
 func TestNewDefinitionExplicitOverridesDefault(t *testing.T) {
-	set := minimalSet()
-	set.Set("skillType", "PDAM")
-	set.Set("offensive", "false")
-	set.Set("baseCritRate", "42")
-	d, err := NewDefinition(1, 1, "x", set)
-	if err != nil {
-		t.Fatalf("NewDefinition() error: %v", err)
-	}
+	a := minimalAttrs()
+	a.SkillType = "PDAM"
+	offensive, rate := false, 42
+	a.Offensive, a.BaseCritRate = &offensive, &rate
+
+	d := NewDefinition(1, 1, "x", a)
 	if d.Offensive {
 		t.Fatal("explicit offensive=false was overridden by the PDAM default")
 	}
@@ -87,114 +100,44 @@ func TestNewDefinitionExplicitOverridesDefault(t *testing.T) {
 	}
 }
 
-func TestNewDefinitionCubicFields(t *testing.T) {
-	d, err := NewDefinition(1, 1, "x", minimalSet())
-	if err != nil {
-		t.Fatalf("NewDefinition() error: %v", err)
-	}
-	if d.IsCubic || d.NpcID != 0 {
-		t.Fatalf("NewDefinition() defaults IsCubic/NpcID = %v/%d, want false/0", d.IsCubic, d.NpcID)
-	}
-
-	set := minimalSet()
-	set.Set("isCubic", "true")
-	set.Set("npcId", "1")
-	d, err = NewDefinition(1, 1, "x", set)
-	if err != nil {
-		t.Fatalf("NewDefinition() error: %v", err)
-	}
-	if !d.IsCubic || d.NpcID != 1 {
-		t.Fatalf("NewDefinition() IsCubic/NpcID = %v/%d, want true/1", d.IsCubic, d.NpcID)
-	}
-}
-
-func TestNewDefinitionOptionalReferences(t *testing.T) {
-	set := minimalSet()
-	set.Set("sharedReuse", "10-2")
-	set.Set("negateId", "1,2,3")
-	set.Set("negateStats", "STUN ROOT")
-	set.Set("flyType", "CHARGE")
-
-	d, err := NewDefinition(1, 1, "x", set)
-	if err != nil {
-		t.Fatalf("NewDefinition() error: %v", err)
-	}
-	if d.SharedReuse == nil || d.SharedReuse.ID != 10 || d.SharedReuse.Level != 2 {
-		t.Fatalf("SharedReuse = %+v, want {10 2}", d.SharedReuse)
-	}
-	if len(d.NegateIDs) != 3 || d.NegateIDs[0] != 1 || d.NegateIDs[2] != 3 {
-		t.Fatalf("NegateIDs = %v, want [1 2 3]", d.NegateIDs)
-	}
-	if len(d.NegateTypes) != 2 || d.NegateTypes[0] != "STUN" || d.NegateTypes[1] != "ROOT" {
-		t.Fatalf("NegateTypes = %v, want [STUN ROOT]", d.NegateTypes)
-	}
-	if d.Flight == nil || *d.Flight != FlightCharge {
-		t.Fatalf("Flight = %v, want FlightCharge", d.Flight)
-	}
-}
-
 func TestNewDefinitionHeroSkill(t *testing.T) {
-	d, err := NewDefinition(395, 1, "Hero Skill", minimalSet())
-	if err != nil {
-		t.Fatalf("NewDefinition() error: %v", err)
-	}
-	if !d.HeroSkill {
+	if !NewDefinition(395, 1, "Hero Skill", minimalAttrs()).HeroSkill {
 		t.Fatal("skill 395: HeroSkill = false, want true")
 	}
-
-	d2, err := NewDefinition(1, 1, "Not Hero", minimalSet())
-	if err != nil {
-		t.Fatalf("NewDefinition() error: %v", err)
-	}
-	if d2.HeroSkill {
+	if NewDefinition(1, 1, "Not Hero", minimalAttrs()).HeroSkill {
 		t.Fatal("skill 1: HeroSkill = true, want false")
 	}
 }
 
-func TestNewDefinitionRequiredFields(t *testing.T) {
-	cases := []struct {
-		name string
-		set  func() *commons.StatSet
-	}{
-		{"missing target", func() *commons.StatSet {
-			s := commons.NewStatSet()
-			s.Set("skillType", "BUFF")
-			s.Set("operateType", "ACTIVE")
-			return s
-		}},
-		{"missing skillType", func() *commons.StatSet {
-			s := commons.NewStatSet()
-			s.Set("target", "ONE")
-			s.Set("operateType", "ACTIVE")
-			return s
-		}},
-		{"missing operateType", func() *commons.StatSet {
-			s := commons.NewStatSet()
-			s.Set("target", "ONE")
-			s.Set("skillType", "BUFF")
-			return s
-		}},
-		{"unknown target tag", func() *commons.StatSet {
-			s := minimalSet()
-			s.Set("target", "NOT_REAL")
-			return s
-		}},
-		{"malformed sharedReuse", func() *commons.StatSet {
-			s := minimalSet()
-			s.Set("sharedReuse", "not-a-pair-of-ints")
-			return s
-		}},
-		{"malformed negateId", func() *commons.StatSet {
-			s := minimalSet()
-			s.Set("negateId", "1,oops")
-			return s
-		}},
+func TestParseRef(t *testing.T) {
+	ref, err := ParseRef("10-2")
+	if err != nil {
+		t.Fatalf("ParseRef(\"10-2\") error: %v", err)
 	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			if _, err := NewDefinition(1, 1, "x", c.set()); err == nil {
-				t.Fatalf("expected an error for %s, got nil", c.name)
-			}
-		})
+	if ref.ID != 10 || ref.Level != 2 {
+		t.Fatalf("ParseRef(\"10-2\") = %+v, want {10 2}", ref)
+	}
+	for _, raw := range []string{"", "10", "not-a-pair-of-ints", "10-2-3", "x-2", "10-x", "100--1", "-1-2"} {
+		if _, err := ParseRef(raw); err == nil {
+			t.Fatalf("ParseRef(%q) = nil error, want an error", raw)
+		}
+	}
+}
+
+func TestParseEnums(t *testing.T) {
+	if a, err := ParseActivation("TOGGLE"); err != nil || a != ActivationToggle {
+		t.Fatalf("ParseActivation(\"TOGGLE\") = %v, %v", a, err)
+	}
+	if tgt, err := ParseTarget("CORPSE_MOB"); err != nil || tgt != TargetCorpseMob {
+		t.Fatalf("ParseTarget(\"CORPSE_MOB\") = %v, %v", tgt, err)
+	}
+	if e, err := ParseElement("VALAKAS"); err != nil || e != ElementValakas {
+		t.Fatalf("ParseElement(\"VALAKAS\") = %v, %v", e, err)
+	}
+	if f, err := ParseFlight("CHARGE"); err != nil || f != FlightCharge {
+		t.Fatalf("ParseFlight(\"CHARGE\") = %v, %v", f, err)
+	}
+	if _, err := ParseTarget("NOT_A_TARGET"); err == nil {
+		t.Fatal("ParseTarget(\"NOT_A_TARGET\") = nil error, want an error")
 	}
 }
