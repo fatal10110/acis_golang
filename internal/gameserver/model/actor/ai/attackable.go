@@ -360,8 +360,7 @@ func (a *Attackable) thinkAttack() (bool, error) {
 	}
 
 	if !a.attack.CanAttack(target) {
-		a.skipAttackTarget(target)
-		return true, nil
+		return false, nil
 	}
 
 	stopErr := a.move.Stop()
@@ -470,23 +469,6 @@ func (a *Attackable) dropLostCastTarget(target attackable.Combatant, skillType s
 		return true
 	}
 	return false
-}
-
-func (a *Attackable) skipAttackTarget(target attackable.Combatant) {
-	var hate float64
-	if threat, ok := a.threats.Get(target); ok {
-		hate = threat.Hate
-	}
-	a.threats.StopHate(target)
-	a.desires.Remove(IntentionAttack, target)
-	a.clearIntentionsFor(target)
-	if hate <= 0 {
-		return
-	}
-	if next, ok := a.threats.MostHated(); ok {
-		a.threats.AddDamage(next.Attacker, 0, hate)
-		a.addAttackDesire(next.Attacker, hate)
-	}
 }
 
 func (a *Attackable) clearIntentionsFor(target attackable.Combatant) {
