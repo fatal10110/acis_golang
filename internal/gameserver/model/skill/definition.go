@@ -467,12 +467,15 @@ func defaultBaseCritRate(skillType string) int {
 }
 
 // ParseRef parses a skill reference in its "skillId-level" data-file form,
-// the shape a "sharedReuse" attribute carries.
+// the shape a "sharedReuse" attribute carries. Exactly two dash-separated
+// parts are required: a level is never negative, so a value like "100--1"
+// is corrupt data rather than a reference to level -1.
 func ParseRef(raw string) (Ref, error) {
-	id, level, ok := strings.Cut(raw, "-")
-	if !ok {
+	parts := strings.Split(raw, "-")
+	if len(parts) != 2 {
 		return Ref{}, fmt.Errorf("want \"skillId-level\"")
 	}
+	id, level := parts[0], parts[1]
 	rawID, err := strconv.ParseInt(id, 10, 32)
 	if err != nil {
 		return Ref{}, err

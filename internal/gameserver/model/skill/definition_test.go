@@ -117,7 +117,7 @@ func TestParseRef(t *testing.T) {
 	if ref.ID != 10 || ref.Level != 2 {
 		t.Fatalf("ParseRef(\"10-2\") = %+v, want {10 2}", ref)
 	}
-	for _, raw := range []string{"", "10", "not-a-pair-of-ints", "10-2-3", "x-2", "10-x"} {
+	for _, raw := range []string{"", "10", "not-a-pair-of-ints", "10-2-3", "x-2", "10-x", "100--1", "-1-2"} {
 		if _, err := ParseRef(raw); err == nil {
 			t.Fatalf("ParseRef(%q) = nil error, want an error", raw)
 		}

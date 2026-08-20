@@ -3,6 +3,7 @@ package xml
 import (
 	"errors"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -415,6 +416,96 @@ func TestLoadSkillDefinitions(t *testing.T) {
 		}
 		if e := ench2.SelfEffects[0]; e.Name != "ManaHeal" || e.Value != 1 || e.Icon {
 			t.Fatalf("skill 42 level 141 self effect = %+v", e)
+		}
+	})
+
+	// The shipped data spells booleans both ways and relies on a present
+	// "false" beating a true default, so a level's own boolean value has to
+	// win over the loader's default in both directions and regardless of
+	// case.
+	t.Run("explicit booleans override their defaults in both directions", func(t *testing.T) {
+		// canBeReflected/canBeDispeled are the two attributes that default
+		// to true, so only a present "false" can distinguish a real read
+		// from the default.
+		d, ok := table.Get(1375, 1)
+		if !ok {
+			t.Fatal("skill 1375 level 1 not loaded")
+		}
+		if d.Name != "Heroic Grandeur" {
+			t.Fatalf("skill 1375 level 1 Name = %q, want \"Heroic Grandeur\"", d.Name)
+		}
+		if d.CanBeReflected || d.CanBeDispelled {
+			t.Fatalf("skill 1375 level 1 = canBeReflected=%v canBeDispeled=%v, want both false", d.CanBeReflected, d.CanBeDispelled)
+		}
+
+		// Skill 455 writes offensive="True" with a capital T, and SIGNET is
+		// neither a classified-offensive type nor a debuff nor a CORPSE_MOB
+		// target, so its Offensive would default to false: only a
+		// case-insensitive read of the attribute makes it true.
+		signet, ok := table.Get(455, 1)
+		if !ok {
+			t.Fatal("skill 455 level 1 not loaded")
+		}
+		if signet.SkillType != "SIGNET" || signet.Debuff || signet.Target == skill.TargetCorpseMob {
+			t.Fatalf("skill 455 level 1 no longer defaults Offensive to false: %+v", signet)
+		}
+		if !signet.Offensive {
+			t.Fatal("skill 455 level 1 Offensive = false, want true from offensive=\"True\"")
+		}
+	})
+
+	// Every attribute name is a bare string key in the loader, so a mistyped
+	// one is a silent default rather than an error. These are the optional
+	// attributes whose absent value is distinguishable from any real one.
+	t.Run("optional attributes decode to their own fields", func(t *testing.T) {
+		cubic, ok := table.Get(10, 1)
+		if !ok {
+			t.Fatal("skill 10 level 1 not loaded")
+		}
+		if !cubic.IsCubic || cubic.NpcID != 1 {
+			t.Fatalf("skill 10 level 1 = isCubic=%v npcId=%d, want true/1", cubic.IsCubic, cubic.NpcID)
+		}
+
+		negateStats, ok := table.Get(7003, 1)
+		if !ok {
+			t.Fatal("skill 7003 level 1 not loaded")
+		}
+		if got, want := negateStats.NegateTypes, []string{"BUFF", "DEBUFF"}; !slices.Equal(got, want) {
+			t.Fatalf("skill 7003 level 1 NegateTypes = %v, want %v", got, want)
+		}
+
+		negateIDs, ok := table.Get(5102, 1)
+		if !ok {
+			t.Fatal("skill 5102 level 1 not loaded")
+		}
+		if got, want := negateIDs.NegateIDs, []int{5106, 5107, 5108, 5098}; !slices.Equal(got, want) {
+			t.Fatalf("skill 5102 level 1 NegateIDs = %v, want %v", got, want)
+		}
+
+		// 2288 shares 2287's reuse group, so the parsed reference must be
+		// the other skill's id rather than its own.
+		shared, ok := table.Get(2288, 1)
+		if !ok {
+			t.Fatal("skill 2288 level 1 not loaded")
+		}
+		if shared.SharedReuse == nil || *shared.SharedReuse != (skill.Ref{ID: 2287, Level: 1}) {
+			t.Fatalf("skill 2288 level 1 SharedReuse = %v, want {2287 1}", shared.SharedReuse)
+		}
+
+		// flyType/element are the two non-required enums, and flyRadius is
+		// table-substituted alongside them.
+		fly, ok := table.Get(5015, 1)
+		if !ok {
+			t.Fatal("skill 5015 level 1 not loaded")
+		}
+		if fly.Flight == nil || *fly.Flight != skill.FlightCharge {
+			t.Fatalf("skill 5015 level 1 Flight = %v, want FlightCharge", fly.Flight)
+		}
+		if fly.Element != skill.ElementDark {
+			t.Fatalf("skill 5015 level 1 Element = %v, want ElementDark", fly.Element)
+		}
+		if fly.FlyRadius != 400 {
+			t.Fatalf("skill 5015 level 1 FlyRadius = %d, want 400", fly.FlyRadius)
 		}
 	})
 }
