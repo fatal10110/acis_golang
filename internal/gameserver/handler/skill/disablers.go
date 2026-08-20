@@ -259,24 +259,35 @@ func disableWithSuccessCheck(cast Cast, target disablerTarget) {
 	applyCastEffects(cast, target, cast.Skill, cast.Skill.Effects)
 }
 
+// disableReflectable rolls the shield defense against the original target
+// before the reflect swap, matching Disablers.java:64 (calcShldUse against
+// targetCreature, once, ahead of the switch) and :80-83 (the reflect
+// reassignment happens after sDef is already fixed, and calcSkillSuccess
+// still consumes that pre-swap sDef even when the reflected cast now lands
+// on the caster).
 func disableReflectable(cast Cast, target disablerTarget) {
+	shield := resolveShieldDefense(cast.Caster, target, cast.Skill)
 	effected := reflectTarget(cast, target)
 	if effected == nil {
 		return
 	}
-	succeeded, ok := checkSkillSuccess(cast.Caster, effected, cast.Skill)
+	succeeded, ok := checkSkillSuccessBSSWithShield(cast.Caster, effected, cast.Skill, blessedSpiritshotCharged(cast.Caster), shield)
 	if !ok || !succeeded {
 		return
 	}
 	applyCastEffects(cast, effected, cast.Skill, cast.Skill.Effects)
 }
 
+// disableMute rolls the shield defense against the original target before
+// the reflect swap; see disableReflectable's comment (Disablers.java:64,
+// :90-93 for the MUTE case specifically).
 func disableMute(cast Cast, target disablerTarget) {
+	shield := resolveShieldDefense(cast.Caster, target, cast.Skill)
 	effected := reflectTarget(cast, target)
 	if effected == nil {
 		return
 	}
-	succeeded, ok := checkSkillSuccess(cast.Caster, effected, cast.Skill)
+	succeeded, ok := checkSkillSuccessBSSWithShield(cast.Caster, effected, cast.Skill, blessedSpiritshotCharged(cast.Caster), shield)
 	if !ok || !succeeded {
 		return
 	}

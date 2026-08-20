@@ -32,6 +32,7 @@ type disablerFake struct {
 	hate                   *attackable.HateTable
 	shield                 formulas.ShieldDefense
 	level                  int
+	reflects               bool
 
 	// lastBss and lastShield record the most recent SkillSuccessInput call's
 	// resolved caster/target state, for tests asserting checkSkillSuccess
@@ -71,6 +72,15 @@ func (d *disablerFake) SkillSuccessInput(caster creature.DeathActor, def modelsk
 // exercise checkSkillSuccess's shield-block threading.
 func (d *disablerFake) ShieldDefense(caster creature.DeathActor, def modelskill.Definition, isCrit bool) formulas.ShieldDefense {
 	return d.shield
+}
+
+// SkillReflectInput reports a guaranteed reflect when d.reflects is set
+// (ReflectChance 100 always beats a [0,100) roll), and no reflect otherwise.
+func (d *disablerFake) SkillReflectInput(def modelskill.Definition) formulas.SkillReflectInput {
+	if !d.reflects {
+		return formulas.SkillReflectInput{}
+	}
+	return formulas.SkillReflectInput{CanBeReflected: true, Magic: true, ReflectChance: 100}
 }
 
 func (d *disablerFake) Attackable() bool                   { return d.attackableFlag }
@@ -169,6 +179,60 @@ func TestStunAppliesOnGuaranteedSuccess(t *testing.T) {
 	})
 	if len(target.list.All()) != 1 {
 		t.Fatal("STUN should apply its effect on a guaranteed-success roll")
+	}
+}
+
+// TestReflectedStunUsesOriginalTargetsPreSwapShieldBlock proves the shield
+// roll that gates a reflected STUN/ROOT/SLEEP/PARALYZE cast is resolved
+// against the original target before the reflect swap, matching
+// Disablers.java:64 (calcShldUse against targetCreature, once, ahead of the
+// switch) and :80-83 (the reflect reassignment happens after sDef is fixed).
+// The original target perfect-blocks and reflects; the caster's own shield
+// state must never be consulted for the reflected cast.
+func TestReflectedStunUsesOriginalTargetsPreSwapShieldBlock(t *testing.T) {
+	registry := NewDefaultRegistry()
+	target := newDisablerFake(1)
+	target.shield = formulas.ShieldPerfect
+	target.reflects = true
+	caster := newDisablerFake(2)
+	caster.shield = formulas.ShieldFailed // must never be consulted
+
+	registry.Use(Cast{
+		Caster:  caster,
+		Skill:   modelskill.Definition{SkillType: "STUN", Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 10}}},
+		Targets: []Actor{target},
+	})
+
+	if caster.lastShield != formulas.ShieldPerfect {
+		t.Fatalf("lastShield = %v, want the original target's pre-swap ShieldPerfect", caster.lastShield)
+	}
+	if len(caster.list.All()) != 0 {
+		t.Fatal("original target's perfect block must fail the reflected cast against the caster")
+	}
+}
+
+// TestReflectedMuteUsesOriginalTargetsPreSwapShieldBlock is
+// TestReflectedStunUsesOriginalTargetsPreSwapShieldBlock for the MUTE case
+// (Disablers.java:90-93), which resolves shield the same way.
+func TestReflectedMuteUsesOriginalTargetsPreSwapShieldBlock(t *testing.T) {
+	registry := NewDefaultRegistry()
+	target := newDisablerFake(1)
+	target.shield = formulas.ShieldPerfect
+	target.reflects = true
+	caster := newDisablerFake(2)
+	caster.shield = formulas.ShieldFailed // must never be consulted
+
+	registry.Use(Cast{
+		Caster:  caster,
+		Skill:   modelskill.Definition{SkillType: "MUTE", Effects: []modelskill.EffectTemplate{{Name: "Mute", Time: 10}}},
+		Targets: []Actor{target},
+	})
+
+	if caster.lastShield != formulas.ShieldPerfect {
+		t.Fatalf("lastShield = %v, want the original target's pre-swap ShieldPerfect", caster.lastShield)
+	}
+	if len(caster.list.All()) != 0 {
+		t.Fatal("original target's perfect block must fail the reflected cast against the caster")
 	}
 }
 
