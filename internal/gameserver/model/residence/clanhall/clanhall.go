@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/residence"
 )
@@ -53,66 +52,55 @@ func (h Hall) IsSiegable() bool {
 	return h.SiegeLength > 0
 }
 
-// NewHall builds a Hall from its XML attrs plus already-decoded child data.
-func NewHall(set *commons.StatSet, zones []residence.Zone, spawns map[residence.SpawnType][]location.Location) (*Hall, error) {
-	idf := commons.NewFields(set, "clanhall")
-	id := idf.Int("id")
-	if err := idf.Err(); err != nil {
-		return nil, err
-	}
+// HallAttrs holds a Hall's own decoded XML attributes, separate from its
+// already-decoded child collections (zones, spawns) passed alongside to
+// NewHall.
+type HallAttrs struct {
+	ID, ParentID                            int
+	Alias, Name, Description, Town          string
+	AuctionMin, Deposit, Lease, Size, Grade int
+	SiegeLength                             int64
+	ScheduleConfig                          []int
+	Tax                                     residence.Tax
+	Gates                                   []string
+	NPCs                                    []int
+}
 
-	f := commons.NewFields(set, fmt.Sprintf("clanhall %d", id))
-	parentID := f.Int("parentId")
-	taxRate := f.Int("taxRate")
-	taxSysgetRate := f.Int("taxSysgetRate")
-	tributeRate := f.Int("tributeRate")
-	npcs := f.IntArray("npcs")
-	alias := f.StringDefault("alias", "")
-	if alias == "" {
-		f.Fail(fmt.Errorf("alias is required"))
+// NewHall builds a Hall from its decoded attrs plus already-decoded child
+// data.
+func NewHall(attrs HallAttrs, zones []residence.Zone, spawns map[residence.SpawnType][]location.Location) (*Hall, error) {
+	if attrs.Alias == "" {
+		return nil, fmt.Errorf("clanhall %d: alias is required", attrs.ID)
 	}
-	name := f.StringDefault("name", "")
-	if name == "" {
-		f.Fail(fmt.Errorf("name is required"))
+	if attrs.Name == "" {
+		return nil, fmt.Errorf("clanhall %d: name is required", attrs.ID)
 	}
-	desc := f.StringDefault("desc", "")
-	if desc == "" {
-		f.Fail(fmt.Errorf("desc is required"))
+	if attrs.Description == "" {
+		return nil, fmt.Errorf("clanhall %d: desc is required", attrs.ID)
 	}
-	town := f.StringDefault("loc", "")
-	if town == "" {
-		f.Fail(fmt.Errorf("loc is required"))
-	}
-	siegeLength := f.Int64Default("siegeLength", 0)
-	scheduleConfig := f.IntArrayDefault("scheduleConfig", nil)
-	gates := cleanStrings(f.StringArrayDefault("gates", nil))
-	if err := f.Err(); err != nil {
-		return nil, err
+	if attrs.Town == "" {
+		return nil, fmt.Errorf("clanhall %d: loc is required", attrs.ID)
 	}
 
 	return &Hall{
-		ID:             id,
-		ParentID:       parentID,
-		Alias:          alias,
-		Name:           name,
-		Description:    desc,
-		Town:           town,
-		AuctionMin:     getIntDefault(set, "auctionMin"),
-		Deposit:        getIntDefault(set, "deposit"),
-		Lease:          getIntDefault(set, "lease"),
-		Size:           getIntDefault(set, "size"),
-		Grade:          getIntDefault(set, "grade"),
-		SiegeLength:    siegeLength,
-		ScheduleConfig: append([]int(nil), scheduleConfig...),
-		Tax: residence.Tax{
-			Rate:        taxRate,
-			SysgetRate:  taxSysgetRate,
-			TributeRate: tributeRate,
-		},
-		Gates:  gates,
-		NPCs:   append([]int(nil), npcs...),
-		Spawns: residence.CopySpawns(spawns),
-		Zones:  append([]residence.Zone(nil), zones...),
+		ID:             attrs.ID,
+		ParentID:       attrs.ParentID,
+		Alias:          attrs.Alias,
+		Name:           attrs.Name,
+		Description:    attrs.Description,
+		Town:           attrs.Town,
+		AuctionMin:     attrs.AuctionMin,
+		Deposit:        attrs.Deposit,
+		Lease:          attrs.Lease,
+		Size:           attrs.Size,
+		Grade:          attrs.Grade,
+		SiegeLength:    attrs.SiegeLength,
+		ScheduleConfig: append([]int(nil), attrs.ScheduleConfig...),
+		Tax:            attrs.Tax,
+		Gates:          attrs.Gates,
+		NPCs:           append([]int(nil), attrs.NPCs...),
+		Spawns:         residence.CopySpawns(spawns),
+		Zones:          append([]residence.Zone(nil), zones...),
 	}, nil
 }
 
@@ -192,25 +180,19 @@ type Deco struct {
 	Price int
 }
 
-// NewDeco builds a Deco from set.
-func NewDeco(set *commons.StatSet) (Deco, error) {
-	name := commons.NewFields(set, "clanhall: deco").StringDefault("name", "")
+// NewDeco builds a Deco from its already-decoded attributes.
+func NewDeco(name string, decoType, level, depth, days, price int) (Deco, error) {
 	if name == "" {
 		return Deco{}, fmt.Errorf("clanhall: deco: name is required")
 	}
-	f := commons.NewFields(set, fmt.Sprintf("clanhall: deco %q", name))
-	deco := Deco{
+	return Deco{
 		Name:  name,
-		Type:  f.Int("type"),
-		Level: f.Int("level"),
-		Depth: f.Int("depth"),
-		Days:  f.Int("days"),
-		Price: f.Int("price"),
-	}
-	if err := f.Err(); err != nil {
-		return Deco{}, err
-	}
-	return deco, nil
+		Type:  decoType,
+		Level: level,
+		Depth: depth,
+		Days:  days,
+		Price: price,
+	}, nil
 }
 
 // DecoTable stores clan hall decorations keyed by (type, level).
@@ -274,30 +256,4 @@ func (t *DecoTable) Depth(decoType, level int) int {
 		return deco.Depth
 	}
 	return 0
-}
-
-func cleanStrings(in []string) []string {
-	if len(in) == 0 {
-		return nil
-	}
-	out := make([]string, 0, len(in))
-	for _, s := range in {
-		s = strings.TrimSpace(s)
-		if s == "" {
-			continue
-		}
-		out = append(out, s)
-	}
-	if len(out) == 0 {
-		return nil
-	}
-	return out
-}
-
-func getIntDefault(set *commons.StatSet, key string) int {
-	value, err := set.GetIntDefault(key, 0)
-	if err != nil {
-		return 0
-	}
-	return value
 }

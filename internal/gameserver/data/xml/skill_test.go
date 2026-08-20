@@ -3,6 +3,7 @@ package xml
 import (
 	"errors"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -417,6 +418,103 @@ func TestLoadSkillDefinitions(t *testing.T) {
 			t.Fatalf("skill 42 level 141 self effect = %+v", e)
 		}
 	})
+
+	// The shipped data spells booleans both ways and relies on a present
+	// "false" beating a true default, so a level's own boolean value has to
+	// win over the loader's default in both directions and regardless of
+	// case.
+	t.Run("explicit booleans override their defaults in both directions", func(t *testing.T) {
+		// canBeReflected/canBeDispeled are the two attributes that default
+		// to true, so only a present "false" can distinguish a real read
+		// from the default.
+		d, ok := table.Get(1375, 1)
+		if !ok {
+			t.Fatal("skill 1375 level 1 not loaded")
+		}
+		if d.Name != "Heroic Grandeur" {
+			t.Fatalf("skill 1375 level 1 Name = %q, want \"Heroic Grandeur\"", d.Name)
+		}
+		if d.CanBeReflected || d.CanBeDispelled {
+			t.Fatalf("skill 1375 level 1 = canBeReflected=%v canBeDispeled=%v, want both false", d.CanBeReflected, d.CanBeDispelled)
+		}
+
+		// Skill 455 writes offensive="True" with a capital T, and SIGNET is
+		// neither a classified-offensive type nor a debuff nor a CORPSE_MOB
+		// target, so its Offensive would default to false: only a
+		// case-insensitive read of the attribute makes it true.
+		signet, ok := table.Get(455, 1)
+		if !ok {
+			t.Fatal("skill 455 level 1 not loaded")
+		}
+		if signet.SkillType != "SIGNET" || signet.Debuff || signet.Target == skill.TargetCorpseMob {
+			t.Fatalf("skill 455 level 1 no longer defaults Offensive to false: %+v", signet)
+		}
+		if !signet.Offensive {
+			t.Fatal("skill 455 level 1 Offensive = false, want true from offensive=\"True\"")
+		}
+	})
+
+	// Every attribute name is a bare string key in the loader, so a mistyped
+	// one is a silent default rather than an error. These are the optional
+	// attributes whose absent value is distinguishable from any real one.
+	t.Run("optional attributes decode to their own fields", func(t *testing.T) {
+		cubic, ok := table.Get(10, 1)
+		if !ok {
+			t.Fatal("skill 10 level 1 not loaded")
+		}
+		if !cubic.IsCubic || cubic.NpcID != 1 {
+			t.Fatalf("skill 10 level 1 = isCubic=%v npcId=%d, want true/1", cubic.IsCubic, cubic.NpcID)
+		}
+
+		negateStats, ok := table.Get(7003, 1)
+		if !ok {
+			t.Fatal("skill 7003 level 1 not loaded")
+		}
+		if got, want := negateStats.NegateTypes, []string{"BUFF", "DEBUFF"}; !slices.Equal(got, want) {
+			t.Fatalf("skill 7003 level 1 NegateTypes = %v, want %v", got, want)
+		}
+
+		negateIDs, ok := table.Get(5102, 1)
+		if !ok {
+			t.Fatal("skill 5102 level 1 not loaded")
+		}
+		if got, want := negateIDs.NegateIDs, []int{5106, 5107, 5108, 5098}; !slices.Equal(got, want) {
+			t.Fatalf("skill 5102 level 1 NegateIDs = %v, want %v", got, want)
+		}
+
+		// 2288 shares 2287's reuse group, so the parsed reference must be
+		// the other skill's id rather than its own.
+		shared, ok := table.Get(2288, 1)
+		if !ok {
+			t.Fatal("skill 2288 level 1 not loaded")
+		}
+		if shared.SharedReuse == nil || *shared.SharedReuse != (skill.Ref{ID: 2287, Level: 1}) {
+			t.Fatalf("skill 2288 level 1 SharedReuse = %v, want {2287 1}", shared.SharedReuse)
+		}
+
+		// flyType/element are the two non-required enums, and flyRadius is
+		// table-substituted alongside them.
+		fly, ok := table.Get(5015, 1)
+		if !ok {
+			t.Fatal("skill 5015 level 1 not loaded")
+		}
+		if fly.Flight == nil || *fly.Flight != skill.FlightCharge {
+			t.Fatalf("skill 5015 level 1 Flight = %v, want FlightCharge", fly.Flight)
+		}
+		if fly.Element != skill.ElementDark {
+			t.Fatalf("skill 5015 level 1 Element = %v, want ElementDark", fly.Element)
+		}
+		if fly.FlyRadius != 400 {
+			t.Fatalf("skill 5015 level 1 FlyRadius = %d, want 400", fly.FlyRadius)
+		}
+	})
+}
+
+// skillFixture wraps extra as the only non-required content of a one-level
+// <skill> element that is otherwise valid, so an error case isolates the
+// attribute or child under test.
+func skillFixture(extra string) string {
+	return `<list><skill id="1" name="x" levels="1"><set name="target" val="ONE"/><set name="skillType" val="PDAM"/><set name="operateType" val="ACTIVE"/>` + extra + `</skill></list>`
 }
 
 func TestLoadSkillDefinitionsErrors(t *testing.T) {
@@ -457,6 +555,54 @@ func TestLoadSkillDefinitionsErrors(t *testing.T) {
 		{
 			name:    "non-numeric level count",
 			content: `<list><skill id="1" name="x" levels="oops"><set name="target" val="ONE"/><set name="skillType" val="PDAM"/><set name="operateType" val="ACTIVE"/></skill></list>`,
+		},
+		{
+			name:    "unknown operateType tag",
+			content: skillFixture(`<set name="operateType" val="NOT_AN_OPERATE_TYPE"/>`),
+		},
+		{
+			name:    "malformed integer attribute",
+			content: skillFixture(`<set name="mpConsume" val="oops"/>`),
+		},
+		{
+			name:    "malformed float attribute",
+			content: skillFixture(`<set name="power" val="oops"/>`),
+		},
+		{
+			name:    "unknown element tag",
+			content: skillFixture(`<set name="element" val="NOT_AN_ELEMENT"/>`),
+		},
+		{
+			name:    "unknown flyType tag",
+			content: skillFixture(`<set name="flyType" val="NOT_A_FLY_TYPE"/>`),
+		},
+		{
+			name:    "malformed sharedReuse pair",
+			content: skillFixture(`<set name="sharedReuse" val="not-a-pair-of-ints"/>`),
+		},
+		{
+			name:    "malformed negateId list",
+			content: skillFixture(`<set name="negateId" val="1,oops"/>`),
+		},
+		{
+			name:    "effect without a name",
+			content: skillFixture(`<for><effect count="1" time="1" val="0"/></for>`),
+		},
+		{
+			name:    "effect without a value",
+			content: skillFixture(`<for><effect name="Buff" count="1" time="1"/></for>`),
+		},
+		{
+			name:    "malformed effect count literal",
+			content: skillFixture(`<for><effect name="Buff" val="0" count="oops"/></for>`),
+		},
+		{
+			name:    "stat func without a value",
+			content: skillFixture(`<for><add stat="runSpd"/></for>`),
+		},
+		{
+			name:    "malformed condition msgId literal",
+			content: skillFixture(`<cond msgId="oops"><player Charges="1"/></cond>`),
 		},
 	}
 

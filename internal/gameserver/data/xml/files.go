@@ -85,6 +85,35 @@ func (c *coord32) UnmarshalXMLAttr(attr xml.Attr) error {
 	return nil
 }
 
+// coord64 is like coord but for a required int64 attribute (e.g. a clan hall
+// siege length in milliseconds).
+type coord64 int64
+
+func (c *coord64) UnmarshalXMLAttr(attr xml.Attr) error {
+	n, err := strconv.ParseInt(attr.Value, 10, 64)
+	if err != nil {
+		return fmt.Errorf("%s: %w", attr.Name.Local, err)
+	}
+	*c = coord64(n)
+	return nil
+}
+
+// looseIntAttr is an optional int attribute that silently defaults to 0 on
+// an absent or malformed value, matching commons.StatSet.GetIntDefault's
+// swallowed-parse-error behavior for a handful of legacy clan hall fields
+// (auctionMin, deposit, lease, size, grade).
+type looseIntAttr int
+
+func (l *looseIntAttr) UnmarshalXMLAttr(attr xml.Attr) error {
+	n, err := strconv.Atoi(attr.Value)
+	if err != nil {
+		*l = 0
+		return nil
+	}
+	*l = looseIntAttr(n)
+	return nil
+}
+
 // floatAttr is a required float64 attribute, rejecting the same malformed
 // input commons.StatSet.GetFloat64 did.
 type floatAttr float64

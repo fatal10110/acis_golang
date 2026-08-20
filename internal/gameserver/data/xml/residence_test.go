@@ -42,6 +42,47 @@ func TestLoadCastles(t *testing.T) {
 	}
 }
 
+// TestLoadCastlesControlTowerLastPositionAndStatsWin covers a control tower
+// with more than one <position>/<stats> child: the removed StatSet path
+// built the tower's attrs by merging every child in document order, so a
+// later child overwrote an earlier one. The XML-tag decode must reproduce
+// that last-wins order, not read the first child.
+func TestLoadCastlesControlTowerLastPositionAndStatsWin(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "castles.xml")
+	writeXMLFixture(t, path, `<list><castle id="1" alias="gludio" parentId="0" name="Gludio" circletId="1">
+		<controlTowers>
+			<controlTower alias="tower1" type="LIFE_CONTROL">
+				<position x="1" y="2" z="3"/>
+				<position x="10" y="20" z="30"/>
+				<stats hp="100" pDef="1" mDef="1"/>
+				<stats hp="200" pDef="2" mDef="2"/>
+			</controlTower>
+		</controlTowers>
+		<npcs val="1"/>
+		<tax taxRate="0" taxSysgetRate="0" tributeRate="0"/>
+	</castle></list>`)
+
+	table, err := LoadCastles(path)
+	if err != nil {
+		t.Fatalf("LoadCastles(%q) error: %v", path, err)
+	}
+	c, ok := table.Get(1)
+	if !ok {
+		t.Fatal("Get(1) returned no castle")
+	}
+	if len(c.ControlTowers) != 1 {
+		t.Fatalf("len(ControlTowers) = %d, want 1", len(c.ControlTowers))
+	}
+	tower := c.ControlTowers[0]
+	if tower.Position.X != 10 || tower.Position.Y != 20 || tower.Position.Z != 30 {
+		t.Fatalf("Position = %+v, want last <position> (10,20,30)", tower.Position)
+	}
+	if tower.HP != 200 || tower.PDef != 2 || tower.MDef != 2 {
+		t.Fatalf("stats = {%v %v %v}, want last <stats> (200,2,2)", tower.HP, tower.PDef, tower.MDef)
+	}
+}
+
 func TestLoadClanHalls(t *testing.T) {
 	path := datapackPath(t, filepath.Join("data", "xml", "clanHalls.xml"))
 
@@ -111,6 +152,15 @@ func TestResidenceLoadersErrors(t *testing.T) {
 			name:    "castle missing tax",
 			path:    filepath.Join(dir, "castles.xml"),
 			content: `<list><castle id="1" alias="gludio" parentId="0" name="Gludio" circletId="1"><npcs val="1"/><spawns><spawn type="OWNER" x="1" y="2" z="3"/></spawns></castle></list>`,
+			load: func(path string) error {
+				_, err := LoadCastles(path)
+				return err
+			},
+		},
+		{
+			name:    "castle tax missing tributeRate",
+			path:    filepath.Join(dir, "castles.xml"),
+			content: `<list><castle id="1" alias="gludio" parentId="0" name="Gludio" circletId="1"><npcs val="1"/><tax taxRate="15" taxSysgetRate="40"/><spawns><spawn type="OWNER" x="1" y="2" z="3"/></spawns></castle></list>`,
 			load: func(path string) error {
 				_, err := LoadCastles(path)
 				return err
