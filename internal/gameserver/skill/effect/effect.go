@@ -203,12 +203,18 @@ func (e *Effect) claimAction(now time.Time) (runAction bool, remove bool) {
 // no such hook. The flag flips immediately (so InUse() is accurate the
 // moment the caller's lock is released) but the hook itself is returned
 // for the caller to run later, outside that lock: see List.runHooks.
+//
+// It does not stop e's tick schedule: a stacked-out loser keeps draining its
+// own count while displaced, mirroring AbstractEffect.scheduleEffect()'s
+// ACTING case, which decrements _count on every tick regardless of
+// getInUse() (AbstractEffect.java:291-306) and only calls stopEffectTask()
+// once the count is exhausted or the effect actually leaves the list — see
+// List.remove.
 func (e *Effect) beginExit() func() {
 	if !e.inUse {
 		return nil
 	}
 	e.inUse = false
-	e.stopSchedule()
 	if e.OnExit == nil {
 		return nil
 	}
