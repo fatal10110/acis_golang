@@ -521,6 +521,83 @@ func TestControllerBroadcastsMoveOnEachSegmentAdvance(t *testing.T) {
 	}
 }
 
+// TestControllerBroadcastsMoveOnEachSegmentAdvanceViaPositionUpdate covers
+// the same multi-waypoint route as
+// TestControllerBroadcastsMoveOnEachSegmentAdvance, but drives it through
+// the tick-based PositionUpdate path (as issue #925 asked for) instead of
+// firing the arrival timer directly. finishLocked's advance branch inside
+// UpdatePosition fires the same segment-advanced hook, so this must produce
+// the identical broadcast count per segment.
+func TestControllerBroadcastsMoveOnEachSegmentAdvanceViaPositionUpdate(t *testing.T) {
+	self := &fakeSelf{x: 0, y: 0, z: 30}
+	waypoints := []location.Location{
+		{X: 50, Y: 0, Z: 30},
+		{X: 50, Y: 50, Z: 30},
+		{X: 100, Y: 50, Z: 30},
+	}
+	geo := &recordingGeo{
+		canMove:    false, // direct line blocked -> tier 2 pathfinding
+		height:     30,
+		findPath:   waypoints,
+		findPathOK: true,
+	}
+	cm, err := NewCreatureMove(location.Location{X: self.x, Y: self.y, Z: self.z}, 50, geo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	clock := &fakeMoveClock{}
+	cm.afterFunc = clock.AfterFunc // suppress the arrival timer; ticks alone drive this test
+	c, err := NewController(cm, self)
+	if err != nil {
+		t.Fatal(err)
+	}
+	updates := &fakePositionUpdates{}
+	c.SetPositionUpdates(updates)
+
+	c.MoveHome(location.Location{X: 100, Y: 50, Z: 30})
+	if len(self.broadcasts) != 1 {
+		t.Fatalf("BroadcastMove calls after move start = %d, want 1 (first segment)", len(self.broadcasts))
+	}
+
+	// speed 50, 50-cell segments -> 1s per leg = 10 ticks of
+	// PositionUpdateInterval (100ms) each.
+	ticksPerSegment := 10
+
+	for i := range ticksPerSegment {
+		if !c.PositionUpdate() {
+			t.Fatalf("PositionUpdate() = false mid segment 1 (tick %d), want true", i)
+		}
+	}
+	if len(self.broadcasts) != 2 {
+		t.Fatalf("BroadcastMove calls after segment 1 advance = %d, want 2", len(self.broadcasts))
+	}
+	if got := c.move.Destination(); got != waypoints[1] {
+		t.Fatalf("Destination() = %+v, want %+v", got, waypoints[1])
+	}
+
+	for i := range ticksPerSegment {
+		if !c.PositionUpdate() {
+			t.Fatalf("PositionUpdate() = false mid segment 2 (tick %d), want true", i)
+		}
+	}
+	if len(self.broadcasts) != 3 {
+		t.Fatalf("BroadcastMove calls after segment 2 advance = %d, want 3", len(self.broadcasts))
+	}
+	if got := c.move.Destination(); got != waypoints[2] {
+		t.Fatalf("Destination() = %+v, want %+v", got, waypoints[2])
+	}
+
+	for range ticksPerSegment {
+		c.PositionUpdate()
+	}
+	if len(self.broadcasts) != 3 {
+		t.Fatalf("BroadcastMove calls after final segment = %d, want 3 (no re-broadcast on arrival)", len(self.broadcasts))
+	}
+	if c.move.Moving() {
+		t.Fatal("Moving() = true after final segment, want false")
+	}
+}
+
 // fakePositionUpdates stands in for PositionUpdateRegistry. The real
 // implementation, task.PositionUpdates, imports move (it's typed over
 // move.PositionUpdater), so move's own test package cannot import task

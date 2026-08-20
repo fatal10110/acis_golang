@@ -237,11 +237,14 @@ func (c *Controller) SetArrived(arrived func()) {
 }
 
 // PositionUpdate advances one movement correction tick, syncing this
-// controller's world presence to the newly interpolated position. It does
-// not rebroadcast a movement packet: clients interpolate from the single
-// move-start packet already sent by whichever call began this move, and
-// resending it every tick would restart that client-side animation instead
-// of just correcting server-side state. It returns false once the move has
+// controller's world presence to the newly interpolated position. An
+// ordinary interpolation tick does not itself rebroadcast a movement
+// packet — resending one every tick would restart the client-side walk
+// animation instead of just correcting server-side state — but crossing a
+// geopath segment boundary inside UpdatePosition does rebroadcast (via the
+// segment-advanced hook installed in NewController), deliberately, so the
+// client restarts its per-leg animation the same way the reference client
+// does on each routed waypoint. It returns false once the move has
 // stopped.
 //
 // Reaching the destination fires the arrived hook synchronously inside
