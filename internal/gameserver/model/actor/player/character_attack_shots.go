@@ -57,13 +57,16 @@ const (
 	ChargeShotAlreadyCharged
 )
 
-// ChargeSoulshot attempts to charge the active weapon with a soulshot of
-// shotCrystal grade, using reducedRoll (a 0-99 percentile roll) to decide
-// whether the weapon's reduced-consumption count applies. Checks run
-// capacity, then grade, then already-charged — the reference's own order
-// for this shot kind, which differs from ChargeSpiritshot's order. On
-// ChargeShotOK the weapon is marked charged and consume is the count to
-// destroy from the item stack.
+// ChargeSoulshot evaluates whether the active weapon can accept a soulshot
+// charge of shotCrystal grade, using reducedRoll (a 0-99 percentile roll)
+// to decide whether the weapon's reduced-consumption count applies. Checks
+// run capacity, then grade, then already-charged — the reference's own
+// order for this shot kind, which differs from ChargeSpiritshot's order
+// (SoulShots.java:27-45). It does not mark the weapon charged: the
+// reference destroys the item stack first and only calls setChargedShot
+// after that succeeds (SoulShots.java:49-62), so the caller commits the
+// charge itself via SetChargedShot(item.ShotSoul, true) once the item is
+// destroyed. On ChargeShotOK, consume is the count to destroy.
 func (c *Character) ChargeSoulshot(shotCrystal item.CrystalType, reducedRoll int) (consume int32, result ChargeShotResult) {
 	w := c.activeWeapon()
 	if w.inst == nil || w.tmpl == nil || w.tmpl.Weapon == nil || w.tmpl.Weapon.SoulshotCount == 0 {
@@ -76,17 +79,19 @@ func (c *Character) ChargeSoulshot(shotCrystal item.CrystalType, reducedRoll int
 		return 0, ChargeShotAlreadyCharged
 	}
 	consume, _ = w.tmpl.Weapon.EvaluateSoulshot(w.tmpl.Crystal, shotCrystal, false, reducedRoll)
-	w.inst.SetChargedShot(item.ShotSoul, true)
 	return consume, ChargeShotOK
 }
 
-// ChargeSpiritshot attempts to charge the active weapon with a spiritshot
-// of shotCrystal grade (kind is ShotSpirit or ShotBlessedSpirit; both draw
-// from the weapon's same spiritshot capacity). Checks run capacity, then
-// already-charged, then grade — the reference's own order for this shot
-// kind, which differs from ChargeSoulshot's order. On ChargeShotOK the
-// weapon is marked charged with kind and consume is the count to destroy
-// from the item stack.
+// ChargeSpiritshot evaluates whether the active weapon can accept a
+// spiritshot charge of shotCrystal grade (kind is ShotSpirit or
+// ShotBlessedSpirit; both draw from the weapon's same spiritshot capacity).
+// Checks run capacity, then already-charged, then grade — the reference's
+// own order for this shot kind, which differs from ChargeSoulshot's order
+// (SpiritShots.java:25-43). It does not mark the weapon charged: the
+// reference destroys the item stack first and only calls setChargedShot
+// after that succeeds (SpiritShots.java:45-57), so the caller commits the
+// charge itself via SetChargedShot(kind, true) once the item is destroyed.
+// On ChargeShotOK, consume is the count to destroy.
 func (c *Character) ChargeSpiritshot(kind item.ShotKind, shotCrystal item.CrystalType) (consume int32, result ChargeShotResult) {
 	w := c.activeWeapon()
 	if w.inst == nil || w.tmpl == nil || w.tmpl.Weapon == nil || w.tmpl.Weapon.SpiritshotCount == 0 {
@@ -99,6 +104,5 @@ func (c *Character) ChargeSpiritshot(kind item.ShotKind, shotCrystal item.Crysta
 		return 0, ChargeShotGradeMismatch
 	}
 	consume, _ = w.tmpl.Weapon.EvaluateSpiritshot(w.tmpl.Crystal, shotCrystal, false)
-	w.inst.SetChargedShot(kind, true)
 	return consume, ChargeShotOK
 }

@@ -75,7 +75,7 @@ func testItemTemplates() *item.Table {
 			Crystal:        item.CrystalD,
 			DefaultAction:  item.ActionSoulshot,
 			EtcItem:        &item.EtcItemDetail{Type: item.EtcItemShot, Handler: "SoulShots"},
-			AttachedSkills: []item.SkillRef{{ID: 2154, Level: 1}},
+			AttachedSkills: []item.SkillRef{{ID: 2150, Level: 1}},
 		},
 		{
 			ID:             2509,
@@ -87,7 +87,7 @@ func testItemTemplates() *item.Table {
 			Crystal:        item.CrystalD,
 			DefaultAction:  item.ActionSpiritshot,
 			EtcItem:        &item.EtcItemDetail{Type: item.EtcItemShot, Handler: "SpiritShots"},
-			AttachedSkills: []item.SkillRef{{ID: 2155, Level: 1}},
+			AttachedSkills: []item.SkillRef{{ID: 2047, Level: 1}},
 		},
 		{
 			ID:             1464,
@@ -99,7 +99,7 @@ func testItemTemplates() *item.Table {
 			Crystal:        item.CrystalC,
 			DefaultAction:  item.ActionSoulshot,
 			EtcItem:        &item.EtcItemDetail{Type: item.EtcItemShot, Handler: "SoulShots"},
-			AttachedSkills: []item.SkillRef{{ID: 2156, Level: 1}},
+			AttachedSkills: []item.SkillRef{{ID: 2151, Level: 1}},
 		},
 		{
 			ID:             6645,

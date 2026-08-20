@@ -81,6 +81,9 @@ func (l *GameClientLink) useShotItem(live *livePlayer, inv *itemcontainer.Invent
 	case itemhandler.ShotGradeMismatch:
 		l.replyShotRejection(live, res.AutoEnabled, msgs.gradeMismatch)
 	case itemhandler.ShotNotEnoughItems:
+		if res.AutoEnabled {
+			l.disableAutoShot(live, tmpl.ID)
+		}
 		l.replyShotRejection(live, res.AutoEnabled, msgs.notEnough)
 	case itemhandler.ShotApplied:
 		live.SendFrame(serverpackets.FrameSystemMessage(msgs.enabled))
@@ -92,6 +95,20 @@ func (l *GameClientLink) useShotItem(live *livePlayer, inv *itemcontainer.Invent
 		}
 	}
 	return true
+}
+
+// disableAutoShot turns off itemID's auto-shot flag and notifies the
+// client, matching Player.disableAutoShot's active-list branch
+// (Player.java:5106-5117: removeAutoSoulShot, ExAutoSoulShot(itemId, 0),
+// then AUTO_USE_OF_S1_CANCELLED). Called when a direct-use shot charge
+// hits ShotNotEnoughItems while its item is auto-enabled, so a depleted
+// stack turns auto-shot off instead of leaving the client's auto icon lit
+// against a caster that can no longer charge (SoulShots.java:52-54,
+// SpiritShots.java:46-48, BlessedSpiritShots.java:48-50).
+func (l *GameClientLink) disableAutoShot(live *livePlayer, itemID int32) {
+	live.SetAutoSoulShot(itemID, false)
+	live.SendFrame(serverpackets.FrameExAutoSoulShot(itemID, false))
+	live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageAutoUseOfItemCancelled, itemID))
 }
 
 // replyShotRejection answers a shot-charge rejection: msg unless

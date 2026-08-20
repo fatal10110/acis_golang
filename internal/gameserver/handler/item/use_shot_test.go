@@ -16,6 +16,9 @@ type fakeShotCharger struct {
 	gotShotCrystal, gotSpiritCrystal modelitem.CrystalType
 	gotSpiritKind                    modelitem.ShotKind
 	autoEnabledCalledWith            int32
+	setChargedShotCalls              int
+	setChargedShotKind               modelitem.ShotKind
+	setChargedShotValue              bool
 }
 
 func (f *fakeShotCharger) ChargeSoulshot(shotCrystal modelitem.CrystalType, reducedRoll int) (int32, player.ChargeShotResult) {
@@ -27,6 +30,12 @@ func (f *fakeShotCharger) ChargeSpiritshot(kind modelitem.ShotKind, shotCrystal 
 	f.gotSpiritKind = kind
 	f.gotSpiritCrystal = shotCrystal
 	return f.spiritshotConsume, f.spiritshotResult
+}
+
+func (f *fakeShotCharger) SetChargedShot(kind modelitem.ShotKind, charged bool) {
+	f.setChargedShotCalls++
+	f.setChargedShotKind = kind
+	f.setChargedShotValue = charged
 }
 
 func (f *fakeShotCharger) AutoSoulShotEnabled(itemID int32) bool {
@@ -68,6 +77,9 @@ func TestUseShotSoulshotApplied(t *testing.T) {
 	}
 	if caster.gotShotCrystal != modelitem.CrystalD {
 		t.Fatalf("ChargeSoulshot crystal = %v, want CrystalD", caster.gotShotCrystal)
+	}
+	if caster.setChargedShotCalls != 1 || caster.setChargedShotKind != modelitem.ShotSoul || !caster.setChargedShotValue {
+		t.Fatalf("SetChargedShot calls = %d kind = %v value = %v, want 1/ShotSoul/true", caster.setChargedShotCalls, caster.setChargedShotKind, caster.setChargedShotValue)
 	}
 }
 
@@ -137,6 +149,9 @@ func TestUseShotNotEnoughItemsWhenDestroyFails(t *testing.T) {
 
 	if res.Outcome != ShotNotEnoughItems {
 		t.Fatalf("Outcome = %v, want ShotNotEnoughItems", res.Outcome)
+	}
+	if caster.setChargedShotCalls != 0 {
+		t.Fatalf("SetChargedShot calls = %d, want 0: a failed destroy must not leave the weapon charged (SoulShots.java:49-62)", caster.setChargedShotCalls)
 	}
 }
 
