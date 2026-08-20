@@ -273,12 +273,6 @@ func newLinkedGameClientWithSkillsShortcutsSeed(t *testing.T, skills *skillstate
 	return newLinkedGameClientWithSkillsShortcutsCrestsSeed(t, skills, shortcutSeed, nil, modelskill.BookPolicy{}, nil, seed, wantChars)
 }
 
-func newLinkedGameClientWithCrests(t *testing.T, crests *datacache.Crests) (c *fakeGameClient, chars *fakeCharStore, items *fakeItemStore, state *world.State) {
-	t.Helper()
-	c, chars, items, _, state = newLinkedGameClientWithSkillsShortcutsCrestsSeed(t, nil, nil, crests, modelskill.BookPolicy{}, nil, nil, 0)
-	return c, chars, items, state
-}
-
 func newLinkedGameClientWithSkillsShortcutsCrestsSeed(t *testing.T, skills *skillstate.Persistence, shortcutSeed func(*fakeShortcutStore), crests *datacache.Crests, spellbooks modelskill.BookPolicy, trees *modelskill.Trees, seed func(*fakeCharStore, *fakeItemStore), wantChars int, cursedWeapons ...*entity.CursedWeaponTable) (c *fakeGameClient, chars *fakeCharStore, items *fakeItemStore, shortcuts *fakeShortcutStore, state *world.State) {
 	t.Helper()
 
