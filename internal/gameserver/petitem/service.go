@@ -153,14 +153,31 @@ func withinGiveRange(owner positioned, pet *summon.Actor) bool {
 // paperdoll slot pointing at the transferred instance — so an equipped item
 // must be unequipped explicitly here, matching Pet.transferItem's wasWorn
 // tracking and PET_TOOK_OFF_S1 notification (Pet.java:456-472).
+//
+// wasWorn is only captured as a boolean before the transfer is attempted;
+// the actual paperdoll-clearing mutation runs only once s.transfer reports
+// GiveOK, mirroring where Java's own paperdoll-clearing side effect fires —
+// inside ItemContainer.transferItem's removeItem call
+// (ItemContainer.java:279/292), which only runs on the confirmed-success
+// path, after the item is reconfirmed still present. A failed transfer
+// (e.g. the item was concurrently removed from petInv between this lookup
+// and transfer's own re-check) must leave the pet's equip state untouched,
+// same as Java. The clear uses ClearWornSlot rather than UnequipSlot: by
+// this point the transfer has already moved inst into playerInv and set
+// its Location there, and UnequipSlot's own SetLocation(petInv.Location(),
+// 0) would incorrectly move it back.
 func (s *Service) GetFromPet(petInv, playerInv *itemcontainer.Inventory, objectID int32, count int) (TransferResult, bool, error) {
 	wasWorn := false
 	itemID := int32(0)
+	slot := 0
+	var inst *item.Instance
 	if petInv != nil {
-		if inst := petInv.ItemByObjectID(objectID); inst != nil {
-			if st := inst.Snapshot(); st.Equipped() {
-				wasWorn = petInv.UnequipSlot(st.LocationData) != nil
+		if candidate := petInv.ItemByObjectID(objectID); candidate != nil {
+			if st := candidate.Snapshot(); st.Equipped() {
+				wasWorn = true
 				itemID = st.TemplateID
+				slot = st.LocationData
+				inst = candidate
 			}
 		}
 	}
@@ -168,8 +185,10 @@ func (s *Service) GetFromPet(petInv, playerInv *itemcontainer.Inventory, objectI
 	if failure != GiveOK {
 		return result, false, err
 	}
-	result.WasWorn = wasWorn
-	result.ItemID = itemID
+	if wasWorn && petInv.ClearWornSlot(slot, inst) {
+		result.WasWorn = true
+		result.ItemID = itemID
+	}
 	return result, true, err
 }
 
