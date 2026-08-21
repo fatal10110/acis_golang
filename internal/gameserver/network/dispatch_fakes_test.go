@@ -280,8 +280,11 @@ func (s *fakeItemStore) Delete(_ context.Context, objectID int32) error {
 }
 
 type fakeShortcutStore struct {
-	mu      sync.Mutex
-	byOwner map[int32][]shortcut.Shortcut
+	mu             sync.Mutex
+	byOwner        map[int32][]shortcut.Shortcut
+	listByOwnerErr error
+	saveErr        error
+	deleteErr      error
 }
 
 func newFakeShortcutStore() *fakeShortcutStore {
@@ -291,12 +294,18 @@ func newFakeShortcutStore() *fakeShortcutStore {
 func (s *fakeShortcutStore) ListByOwner(_ context.Context, ownerID int32) ([]shortcut.Shortcut, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.listByOwnerErr != nil {
+		return nil, s.listByOwnerErr
+	}
 	return append([]shortcut.Shortcut(nil), s.byOwner[ownerID]...), nil
 }
 
 func (s *fakeShortcutStore) Save(_ context.Context, ownerID int32, sc shortcut.Shortcut) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.saveErr != nil {
+		return s.saveErr
+	}
 	list := shortcut.NewList(s.byOwner[ownerID])
 	list.Register(sc)
 	s.byOwner[ownerID] = list.All()
@@ -306,6 +315,9 @@ func (s *fakeShortcutStore) Save(_ context.Context, ownerID int32, sc shortcut.S
 func (s *fakeShortcutStore) Delete(_ context.Context, ownerID int32, slot, page int32) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.deleteErr != nil {
+		return s.deleteErr
+	}
 	list := shortcut.NewList(s.byOwner[ownerID])
 	list.Delete(slot, page)
 	s.byOwner[ownerID] = list.All()
