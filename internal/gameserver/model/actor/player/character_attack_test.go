@@ -462,8 +462,12 @@ func TestCharacterChargeSoulshot(t *testing.T) {
 	if consume != 2 {
 		t.Fatalf("consume = %d, want 2 (weapon SoulshotCount)", consume)
 	}
+	if c.SoulshotCharged() {
+		t.Fatal("SoulshotCharged() = true before the caller commits the charge")
+	}
+	c.SetChargedShot(item.ShotSoul, true)
 	if !c.SoulshotCharged() {
-		t.Fatal("SoulshotCharged() = false after a successful charge")
+		t.Fatal("SoulshotCharged() = false after the caller commits the charge")
 	}
 
 	// Already charged: reported distinctly from the other rejections so
@@ -516,8 +520,12 @@ func TestCharacterChargeSpiritshot(t *testing.T) {
 	if consume != 1 {
 		t.Fatalf("consume = %d, want 1 (weapon SpiritshotCount)", consume)
 	}
+	if c.SpiritshotCharged() {
+		t.Fatal("SpiritshotCharged() = true before the caller commits the charge")
+	}
+	c.SetChargedShot(item.ShotSpirit, true)
 	if !c.SpiritshotCharged() {
-		t.Fatal("SpiritshotCharged() = false after a successful charge")
+		t.Fatal("SpiritshotCharged() = false after the caller commits the charge")
 	}
 
 	if _, result := c.ChargeSpiritshot(item.ShotSpirit, item.CrystalD); result != ChargeShotAlreadyCharged {
@@ -530,6 +538,7 @@ func TestCharacterChargeSpiritshotChecksAlreadyChargedBeforeGrade(t *testing.T) 
 	if _, result := c.ChargeSpiritshot(item.ShotSpirit, item.CrystalD); result != ChargeShotOK {
 		t.Fatal("setup charge failed")
 	}
+	c.SetChargedShot(item.ShotSpirit, true)
 
 	// Reference order for this shot kind checks already-charged before
 	// grade — a mismatched-grade attempt on an already-charged weapon
@@ -545,9 +554,11 @@ func TestCharacterChargeSpiritshotAndBlessedAreIndependentCharges(t *testing.T) 
 	if _, result := c.ChargeSpiritshot(item.ShotSpirit, item.CrystalD); result != ChargeShotOK {
 		t.Fatal("spirit charge setup failed")
 	}
+	c.SetChargedShot(item.ShotSpirit, true)
 	if _, result := c.ChargeSpiritshot(item.ShotBlessedSpirit, item.CrystalD); result != ChargeShotOK {
 		t.Fatalf("result = %v, want ChargeShotOK (blessed is a distinct charge slot)", result)
 	}
+	c.SetChargedShot(item.ShotBlessedSpirit, true)
 	if !c.BlessedSpiritshotCharged() {
 		t.Fatal("BlessedSpiritshotCharged() = false after a successful charge")
 	}

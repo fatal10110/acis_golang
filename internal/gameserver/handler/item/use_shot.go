@@ -24,6 +24,7 @@ const (
 type ShotCharger interface {
 	ChargeSoulshot(shotCrystal modelitem.CrystalType, reducedRoll int) (int32, player.ChargeShotResult)
 	ChargeSpiritshot(kind modelitem.ShotKind, shotCrystal modelitem.CrystalType) (int32, player.ChargeShotResult)
+	SetChargedShot(kind modelitem.ShotKind, charged bool)
 	AutoSoulShotEnabled(itemID int32) bool
 }
 
@@ -82,13 +83,17 @@ func UseShot(req ShotUseRequest) ShotUseResult {
 
 	var consume int32
 	var result player.ChargeShotResult
+	var kind modelitem.ShotKind
 	switch req.Template.EtcItem.Handler {
 	case SoulShotsHandler:
+		kind = modelitem.ShotSoul
 		consume, result = req.Caster.ChargeSoulshot(req.Template.Crystal, rnd.Get(100))
 	case SpiritShotsHandler:
-		consume, result = req.Caster.ChargeSpiritshot(modelitem.ShotSpirit, req.Template.Crystal)
+		kind = modelitem.ShotSpirit
+		consume, result = req.Caster.ChargeSpiritshot(kind, req.Template.Crystal)
 	case BlessedSpiritShotsHandler:
-		consume, result = req.Caster.ChargeSpiritshot(modelitem.ShotBlessedSpirit, req.Template.Crystal)
+		kind = modelitem.ShotBlessedSpirit
+		consume, result = req.Caster.ChargeSpiritshot(kind, req.Template.Crystal)
 	default:
 		return ShotUseResult{Outcome: ShotNotHandled}
 	}
@@ -106,6 +111,7 @@ func UseShot(req ShotUseRequest) ShotUseResult {
 	if _, ok := req.Destroyer.DestroyItem(req.Inventory, req.Item.ObjectID, int(consume)); !ok {
 		return ShotUseResult{Outcome: ShotNotEnoughItems, AutoEnabled: autoEnabled}
 	}
+	req.Caster.SetChargedShot(kind, true)
 
 	var skillID int32
 	if len(req.Template.AttachedSkills) > 0 {
