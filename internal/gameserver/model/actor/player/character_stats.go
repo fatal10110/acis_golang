@@ -42,8 +42,8 @@ func (c *Character) statCalcOrCreate(s stat.Stat) *effect.Calculator {
 
 func (c *Character) calcStat(s stat.Stat, base float64) float64 {
 	value := c.statCalc(s).Calc(characterStatActor{c: c}, base)
-	if s.CantBeNegative() && value < 0 {
-		return 0
+	if s.CantBeNegative() && value <= 0 {
+		return 1
 	}
 	return value
 }

@@ -205,34 +205,36 @@ func TestMoveLivePlayerSimulatesWalkServerSide(t *testing.T) {
 	}
 }
 
-// TestMoveLivePlayerRejectsBlockedRouteWithActionFailed pins the rejection
-// half of the fix: a route the move controller cannot simulate at all (geo
-// fully blocked) must answer ActionFailed instead of going silent, and must
-// not broadcast a move the server never actually started.
-func TestMoveLivePlayerRejectsBlockedRouteWithActionFailed(t *testing.T) {
+func TestMoveLivePlayerBroadcastsBlockedRouteAsZeroDistanceMove(t *testing.T) {
 	capture := &frameCapture{}
 	live := newTestLivePlayerWithGeo(t, 1, capture, blockedTestGeo{})
 	gcl := &GameClientLink{log: zerolog.Nop()}
 
 	moveBroadcasts := 0
-	live.Character.SetMoveBroadcaster(func(move.Event) { moveBroadcasts++ })
+	var gotEvent move.Event
+	live.Character.SetMoveBroadcaster(func(event move.Event) {
+		moveBroadcasts++
+		gotEvent = event
+	})
 
 	origin := live.CurrentLocation()
-	originHeading := live.CurrentHeading()
 	gcl.moveLivePlayer(live, location.Location{X: origin.X + 500, Y: origin.Y, Z: origin.Z})
 
-	if moveBroadcasts != 0 {
-		t.Fatalf("move broadcasts on a blocked route = %d, want 0", moveBroadcasts)
+	if moveBroadcasts != 1 {
+		t.Fatalf("move broadcasts on a blocked route = %d, want 1", moveBroadcasts)
 	}
 	opcodes := frameOpcodes(capture.frames)
-	if len(opcodes) != 1 || opcodes[0] != serverpackets.OpcodeActionFailed {
-		t.Fatalf("frames sent = %x, want a single ActionFailed (%#x)", opcodes, serverpackets.OpcodeActionFailed)
+	if len(opcodes) != 0 {
+		t.Fatalf("frames sent = %x, want none", opcodes)
+	}
+	if want := (move.Event{Origin: origin, Destination: origin, Speed: 120}); gotEvent != want {
+		t.Fatalf("broadcast move = %+v, want %+v", gotEvent, want)
 	}
 	if got := live.move.Position(); got != origin {
-		t.Fatalf("position after a rejected route = %+v, want unchanged %+v", got, origin)
+		t.Fatalf("position before zero-distance arrival = %+v, want %+v", got, origin)
 	}
-	if got := live.CurrentHeading(); got != originHeading {
-		t.Fatalf("heading after a rejected route = %d, want unchanged %d (a walk that never starts must not rotate the player)", got, originHeading)
+	if got := live.CurrentHeading(); got != origin.HeadingTo(location.Location{X: origin.X + 500, Y: origin.Y, Z: origin.Z}) {
+		t.Fatalf("heading after accepted zero-distance route = %d, want %d", got, origin.HeadingTo(location.Location{X: origin.X + 500, Y: origin.Y, Z: origin.Z}))
 	}
 }
 

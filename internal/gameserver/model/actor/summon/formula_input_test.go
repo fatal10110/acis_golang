@@ -203,6 +203,17 @@ func TestSummonSkillReflectInputUsesMagicSpecificStat(t *testing.T) {
 	}
 }
 
+func TestSummonCalcStatFloorsNonPositiveValues(t *testing.T) {
+	for _, value := range []float64{0, -1} {
+		a := NewPet(PetConfig{ObjectID: 1})
+		a.AddStatFuncs([]effect.Mod{{Stat: stat.PowerAttack, Op: effect.OpSet, Value: value}})
+
+		if got := a.CalcStat(stat.PowerAttack, 10); got != 1 {
+			t.Errorf("CalcStat(PowerAttack, %v) = %v, want 1", value, got)
+		}
+	}
+}
+
 func TestDeadConcurrentReduceHPAndRead(t *testing.T) {
 	actor := NewPet(PetConfig{Stats: CombatStats{MaxHP: 1}})
 	started := make(chan struct{})
