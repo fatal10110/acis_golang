@@ -197,7 +197,6 @@ Missing M5 stats/combat/items/progression client packets:
 - `SendWarehouseDepositList`
 - `SendWarehouseWithdrawList`
 - `RequestPackageSend`
-- `RequestRestartPoint`
 
 Warehouse/freight transaction packets remain deferred:
 
