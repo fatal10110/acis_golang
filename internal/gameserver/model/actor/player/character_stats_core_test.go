@@ -171,6 +171,17 @@ func TestCharacterFormulaInputsResolveLiveStats(t *testing.T) {
 	}
 }
 
+func TestCharacterCalcStatFloorsNonPositiveValues(t *testing.T) {
+	for _, value := range []float64{0, -1} {
+		c := liveCharacter(1, combatTemplate(), combatItems())
+		c.AddStatFuncs([]effect.Mod{{Stat: stat.PowerAttack, Op: effect.OpSet, Value: value}})
+
+		if got := c.CalcStat(stat.PowerAttack, 10); got != 1 {
+			t.Errorf("CalcStat(PowerAttack, %v) = %v, want 1", value, got)
+		}
+	}
+}
+
 func TestCharacterLethalInputAndOutcomes(t *testing.T) {
 	tmpl := combatTemplate()
 	caster := liveCharacter(1, tmpl, combatItems())
