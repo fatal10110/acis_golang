@@ -35,13 +35,32 @@ func fullQueueConn(t *testing.T) *Conn {
 	t.Cleanup(func() { serverRaw.Close(); clientRaw.Close() })
 	conn := &Conn{Conn: serverRaw, out: make(chan queuedWrite, outboundBuffer), stopping: make(chan struct{})}
 	for range outboundBuffer {
-		conn.out <- queuedWrite{frame: wire.BorrowedFrame(wire.FrameBytes([]byte{0x02, 0x00}))}
+		conn.out <- queuedWrite{frame: wire.BorrowedFrame(mustFrameBytes([]byte{0x02, 0x00}))}
 	}
 	return conn
 }
 
 func sendSessionPayload(s *Session, payload []byte) bool {
-	return s.SendFrame(wire.BorrowedFrame(wire.FrameBytes(payload)))
+	return s.SendFrame(wire.BorrowedFrame(mustFrameBytes(payload)))
+}
+
+func TestSessionRejectsFrameTooLongForLengthHeader(t *testing.T) {
+	s, client := pipeSessions(t)
+
+	frame := wire.BorrowedFrame(make([]byte, wire.MaxFrameLength+1))
+	if frame.Err() == nil {
+		t.Fatal("oversized frame accepted by BorrowedFrame, want length error")
+	}
+	if s.SendFrame(frame) {
+		t.Fatal("SendFrame(oversized) = true, want false")
+	}
+
+	if err := client.SetReadDeadline(time.Now().Add(50 * time.Millisecond)); err != nil {
+		t.Fatalf("SetReadDeadline: %v", err)
+	}
+	if n, err := client.Read(make([]byte, 1)); err == nil {
+		t.Fatalf("read %d bytes for a rejected frame, want none", n)
+	}
 }
 
 func TestSessionSendFramesWithLittleEndianLengthHeader(t *testing.T) {
@@ -121,7 +140,7 @@ func TestSessionTrySendFrameDisconnectsFullQueueWithoutBlocking(t *testing.T) {
 
 	done := make(chan bool, 1)
 	go func() {
-		done <- s.TrySendFrame(wire.BorrowedFrame(wire.FrameBytes([]byte{0x02, 0x00})))
+		done <- s.TrySendFrame(wire.BorrowedFrame(mustFrameBytes([]byte{0x02, 0x00})))
 	}()
 	select {
 	case sent := <-done:
@@ -149,7 +168,7 @@ func TestSessionTrySendFrameChecksFullQueueBeforeSessionLock(t *testing.T) {
 	defer s.mu.Unlock()
 
 	done := make(chan bool, 1)
-	go func() { done <- s.TrySendFrame(wire.BorrowedFrame(wire.FrameBytes([]byte{0x02, 0x00}))) }()
+	go func() { done <- s.TrySendFrame(wire.BorrowedFrame(mustFrameBytes([]byte{0x02, 0x00}))) }()
 	select {
 	case sent := <-done:
 		if sent {
@@ -203,7 +222,7 @@ func TestHealthySessionSurvivesConcurrentBroadcasts(t *testing.T) {
 	for range 16 {
 		wg.Go(func() {
 			for range 500 {
-				if !s.TrySendFrame(wire.BorrowedFrame(wire.FrameBytes([]byte{0x04, 0x00, 0x01, 0x02}))) {
+				if !s.TrySendFrame(wire.BorrowedFrame(mustFrameBytes([]byte{0x04, 0x00, 0x01, 0x02}))) {
 					dropped.Add(1)
 				}
 				time.Sleep(time.Millisecond)
@@ -228,7 +247,7 @@ type sessionBroadcastActor struct {
 func (a *sessionBroadcastActor) ObjectID() int32 { return a.id }
 func (*sessionBroadcastActor) Tick()             {}
 func (a *sessionBroadcastActor) Think() error {
-	a.session.TrySendFrame(wire.BorrowedFrame(wire.FrameBytes([]byte{0x04, 0x00, 0x01, 0x02})))
+	a.session.TrySendFrame(wire.BorrowedFrame(mustFrameBytes([]byte{0x04, 0x00, 0x01, 0x02})))
 	return nil
 }
 
@@ -353,4 +372,13 @@ func TestSessionSendFrameSerializesConcurrentCallers(t *testing.T) {
 	if len(seen) != senders {
 		t.Fatalf("saw %d distinct payloads, want %d (frames corrupted by interleaving)", len(seen), senders)
 	}
+}
+
+// mustFrameBytes frames a payload short enough that framing cannot fail.
+func mustFrameBytes(payload []byte) []byte {
+	frame, err := wire.FrameBytes(payload)
+	if err != nil {
+		panic(err)
+	}
+	return frame
 }

@@ -5,12 +5,22 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"math"
 	"sync"
 )
 
 // FrameHeaderSize is the length of a length-prefixed frame's own header,
 // which itself counts toward the length it encodes.
 const FrameHeaderSize = 2
+
+// MaxFrameLength is the largest total frame length the uint16 header can
+// encode. A frame beyond it would write a truncated header and desynchronize
+// every later frame on that connection, so it must be rejected instead.
+const MaxFrameLength = math.MaxUint16
+
+func frameLengthError(length int) error {
+	return fmt.Errorf("wire: frame length %d exceeds the %d-byte maximum", length, MaxFrameLength)
+}
 
 // Frame is an outbound byte slice plus an optional release hook for pooled
 // backing storage.
@@ -31,13 +41,22 @@ func (f Frame) Err() error {
 	return f.err
 }
 
-// BorrowedFrame returns a frame whose storage is not owned by a pool.
+// BorrowedFrame returns a frame whose storage is not owned by a pool. A frame
+// too long for its uint16 length header is rejected instead.
 func BorrowedFrame(bytes []byte) Frame {
+	if len(bytes) > MaxFrameLength {
+		return InvalidFrame(frameLengthError(len(bytes)))
+	}
 	return Frame{bytes: bytes}
 }
 
-// OwnedFrame returns a frame whose writer must be released after use.
+// OwnedFrame returns a frame whose writer must be released after use. A frame
+// too long for its uint16 length header is rejected instead, still carrying
+// the release hook so its writer returns to the pool.
 func OwnedFrame(bytes []byte, writer *Writer, release func(*Writer)) Frame {
+	if len(bytes) > MaxFrameLength {
+		return Frame{writer: writer, release: release, err: frameLengthError(len(bytes))}
+	}
 	return Frame{bytes: bytes, writer: writer, release: release}
 }
 
@@ -55,8 +74,17 @@ func (f Frame) Release() {
 
 // FrameBytes returns payload framed behind a little-endian uint16 length
 // header (header included in the count), ready to write or encrypt in
-// place.
-func FrameBytes(payload []byte) []byte {
+// place. It reports an error for a payload too long to encode in that
+// header rather than emitting a truncated one.
+func FrameBytes(payload []byte) ([]byte, error) {
+	if length := FrameHeaderSize + len(payload); length > MaxFrameLength {
+		return nil, frameLengthError(length)
+	}
+	return frameBytes(payload), nil
+}
+
+// frameBytes frames payload whose length the caller has already bounded.
+func frameBytes(payload []byte) []byte {
 	frame := make([]byte, FrameHeaderSize+len(payload))
 	binary.LittleEndian.PutUint16(frame, uint16(len(frame)))
 	copy(frame[FrameHeaderSize:], payload)
@@ -116,8 +144,14 @@ func (fr *FrameReader) ReadFrame() ([]byte, error) {
 // WriteFrame writes payload to w as one length-prefixed frame: a
 // little-endian uint16 header giving the total frame length (header
 // included), followed by payload itself.
+// It reports an error without writing anything when payload is too long for
+// the length header.
 func WriteFrame(w io.Writer, payload []byte) error {
-	_, err := w.Write(FrameBytes(payload))
+	frame, err := FrameBytes(payload)
+	if err != nil {
+		return err
+	}
+	_, err = w.Write(frame)
 	return err
 }
 
