@@ -20,12 +20,13 @@ func (s *spoilFakeTarget) SpoilPool() *item.SpoilPool { return s.pool }
 
 type spoilFakeCaster struct {
 	fakeActor
-	id       int32
-	level    int
-	inParty  bool
-	items    map[int32]int
-	distItem int32
-	distCnt  int32
+	id             int32
+	level          int
+	inParty        bool
+	items          map[int32]int
+	distItem       int32
+	distCnt        int32
+	alreadyNotices int
 }
 
 func (c spoilFakeCaster) ObjectID() int32 { return c.id }
@@ -40,12 +41,14 @@ func (c *spoilFakeCaster) InParty() bool { return c.inParty }
 func (c *spoilFakeCaster) DistributeItem(itemID, count int32) {
 	c.distItem, c.distCnt = itemID, count
 }
+func (c *spoilFakeCaster) NotifySpoilAlready() { c.alreadyNotices++ }
+func (*spoilFakeCaster) NotifySpoilSuccess()   {}
 
 func TestSpoilEventuallyMarksTarget(t *testing.T) {
 	// Level-equal caster/target still carries a real magic-resist chance
 	// (never exactly 100%), so retry instead of asserting a single roll.
 	registry := NewDefaultRegistry()
-	caster := spoilFakeCaster{id: 42, level: 40}
+	caster := &spoilFakeCaster{id: 42, level: 40}
 
 	for i := 0; i < 300; i++ {
 		target := &spoilFakeTarget{level: 40, pool: &item.SpoilPool{}}
@@ -66,13 +69,16 @@ func TestSpoilEventuallyMarksTarget(t *testing.T) {
 
 func TestSpoilAlreadySpoiledIsSkipped(t *testing.T) {
 	registry := NewDefaultRegistry()
-	caster := spoilFakeCaster{id: 42, level: 40}
+	caster := &spoilFakeCaster{id: 42, level: 40}
 	target := &spoilFakeTarget{level: 40, pool: &item.SpoilPool{}}
 	target.pool.Mark(99)
 
 	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "SPOIL", MagicLevel: 40}, Targets: []Actor{target}})
 	if !target.pool.IsSpoiler(99) {
 		t.Fatal("an already-spoiled pool should keep its original spoiler")
+	}
+	if caster.alreadyNotices != 1 {
+		t.Fatalf("already-spoiled notices = %d, want 1", caster.alreadyNotices)
 	}
 }
 

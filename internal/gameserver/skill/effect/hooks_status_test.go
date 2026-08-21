@@ -11,8 +11,9 @@ import (
 )
 
 type spoilFakeCaster struct {
-	id    int32
-	level int
+	id             int32
+	level          int
+	alreadyNotices int
 }
 
 func (c *spoilFakeCaster) ObjectID() int32 { return c.id }
@@ -20,6 +21,10 @@ func (c *spoilFakeCaster) ObjectID() int32 { return c.id }
 func (c *spoilFakeCaster) Dead() bool { return false }
 
 func (c *spoilFakeCaster) Level() int { return c.level }
+
+func (c *spoilFakeCaster) NotifySpoilAlready() { c.alreadyNotices++ }
+
+func (*spoilFakeCaster) NotifySpoilSuccess() {}
 
 type spoilFakeTarget struct {
 	dead  bool
@@ -102,6 +107,9 @@ func TestSpoilEffectRejectsDeadOrAlreadySpoiledOrWrongActorTypes(t *testing.T) {
 	if !spoiled.pool.IsSpoiler(999) {
 		t.Error("an already-spoiled target's existing spoiler must not be overwritten")
 	}
+	if caster.alreadyNotices != 1 {
+		t.Fatalf("already-spoiled notices = %d, want 1", caster.alreadyNotices)
+	}
 }
 
 func TestRelaxEffectSitsOnStartAndDrainsMpWhileSeatedAndNotFull(t *testing.T) {
@@ -155,6 +163,9 @@ func TestRelaxEffectActionEndsWhenStandingOrHpFullOrLackMp(t *testing.T) {
 			e.Effected = tt.target
 			if e.ActionTime() {
 				t.Fatal("relax effect action tick continued, want it to end")
+			}
+			if tt.name == "hp full" && tt.target.relaxNotice != 1 {
+				t.Fatalf("HP-full notices = %d, want 1", tt.target.relaxNotice)
 			}
 		})
 	}
