@@ -20,8 +20,8 @@ func (c *countingConn) Read(p []byte) (int, error) {
 
 func TestFrameReaderReadsSequentialFrames(t *testing.T) {
 	var stream []byte
-	stream = append(stream, FrameBytes([]byte{1, 2, 3})...)
-	stream = append(stream, FrameBytes([]byte{4, 5})...)
+	stream = append(stream, mustFrameBytes([]byte{1, 2, 3})...)
+	stream = append(stream, mustFrameBytes([]byte{4, 5})...)
 
 	fr := NewFrameReader(bytes.NewReader(stream))
 
@@ -47,7 +47,7 @@ func TestFrameReaderReadsSequentialFrames(t *testing.T) {
 }
 
 func TestFrameReaderBuffersConsecutiveFrames(t *testing.T) {
-	stream := append(FrameBytes([]byte{1, 2, 3}), FrameBytes([]byte{4, 5})...)
+	stream := append(mustFrameBytes([]byte{1, 2, 3}), mustFrameBytes([]byte{4, 5})...)
 	conn := &countingConn{r: bytes.NewReader(stream)}
 	fr := NewFrameReader(conn)
 
@@ -74,8 +74,8 @@ func TestFrameReaderRejectsHeaderShorterThanItself(t *testing.T) {
 
 func TestFrameReaderReusesItsBuffer(t *testing.T) {
 	var stream []byte
-	stream = append(stream, FrameBytes([]byte{1, 2, 3})...)
-	stream = append(stream, FrameBytes([]byte{9, 9, 9})...)
+	stream = append(stream, mustFrameBytes([]byte{1, 2, 3})...)
+	stream = append(stream, mustFrameBytes([]byte{9, 9, 9})...)
 
 	r := bytes.NewReader(stream)
 	fr := NewFrameReader(r)
@@ -103,7 +103,7 @@ func TestFrameReaderReusesItsBuffer(t *testing.T) {
 }
 
 func BenchmarkReadFrame(b *testing.B) {
-	stream := FrameBytes(make([]byte, 64))
+	stream := mustFrameBytes(make([]byte, 64))
 	r := bytes.NewReader(stream)
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
@@ -117,7 +117,7 @@ func BenchmarkReadFrame(b *testing.B) {
 }
 
 func BenchmarkFrameReader(b *testing.B) {
-	stream := FrameBytes(make([]byte, 64))
+	stream := mustFrameBytes(make([]byte, 64))
 	r := bytes.NewReader(stream)
 	fr := NewFrameReader(r)
 	b.ReportAllocs()
@@ -129,4 +129,13 @@ func BenchmarkFrameReader(b *testing.B) {
 			b.Fatalf("ReadFrame: %v", err)
 		}
 	}
+}
+
+// mustFrameBytes frames a payload short enough that framing cannot fail.
+func mustFrameBytes(payload []byte) []byte {
+	frame, err := FrameBytes(payload)
+	if err != nil {
+		panic(err)
+	}
+	return frame
 }
