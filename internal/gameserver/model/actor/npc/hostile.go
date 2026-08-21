@@ -409,13 +409,15 @@ func (h *Hostile) RandomNearbyMonster(radius int) (attackable.Combatant, bool) {
 // has no world placement yet. The reference confusion effect also
 // considers nearby playable actors as candidates; no playable actor in
 // this port exposes itself to this search yet, so only other attackable
-// NPCs are ever found here.
+// NPCs are ever found here. The search is unwidened by collision radius:
+// EffectConfusion.java:43 filters candidates by plain distance2D, not
+// MathUtil.checkIfInRange's body-to-body widening.
 func (h *Hostile) RandomNearbyCombatant(radius int) (attackable.Combatant, bool) {
 	if h.world == nil {
 		return nil, false
 	}
 	var candidates []attackable.Combatant
-	h.world.ForEachKnownInRadius(h, radius, func(obj world.Tracked) {
+	h.world.ForEachKnownInPlainRadius(h, radius, func(obj world.Tracked) {
 		other, ok := obj.(*Hostile)
 		if !ok || other.chestKind() {
 			return

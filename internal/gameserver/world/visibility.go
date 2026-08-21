@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/worldobject"
 )
 
@@ -416,10 +415,23 @@ func (s *State) AppendKnown(out []Tracked, t Tracked) []Tracked {
 }
 
 // ForEachKnownInRadius calls fn for every object within radius units of t
-// in 3D, excluding t itself. The search widens to as many region rings as
-// the radius spans, and a radius of -1 matches every object in the
-// searched regions. It does nothing when t is off the grid.
+// in 3D, excluding t itself, widened by each bodied side's collision
+// radius. The search widens to as many region rings as the radius spans,
+// and a radius of -1 matches every object in the searched regions. It does
+// nothing when t is off the grid.
 func (s *State) ForEachKnownInRadius(t Tracked, radius int, fn func(Tracked)) {
+	s.forEachKnownInRadius(t, radius, true, fn)
+}
+
+// ForEachKnownInPlainRadius is ForEachKnownInRadius without collision-radius
+// widening: it matches a reference check against a plain point distance
+// (e.g. EffectConfusion.java:41's distance2D filter), not
+// MathUtil.checkIfInRange's body-to-body widening.
+func (s *State) ForEachKnownInPlainRadius(t Tracked, radius int, fn func(Tracked)) {
+	s.forEachKnownInRadius(t, radius, false, fn)
+}
+
+func (s *State) forEachKnownInRadius(t Tracked, radius int, widen bool, fn func(Tracked)) {
 	r := t.presence().currentRegion()
 	if r == nil {
 		return
@@ -431,7 +443,7 @@ func (s *State) ForEachKnownInRadius(t Tracked, radius int, fn func(Tracked)) {
 	for _, region := range s.AppendNeighbors(regionBuf[:0], r, searchDepth(radius)) {
 		objects = region.AppendObjects(objects[:0])
 		for _, o := range objects {
-			if o.ObjectID() == t.ObjectID() || !inRange(radius, t, o) {
+			if o.ObjectID() == t.ObjectID() || !inRange(radius, t, o, widen) {
 				continue
 			}
 			fn(o)
@@ -455,24 +467,34 @@ type bodied interface {
 }
 
 // inRange reports whether a and b are within rng units of each other,
-// widened by each side's collision radius when it has one. A rng of -1
-// means unlimited; any other negative value behaves like its absolute
-// value.
-func inRange(rng int, a, b Tracked) bool {
+// widened (when widen is true) by each side's collision radius when it has
+// one. A rng of -1 means unlimited; any other negative value behaves like
+// its absolute value. The comparison stays in float64 space end to end,
+// matching MathUtil.checkIfInRange's double totalRadius (MathUtil.java:193-198,
+// 214-217): summing collision radii as an int before comparing, as an
+// earlier version of this function did, silently truncates fractional
+// radii (e.g. 7.5 on female player templates, or Grow-scaled NPC bodies).
+func inRange(rng int, a, b Tracked, widen bool) bool {
 	if rng == -1 {
 		return true
 	}
 	if rng < 0 {
 		rng = -rng
 	}
-	if ab, ok := a.(bodied); ok {
-		rng += int(ab.CollisionRadius())
-	}
-	if bb, ok := b.(bodied); ok {
-		rng += int(bb.CollisionRadius())
+	total := float64(rng)
+	if widen {
+		if ab, ok := a.(bodied); ok {
+			total += ab.CollisionRadius()
+		}
+		if bb, ok := b.(bodied); ok {
+			total += bb.CollisionRadius()
+		}
 	}
 
 	ax, ay, az := a.presence().Position()
 	bx, by, bz := b.presence().Position()
-	return location.In3DRange(ax, ay, az, bx, by, bz, rng)
+	dx := float64(ax - bx)
+	dy := float64(ay - by)
+	dz := float64(az - bz)
+	return dx*dx+dy*dy+dz*dz <= total*total
 }
