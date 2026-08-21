@@ -216,6 +216,25 @@ func TestDestroyItemRejectsNonDestroyable(t *testing.T) {
 	}
 }
 
+func TestDestroyItemResultClassifiesRejections(t *testing.T) {
+	templates := item.NewTable([]*item.Template{
+		{ID: 20, Kind: item.KindEtcItem, Destroyable: false, Duration: -1, EtcItem: &item.EtcItemDetail{}},
+		{ID: 21, Kind: item.KindEtcItem, Stackable: true, Destroyable: true, Duration: -1, EtcItem: &item.EtcItemDetail{}},
+	})
+	inv := itemcontainer.NewPlayerInventory(1, templates)
+	protected := inv.AddNew(20, 1, 500)
+	stack := inv.AddNew(21, 1, 501)
+
+	_, failure := NewService(nil).DestroyItemResult(inv, stack.ObjectID, 0)
+	if failure != DestroyInvalidCount {
+		t.Fatalf("zero-count failure = %v, want DestroyInvalidCount", failure)
+	}
+	_, failure = NewService(nil).DestroyItemResult(inv, protected.ObjectID, 1)
+	if failure != DestroyNotDestroyable {
+		t.Fatalf("protected-item failure = %v, want DestroyNotDestroyable", failure)
+	}
+}
+
 func TestDestroyItemReportsUnequippedInstance(t *testing.T) {
 	templates := testTemplates()
 	inv := itemcontainer.NewPlayerInventory(1, templates)

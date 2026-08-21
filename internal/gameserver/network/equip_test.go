@@ -396,8 +396,8 @@ func TestDeadPlayerItemOpsAreNoops(t *testing.T) {
 
 		(&GameClientLink{}).destroyLiveItem(live, stack.ObjectID, 2)
 
-		if stack.Count != 5 || len(capture.frames) != 1 || capture.frames[0][0] != serverpackets.OpcodeActionFailed {
-			t.Fatalf("dead RequestDestroyItem mutated item=%+v frames=%x, want unchanged item and ActionFailed only", stack, capture.frames)
+		if stack.Count != 5 || len(capture.frames) != 0 {
+			t.Fatalf("dead RequestDestroyItem mutated item=%+v frames=%x, want unchanged item and no frames", stack, capture.frames)
 		}
 	})
 
@@ -411,8 +411,86 @@ func TestDeadPlayerItemOpsAreNoops(t *testing.T) {
 
 		(&GameClientLink{ids: &sequentialIDs{next: 100}}).crystallizeLiveItem(live, clientpackets.RequestCrystallizeItem{ObjectID: weapon.ObjectID, Count: 1})
 
-		if live.Inventory().ItemByObjectID(weapon.ObjectID) == nil || len(capture.frames) != 1 || capture.frames[0][0] != serverpackets.OpcodeActionFailed {
-			t.Fatalf("dead RequestCrystallizeItem mutated inventory frames=%x, want unchanged inventory and ActionFailed only", capture.frames)
+		if live.Inventory().ItemByObjectID(weapon.ObjectID) == nil || len(capture.frames) != 0 {
+			t.Fatalf("dead RequestCrystallizeItem mutated inventory frames=%x, want unchanged inventory and no frames", capture.frames)
+		}
+	})
+}
+
+func TestItemOperationRejectMessages(t *testing.T) {
+	t.Run("drop zero count", func(t *testing.T) {
+		templates := item.NewTable([]*item.Template{{ID: item.AdenaID, Kind: item.KindEtcItem, Duration: -1, Stackable: true, Dropable: true, Destroyable: true, EtcItem: &item.EtcItemDetail{}}})
+		capture := &frameCapture{}
+		live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{{ObjectID: 500, TemplateID: item.AdenaID, Count: 1, Location: item.LocationInventory}})
+
+		(&GameClientLink{groundItems: &recordingGroundDropper{}}).dropLiveItem(live, clientpackets.RequestDropItem{ObjectID: 500})
+
+		if len(capture.frames) != 1 {
+			t.Fatalf("frames = %x, want one CannotDiscardThisItem", capture.frames)
+		}
+		assertStaticSystemMessageFrame(t, capture.frames[0], serverpackets.SystemMessageCannotDiscardThisItem)
+	})
+
+	t.Run("destroy invalid count", func(t *testing.T) {
+		templates := item.NewTable([]*item.Template{{ID: item.AdenaID, Kind: item.KindEtcItem, Duration: -1, Stackable: true, Destroyable: true, EtcItem: &item.EtcItemDetail{}}})
+		capture := &frameCapture{}
+		live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{{ObjectID: 500, TemplateID: item.AdenaID, Count: 1, Location: item.LocationInventory}})
+
+		(&GameClientLink{inventory: invops.NewService(nil)}).destroyLiveItem(live, 500, 0)
+
+		if len(capture.frames) != 1 {
+			t.Fatalf("frames = %x, want one CannotDestroyNumberIncorrect", capture.frames)
+		}
+		assertStaticSystemMessageFrame(t, capture.frames[0], serverpackets.SystemMessageCannotDestroyNumberIncorrect)
+	})
+
+	t.Run("destroy count above held", func(t *testing.T) {
+		templates := item.NewTable([]*item.Template{{ID: item.AdenaID, Kind: item.KindEtcItem, Duration: -1, Stackable: true, Destroyable: true, EtcItem: &item.EtcItemDetail{}}})
+		capture := &frameCapture{}
+		live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{{ObjectID: 500, TemplateID: item.AdenaID, Count: 1, Location: item.LocationInventory}})
+
+		(&GameClientLink{inventory: invops.NewService(nil)}).destroyLiveItem(live, 500, 2)
+
+		if len(capture.frames) != 1 {
+			t.Fatalf("frames = %x, want one CannotDestroyNumberIncorrect", capture.frames)
+		}
+		assertStaticSystemMessageFrame(t, capture.frames[0], serverpackets.SystemMessageCannotDestroyNumberIncorrect)
+	})
+
+	t.Run("destroy multiple non-stackable", func(t *testing.T) {
+		templates := item.NewTable([]*item.Template{{ID: 20, Kind: item.KindEtcItem, Duration: -1, Destroyable: true, EtcItem: &item.EtcItemDetail{}}})
+		capture := &frameCapture{}
+		live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{{ObjectID: 500, TemplateID: 20, Count: 2, Location: item.LocationInventory}})
+
+		(&GameClientLink{inventory: invops.NewService(nil)}).destroyLiveItem(live, 500, 2)
+
+		if len(capture.frames) != 0 {
+			t.Fatalf("frames = %x, want none", capture.frames)
+		}
+	})
+
+	t.Run("destroy hero item", func(t *testing.T) {
+		templates := item.NewTable([]*item.Template{{ID: 6611, Kind: item.KindWeapon, Duration: -1, Destroyable: false, Weapon: &item.WeaponDetail{}}})
+		capture := &frameCapture{}
+		live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{{ObjectID: 500, TemplateID: 6611, Count: 1, Location: item.LocationInventory}})
+
+		(&GameClientLink{inventory: invops.NewService(nil)}).destroyLiveItem(live, 500, 1)
+
+		if len(capture.frames) != 1 {
+			t.Fatalf("frames = %x, want one HeroWeaponsCantDestroyed", capture.frames)
+		}
+		assertStaticSystemMessageFrame(t, capture.frames[0], serverpackets.SystemMessageHeroWeaponsCantDestroyed)
+	})
+
+	t.Run("drop negative count", func(t *testing.T) {
+		templates := item.NewTable([]*item.Template{{ID: item.AdenaID, Kind: item.KindEtcItem, Duration: -1, Stackable: true, Dropable: true, Destroyable: true, EtcItem: &item.EtcItemDetail{}}})
+		capture := &frameCapture{}
+		live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{{ObjectID: 500, TemplateID: item.AdenaID, Count: 1, Location: item.LocationInventory}})
+
+		(&GameClientLink{groundItems: &recordingGroundDropper{}}).dropLiveItem(live, clientpackets.RequestDropItem{ObjectID: 500, Count: -1})
+
+		if len(capture.frames) != 0 {
+			t.Fatalf("frames = %x, want none", capture.frames)
 		}
 	})
 }

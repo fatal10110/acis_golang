@@ -3,6 +3,7 @@ package loginserver
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/rand/v2"
 	"net"
 	"sync"
@@ -122,6 +123,9 @@ type clientConn struct {
 }
 
 func (c *clientConn) send(payload []byte) error {
+	if wire.FrameHeaderSize+commoncrypt.PaddedSize(len(payload)+8) > wire.MaxFrameLength {
+		return fmt.Errorf("login packet exceeds maximum frame length")
+	}
 	return wire.WriteFrame(c.conn, c.crypt.Encrypt(payload))
 }
 

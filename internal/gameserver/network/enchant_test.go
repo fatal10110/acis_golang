@@ -97,6 +97,19 @@ func TestEnchantLiveItemRejectsInvalidTargetWithoutConsumingScroll(t *testing.T)
 	assertEnchantResultFrame(t, capture.frames[1], serverpackets.EnchantResultCancelled)
 }
 
+func TestEnchantLiveItemWithoutActiveScrollIsSilent(t *testing.T) {
+	templates := enchantTestTemplates()
+	weapon := &item.Instance{ObjectID: 500, TemplateID: 30, OwnerID: 1, Count: 1, Location: item.LocationInventory}
+	capture := &frameCapture{}
+	live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{weapon})
+
+	(&GameClientLink{}).enchantLiveItem(context.Background(), live, clientpackets.RequestEnchantItem{ObjectID: weapon.ObjectID})
+
+	if got := capture.snapshot(); len(got) != 0 {
+		t.Fatalf("frames = %x, want none", frameOpcodes(got))
+	}
+}
+
 func TestEnchantLiveItemFailureBreaksItemIntoCrystals(t *testing.T) {
 	templates := enchantTestTemplates()
 	weapon := &item.Instance{ObjectID: 500, TemplateID: 30, OwnerID: 1, Count: 1, EnchantLevel: 3, Location: item.LocationInventory}
