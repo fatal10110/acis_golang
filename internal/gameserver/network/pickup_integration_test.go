@@ -24,15 +24,15 @@ import (
 func TestGameClientLinkPickupGroundItemFullClientFlow(t *testing.T) {
 	c, chars, _, _, _, state := newLinkedSQLGameClient(t, nil, nil, 0)
 
-	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
-	c.read() // CharCreateOk
-	c.read() // CharSelectInfo
+	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.Read() // CharCreateOk
+	c.Read() // CharSelectInfo
 	objID := sqlSoleObjectID(t, chars)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
 	playerObj, ok := state.Player(objID)
@@ -52,34 +52,34 @@ func TestGameClientLinkPickupGroundItemFullClientFlow(t *testing.T) {
 		t.Fatalf("ground item: %v", err)
 	}
 	state.Spawn(ground, px+groundPickupInteractionDistance+1, py, pz, 0)
-	if reply := c.read(); reply[0] != serverpackets.OpcodeSpawnItem {
+	if reply := c.Read(); reply[0] != serverpackets.OpcodeSpawnItem {
 		t.Fatalf("ground item spawn opcode = %#x, want SpawnItem (%#x)", reply[0], serverpackets.OpcodeSpawnItem)
 	}
 
 	origin := location.Location{X: px, Y: py, Z: pz}
-	c.send(encodeAction(ground.ObjectID(), origin, false))
-	reply := c.read()
+	c.Send(encodeAction(ground.ObjectID(), origin, false))
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeActionFailed {
 		t.Fatalf("Action opcode = %#x, want ActionFailed (%#x) — an out-of-range pickup must release the client's pending action before approaching", reply[0], serverpackets.OpcodeActionFailed)
 	}
-	reply = c.read()
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeMoveToLocation {
 		t.Fatalf("Action opcode = %#x, want MoveToLocation (%#x) — an out-of-range pickup must approach before collecting", reply[0], serverpackets.OpcodeMoveToLocation)
 	}
-	reply = c.read()
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeActionFailed {
 		t.Fatalf("Action opcode = %#x, want ActionFailed (%#x) — a successful pickup must still release the client's pending action", reply[0], serverpackets.OpcodeActionFailed)
 	}
-	reply = c.read()
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeGetItem {
 		t.Fatalf("Action opcode = %#x, want GetItem (%#x) — the pickup click was silently dropped", reply[0], serverpackets.OpcodeGetItem)
 	}
-	reply = c.read()
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeDeleteObject {
 		t.Fatalf("pickup follow-up opcode = %#x, want DeleteObject (%#x) — the item never disappears from the ground", reply[0], serverpackets.OpcodeDeleteObject)
 	}
 	inventoryUpdatesFor(t, state).Tick()
-	reply = c.read()
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeInventoryUpdate {
 		t.Fatalf("pickup follow-up opcode = %#x, want InventoryUpdate (%#x)", reply[0], serverpackets.OpcodeInventoryUpdate)
 	}
@@ -90,8 +90,8 @@ func TestGameClientLinkPickupGroundItemFullClientFlow(t *testing.T) {
 
 	// Movement must still work after the pickup resolves.
 	x, y, z := live.Position()
-	c.send(encodeMoveBackwardToLocation(origin, location.Location{X: x, Y: y, Z: z}, 1))
-	reply = c.read()
+	c.Send(encodeMoveBackwardToLocation(origin, location.Location{X: x, Y: y, Z: z}, 1))
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeMoveToLocation {
 		t.Fatalf("movement after pickup opcode = %#x, want MoveToLocation (%#x) — client is unresponsive to move commands", reply[0], serverpackets.OpcodeMoveToLocation)
 	}
@@ -107,15 +107,15 @@ func TestGameClientLinkPickupGroundItemFullClientFlow(t *testing.T) {
 func TestAttachLivePlayerBuildsCastControllerEagerly(t *testing.T) {
 	c, chars, _, _, _, state := newLinkedSQLGameClient(t, nil, nil, 0)
 
-	c.send(encodeRequestCharacterCreate("Caster", 0, 0, 0, 1, 0, 0))
-	c.read() // CharCreateOk
-	c.read() // CharSelectInfo
+	c.Send(encodeRequestCharacterCreate("Caster", 0, 0, 0, 1, 0, 0))
+	c.Read() // CharCreateOk
+	c.Read() // CharSelectInfo
 	objID := sqlSoleObjectID(t, chars)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
 	playerObj, ok := state.Player(objID)
@@ -137,15 +137,15 @@ func TestAttachLivePlayerBuildsCastControllerEagerly(t *testing.T) {
 func TestGameClientLinkPickupAdenaMergeFullClientFlow(t *testing.T) {
 	c, chars, _, _, _, state := newLinkedSQLGameClient(t, nil, nil, 0)
 
-	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
-	c.read() // CharCreateOk
-	c.read() // CharSelectInfo
+	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.Read() // CharCreateOk
+	c.Read() // CharSelectInfo
 	objID := sqlSoleObjectID(t, chars)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
 	playerObj, ok := state.Player(objID)
@@ -174,23 +174,23 @@ func TestGameClientLinkPickupAdenaMergeFullClientFlow(t *testing.T) {
 		t.Fatalf("ground item: %v", err)
 	}
 	state.Spawn(ground, px+30, py, pz, 0)
-	if reply := c.read(); reply[0] != serverpackets.OpcodeSpawnItem {
+	if reply := c.Read(); reply[0] != serverpackets.OpcodeSpawnItem {
 		t.Fatalf("ground spawn opcode = %#x, want SpawnItem (%#x)", reply[0], serverpackets.OpcodeSpawnItem)
 	}
 
 	origin := location.Location{X: px, Y: py, Z: pz}
-	c.send(encodeAction(ground.ObjectID(), origin, false))
-	if reply := c.read(); reply[0] != serverpackets.OpcodeActionFailed {
+	c.Send(encodeAction(ground.ObjectID(), origin, false))
+	if reply := c.Read(); reply[0] != serverpackets.OpcodeActionFailed {
 		t.Fatalf("pickup opcode = %#x, want ActionFailed (%#x) — the client's pending action is never released", reply[0], serverpackets.OpcodeActionFailed)
 	}
-	if reply := c.read(); reply[0] != serverpackets.OpcodeGetItem {
+	if reply := c.Read(); reply[0] != serverpackets.OpcodeGetItem {
 		t.Fatalf("second Action opcode = %#x, want GetItem (%#x)", reply[0], serverpackets.OpcodeGetItem)
 	}
-	if reply := c.read(); reply[0] != serverpackets.OpcodeDeleteObject {
+	if reply := c.Read(); reply[0] != serverpackets.OpcodeDeleteObject {
 		t.Fatalf("follow-up opcode = %#x, want DeleteObject (%#x) — item stays on the ground", reply[0], serverpackets.OpcodeDeleteObject)
 	}
 	inventoryUpdatesFor(t, state).Tick()
-	if reply := c.read(); reply[0] != serverpackets.OpcodeInventoryUpdate {
+	if reply := c.Read(); reply[0] != serverpackets.OpcodeInventoryUpdate {
 		t.Fatalf("follow-up opcode = %#x, want InventoryUpdate (%#x)", reply[0], serverpackets.OpcodeInventoryUpdate)
 	}
 
@@ -203,8 +203,8 @@ func TestGameClientLinkPickupAdenaMergeFullClientFlow(t *testing.T) {
 
 	// Must still respond to movement.
 	x, y, z := live.Position()
-	c.send(encodeMoveBackwardToLocation(origin, location.Location{X: x, Y: y, Z: z}, 1))
-	if reply := c.read(); reply[0] != serverpackets.OpcodeMoveToLocation {
+	c.Send(encodeMoveBackwardToLocation(origin, location.Location{X: x, Y: y, Z: z}, 1))
+	if reply := c.Read(); reply[0] != serverpackets.OpcodeMoveToLocation {
 		t.Fatalf("movement after pickup opcode = %#x, want MoveToLocation — character unresponsive", reply[0])
 	}
 }

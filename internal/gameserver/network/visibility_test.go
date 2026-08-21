@@ -12,9 +12,11 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	gamecipher "github.com/fatal10110/acis_golang/internal/gameserver/network/cipher"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 type summonDamageAttacker struct{ name string }
@@ -24,29 +26,29 @@ func (a summonDamageAttacker) CharacterName() string { return a.name }
 
 func TestLivePlayerVisibilitySendsCharInfoAndDeleteObject(t *testing.T) {
 	state := world.New()
-	firstFrames := &frameCapture{}
-	secondFrames := &frameCapture{}
+	firstFrames := &testsupport.FrameCapture{}
+	secondFrames := &testsupport.FrameCapture{}
 	first := newTestLivePlayer(t, 1, firstFrames)
 	second := newTestLivePlayer(t, 2, secondFrames)
 
 	state.Spawn(first, 0, 0, 0, 0)
 	state.Spawn(second, 100, 0, 0, 0)
 
-	if len(firstFrames.frames) != 1 || firstFrames.frames[0][0] != serverpackets.OpcodeCharInfo {
-		t.Fatalf("first player frames = %x, want one CharInfo", firstFrames.frames)
+	if len(firstFrames.Frames()) != 1 || firstFrames.Frames()[0][0] != serverpackets.OpcodeCharInfo {
+		t.Fatalf("first player frames = %x, want one CharInfo", firstFrames.Frames())
 	}
-	if len(secondFrames.frames) != 1 || secondFrames.frames[0][0] != serverpackets.OpcodeCharInfo {
-		t.Fatalf("second player frames = %x, want one CharInfo", secondFrames.frames)
+	if len(secondFrames.Frames()) != 1 || secondFrames.Frames()[0][0] != serverpackets.OpcodeCharInfo {
+		t.Fatalf("second player frames = %x, want one CharInfo", secondFrames.Frames())
 	}
 
 	state.Despawn(second)
-	if got := firstFrames.frames[len(firstFrames.frames)-1][0]; got != serverpackets.OpcodeDeleteObject {
+	if got := firstFrames.Frames()[len(firstFrames.Frames())-1][0]; got != serverpackets.OpcodeDeleteObject {
 		t.Fatalf("last first-player frame opcode = %#x, want DeleteObject (%#x)", got, serverpackets.OpcodeDeleteObject)
 	}
 }
 
 func TestPetInfoSnapshotMirrorsOwnerPvPFlag(t *testing.T) {
-	owner := newTestLivePlayer(t, 1, &frameCapture{})
+	owner := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
 	owner.UpdatePvPFlag(task.PvPFlagBlinking)
 	npcs := npc.NewTable([]*npc.Template{{ID: 12077, TemplateID: 12077}})
 	pet := summon.NewPet(summon.PetConfig{ObjectID: 20, Owner: owner, NPCID: 12077})
@@ -62,7 +64,7 @@ func TestPetInfoSnapshotMirrorsOwnerPvPFlag(t *testing.T) {
 
 func TestLivePlayerVisibilityRendersSupportedWorldObjectsSymmetrically(t *testing.T) {
 	state := world.New()
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	viewer := newTestLivePlayer(t, 1, frames)
 	state.Spawn(viewer, 0, 0, 0, 0)
 
@@ -81,12 +83,12 @@ func TestLivePlayerVisibilityRendersSupportedWorldObjectsSymmetrically(t *testin
 		serverpackets.OpcodeDoorInfo,
 		serverpackets.OpcodeStaticObjectInfo,
 	}
-	if got := frameOpcodes(frames.frames); string(got) != string(want) {
+	if got := testsupport.FrameOpcodes(frames.Frames()); string(got) != string(want) {
 		t.Fatalf("spawn opcodes = %x, want %x", got, want)
 	}
 
 	state.Despawn(invisible)
-	if got := frameOpcodes(frames.frames); string(got) != string(want) {
+	if got := testsupport.FrameOpcodes(frames.Frames()); string(got) != string(want) {
 		t.Fatalf("opcodes after despawning unsupported object = %x, want still %x", got, want)
 	}
 
@@ -98,14 +100,14 @@ func TestLivePlayerVisibilityRendersSupportedWorldObjectsSymmetrically(t *testin
 		serverpackets.OpcodeDeleteObject,
 		serverpackets.OpcodeDeleteObject,
 	)
-	if got := frameOpcodes(frames.frames); string(got) != string(want) {
+	if got := testsupport.FrameOpcodes(frames.Frames()); string(got) != string(want) {
 		t.Fatalf("despawn opcodes = %x, want %x", got, want)
 	}
 }
 
 func TestLivePlayerVisibilityRendersHostileNPC(t *testing.T) {
 	state := world.New()
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	viewer := newTestLivePlayer(t, 1, frames)
 	state.Spawn(viewer, 0, 0, 0, 0)
 
@@ -113,10 +115,10 @@ func TestLivePlayerVisibilityRendersHostileNPC(t *testing.T) {
 	state.Spawn(hostile, 100, 0, -50, 123)
 
 	const opcodeNPCInfo = 0x16
-	if len(frames.frames) != 1 {
-		t.Fatalf("frames = %x, want one NPCInfo frame", frames.frames)
+	if len(frames.Frames()) != 1 {
+		t.Fatalf("frames = %x, want one NPCInfo frame", frames.Frames())
 	}
-	got := frames.frames[0]
+	got := frames.Frames()[0]
 	appendInt32 := func(b []byte, v int32) []byte {
 		return binary.LittleEndian.AppendUint32(b, uint32(v))
 	}
@@ -133,21 +135,21 @@ func TestLivePlayerVisibilityRendersHostileNPC(t *testing.T) {
 	}
 
 	state.Despawn(hostile)
-	if len(frames.frames) != 2 || frames.frames[1][0] != serverpackets.OpcodeDeleteObject {
-		t.Fatalf("frames after NPC despawn = %x, want DeleteObject after NPCInfo", frames.frames)
+	if len(frames.Frames()) != 2 || frames.Frames()[1][0] != serverpackets.OpcodeDeleteObject {
+		t.Fatalf("frames after NPC despawn = %x, want DeleteObject after NPCInfo", frames.Frames())
 	}
 }
 
 func TestHostileAbnormalEffectRefreshResendsLiveNPCInfo(t *testing.T) {
 	state := world.New()
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	viewer := newTestLivePlayer(t, 1, frames)
 	state.Spawn(viewer, 0, 0, 0, 0)
 
 	hostile := newTestHostileNPC(t, 20)
 	hostile.SetWorld(state)
 	state.Spawn(hostile, 100, 0, -50, 123)
-	frames.frames = nil
+	testsupport.ResetCapture(frames)
 
 	hostile.SetCollisionRadius(9 * 1.19)
 	hostile.StartAbnormalEffect(0x010000)
@@ -160,10 +162,10 @@ func TestHostileAbnormalEffectRefreshResendsLiveNPCInfo(t *testing.T) {
 	}
 	hostile.UpdateAbnormalEffect()
 
-	if len(frames.frames) != 1 {
-		t.Fatalf("frames = %x, want one refreshed NPCInfo", frames.frames)
+	if len(frames.Frames()) != 1 {
+		t.Fatalf("frames = %x, want one refreshed NPCInfo", frames.Frames())
 	}
-	got := frames.frames[0]
+	got := frames.Frames()[0]
 	if got[0] != serverpackets.OpcodeNPCInfo {
 		t.Fatalf("opcode = %#x, want NPCInfo (%#x)", got[0], serverpackets.OpcodeNPCInfo)
 	}
@@ -171,8 +173,8 @@ func TestHostileAbnormalEffectRefreshResendsLiveNPCInfo(t *testing.T) {
 
 func TestSummonAbnormalEffectRefreshesOwnerPetInfoThenBystanderSummonInfo(t *testing.T) {
 	state := world.New()
-	ownerFrames := &frameCapture{}
-	bystanderFrames := &frameCapture{}
+	ownerFrames := &testsupport.FrameCapture{}
+	bystanderFrames := &testsupport.FrameCapture{}
 	owner := newTestLivePlayer(t, 1, ownerFrames)
 	bystander := newTestLivePlayer(t, 2, bystanderFrames)
 	owner.npcs = npc.NewTable([]*npc.Template{{ID: 12077, TemplateID: 12077, Name: "Wolf", AtkSpd: 300, RunSpeed: 120, WalkSpeed: 60}})
@@ -182,8 +184,8 @@ func TestSummonAbnormalEffectRefreshesOwnerPetInfoThenBystanderSummonInfo(t *tes
 
 	pet := summon.NewPet(summon.PetConfig{ObjectID: 20, Owner: owner, NPCID: 12077, Name: "Wolf", Level: 5, Stats: summon.CombatStats{MaxHP: 100, MaxMP: 30}})
 	summon.SpawnBesideOwner(state, pet, owner, location.Location{X: 10})
-	ownerFrames.frames = nil
-	bystanderFrames.frames = nil
+	testsupport.ResetCapture(ownerFrames)
+	testsupport.ResetCapture(bystanderFrames)
 
 	pet.StartAbnormalEffect(0x010000)
 	pet.UpdateAbnormalEffect()
@@ -192,11 +194,11 @@ func TestSummonAbnormalEffectRefreshesOwnerPetInfoThenBystanderSummonInfo(t *tes
 	if !ok || snapshot.AbnormalEffect != 0x010000 {
 		t.Fatalf("PetInfo abnormal effect = %#x, %v; want %#x, true", snapshot.AbnormalEffect, ok, 0x010000)
 	}
-	if len(ownerFrames.frames) != 1 || ownerFrames.frames[0][0] != serverpackets.OpcodePetInfo {
-		t.Fatalf("owner refresh frames = %x, want one PetInfo (%#x)", ownerFrames.frames, serverpackets.OpcodePetInfo)
+	if len(ownerFrames.Frames()) != 1 || ownerFrames.Frames()[0][0] != serverpackets.OpcodePetInfo {
+		t.Fatalf("owner refresh frames = %x, want one PetInfo (%#x)", ownerFrames.Frames(), serverpackets.OpcodePetInfo)
 	}
-	if len(bystanderFrames.frames) != 1 || bystanderFrames.frames[0][0] != serverpackets.OpcodeNPCInfo {
-		t.Fatalf("bystander refresh frames = %x, want one SummonInfo (%#x)", bystanderFrames.frames, serverpackets.OpcodeNPCInfo)
+	if len(bystanderFrames.Frames()) != 1 || bystanderFrames.Frames()[0][0] != serverpackets.OpcodeNPCInfo {
+		t.Fatalf("bystander refresh frames = %x, want one SummonInfo (%#x)", bystanderFrames.Frames(), serverpackets.OpcodeNPCInfo)
 	}
 	snap, ok := summonInfoSnapshot(pet, bystander.npcs)
 	if !ok || snap.AbnormalEffect != 0x010000 {
@@ -206,8 +208,8 @@ func TestSummonAbnormalEffectRefreshesOwnerPetInfoThenBystanderSummonInfo(t *tes
 
 func TestLivePlayerVisibilitySendsOwnerPetInfoAndBystanderSummonInfo(t *testing.T) {
 	state := world.New()
-	ownerFrames := &frameCapture{}
-	bystanderFrames := &frameCapture{}
+	ownerFrames := &testsupport.FrameCapture{}
+	bystanderFrames := &testsupport.FrameCapture{}
 	owner := newTestLivePlayer(t, 1, ownerFrames)
 	bystander := newTestLivePlayer(t, 2, bystanderFrames)
 	owner.npcs = npc.NewTable([]*npc.Template{{
@@ -231,29 +233,29 @@ func TestLivePlayerVisibilitySendsOwnerPetInfoAndBystanderSummonInfo(t *testing.
 	})
 	summon.SpawnBesideOwner(state, pet, owner, location.Location{X: 10})
 
-	if n := len(ownerFrames.frames); n < 2 || ownerFrames.frames[n-2][0] != serverpackets.OpcodePetInfo || ownerFrames.frames[n-1][0] != serverpackets.OpcodePetItemList {
-		t.Fatalf("owner last frames = %x, want PetInfo then PetItemList", ownerFrames.frames)
+	if n := len(ownerFrames.Frames()); n < 2 || ownerFrames.Frames()[n-2][0] != serverpackets.OpcodePetInfo || ownerFrames.Frames()[n-1][0] != serverpackets.OpcodePetItemList {
+		t.Fatalf("owner last frames = %x, want PetInfo then PetItemList", ownerFrames.Frames())
 	}
 	if updates := petInventory.DrainUpdates(); len(updates) != 0 {
 		t.Fatalf("pet inventory updates after full snapshot = %v, want cleared", updates)
 	}
-	if n := len(bystanderFrames.frames); n == 0 || bystanderFrames.frames[n-1][0] != serverpackets.OpcodeNPCInfo {
-		t.Fatalf("bystander last frame = %x, want SummonInfo (%#x)", bystanderFrames.frames, serverpackets.OpcodeNPCInfo)
+	if n := len(bystanderFrames.Frames()); n == 0 || bystanderFrames.Frames()[n-1][0] != serverpackets.OpcodeNPCInfo {
+		t.Fatalf("bystander last frame = %x, want SummonInfo (%#x)", bystanderFrames.Frames(), serverpackets.OpcodeNPCInfo)
 	}
 
 	state.Despawn(pet)
-	if n := len(ownerFrames.frames); n == 0 || ownerFrames.frames[n-1][0] != serverpackets.OpcodePetDelete {
-		t.Fatalf("owner last frame after pet despawn = %x, want PetDelete (%#x) last", ownerFrames.frames, serverpackets.OpcodePetDelete)
+	if n := len(ownerFrames.Frames()); n == 0 || ownerFrames.Frames()[n-1][0] != serverpackets.OpcodePetDelete {
+		t.Fatalf("owner last frame after pet despawn = %x, want PetDelete (%#x) last", ownerFrames.Frames(), serverpackets.OpcodePetDelete)
 	}
-	if n := len(bystanderFrames.frames); n == 0 || bystanderFrames.frames[n-1][0] != serverpackets.OpcodeDeleteObject {
-		t.Fatalf("bystander last frame after pet despawn = %x, want DeleteObject", bystanderFrames.frames)
+	if n := len(bystanderFrames.Frames()); n == 0 || bystanderFrames.Frames()[n-1][0] != serverpackets.OpcodeDeleteObject {
+		t.Fatalf("bystander last frame after pet despawn = %x, want DeleteObject", bystanderFrames.Frames())
 	}
 }
 
 func TestSummonDamagePublishesPetStatusToOwnerAndSummonInfoToObservers(t *testing.T) {
 	state := world.New()
-	ownerFrames := &frameCapture{}
-	bystanderFrames := &frameCapture{}
+	ownerFrames := &testsupport.FrameCapture{}
+	bystanderFrames := &testsupport.FrameCapture{}
 	owner := newTestLivePlayer(t, 1, ownerFrames)
 	bystander := newTestLivePlayer(t, 2, bystanderFrames)
 	owner.npcs = npc.NewTable([]*npc.Template{{
@@ -271,8 +273,8 @@ func TestSummonDamagePublishesPetStatusToOwnerAndSummonInfoToObservers(t *testin
 	gcl := &GameClientLink{world: state}
 	gcl.wireSummonAI(pet)
 	summon.SpawnBesideOwner(state, pet, owner, location.Location{X: 10})
-	ownerFrames.frames = nil
-	bystanderFrames.frames = nil
+	testsupport.ResetCapture(ownerFrames)
+	testsupport.ResetCapture(bystanderFrames)
 
 	for _, damage := range []struct {
 		name  string
@@ -282,14 +284,14 @@ func TestSummonDamagePublishesPetStatusToOwnerAndSummonInfoToObservers(t *testin
 		{"dot", func() { pet.ReduceHPByDOT(10, nil, true) }},
 	} {
 		t.Run(damage.name, func(t *testing.T) {
-			ownerFrames.frames = nil
-			bystanderFrames.frames = nil
+			testsupport.ResetCapture(ownerFrames)
+			testsupport.ResetCapture(bystanderFrames)
 			damage.apply()
 
-			if got := frameOpcodes(ownerFrames.frames); string(got) != string([]byte{serverpackets.OpcodePetStatusUpdate}) {
+			if got := testsupport.FrameOpcodes(ownerFrames.Frames()); string(got) != string([]byte{serverpackets.OpcodePetStatusUpdate}) {
 				t.Fatalf("owner opcodes = %x, want PetStatusUpdate", got)
 			}
-			if got := frameOpcodes(bystanderFrames.frames); string(got) != string([]byte{serverpackets.OpcodeNPCInfo}) {
+			if got := testsupport.FrameOpcodes(bystanderFrames.Frames()); string(got) != string([]byte{serverpackets.OpcodeNPCInfo}) {
 				t.Fatalf("bystander opcodes = %x, want SummonInfo", got)
 			}
 		})
@@ -311,9 +313,9 @@ func TestSummonDamageSendsOwnerSystemMessageForPetAndServitor(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			state := world.New()
-			ownerFrames := &frameCapture{}
+			ownerFrames := &testsupport.FrameCapture{}
 			owner := newTestLivePlayer(t, 1, ownerFrames)
-			attacker := newTestLivePlayer(t, 2, &frameCapture{})
+			attacker := newTestLivePlayer(t, 2, &testsupport.FrameCapture{})
 			owner.npcs = npc.NewTable([]*npc.Template{{ID: 12077, TemplateID: 12077, Name: "Wolf", AtkSpd: 300, RunSpeed: 120, WalkSpeed: 60, CollisionRadius: 8, CollisionHeight: 20}})
 			state.AddPlayer(owner)
 			state.AddPlayer(attacker)
@@ -322,14 +324,14 @@ func TestSummonDamageSendsOwnerSystemMessageForPetAndServitor(t *testing.T) {
 			actor := tc.new(owner)
 			link := &GameClientLink{world: state}
 			link.wireSummonAI(actor)
-			ownerFrames.frames = nil
+			testsupport.ResetCapture(ownerFrames)
 
 			actor.ReduceHP(12.9, summonDamageAttacker{name: "Attacker"}, modelskill.Definition{})
 
-			if len(ownerFrames.frames) != 2 {
-				t.Fatalf("owner frames = %d, want status update and damage message", len(ownerFrames.frames))
+			if len(ownerFrames.Frames()) != 2 {
+				t.Fatalf("owner frames = %d, want status update and damage message", len(ownerFrames.Frames()))
 			}
-			assertSystemMessageStringNumberFrame(t, ownerFrames.frames[1], tc.message, "Attacker", 12)
+			assertSystemMessageStringNumberFrame(t, ownerFrames.Frames()[1], tc.message, "Attacker", 12)
 		})
 	}
 }
@@ -365,9 +367,9 @@ func assertSystemMessageStringNumberFrame(t *testing.T, frame []byte, messageID 
 
 func TestSummonStatusObserverFramesAreIndependent(t *testing.T) {
 	state := world.New()
-	owner := newTestLivePlayer(t, 1, &frameCapture{})
-	first := newTestLivePlayer(t, 2, &frameCapture{})
-	second := newTestLivePlayer(t, 3, &frameCapture{})
+	owner := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
+	first := newTestLivePlayer(t, 2, &testsupport.FrameCapture{})
+	second := newTestLivePlayer(t, 3, &testsupport.FrameCapture{})
 	owner.npcs = npc.NewTable([]*npc.Template{{ID: 12077, TemplateID: 12077, AtkSpd: 300}})
 	state.Spawn(owner, 0, 0, 0, 0)
 	state.Spawn(first, 100, 0, 0, 0)
@@ -397,7 +399,7 @@ func TestSummonStatusObserverFramesAreIndependent(t *testing.T) {
 }
 
 func TestPetInfoSnapshotPetUsesPerLevelShotCounts(t *testing.T) {
-	owner := newTestLivePlayer(t, 1, &frameCapture{})
+	owner := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
 	npcs := npc.NewTable([]*npc.Template{{
 		ID: 12077, TemplateID: 12077, Name: "Wolf",
 		AtkSpd: 300, RunSpeed: 120, WalkSpeed: 60,
@@ -419,7 +421,7 @@ func TestPetInfoSnapshotPetUsesPerLevelShotCounts(t *testing.T) {
 }
 
 func TestPetInfoSnapshotServitorUsesTemplateShotCountsAndLifetimeFed(t *testing.T) {
-	owner := newTestLivePlayer(t, 1, &frameCapture{})
+	owner := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
 	npcs := npc.NewTable([]*npc.Template{{
 		ID: 14, TemplateID: 14, Name: "Servitor",
 		AtkSpd: 300, RunSpeed: 120, WalkSpeed: 60,
@@ -446,7 +448,7 @@ func TestPetInfoSnapshotServitorUsesTemplateShotCountsAndLifetimeFed(t *testing.
 
 func TestLivePlayerForgetSkipsObjectsItWouldNotDiscover(t *testing.T) {
 	state := world.New()
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	player := newTestLivePlayer(t, 1, frames)
 	obj := &invisibleTracked{id: 2}
 
@@ -454,19 +456,19 @@ func TestLivePlayerForgetSkipsObjectsItWouldNotDiscover(t *testing.T) {
 	state.Spawn(obj, 100, 0, 0, 0)
 	state.Despawn(obj)
 
-	if len(frames.frames) != 0 {
-		t.Fatalf("frames for non-live tracked object = %x, want none", frames.frames)
+	if len(frames.Frames()) != 0 {
+		t.Fatalf("frames for non-live tracked object = %x, want none", frames.Frames())
 	}
 }
 
 func TestLivePlayerForgetDoesNotBlockOnFullVisibilityQueue(t *testing.T) {
-	cipher, err := NewCipher(bytes.Repeat([]byte{0x11}, keySize))
+	cipher, err := gamecipher.NewCipher(bytes.Repeat([]byte{0x11}, gamecipher.KeySize))
 	if err != nil {
 		t.Fatalf("NewCipher: %v", err)
 	}
 	conn := fullQueueConn(t)
 
-	player := newTestLivePlayer(t, 1, &frameCapture{})
+	player := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
 	player.visibilitySend = NewSession(conn, cipher).trySendFrame
 	done := make(chan struct{})
 	go func() {
@@ -481,14 +483,14 @@ func TestLivePlayerForgetDoesNotBlockOnFullVisibilityQueue(t *testing.T) {
 }
 
 func TestLivePlayerDiscoverDroppedItemDoesNotBlockOnFullVisibilityQueue(t *testing.T) {
-	cipher, err := NewCipher(bytes.Repeat([]byte{0x11}, keySize))
+	cipher, err := gamecipher.NewCipher(bytes.Repeat([]byte{0x11}, gamecipher.KeySize))
 	if err != nil {
 		t.Fatalf("NewCipher: %v", err)
 	}
 	conn := fullQueueConn(t)
 	s := NewSession(conn, cipher)
 
-	player := newTestLivePlayer(t, 1, &frameCapture{})
+	player := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
 	player.Character.SetFrameSender(s.SendFrame)
 	player.visibilitySend = s.trySendFrame
 	item := &visibleGroundItem{id: 2, itemID: 57, count: 1, dropperID: 1}

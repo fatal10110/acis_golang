@@ -8,6 +8,7 @@ import (
 
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 // zeroInterruptDef is a skill whose interrupt window is already closed the
@@ -24,7 +25,7 @@ var zeroInterruptDef = modelskill.Definition{
 // AiEventType.CANCEL -> getCast().stop() (unconditional stop, no
 // CASTING_INTERRUPTED) and leaves the target untouched.
 func TestRequestTargetCancelAbortsCastInsideInterruptWindow(t *testing.T) {
-	live := newTestLivePlayer(t, 1, &frameCapture{})
+	live := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
 	gcl := &GameClientLink{log: zerolog.Nop()}
 	controller := gcl.castController(live)
 	if _, err := controller.Start(time.Now(), live, castingDef); err != nil {
@@ -47,7 +48,7 @@ func TestRequestTargetCancelAbortsCastInsideInterruptWindow(t *testing.T) {
 // window has closed, Esc never fires AiEventType.CANCEL at all — the cast
 // lands undisturbed.
 func TestRequestTargetCancelIsNoOpOutsideInterruptWindow(t *testing.T) {
-	live := newTestLivePlayer(t, 1, &frameCapture{})
+	live := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
 	gcl := &GameClientLink{log: zerolog.Nop()}
 	controller := gcl.castController(live)
 	if _, err := controller.Start(time.Now(), live, zeroInterruptDef); err != nil {
@@ -65,7 +66,7 @@ func TestRequestTargetCancelIsNoOpOutsideInterruptWindow(t *testing.T) {
 // RequestTargetCancel.java:28-29: with Unselect == 0 and no active cast,
 // Esc clears the target exactly like today's clearLiveTarget path.
 func TestRequestTargetCancelClearsTargetWhenNotCasting(t *testing.T) {
-	live := newTestLivePlayer(t, 1, &frameCapture{})
+	live := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
 	gcl := &GameClientLink{log: zerolog.Nop()}
 	live.SetTargetTracked(live)
 
@@ -80,7 +81,7 @@ func TestRequestTargetCancelClearsTargetWhenNotCasting(t *testing.T) {
 // RequestTargetCancel.java:31-32: Unselect != 0 always clears the target,
 // regardless of an in-flight cast, and never touches the cast itself.
 func TestRequestTargetCancelUnselectAlwaysClearsTargetDuringCast(t *testing.T) {
-	live := newTestLivePlayer(t, 1, &frameCapture{})
+	live := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
 	gcl := &GameClientLink{log: zerolog.Nop()}
 	controller := gcl.castController(live)
 	if _, err := controller.Start(time.Now(), live, castingDef); err != nil {

@@ -16,6 +16,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 type recordingSkillHandler struct {
@@ -28,8 +29,8 @@ func (h recordingSkillHandler) Use(cast handlerskill.Cast) {
 }
 
 func TestGameClientLinkSendsCounterattackFeedbackToPlayerParticipants(t *testing.T) {
-	attackerFrames := &frameCapture{}
-	defenderFrames := &frameCapture{}
+	attackerFrames := &testsupport.FrameCapture{}
+	defenderFrames := &testsupport.FrameCapture{}
 	attacker := newTestLivePlayer(t, 1, attackerFrames)
 	attacker.Name = "Attacker"
 	defender := newTestLivePlayer(t, 2, defenderFrames)
@@ -46,20 +47,20 @@ func TestGameClientLinkSendsCounterattackFeedbackToPlayerParticipants(t *testing
 		AttackFailed: 1,
 	})
 
-	if len(attackerFrames.frames) != 2 {
-		t.Fatalf("attacker frames = %d, want 2", len(attackerFrames.frames))
+	if len(attackerFrames.Frames()) != 2 {
+		t.Fatalf("attacker frames = %d, want 2", len(attackerFrames.Frames()))
 	}
-	assertSystemMessageStringFrame(t, attackerFrames.frames[0], serverpackets.SystemMessageS1PerformingCounterattack, defender.Name)
-	assertStaticSystemMessageFrame(t, attackerFrames.frames[1], serverpackets.SystemMessageAttackFailed)
-	if len(defenderFrames.frames) != 1 {
-		t.Fatalf("defender frames = %d, want 1", len(defenderFrames.frames))
+	assertSystemMessageStringFrame(t, attackerFrames.Frames()[0], serverpackets.SystemMessageS1PerformingCounterattack, defender.Name)
+	assertStaticSystemMessageFrame(t, attackerFrames.Frames()[1], serverpackets.SystemMessageAttackFailed)
+	if len(defenderFrames.Frames()) != 1 {
+		t.Fatalf("defender frames = %d, want 1", len(defenderFrames.Frames()))
 	}
-	assertSystemMessageStringFrame(t, defenderFrames.frames[0], serverpackets.SystemMessageCounteredS1Attack, attacker.Name)
+	assertSystemMessageStringFrame(t, defenderFrames.Frames()[0], serverpackets.SystemMessageCounteredS1Attack, attacker.Name)
 }
 
 func TestGameClientLinkSendsLethalFeedbackToPlayerParticipants(t *testing.T) {
-	attackerFrames := &frameCapture{}
-	targetFrames := &frameCapture{}
+	attackerFrames := &testsupport.FrameCapture{}
+	targetFrames := &testsupport.FrameCapture{}
 	attacker := newTestLivePlayer(t, 1, attackerFrames)
 	target := newTestLivePlayer(t, 2, targetFrames)
 	state := world.New()
@@ -71,18 +72,18 @@ func TestGameClientLinkSendsLethalFeedbackToPlayerParticipants(t *testing.T) {
 		AttackerID: attacker.ObjectID(), TargetID: target.ObjectID(),
 	}}})
 
-	if len(attackerFrames.frames) != 1 {
-		t.Fatalf("attacker frames = %d, want 1", len(attackerFrames.frames))
+	if len(attackerFrames.Frames()) != 1 {
+		t.Fatalf("attacker frames = %d, want 1", len(attackerFrames.Frames()))
 	}
-	assertStaticSystemMessageFrame(t, attackerFrames.frames[0], 1668)
-	if len(targetFrames.frames) != 1 {
-		t.Fatalf("target frames = %d, want 1", len(targetFrames.frames))
+	assertStaticSystemMessageFrame(t, attackerFrames.Frames()[0], 1668)
+	if len(targetFrames.Frames()) != 1 {
+		t.Fatalf("target frames = %d, want 1", len(targetFrames.Frames()))
 	}
-	assertStaticSystemMessageFrame(t, targetFrames.frames[0], 1667)
+	assertStaticSystemMessageFrame(t, targetFrames.Frames()[0], 1667)
 }
 
 func TestGameClientLinkSendsResistedSkillFeedbackToCaster(t *testing.T) {
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	caster := newTestLivePlayer(t, 1, frames)
 	link := &GameClientLink{}
 
@@ -90,10 +91,10 @@ func TestGameClientLinkSendsResistedSkillFeedbackToCaster(t *testing.T) {
 		TargetName: "Target", SkillID: 123, SkillLevel: 1,
 	}}})
 
-	if len(frames.frames) != 1 {
-		t.Fatalf("caster frames = %d, want 1", len(frames.frames))
+	if len(frames.Frames()) != 1 {
+		t.Fatalf("caster frames = %d, want 1", len(frames.Frames()))
 	}
-	frame := frames.frames[0]
+	frame := frames.Frames()[0]
 	if frame[0] != serverpackets.OpcodeSystemMessage {
 		t.Fatalf("opcode = %#x, want SystemMessage", frame[0])
 	}
@@ -113,8 +114,8 @@ func TestGameClientLinkSendsResistedSkillFeedbackToCaster(t *testing.T) {
 }
 
 func TestGameClientLinkSendsBlowEvasionFeedbackToPlayerParticipants(t *testing.T) {
-	attackerFrames := &frameCapture{}
-	defenderFrames := &frameCapture{}
+	attackerFrames := &testsupport.FrameCapture{}
+	defenderFrames := &testsupport.FrameCapture{}
 	attacker := newTestLivePlayer(t, 1, attackerFrames)
 	attacker.Name = "Attacker"
 	defender := newTestLivePlayer(t, 2, defenderFrames)
@@ -128,15 +129,15 @@ func TestGameClientLinkSendsBlowEvasionFeedbackToPlayerParticipants(t *testing.T
 		AttackerID: attacker.ObjectID(), DefenderID: defender.ObjectID(),
 	}}})
 
-	if len(attackerFrames.frames) != 1 || len(defenderFrames.frames) != 1 {
-		t.Fatalf("evasion frames = attacker %d defender %d, want 1 each", len(attackerFrames.frames), len(defenderFrames.frames))
+	if len(attackerFrames.Frames()) != 1 || len(defenderFrames.Frames()) != 1 {
+		t.Fatalf("evasion frames = attacker %d defender %d, want 1 each", len(attackerFrames.Frames()), len(defenderFrames.Frames()))
 	}
-	assertSystemMessageStringFrame(t, attackerFrames.frames[0], serverpackets.SystemMessageS1DodgesAttack, "Defender")
-	assertSystemMessageStringFrame(t, defenderFrames.frames[0], serverpackets.SystemMessageAvoidedS1Attack, "Attacker")
+	assertSystemMessageStringFrame(t, attackerFrames.Frames()[0], serverpackets.SystemMessageS1DodgesAttack, "Defender")
+	assertSystemMessageStringFrame(t, defenderFrames.Frames()[0], serverpackets.SystemMessageAvoidedS1Attack, "Attacker")
 }
 
 func TestGameClientLinkSendsCounterattackFeedbackWithNonPlayerName(t *testing.T) {
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	attacker := newTestLivePlayer(t, 1, frames)
 	attacker.Name = "Attacker"
 	state := world.New()
@@ -147,14 +148,14 @@ func TestGameClientLinkSendsCounterattackFeedbackWithNonPlayerName(t *testing.T)
 		AttackerID: attacker.ObjectID(), DefenderID: 2, DefenderName: "Countering NPC",
 	}}})
 
-	if len(frames.frames) != 1 {
-		t.Fatalf("attacker frames = %d, want 1", len(frames.frames))
+	if len(frames.Frames()) != 1 {
+		t.Fatalf("attacker frames = %d, want 1", len(frames.Frames()))
 	}
-	assertSystemMessageStringFrame(t, frames.frames[0], serverpackets.SystemMessageS1PerformingCounterattack, "Countering NPC")
+	assertSystemMessageStringFrame(t, frames.Frames()[0], serverpackets.SystemMessageS1PerformingCounterattack, "Countering NPC")
 }
 
 func TestGameClientLinkMagicSkillUseRejectsMissingSkillItemsWithSkillName(t *testing.T) {
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 7, capture)
 	live.Character.SetSkillLevel(3, 1)
 	link := &GameClientLink{skills: skillstate.NewPersistence(nil, modelskill.NewTable([]modelskill.Definition{{
@@ -164,14 +165,14 @@ func TestGameClientLinkMagicSkillUseRejectsMissingSkillItemsWithSkillName(t *tes
 
 	link.handleMagicSkillUse(live, clientpackets.RequestMagicSkillUse{SkillID: 3})
 
-	if got, want := frameOpcodes(capture.frames), []byte{serverpackets.OpcodeSystemMessage, serverpackets.OpcodeActionFailed}; !bytes.Equal(got, want) {
+	if got, want := testsupport.FrameOpcodes(capture.Frames()), []byte{serverpackets.OpcodeSystemMessage, serverpackets.OpcodeActionFailed}; !bytes.Equal(got, want) {
 		t.Fatalf("missing-item cast opcodes = %#x, want SystemMessage then ActionFailed (%#x)", got, want)
 	}
-	assertSystemMessageSkillFrame(t, capture.frames[0], serverpackets.SystemMessageS1CannotBeUsed, 3, 1)
+	assertSystemMessageSkillFrame(t, capture.Frames()[0], serverpackets.SystemMessageS1CannotBeUsed, 3, 1)
 }
 
 func TestGameClientLinkMagicSkillUseMissingOneTargetSendsActionFailedOnly(t *testing.T) {
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 7, capture)
 	live.Character.SetSkillLevel(3, 1)
 	link := &GameClientLink{skills: skillstate.NewPersistence(nil, modelskill.NewTable([]modelskill.Definition{{
@@ -180,7 +181,7 @@ func TestGameClientLinkMagicSkillUseMissingOneTargetSendsActionFailedOnly(t *tes
 
 	link.handleMagicSkillUse(live, clientpackets.RequestMagicSkillUse{SkillID: 3})
 
-	if got, want := frameOpcodes(capture.frames), []byte{serverpackets.OpcodeActionFailed}; !bytes.Equal(got, want) {
+	if got, want := testsupport.FrameOpcodes(capture.Frames()), []byte{serverpackets.OpcodeActionFailed}; !bytes.Equal(got, want) {
 		t.Fatalf("missing-target cast opcodes = %#x, want ActionFailed only (%#x)", got, want)
 	}
 }
@@ -225,7 +226,7 @@ func TestGameClientLinkMagicSkillUseGroundCastFailuresSendReason(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			capture := &frameCapture{}
+			capture := &testsupport.FrameCapture{}
 			live := newTestLivePlayer(t, 7, capture)
 			live.Character.SetSkillLevel(3, 1)
 			live.Character.SetGroundTarget(800, 100, 0)
@@ -239,16 +240,16 @@ func TestGameClientLinkMagicSkillUseGroundCastFailuresSendReason(t *testing.T) {
 
 			link.handleMagicSkillUse(live, clientpackets.RequestMagicSkillUse{SkillID: 3})
 
-			if got, want := frameOpcodes(capture.frames), []byte{serverpackets.OpcodeSystemMessage, serverpackets.OpcodeActionFailed}; !bytes.Equal(got, want) {
+			if got, want := testsupport.FrameOpcodes(capture.Frames()), []byte{serverpackets.OpcodeSystemMessage, serverpackets.OpcodeActionFailed}; !bytes.Equal(got, want) {
 				t.Fatalf("ground cast rejection opcodes = %#x, want SystemMessage then ActionFailed (%#x)", got, want)
 			}
-			tt.assert(t, capture.frames[0])
+			tt.assert(t, capture.Frames()[0])
 		})
 	}
 }
 
 func TestGameClientLinkMagicSkillUseGroundCastFacesPointAndBroadcastsPosition(t *testing.T) {
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 7, capture)
 	state := world.New()
 	live.SetWorld(state)
@@ -265,8 +266,8 @@ func TestGameClientLinkMagicSkillUseGroundCastFacesPointAndBroadcastsPosition(t 
 
 	link.handleMagicSkillUse(live, clientpackets.RequestMagicSkillUse{SkillID: 3})
 
-	frames := capture.snapshot()
-	if got, want := frameOpcodes(frames)[:2], []byte{serverpackets.OpcodeValidateLocation, serverpackets.OpcodeMagicSkillUse}; !bytes.Equal(got, want) {
+	frames := capture.Frames()
+	if got, want := testsupport.FrameOpcodes(frames)[:2], []byte{serverpackets.OpcodeValidateLocation, serverpackets.OpcodeMagicSkillUse}; !bytes.Equal(got, want) {
 		t.Fatalf("ground cast opening opcodes = %#x, want ValidateLocation then MagicSkillUse (%#x)", got, want)
 	}
 	if got := live.CurrentHeading(); got != 16384 {
@@ -277,7 +278,7 @@ func TestGameClientLinkMagicSkillUseGroundCastFacesPointAndBroadcastsPosition(t 
 
 func TestGameClientLinkMagicSkillUseAppliesAreaSkillToResolvedTargets(t *testing.T) {
 	state := world.New()
-	casterCapture := &frameCapture{}
+	casterCapture := &testsupport.FrameCapture{}
 	caster := newTestLivePlayer(t, 7, casterCapture)
 	aimed := newTestHostileNPC(t, 8)
 	nearby := newTestHostileNPC(t, 9)
@@ -310,10 +311,10 @@ func TestGameClientLinkMagicSkillUseAppliesAreaSkillToResolvedTargets(t *testing
 			t.Fatalf("area effect targets = %v, want %d and %d", got, aimed.ObjectID(), nearby.ObjectID())
 		}
 	case <-time.After(time.Second):
-		t.Fatalf("area cast did not reach its skill handler; frames = %#x", frameOpcodes(casterCapture.frames))
+		t.Fatalf("area cast did not reach its skill handler; frames = %#x", testsupport.FrameOpcodes(casterCapture.Frames()))
 	}
 
-	for _, frame := range casterCapture.snapshot() {
+	for _, frame := range casterCapture.Frames() {
 		if frame[0] != serverpackets.OpcodeMagicSkillLaunched {
 			continue
 		}
@@ -335,9 +336,9 @@ func TestGameClientLinkMagicSkillUseAppliesAreaSkillToResolvedTargets(t *testing
 
 func TestGameClientLinkMagicSkillUseMassCubicRefreshesEachRecipient(t *testing.T) {
 	state := world.New()
-	casterFrames := &frameCapture{}
-	firstFrames := &frameCapture{}
-	secondFrames := &frameCapture{}
+	casterFrames := &testsupport.FrameCapture{}
+	firstFrames := &testsupport.FrameCapture{}
+	secondFrames := &testsupport.FrameCapture{}
 	caster := newTestLivePlayer(t, 7, casterFrames)
 	first := newTestLivePlayer(t, 8, firstFrames)
 	second := newTestLivePlayer(t, 9, secondFrames)
@@ -351,9 +352,9 @@ func TestGameClientLinkMagicSkillUseMassCubicRefreshesEachRecipient(t *testing.T
 	caster.SetTargetTracked(first)
 	first.KarmaPoints = 1
 	second.KarmaPoints = 1
-	casterFrames.frames = nil
-	firstFrames.frames = nil
-	secondFrames.frames = nil
+	testsupport.ResetCapture(casterFrames)
+	testsupport.ResetCapture(firstFrames)
+	testsupport.ResetCapture(secondFrames)
 
 	clock := &fakeCubicClock{}
 	link := newCubicTestLink(t, clock, &attackStanceRecorder{}, modelskill.Definition{
@@ -369,9 +370,9 @@ func TestGameClientLinkMagicSkillUseMassCubicRefreshesEachRecipient(t *testing.T
 	var firstSent, secondSent, casterSent [][]byte
 	deadline := time.Now().Add(time.Second)
 	for time.Now().Before(deadline) {
-		firstSent = firstFrames.snapshot()
-		secondSent = secondFrames.snapshot()
-		casterSent = casterFrames.snapshot()
+		firstSent = firstFrames.Frames()
+		secondSent = secondFrames.Frames()
+		casterSent = casterFrames.Frames()
 		if len(framesWithOpcode(firstSent, serverpackets.OpcodeUserInfo)) == 1 &&
 			len(framesWithOpcode(secondSent, serverpackets.OpcodeUserInfo)) == 1 &&
 			len(framesWithOpcode(casterSent, serverpackets.OpcodeCharInfo)) == 2 {
@@ -398,7 +399,7 @@ func TestGameClientLinkMagicSkillUseMassCubicRefreshesEachRecipient(t *testing.T
 }
 
 func TestGameClientLinkMagicSkillUseDefersUntilAttackFinishes(t *testing.T) {
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 7, capture)
 	live.Character.SetSkillLevel(3, 1)
 	link := &GameClientLink{skills: skillstate.NewPersistence(nil, modelskill.NewTable([]modelskill.Definition{{
@@ -409,23 +410,23 @@ func TestGameClientLinkMagicSkillUseDefersUntilAttackFinishes(t *testing.T) {
 	if err := live.attack.DoAttack(newTestHostileNPC(t, 100)); err != nil {
 		t.Fatalf("start attack: %v", err)
 	}
-	capture.frames = nil
+	testsupport.ResetCapture(capture)
 
 	link.handleMagicSkillUse(live, clientpackets.RequestMagicSkillUse{SkillID: 3})
 	if link.castController(live).CastingNow() {
 		t.Fatal("cast started before the active attack finished")
 	}
-	if got, want := frameOpcodes(capture.frames), []byte{serverpackets.OpcodeActionFailed}; !bytes.Equal(got, want) {
+	if got, want := testsupport.FrameOpcodes(capture.Frames()), []byte{serverpackets.OpcodeActionFailed}; !bytes.Equal(got, want) {
 		t.Fatalf("deferred cast opcodes = %#x, want ActionFailed (%#x)", got, want)
 	}
 
 	live.attack.Stop()
-	capture.frames = nil
+	testsupport.ResetCapture(capture)
 	link.finishDeferredMagicSkill(live)
 	if !link.castController(live).CastingNow() {
 		t.Fatal("deferred cast did not start after the attack finished")
 	}
-	if got, want := frameOpcodes(capture.frames), []byte{serverpackets.OpcodeMagicSkillUse, serverpackets.OpcodeSystemMessage, serverpackets.OpcodeSetupGauge}; !bytes.Equal(got, want) {
+	if got, want := testsupport.FrameOpcodes(capture.Frames()), []byte{serverpackets.OpcodeMagicSkillUse, serverpackets.OpcodeSystemMessage, serverpackets.OpcodeSetupGauge}; !bytes.Equal(got, want) {
 		t.Fatalf("drained cast opcodes = %#x, want MagicSkillUse, SystemMessage, SetupGauge (%#x)", got, want)
 	}
 }
@@ -435,7 +436,7 @@ func TestGameClientLinkMagicSkillUseDefersUntilAttackFinishes(t *testing.T) {
 // mute, death, ...) are wired separately, so this drives the funnel
 // directly.
 func TestAbortedCastSendsCancelAndActionFailed(t *testing.T) {
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	link := &GameClientLink{}
 	live := newEquipTestLivePlayer(t, 7, capture, item.NewTable(nil), nil)
 	controller := link.castController(live)
@@ -447,14 +448,14 @@ func TestAbortedCastSendsCancelAndActionFailed(t *testing.T) {
 	if _, err := controller.Start(time.Now(), live, def); err != nil {
 		t.Fatalf("Start() error: %v", err)
 	}
-	capture.frames = nil
+	testsupport.ResetCapture(capture)
 
 	controller.Stop()
 
-	if got, want := frameOpcodes(capture.frames), []byte{serverpackets.OpcodeMagicSkillCanceled, serverpackets.OpcodeActionFailed}; !bytes.Equal(got, want) {
+	if got, want := testsupport.FrameOpcodes(capture.Frames()), []byte{serverpackets.OpcodeMagicSkillCanceled, serverpackets.OpcodeActionFailed}; !bytes.Equal(got, want) {
 		t.Fatalf("abort opcodes = %#x, want MagicSkillCanceled then ActionFailed (%#x)", got, want)
 	}
-	if caster := wire.NewReader(capture.frames[0][1:]).ReadInt32(); caster != live.ObjectID() {
+	if caster := wire.NewReader(capture.Frames()[0][1:]).ReadInt32(); caster != live.ObjectID() {
 		t.Fatalf("MagicSkillCanceled caster = %d, want %d", caster, live.ObjectID())
 	}
 
@@ -462,9 +463,9 @@ func TestAbortedCastSendsCancelAndActionFailed(t *testing.T) {
 	// calls clientActionFailed() unconditionally, after (and regardless of)
 	// super.stop()'s isCastingNow()-gated cancel broadcast
 	// (PlayerCast.java:381-387, PlayerAI.java:556-560).
-	capture.frames = nil
+	testsupport.ResetCapture(capture)
 	controller.Stop()
-	if got, want := frameOpcodes(capture.frames), []byte{serverpackets.OpcodeActionFailed}; !bytes.Equal(got, want) {
+	if got, want := testsupport.FrameOpcodes(capture.Frames()), []byte{serverpackets.OpcodeActionFailed}; !bytes.Equal(got, want) {
 		t.Fatalf("idle Stop opcodes = %#x, want ActionFailed only (%#x)", got, want)
 	}
 }
@@ -475,7 +476,7 @@ func TestAbortedCastSendsCancelAndActionFailed(t *testing.T) {
 // CreatureCast.interrupt() vs the unconditional stop() TestAbortedCastSends
 // CancelAndActionFailed covers.
 func TestInterruptedCastSendsCancelCastingInterruptedAndActionFailed(t *testing.T) {
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	link := &GameClientLink{}
 	live := newEquipTestLivePlayer(t, 7, capture, item.NewTable(nil), nil)
 	controller := link.castController(live)
@@ -488,14 +489,14 @@ func TestInterruptedCastSendsCancelCastingInterruptedAndActionFailed(t *testing.
 	if _, err := controller.Start(now, live, def); err != nil {
 		t.Fatalf("Start() error: %v", err)
 	}
-	capture.frames = nil
+	testsupport.ResetCapture(capture)
 
 	if !controller.Interrupt(now.Add(100 * time.Millisecond)) {
 		t.Fatal("Interrupt() = false inside the interrupt window, want true")
 	}
 
 	want := []byte{serverpackets.OpcodeMagicSkillCanceled, serverpackets.OpcodeSystemMessage, serverpackets.OpcodeActionFailed}
-	if got := frameOpcodes(capture.frames); !bytes.Equal(got, want) {
+	if got := testsupport.FrameOpcodes(capture.Frames()); !bytes.Equal(got, want) {
 		t.Fatalf("interrupt opcodes = %#x, want MagicSkillCanceled, SystemMessage, ActionFailed (%#x)", got, want)
 	}
 }

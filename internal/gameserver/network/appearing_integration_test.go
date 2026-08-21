@@ -15,10 +15,10 @@ func TestGameClientLinkAppearingSendsUserInfo(t *testing.T) {
 		seedSelectableSQLCharacter(t, chars, "player1", "Newbie", 1, 0)
 	}, 1)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 	obj, ok := state.Player(sqlSoleObjectID(t, chars))
 	if !ok {
@@ -30,9 +30,9 @@ func TestGameClientLinkAppearingSendsUserInfo(t *testing.T) {
 	}
 	live.SetTeleporting(true)
 
-	c.send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
+	c.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
 
-	reply := c.read()
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeUserInfo {
 		t.Fatalf("Appearing opcode = %#x, want UserInfo (%#x)", reply[0], serverpackets.OpcodeUserInfo)
 	}

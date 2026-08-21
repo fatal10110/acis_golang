@@ -15,18 +15,18 @@ import (
 func TestGameClientLinkEnterWorldSendsPersistedShortcuts(t *testing.T) {
 	c, chars, shortcuts, _ := newLinkedSQLGameClientWithShortcuts(t)
 
-	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
-	c.read() // CharCreateOk
-	c.read() // CharSelectInfo
+	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.Read() // CharCreateOk
+	c.Read() // CharSelectInfo
 	objID := sqlCharacterID(t, chars)
 	if err := shortcuts.Save(context.Background(), objID, shortcut.Shortcut{Slot: 3, Page: 1, Type: shortcut.Action, ID: 5, Level: -1, CharacterType: 1}); err != nil {
 		t.Fatalf("seed shortcut: %v", err)
 	}
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	frames := readEnterWorldBurst(t, c, false)
 
 	frame := frames[9]
@@ -44,18 +44,18 @@ func TestGameClientLinkEnterWorldSendsPersistedShortcuts(t *testing.T) {
 func TestGameClientLinkRegistersShortcut(t *testing.T) {
 	c, chars, shortcuts, _ := newLinkedSQLGameClientWithShortcuts(t)
 
-	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
-	c.read() // CharCreateOk
-	c.read() // CharSelectInfo
+	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.Read() // CharCreateOk
+	c.Read() // CharSelectInfo
 	objID := sqlCharacterID(t, chars)
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
-	c.send(encodeRequestShortCutReg(int32(serverpackets.ShortcutAction), 15, 5, 1))
-	reply := c.read()
+	c.Send(encodeRequestShortCutReg(int32(serverpackets.ShortcutAction), 15, 5, 1))
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeShortCutRegister {
 		t.Fatalf("opcode = %#x, want ShortCutRegister (%#x)", reply[0], serverpackets.OpcodeShortCutRegister)
 	}
@@ -72,21 +72,21 @@ func TestGameClientLinkRegistersShortcut(t *testing.T) {
 func TestGameClientLinkRegistersSkillShortcutAtKnownLevel(t *testing.T) {
 	c, chars, shortcuts, knownSkills := newLinkedSQLGameClientWithShortcuts(t)
 
-	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
-	c.read() // CharCreateOk
-	c.read() // CharSelectInfo
+	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.Read() // CharCreateOk
+	c.Read() // CharSelectInfo
 	objID := sqlCharacterID(t, chars)
 	if err := knownSkills.SetKnownSkill(context.Background(), objID, 0, 248, 3); err != nil {
 		t.Fatalf("seed known skill: %v", err)
 	}
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
-	c.send(encodeRequestShortCutReg(int32(serverpackets.ShortcutSkill), 15, 248, 1))
-	reply := c.read()
+	c.Send(encodeRequestShortCutReg(int32(serverpackets.ShortcutSkill), 15, 248, 1))
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeShortCutRegister {
 		t.Fatalf("opcode = %#x, want ShortCutRegister (%#x)", reply[0], serverpackets.OpcodeShortCutRegister)
 	}
@@ -107,21 +107,21 @@ func TestGameClientLinkRegistersSkillShortcutAtKnownLevel(t *testing.T) {
 func TestGameClientLinkDeletesShortcut(t *testing.T) {
 	c, chars, shortcuts, _ := newLinkedSQLGameClientWithShortcuts(t)
 
-	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
-	c.read() // CharCreateOk
-	c.read() // CharSelectInfo
+	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.Read() // CharCreateOk
+	c.Read() // CharSelectInfo
 	objID := sqlCharacterID(t, chars)
 	if err := shortcuts.Save(context.Background(), objID, shortcut.Shortcut{Slot: 3, Page: 1, Type: shortcut.Action, ID: 5, Level: -1, CharacterType: 1}); err != nil {
 		t.Fatalf("seed shortcut: %v", err)
 	}
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
-	c.send(encodeRequestShortCutDel(15))
-	reply := c.read()
+	c.Send(encodeRequestShortCutDel(15))
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeShortCutDelete {
 		t.Fatalf("opcode = %#x, want ShortCutDelete (%#x)", reply[0], serverpackets.OpcodeShortCutDelete)
 	}

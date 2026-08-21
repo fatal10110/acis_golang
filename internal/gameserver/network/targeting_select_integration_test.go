@@ -13,15 +13,15 @@ import (
 func TestGameClientLinkActionAttackAndTargetCancel(t *testing.T) {
 	c, chars, _, _, _, state := newLinkedSQLGameClient(t, nil, nil, 0)
 
-	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
-	c.read() // CharCreateOk
-	c.read() // CharSelectInfo
+	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.Read() // CharCreateOk
+	c.Read() // CharSelectInfo
 	objID := sqlCharacterID(t, chars)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
 	playerObj, ok := state.Player(objID)
@@ -40,25 +40,25 @@ func TestGameClientLinkActionAttackAndTargetCancel(t *testing.T) {
 	// Spawned well within melee range so this exercises the immediate-attack
 	// path; out-of-range approach is covered separately.
 	state.Spawn(target, px+30, py, pz, 0)
-	if reply := c.read(); reply[0] != serverpackets.OpcodeNPCInfo {
+	if reply := c.Read(); reply[0] != serverpackets.OpcodeNPCInfo {
 		t.Fatalf("visible target opcode = %#x, want NPCInfo (%#x)", reply[0], serverpackets.OpcodeNPCInfo)
 	}
 
 	origin := location.Location{X: px, Y: py, Z: pz}
-	c.send(encodeAction(target.ObjectID(), origin, false))
-	reply := c.read()
+	c.Send(encodeAction(target.ObjectID(), origin, false))
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeValidateLocation {
 		t.Fatalf("Action first opcode = %#x, want ValidateLocation (%#x)", reply[0], serverpackets.OpcodeValidateLocation)
 	}
-	reply = c.read()
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeMyTargetSelected {
 		t.Fatalf("Action second opcode = %#x, want MyTargetSelected (%#x)", reply[0], serverpackets.OpcodeMyTargetSelected)
 	}
-	reply = c.read()
+	reply = c.Read()
 	assertTargetHPStatus(t, reply, target.ObjectID(), target.MaxHP(), target.CurrentHP())
 
-	c.send(encodeAttackRequest(target.ObjectID(), origin, false))
-	reply = c.read()
+	c.Send(encodeAttackRequest(target.ObjectID(), origin, false))
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeAutoAttackStart {
 		t.Fatalf("AttackRequest first opcode = %#x, want AutoAttackStart (%#x)", reply[0], serverpackets.OpcodeAutoAttackStart)
 	}
@@ -66,7 +66,7 @@ func TestGameClientLinkActionAttackAndTargetCancel(t *testing.T) {
 	if attackerID := r.ReadInt32(); attackerID != objID {
 		t.Fatalf("AutoAttackStart object id = %d, want %d", attackerID, objID)
 	}
-	reply = c.read()
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeAttack {
 		t.Fatalf("AttackRequest opcode = %#x, want Attack (%#x)", reply[0], serverpackets.OpcodeAttack)
 	}
@@ -75,8 +75,8 @@ func TestGameClientLinkActionAttackAndTargetCancel(t *testing.T) {
 		t.Fatalf("Attack attacker id = %d, want %d", attackerID, objID)
 	}
 
-	c.send(encodeRequestTargetCancel(1))
-	reply = c.read()
+	c.Send(encodeRequestTargetCancel(1))
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeActionFailed {
 		t.Fatalf("RequestTargetCancel opcode = %#x, want ActionFailed (%#x)", reply[0], serverpackets.OpcodeActionFailed)
 	}

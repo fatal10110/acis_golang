@@ -25,6 +25,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/fatal10110/acis_golang/internal/link"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 // newLinkedSQLGameClientFull is the SQL-store counterpart of the fake-store
@@ -33,7 +34,7 @@ import (
 // gamesql stores on a shared MariaDB container, dials a fake game client
 // through VersionCheck and a successful AuthLogin, and returns it positioned
 // right after the initial (empty) CharSelectInfo.
-func newLinkedSQLGameClientFull(t *testing.T, skills *skillstate.Persistence, shortcutSeed func(*gamesql.ShortcutStore), crests *datacache.Crests, spellbooks modelskill.BookPolicy, trees *modelskill.Trees, karmaPlayerCanTeleport bool, seed func(*gamesql.CharacterStore, *gamesql.ItemStore), wantChars int, cursedWeapons ...*entity.CursedWeaponTable) (c *fakeGameClient, chars *gamesql.CharacterStore, items *gamesql.ItemStore, shortcuts *gamesql.ShortcutStore, knownSkills *gamesql.CharacterSkillStore, state *world.State) {
+func newLinkedSQLGameClientFull(t *testing.T, skills *skillstate.Persistence, shortcutSeed func(*gamesql.ShortcutStore), crests *datacache.Crests, spellbooks modelskill.BookPolicy, trees *modelskill.Trees, karmaPlayerCanTeleport bool, seed func(*gamesql.CharacterStore, *gamesql.ItemStore), wantChars int, cursedWeapons ...*entity.CursedWeaponTable) (c *testsupport.ScriptedClient, chars *gamesql.CharacterStore, items *gamesql.ItemStore, shortcuts *gamesql.ShortcutStore, knownSkills *gamesql.CharacterSkillStore, state *world.State) {
 	t.Helper()
 
 	db := sqltest.SharedDB(t)
@@ -135,12 +136,12 @@ func newLinkedSQLGameClientFull(t *testing.T, skills *skillstate.Persistence, sh
 		gcl.Handle(ctx, conn)
 	}, zerolog.Nop())
 
-	c = dialGameClient(t, ln.Addr().String())
-	c.sendProtocolVersion(746)
+	c = testsupport.Dial(t, ln.Addr().String())
+	c.SendProtocolVersion(746)
 	key := link.SessionKey{LoginKey1: 11, LoginKey2: 22, PlayKey1: 33, PlayKey2: 44}
 	sessions.Put("player1", key)
-	c.send(encodeAuthLogin("player1", key))
-	if reply := c.read(); reply[0] != serverpackets.OpcodeCharSelectInfo {
+	c.Send(encodeAuthLogin("player1", key))
+	if reply := c.Read(); reply[0] != serverpackets.OpcodeCharSelectInfo {
 		t.Fatalf("opcode = %#x, want CharSelectInfo (%#x)", reply[0], serverpackets.OpcodeCharSelectInfo)
 	} else if count := wire.NewReader(reply[1:]).ReadInt32(); count != int32(wantChars) {
 		t.Fatalf("initial char count = %d, want %d", count, wantChars)
@@ -148,12 +149,12 @@ func newLinkedSQLGameClientFull(t *testing.T, skills *skillstate.Persistence, sh
 	return c, chars, items, shortcuts, knownSkills, state
 }
 
-func newLinkedSQLGameClient(t *testing.T, skills *skillstate.Persistence, seed func(*gamesql.CharacterStore, *gamesql.ItemStore), wantChars int) (*fakeGameClient, *gamesql.CharacterStore, *gamesql.ItemStore, *gamesql.ShortcutStore, *gamesql.CharacterSkillStore, *world.State) {
+func newLinkedSQLGameClient(t *testing.T, skills *skillstate.Persistence, seed func(*gamesql.CharacterStore, *gamesql.ItemStore), wantChars int) (*testsupport.ScriptedClient, *gamesql.CharacterStore, *gamesql.ItemStore, *gamesql.ShortcutStore, *gamesql.CharacterSkillStore, *world.State) {
 	t.Helper()
 	return newLinkedSQLGameClientFull(t, skills, nil, nil, modelskill.BookPolicy{}, nil, true, seed, wantChars)
 }
 
-func newLinkedSQLGameClientWithShortcuts(t *testing.T) (*fakeGameClient, *gamesql.CharacterStore, *gamesql.ShortcutStore, *gamesql.CharacterSkillStore) {
+func newLinkedSQLGameClientWithShortcuts(t *testing.T) (*testsupport.ScriptedClient, *gamesql.CharacterStore, *gamesql.ShortcutStore, *gamesql.CharacterSkillStore) {
 	t.Helper()
 	c, chars, _, shortcuts, knownSkills, _ := newLinkedSQLGameClient(t, nil, nil, 0)
 	return c, chars, shortcuts, knownSkills
@@ -163,7 +164,7 @@ func newLinkedSQLGameClientWithShortcuts(t *testing.T) (*fakeGameClient, *gamesq
 // with an explicit KarmaPlayerCanTeleport value, for the karma-teleport
 // rejection tests (mirrors the retired fake-store
 // newLinkedGameClientWithKarmaPlayerCanTeleport).
-func newLinkedSQLGameClientWithKarmaPlayerCanTeleport(t *testing.T, karmaPlayerCanTeleport bool, skills *skillstate.Persistence, seed func(*gamesql.CharacterStore, *gamesql.ItemStore), wantChars int) (c *fakeGameClient, chars *gamesql.CharacterStore, items *gamesql.ItemStore, state *world.State) {
+func newLinkedSQLGameClientWithKarmaPlayerCanTeleport(t *testing.T, karmaPlayerCanTeleport bool, skills *skillstate.Persistence, seed func(*gamesql.CharacterStore, *gamesql.ItemStore), wantChars int) (c *testsupport.ScriptedClient, chars *gamesql.CharacterStore, items *gamesql.ItemStore, state *world.State) {
 	t.Helper()
 	c, chars, items, _, _, state = newLinkedSQLGameClientFull(t, skills, nil, nil, modelskill.BookPolicy{}, nil, karmaPlayerCanTeleport, seed, wantChars)
 	return c, chars, items, state

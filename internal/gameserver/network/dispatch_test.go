@@ -17,9 +17,9 @@ import (
 func TestGameClientLinkEnchantItemInGame(t *testing.T) {
 	c, chars, items, state := newLinkedGameClient(t)
 
-	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
-	c.read() // CharCreateOk
-	c.read() // CharSelectInfo
+	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.Read() // CharCreateOk
+	c.Read() // CharSelectInfo
 	objID := chars.soleObjectID(t)
 	if err := items.Create(context.Background(), objID, item.Instance{
 		ObjectID:   504,
@@ -40,28 +40,28 @@ func TestGameClientLinkEnchantItemInGame(t *testing.T) {
 		t.Fatalf("seed scroll: %v", err)
 	}
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
-	c.send(encodeUseItem(505, false))
-	assertStaticSystemMessageFrame(t, c.read(), serverpackets.SystemMessageSelectItemToEnchant)
-	assertChooseInventoryItemFrame(t, c.read(), 955)
+	c.Send(encodeUseItem(505, false))
+	assertStaticSystemMessageFrame(t, c.Read(), serverpackets.SystemMessageSelectItemToEnchant)
+	assertChooseInventoryItemFrame(t, c.Read(), 955)
 
-	c.send(encodeRequestEnchantItem(504))
-	reply := c.read()
+	c.Send(encodeRequestEnchantItem(504))
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeSystemMessage {
 		t.Fatalf("enchant success message opcode = %#x, want SystemMessage (%#x)", reply[0], serverpackets.OpcodeSystemMessage)
 	}
-	assertEnchantResultFrame(t, c.read(), serverpackets.EnchantResultSuccess)
-	if reply := c.read(); reply[0] != serverpackets.OpcodeUserInfo {
+	assertEnchantResultFrame(t, c.Read(), serverpackets.EnchantResultSuccess)
+	if reply := c.Read(); reply[0] != serverpackets.OpcodeUserInfo {
 		t.Fatalf("enchant userinfo opcode = %#x, want UserInfo (%#x)", reply[0], serverpackets.OpcodeUserInfo)
 	}
 
 	inventoryUpdatesFor(t, state).Tick()
-	if reply := c.read(); reply[0] != serverpackets.OpcodeInventoryUpdate {
+	if reply := c.Read(); reply[0] != serverpackets.OpcodeInventoryUpdate {
 		t.Fatalf("enchant inventory opcode = %#x, want InventoryUpdate (%#x)", reply[0], serverpackets.OpcodeInventoryUpdate)
 	}
 }

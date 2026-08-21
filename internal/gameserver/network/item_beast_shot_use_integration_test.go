@@ -39,10 +39,10 @@ func TestGameClientLinkUseBeastSoulshotChargesSummonAndConsumes(t *testing.T) {
 	const shotObjectID int32 = 900
 	c, chars, _, _, _, state := newLinkedSQLGameClient(t, nil, beastShotSeed(t, 6645, shotObjectID, 10), 1)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
 	objID := sqlSoleObjectID(t, chars)
@@ -53,8 +53,8 @@ func TestGameClientLinkUseBeastSoulshotChargesSummonAndConsumes(t *testing.T) {
 	})
 	state.AddSummon(objID, servitor)
 
-	c.send(encodeUseItem(shotObjectID, false))
-	reply := c.read()
+	c.Send(encodeUseItem(shotObjectID, false))
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeSystemMessage {
 		t.Fatalf("opcode = %#x, want SystemMessage (%#x)", reply[0], serverpackets.OpcodeSystemMessage)
 	}
@@ -63,7 +63,7 @@ func TestGameClientLinkUseBeastSoulshotChargesSummonAndConsumes(t *testing.T) {
 		t.Fatalf("SystemMessage id = %d, want PetUsesS1 (%d)", id, serverpackets.SystemMessagePetUsesS1)
 	}
 
-	reply = c.read()
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeMagicSkillUse {
 		t.Fatalf("opcode = %#x, want MagicSkillUse (%#x)", reply[0], serverpackets.OpcodeMagicSkillUse)
 	}
@@ -88,14 +88,14 @@ func TestGameClientLinkUseBeastSoulshotNoSummonAnswersRejection(t *testing.T) {
 	const shotObjectID int32 = 901
 	c, _, _, _, _, _ := newLinkedSQLGameClient(t, nil, beastShotSeed(t, 6645, shotObjectID, 10), 1)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
-	c.send(encodeUseItem(shotObjectID, false))
-	reply := c.read()
+	c.Send(encodeUseItem(shotObjectID, false))
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeSystemMessage {
 		t.Fatalf("opcode = %#x, want SystemMessage (%#x)", reply[0], serverpackets.OpcodeSystemMessage)
 	}

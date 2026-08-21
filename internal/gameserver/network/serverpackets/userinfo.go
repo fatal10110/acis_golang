@@ -1,10 +1,11 @@
 package serverpackets
 
 import (
+	"math"
+
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
-	"math"
 )
 
 func clampInt32(value int) int32 {

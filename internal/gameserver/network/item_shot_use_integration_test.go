@@ -44,10 +44,10 @@ func TestGameClientLinkUseSoulshotChargesWeaponAndConsumes(t *testing.T) {
 	const shotObjectID int32 = 801
 	c, chars, _, _, _, state := newLinkedSQLGameClient(t, nil, shotWeaponSeed(t, 1463, shotObjectID, 10), 1)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
 	obj, ok := state.Player(sqlSoleObjectID(t, chars))
@@ -59,8 +59,8 @@ func TestGameClientLinkUseSoulshotChargesWeaponAndConsumes(t *testing.T) {
 		t.Fatal("world player is not a *livePlayer")
 	}
 
-	c.send(encodeUseItem(shotObjectID, false))
-	reply := c.read()
+	c.Send(encodeUseItem(shotObjectID, false))
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeSystemMessage {
 		t.Fatalf("opcode = %#x, want SystemMessage (%#x)", reply[0], serverpackets.OpcodeSystemMessage)
 	}
@@ -69,7 +69,7 @@ func TestGameClientLinkUseSoulshotChargesWeaponAndConsumes(t *testing.T) {
 		t.Fatalf("SystemMessage id = %d, want EnabledSoulshot (%d)", id, serverpackets.SystemMessageEnabledSoulshot)
 	}
 
-	reply = c.read()
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeMagicSkillUse {
 		t.Fatalf("opcode = %#x, want MagicSkillUse (%#x)", reply[0], serverpackets.OpcodeMagicSkillUse)
 	}
@@ -96,18 +96,18 @@ func TestGameClientLinkUseSoulshotAlreadyChargedIsSilent(t *testing.T) {
 	const shotObjectID int32 = 802
 	c, _, _, _, _, _ := newLinkedSQLGameClient(t, nil, shotWeaponSeed(t, 1463, shotObjectID, 10), 1)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
-	c.send(encodeUseItem(shotObjectID, false))
-	for c.readWithTimeout(time.Second) != nil {
+	c.Send(encodeUseItem(shotObjectID, false))
+	for c.ReadWithTimeout(time.Second) != nil {
 	}
 
-	c.send(encodeUseItem(shotObjectID, false))
-	if reply := c.readWithTimeout(300 * time.Millisecond); reply != nil {
+	c.Send(encodeUseItem(shotObjectID, false))
+	if reply := c.ReadWithTimeout(300 * time.Millisecond); reply != nil {
 		t.Fatalf("second use while charged replied %x, want no reply at all", reply)
 	}
 }
@@ -119,14 +119,14 @@ func TestGameClientLinkUseSoulshotGradeMismatchAnswersActionFailed(t *testing.T)
 	const shotObjectID int32 = 803
 	c, _, _, _, _, _ := newLinkedSQLGameClient(t, nil, shotWeaponSeed(t, 1464, shotObjectID, 10), 1) // 1464: C-grade, weapon (30) is D-grade
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
-	c.send(encodeUseItem(shotObjectID, false))
-	reply := c.read()
+	c.Send(encodeUseItem(shotObjectID, false))
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeSystemMessage {
 		t.Fatalf("opcode = %#x, want SystemMessage (%#x)", reply[0], serverpackets.OpcodeSystemMessage)
 	}
@@ -134,7 +134,7 @@ func TestGameClientLinkUseSoulshotGradeMismatchAnswersActionFailed(t *testing.T)
 	if id := r.ReadInt32(); id != serverpackets.SystemMessageSoulshotsGradeMismatch {
 		t.Fatalf("SystemMessage id = %d, want SoulshotsGradeMismatch (%d)", id, serverpackets.SystemMessageSoulshotsGradeMismatch)
 	}
-	if reply := c.read(); reply[0] != serverpackets.OpcodeActionFailed {
+	if reply := c.Read(); reply[0] != serverpackets.OpcodeActionFailed {
 		t.Fatalf("opcode = %#x, want ActionFailed (%#x)", reply[0], serverpackets.OpcodeActionFailed)
 	}
 }
@@ -151,10 +151,10 @@ func TestGameClientLinkUseSoulshotNotEnoughWithAutoEnabledDisablesAutoShot(t *te
 	const shotObjectID int32 = 804
 	c, chars, _, _, _, state := newLinkedSQLGameClient(t, nil, shotWeaponSeed(t, 1463, shotObjectID, 0), 1)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
 	obj, ok := state.Player(sqlSoleObjectID(t, chars))
@@ -166,15 +166,15 @@ func TestGameClientLinkUseSoulshotNotEnoughWithAutoEnabledDisablesAutoShot(t *te
 		t.Fatal("world player is not a *livePlayer")
 	}
 
-	c.send(encodeRequestAutoSoulShot(1463, 1))
-	c.read() // ExAutoSoulShot(1463, true)
-	c.read() // SystemMessage UseOfItemWillBeAuto
+	c.Send(encodeRequestAutoSoulShot(1463, 1))
+	c.Read() // ExAutoSoulShot(1463, true)
+	c.Read() // SystemMessage UseOfItemWillBeAuto
 
-	c.send(encodeUseItem(shotObjectID, false))
+	c.Send(encodeUseItem(shotObjectID, false))
 
-	assertExAutoSoulShotFrame(t, c.read(), 1463, false)
+	assertExAutoSoulShotFrame(t, c.Read(), 1463, false)
 
-	reply := c.read()
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeSystemMessage {
 		t.Fatalf("opcode = %#x, want SystemMessage (%#x)", reply[0], serverpackets.OpcodeSystemMessage)
 	}
@@ -183,11 +183,11 @@ func TestGameClientLinkUseSoulshotNotEnoughWithAutoEnabledDisablesAutoShot(t *te
 		t.Fatalf("SystemMessage id = %d, want AutoUseOfItemCancelled (%d)", id, serverpackets.SystemMessageAutoUseOfItemCancelled)
 	}
 
-	if reply := c.read(); reply[0] != serverpackets.OpcodeActionFailed {
+	if reply := c.Read(); reply[0] != serverpackets.OpcodeActionFailed {
 		t.Fatalf("opcode = %#x, want ActionFailed (%#x)", reply[0], serverpackets.OpcodeActionFailed)
 	}
 
-	if reply := c.readWithTimeout(300 * time.Millisecond); reply != nil {
+	if reply := c.ReadWithTimeout(300 * time.Millisecond); reply != nil {
 		t.Fatalf("unexpected extra reply %x, want none (NOT_ENOUGH_SOULSHOTS suppressed while auto-enabled)", reply)
 	}
 

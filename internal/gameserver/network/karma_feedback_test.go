@@ -4,18 +4,19 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 // TestSendKarmaChangeFramesOrdersMessageBeforeStatus pins the reference's
 // order: SystemMessage(YOUR_KARMA_HAS_BEEN_CHANGED_TO_S1) before
 // StatusUpdate(KARMA), matching Player.setKarma (Player.java:1076-1080).
 func TestSendKarmaChangeFramesOrdersMessageBeforeStatus(t *testing.T) {
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, frames)
 
 	sendKarmaChangeFrames(live, 240)
 
-	sent := frames.frames
+	sent := frames.Frames()
 	if len(sent) != 2 {
 		t.Fatalf("frames sent = %d, want 2", len(sent))
 	}

@@ -19,12 +19,12 @@ import (
 func TestGameClientLinkFullFlow(t *testing.T) {
 	c, chars, _, _, _, state := newLinkedSQLGameClient(t, nil, nil, 0)
 
-	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
-	reply := c.read()
+	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeCharCreateOk {
 		t.Fatalf("opcode = %#x, want CharCreateOk (%#x)", reply[0], serverpackets.OpcodeCharCreateOk)
 	}
-	reply = c.read()
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeCharSelectInfo {
 		t.Fatalf("opcode = %#x, want CharSelectInfo (%#x)", reply[0], serverpackets.OpcodeCharSelectInfo)
 	}
@@ -33,18 +33,18 @@ func TestGameClientLinkFullFlow(t *testing.T) {
 	}
 	objID := sqlSoleObjectID(t, chars)
 
-	c.send(encodeRequestGameStart(0))
-	reply = c.read()
+	c.Send(encodeRequestGameStart(0))
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeSSQInfo {
 		t.Fatalf("opcode = %#x, want SSQInfo (%#x)", reply[0], serverpackets.OpcodeSSQInfo)
 	}
-	reply = c.read()
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeCharSelected {
 		t.Fatalf("opcode = %#x, want CharSelected (%#x)", reply[0], serverpackets.OpcodeCharSelected)
 	}
 
-	c.send(encodeRequestManorList())
-	reply = c.read()
+	c.Send(encodeRequestManorList())
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeExtended {
 		t.Fatalf("opcode = %#x, want extended packet (%#x)", reply[0], serverpackets.OpcodeExtended)
 	}
@@ -52,7 +52,7 @@ func TestGameClientLinkFullFlow(t *testing.T) {
 		t.Fatalf("extended opcode = %#x, want ExSendManorList (%#x)", second, serverpackets.OpcodeExSendManorList)
 	}
 
-	c.send(encodeEnterWorld())
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 	if _, ok := state.Player(objID); !ok {
 		t.Fatalf("world.Player(%d) missing after EnterWorld", objID)
@@ -64,13 +64,13 @@ func TestGameClientLinkFullFlow(t *testing.T) {
 
 func TestGameClientLinkChargeFeedbackFrames(t *testing.T) {
 	c, chars, _, _, _, state := newLinkedSQLGameClient(t, nil, nil, 0)
-	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
-	c.read() // CharCreateOk
-	c.read() // CharSelectInfo
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.Read() // CharCreateOk
+	c.Read() // CharSelectInfo
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
 	live, ok := state.Player(sqlSoleObjectID(t, chars))
@@ -80,19 +80,19 @@ func TestGameClientLinkChargeFeedbackFrames(t *testing.T) {
 	character := live.(*livePlayer).Character
 
 	character.IncreaseCharges(2, 5)
-	assertForceChargeMessage(t, c.read(), serverpackets.SystemMessageForceIncreasedToS1, 2)
-	if frame := c.read(); frame[0] != serverpackets.OpcodeEtcStatusUpdate {
+	assertForceChargeMessage(t, c.Read(), serverpackets.SystemMessageForceIncreasedToS1, 2)
+	if frame := c.Read(); frame[0] != serverpackets.OpcodeEtcStatusUpdate {
 		t.Fatalf("partial-add frame opcode = %#x, want EtcStatusUpdate (%#x)", frame[0], serverpackets.OpcodeEtcStatusUpdate)
 	}
 
 	character.IncreaseCharges(3, 5)
-	assertForceChargeMessage(t, c.read(), serverpackets.SystemMessageForceMaxLevelReached, 0)
-	if frame := c.read(); frame[0] != serverpackets.OpcodeEtcStatusUpdate {
+	assertForceChargeMessage(t, c.Read(), serverpackets.SystemMessageForceMaxLevelReached, 0)
+	if frame := c.Read(); frame[0] != serverpackets.OpcodeEtcStatusUpdate {
 		t.Fatalf("clamped-add frame opcode = %#x, want EtcStatusUpdate (%#x)", frame[0], serverpackets.OpcodeEtcStatusUpdate)
 	}
 
 	character.IncreaseCharges(1, 5)
-	assertForceChargeMessage(t, c.read(), serverpackets.SystemMessageForceMaxLevelReached, 0)
+	assertForceChargeMessage(t, c.Read(), serverpackets.SystemMessageForceMaxLevelReached, 0)
 }
 
 // TestGameClientLinkEnterWorldRecomputesRestoredWeight is the regression test
@@ -112,9 +112,9 @@ func TestGameClientLinkEnterWorldRecomputesRestoredWeight(t *testing.T) {
 		}
 	}, 1)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
 
 	objID := sqlSoleObjectID(t, chars)
 
@@ -122,8 +122,8 @@ func TestGameClientLinkEnterWorldRecomputesRestoredWeight(t *testing.T) {
 	// zero totalWeight changing to the real carried weight and fires the
 	// weight notifier immediately — before EnterWorld's own fixed frame
 	// burst — so the login StatusUpdate(CUR_LOAD) arrives first.
-	c.send(encodeEnterWorld())
-	reply := c.read()
+	c.Send(encodeEnterWorld())
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeStatusUpdate {
 		t.Fatalf("opcode = %#x, want StatusUpdate (%#x) for the login weight recompute", reply[0], serverpackets.OpcodeStatusUpdate)
 	}
@@ -153,15 +153,15 @@ func TestGameClientLinkEnterWorldRecomputesRestoredWeight(t *testing.T) {
 func TestGameClientLinkRequestItemListRecomputesWeight(t *testing.T) {
 	c, chars, _, _, _, state := newLinkedSQLGameClient(t, nil, nil, 0)
 
-	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
-	c.read() // CharCreateOk
-	c.read() // CharSelectInfo
+	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.Read() // CharCreateOk
+	c.Read() // CharSelectInfo
 	objID := sqlSoleObjectID(t, chars)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
 	live, ok := state.Player(objID)
@@ -170,15 +170,15 @@ func TestGameClientLinkRequestItemListRecomputesWeight(t *testing.T) {
 	}
 	live.(*livePlayer).Inventory().AddNew(9500, 5, 501)
 
-	c.send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
-	reply := c.read()
+	c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeStatusUpdate {
 		t.Fatalf("opcode = %#x, want StatusUpdate (%#x) for the RequestItemList weight recompute", reply[0], serverpackets.OpcodeStatusUpdate)
 	}
 	assertStatusAttrs(t, reply, objID, []serverpackets.StatusAttribute{
 		{Type: serverpackets.StatusCurrentLoad, Value: 50},
 	})
-	reply = c.read()
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeItemList {
 		t.Fatalf("opcode = %#x, want ItemList (%#x)", reply[0], serverpackets.OpcodeItemList)
 	}
@@ -198,10 +198,10 @@ func TestGameClientLinkEnterWorldReGrantsFreeSkills(t *testing.T) {
 		seedSelectableSQLCharacter(t, chars, "player1", "Newbie", 50, 0)
 	}, 1)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	frames := readEnterWorldBurst(t, c, false)
 
 	skillList := frames[5]
@@ -236,10 +236,10 @@ func TestGameClientLinkEnterWorldRestoresDeathPenaltyPassiveStats(t *testing.T) 
 		}
 	}, 1)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
 	live, ok := state.Player(sqlSoleObjectID(t, chars))
@@ -266,10 +266,10 @@ func TestGameClientLinkEnterWorldSkipsDeathPenaltyPassiveAtZero(t *testing.T) {
 		basePAtk = ch.PAtk()
 	}, 1)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
 	live, ok := state.Player(sqlSoleObjectID(t, chars))
@@ -288,15 +288,15 @@ func TestGameClientLinkEnterWorldSkipsDeathPenaltyPassiveAtZero(t *testing.T) {
 func TestGameClientLinkCreateInvalidNameKeepsConnectionOpen(t *testing.T) {
 	c, _, _, _, _, _ := newLinkedSQLGameClient(t, nil, nil, 0)
 
-	c.send(encodeRequestCharacterCreate("bad name!", 0, 0, 0, 1, 0, 0))
-	reply := c.read()
+	c.Send(encodeRequestCharacterCreate("bad name!", 0, 0, 0, 1, 0, 0))
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeCharCreateFail {
 		t.Fatalf("opcode = %#x, want CharCreateFail (%#x)", reply[0], serverpackets.OpcodeCharCreateFail)
 	}
 
 	// The connection must still be usable: a valid create now succeeds.
-	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
-	reply = c.read()
+	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeCharCreateOk {
 		t.Fatalf("opcode = %#x, want CharCreateOk (%#x)", reply[0], serverpackets.OpcodeCharCreateOk)
 	}
@@ -305,18 +305,18 @@ func TestGameClientLinkCreateInvalidNameKeepsConnectionOpen(t *testing.T) {
 func TestGameClientLinkDeleteAndRestore(t *testing.T) {
 	c, chars, _, _, _, _ := newLinkedSQLGameClient(t, nil, nil, 0)
 
-	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
-	c.read() // CharCreateOk
-	c.read() // CharSelectInfo
+	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.Read() // CharCreateOk
+	c.Read() // CharSelectInfo
 
 	objID := sqlSoleObjectID(t, chars)
 
-	c.send(encodeRequestCharacterDelete(0))
-	reply := c.read()
+	c.Send(encodeRequestCharacterDelete(0))
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeCharDeleteOk {
 		t.Fatalf("opcode = %#x, want CharDeleteOk (%#x)", reply[0], serverpackets.OpcodeCharDeleteOk)
 	}
-	c.read() // CharSelectInfo refresh
+	c.Read() // CharSelectInfo refresh
 
 	ch, err := chars.Get(context.Background(), objID)
 	if err != nil {
@@ -326,8 +326,8 @@ func TestGameClientLinkDeleteAndRestore(t *testing.T) {
 		t.Fatal("expected character to be scheduled for deletion")
 	}
 
-	c.send(encodeCharacterRestore(0))
-	c.read() // CharSelectInfo refresh
+	c.Send(encodeCharacterRestore(0))
+	c.Read() // CharSelectInfo refresh
 
 	ch, err = chars.Get(context.Background(), objID)
 	if err != nil {

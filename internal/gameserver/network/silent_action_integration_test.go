@@ -33,15 +33,15 @@ import (
 func TestGameClientLinkNeverGoesSilentOnActionRequests(t *testing.T) {
 	c, chars, _, _, _, _ := newLinkedSQLGameClient(t, nil, nil, 0)
 
-	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
-	c.read() // CharCreateOk
-	c.read() // CharSelectInfo
+	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.Read() // CharCreateOk
+	c.Read() // CharSelectInfo
 	sqlSoleObjectID(t, chars)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
 	const missingObjectID = 999999
@@ -63,18 +63,18 @@ func TestGameClientLinkNeverGoesSilentOnActionRequests(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			c.send(tc.payload)
+			c.Send(tc.payload)
 			// The first read is the actual assertion: it must prove the
 			// server answered at all, so it gets a generous timeout. Any
 			// further frames from the same rejection (e.g. a system
 			// message followed by ActionFailed) are already in flight by
 			// the time the first one arrives, so a short timeout is
 			// enough to drain them before the next case's send.
-			first := c.readWithTimeout(2 * time.Second)
+			first := c.ReadWithTimeout(2 * time.Second)
 			if first == nil {
 				t.Fatalf("%s: no reply at all — the request was silently dropped, leaving the client's action unresolved", tc.name)
 			}
-			for c.readWithTimeout(100*time.Millisecond) != nil {
+			for c.ReadWithTimeout(100*time.Millisecond) != nil {
 			}
 		})
 	}
@@ -101,24 +101,24 @@ func TestGameClientLinkUseItemPotionRejectionReplies(t *testing.T) {
 		}
 	}, 1)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
 	// First use succeeds: drains the InventoryUpdate, MagicSkillUse and
 	// USE_S1 frames so the second use's reply is the next thing read.
-	c.send(encodeUseItem(objectID, false))
-	for c.readWithTimeout(time.Second) != nil {
+	c.Send(encodeUseItem(objectID, false))
+	for c.ReadWithTimeout(time.Second) != nil {
 	}
 
-	c.send(encodeUseItem(objectID, false))
-	first := c.readWithTimeout(2 * time.Second)
+	c.Send(encodeUseItem(objectID, false))
+	first := c.ReadWithTimeout(2 * time.Second)
 	if first == nil {
 		t.Fatal("reuse-rejected potion use produced no reply at all — the request was silently dropped")
 	}
-	for c.readWithTimeout(100*time.Millisecond) != nil {
+	for c.ReadWithTimeout(100*time.Millisecond) != nil {
 	}
 
 	_ = chars // keep the character-store handle live for the seeded player
@@ -140,14 +140,14 @@ func TestGameClientLinkUseItemQuestItemRejectionReplies(t *testing.T) {
 		}
 	}, 1)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
-	c.send(encodeUseItem(objectID, false))
-	assertSystemMessageIDFrame(t, c.read(), serverpackets.SystemMessageCannotUseQuestItems)
-	for c.readWithTimeout(100*time.Millisecond) != nil {
+	c.Send(encodeUseItem(objectID, false))
+	assertSystemMessageIDFrame(t, c.Read(), serverpackets.SystemMessageCannotUseQuestItems)
+	for c.ReadWithTimeout(100*time.Millisecond) != nil {
 	}
 }

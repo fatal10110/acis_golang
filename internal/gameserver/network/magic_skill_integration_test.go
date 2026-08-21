@@ -31,14 +31,14 @@ func TestGameClientLinkMagicSkillUseStartsKnownActiveSkill(t *testing.T) {
 		store.seedKnown(objID, 0, player.SkillLevels{3: 1})
 	}, 1)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
-	c.send(encodeRequestMagicSkillUse(3, false, false))
-	reply := c.read()
+	c.Send(encodeRequestMagicSkillUse(3, false, false))
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeMagicSkillUse {
 		t.Fatalf("magic use opcode = %#x, want MagicSkillUse (%#x)", reply[0], serverpackets.OpcodeMagicSkillUse)
 	}
@@ -50,10 +50,10 @@ func TestGameClientLinkMagicSkillUseStartsKnownActiveSkill(t *testing.T) {
 		t.Fatalf("MagicSkillUse timing = hit %d reuse %d, want 500/1200", hitTime, reuse)
 	}
 
-	reply = c.read()
+	reply = c.Read()
 	assertSystemMessageSkillFrame(t, reply, serverpackets.SystemMessageUseS1, 3, 1)
 
-	reply = c.read()
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeSetupGauge {
 		t.Fatalf("setup gauge opcode = %#x, want SetupGauge (%#x)", reply[0], serverpackets.OpcodeSetupGauge)
 	}
@@ -62,7 +62,7 @@ func TestGameClientLinkMagicSkillUseStartsKnownActiveSkill(t *testing.T) {
 		t.Fatalf("SetupGauge = color %d current %d max %d, want blue/500/500", color, current, maxTime)
 	}
 
-	reply = c.read()
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeMagicSkillLaunched {
 		t.Fatalf("magic launched opcode = %#x, want MagicSkillLaunched (%#x)", reply[0], serverpackets.OpcodeMagicSkillLaunched)
 	}
@@ -71,7 +71,7 @@ func TestGameClientLinkMagicSkillUseStartsKnownActiveSkill(t *testing.T) {
 		t.Fatalf("MagicSkillLaunched = caster %d skill %d level %d count %d target %d, want %d/3/1/1/%d", caster, skillID, level, count, target, objID, objID)
 	}
 
-	reply = c.read()
+	reply = c.Read()
 	assertStatusAttrs(t, reply, objID, []serverpackets.StatusAttribute{{Type: serverpackets.StatusCurrentMP, Value: 25}})
 }
 
@@ -90,18 +90,18 @@ func TestGameClientLinkMagicSkillUseRecordsCtrlShiftModifiers(t *testing.T) {
 		store.seedKnown(objID, 0, player.SkillLevels{3: 1})
 	}, 1)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
-	c.send(encodeRequestMagicSkillUse(3, true, true))
-	c.read() // MagicSkillUse
-	c.read() // SystemMessage
-	c.read() // SetupGauge
-	c.read() // MagicSkillLaunched
-	c.read() // StatusUpdate
+	c.Send(encodeRequestMagicSkillUse(3, true, true))
+	c.Read() // MagicSkillUse
+	c.Read() // SystemMessage
+	c.Read() // SetupGauge
+	c.Read() // MagicSkillLaunched
+	c.Read() // StatusUpdate
 
 	obj, ok := state.Player(objID)
 	if !ok {
@@ -130,15 +130,15 @@ func TestGameClientLinkMagicSkillUseRecordsCtrlShiftModifiersOnRejection(t *test
 		store.seedKnown(objID, 0, player.SkillLevels{3: 1})
 	}, 1)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
-	c.send(encodeRequestMagicSkillUse(3, true, true))
-	c.read() // SystemMessage (not enough MP)
-	c.read() // ActionFailed
+	c.Send(encodeRequestMagicSkillUse(3, true, true))
+	c.Read() // SystemMessage (not enough MP)
+	c.Read() // ActionFailed
 
 	obj, ok := state.Player(objID)
 	if !ok {
@@ -169,18 +169,18 @@ func TestGameClientLinkMagicSkillUseAppliesBuffEffectToSelf(t *testing.T) {
 		store.seedKnown(objID, 0, player.SkillLevels{4: 1})
 	}, 1)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
-	c.send(encodeRequestMagicSkillUse(4, false, false))
-	c.read() // MagicSkillUse
-	c.read() // SystemMessage
-	c.read() // SetupGauge
-	c.read() // MagicSkillLaunched
-	c.read() // StatusUpdate
+	c.Send(encodeRequestMagicSkillUse(4, false, false))
+	c.Read() // MagicSkillUse
+	c.Read() // SystemMessage
+	c.Read() // SetupGauge
+	c.Read() // MagicSkillLaunched
+	c.Read() // StatusUpdate
 
 	obj, ok := state.Player(objID)
 	if !ok {
@@ -202,10 +202,10 @@ func TestGameClientLinkEffectStanceBroadcasts(t *testing.T) {
 		objID = seedSelectableSQLCharacter(t, chars, "player1", "Newbie", 5, 0).ID
 	}, 1)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
 	obj, ok := state.Player(objID)
@@ -226,7 +226,7 @@ func TestGameClientLinkEffectStanceBroadcasts(t *testing.T) {
 		if !e.OnStart(e) {
 			t.Fatalf("%s start rejected live character", name)
 		}
-		frame := c.read()
+		frame := c.Read()
 		if frame[0] != serverpackets.OpcodeChangeWaitType {
 			t.Fatalf("%s opcode = %#x, want ChangeWaitType", name, frame[0])
 		}
@@ -243,11 +243,11 @@ func TestGameClientLinkEffectStanceBroadcasts(t *testing.T) {
 	start("Relax", serverpackets.WaitSitting)
 	start("ChameleonRest", serverpackets.WaitSitting)
 	fakeDeath := start("FakeDeath", serverpackets.WaitFakeDeathStart)
-	if frame := c.read(); frame[0] != serverpackets.OpcodeAbnormalStatusUpdate {
+	if frame := c.Read(); frame[0] != serverpackets.OpcodeAbnormalStatusUpdate {
 		t.Fatalf("fake death start follow-up opcode = %#x, want AbnormalStatusUpdate", frame[0])
 	}
 	fakeDeath.OnExit(fakeDeath)
-	frame := c.read()
+	frame := c.Read()
 	if frame[0] != serverpackets.OpcodeChangeWaitType {
 		t.Fatalf("fake death exit opcode = %#x, want ChangeWaitType", frame[0])
 	}
@@ -258,7 +258,7 @@ func TestGameClientLinkEffectStanceBroadcasts(t *testing.T) {
 	if got := r.ReadInt32(); got != int32(serverpackets.WaitFakeDeathStop) {
 		t.Fatalf("fake death exit wait type = %d, want %d", got, serverpackets.WaitFakeDeathStop)
 	}
-	if frame := c.read(); frame[0] != serverpackets.OpcodeRevive {
+	if frame := c.Read(); frame[0] != serverpackets.OpcodeRevive {
 		t.Fatalf("fake death exit opcode = %#x, want Revive", frame[0])
 	}
 }
@@ -279,19 +279,19 @@ func TestGameClientLinkMagicSkillUseGroundRecordsGroundTargetAndAppliesEffect(t 
 		store.seedKnown(objID, 0, player.SkillLevels{5: 1})
 	}, 1)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
-	c.send(encodeRequestExMagicSkillUseGround(1000, 2000, 300, 5, false, false))
-	c.read() // ValidateLocation
-	c.read() // MagicSkillUse
-	c.read() // SystemMessage
-	c.read() // SetupGauge
-	c.read() // MagicSkillLaunched
-	c.read() // StatusUpdate
+	c.Send(encodeRequestExMagicSkillUseGround(1000, 2000, 300, 5, false, false))
+	c.Read() // ValidateLocation
+	c.Read() // MagicSkillUse
+	c.Read() // SystemMessage
+	c.Read() // SetupGauge
+	c.Read() // MagicSkillLaunched
+	c.Read() // StatusUpdate
 
 	obj, ok := state.Player(objID)
 	if !ok {
@@ -322,10 +322,10 @@ func TestGameClientLinkMagicSkillUseGroundWalksIntoCastRange(t *testing.T) {
 		store.seedKnown(id, 0, player.SkillLevels{5: 1})
 	}, 1)
 
-	c.send(encodeRequestGameStart(0))
-	c.read()
-	c.read()
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read()
+	c.Read()
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 	obj, ok := state.Player(id)
 	if !ok {
@@ -333,14 +333,14 @@ func TestGameClientLinkMagicSkillUseGroundWalksIntoCastRange(t *testing.T) {
 	}
 	obj.(*livePlayer).Move().SetSpeed(100000)
 
-	c.send(encodeRequestExMagicSkillUseGround(5000, 0, 0, 5, false, false))
-	if reply := c.read(); reply[0] != serverpackets.OpcodeMoveToLocation {
+	c.Send(encodeRequestExMagicSkillUseGround(5000, 0, 0, 5, false, false))
+	if reply := c.Read(); reply[0] != serverpackets.OpcodeMoveToLocation {
 		t.Fatalf("out-of-range ground cast opcode = %#x, want MoveToLocation (%#x)", reply[0], serverpackets.OpcodeMoveToLocation)
 	}
-	if reply := c.read(); reply[0] != serverpackets.OpcodeValidateLocation {
+	if reply := c.Read(); reply[0] != serverpackets.OpcodeValidateLocation {
 		t.Fatalf("post-walk ground cast opcode = %#x, want ValidateLocation (%#x)", reply[0], serverpackets.OpcodeValidateLocation)
 	}
-	if reply := c.read(); reply[0] != serverpackets.OpcodeMagicSkillUse {
+	if reply := c.Read(); reply[0] != serverpackets.OpcodeMagicSkillUse {
 		t.Fatalf("post-walk ground cast opcode = %#x, want MagicSkillUse (%#x)", reply[0], serverpackets.OpcodeMagicSkillUse)
 	}
 }
@@ -356,14 +356,14 @@ func TestGameClientLinkMagicSkillUseGroundShiftRejectsOutOfRangeTarget(t *testin
 		store.seedKnown(id, 0, player.SkillLevels{5: 1})
 	}, 1)
 
-	c.send(encodeRequestGameStart(0))
-	c.read()
-	c.read()
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read()
+	c.Read()
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
-	c.send(encodeRequestExMagicSkillUseGround(5000, 0, 0, 5, false, true))
-	assertStaticSystemMessageFrame(t, c.read(), serverpackets.SystemMessageTargetTooFar)
+	c.Send(encodeRequestExMagicSkillUseGround(5000, 0, 0, 5, false, true))
+	assertStaticSystemMessageFrame(t, c.Read(), serverpackets.SystemMessageTargetTooFar)
 }
 
 func TestGameClientLinkMagicSkillUseGroundSilentlyIgnoresNonGroundSkill(t *testing.T) {
@@ -382,14 +382,14 @@ func TestGameClientLinkMagicSkillUseGroundSilentlyIgnoresNonGroundSkill(t *testi
 		store.seedKnown(objID, 0, player.SkillLevels{5: 1})
 	}, 1)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
-	c.send(encodeRequestExMagicSkillUseGround(1000, 2000, 300, 5, false, false))
-	if reply := c.readWithTimeout(300 * time.Millisecond); reply != nil {
+	c.Send(encodeRequestExMagicSkillUseGround(1000, 2000, 300, 5, false, false))
+	if reply := c.ReadWithTimeout(300 * time.Millisecond); reply != nil {
 		t.Fatalf("non-ground ground-cast reply = opcode %#x, want no reply", reply[0])
 	}
 
@@ -405,8 +405,8 @@ func TestGameClientLinkMagicSkillUseGroundSilentlyIgnoresNonGroundSkill(t *testi
 		t.Fatalf("GroundTarget() = (%d,%d,%d), want unchanged (0,0,0)", x, y, z)
 	}
 
-	c.send(encodeRequestExMagicSkillUseGround(1000, 2000, 300, 9999, false, false))
-	if reply := c.readWithTimeout(300 * time.Millisecond); reply != nil {
+	c.Send(encodeRequestExMagicSkillUseGround(1000, 2000, 300, 9999, false, false))
+	if reply := c.ReadWithTimeout(300 * time.Millisecond); reply != nil {
 		t.Fatalf("unlearned ground-cast reply = opcode %#x, want no reply", reply[0])
 	}
 }
@@ -427,17 +427,17 @@ func TestGameClientLinkMagicSkillUseSendsAttackFailedWhenContinuousSkillDoesNotL
 		store.seedKnown(objID, 0, player.SkillLevels{5: 1})
 	}, 1)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
-	c.send(encodeRequestMagicSkillUse(5, false, false))
-	c.read() // MagicSkillUse
-	c.read() // SystemMessage UseS1
-	c.read() // MagicSkillLaunched
-	assertStaticSystemMessageFrame(t, c.read(), serverpackets.SystemMessageAttackFailed)
+	c.Send(encodeRequestMagicSkillUse(5, false, false))
+	c.Read() // MagicSkillUse
+	c.Read() // SystemMessage UseS1
+	c.Read() // MagicSkillLaunched
+	assertStaticSystemMessageFrame(t, c.Read(), serverpackets.SystemMessageAttackFailed)
 
 	obj, ok := state.Player(objID)
 	if !ok {
@@ -470,16 +470,16 @@ func TestGameClientLinkMagicSkillUseAppliesReferencedEffectSkillAtFallbackLevel(
 		store.seedKnown(objID, 0, player.SkillLevels{454: 1})
 	}, 1)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
-	c.send(encodeRequestMagicSkillUse(454, false, false))
-	c.read() // MagicSkillUse
-	c.read() // SystemMessage
-	c.read() // MagicSkillLaunched
+	c.Send(encodeRequestMagicSkillUse(454, false, false))
+	c.Read() // MagicSkillUse
+	c.Read() // SystemMessage
+	c.Read() // MagicSkillLaunched
 
 	obj, ok := state.Player(objID)
 	if !ok {
@@ -519,10 +519,10 @@ func TestGameClientLinkTogglesOnThenOff(t *testing.T) {
 		store.seedKnown(objID, 0, player.SkillLevels{288: 1})
 	}, 1)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
 	obj, ok := state.Player(objID)
@@ -538,8 +538,8 @@ func TestGameClientLinkTogglesOnThenOff(t *testing.T) {
 	// reference broadcasts MagicSkillUse before applying the skill's
 	// effects, so the ack packet lands before any AbnormalStatusUpdate the
 	// activation's effect triggers.
-	c.send(encodeRequestMagicSkillUse(288, false, false))
-	reply := c.read()
+	c.Send(encodeRequestMagicSkillUse(288, false, false))
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeMagicSkillUse {
 		t.Fatalf("magic use opcode = %#x, want MagicSkillUse (%#x)", reply[0], serverpackets.OpcodeMagicSkillUse)
 	}
@@ -553,7 +553,7 @@ func TestGameClientLinkTogglesOnThenOff(t *testing.T) {
 	if entries := readAbnormalStatusUpdateFrame(t, c); len(entries) != 0 {
 		t.Fatalf("AbnormalStatusUpdate entries after activation = %+v, want none (test skill has no icon)", entries)
 	}
-	c.expectNoFrame()
+	c.ExpectNoFrame()
 
 	effects := character.EffectList().All()
 	if len(effects) != 1 || effects[0].Skill.ID != 288 {
@@ -566,15 +566,15 @@ func TestGameClientLinkTogglesOnThenOff(t *testing.T) {
 	// path too (PlayerCast.java:127 vs 135-137), so the ack packet must
 	// land before the effect-exit AbnormalStatusUpdate here as well.
 	beforeMP := character.MP()
-	c.send(encodeRequestMagicSkillUse(288, false, false))
-	reply = c.read()
+	c.Send(encodeRequestMagicSkillUse(288, false, false))
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeMagicSkillUse {
 		t.Fatalf("magic use opcode = %#x, want MagicSkillUse (%#x)", reply[0], serverpackets.OpcodeMagicSkillUse)
 	}
 	if entries := readAbnormalStatusUpdateFrame(t, c); len(entries) != 0 {
 		t.Fatalf("AbnormalStatusUpdate entries after deactivation = %+v, want none (test skill has no icon)", entries)
 	}
-	c.expectNoFrame()
+	c.ExpectNoFrame()
 
 	if got := character.MP(); got != beforeMP {
 		t.Fatalf("MP after toggle deactivation = %d, want unchanged %d", got, beforeMP)
@@ -597,10 +597,10 @@ func TestGameClientLinkToggleCostFailuresBroadcastCastAbort(t *testing.T) {
 		store.seedKnown(objID, 0, player.SkillLevels{289: 1, 290: 1})
 	}, 1)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
 	for _, test := range []struct {
@@ -611,24 +611,24 @@ func TestGameClientLinkToggleCostFailuresBroadcastCastAbort(t *testing.T) {
 		{290, serverpackets.SystemMessageNotEnoughHP},
 	} {
 		t.Run(fmt.Sprintf("skill-%d", test.skillID), func(t *testing.T) {
-			c.send(encodeRequestMagicSkillUse(test.skillID, false, false))
-			if frame := c.read(); frame[0] != serverpackets.OpcodeMagicSkillUse {
+			c.Send(encodeRequestMagicSkillUse(test.skillID, false, false))
+			if frame := c.Read(); frame[0] != serverpackets.OpcodeMagicSkillUse {
 				t.Fatalf("first opcode = %#x, want MagicSkillUse (%#x)", frame[0], serverpackets.OpcodeMagicSkillUse)
 			}
-			frame := c.read()
+			frame := c.Read()
 			if frame[0] != serverpackets.OpcodeSystemMessage {
 				t.Fatalf("second opcode = %#x, want SystemMessage (%#x)", frame[0], serverpackets.OpcodeSystemMessage)
 			}
 			if got := wire.NewReader(frame[1:]).ReadInt32(); got != test.message {
 				t.Fatalf("SystemMessage id = %d, want %d", got, test.message)
 			}
-			if frame := c.read(); frame[0] != serverpackets.OpcodeMagicSkillCanceled {
+			if frame := c.Read(); frame[0] != serverpackets.OpcodeMagicSkillCanceled {
 				t.Fatalf("third opcode = %#x, want MagicSkillCanceled (%#x)", frame[0], serverpackets.OpcodeMagicSkillCanceled)
 			}
-			if frame := c.read(); frame[0] != serverpackets.OpcodeActionFailed {
+			if frame := c.Read(); frame[0] != serverpackets.OpcodeActionFailed {
 				t.Fatalf("fourth opcode = %#x, want ActionFailed (%#x)", frame[0], serverpackets.OpcodeActionFailed)
 			}
-			c.expectNoFrame()
+			c.ExpectNoFrame()
 		})
 	}
 }
@@ -656,10 +656,10 @@ func TestGameClientLinkTogglesRejectAllSkillsDisabled(t *testing.T) {
 		store.seedKnown(objID, 0, player.SkillLevels{288: 1})
 	}, 1)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
 	obj, ok := state.Player(objID)
@@ -676,14 +676,14 @@ func TestGameClientLinkTogglesRejectAllSkillsDisabled(t *testing.T) {
 		t.Fatal(err)
 	}
 	character.Character.EffectList().Add(e)
-	c.read() // AbnormalStatusUpdate from the Stun effect landing
+	c.Read() // AbnormalStatusUpdate from the Stun effect landing
 
 	beforeMP := character.MP()
-	c.send(encodeRequestMagicSkillUse(288, false, false))
-	if reply := c.read(); reply[0] != serverpackets.OpcodeActionFailed {
+	c.Send(encodeRequestMagicSkillUse(288, false, false))
+	if reply := c.Read(); reply[0] != serverpackets.OpcodeActionFailed {
 		t.Fatalf("reply opcode = %#x, want ActionFailed only (%#x)", reply[0], serverpackets.OpcodeActionFailed)
 	}
-	c.expectNoFrame()
+	c.ExpectNoFrame()
 
 	if got := character.MP(); got != beforeMP {
 		t.Fatalf("MP after rejected toggle = %d, want unchanged %d", got, beforeMP)
@@ -722,14 +722,14 @@ func TestGameClientLinkMagicSkillUseRejectsInsufficientMP(t *testing.T) {
 		store.seedKnown(objID, 0, player.SkillLevels{3: 1})
 	}, 1)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
-	c.send(encodeRequestMagicSkillUse(3, false, false))
-	reply := c.read()
+	c.Send(encodeRequestMagicSkillUse(3, false, false))
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeSystemMessage {
 		t.Fatalf("not-enough-mp opcode = %#x, want SystemMessage (%#x)", reply[0], serverpackets.OpcodeSystemMessage)
 	}
@@ -741,7 +741,7 @@ func TestGameClientLinkMagicSkillUseRejectsInsufficientMP(t *testing.T) {
 		t.Fatalf("SystemMessage params = %d, want 0", params)
 	}
 
-	reply = c.read()
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeActionFailed {
 		t.Fatalf("after not-enough-mp opcode = %#x, want ActionFailed (%#x)", reply[0], serverpackets.OpcodeActionFailed)
 	}
@@ -763,18 +763,18 @@ func TestGameClientLinkMagicSkillUseCubicCastBroadcastsCharacterInfo(t *testing.
 		store.seedKnown(objID, 0, player.SkillLevels{10: 1})
 	}, 1)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
-	c.send(encodeRequestMagicSkillUse(10, false, false))
-	c.read() // MagicSkillUse
-	c.read() // SystemMessage UseS1
-	c.read() // MagicSkillLaunched
+	c.Send(encodeRequestMagicSkillUse(10, false, false))
+	c.Read() // MagicSkillUse
+	c.Read() // SystemMessage UseS1
+	c.Read() // MagicSkillLaunched
 
-	reply := c.read()
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeUserInfo {
 		t.Fatalf("opcode = %#x, want UserInfo (%#x): a new cubic must refresh the caster's character info", reply[0], serverpackets.OpcodeUserInfo)
 	}
@@ -807,10 +807,10 @@ func TestGameClientLinkMagicSkillUseRejectsCubicCastWhenListFull(t *testing.T) {
 		store.seedKnown(objID, 0, player.SkillLevels{11: 1})
 	}, 1)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
 	obj, ok := state.Player(objID)
@@ -824,9 +824,9 @@ func TestGameClientLinkMagicSkillUseRejectsCubicCastWhenListFull(t *testing.T) {
 	// Already at the default cap (no Cubic Mastery): one active cubic.
 	character.Character.AddOrRefreshCubic(1, false)
 
-	c.send(encodeRequestMagicSkillUse(11, false, false))
-	assertStaticSystemMessageFrame(t, c.read(), serverpackets.SystemMessageCubicSummoningFailed)
-	if reply := c.read(); reply[0] != serverpackets.OpcodeActionFailed {
+	c.Send(encodeRequestMagicSkillUse(11, false, false))
+	assertStaticSystemMessageFrame(t, c.Read(), serverpackets.SystemMessageCubicSummoningFailed)
+	if reply := c.Read(); reply[0] != serverpackets.OpcodeActionFailed {
 		t.Fatalf("follow-up opcode = %#x, want ActionFailed (%#x)", reply[0], serverpackets.OpcodeActionFailed)
 	}
 	if ids := character.Character.CubicIDs(); len(ids) != 1 || ids[0] != 1 {
@@ -856,10 +856,10 @@ func TestGameClientLinkMagicSkillUseRejectsAllSkillsDisabled(t *testing.T) {
 		store.seedKnown(objID, 0, player.SkillLevels{12: 1})
 	}, 1)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
 	obj, ok := state.Player(objID)
@@ -875,10 +875,10 @@ func TestGameClientLinkMagicSkillUseRejectsAllSkillsDisabled(t *testing.T) {
 		t.Fatal(err)
 	}
 	character.Character.EffectList().Add(e)
-	c.read() // AbnormalStatusUpdate from the Stun effect landing
+	c.Read() // AbnormalStatusUpdate from the Stun effect landing
 
-	c.send(encodeRequestMagicSkillUse(12, false, false))
-	if reply := c.read(); reply[0] != serverpackets.OpcodeActionFailed {
+	c.Send(encodeRequestMagicSkillUse(12, false, false))
+	if reply := c.Read(); reply[0] != serverpackets.OpcodeActionFailed {
 		t.Fatalf("reply opcode = %#x, want ActionFailed only (%#x)", reply[0], serverpackets.OpcodeActionFailed)
 	}
 }

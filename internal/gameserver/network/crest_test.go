@@ -13,6 +13,7 @@ import (
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 func TestAllowedGatesRequestPledgeCrest(t *testing.T) {
@@ -178,10 +179,10 @@ func assertExPledgeCrestLargeFrame(t *testing.T, frame []byte, crestID int32, da
 	}
 }
 
-func assertNoReply(t *testing.T, c *fakeGameClient) {
+func assertNoReply(t *testing.T, c *testsupport.ScriptedClient) {
 	t.Helper()
-	c.conn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
-	if frame, err := wire.ReadFrame(c.conn); err == nil {
+	c.Conn().SetReadDeadline(time.Now().Add(100 * time.Millisecond))
+	if frame, err := wire.ReadFrame(c.Conn()); err == nil {
 		t.Fatalf("unexpected frame: %x", frame)
 	} else if netErr, ok := err.(net.Error); !ok || !netErr.Timeout() {
 		t.Fatalf("ReadFrame error = %v, want timeout", err)

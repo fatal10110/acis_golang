@@ -12,14 +12,15 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/link"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 func TestGameClientLinkWaitsForProtocolVersion(t *testing.T) {
 	addr, _, _, _ := newTestGameClientLink(t, func() *LoginLink { return nil }, NewSessionValidator())
-	c := dialGameClient(t, addr)
+	c := testsupport.Dial(t, addr)
 
-	c.conn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
-	if _, err := wire.ReadFrame(c.conn); err == nil {
+	c.Conn().SetReadDeadline(time.Now().Add(100 * time.Millisecond))
+	if _, err := wire.ReadFrame(c.Conn()); err == nil {
 		t.Fatal("server sent data before ProtocolVersion")
 	} else if ne, ok := err.(net.Error); !ok || !ne.Timeout() {
 		t.Fatalf("read before ProtocolVersion error = %v, want timeout", err)
@@ -28,17 +29,17 @@ func TestGameClientLinkWaitsForProtocolVersion(t *testing.T) {
 
 func TestGameClientLinkSendsVersionCheckAfterProtocolVersion(t *testing.T) {
 	addr, _, _, _ := newTestGameClientLink(t, func() *LoginLink { return nil }, NewSessionValidator())
-	c := dialGameClient(t, addr)
-	c.sendProtocolVersion(746)
+	c := testsupport.Dial(t, addr)
+	c.SendProtocolVersion(746)
 }
 
 func TestGameClientLinkBadProtocolVersionClosesSilently(t *testing.T) {
 	addr, _, _, _ := newTestGameClientLink(t, func() *LoginLink { return nil }, NewSessionValidator())
-	c := dialGameClient(t, addr)
-	if err := wire.WriteFrame(c.conn, encodeProtocolVersion(1)); err != nil {
+	c := testsupport.Dial(t, addr)
+	if err := wire.WriteFrame(c.Conn(), encodeProtocolVersion(1)); err != nil {
 		t.Fatalf("write ProtocolVersion: %v", err)
 	}
-	c.expectClosed()
+	c.ExpectClosed()
 }
 
 func TestGameClientLinkUnknownOpcodeTolerantAfterAuthDisconnectsPastThreshold(t *testing.T) {
@@ -48,44 +49,44 @@ func TestGameClientLinkUnknownOpcodeTolerantAfterAuthDisconnectsPastThreshold(t 
 	// (AUTHED) state this client is in: maxUnknownPerMin (5) rejections
 	// tolerate, the 6th disconnects.
 	for range maxUnknownPerMin {
-		c.send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
+		c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
 	}
-	c.send(encodeRequestPledgeCrest(1))
-	reply := c.read()
+	c.Send(encodeRequestPledgeCrest(1))
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodePledgeCrest {
 		t.Fatalf("post-tolerated-unknown opcode = %#x, want PledgeCrest (%#x)", reply[0], serverpackets.OpcodePledgeCrest)
 	}
 
-	c.send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
-	c.expectClosed()
+	c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
+	c.ExpectClosed()
 }
 
 func TestGameClientLinkUnknownExtendedOpcodeTolerantDisconnectsPastThreshold(t *testing.T) {
 	c, _, _, _ := newLinkedGameClient(t)
 
-	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
-	c.read() // CharCreateOk
-	c.read() // CharSelectInfo
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.Read() // CharCreateOk
+	c.Read() // CharSelectInfo
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
 	// An unmapped extended second-opcode counts toward the same sliding-60s
 	// maxUnknownPerMin threshold as a top-level unknown opcode: the first
 	// maxUnknownPerMin are tolerated, the next one disconnects.
 	for range maxUnknownPerMin {
-		c.send(encodeUnknownExtendedOpcode())
+		c.Send(encodeUnknownExtendedOpcode())
 	}
-	c.send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
-	reply := c.read()
+	c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeItemList {
 		t.Fatalf("post-tolerated-unknown-extended opcode = %#x, want ItemList (%#x)", reply[0], serverpackets.OpcodeItemList)
 	}
 
-	c.send(encodeUnknownExtendedOpcode())
-	if reply := c.read(); reply[0] != serverpackets.OpcodeActionFailed {
+	c.Send(encodeUnknownExtendedOpcode())
+	if reply := c.Read(); reply[0] != serverpackets.OpcodeActionFailed {
 		// detachLivePlayer's Stop() now reaches the cast controller
 		// (Player.cleanup -> abortAll(true) -> _cast.stop(),
 		// Creature.java:1298-1302), and PlayerCast.stop() sends
@@ -93,46 +94,46 @@ func TestGameClientLinkUnknownExtendedOpcodeTolerantDisconnectsPastThreshold(t *
 		// (PlayerCast.java:382-387).
 		t.Fatalf("pre-close opcode = %#x, want ActionFailed from detach's unconditional cast-stop ack (%#x)", reply[0], serverpackets.OpcodeActionFailed)
 	}
-	c.expectClosed()
+	c.ExpectClosed()
 }
 
 func TestGameClientLinkOpcodeBeforeAuthCloses(t *testing.T) {
 	addr, _, _, _ := newTestGameClientLink(t, func() *LoginLink { return nil }, NewSessionValidator())
-	c := dialGameClient(t, addr)
-	c.sendProtocolVersion(746)
+	c := testsupport.Dial(t, addr)
+	c.SendProtocolVersion(746)
 
-	c.send(encodeEnterWorld())
-	c.expectClosed()
+	c.Send(encodeEnterWorld())
+	c.ExpectClosed()
 }
 
 func TestGameClientLinkAuthLoginServerDownFails(t *testing.T) {
 	addr, _, _, _ := newTestGameClientLink(t, func() *LoginLink { return nil }, NewSessionValidator())
-	c := dialGameClient(t, addr)
-	c.sendProtocolVersion(746)
+	c := testsupport.Dial(t, addr)
+	c.SendProtocolVersion(746)
 
-	c.send(encodeAuthLogin("player1", link.SessionKey{}))
-	reply := c.read()
+	c.Send(encodeAuthLogin("player1", link.SessionKey{}))
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeAuthLoginFail {
 		t.Fatalf("opcode = %#x, want AuthLoginFail (%#x)", reply[0], serverpackets.OpcodeAuthLoginFail)
 	}
-	c.expectClosed()
+	c.ExpectClosed()
 }
 
 func TestGameClientLinkSendTimeCheckIsNoOpInGame(t *testing.T) {
 	c, _, _, _ := newLinkedGameClient(t)
 
-	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
-	c.read() // CharCreateOk
-	c.read() // CharSelectInfo
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.Read() // CharCreateOk
+	c.Read() // CharSelectInfo
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
-	c.send(encodeSendTimeCheck(17, 34))
-	c.send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
-	reply := c.read()
+	c.Send(encodeSendTimeCheck(17, 34))
+	c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeItemList {
 		t.Fatalf("post-SendTimeCheck opcode = %#x, want ItemList (%#x)", reply[0], serverpackets.OpcodeItemList)
 	}
@@ -146,18 +147,18 @@ func TestGameClientLinkMalformedLivePacketsDoNotDisconnect(t *testing.T) {
 	} {
 		t.Run(fmt.Sprintf("opcode_%02x", opcode), func(t *testing.T) {
 			c, _, _, _ := newLinkedGameClient(t)
-			c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
-			c.read() // CharCreateOk
-			c.read() // CharSelectInfo
-			c.send(encodeRequestGameStart(0))
-			c.read() // SSQInfo
-			c.read() // CharSelected
-			c.send(encodeEnterWorld())
+			c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+			c.Read() // CharCreateOk
+			c.Read() // CharSelectInfo
+			c.Send(encodeRequestGameStart(0))
+			c.Read() // SSQInfo
+			c.Read() // CharSelected
+			c.Send(encodeEnterWorld())
 			readEnterWorldBurst(t, c, false)
 
-			c.send(encodeSingleOpcode(opcode))
-			c.send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
-			reply := c.read()
+			c.Send(encodeSingleOpcode(opcode))
+			c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
+			reply := c.Read()
 			if reply[0] != serverpackets.OpcodeItemList {
 				t.Fatalf("post-malformed opcode = %#x, want ItemList (%#x)", reply[0], serverpackets.OpcodeItemList)
 			}
@@ -168,16 +169,16 @@ func TestGameClientLinkMalformedLivePacketsDoNotDisconnect(t *testing.T) {
 func TestGameClientLinkMalformedCharacterSelectPacketToleratesFirstDisconnectsOnSecond(t *testing.T) {
 	c, _, _, _ := newLinkedGameClient(t)
 
-	c.send(encodeSingleOpcode(clientpackets.OpcodeRequestPledgeCrest))
-	c.send(encodeRequestPledgeCrest(1))
-	reply := c.read()
+	c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestPledgeCrest))
+	c.Send(encodeRequestPledgeCrest(1))
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodePledgeCrest {
 		t.Fatalf("post-first-malformed opcode = %#x, want PledgeCrest (%#x)", reply[0], serverpackets.OpcodePledgeCrest)
 	}
 
-	c.send(encodeSingleOpcode(clientpackets.OpcodeRequestPledgeCrest))
-	c.conn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
-	if _, err := c.conn.Read(make([]byte, 1)); !errors.Is(err, io.EOF) {
+	c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestPledgeCrest))
+	c.Conn().SetReadDeadline(time.Now().Add(100 * time.Millisecond))
+	if _, err := c.Conn().Read(make([]byte, 1)); !errors.Is(err, io.EOF) {
 		t.Fatalf("malformed character-select packet read error = %v, want EOF", err)
 	}
 }

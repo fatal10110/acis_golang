@@ -1,5 +1,3 @@
-//go:build integration
-
 // Package sqltest starts a real, disposable MariaDB instance carrying the
 // shipped gameserver schema, for integration tests across this module that
 // need to read and write through it rather than a mock.

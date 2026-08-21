@@ -12,12 +12,13 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 func TestSelectAndClearLiveTargetSendsTargetPackets(t *testing.T) {
 	state := world.New()
-	attackerFrames := &frameCapture{}
-	observerFrames := &frameCapture{}
+	attackerFrames := &testsupport.FrameCapture{}
+	observerFrames := &testsupport.FrameCapture{}
 	attacker := newTestLivePlayer(t, 1, attackerFrames)
 	observer := newTestLivePlayer(t, 2, observerFrames)
 	target := newTestHostileNPC(t, 3)
@@ -25,27 +26,27 @@ func TestSelectAndClearLiveTargetSendsTargetPackets(t *testing.T) {
 	state.Spawn(attacker, 0, 0, 0, 0)
 	state.Spawn(observer, 100, 0, 0, 0)
 	state.Spawn(target, 150, 0, 0, 0)
-	attackerFrames.frames = nil
-	observerFrames.frames = nil
+	testsupport.ResetCapture(attackerFrames)
+	testsupport.ResetCapture(observerFrames)
 
 	gcl := &GameClientLink{world: state, log: zerolog.Nop()}
 	if !gcl.selectLiveTarget(attacker, target) {
 		t.Fatal("selectLiveTarget returned false")
 	}
-	if got := frameOpcodes(attackerFrames.frames); string(got) != string([]byte{serverpackets.OpcodeValidateLocation, serverpackets.OpcodeMyTargetSelected, serverpackets.OpcodeStatusUpdate}) {
+	if got := testsupport.FrameOpcodes(attackerFrames.Frames()); string(got) != string([]byte{serverpackets.OpcodeValidateLocation, serverpackets.OpcodeMyTargetSelected, serverpackets.OpcodeStatusUpdate}) {
 		t.Fatalf("attacker select opcodes = %x, want ValidateLocation, MyTargetSelected, StatusUpdate", got)
 	}
-	if got := frameOpcodes(observerFrames.frames); string(got) != string([]byte{serverpackets.OpcodeTargetSelected}) {
+	if got := testsupport.FrameOpcodes(observerFrames.Frames()); string(got) != string([]byte{serverpackets.OpcodeTargetSelected}) {
 		t.Fatalf("observer select opcodes = %x, want TargetSelected", got)
 	}
 
-	attackerFrames.frames = nil
-	observerFrames.frames = nil
+	testsupport.ResetCapture(attackerFrames)
+	testsupport.ResetCapture(observerFrames)
 	gcl.clearLiveTarget(attacker)
-	if got := frameOpcodes(attackerFrames.frames); string(got) != string([]byte{serverpackets.OpcodeActionFailed}) {
+	if got := testsupport.FrameOpcodes(attackerFrames.Frames()); string(got) != string([]byte{serverpackets.OpcodeActionFailed}) {
 		t.Fatalf("attacker clear opcodes = %x, want ActionFailed", got)
 	}
-	if got := frameOpcodes(observerFrames.frames); string(got) != string([]byte{serverpackets.OpcodeTargetUnselected}) {
+	if got := testsupport.FrameOpcodes(observerFrames.Frames()); string(got) != string([]byte{serverpackets.OpcodeTargetUnselected}) {
 		t.Fatalf("observer clear opcodes = %x, want TargetUnselected", got)
 	}
 }
@@ -63,7 +64,7 @@ func TestSelectAndClearLiveTargetSendsTargetPackets(t *testing.T) {
 // requires both Position() and Heading(), which excludes Chair.
 func TestSelectLiveTargetOmitsValidateLocationForStaticObject(t *testing.T) {
 	state := world.New()
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, frames)
 	chair, err := staticobject.NewObject(2, &staticobject.Template{
 		ID:       777,
@@ -76,13 +77,13 @@ func TestSelectLiveTargetOmitsValidateLocationForStaticObject(t *testing.T) {
 
 	state.Spawn(live, 0, 0, 0, 0)
 	state.Spawn(chair, 100, 0, 0, 0)
-	frames.frames = nil
+	testsupport.ResetCapture(frames)
 
 	gcl := &GameClientLink{world: state, log: zerolog.Nop()}
 	if !gcl.selectLiveTarget(live, chair) {
 		t.Fatal("selectLiveTarget returned false")
 	}
-	if got := frameOpcodes(frames.frames); string(got) != string([]byte{serverpackets.OpcodeMyTargetSelected}) {
+	if got := testsupport.FrameOpcodes(frames.Frames()); string(got) != string([]byte{serverpackets.OpcodeMyTargetSelected}) {
 		t.Fatalf("chair select opcodes = %x, want MyTargetSelected only (no ValidateLocation)", got)
 	}
 }
@@ -100,26 +101,26 @@ func TestSelectLiveTargetOmitsValidateLocationForStaticObject(t *testing.T) {
 // livePlayer) still gets ValidateLocation.
 func TestSelectLiveTargetSendsValidateLocationForSummon(t *testing.T) {
 	state := world.New()
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	attacker := newTestLivePlayer(t, 1, frames)
 	pet := summon.NewPet(summon.PetConfig{ObjectID: 501, Level: 44, Stats: summon.CombatStats{MaxHP: 500, MaxMP: 200}})
 
 	state.Spawn(attacker, 0, 0, 0, 0)
 	state.Spawn(pet, 100, 0, 0, 0)
-	frames.frames = nil
+	testsupport.ResetCapture(frames)
 
 	gcl := &GameClientLink{world: state, log: zerolog.Nop()}
 	if !gcl.selectLiveTarget(attacker, pet) {
 		t.Fatal("selectLiveTarget returned false")
 	}
-	if got := frameOpcodes(frames.frames); len(got) == 0 || got[0] != serverpackets.OpcodeValidateLocation {
+	if got := testsupport.FrameOpcodes(frames.Frames()); len(got) == 0 || got[0] != serverpackets.OpcodeValidateLocation {
 		t.Fatalf("summon select opcodes = %x, want leading ValidateLocation", got)
 	}
 }
 
 func TestGameClientLinkActionSitsOnSelectedChairStaticObject(t *testing.T) {
 	state := world.New()
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, frames)
 	chair, err := staticobject.NewObject(2, &staticobject.Template{
 		ID:       777,
@@ -132,13 +133,13 @@ func TestGameClientLinkActionSitsOnSelectedChairStaticObject(t *testing.T) {
 
 	state.Spawn(live, 0, 0, 0, 0)
 	state.Spawn(chair, 100, 0, 0, 0)
-	frames.frames = nil
+	testsupport.ResetCapture(frames)
 	live.SetTargetTracked(chair)
 
 	gcl := &GameClientLink{world: state, log: zerolog.Nop()}
 	gcl.handleTargetAction(context.Background(), live, chair.ObjectID(), true, false)
 
-	if got := frameOpcodes(frames.frames); string(got) != string([]byte{serverpackets.OpcodeChangeWaitType, serverpackets.OpcodeActionFailed, serverpackets.OpcodeChairSit}) {
+	if got := testsupport.FrameOpcodes(frames.Frames()); string(got) != string([]byte{serverpackets.OpcodeChangeWaitType, serverpackets.OpcodeActionFailed, serverpackets.OpcodeChairSit}) {
 		t.Fatalf("chair action opcodes = %x, want ChangeWaitType, ActionFailed, ChairSit", got)
 	}
 	if live.Standing() {
@@ -148,7 +149,7 @@ func TestGameClientLinkActionSitsOnSelectedChairStaticObject(t *testing.T) {
 		t.Fatal("chair was not marked busy")
 	}
 
-	r := wire.NewReader(frames.frames[2][1:])
+	r := wire.NewReader(frames.Frames()[2][1:])
 	if got := r.ReadInt32(); got != live.ObjectID() {
 		t.Fatalf("ChairSit player id = %d, want %d", got, live.ObjectID())
 	}
@@ -156,7 +157,7 @@ func TestGameClientLinkActionSitsOnSelectedChairStaticObject(t *testing.T) {
 		t.Fatalf("ChairSit static id = %d, want %d", got, chair.StaticObjectID())
 	}
 
-	frames.frames = nil
+	testsupport.ResetCapture(frames)
 	gcl.changeLiveWaitType(live, true)
 	if chair.Busy() {
 		t.Fatal("chair stayed busy after standing")
@@ -164,7 +165,7 @@ func TestGameClientLinkActionSitsOnSelectedChairStaticObject(t *testing.T) {
 	if !live.Standing() {
 		t.Fatal("live player did not stand after stand request")
 	}
-	if got := frameOpcodes(frames.frames); string(got) != string([]byte{serverpackets.OpcodeChangeWaitType}) {
+	if got := testsupport.FrameOpcodes(frames.Frames()); string(got) != string([]byte{serverpackets.OpcodeChangeWaitType}) {
 		t.Fatalf("stand opcodes = %x, want ChangeWaitType", got)
 	}
 }
@@ -219,7 +220,7 @@ func TestGameClientLinkActionInteractsWithSelectedStaticObject(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			state := world.New()
-			frames := &frameCapture{}
+			frames := &testsupport.FrameCapture{}
 			live := newTestLivePlayer(t, 1, frames)
 			obj, err := staticobject.NewObject(2, tt.template)
 			if err != nil {
@@ -228,22 +229,22 @@ func TestGameClientLinkActionInteractsWithSelectedStaticObject(t *testing.T) {
 			state.Spawn(live, 0, 0, 0, 0)
 			state.Spawn(obj, 0, 0, 0, 0)
 			live.SetTargetTracked(obj)
-			frames.frames = nil
+			testsupport.ResetCapture(frames)
 
 			gcl := &GameClientLink{world: state, html: testHTMLCache(t, tt.html), log: zerolog.Nop()}
 			gcl.handleTargetAction(context.Background(), live, obj.ObjectID(), true, false)
 
-			if got := frameOpcodes(frames.frames); string(got) != string(tt.opcodes) {
+			if got := testsupport.FrameOpcodes(frames.Frames()); string(got) != string(tt.opcodes) {
 				t.Fatalf("action opcodes = %x, want %x", got, tt.opcodes)
 			}
-			tt.assert(t, frames.frames[1], obj.ObjectID())
+			tt.assert(t, frames.Frames()[1], obj.ObjectID())
 		})
 	}
 }
 
 func TestGameClientLinkResolveTargetFallsBackToPlayerRegistry(t *testing.T) {
 	state := world.New()
-	targetFrames := &frameCapture{}
+	targetFrames := &testsupport.FrameCapture{}
 	target := newTestLivePlayer(t, 42, targetFrames)
 	state.AddPlayer(target)
 

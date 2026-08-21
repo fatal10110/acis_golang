@@ -23,11 +23,12 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	tradebook "github.com/fatal10110/acis_golang/internal/gameserver/trade"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 func TestHandleTargetActionShiftClickGroundItemDoesNotMoveOrRetarget(t *testing.T) {
 	state := world.New()
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, frames)
 	prior := newTestHostileNPC(t, 2)
 	state.Spawn(live, 0, 0, 0, 0)
@@ -44,11 +45,11 @@ func TestHandleTargetActionShiftClickGroundItemDoesNotMoveOrRetarget(t *testing.
 	}
 	state.Spawn(ground, groundPickupInteractionDistance+1, 0, 0, 0)
 
-	frames.frames = nil
+	testsupport.ResetCapture(frames)
 	gcl := &GameClientLink{world: state}
 	gcl.handleTargetAction(context.Background(), live, ground.ObjectID(), false, true)
 
-	assertOpcodeSequence(t, frames.frames, serverpackets.OpcodeActionFailed)
+	testsupport.AssertOpcodeSequence(t, frames.Frames(), serverpackets.OpcodeActionFailed)
 	if got := live.Target(); got != prior {
 		t.Fatalf("Target() = %v, want prior creature %v", got, prior)
 	}
@@ -66,7 +67,7 @@ func dropTestGround(t *testing.T, state *world.State, drops *task.GroundItems, i
 
 func TestPickupLiveGroundItemMovesItemAndDespawns(t *testing.T) {
 	templates := petTestTemplates()
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
 	state := world.New()
 	state.Spawn(live, 100, 0, 0, 0)
@@ -74,7 +75,7 @@ func TestPickupLiveGroundItemMovesItemAndDespawns(t *testing.T) {
 	tmpl, _ := templates.Get(item.AdenaID)
 	ground := dropTestGround(t, state, drops, item.Instance{ObjectID: 900, TemplateID: item.AdenaID, Count: 40, ManaLeft: -1}, tmpl, 100, 0, 0)
 
-	capture.frames = nil
+	testsupport.ResetCapture(capture)
 	store := &recordingEnchantItemStore{}
 	gcl := &GameClientLink{world: state, groundItems: drops, items: store}
 	updates := wireInventoryUpdates(gcl, live)
@@ -84,7 +85,7 @@ func TestPickupLiveGroundItemMovesItemAndDespawns(t *testing.T) {
 	}
 	updates.Tick()
 
-	assertOpcodeSequence(t, capture.frames,
+	testsupport.AssertOpcodeSequence(t, capture.Frames(),
 		serverpackets.OpcodeActionFailed,
 		serverpackets.OpcodeGetItem,
 		serverpackets.OpcodeDeleteObject,
@@ -117,7 +118,7 @@ func TestPickupLiveGroundItemMovesItemAndDespawns(t *testing.T) {
 // already does (targeting.go:110-120) applied to the arrival path too.
 func TestFinishLiveGroundPickupRevalidatesAfterArrival(t *testing.T) {
 	templates := petTestTemplates()
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
 	state := world.New()
 	state.Spawn(live, 100, 0, 0, 0)
@@ -134,11 +135,11 @@ func TestFinishLiveGroundPickupRevalidatesAfterArrival(t *testing.T) {
 	state.Despawn(ground)
 	drops.Remove(ground)
 
-	capture.frames = nil
+	testsupport.ResetCapture(capture)
 	gcl.finishLiveGroundPickup(live)
 
-	if len(capture.frames) != 0 {
-		t.Fatalf("finishLiveGroundPickup frames = %v, want none — a vanished target must not be collected", frameOpcodes(capture.frames))
+	if len(capture.Frames()) != 0 {
+		t.Fatalf("finishLiveGroundPickup frames = %v, want none — a vanished target must not be collected", testsupport.FrameOpcodes(capture.Frames()))
 	}
 	if stack := live.Inventory().ItemByTemplateID(item.AdenaID); stack != nil {
 		t.Fatalf("inventory stack = %+v, want no pickup for a target that vanished mid-walk", stack)
@@ -192,14 +193,14 @@ func TestPickupLiveGroundItemConsumesHerbWithoutStoringIt(t *testing.T) {
 	templates := herbTestTemplates()
 	tmpl, _ := templates.Get(herbTemplate)
 	tmpl.AttachedSkills = append(tmpl.AttachedSkills, item.SkillRef{ID: 2279, Level: 1})
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
 	state := world.New()
 	state.Spawn(live, 100, 0, 0, 0)
 	drops := task.NewGroundItems(state, task.GroundItemOptions{HerbAutoDestroy: time.Hour}, time.Now)
 	ground := dropTestGround(t, state, drops, item.Instance{ObjectID: 900, TemplateID: herbTemplate, Count: 1, ManaLeft: -1}, tmpl, 100, 0, 0)
 
-	capture.frames = nil
+	testsupport.ResetCapture(capture)
 	store := &recordingEnchantItemStore{}
 	gcl := &GameClientLink{
 		world:         state,
@@ -214,7 +215,7 @@ func TestPickupLiveGroundItemConsumesHerbWithoutStoringIt(t *testing.T) {
 		t.Fatal("pickupLiveGroundItem returned false for a herb ground item target")
 	}
 
-	assertOpcodeSequence(t, capture.frames,
+	testsupport.AssertOpcodeSequence(t, capture.Frames(),
 		serverpackets.OpcodeActionFailed,
 		serverpackets.OpcodeGetItem,
 		serverpackets.OpcodeDeleteObject,
@@ -239,8 +240,8 @@ func TestPickupLiveGroundItemConsumesHerbWithoutStoringIt(t *testing.T) {
 	if len(effects) != 2 || effects[0].Skill.ID != 2278 || effects[1].Skill.ID != 2279 {
 		t.Fatalf("installed effects = %+v, want herb skills 2278 then 2279", effects)
 	}
-	assertSystemMessageSkillFrame(t, capture.frames[4], serverpackets.SystemMessageUseS1, 2278, 1)
-	assertSystemMessageSkillFrame(t, capture.frames[6], serverpackets.SystemMessageUseS1, 2279, 1)
+	assertSystemMessageSkillFrame(t, capture.Frames()[4], serverpackets.SystemMessageUseS1, 2278, 1)
+	assertSystemMessageSkillFrame(t, capture.Frames()[6], serverpackets.SystemMessageUseS1, 2279, 1)
 }
 
 // TestConsumeHerbRejectsNonHerbTemplate pins the precondition consumeHerb
@@ -253,7 +254,7 @@ func TestConsumeHerbRejectsNonHerbTemplate(t *testing.T) {
 		EtcItem:        &item.EtcItemDetail{Type: item.EtcItemPotion, Handler: "ItemSkills"},
 		AttachedSkills: []item.SkillRef{{ID: 2278, Level: 1}},
 	}})
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
 	gcl := &GameClientLink{
 		skills:        herbTestSkill(t),
@@ -261,11 +262,11 @@ func TestConsumeHerbRejectsNonHerbTemplate(t *testing.T) {
 		skillHandlers: handlerskill.NewDefaultRegistry(),
 	}
 
-	capture.frames = nil
+	testsupport.ResetCapture(capture)
 	gcl.consumeHerb(live, 20)
 
-	if len(capture.frames) != 0 {
-		t.Fatalf("frames = %d, want none for a non-herb template", len(capture.frames))
+	if len(capture.Frames()) != 0 {
+		t.Fatalf("frames = %d, want none for a non-herb template", len(capture.Frames()))
 	}
 	if effects := live.EffectList().All(); len(effects) != 0 {
 		t.Fatalf("installed effects = %+v, want none", effects)
@@ -282,7 +283,7 @@ func TestConsumeHerbMirrorsOntoServitorOnly(t *testing.T) {
 	templates := herbTestTemplates()
 
 	t.Run("active servitor", func(t *testing.T) {
-		capture := &frameCapture{}
+		capture := &testsupport.FrameCapture{}
 		live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
 		state := world.New()
 		state.Spawn(live, 100, 0, 0, 0)
@@ -295,15 +296,15 @@ func TestConsumeHerbMirrorsOntoServitorOnly(t *testing.T) {
 			skillHandlers: handlerskill.NewDefaultRegistry(),
 		}
 
-		capture.frames = nil
+		testsupport.ResetCapture(capture)
 		gcl.consumeHerb(live, herbTemplate)
 
-		assertOpcodeSequence(t, capture.frames,
+		testsupport.AssertOpcodeSequence(t, capture.Frames(),
 			serverpackets.OpcodeMagicSkillUse,
 			serverpackets.OpcodeMagicSkillUse,
 			serverpackets.OpcodeSystemMessage,
 		)
-		r := wire.NewReader(capture.frames[1][1:])
+		r := wire.NewReader(capture.Frames()[1][1:])
 		if caster, target := r.ReadInt32(), r.ReadInt32(); caster != servitor.ObjectID() || target != servitor.ObjectID() {
 			t.Fatalf("second MagicSkillUse caster/target = %d/%d, want servitor %d/%d", caster, target, servitor.ObjectID(), servitor.ObjectID())
 		}
@@ -313,7 +314,7 @@ func TestConsumeHerbMirrorsOntoServitorOnly(t *testing.T) {
 	})
 
 	t.Run("active pet, no mirror", func(t *testing.T) {
-		capture := &frameCapture{}
+		capture := &testsupport.FrameCapture{}
 		live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
 		state := world.New()
 		state.Spawn(live, 100, 0, 0, 0)
@@ -326,10 +327,10 @@ func TestConsumeHerbMirrorsOntoServitorOnly(t *testing.T) {
 			skillHandlers: handlerskill.NewDefaultRegistry(),
 		}
 
-		capture.frames = nil
+		testsupport.ResetCapture(capture)
 		gcl.consumeHerb(live, herbTemplate)
 
-		assertOpcodeSequence(t, capture.frames, serverpackets.OpcodeMagicSkillUse, serverpackets.OpcodeSystemMessage)
+		testsupport.AssertOpcodeSequence(t, capture.Frames(), serverpackets.OpcodeMagicSkillUse, serverpackets.OpcodeSystemMessage)
 		if effects := pet.EffectList().All(); len(effects) != 0 {
 			t.Fatalf("pet installed effects = %+v, want none (herb never mirrors onto a pet)", effects)
 		}
@@ -360,7 +361,7 @@ func (f *fakeAfterFuncs) fireAll() {
 
 func TestPickupLiveGroundItemLocksAndReleasesTransientParalysis(t *testing.T) {
 	templates := petTestTemplates()
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
 	state := world.New()
 	state.Spawn(live, 100, 0, 0, 0)
@@ -401,7 +402,7 @@ func TestPickupLiveGroundItemLocksAndReleasesTransientParalysis(t *testing.T) {
 // pending deferred pickup queued under the newer lock would wrongly see
 // pickupLockActive()==false and get discarded instead of re-deferred.
 func TestExitPickupLockIgnoresStaleGeneration(t *testing.T) {
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, capture)
 
 	staleGen := live.enterPickupLock()
@@ -439,7 +440,7 @@ func TestExitPickupLockIgnoresStaleGeneration(t *testing.T) {
 // against livePickupBlockedDeferrable many times under -race to catch both
 // the data race and the stale combination.
 func TestPickupBlockedDeferrableAtomicWithLockExit(t *testing.T) {
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, capture)
 
 	for i := 0; i < 2000; i++ {
@@ -466,7 +467,7 @@ func TestPickupBlockedDeferrableAtomicWithLockExit(t *testing.T) {
 
 func TestPickupLiveGroundItemDefersLatestClickUntilParalysisReleases(t *testing.T) {
 	templates := petTestTemplates()
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
 	state := world.New()
 	state.Spawn(live, 100, 0, 0, 0)
@@ -479,11 +480,11 @@ func TestPickupLiveGroundItemDefersLatestClickUntilParalysisReleases(t *testing.
 	gcl := &GameClientLink{world: state, groundItems: drops, afterFunc: fake.schedule}
 
 	gcl.pickupLiveGroundItem(context.Background(), live, first)
-	capture.frames = nil
+	testsupport.ResetCapture(capture)
 	gcl.pickupLiveGroundItem(context.Background(), live, older)
 	gcl.pickupLiveGroundItem(context.Background(), live, latest)
 
-	assertOpcodeSequence(t, capture.frames, serverpackets.OpcodeActionFailed, serverpackets.OpcodeActionFailed)
+	testsupport.AssertOpcodeSequence(t, capture.Frames(), serverpackets.OpcodeActionFailed, serverpackets.OpcodeActionFailed)
 	if _, ok := state.Object(older.ObjectID()); !ok {
 		t.Fatal("older deferred pickup ran before the paralysis lock released")
 	}
@@ -500,7 +501,7 @@ func TestPickupLiveGroundItemDefersLatestClickUntilParalysisReleases(t *testing.
 
 func TestStartPickupLiveGroundItemDefersUntilAttackFinishes(t *testing.T) {
 	templates := petTestTemplates()
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, frames)
 	state := world.New()
 	drops := task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour}, time.Now)
@@ -519,11 +520,11 @@ func TestStartPickupLiveGroundItemDefersUntilAttackFinishes(t *testing.T) {
 	if !gcl.attackLiveTarget(live, target) {
 		t.Fatal("attackLiveTarget returned false")
 	}
-	frames.frames = nil
+	testsupport.ResetCapture(frames)
 	if !gcl.startPickupLiveGroundItem(context.Background(), live, ground, false) {
 		t.Fatal("startPickupLiveGroundItem returned false")
 	}
-	assertOpcodeSequence(t, frames.frames, serverpackets.OpcodeActionFailed)
+	testsupport.AssertOpcodeSequence(t, frames.Frames(), serverpackets.OpcodeActionFailed)
 	live.Character.SetFrameSender(func(frame wire.Frame) bool {
 		frame.Release()
 		return true
@@ -555,7 +556,7 @@ func TestStartPickupLiveGroundItemDefersUntilAttackFinishes(t *testing.T) {
 // (PlayableAI.java:223, AbstractAI.java:238-246).
 func TestFinishDeferredPickupWalksToOutOfRangeItem(t *testing.T) {
 	templates := petTestTemplates()
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, frames)
 	state := world.New()
 	drops := task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour}, time.Now)
@@ -571,14 +572,14 @@ func TestFinishDeferredPickupWalksToOutOfRangeItem(t *testing.T) {
 	state.Spawn(live, 100, 0, 0, 0)
 	t.Cleanup(live.Stop)
 
-	frames.frames = nil
+	testsupport.ResetCapture(frames)
 	live.deferPickup(context.Background(), ground, false)
 	gcl.finishDeferredPickup(live)
 
 	// snapshot(), not the frames field directly: the walk just started can
 	// arrive and deliver its own frames from a background timer goroutine
 	// concurrently with this read.
-	assertOpcodeSequence(t, frames.snapshot(), serverpackets.OpcodeActionFailed, serverpackets.OpcodeMoveToLocation)
+	testsupport.AssertOpcodeSequence(t, frames.Frames(), serverpackets.OpcodeActionFailed, serverpackets.OpcodeMoveToLocation)
 
 	deadline := time.Now().Add(2 * time.Second)
 	for {
@@ -601,7 +602,7 @@ func TestFinishDeferredPickupWalksToOutOfRangeItem(t *testing.T) {
 // arrival.
 func TestAttackClickDuringPickupApproachDropsStaleIntention(t *testing.T) {
 	state := world.New()
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	attacker := newTestLivePlayer(t, 1, frames)
 	attacker.Character.SetWorld(state)
 	attacker.Character.SetRollSource(func(int) int { return 0 })
@@ -631,15 +632,15 @@ func TestAttackClickDuringPickupApproachDropsStaleIntention(t *testing.T) {
 	state.Spawn(ground, 0, -(groundPickupInteractionDistance + 50), 0, 0)
 	state.Spawn(target, 200, 0, 0, 0)
 
-	frames.frames = nil
+	testsupport.ResetCapture(frames)
 	if !gcl.startPickupLiveGroundItem(context.Background(), attacker, ground, false) {
 		t.Fatal("startPickupLiveGroundItem returned false for a ground item target")
 	}
-	if got := frameOpcodes(frames.frames); string(got) != string([]byte{serverpackets.OpcodeActionFailed, serverpackets.OpcodeMoveToLocation}) {
+	if got := testsupport.FrameOpcodes(frames.Frames()); string(got) != string([]byte{serverpackets.OpcodeActionFailed, serverpackets.OpcodeMoveToLocation}) {
 		t.Fatalf("pickup-approach opcodes = %x, want ActionFailed then MoveToLocation", got)
 	}
 
-	frames.frames = nil
+	testsupport.ResetCapture(frames)
 	if !gcl.attackLiveTarget(attacker, target) {
 		t.Fatal("attackLiveTarget returned false for a distant target")
 	}
@@ -652,7 +653,7 @@ func TestAttackClickDuringPickupApproachDropsStaleIntention(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 
-	if got := frameOpcodes(frames.snapshot()); bytes.Contains(got, []byte{serverpackets.OpcodeActionFailed}) {
+	if got := testsupport.FrameOpcodes(frames.Frames()); bytes.Contains(got, []byte{serverpackets.OpcodeActionFailed}) {
 		t.Fatalf("attack-chase opcodes = %x, must not contain ActionFailed from the stale pickup", got)
 	}
 	if _, ok := state.Object(ground.ObjectID()); !ok {
@@ -668,7 +669,7 @@ func TestAttackClickDuringPickupApproachDropsStaleIntention(t *testing.T) {
 // any subsequent click, walk included.
 func TestWalkClickDuringPickupApproachDropsStaleIntention(t *testing.T) {
 	state := world.New()
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, frames)
 	live.Character.SetWorld(state)
 	gcl := &GameClientLink{world: state, log: zerolog.Nop(), inventory: invops.NewService(nil)}
@@ -693,17 +694,17 @@ func TestWalkClickDuringPickupApproachDropsStaleIntention(t *testing.T) {
 	// location on that arrival.
 	state.Spawn(ground, 0, -(groundPickupInteractionDistance + 50), 0, 0)
 
-	frames.frames = nil
+	testsupport.ResetCapture(frames)
 	if !gcl.startPickupLiveGroundItem(context.Background(), live, ground, false) {
 		t.Fatal("startPickupLiveGroundItem returned false for a ground item target")
 	}
-	if got := frameOpcodes(frames.frames); string(got) != string([]byte{serverpackets.OpcodeActionFailed, serverpackets.OpcodeMoveToLocation}) {
+	if got := testsupport.FrameOpcodes(frames.Frames()); string(got) != string([]byte{serverpackets.OpcodeActionFailed, serverpackets.OpcodeMoveToLocation}) {
 		t.Fatalf("pickup-approach opcodes = %x, want ActionFailed then MoveToLocation", got)
 	}
 
-	frames.frames = nil
+	testsupport.ResetCapture(frames)
 	gcl.moveLivePlayer(live, location.Location{X: 200, Y: 0, Z: 0})
-	if got := frameOpcodes(frames.frames); string(got) != string([]byte{serverpackets.OpcodeMoveToLocation}) {
+	if got := testsupport.FrameOpcodes(frames.Frames()); string(got) != string([]byte{serverpackets.OpcodeMoveToLocation}) {
 		t.Fatalf("walk-redirect opcodes = %x, want MoveToLocation only", got)
 	}
 
@@ -722,7 +723,7 @@ func TestWalkClickDuringPickupApproachDropsStaleIntention(t *testing.T) {
 	// a moment to run before asserting on its side effects.
 	time.Sleep(50 * time.Millisecond)
 
-	if got := frameOpcodes(frames.snapshot()); bytes.Contains(got, []byte{serverpackets.OpcodeActionFailed}) {
+	if got := testsupport.FrameOpcodes(frames.Frames()); bytes.Contains(got, []byte{serverpackets.OpcodeActionFailed}) {
 		t.Fatalf("walk-redirect arrival opcodes = %x, must not contain ActionFailed from the stale pickup", got)
 	}
 	if _, ok := state.Object(ground.ObjectID()); !ok {
@@ -740,7 +741,7 @@ func TestWalkClickDuringPickupApproachDropsStaleIntention(t *testing.T) {
 // is fresh or promoted from the queue.
 func TestFinishDeferredPickupHonorsShiftAndFailsWithoutWalking(t *testing.T) {
 	templates := petTestTemplates()
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, frames)
 	state := world.New()
 	drops := task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour}, time.Now)
@@ -751,11 +752,11 @@ func TestFinishDeferredPickupHonorsShiftAndFailsWithoutWalking(t *testing.T) {
 	state.Spawn(live, 100, 0, 0, 0)
 	t.Cleanup(live.Stop)
 
-	frames.frames = nil
+	testsupport.ResetCapture(frames)
 	live.deferPickup(context.Background(), ground, true)
 	gcl.finishDeferredPickup(live)
 
-	assertOpcodeSequence(t, frames.frames, serverpackets.OpcodeActionFailed)
+	testsupport.AssertOpcodeSequence(t, frames.Frames(), serverpackets.OpcodeActionFailed)
 	if _, ok := state.Object(ground.ObjectID()); !ok {
 		t.Fatal("shift-deferred out-of-range pickup was collected instead of failing outright")
 	}
@@ -764,7 +765,7 @@ func TestFinishDeferredPickupHonorsShiftAndFailsWithoutWalking(t *testing.T) {
 func TestPickupLiveGroundItemMergesStackAndDeletesGroundRow(t *testing.T) {
 	templates := petTestTemplates()
 	existing := &item.Instance{ObjectID: 800, TemplateID: item.AdenaID, OwnerID: 1, Count: 10, Location: item.LocationInventory}
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{existing})
 	state := world.New()
 	state.Spawn(live, 100, 0, 0, 0)
@@ -772,7 +773,7 @@ func TestPickupLiveGroundItemMergesStackAndDeletesGroundRow(t *testing.T) {
 	tmpl, _ := templates.Get(item.AdenaID)
 	ground := dropTestGround(t, state, drops, item.Instance{ObjectID: 900, TemplateID: item.AdenaID, Count: 40, ManaLeft: -1}, tmpl, 100, 0, 0)
 
-	capture.frames = nil
+	testsupport.ResetCapture(capture)
 	store := &recordingEnchantItemStore{}
 	gcl := &GameClientLink{world: state, groundItems: drops, items: store}
 
@@ -805,9 +806,9 @@ func TestPickupLiveGroundItemBroadcastsAttentionForWeaponAndArmor(t *testing.T) 
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			templates := pickupAttentionTestTemplates()
-			pickerFrames := &frameCapture{}
-			observerFrames := &frameCapture{}
-			farFrames := &frameCapture{}
+			pickerFrames := &testsupport.FrameCapture{}
+			observerFrames := &testsupport.FrameCapture{}
+			farFrames := &testsupport.FrameCapture{}
 			picker := newEquipTestLivePlayer(t, 1, pickerFrames, templates, nil)
 			observer := newEquipTestLivePlayer(t, 2, observerFrames, templates, nil)
 			far := newEquipTestLivePlayer(t, 3, farFrames, templates, nil)
@@ -825,16 +826,16 @@ func TestPickupLiveGroundItemBroadcastsAttentionForWeaponAndArmor(t *testing.T) 
 				ManaLeft:     -1,
 			}, tmpl, 100, 0, 0)
 
-			pickerFrames.frames = nil
-			observerFrames.frames = nil
-			farFrames.frames = nil
+			testsupport.ResetCapture(pickerFrames)
+			testsupport.ResetCapture(observerFrames)
+			testsupport.ResetCapture(farFrames)
 			gcl := &GameClientLink{world: state, groundItems: drops}
 
 			gcl.pickupLiveGroundItem(context.Background(), picker, ground)
 
-			assertPickupAttentionFrame(t, firstSystemMessageFrame(pickerFrames.frames), tc.messageID, picker.Name, tc.enchantLevel, tc.templateID)
-			assertPickupAttentionFrame(t, firstSystemMessageFrame(observerFrames.frames), tc.messageID, picker.Name, tc.enchantLevel, tc.templateID)
-			if frame := firstSystemMessageFrame(farFrames.frames); frame != nil {
+			assertPickupAttentionFrame(t, firstSystemMessageFrame(pickerFrames.Frames()), tc.messageID, picker.Name, tc.enchantLevel, tc.templateID)
+			assertPickupAttentionFrame(t, firstSystemMessageFrame(observerFrames.Frames()), tc.messageID, picker.Name, tc.enchantLevel, tc.templateID)
+			if frame := firstSystemMessageFrame(farFrames.Frames()); frame != nil {
 				t.Fatalf("far observer received attention SystemMessage frame: % x", frame)
 			}
 		})
@@ -843,8 +844,8 @@ func TestPickupLiveGroundItemBroadcastsAttentionForWeaponAndArmor(t *testing.T) 
 
 func TestPickupLiveGroundItemSkipsAttentionForEtcItem(t *testing.T) {
 	templates := pickupAttentionTestTemplates()
-	pickerFrames := &frameCapture{}
-	observerFrames := &frameCapture{}
+	pickerFrames := &testsupport.FrameCapture{}
+	observerFrames := &testsupport.FrameCapture{}
 	picker := newEquipTestLivePlayer(t, 1, pickerFrames, templates, nil)
 	observer := newEquipTestLivePlayer(t, 2, observerFrames, templates, nil)
 	state := world.New()
@@ -854,23 +855,23 @@ func TestPickupLiveGroundItemSkipsAttentionForEtcItem(t *testing.T) {
 	tmpl, _ := templates.Get(item.AdenaID)
 	ground := dropTestGround(t, state, drops, item.Instance{ObjectID: 900, TemplateID: item.AdenaID, Count: 40, ManaLeft: -1}, tmpl, 100, 0, 0)
 
-	pickerFrames.frames = nil
-	observerFrames.frames = nil
+	testsupport.ResetCapture(pickerFrames)
+	testsupport.ResetCapture(observerFrames)
 	gcl := &GameClientLink{world: state, groundItems: drops}
 
 	gcl.pickupLiveGroundItem(context.Background(), picker, ground)
 
-	if frame := firstSystemMessageFrame(pickerFrames.frames); frame != nil {
+	if frame := firstSystemMessageFrame(pickerFrames.Frames()); frame != nil {
 		t.Fatalf("etc pickup sent picker attention SystemMessage frame: % x", frame)
 	}
-	if frame := firstSystemMessageFrame(observerFrames.frames); frame != nil {
+	if frame := firstSystemMessageFrame(observerFrames.Frames()); frame != nil {
 		t.Fatalf("etc pickup broadcast SystemMessage frame: % x", frame)
 	}
 }
 
 func TestPickupLiveGroundItemRejectsOutOfRange(t *testing.T) {
 	templates := petTestTemplates()
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
 	state := world.New()
 	state.Spawn(live, 100, 0, 0, 0)
@@ -878,7 +879,7 @@ func TestPickupLiveGroundItemRejectsOutOfRange(t *testing.T) {
 	tmpl, _ := templates.Get(item.AdenaID)
 	ground := dropTestGround(t, state, drops, item.Instance{ObjectID: 900, TemplateID: item.AdenaID, Count: 40, ManaLeft: -1}, tmpl, 100+groundPickupInteractionDistance+1, 0, 0)
 
-	capture.frames = nil
+	testsupport.ResetCapture(capture)
 	gcl := &GameClientLink{world: state, groundItems: drops}
 
 	gcl.pickupLiveGroundItem(context.Background(), live, ground)
@@ -887,7 +888,7 @@ func TestPickupLiveGroundItemRejectsOutOfRange(t *testing.T) {
 	// clientActionFailed() unconditionally and then re-evaluates the move,
 	// but never a rejection SystemMessage from this branch (PlayableAI.java:
 	// 199-234).
-	assertOpcodeSequence(t, capture.frames, serverpackets.OpcodeActionFailed)
+	testsupport.AssertOpcodeSequence(t, capture.Frames(), serverpackets.OpcodeActionFailed)
 	if _, ok := state.Object(ground.ObjectID()); !ok {
 		t.Fatal("ground item removed after an out-of-range pickup attempt")
 	}
@@ -902,7 +903,7 @@ func TestPickupLiveGroundItemRejectsOutOfRange(t *testing.T) {
 // 225-228).
 func TestStartPickupLiveGroundItemRejectsBlockedWalkWithActionFailedOnly(t *testing.T) {
 	templates := petTestTemplates()
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newTestLivePlayerWithGeo(t, 1, capture, blockedTestGeo{})
 	state := world.New()
 	state.Spawn(live, 100, 0, 0, 0)
@@ -910,14 +911,14 @@ func TestStartPickupLiveGroundItemRejectsBlockedWalkWithActionFailedOnly(t *test
 	tmpl, _ := templates.Get(item.AdenaID)
 	ground := dropTestGround(t, state, drops, item.Instance{ObjectID: 900, TemplateID: item.AdenaID, Count: 40, ManaLeft: -1}, tmpl, 100+groundPickupInteractionDistance+50, 0, 0)
 
-	capture.frames = nil
+	testsupport.ResetCapture(capture)
 	gcl := &GameClientLink{world: state, groundItems: drops}
 
 	if !gcl.startPickupLiveGroundItem(context.Background(), live, ground, false) {
 		t.Fatal("startPickupLiveGroundItem returned false for a ground item target")
 	}
 
-	assertOpcodeSequence(t, capture.frames, serverpackets.OpcodeActionFailed)
+	testsupport.AssertOpcodeSequence(t, capture.Frames(), serverpackets.OpcodeActionFailed)
 	if _, ok := state.Object(ground.ObjectID()); !ok {
 		t.Fatal("ground item removed after a blocked-walk pickup attempt")
 	}
@@ -986,7 +987,7 @@ func assertPickupAttentionFrame(t *testing.T, frame []byte, wantID int, wantName
 
 func TestPickupLiveGroundItemRejectsLootLockedByOtherOwner(t *testing.T) {
 	templates := petTestTemplates()
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
 	state := world.New()
 	state.Spawn(live, 100, 0, 0, 0)
@@ -994,12 +995,12 @@ func TestPickupLiveGroundItemRejectsLootLockedByOtherOwner(t *testing.T) {
 	tmpl, _ := templates.Get(item.AdenaID)
 	ground := dropTestGround(t, state, drops, item.Instance{ObjectID: 900, TemplateID: item.AdenaID, OwnerID: 99, Count: 40, ManaLeft: -1}, tmpl, 100, 0, 0)
 
-	capture.frames = nil
+	testsupport.ResetCapture(capture)
 	gcl := &GameClientLink{world: state, groundItems: drops}
 
 	gcl.pickupLiveGroundItem(context.Background(), live, ground)
 
-	assertOpcodeSequence(t, capture.frames, serverpackets.OpcodeActionFailed, serverpackets.OpcodeSystemMessage)
+	testsupport.AssertOpcodeSequence(t, capture.Frames(), serverpackets.OpcodeActionFailed, serverpackets.OpcodeSystemMessage)
 	if _, ok := state.Object(ground.ObjectID()); !ok {
 		t.Fatal("loot-locked ground item removed by a non-owner pickup attempt")
 	}
@@ -1011,7 +1012,7 @@ func TestPickupLiveGroundItemRejectsLootLockedByOtherOwner(t *testing.T) {
 // rejection.
 func TestPickupLiveGroundItemRejectsWhenTrading(t *testing.T) {
 	templates := petTestTemplates()
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
 	state := world.New()
 	state.Spawn(live, 100, 0, 0, 0)
@@ -1023,12 +1024,12 @@ func TestPickupLiveGroundItemRejectsWhenTrading(t *testing.T) {
 	trades.Request(live.ObjectID(), 2)
 	trades.Answer(2, true)
 
-	capture.frames = nil
+	testsupport.ResetCapture(capture)
 	gcl := &GameClientLink{world: state, groundItems: drops, trades: trades}
 
 	gcl.pickupLiveGroundItem(context.Background(), live, ground)
 
-	assertOpcodeSequence(t, capture.frames, serverpackets.OpcodeActionFailed, serverpackets.OpcodeSystemMessage)
+	testsupport.AssertOpcodeSequence(t, capture.Frames(), serverpackets.OpcodeActionFailed, serverpackets.OpcodeSystemMessage)
 	if _, ok := state.Object(ground.ObjectID()); !ok {
 		t.Fatal("ground item removed while its picker was trading")
 	}
@@ -1040,7 +1041,7 @@ func TestPickupLiveGroundItemRejectsWhenTrading(t *testing.T) {
 func TestPickupLiveGroundItemRejectsHerbLootLockedByOtherOwner(t *testing.T) {
 	const herbTemplate int32 = 8600
 	templates := herbTestTemplates()
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
 	state := world.New()
 	state.Spawn(live, 100, 0, 0, 0)
@@ -1048,12 +1049,12 @@ func TestPickupLiveGroundItemRejectsHerbLootLockedByOtherOwner(t *testing.T) {
 	tmpl, _ := templates.Get(herbTemplate)
 	ground := dropTestGround(t, state, drops, item.Instance{ObjectID: 900, TemplateID: herbTemplate, OwnerID: 99, Count: 1, ManaLeft: -1}, tmpl, 100, 0, 0)
 
-	capture.frames = nil
+	testsupport.ResetCapture(capture)
 	gcl := &GameClientLink{world: state, groundItems: drops}
 
 	gcl.pickupLiveGroundItem(context.Background(), live, ground)
 
-	assertOpcodeSequence(t, capture.frames, serverpackets.OpcodeActionFailed, serverpackets.OpcodeSystemMessage)
+	testsupport.AssertOpcodeSequence(t, capture.Frames(), serverpackets.OpcodeActionFailed, serverpackets.OpcodeSystemMessage)
 	if _, ok := state.Object(ground.ObjectID()); !ok {
 		t.Fatal("loot-locked herb removed by a non-owner pickup attempt")
 	}
@@ -1062,7 +1063,7 @@ func TestPickupLiveGroundItemRejectsHerbLootLockedByOtherOwner(t *testing.T) {
 func TestPickupLiveGroundItemRejectsWhenSlotsFull(t *testing.T) {
 	templates := petTestTemplates()
 	held := &item.Instance{ObjectID: 800, TemplateID: 2375, OwnerID: 1, Count: 1, Location: item.LocationInventory}
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{held})
 	live.Inventory().SlotLimit = 1
 	state := world.New()
@@ -1071,19 +1072,19 @@ func TestPickupLiveGroundItemRejectsWhenSlotsFull(t *testing.T) {
 	tmpl, _ := templates.Get(int32(2375))
 	ground := dropTestGround(t, state, drops, item.Instance{ObjectID: 900, TemplateID: 2375, Count: 1, ManaLeft: -1}, tmpl, 100, 0, 0)
 
-	capture.frames = nil
+	testsupport.ResetCapture(capture)
 	gcl := &GameClientLink{world: state, groundItems: drops}
 
 	gcl.pickupLiveGroundItem(context.Background(), live, ground)
 
-	assertSystemMessageIDFrame(t, capture.frames[1], serverpackets.SystemMessageSlotsFull)
+	assertSystemMessageIDFrame(t, capture.Frames()[1], serverpackets.SystemMessageSlotsFull)
 	// This is the regression case for the reported bug: a full inventory
 	// (an easy state to reach while playtesting pickup) previously answered
 	// only with the system message, leaving the client's action pending
 	// forever — matching "item never disappears" (the pickup click that
 	// would have retried never got a chance) and "character stops
 	// responding to movement". ActionFailed leads (reference order).
-	if got := frameOpcodes(capture.frames); string(got) != string([]byte{serverpackets.OpcodeActionFailed, serverpackets.OpcodeSystemMessage}) {
+	if got := testsupport.FrameOpcodes(capture.Frames()); string(got) != string([]byte{serverpackets.OpcodeActionFailed, serverpackets.OpcodeSystemMessage}) {
 		t.Fatalf("slots-full opcodes = %x, want ActionFailed, SystemMessage", got)
 	}
 	if _, ok := state.Object(ground.ObjectID()); !ok {
