@@ -157,6 +157,9 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 	}
 	client.Session.SendFrame(serverpackets.FrameEtcStatusUpdate(serverpackets.EtcStatus{WeightPenalty: int32(c.WeightPenalty()), GradePenalty: c.WeaponGradePenalty() || c.ArmorGradePenalty() > 0, DeathPenaltyLevel: int32(c.DeathPenaltyLevel())}))
 	client.Session.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageWelcomeToLineage))
+	if l.playerClock != nil && c.Race == player.RaceDarkElf {
+		l.playerClock.NotifyShadowSenseState(live)
+	}
 	client.Session.SendFrame(serverpackets.FrameQuestList(nil))
 	client.Session.SendFrame(serverpackets.FrameSkillList(skillList))
 	client.Session.SendFrame(serverpackets.FrameFriendList(nil))

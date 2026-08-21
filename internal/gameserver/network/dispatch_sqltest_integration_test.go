@@ -42,7 +42,7 @@ func newLinkedSQLGameClientFull(t *testing.T, skills *skillstate.Persistence, sh
 	shortcuts = gamesql.NewShortcutStore(db)
 	knownSkills = gamesql.NewCharacterSkillStore(db)
 	if skills == nil {
-		skills = skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), modelskill.NewTable([]modelskill.Definition{{ID: 248, Level: 3}}), knownSkills)
+		skills = skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), modelskill.NewTable([]modelskill.Definition{{ID: 248, Level: 3}, {ID: 294, Level: 1}}), knownSkills)
 	}
 	if seed != nil {
 		seed(chars, items)
@@ -66,6 +66,11 @@ func newLinkedSQLGameClientFull(t *testing.T, skills *skillstate.Persistence, sh
 	}
 	t.Cleanup(func() { loginLink.Close() })
 	state = world.New()
+	clock := task.NewGameClock(time.Now)
+	playerClock, err := task.NewPlayerClock(clock, state, NewPlayerClockEffects(state))
+	if err != nil {
+		t.Fatalf("new player clock: %v", err)
+	}
 	templates := testTemplates(t)
 	itemTemplates := testItemTemplates()
 	ids := &sequentialIDs{next: 100}
@@ -90,6 +95,7 @@ func newLinkedSQLGameClientFull(t *testing.T, skills *skillstate.Persistence, sh
 		IDs:              ids,
 		GroundItems:      task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour, PlayerDroppedMultiplier: 1}, time.Now),
 		Positions:        task.NewPositionUpdates(state),
+		PlayerClock:      playerClock,
 		InventoryUpdates: inventoryUpdates,
 		PlayerConfig:     PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: karmaPlayerCanTeleport, AllowWater: true},
 		PetConfig:        petmodel.DefaultConfig(),
