@@ -22,6 +22,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -51,13 +53,14 @@ func TestLiveMoveSpeedUsesSwimSpeedInWater(t *testing.T) {
 	}
 
 	live.SetRunning(false)
+	live.AddStatFuncs([]effect.Mod{{Stat: stat.RunSpeed, Op: effect.OpAdd, Value: 5}})
 	if got := liveMoveSpeed(live); got != live.SwimSpeed() {
 		t.Fatalf("liveMoveSpeed() in water while walking = %v, want SwimSpeed() %v (swim speed ignores run/walk)", got, live.SwimSpeed())
 	}
 
 	live.zoneActor.ZoneFlags().Set(zone.FlagWater, false)
-	if got := liveMoveSpeed(live); got != live.template.WalkSpeed {
-		t.Fatalf("liveMoveSpeed() back on land while walking = %v, want WalkSpeed %v", got, live.template.WalkSpeed)
+	if got, want := liveMoveSpeed(live), live.WalkSpeed(); got != want {
+		t.Fatalf("liveMoveSpeed() back on land while walking = %v, want stat-modified WalkSpeed %v", got, want)
 	}
 }
 
