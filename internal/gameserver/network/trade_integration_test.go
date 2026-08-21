@@ -72,16 +72,16 @@ func TestDirectTradeAddItemToleratesPartnerOutOfRange(t *testing.T) {
 	if err := link.world.Move(second, 1000, 0, 0); err != nil {
 		t.Fatalf("Move: %v", err)
 	}
-	resetCapture(firstCap, secondCap)
+	testsupport.ResetCapture(firstCap, secondCap)
 
 	link.handleAddTradeItem(first, clientpackets.AddTradeItem{ObjectID: 500, Count: 40})
 
-	assertOpcodeSequence(t, firstCap.frames,
+	testsupport.AssertOpcodeSequence(t, firstCap.Frames(),
 		serverpackets.OpcodeTradeOwnAdd,
 		serverpackets.OpcodeTradeUpdate,
 		serverpackets.OpcodeTradeItemUpdate,
 	)
-	assertOpcodeSequence(t, secondCap.frames, serverpackets.OpcodeTradeOtherAdd)
+	testsupport.AssertOpcodeSequence(t, secondCap.Frames(), serverpackets.OpcodeTradeOtherAdd)
 	if !link.trades.HasActive(first.ObjectID()) || !link.trades.HasActive(second.ObjectID()) {
 		t.Fatal("trade session should still be active after AddTradeItem with partner out of range")
 	}
