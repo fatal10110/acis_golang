@@ -47,17 +47,25 @@ type TradeItemUpdateEntry struct {
 	AvailableCount int
 }
 
+// siegeGuardItemIDMin and siegeGuardItemIDMax bound the buylist item IDs
+// that price with the siege-guard rate multiplier (BuyList.java:47).
+const (
+	siegeGuardItemIDMin = 3960
+	siegeGuardItemIDMax = 4026
+)
+
 // FrameBuyList builds the BuyList packet for a merchant buylist.
-func FrameBuyList(list buylist.List, currentMoney int, taxRate float64, templates *item.Table) (wire.Frame, error) {
+// siegeGuardsPriceRate mirrors Config.RATE_SIEGE_GUARDS_PRICE (default 1.0).
+func FrameBuyList(list buylist.List, currentMoney int, taxRate, siegeGuardsPriceRate float64, templates *item.Table) (wire.Frame, error) {
 	w := newFrameWriter(OpcodeBuyList)
-	if err := writeBuyList(w, list, currentMoney, taxRate, templates); err != nil {
+	if err := writeBuyList(w, list, currentMoney, taxRate, siegeGuardsPriceRate, templates); err != nil {
 		releaseFrameWriter(w)
 		return wire.Frame{}, err
 	}
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter), nil
 }
 
-func writeBuyList(w *wire.Writer, list buylist.List, currentMoney int, taxRate float64, templates *item.Table) error {
+func writeBuyList(w *wire.Writer, list buylist.List, currentMoney int, taxRate, siegeGuardsPriceRate float64, templates *item.Table) error {
 	w.WriteInt32(int32(currentMoney))
 	w.WriteInt32(int32(list.ID))
 	count, err := wire.Uint16Count(len(list.Products))
@@ -77,7 +85,12 @@ func writeBuyList(w *wire.Writer, list buylist.List, currentMoney int, taxRate f
 		if count < 0 {
 			count = 0
 		}
-		price := int32(float64(product.Price) * (1 + taxRate))
+		var price int32
+		if product.ItemID >= siegeGuardItemIDMin && product.ItemID <= siegeGuardItemIDMax {
+			price = int32(float64(product.Price) * siegeGuardsPriceRate * (1 + taxRate))
+		} else {
+			price = int32(float64(product.Price) * (1 + taxRate))
+		}
 		writeShopItem(w, tmpl, product.ItemID, product.ItemID, count, 0, 0, 0, price)
 	}
 	return nil
