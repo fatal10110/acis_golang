@@ -5,8 +5,21 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
+	"github.com/fatal10110/acis_golang/internal/gameserver/geo/engine"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
+
+type movementDynamicObject struct {
+	x, y, z int
+	data    [][]block.NSWE
+}
+
+func (o movementDynamicObject) GeoX() int               { return o.x }
+func (o movementDynamicObject) GeoY() int               { return o.y }
+func (o movementDynamicObject) GeoZ() int               { return o.z }
+func (o movementDynamicObject) Height() int             { return 32 }
+func (o movementDynamicObject) GeoData() [][]block.NSWE { return o.data }
 
 func TestCreatureMove_MoveToLocationScenarios(t *testing.T) {
 	origin := location.Location{X: 10, Y: 20, Z: 30}
@@ -154,6 +167,107 @@ func TestCreatureMove_MoveToLocationPassesGeodataCoordinates(t *testing.T) {
 	wantMove := geoCall{origin: origin, target: location.Location{X: target.X, Y: target.Y, Z: 42}}
 	if len(geo.moveCalls) != 1 || geo.moveCalls[0] != wantMove {
 		t.Fatalf("CanMove() calls = %+v, want [%+v]", geo.moveCalls, wantMove)
+	}
+}
+
+func TestCreatureMove_UpdatePositionStopsWhenObstacleCloses(t *testing.T) {
+	geo := &recordingGeo{canMove: true}
+	mover, err := NewCreatureMove(location.Location{}, 100, geo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	arrived := 0
+	blocked := 0
+	mover.SetArrivedHook(func() { arrived++ })
+	mover.SetBlockedHook(func() { blocked++ })
+	if _, err := mover.MoveToLocation(location.Location{X: 100}); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, moving := mover.UpdatePosition(PositionUpdateInterval); !moving {
+		t.Fatal("first UpdatePosition() stopped move, want moving")
+	}
+	geo.canMove = false
+	if _, moving := mover.UpdatePosition(PositionUpdateInterval); moving {
+		t.Fatal("UpdatePosition() moving = true after obstacle closes, want false")
+	}
+
+	if got := mover.Position(); got != (location.Location{X: 10}) {
+		t.Fatalf("Position() = %+v, want %+v", got, location.Location{X: 10})
+	}
+	if arrived != 0 {
+		t.Fatalf("arrived hook calls = %d, want 0", arrived)
+	}
+	if blocked != 1 {
+		t.Fatalf("blocked hook calls = %d, want 1", blocked)
+	}
+	want := geoCall{origin: location.Location{X: 10}, target: location.Location{X: 20}}
+	if got := geo.moveCalls[len(geo.moveCalls)-1]; got != want {
+		t.Fatalf("last CanMove() call = %+v, want %+v", got, want)
+	}
+}
+
+func TestCreatureMove_UpdatePositionChecksFinalStepForNewObstacle(t *testing.T) {
+	geo := &recordingGeo{canMove: true}
+	mover, err := NewCreatureMove(location.Location{}, 100, geo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	arrived := 0
+	blocked := 0
+	mover.SetArrivedHook(func() { arrived++ })
+	mover.SetBlockedHook(func() { blocked++ })
+	if _, err := mover.MoveToLocation(location.Location{X: 10}); err != nil {
+		t.Fatal(err)
+	}
+
+	geo.canMove = false
+	if _, moving := mover.UpdatePosition(PositionUpdateInterval); moving {
+		t.Fatal("UpdatePosition() moving = true after obstacle closes, want false")
+	}
+	if got := mover.Position(); got != (location.Location{}) {
+		t.Fatalf("Position() = %+v, want origin", got)
+	}
+	if arrived != 0 || blocked != 1 {
+		t.Fatalf("arrival callbacks = (%d, %d), want (0, 1)", arrived, blocked)
+	}
+}
+
+func TestCreatureMove_UpdatePositionStopsWhenDynamicNSWECloses(t *testing.T) {
+	e := engine.New()
+	region, err := block.NewRegionFromBlocks([]block.Block{block.NewFlat(0)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := e.SetRegion(engine.TileXMin, engine.TileYMin, region); err != nil {
+		t.Fatal(err)
+	}
+	origin := location.Location{X: engine.WorldX(0), Y: engine.WorldY(0)}
+	target := location.Location{X: engine.WorldX(2), Y: origin.Y}
+	mover, err := NewCreatureMove(origin, 160, NewGeo(e, nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	arrived := 0
+	blocked := 0
+	mover.SetArrivedHook(func() { arrived++ })
+	mover.SetBlockedHook(func() { blocked++ })
+	if _, err := mover.MoveToLocation(target); err != nil {
+		t.Fatal(err)
+	}
+	if _, moving := mover.UpdatePosition(PositionUpdateInterval); !moving {
+		t.Fatal("first UpdatePosition() stopped move, want moving")
+	}
+
+	e.AddObject(movementDynamicObject{x: 1, y: 0, data: [][]block.NSWE{{block.NoDirections}}})
+	if _, moving := mover.UpdatePosition(PositionUpdateInterval); moving {
+		t.Fatal("UpdatePosition() moving = true after dynamic NSWE closes, want false")
+	}
+	if got := mover.Position(); got != (location.Location{X: engine.WorldX(1), Y: origin.Y}) {
+		t.Fatalf("Position() = %+v, want position before dynamic obstacle", got)
+	}
+	if arrived != 0 || blocked != 1 {
+		t.Fatalf("arrival callbacks = (%d, %d), want (0, 1)", arrived, blocked)
 	}
 }
 

@@ -24,6 +24,7 @@ type validLocationCall struct {
 // is disproportionate for these move-resolution unit tests. Kept as-is.
 type recordingGeo struct {
 	canMove            bool
+	canMoveAt          func(ox, oy, oz, tx, ty, tz int) bool
 	height             int16
 	findPath           []location.Location
 	findPathOK         bool
@@ -39,6 +40,9 @@ func (g *recordingGeo) CanMove(ox, oy, oz, tx, ty, tz int) bool {
 		origin: location.Location{X: ox, Y: oy, Z: oz},
 		target: location.Location{X: tx, Y: ty, Z: tz},
 	})
+	if g.canMoveAt != nil {
+		return g.canMoveAt(ox, oy, oz, tx, ty, tz)
+	}
 	return g.canMove
 }
 

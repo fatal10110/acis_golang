@@ -242,6 +242,17 @@ func (c *Controller) SetArrived(arrived func()) {
 	})
 }
 
+// SetBlocked records the callback invoked when a dynamic obstacle stops
+// movement before arrival. A nil callback (the default) makes it a no-op.
+func (c *Controller) SetBlocked(blocked func()) {
+	c.move.SetBlockedHook(func() {
+		c.removePositionUpdate()
+		if blocked != nil {
+			blocked()
+		}
+	})
+}
+
 // PositionUpdate advances one movement correction tick, syncing this
 // controller's world presence to the newly interpolated position. An
 // ordinary interpolation tick does not itself rebroadcast a movement
