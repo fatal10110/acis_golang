@@ -3,6 +3,7 @@
 package network
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -581,6 +582,54 @@ func TestGameClientLinkTogglesOnThenOff(t *testing.T) {
 	effects = character.EffectList().All()
 	if len(effects) != 0 {
 		t.Fatalf("effects after toggle deactivation = %+v, want none", effects)
+	}
+}
+
+func TestGameClientLinkToggleCostFailuresBroadcastCastAbort(t *testing.T) {
+	store := newMemorySkillSaveStore()
+	skills := skillstate.NewPersistence(store, modelskill.NewTable([]modelskill.Definition{
+		{ID: 289, Level: 1, Activation: modelskill.ActivationToggle, Target: modelskill.TargetSelf, MPConsume: 100000},
+		{ID: 290, Level: 1, Activation: modelskill.ActivationToggle, Target: modelskill.TargetSelf, HPConsume: 100000},
+	}), store)
+	var objID int32
+	c, _, _, _, _, _ := newLinkedSQLGameClient(t, skills, func(chars *gamesql.CharacterStore, _ *gamesql.ItemStore) {
+		objID = seedSelectableSQLCharacter(t, chars, "player1", "Newbie", 5, 0).ID
+		store.seedKnown(objID, 0, player.SkillLevels{289: 1, 290: 1})
+	}, 1)
+
+	c.send(encodeRequestGameStart(0))
+	c.read() // SSQInfo
+	c.read() // CharSelected
+	c.send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	for _, test := range []struct {
+		skillID int32
+		message int32
+	}{
+		{289, serverpackets.SystemMessageNotEnoughMP},
+		{290, serverpackets.SystemMessageNotEnoughHP},
+	} {
+		t.Run(fmt.Sprintf("skill-%d", test.skillID), func(t *testing.T) {
+			c.send(encodeRequestMagicSkillUse(test.skillID, false, false))
+			if frame := c.read(); frame[0] != serverpackets.OpcodeMagicSkillUse {
+				t.Fatalf("first opcode = %#x, want MagicSkillUse (%#x)", frame[0], serverpackets.OpcodeMagicSkillUse)
+			}
+			if frame := c.read(); frame[0] != serverpackets.OpcodeMagicSkillCanceled {
+				t.Fatalf("second opcode = %#x, want MagicSkillCanceled (%#x)", frame[0], serverpackets.OpcodeMagicSkillCanceled)
+			}
+			frame := c.read()
+			if frame[0] != serverpackets.OpcodeSystemMessage {
+				t.Fatalf("third opcode = %#x, want SystemMessage (%#x)", frame[0], serverpackets.OpcodeSystemMessage)
+			}
+			if got := wire.NewReader(frame[1:]).ReadInt32(); got != test.message {
+				t.Fatalf("SystemMessage id = %d, want %d", got, test.message)
+			}
+			if frame := c.read(); frame[0] != serverpackets.OpcodeActionFailed {
+				t.Fatalf("fourth opcode = %#x, want ActionFailed (%#x)", frame[0], serverpackets.OpcodeActionFailed)
+			}
+			c.expectNoFrame()
+		})
 	}
 }
 
