@@ -715,9 +715,9 @@ func TestGameClientLinkRequestGiveItemToPetDispatch(t *testing.T) {
 
 	c.send(encodeRequestGiveItemToPet(500, 25))
 	// giveItemToPet's own handler sends nothing on success; sync on a
-	// guaranteed-rejected follow-up before driving the tick, so the tick
+	// RequestItemList follow-up before driving the tick, so the tick
 	// doesn't race the transfer.
-	syncBarrier(t, c, func() { c.send(encodeRequestDestroyItem(999999, 1)) }, serverpackets.OpcodeActionFailed)
+	syncBarrier(t, c, func() { c.send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList)) }, serverpackets.OpcodeItemList)
 	inventoryUpdatesFor(t, state).Tick()
 	reply := c.read()
 	if reply[0] != serverpackets.OpcodePetInventoryUpdate {

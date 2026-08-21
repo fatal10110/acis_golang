@@ -288,12 +288,10 @@ func (l *GameClientLink) unequipItem(live *livePlayer, bodySlot int32) {
 
 func (l *GameClientLink) dropLiveItem(live *livePlayer, req clientpackets.RequestDropItem) {
 	if !liveItemOpsAllowed(live) || l.groundItems == nil || req.Count <= 0 {
-		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
 	inv := live.Inventory()
 	if inv == nil {
-		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
 	if req.ObjectID == live.Character.MountObjectID() {
@@ -339,12 +337,10 @@ func (l *GameClientLink) dropLiveItem(live *livePlayer, req clientpackets.Reques
 
 func (l *GameClientLink) destroyLiveItem(live *livePlayer, objectID int32, count int) {
 	if !liveItemOpsAllowed(live) || count <= 0 {
-		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
 	inv := live.Inventory()
 	if inv == nil {
-		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
 	if objectID == live.Character.MountObjectID() {
@@ -353,7 +349,6 @@ func (l *GameClientLink) destroyLiveItem(live *livePlayer, objectID int32, count
 	}
 	res, ok := l.inventory.DestroyItem(inv, objectID, count)
 	if !ok {
-		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
 	l.applyEquipStatChanges(live, inv, res)
@@ -364,7 +359,6 @@ func (l *GameClientLink) destroyLiveItem(live *livePlayer, objectID int32, count
 
 func (l *GameClientLink) crystallizeLiveItem(live *livePlayer, req clientpackets.RequestCrystallizeItem) {
 	if !liveItemOpsAllowed(live) || req.Count <= 0 {
-		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
 	inv := live.Inventory()
@@ -384,7 +378,6 @@ func (l *GameClientLink) crystallizeLiveItem(live *livePlayer, req clientpackets
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	default:
-		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
 

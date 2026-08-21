@@ -396,8 +396,8 @@ func TestDeadPlayerItemOpsAreNoops(t *testing.T) {
 
 		(&GameClientLink{}).destroyLiveItem(live, stack.ObjectID, 2)
 
-		if stack.Count != 5 || len(capture.frames) != 1 || capture.frames[0][0] != serverpackets.OpcodeActionFailed {
-			t.Fatalf("dead RequestDestroyItem mutated item=%+v frames=%x, want unchanged item and ActionFailed only", stack, capture.frames)
+		if stack.Count != 5 || len(capture.frames) != 0 {
+			t.Fatalf("dead RequestDestroyItem mutated item=%+v frames=%x, want unchanged item and no frames", stack, capture.frames)
 		}
 	})
 
@@ -411,8 +411,8 @@ func TestDeadPlayerItemOpsAreNoops(t *testing.T) {
 
 		(&GameClientLink{ids: &sequentialIDs{next: 100}}).crystallizeLiveItem(live, clientpackets.RequestCrystallizeItem{ObjectID: weapon.ObjectID, Count: 1})
 
-		if live.Inventory().ItemByObjectID(weapon.ObjectID) == nil || len(capture.frames) != 1 || capture.frames[0][0] != serverpackets.OpcodeActionFailed {
-			t.Fatalf("dead RequestCrystallizeItem mutated inventory frames=%x, want unchanged inventory and ActionFailed only", capture.frames)
+		if live.Inventory().ItemByObjectID(weapon.ObjectID) == nil || len(capture.frames) != 0 {
+			t.Fatalf("dead RequestCrystallizeItem mutated inventory frames=%x, want unchanged inventory and no frames", capture.frames)
 		}
 	})
 }
