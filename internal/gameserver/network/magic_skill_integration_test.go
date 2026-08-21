@@ -615,15 +615,15 @@ func TestGameClientLinkToggleCostFailuresBroadcastCastAbort(t *testing.T) {
 			if frame := c.read(); frame[0] != serverpackets.OpcodeMagicSkillUse {
 				t.Fatalf("first opcode = %#x, want MagicSkillUse (%#x)", frame[0], serverpackets.OpcodeMagicSkillUse)
 			}
-			if frame := c.read(); frame[0] != serverpackets.OpcodeMagicSkillCanceled {
-				t.Fatalf("second opcode = %#x, want MagicSkillCanceled (%#x)", frame[0], serverpackets.OpcodeMagicSkillCanceled)
-			}
 			frame := c.read()
 			if frame[0] != serverpackets.OpcodeSystemMessage {
-				t.Fatalf("third opcode = %#x, want SystemMessage (%#x)", frame[0], serverpackets.OpcodeSystemMessage)
+				t.Fatalf("second opcode = %#x, want SystemMessage (%#x)", frame[0], serverpackets.OpcodeSystemMessage)
 			}
 			if got := wire.NewReader(frame[1:]).ReadInt32(); got != test.message {
 				t.Fatalf("SystemMessage id = %d, want %d", got, test.message)
+			}
+			if frame := c.read(); frame[0] != serverpackets.OpcodeMagicSkillCanceled {
+				t.Fatalf("third opcode = %#x, want MagicSkillCanceled (%#x)", frame[0], serverpackets.OpcodeMagicSkillCanceled)
 			}
 			if frame := c.read(); frame[0] != serverpackets.OpcodeActionFailed {
 				t.Fatalf("fourth opcode = %#x, want ActionFailed (%#x)", frame[0], serverpackets.OpcodeActionFailed)

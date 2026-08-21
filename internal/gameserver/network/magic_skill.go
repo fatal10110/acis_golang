@@ -288,7 +288,10 @@ func (l *GameClientLink) handleToggleSkillUse(live *livePlayer, req clientpacket
 	if err != nil {
 		if errors.Is(err, actorcast.ErrNotEnoughMP) || errors.Is(err, actorcast.ErrNotEnoughHP) {
 			broadcast()
+			sendMagicCastFailureReason(live, def, err)
 			l.broadcastCastAborted(live, false)
+			sendMagicActionFailed(live)
+			return
 		}
 		sendMagicCastFailure(live, def, err)
 		return
