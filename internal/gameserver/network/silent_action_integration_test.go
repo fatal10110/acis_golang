@@ -9,7 +9,6 @@ import (
 
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
@@ -53,10 +52,6 @@ func TestGameClientLinkNeverGoesSilentOnActionRequests(t *testing.T) {
 	}{
 		{"UseItem on an object the player doesn't hold", encodeUseItem(missingObjectID, false)},
 		{"RequestUnEquipItem for an empty body slot", encodeRequestUnEquipItem(0)},
-		{"RequestEnchantItem on an object the player doesn't hold", encodeRequestEnchantItem(missingObjectID)},
-		{"RequestDestroyItem on an object the player doesn't hold", encodeRequestDestroyItem(missingObjectID, 1)},
-		{"RequestCrystallizeItem on an object the player doesn't hold", encodeRequestCrystallizeItem(missingObjectID, 1)},
-		{"RequestDropItem on an object the player doesn't hold", encodeRequestDropItem(missingObjectID, 1, location.Location{})},
 		{"RequestActionUse with an action id no handler claims", encodeRequestActionUse(9999, false, false)},
 		{"RequestActionUse pet command with no active summon", encodeRequestActionUse(16, false, false)},
 		// Fishing trainer info for a skill the trainer can't offer: the

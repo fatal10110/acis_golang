@@ -52,6 +52,9 @@ const (
 	SystemMessageLethalStrikeSuccessful            = 1668
 	SystemMessageInvalidTarget                     = 109
 	SystemMessageCannotDiscardDistanceTooFar       = 151
+	SystemMessageCannotDiscardThisItem             = 98
+	SystemMessageCannotDestroyNumberIncorrect      = 163
+	SystemMessageHeroWeaponsCantDestroyed          = 1845
 	SystemMessageItemMissingToLearnSkill           = 276
 	SystemMessageLearnedSkill                      = 277
 	SystemMessageNotEnoughSPToLearnSkill           = 278
