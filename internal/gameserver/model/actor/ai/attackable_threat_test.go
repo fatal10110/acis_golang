@@ -63,8 +63,8 @@ func TestAttackableAITickRefreshesStaleThreatAndHate(t *testing.T) {
 	if got := ai.Hates().Hate(dead); got != 0 {
 		t.Fatalf("dead hate entry = %v, want removed", got)
 	}
-	if got := ai.Hates().Hate(kept); got != -65100 {
-		t.Fatalf("kept hate entry = %v, want decayed", got)
+	if got := ai.Hates().Hate(kept); got != 900 {
+		t.Fatalf("kept hate entry = %v, want unchanged", got)
 	}
 }
 

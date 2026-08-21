@@ -130,12 +130,10 @@ func TestCreatureMove_MoveToLocationPartialFallbackWalksPartialRoute(t *testing.
 	}
 }
 
-// TestCreatureMove_MoveToLocationNoProgressFallbackReturnsError covers the
-// tier-3 fully-blocked edge: the straight line is blocked, pathfinding finds
-// no route, and the partial fall-back resolves to the origin itself. The
-// request fails without altering the prior destination, preserving the
-// pre-existing in-flight move state.
-func TestCreatureMove_MoveToLocationNoProgressFallbackReturnsError(t *testing.T) {
+// TestCreatureMove_MoveToLocationNoProgressFallbackStartsZeroDistanceArrival
+// covers the tier-3 fully-blocked edge: the straight line is blocked,
+// pathfinding finds no route, and the partial fallback resolves to the origin.
+func TestCreatureMove_MoveToLocationNoProgressFallbackStartsZeroDistanceArrival(t *testing.T) {
 	origin := location.Location{X: 0, Y: 0, Z: 30}
 	prior := location.Location{X: -42, Y: -42, Z: 30}
 	geo := &recordingGeo{
@@ -143,25 +141,27 @@ func TestCreatureMove_MoveToLocationNoProgressFallbackReturnsError(t *testing.T)
 		height:     30,
 		findPath:   nil,
 		findPathOK: false,
-		// ValidLocation left zero → stub returns the call's origin, i.e.
-		// no lateral progress, which the resolver rejects.
+		// ValidLocation left zero → stub returns the call's origin.
 	}
 	mover, err := NewCreatureMove(origin, 50, geo)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Seed an in-flight destination so the "blocked" error preserves it.
+	// Seed an in-flight destination so the new request must replace it.
 	mover.destination = prior
 	mover.moving = true
 
-	_, err = mover.MoveToLocation(location.Location{X: 100, Y: 0, Z: 30})
-	if err == nil {
-		t.Fatal("MoveToLocation() error = nil, want error for no-progress fall-back")
+	event, err := mover.MoveToLocation(location.Location{X: 100, Y: 0, Z: 30})
+	if err != nil {
+		t.Fatalf("MoveToLocation() error = %v, want nil", err)
 	}
-	if got := mover.Destination(); got != prior {
-		t.Fatalf("Destination() = %+v, want preserved prior %+v", got, prior)
+	if want := (Event{Origin: origin, Destination: origin, Speed: 50}); event != want {
+		t.Fatalf("MoveToLocation() event = %+v, want %+v", event, want)
+	}
+	if got := mover.Destination(); got != origin {
+		t.Fatalf("Destination() = %+v, want origin %+v", got, origin)
 	}
 	if !mover.Moving() {
-		t.Fatal("Moving() = false, want prior in-flight state preserved")
+		t.Fatal("Moving() = false, want zero-distance arrival pending")
 	}
 }

@@ -204,15 +204,14 @@ func (m *CreatureMove) MoveToLocation(target location.Location) (Event, error) {
 func (m *CreatureMove) moveToLocationLocked(target location.Location) (Event, error) {
 	target.Z = int(m.geo.Height(target.X, target.Y, target.Z))
 
-	// Same-cell requests resolve as a zero-distance completion: no
-	// pathfinding query, no arrival timer.
+	// Same-cell requests complete on the next movement tick.
 	if target.X == m.origin.X && target.Y == m.origin.Y {
 		m.waypoints = nil
 		m.destination = target
 		m.accurateX = float64(m.origin.X)
 		m.accurateY = float64(m.origin.Y)
-		m.moving = false
-		m.rescheduleLocked(0)
+		m.moving = true
+		m.rescheduleLocked(PositionUpdateInterval)
 		return Event{Origin: m.origin, Destination: target, Speed: m.speed}, nil
 	}
 
@@ -237,8 +236,12 @@ func (m *CreatureMove) moveToLocationLocked(target location.Location) (Event, er
 	m.accurateY = float64(origin.Y)
 	m.destination = destination
 	m.waypoints = waypoints
-	m.moving = duration > 0
-	m.rescheduleLocked(duration)
+	m.moving = true
+	if duration == 0 {
+		m.rescheduleLocked(PositionUpdateInterval)
+	} else {
+		m.rescheduleLocked(duration)
+	}
 
 	return Event{
 		Origin:      origin,
@@ -274,12 +277,6 @@ func (m *CreatureMove) resolvePathLocked(target location.Location) (location.Loc
 	}
 
 	fallback := m.geo.ValidLocation(m.origin.X, m.origin.Y, m.origin.Z, target.X, target.Y, target.Z)
-	// A fall-back that resolves to the origin itself means walking the line
-	// makes no lateral progress: the route is genuinely blocked, so the
-	// request fails without disturbing the prior destination.
-	if fallback.X == m.origin.X && fallback.Y == m.origin.Y {
-		return location.Location{}, nil, errors.New("move: route is blocked")
-	}
 	return fallback, nil, nil
 }
 
