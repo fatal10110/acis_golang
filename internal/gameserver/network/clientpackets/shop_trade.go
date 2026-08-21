@@ -16,6 +16,11 @@ const (
 	shopBuyRowSize         = 2 * 4
 	shopSellRowSize        = 3 * 4
 	shopHeaderSize         = 2 * 4
+
+	// maxShopItemInPacket mirrors Config.MAX_ITEM_IN_PACKET (see
+	// warehouse.go's maxItemInPacket): max(INVENTORY_MAXIMUM_NO_DWARF,
+	// INVENTORY_MAXIMUM_DWARF), effectively 100.
+	maxShopItemInPacket = 100
 )
 
 // TradeRequest asks another player to open a direct trade.
@@ -238,6 +243,11 @@ func DecodeRequestSellItem(payload []byte) (RequestSellItem, error) {
 func validateShopRows(name string, count int32, rowSize, remaining int) error {
 	if count <= 0 {
 		return fmt.Errorf("clientpackets: %s: invalid item count %d", name, count)
+	}
+	// Mirrors RequestBuyItem.java:32 / RequestSellItem.java:26's
+	// "count > Config.MAX_ITEM_IN_PACKET" guard.
+	if count > maxShopItemInPacket {
+		return fmt.Errorf("clientpackets: %s: item count %d exceeds max %d", name, count, maxShopItemInPacket)
 	}
 	// A row-count/remaining-length mismatch mirrors the reference's silent
 	// readImpl() return (RequestBuyItem/RequestSellItem: "count * BATCH_LENGTH

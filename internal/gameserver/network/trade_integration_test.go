@@ -66,6 +66,27 @@ func TestDirectTradeAddItemSendsOfferPackets(t *testing.T) {
 	_ = second
 }
 
+func TestDirectTradeAddItemToleratesPartnerOutOfRange(t *testing.T) {
+	link, _, firstCap, secondCap, first, second := newStartedDirectTradeFixture(t)
+	seedLiveItem(t, first, 500, item.AdenaID, 100)
+	if err := link.world.Move(second, 1000, 0, 0); err != nil {
+		t.Fatalf("Move: %v", err)
+	}
+	resetCapture(firstCap, secondCap)
+
+	link.handleAddTradeItem(first, clientpackets.AddTradeItem{ObjectID: 500, Count: 40})
+
+	assertOpcodeSequence(t, firstCap.frames,
+		serverpackets.OpcodeTradeOwnAdd,
+		serverpackets.OpcodeTradeUpdate,
+		serverpackets.OpcodeTradeItemUpdate,
+	)
+	assertOpcodeSequence(t, secondCap.frames, serverpackets.OpcodeTradeOtherAdd)
+	if !link.trades.HasActive(first.ObjectID()) || !link.trades.HasActive(second.ObjectID()) {
+		t.Fatal("trade session should still be active after AddTradeItem with partner out of range")
+	}
+}
+
 func TestDirectTradeRejectsInvalidItem(t *testing.T) {
 	link, _, firstCap, secondCap, first, _ := newStartedDirectTradeFixture(t)
 	seedLiveItem(t, first, 501, 1463, 5)

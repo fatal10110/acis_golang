@@ -19,7 +19,7 @@ func TestFrameBuyList(t *testing.T) {
 		{ItemID: 2368, Price: 625, MaxCount: 3},
 	}}
 
-	frame, err := FrameBuyList(list, 123456, 0.10, templates)
+	frame, err := FrameBuyList(list, 123456, 0.10, 1.0, templates)
 	if err != nil {
 		t.Fatalf("FrameBuyList: %v", err)
 	}
@@ -31,6 +31,43 @@ func TestFrameBuyList(t *testing.T) {
 	want = binary.LittleEndian.AppendUint16(want, 2)
 	want = appendShopTradeItem(want, item.CategoryMoneyOrEtcItem, 57, 57, 0, item.SubCategoryMoney, item.SlotNone, 0, 0, 0, 1)
 	want = appendShopTradeItem(want, item.CategoryWeaponOrJewelry, 2368, 2368, 3, item.SubCategoryWeapon, item.SlotLRHand, 0, 0, 0, 687)
+
+	if !bytes.Equal(got, want) {
+		t.Fatalf("FrameBuyList() = %x, want %x", got, want)
+	}
+}
+
+// TestFrameBuyListSiegeGuardPrice proves siege-guard buylist items (IDs
+// 3960-4026) price with Config.RATE_SIEGE_GUARDS_PRICE in addition to tax,
+// per BuyList.java:47-50, while items outside that range use the plain
+// price*(1+taxRate) formula.
+func TestFrameBuyListSiegeGuardPrice(t *testing.T) {
+	templates := item.NewTable([]*item.Template{
+		{ID: 3960, Kind: item.KindEtcItem, Slot: item.SlotNone},
+		{ID: 4026, Kind: item.KindEtcItem, Slot: item.SlotNone},
+		{ID: 4027, Kind: item.KindEtcItem, Slot: item.SlotNone},
+	})
+	list := buylist.List{ID: 1, Products: []buylist.Product{
+		{ItemID: 3960, Price: 1000, MaxCount: -1},
+		{ItemID: 4026, Price: 1000, MaxCount: -1},
+		{ItemID: 4027, Price: 1000, MaxCount: -1},
+	}}
+
+	frame, err := FrameBuyList(list, 0, 0.10, 2.0, templates)
+	if err != nil {
+		t.Fatalf("FrameBuyList: %v", err)
+	}
+	got := framePayload(t, frame)
+
+	want := []byte{OpcodeBuyList}
+	want = binary.LittleEndian.AppendUint32(want, 0)
+	want = binary.LittleEndian.AppendUint32(want, 1)
+	want = binary.LittleEndian.AppendUint16(want, 3)
+	// Siege-guard range: price * rate(2.0) * (1+tax) = 1000*2.0*1.10 = 2200.
+	want = appendShopTradeItem(want, item.CategoryMoneyOrEtcItem, 3960, 3960, 0, item.SubCategoryOther, item.SlotNone, 0, 0, 0, 2200)
+	want = appendShopTradeItem(want, item.CategoryMoneyOrEtcItem, 4026, 4026, 0, item.SubCategoryOther, item.SlotNone, 0, 0, 0, 2200)
+	// Outside range: price * (1+tax) = 1000*1.10 = 1100, rate not applied.
+	want = appendShopTradeItem(want, item.CategoryMoneyOrEtcItem, 4027, 4027, 0, item.SubCategoryOther, item.SlotNone, 0, 0, 0, 1100)
 
 	if !bytes.Equal(got, want) {
 		t.Fatalf("FrameBuyList() = %x, want %x", got, want)
@@ -175,7 +212,7 @@ func TestFrameTradeUpdatePackets(t *testing.T) {
 }
 
 func TestFrameShopTradeMissingTemplate(t *testing.T) {
-	if _, err := FrameBuyList(buylist.List{ID: 1, Products: []buylist.Product{{ItemID: 9, MaxCount: -1}}}, 0, 0, item.NewTable(nil)); err == nil {
+	if _, err := FrameBuyList(buylist.List{ID: 1, Products: []buylist.Product{{ItemID: 9, MaxCount: -1}}}, 0, 0, 1.0, item.NewTable(nil)); err == nil {
 		t.Fatal("FrameBuyList: want missing-template error")
 	}
 	if _, err := FrameSellList(0, []*item.Instance{{TemplateID: 9}}, item.NewTable(nil)); err == nil {
