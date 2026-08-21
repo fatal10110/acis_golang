@@ -192,6 +192,50 @@ func TestGetItemFromPetTransfersBackToOwner(t *testing.T) {
 	_ = petInv
 }
 
+// TestGetItemFromPetUnequipsWornItemBeforeTransfer covers Pet.transferItem's
+// wasWorn tracking (Pet.java:456-472): pulling an equipped pet item off via
+// RequestGetItemFromPet must unequip it first, matching PET_TOOK_OFF_S1, or
+// the pet's paperdoll/wornMask keep a stale pointer into an instance the pet
+// no longer owns.
+func TestGetItemFromPetUnequipsWornItemBeforeTransfer(t *testing.T) {
+	templates := petTestTemplates()
+	weapon := &item.Instance{ObjectID: 700, TemplateID: 2375, OwnerID: 0x20000001, Count: 1, Location: item.LocationPetEquip, LocationData: itemcontainer.RHand}
+	capture := &testsupport.FrameCapture{}
+	live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
+	state := world.New()
+	state.Spawn(live, 0, 0, 0, 0)
+	_, petInv := attachTestPet(t, state, live, templates, 12077, []*item.Instance{weapon})
+	if petInv.ItemAt(itemcontainer.RHand) != weapon {
+		t.Fatalf("test setup: weapon not equipped in pet RHand")
+	}
+	testsupport.ResetCapture(capture)
+	store := &recordingEnchantItemStore{}
+	ids := &sequentialIDs{next: 930}
+	gcl := &GameClientLink{world: state, ids: ids, items: store, petItems: petitem.NewService(ids)}
+	updates := wireInventoryUpdates(gcl, live)
+
+	gcl.getItemFromPet(context.Background(), live, clientpackets.RequestGetItemFromPet{ObjectID: weapon.ObjectID, Count: 1})
+	updates.Tick()
+
+	if petInv.ItemAt(itemcontainer.RHand) != nil {
+		t.Fatalf("pet RHand = %+v, want cleared after transferring the equipped weapon out", petInv.ItemAt(itemcontainer.RHand))
+	}
+	if weapon.Location != item.LocationInventory || weapon.OwnerID != live.ObjectID() {
+		t.Fatalf("weapon state = %+v, want moved into the player's inventory", weapon)
+	}
+	frames := capture.Frames()
+	foundSystemMessage := false
+	for _, frame := range frames {
+		if len(frame) > 0 && frame[0] == serverpackets.OpcodeSystemMessage {
+			assertSystemMessageItemFrame(t, frame, serverpackets.SystemMessagePetTookOffS1, weapon.TemplateID)
+			foundSystemMessage = true
+		}
+	}
+	if !foundSystemMessage {
+		t.Fatalf("frames = %+v, want a PET_TOOK_OFF_S1 system message", frames)
+	}
+}
+
 func TestGetItemFromPetCancelsActiveEnchantOnFailedTransfer(t *testing.T) {
 	templates := petTestTemplates()
 	capture := &testsupport.FrameCapture{}

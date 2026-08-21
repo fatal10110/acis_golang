@@ -183,6 +183,9 @@ func (l *GameClientLink) getItemFromPet(ctx context.Context, live *livePlayer, r
 		return
 	}
 	l.applyPersistActions(ctx, res.Persist)
+	if res.WasWorn {
+		live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessagePetTookOffS1, res.ItemID))
+	}
 }
 
 // petGetItem handles a command-your-pet-to-loot request. Once live is known
