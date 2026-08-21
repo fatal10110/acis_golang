@@ -31,7 +31,7 @@ type FrameBuilder interface {
 	SkillUse(casterID int32, casterAt location.Location, targetID int32, targetAt location.Location, skillID, level int32, hitTime, reuseDelay int, success bool) wire.Frame
 	SkillLaunched(objectID, skillID, level int32, targetIDs []int32) wire.Frame
 	SkillCanceled(objectID int32) wire.Frame
-	Die(objectID int32) wire.Frame
+	Die(objectID int32, sweep bool) wire.Frame
 	Move(objectID int32, event move.Event) wire.Frame
 	MoveToPawn(objectID, targetID int32, distance int, origin location.Location) wire.Frame
 	Stop(objectID int32, at location.Location, heading int) wire.Frame

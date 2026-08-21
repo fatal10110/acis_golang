@@ -408,7 +408,7 @@ func (h *Hostile) BroadcastDie() error {
 		return ErrNoFrameBuilder
 	}
 	return h.broadcastFrame(func() wire.Frame {
-		return h.frames.Die(h.ObjectID())
+		return h.frames.Die(h.ObjectID(), h.SpoilPool().Sweepable())
 	})
 }
 

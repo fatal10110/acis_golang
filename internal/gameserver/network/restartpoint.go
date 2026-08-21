@@ -6,6 +6,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
 
 // restartTeleportOffset is the random scatter radius applied to a restart
@@ -24,7 +25,14 @@ const restartTeleportOffset = 20
 // to the same destination an unrecognized type would: the player's nearest
 // town restart point.
 func (l *GameClientLink) restartLivePlayer(live *livePlayer, req clientpackets.RequestRestartPoint) {
-	if live == nil || !live.Dead() {
+	if live == nil {
+		return
+	}
+	if live.FakeDead() {
+		live.EffectList().StopByType(effect.TypeFakeDeath)
+		return
+	}
+	if !live.Dead() {
 		return
 	}
 

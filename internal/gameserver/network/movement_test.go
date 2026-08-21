@@ -2,6 +2,7 @@ package network
 
 import (
 	"bytes"
+	"encoding/binary"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -354,13 +356,18 @@ func TestBroadcastLiveDieSendsDieToOwnSessionAndObservers(t *testing.T) {
 	observerFrames := &frameCapture{}
 	victim := newTestLivePlayer(t, 1, victimFrames)
 	observer := newTestLivePlayer(t, 2, observerFrames)
+	victim.AccessLevel = 7
 
 	state.Spawn(victim, 0, 0, 0, 0)
 	state.Spawn(observer, 100, 0, 0, 0)
 	victimFrames.frames = nil
 	observerFrames.frames = nil
 
-	gcl := &GameClientLink{world: state, log: zerolog.Nop()}
+	adminData, err := admin.NewData([]admin.AccessLevel{{Level: 7, AllowFixedRes: true}}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gcl := &GameClientLink{world: state, admin: adminData, log: zerolog.Nop()}
 	gcl.broadcastLiveDie(victim)
 
 	if got := frameOpcodes(victimFrames.frames); string(got) != string([]byte{serverpackets.OpcodeDie}) {
@@ -368,6 +375,11 @@ func TestBroadcastLiveDieSendsDieToOwnSessionAndObservers(t *testing.T) {
 	}
 	if got := frameOpcodes(observerFrames.frames); string(got) != string([]byte{serverpackets.OpcodeDie}) {
 		t.Fatalf("observer opcodes = %x, want Die", got)
+	}
+	for _, frames := range [][][]byte{victimFrames.frames, observerFrames.frames} {
+		if got := binary.LittleEndian.Uint32(frames[0][25:29]); got != 1 {
+			t.Fatalf("Die fixed-res field = %d, want 1", got)
+		}
 	}
 }
 
