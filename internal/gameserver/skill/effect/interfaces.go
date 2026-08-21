@@ -272,6 +272,11 @@ type spoilCaster interface {
 	levelTarget
 }
 
+type spoilNotifier interface {
+	NotifySpoilAlready()
+	NotifySpoilSuccess()
+}
+
 // spoilTarget is implemented by a monster-kind actor whose spoil pool can
 // be checked and marked, mirroring the SPOIL skill-type handler's own
 // target surface for a caster-applied spoil effect.
@@ -315,6 +320,10 @@ type fakeDeathStanceTarget interface {
 // treated as never full.
 type hpFullTarget interface {
 	HPFull() bool
+}
+
+type relaxHPFullNotifier interface {
+	NotifyRelaxDeactivatedHPFull(*Effect)
 }
 
 // summonOwnerTarget is implemented by a summon actor whose owning player's

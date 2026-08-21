@@ -25,6 +25,18 @@ func TestCharacterVitals(t *testing.T) {
 	}
 }
 
+func TestHPFull(t *testing.T) {
+	ch := &Character{}
+	ch.SetResourceValues(Resources{MaxHP: 100, CurrentHP: 99})
+	if ch.HPFull() {
+		t.Fatal("HPFull() = true below maximum")
+	}
+	ch.SetResourceValues(Resources{MaxHP: 100, CurrentHP: 100})
+	if !ch.HPFull() {
+		t.Fatal("HPFull() = false at maximum")
+	}
+}
+
 func TestVitalsChangesTo(t *testing.T) {
 	before := Vitals{HP: 100, MP: 50}
 

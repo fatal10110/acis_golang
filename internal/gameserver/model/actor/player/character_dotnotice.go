@@ -41,3 +41,45 @@ func (c *Character) NotifyEffectRemovedDueLackMP(*effect.Effect) {
 		send()
 	}
 }
+
+// SetRelaxHPFullNotifier records the packet-layer hook for Relax ending at full HP.
+func (c *Character) SetRelaxHPFullNotifier(send func()) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	c.sendRelaxHPFullNotice = send
+}
+
+// NotifyRelaxDeactivatedHPFull sends SKILL_DEACTIVATED_HP_FULL.
+func (c *Character) NotifyRelaxDeactivatedHPFull(*effect.Effect) {
+	c.stateMu.RLock()
+	send := c.sendRelaxHPFullNotice
+	c.stateMu.RUnlock()
+	if send != nil {
+		send()
+	}
+}
+
+// SetSpoilNotifiers records packet-layer hooks for Spoil outcomes.
+func (c *Character) SetSpoilNotifiers(already, success func()) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	c.sendSpoilAlreadyNotice, c.sendSpoilSuccessNotice = already, success
+}
+
+func (c *Character) NotifySpoilAlready() {
+	c.stateMu.RLock()
+	send := c.sendSpoilAlreadyNotice
+	c.stateMu.RUnlock()
+	if send != nil {
+		send()
+	}
+}
+
+func (c *Character) NotifySpoilSuccess() {
+	c.stateMu.RLock()
+	send := c.sendSpoilSuccessNotice
+	c.stateMu.RUnlock()
+	if send != nil {
+		send()
+	}
+}
