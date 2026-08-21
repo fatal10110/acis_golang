@@ -200,7 +200,7 @@ func TestGetItemFromPetTransfersBackToOwner(t *testing.T) {
 func TestGetItemFromPetUnequipsWornItemBeforeTransfer(t *testing.T) {
 	templates := petTestTemplates()
 	weapon := &item.Instance{ObjectID: 700, TemplateID: 2375, OwnerID: 0x20000001, Count: 1, Location: item.LocationPetEquip, LocationData: itemcontainer.RHand}
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
 	state := world.New()
 	state.Spawn(live, 0, 0, 0, 0)
@@ -208,7 +208,7 @@ func TestGetItemFromPetUnequipsWornItemBeforeTransfer(t *testing.T) {
 	if petInv.ItemAt(itemcontainer.RHand) != weapon {
 		t.Fatalf("test setup: weapon not equipped in pet RHand")
 	}
-	capture.frames = nil
+	testsupport.ResetCapture(capture)
 	store := &recordingEnchantItemStore{}
 	ids := &sequentialIDs{next: 930}
 	gcl := &GameClientLink{world: state, ids: ids, items: store, petItems: petitem.NewService(ids)}
@@ -223,15 +223,16 @@ func TestGetItemFromPetUnequipsWornItemBeforeTransfer(t *testing.T) {
 	if weapon.Location != item.LocationInventory || weapon.OwnerID != live.ObjectID() {
 		t.Fatalf("weapon state = %+v, want moved into the player's inventory", weapon)
 	}
+	frames := capture.Frames()
 	foundSystemMessage := false
-	for _, frame := range capture.frames {
+	for _, frame := range frames {
 		if len(frame) > 0 && frame[0] == serverpackets.OpcodeSystemMessage {
 			assertSystemMessageItemFrame(t, frame, serverpackets.SystemMessagePetTookOffS1, weapon.TemplateID)
 			foundSystemMessage = true
 		}
 	}
 	if !foundSystemMessage {
-		t.Fatalf("frames = %+v, want a PET_TOOK_OFF_S1 system message", capture.frames)
+		t.Fatalf("frames = %+v, want a PET_TOOK_OFF_S1 system message", frames)
 	}
 }
 
