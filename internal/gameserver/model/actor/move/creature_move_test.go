@@ -21,6 +21,17 @@ func (o movementDynamicObject) GeoZ() int               { return o.z }
 func (o movementDynamicObject) Height() int             { return 32 }
 func (o movementDynamicObject) GeoData() [][]block.NSWE { return o.data }
 
+type heightGeo struct{ engine *engine.Engine }
+
+func (g heightGeo) CanMove(_, _, _, _, _, _ int) bool { return true }
+func (g heightGeo) Height(x, y, z int) int16          { return g.engine.Height(x, y, z) }
+func (heightGeo) FindPath(_, _ location.Location) ([]location.Location, bool) {
+	return nil, false
+}
+func (heightGeo) ValidLocation(ox, oy, oz, _, _, _ int) location.Location {
+	return location.Location{X: ox, Y: oy, Z: oz}
+}
+
 func TestCreatureMove_MoveToLocationScenarios(t *testing.T) {
 	origin := location.Location{X: 10, Y: 20, Z: 30}
 	previous := location.Location{X: 60, Y: 20, Z: 30}
@@ -271,6 +282,43 @@ func TestCreatureMove_UpdatePositionStopsWhenDynamicNSWECloses(t *testing.T) {
 	}
 	if arrived != 0 || blocked != 1 {
 		t.Fatalf("arrival callbacks = (%d, %d), want (0, 1)", arrived, blocked)
+	}
+}
+
+func TestCreatureMove_UpdatePositionResamplesDestinationHeight(t *testing.T) {
+	e := engine.New()
+	region, err := block.NewRegionFromBlocks([]block.Block{block.NewFlat(0)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := e.SetRegion(engine.TileXMin, engine.TileYMin, region); err != nil {
+		t.Fatal(err)
+	}
+	origin := location.Location{X: engine.WorldX(0), Y: engine.WorldY(0)}
+	target := location.Location{X: engine.WorldX(2), Y: origin.Y}
+	mover, err := NewCreatureMove(origin, 100, heightGeo{engine: e})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := mover.MoveToLocation(target); err != nil {
+		t.Fatal(err)
+	}
+	const step = 10 * time.Millisecond
+	if _, moving := mover.UpdatePosition(step); !moving {
+		t.Fatal("first UpdatePosition() stopped move, want moving")
+	}
+
+	e.AddObject(movementDynamicObject{x: 2, y: 0, data: [][]block.NSWE{{block.NoDirections}}})
+	for range 40 {
+		if _, moving := mover.UpdatePosition(step); !moving {
+			break
+		}
+	}
+	if mover.Moving() {
+		t.Fatal("UpdatePosition() did not reach destination")
+	}
+	if got := mover.Position(); got != (location.Location{X: target.X, Y: target.Y, Z: 32}) {
+		t.Fatalf("Position() = %+v, want destination at dynamic height", got)
 	}
 }
 
