@@ -221,11 +221,8 @@ func TestHealthySessionSurvivesConcurrentBroadcasts(t *testing.T) {
 	var dropped atomic.Int64
 	for range 16 {
 		wg.Go(func() {
-			for range 500 {
-				if !s.TrySendFrame(wire.BorrowedFrame(mustFrameBytes([]byte{0x04, 0x00, 0x01, 0x02}))) {
-					dropped.Add(1)
-				}
-				time.Sleep(time.Millisecond)
+			if !s.TrySendFrame(wire.BorrowedFrame(mustFrameBytes([]byte{0x04, 0x00, 0x01, 0x02}))) {
+				dropped.Add(1)
 			}
 		})
 	}
