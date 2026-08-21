@@ -49,6 +49,22 @@ const (
 	CrystallizeGradeTooHigh
 )
 
+// DestroyFailure is the non-mutating reason a destroy request failed.
+type DestroyFailure uint8
+
+const (
+	// DestroyOK means the item was destroyed.
+	DestroyOK DestroyFailure = iota
+	// DestroyNoop means the request should be ignored.
+	DestroyNoop
+	// DestroyInvalidCount means the requested count is invalid.
+	DestroyInvalidCount
+	// DestroyNotDestroyable means the item cannot be destroyed.
+	DestroyNotDestroyable
+	// DestroyHeroItem means the item is a hero item.
+	DestroyHeroItem
+)
+
 // CrystallizeResult is the domain result of crystallizing one item.
 type CrystallizeResult struct {
 	Result
@@ -192,32 +208,57 @@ func (s *Service) PickupGround(inv *itemcontainer.Inventory, ground *item.Instan
 	return Result{Persist: []Persist{Save(result)}}, PickupOK
 }
 
-// DestroyItem consumes count units from inv.
-func (s *Service) DestroyItem(inv *itemcontainer.Inventory, objectID int32, count int) (Result, bool) {
-	if inv == nil || count <= 0 {
-		return Result{}, false
+// DestroyItemFailure classifies a destroy request without mutating inv.
+func (s *Service) DestroyItemFailure(inv *itemcontainer.Inventory, objectID int32, count int) DestroyFailure {
+	if inv == nil {
+		return DestroyNoop
 	}
 	inst := inv.ItemByObjectID(objectID)
 	if inst == nil {
-		return Result{}, false
+		return DestroyNoop
 	}
 	tmpl, ok := inv.Templates().Get(inst.TemplateID)
 	st := inst.Snapshot()
-	if !ok || !inst.Destroyable(tmpl) || tmpl.HeroItem() || st.Count < count {
-		return Result{}, false
+	if !ok {
+		return DestroyNoop
+	}
+	if count <= 0 || st.Count < count {
+		return DestroyInvalidCount
 	}
 	if !tmpl.Stackable && count > 1 {
-		return Result{}, false
+		return DestroyNoop
 	}
+	if tmpl.HeroItem() {
+		return DestroyHeroItem
+	}
+	if !inst.Destroyable(tmpl) {
+		return DestroyNotDestroyable
+	}
+	return DestroyOK
+}
+
+// DestroyItemResult consumes count units from inv and classifies a rejection.
+func (s *Service) DestroyItemResult(inv *itemcontainer.Inventory, objectID int32, count int) (Result, DestroyFailure) {
+	if failure := s.DestroyItemFailure(inv, objectID, count); failure != DestroyOK {
+		return Result{}, failure
+	}
+	inst := inv.ItemByObjectID(objectID)
+	st := inst.Snapshot()
 	wasEquipped := st.Equipped() && st.Count <= count
 	if inv.DestroyItem(inst, count) == nil {
-		return Result{}, false
+		return Result{}, DestroyNoop
 	}
 	res := Result{EquipmentChanged: wasEquipped}
 	if wasEquipped {
 		res.Changed = []*item.Instance{inst}
 	}
-	return res, true
+	return res, DestroyOK
+}
+
+// DestroyItem consumes count units from inv.
+func (s *Service) DestroyItem(inv *itemcontainer.Inventory, objectID int32, count int) (Result, bool) {
+	res, failure := s.DestroyItemResult(inv, objectID, count)
+	return res, failure == DestroyOK
 }
 
 // TransferItem moves count units from source to receiver and reports store writes.

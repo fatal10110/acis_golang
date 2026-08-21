@@ -152,7 +152,7 @@ func TestGameClientLinkDestroyItemInGame(t *testing.T) {
 	// A destroy that doesn't touch equipment sends no frame of its own, so
 	// there's nothing to block on that proves the server has processed it
 	// before the test drives the batching task's tick.
-	syncBarrier(t, c, func() { c.send(encodeRequestDestroyItem(999999, 1)) }, serverpackets.OpcodeActionFailed)
+	syncBarrier(t, c, func() { c.send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList)) }, serverpackets.OpcodeItemList)
 	inventoryUpdatesFor(t, state).Tick()
 	reply := c.read()
 	if reply[0] != serverpackets.OpcodeInventoryUpdate {
