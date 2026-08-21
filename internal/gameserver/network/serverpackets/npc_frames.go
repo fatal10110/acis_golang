@@ -55,8 +55,8 @@ func (NpcFrameBuilder) SkillCanceled(objectID int32) wire.Frame {
 }
 
 // Die builds the death packet.
-func (NpcFrameBuilder) Die(objectID int32) wire.Frame {
-	return FrameDie(objectID, DieOptions{})
+func (NpcFrameBuilder) Die(objectID int32, sweep bool) wire.Frame {
+	return FrameDie(objectID, DieOptions{Sweep: sweep})
 }
 
 // Move builds a MoveToLocation packet for event.

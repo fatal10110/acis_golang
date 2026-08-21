@@ -10,6 +10,7 @@ import (
 	gamemanager "github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -90,6 +91,27 @@ func TestResolveCanGiveDamageUsesAccessLevelFlag(t *testing.T) {
 	}
 	if resolveCanGiveDamage(data, 2) {
 		t.Fatal("restricted access level was granted damage permission")
+	}
+}
+
+func TestResolveFixedResUsesAccessLevelFlag(t *testing.T) {
+	data, err := admin.NewData([]admin.AccessLevel{{Level: 0}, {Level: 7, AllowFixedRes: true}}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolveFixedRes(data, 0) || !resolveFixedRes(data, 7) || resolveFixedRes(nil, 7) {
+		t.Fatal("resolveFixedRes() did not follow the access-level flag")
+	}
+}
+
+func TestDieOptionsUsesAccessLevelForDeadReconnect(t *testing.T) {
+	data, err := admin.NewData([]admin.AccessLevel{{Level: 7, AllowFixedRes: true}}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	options := (&GameClientLink{admin: data}).dieOptions(&player.Character{AccessLevel: 7})
+	if !options.FixedRes {
+		t.Fatal("dead reconnect DieOptions.FixedRes = false, want true")
 	}
 }
 

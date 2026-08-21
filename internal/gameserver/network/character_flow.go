@@ -167,11 +167,15 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 	client.Session.SendFrame(itemListFrame)
 	client.Session.SendFrame(serverpackets.FrameShortCutInit(serverShortcutList(shortcuts)))
 	if c.Dead() {
-		client.Session.SendFrame(serverpackets.FrameDie(c.ObjectID(), serverpackets.DieOptions{}))
+		client.Session.SendFrame(serverpackets.FrameDie(c.ObjectID(), l.dieOptions(c)))
 	}
 	client.Session.SendFrame(serverpackets.FrameSkillCoolTime(coolTimes))
 	client.Session.SendFrame(serverpackets.FrameActionFailed())
 	return live, true
+}
+
+func (l *GameClientLink) dieOptions(c *player.Character) serverpackets.DieOptions {
+	return serverpackets.DieOptions{FixedRes: resolveFixedRes(l.admin, c.AccessLevel)}
 }
 
 // socialActionLevelUp is the social animation id played for everyone who can

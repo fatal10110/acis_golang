@@ -2,6 +2,7 @@ package npc
 
 import (
 	"bytes"
+	"encoding/binary"
 	"strings"
 	"testing"
 	"time"
@@ -469,6 +470,9 @@ func TestHostileDieBroadcastsDieToKnownReceivers(t *testing.T) {
 	if observer.frames[0][0] != serverpackets.OpcodeDie {
 		t.Fatalf("frame opcode = %#x, want %#x", observer.frames[0][0], serverpackets.OpcodeDie)
 	}
+	if got := binary.LittleEndian.Uint32(observer.frames[0][21:25]); got != 0 {
+		t.Fatalf("Die sweep field = %d, want 0", got)
+	}
 
 	// A repeated kill is a no-op per Die's once-only contract: no second
 	// Die packet.
@@ -477,6 +481,24 @@ func TestHostileDieBroadcastsDieToKnownReceivers(t *testing.T) {
 	}
 	if len(observer.frames) != 1 {
 		t.Fatalf("observer received %d frames after a repeat kill, want still 1", len(observer.frames))
+	}
+}
+
+func TestHostileDieSetsSweepFlagFromSpoilPool(t *testing.T) {
+	state := world.New()
+	victim := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", HPMax: 10})
+	victim.SetWorld(state)
+	state.Spawn(victim, 100, 100, 0, 0)
+
+	observer := &frameReceiver{trackedID: 55}
+	state.Spawn(observer, 100, 100, 0, 0)
+	victim.SpoilPool().Add(57, 1)
+
+	if !victim.Die(&hostileTarget{id: 2}, nil) {
+		t.Fatal("Die() = false on a live target, want true")
+	}
+	if got := binary.LittleEndian.Uint32(observer.frames[0][21:25]); got != 1 {
+		t.Fatalf("Die sweep field = %d, want 1", got)
 	}
 }
 
