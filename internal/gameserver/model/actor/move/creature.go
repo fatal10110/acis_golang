@@ -73,6 +73,7 @@ type CreatureMove struct {
 	followOffset         int
 	followMode           FollowMode
 	arrived              func()
+	blocked              func()
 	segmentAdvanced      func(Event) error
 	timer                scheduledTimer
 	moveSeq              uint64
@@ -129,6 +130,14 @@ func (m *CreatureMove) SetArrivedHook(arrived func()) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.arrived = arrived
+}
+
+// SetBlockedHook records the callback fired when an in-flight move is stopped
+// by a newly blocked geodata path. A nil hook (the default) makes it a no-op.
+func (m *CreatureMove) SetBlockedHook(blocked func()) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.blocked = blocked
 }
 
 // SetLogger records where a panic recovered from an arrival callback is
@@ -400,6 +409,24 @@ func (m *CreatureMove) UpdatePosition(step time.Duration) (Event, bool) {
 	dy := float64(m.destination.Y) - m.accurateY
 	left := math.Hypot(dx, dy)
 	passed := m.speed * step.Seconds()
+	nextAccurateX, nextAccurateY := m.accurateX, m.accurateY
+	next := m.destination
+	if left != 0 && passed < left {
+		fraction := passed / left
+		nextAccurateX += dx * fraction
+		nextAccurateY += dy * fraction
+		next.X = int(nextAccurateX)
+		next.Y = int(nextAccurateY)
+		next.Z = int(m.geo.Height(next.X, next.Y, m.origin.Z))
+	}
+	if !m.geo.CanMove(m.origin.X, m.origin.Y, m.origin.Z, next.X, next.Y, next.Z) {
+		action := m.stopBlockedLocked()
+		m.mu.Unlock()
+		if action != nil {
+			action()
+		}
+		return Event{}, false
+	}
 	if left == 0 || passed >= left {
 		action := m.finishLocked()
 		if !m.moving {
@@ -420,19 +447,19 @@ func (m *CreatureMove) UpdatePosition(step time.Duration) (Event, bool) {
 		return event, true
 	}
 
-	fraction := passed / left
-	m.accurateX += dx * fraction
-	m.accurateY += dy * fraction
-	nextX := int(m.accurateX)
-	nextY := int(m.accurateY)
-	m.origin = location.Location{
-		X: nextX,
-		Y: nextY,
-		Z: int(m.geo.Height(nextX, nextY, m.origin.Z)),
-	}
+	m.accurateX = nextAccurateX
+	m.accurateY = nextAccurateY
+	m.origin = next
 	event := m.currentEventLocked()
 	m.mu.Unlock()
 	return event, true
+}
+
+func (m *CreatureMove) stopBlockedLocked() func() {
+	m.rescheduleLocked(0)
+	m.waypoints = nil
+	m.moving = false
+	return m.blocked
 }
 
 func (m *CreatureMove) currentEventLocked() Event {

@@ -83,6 +83,7 @@ func NewController(move *CreatureMove, self Actor) (*Controller, error) {
 		event.FollowOffset = 0
 		return self.BroadcastMove(event)
 	})
+	move.SetBlockedHook(func() { _ = self.BroadcastStop() })
 	return &Controller{move: move, self: self}, nil
 }
 

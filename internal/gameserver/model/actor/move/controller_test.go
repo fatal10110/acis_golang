@@ -311,6 +311,37 @@ func TestControllerSetArrivedFiresOnceMovementCompletes(t *testing.T) {
 	}
 }
 
+func TestControllerBroadcastsStopWhenObstacleCloses(t *testing.T) {
+	self := &fakeSelf{}
+	geo := &recordingGeo{canMove: true}
+	cm, err := NewCreatureMove(location.Location{}, 100, geo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, err := NewController(cm, self)
+	if err != nil {
+		t.Fatal(err)
+	}
+	arrived := 0
+	c.SetArrived(func() { arrived++ })
+	if ok, err := c.MoveToLocation(location.Location{X: 100}); err != nil || !ok {
+		t.Fatalf("MoveToLocation() = (%v, %v), want (true, nil)", ok, err)
+	}
+	if !c.PositionUpdate() {
+		t.Fatal("first PositionUpdate() = false, want true")
+	}
+	geo.canMove = false
+	if c.PositionUpdate() {
+		t.Fatal("PositionUpdate() = true after obstacle closes, want false")
+	}
+	if arrived != 0 {
+		t.Fatalf("arrived hook calls = %d, want 0", arrived)
+	}
+	if self.stopCalls != 1 {
+		t.Fatalf("BroadcastStop calls = %d, want 1", self.stopCalls)
+	}
+}
+
 func TestControllerRegistersPositionUpdatesOnMoveStart(t *testing.T) {
 	self := &fakeSelf{id: 11, x: 0, y: 0, radius: 5}
 	c := newTestController(t, self)
@@ -568,7 +599,9 @@ func TestControllerBroadcastsMoveOnEachSegmentAdvanceViaPositionUpdate(t *testin
 		{X: 100, Y: 50, Z: 30},
 	}
 	geo := &recordingGeo{
-		canMove:    false, // direct line blocked -> tier 2 pathfinding
+		canMoveAt: func(ox, oy, oz, tx, ty, tz int) bool {
+			return ox != 0 || oy != 0 || tx != 100 || ty != 50
+		}, // only the initial direct line is blocked -> tier 2 pathfinding
 		height:     30,
 		findPath:   waypoints,
 		findPathOK: true,
