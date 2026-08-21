@@ -311,7 +311,7 @@ func TestControllerSetArrivedFiresOnceMovementCompletes(t *testing.T) {
 	}
 }
 
-func TestControllerSetBlockedFiresInsteadOfArrivedWhenObstacleCloses(t *testing.T) {
+func TestControllerBroadcastsStopWhenObstacleCloses(t *testing.T) {
 	self := &fakeSelf{}
 	geo := &recordingGeo{canMove: true}
 	cm, err := NewCreatureMove(location.Location{}, 100, geo)
@@ -323,9 +323,7 @@ func TestControllerSetBlockedFiresInsteadOfArrivedWhenObstacleCloses(t *testing.
 		t.Fatal(err)
 	}
 	arrived := 0
-	blocked := 0
 	c.SetArrived(func() { arrived++ })
-	c.SetBlocked(func() { blocked++ })
 	if ok, err := c.MoveToLocation(location.Location{X: 100}); err != nil || !ok {
 		t.Fatalf("MoveToLocation() = (%v, %v), want (true, nil)", ok, err)
 	}
@@ -336,8 +334,11 @@ func TestControllerSetBlockedFiresInsteadOfArrivedWhenObstacleCloses(t *testing.
 	if c.PositionUpdate() {
 		t.Fatal("PositionUpdate() = true after obstacle closes, want false")
 	}
-	if arrived != 0 || blocked != 1 {
-		t.Fatalf("arrival callbacks = (%d, %d), want (0, 1)", arrived, blocked)
+	if arrived != 0 {
+		t.Fatalf("arrived hook calls = %d, want 0", arrived)
+	}
+	if self.stopCalls != 1 {
+		t.Fatalf("BroadcastStop calls = %d, want 1", self.stopCalls)
 	}
 }
 

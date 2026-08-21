@@ -83,6 +83,7 @@ func NewController(move *CreatureMove, self Actor) (*Controller, error) {
 		event.FollowOffset = 0
 		return self.BroadcastMove(event)
 	})
+	move.SetBlockedHook(func() { _ = self.BroadcastStop() })
 	return &Controller{move: move, self: self}, nil
 }
 
@@ -244,17 +245,6 @@ func (c *Controller) SetArrived(arrived func()) {
 		c.removePositionUpdate()
 		if arrived != nil {
 			arrived()
-		}
-	})
-}
-
-// SetBlocked records the callback invoked when a dynamic obstacle stops
-// movement before arrival. A nil callback (the default) makes it a no-op.
-func (c *Controller) SetBlocked(blocked func()) {
-	c.move.SetBlockedHook(func() {
-		c.removePositionUpdate()
-		if blocked != nil {
-			blocked()
 		}
 	})
 }
