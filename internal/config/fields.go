@@ -42,11 +42,17 @@ func (f *Fields) Fail(err error) {
 
 // String returns a string property or def when key is missing.
 func (f *Fields) String(key, def string) string {
+	if f.err != nil {
+		return def
+	}
 	return f.props.String(key, def)
 }
 
 // Bool returns a bool property or def when key is missing.
 func (f *Fields) Bool(key string, def bool) bool {
+	if f.err != nil {
+		return def
+	}
 	return f.props.Bool(key, def)
 }
 
