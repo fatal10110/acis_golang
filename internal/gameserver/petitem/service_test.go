@@ -191,6 +191,33 @@ func TestPickupGroundRejectsLootLockedItem(t *testing.T) {
 	}
 }
 
+// Java checks capacity (SummonAI.java:177) before the owner/loot-lock check
+// (SummonAI.java:183), so a pet inventory that is both full and facing a
+// loot-locked item must report the capacity failure, matching
+// network/pickup.go's herb-branch ordering convention.
+func TestPickupGroundReportsCapacityBeforeLootLock(t *testing.T) {
+	templates := testTemplates()
+	petInv := itemcontainer.NewPetInventory(2, templates)
+	petInv.SlotLimit = 1
+	petInv.AddNew(20, 1, 600)
+	owner := &pickupTestOwner{id: 1}
+	pet := summon.NewPet(summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv, Owner: owner})
+	tmpl, ok := templates.Get(item.AdenaID)
+	if !ok {
+		t.Fatal("adena template missing")
+	}
+	ground, err := grounditem.New(item.Instance{ObjectID: 900, TemplateID: item.AdenaID, Count: 40, ManaLeft: -1, OwnerID: 99}, tmpl)
+	if err != nil {
+		t.Fatalf("ground item: %v", err)
+	}
+
+	_, failure := PickupGround(pet, petInv, ground)
+
+	if failure != PickupPetCannotCarryMore {
+		t.Fatalf("PickupGround failure = %v, want PickupPetCannotCarryMore (capacity checked before loot lock)", failure)
+	}
+}
+
 func TestPickupGroundAllowsPetOwnerLootedItem(t *testing.T) {
 	templates := testTemplates()
 	petInv := itemcontainer.NewPetInventory(2, templates)
