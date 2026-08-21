@@ -116,6 +116,14 @@ func (p *PlayerClock) Remove(actorID int32) {
 	delete(p.activity, actorID)
 }
 
+// NotifyShadowSenseState sends actor the current Shadow Sense effect state.
+func (p *PlayerClock) NotifyShadowSenseState(actor PlayerClockActor) {
+	if actor == nil || !actor.HasSkill(shadowSenseSkillID) {
+		return
+	}
+	p.effects.NotifyDayNightSkillTransition(actor.ObjectID(), p.clock.IsNight(), shadowSenseSkillID, shadowSenseLevel)
+}
+
 // Tick fires PLAYING_FOR_LONG_TIME for every tracked player whose reminder
 // has come due and reschedules them for the next interval. Iteration is
 // over the activity map alone; the day/night reapply (onDayNight) walks
