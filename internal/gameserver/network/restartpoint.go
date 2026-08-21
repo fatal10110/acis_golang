@@ -109,5 +109,7 @@ func (l *GameClientLink) completeLivePlayerTeleport(live *livePlayer) {
 	if !ok {
 		return
 	}
-	actor.SyncPosition(live.CurrentLocation())
+	destination := live.CurrentLocation()
+	actor.SyncPosition(destination)
+	actor.BroadcastFrame(serverpackets.FrameTeleportToLocation(actor.ObjectID(), destination, false))
 }
