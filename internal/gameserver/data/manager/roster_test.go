@@ -349,7 +349,7 @@ func TestRoster_Create_AcceptsValidNonNPCName(t *testing.T) {
 func mysticTemplate(t *testing.T) *player.TemplateTable {
 	t.Helper()
 	tmpl := &player.Template{
-		ID:        1,
+		ID:        10, // humanMystic.xml: root profession, parent -1
 		BaseLevel: 1,
 		HPTable:   []float64{80},
 		MPTable:   []float64{30},
@@ -363,7 +363,7 @@ func mysticTemplate(t *testing.T) *player.TemplateTable {
 			{SkillID: 1216, Level: 1, MinLevel: 1, Cost: 0},
 		},
 	}
-	table, err := player.NewTemplateTable(map[int]*player.Template{1: tmpl})
+	table, err := player.NewTemplateTable(map[int]*player.Template{10: tmpl})
 	if err != nil {
 		t.Fatalf("build template table: %v", err)
 	}
@@ -384,7 +384,7 @@ func TestRoster_Create_SeedsTutorialBookAndAutoGetSkillShortcuts(t *testing.T) {
 	roster := NewRoster(characters, items, shortcuts, mysticTemplate(t), starterItemTable(), npc.NewTable(nil), &sequentialIDs{next: 0x10000000}, DefaultDeleteAfter, nil)
 
 	c, outcome, err := roster.Create(ctx, "acct1", CreateRequest{
-		Name: "Mystic", ClassID: 1, Race: 0, Sex: player.SexMale,
+		Name: "Mystic", ClassID: 10, Race: 0, Sex: player.SexMale,
 	})
 	if err != nil {
 		t.Fatalf("Create() unexpected error: %v", err)
