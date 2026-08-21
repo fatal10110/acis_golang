@@ -169,6 +169,78 @@ func TestGameClientLinkActionSitsOnSelectedChairStaticObject(t *testing.T) {
 	}
 }
 
+func TestGameClientLinkActionInteractsWithSelectedStaticObject(t *testing.T) {
+	tests := []struct {
+		name     string
+		template *staticobject.Template
+		html     map[string]string
+		opcodes  []byte
+		assert   func(t *testing.T, frame []byte, objectID int32)
+	}{
+		{
+			name: "town map",
+			template: &staticobject.Template{
+				ID: 1, Type: staticobject.MapType, Texture: "darkelf_t00", MapX: 339, MapY: 170,
+			},
+			html:    map[string]string{"unused.htm": "unused"},
+			opcodes: []byte{serverpackets.OpcodeActionFailed, serverpackets.OpcodeShowTownMap},
+			assert: func(t *testing.T, frame []byte, _ int32) {
+				t.Helper()
+				if frame[0] != 0xde {
+					t.Fatalf("town map opcode = %#x, want %#x", frame[0], 0xde)
+				}
+				r := wire.NewReader(frame[1:])
+				if got := r.ReadString(); got != "town_map.darkelf_t00" {
+					t.Fatalf("town map texture = %q", got)
+				}
+				if got := r.ReadInt32(); got != 339 {
+					t.Fatalf("town map x = %d, want 339", got)
+				}
+				if got := r.ReadInt32(); got != 170 {
+					t.Fatalf("town map y = %d, want 170", got)
+				}
+				if err := r.Err(); err != nil {
+					t.Fatalf("read town map: %v", err)
+				}
+			},
+		},
+		{
+			name:     "arena sign",
+			template: &staticobject.Template{ID: 2, Type: staticobject.ArenaSignType},
+			html:     map[string]string{"signboard.htm": "<html><body>arena</body></html>"},
+			opcodes:  []byte{serverpackets.OpcodeActionFailed, serverpackets.OpcodeNpcHtmlMessage},
+			assert: func(t *testing.T, frame []byte, objectID int32) {
+				t.Helper()
+				assertNpcHtmlMessageFrame(t, frame, objectID, "<html><body>arena</body></html>", 0)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			state := world.New()
+			frames := &frameCapture{}
+			live := newTestLivePlayer(t, 1, frames)
+			obj, err := staticobject.NewObject(2, tt.template)
+			if err != nil {
+				t.Fatal(err)
+			}
+			state.Spawn(live, 0, 0, 0, 0)
+			state.Spawn(obj, 0, 0, 0, 0)
+			live.SetTargetTracked(obj)
+			frames.frames = nil
+
+			gcl := &GameClientLink{world: state, html: testHTMLCache(t, tt.html), log: zerolog.Nop()}
+			gcl.handleTargetAction(context.Background(), live, obj.ObjectID(), true, false)
+
+			if got := frameOpcodes(frames.frames); string(got) != string(tt.opcodes) {
+				t.Fatalf("action opcodes = %x, want %x", got, tt.opcodes)
+			}
+			tt.assert(t, frames.frames[1], obj.ObjectID())
+		})
+	}
+}
+
 func TestGameClientLinkResolveTargetFallsBackToPlayerRegistry(t *testing.T) {
 	state := world.New()
 	targetFrames := &frameCapture{}
