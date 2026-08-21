@@ -214,6 +214,40 @@ func TestUseItemEquipsAndUnequipsPetWeapon(t *testing.T) {
 	}
 }
 
+// TestGetFromPetLeavesEquipmentUntouchedOnFailedTransfer covers the ordering
+// bug flagged on PR 1688: GetFromPet must not unequip until s.transfer
+// reports GiveOK, matching where Java's own paperdoll-clearing side effect
+// fires — inside ItemContainer.transferItem's removeItem call
+// (ItemContainer.java:279/292), which only runs once the item is confirmed
+// removed. count<=0 fails inventory.Service.TransferItem deterministically
+// (service.go's TransferItem guard) without needing a real race.
+func TestGetFromPetLeavesEquipmentUntouchedOnFailedTransfer(t *testing.T) {
+	templates := testTemplates()
+	playerInv := itemcontainer.NewPlayerInventory(1, templates)
+	petInv := itemcontainer.NewPetInventory(2, templates)
+	pet := summon.NewPet(summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv})
+	weapon := petInv.AddNew(20, 1, 700)
+	petInv.DrainUpdates()
+
+	if _, failure := UseItem(pet, petInv, weapon.ObjectID, false); failure != UseOK {
+		t.Fatalf("setup: equip failed")
+	}
+	if weapon.Location != item.LocationPetEquip || petInv.ItemAt(itemcontainer.RHand) != weapon {
+		t.Fatalf("setup: weapon = %+v, want equipped in pet RHand", weapon)
+	}
+
+	_, ok, err := NewService(&testIDs{next: 900}).GetFromPet(petInv, playerInv, weapon.ObjectID, 0)
+	if err != nil {
+		t.Fatalf("GetFromPet error = %v", err)
+	}
+	if ok {
+		t.Fatalf("GetFromPet ok = true, want false for count<=0")
+	}
+	if weapon.Location != item.LocationPetEquip || petInv.ItemAt(itemcontainer.RHand) != weapon {
+		t.Fatalf("weapon = %+v after failed transfer, want still equipped in pet RHand", weapon)
+	}
+}
+
 func testTemplates() *item.Table {
 	return item.NewTable([]*item.Template{
 		{ID: item.AdenaID, Kind: item.KindEtcItem, Stackable: true, Dropable: true, Tradable: true, Destroyable: true, Duration: -1, EtcItem: &item.EtcItemDetail{}},
