@@ -340,7 +340,7 @@ func (l *GameClientLink) dropLiveItem(live *livePlayer, req clientpackets.Reques
 }
 
 func (l *GameClientLink) destroyLiveItem(live *livePlayer, objectID int32, count int) {
-	if !liveItemOpsAllowed(live) {
+	if live == nil {
 		return
 	}
 	inv := live.Inventory()
@@ -377,7 +377,7 @@ func (l *GameClientLink) destroyLiveItem(live *livePlayer, objectID int32, count
 }
 
 func (l *GameClientLink) crystallizeLiveItem(live *livePlayer, req clientpackets.RequestCrystallizeItem) {
-	if !liveItemOpsAllowed(live) || req.Count <= 0 {
+	if live == nil || req.Count <= 0 {
 		return
 	}
 	inv := live.Inventory()
