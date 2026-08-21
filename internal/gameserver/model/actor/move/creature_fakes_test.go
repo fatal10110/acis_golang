@@ -61,8 +61,7 @@ func (g *recordingGeo) ValidLocation(ox, oy, oz, tx, ty, tz int) location.Locati
 		origin: location.Location{X: ox, Y: oy, Z: oz},
 		target: location.Location{X: tx, Y: ty, Z: tz},
 	})
-	// Unset means "no progress", mirroring the real engine's same-cell-fallback:
-	// the fall-back location equals the origin, which the resolver rejects.
+	// Unset means "no progress", mirroring the real engine's same-cell fallback.
 	if g.validLocation == (location.Location{}) {
 		return location.Location{X: ox, Y: oy, Z: oz}
 	}
@@ -83,8 +82,7 @@ func (g staticGeo) Height(x, y, z int) int16 { return g.height }
 
 // staticGeo never reports a found path or partial-progress fall-back: it
 // models terrain that has either an open line (canMove=true) or an absolute
-// block (canMove=false), so the 3-tier resolution declines cleanly and
-// alloc-free.
+// block (canMove=false), whose fallback is a zero-distance arrival.
 func (g staticGeo) FindPath(_, _ location.Location) ([]location.Location, bool) { return nil, false }
 
 func (g staticGeo) ValidLocation(ox, oy, oz, _, _, _ int) location.Location {

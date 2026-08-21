@@ -66,10 +66,11 @@ func TestCreatureMove_MoveToLocationScenarios(t *testing.T) {
 			wantMoving:      true,
 		},
 		{
-			name:            "rejects blocked route",
+			name:            "accepts blocked route as zero-distance arrival",
 			target:          location.Location{X: 60, Y: 20},
-			wantErr:         true,
+			wantEvent:       Event{Origin: origin, Destination: origin, Speed: 50},
 			wantDestination: origin,
+			wantMoving:      true,
 		},
 		{
 			name:            "same position has zero duration",
@@ -77,6 +78,7 @@ func TestCreatureMove_MoveToLocationScenarios(t *testing.T) {
 			target:          origin,
 			wantEvent:       Event{Origin: origin, Destination: origin, Speed: 50},
 			wantDestination: origin,
+			wantMoving:      true,
 		},
 		{
 			name:            "same position accepts the smallest finite speed",
@@ -85,6 +87,7 @@ func TestCreatureMove_MoveToLocationScenarios(t *testing.T) {
 			target:          location.Location{X: origin.X, Y: origin.Y, Z: 999},
 			wantEvent:       Event{Origin: origin, Destination: origin, Speed: math.SmallestNonzeroFloat64},
 			wantDestination: origin,
+			wantMoving:      true,
 		},
 		{
 			name:            "rejects extreme coordinates without changing state",
@@ -96,13 +99,13 @@ func TestCreatureMove_MoveToLocationScenarios(t *testing.T) {
 			wantDestination: extremeOrigin,
 		},
 		{
-			name:              "blocked follow-up preserves state",
+			name:              "blocked follow-up replaces state with zero-distance arrival",
 			canMove:           true,
 			initialTarget:     &location.Location{X: 60, Y: 20},
 			blockAfterInitial: true,
 			target:            location.Location{X: 70, Y: 20},
-			wantErr:           true,
-			wantDestination:   previous,
+			wantEvent:         Event{Origin: origin, Destination: origin, Speed: 50},
+			wantDestination:   origin,
 			wantMoving:        true,
 		},
 	}
