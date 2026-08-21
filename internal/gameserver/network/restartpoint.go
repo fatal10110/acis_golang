@@ -31,9 +31,9 @@ func (l *GameClientLink) restartLivePlayer(live *livePlayer, req clientpackets.R
 	dest, ok := l.restartDestination(live)
 	if !ok {
 		// This is a data-loading gap (no restart-point table loaded at
-		// all), not a normal rejection the reference path ever takes —
-		// the reference always resolves at least the nearest town. With
-		// no destination and nothing sent, the dead player is stranded
+		// all), not a normal rejection the reference path handles safely:
+		// its nearest-town lookup can return nil and then dereference it.
+		// With no destination and nothing sent, the dead player is stranded
 		// on the death screen; ActionFailed is the minimum that lets the
 		// client dismiss the pending death action so the player isn't
 		// stuck, while the warn still surfaces the missing data.
