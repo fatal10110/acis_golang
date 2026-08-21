@@ -84,6 +84,38 @@ func TestControllerMaybeStartOffensiveFollowStartsWhenOutOfRange(t *testing.T) {
 	}
 }
 
+func TestControllerOffensiveFollowSegmentBroadcastUsesWaypoint(t *testing.T) {
+	self := &fakeSelf{x: 0, y: 0, z: 30}
+	waypoints := []location.Location{
+		{X: 50, Y: 0, Z: 30},
+		{X: 50, Y: 50, Z: 30},
+		{X: 100, Y: 50, Z: 30},
+	}
+	geo := &recordingGeo{canMove: false, height: 30, findPath: waypoints, findPathOK: true}
+	cm, err := NewCreatureMove(location.Location{Z: 30}, 50, geo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	clock := &fakeMoveClock{}
+	cm.afterFunc = clock.AfterFunc
+	c, err := NewController(cm, self)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if ok, err := c.MaybeStartOffensiveFollow(&fakeTarget{id: 7, x: 100, y: 50, z: 30}, 0); err != nil || !ok {
+		t.Fatalf("MaybeStartOffensiveFollow() = (%v, %v), want (true, nil)", ok, err)
+	}
+	if got := self.broadcasts[0].FollowTarget; got != 7 {
+		t.Fatalf("initial FollowTarget = %d, want 7", got)
+	}
+
+	clock.fire(clock.timers[len(clock.timers)-1].delay)
+	if got := self.broadcasts[1]; got.FollowTarget != 0 || got.Destination != waypoints[1] {
+		t.Fatalf("segment event = %+v, want a location move to %+v", got, waypoints[1])
+	}
+}
+
 func TestControllerMaybeStartFriendlyFollowStartsWhenOutOfRange(t *testing.T) {
 	self := &fakeSelf{x: 0, y: 0, radius: 5}
 	c := newTestController(t, self)

@@ -72,7 +72,13 @@ func NewController(move *CreatureMove, self Actor) (*Controller, error) {
 	// advance, not just the first: without it, clients keep predicting the
 	// original straight-line walk and visibly cut through obstacles the
 	// server itself routed around.
-	move.SetSegmentAdvancedHook(func(event Event) error { return self.BroadcastMove(event) })
+	move.SetSegmentAdvancedHook(func(event Event) error {
+		// Continuations describe the next route leg, so they must carry its
+		// waypoint rather than a follow target.
+		event.FollowTarget = 0
+		event.FollowOffset = 0
+		return self.BroadcastMove(event)
+	})
 	return &Controller{move: move, self: self}, nil
 }
 
