@@ -330,6 +330,12 @@ func (c *Character) CP() float64 { return c.ResourceValues().CurrentCP }
 // MaxHPValue returns maximum HP as a floating-point skill-resource value.
 func (c *Character) MaxHPValue() float64 { return c.ResourceValues().MaxHP }
 
+// HPFull reports whether current HP has reached maximum HP.
+func (c *Character) HPFull() bool {
+	values := c.ResourceValues()
+	return values.CurrentHP >= values.MaxHP
+}
+
 // MaxMPValue returns maximum MP as a floating-point skill-resource value.
 func (c *Character) MaxMPValue() float64 { return c.ResourceValues().MaxMP }
 

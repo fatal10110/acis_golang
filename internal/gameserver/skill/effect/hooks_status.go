@@ -18,6 +18,9 @@ func spoilStart(e *Effect) bool {
 	}
 	pool := target.SpoilPool()
 	if pool == nil || pool.IsSpoiled() {
+		if notify, ok := e.Effector.(spoilNotifier); ok && pool != nil {
+			notify.NotifySpoilAlready()
+		}
 		return false
 	}
 
@@ -29,6 +32,9 @@ func spoilStart(e *Effect) bool {
 	rate := formulas.MagicSuccessRate(target.Level(), caster.Level(), e.Skill.MagicLevel, e.Skill.LevelDepend, penalty)
 	if formulas.MagicSucceeds(rate, rnd.Get(spoilRoll)) {
 		pool.Mark(caster.ObjectID())
+		if notify, ok := e.Effector.(spoilNotifier); ok {
+			notify.NotifySpoilSuccess()
+		}
 	}
 	return true
 }
@@ -211,6 +217,9 @@ func relaxAction(e *Effect) bool {
 		return false
 	}
 	if full, ok := e.Effected.(hpFullTarget); ok && full.HPFull() {
+		if notify, ok := e.Effected.(relaxHPFullNotifier); ok {
+			notify.NotifyRelaxDeactivatedHPFull(e)
+		}
 		return false
 	}
 	return manaDrainTick(e, target)

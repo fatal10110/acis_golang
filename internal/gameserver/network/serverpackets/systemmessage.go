@@ -137,6 +137,9 @@ const (
 	SystemMessageDrownDamage            = 297  // number parameter
 	SystemMessageSkillRemovedDueLackHP  = 610  // no parameter
 	SystemMessageSkillRemovedDueLackMP  = 140  // no parameter
+	SystemMessageSkillDeactivatedHPFull = 175  // no parameter
+	SystemMessageAlreadySpoiled         = 357  // no parameter
+	SystemMessageSpoilSuccess           = 612  // no parameter
 	SystemMessageRemainingMana10Minutes = 1979 // item-name parameter
 	SystemMessageRemainingMana5Minutes  = 1980 // item-name parameter
 	SystemMessageRemainingMana1Minute   = 1981 // item-name parameter
