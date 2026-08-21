@@ -1,103 +1,135 @@
-# Test strategy: fakes vs. integration/behaviour tests
+# Test strategy: behaviour-first, fakes vs. real boundaries
 
-This repo has hundreds of hand-written `fake*`/`recording*`/`spy*`/`stub*` test doubles, one per
-file, no shared mocks package, and 19 `//go:build integration` files that already exercise real
-boundaries (a disposable MariaDB via `internal/gameserver/data/sql/sqltest`, real TCP/crypto
-handshakes in `internal/link` and `internal/loginserver`). This doc is the decision rule for when a
-fake should be replaced by the real thing it stands in for, so that judgment call doesn't get
-re-litigated per package.
+Tests in this repo are **behavior-first**: a feature's primary coverage is a full-flow scenario
+driven through the real wire protocol against a real MariaDB, not per-function unit tests. This
+doc records the tier structure, the shared harness, and the remaining decision rule for when a
+fake may stand in for a real type.
 
-## Decision rule
+Current state (post #1691, phase 1 of the migration tracked in #1664): the scripted client lives
+in `internal/testsupport`, the server boot harness in `internal/gameservertest`, and the MariaDB
+container helpers in `internal/gameserver/data/sql/sqltest` are untagged. Legacy per-package
+fixtures and the remaining `//go:build integration` files are scheduled for deletion/consolidation
+in #1677 and its children.
+
+## Test tiers
+
+### Tier 1 — behavior suites (`tests/<domain>/`) — the tier that matters
+
+One package per player-facing domain (`character`, `items`, `skills`, `combat`, `trade`, `pets`,
+`lifecycle`). Each file drives one full player-facing flow end to end through
+`gameservertest.Boot` and asserts on three surfaces:
+
+1. client-visible packets (opcode sequence + key payload fields),
+2. world state (live actors, positions, flags),
+3. persisted DB rows (`characters`, `items`, `character_skills`, ...).
+
+New features land here. If a behavior can't be triggered through a client packet or an explicit
+domain entry point, that is a product gap to raise — not a reason to write a white-box unit test.
+
+Harness usage:
+
+```go
+func TestPlayerPicksUpDroppedItem(t *testing.T) {
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 1, 0),
+		gameservertest.WithWantChars(1),
+	)
+	c := srv.Client
+
+	c.Send(encodeRequestGameStart(0))
+	// ... read SSQInfo / CharSelected, send EnterWorld, consume the burst ...
+
+	objID := srv.SoleObjectID(t)
+	srv.GiveItem(t, objID, item.AdenaID, 1000)
+	srv.InventoryUpdates.Tick() // drive batching deterministically
+}
+```
+
+Rules:
+
+- Setup goes through `testsupport.ScriptedClient` and `gameservertest` fixtures only — no
+  per-suite reimplementations of the handshake, no struct-literal surgery on production types.
+- Use `SyncBarrier` when a triggering request has no synchronous reply and you need ordering
+  before driving a task tick.
+- Suites need Docker (MariaDB testcontainer); each suite package calls `sqltest.Main(m)` from
+  `TestMain`.
+
+### Tier 2 — pure-function core tests (`<pkg>_core_test.go`)
+
+The only unit tests allowed outside `tests/`: packet encode/decode round-trips, damage/stat
+formulas (`skill/formulas`, `stat*`), config/property parsing, crypt primitives, container slot
+arithmetic. Table-driven, zero shared fixtures, no build tag. A new file outside `tests/` must fit
+one of these categories.
+
+### Legacy in-package tests
+
+Existing per-package tests remain until their domain's behavior suite covers them, then get
+deleted wholesale (#1678–#1682). Do not add new members to them; extend the behavior suite instead.
+
+## Fakes vs. real types
 
 Replace a fake with the real type only when **both** hold:
 
-1. A real, already-existing production type in this repo satisfies the same method set the fake
-   stands in for. Verify this with `gopls` or a direct `rg` for the interface's methods on the real
-   type *before* starting the conversion — do not assume. See the counter-example below; the
-   assumption has been wrong before.
-2. Building the real type for the test is not disproportionate to the behavior under test. A
-   DB-store boundary reachable via `sqltest.NewDB` always qualifies. A heavy actor requiring full
-   `world.State`/geodata wiring to construct may not, unless the test is specifically about that
-   wiring.
+1. A real, already-existing production type satisfies the same method set the fake stands in for.
+   Verify with `gopls` or a direct `rg` *before* converting — do not assume.
+2. Building the real type is not disproportionate to the behavior under test. A DB-store boundary
+   reachable via `sqltest` always qualifies. A heavy actor requiring full `world.State`/geodata
+   wiring may not, unless the test is about that wiring — but prefer moving such coverage into a
+   behavior suite over keeping a bespoke fake.
 
-Keep a double as-is (do not convert) when:
+Keep a double as-is when:
 
-- It's a pure-algorithm/no-boundary test: `skill/formulas`, `model/geometry`, `geo/pathfind`,
-  `internal/commons` (fields/gameduration/statset), packet byte-level encode/decode tests. These
-  have no boundary to integrate against and are out of scope for this initiative entirely.
-- It satisfies a package-local interface that no real type implements yet. See
-  `internal/gameserver/skill/conditions/conditions_test.go`: its `Actor`/`PlayerActor` interfaces
-  stand in for a not-yet-built creature/clan runtime — `player.Character` implements none of
-  `Actor`'s methods (`Level`, `HPRatio`, `IsMoving`, ...) and none of `PlayerActor`'s clan methods
-  (`HasClan`, `ClanCastleID`, `ClanHallID`, `IsClanLeader`, `PledgeClass`) exist anywhere in the
-  codebase — there is no `clan` package yet. Converting this now would mean adding throwaway stub
-  methods to production types just to satisfy a test, which is scope creep into unbuilt game
-  features disguised as test-quality work. Leave it, and add a one-line comment pointing back here
-  so the next reader doesn't "fix" it incorrectly. Revisit once the real implementation exists.
-- It's a narrow, sanctioned infra seam (a clock, timer, or RNG source) even when a real wall-clock
-  equivalent exists, because determinism is the point of the test, not integration coverage. Example:
-  `fakeCastClock`/`fakeCastTimer` in `internal/gameserver/model/actor/cast`.
+- It serves a tier-2 pure-algorithm test (`skill/formulas`, packet byte fixtures,
+  `internal/commons`) — there is no boundary to integrate against.
+- It satisfies a package-local interface whose real implementation doesn't exist yet (e.g.
+  `skill/conditions`' clan-runtime interfaces). Leave a comment pointing here so nobody "fixes" it
+  by adding stub methods to production types. Revisit when the real implementation lands.
+- It's a narrow sanctioned infra seam (clock, timer, RNG source) where determinism is the point:
+  e.g. `fakeCastClock`/`fakeCastTimer` in `model/actor/cast`.
+- It's part of the shared harness itself: `testsupport.FrameCapture` and the world-presence doubles
+  used by direct frame-sender assertions are sanctioned; they observe rather than reimplement.
 
-## Worked conversion example (the risk this initiative targets)
+Worked example of the risk: `fakeChargesTarget.IncreaseCharges`
+(`skill/effect/hooks_buff_test.go`) once reimplemented the cap/overflow logic that already existed
+on `(*player.Character).IncreaseCharges` and silently drifted. When a fake duplicates real logic,
+delete the fake and call the real type.
 
-`internal/gameserver/skill/effect/hooks_buff_test.go:490` — `fakeChargesTarget.IncreaseCharges`
-**reimplements** the same cap/overflow logic that already exists on the real
-`(*player.Character).IncreaseCharges` (`internal/gameserver/model/actor/player/character_charges.go:21`).
-The fake can silently drift from the real method while its own test keeps passing, since nothing
-ties the two implementations together. `hooks_status_test.go:297`'s `fakeCombatant`/`betrayOwner`
-similarly stand in for `attackable.Combatant` (`internal/gameserver/model/actor/attackable/combatant.go:8`
-— `SiegeGuard() bool`, `AlikeDead() bool`, plus `worldobject.Object`'s `ObjectID()`), which
-`*player.Character` already implements. Both convert cheaply to `&player.Character{ID: N}` — no
-DB/world wiring required, since these tests only read zero-value-safe accessors. This conversion
-stays a plain unit test file; no `//go:build integration` tag, because no DB/socket boundary is
-involved (see the tag convention below — "use the real struct" and "hit a real DB/socket" are
-different conversions).
+## Naming and tagging
 
-## Naming / build-tag convention
+- New behavior suites: `tests/<domain>/<flow>_test.go`, no build tag.
+- New pure-core tests: `<pkg>_core_test.go`, no build tag.
+- `//go:build integration` is legacy-only: it remains on not-yet-ported files and is removed as
+  each migrates. Never add it to a new file. Default `go test ./...` runs everything; Docker is a
+  hard dependency of the default tier (CI gate: #1686).
+- A plain core test must not duplicate a scenario a behavior suite already covers without a
+  documented reason.
 
-- File suffix `_integration_test.go`, package-level `//go:build integration` as the first line,
-  blank line after — matches every existing file in the 19-file set.
-- A plain unit-test file should not duplicate a scenario an integration-tagged file in the same
-  package already covers without a documented reason. `internal/gameserver/data/manager/roster_test.go`
-  (real DB) and `roster_create_test.go` (hand-rolled fake stores, same `Roster.Create` behavior) is
-  the negative example this initiative fixes.
-- Swapping a fake for a real production struct that needs no DB/socket boundary does **not** require
-  the `integration` tag or file suffix — it stays a plain, fast unit test. The tag is for a real
-  external boundary (DB, socket), not for "uses a real type."
+## Actor construction in core tests
 
-## Real actor fixture pattern
+Tier-2 tests construct `&player.Character{ID: N}` directly and rely on zero-value safety, adding
+`creature.NewLive(loc, heading, geoStub, ch)` + `ch.Live = live` only when live-actor behavior is
+exercised (see `persistenceTestGeo` in `internal/gameserver/skill/persistence_test.go`). Behavior
+suites never hand-build actors — they enter the world through packets and use `gameservertest`
+handles. Apply the Rule of Three before extracting any new shared builder.
 
-No shared builder/factory exists for constructing a real `player.Character` in tests today.
-`internal/gameserver/model/actor/player`'s own 40-file test suite constructs `&Character{ID: N}`
-directly and relies on the type being zero-value-friendly, adding
-`creature.NewLive(loc, heading, geoStub, ch)` + `ch.Live = live` only when a test needs
-`EffectList()`, movement, or other live-actor behavior (see the `persistenceTestGeo` stub pattern in
-`internal/gameserver/skill/persistence_test.go`). Document and reuse this pattern rather than
-inventing a new builder package now — a factory would be a speculative abstraction ahead of need.
-Apply the Rule of Three: only extract a shared helper once three or more packages need the identical
-multi-field `Character` setup verbatim.
+## DB-backed tests
 
-## DB integration tests
+Two entry points, both untagged:
 
-Use `sqltest.NewDB(t) *sql.DB` (`internal/gameserver/data/sql/sqltest/sqltest.go`) to get a real,
-schema-provisioned MariaDB instance, then construct the real store type
-(`sql.NewSkillSaveStore(db)`, `sql.NewCharacterStore(db)`, etc.) and drive the test through its real
-read/write path — assert on what the store reads back, not on an in-memory fake's captured state.
+- `sqltest.SharedDB(tb)` — one MariaDB container per test binary, tables truncated between tests;
+  pair with `TestMain(m) { os.Exit(sqltest.Main(m)) }`. This is what behavior suites and
+  `gameservertest.Boot` use.
+- `sqltest.NewDB(t)` — a dedicated container per call; reserved for store-level tests that want
+  full isolation.
 
-`sqltest.NewDB` boots one container per call, and today's integration files mostly call it once per
-test function. If CI wall-clock time becomes a problem as more files convert, a package-level shared
-container (e.g. `sqltest.SharedDB(tb testing.TB)`, booted once in `TestMain`, with per-test cleanup
-via truncation or a rolled-back transaction) is the fix — build that only once there's evidence it's
-needed, not preemptively.
+Construct the real store (`sql.NewCharacterStore(db)`, ...) and assert on what it reads back, not
+on captured in-memory state.
 
-## Checklist before converting a fake
+## Checklist before writing any test
 
-1. Identify every method the fake implements.
-2. Confirm with `gopls` or `rg` that a real, already-existing type in this repo implements every one
-   of those methods (or the real DB/socket boundary the fake stands in for already has a working,
-   integration-tested implementation).
-3. If no real type/implementation exists, stop — leave the fake in place and add a comment linking
-   back to this doc's "keep as-is" list. Do not add stub methods to a production type just to satisfy
-   a test.
-4. If a real type/implementation exists, replace the fake, delete it once unused, and confirm the
-   converted test asserts the same-or-superset of what the fake-based version proved — not less.
+1. Is this a player-facing flow? → tier 1: extend `tests/<domain>/` via `gameservertest`.
+2. Is this a pure function (codec/formula/config/crypt)? → tier 2 `<pkg>_core_test.go`.
+3. Neither, and no behavior suite covers the domain yet? → write the behavior suite first
+   (or extend an adjacent one), then decide whether anything remains worth a core test.
+4. Converting an existing fake? Follow "Fakes vs. real types" above; confirm the converted test
+   asserts the same-or-superset of what the fake-based version proved.
