@@ -8,6 +8,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/restart"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -212,6 +213,37 @@ func TestRestartLivePlayerRevivesAndTeleportsDeadPlayer(t *testing.T) {
 	if dy := got.Y - dest.Y; dy < -restartTeleportOffset || dy > restartTeleportOffset {
 		t.Fatalf("teleported Y = %d, want within %d of %d", got.Y, restartTeleportOffset, dest.Y)
 	}
+}
+
+func TestCompleteLivePlayerTeleportRelocatesActiveSummonOnce(t *testing.T) {
+	state := world.New()
+	live := newTestLivePlayer(t, 1, &frameCapture{})
+	state.Spawn(live, 0, 0, 0, 0)
+	active := summon.NewServitor(summon.ServitorConfig{ObjectID: 2, Owner: live, Level: 40})
+	summon.SpawnBesideOwner(state, active, live, location.Location{})
+
+	gcl := &GameClientLink{world: state, geo: testGeo{}, log: zerolog.Nop()}
+	destination := location.Location{X: 5000, Y: 5000, Z: 100}
+	gcl.teleportLivePlayer(live, destination, 0)
+	if got := summonPosition(active); got == destination {
+		t.Fatalf("summon position before Appearing = %+v, want not yet relocated to %+v", got, destination)
+	}
+
+	gcl.completeLivePlayerTeleport(live)
+	if got := summonPosition(active); got != destination {
+		t.Fatalf("summon position after Appearing = %+v, want %+v", got, destination)
+	}
+
+	active.SyncPosition(location.Location{})
+	gcl.completeLivePlayerTeleport(live)
+	if got := summonPosition(active); got != (location.Location{}) {
+		t.Fatalf("summon position after repeated Appearing = %+v, want unchanged", got)
+	}
+}
+
+func summonPosition(actor *summon.Actor) location.Location {
+	x, y, z := actor.Position()
+	return location.Location{X: x, Y: y, Z: z}
 }
 
 // TestRestartLivePlayerWithNoRestartTableSendsActionFailed pins the
