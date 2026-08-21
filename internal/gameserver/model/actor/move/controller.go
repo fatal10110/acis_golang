@@ -26,6 +26,10 @@ type Actor interface {
 	BroadcastStop() error
 }
 
+type pawnFollowActor interface {
+	OffensiveFollowIsPawnMove() bool
+}
+
 // PositionUpdater is the moving actor surface consumed by the position
 // update task. PositionUpdate must deregister itself from whatever
 // PositionUpdateRegistry it was added through once it no longer needs
@@ -177,8 +181,10 @@ func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, m
 			return false, nil
 		}
 		if mode == FollowOffensive {
-			event.FollowTarget = target.ObjectID()
-			event.FollowOffset = offset
+			if actor, ok := c.self.(pawnFollowActor); ok && actor.OffensiveFollowIsPawnMove() {
+				event.FollowTarget = target.ObjectID()
+				event.FollowOffset = offset
+			}
 		}
 		broadcastErr := c.self.BroadcastMove(event)
 		c.addPositionUpdate()

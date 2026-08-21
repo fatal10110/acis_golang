@@ -528,6 +528,10 @@ func (c *Character) BroadcastMove(event move.Event) error {
 	return nil
 }
 
+// OffensiveFollowIsPawnMove reports that a player's attack approach uses the
+// target-relative movement packet.
+func (c *Character) OffensiveFollowIsPawnMove() bool { return true }
+
 // BroadcastStop sends a stop-in-place notice through the runtime packet
 // hook. See BroadcastAttack: a nil hook is expected, not reported as an
 // error.

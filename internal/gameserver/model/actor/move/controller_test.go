@@ -106,8 +106,8 @@ func TestControllerOffensiveFollowSegmentBroadcastUsesWaypoint(t *testing.T) {
 	if ok, err := c.MaybeStartOffensiveFollow(&fakeTarget{id: 7, x: 100, y: 50, z: 30}, 0); err != nil || !ok {
 		t.Fatalf("MaybeStartOffensiveFollow() = (%v, %v), want (true, nil)", ok, err)
 	}
-	if got := self.broadcasts[0].FollowTarget; got != 7 {
-		t.Fatalf("initial FollowTarget = %d, want 7", got)
+	if got := self.broadcasts[0].FollowTarget; got != 0 {
+		t.Fatalf("initial FollowTarget = %d, want 0 so the approach is a location move", got)
 	}
 
 	clock.fire(clock.timers[len(clock.timers)-1].delay)
