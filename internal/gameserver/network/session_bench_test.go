@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	gamecipher "github.com/fatal10110/acis_golang/internal/gameserver/network/cipher"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/rs/zerolog"
 )
@@ -30,7 +31,7 @@ func (discardAddr) String() string  { return "discard" }
 
 func benchmarkSession(b *testing.B) *Session {
 	b.Helper()
-	cipher, err := NewCipher(make([]byte, keySize))
+	cipher, err := gamecipher.NewCipher(make([]byte, gamecipher.KeySize))
 	if err != nil {
 		b.Fatalf("NewCipher: %v", err)
 	}

@@ -10,15 +10,16 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 func TestGameClientLinkAutoSoulShotInGame(t *testing.T) {
 	const soulshotID int32 = 1463
 	c, chars, items, _ := newLinkedGameClient(t)
 
-	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
-	c.read() // CharCreateOk
-	c.read() // CharSelectInfo
+	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.Read() // CharCreateOk
+	c.Read() // CharSelectInfo
 	objID := chars.soleObjectID(t)
 	if err := items.Create(context.Background(), objID, item.Instance{
 		ObjectID:   510,
@@ -30,31 +31,31 @@ func TestGameClientLinkAutoSoulShotInGame(t *testing.T) {
 		t.Fatalf("seed item: %v", err)
 	}
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
-	c.send(encodeRequestAutoSoulShot(soulshotID, 1))
-	reply := c.read()
+	c.Send(encodeRequestAutoSoulShot(soulshotID, 1))
+	reply := c.Read()
 	assertExAutoSoulShotFrame(t, reply, soulshotID, true)
-	reply = c.read()
+	reply = c.Read()
 	assertSystemMessageItemFrame(t, reply, serverpackets.SystemMessageUseOfItemWillBeAuto, soulshotID)
 
-	c.send(encodeRequestAutoSoulShot(soulshotID, 0))
-	reply = c.read()
+	c.Send(encodeRequestAutoSoulShot(soulshotID, 0))
+	reply = c.Read()
 	assertExAutoSoulShotFrame(t, reply, soulshotID, false)
-	reply = c.read()
+	reply = c.Read()
 	assertSystemMessageItemFrame(t, reply, serverpackets.SystemMessageAutoUseOfItemCancelled, soulshotID)
 }
 
 func TestGameClientLinkDropItemInGame(t *testing.T) {
 	c, chars, items, state := newLinkedGameClient(t)
 
-	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
-	c.read() // CharCreateOk
-	c.read() // CharSelectInfo
+	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.Read() // CharCreateOk
+	c.Read() // CharSelectInfo
 	objID := chars.soleObjectID(t)
 	if err := items.Create(context.Background(), objID, item.Instance{
 		ObjectID:   500,
@@ -66,14 +67,14 @@ func TestGameClientLinkDropItemInGame(t *testing.T) {
 		t.Fatalf("seed item: %v", err)
 	}
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
-	c.send(encodeRequestDropItem(500, 40, location.Location{X: 10, Y: 20, Z: 30}))
-	reply := c.read()
+	c.Send(encodeRequestDropItem(500, 40, location.Location{X: 10, Y: 20, Z: 30}))
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeDropItem {
 		t.Fatalf("drop broadcast opcode = %#x, want DropItem (%#x)", reply[0], serverpackets.OpcodeDropItem)
 	}
@@ -104,7 +105,7 @@ func TestGameClientLinkDropItemInGame(t *testing.T) {
 	}
 
 	inventoryUpdatesFor(t, state).Tick()
-	reply = c.read()
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeInventoryUpdate {
 		t.Fatalf("drop inventory opcode = %#x, want InventoryUpdate (%#x)", reply[0], serverpackets.OpcodeInventoryUpdate)
 	}
@@ -128,9 +129,9 @@ func TestGameClientLinkDropItemInGame(t *testing.T) {
 func TestGameClientLinkDestroyItemInGame(t *testing.T) {
 	c, chars, items, state := newLinkedGameClient(t)
 
-	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
-	c.read() // CharCreateOk
-	c.read() // CharSelectInfo
+	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.Read() // CharCreateOk
+	c.Read() // CharSelectInfo
 	objID := chars.soleObjectID(t)
 	if err := items.Create(context.Background(), objID, item.Instance{
 		ObjectID:   501,
@@ -142,19 +143,19 @@ func TestGameClientLinkDestroyItemInGame(t *testing.T) {
 		t.Fatalf("seed item: %v", err)
 	}
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
-	c.send(encodeRequestDestroyItem(501, 2))
+	c.Send(encodeRequestDestroyItem(501, 2))
 	// A destroy that doesn't touch equipment sends no frame of its own, so
 	// there's nothing to block on that proves the server has processed it
 	// before the test drives the batching task's tick.
-	syncBarrier(t, c, func() { c.send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList)) }, serverpackets.OpcodeItemList)
+	testsupport.SyncBarrier(t, c, func() { c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList)) }, serverpackets.OpcodeItemList)
 	inventoryUpdatesFor(t, state).Tick()
-	reply := c.read()
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeInventoryUpdate {
 		t.Fatalf("destroy inventory opcode = %#x, want InventoryUpdate (%#x)", reply[0], serverpackets.OpcodeInventoryUpdate)
 	}
@@ -178,9 +179,9 @@ func TestGameClientLinkDestroyItemInGame(t *testing.T) {
 func TestGameClientLinkCrystallizeItemInGame(t *testing.T) {
 	c, chars, items, state := newLinkedGameClient(t)
 
-	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
-	c.read() // CharCreateOk
-	c.read() // CharSelectInfo
+	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.Read() // CharCreateOk
+	c.Read() // CharSelectInfo
 	objID := chars.soleObjectID(t)
 	chars.updateCharacter(t, objID, func(ch *player.Character) {
 		ch.SetSkillLevel(248, 1)
@@ -195,14 +196,14 @@ func TestGameClientLinkCrystallizeItemInGame(t *testing.T) {
 		t.Fatalf("seed item: %v", err)
 	}
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
-	c.send(encodeRequestCrystallizeItem(502, 1))
-	reply := c.read()
+	c.Send(encodeRequestCrystallizeItem(502, 1))
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeSystemMessage {
 		t.Fatalf("crystallize message opcode = %#x, want SystemMessage (%#x)", reply[0], serverpackets.OpcodeSystemMessage)
 	}
@@ -221,7 +222,7 @@ func TestGameClientLinkCrystallizeItemInGame(t *testing.T) {
 	}
 
 	inventoryUpdatesFor(t, state).Tick()
-	reply = c.read()
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeInventoryUpdate {
 		t.Fatalf("crystallize inventory opcode = %#x, want InventoryUpdate (%#x)", reply[0], serverpackets.OpcodeInventoryUpdate)
 	}
@@ -262,9 +263,9 @@ func TestGameClientLinkCrystallizeItemInGame(t *testing.T) {
 func TestGameClientLinkCrystallizeItemSkillTooLow(t *testing.T) {
 	c, chars, items, _ := newLinkedGameClient(t)
 
-	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
-	c.read() // CharCreateOk
-	c.read() // CharSelectInfo
+	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.Read() // CharCreateOk
+	c.Read() // CharSelectInfo
 	objID := chars.soleObjectID(t)
 	if err := items.Create(context.Background(), objID, item.Instance{
 		ObjectID:   503,
@@ -276,14 +277,14 @@ func TestGameClientLinkCrystallizeItemSkillTooLow(t *testing.T) {
 		t.Fatalf("seed item: %v", err)
 	}
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
-	c.send(encodeRequestCrystallizeItem(503, 1))
-	reply := c.read()
+	c.Send(encodeRequestCrystallizeItem(503, 1))
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeSystemMessage {
 		t.Fatalf("skill-low opcode = %#x, want SystemMessage (%#x)", reply[0], serverpackets.OpcodeSystemMessage)
 	}
@@ -295,8 +296,8 @@ func TestGameClientLinkCrystallizeItemSkillTooLow(t *testing.T) {
 		t.Fatalf("SystemMessage params = %d, want 0", params)
 	}
 
-	c.send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
-	reply = c.read()
+	c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeItemList {
 		t.Fatalf("post-skill-low opcode = %#x, want ItemList (%#x)", reply[0], serverpackets.OpcodeItemList)
 	}
@@ -317,14 +318,14 @@ func TestGameClientLinkRequestPackageItemListSendsSendableInventory(t *testing.T
 		}
 	}, 1)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
-	c.send(encodeRequestPackageSendableItemList(200))
-	reply := c.read()
+	c.Send(encodeRequestPackageSendableItemList(200))
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodePackageSendableList {
 		t.Fatalf("package item list opcode = %#x, want PackageSendableList (%#x)", reply[0], serverpackets.OpcodePackageSendableList)
 	}

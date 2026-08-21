@@ -6,10 +6,11 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 func TestSpawnProtectionExpiresAndActionCancelsTimer(t *testing.T) {
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, frames)
 	var expire func()
 	link := &GameClientLink{
@@ -25,7 +26,7 @@ func TestSpawnProtectionExpiresAndActionCancelsTimer(t *testing.T) {
 	if live.SpawnProtected() {
 		t.Fatal("spawn protection remained active after expiry")
 	}
-	assertSystemMessageStringFrame(t, frames.frames[0], serverpackets.SystemMessageS1, spawnProtectionEnded)
+	assertSystemMessageStringFrame(t, frames.Frames()[0], serverpackets.SystemMessageS1, spawnProtectionEnded)
 
 	link.activateSpawnProtection(live)
 	link.clearSpawnProtectionOnAction(live)
@@ -33,10 +34,10 @@ func TestSpawnProtectionExpiresAndActionCancelsTimer(t *testing.T) {
 		t.Fatal("action did not clear spawn protection")
 	}
 	expire()
-	if got := len(frames.frames); got != 2 {
+	if got := len(frames.Frames()); got != 2 {
 		t.Fatalf("messages after cancelled expiry = %d, want 2", got)
 	}
-	assertSystemMessageStringFrame(t, frames.frames[1], serverpackets.SystemMessageS1, spawnProtectionActed)
+	assertSystemMessageStringFrame(t, frames.Frames()[1], serverpackets.SystemMessageS1, spawnProtectionActed)
 }
 
 func TestSpawnProtectionActionExemptions(t *testing.T) {

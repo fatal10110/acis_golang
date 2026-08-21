@@ -21,16 +21,17 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 func TestGameClientLinkNormalDisconnectLogsDebug(t *testing.T) {
 	logs := &safeLogBuffer{}
 	logger := zerolog.New(logs).Level(zerolog.DebugLevel)
 	addr, _, _, _ := newTestGameClientLinkWithLog(t, func() *LoginLink { return nil }, NewSessionValidator(), logger)
-	c := dialGameClient(t, addr)
-	c.sendProtocolVersion(746)
+	c := testsupport.Dial(t, addr)
+	c.SendProtocolVersion(746)
 
-	if err := c.conn.Close(); err != nil {
+	if err := c.Conn().Close(); err != nil {
 		t.Fatalf("close client conn: %v", err)
 	}
 	got := waitForLog(t, logs, `"message":"Read frame"`)
@@ -46,7 +47,7 @@ func TestDetachLivePlayerSavesWithUncancelledBoundedContext(t *testing.T) {
 	chars := newFakeCharStore()
 	items := newFakeItemStore()
 	roster := gamemanager.NewRoster(chars, items, nil, testTemplates(t), testItemTemplates(), npc.NewTable(nil), &sequentialIDs{next: 100}, gamemanager.DefaultDeleteAfter, time.Now)
-	live := newTestLivePlayer(t, 101, &frameCapture{})
+	live := newTestLivePlayer(t, 101, &testsupport.FrameCapture{})
 	savedAt := location.Location{X: 46160, Y: 41237, Z: -3534}
 	live.Character.Location = savedAt
 	live.Character.LastHeading = 32768
@@ -79,7 +80,7 @@ func TestDetachLivePlayerPersistsOfflineRecency(t *testing.T) {
 	items := newFakeItemStore()
 	fixedNow := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 	roster := gamemanager.NewRoster(chars, items, nil, testTemplates(t), testItemTemplates(), npc.NewTable(nil), &sequentialIDs{next: 100}, gamemanager.DefaultDeleteAfter, func() time.Time { return fixedNow })
-	live := newTestLivePlayer(t, 101, &frameCapture{})
+	live := newTestLivePlayer(t, 101, &testsupport.FrameCapture{})
 	if err := chars.Create(context.Background(), live.Character); err != nil {
 		t.Fatalf("Create() unexpected error: %v", err)
 	}
@@ -105,7 +106,7 @@ func TestDetachLivePlayerSavesFullStats(t *testing.T) {
 	chars := newFakeCharStore()
 	items := newFakeItemStore()
 	roster := gamemanager.NewRoster(chars, items, nil, testTemplates(t), testItemTemplates(), npc.NewTable(nil), &sequentialIDs{next: 100}, gamemanager.DefaultDeleteAfter, time.Now)
-	live := newTestLivePlayer(t, 101, &frameCapture{})
+	live := newTestLivePlayer(t, 101, &testsupport.FrameCapture{})
 	if err := chars.Create(context.Background(), live.Character); err != nil {
 		t.Fatalf("Create() unexpected error: %v", err)
 	}
@@ -125,7 +126,7 @@ func TestDetachLivePlayerSavesFullStats(t *testing.T) {
 // against a half-torn-down player.
 func TestDetachLivePlayerStopsAttackIntention(t *testing.T) {
 	state := world.New()
-	attackerFrames := &frameCapture{}
+	attackerFrames := &testsupport.FrameCapture{}
 	attacker := newTestLivePlayer(t, 1, attackerFrames)
 	attacker.Character.SetWorld(state)
 	attacker.Character.SetRollSource(func(int) int { return 0 })
@@ -162,7 +163,7 @@ func TestDetachLivePlayerStopsAttackIntention(t *testing.T) {
 // skill committed just before disconnect must never apply its effects or
 // consume its final MP/HP cost against an already-detached character.
 func TestDetachLivePlayerStopsInFlightCast(t *testing.T) {
-	live := newTestLivePlayer(t, 1, &frameCapture{})
+	live := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
 	gcl := &GameClientLink{log: zerolog.Nop()}
 	ctrl := gcl.castController(live)
 
@@ -196,8 +197,8 @@ func TestDetachLivePlayerStopsInFlightCast(t *testing.T) {
 func TestDetachLivePlayerRacesNoHookAccess(t *testing.T) {
 	state := world.New()
 	gcl := &GameClientLink{world: state, log: zerolog.Nop()}
-	attacker := newTestLivePlayer(t, 1, &frameCapture{})
-	target := newTestLivePlayer(t, 2, &frameCapture{})
+	attacker := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
+	target := newTestLivePlayer(t, 2, &testsupport.FrameCapture{})
 	state.Spawn(attacker, 0, 0, 0, 0)
 	state.Spawn(target, 30, 0, 0, 0)
 	state.AddPlayer(attacker)
@@ -234,27 +235,27 @@ func TestDetachLivePlayerRacesNoHookAccess(t *testing.T) {
 func TestGameClientLinkLogoutLeavesWorld(t *testing.T) {
 	c, chars, _, state := newLinkedGameClient(t)
 
-	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
-	c.read() // CharCreateOk
-	c.read() // CharSelectInfo
+	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.Read() // CharCreateOk
+	c.Read() // CharSelectInfo
 	objID := chars.soleObjectID(t)
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
 	savedAt := location.Location{X: 80, Y: 70, Z: 30}
 	spawn := location.Location{X: 10, Y: 20, Z: 30}
-	c.send(encodeMoveBackwardToLocation(savedAt, spawn, 1))
-	reply := c.read()
+	c.Send(encodeMoveBackwardToLocation(savedAt, spawn, 1))
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeMoveToLocation {
 		t.Fatalf("walk opcode = %#x, want MoveToLocation (%#x)", reply[0], serverpackets.OpcodeMoveToLocation)
 	}
 	waitForWorldPosition(t, state, objID, savedAt)
 	walkHeading := spawn.HeadingTo(savedAt)
-	c.send(encodeSingleOpcode(clientpackets.OpcodeLogout))
-	reply = c.read()
+	c.Send(encodeSingleOpcode(clientpackets.OpcodeLogout))
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeLeaveWorld {
 		t.Fatalf("logout opcode = %#x, want LeaveWorld (%#x)", reply[0], serverpackets.OpcodeLeaveWorld)
 	}
@@ -262,10 +263,10 @@ func TestGameClientLinkLogoutLeavesWorld(t *testing.T) {
 	// (Player.cleanup -> abortAll(true) -> _cast.stop(), Creature.java:1298-1302),
 	// and PlayerCast.stop() sends clientActionFailed unconditionally, cast or
 	// no cast in flight (PlayerCast.java:382-387).
-	if reply := c.read(); reply[0] != serverpackets.OpcodeActionFailed {
+	if reply := c.Read(); reply[0] != serverpackets.OpcodeActionFailed {
 		t.Fatalf("post-logout opcode = %#x, want ActionFailed from detach's unconditional cast-stop ack (%#x)", reply[0], serverpackets.OpcodeActionFailed)
 	}
-	c.expectClosed()
+	c.ExpectClosed()
 	if _, ok := state.Player(objID); ok {
 		t.Fatalf("world.Player(%d) still present after logout", objID)
 	}
@@ -278,41 +279,41 @@ func TestGameClientLinkLogoutLeavesWorld(t *testing.T) {
 func TestGameClientLinkRestartReturnsToCharacterSelect(t *testing.T) {
 	c, chars, _, state := newLinkedGameClient(t)
 
-	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
-	c.read() // CharCreateOk
-	c.read() // CharSelectInfo
+	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.Read() // CharCreateOk
+	c.Read() // CharSelectInfo
 	objID := chars.soleObjectID(t)
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
 	savedAt := location.Location{X: 80, Y: 70, Z: 30}
 	spawn := location.Location{X: 10, Y: 20, Z: 30}
-	c.send(encodeMoveBackwardToLocation(savedAt, spawn, 1))
-	reply := c.read()
+	c.Send(encodeMoveBackwardToLocation(savedAt, spawn, 1))
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeMoveToLocation {
 		t.Fatalf("walk opcode = %#x, want MoveToLocation (%#x)", reply[0], serverpackets.OpcodeMoveToLocation)
 	}
 	waitForWorldPosition(t, state, objID, savedAt)
 	walkHeading := spawn.HeadingTo(savedAt)
-	c.send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
+	c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
 	// detachLivePlayer's Stop() now reaches the cast controller
 	// (Player.cleanup -> abortAll(true) -> _cast.stop(), Creature.java:1298-1302),
 	// and PlayerCast.stop() sends clientActionFailed unconditionally, cast or
 	// no cast in flight (PlayerCast.java:382-387), ahead of RestartResponse.
-	if reply := c.read(); reply[0] != serverpackets.OpcodeActionFailed {
+	if reply := c.Read(); reply[0] != serverpackets.OpcodeActionFailed {
 		t.Fatalf("pre-restart opcode = %#x, want ActionFailed from detach's unconditional cast-stop ack (%#x)", reply[0], serverpackets.OpcodeActionFailed)
 	}
-	reply = c.read()
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeRestartResponse {
 		t.Fatalf("restart opcode = %#x, want RestartResponse (%#x)", reply[0], serverpackets.OpcodeRestartResponse)
 	}
 	if ok := wire.NewReader(reply[1:]).ReadInt32(); ok != 1 {
 		t.Fatalf("RestartResponse result = %d, want 1", ok)
 	}
-	reply = c.read()
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeCharSelectInfo {
 		t.Fatalf("post-restart opcode = %#x, want CharSelectInfo (%#x)", reply[0], serverpackets.OpcodeCharSelectInfo)
 	}
@@ -324,8 +325,8 @@ func TestGameClientLinkRestartReturnsToCharacterSelect(t *testing.T) {
 		t.Fatalf("saved position after restart = %+v/%d, want %+v/%d", pos.location, pos.heading, savedAt, walkHeading)
 	}
 
-	c.send(encodeRequestGameStart(0))
-	reply = c.read()
+	c.Send(encodeRequestGameStart(0))
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeSSQInfo {
 		t.Fatalf("second select opcode = %#x, want SSQInfo (%#x)", reply[0], serverpackets.OpcodeSSQInfo)
 	}
@@ -343,7 +344,7 @@ func TestDetachLivePlayerStopsAutosave(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewAutosave() error = %v", err)
 	}
-	live := newTestLivePlayer(t, 101, &frameCapture{})
+	live := newTestLivePlayer(t, 101, &testsupport.FrameCapture{})
 	autosave.Add(live)
 
 	gcl := &GameClientLink{autosave: autosave, log: zerolog.Nop()}
@@ -370,7 +371,7 @@ func (f autosaveCountingEffects) Save(actor task.AutosaveActor) { f(actor) }
 func TestDetachLivePlayerStopsPvPFlagTracking(t *testing.T) {
 	now := time.UnixMilli(0)
 	flags := task.NewPvPFlags(task.PvPFlagOptions{Normal: 40 * time.Second, Flagged: 20 * time.Second}, func() time.Time { return now })
-	live := newTestLivePlayer(t, 101, &frameCapture{})
+	live := newTestLivePlayer(t, 101, &testsupport.FrameCapture{})
 	flags.AddNormal(live)
 	if flags.Len() != 1 {
 		t.Fatalf("PvPFlags.Len() after AddNormal = %d, want 1", flags.Len())

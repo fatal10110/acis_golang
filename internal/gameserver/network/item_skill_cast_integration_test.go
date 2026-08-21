@@ -13,6 +13,7 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 // itemAICastSkillTable seeds a self-target, non-potion carried skill (the
@@ -34,9 +35,9 @@ func itemAICastSkillTable(t *testing.T) *skillstate.Persistence {
 // cast by and on objectID for skillID/level, carrying wantReuse as the
 // installed reuse delay (unlike the instant-cast potion path, an
 // AI-dispatched item skill reports its real reuse delay here).
-func readMagicSkillUseSelfWithReuse(t *testing.T, c *fakeGameClient, objectID int32, skillID, level, wantReuse int32) {
+func readMagicSkillUseSelfWithReuse(t *testing.T, c *testsupport.ScriptedClient, objectID int32, skillID, level, wantReuse int32) {
 	t.Helper()
-	reply := c.read()
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeMagicSkillUse {
 		t.Fatalf("MagicSkillUse opcode = %#x, want %#x", reply[0], serverpackets.OpcodeMagicSkillUse)
 	}
@@ -68,10 +69,10 @@ func TestGameClientLinkUseScrollRunsAICastAndConsumes(t *testing.T) {
 		}
 	}, 1)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
 	obj, ok := state.Player(sqlSoleObjectID(t, chars))
@@ -83,10 +84,10 @@ func TestGameClientLinkUseScrollRunsAICastAndConsumes(t *testing.T) {
 		t.Fatal("world player is not a *livePlayer")
 	}
 
-	c.send(encodeUseItem(objectID, false))
+	c.Send(encodeUseItem(objectID, false))
 	readMagicSkillUseSelfWithReuse(t, c, live.ObjectID(), 2013, 1, 5000)
 
-	reply := c.read()
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeMagicSkillLaunched {
 		t.Fatalf("next opcode = %#x, want MagicSkillLaunched (%#x)", reply[0], serverpackets.OpcodeMagicSkillLaunched)
 	}
@@ -113,10 +114,10 @@ func TestGameClientLinkUseScrollDefersUntilAttackFinishes(t *testing.T) {
 		}
 	}, 1)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
 	obj, ok := state.Player(sqlSoleObjectID(t, chars))
@@ -130,9 +131,9 @@ func TestGameClientLinkUseScrollDefersUntilAttackFinishes(t *testing.T) {
 	if err := live.attack.DoAttack(newTestHostileNPC(t, 709)); err != nil {
 		t.Fatalf("start attack: %v", err)
 	}
-	c.send(encodeUseItem(objectID, false))
+	c.Send(encodeUseItem(objectID, false))
 	for {
-		reply := c.read()
+		reply := c.Read()
 		if reply[0] == serverpackets.OpcodeMagicSkillUse {
 			t.Fatal("item cast started before the active attack finished")
 		}
@@ -168,15 +169,15 @@ func TestGameClientLinkUseScrollWithSharedGroupSendsExUseSharedGroupItem(t *test
 		}
 	}, 1)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 	sqlSoleObjectID(t, chars)
 
-	c.send(encodeUseItem(objectID, false))
-	reply := c.read()
+	c.Send(encodeUseItem(objectID, false))
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeExtended {
 		t.Fatalf("opcode = %#x, want extended (%#x)", reply[0], serverpackets.OpcodeExtended)
 	}
@@ -192,10 +193,10 @@ func TestGameClientLinkUseScrollWithSharedGroupSendsExUseSharedGroupItem(t *test
 	// before the tick-driven InventoryUpdate that now follows them, whatever
 	// their exact content — this test only pins the shared-reuse packet and
 	// the eventual stack count.
-	if reply := c.read(); reply[0] != serverpackets.OpcodeMagicSkillUse {
+	if reply := c.Read(); reply[0] != serverpackets.OpcodeMagicSkillUse {
 		t.Fatalf("opcode = %#x, want MagicSkillUse (%#x)", reply[0], serverpackets.OpcodeMagicSkillUse)
 	}
-	if reply := c.read(); reply[0] != serverpackets.OpcodeMagicSkillLaunched {
+	if reply := c.Read(); reply[0] != serverpackets.OpcodeMagicSkillLaunched {
 		t.Fatalf("opcode = %#x, want MagicSkillLaunched (%#x)", reply[0], serverpackets.OpcodeMagicSkillLaunched)
 	}
 
@@ -238,10 +239,10 @@ func TestGameClientLinkUseScrollHitPhaseCostFailureSendsReasonAndStatusUpdate(t 
 		}
 	}, 1)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
 	obj, ok := state.Player(sqlSoleObjectID(t, chars))
@@ -253,14 +254,14 @@ func TestGameClientLinkUseScrollHitPhaseCostFailureSendsReasonAndStatusUpdate(t 
 		t.Fatal("world player is not a *livePlayer")
 	}
 
-	c.send(encodeUseItem(objectID, false))
-	if reply := c.read(); reply[0] != serverpackets.OpcodeMagicSkillUse {
+	c.Send(encodeUseItem(objectID, false))
+	if reply := c.Read(); reply[0] != serverpackets.OpcodeMagicSkillUse {
 		t.Fatalf("opcode = %#x, want MagicSkillUse (%#x)", reply[0], serverpackets.OpcodeMagicSkillUse)
 	}
-	if reply := c.read(); reply[0] != serverpackets.OpcodeSetupGauge {
+	if reply := c.Read(); reply[0] != serverpackets.OpcodeSetupGauge {
 		t.Fatalf("opcode = %#x, want SetupGauge (%#x)", reply[0], serverpackets.OpcodeSetupGauge)
 	}
-	if reply := c.read(); reply[0] != serverpackets.OpcodeMagicSkillLaunched {
+	if reply := c.Read(); reply[0] != serverpackets.OpcodeMagicSkillLaunched {
 		t.Fatalf("opcode = %#x, want MagicSkillLaunched (%#x)", reply[0], serverpackets.OpcodeMagicSkillLaunched)
 	}
 
@@ -269,7 +270,7 @@ func TestGameClientLinkUseScrollHitPhaseCostFailureSendsReasonAndStatusUpdate(t 
 	// with ErrNotEnoughMP.
 	live.Character.ReduceCurrentMP(live.Character.CurrentMP())
 
-	reply := c.read()
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeSystemMessage {
 		t.Fatalf("hit-failure opcode = %#x, want SystemMessage (%#x)", reply[0], serverpackets.OpcodeSystemMessage)
 	}
@@ -278,7 +279,7 @@ func TestGameClientLinkUseScrollHitPhaseCostFailureSendsReasonAndStatusUpdate(t 
 		t.Fatalf("SystemMessage id = %d, want not enough MP", id)
 	}
 
-	assertStatusAttrs(t, c.read(), live.ObjectID(), []serverpackets.StatusAttribute{
+	assertStatusAttrs(t, c.Read(), live.ObjectID(), []serverpackets.StatusAttribute{
 		{Type: serverpackets.StatusCurrentMP, Value: 0},
 	})
 
@@ -310,10 +311,10 @@ func TestGameClientLinkUseScrollRevalidatesTargetAtLaunch(t *testing.T) {
 		}
 	}, 1)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
 	obj, ok := state.Player(sqlSoleObjectID(t, chars))
@@ -327,16 +328,16 @@ func TestGameClientLinkUseScrollRevalidatesTargetAtLaunch(t *testing.T) {
 	target := newTestHostileNPC(t, 707)
 	state.Spawn(target, 100, 0, 0, 0)
 	live.SetTargetTracked(target)
-	c.read() // NPCInfo
+	c.Read() // NPCInfo
 
-	c.send(encodeUseItem(objectID, false))
-	if reply := c.read(); reply[0] != serverpackets.OpcodeMagicSkillUse {
+	c.Send(encodeUseItem(objectID, false))
+	if reply := c.Read(); reply[0] != serverpackets.OpcodeMagicSkillUse {
 		t.Fatalf("opcode = %#x, want MagicSkillUse (%#x)", reply[0], serverpackets.OpcodeMagicSkillUse)
 	}
-	if reply := c.read(); reply[0] != serverpackets.OpcodeSetupGauge {
+	if reply := c.Read(); reply[0] != serverpackets.OpcodeSetupGauge {
 		t.Fatalf("opcode = %#x, want SetupGauge (%#x)", reply[0], serverpackets.OpcodeSetupGauge)
 	}
-	assertStaticSystemMessageFrame(t, c.read(), serverpackets.SystemMessageDistTooFarCastingStopped)
+	assertStaticSystemMessageFrame(t, c.Read(), serverpackets.SystemMessageDistTooFarCastingStopped)
 }
 
 // TestGameClientLinkUseScrollRejectsReuse verifies a still-cooling
@@ -356,10 +357,10 @@ func TestGameClientLinkUseScrollRejectsReuse(t *testing.T) {
 		}
 	}, 1)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
 	obj, ok := state.Player(sqlSoleObjectID(t, chars))
@@ -371,16 +372,16 @@ func TestGameClientLinkUseScrollRejectsReuse(t *testing.T) {
 		t.Fatal("world player is not a *livePlayer")
 	}
 
-	c.send(encodeUseItem(objectID, false))
+	c.Send(encodeUseItem(objectID, false))
 	readMagicSkillUseSelfWithReuse(t, c, live.ObjectID(), 2013, 1, 5000)
-	if reply := c.read(); reply[0] != serverpackets.OpcodeMagicSkillLaunched {
+	if reply := c.Read(); reply[0] != serverpackets.OpcodeMagicSkillLaunched {
 		t.Fatalf("opcode = %#x, want MagicSkillLaunched (%#x)", reply[0], serverpackets.OpcodeMagicSkillLaunched)
 	}
 	inventoryUpdatesFor(t, state).Tick()
 	readInventoryUpdate(t, c, objectID, 2)
 
-	c.send(encodeUseItem(objectID, false))
-	reply := c.read()
+	c.Send(encodeUseItem(objectID, false))
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeSystemMessage {
 		t.Fatalf("reuse opcode = %#x, want SystemMessage (%#x)", reply[0], serverpackets.OpcodeSystemMessage)
 	}
@@ -388,7 +389,7 @@ func TestGameClientLinkUseScrollRejectsReuse(t *testing.T) {
 	if id := r.ReadInt32(); id != serverpackets.SystemMessageS1PreparedForReuse {
 		t.Fatalf("reuse SystemMessage id = %d, want S1PreparedForReuse (%d)", id, serverpackets.SystemMessageS1PreparedForReuse)
 	}
-	if reply := c.read(); reply[0] != serverpackets.OpcodeActionFailed {
+	if reply := c.Read(); reply[0] != serverpackets.OpcodeActionFailed {
 		t.Fatalf("reuse follow-up opcode = %#x, want ActionFailed (%#x)", reply[0], serverpackets.OpcodeActionFailed)
 	}
 

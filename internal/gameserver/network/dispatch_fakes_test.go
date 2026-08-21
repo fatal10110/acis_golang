@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -337,42 +336,6 @@ type sequentialIDs struct{ next int32 }
 func (s *sequentialIDs) NextID() (int32, error) {
 	s.next++
 	return s.next, nil
-}
-
-type frameCapture struct {
-	mu     sync.Mutex
-	frames [][]byte
-}
-
-func (c *frameCapture) send(frame wire.Frame) bool {
-	defer frame.Release()
-	raw := frame.Bytes()
-	payload := make([]byte, len(raw)-2)
-	copy(payload, raw[2:])
-	c.mu.Lock()
-	c.frames = append(c.frames, payload)
-	c.mu.Unlock()
-	return true
-}
-
-// snapshot returns a safe copy of frames for a test that may race a
-// background goroutine still delivering frames (e.g. an in-flight
-// move-then-arrive callback) — direct field access is fine for every other
-// test here, which only reads after its own synchronous call returns.
-func (c *frameCapture) snapshot() [][]byte {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return append([][]byte(nil), c.frames...)
-}
-
-func frameOpcodes(frames [][]byte) []byte {
-	out := make([]byte, 0, len(frames))
-	for _, frame := range frames {
-		if len(frame) > 0 {
-			out = append(out, frame[0])
-		}
-	}
-	return out
 }
 
 // testGeo is an always-passable move.Geo double for tests that don't

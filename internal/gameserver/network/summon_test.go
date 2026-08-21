@@ -12,19 +12,20 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 func TestGameClientLinkRoutesSummonActionUseToLiveSummon(t *testing.T) {
 	c, chars, _, state := newLinkedGameClient(t)
 
-	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
-	c.read() // CharCreateOk
-	c.read() // CharSelectInfo
+	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.Read() // CharCreateOk
+	c.Read() // CharSelectInfo
 	objID := chars.soleObjectID(t)
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
 	ownerObject, ok := state.Player(objID)
@@ -38,8 +39,8 @@ func TestGameClientLinkRoutesSummonActionUseToLiveSummon(t *testing.T) {
 	liveSummon := summon.NewServitor(summon.ServitorConfig{ObjectID: 500, Owner: owner, Level: 40})
 	summon.SpawnBesideOwner(state, liveSummon, owner, location.Location{})
 
-	c.send(encodeRequestActionUse(52, false, false))
-	reply := c.read()
+	c.Send(encodeRequestActionUse(52, false, false))
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodePetDelete {
 		t.Fatalf("post-action opcode = %#x, want PetDelete (%#x)", reply[0], serverpackets.OpcodePetDelete)
 	}
@@ -54,7 +55,7 @@ func TestGameClientLinkRoutesSummonActionUseToLiveSummon(t *testing.T) {
 
 func TestGameClientLinkSummonActionUseDispatchesSelectedTargetToAI(t *testing.T) {
 	state := world.New()
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 100, frames)
 	state.Spawn(live, 0, 0, 0, 0)
 
@@ -95,19 +96,19 @@ func TestGameClientLinkSummonActionUseDispatchesSelectedTargetToAI(t *testing.T)
 func TestGameClientLinkSummonActionUseWithNoActiveSummonAnswersActionFailed(t *testing.T) {
 	c, chars, _, _ := newLinkedGameClient(t)
 
-	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
-	c.read() // CharCreateOk
-	c.read() // CharSelectInfo
+	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.Read() // CharCreateOk
+	c.Read() // CharSelectInfo
 	chars.soleObjectID(t)
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
 	// Action id 16 is the pet-attack shortcut; no summon has been spawned.
-	c.send(encodeRequestActionUse(16, false, false))
-	reply := c.read()
+	c.Send(encodeRequestActionUse(16, false, false))
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeActionFailed {
 		t.Fatalf("pet-command opcode with no active summon = %#x, want ActionFailed (%#x)", reply[0], serverpackets.OpcodeActionFailed)
 	}
@@ -115,7 +116,7 @@ func TestGameClientLinkSummonActionUseWithNoActiveSummonAnswersActionFailed(t *t
 
 func TestGameClientLinkSummonSkillUseResolvesTargetKindAndDispatches(t *testing.T) {
 	state := world.New()
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 100, frames)
 	state.Spawn(live, 0, 0, 0, 0)
 
@@ -170,7 +171,7 @@ func TestGameClientLinkSinEaterSkillUseBroadcastsFlavorLine(t *testing.T) {
 	}
 
 	state := world.New()
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 100, frames)
 	state.Spawn(live, 0, 0, 0, 0)
 
@@ -182,20 +183,20 @@ func TestGameClientLinkSinEaterSkillUseBroadcastsFlavorLine(t *testing.T) {
 	brain := &recordingNetworkSummonAI{}
 	liveSummon.SetAI(brain)
 	summon.SpawnBesideOwner(state, liveSummon, live, location.Location{})
-	frames.frames = nil
+	testsupport.ResetCapture(frames)
 
 	gcl := &GameClientLink{world: state}
 	if !gcl.handleSummonActionUse(context.Background(), live, clientpackets.RequestActionUse{ActionID: 1001}) {
 		t.Fatal("handleSummonActionUse returned false for Sin Eater skill action")
 	}
-	if got := frameOpcodes(frames.frames); string(got) != string([]byte{serverpackets.OpcodeNpcSay, serverpackets.OpcodeActionFailed}) {
+	if got := testsupport.FrameOpcodes(frames.Frames()); string(got) != string([]byte{serverpackets.OpcodeNpcSay, serverpackets.OpcodeActionFailed}) {
 		t.Fatalf("Sin Eater skill-use opcodes = %x, want NpcSay then ActionFailed", got)
 	}
 }
 
 func TestGameClientLinkSinEaterSkillUseMissedFlavorRollDoesNotBroadcast(t *testing.T) {
 	state := world.New()
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 100, frames)
 	state.Spawn(live, 0, 0, 0, 0)
 
@@ -206,18 +207,18 @@ func TestGameClientLinkSinEaterSkillUseMissedFlavorRollDoesNotBroadcast(t *testi
 	})
 	liveSummon.SetAI(&recordingNetworkSummonAI{})
 	summon.SpawnBesideOwner(state, liveSummon, live, location.Location{})
-	frames.frames = nil
+	testsupport.ResetCapture(frames)
 
 	gcl := &GameClientLink{world: state}
 	gcl.handleSummonActionUse(context.Background(), live, clientpackets.RequestActionUse{ActionID: 1001})
-	if got := frameOpcodes(frames.frames); string(got) != string([]byte{serverpackets.OpcodeActionFailed}) {
+	if got := testsupport.FrameOpcodes(frames.Frames()); string(got) != string([]byte{serverpackets.OpcodeActionFailed}) {
 		t.Fatalf("missed Sin Eater flavor-roll opcodes = %x, want ActionFailed only", got)
 	}
 }
 
 func TestGameClientLinkSummonSkillUsePetBeyondLevelGapIsBlocked(t *testing.T) {
 	state := world.New()
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 100, frames)
 	state.Spawn(live, 0, 0, 0, 0)
 	live.SetTargetTracked(live)
@@ -241,7 +242,7 @@ func TestGameClientLinkSummonSkillUsePetBeyondLevelGapIsBlocked(t *testing.T) {
 
 func TestGameClientLinkSummonSkillUseUnmappedActionFallsThrough(t *testing.T) {
 	state := world.New()
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 100, frames)
 	state.Spawn(live, 0, 0, 0, 0)
 
@@ -253,7 +254,7 @@ func TestGameClientLinkSummonSkillUseUnmappedActionFallsThrough(t *testing.T) {
 
 func TestGameClientLinkSummonSkillUseDoorOnlyActionNeverDispatchesYet(t *testing.T) {
 	state := world.New()
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 100, frames)
 	state.Spawn(live, 0, 0, 0, 0)
 
@@ -287,7 +288,7 @@ func TestGameClientLinkSummonSkillUseDoorOnlyActionNeverDispatchesYet(t *testing
 // AttackableWithoutForceBy or an explicit Ctrl-press.
 func TestGameClientLinkSummonActionUseAttackRequiresForceOrCtrl(t *testing.T) {
 	state := world.New()
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 100, frames)
 	state.Spawn(live, 0, 0, 0, 0)
 
@@ -329,7 +330,7 @@ func TestGameClientLinkSummonActionUseAttackRequiresForceOrCtrl(t *testing.T) {
 // handled elsewhere (attack task)").
 func TestGameClientLinkSummonActionUseAttackIgnoresFakeDeathButHonorsTrueDeath(t *testing.T) {
 	state := world.New()
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 100, frames)
 	state.Spawn(live, 0, 0, 0, 0)
 

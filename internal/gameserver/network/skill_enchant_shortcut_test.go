@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 func TestApplyEnchantSkillRefreshesShortcuts(t *testing.T) {
@@ -20,7 +21,7 @@ func TestApplyEnchantSkillRefreshesShortcuts(t *testing.T) {
 		{"failure resets shortcut", 102, 101, 0, 1, 1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			frames := &frameCapture{}
+			frames := &testsupport.FrameCapture{}
 			live := newTestLivePlayer(t, 1, frames)
 			live.Character.ClassID = 88
 			live.Character.CharLevel = 76
@@ -47,7 +48,7 @@ func TestApplyEnchantSkillRefreshesShortcuts(t *testing.T) {
 				t.Fatalf("shortcut level = %d, want %d", got, tc.want)
 			}
 			registerAt, messageAt := -1, -1
-			for i, frame := range frames.frames {
+			for i, frame := range frames.Frames() {
 				if frame[0] == serverpackets.OpcodeShortCutRegister {
 					registerAt = i
 				}

@@ -6,6 +6,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 func TestUseSummonItemSpawnsDecorativeNPCAndPreventsNearbyDuplicate(t *testing.T) {
@@ -23,7 +24,7 @@ func TestUseSummonItemSpawnsDecorativeNPCAndPreventsNearbyDuplicate(t *testing.T
 	}
 	link.summonItems = items
 
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, frames)
 	state.Spawn(live, 100, 200, 300, 400)
 	nonTreeInstance, err := npc.NewInstance(99, &npc.Template{ID: 9000, TemplateID: 9000, Type: "Folk"})
@@ -35,7 +36,7 @@ func TestUseSummonItemSpawnsDecorativeNPCAndPreventsNearbyDuplicate(t *testing.T
 		t.Fatalf("build non-tree decoration: %v", err)
 	}
 	state.Spawn(nonTree, 200, 200, 300, 0)
-	frames.frames = nil
+	testsupport.ResetCapture(frames)
 	first := &item.Instance{ObjectID: 500, TemplateID: summonTestCollarTemplateID, OwnerID: live.ObjectID(), Count: 1, Location: item.LocationInventory}
 	live.Inventory().Restore([]*item.Instance{first})
 
@@ -56,9 +57,9 @@ func TestUseSummonItemSpawnsDecorativeNPCAndPreventsNearbyDuplicate(t *testing.T
 	if got := decoration.NPCInfoSnapshot(); got.Attackable || got.Running || got.Title != "Player" || got.X != 100 || got.Y != 200 || got.Z != 300 || got.Heading != 400 {
 		t.Fatalf("decoration snapshot = %+v", got)
 	}
-	assertOpcodeSequence(t, frames.frames, serverpackets.OpcodeNPCInfo)
+	testsupport.AssertOpcodeSequence(t, frames.Frames(), serverpackets.OpcodeNPCInfo)
 
-	frames.frames = nil
+	testsupport.ResetCapture(frames)
 	second := &item.Instance{ObjectID: 501, TemplateID: summonTestCollarTemplateID, OwnerID: live.ObjectID(), Count: 1, Location: item.LocationInventory}
 	live.Inventory().Restore([]*item.Instance{second})
 	if !link.useSummonItem(live, live.Inventory(), second) {
@@ -67,8 +68,8 @@ func TestUseSummonItemSpawnsDecorativeNPCAndPreventsNearbyDuplicate(t *testing.T
 	if got := live.Inventory().ItemByObjectID(second.ObjectID); got == nil {
 		t.Fatal("duplicate rejection consumed the item")
 	}
-	if len(frames.frames) != 1 {
-		t.Fatalf("frames = %d, want one duplicate rejection", len(frames.frames))
+	if len(frames.Frames()) != 1 {
+		t.Fatalf("frames = %d, want one duplicate rejection", len(frames.Frames()))
 	}
-	assertSystemMessageStringFrame(t, frames.frames[0], 1142, "Tree")
+	assertSystemMessageStringFrame(t, frames.Frames()[0], 1142, "Tree")
 }

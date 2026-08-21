@@ -17,6 +17,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 // TestTeleportLivePlayerStopsInFlightCast pins the teleport half of the
@@ -24,7 +25,7 @@ import (
 // in-flight cast, the same way it already cancels attack/combat.
 func TestTeleportLivePlayerStopsInFlightCast(t *testing.T) {
 	state := world.New()
-	live := newTestLivePlayer(t, 1, &frameCapture{})
+	live := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
 	state.Spawn(live, 0, 0, 0, 0)
 
 	gcl := &GameClientLink{world: state, geo: testGeo{}, log: zerolog.Nop()}
@@ -53,7 +54,7 @@ func TestTeleportLivePlayerStopsInFlightCast(t *testing.T) {
 // (PlayerCast.java:382-387).
 func TestTeleportLivePlayerSendsActionFailedOnce(t *testing.T) {
 	state := world.New()
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, frames)
 	state.Spawn(live, 0, 0, 0, 0)
 
@@ -62,12 +63,12 @@ func TestTeleportLivePlayerSendsActionFailedOnce(t *testing.T) {
 	if _, err := controller.Start(time.Now(), live, castingDef); err != nil {
 		t.Fatalf("Start() error: %v", err)
 	}
-	frames.frames = nil
+	testsupport.ResetCapture(frames)
 
 	gcl.teleportLivePlayer(live, location.Location{X: 5000, Y: 5000, Z: 100}, 0)
 
 	count := 0
-	for _, f := range frames.frames {
+	for _, f := range frames.Frames() {
 		if f[0] == serverpackets.OpcodeActionFailed {
 			count++
 		}
@@ -87,8 +88,8 @@ func TestTeleportLivePlayerSendsActionFailedOnce(t *testing.T) {
 // immediately, including a short in-range hop that Java would leave intact.
 func TestTeleportLivePlayerDoesNotAbortFusionChannel(t *testing.T) {
 	state := world.New()
-	caster := newTestLivePlayer(t, 1, &frameCapture{})
-	target := newTestLivePlayer(t, 2, &frameCapture{})
+	caster := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
+	target := newTestLivePlayer(t, 2, &testsupport.FrameCapture{})
 	state.Spawn(caster, 0, 0, 0, 0)
 	state.Spawn(target, 100, 0, 0, 0)
 
@@ -127,21 +128,21 @@ func townRestartTable() *restart.Table {
 
 func TestRestartLivePlayerIgnoresLivingPlayer(t *testing.T) {
 	state := world.New()
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, frames)
 	state.Spawn(live, 0, 0, 0, 0)
-	frames.frames = nil
+	testsupport.ResetCapture(frames)
 
 	gcl := &GameClientLink{world: state, geo: testGeo{}, restarts: townRestartTable(), playerConfig: PlayerConfig{RespawnRestoreHP: 0.7}, log: zerolog.Nop()}
 	gcl.restartLivePlayer(live, clientpackets.RequestRestartPoint{})
 
-	if len(frames.frames) != 0 {
-		t.Fatalf("frames sent for a living player = %d, want 0", len(frames.frames))
+	if len(frames.Frames()) != 0 {
+		t.Fatalf("frames sent for a living player = %d, want 0", len(frames.Frames()))
 	}
 }
 
 func TestRestartLivePlayerStopsFakeDeathWithoutRevivingOrTeleporting(t *testing.T) {
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, frames)
 	gcl := &GameClientLink{log: zerolog.Nop()}
 	live.SetStanceBroadcaster(func(stance player.Stance) {
@@ -161,11 +162,11 @@ func TestRestartLivePlayerStopsFakeDeathWithoutRevivingOrTeleporting(t *testing.
 	}
 	e.Effected = live.Character
 	live.EffectList().Add(e)
-	frames.frames = nil
+	testsupport.ResetCapture(frames)
 
 	gcl.restartLivePlayer(live, clientpackets.RequestRestartPoint{})
 
-	if got := frameOpcodes(frames.frames); string(got) != string([]byte{serverpackets.OpcodeChangeWaitType, serverpackets.OpcodeRevive}) {
+	if got := testsupport.FrameOpcodes(frames.Frames()); string(got) != string([]byte{serverpackets.OpcodeChangeWaitType, serverpackets.OpcodeRevive}) {
 		t.Fatalf("fake-death restart opcodes = %x, want ChangeWaitType, Revive", got)
 	}
 	if live.FakeDead() {
@@ -181,14 +182,14 @@ func TestRestartLivePlayerStopsFakeDeathWithoutRevivingOrTeleporting(t *testing.
 
 func TestRestartLivePlayerRevivesAndTeleportsDeadPlayer(t *testing.T) {
 	state := world.New()
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, frames)
 	state.Spawn(live, 0, 0, 0, 0)
 	live.SetHP(1)
 	if !live.Die(nil) {
 		t.Fatal("precondition: Die() = false, want true")
 	}
-	frames.frames = nil
+	testsupport.ResetCapture(frames)
 
 	restarts := townRestartTable()
 	gcl := &GameClientLink{world: state, geo: testGeo{}, restarts: restarts, playerConfig: PlayerConfig{RespawnRestoreHP: 0.7}, log: zerolog.Nop()}
@@ -202,7 +203,7 @@ func TestRestartLivePlayerRevivesAndTeleportsDeadPlayer(t *testing.T) {
 	}
 
 	wantOpcodes := []byte{serverpackets.OpcodeRevive, serverpackets.OpcodeTeleportToLocation}
-	if got := frameOpcodes(frames.frames); string(got) != string(wantOpcodes) {
+	if got := testsupport.FrameOpcodes(frames.Frames()); string(got) != string(wantOpcodes) {
 		t.Fatalf("opcodes = %x, want Revive then TeleportToLocation (%x)", got, wantOpcodes)
 	}
 
@@ -218,9 +219,9 @@ func TestRestartLivePlayerRevivesAndTeleportsDeadPlayer(t *testing.T) {
 
 func TestCompleteLivePlayerTeleportRelocatesActiveSummonOnce(t *testing.T) {
 	state := world.New()
-	live := newTestLivePlayer(t, 1, &frameCapture{})
+	live := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
 	state.Spawn(live, 0, 0, 0, 0)
-	observerFrames := &frameCapture{}
+	observerFrames := &testsupport.FrameCapture{}
 	observer := newTestLivePlayer(t, 2, observerFrames)
 	state.Spawn(observer, 50, 0, 0, 0)
 	active := summon.NewServitor(summon.ServitorConfig{ObjectID: 3, Owner: live, Level: 40})
@@ -232,24 +233,24 @@ func TestCompleteLivePlayerTeleportRelocatesActiveSummonOnce(t *testing.T) {
 	if got := summonPosition(active); got == destination {
 		t.Fatalf("summon position before Appearing = %+v, want not yet relocated to %+v", got, destination)
 	}
-	observerFrames.frames = nil
+	testsupport.ResetCapture(observerFrames)
 
 	gcl.completeLivePlayerTeleport(live)
 	if got := summonPosition(active); got != destination {
 		t.Fatalf("summon position after Appearing = %+v, want %+v", got, destination)
 	}
-	if !containsTeleportFor(observerFrames.frames, active.ObjectID()) {
+	if !containsTeleportFor(observerFrames.Frames(), active.ObjectID()) {
 		t.Fatal("observer did not receive the active summon teleport frame")
 	}
 
 	active.SyncPosition(location.Location{})
-	observerFrames.frames = nil
+	testsupport.ResetCapture(observerFrames)
 	gcl.completeLivePlayerTeleport(live)
 	if got := summonPosition(active); got != (location.Location{}) {
 		t.Fatalf("summon position after repeated Appearing = %+v, want unchanged", got)
 	}
-	if len(observerFrames.frames) != 0 {
-		t.Fatalf("observer frames after repeated Appearing = %x, want none", observerFrames.frames)
+	if len(observerFrames.Frames()) != 0 {
+		t.Fatalf("observer frames after repeated Appearing = %x, want none", observerFrames.Frames())
 	}
 }
 
@@ -276,17 +277,17 @@ func containsTeleportFor(frames [][]byte, objectID int32) bool {
 // can dismiss the pending death action and stays dead past the warn in the log.
 func TestRestartLivePlayerWithNoRestartTableSendsActionFailed(t *testing.T) {
 	state := world.New()
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, frames)
 	state.Spawn(live, 0, 0, 0, 0)
 	live.SetHP(1)
 	live.Die(nil)
-	frames.frames = nil
+	testsupport.ResetCapture(frames)
 
 	gcl := &GameClientLink{world: state, geo: testGeo{}, log: zerolog.Nop()}
 	gcl.restartLivePlayer(live, clientpackets.RequestRestartPoint{})
 
-	if got := frameOpcodes(frames.frames); len(got) != 1 || got[0] != serverpackets.OpcodeActionFailed {
+	if got := testsupport.FrameOpcodes(frames.Frames()); len(got) != 1 || got[0] != serverpackets.OpcodeActionFailed {
 		t.Fatalf("opcodes = %x, want [ActionFailed]", got)
 	}
 	if !live.Dead() {

@@ -25,6 +25,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 // castingDef is a minimal long-hitTime active skill definition, long enough
@@ -39,7 +40,7 @@ var castingDef = modelskill.Definition{
 // speed regardless of the run/walk toggle, instead of the land run/walk
 // speed.
 func TestLiveMoveSpeedUsesSwimSpeedInWater(t *testing.T) {
-	live := newTestLivePlayer(t, 1, &frameCapture{})
+	live := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
 	live.zoneActor = &liveZoneActor{live: live}
 
 	live.SetRunning(true)
@@ -68,13 +69,13 @@ func TestLiveMoveSpeedUsesSwimSpeedInWater(t *testing.T) {
 // the swimming byte reflects Creature.isInWater() at the moment of the
 // run/walk toggle, not a hardcoded land value.
 func TestChangeLiveMoveTypeReportsSwimmingInWaterZone(t *testing.T) {
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, capture)
 	live.zoneActor = &liveZoneActor{live: live}
 	gcl := &GameClientLink{log: zerolog.Nop()}
 
 	gcl.changeLiveMoveType(live, false)
-	frames := capture.snapshot()
+	frames := capture.Frames()
 	if len(frames) != 1 {
 		t.Fatalf("frames captured = %d, want 1", len(frames))
 	}
@@ -87,7 +88,7 @@ func TestChangeLiveMoveTypeReportsSwimmingInWaterZone(t *testing.T) {
 
 	live.zoneActor.ZoneFlags().Set(zone.FlagWater, true)
 	gcl.changeLiveMoveType(live, true)
-	frames = capture.snapshot()
+	frames = capture.Frames()
 	if len(frames) != 2 {
 		t.Fatalf("frames captured = %d, want 2", len(frames))
 	}
@@ -108,7 +109,7 @@ func TestChangeLiveMoveTypeReportsSwimmingInWaterZone(t *testing.T) {
 // The PR under review (#1021) wrongly stopped the cast here, misattributing
 // it to onEvtCancel; this pins the reference behavior instead.
 func TestMoveLivePlayerLeavesInFlightCastRunning(t *testing.T) {
-	live := newTestLivePlayer(t, 1, &frameCapture{})
+	live := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
 	gcl := &GameClientLink{log: zerolog.Nop()}
 	controller := gcl.castController(live)
 	if _, err := controller.Start(time.Now(), live, castingDef); err != nil {
@@ -140,7 +141,7 @@ func (blockedTestGeo) ValidLocation(ox, oy, oz, _, _, _ int) location.Location {
 // newTestLivePlayer but wired to a caller-supplied move.Geo, so a test can
 // exercise a geo-rejected route without touching the always-passable
 // default.
-func newTestLivePlayerWithGeo(t *testing.T, id int32, capture *frameCapture, geo move.Geo) *livePlayer {
+func newTestLivePlayerWithGeo(t *testing.T, id int32, capture *testsupport.FrameCapture, geo move.Geo) *livePlayer {
 	t.Helper()
 	tmpl, ok := testTemplates(t).Get(0)
 	if !ok {
@@ -154,8 +155,8 @@ func newTestLivePlayerWithGeo(t *testing.T, id int32, capture *frameCapture, geo
 	}
 	ch.SetResourceValues(player.Resources{MaxHP: 80, CurrentHP: 80, MaxMP: 30, CurrentMP: 30})
 	ch.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventory(ch.ID, testItemTemplates(), nil))
-	ch.SetFrameSender(capture.send)
-	ch.SetBroadcastFrameSender(capture.send)
+	ch.SetFrameSender(capture.Send)
+	ch.SetBroadcastFrameSender(capture.Send)
 
 	x, y, z := ch.Position()
 	live, err := creature.NewLive(location.Location{X: x, Y: y, Z: z}, tmpl.RunSpeed, geo, ch)
@@ -172,7 +173,7 @@ func newTestLivePlayerWithGeo(t *testing.T, id int32, capture *frameCapture, geo
 	moveCtl.SetArrived(combat.Think)
 	attackCtl.SetFinished(combat.Think)
 
-	return &livePlayer{Character: ch, template: tmpl, attack: attackCtl, move: moveCtl, combat: combat, visibilitySend: capture.send}
+	return &livePlayer{Character: ch, template: tmpl, attack: attackCtl, move: moveCtl, combat: combat, visibilitySend: capture.Send}
 }
 
 // TestMoveLivePlayerSimulatesWalkServerSide pins the fix for #1168: the walk
@@ -180,7 +181,7 @@ func newTestLivePlayerWithGeo(t *testing.T, id int32, capture *frameCapture, geo
 // position, not the packet's claimed origin, so the broadcast MoveToLocation
 // event always carries the server's own position as origin.
 func TestMoveLivePlayerSimulatesWalkServerSide(t *testing.T) {
-	live := newTestLivePlayer(t, 1, &frameCapture{})
+	live := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
 	gcl := &GameClientLink{log: zerolog.Nop()}
 
 	var got move.Event
@@ -209,7 +210,7 @@ func TestMoveLivePlayerSimulatesWalkServerSide(t *testing.T) {
 }
 
 func TestMoveLivePlayerBroadcastsBlockedRouteAsZeroDistanceMove(t *testing.T) {
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newTestLivePlayerWithGeo(t, 1, capture, blockedTestGeo{})
 	gcl := &GameClientLink{log: zerolog.Nop()}
 
@@ -226,7 +227,7 @@ func TestMoveLivePlayerBroadcastsBlockedRouteAsZeroDistanceMove(t *testing.T) {
 	if moveBroadcasts != 1 {
 		t.Fatalf("move broadcasts on a blocked route = %d, want 1", moveBroadcasts)
 	}
-	opcodes := frameOpcodes(capture.frames)
+	opcodes := testsupport.FrameOpcodes(capture.Frames())
 	if len(opcodes) != 0 {
 		t.Fatalf("frames sent = %x, want none", opcodes)
 	}
@@ -246,7 +247,7 @@ func TestMoveLivePlayerBroadcastsBlockedRouteAsZeroDistanceMove(t *testing.T) {
 // stands and never adopts client-reported coordinates (there are none to
 // adopt — the handler no longer accepts any).
 func TestStopLivePlayerStopsSimulatedWalk(t *testing.T) {
-	live := newTestLivePlayer(t, 1, &frameCapture{})
+	live := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
 	gcl := &GameClientLink{log: zerolog.Nop()}
 
 	origin := live.CurrentLocation()
@@ -277,15 +278,15 @@ func TestStopLivePlayerStopsSimulatedWalk(t *testing.T) {
 // nothing server-side, and even a divergent report that does trigger a
 // correction is never adopted as the new server position.
 func TestValidateLivePlayerPositionNeverAdoptsAValidReport(t *testing.T) {
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, capture)
 	gcl := &GameClientLink{log: zerolog.Nop()}
 	origin := live.CurrentLocation()
 
 	nearReport := location.Location{X: origin.X + 1, Y: origin.Y, Z: origin.Z}
 	gcl.validateLivePlayerPosition(live, nearReport)
-	if len(capture.frames) != 0 {
-		t.Fatalf("frames sent for an in-threshold report = %d, want 0", len(capture.frames))
+	if len(capture.Frames()) != 0 {
+		t.Fatalf("frames sent for an in-threshold report = %d, want 0", len(capture.Frames()))
 	}
 	if got := live.CurrentLocation(); got != origin {
 		t.Fatalf("position after an in-threshold report = %+v, want unchanged %+v", got, origin)
@@ -293,7 +294,7 @@ func TestValidateLivePlayerPositionNeverAdoptsAValidReport(t *testing.T) {
 
 	farReport := location.Location{X: origin.X + 8192, Y: origin.Y, Z: origin.Z}
 	gcl.validateLivePlayerPosition(live, farReport)
-	opcodes := frameOpcodes(capture.frames)
+	opcodes := testsupport.FrameOpcodes(capture.Frames())
 	if len(opcodes) != 1 || opcodes[0] != serverpackets.OpcodeValidateLocation {
 		t.Fatalf("frames sent for an out-of-threshold report = %x, want a single ValidateLocation (%#x)", opcodes, serverpackets.OpcodeValidateLocation)
 	}
@@ -311,7 +312,7 @@ func TestValidateLivePlayerPositionNeverAdoptsAValidReport(t *testing.T) {
 // The PR under review (#1021) wrongly stopped the cast here; this pins the
 // reference behavior instead.
 func TestChangeLiveWaitTypeSitLeavesInFlightCastRunning(t *testing.T) {
-	live := newTestLivePlayer(t, 1, &frameCapture{})
+	live := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
 	gcl := &GameClientLink{log: zerolog.Nop()}
 	controller := gcl.castController(live)
 	if _, err := controller.Start(time.Now(), live, castingDef); err != nil {
@@ -328,8 +329,8 @@ func TestChangeLiveWaitTypeSitLeavesInFlightCastRunning(t *testing.T) {
 
 func TestMoveLivePlayerRelocatesWorldVisibility(t *testing.T) {
 	state := world.New()
-	movingFrames := &frameCapture{}
-	watcherFrames := &frameCapture{}
+	movingFrames := &testsupport.FrameCapture{}
+	watcherFrames := &testsupport.FrameCapture{}
 	moving := newTestLivePlayer(t, 1, movingFrames)
 	watcher := newTestLivePlayer(t, 2, watcherFrames)
 
@@ -345,26 +346,26 @@ func TestMoveLivePlayerRelocatesWorldVisibility(t *testing.T) {
 	if !world.Knows(moving, watcher) {
 		t.Fatal("players do not know each other after movement into visibility range")
 	}
-	if got := frameOpcodes(movingFrames.frames); string(got) != string([]byte{serverpackets.OpcodeCharInfo}) {
+	if got := testsupport.FrameOpcodes(movingFrames.Frames()); string(got) != string([]byte{serverpackets.OpcodeCharInfo}) {
 		t.Fatalf("moving player opcodes = %x, want CharInfo", got)
 	}
-	if got := frameOpcodes(watcherFrames.frames); string(got) != string([]byte{serverpackets.OpcodeCharInfo}) {
+	if got := testsupport.FrameOpcodes(watcherFrames.Frames()); string(got) != string([]byte{serverpackets.OpcodeCharInfo}) {
 		t.Fatalf("watcher opcodes = %x, want CharInfo", got)
 	}
 }
 
 func TestBroadcastLiveDieSendsDieToOwnSessionAndObservers(t *testing.T) {
 	state := world.New()
-	victimFrames := &frameCapture{}
-	observerFrames := &frameCapture{}
+	victimFrames := &testsupport.FrameCapture{}
+	observerFrames := &testsupport.FrameCapture{}
 	victim := newTestLivePlayer(t, 1, victimFrames)
 	observer := newTestLivePlayer(t, 2, observerFrames)
 	victim.AccessLevel = 7
 
 	state.Spawn(victim, 0, 0, 0, 0)
 	state.Spawn(observer, 100, 0, 0, 0)
-	victimFrames.frames = nil
-	observerFrames.frames = nil
+	testsupport.ResetCapture(victimFrames)
+	testsupport.ResetCapture(observerFrames)
 
 	adminData, err := admin.NewData([]admin.AccessLevel{{Level: 7, AllowFixedRes: true}}, nil)
 	if err != nil {
@@ -373,13 +374,13 @@ func TestBroadcastLiveDieSendsDieToOwnSessionAndObservers(t *testing.T) {
 	gcl := &GameClientLink{world: state, admin: adminData, log: zerolog.Nop()}
 	gcl.broadcastLiveDie(victim)
 
-	if got := frameOpcodes(victimFrames.frames); string(got) != string([]byte{serverpackets.OpcodeDie}) {
+	if got := testsupport.FrameOpcodes(victimFrames.Frames()); string(got) != string([]byte{serverpackets.OpcodeDie}) {
 		t.Fatalf("victim opcodes = %x, want Die", got)
 	}
-	if got := frameOpcodes(observerFrames.frames); string(got) != string([]byte{serverpackets.OpcodeDie}) {
+	if got := testsupport.FrameOpcodes(observerFrames.Frames()); string(got) != string([]byte{serverpackets.OpcodeDie}) {
 		t.Fatalf("observer opcodes = %x, want Die", got)
 	}
-	for _, frames := range [][][]byte{victimFrames.frames, observerFrames.frames} {
+	for _, frames := range [][][]byte{victimFrames.Frames(), observerFrames.Frames()} {
 		if got := binary.LittleEndian.Uint32(frames[0][25:29]); got != 1 {
 			t.Fatalf("Die fixed-res field = %d, want 1", got)
 		}
@@ -388,8 +389,8 @@ func TestBroadcastLiveDieSendsDieToOwnSessionAndObservers(t *testing.T) {
 
 func TestBroadcastLiveFrameReleasesKnownBufferBeforeDelivery(t *testing.T) {
 	state := world.New()
-	self := newTestLivePlayer(t, 1, &frameCapture{})
-	observer := newTestLivePlayer(t, 2, &frameCapture{})
+	self := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
+	observer := newTestLivePlayer(t, 2, &testsupport.FrameCapture{})
 	state.Spawn(self, 0, 0, 0, 0)
 	state.Spawn(observer, 100, 0, 0, 0)
 	link := &GameClientLink{world: state, log: zerolog.Nop()}
@@ -420,15 +421,15 @@ func TestBroadcastLiveFrameReleasesKnownBufferBeforeDelivery(t *testing.T) {
 
 func TestBroadcastLiveFrameBuildsOnceForAllRecipients(t *testing.T) {
 	state := world.New()
-	selfFrames := &frameCapture{}
-	observerFrames := &frameCapture{}
+	selfFrames := &testsupport.FrameCapture{}
+	observerFrames := &testsupport.FrameCapture{}
 	self := newTestLivePlayer(t, 1, selfFrames)
 	observer := newTestLivePlayer(t, 2, observerFrames)
 
 	state.Spawn(self, 0, 0, 0, 0)
 	state.Spawn(observer, 100, 0, 0, 0)
-	selfFrames.frames = nil
-	observerFrames.frames = nil
+	testsupport.ResetCapture(selfFrames)
+	testsupport.ResetCapture(observerFrames)
 
 	builds := 0
 	(&GameClientLink{world: state, log: zerolog.Nop()}).broadcastLiveFrame(self, func() wire.Frame {
@@ -439,18 +440,18 @@ func TestBroadcastLiveFrameBuildsOnceForAllRecipients(t *testing.T) {
 	if builds != 1 {
 		t.Fatalf("frame builds = %d, want 1", builds)
 	}
-	if len(selfFrames.frames) != 1 || len(observerFrames.frames) != 1 {
-		t.Fatalf("received frames = (%d, %d), want (1, 1)", len(selfFrames.frames), len(observerFrames.frames))
+	if len(selfFrames.Frames()) != 1 || len(observerFrames.Frames()) != 1 {
+		t.Fatalf("received frames = (%d, %d), want (1, 1)", len(selfFrames.Frames()), len(observerFrames.Frames()))
 	}
-	if !bytes.Equal(selfFrames.frames[0], observerFrames.frames[0]) {
-		t.Fatalf("recipient frames differ: self %x observer %x", selfFrames.frames[0], observerFrames.frames[0])
+	if !bytes.Equal(selfFrames.Frames()[0], observerFrames.Frames()[0]) {
+		t.Fatalf("recipient frames differ: self %x observer %x", selfFrames.Frames()[0], observerFrames.Frames()[0])
 	}
 }
 
 func TestBroadcastLiveFrameGivesRecipientsIndependentFrames(t *testing.T) {
 	state := world.New()
-	self := newTestLivePlayer(t, 1, &frameCapture{})
-	observer := newTestLivePlayer(t, 2, &frameCapture{})
+	self := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
+	observer := newTestLivePlayer(t, 2, &testsupport.FrameCapture{})
 	var selfFrame, observerFrame wire.Frame
 	self.Character.SetFrameSender(func(frame wire.Frame) bool {
 		selfFrame = frame
@@ -488,8 +489,8 @@ func TestBroadcastLiveFrameGivesRecipientsIndependentFrames(t *testing.T) {
 }
 
 func TestBroadcastFrameBuildsOnceAndCopiesForRecipients(t *testing.T) {
-	selfFrames := &frameCapture{}
-	observerFrames := &frameCapture{}
+	selfFrames := &testsupport.FrameCapture{}
+	observerFrames := &testsupport.FrameCapture{}
 	self := newTestLivePlayer(t, 1, selfFrames)
 	observer := newTestLivePlayer(t, 2, observerFrames)
 
@@ -508,11 +509,11 @@ func TestBroadcastFrameBuildsOnceAndCopiesForRecipients(t *testing.T) {
 	if builds != 1 {
 		t.Fatalf("frame builds = %d, want 1", builds)
 	}
-	if len(selfFrames.frames) != 1 || len(observerFrames.frames) != 1 {
-		t.Fatalf("recipient frame counts = %d, %d; want 1, 1", len(selfFrames.frames), len(observerFrames.frames))
+	if len(selfFrames.Frames()) != 1 || len(observerFrames.Frames()) != 1 {
+		t.Fatalf("recipient frame counts = %d, %d; want 1, 1", len(selfFrames.Frames()), len(observerFrames.Frames()))
 	}
-	if !bytes.Equal(selfFrames.frames[0], observerFrames.frames[0]) {
-		t.Fatalf("recipient frames differ: self %x observer %x", selfFrames.frames[0], observerFrames.frames[0])
+	if !bytes.Equal(selfFrames.Frames()[0], observerFrames.Frames()[0]) {
+		t.Fatalf("recipient frames differ: self %x observer %x", selfFrames.Frames()[0], observerFrames.Frames()[0])
 	}
 }
 
@@ -530,7 +531,7 @@ func TestBroadcastFrameSkipsBuildWithoutRecipients(t *testing.T) {
 func BenchmarkBroadcastLiveFrameKnownObservers(b *testing.B) {
 	// These senders release synchronously; production queues may retain many frames.
 	state := world.New()
-	self := newTestLivePlayer(b, 1, &frameCapture{})
+	self := newTestLivePlayer(b, 1, &testsupport.FrameCapture{})
 	self.Character.SetFrameSender(func(frame wire.Frame) bool {
 		frame.Release()
 		return true
@@ -541,7 +542,7 @@ func BenchmarkBroadcastLiveFrameKnownObservers(b *testing.B) {
 	})
 	state.Spawn(self, 0, 0, 0, 0)
 	for i := 0; i < 50; i++ {
-		observer := newTestLivePlayer(b, int32(i+2), &frameCapture{})
+		observer := newTestLivePlayer(b, int32(i+2), &testsupport.FrameCapture{})
 		observer.Character.SetFrameSender(func(frame wire.Frame) bool {
 			frame.Release()
 			return true
@@ -566,7 +567,7 @@ func BenchmarkBroadcastLiveFrameKnownObservers(b *testing.B) {
 func BenchmarkBroadcastCharacterInfoKnownObservers(b *testing.B) {
 	// These senders release synchronously; production queues may retain many frames.
 	state := world.New()
-	self := newTestLivePlayer(b, 1, &frameCapture{})
+	self := newTestLivePlayer(b, 1, &testsupport.FrameCapture{})
 	self.Character.SetFrameSender(func(frame wire.Frame) bool {
 		frame.Release()
 		return true
@@ -577,7 +578,7 @@ func BenchmarkBroadcastCharacterInfoKnownObservers(b *testing.B) {
 	})
 	state.Spawn(self, 0, 0, 0, 0)
 	for i := 0; i < 50; i++ {
-		observer := newTestLivePlayer(b, int32(i+2), &frameCapture{})
+		observer := newTestLivePlayer(b, int32(i+2), &testsupport.FrameCapture{})
 		observer.Character.SetFrameSender(func(frame wire.Frame) bool {
 			frame.Release()
 			return true
@@ -604,7 +605,7 @@ func BenchmarkBroadcastCharacterInfoKnownObservers(b *testing.B) {
 // a client-reported walk measures distance/duration from the old spot.
 func TestUpdateLivePlayerPositionReseedsCreatureMove(t *testing.T) {
 	state := world.New()
-	moving := newTestLivePlayer(t, 1, &frameCapture{})
+	moving := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
 	state.Spawn(moving, 0, 0, 0, 0)
 
 	gcl := &GameClientLink{world: state, log: zerolog.Nop()}
@@ -619,15 +620,15 @@ func TestUpdateLivePlayerPositionReseedsCreatureMove(t *testing.T) {
 func TestGameClientLinkWireSafeMovementAndRefreshPacketsInGame(t *testing.T) {
 	c, chars, _, state := newLinkedGameClient(t)
 
-	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
-	c.read() // CharCreateOk
-	c.read() // CharSelectInfo
+	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.Read() // CharCreateOk
+	c.Read() // CharSelectInfo
 	objID := chars.soleObjectID(t)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
 	// spawn is the new character's actual server-authoritative position
@@ -641,8 +642,8 @@ func TestGameClientLinkWireSafeMovementAndRefreshPacketsInGame(t *testing.T) {
 	target := location.Location{X: 46160, Y: 41237, Z: -3534}
 	claimedOrigin := location.Location{X: 46117, Y: 41247, Z: -3532}
 	walkHeading := spawn.HeadingTo(target)
-	c.send(encodeMoveBackwardToLocation(target, claimedOrigin, 1))
-	reply := c.read()
+	c.Send(encodeMoveBackwardToLocation(target, claimedOrigin, 1))
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeMoveToLocation {
 		t.Fatalf("move reply opcode = %#x, want MoveToLocation (%#x)", reply[0], serverpackets.OpcodeMoveToLocation)
 	}
@@ -675,9 +676,9 @@ func TestGameClientLinkWireSafeMovementAndRefreshPacketsInGame(t *testing.T) {
 	// position is within a second's travel and must not be adopted or
 	// answered.
 	nearClientPosition := location.Location{X: spawn.X + 1, Y: spawn.Y, Z: spawn.Z}
-	c.send(encodeValidatePosition(nearClientPosition, 32768))
-	c.send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
-	reply = c.read()
+	c.Send(encodeValidatePosition(nearClientPosition, 32768))
+	c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeItemList {
 		t.Fatalf("item refresh opcode = %#x, want ItemList (%#x)", reply[0], serverpackets.OpcodeItemList)
 	}
@@ -690,8 +691,8 @@ func TestGameClientLinkWireSafeMovementAndRefreshPacketsInGame(t *testing.T) {
 	// divergence threshold: the server corrects the client back to its
 	// own (still-spawn) position, but never adopts the client's report.
 	farClientPosition := location.Location{X: target.X + 500, Y: target.Y, Z: target.Z}
-	c.send(encodeValidatePosition(farClientPosition, 32768))
-	reply = c.read()
+	c.Send(encodeValidatePosition(farClientPosition, 32768))
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeValidateLocation {
 		t.Fatalf("desync correction opcode = %#x, want ValidateLocation (%#x)", reply[0], serverpackets.OpcodeValidateLocation)
 	}
@@ -716,8 +717,8 @@ func TestGameClientLinkWireSafeMovementAndRefreshPacketsInGame(t *testing.T) {
 	// entirely, and StopMove must carry the server's own (still-spawn,
 	// still-mid-walk) position and heading instead.
 	claimedStopAt := location.Location{X: 46155, Y: 41240, Z: -3534}
-	c.send(encodeCannotMoveAnymore(claimedStopAt, 12345))
-	reply = c.read()
+	c.Send(encodeCannotMoveAnymore(claimedStopAt, 12345))
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeStopMove {
 		t.Fatalf("stop reply opcode = %#x, want StopMove (%#x)", reply[0], serverpackets.OpcodeStopMove)
 	}
@@ -737,8 +738,8 @@ func TestGameClientLinkWireSafeMovementAndRefreshPacketsInGame(t *testing.T) {
 		t.Fatalf("player position after CannotMoveAnymore = (%d,%d,%d), want unchanged server position (%d,%d,%d)", x, y, z, spawn.X, spawn.Y, spawn.Z)
 	}
 
-	c.send(encodeStartRotating(32768, 1))
-	reply = c.read()
+	c.Send(encodeStartRotating(32768, 1))
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeStartRotation {
 		t.Fatalf("start rotation opcode = %#x, want StartRotation (%#x)", reply[0], serverpackets.OpcodeStartRotation)
 	}
@@ -750,8 +751,8 @@ func TestGameClientLinkWireSafeMovementAndRefreshPacketsInGame(t *testing.T) {
 		t.Fatalf("StartRotation fields = (%d,%d,%d), want (32768,1,0)", degree, side, speed)
 	}
 
-	c.send(encodeFinishRotating(22222, 1))
-	reply = c.read()
+	c.Send(encodeFinishRotating(22222, 1))
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeStopRotation {
 		t.Fatalf("stop rotation opcode = %#x, want StopRotation (%#x)", reply[0], serverpackets.OpcodeStopRotation)
 	}
@@ -767,8 +768,8 @@ func TestGameClientLinkWireSafeMovementAndRefreshPacketsInGame(t *testing.T) {
 		t.Fatalf("live player heading = %d, want 22222", heading)
 	}
 
-	c.send(encodeSingleOpcode(clientpackets.OpcodeRequestSkillList))
-	reply = c.read()
+	c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestSkillList))
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeSkillList {
 		t.Fatalf("skill refresh opcode = %#x, want SkillList (%#x)", reply[0], serverpackets.OpcodeSkillList)
 	}
@@ -780,15 +781,15 @@ func TestGameClientLinkWireSafeMovementAndRefreshPacketsInGame(t *testing.T) {
 		clientpackets.OpcodeGameGuardReply,
 		clientpackets.OpcodeRequestShowMiniMap,
 	} {
-		c.send(encodeSingleOpcode(opcode))
+		c.Send(encodeSingleOpcode(opcode))
 	}
 	// DlgAnswer is wired (unlike the still-unwired opcodes above), so it
 	// needs a well-formed body; a messageId with no pending dialog behind
 	// it is still a no-op, matching DlgAnswer.runImpl's unmatched-id
 	// fall-through (DlgAnswer.java:20-37).
-	c.send(encodeDlgAnswer(0, 0, 0))
-	c.send(encodeRequestManorList())
-	reply = c.read()
+	c.Send(encodeDlgAnswer(0, 0, 0))
+	c.Send(encodeRequestManorList())
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeExtended {
 		t.Fatalf("post-stub opcode = %#x, want extended packet (%#x)", reply[0], serverpackets.OpcodeExtended)
 	}

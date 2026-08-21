@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	gamecipher "github.com/fatal10110/acis_golang/internal/gameserver/network/cipher"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
@@ -54,12 +55,12 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 		l.log.Error().Err(err).Msg("generate game cipher key")
 		return
 	}
-	cipher, err := NewCipher(key)
+	gameCipher, err := gamecipher.NewCipher(key)
 	if err != nil {
 		l.log.Error().Err(err).Msg("build game cipher")
 		return
 	}
-	session := NewSession(conn, cipher)
+	session := NewSession(conn, gameCipher)
 	client := NewClient(session)
 
 	// chars and entering are read entirely by this goroutine: they resolve

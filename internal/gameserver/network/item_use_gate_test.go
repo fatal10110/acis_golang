@@ -4,22 +4,23 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 func TestSendUseConditionFailureUsesTextMessage(t *testing.T) {
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, frames)
 
 	sendUseConditionFailure(live, &item.Template{ID: 6611}, item.UseCondition{Message: "Only heroes may use this item."})
 
-	if len(frames.frames) != 1 {
-		t.Fatalf("frames = %d, want 1", len(frames.frames))
+	if len(frames.Frames()) != 1 {
+		t.Fatalf("frames = %d, want 1", len(frames.Frames()))
 	}
-	assertSystemMessageStringFrame(t, frames.frames[0], 1987, "Only heroes may use this item.")
+	assertSystemMessageStringFrame(t, frames.Frames()[0], 1987, "Only heroes may use this item.")
 }
 
 func TestPlayerUseConditionHoldsUsesHeroState(t *testing.T) {
-	live := newTestLivePlayer(t, 1, &frameCapture{})
+	live := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
 	heroOnly := item.Condition{Kind: "player", Attrs: map[string]string{"isHero": "true"}}
 	nonHeroOnly := item.Condition{Kind: "player", Attrs: map[string]string{"isHero": "false"}}
 

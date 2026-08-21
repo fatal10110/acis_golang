@@ -17,21 +17,21 @@ import (
 func TestGameClientLinkActionBarStanceCommandsToggleStance(t *testing.T) {
 	c, chars, _, _, _, _ := newLinkedSQLGameClient(t, nil, nil, 0)
 
-	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
-	c.read() // CharCreateOk
-	c.read() // CharSelectInfo
+	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.Read() // CharCreateOk
+	c.Read() // CharSelectInfo
 	objID := sqlCharacterID(t, chars)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
 	// Walk/run button: a fresh character runs, so the first press walks and
 	// the second runs again.
-	c.send(encodeRequestActionUse(1, false, false))
-	reply := c.read()
+	c.Send(encodeRequestActionUse(1, false, false))
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeChangeMoveType {
 		t.Fatalf("walk/run toggle opcode = %#x, want ChangeMoveType (%#x)", reply[0], serverpackets.OpcodeChangeMoveType)
 	}
@@ -42,8 +42,8 @@ func TestGameClientLinkActionBarStanceCommandsToggleStance(t *testing.T) {
 	if running := r.ReadInt32(); running != 0 {
 		t.Fatalf("ChangeMoveType running = %d, want 0 after first toggle", running)
 	}
-	c.send(encodeRequestActionUse(1, false, false))
-	reply = c.read()
+	c.Send(encodeRequestActionUse(1, false, false))
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeChangeMoveType {
 		t.Fatalf("run toggle opcode = %#x, want ChangeMoveType (%#x)", reply[0], serverpackets.OpcodeChangeMoveType)
 	}
@@ -55,8 +55,8 @@ func TestGameClientLinkActionBarStanceCommandsToggleStance(t *testing.T) {
 
 	// Sit/stand button: a fresh character stands, so the first press sits
 	// and the second stands back up.
-	c.send(encodeRequestActionUse(0, false, false))
-	reply = c.read()
+	c.Send(encodeRequestActionUse(0, false, false))
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeChangeWaitType {
 		t.Fatalf("sit toggle opcode = %#x, want ChangeWaitType (%#x)", reply[0], serverpackets.OpcodeChangeWaitType)
 	}
@@ -67,8 +67,8 @@ func TestGameClientLinkActionBarStanceCommandsToggleStance(t *testing.T) {
 	if waitType := r.ReadInt32(); waitType != int32(serverpackets.WaitSitting) {
 		t.Fatalf("ChangeWaitType type = %d, want sitting", waitType)
 	}
-	c.send(encodeRequestActionUse(0, false, false))
-	reply = c.read()
+	c.Send(encodeRequestActionUse(0, false, false))
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeChangeWaitType {
 		t.Fatalf("stand toggle opcode = %#x, want ChangeWaitType (%#x)", reply[0], serverpackets.OpcodeChangeWaitType)
 	}
@@ -80,8 +80,8 @@ func TestGameClientLinkActionBarStanceCommandsToggleStance(t *testing.T) {
 
 	// An action-bar command nothing claims (private store sell) must
 	// release the client with ActionFailed instead of silence.
-	c.send(encodeRequestActionUse(10, false, false))
-	reply = c.read()
+	c.Send(encodeRequestActionUse(10, false, false))
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeActionFailed {
 		t.Fatalf("unclaimed action opcode = %#x, want ActionFailed (%#x)", reply[0], serverpackets.OpcodeActionFailed)
 	}
@@ -90,19 +90,19 @@ func TestGameClientLinkActionBarStanceCommandsToggleStance(t *testing.T) {
 func TestGameClientLinkStanceAndSocialPacketsInGame(t *testing.T) {
 	c, chars, _, _, _, _ := newLinkedSQLGameClient(t, nil, nil, 0)
 
-	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
-	c.read() // CharCreateOk
-	c.read() // CharSelectInfo
+	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.Read() // CharCreateOk
+	c.Read() // CharSelectInfo
 	objID := sqlCharacterID(t, chars)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
-	c.send(encodeRequestChangeMoveType(false))
-	reply := c.read()
+	c.Send(encodeRequestChangeMoveType(false))
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeChangeMoveType {
 		t.Fatalf("walk opcode = %#x, want ChangeMoveType (%#x)", reply[0], serverpackets.OpcodeChangeMoveType)
 	}
@@ -114,8 +114,8 @@ func TestGameClientLinkStanceAndSocialPacketsInGame(t *testing.T) {
 		t.Fatalf("ChangeMoveType flags = (%d,%d), want (0,0)", running, swimming)
 	}
 
-	c.send(encodeRequestChangeMoveType(true))
-	reply = c.read()
+	c.Send(encodeRequestChangeMoveType(true))
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeChangeMoveType {
 		t.Fatalf("run opcode = %#x, want ChangeMoveType (%#x)", reply[0], serverpackets.OpcodeChangeMoveType)
 	}
@@ -125,8 +125,8 @@ func TestGameClientLinkStanceAndSocialPacketsInGame(t *testing.T) {
 		t.Fatalf("ChangeMoveType running = %d, want 1", running)
 	}
 
-	c.send(encodeRequestChangeWaitType(false))
-	reply = c.read()
+	c.Send(encodeRequestChangeWaitType(false))
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeChangeWaitType {
 		t.Fatalf("sit opcode = %#x, want ChangeWaitType (%#x)", reply[0], serverpackets.OpcodeChangeWaitType)
 	}
@@ -138,8 +138,8 @@ func TestGameClientLinkStanceAndSocialPacketsInGame(t *testing.T) {
 		t.Fatalf("ChangeWaitType type = %d, want sitting", waitType)
 	}
 
-	c.send(encodeRequestChangeWaitType(true))
-	reply = c.read()
+	c.Send(encodeRequestChangeWaitType(true))
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeChangeWaitType {
 		t.Fatalf("stand opcode = %#x, want ChangeWaitType (%#x)", reply[0], serverpackets.OpcodeChangeWaitType)
 	}
@@ -149,8 +149,8 @@ func TestGameClientLinkStanceAndSocialPacketsInGame(t *testing.T) {
 		t.Fatalf("ChangeWaitType type = %d, want standing", waitType)
 	}
 
-	c.send(encodeRequestSocialAction(13))
-	reply = c.read()
+	c.Send(encodeRequestSocialAction(13))
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeSocialAction {
 		t.Fatalf("social opcode = %#x, want SocialAction (%#x)", reply[0], serverpackets.OpcodeSocialAction)
 	}

@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 // TestRequestChangeWaitTypeRejectionSendsActionFailed pins Gap 1: a rejected
@@ -20,13 +21,13 @@ import (
 // reference's thinkStand guard) must release the client with ActionFailed
 // instead of silently dropping the frame.
 func TestRequestChangeWaitTypeRejectionSendsActionFailed(t *testing.T) {
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, frames)
 	gcl := &GameClientLink{log: zerolog.Nop()}
 
 	gcl.requestChangeWaitType(live, true)
 
-	if got := frameOpcodes(frames.frames); string(got) != string([]byte{serverpackets.OpcodeActionFailed}) {
+	if got := testsupport.FrameOpcodes(frames.Frames()); string(got) != string([]byte{serverpackets.OpcodeActionFailed}) {
 		t.Fatalf("rejected stand opcodes = %x, want ActionFailed", got)
 	}
 	if !live.Standing() {
@@ -39,7 +40,7 @@ func TestRequestChangeWaitTypeRejectionSendsActionFailed(t *testing.T) {
 // throne exactly like the click path does.
 func TestRequestChangeWaitTypeSitTargetsClaimableChair(t *testing.T) {
 	state := world.New()
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, frames)
 	chair, err := staticobject.NewObject(2, &staticobject.Template{
 		ID:       777,
@@ -52,13 +53,13 @@ func TestRequestChangeWaitTypeSitTargetsClaimableChair(t *testing.T) {
 
 	state.Spawn(live, 0, 0, 0, 0)
 	state.Spawn(chair, 100, 0, 0, 0)
-	frames.frames = nil
+	testsupport.ResetCapture(frames)
 	live.SetTargetTracked(chair)
 
 	gcl := &GameClientLink{world: state, log: zerolog.Nop()}
 	gcl.requestChangeWaitType(live, false)
 
-	if got := frameOpcodes(frames.frames); string(got) != string([]byte{serverpackets.OpcodeChangeWaitType, serverpackets.OpcodeChairSit}) {
+	if got := testsupport.FrameOpcodes(frames.Frames()); string(got) != string([]byte{serverpackets.OpcodeChangeWaitType, serverpackets.OpcodeChairSit}) {
 		t.Fatalf("sit-key chair opcodes = %x, want ChangeWaitType, ChairSit", got)
 	}
 	if !chair.Busy() {
@@ -72,7 +73,7 @@ func TestRequestChangeWaitTypeSitTargetsClaimableChair(t *testing.T) {
 // it just leaves the player sitting on the ground instead of the throne.
 func TestRequestChangeWaitTypeSitFallsBackWhenChairUnclaimable(t *testing.T) {
 	state := world.New()
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, frames)
 	chair, err := staticobject.NewObject(2, &staticobject.Template{
 		ID:       777,
@@ -86,13 +87,13 @@ func TestRequestChangeWaitTypeSitFallsBackWhenChairUnclaimable(t *testing.T) {
 
 	state.Spawn(live, 0, 0, 0, 0)
 	state.Spawn(chair, 100, 0, 0, 0)
-	frames.frames = nil
+	testsupport.ResetCapture(frames)
 	live.SetTargetTracked(chair)
 
 	gcl := &GameClientLink{world: state, log: zerolog.Nop()}
 	gcl.requestChangeWaitType(live, false)
 
-	if got := frameOpcodes(frames.frames); string(got) != string([]byte{serverpackets.OpcodeChangeWaitType}) {
+	if got := testsupport.FrameOpcodes(frames.Frames()); string(got) != string([]byte{serverpackets.OpcodeChangeWaitType}) {
 		t.Fatalf("sit-key opcodes with unclaimable chair = %x, want plain ChangeWaitType only", got)
 	}
 	if live.Standing() {
@@ -109,7 +110,7 @@ func TestRequestChangeWaitTypeSitFallsBackWhenChairUnclaimable(t *testing.T) {
 // through the full client-packet dispatch loop, to keep the frame sequence
 // deterministic.
 func TestRequestChangeWaitTypeStandStopsFakeDeath(t *testing.T) {
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, frames)
 	gcl := &GameClientLink{log: zerolog.Nop()}
 	live.SetStanceBroadcaster(func(stance player.Stance) {
@@ -138,14 +139,14 @@ func TestRequestChangeWaitTypeStandStopsFakeDeath(t *testing.T) {
 	if !live.FakeDead() {
 		t.Fatal("live player not fake-dead after FakeDeath effect start")
 	}
-	frames.frames = nil
+	testsupport.ResetCapture(frames)
 
 	gcl.requestChangeWaitType(live, true)
 
-	if got := frameOpcodes(frames.frames); string(got) != string([]byte{serverpackets.OpcodeChangeWaitType, serverpackets.OpcodeRevive}) {
+	if got := testsupport.FrameOpcodes(frames.Frames()); string(got) != string([]byte{serverpackets.OpcodeChangeWaitType, serverpackets.OpcodeRevive}) {
 		t.Fatalf("stand-during-fake-death opcodes = %x, want ChangeWaitType, Revive", got)
 	}
-	r := wire.NewReader(frames.frames[0][1:])
+	r := wire.NewReader(frames.Frames()[0][1:])
 	r.ReadInt32()
 	if got := r.ReadInt32(); got != int32(serverpackets.WaitFakeDeathStop) {
 		t.Fatalf("stand-during-fake-death wait type = %d, want %d", got, serverpackets.WaitFakeDeathStop)
@@ -159,7 +160,7 @@ func TestRequestChangeWaitTypeStandStopsFakeDeath(t *testing.T) {
 }
 
 func TestGameClientLinkAutoAttackStanceRefreshAndStop(t *testing.T) {
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, capture)
 	tracker := &attackStanceRecorder{}
 	link := &GameClientLink{attackStance: tracker}
@@ -171,28 +172,28 @@ func TestGameClientLinkAutoAttackStanceRefreshAndStop(t *testing.T) {
 	if !live.InCombat() {
 		t.Fatal("live player not marked in combat after AutoAttackStart")
 	}
-	if len(capture.frames) != 1 || capture.frames[0][0] != serverpackets.OpcodeAutoAttackStart {
-		t.Fatalf("start frames = %x, want one AutoAttackStart", capture.frames)
+	if len(capture.Frames()) != 1 || capture.Frames()[0][0] != serverpackets.OpcodeAutoAttackStart {
+		t.Fatalf("start frames = %x, want one AutoAttackStart", capture.Frames())
 	}
 
 	link.startLiveAutoAttack(live)
 	if len(tracker.actors) != 2 {
 		t.Fatalf("attack stance refresh count = %d, want 2", len(tracker.actors))
 	}
-	if len(capture.frames) != 1 {
-		t.Fatalf("second start emitted %d frames, want no duplicate AutoAttackStart", len(capture.frames)-1)
+	if len(capture.Frames()) != 1 {
+		t.Fatalf("second start emitted %d frames, want no duplicate AutoAttackStart", len(capture.Frames())-1)
 	}
 
 	link.stopLiveAutoAttack(live)
 	if live.InCombat() {
 		t.Fatal("live player still marked in combat after AutoAttackStop")
 	}
-	if len(capture.frames) != 2 || capture.frames[1][0] != serverpackets.OpcodeAutoAttackStop {
-		t.Fatalf("stop frames = %x, want AutoAttackStop", capture.frames)
+	if len(capture.Frames()) != 2 || capture.Frames()[1][0] != serverpackets.OpcodeAutoAttackStop {
+		t.Fatalf("stop frames = %x, want AutoAttackStop", capture.Frames())
 	}
 
 	link.stopLiveAutoAttack(live)
-	if len(capture.frames) != 2 {
-		t.Fatalf("second stop emitted %d frames, want no duplicate AutoAttackStop", len(capture.frames)-2)
+	if len(capture.Frames()) != 2 {
+		t.Fatalf("second stop emitted %d frames, want no duplicate AutoAttackStop", len(capture.Frames())-2)
 	}
 }

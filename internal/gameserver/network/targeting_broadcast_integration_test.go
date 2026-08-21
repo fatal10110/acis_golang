@@ -19,15 +19,15 @@ import (
 func TestGameClientLinkAttackBroadcastsTargetHPStatusOnEveryHit(t *testing.T) {
 	c, chars, _, _, _, state := newLinkedSQLGameClient(t, nil, nil, 0)
 
-	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
-	c.read() // CharCreateOk
-	c.read() // CharSelectInfo
+	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.Read() // CharCreateOk
+	c.Read() // CharSelectInfo
 	objID := sqlCharacterID(t, chars)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
 	playerObj, ok := state.Player(objID)
@@ -49,27 +49,27 @@ func TestGameClientLinkAttackBroadcastsTargetHPStatusOnEveryHit(t *testing.T) {
 	// data/manager/npcs.go's newLiveHostile.
 	target.SetWorld(state)
 	state.Spawn(target, px+30, py, pz, 0)
-	if reply := c.read(); reply[0] != serverpackets.OpcodeNPCInfo {
+	if reply := c.Read(); reply[0] != serverpackets.OpcodeNPCInfo {
 		t.Fatalf("visible target opcode = %#x, want NPCInfo (%#x)", reply[0], serverpackets.OpcodeNPCInfo)
 	}
 
 	origin := location.Location{X: px, Y: py, Z: pz}
-	c.send(encodeAction(target.ObjectID(), origin, false))
-	if reply := c.read(); reply[0] != serverpackets.OpcodeValidateLocation {
+	c.Send(encodeAction(target.ObjectID(), origin, false))
+	if reply := c.Read(); reply[0] != serverpackets.OpcodeValidateLocation {
 		t.Fatalf("Action first opcode = %#x, want ValidateLocation (%#x)", reply[0], serverpackets.OpcodeValidateLocation)
 	}
-	c.read() // MyTargetSelected
-	c.read() // StatusUpdate (selection snapshot, still full HP)
+	c.Read() // MyTargetSelected
+	c.Read() // StatusUpdate (selection snapshot, still full HP)
 
-	c.send(encodeAttackRequest(target.ObjectID(), origin, false))
-	if reply := c.read(); reply[0] != serverpackets.OpcodeAutoAttackStart {
+	c.Send(encodeAttackRequest(target.ObjectID(), origin, false))
+	if reply := c.Read(); reply[0] != serverpackets.OpcodeAutoAttackStart {
 		t.Fatalf("AttackRequest first opcode = %#x, want AutoAttackStart (%#x)", reply[0], serverpackets.OpcodeAutoAttackStart)
 	}
-	if reply := c.read(); reply[0] != serverpackets.OpcodeAttack {
+	if reply := c.Read(); reply[0] != serverpackets.OpcodeAttack {
 		t.Fatalf("AttackRequest opcode = %#x, want Attack (%#x)", reply[0], serverpackets.OpcodeAttack)
 	}
 
-	reply := c.read()
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeStatusUpdate {
 		t.Fatalf("post-hit opcode = %#x, want StatusUpdate (%#x) — the hit landed with no visible HP change", reply[0], serverpackets.OpcodeStatusUpdate)
 	}

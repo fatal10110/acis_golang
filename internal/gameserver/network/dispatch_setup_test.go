@@ -29,6 +29,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/fatal10110/acis_golang/internal/link"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 // --- test server setup ---
@@ -74,37 +75,6 @@ func lookupTestInventoryUpdates(state *world.State) (*task.InventoryUpdates, boo
 	defer testInventoryUpdatesMu.Unlock()
 	u, ok := testInventoryUpdates[state]
 	return u, ok
-}
-
-// syncBarrier sends a request guaranteed to be answered with wantOpcode and
-// reads that reply. A connection's dispatch loop handles requests strictly
-// in order, so reading it proves everything sent before it has already been
-// processed server-side — used before driving InventoryUpdates.Tick() in a
-// test whose triggering request has no synchronous reply of its own to
-// block on.
-func syncBarrier(t *testing.T, c *fakeGameClient, send func(), wantOpcode byte) {
-	t.Helper()
-	send()
-	if reply := c.read(); reply[0] != wantOpcode {
-		t.Fatalf("sync barrier opcode = %#x, want %#x", reply[0], wantOpcode)
-	}
-}
-
-// resetCapture clears every capture's recorded frames.
-func resetCapture(captures ...*frameCapture) {
-	for _, capture := range captures {
-		capture.frames = nil
-	}
-}
-
-// assertOpcodeSequence checks that frames carry exactly the given opcodes,
-// in order. Shared by unit and integration tests across the package.
-func assertOpcodeSequence(t *testing.T, frames [][]byte, want ...byte) {
-	t.Helper()
-	got := frameOpcodes(frames)
-	if string(got) != string(want) {
-		t.Fatalf("opcodes = %x, want %x", got, want)
-	}
 }
 
 // assertSystemMessageStringFrame checks a single-param text SystemMessage.
@@ -247,33 +217,33 @@ func newTestGameClientLinkWithSkillsShortcutsCrestsKarmaAndLog(t *testing.T, log
 // GS-LS link (the same infrastructure loginlink_test.go uses), dials a fake
 // game client through VersionCheck and a successful AuthLogin, and returns
 // it positioned right after the initial (empty) CharSelectInfo.
-func newLinkedGameClient(t *testing.T) (c *fakeGameClient, chars *fakeCharStore, items *fakeItemStore, state *world.State) {
+func newLinkedGameClient(t *testing.T) (c *testsupport.ScriptedClient, chars *fakeCharStore, items *fakeItemStore, state *world.State) {
 	t.Helper()
 	return newLinkedGameClientWithSkills(t, nil)
 }
 
-func newLinkedGameClientWithSkills(t *testing.T, skills *skillstate.Persistence) (c *fakeGameClient, chars *fakeCharStore, items *fakeItemStore, state *world.State) {
+func newLinkedGameClientWithSkills(t *testing.T, skills *skillstate.Persistence) (c *testsupport.ScriptedClient, chars *fakeCharStore, items *fakeItemStore, state *world.State) {
 	t.Helper()
 	return newLinkedGameClientWithSkillsSeed(t, skills, nil, 0)
 }
 
-func newLinkedGameClientWithSkillsSeed(t *testing.T, skills *skillstate.Persistence, seed func(*fakeCharStore, *fakeItemStore), wantChars int) (c *fakeGameClient, chars *fakeCharStore, items *fakeItemStore, state *world.State) {
+func newLinkedGameClientWithSkillsSeed(t *testing.T, skills *skillstate.Persistence, seed func(*fakeCharStore, *fakeItemStore), wantChars int) (c *testsupport.ScriptedClient, chars *fakeCharStore, items *fakeItemStore, state *world.State) {
 	t.Helper()
 	c, chars, items, _, state = newLinkedGameClientWithSkillsShortcutsSeed(t, skills, nil, seed, wantChars)
 	return c, chars, items, state
 }
 
-func newLinkedGameClientWithShortcuts(t *testing.T) (c *fakeGameClient, chars *fakeCharStore, items *fakeItemStore, shortcuts *fakeShortcutStore, state *world.State) {
+func newLinkedGameClientWithShortcuts(t *testing.T) (c *testsupport.ScriptedClient, chars *fakeCharStore, items *fakeItemStore, shortcuts *fakeShortcutStore, state *world.State) {
 	t.Helper()
 	return newLinkedGameClientWithSkillsShortcutsSeed(t, nil, nil, nil, 0)
 }
 
-func newLinkedGameClientWithSkillsShortcutsSeed(t *testing.T, skills *skillstate.Persistence, shortcutSeed func(*fakeShortcutStore), seed func(*fakeCharStore, *fakeItemStore), wantChars int) (c *fakeGameClient, chars *fakeCharStore, items *fakeItemStore, shortcuts *fakeShortcutStore, state *world.State) {
+func newLinkedGameClientWithSkillsShortcutsSeed(t *testing.T, skills *skillstate.Persistence, shortcutSeed func(*fakeShortcutStore), seed func(*fakeCharStore, *fakeItemStore), wantChars int) (c *testsupport.ScriptedClient, chars *fakeCharStore, items *fakeItemStore, shortcuts *fakeShortcutStore, state *world.State) {
 	t.Helper()
 	return newLinkedGameClientWithSkillsShortcutsCrestsSeed(t, skills, shortcutSeed, nil, modelskill.BookPolicy{}, nil, seed, wantChars)
 }
 
-func newLinkedGameClientWithSkillsShortcutsCrestsSeed(t *testing.T, skills *skillstate.Persistence, shortcutSeed func(*fakeShortcutStore), crests *datacache.Crests, spellbooks modelskill.BookPolicy, trees *modelskill.Trees, seed func(*fakeCharStore, *fakeItemStore), wantChars int, cursedWeapons ...*entity.CursedWeaponTable) (c *fakeGameClient, chars *fakeCharStore, items *fakeItemStore, shortcuts *fakeShortcutStore, state *world.State) {
+func newLinkedGameClientWithSkillsShortcutsCrestsSeed(t *testing.T, skills *skillstate.Persistence, shortcutSeed func(*fakeShortcutStore), crests *datacache.Crests, spellbooks modelskill.BookPolicy, trees *modelskill.Trees, seed func(*fakeCharStore, *fakeItemStore), wantChars int, cursedWeapons ...*entity.CursedWeaponTable) (c *testsupport.ScriptedClient, chars *fakeCharStore, items *fakeItemStore, shortcuts *fakeShortcutStore, state *world.State) {
 	t.Helper()
 
 	loginAddr, servers, sessions := newTestLoginServer(t, false)
@@ -295,14 +265,14 @@ func newLinkedGameClientWithSkillsShortcutsCrestsSeed(t *testing.T, skills *skil
 		shortcutSeed(shortcuts)
 	}
 
-	c = dialGameClient(t, addr)
-	c.sendProtocolVersion(746)
+	c = testsupport.Dial(t, addr)
+	c.SendProtocolVersion(746)
 
 	key := link.SessionKey{LoginKey1: 11, LoginKey2: 22, PlayKey1: 33, PlayKey2: 44}
 	sessions.Put("player1", key)
-	c.send(encodeAuthLogin("player1", key))
+	c.Send(encodeAuthLogin("player1", key))
 
-	reply := c.read()
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeCharSelectInfo {
 		t.Fatalf("opcode = %#x, want CharSelectInfo (%#x)", reply[0], serverpackets.OpcodeCharSelectInfo)
 	}
@@ -329,7 +299,7 @@ func seedSelectableCharacter(t *testing.T, chars *fakeCharStore, account, name s
 	}
 	return ch.ID
 }
-func newTestLivePlayer(t testing.TB, id int32, capture *frameCapture) *livePlayer {
+func newTestLivePlayer(t testing.TB, id int32, capture *testsupport.FrameCapture) *livePlayer {
 	t.Helper()
 	tmpl, ok := testTemplates(t).Get(0)
 	if !ok {
@@ -343,8 +313,8 @@ func newTestLivePlayer(t testing.TB, id int32, capture *frameCapture) *livePlaye
 	}
 	ch.SetResourceValues(player.Resources{MaxHP: 80, CurrentHP: 80, MaxMP: 30, CurrentMP: 30})
 	ch.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventory(ch.ID, testItemTemplates(), nil))
-	ch.SetFrameSender(capture.send)
-	ch.SetBroadcastFrameSender(capture.send)
+	ch.SetFrameSender(capture.Send)
+	ch.SetBroadcastFrameSender(capture.Send)
 
 	x, y, z := ch.Position()
 	live, err := creature.NewLive(location.Location{X: x, Y: y, Z: z}, tmpl.RunSpeed, testGeo{}, ch)
@@ -361,7 +331,7 @@ func newTestLivePlayer(t testing.TB, id int32, capture *frameCapture) *livePlaye
 	moveCtl.SetArrived(combat.Think)
 	attackCtl.SetFinished(combat.Think)
 
-	return &livePlayer{Character: ch, template: tmpl, attack: attackCtl, move: moveCtl, combat: combat, visibilitySend: capture.send}
+	return &livePlayer{Character: ch, template: tmpl, attack: attackCtl, move: moveCtl, combat: combat, visibilitySend: capture.Send}
 }
 
 func newTestHostileNPC(t *testing.T, id int32) *npc.Hostile {

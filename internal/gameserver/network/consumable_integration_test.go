@@ -11,13 +11,14 @@ import (
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 // readInventoryUpdate asserts the next frame is InventoryUpdate carrying one
 // modified update for objectID with the remaining stack count.
-func readInventoryUpdate(t *testing.T, c *fakeGameClient, objectID int32, wantCount int32) {
+func readInventoryUpdate(t *testing.T, c *testsupport.ScriptedClient, objectID int32, wantCount int32) {
 	t.Helper()
-	reply := c.read()
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeInventoryUpdate {
 		t.Fatalf("InventoryUpdate opcode = %#x, want %#x", reply[0], serverpackets.OpcodeInventoryUpdate)
 	}
@@ -40,9 +41,9 @@ func readInventoryUpdate(t *testing.T, c *fakeGameClient, objectID int32, wantCo
 
 // readExUseSharedGroupItem asserts the next frame is the extended
 // ExUseSharedGroupItem packet carrying templateID/group/remain/total.
-func readExUseSharedGroupItem(t *testing.T, c *fakeGameClient, templateID, group, remain, total int32) {
+func readExUseSharedGroupItem(t *testing.T, c *testsupport.ScriptedClient, templateID, group, remain, total int32) {
 	t.Helper()
-	reply := c.read()
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeExtended {
 		t.Fatalf("opcode = %#x, want extended (%#x)", reply[0], serverpackets.OpcodeExtended)
 	}
@@ -55,9 +56,9 @@ func readExUseSharedGroupItem(t *testing.T, c *fakeGameClient, templateID, group
 	}
 }
 
-func readMagicSkillUseSelf(t *testing.T, c *fakeGameClient, objectID int32, skillID, level int32) {
+func readMagicSkillUseSelf(t *testing.T, c *testsupport.ScriptedClient, objectID int32, skillID, level int32) {
 	t.Helper()
-	reply := c.read()
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeMagicSkillUse {
 		t.Fatalf("MagicSkillUse opcode = %#x, want %#x", reply[0], serverpackets.OpcodeMagicSkillUse)
 	}
@@ -70,9 +71,9 @@ func readMagicSkillUseSelf(t *testing.T, c *fakeGameClient, objectID int32, skil
 	}
 }
 
-func readExRegenMax(t *testing.T, c *fakeGameClient, count, period int32, hpRegen float64) {
+func readExRegenMax(t *testing.T, c *testsupport.ScriptedClient, count, period int32, hpRegen float64) {
 	t.Helper()
-	reply := c.read()
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeExtended {
 		t.Fatalf("opcode = %#x, want extended (%#x)", reply[0], serverpackets.OpcodeExtended)
 	}
@@ -87,9 +88,9 @@ func readExRegenMax(t *testing.T, c *fakeGameClient, count, period int32, hpRege
 
 // readShortBuffStatusUpdateFrame asserts the next frame is
 // ShortBuffStatusUpdate carrying skillID/level/durationSeconds.
-func readShortBuffStatusUpdateFrame(t *testing.T, c *fakeGameClient, skillID, level, durationSeconds int32) {
+func readShortBuffStatusUpdateFrame(t *testing.T, c *testsupport.ScriptedClient, skillID, level, durationSeconds int32) {
 	t.Helper()
-	reply := c.read()
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeShortBuffStatusUpdate {
 		t.Fatalf("opcode = %#x, want ShortBuffStatusUpdate (%#x)", reply[0], serverpackets.OpcodeShortBuffStatusUpdate)
 	}
@@ -118,10 +119,10 @@ func TestGameClientLinkUseHealingPotionAppliesAndConsumes(t *testing.T) {
 		}
 	}, 1)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
 	obj, ok := state.Player(sqlSoleObjectID(t, chars))
@@ -133,10 +134,10 @@ func TestGameClientLinkUseHealingPotionAppliesAndConsumes(t *testing.T) {
 		t.Fatal("world player is not a *livePlayer")
 	}
 
-	c.send(encodeUseItem(objectID, false))
+	c.Send(encodeUseItem(objectID, false))
 	readExUseSharedGroupItem(t, c, potionTemplate, 8, 10, 10)
 	readMagicSkillUseSelf(t, c, live.ObjectID(), 2031, 1)
-	assertSystemMessageSkillFrame(t, c.read(), serverpackets.SystemMessageUseS1, 2031, 1)
+	assertSystemMessageSkillFrame(t, c.Read(), serverpackets.SystemMessageUseS1, 2031, 1)
 	readExRegenMax(t, c, 14, 2, 16*0.66)
 	if entries := readAbnormalStatusUpdateFrame(t, c); len(entries) != 1 || entries[0].SkillID != 2031 || entries[0].Level != 1 || entries[0].Duration != 14 {
 		t.Fatalf("AbnormalStatusUpdate entries = %+v, want one entry skill 2031 level 1 duration 14s", entries)
@@ -153,8 +154,8 @@ func TestGameClientLinkUseHealingPotionAppliesAndConsumes(t *testing.T) {
 		t.Fatalf("healing potion installed effects = %+v, want one HOT effect from skill 2031", effects)
 	}
 
-	c.send(encodeUseItem(objectID, false))
-	reply := c.read()
+	c.Send(encodeUseItem(objectID, false))
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeSystemMessage {
 		t.Fatalf("reuse opcode = %#x, want SystemMessage (%#x)", reply[0], serverpackets.OpcodeSystemMessage)
 	}
@@ -162,7 +163,7 @@ func TestGameClientLinkUseHealingPotionAppliesAndConsumes(t *testing.T) {
 	if id := r.ReadInt32(); id != serverpackets.SystemMessageS1PreparedForReuse {
 		t.Fatalf("reuse SystemMessage id = %d, want S1PreparedForReuse (%d)", id, serverpackets.SystemMessageS1PreparedForReuse)
 	}
-	if reply := c.read(); reply[0] != serverpackets.OpcodeActionFailed {
+	if reply := c.Read(); reply[0] != serverpackets.OpcodeActionFailed {
 		t.Fatalf("reuse follow-up opcode = %#x, want ActionFailed (%#x)", reply[0], serverpackets.OpcodeActionFailed)
 	}
 
@@ -189,10 +190,10 @@ func TestGameClientLinkUseHealingPotionRejectsFlyingCondition(t *testing.T) {
 		}
 	}, 1)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
 	obj, ok := state.Player(sqlSoleObjectID(t, chars))
@@ -205,8 +206,8 @@ func TestGameClientLinkUseHealingPotionRejectsFlyingCondition(t *testing.T) {
 	}
 	live.SetFlying(true)
 
-	c.send(encodeUseItem(objectID, false))
-	assertSystemMessageItemFrame(t, c.read(), serverpackets.SystemMessageS1CannotBeUsed, potionTemplate)
+	c.Send(encodeUseItem(objectID, false))
+	assertSystemMessageItemFrame(t, c.Read(), serverpackets.SystemMessageS1CannotBeUsed, potionTemplate)
 
 	if got := live.Inventory().ItemByObjectID(objectID).Snapshot().Count; got != 5 {
 		t.Fatalf("stack count after flying-condition rejection = %d, want 5 (unchanged)", got)
@@ -233,10 +234,10 @@ func TestGameClientLinkUseDisabledPotionReturnsSilentlyBeforeConsume(t *testing.
 		}
 	}, 1)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
 	obj, ok := state.Player(sqlSoleObjectID(t, chars))
@@ -249,7 +250,7 @@ func TestGameClientLinkUseDisabledPotionReturnsSilentlyBeforeConsume(t *testing.
 	}
 	live.DisableItem(objectID, time.Minute)
 
-	c.send(encodeUseItem(objectID, false))
+	c.Send(encodeUseItem(objectID, false))
 	assertNoReply(t, c)
 
 	if got := live.Inventory().ItemByObjectID(objectID).Snapshot().Count; got != 5 {
@@ -275,10 +276,10 @@ func TestGameClientLinkUseManaPotionRestoresAndConsumes(t *testing.T) {
 		}
 	}, 1)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
 	playerID := sqlSoleObjectID(t, chars)
@@ -298,10 +299,10 @@ func TestGameClientLinkUseManaPotionRestoresAndConsumes(t *testing.T) {
 	maxMP := live.MaxMPValue()
 	beforeMP := live.CurrentMP()
 
-	c.send(encodeUseItem(objectID, false))
+	c.Send(encodeUseItem(objectID, false))
 	readMagicSkillUseSelf(t, c, live.ObjectID(), 2279, 2)
-	assertSystemMessageSkillFrame(t, c.read(), serverpackets.SystemMessageUseS1, 2279, 2)
-	assertStatusAttrs(t, c.read(), live.ObjectID(), []serverpackets.StatusAttribute{
+	assertSystemMessageSkillFrame(t, c.Read(), serverpackets.SystemMessageUseS1, 2279, 2)
+	assertStatusAttrs(t, c.Read(), live.ObjectID(), []serverpackets.StatusAttribute{
 		{Type: serverpackets.StatusCurrentMP, Value: beforeMP + int(maxMP*20/100)},
 	})
 
@@ -337,10 +338,10 @@ func TestGameClientLinkUseEnergyStoneIncreasesForceCharges(t *testing.T) {
 		}
 	}, 1)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
 	obj, ok := state.Player(sqlSoleObjectID(t, chars))
@@ -355,11 +356,11 @@ func TestGameClientLinkUseEnergyStoneIncreasesForceCharges(t *testing.T) {
 		t.Fatalf("charges before use = %d, want 0", got)
 	}
 
-	c.send(encodeUseItem(objectID, false))
+	c.Send(encodeUseItem(objectID, false))
 	readMagicSkillUseSelf(t, c, live.ObjectID(), 2165, 1)
-	assertSystemMessageSkillFrame(t, c.read(), serverpackets.SystemMessageUseS1, 2165, 1)
-	assertForceChargeMessage(t, c.read(), serverpackets.SystemMessageForceIncreasedToS1, 1)
-	if frame := c.read(); frame[0] != serverpackets.OpcodeEtcStatusUpdate {
+	assertSystemMessageSkillFrame(t, c.Read(), serverpackets.SystemMessageUseS1, 2165, 1)
+	assertForceChargeMessage(t, c.Read(), serverpackets.SystemMessageForceIncreasedToS1, 1)
+	if frame := c.Read(); frame[0] != serverpackets.OpcodeEtcStatusUpdate {
 		t.Fatalf("charge feedback frame opcode = %#x, want EtcStatusUpdate (%#x)", frame[0], serverpackets.OpcodeEtcStatusUpdate)
 	}
 	inventoryUpdatesFor(t, state).Tick()
@@ -368,15 +369,15 @@ func TestGameClientLinkUseEnergyStoneIncreasesForceCharges(t *testing.T) {
 		t.Fatalf("charges after first energy stone = %d, want 1", got)
 	}
 
-	c.send(encodeUseItem(objectID, false))
+	c.Send(encodeUseItem(objectID, false))
 	readMagicSkillUseSelf(t, c, live.ObjectID(), 2165, 1)
-	assertSystemMessageSkillFrame(t, c.read(), serverpackets.SystemMessageUseS1, 2165, 1)
+	assertSystemMessageSkillFrame(t, c.Read(), serverpackets.SystemMessageUseS1, 2165, 1)
 	// Reaching maxCharges on this call reports ForceMaxLevelReached instead
 	// of ForceIncreasedToS1, matching character_charges.go's IncreaseCharges
 	// (the "maxed" outcome fires the moment the cap is hit, not only when
 	// already-full short-circuits the call).
-	assertForceChargeMessage(t, c.read(), serverpackets.SystemMessageForceMaxLevelReached, 0)
-	if frame := c.read(); frame[0] != serverpackets.OpcodeEtcStatusUpdate {
+	assertForceChargeMessage(t, c.Read(), serverpackets.SystemMessageForceMaxLevelReached, 0)
+	if frame := c.Read(); frame[0] != serverpackets.OpcodeEtcStatusUpdate {
 		t.Fatalf("charge feedback frame opcode = %#x, want EtcStatusUpdate (%#x)", frame[0], serverpackets.OpcodeEtcStatusUpdate)
 	}
 	if got := live.Character.Charges(); got != 2 {

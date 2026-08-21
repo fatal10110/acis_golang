@@ -29,6 +29,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
+	gamecipher "github.com/fatal10110/acis_golang/internal/gameserver/network/cipher"
 	"github.com/fatal10110/acis_golang/internal/gameserver/petitem"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
@@ -350,11 +351,11 @@ func (l *GameClientLink) scheduleAfter(d time.Duration, fn func()) {
 }
 
 func randomCipherKey() ([]byte, error) {
-	key := make([]byte, keySize)
+	key := make([]byte, gamecipher.KeySize)
 	if _, err := rand.Read(key[:8]); err != nil {
 		return nil, fmt.Errorf("generate game cipher key: %w", err)
 	}
-	copy(key[8:], gameCipherStaticKey[:])
+	copy(key[8:], gamecipher.StaticKey[:])
 	return key, nil
 }
 

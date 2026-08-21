@@ -9,6 +9,7 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 // consumableSkillTable seeds the two instant-cast potion skills the item
@@ -36,7 +37,7 @@ func consumableSkillTable(t *testing.T) *skillstate.Persistence {
 }
 
 func TestSendItemSkillConditionFailureAddsSkillName(t *testing.T) {
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 7, capture)
 
 	sendItemSkillConditionFailure(live, itemhandler.UseResult{
@@ -47,10 +48,10 @@ func TestSendItemSkillConditionFailureAddsSkillName(t *testing.T) {
 		},
 	})
 
-	if len(capture.frames) != 1 {
-		t.Fatalf("frames = %d, want 1", len(capture.frames))
+	if len(capture.Frames()) != 1 {
+		t.Fatalf("frames = %d, want 1", len(capture.Frames()))
 	}
-	assertSystemMessageSkillFrame(t, capture.frames[0], serverpackets.SystemMessageS1CannotBeUsed, 2278, 1)
+	assertSystemMessageSkillFrame(t, capture.Frames()[0], serverpackets.SystemMessageS1CannotBeUsed, 2278, 1)
 }
 
 // TestGameClientLinkUsePotionNotEnoughItemsSendsNotEnoughItems verifies a
@@ -60,7 +61,7 @@ func TestSendItemSkillConditionFailureAddsSkillName(t *testing.T) {
 // skill's own itemConsumeId precheck on a player-requested cast.
 func TestGameClientLinkUsePotionNotEnoughItemsSendsNotEnoughItems(t *testing.T) {
 	skills := consumableSkillTable(t)
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 7, capture)
 	link := &GameClientLink{skills: skills}
 
@@ -78,8 +79,8 @@ func TestGameClientLinkUsePotionNotEnoughItemsSendsNotEnoughItems(t *testing.T) 
 		t.Fatal("useConsumableSkillItem() = false, want true (handled)")
 	}
 
-	if got, want := frameOpcodes(capture.frames), []byte{serverpackets.OpcodeSystemMessage, serverpackets.OpcodeActionFailed}; !bytes.Equal(got, want) {
+	if got, want := testsupport.FrameOpcodes(capture.Frames()), []byte{serverpackets.OpcodeSystemMessage, serverpackets.OpcodeActionFailed}; !bytes.Equal(got, want) {
 		t.Fatalf("destroy-failure opcodes = %#x, want SystemMessage then ActionFailed (%#x)", got, want)
 	}
-	assertSystemMessageIDFrame(t, capture.frames[0], serverpackets.SystemMessageNotEnoughItems)
+	assertSystemMessageIDFrame(t, capture.Frames()[0], serverpackets.SystemMessageNotEnoughItems)
 }
