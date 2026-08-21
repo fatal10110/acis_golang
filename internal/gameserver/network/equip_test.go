@@ -358,7 +358,7 @@ func TestUseItemBroadcastsCharInfoToObservers(t *testing.T) {
 	}
 }
 
-func TestDeadPlayerItemOpsAreNoops(t *testing.T) {
+func TestDeadPlayerItemOperationGates(t *testing.T) {
 	t.Run("use item", func(t *testing.T) {
 		templates := testItemTemplates()
 		weapon := &item.Instance{ObjectID: 500, TemplateID: 30, Location: item.LocationInventory}
@@ -394,10 +394,10 @@ func TestDeadPlayerItemOpsAreNoops(t *testing.T) {
 		live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{stack})
 		live.MarkDead()
 
-		(&GameClientLink{}).destroyLiveItem(live, stack.ObjectID, 2)
+		(&GameClientLink{inventory: invops.NewService(nil)}).destroyLiveItem(live, stack.ObjectID, 2)
 
-		if stack.Count != 5 || len(capture.frames) != 0 {
-			t.Fatalf("dead RequestDestroyItem mutated item=%+v frames=%x, want unchanged item and no frames", stack, capture.frames)
+		if stack.Count != 3 || len(capture.frames) != 0 {
+			t.Fatalf("dead RequestDestroyItem count=%d frames=%x, want count 3 and no frames", stack.Count, capture.frames)
 		}
 	})
 
@@ -409,10 +409,10 @@ func TestDeadPlayerItemOpsAreNoops(t *testing.T) {
 		live.SetSkillLevel(248, 1)
 		live.MarkDead()
 
-		(&GameClientLink{ids: &sequentialIDs{next: 100}}).crystallizeLiveItem(live, clientpackets.RequestCrystallizeItem{ObjectID: weapon.ObjectID, Count: 1})
+		(&GameClientLink{inventory: invops.NewService(&sequentialIDs{next: 100})}).crystallizeLiveItem(live, clientpackets.RequestCrystallizeItem{ObjectID: weapon.ObjectID, Count: 1})
 
-		if live.Inventory().ItemByObjectID(weapon.ObjectID) == nil || len(capture.frames) != 0 {
-			t.Fatalf("dead RequestCrystallizeItem mutated inventory frames=%x, want unchanged inventory and no frames", capture.frames)
+		if live.Inventory().ItemByObjectID(weapon.ObjectID) != nil || len(capture.frames) == 0 {
+			t.Fatalf("dead RequestCrystallizeItem inventory=%+v frames=%x, want source removed and result frames", live.Inventory(), capture.frames)
 		}
 	})
 }
