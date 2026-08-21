@@ -43,7 +43,7 @@ func TestNewRegistrationValidatesTypePageAndSkillLevel(t *testing.T) {
 	if !ok {
 		t.Fatal("NewRegistration returned false for known skill")
 	}
-	if sc != (Shortcut{Slot: 3, Page: 1, Type: Skill, ID: 248, Level: 3, CharacterType: 1}) {
+	if sc != (Shortcut{Slot: 3, Page: 1, Type: Skill, ID: 248, Level: 3, CharacterType: 1, SharedReuseGroup: -1}) {
 		t.Fatalf("NewRegistration skill = %+v, want skill level 3", sc)
 	}
 
@@ -100,7 +100,7 @@ func TestListRefreshSkillLevelUpdatesOnlyMatchingSkillShortcuts(t *testing.T) {
 
 func TestTutorialBookShortcutUsesGrantedInstanceObjectID(t *testing.T) {
 	sc := TutorialBookShortcut(0x10000042)
-	want := Shortcut{Slot: 11, Page: 0, Type: Item, ID: 0x10000042, Level: -1, CharacterType: 1}
+	want := Shortcut{Slot: 11, Page: 0, Type: Item, ID: 0x10000042, Level: -1, CharacterType: 1, SharedReuseGroup: -1}
 	if sc != want {
 		t.Fatalf("TutorialBookShortcut() = %+v, want %+v", sc, want)
 	}
@@ -116,11 +116,36 @@ func TestAutoGetSkillShortcutsMapsHardcodedIDsToSlots(t *testing.T) {
 	if len(got) != 2 {
 		t.Fatalf("AutoGetSkillShortcuts() = %+v, want 2 entries (unknown id 9999 dropped)", got)
 	}
-	if sc := byID[1177]; sc != (Shortcut{Slot: 1, Page: 0, Type: Skill, ID: 1177, Level: 1, CharacterType: 1}) {
+	if sc := byID[1177]; sc != (Shortcut{Slot: 1, Page: 0, Type: Skill, ID: 1177, Level: 1, CharacterType: 1, SharedReuseGroup: -1}) {
 		t.Errorf("skill 1177 shortcut = %+v, want slot 1", sc)
 	}
-	if sc := byID[1216]; sc != (Shortcut{Slot: 9, Page: 0, Type: Skill, ID: 1216, Level: 1, CharacterType: 1}) {
+	if sc := byID[1216]; sc != (Shortcut{Slot: 9, Page: 0, Type: Skill, ID: 1216, Level: 1, CharacterType: 1, SharedReuseGroup: -1}) {
 		t.Errorf("skill 1216 shortcut = %+v, want slot 9", sc)
+	}
+}
+
+func TestRestoreItemShortcutsDropsStaleItemDropsSharedReuseGroup(t *testing.T) {
+	shortcuts := []Shortcut{
+		{Slot: 0, Page: 0, Type: Item, ID: 100, Level: -1, CharacterType: 1, SharedReuseGroup: -1}, // consumed, gone
+		{Slot: 1, Page: 0, Type: Item, ID: 200, Level: -1, CharacterType: 1, SharedReuseGroup: -1}, // present, etc item group 4
+		{Slot: 2, Page: 0, Type: Action, ID: 5, Level: -1, CharacterType: 1, SharedReuseGroup: -1}, // non-item, untouched
+	}
+
+	lookup := func(objectID int32) (int32, bool) {
+		if objectID == 200 {
+			return 4, true
+		}
+		return 0, false
+	}
+
+	got := RestoreItemShortcuts(shortcuts, lookup)
+
+	want := []Shortcut{
+		{Slot: 1, Page: 0, Type: Item, ID: 200, Level: -1, CharacterType: 1, SharedReuseGroup: 4},
+		{Slot: 2, Page: 0, Type: Action, ID: 5, Level: -1, CharacterType: 1, SharedReuseGroup: -1},
+	}
+	if len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
+		t.Fatalf("RestoreItemShortcuts() = %+v, want %+v", got, want)
 	}
 }
 

@@ -167,7 +167,7 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 	client.Session.SendFrame(serverpackets.FrameFriendList(nil))
 	client.Session.SendFrame(serverpackets.FrameUserInfo(serverpackets.UserInfoSnapshot{Character: c, Template: tmpl, Items: items, IsGM: live.isGM}))
 	client.Session.SendFrame(itemListFrame)
-	client.Session.SendFrame(serverpackets.FrameShortCutInit(serverShortcutList(shortcuts)))
+	client.Session.SendFrame(serverpackets.FrameShortCutInit(serverShortcutList(live.shortcuts.All())))
 	if c.Dead() {
 		client.Session.SendFrame(serverpackets.FrameDie(c.ObjectID(), l.dieOptions(c)))
 	}
@@ -332,6 +332,22 @@ func skillListEntries(c *player.Character, skills *skillstate.Persistence) []ser
 
 func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c *player.Character, tmpl *player.Template, items []*item.Instance, shortcuts []shortcut.Shortcut) (*livePlayer, error) {
 	c.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventory(c.ID, l.itemTemplates, items))
+	// Filter/populate ITEM shortcuts against the live inventory just attached
+	// above, mirroring ShortcutList.restore() (ShortcutList.java:173-209): a
+	// stale ITEM shortcut (its item consumed/traded/destroyed since last
+	// logout) is dropped, and every surviving one gets SharedReuseGroup from
+	// its item's etc-item data.
+	shortcuts = shortcut.RestoreItemShortcuts(shortcuts, func(objectID int32) (int32, bool) {
+		inst := c.Inventory().ItemByObjectID(objectID)
+		if inst == nil {
+			return 0, false
+		}
+		tmpl, ok := l.itemTemplates.Get(inst.TemplateID)
+		if !ok || tmpl.EtcItem == nil {
+			return -1, true
+		}
+		return tmpl.EtcItem.SharedReuseGroup, true
+	})
 	c.SetWeightLimitMultiplier(l.playerConfig.WeightLimitMultiplier)
 	c.SetDeathPenaltyChance(l.playerConfig.DeathPenaltyChance)
 	c.RefreshWeightPenalty()

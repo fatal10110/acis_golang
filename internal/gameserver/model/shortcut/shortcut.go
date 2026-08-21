@@ -51,6 +51,11 @@ type Shortcut struct {
 	ID            int32
 	Level         int32
 	CharacterType int32
+	// SharedReuseGroup mirrors Java's Shortcut._sharedReuseGroup, which
+	// defaults to -1 and is only ever populated for an ITEM shortcut on
+	// restore (ShortcutList.java:173-209) — never persisted, always
+	// recomputed from the live inventory. See RestoreItemShortcuts.
+	SharedReuseGroup int32
 }
 
 // NewRegistration validates and builds a client shortcut registration.
@@ -69,12 +74,13 @@ func NewRegistration(slot, page int32, typ Type, id, characterType int32, skillL
 		}
 	}
 	return Shortcut{
-		Slot:          slot,
-		Page:          page,
-		Type:          typ,
-		ID:            id,
-		Level:         level,
-		CharacterType: characterType,
+		Slot:             slot,
+		Page:             page,
+		Type:             typ,
+		ID:               id,
+		Level:            level,
+		CharacterType:    characterType,
+		SharedReuseGroup: -1,
 	}, true
 }
 
@@ -102,9 +108,9 @@ func NewList(shortcuts []Shortcut) *List {
 // Starter returns the default shortcuts granted to a new character.
 func Starter() []Shortcut {
 	return []Shortcut{
-		{Slot: 0, Page: 0, Type: Action, ID: 2, Level: -1, CharacterType: 1},
-		{Slot: 3, Page: 0, Type: Action, ID: 5, Level: -1, CharacterType: 1},
-		{Slot: 10, Page: 0, Type: Action, ID: 0, Level: -1, CharacterType: 1},
+		{Slot: 0, Page: 0, Type: Action, ID: 2, Level: -1, CharacterType: 1, SharedReuseGroup: -1},
+		{Slot: 3, Page: 0, Type: Action, ID: 5, Level: -1, CharacterType: 1, SharedReuseGroup: -1},
+		{Slot: 10, Page: 0, Type: Action, ID: 0, Level: -1, CharacterType: 1, SharedReuseGroup: -1},
 	}
 }
 
@@ -117,7 +123,7 @@ const TutorialBookItemID = 5588
 // objectID rather than the template id — the client cannot resolve an ITEM
 // shortcut any other way (RequestCharacterCreate.java:149-151).
 func TutorialBookShortcut(objectID int32) Shortcut {
-	return Shortcut{Slot: 11, Page: 0, Type: Item, ID: objectID, Level: -1, CharacterType: 1}
+	return Shortcut{Slot: 11, Page: 0, Type: Item, ID: objectID, Level: -1, CharacterType: 1, SharedReuseGroup: -1}
 }
 
 // Auto-get skill ids RequestCharacterCreate.java:157-164 hardcodes to a
@@ -138,9 +144,9 @@ func AutoGetSkillShortcuts(autoGet map[int32]int32) []Shortcut {
 	for id := range autoGet {
 		switch id {
 		case autoGetSkillOrcMystic, autoGetSkillOtherMystic:
-			out = append(out, Shortcut{Slot: 1, Page: 0, Type: Skill, ID: id, Level: 1, CharacterType: 1})
+			out = append(out, Shortcut{Slot: 1, Page: 0, Type: Skill, ID: id, Level: 1, CharacterType: 1, SharedReuseGroup: -1})
 		case autoGetSkillSlot9:
-			out = append(out, Shortcut{Slot: 9, Page: 0, Type: Skill, ID: id, Level: 1, CharacterType: 1})
+			out = append(out, Shortcut{Slot: 9, Page: 0, Type: Skill, ID: id, Level: 1, CharacterType: 1, SharedReuseGroup: -1})
 		}
 	}
 	return out
@@ -218,6 +224,32 @@ func (l *List) RefreshSkillLevel(skillID, level int32) []Shortcut {
 		}
 		return out[i].Slot < out[j].Slot
 	})
+	return out
+}
+
+// ItemLookup resolves an ITEM shortcut's target objectID against the live
+// inventory. ok is false when the inventory no longer holds the item; group
+// is its shared reuse group (-1 if it isn't an etc item), meaningful only
+// when ok is true.
+type ItemLookup func(objectID int32) (group int32, ok bool)
+
+// RestoreItemShortcuts mirrors ShortcutList.restore()'s per-row ITEM handling
+// (ShortcutList.java:173-209): an ITEM shortcut whose item no longer exists
+// in the owner's inventory is dropped, and every surviving ITEM shortcut has
+// its SharedReuseGroup populated via lookup. Other shortcut types pass
+// through unchanged.
+func RestoreItemShortcuts(shortcuts []Shortcut, lookup ItemLookup) []Shortcut {
+	out := make([]Shortcut, 0, len(shortcuts))
+	for _, sc := range shortcuts {
+		if sc.Type == Item {
+			group, ok := lookup(sc.ID)
+			if !ok {
+				continue
+			}
+			sc.SharedReuseGroup = group
+		}
+		out = append(out, sc)
+	}
 	return out
 }
 

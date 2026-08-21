@@ -8,6 +8,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
@@ -131,6 +132,80 @@ func TestGameClientLinkDeletesShortcut(t *testing.T) {
 	}
 	if hasShortcut(got, shortcut.Shortcut{Slot: 3, Page: 1, Type: shortcut.Action, ID: 5, Level: -1, CharacterType: 1}) {
 		t.Fatalf("shortcuts after delete = %+v, still contains deleted shortcut", got)
+	}
+}
+
+// TestGameClientLinkEnterWorldDropsStaleItemShortcutAndSetsSharedReuseGroup
+// mirrors ShortcutList.restore() (ShortcutList.java:173-209): a persisted
+// ITEM shortcut whose item no longer exists in the inventory is dropped, and
+// a surviving one has SharedReuseGroup populated from the item's etc-item
+// data instead of the hardcoded -1.
+func TestGameClientLinkEnterWorldDropsStaleItemShortcutAndSetsSharedReuseGroup(t *testing.T) {
+	const potionTemplate int32 = 9502 // Greater Healing Potion fixture, shared_reuse_group 10
+	const potionObjectID int32 = 700
+	const staleObjectID int32 = 999
+
+	c, chars, items, shortcuts, _, _ := newLinkedSQLGameClient(t, nil, nil, 0)
+
+	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.Read() // CharCreateOk
+	c.Read() // CharSelectInfo
+	objID := sqlCharacterID(t, chars)
+
+	if err := items.Create(context.Background(), objID, item.Instance{
+		ObjectID: potionObjectID, TemplateID: potionTemplate, OwnerID: objID,
+		Count: 1, Location: item.LocationInventory, ManaLeft: -1,
+	}); err != nil {
+		t.Fatalf("seed potion: %v", err)
+	}
+	if err := shortcuts.Save(context.Background(), objID, shortcut.Shortcut{Slot: 3, Page: 1, Type: shortcut.Item, ID: potionObjectID, Level: -1, CharacterType: 1, SharedReuseGroup: -1}); err != nil {
+		t.Fatalf("seed live item shortcut: %v", err)
+	}
+	if err := shortcuts.Save(context.Background(), objID, shortcut.Shortcut{Slot: 4, Page: 1, Type: shortcut.Item, ID: staleObjectID, Level: -1, CharacterType: 1, SharedReuseGroup: -1}); err != nil {
+		t.Fatalf("seed stale item shortcut: %v", err)
+	}
+
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
+	frames := readEnterWorldBurst(t, c, false)
+
+	frame := frames[9]
+	r := wire.NewReader(frame[1:])
+	var foundLive, foundStale bool
+	for range r.ReadInt32() {
+		typ, slot := r.ReadInt32(), r.ReadInt32()
+		if typ != int32(serverpackets.ShortcutItem) {
+			switch serverpackets.ShortcutType(typ) {
+			case serverpackets.ShortcutSkill:
+				r.ReadInt32()
+				r.ReadInt32()
+				r.ReadUint8()
+				r.ReadInt32()
+			default:
+				r.ReadInt32()
+				r.ReadInt32()
+			}
+			continue
+		}
+		id, characterType, group, remaining, reuse, augment := r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32()
+		_, _, _ = remaining, reuse, augment
+		if id == potionObjectID {
+			foundLive = true
+			if slot != 15 || characterType != 1 || group != 10 {
+				t.Fatalf("live item shortcut = slot %d charType %d group %d, want slot 15 charType 1 group 10", slot, characterType, group)
+			}
+		}
+		if id == staleObjectID {
+			foundStale = true
+		}
+	}
+	if !foundLive {
+		t.Fatal("ShortCutInit did not include the live item shortcut")
+	}
+	if foundStale {
+		t.Fatal("ShortCutInit still includes the stale item shortcut, want dropped on restore")
 	}
 }
 
