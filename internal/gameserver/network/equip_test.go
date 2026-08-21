@@ -417,6 +417,47 @@ func TestDeadPlayerItemOpsAreNoops(t *testing.T) {
 	})
 }
 
+func TestItemOperationRejectMessages(t *testing.T) {
+	t.Run("drop zero count", func(t *testing.T) {
+		templates := item.NewTable([]*item.Template{{ID: item.AdenaID, Kind: item.KindEtcItem, Duration: -1, Stackable: true, Dropable: true, Destroyable: true, EtcItem: &item.EtcItemDetail{}}})
+		capture := &frameCapture{}
+		live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{{ObjectID: 500, TemplateID: item.AdenaID, Count: 1, Location: item.LocationInventory}})
+
+		(&GameClientLink{groundItems: &recordingGroundDropper{}}).dropLiveItem(live, clientpackets.RequestDropItem{ObjectID: 500})
+
+		if len(capture.frames) != 1 {
+			t.Fatalf("frames = %x, want one CannotDiscardThisItem", capture.frames)
+		}
+		assertStaticSystemMessageFrame(t, capture.frames[0], 98)
+	})
+
+	t.Run("destroy invalid count", func(t *testing.T) {
+		templates := item.NewTable([]*item.Template{{ID: item.AdenaID, Kind: item.KindEtcItem, Duration: -1, Stackable: true, Destroyable: true, EtcItem: &item.EtcItemDetail{}}})
+		capture := &frameCapture{}
+		live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{{ObjectID: 500, TemplateID: item.AdenaID, Count: 1, Location: item.LocationInventory}})
+
+		(&GameClientLink{}).destroyLiveItem(live, 500, 0)
+
+		if len(capture.frames) != 1 {
+			t.Fatalf("frames = %x, want one CannotDestroyNumberIncorrect", capture.frames)
+		}
+		assertStaticSystemMessageFrame(t, capture.frames[0], 163)
+	})
+
+	t.Run("destroy hero item", func(t *testing.T) {
+		templates := item.NewTable([]*item.Template{{ID: 6611, Kind: item.KindWeapon, Duration: -1, Destroyable: true, Weapon: &item.WeaponDetail{}}})
+		capture := &frameCapture{}
+		live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{{ObjectID: 500, TemplateID: 6611, Count: 1, Location: item.LocationInventory}})
+
+		(&GameClientLink{}).destroyLiveItem(live, 500, 1)
+
+		if len(capture.frames) != 1 {
+			t.Fatalf("frames = %x, want one HeroWeaponsCantDestroyed", capture.frames)
+		}
+		assertStaticSystemMessageFrame(t, capture.frames[0], 1845)
+	})
+}
+
 func TestCrowdControlledPlayerItemOpsAreNoops(t *testing.T) {
 	effectNames := []string{"Stun", "Sleep", "Paralyze", "Fear"}
 

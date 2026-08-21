@@ -287,7 +287,11 @@ func (l *GameClientLink) unequipItem(live *livePlayer, bodySlot int32) {
 }
 
 func (l *GameClientLink) dropLiveItem(live *livePlayer, req clientpackets.RequestDropItem) {
-	if !liveItemOpsAllowed(live) || l.groundItems == nil || req.Count <= 0 {
+	if !liveItemOpsAllowed(live) || l.groundItems == nil || req.Count < 0 {
+		return
+	}
+	if req.Count == 0 {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotDiscardThisItem))
 		return
 	}
 	inv := live.Inventory()
@@ -336,11 +340,34 @@ func (l *GameClientLink) dropLiveItem(live *livePlayer, req clientpackets.Reques
 }
 
 func (l *GameClientLink) destroyLiveItem(live *livePlayer, objectID int32, count int) {
-	if !liveItemOpsAllowed(live) || count <= 0 {
+	if !liveItemOpsAllowed(live) {
 		return
 	}
 	inv := live.Inventory()
 	if inv == nil {
+		return
+	}
+	inst := inv.ItemByObjectID(objectID)
+	if inst == nil {
+		return
+	}
+	tmpl, ok := inv.Templates().Get(inst.TemplateID)
+	if !ok {
+		return
+	}
+	if count <= 0 || int(inst.Snapshot().Count) < count {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotDestroyNumberIncorrect))
+		return
+	}
+	if !inst.Destroyable(tmpl) || tmpl.HeroItem() {
+		message := serverpackets.SystemMessageCannotDiscardThisItem
+		if tmpl.HeroItem() {
+			message = serverpackets.SystemMessageHeroWeaponsCantDestroyed
+		}
+		live.SendFrame(serverpackets.FrameSystemMessage(message))
+		return
+	}
+	if !tmpl.Stackable && count > 1 {
 		return
 	}
 	if objectID == live.Character.MountObjectID() {
