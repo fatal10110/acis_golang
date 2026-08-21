@@ -175,7 +175,7 @@ func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, m
 	if !c.move.Moving() || c.move.Destination() != dest {
 		event, err := c.move.MoveToLocation(dest)
 		if err != nil {
-			// Can't actually approach (blocked route, zero speed): don't
+			// Can't actually approach (for example, zero speed): don't
 			// report "still moving" — that would strand the caller waiting
 			// on progress that will never happen.
 			c.move.CancelFollow()
@@ -197,9 +197,8 @@ func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, m
 // MoveHome requests movement toward home, broadcasts the move, and
 // registers for correction ticks the same way any other movement request
 // does — otherwise this controller's world presence would stay at the
-// stale pre-move cell for the entire walk back. A blocked or unreachable
-// route is silently dropped — matching a return-home attempt that simply
-// can't make progress this tick, not an application error.
+// stale pre-move cell for the entire walk back. A route with no reachable
+// progress becomes a zero-distance move and is broadcast before arrival.
 func (c *Controller) MoveHome(home location.Location) error {
 	event, err := c.move.MoveToLocation(home)
 	if err != nil {

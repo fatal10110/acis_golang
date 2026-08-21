@@ -26,23 +26,12 @@ func (l *GameClientLink) moveLivePlayer(live *livePlayer, target location.Locati
 		l.log.Warn().Err(err).Msg("move: broadcast")
 	}
 	if !accepted {
-		// A route that cannot make lateral progress (geo fully blocked) is
-		// rejected outright; answer it so the click never goes silent. The
-		// reference only ever rotates once a move is actually accepted
-		// (CreatureMove.moveToLocation sets heading after resolving a
-		// destination, never on an outright-rejected one), so a rejected
-		// route must leave heading untouched too.
+		// Rejected moves leave heading untouched.
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
-	// combat.Stop() above already cancelled any move in flight (accepted or
-	// not — PlayerAttack.stopLocked unconditionally calls move.Stop()), so a
-	// parked ground-pickup approach loses its ride regardless of how this
-	// click's own route resolves. Only the accepted branch reaches here: a
-	// rejected route leaves the intention parked but inert, since no arrival
-	// can fire without a new move initiation, and every initiation path
-	// clears or overwrites it. Drop it now or it fires stale against
-	// whatever this new walk arrives at (#1155).
+	// combat.Stop() above cancelled any move in flight, so a parked
+	// ground-pickup approach must not survive this new accepted walk (#1155).
 	live.takePickup()
 	// Face the destination from the same server-authoritative origin the
 	// walk itself started from.
