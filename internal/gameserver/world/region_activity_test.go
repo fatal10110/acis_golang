@@ -183,6 +183,45 @@ func TestRegionActivityPlayerMoveIntoInactiveRegionNotifiedActiveOnce(t *testing
 	}
 }
 
+func TestRegionActivityArrivalDoesNotRepeatConcurrentTransition(t *testing.T) {
+	r := newRegion(0, 0)
+	obj := &activeTrackedStub{trackedStub: trackedStub{id: 1}}
+
+	toggle(r, true)
+	arrival := r.Add(obj) // non-player arrival completes before its direct callback
+	if !r.setActive(false) {
+		t.Fatal("setActive(false) = false, want transition")
+	}
+	r.notifyActivity(false) // concurrent player relocation snapshots the arrival
+	r.notifyArrivalActivity(obj, arrival)
+
+	if obj.inactiveCalls != 1 {
+		t.Fatalf("inactive calls after arrival races a transition = %d, want 1", obj.inactiveCalls)
+	}
+	toggle(r, true)
+	if obj.activeCalls != 1 {
+		t.Fatalf("active calls after a later transition = %d, want 1", obj.activeCalls)
+	}
+}
+
+func TestRegionActivityArrivalWaitsForEveryPendingTransition(t *testing.T) {
+	r := newRegion(0, 0)
+	toggle(r, true)
+	if !r.setActive(false) || !r.setActive(true) {
+		t.Fatal("setActive did not queue both transitions")
+	}
+	r.notifyActivity(false)
+
+	obj := &activeTrackedStub{trackedStub: trackedStub{id: 1}}
+	arrival := r.Add(obj)
+	r.notifyArrivalActivity(obj, arrival)
+	r.notifyActivity(true)
+
+	if obj.activeCalls != 1 {
+		t.Fatalf("active calls after arrival races pending transitions = %d, want 1", obj.activeCalls)
+	}
+}
+
 // TestRegionActivityConcurrentPlayerChurn guards against a check-then-act
 // race: one player's departure could read a stale (pre-arrival) player
 // count for a region and deactivate it right after another player's
