@@ -110,6 +110,116 @@ func TestHostileRechargeShotsUsesTemplateCountersAndBroadcasts(t *testing.T) {
 	}
 }
 
+// TestHostileStatFuncsBroadcastRunSpeedInfo guards #1597: adding or removing
+// an NPC-owned run-speed modifier must refresh every nearby observer's NPCInfo.
+func TestHostileStatFuncsBroadcastRunSpeedInfo(t *testing.T) {
+	hostile := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", DEX: 30, RunSpeed: 100})
+	state := world.New()
+	hostile.SetWorld(state)
+	state.Spawn(hostile, 0, 0, 0, 0)
+
+	observer := &frameReceiver{trackedID: 2}
+	state.Spawn(observer, 600, 0, 0, 0)
+
+	owner := effect.ModOwnerEffect(&effect.Effect{})
+	hostile.AddStatFuncs([]effect.Mod{{Stat: stat.RunSpeed, Op: effect.OpAdd, Value: 10, Owner: owner}})
+	if len(observer.frames) != 1 {
+		t.Fatalf("frames after run-speed buff = %d, want 1 NPCInfo", len(observer.frames))
+	}
+	if got := observer.frames[0][0]; got != serverpackets.OpcodeNPCInfo {
+		t.Fatalf("buff frame opcode = %#x, want NPCInfo %#x", got, serverpackets.OpcodeNPCInfo)
+	}
+	if got := binary.LittleEndian.Uint32(observer.frames[0][41:45]); got != 120 {
+		t.Fatalf("NPCInfo run speed after buff = %d, want 120", got)
+	}
+
+	hostile.RemoveStatsByOwner(owner)
+	if len(observer.frames) != 2 {
+		t.Fatalf("frames after run-speed removal = %d, want 2 NPCInfo frames", len(observer.frames))
+	}
+	if got := binary.LittleEndian.Uint32(observer.frames[1][41:45]); got != 110 {
+		t.Fatalf("NPCInfo run speed after removal = %d, want 110", got)
+	}
+}
+
+// TestHostileStatFuncsBroadcastMaxHPStatus guards #1597: a max-HP modifier
+// sends exactly the changed StatusUpdate attribute, not a stale HP pair.
+func TestHostileStatFuncsBroadcastMaxHPStatus(t *testing.T) {
+	hostile := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", CON: 20, HPMax: 100})
+	state := world.New()
+	hostile.SetWorld(state)
+	state.Spawn(hostile, 0, 0, 0, 0)
+
+	observer := &frameReceiver{trackedID: 2}
+	state.Spawn(observer, 600, 0, 0, 0)
+
+	hostile.AddStatFuncs([]effect.Mod{{Stat: stat.MaxHP, Op: effect.OpMul, Value: 2}})
+	if len(observer.frames) != 1 {
+		t.Fatalf("frames after max-HP buff = %d, want 1 StatusUpdate", len(observer.frames))
+	}
+	frame := observer.frames[0]
+	if got := frame[0]; got != serverpackets.OpcodeStatusUpdate {
+		t.Fatalf("buff frame opcode = %#x, want StatusUpdate %#x", got, serverpackets.OpcodeStatusUpdate)
+	}
+	if got := binary.LittleEndian.Uint32(frame[5:9]); got != 1 {
+		t.Fatalf("StatusUpdate attributes = %d, want 1", got)
+	}
+	if got := binary.LittleEndian.Uint32(frame[9:13]); got != uint32(serverpackets.StatusMaxHP) {
+		t.Fatalf("StatusUpdate attribute type = %d, want max HP %d", got, serverpackets.StatusMaxHP)
+	}
+	if got := binary.LittleEndian.Uint32(frame[13:17]); got != 160 {
+		t.Fatalf("StatusUpdate max HP = %d, want 160", got)
+	}
+}
+
+func TestHostileStatFuncsBroadcastAttackSpeedStatus(t *testing.T) {
+	hostile := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", DEX: 30, WIT: 43, AtkSpd: 100})
+	state := world.New()
+	hostile.SetWorld(state)
+	state.Spawn(hostile, 0, 0, 0, 0)
+
+	observer := &frameReceiver{trackedID: 2}
+	state.Spawn(observer, 600, 0, 0, 0)
+
+	hostile.AddStatFuncs([]effect.Mod{
+		{Stat: stat.PowerAttackSpeed, Op: effect.OpAdd, Value: 10},
+		{Stat: stat.MagicAttackSpeed, Op: effect.OpAdd, Value: 10},
+	})
+	if len(observer.frames) != 1 {
+		t.Fatalf("frames after attack-speed buffs = %d, want 1 StatusUpdate", len(observer.frames))
+	}
+	frame := observer.frames[0]
+	if got := binary.LittleEndian.Uint32(frame[5:9]); got != 2 {
+		t.Fatalf("StatusUpdate attributes = %d, want 2", got)
+	}
+	if got := binary.LittleEndian.Uint32(frame[9:13]); got != 18 {
+		t.Fatalf("first StatusUpdate attribute type = %d, want attack speed 18", got)
+	}
+	if got := binary.LittleEndian.Uint32(frame[17:21]); got != 24 {
+		t.Fatalf("second StatusUpdate attribute type = %d, want cast speed 24", got)
+	}
+}
+
+// TestHostileStatFuncsBroadcastZeroRunSpeedObjectInfo guards #1597's
+// stationary-NPC branch: a zero move speed uses ServerObjectInfo, not NPCInfo.
+func TestHostileStatFuncsBroadcastZeroRunSpeedObjectInfo(t *testing.T) {
+	hostile := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", DEX: 30, RunSpeed: 100})
+	state := world.New()
+	hostile.SetWorld(state)
+	state.Spawn(hostile, 0, 0, 0, 0)
+
+	observer := &frameReceiver{trackedID: 2}
+	state.Spawn(observer, 600, 0, 0, 0)
+
+	hostile.AddStatFuncs([]effect.Mod{{Stat: stat.RunSpeed, Op: effect.OpSet, Value: 0}})
+	if len(observer.frames) != 1 {
+		t.Fatalf("frames after zero-speed buff = %d, want 1 ServerObjectInfo", len(observer.frames))
+	}
+	if got := observer.frames[0][0]; got != 0x8c {
+		t.Fatalf("zero-speed frame opcode = %#x, want ServerObjectInfo %#x", got, 0x8c)
+	}
+}
+
 // TestHostileTakeDamageRollsAttackedShotRecharge ports MonsterBehavior/
 // WarriorBase/WizardBase.onAttacked (aCis Java generic monster AI): a
 // landed hit rolls the defender's SoulShotRate/SpiritShotRate AI parameters

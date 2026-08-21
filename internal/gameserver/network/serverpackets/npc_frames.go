@@ -20,6 +20,11 @@ func (NpcFrameBuilder) Info(snapshot npcinfo.Snapshot) wire.Frame {
 	return FrameNPCInfo(snapshot)
 }
 
+// ObjectInfo builds the stationary-NPC info frame from snapshot.
+func (NpcFrameBuilder) ObjectInfo(snapshot npcinfo.Snapshot) wire.Frame {
+	return FrameServerObjectInfo(snapshot)
+}
+
 // Attack builds the attack packet for snapshot.
 func (NpcFrameBuilder) Attack(snapshot attack.Snapshot) wire.Frame {
 	return FrameAttack(snapshot)
@@ -74,10 +79,11 @@ func (NpcFrameBuilder) Stop(objectID int32, at location.Location, heading int) w
 	return FrameStopMove(objectID, at, heading)
 }
 
-// Status builds a current/max HP status packet.
-func (NpcFrameBuilder) Status(objectID int32, maxHP, curHP int) wire.Frame {
-	return FrameStatusUpdate(objectID, []StatusAttribute{
-		{Type: StatusMaxHP, Value: maxHP},
-		{Type: StatusCurrentHP, Value: curHP},
-	})
+// Status builds an NPC StatusUpdate packet.
+func (NpcFrameBuilder) Status(objectID int32, attrs []npcinfo.StatusAttribute) wire.Frame {
+	status := make([]StatusAttribute, len(attrs))
+	for i, attr := range attrs {
+		status[i] = StatusAttribute{Type: StatusType(attr.Type), Value: attr.Value}
+	}
+	return FrameStatusUpdate(objectID, status)
 }

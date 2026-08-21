@@ -27,6 +27,7 @@ var ErrNoFrameBuilder = errors.New("npc: SetFrameBuilder not called")
 // *who* is listening.
 type FrameBuilder interface {
 	Info(npcinfo.Snapshot) wire.Frame
+	ObjectInfo(npcinfo.Snapshot) wire.Frame
 	Attack(snapshot attack.Snapshot) wire.Frame
 	SkillUse(casterID int32, casterAt location.Location, targetID int32, targetAt location.Location, skillID, level int32, hitTime, reuseDelay int, success bool) wire.Frame
 	SkillLaunched(objectID, skillID, level int32, targetIDs []int32) wire.Frame
@@ -35,7 +36,7 @@ type FrameBuilder interface {
 	Move(objectID int32, event move.Event) wire.Frame
 	MoveToPawn(objectID, targetID int32, distance int, origin location.Location) wire.Frame
 	Stop(objectID int32, at location.Location, heading int) wire.Frame
-	Status(objectID int32, maxHP, curHP int) wire.Frame
+	Status(objectID int32, attrs []npcinfo.StatusAttribute) wire.Frame
 	FlyTo(objectID int32, dest, at location.Location, flight modelskill.Flight) wire.Frame
 	ValidateLocation(objectID int32, at location.Location, heading int) wire.Frame
 }

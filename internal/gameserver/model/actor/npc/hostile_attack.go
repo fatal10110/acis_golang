@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npcinfo"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -145,7 +146,12 @@ func (h *Hostile) AttackType() item.WeaponType {
 
 // AttackSpeed returns this NPC's physical attack speed stat.
 func (h *Hostile) AttackSpeed() int {
-	return int(h.Instance.Template.AtkSpd)
+	return int(h.calcStat(stat.PowerAttackSpeed, h.Instance.Template.AtkSpd))
+}
+
+// MagicAttackSpeed returns this NPC's magic attack speed stat.
+func (h *Hostile) MagicAttackSpeed() int {
+	return int(h.calcStat(stat.MagicAttackSpeed, h.Instance.Template.AtkSpd))
 }
 
 // WeaponReuseDelay returns this NPC's weapon reuse delay; only read for a
@@ -476,7 +482,9 @@ func (h *Hostile) BroadcastStatus() error {
 		return ErrNoFrameBuilder
 	}
 	maxHP, curHP := h.MaxHP(), h.CurrentHP()
-	return h.broadcastFrame(func() wire.Frame { return h.frames.Status(h.ObjectID(), maxHP, curHP) })
+	return h.broadcastFrame(func() wire.Frame {
+		return h.frames.Status(h.ObjectID(), []npcinfo.StatusAttribute{{Type: npcinfo.StatusMaxHP, Value: maxHP}, {Type: npcinfo.StatusCurrentHP, Value: curHP}})
+	})
 }
 
 func (h *Hostile) broadcastFrame(build func() wire.Frame) error {
