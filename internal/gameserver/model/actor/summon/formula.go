@@ -105,8 +105,8 @@ func (a *Actor) statCalcOrCreate(s stat.Stat) *effect.Calculator {
 
 func (a *Actor) calcStat(s stat.Stat, base float64) float64 {
 	value := a.statCalculator(s).Calc(summonStatActor{a: a}, base)
-	if s.CantBeNegative() && value < 0 {
-		return 0
+	if s.CantBeNegative() && value <= 0 {
+		return 1
 	}
 	return value
 }
