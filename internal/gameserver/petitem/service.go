@@ -62,6 +62,11 @@ const (
 // TransferResult carries item-store operations for a pet inventory transfer.
 type TransferResult struct {
 	Persist []inventory.Persist
+	// WasWorn reports whether the transferred item was equipped on the pet
+	// before the transfer (set only by GetFromPet).
+	WasWorn bool
+	// ItemID is the transferred item's template id, valid whenever WasWorn is true.
+	ItemID int32
 }
 
 // UseResult carries item-store operations and owner-visible item data for pet equipment changes.
@@ -141,10 +146,31 @@ func withinGiveRange(owner positioned, pet *summon.Actor) bool {
 	return location.In3DRange(ax, ay, az, bx, by, bz, GiveInteractionDistance)
 }
 
-// GetFromPet transfers one item from a pet inventory to its owner's inventory.
+// GetFromPet transfers one item from a pet inventory to its owner's
+// inventory, unequipping it from the pet first if it was worn. Container.
+// Transfer only touches the container's item map — unlike Java's
+// Inventory.removeItem override (Inventory.java:84-105), it never clears a
+// paperdoll slot pointing at the transferred instance — so an equipped item
+// must be unequipped explicitly here, matching Pet.transferItem's wasWorn
+// tracking and PET_TOOK_OFF_S1 notification (Pet.java:456-472).
 func (s *Service) GetFromPet(petInv, playerInv *itemcontainer.Inventory, objectID int32, count int) (TransferResult, bool, error) {
+	wasWorn := false
+	itemID := int32(0)
+	if petInv != nil {
+		if inst := petInv.ItemByObjectID(objectID); inst != nil {
+			if st := inst.Snapshot(); st.Equipped() {
+				wasWorn = petInv.UnequipSlot(st.LocationData) != nil
+				itemID = st.TemplateID
+			}
+		}
+	}
 	result, failure, err := s.transfer(petInv, playerInv, objectID, count)
-	return result, failure == GiveOK, err
+	if failure != GiveOK {
+		return result, false, err
+	}
+	result.WasWorn = wasWorn
+	result.ItemID = itemID
+	return result, true, err
 }
 
 // UseItem equips or unequips one pet equipment item.
