@@ -279,15 +279,25 @@ func (l *GameClientLink) handleToggleSkillUse(live *livePlayer, req clientpacket
 			Definitions: l.skills,
 		},
 	)
+	broadcast := func() {
+		selfObject := skillCastObject(live)
+		l.broadcastLiveFrame(live, func() wire.Frame {
+			return serverpackets.FrameMagicSkillUse(selfObject, selfObject, int32(def.ID), int32(def.Level), 0, 0, false)
+		})
+	}
 	if err != nil {
+		if errors.Is(err, actorcast.ErrNotEnoughMP) || errors.Is(err, actorcast.ErrNotEnoughHP) {
+			broadcast()
+			sendMagicCastFailureReason(live, def, err)
+			l.broadcastCastAborted(live, false)
+			sendMagicActionFailed(live)
+			return
+		}
 		sendMagicCastFailure(live, def, err)
 		return
 	}
 
-	selfObject := skillCastObject(live)
-	l.broadcastLiveFrame(live, func() wire.Frame {
-		return serverpackets.FrameMagicSkillUse(selfObject, selfObject, int32(def.ID), int32(def.Level), 0, 0, false)
-	})
+	broadcast()
 	if activated {
 		actorcast.ApplyEffects(handlers, live.Character, target, def)
 	} else {
