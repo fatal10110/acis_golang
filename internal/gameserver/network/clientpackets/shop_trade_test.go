@@ -1,6 +1,9 @@
 package clientpackets
 
-import "testing"
+import (
+	"encoding/binary"
+	"testing"
+)
 
 func TestDecodeTradeRequest(t *testing.T) {
 	payload := []byte{OpcodeTradeRequest, 0x04, 0x03, 0x02, 0x01}
@@ -202,5 +205,27 @@ func TestDecodeShopTradeRejectsMalformedLists(t *testing.T) {
 		0x00, 0x00, 0x00, 0x00,
 	}); err == nil {
 		t.Fatal("DecodeRequestSellItem: want error on zero count")
+	}
+}
+
+// TestDecodeShopTradeRejectsOversizedCount proves RequestBuyItem/
+// RequestSellItem reject a row count above Config.MAX_ITEM_IN_PACKET
+// (RequestBuyItem.java:32, RequestSellItem.java:26), mirroring the cap
+// warehouse.go already enforces for sibling packets.
+func TestDecodeShopTradeRejectsOversizedCount(t *testing.T) {
+	const oversized = maxShopItemInPacket + 1
+
+	buyPayload := []byte{OpcodeRequestBuyItem, 0x01, 0x00, 0x00, 0x00}
+	buyPayload = binary.LittleEndian.AppendUint32(buyPayload, uint32(oversized))
+	buyPayload = append(buyPayload, make([]byte, oversized*shopBuyRowSize)...)
+	if _, err := DecodeRequestBuyItem(buyPayload); err == nil {
+		t.Fatal("DecodeRequestBuyItem: want error on count exceeding MAX_ITEM_IN_PACKET")
+	}
+
+	sellPayload := []byte{OpcodeRequestSellItem, 0x01, 0x00, 0x00, 0x00}
+	sellPayload = binary.LittleEndian.AppendUint32(sellPayload, uint32(oversized))
+	sellPayload = append(sellPayload, make([]byte, oversized*shopSellRowSize)...)
+	if _, err := DecodeRequestSellItem(sellPayload); err == nil {
+		t.Fatal("DecodeRequestSellItem: want error on count exceeding MAX_ITEM_IN_PACKET")
 	}
 }
