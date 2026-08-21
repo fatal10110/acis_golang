@@ -12,6 +12,18 @@ import (
 
 const attackHateDecay = 6.6
 
+// staleThreatAge is NpcAI.java's out-of-territory stale-hate threshold
+// (NpcAI.java:319): a threat entry whose last damage is at least this old
+// gets its hate stopped and its queued attack desire dropped while the
+// owner is out of territory.
+const staleThreatAge = 90 * time.Second
+
+// staleThreatSweepTicks approximates NpcAI.java's 10-second out-of-territory
+// sweep period (NpcAI.java:311-325) in AITick (task.AITick, 1 second)
+// units, since Tick already runs once per AITick rather than on its own
+// fixed-rate timer.
+const staleThreatSweepTicks = 10
+
 // AttackableActor is the actor state used by the hostile NPC intention loop.
 type AttackableActor interface {
 	attackable.Combatant
@@ -105,6 +117,12 @@ type Attackable struct {
 	current intention
 	next    intention
 	step    int
+	ootStep int
+
+	// now returns the current time; tickOutOfTerritory reads it instead of
+	// calling time.Now directly so tests can simulate staleThreatAge
+	// elapsing without a real 90-second wait.
+	now func() time.Time
 }
 
 // NewAttackable builds an idle hostile NPC AI loop.
@@ -117,6 +135,7 @@ func NewAttackable(actor AttackableActor, move MoveController, attack AttackCont
 		hates:   attackable.NewHateTable(actor),
 		desires: NewDesireQueue(),
 		current: intention{kind: IntentionIdle},
+		now:     time.Now,
 	}
 }
 
@@ -324,6 +343,8 @@ func (a *Attackable) Tick() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
+	a.tickOutOfTerritory()
+
 	a.step++
 	if a.step%3 != 0 {
 		return
@@ -332,6 +353,36 @@ func (a *Attackable) Tick() {
 	a.threats.ReduceAllHate(attackHateDecay)
 	a.desires.DecreaseWeightByType(IntentionAttack, attackHateDecay)
 	a.step = 0
+}
+
+// tickOutOfTerritory ports NpcAI.java's out-of-territory fixed-rate task
+// (NpcAI.java:298-339): while the owner is outside its spawn territory, it
+// periodically stops hate and drops the queued attack desire for any threat
+// entry that hasn't dealt damage in staleThreatAge, so a mob that briefly
+// loses and reacquires an out-of-territory attacker doesn't keep hate the
+// reference would already have expired. It is a no-op back in territory,
+// which also resets the sweep counter so a later territory exit restarts
+// the cadence, matching the reference cancelling and recreating the task on
+// each isInMyTerritory() transition.
+func (a *Attackable) tickOutOfTerritory() {
+	if a.actor.InTerritory() {
+		a.ootStep = 0
+		return
+	}
+	a.ootStep++
+	if a.ootStep < staleThreatSweepTicks {
+		return
+	}
+	a.ootStep = 0
+
+	now := a.now()
+	for _, t := range a.threats.Snapshot() {
+		if now.Sub(t.Timestamp) < staleThreatAge {
+			continue
+		}
+		a.desires.Remove(IntentionAttack, t.Attacker)
+		a.threats.StopHate(t.Attacker)
+	}
 }
 
 // thinkAttack advances one IntentionAttack step. The first return reports
