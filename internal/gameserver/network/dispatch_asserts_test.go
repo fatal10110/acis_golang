@@ -9,6 +9,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 func skipInventoryRemainder(r *wire.Reader) {
@@ -94,9 +95,9 @@ type abnormalStatusEntry struct {
 
 // readAbnormalStatusUpdateFrame asserts the next frame is AbnormalStatusUpdate
 // and returns its decoded icon entries in wire order.
-func readAbnormalStatusUpdateFrame(t *testing.T, c *fakeGameClient) []abnormalStatusEntry {
+func readAbnormalStatusUpdateFrame(t *testing.T, c *testsupport.ScriptedClient) []abnormalStatusEntry {
 	t.Helper()
-	frame := c.read()
+	frame := c.Read()
 	if frame[0] != serverpackets.OpcodeAbnormalStatusUpdate {
 		t.Fatalf("opcode = %#x, want AbnormalStatusUpdate (%#x)", frame[0], serverpackets.OpcodeAbnormalStatusUpdate)
 	}

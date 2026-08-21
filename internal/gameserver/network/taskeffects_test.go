@@ -21,6 +21,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 	"github.com/rs/zerolog"
 )
 
@@ -117,7 +118,7 @@ func TestDieOptionsUsesAccessLevelForDeadReconnect(t *testing.T) {
 
 func TestPvPZoneMembershipTracksZoneTransitions(t *testing.T) {
 	state := world.New()
-	live := newTestLivePlayer(t, 100, &frameCapture{})
+	live := newTestLivePlayer(t, 100, &testsupport.FrameCapture{})
 	live.zoneActor = &liveZoneActor{live: live}
 	state.Spawn(live, 125, 0, 0, 0)
 	state.AddPlayer(live)
@@ -157,7 +158,7 @@ func TestPvPZoneMembershipTracksZoneTransitions(t *testing.T) {
 
 func TestSiegeZoneMembershipTracksZoneTransitions(t *testing.T) {
 	state := world.New()
-	live := newTestLivePlayer(t, 100, &frameCapture{})
+	live := newTestLivePlayer(t, 100, &testsupport.FrameCapture{})
 	live.zoneActor = &liveZoneActor{live: live}
 	state.Spawn(live, 125, 0, 0, 0)
 	state.AddPlayer(live)
@@ -184,7 +185,7 @@ func TestSiegeZoneMembershipTracksZoneTransitions(t *testing.T) {
 
 func TestTaskEffectsWaterSendsCyanGauge(t *testing.T) {
 	state := world.New()
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 100, capture)
 	state.AddPlayer(live)
 
@@ -194,10 +195,10 @@ func TestTaskEffectsWaterSendsCyanGauge(t *testing.T) {
 	}
 	water.Add(live, 10*time.Second)
 
-	if len(capture.frames) != 1 {
-		t.Fatalf("captured frames = %d, want 1", len(capture.frames))
+	if len(capture.Frames()) != 1 {
+		t.Fatalf("captured frames = %d, want 1", len(capture.Frames()))
 	}
-	got := capture.frames[0]
+	got := capture.Frames()[0]
 	if got[0] != serverpackets.OpcodeSetupGauge {
 		t.Fatalf("opcode = %#x, want %#x", got[0], serverpackets.OpcodeSetupGauge)
 	}
@@ -214,7 +215,7 @@ func TestTaskEffectsWaterSendsCyanGauge(t *testing.T) {
 
 func TestWaterZoneMovementUsesBreathStatAndClearsGaugeOnExit(t *testing.T) {
 	state := world.New()
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 100, capture)
 	live.zoneActor = &liveZoneActor{live: live}
 	state.Spawn(live, 0, 0, 0, 0)
@@ -234,10 +235,10 @@ func TestWaterZoneMovementUsesBreathStatAndClearsGaugeOnExit(t *testing.T) {
 	link.updateLivePlayerPosition(live, location.Location{X: 1500}, 0)
 	link.updateLivePlayerPosition(live, location.Location{}, 0)
 
-	if len(capture.frames) != 4 {
-		t.Fatalf("water-zone frames = %d, want 4 (UserInfo+gauge on enter, UserInfo+gauge on exit)", len(capture.frames))
+	if len(capture.Frames()) != 4 {
+		t.Fatalf("water-zone frames = %d, want 4 (UserInfo+gauge on enter, UserInfo+gauge on exit)", len(capture.Frames()))
 	}
-	gauges := framesWithOpcode(capture.frames, serverpackets.OpcodeSetupGauge)
+	gauges := framesWithOpcode(capture.Frames(), serverpackets.OpcodeSetupGauge)
 	if len(gauges) != 2 {
 		t.Fatalf("gauge frames = %d, want 2", len(gauges))
 	}
@@ -253,7 +254,7 @@ func TestWaterZoneMovementUsesBreathStatAndClearsGaugeOnExit(t *testing.T) {
 	if duration := binary.LittleEndian.Uint32(gauges[1][9:13]); duration != 0 {
 		t.Fatalf("exit gauge maxTime = %d, want 0", duration)
 	}
-	userInfos := framesWithOpcode(capture.frames, serverpackets.OpcodeUserInfo)
+	userInfos := framesWithOpcode(capture.Frames(), serverpackets.OpcodeUserInfo)
 	if len(userInfos) != 2 {
 		t.Fatalf("UserInfo frames = %d, want 2 (broadcastUserInfo on enter and exit)", len(userInfos))
 	}
@@ -271,7 +272,7 @@ func framesWithOpcode(frames [][]byte, opcode byte) [][]byte {
 
 func TestWaterZoneMovementNoOpWhenAllowWaterDisabled(t *testing.T) {
 	state := world.New()
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 102, capture)
 	live.zoneActor = &liveZoneActor{live: live}
 	state.Spawn(live, 0, 0, 0, 0)
@@ -290,14 +291,14 @@ func TestWaterZoneMovementNoOpWhenAllowWaterDisabled(t *testing.T) {
 	link.updateLivePlayerPosition(live, location.Location{X: 1500}, 0)
 	link.updateLivePlayerPosition(live, location.Location{}, 0)
 
-	if len(capture.frames) != 0 {
-		t.Fatalf("water-zone frames = %d, want 0 when AllowWater is disabled", len(capture.frames))
+	if len(capture.Frames()) != 0 {
+		t.Fatalf("water-zone frames = %d, want 0 when AllowWater is disabled", len(capture.Frames()))
 	}
 }
 
 func TestWaterZoneMovementAcrossRegionKeepsCountdown(t *testing.T) {
 	state := world.New()
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 101, capture)
 	live.zoneActor = &liveZoneActor{live: live}
 	boundary := world.MinX + (world.MaxX-world.MinX+1)/world.RegionsX
@@ -316,14 +317,14 @@ func TestWaterZoneMovementAcrossRegionKeepsCountdown(t *testing.T) {
 	link.updateLivePlayerPosition(live, location.Location{X: boundary - 1}, 0)
 	link.updateLivePlayerPosition(live, location.Location{X: boundary + 1}, 0)
 
-	if len(capture.frames) != 2 {
-		t.Fatalf("cross-region water frames = %d, want 2 (UserInfo+gauge)", len(capture.frames))
+	if len(capture.Frames()) != 2 {
+		t.Fatalf("cross-region water frames = %d, want 2 (UserInfo+gauge)", len(capture.Frames()))
 	}
 }
 
 func TestWaterZoneServerPositionSyncStartsCountdown(t *testing.T) {
 	state := world.New()
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 102, capture)
 	live.zoneActor = &liveZoneActor{live: live}
 	live.SetWorld(state)
@@ -342,14 +343,14 @@ func TestWaterZoneServerPositionSyncStartsCountdown(t *testing.T) {
 
 	live.SyncPosition(location.Location{X: 1500})
 
-	if len(capture.frames) != 2 {
-		t.Fatalf("server-sync water frames = %d, want 2 (UserInfo+gauge)", len(capture.frames))
+	if len(capture.Frames()) != 2 {
+		t.Fatalf("server-sync water frames = %d, want 2 (UserInfo+gauge)", len(capture.Frames()))
 	}
 }
 
 func TestZoneRevalidationSerializesClientAndServerPositions(t *testing.T) {
 	state := world.New()
-	live := newTestLivePlayer(t, 103, &frameCapture{})
+	live := newTestLivePlayer(t, 103, &testsupport.FrameCapture{})
 	live.zoneActor = &liveZoneActor{live: live}
 	live.SetWorld(state)
 	state.Spawn(live, 0, 0, 0, 0)
@@ -398,7 +399,7 @@ func TestZoneRevalidationSerializesClientAndServerPositions(t *testing.T) {
 
 func TestTaskEffectsDrownDamagesAndNotifiesLivePlayer(t *testing.T) {
 	state := world.New()
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 100, capture)
 	state.AddPlayer(live)
 
@@ -407,10 +408,10 @@ func TestTaskEffectsDrownDamagesAndNotifiesLivePlayer(t *testing.T) {
 	if live.CurrentHP() >= 100 {
 		t.Fatalf("current HP = %d, want drowning damage", live.CurrentHP())
 	}
-	if len(capture.frames) == 0 {
+	if len(capture.Frames()) == 0 {
 		t.Fatal("drowning sent no client frame")
 	}
-	got := capture.frames[len(capture.frames)-1]
+	got := capture.Frames()[len(capture.Frames())-1]
 	if got[0] != serverpackets.OpcodeSystemMessage {
 		t.Fatalf("opcode = %#x, want %#x", got[0], serverpackets.OpcodeSystemMessage)
 	}
@@ -427,7 +428,7 @@ func TestTaskEffectsDrownDamagesAndNotifiesLivePlayer(t *testing.T) {
 // cast. Drown must go through the DOT-style HP path (ReduceHPByDOT), not the
 // normal-hit path (ReduceHP, which runs breakCastOnDamage).
 func TestTaskEffectsDrownDoesNotBreakInFlightCast(t *testing.T) {
-	live := newTestLivePlayer(t, 100, &frameCapture{})
+	live := newTestLivePlayer(t, 100, &testsupport.FrameCapture{})
 	state := world.New()
 	state.AddPlayer(live)
 
@@ -447,7 +448,7 @@ func TestTaskEffectsDrownDoesNotBreakInFlightCast(t *testing.T) {
 
 func TestTaskEffectsShadowItemExpiryDestroysAndUpdatesLivePlayer(t *testing.T) {
 	state := world.New()
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 100, capture)
 	state.AddPlayer(live)
 
@@ -462,7 +463,7 @@ func TestTaskEffectsShadowItemExpiryDestroysAndUpdatesLivePlayer(t *testing.T) {
 	effects.SetShadowItemExpiry(link.ExpireShadowItem)
 	updates := wireInventoryUpdates(link, live)
 	updates.Tick()
-	resetCapture(capture)
+	testsupport.ResetCapture(capture)
 
 	items, err := task.NewShadowItems(effects)
 	if err != nil {
@@ -475,10 +476,10 @@ func TestTaskEffectsShadowItemExpiryDestroysAndUpdatesLivePlayer(t *testing.T) {
 	if inv.ItemByObjectID(inst.ObjectID) != nil {
 		t.Fatal("expired shadow item remains in inventory")
 	}
-	if len(capture.frames) != 3 || capture.frames[0][0] != serverpackets.OpcodeUserInfo || capture.frames[2][0] != serverpackets.OpcodeInventoryUpdate {
-		t.Fatalf("expiry frames = %x, want UserInfo, SystemMessage, InventoryUpdate", capture.frames)
+	if len(capture.Frames()) != 3 || capture.Frames()[0][0] != serverpackets.OpcodeUserInfo || capture.Frames()[2][0] != serverpackets.OpcodeInventoryUpdate {
+		t.Fatalf("expiry frames = %x, want UserInfo, SystemMessage, InventoryUpdate", capture.Frames())
 	}
-	msg := capture.frames[1]
+	msg := capture.Frames()[1]
 	if msg[0] != serverpackets.OpcodeSystemMessage {
 		t.Fatalf("opcode = %#x, want %#x", msg[0], serverpackets.OpcodeSystemMessage)
 	}
@@ -492,7 +493,7 @@ func TestTaskEffectsShadowItemExpiryDestroysAndUpdatesLivePlayer(t *testing.T) {
 
 func TestShadowItemExpiryWaitsForDetach(t *testing.T) {
 	state := world.New()
-	live := newTestLivePlayer(t, 101, &frameCapture{})
+	live := newTestLivePlayer(t, 101, &testsupport.FrameCapture{})
 	state.Spawn(live, 0, 0, 0, 0)
 	state.AddPlayer(live)
 
@@ -550,7 +551,7 @@ func TestTaskEffectsSavePersistsOnlineLivePlayer(t *testing.T) {
 	chars := newFakeCharStore()
 	items := newFakeItemStore()
 	roster := gamemanager.NewRoster(chars, items, nil, testTemplates(t), testItemTemplates(), npc.NewTable(nil), &sequentialIDs{next: 100}, gamemanager.DefaultDeleteAfter, time.Now)
-	live := newTestLivePlayer(t, 101, &frameCapture{})
+	live := newTestLivePlayer(t, 101, &testsupport.FrameCapture{})
 	if err := chars.Create(context.Background(), live.Character); err != nil {
 		t.Fatalf("Create() unexpected error: %v", err)
 	}
@@ -582,7 +583,7 @@ func TestTaskEffectsSaveStillPersistsMidDetachLivePlayer(t *testing.T) {
 	chars := newFakeCharStore()
 	items := newFakeItemStore()
 	roster := gamemanager.NewRoster(chars, items, nil, testTemplates(t), testItemTemplates(), npc.NewTable(nil), &sequentialIDs{next: 100}, gamemanager.DefaultDeleteAfter, time.Now)
-	live := newTestLivePlayer(t, 101, &frameCapture{})
+	live := newTestLivePlayer(t, 101, &testsupport.FrameCapture{})
 	if err := chars.Create(context.Background(), live.Character); err != nil {
 		t.Fatalf("Create() unexpected error: %v", err)
 	}
@@ -609,7 +610,7 @@ func TestTaskEffectsSaveSkipsRemovedLivePlayer(t *testing.T) {
 	chars := newFakeCharStore()
 	items := newFakeItemStore()
 	roster := gamemanager.NewRoster(chars, items, nil, testTemplates(t), testItemTemplates(), npc.NewTable(nil), &sequentialIDs{next: 100}, gamemanager.DefaultDeleteAfter, time.Now)
-	live := newTestLivePlayer(t, 101, &frameCapture{})
+	live := newTestLivePlayer(t, 101, &testsupport.FrameCapture{})
 
 	effects := NewTaskEffects(state)
 	effects.SetAutosave(roster, zerolog.Nop())
@@ -623,7 +624,7 @@ func TestTaskEffectsSaveSkipsRemovedLivePlayer(t *testing.T) {
 
 func TestTaskEffectsSaveWithoutRosterIsNoop(t *testing.T) {
 	state := world.New()
-	live := newTestLivePlayer(t, 101, &frameCapture{})
+	live := newTestLivePlayer(t, 101, &testsupport.FrameCapture{})
 	state.AddPlayer(live)
 
 	effects := NewTaskEffects(state)

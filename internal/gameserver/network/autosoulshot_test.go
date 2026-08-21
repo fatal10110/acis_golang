@@ -7,6 +7,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 func TestRequestAutoSoulShotTogglesKnownInventoryItem(t *testing.T) {
@@ -21,7 +22,7 @@ func TestRequestAutoSoulShotTogglesKnownInventoryItem(t *testing.T) {
 		EtcItem:       &item.EtcItemDetail{Type: item.EtcItemShot},
 	}})
 	shot := &item.Instance{ObjectID: 500, TemplateID: soulshotID, Count: 100, Location: item.LocationInventory}
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{shot})
 	gcl := &GameClientLink{}
 
@@ -30,23 +31,23 @@ func TestRequestAutoSoulShotTogglesKnownInventoryItem(t *testing.T) {
 	if !live.AutoSoulShotEnabled(soulshotID) {
 		t.Fatal("auto soulshot was not enabled")
 	}
-	if len(capture.frames) != 2 {
-		t.Fatalf("enable frames = %x, want ExAutoSoulShot and SystemMessage", capture.frames)
+	if len(capture.Frames()) != 2 {
+		t.Fatalf("enable frames = %x, want ExAutoSoulShot and SystemMessage", capture.Frames())
 	}
-	assertExAutoSoulShotFrame(t, capture.frames[0], soulshotID, true)
-	assertSystemMessageItemFrame(t, capture.frames[1], serverpackets.SystemMessageUseOfItemWillBeAuto, soulshotID)
+	assertExAutoSoulShotFrame(t, capture.Frames()[0], soulshotID, true)
+	assertSystemMessageItemFrame(t, capture.Frames()[1], serverpackets.SystemMessageUseOfItemWillBeAuto, soulshotID)
 
-	capture.frames = nil
+	testsupport.ResetCapture(capture)
 	gcl.handleAutoSoulShot(live, clientpackets.RequestAutoSoulShot{ItemID: soulshotID, Type: 0})
 
 	if live.AutoSoulShotEnabled(soulshotID) {
 		t.Fatal("auto soulshot is still enabled")
 	}
-	if len(capture.frames) != 2 {
-		t.Fatalf("disable frames = %x, want ExAutoSoulShot and SystemMessage", capture.frames)
+	if len(capture.Frames()) != 2 {
+		t.Fatalf("disable frames = %x, want ExAutoSoulShot and SystemMessage", capture.Frames())
 	}
-	assertExAutoSoulShotFrame(t, capture.frames[0], soulshotID, false)
-	assertSystemMessageItemFrame(t, capture.frames[1], serverpackets.SystemMessageAutoUseOfItemCancelled, soulshotID)
+	assertExAutoSoulShotFrame(t, capture.Frames()[0], soulshotID, false)
+	assertSystemMessageItemFrame(t, capture.Frames()[1], serverpackets.SystemMessageAutoUseOfItemCancelled, soulshotID)
 }
 
 func TestRequestAutoSoulShotIgnoresMissingOrFishingShots(t *testing.T) {
@@ -61,7 +62,7 @@ func TestRequestAutoSoulShotIgnoresMissingOrFishingShots(t *testing.T) {
 		EtcItem:       &item.EtcItemDetail{Type: item.EtcItemShot},
 	}})
 	fishingShot := &item.Instance{ObjectID: 501, TemplateID: fishingShotID, Count: 100, Location: item.LocationInventory}
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{fishingShot})
 	gcl := &GameClientLink{}
 
@@ -71,8 +72,8 @@ func TestRequestAutoSoulShotIgnoresMissingOrFishingShots(t *testing.T) {
 	if live.AutoSoulShotEnabled(fishingShotID) {
 		t.Fatal("fishing shot was enabled for auto use")
 	}
-	if len(capture.frames) != 0 {
-		t.Fatalf("frames = %x, want none", capture.frames)
+	if len(capture.Frames()) != 0 {
+		t.Fatalf("frames = %x, want none", capture.Frames())
 	}
 }
 

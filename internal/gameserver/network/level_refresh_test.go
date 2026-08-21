@@ -10,6 +10,7 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 // levelRefreshTable is a three-level table, so RealMaxLevel is 2 and a single
@@ -32,7 +33,7 @@ func levelRefreshTable(t *testing.T) *player.LevelTable {
 // level 1 only, so a character holding it at level 3 holds it above what the
 // profession supports: the refresh pulls it back down and resends the list.
 func TestRefreshLiveLevelSkillsReconcilesAndSendsSkillList(t *testing.T) {
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, frames)
 	live.Character.SetSkillLevel(3, 3)
 
@@ -47,7 +48,7 @@ func TestRefreshLiveLevelSkillsReconcilesAndSendsSkillList(t *testing.T) {
 		t.Errorf("SkillLevel(3) after refresh = %d, want 1 (pulled back to the granted level)", got)
 	}
 
-	sent := frames.frames
+	sent := frames.Frames()
 	if len(sent) != 1 {
 		t.Fatalf("frames sent = %d, want 1", len(sent))
 	}
@@ -64,7 +65,7 @@ func TestRefreshLiveLevelSkillsReconcilesAndSendsSkillList(t *testing.T) {
 }
 
 func TestRefreshLiveLevelSkillsAutoLearnsBoughtSkills(t *testing.T) {
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, frames)
 	live.Character.CharLevel = 10
 	live.template = &player.Template{Skills: []player.SkillGrant{
@@ -95,7 +96,7 @@ func TestRefreshLiveLevelSkillsAutoLearnsBoughtSkills(t *testing.T) {
 // must re-point any shortcut bound to that skill at its new level instead of
 // leaving the client showing the stale one.
 func TestRefreshLiveLevelSkillsAutoLearnRefreshesShortcut(t *testing.T) {
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, frames)
 	live.Character.CharLevel = 10
 	live.template = &player.Template{Skills: []player.SkillGrant{
@@ -118,7 +119,7 @@ func TestRefreshLiveLevelSkillsAutoLearnRefreshesShortcut(t *testing.T) {
 	}
 
 	var register []byte
-	for _, frame := range frames.frames {
+	for _, frame := range frames.Frames() {
 		if frame[0] == serverpackets.OpcodeShortCutRegister {
 			register = frame
 		}
@@ -145,7 +146,7 @@ func TestRefreshLiveLevelSkillsAutoLearnRefreshesShortcut(t *testing.T) {
 // client and persisted shortcut keep the old level until re-dragged, even
 // though the known skill level itself just dropped.
 func TestRefreshLiveLevelSkillsAutoLearnPullBackLeavesShortcutUntouched(t *testing.T) {
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, frames)
 	live.Character.CharLevel = 10
 	live.Character.SetSkillLevel(3, 3)
@@ -172,7 +173,7 @@ func TestRefreshLiveLevelSkillsAutoLearnPullBackLeavesShortcutUntouched(t *testi
 	if got := live.shortcuts.All()[0].Level; got != 3 {
 		t.Fatalf("shortcut level = %d, want 3 (untouched by the pull-back)", got)
 	}
-	for _, frame := range frames.frames {
+	for _, frame := range frames.Frames() {
 		if frame[0] == serverpackets.OpcodeShortCutRegister {
 			t.Fatal("ShortCutRegister sent, want none for a pull-back")
 		}
@@ -183,13 +184,13 @@ func TestRefreshLiveLevelSkillsAutoLearnPullBackLeavesShortcutUntouched(t *testi
 // no skill persistence attached has nothing to reconcile and sends nothing,
 // rather than pushing an empty skill list that would wipe the client's copy.
 func TestRefreshLiveLevelSkillsWithoutSkillsIsSilent(t *testing.T) {
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, frames)
 	live.Character.SetSkillLevel(3, 3)
 
 	(&GameClientLink{}).refreshLiveLevelSkills(context.Background(), live)
 
-	if sent := frames.frames; len(sent) != 0 {
+	if sent := frames.Frames(); len(sent) != 0 {
 		t.Fatalf("frames sent = %d, want 0", len(sent))
 	}
 	if got := live.Character.SkillLevel(3); got != 3 {
@@ -203,13 +204,13 @@ func TestRefreshLiveLevelSkillsWithoutSkillsIsSilent(t *testing.T) {
 // synchronously inside removeExpAndSp ahead of its own system messages
 // (PlayerStatus.java:583-603, PlayableStatus.java:133-145).
 func TestSendExpSpLossFramesOrdersStatusBeforeExpMessage(t *testing.T) {
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, frames)
 	live.Character.SP = 100
 
 	sendExpSpLossFrames(live, 10, 25)
 
-	sent := frames.frames
+	sent := frames.Frames()
 	if len(sent) != 3 {
 		t.Fatalf("frames sent = %d, want 3", len(sent))
 	}
@@ -227,7 +228,7 @@ func TestSendExpSpLossFramesOrdersStatusBeforeExpMessage(t *testing.T) {
 // TestAddLevelRunsTheRegisteredRefresher pins the domain-to-network join: a
 // level change is what drives the refresher, in either direction.
 func TestAddLevelRunsTheRegisteredRefresher(t *testing.T) {
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, frames)
 	tmpl, ok := testTemplates(t).Get(0)
 	if !ok {
@@ -246,7 +247,7 @@ func TestAddLevelRunsTheRegisteredRefresher(t *testing.T) {
 	live.Character.AddLevel(table, tmpl, -1)
 
 	// One SkillList per level change, up and down alike.
-	sent := frames.frames
+	sent := frames.Frames()
 	skillLists := 0
 	for _, frame := range sent {
 		if frame[0] == serverpackets.OpcodeSkillList {

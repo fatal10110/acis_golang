@@ -21,15 +21,15 @@ import (
 func TestGameClientLinkSecondActionClickAttacksSelectedTarget(t *testing.T) {
 	c, chars, _, _, _, state := newLinkedSQLGameClient(t, nil, nil, 0)
 
-	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
-	c.read() // CharCreateOk
-	c.read() // CharSelectInfo
+	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.Read() // CharCreateOk
+	c.Read() // CharSelectInfo
 	objID := sqlCharacterID(t, chars)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
 	playerObj, ok := state.Player(objID)
@@ -46,26 +46,26 @@ func TestGameClientLinkSecondActionClickAttacksSelectedTarget(t *testing.T) {
 	target.Instance.Template.DEX = 30
 	target.SetRollSource(func(int) int { return 0 })
 	state.Spawn(target, px+30, py, pz, 0)
-	if reply := c.read(); reply[0] != serverpackets.OpcodeNPCInfo {
+	if reply := c.Read(); reply[0] != serverpackets.OpcodeNPCInfo {
 		t.Fatalf("visible target opcode = %#x, want NPCInfo (%#x)", reply[0], serverpackets.OpcodeNPCInfo)
 	}
 
 	origin := location.Location{X: px, Y: py, Z: pz}
-	c.send(encodeAction(target.ObjectID(), origin, false))
-	if reply := c.read(); reply[0] != serverpackets.OpcodeValidateLocation {
+	c.Send(encodeAction(target.ObjectID(), origin, false))
+	if reply := c.Read(); reply[0] != serverpackets.OpcodeValidateLocation {
 		t.Fatalf("first Action opcode = %#x, want ValidateLocation (%#x)", reply[0], serverpackets.OpcodeValidateLocation)
 	}
-	if reply := c.read(); reply[0] != serverpackets.OpcodeMyTargetSelected {
+	if reply := c.Read(); reply[0] != serverpackets.OpcodeMyTargetSelected {
 		t.Fatalf("first Action second frame opcode = %#x, want MyTargetSelected (%#x)", reply[0], serverpackets.OpcodeMyTargetSelected)
 	}
-	c.read() // StatusUpdate
+	c.Read() // StatusUpdate
 
-	c.send(encodeAction(target.ObjectID(), origin, false))
-	reply := c.read()
+	c.Send(encodeAction(target.ObjectID(), origin, false))
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeAutoAttackStart {
 		t.Fatalf("second Action opcode = %#x, want AutoAttackStart (%#x)", reply[0], serverpackets.OpcodeAutoAttackStart)
 	}
-	reply = c.read()
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeAttack {
 		t.Fatalf("second Action follow-up opcode = %#x, want Attack (%#x)", reply[0], serverpackets.OpcodeAttack)
 	}
@@ -81,15 +81,15 @@ func TestGameClientLinkSecondActionClickAttacksSelectedTarget(t *testing.T) {
 func TestGameClientLinkSecondActionClickWalksTowardDistantTarget(t *testing.T) {
 	c, chars, _, _, _, state := newLinkedSQLGameClient(t, nil, nil, 0)
 
-	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
-	c.read() // CharCreateOk
-	c.read() // CharSelectInfo
+	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.Read() // CharCreateOk
+	c.Read() // CharSelectInfo
 	objID := sqlCharacterID(t, chars)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
 	playerObj, ok := state.Player(objID)
@@ -101,22 +101,22 @@ func TestGameClientLinkSecondActionClickWalksTowardDistantTarget(t *testing.T) {
 
 	target := newTestHostileNPC(t, 3008)
 	state.Spawn(target, px+600, py, pz, 0)
-	if reply := c.read(); reply[0] != serverpackets.OpcodeNPCInfo {
+	if reply := c.Read(); reply[0] != serverpackets.OpcodeNPCInfo {
 		t.Fatalf("visible target opcode = %#x, want NPCInfo (%#x)", reply[0], serverpackets.OpcodeNPCInfo)
 	}
 
 	origin := location.Location{X: px, Y: py, Z: pz}
-	c.send(encodeAction(target.ObjectID(), origin, false))
-	if reply := c.read(); reply[0] != serverpackets.OpcodeValidateLocation {
+	c.Send(encodeAction(target.ObjectID(), origin, false))
+	if reply := c.Read(); reply[0] != serverpackets.OpcodeValidateLocation {
 		t.Fatalf("first Action opcode = %#x, want ValidateLocation (%#x)", reply[0], serverpackets.OpcodeValidateLocation)
 	}
-	if reply := c.read(); reply[0] != serverpackets.OpcodeMyTargetSelected {
+	if reply := c.Read(); reply[0] != serverpackets.OpcodeMyTargetSelected {
 		t.Fatalf("first Action second frame opcode = %#x, want MyTargetSelected (%#x)", reply[0], serverpackets.OpcodeMyTargetSelected)
 	}
-	c.read() // StatusUpdate
+	c.Read() // StatusUpdate
 
-	c.send(encodeAction(target.ObjectID(), origin, false))
-	reply := c.read()
+	c.Send(encodeAction(target.ObjectID(), origin, false))
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeMoveToPawn {
 		t.Fatalf("second Action on distant target opcode = %#x, want MoveToPawn (%#x)", reply[0], serverpackets.OpcodeMoveToPawn)
 	}
@@ -125,37 +125,37 @@ func TestGameClientLinkSecondActionClickWalksTowardDistantTarget(t *testing.T) {
 func TestGameClientLinkAttackRequestFirstSelectsOnly(t *testing.T) {
 	c, _, _, _, _, state := newLinkedSQLGameClient(t, nil, nil, 0)
 
-	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
-	c.read() // CharCreateOk
-	c.read() // CharSelectInfo
+	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.Read() // CharCreateOk
+	c.Read() // CharSelectInfo
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
 	target := newTestHostileNPC(t, 3001)
 	state.Spawn(target, 120, 20, 30, 0)
-	if reply := c.read(); reply[0] != serverpackets.OpcodeNPCInfo {
+	if reply := c.Read(); reply[0] != serverpackets.OpcodeNPCInfo {
 		t.Fatalf("visible target opcode = %#x, want NPCInfo (%#x)", reply[0], serverpackets.OpcodeNPCInfo)
 	}
 
 	origin := location.Location{X: 10, Y: 20, Z: 30}
-	c.send(encodeAttackRequest(target.ObjectID(), origin, false))
-	reply := c.read()
+	c.Send(encodeAttackRequest(target.ObjectID(), origin, false))
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeValidateLocation {
 		t.Fatalf("first AttackRequest opcode = %#x, want ValidateLocation (%#x)", reply[0], serverpackets.OpcodeValidateLocation)
 	}
-	reply = c.read()
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeMyTargetSelected {
 		t.Fatalf("first AttackRequest second frame opcode = %#x, want MyTargetSelected (%#x)", reply[0], serverpackets.OpcodeMyTargetSelected)
 	}
-	reply = c.read()
+	reply = c.Read()
 	assertTargetHPStatus(t, reply, target.ObjectID(), target.MaxHP(), target.CurrentHP())
 
-	c.send(encodeRequestTargetCancel(1))
-	reply = c.read()
+	c.Send(encodeRequestTargetCancel(1))
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeActionFailed {
 		t.Fatalf("RequestTargetCancel after first AttackRequest opcode = %#x, want ActionFailed (%#x)", reply[0], serverpackets.OpcodeActionFailed)
 	}

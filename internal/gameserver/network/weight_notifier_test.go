@@ -5,6 +5,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 // wireWeightNotifier mirrors character_flow.go's attachLivePlayer weight
@@ -35,18 +36,18 @@ func TestWeightNotifierSendsStatusUpdateOnWeightChange(t *testing.T) {
 	templates := item.NewTable([]*item.Template{{
 		ID: 1, Kind: item.KindEtcItem, Weight: 10, Stackable: true, EtcItem: &item.EtcItemDetail{},
 	}})
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
 	wireWeightNotifier(live)
 
-	capture.frames = nil
+	testsupport.ResetCapture(capture)
 	live.Inventory().AddNew(1, 5, 100)
 	if !live.Inventory().UpdateWeight() {
 		t.Fatal("UpdateWeight() = false, want true for a nonzero weight change")
 	}
 
-	assertOpcodeSequence(t, capture.frames, serverpackets.OpcodeStatusUpdate)
-	assertStatusAttrs(t, capture.frames[0], live.ObjectID(), []serverpackets.StatusAttribute{
+	testsupport.AssertOpcodeSequence(t, capture.Frames(), serverpackets.OpcodeStatusUpdate)
+	assertStatusAttrs(t, capture.Frames()[0], live.ObjectID(), []serverpackets.StatusAttribute{
 		{Type: serverpackets.StatusCurrentLoad, Value: 50},
 	})
 }
@@ -59,18 +60,18 @@ func TestWeightNotifierSkipsUnchangedWeight(t *testing.T) {
 	templates := item.NewTable([]*item.Template{{
 		ID: 1, Kind: item.KindEtcItem, Weight: 10, Stackable: true, EtcItem: &item.EtcItemDetail{},
 	}})
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
 	wireWeightNotifier(live)
 
 	live.Inventory().AddNew(1, 5, 100)
 	live.Inventory().UpdateWeight()
-	capture.frames = nil
+	testsupport.ResetCapture(capture)
 
 	if live.Inventory().UpdateWeight() {
 		t.Fatal("UpdateWeight() = true, want false when total weight has not changed")
 	}
-	if len(capture.frames) != 0 {
-		t.Fatalf("frames = %d, want none for an unchanged weight recompute", len(capture.frames))
+	if len(capture.Frames()) != 0 {
+		t.Fatalf("frames = %d, want none for an unchanged weight recompute", len(capture.Frames()))
 	}
 }

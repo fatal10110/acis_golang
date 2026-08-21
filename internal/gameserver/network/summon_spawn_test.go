@@ -22,6 +22,7 @@ import (
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 type fakePetStoreNoSaved struct{}
@@ -133,7 +134,7 @@ func newSummonTestLink(t *testing.T) (*GameClientLink, *world.State) {
 
 func TestGameSummonSpawnerRegistersPetWithAITask(t *testing.T) {
 	link, state := newSummonTestLink(t)
-	live := newTestLivePlayer(t, 1, &frameCapture{})
+	live := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
 	state.Spawn(live, 0, 0, 0, 0)
 	inst := &item.Instance{ObjectID: 500, TemplateID: summonTestCollarTemplateID, OwnerID: live.ObjectID()}
 
@@ -160,7 +161,7 @@ func TestGameSummonSpawnerUnregistersPetAIOnDespawn(t *testing.T) {
 	link, state := newSummonTestLink(t)
 	registry := &recordingAIRegistry{}
 	link.ai = registry
-	live := newTestLivePlayer(t, 1, &frameCapture{})
+	live := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
 	inst := &item.Instance{ObjectID: 500, TemplateID: summonTestCollarTemplateID, OwnerID: live.ObjectID()}
 
 	if !(&gameSummonSpawner{link: link, live: live}).SpawnPet(live.Character, inst) {
@@ -179,7 +180,7 @@ func TestGameSummonSpawnerUnregistersPetAIOnDespawn(t *testing.T) {
 
 func TestUseSummonItemMountsWyvern(t *testing.T) {
 	link, state := newSummonTestLink(t)
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, frames)
 	state.Spawn(live, 0, 0, 0, 0)
 	live.Character.SetUserInfoUpdater(func() {
@@ -197,19 +198,19 @@ func TestUseSummonItemMountsWyvern(t *testing.T) {
 	if got := live.Character.MountObjectID(); got != inst.ObjectID {
 		t.Fatalf("MountObjectID() = %d, want %d", got, inst.ObjectID)
 	}
-	assertOpcodeSequence(t, frames.frames, serverpackets.OpcodeRide, serverpackets.OpcodeUserInfo)
+	testsupport.AssertOpcodeSequence(t, frames.Frames(), serverpackets.OpcodeRide, serverpackets.OpcodeUserInfo)
 
-	frames.frames = nil
+	testsupport.ResetCapture(frames)
 	link.destroyLiveItem(live, inst.ObjectID, 1)
 	if got := live.Inventory().ItemByObjectID(inst.ObjectID); got == nil {
 		t.Fatal("destroying mounted control item removed it")
 	}
-	assertOpcodeSequence(t, frames.frames, serverpackets.OpcodeActionFailed)
+	testsupport.AssertOpcodeSequence(t, frames.Frames(), serverpackets.OpcodeActionFailed)
 }
 
 func TestUseSummonItemRejectsWyvernWhileSitting(t *testing.T) {
 	link, _ := newSummonTestLink(t)
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, frames)
 	live.Character.SetStanding(false)
 	inst := &item.Instance{ObjectID: 502, TemplateID: summonTestWyvernTemplateID, OwnerID: live.ObjectID(), Count: 1, Location: item.LocationInventory}
@@ -221,12 +222,12 @@ func TestUseSummonItemRejectsWyvernWhileSitting(t *testing.T) {
 	if got := live.Character.MountType(); got != 0 {
 		t.Fatalf("MountType() = %d, want 0", got)
 	}
-	assertOpcodeSequence(t, frames.frames, serverpackets.OpcodeSystemMessage)
+	testsupport.AssertOpcodeSequence(t, frames.Frames(), serverpackets.OpcodeSystemMessage)
 }
 
 func TestUseSummonItemRejectsWyvernInCombat(t *testing.T) {
 	link, _ := newSummonTestLink(t)
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, frames)
 	live.Character.SetInCombat(true)
 	inst := &item.Instance{ObjectID: 503, TemplateID: summonTestWyvernTemplateID, OwnerID: live.ObjectID(), Count: 1, Location: item.LocationInventory}
@@ -238,12 +239,12 @@ func TestUseSummonItemRejectsWyvernInCombat(t *testing.T) {
 	if got := live.Character.MountType(); got != 0 {
 		t.Fatalf("MountType() = %d, want 0", got)
 	}
-	assertOpcodeSequence(t, frames.frames, serverpackets.OpcodeSystemMessage)
+	testsupport.AssertOpcodeSequence(t, frames.Frames(), serverpackets.OpcodeSystemMessage)
 }
 
 func TestUseSummonItemRejectsSecondWyvern(t *testing.T) {
 	link, state := newSummonTestLink(t)
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, frames)
 	state.Spawn(live, 0, 0, 0, 0)
 	first := &item.Instance{ObjectID: 504, TemplateID: summonTestWyvernTemplateID, OwnerID: live.ObjectID(), Count: 1, Location: item.LocationInventory}
@@ -259,7 +260,7 @@ func TestUseSummonItemRejectsSecondWyvern(t *testing.T) {
 	if got := live.Character.MountObjectID(); got != first.ObjectID {
 		t.Fatalf("MountObjectID() = %d, want %d", got, first.ObjectID)
 	}
-	assertOpcodeSequence(t, frames.frames, serverpackets.OpcodeSystemMessage)
+	testsupport.AssertOpcodeSequence(t, frames.Frames(), serverpackets.OpcodeSystemMessage)
 }
 
 // summonTestSkillTable registers SUMMON_CREATURE (2046,1) with a zero hit
@@ -278,7 +279,7 @@ func summonTestSkillTable(t *testing.T) *skillstate.Persistence {
 
 func TestGameSummonSpawnerSpawnPetRegistersLiveActor(t *testing.T) {
 	link, state := newSummonTestLink(t)
-	live := newTestLivePlayer(t, 1, &frameCapture{})
+	live := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
 	inst := &item.Instance{ObjectID: 500, TemplateID: summonTestCollarTemplateID, OwnerID: live.ObjectID()}
 
 	spawner := &gameSummonSpawner{link: link, live: live}
@@ -323,7 +324,7 @@ func TestGameSummonSpawnerSpawnServitorRegistersLiveActor(t *testing.T) {
 		SSCount: 2, SPSCount: 1,
 		Skills: map[int]int{1126: 1},
 	}})
-	live := newTestLivePlayer(t, 1, &frameCapture{})
+	live := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
 
 	spawner := &gameSummonSpawner{link: link, live: live}
 	if !spawner.SpawnServitor(live.Character, modelskill.Definition{NpcID: 14848}) {
@@ -362,8 +363,8 @@ func TestGameSummonSpawnerRejectsServitorAttackThroughBlockedLineOfSight(t *test
 	link.npcs = npc.NewTable([]*npc.Template{template})
 	geo := &blockedSummonLOSGeo{}
 	link.geo = geo
-	live := newTestLivePlayer(t, 1, &frameCapture{})
-	target := newTestLivePlayer(t, 2, &frameCapture{})
+	live := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
+	target := newTestLivePlayer(t, 2, &testsupport.FrameCapture{})
 	state.Spawn(target.Character, 160, 0, 0, 0)
 
 	spawner := &gameSummonSpawner{link: link, live: live}
@@ -391,7 +392,7 @@ func TestGameSummonSpawnerSpawnPetRestoresSavedName(t *testing.T) {
 	link.petStore = fakePetStoreSaved{state: petmodel.State{
 		Name: "Fang", Level: 10, CurHP: 400, CurMP: 80, Fed: 3000,
 	}}
-	live := newTestLivePlayer(t, 1, &frameCapture{})
+	live := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
 	inst := &item.Instance{ObjectID: 500, TemplateID: summonTestCollarTemplateID, OwnerID: live.ObjectID()}
 
 	spawner := &gameSummonSpawner{link: link, live: live}
@@ -411,7 +412,7 @@ func TestGameClientLinkReturnPetSavesCollarState(t *testing.T) {
 	want := petmodel.State{Name: "Fang", Level: 10, Exp: 1234, SP: 56, CurHP: 200, CurMP: 40, Fed: 2500}
 	store := &recordingPetStore{restoreState: want}
 	link.petStore = store
-	live := newTestLivePlayer(t, 1, &frameCapture{})
+	live := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
 	inst := &item.Instance{ObjectID: 500, TemplateID: summonTestCollarTemplateID, OwnerID: live.ObjectID()}
 	if !(&gameSummonSpawner{link: link, live: live}).SpawnPet(live.Character, inst) {
 		t.Fatal("SpawnPet returned false")
@@ -431,7 +432,7 @@ func TestGameClientLinkDetachLivePlayerSavesPetCollarState(t *testing.T) {
 	link, state := newSummonTestLink(t)
 	store := &recordingPetStore{}
 	link.petStore = store
-	live := newTestLivePlayer(t, 1, &frameCapture{})
+	live := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
 	inst := &item.Instance{ObjectID: 500, TemplateID: summonTestCollarTemplateID, OwnerID: live.ObjectID()}
 	if !(&gameSummonSpawner{link: link, live: live}).SpawnPet(live.Character, inst) {
 		t.Fatal("SpawnPet returned false")
@@ -453,7 +454,7 @@ func TestGameClientLinkDetachLivePlayerSavesPetCollarState(t *testing.T) {
 
 func TestGameClientLinkReturnPetTransfersCarriedItemsToOwner(t *testing.T) {
 	link, state := newSummonTestLink(t)
-	live := newTestLivePlayer(t, 1, &frameCapture{})
+	live := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
 	inst := &item.Instance{ObjectID: 500, TemplateID: summonTestCollarTemplateID, OwnerID: live.ObjectID()}
 	if !(&gameSummonSpawner{link: link, live: live}).SpawnPet(live.Character, inst) {
 		t.Fatal("SpawnPet returned false")
@@ -478,7 +479,7 @@ func TestGameClientLinkReturnPetDropsCarriedItemsWhenOwnerInventoryIsFull(t *tes
 	link, state := newSummonTestLink(t)
 	drops := &recordingGroundDropper{}
 	link.groundItems = drops
-	live := newTestLivePlayer(t, 1, &frameCapture{})
+	live := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
 	live.Inventory().SlotLimit = 1
 	live.Inventory().AddNew(30, 1, 800)
 	inst := &item.Instance{ObjectID: 500, TemplateID: summonTestCollarTemplateID, OwnerID: live.ObjectID()}
@@ -507,7 +508,7 @@ func TestGameClientLinkReturnPetDropsCarriedItemsWhenOwnerInventoryIsFull(t *tes
 // Launch/Hit cast to a live, AI-attached pet in the world.
 func TestUseSummonItemSpawnsPetEndToEnd(t *testing.T) {
 	link, state := newSummonTestLink(t)
-	live := newTestLivePlayer(t, 1, &frameCapture{})
+	live := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
 	inst := &item.Instance{ObjectID: 500, TemplateID: summonTestCollarTemplateID, OwnerID: live.ObjectID()}
 	live.Inventory().Restore([]*item.Instance{inst})
 
@@ -542,7 +543,7 @@ func TestUseSummonItemSpawnsPetEndToEnd(t *testing.T) {
 
 func TestUseSummonItemRejectsSittingOwner(t *testing.T) {
 	link, _ := newSummonTestLink(t)
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, frames)
 	live.Character.SetStanding(false)
 	inst := &item.Instance{ObjectID: 500, TemplateID: summonTestCollarTemplateID, OwnerID: live.ObjectID()}
@@ -550,10 +551,10 @@ func TestUseSummonItemRejectsSittingOwner(t *testing.T) {
 	if !link.useSummonItem(live, live.Inventory(), inst) {
 		t.Fatal("useSummonItem returned false, want handled rejection")
 	}
-	if len(frames.frames) != 1 {
-		t.Fatalf("frames = %d, want exactly one rejection", len(frames.frames))
+	if len(frames.Frames()) != 1 {
+		t.Fatalf("frames = %d, want exactly one rejection", len(frames.Frames()))
 	}
-	assertSystemMessageIDFrame(t, frames.frames[0], 31)
+	assertSystemMessageIDFrame(t, frames.Frames()[0], 31)
 }
 
 // TestGameSummonSpawnerSpawnPetBroadcastsSpawnRelation covers Summon.onSpawn's
@@ -564,8 +565,8 @@ func TestUseSummonItemRejectsSittingOwner(t *testing.T) {
 func TestGameSummonSpawnerSpawnPetBroadcastsSpawnRelation(t *testing.T) {
 	link, state := newSummonTestLink(t)
 	link.ids = &fakeSummonIDs{next: 100}
-	selfFrames := &frameCapture{}
-	observerFrames := &frameCapture{}
+	selfFrames := &testsupport.FrameCapture{}
+	observerFrames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, selfFrames)
 	observer := newTestLivePlayer(t, 2, observerFrames)
 	live.npcs = link.npcs
@@ -575,8 +576,8 @@ func TestGameSummonSpawnerSpawnPetBroadcastsSpawnRelation(t *testing.T) {
 	state.Spawn(observer, 100, 0, 0, 0)
 	// Spawn's mutual Discover already exchanged CharInfo frames between the
 	// two; clear those before exercising SpawnPet's relation broadcast.
-	selfFrames.frames = nil
-	observerFrames.frames = nil
+	testsupport.ResetCapture(selfFrames)
+	testsupport.ResetCapture(observerFrames)
 
 	inst := &item.Instance{ObjectID: 500, TemplateID: summonTestCollarTemplateID, OwnerID: live.ObjectID()}
 	spawner := &gameSummonSpawner{link: link, live: live}
@@ -589,35 +590,35 @@ func TestGameSummonSpawnerSpawnPetBroadcastsSpawnRelation(t *testing.T) {
 	}
 	pet := obj.(*summon.Actor)
 
-	if len(selfFrames.frames) != 3 {
-		t.Fatalf("self frames = %d, want PetInfo, PetItemList, then summon self-view", len(selfFrames.frames))
+	if len(selfFrames.Frames()) != 3 {
+		t.Fatalf("self frames = %d, want PetInfo, PetItemList, then summon self-view", len(selfFrames.Frames()))
 	}
-	if selfFrames.frames[0][0] != serverpackets.OpcodePetInfo {
-		t.Fatalf("self first frame opcode = %#x, want PetInfo (%#x)", selfFrames.frames[0][0], serverpackets.OpcodePetInfo)
+	if selfFrames.Frames()[0][0] != serverpackets.OpcodePetInfo {
+		t.Fatalf("self first frame opcode = %#x, want PetInfo (%#x)", selfFrames.Frames()[0][0], serverpackets.OpcodePetInfo)
 	}
-	if selfFrames.frames[1][0] != serverpackets.OpcodePetItemList {
-		t.Fatalf("self second frame opcode = %#x, want PetItemList (%#x)", selfFrames.frames[1][0], serverpackets.OpcodePetItemList)
+	if selfFrames.Frames()[1][0] != serverpackets.OpcodePetItemList {
+		t.Fatalf("self second frame opcode = %#x, want PetItemList (%#x)", selfFrames.Frames()[1][0], serverpackets.OpcodePetItemList)
 	}
 	wantSelf := relationChangedPayload(pet.ObjectID(), serverpackets.RelationHasKarma, 0, 500, 0)
-	if !bytes.Equal(selfFrames.frames[2], wantSelf) {
-		t.Fatalf("self relation frame = %x, want %x", selfFrames.frames[2], wantSelf)
+	if !bytes.Equal(selfFrames.Frames()[2], wantSelf) {
+		t.Fatalf("self relation frame = %x, want %x", selfFrames.Frames()[2], wantSelf)
 	}
 
-	if len(observerFrames.frames) != 2 {
-		t.Fatalf("observer frames = %d, want SummonInfo then relation", len(observerFrames.frames))
+	if len(observerFrames.Frames()) != 2 {
+		t.Fatalf("observer frames = %d, want SummonInfo then relation", len(observerFrames.Frames()))
 	}
-	if observerFrames.frames[0][0] != serverpackets.OpcodeNPCInfo {
-		t.Fatalf("observer first frame opcode = %#x, want SummonInfo (%#x)", observerFrames.frames[0][0], serverpackets.OpcodeNPCInfo)
+	if observerFrames.Frames()[0][0] != serverpackets.OpcodeNPCInfo {
+		t.Fatalf("observer first frame opcode = %#x, want SummonInfo (%#x)", observerFrames.Frames()[0][0], serverpackets.OpcodeNPCInfo)
 	}
 	wantObserver := relationChangedPayload(pet.ObjectID(), serverpackets.RelationHasKarma, 1, 500, 0)
-	if !bytes.Equal(observerFrames.frames[1], wantObserver) {
-		t.Fatalf("observer relation frame = %x, want %x", observerFrames.frames[1], wantObserver)
+	if !bytes.Equal(observerFrames.Frames()[1], wantObserver) {
+		t.Fatalf("observer relation frame = %x, want %x", observerFrames.Frames()[1], wantObserver)
 	}
 }
 
 func TestGameSummonSpawnerSpawnPetRejectsSecondSummon(t *testing.T) {
 	link, _ := newSummonTestLink(t)
-	live := newTestLivePlayer(t, 1, &frameCapture{})
+	live := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
 	inst := &item.Instance{ObjectID: 500, TemplateID: summonTestCollarTemplateID, OwnerID: live.ObjectID()}
 
 	spawner := &gameSummonSpawner{link: link, live: live}
@@ -644,7 +645,7 @@ func TestSummonCastControllerRecoversPanickingHook(t *testing.T) {
 	link, state := newSummonTestLink(t)
 	buf := &syncBuffer{}
 	link.log = zerolog.New(buf)
-	live := newTestLivePlayer(t, 1, &frameCapture{})
+	live := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
 
 	spawner := &gameSummonSpawner{link: link, live: live}
 	if !spawner.SpawnServitor(live.Character, modelskill.Definition{NpcID: 12500}) {

@@ -14,6 +14,7 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 // testBookPolicy maps the test template's skill 3 to Adena (item id 57), so
@@ -31,7 +32,7 @@ func testBookPolicy(t *testing.T) modelskill.BookPolicy {
 
 // newAcquireSkillClient wires a linked client with a spellbook policy and one
 // selectable character at level 5 with sp sp.
-func newAcquireSkillClient(t *testing.T, skills *skillstate.Persistence, policy modelskill.BookPolicy, trees *modelskill.Trees, sp int, seedItems func(*gamesql.ItemStore, int32)) *fakeGameClient {
+func newAcquireSkillClient(t *testing.T, skills *skillstate.Persistence, policy modelskill.BookPolicy, trees *modelskill.Trees, sp int, seedItems func(*gamesql.ItemStore, int32)) *testsupport.ScriptedClient {
 	t.Helper()
 	var objID int32
 	c, _, _, _, _, _ := newLinkedSQLGameClientFull(t, skills, nil, nil, policy, trees, true, func(chars *gamesql.CharacterStore, items *gamesql.ItemStore) {
@@ -40,10 +41,10 @@ func newAcquireSkillClient(t *testing.T, skills *skillstate.Persistence, policy 
 			seedItems(items, objID)
 		}
 	}, 1)
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 	return c
 }
@@ -58,8 +59,8 @@ func TestAcquireSkillInfoIncludesSpellbookRequirement(t *testing.T) {
 	}), store)
 	c := newAcquireSkillClient(t, skills, testBookPolicy(t), nil, 50, nil)
 
-	c.send(encodeRequestAcquireSkillInfo(3, 1, 0))
-	reply := c.read()
+	c.Send(encodeRequestAcquireSkillInfo(3, 1, 0))
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeAcquireSkillInfo {
 		t.Fatalf("opcode = %#x, want AcquireSkillInfo (%#x)", reply[0], serverpackets.OpcodeAcquireSkillInfo)
 	}
@@ -88,8 +89,8 @@ func TestAcquireSkillLearnBlockedByMissingSpellbook(t *testing.T) {
 	}), store)
 	c := newAcquireSkillClient(t, skills, testBookPolicy(t), nil, 50, nil)
 
-	c.send(encodeRequestAcquireSkill(3, 1, 0))
-	reply := c.read()
+	c.Send(encodeRequestAcquireSkill(3, 1, 0))
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeSystemMessage {
 		t.Fatalf("opcode = %#x, want SystemMessage (%#x)", reply[0], serverpackets.OpcodeSystemMessage)
 	}
@@ -97,7 +98,7 @@ func TestAcquireSkillLearnBlockedByMissingSpellbook(t *testing.T) {
 		t.Fatalf("SystemMessage id = %d, want item-missing (%d)", id, serverpackets.SystemMessageItemMissingToLearnSkill)
 	}
 
-	reply = c.read()
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeAcquireSkillList {
 		t.Fatalf("opcode = %#x, want AcquireSkillList (%#x)", reply[0], serverpackets.OpcodeAcquireSkillList)
 	}
@@ -110,17 +111,17 @@ func TestAcquireSkillLearnBlockedByMissingSpellbook(t *testing.T) {
 func TestGameClientLinkSendsSkillCoolTimeInGame(t *testing.T) {
 	c, _, _, _, _, _ := newLinkedSQLGameClient(t, nil, nil, 0)
 
-	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
-	c.read() // CharCreateOk
-	c.read() // CharSelectInfo
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.Read() // CharCreateOk
+	c.Read() // CharSelectInfo
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
-	c.send(encodeRequestSkillCoolTime())
-	reply := c.read()
+	c.Send(encodeRequestSkillCoolTime())
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeSkillCoolTime {
 		t.Fatalf("opcode = %#x, want SkillCoolTime (%#x)", reply[0], serverpackets.OpcodeSkillCoolTime)
 	}
@@ -128,8 +129,8 @@ func TestGameClientLinkSendsSkillCoolTimeInGame(t *testing.T) {
 		t.Fatalf("SkillCoolTime count = %d, want 0", count)
 	}
 
-	c.send(encodeRequestManorList())
-	reply = c.read()
+	c.Send(encodeRequestManorList())
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeExtended {
 		t.Fatalf("opcode = %#x, want extended packet (%#x)", reply[0], serverpackets.OpcodeExtended)
 	}
@@ -147,14 +148,14 @@ func TestGameClientLinkSendsCursedWeaponListAndEmptyLocations(t *testing.T) {
 		seedSelectableSQLCharacter(t, chars, "player1", "Newbie", 5, 0)
 	}, 1, table)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
-	c.send(encodeRequestCursedWeaponList())
-	reply := c.read()
+	c.Send(encodeRequestCursedWeaponList())
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeExtended {
 		t.Fatalf("list opcode = %#x, want extended packet (%#x)", reply[0], serverpackets.OpcodeExtended)
 	}
@@ -172,8 +173,8 @@ func TestGameClientLinkSendsCursedWeaponListAndEmptyLocations(t *testing.T) {
 		t.Fatalf("read cursed weapon list: %v", err)
 	}
 
-	c.send(encodeRequestCursedWeaponLocation())
-	c.expectNoFrame()
+	c.Send(encodeRequestCursedWeaponLocation())
+	c.ExpectNoFrame()
 }
 
 func TestGameClientLinkAcquireSkillInfoAndLearnGeneralSkill(t *testing.T) {
@@ -186,14 +187,14 @@ func TestGameClientLinkAcquireSkillInfoAndLearnGeneralSkill(t *testing.T) {
 		objID = seedSelectableSQLCharacter(t, chars, "player1", "Newbie", 5, 50).ID
 	}, 1)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
-	c.send(encodeRequestAcquireSkillInfo(3, 1, 0))
-	reply := c.read()
+	c.Send(encodeRequestAcquireSkillInfo(3, 1, 0))
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeAcquireSkillInfo {
 		t.Fatalf("skill info opcode = %#x, want AcquireSkillInfo (%#x)", reply[0], serverpackets.OpcodeAcquireSkillInfo)
 	}
@@ -205,11 +206,11 @@ func TestGameClientLinkAcquireSkillInfoAndLearnGeneralSkill(t *testing.T) {
 		t.Fatalf("AcquireSkillInfo requirements = %d, want 0", reqs)
 	}
 
-	c.send(encodeRequestAcquireSkill(3, 1, 0))
-	reply = c.read()
+	c.Send(encodeRequestAcquireSkill(3, 1, 0))
+	reply = c.Read()
 	assertSPStatus(t, reply, objID, 0)
 
-	reply = c.read()
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeSystemMessage {
 		t.Fatalf("SP-decreased opcode = %#x, want SystemMessage (%#x)", reply[0], serverpackets.OpcodeSystemMessage)
 	}
@@ -221,10 +222,10 @@ func TestGameClientLinkAcquireSkillInfoAndLearnGeneralSkill(t *testing.T) {
 		t.Fatalf("read SP-decreased message: %v", err)
 	}
 
-	reply = c.read()
+	reply = c.Read()
 	assertSystemMessageSkillFrame(t, reply, serverpackets.SystemMessageLearnedSkill, 3, 1)
 
-	reply = c.read()
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeSkillList {
 		t.Fatalf("learn SkillList opcode = %#x, want SkillList (%#x)", reply[0], serverpackets.OpcodeSkillList)
 	}
@@ -240,7 +241,7 @@ func TestGameClientLinkAcquireSkillInfoAndLearnGeneralSkill(t *testing.T) {
 		t.Fatalf("read SkillList: %v", err)
 	}
 
-	reply = c.read()
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeAcquireSkillList {
 		t.Fatalf("learn AcquireSkillList opcode = %#x, want AcquireSkillList (%#x)", reply[0], serverpackets.OpcodeAcquireSkillList)
 	}
@@ -274,19 +275,19 @@ func TestGameClientLinkLearnGeneralSkillRefreshesShortcut(t *testing.T) {
 		objID = seedSelectableSQLCharacter(t, chars, "player1", "Newbie", 5, 50).ID
 	}, 1)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
-	c.send(encodeRequestAcquireSkill(3, 1, 0))
-	assertSPStatus(t, c.read(), objID, 0)
-	c.read() // SP-decreased SystemMessage
-	c.read() // LearnedSkill SystemMessage
-	c.read() // SkillList
+	c.Send(encodeRequestAcquireSkill(3, 1, 0))
+	assertSPStatus(t, c.Read(), objID, 0)
+	c.Read() // SP-decreased SystemMessage
+	c.Read() // LearnedSkill SystemMessage
+	c.Read() // SkillList
 
-	reply := c.read()
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeShortCutRegister {
 		t.Fatalf("opcode = %#x, want ShortCutRegister (%#x)", reply[0], serverpackets.OpcodeShortCutRegister)
 	}
@@ -306,14 +307,14 @@ func TestGameClientLinkAcquireSkillNeedsSP(t *testing.T) {
 		objID = seedSelectableSQLCharacter(t, chars, "player1", "Newbie", 5, 49).ID
 	}, 1)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
-	c.send(encodeRequestAcquireSkill(3, 1, 0))
-	reply := c.read()
+	c.Send(encodeRequestAcquireSkill(3, 1, 0))
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeSystemMessage {
 		t.Fatalf("needs-sp opcode = %#x, want SystemMessage (%#x)", reply[0], serverpackets.OpcodeSystemMessage)
 	}
@@ -322,7 +323,7 @@ func TestGameClientLinkAcquireSkillNeedsSP(t *testing.T) {
 		t.Fatalf("SystemMessage id = %d, want not enough SP", id)
 	}
 
-	reply = c.read()
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeAcquireSkillList {
 		t.Fatalf("needs-sp list opcode = %#x, want AcquireSkillList (%#x)", reply[0], serverpackets.OpcodeAcquireSkillList)
 	}
@@ -356,7 +357,7 @@ func fishingSkills(t *testing.T) *skillstate.Persistence {
 	}), store)
 }
 
-func enterFishingClient(t *testing.T, trees *modelskill.Trees, skills *skillstate.Persistence, seedItems func(*gamesql.ItemStore, int32)) (*fakeGameClient, *memorySkillSaveStore, int32) {
+func enterFishingClient(t *testing.T, trees *modelskill.Trees, skills *skillstate.Persistence, seedItems func(*gamesql.ItemStore, int32)) (*testsupport.ScriptedClient, *memorySkillSaveStore, int32) {
 	t.Helper()
 	store := newMemorySkillSaveStore()
 	pers := skillstate.NewPersistence(store, modelskill.NewTable([]modelskill.Definition{
@@ -369,10 +370,10 @@ func enterFishingClient(t *testing.T, trees *modelskill.Trees, skills *skillstat
 			seedItems(items, objID)
 		}
 	}, 1)
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 	return c, store, objID
 }
@@ -382,8 +383,8 @@ func enterFishingClient(t *testing.T, trees *modelskill.Trees, skills *skillstat
 func TestAcquireFishingSkillInfo(t *testing.T) {
 	c, _, _ := enterFishingClient(t, fishingTrees(), fishingSkills(t), nil)
 
-	c.send(encodeRequestAcquireSkillInfo(1368, 1, 1))
-	reply := c.read()
+	c.Send(encodeRequestAcquireSkillInfo(1368, 1, 1))
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeAcquireSkillInfo {
 		t.Fatalf("opcode = %#x, want AcquireSkillInfo (%#x)", reply[0], serverpackets.OpcodeAcquireSkillInfo)
 	}
@@ -413,12 +414,12 @@ func TestLearnFishingSkill(t *testing.T) {
 		}
 	})
 
-	c.send(encodeRequestAcquireSkill(1368, 1, 1))
+	c.Send(encodeRequestAcquireSkill(1368, 1, 1))
 
-	reply := c.read()
+	reply := c.Read()
 	assertSystemMessageSkillFrame(t, reply, serverpackets.SystemMessageLearnedSkill, 1368, 1)
 
-	reply = c.read()
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeExtended {
 		t.Fatalf("opcode = %#x, want extended (%#x)", reply[0], serverpackets.OpcodeExtended)
 	}
@@ -426,7 +427,7 @@ func TestLearnFishingSkill(t *testing.T) {
 		t.Fatalf("extended opcode = %#x, want ExStorageMaxCount (%#x)", second, serverpackets.OpcodeExStorageMaxCount)
 	}
 
-	reply = c.read()
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeSkillList {
 		t.Fatalf("opcode = %#x, want SkillList (%#x)", reply[0], serverpackets.OpcodeSkillList)
 	}
@@ -438,7 +439,7 @@ func TestLearnFishingSkill(t *testing.T) {
 		t.Fatalf("SkillList entry = passive %d level %d id %d, want 0/1/1368", passive, level, id)
 	}
 
-	reply = c.read()
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeAcquireSkillList {
 		t.Fatalf("opcode = %#x, want AcquireSkillList (%#x)", reply[0], serverpackets.OpcodeAcquireSkillList)
 	}
@@ -457,8 +458,8 @@ func TestLearnFishingSkill(t *testing.T) {
 func TestLearnFishingSkillBlockedByMissingItem(t *testing.T) {
 	c, store, objID := enterFishingClient(t, fishingTrees(), fishingSkills(t), nil)
 
-	c.send(encodeRequestAcquireSkill(1368, 1, 1))
-	reply := c.read()
+	c.Send(encodeRequestAcquireSkill(1368, 1, 1))
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeSystemMessage {
 		t.Fatalf("opcode = %#x, want SystemMessage (%#x)", reply[0], serverpackets.OpcodeSystemMessage)
 	}
@@ -466,7 +467,7 @@ func TestLearnFishingSkillBlockedByMissingItem(t *testing.T) {
 		t.Fatalf("SystemMessage id = %d, want item-missing (%d)", id, serverpackets.SystemMessageItemMissingToLearnSkill)
 	}
 
-	reply = c.read()
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeAcquireSkillList {
 		t.Fatalf("opcode = %#x, want AcquireSkillList (%#x)", reply[0], serverpackets.OpcodeAcquireSkillList)
 	}

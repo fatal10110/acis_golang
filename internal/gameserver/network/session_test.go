@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	gamecipher "github.com/fatal10110/acis_golang/internal/gameserver/network/cipher"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/rs/zerolog"
@@ -21,8 +22,8 @@ func pipeSessions(t *testing.T) (server *Session, client net.Conn) {
 	serverRaw, clientRaw := net.Pipe()
 	t.Cleanup(func() { serverRaw.Close(); clientRaw.Close() })
 
-	key := bytes.Repeat([]byte{0x11}, keySize)
-	cipher, err := NewCipher(key)
+	key := bytes.Repeat([]byte{0x11}, gamecipher.KeySize)
+	cipher, err := gamecipher.NewCipher(key)
 	if err != nil {
 		t.Fatalf("NewCipher: %v", err)
 	}
@@ -104,15 +105,14 @@ func TestSessionSendFrameWritesAndReleasesOwnedFrame(t *testing.T) {
 }
 
 func TestSessionTrySendFrameDropsAndReleasesOwnedFrameWhenQueueFull(t *testing.T) {
-	key := bytes.Repeat([]byte{0x11}, keySize)
-	cipher, err := NewCipher(key)
+	key := bytes.Repeat([]byte{0x11}, gamecipher.KeySize)
+	cipher, err := gamecipher.NewCipher(key)
 	if err != nil {
 		t.Fatalf("NewCipher: %v", err)
 	}
 	conn := fullQueueConn(t)
 	s := NewSession(conn, cipher)
-	wantEnabled := cipher.enabled
-	wantOutKey := cipher.outKey
+	wantArmed, wantOutKey := cipher.OutboundState()
 
 	released := make(chan struct{}, 1)
 	frame := wire.OwnedFrame([]byte{0x02, 0x00}, nil, func(*wire.Writer) { released <- struct{}{} })
@@ -124,14 +124,14 @@ func TestSessionTrySendFrameDropsAndReleasesOwnedFrameWhenQueueFull(t *testing.T
 	case <-time.After(time.Second):
 		t.Fatal("dropped frame was not released")
 	}
-	if cipher.enabled != wantEnabled || cipher.outKey != wantOutKey {
+	if armed, outKey := cipher.OutboundState(); armed != wantArmed || outKey != wantOutKey {
 		t.Fatal("dropped frame advanced the outbound cipher")
 	}
 }
 
 func TestSessionTrySendFrameDisconnectsFullQueueWithoutBlocking(t *testing.T) {
-	key := bytes.Repeat([]byte{0x11}, keySize)
-	cipher, err := NewCipher(key)
+	key := bytes.Repeat([]byte{0x11}, gamecipher.KeySize)
+	cipher, err := gamecipher.NewCipher(key)
 	if err != nil {
 		t.Fatalf("NewCipher: %v", err)
 	}
@@ -157,8 +157,8 @@ func TestSessionTrySendFrameDisconnectsFullQueueWithoutBlocking(t *testing.T) {
 }
 
 func TestSessionTrySendFrameChecksFullQueueBeforeSessionLock(t *testing.T) {
-	key := bytes.Repeat([]byte{0x11}, keySize)
-	cipher, err := NewCipher(key)
+	key := bytes.Repeat([]byte{0x11}, gamecipher.KeySize)
+	cipher, err := gamecipher.NewCipher(key)
 	if err != nil {
 		t.Fatalf("NewCipher: %v", err)
 	}
@@ -180,8 +180,8 @@ func TestSessionTrySendFrameChecksFullQueueBeforeSessionLock(t *testing.T) {
 }
 
 func TestAITickCompletesWithSaturatedSession(t *testing.T) {
-	key := bytes.Repeat([]byte{0x11}, keySize)
-	cipher, err := NewCipher(key)
+	key := bytes.Repeat([]byte{0x11}, gamecipher.KeySize)
+	cipher, err := gamecipher.NewCipher(key)
 	if err != nil {
 		t.Fatalf("NewCipher: %v", err)
 	}
@@ -211,8 +211,8 @@ func TestHealthySessionSurvivesConcurrentBroadcasts(t *testing.T) {
 	conn := newConn(serverRaw, zerolog.Nop())
 	defer conn.Close()
 
-	key := bytes.Repeat([]byte{0x11}, keySize)
-	cipher, err := NewCipher(key)
+	key := bytes.Repeat([]byte{0x11}, gamecipher.KeySize)
+	cipher, err := gamecipher.NewCipher(key)
 	if err != nil {
 		t.Fatalf("NewCipher: %v", err)
 	}
@@ -279,7 +279,7 @@ func TestSessionReadFrameDecryptsAfterCipherArmed(t *testing.T) {
 		t.Fatalf("read arming frame: %v", err)
 	}
 
-	clientCipher, err := NewCipher(bytes.Repeat([]byte{0x11}, keySize))
+	clientCipher, err := gamecipher.NewCipher(bytes.Repeat([]byte{0x11}, gamecipher.KeySize))
 	if err != nil {
 		t.Fatalf("NewCipher: %v", err)
 	}
@@ -324,7 +324,7 @@ func TestSessionSendFrameSerializesConcurrentCallers(t *testing.T) {
 	// frame after; mirror decrypts each frame in receipt order to recover
 	// the original byte, proving send order matched encrypt order (a
 	// corrupted interleaving would fail to decrypt cleanly).
-	mirror, err := NewCipher(bytes.Repeat([]byte{0x11}, keySize))
+	mirror, err := gamecipher.NewCipher(bytes.Repeat([]byte{0x11}, gamecipher.KeySize))
 	if err != nil {
 		t.Fatalf("NewCipher: %v", err)
 	}
@@ -359,7 +359,7 @@ func TestSessionSendFrameSerializesConcurrentCallers(t *testing.T) {
 		if i == 0 {
 			// The arm frame: Session.SendFrame's first call leaves it cleartext,
 			// so there is nothing to decrypt.
-			mirror.enabled = true
+			mirror.Encrypt(nil)
 		} else {
 			mirror.Decrypt(payload)
 		}

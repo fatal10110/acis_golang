@@ -13,6 +13,7 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 // wireLiveAttackHooks connects a newTestLivePlayer-built live player to gcl
@@ -50,7 +51,7 @@ func wireLiveAttackHooks(gcl *GameClientLink, live *livePlayer) {
 
 func TestGameClientLinkAttackLiveTargetReusesController(t *testing.T) {
 	state := world.New()
-	attackerFrames := &frameCapture{}
+	attackerFrames := &testsupport.FrameCapture{}
 	attacker := newTestLivePlayer(t, 1, attackerFrames)
 	attacker.Character.SetWorld(state)
 	attacker.Character.SetRollSource(func(int) int { return 0 })
@@ -63,23 +64,23 @@ func TestGameClientLinkAttackLiveTargetReusesController(t *testing.T) {
 
 	state.Spawn(attacker, 0, 0, 0, 0)
 	state.Spawn(target, 30, 0, 0, 0)
-	attackerFrames.frames = nil
+	testsupport.ResetCapture(attackerFrames)
 
 	if !gcl.attackLiveTarget(attacker, target) {
 		t.Fatal("first attackLiveTarget returned false")
 	}
-	if got := frameOpcodes(attackerFrames.frames); string(got) != string([]byte{serverpackets.OpcodeAutoAttackStart, serverpackets.OpcodeAttack}) {
+	if got := testsupport.FrameOpcodes(attackerFrames.Frames()); string(got) != string([]byte{serverpackets.OpcodeAutoAttackStart, serverpackets.OpcodeAttack}) {
 		t.Fatalf("first attack opcodes = %x, want AutoAttackStart, Attack", got)
 	}
 	if attacker.attack == nil || !attacker.attack.AttackingNow() {
 		t.Fatal("live player attack controller is not tracking the active attack")
 	}
 
-	attackerFrames.frames = nil
+	testsupport.ResetCapture(attackerFrames)
 	if gcl.attackLiveTarget(attacker, target) {
 		t.Fatal("second attackLiveTarget returned true while the first swing is active")
 	}
-	if got := frameOpcodes(attackerFrames.frames); string(got) != string([]byte{serverpackets.OpcodeActionFailed}) {
+	if got := testsupport.FrameOpcodes(attackerFrames.Frames()); string(got) != string([]byte{serverpackets.OpcodeActionFailed}) {
 		t.Fatalf("second attack opcodes = %x, want ActionFailed only", got)
 	}
 
@@ -98,7 +99,7 @@ func TestGameClientLinkAttackLiveTargetReusesController(t *testing.T) {
 // nothing, and must not land a swing until it actually arrives.
 func TestGameClientLinkAttackLiveTargetOutOfRangeWalksBeforeSwinging(t *testing.T) {
 	state := world.New()
-	attackerFrames := &frameCapture{}
+	attackerFrames := &testsupport.FrameCapture{}
 	attacker := newTestLivePlayer(t, 1, attackerFrames)
 	attacker.Character.SetWorld(state)
 	attacker.Character.SetRollSource(func(int) int { return 0 })
@@ -111,12 +112,12 @@ func TestGameClientLinkAttackLiveTargetOutOfRangeWalksBeforeSwinging(t *testing.
 
 	state.Spawn(attacker, 0, 0, 0, 0)
 	state.Spawn(target, 1000, 0, 0, 0)
-	attackerFrames.frames = nil
+	testsupport.ResetCapture(attackerFrames)
 
 	if !gcl.attackLiveTarget(attacker, target) {
 		t.Fatal("attackLiveTarget returned false for a distant target, want true (start walking)")
 	}
-	if got := frameOpcodes(attackerFrames.frames); string(got) != string([]byte{serverpackets.OpcodeMoveToPawn}) {
+	if got := testsupport.FrameOpcodes(attackerFrames.Frames()); string(got) != string([]byte{serverpackets.OpcodeMoveToPawn}) {
 		t.Fatalf("out-of-range attack opcodes = %x, want MoveToPawn only (no premature swing)", got)
 	}
 	if attacker.attack.AttackingNow() {
@@ -129,12 +130,12 @@ func TestGameClientLinkAttackLiveTargetOutOfRangeWalksBeforeSwinging(t *testing.
 	// A redundant re-evaluation of the same still-converging target (e.g.
 	// the client resending its Attack packet while walking) must not
 	// re-broadcast movement or fail the action.
-	attackerFrames.frames = nil
+	testsupport.ResetCapture(attackerFrames)
 	if !gcl.attackLiveTarget(attacker, target) {
 		t.Fatal("second attackLiveTarget returned false while still closing distance")
 	}
-	if len(attackerFrames.frames) != 0 {
-		t.Fatalf("redundant re-evaluation opcodes = %x, want none", frameOpcodes(attackerFrames.frames))
+	if len(attackerFrames.Frames()) != 0 {
+		t.Fatalf("redundant re-evaluation opcodes = %x, want none", testsupport.FrameOpcodes(attackerFrames.Frames()))
 	}
 }
 
@@ -146,7 +147,7 @@ func TestGameClientLinkAttackLiveTargetOutOfRangeWalksBeforeSwinging(t *testing.
 // found broken, rather than a fake clock that can't observe this bug.
 func TestGameClientLinkAttackLiveTargetArrivesAndLandsASwing(t *testing.T) {
 	state := world.New()
-	attackerFrames := &frameCapture{}
+	attackerFrames := &testsupport.FrameCapture{}
 	attacker := newTestLivePlayer(t, 1, attackerFrames)
 	attacker.Character.SetWorld(state)
 	attacker.Character.SetRollSource(func(int) int { return 0 })
@@ -186,7 +187,7 @@ func TestGameClientLinkAttackLiveTargetArrivesAndLandsASwing(t *testing.T) {
 // arrived/finished hooks keep re-evaluating and re-attacking forever.
 func TestClearLiveTargetStopsAttackIntention(t *testing.T) {
 	state := world.New()
-	attackerFrames := &frameCapture{}
+	attackerFrames := &testsupport.FrameCapture{}
 	attacker := newTestLivePlayer(t, 1, attackerFrames)
 	attacker.Character.SetWorld(state)
 	attacker.Character.SetRollSource(func(int) int { return 0 })
@@ -220,7 +221,7 @@ func TestClearLiveTargetStopsAttackIntention(t *testing.T) {
 // toward the old target underneath them.
 func TestMoveLivePlayerStopsAttackIntention(t *testing.T) {
 	state := world.New()
-	attackerFrames := &frameCapture{}
+	attackerFrames := &testsupport.FrameCapture{}
 	attacker := newTestLivePlayer(t, 1, attackerFrames)
 	attacker.Character.SetWorld(state)
 	attacker.Character.SetRollSource(func(int) int { return 0 })
@@ -279,7 +280,7 @@ func TestCastFinishResumesPendingAttackIntention(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			state := world.New()
-			attackerFrames := &frameCapture{}
+			attackerFrames := &testsupport.FrameCapture{}
 			attacker := newTestLivePlayer(t, 1, attackerFrames)
 			attacker.Character.SetWorld(state)
 			attacker.Character.SetRollSource(func(int) int { return 0 })
@@ -303,7 +304,7 @@ func TestCastFinishResumesPendingAttackIntention(t *testing.T) {
 			// Isolates the finish-observer gate: see the doc comment above
 			// on why this doesn't reflect a real cast-start call site yet.
 			attacker.attack.Stop()
-			attackerFrames.frames = nil
+			testsupport.ResetCapture(attackerFrames)
 
 			controller := gcl.castController(attacker)
 			if _, err := controller.Start(time.Now(), attacker, tt.def); err != nil {
@@ -321,7 +322,7 @@ func TestCastFinishResumesPendingAttackIntention(t *testing.T) {
 				// does not repeat since the actor never left combat stance.
 				// In both cases the last frame must be the resumed swing's
 				// Attack.
-				frames := frameOpcodes(attackerFrames.frames)
+				frames := testsupport.FrameOpcodes(attackerFrames.Frames())
 				if len(frames) == 0 || frames[len(frames)-1] != serverpackets.OpcodeAttack {
 					t.Fatalf("attack opcodes after cast %s = %#x, want the last frame to be Attack (the resumed intention)", tt.name, frames)
 				}
@@ -343,7 +344,7 @@ func TestCastFinishResumesPendingAttackIntention(t *testing.T) {
 
 func TestCastFinishResumesAttackQueuedDuringCast(t *testing.T) {
 	state := world.New()
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	attacker := newTestLivePlayer(t, 1, frames)
 	attacker.Character.SetWorld(state)
 	attacker.Character.SetRollSource(func(int) int { return 0 })
@@ -370,7 +371,7 @@ func TestCastFinishResumesAttackQueuedDuringCast(t *testing.T) {
 
 	controller.Finish()
 
-	opcodes := frameOpcodes(frames.frames)
+	opcodes := testsupport.FrameOpcodes(frames.Frames())
 	if len(opcodes) == 0 || opcodes[len(opcodes)-1] != serverpackets.OpcodeAttack {
 		t.Fatalf("attack opcodes after cast completion = %#x, want the last frame to be Attack", opcodes)
 	}

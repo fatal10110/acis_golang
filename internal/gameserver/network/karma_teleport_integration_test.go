@@ -77,10 +77,10 @@ func TestGameClientLinkUseItemBlockedByKarmaTeleport(t *testing.T) {
 		}
 	}, 1)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
 	obj, ok := state.Player(playerObjID)
@@ -92,8 +92,8 @@ func TestGameClientLinkUseItemBlockedByKarmaTeleport(t *testing.T) {
 		t.Fatal("world player is not a *livePlayer")
 	}
 
-	c.send(encodeUseItem(objectID, false))
-	if reply := c.readWithTimeout(500 * time.Millisecond); reply != nil {
+	c.Send(encodeUseItem(objectID, false))
+	if reply := c.ReadWithTimeout(500 * time.Millisecond); reply != nil {
 		t.Fatalf("karma-blocked item use reply = opcode %#x, want no reply (silent reject)", reply[0])
 	}
 
@@ -112,18 +112,18 @@ func TestGameClientLinkMagicSkillUseRecallBlockedByKarma(t *testing.T) {
 		store.seedKnown(objID, 0, player.SkillLevels{2031: 1})
 	}, 1)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
-	c.send(encodeRequestMagicSkillUse(2031, false, false))
-	reply := c.read()
+	c.Send(encodeRequestMagicSkillUse(2031, false, false))
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeActionFailed {
 		t.Fatalf("blocked recall cast opcode = %#x, want ActionFailed (%#x)", reply[0], serverpackets.OpcodeActionFailed)
 	}
-	if reply := c.readWithTimeout(200 * time.Millisecond); reply != nil {
+	if reply := c.ReadWithTimeout(200 * time.Millisecond); reply != nil {
 		t.Fatalf("unexpected extra reply after blocked recall cast = opcode %#x", reply[0])
 	}
 }

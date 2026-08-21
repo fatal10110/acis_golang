@@ -6,11 +6,12 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 func TestPlayerClockEffectsSendsSystemMessagesToLivePlayer(t *testing.T) {
 	state := world.New()
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 100, capture)
 	state.AddPlayer(live)
 
@@ -18,8 +19,8 @@ func TestPlayerClockEffectsSendsSystemMessagesToLivePlayer(t *testing.T) {
 	effects.NotifyPlayingTooLong(100)
 	effects.NotifyDayNightSkillTransition(100, true, 294, 1)
 
-	if len(capture.frames) != 2 {
-		t.Fatalf("captured frames = %d, want 2", len(capture.frames))
+	if len(capture.Frames()) != 2 {
+		t.Fatalf("captured frames = %d, want 2", len(capture.Frames()))
 	}
 	wantTooLong := []byte{
 		serverpackets.OpcodeSystemMessage,
@@ -34,11 +35,11 @@ func TestPlayerClockEffectsSendsSystemMessagesToLivePlayer(t *testing.T) {
 		0x26, 0x01, 0x00, 0x00, // skill 294
 		0x01, 0x00, 0x00, 0x00, // level 1
 	}
-	if !bytes.Equal(capture.frames[0], wantTooLong) {
-		t.Fatalf("playing-too-long frame = %x, want %x", capture.frames[0], wantTooLong)
+	if !bytes.Equal(capture.Frames()[0], wantTooLong) {
+		t.Fatalf("playing-too-long frame = %x, want %x", capture.Frames()[0], wantTooLong)
 	}
-	if !bytes.Equal(capture.frames[1], wantNight) {
-		t.Fatalf("night skill frame = %x, want %x", capture.frames[1], wantNight)
+	if !bytes.Equal(capture.Frames()[1], wantNight) {
+		t.Fatalf("night skill frame = %x, want %x", capture.Frames()[1], wantNight)
 	}
 }
 

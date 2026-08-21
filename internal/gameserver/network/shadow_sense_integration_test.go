@@ -35,13 +35,13 @@ func TestGameClientLinkEnterWorldSendsShadowSenseState(t *testing.T) {
 		t.Fatalf("seed Shadow Sense: %v", err)
 	}
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 
 	for range 14 {
-		frame := c.readWithTimeout(time.Second)
+		frame := c.ReadWithTimeout(time.Second)
 		if frame == nil {
 			break
 		}

@@ -20,9 +20,10 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
-func newEquipTestLivePlayer(t *testing.T, id int32, capture *frameCapture, templates *item.Table, items []*item.Instance) *livePlayer {
+func newEquipTestLivePlayer(t *testing.T, id int32, capture *testsupport.FrameCapture, templates *item.Table, items []*item.Instance) *livePlayer {
 	t.Helper()
 	tmpl, ok := testTemplates(t).Get(0)
 	if !ok {
@@ -36,8 +37,8 @@ func newEquipTestLivePlayer(t *testing.T, id int32, capture *frameCapture, templ
 	}
 	ch.SetResourceValues(player.Resources{MaxHP: 80, CurrentHP: 80, MaxMP: 30, CurrentMP: 30})
 	ch.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventory(ch.ID, templates, items))
-	ch.SetFrameSender(capture.send)
-	ch.SetBroadcastFrameSender(capture.send)
+	ch.SetFrameSender(capture.Send)
+	ch.SetBroadcastFrameSender(capture.Send)
 
 	live, err := creature.NewLive(ch.Location, tmpl.RunSpeed, testGeo{}, ch)
 	if err != nil {
@@ -45,7 +46,7 @@ func newEquipTestLivePlayer(t *testing.T, id int32, capture *frameCapture, templ
 	}
 	ch.Live = live
 
-	return &livePlayer{Character: ch, template: tmpl, items: items, visibilitySend: capture.send}
+	return &livePlayer{Character: ch, template: tmpl, items: items, visibilitySend: capture.Send}
 }
 
 // wireInventoryUpdates gives gcl a batching task and registers live's
@@ -107,7 +108,7 @@ func addEquipTestEffect(t *testing.T, live *livePlayer, name string) *effect.Eff
 func TestUseItemTogglesEquipState(t *testing.T) {
 	templates := item.NewTable([]*item.Template{{ID: 10, Kind: item.KindWeapon, Slot: item.SlotRHand, Weapon: &item.WeaponDetail{Type: item.WeaponSword}}})
 	weapon := &item.Instance{ObjectID: 500, TemplateID: 10, Location: item.LocationInventory}
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{weapon})
 	gcl := &GameClientLink{}
 	updates := wireInventoryUpdates(gcl, live)
@@ -121,10 +122,10 @@ func TestUseItemTogglesEquipState(t *testing.T) {
 	if weapon.Location != item.LocationPaperdoll || weapon.LocationData != itemcontainer.RHand {
 		t.Fatalf("weapon location = %v/%d, want paperdoll/RHand", weapon.Location, weapon.LocationData)
 	}
-	if len(capture.frames) != 2 || capture.frames[0][0] != serverpackets.OpcodeUserInfo || capture.frames[1][0] != serverpackets.OpcodeInventoryUpdate {
-		t.Fatalf("frames after equip = %x, want UserInfo then InventoryUpdate", capture.frames)
+	if len(capture.Frames()) != 2 || capture.Frames()[0][0] != serverpackets.OpcodeUserInfo || capture.Frames()[1][0] != serverpackets.OpcodeInventoryUpdate {
+		t.Fatalf("frames after equip = %x, want UserInfo then InventoryUpdate", capture.Frames())
 	}
-	capture.frames = nil
+	testsupport.ResetCapture(capture)
 
 	gcl.useItem(live, weapon.ObjectID)
 	updates.Tick()
@@ -135,8 +136,8 @@ func TestUseItemTogglesEquipState(t *testing.T) {
 	if weapon.Location != item.LocationInventory {
 		t.Fatalf("weapon location = %v, want inventory", weapon.Location)
 	}
-	if len(capture.frames) != 2 || capture.frames[0][0] != serverpackets.OpcodeUserInfo || capture.frames[1][0] != serverpackets.OpcodeInventoryUpdate {
-		t.Fatalf("frames after unequip = %x, want UserInfo then InventoryUpdate", capture.frames)
+	if len(capture.Frames()) != 2 || capture.Frames()[0][0] != serverpackets.OpcodeUserInfo || capture.Frames()[1][0] != serverpackets.OpcodeInventoryUpdate {
+		t.Fatalf("frames after unequip = %x, want UserInfo then InventoryUpdate", capture.Frames())
 	}
 }
 
@@ -147,7 +148,7 @@ func TestUseItemAttachesAndUnequipDetachesItemStats(t *testing.T) {
 		Modifiers: []item.StatModifier{{Op: item.FuncAdd, Stat: "mAtk", Value: 17}},
 	}})
 	weapon := &item.Instance{ObjectID: 500, TemplateID: 10, Location: item.LocationInventory}
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{weapon})
 	gcl := &GameClientLink{skills: skillstate.NewPersistence(nil, modelskill.NewTable(nil))}
 	baseMAtk := live.MAtk()
@@ -178,7 +179,7 @@ func TestUseItemGrantsNonPassiveAttachedSkillAndSendsSkillListAndCoolTime(t *tes
 		AttachedSkills: []item.SkillRef{{ID: itemSkillID, Level: 1}},
 	}})
 	hat := &item.Instance{ObjectID: 500, TemplateID: 9184, Location: item.LocationInventory}
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{hat})
 	skills := modelskill.NewTable([]modelskill.Definition{
 		{ID: itemSkillID, Level: 1, Activation: modelskill.ActivationActive, EquipDelay: 30000},
@@ -191,7 +192,7 @@ func TestUseItemGrantsNonPassiveAttachedSkillAndSendsSkillListAndCoolTime(t *tes
 		t.Fatalf("SkillLevel(%d) after equip = %d, want 1", itemSkillID, got)
 	}
 	var sawSkillList, sawCoolTime bool
-	for _, f := range capture.frames {
+	for _, f := range capture.Frames() {
 		switch f[0] {
 		case serverpackets.OpcodeSkillList:
 			sawSkillList = true
@@ -200,12 +201,12 @@ func TestUseItemGrantsNonPassiveAttachedSkillAndSendsSkillListAndCoolTime(t *tes
 		}
 	}
 	if !sawSkillList {
-		t.Fatalf("frames after equip = %x, want a SkillList frame", capture.frames)
+		t.Fatalf("frames after equip = %x, want a SkillList frame", capture.Frames())
 	}
 	if !sawCoolTime {
-		t.Fatalf("frames after equip = %x, want a SkillCoolTime frame (equip delay armed)", capture.frames)
+		t.Fatalf("frames after equip = %x, want a SkillCoolTime frame (equip delay armed)", capture.Frames())
 	}
-	capture.frames = nil
+	testsupport.ResetCapture(capture)
 
 	gcl.useItem(live, hat.ObjectID)
 
@@ -213,7 +214,7 @@ func TestUseItemGrantsNonPassiveAttachedSkillAndSendsSkillListAndCoolTime(t *tes
 		t.Fatalf("SkillLevel(%d) after unequip = %d, want 0 (revoked)", itemSkillID, got)
 	}
 	sawSkillList, sawCoolTime = false, false
-	for _, f := range capture.frames {
+	for _, f := range capture.Frames() {
 		switch f[0] {
 		case serverpackets.OpcodeSkillList:
 			sawSkillList = true
@@ -222,16 +223,16 @@ func TestUseItemGrantsNonPassiveAttachedSkillAndSendsSkillListAndCoolTime(t *tes
 		}
 	}
 	if !sawSkillList {
-		t.Fatalf("frames after unequip = %x, want a SkillList frame", capture.frames)
+		t.Fatalf("frames after unequip = %x, want a SkillList frame", capture.Frames())
 	}
 	if sawCoolTime {
-		t.Fatalf("frames after unequip = %x, want no SkillCoolTime frame (reference sends none on unequip)", capture.frames)
+		t.Fatalf("frames after unequip = %x, want no SkillCoolTime frame (reference sends none on unequip)", capture.Frames())
 	}
 }
 
 func TestUseItemUnknownObjectIDIsNoop(t *testing.T) {
 	templates := item.NewTable(nil)
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
 	gcl := &GameClientLink{}
 
@@ -239,15 +240,15 @@ func TestUseItemUnknownObjectIDIsNoop(t *testing.T) {
 
 	// ActionFailed must still answer a rejected use: the client's item
 	// window locks the clicked slot waiting for a response.
-	if len(capture.frames) != 1 || capture.frames[0][0] != serverpackets.OpcodeActionFailed {
-		t.Fatalf("frames for unknown object id = %x, want ActionFailed only", capture.frames)
+	if len(capture.Frames()) != 1 || capture.Frames()[0][0] != serverpackets.OpcodeActionFailed {
+		t.Fatalf("frames for unknown object id = %x, want ActionFailed only", capture.Frames())
 	}
 }
 
 func TestUnequipItemBySlot(t *testing.T) {
 	templates := item.NewTable([]*item.Template{{ID: 20, Kind: item.KindArmor, Slot: item.SlotChest, Armor: &item.ArmorDetail{Type: item.ArmorLight}}})
 	chest := &item.Instance{ObjectID: 501, TemplateID: 20, Location: item.LocationPaperdoll, LocationData: itemcontainer.Chest}
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{chest})
 	gcl := &GameClientLink{}
 	updates := wireInventoryUpdates(gcl, live)
@@ -258,10 +259,10 @@ func TestUnequipItemBySlot(t *testing.T) {
 	if chest.Equipped() {
 		t.Fatal("chest piece still equipped after RequestUnEquipItem")
 	}
-	if len(capture.frames) != 3 || capture.frames[0][0] != serverpackets.OpcodeUserInfo || capture.frames[1][0] != serverpackets.OpcodeSystemMessage || capture.frames[2][0] != serverpackets.OpcodeInventoryUpdate {
-		t.Fatalf("frames after unequip = %x, want UserInfo, S1_DISARMED SystemMessage, then InventoryUpdate", capture.frames)
+	if len(capture.Frames()) != 3 || capture.Frames()[0][0] != serverpackets.OpcodeUserInfo || capture.Frames()[1][0] != serverpackets.OpcodeSystemMessage || capture.Frames()[2][0] != serverpackets.OpcodeInventoryUpdate {
+		t.Fatalf("frames after unequip = %x, want UserInfo, S1_DISARMED SystemMessage, then InventoryUpdate", capture.Frames())
 	}
-	if r := wire.NewReader(capture.frames[1][1:]); r.ReadInt32() != serverpackets.SystemMessageS1Disarmed {
+	if r := wire.NewReader(capture.Frames()[1][1:]); r.ReadInt32() != serverpackets.SystemMessageS1Disarmed {
 		t.Fatalf("unenchanted unequip message id != S1_DISARMED")
 	}
 }
@@ -272,7 +273,7 @@ func TestUnequipItemBySlot(t *testing.T) {
 func TestUnequipItemEnchantedSendsEquipmentRemoved(t *testing.T) {
 	templates := item.NewTable([]*item.Template{{ID: 20, Kind: item.KindArmor, Slot: item.SlotChest, Armor: &item.ArmorDetail{Type: item.ArmorLight}}})
 	chest := &item.Instance{ObjectID: 501, TemplateID: 20, EnchantLevel: 6, Location: item.LocationPaperdoll, LocationData: itemcontainer.Chest}
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{chest})
 	gcl := &GameClientLink{}
 	updates := wireInventoryUpdates(gcl, live)
@@ -280,10 +281,10 @@ func TestUnequipItemEnchantedSendsEquipmentRemoved(t *testing.T) {
 	gcl.unequipItem(live, int32(item.SlotChest))
 	updates.Tick()
 
-	if len(capture.frames) != 3 || capture.frames[1][0] != serverpackets.OpcodeSystemMessage {
-		t.Fatalf("frames after enchanted unequip = %x, want UserInfo, EQUIPMENT_S1_S2_REMOVED SystemMessage, then InventoryUpdate", capture.frames)
+	if len(capture.Frames()) != 3 || capture.Frames()[1][0] != serverpackets.OpcodeSystemMessage {
+		t.Fatalf("frames after enchanted unequip = %x, want UserInfo, EQUIPMENT_S1_S2_REMOVED SystemMessage, then InventoryUpdate", capture.Frames())
 	}
-	r := wire.NewReader(capture.frames[1][1:])
+	r := wire.NewReader(capture.Frames()[1][1:])
 	if id := r.ReadInt32(); id != serverpackets.SystemMessageEquipmentS1S2Removed {
 		t.Fatalf("enchanted unequip message id = %d, want EQUIPMENT_S1_S2_REMOVED", id)
 	}
@@ -295,11 +296,11 @@ func TestUnequipItemEnchantedSendsEquipmentRemoved(t *testing.T) {
 func TestUnequipItemDuringCastIsRejected(t *testing.T) {
 	templates := item.NewTable([]*item.Template{{ID: 20, Kind: item.KindArmor, Slot: item.SlotChest, Armor: &item.ArmorDetail{Type: item.ArmorLight}}})
 	chest := &item.Instance{ObjectID: 501, TemplateID: 20, Location: item.LocationPaperdoll, LocationData: itemcontainer.Chest}
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{chest})
 	state := world.New()
 	state.Spawn(live, 0, 0, 0, 0)
-	capture.frames = nil
+	testsupport.ResetCapture(capture)
 
 	gcl := &GameClientLink{world: state, geo: testGeo{}}
 	controller := gcl.castController(live)
@@ -309,10 +310,10 @@ func TestUnequipItemDuringCastIsRejected(t *testing.T) {
 
 	gcl.unequipItem(live, int32(item.SlotChest))
 
-	if !chest.Equipped() || len(capture.frames) != 1 || capture.frames[0][0] != serverpackets.OpcodeSystemMessage {
-		t.Fatalf("mid-cast RequestUnEquipItem mutated item=%+v frames=%x, want unchanged item and S1_CANNOT_BE_USED SystemMessage only", chest, capture.frames)
+	if !chest.Equipped() || len(capture.Frames()) != 1 || capture.Frames()[0][0] != serverpackets.OpcodeSystemMessage {
+		t.Fatalf("mid-cast RequestUnEquipItem mutated item=%+v frames=%x, want unchanged item and S1_CANNOT_BE_USED SystemMessage only", chest, capture.Frames())
 	}
-	r := wire.NewReader(capture.frames[0][1:])
+	r := wire.NewReader(capture.Frames()[0][1:])
 	if id := r.ReadInt32(); id != serverpackets.SystemMessageS1CannotBeUsed {
 		t.Fatalf("mid-cast unequip message id = %d, want S1_CANNOT_BE_USED", id)
 	}
@@ -320,14 +321,14 @@ func TestUnequipItemDuringCastIsRejected(t *testing.T) {
 
 func TestUnequipItemEmptySlotIsNoop(t *testing.T) {
 	templates := item.NewTable(nil)
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
 	gcl := &GameClientLink{}
 
 	gcl.unequipItem(live, int32(item.SlotChest))
 
-	if len(capture.frames) != 1 || capture.frames[0][0] != serverpackets.OpcodeActionFailed {
-		t.Fatalf("frames for empty slot = %x, want ActionFailed only", capture.frames)
+	if len(capture.Frames()) != 1 || capture.Frames()[0][0] != serverpackets.OpcodeActionFailed {
+		t.Fatalf("frames for empty slot = %x, want ActionFailed only", capture.Frames())
 	}
 }
 
@@ -335,26 +336,26 @@ func TestUseItemBroadcastsCharInfoToObservers(t *testing.T) {
 	templates := item.NewTable([]*item.Template{{ID: 10, Kind: item.KindWeapon, Slot: item.SlotRHand, Weapon: &item.WeaponDetail{Type: item.WeaponSword}}})
 	weapon := &item.Instance{ObjectID: 500, TemplateID: 10, Location: item.LocationInventory}
 	state := world.New()
-	wearerFrames := &frameCapture{}
-	observerFrames := &frameCapture{}
+	wearerFrames := &testsupport.FrameCapture{}
+	observerFrames := &testsupport.FrameCapture{}
 	wearer := newEquipTestLivePlayer(t, 1, wearerFrames, templates, []*item.Instance{weapon})
 	observer := newEquipTestLivePlayer(t, 2, observerFrames, item.NewTable(nil), nil)
 
 	state.Spawn(wearer, 0, 0, 0, 0)
 	state.Spawn(observer, 100, 0, 0, 0)
-	wearerFrames.frames = nil
-	observerFrames.frames = nil
+	testsupport.ResetCapture(wearerFrames)
+	testsupport.ResetCapture(observerFrames)
 
 	gcl := &GameClientLink{world: state}
 	updates := wireInventoryUpdates(gcl, wearer)
 	gcl.useItem(wearer, weapon.ObjectID)
 	updates.Tick()
 
-	if len(wearerFrames.frames) != 2 || wearerFrames.frames[0][0] != serverpackets.OpcodeUserInfo || wearerFrames.frames[1][0] != serverpackets.OpcodeInventoryUpdate {
-		t.Fatalf("wearer frames = %x, want UserInfo then InventoryUpdate", wearerFrames.frames)
+	if len(wearerFrames.Frames()) != 2 || wearerFrames.Frames()[0][0] != serverpackets.OpcodeUserInfo || wearerFrames.Frames()[1][0] != serverpackets.OpcodeInventoryUpdate {
+		t.Fatalf("wearer frames = %x, want UserInfo then InventoryUpdate", wearerFrames.Frames())
 	}
-	if len(observerFrames.frames) != 1 || observerFrames.frames[0][0] != serverpackets.OpcodeCharInfo {
-		t.Fatalf("observer frames = %x, want one CharInfo", observerFrames.frames)
+	if len(observerFrames.Frames()) != 1 || observerFrames.Frames()[0][0] != serverpackets.OpcodeCharInfo {
+		t.Fatalf("observer frames = %x, want one CharInfo", observerFrames.Frames())
 	}
 }
 
@@ -362,57 +363,57 @@ func TestDeadPlayerItemOperationGates(t *testing.T) {
 	t.Run("use item", func(t *testing.T) {
 		templates := testItemTemplates()
 		weapon := &item.Instance{ObjectID: 500, TemplateID: 30, Location: item.LocationInventory}
-		capture := &frameCapture{}
+		capture := &testsupport.FrameCapture{}
 		live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{weapon})
 		live.MarkDead()
 
 		(&GameClientLink{}).useItem(live, weapon.ObjectID)
 
-		if weapon.Equipped() || len(capture.frames) != 1 || capture.frames[0][0] != serverpackets.OpcodeActionFailed {
-			t.Fatalf("dead UseItem mutated item=%+v frames=%x, want unchanged item and ActionFailed only", weapon, capture.frames)
+		if weapon.Equipped() || len(capture.Frames()) != 1 || capture.Frames()[0][0] != serverpackets.OpcodeActionFailed {
+			t.Fatalf("dead UseItem mutated item=%+v frames=%x, want unchanged item and ActionFailed only", weapon, capture.Frames())
 		}
 	})
 
 	t.Run("unequip item", func(t *testing.T) {
 		templates := item.NewTable([]*item.Template{{ID: 20, Kind: item.KindArmor, Slot: item.SlotChest, Armor: &item.ArmorDetail{Type: item.ArmorLight}}})
 		chest := &item.Instance{ObjectID: 501, TemplateID: 20, Location: item.LocationPaperdoll, LocationData: itemcontainer.Chest}
-		capture := &frameCapture{}
+		capture := &testsupport.FrameCapture{}
 		live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{chest})
 		live.MarkDead()
 
 		(&GameClientLink{}).unequipItem(live, int32(item.SlotChest))
 
-		if !chest.Equipped() || len(capture.frames) != 1 || capture.frames[0][0] != serverpackets.OpcodeSystemMessage {
-			t.Fatalf("dead RequestUnEquipItem mutated item=%+v frames=%x, want unchanged item and S1_CANNOT_BE_USED SystemMessage only", chest, capture.frames)
+		if !chest.Equipped() || len(capture.Frames()) != 1 || capture.Frames()[0][0] != serverpackets.OpcodeSystemMessage {
+			t.Fatalf("dead RequestUnEquipItem mutated item=%+v frames=%x, want unchanged item and S1_CANNOT_BE_USED SystemMessage only", chest, capture.Frames())
 		}
 	})
 
 	t.Run("destroy item", func(t *testing.T) {
 		templates := testItemTemplates()
 		stack := &item.Instance{ObjectID: 502, TemplateID: 20, Count: 5, Location: item.LocationInventory}
-		capture := &frameCapture{}
+		capture := &testsupport.FrameCapture{}
 		live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{stack})
 		live.MarkDead()
 
 		(&GameClientLink{inventory: invops.NewService(nil)}).destroyLiveItem(live, stack.ObjectID, 2)
 
-		if stack.Count != 3 || len(capture.frames) != 0 {
-			t.Fatalf("dead RequestDestroyItem count=%d frames=%x, want count 3 and no frames", stack.Count, capture.frames)
+		if stack.Count != 3 || len(capture.Frames()) != 0 {
+			t.Fatalf("dead RequestDestroyItem count=%d frames=%x, want count 3 and no frames", stack.Count, capture.Frames())
 		}
 	})
 
 	t.Run("crystallize item", func(t *testing.T) {
 		templates := testItemTemplates()
 		weapon := &item.Instance{ObjectID: 503, TemplateID: 30, Count: 1, Location: item.LocationInventory}
-		capture := &frameCapture{}
+		capture := &testsupport.FrameCapture{}
 		live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{weapon})
 		live.SetSkillLevel(248, 1)
 		live.MarkDead()
 
 		(&GameClientLink{inventory: invops.NewService(&sequentialIDs{next: 100})}).crystallizeLiveItem(live, clientpackets.RequestCrystallizeItem{ObjectID: weapon.ObjectID, Count: 1})
 
-		if live.Inventory().ItemByObjectID(weapon.ObjectID) != nil || len(capture.frames) == 0 {
-			t.Fatalf("dead RequestCrystallizeItem inventory=%+v frames=%x, want source removed and result frames", live.Inventory(), capture.frames)
+		if live.Inventory().ItemByObjectID(weapon.ObjectID) != nil || len(capture.Frames()) == 0 {
+			t.Fatalf("dead RequestCrystallizeItem inventory=%+v frames=%x, want source removed and result frames", live.Inventory(), capture.Frames())
 		}
 	})
 }
@@ -420,77 +421,77 @@ func TestDeadPlayerItemOperationGates(t *testing.T) {
 func TestItemOperationRejectMessages(t *testing.T) {
 	t.Run("drop zero count", func(t *testing.T) {
 		templates := item.NewTable([]*item.Template{{ID: item.AdenaID, Kind: item.KindEtcItem, Duration: -1, Stackable: true, Dropable: true, Destroyable: true, EtcItem: &item.EtcItemDetail{}}})
-		capture := &frameCapture{}
+		capture := &testsupport.FrameCapture{}
 		live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{{ObjectID: 500, TemplateID: item.AdenaID, Count: 1, Location: item.LocationInventory}})
 
 		(&GameClientLink{groundItems: &recordingGroundDropper{}}).dropLiveItem(live, clientpackets.RequestDropItem{ObjectID: 500})
 
-		if len(capture.frames) != 1 {
-			t.Fatalf("frames = %x, want one CannotDiscardThisItem", capture.frames)
+		if len(capture.Frames()) != 1 {
+			t.Fatalf("frames = %x, want one CannotDiscardThisItem", capture.Frames())
 		}
-		assertStaticSystemMessageFrame(t, capture.frames[0], serverpackets.SystemMessageCannotDiscardThisItem)
+		assertStaticSystemMessageFrame(t, capture.Frames()[0], serverpackets.SystemMessageCannotDiscardThisItem)
 	})
 
 	t.Run("destroy invalid count", func(t *testing.T) {
 		templates := item.NewTable([]*item.Template{{ID: item.AdenaID, Kind: item.KindEtcItem, Duration: -1, Stackable: true, Destroyable: true, EtcItem: &item.EtcItemDetail{}}})
-		capture := &frameCapture{}
+		capture := &testsupport.FrameCapture{}
 		live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{{ObjectID: 500, TemplateID: item.AdenaID, Count: 1, Location: item.LocationInventory}})
 
 		(&GameClientLink{inventory: invops.NewService(nil)}).destroyLiveItem(live, 500, 0)
 
-		if len(capture.frames) != 1 {
-			t.Fatalf("frames = %x, want one CannotDestroyNumberIncorrect", capture.frames)
+		if len(capture.Frames()) != 1 {
+			t.Fatalf("frames = %x, want one CannotDestroyNumberIncorrect", capture.Frames())
 		}
-		assertStaticSystemMessageFrame(t, capture.frames[0], serverpackets.SystemMessageCannotDestroyNumberIncorrect)
+		assertStaticSystemMessageFrame(t, capture.Frames()[0], serverpackets.SystemMessageCannotDestroyNumberIncorrect)
 	})
 
 	t.Run("destroy count above held", func(t *testing.T) {
 		templates := item.NewTable([]*item.Template{{ID: item.AdenaID, Kind: item.KindEtcItem, Duration: -1, Stackable: true, Destroyable: true, EtcItem: &item.EtcItemDetail{}}})
-		capture := &frameCapture{}
+		capture := &testsupport.FrameCapture{}
 		live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{{ObjectID: 500, TemplateID: item.AdenaID, Count: 1, Location: item.LocationInventory}})
 
 		(&GameClientLink{inventory: invops.NewService(nil)}).destroyLiveItem(live, 500, 2)
 
-		if len(capture.frames) != 1 {
-			t.Fatalf("frames = %x, want one CannotDestroyNumberIncorrect", capture.frames)
+		if len(capture.Frames()) != 1 {
+			t.Fatalf("frames = %x, want one CannotDestroyNumberIncorrect", capture.Frames())
 		}
-		assertStaticSystemMessageFrame(t, capture.frames[0], serverpackets.SystemMessageCannotDestroyNumberIncorrect)
+		assertStaticSystemMessageFrame(t, capture.Frames()[0], serverpackets.SystemMessageCannotDestroyNumberIncorrect)
 	})
 
 	t.Run("destroy multiple non-stackable", func(t *testing.T) {
 		templates := item.NewTable([]*item.Template{{ID: 20, Kind: item.KindEtcItem, Duration: -1, Destroyable: true, EtcItem: &item.EtcItemDetail{}}})
-		capture := &frameCapture{}
+		capture := &testsupport.FrameCapture{}
 		live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{{ObjectID: 500, TemplateID: 20, Count: 2, Location: item.LocationInventory}})
 
 		(&GameClientLink{inventory: invops.NewService(nil)}).destroyLiveItem(live, 500, 2)
 
-		if len(capture.frames) != 0 {
-			t.Fatalf("frames = %x, want none", capture.frames)
+		if len(capture.Frames()) != 0 {
+			t.Fatalf("frames = %x, want none", capture.Frames())
 		}
 	})
 
 	t.Run("destroy hero item", func(t *testing.T) {
 		templates := item.NewTable([]*item.Template{{ID: 6611, Kind: item.KindWeapon, Duration: -1, Destroyable: false, Weapon: &item.WeaponDetail{}}})
-		capture := &frameCapture{}
+		capture := &testsupport.FrameCapture{}
 		live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{{ObjectID: 500, TemplateID: 6611, Count: 1, Location: item.LocationInventory}})
 
 		(&GameClientLink{inventory: invops.NewService(nil)}).destroyLiveItem(live, 500, 1)
 
-		if len(capture.frames) != 1 {
-			t.Fatalf("frames = %x, want one HeroWeaponsCantDestroyed", capture.frames)
+		if len(capture.Frames()) != 1 {
+			t.Fatalf("frames = %x, want one HeroWeaponsCantDestroyed", capture.Frames())
 		}
-		assertStaticSystemMessageFrame(t, capture.frames[0], serverpackets.SystemMessageHeroWeaponsCantDestroyed)
+		assertStaticSystemMessageFrame(t, capture.Frames()[0], serverpackets.SystemMessageHeroWeaponsCantDestroyed)
 	})
 
 	t.Run("drop negative count", func(t *testing.T) {
 		templates := item.NewTable([]*item.Template{{ID: item.AdenaID, Kind: item.KindEtcItem, Duration: -1, Stackable: true, Dropable: true, Destroyable: true, EtcItem: &item.EtcItemDetail{}}})
-		capture := &frameCapture{}
+		capture := &testsupport.FrameCapture{}
 		live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{{ObjectID: 500, TemplateID: item.AdenaID, Count: 1, Location: item.LocationInventory}})
 
 		(&GameClientLink{groundItems: &recordingGroundDropper{}}).dropLiveItem(live, clientpackets.RequestDropItem{ObjectID: 500, Count: -1})
 
-		if len(capture.frames) != 0 {
-			t.Fatalf("frames = %x, want none", capture.frames)
+		if len(capture.Frames()) != 0 {
+			t.Fatalf("frames = %x, want none", capture.Frames())
 		}
 	})
 }
@@ -502,28 +503,28 @@ func TestCrowdControlledPlayerItemOpsAreNoops(t *testing.T) {
 		t.Run(effectName+"/use item", func(t *testing.T) {
 			templates := testItemTemplates()
 			weapon := &item.Instance{ObjectID: 500, TemplateID: 30, Location: item.LocationInventory}
-			capture := &frameCapture{}
+			capture := &testsupport.FrameCapture{}
 			live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{weapon})
 			addEquipTestEffect(t, live, effectName)
 
 			(&GameClientLink{}).useItem(live, weapon.ObjectID)
 
-			if weapon.Equipped() || len(capture.frames) != 1 || capture.frames[0][0] != serverpackets.OpcodeActionFailed {
-				t.Fatalf("%s UseItem mutated item=%+v frames=%x, want unchanged item and ActionFailed only", effectName, weapon, capture.frames)
+			if weapon.Equipped() || len(capture.Frames()) != 1 || capture.Frames()[0][0] != serverpackets.OpcodeActionFailed {
+				t.Fatalf("%s UseItem mutated item=%+v frames=%x, want unchanged item and ActionFailed only", effectName, weapon, capture.Frames())
 			}
 		})
 
 		t.Run(effectName+"/unequip item", func(t *testing.T) {
 			templates := item.NewTable([]*item.Template{{ID: 20, Kind: item.KindArmor, Slot: item.SlotChest, Armor: &item.ArmorDetail{Type: item.ArmorLight}}})
 			chest := &item.Instance{ObjectID: 501, TemplateID: 20, Location: item.LocationPaperdoll, LocationData: itemcontainer.Chest}
-			capture := &frameCapture{}
+			capture := &testsupport.FrameCapture{}
 			live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{chest})
 			addEquipTestEffect(t, live, effectName)
 
 			(&GameClientLink{}).unequipItem(live, int32(item.SlotChest))
 
-			if !chest.Equipped() || len(capture.frames) != 1 || capture.frames[0][0] != serverpackets.OpcodeSystemMessage {
-				t.Fatalf("%s RequestUnEquipItem mutated item=%+v frames=%x, want unchanged item and S1_CANNOT_BE_USED SystemMessage only", effectName, chest, capture.frames)
+			if !chest.Equipped() || len(capture.Frames()) != 1 || capture.Frames()[0][0] != serverpackets.OpcodeSystemMessage {
+				t.Fatalf("%s RequestUnEquipItem mutated item=%+v frames=%x, want unchanged item and S1_CANNOT_BE_USED SystemMessage only", effectName, chest, capture.Frames())
 			}
 		})
 	}
@@ -531,14 +532,14 @@ func TestCrowdControlledPlayerItemOpsAreNoops(t *testing.T) {
 	t.Run("manual paralysis lock/use item", func(t *testing.T) {
 		templates := testItemTemplates()
 		weapon := &item.Instance{ObjectID: 500, TemplateID: 30, Location: item.LocationInventory}
-		capture := &frameCapture{}
+		capture := &testsupport.FrameCapture{}
 		live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{weapon})
 		live.SetParalyzed(true)
 
 		(&GameClientLink{}).useItem(live, weapon.ObjectID)
 
-		if weapon.Equipped() || len(capture.frames) != 1 || capture.frames[0][0] != serverpackets.OpcodeActionFailed {
-			t.Fatalf("paralyzed UseItem mutated item=%+v frames=%x, want unchanged item and ActionFailed only", weapon, capture.frames)
+		if weapon.Equipped() || len(capture.Frames()) != 1 || capture.Frames()[0][0] != serverpackets.OpcodeActionFailed {
+			t.Fatalf("paralyzed UseItem mutated item=%+v frames=%x, want unchanged item and ActionFailed only", weapon, capture.Frames())
 		}
 	})
 }
@@ -559,7 +560,7 @@ func TestCrowdControlledPlayerCanStillDropDestroyAndPickUp(t *testing.T) {
 		t.Run(effectName+"/drop", func(t *testing.T) {
 			templates := testItemTemplates()
 			stack := &item.Instance{ObjectID: 500, TemplateID: item.AdenaID, Count: 100, Location: item.LocationInventory}
-			capture := &frameCapture{}
+			capture := &testsupport.FrameCapture{}
 			live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{stack})
 			addEquipTestEffect(t, live, effectName)
 			drops := &recordingGroundDropper{}
@@ -575,15 +576,15 @@ func TestCrowdControlledPlayerCanStillDropDestroyAndPickUp(t *testing.T) {
 			if stack.Count != 60 || len(drops.drops) != 1 {
 				t.Fatalf("%s drop mutated count=%d drops=%d, want count 60 and 1 drop", effectName, stack.Count, len(drops.drops))
 			}
-			if len(capture.frames) != 0 {
-				t.Fatalf("%s drop frames=%x, want none (no rejection)", effectName, capture.frames)
+			if len(capture.Frames()) != 0 {
+				t.Fatalf("%s drop frames=%x, want none (no rejection)", effectName, capture.Frames())
 			}
 		})
 
 		t.Run(effectName+"/destroy", func(t *testing.T) {
 			templates := testItemTemplates()
 			stack := &item.Instance{ObjectID: 500, TemplateID: item.AdenaID, Count: 5, Location: item.LocationInventory}
-			capture := &frameCapture{}
+			capture := &testsupport.FrameCapture{}
 			live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{stack})
 			addEquipTestEffect(t, live, effectName)
 
@@ -592,8 +593,8 @@ func TestCrowdControlledPlayerCanStillDropDestroyAndPickUp(t *testing.T) {
 			if stack.Count != 3 {
 				t.Fatalf("%s destroy mutated count=%d, want 3", effectName, stack.Count)
 			}
-			if len(capture.frames) != 0 {
-				t.Fatalf("%s destroy frames=%x, want none (no rejection)", effectName, capture.frames)
+			if len(capture.Frames()) != 0 {
+				t.Fatalf("%s destroy frames=%x, want none (no rejection)", effectName, capture.Frames())
 			}
 		})
 
@@ -602,7 +603,7 @@ func TestCrowdControlledPlayerCanStillDropDestroyAndPickUp(t *testing.T) {
 	t.Run("manual paralysis lock/drop", func(t *testing.T) {
 		templates := testItemTemplates()
 		stack := &item.Instance{ObjectID: 500, TemplateID: item.AdenaID, Count: 100, Location: item.LocationInventory}
-		capture := &frameCapture{}
+		capture := &testsupport.FrameCapture{}
 		live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{stack})
 		live.SetParalyzed(true)
 		drops := &recordingGroundDropper{}
@@ -615,8 +616,8 @@ func TestCrowdControlledPlayerCanStillDropDestroyAndPickUp(t *testing.T) {
 			Z:        0,
 		})
 
-		if stack.Count != 60 || len(drops.drops) != 1 || len(capture.frames) != 0 {
-			t.Fatalf("paralyzed drop mutated count=%d drops=%d frames=%x, want count 60, 1 drop, no frames", stack.Count, len(drops.drops), capture.frames)
+		if stack.Count != 60 || len(drops.drops) != 1 || len(capture.Frames()) != 0 {
+			t.Fatalf("paralyzed drop mutated count=%d drops=%d frames=%x, want count 60, 1 drop, no frames", stack.Count, len(drops.drops), capture.Frames())
 		}
 	})
 }
@@ -632,7 +633,7 @@ func TestCrowdControlledPlayerCannotPickUp(t *testing.T) {
 	for _, effectName := range effectNames {
 		t.Run(effectName, func(t *testing.T) {
 			templates := petTestTemplates()
-			capture := &frameCapture{}
+			capture := &testsupport.FrameCapture{}
 			live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
 			state := world.New()
 			state.Spawn(live, 100, 0, 0, 0)
@@ -641,7 +642,7 @@ func TestCrowdControlledPlayerCannotPickUp(t *testing.T) {
 			ground := dropTestGround(t, state, drops, item.Instance{ObjectID: 900, TemplateID: item.AdenaID, Count: 40, ManaLeft: -1}, tmpl, 100, 0, 0)
 			addEquipTestEffect(t, live, effectName)
 			store := &recordingEnchantItemStore{}
-			capture.frames = nil // drop the setup-time SpawnItem broadcast
+			testsupport.ResetCapture(capture) // drop the setup-time SpawnItem broadcast
 
 			gcl := &GameClientLink{world: state, groundItems: drops, items: store}
 			if !gcl.pickupLiveGroundItem(context.Background(), live, ground) {
@@ -654,8 +655,8 @@ func TestCrowdControlledPlayerCannotPickUp(t *testing.T) {
 			if got := drops.Len(); got != 1 {
 				t.Fatalf("%s pickup ground item tracker Len = %d, want 1 (item still on ground)", effectName, got)
 			}
-			if len(capture.frames) != 1 || capture.frames[0][0] != serverpackets.OpcodeActionFailed {
-				t.Fatalf("%s pickup frames=%x, want ActionFailed only", effectName, capture.frames)
+			if len(capture.Frames()) != 1 || capture.Frames()[0][0] != serverpackets.OpcodeActionFailed {
+				t.Fatalf("%s pickup frames=%x, want ActionFailed only", effectName, capture.Frames())
 			}
 		})
 	}
@@ -664,7 +665,7 @@ func TestCrowdControlledPlayerCannotPickUp(t *testing.T) {
 func TestDropLiveItemRejectsFarCoordinatesBeforeInventoryMutation(t *testing.T) {
 	templates := testItemTemplates()
 	stack := &item.Instance{ObjectID: 504, TemplateID: item.AdenaID, Count: 100, Location: item.LocationInventory}
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{stack})
 	drops := &recordingGroundDropper{}
 
@@ -679,10 +680,10 @@ func TestDropLiveItemRejectsFarCoordinatesBeforeInventoryMutation(t *testing.T) 
 	if stack.Count != 100 || len(drops.drops) != 0 {
 		t.Fatalf("far drop mutated count=%d drops=%d", stack.Count, len(drops.drops))
 	}
-	if got := frameOpcodes(capture.frames); string(got) != string([]byte{serverpackets.OpcodeSystemMessage}) {
+	if got := testsupport.FrameOpcodes(capture.Frames()); string(got) != string([]byte{serverpackets.OpcodeSystemMessage}) {
 		t.Fatalf("far drop opcodes = %x, want SystemMessage only", got)
 	}
-	r := wire.NewReader(capture.frames[0][1:])
+	r := wire.NewReader(capture.Frames()[0][1:])
 	if id := r.ReadInt32(); id != 151 {
 		t.Fatalf("far drop system message id = %d, want 151", id)
 	}

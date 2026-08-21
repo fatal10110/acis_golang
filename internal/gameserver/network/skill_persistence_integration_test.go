@@ -25,9 +25,9 @@ func TestGameClientLinkEnterWorldRestoresPersistedSkillState(t *testing.T) {
 	), func() time.Time { return now })
 	c, chars, _, _, _, state := newLinkedSQLGameClient(t, p, nil, 0)
 
-	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
-	c.read() // CharCreateOk
-	c.read() // CharSelectInfo
+	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.Read() // CharCreateOk
+	c.Read() // CharSelectInfo
 	objID := sqlSoleObjectID(t, chars)
 	store.seed(objID, 0, []effect.SaveRow{{
 		Skill:         skillRef(1040, 3),
@@ -39,10 +39,10 @@ func TestGameClientLinkEnterWorldRestoresPersistedSkillState(t *testing.T) {
 		BuffIndex:     1,
 	}})
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 
 	// ReplayEffects adds the restored buff to the live effect list between
 	// HennaInfo and EtcStatusUpdate (mirroring EnterWorld.java:100's
@@ -65,7 +65,7 @@ func TestGameClientLinkEnterWorldRestoresPersistedSkillState(t *testing.T) {
 		serverpackets.OpcodeActionFailed,
 	}
 	for i, opcode := range want {
-		frame := c.read()
+		frame := c.Read()
 		if frame[0] != opcode {
 			t.Fatalf("EnterWorld frame %d opcode = %#x, want %#x", i, frame[0], opcode)
 		}
@@ -100,16 +100,16 @@ func TestGameClientLinkEnterWorldSendsKnownSkillList(t *testing.T) {
 	), store)
 	c, chars, _, _, _, _ := newLinkedSQLGameClient(t, p, nil, 0)
 
-	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
-	c.read() // CharCreateOk
-	c.read() // CharSelectInfo
+	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.Read() // CharCreateOk
+	c.Read() // CharSelectInfo
 	objID := sqlSoleObjectID(t, chars)
 	store.seedKnown(objID, 0, player.SkillLevels{248: 1})
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	frames := readEnterWorldBurst(t, c, false)
 
 	skillList := frames[5]
@@ -147,31 +147,31 @@ func TestGameClientLinkLogoutPersistsSkillState(t *testing.T) {
 	}, 1)
 
 	beforeCast := time.Now()
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
-	c.send(encodeRequestMagicSkillUse(1204, false, false))
-	c.read() // MagicSkillUse
-	c.read() // SystemMessage
-	c.read() // SetupGauge
-	c.read() // MagicSkillLaunched
-	c.read() // StatusUpdate
+	c.Send(encodeRequestMagicSkillUse(1204, false, false))
+	c.Read() // MagicSkillUse
+	c.Read() // SystemMessage
+	c.Read() // SetupGauge
+	c.Read() // MagicSkillLaunched
+	c.Read() // StatusUpdate
 	afterCast := time.Now()
 
-	c.send(encodeSingleOpcode(clientpackets.OpcodeLogout))
-	c.read() // LeaveWorld
-	c.read() // AbnormalStatusUpdate, from the buff landing's List.Add
+	c.Send(encodeSingleOpcode(clientpackets.OpcodeLogout))
+	c.Read() // LeaveWorld
+	c.Read() // AbnormalStatusUpdate, from the buff landing's List.Add
 	// detachLivePlayer's Stop() now reaches the cast controller
 	// (Player.cleanup -> abortAll(true) -> _cast.stop(), Creature.java:1298-1302),
 	// and PlayerCast.stop() sends clientActionFailed unconditionally, cast or
 	// no cast in flight (PlayerCast.java:382-387).
-	if reply := c.read(); reply[0] != serverpackets.OpcodeActionFailed {
+	if reply := c.Read(); reply[0] != serverpackets.OpcodeActionFailed {
 		t.Fatalf("post-logout opcode = %#x, want ActionFailed from detach's unconditional cast-stop ack (%#x)", reply[0], serverpackets.OpcodeActionFailed)
 	}
-	c.expectClosed()
+	c.ExpectClosed()
 
 	got := store.rowsFor(objID, 0)
 	if len(got) != 1 {

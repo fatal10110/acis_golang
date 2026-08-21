@@ -12,7 +12,7 @@ import (
 // TestDecodeClientPacketClassifiesShortPacketVsValidationErrors proves
 // decodeClientPacket only routes wire.ErrShortPacket-class decode errors
 // (buffer-underflow-equivalent) toward disconnect, matching
-// L2GameClientPacket.read(): other decode validation errors are logged and
+// L2GameClientPacket.Read(): other decode validation errors are logged and
 // the packet dropped without ever counting toward the underflow threshold
 // or disconnecting, pre-auth or post-auth. Exercised directly against
 // decodeClientPacket rather than through a specific wired opcode, since no

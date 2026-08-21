@@ -10,30 +10,31 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 func TestRequestLinkHTMLSendsCachedNpcHtmlMessage(t *testing.T) {
 	html := testHTMLCache(t, map[string]string{"help/tutorial.htm": "<html><body>tutorial</body></html>"})
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, item.NewTable(nil), nil)
 	gcl := &GameClientLink{html: html}
 
 	gcl.requestLinkHTML(live, clientpackets.RequestLinkHTML{Link: "data/html/help/tutorial.htm"})
 
-	assertOpcodeSequence(t, capture.frames, serverpackets.OpcodeNpcHtmlMessage)
-	assertNpcHtmlMessageFrame(t, capture.frames[0], 0, "<html><body>tutorial</body></html>", 0)
+	testsupport.AssertOpcodeSequence(t, capture.Frames(), serverpackets.OpcodeNpcHtmlMessage)
+	assertNpcHtmlMessageFrame(t, capture.Frames()[0], 0, "<html><body>tutorial</body></html>", 0)
 }
 
 func TestRequestLinkHTMLSendsMissingNoticeForSafeMissingFile(t *testing.T) {
 	html := testHTMLCache(t, map[string]string{"help/tutorial.htm": "<html/>"})
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, item.NewTable(nil), nil)
 	gcl := &GameClientLink{html: html}
 
 	gcl.requestLinkHTML(live, clientpackets.RequestLinkHTML{Link: "help/missing.htm"})
 
-	assertOpcodeSequence(t, capture.frames, serverpackets.OpcodeNpcHtmlMessage)
-	assertNpcHtmlMessageFrame(t, capture.frames[0], 0, "<html><body>My html is missing:<br>help/missing.htm</body></html>", 0)
+	testsupport.AssertOpcodeSequence(t, capture.Frames(), serverpackets.OpcodeNpcHtmlMessage)
+	assertNpcHtmlMessageFrame(t, capture.Frames()[0], 0, "<html><body>My html is missing:<br>help/missing.htm</body></html>", 0)
 }
 
 func TestRequestLinkHTMLRejectsUnsafeLinks(t *testing.T) {
@@ -44,14 +45,14 @@ func TestRequestLinkHTMLRejectsUnsafeLinks(t *testing.T) {
 	}
 	for _, link := range tests {
 		t.Run(link, func(t *testing.T) {
-			capture := &frameCapture{}
+			capture := &testsupport.FrameCapture{}
 			live := newEquipTestLivePlayer(t, 1, capture, item.NewTable(nil), nil)
 			gcl := &GameClientLink{html: html}
 
 			gcl.requestLinkHTML(live, clientpackets.RequestLinkHTML{Link: link})
 
-			if len(capture.frames) != 0 {
-				t.Fatalf("frames = %x, want none", capture.frames)
+			if len(capture.Frames()) != 0 {
+				t.Fatalf("frames = %x, want none", capture.Frames())
 			}
 		})
 	}
@@ -59,57 +60,57 @@ func TestRequestLinkHTMLRejectsUnsafeLinks(t *testing.T) {
 
 func TestRequestBypassToServerPlayerHelpSendsCachedNpcHtmlMessage(t *testing.T) {
 	html := testHTMLCache(t, map[string]string{"help/tutorial.htm": "<html><body>tutorial</body></html>"})
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, item.NewTable(nil), nil)
 	gcl := &GameClientLink{html: html}
 
 	gcl.requestBypassToServer(live, clientpackets.RequestBypassToServer{Command: "player_help tutorial.htm"})
 
-	assertOpcodeSequence(t, capture.frames, serverpackets.OpcodeNpcHtmlMessage)
-	assertNpcHtmlMessageFrame(t, capture.frames[0], 0, "<html><body>tutorial</body></html>", 0)
+	testsupport.AssertOpcodeSequence(t, capture.Frames(), serverpackets.OpcodeNpcHtmlMessage)
+	assertNpcHtmlMessageFrame(t, capture.Frames()[0], 0, "<html><body>tutorial</body></html>", 0)
 }
 
 func TestRequestBypassToServerPlayerHelpSetsItemID(t *testing.T) {
 	html := testHTMLCache(t, map[string]string{"help/lidias_diary/7064-16.htm": "<html><body>diary</body></html>"})
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, item.NewTable(nil), nil)
 	gcl := &GameClientLink{html: html}
 
 	gcl.requestBypassToServer(live, clientpackets.RequestBypassToServer{Command: "player_help lidias_diary/7064-16.htm#7064"})
 
-	assertOpcodeSequence(t, capture.frames, serverpackets.OpcodeNpcHtmlMessage)
-	assertNpcHtmlMessageFrame(t, capture.frames[0], 0, "<html><body>diary</body></html>", 7064)
+	testsupport.AssertOpcodeSequence(t, capture.Frames(), serverpackets.OpcodeNpcHtmlMessage)
+	assertNpcHtmlMessageFrame(t, capture.Frames()[0], 0, "<html><body>diary</body></html>", 7064)
 }
 
 func TestRequestBypassToServerPlayerHelpRejectsUnsafePath(t *testing.T) {
 	html := testHTMLCache(t, map[string]string{"help/tutorial.htm": "<html/>"})
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, item.NewTable(nil), nil)
 	gcl := &GameClientLink{html: html}
 
 	gcl.requestBypassToServer(live, clientpackets.RequestBypassToServer{Command: "player_help ../admin.htm"})
 
-	if len(capture.frames) != 0 {
-		t.Fatalf("frames = %x, want none", capture.frames)
+	if len(capture.Frames()) != 0 {
+		t.Fatalf("frames = %x, want none", capture.Frames())
 	}
 }
 
 func TestGameClientLinkRequestLinkHTMLDispatch(t *testing.T) {
 	c, chars, _, _ := newLinkedGameClient(t)
 
-	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
-	c.read() // CharCreateOk
-	c.read() // CharSelectInfo
+	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.Read() // CharCreateOk
+	c.Read() // CharSelectInfo
 	chars.soleObjectID(t)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
-	c.send(encodeRequestLinkHTML("help/tutorial.htm"))
-	reply := c.read()
+	c.Send(encodeRequestLinkHTML("help/tutorial.htm"))
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeNpcHtmlMessage {
 		t.Fatalf("reply opcode = %#x, want NpcHtmlMessage (%#x)", reply[0], serverpackets.OpcodeNpcHtmlMessage)
 	}
@@ -119,19 +120,19 @@ func TestGameClientLinkRequestLinkHTMLDispatch(t *testing.T) {
 func TestGameClientLinkRequestBypassToServerPlayerHelpDispatch(t *testing.T) {
 	c, chars, _, _ := newLinkedGameClient(t)
 
-	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
-	c.read() // CharCreateOk
-	c.read() // CharSelectInfo
+	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.Read() // CharCreateOk
+	c.Read() // CharSelectInfo
 	chars.soleObjectID(t)
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
-	c.send(encodeRequestBypassToServer("player_help tutorial.htm"))
-	reply := c.read()
+	c.Send(encodeRequestBypassToServer("player_help tutorial.htm"))
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeNpcHtmlMessage {
 		t.Fatalf("reply opcode = %#x, want NpcHtmlMessage (%#x)", reply[0], serverpackets.OpcodeNpcHtmlMessage)
 	}

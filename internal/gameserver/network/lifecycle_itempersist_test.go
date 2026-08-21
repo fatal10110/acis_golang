@@ -15,6 +15,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 // recordingItemPersistence captures what the lazy persistence task writes,
@@ -52,7 +53,7 @@ func TestDetachLivePlayerFlushesPendingItems(t *testing.T) {
 	store := &recordingItemPersistence{}
 	items := task.NewItemInstances(store, testItemTemplates())
 
-	live := newTestLivePlayer(t, 101, &frameCapture{})
+	live := newTestLivePlayer(t, 101, &testsupport.FrameCapture{})
 	inv := live.Character.Inventory()
 	if inv == nil {
 		t.Fatal("test player has no inventory")
@@ -96,7 +97,7 @@ func TestFlushItemPersistenceKeepsItemsPendingOnFailure(t *testing.T) {
 	store := &failingItemPersistence{}
 	items := task.NewItemInstances(store, testItemTemplates())
 
-	live := newTestLivePlayer(t, 102, &frameCapture{})
+	live := newTestLivePlayer(t, 102, &testsupport.FrameCapture{})
 	inv := live.Character.Inventory()
 	if inv == nil {
 		t.Fatal("test player has no inventory")
@@ -131,7 +132,7 @@ func TestUnsummonPersistsTransferredPetInventoryItems(t *testing.T) {
 	items := task.NewItemInstances(store, petTestTemplates())
 
 	state := world.New()
-	live := newTestLivePlayer(t, 103, &frameCapture{})
+	live := newTestLivePlayer(t, 103, &testsupport.FrameCapture{})
 	state.Spawn(live, 0, 0, 0, 0)
 
 	petInv := itemcontainer.NewPetInventory(0x20000001, petTestTemplates())

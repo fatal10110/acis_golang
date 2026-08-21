@@ -19,29 +19,30 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	tradebook "github.com/fatal10110/acis_golang/internal/gameserver/trade"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 func TestDirectTradeRequestAndAnswerStartsTrade(t *testing.T) {
 	link, _, firstCap, secondCap, first, second := newDirectTradeFixture(t)
 
 	link.handleTradeRequest(first, clientpackets.TradeRequest{ObjectID: second.ObjectID()})
-	assertOpcodeSequence(t, secondCap.frames, serverpackets.OpcodeSendTradeRequest)
-	assertSystemMessageStringFrame(t, firstCap.frames[0], serverpackets.SystemMessageRequestS1ForTrade, second.Name)
+	testsupport.AssertOpcodeSequence(t, secondCap.Frames(), serverpackets.OpcodeSendTradeRequest)
+	assertSystemMessageStringFrame(t, firstCap.Frames()[0], serverpackets.SystemMessageRequestS1ForTrade, second.Name)
 
 	link.handleAnswerTradeRequest(second, clientpackets.AnswerTradeRequest{Response: 1})
 
-	assertOpcodeSequence(t, firstCap.frames,
+	testsupport.AssertOpcodeSequence(t, firstCap.Frames(),
 		serverpackets.OpcodeSystemMessage,
 		serverpackets.OpcodeSystemMessage,
 		serverpackets.OpcodeTradeStart,
 	)
-	assertOpcodeSequence(t, secondCap.frames,
+	testsupport.AssertOpcodeSequence(t, secondCap.Frames(),
 		serverpackets.OpcodeSendTradeRequest,
 		serverpackets.OpcodeSystemMessage,
 		serverpackets.OpcodeTradeStart,
 	)
-	assertSystemMessageStringFrame(t, firstCap.frames[1], serverpackets.SystemMessageBeginTradeWithS1, second.Name)
-	assertSystemMessageStringFrame(t, secondCap.frames[1], serverpackets.SystemMessageBeginTradeWithS1, first.Name)
+	assertSystemMessageStringFrame(t, firstCap.Frames()[1], serverpackets.SystemMessageBeginTradeWithS1, second.Name)
+	assertSystemMessageStringFrame(t, secondCap.Frames()[1], serverpackets.SystemMessageBeginTradeWithS1, first.Name)
 
 	if !link.trades.HasActive(first.ObjectID()) || !link.trades.HasActive(second.ObjectID()) {
 		t.Fatal("trade session was not registered for both players")
@@ -51,17 +52,17 @@ func TestDirectTradeRequestAndAnswerStartsTrade(t *testing.T) {
 func TestDirectTradeAddItemSendsOfferPackets(t *testing.T) {
 	link, _, firstCap, secondCap, first, second := newStartedDirectTradeFixture(t)
 	seedLiveItem(t, first, 500, item.AdenaID, 100)
-	resetCapture(firstCap, secondCap)
+	testsupport.ResetCapture(firstCap, secondCap)
 
 	link.handleAddTradeItem(first, clientpackets.AddTradeItem{ObjectID: 500, Count: 40})
 
-	assertOpcodeSequence(t, firstCap.frames,
+	testsupport.AssertOpcodeSequence(t, firstCap.Frames(),
 		serverpackets.OpcodeTradeOwnAdd,
 		serverpackets.OpcodeTradeUpdate,
 		serverpackets.OpcodeTradeItemUpdate,
 	)
-	assertOpcodeSequence(t, secondCap.frames, serverpackets.OpcodeTradeOtherAdd)
-	assertTradeUpdateCount(t, firstCap.frames[1], 60)
+	testsupport.AssertOpcodeSequence(t, secondCap.Frames(), serverpackets.OpcodeTradeOtherAdd)
+	assertTradeUpdateCount(t, firstCap.Frames()[1], 60)
 	_ = second
 }
 
@@ -71,16 +72,16 @@ func TestDirectTradeAddItemToleratesPartnerOutOfRange(t *testing.T) {
 	if err := link.world.Move(second, 1000, 0, 0); err != nil {
 		t.Fatalf("Move: %v", err)
 	}
-	resetCapture(firstCap, secondCap)
+	testsupport.ResetCapture(firstCap, secondCap)
 
 	link.handleAddTradeItem(first, clientpackets.AddTradeItem{ObjectID: 500, Count: 40})
 
-	assertOpcodeSequence(t, firstCap.frames,
+	testsupport.AssertOpcodeSequence(t, firstCap.Frames(),
 		serverpackets.OpcodeTradeOwnAdd,
 		serverpackets.OpcodeTradeUpdate,
 		serverpackets.OpcodeTradeItemUpdate,
 	)
-	assertOpcodeSequence(t, secondCap.frames, serverpackets.OpcodeTradeOtherAdd)
+	testsupport.AssertOpcodeSequence(t, secondCap.Frames(), serverpackets.OpcodeTradeOtherAdd)
 	if !link.trades.HasActive(first.ObjectID()) || !link.trades.HasActive(second.ObjectID()) {
 		t.Fatal("trade session should still be active after AddTradeItem with partner out of range")
 	}
@@ -89,14 +90,14 @@ func TestDirectTradeAddItemToleratesPartnerOutOfRange(t *testing.T) {
 func TestDirectTradeRejectsInvalidItem(t *testing.T) {
 	link, _, firstCap, secondCap, first, _ := newStartedDirectTradeFixture(t)
 	seedLiveItem(t, first, 501, 1463, 5)
-	resetCapture(firstCap, secondCap)
+	testsupport.ResetCapture(firstCap, secondCap)
 
 	link.handleAddTradeItem(first, clientpackets.AddTradeItem{ObjectID: 501, Count: 1})
 
-	assertOpcodeSequence(t, firstCap.frames, serverpackets.OpcodeSystemMessage)
-	assertStaticSystemMessageFrame(t, firstCap.frames[0], serverpackets.SystemMessageNothingHappened)
-	if len(secondCap.frames) != 0 {
-		t.Fatalf("partner frames = %x, want none", frameOpcodes(secondCap.frames))
+	testsupport.AssertOpcodeSequence(t, firstCap.Frames(), serverpackets.OpcodeSystemMessage)
+	assertStaticSystemMessageFrame(t, firstCap.Frames()[0], serverpackets.SystemMessageNothingHappened)
+	if len(secondCap.Frames()) != 0 {
+		t.Fatalf("partner frames = %x, want none", testsupport.FrameOpcodes(secondCap.Frames()))
 	}
 }
 
@@ -107,34 +108,34 @@ func TestDirectTradeConfirmTransfersItemsAndPersists(t *testing.T) {
 	if err := store.Create(ctx, first.ObjectID(), *adena); err != nil {
 		t.Fatalf("seed store: %v", err)
 	}
-	resetCapture(firstCap, secondCap)
+	testsupport.ResetCapture(firstCap, secondCap)
 
 	link.handleAddTradeItem(first, clientpackets.AddTradeItem{ObjectID: 500, Count: 40})
-	resetCapture(firstCap, secondCap)
+	testsupport.ResetCapture(firstCap, secondCap)
 
 	link.handleTradeDone(ctx, first, clientpackets.TradeDone{Response: 1})
-	assertOpcodeSequence(t, firstCap.frames, serverpackets.OpcodeTradePressOwnOk)
-	assertOpcodeSequence(t, secondCap.frames, serverpackets.OpcodeSystemMessage, serverpackets.OpcodeTradePressOtherOk)
-	assertSystemMessageStringFrame(t, secondCap.frames[0], serverpackets.SystemMessageS1ConfirmedTrade, first.Name)
-	resetCapture(firstCap, secondCap)
+	testsupport.AssertOpcodeSequence(t, firstCap.Frames(), serverpackets.OpcodeTradePressOwnOk)
+	testsupport.AssertOpcodeSequence(t, secondCap.Frames(), serverpackets.OpcodeSystemMessage, serverpackets.OpcodeTradePressOtherOk)
+	assertSystemMessageStringFrame(t, secondCap.Frames()[0], serverpackets.SystemMessageS1ConfirmedTrade, first.Name)
+	testsupport.ResetCapture(firstCap, secondCap)
 
 	link.handleTradeDone(ctx, second, clientpackets.TradeDone{Response: 1})
 	link.inventoryUpdates.Tick()
 
-	assertOpcodeSequence(t, firstCap.frames,
+	testsupport.AssertOpcodeSequence(t, firstCap.Frames(),
 		serverpackets.OpcodeSendTradeDone,
 		serverpackets.OpcodeSystemMessage,
 		serverpackets.OpcodeInventoryUpdate,
 	)
-	assertOpcodeSequence(t, secondCap.frames,
+	testsupport.AssertOpcodeSequence(t, secondCap.Frames(),
 		serverpackets.OpcodeSendTradeDone,
 		serverpackets.OpcodeSystemMessage,
 		serverpackets.OpcodeInventoryUpdate,
 	)
-	assertTradeDoneFrame(t, firstCap.frames[0], true)
-	assertTradeDoneFrame(t, secondCap.frames[0], true)
-	assertStaticSystemMessageFrame(t, firstCap.frames[1], serverpackets.SystemMessageTradeSuccessful)
-	assertStaticSystemMessageFrame(t, secondCap.frames[1], serverpackets.SystemMessageTradeSuccessful)
+	assertTradeDoneFrame(t, firstCap.Frames()[0], true)
+	assertTradeDoneFrame(t, secondCap.Frames()[0], true)
+	assertStaticSystemMessageFrame(t, firstCap.Frames()[1], serverpackets.SystemMessageTradeSuccessful)
+	assertStaticSystemMessageFrame(t, secondCap.Frames()[1], serverpackets.SystemMessageTradeSuccessful)
 
 	if got := first.Inventory().ItemByObjectID(500).Count; got != 60 {
 		t.Fatalf("first adena count = %d, want 60", got)
@@ -160,14 +161,14 @@ func TestDirectTradeConfirmTransfersItemsAndPersists(t *testing.T) {
 
 func TestDirectTradeCancelClearsSession(t *testing.T) {
 	link, _, firstCap, secondCap, first, second := newStartedDirectTradeFixture(t)
-	resetCapture(firstCap, secondCap)
+	testsupport.ResetCapture(firstCap, secondCap)
 
 	link.handleTradeDone(context.Background(), first, clientpackets.TradeDone{Response: 0})
 
-	assertOpcodeSequence(t, firstCap.frames, serverpackets.OpcodeSendTradeDone, serverpackets.OpcodeSystemMessage)
-	assertOpcodeSequence(t, secondCap.frames, serverpackets.OpcodeSendTradeDone, serverpackets.OpcodeSystemMessage)
-	assertSystemMessageStringFrame(t, firstCap.frames[1], serverpackets.SystemMessageS1CanceledTrade, second.Name)
-	assertSystemMessageStringFrame(t, secondCap.frames[1], serverpackets.SystemMessageS1CanceledTrade, first.Name)
+	testsupport.AssertOpcodeSequence(t, firstCap.Frames(), serverpackets.OpcodeSendTradeDone, serverpackets.OpcodeSystemMessage)
+	testsupport.AssertOpcodeSequence(t, secondCap.Frames(), serverpackets.OpcodeSendTradeDone, serverpackets.OpcodeSystemMessage)
+	assertSystemMessageStringFrame(t, firstCap.Frames()[1], serverpackets.SystemMessageS1CanceledTrade, second.Name)
+	assertSystemMessageStringFrame(t, secondCap.Frames()[1], serverpackets.SystemMessageS1CanceledTrade, first.Name)
 	if link.trades.HasActive(first.ObjectID()) || link.trades.HasActive(second.ObjectID()) {
 		t.Fatal("trade session was not cleared after cancel")
 	}
@@ -176,34 +177,34 @@ func TestDirectTradeCancelClearsSession(t *testing.T) {
 func TestDirectTradeClientLoopDispatchesInGame(t *testing.T) {
 	c, _, _, _, _, _ := newLinkedSQLGameClient(t, nil, nil, 0)
 
-	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
-	c.read() // CharCreateOk
-	c.read() // CharSelectInfo
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.Read() // CharCreateOk
+	c.Read() // CharSelectInfo
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
-	c.send(encodeAnswerTradeRequest(0))
-	reply := c.read()
+	c.Send(encodeAnswerTradeRequest(0))
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeSendTradeDone {
 		t.Fatalf("answer without request opcode = %#x, want SendTradeDone (%#x)", reply[0], serverpackets.OpcodeSendTradeDone)
 	}
-	reply = c.read()
+	reply = c.Read()
 	assertStaticSystemMessageFrame(t, reply, serverpackets.SystemMessageTargetNotFound)
 
-	c.send(encodeTradeRequest(999999))
-	c.send(encodeAddTradeItem(0, 500, 1))
-	c.send(encodeTradeDone(1))
-	c.send(encodeSingleOpcode(clientpackets.OpcodeRequestSkillList))
-	reply = c.read()
+	c.Send(encodeTradeRequest(999999))
+	c.Send(encodeAddTradeItem(0, 500, 1))
+	c.Send(encodeTradeDone(1))
+	c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestSkillList))
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeSkillList {
 		t.Fatalf("post-trade-dispatch opcode = %#x, want SkillList (%#x)", reply[0], serverpackets.OpcodeSkillList)
 	}
 }
 
-func newStartedDirectTradeFixture(t *testing.T) (*GameClientLink, *gamesql.ItemStore, *frameCapture, *frameCapture, *livePlayer, *livePlayer) {
+func newStartedDirectTradeFixture(t *testing.T) (*GameClientLink, *gamesql.ItemStore, *testsupport.FrameCapture, *testsupport.FrameCapture, *livePlayer, *livePlayer) {
 	t.Helper()
 	link, store, firstCap, secondCap, first, second := newDirectTradeFixture(t)
 	link.handleTradeRequest(first, clientpackets.TradeRequest{ObjectID: second.ObjectID()})
@@ -211,10 +212,10 @@ func newStartedDirectTradeFixture(t *testing.T) (*GameClientLink, *gamesql.ItemS
 	return link, store, firstCap, secondCap, first, second
 }
 
-func newDirectTradeFixture(t *testing.T) (*GameClientLink, *gamesql.ItemStore, *frameCapture, *frameCapture, *livePlayer, *livePlayer) {
+func newDirectTradeFixture(t *testing.T) (*GameClientLink, *gamesql.ItemStore, *testsupport.FrameCapture, *testsupport.FrameCapture, *livePlayer, *livePlayer) {
 	t.Helper()
 	state := world.New()
-	firstCap, secondCap := &frameCapture{}, &frameCapture{}
+	firstCap, secondCap := &testsupport.FrameCapture{}, &testsupport.FrameCapture{}
 	first := newTestLivePlayer(t, 1, firstCap)
 	first.Name = "TraderOne"
 	second := newTestLivePlayer(t, 2, secondCap)
@@ -223,7 +224,7 @@ func newDirectTradeFixture(t *testing.T) (*GameClientLink, *gamesql.ItemStore, *
 	state.AddPlayer(first)
 	state.Spawn(second, 100, 0, 0, 0)
 	state.AddPlayer(second)
-	resetCapture(firstCap, secondCap)
+	testsupport.ResetCapture(firstCap, secondCap)
 
 	store := gamesql.NewItemStore(sqltest.SharedDB(t))
 	ids := &sequentialIDs{next: 1000}

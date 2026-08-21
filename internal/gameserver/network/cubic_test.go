@@ -12,6 +12,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 // fakeCubicTimer/fakeCubicClock give cubic.AfterFunc a deterministic,
@@ -69,22 +70,22 @@ const (
 
 func TestSyncCubicTargetsRefreshesNonCasterCharacterInfo(t *testing.T) {
 	state := world.New()
-	casterFrames := &frameCapture{}
-	recipientFrames := &frameCapture{}
+	casterFrames := &testsupport.FrameCapture{}
+	recipientFrames := &testsupport.FrameCapture{}
 	caster := newTestLivePlayer(t, 1, casterFrames)
 	recipient := newTestLivePlayer(t, 2, recipientFrames)
 	state.Spawn(caster, 0, 0, 0, 0)
 	state.Spawn(recipient, 100, 0, 0, 0)
-	casterFrames.frames = nil
-	recipientFrames.frames = nil
+	testsupport.ResetCapture(casterFrames)
+	testsupport.ResetCapture(recipientFrames)
 
 	l := &GameClientLink{world: state}
 	l.syncCubicTargets(caster, actorcast.EffectResult{CubicAddedTargets: []handlerskill.Actor{recipient}}, modelskill.Definition{})
 
-	if got := frameOpcodes(recipientFrames.frames); len(got) != 1 || got[0] != serverpackets.OpcodeUserInfo {
+	if got := testsupport.FrameOpcodes(recipientFrames.Frames()); len(got) != 1 || got[0] != serverpackets.OpcodeUserInfo {
 		t.Fatalf("recipient opcodes = %x, want UserInfo", got)
 	}
-	if got := frameOpcodes(casterFrames.frames); len(got) != 1 || got[0] != serverpackets.OpcodeCharInfo {
+	if got := testsupport.FrameOpcodes(casterFrames.Frames()); len(got) != 1 || got[0] != serverpackets.OpcodeCharInfo {
 		t.Fatalf("caster opcodes = %x, want CharInfo", got)
 	}
 }
@@ -100,7 +101,7 @@ func TestFireCubic_LifeCubicSelfStartsAndFiresWithoutAttackStance(t *testing.T) 
 		modelskill.Definition{ID: testLifeCubicHealSkillID, Level: 1, SkillType: "HEAL", Target: modelskill.TargetOne},
 	)
 
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, capture)
 	// A huge raw MaxHP baseline with CurrentHP at 1 keeps the actual
 	// HP-ratio well under 1.0 regardless of the derived-stat formula
@@ -119,7 +120,7 @@ func TestFireCubic_LifeCubicSelfStartsAndFiresWithoutAttackStance(t *testing.T) 
 	clock.fireLast()
 
 	var foundMagicSkillUse, foundSystemMessage bool
-	for _, op := range frameOpcodes(capture.frames) {
+	for _, op := range testsupport.FrameOpcodes(capture.Frames()) {
 		switch op {
 		case serverpackets.OpcodeMagicSkillUse:
 			foundMagicSkillUse = true
@@ -128,10 +129,10 @@ func TestFireCubic_LifeCubicSelfStartsAndFiresWithoutAttackStance(t *testing.T) 
 		}
 	}
 	if !foundMagicSkillUse {
-		t.Fatalf("Life Cubic fire did not broadcast MagicSkillUse, frames = %v", frameOpcodes(capture.frames))
+		t.Fatalf("Life Cubic fire did not broadcast MagicSkillUse, frames = %v", testsupport.FrameOpcodes(capture.Frames()))
 	}
 	if !foundSystemMessage {
-		t.Fatalf("Life Cubic heal did not send SystemMessage (REJUVENATING_HP) to the player-shaped target, frames = %v", frameOpcodes(capture.frames))
+		t.Fatalf("Life Cubic heal did not send SystemMessage (REJUVENATING_HP) to the player-shaped target, frames = %v", testsupport.FrameOpcodes(capture.Frames()))
 	}
 }
 
@@ -146,7 +147,7 @@ func TestFireCubic_NonLifeCubicStopsWhenOwnerNotInAttackStance(t *testing.T) {
 		modelskill.Definition{ID: testStormFireSkillID, Level: 1, SkillType: "MDAM", Target: modelskill.TargetOne},
 	)
 
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, capture)
 
 	def, _ := l.skills.Definition(modelskill.Ref{ID: testStormCubicGrantID, Level: 1})
@@ -167,7 +168,7 @@ func TestFireCubic_NonLifeCubicStopsWhenOwnerNotInAttackStance(t *testing.T) {
 	runtimes[0].Action()
 	clock.fireLast()
 
-	for _, op := range frameOpcodes(capture.frames) {
+	for _, op := range testsupport.FrameOpcodes(capture.Frames()) {
 		if op == serverpackets.OpcodeMagicSkillUse {
 			t.Fatal("cubic fired MagicSkillUse while owner not in attack stance")
 		}
@@ -185,7 +186,7 @@ func TestFireCubic_NonLifeCubicFiresAgainstOwnerTargetInAttackStance(t *testing.
 		modelskill.Definition{ID: testStormFireSkillID, Level: 1, SkillType: "MDAM", Target: modelskill.TargetOne},
 	)
 
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, capture)
 	live.SetRollSource(func(int) int { return 0 }) // passes activation-chance roll, picks skill index 0
 
@@ -204,13 +205,13 @@ func TestFireCubic_NonLifeCubicFiresAgainstOwnerTargetInAttackStance(t *testing.
 	clock.fireLast()
 
 	found := false
-	for _, op := range frameOpcodes(capture.frames) {
+	for _, op := range testsupport.FrameOpcodes(capture.Frames()) {
 		if op == serverpackets.OpcodeMagicSkillUse {
 			found = true
 		}
 	}
 	if !found {
-		t.Fatalf("cubic in attack stance with a valid target did not broadcast MagicSkillUse, frames = %v", frameOpcodes(capture.frames))
+		t.Fatalf("cubic in attack stance with a valid target did not broadcast MagicSkillUse, frames = %v", testsupport.FrameOpcodes(capture.Frames()))
 	}
 }
 
@@ -234,7 +235,7 @@ func TestFireCubic_OwnerDiesDuringCastDelaySkipsDeferredEffect(t *testing.T) {
 	var deferred func()
 	l.afterFunc = func(_ time.Duration, fn func()) { deferred = fn } // captured, not run yet
 
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, capture)
 	live.SetResourceValues(player.Resources{MaxHP: 1000, CurrentHP: 1, MaxMP: 30, CurrentMP: 30})
 	live.SetRollSource(func(int) int { return 0 })
@@ -276,7 +277,7 @@ func TestFireCubic_CubicExpiresDuringCastDelaySkipsDeferredEffect(t *testing.T) 
 	var deferred func()
 	l.afterFunc = func(_ time.Duration, fn func()) { deferred = fn } // captured, not run yet
 
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, capture)
 	live.SetResourceValues(player.Resources{MaxHP: 1000, CurrentHP: 1, MaxMP: 30, CurrentMP: 30})
 	live.SetRollSource(func(int) int { return 0 })
@@ -318,7 +319,7 @@ func TestFireCubic_OwnerDetachesDuringCastDelaySkipsDeferredEffect(t *testing.T)
 	var deferred func()
 	l.afterFunc = func(_ time.Duration, fn func()) { deferred = fn } // captured, not run yet
 
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, capture)
 	live.SetResourceValues(player.Resources{MaxHP: 1000, CurrentHP: 1, MaxMP: 30, CurrentMP: 30})
 	live.SetRollSource(func(int) int { return 0 })
@@ -357,7 +358,7 @@ func TestFireCubic_DeadOwnerStopsInsteadOfFiring(t *testing.T) {
 		modelskill.Definition{ID: testLifeCubicHealSkillID, Level: 1, SkillType: "HEAL", Target: modelskill.TargetOne},
 	)
 
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, capture)
 	live.SetResourceValues(player.Resources{MaxHP: 1000, CurrentHP: 1, MaxMP: 30, CurrentMP: 30})
 	live.SetRollSource(func(int) int { return 0 })
@@ -368,7 +369,7 @@ func TestFireCubic_DeadOwnerStopsInsteadOfFiring(t *testing.T) {
 
 	clock.fireLast()
 
-	for _, op := range frameOpcodes(capture.frames) {
+	for _, op := range testsupport.FrameOpcodes(capture.Frames()) {
 		if op == serverpackets.OpcodeMagicSkillUse {
 			t.Fatal("dead owner's cubic fired MagicSkillUse, want stopped instead")
 		}
@@ -392,7 +393,7 @@ func TestLivePlayerStop_StopsLiveCubicRuntimes(t *testing.T) {
 		modelskill.Definition{ID: testLifeCubicHealSkillID, Level: 1, SkillType: "HEAL", Target: modelskill.TargetOne},
 	)
 
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, capture)
 	def, _ := l.skills.Definition(modelskill.Ref{ID: testLifeCubicGrantSkillID, Level: 1})
 	l.syncCubicRuntime(live, cubic.Life, def)

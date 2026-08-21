@@ -1,4 +1,4 @@
-package network
+package cipher
 
 import (
 	"bytes"

@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	gamecipher "github.com/fatal10110/acis_golang/internal/gameserver/network/cipher"
 )
 
 // frameHeaderSize is the length of a frame's little-endian size prefix,
@@ -27,7 +28,7 @@ const trySendLockAttempts = 64
 // waits for mu and aborts the connection instead.
 type Session struct {
 	conn   *Conn
-	cipher *Cipher
+	cipher *gamecipher.Cipher
 	mu     sync.Mutex
 
 	// frames reuses one payload buffer across inbound frames; it belongs to
@@ -36,7 +37,7 @@ type Session struct {
 }
 
 // NewSession pairs conn with cipher for framed, encrypted read/write.
-func NewSession(conn *Conn, cipher *Cipher) *Session {
+func NewSession(conn *Conn, cipher *gamecipher.Cipher) *Session {
 	return &Session{conn: conn, cipher: cipher, frames: wire.NewFrameReader(conn)}
 }
 

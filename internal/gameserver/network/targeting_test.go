@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/worldobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 // CharCreateOk
@@ -148,7 +149,7 @@ import (
 // step.
 func TestLiveTargetReflectsDomainLevelRetarget(t *testing.T) {
 	state := world.New()
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, frames)
 	other := newTestHostileNPC(t, 2)
 	caster := newTestHostileNPC(t, 3)
@@ -186,8 +187,8 @@ func TestLiveTargetReflectsDomainLevelRetarget(t *testing.T) {
 // retarget reproduces that funnel instead of only updating the field.
 func TestRetargetHookSendsPlayerSetTargetPackets(t *testing.T) {
 	state := world.New()
-	retargetedFrames := &frameCapture{}
-	observerFrames := &frameCapture{}
+	retargetedFrames := &testsupport.FrameCapture{}
+	observerFrames := &testsupport.FrameCapture{}
 	retargeted := newTestLivePlayer(t, 1, retargetedFrames)
 	observer := newTestLivePlayer(t, 2, observerFrames)
 	caster := newTestHostileNPC(t, 3)
@@ -200,18 +201,18 @@ func TestRetargetHookSendsPlayerSetTargetPackets(t *testing.T) {
 	state.Spawn(retargeted, 0, 0, 0, 0)
 	state.Spawn(observer, 100, 0, 0, 0)
 	state.Spawn(caster, 150, 0, 0, 0)
-	retargetedFrames.frames = nil
-	observerFrames.frames = nil
+	testsupport.ResetCapture(retargetedFrames)
+	testsupport.ResetCapture(observerFrames)
 
 	retargeted.Character.SetTarget(world.Tracked(caster))
 
 	if got := retargeted.Target(); got != world.Tracked(caster) {
 		t.Fatalf("Target() after domain-level retarget = %v, want %v", got, caster)
 	}
-	if got := frameOpcodes(retargetedFrames.frames); string(got) != string([]byte{serverpackets.OpcodeValidateLocation, serverpackets.OpcodeMyTargetSelected, serverpackets.OpcodeStatusUpdate}) {
+	if got := testsupport.FrameOpcodes(retargetedFrames.Frames()); string(got) != string([]byte{serverpackets.OpcodeValidateLocation, serverpackets.OpcodeMyTargetSelected, serverpackets.OpcodeStatusUpdate}) {
 		t.Fatalf("retargeted player opcodes = %x, want ValidateLocation, MyTargetSelected, StatusUpdate", got)
 	}
-	if got := frameOpcodes(observerFrames.frames); string(got) != string([]byte{serverpackets.OpcodeTargetSelected}) {
+	if got := testsupport.FrameOpcodes(observerFrames.Frames()); string(got) != string([]byte{serverpackets.OpcodeTargetSelected}) {
 		t.Fatalf("observer opcodes = %x, want TargetSelected", got)
 	}
 }
@@ -223,7 +224,7 @@ func TestRetargetHookSendsPlayerSetTargetPackets(t *testing.T) {
 // attack click uses.
 func TestAttackTargetHookStartsLiveAttackIntention(t *testing.T) {
 	state := world.New()
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, frames)
 	live.Character.SetWorld(state)
 	live.Character.SetRollSource(func(int) int { return 0 })

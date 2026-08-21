@@ -22,6 +22,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/petitem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 func petTestTemplates() *item.Table {
@@ -118,12 +119,12 @@ func TestGameClientLinkNewPetAppliesConfiguredPetLimits(t *testing.T) {
 func TestGiveItemToPetTransfersAndPersists(t *testing.T) {
 	templates := petTestTemplates()
 	source := &item.Instance{ObjectID: 500, TemplateID: item.AdenaID, OwnerID: 1, Count: 100, Location: item.LocationInventory}
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{source})
 	state := world.New()
 	state.Spawn(live, 0, 0, 0, 0)
 	_, petInv := attachTestPet(t, state, live, templates, 12077, nil)
-	capture.frames = nil
+	testsupport.ResetCapture(capture)
 	store := &recordingEnchantItemStore{}
 	ids := &sequentialIDs{next: 900}
 	gcl := &GameClientLink{world: state, ids: ids, items: store, petItems: petitem.NewService(ids)}
@@ -142,7 +143,7 @@ func TestGiveItemToPetTransfersAndPersists(t *testing.T) {
 	// The receiving inventory (the pet's) registers with the batching task
 	// first, inside TransferItem's own Add path; the source registers after
 	// the transfer completes. The task delivers in registration order.
-	if got := frameOpcodes(capture.frames); string(got) != string([]byte{serverpackets.OpcodePetInventoryUpdate, serverpackets.OpcodeInventoryUpdate}) {
+	if got := testsupport.FrameOpcodes(capture.Frames()); string(got) != string([]byte{serverpackets.OpcodePetInventoryUpdate, serverpackets.OpcodeInventoryUpdate}) {
 		t.Fatalf("opcodes = %x, want PetInventoryUpdate then InventoryUpdate", got)
 	}
 	if len(store.updated) != 1 || store.updated[0].ObjectID != source.ObjectID || store.updated[0].Count != 70 {
@@ -156,12 +157,12 @@ func TestGiveItemToPetTransfersAndPersists(t *testing.T) {
 func TestGetItemFromPetTransfersBackToOwner(t *testing.T) {
 	templates := petTestTemplates()
 	petItem := &item.Instance{ObjectID: 600, TemplateID: item.AdenaID, OwnerID: 0x20000001, Count: 40, Location: item.LocationPet}
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
 	state := world.New()
 	state.Spawn(live, 0, 0, 0, 0)
 	_, petInv := attachTestPet(t, state, live, templates, 12077, []*item.Instance{petItem})
-	capture.frames = nil
+	testsupport.ResetCapture(capture)
 	store := &recordingEnchantItemStore{}
 	ids := &sequentialIDs{next: 910}
 	gcl := &GameClientLink{world: state, ids: ids, items: store, petItems: petitem.NewService(ids)}
@@ -179,7 +180,7 @@ func TestGetItemFromPetTransfersBackToOwner(t *testing.T) {
 	}
 	// The receiving inventory (the player's) registers with the batching
 	// task first, inside TransferItem's own Add path.
-	if got := frameOpcodes(capture.frames); string(got) != string([]byte{serverpackets.OpcodeInventoryUpdate, serverpackets.OpcodePetInventoryUpdate}) {
+	if got := testsupport.FrameOpcodes(capture.Frames()); string(got) != string([]byte{serverpackets.OpcodeInventoryUpdate, serverpackets.OpcodePetInventoryUpdate}) {
 		t.Fatalf("opcodes = %x, want InventoryUpdate then PetInventoryUpdate", got)
 	}
 	if len(store.updated) != 1 || store.updated[0].ObjectID != petItem.ObjectID || store.updated[0].Count != 25 {
@@ -236,12 +237,12 @@ func TestGetItemFromPetUnequipsWornItemBeforeTransfer(t *testing.T) {
 
 func TestGetItemFromPetCancelsActiveEnchantOnFailedTransfer(t *testing.T) {
 	templates := petTestTemplates()
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
 	state := world.New()
 	state.Spawn(live, 0, 0, 0, 0)
 	attachTestPet(t, state, live, templates, 12077, nil)
-	capture.frames = nil
+	testsupport.ResetCapture(capture)
 	store := &recordingEnchantItemStore{}
 	ids := &sequentialIDs{next: 920}
 	gcl := &GameClientLink{world: state, ids: ids, items: store, petItems: petitem.NewService(ids)}
@@ -258,17 +259,17 @@ func TestGetItemFromPetCancelsActiveEnchantOnFailedTransfer(t *testing.T) {
 	if got := gcl.enchantStateStore().Active(live.ObjectID()); got != 0 {
 		t.Fatalf("active enchant scroll = %d, want cleared despite failed transfer", got)
 	}
-	assertOpcodeSequence(t, capture.frames,
+	testsupport.AssertOpcodeSequence(t, capture.Frames(),
 		serverpackets.OpcodeEnchantResult,
 		serverpackets.OpcodeSystemMessage,
 	)
-	assertEnchantResultFrame(t, capture.frames[0], serverpackets.EnchantResultCancelled)
-	assertStaticSystemMessageFrame(t, capture.frames[1], serverpackets.SystemMessageEnchantScrollCancelled)
+	assertEnchantResultFrame(t, capture.Frames()[0], serverpackets.EnchantResultCancelled)
+	assertStaticSystemMessageFrame(t, capture.Frames()[1], serverpackets.SystemMessageEnchantScrollCancelled)
 }
 
 func TestPetGetItemPicksUpGroundItem(t *testing.T) {
 	templates := petTestTemplates()
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
 	state := world.New()
 	state.Spawn(live, 0, 0, 0, 0)
@@ -285,7 +286,7 @@ func TestPetGetItemPicksUpGroundItem(t *testing.T) {
 	drops := task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour}, time.Now)
 	drops.Drop(ground, task.DropOptions{X: 10, Y: 20, Z: 30})
 
-	capture.frames = nil
+	testsupport.ResetCapture(capture)
 	store := &recordingEnchantItemStore{}
 	gcl := &GameClientLink{world: state, groundItems: drops, items: store}
 	updates := wireInventoryUpdates(gcl, live)
@@ -293,12 +294,12 @@ func TestPetGetItemPicksUpGroundItem(t *testing.T) {
 	gcl.petGetItem(context.Background(), live, clientpackets.RequestPetGetItem{ObjectID: ground.ObjectID()})
 	updates.Tick()
 
-	assertOpcodeSequence(t, capture.frames,
+	testsupport.AssertOpcodeSequence(t, capture.Frames(),
 		serverpackets.OpcodeGetItem,
 		serverpackets.OpcodeDeleteObject,
 		serverpackets.OpcodePetInventoryUpdate,
 	)
-	r := wire.NewReader(capture.frames[0][1:])
+	r := wire.NewReader(capture.Frames()[0][1:])
 	if got := r.ReadInt32(); got != pet.ObjectID() {
 		t.Fatalf("GetItem picker id = %d, want pet id %d", got, pet.ObjectID())
 	}
@@ -338,7 +339,7 @@ func TestPetGetItemPicksUpGroundItemOverPetWeightLimit(t *testing.T) {
 			Weight: 50, EtcItem: &item.EtcItemDetail{},
 		},
 	})
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
 	state := world.New()
 	state.Spawn(live, 0, 0, 0, 0)
@@ -361,7 +362,7 @@ func TestPetGetItemPicksUpGroundItemOverPetWeightLimit(t *testing.T) {
 	drops := task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour}, time.Now)
 	drops.Drop(ground, task.DropOptions{X: 10, Y: 20, Z: 30})
 
-	capture.frames = nil
+	testsupport.ResetCapture(capture)
 	store := &recordingEnchantItemStore{}
 	gcl := &GameClientLink{world: state, groundItems: drops, items: store}
 	updates := wireInventoryUpdates(gcl, live)
@@ -369,12 +370,12 @@ func TestPetGetItemPicksUpGroundItemOverPetWeightLimit(t *testing.T) {
 	gcl.petGetItem(context.Background(), live, clientpackets.RequestPetGetItem{ObjectID: ground.ObjectID()})
 	updates.Tick()
 
-	assertOpcodeSequence(t, capture.frames,
+	testsupport.AssertOpcodeSequence(t, capture.Frames(),
 		serverpackets.OpcodeGetItem,
 		serverpackets.OpcodeDeleteObject,
 		serverpackets.OpcodePetInventoryUpdate,
 	)
-	r := wire.NewReader(capture.frames[0][1:])
+	r := wire.NewReader(capture.Frames()[0][1:])
 	if got := r.ReadInt32(); got != pet.ObjectID() {
 		t.Fatalf("GetItem picker id = %d, want pet id %d", got, pet.ObjectID())
 	}
@@ -405,7 +406,7 @@ func TestPetGetItemConsumesHerb(t *testing.T) {
 	templates := herbTestTemplates()
 	tmpl, _ := templates.Get(herbTemplate)
 	tmpl.AttachedSkills = append(tmpl.AttachedSkills, item.SkillRef{ID: 2279, Level: 1})
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
 	state := world.New()
 	state.Spawn(live, 0, 0, 0, 0)
@@ -417,7 +418,7 @@ func TestPetGetItemConsumesHerb(t *testing.T) {
 	drops := task.NewGroundItems(state, task.GroundItemOptions{HerbAutoDestroy: time.Hour}, time.Now)
 	drops.Drop(ground, task.DropOptions{X: 10, Y: 20, Z: 30})
 
-	capture.frames = nil
+	testsupport.ResetCapture(capture)
 	store := &recordingEnchantItemStore{}
 	gcl := &GameClientLink{
 		world:         state,
@@ -430,7 +431,7 @@ func TestPetGetItemConsumesHerb(t *testing.T) {
 
 	gcl.petGetItem(context.Background(), live, clientpackets.RequestPetGetItem{ObjectID: ground.ObjectID()})
 
-	assertOpcodeSequence(t, capture.frames,
+	testsupport.AssertOpcodeSequence(t, capture.Frames(),
 		serverpackets.OpcodeGetItem,
 		serverpackets.OpcodeDeleteObject,
 		serverpackets.OpcodeMagicSkillUse,
@@ -439,8 +440,8 @@ func TestPetGetItemConsumesHerb(t *testing.T) {
 		serverpackets.OpcodeSystemMessage,
 		serverpackets.OpcodeStatusUpdate,
 	)
-	assertSystemMessageSkillFrame(t, capture.frames[3], serverpackets.SystemMessagePetUsesS1, 2278, 1)
-	assertSystemMessageSkillFrame(t, capture.frames[5], serverpackets.SystemMessagePetUsesS1, 2279, 1)
+	assertSystemMessageSkillFrame(t, capture.Frames()[3], serverpackets.SystemMessagePetUsesS1, 2278, 1)
+	assertSystemMessageSkillFrame(t, capture.Frames()[5], serverpackets.SystemMessagePetUsesS1, 2279, 1)
 	if petInv.ItemByTemplateID(herbTemplate) != nil || len(store.saved) != 0 || len(store.updated) != 0 {
 		t.Fatalf("pet inventory/store retained herb: item=%+v saved=%+v updated=%+v", petInv.ItemByTemplateID(herbTemplate), store.saved, store.updated)
 	}
@@ -457,7 +458,7 @@ func TestPetGetItemReportsNonTradableHerb(t *testing.T) {
 	templates := herbTestTemplates()
 	tmpl, _ := templates.Get(herbTemplate)
 	tmpl.Tradable = false
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
 	state := world.New()
 	state.Spawn(live, 0, 0, 0, 0)
@@ -469,7 +470,7 @@ func TestPetGetItemReportsNonTradableHerb(t *testing.T) {
 	drops := task.NewGroundItems(state, task.GroundItemOptions{HerbAutoDestroy: time.Hour}, time.Now)
 	drops.Drop(ground, task.DropOptions{X: 10, Y: 20, Z: 30})
 
-	capture.frames = nil
+	testsupport.ResetCapture(capture)
 	gcl := &GameClientLink{
 		world:         state,
 		groundItems:   drops,
@@ -480,13 +481,13 @@ func TestPetGetItemReportsNonTradableHerb(t *testing.T) {
 
 	gcl.petGetItem(context.Background(), live, clientpackets.RequestPetGetItem{ObjectID: ground.ObjectID()})
 
-	assertOpcodeSequence(t, capture.frames,
+	testsupport.AssertOpcodeSequence(t, capture.Frames(),
 		serverpackets.OpcodeGetItem,
 		serverpackets.OpcodeDeleteObject,
 		serverpackets.OpcodeSystemMessage,
 		serverpackets.OpcodeStatusUpdate,
 	)
-	assertStaticSystemMessageFrame(t, capture.frames[2], serverpackets.SystemMessageItemNotForPets)
+	assertStaticSystemMessageFrame(t, capture.Frames()[2], serverpackets.SystemMessageItemNotForPets)
 	if effects := pet.EffectList().All(); len(effects) != 0 {
 		t.Fatalf("pet effects = %+v, want none", effects)
 	}
@@ -495,7 +496,7 @@ func TestPetGetItemReportsNonTradableHerb(t *testing.T) {
 func TestPetGetItemReportsHerbReuse(t *testing.T) {
 	const herbTemplate int32 = 8600
 	templates := herbTestTemplates()
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
 	state := world.New()
 	state.Spawn(live, 0, 0, 0, 0)
@@ -509,18 +510,18 @@ func TestPetGetItemReportsHerbReuse(t *testing.T) {
 	drops := task.NewGroundItems(state, task.GroundItemOptions{HerbAutoDestroy: time.Hour}, time.Now)
 	drops.Drop(ground, task.DropOptions{X: 10, Y: 20, Z: 30})
 
-	capture.frames = nil
+	testsupport.ResetCapture(capture)
 	gcl := &GameClientLink{world: state, groundItems: drops, skills: herbTestSkill(t)}
 
 	gcl.petGetItem(context.Background(), live, clientpackets.RequestPetGetItem{ObjectID: ground.ObjectID()})
 
-	assertOpcodeSequence(t, capture.frames,
+	testsupport.AssertOpcodeSequence(t, capture.Frames(),
 		serverpackets.OpcodeGetItem,
 		serverpackets.OpcodeDeleteObject,
 		serverpackets.OpcodeSystemMessage,
 		serverpackets.OpcodeStatusUpdate,
 	)
-	assertSystemMessageSkillFrame(t, capture.frames[2], serverpackets.SystemMessageS1PreparedForReuse, 2278, 1)
+	assertSystemMessageSkillFrame(t, capture.Frames()[2], serverpackets.SystemMessageS1PreparedForReuse, 2278, 1)
 }
 
 func TestPetGetItemAcknowledgesUnhandledHerb(t *testing.T) {
@@ -528,7 +529,7 @@ func TestPetGetItemAcknowledgesUnhandledHerb(t *testing.T) {
 	templates := herbTestTemplates()
 	tmpl, _ := templates.Get(herbTemplate)
 	tmpl.AttachedSkills = nil
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
 	state := world.New()
 	state.Spawn(live, 0, 0, 0, 0)
@@ -540,12 +541,12 @@ func TestPetGetItemAcknowledgesUnhandledHerb(t *testing.T) {
 	drops := task.NewGroundItems(state, task.GroundItemOptions{HerbAutoDestroy: time.Hour}, time.Now)
 	drops.Drop(ground, task.DropOptions{X: 10, Y: 20, Z: 30})
 
-	capture.frames = nil
+	testsupport.ResetCapture(capture)
 	gcl := &GameClientLink{world: state, groundItems: drops, skills: herbTestSkill(t)}
 
 	gcl.petGetItem(context.Background(), live, clientpackets.RequestPetGetItem{ObjectID: ground.ObjectID()})
 
-	assertOpcodeSequence(t, capture.frames,
+	testsupport.AssertOpcodeSequence(t, capture.Frames(),
 		serverpackets.OpcodeGetItem,
 		serverpackets.OpcodeDeleteObject,
 		serverpackets.OpcodeActionFailed,
@@ -556,7 +557,7 @@ func TestPetGetItemAcknowledgesUnhandledHerb(t *testing.T) {
 func TestPetGetItemMergesStackAndDeletesGroundRow(t *testing.T) {
 	templates := petTestTemplates()
 	petItem := &item.Instance{ObjectID: 901, TemplateID: item.AdenaID, OwnerID: 0x20000001, Count: 10, Location: item.LocationPet}
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
 	state := world.New()
 	state.Spawn(live, 0, 0, 0, 0)
@@ -573,7 +574,7 @@ func TestPetGetItemMergesStackAndDeletesGroundRow(t *testing.T) {
 	drops := task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour}, time.Now)
 	drops.Drop(ground, task.DropOptions{X: 10, Y: 20, Z: 30})
 
-	capture.frames = nil
+	testsupport.ResetCapture(capture)
 	store := &recordingEnchantItemStore{}
 	gcl := &GameClientLink{world: state, groundItems: drops, items: store}
 	updates := wireInventoryUpdates(gcl, live)
@@ -581,7 +582,7 @@ func TestPetGetItemMergesStackAndDeletesGroundRow(t *testing.T) {
 	gcl.petGetItem(context.Background(), live, clientpackets.RequestPetGetItem{ObjectID: ground.ObjectID()})
 	updates.Tick()
 
-	assertOpcodeSequence(t, capture.frames,
+	testsupport.AssertOpcodeSequence(t, capture.Frames(),
 		serverpackets.OpcodeGetItem,
 		serverpackets.OpcodeDeleteObject,
 		serverpackets.OpcodePetInventoryUpdate,
@@ -605,12 +606,12 @@ func TestGiveItemToPetCancelsActiveEnchantBeforeTransfer(t *testing.T) {
 	templates := petTestTemplates()
 	source := &item.Instance{ObjectID: 500, TemplateID: item.AdenaID, OwnerID: 1, Count: 100, Location: item.LocationInventory}
 	scroll := &item.Instance{ObjectID: 501, TemplateID: 955, OwnerID: 1, Count: 1, Location: item.LocationInventory}
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{source, scroll})
 	state := world.New()
 	state.Spawn(live, 0, 0, 0, 0)
 	attachTestPet(t, state, live, templates, 12077, nil)
-	capture.frames = nil
+	testsupport.ResetCapture(capture)
 	store := &recordingEnchantItemStore{}
 	ids := &sequentialIDs{next: 900}
 	gcl := &GameClientLink{world: state, ids: ids, items: store, petItems: petitem.NewService(ids)}
@@ -623,14 +624,14 @@ func TestGiveItemToPetCancelsActiveEnchantBeforeTransfer(t *testing.T) {
 	if got := gcl.enchantStateStore().Active(live.ObjectID()); got != 0 {
 		t.Fatalf("active enchant scroll = %d, want cleared", got)
 	}
-	assertOpcodeSequence(t, capture.frames,
+	testsupport.AssertOpcodeSequence(t, capture.Frames(),
 		serverpackets.OpcodeEnchantResult,
 		serverpackets.OpcodeSystemMessage,
 		serverpackets.OpcodePetInventoryUpdate,
 		serverpackets.OpcodeInventoryUpdate,
 	)
-	assertEnchantResultFrame(t, capture.frames[0], serverpackets.EnchantResultCancelled)
-	assertStaticSystemMessageFrame(t, capture.frames[1], serverpackets.SystemMessageEnchantScrollCancelled)
+	assertEnchantResultFrame(t, capture.Frames()[0], serverpackets.EnchantResultCancelled)
+	assertStaticSystemMessageFrame(t, capture.Frames()[1], serverpackets.SystemMessageEnchantScrollCancelled)
 }
 
 // failingIDs simulates an object-ID allocator that has run out of IDs, to
@@ -642,12 +643,12 @@ func (failingIDs) NextID() (int32, error) { return 0, errors.New("id allocator e
 func TestGiveItemToPetCancelsActiveEnchantOnTransferFailure(t *testing.T) {
 	templates := petTestTemplates()
 	source := &item.Instance{ObjectID: 500, TemplateID: item.AdenaID, OwnerID: 1, Count: 100, Location: item.LocationInventory}
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{source})
 	state := world.New()
 	state.Spawn(live, 0, 0, 0, 0)
 	attachTestPet(t, state, live, templates, 12077, nil)
-	capture.frames = nil
+	testsupport.ResetCapture(capture)
 	store := &recordingEnchantItemStore{}
 	ids := failingIDs{}
 	gcl := &GameClientLink{world: state, ids: ids, items: store, petItems: petitem.NewService(ids)}
@@ -668,23 +669,23 @@ func TestGiveItemToPetCancelsActiveEnchantOnTransferFailure(t *testing.T) {
 	if source.Count != 100 {
 		t.Fatalf("source Count = %d, want unchanged 100 after failed transfer", source.Count)
 	}
-	assertOpcodeSequence(t, capture.frames,
+	testsupport.AssertOpcodeSequence(t, capture.Frames(),
 		serverpackets.OpcodeEnchantResult,
 		serverpackets.OpcodeSystemMessage,
 	)
-	assertEnchantResultFrame(t, capture.frames[0], serverpackets.EnchantResultCancelled)
-	assertStaticSystemMessageFrame(t, capture.frames[1], serverpackets.SystemMessageEnchantScrollCancelled)
+	assertEnchantResultFrame(t, capture.Frames()[0], serverpackets.EnchantResultCancelled)
+	assertStaticSystemMessageFrame(t, capture.Frames()[1], serverpackets.SystemMessageEnchantScrollCancelled)
 }
 
 func TestPetUseItemEquipsWolfWeapon(t *testing.T) {
 	templates := petTestTemplates()
 	weapon := &item.Instance{ObjectID: 700, TemplateID: 2375, OwnerID: 0x20000001, Count: 1, Location: item.LocationPet}
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
 	state := world.New()
 	state.Spawn(live, 0, 0, 0, 0)
 	_, petInv := attachTestPet(t, state, live, templates, 12077, []*item.Instance{weapon})
-	capture.frames = nil
+	testsupport.ResetCapture(capture)
 	store := &recordingEnchantItemStore{}
 	gcl := &GameClientLink{world: state, items: store}
 	updates := wireInventoryUpdates(gcl, live)
@@ -695,10 +696,10 @@ func TestPetUseItemEquipsWolfWeapon(t *testing.T) {
 	if weapon.Location != item.LocationPetEquip || weapon.LocationData != itemcontainer.RHand || petInv.ItemAt(itemcontainer.RHand) != weapon {
 		t.Fatalf("weapon equip state = %+v, want pet RHand equipped", weapon)
 	}
-	if got := frameOpcodes(capture.frames); string(got) != string([]byte{serverpackets.OpcodeSystemMessage, serverpackets.OpcodePetInventoryUpdate}) {
+	if got := testsupport.FrameOpcodes(capture.Frames()); string(got) != string([]byte{serverpackets.OpcodeSystemMessage, serverpackets.OpcodePetInventoryUpdate}) {
 		t.Fatalf("opcodes = %x, want SystemMessage then PetInventoryUpdate", got)
 	}
-	assertSystemMessageItemFrame(t, capture.frames[0], serverpackets.SystemMessagePetPutOnS1, weapon.TemplateID)
+	assertSystemMessageItemFrame(t, capture.Frames()[0], serverpackets.SystemMessagePetPutOnS1, weapon.TemplateID)
 	if len(store.updated) != 1 || store.updated[0].ObjectID != weapon.ObjectID || store.updated[0].Location != item.LocationPetEquip {
 		t.Fatalf("updated rows = %+v, want equipped pet weapon", store.updated)
 	}
@@ -707,12 +708,12 @@ func TestPetUseItemEquipsWolfWeapon(t *testing.T) {
 func TestGiveItemToPetRejectsForbiddenItem(t *testing.T) {
 	templates := petTestTemplates()
 	source := &item.Instance{ObjectID: 800, TemplateID: 9000, OwnerID: 1, Count: 1, Location: item.LocationInventory}
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, []*item.Instance{source})
 	state := world.New()
 	state.Spawn(live, 0, 0, 0, 0)
 	attachTestPet(t, state, live, templates, 12077, nil)
-	capture.frames = nil
+	testsupport.ResetCapture(capture)
 	gcl := &GameClientLink{world: state, ids: &sequentialIDs{next: 900}}
 
 	gcl.giveItemToPet(context.Background(), live, clientpackets.RequestGiveItemToPet{ObjectID: source.ObjectID, Count: 1})
@@ -720,18 +721,18 @@ func TestGiveItemToPetRejectsForbiddenItem(t *testing.T) {
 	if live.Inventory().ItemByObjectID(source.ObjectID) == nil {
 		t.Fatal("forbidden item moved out of player inventory")
 	}
-	if got := frameOpcodes(capture.frames); string(got) != string([]byte{serverpackets.OpcodeSystemMessage}) {
+	if got := testsupport.FrameOpcodes(capture.Frames()); string(got) != string([]byte{serverpackets.OpcodeSystemMessage}) {
 		t.Fatalf("opcodes = %x, want SystemMessage only", got)
 	}
-	assertStaticSystemMessageFrame(t, capture.frames[0], serverpackets.SystemMessageItemNotForPets)
+	assertStaticSystemMessageFrame(t, capture.Frames()[0], serverpackets.SystemMessageItemNotForPets)
 }
 
 func TestGameClientLinkRequestGiveItemToPetDispatch(t *testing.T) {
 	c, chars, items, state := newLinkedGameClient(t)
 
-	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
-	c.read() // CharCreateOk
-	c.read() // CharSelectInfo
+	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.Read() // CharCreateOk
+	c.Read() // CharSelectInfo
 	objID := chars.soleObjectID(t)
 	if err := items.Create(context.Background(), objID, item.Instance{
 		ObjectID:   500,
@@ -743,10 +744,10 @@ func TestGameClientLinkRequestGiveItemToPetDispatch(t *testing.T) {
 		t.Fatalf("seed item: %v", err)
 	}
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
 	playerObj, ok := state.Player(objID)
@@ -756,17 +757,17 @@ func TestGameClientLinkRequestGiveItemToPetDispatch(t *testing.T) {
 	live := playerObj.(*livePlayer)
 	_, petInv := attachTestPet(t, state, live, testItemTemplates(), 12077, nil)
 
-	c.send(encodeRequestGiveItemToPet(500, 25))
+	c.Send(encodeRequestGiveItemToPet(500, 25))
 	// giveItemToPet's own handler sends nothing on success; sync on a
 	// RequestItemList follow-up before driving the tick, so the tick
 	// doesn't race the transfer.
-	syncBarrier(t, c, func() { c.send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList)) }, serverpackets.OpcodeItemList)
+	testsupport.SyncBarrier(t, c, func() { c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList)) }, serverpackets.OpcodeItemList)
 	inventoryUpdatesFor(t, state).Tick()
-	reply := c.read()
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodePetInventoryUpdate {
 		t.Fatalf("first reply opcode = %#x, want PetInventoryUpdate (%#x)", reply[0], serverpackets.OpcodePetInventoryUpdate)
 	}
-	reply = c.read()
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeInventoryUpdate {
 		t.Fatalf("second reply opcode = %#x, want InventoryUpdate (%#x)", reply[0], serverpackets.OpcodeInventoryUpdate)
 	}
@@ -778,9 +779,9 @@ func TestGameClientLinkRequestGiveItemToPetDispatch(t *testing.T) {
 func TestGameClientLinkRequestPetGetItemDispatch(t *testing.T) {
 	c, chars, items, state := newLinkedGameClient(t)
 
-	c.send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
-	c.read() // CharCreateOk
-	c.read() // CharSelectInfo
+	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.Read() // CharCreateOk
+	c.Read() // CharSelectInfo
 	objID := chars.soleObjectID(t)
 	if err := items.Create(context.Background(), objID, item.Instance{
 		ObjectID:   500,
@@ -792,10 +793,10 @@ func TestGameClientLinkRequestPetGetItemDispatch(t *testing.T) {
 		t.Fatalf("seed item: %v", err)
 	}
 
-	c.send(encodeRequestGameStart(0))
-	c.read() // SSQInfo
-	c.read() // CharSelected
-	c.send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
 
 	playerObj, ok := state.Player(objID)
@@ -805,8 +806,8 @@ func TestGameClientLinkRequestPetGetItemDispatch(t *testing.T) {
 	live := playerObj.(*livePlayer)
 	pet, petInv := attachTestPet(t, state, live, testItemTemplates(), 12077, nil)
 
-	c.send(encodeRequestDropItem(500, 40, location.Location{X: 10, Y: 20, Z: 30}))
-	reply := c.read()
+	c.Send(encodeRequestDropItem(500, 40, location.Location{X: 10, Y: 20, Z: 30}))
+	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeDropItem {
 		t.Fatalf("drop broadcast opcode = %#x, want DropItem (%#x)", reply[0], serverpackets.OpcodeDropItem)
 	}
@@ -815,12 +816,12 @@ func TestGameClientLinkRequestPetGetItemDispatch(t *testing.T) {
 	groundID := r.ReadInt32()
 
 	inventoryUpdatesFor(t, state).Tick()
-	if reply := c.read(); reply[0] != serverpackets.OpcodeInventoryUpdate {
+	if reply := c.Read(); reply[0] != serverpackets.OpcodeInventoryUpdate {
 		t.Fatalf("drop inventory opcode = %#x, want InventoryUpdate (%#x)", reply[0], serverpackets.OpcodeInventoryUpdate)
 	}
 
-	c.send(encodeRequestPetGetItem(groundID))
-	reply = c.read()
+	c.Send(encodeRequestPetGetItem(groundID))
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeGetItem {
 		t.Fatalf("pickup opcode = %#x, want GetItem (%#x)", reply[0], serverpackets.OpcodeGetItem)
 	}
@@ -831,12 +832,12 @@ func TestGameClientLinkRequestPetGetItemDispatch(t *testing.T) {
 	if got := r.ReadInt32(); got != groundID {
 		t.Fatalf("GetItem ground id = %d, want %d", got, groundID)
 	}
-	reply = c.read()
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeDeleteObject {
 		t.Fatalf("pickup delete opcode = %#x, want DeleteObject (%#x)", reply[0], serverpackets.OpcodeDeleteObject)
 	}
 	inventoryUpdatesFor(t, state).Tick()
-	reply = c.read()
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodePetInventoryUpdate {
 		t.Fatalf("pickup inventory opcode = %#x, want PetInventoryUpdate (%#x)", reply[0], serverpackets.OpcodePetInventoryUpdate)
 	}
@@ -855,24 +856,24 @@ func TestGameClientLinkRequestPetGetItemDispatch(t *testing.T) {
 
 func TestHandleTargetActionShowsPetStatusForOwnerPet(t *testing.T) {
 	templates := petTestTemplates()
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
 	state := world.New()
 	state.Spawn(live, 0, 0, 0, 0)
 	pet, _ := attachTestPet(t, state, live, templates, 12077, nil)
-	capture.frames = nil
+	testsupport.ResetCapture(capture)
 	gcl := &GameClientLink{world: state}
 
 	gcl.handleTargetAction(context.Background(), live, pet.ObjectID(), false, false)
-	capture.frames = nil
+	testsupport.ResetCapture(capture)
 	gcl.handleTargetAction(context.Background(), live, pet.ObjectID(), true, false)
 
 	// Interacting with an owned summon must also release the pending action
 	// the client registered for the click, or its input stays locked.
-	if got := frameOpcodes(capture.frames); string(got) != string([]byte{serverpackets.OpcodeActionFailed, serverpackets.OpcodePetStatusShow}) {
+	if got := testsupport.FrameOpcodes(capture.Frames()); string(got) != string([]byte{serverpackets.OpcodeActionFailed, serverpackets.OpcodePetStatusShow}) {
 		t.Fatalf("opcodes = %x, want ActionFailed, PetStatusShow", got)
 	}
-	r := wire.NewReader(capture.frames[1][1:])
+	r := wire.NewReader(capture.Frames()[1][1:])
 	if got := r.ReadInt32(); got != int32(pet.SummonType()) {
 		t.Fatalf("PetStatusShow summon type = %d, want %d", got, pet.SummonType())
 	}
@@ -880,7 +881,7 @@ func TestHandleTargetActionShowsPetStatusForOwnerPet(t *testing.T) {
 
 func TestHandleTargetActionDeniesPetStatusOutOfRange(t *testing.T) {
 	templates := petTestTemplates()
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
 	state := world.New()
 	state.Spawn(live, 0, 0, 0, 0)
@@ -888,17 +889,17 @@ func TestHandleTargetActionDeniesPetStatusOutOfRange(t *testing.T) {
 	if err := state.Move(pet, summonInteractRange+1, 0, 0); err != nil {
 		t.Fatalf("move pet out of range: %v", err)
 	}
-	capture.frames = nil
+	testsupport.ResetCapture(capture)
 	gcl := &GameClientLink{world: state}
 
 	gcl.handleTargetAction(context.Background(), live, pet.ObjectID(), false, false)
-	capture.frames = nil
+	testsupport.ResetCapture(capture)
 	gcl.handleTargetAction(context.Background(), live, pet.ObjectID(), true, false)
 
 	// Out of range and with no move controller wired (live.move == nil), the
 	// click only releases the pending action — it must not open the status
 	// window instantly the way the pre-fix code did for any distance.
-	if got := frameOpcodes(capture.frames); string(got) != string([]byte{serverpackets.OpcodeActionFailed}) {
+	if got := testsupport.FrameOpcodes(capture.Frames()); string(got) != string([]byte{serverpackets.OpcodeActionFailed}) {
 		t.Fatalf("opcodes = %x, want only ActionFailed", got)
 	}
 }
@@ -911,7 +912,7 @@ func TestHandleTargetActionDeniesPetStatusOutOfRange(t *testing.T) {
 // proved.
 func TestShowOwnedPetStatusShiftOutOfRangeDoesNotWalk(t *testing.T) {
 	templates := petTestTemplates()
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, frames)
 	state := world.New()
 	gcl := &GameClientLink{world: state}
@@ -923,12 +924,12 @@ func TestShowOwnedPetStatusShiftOutOfRangeDoesNotWalk(t *testing.T) {
 	}
 	t.Cleanup(live.Stop)
 
-	frames.frames = nil
+	testsupport.ResetCapture(frames)
 	gcl.handleTargetAction(context.Background(), live, pet.ObjectID(), false, false)
-	frames.frames = nil
+	testsupport.ResetCapture(frames)
 	gcl.handleTargetAction(context.Background(), live, pet.ObjectID(), true, true)
 
-	if got := frameOpcodes(frames.frames); string(got) != string([]byte{serverpackets.OpcodeActionFailed}) {
+	if got := testsupport.FrameOpcodes(frames.Frames()); string(got) != string([]byte{serverpackets.OpcodeActionFailed}) {
 		t.Fatalf("opcodes = %x, want only ActionFailed — a shift-click out of range must not walk", got)
 	}
 }
@@ -940,7 +941,7 @@ func TestShowOwnedPetStatusShiftOutOfRangeDoesNotWalk(t *testing.T) {
 // distance. It drives a real move.Controller so the walk actually arrives.
 func TestShowOwnedPetStatusWalksToOutOfRangePetAndOpensOnArrival(t *testing.T) {
 	templates := petTestTemplates()
-	frames := &frameCapture{}
+	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, frames)
 	state := world.New()
 	gcl := &GameClientLink{world: state}
@@ -958,16 +959,16 @@ func TestShowOwnedPetStatusWalksToOutOfRangePetAndOpensOnArrival(t *testing.T) {
 	}
 	t.Cleanup(live.Stop)
 
-	frames.frames = nil
+	testsupport.ResetCapture(frames)
 	gcl.handleTargetAction(context.Background(), live, pet.ObjectID(), false, false)
-	frames.frames = nil
+	testsupport.ResetCapture(frames)
 	gcl.handleTargetAction(context.Background(), live, pet.ObjectID(), true, false)
 
-	assertOpcodeSequence(t, frames.snapshot(), serverpackets.OpcodeActionFailed, serverpackets.OpcodeMoveToLocation)
+	testsupport.AssertOpcodeSequence(t, frames.Frames(), serverpackets.OpcodeActionFailed, serverpackets.OpcodeMoveToLocation)
 
 	deadline := time.Now().Add(2 * time.Second)
 	for {
-		for _, f := range frames.snapshot() {
+		for _, f := range frames.Frames() {
 			if f[0] == serverpackets.OpcodePetStatusShow {
 				return
 			}
@@ -987,7 +988,7 @@ func TestShowOwnedPetStatusWalksToOutOfRangePetAndOpensOnArrival(t *testing.T) {
 // (PlayerAI.java:445).
 func TestFinishPetInteractStaysClosedWhenNowOutOfRange(t *testing.T) {
 	templates := petTestTemplates()
-	capture := &frameCapture{}
+	capture := &testsupport.FrameCapture{}
 	live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
 	state := world.New()
 	state.Spawn(live, 0, 0, 0, 0)
@@ -998,12 +999,12 @@ func TestFinishPetInteractStaysClosedWhenNowOutOfRange(t *testing.T) {
 	if err := state.Move(pet, summonInteractRange+1, 0, 0); err != nil {
 		t.Fatalf("move pet out of range: %v", err)
 	}
-	capture.frames = nil
+	testsupport.ResetCapture(capture)
 
 	gcl.finishPetInteract(live)
 
-	if len(capture.frames) != 0 {
-		t.Fatalf("frames = %v, want none — an arrival that's now out of range must stay silent", capture.frames)
+	if len(capture.Frames()) != 0 {
+		t.Fatalf("frames = %v, want none — an arrival that's now out of range must stay silent", capture.Frames())
 	}
 }
 
