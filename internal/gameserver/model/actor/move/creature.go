@@ -402,6 +402,7 @@ func (m *CreatureMove) UpdatePosition(step time.Duration) (Event, bool) {
 		return event, true
 	}
 
+	m.destination.Z = int(m.geo.Height(m.destination.X, m.destination.Y, m.destination.Z))
 	dx := float64(m.destination.X) - m.accurateX
 	dy := float64(m.destination.Y) - m.accurateY
 	left := math.Hypot(dx, dy)
