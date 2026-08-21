@@ -97,6 +97,38 @@ func TestCreatureMove_MoveToLocationFiresArrivedOnceDurationElapses(t *testing.T
 	}
 }
 
+func TestCreatureMove_MoveToLocationBlockedRouteFiresArrivedOnNextTick(t *testing.T) {
+	origin := location.Location{X: 0, Y: 0, Z: 0}
+	mover, err := NewCreatureMove(origin, 100, &recordingGeo{height: 0})
+	if err != nil {
+		t.Fatal(err)
+	}
+	clock := &fakeMoveClock{}
+	mover.afterFunc = clock.AfterFunc
+	arrivedCalls := 0
+	mover.SetArrivedHook(func() { arrivedCalls++ })
+
+	event, err := mover.MoveToLocation(location.Location{X: 100, Y: 0, Z: 0})
+	if err != nil {
+		t.Fatalf("MoveToLocation() error = %v, want nil", err)
+	}
+	if want := (Event{Origin: origin, Destination: origin, Speed: 100}); event != want {
+		t.Fatalf("MoveToLocation() event = %+v, want %+v", event, want)
+	}
+	if !mover.Moving() {
+		t.Fatal("Moving() = false before zero-distance arrival, want true")
+	}
+
+	clock.fire(PositionUpdateInterval)
+
+	if arrivedCalls != 1 {
+		t.Fatalf("arrived hook calls = %d, want 1", arrivedCalls)
+	}
+	if mover.Moving() {
+		t.Fatal("Moving() = true after zero-distance arrival, want false")
+	}
+}
+
 func TestCreatureMove_MoveToLocationSupersedesPendingArrival(t *testing.T) {
 	origin := location.Location{X: 0, Y: 0, Z: 0}
 	geo := &recordingGeo{canMove: true, height: 0}

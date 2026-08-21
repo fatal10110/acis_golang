@@ -185,7 +185,7 @@ func TestControllerMaybeStartOffensiveFollowIgnoresUnlocatedTarget(t *testing.T)
 	}
 }
 
-func TestControllerMaybeStartOffensiveFollowReportsFalseWhenRouteIsBlocked(t *testing.T) {
+func TestControllerMaybeStartOffensiveFollowBroadcastsZeroDistanceRoute(t *testing.T) {
 	self := &fakeSelf{x: 0, y: 0, radius: 5}
 	cm, err := NewCreatureMove(location.Location{X: self.x, Y: self.y}, 100, &recordingGeo{canMove: false})
 	if err != nil {
@@ -197,14 +197,14 @@ func TestControllerMaybeStartOffensiveFollowReportsFalseWhenRouteIsBlocked(t *te
 	}
 	target := &fakeTarget{id: 7, x: 1000, y: 0, radius: 5}
 
-	if ok, _ := c.MaybeStartOffensiveFollow(target, 40); ok {
-		t.Fatal("MaybeStartOffensiveFollow() = true, want false when the route is blocked — a caller must not wait forever on movement that will never happen")
+	if ok, _ := c.MaybeStartOffensiveFollow(target, 40); !ok {
+		t.Fatal("MaybeStartOffensiveFollow() = false, want true for an accepted zero-distance route")
 	}
-	if c.move.Moving() {
-		t.Fatal("Moving() = true after a blocked route, want false")
+	if !c.move.Moving() {
+		t.Fatal("Moving() = false before the zero-distance arrival tick")
 	}
-	if len(self.broadcasts) != 0 {
-		t.Fatalf("BroadcastMove calls after a blocked route = %d, want 0", len(self.broadcasts))
+	if len(self.broadcasts) != 1 {
+		t.Fatalf("BroadcastMove calls = %d, want 1", len(self.broadcasts))
 	}
 }
 
@@ -497,7 +497,7 @@ func TestControllerMoveHomeRequestsMovement(t *testing.T) {
 	}
 }
 
-func TestControllerMoveHomeDropsBlockedRoute(t *testing.T) {
+func TestControllerMoveHomeBroadcastsZeroDistanceRoute(t *testing.T) {
 	self := &fakeSelf{}
 	cm, err := NewCreatureMove(location.Location{X: self.x, Y: self.y}, 100, &recordingGeo{canMove: false})
 	if err != nil {
@@ -512,11 +512,11 @@ func TestControllerMoveHomeDropsBlockedRoute(t *testing.T) {
 
 	c.MoveHome(location.Location{X: 500, Y: 500, Z: 0})
 
-	if len(self.broadcasts) != 0 {
-		t.Fatalf("BroadcastMove calls = %d, want 0 for a blocked route", len(self.broadcasts))
+	if len(self.broadcasts) != 1 {
+		t.Fatalf("BroadcastMove calls = %d, want 1", len(self.broadcasts))
 	}
-	if len(updates.added) != 0 {
-		t.Fatalf("registered movers = %v, want none for a blocked route", updates.added)
+	if len(updates.added) != 1 {
+		t.Fatalf("registered movers = %v, want one", updates.added)
 	}
 }
 
