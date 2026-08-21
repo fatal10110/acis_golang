@@ -40,7 +40,7 @@ func (l *GameClientLink) applyEnchantSkill(ctx context.Context, live *livePlayer
 	if live == nil {
 		return
 	}
-	_, status, err := skillstate.Enchant(ctx, live.Character, l.levels, live.template, l.skillTrees, l.skills, l.playerConfig.SkillEnchantSPBookNeeded, l.rollEnchantSkill, int(req.SkillID), int(req.SkillLevel))
+	result, status, err := skillstate.Enchant(ctx, live.Character, l.levels, live.template, l.skillTrees, l.skills, l.playerConfig.SkillEnchantSPBookNeeded, l.rollEnchantSkill, int(req.SkillID), int(req.SkillLevel))
 	if err != nil {
 		l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("enchant skill")
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNothingHappened))
@@ -61,6 +61,7 @@ func (l *GameClientLink) applyEnchantSkill(ctx context.Context, live *livePlayer
 		return
 	}
 
+	l.refreshSkillShortcuts(ctx, live, int32(result.SkillID), int32(result.AppliedLevel))
 	if status == skillstate.EnchantSucceeded {
 		live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageSucceededEnchantingSkillS1, req.SkillID, req.SkillLevel))
 	} else {
