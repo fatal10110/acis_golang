@@ -10,7 +10,7 @@ import (
 
 func TestTargetMeEffectSetsTargetOrAttacksIfAlreadyTargeted(t *testing.T) {
 	effector := &liveEffectTarget{}
-	target := &liveEffectTarget{}
+	target := &liveEffectTarget{isPlayer: true}
 	e, err := New(Skill{ID: 1}, modelskill.EffectTemplate{Name: "TargetMe"})
 	if err != nil {
 		t.Fatalf("New() error: %v", err)
@@ -32,6 +32,27 @@ func TestTargetMeEffectSetsTargetOrAttacksIfAlreadyTargeted(t *testing.T) {
 	}
 	if want := []string{fmt.Sprintf("try-attack:%v", effector)}; !reflect.DeepEqual(target.events, want) {
 		t.Fatalf("events = %#v, want %#v", target.events, want)
+	}
+}
+
+// TestTargetMeEffectRejectsNonPlayerTarget matches EffectTargetMe.java:23-35
+// (aCis reference), which gates the whole redirect on `getEffected()
+// instanceof Player` and returns false otherwise.
+func TestTargetMeEffectRejectsNonPlayerTarget(t *testing.T) {
+	effector := &liveEffectTarget{}
+	target := &liveEffectTarget{isPlayer: false}
+	e, err := New(Skill{ID: 1}, modelskill.EffectTemplate{Name: "TargetMe"})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e.Effected = target
+	e.Effector = effector
+
+	if e.OnStart(e) {
+		t.Fatal("target me effect start accepted a non-player target")
+	}
+	if len(target.events) != 0 {
+		t.Fatalf("events = %#v, want none", target.events)
 	}
 }
 
