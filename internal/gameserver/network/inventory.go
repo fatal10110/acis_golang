@@ -347,35 +347,27 @@ func (l *GameClientLink) destroyLiveItem(live *livePlayer, objectID int32, count
 	if inv == nil {
 		return
 	}
-	inst := inv.ItemByObjectID(objectID)
-	if inst == nil {
-		return
-	}
-	tmpl, ok := inv.Templates().Get(inst.TemplateID)
-	if !ok {
-		return
-	}
-	if count <= 0 || int(inst.Snapshot().Count) < count {
+	failure := l.inventory.DestroyItemFailure(inv, objectID, count)
+	switch failure {
+	case invops.DestroyOK:
+	case invops.DestroyInvalidCount:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotDestroyNumberIncorrect))
 		return
-	}
-	if !inst.Destroyable(tmpl) || tmpl.HeroItem() {
-		message := serverpackets.SystemMessageCannotDiscardThisItem
-		if tmpl.HeroItem() {
-			message = serverpackets.SystemMessageHeroWeaponsCantDestroyed
-		}
-		live.SendFrame(serverpackets.FrameSystemMessage(message))
+	case invops.DestroyNotDestroyable:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotDiscardThisItem))
 		return
-	}
-	if !tmpl.Stackable && count > 1 {
+	case invops.DestroyHeroItem:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageHeroWeaponsCantDestroyed))
+		return
+	default:
 		return
 	}
 	if objectID == live.Character.MountObjectID() {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
-	res, ok := l.inventory.DestroyItem(inv, objectID, count)
-	if !ok {
+	res, failure := l.inventory.DestroyItemResult(inv, objectID, count)
+	if failure != invops.DestroyOK {
 		return
 	}
 	l.applyEquipStatChanges(live, inv, res)
