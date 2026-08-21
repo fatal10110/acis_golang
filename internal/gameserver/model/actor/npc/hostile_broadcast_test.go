@@ -14,7 +14,7 @@ func TestHostileBroadcastFrameBuildsOnceForKnownObservers(t *testing.T) {
 	builds := 0
 	hostile.broadcastFrame(func() wire.Frame {
 		builds++
-		return wire.BorrowedFrame(wire.FrameBytes([]byte{1, 2, 3}))
+		return wire.BorrowedFrame(mustFrameBytes([]byte{1, 2, 3}))
 	})
 	if builds != 1 {
 		t.Fatalf("frame builds = %d, want 1", builds)
@@ -32,7 +32,7 @@ func TestHostileBroadcastFrameSkipsBuildWithoutObservers(t *testing.T) {
 	builds := 0
 	hostile.broadcastFrame(func() wire.Frame {
 		builds++
-		return wire.BorrowedFrame(wire.FrameBytes([]byte{1, 2, 3}))
+		return wire.BorrowedFrame(mustFrameBytes([]byte{1, 2, 3}))
 	})
 	if builds != 0 {
 		t.Fatalf("frame builds = %d, want 0", builds)
@@ -42,7 +42,7 @@ func TestHostileBroadcastFrameSkipsBuildWithoutObservers(t *testing.T) {
 func TestHostileBroadcastFrameGivesObserversIndependentBuffers(t *testing.T) {
 	hostile, receivers := newRetainedBroadcastFixture(t, 2)
 	hostile.broadcastFrame(func() wire.Frame {
-		return wire.BorrowedFrame(wire.FrameBytes([]byte{1, 2, 3}))
+		return wire.BorrowedFrame(mustFrameBytes([]byte{1, 2, 3}))
 	})
 	assertIndependentFrames(t, receivers[0].frame, receivers[1].frame)
 }
@@ -56,7 +56,7 @@ func TestHostileBroadcastFrameReleasesKnownBufferBeforeDelivery(t *testing.T) {
 	state.Spawn(receiver, 100, 0, 0, 0)
 	receiver.nested = func() {
 		if err := hostile.broadcastFrame(func() wire.Frame {
-			return wire.BorrowedFrame(wire.FrameBytes([]byte{1, 2, 3}))
+			return wire.BorrowedFrame(mustFrameBytes([]byte{1, 2, 3}))
 		}); err != nil {
 			t.Errorf("nested broadcast: %v", err)
 		}
@@ -65,7 +65,7 @@ func TestHostileBroadcastFrameReleasesKnownBufferBeforeDelivery(t *testing.T) {
 	done := make(chan error, 1)
 	go func() {
 		done <- hostile.broadcastFrame(func() wire.Frame {
-			return wire.BorrowedFrame(wire.FrameBytes([]byte{1, 2, 3}))
+			return wire.BorrowedFrame(mustFrameBytes([]byte{1, 2, 3}))
 		})
 	}()
 	select {
@@ -151,4 +151,13 @@ func assertIndependentFrames(t testing.TB, first, second wire.Frame) {
 	if second.Bytes()[wire.FrameHeaderSize] != secondPayload {
 		t.Fatal("mutating one observer frame changed another observer frame")
 	}
+}
+
+// mustFrameBytes frames a payload short enough that framing cannot fail.
+func mustFrameBytes(payload []byte) []byte {
+	frame, err := wire.FrameBytes(payload)
+	if err != nil {
+		panic(err)
+	}
+	return frame
 }
