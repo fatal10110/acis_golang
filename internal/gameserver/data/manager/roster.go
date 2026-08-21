@@ -201,13 +201,24 @@ func (r *Roster) Create(ctx context.Context, accountName string, req CreateReque
 		return nil, CreateRejected, err
 	}
 
+	starterShortcuts := shortcut.Starter()
 	for _, grant := range tmpl.Items {
-		if err := r.grantItem(ctx, c.ID, grant); err != nil {
+		objectID, err := r.grantItem(ctx, c.ID, grant)
+		if err != nil {
 			return nil, CreateRejected, err
 		}
+		if grant.ItemID == shortcut.TutorialBookItemID {
+			starterShortcuts = append(starterShortcuts, shortcut.TutorialBookShortcut(objectID))
+		}
 	}
+	autoGet := make(map[int32]int32)
+	for _, grant := range tmpl.AutoGetSkillGrants(1, nil) {
+		autoGet[int32(grant.SkillID)] = int32(grant.Level)
+	}
+	starterShortcuts = append(starterShortcuts, shortcut.AutoGetSkillShortcuts(autoGet)...)
+
 	if r.shortcuts != nil {
-		for _, sc := range shortcut.Starter() {
+		for _, sc := range starterShortcuts {
 			if err := r.shortcuts.Save(ctx, c.ID, sc); err != nil {
 				return nil, CreateRejected, err
 			}
@@ -217,22 +228,22 @@ func (r *Roster) Create(ctx context.Context, accountName string, req CreateReque
 	return c, CreateOK, nil
 }
 
-func (r *Roster) grantItem(ctx context.Context, ownerID int32, grant player.StarterItem) error {
+func (r *Roster) grantItem(ctx context.Context, ownerID int32, grant player.StarterItem) (int32, error) {
 	tmpl, ok := r.itemTable.Get(int32(grant.ItemID))
 	if !ok {
-		return fmt.Errorf("player roster: starter item %d has no template", grant.ItemID)
+		return 0, fmt.Errorf("player roster: starter item %d has no template", grant.ItemID)
 	}
 
 	itemID, err := r.ids.NextID()
 	if err != nil {
-		return fmt.Errorf("player roster: grant item %d: %w", grant.ItemID, err)
+		return 0, fmt.Errorf("player roster: grant item %d: %w", grant.ItemID, err)
 	}
 
 	inst := item.NewStackOrEquip(itemID, tmpl, grant.Count, grant.Equipped)
 	if err := r.items.Create(ctx, ownerID, inst); err != nil {
-		return err
+		return 0, err
 	}
-	return nil
+	return itemID, nil
 }
 
 // hairStyleLimit returns the highest hairstyle index sex may choose: male

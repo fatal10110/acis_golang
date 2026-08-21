@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
 )
 
 // sequentialIDs (a minimal idAllocator: ids count up from a fixed start
@@ -342,5 +343,86 @@ func TestRoster_Create_AcceptsValidNonNPCName(t *testing.T) {
 	}
 	if c.Name != "Newbie" {
 		t.Fatalf("Create() character name = %q, want Newbie", c.Name)
+	}
+}
+
+func mysticTemplate(t *testing.T) *player.TemplateTable {
+	t.Helper()
+	tmpl := &player.Template{
+		ID:        10, // humanMystic.xml: root profession, parent -1
+		BaseLevel: 1,
+		HPTable:   []float64{80},
+		MPTable:   []float64{30},
+		CPTable:   []float64{32},
+		Spawns:    []location.Location{{X: 0, Y: 0, Z: 0}},
+		Items: []player.StarterItem{
+			{ItemID: 5588, Count: 1, Equipped: false},
+		},
+		Skills: []player.SkillGrant{
+			{SkillID: 1177, Level: 1, MinLevel: 1, Cost: 0},
+			{SkillID: 1216, Level: 1, MinLevel: 1, Cost: 0},
+		},
+	}
+	table, err := player.NewTemplateTable(map[int]*player.Template{10: tmpl})
+	if err != nil {
+		t.Fatalf("build template table: %v", err)
+	}
+	return table
+}
+
+// TestRoster_Create_SeedsTutorialBookAndAutoGetSkillShortcuts proves Create
+// reproduces RequestCharacterCreate.java:149-164: the tutorial book (item
+// 5588) gets an ITEM shortcut keyed on its granted instance's own objectID
+// (slot 11), and each auto-get skill (Template.AutoGetSkillGrants at level
+// 1) gets its hardcoded shortcut slot (1177 -> slot 1, 1216 -> slot 9).
+func TestRoster_Create_SeedsTutorialBookAndAutoGetSkillShortcuts(t *testing.T) {
+	ctx := context.Background()
+	db := sqltest.SharedDB(t)
+	characters := sql.NewCharacterStore(db)
+	items := sql.NewItemStore(db)
+	shortcuts := sql.NewShortcutStore(db)
+	roster := NewRoster(characters, items, shortcuts, mysticTemplate(t), starterItemTable(), npc.NewTable(nil), &sequentialIDs{next: 0x10000000}, DefaultDeleteAfter, nil)
+
+	c, outcome, err := roster.Create(ctx, "acct1", CreateRequest{
+		Name: "Mystic", ClassID: 10, Race: 0, Sex: player.SexMale,
+	})
+	if err != nil {
+		t.Fatalf("Create() unexpected error: %v", err)
+	}
+	if outcome != CreateOK {
+		t.Fatalf("Create() outcome = %v, want CreateOK", outcome)
+	}
+
+	granted, err := items.ListByOwner(ctx, c.ID)
+	if err != nil {
+		t.Fatalf("ListByOwner(items): %v", err)
+	}
+	var bookObjectID int32
+	for _, inst := range granted {
+		if inst.TemplateID == 5588 {
+			bookObjectID = inst.ObjectID
+		}
+	}
+	if bookObjectID == 0 {
+		t.Fatal("tutorial book item not granted")
+	}
+
+	got, err := shortcuts.ListByOwner(ctx, c.ID)
+	if err != nil {
+		t.Fatalf("ListByOwner(shortcuts): %v", err)
+	}
+
+	bySlot := make(map[int32]shortcut.Shortcut)
+	for _, sc := range got {
+		bySlot[sc.Slot] = sc
+	}
+	if sc := bySlot[11]; sc.Type != shortcut.Item || sc.ID != bookObjectID {
+		t.Errorf("slot 11 shortcut = %+v, want tutorial book ITEM shortcut keyed on objectID %d", sc, bookObjectID)
+	}
+	if sc := bySlot[1]; sc.Type != shortcut.Skill || sc.ID != 1177 {
+		t.Errorf("slot 1 shortcut = %+v, want auto-get skill 1177", sc)
+	}
+	if sc := bySlot[9]; sc.Type != shortcut.Skill || sc.ID != 1216 {
+		t.Errorf("slot 9 shortcut = %+v, want auto-get skill 1216", sc)
 	}
 }
