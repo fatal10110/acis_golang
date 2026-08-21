@@ -266,13 +266,20 @@ func (h *Hostile) NPCInfoSnapshot() npcinfo.Snapshot {
 	return npcinfo.Snapshot{
 		ObjectID: h.ObjectID(), TemplateID: tmpl.TemplateID, Attackable: true,
 		X: x, Y: y, Z: z, Heading: h.Heading(),
-		MAtkSpd: int(tmpl.AtkSpd), PAtkSpd: h.AttackSpeed(),
-		RunSpd: int(tmpl.RunSpeed), WalkSpd: int(tmpl.WalkSpeed),
+		MAtkSpd: h.MagicAttackSpeed(), PAtkSpd: h.AttackSpeed(),
+		RunSpd: h.RunSpeed(), WalkSpd: int(tmpl.WalkSpeed),
+		CurrentHP: h.CurrentHP(), MaxHP: int(h.MaxHPValue()),
 		CollisionRadius: h.CollisionRadius(), CollisionHeight: tmpl.CollisionHeight,
 		RightHand: tmpl.RightHand, LeftHand: tmpl.LeftHand,
 		Running: true, AlikeDead: h.AlikeDead(), SummonAnimation: 2,
 		AbnormalEffect: h.AbnormalEffect(), Name: name, Title: title,
 	}
+}
+
+func (h *Hostile) serverObjectInfoSnapshot() npcinfo.Snapshot {
+	snapshot := h.NPCInfoSnapshot()
+	snapshot.Name = h.Instance.Template.Name
+	return snapshot
 }
 
 // UpdateAbnormalEffect re-announces this NPC's current visible state.

@@ -274,8 +274,9 @@ func (c *Calculator) AddMod(m Mod) {
 	c.mods = next
 }
 
-// RemoveOwner removes every Mod whose Owner equals owner.
-func (c *Calculator) RemoveOwner(owner ModOwner) {
+// RemoveOwner removes every Mod whose Owner equals owner and reports whether
+// the calculator changed.
+func (c *Calculator) RemoveOwner(owner ModOwner) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -291,6 +292,7 @@ func (c *Calculator) RemoveOwner(owner ModOwner) {
 	if changed {
 		c.mods = kept
 	}
+	return changed
 }
 
 // Calc runs the chain for actor, starting the running value from base:

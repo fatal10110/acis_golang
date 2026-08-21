@@ -91,6 +91,11 @@ func (h *Hostile) MaxHPValue() float64 {
 	return h.calcStat(stat.MaxHP, h.Instance.Template.HPMax)
 }
 
+// RunSpeed returns this NPC's final run speed.
+func (h *Hostile) RunSpeed() int {
+	return int(h.calcStat(stat.RunSpeed, h.Instance.Template.RunSpeed))
+}
+
 // MPValue returns current MP as a floating-point skill-resource value.
 func (h *Hostile) MPValue() float64 {
 	h.mpMu.RLock()

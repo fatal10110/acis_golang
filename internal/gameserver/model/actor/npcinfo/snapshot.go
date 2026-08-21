@@ -10,6 +10,7 @@ type Snapshot struct {
 	Heading                      int
 	MAtkSpd, PAtkSpd             int
 	RunSpd, WalkSpd              int
+	CurrentHP, MaxHP             int
 	CollisionRadius              float64
 	CollisionHeight              float64
 	RightHand, Chest, LeftHand   int
@@ -24,4 +25,20 @@ type Snapshot struct {
 	EnchantEffect                int
 	Flying                       bool
 	Name, Title                  string
+}
+
+// StatusType is a client-visible StatusUpdate attribute identifier.
+type StatusType int32
+
+const (
+	StatusCurrentHP     StatusType = 9
+	StatusMaxHP         StatusType = 10
+	StatusPhysicalSpeed StatusType = 18
+	StatusMagicSpeed    StatusType = 24
+)
+
+// StatusAttribute is one changed value in an NPC StatusUpdate.
+type StatusAttribute struct {
+	Type  StatusType
+	Value int
 }

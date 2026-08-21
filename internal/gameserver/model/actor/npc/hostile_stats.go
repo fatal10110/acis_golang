@@ -1,6 +1,8 @@
 package npc
 
 import (
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npcinfo"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/funcs"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
@@ -21,6 +23,7 @@ func (h *Hostile) AddStatFuncs(fns []effect.Mod) {
 	for _, fn := range fns {
 		h.statCalcOrCreate(fn.Stat).AddMod(fn)
 	}
+	h.broadcastModifiedStats(fns)
 }
 
 // RemoveStatsByOwner drops every stat func previously added for owner.
@@ -31,10 +34,58 @@ func (h *Hostile) RemoveStatsByOwner(owner effect.ModOwner) {
 	h.statMu.RLock()
 	calcs := h.statCalcs
 	h.statMu.RUnlock()
-	for _, calc := range calcs {
+	var modified []stat.Stat
+	for s, calc := range calcs {
 		if calc != nil {
-			calc.RemoveOwner(owner)
+			if calc.RemoveOwner(owner) {
+				modified = append(modified, stat.Stat(s))
+			}
 		}
+	}
+	h.broadcastModifiedStatsFor(modified)
+}
+
+func (h *Hostile) broadcastModifiedStats(fns []effect.Mod) {
+	stats := make([]stat.Stat, len(fns))
+	for i, fn := range fns {
+		stats[i] = fn.Stat
+	}
+	h.broadcastModifiedStatsFor(stats)
+}
+
+func (h *Hostile) broadcastModifiedStatsFor(stats []stat.Stat) {
+	if h.frames == nil {
+		return
+	}
+	full := false
+	attrs := make([]npcinfo.StatusAttribute, 0, len(stats))
+	for _, s := range stats {
+		switch s {
+		case stat.PowerAttackSpeed:
+			attrs = append(attrs, npcinfo.StatusAttribute{Type: npcinfo.StatusPhysicalSpeed, Value: h.AttackSpeed()})
+		case stat.MagicAttackSpeed:
+			attrs = append(attrs, npcinfo.StatusAttribute{Type: npcinfo.StatusMagicSpeed, Value: h.MagicAttackSpeed()})
+		case stat.MaxHP:
+			attrs = append(attrs, npcinfo.StatusAttribute{Type: npcinfo.StatusMaxHP, Value: int(h.MaxHPValue())})
+		case stat.RunSpeed:
+			full = true
+		}
+	}
+	if full {
+		build := func() wire.Frame { return h.frames.Info(h.NPCInfoSnapshot()) }
+		if h.RunSpeed() == 0 {
+			build = func() wire.Frame { return h.frames.ObjectInfo(h.serverObjectInfoSnapshot()) }
+		}
+		if err := h.broadcastFrame(build); err != nil {
+			h.log.Warn().Err(err).Int32("object_id", h.ObjectID()).Msg("broadcast npc stat change")
+		}
+		return
+	}
+	if len(attrs) == 0 {
+		return
+	}
+	if err := h.broadcastFrame(func() wire.Frame { return h.frames.Status(h.ObjectID(), attrs) }); err != nil {
+		h.log.Warn().Err(err).Int32("object_id", h.ObjectID()).Msg("broadcast npc stat change")
 	}
 }
 

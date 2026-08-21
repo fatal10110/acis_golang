@@ -8,6 +8,9 @@ import (
 // OpcodeNPCInfo is the wire opcode for a visible NPC entering sight.
 const OpcodeNPCInfo = 0x16
 
+// OpcodeServerObjectInfo is the wire opcode for a stationary NPC update.
+const OpcodeServerObjectInfo = 0x8c
+
 // NPCInfoSnapshot is everything NPCInfo needs for one visible NPC.
 type NPCInfoSnapshot = npcinfo.Snapshot
 
@@ -61,5 +64,27 @@ func FrameNPCInfo(s NPCInfoSnapshot) wire.Frame {
 	w.WriteFloat64(s.CollisionHeight)
 	w.WriteInt32(int32(s.EnchantEffect))
 	w.WriteInt32(boolInt32(s.Flying))
+	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
+}
+
+// FrameServerObjectInfo builds the stationary-NPC update packet.
+func FrameServerObjectInfo(s NPCInfoSnapshot) wire.Frame {
+	w := newFrameWriter(OpcodeServerObjectInfo)
+	w.WriteInt32(s.ObjectID)
+	w.WriteInt32(int32(s.TemplateID + 1000000))
+	w.WriteString(s.Name)
+	w.WriteInt32(boolInt32(s.Attackable))
+	w.WriteInt32(int32(s.X))
+	w.WriteInt32(int32(s.Y))
+	w.WriteInt32(int32(s.Z))
+	w.WriteInt32(int32(s.Heading))
+	w.WriteFloat64(1)
+	w.WriteFloat64(1)
+	w.WriteFloat64(s.CollisionRadius)
+	w.WriteFloat64(s.CollisionHeight)
+	w.WriteInt32(int32(s.CurrentHP))
+	w.WriteInt32(int32(s.MaxHP))
+	w.WriteInt32(1)
+	w.WriteInt32(0)
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
 }

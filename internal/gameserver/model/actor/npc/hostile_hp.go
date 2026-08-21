@@ -5,7 +5,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 )
 
-// MaxHP returns this NPC's maximum hit points, from its template.
+// MaxHP returns this NPC's template maximum hit points.
 func (h *Hostile) MaxHP() int {
 	return int(h.Instance.Template.HPMax)
 }
