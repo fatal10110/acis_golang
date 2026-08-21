@@ -6,10 +6,14 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/restart"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -131,6 +135,45 @@ func TestRestartLivePlayerIgnoresLivingPlayer(t *testing.T) {
 
 	if len(frames.frames) != 0 {
 		t.Fatalf("frames sent for a living player = %d, want 0", len(frames.frames))
+	}
+}
+
+func TestRestartLivePlayerStopsFakeDeathWithoutRevivingOrTeleporting(t *testing.T) {
+	frames := &frameCapture{}
+	live := newTestLivePlayer(t, 1, frames)
+	gcl := &GameClientLink{log: zerolog.Nop()}
+	live.SetStanceBroadcaster(func(stance player.Stance) {
+		if stance != player.StanceFakeDeathStop {
+			return
+		}
+		x, y, z := live.Position()
+		gcl.broadcastLiveFrame(live, func() wire.Frame {
+			return serverpackets.FrameChangeWaitType(live.ObjectID(), serverpackets.WaitFakeDeathStop, location.Location{X: x, Y: y, Z: z})
+		})
+	})
+	live.SetFakeDeathReviveBroadcaster(func() { gcl.broadcastLiveRevive(live) })
+
+	e, err := effect.New(effect.Skill{}, modelskill.EffectTemplate{Name: "FakeDeath"})
+	if err != nil {
+		t.Fatalf("effect.New(FakeDeath): %v", err)
+	}
+	e.Effected = live.Character
+	live.EffectList().Add(e)
+	frames.frames = nil
+
+	gcl.restartLivePlayer(live, clientpackets.RequestRestartPoint{})
+
+	if got := frameOpcodes(frames.frames); string(got) != string([]byte{serverpackets.OpcodeChangeWaitType, serverpackets.OpcodeRevive}) {
+		t.Fatalf("fake-death restart opcodes = %x, want ChangeWaitType, Revive", got)
+	}
+	if live.FakeDead() {
+		t.Fatal("FakeDead() = true after restart request")
+	}
+	if live.Dead() {
+		t.Fatal("Dead() = true after fake-death restart request")
+	}
+	if live.Teleporting() {
+		t.Fatal("Teleporting() = true after fake-death restart request")
 	}
 }
 
