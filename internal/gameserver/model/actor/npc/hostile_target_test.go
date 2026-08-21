@@ -72,6 +72,13 @@ func TestHostileAutoAttackTargetValid(t *testing.T) {
 			want:       false,
 		},
 		{
+			name:       "target exactly at range is excluded",
+			aggroRange: 10,
+			target:     func() *gateTarget { return &gateTarget{id: 2} },
+			targetPos:  [3]int{100 + rangeVal, 100, 0},
+			want:       false,
+		},
+		{
 			name:       "already-dead target is excluded",
 			aggroRange: 10,
 			target:     func() *gateTarget { return &gateTarget{id: 2, dead: true} },
@@ -145,6 +152,18 @@ func TestHostileAutoAttackTargetValid(t *testing.T) {
 				t.Fatalf("AutoAttackTargetValid() = %v, want %v", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestHostileAutoAttackTargetValidExcludesNegativeRange(t *testing.T) {
+	state := world.New()
+	attacker := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", AggroRange: 10})
+	state.Spawn(attacker, 100, 100, 0, 0)
+	target := &gateTarget{id: 2}
+	state.Spawn(target, 100, 100, 0, 0)
+
+	if attacker.AutoAttackTargetValid(target, -1, false) {
+		t.Fatal("AutoAttackTargetValid() = true with a negative range, want false")
 	}
 }
 
@@ -379,18 +398,17 @@ func TestHostileReconsiderTargetRangeFilterExcludesOutOfRangeCandidate(t *testin
 	owner := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", AggroRange: 10})
 	state.Spawn(owner, 100, 100, 0, 0)
 
-	far := &gateTarget{id: 2}
+	boundary := &gateTarget{id: 2}
 	near := &gateTarget{id: 3}
-	state.Spawn(far, 100+rangeVal+1000, 100, 0, 0)
+	state.Spawn(boundary, 100+rangeVal, 100, 0, 0)
 	state.Spawn(near, 100, 100, 0, 0)
-	owner.AddDamageHate(far, 0, 10)
+	owner.AddDamageHate(boundary, 0, 10)
 	owner.AddDamageHate(near, 0, 25)
 
-	// near is mostHated (higher hate), leaving far as the sole candidate;
-	// the rangeVal filter (independent of AutoAttackTargetValid's own
-	// aggro-range check) excludes it for being out of range.
+	// near is mostHated (higher hate), leaving boundary as the sole candidate;
+	// the strict rangeVal filter excludes a target exactly at the boundary.
 	if _, ok := owner.ReconsiderTarget(rangeVal); ok {
-		t.Fatal("ReconsiderTarget: ok = true, want false when the only candidate fails the range filter")
+		t.Fatal("ReconsiderTarget: ok = true, want false when the only candidate is exactly at range")
 	}
 }
 
@@ -429,6 +447,22 @@ func TestHostileReconsiderTargetFallsBackToKnownlistWhenHateListEmpty(t *testing
 	}
 	if got := owner.AI().Threats().Hate(bystander); got != 1 {
 		t.Fatalf("fallback candidate hate = %v, want 1 (simulated aggro-range entrance)", got)
+	}
+}
+
+func TestHostileReconsiderTargetKnownlistExcludesExactRangeBoundary(t *testing.T) {
+	const rangeVal = 500
+
+	state := world.New()
+	owner := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", AggroRange: 1000})
+	owner.SetWorld(state)
+	state.Spawn(owner, 100, 100, 0, 0)
+
+	boundary := &gateTarget{id: 2}
+	state.Spawn(boundary, 100+rangeVal, 100, 0, 0)
+
+	if _, ok := owner.ReconsiderTarget(rangeVal); ok {
+		t.Fatal("ReconsiderTarget: ok = true, want false for a known-list target exactly at range")
 	}
 }
 

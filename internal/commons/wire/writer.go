@@ -131,9 +131,12 @@ func (w *Writer) Cap() int {
 
 // Frame returns the assembled payload behind a little-endian frame length
 // header. Writers built with NewFrameWriter backfill that header in place.
+// A payload too long for the uint16 header keeps its truncated header here;
+// OwnedFrame and BorrowedFrame reject the oversized result before it can be
+// queued for send.
 func (w *Writer) Frame() []byte {
 	if w.payloadOffset != FrameHeaderSize {
-		return FrameBytes(w.buf)
+		return frameBytes(w.buf)
 	}
 	binary.LittleEndian.PutUint16(w.buf[:FrameHeaderSize], uint16(len(w.buf)))
 	return w.buf

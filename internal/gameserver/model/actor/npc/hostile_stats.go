@@ -70,11 +70,11 @@ func (h *Hostile) statCalcOrCreate(s stat.Stat) *effect.Calculator {
 
 // calcStat runs s's finalization chain (the base funcs every NPC attaches
 // plus any buff/debuff funcs an active effect has added) starting from
-// base, clamping to zero for a stat that can't go negative.
+// base, flooring a non-positive stat that can't go negative at one.
 func (h *Hostile) calcStat(s stat.Stat, base float64) float64 {
 	value := h.statCalc(s).Calc(hostileStatActor{h: h}, base)
-	if s.CantBeNegative() && value < 0 {
-		return 0
+	if s.CantBeNegative() && value <= 0 {
+		return 1
 	}
 	return value
 }

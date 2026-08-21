@@ -52,6 +52,22 @@ func TestHostileConditionalStatFuncGatesOnRealLevel(t *testing.T) {
 	}
 }
 
+func TestHostileCalcStatFloorsNonNegativeStatsAtOne(t *testing.T) {
+	hostile, err := NewHostile(&Instance{
+		ObjectID: 101,
+		Template: &Template{ID: 9001, Type: "Monster", Level: 20, PAtk: 100},
+		Kind:     "Monster",
+	}, newHostileLive(t), &hostileMove{}, &hostileAttack{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	hostile.AddStatFuncs([]effect.Mod{{Stat: stat.PowerAttack, Op: effect.OpSet, Value: 0}})
+	if got := hostile.CalcStat(stat.PowerAttack, 100); got != 1 {
+		t.Errorf("CalcStat(PowerAttack, 100) = %v, want 1", got)
+	}
+}
+
 func TestHostileStatActorImplementsConditionsActor(t *testing.T) {
 	hostile, err := NewHostile(&Instance{
 		ObjectID: 101,
