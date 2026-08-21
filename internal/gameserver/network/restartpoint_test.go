@@ -254,6 +254,46 @@ func TestCompleteLivePlayerTeleportRelocatesActiveSummonOnce(t *testing.T) {
 	}
 }
 
+// TestCompleteLivePlayerTeleportGatesSpawnProtection pins issue #1634:
+// completeLivePlayerTeleport must only clear Teleporting() and activate
+// spawn protection for a flagged (post-teleport) Appearing, matching
+// Creature.java's compare-and-set completion (Creature.java:221-227) that
+// Player.java:6112-6117 gates spawn protection on. An unflagged Appearing —
+// reachable any time a live client sends opcode 0x30 outside a teleport
+// window — must leave both untouched, and a duplicate Appearing after
+// completion must not reactivate protection a second time.
+func TestCompleteLivePlayerTeleportGatesSpawnProtection(t *testing.T) {
+	live := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
+	gcl := &GameClientLink{
+		playerConfig: PlayerConfig{SpawnProtection: time.Second},
+		afterFunc:    func(time.Duration, func()) {},
+		log:          zerolog.Nop(),
+	}
+
+	gcl.completeLivePlayerTeleport(live)
+	if live.SpawnProtected() {
+		t.Fatal("spawn protection activated for an unflagged Appearing")
+	}
+	if live.Teleporting() {
+		t.Fatal("Teleporting() = true after an unflagged Appearing")
+	}
+
+	live.SetTeleporting(true)
+	gcl.completeLivePlayerTeleport(live)
+	if !live.SpawnProtected() {
+		t.Fatal("spawn protection not activated for a flagged Appearing")
+	}
+	if live.Teleporting() {
+		t.Fatal("Teleporting() = true after a flagged Appearing")
+	}
+	gen := live.spawnProtectionGen
+
+	gcl.completeLivePlayerTeleport(live)
+	if live.spawnProtectionGen != gen {
+		t.Fatal("duplicate Appearing re-activated spawn protection")
+	}
+}
+
 func summonPosition(actor *summon.Actor) location.Location {
 	x, y, z := actor.Position()
 	return location.Location{X: x, Y: y, Z: z}
