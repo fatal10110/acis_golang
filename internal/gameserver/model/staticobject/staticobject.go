@@ -10,6 +10,13 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
+const (
+	// MapType is the static-object type used by town maps.
+	MapType = 0
+	// ArenaSignType is the static-object type used by arena signs.
+	ArenaSignType = 2
+)
+
 // Template is one static object entry from staticObjects.xml.
 type Template struct {
 	ID       int
