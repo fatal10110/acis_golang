@@ -8,7 +8,16 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
+
+type pickupTestOwner struct {
+	world.Presence
+	id int32
+}
+
+func (o *pickupTestOwner) ObjectID() int32 { return o.id }
+func (o *pickupTestOwner) LevelValue() int { return 1 }
 
 type testIDs struct{ next int32 }
 
@@ -155,6 +164,84 @@ func TestPickupGroundItemSucceedsOverPetWeightLimit(t *testing.T) {
 	}
 }
 
+// SummonAI.thinkPickUp() (SummonAI.java:183) rejects pickup when the ground
+// item is owned by someone other than the pet owner, mirroring invops.LootLocked
+// on the player pickup path.
+func TestPickupGroundRejectsLootLockedItem(t *testing.T) {
+	templates := testTemplates()
+	petInv := itemcontainer.NewPetInventory(2, templates)
+	owner := &pickupTestOwner{id: 1}
+	pet := summon.NewPet(summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv, Owner: owner})
+	tmpl, ok := templates.Get(item.AdenaID)
+	if !ok {
+		t.Fatal("adena template missing")
+	}
+	ground, err := grounditem.New(item.Instance{ObjectID: 900, TemplateID: item.AdenaID, Count: 40, ManaLeft: -1, OwnerID: 99}, tmpl)
+	if err != nil {
+		t.Fatalf("ground item: %v", err)
+	}
+
+	res, failure := PickupGround(pet, petInv, ground)
+
+	if failure != PickupLootLocked {
+		t.Fatalf("PickupGround failure = %v, want PickupLootLocked", failure)
+	}
+	if petInv.ItemByTemplateID(item.AdenaID) != nil || len(res.Persist) != 0 {
+		t.Fatalf("result = %+v, want no pickup", res)
+	}
+}
+
+// Java checks capacity (SummonAI.java:177) before the owner/loot-lock check
+// (SummonAI.java:183), so a pet inventory that is both full and facing a
+// loot-locked item must report the capacity failure, matching
+// network/pickup.go's herb-branch ordering convention.
+func TestPickupGroundReportsCapacityBeforeLootLock(t *testing.T) {
+	templates := testTemplates()
+	petInv := itemcontainer.NewPetInventory(2, templates)
+	petInv.SlotLimit = 1
+	petInv.AddNew(20, 1, 600)
+	owner := &pickupTestOwner{id: 1}
+	pet := summon.NewPet(summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv, Owner: owner})
+	tmpl, ok := templates.Get(item.AdenaID)
+	if !ok {
+		t.Fatal("adena template missing")
+	}
+	ground, err := grounditem.New(item.Instance{ObjectID: 900, TemplateID: item.AdenaID, Count: 40, ManaLeft: -1, OwnerID: 99}, tmpl)
+	if err != nil {
+		t.Fatalf("ground item: %v", err)
+	}
+
+	_, failure := PickupGround(pet, petInv, ground)
+
+	if failure != PickupPetCannotCarryMore {
+		t.Fatalf("PickupGround failure = %v, want PickupPetCannotCarryMore (capacity checked before loot lock)", failure)
+	}
+}
+
+func TestPickupGroundAllowsPetOwnerLootedItem(t *testing.T) {
+	templates := testTemplates()
+	petInv := itemcontainer.NewPetInventory(2, templates)
+	owner := &pickupTestOwner{id: 1}
+	pet := summon.NewPet(summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv, Owner: owner})
+	tmpl, ok := templates.Get(item.AdenaID)
+	if !ok {
+		t.Fatal("adena template missing")
+	}
+	ground, err := grounditem.New(item.Instance{ObjectID: 900, TemplateID: item.AdenaID, Count: 40, ManaLeft: -1, OwnerID: 1}, tmpl)
+	if err != nil {
+		t.Fatalf("ground item: %v", err)
+	}
+
+	res, failure := PickupGround(pet, petInv, ground)
+
+	if failure != PickupOK {
+		t.Fatalf("PickupGround failure = %v, want OK", failure)
+	}
+	if petInv.ItemByTemplateID(item.AdenaID) == nil || len(res.Persist) != 1 {
+		t.Fatalf("result = %+v, want pickup", res)
+	}
+}
+
 func TestPickupGroundHerbStaysOutOfPetInventory(t *testing.T) {
 	templates := item.NewTable([]*item.Template{{
 		ID:          9001,
@@ -184,6 +271,36 @@ func TestPickupGroundHerbStaysOutOfPetInventory(t *testing.T) {
 	}
 	if res.Herb == nil || res.Herb.TemplateID != 9001 || len(res.Persist) != 0 {
 		t.Fatalf("result = %+v, want transient herb and no persistence", res)
+	}
+}
+
+func TestPickupGroundRejectsLootLockedHerb(t *testing.T) {
+	templates := item.NewTable([]*item.Template{{
+		ID:          9001,
+		Kind:        item.KindEtcItem,
+		Stackable:   true,
+		Dropable:    true,
+		Tradable:    true,
+		Destroyable: true,
+		Duration:    -1,
+		EtcItem:     &item.EtcItemDetail{Type: item.EtcItemHerb},
+	}})
+	petInv := itemcontainer.NewPetInventory(2, templates)
+	owner := &pickupTestOwner{id: 1}
+	pet := summon.NewPet(summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv, Owner: owner})
+	tmpl, _ := templates.Get(9001)
+	ground, err := grounditem.New(item.Instance{ObjectID: 900, TemplateID: 9001, Count: 1, ManaLeft: -1, OwnerID: 99}, tmpl)
+	if err != nil {
+		t.Fatalf("ground item: %v", err)
+	}
+
+	res, failure := PickupGround(pet, petInv, ground)
+
+	if failure != PickupLootLocked {
+		t.Fatalf("PickupGround failure = %v, want PickupLootLocked", failure)
+	}
+	if res.Herb != nil {
+		t.Fatalf("result = %+v, want no herb use", res)
 	}
 }
 

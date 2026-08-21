@@ -22,6 +22,8 @@ const (
 	PickupItemNotForPets
 	// PickupPetCannotCarryMore means the pet lacks free inventory slots.
 	PickupPetCannotCarryMore
+	// PickupLootLocked means ground is owned by someone other than pet's owner.
+	PickupLootLocked
 )
 
 // PickupResult carries item-store operations for a pet ground-item pickup.
@@ -45,14 +47,18 @@ func PickupGround(pet *summon.Actor, petInv *itemcontainer.Inventory, ground *gr
 	}
 
 	picked := ground.Instance.Clone()
-	if ground.Template.EtcItem != nil && ground.Template.EtcItem.Type == modelitem.EtcItemHerb {
-		return PickupResult{Herb: picked}, PickupOK
-	}
-	if ForbiddenForPet(picked, ground.Template) {
+	herb := ground.Template.EtcItem != nil && ground.Template.EtcItem.Type == modelitem.EtcItemHerb
+	if !herb && ForbiddenForPet(picked, ground.Template) {
 		return PickupResult{}, PickupItemNotForPets
 	}
 	if !petInv.ValidateCapacity(petInv.SlotsNeededFor(picked, ground.Template)) {
 		return PickupResult{}, PickupPetCannotCarryMore
+	}
+	if inventory.LootLocked(ground.Instance.OwnerID, pet.OwnerID()) {
+		return PickupResult{}, PickupLootLocked
+	}
+	if herb {
+		return PickupResult{Herb: picked}, PickupOK
 	}
 
 	result, absorbed := petInv.Add(picked)
