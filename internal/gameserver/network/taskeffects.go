@@ -63,6 +63,14 @@ func resolveCanGiveDamage(data *admin.Data, accessLevel int) bool {
 	return ok && level.GiveDamage
 }
 
+func resolveFixedRes(data *admin.Data, accessLevel int) bool {
+	if data == nil {
+		return false
+	}
+	level, ok := data.AccessLevel(accessLevel)
+	return ok && level.AllowFixedRes
+}
+
 func (a *liveZoneActor) revalidate(ix *zone.Index) {
 	a.mu.Lock()
 	defer a.mu.Unlock()

@@ -93,6 +93,16 @@ func TestResolveCanGiveDamageUsesAccessLevelFlag(t *testing.T) {
 	}
 }
 
+func TestResolveFixedResUsesAccessLevelFlag(t *testing.T) {
+	data, err := admin.NewData([]admin.AccessLevel{{Level: 0}, {Level: 7, AllowFixedRes: true}}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolveFixedRes(data, 0) || !resolveFixedRes(data, 7) || resolveFixedRes(nil, 7) {
+		t.Fatal("resolveFixedRes() did not follow the access-level flag")
+	}
+}
+
 func TestPvPZoneMembershipTracksZoneTransitions(t *testing.T) {
 	state := world.New()
 	live := newTestLivePlayer(t, 100, &frameCapture{})
