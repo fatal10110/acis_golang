@@ -319,7 +319,7 @@ func (a *Attackable) promoteNext() {
 	}
 }
 
-// Tick advances the AI clock and applies periodic hate decay.
+// Tick advances the AI clock and applies periodic attack-threat decay.
 func (a *Attackable) Tick() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -330,7 +330,6 @@ func (a *Attackable) Tick() {
 	}
 	a.refreshCombatMemory()
 	a.threats.ReduceAllHate(attackHateDecay)
-	a.hates.ReduceAllHate(66000)
 	a.desires.DecreaseWeightByType(IntentionAttack, attackHateDecay)
 	a.step = 0
 }
