@@ -40,6 +40,7 @@ type liveEffectTarget struct {
 	vuln              float64
 	standing          bool
 	hpFull            bool
+	relaxNotice       int
 	recentFakeDeath   bool
 	objectID          int32
 	ownerID           int32
@@ -226,6 +227,10 @@ func (t *liveEffectTarget) SetStanding(v bool) bool {
 }
 
 func (t *liveEffectTarget) HPFull() bool { return t.hpFull }
+
+func (t *liveEffectTarget) NotifyRelaxDeactivatedHPFull(*Effect) {
+	t.relaxNotice++
+}
 
 func (t *liveEffectTarget) MarkRecentFakeDeath() {
 	t.recentFakeDeath = true
