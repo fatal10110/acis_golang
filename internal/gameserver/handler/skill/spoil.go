@@ -17,6 +17,11 @@ type magicCaster interface {
 	Level() int
 }
 
+type spoilNotifier interface {
+	NotifySpoilAlready()
+	NotifySpoilSuccess()
+}
+
 // weaponGradePenalized optionally reports whether the caster's equipped
 // weapon grade is insufficient for the skill being cast (a flat magic-
 // resist penalty); a caster without one is treated as unpenalized.
@@ -47,12 +52,18 @@ func (spoilHandler) Use(cast Cast) {
 		}
 		pool := target.SpoilPool()
 		if pool == nil || pool.IsSpoiled() {
+			if notify, ok := cast.Caster.(spoilNotifier); ok && pool != nil {
+				notify.NotifySpoilAlready()
+			}
 			continue
 		}
 
 		rate := formulas.MagicSuccessRate(target.Level(), caster.Level(), cast.Skill.MagicLevel, cast.Skill.LevelDepend, penalty)
 		if formulas.MagicSucceeds(rate, rnd.Get(10000)) {
 			pool.Mark(caster.ObjectID())
+			if notify, ok := cast.Caster.(spoilNotifier); ok {
+				notify.NotifySpoilSuccess()
+			}
 		}
 	}
 }
