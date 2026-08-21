@@ -99,23 +99,27 @@ func (n *Npcs) spawnPersisted(key string, maker *spawn.Maker, entry spawn.Entry,
 		return
 	}
 
-	loc, heading, hp := pos.Location, pos.Heading, int(tmpl.HPMax)
+	loc, heading, hp := pos.Location, pos.Heading, fullHP
 	if state.CheckAlive(pos.Location, pos.Heading, int(tmpl.HPMax), 0, now) {
 		loc, heading, hp = state.Location, state.Heading, state.CurrentHP
 	}
 	n.instantiate(key, entry, tmpl, loc, heading, hp)
 }
 
+// fullHP tells instantiate to seed the spawned Hostile at its own calculated
+// Max HP rather than a persisted CurrentHP value.
+const fullHP = -1
+
 // spawnFresh places one non-persisted instance of entry at a freshly rolled
 // position, always alive at full HP — the reference server never restores
 // HP/position across restarts for a spawn without a database name.
 func (n *Npcs) spawnFresh(key string, entry spawn.Entry, tmpl *npc.Template, pos spawn.Position) {
-	n.instantiate(key, entry, tmpl, pos.Location, pos.Heading, int(tmpl.HPMax))
+	n.instantiate(key, entry, tmpl, pos.Location, pos.Heading, fullHP)
 }
 
 // instantiate builds one live Hostile from tmpl and places it in the world
-// at (loc, heading) with hp current HP, registering it for AI ticks and
-// corpse decay/respawn.
+// at (loc, heading) with hp current HP (or fullHP, its calculated Max HP),
+// registering it for AI ticks and corpse decay/respawn.
 func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, loc location.Location, heading, hp int) {
 	id, err := n.ids.NextID()
 	if err != nil {
@@ -142,6 +146,9 @@ func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, lo
 		return
 	}
 
+	if hp == fullHP {
+		hp = hostile.MaxHP()
+	}
 	hostile.SetCurrentHP(hp)
 	hostile.SetWorld(n.state)
 	hostile.SetFrameBuilder(serverpackets.NpcFrameBuilder{})
