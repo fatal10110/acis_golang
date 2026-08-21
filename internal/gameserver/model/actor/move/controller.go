@@ -22,6 +22,7 @@ type Actor interface {
 	Located
 	ObjectID() int32
 	SyncPosition(location.Location)
+	SetHeading(int)
 	BroadcastMove(Event) error
 	BroadcastStop() error
 }
@@ -81,6 +82,10 @@ func NewController(move *CreatureMove, self Actor) (*Controller, error) {
 		// waypoint rather than a follow target.
 		event.FollowTarget = 0
 		event.FollowOffset = 0
+		// Reference rotates toward the new leg immediately before
+		// broadcasting it (CreatureMove.java moveToNextRoutePoint,
+		// setHeadingTo(destination) directly above the MoveToLocation send).
+		self.SetHeading(event.Origin.HeadingTo(event.Destination))
 		return self.BroadcastMove(event)
 	})
 	move.SetBlockedHook(func() { _ = self.BroadcastStop() })

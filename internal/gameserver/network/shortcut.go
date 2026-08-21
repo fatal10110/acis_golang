@@ -30,7 +30,6 @@ func (l *GameClientLink) registerShortcut(ctx context.Context, live *livePlayer,
 	if l.shortcuts != nil {
 		if err := l.shortcuts.Save(ctx, live.ObjectID(), sc); err != nil {
 			l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("register shortcut")
-			return
 		}
 	}
 	live.shortcuts.Register(sc)
@@ -51,7 +50,6 @@ func (l *GameClientLink) deleteShortcut(ctx context.Context, live *livePlayer, r
 	if l.shortcuts != nil {
 		if err := l.shortcuts.Delete(ctx, live.ObjectID(), req.Slot, req.Page); err != nil {
 			l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("delete shortcut")
-			return
 		}
 	}
 	live.shortcuts.Delete(req.Slot, req.Page)
