@@ -56,6 +56,22 @@ func TestFieldsMalformedSticksFirstError(t *testing.T) {
 	}
 }
 
+func TestFieldsStringAndBoolRespectStickyError(t *testing.T) {
+	p, err := ParseString("bad = notanumber\nstr = value\nbool = true\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f := NewFields(p, "test")
+
+	f.Int("bad", 0)
+	if got := f.String("str", "default"); got != "default" {
+		t.Fatalf("String(str) after sticky error = %q, want default", got)
+	}
+	if got := f.Bool("bool", false); got != false {
+		t.Fatalf("Bool(bool) after sticky error = %v, want false", got)
+	}
+}
+
 func TestFieldsIntPairsCommaAndSemicolon(t *testing.T) {
 	p, err := ParseString("comma = 57-0,5575-0,6673-10\nsemi = 1-2;3-4\n")
 	if err != nil {
