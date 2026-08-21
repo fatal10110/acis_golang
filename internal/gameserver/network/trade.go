@@ -105,7 +105,7 @@ func (l *GameClientLink) handleAddTradeItem(live *livePlayer, req clientpackets.
 		return
 	}
 	partner, ok := l.livePlayerByID(partnerID)
-	if !ok || !l.validTradeParticipants(live, partner) {
+	if !ok || !l.tradePartnerLive(live, partner) {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetNotFound))
 		l.cancelTradeByID(live.ObjectID())
 		return
@@ -272,6 +272,16 @@ func (l *GameClientLink) livePlayerByID(objectID int32) (*livePlayer, bool) {
 }
 
 func (l *GameClientLink) validTradeParticipants(first, second *livePlayer) bool {
+	return l.tradePartnerLive(first, second) && livePlayersInRange(first, second, tradeInteractionDistance)
+}
+
+// tradePartnerLive reports whether both players are still online in the
+// world, without the 150-unit interaction-distance check. AddTradeItem.java
+// L40-46 gates on partner liveness only (partner != null, still in World,
+// getActiveTradeList() != null) — the reference enforces
+// Npc.INTERACTION_DISTANCE solely in TradeList.validate(), called from
+// TradeList.confirm() (TradeList.java L326-341), i.e. only at TradeDone.
+func (l *GameClientLink) tradePartnerLive(first, second *livePlayer) bool {
 	if first == nil || second == nil || first.Inventory() == nil || second.Inventory() == nil {
 		return false
 	}
@@ -281,7 +291,7 @@ func (l *GameClientLink) validTradeParticipants(first, second *livePlayer) bool 
 	if current, ok := l.livePlayerByID(second.ObjectID()); !ok || current != second {
 		return false
 	}
-	return livePlayersInRange(first, second, tradeInteractionDistance)
+	return true
 }
 
 func livePlayersInRange(first, second *livePlayer, radius int) bool {
