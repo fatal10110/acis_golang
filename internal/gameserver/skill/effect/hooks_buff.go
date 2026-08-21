@@ -22,6 +22,9 @@ func targetMeStart(e *Effect) bool {
 	if !ok {
 		return false
 	}
+	if pt, ok := e.Effected.(playerTarget); !ok || !pt.IsPlayer() {
+		return false
+	}
 	if target.CurrentTarget() == e.Effector {
 		target.TryToAttack(e.Effector)
 	} else {
