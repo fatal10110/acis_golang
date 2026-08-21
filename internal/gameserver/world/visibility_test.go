@@ -761,7 +761,7 @@ func TestInRangeMatchesOracle(t *testing.T) {
 		a.x, a.y, a.z = tc.x1, tc.y1, tc.z1
 		b := &trackedStub{id: 2}
 		b.x, b.y, b.z = tc.x2, tc.y2, tc.z2
-		if got := inRange(tc.rng, a, b); got != tc.want {
+		if got := inRange(tc.rng, a, b, true); got != tc.want {
 			t.Errorf("inRange(%d, (%d,%d,%d), (%d,%d,%d)) = %v, want %v",
 				tc.rng, tc.x1, tc.y1, tc.z1, tc.x2, tc.y2, tc.z2, got, tc.want)
 		}
@@ -785,15 +785,40 @@ func TestInRangeWidensByCollisionRadius(t *testing.T) {
 
 	// Centre distance (150) exceeds the raw range (100), but with both
 	// 40-unit bodies added (100+40+40=180) they're within range.
-	if !inRange(100, a, b) {
+	if !inRange(100, a, b, true) {
 		t.Error("inRange(100, ...) = false, want true once collision radii are added")
 	}
 
 	// A point occupant (no CollisionRadius) gets no widening.
 	p := &trackedStub{id: 3}
 	p.x, p.y, p.z = 150, 0, 0
-	if inRange(100, a, p) {
+	if inRange(100, a, p, true) {
 		t.Error("inRange(100, ...) = true, want false: point occupant should not be widened")
+	}
+
+	// widen=false ignores collision radii entirely, matching a reference
+	// check that filters by plain point distance (e.g. EffectConfusion.java:43).
+	if inRange(100, a, b, false) {
+		t.Error("inRange(100, ..., widen=false) = true, want false: widening must be suppressed")
+	}
+}
+
+// TestInRangeKeepsFractionalCollisionRadii covers pr-reviews/928.md finding
+// 1: summing collision radii as int truncated fractional radii (7.5 on
+// female player templates, Grow-scaled NPC bodies) before comparing,
+// diverging from MathUtil.checkIfInRange's double-space totalRadius
+// (MathUtil.java:193-198,214-217).
+func TestInRangeKeepsFractionalCollisionRadii(t *testing.T) {
+	a := &bodiedStub{trackedStub: trackedStub{id: 1}, radius: 7.5}
+	a.x, a.y, a.z = 0, 0, 0
+	b := &bodiedStub{trackedStub: trackedStub{id: 2}, radius: 7.5}
+	b.x, b.y, b.z = 115, 0, 0
+
+	// Java: (100+7.5+7.5)^2 = 13225 >= distance^2 (115^2 = 13225) -> in range.
+	// A truncating int sum instead allows only (100+7+7)^2 = 12996 < 13225,
+	// which would wrongly report out of range.
+	if !inRange(100, a, b, true) {
+		t.Error("inRange(100, ...) = false, want true: fractional collision radii must not truncate")
 	}
 }
 
