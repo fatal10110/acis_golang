@@ -18,8 +18,16 @@ type Region struct {
 	mu      sync.RWMutex
 	objects map[int32]Tracked
 
-	playersCount atomic.Int32
-	active       atomic.Bool
+	activityMu      sync.Mutex
+	activityVersion uint64
+	activityPending uint64
+	playersCount    atomic.Int32
+	active          atomic.Bool
+}
+
+type regionActivityArrival struct {
+	version uint64
+	pending bool
 }
 
 type activeRegionActor interface {
@@ -50,11 +58,33 @@ func (r *Region) Active() bool {
 // notifyActivity for a change it reports — see relocate, which defers that
 // work until after releasing regionActivityMu.
 func (r *Region) setActive(value bool) bool {
-	return r.active.CompareAndSwap(!value, value)
+	r.activityMu.Lock()
+	defer r.activityMu.Unlock()
+	if !r.active.CompareAndSwap(!value, value) {
+		return false
+	}
+	r.activityVersion++
+	r.activityPending++
+	return true
 }
 
 func (r *Region) notifyActivity(active bool) {
-	for _, obj := range r.Objects() {
+	r.activityMu.Lock()
+	objects := r.Objects()
+	r.activityPending--
+	r.activityMu.Unlock()
+	for _, obj := range objects {
+		notifyObjectActivity(obj, active)
+	}
+}
+
+func (r *Region) notifyArrivalActivity(obj Tracked, arrival regionActivityArrival) {
+	r.activityMu.Lock()
+	changed := r.activityVersion != arrival.version
+	pending := r.activityPending != 0
+	active := r.Active()
+	r.activityMu.Unlock()
+	if !arrival.pending && !changed && !pending {
 		notifyObjectActivity(obj, active)
 	}
 }
@@ -72,13 +102,16 @@ func notifyObjectActivity(obj Tracked, active bool) {
 }
 
 // Add registers obj as visible within r.
-func (r *Region) Add(obj Tracked) {
+func (r *Region) Add(obj Tracked) regionActivityArrival {
+	r.activityMu.Lock()
+	defer r.activityMu.Unlock()
 	r.mu.Lock()
 	r.objects[obj.ObjectID()] = obj
 	r.mu.Unlock()
 	if _, ok := obj.(Player); ok {
 		r.playersCount.Add(1)
 	}
+	return regionActivityArrival{r.activityVersion, r.activityPending != 0}
 }
 
 // Remove drops the object with the given id from r, if present.

@@ -220,8 +220,9 @@ func (s *State) relocate(t Tracked, next *Region) {
 	if prev != nil && prev.removeIfSame(t.ObjectID(), t) {
 		oldAreas = s.AppendNeighbors(oldAreaBuf[:0], prev, 1)
 	}
+	var arrival regionActivityArrival
 	if next != nil {
-		next.Add(t)
+		arrival = next.Add(t)
 		newAreas = s.AppendNeighbors(newAreaBuf[:0], next, 1)
 	}
 	p.mu.Lock()
@@ -230,7 +231,7 @@ func (s *State) relocate(t Tracked, next *Region) {
 	if next != nil && !tIsPlayer && prev != nil {
 		// A non-player entering a region that was already active or
 		// inactive sees no setActive transition, so notify it directly.
-		notifyObjectActivity(t, next.Active())
+		next.notifyArrivalActivity(t, arrival)
 	}
 
 	tObs, tObserves := t.(Observer)
