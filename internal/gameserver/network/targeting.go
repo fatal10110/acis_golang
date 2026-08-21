@@ -62,12 +62,38 @@ func (l *GameClientLink) handleTargetAction(ctx context.Context, live *livePlaye
 	if selected && l.showOwnedPetStatus(live, target, shift) {
 		return
 	}
+	if selected && l.interactLiveStaticObject(live, target) {
+		return
+	}
 	if selected && l.sitLiveOnChair(live, target, true) {
 		return
 	}
 	if selected {
 		l.attackLiveTarget(live, target)
 	}
+}
+
+func (l *GameClientLink) interactLiveStaticObject(live *livePlayer, target world.Tracked) bool {
+	obj, ok := target.(*staticobject.Object)
+	if !ok {
+		return false
+	}
+
+	switch obj.Type() {
+	case staticobject.MapType:
+		live.SendFrame(serverpackets.FrameActionFailed())
+		live.SendFrame(serverpackets.FrameShowTownMap("town_map."+obj.Template.Texture, obj.Template.MapX, obj.Template.MapY))
+	case staticobject.ArenaSignType:
+		html, ok := l.html.Get("signboard.htm")
+		if !ok {
+			html = "<html><body>My html is missing:<br>data/html/signboard.htm</body></html>"
+		}
+		live.SendFrame(serverpackets.FrameActionFailed())
+		live.SendFrame(serverpackets.FrameNpcHtmlMessage(obj.ObjectID(), html, 0))
+	default:
+		return false
+	}
+	return true
 }
 
 func (l *GameClientLink) startPickupLiveGroundItem(ctx context.Context, live *livePlayer, target world.Tracked, shift bool) bool {

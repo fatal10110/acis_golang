@@ -13,6 +13,8 @@ const (
 	OpcodeStaticObjectInfo = 0x99
 	// OpcodeChairSit is the wire opcode for ChairSit.
 	OpcodeChairSit = 0xe1
+	// OpcodeShowTownMap is the wire opcode for ShowTownMap.
+	OpcodeShowTownMap = 0xde
 )
 
 type doorPacketObject interface {
@@ -70,5 +72,14 @@ func FrameChairSit(playerID int32, staticID int) wire.Frame {
 	w := newFrameWriter(OpcodeChairSit)
 	w.WriteInt32(playerID)
 	w.WriteInt32(int32(staticID))
+	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
+}
+
+// FrameShowTownMap builds a town map packet.
+func FrameShowTownMap(texture string, x, y int) wire.Frame {
+	w := newFrameWriter(OpcodeShowTownMap)
+	w.WriteString(texture)
+	w.WriteInt32(int32(x))
+	w.WriteInt32(int32(y))
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
 }
