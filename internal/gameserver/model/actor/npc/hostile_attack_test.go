@@ -470,6 +470,9 @@ func TestHostileDieBroadcastsDieToKnownReceivers(t *testing.T) {
 	if observer.frames[0][0] != serverpackets.OpcodeDie {
 		t.Fatalf("frame opcode = %#x, want %#x", observer.frames[0][0], serverpackets.OpcodeDie)
 	}
+	if got := binary.LittleEndian.Uint32(observer.frames[0][21:25]); got != 0 {
+		t.Fatalf("Die sweep field = %d, want 0", got)
+	}
 
 	// A repeated kill is a no-op per Die's once-only contract: no second
 	// Die packet.
