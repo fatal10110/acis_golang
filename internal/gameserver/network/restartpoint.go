@@ -3,6 +3,7 @@ package network
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -90,4 +91,25 @@ func (l *GameClientLink) teleportLivePlayer(live *livePlayer, target location.Lo
 	l.broadcastLiveFrame(live, func() wire.Frame {
 		return serverpackets.FrameTeleportToLocation(live.ObjectID(), target, false)
 	})
+}
+
+func (l *GameClientLink) completeLivePlayerTeleport(live *livePlayer) {
+	if live == nil || !live.SetTeleporting(false) {
+		return
+	}
+	l.activateSpawnProtection(live)
+	if l.world == nil {
+		return
+	}
+	active, ok := l.world.Summon(live.ObjectID())
+	if !ok {
+		return
+	}
+	actor, ok := active.(*summon.Actor)
+	if !ok {
+		return
+	}
+	destination := live.CurrentLocation()
+	actor.SyncPosition(destination)
+	actor.BroadcastFrame(serverpackets.FrameTeleportToLocation(actor.ObjectID(), destination, false))
 }

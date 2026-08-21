@@ -1,6 +1,7 @@
 package network
 
 import (
+	"encoding/binary"
 	"testing"
 	"time"
 
@@ -8,6 +9,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/restart"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -212,6 +214,57 @@ func TestRestartLivePlayerRevivesAndTeleportsDeadPlayer(t *testing.T) {
 	if dy := got.Y - dest.Y; dy < -restartTeleportOffset || dy > restartTeleportOffset {
 		t.Fatalf("teleported Y = %d, want within %d of %d", got.Y, restartTeleportOffset, dest.Y)
 	}
+}
+
+func TestCompleteLivePlayerTeleportRelocatesActiveSummonOnce(t *testing.T) {
+	state := world.New()
+	live := newTestLivePlayer(t, 1, &frameCapture{})
+	state.Spawn(live, 0, 0, 0, 0)
+	observerFrames := &frameCapture{}
+	observer := newTestLivePlayer(t, 2, observerFrames)
+	state.Spawn(observer, 50, 0, 0, 0)
+	active := summon.NewServitor(summon.ServitorConfig{ObjectID: 3, Owner: live, Level: 40})
+	summon.SpawnBesideOwner(state, active, live, location.Location{})
+
+	gcl := &GameClientLink{world: state, geo: testGeo{}, log: zerolog.Nop()}
+	destination := location.Location{X: 100, Y: 0, Z: 0}
+	gcl.teleportLivePlayer(live, destination, 0)
+	if got := summonPosition(active); got == destination {
+		t.Fatalf("summon position before Appearing = %+v, want not yet relocated to %+v", got, destination)
+	}
+	observerFrames.frames = nil
+
+	gcl.completeLivePlayerTeleport(live)
+	if got := summonPosition(active); got != destination {
+		t.Fatalf("summon position after Appearing = %+v, want %+v", got, destination)
+	}
+	if !containsTeleportFor(observerFrames.frames, active.ObjectID()) {
+		t.Fatal("observer did not receive the active summon teleport frame")
+	}
+
+	active.SyncPosition(location.Location{})
+	observerFrames.frames = nil
+	gcl.completeLivePlayerTeleport(live)
+	if got := summonPosition(active); got != (location.Location{}) {
+		t.Fatalf("summon position after repeated Appearing = %+v, want unchanged", got)
+	}
+	if len(observerFrames.frames) != 0 {
+		t.Fatalf("observer frames after repeated Appearing = %x, want none", observerFrames.frames)
+	}
+}
+
+func summonPosition(actor *summon.Actor) location.Location {
+	x, y, z := actor.Position()
+	return location.Location{X: x, Y: y, Z: z}
+}
+
+func containsTeleportFor(frames [][]byte, objectID int32) bool {
+	for _, frame := range frames {
+		if len(frame) >= 5 && frame[0] == serverpackets.OpcodeTeleportToLocation && int32(binary.LittleEndian.Uint32(frame[1:])) == objectID {
+			return true
+		}
+	}
+	return false
 }
 
 // TestRestartLivePlayerWithNoRestartTableSendsActionFailed pins the
