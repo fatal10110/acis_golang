@@ -551,6 +551,31 @@ func (inv *Inventory) unequipSlotLocked(slot int) *item.Instance {
 	return inv.setPaperdollItemLocked(slot, nil, nil)
 }
 
+// ClearWornSlot drops paperdoll position slot's occupant and its wornMask
+// contribution when it still equals inst, without touching inst's own
+// Location/LocationData or queuing an inventory update for it. Use this
+// instead of UnequipSlot when inst has already been moved to a different
+// container (e.g. by a completed transfer) and only this inventory's own
+// equip bookkeeping needs to catch up — UnequipSlot's SetLocation(inv.
+// Location(), 0) would otherwise stomp the location the transfer already
+// assigned. Reports whether it actually cleared anything.
+func (inv *Inventory) ClearWornSlot(slot int, inst *item.Instance) bool {
+	if slot < 0 || slot >= item.PaperdollSlots || inst == nil {
+		return false
+	}
+	inv.mu.Lock()
+	defer inv.fireNotifier() // registered first, so it runs last, after the unlock
+	defer inv.mu.Unlock()
+	if inv.paperdoll[slot] != inst {
+		return false
+	}
+	inv.paperdoll[slot] = nil
+	if tmpl, ok := inv.Templates().Get(inst.TemplateID); ok {
+		inv.wornMask &^= tmpl.Mask()
+	}
+	return true
+}
+
 // UpdateWeight recomputes the inventory's total carried weight and reports
 // whether it changed.
 func (inv *Inventory) UpdateWeight() bool {
