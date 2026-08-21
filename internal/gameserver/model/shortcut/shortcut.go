@@ -108,6 +108,44 @@ func Starter() []Shortcut {
 	}
 }
 
+// TutorialBookItemID is the reference-hardcoded template id of the tutorial
+// guide granted to every base profession (RequestCharacterCreate.java:150).
+const TutorialBookItemID = 5588
+
+// TutorialBookShortcut returns the slot-11 ITEM shortcut for the tutorial
+// book granted at character creation, keyed on the granted instance's own
+// objectID rather than the template id — the client cannot resolve an ITEM
+// shortcut any other way (RequestCharacterCreate.java:149-151).
+func TutorialBookShortcut(objectID int32) Shortcut {
+	return Shortcut{Slot: 11, Page: 0, Type: Item, ID: objectID, Level: -1, CharacterType: 1}
+}
+
+// Auto-get skill ids RequestCharacterCreate.java:157-164 hardcodes to a
+// starter shortcut slot: 1001 (orc mystics) and 1177 (other mystics) share
+// slot 1, 1216 shares slot 9. Any other auto-get skill id gets no shortcut.
+const (
+	autoGetSkillOrcMystic   int32 = 1001
+	autoGetSkillOtherMystic int32 = 1177
+	autoGetSkillSlot9       int32 = 1216
+)
+
+// AutoGetSkillShortcuts returns the default shortcut-bar entries for a new
+// character's free (auto-get) skills, given their id/level pairs. It mirrors
+// RequestCharacterCreate.java:157-164, which hardcodes the shortcut level to
+// 1 rather than the granted skill's own level.
+func AutoGetSkillShortcuts(autoGet map[int32]int32) []Shortcut {
+	var out []Shortcut
+	for id := range autoGet {
+		switch id {
+		case autoGetSkillOrcMystic, autoGetSkillOtherMystic:
+			out = append(out, Shortcut{Slot: 1, Page: 0, Type: Skill, ID: id, Level: 1, CharacterType: 1})
+		case autoGetSkillSlot9:
+			out = append(out, Shortcut{Slot: 9, Page: 0, Type: Skill, ID: id, Level: 1, CharacterType: 1})
+		}
+	}
+	return out
+}
+
 // Register adds or replaces shortcut.
 func (l *List) Register(shortcut Shortcut) {
 	if l.bySlot == nil {

@@ -98,6 +98,32 @@ func TestListRefreshSkillLevelUpdatesOnlyMatchingSkillShortcuts(t *testing.T) {
 	}
 }
 
+func TestTutorialBookShortcutUsesGrantedInstanceObjectID(t *testing.T) {
+	sc := TutorialBookShortcut(0x10000042)
+	want := Shortcut{Slot: 11, Page: 0, Type: Item, ID: 0x10000042, Level: -1, CharacterType: 1}
+	if sc != want {
+		t.Fatalf("TutorialBookShortcut() = %+v, want %+v", sc, want)
+	}
+}
+
+func TestAutoGetSkillShortcutsMapsHardcodedIDsToSlots(t *testing.T) {
+	got := AutoGetSkillShortcuts(map[int32]int32{1177: 1, 1216: 1, 9999: 1})
+
+	byID := make(map[int32]Shortcut)
+	for _, sc := range got {
+		byID[sc.ID] = sc
+	}
+	if len(got) != 2 {
+		t.Fatalf("AutoGetSkillShortcuts() = %+v, want 2 entries (unknown id 9999 dropped)", got)
+	}
+	if sc := byID[1177]; sc != (Shortcut{Slot: 1, Page: 0, Type: Skill, ID: 1177, Level: 1, CharacterType: 1}) {
+		t.Errorf("skill 1177 shortcut = %+v, want slot 1", sc)
+	}
+	if sc := byID[1216]; sc != (Shortcut{Slot: 9, Page: 0, Type: Skill, ID: 1216, Level: 1, CharacterType: 1}) {
+		t.Errorf("skill 1216 shortcut = %+v, want slot 9", sc)
+	}
+}
+
 func TestTypeStringsRoundTrip(t *testing.T) {
 	for _, typ := range []Type{Item, Skill, Action, Macro, Recipe} {
 		got, ok := ParseType(typ.String())
