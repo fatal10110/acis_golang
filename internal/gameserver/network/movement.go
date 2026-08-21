@@ -67,7 +67,7 @@ func liveMoveSpeed(live *livePlayer) float64 {
 	if live.Running() {
 		return live.RunSpeed()
 	}
-	return live.template.WalkSpeed
+	return live.WalkSpeed()
 }
 
 func (l *GameClientLink) changeLiveMoveType(live *livePlayer, run bool) {
