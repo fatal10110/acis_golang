@@ -95,10 +95,12 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 	}
 	shortcuts := shortcut.Starter()
 	if l.shortcuts != nil {
-		shortcuts, err = l.shortcuts.ListByOwner(ctx, c.ID)
-		if err != nil {
-			l.log.Error().Err(err).Msg("enter world: list shortcuts")
-			return nil, false
+		restored, listErr := l.shortcuts.ListByOwner(ctx, c.ID)
+		if listErr != nil {
+			l.log.Error().Err(listErr).Msg("enter world: list shortcuts")
+			shortcuts = nil
+		} else {
+			shortcuts = restored
 		}
 	}
 
