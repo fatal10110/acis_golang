@@ -72,6 +72,13 @@ func TestHostileAutoAttackTargetValid(t *testing.T) {
 			want:       false,
 		},
 		{
+			name:       "target exactly at range is excluded",
+			aggroRange: 10,
+			target:     func() *gateTarget { return &gateTarget{id: 2} },
+			targetPos:  [3]int{100 + rangeVal, 100, 0},
+			want:       false,
+		},
+		{
 			name:       "already-dead target is excluded",
 			aggroRange: 10,
 			target:     func() *gateTarget { return &gateTarget{id: 2, dead: true} },
@@ -145,6 +152,18 @@ func TestHostileAutoAttackTargetValid(t *testing.T) {
 				t.Fatalf("AutoAttackTargetValid() = %v, want %v", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestHostileAutoAttackTargetValidExcludesNegativeRange(t *testing.T) {
+	state := world.New()
+	attacker := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", AggroRange: 10})
+	state.Spawn(attacker, 100, 100, 0, 0)
+	target := &gateTarget{id: 2}
+	state.Spawn(target, 100, 100, 0, 0)
+
+	if attacker.AutoAttackTargetValid(target, -1, false) {
+		t.Fatal("AutoAttackTargetValid() = true with a negative range, want false")
 	}
 }
 

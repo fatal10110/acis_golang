@@ -88,13 +88,19 @@ func (h *Hostile) AutoAttackTargetValid(target attackable.Combatant, rangeVal in
 // inRangeAndUnconcealed applies the range and silent-move gates the
 // reference rule reserves for non-NPC targets.
 func (h *Hostile) inRangeAndUnconcealed(target attackable.Combatant, rangeVal int) bool {
+	if rangeVal < 0 {
+		return false
+	}
 	other, ok := target.(interface{ Position() (int, int, int) })
 	if !ok {
 		return false
 	}
 	tx, ty, tz := other.Position()
 	sx, sy, sz := h.Position()
-	if !location.In3DRange(sx, sy, sz, tx, ty, tz, rangeVal) {
+	dx := int64(sx) - int64(tx)
+	dy := int64(sy) - int64(ty)
+	dz := int64(sz) - int64(tz)
+	if dx*dx+dy*dy+dz*dz >= int64(rangeVal)*int64(rangeVal) {
 		return false
 	}
 
