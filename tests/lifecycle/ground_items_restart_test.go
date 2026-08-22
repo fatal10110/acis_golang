@@ -1,12 +1,47 @@
 package lifecycle
 
 import (
+	"bytes"
+	"sync"
 	"testing"
+
+	"github.com/rs/zerolog"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
+
+// logBuffer collects both boots' server logs so a failing restart test can
+// show what the stack actually reported (handler errors are logged, not
+// fatal).
+type logBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *logBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func startLoggedBoot(t *testing.T, opts ...gameservertest.Option) *gameservertest.Server {
+	t.Helper()
+	logs := &logBuffer{}
+	srv := gameservertest.Boot(t, append(opts, gameservertest.WithLog(zerolog.New(logs)))...)
+	t.Cleanup(func() {
+		if !t.Failed() {
+			return
+		}
+		logs.mu.Lock()
+		defer logs.mu.Unlock()
+		if logs.buf.Len() > 0 {
+			t.Logf("server log:\n%s", logs.buf.String())
+		}
+	})
+	return srv
+}
 
 // TestGroundItemsRestartRoundTrip drops an item, shuts the server down, and
 // boots a fresh stack on the same database: the drop must survive in
@@ -14,7 +49,7 @@ import (
 // cleared so nothing double-restores), and be fully usable — the entering
 // client picks it up and the adena is back in one inventory stack.
 func TestGroundItemsRestartRoundTrip(t *testing.T) {
-	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
+	srv := startLoggedBoot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	objID := srv.SoleObjectID(t)
 	adena := srv.GiveItem(t, objID, item.AdenaID, 100)
@@ -30,7 +65,7 @@ func TestGroundItemsRestartRoundTrip(t *testing.T) {
 		t.Fatalf("items_on_ground rows after shutdown = %+v, want one adena row object %d count 40", rows, groundID)
 	}
 
-	srv2 := gameservertest.Boot(t, gameservertest.WithWantChars(1))
+	srv2 := startLoggedBoot(t, gameservertest.WithWantChars(1))
 	if _, ok := srv2.State.Object(groundID); !ok {
 		t.Fatal("second boot did not restore the dropped item into world state")
 	}
