@@ -470,18 +470,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 		l.updateLiveAbnormalEffect(live)
 	})
 	c.SetAbnormalEffectBroadcaster(func() {
-		items := live.inventoryItems()
-		live.SendFrame(serverpackets.FrameUserInfo(serverpackets.UserInfoSnapshot{Character: live.Character, Template: live.template, Items: items, IsGM: live.isGM}))
-		if l.world != nil {
-			info := serverpackets.CharInfoSnapshot{Character: live.Character, Template: live.template, Items: items}
-			broadcastFrame(func() wire.Frame { return serverpackets.FrameCharInfo(info) }, func(send func(frameReceiver)) {
-				l.world.ForEachKnown(live, func(o world.Tracked) {
-					if receiver, ok := o.(frameReceiver); ok {
-						send(receiver)
-					}
-				})
-			})
-		}
+		l.broadcastCharacterInfo(live)
 	})
 	c.SetExpSpGainNotifier(func(exp int64, sp int) {
 		live.SendFrame(expSpGainMessage(exp, sp))

@@ -30,14 +30,21 @@ func TestDisablerEffectsRunLiveStartExitHooks(t *testing.T) {
 			wantExit:  []string{"think", "abnormal"},
 		},
 		{
+			// Paralyze and Petrification are the two disabler effects that
+			// also carry a client-visible abnormal-effect mask
+			// (AbnormalEffect.HOLD_1/HOLD_2 in EffectParalyze.java:28 and
+			// EffectPetrification.java:28), so — unlike Stun/Root/Sleep —
+			// they route through startAbnormalEffect/stopAbnormalEffect and
+			// drive BroadcastAbnormalEffect on a player target in addition
+			// to the icon-list refresh.
 			name:      "Paralyze",
-			wantStart: []string{"abnormal", "abort:false"},
-			wantExit:  []string{"abnormal", "think"},
+			wantStart: []string{"abnormal", "broadcast", "abort:false"},
+			wantExit:  []string{"abnormal", "broadcast", "think"},
 		},
 		{
 			name:      "Petrification",
-			wantStart: []string{"abnormal", "abort:false", "invul:true"},
-			wantExit:  []string{"abnormal", "think", "invul:false"},
+			wantStart: []string{"abnormal", "broadcast", "abort:false", "invul:true"},
+			wantExit:  []string{"abnormal", "broadcast", "think", "invul:false"},
 		},
 	}
 
