@@ -299,7 +299,9 @@ func (l *GameClientLink) handleToggleSkillUse(live *livePlayer, req clientpacket
 
 	broadcast()
 	if activated {
-		actorcast.ApplyEffects(handlers, live.Character, target, def)
+		result := actorcast.ApplyEffectsResult(handlers, live.Character, target, def)
+		l.sendSkillHandlerResult(live, result)
+		l.syncCubicTargets(live, result, def)
 	} else {
 		skillhandler.StopEffect(live.Character, def.ID)
 	}
