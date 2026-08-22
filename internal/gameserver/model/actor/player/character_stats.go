@@ -250,7 +250,11 @@ func (c *Character) ShieldDefense(caster creature.DeathActor, def modelskill.Def
 		return formulas.ShieldFailed
 	}
 
-	result := formulas.ShieldUse(baseRate, c.DEX(), attackerUsesBow(caster), isCrit, c.perfectShieldBlockRate, c.rollValue(100))
+	c.stateMu.RLock()
+	perfectRate := c.perfectShieldBlockRate
+	c.stateMu.RUnlock()
+
+	result := formulas.ShieldUse(baseRate, c.DEX(), attackerUsesBow(caster), isCrit, perfectRate, c.rollValue(100))
 	c.notifyShieldBlock(result)
 	return result
 }
