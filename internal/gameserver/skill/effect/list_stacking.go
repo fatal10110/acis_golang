@@ -139,12 +139,20 @@ func (l *List) removeRejectedStacked(e *Effect) {
 // addStacked) does not call remove: a displaced member stays queued and its
 // schedule keeps draining.
 func (l *List) remove(e *Effect, pending *[]func()) {
+	// wornOff must be read before stopSchedule zeroes e's remaining-tick
+	// counter, so notifyExpiry below can still tell natural exhaustion
+	// (getCount() == 0) apart from early removal.
+	wornOff := e.Remaining() == 0
 	e.stopSchedule()
 
 	if e.stackType() == "none" {
-		if l.removeFromVisible(e) && e.InUse() {
+		removed := l.removeFromVisible(e)
+		if removed && e.InUse() {
 			*pending = append(*pending, func() { l.removeStats(e) })
 			appendThunk(pending, e.beginExit())
+		}
+		if removed {
+			l.notifyExpiry(e, wornOff, pending)
 		}
 		return
 	}
@@ -152,7 +160,9 @@ func (l *List) remove(e *Effect, pending *[]func()) {
 	queue := l.stacks[e.stackType()]
 	index := slices.Index(queue, e)
 	if index < 0 {
-		l.removeFromVisible(e)
+		if l.removeFromVisible(e) {
+			l.notifyExpiry(e, wornOff, pending)
+		}
 		return
 	}
 
@@ -173,7 +183,9 @@ func (l *List) remove(e *Effect, pending *[]func()) {
 	} else {
 		l.stacks[e.stackType()] = queue
 	}
-	l.removeFromVisible(e)
+	if l.removeFromVisible(e) {
+		l.notifyExpiry(e, wornOff, pending)
+	}
 }
 
 func (l *List) contained(e *Effect) *Effect {

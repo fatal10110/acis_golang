@@ -1,6 +1,9 @@
 package player
 
-import "github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+import (
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+)
 
 // SetLackHPNotifier records the packet-layer hook for a toggle DOT effect
 // removed because its tick would exceed the target's remaining HP.
@@ -81,5 +84,46 @@ func (c *Character) NotifySpoilSuccess() {
 	c.stateMu.RUnlock()
 	if send != nil {
 		send()
+	}
+}
+
+// SetEffectExpiryNotifiers records the packet-layer hooks for an active
+// effect's worn-off/disappeared/aborted system message.
+func (c *Character) SetEffectExpiryNotifiers(wornOff, disappeared, aborted func(skillID modelskill.ID, level int)) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	c.sendEffectWornOff, c.sendEffectDisappeared, c.sendEffectAborted = wornOff, disappeared, aborted
+}
+
+// NotifyEffectWornOff sends S1_HAS_WORN_OFF for an effect that ran its full
+// course.
+func (c *Character) NotifyEffectWornOff(skillID modelskill.ID, level int) {
+	c.stateMu.RLock()
+	send := c.sendEffectWornOff
+	c.stateMu.RUnlock()
+	if send != nil {
+		send(skillID, level)
+	}
+}
+
+// NotifyEffectDisappeared sends EFFECT_S1_DISAPPEARED for an effect removed
+// before it ran its full course.
+func (c *Character) NotifyEffectDisappeared(skillID modelskill.ID, level int) {
+	c.stateMu.RLock()
+	send := c.sendEffectDisappeared
+	c.stateMu.RUnlock()
+	if send != nil {
+		send(skillID, level)
+	}
+}
+
+// NotifyEffectAborted sends S1_HAS_BEEN_ABORTED for a toggle skill turned
+// off.
+func (c *Character) NotifyEffectAborted(skillID modelskill.ID, level int) {
+	c.stateMu.RLock()
+	send := c.sendEffectAborted
+	c.stateMu.RUnlock()
+	if send != nil {
+		send(skillID, level)
 	}
 }
