@@ -1,7 +1,6 @@
 package npc
 
 import (
-	"math"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
@@ -318,7 +317,7 @@ func (h *Hostile) MakeAttackHit(target attackable.Combatant, split bool) attack.
 		return hit
 	}
 
-	critRate := math.Min(h.calcStat(stat.CriticalRate, tpl.CritRate), 500)
+	critRate := float64(min(int(h.calcStat(stat.CriticalRate, tpl.CritRate)), 500))
 	crit := formulas.CritSucceeds(critRate, h.roll(1000))
 
 	randomMul := creature.RandomDamageMultiplier(h, modelskill.Definition{})
