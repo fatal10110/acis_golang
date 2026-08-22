@@ -3,6 +3,7 @@ package inventory
 import (
 	"testing"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 )
@@ -116,6 +117,30 @@ func TestTransferItemFullMoveUpdatesMovedInstance(t *testing.T) {
 	}
 	if len(res.Persist) != 1 || res.Persist[0].Action != PersistUpdate || res.Persist[0].Item.ObjectID != inst.ObjectID {
 		t.Fatalf("persist actions = %+v, want moved item update", res.Persist)
+	}
+}
+
+// PickupGround must report a full-inventory rejection (not a loot-lock
+// rejection) when both conditions hold, matching SummonAI.thinkPickUp()
+// (SummonAI.java:172-193), which validates capacity before the owner check.
+func TestPickupGroundReportsCapacityBeforeLootLock(t *testing.T) {
+	templates := testTemplates()
+	inv := itemcontainer.NewPlayerInventory(1, templates)
+	inv.SlotLimit = 1
+	inv.AddNew(20, 1, 600)
+	tmpl, ok := templates.Get(item.AdenaID)
+	if !ok {
+		t.Fatal("adena template missing")
+	}
+	ground, err := grounditem.New(item.Instance{ObjectID: 900, TemplateID: item.AdenaID, Count: 40, ManaLeft: -1, OwnerID: 99}, tmpl)
+	if err != nil {
+		t.Fatalf("ground item: %v", err)
+	}
+
+	_, failure := NewService(nil).PickupGround(inv, &ground.Instance, ground.Template, 1)
+
+	if failure != PickupSlotsFull {
+		t.Fatalf("PickupGround failure = %v, want PickupSlotsFull (capacity checked before loot lock)", failure)
 	}
 }
 
