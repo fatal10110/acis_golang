@@ -425,10 +425,12 @@ func (l *GameClientLink) attackLiveTarget(live *livePlayer, target world.Tracked
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return false
 	}
-	// Reference: AttackRequest.java:31 rejects via isOutOfControl() before
-	// dispatching to onAction — narrowed here to the two flags not already
-	// gated elsewhere on this path (Teleporting, ImmobileUntilAttacked).
-	if live.Teleporting() || live.ImmobileUntilAttacked() {
+	// Reference: AttackRequest.java:31 rejects via isOutOfControl()
+	// (Creature.java:652-655) before dispatching to onAction — the full
+	// 8-flag union: Stunned, ImmobileUntilAttacked, Sleeping, Paralyzed,
+	// Afraid, Confused, Teleporting, Dead.
+	if live.Stunned() || live.ImmobileUntilAttacked() || live.Sleeping() || live.Paralyzed() ||
+		live.Afraid() || live.Confused() || live.Teleporting() || live.Dead() {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return false
 	}

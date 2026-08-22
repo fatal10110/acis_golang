@@ -50,9 +50,9 @@ func wireLiveAttackHooks(gcl *GameClientLink, live *livePlayer) {
 }
 
 // TestAttackLiveTargetRejectsOutOfControl pins AttackRequest.java:31's
-// isOutOfControl() reject, narrowed to the two flags no other gate on this
-// path already covers (#1574): a teleporting or ImmobileUntilAttacked-locked
-// player's attack click is refused with ActionFailed and never starts a
+// isOutOfControl() reject (Creature.java:652-655): a teleporting,
+// immobile-until-attacked, stunned, sleeping, paralyzed, afraid, confused, or
+// dead player's attack click is refused with ActionFailed and never starts a
 // combat controller.
 func TestAttackLiveTargetRejectsOutOfControl(t *testing.T) {
 	tests := []struct {
@@ -64,6 +64,24 @@ func TestAttackLiveTargetRejectsOutOfControl(t *testing.T) {
 		}},
 		{"immobile until attacked", func(t *testing.T, live *livePlayer) {
 			addLiveEffect(t, live, "ImmobileUntilAttacked")
+		}},
+		{"stunned", func(t *testing.T, live *livePlayer) {
+			addLiveEffect(t, live, "Stun")
+		}},
+		{"sleeping", func(t *testing.T, live *livePlayer) {
+			addLiveEffect(t, live, "Sleep")
+		}},
+		{"paralyzed", func(t *testing.T, live *livePlayer) {
+			addLiveEffect(t, live, "Paralyze")
+		}},
+		{"afraid", func(t *testing.T, live *livePlayer) {
+			addLiveFearEffect(t, live)
+		}},
+		{"confused", func(t *testing.T, live *livePlayer) {
+			addLiveEffect(t, live, "Confusion")
+		}},
+		{"dead", func(t *testing.T, live *livePlayer) {
+			live.MarkDead()
 		}},
 	}
 	for _, tt := range tests {
