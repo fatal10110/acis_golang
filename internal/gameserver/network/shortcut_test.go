@@ -70,6 +70,77 @@ func TestGameClientLinkRegistersShortcut(t *testing.T) {
 	}
 }
 
+// TestGameClientLinkRejectsItemShortcutForObjectNotInInventory mirrors
+// ShortcutList.addShortcut's ITEM branch (ShortcutList.java:62-98): a
+// registration for an ITEM objectId not in the player's live inventory is
+// silently dropped — no reply, no persisted row.
+func TestGameClientLinkRejectsItemShortcutForObjectNotInInventory(t *testing.T) {
+	const missingObjectID int32 = 999
+
+	c, chars, _, shortcuts, _, _ := newLinkedSQLGameClient(t, nil, nil, 0)
+
+	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.Read() // CharCreateOk
+	c.Read() // CharSelectInfo
+	objID := sqlCharacterID(t, chars)
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	c.Send(encodeRequestShortCutReg(int32(serverpackets.ShortcutItem), 15, missingObjectID, 1))
+	assertNoReply(t, c)
+
+	got, err := shortcuts.ListByOwner(context.Background(), objID)
+	if err != nil {
+		t.Fatalf("list shortcuts: %v", err)
+	}
+	if hasShortcut(got, shortcut.Shortcut{Slot: 3, Page: 1, Type: shortcut.Item, ID: missingObjectID, Level: -1, CharacterType: 1}) {
+		t.Fatalf("shortcuts = %+v, want no row for missing item", got)
+	}
+}
+
+// TestGameClientLinkRegistersItemShortcutForObjectInInventory is the
+// success-path counterpart: an ITEM objectId present in inventory persists
+// as today.
+func TestGameClientLinkRegistersItemShortcutForObjectInInventory(t *testing.T) {
+	const potionTemplate int32 = 9502 // Greater Healing Potion fixture
+	const potionObjectID int32 = 700
+
+	c, chars, items, shortcuts, _, _ := newLinkedSQLGameClient(t, nil, nil, 0)
+
+	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	c.Read() // CharCreateOk
+	c.Read() // CharSelectInfo
+	objID := sqlCharacterID(t, chars)
+	if err := items.Create(context.Background(), objID, item.Instance{
+		ObjectID: potionObjectID, TemplateID: potionTemplate, OwnerID: objID,
+		Count: 1, Location: item.LocationInventory, ManaLeft: -1,
+	}); err != nil {
+		t.Fatalf("seed potion: %v", err)
+	}
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	c.Send(encodeRequestShortCutReg(int32(serverpackets.ShortcutItem), 15, potionObjectID, 1))
+	reply := c.Read()
+	if reply[0] != serverpackets.OpcodeShortCutRegister {
+		t.Fatalf("opcode = %#x, want ShortCutRegister (%#x)", reply[0], serverpackets.OpcodeShortCutRegister)
+	}
+	got, err := shortcuts.ListByOwner(context.Background(), objID)
+	if err != nil {
+		t.Fatalf("list shortcuts: %v", err)
+	}
+	want := shortcut.Shortcut{Slot: 3, Page: 1, Type: shortcut.Item, ID: potionObjectID, Level: -1, CharacterType: 1}
+	if !hasShortcut(got, want) {
+		t.Fatalf("shortcuts = %+v, want %+v", got, want)
+	}
+}
+
 func TestGameClientLinkRegistersSkillShortcutAtKnownLevel(t *testing.T) {
 	c, chars, shortcuts, knownSkills := newLinkedSQLGameClientWithShortcuts(t)
 

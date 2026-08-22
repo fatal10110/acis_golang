@@ -23,6 +23,8 @@ func (l *GameClientLink) registerShortcut(ctx context.Context, live *livePlayer,
 	}
 	sc, ok := shortcut.NewRegistration(req.Slot, req.Page, shortcut.Type(req.Type), req.ID, req.CharacterType, func(id int32) int {
 		return live.SkillLevel(int(id))
+	}, func(objectID int32) bool {
+		return live.Inventory().ItemByObjectID(objectID) != nil
 	})
 	if !ok {
 		return

@@ -59,17 +59,25 @@ type Shortcut struct {
 }
 
 // NewRegistration validates and builds a client shortcut registration.
-func NewRegistration(slot, page int32, typ Type, id, characterType int32, skillLevel func(int32) int) (Shortcut, bool) {
+// hasItem mirrors ShortcutList.addShortcut's ITEM branch
+// (ShortcutList.java:62-98): an ITEM registration for an objectId not in the
+// player's live inventory is dropped rather than persisted.
+func NewRegistration(slot, page int32, typ Type, id, characterType int32, skillLevel func(int32) int, hasItem func(int32) bool) (Shortcut, bool) {
 	if page < 0 || page > MaxRegistrationPage || typ < Item || typ > Recipe {
 		return Shortcut{}, false
 	}
 	level := int32(-1)
-	if typ == Skill {
+	switch typ {
+	case Skill:
 		if skillLevel == nil {
 			return Shortcut{}, false
 		}
 		level = int32(skillLevel(id))
 		if level <= 0 {
+			return Shortcut{}, false
+		}
+	case Item:
+		if hasItem == nil || !hasItem(id) {
 			return Shortcut{}, false
 		}
 	}
