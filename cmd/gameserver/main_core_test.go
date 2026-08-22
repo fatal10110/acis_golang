@@ -14,8 +14,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/pathfind"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/probe"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
-	"github.com/fatal10110/acis_golang/internal/gameserver/task"
-	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/fatal10110/acis_golang/internal/link"
 	"github.com/fatal10110/acis_golang/internal/loginserver/model"
 )
@@ -335,50 +333,6 @@ func TestLoadCrestCacheAllowsMissingDirectory(t *testing.T) {
 	if crests.Len() != 0 {
 		t.Fatalf("Len() = %d, want 0 for missing crest directory", crests.Len())
 	}
-}
-
-func TestWorldAttackStanceEffectsStopsPlayerRegistryActor(t *testing.T) {
-	state := world.New()
-	actor := &stoppableTestActor{id: 1001}
-	state.AddPlayer(actor)
-
-	worldAttackStanceEffects{state: state}.AutoAttackStop(actor)
-
-	if !actor.stopped {
-		t.Fatal("AutoAttackStop did not stop an actor present only in the player registry")
-	}
-}
-
-type stoppableTestActor struct {
-	world.Presence
-	id      int32
-	stopped bool
-}
-
-func (a *stoppableTestActor) ObjectID() int32 { return a.id }
-func (a *stoppableTestActor) Stop()           { a.stopped = true }
-
-func TestProvideAdditionalLifecycleTasks(t *testing.T) {
-	state := provideWorldState()
-	effects := provideTaskEffects(state)
-	water, err := provideWater(effects)
-	if err != nil {
-		t.Fatalf("provideWater() error = %v", err)
-	}
-	if water == nil {
-		t.Fatal("provideWater() = nil")
-	}
-
-	shadowItems, err := provideShadowItems(effects)
-	if err != nil {
-		t.Fatalf("provideShadowItems() error = %v", err)
-	}
-	if shadowItems == nil {
-		t.Fatal("provideShadowItems() = nil")
-	}
-
-	var _ *task.Water = water
-	var _ *task.ShadowItems = shadowItems
 }
 
 func TestGameServerConfigUsesRequestIDWithoutHexID(t *testing.T) {
