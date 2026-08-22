@@ -222,11 +222,33 @@ func addLiveEffect(t *testing.T, live *livePlayer, name string) {
 	live.EffectList().Add(e)
 }
 
+// liveFearFleeTarget satisfies the flee hook Fear's runtime needs to
+// activate (fearAction requires an effect.Participant implementing
+// FleeFrom) — production Player actors don't implement it yet (tracked
+// under #117), so addLiveFearEffect substitutes this stub as Effected while
+// still adding to live's own EffectList, exactly as addCharacterEffect does
+// in player/character_cc_test.go.
+type liveFearFleeTarget struct{}
+
+func (liveFearFleeTarget) ObjectID() int32                                    { return 0 }
+func (liveFearFleeTarget) Dead() bool                                         { return false }
+func (liveFearFleeTarget) FleeFrom(effector effect.Participant, distance int) {}
+
+func addLiveFearEffect(t *testing.T, live *livePlayer) {
+	t.Helper()
+	e, err := effect.New(effect.Skill{ID: 1}, modelskill.EffectTemplate{Name: "Fear"})
+	if err != nil {
+		t.Fatalf("effect.New(Fear) error: %v", err)
+	}
+	e.Effected = liveFearFleeTarget{}
+	live.EffectList().Add(e)
+}
+
 // TestMoveLivePlayerRejectsOutOfControl pins MoveBackwardToLocation.java:76's
-// isOutOfControl() reject, narrowed to the two flags no other gate on this
-// path already covers (#1574): a teleporting or ImmobileUntilAttacked-locked
-// player's walk request is refused with ActionFailed and the server position
-// never moves.
+// isOutOfControl() reject (Creature.java:652-655): a teleporting,
+// immobile-until-attacked, stunned, sleeping, paralyzed, afraid, confused, or
+// dead player's walk request is refused with ActionFailed and the server
+// position never moves.
 func TestMoveLivePlayerRejectsOutOfControl(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -237,6 +259,24 @@ func TestMoveLivePlayerRejectsOutOfControl(t *testing.T) {
 		}},
 		{"immobile until attacked", func(t *testing.T, live *livePlayer) {
 			addLiveEffect(t, live, "ImmobileUntilAttacked")
+		}},
+		{"stunned", func(t *testing.T, live *livePlayer) {
+			addLiveEffect(t, live, "Stun")
+		}},
+		{"sleeping", func(t *testing.T, live *livePlayer) {
+			addLiveEffect(t, live, "Sleep")
+		}},
+		{"paralyzed", func(t *testing.T, live *livePlayer) {
+			addLiveEffect(t, live, "Paralyze")
+		}},
+		{"afraid", func(t *testing.T, live *livePlayer) {
+			addLiveFearEffect(t, live)
+		}},
+		{"confused", func(t *testing.T, live *livePlayer) {
+			addLiveEffect(t, live, "Confusion")
+		}},
+		{"dead", func(t *testing.T, live *livePlayer) {
+			live.MarkDead()
 		}},
 	}
 	for _, tt := range tests {
