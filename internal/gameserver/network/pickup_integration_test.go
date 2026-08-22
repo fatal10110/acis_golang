@@ -4,6 +4,7 @@ package network
 
 import (
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -88,12 +89,23 @@ func TestGameClientLinkPickupGroundItemFullClientFlow(t *testing.T) {
 		t.Fatalf("world.Object(%d) still present after pickup", ground.ObjectID())
 	}
 
-	// Movement must still work after the pickup resolves.
+	// A successful pickup starts pickupParalyzeLock's brief anti-mash
+	// paralysis (Player.setIsParalyzed(true), PlayerAI.java:406-407) — a
+	// move issued inside that window is correctly denied by the
+	// isOutOfControl() gate (#1720), not silently dropped.
 	x, y, z := live.Position()
 	c.Send(encodeMoveBackwardToLocation(origin, location.Location{X: x, Y: y, Z: z}, 1))
 	reply = c.Read()
+	if reply[0] != serverpackets.OpcodeActionFailed {
+		t.Fatalf("movement during pickup-lock opcode = %#x, want ActionFailed (%#x) — a paralyzed player must not move", reply[0], serverpackets.OpcodeActionFailed)
+	}
+
+	// Movement must still work once the pickup lock clears.
+	time.Sleep(pickupParalyzeLock + 50*time.Millisecond)
+	c.Send(encodeMoveBackwardToLocation(origin, location.Location{X: x, Y: y, Z: z}, 1))
+	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeMoveToLocation {
-		t.Fatalf("movement after pickup opcode = %#x, want MoveToLocation (%#x) — client is unresponsive to move commands", reply[0], serverpackets.OpcodeMoveToLocation)
+		t.Fatalf("movement after pickup lock clears opcode = %#x, want MoveToLocation (%#x) — client is unresponsive to move commands", reply[0], serverpackets.OpcodeMoveToLocation)
 	}
 }
 
@@ -201,10 +213,17 @@ func TestGameClientLinkPickupAdenaMergeFullClientFlow(t *testing.T) {
 		t.Fatalf("merged adena stack = %+v, want count 140", stack)
 	}
 
-	// Must still respond to movement.
+	// The same pickup-lock paralysis denies a move inside the window...
 	x, y, z := live.Position()
 	c.Send(encodeMoveBackwardToLocation(origin, location.Location{X: x, Y: y, Z: z}, 1))
+	if reply := c.Read(); reply[0] != serverpackets.OpcodeActionFailed {
+		t.Fatalf("movement during pickup-lock opcode = %#x, want ActionFailed (%#x) — a paralyzed player must not move", reply[0], serverpackets.OpcodeActionFailed)
+	}
+
+	// ...and must still respond to movement once it clears.
+	time.Sleep(pickupParalyzeLock + 50*time.Millisecond)
+	c.Send(encodeMoveBackwardToLocation(origin, location.Location{X: x, Y: y, Z: z}, 1))
 	if reply := c.Read(); reply[0] != serverpackets.OpcodeMoveToLocation {
-		t.Fatalf("movement after pickup opcode = %#x, want MoveToLocation — character unresponsive", reply[0])
+		t.Fatalf("movement after pickup lock clears opcode = %#x, want MoveToLocation — character unresponsive", reply[0])
 	}
 }
