@@ -82,6 +82,16 @@ type abnormalUpdater interface {
 	UpdateAbnormalEffect()
 }
 
+// abnormalEffectBroadcaster is implemented by an actor whose abnormal-effect
+// bitmask has a client update distinct from the buff icon list, mirroring
+// Creature.startAbnormalEffect()/stopAbnormalEffect() calling
+// updateAbnormalEffect() directly (Player.updateAbnormalEffect() ->
+// broadcastUserInfo()). NPC and summon fold this into their existing
+// abnormalUpdater implementation and do not need this hook.
+type abnormalEffectBroadcaster interface {
+	BroadcastAbnormalEffect()
+}
+
 // effectExpiryNotifier is implemented by an actor that reports which of
 // three system messages accompanies one of its icon-showing effects
 // leaving the list, mirroring EffectList.removeEffectFromQueue's message

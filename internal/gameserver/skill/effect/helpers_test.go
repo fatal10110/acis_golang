@@ -108,6 +108,10 @@ func (t *liveEffectTarget) UpdateAbnormalEffect() {
 	t.events = append(t.events, "abnormal")
 }
 
+func (t *liveEffectTarget) BroadcastAbnormalEffect() {
+	t.events = append(t.events, "broadcast")
+}
+
 func (t *liveEffectTarget) Think() error {
 	t.events = append(t.events, "think")
 	return nil
