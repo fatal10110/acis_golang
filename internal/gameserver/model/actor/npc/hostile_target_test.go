@@ -3,6 +3,7 @@ package npc
 import (
 	"testing"
 
+	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -36,6 +37,24 @@ type ownedGateTarget struct {
 }
 
 func (t *ownedGateTarget) OwnerCombatant() attackable.Combatant { return t.owner }
+
+// siegeGateTarget is a minimal player-alike attackable.Combatant double for
+// SiegeGuard.canAutoAttack (SiegeGuard.java:82-96): dead, silent, and
+// attackableBy stand in for the acting player's alike-dead state, silent
+// movement, and target.isAttackableBy(this).
+type siegeGateTarget struct {
+	world.Presence
+	id           int32
+	dead         bool
+	silent       bool
+	attackableBy bool
+}
+
+func (t *siegeGateTarget) ObjectID() int32                        { return t.id }
+func (t *siegeGateTarget) SiegeGuard() bool                       { return false }
+func (t *siegeGateTarget) AlikeDead() bool                        { return t.dead }
+func (t *siegeGateTarget) SilentMoving() bool                     { return t.silent }
+func (t *siegeGateTarget) AttackableBy(skilltarget.Creature) bool { return t.attackableBy }
 
 func newKindHostile(t testing.TB, id int32, tpl *Template, kind InstanceKind) *Hostile {
 	t.Helper()
@@ -584,6 +603,111 @@ func TestHostileReconsiderTargetKnownlistExcludesExactRangeBoundary(t *testing.T
 
 	if _, ok := owner.ReconsiderTarget(rangeVal); ok {
 		t.Fatal("ReconsiderTarget: ok = true, want false for a known-list target exactly at range")
+	}
+}
+
+func TestHostileSiegeGuardAutoAttackTargetValid(t *testing.T) {
+	const originX = 100
+
+	tests := []struct {
+		name         string
+		dead         bool
+		silent       bool
+		attackableBy bool
+		dx           int
+		want         bool
+	}{
+		{name: "attackable player-alike target is valid", attackableBy: true, want: true},
+		{name: "alike-dead acting player is excluded", dead: true, attackableBy: true, want: false},
+		{name: "silently moving target beyond 250 units is excluded", silent: true, attackableBy: true, dx: 300, want: false},
+		{name: "silently moving target within 250 units is included", silent: true, attackableBy: true, dx: 100, want: true},
+		{name: "a target the reference marks unattackable is excluded", attackableBy: false, want: false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			state := world.New()
+			guard := newKindHostile(t, 1, &Template{ID: 1, Type: "SiegeGuard"}, "SiegeGuard")
+			state.Spawn(guard, originX, 100, 0, 0)
+
+			target := &siegeGateTarget{id: 2, dead: tc.dead, silent: tc.silent, attackableBy: tc.attackableBy}
+			state.Spawn(target, originX+tc.dx, 100, 0, 0)
+
+			if got := guard.siegeGuardAutoAttackTargetValid(target); got != tc.want {
+				t.Fatalf("siegeGuardAutoAttackTargetValid() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestHostileSiegeGuardAutoAttackTargetValidExcludesNPC proves the
+// dedicated SiegeGuard rule requires an acting player (SiegeGuard.java:84:
+// target.getActingPlayer() == null rejects), unlike the general rule's
+// Guard/FriendlyMonster karma check.
+func TestHostileSiegeGuardAutoAttackTargetValidExcludesNPC(t *testing.T) {
+	state := world.New()
+	guard := newKindHostile(t, 1, &Template{ID: 1, Type: "SiegeGuard"}, "SiegeGuard")
+	state.Spawn(guard, 100, 100, 0, 0)
+
+	other := newCombatHostile(t, 2, &Template{ID: 2, Type: "Monster"})
+	state.Spawn(other, 100, 100, 0, 0)
+
+	if guard.siegeGuardAutoAttackTargetValid(other) {
+		t.Fatal("siegeGuardAutoAttackTargetValid(NPC target) = true, want false")
+	}
+}
+
+// TestHostileAutoAttackTargetValidSiegeGuardGeneralPathUnchanged proves the
+// three-argument RandomizeHate path (AutoAttackTargetValid) keeps SiegeGuard
+// on the same default rule every other non-Guard/FriendlyMonster kind uses,
+// unaffected by the new one-argument siegeGuardAutoAttackTargetValid gate: a
+// target this NPC rejects for isAttackableBy still passes the general rule,
+// and a plain NPC target is still excluded (SiegeGuard isn't confused).
+func TestHostileAutoAttackTargetValidSiegeGuardGeneralPathUnchanged(t *testing.T) {
+	state := world.New()
+	guard := newKindHostile(t, 1, &Template{ID: 1, Type: "SiegeGuard", AggroRange: 10}, "SiegeGuard")
+	state.Spawn(guard, 100, 100, 0, 0)
+
+	// Not attackable under the dedicated siege rule, yet the general rule
+	// never consults AttackableBy and still accepts it.
+	target := &siegeGateTarget{id: 2, attackableBy: false}
+	state.Spawn(target, 100, 100, 0, 0)
+
+	if !guard.AutoAttackTargetValid(target, 500, false) {
+		t.Fatal("AutoAttackTargetValid() = false, want true: the general path must ignore isAttackableBy")
+	}
+
+	otherNPC := newCombatHostile(t, 3, &Template{ID: 3, Type: "Monster"})
+	state.Spawn(otherNPC, 100, 100, 0, 0)
+
+	if guard.AutoAttackTargetValid(otherNPC, 500, false) {
+		t.Fatal("AutoAttackTargetValid(other NPC) = true, want false: SiegeGuard isn't confused")
+	}
+}
+
+// TestHostileReconsiderTargetUsesSiegeGuardRuleFromHateList proves
+// ReconsiderTarget's hate-list branch gates a SiegeGuard's candidates
+// through siegeGuardAutoAttackTargetValid rather than the general rule: a
+// hate-list entry the reference marks unattackable is excluded even though
+// it would pass the general rule's default (non-Guard) branch.
+func TestHostileReconsiderTargetUsesSiegeGuardRuleFromHateList(t *testing.T) {
+	state := world.New()
+	guard := newKindHostile(t, 1, &Template{ID: 1, Type: "SiegeGuard", AggroRange: 10}, "SiegeGuard")
+	state.Spawn(guard, 100, 100, 0, 0)
+
+	unattackable := &siegeGateTarget{id: 2, attackableBy: false}
+	attackable := &siegeGateTarget{id: 3, attackableBy: true}
+	state.Spawn(unattackable, 100, 100, 0, 0)
+	state.Spawn(attackable, 100, 100, 0, 0)
+	guard.AddDamageHate(unattackable, 0, 10)
+	guard.AddDamageHate(attackable, 0, 5)
+
+	chosen, ok := guard.ReconsiderTarget(0)
+	if !ok {
+		t.Fatal("ReconsiderTarget: ok = false, want true")
+	}
+	if chosen.ObjectID() != attackable.ObjectID() {
+		t.Fatalf("chosen = %d, want %d: the unattackable, higher-hate entry must be skipped", chosen.ObjectID(), attackable.ObjectID())
 	}
 }
 

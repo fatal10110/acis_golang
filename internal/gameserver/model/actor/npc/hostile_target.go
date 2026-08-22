@@ -3,6 +3,7 @@ package npc
 import (
 	"slices"
 
+	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -135,6 +136,50 @@ func (h *Hostile) karmaTargetVisible(target attackable.Combatant) bool {
 	return ok && pk.Karma() > 0 && h.CanSee(target)
 }
 
+// siegeGuardAutoAttackTargetValid ports SiegeGuard.canAutoAttack(Creature)
+// (SiegeGuard.java:82-96): the dedicated one-argument auto-attack rule a
+// SiegeGuard kind uses in place of AutoAttackTargetValid above, reachable
+// only through the one-argument reconsider-target path below. The
+// three-argument RandomizeHate path (Npc.canAutoAttack(Creature, int,
+// boolean)) keeps calling AutoAttackTargetValid unchanged for SiegeGuard,
+// same as every other kind.
+//
+// Rejects a target with no acting player (an NPC target) or an alike-dead
+// acting player, and a silently-moving target beyond 250 units; otherwise
+// requires siege attackability (target.isAttackableBy(this)) and line of
+// sight. Not modeled: the acting player's invisibility check
+// (targetPlayer.getAppearance().isVisible()) — no player appearance state
+// exists yet (#907); and the clan/siege-side DEFENDER/OWNER exclusion inside
+// Playable.isAttackableBy's SiegeGuard branch — no castle/siege state exists
+// yet (#232/#234), so target.isAttackableBy(this) here falls through to
+// whatever general AttackableBy the target exposes.
+func (h *Hostile) siegeGuardAutoAttackTargetValid(target attackable.Combatant) bool {
+	if target == nil {
+		return false
+	}
+
+	if _, targetIsNPC := target.(*Hostile); targetIsNPC {
+		return false
+	}
+
+	if target.AlikeDead() {
+		return false
+	}
+
+	if sm, ok := target.(interface{ SilentMoving() bool }); ok && sm.SilentMoving() && !h.withinDistance(target, 250) {
+		return false
+	}
+
+	rules, ok := target.(interface {
+		AttackableBy(skilltarget.Creature) bool
+	})
+	if !ok || !rules.AttackableBy(h) {
+		return false
+	}
+
+	return h.CanSee(target)
+}
+
 // ReconsiderTarget ports Npc.java's AggroList.reconsiderTarget(range), used
 // when this NPC can no longer act on its current target (e.g. an
 // immobilize state): first tries to pick a replacement from its own hate
@@ -155,6 +200,9 @@ func (h *Hostile) karmaTargetVisible(target attackable.Combatant) bool {
 // unwired API the reference itself carries — see acis_golang#977.
 func (h *Hostile) ReconsiderTarget(rangeVal int) (attackable.Combatant, bool) {
 	valid := func(target attackable.Combatant) bool {
+		if h.SiegeGuard() {
+			return h.siegeGuardAutoAttackTargetValid(target)
+		}
 		return h.AutoAttackTargetValid(target, h.Instance.Template.AggroRange, false)
 	}
 	inRange := func(target attackable.Combatant) bool {
