@@ -469,6 +469,9 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	c.SetAbnormalEffectUpdater(func() {
 		l.updateLiveAbnormalEffect(live)
 	})
+	c.SetAbnormalEffectBroadcaster(func() {
+		l.broadcastCharacterInfo(live)
+	})
 	c.SetExpSpGainNotifier(func(exp int64, sp int) {
 		live.SendFrame(expSpGainMessage(exp, sp))
 	})

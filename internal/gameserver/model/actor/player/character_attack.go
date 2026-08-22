@@ -224,6 +224,55 @@ func (c *Character) UpdateAbnormalEffect() {
 	}
 }
 
+// StartAbnormalEffect adds mask to this character's client-visible
+// abnormal-effect bitmask (the cosmetic/visual state carried in CharInfo and
+// UserInfo, e.g. BigHead), mirroring Creature.startAbnormalEffect(int).
+func (c *Character) StartAbnormalEffect(mask int) {
+	c.abnormalEffectMask.Or(int32(mask))
+}
+
+// StopAbnormalEffect removes mask from this character's client-visible
+// abnormal-effect bitmask, mirroring Creature.stopAbnormalEffect(int).
+func (c *Character) StopAbnormalEffect(mask int) {
+	for {
+		current := c.abnormalEffectMask.Load()
+		if c.abnormalEffectMask.CompareAndSwap(current, current&^int32(mask)) {
+			return
+		}
+	}
+}
+
+// AbnormalEffect returns this character's client-visible abnormal-effect
+// bitmask.
+func (c *Character) AbnormalEffect() int {
+	return int(c.abnormalEffectMask.Load())
+}
+
+// SetAbnormalEffectBroadcaster records the packet-layer hook that resends
+// this character's own UserInfo and broadcasts CharInfo to nearby observers
+// after its abnormal-effect bitmask changes, mirroring
+// Player.updateAbnormalEffect() -> broadcastUserInfo(). This is distinct
+// from UpdateAbnormalEffect, which refreshes the buff icon list
+// (EffectList.updateEffectIcons()) on every effect start/exit regardless of
+// whether the bitmask changed.
+func (c *Character) SetAbnormalEffectBroadcaster(broadcast func()) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	c.broadcastAbnormalEffect = broadcast
+}
+
+// BroadcastAbnormalEffect resends this character's UserInfo/CharInfo through
+// the runtime packet hook after StartAbnormalEffect/StopAbnormalEffect
+// changed its bitmask.
+func (c *Character) BroadcastAbnormalEffect() {
+	c.stateMu.RLock()
+	broadcast := c.broadcastAbnormalEffect
+	c.stateMu.RUnlock()
+	if broadcast != nil {
+		broadcast()
+	}
+}
+
 // BroadcastStatus sends this character's current HP through the runtime
 // packet hook.
 func (c *Character) BroadcastStatus() {

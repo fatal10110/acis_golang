@@ -107,3 +107,32 @@ func TestFrameCharInfo_CubicsSerializeCountAndIDs(t *testing.T) {
 		t.Fatalf("bytes after cubic field don't resync with the no-cubic encoding: got %x, want %x", suffix, base[prefixLen+2:])
 	}
 }
+
+func TestFrameCharInfoCarriesAbnormalEffectMask(t *testing.T) {
+	tmpl := &player.Template{}
+	plain := &player.Character{Name: "C"}
+	bigHead := &player.Character{Name: "C"}
+	bigHead.StartAbnormalEffect(0x002000)
+
+	base := framePayload(t, FrameCharInfo(CharInfoSnapshot{Character: plain, Template: tmpl}))
+	got := framePayload(t, FrameCharInfo(CharInfoSnapshot{Character: bigHead, Template: tmpl}))
+
+	// Same-length encodings that must differ in exactly the abnormal-effect
+	// int32 field, and resync everywhere else.
+	if len(base) != len(got) {
+		t.Fatalf("payload length changed: base %d, got %d", len(base), len(got))
+	}
+	prefixLen := 0
+	for prefixLen < len(base) && base[prefixLen] == got[prefixLen] {
+		prefixLen++
+	}
+	// 0x002000's only non-zero byte is its little-endian byte 1, so the diff
+	// starts one byte into the field.
+	fieldStart := prefixLen - 1
+	if v := binary.LittleEndian.Uint32(got[fieldStart:]); v != 0x002000 {
+		t.Fatalf("abnormal effect field at offset %d = %#x, want %#x", fieldStart, v, 0x002000)
+	}
+	if suffix := got[fieldStart+4:]; !bytes.Equal(suffix, base[fieldStart+4:]) {
+		t.Fatalf("bytes after the abnormal effect field don't resync: got %x, want %x", suffix, base[fieldStart+4:])
+	}
+}

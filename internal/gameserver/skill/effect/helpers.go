@@ -17,6 +17,9 @@ func startAbnormalEffect(target Participant, mask int) {
 		target.StartAbnormalEffect(mask)
 	}
 	refresh(target)
+	if b, ok := target.(abnormalEffectBroadcaster); ok {
+		b.BroadcastAbnormalEffect()
+	}
 }
 
 func stopAbnormalEffect(target Participant, mask int) {
@@ -24,6 +27,9 @@ func stopAbnormalEffect(target Participant, mask int) {
 		target.StopAbnormalEffect(mask)
 	}
 	refresh(target)
+	if b, ok := target.(abnormalEffectBroadcaster); ok {
+		b.BroadcastAbnormalEffect()
+	}
 }
 
 func fearImmune(target Participant) bool {
