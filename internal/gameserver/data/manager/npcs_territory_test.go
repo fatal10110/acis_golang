@@ -20,6 +20,7 @@ func (constGeoZ) FindPath(_, _ location.Location) ([]location.Location, bool) {
 func (constGeoZ) ValidLocation(ox, oy, oz, _, _, _ int) location.Location {
 	return location.Location{X: ox, Y: oy, Z: oz}
 }
+func (constGeoZ) Walkable(int, int, int) bool { return true }
 
 func TestMergedZRangeIsMinOfMinsMaxOfMaxes(t *testing.T) {
 	territories := []*spawn.Territory{
@@ -95,5 +96,90 @@ func TestRandomTerritoryPositionUsesMergedZRangeNotSubTerritoryOwnRange(t *testi
 	// so a fixed implementation should land in B close to 50% of the time.
 	if frac := float64(inB) / trials; frac < 0.20 {
 		t.Fatalf("randomTerritoryPosition landed in territory B %.3f of the time, want >0.20 (old per-territory Z check would give ~0.001)", frac)
+	}
+}
+
+// halfWalkableGeo models a territory whose geodata straddles walkable and
+// unwalkable ground: every point with X < unwalkableMaxX is rejected, same
+// as Territory.getRandomLocation's canMoveAround retry in the Java
+// reference (aCis_gameserver Territory.java:138/193).
+type halfWalkableGeo struct {
+	unwalkableMaxX int
+	walkableCalls  int
+}
+
+func (halfWalkableGeo) CanMove(int, int, int, int, int, int) bool { return true }
+func (halfWalkableGeo) Height(_, _, z int) int16                  { return int16(z) }
+func (halfWalkableGeo) FindPath(_, _ location.Location) ([]location.Location, bool) {
+	return nil, false
+}
+func (halfWalkableGeo) ValidLocation(ox, oy, oz, _, _, _ int) location.Location {
+	return location.Location{X: ox, Y: oy, Z: oz}
+}
+
+func (g *halfWalkableGeo) Walkable(x, _, _ int) bool {
+	g.walkableCalls++
+	return x >= g.unwalkableMaxX
+}
+
+func squareTerritory(minX, minY, maxX, maxY int) *spawn.Territory {
+	return &spawn.Territory{
+		Name: "half-walkable",
+		MinZ: -100,
+		MaxZ: 100,
+		Nodes: []spawn.Node{
+			{X: minX, Y: minY},
+			{X: maxX, Y: minY},
+			{X: maxX, Y: maxY},
+			{X: minX, Y: maxY},
+		},
+	}
+}
+
+// TestRandomTerritoryPosition_RetriesUnwalkablePoints regression-tests #1716:
+// a candidate point that fails the walkability check must be retried within
+// the existing territorySpawnAttempts budget rather than accepted outright.
+// The unwalkable band covers only a fifth of the territory's width, so the
+// 10-attempt budget finds a walkable point with overwhelming probability;
+// this asserts every returned placement over many runs lands on the
+// walkable side.
+func TestRandomTerritoryPosition_RetriesUnwalkablePoints(t *testing.T) {
+	territory := squareTerritory(0, 0, 100, 100)
+	maker := &spawn.Maker{Territories: []*spawn.Territory{territory}}
+	geo := &halfWalkableGeo{unwalkableMaxX: 20}
+
+	for i := 0; i < 300; i++ {
+		pos, ok := randomTerritoryPosition(maker, geo)
+		if !ok {
+			t.Fatalf("run %d: randomTerritoryPosition returned ok=false", i)
+		}
+		if pos.Location.X < 20 {
+			t.Fatalf("run %d: placed NPC at unwalkable X=%d, want >= 20", i, pos.Location.X)
+		}
+	}
+
+	if geo.walkableCalls == 0 {
+		t.Fatal("Walkable was never called; randomTerritoryPosition is not checking geodata")
+	}
+}
+
+// TestRandomTerritoryPosition_FallsBackWhenNeverWalkable matches
+// Territory.getRandomLocation's exhaustion behavior: when every candidate
+// fails the walkability check, the last rolled position is still returned
+// rather than failing placement outright.
+func TestRandomTerritoryPosition_FallsBackWhenNeverWalkable(t *testing.T) {
+	territory := squareTerritory(0, 0, 100, 100)
+	maker := &spawn.Maker{Territories: []*spawn.Territory{territory}}
+	geo := &halfWalkableGeo{unwalkableMaxX: 1000} // rejects every point
+
+	pos, ok := randomTerritoryPosition(maker, geo)
+	if !ok {
+		t.Fatal("randomTerritoryPosition returned ok=false, want fallback position")
+	}
+	if pos.Location.X < 0 || pos.Location.X > 100 {
+		t.Fatalf("fallback position X=%d outside territory bounds", pos.Location.X)
+	}
+	if geo.walkableCalls != territorySpawnAttempts {
+		t.Fatalf("walkableCalls = %d, want %d (one per attempt, all exhausted)", geo.walkableCalls, territorySpawnAttempts)
 	}
 }

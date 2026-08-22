@@ -70,7 +70,7 @@ func randomTerritoryPosition(maker *spawn.Maker, geo move.Geo) (spawn.Position, 
 		}
 		last, haveLast = pos, true
 
-		if z < minZ || z > maxZ || insideAnyTerritory(maker.BannedTerritories, pos.Location) {
+		if z < minZ || z > maxZ || insideAnyTerritory(maker.BannedTerritories, pos.Location) || !geo.Walkable(x, y, z) {
 			continue
 		}
 		return pos, true

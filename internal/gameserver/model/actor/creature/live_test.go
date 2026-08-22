@@ -19,6 +19,7 @@ func (g liveGeo) Height(_, _, _ int) int16          { return g.height }
 // liveGeo does not exercise pathfinding or fall-back resolution: tests that
 // build it either walk a clear line or simulate a fully blocked one.
 func (g liveGeo) FindPath(_, _ location.Location) ([]location.Location, bool) { return nil, false }
+func (g liveGeo) Walkable(int, int, int) bool { return true }
 func (g liveGeo) ValidLocation(ox, oy, oz, _, _, _ int) location.Location {
 	return location.Location{X: ox, Y: oy, Z: oz}
 }

@@ -24,6 +24,7 @@ func (permissiveGeo) Height(x, y, z int) int16                { return int16(z) 
 func (permissiveGeo) FindPath(origin, target location.Location) ([]location.Location, bool) {
 	return nil, false
 }
+func (permissiveGeo) Walkable(int, int, int) bool { return true }
 func (permissiveGeo) ValidLocation(ox, oy, oz, tx, ty, tz int) location.Location {
 	return location.Location{X: tx, Y: ty, Z: tz}
 }
