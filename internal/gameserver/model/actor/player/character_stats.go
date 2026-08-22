@@ -14,8 +14,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
-const perfectShieldBlockRate = 5
-
 // statCalc returns s's live Calculator, creating it (with its builtin
 // finalize step) on first touch. The common warm case only takes statMu's
 // read lock; the slot is created at most once per Stat per Character.
@@ -228,6 +226,14 @@ func (c *Character) MEN() int { return characterStatActor{c: c}.MEN() }
 
 func (c *Character) LevelMod() float64 { return characterStatActor{c: c}.LevelMod() }
 
+// SetPerfectShieldBlockRate records the players.properties-configured
+// PerfectShieldBlockRate roll threshold used by ShieldDefense.
+func (c *Character) SetPerfectShieldBlockRate(rate int) {
+	c.stateMu.Lock()
+	c.perfectShieldBlockRate = rate
+	c.stateMu.Unlock()
+}
+
 // ShieldDefense resolves c's shield-block outcome against an incoming skill.
 func (c *Character) ShieldDefense(caster creature.DeathActor, def modelskill.Definition, isCrit bool) formulas.ShieldDefense {
 	if def.IgnoreShield || !c.secondaryShieldEquipped() {
@@ -244,7 +250,7 @@ func (c *Character) ShieldDefense(caster creature.DeathActor, def modelskill.Def
 		return formulas.ShieldFailed
 	}
 
-	result := formulas.ShieldUse(baseRate, c.DEX(), attackerUsesBow(caster), isCrit, perfectShieldBlockRate, c.rollValue(100))
+	result := formulas.ShieldUse(baseRate, c.DEX(), attackerUsesBow(caster), isCrit, c.perfectShieldBlockRate, c.rollValue(100))
 	c.notifyShieldBlock(result)
 	return result
 }
