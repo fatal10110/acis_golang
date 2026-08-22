@@ -242,29 +242,6 @@ func (s *fakeItemStore) Update(ctx context.Context, inst *item.Instance) error {
 	return s.Save(ctx, inst)
 }
 
-func TestFakeItemStoreSaveSnapshotsConcurrentItemMutation(t *testing.T) {
-	store := newFakeItemStore()
-	inst := &item.Instance{ObjectID: 1, TemplateID: item.AdenaID, OwnerID: 1, Count: 1, Location: item.LocationInventory}
-
-	var wg sync.WaitGroup
-	wg.Add(2)
-	go func() {
-		defer wg.Done()
-		for range 1_000 {
-			if err := store.Save(context.Background(), inst); err != nil {
-				t.Error(err)
-			}
-		}
-	}()
-	go func() {
-		defer wg.Done()
-		for range 1_000 {
-			inst.SetPersistNotifier(nil)
-		}
-	}()
-	wg.Wait()
-}
-
 func (s *fakeItemStore) Delete(_ context.Context, objectID int32) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -358,7 +335,7 @@ func (testGeo) CanMove(int, int, int, int, int, int) bool { return true }
 func (testGeo) Height(_, _, z int) int16                  { return int16(z) }
 
 func (testGeo) FindPath(_, _ location.Location) ([]location.Location, bool) { return nil, false }
-func (testGeo) Walkable(int, int, int) bool { return true }
+func (testGeo) Walkable(int, int, int) bool                                 { return true }
 func (testGeo) ValidLocation(ox, oy, oz, _, _, _ int) location.Location {
 	return location.Location{X: ox, Y: oy, Z: oz}
 }

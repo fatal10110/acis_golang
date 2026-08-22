@@ -38,18 +38,6 @@ func encodeRequestCharacterCreate(name string, race, sex, classID int32, hairSty
 	return w.Bytes()
 }
 
-func encodeRequestCharacterDelete(slot int32) []byte {
-	w := wire.NewPacketWriter(clientpackets.OpcodeRequestCharacterDelete)
-	w.WriteInt32(slot)
-	return w.Bytes()
-}
-
-func encodeCharacterRestore(slot int32) []byte {
-	w := wire.NewPacketWriter(clientpackets.OpcodeCharacterRestore)
-	w.WriteInt32(slot)
-	return w.Bytes()
-}
-
 func encodeRequestGameStart(slot int32) []byte {
 	w := wire.NewPacketWriter(clientpackets.OpcodeRequestGameStart)
 	w.WriteInt32(slot)
@@ -100,12 +88,6 @@ func encodeUseItem(objectID int32, ctrl bool) []byte {
 	w := wire.NewPacketWriter(clientpackets.OpcodeUseItem)
 	w.WriteInt32(objectID)
 	w.WriteInt32(wire.BoolInt32(ctrl))
-	return w.Bytes()
-}
-
-func encodeRequestUnEquipItem(bodySlot int32) []byte {
-	w := wire.NewPacketWriter(clientpackets.OpcodeRequestUnEquipItem)
-	w.WriteInt32(bodySlot)
 	return w.Bytes()
 }
 
@@ -229,40 +211,6 @@ func encodeAction(objectID int32, origin location.Location, shift bool) []byte {
 	w.WriteInt32(int32(origin.Y))
 	w.WriteInt32(int32(origin.Z))
 	w.WriteUint8(wire.BoolByte(shift))
-	return w.Bytes()
-}
-
-func encodeAttackRequest(objectID int32, origin location.Location, shift bool) []byte {
-	w := wire.NewPacketWriter(clientpackets.OpcodeAttackRequest)
-	w.WriteInt32(objectID)
-	w.WriteInt32(int32(origin.X))
-	w.WriteInt32(int32(origin.Y))
-	w.WriteInt32(int32(origin.Z))
-	w.WriteUint8(wire.BoolByte(shift))
-	return w.Bytes()
-}
-
-func encodeRequestTargetCancel(unselect uint16) []byte {
-	w := wire.NewPacketWriter(clientpackets.OpcodeRequestTargetCancel)
-	w.WriteUint16(unselect)
-	return w.Bytes()
-}
-
-func encodeRequestChangeMoveType(run bool) []byte {
-	w := wire.NewPacketWriter(clientpackets.OpcodeRequestChangeMoveType)
-	w.WriteInt32(wire.BoolInt32(run))
-	return w.Bytes()
-}
-
-func encodeRequestChangeWaitType(stand bool) []byte {
-	w := wire.NewPacketWriter(clientpackets.OpcodeRequestChangeWaitType)
-	w.WriteInt32(wire.BoolInt32(stand))
-	return w.Bytes()
-}
-
-func encodeRequestSocialAction(actionID int32) []byte {
-	w := wire.NewPacketWriter(clientpackets.OpcodeRequestSocialAction)
-	w.WriteInt32(actionID)
 	return w.Bytes()
 }
 
