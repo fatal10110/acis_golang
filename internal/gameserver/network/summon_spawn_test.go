@@ -9,6 +9,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -714,4 +715,42 @@ func TestWireSummonAIForwardsHitResultToOwner(t *testing.T) {
 		t.Fatalf("owner frames = %d, want 1", len(frames.Frames()))
 	}
 	assertStaticSystemMessageFrame(t, frames.Frames()[0], serverpackets.SystemMessageAttackFailed)
+}
+
+// TestWireSummonAIOwnerForwardDropsPlayerGatedCategories is the regression
+// test for the pr-reviews/1719 finding on #1572: S1_DODGES_ATTACK and
+// S1_PERFORMING_COUNTERATTACK (Blow.java:46-47,88-89) and the generic
+// per-effect resisted message (L2Skill.java:1196-1197) are gated
+// `instanceof Player` on the caster/effector in the reference and never fire
+// at all for a Summon — forwarding the raw EffectResult to the owner would
+// send the owner messages Java never sends for these categories. Only
+// AttackFailed and Lethals (both unconditional `sendPacket` calls in the
+// reference) may reach the owner.
+func TestWireSummonAIOwnerForwardDropsPlayerGatedCategories(t *testing.T) {
+	link, state := newSummonTestLink(t)
+	frames := &testsupport.FrameCapture{}
+	live := newTestLivePlayer(t, 1, frames)
+	state.AddPlayer(live)
+
+	spawner := &gameSummonSpawner{link: link, live: live}
+	if !spawner.SpawnServitor(live.Character, modelskill.Definition{NpcID: 12500}) {
+		t.Fatal("SpawnServitor returned false")
+	}
+	obj, ok := state.Summon(live.ObjectID())
+	if !ok {
+		t.Fatal("servitor not registered in world.State")
+	}
+	actor := obj.(*summon.Actor)
+
+	ctrl := link.wireSummonAI(actor)
+	testsupport.ResetCapture(frames)
+	ctrl.OnHitResult(actorcast.EffectResult{
+		Dodges:         []handlerskill.Dodge{{AttackerID: actor.ObjectID(), DefenderID: live.ObjectID()}},
+		Counterattacks: []handlerskill.Counterattack{{AttackerID: actor.ObjectID(), DefenderID: live.ObjectID()}},
+		Resisted:       []handlerskill.Resisted{{TargetName: "Target", SkillID: 1, SkillLevel: 1}},
+	})
+
+	if len(frames.Frames()) != 0 {
+		t.Fatalf("owner frames = %d, want 0 (Dodges/Counterattacks/Resisted are Player-gated in Java and must not reach the owner)", len(frames.Frames()))
+	}
 }
