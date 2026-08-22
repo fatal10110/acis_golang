@@ -3,6 +3,7 @@ package network
 import (
 	"bytes"
 	"encoding/binary"
+	"net"
 	"testing"
 	"time"
 
@@ -23,6 +24,27 @@ type summonDamageAttacker struct{ name string }
 
 func (a summonDamageAttacker) ObjectID() int32       { return 1 }
 func (a summonDamageAttacker) CharacterName() string { return a.name }
+
+// fullQueueConn builds a conn whose outbound queue is already full, for
+// asserting that visibility sends never block on it.
+func fullQueueConn(t *testing.T) *Conn {
+	t.Helper()
+	serverRaw, clientRaw := net.Pipe()
+	t.Cleanup(func() { serverRaw.Close(); clientRaw.Close() })
+	conn := &Conn{Conn: serverRaw, out: make(chan queuedWrite, outboundBuffer), stopping: make(chan struct{})}
+	for range outboundBuffer {
+		conn.out <- queuedWrite{frame: wire.BorrowedFrame(mustFrameBytes([]byte{0x02, 0x00}))}
+	}
+	return conn
+}
+
+func mustFrameBytes(payload []byte) []byte {
+	frame, err := wire.FrameBytes(payload)
+	if err != nil {
+		panic(err)
+	}
+	return frame
+}
 
 func TestLivePlayerVisibilitySendsCharInfoAndDeleteObject(t *testing.T) {
 	state := world.New()
