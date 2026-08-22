@@ -71,6 +71,7 @@ const (
 	SystemMessageDeadPetCannotBeReturned           = 589
 	SystemMessageCannotGiveItemsToDeadPet          = 590
 	SystemMessageYouCannotRestoreHungryPets        = 594
+	SystemMessageYourPetAteALittleButIsStillHungry = 596
 	SystemMessageItemNotForPets                    = 544
 	SystemMessagePetCannotCarryMoreItems           = 545
 	SystemMessagePetTooEncumbered                  = 546
@@ -159,6 +160,11 @@ const (
 	// Shield-block feedback.
 	SystemMessageShieldDefenceSuccessful       = 111  // no parameter
 	SystemMessageExcellentShieldDefenseSuccess = 1281 // no parameter
+
+	// Effect-expiry feedback.
+	SystemMessageS1HasWornOff        = 92  // skill-name parameter
+	SystemMessageS1HasBeenAborted    = 335 // skill-name parameter
+	SystemMessageEffectS1Disappeared = 749 // skill-name parameter
 )
 
 // SystemMessage parameter types used by focused packet helpers.

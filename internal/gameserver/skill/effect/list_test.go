@@ -1,7 +1,10 @@
 package effect
 
 import (
+	"fmt"
 	"reflect"
+	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -27,6 +30,18 @@ func (o eventOwner) MaxBuffCount() int {
 		return 20
 	}
 	return o.maxBuff
+}
+
+func (o eventOwner) NotifyEffectWornOff(skillID modelskill.ID, level int) {
+	*o.events = append(*o.events, fmt.Sprintf("worn-off:%d:%d", skillID, level))
+}
+
+func (o eventOwner) NotifyEffectDisappeared(skillID modelskill.ID, level int) {
+	*o.events = append(*o.events, fmt.Sprintf("disappeared:%d:%d", skillID, level))
+}
+
+func (o eventOwner) NotifyEffectAborted(skillID modelskill.ID, level int) {
+	*o.events = append(*o.events, fmt.Sprintf("aborted:%d:%d", skillID, level))
 }
 
 func newEffect(name string, id modelskill.ID, stackType string, stackOrder float64, debuff bool) *Effect {
@@ -808,4 +823,74 @@ func TestListDisplacedStackedEffectSelfRemovesOnCountExhaustionWithoutEverActiva
 			t.Fatal("weak fired its periodic action even though it was never promoted")
 		}
 	}
+}
+
+// TestListEffectExpiryMessages proves each of the three system-message
+// variants EffectList.removeEffectFromQueue sends fires for its
+// corresponding removal path (EffectList.java:572-584): natural count
+// exhaustion (worn off), early removal (disappeared), and a toggle skill
+// turned off (aborted).
+func TestListEffectExpiryMessages(t *testing.T) {
+	t.Run("worn off on count exhaustion", func(t *testing.T) {
+		var events []string
+		list := NewList(eventOwner{events: &events})
+		e := namedEffect("wornoff", 10, "none", 0, false, &events)
+		e.Skill.Level = 3
+		e.Template.Count, e.Template.Time, e.Template.Icon = 1, 1, true
+		list.Add(e)
+		start := time.Unix(1000, 0)
+		e.startSchedule(start)
+
+		list.tickAt(start.Add(1 * time.Second))
+
+		if !slices.Contains(events, "worn-off:10:3") {
+			t.Fatalf("events = %v, want worn-off:10:3", events)
+		}
+	})
+
+	t.Run("disappeared on early removal", func(t *testing.T) {
+		var events []string
+		list := NewList(eventOwner{events: &events})
+		e := namedEffect("early", 11, "none", 0, false, &events)
+		e.Skill.Level = 2
+		e.Template.Count, e.Template.Time, e.Template.Icon = 5, 1, true
+		list.Add(e)
+
+		list.Remove(e)
+
+		if !slices.Contains(events, "disappeared:11:2") {
+			t.Fatalf("events = %v, want disappeared:11:2", events)
+		}
+	})
+
+	t.Run("aborted on toggle turned off", func(t *testing.T) {
+		var events []string
+		list := NewList(eventOwner{events: &events})
+		e := namedEffect("toggle", 12, "none", 0, false, &events)
+		e.Skill.Level = 1
+		e.Skill.Toggle = true
+		e.Template.Icon = true
+		list.Add(e)
+
+		list.Remove(e)
+
+		if !slices.Contains(events, "aborted:12:1") {
+			t.Fatalf("events = %v, want aborted:12:1", events)
+		}
+	})
+
+	t.Run("no message without icon", func(t *testing.T) {
+		var events []string
+		list := NewList(eventOwner{events: &events})
+		e := namedEffect("noicon", 13, "none", 0, false, &events)
+		list.Add(e)
+
+		list.Remove(e)
+
+		for _, ev := range events {
+			if strings.HasPrefix(ev, "worn-off:") || strings.HasPrefix(ev, "disappeared:") || strings.HasPrefix(ev, "aborted:") {
+				t.Fatalf("events = %v, want no expiry message for a non-icon effect", events)
+			}
+		}
+	})
 }
