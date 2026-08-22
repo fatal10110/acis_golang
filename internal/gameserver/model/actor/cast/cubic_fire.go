@@ -180,13 +180,33 @@ func ApplyCubicHeal(power float32, target Target) (healed bool) {
 // cast-participant surface a skill handler acts on, so a target that isn't
 // actor-shaped is dropped here instead of reaching the handlers as a value
 // none of their assertions can match.
-func ApplyCubicEffect(skills *handlerskill.Registry, caster handlerskill.Actor, def modelskill.Definition, target Target) {
+// The returned EffectResult carries AttackFailed (and any other handler
+// outcome) back to the caller, matching useContinuousSkill (Cubic.java:439-444):
+// a failed offensive continuous roll must still reach the owner as
+// ATTACK_FAILED, not be dropped silently.
+func ApplyCubicEffect(skills *handlerskill.Registry, caster handlerskill.Actor, def modelskill.Definition, target Target) EffectResult {
 	if skills == nil {
-		return
+		return EffectResult{}
 	}
 	actor, ok := target.(handlerskill.Actor)
 	if !ok {
-		return
+		return EffectResult{}
 	}
-	skills.UseResult(handlerskill.Cast{Caster: caster, Skill: def, Targets: []handlerskill.Actor{actor}})
+	result, ok := skills.UseResult(handlerskill.Cast{Caster: caster, Skill: def, Targets: []handlerskill.Actor{actor}})
+	if !ok {
+		return EffectResult{}
+	}
+	return EffectResult{
+		Handled:           true,
+		AttackFailed:      result.AttackFailed,
+		Counterattacks:    result.Counterattacks,
+		Lethals:           result.Lethals,
+		Dodges:            result.Dodges,
+		Resisted:          result.Resisted,
+		CubicAdded:        result.CubicAdded,
+		CubicTargets:      result.CubicTargets,
+		CubicAddedTargets: result.CubicAddedTargets,
+		CubicTouched:      result.CubicTouched,
+		CubicID:           result.CubicID,
+	}
 }
