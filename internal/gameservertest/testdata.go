@@ -45,11 +45,49 @@ func Templates(t testing.TB) *player.TemplateTable {
 			{SkillID: 900001, Level: 1, MinLevel: 50, Cost: 0},
 		},
 	}
-	table, err := player.NewTemplateTable(map[int]*player.Template{0: tmpl})
+	table, err := player.NewTemplateTable(map[int]*player.Template{
+		0:  tmpl,
+		1:  fighterLineTemplate(1),
+		2:  fighterLineTemplate(2),
+		88: duelistTemplate(),
+	})
 	if err != nil {
 		t.Fatalf("build template table: %v", err)
 	}
 	return table
+}
+
+// fighterLineTemplate fills the intermediate warrior-profession templates
+// the duelist line requires the table to carry.
+func fighterLineTemplate(id int) *player.Template {
+	return &player.Template{
+		ID:        id,
+		BaseLevel: 1,
+		HPTable:   []float64{80},
+		MPTable:   []float64{30},
+		CPTable:   []float64{32},
+		Spawns:    []location.Location{{X: 10, Y: 20, Z: 30}},
+		RunSpeed:  120,
+		WalkSpeed: 60,
+		SwimSpeed: 50,
+	}
+}
+
+// duelistTemplate is the enchant-eligible third-profession template the
+// skill-enchant flows select; it shares the fighter spawn point so both
+// classes land in the same world region.
+func duelistTemplate() *player.Template {
+	return &player.Template{
+		ID:        88,
+		BaseLevel: 76,
+		HPTable:   []float64{80},
+		MPTable:   []float64{30},
+		CPTable:   []float64{32},
+		Spawns:    []location.Location{{X: 10, Y: 20, Z: 30}},
+		RunSpeed:  120,
+		WalkSpeed: 60,
+		SwimSpeed: 50,
+	}
 }
 
 // ItemTemplates builds the item catalog shared by the behavior suites: adena,

@@ -237,6 +237,10 @@ type GameClientLinkConfig struct {
 	// EnchantRoll supplies enchant dice rolls in [0,1); nil falls back to
 	// the random source. Behavior harnesses inject a deterministic roll.
 	EnchantRoll func() float64
+	// SkillEnchantRoll supplies skill-enchant dice rolls in [0,99]; nil
+	// falls back to the random source. Behavior harnesses inject a
+	// deterministic roll.
+	SkillEnchantRoll func() int
 }
 
 // NewGameClientLink builds a GameClientLink from its collaborators.
@@ -283,6 +287,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) *GameClientLink {
 		playerConfig:     cfg.PlayerConfig,
 		petConfig:        cfg.PetConfig,
 		enchantRoll:      cfg.EnchantRoll,
+		skillEnchantRoll: cfg.SkillEnchantRoll,
 		inventory:        invops.NewService(cfg.IDs),
 		petItems:         petitem.NewService(cfg.IDs),
 		trades:           tradebook.NewBook(time.Now),
