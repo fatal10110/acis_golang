@@ -64,6 +64,26 @@ func (e *Engine) CanMove(ox, oy, oz, tx, ty, tz int) bool {
 	return goz == int(e.Height(tx, ty, tz))
 }
 
+// CanMoveAround reports whether the 3x3 geodata cell block centered on the
+// world position is fully open in every direction, matching Java's
+// GeoEngine.canMoveAround: a single point can sit on open ground yet still
+// be enclosed by blocked edges on every side, so a walkability check must
+// look at the surrounding cells rather than the cell alone.
+func (e *Engine) CanMoveAround(worldX, worldY, worldZ int) bool {
+	geoX := GeoX(worldX)
+	geoY := GeoY(worldY)
+
+	for ix := -1; ix <= 1; ix++ {
+		for iy := -1; iy <= 1; iy++ {
+			if e.nsweNearest(geoX+ix, geoY+iy, worldZ) != block.AllDirections {
+				return false
+			}
+		}
+	}
+
+	return true
+}
+
 // CanSee reports whether the two world positions share mutual line of sight.
 func (e *Engine) CanSee(ox, oy, oz, tx, ty, tz int) bool {
 	return e.CanSeeWithHeights(ox, oy, oz, 0, tx, ty, tz, 0)

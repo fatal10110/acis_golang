@@ -68,6 +68,8 @@ func (g *recordingGeo) ValidLocation(ox, oy, oz, tx, ty, tz int) location.Locati
 	return g.validLocation
 }
 
+func (g *recordingGeo) Walkable(int, int, int) bool { return true }
+
 // staticGeo is a zero-allocation Geo stub for allocation-ceiling tests:
 // recordingGeo's call-log slices grow and occasionally reallocate, which
 // would add noise to a per-call allocation measurement.
@@ -88,6 +90,8 @@ func (g staticGeo) FindPath(_, _ location.Location) ([]location.Location, bool) 
 func (g staticGeo) ValidLocation(ox, oy, oz, _, _, _ int) location.Location {
 	return location.Location{X: ox, Y: oy, Z: oz}
 }
+
+func (g staticGeo) Walkable(int, int, int) bool { return true }
 
 // fakeMoveClock/fakeMoveTimer are the sanctioned clock/timer infra-seam
 // exception (docs/agents/test-strategy.md): determinism is the point, not

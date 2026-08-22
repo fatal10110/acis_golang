@@ -133,6 +133,7 @@ func (blockedTestGeo) Height(_, _, z int) int16                  { return int16(
 func (blockedTestGeo) FindPath(_, _ location.Location) ([]location.Location, bool) {
 	return nil, false
 }
+func (blockedTestGeo) Walkable(int, int, int) bool { return true }
 func (blockedTestGeo) ValidLocation(ox, oy, oz, _, _, _ int) location.Location {
 	return location.Location{X: ox, Y: oy, Z: oz}
 }
@@ -206,6 +207,56 @@ func TestMoveLivePlayerSimulatesWalkServerSide(t *testing.T) {
 	}
 	if heading := live.CurrentHeading(); heading != origin.HeadingTo(target) {
 		t.Fatalf("heading = %d, want %d (facing target from server position)", heading, origin.HeadingTo(target))
+	}
+}
+
+// addLiveEffect installs a named effect on live's effect list, mirroring
+// the npc package's addHostileEffect for player-side crowd-control tests.
+func addLiveEffect(t *testing.T, live *livePlayer, name string) {
+	t.Helper()
+	e, err := effect.New(effect.Skill{ID: 1}, modelskill.EffectTemplate{Name: name})
+	if err != nil {
+		t.Fatalf("effect.New(%q) error: %v", name, err)
+	}
+	e.Effected = live
+	live.EffectList().Add(e)
+}
+
+// TestMoveLivePlayerRejectsOutOfControl pins MoveBackwardToLocation.java:76's
+// isOutOfControl() reject, narrowed to the two flags no other gate on this
+// path already covers (#1574): a teleporting or ImmobileUntilAttacked-locked
+// player's walk request is refused with ActionFailed and the server position
+// never moves.
+func TestMoveLivePlayerRejectsOutOfControl(t *testing.T) {
+	tests := []struct {
+		name  string
+		setup func(*testing.T, *livePlayer)
+	}{
+		{"teleporting", func(t *testing.T, live *livePlayer) {
+			live.Character.SetTeleporting(true)
+		}},
+		{"immobile until attacked", func(t *testing.T, live *livePlayer) {
+			addLiveEffect(t, live, "ImmobileUntilAttacked")
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			capture := &testsupport.FrameCapture{}
+			live := newTestLivePlayer(t, 1, capture)
+			gcl := &GameClientLink{log: zerolog.Nop()}
+			tt.setup(t, live)
+
+			origin := live.CurrentLocation()
+			gcl.moveLivePlayer(live, location.Location{X: origin.X + 8192, Y: origin.Y, Z: origin.Z})
+
+			opcodes := testsupport.FrameOpcodes(capture.Frames())
+			if len(opcodes) != 1 || opcodes[0] != serverpackets.OpcodeActionFailed {
+				t.Fatalf("frames sent = %x, want a single ActionFailed (%#x)", opcodes, serverpackets.OpcodeActionFailed)
+			}
+			if got := live.CurrentLocation(); got != origin {
+				t.Fatalf("position after a rejected move = %+v, want unchanged %+v", got, origin)
+			}
+		})
 	}
 }
 
@@ -300,6 +351,28 @@ func TestValidateLivePlayerPositionNeverAdoptsAValidReport(t *testing.T) {
 	}
 	if got := live.CurrentLocation(); got != origin {
 		t.Fatalf("position after an out-of-threshold report = %+v, want unchanged server position %+v (never adopted)", got, origin)
+	}
+}
+
+// TestValidateLivePlayerPositionSkipsWhileTeleporting pins
+// ValidatePosition.java:39, which returns before any correction while
+// isTeleporting() — unlike the move/attack gates, it sends no ActionFailed
+// either, matching the reference's silent early return (#1574).
+func TestValidateLivePlayerPositionSkipsWhileTeleporting(t *testing.T) {
+	capture := &testsupport.FrameCapture{}
+	live := newTestLivePlayer(t, 1, capture)
+	gcl := &GameClientLink{log: zerolog.Nop()}
+	live.Character.SetTeleporting(true)
+
+	origin := live.CurrentLocation()
+	farReport := location.Location{X: origin.X + 8192, Y: origin.Y, Z: origin.Z}
+	gcl.validateLivePlayerPosition(live, farReport)
+
+	if len(capture.Frames()) != 0 {
+		t.Fatalf("frames sent while teleporting = %d, want 0", len(capture.Frames()))
+	}
+	if got := live.CurrentLocation(); got != origin {
+		t.Fatalf("position while teleporting = %+v, want unchanged %+v", got, origin)
 	}
 }
 

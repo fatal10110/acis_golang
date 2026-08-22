@@ -425,6 +425,13 @@ func (l *GameClientLink) attackLiveTarget(live *livePlayer, target world.Tracked
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return false
 	}
+	// Reference: AttackRequest.java:31 rejects via isOutOfControl() before
+	// dispatching to onAction — narrowed here to the two flags not already
+	// gated elsewhere on this path (Teleporting, ImmobileUntilAttacked).
+	if live.Teleporting() || live.ImmobileUntilAttacked() {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return false
+	}
 	// The reference's single intention slot drops PICK_UP on any subsequent
 	// attack click regardless of which thinkAttack branch it takes — most
 	// branches here also cancel or redirect the move itself (chase redirect,

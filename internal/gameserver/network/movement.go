@@ -9,6 +9,13 @@ import (
 )
 
 func (l *GameClientLink) moveLivePlayer(live *livePlayer, target location.Location) {
+	// Reference: MoveBackwardToLocation.java:76 rejects while
+	// player.isOutOfControl() — here narrowed to the two flags not already
+	// gated elsewhere on this path (Teleporting, ImmobileUntilAttacked).
+	if live.Teleporting() || live.ImmobileUntilAttacked() {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return
+	}
 	// A client-initiated walk overrides any attack-driven chase movement —
 	// otherwise the server's own MaybeStartOffensiveFollow re-think would
 	// fight the player's own steering back toward the old target.
@@ -47,6 +54,12 @@ func (l *GameClientLink) stopLivePlayer(live *livePlayer) {
 }
 
 func (l *GameClientLink) validateLivePlayerPosition(live *livePlayer, reported location.Location) {
+	// Reference: ValidatePosition.java:39 skips validation entirely while
+	// isTeleporting() — no correction packet, unlike the other two gates
+	// here which answer ActionFailed.
+	if live.Teleporting() {
+		return
+	}
 	// ValidatePosition only corrects excessive divergence: a client that
 	// drifted beyond a second's worth of movement gets the server position
 	// back, while a report within the threshold changes nothing. The walk

@@ -28,6 +28,7 @@ func (g heightGeo) Height(x, y, z int) int16          { return g.engine.Height(x
 func (heightGeo) FindPath(_, _ location.Location) ([]location.Location, bool) {
 	return nil, false
 }
+func (heightGeo) Walkable(int, int, int) bool { return true }
 func (heightGeo) ValidLocation(ox, oy, oz, _, _, _ int) location.Location {
 	return location.Location{X: ox, Y: oy, Z: oz}
 }

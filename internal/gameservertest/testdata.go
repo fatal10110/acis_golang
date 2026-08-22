@@ -24,6 +24,7 @@ func (Geo) FindPath(_, _ location.Location) ([]location.Location, bool) { return
 func (Geo) ValidLocation(ox, oy, oz, _, _, _ int) location.Location {
 	return location.Location{X: ox, Y: oy, Z: oz}
 }
+func (Geo) Walkable(int, int, int) bool { return true }
 
 // Templates builds the single class template (id 0) every suite's characters
 // use: level-1 human fighter stats with the shared acquire-skill grants.
