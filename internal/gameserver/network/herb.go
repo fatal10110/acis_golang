@@ -73,7 +73,7 @@ func (l *GameClientLink) consumeHerb(live *livePlayer, itemID int32) {
 		live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageUseS1, int32(res.Skill.ID), int32(res.Skill.Level)))
 		applyItemCastCharges(live, res)
 		beforeVitals := live.Vitals()
-		res.Apply()
+		l.sendSkillHandlerResult(live, res.Apply())
 		sendMagicStatusUpdate(live, beforeVitals)
 	}
 }

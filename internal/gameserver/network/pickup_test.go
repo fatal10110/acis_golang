@@ -244,6 +244,69 @@ func TestPickupLiveGroundItemConsumesHerbWithoutStoringIt(t *testing.T) {
 	assertSystemMessageSkillFrame(t, capture.Frames()[6], serverpackets.SystemMessageUseS1, 2279, 1)
 }
 
+// offensiveHerbTestSkill seeds the herb's carried skill as an offensive
+// continuous skill with a guaranteed-failed landing roll (BaseLandRate 0),
+// matching Continuous.java:129-130's failed-landing branch, so consumeHerb's
+// apply path (network/herb.go, itemhandler.UseSkill's apply closure) is
+// exercised on the failure branch rather than the success branch every other
+// herb test in this file covers.
+func offensiveHerbTestSkill(t *testing.T) *skillstate.Persistence {
+	t.Helper()
+	store := newMemorySkillSaveStore()
+	return skillstate.NewPersistence(store, modelskill.NewTable([]modelskill.Definition{{
+		ID: 2278, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+		SkillType: "DEBUFF", EffectType: "DEBUFF", Debuff: true, Potion: true,
+		BaseLandRate: 0, IgnoreResists: true,
+		Effects: []modelskill.EffectTemplate{{Name: "Debuff", Time: 60}},
+	}}), store)
+}
+
+// TestConsumeHerbSendsAttackFailedForCasterAndMirroredSummon is the
+// regression test for #1573: consumeHerb's apply closure (network/herb.go,
+// itemhandler.UseAll's Apply in handler/item/use_skill.go) used to call the
+// plain ApplyEffects for both the caster and the mirrored summon, so a
+// failed offensive continuous roll never reached ATTACK_FAILED. It now
+// merges both applications' EffectResult and feeds it to
+// sendSkillHandlerResult, so a failed roll on the caster's own application
+// alone must still surface ATTACK_FAILED (aCis's Continuous.java:129-130 —
+// the same branch #943 already covered for the non-item cast paths).
+func TestConsumeHerbSendsAttackFailedForCasterAndMirroredSummon(t *testing.T) {
+	const herbTemplate int32 = 8600
+	templates := herbTestTemplates()
+	capture := &testsupport.FrameCapture{}
+	live := newEquipTestLivePlayer(t, 1, capture, templates, nil)
+	state := world.New()
+	state.Spawn(live, 100, 0, 0, 0)
+	servitor := summon.NewServitor(summon.ServitorConfig{ObjectID: 500, Level: 44, Stats: summon.CombatStats{MaxHP: 500, MaxMP: 200}})
+	state.AddSummon(live.ObjectID(), servitor)
+	gcl := &GameClientLink{
+		world:         state,
+		skills:        offensiveHerbTestSkill(t),
+		targets:       skilltarget.NewRegistry(skilltarget.WorldKnown{State: state}),
+		skillHandlers: handlerskill.NewDefaultRegistry(),
+	}
+
+	testsupport.ResetCapture(capture)
+	gcl.consumeHerb(live, herbTemplate)
+
+	testsupport.AssertOpcodeSequence(t, capture.Frames(),
+		serverpackets.OpcodeMagicSkillUse,
+		serverpackets.OpcodeMagicSkillUse,
+		serverpackets.OpcodeSystemMessage,
+		serverpackets.OpcodeSystemMessage,
+		serverpackets.OpcodeSystemMessage,
+	)
+	assertSystemMessageSkillFrame(t, capture.Frames()[2], serverpackets.SystemMessageUseS1, 2278, 1)
+	assertStaticSystemMessageFrame(t, capture.Frames()[3], serverpackets.SystemMessageAttackFailed)
+	assertStaticSystemMessageFrame(t, capture.Frames()[4], serverpackets.SystemMessageAttackFailed)
+	if effects := live.EffectList().All(); len(effects) != 0 {
+		t.Fatalf("caster effects = %+v, want none: the landing roll failed", effects)
+	}
+	if effects := servitor.EffectList().All(); len(effects) != 0 {
+		t.Fatalf("servitor effects = %+v, want none: the landing roll failed", effects)
+	}
+}
+
 // TestConsumeHerbRejectsNonHerbTemplate pins the precondition consumeHerb
 // enforces for both its callers: a non-herb template never builds the
 // transient, object-id-less instance, so no destroy can run against the live

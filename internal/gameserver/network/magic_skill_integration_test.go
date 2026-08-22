@@ -585,6 +585,52 @@ func TestGameClientLinkTogglesOnThenOff(t *testing.T) {
 	}
 }
 
+// TestGameClientLinkToggleActivationSendsAttackFailedWhenContinuousSkillDoesNotLand
+// covers the toggle-cast seam #1573 found dropped: an offensive continuous
+// skill activated as a toggle still routes through the same Continuous
+// handler as an ordinary active skill, so a failed landing roll must send
+// ATTACK_FAILED (Continuous.java:129-130) exactly as it already does for the
+// non-toggle path (see the sibling
+// TestGameClientLinkMagicSkillUseSendsAttackFailedWhenContinuousSkillDoesNotLand).
+func TestGameClientLinkToggleActivationSendsAttackFailedWhenContinuousSkillDoesNotLand(t *testing.T) {
+	store := newMemorySkillSaveStore()
+	skills := skillstate.NewPersistence(store, modelskill.NewTable([]modelskill.Definition{
+		{
+			ID: 291, Level: 1, Activation: modelskill.ActivationToggle, Target: modelskill.TargetSelf,
+			SkillType: "DEBUFF", EffectType: "DEBUFF", Debuff: true,
+			BaseLandRate: 0, IgnoreResists: true,
+			Effects: []modelskill.EffectTemplate{{Name: "Debuff", Time: 60}},
+		},
+	}), store)
+	var objID int32
+	c, _, _, _, _, state := newLinkedSQLGameClient(t, skills, func(chars *gamesql.CharacterStore, _ *gamesql.ItemStore) {
+		objID = seedSelectableSQLCharacter(t, chars, "player1", "Newbie", 5, 0).ID
+		store.seedKnown(objID, 0, player.SkillLevels{291: 1})
+	}, 1)
+
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	c.Send(encodeRequestMagicSkillUse(291, false, false))
+	c.Read() // MagicSkillUse
+	assertStaticSystemMessageFrame(t, c.Read(), serverpackets.SystemMessageAttackFailed)
+
+	obj, ok := state.Player(objID)
+	if !ok {
+		t.Fatalf("player %d not found in world state after cast", objID)
+	}
+	character, ok := obj.(*livePlayer)
+	if !ok {
+		t.Fatalf("world state player %d is not a *livePlayer", objID)
+	}
+	if effects := character.EffectList().All(); len(effects) != 0 {
+		t.Fatalf("effects after failed toggle DEBUFF = %+v, want none", effects)
+	}
+}
+
 func TestGameClientLinkToggleCostFailuresBroadcastCastAbort(t *testing.T) {
 	store := newMemorySkillSaveStore()
 	skills := skillstate.NewPersistence(store, modelskill.NewTable([]modelskill.Definition{
