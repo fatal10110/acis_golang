@@ -279,6 +279,54 @@ func TestAttackableAIRandomizeHateDisplacesTargetAndRebuildsDesires(t *testing.T
 	}
 }
 
+// TestAttackableAIAddDamageHateSetsMoveToTarget ports NpcAI.java:698-711:
+// every addAttackDesire overload reached from the ordinary hate-list path
+// (Npc.java:2036's getAI().addAttackDesire) defaults moveToTarget = true.
+// Only the scripted addAttackDesireHold (NpcAI.java:683-696, not yet ported)
+// passes false, so a plain hate-driven queued desire must never look "held".
+func TestAttackableAIAddDamageHateSetsMoveToTarget(t *testing.T) {
+	owner := actor(1)
+	target := actor(2)
+	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+
+	ai.AddDamageHate(target, 0, 10)
+
+	desire, ok := ai.Desires().Peek()
+	if !ok {
+		t.Fatal("Desires().Peek() ok = false after AddDamageHate")
+	}
+	if !desire.MoveToTarget {
+		t.Fatal("AddDamageHate queued desire MoveToTarget = false, want true")
+	}
+}
+
+// TestAttackableAIRandomizeHateRequeuesWithMoveToTarget ports
+// AggroList.randomizeAttack()'s post-swap requeue loop (AggroList.java:225-226),
+// which resolves to the same moveToTarget = true overload.
+func TestAttackableAIRandomizeHateRequeuesWithMoveToTarget(t *testing.T) {
+	owner := actor(1)
+	low := actor(2)
+	high := actor(3)
+	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+
+	ai.AddDamageHate(low, 0, 10)
+	ai.AddDamageHate(high, 0, 25)
+
+	always := func(attackable.Combatant) bool { return true }
+	first := func(int) int { return 0 }
+	if ok := ai.RandomizeHate(always, first); !ok {
+		t.Fatal("RandomizeHate: ok = false, want true")
+	}
+
+	desire, ok := ai.Desires().Peek()
+	if !ok {
+		t.Fatal("Desires().Peek() ok = false after RandomizeHate")
+	}
+	if !desire.MoveToTarget {
+		t.Fatal("RandomizeHate requeued desire MoveToTarget = false, want true")
+	}
+}
+
 func TestAttackableAIRandomizeHateNoopWithSingleAttacker(t *testing.T) {
 	owner := actor(1)
 	target := actor(2)
