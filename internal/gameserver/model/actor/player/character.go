@@ -135,6 +135,9 @@ type Character struct {
 	sendServitorVanished      func()
 	sendShieldBlockSuccess    func()
 	sendShieldBlockPerfect    func()
+	sendEffectWornOff         func(skillID modelskill.ID, level int)
+	sendEffectDisappeared     func(skillID modelskill.ID, level int)
+	sendEffectAborted         func(skillID modelskill.ID, level int)
 	consumeHerb               func(itemID int32)
 	roll                      func(int) int
 	attackTarget              func(world.Tracked)

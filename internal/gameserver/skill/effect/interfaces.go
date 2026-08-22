@@ -92,6 +92,16 @@ type abnormalEffectBroadcaster interface {
 	BroadcastAbnormalEffect()
 }
 
+// effectExpiryNotifier is implemented by an actor that reports which of
+// three system messages accompanies one of its icon-showing effects
+// leaving the list, mirroring EffectList.removeEffectFromQueue's message
+// branch (EffectList.java:572-584).
+type effectExpiryNotifier interface {
+	NotifyEffectWornOff(skillID modelskill.ID, level int)
+	NotifyEffectDisappeared(skillID modelskill.ID, level int)
+	NotifyEffectAborted(skillID modelskill.ID, level int)
+}
+
 type thinkTarget interface {
 	Think() error
 }
