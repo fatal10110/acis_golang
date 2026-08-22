@@ -10,9 +10,11 @@ import (
 
 func (l *GameClientLink) moveLivePlayer(live *livePlayer, target location.Location) {
 	// Reference: MoveBackwardToLocation.java:76 rejects while
-	// player.isOutOfControl() — here narrowed to the two flags not already
-	// gated elsewhere on this path (Teleporting, ImmobileUntilAttacked).
-	if live.Teleporting() || live.ImmobileUntilAttacked() {
+	// player.isOutOfControl() (Creature.java:652-655) — the full 8-flag
+	// union: Stunned, ImmobileUntilAttacked, Sleeping, Paralyzed, Afraid,
+	// Confused, Teleporting, Dead.
+	if live.Stunned() || live.ImmobileUntilAttacked() || live.Sleeping() || live.Paralyzed() ||
+		live.Afraid() || live.Confused() || live.Teleporting() || live.Dead() {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
