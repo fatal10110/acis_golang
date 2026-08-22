@@ -56,6 +56,18 @@ func (t *siegeGateTarget) AlikeDead() bool                        { return t.dea
 func (t *siegeGateTarget) SilentMoving() bool                     { return t.silent }
 func (t *siegeGateTarget) AttackableBy(skilltarget.Creature) bool { return t.attackableBy }
 
+// ownedSiegeGateTarget is a Summon/Pet-alike siegeGateTarget: its own
+// AlikeDead/SilentMoving reflect its own state, while OwnerCombatant
+// resolves to the owning player whose state SiegeGuard.canAutoAttack
+// actually gates on (SiegeGuard.java:84-93 reads target.getActingPlayer()
+// once, then checks every gate against that resolved player).
+type ownedSiegeGateTarget struct {
+	*siegeGateTarget
+	owner attackable.Combatant
+}
+
+func (t *ownedSiegeGateTarget) OwnerCombatant() attackable.Combatant { return t.owner }
+
 func newKindHostile(t testing.TB, id int32, tpl *Template, kind InstanceKind) *Hostile {
 	t.Helper()
 	h, err := NewHostile(&Instance{ObjectID: id, Template: tpl, Kind: kind}, newHostileLive(t), &hostileMove{}, &hostileAttack{})
@@ -637,6 +649,29 @@ func TestHostileSiegeGuardAutoAttackTargetValid(t *testing.T) {
 				t.Fatalf("siegeGuardAutoAttackTargetValid() = %v, want %v", got, tc.want)
 			}
 		})
+	}
+}
+
+// TestHostileSiegeGuardAutoAttackTargetValidChecksOwningPlayerNotSummon
+// proves the alike-dead/silent-moving/distance gates run against the
+// summon's owning player, not the summon's own state (SiegeGuard.java:84-93
+// resolves target.getActingPlayer() once and checks every gate on that
+// player). A living summon owned by an alike-dead player must be rejected
+// even though the summon itself isn't dead.
+func TestHostileSiegeGuardAutoAttackTargetValidChecksOwningPlayerNotSummon(t *testing.T) {
+	state := world.New()
+	guard := newKindHostile(t, 1, &Template{ID: 1, Type: "SiegeGuard"}, "SiegeGuard")
+	state.Spawn(guard, 100, 100, 0, 0)
+
+	owner := &siegeGateTarget{id: 3, dead: true, attackableBy: true}
+	summon := &ownedSiegeGateTarget{
+		siegeGateTarget: &siegeGateTarget{id: 2, dead: false, attackableBy: true},
+		owner:           owner,
+	}
+	state.Spawn(summon, 100, 100, 0, 0)
+
+	if guard.siegeGuardAutoAttackTargetValid(summon) {
+		t.Fatal("siegeGuardAutoAttackTargetValid(summon) = true, want false: owning player is alike-dead")
 	}
 }
 

@@ -145,9 +145,14 @@ func (h *Hostile) karmaTargetVisible(target attackable.Combatant) bool {
 // same as every other kind.
 //
 // Rejects a target with no acting player (an NPC target) or an alike-dead
-// acting player, and a silently-moving target beyond 250 units; otherwise
-// requires siege attackability (target.isAttackableBy(this)) and line of
-// sight. Not modeled: the acting player's invisibility check
+// acting player, and an acting player silently moving beyond 250 units;
+// otherwise requires siege attackability (target.isAttackableBy(this)) and
+// line of sight. The reference resolves target.getActingPlayer() once and
+// checks the alike-dead/silent-moving/distance gates against that acting
+// player, not against target directly — for a Summon/Pet target this is the
+// owning player, matching AutoAttackTargetValid's own OwnerCombatant()
+// resolution above; only the closing isAttackableBy/canSeeTarget calls use
+// the raw target. Not modeled: the acting player's invisibility check
 // (targetPlayer.getAppearance().isVisible()) — no player appearance state
 // exists yet (#907); and the clan/siege-side DEFENDER/OWNER exclusion inside
 // Playable.isAttackableBy's SiegeGuard branch — no castle/siege state exists
@@ -162,11 +167,15 @@ func (h *Hostile) siegeGuardAutoAttackTargetValid(target attackable.Combatant) b
 		return false
 	}
 
-	if target.AlikeDead() {
+	actingPlayer := target
+	if owned, ok := target.(interface{ OwnerCombatant() attackable.Combatant }); ok {
+		actingPlayer = owned.OwnerCombatant()
+	}
+	if actingPlayer == nil || actingPlayer.AlikeDead() {
 		return false
 	}
 
-	if sm, ok := target.(interface{ SilentMoving() bool }); ok && sm.SilentMoving() && !h.withinDistance(target, 250) {
+	if sm, ok := actingPlayer.(interface{ SilentMoving() bool }); ok && sm.SilentMoving() && !h.withinDistance(actingPlayer, 250) {
 		return false
 	}
 
