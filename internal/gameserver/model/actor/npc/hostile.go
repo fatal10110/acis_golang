@@ -174,8 +174,6 @@ func NewHostile(inst *Instance, live *creature.Live, movement ai.MoveController,
 		Instance:           inst,
 		Live:               live,
 		move:               movement,
-		hp:                 inst.Template.HPMax,
-		mp:                 inst.Template.MPMax,
 		roll:               rand.Intn,
 		currentSoulshots:   currentSoulshots,
 		currentSpiritshots: currentSpiritshots,
@@ -184,6 +182,11 @@ func NewHostile(inst *Instance, live *creature.Live, movement ai.MoveController,
 	}
 	h.health = creature.NewHealth(&h.hp)
 	h.brain = ai.NewAttackable(h, movement, attack)
+	// Seed from calculated Max HP/MP (CreatureStatus.setMaxHpMp uses the
+	// int-truncated getMaxHp/getMaxMp, not the raw template value or the
+	// untruncated calcStat result): MaxHpMul/MaxMpMul scale by CON/MEN bonus.
+	h.hp = float64(h.MaxHP())
+	h.mp = float64(int(h.MaxMPValue()))
 	return h, nil
 }
 
