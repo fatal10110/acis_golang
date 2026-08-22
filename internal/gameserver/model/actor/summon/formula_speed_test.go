@@ -31,6 +31,18 @@ func TestActorCriticalRateCapsAt500(t *testing.T) {
 	}
 }
 
+// TestActorCriticalRateTruncatesBeforeCap pins the boundary from
+// CreatureStatus.getCriticalHit (CreatureStatus.java:551-553):
+// `Math.min((int) calcStat(...), 500)`. A base critical rate of 8.48
+// finalizes to 84.8 (base*10, no DEX bonus for summons); truncating first
+// yields the int 84, not the untruncated 84.8.
+func TestActorCriticalRateTruncatesBeforeCap(t *testing.T) {
+	pet := NewPet(PetConfig{ObjectID: 1, Level: 10, Roll: zeroSummonRoll})
+	if got := pet.CriticalRate(8.48); got != 84 {
+		t.Fatalf("CriticalRate(8.48) = %v, want truncated to 84", got)
+	}
+}
+
 func TestActorMAtkSpdServitorNeverHalved(t *testing.T) {
 	// A servitor has no feeding state at all (isPet is false), so its
 	// magic attack speed must equal a well-fed pet's, never a hungry one's.
