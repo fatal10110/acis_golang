@@ -213,6 +213,31 @@ func TestBigHeadEffectCarriesVisibleAbnormalHooks(t *testing.T) {
 	}
 }
 
+// TestBigHeadEffectTogglesMaskAndBroadcastsDistinctFromIconRefresh proves
+// BigHead's start/exit hooks flip the 0x002000 mask and drive both the icon
+// refresh (UpdateAbnormalEffect, Java's EffectList.updateEffectIcons()) and
+// the client-visible mask broadcast (BroadcastAbnormalEffect, Java's
+// Creature.startAbnormalEffect() -> updateAbnormalEffect()) — the gap this
+// issue closes for player targets.
+func TestBigHeadEffectTogglesMaskAndBroadcastsDistinctFromIconRefresh(t *testing.T) {
+	target := &growEffectTarget{}
+	e, err := New(Skill{}, modelskill.EffectTemplate{Name: "BigHead"})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	e.Effected = target
+
+	if !e.OnStart(e) {
+		t.Fatal("OnStart() = false, want true")
+	}
+	e.OnExit(e)
+
+	want := []string{"start:0x2000", "abnormal", "broadcast", "stop:0x2000", "abnormal", "broadcast"}
+	if !reflect.DeepEqual(target.events, want) {
+		t.Fatalf("events = %#v, want %#v", target.events, want)
+	}
+}
+
 func TestSignetGroundKindsAcceptButDeclineToStartOutsideALiveCast(t *testing.T) {
 	for _, name := range []string{"Signet", "SignetNoise", "SignetAntiSummon", "SignetMDam"} {
 		e, err := New(Skill{}, modelskill.EffectTemplate{Name: name})
@@ -242,13 +267,13 @@ func TestClanGateEffectStartsAndStopsMagicCircle(t *testing.T) {
 	if !e.OnStart(e) {
 		t.Fatal("ClanGate OnStart() = false, want true")
 	}
-	want := []string{fmt.Sprintf("start:%#x", magicCircleAbnormalMask), "abnormal"}
+	want := []string{fmt.Sprintf("start:%#x", magicCircleAbnormalMask), "abnormal", "broadcast"}
 	if !reflect.DeepEqual(target.events, want) {
 		t.Fatalf("start events = %#v, want %#v", target.events, want)
 	}
 
 	e.OnExit(e)
-	want = append(want, fmt.Sprintf("stop:%#x", magicCircleAbnormalMask), "abnormal")
+	want = append(want, fmt.Sprintf("stop:%#x", magicCircleAbnormalMask), "abnormal", "broadcast")
 	if !reflect.DeepEqual(target.events, want) {
 		t.Fatalf("events after exit = %#v, want %#v", target.events, want)
 	}

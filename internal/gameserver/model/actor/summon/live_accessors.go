@@ -548,6 +548,29 @@ func (a *Actor) Fed() int {
 	return a.fed
 }
 
+// CanEatFood reports whether itemID matches one of this pet's configured
+// food template ids, matching PetTemplate.canEatFood.
+func (a *Actor) CanEatFood(itemID int32) bool {
+	return itemID == a.food1 || itemID == a.food2
+}
+
+// AddFed increases a pet's meal gauge by amount, capped at maxMeal, and
+// reports the resulting fed value along with whether the pet is still below
+// the auto-feed threshold, matching Pet.checkAutoFeedState after
+// PetFoods.useFood's setCurrentFed update.
+func (a *Actor) AddFed(amount int) (fed int, stillHungry bool) {
+	a.statusMu.Lock()
+	a.fed += amount
+	if a.fed > a.maxMeal {
+		a.fed = a.maxMeal
+	}
+	a.belowUnsummonLimit = petmodel.BelowShare(a.fed, a.maxMeal, a.unsummonLimit)
+	fed = a.fed
+	stillHungry = petmodel.BelowShare(fed, a.maxMeal, a.autoFeedLimit)
+	a.statusMu.Unlock()
+	return fed, stillHungry
+}
+
 // Lifetime returns a servitor's current time-remaining/total-lifetime state,
 // the servitor analogue of a pet's Fed/maxMeal (Servitor.getTimeRemaining/
 // getTotalLifeTime, mirrored by PetInfo.java:26-30's non-Pet branch).

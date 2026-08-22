@@ -502,6 +502,10 @@ func (t *growEffectTarget) UpdateAbnormalEffect() {
 	t.events = append(t.events, "abnormal")
 }
 
+func (t *growEffectTarget) BroadcastAbnormalEffect() {
+	t.events = append(t.events, "broadcast")
+}
+
 func TestGrowEffectScalesCollisionRadiusAndRestoresOnExit(t *testing.T) {
 	baseRadius := 9.0
 	target := &growEffectTarget{radius: baseRadius}
@@ -520,7 +524,7 @@ func TestGrowEffectScalesCollisionRadiusAndRestoresOnExit(t *testing.T) {
 	}
 
 	e.OnExit(e)
-	if wantEvents := []string{fmt.Sprintf("set:%g", want), "start:0x10000", "abnormal", "reset", "stop:0x10000", "abnormal"}; !reflect.DeepEqual(target.events, wantEvents) {
+	if wantEvents := []string{fmt.Sprintf("set:%g", want), "start:0x10000", "abnormal", "broadcast", "reset", "stop:0x10000", "abnormal", "broadcast"}; !reflect.DeepEqual(target.events, wantEvents) {
 		t.Fatalf("events = %#v, want %#v", target.events, wantEvents)
 	}
 }

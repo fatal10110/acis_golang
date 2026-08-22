@@ -371,5 +371,50 @@ func testTemplates() *item.Table {
 		{ID: item.AdenaID, Kind: item.KindEtcItem, Stackable: true, Dropable: true, Tradable: true, Destroyable: true, Duration: -1, EtcItem: &item.EtcItemDetail{}},
 		{ID: 20, Kind: item.KindWeapon, Slot: item.SlotWolf, Dropable: true, Tradable: true, Destroyable: true, Duration: -1, Weapon: &item.WeaponDetail{Type: item.WeaponPet}},
 		{ID: 30, Kind: item.KindWeapon, Slot: item.SlotRHand, Dropable: true, Tradable: true, Destroyable: true, Duration: -1, Weapon: &item.WeaponDetail{Type: item.WeaponSword}},
+		{ID: 1060, Kind: item.KindEtcItem, Stackable: true, Dropable: true, Tradable: true, Destroyable: true, Duration: -1, EtcItem: &item.EtcItemDetail{Type: item.EtcItemPotion, Handler: "ItemSkills"}},
+		{ID: 2515, Kind: item.KindEtcItem, Stackable: true, Dropable: true, Tradable: true, Destroyable: true, Duration: -1, EtcItem: &item.EtcItemDetail{Handler: "PetFoods"}},
+		{ID: 4038, Kind: item.KindEtcItem, Stackable: true, Dropable: true, Tradable: true, Destroyable: true, Duration: -1, EtcItem: &item.EtcItemDetail{Handler: "PetFoods"}},
 	})
+}
+
+// TestUseItemDispatchesEligibleConsumable pins #1582: a non-equipment item
+// this pet can eat (matches its template food ids) or that is a potion must
+// report UseConsumable for the network layer to dispatch to its etc-item
+// handler, not fall through to UsePetCannotUseItem.
+func TestUseItemDispatchesEligibleConsumable(t *testing.T) {
+	templates := testTemplates()
+	petInv := itemcontainer.NewPetInventory(2, templates)
+	pet := summon.NewPet(summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv, Food1: 2515})
+
+	potion := petInv.AddNew(1060, 1, 700)
+	petInv.DrainUpdates()
+	res, failure := UseItem(pet, petInv, potion.ObjectID, false)
+	if failure != UseConsumable || res.ItemID != 1060 {
+		t.Fatalf("potion UseItem = (%+v, %v), want UseConsumable for template 1060", res, failure)
+	}
+
+	food := petInv.AddNew(2515, 1, 701)
+	petInv.DrainUpdates()
+	res, failure = UseItem(pet, petInv, food.ObjectID, false)
+	if failure != UseConsumable || res.ItemID != 2515 {
+		t.Fatalf("food UseItem = (%+v, %v), want UseConsumable for template 2515 (matches pet's Food1)", res, failure)
+	}
+}
+
+// TestUseItemRejectsIneligibleFood covers PetTemplate.canEatFood's negative
+// case: a PetFoods item whose id doesn't match this pet's configured food
+// ids is not eligible, matching RequestPetUseItem.java's PET_CANNOT_USE_ITEM
+// gate rather than dispatching it.
+func TestUseItemRejectsIneligibleFood(t *testing.T) {
+	templates := testTemplates()
+	petInv := itemcontainer.NewPetInventory(2, templates)
+	pet := summon.NewPet(summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv, Food1: 2515})
+
+	food := petInv.AddNew(4038, 1, 700)
+	petInv.DrainUpdates()
+
+	res, failure := UseItem(pet, petInv, food.ObjectID, false)
+	if failure != UsePetCannotUseItem || res.ItemID != 0 {
+		t.Fatalf("UseItem = (%+v, %v), want UsePetCannotUseItem for food id not matching pet's Food1/Food2", res, failure)
+	}
 }

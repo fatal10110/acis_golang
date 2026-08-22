@@ -268,6 +268,9 @@ func (l *GameClientLink) petUseItem(ctx context.Context, live *livePlayer, req c
 	case petitem.UsePetCannotUseItem:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessagePetCannotUseItem))
 		return
+	case petitem.UseConsumable:
+		l.usePetConsumable(live, pet, petInv, req.ObjectID)
+		return
 	}
 
 	l.applyPersistActions(ctx, res.Persist)
