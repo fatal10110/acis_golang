@@ -21,9 +21,13 @@ func (h *Hostile) Aggressive() bool {
 // request.
 //
 // Excluded unconditionally: a nil target and an already-dead target. A
-// non-NPC target must also be within rangeVal and, unless this NPC is
-// raid-related or its template can see through concealment, not be
-// silently moving.
+// candidate already the FinalTarget of a queued, non-moving ATTACK Desire
+// is excluded too when that already starts or maintains an offensive
+// follow (Npc.java:2107-2110, CreatureMove.maybeStartOffensiveFollow):
+// this NPC is already committed to closing on it, so re-validating it
+// against the rules below is redundant. A non-NPC target must also be
+// within rangeVal and, unless this NPC is raid-related or its template can
+// see through concealment, not be silently moving.
 //
 // Guard and FriendlyMonster kinds then use one rule: attack only a
 // karma-positive target, purely on line of sight. Every other kind excludes
@@ -43,10 +47,23 @@ func (h *Hostile) Aggressive() bool {
 // branch (gated by a config flag that ships disabled by default, and needs
 // npc AI config plumbing that doesn't exist yet), and the peace-zone aggro
 // config flag (allowPeaceful is a caller-supplied parameter here rather
-// than the reference's own config-driven default).
+// than the reference's own config-driven default). The follow gate's
+// distance decision reuses move.Controller.MaybeStartOffensiveFollow,
+// which doesn't reproduce CreatureMove's own line-of-sight branch (see
+// that method's doc): no geodata query is wired into a live actor yet.
 func (h *Hostile) AutoAttackTargetValid(target attackable.Combatant, rangeVal int, allowPeaceful bool) bool {
 	if target == nil || target.AlikeDead() {
 		return false
+	}
+
+	if _, ok := h.brain.Desires().NonMovingAttack(target); ok {
+		following, err := h.brain.MaybeStartOffensiveFollow(target)
+		if err != nil {
+			h.log.Debug().Err(err).Int32("object_id", h.ObjectID()).Msg("npc: offensive follow broadcast")
+		}
+		if following {
+			return false
+		}
 	}
 
 	_, targetIsNPC := target.(*Hostile)

@@ -3,6 +3,7 @@ package npc
 import (
 	"testing"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -280,6 +281,126 @@ func TestHostileAutoAttackTargetValidRaidRelatedSeesThroughSilentMove(t *testing
 
 	if !attacker.AutoAttackTargetValid(target, 500, false) {
 		t.Fatal("AutoAttackTargetValid(silent target) = false once RaidRelated, want true")
+	}
+}
+
+// newFollowGateHostile builds a Hostile whose move controller is a
+// hostileMove fake, returned alongside it so a test can script whether
+// MaybeStartOffensiveFollow reports an active follow.
+func newFollowGateHostile(t testing.TB, id int32, tpl *Template) (*Hostile, *hostileMove) {
+	t.Helper()
+	move := &hostileMove{}
+	h, err := NewHostile(&Instance{ObjectID: id, Template: tpl, Kind: "Monster"}, newHostileLive(t), move, &hostileAttack{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return h, move
+}
+
+func TestHostileAutoAttackTargetValidQueuedAttackDesireFollowGate(t *testing.T) {
+	// This ports Npc.java:2107-2110: a candidate already the FinalTarget of
+	// a queued, non-moving ATTACK desire is excluded from re-validation
+	// whenever that desire's follow either starts or is already under way
+	// (maybeStartOffensiveFollow reporting true, e.g. because the target
+	// sits out of melee range and a follow task got issued). A candidate
+	// already close enough that no follow is needed (maybeStartOffensiveFollow
+	// reporting false) falls through to the normal targeting rule instead.
+	tests := []struct {
+		name         string
+		followResult bool
+		moveToTarget bool
+		want         bool
+		wantFollowed bool
+	}{
+		{
+			name:         "out-of-range queued attack desire starts a follow and is excluded",
+			followResult: true,
+			want:         false,
+			wantFollowed: true,
+		},
+		{
+			name:         "in-range queued attack desire needs no follow and falls through to the normal rule",
+			followResult: false,
+			want:         true,
+			wantFollowed: true,
+		},
+		{
+			name:         "an already-moving queued attack desire skips the gate entirely",
+			followResult: true,
+			moveToTarget: true,
+			want:         true,
+			wantFollowed: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			state := world.New()
+			attacker, move := newFollowGateHostile(t, 1, &Template{ID: 1, Type: "Monster", AggroRange: 10})
+			move.followResult = tc.followResult
+			state.Spawn(attacker, 100, 100, 0, 0)
+
+			target := &gateTarget{id: 2}
+			state.Spawn(target, 100, 100, 0, 0)
+
+			attacker.AI().Desires().AddOrUpdate(&ai.Desire{
+				Kind:         ai.IntentionAttack,
+				FinalTarget:  target,
+				MoveToTarget: tc.moveToTarget,
+			})
+
+			if got := attacker.AutoAttackTargetValid(target, 500, false); got != tc.want {
+				t.Fatalf("AutoAttackTargetValid() = %v, want %v", got, tc.want)
+			}
+			if followed := move.followTarget != nil; followed != tc.wantFollowed {
+				t.Fatalf("MaybeStartOffensiveFollow called = %v, want %v", followed, tc.wantFollowed)
+			}
+		})
+	}
+}
+
+func TestHostileAutoAttackTargetValidNoQueuedDesireSkipsFollowGate(t *testing.T) {
+	state := world.New()
+	attacker, move := newFollowGateHostile(t, 1, &Template{ID: 1, Type: "Monster", AggroRange: 10})
+	move.followResult = true
+	state.Spawn(attacker, 100, 100, 0, 0)
+
+	target := &gateTarget{id: 2}
+	state.Spawn(target, 100, 100, 0, 0)
+
+	if !attacker.AutoAttackTargetValid(target, 500, false) {
+		t.Fatal("AutoAttackTargetValid() = false, want true: no queued attack desire means the follow gate must not apply")
+	}
+	if move.followTarget != nil {
+		t.Fatal("MaybeStartOffensiveFollow: called, want the gate to skip it with no matching queued desire")
+	}
+}
+
+func TestHostileRandomizeHateExcludesCandidateAlreadyFollowedByQueuedAttackDesire(t *testing.T) {
+	// Mirrors AggroList.randomizeAttack reading canAutoAttack: a hate-list
+	// entry whose queued, non-moving ATTACK desire already starts or
+	// maintains an offensive follow toward it can never become the
+	// displacer, even though it has the higher hate that would otherwise
+	// make it the immediate pick.
+	state := world.New()
+	owner, move := newFollowGateHostile(t, 1, &Template{ID: 1, Type: "Monster", AggroRange: 10})
+	owner.SetRollSource(zeroRoll)
+	move.followResult = true
+	state.Spawn(owner, 100, 100, 0, 0)
+
+	mostHated := &gateTarget{id: 2}
+	followed := &gateTarget{id: 3}
+	state.Spawn(mostHated, 100, 100, 0, 0)
+	state.Spawn(followed, 100, 100, 0, 0)
+
+	owner.AddDamageHate(mostHated, 0, 999)
+	owner.AddDamageHate(followed, 0, 25)
+
+	if ok := owner.RandomizeHate(); ok {
+		t.Fatal("RandomizeHate: ok = true, want false: the sole non-mostHated candidate is excluded by the follow gate")
+	}
+	if got := owner.AI().Threats().Hate(followed); got != 25 {
+		t.Fatalf("excluded candidate hate = %v, want unchanged 25", got)
 	}
 }
 
