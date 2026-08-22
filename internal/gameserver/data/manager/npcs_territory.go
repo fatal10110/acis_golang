@@ -35,33 +35,105 @@ func (n *Npcs) pickSpawnPosition(maker *spawn.Maker, entry spawn.Entry) (spawn.P
 const territorySpawnAttempts = 10
 const territoryPointAttempts = 64
 
+// randomTerritoryPosition matches Java's SpawnManager.findTerritory (merges
+// a maker's ";"-delimited territory list into one Territory: minZ/maxZ are
+// min-of-mins/max-of-maxes across the list, shapes are the union) plus
+// Territory.getRandomLocation's area-weighted triangle draw
+// (Territory.java:103-156, Polygon.java:15-37: a triangle is picked with
+// probability proportional to its size within the merged shape list). Since
+// each sub-territory's contribution to that merged weight is proportional
+// to its own total area, picking a whole sub-territory with probability
+// proportional to territoryArea, then a uniform point within it, is the
+// same distribution. Z is resolved and range-checked against the merged
+// bounds, not the picked sub-territory's own MinZ/MaxZ.
 func randomTerritoryPosition(maker *spawn.Maker, geo move.Geo) (spawn.Position, bool) {
 	if maker == nil || len(maker.Territories) == 0 {
 		return spawn.Position{}, false
 	}
 
+	minZ, maxZ := mergedZRange(maker.Territories)
+	avgZ := (minZ + maxZ) / 2
+
 	var last spawn.Position
 	haveLast := false
 	for i := 0; i < territorySpawnAttempts; i++ {
-		territory := maker.Territories[rnd.Get(len(maker.Territories))]
+		territory := weightedTerritoryPick(maker.Territories)
 		x, y, ok := randomPointInTerritory(territory)
 		if !ok {
 			continue
 		}
 
-		z := int(geo.Height(x, y, averageZ(territory)))
+		z := int(geo.Height(x, y, avgZ))
 		pos := spawn.Position{
 			Location: location.Location{X: x, Y: y, Z: z},
 			Heading:  rnd.Get(65536),
 		}
 		last, haveLast = pos, true
 
-		if z < territory.MinZ || z > territory.MaxZ || insideAnyTerritory(maker.BannedTerritories, pos.Location) {
+		if z < minZ || z > maxZ || insideAnyTerritory(maker.BannedTerritories, pos.Location) {
 			continue
 		}
 		return pos, true
 	}
 	return last, haveLast
+}
+
+func mergedZRange(territories []*spawn.Territory) (minZ, maxZ int) {
+	minZ, maxZ = territories[0].MinZ, territories[0].MaxZ
+	for _, t := range territories[1:] {
+		minZ = min(minZ, t.MinZ)
+		maxZ = max(maxZ, t.MaxZ)
+	}
+	return minZ, maxZ
+}
+
+// weightedTerritoryPick draws one territory with probability proportional
+// to its 2D polygon area, matching Java's area/size-weighted triangle
+// selection over the merged shape list (see randomTerritoryPosition).
+func weightedTerritoryPick(territories []*spawn.Territory) *spawn.Territory {
+	if len(territories) == 1 {
+		return territories[0]
+	}
+
+	total := 0.0
+	areas := make([]float64, len(territories))
+	for i, t := range territories {
+		areas[i] = territoryArea(t)
+		total += areas[i]
+	}
+	if total <= 0 {
+		return territories[rnd.Get(len(territories))]
+	}
+
+	roll := rnd.GetFloat(total)
+	for i, area := range areas {
+		roll -= area
+		if roll < 0 {
+			return territories[i]
+		}
+	}
+	return territories[len(territories)-1]
+}
+
+// territoryArea is the shoelace-formula area of the territory's polygon,
+// computed from Nodes directly so it agrees with territoryContains2D's own
+// point-in-polygon test regardless of whether the embedded geometry.Territory
+// was populated.
+func territoryArea(territory *spawn.Territory) float64 {
+	nodes := territory.Nodes
+	if len(nodes) < 3 {
+		return 0
+	}
+	var sum float64
+	j := len(nodes) - 1
+	for i := range nodes {
+		sum += float64(nodes[j].X)*float64(nodes[i].Y) - float64(nodes[i].X)*float64(nodes[j].Y)
+		j = i
+	}
+	if sum < 0 {
+		sum = -sum
+	}
+	return sum / 2
 }
 
 func randomPointInTerritory(territory *spawn.Territory) (int, int, bool) {
@@ -145,10 +217,6 @@ func territoryCentroid(territory *spawn.Territory) (int, int) {
 		y += node.Y
 	}
 	return x / len(territory.Nodes), y / len(territory.Nodes)
-}
-
-func averageZ(territory *spawn.Territory) int {
-	return (territory.MinZ + territory.MaxZ) / 2
 }
 
 // locatedRef and creatureActorRef are forward references that break the
