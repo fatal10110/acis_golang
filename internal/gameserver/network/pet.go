@@ -234,6 +234,10 @@ func (l *GameClientLink) petGetItem(ctx context.Context, live *livePlayer, req c
 	case petitem.PickupPetCannotCarryMore:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessagePetCannotCarryMoreItems))
 		return
+	case petitem.PickupLootLocked:
+		live.SendFrame(serverpackets.FrameActionFailed())
+		live.SendFrame(failedPickupFrame(ground.ItemID(), ground.Count()))
+		return
 	default: // petitem.PickupNoop and any other unhandled failure
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return

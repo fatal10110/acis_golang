@@ -3,6 +3,7 @@ package ai
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 )
@@ -65,6 +66,114 @@ func TestAttackableAITickRefreshesStaleThreatAndHate(t *testing.T) {
 	}
 	if got := ai.Hates().Hate(kept); got != 900 {
 		t.Fatalf("kept hate entry = %v, want unchanged", got)
+	}
+}
+
+// TestAttackableAITickClearsStaleThreatOutOfTerritory ports NpcAI.java's
+// out-of-territory fixed-rate task (NpcAI.java:298-339): a threat entry
+// whose last damage is at least staleThreatAge old gets its hate stopped
+// and its queued attack desire dropped once the owner has been out of
+// territory for staleThreatSweepTicks.
+func TestAttackableAITickClearsStaleThreatOutOfTerritory(t *testing.T) {
+	owner := actor(1)
+	owner.inTerritory = false
+	target := actor(2)
+	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+	ai.AddDamageHate(target, 0, 20)
+
+	future := time.Now().Add(91 * time.Second)
+	ai.now = func() time.Time { return future }
+
+	for i := 0; i < staleThreatSweepTicks; i++ {
+		ai.Tick()
+	}
+
+	if got := ai.Threats().Hate(target); got != 0 {
+		t.Fatalf("hate after stale sweep = %v, want 0 (stopped)", got)
+	}
+	if _, ok := ai.Threats().Get(target); !ok {
+		t.Fatal("threat entry dropped, want kept with hate stopped")
+	}
+	if got := ai.Desires().Len(); got != 0 {
+		t.Fatalf("desires len = %d, want 0 (stale attack desire dropped)", got)
+	}
+}
+
+// TestAttackableAITickKeepsFreshThreatOutOfTerritory confirms the sweep
+// only touches entries whose last damage is stale; an attacker still
+// dealing damage within staleThreatAge keeps its desire queued.
+func TestAttackableAITickKeepsFreshThreatOutOfTerritory(t *testing.T) {
+	owner := actor(1)
+	owner.inTerritory = false
+	target := actor(2)
+	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+	ai.AddDamageHate(target, 0, 20)
+
+	future := time.Now().Add(10 * time.Second)
+	ai.now = func() time.Time { return future }
+
+	for i := 0; i < staleThreatSweepTicks; i++ {
+		ai.Tick()
+	}
+
+	if got := ai.Desires().Len(); got != 1 {
+		t.Fatalf("desires len = %d, want 1 (fresh attack desire kept)", got)
+	}
+}
+
+// TestAttackableAITickSkipsStaleSweepInTerritory confirms the sweep never
+// runs while the owner is in its territory, matching NpcAI.java only
+// starting the task on the isInMyTerritory() false transition and
+// cancelling it back to territory.
+func TestAttackableAITickSkipsStaleSweepInTerritory(t *testing.T) {
+	owner := actor(1)
+	target := actor(2)
+	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+	ai.AddDamageHate(target, 0, 20)
+
+	future := time.Now().Add(91 * time.Second)
+	ai.now = func() time.Time { return future }
+
+	for i := 0; i < staleThreatSweepTicks; i++ {
+		ai.Tick()
+	}
+
+	if got := ai.Desires().Len(); got != 1 {
+		t.Fatalf("desires len = %d, want 1 (in-territory owner never runs the OOT sweep)", got)
+	}
+}
+
+// TestAttackableAITickOutOfTerritorySweepRestartsOnReentry confirms
+// returning to territory resets the sweep countdown, matching NpcAI.java
+// cancelling the fixed-rate task on return and recreating it fresh (with
+// its own initial delay) the next time the owner leaves territory.
+func TestAttackableAITickOutOfTerritorySweepRestartsOnReentry(t *testing.T) {
+	owner := actor(1)
+	owner.inTerritory = false
+	target := actor(2)
+	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+	// A large hate value keeps the attack desire alive through the regular
+	// per-3-tick decay (Attackable.Tick, attackHateDecay) across this
+	// test's 19 total ticks, isolating the OOT-sweep-restart behavior under
+	// test from that unrelated decay path.
+	ai.AddDamageHate(target, 0, 1000)
+
+	future := time.Now().Add(91 * time.Second)
+	ai.now = func() time.Time { return future }
+
+	for i := 0; i < staleThreatSweepTicks-1; i++ {
+		ai.Tick()
+	}
+	owner.inTerritory = true
+	ai.Tick()
+	owner.inTerritory = false
+
+	for i := 0; i < staleThreatSweepTicks-1; i++ {
+		ai.Tick()
+	}
+
+	if got := ai.Desires().Len(); got != 1 {
+		t.Fatalf("desires len = %d, want 1 (sweep countdown restarted on territory reentry)", got)
 	}
 }
 

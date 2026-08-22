@@ -16,6 +16,7 @@ type fakeSelf struct {
 	id         int32
 	x, y, z    int
 	radius     float64
+	heading    int
 	broadcasts []Event
 	stopCalls  int
 }
@@ -28,6 +29,7 @@ func (f *fakeSelf) BroadcastMove(event Event) error {
 	return nil
 }
 func (f *fakeSelf) BroadcastStop() error { f.stopCalls++; return nil }
+func (f *fakeSelf) SetHeading(h int)     { f.heading = h }
 func (f *fakeSelf) SyncPosition(position location.Location) {
 	f.x, f.y, f.z = position.X, position.Y, position.Z
 }
@@ -566,6 +568,9 @@ func TestControllerBroadcastsMoveOnEachSegmentAdvance(t *testing.T) {
 	if got := c.move.Destination(); got != waypoints[1] {
 		t.Fatalf("Destination() = %+v, want %+v", got, waypoints[1])
 	}
+	if want := waypoints[0].HeadingTo(waypoints[1]); self.heading != want {
+		t.Fatalf("heading after segment 1 advance = %d, want %d (facing segment 2, not move-start direction)", self.heading, want)
+	}
 
 	clock.fire(segmentDuration)
 	if len(self.broadcasts) != 3 {
@@ -573,6 +578,9 @@ func TestControllerBroadcastsMoveOnEachSegmentAdvance(t *testing.T) {
 	}
 	if got := c.move.Destination(); got != waypoints[2] {
 		t.Fatalf("Destination() = %+v, want %+v", got, waypoints[2])
+	}
+	if want := waypoints[1].HeadingTo(waypoints[2]); self.heading != want {
+		t.Fatalf("heading after segment 2 advance = %d, want %d", self.heading, want)
 	}
 
 	clock.fire(segmentDuration)
