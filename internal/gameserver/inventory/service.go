@@ -190,11 +190,11 @@ func (s *Service) PickupGround(inv *itemcontainer.Inventory, ground *item.Instan
 	if inv == nil || ground == nil || tmpl == nil || groundState.Count <= 0 {
 		return Result{}, PickupNoop
 	}
-	if LootLocked(groundState.OwnerID, pickerID) {
-		return Result{}, PickupLootLocked
-	}
 	if !inv.ValidateCapacity(inv.SlotsNeededFor(ground, tmpl)) {
 		return Result{}, PickupSlotsFull
+	}
+	if LootLocked(groundState.OwnerID, pickerID) {
+		return Result{}, PickupLootLocked
 	}
 
 	picked := groundState.Instance()
