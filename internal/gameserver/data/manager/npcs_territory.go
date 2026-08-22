@@ -115,11 +115,16 @@ func weightedTerritoryPick(territories []*spawn.Territory) *spawn.Territory {
 	return territories[len(territories)-1]
 }
 
-// territoryArea is the shoelace-formula area of the territory's polygon,
-// computed from Nodes directly so it agrees with territoryContains2D's own
-// point-in-polygon test regardless of whether the embedded geometry.Territory
-// was populated.
+// territoryArea is the territory's 2D polygon area. Production territories
+// are always built via spawn.NewTerritory, which populates the embedded
+// *geometry.Territory, so its Area() is used directly there; the shoelace
+// fallback covers test fixtures built via struct literal, which leave that
+// pointer nil.
 func territoryArea(territory *spawn.Territory) float64 {
+	if territory.Territory != nil {
+		return territory.Territory.Area()
+	}
+
 	nodes := territory.Nodes
 	if len(nodes) < 3 {
 		return 0
