@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
 // Geo is an always-passable move.Geo double for suites that don't exercise
@@ -166,11 +167,47 @@ func ItemTemplates() *item.Table {
 			EtcItem:   &item.EtcItemDetail{Type: item.EtcItemScrollEnchantWeapon, Handler: "EnchantScrolls"},
 		},
 		{
+			ID:        6575,
+			Name:      "Blessed Scroll: Enchant Weapon (D)",
+			Kind:      item.KindEtcItem,
+			Duration:  -1,
+			Stackable: true,
+			EtcItem:   &item.EtcItemDetail{Type: item.EtcItemBlessedScrollEnchantWeapon, Handler: "EnchantScrolls"},
+		},
+		{
+			ID:       40,
+			Name:     "Tunic",
+			Kind:     item.KindArmor,
+			Slot:     item.SlotChest,
+			Duration: -1,
+			Crystal:  item.CrystalD,
+			Armor:    &item.ArmorDetail{Type: item.ArmorMagic},
+		},
+		{
+			ID:             1060,
+			Name:           "Lesser Healing Potion",
+			Kind:           item.KindEtcItem,
+			Duration:       -1,
+			Stackable:      true,
+			Dropable:       true,
+			Tradable:       true,
+			Destroyable:    true,
+			Depositable:    true,
+			EtcItem:        &item.EtcItemDetail{Type: item.EtcItemPotion, Handler: "ItemSkills", ReuseDelay: 10000, SharedReuseGroup: 8},
+			AttachedSkills: []item.SkillRef{{ID: 2031, Level: 1}},
+			UseConditions: []item.UseCondition{{
+				Root:      item.Condition{Kind: "player", Attrs: map[string]string{"flying": "False"}},
+				MessageID: int32(serverpackets.SystemMessageS1CannotBeUsed),
+				AddName:   true,
+			}},
+		},
+		{
 			ID:             736,
 			Name:           "Scroll: Escape",
 			Kind:           item.KindEtcItem,
 			Duration:       -1,
 			Stackable:      true,
+			Destroyable:    true,
 			EtcItem:        &item.EtcItemDetail{Type: item.EtcItemScroll, Handler: "ItemSkills", SharedReuseGroup: -1},
 			AttachedSkills: []item.SkillRef{{ID: 2013, Level: 1}},
 		},
@@ -233,7 +270,7 @@ func (s *Server) seedCharacter(tb testing.TB, account, name string, level, sp in
 	if !ok {
 		tb.Fatal("missing test class template")
 	}
-	ch, err := player.NewCharacter(100, tmpl, account, name, 1, 0, 0, player.SexMale)
+	ch, err := player.NewCharacter(s.ids.nextID(), tmpl, account, name, 1, 0, 0, player.SexMale)
 	if err != nil {
 		tb.Fatalf("seed character: %v", err)
 	}
