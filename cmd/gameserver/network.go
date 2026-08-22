@@ -73,6 +73,7 @@ func provideGameClientLink(
 	effects *network.TaskEffects,
 	respawnHP respawnRestoreHP,
 	deathPenalty deathPenaltyChance,
+	shieldBlockRate perfectShieldBlockRate,
 	spawnProtection playerSpawnProtection,
 	spBookNeeded skillEnchantSPBookNeeded,
 	autoLearn autoLearnSkills,
@@ -85,6 +86,7 @@ func provideGameClientLink(
 	playerConfig := network.PlayerConfig{
 		RespawnRestoreHP:         float64(respawnHP),
 		DeathPenaltyChance:       int(deathPenalty),
+		PerfectShieldBlockRate:   int(shieldBlockRate),
 		SpawnProtection:          time.Duration(spawnProtection),
 		SkillEnchantSPBookNeeded: bool(spBookNeeded),
 		AutoLearnSkills:          bool(autoLearn),

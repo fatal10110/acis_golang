@@ -66,6 +66,35 @@ func TestCharacterShieldDefenseUsesLiveShieldStatsFacingAndRoll(t *testing.T) {
 	}
 }
 
+// TestCharacterShieldDefenseUsesConfiguredPerfectShieldBlockRate proves a
+// non-default PerfectShieldBlockRate (players.properties) changes the
+// perfect-block roll threshold, matching Formulas.java:859.
+func TestCharacterShieldDefenseUsesConfiguredPerfectShieldBlockRate(t *testing.T) {
+	tmpl := combatTemplate()
+	items := shieldDefenseItems()
+	caster := liveCharacter(1, tmpl, items)
+	target := liveCharacter(2, tmpl, items, equippedShield())
+	caster.SetLastKnownPosition(location.Location{X: 80, Y: 0, Z: 0}, 0)
+	target.SetLastKnownPosition(location.Location{X: 0, Y: 0, Z: 0}, 0)
+	target.AddStatFuncs([]effect.Mod{
+		{Stat: stat.ShieldRate, Op: effect.OpSet, Value: 20, Owner: testModOwner()},
+		{Stat: stat.ShieldDefenceAngle, Op: effect.OpSet, Value: 120, Owner: testModOwner()},
+	})
+	target.SetRollSource(func(int) int { return 10 })
+
+	// Default rate 5: roll 10 is >= rate, so an ordinary block, not perfect.
+	if got := target.ShieldDefense(caster, modelskill.Definition{SkillType: "STUN"}, false); got != formulas.ShieldSuccess {
+		t.Fatalf("ShieldDefense() with default rate = %v, want ShieldSuccess", got)
+	}
+
+	// Configuring PerfectShieldBlockRate to 15 pushes the same roll (10)
+	// under the threshold, upgrading the block to perfect.
+	target.SetPerfectShieldBlockRate(15)
+	if got := target.ShieldDefense(caster, modelskill.Definition{SkillType: "STUN"}, false); got != formulas.ShieldPerfect {
+		t.Fatalf("ShieldDefense() with configured rate 15 = %v, want ShieldPerfect", got)
+	}
+}
+
 func TestCharacterShieldDefenseGatesEquipStatsAndFacing(t *testing.T) {
 	tmpl := combatTemplate()
 	items := shieldDefenseItems()

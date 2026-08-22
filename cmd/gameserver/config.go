@@ -72,6 +72,19 @@ func loadDeathPenaltyChance(paths gameServerPaths) (deathPenaltyChance, error) {
 	return deathPenaltyChance(config.NewFields(props, "death penalty chance").Int("DeathPenaltyChance", 20)), nil
 }
 
+// perfectShieldBlockRate is the roll threshold (out of 100) below which a
+// successful shield block upgrades to a perfect block, read from
+// players.properties (Config.java:338,873).
+type perfectShieldBlockRate int
+
+func loadPerfectShieldBlockRate(paths gameServerPaths) (perfectShieldBlockRate, error) {
+	props, err := config.LoadFile(paths.PlayersConfigPath)
+	if err != nil {
+		return 0, err
+	}
+	return perfectShieldBlockRate(config.NewFields(props, "perfect shield block rate").Int("PerfectShieldBlockRate", 5)), nil
+}
+
 // skillEnchantSPBookNeeded controls whether enchanting a skill above level
 // 76 also consumes the tree's configured spellbook item, read from
 // players.properties.

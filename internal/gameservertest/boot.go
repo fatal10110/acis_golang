@@ -275,7 +275,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Positions:        task.NewPositionUpdates(state),
 		PlayerClock:      playerClock,
 		InventoryUpdates: inventoryUpdates,
-		PlayerConfig:     network.PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, AllowWater: true},
+		PlayerConfig:     network.PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, AllowWater: true, PerfectShieldBlockRate: 5},
 		PetConfig:        petmodel.DefaultConfig(),
 		Log:              o.log,
 	})
