@@ -16,6 +16,7 @@ func (persistenceTestGeo) Height(_, _, _ int) int16          { return 0 }
 func (persistenceTestGeo) FindPath(_, _ location.Location) ([]location.Location, bool) {
 	return nil, false
 }
+func (persistenceTestGeo) Walkable(int, int, int) bool { return true }
 func (persistenceTestGeo) ValidLocation(ox, oy, oz, _, _, _ int) location.Location {
 	return location.Location{X: ox, Y: oy, Z: oz}
 }

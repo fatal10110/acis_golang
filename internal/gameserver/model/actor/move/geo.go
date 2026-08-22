@@ -18,6 +18,10 @@ type Geo interface {
 	Height(x, y, z int) int16
 	FindPath(origin, target location.Location) (waypoints []location.Location, ok bool)
 	ValidLocation(ox, oy, oz, tx, ty, tz int) location.Location
+	// Walkable reports whether the exact point is open geodata in every
+	// direction (a 3x3 cell block, not just the point itself), the check
+	// Territory-random spawn placement retries against.
+	Walkable(x, y, z int) bool
 }
 
 // EngineGeo wires a geodata engine and a pathfinder to the Geo interface used
@@ -52,4 +56,8 @@ func (g EngineGeo) FindPath(origin, target location.Location) ([]location.Locati
 
 func (g EngineGeo) ValidLocation(ox, oy, oz, tx, ty, tz int) location.Location {
 	return g.Engine.ValidLocation(ox, oy, oz, tx, ty, tz)
+}
+
+func (g EngineGeo) Walkable(x, y, z int) bool {
+	return g.Engine.CanMoveAround(x, y, z)
 }

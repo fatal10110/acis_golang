@@ -133,6 +133,7 @@ func (blockedTestGeo) Height(_, _, z int) int16                  { return int16(
 func (blockedTestGeo) FindPath(_, _ location.Location) ([]location.Location, bool) {
 	return nil, false
 }
+func (blockedTestGeo) Walkable(int, int, int) bool { return true }
 func (blockedTestGeo) ValidLocation(ox, oy, oz, _, _, _ int) location.Location {
 	return location.Location{X: ox, Y: oy, Z: oz}
 }

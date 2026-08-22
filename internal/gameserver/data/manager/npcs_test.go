@@ -31,6 +31,8 @@ func (staticGeo) ValidLocation(ox, oy, oz, _, _, _ int) location.Location {
 	return location.Location{X: ox, Y: oy, Z: oz}
 }
 
+func (staticGeo) Walkable(int, int, int) bool { return true }
+
 var neutralRates = item.Rates{Spoil: 1, Currency: 1, Item: 1, ItemRaid: 1, Herb: 1}
 
 func monsterTemplate(id int) *npc.Template {

@@ -449,6 +449,7 @@ func (requestGeo) Height(_, _, _ int) int16          { return 0 }
 func (requestGeo) FindPath(_, _ location.Location) ([]location.Location, bool) {
 	return nil, false
 }
+func (requestGeo) Walkable(int, int, int) bool { return true }
 func (requestGeo) ValidLocation(ox, oy, oz, _, _, _ int) location.Location {
 	return location.Location{X: ox, Y: oy, Z: oz}
 }

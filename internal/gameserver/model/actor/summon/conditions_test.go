@@ -19,6 +19,7 @@ func (openGeo) Height(x, y, z int) int16                { return int16(z) }
 func (openGeo) FindPath(origin, target location.Location) ([]location.Location, bool) {
 	return nil, false
 }
+func (openGeo) Walkable(int, int, int) bool { return true }
 func (openGeo) ValidLocation(ox, oy, oz, tx, ty, tz int) location.Location {
 	return location.Location{X: tx, Y: ty, Z: tz}
 }

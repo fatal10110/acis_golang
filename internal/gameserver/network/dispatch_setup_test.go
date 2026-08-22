@@ -370,6 +370,7 @@ func (testHostileGeo) CanMove(_, _, _, _, _, _ int) bool { return true }
 func (testHostileGeo) Height(_, _, _ int) int16          { return 0 }
 
 func (testHostileGeo) FindPath(_, _ location.Location) ([]location.Location, bool) { return nil, false }
+func (testHostileGeo) Walkable(int, int, int) bool { return true }
 func (testHostileGeo) ValidLocation(ox, oy, oz, _, _, _ int) location.Location {
 	return location.Location{X: ox, Y: oy, Z: oz}
 }

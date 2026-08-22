@@ -303,6 +303,7 @@ func (summonFriendGeo) Height(_, _, _ int) int16          { return 0 }
 func (summonFriendGeo) FindPath(_, _ location.Location) ([]location.Location, bool) {
 	return nil, false
 }
+func (summonFriendGeo) Walkable(int, int, int) bool { return true }
 func (summonFriendGeo) ValidLocation(ox, oy, oz, _, _, _ int) location.Location {
 	return location.Location{X: ox, Y: oy, Z: oz}
 }
