@@ -408,6 +408,8 @@ func (a *recordingNetworkSummonAI) TryToCast(target attackable.Combatant, ref mo
 	return true
 }
 
+func (a *recordingNetworkSummonAI) AttackingNow() bool { return false }
+
 type summonActionCombatant struct {
 	world.Presence
 	id   int32

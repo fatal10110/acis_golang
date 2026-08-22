@@ -22,11 +22,13 @@ type liveOwnerStub struct {
 	id             int32
 	level          int
 	spawnProtected bool
+	inCombat       bool
 }
 
 func (o *liveOwnerStub) ObjectID() int32      { return o.id }
 func (o *liveOwnerStub) LevelValue() int      { return o.level }
 func (o *liveOwnerStub) SpawnProtected() bool { return o.spawnProtected }
+func (o *liveOwnerStub) InCombat() bool       { return o.inCombat }
 
 func TestActorInvulIncludesOwnerSpawnProtection(t *testing.T) {
 	owner := &liveOwnerStub{spawnProtected: true}
@@ -276,6 +278,101 @@ func TestServitorTickConsumesOwnerUpkeepAndUnsummonsOnMissingItem(t *testing.T) 
 	}
 	if _, ok := state.Summon(owner.ObjectID()); ok {
 		t.Fatal("owner still has active summon after unpaid upkeep")
+	}
+}
+
+// TestServitorTickUsesActiveCostWhileOwnerInCombat covers PR#551 Finding 1:
+// TickServitor's combat-rate branch (live_lifecycle.go) reads Actor.InCombat,
+// which must delegate to the owner (Summon.isInCombat, Summon.java:302-305:
+// "return _owner != null && _owner.isInCombat();") since combat/attack
+// fields were never assigned and always read false before this fix.
+func TestServitorTickUsesActiveCostWhileOwnerInCombat(t *testing.T) {
+	state := world.New()
+	owner := &liveOwnerStub{id: 100, level: 40, inCombat: true}
+	state.Spawn(owner, 1000, 2000, -50, 32768)
+
+	actor := NewServitor(ServitorConfig{
+		ObjectID:       200,
+		Owner:          owner,
+		Level:          44,
+		TimeLostIdle:   100,
+		TimeLostActive: 900,
+		Lifetime: LifetimeState{
+			TimeRemaining: 100000,
+			TotalLifeTime: 100000,
+		},
+	})
+	SpawnBesideOwner(state, actor, owner, location.Location{})
+
+	result := actor.TickServitor(state)
+	if want := 100000 - 900; result.TimeRemaining != want {
+		t.Fatalf("TimeRemaining after tick while owner in combat = %d, want %d (TimeLostActive, not TimeLostIdle)", result.TimeRemaining, want)
+	}
+}
+
+// TestPetTickUsesBattleMealWhileOwnerInCombat covers the same gap for
+// TickPet's MealInBattle branch.
+func TestPetTickUsesBattleMealWhileOwnerInCombat(t *testing.T) {
+	state := world.New()
+	owner := &liveOwnerStub{id: 100, level: 40, inCombat: true}
+	state.Spawn(owner, 1000, 2000, -50, 32768)
+
+	actor := NewPet(PetConfig{
+		ObjectID:     200,
+		Owner:        owner,
+		Level:        44,
+		Fed:          100,
+		MaxMeal:      100,
+		MealInNormal: 5,
+		MealInBattle: 20,
+	})
+	SpawnBesideOwner(state, actor, owner, location.Location{})
+
+	actor.TickPet(state)
+	if got, want := actor.Fed(), 100-20; got != want {
+		t.Fatalf("Fed() after tick while owner in combat = %d, want %d (MealInBattle, not MealInNormal)", got, want)
+	}
+}
+
+// TestApplyCommandRefusesReturnPetAndUnsummonServitorWhileOwnerInCombat
+// covers RequestActionUse.java:209-210/287-288's
+// "isAttackingNow() || isInCombat()" refusal for cases 19/52: a fighting
+// owner must not be able to instantly recall a pet or dismiss a servitor.
+func TestApplyCommandRefusesReturnPetAndUnsummonServitorWhileOwnerInCombat(t *testing.T) {
+	state := world.New()
+	owner := &liveOwnerStub{id: 100, level: 40, inCombat: true}
+	state.Spawn(owner, 1000, 2000, -50, 32768)
+
+	pet := NewPet(PetConfig{ObjectID: 200, Owner: owner, Level: 44, MaxMeal: 100, Fed: 100})
+	SpawnBesideOwner(state, pet, owner, location.Location{})
+	pet.SetAI(&recordingSummonAI{})
+	if got := pet.ApplyCommand(CommandContext{Command: CommandReturnPet, World: state}); got.Outcome != OutcomeRefusedInCombat {
+		t.Fatalf("ApplyCommand(CommandReturnPet) while owner in combat = %+v, want OutcomeRefusedInCombat", got)
+	}
+
+	servitor := NewServitor(ServitorConfig{ObjectID: 201, Owner: owner})
+	SpawnBesideOwner(state, servitor, owner, location.Location{})
+	servitor.SetAI(&recordingSummonAI{})
+	if got := servitor.ApplyCommand(CommandContext{Command: CommandUnsummonServitor, World: state}); got.Outcome != OutcomeRefusedInCombat {
+		t.Fatalf("ApplyCommand(CommandUnsummonServitor) while owner in combat = %+v, want OutcomeRefusedInCombat", got)
+	}
+}
+
+// TestApplyCommandRefusesReturnPetWhileSummonIsAttackingNow covers the other
+// half of the disjunction: CreatureAttack.isAttackingNow (CreatureAttack.java:56-59)
+// is the summon's own in-flight attack flag, independent of the owner's
+// combat-stance state, reached via Actor.IsAttackingNow -> AI.AttackingNow.
+func TestApplyCommandRefusesReturnPetWhileSummonIsAttackingNow(t *testing.T) {
+	state := world.New()
+	owner := &liveOwnerStub{id: 100, level: 40}
+	state.Spawn(owner, 1000, 2000, -50, 32768)
+
+	pet := NewPet(PetConfig{ObjectID: 200, Owner: owner, Level: 44, MaxMeal: 100, Fed: 100})
+	SpawnBesideOwner(state, pet, owner, location.Location{})
+	pet.SetAI(&recordingSummonAI{attackingNow: true})
+
+	if got := pet.ApplyCommand(CommandContext{Command: CommandReturnPet, World: state}); got.Outcome != OutcomeRefusedInCombat {
+		t.Fatalf("ApplyCommand(CommandReturnPet) while summon mid-swing = %+v, want OutcomeRefusedInCombat", got)
 	}
 }
 
@@ -556,7 +653,8 @@ func TestActorDenyAIActionDoesNotTreatOutOfControlAsAnAIBlock(t *testing.T) {
 }
 
 type recordingSummonAI struct {
-	events []string
+	events       []string
+	attackingNow bool
 }
 
 func (a *recordingSummonAI) TryToAttack(target attackable.Combatant) bool {
@@ -577,6 +675,8 @@ func (a *recordingSummonAI) TryToCast(target attackable.Combatant, ref modelskil
 	a.events = append(a.events, "cast:"+objectIDString(target))
 	return true
 }
+
+func (a *recordingSummonAI) AttackingNow() bool { return a.attackingNow }
 
 // rejectingSummonAI records the cast dispatch like recordingSummonAI but
 // reports it rejected, simulating the AI declining the cast (cooldown,

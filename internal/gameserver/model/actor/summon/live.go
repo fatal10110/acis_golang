@@ -28,6 +28,11 @@ type AI interface {
 	TryToFollow(attackable.Combatant) bool
 	TryToIdle()
 	TryToCast(target attackable.Combatant, ref modelskill.Ref) bool
+	// AttackingNow reports whether this summon's own attack cycle is
+	// currently in flight, matching CreatureAttack.isAttackingNow
+	// (CreatureAttack.java:56-59): a plain start/stop flag on the summon's
+	// own attack component, independent of its owner.
+	AttackingNow() bool
 }
 
 // Owner is the live player surface a summon needs for world placement and
@@ -36,6 +41,11 @@ type Owner interface {
 	world.Tracked
 	LevelValue() int
 	Position() (int, int, int)
+	// InCombat reports the owner's own attack-stance state. Summon.isInCombat
+	// (Summon.java:302-305) delegates straight to _owner.isInCombat() — a
+	// pet/servitor's "in combat" status is entirely owner-derived, never
+	// tracked on the summon itself.
+	InCombat() bool
 }
 
 // Actor is a live pet or servitor placed in world.State next to its owner.
@@ -86,8 +96,6 @@ type Actor struct {
 	expNotifier    func(int64)
 	dead           bool
 	disabled       bool
-	combat         bool
-	attack         bool
 	brain          AI
 	onDespawn      func()
 	// skills maps skill id to the level this summon's npc template grants
