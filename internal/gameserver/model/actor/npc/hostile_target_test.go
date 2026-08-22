@@ -407,12 +407,13 @@ func TestHostileAutoAttackTargetValidNoQueuedDesireSkipsFollowGate(t *testing.T)
 	}
 }
 
-func TestHostileRandomizeHateExcludesCandidateAlreadyFollowedByQueuedAttackDesire(t *testing.T) {
-	// Mirrors AggroList.randomizeAttack reading canAutoAttack: a hate-list
-	// entry whose queued, non-moving ATTACK desire already starts or
-	// maintains an offensive follow toward it can never become the
-	// displacer, even though it has the higher hate that would otherwise
-	// make it the immediate pick.
+func TestHostileRandomizeHateDoesNotExcludeOrdinaryHateListCandidate(t *testing.T) {
+	// Regression for #1710: AddDamageHate now sets Desire.MoveToTarget = true
+	// (NpcAI.java:698-711's default), so an ordinary hate-list candidate's
+	// queued ATTACK desire never matches NonMovingAttack and #1593's follow
+	// gate never fires for it — even when MaybeStartOffensiveFollow would
+	// report an active follow. Pre-fix, the always-false MoveToTarget
+	// default made the gate wrongly exclude this candidate from candidacy.
 	state := world.New()
 	owner, move := newFollowGateHostile(t, 1, &Template{ID: 1, Type: "Monster", AggroRange: 10})
 	owner.SetRollSource(zeroRoll)
@@ -420,18 +421,21 @@ func TestHostileRandomizeHateExcludesCandidateAlreadyFollowedByQueuedAttackDesir
 	state.Spawn(owner, 100, 100, 0, 0)
 
 	mostHated := &gateTarget{id: 2}
-	followed := &gateTarget{id: 3}
+	candidate := &gateTarget{id: 3}
 	state.Spawn(mostHated, 100, 100, 0, 0)
-	state.Spawn(followed, 100, 100, 0, 0)
+	state.Spawn(candidate, 100, 100, 0, 0)
 
 	owner.AddDamageHate(mostHated, 0, 999)
-	owner.AddDamageHate(followed, 0, 25)
+	owner.AddDamageHate(candidate, 0, 25)
 
-	if ok := owner.RandomizeHate(); ok {
-		t.Fatal("RandomizeHate: ok = true, want false: the sole non-mostHated candidate is excluded by the follow gate")
+	if ok := owner.RandomizeHate(); !ok {
+		t.Fatal("RandomizeHate: ok = false, want true: an ordinary hate-list candidate must not be excluded by the follow gate")
 	}
-	if got := owner.AI().Threats().Hate(followed); got != 25 {
-		t.Fatalf("excluded candidate hate = %v, want unchanged 25", got)
+	if got := owner.AI().Threats().Hate(candidate); got != 1199 {
+		t.Fatalf("displaced candidate hate = %v, want 999 + 200 = 1199", got)
+	}
+	if got := owner.AI().Threats().Hate(mostHated); got != 999 {
+		t.Fatalf("mostHated hate = %v, want unchanged 999", got)
 	}
 }
 
