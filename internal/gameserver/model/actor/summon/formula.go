@@ -293,10 +293,11 @@ func (a *Actor) EvasionRate() float64 {
 }
 
 // CriticalRate returns this summon's physical critical rate, given
-// baseCritRate from its npc template, capped at 500 (CreatureStatus.java:
-// 551-554), matching the same cap already used at npc/hostile_attack.go:277.
+// baseCritRate from its npc template, truncated to an int and capped at 500
+// per CreatureStatus.getCriticalHit (CreatureStatus.java:551-553):
+// `Math.min((int) calcStat(...), 500)`.
 func (a *Actor) CriticalRate(baseCritRate float64) float64 {
-	return math.Min(a.calcStat(stat.CriticalRate, baseCritRate), 500)
+	return float64(min(int(a.calcStat(stat.CriticalRate, baseCritRate)), 500))
 }
 
 // MoveSpeed returns this summon's current move speed, matching its run
