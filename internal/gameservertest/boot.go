@@ -58,6 +58,8 @@ type options struct {
 	seedShortcuts          func(*gamesql.ShortcutStore)
 	wantChars              int
 	enchantRoll            func() float64
+	skillEnchantRoll       func() int
+	levels                 *player.LevelTable
 	log                    zerolog.Logger
 }
 
@@ -121,6 +123,20 @@ func WithWantChars(n int) Option { return func(o *options) { o.wantChars = n } }
 // (default: the random source), so enchant outcomes are deterministic.
 func WithEnchantRoll(roll func() float64) Option {
 	return func(o *options) { o.enchantRoll = roll }
+}
+
+// WithSkillEnchantRoll supplies the skill-enchant dice roll source wired into
+// the link (default: the random source), so enchant outcomes are
+// deterministic.
+func WithSkillEnchantRoll(roll func() int) Option {
+	return func(o *options) { o.skillEnchantRoll = roll }
+}
+
+// WithLevels supplies the player level table wired into the link (default: a
+// flat synthetic table covering levels 1-85), so level-gated flows such as
+// skill enchant have real thresholds to check.
+func WithLevels(levels *player.LevelTable) Option {
+	return func(o *options) { o.levels = levels }
 }
 
 // WithLog sets the link logger (default zero-logger).
@@ -391,6 +407,17 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	templates := Templates(t)
 	itemTemplates := ItemTemplates()
 	ids := &sequentialIDs{next: 100}
+	levels := o.levels
+	if levels == nil {
+		synthetic := make(map[int]player.Level, 85)
+		for lvl := 1; lvl <= 85; lvl++ {
+			synthetic[lvl] = player.Level{RequiredExpToLevelUp: 1000}
+		}
+		levels, err = player.NewLevelTable(synthetic)
+		if err != nil {
+			t.Fatalf("build level table: %v", err)
+		}
+	}
 	inventoryUpdates := task.NewInventoryUpdates()
 	itemInstances := task.NewItemInstances(gamesql.NewItemFlushStore(db), itemTemplates)
 
@@ -435,6 +462,8 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		PlayerConfig:     network.PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, AllowWater: true, PerfectShieldBlockRate: 5},
 		PetConfig:        petmodel.DefaultConfig(),
 		EnchantRoll:      o.enchantRoll,
+		SkillEnchantRoll: o.skillEnchantRoll,
+		Levels:           levels,
 		Log:              o.log,
 	})
 	effects.SetShadowItemExpiry(gcl.ExpireShadowItem)
