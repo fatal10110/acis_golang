@@ -57,6 +57,7 @@ type options struct {
 	seed                   func(*gamesql.CharacterStore, *gamesql.ItemStore)
 	seedShortcuts          func(*gamesql.ShortcutStore)
 	wantChars              int
+	enchantRoll            func() float64
 	log                    zerolog.Logger
 }
 
@@ -116,6 +117,12 @@ func WithShortcutSeed(seed func(*gamesql.ShortcutStore)) Option {
 // handshake.
 func WithWantChars(n int) Option { return func(o *options) { o.wantChars = n } }
 
+// WithEnchantRoll supplies the enchant dice roll source wired into the link
+// (default: the random source), so enchant outcomes are deterministic.
+func WithEnchantRoll(roll func() float64) Option {
+	return func(o *options) { o.enchantRoll = roll }
+}
+
 // WithLog sets the link logger (default zero-logger).
 func WithLog(log zerolog.Logger) Option { return func(o *options) { o.log = log } }
 
@@ -129,9 +136,14 @@ type Server struct {
 	Shortcuts        *gamesql.ShortcutStore
 	KnownSkills      *gamesql.CharacterSkillStore
 	InventoryUpdates *task.InventoryUpdates
+	ItemInstances    *task.ItemInstances
+	GroundItems      *task.GroundItems
 	account          string
 	templates        *player.TemplateTable
 	ids              *sequentialIDs
+	addr             net.Addr
+	sessions         *manager.SessionStore
+	groundStore      *gamesql.GroundItemStore
 
 	closeOnce sync.Once
 	cancel    context.CancelFunc
@@ -165,6 +177,93 @@ func (s *Server) GiveItem(tb testing.TB, ownerID, templateID, count int32) int32
 	return s.giveItem(tb, ownerID, templateID, count)
 }
 
+// Addr is the gameserver TCP listener address additional clients dial.
+func (s *Server) Addr() string { return s.addr.String() }
+
+// SeedCharacterFor inserts a selectable character for the given account
+// through the real SQL character store.
+func (s *Server) SeedCharacterFor(tb testing.TB, account, name string, level, sp int) *player.Character {
+	return s.seedCharacter(tb, account, name, level, sp)
+}
+
+// DialClient connects a second scripted client as account: handshake,
+// AuthLogin, and the initial CharSelectInfo (whose character count must be
+// wantChars). The primary client keeps using Server.Client.
+func (s *Server) DialClient(t *testing.T, account string, wantChars int) *testsupport.ScriptedClient {
+	t.Helper()
+	c := testsupport.Dial(t, s.addr.String())
+	c.SendProtocolVersion(746)
+
+	key := link.SessionKey{LoginKey1: 11, LoginKey2: 22, PlayKey1: 33, PlayKey2: 44}
+	s.sessions.Put(account, key)
+	w := wire.NewPacketWriter(clientpackets.OpcodeAuthLogin)
+	w.WriteString(account)
+	w.WriteInt32(key.PlayKey2)
+	w.WriteInt32(key.PlayKey1)
+	w.WriteInt32(key.LoginKey1)
+	w.WriteInt32(key.LoginKey2)
+	c.Send(w.Bytes())
+
+	reply := c.Read()
+	if reply[0] != serverpackets.OpcodeCharSelectInfo {
+		t.Fatalf("opcode = %#x, want CharSelectInfo (%#x)", reply[0], serverpackets.OpcodeCharSelectInfo)
+	}
+	if count := wire.NewReader(reply[1:]).ReadInt32(); count != int32(wantChars) {
+		t.Fatalf("char count for %s = %d, want %d", account, count, wantChars)
+	}
+	return c
+}
+
+// MarkPlayerDead transitions the live player's dead state without routing a
+// kill through the combat stack, which its own suites drive end to end; item
+// suites use it only to set up gate preconditions no single packet reaches.
+func (s *Server) MarkPlayerDead(tb testing.TB, objID int32) {
+	tb.Helper()
+	obj, ok := s.State.Player(objID)
+	if !ok {
+		tb.Fatalf("world.Player(%d) missing", objID)
+	}
+	marker, ok := obj.(interface{ MarkDead() bool })
+	if !ok {
+		tb.Fatalf("world.Player(%d) = %T does not expose MarkDead", objID, obj)
+	}
+	marker.MarkDead()
+}
+
+// SetPlayerOperating toggles the live player's store/workshop operation
+// state, the precondition of the use-item storing gate.
+func (s *Server) SetPlayerOperating(tb testing.TB, objID int32, operating bool) {
+	tb.Helper()
+	obj, ok := s.State.Player(objID)
+	if !ok {
+		tb.Fatalf("world.Player(%d) missing", objID)
+	}
+	setter, ok := obj.(interface{ SetOperating(bool) bool })
+	if !ok {
+		tb.Fatalf("world.Player(%d) = %T does not expose SetOperating", objID, obj)
+	}
+	setter.SetOperating(operating)
+}
+
+// FlushItems persists every pending item mutation the way the production
+// lazy-persistence tick does, so suites can assert the items rows mid-test.
+func (s *Server) FlushItems(tb testing.TB) {
+	tb.Helper()
+	if err := s.ItemInstances.Save(context.Background()); err != nil {
+		tb.Fatalf("flush items: %v", err)
+	}
+}
+
+// FlushGroundItems persists every tracked ground item into items_on_ground
+// the way the production shutdown hook does, so suites can assert the rows
+// mid-test instead of tearing the server down.
+func (s *Server) FlushGroundItems(tb testing.TB) {
+	tb.Helper()
+	if err := s.groundStore.Save(context.Background(), s.GroundItems.Snapshots(nil)); err != nil {
+		tb.Fatalf("save ground items: %v", err)
+	}
+}
+
 // NewObjectID allocates the next object id from the server's id sequence.
 func (s *Server) NewObjectID() int32 {
 	id, err := s.ids.NextID()
@@ -192,6 +291,16 @@ func (s *sequentialIDs) NextID() (int32, error) {
 	defer s.mu.Unlock()
 	s.next++
 	return s.next, nil
+}
+
+// nextID allocates the next object id, panicking on allocation failure (the
+// deterministic sequence never fails).
+func (s *sequentialIDs) nextID() int32 {
+	id, err := s.NextID()
+	if err != nil {
+		panic(err)
+	}
+	return id
 }
 
 // Boot starts the shared MariaDB container, wires the full gameserver stack,
@@ -244,6 +353,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	t.Cleanup(func() { loginLink.Close() })
 
 	state := world.New()
+	groundItems := task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour, PlayerDroppedMultiplier: 1}, time.Now)
 	clock := task.NewGameClock(time.Now)
 	playerClock, err := task.NewPlayerClock(clock, state, network.NewPlayerClockEffects(state))
 	if err != nil {
@@ -253,6 +363,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	itemTemplates := ItemTemplates()
 	ids := &sequentialIDs{next: 100}
 	inventoryUpdates := task.NewInventoryUpdates()
+	itemInstances := task.NewItemInstances(gamesql.NewItemFlushStore(db), itemTemplates)
 	roster := gamemanager.NewRoster(chars, items, shortcuts, templates, itemTemplates, npc.NewTable(nil), ids, gamemanager.DefaultDeleteAfter, time.Now)
 	gcl := network.NewGameClientLink(network.GameClientLinkConfig{
 		Validator:        validator,
@@ -271,12 +382,14 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		World:            state,
 		Geo:              Geo{},
 		IDs:              ids,
-		GroundItems:      task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour, PlayerDroppedMultiplier: 1}, time.Now),
+		GroundItems:      groundItems,
 		Positions:        task.NewPositionUpdates(state),
 		PlayerClock:      playerClock,
 		InventoryUpdates: inventoryUpdates,
+		ItemInstances:    itemInstances,
 		PlayerConfig:     network.PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, AllowWater: true},
 		PetConfig:        petmodel.DefaultConfig(),
+		EnchantRoll:      o.enchantRoll,
 		Log:              o.log,
 	})
 
@@ -317,7 +430,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		if !ok {
 			t.Fatal("missing test class template")
 		}
-		ch, err := player.NewCharacter(100, tmpl, o.account, spec.name, 1, 0, 0, player.SexMale)
+		ch, err := player.NewCharacter(ids.nextID(), tmpl, o.account, spec.name, 1, 0, 0, player.SexMale)
 		if err != nil {
 			t.Fatalf("seed character: %v", err)
 		}
@@ -358,9 +471,14 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Shortcuts:        shortcuts,
 		KnownSkills:      knownSkills,
 		InventoryUpdates: inventoryUpdates,
+		ItemInstances:    itemInstances,
+		GroundItems:      groundItems,
 		account:          o.account,
 		templates:        templates,
 		ids:              ids,
+		addr:             ln.Addr(),
+		sessions:         sessions,
+		groundStore:      gamesql.NewGroundItemStore(db),
 		cancel:           cancel,
 	}
 }

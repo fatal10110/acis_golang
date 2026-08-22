@@ -231,6 +231,9 @@ type GameClientLinkConfig struct {
 	PlayerConfig  PlayerConfig
 	PetConfig     petmodel.Config
 	Log           zerolog.Logger
+	// EnchantRoll supplies enchant dice rolls in [0,1); nil falls back to
+	// the random source. Behavior harnesses inject a deterministic roll.
+	EnchantRoll func() float64
 }
 
 // NewGameClientLink builds a GameClientLink from its collaborators.
@@ -276,6 +279,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) *GameClientLink {
 		admin:            cfg.Admin,
 		playerConfig:     cfg.PlayerConfig,
 		petConfig:        cfg.PetConfig,
+		enchantRoll:      cfg.EnchantRoll,
 		inventory:        invops.NewService(cfg.IDs),
 		petItems:         petitem.NewService(cfg.IDs),
 		trades:           tradebook.NewBook(time.Now),
