@@ -166,7 +166,7 @@ func (h *Hostile) ReduceHP(amount float64, attacker creature.DeathActor, _ model
 		return
 	}
 	if combatant, ok := attacker.(attackable.Combatant); ok {
-		h.AddDamageHate(combatant, amount, amount)
+		h.AddCombatDamageHate(combatant, amount)
 		h.RollAttackedShotRecharge()
 	}
 	h.applyNonConsumptionDamageEffects(false)
