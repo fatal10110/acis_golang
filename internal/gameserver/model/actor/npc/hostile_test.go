@@ -478,12 +478,20 @@ type hostileMove struct {
 	followRange  int
 	home         location.Location
 	stopCount    int
+
+	// followResult and followErr let a test script
+	// MaybeStartOffensiveFollow's return value, simulating the follow
+	// controller either starting/maintaining a follow (true) or finding the
+	// target already close enough (false), without needing real world
+	// geometry.
+	followResult bool
+	followErr    error
 }
 
 func (m *hostileMove) MaybeStartOffensiveFollow(target attackable.Combatant, attackRange int) (bool, error) {
 	m.followTarget = target
 	m.followRange = attackRange
-	return false, nil
+	return m.followResult, m.followErr
 }
 
 func (m *hostileMove) MoveHome(home location.Location) error {

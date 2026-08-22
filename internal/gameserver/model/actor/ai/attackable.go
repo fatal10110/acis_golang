@@ -139,6 +139,16 @@ func NewAttackable(actor AttackableActor, move MoveController, attack AttackCont
 	}
 }
 
+// MaybeStartOffensiveFollow starts or maintains an offensive follow task
+// toward target at this actor's own physical attack range. Exposed for
+// AutoAttackTargetValid's queued-desire follow gate (Npc.java:2107-2110),
+// called outside the AI loop's own Think step; it must not take a.mu, since
+// a caller such as RandomizeHate already holds it while evaluating
+// candidates.
+func (a *Attackable) MaybeStartOffensiveFollow(target attackable.Combatant) (bool, error) {
+	return a.move.MaybeStartOffensiveFollow(target, a.actor.PhysicalAttackRange())
+}
+
 // ObjectID returns the actor id controlled by this AI loop.
 func (a *Attackable) ObjectID() int32 {
 	return a.actor.ObjectID()
