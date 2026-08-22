@@ -92,6 +92,7 @@ func TestPetUseItemConsumesPotion(t *testing.T) {
 	testsupport.AssertOpcodeSequence(t, capture.Frames(),
 		serverpackets.OpcodeMagicSkillUse,
 		serverpackets.OpcodeSystemMessage,
+		serverpackets.OpcodeStatusUpdate,
 	)
 	assertSystemMessageSkillFrame(t, capture.Frames()[1], serverpackets.SystemMessagePetUsesS1, 2031, 1)
 	if petInv.ItemByObjectID(900) != nil {

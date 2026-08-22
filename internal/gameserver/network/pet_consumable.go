@@ -62,6 +62,12 @@ func (l *GameClientLink) consumePetPotion(live *livePlayer, pet *summon.Actor, p
 		Destroyer:   l.inventory,
 		IsPet:       true,
 	})
+	defer l.broadcastPetFrame(live, pet, func() wire.Frame {
+		return serverpackets.FrameStatusUpdate(pet.ObjectID(), []serverpackets.StatusAttribute{
+			{Type: serverpackets.StatusCurrentHP, Value: int(pet.HP())},
+			{Type: serverpackets.StatusCurrentMP, Value: int(pet.MPValue())},
+		})
+	})
 	for _, res := range results {
 		switch res.Outcome {
 		case itemhandler.PetRejected:
