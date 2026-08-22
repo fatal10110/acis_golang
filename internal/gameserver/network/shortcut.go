@@ -95,7 +95,7 @@ func serverShortcut(sc shortcut.Shortcut) serverpackets.Shortcut {
 		Type:             serverShortcutType(sc.Type),
 		CharacterType:    sc.CharacterType,
 		Level:            sc.Level,
-		SharedReuseGroup: -1,
+		SharedReuseGroup: sc.SharedReuseGroup,
 	}
 }
 

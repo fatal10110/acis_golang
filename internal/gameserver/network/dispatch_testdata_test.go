@@ -239,6 +239,14 @@ func testItemTemplates() *item.Table {
 			Weight:    10,
 		},
 		{
+			ID:        9502,
+			Name:      "Greater Healing Potion",
+			Kind:      item.KindEtcItem,
+			Duration:  -1,
+			Stackable: true,
+			EtcItem:   &item.EtcItemDetail{Type: item.EtcItemPotion, SharedReuseGroup: 10},
+		},
+		{
 			ID:          91000,
 			Name:        "Wolf Collar",
 			Kind:        item.KindEtcItem,
