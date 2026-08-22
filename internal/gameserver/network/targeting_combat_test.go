@@ -49,6 +49,52 @@ func wireLiveAttackHooks(gcl *GameClientLink, live *livePlayer) {
 	})
 }
 
+// TestAttackLiveTargetRejectsOutOfControl pins AttackRequest.java:31's
+// isOutOfControl() reject, narrowed to the two flags no other gate on this
+// path already covers (#1574): a teleporting or ImmobileUntilAttacked-locked
+// player's attack click is refused with ActionFailed and never starts a
+// combat controller.
+func TestAttackLiveTargetRejectsOutOfControl(t *testing.T) {
+	tests := []struct {
+		name  string
+		setup func(*testing.T, *livePlayer)
+	}{
+		{"teleporting", func(t *testing.T, live *livePlayer) {
+			live.Character.SetTeleporting(true)
+		}},
+		{"immobile until attacked", func(t *testing.T, live *livePlayer) {
+			addLiveEffect(t, live, "ImmobileUntilAttacked")
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			state := world.New()
+			attackerFrames := &testsupport.FrameCapture{}
+			attacker := newTestLivePlayer(t, 1, attackerFrames)
+			attacker.Character.SetWorld(state)
+			gcl := &GameClientLink{world: state, log: zerolog.Nop()}
+			wireLiveAttackHooks(gcl, attacker)
+			target := newTestHostileNPC(t, 3002)
+
+			state.Spawn(attacker, 0, 0, 0, 0)
+			state.Spawn(target, 30, 0, 0, 0)
+			tt.setup(t, attacker)
+			testsupport.ResetCapture(attackerFrames)
+
+			if gcl.attackLiveTarget(attacker, target) {
+				t.Fatal("attackLiveTarget accepted while out of control, want rejected")
+			}
+			opcodes := testsupport.FrameOpcodes(attackerFrames.Frames())
+			if len(opcodes) != 1 || opcodes[0] != serverpackets.OpcodeActionFailed {
+				t.Fatalf("frames sent = %x, want a single ActionFailed (%#x)", opcodes, serverpackets.OpcodeActionFailed)
+			}
+			if attacker.attack != nil && attacker.attack.AttackingNow() {
+				t.Fatal("attack controller started while out of control")
+			}
+		})
+	}
+}
+
 func TestGameClientLinkAttackLiveTargetReusesController(t *testing.T) {
 	state := world.New()
 	attackerFrames := &testsupport.FrameCapture{}
