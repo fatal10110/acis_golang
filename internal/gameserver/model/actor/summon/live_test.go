@@ -414,6 +414,37 @@ func TestPetTickAutoFeedsFromPetInventory(t *testing.T) {
 	}
 }
 
+// TestActorCanEatFoodAndAddFed covers the #1582 primitives RequestPetUseItem
+// needs to eat a manually-used food item: CanEatFood matches the pet
+// template's configured food ids (PetTemplate.canEatFood), and AddFed clamps
+// at maxMeal and reports whether the pet is still below the auto-feed
+// threshold (Pet.checkAutoFeedState), matching PetFoods.useFood.
+func TestActorCanEatFoodAndAddFed(t *testing.T) {
+	actor := NewPet(PetConfig{
+		ObjectID:      200,
+		NPCID:         12077,
+		Fed:           10,
+		MaxMeal:       100,
+		Food1:         2515,
+		Food2:         7582,
+		AutoFeedLimit: 0.55,
+	})
+
+	if !actor.CanEatFood(2515) || !actor.CanEatFood(7582) || actor.CanEatFood(4038) {
+		t.Fatalf("CanEatFood mismatched pet's configured Food1/Food2")
+	}
+
+	fed, stillHungry := actor.AddFed(40)
+	if fed != 50 || !stillHungry {
+		t.Fatalf("AddFed(40) = (%d, %v), want (50, true) — still below the 55%% auto-feed threshold", fed, stillHungry)
+	}
+
+	fed, stillHungry = actor.AddFed(1000)
+	if fed != 100 || stillHungry {
+		t.Fatalf("AddFed(1000) = (%d, %v), want (100, false) — clamped at maxMeal, no longer hungry", fed, stillHungry)
+	}
+}
+
 func TestNewPetAppliesConfiguredInventoryLimits(t *testing.T) {
 	inventory := itemcontainer.NewPetInventory(200, item.NewTable(nil))
 	cfg := petmodel.DefaultConfig()
