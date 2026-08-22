@@ -45,8 +45,14 @@ const (
 	UseNoop
 	// UseCannotBeUsed means the item cannot be used in the pet's current state.
 	UseCannotBeUsed
-	// UsePetCannotUseItem means the item is not valid pet equipment.
+	// UsePetCannotUseItem means the item is neither valid pet equipment nor
+	// an eligible consumable (food the pet's template accepts, or a potion).
 	UsePetCannotUseItem
+	// UseConsumable means the item is not pet equipment but is an eligible
+	// consumable (food or potion): the caller dispatches it to the item's
+	// etc-item handler (network.usePetConsumable) rather than mutating the
+	// paperdoll itself.
+	UseConsumable
 )
 
 // UseOutcome identifies the pet equipment mutation.
@@ -208,7 +214,16 @@ func UseItem(pet *summon.Actor, petInv *itemcontainer.Inventory, objectID int32,
 	if ownerDead || pet.Dead() {
 		return UseResult{ItemID: inst.TemplateID}, UseCannotBeUsed
 	}
-	if !Equippable(tmpl) || !pet.CanWearPetItem(tmpl) {
+	if !Equippable(tmpl) {
+		if tmpl.EtcItem == nil || tmpl.EtcItem.Handler == "" {
+			return UseResult{}, UsePetCannotUseItem
+		}
+		if !pet.CanEatFood(inst.TemplateID) && tmpl.EtcItem.Type != item.EtcItemPotion {
+			return UseResult{}, UsePetCannotUseItem
+		}
+		return UseResult{ItemID: inst.TemplateID}, UseConsumable
+	}
+	if !pet.CanWearPetItem(tmpl) {
 		return UseResult{}, UsePetCannotUseItem
 	}
 

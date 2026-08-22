@@ -13,6 +13,7 @@ type Config struct {
 	SinEaterExpRate       float64
 	WeightLimitMultiplier float64
 	InventorySlots        int
+	FoodRate              int
 }
 
 // DefaultConfig returns the shipped pet configuration defaults.
@@ -22,6 +23,7 @@ func DefaultConfig() Config {
 		SinEaterExpRate:       1,
 		WeightLimitMultiplier: 1,
 		InventorySlots:        12,
+		FoodRate:              1,
 	}
 }
 
@@ -33,6 +35,7 @@ func ConfigFromProperties(serverProps, playersProps *config.Properties) (Config,
 	server := config.NewFields(serverProps, "pet server config")
 	cfg.ExpRate = server.Float64("PetXpRate", cfg.ExpRate)
 	cfg.SinEaterExpRate = server.Float64("SinEaterXpRate", cfg.SinEaterExpRate)
+	cfg.FoodRate = server.Int("PetFoodRate", cfg.FoodRate)
 	if err := server.Err(); err != nil {
 		return Config{}, err
 	}
