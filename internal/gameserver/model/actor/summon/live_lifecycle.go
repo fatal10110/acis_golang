@@ -64,7 +64,7 @@ func (a *Actor) TickServitor(state *world.State) TickResult {
 	}
 
 	cost := a.timeLostIdle
-	if a.combat {
+	if a.InCombat() {
 		cost = a.timeLostActive
 	}
 	a.statusMu.Lock()
@@ -108,9 +108,10 @@ func (a *Actor) TickPet(state *world.State) PetTickResult {
 		return PetTickResult{}
 	}
 
+	inCombat := a.InCombat()
 	a.statusMu.Lock()
 	consume := a.mealInNormal
-	if a.combat {
+	if inCombat {
 		consume = a.mealInBattle
 	}
 	a.fed = petmodel.NextFed(a.fed, consume)
@@ -194,8 +195,8 @@ func (a *Actor) resolveRequest(ctx CommandContext) Request {
 		IsPet:                  a.isPet,
 		SummonIsDead:           dead,
 		OutOfControl:           a.OutOfControl(),
-		InCombat:               a.combat,
-		IsAttackingNow:         a.attack,
+		InCombat:               a.InCombat(),
+		IsAttackingNow:         a.IsAttackingNow(),
 		HasTarget:              ctx.Target != nil,
 		TargetIsSummon:         sameObject(ctx.Target, a),
 		TargetIsOwner:          sameObject(ctx.Target, a.owner),

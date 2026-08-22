@@ -285,6 +285,12 @@ func (s *Summon) busyLocked() bool {
 	return s.attack.BowCoolingDown() || s.attack.AttackingNow() || (s.cast != nil && s.cast.CastingNow())
 }
 
+// AttackingNow reports whether this summon's own attack cycle is currently
+// in flight, matching CreatureAttack.isAttackingNow (CreatureAttack.java:56-59).
+func (s *Summon) AttackingNow() bool {
+	return s.attack != nil && s.attack.AttackingNow()
+}
+
 // targetLostLocked matches AbstractAI.isTargetLost (AbstractAI.java:586-594,
 // unmodified by SummonAI's override at SummonAI.java:275-281): only a nil or
 // no-longer-known target counts as lost. Death (true or fake) is not a loss

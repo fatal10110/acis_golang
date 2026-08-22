@@ -234,6 +234,7 @@ type eraseOwnerFake struct {
 func (o *eraseOwnerFake) ObjectID() int32   { return o.id }
 func (o *eraseOwnerFake) LevelValue() int   { return o.level }
 func (o *eraseOwnerFake) ServitorVanished() { o.vanished++ }
+func (o *eraseOwnerFake) InCombat() bool    { return false }
 
 // newEraseServitor spawns a real *summon.Actor servitor beside owner in
 // state, exercising the production erasableSummon surface disableErase

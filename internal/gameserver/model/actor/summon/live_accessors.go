@@ -458,6 +458,20 @@ func (a *Actor) OutOfControl() bool {
 	return a.disabled || a.effects.IsAffected(effect.FlagBetrayed)
 }
 
+// InCombat reports the owner's attack-stance state, matching
+// Summon.isInCombat (Summon.java:302-305): _owner != null && _owner.isInCombat().
+func (a *Actor) InCombat() bool {
+	return a.owner != nil && a.owner.InCombat()
+}
+
+// IsAttackingNow reports whether this summon's own attack cycle is
+// currently in flight, matching CreatureAttack.isAttackingNow
+// (CreatureAttack.java:56-59) as read via pet.getAttack()/servitor.getAttack()
+// — the summon's own attack component, not the owner's.
+func (a *Actor) IsAttackingNow() bool {
+	return a.brain != nil && a.brain.AttackingNow()
+}
+
 // OwnerCombatant returns the owning player when it can be targeted by AI.
 func (a *Actor) OwnerCombatant() attackable.Combatant {
 	owner, _ := a.owner.(attackable.Combatant)
