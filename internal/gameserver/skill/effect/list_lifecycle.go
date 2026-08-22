@@ -87,6 +87,32 @@ func (l *List) notifyAbnormalUpdate() {
 	}
 }
 
+// notifyExpiry queues e's worn-off/disappeared/aborted system message,
+// mirroring EffectList.removeEffectFromQueue: only for an effect that
+// actually left the buffs/debuffs list (not one rejected before insertion)
+// and whose template shows an icon. wornOff must be read before
+// e.stopSchedule() runs, since that call zeroes e's remaining-tick counter.
+// e.Skill.Toggle wins over the count check even though a toggle's schedule
+// never reaches count 0, matching the reference checking isToggle() first.
+func (l *List) notifyExpiry(e *Effect, wornOff bool, pending *[]func()) {
+	if !e.Template.Icon {
+		return
+	}
+	notifier, ok := l.owner.(effectExpiryNotifier)
+	if !ok {
+		return
+	}
+	skillID, level := e.Skill.ID, e.Skill.Level
+	switch {
+	case e.Skill.Toggle:
+		*pending = append(*pending, func() { notifier.NotifyEffectAborted(skillID, level) })
+	case wornOff:
+		*pending = append(*pending, func() { notifier.NotifyEffectWornOff(skillID, level) })
+	default:
+		*pending = append(*pending, func() { notifier.NotifyEffectDisappeared(skillID, level) })
+	}
+}
+
 // runHooks fires each queued hook in order, after the caller has released
 // l.mu. Add/Remove queue every OnStart/OnExit/OnStopTask call (and the
 // owner stat-func callbacks that accompany them) here instead of firing
