@@ -49,7 +49,7 @@ func (l *GameClientLink) consumePetHerb(live *livePlayer, pet *summon.Actor, inv
 		l.broadcastPetFrame(live, pet, func() wire.Frame {
 			return serverpackets.FrameMagicSkillUse(self, self, int32(res.Skill.ID), int32(res.Skill.Level), 0, 0, false)
 		})
-		res.Apply()
+		l.sendSkillHandlerResult(live, res.Apply())
 		live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessagePetUsesS1, int32(res.Skill.ID), int32(res.Skill.Level)))
 	}
 }

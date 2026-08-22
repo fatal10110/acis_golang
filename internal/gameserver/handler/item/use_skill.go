@@ -61,10 +61,12 @@ type UseResult struct {
 	Condition modelskill.ConditionClause
 
 	// Apply runs the skill's effects on the caster (and the mirrored
-	// summon, for a herb). It is set only on Applied and is the caller's
-	// job to invoke after sending its own cast-acknowledgment packets,
-	// matching the reference's send-then-apply cast sequencing.
-	Apply func()
+	// summon, for a herb), returning the merged caster-visible result so
+	// the caller can feed it to its ATTACK_FAILED/counterattack/etc.
+	// reporting seam. It is set only on Applied and is the caller's job to
+	// invoke after sending its own cast-acknowledgment packets, matching
+	// the reference's send-then-apply cast sequencing.
+	Apply func() actorcast.EffectResult
 
 	// MirroredSummon is the servitor the herb's effect was mirrored onto,
 	// set only when that mirror happened. The caller broadcasts its own
@@ -188,11 +190,18 @@ func UseAll(req UseRequest) []UseResult {
 
 		reuse := installItemReuse(req.Caster, def, reuseKey, tmpl.EtcItem.ReuseDelay)
 		mirrorToSummon := tmpl.EtcItem.Type == modelitem.EtcItemHerb && !req.IsPet && req.Summon != nil
-		apply := func() {
-			actorcast.ApplyEffects(req.Effects, req.Caster, req.Caster, def)
+		apply := func() actorcast.EffectResult {
+			result := actorcast.ApplyEffectsResult(req.Effects, req.Caster, req.Caster, def)
 			if mirrorToSummon {
-				actorcast.ApplyEffects(req.Effects, req.Summon, req.Summon, def)
+				summonResult := actorcast.ApplyEffectsResult(req.Effects, req.Summon, req.Summon, def)
+				result.AttackFailed += summonResult.AttackFailed
+				result.Handled = result.Handled || summonResult.Handled
+				result.Counterattacks = append(result.Counterattacks, summonResult.Counterattacks...)
+				result.Lethals = append(result.Lethals, summonResult.Lethals...)
+				result.Dodges = append(result.Dodges, summonResult.Dodges...)
+				result.Resisted = append(result.Resisted, summonResult.Resisted...)
 			}
+			return result
 		}
 
 		result := UseResult{Outcome: Applied, Skill: def, Apply: apply, SharedReuseGroup: tmpl.EtcItem.SharedReuseGroup, ReuseMillis: reuse}
