@@ -42,7 +42,7 @@ func (h *Hostile) TakeDamage(dmg int, attacker creature.DeathActor) bool {
 	}
 	if dmg > 0 {
 		if combatant, ok := attacker.(attackable.Combatant); ok {
-			h.AddDamageHate(combatant, float64(dmg), float64(dmg))
+			h.AddCombatDamageHate(combatant, float64(dmg))
 			h.RollAttackedShotRecharge()
 		}
 		h.applyNonConsumptionDamageEffects(false)

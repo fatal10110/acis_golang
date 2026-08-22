@@ -273,6 +273,33 @@ func TestHostileTakeDamageRollsAttackedShotRecharge(t *testing.T) {
 	}
 }
 
+// TestHostileTakeDamageQueuesFlatAttackDesireWeight guards against the
+// ATTACK desire's weight scaling with damage dealt: DefaultNpc.tryToAttack
+// always queues a flat 200 weight per hit (accumulated across hits by
+// DesireQueue.AddOrUpdate, same as any other addAttackDesire caller), and
+// Npc.reduceCurrentHp never derives desire weight from damage at all. A
+// 10-damage hit and a 500-damage hit must add the same 200 increment, even
+// though the threat table's hate keeps accumulating with the damage dealt.
+func TestHostileTakeDamageQueuesFlatAttackDesireWeight(t *testing.T) {
+	defender := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", HPMax: 1000})
+	attacker := newCombatHostile(t, 2, &Template{ID: 2, Type: "Monster"})
+
+	defender.TakeDamage(10, attacker)
+	defender.TakeDamage(500, attacker)
+
+	desire, ok := defender.AI().Desires().Peek()
+	if !ok {
+		t.Fatal("Desires().Peek() ok = false, want a queued attack desire")
+	}
+	if desire.Weight != 400 {
+		t.Fatalf("queued attack desire weight = %v, want 400 (two flat-200 hits, "+
+			"independent of the 10 vs. 500 damage dealt)", desire.Weight)
+	}
+	if got := defender.AI().Threats().Hate(attacker); got != 510 {
+		t.Fatalf("threat table hate = %v, want 510 (damage still accumulates there)", got)
+	}
+}
+
 func TestHostileSetChargedShotDischargesIndependentlyPerKind(t *testing.T) {
 	hostile := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster"})
 
