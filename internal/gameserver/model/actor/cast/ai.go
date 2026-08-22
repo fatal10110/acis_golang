@@ -24,6 +24,11 @@ type AIController struct {
 	// OnLaunchAbort sends the caster-visible result of a launch-phase gate
 	// failure. Network wiring owns the system-message encoding.
 	OnLaunchAbort func(LaunchAbortReason)
+	// OnHitResult receives the EffectResult of a resolved Hit-phase cast.
+	// NPC casters leave it unset (Creature.sendPacket is a no-op in the
+	// reference); summon casters wire it to forward the result to the
+	// owner, mirroring Summon.sendPacket's owner-forward.
+	OnHitResult func(EffectResult)
 }
 
 // Disabled reports whether the actor cannot attempt a new cast right now:
@@ -217,7 +222,10 @@ func (a *AIController) Cast(target attackable.Combatant, ref modelskill.Ref) {
 			if def.SkillType == "FUSION" || !launchResolved {
 				return
 			}
-			ApplyResolvedEffectsResult(a.Effects, a.Caster, launchTargets, def)
+			result := ApplyResolvedEffectsResult(a.Effects, a.Caster, launchTargets, def)
+			if a.OnHitResult != nil {
+				a.OnHitResult(result)
+			}
 		},
 	})
 }

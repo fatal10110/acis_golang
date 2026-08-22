@@ -451,6 +451,52 @@ func TestAIControllerCastReportsLaunchAbort(t *testing.T) {
 	}
 }
 
+// TestAIControllerCastReportsHitResult verifies the Hit-phase EffectResult
+// reaches OnHitResult instead of being discarded (issue 1572: a summon's
+// failed-skill roll never notified the owner because AIController's Hit hook
+// dropped ApplyResolvedEffectsResult's return value). Network wiring uses
+// this hook to forward the result to the summon's owner, mirroring
+// Summon.sendPacket's owner-forward; NPC casters simply leave it unset.
+func TestAIControllerCastReportsHitResult(t *testing.T) {
+	clock := &fakeCastClock{}
+	actor := scalingActor()
+	ctrl := NewController(actor)
+	ctrl.afterFunc = clock.AfterFunc
+
+	ref := modelskill.Ref{ID: scalingDef.ID, Level: scalingDef.Level}
+	def := scalingDef
+	def.Target = modelskill.TargetOne
+	def.SkillType = "DUMMYCAST"
+
+	rec := &recordingSkillHandler{result: handlerskill.Result{AttackFailed: 1}}
+	caster := &fakeBroadcastingCaster{fakeCastCreature: fakeCastCreature{id: 1, category: skilltarget.CategoryAttackable}}
+	target := &fakeCastCreature{id: 2, category: skilltarget.CategoryAttackable}
+
+	var got EffectResult
+	var calls int
+	ai := &AIController{
+		Controller:  ctrl,
+		Definitions: fakeDefinitions{ref: def},
+		Effects:     newEffectHandlers(effectsKnown{}, "DUMMYCAST", rec),
+		Caster:      caster,
+		OnHitResult: func(result EffectResult) {
+			got = result
+			calls++
+		},
+	}
+
+	ai.Cast(target, ref)
+	clock.fire(125 * time.Millisecond) // Launch
+	clock.fire(400 * time.Millisecond) // Hit
+
+	if calls != 1 {
+		t.Fatalf("OnHitResult calls = %d, want 1", calls)
+	}
+	if got.AttackFailed != 1 {
+		t.Fatalf("OnHitResult AttackFailed = %d, want 1", got.AttackFailed)
+	}
+}
+
 // TestAIControllerCastSkipsEffectsForFusionSkill matches
 // CreatureCast.doFusionCast (CreatureCast.java:81-84), an empty stub for
 // every non-player caster ("Non-Player Creatures cannot use FUSION or
