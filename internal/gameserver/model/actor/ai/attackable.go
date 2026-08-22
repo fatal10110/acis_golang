@@ -210,12 +210,17 @@ func (a *Attackable) AddCombatDamageHate(attacker attackable.Combatant, damage f
 	a.addAttackDesire(attacker, combatAttackDesireWeight)
 }
 
+// addAttackDesire ports the ordinary hate-list overloads of NpcAI.java's
+// addAttackDesire (NpcAI.java:698-711), all of which default
+// moveToTarget = true. Only the scripted addAttackDesireHold
+// (NpcAI.java:683-696, not yet ported) queues MoveToTarget = false.
 func (a *Attackable) addAttackDesire(attacker attackable.Combatant, hate float64) {
 	a.desires.AddOrUpdate(&Desire{
-		Kind:        IntentionAttack,
-		FinalTarget: attacker,
-		Weight:      hate,
-		QueuedAt:    time.Now(),
+		Kind:         IntentionAttack,
+		FinalTarget:  attacker,
+		Weight:       hate,
+		QueuedAt:     time.Now(),
+		MoveToTarget: true,
 	})
 }
 
