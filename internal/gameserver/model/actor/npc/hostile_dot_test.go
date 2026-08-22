@@ -30,7 +30,7 @@ func TestDamageOverTimeEffectTargetsHostile(t *testing.T) {
 	if !e.ActionTime() {
 		t.Fatal("ActionTime() = false, want true")
 	}
-	if got, want := h.HP(), 96.0; got != want {
+	if got, want := h.HP(), h.MaxHPValue()-4; got != want {
 		t.Fatalf("HP() = %v, want %v", got, want)
 	}
 }

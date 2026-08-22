@@ -321,6 +321,14 @@ func startEffects(lc fx.Lifecycle, effects *task.Effects, log zerolog.Logger) {
 	startTicker(lc, log, effects.Start)
 }
 
+func provideNPCRegen(state *world.State) *task.NPCRegen {
+	return task.NewNPCRegen(state)
+}
+
+func startNPCRegen(lc fx.Lifecycle, regen *task.NPCRegen, log zerolog.Logger) {
+	startTicker(lc, log, regen.Start)
+}
+
 // worldAttackStanceEffects stops an actor's attack animation once its
 // combat-stance inactivity period elapses. Actors that don't expose a
 // physical-attack controller are left alone.

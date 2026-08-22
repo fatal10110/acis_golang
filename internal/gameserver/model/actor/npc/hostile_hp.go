@@ -5,9 +5,10 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 )
 
-// MaxHP returns this NPC's template maximum hit points.
+// MaxHP returns this NPC's calculated maximum hit points (CreatureStatus.
+// getMaxHp: calcStat(MAX_HP, template base) — not the raw template value).
 func (h *Hostile) MaxHP() int {
-	return int(h.Instance.Template.HPMax)
+	return int(h.MaxHPValue())
 }
 
 // CurrentHP returns this NPC's live hit points.
@@ -15,10 +16,17 @@ func (h *Hostile) CurrentHP() int {
 	return int(h.health.Current())
 }
 
-// SetCurrentHP overrides this NPC's live hit points, e.g. to restore a
-// persisted value at spawn time instead of starting at MaxHP. It has no
-// effect once this NPC has already died.
+// SetCurrentHP overrides this NPC's live hit points, clamped to [0,
+// calculated MaxHP], e.g. to restore a persisted value at spawn time
+// instead of starting at MaxHP. It has no effect once this NPC has already
+// died.
 func (h *Hostile) SetCurrentHP(hp int) {
+	if max := h.MaxHP(); hp > max {
+		hp = max
+	}
+	if hp < 0 {
+		hp = 0
+	}
 	h.health.SetCurrent(float64(hp))
 }
 
