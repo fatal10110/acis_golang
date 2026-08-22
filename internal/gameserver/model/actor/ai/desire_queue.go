@@ -128,6 +128,24 @@ func (q *DesireQueue) removeLocked(drop func(*Desire) bool) {
 	q.desires = kept
 }
 
+// NonMovingAttack returns the queued ATTACK Desire aimed at target whose
+// MoveToTarget is false, if one is queued. Equivalent to the reference's
+// Npc.canAutoAttack finding the first ATTACK desire for target and then
+// checking !getMoveToTarget(): a matching desire with MoveToTarget true is
+// treated the same as no match, since callers only act on the non-moving
+// case.
+func (q *DesireQueue) NonMovingAttack(target attackable.Combatant) (*Desire, bool) {
+	q.mu.RLock()
+	defer q.mu.RUnlock()
+
+	for _, d := range q.desires {
+		if d.Kind == IntentionAttack && !d.MoveToTarget && sameCombatant(d.FinalTarget, target) {
+			return d, true
+		}
+	}
+	return nil, false
+}
+
 // Len returns the number of Desires currently queued.
 func (q *DesireQueue) Len() int {
 	q.mu.RLock()

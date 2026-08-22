@@ -392,9 +392,11 @@ func (c *Character) Accuracy() int {
 	return int(val)
 }
 
-// CriticalRate returns this player's physical critical rate.
+// CriticalRate returns this player's physical critical rate, truncated to
+// an int and capped at 500 per CreatureStatus.getCriticalHit
+// (CreatureStatus.java:551-553): `Math.min((int) calcStat(...), 500)`.
 func (c *Character) CriticalRate() float64 {
-	return c.calcStat(stat.CriticalRate, c.activeWeapon().stat("rCrit", 4))
+	return float64(min(int(c.calcStat(stat.CriticalRate, c.activeWeapon().stat("rCrit", 4))), 500))
 }
 
 // MagicCriticalRate returns this player's magic critical rate.

@@ -67,6 +67,30 @@ func TestHostileMakeAttackHitResolvesDamage(t *testing.T) {
 	}
 }
 
+// TestHostileMakeAttackHitTruncatesCriticalRateBeforeCap pins the boundary
+// from CreatureStatus.java:551-553 (`Math.min((int) calcStat(...), 500)`):
+// the finalized critical rate is truncated to an int before the 500 cap and
+// before the roll comparison in Formulas.java:705-708. At DEX=26 and
+// CritRate=8, AtkCritical finalizes to 8*DEXBonus[26]*10=84.8; truncating
+// first yields the int 84, which a roll of exactly 84 must NOT beat
+// (CritSucceeds requires rate strictly greater than roll). Without
+// truncation the fractional 84.8 would still beat a roll of 84, so this
+// pins the previously-missing cast.
+func TestHostileMakeAttackHitTruncatesCriticalRateBeforeCap(t *testing.T) {
+	attacker := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", PAtk: 100, STR: 40, DEX: 26, Level: 1, CritRate: 8})
+	attacker.SetRollSource(func(int) int { return 84 })
+	defender := newCombatHostile(t, 2, &Template{ID: 2, Type: "Monster", PDef: 50, STR: 40, DEX: 26, Level: 1, HPMax: 1000})
+
+	hit := attacker.MakeAttackHit(defender, false)
+
+	if hit.Miss {
+		t.Fatal("MakeAttackHit().Miss = true, want a hit (matched accuracy/evasion beats roll 84)")
+	}
+	if hit.Crit {
+		t.Fatal("MakeAttackHit().Crit = true, want false: truncated critical rate 84 must not beat roll 84")
+	}
+}
+
 func TestHostileRechargeShotsUsesTemplateCountersAndBroadcasts(t *testing.T) {
 	ai := commons.NewStatSet()
 	ai.Set("SoulShot", 1)
@@ -246,6 +270,33 @@ func TestHostileTakeDamageRollsAttackedShotRecharge(t *testing.T) {
 	}
 	if got := defender.CurrentSoulshotCount(); got != 0 {
 		t.Fatalf("CurrentSoulshotCount() = %d, want 0", got)
+	}
+}
+
+// TestHostileTakeDamageQueuesFlatAttackDesireWeight guards against the
+// ATTACK desire's weight scaling with damage dealt: DefaultNpc.tryToAttack
+// always queues a flat 200 weight per hit (accumulated across hits by
+// DesireQueue.AddOrUpdate, same as any other addAttackDesire caller), and
+// Npc.reduceCurrentHp never derives desire weight from damage at all. A
+// 10-damage hit and a 500-damage hit must add the same 200 increment, even
+// though the threat table's hate keeps accumulating with the damage dealt.
+func TestHostileTakeDamageQueuesFlatAttackDesireWeight(t *testing.T) {
+	defender := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", HPMax: 1000})
+	attacker := newCombatHostile(t, 2, &Template{ID: 2, Type: "Monster"})
+
+	defender.TakeDamage(10, attacker)
+	defender.TakeDamage(500, attacker)
+
+	desire, ok := defender.AI().Desires().Peek()
+	if !ok {
+		t.Fatal("Desires().Peek() ok = false, want a queued attack desire")
+	}
+	if desire.Weight != 400 {
+		t.Fatalf("queued attack desire weight = %v, want 400 (two flat-200 hits, "+
+			"independent of the 10 vs. 500 damage dealt)", desire.Weight)
+	}
+	if got := defender.AI().Threats().Hate(attacker); got != 510 {
+		t.Fatalf("threat table hate = %v, want 510 (damage still accumulates there)", got)
 	}
 }
 

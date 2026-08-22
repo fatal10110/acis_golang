@@ -101,6 +101,9 @@ type PlayerConfig struct {
 	// use a TELEPORT/RECALL-type skill, direct or item-attached.
 	KarmaPlayerCanTeleport bool
 	AwardPKKillPVPPoint    bool
+	// PerfectShieldBlockRate is the roll threshold (out of 100) below which
+	// a successful shield block upgrades to a perfect block.
+	PerfectShieldBlockRate int
 }
 
 // GameClientLink accepts and drives connections from Interlude game

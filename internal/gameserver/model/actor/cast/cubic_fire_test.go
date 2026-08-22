@@ -3,7 +3,9 @@ package cast
 import (
 	"testing"
 
+	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -61,6 +63,56 @@ func TestApplyCubicHeal_SkipsUnhealableTarget(t *testing.T) {
 	}
 	if target.added != 0 {
 		t.Fatalf("AddHP called on an unhealable target, amount = %v", target.added)
+	}
+}
+
+// fakeCubicEffectCaster and fakeCubicEffectTarget are the minimal
+// handlerskill.Actor + cast.Target surface ApplyCubicEffect's dispatch
+// needs. fakeCubicEffectTarget deliberately does not implement
+// checkSkillSuccess's skillSuccessSource probe, so an offensive continuous
+// skill (DEBUFF/DOT/etc.) always fails its landing roll — matching
+// Cubic.useContinuousSkill's calcCubicSkillSuccess()==false branch
+// (Cubic.java:439-444), the case this test exercises.
+type fakeCubicEffectCaster struct{ id int32 }
+
+func (f *fakeCubicEffectCaster) ObjectID() int32           { return f.id }
+func (f *fakeCubicEffectCaster) Position() (int, int, int) { return 0, 0, 0 }
+func (f *fakeCubicEffectCaster) Dead() bool                { return false }
+
+type fakeCubicEffectTarget struct {
+	id   int32
+	list *effect.List
+}
+
+func (f *fakeCubicEffectTarget) ObjectID() int32           { return f.id }
+func (f *fakeCubicEffectTarget) Position() (int, int, int) { return 0, 0, 0 }
+func (f *fakeCubicEffectTarget) Dead() bool                { return false }
+func (f *fakeCubicEffectTarget) EffectList() *effect.List  { return f.list }
+
+// TestApplyCubicEffect_FailedOffensiveContinuousRollReportsAttackFailed
+// covers the issue-1570 gap: ApplyCubicEffect used to discard
+// skills.UseResult's Result outright, so a failed offensive continuous
+// landing roll never reached the caller and the cubic's owner never saw
+// ATTACK_FAILED, unlike the reference's useContinuousSkill.
+func TestApplyCubicEffect_FailedOffensiveContinuousRollReportsAttackFailed(t *testing.T) {
+	registry := handlerskill.NewDefaultRegistry()
+	caster := &fakeCubicEffectCaster{id: 1}
+	target := &fakeCubicEffectTarget{id: 2, list: effect.NewList(nil)}
+
+	def := modelskill.Definition{
+		SkillType: "DEBUFF",
+		Offensive: true,
+		Debuff:    true,
+		Effects:   []modelskill.EffectTemplate{{Name: "Buff", Time: 600}},
+	}
+
+	result := ApplyCubicEffect(registry, caster, def, target)
+
+	if !result.Handled {
+		t.Fatal("ApplyCubicEffect() Handled = false, want true (DEBUFF has a registered handler)")
+	}
+	if result.AttackFailed != 1 {
+		t.Fatalf("ApplyCubicEffect() AttackFailed = %d, want 1", result.AttackFailed)
 	}
 }
 

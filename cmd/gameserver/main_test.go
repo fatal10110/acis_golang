@@ -189,6 +189,36 @@ func TestLoadDeathPenaltyChanceDefaultsToTwenty(t *testing.T) {
 	}
 }
 
+func TestLoadPerfectShieldBlockRateUsesPlayersProperties(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "players.properties")
+	if err := os.WriteFile(configPath, []byte("PerfectShieldBlockRate = 15\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := loadPerfectShieldBlockRate(gameServerPaths{PlayersConfigPath: configPath})
+	if err != nil {
+		t.Fatalf("loadPerfectShieldBlockRate() error = %v", err)
+	}
+	if got != 15 {
+		t.Fatalf("loadPerfectShieldBlockRate() = %d, want 15", got)
+	}
+}
+
+func TestLoadPerfectShieldBlockRateDefaultsToFive(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "players.properties")
+	if err := os.WriteFile(configPath, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := loadPerfectShieldBlockRate(gameServerPaths{PlayersConfigPath: configPath})
+	if err != nil {
+		t.Fatalf("loadPerfectShieldBlockRate() error = %v", err)
+	}
+	if got != 5 {
+		t.Fatalf("loadPerfectShieldBlockRate() = %d, want 5", got)
+	}
+}
+
 func TestLoadPlayerSpawnProtectionUsesPlayersProperties(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "players.properties")
 	if err := os.WriteFile(configPath, []byte("PlayerSpawnProtection = 12\n"), 0o600); err != nil {

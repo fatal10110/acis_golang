@@ -139,6 +139,16 @@ func NewAttackable(actor AttackableActor, move MoveController, attack AttackCont
 	}
 }
 
+// MaybeStartOffensiveFollow starts or maintains an offensive follow task
+// toward target at this actor's own physical attack range. Exposed for
+// AutoAttackTargetValid's queued-desire follow gate (Npc.java:2107-2110),
+// called outside the AI loop's own Think step; it must not take a.mu, since
+// a caller such as RandomizeHate already holds it while evaluating
+// candidates.
+func (a *Attackable) MaybeStartOffensiveFollow(target attackable.Combatant) (bool, error) {
+	return a.move.MaybeStartOffensiveFollow(target, a.actor.PhysicalAttackRange())
+}
+
 // ObjectID returns the actor id controlled by this AI loop.
 func (a *Attackable) ObjectID() int32 {
 	return a.actor.ObjectID()
@@ -182,12 +192,35 @@ func (a *Attackable) AddDamageHate(attacker attackable.Combatant, damage, hate f
 	a.addAttackDesire(attacker, hate)
 }
 
+// combatAttackDesireWeight is the flat ATTACK desire weight queued for raw
+// combat damage, matching DefaultNpc.tryToAttack's scripted 200
+// (Npc.reduceCurrentHp never routes through addAttackDesire in the
+// reference; nothing there derives desire weight from damage dealt).
+const combatAttackDesireWeight = 200
+
+// AddCombatDamageHate records attacker's combat damage in the physical
+// threat table — accumulating hate there to drive target selection among
+// multiple attackers, unchanged from AddDamageHate — but queues its attack
+// Desire at a flat weight instead of scaling it with the damage dealt.
+func (a *Attackable) AddCombatDamageHate(attacker attackable.Combatant, damage float64) {
+	a.threats.AddDamage(attacker, damage, damage)
+	if attacker == nil || (a.actor.SiegeGuard() && attacker.SiegeGuard()) {
+		return
+	}
+	a.addAttackDesire(attacker, combatAttackDesireWeight)
+}
+
+// addAttackDesire ports the ordinary hate-list overloads of NpcAI.java's
+// addAttackDesire (NpcAI.java:698-711), all of which default
+// moveToTarget = true. Only the scripted addAttackDesireHold
+// (NpcAI.java:683-696, not yet ported) queues MoveToTarget = false.
 func (a *Attackable) addAttackDesire(attacker attackable.Combatant, hate float64) {
 	a.desires.AddOrUpdate(&Desire{
-		Kind:        IntentionAttack,
-		FinalTarget: attacker,
-		Weight:      hate,
-		QueuedAt:    time.Now(),
+		Kind:         IntentionAttack,
+		FinalTarget:  attacker,
+		Weight:       hate,
+		QueuedAt:     time.Now(),
+		MoveToTarget: true,
 	})
 }
 

@@ -355,6 +355,13 @@ func (h *Hostile) AddDamageHate(attacker attackable.Combatant, damage, hate floa
 	h.brain.AddDamageHate(attacker, damage, hate)
 }
 
+// AddCombatDamageHate records attacker's combat damage against this NPC,
+// queuing its attack Desire at a flat weight instead of scaling it with the
+// damage dealt (see ai.Attackable.AddCombatDamageHate).
+func (h *Hostile) AddCombatDamageHate(attacker attackable.Combatant, damage float64) {
+	h.brain.AddCombatDamageHate(attacker, damage)
+}
+
 // AddHate records skill-cast hate against this NPC.
 func (h *Hostile) AddHate(attacker attackable.Combatant, hate float64) {
 	h.brain.AddHate(attacker, hate)

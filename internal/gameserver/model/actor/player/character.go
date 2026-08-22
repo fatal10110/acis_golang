@@ -230,6 +230,11 @@ type Character struct {
 	deathPenaltyChance      int
 	updateDeathPenaltySkill func(oldLevel, newLevel int)
 
+	// perfectShieldBlockRate is the players.properties-configured
+	// PerfectShieldBlockRate roll threshold for a shield block to upgrade
+	// to a perfect block (Formulas.java:859).
+	perfectShieldBlockRate int
+
 	skills skillState
 	cubics cubic.List
 }

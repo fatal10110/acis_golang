@@ -3,6 +3,7 @@ package npc
 import (
 	"slices"
 
+	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -21,9 +22,13 @@ func (h *Hostile) Aggressive() bool {
 // request.
 //
 // Excluded unconditionally: a nil target and an already-dead target. A
-// non-NPC target must also be within rangeVal and, unless this NPC is
-// raid-related or its template can see through concealment, not be
-// silently moving.
+// candidate already the FinalTarget of a queued, non-moving ATTACK Desire
+// is excluded too when that already starts or maintains an offensive
+// follow (Npc.java:2107-2110, CreatureMove.maybeStartOffensiveFollow):
+// this NPC is already committed to closing on it, so re-validating it
+// against the rules below is redundant. A non-NPC target must also be
+// within rangeVal and, unless this NPC is raid-related or its template can
+// see through concealment, not be silently moving.
 //
 // Guard and FriendlyMonster kinds then use one rule: attack only a
 // karma-positive target, purely on line of sight. Every other kind excludes
@@ -43,10 +48,23 @@ func (h *Hostile) Aggressive() bool {
 // branch (gated by a config flag that ships disabled by default, and needs
 // npc AI config plumbing that doesn't exist yet), and the peace-zone aggro
 // config flag (allowPeaceful is a caller-supplied parameter here rather
-// than the reference's own config-driven default).
+// than the reference's own config-driven default). The follow gate's
+// distance decision reuses move.Controller.MaybeStartOffensiveFollow,
+// which doesn't reproduce CreatureMove's own line-of-sight branch (see
+// that method's doc): no geodata query is wired into a live actor yet.
 func (h *Hostile) AutoAttackTargetValid(target attackable.Combatant, rangeVal int, allowPeaceful bool) bool {
 	if target == nil || target.AlikeDead() {
 		return false
+	}
+
+	if _, ok := h.brain.Desires().NonMovingAttack(target); ok {
+		following, err := h.brain.MaybeStartOffensiveFollow(target)
+		if err != nil {
+			h.log.Debug().Err(err).Int32("object_id", h.ObjectID()).Msg("npc: offensive follow broadcast")
+		}
+		if following {
+			return false
+		}
 	}
 
 	_, targetIsNPC := target.(*Hostile)
@@ -118,6 +136,59 @@ func (h *Hostile) karmaTargetVisible(target attackable.Combatant) bool {
 	return ok && pk.Karma() > 0 && h.CanSee(target)
 }
 
+// siegeGuardAutoAttackTargetValid ports SiegeGuard.canAutoAttack(Creature)
+// (SiegeGuard.java:82-96): the dedicated one-argument auto-attack rule a
+// SiegeGuard kind uses in place of AutoAttackTargetValid above, reachable
+// only through the one-argument reconsider-target path below. The
+// three-argument RandomizeHate path (Npc.canAutoAttack(Creature, int,
+// boolean)) keeps calling AutoAttackTargetValid unchanged for SiegeGuard,
+// same as every other kind.
+//
+// Rejects a target with no acting player (an NPC target) or an alike-dead
+// acting player, and an acting player silently moving beyond 250 units;
+// otherwise requires siege attackability (target.isAttackableBy(this)) and
+// line of sight. The reference resolves target.getActingPlayer() once and
+// checks the alike-dead/silent-moving/distance gates against that acting
+// player, not against target directly — for a Summon/Pet target this is the
+// owning player, matching AutoAttackTargetValid's own OwnerCombatant()
+// resolution above; only the closing isAttackableBy/canSeeTarget calls use
+// the raw target. Not modeled: the acting player's invisibility check
+// (targetPlayer.getAppearance().isVisible()) — no player appearance state
+// exists yet (#907); and the clan/siege-side DEFENDER/OWNER exclusion inside
+// Playable.isAttackableBy's SiegeGuard branch — no castle/siege state exists
+// yet (#232/#234), so target.isAttackableBy(this) here falls through to
+// whatever general AttackableBy the target exposes.
+func (h *Hostile) siegeGuardAutoAttackTargetValid(target attackable.Combatant) bool {
+	if target == nil {
+		return false
+	}
+
+	if _, targetIsNPC := target.(*Hostile); targetIsNPC {
+		return false
+	}
+
+	actingPlayer := target
+	if owned, ok := target.(interface{ OwnerCombatant() attackable.Combatant }); ok {
+		actingPlayer = owned.OwnerCombatant()
+	}
+	if actingPlayer == nil || actingPlayer.AlikeDead() {
+		return false
+	}
+
+	if sm, ok := actingPlayer.(interface{ SilentMoving() bool }); ok && sm.SilentMoving() && !h.withinDistance(actingPlayer, 250) {
+		return false
+	}
+
+	rules, ok := target.(interface {
+		AttackableBy(skilltarget.Creature) bool
+	})
+	if !ok || !rules.AttackableBy(h) {
+		return false
+	}
+
+	return h.CanSee(target)
+}
+
 // ReconsiderTarget ports Npc.java's AggroList.reconsiderTarget(range), used
 // when this NPC can no longer act on its current target (e.g. an
 // immobilize state): first tries to pick a replacement from its own hate
@@ -138,6 +209,9 @@ func (h *Hostile) karmaTargetVisible(target attackable.Combatant) bool {
 // unwired API the reference itself carries — see acis_golang#977.
 func (h *Hostile) ReconsiderTarget(rangeVal int) (attackable.Combatant, bool) {
 	valid := func(target attackable.Combatant) bool {
+		if h.SiegeGuard() {
+			return h.siegeGuardAutoAttackTargetValid(target)
+		}
 		return h.AutoAttackTargetValid(target, h.Instance.Template.AggroRange, false)
 	}
 	inRange := func(target attackable.Combatant) bool {
