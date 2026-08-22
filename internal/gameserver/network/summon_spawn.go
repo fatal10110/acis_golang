@@ -306,6 +306,15 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 		Effects:     actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers},
 		Caster:      actor,
 	}
+	// Summon.sendPacket forwards every packet to the owner (base
+	// Creature.sendPacket is a no-op), so a summon's failed-skill
+	// ATTACK_FAILED/RESISTED must reach the owner's client; NPC casters
+	// leave OnHitResult unset and stay silent.
+	aiController.OnHitResult = func(result actorcast.EffectResult) {
+		if owner, ok := l.livePlayerByID(actor.OwnerID()); ok {
+			l.sendSkillHandlerResult(owner, result)
+		}
+	}
 	brain.SetCastController(aiController)
 	actor.SetAI(brain)
 	if l.ai != nil {
