@@ -182,6 +182,24 @@ func (a *Attackable) AddDamageHate(attacker attackable.Combatant, damage, hate f
 	a.addAttackDesire(attacker, hate)
 }
 
+// combatAttackDesireWeight is the flat ATTACK desire weight queued for raw
+// combat damage, matching DefaultNpc.tryToAttack's scripted 200
+// (Npc.reduceCurrentHp never routes through addAttackDesire in the
+// reference; nothing there derives desire weight from damage dealt).
+const combatAttackDesireWeight = 200
+
+// AddCombatDamageHate records attacker's combat damage in the physical
+// threat table — accumulating hate there to drive target selection among
+// multiple attackers, unchanged from AddDamageHate — but queues its attack
+// Desire at a flat weight instead of scaling it with the damage dealt.
+func (a *Attackable) AddCombatDamageHate(attacker attackable.Combatant, damage float64) {
+	a.threats.AddDamage(attacker, damage, damage)
+	if attacker == nil || (a.actor.SiegeGuard() && attacker.SiegeGuard()) {
+		return
+	}
+	a.addAttackDesire(attacker, combatAttackDesireWeight)
+}
+
 func (a *Attackable) addAttackDesire(attacker attackable.Combatant, hate float64) {
 	a.desires.AddOrUpdate(&Desire{
 		Kind:        IntentionAttack,
