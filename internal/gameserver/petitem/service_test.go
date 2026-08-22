@@ -18,6 +18,7 @@ type pickupTestOwner struct {
 
 func (o *pickupTestOwner) ObjectID() int32 { return o.id }
 func (o *pickupTestOwner) LevelValue() int { return 1 }
+func (o *pickupTestOwner) InCombat() bool  { return false }
 
 type testIDs struct{ next int32 }
 
