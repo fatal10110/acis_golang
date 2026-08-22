@@ -138,6 +138,7 @@ type Server struct {
 	InventoryUpdates *task.InventoryUpdates
 	ItemInstances    *task.ItemInstances
 	GroundItems      *task.GroundItems
+	ShadowItems      *task.ShadowItems
 	account          string
 	templates        *player.TemplateTable
 	ids              *sequentialIDs
@@ -264,6 +265,28 @@ func (s *Server) FlushGroundItems(tb testing.TB) {
 	}
 }
 
+// shutdownDrainTimeout bounds each final flush Shutdown runs, mirroring the
+// production stop hooks giving their last-chance writes their own budget.
+const shutdownDrainTimeout = 10 * time.Second
+
+// Shutdown drains every pending persistence batch exactly the way the
+// production stop hooks do — pending item mutations through one final
+// ItemInstances save, tracked ground items back into items_on_ground — and
+// then tears the stack down. Restart tests call it on the first Boot cycle
+// so the second Boot restores what the first died holding.
+func (s *Server) Shutdown(tb testing.TB) {
+	tb.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), shutdownDrainTimeout)
+	defer cancel()
+	if err := s.ItemInstances.Save(ctx); err != nil {
+		tb.Fatalf("shutdown item flush: %v", err)
+	}
+	if err := s.groundStore.Save(ctx, s.GroundItems.Snapshots(nil)); err != nil {
+		tb.Fatalf("shutdown ground-item save: %v", err)
+	}
+	s.Close()
+}
+
 // NewObjectID allocates the next object id from the server's id sequence.
 func (s *Server) NewObjectID() int32 {
 	id, err := s.ids.NextID()
@@ -353,17 +376,38 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	t.Cleanup(func() { loginLink.Close() })
 
 	state := world.New()
+	groundStore := gamesql.NewGroundItemStore(db)
 	groundItems := task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour, PlayerDroppedMultiplier: 1}, time.Now)
 	clock := task.NewGameClock(time.Now)
 	playerClock, err := task.NewPlayerClock(clock, state, network.NewPlayerClockEffects(state))
 	if err != nil {
 		t.Fatalf("new player clock: %v", err)
 	}
+	effects := network.NewTaskEffects(state)
+	shadowItems, err := task.NewShadowItems(effects)
+	if err != nil {
+		t.Fatalf("new shadow items: %v", err)
+	}
 	templates := Templates(t)
 	itemTemplates := ItemTemplates()
 	ids := &sequentialIDs{next: 100}
 	inventoryUpdates := task.NewInventoryUpdates()
 	itemInstances := task.NewItemInstances(gamesql.NewItemFlushStore(db), itemTemplates)
+
+	// Restore the ground items the previous session saved at shutdown,
+	// mirroring the production boot: hydrate into world state, then clear
+	// the rows so a crash cannot double-restore them.
+	rows, err := groundStore.Load(context.Background())
+	if err != nil {
+		t.Fatalf("load ground items: %v", err)
+	}
+	if err := groundItems.Load(rows, itemTemplates); err != nil {
+		t.Fatalf("restore ground items: %v", err)
+	}
+	if err := groundStore.Clear(context.Background()); err != nil {
+		t.Fatalf("clear ground items: %v", err)
+	}
+
 	roster := gamemanager.NewRoster(chars, items, shortcuts, templates, itemTemplates, npc.NewTable(nil), ids, gamemanager.DefaultDeleteAfter, time.Now)
 	gcl := network.NewGameClientLink(network.GameClientLinkConfig{
 		Validator:        validator,
@@ -387,11 +431,13 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		PlayerClock:      playerClock,
 		InventoryUpdates: inventoryUpdates,
 		ItemInstances:    itemInstances,
+		ShadowItems:      shadowItems,
 		PlayerConfig:     network.PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, AllowWater: true, PerfectShieldBlockRate: 5},
 		PetConfig:        petmodel.DefaultConfig(),
 		EnchantRoll:      o.enchantRoll,
 		Log:              o.log,
 	})
+	effects.SetShadowItemExpiry(gcl.ExpireShadowItem)
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -473,6 +519,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		InventoryUpdates: inventoryUpdates,
 		ItemInstances:    itemInstances,
 		GroundItems:      groundItems,
+		ShadowItems:      shadowItems,
 		account:          o.account,
 		templates:        templates,
 		ids:              ids,

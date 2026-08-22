@@ -152,6 +152,19 @@ func ItemTemplates() *item.Table {
 			Weapon:       &item.WeaponDetail{Type: item.WeaponSword, SoulshotCount: 1, SpiritshotCount: 1},
 		},
 		{
+			// A time-limited shadow weapon: Duration minutes of mana decay
+			// while equipped (Duration 5 → 300 seconds of initial mana).
+			ID:           7884,
+			Name:         "Shadow Sword",
+			Kind:         item.KindWeapon,
+			Slot:         item.SlotRHand,
+			Duration:     5,
+			Crystal:      item.CrystalD,
+			CrystalCount: 10,
+			Destroyable:  true,
+			Weapon:       &item.WeaponDetail{Type: item.WeaponSword, SoulshotCount: 1, SpiritshotCount: 1},
+		},
+		{
 			ID:        item.CrystalD.ItemID(),
 			Name:      "D-grade Crystal",
 			Kind:      item.KindEtcItem,
