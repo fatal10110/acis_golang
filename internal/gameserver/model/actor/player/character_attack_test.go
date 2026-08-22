@@ -154,6 +154,43 @@ func TestCharacterPhysicalAttackResolvesLethalHit(t *testing.T) {
 	}
 }
 
+// TestCharacterCriticalRateTruncatesBeforeCap pins the boundary from
+// CreatureStatus.getCriticalHit (CreatureStatus.java:551-553):
+// `Math.min((int) calcStat(...), 500)`. The finalized critical rate is
+// truncated to an int before the 500 cap and before the roll comparison in
+// Formulas.java:705-708. At DEX=26 and a weapon rCrit base of 8,
+// AtkCritical finalizes to 8*DEXBonus[26]*10=84.8; truncating first yields
+// the int 84, which a roll of exactly 84 must NOT beat (CritSucceeds
+// requires rate strictly greater than roll). Without truncation the
+// fractional 84.8 would still beat a roll of 84.
+func TestCharacterCriticalRateTruncatesBeforeCap(t *testing.T) {
+	tmpl := combatTemplate()
+	tmpl.DEX = 26
+	items := item.NewTable([]*item.Template{
+		{ID: 1, Kind: item.KindWeapon, Slot: item.SlotRHand, Weapon: &item.WeaponDetail{Type: item.WeaponFist}},
+		{ID: 2, Kind: item.KindWeapon, Slot: item.SlotRHand, Crystal: item.CrystalD, Weapon: &item.WeaponDetail{Type: item.WeaponSword}, Modifiers: []item.StatModifier{
+			{Op: item.FuncSet, Stat: "pAtk", Value: 100},
+			{Op: item.FuncSet, Stat: "pAtkSpd", Value: 433},
+			{Op: item.FuncSet, Stat: "rCrit", Value: 8},
+		}},
+	})
+	attacker := liveCharacter(1, tmpl, items, &item.Instance{
+		ObjectID: 10, TemplateID: 2, Location: item.LocationPaperdoll, LocationData: itemcontainer.RHand,
+	})
+	attacker.SetRollSource(func(int) int { return 84 })
+	defender := liveCharacter(2, tmpl, items)
+	defender.SetHP(100)
+
+	hit := attacker.MakeAttackHit(defender, false)
+
+	if hit.Miss {
+		t.Fatal("MakeAttackHit().Miss = true, want a hit (matched accuracy/evasion beats roll 84)")
+	}
+	if hit.Crit {
+		t.Fatal("MakeAttackHit().Crit = true, want false: truncated critical rate 84 must not beat roll 84")
+	}
+}
+
 // fakeLineOfSight is a LineOfSight double that records the query it
 // received and returns a fixed result.
 type fakeLineOfSight struct {
