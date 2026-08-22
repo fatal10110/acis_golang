@@ -87,6 +87,7 @@ func liveCharacter(id int32, tmpl *Template, items *item.Table, equipped ...*ite
 	c.SetResourceValues(Resources{MaxHP: 100, CurrentHP: 100, MaxMP: 30, CurrentMP: 30})
 	c.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventory(c.ID, items, equipped))
 	c.SetRollSource(zeroRoll)
+	c.SetPerfectShieldBlockRate(5)
 	return c
 }
 

@@ -51,6 +51,7 @@ func TestProvideGameClientLinkUsesGameDataSkillTrees(t *testing.T) {
 			func() respawnRestoreHP { return 0.7 },
 			func() playerSpawnProtection { return 0 },
 			func() deathPenaltyChance { return 20 },
+			func() perfectShieldBlockRate { return 5 },
 			func() skillEnchantSPBookNeeded { return true },
 			func() autoLearnSkills { return false },
 			func() weightLimitMultiplier { return 1 },
