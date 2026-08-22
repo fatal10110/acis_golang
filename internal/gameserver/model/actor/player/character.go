@@ -107,6 +107,8 @@ type Character struct {
 	broadcastStance           func(Stance)
 	broadcastFakeDeathRevive  func()
 	updateAbnormalEffect      func()
+	abnormalEffectMask        atomic.Int32
+	broadcastAbnormalEffect   func()
 	broadcastFlight           func(location.Location, modelskill.Flight)
 	broadcastPosition         func()
 	updateWeightPenalty       func()

@@ -223,7 +223,7 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) error {
 	}
 
 	w.WriteUint8(0) // in party-match room: party matching is not modeled
-	w.WriteInt32(0) // abnormal effect mask: status effects are not modeled
+	w.WriteInt32(int32(c.AbnormalEffect()))
 	w.WriteUint8(0)
 	w.WriteInt32(0)  // clan privileges: clans are not modeled
 	w.WriteUint16(0) // recommendations left: recommendations are not modeled
