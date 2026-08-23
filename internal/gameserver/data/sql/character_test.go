@@ -74,10 +74,11 @@ func TestCharacterStoreSavePersistsFullStats(t *testing.T) {
 	store := NewCharacterStore(db)
 
 	c := &player.Character{
-		ID:        0x10000001,
-		CharLevel: 5,
-		Exp:       12345,
-		SP:        67,
+		ID:             0x10000001,
+		CharLevel:      5,
+		Exp:            12345,
+		ExpBeforeDeath: 15000,
+		SP:             67,
 	}
 	c.SetResourceValues(player.Resources{
 		MaxHP: 200, CurrentHP: 150,
@@ -93,10 +94,10 @@ func TestCharacterStoreSavePersistsFullStats(t *testing.T) {
 		t.Fatalf("Save() error = %v", err)
 	}
 
-	if !strings.Contains(rec.query, "SET level = ?, maxHp = ?, curHp = ?, maxCp = ?, curCp = ?, maxMp = ?, curMp = ?, exp = ?, sp = ?, karma = ?, pvpkills = ?, pkkills = ?, death_penalty_level = ?") {
+	if !strings.Contains(rec.query, "SET level = ?, maxHp = ?, curHp = ?, maxCp = ?, curCp = ?, maxMp = ?, curMp = ?, exp = ?, expBeforeDeath = ?, sp = ?, karma = ?, pvpkills = ?, pkkills = ?, death_penalty_level = ?") {
 		t.Fatalf("Save() query = %q, missing full-stat columns", rec.query)
 	}
-	want := []any{int64(5), 200.0, 150.0, 90.0, 45.0, 70.0, 60.0, int64(12345), int64(67), int64(240), int64(3), int64(1), int64(4), int64(0x10000001)}
+	want := []any{int64(5), 200.0, 150.0, 90.0, 45.0, 70.0, 60.0, int64(12345), int64(15000), int64(67), int64(240), int64(3), int64(1), int64(4), int64(0x10000001)}
 	if len(rec.args) != len(want) {
 		t.Fatalf("Save() args = %#v, want %d args", rec.args, len(want))
 	}
@@ -139,7 +140,7 @@ func TestScanCharacterReadsHeroFlag(t *testing.T) {
 		1, 80.0, 80.0, 32.0, 32.0, 30.0, 30.0,
 		1, 2, 3, byte(player.SexMale),
 		32768, -56733, -113459, -690,
-		int64(0), 0, 0, 0, 0, 0,
+		int64(0), int64(9999), 0, 0, 0, 0, 0,
 		int(player.RaceHuman), 0, 0,
 		int64(0), "", 0, 1, int64(0),
 		0,
@@ -150,6 +151,9 @@ func TestScanCharacterReadsHeroFlag(t *testing.T) {
 	if !c.IsHero() {
 		t.Fatal("scanCharacter() returned non-hero for hero = 1")
 	}
+	if c.ExpBeforeDeath != 9999 {
+		t.Fatalf("scanCharacter() ExpBeforeDeath = %d, want 9999", c.ExpBeforeDeath)
+	}
 }
 
 func TestScanCharacterReadsDeathPenaltyLevel(t *testing.T) {
@@ -158,7 +162,7 @@ func TestScanCharacterReadsDeathPenaltyLevel(t *testing.T) {
 		1, 80.0, 80.0, 32.0, 32.0, 30.0, 30.0,
 		1, 2, 3, byte(player.SexMale),
 		32768, -56733, -113459, -690,
-		int64(0), 0, 0, 0, 0, 0,
+		int64(0), int64(0), 0, 0, 0, 0, 0,
 		int(player.RaceHuman), 0, 0,
 		int64(0), "", 0, 0, int64(0),
 		7,

@@ -26,7 +26,7 @@ const characterColumns = `obj_Id, account_name, char_name,
 	COALESCE(maxCp,0), COALESCE(curCp,0), COALESCE(maxMp,0), COALESCE(curMp,0),
 	COALESCE(face,0), COALESCE(hairStyle,0), COALESCE(hairColor,0), COALESCE(sex,0),
 	COALESCE(heading,0), COALESCE(x,0), COALESCE(y,0), COALESCE(z,0),
-	exp, sp, COALESCE(karma,0), COALESCE(pvpkills,0), COALESCE(pkkills,0), COALESCE(clanid,0),
+	exp, COALESCE(expBeforeDeath,0), sp, COALESCE(karma,0), COALESCE(pvpkills,0), COALESCE(pkkills,0), COALESCE(clanid,0),
 	COALESCE(race,0), COALESCE(classid,0), base_class,
 	COALESCE(deletetime,0), COALESCE(title,''), COALESCE(accesslevel,0), COALESCE(hero,0), COALESCE(lastAccess,0),
 	COALESCE(death_penalty_level,0)`
@@ -62,18 +62,18 @@ func (s *CharacterStore) Create(ctx context.Context, c *player.Character) error 
 	return nil
 }
 
-// Save persists c's full in-memory stats — level, exp, sp, cur/max
-// HP/CP/MP, karma/pvpkills/pkkills, and death_penalty_level — the same
-// column set Create writes at character creation plus the reference's
+// Save persists c's full in-memory stats — level, exp, expBeforeDeath, sp,
+// cur/max HP/CP/MP, karma/pvpkills/pkkills, and death_penalty_level — the
+// same column set Create writes at character creation plus the reference's
 // storeCharBase columns, so a later reload reflects everything gained
 // since the last save instead of the row's creation-time values.
 func (s *CharacterStore) Save(ctx context.Context, c *player.Character) error {
 	resources := c.ResourceValues()
 	_, err := s.db.ExecContext(ctx,
-		`UPDATE characters SET level = ?, maxHp = ?, curHp = ?, maxCp = ?, curCp = ?, maxMp = ?, curMp = ?, exp = ?, sp = ?, karma = ?, pvpkills = ?, pkkills = ?, death_penalty_level = ?
+		`UPDATE characters SET level = ?, maxHp = ?, curHp = ?, maxCp = ?, curCp = ?, maxMp = ?, curMp = ?, exp = ?, expBeforeDeath = ?, sp = ?, karma = ?, pvpkills = ?, pkkills = ?, death_penalty_level = ?
 			 WHERE obj_Id = ?`,
 		c.CharLevel, resources.MaxHP, resources.CurrentHP, resources.MaxCP, resources.CurrentCP, resources.MaxMP, resources.CurrentMP,
-		c.Exp, c.SP, c.KarmaPoints, c.PvPKills, c.PKKills, c.DeathPenaltyLevel(), c.ID,
+		c.Exp, c.ExpBeforeDeath, c.SP, c.KarmaPoints, c.PvPKills, c.PKKills, c.DeathPenaltyLevel(), c.ID,
 	)
 	if err != nil {
 		return fmt.Errorf("save character %d: %w", c.ID, err)
@@ -137,7 +137,7 @@ func scanCharacter(row rowScanner) (*player.Character, error) {
 		&c.CharLevel, &maxHP, &curHP, &maxCP, &curCP, &maxMP, &curMP,
 		&c.Face, &c.HairStyle, &c.HairColor, &sex,
 		&c.LastHeading, &c.Location.X, &c.Location.Y, &c.Location.Z,
-		&c.Exp, &c.SP, &c.KarmaPoints, &c.PvPKills, &c.PKKills, &c.ClanID,
+		&c.Exp, &c.ExpBeforeDeath, &c.SP, &c.KarmaPoints, &c.PvPKills, &c.PKKills, &c.ClanID,
 		&race, &classID, &c.BaseClassID,
 		&c.DeleteAt, &c.Title, &c.AccessLevel, &hero, &c.LastAccess,
 		&deathPenaltyLevel,

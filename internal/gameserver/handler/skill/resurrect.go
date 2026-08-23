@@ -10,6 +10,12 @@ type reviveTarget interface {
 	Revive(percent float64)
 }
 
+// expRestorer is implemented by player targets that track exp lost at
+// death (player.Character.RestoreExp); other revivable targets don't.
+type expRestorer interface {
+	RestoreExp(restorePercent float64)
+}
+
 type resurrectHandler struct{}
 
 func (resurrectHandler) Types() []string { return []string{"RESURRECT"} }
@@ -30,6 +36,12 @@ func (resurrectHandler) Use(cast Cast) {
 		target, ok := obj.(reviveTarget)
 		if !ok {
 			continue
+		}
+		// Player.doRevive(double) restores exp before the HP/MP/CP revive
+		// (Player.java:6008-6012); RestoreExp self-guards on there being an
+		// actual death to restore from.
+		if er, ok := obj.(expRestorer); ok {
+			er.RestoreExp(percent)
 		}
 		target.Revive(percent)
 	}

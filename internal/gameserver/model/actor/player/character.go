@@ -52,6 +52,12 @@ type Character struct {
 	Exp       int64
 	SP        int
 
+	// ExpBeforeDeath is the persisted exp snapshot taken at the last death,
+	// before the death's exp loss was applied (Player.java:2919). A
+	// resurrection effect restores a percentage of the exp lost since then
+	// via RestoreExp, which also clears this back to 0.
+	ExpBeforeDeath int64
+
 	maxHP, curHP float64
 	maxCP, curCP float64
 	maxMP, curMP float64
