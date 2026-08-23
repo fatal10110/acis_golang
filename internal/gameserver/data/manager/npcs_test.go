@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
+	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -111,7 +112,7 @@ func newHarness(t *testing.T, spawns *Spawns, templates *npc.Table) *testHarness
 	ground := &recordingGround{}
 	rewards := KillRewardConfig{Rates: neutralRates, DeepBlueDropRules: true, PlayerLevels: testLevelTable(t)}
 
-	npcs, err := NewNpcs(spawns, templates, staticGeo{}, h.state, ids, decay, respawn, ai, updates, items, ground, rewards, nowFn, zerolog.Nop())
+	npcs, err := NewNpcs(spawns, templates, staticGeo{}, h.state, ids, decay, respawn, ai, updates, items, ground, rewards, nowFn, zerolog.Nop(), nil, actorcast.EffectHandlers{})
 	if err != nil {
 		t.Fatalf("NewNpcs: %v", err)
 	}

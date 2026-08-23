@@ -8,6 +8,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -77,6 +78,14 @@ type Npcs struct {
 	now       func() time.Time
 	log       zerolog.Logger
 
+	// castDefs and castEffects wire a live Hostile's cast.AIController at
+	// spawn (see newLiveHostile). castDefs is nil-checked so a caller with
+	// no skill data loaded (e.g. an existing test harness) still gets a
+	// live Hostile with no AI-cast capability, matching a CastController-
+	// less ai.Attackable's existing "no skills to cast" contract.
+	castDefs    actorcast.Definitions
+	castEffects actorcast.EffectHandlers
+
 	mu   sync.Mutex
 	slot map[string]slotInfo
 	live map[int32]string
@@ -96,7 +105,7 @@ type Npcs struct {
 // NewNpcs walks spawns' loaded table and instantiates every "on start"
 // maker's qualifying entries into state, respecting persisted dead/alive
 // data for database-tracked entries.
-func NewNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.State, ids idAllocator, decay *task.Decay, respawnTask *task.Respawn, ai *task.AI, positions *task.PositionUpdates, items *item.Table, ground groundPlacer, rewards KillRewardConfig, now func() time.Time, log zerolog.Logger) (*Npcs, error) {
+func NewNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.State, ids idAllocator, decay *task.Decay, respawnTask *task.Respawn, ai *task.AI, positions *task.PositionUpdates, items *item.Table, ground groundPlacer, rewards KillRewardConfig, now func() time.Time, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers) (*Npcs, error) {
 	if spawns == nil || spawns.Table() == nil {
 		return nil, fmt.Errorf("npcs: nil spawn table")
 	}
@@ -135,22 +144,24 @@ func NewNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.St
 	}
 
 	n := &Npcs{
-		templates: templates,
-		geo:       geo,
-		state:     state,
-		ids:       ids,
-		decay:     decay,
-		respawn:   respawnTask,
-		ai:        ai,
-		positions: positions,
-		items:     items,
-		ground:    ground,
-		rewards:   rewards,
-		spawns:    spawns,
-		now:       now,
-		log:       log,
-		slot:      make(map[string]slotInfo),
-		live:      make(map[int32]string),
+		templates:   templates,
+		geo:         geo,
+		state:       state,
+		ids:         ids,
+		decay:       decay,
+		respawn:     respawnTask,
+		ai:          ai,
+		positions:   positions,
+		items:       items,
+		ground:      ground,
+		rewards:     rewards,
+		spawns:      spawns,
+		now:         now,
+		log:         log,
+		castDefs:    castDefs,
+		castEffects: castEffects,
+		slot:        make(map[string]slotInfo),
+		live:        make(map[int32]string),
 	}
 
 	for _, maker := range spawns.Table().Makers() {

@@ -1,6 +1,8 @@
 package manager
 
 import (
+	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
+
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
@@ -18,7 +20,7 @@ type statOwnerRef struct{ effect.StatOwner }
 // controller (over the Hostile's lifetime movement state) and a real attack
 // controller, resolving their mutual construction-order dependency on the
 // finished Hostile via locatedRef/creatureActorRef/statOwnerRef.
-func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *task.PositionUpdates, log zerolog.Logger) (*npc.Hostile, error) {
+func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *task.PositionUpdates, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers) (*npc.Hostile, error) {
 	statRef := &statOwnerRef{}
 	live, err := creature.NewLive(inst.Home, speed, geo, statRef)
 	if err != nil {
@@ -49,6 +51,28 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 	locRef.Actor = hostile
 	actorRef.CreatureActor = hostile
 	statRef.StatOwner = hostile
+
+	// Wire the AI-cast seam (issue #1612): a nil castDefs (an existing
+	// harness that hasn't loaded skill data) leaves the AI loop with no
+	// CastController, matching ai.Attackable's existing "no skills to
+	// cast" no-op contract for IntentionCast — the same nil-safe pattern
+	// SummonActor's caller relies on before l.skills is ready.
+	if castDefs != nil {
+		castController := actorcast.NewController(actorcast.HostileActor{Hostile: hostile})
+		castController.SetLogger(log)
+		aiController := &actorcast.AIController{
+			Controller:  castController,
+			Definitions: castDefs,
+			Effects:     castEffects,
+			Caster:      hostile,
+			// OnHitResult is left unset: Creature.sendPacket is a no-op in
+			// the reference for a non-Player, non-Summon-owner caster, so a
+			// hostile-NPC cast's Hit-phase result has no forward target
+			// (matching AIController's own OnHitResult doc, and
+			// summon_spawn.go's Summon-only OnHitResult wiring).
+		}
+		hostile.AI().SetCastController(aiController)
+	}
 
 	// Re-evaluate the AI loop as soon as a chase leg completes or a swing
 	// finishes, rather than waiting for the next fixed AI tick — otherwise
