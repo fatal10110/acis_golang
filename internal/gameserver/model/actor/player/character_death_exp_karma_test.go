@@ -171,3 +171,30 @@ func TestApplyDeathExpKarmaLossSiegeZoneHalvesPercent(t *testing.T) {
 		t.Fatalf("Exp after siege-zone death = %d, want %d", c.Exp, want)
 	}
 }
+
+// TestDieAwardsKillerKarmaBeforeApplyingVictimsOwnDeathPenalty matches the
+// reference's ordering: Playable.doDie (Playable.java:178-183) runs
+// onKillUpdatePvPKarma — the source of awardKillerPKKarma/awardKillerPvPKill
+// — while the victim's karma is still untouched, and only Player.doDie's
+// later applyDeathPenalty call (Player.java:2650) reduces it
+// (updateKarmaLoss, Player.java:2921-2925). Character.Die must therefore run
+// the killer-reward checks before applyDeathExpKarmaLoss, not after: a
+// small-positive-karma victim (3) must still block the "innocent, karma-free
+// victim" PK-karma award even though this same death floors that karma to 0
+// a moment later.
+func TestDieAwardsKillerKarmaBeforeApplyingVictimsOwnDeathPenalty(t *testing.T) {
+	victim := newDeathExpKarmaCharacter(t, 2.0, 10.0)
+	victim.KarmaPoints = 3
+	killer := &Character{ID: 2}
+
+	if !victim.Die(killer) {
+		t.Fatal("Die() = false, want true")
+	}
+
+	if killer.PKKills != 0 || killer.KarmaPoints != 0 {
+		t.Fatalf("killer = (PKKills=%d, KarmaPoints=%d), want (0, 0): PK-karma award must read the victim's pre-penalty karma", killer.PKKills, killer.KarmaPoints)
+	}
+	if victim.KarmaPoints != 0 {
+		t.Fatalf("victim.KarmaPoints after death = %d, want 0 (own death penalty still floors it)", victim.KarmaPoints)
+	}
+}
