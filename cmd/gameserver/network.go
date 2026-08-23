@@ -79,6 +79,8 @@ func provideGameClientLink(
 	autoLearn autoLearnSkills,
 	weightLimit weightLimitMultiplier,
 	karmaTeleport karmaPlayerCanTeleport,
+	delevel allowDelevel,
+	karmaExpLost rateKarmaExpLost,
 	petCfg pet.Config,
 	petStore *gamesql.PetStore,
 	log zerolog.Logger,
@@ -94,6 +96,8 @@ func provideGameClientLink(
 		KarmaPlayerCanTeleport:   bool(karmaTeleport),
 		AwardPKKillPVPPoint:      pvpOptions.AwardPKKillPVPPoint,
 		AllowWater:               cfg.AllowWater,
+		AllowDelevel:             bool(delevel),
+		RateKarmaExpLost:         float64(karmaExpLost),
 	}
 	link := network.NewGameClientLink(network.GameClientLinkConfig{
 		Validator:     validator,

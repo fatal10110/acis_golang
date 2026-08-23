@@ -104,6 +104,12 @@ type PlayerConfig struct {
 	// PerfectShieldBlockRate is the roll threshold (out of 100) below which
 	// a successful shield block upgrades to a perfect block.
 	PerfectShieldBlockRate int
+	// AllowDelevel controls whether a player death may cost experience/karma
+	// at all.
+	AllowDelevel bool
+	// RateKarmaExpLost scales the death exp-loss percentage while the dying
+	// player carries positive karma.
+	RateKarmaExpLost float64
 }
 
 // GameClientLink accepts and drives connections from Interlude game

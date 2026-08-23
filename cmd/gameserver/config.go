@@ -131,6 +131,30 @@ func loadKarmaPlayerCanTeleport(paths gameServerPaths) (karmaPlayerCanTeleport, 
 	return karmaPlayerCanTeleport(config.NewFields(props, "karma player can teleport").Bool("KarmaPlayerCanTeleport", true)), nil
 }
 
+// allowDelevel controls whether a player death may cost experience/karma at
+// all, read from players.properties.
+type allowDelevel bool
+
+func loadAllowDelevel(paths gameServerPaths) (allowDelevel, error) {
+	props, err := config.LoadFile(paths.PlayersConfigPath)
+	if err != nil {
+		return false, err
+	}
+	return allowDelevel(config.NewFields(props, "allow delevel").Bool("AllowDelevel", true)), nil
+}
+
+// rateKarmaExpLost scales the death exp-loss percentage while the dying
+// player carries positive karma, read from server.properties.
+type rateKarmaExpLost float64
+
+func loadRateKarmaExpLost(paths gameServerPaths) (rateKarmaExpLost, error) {
+	props, err := config.LoadFile(paths.ConfigPath)
+	if err != nil {
+		return 0, err
+	}
+	return rateKarmaExpLost(config.NewFields(props, "rate karma exp lost").Float64("RateKarmaExpLost", 1)), nil
+}
+
 func loadPetConfig(paths gameServerPaths) (pet.Config, error) {
 	serverProps, err := config.LoadFile(paths.ConfigPath)
 	if err != nil {

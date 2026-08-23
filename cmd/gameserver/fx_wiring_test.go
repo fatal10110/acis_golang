@@ -56,6 +56,8 @@ func TestProvideGameClientLinkUsesGameDataSkillTrees(t *testing.T) {
 			func() autoLearnSkills { return false },
 			func() weightLimitMultiplier { return 1 },
 			func() karmaPlayerCanTeleport { return true },
+			func() allowDelevel { return true },
+			func() rateKarmaExpLost { return 1 },
 			func() pet.Config { return pet.DefaultConfig() },
 			func() zerolog.Logger { return zerolog.Nop() },
 			provideGameClientLink,
