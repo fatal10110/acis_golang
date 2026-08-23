@@ -30,7 +30,22 @@ func (Geo) Walkable(int, int, int) bool { return true }
 // use: level-1 human fighter stats with the shared acquire-skill grants.
 func Templates(t testing.TB) *player.TemplateTable {
 	t.Helper()
-	tmpl := &player.Template{
+	table, err := player.NewTemplateTable(map[int]*player.Template{
+		0:  ClassTemplate(),
+		1:  fighterLineTemplate(1),
+		2:  fighterLineTemplate(2),
+		88: duelistTemplate(),
+	})
+	if err != nil {
+		t.Fatalf("build template table: %v", err)
+	}
+	return table
+}
+
+// ClassTemplate is the shared human-fighter class template every seeded
+// character selects, usable without a testing context.
+func ClassTemplate() *player.Template {
+	return &player.Template{
 		ID:        0,
 		BaseLevel: 1,
 		HPTable:   []float64{80},
@@ -45,16 +60,6 @@ func Templates(t testing.TB) *player.TemplateTable {
 			{SkillID: 900001, Level: 1, MinLevel: 50, Cost: 0},
 		},
 	}
-	table, err := player.NewTemplateTable(map[int]*player.Template{
-		0:  tmpl,
-		1:  fighterLineTemplate(1),
-		2:  fighterLineTemplate(2),
-		88: duelistTemplate(),
-	})
-	if err != nil {
-		t.Fatalf("build template table: %v", err)
-	}
-	return table
 }
 
 // fighterLineTemplate fills the intermediate warrior-profession templates

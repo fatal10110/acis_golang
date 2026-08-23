@@ -3,6 +3,7 @@ package gameservertest
 import (
 	"testing"
 
+	gamemanager "github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -23,6 +24,14 @@ var hostileNPCSpawn = location.Location{X: 60, Y: 20, Z: 30}
 // (targeting, skill damage) and never need it to act on its own.
 func (s *Server) SpawnHostileNPC(t *testing.T) *npc.Hostile {
 	t.Helper()
+	return s.SpawnHostileNPCAt(t, hostileNPCSpawn)
+}
+
+// SpawnHostileNPCAt seeds the fixture monster at an explicit point, so
+// combat scenarios control attack range. It shares SpawnHostileNPC's
+// construction path.
+func (s *Server) SpawnHostileNPCAt(t *testing.T, at location.Location) *npc.Hostile {
+	t.Helper()
 	tmpl := &npc.Template{
 		ID:              100,
 		TemplateID:      100,
@@ -39,7 +48,7 @@ func (s *Server) SpawnHostileNPC(t *testing.T) *npc.Hostile {
 	if err != nil {
 		t.Fatalf("new npc instance: %v", err)
 	}
-	live, err := creature.NewLive(hostileNPCSpawn, tmpl.RunSpeed, Geo{}, nil)
+	live, err := creature.NewLive(at, tmpl.RunSpeed, Geo{}, nil)
 	if err != nil {
 		t.Fatalf("new npc live: %v", err)
 	}
@@ -48,7 +57,10 @@ func (s *Server) SpawnHostileNPC(t *testing.T) *npc.Hostile {
 		t.Fatalf("new hostile npc: %v", err)
 	}
 	hostile.SetFrameBuilder(serverpackets.NpcFrameBuilder{})
-	s.State.Spawn(hostile, hostileNPCSpawn.X, hostileNPCSpawn.Y, hostileNPCSpawn.Z, 0)
+	hostile.SetWorld(s.State)
+	hostile.SetRewarder(gamemanager.NewHostileRewarder(hostile, tmpl, s.State,
+		gamemanager.KillRewardConfig{PlayerLevels: s.levelTable}, s.itemTable))
+	s.State.Spawn(hostile, at.X, at.Y, at.Z, 0)
 	return hostile
 }
 

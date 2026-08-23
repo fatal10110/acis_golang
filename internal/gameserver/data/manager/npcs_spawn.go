@@ -4,10 +4,13 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 func isOnStartMaker(maker *spawn.Maker) bool {
@@ -177,6 +180,24 @@ func (n *Npcs) rewarderFor(hostile *npc.Hostile, tmpl *npc.Template) *deathRewar
 		ids:        n.ids,
 		items:      n.items,
 		ground:     n.ground,
+	}
+}
+
+// NewHostileRewarder builds the production kill-reward hook for a hostile
+// spawned outside the spawn table — the behavior-test boot uses it so kills
+// pay real experience/SP through the same death chain. Drop categories come
+// from the template and corpse-decay scheduling from its CorpseTime, so a
+// caller whose templates declare neither never reaches the decay, drop-id,
+// or ground-placement hooks this simplified signature leaves out.
+func NewHostileRewarder(hostile *npc.Hostile, tmpl *npc.Template, state *world.State, config KillRewardConfig, items *item.Table) creature.Rewarder {
+	return &deathRewards{
+		hostile:    hostile,
+		state:      state,
+		tmpl:       tmpl,
+		categories: tmpl.Drops,
+		config:     config,
+		raid:       tmpl.Type == "RaidBoss",
+		items:      items,
 	}
 }
 

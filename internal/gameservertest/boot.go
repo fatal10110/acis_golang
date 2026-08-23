@@ -26,6 +26,8 @@ import (
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/restart"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
@@ -54,6 +56,10 @@ type options struct {
 	crests                 *datacache.Crests
 	cursedWeapons          []*entity.CursedWeaponTable
 	karmaPlayerCanTeleport bool
+	restarts               *restart.Table
+	spawnProtection        time.Duration
+	allowDelevel           bool
+	rateKarmaExpLost       float64
 	seed                   func(*gamesql.CharacterStore, *gamesql.ItemStore)
 	seedShortcuts          func(*gamesql.ShortcutStore)
 	wantChars              int
@@ -96,6 +102,31 @@ func WithCursedWeapons(tables ...*entity.CursedWeaponTable) Option {
 // (default true).
 func WithKarmaTeleport(allowed bool) Option {
 	return func(o *options) { o.karmaPlayerCanTeleport = allowed }
+}
+
+// WithRestartPoints supplies the restart-point table wired into the link
+// (default: none, so restart requests answer ActionFailed).
+func WithRestartPoints(table *restart.Table) Option {
+	return func(o *options) { o.restarts = table }
+}
+
+// WithSpawnProtection sets the players.properties SpawnProtection window
+// activated on teleport completion (default: disabled).
+func WithSpawnProtection(window time.Duration) Option {
+	return func(o *options) { o.spawnProtection = window }
+}
+
+// WithAllowDelevel sets the players.properties AllowDelevel gate: whether a
+// death may cost experience/karma (default false).
+func WithAllowDelevel(allow bool) Option {
+	return func(o *options) { o.allowDelevel = allow }
+}
+
+// WithRateKarmaExpLost sets the server.properties RateKarmaExpLost
+// multiplier applied to the death exp-loss percentage while karma is
+// positive (default 1).
+func WithRateKarmaExpLost(rate float64) Option {
+	return func(o *options) { o.rateKarmaExpLost = rate }
 }
 
 // WithSeed inserts rows through the real SQL stores before the client dials.
@@ -157,6 +188,8 @@ type Server struct {
 	ShadowItems      *task.ShadowItems
 	account          string
 	templates        *player.TemplateTable
+	itemTable        *item.Table
+	levelTable       *player.LevelTable
 	ids              *sequentialIDs
 	addr             net.Addr
 	sessions         *manager.SessionStore
@@ -459,7 +492,8 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		InventoryUpdates: inventoryUpdates,
 		ItemInstances:    itemInstances,
 		ShadowItems:      shadowItems,
-		PlayerConfig:     network.PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, AllowWater: true, PerfectShieldBlockRate: 5},
+		PlayerConfig:     network.PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, AllowWater: true, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost},
+		Restarts:         o.restarts,
 		PetConfig:        petmodel.DefaultConfig(),
 		EnchantRoll:      o.enchantRoll,
 		SkillEnchantRoll: o.skillEnchantRoll,
@@ -540,6 +574,8 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	return &Server{
 		Client:           c,
 		State:            state,
+		itemTable:        itemTemplates,
+		levelTable:       levels,
 		DB:               db,
 		Chars:            chars,
 		Items:            items,
