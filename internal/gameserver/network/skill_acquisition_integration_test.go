@@ -79,6 +79,21 @@ func TestAcquireSkillInfoIncludesSpellbookRequirement(t *testing.T) {
 	}
 }
 
+// TestAcquireSkillInfoRejectedGeneralOfferIsSilent verifies that requesting
+// info for a general offer the trainer does not have (wrong level here)
+// sends no frame at all, matching RequestAcquireSkillInfo.java:56-79 (case
+// 0), which returns on rejected preconditions with no alternative packet.
+func TestAcquireSkillInfoRejectedGeneralOfferIsSilent(t *testing.T) {
+	store := newMemorySkillSaveStore()
+	skills := skillstate.NewPersistence(store, modelskill.NewTable([]modelskill.Definition{
+		{ID: 3, Level: 1, Activation: modelskill.ActivationActive},
+	}), store)
+	c := newAcquireSkillClient(t, skills, testBookPolicy(t), nil, 50, nil)
+
+	c.Send(encodeRequestAcquireSkillInfo(3, 2, 0))
+	c.ExpectNoFrame()
+}
+
 // TestAcquireSkillLearnBlockedByMissingSpellbook verifies that learning a
 // spellbook-requiring skill without the book in inventory sends the
 // item-missing system message and the skill list, without learning the skill.
@@ -401,6 +416,17 @@ func TestAcquireFishingSkillInfo(t *testing.T) {
 	if err := r.Err(); err != nil {
 		t.Fatalf("read AcquireSkillInfo: %v", err)
 	}
+}
+
+// TestAcquireSkillInfoRejectedFishingOfferIsSilent verifies that requesting
+// info for a fishing offer the trainer does not have (unknown skill id here)
+// sends no frame, matching RequestAcquireSkillInfo.java:82-99 (case 1), which
+// only sends AcquireSkillInfo when getFishingSkillFor(...) != null.
+func TestAcquireSkillInfoRejectedFishingOfferIsSilent(t *testing.T) {
+	c, _, _ := enterFishingClient(t, fishingTrees(), fishingSkills(t), nil)
+
+	c.Send(encodeRequestAcquireSkillInfo(99999, 1, 1))
+	c.ExpectNoFrame()
 }
 
 // TestLearnFishingSkill verifies consuming the fishing item lets the skill
