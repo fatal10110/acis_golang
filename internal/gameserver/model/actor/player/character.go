@@ -88,6 +88,9 @@ type Character struct {
 	LastAccess int64
 
 	runtimeTemplate           *Template
+	levelTable                *LevelTable
+	allowDelevel              bool
+	rateKarmaExpLost          float64
 	inventory                 *itemcontainer.Inventory
 	world                     *world.State
 	los                       LineOfSight
