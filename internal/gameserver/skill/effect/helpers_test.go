@@ -281,3 +281,39 @@ func hasEffectInList(list *List, e *Effect) bool {
 	}
 	return false
 }
+type growEffectTarget struct {
+	events []string
+	radius float64
+}
+
+func (t *growEffectTarget) ObjectID() int32 { return 0 }
+
+func (t *growEffectTarget) Dead() bool { return false }
+
+func (t *growEffectTarget) CollisionRadius() float64 { return t.radius }
+
+func (t *growEffectTarget) SetCollisionRadius(radius float64) {
+	t.radius = radius
+	t.events = append(t.events, fmt.Sprintf("set:%g", radius))
+}
+
+func (t *growEffectTarget) ResetCollisionRadius() {
+	t.events = append(t.events, "reset")
+}
+
+func (t *growEffectTarget) StartAbnormalEffect(mask int) {
+	t.events = append(t.events, fmt.Sprintf("start:%#x", mask))
+}
+
+func (t *growEffectTarget) StopAbnormalEffect(mask int) {
+	t.events = append(t.events, fmt.Sprintf("stop:%#x", mask))
+}
+
+func (t *growEffectTarget) UpdateAbnormalEffect() {
+	t.events = append(t.events, "abnormal")
+}
+
+func (t *growEffectTarget) BroadcastAbnormalEffect() {
+	t.events = append(t.events, "broadcast")
+}
+
