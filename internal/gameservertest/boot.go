@@ -58,6 +58,8 @@ type options struct {
 	karmaPlayerCanTeleport bool
 	restarts               *restart.Table
 	spawnProtection        time.Duration
+	allowDelevel           bool
+	rateKarmaExpLost       float64
 	seed                   func(*gamesql.CharacterStore, *gamesql.ItemStore)
 	seedShortcuts          func(*gamesql.ShortcutStore)
 	wantChars              int
@@ -112,6 +114,19 @@ func WithRestartPoints(table *restart.Table) Option {
 // activated on teleport completion (default: disabled).
 func WithSpawnProtection(window time.Duration) Option {
 	return func(o *options) { o.spawnProtection = window }
+}
+
+// WithAllowDelevel sets the players.properties AllowDelevel gate: whether a
+// death may cost experience/karma (default false).
+func WithAllowDelevel(allow bool) Option {
+	return func(o *options) { o.allowDelevel = allow }
+}
+
+// WithRateKarmaExpLost sets the server.properties RateKarmaExpLost
+// multiplier applied to the death exp-loss percentage while karma is
+// positive (default 1).
+func WithRateKarmaExpLost(rate float64) Option {
+	return func(o *options) { o.rateKarmaExpLost = rate }
 }
 
 // WithSeed inserts rows through the real SQL stores before the client dials.
@@ -477,7 +492,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		InventoryUpdates: inventoryUpdates,
 		ItemInstances:    itemInstances,
 		ShadowItems:      shadowItems,
-		PlayerConfig:     network.PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, AllowWater: true, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection},
+		PlayerConfig:     network.PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, AllowWater: true, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost},
 		Restarts:         o.restarts,
 		PetConfig:        petmodel.DefaultConfig(),
 		EnchantRoll:      o.enchantRoll,
