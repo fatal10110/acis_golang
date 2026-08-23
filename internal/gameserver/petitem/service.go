@@ -214,6 +214,17 @@ func UseItem(pet *summon.Actor, petInv *itemcontainer.Inventory, objectID int32,
 	if ownerDead || pet.Dead() {
 		return UseResult{ItemID: inst.TemplateID}, UseCannotBeUsed
 	}
+
+	st := inst.Snapshot()
+	// RequestPetUseItem.java:40 gates both the equip and consumable-dispatch
+	// branches below on item.getItem().checkCondition(pet, pet, true) for a
+	// not-yet-equipped item. Item.checkCondition (Item.java:455-459) sends
+	// PET_CANNOT_USE_ITEM to the pet's owner on failure rather than staying
+	// silent, so this reuses UsePetCannotUseItem rather than a bare no-op.
+	if !st.Equipped() && !checkUseConditions(pet, tmpl.UseConditions) {
+		return UseResult{ItemID: inst.TemplateID}, UsePetCannotUseItem
+	}
+
 	if !Equippable(tmpl) {
 		if tmpl.EtcItem == nil || tmpl.EtcItem.Handler == "" {
 			return UseResult{}, UsePetCannotUseItem
@@ -227,7 +238,6 @@ func UseItem(pet *summon.Actor, petInv *itemcontainer.Inventory, objectID int32,
 		return UseResult{}, UsePetCannotUseItem
 	}
 
-	st := inst.Snapshot()
 	if st.Equipped() {
 		old := petInv.UnequipSlot(st.LocationData)
 		if old == nil {

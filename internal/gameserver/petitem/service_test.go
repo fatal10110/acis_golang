@@ -366,6 +366,96 @@ func TestGetFromPetLeavesEquipmentUntouchedOnFailedTransfer(t *testing.T) {
 	}
 }
 
+// TestUseItemRejectsConditionFailureOnUnequippedItem covers
+// RequestPetUseItem.java:40's item.getItem().checkCondition(pet, pet, true)
+// gate: an unequipped pet weapon whose template carries a <cond> the pet
+// fails must not equip, matching Item.checkCondition's PET_CANNOT_USE_ITEM
+// side effect on a Summon effector (Item.java:455-459).
+func TestUseItemRejectsConditionFailureOnUnequippedItem(t *testing.T) {
+	templates := item.NewTable([]*item.Template{
+		{ID: 21, Kind: item.KindWeapon, Slot: item.SlotWolf, Dropable: true, Tradable: true, Destroyable: true, Duration: -1,
+			Weapon:        &item.WeaponDetail{Type: item.WeaponPet},
+			UseConditions: []item.UseCondition{{Root: item.Condition{Kind: "player", Attrs: map[string]string{"level": "50"}}}}},
+	})
+	petInv := itemcontainer.NewPetInventory(2, templates)
+	pet := summon.NewPet(summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv, Level: 10})
+	weapon := petInv.AddNew(21, 1, 700)
+	petInv.DrainUpdates()
+
+	res, failure := UseItem(pet, petInv, weapon.ObjectID, false)
+	if failure != UsePetCannotUseItem || res.ItemID != 21 {
+		t.Fatalf("UseItem = (%+v, %v), want UsePetCannotUseItem for level-gated weapon on an under-level pet", res, failure)
+	}
+	if weapon.Location == item.LocationPetEquip {
+		t.Fatalf("weapon = %+v, want left unequipped after condition failure", weapon)
+	}
+}
+
+// TestUseItemAllowsConditionSuccessOnUnequippedItem covers the passing side
+// of the same gate: a pet meeting the level condition still equips normally.
+func TestUseItemAllowsConditionSuccessOnUnequippedItem(t *testing.T) {
+	templates := item.NewTable([]*item.Template{
+		{ID: 21, Kind: item.KindWeapon, Slot: item.SlotWolf, Dropable: true, Tradable: true, Destroyable: true, Duration: -1,
+			Weapon:        &item.WeaponDetail{Type: item.WeaponPet},
+			UseConditions: []item.UseCondition{{Root: item.Condition{Kind: "player", Attrs: map[string]string{"level": "50"}}}}},
+	})
+	petInv := itemcontainer.NewPetInventory(2, templates)
+	pet := summon.NewPet(summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv, Level: 50})
+	weapon := petInv.AddNew(21, 1, 700)
+	petInv.DrainUpdates()
+
+	res, failure := UseItem(pet, petInv, weapon.ObjectID, false)
+	if failure != UseOK || res.Outcome != Equipped {
+		t.Fatalf("UseItem = (%+v, %v), want equipped for a pet meeting the level condition", res, failure)
+	}
+}
+
+// TestUseItemConditionGateSkipsAlreadyEquippedItem covers the reference's
+// !item.isEquipped() guard: unequipping a currently worn item never runs
+// checkCondition, so an already-equipped item that would now fail its own
+// condition (e.g. the pet fell below the level requirement) still unequips.
+func TestUseItemConditionGateSkipsAlreadyEquippedItem(t *testing.T) {
+	templates := item.NewTable([]*item.Template{
+		{ID: 21, Kind: item.KindWeapon, Slot: item.SlotWolf, Dropable: true, Tradable: true, Destroyable: true, Duration: -1,
+			Weapon:        &item.WeaponDetail{Type: item.WeaponPet},
+			UseConditions: []item.UseCondition{{Root: item.Condition{Kind: "player", Attrs: map[string]string{"level": "50"}}}}},
+	})
+	petInv := itemcontainer.NewPetInventory(2, templates)
+	// The pet is under-level from the start (unlike the equip case, level
+	// never needs to change): the reference's !item.isEquipped() guard skips
+	// checkCondition entirely for the unequip path, so it must never run.
+	pet := summon.NewPet(summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv, Level: 10})
+	weapon := petInv.AddNew(21, 1, 700)
+	tmpl, _ := templates.Get(21)
+	petInv.SetPaperdollItem(itemcontainer.RHand, weapon, tmpl)
+	petInv.DrainUpdates()
+
+	res, failure := UseItem(pet, petInv, weapon.ObjectID, false)
+	if failure != UseOK || res.Outcome != Unequipped {
+		t.Fatalf("UseItem = (%+v, %v), want unequipped without re-checking the condition", res, failure)
+	}
+}
+
+// TestUseItemConditionGateAppliesToConsumableDispatch covers the reference's
+// gate applying to the non-equipment (etc-item) branch too: a food/potion
+// template's failed <cond> must reject before UseConsumable dispatch.
+func TestUseItemConditionGateAppliesToConsumableDispatch(t *testing.T) {
+	templates := item.NewTable([]*item.Template{
+		{ID: 1061, Kind: item.KindEtcItem, Stackable: true, Dropable: true, Tradable: true, Destroyable: true, Duration: -1,
+			EtcItem:       &item.EtcItemDetail{Type: item.EtcItemPotion, Handler: "ItemSkills"},
+			UseConditions: []item.UseCondition{{Root: item.Condition{Kind: "player", Attrs: map[string]string{"level": "50"}}}}},
+	})
+	petInv := itemcontainer.NewPetInventory(2, templates)
+	pet := summon.NewPet(summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv, Level: 10})
+	potion := petInv.AddNew(1061, 1, 700)
+	petInv.DrainUpdates()
+
+	res, failure := UseItem(pet, petInv, potion.ObjectID, false)
+	if failure != UsePetCannotUseItem || res.ItemID != 1061 {
+		t.Fatalf("UseItem = (%+v, %v), want UsePetCannotUseItem for a level-gated potion on an under-level pet", res, failure)
+	}
+}
+
 func testTemplates() *item.Table {
 	return item.NewTable([]*item.Template{
 		{ID: item.AdenaID, Kind: item.KindEtcItem, Stackable: true, Dropable: true, Tradable: true, Destroyable: true, Duration: -1, EtcItem: &item.EtcItemDetail{}},
