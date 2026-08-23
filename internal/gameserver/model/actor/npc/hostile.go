@@ -126,6 +126,10 @@ type Hostile struct {
 	// collisionRadiusOverride is the runtime body-radius override a live
 	// effect (e.g. Grow) installs; nil means "use the template value".
 	collisionRadiusOverride atomic.Pointer[float64]
+
+	// skillMu guards disabledSkills, this NPC's cast reuse-delay state.
+	skillMu        sync.Mutex
+	disabledSkills map[int32]time.Time
 }
 
 // CharacterName returns this NPC's display name for character-name packets.

@@ -45,6 +45,13 @@ func (t *Table) Get(id ID, level int) (Definition, bool) {
 	return d, ok
 }
 
+// Definition returns the definition for ref, satisfying the cast/handler
+// packages' Definitions interface for a non-player caster (e.g. a hostile
+// NPC) that has no per-character skill state to resolve through instead.
+func (t *Table) Definition(ref Ref) (Definition, bool) {
+	return t.Get(ref.ID, ref.Level)
+}
+
 // MaxLevel returns the highest regular (non-enchant) level loaded for id, or
 // 0 if no definition was loaded for it.
 func (t *Table) MaxLevel(id ID) int {
