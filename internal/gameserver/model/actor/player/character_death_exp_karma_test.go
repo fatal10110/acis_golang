@@ -172,6 +172,60 @@ func TestApplyDeathExpKarmaLossSiegeZoneHalvesPercent(t *testing.T) {
 	}
 }
 
+// TestApplyDeathExpKarmaLossSnapshotsExpBeforeDeath matches
+// Player.applyDeathPenalty's `setExpBeforeDeath(getStatus().getExp())`
+// (Player.java:2919): the pre-loss exp is recorded, not the post-loss exp.
+func TestApplyDeathExpKarmaLossSnapshotsExpBeforeDeath(t *testing.T) {
+	c := newDeathExpKarmaCharacter(t, 2.0, 10.0)
+	killer := &Character{ID: 2}
+
+	c.applyDeathExpKarmaLoss(killer)
+
+	if c.ExpBeforeDeath != 1500 {
+		t.Fatalf("ExpBeforeDeath = %d, want 1500 (the pre-loss exp)", c.ExpBeforeDeath)
+	}
+	if c.Exp != 1100 {
+		t.Fatalf("Exp after death = %d, want 1100", c.Exp)
+	}
+}
+
+// TestRestoreExpAddsPercentOfLostExpAndClearsSnapshot matches
+// Player.restoreExp (Player.java:2865-2872).
+func TestRestoreExpAddsPercentOfLostExpAndClearsSnapshot(t *testing.T) {
+	c := newDeathExpKarmaCharacter(t, 2.0, 10.0)
+	killer := &Character{ID: 2}
+	c.applyDeathExpKarmaLoss(killer) // Exp: 1500 -> 1100, ExpBeforeDeath = 1500.
+
+	var gained []int64
+	c.SetExpSpGainNotifier(func(exp int64, sp int) { gained = append(gained, exp) })
+
+	c.RestoreExp(50)
+
+	// restored = round((1500-1100)*50/100) = 200.
+	if want := int64(1300); c.Exp != want {
+		t.Fatalf("Exp after RestoreExp(50) = %d, want %d", c.Exp, want)
+	}
+	if c.ExpBeforeDeath != 0 {
+		t.Fatalf("ExpBeforeDeath after RestoreExp = %d, want 0", c.ExpBeforeDeath)
+	}
+	if len(gained) != 1 || gained[0] != 200 {
+		t.Fatalf("exp-gain notifications = %v, want [200]", gained)
+	}
+}
+
+// TestRestoreExpNoDeathIsNoOp matches restoreExp's
+// `if (getExpBeforeDeath() > 0)` guard (Player.java:2867): a character that
+// never died has nothing to restore.
+func TestRestoreExpNoDeathIsNoOp(t *testing.T) {
+	c := newDeathExpKarmaCharacter(t, 2.0, 10.0)
+
+	c.RestoreExp(100)
+
+	if c.Exp != 1500 {
+		t.Fatalf("Exp after no-op RestoreExp = %d, want unchanged 1500", c.Exp)
+	}
+}
+
 // TestDieAwardsKillerKarmaBeforeApplyingVictimsOwnDeathPenalty matches the
 // reference's ordering: Playable.doDie (Playable.java:178-183) runs
 // onKillUpdatePvPKarma — the source of awardKillerPKKarma/awardKillerPvPKill
