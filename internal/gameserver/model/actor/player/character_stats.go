@@ -663,6 +663,14 @@ func (c *Character) CounterSkillPhysical() float64 {
 	return c.CalcStat(stat.CounterSkillPhysical, 0)
 }
 
+// CancelVulnerability returns c's CANCEL_VULN multiplier for the cancel and
+// cancel-debuff success-rate formulas (Formulas.java:949-951). classification
+// is unused: the reference applies CANCEL_VULN uniformly, without the
+// per-classification switch it uses for the other _VULN stats.
+func (c *Character) CancelVulnerability(_ string) float64 {
+	return c.CalcStat(stat.CancelVuln, 1)
+}
+
 // SkillReflectInput resolves c's reflected-skill chance for def.
 func (c *Character) SkillReflectInput(def modelskill.Definition) formulas.SkillReflectInput {
 	reflectStat := stat.ReflectSkillPhysic
