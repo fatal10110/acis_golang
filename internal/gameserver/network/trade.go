@@ -175,8 +175,15 @@ func (l *GameClientLink) handleTradeDone(ctx context.Context, live *livePlayer, 
 		return
 	}
 	partner, ok := l.livePlayerByID(partnerID)
-	if !ok || !l.validTradeParticipants(live, partner) {
+	if !ok || !l.tradePartnerLive(live, partner) {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetNotFound))
+		return
+	}
+	if !livePlayersInRange(live, partner, tradeInteractionDistance) {
+		// The reference validates the interaction radius on every confirm
+		// and answers an out-of-range confirm by cancelling the whole
+		// trade for both players, not with a per-player error message.
+		l.cancelTradeByID(live.ObjectID())
 		return
 	}
 
