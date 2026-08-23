@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 )
 
 // petFoodsHandler is the etc-item handler name RequestPetUseItem.java
@@ -99,14 +100,11 @@ func (l *GameClientLink) consumePetPotion(live *livePlayer, pet *summon.Actor, p
 // food rate, alerting the owner if the pet is still hungry afterward
 // (PetFoods.java:49-68).
 func (l *GameClientLink) consumePetFood(live *livePlayer, pet *summon.Actor, petInv *itemcontainer.Inventory, inst *item.Instance) {
-	magicID, ok := petFoodMagicIDs[inst.TemplateID]
+	amount, ok := petFoodFeedAmount(l.skills, l.petConfig.FoodRate, inst.TemplateID)
 	if !ok {
 		return
 	}
-	def, ok := l.skills.Definition(modelskill.Ref{ID: modelskill.ID(magicID), Level: 1})
-	if !ok {
-		return
-	}
+	magicID := petFoodMagicIDs[inst.TemplateID]
 	if _, ok := l.inventory.DestroyItem(petInv, inst.ObjectID, 1); !ok {
 		return
 	}
@@ -116,8 +114,26 @@ func (l *GameClientLink) consumePetFood(live *livePlayer, pet *summon.Actor, pet
 		return serverpackets.FrameMagicSkillUse(self, self, magicID, 1, 0, 0, false)
 	})
 
-	_, stillHungry := pet.AddFed(def.Feed * l.petConfig.FoodRate)
+	_, stillHungry := pet.AddFed(amount)
 	if stillHungry {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageYourPetAteALittleButIsStillHungry))
 	}
+}
+
+// petFoodFeedAmount resolves the meal-gauge amount a pet-food item template
+// restores: PetFoods.java's hardcoded item->feed-skill map, scaled by the
+// configured pet food rate (PetFoods.java:63: skill.getFeed() *
+// Config.PET_FOOD_RATE). Used for both the manual "eat from inventory"
+// packet and the auto-feed tick, since both dispatch through the same
+// item handler in the reference.
+func petFoodFeedAmount(skills *skillstate.Persistence, foodRate int, templateID int32) (int, bool) {
+	magicID, ok := petFoodMagicIDs[templateID]
+	if !ok {
+		return 0, false
+	}
+	def, ok := skills.Definition(modelskill.Ref{ID: modelskill.ID(magicID), Level: 1})
+	if !ok {
+		return 0, false
+	}
+	return def.Feed * foodRate, true
 }

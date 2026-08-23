@@ -6,6 +6,7 @@ import (
 
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
@@ -14,6 +15,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
@@ -151,6 +153,74 @@ func TestPetUseItemConsumesFood(t *testing.T) {
 	}
 	if fed := pet.Fed(); fed != 50 {
 		t.Fatalf("fed = %d, want 50 (10 + Feed 40)", fed)
+	}
+}
+
+// TestGameSummonSpawnerWiresAutoFeedRestore is the regression test for
+// #1730: FoodRestore was never set at spawn, so TickPet's auto-feed branch
+// (live_lifecycle.go:130) always added 0 to the meal gauge. It must be
+// wired from the same feed skill PetFoods.java uses for the manual "eat
+// from inventory" path (#1582), since both dispatch through the same item
+// handler in the reference (PetFoods.java:50-70).
+func TestGameSummonSpawnerWiresAutoFeedRestore(t *testing.T) {
+	templates := petConsumableTestTemplates()
+	npcs := npc.NewTable([]*npc.Template{{
+		ID: 12077, Name: "Wolf", Level: 10,
+		Pet: &npc.PetData{
+			Food1:         2515,
+			AutoFeedLimit: 0.55,
+			Levels: map[int]npc.PetLevelStats{
+				10: {MaxHP: 400, MaxMP: 80, MaxMeal: 100, MealInNormal: 0, MealInBattle: 0},
+			},
+		},
+	}})
+	summonItems, err := item.NewSummonItemTable([]item.SummonItem{
+		{ItemID: summonTestCollarTemplateID, NPCID: 12077, SummonType: summonItemTypePet},
+	})
+	if err != nil {
+		t.Fatalf("build summon item table: %v", err)
+	}
+	state := world.New()
+	link := NewGameClientLink(GameClientLinkConfig{
+		World:         state,
+		AI:            task.NewAI(state),
+		NPCs:          npcs,
+		SummonItems:   summonItems,
+		PetStore:      fakePetStoreNoSaved{},
+		IDs:           &fakeSummonIDs{},
+		Skills:        petConsumableTestSkill(t),
+		ItemTemplates: templates,
+	})
+	link.petConfig.FoodRate = 1
+	live := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
+	state.Spawn(live, 0, 0, 0, 0)
+	inst := &item.Instance{ObjectID: 500, TemplateID: summonTestCollarTemplateID, OwnerID: live.ObjectID()}
+
+	if !(&gameSummonSpawner{link: link, live: live}).SpawnPet(live.Character, inst) {
+		t.Fatal("SpawnPet returned false")
+	}
+	obj, ok := state.Summon(live.ObjectID())
+	if !ok {
+		t.Fatal("pet not registered in world.State")
+	}
+	pet := obj.(*summon.Actor)
+	pet.PetInventory().Restore([]*item.Instance{
+		{ObjectID: 900, TemplateID: 2515, Count: 1, Location: item.LocationPet},
+	})
+
+	if fed, _ := pet.AddFed(-90); fed != 10 {
+		t.Fatalf("Fed() after AddFed(-90) = %d, want 10", fed)
+	}
+
+	result := pet.TickPet(state)
+	if !result.AutoFed {
+		t.Fatalf("TickPet result = %+v, want AutoFed", result)
+	}
+	if fed := pet.Fed(); fed != 50 {
+		t.Fatalf("Fed() after auto-feed = %d, want 50 (10 + Feed 40)", fed)
+	}
+	if pet.PetInventory().ItemByObjectID(900) != nil {
+		t.Fatalf("pet inventory retained auto-fed food")
 	}
 }
 

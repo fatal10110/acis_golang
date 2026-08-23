@@ -122,6 +122,15 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 		name = state.Name
 	}
 
+	// food1/food2 restore different amounts: each maps to its own feed
+	// skill (PetFoods.java's hardcoded item->skill map), and those skills'
+	// Feed values differ (e.g. Strider's food vs Clan Hall Strider's food).
+	foodRestore1, _ := petFoodFeedAmount(link.skills, link.petConfig.FoodRate, int32(npcTmpl.Pet.Food1))
+	var foodRestore2 int
+	if npcTmpl.Pet.Food2 != 0 {
+		foodRestore2, _ = petFoodFeedAmount(link.skills, link.petConfig.FoodRate, int32(npcTmpl.Pet.Food2))
+	}
+
 	pet := link.newPet(summon.PetConfig{
 		ObjectID:        objID,
 		Owner:           live,
@@ -145,6 +154,8 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 		MealInBattle:    levelStats.MealInBattle,
 		Food1:           int32(npcTmpl.Pet.Food1),
 		Food2:           int32(npcTmpl.Pet.Food2),
+		FoodRestore1:    foodRestore1,
+		FoodRestore2:    foodRestore2,
 		AutoFeedLimit:   npcTmpl.Pet.AutoFeedLimit,
 		HungryLimit:     npcTmpl.Pet.HungryLimit,
 		UnsummonLimit:   npcTmpl.Pet.UnsummonLimit,
