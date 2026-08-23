@@ -122,12 +122,14 @@ func (a *Actor) TickPet(state *world.State) PetTickResult {
 	result := PetTickResult{Fed: fed}
 	if a.petInventory != nil && petmodel.BelowShare(fed, maxMeal, a.autoFeedLimit) {
 		food := a.petInventory.ItemByTemplateID(a.food1)
+		restore := a.foodRestore1
 		if food == nil && a.food2 != 0 {
 			food = a.petInventory.ItemByTemplateID(a.food2)
+			restore = a.foodRestore2
 		}
 		if food != nil && a.petInventory.DestroyItem(food, 1) != nil {
 			a.statusMu.Lock()
-			a.fed += a.foodRestore
+			a.fed += restore
 			if a.fed > a.maxMeal {
 				a.fed = a.maxMeal
 			}

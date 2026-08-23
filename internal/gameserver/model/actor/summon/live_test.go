@@ -395,7 +395,7 @@ func TestPetTickAutoFeedsFromPetInventory(t *testing.T) {
 		MaxMeal:       100,
 		MealInNormal:  10,
 		Food1:         foodID,
-		FoodRestore:   30,
+		FoodRestore1:  30,
 		AutoFeedLimit: 0.55,
 		HungryLimit:   0.50,
 		UnsummonLimit: 0.40,
