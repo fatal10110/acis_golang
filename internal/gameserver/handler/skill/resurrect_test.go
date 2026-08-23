@@ -19,7 +19,7 @@ type reviveFakeTarget struct {
 	percent float64
 }
 
-func (t *reviveFakeTarget) Revive(percent float64) { t.percent = percent }
+func (t *reviveFakeTarget) Revive(percent float64) bool { t.percent = percent; return true }
 
 // reviveFakeExpTarget additionally implements expRestorer, matching
 // player.Character, to verify Resurrect wires both calls.
