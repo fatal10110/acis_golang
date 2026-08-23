@@ -36,28 +36,12 @@ func sendUseConditionFailure(live *livePlayer, tmpl *item.Template, uc item.UseC
 }
 
 func itemUseConditionHolds(live *livePlayer, cond item.Condition) bool {
-	switch strings.ToLower(cond.Kind) {
-	case "and":
-		for _, child := range cond.Children {
-			if !itemUseConditionHolds(live, child) {
-				return false
-			}
+	return item.EvaluateCondition(cond, func(leaf item.Condition) bool {
+		if strings.ToLower(leaf.Kind) != "player" {
+			return false
 		}
-		return true
-	case "or":
-		for _, child := range cond.Children {
-			if itemUseConditionHolds(live, child) {
-				return true
-			}
-		}
-		return false
-	case "not":
-		return len(cond.Children) == 1 && !itemUseConditionHolds(live, cond.Children[0])
-	case "player":
-		return playerUseConditionHolds(live, cond.Attrs)
-	default:
-		return false
-	}
+		return playerUseConditionHolds(live, leaf.Attrs)
+	})
 }
 
 func playerUseConditionHolds(live *livePlayer, attrs map[string]string) bool {

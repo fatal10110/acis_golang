@@ -21,28 +21,12 @@ func checkUseConditions(pet *summon.Actor, conditions []item.UseCondition) bool 
 }
 
 func petUseConditionHolds(pet *summon.Actor, cond item.Condition) bool {
-	switch strings.ToLower(cond.Kind) {
-	case "and":
-		for _, child := range cond.Children {
-			if !petUseConditionHolds(pet, child) {
-				return false
-			}
+	return item.EvaluateCondition(cond, func(leaf item.Condition) bool {
+		if strings.ToLower(leaf.Kind) != "player" {
+			return false
 		}
-		return true
-	case "or":
-		for _, child := range cond.Children {
-			if petUseConditionHolds(pet, child) {
-				return true
-			}
-		}
-		return false
-	case "not":
-		return len(cond.Children) == 1 && !petUseConditionHolds(pet, cond.Children[0])
-	case "player":
-		return petPlayerConditionHolds(pet, cond.Attrs)
-	default:
-		return false
-	}
+		return petPlayerConditionHolds(pet, leaf.Attrs)
+	})
 }
 
 // petPlayerConditionHolds evaluates a <player> leaf's attrs against pet as
