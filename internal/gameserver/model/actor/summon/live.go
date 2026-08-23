@@ -128,7 +128,13 @@ type Actor struct {
 	mealInBattle  int
 	food1         int32
 	food2         int32
-	foodRestore   int
+	// foodRestore1/foodRestore2 hold the meal gauge each food item
+	// restores on auto-feed: PetFoods.java's feed skill for that item
+	// (skill.getFeed() * PET_FOOD_RATE), since food1 and food2 can map to
+	// different feed skills with different amounts (e.g. Strider's food
+	// vs Clan Hall Strider's food).
+	foodRestore1  int
+	foodRestore2  int
 	autoFeedLimit float64
 	hungryLimit   float64
 	unsummonLimit float64
@@ -258,7 +264,8 @@ type PetConfig struct {
 	MealInBattle  int
 	Food1         int32
 	Food2         int32
-	FoodRestore   int
+	FoodRestore1  int
+	FoodRestore2  int
 	AutoFeedLimit float64
 	HungryLimit   float64
 	UnsummonLimit float64
@@ -355,7 +362,8 @@ func NewPet(cfg PetConfig) *Actor {
 		mealInBattle:  cfg.MealInBattle,
 		food1:         cfg.Food1,
 		food2:         cfg.Food2,
-		foodRestore:   cfg.FoodRestore,
+		foodRestore1:  cfg.FoodRestore1,
+		foodRestore2:  cfg.FoodRestore2,
 		autoFeedLimit: cfg.AutoFeedLimit,
 		hungryLimit:   cfg.HungryLimit,
 		unsummonLimit: cfg.UnsummonLimit,
