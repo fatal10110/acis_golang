@@ -127,6 +127,13 @@ func (pdamHandler) UseResult(cast Cast) Result {
 		if !ok {
 			continue
 		}
+		if in.Evaded {
+			result.Dodges = append(result.Dodges, Dodge{
+				AttackerID: counterattackObjectID(cast.Caster), AttackerName: counterattackName(cast.Caster),
+				DefenderID: counterattackObjectID(target), DefenderName: counterattackName(target),
+			})
+			continue
+		}
 		applyPdamEffects(cast, obj, in.Shield, &result)
 		damage := formulas.PhysicalSkillDamage(in)
 		if damage > 0 {
@@ -139,6 +146,9 @@ func (pdamHandler) UseResult(cast Cast) Result {
 		}
 	}
 	applySelfEffects(cast, cast.Skill)
+	if caster, ok := cast.Caster.(shotCharger); ok {
+		caster.SetChargedShot(modelitem.ShotSoul, cast.Skill.StaticReuse)
+	}
 	return result
 }
 
@@ -235,6 +245,13 @@ func (mdamHandler) UseResult(cast Cast) Result {
 		}
 	}
 	applySelfEffects(cast, cast.Skill)
+	if caster, ok := cast.Caster.(chargedShotUser); ok {
+		kind := modelitem.ShotSpirit
+		if caster.ChargedShot(modelitem.ShotBlessedSpirit) {
+			kind = modelitem.ShotBlessedSpirit
+		}
+		caster.SetChargedShot(kind, cast.Skill.StaticReuse)
+	}
 	return result
 }
 
@@ -287,7 +304,7 @@ func (blowHandler) UseResult(cast Cast) Result {
 	}
 	for _, obj := range cast.Targets {
 		target, ok := obj.(blowDamageTarget)
-		if !ok || target.Dead() {
+		if !ok || alikeDead(target) {
 			continue
 		}
 		in, ok := target.BlowInput(cast.Caster, cast.Skill)

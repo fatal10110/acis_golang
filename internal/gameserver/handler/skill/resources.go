@@ -106,6 +106,7 @@ func (healPercentHandler) Types() []string { return []string{"HEAL_PERCENT", "MA
 func (healPercentHandler) Use(cast Cast) {
 	if skillTypeKey(cast.Skill.SkillType) == "HEAL_PERCENT" {
 		for _, obj := range cast.Targets {
+			applyCastEffects(cast, obj, cast.Skill, cast.Skill.Effects)
 			target, ok := obj.(hpPercentTarget)
 			if !ok || !target.CanBeHealed() {
 				continue
@@ -116,6 +117,7 @@ func (healPercentHandler) Use(cast Cast) {
 	}
 
 	for _, obj := range cast.Targets {
+		applyCastEffects(cast, obj, cast.Skill, cast.Skill.Effects)
 		target, ok := obj.(mpPercentTarget)
 		if !ok || !target.CanBeHealed() {
 			continue
@@ -150,6 +152,7 @@ func (combatPointHealHandler) Types() []string { return []string{"COMBATPOINTHEA
 
 func (combatPointHealHandler) Use(cast Cast) {
 	for _, obj := range cast.Targets {
+		applyCastEffects(cast, obj, cast.Skill, cast.Skill.Effects)
 		target, ok := obj.(cpHealTarget)
 		if !ok || target.Dead() || target.Invulnerable() {
 			continue

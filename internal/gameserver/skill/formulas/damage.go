@@ -92,6 +92,7 @@ type PhysicalSkillInput struct {
 	RaceMul       float64
 	WeaponVulnMul float64
 	PvPMul        float64
+	Evaded        bool
 }
 
 // PhysicalSkillDamage computes a physical skill's damage.
