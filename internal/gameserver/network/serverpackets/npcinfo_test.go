@@ -23,7 +23,7 @@ func TestFrameServerObjectInfo(t *testing.T) {
 	for _, value := range []uint32{1, 0xffffffff, 2, 0xfffffffd, 4} {
 		want = binary.LittleEndian.AppendUint32(want, value)
 	}
-	for _, value := range []float64{1, 1, 5.5, 6.5} {
+	for _, value := range []float64{1, 1.1, 5.5, 6.5} {
 		want = binary.LittleEndian.AppendUint64(want, math.Float64bits(value))
 	}
 	for _, value := range []uint32{70, 100, 1, 0} {
@@ -31,6 +31,14 @@ func TestFrameServerObjectInfo(t *testing.T) {
 	}
 	if !bytes.Equal(got, want) {
 		t.Fatalf("FrameServerObjectInfo() = %x, want %x", got, want)
+	}
+}
+
+func TestFrameNPCInfoWritesAttackSpeedMultiplier(t *testing.T) {
+	payload := framePayload(t, FrameNPCInfo(NPCInfoSnapshot{}))
+	const multiplierOffset = 1 + 18*4
+	if got := math.Float64frombits(binary.LittleEndian.Uint64(payload[multiplierOffset+8:])); got != 1.1 {
+		t.Fatalf("attack speed multiplier = %v, want 1.1", got)
 	}
 }
 
