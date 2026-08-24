@@ -160,9 +160,7 @@ func paralyzeStart(e *Effect) bool {
 
 func paralyzeExit(e *Effect) {
 	stopAbnormalEffect(e.Effected, 0x000400)
-	if target, ok := e.Effected.(thinkTarget); ok {
-		_ = target.Think()
-	}
+	thinkIfNotPlayer(e.Effected)
 }
 
 func petrificationStart(e *Effect) bool {
@@ -176,11 +174,18 @@ func petrificationStart(e *Effect) bool {
 
 func petrificationExit(e *Effect) {
 	stopAbnormalEffect(e.Effected, 0x000800)
-	if target, ok := e.Effected.(thinkTarget); ok {
-		_ = target.Think()
-	}
+	thinkIfNotPlayer(e.Effected)
 	if target, ok := e.Effected.(invulnerabilityTarget); ok {
 		target.SetInvul(false)
+	}
+}
+
+func thinkIfNotPlayer(target Participant) {
+	if player, ok := target.(playerTarget); ok && player.IsPlayer() {
+		return
+	}
+	if target, ok := target.(thinkTarget); ok {
+		_ = target.Think()
 	}
 }
 
