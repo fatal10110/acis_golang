@@ -211,9 +211,8 @@ const (
 )
 
 type kind struct {
-	typ    Type
-	flag   Flag
-	debuff bool
+	typ  Type
+	flag Flag
 	// rejectsIfAffected marks a kind that refuses to be added at all (its
 	// stop-task hook fires instead) when the owner is already affected by
 	// its own Flag bit, from any currently held effect that carries it —
@@ -226,25 +225,25 @@ type kind struct {
 
 var coreKinds = map[string]kind{
 	"Buff":                  {typ: TypeBuff},
-	"Debuff":                {typ: TypeDebuff, debuff: true},
-	"DamOverTime":           {typ: TypeDamOverTime, debuff: true},
+	"Debuff":                {typ: TypeDebuff},
+	"DamOverTime":           {typ: TypeDamOverTime},
 	"ManaDamOverTime":       {typ: TypeManaDamOverTime},
-	"Fear":                  {typ: TypeFear, flag: FlagFear, debuff: true, rejectsIfAffected: true},
-	"Root":                  {typ: TypeRoot, flag: FlagRooted, debuff: true, rejectsIfAffected: true},
-	"Sleep":                 {typ: TypeSleep, flag: FlagSleep, debuff: true, rejectsIfAffected: true},
-	"Stun":                  {typ: TypeStun, flag: FlagStunned, debuff: true, rejectsIfAffected: true},
+	"Fear":                  {typ: TypeFear, flag: FlagFear, rejectsIfAffected: true},
+	"Root":                  {typ: TypeRoot, flag: FlagRooted, rejectsIfAffected: true},
+	"Sleep":                 {typ: TypeSleep, flag: FlagSleep, rejectsIfAffected: true},
+	"Stun":                  {typ: TypeStun, flag: FlagStunned, rejectsIfAffected: true},
 	"AbortCast":             {typ: TypeAbortCast},
 	"ImmobileUntilAttacked": {typ: TypeImmobileUntilAttacked, flag: FlagMeditating},
 	"ImobileBuff":           {typ: TypeImmobilizeEffector},
 	"Invincible":            {typ: TypeInvincible},
 	"ManaHealOverTime":      {typ: TypeManaHealOverTime},
-	"Mute":                  {typ: TypeMute, flag: flagMuted, debuff: true},
+	"Mute":                  {typ: TypeMute, flag: flagMuted},
 	"NoblesseBless":         {typ: TypeNoblesseBless, flag: flagNoblesseBlessing},
-	"Paralyze":              {typ: TypeParalyze, flag: FlagParalyzed, debuff: true},
-	"Petrification":         {typ: TypePetrification, flag: FlagParalyzed, debuff: true},
-	"PhysicalMute":          {typ: TypePhysicalMute, flag: flagPhysicalMuted, debuff: true},
+	"Paralyze":              {typ: TypeParalyze, flag: FlagParalyzed},
+	"Petrification":         {typ: TypePetrification, flag: FlagParalyzed},
+	"PhysicalMute":          {typ: TypePhysicalMute, flag: flagPhysicalMuted},
 	"RemoveTarget":          {typ: TypeRemoveTarget},
-	"SilenceMagicPhysical":  {typ: TypeSilenceAll, flag: flagMuted | flagPhysicalMuted, debuff: true},
+	"SilenceMagicPhysical":  {typ: TypeSilenceAll, flag: flagMuted | flagPhysicalMuted},
 	"SilentMove":            {typ: TypeSilentMove, flag: FlagSilentMove},
 	"StunSelf":              {typ: TypeStunSelf, flag: FlagStunned},
 	"Heal":                  {typ: TypeHeal},
@@ -273,9 +272,9 @@ var coreKinds = map[string]kind{
 	"ImobilePetBuff":        {typ: TypeImmobilizePetBuff},
 	"Distrust":              {typ: TypeDistrust},
 	"Confusion":             {typ: TypeConfusion, flag: FlagConfused},
-	"Betray":                {typ: TypeBetray, flag: FlagBetrayed, debuff: true},
+	"Betray":                {typ: TypeBetray, flag: FlagBetrayed},
 	"RandomizeHate":         {typ: TypeRandomizeHate},
-	"ThrowUp":               {typ: TypeThrowUp, flag: FlagStunned, debuff: true},
+	"ThrowUp":               {typ: TypeThrowUp, flag: FlagStunned},
 	"Grow":                  {typ: TypeGrow},
 	"FakeDeath":             {typ: TypeFakeDeath, flag: FlagFakeDeath},
 	"Seed":                  {typ: TypeSeed},
@@ -378,7 +377,6 @@ func New(skill Skill, tmpl modelskill.EffectTemplate) (*Effect, error) {
 		k.flag = FlagNone
 	}
 
-	skill.Debuff = skill.Debuff || k.debuff
 	// A seed effect's Level is a charge counter (IncreasePower), not the
 	// applied skill level: EffectSeed.java:10 hardcodes _power = 1 at
 	// construction regardless of skill.getLevel().
