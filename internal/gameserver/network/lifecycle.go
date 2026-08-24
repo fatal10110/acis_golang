@@ -52,7 +52,7 @@ func (l *GameClientLink) detachLivePlayer(ctx context.Context, live *livePlayer)
 			}
 		}
 		if l.skills != nil {
-			if err := l.skills.Save(saveCtx, live.Character, true); err != nil {
+			if err := l.skills.Save(saveCtx, live.Character); err != nil {
 				l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("save player skill state")
 			}
 		}
