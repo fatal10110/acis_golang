@@ -95,16 +95,18 @@ type auraHandler struct {
 func (auraHandler) Target() modelskill.Target { return modelskill.TargetAura }
 
 func (h auraHandler) Targets(caster, _ Creature, skill *modelskill.Definition) []Creature {
-	return h.collect(caster, skillRadius(skill), nil)
+	return h.collect(caster, skillRadius(skill), nil, auraCanAffect)
 }
 
 func (auraHandler) FinalTarget(caster, _ Creature, _ *modelskill.Definition) Creature {
 	return caster
 }
 
-func (auraHandler) CanCast(Creature, Creature, *modelskill.Definition, bool) bool { return true }
+func (auraHandler) CanCast(caster, _ Creature, skill *modelskill.Definition, _ bool) bool {
+	return skill == nil || !skill.Offensive || !inPeaceZone(caster)
+}
 
-func (h auraHandler) collect(caster Creature, radius int, keep func(Creature) bool) []Creature {
+func (h auraHandler) collect(caster Creature, radius int, keep func(Creature) bool, canAffect func(Creature, Creature) bool) []Creature {
 	if h.known == nil {
 		return nil
 	}
@@ -116,7 +118,7 @@ func (h auraHandler) collect(caster Creature, radius int, keep func(Creature) bo
 		if keep != nil && !keep(creature) {
 			return
 		}
-		if auraCanAffect(caster, creature) {
+		if canAffect(caster, creature) {
 			out = append(out, creature)
 		}
 	})
@@ -132,15 +134,15 @@ func (frontAuraHandler) Target() modelskill.Target { return modelskill.TargetFro
 func (h frontAuraHandler) Targets(caster, _ Creature, skill *modelskill.Definition) []Creature {
 	return auraHandler{known: h.known}.collect(caster, skillRadius(skill), func(creature Creature) bool {
 		return creatureOrientedLocation(caster).IsInFrontOf(creatureLocation(creature))
-	})
+	}, areaCanAffect)
 }
 
 func (frontAuraHandler) FinalTarget(caster, _ Creature, _ *modelskill.Definition) Creature {
 	return caster
 }
 
-func (frontAuraHandler) CanCast(Creature, Creature, *modelskill.Definition, bool) bool {
-	return true
+func (frontAuraHandler) CanCast(caster, _ Creature, skill *modelskill.Definition, _ bool) bool {
+	return skill == nil || !skill.Offensive || !inPeaceZone(caster)
 }
 
 type behindAuraHandler struct {
@@ -152,15 +154,15 @@ func (behindAuraHandler) Target() modelskill.Target { return modelskill.TargetBe
 func (h behindAuraHandler) Targets(caster, _ Creature, skill *modelskill.Definition) []Creature {
 	return auraHandler{known: h.known}.collect(caster, skillRadius(skill), func(creature Creature) bool {
 		return creatureOrientedLocation(caster).IsBehind(creatureLocation(creature))
-	})
+	}, areaCanAffect)
 }
 
 func (behindAuraHandler) FinalTarget(caster, _ Creature, _ *modelskill.Definition) Creature {
 	return caster
 }
 
-func (behindAuraHandler) CanCast(Creature, Creature, *modelskill.Definition, bool) bool {
-	return true
+func (behindAuraHandler) CanCast(caster, _ Creature, _ *modelskill.Definition, _ bool) bool {
+	return !inPeaceZone(caster)
 }
 
 type auraUndeadHandler struct {
