@@ -42,6 +42,10 @@ func TestControllerDualHitAndCompletionTiming(t *testing.T) {
 	if !ctrl.AttackingNow() || finished != 0 {
 		t.Fatalf("completion before 3*attackTime/4: attacking = %v, finished = %d; want true, 0", ctrl.AttackingNow(), finished)
 	}
+	clock.fire(550 * time.Millisecond)
+	if ctrl.InHitAnimation() {
+		t.Fatal("InHitAnimation() after first dual landing + 300ms = true, want false")
+	}
 	clock.fire(750 * time.Millisecond)
 	if ctrl.AttackingNow() || finished != 1 {
 		t.Fatalf("completion at 3*attackTime/4: attacking = %v, finished = %d; want false, 1", ctrl.AttackingNow(), finished)

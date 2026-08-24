@@ -392,13 +392,9 @@ func (c *Controller) start(weapon item.WeaponType, attackTime time.Duration, hit
 	c.bowCooling = weapon == item.WeaponBow
 	c.inHitAnimation = true
 
-	lastLanding := time.Duration(0)
-	for _, hit := range hits {
-		if hit.delay > lastLanding {
-			lastLanding = hit.delay
-		}
+	if len(hits) > 0 {
+		c.scheduleLocked(hits[0].delay+300*time.Millisecond, func() { c.clearHitAnimation(seq) })
 	}
-	c.scheduleLocked(lastLanding+300*time.Millisecond, func() { c.clearHitAnimation(seq) })
 
 	finishAt := attackTime
 	finish := func() { c.finishAttack(seq) }
