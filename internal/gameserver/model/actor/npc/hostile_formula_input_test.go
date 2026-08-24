@@ -192,6 +192,18 @@ func TestHostileFormulaInputsResolveStatsAndRaceMultiplier(t *testing.T) {
 	}
 }
 
+func TestHostileUndeadMatchesTemplateRace(t *testing.T) {
+	undead := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", Race: RaceUndead})
+	if !undead.Undead() {
+		t.Fatal("undead hostile = false, want true")
+	}
+
+	living := newCombatHostile(t, 2, &Template{ID: 2, Type: "Monster", Race: RaceBeast})
+	if living.Undead() {
+		t.Fatal("living hostile = true, want false")
+	}
+}
+
 func TestHostileSkillReflectInputUsesMagicSpecificStat(t *testing.T) {
 	target := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", Level: 1})
 	refOwner := effect.ModOwnerEffect(&effect.Effect{})
