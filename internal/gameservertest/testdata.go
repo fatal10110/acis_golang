@@ -286,13 +286,49 @@ func ItemTemplates() *item.Table {
 			Weight:    10,
 		},
 		{
-			ID:          91000,
+			ID:          9600,
 			Name:        "Wolf Collar",
 			Kind:        item.KindEtcItem,
 			Duration:    -1,
 			Stackable:   true,
 			Destroyable: true,
 			EtcItem:     &item.EtcItemDetail{Handler: "SummonItems"},
+		},
+		{
+			// The wyvern control item the mount flow uses; the summon-item
+			// table maps it to the wyvern summon type.
+			ID:          9601,
+			Name:        "Wyvern Collar",
+			Kind:        item.KindEtcItem,
+			Duration:    -1,
+			Stackable:   true,
+			Destroyable: true,
+			EtcItem:     &item.EtcItemDetail{Handler: "SummonItems"},
+		},
+		{
+			// A decorative-summon item (Christmas Tree); the summon-item
+			// table maps it to the decorative summon type.
+			ID:          9602,
+			Name:        "Decoration Kit",
+			Kind:        item.KindEtcItem,
+			Duration:    -1,
+			Stackable:   true,
+			Destroyable: true,
+			EtcItem:     &item.EtcItemDetail{Handler: "SummonItems"},
+		},
+		{
+			// Wolf's food, the PetFoods-handler item the pet feeding path
+			// dispatches through its hardcoded feed-skill mapping.
+			ID:             2515,
+			Name:           "Wolf Food",
+			Kind:           item.KindEtcItem,
+			Duration:       -1,
+			Stackable:      true,
+			Dropable:       true,
+			Tradable:       true,
+			Destroyable:    true,
+			EtcItem:        &item.EtcItemDetail{Handler: "PetFoods"},
+			AttachedSkills: []item.SkillRef{{ID: 2048, Level: 1}},
 		},
 	})
 }
