@@ -74,11 +74,13 @@ func TestSingleTargetKindHandlersValidateCastTargets(t *testing.T) {
 	holyThing := &targetActor{id: 2, category: CategoryFolk, holy: true}
 	lockedDoor := &targetActor{id: 3, category: CategoryFolk}
 	unlockableDoor := &targetActor{id: 4, category: CategoryFolk, unlockable: true}
-	undeadMonster := &targetActor{id: 5, category: CategoryAttackable, undead: true}
+	undeadMonster := &targetActor{id: 5, category: CategoryAttackable, undead: true, monster: true}
+	undeadGuard := &targetActor{id: 10, category: CategoryAttackable, undead: true}
 	livingMonster := &targetActor{id: 6, category: CategoryAttackable}
 	deadUndead := &targetActor{id: 7, category: CategoryAttackable, dead: true, undead: true}
 	undeadServitor := &targetActor{id: 8, category: CategoryPlayable, owner: caster, undead: true}
-	registry := NewRegistry(knownList{caster, holyThing, lockedDoor, unlockableDoor, undeadMonster, livingMonster, deadUndead, undeadServitor})
+	undeadPet := &targetActor{id: 9, category: CategoryPlayable, owner: caster, undead: true, pet: true}
+	registry := NewRegistry(knownList{caster, holyThing, lockedDoor, unlockableDoor, undeadMonster, undeadGuard, livingMonster, deadUndead, undeadServitor, undeadPet})
 	skill := &modelskill.Definition{}
 
 	holy := mustHandler(t, registry, modelskill.TargetHoly)
@@ -119,8 +121,14 @@ func TestSingleTargetKindHandlersValidateCastTargets(t *testing.T) {
 	if !undead.CanCast(caster, undeadMonster, skill, false) {
 		t.Fatal("undead CanCast on undead monster = false, want true")
 	}
+	if undead.CanCast(caster, undeadGuard, skill, false) {
+		t.Fatal("undead CanCast on undead non-monster = true, want false")
+	}
 	if !undead.CanCast(caster, undeadServitor, skill, false) {
 		t.Fatal("undead CanCast on undead servitor = false, want true")
+	}
+	if undead.CanCast(caster, undeadPet, skill, false) {
+		t.Fatal("undead CanCast on undead pet = true, want false")
 	}
 	if undead.CanCast(caster, livingMonster, skill, false) {
 		t.Fatal("undead CanCast on living monster = true, want false")

@@ -25,6 +25,11 @@ func (h *Hostile) Attackable() bool { return true }
 // Playable reports whether h is player-controlled.
 func (h *Hostile) Playable() bool { return false }
 
+// Undead reports whether h has the undead NPC race.
+func (h *Hostile) Undead() bool {
+	return h != nil && h.Instance != nil && h.Instance.Template != nil && h.Instance.Template.Race == RaceUndead
+}
+
 // Invul reports whether h is currently invulnerable.
 func (h *Hostile) Invul() bool { return h != nil && h.Live != nil && h.Live.Invul() }
 
