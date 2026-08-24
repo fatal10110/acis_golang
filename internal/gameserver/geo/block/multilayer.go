@@ -86,11 +86,11 @@ func (b *Multilayer) Above(cellX, cellY int, worldZ int32) int {
 }
 
 // Below returns a handle to the first layer below worldZ at the given
-// cell, scanning from the bottommost layer up, or -1 if none qualifies.
+// cell, scanning from the topmost layer down, or -1 if none qualifies.
 func (b *Multilayer) Below(cellX, cellY int, worldZ int32) int {
 	ci := cellIndex(cellX, cellY)
 	layers := b.cells[ci]
-	for i := 0; i < len(layers); i++ {
+	for i := len(layers) - 1; i >= 0; i-- {
 		if int32(layers[i].Height) < worldZ {
 			return ci*layerSlot + i
 		}

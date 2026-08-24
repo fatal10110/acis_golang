@@ -22,6 +22,17 @@ type activePlayerStub struct {
 func (p *activePlayerStub) OnActiveRegion()   { p.activeCalls++ }
 func (p *activePlayerStub) OnInactiveRegion() { p.inactiveCalls++ }
 
+type orderedActivityObserver struct {
+	trackedStub
+	events []string
+}
+
+func (o *orderedActivityObserver) Discover(Tracked) {}
+func (o *orderedActivityObserver) Forget(Tracked)   { o.events = append(o.events, "forget") }
+func (o *orderedActivityObserver) OnInactiveRegion() {
+	o.events = append(o.events, "inactive")
+}
+
 func TestRegionActivatesOnPlayerSpawnAndDeactivatesOnDespawn(t *testing.T) {
 	s := New()
 
@@ -46,6 +57,44 @@ func TestRegionActivatesOnPlayerSpawnAndDeactivatesOnDespawn(t *testing.T) {
 	}
 	if s.RegionActive(p) {
 		t.Fatal("RegionActive(p) = true after despawn, want false (off the grid)")
+	}
+}
+
+func TestRegionDeactivatesOnPlayerDespawnAll(t *testing.T) {
+	s := New()
+
+	p := &playerStub{trackedStub: trackedStub{id: 1}}
+	actor := &activeTrackedStub{trackedStub: trackedStub{id: 2}}
+	s.Spawn(p, 0, 0, 0, 0)
+	s.Spawn(actor, 100, 0, 0, 0)
+	actor.activeCalls = 0
+
+	region, _ := s.RegionAt(0, 0)
+	s.DespawnAll([]Tracked{p})
+
+	if region.Active() {
+		t.Fatal("region stayed active after its only player was bulk-despawned")
+	}
+	if actor.inactiveCalls != 1 {
+		t.Fatalf("inactive calls = %d, want 1", actor.inactiveCalls)
+	}
+}
+
+func TestRegionDespawnAllForgetsBeforeInactive(t *testing.T) {
+	s := New()
+	p := &playerStub{trackedStub: trackedStub{id: 1}}
+	actor := &orderedActivityObserver{trackedStub: trackedStub{id: 2}}
+	s.Spawn(p, 0, 0, 0, 0)
+	s.Spawn(actor, 100, 0, 0, 0)
+	actor.events = nil
+
+	s.DespawnAll([]Tracked{p})
+
+	if got, want := len(actor.events), 2; got != want {
+		t.Fatalf("events = %v, want forget then inactive", actor.events)
+	}
+	if actor.events[0] != "forget" || actor.events[1] != "inactive" {
+		t.Fatalf("events = %v, want [forget inactive]", actor.events)
 	}
 }
 
