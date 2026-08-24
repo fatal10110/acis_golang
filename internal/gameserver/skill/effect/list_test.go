@@ -905,3 +905,16 @@ func TestListRemoveStackedEffectWithoutQueueLeavesVisible(t *testing.T) {
 
 	requireNames(t, list.All(), []string{"stacked"})
 }
+
+func TestListRemoveStackedEffectAbsentFromQueueRemovesVisible(t *testing.T) {
+	list := NewList(nil, WithCancelLesser(false))
+	removed := newEffect("removed", 1, "speed", 1, false)
+	remaining := newEffect("remaining", 2, "speed", 2, false)
+	list.Add(removed)
+	list.Add(remaining)
+
+	list.stacks["speed"] = []*Effect{remaining}
+	list.Remove(removed)
+
+	requireNames(t, list.All(), []string{"remaining"})
+}
