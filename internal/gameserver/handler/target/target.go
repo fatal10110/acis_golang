@@ -81,6 +81,12 @@ type CorpseTarget interface {
 	HasCorpse() bool
 }
 
+// MonsterTarget identifies the Monster-family corpses accepted by harvest and
+// sweep skills.
+type MonsterTarget interface {
+	MonsterKind() bool
+}
+
 // CorpseDeadlineTarget is optionally implemented by mob corpses that expose
 // the decay deadline used for Java's too-old corpse targeting cutoff.
 type CorpseDeadlineTarget interface {

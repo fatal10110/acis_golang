@@ -51,6 +51,9 @@ const (
 	SystemMessageLethalStrike                      = 1667
 	SystemMessageLethalStrikeSuccessful            = 1668
 	SystemMessageInvalidTarget                     = 109
+	SystemMessageSweeperFailedTargetNotSpoiled     = 343
+	SystemMessageHarvestFailedSeedNotSown          = 893
+	SystemMessageCorpseTooOldSkillNotUsed          = 1247
 	SystemMessageCannotDiscardDistanceTooFar       = 151
 	SystemMessageCannotDiscardThisItem             = 98
 	SystemMessageCannotDestroyNumberIncorrect      = 163

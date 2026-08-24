@@ -74,6 +74,11 @@ func hasCorpse(creature Creature) bool {
 	return ok && corpse.HasCorpse()
 }
 
+func monsterKind(creature Creature) bool {
+	monster, ok := creature.(MonsterTarget)
+	return ok && monster.MonsterKind()
+}
+
 func corpseTooOld(creature Creature) bool {
 	target, ok := creature.(CorpseDeadlineTarget)
 	if !ok {
