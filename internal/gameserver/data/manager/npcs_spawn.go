@@ -17,6 +17,9 @@ func isOnStartMaker(maker *spawn.Maker) bool {
 	if maker.Event != "" {
 		return false
 	}
+	if maker.SpawnTime != "" {
+		return false
+	}
 	if v, ok := maker.AIParams["on_start_spawn"]; ok && v == "0" {
 		return false
 	}

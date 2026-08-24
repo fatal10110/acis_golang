@@ -76,25 +76,25 @@ func TestNewBuildsCoreEffectMetadata(t *testing.T) {
 		debuff      bool
 		wantRejects bool
 	}{
-		{"Debuff", TypeDebuff, FlagNone, true, false},
-		{"Stun", TypeStun, FlagStunned, true, true},
-		{"Root", TypeRoot, FlagRooted, true, true},
-		{"Sleep", TypeSleep, FlagSleep, true, true},
-		{"Fear", TypeFear, FlagFear, true, true},
-		{"DamOverTime", TypeDamOverTime, FlagNone, true, false},
+		{"Debuff", TypeDebuff, FlagNone, false, false},
+		{"Stun", TypeStun, FlagStunned, false, true},
+		{"Root", TypeRoot, FlagRooted, false, true},
+		{"Sleep", TypeSleep, FlagSleep, false, true},
+		{"Fear", TypeFear, FlagFear, false, true},
+		{"DamOverTime", TypeDamOverTime, FlagNone, false, false},
 		{"ManaDamOverTime", TypeManaDamOverTime, FlagNone, false, false},
 		{"AbortCast", TypeAbortCast, FlagNone, false, false},
 		{"ImmobileUntilAttacked", TypeImmobileUntilAttacked, FlagMeditating, false, false},
 		{"ImobileBuff", TypeImmobilizeEffector, FlagNone, false, false},
 		{"Invincible", TypeInvincible, FlagNone, false, false},
 		{"ManaHealOverTime", TypeManaHealOverTime, FlagNone, false, false},
-		{"Mute", TypeMute, flagMuted, true, false},
+		{"Mute", TypeMute, flagMuted, false, false},
 		{"NoblesseBless", TypeNoblesseBless, flagNoblesseBlessing, false, false},
-		{"Paralyze", TypeParalyze, FlagParalyzed, true, false},
-		{"Petrification", TypePetrification, FlagParalyzed, true, false},
-		{"PhysicalMute", TypePhysicalMute, flagPhysicalMuted, true, false},
+		{"Paralyze", TypeParalyze, FlagParalyzed, false, false},
+		{"Petrification", TypePetrification, FlagParalyzed, false, false},
+		{"PhysicalMute", TypePhysicalMute, flagPhysicalMuted, false, false},
 		{"RemoveTarget", TypeRemoveTarget, FlagNone, false, false},
-		{"SilenceMagicPhysical", TypeSilenceAll, flagMuted | flagPhysicalMuted, true, false},
+		{"SilenceMagicPhysical", TypeSilenceAll, flagMuted | flagPhysicalMuted, false, false},
 		{"SilentMove", TypeSilentMove, FlagSilentMove, false, false},
 		{"StunSelf", TypeStunSelf, FlagStunned, false, false},
 		{"Heal", TypeHeal, FlagNone, false, false},
@@ -115,7 +115,7 @@ func TestNewBuildsCoreEffectMetadata(t *testing.T) {
 		{"ImobilePetBuff", TypeImmobilizePetBuff, FlagNone, false, false},
 		{"Distrust", TypeDistrust, FlagNone, false, false},
 		{"Confusion", TypeConfusion, FlagConfused, false, false},
-		{"Betray", TypeBetray, FlagBetrayed, true, false},
+		{"Betray", TypeBetray, FlagBetrayed, false, false},
 	}
 
 	for _, tt := range tests {
@@ -140,6 +140,16 @@ func TestNewBuildsCoreEffectMetadata(t *testing.T) {
 				t.Fatal("non-periodic action hook continued")
 			}
 		})
+	}
+}
+
+func TestNewPreservesDatapackDebuffFlag(t *testing.T) {
+	e, err := New(Skill{ID: 1, Debuff: true}, modelskill.EffectTemplate{Name: "Stun"})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	if !e.Skill.Debuff {
+		t.Fatal("Debuff = false, want datapack value preserved")
 	}
 }
 
