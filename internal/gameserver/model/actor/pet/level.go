@@ -6,10 +6,10 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 )
 
-// roundInt64 rounds v to the nearest integer, half away from zero, matching
-// the rounding this package's exp/penalty formulas are specified with.
+// roundInt64 rounds v to the nearest integer with halves toward positive
+// infinity, matching the pet experience formulas.
 func roundInt64(v float64) int64 {
-	return int64(math.Round(v))
+	return int64(math.Floor(v + 0.5))
 }
 
 // ExpForLevel returns the total experience required to reach level
