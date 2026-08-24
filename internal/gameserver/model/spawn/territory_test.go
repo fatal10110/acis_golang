@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/geometry"
 )
 
 func testTerritorySet(name string, minZ, maxZ int) *commons.StatSet {
@@ -72,5 +73,18 @@ func TestTerritoryLiteralWithoutGeometryStaysUsable(t *testing.T) {
 	tr := &Territory{Name: "t", MinZ: -100, MaxZ: 100, Nodes: []Node{{X: 0, Y: 0}, {X: 10, Y: 0}, {X: 0, Y: 10}}}
 	if tr.Name != "t" || tr.MinZ != -100 || tr.MaxZ != 100 || len(tr.Nodes) != 3 {
 		t.Error("literal-constructed Territory lost its field values")
+	}
+	if !tr.Contains(1, 1, 0) {
+		t.Error("literal-constructed Territory does not contain an interior point")
+	}
+	if got, want := tr.Area(), 50.0; got != want {
+		t.Errorf("literal-constructed Territory Area() = %v, want %v", got, want)
+	}
+	other, err := geometry.NewTerritory(-100, 100, geometry.NewRectangle(0, 1, 0, 1))
+	if err != nil {
+		t.Fatalf("NewTerritory: %v", err)
+	}
+	if !tr.Intersects(other) {
+		t.Error("literal-constructed Territory does not intersect an overlapping territory")
 	}
 }
