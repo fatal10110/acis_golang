@@ -112,6 +112,7 @@ func readSkippingEquipNoise(t *testing.T, c *testsupport.ScriptedClient, what st
 func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	t.Helper()
 	want := []byte{
+		serverpackets.OpcodeSendMacroList,
 		serverpackets.OpcodeExtended,
 		serverpackets.OpcodeHennaInfo,
 		serverpackets.OpcodeEtcStatusUpdate,
