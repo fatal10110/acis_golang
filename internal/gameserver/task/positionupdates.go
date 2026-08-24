@@ -19,16 +19,14 @@ const PositionUpdateTick = move.PositionUpdateInterval
 // doing anything else on a reentrant or concurrent Tick call, since Start's
 // caller is the only reliable place that owns the scheduler goroutine.
 type PositionUpdates struct {
-	state *world.State
-	log   zerolog.Logger
+	log zerolog.Logger
 
 	*activeRegistry[int32, move.PositionUpdater]
 }
 
-// NewPositionUpdates returns an empty movement-correction registry. A nil
-// state treats every mover as active.
-func NewPositionUpdates(state *world.State) *PositionUpdates {
-	return &PositionUpdates{state: state, activeRegistry: newActiveRegistry[int32, move.PositionUpdater]()}
+// NewPositionUpdates returns an empty movement-correction registry.
+func NewPositionUpdates(_ *world.State) *PositionUpdates {
+	return &PositionUpdates{activeRegistry: newActiveRegistry[int32, move.PositionUpdater]()}
 }
 
 // Start launches the fixed movement-correction task.
@@ -77,28 +75,6 @@ func (p *PositionUpdates) Tick() {
 	defer p.releaseSnapshot()
 
 	for _, actor := range p.snapshot() {
-		if !p.canUpdate(actor) {
-			continue
-		}
 		actor.PositionUpdate()
 	}
-}
-
-type regionPositionUpdater interface {
-	RegionActor() world.Tracked
-}
-
-func (p *PositionUpdates) canUpdate(actor move.PositionUpdater) bool {
-	if p.state == nil {
-		return true
-	}
-	if tracked, ok := actor.(world.Tracked); ok {
-		return canWorkInRegion(p.state, tracked)
-	}
-	regioned, ok := actor.(regionPositionUpdater)
-	if !ok {
-		return true
-	}
-	tracked := regioned.RegionActor()
-	return tracked == nil || canWorkInRegion(p.state, tracked)
 }

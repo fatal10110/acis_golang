@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/statbonus"
 )
@@ -34,6 +35,17 @@ func TestHostileSkillSuccessInputUsesTemplateStatsAndCasterMagicAttack(t *testin
 	}
 	if want := 1.015; !closeNPCFloat(without.LevelModifier, want) {
 		t.Fatalf("LevelModifier = %v, want %v", without.LevelModifier, want)
+	}
+}
+
+func TestHostileInactiveRegionStopsAllEffects(t *testing.T) {
+	hostile := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster"})
+	hostile.EffectList().Add(&effect.Effect{Skill: effect.Skill{ID: 1}, Template: modelskill.EffectTemplate{Name: "test"}})
+
+	hostile.OnInactiveRegion()
+
+	if got := hostile.EffectList().All(); len(got) != 0 {
+		t.Fatalf("effects after region deactivation = %d, want 0", len(got))
 	}
 }
 
