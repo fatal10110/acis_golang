@@ -157,10 +157,11 @@ func (r *Roster) Create(ctx context.Context, accountName string, req CreateReque
 	if !validCharacterName.MatchString(req.Name) {
 		return nil, CreateInvalidName, nil
 	}
-	if r.npcs != nil {
-		if _, ok := r.npcs.GetByName(req.Name); ok {
-			return nil, CreateInvalidName, nil
-		}
+	if r.npcs == nil {
+		return nil, CreateInvalidName, nil
+	}
+	if _, ok := r.npcs.GetByName(req.Name); ok {
+		return nil, CreateInvalidName, nil
 	}
 
 	count, err := r.characters.CountByAccount(ctx, accountName)
