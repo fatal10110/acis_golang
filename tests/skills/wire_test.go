@@ -125,6 +125,7 @@ func startInWorld(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	t.Helper()
 	want := []byte{
+		serverpackets.OpcodeSendMacroList,
 		serverpackets.OpcodeExtended,
 		serverpackets.OpcodeHennaInfo,
 		serverpackets.OpcodeEtcStatusUpdate,
@@ -148,6 +149,7 @@ func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 func readEnterWorldBurstWithRestoredBuff(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	t.Helper()
 	want := []byte{
+		serverpackets.OpcodeSendMacroList,
 		serverpackets.OpcodeExtended,
 		serverpackets.OpcodeHennaInfo,
 		serverpackets.OpcodeAbnormalStatusUpdate,
