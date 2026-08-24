@@ -199,7 +199,6 @@ func (l *GameClientLink) broadcastPickupAttention(live *livePlayer, ground *grou
 		)
 	}
 	broadcastFrame(frame, func(send func(frameReceiver)) {
-		send(live)
 		l.world.ForEachKnownInRadius(live, pickupAttentionRadius, func(o world.Tracked) {
 			if receiver, ok := o.(frameReceiver); ok {
 				send(receiver)

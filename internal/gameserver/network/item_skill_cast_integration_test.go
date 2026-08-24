@@ -389,8 +389,8 @@ func TestGameClientLinkUseScrollRejectsReuse(t *testing.T) {
 	if id := r.ReadInt32(); id != serverpackets.SystemMessageS1PreparedForReuse {
 		t.Fatalf("reuse SystemMessage id = %d, want S1PreparedForReuse (%d)", id, serverpackets.SystemMessageS1PreparedForReuse)
 	}
-	if reply := c.Read(); reply[0] != serverpackets.OpcodeActionFailed {
-		t.Fatalf("reuse follow-up opcode = %#x, want ActionFailed (%#x)", reply[0], serverpackets.OpcodeActionFailed)
+	if reply := c.ReadWithTimeout(100 * time.Millisecond); reply != nil {
+		t.Fatalf("reuse follow-up frame = %#x, want none", reply[0])
 	}
 
 	if got := live.Inventory().ItemByObjectID(objectID).Snapshot().Count; got != 2 {
