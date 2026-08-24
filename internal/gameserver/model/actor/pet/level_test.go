@@ -23,8 +23,8 @@ func TestExpForLevel(t *testing.T) {
 }
 
 // Expected values below were computed independently from the specified
-// formula (percentLost = -0.07*level + 6.5; round half away from zero), not
-// copied from this package's own implementation.
+// formula (percentLost = -0.07*level + 6.5; Java Math.round), not copied from
+// this package's own implementation.
 func TestDeathPenaltyExpLoss(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -51,6 +51,20 @@ func TestDeathPenaltyExpLoss(t *testing.T) {
 				t.Errorf("DeathPenaltyExpLoss(level=%d) = %d, want %d", tt.level, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestRoundInt64_NegativeHalves(t *testing.T) {
+	for _, tt := range []struct {
+		in   float64
+		want int64
+	}{
+		{-0.5, 0},
+		{-1.5, -1},
+	} {
+		if got := roundInt64(tt.in); got != tt.want {
+			t.Errorf("roundInt64(%v) = %d, want %d", tt.in, got, tt.want)
+		}
 	}
 }
 

@@ -21,9 +21,8 @@ func NextFed(current, consume int) int {
 	return 0
 }
 
-// BelowShare reports whether fed has dropped under share of maxMeal, e.g.
-// share=0.55 tests the auto-feed threshold and share=0.10 the hungry
-// threshold.
+// BelowShare reports whether fed has dropped under a caller-supplied share of
+// maxMeal. Starvation uses 0.10; auto-feed and hungry shares come from pet data.
 func BelowShare(fed, maxMeal int, share float64) bool {
 	return float64(fed) < float64(maxMeal)*share
 }

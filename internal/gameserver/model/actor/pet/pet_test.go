@@ -50,6 +50,9 @@ func TestScaledExpGain(t *testing.T) {
 	if got := ScaledExpGain(12564, 1000, 1.5, 3.0); got != 3000 {
 		t.Errorf("ScaledExpGain(owner-tracking pet) = %d, want 3000", got)
 	}
+	if got := ScaledExpGain(12077, -1, 0.5, 3.0); got != 0 {
+		t.Errorf("ScaledExpGain(negative half) = %d, want 0", got)
+	}
 }
 
 func TestConfigFromPropertiesLoadsPetRatesAndInventoryLimits(t *testing.T) {
