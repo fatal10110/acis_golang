@@ -196,13 +196,22 @@ func (l *GameClientLink) handleTradeDone(ctx context.Context, live *livePlayer, 
 		return
 	}
 
-	first, second, ok := l.tradeParticipants(result.Session)
+	l.settleConfirmedTrade(ctx, result.Session, live.ObjectID())
+}
+
+// settleConfirmedTrade exchanges the offers of a session both sides have
+// confirmed. The reference re-validates at settlement too (TradeList.confirm,
+// both-sides-confirmed branch) and answers a failed re-check by cancelling
+// the whole trade for both players — the same cancel broadcast as everywhere
+// else — not with the exchange-ended finish of a failed transfer.
+func (l *GameClientLink) settleConfirmedTrade(ctx context.Context, session tradebook.Session, confirmerID int32) {
+	first, second, ok := l.tradeParticipants(session)
 	if !ok || !l.validTradeParticipants(first, second) {
-		l.finishTrade(first, second, false)
+		l.cancelTradeByID(confirmerID)
 		return
 	}
 
-	settlement := tradebook.Settle(result.Session, first.Inventory(), second.Inventory(), func(source, receiver *itemcontainer.Inventory, objectID int32, count int) bool {
+	settlement := tradebook.Settle(session, first.Inventory(), second.Inventory(), func(source, receiver *itemcontainer.Inventory, objectID int32, count int) bool {
 		return l.transferTradeInventoryItem(ctx, source, receiver, objectID, count)
 	})
 	failMessage := tradeSettlementMessage(settlement.Status)
