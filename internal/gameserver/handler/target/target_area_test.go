@@ -80,6 +80,40 @@ func TestAuraUndeadTargetsFilterByUndeadSightAndAttackability(t *testing.T) {
 	}
 }
 
+func TestAuraHandlersRejectPeaceZoneCastsLikeJava(t *testing.T) {
+	caster := &targetActor{id: 1, category: CategoryPlayable, peace: true}
+	registry := NewRegistry(knownList{caster})
+
+	for _, target := range []modelskill.Target{modelskill.TargetAura, modelskill.TargetFrontAura} {
+		handler := mustHandler(t, registry, target)
+		if handler.CanCast(caster, nil, &modelskill.Definition{Offensive: true}, false) {
+			t.Fatalf("%s CanCast in peace zone with offensive skill = true, want false", target)
+		}
+		if !handler.CanCast(caster, nil, &modelskill.Definition{}, false) {
+			t.Fatalf("%s CanCast in peace zone with non-offensive skill = false, want true", target)
+		}
+	}
+
+	behind := mustHandler(t, registry, modelskill.TargetBehindAura)
+	if behind.CanCast(caster, nil, &modelskill.Definition{}, false) {
+		t.Fatal("behind aura CanCast in peace zone = true, want false")
+	}
+}
+
+func TestFrontAndBehindAuraDoNotAffectPlayableTargetsForFolkCaster(t *testing.T) {
+	caster := &targetActor{id: 1, category: CategoryFolk, heading: 0}
+	front := &targetActor{id: 2, category: CategoryPlayable, x: 80}
+	behind := &targetActor{id: 3, category: CategoryPlayable, x: -80}
+	registry := NewRegistry(knownList{caster, front, behind})
+
+	if got := ids(mustHandler(t, registry, modelskill.TargetFrontAura).Targets(caster, nil, &modelskill.Definition{Radius: 100})); len(got) != 0 {
+		t.Fatalf("front aura folk targets = %v, want none", got)
+	}
+	if got := ids(mustHandler(t, registry, modelskill.TargetBehindAura).Targets(caster, nil, &modelskill.Definition{Radius: 100})); len(got) != 0 {
+		t.Fatalf("behind aura folk targets = %v, want none", got)
+	}
+}
+
 func TestFrontAndBehindAurasUseCasterHeading(t *testing.T) {
 	caster := &targetActor{id: 1, category: CategoryPlayable, heading: 0}
 	front := &targetActor{id: 2, category: CategoryAttackable, x: 80, attackableWithoutForce: true}
