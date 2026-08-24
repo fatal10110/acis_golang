@@ -151,7 +151,7 @@ func TestPositionUpdatesConcurrentAccess(t *testing.T) {
 	wg.Wait()
 }
 
-func TestPositionUpdatesTickSkipsInactiveRegions(t *testing.T) {
+func TestPositionUpdatesTickRunsInactiveRegions(t *testing.T) {
 	state := world.New()
 	updates := NewPositionUpdates(state)
 	inactive := &positionUpdateActorStub{id: 1, moving: true}
@@ -165,8 +165,8 @@ func TestPositionUpdatesTickSkipsInactiveRegions(t *testing.T) {
 
 	updates.Tick()
 
-	if inactive.ticks != 0 {
-		t.Fatalf("inactive ticks = %d, want 0", inactive.ticks)
+	if inactive.ticks != 1 {
+		t.Fatalf("inactive ticks = %d, want 1", inactive.ticks)
 	}
 	if active.ticks != 1 {
 		t.Fatalf("active ticks = %d, want 1", active.ticks)

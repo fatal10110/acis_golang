@@ -526,6 +526,7 @@ func (h *Hostile) canRunAI() bool {
 
 func (h *Hostile) enterInactiveRegion() {
 	if h.regionInactive.CompareAndSwap(false, true) {
+		h.EffectList().StopAll()
 		h.brain.SetBackToPeace()
 	}
 }
