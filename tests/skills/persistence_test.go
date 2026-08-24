@@ -30,7 +30,7 @@ func TestLearnedSkillSurvivesRelogin(t *testing.T) {
 
 	relogin := srv.DialClient(t, "player1", 1)
 	frames := startInWorld(t, relogin)
-	assertSkillList(t, frames[5], skillListEntry{passive: 0, level: 1, id: 3})
+	assertSkillList(t, frames[6], skillListEntry{passive: 0, level: 1, id: 3})
 	assertKnownSkills(t, srv, objID, map[int]int{3: 1})
 }
 
@@ -89,9 +89,9 @@ func TestLiveBuffAndReusePersistAtLogoutAndRestoreAtLogin(t *testing.T) {
 	}
 
 	// The restored buff is live again: its replay during EnterWorld landed
-	// the AbnormalStatusUpdate burst frame (index 2), and a second logout
+	// the AbnormalStatusUpdate burst frame (index 3), and a second logout
 	// saves it right back — an expired effect would persist nothing.
-	if frame := frames[2]; frame[0] != serverpackets.OpcodeAbnormalStatusUpdate {
+	if frame := frames[3]; frame[0] != serverpackets.OpcodeAbnormalStatusUpdate {
 		t.Fatalf("restored-buff frame opcode = %#x, want AbnormalStatusUpdate", frame[0])
 	}
 	drainUntilQuiet(t, relogin)

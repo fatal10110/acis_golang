@@ -116,6 +116,7 @@ func startInWorld(t *testing.T, c *testsupport.ScriptedClient) {
 func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient) {
 	t.Helper()
 	want := []byte{
+		serverpackets.OpcodeSendMacroList,
 		serverpackets.OpcodeExtended,
 		serverpackets.OpcodeHennaInfo,
 		serverpackets.OpcodeEtcStatusUpdate,
