@@ -1,13 +1,71 @@
 package player
 
 import (
+	"slices"
 	"testing"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
+
+type poleKnownCombatant struct {
+	world.Presence
+	id int32
+}
+
+func (c *poleKnownCombatant) ObjectID() int32  { return c.id }
+func (c *poleKnownCombatant) SiegeGuard() bool { return false }
+func (c *poleKnownCombatant) AlikeDead() bool  { return false }
+
+func TestCharacterPoleAttackConfigAndKnownCombatants(t *testing.T) {
+	c := liveCharacter(1, combatTemplate(), combatItems())
+	live, err := creature.NewLive(location.Location{}, 0, permissiveGeo{}, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.Live = live
+	c.AddStatFuncs([]effect.Mod{
+		{Stat: stat.PowerAttackRange, Op: effect.OpAdd, Value: 25},
+		{Stat: stat.PowerAttackAngle, Op: effect.OpSet, Value: 150},
+		{Stat: stat.AttackCountMax, Op: effect.OpSet, Value: 4},
+	})
+
+	if got := c.PhysicalAttackRange(); got != 65 {
+		t.Fatalf("PhysicalAttackRange() = %d, want stat-finalized 65", got)
+	}
+	if got := c.PoleAttackAngle(); got != 150 {
+		t.Fatalf("PoleAttackAngle() = %d, want 150", got)
+	}
+	if got := c.PoleAttackCountMax(); got != 4 {
+		t.Fatalf("PoleAttackCountMax() = %d, want 4", got)
+	}
+
+	state := world.New()
+	c.SetWorld(state)
+	state.Spawn(c, 0, 0, 0, 0)
+	near := &poleKnownCombatant{id: 2}
+	far := &poleKnownCombatant{id: 3}
+	state.Spawn(near, 50, 0, 0, 0)
+	state.Spawn(far, 150, 0, 0, 0)
+	var known []int32
+	c.ForEachKnownCombatantInRadius(100, func(candidate attackable.Combatant) {
+		known = append(known, candidate.ObjectID())
+	})
+	if !slices.Equal(known, []int32{2}) {
+		t.Fatalf("known combatants in radius = %v, want [2]", known)
+	}
+
+	c.EffectList().Add(&effect.Effect{Skill: effect.Skill{ID: 1}, Type: effect.TypePolearmTargetSingle})
+	if got := c.PoleAttackCountMax(); got != 1 {
+		t.Fatalf("PoleAttackCountMax() with single-target marker = %d, want 1", got)
+	}
+}
 
 func TestCharacterStatFuncsAffectCombatStatsAndCanBeRemoved(t *testing.T) {
 	tmpl := combatTemplate()

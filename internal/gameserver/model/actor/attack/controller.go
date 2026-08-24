@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/rs/zerolog"
 )
@@ -52,6 +53,10 @@ type CreatureActor interface {
 
 	AttackType() item.WeaponType
 	AttackSpeed() int
+	PhysicalAttackRange() int
+	PoleAttackAngle() int
+	PoleAttackCountMax() int
+	ForEachKnownCombatantInRadius(int, func(attackable.Combatant))
 	WeaponReuseDelay() time.Duration
 	WeaponGrade() int
 	SoulshotCharged() bool
@@ -284,18 +289,53 @@ func (c *Controller) DoAttack(target attackable.Combatant) error {
 	case item.WeaponDual, item.WeaponDualFist:
 		hits = []Hit{c.makeHit(target, true), c.makeHit(target, true)}
 		landings = []scheduledHit{
-			{hit: hits[0], delay: attackTime / 4},
-			{hit: hits[1], delay: attackTime * 3 / 4},
+			{hits: hits[:1], delay: attackTime / 4},
+			{hits: hits[1:], delay: attackTime / 2},
 		}
 	case item.WeaponBow:
 		hits = []Hit{c.makeHit(target, false)}
-		landings = []scheduledHit{{hit: hits[0], delay: attackTime}}
+		landings = []scheduledHit{{hits: hits, delay: attackTime}}
 	case item.WeaponPole:
 		hits = []Hit{c.makeHit(target, false)}
-		landings = []scheduledHit{{hit: hits[0], delay: attackTime / 2}}
+		maxTargets := c.actor.PoleAttackCountMax()
+		if maxTargets > 1 {
+			x, y, z := c.actor.Position()
+			origin := location.OrientedLocation{
+				Location: location.Location{X: x, Y: y, Z: z},
+				Heading:  c.actor.Heading(),
+			}
+			angle := c.actor.PoleAttackAngle()
+			primary, primaryIsCreature := target.(skilltarget.Creature)
+			primaryIsPlayable := primaryIsCreature && primary.Category().Has(skilltarget.CategoryPlayable)
+			c.actor.ForEachKnownCombatantInRadius(c.actor.PhysicalAttackRange(), func(candidate attackable.Combatant) {
+				if len(hits) >= maxTargets || candidate.ObjectID() == c.actor.ObjectID() || candidate.ObjectID() == target.ObjectID() {
+					return
+				}
+				creatureTarget, ok := candidate.(skilltarget.Creature)
+				if !ok {
+					return
+				}
+				tx, ty, tz := creatureTarget.Position()
+				if !origin.IsFacing(location.Location{X: tx, Y: ty, Z: tz}, angle) {
+					return
+				}
+				rules, ok := candidate.(skilltarget.AttackRules)
+				if !ok || !rules.AttackableBy(c.actor) {
+					return
+				}
+				if c.playable != nil && creatureTarget.Category().Has(skilltarget.CategoryPlayable) {
+					peace, _ := candidate.(interface{ InPeaceZone() bool })
+					if (peace != nil && peace.InPeaceZone()) || !primaryIsPlayable || !rules.AttackableWithoutForceBy(c.playable) {
+						return
+					}
+				}
+				hits = append(hits, c.makeHit(candidate, false))
+			})
+		}
+		landings = []scheduledHit{{hits: hits, delay: attackTime / 2}}
 	default:
 		hits = []Hit{c.makeHit(target, false)}
-		landings = []scheduledHit{{hit: hits[0], delay: attackTime / 2}}
+		landings = []scheduledHit{{hits: hits, delay: attackTime / 2}}
 	}
 
 	c.start(attackType, attackTime, landings)
@@ -337,7 +377,7 @@ func (c *Controller) makeHit(target attackable.Combatant, split bool) Hit {
 }
 
 type scheduledHit struct {
-	hit   Hit
+	hits  []Hit
 	delay time.Duration
 }
 
@@ -352,21 +392,45 @@ func (c *Controller) start(weapon item.WeaponType, attackTime time.Duration, hit
 	c.bowCooling = weapon == item.WeaponBow
 	c.inHitAnimation = true
 
-	lastLanding := time.Duration(0)
-	for _, hit := range hits {
-		hit := hit
-		if hit.delay > lastLanding {
-			lastLanding = hit.delay
-		}
-		c.scheduleLocked(hit.delay, func() { c.deliverHit(seq, hit.hit) })
+	if len(hits) > 0 {
+		c.scheduleLocked(hits[0].delay+300*time.Millisecond, func() { c.clearHitAnimation(seq) })
 	}
-	c.scheduleLocked(lastLanding+300*time.Millisecond, func() { c.clearHitAnimation(seq) })
 
+	finishAt := attackTime
+	finish := func() { c.finishAttack(seq) }
 	if weapon == item.WeaponBow {
-		c.scheduleLocked(attackTime, func() { c.finishBow(seq) })
+		finish = func() { c.finishBow(seq) }
+	}
+	if weapon == item.WeaponDual || weapon == item.WeaponDualFist {
+		finishAt = attackTime * 3 / 4
+	}
+	if len(hits) == 0 {
+		c.scheduleLocked(finishAt, finish)
 		return
 	}
-	c.scheduleLocked(attackTime, func() { c.finishAttack(seq) })
+	c.scheduleHitLocked(seq, hits, 0, finishAt, finish)
+}
+
+func (c *Controller) scheduleHitLocked(seq uint64, groups []scheduledHit, index int, finishAt time.Duration, finish func()) {
+	group := groups[index]
+	delay := group.delay
+	if index > 0 {
+		delay -= groups[index-1].delay
+	}
+	c.scheduleLocked(delay, func() {
+		c.deliverHits(seq, group.hits)
+
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		if seq != c.attackSeq {
+			return
+		}
+		if index+1 < len(groups) {
+			c.scheduleHitLocked(seq, groups, index+1, finishAt, finish)
+			return
+		}
+		c.scheduleLocked(max(time.Duration(0), finishAt-group.delay), finish)
+	})
 }
 
 func (c *Controller) snapshot(hits []Hit) Snapshot {
@@ -414,14 +478,20 @@ type pvpAttackNotifier interface {
 	NotePvPAttack(any)
 }
 
-func (c *Controller) deliverHit(seq uint64, hit Hit) {
+func (c *Controller) deliverHits(seq uint64, hits []Hit) {
 	c.mu.RLock()
 	active := seq == c.attackSeq
 	c.mu.RUnlock()
-	if !active || hit.Target == nil {
+	if !active || len(hits) == 0 || hits[0].Target == nil || c.actor.AlikeDead() || !c.actor.Knows(hits[0].Target) || hits[0].Target.AlikeDead() {
 		return
 	}
-	if c.actor.AlikeDead() || !c.actor.Knows(hit.Target) || hit.Target.AlikeDead() {
+	for _, hit := range hits {
+		c.deliverHit(hit)
+	}
+}
+
+func (c *Controller) deliverHit(hit Hit) {
+	if hit.Target == nil || !c.actor.Knows(hit.Target) || hit.Target.AlikeDead() {
 		return
 	}
 	if !hit.Miss {
