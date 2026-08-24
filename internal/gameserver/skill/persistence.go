@@ -57,16 +57,12 @@ func NewPersistenceWithClock(store skillSaveStore, skills *modelskill.Table, now
 
 // Save replaces c's persisted skill state with its current active effects and
 // pending reuse timers.
-func (p *Persistence) Save(ctx context.Context, c *player.Character, includeEffects bool) error {
+func (p *Persistence) Save(ctx context.Context, c *player.Character) error {
 	if p == nil || p.store == nil || c == nil {
 		return nil
 	}
 	classIndex := c.SkillSaveClassIndex()
-	var liveEffects []effect.ActiveEffect
-	if includeEffects {
-		liveEffects = p.liveActiveEffects(c)
-	}
-	rows := effect.BuildSaveRows(liveEffects, c.SkillReuseTimers(p.currentTime()), classIndex, includeEffects)
+	rows := effect.BuildSaveRows(p.liveActiveEffects(c), c.SkillReuseTimers(p.currentTime()), classIndex)
 	if err := p.store.Replace(ctx, c.ID, classIndex, rows); err != nil {
 		return fmt.Errorf("save skill state for character %d: %w", c.ID, err)
 	}
