@@ -896,7 +896,9 @@ func TestPickupLiveGroundItemBroadcastsAttentionForWeaponAndArmor(t *testing.T) 
 
 			gcl.pickupLiveGroundItem(context.Background(), picker, ground)
 
-			assertPickupAttentionFrame(t, firstSystemMessageFrame(pickerFrames.Frames()), tc.messageID, picker.Name, tc.enchantLevel, tc.templateID)
+			if frame := firstSystemMessageFrame(pickerFrames.Frames()); frame != nil {
+				t.Fatalf("picker received attention SystemMessage frame: % x", frame)
+			}
 			assertPickupAttentionFrame(t, firstSystemMessageFrame(observerFrames.Frames()), tc.messageID, picker.Name, tc.enchantLevel, tc.templateID)
 			if frame := firstSystemMessageFrame(farFrames.Frames()); frame != nil {
 				t.Fatalf("far observer received attention SystemMessage frame: % x", frame)
