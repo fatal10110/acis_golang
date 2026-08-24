@@ -43,9 +43,10 @@ func TestControllerDualHitAndCompletionTiming(t *testing.T) {
 }
 
 func TestControllerPoleSelectsForwardTargetsUpToCap(t *testing.T) {
-	primary := &timingTarget{id: 2, x: 40, attackable: true}
-	first := &timingTarget{id: 3, x: 50, y: 20, attackable: true}
-	second := &timingTarget{id: 4, x: 60, y: -20, attackable: true}
+	var landed []int32
+	primary := &timingTarget{id: 2, x: 40, attackable: true, landed: &landed}
+	first := &timingTarget{id: 3, x: 50, y: 20, attackable: true, landed: &landed}
+	second := &timingTarget{id: 4, x: 60, y: -20, attackable: true, landed: &landed}
 	beyondCap := &timingTarget{id: 5, x: 70, attackable: true}
 	behind := &timingTarget{id: 6, x: -30, attackable: true}
 	outOfRange := &timingTarget{id: 7, x: 101, attackable: true}
@@ -60,6 +61,10 @@ func TestControllerPoleSelectsForwardTargetsUpToCap(t *testing.T) {
 	clock := &timingClock{}
 	ctrl := NewCreature(actor)
 	ctrl.afterFunc = clock.AfterFunc
+	primary.onDamage = func() {
+		actor.dead = true
+		ctrl.Stop()
+	}
 
 	if err := ctrl.DoAttack(primary); err != nil {
 		t.Fatalf("DoAttack() error: %v", err)
@@ -71,8 +76,17 @@ func TestControllerPoleSelectsForwardTargetsUpToCap(t *testing.T) {
 	if got, want := snapshotTargetIDs(actor.snapshot), []int32{2, 3, 4}; !slices.Equal(got, want) {
 		t.Fatalf("snapshot target IDs = %v, want %v", got, want)
 	}
+	if actor.broadcasts != 1 {
+		t.Fatalf("attack broadcasts = %d, want 1", actor.broadcasts)
+	}
+	if got := clock.count(500 * time.Millisecond); got != 1 {
+		t.Fatalf("timers at attackTime/2 = %d, want one pole group", got)
+	}
 
 	clock.fire(500 * time.Millisecond)
+	if want := []int32{2, 3, 4}; !slices.Equal(landed, want) {
+		t.Fatalf("landing order = %v, want %v", landed, want)
+	}
 	for _, target := range []*timingTarget{primary, first, second} {
 		if target.hits != 1 {
 			t.Errorf("target %d hits at attackTime/2 = %d, want 1", target.id, target.hits)
@@ -136,6 +150,16 @@ func (c *timingClock) fire(delay time.Duration) {
 	}
 }
 
+func (c *timingClock) count(delay time.Duration) int {
+	count := 0
+	for _, timer := range c.timers {
+		if timer.delay == delay {
+			count++
+		}
+	}
+	return count
+}
+
 type timingTimer struct {
 	delay   time.Duration
 	f       func()
@@ -157,11 +181,13 @@ type timingActor struct {
 	known       []attackable.Combatant
 	queryRadius int
 	snapshot    Snapshot
+	broadcasts  int
+	dead        bool
 }
 
 func (a *timingActor) ObjectID() int32                         { return 1 }
 func (a *timingActor) SiegeGuard() bool                        { return false }
-func (a *timingActor) AlikeDead() bool                         { return false }
+func (a *timingActor) AlikeDead() bool                         { return a.dead }
 func (a *timingActor) AttackDisabled() bool                    { return false }
 func (a *timingActor) MovementDisabled() bool                  { return false }
 func (a *timingActor) InAttackRange(attackable.Combatant) bool { return true }
@@ -175,7 +201,7 @@ func (a *timingActor) SoulshotCharged() bool                   { return false }
 func (a *timingActor) SetChargedShot(item.ShotKind, bool)      {}
 func (a *timingActor) Position() (int, int, int)               { return 0, 0, 0 }
 func (a *timingActor) Heading() int                            { return 0 }
-func (a *timingActor) Dead() bool                              { return false }
+func (a *timingActor) Dead() bool                              { return a.dead }
 func (a *timingActor) Category() target.Category               { return target.CategoryAttackable }
 func (a *timingActor) SetHeadingTo(attackable.Combatant)       {}
 
@@ -200,6 +226,7 @@ func (a *timingActor) MakeAttackHit(t attackable.Combatant, _ bool) Hit {
 }
 func (a *timingActor) BroadcastAttack(snapshot Snapshot) error {
 	a.snapshot = snapshot
+	a.broadcasts++
 	return nil
 }
 
@@ -208,6 +235,8 @@ type timingTarget struct {
 	x, y, z    int
 	attackable bool
 	hits       int
+	landed     *[]int32
+	onDamage   func()
 }
 
 func (t *timingTarget) ObjectID() int32  { return t.id }
@@ -225,5 +254,11 @@ func (t *timingTarget) AttackableBy(target.Creature) bool             { return t
 func (t *timingTarget) AttackableWithoutForceBy(target.Creature) bool { return t.attackable }
 func (t *timingTarget) TakeDamage(_ int, _ creature.DeathActor) bool {
 	t.hits++
+	if t.landed != nil {
+		*t.landed = append(*t.landed, t.id)
+	}
+	if t.onDamage != nil {
+		t.onDamage()
+	}
 	return false
 }

@@ -289,12 +289,12 @@ func (c *Controller) DoAttack(target attackable.Combatant) error {
 	case item.WeaponDual, item.WeaponDualFist:
 		hits = []Hit{c.makeHit(target, true), c.makeHit(target, true)}
 		landings = []scheduledHit{
-			{hit: hits[0], delay: attackTime / 4},
-			{hit: hits[1], delay: attackTime / 2},
+			{hits: hits[:1], delay: attackTime / 4},
+			{hits: hits[1:], delay: attackTime / 2},
 		}
 	case item.WeaponBow:
 		hits = []Hit{c.makeHit(target, false)}
-		landings = []scheduledHit{{hit: hits[0], delay: attackTime}}
+		landings = []scheduledHit{{hits: hits, delay: attackTime}}
 	case item.WeaponPole:
 		hits = []Hit{c.makeHit(target, false)}
 		maxTargets := c.actor.PoleAttackCountMax()
@@ -332,13 +332,10 @@ func (c *Controller) DoAttack(target attackable.Combatant) error {
 				hits = append(hits, c.makeHit(candidate, false))
 			})
 		}
-		landings = make([]scheduledHit, 0, len(hits))
-		for _, hit := range hits {
-			landings = append(landings, scheduledHit{hit: hit, delay: attackTime / 2})
-		}
+		landings = []scheduledHit{{hits: hits, delay: attackTime / 2}}
 	default:
 		hits = []Hit{c.makeHit(target, false)}
-		landings = []scheduledHit{{hit: hits[0], delay: attackTime / 2}}
+		landings = []scheduledHit{{hits: hits, delay: attackTime / 2}}
 	}
 
 	c.start(attackType, attackTime, landings)
@@ -380,7 +377,7 @@ func (c *Controller) makeHit(target attackable.Combatant, split bool) Hit {
 }
 
 type scheduledHit struct {
-	hit   Hit
+	hits  []Hit
 	delay time.Duration
 }
 
@@ -401,7 +398,7 @@ func (c *Controller) start(weapon item.WeaponType, attackTime time.Duration, hit
 		if hit.delay > lastLanding {
 			lastLanding = hit.delay
 		}
-		c.scheduleLocked(hit.delay, func() { c.deliverHit(seq, hit.hit) })
+		c.scheduleLocked(hit.delay, func() { c.deliverHits(seq, hit.hits) })
 	}
 	c.scheduleLocked(lastLanding+300*time.Millisecond, func() { c.clearHitAnimation(seq) })
 
@@ -460,14 +457,20 @@ type pvpAttackNotifier interface {
 	NotePvPAttack(any)
 }
 
-func (c *Controller) deliverHit(seq uint64, hit Hit) {
+func (c *Controller) deliverHits(seq uint64, hits []Hit) {
 	c.mu.RLock()
 	active := seq == c.attackSeq
 	c.mu.RUnlock()
-	if !active || hit.Target == nil {
+	if !active || len(hits) == 0 || hits[0].Target == nil || c.actor.AlikeDead() || !c.actor.Knows(hits[0].Target) || hits[0].Target.AlikeDead() {
 		return
 	}
-	if c.actor.AlikeDead() || !c.actor.Knows(hit.Target) || hit.Target.AlikeDead() {
+	for _, hit := range hits {
+		c.deliverHit(hit)
+	}
+}
+
+func (c *Controller) deliverHit(hit Hit) {
+	if hit.Target == nil || !c.actor.Knows(hit.Target) || hit.Target.AlikeDead() {
 		return
 	}
 	if !hit.Miss {
