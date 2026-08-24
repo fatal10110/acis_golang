@@ -62,6 +62,8 @@ type options struct {
 	rateKarmaExpLost       float64
 	seed                   func(*gamesql.CharacterStore, *gamesql.ItemStore)
 	seedShortcuts          func(*gamesql.ShortcutStore)
+	npcs                   *npc.Table
+	summonItems            *item.SummonItemTable
 	wantChars              int
 	enchantRoll            func() float64
 	skillEnchantRoll       func() int
@@ -146,6 +148,17 @@ func WithShortcutSeed(seed func(*gamesql.ShortcutStore)) Option {
 	return func(o *options) { o.seedShortcuts = seed }
 }
 
+// WithNPCs supplies the NPC template table wired into the link (and the
+// roster), so flows that resolve NPC templates — pet collars, decorative
+// summons — have data to resolve.
+func WithNPCs(table *npc.Table) Option { return func(o *options) { o.npcs = table } }
+
+// WithSummonItems supplies the summon-item table wired into the link, so
+// collar-shaped items dispatch through the summon-item use path.
+func WithSummonItems(items *item.SummonItemTable) Option {
+	return func(o *options) { o.summonItems = items }
+}
+
 // WithWantChars asserts how many characters CharSelectInfo reports after the
 // handshake.
 func WithWantChars(n int) Option { return func(o *options) { o.wantChars = n } }
@@ -182,6 +195,7 @@ type Server struct {
 	Items            *gamesql.ItemStore
 	Shortcuts        *gamesql.ShortcutStore
 	KnownSkills      *gamesql.CharacterSkillStore
+	Pets             *gamesql.PetStore
 	InventoryUpdates *task.InventoryUpdates
 	ItemInstances    *task.ItemInstances
 	GroundItems      *task.GroundItems
@@ -453,6 +467,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	}
 	inventoryUpdates := task.NewInventoryUpdates()
 	itemInstances := task.NewItemInstances(gamesql.NewItemFlushStore(db), itemTemplates)
+	petStore := gamesql.NewPetStore(db)
 
 	// Restore the ground items the previous session saved at shutdown,
 	// mirroring the production boot: hydrate into world state, then clear
@@ -468,7 +483,11 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		t.Fatalf("clear ground items: %v", err)
 	}
 
-	roster := gamemanager.NewRoster(chars, items, shortcuts, templates, itemTemplates, npc.NewTable(nil), ids, gamemanager.DefaultDeleteAfter, time.Now)
+	rosterNPCs := o.npcs
+	if rosterNPCs == nil {
+		rosterNPCs = npc.NewTable(nil)
+	}
+	roster := gamemanager.NewRoster(chars, items, shortcuts, templates, itemTemplates, rosterNPCs, ids, gamemanager.DefaultDeleteAfter, time.Now)
 	gcl := network.NewGameClientLink(network.GameClientLinkConfig{
 		Validator:        validator,
 		LoginLink:        func() *network.LoginLink { return loginLink },
@@ -484,6 +503,9 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		SkillTrees:       o.trees,
 		CursedWeapons:    cursed,
 		World:            state,
+		NPCs:             o.npcs,
+		SummonItems:      o.summonItems,
+		PetStore:         petStore,
 		Geo:              Geo{},
 		IDs:              ids,
 		GroundItems:      groundItems,
@@ -581,6 +603,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Items:            items,
 		Shortcuts:        shortcuts,
 		KnownSkills:      knownSkills,
+		Pets:             petStore,
 		InventoryUpdates: inventoryUpdates,
 		ItemInstances:    itemInstances,
 		GroundItems:      groundItems,
