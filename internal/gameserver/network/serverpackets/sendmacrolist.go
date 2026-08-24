@@ -8,7 +8,7 @@ const OpcodeSendMacroList = 0xe7
 // FrameSendMacroListEmpty builds the empty macro-list packet sent on world entry.
 func FrameSendMacroListEmpty() wire.Frame {
 	w := newFrameWriter(OpcodeSendMacroList)
-	w.WriteInt32(0) // macro revision
+	w.WriteInt32(2) // initial macro-list revision
 	w.WriteUint8(0) // unknown
 	w.WriteUint8(0) // macro count
 	w.WriteUint8(0) // no macro follows

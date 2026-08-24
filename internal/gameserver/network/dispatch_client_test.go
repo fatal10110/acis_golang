@@ -36,7 +36,7 @@ func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient, wantDie bo
 			t.Fatalf("EnterWorld frame %d opcode = %#x, want %#x", i, frame[0], opcode)
 		}
 		if i == 0 {
-			want := []byte{serverpackets.OpcodeSendMacroList, 0, 0, 0, 0, 0, 0, 0}
+			want := []byte{serverpackets.OpcodeSendMacroList, 2, 0, 0, 0, 0, 0, 0}
 			if !bytes.Equal(frame, want) {
 				t.Fatalf("EnterWorld SendMacroList = %x, want %x", frame, want)
 			}
