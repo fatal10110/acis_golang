@@ -126,7 +126,7 @@ func (c *Controller) SetPositionUpdates(updates PositionUpdateRegistry) {
 //
 // This does not reproduce the reference behavior's line-of-sight branch (an
 // out-of-range NPC that also can't see its target still counts it as
-// followable) — no geodata query is wired into a live actor yet. It also
+// followable) — the controller has no line-of-sight input. It also
 // does not re-track a target that keeps moving during the approach: this
 // starts one movement request toward the target's position at call time,
 // which is enough to converge on a stationary target and is re-issued

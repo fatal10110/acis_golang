@@ -319,6 +319,10 @@ func (h *Hostile) MakeAttackHit(target attackable.Combatant, split bool) attack.
 
 	critRate := float64(min(int(h.calcStat(stat.CriticalRate, tpl.CritRate)), 500))
 	crit := formulas.CritSucceeds(critRate, h.roll(1000))
+	posMul := 1.0
+	if formulaTarget, ok := target.(creature.FormulaActor); ok {
+		posMul = creature.PositionMultiplierFrom(formulaTarget, h, crit)
+	}
 
 	randomMul := creature.RandomDamageMultiplier(h, modelskill.Definition{})
 
@@ -331,7 +335,7 @@ func (h *Hostile) MakeAttackHit(target attackable.Combatant, split bool) attack.
 		AttackPower:       h.calcStat(stat.PowerAttack, tpl.PAtk),
 		Defence:           defence,
 		Crit:              crit,
-		PosMul:            formulas.PosMul(false, true, crit),
+		PosMul:            posMul,
 		ElementalMul:      1,
 		RandomMul:         randomMul,
 		RaceMul:           1,
