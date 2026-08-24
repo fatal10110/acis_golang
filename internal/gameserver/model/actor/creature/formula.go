@@ -78,7 +78,7 @@ func ResolvePhysicalSkillInput(caster DeathActor, target FormulaActor, def model
 		return formulas.PhysicalSkillInput{}, false
 	}
 	soulshot := attacker.SoulshotCharged()
-	if attacker.AttackType() != item.WeaponNone && attacker.AttackType() != item.WeaponBow && float64(target.Roll(100)) < target.CalcStat(stat.PSkillEvasion, 0) {
+	if attacker.AttackType() != item.WeaponFist && attacker.AttackType() != item.WeaponBow && float64(target.Roll(100)) < target.CalcStat(stat.PSkillEvasion, 0) {
 		return formulas.PhysicalSkillInput{Evaded: true}, true
 	}
 	skillPower := float64(def.Power)
