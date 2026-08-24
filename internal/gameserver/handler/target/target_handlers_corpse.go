@@ -67,27 +67,39 @@ func (areaCorpseMobHandler) CanCast(_, target Creature, skill *modelskill.Defini
 	return corpseMobCanCast(target, skill)
 }
 
-// corpseMobCanCast applies the mob-corpse cast-eligibility rule shared by
-// the single-target and area corpse-mob handlers: the target must have a
-// pending corpse and not be a player-controlled actor or summon, a harvest
-// skill always succeeds against an attackable corpse regardless of its age,
-// and a sweep skill only ever succeeds against an attackable corpse. Mob
-// corpses that expose decay deadline state stop accepting generic corpse
-// skills once they are past the halfway age cutoff, unless seeded/spoiled.
+// CorpseCastFailure identifies why a corpse-mob cast cannot start.
+type CorpseCastFailure uint8
+
+const (
+	CorpseCastAllowed CorpseCastFailure = iota
+	CorpseCastInvalidTarget
+	CorpseCastHarvestNotMonster
+	CorpseCastTooOld
+	CorpseCastSweepNotMonster
+)
+
 func corpseMobCanCast(target Creature, skill *modelskill.Definition) bool {
+	return CorpseCastFailureFor(target, skill) == CorpseCastAllowed
+}
+
+// CorpseCastFailureFor applies the shared corpse-mob eligibility rule.
+func CorpseCastFailureFor(target Creature, skill *modelskill.Definition) CorpseCastFailure {
 	if target == nil || !hasCorpse(target) || target.Category().Has(CategoryPlayable) {
-		return false
+		return CorpseCastInvalidTarget
 	}
 	if skill != nil && skill.SkillType == "HARVEST" {
-		return target.Category().Has(CategoryAttackable)
-	}
-	if skill != nil && skill.SkillType == "SWEEP" && !target.Category().Has(CategoryAttackable) {
-		return false
+		if !monsterKind(target) {
+			return CorpseCastHarvestNotMonster
+		}
+		return CorpseCastAllowed
 	}
 	if target.Category().Has(CategoryAttackable) && corpseTooOld(target) && !corpseAgeBypass(target) {
-		return false
+		return CorpseCastTooOld
 	}
-	return true
+	if skill != nil && skill.SkillType == "SWEEP" && !monsterKind(target) {
+		return CorpseCastSweepNotMonster
+	}
+	return CorpseCastAllowed
 }
 
 type corpsePlayerHandler struct{}
