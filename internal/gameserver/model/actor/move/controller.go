@@ -160,7 +160,13 @@ func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, m
 	dest := location.Location{X: tx, Y: ty, Z: tz}
 
 	totalRadius := followRange(offset, c.self.CollisionRadius(), other.CollisionRadius())
-	if in2DRange(origin, dest, totalRadius) {
+	inRange := in2DRange(origin, dest, totalRadius)
+	if mode == FollowOffensive {
+		if actor, ok := c.self.(pawnFollowActor); ok && actor.OffensiveFollowIsPawnMove() {
+			inRange = location.In3DRange(origin.X, origin.Y, origin.Z, dest.X, dest.Y, dest.Z, totalRadius)
+		}
+	}
+	if inRange {
 		if mode == FollowFriendly {
 			c.move.StartFriendlyFollow(target.ObjectID(), offset)
 		} else {
