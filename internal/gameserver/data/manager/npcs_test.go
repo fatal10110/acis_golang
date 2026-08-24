@@ -171,7 +171,10 @@ func testLevelTable(t *testing.T) *player.LevelTable {
 
 func TestPickPositionSingleKeepsDeclaredHeading(t *testing.T) {
 	positions := []spawn.Position{{Location: location.Location{X: 1, Y: 2, Z: 3}, Heading: 999}}
-	got := pickPosition(positions)
+	got, ok := pickPosition(positions)
+	if !ok {
+		t.Fatal("pickPosition(single) returned no position")
+	}
 	if got.Heading != 999 || got.Location.X != 1 {
 		t.Fatalf("pickPosition(single) = %+v, want the declared entry unchanged", got)
 	}
@@ -188,7 +191,10 @@ func TestPickPositionWeightedDistributionAndRandomHeading(t *testing.T) {
 	counts := map[int]int{}
 	headingRandomized := false
 	for i := 0; i < trials; i++ {
-		pos := pickPosition(positions)
+		pos, ok := pickPosition(positions)
+		if !ok {
+			t.Fatal("pickPosition(weighted) returned no position")
+		}
 		counts[pos.Location.X]++
 		if pos.Location.X == 1 && pos.Heading != 111 {
 			headingRandomized = true
@@ -207,6 +213,25 @@ func TestPickPositionWeightedDistributionAndRandomHeading(t *testing.T) {
 		if got < want-0.03 || got > want+0.03 {
 			t.Fatalf("pickPosition(weighted) x=%d frequency = %.3f, want ~%.2f", x, got, want)
 		}
+	}
+}
+
+func TestPickPositionWeightedMissesUnderfilledTable(t *testing.T) {
+	positions := []spawn.Position{
+		{Location: location.Location{X: 1}, Chance: 0},
+		{Location: location.Location{X: 2}, Chance: 0},
+	}
+
+	for i := 0; i < 100; i++ {
+		if _, ok := pickPosition(positions); ok {
+			t.Fatal("pickPosition(underfilled) selected a position, want no placement")
+		}
+	}
+}
+
+func TestIsOnStartMakerSkipsSpawnTime(t *testing.T) {
+	if isOnStartMaker(&spawn.Maker{SpawnTime: "day"}) {
+		t.Fatal("isOnStartMaker(spawnTime) = true, want false")
 	}
 }
 
