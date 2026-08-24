@@ -1,116 +1,287 @@
 package network
 
+// Summon/pet coverage whose assertions live behind internal seams that no
+// single packet reaches deterministically in the e2e suites (tests/pets,
+// tests/trade): wireSummonAI's cast-controller and hit-result wiring
+// regressions (#1396, #1572), the item-use state gates, and the summon
+// action-table dispatch resolved through AI recording doubles. Everything
+// else from the deleted trade/pet unit-test files is covered by those flow
+// packages or by lower-layer unit tests.
+
 import (
 	"context"
+	"strings"
 	"testing"
+	"time"
 
+	"github.com/rs/zerolog"
+
+	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
-func TestGameClientLinkRoutesSummonActionUseToLiveSummon(t *testing.T) {
-	c, chars, _, state := newLinkedGameClient(t)
+type fakePetStoreNoSaved struct{}
 
-	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
-	c.Read() // CharCreateOk
-	c.Read() // CharSelectInfo
-	objID := chars.soleObjectID(t)
-	c.Send(encodeRequestGameStart(0))
-	c.Read() // SSQInfo
-	c.Read() // CharSelected
-	c.Send(encodeEnterWorld())
-	readEnterWorldBurst(t, c, false)
+func (fakePetStoreNoSaved) Get(context.Context, int32) (petmodel.State, bool, error) {
+	return petmodel.State{}, false, nil
+}
 
-	ownerObject, ok := state.Player(objID)
-	if !ok {
-		t.Fatalf("world.Player(%d) missing", objID)
-	}
-	owner, ok := ownerObject.(summon.Owner)
-	if !ok {
-		t.Fatalf("world.Player(%d) does not satisfy summon.Owner", objID)
-	}
-	liveSummon := summon.NewServitor(summon.ServitorConfig{ObjectID: 500, Owner: owner, Level: 40})
-	summon.SpawnBesideOwner(state, liveSummon, owner, location.Location{})
+func (fakePetStoreNoSaved) Save(context.Context, int32, petmodel.State) error { return nil }
 
-	c.Send(encodeRequestActionUse(52, false, false))
-	reply := c.Read()
-	if reply[0] != serverpackets.OpcodePetDelete {
-		t.Fatalf("post-action opcode = %#x, want PetDelete (%#x)", reply[0], serverpackets.OpcodePetDelete)
-	}
+type fakeSummonIDs struct{ next int32 }
 
-	if _, ok := state.Summon(objID); ok {
-		t.Fatalf("owner %d still has active summon after action 52", objID)
-	}
-	if _, ok := state.Object(liveSummon.ObjectID()); ok {
-		t.Fatalf("summon object %d still exists after action 52", liveSummon.ObjectID())
+func (f *fakeSummonIDs) NextID() (int32, error) {
+	f.next++
+	return f.next, nil
+}
+
+const (
+	summonTestCollarTemplateID = 91000
+	summonTestWyvernTemplateID = 91001
+)
+
+func summonTestPetNPCTemplate() *npc.Template {
+	return &npc.Template{
+		ID: 12500, Name: "Wolf", Level: 10,
+		STR: 40, CON: 43, DEX: 30, INT: 22, WIT: 20, MEN: 20,
+		BaseAttackRange: 40,
+		Pet: &npc.PetData{
+			Food1: 2515, Food2: 2516,
+			AutoFeedLimit: 55, HungryLimit: 30, UnsummonLimit: 10,
+			Levels: map[int]npc.PetLevelStats{
+				10: {MaxHP: 400, MaxMP: 80, PAtk: 100, PDef: 90, MAtk: 20, MDef: 40, MaxMeal: 3000, MealInNormal: 5, MealInBattle: 10},
+			},
+		},
+		Skills: map[int]int{2046: 1},
 	}
 }
 
-func TestGameClientLinkSummonActionUseDispatchesSelectedTargetToAI(t *testing.T) {
+// newSummonTestLink builds a GameClientLink whose npcs/summonItems/petStore
+// are wired for gameSummonSpawner.SpawnPet, sharing state with the caller
+// so the caller can assert against it.
+func newSummonTestLink(t *testing.T) (*GameClientLink, *world.State) {
+	t.Helper()
+	npcs := npc.NewTable([]*npc.Template{summonTestPetNPCTemplate()})
+	summonItems, err := item.NewSummonItemTable([]item.SummonItem{
+		{ItemID: summonTestCollarTemplateID, NPCID: 12500, SummonType: summonItemTypePet},
+		{ItemID: summonTestWyvernTemplateID, NPCID: 12621, SummonType: summonItemTypeWyvern},
+	})
+	if err != nil {
+		t.Fatalf("build summon item table: %v", err)
+	}
 	state := world.New()
+	link := NewGameClientLink(GameClientLinkConfig{
+		World:         state,
+		AI:            task.NewAI(state),
+		NPCs:          npcs,
+		SummonItems:   summonItems,
+		PetStore:      fakePetStoreNoSaved{},
+		IDs:           &fakeSummonIDs{},
+		Skills:        summonTestSkillTable(t),
+		ItemTemplates: testItemTemplates(),
+	})
+	return link, state
+}
+
+// summonTestSkillTable registers SUMMON_CREATURE (2046,1) with a zero hit
+// time so a test can drive its Launch/Hit phases synchronously without a
+// fake clock, mirroring itemAICastSkillTable's TELEPORT fixture.
+func summonTestSkillTable(t *testing.T) *skillstate.Persistence {
+	t.Helper()
+	store := newMemorySkillSaveStore()
+	return skillstate.NewPersistence(store, modelskill.NewTable([]modelskill.Definition{
+		{
+			ID: 2046, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+			SkillType: "SUMMON_CREATURE", StaticHitTime: true, HitTime: 0, StaticReuse: true, ReuseDelay: 0,
+		},
+	}), store)
+}
+
+func TestUseSummonItemRejectsWyvernWhileSitting(t *testing.T) {
+	link, _ := newSummonTestLink(t)
 	frames := &testsupport.FrameCapture{}
-	live := newTestLivePlayer(t, 100, frames)
-	state.Spawn(live, 0, 0, 0, 0)
+	live := newTestLivePlayer(t, 1, frames)
+	live.Character.SetStanding(false)
+	inst := &item.Instance{ObjectID: 502, TemplateID: summonTestWyvernTemplateID, OwnerID: live.ObjectID(), Count: 1, Location: item.LocationInventory}
+	live.Inventory().Restore([]*item.Instance{inst})
 
-	hostile := newTestHostileNPC(t, 300)
-	state.Spawn(hostile, 100, 0, 0, 0)
-
-	liveSummon := summon.NewServitor(summon.ServitorConfig{ObjectID: 500, Owner: live, Level: 40})
-	brain := &recordingNetworkSummonAI{}
-	liveSummon.SetAI(brain)
-	summon.SpawnBesideOwner(state, liveSummon, live, location.Location{})
-
-	live.SetTargetTracked(hostile)
-	gcl := &GameClientLink{world: state}
-	if !gcl.handleSummonActionUse(context.Background(), live, clientpackets.RequestActionUse{ActionID: 16}) {
-		t.Fatal("handleSummonActionUse returned false for a summon attack command")
+	if !link.useSummonItem(live, live.Inventory(), inst) {
+		t.Fatal("useSummonItem returned false, want handled rejection")
 	}
-	if len(brain.attacks) != 1 || brain.attacks[0] != hostile.ObjectID() {
-		t.Fatalf("AI attacks = %v, want selected hostile id %d", brain.attacks, hostile.ObjectID())
+	if got := live.Character.MountType(); got != 0 {
+		t.Fatalf("MountType() = %d, want 0", got)
 	}
+	testsupport.AssertOpcodeSequence(t, frames.Frames(), serverpackets.OpcodeSystemMessage)
+}
 
-	friendlyCreature := &summonActionCombatant{id: 301}
-	state.Spawn(friendlyCreature, 150, 0, 0, 0)
-	live.SetTargetTracked(friendlyCreature)
-	if !gcl.handleSummonActionUse(context.Background(), live, clientpackets.RequestActionUse{ActionID: 16}) {
-		t.Fatal("handleSummonActionUse returned false for a summon follow-target command")
+func TestUseSummonItemRejectsWyvernInCombat(t *testing.T) {
+	link, _ := newSummonTestLink(t)
+	frames := &testsupport.FrameCapture{}
+	live := newTestLivePlayer(t, 1, frames)
+	live.Character.SetInCombat(true)
+	inst := &item.Instance{ObjectID: 503, TemplateID: summonTestWyvernTemplateID, OwnerID: live.ObjectID(), Count: 1, Location: item.LocationInventory}
+	live.Inventory().Restore([]*item.Instance{inst})
+
+	if !link.useSummonItem(live, live.Inventory(), inst) {
+		t.Fatal("useSummonItem returned false, want handled rejection")
 	}
-	if len(brain.follows) != 1 || brain.follows[0] != friendlyCreature.ObjectID() {
-		t.Fatalf("AI follows = %v, want selected creature id %d", brain.follows, friendlyCreature.ObjectID())
+	if got := live.Character.MountType(); got != 0 {
+		t.Fatalf("MountType() = %d, want 0", got)
+	}
+	testsupport.AssertOpcodeSequence(t, frames.Frames(), serverpackets.OpcodeSystemMessage)
+}
+
+func TestUseSummonItemRejectsSittingOwner(t *testing.T) {
+	link, _ := newSummonTestLink(t)
+	frames := &testsupport.FrameCapture{}
+	live := newTestLivePlayer(t, 1, frames)
+	live.Character.SetStanding(false)
+	inst := &item.Instance{ObjectID: 500, TemplateID: summonTestCollarTemplateID, OwnerID: live.ObjectID()}
+
+	if !link.useSummonItem(live, live.Inventory(), inst) {
+		t.Fatal("useSummonItem returned false, want handled rejection")
+	}
+	if len(frames.Frames()) != 1 {
+		t.Fatalf("frames = %d, want exactly one rejection", len(frames.Frames()))
+	}
+	assertSystemMessageIDFrame(t, frames.Frames()[0], 31)
+}
+
+// TestSummonCastControllerRecoversPanickingHook is the regression test for
+// #1396: wireSummonAI built every summon's cast controller without
+// SetLogger, so a panic recovered from a scheduled Launch/Hit/Finish
+// callback (Controller.scheduleLocked's recover wrapper, unconditional for
+// every Controller) logged through a zero-value zerolog.Logger and was
+// silently discarded, matching the network/dispatch_test.go
+// (TestScheduleAfterRecoversPanickingCallback) and cast/schedule_test.go
+// (TestScheduleRecoversPanickingHook) recover-and-log proof pattern. It
+// drives wireSummonAI's own returned controller — a compiler-checked seam,
+// not a reflection-based reach into unexported AI state — so reverting
+// wireSummonAI's SetLogger call fails this test.
+func TestSummonCastControllerRecoversPanickingHook(t *testing.T) {
+	link, state := newSummonTestLink(t)
+	buf := &syncBuffer{}
+	link.log = zerolog.New(buf)
+	live := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
+
+	spawner := &gameSummonSpawner{link: link, live: live}
+	if !spawner.SpawnServitor(live.Character, modelskill.Definition{NpcID: 12500}) {
+		t.Fatal("SpawnServitor returned false")
+	}
+	obj, ok := state.Summon(live.ObjectID())
+	if !ok {
+		t.Fatal("servitor not registered in world.State")
+	}
+	actor := obj.(*summon.Actor)
+
+	// wireSummonAI is idempotent enough for this: re-wiring the same actor
+	// replaces its AI brain and cast controller (both plain field
+	// assignments) with a freshly built one carrying the same l.log,
+	// giving the test direct, compiler-checked access to what SpawnServitor
+	// itself installed instead of reaching into unexported AI state.
+	ctrl := link.wireSummonAI(actor)
+	plan, err := ctrl.Controller.Start(time.Now(), actor, modelskill.Definition{ID: 1, Level: 1, HitTime: 0})
+	if err != nil {
+		t.Fatalf("Start() error: %v", err)
+	}
+	ctrl.Controller.Schedule(plan, actorcast.Hooks{Launch: func() bool { panic("boom") }})
+
+	deadline := time.Now().Add(time.Second)
+	for !strings.Contains(buf.String(), "boom") {
+		if time.Now().After(deadline) {
+			t.Fatalf("panic was not recovered and logged, got: %s", buf.String())
+		}
+		time.Sleep(time.Millisecond)
 	}
 }
 
-// TestGameClientLinkSummonActionUseWithNoActiveSummonAnswersActionFailed is
-// the regression test for a pet-command shortcut (attack/follow/stop/
-// return) pressed with no summon out: handleSummonActionUse recognized the
-// action id and claimed the request as handled, but sent nothing back,
-// silently swallowing the ActionFailed fallback the dispatch loop would
-// otherwise have sent for an unclaimed action-bar command.
-func TestGameClientLinkSummonActionUseWithNoActiveSummonAnswersActionFailed(t *testing.T) {
-	c, chars, _, _ := newLinkedGameClient(t)
+// TestWireSummonAIForwardsHitResultToOwner is the regression test for #1572:
+// AIController's Hit hook discarded ApplyResolvedEffectsResult's return
+// value, so a summon's failed-skill roll never reached the owner. Summon.java
+// forwards every packet to the owner (Summon.sendPacket, base
+// Creature.sendPacket a no-op) — wireSummonAI's OnHitResult wiring is the Go
+// equivalent, and this drives it directly to prove the forward actually
+// happens rather than re-testing sendSkillHandlerResult's own encoding
+// (already covered by magic_skill_test.go).
+func TestWireSummonAIForwardsHitResultToOwner(t *testing.T) {
+	link, state := newSummonTestLink(t)
+	frames := &testsupport.FrameCapture{}
+	live := newTestLivePlayer(t, 1, frames)
+	state.AddPlayer(live)
 
-	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
-	c.Read() // CharCreateOk
-	c.Read() // CharSelectInfo
-	chars.soleObjectID(t)
-	c.Send(encodeRequestGameStart(0))
-	c.Read() // SSQInfo
-	c.Read() // CharSelected
-	c.Send(encodeEnterWorld())
-	readEnterWorldBurst(t, c, false)
+	spawner := &gameSummonSpawner{link: link, live: live}
+	if !spawner.SpawnServitor(live.Character, modelskill.Definition{NpcID: 12500}) {
+		t.Fatal("SpawnServitor returned false")
+	}
+	obj, ok := state.Summon(live.ObjectID())
+	if !ok {
+		t.Fatal("servitor not registered in world.State")
+	}
+	actor := obj.(*summon.Actor)
 
-	// Action id 16 is the pet-attack shortcut; no summon has been spawned.
-	c.Send(encodeRequestActionUse(16, false, false))
-	reply := c.Read()
-	if reply[0] != serverpackets.OpcodeActionFailed {
-		t.Fatalf("pet-command opcode with no active summon = %#x, want ActionFailed (%#x)", reply[0], serverpackets.OpcodeActionFailed)
+	ctrl := link.wireSummonAI(actor)
+	if ctrl.OnHitResult == nil {
+		t.Fatal("OnHitResult not wired, want a summon caster to forward Hit results to its owner")
+	}
+
+	testsupport.ResetCapture(frames)
+	ctrl.OnHitResult(actorcast.EffectResult{AttackFailed: 1})
+
+	if len(frames.Frames()) != 1 {
+		t.Fatalf("owner frames = %d, want 1", len(frames.Frames()))
+	}
+	assertStaticSystemMessageFrame(t, frames.Frames()[0], serverpackets.SystemMessageAttackFailed)
+}
+
+// TestWireSummonAIOwnerForwardDropsPlayerGatedCategories is the regression
+// test for the pr-reviews/1719 finding on #1572: S1_DODGES_ATTACK and
+// S1_PERFORMING_COUNTERATTACK (Blow.java:46-47,88-89) and the generic
+// per-effect resisted message (L2Skill.java:1196-1197) are gated
+// `instanceof Player` on the caster/effector in the reference and never fire
+// at all for a Summon — forwarding the raw EffectResult to the owner would
+// send the owner messages Java never sends for these categories. Only
+// AttackFailed and Lethals (both unconditional `sendPacket` calls in the
+// reference) may reach the owner.
+func TestWireSummonAIOwnerForwardDropsPlayerGatedCategories(t *testing.T) {
+	link, state := newSummonTestLink(t)
+	frames := &testsupport.FrameCapture{}
+	live := newTestLivePlayer(t, 1, frames)
+	state.AddPlayer(live)
+
+	spawner := &gameSummonSpawner{link: link, live: live}
+	if !spawner.SpawnServitor(live.Character, modelskill.Definition{NpcID: 12500}) {
+		t.Fatal("SpawnServitor returned false")
+	}
+	obj, ok := state.Summon(live.ObjectID())
+	if !ok {
+		t.Fatal("servitor not registered in world.State")
+	}
+	actor := obj.(*summon.Actor)
+
+	ctrl := link.wireSummonAI(actor)
+	testsupport.ResetCapture(frames)
+	ctrl.OnHitResult(actorcast.EffectResult{
+		Dodges:         []handlerskill.Dodge{{AttackerID: actor.ObjectID(), DefenderID: live.ObjectID()}},
+		Counterattacks: []handlerskill.Counterattack{{AttackerID: actor.ObjectID(), DefenderID: live.ObjectID()}},
+		Resisted:       []handlerskill.Resisted{{TargetName: "Target", SkillID: 1, SkillLevel: 1}},
+	})
+
+	if len(frames.Frames()) != 0 {
+		t.Fatalf("owner frames = %d, want 0 (Dodges/Counterattacks/Resisted are Player-gated in Java and must not reach the owner)", len(frames.Frames()))
 	}
 }
 
@@ -409,13 +580,3 @@ func (a *recordingNetworkSummonAI) TryToCast(target attackable.Combatant, ref mo
 }
 
 func (a *recordingNetworkSummonAI) AttackingNow() bool { return false }
-
-type summonActionCombatant struct {
-	world.Presence
-	id   int32
-	dead bool
-}
-
-func (c *summonActionCombatant) ObjectID() int32  { return c.id }
-func (c *summonActionCombatant) SiegeGuard() bool { return false }
-func (c *summonActionCombatant) AlikeDead() bool  { return c.dead }
