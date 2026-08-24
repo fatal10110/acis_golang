@@ -160,9 +160,8 @@ func (l *List) remove(e *Effect, pending *[]func()) {
 	queue := l.stacks[e.stackType()]
 	index := slices.Index(queue, e)
 	if index < 0 {
-		if l.removeFromVisible(e) {
-			l.notifyExpiry(e, wornOff, pending)
-		}
+		// EffectList.java:533-539 returns before touching the visible list
+		// when this stack queue is absent.
 		return
 	}
 

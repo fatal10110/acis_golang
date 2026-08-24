@@ -894,3 +894,14 @@ func TestListEffectExpiryMessages(t *testing.T) {
 		}
 	})
 }
+
+func TestListRemoveStackedEffectWithoutQueueLeavesVisible(t *testing.T) {
+	list := NewList(nil)
+	e := newEffect("stacked", 1, "speed", 1, false)
+	list.Add(e)
+
+	delete(list.stacks, "speed")
+	list.Remove(e)
+
+	requireNames(t, list.All(), []string{"stacked"})
+}
