@@ -12,6 +12,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 )
@@ -498,10 +499,26 @@ func (c *Character) SwimSpeed() float64 {
 // PhysicalAttackRange returns the attack range for the active weapon
 // family.
 func (c *Character) PhysicalAttackRange() int {
+	base := 40
 	if rng, ok := weaponRange[c.AttackType()]; ok {
-		return rng
+		base = rng
 	}
-	return 40
+	return int(c.calcStat(stat.PowerAttackRange, float64(base)))
+}
+
+// PoleAttackAngle returns the finalized forward cone used by pole attacks.
+func (c *Character) PoleAttackAngle() int {
+	return int(c.calcStat(stat.PowerAttackAngle, 120))
+}
+
+// PoleAttackCountMax returns the primary-inclusive pole target cap.
+func (c *Character) PoleAttackCountMax() int {
+	for _, active := range c.EffectList().All() {
+		if active.Type == effect.TypePolearmTargetSingle {
+			return 1
+		}
+	}
+	return int(c.calcStat(stat.AttackCountMax, 0))
 }
 
 // WeaponReuseDelay returns the active weapon reuse delay, used for bows.

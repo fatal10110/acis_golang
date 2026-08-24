@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/rs/zerolog"
 )
@@ -52,6 +53,10 @@ type CreatureActor interface {
 
 	AttackType() item.WeaponType
 	AttackSpeed() int
+	PhysicalAttackRange() int
+	PoleAttackAngle() int
+	PoleAttackCountMax() int
+	ForEachKnownCombatantInRadius(int, func(attackable.Combatant))
 	WeaponReuseDelay() time.Duration
 	WeaponGrade() int
 	SoulshotCharged() bool
@@ -292,7 +297,45 @@ func (c *Controller) DoAttack(target attackable.Combatant) error {
 		landings = []scheduledHit{{hit: hits[0], delay: attackTime}}
 	case item.WeaponPole:
 		hits = []Hit{c.makeHit(target, false)}
-		landings = []scheduledHit{{hit: hits[0], delay: attackTime / 2}}
+		maxTargets := c.actor.PoleAttackCountMax()
+		if maxTargets > 1 {
+			x, y, z := c.actor.Position()
+			origin := location.OrientedLocation{
+				Location: location.Location{X: x, Y: y, Z: z},
+				Heading:  c.actor.Heading(),
+			}
+			angle := c.actor.PoleAttackAngle()
+			primary, primaryIsCreature := target.(skilltarget.Creature)
+			primaryIsPlayable := primaryIsCreature && primary.Category().Has(skilltarget.CategoryPlayable)
+			c.actor.ForEachKnownCombatantInRadius(c.actor.PhysicalAttackRange(), func(candidate attackable.Combatant) {
+				if len(hits) >= maxTargets || candidate.ObjectID() == c.actor.ObjectID() || candidate.ObjectID() == target.ObjectID() {
+					return
+				}
+				creatureTarget, ok := candidate.(skilltarget.Creature)
+				if !ok {
+					return
+				}
+				tx, ty, tz := creatureTarget.Position()
+				if !origin.IsFacing(location.Location{X: tx, Y: ty, Z: tz}, angle) {
+					return
+				}
+				rules, ok := candidate.(skilltarget.AttackRules)
+				if !ok || !rules.AttackableBy(c.actor) {
+					return
+				}
+				if c.playable != nil && creatureTarget.Category().Has(skilltarget.CategoryPlayable) {
+					peace, _ := candidate.(interface{ InPeaceZone() bool })
+					if (peace != nil && peace.InPeaceZone()) || !primaryIsPlayable || !rules.AttackableWithoutForceBy(c.playable) {
+						return
+					}
+				}
+				hits = append(hits, c.makeHit(candidate, false))
+			})
+		}
+		landings = make([]scheduledHit, 0, len(hits))
+		for _, hit := range hits {
+			landings = append(landings, scheduledHit{hit: hit, delay: attackTime / 2})
+		}
 	default:
 		hits = []Hit{c.makeHit(target, false)}
 		landings = []scheduledHit{{hit: hits[0], delay: attackTime / 2}}

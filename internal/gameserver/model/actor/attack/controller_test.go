@@ -1,6 +1,7 @@
 package attack
 
 import (
+	"slices"
 	"testing"
 	"time"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
 
 func TestControllerDualHitAndCompletionTiming(t *testing.T) {
@@ -38,6 +40,83 @@ func TestControllerDualHitAndCompletionTiming(t *testing.T) {
 	if ctrl.AttackingNow() || finished != 1 {
 		t.Fatalf("completion at 3*attackTime/4: attacking = %v, finished = %d; want false, 1", ctrl.AttackingNow(), finished)
 	}
+}
+
+func TestControllerPoleSelectsForwardTargetsUpToCap(t *testing.T) {
+	primary := &timingTarget{id: 2, x: 40, attackable: true}
+	first := &timingTarget{id: 3, x: 50, y: 20, attackable: true}
+	second := &timingTarget{id: 4, x: 60, y: -20, attackable: true}
+	beyondCap := &timingTarget{id: 5, x: 70, attackable: true}
+	behind := &timingTarget{id: 6, x: -30, attackable: true}
+	outOfRange := &timingTarget{id: 7, x: 101, attackable: true}
+	notAttackable := &timingTarget{id: 8, x: 30}
+	outsideCone := &timingTarget{id: 9, x: 30, y: 83, attackable: true}
+	actor := &timingActor{
+		attackType:  item.WeaponPole,
+		attackSpeed: 500,
+		poleMax:     3,
+	}
+	actor.known = []attackable.Combatant{actor, primary, outsideCone, first, second, beyondCap, behind, outOfRange, notAttackable}
+	clock := &timingClock{}
+	ctrl := NewCreature(actor)
+	ctrl.afterFunc = clock.AfterFunc
+
+	if err := ctrl.DoAttack(primary); err != nil {
+		t.Fatalf("DoAttack() error: %v", err)
+	}
+
+	if actor.queryRadius != 100 {
+		t.Fatalf("known-combatant radius = %d, want 100", actor.queryRadius)
+	}
+	if got, want := snapshotTargetIDs(actor.snapshot), []int32{2, 3, 4}; !slices.Equal(got, want) {
+		t.Fatalf("snapshot target IDs = %v, want %v", got, want)
+	}
+
+	clock.fire(500 * time.Millisecond)
+	for _, target := range []*timingTarget{primary, first, second} {
+		if target.hits != 1 {
+			t.Errorf("target %d hits at attackTime/2 = %d, want 1", target.id, target.hits)
+		}
+	}
+	for _, target := range []*timingTarget{beyondCap, behind, outOfRange, notAttackable, outsideCone} {
+		if target.hits != 0 {
+			t.Errorf("excluded target %d hits = %d, want 0", target.id, target.hits)
+		}
+	}
+}
+
+func TestControllerPoleSingleTargetEffectKeepsOnlyPrimary(t *testing.T) {
+	primary := &timingTarget{id: 2, x: 40, attackable: true}
+	secondary := &timingTarget{id: 3, x: 50, attackable: true}
+	actor := &timingActor{
+		attackType:  item.WeaponPole,
+		attackSpeed: 500,
+		poleMax:     1,
+		known:       []attackable.Combatant{secondary},
+	}
+	clock := &timingClock{}
+	ctrl := NewCreature(actor)
+	ctrl.afterFunc = clock.AfterFunc
+
+	if err := ctrl.DoAttack(primary); err != nil {
+		t.Fatalf("DoAttack() error: %v", err)
+	}
+
+	if got, want := snapshotTargetIDs(actor.snapshot), []int32{2}; !slices.Equal(got, want) {
+		t.Fatalf("snapshot target IDs = %v, want %v", got, want)
+	}
+	clock.fire(500 * time.Millisecond)
+	if primary.hits != 1 || secondary.hits != 0 {
+		t.Fatalf("hits at attackTime/2 = primary %d, secondary %d; want 1, 0", primary.hits, secondary.hits)
+	}
+}
+
+func snapshotTargetIDs(snapshot Snapshot) []int32 {
+	ids := make([]int32, len(snapshot.Hits))
+	for i, hit := range snapshot.Hits {
+		ids[i] = hit.TargetID
+	}
+	return ids
 }
 
 type timingClock struct{ timers []*timingTimer }
@@ -74,6 +153,10 @@ func (t *timingTimer) Stop() bool {
 type timingActor struct {
 	attackType  item.WeaponType
 	attackSpeed int
+	poleMax     int
+	known       []attackable.Combatant
+	queryRadius int
+	snapshot    Snapshot
 }
 
 func (a *timingActor) ObjectID() int32                         { return 1 }
@@ -95,19 +178,51 @@ func (a *timingActor) Heading() int                            { return 0 }
 func (a *timingActor) Dead() bool                              { return false }
 func (a *timingActor) Category() target.Category               { return target.CategoryAttackable }
 func (a *timingActor) SetHeadingTo(attackable.Combatant)       {}
+
+func (a *timingActor) PhysicalAttackRange() int { return 100 }
+func (a *timingActor) PoleAttackAngle() int     { return 120 }
+func (a *timingActor) PoleAttackCountMax() int  { return a.poleMax }
+func (a *timingActor) ForEachKnownCombatantInRadius(radius int, fn func(attackable.Combatant)) {
+	a.queryRadius = radius
+	for _, candidate := range a.known {
+		positioned, ok := candidate.(interface{ Position() (int, int, int) })
+		if !ok {
+			continue
+		}
+		x, y, z := positioned.Position()
+		if location.In3DRange(0, 0, 0, x, y, z, radius) {
+			fn(candidate)
+		}
+	}
+}
 func (a *timingActor) MakeAttackHit(t attackable.Combatant, _ bool) Hit {
 	return Hit{Target: t, Damage: 1}
 }
-func (a *timingActor) BroadcastAttack(Snapshot) error { return nil }
+func (a *timingActor) BroadcastAttack(snapshot Snapshot) error {
+	a.snapshot = snapshot
+	return nil
+}
 
 type timingTarget struct {
-	id   int32
-	hits int
+	id         int32
+	x, y, z    int
+	attackable bool
+	hits       int
 }
 
 func (t *timingTarget) ObjectID() int32  { return t.id }
 func (t *timingTarget) SiegeGuard() bool { return false }
 func (t *timingTarget) AlikeDead() bool  { return false }
+func (t *timingTarget) Heading() int     { return 0 }
+func (t *timingTarget) Dead() bool       { return false }
+func (t *timingTarget) Category() target.Category {
+	return target.CategoryAttackable
+}
+func (t *timingTarget) Position() (int, int, int) {
+	return t.x, t.y, t.z
+}
+func (t *timingTarget) AttackableBy(target.Creature) bool             { return t.attackable }
+func (t *timingTarget) AttackableWithoutForceBy(target.Creature) bool { return t.attackable }
 func (t *timingTarget) TakeDamage(_ int, _ creature.DeathActor) bool {
 	t.hits++
 	return false
