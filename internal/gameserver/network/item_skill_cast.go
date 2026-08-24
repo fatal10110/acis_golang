@@ -37,6 +37,10 @@ func (l *GameClientLink) useItemAICast(live *livePlayer, inv *itemcontainer.Inve
 	if !ok {
 		return false
 	}
+	if live.SkillDisabled(actorcast.ReuseKey(def)) {
+		live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1PreparedForReuse, int32(def.ID), int32(def.Level)))
+		return true
+	}
 	if live.attack != nil && live.attack.AttackingNow() {
 		live.deferItemAICast(inv, inst)
 		sendMagicActionFailed(live)
