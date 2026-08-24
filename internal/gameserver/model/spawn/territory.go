@@ -27,6 +27,49 @@ type Territory struct {
 	*geometry.Territory
 }
 
+func (t *Territory) geometryTerritory() *geometry.Territory {
+	if t == nil {
+		return nil
+	}
+	if t.Territory != nil {
+		return t.Territory
+	}
+	points := make([]geometry.Point, len(t.Nodes))
+	for i, n := range t.Nodes {
+		points[i] = geometry.Point{X: n.X, Y: n.Y}
+	}
+	poly, err := geometry.NewPolygon(points)
+	if err != nil {
+		return nil
+	}
+	shape, err := geometry.NewTerritory(t.MinZ, t.MaxZ, poly)
+	if err != nil {
+		return nil
+	}
+	return shape
+}
+
+// Contains reports whether (x, y, z) lies inside the territory.
+func (t *Territory) Contains(x, y, z int) bool {
+	shape := t.geometryTerritory()
+	return shape != nil && shape.Contains(x, y, z)
+}
+
+// Area reports the territory's 2D area.
+func (t *Territory) Area() float64 {
+	shape := t.geometryTerritory()
+	if shape == nil {
+		return 0
+	}
+	return shape.Area()
+}
+
+// Intersects reports whether this territory overlaps other.
+func (t *Territory) Intersects(other *geometry.Territory) bool {
+	shape := t.geometryTerritory()
+	return shape != nil && other != nil && shape.Intersects(other)
+}
+
 // NewTerritory builds a Territory from set plus its decoded polygon nodes.
 func NewTerritory(set *commons.StatSet, nodes []Node) (*Territory, error) {
 	idf := commons.NewFields(set, "spawn territory")
