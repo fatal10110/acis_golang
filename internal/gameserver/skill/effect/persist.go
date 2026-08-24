@@ -60,10 +60,6 @@ type ActiveEffect struct {
 	HealOverTime bool
 }
 
-func (e ActiveEffect) excluded() bool {
-	return e.Toggle || e.Herb || e.Continuous || e.HealOverTime
-}
-
 // ReuseTimer is one skill's remaining reuse delay, independent of whether
 // an effect from it is still active. Callers pass only timers that have not
 // yet expired — BuildSaveRows treats an expired or absent timer as no
@@ -78,44 +74,41 @@ type ReuseTimer struct {
 
 // BuildSaveRows converts one character's active effects and pending reuse
 // timers into the rows a relog restore later replays. Each reuse group
-// contributes at most one row: when includeEffects is true and the group's
-// first (in encounter order) active effect isn't excluded, that effect's
-// own row wins and carries the group's reuse timer alongside it; otherwise
-// any unclaimed reuse timer for that group adds a trailing
+// contributes at most one row: the group's first (in encounter order) active
+// effect claims its reuse timer unless it is heal-over-time. Toggle, herb,
+// and continuous effects claim the reuse group without producing a row.
+// Any unclaimed reuse timer adds a trailing
 // RestoreTypeReuseOnly row. buff_index numbers the combined rows 1-based in
 // that order, so an effect row always sorts before the reuse-only rows that
 // follow it.
-//
-// includeEffects lets a caller store leftover reuse delays without storing
-// any effect state — used on paths that intentionally drop active buffs
-// (e.g. a duel) but still want skills to remember their cooldown.
-func BuildSaveRows(effects []ActiveEffect, timers []ReuseTimer, classIndex int32, includeEffects bool) []SaveRow {
+func BuildSaveRows(effects []ActiveEffect, timers []ReuseTimer, classIndex int32) []SaveRow {
 	var rows []SaveRow
 	claimed := make(map[int32]bool)
 	var index int32
 
-	if includeEffects {
-		for _, e := range effects {
-			if claimed[e.ReuseGroup] || e.excluded() {
-				continue
-			}
-			claimed[e.ReuseGroup] = true
-
-			var delay, expires int64
-			for _, t := range timers {
-				if t.ReuseGroup == e.ReuseGroup {
-					delay, expires = t.Delay, t.ExpiresAt
-					break
-				}
-			}
-
-			index++
-			rows = append(rows, SaveRow{
-				Skill: e.Skill, EffectCount: e.Count, EffectCurTime: e.Time,
-				ReuseDelay: delay, SystemTime: expires,
-				RestoreType: RestoreTypeEffect, ClassIndex: classIndex, BuffIndex: index,
-			})
+	for _, e := range effects {
+		if claimed[e.ReuseGroup] || e.HealOverTime {
+			continue
 		}
+		claimed[e.ReuseGroup] = true
+		if e.Toggle || e.Herb || e.Continuous {
+			continue
+		}
+
+		var delay, expires int64
+		for _, t := range timers {
+			if t.ReuseGroup == e.ReuseGroup {
+				delay, expires = t.Delay, t.ExpiresAt
+				break
+			}
+		}
+
+		index++
+		rows = append(rows, SaveRow{
+			Skill: e.Skill, EffectCount: e.Count, EffectCurTime: e.Time,
+			ReuseDelay: delay, SystemTime: expires,
+			RestoreType: RestoreTypeEffect, ClassIndex: classIndex, BuffIndex: index,
+		})
 	}
 
 	for _, t := range timers {
