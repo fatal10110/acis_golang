@@ -394,22 +394,47 @@ func (c *Controller) start(weapon item.WeaponType, attackTime time.Duration, hit
 
 	lastLanding := time.Duration(0)
 	for _, hit := range hits {
-		hit := hit
 		if hit.delay > lastLanding {
 			lastLanding = hit.delay
 		}
-		c.scheduleLocked(hit.delay, func() { c.deliverHits(seq, hit.hits) })
 	}
 	c.scheduleLocked(lastLanding+300*time.Millisecond, func() { c.clearHitAnimation(seq) })
 
+	finishAt := attackTime
+	finish := func() { c.finishAttack(seq) }
 	if weapon == item.WeaponBow {
-		c.scheduleLocked(attackTime, func() { c.finishBow(seq) })
-		return
+		finish = func() { c.finishBow(seq) }
 	}
 	if weapon == item.WeaponDual || weapon == item.WeaponDualFist {
-		attackTime = attackTime * 3 / 4
+		finishAt = attackTime * 3 / 4
 	}
-	c.scheduleLocked(attackTime, func() { c.finishAttack(seq) })
+	if len(hits) == 0 {
+		c.scheduleLocked(finishAt, finish)
+		return
+	}
+	c.scheduleHitLocked(seq, hits, 0, finishAt, finish)
+}
+
+func (c *Controller) scheduleHitLocked(seq uint64, groups []scheduledHit, index int, finishAt time.Duration, finish func()) {
+	group := groups[index]
+	delay := group.delay
+	if index > 0 {
+		delay -= groups[index-1].delay
+	}
+	c.scheduleLocked(delay, func() {
+		c.deliverHits(seq, group.hits)
+
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		if seq != c.attackSeq {
+			return
+		}
+		if index+1 < len(groups) {
+			c.scheduleHitLocked(seq, groups, index+1, finishAt, finish)
+			return
+		}
+		c.scheduleLocked(max(time.Duration(0), finishAt-group.delay), finish)
+	})
 }
 
 func (c *Controller) snapshot(hits []Hit) Snapshot {

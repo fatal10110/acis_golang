@@ -24,6 +24,12 @@ func TestControllerDualHitAndCompletionTiming(t *testing.T) {
 	if err := ctrl.DoAttack(target); err != nil {
 		t.Fatalf("DoAttack() error: %v", err)
 	}
+	if got := clock.activeCount(500 * time.Millisecond); got != 0 {
+		t.Fatalf("second-hit timers before first landing = %d, want 0", got)
+	}
+	if got := clock.activeCount(750 * time.Millisecond); got != 0 {
+		t.Fatalf("completion timers before second landing = %d, want 0", got)
+	}
 
 	clock.fire(250 * time.Millisecond)
 	if target.hits != 1 {
@@ -39,6 +45,37 @@ func TestControllerDualHitAndCompletionTiming(t *testing.T) {
 	clock.fire(750 * time.Millisecond)
 	if ctrl.AttackingNow() || finished != 1 {
 		t.Fatalf("completion at 3*attackTime/4: attacking = %v, finished = %d; want false, 1", ctrl.AttackingNow(), finished)
+	}
+}
+
+func TestControllerDualSlowFirstHitDelaysSecondHitAndCompletion(t *testing.T) {
+	actor := &timingActor{attackType: item.WeaponDual, attackSpeed: 500}
+	target := &timingTarget{id: 2}
+	clock := &timingClock{}
+	ctrl := NewCreature(actor)
+	ctrl.afterFunc = clock.AfterFunc
+	finished := 0
+	ctrl.SetFinished(func() { finished++ })
+	target.onDamage = func() {
+		if target.hits == 1 {
+			clock.fire(750 * time.Millisecond)
+		}
+	}
+
+	if err := ctrl.DoAttack(target); err != nil {
+		t.Fatalf("DoAttack() error: %v", err)
+	}
+	clock.fire(250 * time.Millisecond)
+	if target.hits != 1 || finished != 0 {
+		t.Fatalf("after slow first hit: hits = %d, finished = %d; want 1, 0", target.hits, finished)
+	}
+	clock.fire(time.Second)
+	if target.hits != 2 || finished != 0 {
+		t.Fatalf("after delayed second hit: hits = %d, finished = %d; want 2, 0", target.hits, finished)
+	}
+	clock.fire(1250 * time.Millisecond)
+	if finished != 1 {
+		t.Fatalf("finished after delayed second hit = %d, want 1", finished)
 	}
 }
 
@@ -61,7 +98,13 @@ func TestControllerPoleSelectsForwardTargetsUpToCap(t *testing.T) {
 	clock := &timingClock{}
 	ctrl := NewCreature(actor)
 	ctrl.afterFunc = clock.AfterFunc
+	finished := 0
+	ctrl.SetFinished(func() { finished++ })
 	primary.onDamage = func() {
+		clock.fire(time.Second)
+		if finished != 0 {
+			t.Fatalf("pole completed during hit group: finished = %d, want 0", finished)
+		}
 		actor.dead = true
 		ctrl.Stop()
 	}
@@ -81,6 +124,9 @@ func TestControllerPoleSelectsForwardTargetsUpToCap(t *testing.T) {
 	}
 	if got := clock.count(500 * time.Millisecond); got != 1 {
 		t.Fatalf("timers at attackTime/2 = %d, want one pole group", got)
+	}
+	if got := clock.activeCount(time.Second); got != 0 {
+		t.Fatalf("completion timers before pole group landing = %d, want 0", got)
 	}
 
 	clock.fire(500 * time.Millisecond)
@@ -133,21 +179,35 @@ func snapshotTargetIDs(snapshot Snapshot) []int32 {
 	return ids
 }
 
-type timingClock struct{ timers []*timingTimer }
+type timingClock struct {
+	now    time.Duration
+	timers []*timingTimer
+}
 
 func (c *timingClock) AfterFunc(delay time.Duration, f func()) scheduledTimer {
-	timer := &timingTimer{delay: delay, f: f}
+	timer := &timingTimer{delay: c.now + delay, f: f}
 	c.timers = append(c.timers, timer)
 	return timer
 }
 
 func (c *timingClock) fire(delay time.Duration) {
+	c.now = delay
 	for _, timer := range c.timers {
 		if timer.delay == delay && !timer.stopped {
 			timer.stopped = true
 			timer.f()
 		}
 	}
+}
+
+func (c *timingClock) activeCount(delay time.Duration) int {
+	count := 0
+	for _, timer := range c.timers {
+		if timer.delay == delay && !timer.stopped {
+			count++
+		}
+	}
+	return count
 }
 
 func (c *timingClock) count(delay time.Duration) int {
