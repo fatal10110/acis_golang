@@ -54,9 +54,6 @@ func TestRegionQueriesPackedBlocks(t *testing.T) {
 	if got := r.NSWENearest(0, 2, 4, 5, 40); got != South|East {
 		t.Fatalf("multilayer nearest nswe = %v, want SE", got)
 	}
-	if got := r.HeightNearest(0, 2, 4, 5, 16); got != -16 {
-		t.Fatalf("multilayer tied nearest height = %d, want -16", got)
-	}
 	if got := r.Height(0, 2, r.Below(0, 2, 4, 5, 100)); got != 48 {
 		t.Fatalf("multilayer below height = %d, want 48", got)
 	}

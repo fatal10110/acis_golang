@@ -224,7 +224,7 @@ func (r *Region) Nearest(blockX, blockY, cellX, cellY int, worldZ int32) int {
 	limit := int32(math.MaxInt32)
 	for i := 0; i < count; i++ {
 		d := abs32(int32(DecodeCell(r.multilayerCode(entry, cellX, cellY, i)).Height) - worldZ)
-		if d >= limit {
+		if d > limit {
 			break
 		}
 		limit = d
