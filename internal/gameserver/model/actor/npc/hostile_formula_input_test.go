@@ -5,11 +5,46 @@ import (
 	"testing"
 
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
+
+func TestHostileMakeAttackHitUsesTargetFacingForDamage(t *testing.T) {
+	caster := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", Level: 1, PAtk: 100, CritRate: 0, BaseRandomDamage: 5})
+	target := newCombatHostile(t, 2, &Template{ID: 2, Type: "Monster", Level: 1, PDef: 50})
+	caster.SetRollSource(zeroRoll)
+
+	state := world.New()
+	state.Spawn(target, 0, 0, 0, 0)    // Faces east.
+	state.Spawn(caster, -100, 0, 0, 0) // West of target: behind.
+
+	hit := caster.MakeAttackHit(target, false)
+	if hit.Miss || hit.Crit {
+		t.Fatalf("hit = %+v, want non-critical hit", hit)
+	}
+
+	want := int(formulas.PhysicalAttackDamage(formulas.PhysicalAttackInput{
+		AttackPower:       caster.PAtk(),
+		Defence:           target.PDef(),
+		PosMul:            creature.PositionMultiplierFrom(target, caster, false),
+		ElementalMul:      1,
+		RandomMul:         creature.RandomDamageMultiplier(caster, modelskill.Definition{}),
+		RaceMul:           1,
+		WeaponVulnMul:     1,
+		PvPMul:            1,
+		CritDamageMul:     1,
+		CritDamagePosMul:  1,
+		CritVulnMul:       1,
+		CritDamageAddBase: 0,
+	}))
+	if hit.Damage != want {
+		t.Fatalf("behind-hit damage = %d, want %d", hit.Damage, want)
+	}
+}
 
 func TestHostileFormulaInputsResolveStatsAndRaceMultiplier(t *testing.T) {
 	caster := newCombatHostile(t, 1, &Template{
@@ -189,6 +224,18 @@ func TestHostileFormulaInputsResolveStatsAndRaceMultiplier(t *testing.T) {
 	}
 	if got, want := static, 36.0; !closeNPCFormulaFloat(got, want) {
 		t.Fatalf("HealAmount(static) = %v, want %v", got, want)
+	}
+}
+
+func TestHostileUndeadMatchesTemplateRace(t *testing.T) {
+	undead := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", Race: RaceUndead})
+	if !undead.Undead() {
+		t.Fatal("undead hostile = false, want true")
+	}
+
+	living := newCombatHostile(t, 2, &Template{ID: 2, Type: "Monster", Race: RaceBeast})
+	if living.Undead() {
+		t.Fatal("living hostile = true, want false")
 	}
 }
 
