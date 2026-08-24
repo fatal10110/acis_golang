@@ -206,11 +206,11 @@ func (s *State) DespawnAll(ts []Tracked) {
 	}
 	if hasPlayer {
 		s.regionActivityMu.Unlock()
-		for _, tg := range toggles {
-			tg.region.notifyActivity(tg.active)
-		}
 		for _, notification := range notifications {
 			notification.notify()
+		}
+		for _, tg := range toggles {
+			tg.region.notifyActivity(tg.active)
 		}
 	}
 
