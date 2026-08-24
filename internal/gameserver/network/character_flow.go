@@ -146,6 +146,7 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 		l.autosave.Add(live)
 	}
 
+	client.Session.SendFrame(serverpackets.FrameSendMacroListEmpty())
 	client.Session.SendFrame(serverpackets.FrameExStorageMaxCount(c))
 	client.Session.SendFrame(serverpackets.FrameHennaInfo(c.ClassID))
 	// Replay restored buffs into the live effect list here, matching

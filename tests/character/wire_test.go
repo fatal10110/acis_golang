@@ -78,6 +78,7 @@ func encodeMoveBackwardToLocation(target, origin location.Location, moveMovement
 func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	t.Helper()
 	want := []byte{
+		serverpackets.OpcodeSendMacroList,
 		serverpackets.OpcodeExtended,
 		serverpackets.OpcodeHennaInfo,
 		serverpackets.OpcodeEtcStatusUpdate,

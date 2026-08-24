@@ -143,6 +143,25 @@ func TestNewBuildsCoreEffectMetadata(t *testing.T) {
 	}
 }
 
+func TestParalyzeAndPetrificationExitDoNotThinkPlayers(t *testing.T) {
+	for _, name := range []string{"Paralyze", "Petrification"} {
+		t.Run(name, func(t *testing.T) {
+			target := &liveEffectTarget{isPlayer: true}
+			e, err := New(Skill{}, modelskill.EffectTemplate{Name: name})
+			if err != nil {
+				t.Fatalf("New() error: %v", err)
+			}
+			e.Effected = target
+			e.OnExit(e)
+			for _, event := range target.events {
+				if event == "think" {
+					t.Fatalf("exit events = %#v, want no THINK for a player", target.events)
+				}
+			}
+		})
+	}
+}
+
 // TestNewDerivesHerbFromSkillName mirrors AbstractEffect._isHerbEffect =
 // _skill.getName().contains("Herb"): Herb is a property of the skill's name,
 // not of how the effect was applied, so a skill named "Herb of Life" is a

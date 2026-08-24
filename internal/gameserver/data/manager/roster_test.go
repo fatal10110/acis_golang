@@ -128,6 +128,21 @@ func TestRoster_Create_InvalidName(t *testing.T) {
 	}
 }
 
+func TestRoster_Create_RejectsWhenNPCTableMissing(t *testing.T) {
+	ctx := context.Background()
+	roster, _, _ := newTestRoster(t, DefaultDeleteAfter, nil, (*npc.Table)(nil))
+
+	_, outcome, err := roster.Create(ctx, "acct1", CreateRequest{
+		Name: "Newbie", ClassID: 0, Race: 0, Sex: player.SexMale,
+	})
+	if err != nil {
+		t.Fatalf("Create() unexpected error: %v", err)
+	}
+	if outcome != CreateInvalidName {
+		t.Fatalf("Create() outcome = %v, want CreateInvalidName", outcome)
+	}
+}
+
 func TestRoster_Create_NameTaken(t *testing.T) {
 	ctx := context.Background()
 	roster, _, _ := newTestRoster(t, DefaultDeleteAfter, nil)
