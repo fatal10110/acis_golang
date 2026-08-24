@@ -231,6 +231,18 @@ func (h *Hostile) SetWorld(state *world.State) {
 	h.world = state
 }
 
+// ForEachKnownCombatantInRadius visits nearby combatants through the world grid.
+func (h *Hostile) ForEachKnownCombatantInRadius(radius int, fn func(attackable.Combatant)) {
+	if h.world == nil {
+		return
+	}
+	h.world.ForEachKnownInRadius(h, radius, func(candidate world.Tracked) {
+		if combatant, ok := candidate.(attackable.Combatant); ok {
+			fn(combatant)
+		}
+	})
+}
+
 // SetFrameBuilder records the network-layer hook that translates this NPC's
 // broadcast-worthy state changes into wire frames, keeping serverpackets and
 // wire-encoding knowledge out of the model layer. Broadcast* is a no-op
@@ -644,6 +656,21 @@ func (h *Hostile) Knows(target attackable.Combatant) bool {
 // PhysicalAttackRange returns this NPC's melee attack range.
 func (h *Hostile) PhysicalAttackRange() int {
 	return h.Instance.Template.BaseAttackRange
+}
+
+// PoleAttackAngle returns the finalized forward cone used by pole attacks.
+func (h *Hostile) PoleAttackAngle() int {
+	return int(h.calcStat(stat.PowerAttackAngle, 120))
+}
+
+// PoleAttackCountMax returns the primary-inclusive pole target cap.
+func (h *Hostile) PoleAttackCountMax() int {
+	for _, active := range h.EffectList().All() {
+		if active.Type == effect.TypePolearmTargetSingle {
+			return 1
+		}
+	}
+	return int(h.calcStat(stat.AttackCountMax, 0))
 }
 
 // ReturnHome reports whether this NPC started returning to its spawn.

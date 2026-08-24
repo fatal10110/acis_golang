@@ -175,6 +175,18 @@ func (c *Character) SetWorld(state *world.State) {
 	c.world = state
 }
 
+// ForEachKnownCombatantInRadius visits nearby combatants through the world grid.
+func (c *Character) ForEachKnownCombatantInRadius(radius int, fn func(attackable.Combatant)) {
+	if c.world == nil {
+		return
+	}
+	c.world.ForEachKnownInRadius(c, radius, func(candidate world.Tracked) {
+		if combatant, ok := candidate.(attackable.Combatant); ok {
+			fn(combatant)
+		}
+	})
+}
+
 // SyncPosition moves this player's live world-grid presence to position.
 func (c *Character) SyncPosition(position location.Location) {
 	previous := c.CurrentLocation()
