@@ -30,7 +30,7 @@ func TestLoadSpawnlistFixture(t *testing.T) {
 		<node x="31" y="30"/>
 		<node x="31" y="31"/>
 	</territory>
-	<npcmaker name="maker_1" territory="a;b" ban="ban1;ban2" event="night" maximumNpcs="7">
+	<npcmaker name="maker_1" territory="a;b" ban="ban1;ban2" event="night" spawnTime="day" maximumNpcs="7">
 		<ai type="event_maker">
 			<set name="EventName" val="@event_mutant_pig"/>
 		</ai>
@@ -79,6 +79,9 @@ func TestLoadSpawnlistFixture(t *testing.T) {
 	}
 	if got, want := maker.MaximumNPCs, 7; got != want {
 		t.Fatalf("maker.MaximumNPCs = %d, want %d", got, want)
+	}
+	if got, want := maker.SpawnTime, "day"; got != want {
+		t.Fatalf("maker.SpawnTime = %q, want %q", got, want)
 	}
 
 	first := maker.Entries[0]

@@ -16,6 +16,7 @@ type Maker struct {
 	AIParams          map[string]string
 	MaximumNPCs       int
 	Event             string
+	SpawnTime         string
 	Entries           []Entry
 }
 
@@ -44,6 +45,7 @@ func NewMaker(set *commons.StatSet, territories []*Territory, banned []*Territor
 		AIParams:          copyStringMap(aiParams),
 		MaximumNPCs:       maximum,
 		Event:             f.StringDefault("event", ""),
+		SpawnTime:         f.StringDefault("spawnTime", ""),
 		Entries:           append([]Entry(nil), entries...),
 	}, nil
 }
