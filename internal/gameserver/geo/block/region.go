@@ -274,7 +274,7 @@ func (r *Region) Below(blockX, blockY, cellX, cellY int, worldZ int32) int {
 		}
 	case regionMultilayer:
 		count := r.Layers(blockX, blockY, cellX, cellY)
-		for i := 0; i < count; i++ {
+		for i := count - 1; i >= 0; i-- {
 			if int32(DecodeCell(r.multilayerCode(entry, cellX, cellY, i)).Height) < worldZ {
 				return cellIndex(cellX, cellY)*layerSlot + i
 			}
