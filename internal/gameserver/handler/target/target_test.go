@@ -42,6 +42,7 @@ type targetActor struct {
 	undead                 bool
 	peace                  bool
 	corpse                 bool
+	monster                bool
 	corpseDeadline         time.Time
 	corpseTime             time.Duration
 	spoiled                bool
@@ -116,6 +117,8 @@ func (a *targetActor) Undead() bool { return a.undead }
 func (a *targetActor) InPeaceZone() bool { return a.peace }
 
 func (a *targetActor) HasCorpse() bool { return a.corpse }
+
+func (a *targetActor) MonsterKind() bool { return a.monster }
 
 func (a *targetActor) CorpseDeadline() (time.Time, bool) {
 	return a.corpseDeadline, !a.corpseDeadline.IsZero()

@@ -80,6 +80,7 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 	})
 	if err != nil {
 		if errors.Is(err, actorcast.ErrInvalidTarget) && started.Target == nil {
+			sendCorpseCastFailure(live, started.Definition)
 			sendMagicActionFailed(live)
 			return
 		}
@@ -160,6 +161,21 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 			sendMagicStatusUpdate(live, beforeVitals)
 		},
 	})
+}
+
+func sendCorpseCastFailure(live *livePlayer, def modelskill.Definition) {
+	if live == nil || (def.Target != modelskill.TargetCorpseMob && def.Target != modelskill.TargetAreaCorpseMob) {
+		return
+	}
+	target, _ := live.Target().(skilltarget.Creature)
+	switch skilltarget.CorpseCastFailureFor(target, &def) {
+	case skilltarget.CorpseCastHarvestNotMonster:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageHarvestFailedSeedNotSown))
+	case skilltarget.CorpseCastTooOld:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCorpseTooOldSkillNotUsed))
+	case skilltarget.CorpseCastSweepNotMonster:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSweeperFailedTargetNotSpoiled))
+	}
 }
 
 func (l *GameClientLink) walkToGroundCast(live *livePlayer, req clientpackets.RequestMagicSkillUse, castRange int) bool {

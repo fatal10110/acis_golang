@@ -17,6 +17,20 @@ func TestFrameSystemMessage(t *testing.T) {
 	}
 }
 
+func TestFrameSystemMessageCorpseTargetFailures(t *testing.T) {
+	for _, id := range []int{
+		SystemMessageSweeperFailedTargetNotSpoiled,
+		SystemMessageHarvestFailedSeedNotSown,
+		SystemMessageCorpseTooOldSkillNotUsed,
+	} {
+		got := framePayload(t, FrameSystemMessage(id))
+		want := []byte{OpcodeSystemMessage, byte(id), byte(id >> 8), 0, 0, 0, 0, 0, 0}
+		if !bytes.Equal(got, want) {
+			t.Fatalf("FrameSystemMessage(%d) = %x, want %x", id, got, want)
+		}
+	}
+}
+
 func TestFrameSystemMessageCounterattackFeedback(t *testing.T) {
 	tests := []struct {
 		name string

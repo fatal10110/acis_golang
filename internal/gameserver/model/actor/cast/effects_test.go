@@ -19,6 +19,7 @@ type effectsActor struct {
 	category skilltarget.Category
 	dead     bool
 	corpse   bool
+	monster  bool
 	summon   *effectsActor
 }
 
@@ -46,6 +47,7 @@ func (a *effectsActor) Category() skilltarget.Category { return a.category }
 func (a *effectsActor) AttackableBy(skilltarget.Creature) bool             { return true }
 func (a *effectsActor) AttackableWithoutForceBy(skilltarget.Creature) bool { return true }
 func (a *effectsActor) HasCorpse() bool                                    { return a.corpse }
+func (a *effectsActor) MonsterKind() bool                                   { return a.monster }
 
 func (a *effectsActor) Summon() (skilltarget.Creature, bool) {
 	if a.summon == nil {
@@ -204,7 +206,7 @@ func TestApplyEffectsAuraTargetSweepsRadiusAroundCaster(t *testing.T) {
 
 func TestApplyEffectsCorpseMobTargetRequiresPendingCorpse(t *testing.T) {
 	caster := &effectsActor{id: 1, category: skilltarget.CategoryPlayable}
-	corpse := &effectsActor{id: 2, category: skilltarget.CategoryAttackable, dead: true, corpse: true}
+	corpse := &effectsActor{id: 2, category: skilltarget.CategoryAttackable, dead: true, corpse: true, monster: true}
 	live := &effectsActor{id: 3, category: skilltarget.CategoryAttackable, corpse: false}
 	def := modelskill.Definition{ID: 102, Target: modelskill.TargetCorpseMob, SkillType: "SWEEP"}
 
