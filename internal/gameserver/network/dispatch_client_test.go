@@ -1,6 +1,7 @@
 package network
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
@@ -11,6 +12,7 @@ import (
 func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient, wantDie bool) [][]byte {
 	t.Helper()
 	want := []byte{
+		serverpackets.OpcodeSendMacroList,
 		serverpackets.OpcodeExtended,
 		serverpackets.OpcodeHennaInfo,
 		serverpackets.OpcodeEtcStatusUpdate,
@@ -34,6 +36,12 @@ func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient, wantDie bo
 			t.Fatalf("EnterWorld frame %d opcode = %#x, want %#x", i, frame[0], opcode)
 		}
 		if i == 0 {
+			want := []byte{serverpackets.OpcodeSendMacroList, 0, 0, 0, 0, 0, 0, 0}
+			if !bytes.Equal(frame, want) {
+				t.Fatalf("EnterWorld SendMacroList = %x, want %x", frame, want)
+			}
+		}
+		if i == 1 {
 			if second := wire.NewReader(frame[1:]).ReadUint16(); second != serverpackets.OpcodeExStorageMaxCount {
 				t.Fatalf("EnterWorld first extended opcode = %#x, want ExStorageMaxCount (%#x)", second, serverpackets.OpcodeExStorageMaxCount)
 			}
