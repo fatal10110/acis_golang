@@ -139,6 +139,14 @@ func (s *State) DespawnAll(ts []Tracked) {
 		}
 	}()
 
+	hasPlayer := slices.ContainsFunc(ts, func(t Tracked) bool {
+		_, ok := t.(Player)
+		return ok
+	})
+	if hasPlayer {
+		s.regionActivityMu.Lock()
+	}
+
 	byRegion := make(map[*Region][]Tracked, len(ts))
 	for _, t := range ts {
 		p := t.presence()
@@ -151,6 +159,8 @@ func (s *State) DespawnAll(ts []Tracked) {
 
 	var areaBuf [9]*Region
 	var objectBuf []Tracked
+	var toggles []regionToggle
+	var notifications []visibilityNotification
 	for region, group := range byRegion {
 		if region == nil {
 			continue
@@ -165,6 +175,16 @@ func (s *State) DespawnAll(ts []Tracked) {
 			continue
 		}
 		areas := s.AppendNeighbors(areaBuf[:0], region, 1)
+		if hasPlayer && slices.ContainsFunc(left, func(t Tracked) bool {
+			_, ok := t.(Player)
+			return ok
+		}) {
+			for _, r := range areas {
+				if s.regionNeighborhoodEmpty(r) && r.setActive(false) {
+					toggles = append(toggles, regionToggle{r, false})
+				}
+			}
+		}
 		for _, r := range areas {
 			objectBuf = r.AppendObjects(objectBuf[:0])
 			for _, o := range objectBuf {
@@ -174,10 +194,23 @@ func (s *State) DespawnAll(ts []Tracked) {
 				}
 				for _, t := range left {
 					if o.ObjectID() != t.ObjectID() {
-						w.Forget(t)
+						if hasPlayer {
+							notifications = append(notifications, visibilityNotification{w, t, false})
+						} else {
+							w.Forget(t)
+						}
 					}
 				}
 			}
+		}
+	}
+	if hasPlayer {
+		s.regionActivityMu.Unlock()
+		for _, tg := range toggles {
+			tg.region.notifyActivity(tg.active)
+		}
+		for _, notification := range notifications {
+			notification.notify()
 		}
 	}
 

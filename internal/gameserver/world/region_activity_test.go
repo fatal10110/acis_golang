@@ -49,6 +49,26 @@ func TestRegionActivatesOnPlayerSpawnAndDeactivatesOnDespawn(t *testing.T) {
 	}
 }
 
+func TestRegionDeactivatesOnPlayerDespawnAll(t *testing.T) {
+	s := New()
+
+	p := &playerStub{trackedStub: trackedStub{id: 1}}
+	actor := &activeTrackedStub{trackedStub: trackedStub{id: 2}}
+	s.Spawn(p, 0, 0, 0, 0)
+	s.Spawn(actor, 100, 0, 0, 0)
+	actor.activeCalls = 0
+
+	region, _ := s.RegionAt(0, 0)
+	s.DespawnAll([]Tracked{p})
+
+	if region.Active() {
+		t.Fatal("region stayed active after its only player was bulk-despawned")
+	}
+	if actor.inactiveCalls != 1 {
+		t.Fatalf("inactive calls = %d, want 1", actor.inactiveCalls)
+	}
+}
+
 // TestRegionStaysActiveWhileAnyNeighborHasAPlayer covers the neighborhood
 // (not per-region) nature of activation: a region deactivates only once
 // none of the 3x3 regions around it holds a player, even if the player
