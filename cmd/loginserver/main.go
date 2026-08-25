@@ -77,6 +77,7 @@ func newLoginServerApp(paths loginServerPaths) *fx.App {
 			manager.NewLoginKeyPool,
 			provideIPBanList,
 			provideFloodGuard,
+			loginserver.NewLinkRoster,
 			provideGameServerLink,
 			provideClientLink,
 		),
@@ -226,9 +227,10 @@ func provideGameServerLink(
 	accounts *loginsql.AccountStore,
 	registrations *loginsql.GameServerStore,
 	flood *netutil.FloodGuard,
+	roster *loginserver.LinkRoster,
 	log zerolog.Logger,
 ) *loginserver.GameServerLink {
-	return loginserver.NewGameServerLink(servers, names, keys, sessions, bans, accounts, registrations, cfg.AllowNewGameServers, flood, log)
+	return loginserver.NewGameServerLink(servers, names, keys, sessions, bans, accounts, registrations, cfg.AllowNewGameServers, flood, roster, log)
 }
 
 func provideClientLink(
@@ -238,9 +240,10 @@ func provideClientLink(
 	sessions *manager.SessionStore,
 	bans *manager.IPBanList,
 	keys *manager.LoginKeyPool,
+	roster *loginserver.LinkRoster,
 	log zerolog.Logger,
 ) *loginserver.ClientLink {
-	return loginserver.NewClientLink(accounts, servers, sessions, bans, keys, cfg.AutoCreateAccounts, cfg.ShowLicence, cfg.LoginTryBeforeBan, cfg.LoginBlockAfterBan, log)
+	return loginserver.NewClientLink(accounts, servers, sessions, bans, keys, roster, cfg.AutoCreateAccounts, cfg.ShowLicence, cfg.LoginTryBeforeBan, cfg.LoginBlockAfterBan, log)
 }
 
 func startLoginServer(lc fx.Lifecycle, cfg loginServerConfig, link *loginserver.GameServerLink, clients *loginserver.ClientLink, log zerolog.Logger) {

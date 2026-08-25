@@ -58,7 +58,7 @@ func TestGameServerLinkFloodGuardDropsFastRepeatConnections(t *testing.T) {
 		t.Fatalf("NewRSAKeyPool: %v", err)
 	}
 
-	l := NewGameServerLink(manager.NewServerRegistry(), names, keys, manager.NewSessionStore(), manager.NewIPBanList(zerolog.Nop()), nil, nil, true, guard, zerolog.Nop())
+	l := NewGameServerLink(manager.NewServerRegistry(), names, keys, manager.NewSessionStore(), manager.NewIPBanList(zerolog.Nop()), nil, nil, true, guard, NewLinkRoster(), zerolog.Nop())
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("listen: %v", err)
