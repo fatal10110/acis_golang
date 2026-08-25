@@ -126,7 +126,7 @@ func (c *Controller) SetPositionUpdates(updates PositionUpdateRegistry) {
 //
 // This does not reproduce the reference behavior's line-of-sight branch (an
 // out-of-range NPC that also can't see its target still counts it as
-// followable) — no geodata query is wired into a live actor yet. It also
+// followable) — the controller has no line-of-sight input. It also
 // does not re-track a target that keeps moving during the approach: this
 // starts one movement request toward the target's position at call time,
 // which is enough to converge on a stationary target and is re-issued
@@ -160,7 +160,13 @@ func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, m
 	dest := location.Location{X: tx, Y: ty, Z: tz}
 
 	totalRadius := followRange(offset, c.self.CollisionRadius(), other.CollisionRadius())
-	if in2DRange(origin, dest, totalRadius) {
+	inRange := in2DRange(origin, dest, totalRadius)
+	if mode == FollowOffensive {
+		if actor, ok := c.self.(pawnFollowActor); ok && actor.OffensiveFollowIsPawnMove() {
+			inRange = location.In3DRange(origin.X, origin.Y, origin.Z, dest.X, dest.Y, dest.Z, totalRadius)
+		}
+	}
+	if inRange {
 		if mode == FollowFriendly {
 			c.move.StartFriendlyFollow(target.ObjectID(), offset)
 		} else {

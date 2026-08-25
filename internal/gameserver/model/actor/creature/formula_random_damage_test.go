@@ -11,34 +11,57 @@ import (
 // randomDamageTestActor is a minimal FormulaActor stub for exercising
 // RandomDamageMultiplier in isolation.
 type randomDamageTestActor struct {
-	level  int
-	spread int
-	roll   int
+	level         int
+	spread        int
+	roll          int
+	attackType    item.WeaponType
+	pSkillEvasion float64
 }
 
-func (a *randomDamageTestActor) Position() (int, int, int)           { return 0, 0, 0 }
-func (a *randomDamageTestActor) Heading() int                        { return 0 }
-func (a *randomDamageTestActor) Level() int                          { return a.level }
-func (a *randomDamageTestActor) STR() int                            { return 0 }
-func (a *randomDamageTestActor) CON() int                            { return 0 }
-func (a *randomDamageTestActor) DEX() int                            { return 0 }
-func (a *randomDamageTestActor) INT() int                            { return 0 }
-func (a *randomDamageTestActor) WIT() int                            { return 0 }
-func (a *randomDamageTestActor) MEN() int                            { return 0 }
-func (a *randomDamageTestActor) PAtk() float64                       { return 0 }
-func (a *randomDamageTestActor) PDef() float64                       { return 0 }
-func (a *randomDamageTestActor) MAtk() float64                       { return 0 }
-func (a *randomDamageTestActor) MDef() float64                       { return 0 }
-func (a *randomDamageTestActor) MagicCriticalRate() float64          { return 0 }
-func (a *randomDamageTestActor) AttackType() item.WeaponType         { return item.WeaponNone }
-func (a *randomDamageTestActor) SoulshotCharged() bool               { return false }
-func (a *randomDamageTestActor) SpiritshotCharged() bool             { return false }
-func (a *randomDamageTestActor) BlessedSpiritshotCharged() bool      { return false }
-func (a *randomDamageTestActor) CalcStat(stat.Stat, float64) float64 { return 0 }
-func (a *randomDamageTestActor) RandomDamageSpread() int             { return a.spread }
-func (a *randomDamageTestActor) Roll(int) int                        { return a.roll }
+func (a *randomDamageTestActor) Position() (int, int, int)      { return 0, 0, 0 }
+func (a *randomDamageTestActor) ObjectID() int32                { return 1 }
+func (a *randomDamageTestActor) Heading() int                   { return 0 }
+func (a *randomDamageTestActor) Level() int                     { return a.level }
+func (a *randomDamageTestActor) STR() int                       { return 0 }
+func (a *randomDamageTestActor) CON() int                       { return 0 }
+func (a *randomDamageTestActor) DEX() int                       { return 0 }
+func (a *randomDamageTestActor) INT() int                       { return 0 }
+func (a *randomDamageTestActor) WIT() int                       { return 0 }
+func (a *randomDamageTestActor) MEN() int                       { return 0 }
+func (a *randomDamageTestActor) PAtk() float64                  { return 0 }
+func (a *randomDamageTestActor) PDef() float64                  { return 0 }
+func (a *randomDamageTestActor) MAtk() float64                  { return 0 }
+func (a *randomDamageTestActor) MDef() float64                  { return 0 }
+func (a *randomDamageTestActor) MagicCriticalRate() float64     { return 0 }
+func (a *randomDamageTestActor) AttackType() item.WeaponType    { return a.attackType }
+func (a *randomDamageTestActor) SoulshotCharged() bool          { return false }
+func (a *randomDamageTestActor) SpiritshotCharged() bool        { return false }
+func (a *randomDamageTestActor) BlessedSpiritshotCharged() bool { return false }
+func (a *randomDamageTestActor) CalcStat(kind stat.Stat, base float64) float64 {
+	if kind == stat.PSkillEvasion {
+		return a.pSkillEvasion
+	}
+	return base
+}
+func (a *randomDamageTestActor) RandomDamageSpread() int { return a.spread }
+func (a *randomDamageTestActor) Roll(int) int            { return a.roll }
 
 var _ FormulaActor = (*randomDamageTestActor)(nil)
+
+func TestResolvePhysicalSkillInputSkipsEvasionForUnarmedAndBow(t *testing.T) {
+	target := &randomDamageTestActor{pSkillEvasion: 100}
+	for _, attackType := range []item.WeaponType{item.WeaponFist, item.WeaponBow} {
+		in, ok := ResolvePhysicalSkillInput(&randomDamageTestActor{attackType: attackType}, target, modelskill.Definition{}, false, 1)
+		if !ok || in.Evaded {
+			t.Fatalf("AttackType %v evaded = %v, ok = %v; want false, true", attackType, in.Evaded, ok)
+		}
+	}
+
+	in, ok := ResolvePhysicalSkillInput(&randomDamageTestActor{attackType: item.WeaponSword}, target, modelskill.Definition{}, false, 1)
+	if !ok || !in.Evaded {
+		t.Fatalf("sword evaded = %v, ok = %v; want true, true", in.Evaded, ok)
+	}
+}
 
 // Mirrors Creature.getRandomDamageMultiplier (Creature.java:1699-1710):
 // weaponless attackers (spread == -1, the sentinel) roll `5 + sqrt(level)`

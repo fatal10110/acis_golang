@@ -2,9 +2,11 @@ package skill
 
 import (
 	"math"
+	"slices"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	modelitem "github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
@@ -82,6 +84,7 @@ type skillTarget struct {
 	cp, maxCP float64
 
 	dead         bool
+	alikeDead    bool
 	invulnerable bool
 	cursed       bool
 
@@ -111,11 +114,13 @@ type skillTarget struct {
 	lethalOutcomes []formulas.LethalOutcome
 
 	effects *effect.List
+	shots   []modelitem.ShotKind
+	charged map[modelitem.ShotKind]bool
 }
 
 func (t *skillTarget) EffectList() *effect.List { return t.effects }
 
-func (t *skillTarget) AlikeDead() bool { return t.dead }
+func (t *skillTarget) AlikeDead() bool { return t.dead || t.alikeDead }
 func (t *skillTarget) Dead() bool      { return t.dead }
 
 func (t *skillTarget) Invulnerable() bool { return t.invulnerable }
@@ -206,6 +211,12 @@ func (t *skillTarget) Die(killer creature.DeathActor) {
 func (t *skillTarget) ReduceHP(v float64, attacker creature.DeathActor, skill modelskill.Definition) {
 	t.hp -= v
 }
+
+func (t *skillTarget) SetChargedShot(kind modelitem.ShotKind, _ bool) {
+	t.shots = append(t.shots, kind)
+}
+
+func (t *skillTarget) ChargedShot(kind modelitem.ShotKind) bool { return t.charged[kind] }
 
 func (t *skillTarget) PhysicalSkillInput(caster creature.DeathActor, skill modelskill.Definition) (formulas.PhysicalSkillInput, bool) {
 	return t.physicalInput, t.physicalOK
@@ -477,6 +488,76 @@ func TestPhysicalMagicBlowAndManaDamageHandlersUseFormulaInputs(t *testing.T) {
 	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "MANADAM"}, Targets: []Actor{target}})
 	if target.mp != 20 {
 		t.Fatalf("MANADAM mp = %v, want 20", target.mp)
+	}
+}
+
+func TestPdamAndMdamDischargeTheirChargedShots(t *testing.T) {
+	registry := NewDefaultRegistry()
+	caster := &skillTarget{}
+	target := &skillTarget{
+		hp: 1000,
+		physicalInput: formulas.PhysicalSkillInput{
+			AttackPower: 100, SkillPower: 50, Defence: 50,
+			RandomMul: 1, RaceMul: 1, WeaponVulnMul: 1, PvPMul: 1, ElementalMul: 1,
+		},
+		physicalOK: true,
+		magicInput: formulas.MagicDamageInput{
+			MAtk: 100, MDef: 50, SkillPower: 20, PvPMul: 1, ElementalMul: 1,
+		},
+		magicOK: true,
+	}
+
+	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "PDAM"}, Targets: []Actor{target}})
+	caster.charged = map[modelitem.ShotKind]bool{modelitem.ShotBlessedSpirit: true}
+	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "MDAM"}, Targets: []Actor{target}})
+
+	if got, want := caster.shots, []modelitem.ShotKind{modelitem.ShotSoul, modelitem.ShotBlessedSpirit}; !slices.Equal(got, want) {
+		t.Fatalf("discharged shots = %v, want %v", got, want)
+	}
+}
+
+func TestPdamReportsDodgeWithoutDealingDamage(t *testing.T) {
+	registry := NewDefaultRegistry()
+	caster := &skillTarget{}
+	target := &skillTarget{
+		hp:            1000,
+		physicalInput: formulas.PhysicalSkillInput{Evaded: true},
+		physicalOK:    true,
+	}
+
+	result, _ := registry.UseResult(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "PDAM"}, Targets: []Actor{target}})
+	if target.hp != 1000 || len(result.Dodges) != 1 {
+		t.Fatalf("PDAM dodge = hp %v, dodges %d; want hp 1000 and one dodge", target.hp, len(result.Dodges))
+	}
+}
+
+func TestHealPercentAndCombatPointHealApplySkillEffects(t *testing.T) {
+	registry := NewDefaultRegistry()
+	caster := &skillTarget{}
+	hp := &skillTarget{hp: 50, maxHP: 100, effects: effect.NewList(noopStatOwner{})}
+	cp := &skillTarget{cp: 50, maxCP: 100, effects: effect.NewList(noopStatOwner{})}
+	effects := []modelskill.EffectTemplate{{Name: "Buff", Time: 60}}
+
+	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{ID: 1, SkillType: "HEAL_PERCENT", Power: 10, Effects: effects}, Targets: []Actor{hp}})
+	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{ID: 2, SkillType: "COMBATPOINTHEAL", Power: 10, Effects: effects}, Targets: []Actor{cp}})
+
+	if len(hp.effects.All()) != 1 || len(cp.effects.All()) != 1 {
+		t.Fatalf("healing effects = hp %d, cp %d; want one each", len(hp.effects.All()), len(cp.effects.All()))
+	}
+}
+
+func TestBlowSkipsAlikeDeadTargets(t *testing.T) {
+	registry := NewDefaultRegistry()
+	target := &skillTarget{
+		hp:        1000,
+		alikeDead: true,
+		blowInput: formulas.BlowInput{Landed: true, AttackPower: 100, SkillPower: 50, Defence: 50, RandomMul: 1, PosMul: 1},
+		blowOK:    true,
+	}
+
+	registry.Use(Cast{Caster: &skillTarget{}, Skill: modelskill.Definition{SkillType: "BLOW"}, Targets: []Actor{target}})
+	if target.hp != 1000 {
+		t.Fatalf("BLOW changed alike-dead target hp to %v, want 1000", target.hp)
 	}
 }
 

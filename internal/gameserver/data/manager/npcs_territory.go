@@ -7,9 +7,9 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
 )
 
-func pickPosition(positions []spawn.Position) spawn.Position {
+func pickPosition(positions []spawn.Position) (spawn.Position, bool) {
 	if len(positions) == 1 {
-		return positions[0]
+		return positions[0], true
 	}
 
 	chance := rnd.Get(100)
@@ -17,17 +17,15 @@ func pickPosition(positions []spawn.Position) spawn.Position {
 		chance -= pos.Chance
 		if chance < 0 {
 			pos.Heading = rnd.Get(65536)
-			return pos
+			return pos, true
 		}
 	}
-	last := positions[len(positions)-1]
-	last.Heading = rnd.Get(65536)
-	return last
+	return spawn.Position{}, false
 }
 
 func (n *Npcs) pickSpawnPosition(maker *spawn.Maker, entry spawn.Entry) (spawn.Position, bool) {
 	if len(entry.Positions) > 0 {
-		return pickPosition(entry.Positions), true
+		return pickPosition(entry.Positions)
 	}
 	return randomTerritoryPosition(maker, n.geo)
 }

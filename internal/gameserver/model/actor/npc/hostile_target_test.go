@@ -1,13 +1,50 @@
 package npc
 
 import (
+	"slices"
 	"testing"
 
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
+
+func TestHostilePoleAttackConfigAndKnownCombatants(t *testing.T) {
+	h := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", BaseAttackRange: 80})
+	h.AddStatFuncs([]effect.Mod{
+		{Stat: stat.PowerAttackAngle, Op: effect.OpSet, Value: 150},
+		{Stat: stat.AttackCountMax, Op: effect.OpSet, Value: 4},
+	})
+	if got := h.PoleAttackAngle(); got != 150 {
+		t.Fatalf("PoleAttackAngle() = %d, want 150", got)
+	}
+	if got := h.PoleAttackCountMax(); got != 4 {
+		t.Fatalf("PoleAttackCountMax() = %d, want 4", got)
+	}
+
+	state := world.New()
+	h.SetWorld(state)
+	state.Spawn(h, 0, 0, 0, 0)
+	near := &gateTarget{id: 2}
+	far := &gateTarget{id: 3}
+	state.Spawn(near, 50, 0, 0, 0)
+	state.Spawn(far, 150, 0, 0, 0)
+	var known []int32
+	h.ForEachKnownCombatantInRadius(100, func(candidate attackable.Combatant) {
+		known = append(known, candidate.ObjectID())
+	})
+	if !slices.Equal(known, []int32{2}) {
+		t.Fatalf("known combatants in radius = %v, want [2]", known)
+	}
+
+	h.EffectList().Add(&effect.Effect{Skill: effect.Skill{ID: 1}, Type: effect.TypePolearmTargetSingle})
+	if got := h.PoleAttackCountMax(); got != 1 {
+		t.Fatalf("PoleAttackCountMax() with single-target marker = %d, want 1", got)
+	}
+}
 
 // gateTarget is a minimal attackable.Combatant double whose gate-relevant
 // state (dead, silently moving, standing in a peace zone, karma) is set

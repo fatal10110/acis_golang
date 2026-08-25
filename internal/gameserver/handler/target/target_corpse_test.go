@@ -14,28 +14,32 @@ func TestCorpseMobHandlerCastConditions(t *testing.T) {
 	now := time.Now()
 
 	tests := []struct {
-		name   string
-		target *targetActor
-		skill  *modelskill.Definition
-		want   bool
+		name    string
+		target  *targetActor
+		skill   *modelskill.Definition
+		want    bool
+		failure CorpseCastFailure
 	}{
-		{"no corpse", &targetActor{id: 2, category: CategoryAttackable}, &modelskill.Definition{}, false},
-		{"playable corpse", &targetActor{id: 3, category: CategoryPlayable, corpse: true}, &modelskill.Definition{}, false},
-		{"mob corpse, default skill", &targetActor{id: 4, category: CategoryAttackable, corpse: true}, &modelskill.Definition{}, true},
-		{"harvest on monster corpse", &targetActor{id: 5, category: CategoryAttackable, corpse: true}, &modelskill.Definition{SkillType: "HARVEST"}, true},
-		{"harvest on non-monster corpse", &targetActor{id: 6, category: CategoryFolk, corpse: true}, &modelskill.Definition{SkillType: "HARVEST"}, false},
-		{"sweep on monster corpse", &targetActor{id: 7, category: CategoryAttackable, corpse: true}, &modelskill.Definition{SkillType: "SWEEP"}, true},
-		{"sweep on non-monster corpse", &targetActor{id: 8, category: CategoryFolk, corpse: true}, &modelskill.Definition{SkillType: "SWEEP"}, false},
-		{"fresh mob corpse", &targetActor{id: 10, category: CategoryAttackable, corpse: true, corpseDeadline: now.Add(10 * time.Second), corpseTime: 8 * time.Second}, &modelskill.Definition{}, true},
-		{"too old mob corpse", &targetActor{id: 11, category: CategoryAttackable, corpse: true, corpseDeadline: now.Add(time.Second), corpseTime: 8 * time.Second}, &modelskill.Definition{}, false},
-		{"spoiled old mob corpse bypasses age cutoff", &targetActor{id: 12, category: CategoryAttackable, corpse: true, corpseDeadline: now.Add(time.Second), corpseTime: 8 * time.Second, spoiled: true}, &modelskill.Definition{}, true},
-		{"seeded old mob corpse bypasses age cutoff", &targetActor{id: 13, category: CategoryAttackable, corpse: true, corpseDeadline: now.Add(time.Second), corpseTime: 8 * time.Second, seeded: true}, &modelskill.Definition{}, true},
+		{"no corpse", &targetActor{id: 2, category: CategoryAttackable}, &modelskill.Definition{}, false, CorpseCastInvalidTarget},
+		{"playable corpse", &targetActor{id: 3, category: CategoryPlayable, corpse: true}, &modelskill.Definition{}, false, CorpseCastInvalidTarget},
+		{"mob corpse, default skill", &targetActor{id: 4, category: CategoryAttackable, corpse: true}, &modelskill.Definition{}, true, CorpseCastAllowed},
+		{"harvest on monster corpse", &targetActor{id: 5, category: CategoryAttackable, corpse: true, monster: true}, &modelskill.Definition{SkillType: "HARVEST"}, true, CorpseCastAllowed},
+		{"harvest on attackable guard corpse", &targetActor{id: 6, category: CategoryAttackable, corpse: true}, &modelskill.Definition{SkillType: "HARVEST"}, false, CorpseCastHarvestNotMonster},
+		{"sweep on monster corpse", &targetActor{id: 7, category: CategoryAttackable, corpse: true, monster: true}, &modelskill.Definition{SkillType: "SWEEP"}, true, CorpseCastAllowed},
+		{"sweep on attackable guard corpse", &targetActor{id: 8, category: CategoryAttackable, corpse: true}, &modelskill.Definition{SkillType: "SWEEP"}, false, CorpseCastSweepNotMonster},
+		{"fresh mob corpse", &targetActor{id: 10, category: CategoryAttackable, corpse: true, corpseDeadline: now.Add(10 * time.Second), corpseTime: 8 * time.Second}, &modelskill.Definition{}, true, CorpseCastAllowed},
+		{"too old mob corpse", &targetActor{id: 11, category: CategoryAttackable, corpse: true, corpseDeadline: now.Add(time.Second), corpseTime: 8 * time.Second}, &modelskill.Definition{}, false, CorpseCastTooOld},
+		{"spoiled old mob corpse bypasses age cutoff", &targetActor{id: 12, category: CategoryAttackable, corpse: true, corpseDeadline: now.Add(time.Second), corpseTime: 8 * time.Second, spoiled: true}, &modelskill.Definition{}, true, CorpseCastAllowed},
+		{"seeded old mob corpse bypasses age cutoff", &targetActor{id: 13, category: CategoryAttackable, corpse: true, corpseDeadline: now.Add(time.Second), corpseTime: 8 * time.Second, seeded: true}, &modelskill.Definition{}, true, CorpseCastAllowed},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := handler.CanCast(caster, tt.target, tt.skill, false); got != tt.want {
 				t.Fatalf("CanCast = %v, want %v", got, tt.want)
+			}
+			if got := CorpseCastFailureFor(tt.target, tt.skill); got != tt.failure {
+				t.Fatalf("CorpseCastFailureFor = %v, want %v", got, tt.failure)
 			}
 		})
 	}

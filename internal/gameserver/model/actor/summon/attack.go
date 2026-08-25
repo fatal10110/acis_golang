@@ -9,7 +9,10 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 type physicalTarget interface {
@@ -34,6 +37,30 @@ func (a *Actor) InAttackRange(target attackable.Combatant) bool {
 	tx, ty, tz := other.Position()
 	distance := a.PhysicalAttackRange() + int(a.CollisionRadius()) + int(other.CollisionRadius())
 	return location.In3DRange(x, y, z, tx, ty, tz, distance)
+}
+
+func (a *Actor) ForEachKnownCombatantInRadius(radius int, fn func(attackable.Combatant)) {
+	if a.world == nil {
+		return
+	}
+	a.world.ForEachKnownInRadius(a, radius, func(candidate world.Tracked) {
+		if combatant, ok := candidate.(attackable.Combatant); ok {
+			fn(combatant)
+		}
+	})
+}
+
+func (a *Actor) PoleAttackAngle() int {
+	return int(a.calcStat(stat.PowerAttackAngle, 120))
+}
+
+func (a *Actor) PoleAttackCountMax() int {
+	for _, active := range a.EffectList().All() {
+		if active.Type == effect.TypePolearmTargetSingle {
+			return 1
+		}
+	}
+	return int(a.calcStat(stat.AttackCountMax, 0))
 }
 
 // LineOfSight reports whether two actors have a geodata-obstructed view.

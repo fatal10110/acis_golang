@@ -73,7 +73,6 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 	if l.skills != nil {
 		if err := l.skills.Restore(ctx, c); err != nil {
 			l.log.Error().Err(err).Int32("object_id", c.ID).Msg("enter world: restore skill state")
-			return nil, false
 		}
 		// Re-derive level-unlocked skills on every login (Player.java:4139
 		// calls giveSkills() right after restoreCharData()), so a free grant
@@ -147,6 +146,7 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 		l.autosave.Add(live)
 	}
 
+	client.Session.SendFrame(serverpackets.FrameSendMacroListEmpty())
 	client.Session.SendFrame(serverpackets.FrameExStorageMaxCount(c))
 	client.Session.SendFrame(serverpackets.FrameHennaInfo(c.ClassID))
 	// Replay restored buffs into the live effect list here, matching

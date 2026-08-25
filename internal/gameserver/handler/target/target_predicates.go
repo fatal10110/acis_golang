@@ -55,11 +55,12 @@ func validUndeadSingleTarget(creature Creature) bool {
 		return false
 	}
 	if creature.Category().Has(CategoryAttackable) {
-		return true
+		return monsterKind(creature)
 	}
 	if creature.Category().Has(CategoryPlayable) {
 		_, ok := ownerOf(creature)
-		return ok
+		pet, isPet := creature.(PetTarget)
+		return ok && isPet && !pet.IsPet()
 	}
 	return false
 }
@@ -72,6 +73,11 @@ func isUndead(creature Creature) bool {
 func hasCorpse(creature Creature) bool {
 	corpse, ok := creature.(CorpseTarget)
 	return ok && corpse.HasCorpse()
+}
+
+func monsterKind(creature Creature) bool {
+	monster, ok := creature.(MonsterTarget)
+	return ok && monster.MonsterKind()
 }
 
 func corpseTooOld(creature Creature) bool {
