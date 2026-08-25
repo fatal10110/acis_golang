@@ -22,11 +22,11 @@ func TestEncodeAccountKicked(t *testing.T) {
 
 // ---- from ggauth_test.go ----
 func TestEncodeGGAuth(t *testing.T) {
-	got := EncodeGGAuth(GGAuthSkipRequest)
-
-	var want []byte
+	const sessionID int32 = 0x11223344
+	got := EncodeGGAuth(sessionID)
+	want := make([]byte, 0, 21)
 	want = append(want, OpcodeGGAuth)
-	want = binary.LittleEndian.AppendUint32(want, uint32(GGAuthSkipRequest))
+	want = binary.LittleEndian.AppendUint32(want, uint32(sessionID))
 	want = binary.LittleEndian.AppendUint32(want, 0)
 	want = binary.LittleEndian.AppendUint32(want, 0)
 	want = binary.LittleEndian.AppendUint32(want, 0)
@@ -65,6 +65,7 @@ func TestEncodeLoginFail(t *testing.T) {
 		reason LoginFailReason
 	}{
 		{"system error", LoginFailSystemError},
+		{"password wrong", LoginFailPasswordWrong},
 		{"dual box", LoginFailDualBox},
 	}
 	for _, tt := range tests {
@@ -116,7 +117,7 @@ func TestJavaOracleServerPacketVectors(t *testing.T) {
 		want string
 	}{
 		{"AccountKicked", EncodeAccountKicked(AccountKickedPermanentlyBanned), "0220000000"},
-		{"GGAuth", EncodeGGAuth(GGAuthSkipRequest), "0b0b00000000000000000000000000000000000000"},
+		{"GGAuth", EncodeGGAuth(0x11223344), "0b4433221100000000000000000000000000000000"},
 		{"Init", EncodeInit(0x11223344, modulus, key), "004433221121c60000" + "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f" + "00000000000000000000000000000000" + "101112131415161718191a1b1c1d1e1f00"},
 		{"LoginFail", EncodeLoginFail(LoginFailUserOrPassWrong), "0103000000"},
 		{"LoginOk", EncodeLoginOk(0x11223344, -0x66554434), "0344332211ccbbaa990000000000000000ea03000000000000000000000000000000000000000000000000000000000000"},

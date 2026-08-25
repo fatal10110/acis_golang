@@ -14,7 +14,9 @@ import (
 // fails, running handle on its own goroutine per connection. On cancellation
 // it closes the listener and every accepted connection, then waits for all
 // handlers to return. AcceptLoop applies no timeout of its own, so callers
-// that need a bounded shutdown must impose one. A panic in either the shutdown
+// that need a bounded shutdown must impose one. Accepted TCP connections
+// have TCP_NODELAY enabled, matching the selector configuration shared by
+// both servers. A panic in either the shutdown
 // watcher or a connection's handle is recovered and logged rather than taking
 // down the caller. The caller owns ln: AcceptLoop closes it on ctx cancellation
 // but does not create it. A zero-value logger disables logging.
@@ -59,6 +61,9 @@ func AcceptLoop(ctx context.Context, ln net.Listener, handle func(conn net.Conn)
 			default:
 				return err
 			}
+		}
+		if tcp, ok := conn.(*net.TCPConn); ok {
+			tcp.SetNoDelay(true)
 		}
 		connsMu.Lock()
 		conns[conn] = struct{}{}
