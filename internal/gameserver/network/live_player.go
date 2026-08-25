@@ -68,6 +68,10 @@ type livePlayer struct {
 	cubics   map[cubic.ID]*cubic.Runtime
 }
 
+// AccountName returns the owning account of this in-world player, used to
+// report the online roster and per-account entries to the login server.
+func (p *livePlayer) AccountName() string { return p.Character.AccountName }
+
 type pickupIntention struct {
 	ctx    context.Context
 	target world.Tracked
