@@ -5,10 +5,12 @@ import (
 	"testing"
 
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/statbonus"
 )
 
 // The tests here are the white-box survivors of the character-flow pilot
@@ -162,5 +164,81 @@ func TestGameClientLinkEnterWorldSkipsDeathPenaltyPassiveAtZero(t *testing.T) {
 	}
 	if got := character.SkillLevel(5076); got != 0 {
 		t.Fatalf("SkillLevel(5076) = %d, want 0 for transient death penalty", got)
+	}
+}
+
+// TestGameClientLinkEnterWorldRebasesRestoredVitalBases pins the restore
+// boundary for persisted vitals through the real login path: the characters
+// row stores finalized max snapshots (Save writes ResourceValues), so entering
+// the world must re-derive the raw bases from the class level tables instead
+// of letting every read re-apply the CON/MEN finalize — which previously made
+// each save→load cycle compound the drift. Current HP/MP/CP survive the round
+// trip unscaled.
+func TestGameClientLinkEnterWorldRebasesRestoredVitalBases(t *testing.T) {
+	tmpl, ok := testTemplates(t).Get(0)
+	if !ok {
+		t.Fatal("missing test class template")
+	}
+	finalHP := tmpl.HPTable[0] * statbonus.CONBonus[tmpl.CON]
+	finalMP := tmpl.MPTable[0] * statbonus.MENBonus[tmpl.MEN]
+	// Whole numbers only: the characters table's vitals columns have no
+	// fractional digits, so anything else is rounded by the row itself.
+	restoredHP, restoredMP := 20.0, 15.0
+
+	c, chars, _, _, _, state := newLinkedSQLGameClient(t, nil, func(chars *gamesql.CharacterStore, _ *gamesql.ItemStore) {
+		ch := seedSelectableSQLCharacter(t, chars, "player1", "Newbie", 1, 0)
+		ch.SetResourceValues(player.Resources{
+			MaxHP: finalHP, CurrentHP: restoredHP,
+			MaxCP: tmpl.CPTable[0] * statbonus.CONBonus[tmpl.CON], CurrentCP: 0,
+			MaxMP: finalMP, CurrentMP: restoredMP,
+		})
+		if err := chars.Save(context.Background(), ch); err != nil {
+			t.Fatalf("save premultiplied vitals snapshot: %v", err)
+		}
+	}, 1)
+
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
+	readEnterWorldBurst(t, c, false)
+
+	live, ok := state.Player(sqlSoleObjectID(t, chars))
+	if !ok {
+		t.Fatal("world player missing after EnterWorld")
+	}
+	character := live.(*livePlayer).Character
+
+	res := character.ResourceValues()
+	// The computed maxima are the level-table bases finalized once through
+	// the live attributes — not the row snapshot re-finalized.
+	if want := tmpl.HPTable[0] * statbonus.CONBonus[character.CON()]; res.MaxHP != want {
+		t.Errorf("MaxHPValue() after restore = %v, want base finalized once = %v", res.MaxHP, want)
+	}
+	if want := tmpl.MPTable[0] * statbonus.MENBonus[character.MEN()]; res.MaxMP != want {
+		t.Errorf("MaxMPValue() after restore = %v, want base finalized once = %v", res.MaxMP, want)
+	}
+	if res.CurrentHP != restoredHP {
+		t.Errorf("CurrentHP after restore = %v, want row value preserved = %v", res.CurrentHP, restoredHP)
+	}
+	if res.CurrentMP != restoredMP {
+		t.Errorf("CurrentMP after restore = %v, want row value preserved = %v", res.CurrentMP, restoredMP)
+	}
+
+	// The next save→load cycle must be a fixed point: same maxima, currents
+	// untouched.
+	if err := chars.Save(context.Background(), character); err != nil {
+		t.Fatalf("save live character: %v", err)
+	}
+	reloaded, err := chars.Get(context.Background(), character.ID)
+	if err != nil {
+		t.Fatalf("reload character: %v", err)
+	}
+	reloaded.AttachRuntime(tmpl, nil)
+	reloaded.RestoreVitals(tmpl)
+
+	if next := reloaded.ResourceValues(); next.MaxHP != res.MaxHP || next.MaxMP != res.MaxMP || next.MaxCP != res.MaxCP ||
+		next.CurrentHP != res.CurrentHP || next.CurrentMP != res.CurrentMP || next.CurrentCP != res.CurrentCP {
+		t.Errorf("second cycle = %+v, want unchanged %+v", next, res)
 	}
 }
