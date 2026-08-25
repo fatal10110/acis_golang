@@ -369,6 +369,8 @@ func TestClientLinkLoginDecodeFailureSendsAccessFailed(t *testing.T) {
 	addr, _, _, _, _ := newTestClientLink(t, newFakeAccountStore(), false)
 	c := dialLoginClient(t, addr)
 
+	c.gameGuard()
+
 	// A RequestAuthLogin body shorter than the 128-byte RSA credential block
 	// fails to decode before any account lookup happens.
 	w := wire.NewPacketWriter(clientpackets.OpcodeRequestAuthLogin)
@@ -391,6 +393,7 @@ func TestClientLinkLoginLastActiveWriteFailureSendsAccessFailed(t *testing.T) {
 	addr, l, _, sessions, _ := newTestClientLink(t, accounts, false)
 	c := dialLoginClient(t, addr)
 
+	c.gameGuard()
 	c.send(encodeRequestAuthLogin(&l.loginKeyPair().Private.PublicKey, "player1", "s3cret"))
 	reply := c.read()
 	if reply[0] != serverpackets.OpcodeLoginFail {
@@ -518,6 +521,7 @@ func TestClientLinkUnknownAccountAutoCreateOffCountsFailedAttempts(t *testing.T)
 
 	for i := 1; i <= 3; i++ {
 		c := dialLoginClient(t, addr)
+		c.gameGuard()
 		c.send(encodeRequestAuthLogin(&l.loginKeyPair().Private.PublicKey, "missing", "s3cret"))
 		reply := c.read()
 		if reply[0] != serverpackets.OpcodeLoginFail {
