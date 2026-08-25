@@ -41,3 +41,7 @@ go run ./cmd/datadiff -category=skill -expected-dump=skill.dump
 ```
 
 `-datapack` is optional when `aCis_datapack/` sits next to the checkout or `ACIS_DATAPACK` is set. Current category coverage is the output of `-list`.
+
+## Testing
+
+Tests are behavior-first: full-flow scenarios in `tests/<domain>/` drive real packets against a real MariaDB, with only a small pure-function core unit-tested directly. See the [Testing section in AGENTS.md](AGENTS.md#testing) for the policy, allowed pure-unit categories, harness usage, and run commands.
