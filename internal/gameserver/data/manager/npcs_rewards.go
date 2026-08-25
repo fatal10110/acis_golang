@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
@@ -24,6 +25,7 @@ type deathRewards struct {
 	ids        idAllocator
 	items      *item.Table
 	ground     groundPlacer
+	geo        move.Geo
 }
 
 type playerRewardEntry struct {
@@ -136,7 +138,7 @@ func (d *deathRewards) rollDrops(killer creature.DeathActor, maxDealer *player.C
 	if maxDealer != nil {
 		receiver = maxDealer
 	}
-	NewKillReward(d.categories, d.hostile.SpoilPool(), levelMultiplier, d.raid, d.config.Rates, autoLootItems, d.config.AutoLootHerbs, d.ids, d.items, d.ground, x, y, z, heading, d.hostile.ObjectID()).CalculateRewards(receiver)
+	NewKillReward(d.categories, d.hostile.SpoilPool(), levelMultiplier, d.raid, d.config.Rates, autoLootItems, d.config.AutoLootHerbs, d.ids, d.items, d.ground, d.geo, x, y, z, heading, d.hostile.ObjectID()).CalculateRewards(receiver)
 }
 
 func (d *deathRewards) grantExpAndSp(entries []playerRewardEntry, totalDamage float64) {

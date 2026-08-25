@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/config"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/rs/zerolog"
@@ -1896,4 +1897,52 @@ func TestWaterConcurrentAccess(t *testing.T) {
 		}
 	}()
 	wg.Wait()
+}
+
+// ---- from grounditems_test.go ----
+
+func newTestGroundItem(t *testing.T, id, templateID int32) *grounditem.Item {
+	t.Helper()
+	tmpl := &item.Template{ID: templateID, Kind: item.KindEtcItem, EtcItem: &item.EtcItemDetail{}}
+	inst := item.Instance{ObjectID: id, TemplateID: templateID, Count: 1, Location: item.LocationVoid}
+	ground, err := grounditem.New(inst, tmpl)
+	if err != nil {
+		t.Fatalf("grounditem.New() error = %v", err)
+	}
+	return ground
+}
+
+func TestGroundItemsDropLootProtectionLocksThenExpires(t *testing.T) {
+	now := time.Unix(0, 0)
+	g := NewGroundItems(nil, DefaultGroundItemOptions(), func() time.Time { return now })
+
+	ground := newTestGroundItem(t, 1, 57)
+	g.Drop(ground, DropOptions{X: 1, Y: 1, Z: 1, ProtectOwnerID: 42, ProtectFor: 15 * time.Second})
+
+	if got := ground.Instance.Snapshot().OwnerID; got != 42 {
+		t.Fatalf("OwnerID after drop = %d, want 42 (locked to killer)", got)
+	}
+
+	now = now.Add(10 * time.Second)
+	g.Tick()
+	if got := ground.Instance.Snapshot().OwnerID; got != 42 {
+		t.Fatalf("OwnerID before protection deadline = %d, want still 42", got)
+	}
+
+	now = now.Add(6 * time.Second) // total 16s > 15s protection window
+	g.Tick()
+	if got := ground.Instance.Snapshot().OwnerID; got != 0 {
+		t.Fatalf("OwnerID after protection deadline = %d, want 0 (unlocked)", got)
+	}
+}
+
+func TestGroundItemsDropWithoutProtectOwnerLeavesItemUnowned(t *testing.T) {
+	g := NewGroundItems(nil, DefaultGroundItemOptions(), func() time.Time { return time.Unix(0, 0) })
+
+	ground := newTestGroundItem(t, 1, 57)
+	g.Drop(ground, DropOptions{X: 1, Y: 1, Z: 1})
+
+	if got := ground.Instance.Snapshot().OwnerID; got != 0 {
+		t.Fatalf("OwnerID = %d, want 0 for an unprotected drop", got)
+	}
 }
