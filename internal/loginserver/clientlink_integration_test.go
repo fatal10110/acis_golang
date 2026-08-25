@@ -675,6 +675,7 @@ func TestClientLinkShowLicenceOffRepliesServerListAfterLogin(t *testing.T) {
 	servers.MarkOnline(7, "127.0.0.1", 7777, 100)
 
 	c := dialLoginClient(t, addr)
+	c.gameGuard()
 	c.send(encodeRequestAuthLogin(&l.loginKeyPair().Private.PublicKey, "player1", "s3cret"))
 	reply := c.read()
 	if reply[0] != serverpackets.OpcodeServerList {
@@ -695,6 +696,7 @@ func TestClientLinkShowLicenceOffSkipsSessionKeyCheckOnServerLogin(t *testing.T)
 	servers.MarkOnline(7, "127.0.0.1", 7777, 100)
 
 	c := dialLoginClient(t, addr)
+	c.gameGuard()
 	c.send(encodeRequestAuthLogin(&l.loginKeyPair().Private.PublicKey, "player1", "s3cret"))
 	reply := c.read()
 	if reply[0] != serverpackets.OpcodeServerList {
