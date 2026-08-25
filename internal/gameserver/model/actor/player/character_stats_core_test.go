@@ -4513,6 +4513,24 @@ func TestCharacter_AddLevel_Direct(t *testing.T) {
 	}
 }
 
+func TestCharacter_AddLevel_RefillsStatCalculatedVitals(t *testing.T) {
+	table := realLevelTable(t)
+	tmpl := levelStepTemplate(81)
+	c := newProgressionCharacter()
+	c.AttachRuntime(tmpl, nil)
+	c.AddStatFuncs([]effect.Mod{
+		{Stat: stat.MaxHP, Op: effect.OpMul, Value: 2, Owner: testModOwner()},
+		{Stat: stat.MaxMP, Op: effect.OpMul, Value: 2, Owner: testModOwner()},
+		{Stat: stat.MaxCP, Op: effect.OpMul, Value: 2, Owner: testModOwner()},
+	})
+
+	c.AddLevel(table, tmpl, 1)
+
+	if got := c.ResourceValues(); got.CurrentHP != got.MaxHP || got.CurrentMP != got.MaxMP || got.CurrentCP != got.MaxCP {
+		t.Fatalf("ResourceValues() after stat-modified level-up = %+v, want every current value at its stat-calculated max", got)
+	}
+}
+
 // TestCharacter_AddLevel_NilTemplateSkipsRefill covers the case where a
 // caller doesn't have (or need) the profession template on hand: the level
 // and experience still update, but HP/MP/CP are left alone.
