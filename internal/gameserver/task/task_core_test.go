@@ -1936,6 +1936,31 @@ func TestGroundItemsDropLootProtectionLocksThenExpires(t *testing.T) {
 	}
 }
 
+func TestGroundItemsLoadClearsPersistedLootProtectionOwner(t *testing.T) {
+	templates := item.NewTable([]*item.Template{{ID: 57, Kind: item.KindEtcItem, EtcItem: &item.EtcItemDetail{}}})
+	g := NewGroundItems(nil, DefaultGroundItemOptions(), func() time.Time { return time.Unix(0, 0) })
+
+	// A snapshot carrying a nonzero OwnerID models a row flushed mid-protection
+	// window; Load has no persisted lootExpiresAt to restore alongside it, so
+	// Tick's unlock branch (gated on lootExpiresAt) would never fire again if
+	// the owner survived the reload, permanently locking the item.
+	rows := []item.GroundSnapshot{{
+		Instance: item.Instance{ObjectID: 1, TemplateID: 57, Count: 1, OwnerID: 42, Location: item.LocationVoid},
+		X:        1, Y: 1, Z: 1,
+	}}
+	if err := g.Load(rows, templates); err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	snaps := g.Snapshots(nil)
+	if len(snaps) != 1 {
+		t.Fatalf("Snapshots() len = %d, want 1", len(snaps))
+	}
+	if snaps[0].OwnerID != 0 {
+		t.Fatalf("OwnerID after Load = %d, want 0 (a restart cannot resume a loot-protection lock it never persisted a deadline for)", snaps[0].OwnerID)
+	}
+}
+
 func TestGroundItemsDropWithoutProtectOwnerLeavesItemUnowned(t *testing.T) {
 	g := NewGroundItems(nil, DefaultGroundItemOptions(), func() time.Time { return time.Unix(0, 0) })
 

@@ -167,6 +167,12 @@ func (g *GroundItems) Load(rows []item.GroundSnapshot, templates *item.Table) er
 			return fmt.Errorf("ground items: item template %d not loaded", row.TemplateID)
 		}
 		row.Instance.ManaLeft = tmpl.InitialManaLeft()
+		// A loot-protection owner has no persisted deadline (only
+		// lootExpiresAt tracks it, in-memory only), so a restart can never
+		// correctly resume it; matching ItemInstance.setDropProtection's own
+		// in-memory-only ThreadPool.schedule state (aCis ItemInstance.java:
+		// 827-831), the lock does not survive past this reload.
+		row.Instance.OwnerID = 0
 		ground, err := grounditem.New(row.Instance, tmpl)
 		if err != nil {
 			return err
