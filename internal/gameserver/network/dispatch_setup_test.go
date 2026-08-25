@@ -150,7 +150,7 @@ func newTestGameClientLinkWithSkillsShortcutsCrestsKarmaAndLog(t *testing.T, log
 	if len(cursedWeapons) > 0 {
 		cursed = cursedWeapons[0]
 	}
-	playerConfig := PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: karmaPlayerCanTeleport, AllowWater: true}
+	playerConfig := PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: karmaPlayerCanTeleport, AllowWater: true, CharacterSelectDelay: 3 * time.Second, ServerBypassDelay: 100 * time.Millisecond}
 	inventoryUpdates := task.NewInventoryUpdates()
 	gcl := NewGameClientLink(GameClientLinkConfig{
 		Validator:        validator,

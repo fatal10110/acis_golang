@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
@@ -88,6 +89,26 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			return
 		}
 		opcode := payload[0]
+		// Packet-protection gate, ahead of the state gate: every received
+		// frame is counted, and while a flood is active frames are dropped,
+		// answering ActionFailed at most once per second of ongoing flood.
+		// After counting (so dropped frames never reach a handler), an
+		// excess of detected floods per minute disconnects, as does a hard
+		// cap on packets processed pre-auth. The queue-size accounting and
+		// burst cap of the reference have no counterpart here: this port's
+		// read loop processes each frame inline with its read, so there is
+		// no inbound queue to overflow or drain in batches.
+		if actionFailed, drop := client.stats.countIncomingPacket(time.Now()); actionFailed {
+			session.SendFrame(serverpackets.FrameActionFailed())
+		} else if drop {
+			continue
+		} else if client.stats.floodsExceeded() {
+			l.log.Warn().Str("state", client.State().String()).Msg("game client disconnected: too many packet floods")
+			return
+		} else if client.State() == StateConnected && client.stats.processedPackets > preAuthMaxProcessedPackets {
+			l.log.Warn().Str("state", client.State().String()).Msg("game client disconnected: too many packets in non-authed state")
+			return
+		}
 		if !client.Accept(opcode) {
 			l.log.Warn().Str("state", client.State().String()).Str("opcode", hex.EncodeToString(payload)).Msg("Accept opcode")
 			// Pre-auth, any rejected opcode disconnects immediately; once
@@ -181,6 +202,12 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				}
 				continue
 			}
+			// The character-select reuse gate answers a refused delete
+			// with the deletion-failed reply; nothing else runs.
+			if !client.performFloodProtected(floodProtectorCharacterSelect, l.playerConfig.CharacterSelectDelay, time.Now()) {
+				session.SendFrame(serverpackets.FrameCharDeleteFail(serverpackets.CharDeleteFailReasonDeletionFailed))
+				continue
+			}
 			c, ok := slotCharacter(chars, req.Slot)
 			if !ok {
 				// An unknown slot sends no failure reply — only the
@@ -212,6 +239,11 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				if errors.Is(err, errMalformedPacketDisconnect) {
 					return
 				}
+				continue
+			}
+			// The character-select reuse gate refuses a restore silently,
+			// leaving the client's character list untouched.
+			if !client.performFloodProtected(floodProtectorCharacterSelect, l.playerConfig.CharacterSelectDelay, time.Now()) {
 				continue
 			}
 			if c, ok := slotCharacter(chars, req.Slot); ok {
@@ -265,6 +297,10 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				if errors.Is(err, errMalformedPacketDisconnect) {
 					return
 				}
+				continue
+			}
+			// The character-select reuse gate refuses a selection silently.
+			if !client.performFloodProtected(floodProtectorCharacterSelect, l.playerConfig.CharacterSelectDelay, time.Now()) {
 				continue
 			}
 			c, ok := slotCharacter(chars, req.Slot)
@@ -744,6 +780,12 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				if errors.Is(err, errMalformedPacketDisconnect) {
 					return
 				}
+				continue
+			}
+			// An empty command returns before the bypass reuse gate is
+			// consulted, so it never consumes the cooldown; a refused
+			// command is dropped silently.
+			if req.Command != "" && !client.performFloodProtected(floodProtectorServerBypass, l.playerConfig.ServerBypassDelay, time.Now()) {
 				continue
 			}
 			l.requestBypassToServer(live, req)

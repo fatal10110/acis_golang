@@ -16,7 +16,7 @@ import (
 // restarts back to character selection, and requires the walk destination
 // to survive in the characters row so the next selection starts there.
 func TestRestartReturnsToCharacterSelect(t *testing.T) {
-	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
+	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1), gameservertest.WithReuseDelays(0, 0))
 	c := srv.Client
 
 	c.Send(encodeRequestGameStart(0))

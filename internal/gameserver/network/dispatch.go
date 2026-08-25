@@ -110,6 +110,12 @@ type PlayerConfig struct {
 	// RateKarmaExpLost scales the death exp-loss percentage while the dying
 	// player carries positive karma.
 	RateKarmaExpLost float64
+	// CharacterSelectDelay is the reuse delay shared by the character-list
+	// actions (delete, restore, select) on one client session.
+	CharacterSelectDelay time.Duration
+	// ServerBypassDelay is the reuse delay between two bypass commands on
+	// one client session.
+	ServerBypassDelay time.Duration
 }
 
 // GameClientLink accepts and drives connections from Interlude game

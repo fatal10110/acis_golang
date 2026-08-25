@@ -62,6 +62,8 @@ type options struct {
 	spawnProtection        time.Duration
 	allowDelevel           bool
 	rateKarmaExpLost       float64
+	characterSelectDelay   time.Duration
+	serverBypassDelay      time.Duration
 	seed                   func(*gamesql.CharacterStore, *gamesql.ItemStore)
 	seedShortcuts          func(*gamesql.ShortcutStore)
 	npcs                   *npc.Table
@@ -118,6 +120,14 @@ func WithRestartPoints(table *restart.Table) Option {
 // activated on teleport completion (default: disabled).
 func WithSpawnProtection(window time.Duration) Option {
 	return func(o *options) { o.spawnProtection = window }
+}
+
+// WithReuseDelays overrides the server.properties CharacterSelectTime and
+// ServerBypassTime reuse delays (defaults 3s and 100ms). The reference
+// treats 0 as "never rate-limited", so flows that legitimately repeat a
+// gated action within the shipped window can boot with zero delays.
+func WithReuseDelays(characterSelect, serverBypass time.Duration) Option {
+	return func(o *options) { o.characterSelectDelay, o.serverBypassDelay = characterSelect, serverBypass }
 }
 
 // WithAllowDelevel sets the players.properties AllowDelevel gate: whether a
@@ -573,6 +583,8 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	o := &options{
 		account:                "player1",
 		karmaPlayerCanTeleport: true,
+		characterSelectDelay:   3 * time.Second,
+		serverBypassDelay:      100 * time.Millisecond,
 	}
 	for _, opt := range opts {
 		opt(o)
@@ -690,7 +702,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		InventoryUpdates: inventoryUpdates,
 		ItemInstances:    itemInstances,
 		ShadowItems:      shadowItems,
-		PlayerConfig:     network.PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, AllowWater: true, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost},
+		PlayerConfig:     network.PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, AllowWater: true, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay},
 		Restarts:         o.restarts,
 		PetConfig:        petmodel.DefaultConfig(),
 		EnchantRoll:      o.enchantRoll,

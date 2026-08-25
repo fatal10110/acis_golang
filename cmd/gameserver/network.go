@@ -82,6 +82,8 @@ func provideGameClientLink(
 	karmaTeleport karmaPlayerCanTeleport,
 	delevel allowDelevel,
 	karmaExpLost rateKarmaExpLost,
+	charSelect characterSelectDelay,
+	bypassDelay serverBypassDelay,
 	petCfg pet.Config,
 	petStore *gamesql.PetStore,
 	log zerolog.Logger,
@@ -99,6 +101,8 @@ func provideGameClientLink(
 		AllowWater:               cfg.AllowWater,
 		AllowDelevel:             bool(delevel),
 		RateKarmaExpLost:         float64(karmaExpLost),
+		CharacterSelectDelay:     time.Duration(charSelect),
+		ServerBypassDelay:        time.Duration(bypassDelay),
 	}
 	link := network.NewGameClientLink(network.GameClientLinkConfig{
 		Validator:     validator,
