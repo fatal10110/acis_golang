@@ -149,7 +149,38 @@ func provideSkillPersistence(pool *sql.DB, data *gameData) *skillstate.Persisten
 	return skillstate.NewPersistence(gamesql.NewSkillSaveStore(pool), data.Skills, gamesql.NewCharacterSkillStore(pool))
 }
 
-func startGameServer(lc fx.Lifecycle, cfg gameServerConfig, _ *gameData, _ *manager.Roster, validator *network.SessionValidator, links *loginLinkState, clients *network.GameClientLink, log zerolog.Logger) {
+// onlineAccounts collects the account names of every player currently in
+// the world, forming the roster reported to the login server at
+// registration.
+func onlineAccounts(state *world.State) []string {
+	var out []string
+	for _, obj := range state.Players() {
+		p, ok := obj.(interface{ AccountName() string })
+		if !ok {
+			continue
+		}
+		if name := p.AccountName(); name != "" {
+			out = append(out, name)
+		}
+	}
+	return out
+}
+
+// playerAuthResponseHandler reports a successfully authed account to the
+// login server before resolving the waiting game client, so the online
+// roster grows before the client proceeds into the world.
+func playerAuthResponseHandler(links *loginLinkState, validator *network.SessionValidator, log zerolog.Logger) func(string, bool) {
+	return func(account string, ok bool) {
+		if link := links.get(); ok && link != nil {
+			if err := link.SendPlayerInGame([]string{account}); err != nil {
+				log.Debug().Err(err).Str("account", account).Msg("notify player in game")
+			}
+		}
+		validator.Resolve(account, ok)
+	}
+}
+
+func startGameServer(lc fx.Lifecycle, cfg gameServerConfig, _ *gameData, _ *manager.Roster, validator *network.SessionValidator, links *loginLinkState, clients *network.GameClientLink, state *world.State, log zerolog.Logger) {
 	var cancel context.CancelFunc
 	var wg sync.WaitGroup
 	wroteGeneratedHexID := false
@@ -163,9 +194,16 @@ func startGameServer(lc fx.Lifecycle, cfg gameServerConfig, _ *gameData, _ *mana
 			go func() {
 				defer wg.Done()
 				network.Maintain(runCtx, cfg.LoginAddr, cfg.Auth, network.LoginLinkHandlers{
-					PlayerAuthResponse: validator.Resolve,
+					PlayerAuthResponse: playerAuthResponseHandler(links, validator, log),
 				}, network.DefaultReconnectDelay, func(link *network.LoginLink) {
 					links.set(link)
+					if accounts := onlineAccounts(state); len(accounts) > 0 {
+						if err := link.SendPlayerInGame(accounts); err != nil {
+							log.Error().Err(err).Int("accounts", len(accounts)).Msg("send online roster to loginserver")
+						} else {
+							log.Info().Int("accounts", len(accounts)).Msg("online roster sent to loginserver")
+						}
+					}
 					if cfg.GeneratedHexID && !wroteGeneratedHexID {
 						if err := writeHexIDFile(cfg.HexIDPath, int(link.ServerID), cfg.Auth.HexID); err != nil {
 							log.Error().Err(err).Str("path", cfg.HexIDPath).Msg("write generated hexid")
