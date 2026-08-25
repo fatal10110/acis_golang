@@ -289,9 +289,15 @@ func NewCharacter(objectID int32, tmpl *Template, accountName, name string, hair
 
 		CharLevel: 1,
 
-		maxHP: float64(int(tmpl.HPTable[0] * statbonus.CONBonus[tmpl.CON])), curHP: float64(int(tmpl.HPTable[0] * statbonus.CONBonus[tmpl.CON])),
-		maxCP: float64(int(tmpl.CPTable[0] * statbonus.CONBonus[tmpl.CON])),
-		maxMP: float64(int(tmpl.MPTable[0] * statbonus.MENBonus[tmpl.MEN])), curMP: float64(int(tmpl.MPTable[0] * statbonus.MENBonus[tmpl.MEN])),
+		// The stored max fields are raw calculator bases — the level-table
+		// values, exactly what AddLevel's refill persists. The stat finalize
+		// applies the CON/MEN bonus once on read, so seeding the bonus here
+		// as well would double it for every freshly created character. The
+		// current values instead start at the computed effective maximum
+		// (HP and MP full, CP empty).
+		maxHP: tmpl.HPTable[0], curHP: float64(int(tmpl.HPTable[0] * statbonus.CONBonus[tmpl.CON])),
+		maxCP: tmpl.CPTable[0],
+		maxMP: tmpl.MPTable[0], curMP: float64(int(tmpl.MPTable[0] * statbonus.MENBonus[tmpl.MEN])),
 
 		Face: int(face), HairStyle: int(hairStyle), HairColor: int(hairColor),
 

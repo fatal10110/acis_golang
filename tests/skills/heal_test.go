@@ -11,9 +11,8 @@ import (
 
 // damageToHealHeadroom drops the caster so its remaining HP sits exactly
 // headroom below the stat-computed max — the observable slack a heal flow
-// needs. Fresh fixture characters currently sit above their computed max
-// (#1896), so the drop is measured from the current value down to the target,
-// not from full HP.
+// needs. A fresh character starts at its computed max, so the drop is
+// measured from full HP down to the target.
 func damageToHealHeadroom(t *testing.T, srv *gameservertest.Server, objID, headroom int32) (before, maxHP int) {
 	t.Helper()
 	maxHP = srv.PlayerMaxHP(t, objID)

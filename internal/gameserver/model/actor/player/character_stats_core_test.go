@@ -3872,14 +3872,23 @@ func TestNewCharacter(t *testing.T) {
 		t.Errorf("Level = %d, want 1", c.CharLevel)
 	}
 	res := c.ResourceValues()
-	if want := float64(int(tmpl.HPTable[0] * statbonus.CONBonus[tmpl.CON])); res.MaxHP != want || res.CurrentHP != want {
-		t.Errorf("HP = %v/%v, want %v/%v", res.MaxHP, res.CurrentHP, want, want)
+	if res.MaxHP != tmpl.HPTable[0] {
+		t.Errorf("stored max HP base = %v, want raw table value %v", res.MaxHP, tmpl.HPTable[0])
 	}
-	if want := float64(int(tmpl.MPTable[0] * statbonus.MENBonus[tmpl.MEN])); res.MaxMP != want || res.CurrentMP != want {
-		t.Errorf("MP = %v/%v, want %v/%v", res.MaxMP, res.CurrentMP, want, want)
+	if want := float64(int(tmpl.HPTable[0] * statbonus.CONBonus[tmpl.CON])); res.CurrentHP != want {
+		t.Errorf("CurrentHP = %v, want computed max %v", res.CurrentHP, want)
 	}
-	if want := float64(int(tmpl.CPTable[0] * statbonus.CONBonus[tmpl.CON])); res.MaxCP != want || res.CurrentCP != 0 {
-		t.Errorf("CP = %v/%v, want %v/0", res.MaxCP, res.CurrentCP, want)
+	if res.MaxMP != tmpl.MPTable[0] {
+		t.Errorf("stored max MP base = %v, want raw table value %v", res.MaxMP, tmpl.MPTable[0])
+	}
+	if want := float64(int(tmpl.MPTable[0] * statbonus.MENBonus[tmpl.MEN])); res.CurrentMP != want {
+		t.Errorf("CurrentMP = %v, want computed max %v", res.CurrentMP, want)
+	}
+	if res.MaxCP != tmpl.CPTable[0] {
+		t.Errorf("stored max CP base = %v, want raw table value %v", res.MaxCP, tmpl.CPTable[0])
+	}
+	if res.CurrentCP != 0 {
+		t.Errorf("CurrentCP = %v, want 0", res.CurrentCP)
 	}
 	if c.HairStyle != 1 || c.HairColor != 2 || c.Face != 0 {
 		t.Errorf("appearance = hairStyle=%d hairColor=%d face=%d, want 1/2/0", c.HairStyle, c.HairColor, c.Face)
@@ -3889,6 +3898,35 @@ func TestNewCharacter(t *testing.T) {
 	}
 	if c.AccessLevel != defaultAccessLevel {
 		t.Errorf("AccessLevel = %d, want %d", c.AccessLevel, defaultAccessLevel)
+	}
+}
+
+// TestNewCharacterVitalsApplyBonusOnce pins that a freshly created
+// character's computed maxima fold the CON/MEN bonus exactly once: the raw
+// level-table bases stored at creation are finalized through the live stat
+// calculator without pre-multiplication, and no current value starts above
+// its own maximum.
+func TestNewCharacterVitalsApplyBonusOnce(t *testing.T) {
+	tmpl := humanFighterTemplate()
+
+	c, err := NewCharacter(1, tmpl, "acct1", "Newbie", 0, 0, 0, SexMale)
+	if err != nil {
+		t.Fatalf("NewCharacter() unexpected error: %v", err)
+	}
+	c.AttachRuntime(tmpl, nil)
+
+	res := c.ResourceValues()
+	if want := tmpl.HPTable[0] * statbonus.CONBonus[tmpl.CON]; res.MaxHP != want {
+		t.Errorf("MaxHPValue() = %v, want table*CONBonus applied once = %v", res.MaxHP, want)
+	}
+	if want := tmpl.MPTable[0] * statbonus.MENBonus[tmpl.MEN]; res.MaxMP != want {
+		t.Errorf("MaxMPValue() = %v, want table*MENBonus applied once = %v", res.MaxMP, want)
+	}
+	if want := tmpl.CPTable[0] * statbonus.CONBonus[tmpl.CON]; res.MaxCP != want {
+		t.Errorf("MaxCPValue() = %v, want table*CONBonus applied once = %v", res.MaxCP, want)
+	}
+	if res.CurrentHP > res.MaxHP || res.CurrentMP > res.MaxMP || res.CurrentCP > res.MaxCP {
+		t.Errorf("current vitals %+v exceed their maxima on a fresh character", res)
 	}
 }
 
