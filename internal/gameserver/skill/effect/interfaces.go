@@ -359,6 +359,10 @@ type hateRaiser interface {
 	AddDamageHate(attacker attackable.Combatant, damage, hate float64)
 }
 
+type attackDesireRaiser interface {
+	AddAttackDesire(attacker attackable.Combatant, hate float64)
+}
+
 // monsterKindTarget optionally reports whether an actor is specifically a
 // Monster-family hostile NPC (as opposed to a guard, siege guard, or
 // friendly monster); an actor without one is treated as not Monster-family.

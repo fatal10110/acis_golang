@@ -371,6 +371,11 @@ func (h *Hostile) AddDamageHate(attacker attackable.Combatant, damage, hate floa
 	h.brain.AddDamageHate(attacker, damage, hate)
 }
 
+// AddAttackDesire queues an attack intention against this NPC.
+func (h *Hostile) AddAttackDesire(attacker attackable.Combatant, hate float64) {
+	h.brain.AddAttackDesire(attacker, hate)
+}
+
 // AddCombatDamageHate records attacker's combat damage against this NPC,
 // queuing its attack Desire at a flat weight instead of scaling it with the
 // damage dealt (see ai.Attackable.AddCombatDamageHate).
