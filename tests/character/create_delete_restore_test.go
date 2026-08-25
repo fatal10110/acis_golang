@@ -27,7 +27,7 @@ func TestCreateInvalidNameKeepsConnectionOpen(t *testing.T) {
 }
 
 func TestDeleteAndRestore(t *testing.T) {
-	srv := gameservertest.Boot(t)
+	srv := gameservertest.Boot(t, gameservertest.WithReuseDelays(0, 0))
 	c := srv.Client
 
 	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
