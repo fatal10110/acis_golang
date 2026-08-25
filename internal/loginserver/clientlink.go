@@ -52,6 +52,7 @@ type ClientLink struct {
 	sessions           *manager.SessionStore
 	bans               *manager.IPBanList
 	autoCreateAccounts bool
+	skipLicenceCheck   bool
 	loginTryBeforeBan  int
 	loginBlockAfterBan time.Duration
 	log                zerolog.Logger
@@ -71,6 +72,9 @@ type ClientLink struct {
 // NewClientLink builds a ClientLink from its collaborators. autoCreateAccounts
 // mirrors the AutoCreateAccounts config flag: an unrecognized login is
 // registered on its first successful RequestAuthLogin rather than rejected.
+// skipLicenceCheck is the inverse of the ShowLicence config flag: when
+// ShowLicence is false, a successful login replies ServerList instead of
+// LoginOk and the session-key pair on RequestServerLogin is not enforced.
 func NewClientLink(
 	accounts *loginsql.AccountStore,
 	servers *manager.ServerRegistry,
@@ -78,6 +82,7 @@ func NewClientLink(
 	bans *manager.IPBanList,
 	keys *manager.LoginKeyPool,
 	autoCreateAccounts bool,
+	showLicence bool,
 	loginTryBeforeBan int,
 	loginBlockAfterBan time.Duration,
 	log zerolog.Logger,
@@ -88,6 +93,7 @@ func NewClientLink(
 		sessions:           sessions,
 		bans:               bans,
 		autoCreateAccounts: autoCreateAccounts,
+		skipLicenceCheck:   !showLicence,
 		loginTryBeforeBan:  loginTryBeforeBan,
 		loginBlockAfterBan: loginBlockAfterBan,
 		log:                log,
@@ -267,6 +273,9 @@ func (l *ClientLink) onRequestAuthLogin(ctx context.Context, c *clientConn, payl
 	l.sessions.Put(c.account, link.SessionKey{LoginKey1: c.loginKey1, LoginKey2: c.loginKey2})
 	c.authed = true
 
+	if l.skipLicenceCheck {
+		return c.send(serverpackets.EncodeServerList(byte(c.lastServer), l.serverEntries())) == nil
+	}
 	return c.send(serverpackets.EncodeLoginOk(c.loginKey1, c.loginKey2)) == nil
 }
 
@@ -399,7 +408,7 @@ func (l *ClientLink) onRequestServerLogin(ctx context.Context, c *clientConn, pa
 		l.log.Warn().Str("ip", c.remoteIP.String()).Err(err).Msg("login client")
 		return
 	}
-	if req.SessionKey1 != c.loginKey1 || req.SessionKey2 != c.loginKey2 {
+	if !l.skipLicenceCheck && (req.SessionKey1 != c.loginKey1 || req.SessionKey2 != c.loginKey2) {
 		_ = c.send(serverpackets.EncodePlayFail(serverpackets.PlayFailSystemError))
 		return
 	}

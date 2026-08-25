@@ -241,7 +241,7 @@ func encodeRequestServerLogin(key1, key2 int32, serverID byte) []byte {
 
 // --- test server setup ---
 
-func newTestClientLink(t *testing.T, accounts *fakeAccountStore, autoCreate bool) (addr string, l *ClientLink, servers *manager.ServerRegistry, sessions *manager.SessionStore, bans *manager.IPBanList) {
+func newTestClientLink(t *testing.T, accounts *fakeAccountStore, autoCreate bool, opts ...func(*ClientLink)) (addr string, l *ClientLink, servers *manager.ServerRegistry, sessions *manager.SessionStore, bans *manager.IPBanList) {
 	t.Helper()
 
 	keyPair, err := commoncrypt.NewLoginKeyPair()
@@ -265,6 +265,9 @@ func newTestClientLink(t *testing.T, accounts *fakeAccountStore, autoCreate bool
 		newKeyPair:         func() *commoncrypt.LoginKeyPair { return keyPair },
 		newSessionKey:      func() ([]byte, error) { return testSessionKey, nil },
 		newSessionID:       func() int32 { return testInitSessionID },
+	}
+	for _, opt := range opts {
+		opt(l)
 	}
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
@@ -662,6 +665,48 @@ func TestClientLinkServerEntriesFallbackToLoopbackForNonIPv4Host(t *testing.T) {
 	}
 	if want := [4]byte{127, 0, 0, 1}; entries[0].IP != want {
 		t.Fatalf("server entry IP = %v, want %v", entries[0].IP, want)
+	}
+}
+
+func TestClientLinkShowLicenceOffRepliesServerListAfterLogin(t *testing.T) {
+	accounts := newFakeAccountStore(model.NewAccount("player1", mustHashPassword(t, "s3cret"), 0, 2))
+	addr, l, servers, _, _ := newTestClientLink(t, accounts, false, func(l *ClientLink) { l.skipLicenceCheck = true })
+	servers.Register(7, []byte{0x01})
+	servers.MarkOnline(7, "127.0.0.1", 7777, 100)
+
+	c := dialLoginClient(t, addr)
+	c.gameGuard()
+	c.send(encodeRequestAuthLogin(&l.loginKeyPair().Private.PublicKey, "player1", "s3cret"))
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeServerList {
+		t.Fatalf("opcode = %#x, want ServerList (%#x)", reply[0], serverpackets.OpcodeServerList)
+	}
+	if count := reply[1]; count != 1 {
+		t.Fatalf("server count = %d, want 1", count)
+	}
+	if last := reply[2]; last != 2 {
+		t.Fatalf("last server = %d, want 2 (account.LastServer)", last)
+	}
+}
+
+func TestClientLinkShowLicenceOffSkipsSessionKeyCheckOnServerLogin(t *testing.T) {
+	accounts := newFakeAccountStore(model.NewAccount("player1", mustHashPassword(t, "s3cret"), 0, 1))
+	addr, l, servers, _, _ := newTestClientLink(t, accounts, false, func(l *ClientLink) { l.skipLicenceCheck = true })
+	servers.Register(7, []byte{0x01})
+	servers.MarkOnline(7, "127.0.0.1", 7777, 100)
+
+	c := dialLoginClient(t, addr)
+	c.gameGuard()
+	c.send(encodeRequestAuthLogin(&l.loginKeyPair().Private.PublicKey, "player1", "s3cret"))
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeServerList {
+		t.Fatalf("opcode = %#x, want ServerList (%#x)", reply[0], serverpackets.OpcodeServerList)
+	}
+
+	c.send(encodeRequestServerLogin(0x1a2b3c4d, -0x5e6f7081, 7))
+	reply = c.read()
+	if reply[0] != serverpackets.OpcodePlayOk {
+		t.Fatalf("opcode = %#x, want PlayOk (%#x)", reply[0], serverpackets.OpcodePlayOk)
 	}
 }
 
