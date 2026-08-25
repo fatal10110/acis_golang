@@ -629,3 +629,96 @@ func TestLoadSkillDefinitionsErrors(t *testing.T) {
 		}
 	})
 }
+
+// TestConditionMessagePrecedence covers pr-reviews/478.md finding 1: a
+// regular-level <cond> reads msg or msgId, never both
+// (DocumentSkill.java:216-224), and an enchant-route cond reads only msg,
+// ignoring msgId/addName entirely even when present
+// (DocumentSkill.java:245-247, 289-291).
+func TestConditionMessagePrecedence(t *testing.T) {
+	t.Run("regular cond: msg present wins over msgId", func(t *testing.T) {
+		dir := t.TempDir()
+		content := skillFixture(`<cond msg="both attrs present" msgId="113" addName="1"><player Charges="1"/></cond>`)
+		writeXMLFixture(t, filepath.Join(dir, "fixture.xml"), content)
+		table, err := LoadSkillDefinitions(dir)
+		if err != nil {
+			t.Fatalf("LoadSkillDefinitions: %v", err)
+		}
+		def, ok := table.Get(1, 1)
+		if !ok {
+			t.Fatal("skill 1 level 1 not loaded")
+		}
+		if len(def.Conditions) != 1 {
+			t.Fatalf("Conditions = %+v, want 1 entry", def.Conditions)
+		}
+		cond := def.Conditions[0]
+		if cond.Message != "both attrs present" || cond.MessageID != 0 || cond.AddName {
+			t.Fatalf("condition message = %+v, want only Message set", cond)
+		}
+	})
+
+	t.Run("enchant1cond: msgId is never read, even when msg is absent and msgId is malformed", func(t *testing.T) {
+		dir := t.TempDir()
+		content := `<list><skill id="1" name="x" levels="1" enchantLevels1="1">` +
+			`<set name="target" val="ONE"/><set name="skillType" val="PDAM"/><set name="operateType" val="ACTIVE"/>` +
+			`<enchant1cond msgId="oops"><player Charges="1"/></enchant1cond>` +
+			`</skill></list>`
+		writeXMLFixture(t, filepath.Join(dir, "fixture.xml"), content)
+		table, err := LoadSkillDefinitions(dir)
+		if err != nil {
+			t.Fatalf("LoadSkillDefinitions: %v", err)
+		}
+		def, ok := table.Get(1, 101)
+		if !ok {
+			t.Fatal("skill 1 level 101 (enchant1) not loaded")
+		}
+		if len(def.Conditions) != 1 {
+			t.Fatalf("Conditions = %+v, want 1 entry", def.Conditions)
+		}
+		cond := def.Conditions[0]
+		if cond.Message != "" || cond.MessageID != 0 || cond.AddName {
+			t.Fatalf("enchant1cond message = %+v, want zero value (msgId never consulted)", cond)
+		}
+	})
+}
+
+// TestSkillGrammarDegradesGracefully covers pr-reviews/478.md finding 2:
+// an empty/predicate-less <cond/> and an unrecognized tag inside a <for>
+// block tolerate the malformed content instead of failing the whole file,
+// matching DocumentBase.java's parseCondition (returns null, attach(null) is
+// a no-op) and parseTemplate (no fall-through branch for an unknown tag).
+func TestSkillGrammarDegradesGracefully(t *testing.T) {
+	t.Run("empty cond is skipped, not a load failure", func(t *testing.T) {
+		dir := t.TempDir()
+		content := skillFixture(`<cond/>`)
+		writeXMLFixture(t, filepath.Join(dir, "fixture.xml"), content)
+		table, err := LoadSkillDefinitions(dir)
+		if err != nil {
+			t.Fatalf("LoadSkillDefinitions: %v", err)
+		}
+		def, ok := table.Get(1, 1)
+		if !ok {
+			t.Fatal("skill 1 level 1 not loaded")
+		}
+		if len(def.Conditions) != 0 {
+			t.Fatalf("Conditions = %+v, want none", def.Conditions)
+		}
+	})
+
+	t.Run("unrecognized tag inside a for block is skipped, not a load failure", func(t *testing.T) {
+		dir := t.TempDir()
+		content := skillFixture(`<for><bogusTag/><add stat="runSpd" val="5"/></for>`)
+		writeXMLFixture(t, filepath.Join(dir, "fixture.xml"), content)
+		table, err := LoadSkillDefinitions(dir)
+		if err != nil {
+			t.Fatalf("LoadSkillDefinitions: %v", err)
+		}
+		def, ok := table.Get(1, 1)
+		if !ok {
+			t.Fatal("skill 1 level 1 not loaded")
+		}
+		if len(def.Funcs) != 1 || def.Funcs[0].Stat != "runSpd" || def.Funcs[0].Value != 5 {
+			t.Fatalf("Funcs = %+v, want the add op to survive the skipped tag", def.Funcs)
+		}
+	})
+}
