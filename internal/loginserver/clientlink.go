@@ -39,6 +39,7 @@ type accountStore interface {
 	Account(ctx context.Context, login string) (model.Account, error)
 	CreateAccount(ctx context.Context, login, hashedPassword string, createdAt time.Time) (model.Account, error)
 	SetLastServer(ctx context.Context, login string, serverID int) error
+	SetLastActive(ctx context.Context, login string, at time.Time) error
 }
 
 // ClientLink accepts and drives connections from Interlude game clients over
@@ -228,6 +229,7 @@ func (l *ClientLink) onRequestAuthLogin(ctx context.Context, c *clientConn, payl
 	req, err := clientpackets.DecodeRequestAuthLogin(payload, c.key.Private)
 	if err != nil {
 		l.log.Warn().Str("ip", c.remoteIP.String()).Err(err).Msg("login client")
+		_ = c.send(serverpackets.EncodeLoginFail(serverpackets.LoginFailAccessFailed))
 		return false
 	}
 
@@ -296,6 +298,11 @@ func (l *ClientLink) authenticate(ctx context.Context, c *clientConn, req client
 			return model.Account{}, false
 		}
 		l.clearFailedAttempts(c.remoteIP)
+		if err := l.accounts.SetLastActive(ctx, account.Login, time.Now()); err != nil {
+			l.log.Error().Str("account", account.Login).Err(err).Msg("set last-active time")
+			_ = c.send(serverpackets.EncodeLoginFail(serverpackets.LoginFailAccessFailed))
+			return model.Account{}, false
+		}
 		return account, true
 	}
 }
