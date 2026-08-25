@@ -437,6 +437,49 @@ func (s *Server) PlayerCurrentMP(tb testing.TB, objID int32) int {
 	return reader.CurrentMP()
 }
 
+// DamagePlayerHP reduces the live player's current HP by amount, so heal
+// flows have observable headroom no single packet creates.
+func (s *Server) DamagePlayerHP(tb testing.TB, objID int32, amount int) {
+	tb.Helper()
+	obj, ok := s.State.Player(objID)
+	if !ok {
+		tb.Fatalf("world.Player(%d) missing", objID)
+	}
+	reducer, ok := obj.(interface{ ReduceCurrentHP(int) bool })
+	if !ok {
+		tb.Fatalf("world.Player(%d) = %T does not expose ReduceCurrentHP", objID, obj)
+	}
+	reducer.ReduceCurrentHP(amount)
+}
+
+// PlayerCurrentHP reports the live player's current HP.
+func (s *Server) PlayerCurrentHP(tb testing.TB, objID int32) int {
+	tb.Helper()
+	obj, ok := s.State.Player(objID)
+	if !ok {
+		tb.Fatalf("world.Player(%d) missing", objID)
+	}
+	reader, ok := obj.(interface{ CurrentHP() int })
+	if !ok {
+		tb.Fatalf("world.Player(%d) = %T does not expose CurrentHP", objID, obj)
+	}
+	return reader.CurrentHP()
+}
+
+// PlayerMaxHP reports the live player's stat-computed maximum HP.
+func (s *Server) PlayerMaxHP(tb testing.TB, objID int32) int {
+	tb.Helper()
+	obj, ok := s.State.Player(objID)
+	if !ok {
+		tb.Fatalf("world.Player(%d) missing", objID)
+	}
+	reader, ok := obj.(interface{ MaxHPValue() float64 })
+	if !ok {
+		tb.Fatalf("world.Player(%d) = %T does not expose MaxHPValue", objID, obj)
+	}
+	return int(reader.MaxHPValue())
+}
+
 // FlushItems persists every pending item mutation the way the production
 // lazy-persistence tick does, so suites can assert the items rows mid-test.
 func (s *Server) FlushItems(tb testing.TB) {
