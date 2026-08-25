@@ -165,6 +165,13 @@ func (combatPointHealHandler) Use(cast Cast) {
 	}
 }
 
+// castBreakTarget is implemented by targets that carry their own live cast
+// to interrupt (player.Character.BreakCastOnDamage); other CPDAMPERCENT
+// targets have no cast to break.
+type castBreakTarget interface {
+	BreakCastOnDamage(damage float64)
+}
+
 type cpDamagePercentHandler struct{}
 
 func (cpDamagePercentHandler) Types() []string { return []string{"CPDAMPERCENT"} }
@@ -179,6 +186,11 @@ func (cpDamagePercentHandler) Use(cast Cast) {
 			continue
 		}
 		damage := int(target.CP() * float64(cast.Skill.Power) / 100)
+		// Formulas.calcCastBreak(targetPlayer, damage) runs before the
+		// effects/CP-reduction that follow it (CpDamPercent.java:44,48).
+		if breakable, ok := obj.(castBreakTarget); ok {
+			breakable.BreakCastOnDamage(float64(damage))
+		}
 		if damage > 0 {
 			target.SetCP(target.CP() - float64(damage))
 		}

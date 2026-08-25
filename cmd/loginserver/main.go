@@ -17,6 +17,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/db"
 	"github.com/fatal10110/acis_golang/internal/commons/logging"
+	"github.com/fatal10110/acis_golang/internal/commons/netutil"
 	"github.com/fatal10110/acis_golang/internal/config"
 	"github.com/fatal10110/acis_golang/internal/loginserver"
 	"github.com/fatal10110/acis_golang/internal/loginserver/data/manager"
@@ -39,6 +40,7 @@ type loginServerConfig struct {
 	ShowLicence         bool
 	LoginTryBeforeBan   int
 	LoginBlockAfterBan  time.Duration
+	Flood               netutil.FloodGuardConfig
 	Database            db.Config
 }
 
@@ -74,6 +76,7 @@ func newLoginServerApp(paths loginServerPaths) *fx.App {
 			manager.NewRSAKeyPool,
 			manager.NewLoginKeyPool,
 			provideIPBanList,
+			provideFloodGuard,
 			provideGameServerLink,
 			provideClientLink,
 		),
@@ -106,6 +109,23 @@ func loginServerConfigFromProperties(_ loginServerPaths, props *config.Propertie
 	if err != nil {
 		return loginServerConfig{}, err
 	}
+	floodEnabled := props.Bool("EnableFloodProtection", true)
+	fastConnectionLimit, err := props.Int("FastConnectionLimit", 15)
+	if err != nil {
+		return loginServerConfig{}, err
+	}
+	normalConnectionTime, err := props.Int("NormalConnectionTime", 700)
+	if err != nil {
+		return loginServerConfig{}, err
+	}
+	fastConnectionTime, err := props.Int("FastConnectionTime", 350)
+	if err != nil {
+		return loginServerConfig{}, err
+	}
+	maxConnectionsPerIP, err := props.Int("MaxConnectionPerIP", 50)
+	if err != nil {
+		return loginServerConfig{}, err
+	}
 
 	return loginServerConfig{
 		ClientAddr:          listenAddress(props.String("LoginserverHostname", "*"), clientPort),
@@ -115,6 +135,13 @@ func loginServerConfigFromProperties(_ loginServerPaths, props *config.Propertie
 		ShowLicence:         props.Bool("ShowLicence", true),
 		LoginTryBeforeBan:   loginTryBeforeBan,
 		LoginBlockAfterBan:  time.Duration(loginBlockAfterBan) * time.Second,
+		Flood: netutil.FloodGuardConfig{
+			Enabled:              floodEnabled,
+			FastConnectionLimit:  fastConnectionLimit,
+			NormalConnectionTime: time.Duration(normalConnectionTime) * time.Millisecond,
+			FastConnectionTime:   time.Duration(fastConnectionTime) * time.Millisecond,
+			MaxConnectionsPerIP:  maxConnectionsPerIP,
+		},
 		Database: db.Config{
 			URL:      props.String("URL", "jdbc:mariadb://localhost/acis"),
 			Login:    props.String("Login", "root"),
@@ -185,6 +212,10 @@ func provideIPBanList(paths loginServerPaths, log zerolog.Logger) *manager.IPBan
 	return manager.LoadIPBanList(paths.BannedIPsPath, log)
 }
 
+func provideFloodGuard(cfg loginServerConfig, log zerolog.Logger) *netutil.FloodGuard {
+	return netutil.NewFloodGuard(cfg.Flood, log)
+}
+
 func provideGameServerLink(
 	cfg loginServerConfig,
 	servers *manager.ServerRegistry,
@@ -194,9 +225,10 @@ func provideGameServerLink(
 	bans *manager.IPBanList,
 	accounts *loginsql.AccountStore,
 	registrations *loginsql.GameServerStore,
+	flood *netutil.FloodGuard,
 	log zerolog.Logger,
 ) *loginserver.GameServerLink {
-	return loginserver.NewGameServerLink(servers, names, keys, sessions, bans, accounts, registrations, cfg.AllowNewGameServers, log)
+	return loginserver.NewGameServerLink(servers, names, keys, sessions, bans, accounts, registrations, cfg.AllowNewGameServers, flood, log)
 }
 
 func provideClientLink(
