@@ -239,6 +239,20 @@ func (inst *Instance) DestroyState() {
 	inst.persisted()
 }
 
+// SetOwner records inst's owning object without touching location, for a
+// ground item's temporary loot-protection owner.
+func (inst *Instance) SetOwner(ownerID int32) {
+	mu := inst.lock()
+	mu.Lock()
+	changed := inst.OwnerID != ownerID
+	inst.OwnerID = ownerID
+	mu.Unlock()
+
+	if changed {
+		inst.persisted()
+	}
+}
+
 // SetOwnerLocation records inst's owning object and location data.
 func (inst *Instance) SetOwnerLocation(ownerID int32, loc Location, locData int) {
 	mu := inst.lock()
