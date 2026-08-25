@@ -199,6 +199,17 @@ func encodeAuthGameGuard(sessionID int32) []byte {
 	return w.Bytes()
 }
 
+// gameGuard completes the AuthGameGuard exchange with the Init session id,
+// as every real client does after receiving Init.
+func (f *fakeLoginClient) gameGuard() {
+	f.t.Helper()
+	f.send(encodeAuthGameGuard(testInitSessionID))
+	reply := f.read()
+	if reply[0] != serverpackets.OpcodeGGAuth {
+		f.t.Fatalf("opcode = %#x, want GGAuth (%#x)", reply[0], serverpackets.OpcodeGGAuth)
+	}
+}
+
 // encodeRequestAuthLogin builds a raw RequestAuthLogin payload: the
 // credential block RSA-encrypted (no padding scheme) with pub, matching
 // DecodeRequestAuthLogin's fixed username/password offsets.
@@ -283,7 +294,7 @@ func TestClientLinkAuthGameGuardRepliesGGAuth(t *testing.T) {
 	addr, _, _, _, _ := newTestClientLink(t, newFakeAccountStore(), false)
 	c := dialLoginClient(t, addr)
 
-	c.send(encodeAuthGameGuard(1))
+	c.send(encodeAuthGameGuard(testInitSessionID))
 	reply := c.read()
 	if reply[0] != serverpackets.OpcodeGGAuth {
 		t.Fatalf("opcode = %#x, want GGAuth (%#x)", reply[0], serverpackets.OpcodeGGAuth)
@@ -293,11 +304,46 @@ func TestClientLinkAuthGameGuardRepliesGGAuth(t *testing.T) {
 	}
 }
 
+func TestClientLinkGameGuardWrongSessionIDClosesWithAccessFailed(t *testing.T) {
+	addr, _, _, _, _ := newTestClientLink(t, newFakeAccountStore(), false)
+	c := dialLoginClient(t, addr)
+
+	c.send(encodeAuthGameGuard(testInitSessionID+1))
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeLoginFail {
+		t.Fatalf("opcode = %#x, want LoginFail (%#x)", reply[0], serverpackets.OpcodeLoginFail)
+	}
+	if reason := loginFailReason(t, reply); reason != serverpackets.LoginFailAccessFailed {
+		t.Fatalf("reason = %d, want REASON_ACCESS_FAILED (%d)", reason, serverpackets.LoginFailAccessFailed)
+	}
+	c.expectClosed()
+}
+
+func TestClientLinkCredentialsBeforeGameGuardAreDropped(t *testing.T) {
+	accounts := newFakeAccountStore(model.NewAccount("player1", mustHashPassword(t, "s3cret"), 0, 1))
+	addr, l, _, sessions, _ := newTestClientLink(t, accounts, false)
+	c := dialLoginClient(t, addr)
+
+	c.send(encodeRequestAuthLogin(&l.loginKeyPair().Private.PublicKey, "player1", "s3cret"))
+
+	if _, ok := sessions.Get("player1"); ok {
+		t.Fatal("credentials sent before the GameGuard exchange must not create a session")
+	}
+
+	c.gameGuard()
+	c.send(encodeRequestAuthLogin(&l.loginKeyPair().Private.PublicKey, "player1", "s3cret"))
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeLoginOk {
+		t.Fatalf("opcode = %#x, want LoginOk (%#x)", reply[0], serverpackets.OpcodeLoginOk)
+	}
+}
+
 func TestClientLinkLoginSuccess(t *testing.T) {
 	accounts := newFakeAccountStore(model.NewAccount("player1", mustHashPassword(t, "s3cret"), 0, 1))
 	addr, l, _, sessions, _ := newTestClientLink(t, accounts, false)
 	c := dialLoginClient(t, addr)
 
+	c.gameGuard()
 	c.send(encodeRequestAuthLogin(&l.loginKeyPair().Private.PublicKey, "player1", "s3cret"))
 	reply := c.read()
 	if reply[0] != serverpackets.OpcodeLoginOk {
@@ -370,6 +416,7 @@ func TestClientLinkLoginWrongPassword(t *testing.T) {
 	addr, l, _, _, _ := newTestClientLink(t, accounts, false)
 	c := dialLoginClient(t, addr)
 
+	c.gameGuard()
 	c.send(encodeRequestAuthLogin(&l.loginKeyPair().Private.PublicKey, "player1", "wrong"))
 	reply := c.read()
 	if reply[0] != serverpackets.OpcodeLoginFail {
@@ -388,6 +435,7 @@ func TestClientLinkFailedPasswordsBanIPAtThreshold(t *testing.T) {
 
 	for i := 1; i <= 3; i++ {
 		c := dialLoginClient(t, addr)
+		c.gameGuard()
 		c.send(encodeRequestAuthLogin(&l.loginKeyPair().Private.PublicKey, "player1", "wrong"))
 		reply := c.read()
 		if reply[0] != serverpackets.OpcodeLoginFail {
@@ -412,6 +460,7 @@ func TestClientLinkFailedPasswordAttemptsResetOnSuccess(t *testing.T) {
 
 	for i := 1; i <= 2; i++ {
 		c := dialLoginClient(t, addr)
+		c.gameGuard()
 		c.send(encodeRequestAuthLogin(&l.loginKeyPair().Private.PublicKey, "player1", "wrong"))
 		reply := c.read()
 		if reply[0] != serverpackets.OpcodeLoginFail {
@@ -428,6 +477,7 @@ func TestClientLinkFailedPasswordAttemptsResetOnSuccess(t *testing.T) {
 	waitSessionMissing(t, sessions, "player1")
 
 	c = dialLoginClient(t, addr)
+	c.gameGuard()
 	c.send(encodeRequestAuthLogin(&l.loginKeyPair().Private.PublicKey, "player1", "wrong"))
 	reply := c.read()
 	if reply[0] != serverpackets.OpcodeLoginFail {
@@ -445,6 +495,7 @@ func TestClientLinkLoginUnknownAccountAutoCreateOff(t *testing.T) {
 	addr, l, _, _, _ := newTestClientLink(t, accounts, false)
 	c := dialLoginClient(t, addr)
 
+	c.gameGuard()
 	c.send(encodeRequestAuthLogin(&l.loginKeyPair().Private.PublicKey, "newplayer", "s3cret"))
 	reply := c.read()
 	if reply[0] != serverpackets.OpcodeLoginFail {
@@ -485,6 +536,7 @@ func TestClientLinkLoginUnknownAccountAutoCreateOn(t *testing.T) {
 	addr, l, _, sessions, _ := newTestClientLink(t, accounts, true)
 	c := dialLoginClient(t, addr)
 
+	c.gameGuard()
 	c.send(encodeRequestAuthLogin(&l.loginKeyPair().Private.PublicKey, "newplayer", "s3cret"))
 	reply := c.read()
 	if reply[0] != serverpackets.OpcodeLoginOk {
@@ -508,6 +560,7 @@ func TestClientLinkLoginBannedAccountRejected(t *testing.T) {
 	addr, l, _, _, _ := newTestClientLink(t, accounts, false)
 	c := dialLoginClient(t, addr)
 
+	c.gameGuard()
 	c.send(encodeRequestAuthLogin(&l.loginKeyPair().Private.PublicKey, "banned", "s3cret"))
 	reply := c.read()
 	if reply[0] != serverpackets.OpcodeAccountKicked {
@@ -522,6 +575,7 @@ func TestClientLinkLoginDuplicateSessionRejected(t *testing.T) {
 	sessions.Put("player1", link.SessionKey{LoginKey1: 1, LoginKey2: 2})
 
 	c := dialLoginClient(t, addr)
+	c.gameGuard()
 	c.send(encodeRequestAuthLogin(&l.loginKeyPair().Private.PublicKey, "player1", "s3cret"))
 	reply := c.read()
 	if reply[0] != serverpackets.OpcodeLoginFail {
@@ -534,6 +588,7 @@ func TestClientLinkLoginDuplicateSessionRejected(t *testing.T) {
 // returns the two session-key halves LoginOk carried.
 func (f *fakeLoginClient) login(l *ClientLink, username, password string) (key1, key2 int32) {
 	f.t.Helper()
+	f.gameGuard()
 	f.send(encodeRequestAuthLogin(&l.loginKeyPair().Private.PublicKey, username, password))
 	reply := f.read()
 	if reply[0] != serverpackets.OpcodeLoginOk {
