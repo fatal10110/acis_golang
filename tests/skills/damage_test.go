@@ -135,3 +135,83 @@ func TestDamageOverTimeTicksDrainNPCHealth(t *testing.T) {
 		t.Fatalf("monster HP after second DoT tick = %d, want drained below %d", afterSecond, afterFirst)
 	}
 }
+
+// TestResistedSkillReportsResistanceToCaster drives an MDAM cast whose
+// effect-landing roll can never succeed (IgnoreResists returns BaseLandRate
+// verbatim, and a zero rate never beats the roll) at another player: the
+// damage itself lands, and the caster's own client receives the
+// resisted-your-skill system message naming the target and the skill.
+func TestResistedSkillReportsResistanceToCaster(t *testing.T) {
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Mage", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{
+			{
+				ID: 44, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
+				CastRange: 900, HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
+				SkillType: "MDAM", Power: 1_000_000,
+				IgnoreResists: true, BaseLandRate: 0,
+				Effects: []modelskill.EffectTemplate{{Name: "DamOverTime", Value: 100, Count: 5, Time: 1}},
+			},
+		})),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, 44, 1)
+	victim := srv.SeedCharacterFor(t, "victim", "Victim", 1, 0)
+	vc := srv.DialClient(t, "victim", 1)
+	startInWorldAmongPlayers(t, vc)
+	startInWorldAmongPlayers(t, c)
+	drainUntilQuiet(t, vc)
+	drainUntilQuiet(t, c)
+
+	before := srv.PlayerCurrentHP(t, victim.ID)
+
+	c.Send(encodeAction(victim.ID, hostileX, hostileY, hostileZ, false))
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeValidateLocation, "click ValidateLocation")
+	frame := c.Read()
+	assertFrameOpcode(t, frame, serverpackets.OpcodeMyTargetSelected, "MyTargetSelected")
+	if got := wireReader(frame[1:]).ReadInt32(); got != victim.ID {
+		t.Fatalf("MyTargetSelected object id = %d, want %d", got, victim.ID)
+	}
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeStatusUpdate, "target StatusUpdate")
+	drainUntilQuiet(t, c)
+
+	// An unflagged innocent is only attackable with force (ctrl), matching
+	// the reference's isAttackableWithoutForce gate.
+	c.Send(encodeRequestMagicSkillUse(44, true, false))
+	readCastStartFrames(t, c, objID, 44, 1, 500, 60_000, victim.ID)
+
+	waitFor(t, "MDAM damage on the victim", func() bool {
+		return srv.PlayerCurrentHP(t, victim.ID) < before
+	})
+	drainUntilQuiet(t, vc)
+
+	found := false
+	for i := 0; i < 50 && !found; i++ {
+		frame = c.ReadWithTimeout(time.Second)
+		if frame == nil {
+			break
+		}
+		if frame[0] != serverpackets.OpcodeSystemMessage {
+			continue
+		}
+		r := wireReader(frame[1:])
+		if id := r.ReadInt32(); id != int32(serverpackets.SystemMessageS1ResistedYourS2) {
+			continue
+		}
+		found = true
+		if params := r.ReadInt32(); params != 2 {
+			t.Fatalf("resisted message params = %d, want 2", params)
+		}
+		if typ := r.ReadInt32(); typ != serverpackets.SystemMessageParamText || r.ReadString() != "Victim" {
+			t.Fatalf("resisted message first parameter = text Victim")
+		}
+		if typ := r.ReadInt32(); typ != serverpackets.SystemMessageParamSkillName || r.ReadInt32() != 44 || r.ReadInt32() != 1 {
+			t.Fatalf("resisted message second parameter = skill 44 level 1")
+		}
+	}
+	if !found {
+		t.Fatalf("resisted-your-skill message never arrived")
+	}
+	drainUntilQuiet(t, c)
+}
