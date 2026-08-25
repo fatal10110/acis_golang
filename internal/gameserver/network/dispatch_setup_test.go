@@ -101,6 +101,11 @@ func assertSystemMessageStringFrame(t *testing.T, frame []byte, messageID int, t
 	}
 }
 
+// testLinkNow, when non-nil, supplies the packet-accounting clock of every
+// GameClientLink constructed afterwards, freezing flood windows for
+// deterministic flood-gate assertions.
+var testLinkNow func() time.Time
+
 func newTestGameClientLink(t *testing.T, loginLink func() *LoginLink, validator *SessionValidator) (addr string, chars *fakeCharStore, items *fakeItemStore, state *world.State) {
 	t.Helper()
 	return newTestGameClientLinkWithLog(t, loginLink, validator, zerolog.Nop())
@@ -175,6 +180,7 @@ func newTestGameClientLinkWithSkillsShortcutsCrestsKarmaAndLog(t *testing.T, log
 		PlayerConfig:     playerConfig,
 		PetConfig:        petmodel.DefaultConfig(),
 		Log:              log,
+		Now:              testLinkNow,
 	})
 	registerTestInventoryUpdates(t, state, inventoryUpdates)
 

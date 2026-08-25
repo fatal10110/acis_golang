@@ -98,9 +98,17 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 		// burst cap of the reference have no counterpart here: this port's
 		// read loop processes each frame inline with its read, so there is
 		// no inbound queue to overflow or drain in batches.
-		if actionFailed, drop := client.stats.countIncomingPacket(time.Now()); actionFailed {
-			session.SendFrame(serverpackets.FrameActionFailed())
-		} else if drop {
+		now := l.now
+		if now == nil {
+			now = time.Now
+		}
+		// A dropped frame never reaches a handler: that includes the
+		// flood-onset packet itself, which answers ActionFailed and is
+		// discarded like every other frame of the flood.
+		if actionFailed, drop := client.stats.countIncomingPacket(now()); actionFailed || drop {
+			if actionFailed {
+				session.SendFrame(serverpackets.FrameActionFailed())
+			}
 			continue
 		} else if client.stats.floodsExceeded() {
 			l.log.Warn().Str("state", client.State().String()).Msg("game client disconnected: too many packet floods")

@@ -178,6 +178,11 @@ type GameClientLink struct {
 	// tests for a deterministic handshake.
 	newCipherKey func() ([]byte, error)
 
+	// now supplies wall time for packet accounting; nil falls back to
+	// time.Now at the call site. Overridden in tests for deterministic
+	// flood windows.
+	now func() time.Time
+
 	// enchantRoll supplies enchant dice rolls; overridden in tests.
 	enchantRoll func() float64
 
@@ -250,6 +255,9 @@ type GameClientLinkConfig struct {
 	PlayerConfig  PlayerConfig
 	PetConfig     petmodel.Config
 	Log           zerolog.Logger
+	// Now supplies the clock packet accounting uses to bucket received
+	// frames into flood windows; nil means time.Now.
+	Now func() time.Time
 	// EnchantRoll supplies enchant dice rolls in [0,1); nil falls back to
 	// the random source. Behavior harnesses inject a deterministic roll.
 	EnchantRoll func() float64
@@ -317,6 +325,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) *GameClientLink {
 			Log:       cfg.Log,
 		}),
 		log:          cfg.Log,
+		now:          cfg.Now,
 		newCipherKey: randomCipherKey,
 	}
 	link.cubicAfterFunc = func(d time.Duration, fn func()) cubic.Timer {

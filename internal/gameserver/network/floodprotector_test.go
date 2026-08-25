@@ -115,3 +115,51 @@ func TestGameStartFloodGateIsSilent(t *testing.T) {
 	c.Send(encodeRequestGameStart(0))
 	c.ExpectNoFrame()
 }
+
+// TestFloodOnsetPacketIsDroppedNotDispatched pins that the packet which
+// trips flood detection is itself dropped, not dispatched: the reference's
+// dropPacket returns true — meaning dropped — immediately after sending
+// ActionFailed, so the onset packet must never reach its handler.
+//
+// The link's packet-accounting clock is frozen, putting the two handshake
+// frames and the entire burst into one counting window: the flood fires on
+// the (maxPacketsPerSecond-1)-th create attempt regardless of real timing.
+func TestFloodOnsetPacketIsDroppedNotDispatched(t *testing.T) {
+	testLinkNow = func() time.Time { return time.Unix(0, 0) }
+	defer func() { testLinkNow = nil }()
+	c, _, _, _ := newLinkedGameClient(t)
+
+	// Create attempts whose name always fails validation answer exactly
+	// one CharCreateFail per dispatched packet, so reply counts map to
+	// dispatched packets.
+	w := encodeRequestCharacterCreate("!!", 0, 0, 0, 1, 0, 0)
+	for i := 0; i <= maxPacketsPerSecond; i++ {
+		c.Send(w)
+	}
+
+	actionFailed, dispatched := 0, 0
+	for {
+		frame := c.ReadWithTimeout(2 * time.Second)
+		if frame == nil {
+			break
+		}
+		switch frame[0] {
+		case serverpackets.OpcodeActionFailed:
+			actionFailed++
+		case serverpackets.OpcodeCharCreateFail:
+			dispatched++
+		default:
+			t.Fatalf("unexpected opcode %#x while flooding", frame[0])
+		}
+	}
+	// Two handshake frames share the frozen window with the burst of
+	// maxPacketsPerSecond+1 creates: the window overflows on create
+	// maxPacketsPerSecond-1, which is answered ActionFailed and dropped,
+	// and the final two creates are dropped silently.
+	if actionFailed != 1 {
+		t.Fatalf("ActionFailed replies = %d, want exactly 1 (the flood onset)", actionFailed)
+	}
+	if dispatched != maxPacketsPerSecond-2 {
+		t.Fatalf("dispatched creates = %d, want %d — a flooded packet reached its handler", dispatched, maxPacketsPerSecond-2)
+	}
+}
