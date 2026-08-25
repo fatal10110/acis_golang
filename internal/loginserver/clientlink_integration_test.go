@@ -611,7 +611,7 @@ func TestClientLinkServerEntriesFallbackToLoopbackForNonIPv4Host(t *testing.T) {
 
 func TestClientLinkShowLicenceOffRepliesServerListAfterLogin(t *testing.T) {
 	accounts := newFakeAccountStore(model.NewAccount("player1", mustHashPassword(t, "s3cret"), 0, 2))
-	addr, l, servers, _, _ := newTestClientLink(t, accounts, false, func(l *ClientLink) { l.showLicence = false })
+	addr, l, servers, _, _ := newTestClientLink(t, accounts, false, func(l *ClientLink) { l.skipLicenceCheck = true })
 	servers.Register(7, []byte{0x01})
 	servers.MarkOnline(7, "127.0.0.1", 7777, 100)
 
@@ -631,7 +631,7 @@ func TestClientLinkShowLicenceOffRepliesServerListAfterLogin(t *testing.T) {
 
 func TestClientLinkShowLicenceOffSkipsSessionKeyCheckOnServerLogin(t *testing.T) {
 	accounts := newFakeAccountStore(model.NewAccount("player1", mustHashPassword(t, "s3cret"), 0, 1))
-	addr, l, servers, _, _ := newTestClientLink(t, accounts, false, func(l *ClientLink) { l.showLicence = false })
+	addr, l, servers, _, _ := newTestClientLink(t, accounts, false, func(l *ClientLink) { l.skipLicenceCheck = true })
 	servers.Register(7, []byte{0x01})
 	servers.MarkOnline(7, "127.0.0.1", 7777, 100)
 
