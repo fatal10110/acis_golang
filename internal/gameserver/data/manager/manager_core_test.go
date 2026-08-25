@@ -39,6 +39,25 @@ func (r *recordingGround) Drop(ground *grounditem.Item, opts task.DropOptions) {
 	r.dropped = append(r.dropped, opts)
 }
 
+// fakeGeo is a move.Geo test double whose ValidLocation is the only method
+// KillReward's scatter path relies on.
+type fakeGeo struct {
+	validAt func(ox, oy, oz, tx, ty, tz int) location.Location
+}
+
+func (f fakeGeo) CanMove(ox, oy, oz, tx, ty, tz int) bool { return true }
+func (f fakeGeo) Height(x, y, z int) int16                { return int16(z) }
+func (f fakeGeo) FindPath(origin, target location.Location) ([]location.Location, bool) {
+	return nil, false
+}
+func (f fakeGeo) ValidLocation(ox, oy, oz, tx, ty, tz int) location.Location {
+	if f.validAt != nil {
+		return f.validAt(ox, oy, oz, tx, ty, tz)
+	}
+	return location.Location{X: tx, Y: ty, Z: tz}
+}
+func (f fakeGeo) Walkable(x, y, z int) bool { return true }
+
 type nopKiller struct{ id int32 }
 
 func (n nopKiller) ObjectID() int32 { return n.id }
@@ -83,7 +102,7 @@ func TestKillReward_DropsRolledItemsAtLocation(t *testing.T) {
 	}
 	rates := item.Rates{Spoil: 1, Currency: 1, Item: 1, ItemRaid: 1, Herb: 1}
 
-	r := NewKillReward(categories, nil, 1, false, rates, false, false, ids, items, ground, 100, 200, 300, 45, 999)
+	r := NewKillReward(categories, nil, 1, false, rates, false, false, ids, items, ground, nil, 100, 200, 300, 45, 999)
 	r.CalculateRewards(nopKiller{id: 1})
 
 	if len(ground.items) != 1 {
@@ -102,6 +121,98 @@ func TestKillReward_DropsRolledItemsAtLocation(t *testing.T) {
 	}
 }
 
+func TestKillReward_ScattersDropAroundCorpseThroughGeoValidation(t *testing.T) {
+	items := item.NewTable([]*item.Template{{ID: 57, Name: "adena"}})
+	ground := &recordingGround{}
+	ids := &sequentialIDs{}
+	categories := []item.DropCategory{
+		{Kind: item.DropCurrency, Chance: 100, Drops: []item.Drop{{ItemID: 57, Min: 1, Max: 1, Chance: 100}}},
+	}
+	rates := item.Rates{Spoil: 1, Currency: 1, Item: 1, ItemRaid: 1, Herb: 1}
+
+	var gotOX, gotOY, gotOZ, gotTX, gotTY int
+	geo := fakeGeo{validAt: func(ox, oy, oz, tx, ty, tz int) location.Location {
+		gotOX, gotOY, gotOZ, gotTX, gotTY = ox, oy, oz, tx, ty
+		return location.Location{X: 555, Y: 666, Z: 300}
+	}}
+
+	r := NewKillReward(categories, nil, 1, false, rates, false, false, ids, items, ground, geo, 100, 200, 300, 45, 999)
+	r.CalculateRewards(nopKiller{id: 1})
+
+	if gotOX != 100 || gotOY != 200 || gotOZ != 300 {
+		t.Fatalf("ValidLocation origin = (%d,%d,%d), want corpse position (100,200,300)", gotOX, gotOY, gotOZ)
+	}
+	if d := gotTX - 100; d < -dropScatterOffset || d > dropScatterOffset {
+		t.Fatalf("scattered target X = %d, want within +/-%d of 100", gotTX, dropScatterOffset)
+	}
+	if d := gotTY - 200; d < -dropScatterOffset || d > dropScatterOffset {
+		t.Fatalf("scattered target Y = %d, want within +/-%d of 200", gotTY, dropScatterOffset)
+	}
+	opts := ground.dropped[0]
+	if opts.X != 555 || opts.Y != 666 || opts.Z != 300 {
+		t.Fatalf("drop location = %+v, want the geo-validated point (555, 666, 300)", opts)
+	}
+}
+
+func TestKillReward_ProtectsDropToPlayerKillerForRegularDuration(t *testing.T) {
+	items := item.NewTable([]*item.Template{{ID: 57, Name: "adena"}})
+	ground := &recordingGround{}
+	ids := &sequentialIDs{}
+	categories := []item.DropCategory{
+		{Kind: item.DropCurrency, Chance: 100, Drops: []item.Drop{{ItemID: 57, Min: 1, Max: 1, Chance: 100}}},
+	}
+	rates := item.Rates{Spoil: 1, Currency: 1, Item: 1, ItemRaid: 1, Herb: 1}
+
+	killer := &lootKiller{id: 77}
+	r := NewKillReward(categories, nil, 1, false, rates, false, false, ids, items, ground, nil, 0, 0, 0, 0, 0)
+	r.CalculateRewards(killer)
+
+	opts := ground.dropped[0]
+	if opts.ProtectOwnerID != 77 {
+		t.Fatalf("ProtectOwnerID = %d, want 77 (the killing player)", opts.ProtectOwnerID)
+	}
+	if opts.ProtectFor != regularLootProtection {
+		t.Fatalf("ProtectFor = %v, want %v for a regular mob", opts.ProtectFor, regularLootProtection)
+	}
+}
+
+func TestKillReward_ProtectsRaidDropForLongerDuration(t *testing.T) {
+	items := item.NewTable([]*item.Template{{ID: 57, Name: "adena"}})
+	ground := &recordingGround{}
+	ids := &sequentialIDs{}
+	categories := []item.DropCategory{
+		{Kind: item.DropCurrency, Chance: 100, Drops: []item.Drop{{ItemID: 57, Min: 1, Max: 1, Chance: 100}}},
+	}
+	rates := item.Rates{Spoil: 1, Currency: 1, Item: 1, ItemRaid: 1, Herb: 1}
+
+	killer := &lootKiller{id: 77}
+	r := NewKillReward(categories, nil, 1, true, rates, false, false, ids, items, ground, nil, 0, 0, 0, 0, 0)
+	r.CalculateRewards(killer)
+
+	opts := ground.dropped[0]
+	if opts.ProtectFor != raidLootProtection {
+		t.Fatalf("ProtectFor = %v, want %v for a raid boss", opts.ProtectFor, raidLootProtection)
+	}
+}
+
+func TestKillReward_NonPlayerKillerGetsNoDropProtection(t *testing.T) {
+	items := item.NewTable([]*item.Template{{ID: 57, Name: "adena"}})
+	ground := &recordingGround{}
+	ids := &sequentialIDs{}
+	categories := []item.DropCategory{
+		{Kind: item.DropCurrency, Chance: 100, Drops: []item.Drop{{ItemID: 57, Min: 1, Max: 1, Chance: 100}}},
+	}
+	rates := item.Rates{Spoil: 1, Currency: 1, Item: 1, ItemRaid: 1, Herb: 1}
+
+	r := NewKillReward(categories, nil, 1, false, rates, false, false, ids, items, ground, nil, 0, 0, 0, 0, 0)
+	r.CalculateRewards(nopKiller{id: 1})
+
+	opts := ground.dropped[0]
+	if opts.ProtectOwnerID != 0 {
+		t.Fatalf("ProtectOwnerID = %d, want 0 (no getActingPlayer() to protect)", opts.ProtectOwnerID)
+	}
+}
+
 func TestKillReward_SkipsSpoilWithoutPool(t *testing.T) {
 	items := item.NewTable([]*item.Template{{ID: 6673, Name: "spoil-item"}})
 	ground := &recordingGround{}
@@ -112,7 +223,7 @@ func TestKillReward_SkipsSpoilWithoutPool(t *testing.T) {
 	}
 	rates := item.Rates{Spoil: 1, Currency: 1, Item: 1, ItemRaid: 1, Herb: 1}
 
-	r := NewKillReward(categories, nil, 1, false, rates, false, false, ids, items, ground, 0, 0, 0, 0, 0)
+	r := NewKillReward(categories, nil, 1, false, rates, false, false, ids, items, ground, nil, 0, 0, 0, 0, 0)
 	r.CalculateRewards(nopKiller{id: 1})
 
 	if len(ground.items) != 0 {
@@ -140,7 +251,7 @@ func TestKillReward_ConsumesAutoLootHerbInsteadOfStoringIt(t *testing.T) {
 	rates := item.Rates{Spoil: 1, Currency: 1, Item: 1, ItemRaid: 1, Herb: 1}
 
 	killer := &lootKiller{id: 1}
-	r := NewKillReward(herbCategories(), nil, 1, false, rates, false, true, &sequentialIDs{}, herbTable(), ground, 0, 0, 0, 0, 0)
+	r := NewKillReward(herbCategories(), nil, 1, false, rates, false, true, &sequentialIDs{}, herbTable(), ground, nil, 0, 0, 0, 0, 0)
 	r.CalculateRewards(killer)
 
 	if len(killer.herbs) != 1 || killer.herbs[0] != 8600 {
@@ -162,7 +273,7 @@ func TestKillReward_DropsAutoLootHerbWhenKillerCannotConsume(t *testing.T) {
 	ground := &recordingGround{}
 	rates := item.Rates{Spoil: 1, Currency: 1, Item: 1, ItemRaid: 1, Herb: 1}
 
-	r := NewKillReward(herbCategories(), nil, 1, false, rates, false, true, &sequentialIDs{}, herbTable(), ground, 0, 0, 0, 0, 0)
+	r := NewKillReward(herbCategories(), nil, 1, false, rates, false, true, &sequentialIDs{}, herbTable(), ground, nil, 0, 0, 0, 0, 0)
 	r.CalculateRewards(nopKiller{id: 1})
 
 	if len(ground.items) != 1 || ground.items[0].ItemID() != 8600 {
@@ -180,7 +291,7 @@ func TestKillReward_DropsAutoLootHerbWhenTheConsumerIsInactive(t *testing.T) {
 	rates := item.Rates{Spoil: 1, Currency: 1, Item: 1, ItemRaid: 1, Herb: 1}
 
 	killer := &lootKiller{id: 1, refuseHerbs: true}
-	r := NewKillReward(herbCategories(), nil, 1, false, rates, false, true, &sequentialIDs{}, herbTable(), ground, 0, 0, 0, 0, 0)
+	r := NewKillReward(herbCategories(), nil, 1, false, rates, false, true, &sequentialIDs{}, herbTable(), ground, nil, 0, 0, 0, 0, 0)
 	r.CalculateRewards(killer)
 
 	if len(killer.herbs) != 0 {
@@ -205,7 +316,7 @@ func TestKillReward_StoresNonHerbTemplateFromHerbCategory(t *testing.T) {
 	rates := item.Rates{Spoil: 1, Currency: 1, Item: 1, ItemRaid: 1, Herb: 1}
 
 	killer := &lootKiller{id: 1}
-	r := NewKillReward(herbCategories(), nil, 1, false, rates, false, true, &sequentialIDs{}, items, ground, 0, 0, 0, 0, 0)
+	r := NewKillReward(herbCategories(), nil, 1, false, rates, false, true, &sequentialIDs{}, items, ground, nil, 0, 0, 0, 0, 0)
 	r.CalculateRewards(killer)
 
 	if len(killer.herbs) != 0 {
@@ -230,7 +341,7 @@ func TestKillReward_AutoLootsRolledItemsIntoKillerInventory(t *testing.T) {
 	rates := item.Rates{Spoil: 1, Currency: 1, Item: 1, ItemRaid: 1, Herb: 1}
 
 	killer := &lootKiller{id: 1}
-	r := NewKillReward(categories, nil, 1, false, rates, true, false, ids, items, ground, 0, 0, 0, 0, 0)
+	r := NewKillReward(categories, nil, 1, false, rates, true, false, ids, items, ground, nil, 0, 0, 0, 0, 0)
 	r.CalculateRewards(killer)
 
 	if len(ground.items) != 0 {
@@ -250,7 +361,7 @@ func TestKillReward_SkipsItemOnIDExhaustion(t *testing.T) {
 	}
 	rates := item.Rates{Spoil: 1, Currency: 1, Item: 1, ItemRaid: 1, Herb: 1}
 
-	r := NewKillReward(categories, nil, 1, false, rates, false, false, failingIDs{}, items, ground, 0, 0, 0, 0, 0)
+	r := NewKillReward(categories, nil, 1, false, rates, false, false, failingIDs{}, items, ground, nil, 0, 0, 0, 0, 0)
 	r.CalculateRewards(nopKiller{id: 1})
 
 	if len(ground.items) != 0 {
