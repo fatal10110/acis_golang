@@ -26,7 +26,9 @@ import (
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/restart"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
@@ -307,6 +309,132 @@ func (s *Server) SetPlayerOperating(tb testing.TB, objID int32, operating bool) 
 		tb.Fatalf("world.Player(%d) = %T does not expose SetOperating", objID, obj)
 	}
 	setter.SetOperating(operating)
+}
+
+// SeedGroundItem places an item instance directly on the ground at the given
+// location, owned by ownerID, without routing a drop request through the
+// client protocol. Item suites use it to stage loot — herbs, other players'
+// protected drops — that no single packet produces.
+func (s *Server) SeedGroundItem(tb testing.TB, ownerID, templateID, count int32, x, y, z int) {
+	tb.Helper()
+	tmpl, ok := s.itemTable.Get(templateID)
+	if !ok {
+		tb.Fatalf("no item template %d for ground seed", templateID)
+	}
+	ground, err := grounditem.New(item.Instance{
+		ObjectID:   s.NewObjectID(),
+		TemplateID: templateID,
+		OwnerID:    ownerID,
+		Count:      int(count),
+		ManaLeft:   -1,
+	}, tmpl)
+	if err != nil {
+		tb.Fatalf("seed ground item: %v", err)
+	}
+	s.GroundItems.Drop(ground, task.DropOptions{X: x, Y: y, Z: z})
+}
+
+// SetPlayerFlying toggles the live player's transport mode, the precondition
+// of the datapack's flying use conditions no single packet reaches.
+func (s *Server) SetPlayerFlying(tb testing.TB, objID int32, flying bool) {
+	tb.Helper()
+	obj, ok := s.State.Player(objID)
+	if !ok {
+		tb.Fatalf("world.Player(%d) missing", objID)
+	}
+	setter, ok := obj.(interface{ SetFlying(bool) bool })
+	if !ok {
+		tb.Fatalf("world.Player(%d) = %T does not expose SetFlying", objID, obj)
+	}
+	setter.SetFlying(flying)
+}
+
+// DisablePlayerItem installs a per-item reuse disable on the live player,
+// mirroring what a timed-task disable produces; item suites use it only to
+// set up gate preconditions no single packet reaches.
+func (s *Server) DisablePlayerItem(tb testing.TB, objID, objectID int32, delay time.Duration) {
+	tb.Helper()
+	obj, ok := s.State.Player(objID)
+	if !ok {
+		tb.Fatalf("world.Player(%d) missing", objID)
+	}
+	disabler, ok := obj.(interface{ DisableItem(int32, time.Duration) })
+	if !ok {
+		tb.Fatalf("world.Player(%d) = %T does not expose DisableItem", objID, obj)
+	}
+	disabler.DisableItem(objectID, delay)
+}
+
+// SetInventorySlotLimit shrinks the live player's inventory slot limit so a
+// full-inventory rejection is reachable without seeding dozens of rows.
+func (s *Server) SetInventorySlotLimit(tb testing.TB, objID int32, limit int) {
+	tb.Helper()
+	obj, ok := s.State.Player(objID)
+	if !ok {
+		tb.Fatalf("world.Player(%d) missing", objID)
+	}
+	holder, ok := obj.(interface{ Inventory() *itemcontainer.Inventory })
+	if !ok {
+		tb.Fatalf("world.Player(%d) = %T does not expose Inventory", objID, obj)
+	}
+	holder.Inventory().SlotLimit = limit
+}
+
+// PlayerPosition reports the live player's current world position.
+func (s *Server) PlayerPosition(tb testing.TB, objID int32) (int, int, int) {
+	tb.Helper()
+	obj, ok := s.State.Player(objID)
+	if !ok {
+		tb.Fatalf("world.Player(%d) missing", objID)
+	}
+	located, ok := obj.(interface{ Position() (int, int, int) })
+	if !ok {
+		tb.Fatalf("world.Player(%d) = %T does not expose Position", objID, obj)
+	}
+	return located.Position()
+}
+
+// PlayerTotalWeight reports the live inventory's last-computed total weight.
+func (s *Server) PlayerTotalWeight(tb testing.TB, objID int32) int {
+	tb.Helper()
+	obj, ok := s.State.Player(objID)
+	if !ok {
+		tb.Fatalf("world.Player(%d) missing", objID)
+	}
+	holder, ok := obj.(interface{ Inventory() *itemcontainer.Inventory })
+	if !ok {
+		tb.Fatalf("world.Player(%d) = %T does not expose Inventory", objID, obj)
+	}
+	return holder.Inventory().TotalWeight()
+}
+
+// DrainPlayerMP reduces the live player's current MP by amount, so restore
+// flows have observable headroom no single packet creates.
+func (s *Server) DrainPlayerMP(tb testing.TB, objID int32, amount int) {
+	tb.Helper()
+	obj, ok := s.State.Player(objID)
+	if !ok {
+		tb.Fatalf("world.Player(%d) missing", objID)
+	}
+	reducer, ok := obj.(interface{ ReduceCurrentMP(int) })
+	if !ok {
+		tb.Fatalf("world.Player(%d) = %T does not expose ReduceCurrentMP", objID, obj)
+	}
+	reducer.ReduceCurrentMP(amount)
+}
+
+// PlayerCurrentMP reports the live player's current MP.
+func (s *Server) PlayerCurrentMP(tb testing.TB, objID int32) int {
+	tb.Helper()
+	obj, ok := s.State.Player(objID)
+	if !ok {
+		tb.Fatalf("world.Player(%d) missing", objID)
+	}
+	reader, ok := obj.(interface{ CurrentMP() int })
+	if !ok {
+		tb.Fatalf("world.Player(%d) = %T does not expose CurrentMP", objID, obj)
+	}
+	return reader.CurrentMP()
 }
 
 // FlushItems persists every pending item mutation the way the production

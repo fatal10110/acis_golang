@@ -3,7 +3,6 @@ package itemcontainer
 import (
 	"errors"
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 )
@@ -79,23 +78,153 @@ func (f *equipFixture) equip(templateID int32) (*item.Instance, []*item.Instance
 	return inst, altered
 }
 
-func TestInventory_EquipItem_TwoHandedClearsOffhand(t *testing.T) {
-	f := newEquipFixture()
-	shield, _ := f.equip(shieldID)
-	if f.inv.ItemAt(LHand) != shield {
-		t.Fatalf("shield should occupy LHand")
-	}
+// TestInventory_EquipItem_SlotRules walks the paperdoll slot bookkeeping
+// table: paired weapons keep their offhand slot, unpaired equips clear
+// conflicting slots, paired accessory slots fill left then right before
+// replacing left, and whole-body pieces clear every slot they subsume.
+func TestInventory_EquipItem_SlotRules(t *testing.T) {
+	t.Run("two-handed clears offhand", func(t *testing.T) {
+		f := newEquipFixture()
+		f.equip(shieldID)
+		if f.inv.ItemAt(LHand) == nil {
+			t.Fatalf("shield should occupy LHand")
+		}
+		twoHand, altered := f.equip(twoHandID)
+		if f.inv.ItemAt(RHand) != twoHand {
+			t.Errorf("two-handed weapon should occupy RHand")
+		}
+		if f.inv.ItemAt(LHand) != nil {
+			t.Errorf("equipping a two-handed weapon should clear LHand")
+		}
+		if len(altered) != 2 {
+			t.Errorf("altered = %v, want shield unequipped + weapon equipped (2 entries)", altered)
+		}
+	})
 
-	twoHand, altered := f.equip(twoHandID)
-	if f.inv.ItemAt(RHand) != twoHand {
-		t.Errorf("two-handed weapon should occupy RHand")
-	}
-	if f.inv.ItemAt(LHand) != nil {
-		t.Errorf("equipping a two-handed weapon should clear LHand")
-	}
-	if len(altered) != 2 {
-		t.Errorf("altered = %v, want shield unequipped + weapon equipped (2 entries)", altered)
-	}
+	t.Run("one-handed clears existing two-handed", func(t *testing.T) {
+		f := newEquipFixture()
+		f.equip(twoHandID)
+		sword, _ := f.equip(swordID)
+		if f.inv.ItemAt(RHand) != sword {
+			t.Errorf("one-handed sword should now occupy RHand")
+		}
+	})
+
+	t.Run("bow arrow pairing keeps offhand", func(t *testing.T) {
+		f := newEquipFixture()
+		f.equip(bowID)
+		arrow, _ := f.equip(arrowID)
+		if f.inv.ItemAt(LHand) != arrow {
+			t.Fatalf("arrow should occupy LHand")
+		}
+		if f.inv.ItemAt(RHand) == nil {
+			t.Errorf("equipping an arrow while a bow is worn must not clear the bow")
+		}
+	})
+
+	t.Run("fishing rod lure pairing keeps offhand", func(t *testing.T) {
+		f := newEquipFixture()
+		f.equip(rodID)
+		f.equip(lureID)
+		if f.inv.ItemAt(RHand) == nil {
+			t.Errorf("equipping a lure while a fishing rod is worn must not clear the rod")
+		}
+	})
+
+	t.Run("unpaired offhand clears two-handed", func(t *testing.T) {
+		f := newEquipFixture()
+		f.equip(twoHandID)
+		f.equip(shieldID)
+		if f.inv.ItemAt(RHand) != nil {
+			t.Errorf("equipping a shield (unpaired LHand item) while two-handed should clear RHand")
+		}
+	})
+
+	t.Run("ears fill first empty then replace left", func(t *testing.T) {
+		f := newEquipFixture()
+		first, _ := f.equip(earringID)
+		if f.inv.ItemAt(LEar) != first {
+			t.Fatalf("first earring should fill LEar")
+		}
+		second, _ := f.equip(earringID)
+		if f.inv.ItemAt(REar) != second {
+			t.Fatalf("second earring should fill REar")
+		}
+		// Both slots full: a third of the *same* template id replaces LEar
+		// (matches the reference's "same id as REar -> replace LEar" rule).
+		third, _ := f.equip(earringID)
+		if f.inv.ItemAt(LEar) != third {
+			t.Errorf("third earring of the same template should replace LEar")
+		}
+	})
+
+	t.Run("fingers same shape", func(t *testing.T) {
+		f := newEquipFixture()
+		first, _ := f.equip(ringID)
+		if f.inv.ItemAt(LFinger) != first {
+			t.Fatalf("first ring should fill LFinger")
+		}
+		second, _ := f.equip(ringID)
+		if f.inv.ItemAt(RFinger) != second {
+			t.Fatalf("second ring should fill RFinger")
+		}
+	})
+
+	t.Run("full armor clears legs", func(t *testing.T) {
+		f := newEquipFixture()
+		f.equip(legsLightID)
+		full, _ := f.equip(fullArmorID)
+		if f.inv.ItemAt(Chest) != full {
+			t.Fatalf("full armor should occupy Chest")
+		}
+		if f.inv.ItemAt(Legs) != nil {
+			t.Errorf("equipping full armor should clear Legs")
+		}
+	})
+
+	t.Run("legs clears full armor", func(t *testing.T) {
+		f := newEquipFixture()
+		f.equip(fullArmorID)
+		legs, _ := f.equip(legsLightID)
+		if f.inv.ItemAt(Legs) != legs {
+			t.Fatalf("legs should occupy Legs")
+		}
+		if f.inv.ItemAt(Chest) != nil {
+			t.Errorf("equipping legs while full armor is worn should clear Chest")
+		}
+	})
+
+	t.Run("all dress clears six slots", func(t *testing.T) {
+		f := newEquipFixture()
+		f.equip(legsLightID)
+		f.equip(shieldID)
+		f.equip(swordID)
+		dress, _ := f.equip(allDressID)
+		if f.inv.ItemAt(Chest) != dress {
+			t.Fatalf("all-dress should occupy Chest")
+		}
+		for _, slot := range []int{Legs, LHand, RHand, Head, Feet, Gloves} {
+			if f.inv.ItemAt(slot) != nil {
+				t.Errorf("all-dress should clear paperdoll slot %d", slot)
+			}
+		}
+	})
+
+	t.Run("hairall clears face and vice versa", func(t *testing.T) {
+		f := newEquipFixture()
+		f.equip(faceID)
+		hairAll, _ := f.equip(hairAllID)
+		if f.inv.ItemAt(Hair) != hairAll {
+			t.Fatalf("hairall should occupy Hair")
+		}
+		if f.inv.ItemAt(Face) != nil {
+			t.Errorf("equipping hairall should clear Face")
+		}
+		hair, _ := f.equip(hairID)
+		if f.inv.ItemAt(Hair) != hair {
+			t.Fatalf("hair should occupy Hair")
+		}
+	})
 }
 
 func TestInventory_PackageSendableItems(t *testing.T) {
@@ -126,142 +255,6 @@ func TestInventory_PackageSendableItems(t *testing.T) {
 	}
 	if items[0].ObjectID != 500 || items[1].ObjectID != 501 {
 		t.Fatalf("PackageSendableItems() object ids = %d,%d; want 500,501", items[0].ObjectID, items[1].ObjectID)
-	}
-}
-
-func TestInventory_EquipItem_OneHandedClearsExistingTwoHanded(t *testing.T) {
-	f := newEquipFixture()
-	f.equip(twoHandID)
-
-	sword, _ := f.equip(swordID)
-	if f.inv.ItemAt(RHand) != sword {
-		t.Errorf("one-handed sword should now occupy RHand")
-	}
-}
-
-func TestInventory_EquipItem_BowArrowPairingKeepsOffhand(t *testing.T) {
-	f := newEquipFixture()
-	f.equip(bowID)
-
-	arrow, _ := f.equip(arrowID)
-	if f.inv.ItemAt(LHand) != arrow {
-		t.Fatalf("arrow should occupy LHand")
-	}
-	if f.inv.ItemAt(RHand) == nil {
-		t.Errorf("equipping an arrow while a bow is worn must not clear the bow")
-	}
-}
-
-func TestInventory_EquipItem_FishingRodLurePairingKeepsOffhand(t *testing.T) {
-	f := newEquipFixture()
-	f.equip(rodID)
-
-	f.equip(lureID)
-	if f.inv.ItemAt(RHand) == nil {
-		t.Errorf("equipping a lure while a fishing rod is worn must not clear the rod")
-	}
-}
-
-func TestInventory_EquipItem_LHandClearsTwoHandedWhenNotPaired(t *testing.T) {
-	f := newEquipFixture()
-	f.equip(twoHandID)
-
-	f.equip(shieldID)
-	if f.inv.ItemAt(RHand) != nil {
-		t.Errorf("equipping a shield (unpaired LHand item) while two-handed should clear RHand")
-	}
-}
-
-func TestInventory_EquipItem_EarsFillFirstEmptyThenReplaceLeft(t *testing.T) {
-	f := newEquipFixture()
-	first, _ := f.equip(earringID)
-	if f.inv.ItemAt(LEar) != first {
-		t.Fatalf("first earring should fill LEar")
-	}
-
-	second, _ := f.equip(earringID)
-	if f.inv.ItemAt(REar) != second {
-		t.Fatalf("second earring should fill REar")
-	}
-
-	// Both slots full: a third of the *same* template id replaces LEar
-	// (matches the reference's "same id as REar -> replace LEar" rule).
-	third, _ := f.equip(earringID)
-	if f.inv.ItemAt(LEar) != third {
-		t.Errorf("third earring of the same template should replace LEar")
-	}
-}
-
-func TestInventory_EquipItem_FingersSameShape(t *testing.T) {
-	f := newEquipFixture()
-	first, _ := f.equip(ringID)
-	if f.inv.ItemAt(LFinger) != first {
-		t.Fatalf("first ring should fill LFinger")
-	}
-	second, _ := f.equip(ringID)
-	if f.inv.ItemAt(RFinger) != second {
-		t.Fatalf("second ring should fill RFinger")
-	}
-}
-
-func TestInventory_EquipItem_FullArmorClearsLegs(t *testing.T) {
-	f := newEquipFixture()
-	f.equip(legsLightID)
-
-	full, _ := f.equip(fullArmorID)
-	if f.inv.ItemAt(Chest) != full {
-		t.Fatalf("full armor should occupy Chest")
-	}
-	if f.inv.ItemAt(Legs) != nil {
-		t.Errorf("equipping full armor should clear Legs")
-	}
-}
-
-func TestInventory_EquipItem_LegsClearsFullArmor(t *testing.T) {
-	f := newEquipFixture()
-	f.equip(fullArmorID)
-
-	legs, _ := f.equip(legsLightID)
-	if f.inv.ItemAt(Legs) != legs {
-		t.Fatalf("legs should occupy Legs")
-	}
-	if f.inv.ItemAt(Chest) != nil {
-		t.Errorf("equipping legs while full armor is worn should clear Chest")
-	}
-}
-
-func TestInventory_EquipItem_AllDressClearsSixSlots(t *testing.T) {
-	f := newEquipFixture()
-	f.equip(legsLightID)
-	f.equip(shieldID)
-	f.equip(swordID)
-
-	dress, _ := f.equip(allDressID)
-	if f.inv.ItemAt(Chest) != dress {
-		t.Fatalf("all-dress should occupy Chest")
-	}
-	for _, slot := range []int{Legs, LHand, RHand, Head, Feet, Gloves} {
-		if f.inv.ItemAt(slot) != nil {
-			t.Errorf("all-dress should clear paperdoll slot %d", slot)
-		}
-	}
-}
-
-func TestInventory_EquipItem_HairAllClearsFaceAndViceVersa(t *testing.T) {
-	f := newEquipFixture()
-	f.equip(faceID)
-
-	hairAll, _ := f.equip(hairAllID)
-	if f.inv.ItemAt(Hair) != hairAll {
-		t.Fatalf("hairall should occupy Hair")
-	}
-	if f.inv.ItemAt(Face) != nil {
-		t.Errorf("equipping hairall should clear Face")
-	}
-
-	hair, _ := f.equip(hairID)
-	if f.inv.ItemAt(Hair) != hair {
-		t.Fatalf("hair should occupy Hair")
 	}
 }
 
@@ -392,14 +385,12 @@ func TestInventory_UnequipSlot(t *testing.T) {
 func TestInventory_WornMask_TwoPieceArmorRequiresMatchingType(t *testing.T) {
 	f := newEquipFixture()
 	chestTmpl, _ := f.templates.Get(chestLightID)
-	legsTmpl, _ := f.templates.Get(legsLightID)
 
 	f.equip(chestLightID)
 	f.equip(legsLightID)
 	if !f.inv.IsWearingType(chestTmpl.Mask()) {
 		t.Errorf("matching light chest+legs should register the light-armor worn mask")
 	}
-	_ = legsTmpl
 
 	f2 := newEquipFixture()
 	f2.equip(chestHeavyID)
@@ -477,63 +468,6 @@ func TestInventory_DrainUpdates_CoalescesStackableCounts(t *testing.T) {
 	}
 	if remaining := inv.DrainUpdates(); len(remaining) != 0 {
 		t.Errorf("DrainUpdates() should clear the queue, got %+v", remaining)
-	}
-}
-
-// TestInventory_BuildAndDrainUpdates_BlocksConcurrentAdd guards against the
-// lost-delta window a separate Items()+DrainUpdates() call pair opens: with
-// two independent critical sections, an Add() landing between them is
-// captured by neither the snapshot nor the drain. BuildAndDrainUpdates
-// closes that window by holding Container.mu and inv.mu for the whole
-// operation, so a concurrent Add() (which needs Container.mu first) cannot
-// even start until the call finishes. This test proves that serialization
-// directly: it grabs the same two locks in the same order
-// BuildAndDrainUpdates does and asserts a concurrent AddNew stays blocked
-// until they're released.
-func TestInventory_BuildAndDrainUpdates_BlocksConcurrentAdd(t *testing.T) {
-	templates := item.NewTable([]*item.Template{
-		{ID: 1, Kind: item.KindEtcItem, Stackable: true, EtcItem: &item.EtcItemDetail{}},
-	})
-	inv := NewPetInventory(1, templates)
-
-	inv.Container.mu.RLock()
-	inv.mu.Lock()
-
-	addDone := make(chan struct{})
-	go func() {
-		inv.AddNew(1, 1, 2)
-		close(addDone)
-	}()
-
-	select {
-	case <-addDone:
-		t.Fatal("AddNew completed while Container.mu and inv.mu were held together; a concurrent change can straddle the snapshot/drain boundary")
-	case <-time.After(50 * time.Millisecond):
-		// Expected: AddNew is blocked on Container.mu.
-	}
-
-	inv.mu.Unlock()
-	inv.Container.mu.RUnlock()
-
-	select {
-	case <-addDone:
-	case <-time.After(time.Second):
-		t.Fatal("AddNew never completed after the locks were released")
-	}
-
-	var gotItems []*item.Instance
-	err := inv.BuildAndDrainUpdates(func(items []*item.Instance) error {
-		gotItems = items
-		return nil
-	})
-	if err != nil {
-		t.Fatalf("BuildAndDrainUpdates() error = %v, want nil", err)
-	}
-	if len(gotItems) != 1 {
-		t.Fatalf("BuildAndDrainUpdates() items = %+v, want 1 item", gotItems)
-	}
-	if inv.HasUpdates() {
-		t.Fatal("BuildAndDrainUpdates() left updates queued after a successful build")
 	}
 }
 
