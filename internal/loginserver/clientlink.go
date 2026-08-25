@@ -401,30 +401,37 @@ func (l *ClientLink) onRequestAuthLogin(ctx context.Context, c *clientConn, payl
 	}
 
 	l.authMu.Lock()
-	if _, mapped := l.sessions.Get(account.Login); mapped {
+	_, mapped := l.sessions.Get(account.Login)
+	old := l.holders[account.Login]
+	delete(l.holders, account.Login)
+	l.sessions.Delete(account.Login)
+	if !mapped {
+		c.account = account.Login
+		c.lastServer = account.LastServer
+		c.accessLevel = account.AccessLevel
+		c.loginKey1, c.loginKey2 = rand.Int32(), rand.Int32()
+		if l.holders == nil {
+			l.holders = make(map[string]*clientConn)
+		}
+		l.sessions.Put(c.account, link.SessionKey{LoginKey1: c.loginKey1, LoginKey2: c.loginKey2})
+		l.holders[c.account] = c
+	}
+	l.authMu.Unlock()
+
+	if mapped {
 		// A second authentication while the account is still mapped here:
 		// both the previous holder, when one is still connected, and the
-		// new client are closed and the mapping is dropped.
-		if old := l.holders[account.Login]; old != nil {
+		// new client are closed and the mapping is dropped. Evicting the
+		// previous holder happens outside authMu: it writes to another
+		// connection's socket, which can block on a stalled reader, and
+		// this mutex gates every account's login.
+		if old != nil {
 			old.closeWith(serverpackets.LoginFailAccountInUse)
 		}
-		delete(l.holders, account.Login)
-		l.sessions.Delete(account.Login)
-		l.authMu.Unlock()
 		_ = c.send(serverpackets.EncodeLoginFail(serverpackets.LoginFailAccountInUse))
 		return false
 	}
 
-	c.account = account.Login
-	c.lastServer = account.LastServer
-	c.accessLevel = account.AccessLevel
-	c.loginKey1, c.loginKey2 = rand.Int32(), rand.Int32()
-	if l.holders == nil {
-		l.holders = make(map[string]*clientConn)
-	}
-	l.sessions.Put(c.account, link.SessionKey{LoginKey1: c.loginKey1, LoginKey2: c.loginKey2})
-	l.holders[c.account] = c
-	l.authMu.Unlock()
 	c.authed = true
 	l.registerPurgeable(c)
 

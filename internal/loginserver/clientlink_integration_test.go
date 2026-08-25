@@ -18,6 +18,7 @@ import (
 	commoncrypt "github.com/fatal10110/acis_golang/internal/commons/crypt"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/link"
+	logincrypt "github.com/fatal10110/acis_golang/internal/loginserver/crypt"
 	"github.com/fatal10110/acis_golang/internal/loginserver/data/manager"
 	loginsql "github.com/fatal10110/acis_golang/internal/loginserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/loginserver/model"
@@ -1158,5 +1159,75 @@ func TestClientLinkDoubleLoginClosesBothClients(t *testing.T) {
 
 	if _, ok := sessions.Get("player1"); ok {
 		t.Fatal("session for player1 remained mapped after both clients were closed")
+	}
+}
+
+// TestClientLinkEvictionWriteDoesNotBlockOtherLogins drives a double-login
+// collision whose previous holder never drains its socket: evicting that
+// holder blocks on its write, but the eviction must happen outside the
+// login mapping lock, so a login for any other account still completes.
+func TestClientLinkEvictionWriteDoesNotBlockOtherLogins(t *testing.T) {
+	accounts := newFakeAccountStore(
+		model.NewAccount("player1", mustHashPassword(t, "s3cret"), 0, 1),
+		model.NewAccount("player2", mustHashPassword(t, "s3cret"), 0, 1),
+	)
+	addr, l, _, sessions, _ := newTestClientLink(t, accounts, false)
+
+	// A previous holder for player1 whose connection nobody reads. net.Pipe
+	// is synchronous and unbuffered: writing the eviction LoginFail to it
+	// blocks until a read consumes the bytes, which never happens here.
+	stalled, holderEnd := net.Pipe()
+	t.Cleanup(func() { stalled.Close(); holderEnd.Close() })
+	crypt, err := logincrypt.NewLoginCrypt(testSessionKey)
+	if err != nil {
+		t.Fatalf("NewLoginCrypt: %v", err)
+	}
+	if l.holders == nil {
+		l.holders = make(map[string]*clientConn)
+	}
+	l.holders["player1"] = &clientConn{conn: stalled, crypt: crypt}
+	sessions.Put("player1", link.SessionKey{LoginKey1: 1, LoginKey2: 2})
+
+	// The colliding re-authentication for player1 runs concurrently; its
+	// own goroutine may wait on the stalled eviction write.
+	go func() {
+		conn, err := net.Dial("tcp", addr)
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		cipher, err := commoncrypt.NewBlowfishCipher(testSessionKey)
+		if err != nil {
+			return
+		}
+		send := func(payload []byte) {
+			buf := make([]byte, commoncrypt.PaddedSize(len(payload)+4))
+			copy(buf, payload)
+			commoncrypt.AppendChecksum(buf)
+			commoncrypt.EncryptBlocks(cipher, buf)
+			_ = wire.WriteFrame(conn, buf)
+		}
+		conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+		if _, err := wire.ReadFrame(conn); err != nil { // Init
+			return
+		}
+		send(encodeAuthGameGuard(testInitSessionID))
+		send(encodeRequestAuthLogin(&l.loginKeyPair().Private.PublicKey, "player1", "s3cret"))
+		// Stay connected so the server-side write to this client is not
+		// cut short by an early close.
+		buf := make([]byte, 1)
+		for {
+			if _, err := conn.Read(buf); err != nil {
+				return
+			}
+		}
+	}()
+
+	witness := dialLoginClient(t, addr)
+	witness.gameGuard()
+	witness.send(encodeRequestAuthLogin(&l.loginKeyPair().Private.PublicKey, "player2", "s3cret"))
+	reply := witness.read()
+	if reply[0] != serverpackets.OpcodeLoginOk {
+		t.Fatalf("opcode = %#x, want LoginOk (%#x): another account's login was blocked by the stalled eviction write", reply[0], serverpackets.OpcodeLoginOk)
 	}
 }
