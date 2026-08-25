@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/rsa"
 	"encoding/binary"
+	"errors"
 	"net"
 	"sync"
 	"testing"
@@ -35,8 +36,10 @@ import (
 // disproportionate to what they verify.
 
 type fakeAccountStore struct {
-	mu       sync.Mutex
-	accounts map[string]model.Account
+	mu            sync.Mutex
+	accounts      map[string]model.Account
+	lastActive    map[string]time.Time
+	lastActiveErr error
 }
 
 func newFakeAccountStore(accs ...model.Account) *fakeAccountStore {
@@ -44,7 +47,7 @@ func newFakeAccountStore(accs ...model.Account) *fakeAccountStore {
 	for _, a := range accs {
 		m[a.Login] = a
 	}
-	return &fakeAccountStore{accounts: m}
+	return &fakeAccountStore{accounts: m, lastActive: make(map[string]time.Time)}
 }
 
 func (s *fakeAccountStore) Account(_ context.Context, login string) (model.Account, error) {
@@ -74,11 +77,28 @@ func (s *fakeAccountStore) SetLastServer(_ context.Context, login string, server
 	return nil
 }
 
+func (s *fakeAccountStore) SetLastActive(_ context.Context, login string, at time.Time) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.lastActiveErr != nil {
+		return s.lastActiveErr
+	}
+	s.lastActive[login] = at
+	return nil
+}
+
 func (s *fakeAccountStore) get(login string) (model.Account, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	a, ok := s.accounts[login]
 	return a, ok
+}
+
+func (s *fakeAccountStore) getLastActive(login string) (time.Time, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	at, ok := s.lastActive[login]
+	return at, ok
 }
 
 func mustHashPassword(t *testing.T, password string) string {
@@ -294,6 +314,51 @@ func TestClientLinkLoginSuccess(t *testing.T) {
 	wantKey1, wantKey2 := r.ReadInt32(), r.ReadInt32()
 	if key.LoginKey1 != wantKey1 || key.LoginKey2 != wantKey2 {
 		t.Fatalf("stored session key = %+v, want login key halves %d/%d", key, wantKey1, wantKey2)
+	}
+
+	if _, ok := accounts.getLastActive("player1"); !ok {
+		t.Fatal("expected last-active time to be recorded on successful login")
+	}
+}
+
+func TestClientLinkLoginDecodeFailureSendsAccessFailed(t *testing.T) {
+	addr, _, _, _, _ := newTestClientLink(t, newFakeAccountStore(), false)
+	c := dialLoginClient(t, addr)
+
+	// A RequestAuthLogin body shorter than the 128-byte RSA credential block
+	// fails to decode before any account lookup happens.
+	w := wire.NewPacketWriter(clientpackets.OpcodeRequestAuthLogin)
+	w.WriteBytes(make([]byte, 16))
+	c.send(w.Bytes())
+
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeLoginFail {
+		t.Fatalf("opcode = %#x, want LoginFail (%#x)", reply[0], serverpackets.OpcodeLoginFail)
+	}
+	if reason := loginFailReason(t, reply); reason != serverpackets.LoginFailAccessFailed {
+		t.Fatalf("reason = %d, want REASON_ACCESS_FAILED (%d)", reason, serverpackets.LoginFailAccessFailed)
+	}
+	c.expectClosed()
+}
+
+func TestClientLinkLoginLastActiveWriteFailureSendsAccessFailed(t *testing.T) {
+	accounts := newFakeAccountStore(model.NewAccount("player1", mustHashPassword(t, "s3cret"), 0, 1))
+	accounts.lastActiveErr = errors.New("db unavailable")
+	addr, l, _, sessions, _ := newTestClientLink(t, accounts, false)
+	c := dialLoginClient(t, addr)
+
+	c.send(encodeRequestAuthLogin(&l.loginKeyPair().Private.PublicKey, "player1", "s3cret"))
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeLoginFail {
+		t.Fatalf("opcode = %#x, want LoginFail (%#x)", reply[0], serverpackets.OpcodeLoginFail)
+	}
+	if reason := loginFailReason(t, reply); reason != serverpackets.LoginFailAccessFailed {
+		t.Fatalf("reason = %d, want REASON_ACCESS_FAILED (%d)", reason, serverpackets.LoginFailAccessFailed)
+	}
+	c.expectClosed()
+
+	if _, ok := sessions.Get("player1"); ok {
+		t.Fatal("expected no session to be stored when the last-active write fails")
 	}
 }
 
