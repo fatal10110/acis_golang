@@ -7,11 +7,11 @@ import (
 )
 
 func TestEncodeGGAuth(t *testing.T) {
-	got := EncodeGGAuth(GGAuthSkipRequest)
-
-	var want []byte
+	const sessionID int32 = 0x11223344
+	got := EncodeGGAuth(sessionID)
+	want := make([]byte, 0, 21)
 	want = append(want, OpcodeGGAuth)
-	want = binary.LittleEndian.AppendUint32(want, uint32(GGAuthSkipRequest))
+	want = binary.LittleEndian.AppendUint32(want, uint32(sessionID))
 	want = binary.LittleEndian.AppendUint32(want, 0)
 	want = binary.LittleEndian.AppendUint32(want, 0)
 	want = binary.LittleEndian.AppendUint32(want, 0)

@@ -59,11 +59,12 @@ type ClientLink struct {
 	failedMu       sync.Mutex
 	failedAttempts map[string]int
 
-	// newKeyPair and newSessionKey supply each connection's RSA key pair and
-	// dynamic Blowfish key; overridden in tests for a deterministic
-	// handshake.
+	// newKeyPair, newSessionKey, and newSessionID supply each connection's
+	// RSA key pair, dynamic Blowfish key, and Init session id; overridden in
+	// tests for a deterministic handshake.
 	newKeyPair    func() *commoncrypt.LoginKeyPair
 	newSessionKey func() ([]byte, error)
+	newSessionID  func() int32
 }
 
 // NewClientLink builds a ClientLink from its collaborators. autoCreateAccounts
@@ -92,6 +93,7 @@ func NewClientLink(
 		failedAttempts:     make(map[string]int),
 		newKeyPair:         keys.Random,
 		newSessionKey:      logincrypt.NewSessionKey,
+		newSessionID:       rand.Int32,
 	}
 }
 
@@ -109,10 +111,11 @@ func (l *ClientLink) Serve(ctx context.Context, ln net.Listener) error {
 // goroutine running handleConnection: nothing else writes to conn or
 // advances crypt.
 type clientConn struct {
-	conn     net.Conn
-	remoteIP net.IP
-	crypt    *logincrypt.LoginCrypt
-	key      *commoncrypt.LoginKeyPair
+	conn      net.Conn
+	remoteIP  net.IP
+	crypt     *logincrypt.LoginCrypt
+	key       *commoncrypt.LoginKeyPair
+	sessionID int32
 
 	account    string
 	authed     bool
@@ -156,13 +159,14 @@ func (l *ClientLink) handleConnection(ctx context.Context, conn net.Conn) {
 	}
 
 	c = &clientConn{
-		conn:     conn,
-		remoteIP: ip,
-		crypt:    cr,
-		key:      l.newKeyPair(),
+		conn:      conn,
+		remoteIP:  ip,
+		crypt:     cr,
+		key:       l.newKeyPair(),
+		sessionID: l.newSessionID(),
 	}
 
-	if err := c.send(serverpackets.EncodeInit(rand.Int32(), c.key.ScrambledModulus, sessionKey)); err != nil {
+	if err := c.send(serverpackets.EncodeInit(c.sessionID, c.key.ScrambledModulus, sessionKey)); err != nil {
 		return
 	}
 
@@ -208,7 +212,7 @@ func (l *ClientLink) onAuthGameGuard(c *clientConn, payload []byte) {
 		l.log.Warn().Str("ip", c.remoteIP.String()).Err(err).Msg("login client")
 		return
 	}
-	_ = c.send(serverpackets.EncodeGGAuth(serverpackets.GGAuthSkipRequest))
+	_ = c.send(serverpackets.EncodeGGAuth(c.sessionID))
 }
 
 // onRequestAuthLogin authenticates the presented credentials, issues a
@@ -279,7 +283,7 @@ func (l *ClientLink) authenticate(ctx context.Context, c *clientConn, req client
 	default:
 		if bcrypt.CompareHashAndPassword([]byte(account.Password), []byte(req.Password)) != nil {
 			l.recordFailedAttempt(c.remoteIP)
-			_ = c.send(serverpackets.EncodeLoginFail(serverpackets.LoginFailUserOrPassWrong))
+			_ = c.send(serverpackets.EncodeLoginFail(serverpackets.LoginFailPasswordWrong))
 			return model.Account{}, false
 		}
 		l.clearFailedAttempts(c.remoteIP)

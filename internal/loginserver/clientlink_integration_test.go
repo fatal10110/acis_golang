@@ -5,6 +5,7 @@ package loginserver
 import (
 	"context"
 	"crypto/rsa"
+	"encoding/binary"
 	"net"
 	"sync"
 	"testing"
@@ -105,6 +106,10 @@ func mustHashPassword(t *testing.T, password string) string {
 // socket. There is no production type to substitute; keep as-is.
 
 var testSessionKey = []byte("0123456789abcdef")
+
+// testInitSessionID is the deterministic Init session id every test
+// ClientLink hands out, so tests can assert on session-id echoes.
+const testInitSessionID int32 = 0x5a5a5a5a
 
 type fakeLoginClient struct {
 	t      *testing.T
@@ -230,6 +235,7 @@ func newTestClientLink(t *testing.T, accounts *fakeAccountStore, autoCreate bool
 		log:                zerolog.Nop(),
 		newKeyPair:         func() *commoncrypt.LoginKeyPair { return keyPair },
 		newSessionKey:      func() ([]byte, error) { return testSessionKey, nil },
+		newSessionID:       func() int32 { return testInitSessionID },
 	}
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
@@ -264,6 +270,9 @@ func TestClientLinkAuthGameGuardRepliesGGAuth(t *testing.T) {
 	if reply[0] != serverpackets.OpcodeGGAuth {
 		t.Fatalf("opcode = %#x, want GGAuth (%#x)", reply[0], serverpackets.OpcodeGGAuth)
 	}
+	if got := int32(binary.LittleEndian.Uint32(reply[1:5])); got != testInitSessionID {
+		t.Fatalf("GGAuth response = %#x, want the Init session id %#x", got, testInitSessionID)
+	}
 }
 
 func TestClientLinkLoginSuccess(t *testing.T) {
@@ -288,6 +297,11 @@ func TestClientLinkLoginSuccess(t *testing.T) {
 	}
 }
 
+func loginFailReason(t *testing.T, reply []byte) serverpackets.LoginFailReason {
+	t.Helper()
+	return serverpackets.LoginFailReason(binary.LittleEndian.Uint32(reply[1:5]))
+}
+
 func TestClientLinkLoginWrongPassword(t *testing.T) {
 	accounts := newFakeAccountStore(model.NewAccount("player1", mustHashPassword(t, "s3cret"), 0, 1))
 	addr, l, _, _, _ := newTestClientLink(t, accounts, false)
@@ -297,6 +311,9 @@ func TestClientLinkLoginWrongPassword(t *testing.T) {
 	reply := c.read()
 	if reply[0] != serverpackets.OpcodeLoginFail {
 		t.Fatalf("opcode = %#x, want LoginFail (%#x)", reply[0], serverpackets.OpcodeLoginFail)
+	}
+	if reason := loginFailReason(t, reply); reason != serverpackets.LoginFailPasswordWrong {
+		t.Fatalf("reason = %d, want REASON_PASS_WRONG (%d)", reason, serverpackets.LoginFailPasswordWrong)
 	}
 	c.expectClosed()
 }
@@ -369,6 +386,9 @@ func TestClientLinkLoginUnknownAccountAutoCreateOff(t *testing.T) {
 	reply := c.read()
 	if reply[0] != serverpackets.OpcodeLoginFail {
 		t.Fatalf("opcode = %#x, want LoginFail (%#x)", reply[0], serverpackets.OpcodeLoginFail)
+	}
+	if reason := loginFailReason(t, reply); reason != serverpackets.LoginFailUserOrPassWrong {
+		t.Fatalf("reason = %d, want REASON_USER_OR_PASS_WRONG (%d)", reason, serverpackets.LoginFailUserOrPassWrong)
 	}
 	c.expectClosed()
 

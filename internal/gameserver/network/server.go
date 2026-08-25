@@ -17,9 +17,6 @@ import (
 func Serve(ctx context.Context, ln net.Listener, handle func(ctx context.Context, conn *Conn), log zerolog.Logger) error {
 
 	return netutil.AcceptLoop(ctx, ln, func(raw net.Conn) {
-		if tcp, ok := raw.(*net.TCPConn); ok {
-			tcp.SetNoDelay(true)
-		}
 		conn := newConn(raw, log)
 		defer conn.Close()
 		handle(ctx, conn)
