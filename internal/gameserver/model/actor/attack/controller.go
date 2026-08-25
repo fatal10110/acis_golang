@@ -357,12 +357,6 @@ func (c *Controller) Stop() {
 	c.bowCooling = false
 	c.mu.Unlock()
 
-	if c.playable != nil {
-		c.playable.TryToIdle()
-	}
-	if c.player != nil {
-		c.player.ClientActionFailed()
-	}
 }
 
 func (c *Controller) makeHit(target attackable.Combatant, split bool) Hit {
@@ -482,7 +476,11 @@ func (c *Controller) deliverHits(seq uint64, hits []Hit) {
 	c.mu.RLock()
 	active := seq == c.attackSeq
 	c.mu.RUnlock()
-	if !active || len(hits) == 0 || hits[0].Target == nil || c.actor.AlikeDead() || !c.actor.Knows(hits[0].Target) || hits[0].Target.AlikeDead() {
+	if !active || len(hits) == 0 || hits[0].Target == nil || c.actor.AlikeDead() {
+		return
+	}
+	if !c.actor.Knows(hits[0].Target) || hits[0].Target.AlikeDead() {
+		c.Stop()
 		return
 	}
 	for _, hit := range hits {
