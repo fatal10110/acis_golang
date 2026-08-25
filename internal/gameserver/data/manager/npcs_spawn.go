@@ -183,6 +183,7 @@ func (n *Npcs) rewarderFor(hostile *npc.Hostile, tmpl *npc.Template) *deathRewar
 		ids:        n.ids,
 		items:      n.items,
 		ground:     n.ground,
+		geo:        n.geo,
 	}
 }
 

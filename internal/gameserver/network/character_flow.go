@@ -353,6 +353,12 @@ func skillListEntries(c *player.Character, skills *skillstate.Persistence) []ser
 
 func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c *player.Character, tmpl *player.Template, items []*item.Instance, shortcuts []shortcut.Shortcut) (*livePlayer, error) {
 	c.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventory(c.ID, l.itemTemplates, items))
+	// The characters row stores finalized max snapshots (Save writes
+	// ResourceValues), but the vitals fields are raw calculator bases once a
+	// template is attached — re-seed them from the class tables so the CON/MEN
+	// finalize applies exactly once per login instead of compounding across
+	// save→load cycles. Current HP/MP/CP stay as restored from the row.
+	c.RestoreVitals(tmpl)
 	// Filter/populate ITEM shortcuts against the live inventory just attached
 	// above, mirroring ShortcutList.restore() (ShortcutList.java:173-209): a
 	// stale ITEM shortcut (its item consumed/traded/destroyed since last

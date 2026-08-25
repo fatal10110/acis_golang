@@ -3872,14 +3872,23 @@ func TestNewCharacter(t *testing.T) {
 		t.Errorf("Level = %d, want 1", c.CharLevel)
 	}
 	res := c.ResourceValues()
-	if want := float64(int(tmpl.HPTable[0] * statbonus.CONBonus[tmpl.CON])); res.MaxHP != want || res.CurrentHP != want {
-		t.Errorf("HP = %v/%v, want %v/%v", res.MaxHP, res.CurrentHP, want, want)
+	if res.MaxHP != tmpl.HPTable[0] {
+		t.Errorf("stored max HP base = %v, want raw table value %v", res.MaxHP, tmpl.HPTable[0])
 	}
-	if want := float64(int(tmpl.MPTable[0] * statbonus.MENBonus[tmpl.MEN])); res.MaxMP != want || res.CurrentMP != want {
-		t.Errorf("MP = %v/%v, want %v/%v", res.MaxMP, res.CurrentMP, want, want)
+	if want := float64(int(tmpl.HPTable[0] * statbonus.CONBonus[tmpl.CON])); res.CurrentHP != want {
+		t.Errorf("CurrentHP = %v, want computed max %v", res.CurrentHP, want)
 	}
-	if want := float64(int(tmpl.CPTable[0] * statbonus.CONBonus[tmpl.CON])); res.MaxCP != want || res.CurrentCP != 0 {
-		t.Errorf("CP = %v/%v, want %v/0", res.MaxCP, res.CurrentCP, want)
+	if res.MaxMP != tmpl.MPTable[0] {
+		t.Errorf("stored max MP base = %v, want raw table value %v", res.MaxMP, tmpl.MPTable[0])
+	}
+	if want := float64(int(tmpl.MPTable[0] * statbonus.MENBonus[tmpl.MEN])); res.CurrentMP != want {
+		t.Errorf("CurrentMP = %v, want computed max %v", res.CurrentMP, want)
+	}
+	if res.MaxCP != tmpl.CPTable[0] {
+		t.Errorf("stored max CP base = %v, want raw table value %v", res.MaxCP, tmpl.CPTable[0])
+	}
+	if res.CurrentCP != 0 {
+		t.Errorf("CurrentCP = %v, want 0", res.CurrentCP)
 	}
 	if c.HairStyle != 1 || c.HairColor != 2 || c.Face != 0 {
 		t.Errorf("appearance = hairStyle=%d hairColor=%d face=%d, want 1/2/0", c.HairStyle, c.HairColor, c.Face)
@@ -3892,9 +3901,114 @@ func TestNewCharacter(t *testing.T) {
 	}
 }
 
+// TestNewCharacterVitalsApplyBonusOnce pins that a freshly created
+// character's computed maxima fold the CON/MEN bonus exactly once: the raw
+// level-table bases stored at creation are finalized through the live stat
+// calculator without pre-multiplication, and no current value starts above
+// its own maximum.
+func TestNewCharacterVitalsApplyBonusOnce(t *testing.T) {
+	tmpl := humanFighterTemplate()
+
+	c, err := NewCharacter(1, tmpl, "acct1", "Newbie", 0, 0, 0, SexMale)
+	if err != nil {
+		t.Fatalf("NewCharacter() unexpected error: %v", err)
+	}
+	c.AttachRuntime(tmpl, nil)
+
+	res := c.ResourceValues()
+	if want := tmpl.HPTable[0] * statbonus.CONBonus[tmpl.CON]; res.MaxHP != want {
+		t.Errorf("MaxHPValue() = %v, want table*CONBonus applied once = %v", res.MaxHP, want)
+	}
+	if want := tmpl.MPTable[0] * statbonus.MENBonus[tmpl.MEN]; res.MaxMP != want {
+		t.Errorf("MaxMPValue() = %v, want table*MENBonus applied once = %v", res.MaxMP, want)
+	}
+	if want := tmpl.CPTable[0] * statbonus.CONBonus[tmpl.CON]; res.MaxCP != want {
+		t.Errorf("MaxCPValue() = %v, want table*CONBonus applied once = %v", res.MaxCP, want)
+	}
+	if res.CurrentHP > res.MaxHP || res.CurrentMP > res.MaxMP || res.CurrentCP > res.MaxCP {
+		t.Errorf("current vitals %+v exceed their maxima on a fresh character", res)
+	}
+}
+
 func TestNewCharacter_NilTemplate(t *testing.T) {
 	if _, err := NewCharacter(1, nil, "acct1", "Newbie", 0, 0, 0, SexMale); err == nil {
 		t.Fatal("NewCharacter() with nil template: want error, got nil")
+	}
+}
+
+// TestRestoreVitalsRebasesFromTemplate pins the restore boundary for
+// persisted vitals: a characters row stores finalized max snapshots (Save
+// writes ResourceValues), so restoring them verbatim into the raw base fields
+// would re-apply the CON/MEN finalize on every read and compound across
+// save→load cycles. RestoreVitals must re-derive the bases from the class
+// level tables — keeping each cycle's computed maxima identical — while the
+// current values survive untouched.
+func TestRestoreVitalsRebasesFromTemplate(t *testing.T) {
+	tmpl := humanFighterTemplate()
+
+	restored, err := NewCharacter(1, tmpl, "acct1", "Restored", 0, 0, 0, SexMale)
+	if err != nil {
+		t.Fatalf("NewCharacter() unexpected error: %v", err)
+	}
+	restored.CharLevel = 2
+
+	finalHP := tmpl.HPTable[1] * statbonus.CONBonus[tmpl.CON]
+	finalMP := tmpl.MPTable[1] * statbonus.MENBonus[tmpl.MEN]
+	restored.SetResourceValues(Resources{
+		MaxHP: finalHP, CurrentHP: finalHP / 2,
+		MaxCP: tmpl.CPTable[1] * statbonus.CONBonus[tmpl.CON], CurrentCP: 0,
+		MaxMP: finalMP, CurrentMP: finalMP / 2,
+	})
+	restored.AttachRuntime(tmpl, nil)
+
+	restored.RestoreVitals(tmpl)
+
+	res := restored.ResourceValues()
+	if want := tmpl.HPTable[1] * statbonus.CONBonus[tmpl.CON]; res.MaxHP != want {
+		t.Errorf("MaxHPValue() = %v, want table*CONBonus applied once = %v", res.MaxHP, want)
+	}
+	if want := tmpl.MPTable[1] * statbonus.MENBonus[tmpl.MEN]; res.MaxMP != want {
+		t.Errorf("MaxMPValue() = %v, want table*MENBonus applied once = %v", res.MaxMP, want)
+	}
+	if want := tmpl.CPTable[1] * statbonus.CONBonus[tmpl.CON]; res.MaxCP != want {
+		t.Errorf("MaxCPValue() = %v, want table*CONBonus applied once = %v", res.MaxCP, want)
+	}
+	if want := finalHP / 2; res.CurrentHP != want {
+		t.Errorf("CurrentHP = %v, want restored value preserved = %v", res.CurrentHP, want)
+	}
+	if want := finalMP / 2; res.CurrentMP != want {
+		t.Errorf("CurrentMP = %v, want restored value preserved = %v", res.CurrentMP, want)
+	}
+
+	// A second save→load cycle must land on exactly the same maxima and
+	// currents: snapshot is what Save persists, replayed through the restore
+	// boundary.
+	snapshot := restored.ResourceValues()
+	recycled, err := NewCharacter(1, tmpl, "acct1", "Restored", 0, 0, 0, SexMale)
+	if err != nil {
+		t.Fatalf("NewCharacter() unexpected error: %v", err)
+	}
+	recycled.CharLevel = 2
+	recycled.SetResourceValues(snapshot)
+	recycled.AttachRuntime(tmpl, nil)
+	recycled.RestoreVitals(tmpl)
+
+	if next := recycled.ResourceValues(); next != snapshot {
+		t.Errorf("second round trip = %+v, want unchanged %+v", next, snapshot)
+	}
+
+	// Levels without a table row leave the stored bases untouched, matching
+	// AddLevel's refill convention, and a nil template is a no-op.
+	recycled.CharLevel = len(tmpl.HPTable) + 1
+	stale := recycled.ResourceValues()
+	recycled.RestoreVitals(tmpl)
+	if after := recycled.ResourceValues(); after.MaxHP != stale.MaxHP || after.MaxMP != stale.MaxMP || after.MaxCP != stale.MaxCP {
+		t.Errorf("RestoreVitals beyond the table changed maxima %+v → %+v, want untouched", stale, after)
+	}
+	recycled.CharLevel = 2
+	recycled.RestoreVitals(nil)
+	if after := recycled.ResourceValues(); after.MaxHP != stale.MaxHP {
+		t.Errorf("RestoreVitals(nil) changed MaxHP to %v, want untouched %v", after.MaxHP, stale.MaxHP)
 	}
 }
 
@@ -4510,6 +4624,24 @@ func TestCharacter_AddLevel_Direct(t *testing.T) {
 	res := c.ResourceValues()
 	if res.MaxHP != 110 || res.MaxMP != 55 || res.MaxCP != 22 {
 		t.Errorf("MaxHP/MP/CP = %v/%v/%v, want 110/55/22", res.MaxHP, res.MaxMP, res.MaxCP)
+	}
+}
+
+func TestCharacter_AddLevel_RefillsStatCalculatedVitals(t *testing.T) {
+	table := realLevelTable(t)
+	tmpl := levelStepTemplate(81)
+	c := newProgressionCharacter()
+	c.AttachRuntime(tmpl, nil)
+	c.AddStatFuncs([]effect.Mod{
+		{Stat: stat.MaxHP, Op: effect.OpMul, Value: 2, Owner: testModOwner()},
+		{Stat: stat.MaxMP, Op: effect.OpMul, Value: 2, Owner: testModOwner()},
+		{Stat: stat.MaxCP, Op: effect.OpMul, Value: 2, Owner: testModOwner()},
+	})
+
+	c.AddLevel(table, tmpl, 1)
+
+	if got := c.ResourceValues(); got.CurrentHP != got.MaxHP || got.CurrentMP != got.MaxMP || got.CurrentCP != got.MaxCP {
+		t.Fatalf("ResourceValues() after stat-modified level-up = %+v, want every current value at its stat-calculated max", got)
 	}
 }
 

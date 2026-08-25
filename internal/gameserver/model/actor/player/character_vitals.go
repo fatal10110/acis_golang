@@ -55,6 +55,30 @@ func (c *Character) SetResourceValues(res Resources) {
 	c.maxCP, c.curCP = res.MaxCP, res.CurrentCP
 }
 
+// RestoreVitals re-seeds the raw max calculator bases from tmpl's per-level
+// tables at c's stored level, keeping the current HP/MP/CP values as loaded.
+// The max columns persisted on the characters row are finalized snapshots
+// written through ResourceValues, not bases, so restoring them into the base
+// fields would re-apply the CON/MEN finalize on every read and compound
+// across save→load cycles. Maxima are always recomputed from the live
+// template; only the current values survive a round trip unchanged. Levels
+// without a table row (matching AddLevel's refill convention) leave the
+// stored bases untouched.
+func (c *Character) RestoreVitals(tmpl *Template) {
+	if tmpl == nil {
+		return
+	}
+	idx := c.CharLevel - 1
+	if idx < 0 || idx >= len(tmpl.HPTable) || idx >= len(tmpl.MPTable) || idx >= len(tmpl.CPTable) {
+		return
+	}
+	c.vitalsMu.Lock()
+	defer c.vitalsMu.Unlock()
+	c.maxHP = tmpl.HPTable[idx]
+	c.maxMP = tmpl.MPTable[idx]
+	c.maxCP = tmpl.CPTable[idx]
+}
+
 // CurrentHP returns current HP as an integer resource value.
 func (c *Character) CurrentHP() int {
 	return int(c.ResourceValues().CurrentHP)
@@ -103,11 +127,17 @@ func (c *Character) ReduceCurrentMP(amount int) {
 }
 
 func (c *Character) refillResources(maxHP, maxMP, maxCP float64) {
+	currentHP, currentMP, currentCP := maxHP, maxMP, maxCP
+	if c.template() != nil {
+		currentHP = c.calcStat(stat.MaxHP, maxHP)
+		currentMP = c.calcStat(stat.MaxMP, maxMP)
+		currentCP = c.calcStat(stat.MaxCP, maxCP)
+	}
 	c.vitalsMu.Lock()
 	defer c.vitalsMu.Unlock()
-	c.maxHP, c.curHP = maxHP, maxHP
-	c.maxMP, c.curMP = maxMP, maxMP
-	c.maxCP, c.curCP = maxCP, maxCP
+	c.maxHP, c.curHP = maxHP, currentHP
+	c.maxMP, c.curMP = maxMP, currentMP
+	c.maxCP, c.curCP = maxCP, currentCP
 }
 
 // ChangesTo reports which resources differ in next.
