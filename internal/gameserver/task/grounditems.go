@@ -82,11 +82,20 @@ type DropOptions struct {
 	// player discarding an item, or a defeated NPC dropping loot). It is
 	// zero for items with no fall animation, e.g. restored ground items.
 	DropperID int32
+
+	// ProtectOwnerID, when non-zero, reserves the drop to that object id
+	// for ProtectFor: inventory.LootLocked rejects pickup by anyone else
+	// until the deadline passes, matching ItemInstance.setDropProtection
+	// (aCis ItemInstance.java:827-831). ProtectFor <= 0 disables the lock
+	// even if ProtectOwnerID is set.
+	ProtectOwnerID int32
+	ProtectFor     time.Duration
 }
 
 type groundItemEntry struct {
-	item      *grounditem.Item
-	expiresAt time.Time
+	item          *grounditem.Item
+	expiresAt     time.Time
+	lootExpiresAt time.Time
 }
 
 // GroundItems owns dropped ground items and their cleanup deadlines.
@@ -136,10 +145,16 @@ func (g *GroundItems) Drop(ground *grounditem.Item, opts DropOptions) {
 	g.state.Spawn(ground, opts.X, opts.Y, opts.Z, opts.Heading)
 	ground.SetDropperID(0)
 
+	var lootExpiresAt time.Time
+	if opts.ProtectOwnerID != 0 && opts.ProtectFor > 0 {
+		ground.Instance.SetOwner(opts.ProtectOwnerID)
+		lootExpiresAt = g.now().Add(opts.ProtectFor)
+	}
+
 	if ground.DestroyProtected() {
 		return
 	}
-	g.track(ground, g.destroyDelay(ground, opts.PlayerDropped))
+	g.track(ground, g.destroyDelay(ground, opts.PlayerDropped), lootExpiresAt)
 }
 
 // Load restores previously saved ground items and clears their persisted
@@ -152,6 +167,12 @@ func (g *GroundItems) Load(rows []item.GroundSnapshot, templates *item.Table) er
 			return fmt.Errorf("ground items: item template %d not loaded", row.TemplateID)
 		}
 		row.Instance.ManaLeft = tmpl.InitialManaLeft()
+		// A loot-protection owner has no persisted deadline (only
+		// lootExpiresAt tracks it, in-memory only), so a restart can never
+		// correctly resume it; matching ItemInstance.setDropProtection's own
+		// in-memory-only ThreadPool.schedule state (aCis ItemInstance.java:
+		// 827-831), the lock does not survive past this reload.
+		row.Instance.OwnerID = 0
 		ground, err := grounditem.New(row.Instance, tmpl)
 		if err != nil {
 			return err
@@ -176,6 +197,11 @@ func (g *GroundItems) Tick() {
 
 	g.mu.Lock()
 	for id, entry := range g.items {
+		if !entry.lootExpiresAt.IsZero() && !now.Before(entry.lootExpiresAt) {
+			entry.item.Instance.SetOwner(0)
+			entry.lootExpiresAt = time.Time{}
+			g.items[id] = entry
+		}
 		if entry.expiresAt.IsZero() || now.Before(entry.expiresAt) {
 			continue
 		}
@@ -225,13 +251,13 @@ func (g *GroundItems) Snapshots(skip func(itemID int32) bool) []item.GroundSnaps
 	return out
 }
 
-func (g *GroundItems) track(ground *grounditem.Item, delay time.Duration) {
+func (g *GroundItems) track(ground *grounditem.Item, delay time.Duration, lootExpiresAt time.Time) {
 	var expiresAt time.Time
 	if delay != 0 {
 		expiresAt = g.now().Add(delay)
 	}
 	g.mu.Lock()
-	g.items[ground.ObjectID()] = groundItemEntry{item: ground, expiresAt: expiresAt}
+	g.items[ground.ObjectID()] = groundItemEntry{item: ground, expiresAt: expiresAt, lootExpiresAt: lootExpiresAt}
 	g.mu.Unlock()
 }
 
