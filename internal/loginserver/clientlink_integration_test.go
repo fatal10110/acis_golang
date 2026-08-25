@@ -311,7 +311,7 @@ func TestClientLinkGameGuardWrongSessionIDClosesWithAccessFailed(t *testing.T) {
 	addr, _, _, _, _ := newTestClientLink(t, newFakeAccountStore(), false)
 	c := dialLoginClient(t, addr)
 
-	c.send(encodeAuthGameGuard(testInitSessionID+1))
+	c.send(encodeAuthGameGuard(testInitSessionID + 1))
 	reply := c.read()
 	if reply[0] != serverpackets.OpcodeLoginFail {
 		t.Fatalf("opcode = %#x, want LoginFail (%#x)", reply[0], serverpackets.OpcodeLoginFail)

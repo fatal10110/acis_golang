@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rsa"
 	"net"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -30,6 +31,7 @@ type GameServerLink struct {
 	accounts        *sql.AccountStore
 	registrations   registrationStore
 	allowNewServers bool
+	flood           *netutil.FloodGuard
 	log             zerolog.Logger
 }
 
@@ -38,7 +40,8 @@ type registrationStore interface {
 }
 
 // NewGameServerLink builds a GameServerLink from its collaborators.
-// allowNewServers mirrors the AcceptNewGameServer config flag.
+// allowNewServers mirrors the AcceptNewGameServer config flag; flood, when
+// non-nil, throttles connections per remote IP before they are handled.
 func NewGameServerLink(
 	servers *manager.ServerRegistry,
 	names *manager.ServerNames,
@@ -48,6 +51,7 @@ func NewGameServerLink(
 	accounts *sql.AccountStore,
 	registrations registrationStore,
 	allowNewServers bool,
+	flood *netutil.FloodGuard,
 	log zerolog.Logger,
 ) *GameServerLink {
 	return &GameServerLink{
@@ -59,6 +63,7 @@ func NewGameServerLink(
 		accounts:        accounts,
 		registrations:   registrations,
 		allowNewServers: allowNewServers,
+		flood:           flood,
 		log:             log,
 	}
 }
@@ -70,6 +75,15 @@ func NewGameServerLink(
 // listen address/network.
 func (l *GameServerLink) Serve(ctx context.Context, ln net.Listener) error {
 	return netutil.AcceptLoop(ctx, ln, func(conn net.Conn) {
+		if l.flood != nil {
+			ip := remoteIP(conn)
+			if !l.flood.CanConnect(ip.String(), time.Now()) {
+				l.log.Info().Str("ip", ip.String()).Msg("flood-protected link connection dropped")
+				conn.Close()
+				return
+			}
+			defer l.flood.Release(ip.String())
+		}
 		l.handleConnection(ctx, conn)
 	}, l.log)
 }
@@ -139,7 +153,9 @@ func (l *GameServerLink) handleConnection(ctx context.Context, conn net.Conn) {
 
 		switch payload[0] {
 		case link.OpcodeBlowFishKey:
-			l.onBlowFishKey(c, payload)
+			if !l.onBlowFishKey(c, payload) {
+				return
+			}
 		case link.OpcodeGameServerAuth:
 			if !l.onGameServerAuth(ctx, c, payload) {
 				return
@@ -168,15 +184,21 @@ func (l *GameServerLink) handleConnection(ctx context.Context, conn net.Conn) {
 	}
 }
 
-func (l *GameServerLink) onBlowFishKey(c *gameServerConn, payload []byte) {
+// onBlowFishKey installs the dynamic Blowfish key the game server presents.
+// A key that cannot be decrypted or installed leaves the link unusable, so
+// the connection is dropped. It reports false when the connection must
+// close.
+func (l *GameServerLink) onBlowFishKey(c *gameServerConn, payload []byte) bool {
 	key, err := link.DecodeBlowFishKey(payload, c.key)
 	if err != nil {
-		l.log.Warn().Str("ip", c.remoteIP.String()).Err(err).Msg("gameserver link")
-		return
+		l.log.Warn().Str("ip", c.remoteIP.String()).Err(err).Msg("gameserver link: drop connection on undecryptable blowfish key")
+		return false
 	}
 	if err := c.crypt.SetKey(key); err != nil {
-		l.log.Warn().Str("ip", c.remoteIP.String()).Err(err).Msg("gameserver link")
+		l.log.Warn().Str("ip", c.remoteIP.String()).Err(err).Msg("gameserver link: drop connection on invalid blowfish key")
+		return false
 	}
+	return true
 }
 
 // onGameServerAuth handles a registration/re-authentication request: reuse

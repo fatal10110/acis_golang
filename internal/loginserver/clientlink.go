@@ -30,6 +30,9 @@ const (
 	DefaultLoginTryBeforeBan = 3
 	// DefaultLoginBlockAfterBan is the default temporary IP ban duration.
 	DefaultLoginBlockAfterBan = 10 * time.Minute
+	// LoginTimeout is how long an authenticated client may hold its
+	// session without joining a game server before the purge loop drops it.
+	LoginTimeout = 60 * time.Second
 )
 
 // accountStore is the account persistence ClientLink needs. *sql.AccountStore
@@ -60,6 +63,16 @@ type ClientLink struct {
 	// failedMu guards failedAttempts.
 	failedMu       sync.Mutex
 	failedAttempts map[string]int
+
+	// loginTimeout is how long an authed connection may outstay its
+	// welcome before the purge loop closes it; zero disables purging.
+	loginTimeout time.Duration
+
+	// purgeMu guards purgeable, the set of authenticated connections the
+	// purge loop walks. Connections join on successful authentication and
+	// leave when their handler finishes.
+	purgeMu   sync.Mutex
+	purgeable map[*clientConn]struct{}
 
 	// newKeyPair, newSessionKey, and newSessionID supply each connection's
 	// RSA key pair, dynamic Blowfish key, and Init session id; overridden in
@@ -98,6 +111,8 @@ func NewClientLink(
 		loginBlockAfterBan: loginBlockAfterBan,
 		log:                log,
 		failedAttempts:     make(map[string]int),
+		loginTimeout:       LoginTimeout,
+		purgeable:          make(map[*clientConn]struct{}),
 		newKeyPair:         keys.Random,
 		newSessionKey:      logincrypt.NewSessionKey,
 		newSessionID:       rand.Int32,
@@ -105,24 +120,82 @@ func NewClientLink(
 }
 
 // Serve accepts login-client connections on ln until ctx is canceled or
-// accepting fails. Each connection is handled on its own goroutine. The
-// caller owns ln: Serve closes it on ctx cancellation but does not create
-// it, so tests can bind an ephemeral port.
+// accepting fails. Each connection is handled on its own goroutine. A
+// purge loop closes authenticated connections that outstay LoginTimeout
+// without joining a game server. The caller owns ln: Serve closes it on
+// ctx cancellation but does not create it, so tests can bind an ephemeral
+// port.
 func (l *ClientLink) Serve(ctx context.Context, ln net.Listener) error {
+	go l.purgeLoop(ctx)
 	return netutil.AcceptLoop(ctx, ln, func(conn net.Conn) {
 		l.handleConnection(ctx, conn)
 	}, l.log)
 }
 
-// clientConn is one connected login client. It is owned entirely by the
-// goroutine running handleConnection: nothing else writes to conn or
-// advances crypt.
+// purgeLoop sweeps the authenticated connections every half login timeout,
+// dropping those whose connection outlived it, as the reference's purge
+// task does.
+func (l *ClientLink) purgeLoop(ctx context.Context) {
+	if l.loginTimeout <= 0 {
+		return
+	}
+	ticker := time.NewTicker(l.loginTimeout / 2)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			l.purgeStale(time.Now())
+		}
+	}
+}
+
+// purgeStale closes every registered connection that connected more than
+// loginTimeout ago, replying with a LoginFail first.
+func (l *ClientLink) purgeStale(now time.Time) {
+	l.purgeMu.Lock()
+	var stale []*clientConn
+	for c := range l.purgeable {
+		if now.Sub(c.connectedAt) > l.loginTimeout {
+			stale = append(stale, c)
+		}
+	}
+	l.purgeMu.Unlock()
+
+	for _, c := range stale {
+		l.log.Info().Str("ip", c.remoteIP.String()).Str("account", c.account).Msg("purging login client stuck past the login timeout")
+		c.kick()
+	}
+}
+
+// registerPurgeable adds c to the purge set.
+func (l *ClientLink) registerPurgeable(c *clientConn) {
+	l.purgeMu.Lock()
+	if l.purgeable == nil {
+		l.purgeable = make(map[*clientConn]struct{})
+	}
+	l.purgeable[c] = struct{}{}
+	l.purgeMu.Unlock()
+}
+
+// unregisterPurgeable removes c from the purge set.
+func (l *ClientLink) unregisterPurgeable(c *clientConn) {
+	l.purgeMu.Lock()
+	delete(l.purgeable, c)
+	l.purgeMu.Unlock()
+}
+
+// clientConn is one connected login client. Its handler goroutine owns the
+// protocol flow; the purge loop may additionally call kick from outside,
+// so sends are serialized by sendMu.
 type clientConn struct {
-	conn      net.Conn
-	remoteIP  net.IP
-	crypt     *logincrypt.LoginCrypt
-	key       *commoncrypt.LoginKeyPair
-	sessionID int32
+	conn        net.Conn
+	remoteIP    net.IP
+	crypt       *logincrypt.LoginCrypt
+	key         *commoncrypt.LoginKeyPair
+	sessionID   int32
+	connectedAt time.Time
 
 	account    string
 	authed     bool
@@ -131,6 +204,8 @@ type clientConn struct {
 	lastServer int
 	loginKey1  int32
 	loginKey2  int32
+
+	sendMu sync.Mutex
 }
 
 func (c *clientConn) send(payload []byte) error {
@@ -140,9 +215,19 @@ func (c *clientConn) send(payload []byte) error {
 	return wire.WriteFrame(c.conn, c.crypt.Encrypt(payload))
 }
 
+// kick replies LoginFail AccessFailed and closes the connection; safe to
+// call while the handler goroutine is blocked reading.
+func (c *clientConn) kick() {
+	_ = c.send(serverpackets.EncodeLoginFail(serverpackets.LoginFailAccessFailed))
+	c.conn.Close()
+}
+
 func (l *ClientLink) handleConnection(ctx context.Context, conn net.Conn) {
 	var c *clientConn
 	defer func() {
+		if c != nil {
+			l.unregisterPurgeable(c)
+		}
 		if c != nil && c.account != "" && !c.joinedGame {
 			l.sessions.Delete(c.account)
 		}
@@ -167,11 +252,12 @@ func (l *ClientLink) handleConnection(ctx context.Context, conn net.Conn) {
 	}
 
 	c = &clientConn{
-		conn:      conn,
-		remoteIP:  ip,
-		crypt:     cr,
-		key:       l.newKeyPair(),
-		sessionID: l.newSessionID(),
+		conn:        conn,
+		remoteIP:    ip,
+		crypt:       cr,
+		key:         l.newKeyPair(),
+		sessionID:   l.newSessionID(),
+		connectedAt: time.Now(),
 	}
 
 	if err := c.send(serverpackets.EncodeInit(c.sessionID, c.key.ScrambledModulus, sessionKey)); err != nil {
@@ -272,6 +358,7 @@ func (l *ClientLink) onRequestAuthLogin(ctx context.Context, c *clientConn, payl
 	c.loginKey1, c.loginKey2 = rand.Int32(), rand.Int32()
 	l.sessions.Put(c.account, link.SessionKey{LoginKey1: c.loginKey1, LoginKey2: c.loginKey2})
 	c.authed = true
+	l.registerPurgeable(c)
 
 	if l.skipLicenceCheck {
 		return c.send(serverpackets.EncodeServerList(byte(c.lastServer), l.serverEntries())) == nil

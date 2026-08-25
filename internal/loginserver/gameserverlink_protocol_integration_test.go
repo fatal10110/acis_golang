@@ -325,7 +325,7 @@ func newTestLinkWithRegistrationStore(t *testing.T, allowNewServers bool, accoun
 	sessions = manager.NewSessionStore()
 	bans = manager.NewIPBanList(zerolog.Nop())
 
-	l = NewGameServerLink(servers, names, keys, sessions, bans, accounts, registrations, allowNewServers, zerolog.Nop())
+	l = NewGameServerLink(servers, names, keys, sessions, bans, accounts, registrations, allowNewServers, nil, zerolog.Nop())
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {

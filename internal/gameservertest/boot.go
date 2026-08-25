@@ -373,7 +373,9 @@ func (s *Server) SetInventorySlotLimit(tb testing.TB, objID int32, limit int) {
 	if !ok {
 		tb.Fatalf("world.Player(%d) missing", objID)
 	}
-	holder, ok := obj.(interface{ Inventory() *itemcontainer.Inventory })
+	holder, ok := obj.(interface {
+		Inventory() *itemcontainer.Inventory
+	})
 	if !ok {
 		tb.Fatalf("world.Player(%d) = %T does not expose Inventory", objID, obj)
 	}
@@ -401,7 +403,9 @@ func (s *Server) PlayerTotalWeight(tb testing.TB, objID int32) int {
 	if !ok {
 		tb.Fatalf("world.Player(%d) missing", objID)
 	}
-	holder, ok := obj.(interface{ Inventory() *itemcontainer.Inventory })
+	holder, ok := obj.(interface {
+		Inventory() *itemcontainer.Inventory
+	})
 	if !ok {
 		tb.Fatalf("world.Player(%d) = %T does not expose Inventory", objID, obj)
 	}
@@ -772,7 +776,7 @@ func startLoginServerAcceptor(t *testing.T) (addr string, servers *manager.Serve
 	sessions = manager.NewSessionStore()
 	bans := manager.NewIPBanList(zerolog.Nop())
 
-	gsLink := loginserver.NewGameServerLink(servers, names, keys, sessions, bans, nil, nil, false, zerolog.Nop())
+	gsLink := loginserver.NewGameServerLink(servers, names, keys, sessions, bans, nil, nil, false, nil, zerolog.Nop())
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
