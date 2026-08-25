@@ -43,13 +43,11 @@ func (p *SpoilPool) Sweepable() bool {
 	return len(p.items) > 0
 }
 
-// Sweep drains and returns the pooled items, leaving the pool empty. A
-// second call returns nothing, matching the one-time harvest a sweep skill
-// performs; the spoil marker itself is untouched (the monster stays
-// spoiled, just with nothing left to sweep).
+// Sweep drains and returns the pooled items, clearing the spoil state. A
+// second call returns nothing.
 func (p *SpoilPool) Sweep() map[int32]int32 {
 	items := p.items
-	p.items = nil
+	p.Reset()
 	return items
 }
 
