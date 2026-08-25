@@ -84,6 +84,33 @@ func TestControllerDualSlowFirstHitDelaysSecondHitAndCompletion(t *testing.T) {
 	}
 }
 
+func TestControllerStopsWhenMainTargetDiesBeforeHit(t *testing.T) {
+	actor := &timingActor{attackSpeed: 500}
+	target := &timingTarget{id: 2}
+	clock := &timingClock{}
+	ctrl := NewCreature(actor)
+	ctrl.afterFunc = clock.AfterFunc
+
+	if err := ctrl.DoAttack(target); err != nil {
+		t.Fatalf("DoAttack() error: %v", err)
+	}
+	target.dead = true
+	clock.fire(500 * time.Millisecond)
+
+	if ctrl.AttackingNow() {
+		t.Fatal("AttackingNow() after main target dies before hit = true, want false")
+	}
+}
+
+func TestControllerStopIsSilent(t *testing.T) {
+	actor := &timingPlayer{}
+	NewPlayer(actor).Stop()
+
+	if actor.idles != 0 || actor.actionFailed != 0 {
+		t.Fatalf("Stop() notifications = idle %d, ActionFailed %d; want 0, 0", actor.idles, actor.actionFailed)
+	}
+}
+
 func TestControllerPoleSelectsForwardTargetsUpToCap(t *testing.T) {
 	var landed []int32
 	primary := &timingTarget{id: 2, x: 40, attackable: true, landed: &landed}
@@ -250,6 +277,20 @@ type timingActor struct {
 	dead        bool
 }
 
+type timingPlayer struct {
+	timingActor
+	idles        int
+	actionFailed int
+}
+
+func (a *timingPlayer) InPeaceZone() bool         { return false }
+func (a *timingPlayer) TryToIdle()                { a.idles++ }
+func (a *timingPlayer) CheckAndEquipArrows() bool { return true }
+func (a *timingPlayer) WeaponMPConsume() int      { return 0 }
+func (a *timingPlayer) MP() int                   { return 1 }
+func (a *timingPlayer) ClearRecentFakeDeath()     {}
+func (a *timingPlayer) ClientActionFailed()       { a.actionFailed++ }
+
 func (a *timingActor) ObjectID() int32                         { return 1 }
 func (a *timingActor) SiegeGuard() bool                        { return false }
 func (a *timingActor) AlikeDead() bool                         { return a.dead }
@@ -299,6 +340,7 @@ type timingTarget struct {
 	id         int32
 	x, y, z    int
 	attackable bool
+	dead       bool
 	hits       int
 	landed     *[]int32
 	onDamage   func()
@@ -306,9 +348,9 @@ type timingTarget struct {
 
 func (t *timingTarget) ObjectID() int32  { return t.id }
 func (t *timingTarget) SiegeGuard() bool { return false }
-func (t *timingTarget) AlikeDead() bool  { return false }
+func (t *timingTarget) AlikeDead() bool  { return t.dead }
 func (t *timingTarget) Heading() int     { return 0 }
-func (t *timingTarget) Dead() bool       { return false }
+func (t *timingTarget) Dead() bool       { return t.dead }
 func (t *timingTarget) Category() target.Category {
 	return target.CategoryAttackable
 }
