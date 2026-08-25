@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rsa"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -32,6 +33,7 @@ type GameServerLink struct {
 	registrations   registrationStore
 	allowNewServers bool
 	flood           *netutil.FloodGuard
+	roster          *LinkRoster
 	log             zerolog.Logger
 }
 
@@ -41,7 +43,9 @@ type registrationStore interface {
 
 // NewGameServerLink builds a GameServerLink from its collaborators.
 // allowNewServers mirrors the AcceptNewGameServer config flag; flood, when
-// non-nil, throttles connections per remote IP before they are handled.
+// non-nil, throttles connections per remote IP before they are handled;
+// roster records each authed connection so other components can deliver a
+// message to that server's link.
 func NewGameServerLink(
 	servers *manager.ServerRegistry,
 	names *manager.ServerNames,
@@ -52,6 +56,7 @@ func NewGameServerLink(
 	registrations registrationStore,
 	allowNewServers bool,
 	flood *netutil.FloodGuard,
+	roster *LinkRoster,
 	log zerolog.Logger,
 ) *GameServerLink {
 	return &GameServerLink{
@@ -64,6 +69,7 @@ func NewGameServerLink(
 		registrations:   registrations,
 		allowNewServers: allowNewServers,
 		flood:           flood,
+		roster:          roster,
 		log:             log,
 	}
 }
@@ -88,9 +94,9 @@ func (l *GameServerLink) Serve(ctx context.Context, ln net.Listener) error {
 	}, l.log)
 }
 
-// gameServerConn is one game server's link connection. It is owned
-// entirely by the goroutine running handleConnection: nothing else writes
-// to conn or advances crypt.
+// gameServerConn is one game server's link connection. Its handler
+// goroutine owns the protocol flow; the roster may additionally deliver a
+// message from outside, so sends are serialized by sendMu.
 type gameServerConn struct {
 	conn     net.Conn
 	remoteIP net.IP
@@ -98,10 +104,59 @@ type gameServerConn struct {
 	key      *rsa.PrivateKey
 	id       int
 	authed   bool
+
+	sendMu sync.Mutex
 }
 
 func (c *gameServerConn) send(payload []byte) error {
+	c.sendMu.Lock()
+	defer c.sendMu.Unlock()
 	return wire.WriteFrame(c.conn, c.crypt.Encrypt(payload))
+}
+
+// LinkRoster tracks each linked game server's live connection, so a
+// component outside the link's own read loop (ClientLink evicting an account
+// that re-authenticated) can deliver a message to that server. Build one
+// with NewLinkRoster and share it between GameServerLink and ClientLink at
+// composition time.
+//
+// mu guards conns.
+type LinkRoster struct {
+	mu    sync.RWMutex
+	conns map[int]*gameServerConn
+}
+
+// NewLinkRoster returns an empty LinkRoster.
+func NewLinkRoster() *LinkRoster {
+	return &LinkRoster{conns: make(map[int]*gameServerConn)}
+}
+
+func (r *LinkRoster) add(id int, c *gameServerConn) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.conns[id] = c
+}
+
+// remove drops id's entry only if it still points at c, so a replacement
+// connection for the same server is never removed by the old one.
+func (r *LinkRoster) remove(id int, c *gameServerConn) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.conns[id] == c {
+		delete(r.conns, id)
+	}
+}
+
+// kick asks the game server linked at id to disconnect account and reports
+// whether the request was delivered.
+func (r *LinkRoster) kick(id int, account string) bool {
+	r.mu.RLock()
+	c := r.conns[id]
+	r.mu.RUnlock()
+	if c == nil {
+		return false
+	}
+	return c.send(link.EncodeKickPlayer(account)) == nil
 }
 
 // forceClose sends a LoginServerFail with reason; the caller closes conn.
@@ -120,6 +175,9 @@ func (l *GameServerLink) handleConnection(ctx context.Context, conn net.Conn) {
 	}
 	defer func() {
 		if c.authed {
+			if l.roster != nil {
+				l.roster.remove(c.id, c)
+			}
 			l.servers.MarkOffline(c.id)
 			l.log.Info().Int("server_id", c.id).Msg("gameserver disconnected from the link")
 		}
@@ -261,6 +319,9 @@ func (l *GameServerLink) onGameServerAuth(ctx context.Context, c *gameServerConn
 	l.servers.MarkOnline(id, host, c.remoteIP, auth.Port, auth.MaxPlayers)
 	c.id = id
 	c.authed = true
+	if l.roster != nil {
+		l.roster.add(id, c)
+	}
 
 	name, _ := l.names.Name(id)
 	if err := c.send(link.EncodeAuthResponse(byte(id), name)); err != nil {

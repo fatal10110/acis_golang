@@ -1,10 +1,26 @@
 package manager
 
 import (
+	"math/rand/v2"
+	"time"
+
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
+)
+
+// dropScatterOffset is the +/- range applied to each stack's drop point
+// around the corpse, matching Npc.dropItem's item.dropMe(this, 70) call
+// (aCis Npc.java:2258).
+const dropScatterOffset = 70
+
+// Loot-protection windows mirror ItemInstance's REGULAR_LOOT_PROTECTION_TIME
+// / RAID_LOOT_PROTECTION_TIME constants (aCis ItemInstance.java:53-54).
+const (
+	regularLootProtection = 15 * time.Second
+	raidLootProtection    = 300 * time.Second
 )
 
 // groundPlacer drops a rolled item into the visible world. Satisfied by
@@ -43,9 +59,11 @@ type KillReward struct {
 	ids    idAllocator
 	items  *item.Table
 	ground groundPlacer
+	geo    move.Geo
 
 	x, y, z, heading int
 	dropperID        int32
+	protectOwnerID   int32
 }
 
 // NewKillReward returns a Rewarder that rolls categories against pool and
@@ -53,8 +71,11 @@ type KillReward struct {
 // levelMultiplier is the caller-resolved drop-rate penalty for the
 // killer/monster level gap (see item.LevelPenaltyMultiplier); pool may be
 // nil for an unspoiled monster. dropperID is the dying NPC's object id, so
-// nearby observers see the loot fall from its corpse.
-func NewKillReward(categories []item.DropCategory, pool *item.SpoilPool, levelMultiplier float64, raid bool, rates item.Rates, autoLootItems, autoLootHerbs bool, ids idAllocator, items *item.Table, ground groundPlacer, x, y, z, heading int, dropperID int32) *KillReward {
+// nearby observers see the loot fall from its corpse. geo scatters each
+// stack around (x, y, z) and validates the result against geodata,
+// matching ItemInstance.dropMe(Creature, int) (aCis ItemInstance.java:768-
+// 789); a nil geo drops every stack at the exact corpse position instead.
+func NewKillReward(categories []item.DropCategory, pool *item.SpoilPool, levelMultiplier float64, raid bool, rates item.Rates, autoLootItems, autoLootHerbs bool, ids idAllocator, items *item.Table, ground groundPlacer, geo move.Geo, x, y, z, heading int, dropperID int32) *KillReward {
 	return &KillReward{
 		categories:      categories,
 		pool:            pool,
@@ -66,6 +87,7 @@ func NewKillReward(categories []item.DropCategory, pool *item.SpoilPool, levelMu
 		ids:             ids,
 		items:           items,
 		ground:          ground,
+		geo:             geo,
 		x:               x,
 		y:               y,
 		z:               z,
@@ -79,7 +101,13 @@ func NewKillReward(categories []item.DropCategory, pool *item.SpoilPool, levelMu
 // directly to the killer's inventory. An auto-looted herb is consumed
 // instantly instead: herbs never occupy an inventory slot.
 func (k *KillReward) CalculateRewards(killer creature.DeathActor) {
-	receiver, _ := killer.(rewardItemReceiver)
+	receiver, isPlayer := killer.(rewardItemReceiver)
+	if isPlayer {
+		// Only a Playable kill gets its drop reserved, matching Npc.dropItem's
+		// `creature.getActingPlayer() != null` guard before setDropProtection
+		// (aCis Npc.java:2255-2256).
+		k.protectOwnerID = killer.ObjectID()
+	}
 	rolled, herbs := item.RollKillReward(k.categories, k.pool, k.levelMultiplier, k.raid, k.rates, k.autoLootHerbs)
 	for id, qty := range rolled {
 		if k.autoLootItems && k.addToInventory(receiver, id, int(qty)) {
@@ -157,5 +185,24 @@ func (k *KillReward) drop(itemID int32, count int) {
 	if err != nil {
 		return
 	}
-	k.ground.Drop(ground, task.DropOptions{X: k.x, Y: k.y, Z: k.z, Heading: k.heading, DropperID: k.dropperID})
+
+	x, y, z := k.x, k.y, k.z
+	if k.geo != nil {
+		nx := k.x + rand.IntN(2*dropScatterOffset+1) - dropScatterOffset
+		ny := k.y + rand.IntN(2*dropScatterOffset+1) - dropScatterOffset
+		loc := k.geo.ValidLocation(k.x, k.y, k.z, nx, ny, k.z)
+		x, y, z = loc.X, loc.Y, loc.Z
+	}
+
+	protectFor := regularLootProtection
+	if k.raid {
+		protectFor = raidLootProtection
+	}
+
+	k.ground.Drop(ground, task.DropOptions{
+		X: x, Y: y, Z: z, Heading: k.heading,
+		DropperID:      k.dropperID,
+		ProtectOwnerID: k.protectOwnerID,
+		ProtectFor:     protectFor,
+	})
 }

@@ -103,11 +103,17 @@ func (c *Character) ReduceCurrentMP(amount int) {
 }
 
 func (c *Character) refillResources(maxHP, maxMP, maxCP float64) {
+	currentHP, currentMP, currentCP := maxHP, maxMP, maxCP
+	if c.template() != nil {
+		currentHP = c.calcStat(stat.MaxHP, maxHP)
+		currentMP = c.calcStat(stat.MaxMP, maxMP)
+		currentCP = c.calcStat(stat.MaxCP, maxCP)
+	}
 	c.vitalsMu.Lock()
 	defer c.vitalsMu.Unlock()
-	c.maxHP, c.curHP = maxHP, maxHP
-	c.maxMP, c.curMP = maxMP, maxMP
-	c.maxCP, c.curCP = maxCP, maxCP
+	c.maxHP, c.curHP = maxHP, currentHP
+	c.maxMP, c.curMP = maxMP, currentMP
+	c.maxCP, c.curCP = maxCP, currentCP
 }
 
 // ChangesTo reports which resources differ in next.
