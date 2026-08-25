@@ -49,6 +49,15 @@ const (
 	weaponEquippedBonusSlots = 40
 )
 
+// mountNpcIdOffset is added to a mounted character's mount npc id so the
+// client can distinguish the mount field's id space from regular npc ids;
+// an unmounted character reports 0.
+const mountNpcIdOffset = 1000000
+
+// teamBlue is TeamType.BLUE's wire id, the team byte shown while spawn
+// protection holds.
+const teamBlue = 1
+
 // UserInfoSnapshot is everything UserInfo needs about one character at the
 // moment of encoding. It is deliberately narrower than the client's full
 // field list: systems this server hasn't built yet (clans,
@@ -64,6 +73,10 @@ type UserInfoSnapshot struct {
 	// IsGM is the accessLevels.xml isGM flag for Character's access level
 	// (Player.isGM() in the reference), not merely AccessLevel > 0.
 	IsGM bool
+	// SpawnProtectedTeam reports the team byte the client sees while spawn
+	// protection is active: TeamType.BLUE when spawn protection is enabled
+	// and currently held, the unassigned team otherwise.
+	SpawnProtectedTeam bool
 }
 
 // EncodeUserInfo builds the UserInfo packet payload for an unframed send.
@@ -228,14 +241,22 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) error {
 	w.WriteInt32(0)  // clan privileges: clans are not modeled
 	w.WriteUint16(0) // recommendations left: recommendations are not modeled
 	w.WriteUint16(0) // recommendations received: recommendations are not modeled
-	w.WriteInt32(c.MountNPCID())
+	if mountID := c.MountNPCID(); mountID > 0 {
+		w.WriteInt32(mountID + mountNpcIdOffset)
+	} else {
+		w.WriteInt32(0)
+	}
 	w.WriteUint16(uint16(inventoryLimit))
 	w.WriteInt32(int32(c.ClassID))
 	w.WriteInt32(0)
 	w.WriteInt32(int32(resources.MaxCP))
 	w.WriteInt32(int32(resources.CurrentCP))
 	w.WriteUint8(byte(enchantEffect))
-	w.WriteUint8(0) // team: teams (duel/event) are not modeled
+	if s.SpawnProtectedTeam {
+		w.WriteUint8(teamBlue)
+	} else {
+		w.WriteUint8(0) // team: teams (duel/event) are not modeled
+	}
 	w.WriteInt32(0) // large clan crest id: clans are not modeled
 	w.WriteUint8(0) // noble flag: nobility is not modeled
 	w.WriteUint8(0) // hero flag: heroism is not modeled

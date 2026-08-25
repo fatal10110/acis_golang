@@ -381,7 +381,7 @@ func TestFrameCharSelected(t *testing.T) {
 	c.SetResourceValues(player.Resources{CurrentHP: 75, CurrentMP: 30})
 	tmpl := &player.Template{STR: 40, CON: 43, DEX: 30, INT: 21, WIT: 11, MEN: 25}
 
-	got := framePayload(t, FrameCharSelected(CharSelectedSnapshot{Character: c, Template: tmpl, SessionID: 999}))
+	got := framePayload(t, FrameCharSelected(CharSelectedSnapshot{Character: c, Template: tmpl, SessionID: 999, GameTime: 1234}))
 	resources := c.ResourceValues()
 
 	want := []byte{OpcodeCharSelected}
@@ -419,8 +419,8 @@ func TestFrameCharSelected(t *testing.T) {
 	for i := 0; i < 32; i++ { // 30 padding zeros + 2 reserved
 		want = binary.LittleEndian.AppendUint32(want, 0)
 	}
-	want = binary.LittleEndian.AppendUint32(want, 0) // game time
-	want = binary.LittleEndian.AppendUint32(want, 0) // reserved
+	want = binary.LittleEndian.AppendUint32(want, 1234) // game time
+	want = binary.LittleEndian.AppendUint32(want, 0)    // reserved
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.ClassID))
 	for i := 0; i < 4; i++ {
 		want = binary.LittleEndian.AppendUint32(want, 0)
@@ -3440,5 +3440,56 @@ func TestCopyFrameShortSourceReportsFailure(t *testing.T) {
 	defer frame.Release()
 	if ok {
 		t.Fatalf("CopyFrame short source = %x, true; want empty frame, false", frame.Bytes())
+	}
+}
+
+// TestFrameUserInfo_MountNpcIdCarriesOffset pins the mount-id encoding: a
+// mounted character reports its mount npc id shifted into the client's
+// mount id space (+1000000); an unmounted character reports 0.
+func TestFrameUserInfo_MountNpcIdCarriesOffset(t *testing.T) {
+	tmpl := &player.Template{}
+	c := &player.Character{Name: "M"}
+
+	unmounted := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: c, Template: tmpl}))
+	if bytes.Contains(unmounted, binary.LittleEndian.AppendUint32(nil, 12621)) {
+		t.Fatal("unmounted UserInfo contains the raw wyvern npc id")
+	}
+
+	c.Mount(12621, 555)
+	mounted := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: c, Template: tmpl}))
+	if !bytes.Contains(mounted, binary.LittleEndian.AppendUint32(nil, 12621+1000000)) {
+		t.Fatalf("mounted UserInfo does not contain npc id + 1000000 (%d)", 12621+1000000)
+	}
+}
+
+// TestFrameUserInfo_TeamByteBlueWhileSpawnProtected pins the team byte:
+// while spawn protection holds the client sees TeamType.BLUE (1), not the
+// unassigned team.
+func TestFrameUserInfo_TeamByteBlueWhileSpawnProtected(t *testing.T) {
+	tmpl := &player.Template{}
+	c := &player.Character{Name: "M"}
+
+	unprotected := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: c, Template: tmpl}))
+	protected := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: c, Template: tmpl, SpawnProtectedTeam: true}))
+
+	if len(unprotected) != len(protected) {
+		t.Fatalf("payload lengths differ: %d vs %d", len(unprotected), len(protected))
+	}
+	diffs := 0
+	teamAt := -1
+	for i := range unprotected {
+		if unprotected[i] != protected[i] {
+			diffs++
+			teamAt = i
+		}
+	}
+	if diffs != 1 || teamAt < 0 {
+		t.Fatalf("expected exactly one differing byte, got %d (at %d)", diffs, teamAt)
+	}
+	if unprotected[teamAt] != 0 {
+		t.Fatalf("unprotected team byte = %d, want 0", unprotected[teamAt])
+	}
+	if protected[teamAt] != 1 {
+		t.Fatalf("spawn-protected team byte = %d, want TeamType.BLUE (1)", protected[teamAt])
 	}
 }

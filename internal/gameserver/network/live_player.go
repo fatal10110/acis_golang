@@ -43,9 +43,14 @@ type livePlayer struct {
 	isGM          bool
 	log           zerolog.Logger
 
-	known              world.KnownBuffer
-	zoneActor          *liveZoneActor
-	visibilitySend     func(wire.Frame) bool
+	known          world.KnownBuffer
+	zoneActor      *liveZoneActor
+	visibilitySend func(wire.Frame) bool
+	// kick closes this player's client connection (ServerClose then close),
+	// set once at attach time. It is the server-initiated eviction path a
+	// duplicate character selection uses to take the character away from its
+	// previous session.
+	kick               func()
 	stopAttack         func(*livePlayer)
 	shadowExpiryMu     sync.RWMutex
 	spawnProtectionMu  sync.Mutex
@@ -99,6 +104,15 @@ func (p *livePlayer) sendVisibilityFrame(frame wire.Frame) bool {
 		return false
 	}
 	return p.visibilitySend(frame)
+}
+
+// kickClient closes this player's client connection. A no-op when the
+// player was attached without a kick hook (defensive; every production
+// attach sets one).
+func (p *livePlayer) kickClient() {
+	if p.kick != nil {
+		p.kick()
+	}
 }
 
 func (p *livePlayer) Stop() {

@@ -20,6 +20,10 @@ type CharSelectedSnapshot struct {
 	// SessionID is the session-key half the client must present back
 	// unchanged once it sends EnterWorld.
 	SessionID int32
+
+	// GameTime is the current in-game minute of day, 0-1439, from the
+	// server's game clock.
+	GameTime int32
 }
 
 // FrameCharSelected builds the CharSelected packet for s as an owned frame.
@@ -69,7 +73,7 @@ func writeCharSelected(w *wire.Writer, s CharSelectedSnapshot) {
 	w.WriteInt32(0) // reserved
 	w.WriteInt32(0) // reserved
 
-	w.WriteInt32(0) // game time: day/night cycle is not modeled
+	w.WriteInt32(s.GameTime) // current in-game minute of day
 
 	w.WriteInt32(0) // reserved
 

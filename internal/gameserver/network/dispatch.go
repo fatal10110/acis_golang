@@ -143,6 +143,7 @@ type GameClientLink struct {
 	pvpFlags      *task.PvPFlags
 	positions     *task.PositionUpdates
 	playerClock   *task.PlayerClock
+	gameClock     *task.GameClock
 	water         *task.Water
 	shadowItems   *task.ShadowItems
 	autosave      *task.Autosave
@@ -226,9 +227,12 @@ type GameClientLinkConfig struct {
 	PvPFlags      *task.PvPFlags
 	Positions     *task.PositionUpdates
 	PlayerClock   *task.PlayerClock
-	Water         *task.Water
-	ShadowItems   *task.ShadowItems
-	Autosave      *task.Autosave
+	// GameClock is the server's in-game clock; CharSelected reports its
+	// current minute of day. Nil is tolerated (tests) and reports 0.
+	GameClock   *task.GameClock
+	Water       *task.Water
+	ShadowItems *task.ShadowItems
+	Autosave    *task.Autosave
 	// InventoryUpdates batches InventoryUpdate packets for inventory
 	// changes the server makes on its own, outside a client request.
 	InventoryUpdates *task.InventoryUpdates
@@ -281,6 +285,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) *GameClientLink {
 		pvpFlags:      cfg.PvPFlags,
 		positions:     cfg.Positions,
 		playerClock:   cfg.PlayerClock,
+		gameClock:     cfg.GameClock,
 		water:         cfg.Water,
 		shadowItems:   cfg.ShadowItems,
 		autosave:      cfg.Autosave,

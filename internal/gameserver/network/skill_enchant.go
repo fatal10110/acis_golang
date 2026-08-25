@@ -68,10 +68,5 @@ func (l *GameClientLink) applyEnchantSkill(ctx context.Context, live *livePlayer
 		live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageFailedEnchantingSkillS1, req.SkillID, req.SkillLevel))
 	}
 	live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
-	live.SendFrame(serverpackets.FrameUserInfo(serverpackets.UserInfoSnapshot{
-		Character: live.Character,
-		Template:  live.template,
-		Items:     live.inventoryItems(),
-		IsGM:      live.isGM,
-	}))
+	live.SendFrame(serverpackets.FrameUserInfo(l.userInfoSnapshot(live)))
 }

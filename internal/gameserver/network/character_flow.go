@@ -165,7 +165,7 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 	client.Session.SendFrame(serverpackets.FrameQuestList(nil))
 	client.Session.SendFrame(serverpackets.FrameSkillList(skillList))
 	client.Session.SendFrame(serverpackets.FrameFriendList(nil))
-	client.Session.SendFrame(serverpackets.FrameUserInfo(serverpackets.UserInfoSnapshot{Character: c, Template: tmpl, Items: items, IsGM: live.isGM}))
+	client.Session.SendFrame(serverpackets.FrameUserInfo(l.userInfoSnapshot(live)))
 	client.Session.SendFrame(itemListFrame)
 	client.Session.SendFrame(serverpackets.FrameShortCutInit(serverShortcutList(live.shortcuts.All())))
 	if c.Dead() {
@@ -278,6 +278,27 @@ func (l *GameClientLink) refreshLiveLevelSkills(ctx context.Context, live *liveP
 	}
 }
 
+// userInfoSnapshot builds the UserInfo snapshot for live, deriving the
+// spawn-protection team byte the client sees while protection holds.
+func (l *GameClientLink) userInfoSnapshot(live *livePlayer) serverpackets.UserInfoSnapshot {
+	return serverpackets.UserInfoSnapshot{
+		Character:          live.Character,
+		Template:           live.template,
+		Items:              live.inventoryItems(),
+		IsGM:               live.isGM,
+		SpawnProtectedTeam: l.playerConfig.SpawnProtection > 0 && live.SpawnProtected(),
+	}
+}
+
+// gameTime returns the game clock's current minute of day, 0 when no clock
+// is wired (tests without the gameclock task).
+func (l *GameClientLink) gameTime() int32 {
+	if l.gameClock == nil {
+		return 0
+	}
+	return int32(l.gameClock.TimeOfDay())
+}
+
 func skillCoolTimeEntries(timers []effect.ReuseTimer, now time.Time) []serverpackets.SkillCoolTimeEntry {
 	if len(timers) == 0 {
 		return nil
@@ -385,6 +406,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 
 	c.SetCanGiveDamage(resolveCanGiveDamage(l.admin, c.AccessLevel))
 	live := &livePlayer{Character: c, template: tmpl, npcs: l.npcs, items: items, attack: attackCtl, move: moveCtl, combat: combat, shortcuts: shortcut.NewList(shortcuts), isGM: resolveIsGM(l.admin, c.AccessLevel), visibilitySend: client.Session.TrySendFrame, stopAttack: l.stopLiveAutoAttack, log: l.log}
+	live.kick = client.Session.Close
 	live.zoneActor = &liveZoneActor{live: live}
 	c.SetSummonConfirmSender(func(casterName string, casterID int32, x, y, z int, timeout time.Duration) {
 		live.SendFrame(serverpackets.FrameConfirmDlgSummonFriendRequest(casterName, casterID, int32(x), int32(y), int32(z), timeout))
@@ -505,9 +527,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageYouIncreasedYourLevel))
 	})
 	c.SetUserInfoUpdater(func() {
-		live.SendFrame(serverpackets.FrameUserInfo(serverpackets.UserInfoSnapshot{
-			Character: live.Character, Template: live.template, Items: live.inventoryItems(), IsGM: live.isGM,
-		}))
+		live.SendFrame(serverpackets.FrameUserInfo(l.userInfoSnapshot(live)))
 	})
 	c.SetChargesUpdater(func() {
 		live.SendFrame(serverpackets.FrameEtcStatusUpdate(serverpackets.EtcStatus{Charges: int32(live.Charges()), WeightPenalty: int32(live.WeightPenalty()), GradePenalty: live.WeaponGradePenalty() || live.ArmorGradePenalty() > 0, DeathPenaltyLevel: int32(live.DeathPenaltyLevel())}))
@@ -525,7 +545,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	})
 	c.SetWeightPenaltyUpdater(func() {
 		items := live.inventoryItems()
-		live.SendFrame(serverpackets.FrameUserInfo(serverpackets.UserInfoSnapshot{Character: live.Character, Template: live.template, Items: items, IsGM: live.isGM}))
+		live.SendFrame(serverpackets.FrameUserInfo(l.userInfoSnapshot(live)))
 		live.SendFrame(serverpackets.FrameEtcStatusUpdate(serverpackets.EtcStatus{WeightPenalty: int32(live.WeightPenalty()), GradePenalty: live.WeaponGradePenalty() || live.ArmorGradePenalty() > 0, DeathPenaltyLevel: int32(live.DeathPenaltyLevel())}))
 		if l.world != nil {
 			info := serverpackets.CharInfoSnapshot{Character: live.Character, Template: live.template, Items: items}
