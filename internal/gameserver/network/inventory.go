@@ -418,9 +418,7 @@ func (l *GameClientLink) broadcastEquipmentChange(live *livePlayer) {
 // matching the reference's broadcastUserInfo().
 func (l *GameClientLink) broadcastCharacterInfo(live *livePlayer) {
 	items := live.inventoryItems()
-	live.SendFrame(serverpackets.FrameUserInfo(serverpackets.UserInfoSnapshot{
-		Character: live.Character, Template: live.template, Items: items, IsGM: live.isGM,
-	}))
+	live.SendFrame(serverpackets.FrameUserInfo(l.userInfoSnapshot(live)))
 	if l.world == nil {
 		return
 	}

@@ -686,6 +686,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		GroundItems:      groundItems,
 		Positions:        task.NewPositionUpdates(state),
 		PlayerClock:      playerClock,
+		GameClock:        task.NewGameClock(time.Now),
 		InventoryUpdates: inventoryUpdates,
 		ItemInstances:    itemInstances,
 		ShadowItems:      shadowItems,

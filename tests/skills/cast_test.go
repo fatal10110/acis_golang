@@ -70,10 +70,11 @@ type clientReader interface {
 
 // TestCastActiveSkillChargesMPAndStartsReuse walks a full self-cast: the
 // MagicSkillUse ack with the definition's timing, the use message, the cast
-// bar, the launch report, the MP charge in a StatusUpdate, and the pending
-// reuse timer the client can query while it ticks down. A second request
-// while the skill is disabled is rejected with the prepared-for-reuse
-// message and an ActionFailed.
+// bar, the launch report, and the MP charge in a StatusUpdate. A second
+// request while the skill is disabled is rejected with the
+// prepared-for-reuse message and an ActionFailed — the reuse gate itself,
+// since the reference never answers a SkillCoolTime request: the client
+// learns remaining reuse from unsolicited pushes, not queries.
 func TestCastActiveSkillChargesMPAndStartsReuse(t *testing.T) {
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
@@ -97,12 +98,10 @@ func TestCastActiveSkillChargesMPAndStartsReuse(t *testing.T) {
 	assertStatusAttrs(t, c.Read(), objID, []serverpackets.StatusAttribute{{Type: serverpackets.StatusCurrentMP, Value: 25}})
 	drainUntilQuiet(t, c)
 
+	// The reference registers an empty case for RequestSkillCoolTime:
+	// sending one must stay silent.
 	c.Send(encodeRequestSkillCoolTime())
-	entries := readSkillCoolTimeEntries(t, c)
-	if len(entries) != 1 || entries[0].SkillID != 3 || entries[0].Level != 1 ||
-		entries[0].ReuseSeconds != 60 || entries[0].RemainingSeconds <= 0 || entries[0].RemainingSeconds > 60 {
-		t.Fatalf("SkillCoolTime entries = %+v, want skill 3 level 1 reuse 60 with a positive remainder", entries)
-	}
+	c.ExpectNoFrame()
 
 	c.Send(encodeRequestMagicSkillUse(3, false, false))
 	reply := c.Read()

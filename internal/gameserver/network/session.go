@@ -6,6 +6,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	gamecipher "github.com/fatal10110/acis_golang/internal/gameserver/network/cipher"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
 // frameHeaderSize is the length of a frame's little-endian size prefix,
@@ -30,6 +31,12 @@ type Session struct {
 	conn   *Conn
 	cipher *gamecipher.Cipher
 	mu     sync.Mutex
+
+	// cryptEnabled gates the rolling cipher: frames cross in cleartext
+	// until the VersionCheck reply goes out, matching the reference where
+	// encryption starts only once the key has been delivered. mu guards it
+	// together with the encrypt path.
+	cryptEnabled bool
 
 	// frames reuses one payload buffer across inbound frames; it belongs to
 	// the single goroutine calling ReadFrame.
@@ -92,7 +99,9 @@ func (s *Session) encryptAndTrySend(frame wire.Frame, frameBytes []byte) bool {
 		s.conn.abort()
 		return false
 	}
-	s.cipher.Encrypt(frameBytes[frameHeaderSize:])
+	if s.cryptEnabled {
+		s.cipher.Encrypt(frameBytes[frameHeaderSize:])
+	}
 	return s.conn.trySendFrame(frame)
 }
 
@@ -106,7 +115,9 @@ func (s *Session) sendFrame(frame wire.Frame, send func(wire.Frame) bool) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.cipher.Encrypt(frameBytes[frameHeaderSize:])
+	if s.cryptEnabled {
+		s.cipher.Encrypt(frameBytes[frameHeaderSize:])
+	}
 	return send(frame)
 }
 
@@ -122,6 +133,28 @@ func (s *Session) ReadFrame() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	s.cipher.Decrypt(payload)
+	if s.cryptEnabled {
+		s.cipher.Decrypt(payload)
+	}
 	return payload, nil
+}
+
+// EnableCrypt turns the rolling cipher on for every later frame. It must be
+// called right after the VersionCheck reply — the frame that carries the
+// key — has been queued: arming here (a no-transform Encrypt) keeps the
+// first encrypted outbound frame transformed exactly as the client expects.
+func (s *Session) EnableCrypt() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.cryptEnabled = true
+	s.cipher.Encrypt(nil)
+}
+
+// Close sends the ServerClose packet and closes the connection once every
+// queued frame — that packet included — has been written. It is the
+// server-initiated eviction path for a client whose session another
+// selection took over; safe to call from any goroutine.
+func (s *Session) Close() {
+	s.SendFrame(serverpackets.FrameServerClose())
+	_ = s.conn.Close()
 }
