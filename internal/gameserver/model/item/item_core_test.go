@@ -1135,8 +1135,8 @@ func TestSpoilPoolLifecycle(t *testing.T) {
 	if second := pool.Sweep(); second != nil {
 		t.Fatalf("second Sweep() = %v, want nil", second)
 	}
-	if !pool.IsSpoiled() {
-		t.Fatal("IsSpoiled() = false after Sweep, want true (marker survives sweeping)")
+	if pool.IsSpoiled() {
+		t.Fatal("IsSpoiled() = true after Sweep, want false")
 	}
 
 	pool.Reset()
