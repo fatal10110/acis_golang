@@ -642,7 +642,7 @@ func TestClientLinkShowLicenceOffSkipsSessionKeyCheckOnServerLogin(t *testing.T)
 		t.Fatalf("opcode = %#x, want ServerList (%#x)", reply[0], serverpackets.OpcodeServerList)
 	}
 
-	c.send(encodeRequestServerLogin(0xdeadbeef, 0xfeedface, 7))
+	c.send(encodeRequestServerLogin(0x1a2b3c4d, -0x5e6f7081, 7))
 	reply = c.read()
 	if reply[0] != serverpackets.OpcodePlayOk {
 		t.Fatalf("opcode = %#x, want PlayOk (%#x)", reply[0], serverpackets.OpcodePlayOk)
