@@ -47,13 +47,12 @@ type AI struct {
 // NewAI returns an empty active-AI registry. A nil state treats every actor
 // as active. When state is non-nil, registered actors must already be
 // spawned into it; off-grid actors are not ticked.
-func NewAI(state *world.State) *AI {
-	return &AI{state: state, activeRegistry: newActiveRegistry[int32, AIActor]()}
+func NewAI(state *world.State, log zerolog.Logger) *AI {
+	return &AI{state: state, log: log, activeRegistry: newActiveRegistry[int32, AIActor]()}
 }
 
 // Start launches the fixed one-second AI task.
 func (a *AI) Start(log zerolog.Logger) *scheduler.Ticker {
-	a.log = log
 	return scheduler.Start(AITick, func() { a.Tick() }, log)
 }
 
