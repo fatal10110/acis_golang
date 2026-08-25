@@ -197,18 +197,21 @@ type clientConn struct {
 	sessionID   int32
 	connectedAt time.Time
 
-	account    string
-	authed     bool
-	ggAuthed   bool
-	joinedGame bool
-	lastServer int
-	loginKey1  int32
-	loginKey2  int32
+	account     string
+	authed      bool
+	ggAuthed    bool
+	joinedGame  bool
+	accessLevel int
+	lastServer  int
+	loginKey1   int32
+	loginKey2   int32
 
 	sendMu sync.Mutex
 }
 
 func (c *clientConn) send(payload []byte) error {
+	c.sendMu.Lock()
+	defer c.sendMu.Unlock()
 	if wire.FrameHeaderSize+commoncrypt.PaddedSize(len(payload)+8) > wire.MaxFrameLength {
 		return fmt.Errorf("login packet exceeds maximum frame length")
 	}
@@ -297,9 +300,13 @@ func (l *ClientLink) handleConnection(ctx context.Context, conn net.Conn) {
 			}
 			switch payload[0] {
 			case clientpackets.OpcodeRequestServerList:
-				l.onRequestServerList(c, payload)
+				if !l.onRequestServerList(c, payload) {
+					return
+				}
 			case clientpackets.OpcodeRequestServerLogin:
-				l.onRequestServerLogin(ctx, c, payload)
+				if !l.onRequestServerLogin(ctx, c, payload) {
+					return
+				}
 			default:
 				return
 			}
@@ -355,13 +362,14 @@ func (l *ClientLink) onRequestAuthLogin(ctx context.Context, c *clientConn, payl
 
 	c.account = account.Login
 	c.lastServer = account.LastServer
+	c.accessLevel = account.AccessLevel
 	c.loginKey1, c.loginKey2 = rand.Int32(), rand.Int32()
 	l.sessions.Put(c.account, link.SessionKey{LoginKey1: c.loginKey1, LoginKey2: c.loginKey2})
 	c.authed = true
 	l.registerPurgeable(c)
 
 	if l.skipLicenceCheck {
-		return c.send(serverpackets.EncodeServerList(byte(c.lastServer), l.serverEntries())) == nil
+		return c.send(serverpackets.EncodeServerList(byte(c.lastServer), l.serverEntries(c.accessLevel, c.remoteIP))) == nil
 	}
 	return c.send(serverpackets.EncodeLoginOk(c.loginKey1, c.loginKey2)) == nil
 }
@@ -441,16 +449,19 @@ func (l *ClientLink) clearFailedAttempts(ip net.IP) {
 	l.failedMu.Unlock()
 }
 
-func (l *ClientLink) onRequestServerList(c *clientConn, payload []byte) {
+// onRequestServerList validates the session keys and replies ServerList.
+// It reports false when the connection must close.
+func (l *ClientLink) onRequestServerList(c *clientConn, payload []byte) bool {
 	req, err := clientpackets.DecodeRequestServerList(payload)
 	if err != nil {
 		l.log.Warn().Str("ip", c.remoteIP.String()).Err(err).Msg("login client")
-		return
+		return true
 	}
 	if req.SessionKey1 != c.loginKey1 || req.SessionKey2 != c.loginKey2 {
-		return
+		_ = c.send(serverpackets.EncodeLoginFail(serverpackets.LoginFailAccessFailed))
+		return false
 	}
-	entries := l.serverEntries()
+	entries := l.serverEntries(c.accessLevel, c.remoteIP)
 	for _, e := range entries {
 		l.log.Info().
 			Uint8("id", e.ID).
@@ -459,17 +470,26 @@ func (l *ClientLink) onRequestServerList(c *clientConn, payload []byte) {
 			Bool("online", e.Online).
 			Msg("serving ServerList entry")
 	}
-	_ = c.send(serverpackets.EncodeServerList(byte(c.lastServer), entries))
+	return c.send(serverpackets.EncodeServerList(byte(c.lastServer), entries)) == nil
 }
 
 // serverEntries projects the registry's live server state into the wire
-// format, folding in each server's current online-account count.
-func (l *ClientLink) serverEntries() []serverpackets.ServerEntry {
+// format, folding in each server's current online-account count. GM-only
+// servers are masked as down for accounts at access level 0 or below, and a
+// client connecting from a local address is pointed at each game server's
+// link connection IP instead of its advertised host.
+func (l *ClientLink) serverEntries(accessLevel int, clientIP net.IP) []serverpackets.ServerEntry {
+	localClient := isLocalIP(clientIP)
 	all := l.servers.All()
 	out := make([]serverpackets.ServerEntry, 0, len(all))
 	for _, e := range all {
+		online := e.Status != link.ServerTypeDown && !(e.Status == link.ServerTypeGMOnly && accessLevel <= 0) && accessLevel >= 0
+		host := e.Host
+		if localClient && e.ConnIP != nil {
+			host = e.ConnIP.String()
+		}
 		ip := [4]byte{127, 0, 0, 1}
-		if parsed := net.ParseIP(e.Host).To4(); parsed != nil {
+		if parsed := net.ParseIP(host).To4(); parsed != nil {
 			copy(ip[:], parsed)
 		}
 		out = append(out, serverpackets.ServerEntry{
@@ -480,7 +500,7 @@ func (l *ClientLink) serverEntries() []serverpackets.ServerEntry {
 			PvP:            e.Pvp,
 			CurrentPlayers: uint16(l.servers.OnlineAccountCount(e.ID)),
 			MaxPlayers:     uint16(e.MaxPlayers),
-			Online:         e.Status != link.ServerTypeDown,
+			Online:         online,
 			TestServer:     e.TestServer,
 			ShowClock:      e.ShowClock,
 			ShowBrackets:   e.Brackets,
@@ -489,21 +509,46 @@ func (l *ClientLink) serverEntries() []serverpackets.ServerEntry {
 	return out
 }
 
-func (l *ClientLink) onRequestServerLogin(ctx context.Context, c *clientConn, payload []byte) {
+// isLocalIP reports whether addr is missing or points at this machine's
+// vicinity (loopback, link-local, unspecified, or site-private), matching
+// the reference's local-address test for ServerList host substitution.
+func isLocalIP(addr net.IP) bool {
+	return addr == nil || addr.IsLoopback() || addr.IsLinkLocalUnicast() || addr.IsUnspecified() || addr.IsPrivate()
+}
+
+// loginPossible mirrors the account-level gate for entering a game server:
+// the server must be linked and authed, its status must not be down, and a
+// GM-only or full server admits only superior access levels.
+func (l *ClientLink) loginPossible(c *clientConn, serverID int) bool {
+	entry, ok := l.servers.Get(serverID)
+	if !ok || !entry.Authed || entry.Status == link.ServerTypeDown {
+		return false
+	}
+	if entry.Status == link.ServerTypeGMOnly || l.servers.OnlineAccountCount(serverID) >= int(entry.MaxPlayers) {
+		return c.accessLevel > 0
+	}
+	return c.accessLevel >= 0
+}
+
+// onRequestServerLogin validates the session keys where the licence window
+// is shown, gates the chosen game server on the account's eligibility, and
+// issues the play session. It replies with LoginFail/PlayFail and reports
+// false when the connection must close.
+func (l *ClientLink) onRequestServerLogin(ctx context.Context, c *clientConn, payload []byte) bool {
 	req, err := clientpackets.DecodeRequestServerLogin(payload)
 	if err != nil {
 		l.log.Warn().Str("ip", c.remoteIP.String()).Err(err).Msg("login client")
-		return
+		return true
 	}
 	if !l.skipLicenceCheck && (req.SessionKey1 != c.loginKey1 || req.SessionKey2 != c.loginKey2) {
-		_ = c.send(serverpackets.EncodePlayFail(serverpackets.PlayFailSystemError))
-		return
+		_ = c.send(serverpackets.EncodeLoginFail(serverpackets.LoginFailAccessFailed))
+		return false
 	}
 
-	entry, ok := l.servers.Get(int(req.ServerID))
-	if !ok || !entry.Authed {
-		_ = c.send(serverpackets.EncodePlayFail(serverpackets.PlayFailSystemError))
-		return
+	serverID := int(req.ServerID)
+	if !l.loginPossible(c, serverID) {
+		_ = c.send(serverpackets.EncodePlayFail(serverpackets.PlayFailTooManyPlayers))
+		return false
 	}
 
 	playKey1, playKey2 := rand.Int32(), rand.Int32()
@@ -514,8 +559,10 @@ func (l *ClientLink) onRequestServerLogin(ctx context.Context, c *clientConn, pa
 		PlayKey2:  playKey2,
 	})
 	c.joinedGame = true
-	if err := l.accounts.SetLastServer(ctx, c.account, int(req.ServerID)); err != nil {
-		l.log.Error().Str("account", c.account).Err(err).Msg("set last server")
+	if c.lastServer != serverID {
+		if err := l.accounts.SetLastServer(ctx, c.account, serverID); err != nil {
+			l.log.Error().Str("account", c.account).Err(err).Msg("set last server")
+		}
 	}
-	_ = c.send(serverpackets.EncodePlayOk(playKey1, playKey2))
+	return c.send(serverpackets.EncodePlayOk(playKey1, playKey2)) == nil
 }

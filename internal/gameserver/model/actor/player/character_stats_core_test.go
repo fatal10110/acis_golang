@@ -5073,6 +5073,32 @@ func TestTemplateSkillLearning(t *testing.T) {
 	}
 }
 
+// TestTemplateSkillLearningIgnoresMinLevelAndZeroCost pins that CheckSkillLearn
+// does not reject on MinLevel or a zero Cost: RequestAcquireSkill.java's
+// general-learn case (lines 59-101) locates the node via
+// PlayerTemplate.findSkill, which ignores minLvl (PlayerTemplate.java:193-196),
+// and only rejects on known-level continuity and SP vs getCorrectedCost() — it
+// has no level or cost==0 gate of its own.
+func TestTemplateSkillLearningIgnoresMinLevelAndZeroCost(t *testing.T) {
+	tmpl := &Template{Skills: []SkillGrant{
+		{SkillID: 3, Level: 1, MinLevel: 20, Cost: 50},
+		{SkillID: 249, Level: 1, MinLevel: 1, Cost: 0},
+	}}
+
+	if _, status := tmpl.CheckSkillLearn(1, 0, SkillLevels{}, 3, 1); status != LearnNeedsSP {
+		t.Fatalf("CheckSkillLearn(character level 1 below grant MinLevel 20, 0 SP) = %v, want LearnNeedsSP (no MinLevel gate)", status)
+	}
+	grant, status := tmpl.CheckSkillLearn(1, 50, SkillLevels{}, 3, 1)
+	if status != LearnAllowed || grant.SkillID != 3 {
+		t.Fatalf("CheckSkillLearn(character level 1 below grant MinLevel 20, enough SP) = %+v, %v; want LearnAllowed", grant, status)
+	}
+
+	grant, status = tmpl.CheckSkillLearn(1, 0, SkillLevels{}, 249, 1)
+	if status != LearnAllowed || grant.SkillID != 249 || grant.CorrectedCost() != 0 {
+		t.Fatalf("CheckSkillLearn(cost-0 grant requested manually) = %+v, %v; want LearnAllowed (no cost==0 gate)", grant, status)
+	}
+}
+
 func equalInts(a, b []int) bool {
 	if len(a) != len(b) {
 		return false
