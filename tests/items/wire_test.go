@@ -83,6 +83,32 @@ func encodeRequestAutoSoulShot(itemID, typ int32) []byte {
 	return w.Bytes()
 }
 
+func encodeTradeRequest(objectID int32) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeTradeRequest)
+	w.WriteInt32(objectID)
+	return w.Bytes()
+}
+
+func encodeAnswerTradeRequest(response int32) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeAnswerTradeRequest)
+	w.WriteInt32(response)
+	return w.Bytes()
+}
+
+func encodeRequestMagicSkillUse(skillID int32, ctrl, shift bool) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeRequestMagicSkillUse)
+	w.WriteInt32(skillID)
+	w.WriteInt32(wire.BoolInt32(ctrl))
+	w.WriteUint8(wire.BoolByte(shift))
+	return w.Bytes()
+}
+
+func encodeRequestPackageSendableItemList(objectID int32) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeRequestPackageItemList)
+	w.WriteInt32(objectID)
+	return w.Bytes()
+}
+
 func encodeAction(objectID int32, x, y, z int32, shift bool) []byte {
 	w := wire.NewPacketWriter(clientpackets.OpcodeAction)
 	w.WriteInt32(objectID)
@@ -165,8 +191,10 @@ func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	for i, opcode := range want {
 		frame := c.Read()
 		// A client that already knows another player receives that player's
-		// CharInfo ahead of its own burst; skip such leading spawn frames.
-		for i == 0 && frame[0] == serverpackets.OpcodeCharInfo {
+		// CharInfo ahead of its own burst, and a client carrying weighted
+		// items receives the login weight refresh ahead of it; skip such
+		// leading spawn frames.
+		for i == 0 && (frame[0] == serverpackets.OpcodeCharInfo || frame[0] == serverpackets.OpcodeStatusUpdate) {
 			frame = c.Read()
 		}
 		if frame[0] != opcode {
@@ -349,4 +377,21 @@ func assertMagicSkillUseSelf(t *testing.T, frame []byte, objectID, skillID, leve
 	if gotHit != hitTime || gotReuse != reuse {
 		t.Fatalf("MagicSkillUse timing = hit %d reuse %d, want %d/%d", gotHit, gotReuse, hitTime, reuse)
 	}
+}
+
+// statusUpdateAttrs parses a StatusUpdate frame into its type/value pairs.
+func statusUpdateAttrs(t *testing.T, frame []byte) map[serverpackets.StatusType]int32 {
+	t.Helper()
+	assertFrameOpcode(t, frame, serverpackets.OpcodeStatusUpdate, "StatusUpdate")
+	r := wire.NewReader(frame[1:])
+	objID := r.ReadInt32()
+	n := r.ReadInt32()
+	attrs := make(map[serverpackets.StatusType]int32, n)
+	for i := int32(0); i < n; i++ {
+		attrs[serverpackets.StatusType(r.ReadInt32())] = r.ReadInt32()
+	}
+	if err := r.Err(); err != nil {
+		t.Fatalf("read StatusUpdate for %d: %v", objID, err)
+	}
+	return attrs
 }

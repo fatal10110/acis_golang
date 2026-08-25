@@ -3,12 +3,12 @@ package items
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
-	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 // TestDestroyFlushesBatchedUpdate drives a destroy, which has no synchronous
@@ -23,8 +23,15 @@ func TestDestroyFlushesBatchedUpdate(t *testing.T) {
 	startInWorld(t, c)
 
 	c.Send(encodeRequestDestroyItem(potion, 2))
-	testsupport.SyncBarrier(t, c, func() { c.Send(encodeRequestItemList()) }, serverpackets.OpcodeItemList)
-
+	// The background batching tick may deliver the weight refresh and the
+	// update ahead of the barrier reply; wait for the ItemList itself.
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		frame := c.ReadWithTimeout(300 * time.Millisecond)
+		if frame != nil && frame[0] == serverpackets.OpcodeItemList {
+			break
+		}
+	}
 	srv.InventoryUpdates.Tick()
 	e := readInventoryUpdateFor(t, c, potion, 3)
 	if e.state != 2 {

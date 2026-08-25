@@ -2,6 +2,7 @@ package items
 
 import (
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
@@ -23,6 +24,16 @@ func consumableSkills(t *testing.T) *skillstate.Persistence {
 	return skillstate.NewPersistence(store, modelskill.NewTable([]modelskill.Definition{
 		{ID: 248, Level: 3},
 		{ID: 294, Level: 1},
+		{
+			ID: 2279, Level: 2, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+			SkillType: "HOT", Potion: true, HitTime: 0,
+			Effects: []modelskill.EffectTemplate{{Name: "ManaHeal", Value: 20}},
+		},
+		{
+			ID: 2165, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+			SkillType: "HOT", Potion: true, HitTime: 0,
+			Effects: []modelskill.EffectTemplate{{Name: "IncreaseCharges", Value: 1, Count: 2}},
+		},
 		{
 			ID: 2031, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
 			SkillType: "HOT", Potion: true, HitTime: 0,
@@ -231,4 +242,186 @@ func TestUseItemGates(t *testing.T) {
 func barrier(t *testing.T, c *testsupport.ScriptedClient) {
 	t.Helper()
 	testsupport.SyncBarrier(t, c, func() { c.Send(encodeRequestItemList()) }, serverpackets.OpcodeItemList)
+}
+
+// TestUseFlyingConditionRejected pins the datapack flying gate: with the
+// player in a flying transport mode, the potion's use condition answers
+// S1_CANNOT_BE_USED naming the item, and the stack is untouched.
+func TestUseFlyingConditionRejected(t *testing.T) {
+	srv := gameservertest.Boot(t,
+		gameservertest.WithSkills(consumableSkills(t)),
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1))
+	c := srv.Client
+	objID := srv.SoleObjectID(t)
+	potion := srv.GiveItem(t, objID, 1060, 5)
+	startInWorld(t, c)
+
+	srv.SetPlayerFlying(t, objID, true)
+	c.Send(encodeUseItem(potion, false))
+	assertSystemMessageItem(t, c.Read(), serverpackets.SystemMessageS1CannotBeUsed, 1060)
+	barrier(t, c)
+	if inst := mustFindItem(t, srv, objID, potion); inst.Count != 5 {
+		t.Fatalf("potion count after flying rejection = %d, want 5", inst.Count)
+	}
+}
+
+// TestDisabledItemUseIsSilent pins the per-item disable gate: a use click
+// for an item under an active disable produces no reply at all and consumes
+// nothing.
+func TestDisabledItemUseIsSilent(t *testing.T) {
+	srv := gameservertest.Boot(t,
+		gameservertest.WithSkills(consumableSkills(t)),
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1))
+	c := srv.Client
+	objID := srv.SoleObjectID(t)
+	potion := srv.GiveItem(t, objID, 1060, 5)
+	startInWorld(t, c)
+
+	srv.DisablePlayerItem(t, objID, potion, time.Minute)
+	c.Send(encodeUseItem(potion, false))
+	if reply := c.ReadWithTimeout(300 * time.Millisecond); reply != nil {
+		t.Fatalf("disabled item use replied %x, want no reply at all", reply)
+	}
+	if inst := mustFindItem(t, srv, objID, potion); inst.Count != 5 {
+		t.Fatalf("potion count after disabled use = %d, want 5", inst.Count)
+	}
+}
+
+// TestUseManaPotionRestoresMPAndConsumes drives the mana potion: the
+// restore skill is announced, a StatusUpdate carries the refreshed MP once
+// the batching task drains, and one unit leaves the stack and the row.
+func TestUseManaPotionRestoresMPAndConsumes(t *testing.T) {
+	srv := gameservertest.Boot(t,
+		gameservertest.WithSkills(consumableSkills(t)),
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1))
+	c := srv.Client
+	objID := srv.SoleObjectID(t)
+	potion := srv.GiveItem(t, objID, 728, 3)
+	startInWorld(t, c)
+	srv.DrainPlayerMP(t, objID, 20)
+	before := srv.PlayerCurrentMP(t, objID)
+
+	c.Send(encodeUseItem(potion, false))
+	assertMagicSkillUseSelf(t, c.Read(), objID, 2279, 2, 0, 0)
+	drainUntilQuiet(t, c)
+
+	srv.InventoryUpdates.Tick()
+	readInventoryUpdateFor(t, c, potion, 2)
+	srv.FlushItems(t)
+	if inst := mustFindItem(t, srv, objID, potion); inst.Count != 2 {
+		t.Fatalf("persisted mana potion count = %d, want 2", inst.Count)
+	}
+	if got := srv.PlayerCurrentMP(t, objID); got <= before {
+		t.Fatalf("MP after mana potion = %d, want > %d", got, before)
+	}
+}
+
+// TestUseEnergyStoneCapsForceCharges drives the force-charge item: each use
+// announces ForceIncreasedToS1 with the charge HUD packet until the cap,
+// where it reports ForceMaxLevelReached instead, consuming one stone per
+// use either way.
+func TestUseEnergyStoneCapsForceCharges(t *testing.T) {
+	srv := gameservertest.Boot(t,
+		gameservertest.WithSkills(consumableSkills(t)),
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1))
+	c := srv.Client
+	objID := srv.SoleObjectID(t)
+	stone := srv.GiveItem(t, objID, 5589, 2)
+	startInWorld(t, c)
+
+	assertChargeFrame := func(frame []byte, wantID int, charges int32) {
+		t.Helper()
+		r := wire.NewReader(frame[1:])
+		if id := r.ReadInt32(); id != int32(wantID) {
+			t.Fatalf("charge message id = %d, want %d", id, wantID)
+		}
+		if wantID == serverpackets.SystemMessageForceIncreasedToS1 {
+			if params := r.ReadInt32(); params != 1 || r.ReadInt32() != serverpackets.SystemMessageParamNumber || r.ReadInt32() != charges {
+				t.Fatalf("force-increased params wrong, want one number %d", charges)
+			}
+		} else if params := r.ReadInt32(); params != 0 {
+			t.Fatalf("force-max params = %d, want 0", params)
+		}
+	}
+
+	c.Send(encodeUseItem(stone, false))
+	first := collectUntilQuiet(t, c)
+	var sawCast, sawCharge, sawHUD bool
+	for _, f := range first {
+		switch {
+		case f[0] == serverpackets.OpcodeMagicSkillUse:
+			sawCast = true
+		case f[0] == serverpackets.OpcodeSystemMessage && systemMessageID(t, f) == serverpackets.SystemMessageForceIncreasedToS1:
+			assertChargeFrame(f, serverpackets.SystemMessageForceIncreasedToS1, 1)
+			sawCharge = true
+		case f[0] == serverpackets.OpcodeEtcStatusUpdate:
+			sawHUD = true
+		}
+	}
+	if !sawCast || !sawCharge || !sawHUD {
+		t.Fatalf("first stone use frames missing cast=%t charge=%t hud=%t across %d frames", sawCast, sawCharge, sawHUD, len(first))
+	}
+
+	c.Send(encodeUseItem(stone, false))
+	second := collectUntilQuiet(t, c)
+	sawMax := false
+	for _, f := range second {
+		if f[0] == serverpackets.OpcodeSystemMessage && systemMessageID(t, f) == serverpackets.SystemMessageForceMaxLevelReached {
+			assertChargeFrame(f, serverpackets.SystemMessageForceMaxLevelReached, 0)
+			sawMax = true
+		}
+	}
+	if !sawMax {
+		t.Fatalf("second stone use produced no ForceMaxLevelReached across %d frames", len(second))
+	}
+
+	waitFor(t, "both stones consumed", func() bool {
+		srv.InventoryUpdates.Tick()
+		srv.FlushItems(t)
+		for _, inst := range persistedItems(t, srv, objID) {
+			if inst.ObjectID == stone {
+				return false
+			}
+		}
+		return true
+	})
+}
+
+// TestEscapeScrollReuseIsRejected pins the carried-skill reuse gate on the
+// AI-cast path: a second scroll use inside the reuse window answers
+// S1_PREPARED_FOR_REUSE only and consumes nothing further.
+func TestEscapeScrollReuseIsRejected(t *testing.T) {
+	srv := gameservertest.Boot(t,
+		gameservertest.WithSkills(consumableSkills(t)),
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1))
+	c := srv.Client
+	objID := srv.SoleObjectID(t)
+	scroll := srv.GiveItem(t, objID, 736, 3)
+	startInWorld(t, c)
+
+	c.Send(encodeUseItem(scroll, false))
+	assertMagicSkillUseSelf(t, c.Read(), objID, 2013, 1, 0, 5000)
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMagicSkillLaunched, "MagicSkillLaunched")
+	srv.InventoryUpdates.Tick()
+	readInventoryUpdateFor(t, c, scroll, 2)
+	drainUntilQuiet(t, c)
+
+	c.Send(encodeUseItem(scroll, false))
+	frame := c.Read()
+	assertFrameOpcode(t, frame, serverpackets.OpcodeSystemMessage, "reuse SystemMessage")
+	if id := systemMessageID(t, frame); id != serverpackets.SystemMessageS1PreparedForReuse {
+		t.Fatalf("reuse message id = %d, want S1PreparedForReuse (%d)", id, serverpackets.SystemMessageS1PreparedForReuse)
+	}
+	if reply := c.ReadWithTimeout(300 * time.Millisecond); reply != nil {
+		t.Fatalf("rejected reuse follow-up frame %x, want none", reply[0])
+	}
+	srv.FlushItems(t)
+	if inst := mustFindItem(t, srv, objID, scroll); inst.Count != 2 {
+		t.Fatalf("scroll count after rejected reuse = %d, want 2 (unchanged)", inst.Count)
+	}
 }

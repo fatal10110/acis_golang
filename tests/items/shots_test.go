@@ -172,3 +172,22 @@ func TestUseBeastSoulshotWithoutSummonIsRejected(t *testing.T) {
 		t.Fatalf("beast shot count after rejection = %d, want 10", inst.Count)
 	}
 }
+
+// TestAutoSoulShotIgnoresUnknownAndFishingShots pins RequestAutoSoulShot's
+// ignore branches: an unknown item id and a fishing-shot item both produce
+// no reply at all and never enable auto use.
+func TestAutoSoulShotIgnoresUnknownAndFishingShots(t *testing.T) {
+	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
+	c := srv.Client
+	objID := srv.SoleObjectID(t)
+	srv.GiveItem(t, objID, 6535, 100) // fishing shot
+	startInWorld(t, c)
+
+	for _, itemID := range []int32{999999, 6535} {
+		c.Send(encodeRequestAutoSoulShot(itemID, 1))
+		if reply := c.ReadWithTimeout(300 * time.Millisecond); reply != nil {
+			t.Fatalf("auto-soulshot for %d replied %x, want silence", itemID, reply)
+		}
+	}
+	drainUntilQuiet(t, c)
+}
