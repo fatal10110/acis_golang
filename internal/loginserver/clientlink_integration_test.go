@@ -6,6 +6,8 @@ import (
 	"encoding/binary"
 	"errors"
 	"net"
+	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -1008,4 +1010,153 @@ func waitSessionMissing(t *testing.T, sessions *manager.SessionStore, account st
 		time.Sleep(10 * time.Millisecond)
 	}
 	t.Fatalf("session for %q remained stored", account)
+}
+
+// --- client link + game server link sharing one registry and roster ---
+
+// newTestLinkPair boots a ClientLink and a GameServerLink over real
+// sockets, sharing one registry, session store, and link roster, so the
+// account-eviction path can be exercised end to end.
+func newTestLinkPair(t *testing.T, accounts *fakeAccountStore) (clientAddr string, l *ClientLink, gsAddr string, servers *manager.ServerRegistry, sessions *manager.SessionStore) {
+	t.Helper()
+
+	dir := t.TempDir()
+	namesPath := filepath.Join(dir, "serverNames.xml")
+	if err := os.WriteFile(namesPath, []byte(`<?xml version='1.0'?><list>
+		<server id="1" name="Bartz" />
+	</list>`), 0o644); err != nil {
+		t.Fatalf("write serverNames.xml: %v", err)
+	}
+	names, err := manager.LoadServerNames(namesPath)
+	if err != nil {
+		t.Fatalf("LoadServerNames: %v", err)
+	}
+
+	gsKeys, err := manager.NewRSAKeyPool()
+	if err != nil {
+		t.Fatalf("NewRSAKeyPool: %v", err)
+	}
+	keyPair, err := commoncrypt.NewLoginKeyPair()
+	if err != nil {
+		t.Fatalf("NewLoginKeyPair: %v", err)
+	}
+
+	servers = manager.NewServerRegistry()
+	sessions = manager.NewSessionStore()
+	bans := manager.NewIPBanList(zerolog.Nop())
+	roster := NewLinkRoster()
+
+	gsLink := NewGameServerLink(servers, names, gsKeys, sessions, bans, nil, nil, false, nil, roster, zerolog.Nop())
+	l = &ClientLink{
+		accounts:           accounts,
+		servers:            servers,
+		sessions:           sessions,
+		bans:               bans,
+		roster:             roster,
+		loginTryBeforeBan:  DefaultLoginTryBeforeBan,
+		loginBlockAfterBan: DefaultLoginBlockAfterBan,
+		log:                zerolog.Nop(),
+		newKeyPair:         func() *commoncrypt.LoginKeyPair { return keyPair },
+		newSessionKey:      func() ([]byte, error) { return testSessionKey, nil },
+		newSessionID:       func() int32 { return testInitSessionID },
+	}
+
+	gsLn, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	go gsLink.Serve(ctx, gsLn)
+
+	clientLn, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	go l.Serve(ctx, clientLn)
+
+	return clientLn.Addr().String(), l, gsLn.Addr().String(), servers, sessions
+}
+
+// TestClientLinkLoginForAccountOnGameServerRejectsAndKicks drives the
+// account-already-in-play rejection: the second login is closed with
+// REASON_ACCOUNT_IN_USE and the linked game server is asked to evict the
+// live session, while the first login client stays untouched.
+func TestClientLinkLoginForAccountOnGameServerRejectsAndKicks(t *testing.T) {
+	accounts := newFakeAccountStore(model.NewAccount("player1", mustHashPassword(t, "s3cret"), 0, 1))
+	clientAddr, l, gsAddr, servers, sessions := newTestLinkPair(t, accounts)
+
+	servers.Register(1, testHexID)
+	gs := dialGameServer(t, gsAddr)
+	gs.handshake()
+	gs.sendGameServerAuth(1, false, false, "*", 7777, 100, testHexID)
+	if ok, _, _, failReason := gs.readAuthResult(); !ok {
+		t.Fatalf("game server auth failed with reason %d", failReason)
+	}
+
+	first := dialLoginClient(t, clientAddr)
+	key1, key2 := first.login(l, "player1", "s3cret")
+
+	gs.sendPlayerInGame("player1")
+
+	second := dialLoginClient(t, clientAddr)
+	second.gameGuard()
+	second.send(encodeRequestAuthLogin(&l.loginKeyPair().Private.PublicKey, "player1", "s3cret"))
+	reply := second.read()
+	if reply[0] != serverpackets.OpcodeLoginFail {
+		t.Fatalf("opcode = %#x, want LoginFail (%#x)", reply[0], serverpackets.OpcodeLoginFail)
+	}
+	if reason := loginFailReason(t, reply); reason != serverpackets.LoginFailAccountInUse {
+		t.Fatalf("reason = %d, want REASON_ACCOUNT_IN_USE (%d)", reason, serverpackets.LoginFailAccountInUse)
+	}
+	second.expectClosed()
+
+	if account := gs.readKickPlayer(); account != "player1" {
+		t.Fatalf("KickPlayer account = %q, want player1", account)
+	}
+
+	if _, ok := sessions.Get("player1"); !ok {
+		t.Fatal("session for player1 was dropped, want it kept for its holder")
+	}
+	first.send(encodeRequestServerList(key1, key2))
+	if reply := first.read(); reply[0] != serverpackets.OpcodeServerList {
+		t.Fatalf("opcode = %#x, want ServerList (%#x)", reply[0], serverpackets.OpcodeServerList)
+	}
+}
+
+// TestClientLinkDoubleLoginClosesBothClients drives the double-login
+// collision while the account is still mapped on this server: neither the
+// previous holder nor the new client survives, both close with
+// REASON_ACCOUNT_IN_USE and the mapping is dropped.
+func TestClientLinkDoubleLoginClosesBothClients(t *testing.T) {
+	accounts := newFakeAccountStore(model.NewAccount("player1", mustHashPassword(t, "s3cret"), 0, 1))
+	addr, l, _, sessions, _ := newTestClientLink(t, accounts, false)
+
+	first := dialLoginClient(t, addr)
+	first.login(l, "player1", "s3cret")
+
+	second := dialLoginClient(t, addr)
+	second.gameGuard()
+	second.send(encodeRequestAuthLogin(&l.loginKeyPair().Private.PublicKey, "player1", "s3cret"))
+	reply := second.read()
+	if reply[0] != serverpackets.OpcodeLoginFail {
+		t.Fatalf("opcode = %#x, want LoginFail (%#x)", reply[0], serverpackets.OpcodeLoginFail)
+	}
+	if reason := loginFailReason(t, reply); reason != serverpackets.LoginFailAccountInUse {
+		t.Fatalf("reason = %d, want REASON_ACCOUNT_IN_USE (%d)", reason, serverpackets.LoginFailAccountInUse)
+	}
+	second.expectClosed()
+
+	evicted := first.read()
+	if evicted[0] != serverpackets.OpcodeLoginFail {
+		t.Fatalf("opcode = %#x, want LoginFail (%#x)", evicted[0], serverpackets.OpcodeLoginFail)
+	}
+	if reason := loginFailReason(t, evicted); reason != serverpackets.LoginFailAccountInUse {
+		t.Fatalf("reason = %d, want REASON_ACCOUNT_IN_USE (%d)", reason, serverpackets.LoginFailAccountInUse)
+	}
+	first.expectClosed()
+
+	if _, ok := sessions.Get("player1"); ok {
+		t.Fatal("session for player1 remained mapped after both clients were closed")
+	}
 }

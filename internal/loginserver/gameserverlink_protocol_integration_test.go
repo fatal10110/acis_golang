@@ -264,6 +264,16 @@ func (f *fakeGameServer) readPlayerAuthResponse() (account string, ok bool) {
 	return account, r.readByte() != 0
 }
 
+// readKickPlayer reads an eviction request for one account.
+func (f *fakeGameServer) readKickPlayer() string {
+	f.t.Helper()
+	payload := f.readFrame()
+	if payload[0] != link.OpcodeKickPlayer {
+		f.t.Fatalf("opcode = %#x, want KickPlayer (%#x)", payload[0], link.OpcodeKickPlayer)
+	}
+	return newFrameReader(payload).readString()
+}
+
 // docs/agents/test-strategy.md: sql.GameServerStore already satisfies
 // registrationStore (CreateGameServer) and is used by the DB-backed
 // scenarios in gameserverlink_integration_test.go. Kept as a fake here
@@ -325,7 +335,7 @@ func newTestLinkWithRegistrationStore(t *testing.T, allowNewServers bool, accoun
 	sessions = manager.NewSessionStore()
 	bans = manager.NewIPBanList(zerolog.Nop())
 
-	l = NewGameServerLink(servers, names, keys, sessions, bans, accounts, registrations, allowNewServers, nil, zerolog.Nop())
+	l = NewGameServerLink(servers, names, keys, sessions, bans, accounts, registrations, allowNewServers, nil, NewLinkRoster(), zerolog.Nop())
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {

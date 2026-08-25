@@ -54,6 +54,7 @@ type ClientLink struct {
 	servers            *manager.ServerRegistry
 	sessions           *manager.SessionStore
 	bans               *manager.IPBanList
+	roster             *LinkRoster
 	autoCreateAccounts bool
 	skipLicenceCheck   bool
 	loginTryBeforeBan  int
@@ -73,6 +74,12 @@ type ClientLink struct {
 	// leave when their handler finishes.
 	purgeMu   sync.Mutex
 	purgeable map[*clientConn]struct{}
+
+	// authMu guards the authenticated-account mapping: sessions plus
+	// holders. A second authentication for a mapped account closes both the
+	// old holder and the new client, so check-and-insert must be atomic.
+	authMu  sync.Mutex
+	holders map[string]*clientConn
 
 	// newKeyPair, newSessionKey, and newSessionID supply each connection's
 	// RSA key pair, dynamic Blowfish key, and Init session id; overridden in
@@ -94,6 +101,7 @@ func NewClientLink(
 	sessions *manager.SessionStore,
 	bans *manager.IPBanList,
 	keys *manager.LoginKeyPool,
+	roster *LinkRoster,
 	autoCreateAccounts bool,
 	showLicence bool,
 	loginTryBeforeBan int,
@@ -105,6 +113,7 @@ func NewClientLink(
 		servers:            servers,
 		sessions:           sessions,
 		bans:               bans,
+		roster:             roster,
 		autoCreateAccounts: autoCreateAccounts,
 		skipLicenceCheck:   !showLicence,
 		loginTryBeforeBan:  loginTryBeforeBan,
@@ -113,6 +122,7 @@ func NewClientLink(
 		failedAttempts:     make(map[string]int),
 		loginTimeout:       LoginTimeout,
 		purgeable:          make(map[*clientConn]struct{}),
+		holders:            make(map[string]*clientConn),
 		newKeyPair:         keys.Random,
 		newSessionKey:      logincrypt.NewSessionKey,
 		newSessionID:       rand.Int32,
@@ -186,6 +196,16 @@ func (l *ClientLink) unregisterPurgeable(c *clientConn) {
 	l.purgeMu.Unlock()
 }
 
+// clearHolder drops the tracked holder for account if it is still c, so a
+// replacement holder is never removed by the connection it replaced.
+func (l *ClientLink) clearHolder(account string, c *clientConn) {
+	l.authMu.Lock()
+	defer l.authMu.Unlock()
+	if l.holders[account] == c {
+		delete(l.holders, account)
+	}
+}
+
 // clientConn is one connected login client. Its handler goroutine owns the
 // protocol flow; the purge loop may additionally call kick from outside,
 // so sends are serialized by sendMu.
@@ -221,7 +241,13 @@ func (c *clientConn) send(payload []byte) error {
 // kick replies LoginFail AccessFailed and closes the connection; safe to
 // call while the handler goroutine is blocked reading.
 func (c *clientConn) kick() {
-	_ = c.send(serverpackets.EncodeLoginFail(serverpackets.LoginFailAccessFailed))
+	c.closeWith(serverpackets.LoginFailAccessFailed)
+}
+
+// closeWith replies LoginFail with reason and closes the connection; safe
+// to call while the handler goroutine is blocked reading.
+func (c *clientConn) closeWith(reason serverpackets.LoginFailReason) {
+	_ = c.send(serverpackets.EncodeLoginFail(reason))
 	c.conn.Close()
 }
 
@@ -231,8 +257,15 @@ func (l *ClientLink) handleConnection(ctx context.Context, conn net.Conn) {
 		if c != nil {
 			l.unregisterPurgeable(c)
 		}
-		if c != nil && c.account != "" && !c.joinedGame {
-			l.sessions.Delete(c.account)
+		if c != nil && c.account != "" {
+			l.clearHolder(c.account, c)
+			// An account that joined a game server keeps its session until
+			// the server claims it; once the connection has also outstayed
+			// the login timeout, nothing can claim it anymore and the
+			// mapping is dropped.
+			if !c.joinedGame || (l.loginTimeout > 0 && time.Since(c.connectedAt) > l.loginTimeout) {
+				l.sessions.Delete(c.account)
+			}
 		}
 		conn.Close()
 	}()
@@ -355,7 +388,29 @@ func (l *ClientLink) onRequestAuthLogin(ctx context.Context, c *clientConn, payl
 		return false
 	}
 
-	if _, dup := l.sessions.Get(account.Login); dup {
+	// The account is already in play on a linked game server: reject the
+	// new login and evict the live game session.
+	if serverID, online := l.servers.AccountServerID(account.Login); online {
+		l.log.Info().Str("account", account.Login).Int("server_id", serverID).
+			Msg("login for an account already on a game server")
+		_ = c.send(serverpackets.EncodeLoginFail(serverpackets.LoginFailAccountInUse))
+		if entry, ok := l.servers.Get(serverID); ok && entry.Authed && l.roster != nil {
+			l.roster.kick(serverID, account.Login)
+		}
+		return false
+	}
+
+	l.authMu.Lock()
+	if _, mapped := l.sessions.Get(account.Login); mapped {
+		// A second authentication while the account is still mapped here:
+		// both the previous holder, when one is still connected, and the
+		// new client are closed and the mapping is dropped.
+		if old := l.holders[account.Login]; old != nil {
+			old.closeWith(serverpackets.LoginFailAccountInUse)
+		}
+		delete(l.holders, account.Login)
+		l.sessions.Delete(account.Login)
+		l.authMu.Unlock()
 		_ = c.send(serverpackets.EncodeLoginFail(serverpackets.LoginFailAccountInUse))
 		return false
 	}
@@ -364,7 +419,12 @@ func (l *ClientLink) onRequestAuthLogin(ctx context.Context, c *clientConn, payl
 	c.lastServer = account.LastServer
 	c.accessLevel = account.AccessLevel
 	c.loginKey1, c.loginKey2 = rand.Int32(), rand.Int32()
+	if l.holders == nil {
+		l.holders = make(map[string]*clientConn)
+	}
 	l.sessions.Put(c.account, link.SessionKey{LoginKey1: c.loginKey1, LoginKey2: c.loginKey2})
+	l.holders[c.account] = c
+	l.authMu.Unlock()
 	c.authed = true
 	l.registerPurgeable(c)
 
