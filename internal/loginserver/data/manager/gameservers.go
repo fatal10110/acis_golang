@@ -1,6 +1,7 @@
 package manager
 
 import (
+	"net"
 	"sync"
 
 	"github.com/fatal10110/acis_golang/internal/link"
@@ -14,6 +15,7 @@ type ServerEntry struct {
 	HexID      []byte
 	Authed     bool
 	Host       string
+	ConnIP     net.IP
 	Port       uint16
 	MaxPlayers int32
 	Status     link.ServerType
@@ -102,8 +104,9 @@ func (r *ServerRegistry) RegisterFirst(candidateIDs []int, hexID []byte) (Server
 }
 
 // MarkOnline marks the entry at id authed with the given connection
-// details, failing if id is not registered.
-func (r *ServerRegistry) MarkOnline(id int, host string, port uint16, maxPlayers int32) (ServerEntry, bool) {
+// details, failing if id is not registered. connIP records the IP the game
+// server connected from, so local clients can be pointed at it directly.
+func (r *ServerRegistry) MarkOnline(id int, host string, connIP net.IP, port uint16, maxPlayers int32) (ServerEntry, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	e, ok := r.servers[id]
@@ -112,6 +115,7 @@ func (r *ServerRegistry) MarkOnline(id int, host string, port uint16, maxPlayers
 	}
 	e.Authed = true
 	e.Host = host
+	e.ConnIP = connIP
 	e.Port = port
 	e.MaxPlayers = maxPlayers
 	r.servers[id] = e

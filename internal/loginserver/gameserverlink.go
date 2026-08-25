@@ -236,7 +236,7 @@ func (l *GameServerLink) onGameServerAuth(ctx context.Context, c *gameServerConn
 		host = c.remoteIP.String()
 	}
 
-	l.servers.MarkOnline(id, host, auth.Port, auth.MaxPlayers)
+	l.servers.MarkOnline(id, host, c.remoteIP, auth.Port, auth.MaxPlayers)
 	c.id = id
 	c.authed = true
 

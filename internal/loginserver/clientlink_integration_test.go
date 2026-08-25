@@ -311,7 +311,7 @@ func TestClientLinkGameGuardWrongSessionIDClosesWithAccessFailed(t *testing.T) {
 	addr, _, _, _, _ := newTestClientLink(t, newFakeAccountStore(), false)
 	c := dialLoginClient(t, addr)
 
-	c.send(encodeAuthGameGuard(testInitSessionID+1))
+	c.send(encodeAuthGameGuard(testInitSessionID + 1))
 	reply := c.read()
 	if reply[0] != serverpackets.OpcodeLoginFail {
 		t.Fatalf("opcode = %#x, want LoginFail (%#x)", reply[0], serverpackets.OpcodeLoginFail)
@@ -609,7 +609,7 @@ func TestClientLinkServerList(t *testing.T) {
 	accounts := newFakeAccountStore(model.NewAccount("player1", mustHashPassword(t, "s3cret"), 0, 2))
 	addr, l, servers, _, _ := newTestClientLink(t, accounts, false)
 	servers.Register(7, []byte{0x01})
-	servers.MarkOnline(7, "127.0.0.1", 7777, 100)
+	servers.MarkOnline(7, "127.0.0.1", net.ParseIP("127.0.0.1"), 7777, 100)
 
 	c := dialLoginClient(t, addr)
 	key1, key2 := c.login(l, "player1", "s3cret")
@@ -633,10 +633,10 @@ func TestClientLinkServerList(t *testing.T) {
 func TestClientLinkServerEntriesUseAdvertisedStatusForOnlineByte(t *testing.T) {
 	servers := manager.NewServerRegistry()
 	servers.Register(7, []byte{0x01})
-	servers.MarkOnline(7, "127.0.0.1", 7777, 100)
+	servers.MarkOnline(7, "127.0.0.1", net.ParseIP("127.0.0.1"), 7777, 100)
 
 	l := &ClientLink{servers: servers}
-	entries := l.serverEntries()
+	entries := l.serverEntries(0, net.ParseIP("127.0.0.1"))
 	if len(entries) != 1 {
 		t.Fatalf("serverEntries length = %d, want 1", len(entries))
 	}
@@ -647,7 +647,7 @@ func TestClientLinkServerEntriesUseAdvertisedStatusForOnlineByte(t *testing.T) {
 	auto := link.ServerTypeAuto
 	servers.ApplyStatus(7, link.ServerStatus{Status: &auto})
 
-	entries = l.serverEntries()
+	entries = l.serverEntries(0, net.ParseIP("127.0.0.1"))
 	if len(entries) != 1 || !entries[0].Online {
 		t.Fatalf("serverEntries = %+v, want one online entry after Status=Auto", entries)
 	}
@@ -656,10 +656,10 @@ func TestClientLinkServerEntriesUseAdvertisedStatusForOnlineByte(t *testing.T) {
 func TestClientLinkServerEntriesFallbackToLoopbackForNonIPv4Host(t *testing.T) {
 	servers := manager.NewServerRegistry()
 	servers.Register(7, []byte{0x01})
-	servers.MarkOnline(7, "not-an-ip", 7777, 100)
+	servers.MarkOnline(7, "not-an-ip", net.ParseIP("127.0.0.1"), 7777, 100)
 
 	l := &ClientLink{servers: servers}
-	entries := l.serverEntries()
+	entries := l.serverEntries(0, net.ParseIP("127.0.0.1"))
 	if len(entries) != 1 {
 		t.Fatalf("serverEntries length = %d, want 1", len(entries))
 	}
@@ -672,7 +672,7 @@ func TestClientLinkShowLicenceOffRepliesServerListAfterLogin(t *testing.T) {
 	accounts := newFakeAccountStore(model.NewAccount("player1", mustHashPassword(t, "s3cret"), 0, 2))
 	addr, l, servers, _, _ := newTestClientLink(t, accounts, false, func(l *ClientLink) { l.skipLicenceCheck = true })
 	servers.Register(7, []byte{0x01})
-	servers.MarkOnline(7, "127.0.0.1", 7777, 100)
+	servers.MarkOnline(7, "127.0.0.1", net.ParseIP("127.0.0.1"), 7777, 100)
 
 	c := dialLoginClient(t, addr)
 	c.gameGuard()
@@ -692,8 +692,7 @@ func TestClientLinkShowLicenceOffRepliesServerListAfterLogin(t *testing.T) {
 func TestClientLinkShowLicenceOffSkipsSessionKeyCheckOnServerLogin(t *testing.T) {
 	accounts := newFakeAccountStore(model.NewAccount("player1", mustHashPassword(t, "s3cret"), 0, 1))
 	addr, l, servers, _, _ := newTestClientLink(t, accounts, false, func(l *ClientLink) { l.skipLicenceCheck = true })
-	servers.Register(7, []byte{0x01})
-	servers.MarkOnline(7, "127.0.0.1", 7777, 100)
+	markOnlineAuto(t, servers, 7)
 
 	c := dialLoginClient(t, addr)
 	c.gameGuard()
@@ -713,8 +712,7 @@ func TestClientLinkShowLicenceOffSkipsSessionKeyCheckOnServerLogin(t *testing.T)
 func TestClientLinkPlayLoginSuccess(t *testing.T) {
 	accounts := newFakeAccountStore(model.NewAccount("player1", mustHashPassword(t, "s3cret"), 0, 1))
 	addr, l, servers, sessions, _ := newTestClientLink(t, accounts, false)
-	servers.Register(7, []byte{0x01})
-	servers.MarkOnline(7, "127.0.0.1", 7777, 100)
+	markOnlineAuto(t, servers, 7)
 
 	c := dialLoginClient(t, addr)
 	key1, key2 := c.login(l, "player1", "s3cret")
@@ -764,8 +762,7 @@ func TestClientLinkDisconnectBeforeGameServerJoinReleasesSession(t *testing.T) {
 func TestClientLinkDisconnectAfterPlayOkKeepsSessionForGameServer(t *testing.T) {
 	accounts := newFakeAccountStore(model.NewAccount("player1", mustHashPassword(t, "s3cret"), 0, 1))
 	addr, l, servers, sessions, _ := newTestClientLink(t, accounts, false)
-	servers.Register(7, []byte{0x01})
-	servers.MarkOnline(7, "127.0.0.1", 7777, 100)
+	markOnlineAuto(t, servers, 7)
 
 	c := dialLoginClient(t, addr)
 	key1, key2 := c.login(l, "player1", "s3cret")
@@ -807,6 +804,172 @@ func TestClientLinkPlayLoginUnknownServerFails(t *testing.T) {
 	reply := c.read()
 	if reply[0] != serverpackets.OpcodePlayFail {
 		t.Fatalf("opcode = %#x, want PlayFail (%#x)", reply[0], serverpackets.OpcodePlayFail)
+	}
+	if reason := reply[1]; reason != byte(serverpackets.PlayFailTooManyPlayers) {
+		t.Fatalf("PlayFail reason = %#x, want TooManyPlayers (%#x)", reason, serverpackets.PlayFailTooManyPlayers)
+	}
+	c.expectClosed()
+}
+
+// markOnlineAuto links server id and raises its reported status to Auto, as
+// a game server does with its first ServerStatus packet; until then the
+// server counts as down and admits nobody.
+func markOnlineAuto(t *testing.T, servers *manager.ServerRegistry, id int) {
+	t.Helper()
+	servers.Register(id, []byte{0x01})
+	servers.MarkOnline(id, "127.0.0.1", net.ParseIP("127.0.0.1"), 7777, 100)
+	auto := link.ServerTypeAuto
+	if _, ok := servers.ApplyStatus(id, link.ServerStatus{Status: &auto}); !ok {
+		t.Fatalf("ApplyStatus(%d) = false", id)
+	}
+}
+
+func TestClientLinkServerListBadSessionKeyClosesWithAccessFailed(t *testing.T) {
+	accounts := newFakeAccountStore(model.NewAccount("player1", mustHashPassword(t, "s3cret"), 0, 1))
+	addr, l, servers, _, _ := newTestClientLink(t, accounts, false)
+	markOnlineAuto(t, servers, 7)
+
+	c := dialLoginClient(t, addr)
+	c.login(l, "player1", "s3cret")
+
+	c.send(encodeRequestServerList(0x11223344, 0x55667788))
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeLoginFail {
+		t.Fatalf("opcode = %#x, want LoginFail (%#x)", reply[0], serverpackets.OpcodeLoginFail)
+	}
+	if reason := reply[1]; reason != byte(serverpackets.LoginFailAccessFailed) {
+		t.Fatalf("LoginFail reason = %#x, want AccessFailed (%#x)", reason, serverpackets.LoginFailAccessFailed)
+	}
+	c.expectClosed()
+}
+
+func TestClientLinkServerLoginBadSessionKeyClosesWithAccessFailed(t *testing.T) {
+	accounts := newFakeAccountStore(model.NewAccount("player1", mustHashPassword(t, "s3cret"), 0, 1))
+	addr, l, servers, _, _ := newTestClientLink(t, accounts, false)
+	markOnlineAuto(t, servers, 7)
+
+	c := dialLoginClient(t, addr)
+	c.login(l, "player1", "s3cret")
+
+	c.send(encodeRequestServerLogin(0x11223344, 0x55667788, 7))
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodeLoginFail {
+		t.Fatalf("opcode = %#x, want LoginFail (%#x)", reply[0], serverpackets.OpcodeLoginFail)
+	}
+	if reason := reply[1]; reason != byte(serverpackets.LoginFailAccessFailed) {
+		t.Fatalf("LoginFail reason = %#x, want AccessFailed (%#x)", reason, serverpackets.LoginFailAccessFailed)
+	}
+	c.expectClosed()
+}
+
+func TestClientLinkServerLoginDownServerRejected(t *testing.T) {
+	accounts := newFakeAccountStore(model.NewAccount("player1", mustHashPassword(t, "s3cret"), 0, 1))
+	addr, l, servers, _, _ := newTestClientLink(t, accounts, false)
+	servers.Register(7, []byte{0x01})
+
+	c := dialLoginClient(t, addr)
+	key1, key2 := c.login(l, "player1", "s3cret")
+
+	c.send(encodeRequestServerLogin(key1, key2, 7))
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodePlayFail || reply[1] != byte(serverpackets.PlayFailTooManyPlayers) {
+		t.Fatalf("reply opcode %#x reason %#x, want PlayFail TooManyPlayers", reply[0], reply[1])
+	}
+	c.expectClosed()
+}
+
+func TestClientLinkServerLoginGMOnlyAdmitsOnlySuperiorAccounts(t *testing.T) {
+	gmOnly := link.ServerTypeGMOnly
+	accounts := newFakeAccountStore(
+		model.NewAccount("player1", mustHashPassword(t, "s3cret"), 0, 7),
+		model.NewAccount("gm", mustHashPassword(t, "s3cret"), 1, 7),
+	)
+	addr, l, servers, _, _ := newTestClientLink(t, accounts, false)
+	servers.Register(7, []byte{0x01})
+	servers.MarkOnline(7, "127.0.0.1", net.ParseIP("127.0.0.1"), 7777, 100)
+	servers.ApplyStatus(7, link.ServerStatus{Status: &gmOnly})
+
+	c := dialLoginClient(t, addr)
+	key1, key2 := c.login(l, "player1", "s3cret")
+	c.send(encodeRequestServerLogin(key1, key2, 7))
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodePlayFail || reply[1] != byte(serverpackets.PlayFailTooManyPlayers) {
+		t.Fatalf("access level 0: reply opcode %#x reason %#x, want PlayFail TooManyPlayers", reply[0], reply[1])
+	}
+	c.expectClosed()
+
+	gmc := dialLoginClient(t, addr)
+	key1, key2 = gmc.login(l, "gm", "s3cret")
+	gmc.send(encodeRequestServerLogin(key1, key2, 7))
+	if reply := gmc.read(); reply[0] != serverpackets.OpcodePlayOk {
+		t.Fatalf("access level 1: opcode = %#x, want PlayOk (%#x)", reply[0], serverpackets.OpcodePlayOk)
+	}
+}
+
+func TestClientLinkServerLoginFullServerAdmitsOnlySuperiorAccounts(t *testing.T) {
+	full := link.ServerTypeNormal
+	accounts := newFakeAccountStore(
+		model.NewAccount("player1", mustHashPassword(t, "s3cret"), 0, 7),
+		model.NewAccount("gm", mustHashPassword(t, "s3cret"), 1, 7),
+	)
+	addr, l, servers, _, _ := newTestClientLink(t, accounts, false)
+	servers.Register(7, []byte{0x01})
+	servers.MarkOnline(7, "127.0.0.1", net.ParseIP("127.0.0.1"), 7777, 1)
+	servers.ApplyStatus(7, link.ServerStatus{Status: &full})
+	servers.AddOnlineAccount(7, "someoneelse")
+
+	c := dialLoginClient(t, addr)
+	key1, key2 := c.login(l, "player1", "s3cret")
+	c.send(encodeRequestServerLogin(key1, key2, 7))
+	reply := c.read()
+	if reply[0] != serverpackets.OpcodePlayFail || reply[1] != byte(serverpackets.PlayFailTooManyPlayers) {
+		t.Fatalf("full server access level 0: reply opcode %#x reason %#x, want PlayFail TooManyPlayers", reply[0], reply[1])
+	}
+	c.expectClosed()
+
+	servers.RemoveOnlineAccount(7, "someoneelse")
+	c = dialLoginClient(t, addr)
+	key1, key2 = c.login(l, "gm", "s3cret")
+	c.send(encodeRequestServerLogin(key1, key2, 7))
+	if reply := c.read(); reply[0] != serverpackets.OpcodePlayOk {
+		t.Fatalf("full server access level 1: opcode = %#x, want PlayOk (%#x)", reply[0], serverpackets.OpcodePlayOk)
+	}
+}
+
+func TestClientLinkServerEntriesMaskGMOnlyForPlainAccounts(t *testing.T) {
+	gmOnly := link.ServerTypeGMOnly
+	servers := manager.NewServerRegistry()
+	servers.Register(7, []byte{0x01})
+	servers.MarkOnline(7, "93.184.216.34", net.ParseIP("10.0.0.5"), 7777, 100)
+	servers.ApplyStatus(7, link.ServerStatus{Status: &gmOnly})
+
+	l := &ClientLink{servers: servers}
+
+	entries := l.serverEntries(0, net.ParseIP("203.0.113.50"))
+	if len(entries) != 1 || entries[0].Online {
+		t.Fatalf("plain account entries = %+v, want GM-only masked down", entries)
+	}
+
+	entries = l.serverEntries(1, net.ParseIP("203.0.113.50"))
+	if len(entries) != 1 || !entries[0].Online {
+		t.Fatalf("GM account entries = %+v, want online entry", entries)
+	}
+}
+
+func TestClientLinkServerEntriesPointLocalClientsAtConnectionIP(t *testing.T) {
+	servers := manager.NewServerRegistry()
+	servers.Register(7, []byte{0x01})
+	servers.MarkOnline(7, "93.184.216.34", net.ParseIP("192.168.1.10"), 7777, 100)
+
+	l := &ClientLink{servers: servers}
+
+	local := [4]byte{192, 168, 1, 10}
+	if entries := l.serverEntries(0, net.ParseIP("127.0.0.1")); entries[0].IP != local {
+		t.Fatalf("local client entry IP = %v, want %v (connection IP)", entries[0].IP, local)
+	}
+	remote := [4]byte{93, 184, 216, 34}
+	if entries := l.serverEntries(0, net.ParseIP("203.0.113.50")); entries[0].IP != remote {
+		t.Fatalf("remote client entry IP = %v, want %v (advertised host)", entries[0].IP, remote)
 	}
 }
 

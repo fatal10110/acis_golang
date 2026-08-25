@@ -51,11 +51,11 @@ func TestServerRegistryMarkOnlineOffline(t *testing.T) {
 	r := NewServerRegistry()
 	r.Register(5, []byte{0x01})
 
-	entry, ok := r.MarkOnline(5, "1.2.3.4", 7777, 100)
+	entry, ok := r.MarkOnline(5, "1.2.3.4", net.ParseIP("203.0.113.9"), 7777, 100)
 	if !ok {
 		t.Fatal("MarkOnline() = false, want true")
 	}
-	if !entry.Authed || entry.Host != "1.2.3.4" || entry.Port != 7777 || entry.MaxPlayers != 100 {
+	if !entry.Authed || entry.Host != "1.2.3.4" || !entry.ConnIP.Equal(net.ParseIP("203.0.113.9")) || entry.Port != 7777 || entry.MaxPlayers != 100 {
 		t.Fatalf("MarkOnline() entry = %+v", entry)
 	}
 
