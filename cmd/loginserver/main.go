@@ -36,6 +36,7 @@ type loginServerConfig struct {
 	GameServerAddr      string
 	AllowNewGameServers bool
 	AutoCreateAccounts  bool
+	ShowLicence         bool
 	LoginTryBeforeBan   int
 	LoginBlockAfterBan  time.Duration
 	Database            db.Config
@@ -111,6 +112,7 @@ func loginServerConfigFromProperties(_ loginServerPaths, props *config.Propertie
 		GameServerAddr:      listenAddress(props.String("LoginHostname", "*"), linkPort),
 		AllowNewGameServers: props.Bool("AcceptNewGameServer", false),
 		AutoCreateAccounts:  props.Bool("AutoCreateAccounts", true),
+		ShowLicence:         props.Bool("ShowLicence", true),
 		LoginTryBeforeBan:   loginTryBeforeBan,
 		LoginBlockAfterBan:  time.Duration(loginBlockAfterBan) * time.Second,
 		Database: db.Config{
@@ -206,7 +208,7 @@ func provideClientLink(
 	keys *manager.LoginKeyPool,
 	log zerolog.Logger,
 ) *loginserver.ClientLink {
-	return loginserver.NewClientLink(accounts, servers, sessions, bans, keys, cfg.AutoCreateAccounts, cfg.LoginTryBeforeBan, cfg.LoginBlockAfterBan, log)
+	return loginserver.NewClientLink(accounts, servers, sessions, bans, keys, cfg.AutoCreateAccounts, cfg.ShowLicence, cfg.LoginTryBeforeBan, cfg.LoginBlockAfterBan, log)
 }
 
 func startLoginServer(lc fx.Lifecycle, cfg loginServerConfig, link *loginserver.GameServerLink, clients *loginserver.ClientLink, log zerolog.Logger) {
