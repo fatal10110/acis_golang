@@ -19,6 +19,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -74,6 +75,13 @@ func newLinkedSQLGameClientFull(t *testing.T, skills *skillstate.Persistence, sh
 	itemTemplates := testItemTemplates()
 	ids := &sequentialIDs{next: 100}
 	inventoryUpdates := task.NewInventoryUpdates()
+	sevenSignsStore := gamesql.NewSevenSignsStore(db)
+	sevenSigns := sevensigns.NewState(sevenSignsStore, zerolog.Nop(), time.Now, nil)
+	if err := sevenSigns.Restore(context.Background()); err != nil {
+		t.Fatalf("restore seven signs status: %v", err)
+	}
+	sevenSigns.Start()
+	t.Cleanup(sevenSigns.Stop)
 	roster := gamemanager.NewRoster(chars, items, shortcuts, templates, itemTemplates, npc.NewTable(nil), ids, gamemanager.DefaultDeleteAfter, time.Now)
 	gcl := NewGameClientLink(GameClientLinkConfig{
 		Validator:        validator,
@@ -95,6 +103,7 @@ func newLinkedSQLGameClientFull(t *testing.T, skills *skillstate.Persistence, sh
 		GroundItems:      task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour, PlayerDroppedMultiplier: 1}, time.Now),
 		Positions:        task.NewPositionUpdates(state),
 		PlayerClock:      playerClock,
+		SevenSigns:       sevenSigns,
 		InventoryUpdates: inventoryUpdates,
 		PlayerConfig:     PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: karmaPlayerCanTeleport, AllowWater: true},
 		PetConfig:        petmodel.DefaultConfig(),

@@ -30,7 +30,7 @@ func TestLearnedSkillSurvivesRelogin(t *testing.T) {
 
 	relogin := srv.DialClient(t, "player1", 1)
 	frames := startInWorld(t, relogin)
-	assertSkillList(t, frames[6], skillListEntry{passive: 0, level: 1, id: 3})
+	assertSkillList(t, frames[7], skillListEntry{passive: 0, level: 1, id: 3})
 	assertKnownSkills(t, srv, objID, map[int]int{3: 1})
 }
 
