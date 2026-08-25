@@ -104,7 +104,7 @@ func buildSkillDefinitions(el skillElement) ([]skill.Definition, error) {
 			return nil, err
 		}
 		def := skill.NewDefinition(id, i, el.Name, attrs)
-		if err := applySkillTemplates(&def, tables, el.Cond, el.For, i, i); err != nil {
+		if err := applySkillTemplates(&def, tables, el.Cond, el.For, i, i, condMsgModeRegular); err != nil {
 			return nil, fmt.Errorf("skill %d level %d: %w", id, i, err)
 		}
 		defs = append(defs, def)
@@ -138,7 +138,7 @@ func buildSkillDefinitions(el skillElement) ([]skill.Definition, error) {
 			forIndex = levels
 			fors = el.For
 		}
-		if err := applySkillTemplates(&def, tables, conds, fors, condIndex, forIndex); err != nil {
+		if err := applySkillTemplates(&def, tables, conds, fors, condIndex, forIndex, condMsgModeEnchant); err != nil {
 			return nil, fmt.Errorf("skill %d level %d: %w", id, level, err)
 		}
 		defs = append(defs, def)
@@ -170,7 +170,7 @@ func buildSkillDefinitions(el skillElement) ([]skill.Definition, error) {
 			forIndex = levels
 			fors = el.For
 		}
-		if err := applySkillTemplates(&def, tables, conds, fors, condIndex, forIndex); err != nil {
+		if err := applySkillTemplates(&def, tables, conds, fors, condIndex, forIndex, condMsgModeEnchant); err != nil {
 			return nil, fmt.Errorf("skill %d level %d: %w", id, level, err)
 		}
 		defs = append(defs, def)
@@ -213,13 +213,16 @@ func parseCountAttr(s string) (int, error) {
 	return strconv.Atoi(s)
 }
 
-func applySkillTemplates(def *skill.Definition, tables map[string][]string, conds []condElement, fors []forElement, condIndex, forIndex int) error {
+func applySkillTemplates(def *skill.Definition, tables map[string][]string, conds []condElement, fors []forElement, condIndex, forIndex int, msgMode condMsgMode) error {
 	for _, c := range conds {
-		clause, err := buildSkillConditionClause(tables, c.Attrs, c.Children, condIndex)
+		clause, err := buildSkillConditionClause(tables, c.Attrs, c.Children, condIndex, msgMode)
 		if err != nil {
 			return err
 		}
-		def.Conditions = append(def.Conditions, clause)
+		if clause == nil {
+			continue
+		}
+		def.Conditions = append(def.Conditions, *clause)
 	}
 	for _, f := range fors {
 		if err := applyTemplateNodes(def, tables, f.Ops, forIndex); err != nil {
@@ -233,11 +236,11 @@ func applyTemplateNodes(def *skill.Definition, tables map[string][]string, ops [
 	var attachCond *skill.ConditionClause
 	for _, op := range ops {
 		if strings.EqualFold(op.XMLName.Local, "cond") {
-			clause, err := buildSkillConditionClause(tables, op.Attrs, op.Children, tableIndex)
+			clause, err := buildSkillConditionClause(tables, op.Attrs, op.Children, tableIndex, condMsgModeBoth)
 			if err != nil {
 				return err
 			}
-			attachCond = &clause
+			attachCond = clause
 			continue
 		}
 		if strings.EqualFold(op.XMLName.Local, "effect") {
@@ -253,6 +256,12 @@ func applyTemplateNodes(def *skill.Definition, tables map[string][]string, ops [
 			continue
 		}
 
+		// DocumentBase.java's parseTemplate has no fall-through branch for an
+		// unrecognized tag inside a <for> block: it silently skips it rather
+		// than failing the file (DocumentBase.java:145-174).
+		if _, err := skill.ParseFuncOp(op.XMLName.Local); err != nil {
+			continue
+		}
 		fn, err := buildSkillFunc(tables, op.XMLName.Local, op.Attrs, op.Children, attachCond, tableIndex)
 		if err != nil {
 			return err
@@ -306,11 +315,11 @@ func buildNestedEffectTemplates(eff *skill.EffectTemplate, tables map[string][]s
 	var attachCond *skill.ConditionClause
 	for _, n := range nodes {
 		if strings.EqualFold(n.XMLName.Local, "cond") {
-			clause, err := buildSkillConditionClause(tables, n.Attrs, n.Children, tableIndex)
+			clause, err := buildSkillConditionClause(tables, n.Attrs, n.Children, tableIndex, condMsgModeBoth)
 			if err != nil {
 				return err
 			}
-			attachCond = &clause
+			attachCond = clause
 			continue
 		}
 		fnEl := funcElement{XMLName: n.XMLName, Attrs: n.Attrs, Children: n.Children}
@@ -353,27 +362,66 @@ func buildSkillFunc(tables map[string][]string, tag string, attrs []xml.Attr, ch
 	return fn, nil
 }
 
-func buildSkillConditionClause(tables map[string][]string, attrs []xml.Attr, children []condNode, tableIndex int) (skill.ConditionClause, error) {
+// condMsgMode selects how buildSkillConditionClause resolves a cond's
+// msg/msgId/addName attributes, mirroring the differences between the three
+// places DocumentSkill.java attaches a message to a condition:
+//   - condMsgModeRegular: a regular-level <cond> (DocumentSkill.java:216-224)
+//     uses msg when present, else msgId (with addName only when msgId > 0);
+//     msgId and addName are never read alongside msg.
+//   - condMsgModeEnchant: an enchant1cond/enchant2cond block
+//     (DocumentSkill.java:245-247, 289-291) reads only msg — msgId and
+//     addName are never consulted, even when present in the XML.
+//   - condMsgModeBoth: op-level <cond> attachment (DocumentBase.java's
+//     generic parseTemplate, not DocumentSkill's per-level loop) has no
+//     message semantics in the reference at all; this preserves the prior
+//     Go behavior of resolving msg and msgId independently rather than
+//     changing untested behavior outside this finding's scope.
+type condMsgMode int
+
+const (
+	condMsgModeRegular condMsgMode = iota
+	condMsgModeEnchant
+	condMsgModeBoth
+)
+
+// buildSkillConditionClause resolves a <cond> element into a clause. A cond
+// with no predicate child returns (nil, nil): DocumentBase.java's
+// parseCondition returns null for a missing element node, and attach(null)
+// is a tolerated no-op (DocumentBase.java:309-315,341) rather than a load
+// failure.
+func buildSkillConditionClause(tables map[string][]string, attrs []xml.Attr, children []condNode, tableIndex int, msgMode condMsgMode) (*skill.ConditionClause, error) {
 	if len(children) == 0 {
-		return skill.ConditionClause{}, fmt.Errorf("cond: no predicate defined")
+		return nil, nil
 	}
 	vals, err := resolveAttrMap(tables, attrs, tableIndex)
 	if err != nil {
-		return skill.ConditionClause{}, err
+		return nil, err
 	}
 	root, err := buildSkillCondition(tables, children[0], tableIndex)
 	if err != nil {
-		return skill.ConditionClause{}, err
+		return nil, err
 	}
 	a := newAttrValues(vals, "cond")
 	clause := skill.ConditionClause{Root: root}
-	clause.Message = a.strDefault("msg", "")
-	clause.MessageID = a.int32LiteralDefault("msgId", 0)
-	clause.AddName = a.has("addName") && clause.MessageID > 0
-	if err := a.Err(); err != nil {
-		return skill.ConditionClause{}, err
+	switch msgMode {
+	case condMsgModeRegular:
+		if a.has("msg") {
+			clause.Message = a.strDefault("msg", "")
+		} else if a.has("msgId") {
+			clause.MessageID = a.int32LiteralDefault("msgId", 0)
+			clause.AddName = a.has("addName") && clause.MessageID > 0
+		}
+	case condMsgModeEnchant:
+		clause.Message = a.strDefault("msg", "")
+	case condMsgModeBoth:
+		clause.Message = a.strDefault("msg", "")
+		clause.MessageID = a.int32LiteralDefault("msgId", 0)
+		clause.AddName = a.has("addName") && clause.MessageID > 0
 	}
-	return clause, nil
+	if err := a.Err(); err != nil {
+		return nil, err
+	}
+	return &clause, nil
 }
 
 func buildSkillCondition(tables map[string][]string, n condNode, tableIndex int) (skill.Condition, error) {
