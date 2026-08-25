@@ -126,6 +126,7 @@ type clientConn struct {
 
 	account    string
 	authed     bool
+	ggAuthed   bool
 	joinedGame bool
 	lastServer int
 	loginKey1  int32
@@ -193,8 +194,14 @@ func (l *ClientLink) handleConnection(ctx context.Context, conn net.Conn) {
 
 		switch payload[0] {
 		case clientpackets.OpcodeAuthGameGuard:
-			l.onAuthGameGuard(c, payload)
+			if !l.onAuthGameGuard(c, payload) {
+				return
+			}
 		case clientpackets.OpcodeRequestAuthLogin:
+			if !c.ggAuthed {
+				l.log.Warn().Str("ip", c.remoteIP.String()).Msg("login client sent credentials before the GameGuard exchange")
+				continue
+			}
 			if !l.onRequestAuthLogin(ctx, c, payload) {
 				return
 			}
@@ -214,12 +221,24 @@ func (l *ClientLink) handleConnection(ctx context.Context, conn net.Conn) {
 	}
 }
 
-func (l *ClientLink) onAuthGameGuard(c *clientConn, payload []byte) {
-	if _, err := clientpackets.DecodeAuthGameGuard(payload); err != nil {
+// onAuthGameGuard validates the client's GameGuard response against the
+// Init session id and replies GGAuth. It reports false when the connection
+// must close.
+func (l *ClientLink) onAuthGameGuard(c *clientConn, payload []byte) bool {
+	req, err := clientpackets.DecodeAuthGameGuard(payload)
+	if err != nil {
 		l.log.Warn().Str("ip", c.remoteIP.String()).Err(err).Msg("login client")
-		return
+		return true
 	}
+	if req.SessionID != c.sessionID {
+		l.log.Warn().Str("ip", c.remoteIP.String()).Int32("got", req.SessionID).Int32("want", c.sessionID).
+			Msg("login client failed the GameGuard session-id check")
+		_ = c.send(serverpackets.EncodeLoginFail(serverpackets.LoginFailAccessFailed))
+		return false
+	}
+	c.ggAuthed = true
 	_ = c.send(serverpackets.EncodeGGAuth(c.sessionID))
+	return true
 }
 
 // onRequestAuthLogin authenticates the presented credentials, issues a
