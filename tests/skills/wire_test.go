@@ -120,6 +120,59 @@ func startInWorld(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	return frames
 }
 
+// startInWorldAmongPlayers selects slot 0 and enters the world while other
+// players may already be present: their CharInfo spawn broadcasts can
+// interleave anywhere in the selection and EnterWorld reply sequences, so
+// those frames are skipped by opcode rather than consumed by position.
+func startInWorldAmongPlayers(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
+	t.Helper()
+	c.Send(encodeRequestGameStart(0))
+	sawSSQ, sawSelected := false, false
+	for !sawSSQ || !sawSelected {
+		frame := c.Read()
+		switch frame[0] {
+		case serverpackets.OpcodeSSQInfo:
+			sawSSQ = true
+		case serverpackets.OpcodeCharSelected:
+			sawSelected = true
+		case serverpackets.OpcodeCharInfo:
+		default:
+			t.Fatalf("selection frame opcode %#x, want SSQInfo/CharSelected", frame[0])
+		}
+	}
+
+	c.Send(encodeEnterWorld())
+	want := []byte{
+		serverpackets.OpcodeSendMacroList,
+		serverpackets.OpcodeExtended,
+		serverpackets.OpcodeHennaInfo,
+		serverpackets.OpcodeEtcStatusUpdate,
+		serverpackets.OpcodeSystemMessage,
+		serverpackets.OpcodeQuestList,
+		serverpackets.OpcodeSkillList,
+		serverpackets.OpcodeFriendList,
+		serverpackets.OpcodeUserInfo,
+		serverpackets.OpcodeItemList,
+		serverpackets.OpcodeShortCutInit,
+		serverpackets.OpcodeSkillCoolTime,
+		serverpackets.OpcodeActionFailed,
+	}
+	frames := make([][]byte, 0, len(want))
+	for i := 0; i < len(want); {
+		frame := c.Read()
+		if frame[0] == serverpackets.OpcodeCharInfo {
+			continue
+		}
+		if frame[0] != want[i] {
+			t.Fatalf("EnterWorld frame %d opcode = %#x, want %#x", i, frame[0], want[i])
+		}
+		frames = append(frames, frame)
+		i++
+	}
+	drainUntilQuiet(t, c)
+	return frames
+}
+
 // readEnterWorldBurst consumes the fixed EnterWorld reply burst and returns
 // its frames in wire order.
 func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
