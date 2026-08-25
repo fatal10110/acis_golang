@@ -1446,6 +1446,12 @@ type skillTarget struct {
 	effects *effect.List
 	shots   []modelitem.ShotKind
 	charged map[modelitem.ShotKind]bool
+
+	castBreakDamage []float64
+}
+
+func (t *skillTarget) BreakCastOnDamage(damage float64) {
+	t.castBreakDamage = append(t.castBreakDamage, damage)
 }
 
 func (t *skillTarget) EffectList() *effect.List { return t.effects }
@@ -1706,6 +1712,12 @@ func TestCPDamagePercentReducesCurrentCP(t *testing.T) {
 	}
 	if dead.cp != 80 || invulnerable.cp != 80 {
 		t.Fatalf("invalid target cp changed: dead=%v invulnerable=%v", dead.cp, invulnerable.cp)
+	}
+	if len(target.castBreakDamage) != 1 || target.castBreakDamage[0] != 28 {
+		t.Fatalf("castBreakDamage = %v, want single call with 28 (CpDamPercent.java:44 calcCastBreak(targetPlayer, damage) before the CP reduction)", target.castBreakDamage)
+	}
+	if len(dead.castBreakDamage) != 0 || len(invulnerable.castBreakDamage) != 0 {
+		t.Fatalf("cast break rolled for skipped target: dead=%v invulnerable=%v", dead.castBreakDamage, invulnerable.castBreakDamage)
 	}
 }
 
