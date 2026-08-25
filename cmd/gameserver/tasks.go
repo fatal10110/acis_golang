@@ -251,8 +251,8 @@ func startRespawnTask(lc fx.Lifecycle, r *task.Respawn, log zerolog.Logger) {
 	startTicker(lc, log, r.Start)
 }
 
-func provideAI(state *world.State) *task.AI {
-	return task.NewAI(state)
+func provideAI(state *world.State, log zerolog.Logger) *task.AI {
+	return task.NewAI(state, log)
 }
 
 func startAI(lc fx.Lifecycle, ai *task.AI, log zerolog.Logger) {
