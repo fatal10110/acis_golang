@@ -12,6 +12,7 @@ func TestEncodeLoginFail(t *testing.T) {
 		reason LoginFailReason
 	}{
 		{"system error", LoginFailSystemError},
+		{"password wrong", LoginFailPasswordWrong},
 		{"dual box", LoginFailDualBox},
 	}
 	for _, tt := range tests {
