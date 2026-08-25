@@ -5,11 +5,11 @@ driven through the real wire protocol against a real MariaDB, not per-function u
 doc records the tier structure, the shared harness, and the remaining decision rule for when a
 fake may stand in for a real type.
 
-Current state (post #1691, phase 1 of the migration tracked in #1664): the scripted client lives
+Current state (post #1682): the scripted client lives
 in `internal/testsupport`, the server boot harness in `internal/gameservertest`, and the MariaDB
-container helpers in `internal/gameserver/data/sql/sqltest` are untagged. Legacy per-package
-fixtures and the remaining `//go:build integration` files are scheduled for deletion/consolidation
-in #1677 and its children.
+container helpers in `internal/gameserver/data/sql/sqltest`. The legacy per-package fixtures and
+the integration build tag is gone: #1677 and its children deleted flow-covered unit tests,
+and #1682 consolidated the pure-function survivors into `<pkg>_core_test.go` files.
 
 ## Test tiers
 
@@ -98,9 +98,8 @@ delete the fake and call the real type.
 
 - New behavior suites: `tests/<domain>/<flow>_test.go`, no build tag.
 - New pure-core tests: `<pkg>_core_test.go`, no build tag.
-- `//go:build integration` is legacy-only: it remains on not-yet-ported files and is removed as
-  each migrates. Never add it to a new file. Default `go test ./...` runs everything; Docker is a
-  hard dependency of the default tier (CI gate: #1686).
+- No file carries the integration build tag (removed tree-wide in #1682). Default `go test ./...`
+  runs everything; Docker is a hard dependency of the default tier.
 - A plain core test must not duplicate a scenario a behavior suite already covers without a
   documented reason.
 

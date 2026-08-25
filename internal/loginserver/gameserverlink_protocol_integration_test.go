@@ -1,5 +1,3 @@
-//go:build integration
-
 // This file drives GameServerLink's protocol/session logic (registration
 // gates, already-logged-in rejection, PlayerAuthRequest, status/roster
 // updates, disconnect handling, panic recovery, unknown-opcode rejection)

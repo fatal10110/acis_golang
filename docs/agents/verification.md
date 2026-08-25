@@ -59,24 +59,25 @@ find acis_golang -name '*.go' -type f -exec gofmt -l {} +
 rtk go -C acis_golang vet ./...
 rtk go -C acis_golang build ./...
 rtk go -C acis_golang test -race ./...
-rtk go -C acis_golang test -tags=integration -count=1 ./...
 ```
 
-CI runs `-race` and `-tags=integration` as separate jobs; run both locally before claiming completion.
+There is no separate integration tier: `go test ./...` is the only run and needs Docker (the
+persistence suites boot MariaDB via testcontainers). The integration build tag was removed
+tree-wide in #1682; never reintroduce it.
 
-### Colima: `-tags=integration` needs an explicit Docker host and Ryuk disabled
+### Colima: the default test run needs an explicit Docker host and Ryuk disabled
 
-`-tags=integration` spins up mariadb via testcontainers-go. On a machine running Colima instead of
+The persistence suites spin up mariadb via testcontainers-go. On a machine running Colima instead of
 Docker Desktop, the default socket discovery fails with `rootless Docker not found`, and even after
 pointing at the Colima socket, testcontainers' Ryuk reaper sidecar fails to start (`error while
 creating mount source path .../docker.sock: operation not supported`) because it bind-mounts the
 socket the way Docker Desktop's layout expects, which Colima's does not match. Set both before
-running the integration gate:
+running the suite:
 
 ```bash
 export DOCKER_HOST=unix://$HOME/.colima/default/docker.sock
 export TESTCONTAINERS_RYUK_DISABLED=true
-rtk go -C acis_golang test -tags=integration -count=1 ./...
+rtk go -C acis_golang test -race -count=1 ./...
 ```
 
 Confirm the actual socket path with `docker context ls` first — `default/docker.sock` assumes the
@@ -86,7 +87,7 @@ tears down each container it starts.
 ### `sqltest.SharedDB`: one container per package instead of one per test
 
 `sqltest.NewDB(t)` boots a fresh MariaDB container for that single test. For a package with many
-integration tests this means many container boots, which dominates the `-tags=integration` job's
+persistence tests this means many container boots, which dominates the default run's
 wall-clock time. `sqltest.SharedDB(tb)` boots one container per package instead: a package-level
 `sync.Once` starts it lazily on the first call within that test binary (Go compiles each package's
 tests into its own binary, so "once per binary" is "once per package"), and every caller gets the
@@ -94,11 +95,9 @@ package's tables truncated via `tb.Cleanup` after its own test so tests don't se
 by earlier tests in the package.
 
 Because the container isn't torn down per test, a package using `SharedDB` must add a `TestMain`
-under the `integration` build tag that terminates it once, after every test in the package has run:
+that terminates it once, after every test in the package has run:
 
 ```go
-//go:build integration
-
 func TestMain(m *testing.M) { os.Exit(sqltest.Main(m)) }
 ```
 
