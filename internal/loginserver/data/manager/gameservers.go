@@ -198,3 +198,20 @@ func (r *ServerRegistry) OnlineAccountCount(id int) int {
 	defer r.mu.RUnlock()
 	return len(r.online[id])
 }
+
+// AccountServerID returns the id of the linked game server that currently
+// reports account online, scanning every authed server's roster. It reports
+// false when no linked server holds the account.
+func (r *ServerRegistry) AccountServerID(account string) (int, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	for id, e := range r.servers {
+		if !e.Authed {
+			continue
+		}
+		if _, online := r.online[id][account]; online {
+			return id, true
+		}
+	}
+	return 0, false
+}

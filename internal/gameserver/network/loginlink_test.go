@@ -53,7 +53,7 @@ func newTestLoginServer(t *testing.T, allowNewServers bool) (addr string, server
 	sessions = manager.NewSessionStore()
 	bans := manager.NewIPBanList(zerolog.Nop())
 
-	gsLink := loginserver.NewGameServerLink(servers, names, keys, sessions, bans, nil, nil, allowNewServers, nil, zerolog.Nop())
+	gsLink := loginserver.NewGameServerLink(servers, names, keys, sessions, bans, nil, nil, allowNewServers, nil, loginserver.NewLinkRoster(), zerolog.Nop())
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
