@@ -91,3 +91,11 @@ func (c *Character) breakCastOnDamage(damage float64) {
 		return c.CalcStat(stat.AttackCancel, base)
 	}, c.rollValue(100), c.Invul())
 }
+
+// BreakCastOnDamage applies calcCastBreak's damage-based interrupt roll to
+// c's own in-progress cast, for skill handlers (e.g. CPDAMPERCENT) that deal
+// damage outside the HP-reduction path and so never funnel it through
+// ReduceHP/breakCastOnDamage.
+func (c *Character) BreakCastOnDamage(damage float64) {
+	c.breakCastOnDamage(damage)
+}
