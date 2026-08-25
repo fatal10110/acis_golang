@@ -402,10 +402,15 @@ func (t *Template) RequiredLevelForNextSkillGrant(characterLevel int) int {
 }
 
 // CheckSkillLearn checks whether a manual skill grant can be learned now and
-// whether availableSP covers its corrected cost.
+// whether availableSP covers its corrected cost. It intentionally does not
+// gate on MinLevel or a zero Cost: RequestAcquireSkill.java's general-learn
+// case (lines 59-101) only checks known-level continuity, template
+// membership via PlayerTemplate.findSkill (which ignores minLvl,
+// PlayerTemplate.java:193-196), and SP vs getCorrectedCost() — it has no
+// level or cost==0 rejection of its own.
 func (t *Template) CheckSkillLearn(characterLevel, availableSP int, known SkillLevels, skillID, level int) (SkillGrant, LearnStatus) {
 	grant, ok := t.FindSkillGrant(skillID, level)
-	if !ok || grant.MinLevel > characterLevel || grant.Cost == 0 || known.Level(skillID) != level-1 {
+	if !ok || known.Level(skillID) != level-1 {
 		return SkillGrant{}, LearnUnavailable
 	}
 	if availableSP < grant.CorrectedCost() {
