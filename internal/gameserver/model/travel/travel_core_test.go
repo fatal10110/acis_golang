@@ -8,10 +8,11 @@ import (
 // ---- from teleport_test.go ----
 func TestTeleportCalculatedPrice(t *testing.T) {
 	tests := []struct {
-		name string
-		kind Kind
-		now  time.Time
-		want int
+		name    string
+		kind    Kind
+		priceID int
+		now     time.Time
+		want    int
 	}{
 		{
 			name: "weekday evening full price",
@@ -49,6 +50,13 @@ func TestTeleportCalculatedPrice(t *testing.T) {
 			now:  time.Date(2026, time.July, 11, 20, 0, 0, 0, time.UTC), // Saturday
 			want: 1000,
 		},
+		{
+			name:    "ancient adena skips core time half price",
+			kind:    KindStandard,
+			priceID: 5575,
+			now:     time.Date(2026, time.July, 11, 20, 0, 0, 0, time.UTC), // Saturday
+			want:    1000,
+		},
 	}
 
 	for _, tt := range tests {
@@ -57,7 +65,7 @@ func TestTeleportCalculatedPrice(t *testing.T) {
 			if tt.name == "core time rounds down with a floor of one" {
 				priceCount = 1
 			}
-			tp := Teleport{Kind: tt.kind, PriceCount: priceCount}
+			tp := Teleport{Kind: tt.kind, PriceID: tt.priceID, PriceCount: priceCount}
 			if got := tp.CalculatedPrice(tt.now); got != tt.want {
 				t.Fatalf("CalculatedPrice() = %d, want %d", got, tt.want)
 			}
