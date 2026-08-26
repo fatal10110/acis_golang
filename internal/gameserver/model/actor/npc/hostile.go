@@ -675,16 +675,13 @@ func (h *Hostile) PoleAttackCountMax() int {
 
 // ReturnHome reports whether this NPC started returning to its spawn.
 func (h *Hostile) ReturnHome() bool {
+	if h.SiegeGuard() {
+		return h.returnHomeOutsideDriftRange()
+	}
 	if h.InTerritory() || !h.brain.Hates().IsEmpty() {
 		return false
 	}
-	if in2DRange(h.location(), h.Instance.Home, h.driftRange()) {
-		return false
-	}
-
-	h.brain.Threats().ZeroHate()
-	h.move.MoveHome(h.Instance.Home)
-	return true
+	return h.returnHomeOutsideDriftRange()
 }
 
 // InTerritory reports whether this NPC is inside its spawn territory.
@@ -692,7 +689,7 @@ func (h *Hostile) InTerritory() bool {
 	if !h.Instance.HasHome {
 		return true
 	}
-	return h.location().In3DRange(h.Instance.Home, h.driftRange())
+	return h.location().In3DRange(h.Instance.Home, defaultDriftRange)
 }
 
 func hostileKind(inst *Instance) InstanceKind {
@@ -707,11 +704,26 @@ func (h *Hostile) location() location.Location {
 	return location.Location{X: x, Y: y, Z: z}
 }
 
+// IsMoving reports whether this NPC has an in-flight movement request.
+func (h *Hostile) IsMoving() bool { return h.Move().Moving() }
+
 func (h *Hostile) driftRange() int {
+	if kind := hostileKind(h.Instance); kind == "Guard" || kind == "SiegeGuard" {
+		return 20
+	}
 	if h.Instance.DriftRange > 0 {
 		return h.Instance.DriftRange
 	}
 	return defaultDriftRange
+}
+
+func (h *Hostile) returnHomeOutsideDriftRange() bool {
+	if !h.Instance.HasHome || in2DRange(h.location(), h.Instance.Home, h.driftRange()) {
+		return false
+	}
+	h.brain.Threats().ZeroHate()
+	_ = h.move.MoveHome(h.Instance.Home)
+	return true
 }
 
 func in2DRange(a, b location.Location, radius int) bool {

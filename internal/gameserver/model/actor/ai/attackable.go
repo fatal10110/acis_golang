@@ -31,6 +31,7 @@ type AttackableActor interface {
 	Knows(attackable.Combatant) bool
 	PhysicalAttackRange() int
 	ReturnHome() bool
+	IsMoving() bool
 	InTerritory() bool
 	// SetHeadingTo faces the actor toward target, used before committing to
 	// a skill cast whose animation is long enough to plant first.
@@ -500,6 +501,9 @@ func (a *Attackable) thinkCast() (bool, error) {
 }
 
 func (a *Attackable) thinkWander() {
+	if a.actor.IsMoving() {
+		return
+	}
 	if a.actor.ReturnHome() {
 		return
 	}
