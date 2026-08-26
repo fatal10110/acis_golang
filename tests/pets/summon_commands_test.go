@@ -72,11 +72,10 @@ func TestDecorativeSummonSpawnsTreeAndBlocksDuplicate(t *testing.T) {
 // second wyvern collar answers SUMMON_ONLY_ONE.
 func TestWyvernCollarMountsPlayer(t *testing.T) {
 	h := bootOwnerWithCollar(t,
-		seedItem{TemplateID: wyvernCollarID, Count: 1},
-		seedItem{TemplateID: wyvernCollarID, Count: 1},
+		seedItem{TemplateID: wyvernCollarID, Count: 2},
 	)
 	wyvernCollar := h.seeded[wyvernCollarID][0]
-	secondCollar := h.seeded[wyvernCollarID][1]
+	secondCollar := wyvernCollar
 
 	h.client.Send(encodeUseItem(wyvernCollar, false))
 	frame := mustRead(t, h.client, "Ride broadcast")
