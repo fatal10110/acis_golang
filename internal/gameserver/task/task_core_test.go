@@ -1971,3 +1971,18 @@ func TestGroundItemsDropWithoutProtectOwnerLeavesItemUnowned(t *testing.T) {
 		t.Fatalf("OwnerID = %d, want 0 for an unprotected drop", got)
 	}
 }
+
+func TestGroundItemOptionsFromPropertiesAbsentSpecialItemsUsesNoOverrides(t *testing.T) {
+	props, err := config.ParseString("")
+	if err != nil {
+		t.Fatalf("ParseString() error = %v", err)
+	}
+
+	opts, err := GroundItemOptionsFromProperties(props)
+	if err != nil {
+		t.Fatalf("GroundItemOptionsFromProperties() error = %v", err)
+	}
+	if len(opts.SpecialAutoDestroy) != 0 {
+		t.Fatalf("SpecialAutoDestroy = %v, want no overrides when AutoDestroySpecialItemTime is absent", opts.SpecialAutoDestroy)
+	}
+}
