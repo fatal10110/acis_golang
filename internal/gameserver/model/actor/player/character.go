@@ -93,6 +93,13 @@ type Character struct {
 	DeleteAt   int64
 	LastAccess int64
 
+	// onlineMu guards the session playtime clock below. The clock starts
+	// when the row is restored and every save persists the accumulated
+	// total, so both run from goroutines that never otherwise meet.
+	onlineMu       sync.Mutex
+	onlineTimeBase int64
+	onlineBegin    time.Time
+
 	runtimeTemplate           *Template
 	levelTable                *LevelTable
 	allowDelevel              bool
@@ -331,4 +338,27 @@ func (c *Character) CurrentHeading() int {
 	c.locMu.RLock()
 	defer c.locMu.RUnlock()
 	return c.LastHeading
+}
+
+// SetOnlineTime seeds the session playtime clock with seconds already
+// accumulated by earlier sessions; the in-session elapsed time is measured
+// from now, so the first save after this call persists base plus elapsed.
+func (c *Character) SetOnlineTime(seconds int64, now time.Time) {
+	c.onlineMu.Lock()
+	defer c.onlineMu.Unlock()
+	c.onlineTimeBase = seconds
+	c.onlineBegin = now
+}
+
+// TotalOnlineTime returns the character's lifetime playtime in seconds:
+// the base restored from the characters row plus everything accrued since
+// the clock started.
+func (c *Character) TotalOnlineTime(now time.Time) int64 {
+	c.onlineMu.Lock()
+	defer c.onlineMu.Unlock()
+	total := c.onlineTimeBase
+	if !c.onlineBegin.IsZero() && now.After(c.onlineBegin) {
+		total += int64(now.Sub(c.onlineBegin) / time.Second)
+	}
+	return total
 }

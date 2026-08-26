@@ -115,6 +115,14 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 		return nil, false
 	}
 	l.activateSpawnProtection(live)
+	if l.roster != nil {
+		// Mark the row online at login (the reference updates the online
+		// status when a client enters the world), so external DB consumers
+		// see online=1 without waiting for the first periodic save.
+		if err := l.roster.SaveOnlineRecency(ctx, c); err != nil {
+			l.log.Error().Err(err).Int32("object_id", c.ID).Msg("enter world: save player online recency")
+		}
+	}
 	if l.skills != nil {
 		if err := l.skills.RestoreEquippedItemStats(c, c.Inventory()); err != nil {
 			l.log.Error().Err(err).Int32("object_id", c.ID).Msg("enter world: restore equipped item stats")

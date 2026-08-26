@@ -98,14 +98,27 @@ func (f *Fields) Float64(key string, def float64) float64 {
 	return v
 }
 
-// IntPairs returns pairs parsed from a value shaped like "57-100;6651-3" or
-// "57-0,5575-0", or def (parsed the same way) when key is missing. A
-// present-but-malformed value records an error and returns nil.
+// IntPairs returns pairs parsed from a ';'-separated value shaped like
+// "57-100;6651-3", or def parsed the same way when key is missing. A
+// malformed entry yields an empty slice without recording an error, so one
+// bad value never aborts loading; the caller decides whether an empty
+// result needs a warning of its own.
 func (f *Fields) IntPairs(key, def string) []IntPair {
 	if f.err != nil {
 		return nil
 	}
-	v, err := f.props.IntPairs(key, def)
+	v, _ := f.props.IntPairs(key, def)
+	return v
+}
+
+// IntPairsComma returns pairs parsed from a comma-separated list of
+// first-second entries, or def parsed the same way when key is missing. A
+// present-but-malformed value records an error and returns nil.
+func (f *Fields) IntPairsComma(key, def string) []IntPair {
+	if f.err != nil {
+		return nil
+	}
+	v, err := f.props.IntPairsComma(key, def)
 	if err != nil {
 		f.Fail(err)
 		return nil
