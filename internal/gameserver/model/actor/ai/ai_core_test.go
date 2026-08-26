@@ -442,6 +442,7 @@ type fakeActor struct {
 	inTerritory     bool
 	returnHome      bool
 	returnHomeCalls int
+	moving          bool
 	headingTarget   attackable.Combatant
 	moveToPawnCalls int
 	moveToPawnTo    attackable.Combatant
@@ -467,6 +468,7 @@ func (a *fakeActor) ReturnHome() bool {
 	a.returnHomeCalls++
 	return a.returnHome
 }
+func (a *fakeActor) IsMoving() bool    { return a.moving }
 func (a *fakeActor) InTerritory() bool { return a.inTerritory }
 func (a *fakeActor) SetHeadingTo(target attackable.Combatant) {
 	a.headingTarget = target
@@ -972,6 +974,21 @@ func TestAttackableAIWanderReturnHome(t *testing.T) {
 	}
 	if got := ai.CurrentIntention(); got != IntentionWander {
 		t.Fatalf("CurrentIntention() = %v, want wander while returning home", got)
+	}
+}
+
+func TestAttackableAIWanderSkipsReturnHomeWhileMoving(t *testing.T) {
+	owner := actor(1)
+	owner.inTerritory = false
+	owner.returnHome = true
+	owner.moving = true
+	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+
+	ai.SetWander()
+	ai.Think()
+
+	if owner.returnHomeCalls != 0 {
+		t.Fatalf("ReturnHome calls = %d, want 0 while moving", owner.returnHomeCalls)
 	}
 }
 
