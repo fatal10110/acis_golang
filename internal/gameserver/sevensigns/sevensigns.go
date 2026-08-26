@@ -94,6 +94,9 @@ type State struct {
 	row        StatusRow
 	nextChange time.Time
 	timer      *time.Timer
+	// stopped latches Stop: a transition already running when Stop arrives
+	// must not re-arm the timer once its save completes.
+	stopped bool
 }
 
 // NewState returns a state persisting through store. now supplies wall time;
@@ -135,18 +138,21 @@ func (s *State) Restore(ctx context.Context) error {
 	return nil
 }
 
-// Start arms the transition timer for the pending period change. Restore
-// must have completed first.
+// Start arms the transition timer for the pending period change and clears
+// any earlier Stop. Restore must have completed first.
 func (s *State) Start() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.stopped = false
 	s.scheduleLocked()
 }
 
-// Stop cancels the pending transition timer.
+// Stop cancels the pending transition timer and latches, so a transition
+// already in flight cannot re-arm once it finishes persisting.
 func (s *State) Stop() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.stopped = true
 	if s.timer != nil {
 		s.timer.Stop()
 		s.timer = nil
@@ -200,6 +206,9 @@ func (s *State) advance() {
 }
 
 func (s *State) scheduleLocked() {
+	if s.stopped {
+		return
+	}
 	if s.timer != nil {
 		s.timer.Stop()
 	}

@@ -100,13 +100,19 @@ type recordingStore struct {
 	found    bool
 	saves    []StatusRow
 	failSave bool
+	// onSave, when set, runs at the start of every SaveStatus so a test can
+	// interleave other work into the transition's unlocked save window.
+	onSave func()
 }
 
 func (s *recordingStore) LoadStatus(context.Context) (StatusRow, bool, error) {
 	return s.row, s.found, nil
 }
 
-func (s *recordingStore) SaveStatus(_ context.Context, row StatusRow) error {
+func (s *recordingStore) SaveStatus(ctx context.Context, row StatusRow) error {
+	if s.onSave != nil {
+		s.onSave()
+	}
 	if s.failSave {
 		return errors.New("db down")
 	}
@@ -243,6 +249,49 @@ func TestStopCancelsPendingTransition(t *testing.T) {
 	// a stub, so just verify no further scheduling happened implicitly.
 	if len(h.fired) != 1 {
 		t.Fatalf("callbacks fired = %d, want 1", len(h.fired))
+	}
+}
+
+// A Stop landing inside a transition's save window must win over that
+// transition's re-arm: once stopped, the in-flight advance finishes without
+// scheduling anything new.
+func TestStopDuringTransitionSavePreventsRearm(t *testing.T) {
+	start := at(2026, time.August, 26, 12, 0, time.UTC)
+	h := newStateHarness(t, start)
+	h.store.row = StatusRow{Cycle: 2, Period: Results, LastSave: start.Add(-time.Hour)}
+	h.store.found = true
+	if err := h.state.Restore(context.Background()); err != nil {
+		t.Fatalf("Restore: %v", err)
+	}
+	h.state.Start()
+
+	saving := make(chan struct{})
+	release := make(chan struct{})
+	h.store.onSave = func() {
+		close(saving)
+		<-release
+	}
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		h.fired[0]()
+	}()
+
+	select {
+	case <-saving:
+	case <-time.After(5 * time.Second):
+		t.Fatal("transition never reached its save window")
+	}
+	h.state.Stop()
+	close(release)
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("transition did not finish after release")
+	}
+	if len(h.fired) != 1 {
+		t.Fatalf("callbacks armed after stop = %d, want the single fired transition only", len(h.fired))
 	}
 }
 
