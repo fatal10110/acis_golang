@@ -56,6 +56,7 @@ func (p *livePlayer) Discover(obj world.Tracked) {
 		p.sendVisibilityFrame(serverpackets.FrameSpawnItem(o))
 	case doorObject:
 		p.sendVisibilityFrame(serverpackets.FrameDoorInfo(o, false))
+		p.sendVisibilityFrame(serverpackets.FrameDoorStatusUpdate(o, false))
 	case staticObject:
 		p.sendVisibilityFrame(serverpackets.FrameStaticObjectInfo(o))
 	}
