@@ -95,11 +95,11 @@ func loadGameData(paths gameServerPaths, cfg gameServerConfig, log zerolog.Logge
 	if err != nil {
 		return nil, err
 	}
-	items, err := gamexml.LoadItemTemplates(filepath.Join(xmlRoot, "items"))
+	items, err := gamexml.LoadItemTemplates(filepath.Join(xmlRoot, "items"), log)
 	if err != nil {
 		return nil, err
 	}
-	skills, err := gamexml.LoadSkillDefinitions(filepath.Join(xmlRoot, "skills"))
+	skills, err := gamexml.LoadSkillDefinitions(filepath.Join(xmlRoot, "skills"), log)
 	if err != nil {
 		return nil, err
 	}

@@ -1,6 +1,7 @@
 package xml
 
 import (
+	"bytes"
 	"errors"
 	"path/filepath"
 	"slices"
@@ -13,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
+	"github.com/rs/zerolog"
 )
 
 // fakeWearingActor is a minimal stat.Actor+conditions.Actor/PlayerActor
@@ -84,7 +86,7 @@ var _ stat.Actor = fakeWearingActor{}
 // template has genuinely gone unhandled again.
 func TestConditionalStatFuncsBuildForEveryShippedSkill(t *testing.T) {
 	dir := datapackPath(t, filepath.Join("data", "xml", "skills"))
-	table, err := LoadSkillDefinitions(dir)
+	table, err := LoadSkillDefinitions(dir, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("LoadSkillDefinitions(%q) error: %v", dir, err)
 	}
@@ -159,7 +161,7 @@ func TestConditionalStatFuncsBuildForEveryShippedSkill(t *testing.T) {
 func TestLoadSkillDefinitions(t *testing.T) {
 	dir := datapackPath(t, filepath.Join("data", "xml", "skills"))
 
-	table, err := LoadSkillDefinitions(dir)
+	table, err := LoadSkillDefinitions(dir, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("LoadSkillDefinitions(%q) error: %v", dir, err)
 	}
@@ -517,17 +519,30 @@ func skillFixture(extra string) string {
 	return `<list><skill id="1" name="x" levels="1"><set name="target" val="ONE"/><set name="skillType" val="PDAM"/><set name="operateType" val="ACTIVE"/>` + extra + `</skill></list>`
 }
 
-func TestLoadSkillDefinitionsErrors(t *testing.T) {
+// TestLoadSkillDefinitionsMalformedXMLFails checks that a file whose XML is
+// not well-formed still aborts the whole load: only an individual <skill>
+// element's data problem is tolerated (see
+// TestLoadSkillDefinitionsSkipsMalformedSkills).
+func TestLoadSkillDefinitionsMalformedXMLFails(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "fixture.xml")
+	writeXMLFixture(t, path, `<list><skill id="1" name="x" levels="1" <set name="target" val="ONE"/></skill></list>`)
+	if _, err := LoadSkillDefinitions(dir, zerolog.Nop()); err == nil {
+		t.Fatal("expected an error for malformed xml, got nil")
+	}
+}
+
+// TestLoadSkillDefinitionsSkipsMalformedSkills checks that a single <skill>
+// element with a data problem is logged and skipped rather than aborting
+// the whole load, matching DocumentSkill.java's per-level try/catch
+// ("Failed parsing skill.").
+func TestLoadSkillDefinitionsSkipsMalformedSkills(t *testing.T) {
 	dir := t.TempDir()
 
 	cases := []struct {
 		name    string
 		content string
 	}{
-		{
-			name:    "malformed xml",
-			content: `<list><skill id="1" name="x" levels="1" <set name="target" val="ONE"/></skill></list>`,
-		},
 		{
 			name:    "missing required skillType attribute",
 			content: `<list><skill id="1" name="x" levels="1"><set name="target" val="ONE"/><set name="operateType" val="ACTIVE"/></skill></list>`,
@@ -541,12 +556,14 @@ func TestLoadSkillDefinitionsErrors(t *testing.T) {
 			content: `<list><skill id="1" name="x" levels="1"><set name="target" val="NOT_A_TARGET"/><set name="skillType" val="PDAM"/><set name="operateType" val="ACTIVE"/></skill></list>`,
 		},
 		{
-			name:    "value references an undefined table",
+			// power's undefined-table substitution reads as "" (see
+			// TestLoadSkillDefinitionsToleratesUndefinedTableRefInCondition
+			// for the case where an unresolved reference doesn't itself
+			// fail the level), and "" then fails power's own required
+			// float64 parse — the level is skipped for that reason, not
+			// because the unresolved reference errors directly.
+			name:    "value references an undefined table, and the resulting empty value fails to parse",
 			content: `<list><skill id="1" name="x" levels="1"><set name="target" val="ONE"/><set name="skillType" val="PDAM"/><set name="operateType" val="ACTIVE"/><set name="power" val="#missing"/></skill></list>`,
-		},
-		{
-			name:    "condition references an undefined table",
-			content: `<list><skill id="1" name="x" levels="1"><set name="target" val="ONE"/><set name="skillType" val="PDAM"/><set name="operateType" val="ACTIVE"/><cond><player Charges="#missing"/></cond></skill></list>`,
 		},
 		{
 			name:    "table name missing the '#' prefix",
@@ -610,24 +627,108 @@ func TestLoadSkillDefinitionsErrors(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			path := filepath.Join(dir, "fixture.xml")
 			writeXMLFixture(t, path, c.content)
-			if _, err := LoadSkillDefinitions(dir); err == nil {
-				t.Fatalf("expected an error for %s, got nil", c.name)
+
+			var buf bytes.Buffer
+			table, err := LoadSkillDefinitions(dir, zerolog.New(&buf))
+			if err != nil {
+				t.Fatalf("LoadSkillDefinitions: unexpected error for %s: %v", c.name, err)
+			}
+			if _, ok := table.Get(1, 1); ok {
+				t.Fatalf("%s: malformed skill 1 should have been skipped", c.name)
+			}
+			got := buf.String()
+			if !strings.Contains(got, "fixture.xml") {
+				t.Fatalf("%s: log output = %q, want it to name the file", c.name, got)
 			}
 		})
 	}
 
 	t.Run("empty directory", func(t *testing.T) {
 		empty := t.TempDir()
-		if _, err := LoadSkillDefinitions(empty); err == nil {
+		if _, err := LoadSkillDefinitions(empty, zerolog.Nop()); err == nil {
 			t.Fatal("expected an error for an empty directory, got nil")
 		}
 	})
 
 	t.Run("missing directory", func(t *testing.T) {
-		if _, err := LoadSkillDefinitions(filepath.Join(dir, "does-not-exist")); err == nil {
+		if _, err := LoadSkillDefinitions(filepath.Join(dir, "does-not-exist"), zerolog.Nop()); err == nil {
 			t.Fatal("expected an error for a missing directory, got nil")
 		}
 	})
+}
+
+// TestLoadSkillDefinitionsToleratesUndefinedTableRefInCondition checks that
+// an unresolved "#name" table reference is itself logged and substituted
+// with "" rather than failing the level, matching DocumentSkill.java's
+// getTableValue/getTableValue(name,int) (DocumentSkill.java:55-81): both
+// overloads catch the lookup failure, log, and return "" instead of
+// propagating. Here the "" substitution flows into a condition attribute
+// that isn't itself parsed as a number during load, so the level still
+// builds successfully with the empty value — unlike the sibling case in
+// TestLoadSkillDefinitionsSkipsMalformedSkills where the "" substitution
+// feeds a required numeric attribute and fails there instead.
+func TestLoadSkillDefinitionsToleratesUndefinedTableRefInCondition(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "fixture.xml")
+	writeXMLFixture(t, path, `<list><skill id="1" name="x" levels="1"><set name="target" val="ONE"/><set name="skillType" val="PDAM"/><set name="operateType" val="ACTIVE"/><cond><player Charges="#missing"/></cond></skill></list>`)
+
+	var buf bytes.Buffer
+	table, err := LoadSkillDefinitions(dir, zerolog.New(&buf))
+	if err != nil {
+		t.Fatalf("LoadSkillDefinitions: unexpected error: %v", err)
+	}
+
+	def, ok := table.Get(1, 1)
+	if !ok {
+		t.Fatal("skill 1 level 1 should have loaded despite the unresolved table reference")
+	}
+	if len(def.Conditions) != 1 || def.Conditions[0].Root.Attrs["Charges"] != "" {
+		t.Fatalf("skill 1 level 1 conditions = %+v, want Charges resolved to \"\"", def.Conditions)
+	}
+
+	got := buf.String()
+	if !strings.Contains(got, "fixture.xml") || !strings.Contains(got, "\"skill\":1") {
+		t.Fatalf("log output = %q, want it to name the file and skill id", got)
+	}
+}
+
+// TestLoadSkillDefinitionsSkipsOnlyTheMalformedLevel checks that a bad
+// level's table-substituted value only drops that one level, keeping the
+// other, well-formed levels of the same skill — the granularity
+// DocumentSkill.java's makeSkills (DocumentSkill.java:310-370) actually
+// applies its per-level try/catch at, rather than dropping the whole
+// <skill> element the way an earlier version of this loader did.
+func TestLoadSkillDefinitionsSkipsOnlyTheMalformedLevel(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "fixture.xml")
+	writeXMLFixture(t, path, `<list><skill id="5" name="x" levels="3">
+		<table name="#mp"> 10 oops 30 </table>
+		<set name="target" val="ONE"/>
+		<set name="skillType" val="PDAM"/>
+		<set name="operateType" val="ACTIVE"/>
+		<set name="mpConsume" val="#mp"/>
+	</skill></list>`)
+
+	var buf bytes.Buffer
+	table, err := LoadSkillDefinitions(dir, zerolog.New(&buf))
+	if err != nil {
+		t.Fatalf("LoadSkillDefinitions: unexpected error: %v", err)
+	}
+
+	if def, ok := table.Get(5, 1); !ok || def.MPConsume != 10 {
+		t.Fatalf("skill 5 level 1 = %+v, %v, want MPConsume 10", def, ok)
+	}
+	if _, ok := table.Get(5, 2); ok {
+		t.Fatal("skill 5 level 2 should have been skipped (mpConsume = \"oops\")")
+	}
+	if def, ok := table.Get(5, 3); !ok || def.MPConsume != 30 {
+		t.Fatalf("skill 5 level 3 = %+v, %v, want MPConsume 30", def, ok)
+	}
+
+	got := buf.String()
+	if !strings.Contains(got, "fixture.xml") || !strings.Contains(got, "\"skill\":5") || !strings.Contains(got, "\"level\":2") {
+		t.Fatalf("log output = %q, want it to name the file, skill id, and level 2", got)
+	}
 }
 
 // TestConditionMessagePrecedence covers pr-reviews/478.md finding 1: a
@@ -640,7 +741,7 @@ func TestConditionMessagePrecedence(t *testing.T) {
 		dir := t.TempDir()
 		content := skillFixture(`<cond msg="both attrs present" msgId="113" addName="1"><player Charges="1"/></cond>`)
 		writeXMLFixture(t, filepath.Join(dir, "fixture.xml"), content)
-		table, err := LoadSkillDefinitions(dir)
+		table, err := LoadSkillDefinitions(dir, zerolog.Nop())
 		if err != nil {
 			t.Fatalf("LoadSkillDefinitions: %v", err)
 		}
@@ -664,7 +765,7 @@ func TestConditionMessagePrecedence(t *testing.T) {
 			`<enchant1cond msgId="oops"><player Charges="1"/></enchant1cond>` +
 			`</skill></list>`
 		writeXMLFixture(t, filepath.Join(dir, "fixture.xml"), content)
-		table, err := LoadSkillDefinitions(dir)
+		table, err := LoadSkillDefinitions(dir, zerolog.Nop())
 		if err != nil {
 			t.Fatalf("LoadSkillDefinitions: %v", err)
 		}
@@ -692,7 +793,7 @@ func TestSkillGrammarDegradesGracefully(t *testing.T) {
 		dir := t.TempDir()
 		content := skillFixture(`<cond/>`)
 		writeXMLFixture(t, filepath.Join(dir, "fixture.xml"), content)
-		table, err := LoadSkillDefinitions(dir)
+		table, err := LoadSkillDefinitions(dir, zerolog.Nop())
 		if err != nil {
 			t.Fatalf("LoadSkillDefinitions: %v", err)
 		}
@@ -709,7 +810,7 @@ func TestSkillGrammarDegradesGracefully(t *testing.T) {
 		dir := t.TempDir()
 		content := skillFixture(`<for><bogusTag/><add stat="runSpd" val="5"/></for>`)
 		writeXMLFixture(t, filepath.Join(dir, "fixture.xml"), content)
-		table, err := LoadSkillDefinitions(dir)
+		table, err := LoadSkillDefinitions(dir, zerolog.Nop())
 		if err != nil {
 			t.Fatalf("LoadSkillDefinitions: %v", err)
 		}

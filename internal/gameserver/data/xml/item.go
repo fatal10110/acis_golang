@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/rs/zerolog"
 )
 
 // itemFile is the root element of one item template XML file: a flat list
@@ -70,11 +71,15 @@ type condNode struct {
 // "data/xml/items" directory: one flat list of files, each holding a flat
 // list of <item> elements.
 //
-// A directory that can't be listed, a file whose XML is not well-formed, or
-// an individual <item> that can't be turned into a Template fails the whole
-// load: the caller gets an actionable error rather than a partially
-// populated table.
-func LoadItemTemplates(dir string) (*item.Table, error) {
+// A directory that can't be listed or a file whose XML is not well-formed
+// fails the whole load: the caller gets an actionable error rather than a
+// partially populated table. An individual <item> element that can't be
+// turned into a Template is logged and skipped, matching DocumentItem.java's
+// per-item try/catch ("Cannot create item {}."); the rest of the file and
+// other files continue loading.
+//
+// log receives skipped-item diagnostics; the zero logger discards them.
+func LoadItemTemplates(dir string, log zerolog.Logger) (*item.Table, error) {
 	docs, err := loadXMLDocuments[itemFile](dir, "item template")
 	if err != nil {
 		return nil, err
@@ -85,7 +90,8 @@ func LoadItemTemplates(dir string) (*item.Table, error) {
 		for _, el := range doc.Data.Items {
 			tpl, err := buildItemTemplate(el)
 			if err != nil {
-				return nil, fmt.Errorf("data/xml: parse item in %s: %w", doc.Path, err)
+				log.Error().Err(err).Str("file", doc.Path).Msg("data/xml: skipping malformed item template")
+				continue
 			}
 			templates = append(templates, tpl)
 		}

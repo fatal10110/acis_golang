@@ -1,7 +1,6 @@
 package xml
 
 import (
-	"encoding/xml"
 	"fmt"
 	"math"
 	"strconv"
@@ -28,22 +27,6 @@ type attrValues struct {
 // element being built and is prepended to the first error recorded.
 func newAttrValues(vals map[string]string, prefix string) *attrValues {
 	return &attrValues{vals: vals, prefix: prefix}
-}
-
-// resolveAttrMap folds an element's attributes into a name-keyed map,
-// resolving any "#name" table reference against row tableIndex first. A
-// repeated attribute name keeps the last value, the way an XML attribute
-// list is folded everywhere else in this package.
-func resolveAttrMap(tables map[string][]string, attrs []xml.Attr, tableIndex int) (map[string]string, error) {
-	vals := make(map[string]string, len(attrs))
-	for _, a := range attrs {
-		v, err := resolveTableValue(tables, a.Name.Local, a.Value, tableIndex)
-		if err != nil {
-			return nil, err
-		}
-		vals[a.Name.Local] = v
-	}
-	return vals, nil
 }
 
 // Err reports the first error recorded by any accessor call, if any.
