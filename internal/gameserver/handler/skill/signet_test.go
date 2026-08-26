@@ -7,6 +7,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
@@ -76,7 +77,8 @@ type signetFakeTarget struct {
 
 	list *effect.List
 
-	unsummoned bool
+	unsummoned    bool
+	selfSkillUses int
 }
 
 func newSignetFakeTarget(id int32) *signetFakeTarget {
@@ -90,7 +92,10 @@ func (t *signetFakeTarget) Dead() bool                      { return t.dead }
 func (t *signetFakeTarget) InPeaceZone() bool               { return t.peace }
 func (t *signetFakeTarget) EffectList() *effect.List        { return t.list }
 func (t *signetFakeTarget) Unsummon()                       { t.unsummoned = true }
-func (t *signetFakeTarget) BroadcastFrame(frame wire.Frame) { frame.Release() }
+func (t *signetFakeTarget) BroadcastSelfSkillUse(_, _ int32) error {
+	t.selfSkillUses++
+	return nil
+}
 
 func (t *signetFakeTarget) MagicDamageInput(caster creature.DeathActor, skill modelskill.Definition) (formulas.MagicDamageInput, bool) {
 	return t.magicInput, t.magicOK
@@ -137,13 +142,35 @@ func (f fakeSignetDefinitions) MaxLevel(id modelskill.ID) int {
 	return max
 }
 
-func newTestSignetHandler(defs Definitions) (signetHandler, *world.State) {
+// fakeSignetFrames stands in for the network-owned packet builder. Signet
+// ticks broadcast SkillUse and SkillLaunched through it, so those two are
+// counted and answered with a throwaway frame; the embedded interface keeps
+// every unneeded method a non-nil panic guard rather than silent success.
+type fakeSignetFrames struct {
+	npc.FrameBuilder
+
+	skillUses int
+	launched  int
+}
+
+func (f *fakeSignetFrames) SkillUse(casterID int32, casterAt location.Location, targetID int32, targetAt location.Location, skillID, level int32, hitTime, reuseDelay int, success bool) wire.Frame {
+	f.skillUses++
+	return wire.BorrowedFrame([]byte{0x48})
+}
+
+func (f *fakeSignetFrames) SkillLaunched(objectID, skillID, level int32, targetIDs []int32) wire.Frame {
+	f.launched++
+	return wire.BorrowedFrame([]byte{0x76})
+}
+
+func newTestSignetHandler(defs Definitions) (signetHandler, *world.State, *fakeSignetFrames) {
 	state := world.New()
 	templates := fakeSignetTemplates{byID: map[int]*npc.Template{
 		13018: {ID: 13018, Type: "EffectPoint"},
 	}}
-	h := signetHandler{defs: defs, templates: templates, ids: &fakeSignetIDs{}, world: state}
-	return h, state
+	frames := &fakeSignetFrames{}
+	h := signetHandler{defs: defs, templates: templates, ids: &fakeSignetIDs{}, world: state, frames: frames}
+	return h, state, frames
 }
 
 func TestSignetBuffAppliesSubSkillToNearbyTargetsAndDespawns(t *testing.T) {
@@ -153,7 +180,7 @@ func TestSignetBuffAppliesSubSkillToNearbyTargetsAndDespawns(t *testing.T) {
 			Effects: []modelskill.EffectTemplate{{Name: "Buff", Time: 60, Count: 1}},
 		},
 	}}
-	h, state := newTestSignetHandler(defs)
+	h, state, _ := newTestSignetHandler(defs)
 
 	caster := newSignetFakeCaster(1, 100, 100, 0, 100)
 	target := newSignetFakeTarget(2)
@@ -191,7 +218,7 @@ func TestSignetBuffAppliesSubSkillToNearbyTargetsAndDespawns(t *testing.T) {
 }
 
 func TestSignetSpawnsAtGroundTarget(t *testing.T) {
-	h, state := newTestSignetHandler(nil)
+	h, state, _ := newTestSignetHandler(nil)
 	caster := newSignetFakeCaster(1, 100, 100, 0, 100)
 	caster.gx, caster.gy, caster.gz = 300, 400, 50
 
@@ -210,7 +237,7 @@ func TestSignetSpawnsAtGroundTarget(t *testing.T) {
 }
 
 func TestSignetCasttimeMDamSpawnsPaysMPAndDamagesOnItsLiveTick(t *testing.T) {
-	h, state := newTestSignetHandler(nil)
+	h, state, _ := newTestSignetHandler(nil)
 
 	caster := newSignetFakeCaster(1, 100, 100, 0, 100)
 	target := newSignetFakeTarget(2)
@@ -263,7 +290,7 @@ func TestSignetCasttimeMDamSpawnsPaysMPAndDamagesOnItsLiveTick(t *testing.T) {
 }
 
 func TestSignetCasttimeAppliesEveryRecognizedSelfEffectTemplate(t *testing.T) {
-	h, state := newTestSignetHandler(nil)
+	h, state, _ := newTestSignetHandler(nil)
 	caster := newSignetFakeCaster(1, 100, 100, 0, 100)
 
 	def := modelskill.Definition{
@@ -289,7 +316,7 @@ func TestSignetCasttimeAppliesEveryRecognizedSelfEffectTemplate(t *testing.T) {
 }
 
 func TestSignetCasttimeMDamDropsOnLackOfMP(t *testing.T) {
-	h, _ := newTestSignetHandler(nil)
+	h, _, _ := newTestSignetHandler(nil)
 
 	caster := newSignetFakeCaster(1, 100, 100, 0, 5) // below the skill's mpConsume
 	def := modelskill.Definition{
@@ -317,7 +344,7 @@ func TestSignetNoiseCancelsDanceEffectsAfterFirstTick(t *testing.T) {
 	defs := fakeSignetDefinitions{byRef: map[modelskill.Ref]modelskill.Definition{
 		{ID: 5124, Level: 1}: {ID: 5124, Level: 1, SkillType: "DEBUFF"},
 	}}
-	h, state := newTestSignetHandler(defs)
+	h, state, _ := newTestSignetHandler(defs)
 
 	caster := newSignetFakeCaster(1, 100, 100, 0, 100)
 	target := newSignetFakeTarget(2)
@@ -348,7 +375,7 @@ func TestSignetNoiseCancelsDanceEffectsAfterFirstTick(t *testing.T) {
 }
 
 func TestSignetAntiSummonUnsummonsAfterFirstTick(t *testing.T) {
-	h, state := newTestSignetHandler(nil)
+	h, state, _ := newTestSignetHandler(nil)
 
 	caster := newSignetFakeCaster(1, 100, 100, 0, 100)
 	target := newSignetFakeTarget(2)
@@ -367,11 +394,17 @@ func TestSignetAntiSummonUnsummonsAfterFirstTick(t *testing.T) {
 	if target.unsummoned {
 		t.Fatal("target unsummoned on the skipped first tick")
 	}
+	if target.selfSkillUses != 0 {
+		t.Fatalf("target self skill-use broadcasts on the skipped first tick = %d, want 0", target.selfSkillUses)
+	}
 
 	time.Sleep(tickInterval)
 	actor.EffectList().Tick()
 	if !target.unsummoned {
 		t.Fatal("target not unsummoned after the second tick")
+	}
+	if target.selfSkillUses != 1 {
+		t.Fatalf("target self skill-use broadcasts after the second tick = %d, want 1 (MagicSkillUse self-cast)", target.selfSkillUses)
 	}
 }
 
