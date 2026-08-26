@@ -17,6 +17,7 @@ func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient, wantDie bo
 		serverpackets.OpcodeHennaInfo,
 		serverpackets.OpcodeEtcStatusUpdate,
 		serverpackets.OpcodeSystemMessage,
+		serverpackets.OpcodeSystemMessage,
 		serverpackets.OpcodeQuestList,
 		serverpackets.OpcodeSkillList,
 		serverpackets.OpcodeFriendList,
