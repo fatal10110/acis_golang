@@ -429,13 +429,31 @@ RequestServerID = 9
 	}
 }
 
-func TestLoadHexIDPropertiesAllowsMissingFile(t *testing.T) {
-	props, err := loadHexIDProperties(gameServerPaths{HexIDPath: filepath.Join(t.TempDir(), "hexid.txt")})
-	if err != nil {
-		t.Fatalf("loadHexIDProperties() error = %v, want nil for missing file", err)
+func TestLoadHexIDPropertiesRejectsMissingFile(t *testing.T) {
+	if _, err := loadHexIDProperties(gameServerPaths{HexIDPath: filepath.Join(t.TempDir(), "hexid.txt")}); err == nil {
+		t.Fatal("loadHexIDProperties() error = nil, want missing-file error")
 	}
-	if props.Props != nil {
-		t.Fatalf("Props = %v, want nil for missing file", props.Props)
+}
+
+func TestGameServerConfigRejectsHexIDFileMissingRequiredKey(t *testing.T) {
+	serverProps, err := config.ParseString("RequestServerID = 9")
+	if err != nil {
+		t.Fatalf("ParseString server: %v", err)
+	}
+
+	for name, hexText := range map[string]string{
+		"ServerID": "HexID = 0a",
+		"HexID":    "ServerID = 9",
+	} {
+		t.Run(name, func(t *testing.T) {
+			hexProps, err := config.ParseString(hexText)
+			if err != nil {
+				t.Fatalf("ParseString hexid: %v", err)
+			}
+			if _, err := gameServerConfigFromProperties(gameServerPaths{}, serverProps, hexProps); err == nil {
+				t.Fatalf("gameServerConfigFromProperties() error = nil, want missing %s error", name)
+			}
+		})
 	}
 }
 

@@ -2,7 +2,6 @@ package main
 
 import (
 	"crypto/rand"
-	"errors"
 	"fmt"
 	"math"
 	"net"
@@ -207,9 +206,6 @@ type hexIDProperties struct {
 func loadHexIDProperties(paths gameServerPaths) (hexIDProperties, error) {
 	props, err := config.LoadFile(paths.HexIDPath)
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return hexIDProperties{}, nil
-		}
 		return hexIDProperties{}, err
 	}
 	return hexIDProperties{Props: props}, nil
@@ -250,11 +246,19 @@ func gameServerConfigFromProperties(paths gameServerPaths, serverProps, hexProps
 		return gameServerConfig{}, err
 	}
 	if hexProps != nil {
-		serverID, err = hexProps.Int("ServerID", requestID)
+		serverIDText, ok := hexProps.Lookup("ServerID")
+		if !ok {
+			return gameServerConfig{}, fmt.Errorf("missing ServerID in hexid file")
+		}
+		serverID, err = strconv.Atoi(serverIDText)
 		if err != nil {
 			return gameServerConfig{}, err
 		}
-		hexID, err = model.ParseHexKey(hexProps.String("HexID", "0"))
+		hexIDText, ok := hexProps.Lookup("HexID")
+		if !ok {
+			return gameServerConfig{}, fmt.Errorf("missing HexID in hexid file")
+		}
+		hexID, err = model.ParseHexKey(hexIDText)
 		if err != nil {
 			return gameServerConfig{}, err
 		}
