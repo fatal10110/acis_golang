@@ -29,6 +29,10 @@ const (
 	SystemMessageFailedToPickupS1                  = 56
 	SystemMessageFailedToPickupS2S1S               = 57
 	SystemMessageS1CannotBeUsed                    = 113
+	SystemMessageCannotLogoutWhileFighting         = 101
+	SystemMessageCannotRestartWhileFighting        = 102
+	SystemMessageNoLogoutHere                      = 778
+	SystemMessageNoRestartHere                     = 779
 	SystemMessageS1Disarmed                        = 417
 	SystemMessageEquipmentS1S2Removed              = 1064
 	SystemMessageRequestS1ForTrade                 = 118
