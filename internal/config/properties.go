@@ -316,14 +316,27 @@ func (p *Properties) Float64s(key string, def []float64) ([]float64, error) {
 	return def, nil
 }
 
-// pairSepRE splits pair-list values on ';' or ',', matching every shipped
-// server.properties pair-list format (semicolon in most keys, comma in
-// AutoDestroySpecialItemTime).
-var pairSepRE = regexp.MustCompile(`[,;]`)
+// pairSep is the separator between entries in an IntPairs list value.
+const pairSep = ";"
 
-// IntPairs returns pairs parsed from values shaped like "57-100;6651-3" or
-// "57-0,5575-0".
+// IntPairs returns pairs parsed from a value shaped like "57-100;6651-3",
+// or def parsed the same way when key is missing. A malformed entry makes
+// the whole list come back empty with a descriptive error; callers that
+// must keep booting (the reference logs a warning and continues) can
+// tolerate the error, while callers mirroring the strict comma-separated
+// config reads treat it as fatal.
 func (p *Properties) IntPairs(key, def string) ([]IntPair, error) {
+	return p.intPairsSep(pairSep, key, def)
+}
+
+// IntPairsComma returns pairs parsed from a comma-separated list of
+// first-second entries. A malformed entry is an error: this form backs
+// config keys whose reference readers let a bad number abort loading.
+func (p *Properties) IntPairsComma(key, def string) ([]IntPair, error) {
+	return p.intPairsSep(",", key, def)
+}
+
+func (p *Properties) intPairsSep(sep, key, def string) ([]IntPair, error) {
 	value := def
 	if found, ok := p.Lookup(key); ok {
 		value = found
@@ -332,7 +345,7 @@ func (p *Properties) IntPairs(key, def string) ([]IntPair, error) {
 		return nil, nil
 	}
 
-	parts := trimTrailingEmpty(pairSepRE.Split(value, -1))
+	parts := trimTrailingEmpty(strings.Split(value, sep))
 	out := make([]IntPair, len(parts))
 	for i, part := range parts {
 		bounds := splitLiteralTrimTrailingEmpty(strings.TrimSpace(part), "-")
