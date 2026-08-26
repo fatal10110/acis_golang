@@ -31,6 +31,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/restart"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -60,6 +61,8 @@ type options struct {
 	cursedWeapons          []*entity.CursedWeaponTable
 	karmaPlayerCanTeleport bool
 	restarts               *restart.Table
+	zones                  *zone.Index
+	attackStance           *task.AttackStance
 	spawnProtection        time.Duration
 	allowDelevel           bool
 	rateKarmaExpLost       float64
@@ -116,6 +119,18 @@ func WithKarmaTeleport(allowed bool) Option {
 // (default: none, so restart requests answer ActionFailed).
 func WithRestartPoints(table *restart.Table) Option {
 	return func(o *options) { o.restarts = table }
+}
+
+// WithZones supplies the zone index wired into the link (default: none, so
+// no zone flags are raised on enter world or movement).
+func WithZones(index *zone.Index) Option {
+	return func(o *options) { o.zones = index }
+}
+
+// WithAttackStance supplies the combat-stance tracker wired into the link
+// (default: nil, so stance is neither tracked nor consulted).
+func WithAttackStance(tracker *task.AttackStance) Option {
+	return func(o *options) { o.attackStance = tracker }
 }
 
 // WithSpawnProtection sets the players.properties SpawnProtection window
@@ -697,7 +712,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		rosterNPCs = npc.NewTable(nil)
 	}
 	roster := gamemanager.NewRoster(chars, items, shortcuts, templates, itemTemplates, rosterNPCs, ids, gamemanager.DefaultDeleteAfter, time.Now)
-	gcl := network.NewGameClientLink(network.GameClientLinkConfig{
+	gclConfig := network.GameClientLinkConfig{
 		Validator:        validator,
 		LoginLink:        func() *network.LoginLink { return loginLink },
 		Roster:           roster,
@@ -727,12 +742,20 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		ShadowItems:      shadowItems,
 		PlayerConfig:     network.PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, AllowWater: true, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay},
 		Restarts:         o.restarts,
+		Zones:            o.zones,
 		PetConfig:        petmodel.DefaultConfig(),
 		EnchantRoll:      o.enchantRoll,
 		SkillEnchantRoll: o.skillEnchantRoll,
 		Levels:           levels,
 		Log:              o.log,
-	})
+	}
+	// Assign through the interface only when set: a typed-nil
+	// *task.AttackStance would otherwise become a non-nil interface and defeat
+	// the link's nil checks.
+	if o.attackStance != nil {
+		gclConfig.AttackStance = o.attackStance
+	}
+	gcl := network.NewGameClientLink(gclConfig)
 	effects.SetShadowItemExpiry(gcl.ExpireShadowItem)
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
