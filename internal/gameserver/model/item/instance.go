@@ -195,7 +195,15 @@ func (inst *Instance) CountValue() int {
 func (inst *Instance) AddCount(delta int) int {
 	mu := inst.lock()
 	mu.Lock()
-	inst.Count += delta
+	const maxCount = 1<<31 - 1
+	switch {
+	case delta > 0 && (inst.Count >= maxCount || delta >= maxCount-inst.Count):
+		inst.Count = maxCount
+	case delta < 0 && (inst.Count <= 0 || delta < -inst.Count):
+		inst.Count = 0
+	default:
+		inst.Count += delta
+	}
 	count := inst.Count
 	mu.Unlock()
 
