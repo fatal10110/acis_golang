@@ -1,13 +1,9 @@
 package main
 
 import (
-	"crypto/rand"
-	"errors"
 	"fmt"
 	"math"
 	"net"
-	"os"
-	"path/filepath"
 	"strconv"
 	"time"
 
@@ -23,14 +19,10 @@ import (
 	"github.com/fatal10110/acis_golang/internal/loginserver/model"
 )
 
-const generatedHexIDSize = 16
-
 type gameServerConfig struct {
 	ListenAddr         string
 	LoginAddr          string
 	Auth               network.LoginServerAuth
-	GeneratedHexID     bool
-	HexIDPath          string
 	Database           db.Config
 	AllowCursedWeapons bool
 	AllowWater         bool
@@ -208,9 +200,6 @@ type hexIDProperties struct {
 func loadHexIDProperties(paths gameServerPaths) (hexIDProperties, error) {
 	props, err := config.LoadFile(paths.HexIDPath)
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return hexIDProperties{}, nil
-		}
 		return hexIDProperties{}, err
 	}
 	return hexIDProperties{Props: props}, nil
@@ -232,10 +221,6 @@ func gameServerConfigFromProperties(paths gameServerPaths, serverProps, hexProps
 	if err != nil {
 		return gameServerConfig{}, err
 	}
-	requestID, err := serverProps.Int("RequestServerID", 0)
-	if err != nil {
-		return gameServerConfig{}, err
-	}
 	maxPlayers, err := serverProps.Int64("MaximumOnlineUsers", 100)
 	if err != nil {
 		return gameServerConfig{}, err
@@ -244,21 +229,24 @@ func gameServerConfigFromProperties(paths gameServerPaths, serverProps, hexProps
 		return gameServerConfig{}, fmt.Errorf("MaximumOnlineUsers %d outside int32 range", maxPlayers)
 	}
 
-	serverID := requestID
-	generated := hexProps == nil
-	hexID, err := generatedHexID()
+	if hexProps == nil {
+		return gameServerConfig{}, fmt.Errorf("missing hexid properties")
+	}
+	serverIDText, ok := hexProps.Lookup("ServerID")
+	if !ok {
+		return gameServerConfig{}, fmt.Errorf("missing ServerID in hexid file")
+	}
+	serverID, err := strconv.Atoi(serverIDText)
 	if err != nil {
 		return gameServerConfig{}, err
 	}
-	if hexProps != nil {
-		serverID, err = hexProps.Int("ServerID", requestID)
-		if err != nil {
-			return gameServerConfig{}, err
-		}
-		hexID, err = model.ParseHexKey(hexProps.String("HexID", "0"))
-		if err != nil {
-			return gameServerConfig{}, err
-		}
+	hexIDText, ok := hexProps.Lookup("HexID")
+	if !ok {
+		return gameServerConfig{}, fmt.Errorf("missing HexID in hexid file")
+	}
+	hexID, err := model.ParseHexKey(hexIDText)
+	if err != nil {
+		return gameServerConfig{}, err
 	}
 
 	host := serverProps.String("Hostname", "*")
@@ -301,8 +289,6 @@ func gameServerConfigFromProperties(paths gameServerPaths, serverProps, hexProps
 				Pvp:          &pvpServer,
 			},
 		},
-		GeneratedHexID: generated,
-		HexIDPath:      paths.HexIDPath,
 		Database: db.Config{
 			URL:      serverProps.String("URL", "jdbc:mariadb://localhost/acis"),
 			Login:    serverProps.String("Login", "root"),
@@ -319,25 +305,6 @@ func listenAddress(host string, port int) string {
 		host = ""
 	}
 	return net.JoinHostPort(host, strconv.Itoa(port))
-}
-
-func generatedHexID() ([]byte, error) {
-	key := make([]byte, generatedHexIDSize)
-	if _, err := rand.Read(key); err != nil {
-		return nil, fmt.Errorf("generate hexid: %w", err)
-	}
-	return key, nil
-}
-
-func writeHexIDFile(path string, serverID int, hexID []byte) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return fmt.Errorf("create hexid directory: %w", err)
-	}
-	data := fmt.Sprintf("#the hexID to auth into login\nServerID=%d\nHexID=%s\n", serverID, model.HexKeyText(hexID))
-	if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
-		return fmt.Errorf("write hexid file: %w", err)
-	}
-	return nil
 }
 
 func provideGroundItemOptions(props *config.Properties) (task.GroundItemOptions, error) {
