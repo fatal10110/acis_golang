@@ -377,6 +377,18 @@ func TestLoadItemTemplatesFailsMalformedItems(t *testing.T) {
 			name:    "unrecognized slot",
 			content: `<item id="1" type="Weapon" name="x"><set name="bodypart" val="tail"/></item>`,
 		},
+		{
+			name:    "empty numeric attribute",
+			content: `<item id="1" type="Weapon" name="x"><set name="bodypart" val="rhand"/><set name="weight" val=""/></item>`,
+		},
+		{
+			name:    "padded numeric attribute",
+			content: `<item id="1" type="Weapon" name="x"><set name="bodypart" val="rhand"/><set name="weight" val=" 12 "/></item>`,
+		},
+		{
+			name:    "overflowing int32 attribute",
+			content: `<item id="99999999999" type="Weapon" name="x"></item>`,
+		},
 	}
 
 	for _, c := range cases {

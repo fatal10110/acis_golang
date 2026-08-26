@@ -324,6 +324,10 @@ func TestLoadNPCTemplatesErrors(t *testing.T) {
 			name:    "malformed drop chance",
 			content: `<list><npc id="1" name="x"><set name="type" val="Monster"/><set name="radius" val="1"/><set name="height" val="1"/><set name="pAtk" val="1"/><set name="mAtk" val="1"/><set name="pDef" val="1"/><set name="mDef" val="1"/><set name="baseDamageRange" val="0;0;1;1"/><drops><category type="DROP"><drop itemid="1" min="1" max="1" chance="oops"/></category></drops></npc></list>`,
 		},
+		{
+			name:    "drop missing itemid",
+			content: `<list><npc id="1" name="x"><set name="type" val="Monster"/><set name="radius" val="1"/><set name="height" val="1"/><set name="pAtk" val="1"/><set name="mAtk" val="1"/><set name="pDef" val="1"/><set name="mDef" val="1"/><set name="baseDamageRange" val="0;0;1;1"/><drops><category type="DROP"><drop min="1" max="1" chance="100"/></category></drops></npc></list>`,
+		},
 	}
 
 	for _, c := range cases {

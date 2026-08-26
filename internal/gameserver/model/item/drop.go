@@ -3,7 +3,6 @@ package item
 import (
 	"fmt"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 )
 
@@ -72,28 +71,6 @@ func (d Drop) RandomAmount() int32 {
 	return int32(rnd.GetRange(int(d.Min), int(d.Max)))
 }
 
-// NewDrop builds a Drop from set, the folded attributes of one <drop>
-// element. itemid, min, max and chance are all required.
-func NewDrop(set *commons.StatSet) (Drop, error) {
-	idf := commons.NewFields(set, "item: drop")
-	itemID := idf.Int32("itemid")
-	if err := idf.Err(); err != nil {
-		return Drop{}, err
-	}
-
-	f := commons.NewFields(set, fmt.Sprintf("item: drop %d", itemID))
-	drop := Drop{
-		ItemID: itemID,
-		Min:    f.Int32("min"),
-		Max:    f.Int32("max"),
-		Chance: f.Float64("chance"),
-	}
-	if err := f.Err(); err != nil {
-		return Drop{}, err
-	}
-	return drop, nil
-}
-
 // DropCategory is one weighted group of possible drops an NPC template
 // carries (e.g. one spoil result, one general drop table). See Roll for how
 // a category resolves against a kill.
@@ -101,25 +78,6 @@ type DropCategory struct {
 	Kind   DropKind
 	Chance float64
 	Drops  []Drop
-}
-
-// NewDropCategory builds a DropCategory from set, the folded attributes of
-// one <category> element, and its already-parsed drops. type is required;
-// chance defaults to 100 when absent.
-func NewDropCategory(set *commons.StatSet, drops []Drop) (DropCategory, error) {
-	typeAttr, err := set.GetString("type")
-	if err != nil {
-		return DropCategory{}, fmt.Errorf("item: drop category: %w", err)
-	}
-	kind, err := ParseDropKind(typeAttr)
-	if err != nil {
-		return DropCategory{}, fmt.Errorf("item: drop category: %w", err)
-	}
-	chance, err := set.GetFloat64Default("chance", 100.0)
-	if err != nil {
-		return DropCategory{}, fmt.Errorf("item: drop category: %w", err)
-	}
-	return DropCategory{Kind: kind, Chance: chance, Drops: drops}, nil
 }
 
 // maxRollChance is the resolution a chance percentage rolls against: a
