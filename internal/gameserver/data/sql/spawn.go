@@ -3,6 +3,7 @@ package sql
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
@@ -55,12 +56,14 @@ func (s *SpawnStore) LoadStates(ctx context.Context) (map[string]*spawn.State, e
 // SaveStates replaces spawn_data with initialized rows from states.
 func (s *SpawnStore) SaveStates(ctx context.Context, states map[string]*spawn.State) error {
 	rows := make([]*spawn.State, 0, len(states))
+	var errs []error
 	for _, state := range states {
 		if state == nil || state.Status < 0 {
 			continue
 		}
 		if state.Name == "" {
-			return fmt.Errorf("save spawn data: empty name")
+			errs = append(errs, fmt.Errorf("save spawn data: empty name"))
+			continue
 		}
 		rows = append(rows, state)
 	}
@@ -99,12 +102,12 @@ func (s *SpawnStore) SaveStates(ctx context.Context, states map[string]*spawn.St
 			state.DBValue,
 			state.RespawnTime,
 		); err != nil {
-			return fmt.Errorf("save spawn data %q: %w", state.Name, err)
+			errs = append(errs, fmt.Errorf("save spawn data %q: %w", state.Name, err))
 		}
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("save spawn data: %w", err)
 	}
 	committed = true
-	return nil
+	return errors.Join(errs...)
 }

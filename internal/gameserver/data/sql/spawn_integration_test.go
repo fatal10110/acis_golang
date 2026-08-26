@@ -76,3 +76,24 @@ func TestSpawnStoreRoundTrip(t *testing.T) {
 		t.Fatalf("updated alive row = %+v", updated["alive"])
 	}
 }
+
+func TestSpawnStoreSaveStatesKeepsValidRowsWhenOneStateIsInvalid(t *testing.T) {
+	ctx := context.Background()
+	store := NewSpawnStore(sqltest.SharedDB(t))
+
+	err := store.SaveStates(ctx, map[string]*spawn.State{
+		"valid": {Name: "valid", Status: spawn.StatusAlive, CurrentHP: 120},
+		"invalid": {Status: spawn.StatusAlive},
+	})
+	if err == nil {
+		t.Fatal("SaveStates() error = nil, want invalid state error")
+	}
+
+	states, err := store.LoadStates(ctx)
+	if err != nil {
+		t.Fatalf("LoadStates() unexpected error: %v", err)
+	}
+	if got := states["valid"]; got == nil || got.CurrentHP != 120 {
+		t.Fatalf("valid state = %+v, want persisted row with CurrentHP 120", got)
+	}
+}
