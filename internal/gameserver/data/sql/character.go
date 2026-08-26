@@ -29,6 +29,7 @@ const characterColumns = `obj_Id, account_name, char_name,
 	exp, COALESCE(expBeforeDeath,0), sp, COALESCE(karma,0), COALESCE(pvpkills,0), COALESCE(pkkills,0), COALESCE(clanid,0),
 	COALESCE(race,0), COALESCE(classid,0), base_class,
 	COALESCE(deletetime,0), COALESCE(title,''), COALESCE(accesslevel,0), COALESCE(hero,0), COALESCE(lastAccess,0),
+	COALESCE(onlinetime,0),
 	COALESCE(death_penalty_level,0)`
 
 // CharacterStore reads and writes the characters table.
@@ -63,17 +64,20 @@ func (s *CharacterStore) Create(ctx context.Context, c *player.Character) error 
 }
 
 // Save persists c's full in-memory stats — level, exp, expBeforeDeath, sp,
-// cur/max HP/CP/MP, karma/pvpkills/pkkills, and death_penalty_level — the
-// same column set Create writes at character creation plus the reference's
-// storeCharBase columns, so a later reload reflects everything gained
-// since the last save instead of the row's creation-time values.
+// cur/max HP/CP/MP, karma/pvpkills/pkkills, death_penalty_level, and the
+// accumulated session playtime — the same column set Create writes at
+// character creation plus the reference's storeCharBase columns, so a later
+// reload reflects everything gained since the last save instead of the
+// row's creation-time values. The row is also marked online: Save only runs
+// for characters currently in game.
 func (s *CharacterStore) Save(ctx context.Context, c *player.Character) error {
 	resources := c.ResourceValues()
+	onlineTime := c.TotalOnlineTime(time.Now())
 	_, err := s.db.ExecContext(ctx,
-		`UPDATE characters SET level = ?, maxHp = ?, curHp = ?, maxCp = ?, curCp = ?, maxMp = ?, curMp = ?, exp = ?, expBeforeDeath = ?, sp = ?, karma = ?, pvpkills = ?, pkkills = ?, death_penalty_level = ?
+		`UPDATE characters SET level = ?, maxHp = ?, curHp = ?, maxCp = ?, curCp = ?, maxMp = ?, curMp = ?, exp = ?, expBeforeDeath = ?, sp = ?, karma = ?, pvpkills = ?, pkkills = ?, death_penalty_level = ?, onlinetime = ?, online = 1
 			 WHERE obj_Id = ?`,
 		c.CharLevel, resources.MaxHP, resources.CurrentHP, resources.MaxCP, resources.CurrentCP, resources.MaxMP, resources.CurrentMP,
-		c.Exp, c.ExpBeforeDeath, c.SP, c.KarmaPoints, c.PvPKills, c.PKKills, c.DeathPenaltyLevel(), c.ID,
+		c.Exp, c.ExpBeforeDeath, c.SP, c.KarmaPoints, c.PvPKills, c.PKKills, c.DeathPenaltyLevel(), onlineTime, c.ID,
 	)
 	if err != nil {
 		return fmt.Errorf("save character %d: %w", c.ID, err)
@@ -130,7 +134,7 @@ func scanCharacter(row rowScanner) (*player.Character, error) {
 	var race, classID int
 	var hero int
 	var maxHP, curHP, maxCP, curCP, maxMP, curMP float64
-	var deathPenaltyLevel int
+	var deathPenaltyLevel, onlineTime int
 
 	err := row.Scan(
 		&c.ID, &c.AccountName, &c.Name,
@@ -140,6 +144,7 @@ func scanCharacter(row rowScanner) (*player.Character, error) {
 		&c.Exp, &c.ExpBeforeDeath, &c.SP, &c.KarmaPoints, &c.PvPKills, &c.PKKills, &c.ClanID,
 		&race, &classID, &c.BaseClassID,
 		&c.DeleteAt, &c.Title, &c.AccessLevel, &hero, &c.LastAccess,
+		&onlineTime,
 		&deathPenaltyLevel,
 	)
 	if err != nil {
@@ -150,6 +155,9 @@ func scanCharacter(row rowScanner) (*player.Character, error) {
 	c.ClassID = classID
 	c.SetHero(hero != 0)
 	c.SetDeathPenaltyLevel(deathPenaltyLevel)
+	// The playtime clock starts at restore: every later save persists the
+	// restored base plus the elapsed session time.
+	c.SetOnlineTime(int64(onlineTime), time.Now())
 	c.SetResourceValues(player.Resources{
 		MaxHP: maxHP, CurrentHP: curHP,
 		MaxCP: maxCP, CurrentCP: curCP,
@@ -202,6 +210,17 @@ func (s *CharacterStore) SetPosition(ctx context.Context, objectID int32, loc lo
 func (s *CharacterStore) SetDeathPenaltyLevel(ctx context.Context, objectID int32, level int) error {
 	if _, err := s.db.ExecContext(ctx, "UPDATE characters SET death_penalty_level = ? WHERE obj_Id = ?", level, objectID); err != nil {
 		return fmt.Errorf("set death penalty level for %d: %w", objectID, err)
+	}
+	return nil
+}
+
+// SetOnline marks the character in game and stamps lastAccess (epoch
+// milliseconds), matching the online-status write the reference performs
+// when a client enters the world, so external DB consumers see the
+// character as online from login until SetOffline.
+func (s *CharacterStore) SetOnline(ctx context.Context, objectID int32, lastAccess int64) error {
+	if _, err := s.db.ExecContext(ctx, "UPDATE characters SET online = 1, lastAccess = ? WHERE obj_Id = ?", lastAccess, objectID); err != nil {
+		return fmt.Errorf("set online recency for %d: %w", objectID, err)
 	}
 	return nil
 }

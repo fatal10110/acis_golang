@@ -72,6 +72,7 @@ type characterStore interface {
 	SetDeleteAt(ctx context.Context, objectID int32, at int64) error
 	SetPosition(ctx context.Context, objectID int32, loc location.Location, heading int) error
 	SetDeathPenaltyLevel(ctx context.Context, objectID int32, level int) error
+	SetOnline(ctx context.Context, objectID int32, lastAccess int64) error
 	SetOffline(ctx context.Context, objectID int32, lastAccess int64) error
 	Delete(ctx context.Context, objectID int32) (bool, error)
 }
@@ -328,6 +329,14 @@ func (r *Roster) SavePosition(ctx context.Context, c *player.Character) error {
 // debuff level for the next relog or server restart load.
 func (r *Roster) SaveDeathPenaltyLevel(ctx context.Context, c *player.Character) error {
 	return r.characters.SetDeathPenaltyLevel(ctx, c.ID, c.DeathPenaltyLevel())
+}
+
+// SaveOnlineRecency marks the live character in game and stamps the
+// current epoch-millisecond time as its lastAccess, so external DB
+// consumers see the character as online from the moment it enters the
+// world until SaveOfflineRecency marks it offline again.
+func (r *Roster) SaveOnlineRecency(ctx context.Context, c *player.Character) error {
+	return r.characters.SetOnline(ctx, c.ID, r.now().UnixMilli())
 }
 
 // SaveOfflineRecency marks the live character offline and stamps the
