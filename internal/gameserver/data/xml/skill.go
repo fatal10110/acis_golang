@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/rs/zerolog"
 )
 
 // skillFile is the root <list> element of one skill definition XML file.
@@ -40,11 +41,15 @@ type skillElement struct {
 
 // LoadSkillDefinitions parses every ".xml" skill definition file directly
 // under dir and returns a lookup table of the resulting definitions, keyed
-// by id and level. A directory that can't be listed, a file whose XML is
-// not well-formed, or a <skill> element with a missing, mangled, or
-// out-of-range attribute fails the whole load: the caller gets an error
-// rather than a partially populated table.
-func LoadSkillDefinitions(dir string) (*skill.Table, error) {
+// by id and level. A directory that can't be listed or a file whose XML is
+// not well-formed fails the whole load: the caller gets an error rather
+// than a partially populated table. A <skill> element with a missing,
+// mangled, or out-of-range attribute is logged and skipped, matching
+// DocumentSkill.java's per-level try/catch ("Failed parsing skill."); other
+// skills and files continue loading.
+//
+// log receives skipped-skill diagnostics; the zero logger discards them.
+func LoadSkillDefinitions(dir string, log zerolog.Logger) (*skill.Table, error) {
 	docs, err := loadXMLDocuments[skillFile](dir, "skill definition")
 	if err != nil {
 		return nil, err
@@ -55,7 +60,8 @@ func LoadSkillDefinitions(dir string) (*skill.Table, error) {
 		for _, el := range doc.Data.Skills {
 			parsed, err := buildSkillDefinitions(el)
 			if err != nil {
-				return nil, fmt.Errorf("xml: %s: %w", doc.Path, err)
+				log.Error().Err(err).Str("file", doc.Path).Msg("data/xml: skipping malformed skill definition")
+				continue
 			}
 			defs = append(defs, parsed...)
 		}

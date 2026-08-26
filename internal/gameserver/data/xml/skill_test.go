@@ -1,6 +1,7 @@
 package xml
 
 import (
+	"bytes"
 	"errors"
 	"path/filepath"
 	"slices"
@@ -13,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
+	"github.com/rs/zerolog"
 )
 
 // fakeWearingActor is a minimal stat.Actor+conditions.Actor/PlayerActor
@@ -84,7 +86,7 @@ var _ stat.Actor = fakeWearingActor{}
 // template has genuinely gone unhandled again.
 func TestConditionalStatFuncsBuildForEveryShippedSkill(t *testing.T) {
 	dir := datapackPath(t, filepath.Join("data", "xml", "skills"))
-	table, err := LoadSkillDefinitions(dir)
+	table, err := LoadSkillDefinitions(dir, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("LoadSkillDefinitions(%q) error: %v", dir, err)
 	}
@@ -159,7 +161,7 @@ func TestConditionalStatFuncsBuildForEveryShippedSkill(t *testing.T) {
 func TestLoadSkillDefinitions(t *testing.T) {
 	dir := datapackPath(t, filepath.Join("data", "xml", "skills"))
 
-	table, err := LoadSkillDefinitions(dir)
+	table, err := LoadSkillDefinitions(dir, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("LoadSkillDefinitions(%q) error: %v", dir, err)
 	}
@@ -517,17 +519,30 @@ func skillFixture(extra string) string {
 	return `<list><skill id="1" name="x" levels="1"><set name="target" val="ONE"/><set name="skillType" val="PDAM"/><set name="operateType" val="ACTIVE"/>` + extra + `</skill></list>`
 }
 
-func TestLoadSkillDefinitionsErrors(t *testing.T) {
+// TestLoadSkillDefinitionsMalformedXMLFails checks that a file whose XML is
+// not well-formed still aborts the whole load: only an individual <skill>
+// element's data problem is tolerated (see
+// TestLoadSkillDefinitionsSkipsMalformedSkills).
+func TestLoadSkillDefinitionsMalformedXMLFails(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "fixture.xml")
+	writeXMLFixture(t, path, `<list><skill id="1" name="x" levels="1" <set name="target" val="ONE"/></skill></list>`)
+	if _, err := LoadSkillDefinitions(dir, zerolog.Nop()); err == nil {
+		t.Fatal("expected an error for malformed xml, got nil")
+	}
+}
+
+// TestLoadSkillDefinitionsSkipsMalformedSkills checks that a single <skill>
+// element with a data problem is logged and skipped rather than aborting
+// the whole load, matching DocumentSkill.java's per-level try/catch
+// ("Failed parsing skill.").
+func TestLoadSkillDefinitionsSkipsMalformedSkills(t *testing.T) {
 	dir := t.TempDir()
 
 	cases := []struct {
 		name    string
 		content string
 	}{
-		{
-			name:    "malformed xml",
-			content: `<list><skill id="1" name="x" levels="1" <set name="target" val="ONE"/></skill></list>`,
-		},
 		{
 			name:    "missing required skillType attribute",
 			content: `<list><skill id="1" name="x" levels="1"><set name="target" val="ONE"/><set name="operateType" val="ACTIVE"/></skill></list>`,
@@ -610,21 +625,31 @@ func TestLoadSkillDefinitionsErrors(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			path := filepath.Join(dir, "fixture.xml")
 			writeXMLFixture(t, path, c.content)
-			if _, err := LoadSkillDefinitions(dir); err == nil {
-				t.Fatalf("expected an error for %s, got nil", c.name)
+
+			var buf bytes.Buffer
+			table, err := LoadSkillDefinitions(dir, zerolog.New(&buf))
+			if err != nil {
+				t.Fatalf("LoadSkillDefinitions: unexpected error for %s: %v", c.name, err)
+			}
+			if _, ok := table.Get(1, 1); ok {
+				t.Fatalf("%s: malformed skill 1 should have been skipped", c.name)
+			}
+			got := buf.String()
+			if !strings.Contains(got, "fixture.xml") {
+				t.Fatalf("%s: log output = %q, want it to name the file", c.name, got)
 			}
 		})
 	}
 
 	t.Run("empty directory", func(t *testing.T) {
 		empty := t.TempDir()
-		if _, err := LoadSkillDefinitions(empty); err == nil {
+		if _, err := LoadSkillDefinitions(empty, zerolog.Nop()); err == nil {
 			t.Fatal("expected an error for an empty directory, got nil")
 		}
 	})
 
 	t.Run("missing directory", func(t *testing.T) {
-		if _, err := LoadSkillDefinitions(filepath.Join(dir, "does-not-exist")); err == nil {
+		if _, err := LoadSkillDefinitions(filepath.Join(dir, "does-not-exist"), zerolog.Nop()); err == nil {
 			t.Fatal("expected an error for a missing directory, got nil")
 		}
 	})
@@ -640,7 +665,7 @@ func TestConditionMessagePrecedence(t *testing.T) {
 		dir := t.TempDir()
 		content := skillFixture(`<cond msg="both attrs present" msgId="113" addName="1"><player Charges="1"/></cond>`)
 		writeXMLFixture(t, filepath.Join(dir, "fixture.xml"), content)
-		table, err := LoadSkillDefinitions(dir)
+		table, err := LoadSkillDefinitions(dir, zerolog.Nop())
 		if err != nil {
 			t.Fatalf("LoadSkillDefinitions: %v", err)
 		}
@@ -664,7 +689,7 @@ func TestConditionMessagePrecedence(t *testing.T) {
 			`<enchant1cond msgId="oops"><player Charges="1"/></enchant1cond>` +
 			`</skill></list>`
 		writeXMLFixture(t, filepath.Join(dir, "fixture.xml"), content)
-		table, err := LoadSkillDefinitions(dir)
+		table, err := LoadSkillDefinitions(dir, zerolog.Nop())
 		if err != nil {
 			t.Fatalf("LoadSkillDefinitions: %v", err)
 		}
@@ -692,7 +717,7 @@ func TestSkillGrammarDegradesGracefully(t *testing.T) {
 		dir := t.TempDir()
 		content := skillFixture(`<cond/>`)
 		writeXMLFixture(t, filepath.Join(dir, "fixture.xml"), content)
-		table, err := LoadSkillDefinitions(dir)
+		table, err := LoadSkillDefinitions(dir, zerolog.Nop())
 		if err != nil {
 			t.Fatalf("LoadSkillDefinitions: %v", err)
 		}
@@ -709,7 +734,7 @@ func TestSkillGrammarDegradesGracefully(t *testing.T) {
 		dir := t.TempDir()
 		content := skillFixture(`<for><bogusTag/><add stat="runSpd" val="5"/></for>`)
 		writeXMLFixture(t, filepath.Join(dir, "fixture.xml"), content)
-		table, err := LoadSkillDefinitions(dir)
+		table, err := LoadSkillDefinitions(dir, zerolog.Nop())
 		if err != nil {
 			t.Fatalf("LoadSkillDefinitions: %v", err)
 		}
