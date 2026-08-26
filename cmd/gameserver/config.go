@@ -17,6 +17,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/link"
 	"github.com/fatal10110/acis_golang/internal/loginserver/model"
+	"github.com/rs/zerolog"
 )
 
 type gameServerConfig struct {
@@ -361,6 +362,31 @@ func provideKillRewardConfig(paths gameServerPaths, serverProps *config.Properti
 		PlayerLevels:      data.Levels,
 		PartyRange:        partyRange,
 	}, nil
+}
+
+// logConfigKeyDrift warns for every key present in a loaded .properties file
+// but absent from config.SupportedKeys, so a shipped key with no Go reader
+// is caught at boot instead of silently ignored.
+func logConfigKeyDrift(paths gameServerPaths, serverProps *config.Properties, log zerolog.Logger) error {
+	warn := func(file string, props *config.Properties) {
+		for _, ref := range config.UnknownKeysIn(file, props) {
+			log.Warn().Str("file", ref.File).Str("key", ref.Key).Msg("config key has no Go reader")
+		}
+	}
+	warn("server.properties", serverProps)
+
+	for file, path := range map[string]string{
+		"players.properties":   paths.PlayersConfigPath,
+		"geoengine.properties": paths.GeoConfigPath,
+		"logging.properties":   paths.LoggingPath,
+	} {
+		props, err := config.LoadFile(path)
+		if err != nil {
+			return err
+		}
+		warn(file, props)
+	}
+	return nil
 }
 
 func provideSpellbookPolicy(paths gameServerPaths, data *gameData) (skill.BookPolicy, error) {
