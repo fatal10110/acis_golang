@@ -1,12 +1,6 @@
 // Package fish models static fishing creature data loaded at boot.
 package fish
 
-import (
-	"fmt"
-
-	"github.com/fatal10110/acis_golang/internal/commons"
-)
-
 // Fish is one static fish row.
 type Fish struct {
 	ID            int32
@@ -21,31 +15,20 @@ type Fish struct {
 	CombatTime    int
 }
 
-// New builds a Fish from one folded <fish> element.
-func New(set *commons.StatSet) (Fish, error) {
-	idf := commons.NewFields(set, "fish")
-	id := idf.Int32("id")
-	if err := idf.Err(); err != nil {
-		return Fish{}, err
-	}
-
-	f := commons.NewFields(set, fmt.Sprintf("fish %d", id))
-	fish := Fish{
+// New builds a Fish from decoded <fish> attributes.
+func New(id int32, level, hp, hpRegen, typ, group, guts, gutsCheckTime, waitTime, combatTime int) Fish {
+	return Fish{
 		ID:            id,
-		Level:         f.Int("level"),
-		HP:            f.Int("hp"),
-		HPRegen:       f.Int("hpRegen"),
-		Type:          f.Int("type"),
-		Group:         f.Int("group"),
-		Guts:          f.Int("guts"),
-		GutsCheckTime: f.Int("gutsCheckTime"),
-		WaitTime:      f.Int("waitTime"),
-		CombatTime:    f.Int("combatTime"),
+		Level:         level,
+		HP:            hp,
+		HPRegen:       hpRegen,
+		Type:          typ,
+		Group:         group,
+		Guts:          guts,
+		GutsCheckTime: gutsCheckTime,
+		WaitTime:      waitTime,
+		CombatTime:    combatTime,
 	}
-	if err := f.Err(); err != nil {
-		return Fish{}, err
-	}
-	return fish, nil
 }
 
 // Table stores fish rows.
