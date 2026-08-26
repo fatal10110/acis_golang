@@ -91,7 +91,7 @@ func recordsFromValues[T any](values []T, id func(int, T) string) ([]datadiff.Re
 // loadItemTable loads the item template table from root, the directory an
 // aCis_datapack checkout is rooted at.
 func loadItemTable(root string) (*item.Table, error) {
-	return xml.LoadItemTemplates(xmlPath(root, "items"))
+	return xml.LoadItemTemplates(xmlPath(root, "items"), zerolog.Nop())
 }
 
 // loadItemRecords reduces every loaded item template to the fields the
@@ -311,7 +311,7 @@ func loadPlayerLevelRecords(root string) ([]datadiff.Record, error) {
 }
 
 func loadSkillRecords(root string) ([]datadiff.Record, error) {
-	table, err := xml.LoadSkillDefinitions(xmlPath(root, "skills"))
+	table, err := xml.LoadSkillDefinitions(xmlPath(root, "skills"), zerolog.Nop())
 	if err != nil {
 		return nil, err
 	}

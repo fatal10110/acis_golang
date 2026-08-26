@@ -1,12 +1,14 @@
 package xml
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/rs/zerolog"
 )
 
 // writeItemFile creates name under dir with body wrapped in a <list> root,
@@ -113,7 +115,7 @@ func TestLoadItemTemplates(t *testing.T) {
 		<set name="is_stackable" val="true" />
 	</item>`)
 
-	table, err := LoadItemTemplates(dir)
+	table, err := LoadItemTemplates(dir, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("LoadItemTemplates: %v", err)
 	}
@@ -321,7 +323,7 @@ func TestLoadItemTemplates(t *testing.T) {
 }
 
 func TestLoadItemTemplatesMissingDirectory(t *testing.T) {
-	if _, err := LoadItemTemplates(filepath.Join(t.TempDir(), "does-not-exist")); err == nil {
+	if _, err := LoadItemTemplates(filepath.Join(t.TempDir(), "does-not-exist"), zerolog.Nop()); err == nil {
 		t.Fatal("LoadItemTemplates with missing directory: expected error")
 	}
 }
@@ -332,15 +334,15 @@ func TestLoadItemTemplatesMalformedXML(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := LoadItemTemplates(dir); err == nil {
+	if _, err := LoadItemTemplates(dir, zerolog.Nop()); err == nil {
 		t.Fatal("LoadItemTemplates with malformed XML: expected error")
 	}
 }
 
-// TestLoadItemTemplatesFailsMalformedItems checks that a single <item>
-// element with a data problem aborts the load with an actionable error
-// instead of silently returning a partial table.
-func TestLoadItemTemplatesFailsMalformedItems(t *testing.T) {
+// TestLoadItemTemplatesSkipsMalformedItems checks that a single <item>
+// element with a data problem is logged and skipped rather than aborting
+// the whole load, matching DocumentItem.java's per-item try/catch.
+func TestLoadItemTemplatesSkipsMalformedItems(t *testing.T) {
 	cases := []struct {
 		name    string
 		content string
@@ -396,12 +398,17 @@ func TestLoadItemTemplatesFailsMalformedItems(t *testing.T) {
 			dir := t.TempDir()
 			writeItemFile(t, dir, "fixture.xml", c.content)
 
-			_, err := LoadItemTemplates(dir)
-			if err == nil {
-				t.Fatal("LoadItemTemplates: expected malformed item error")
+			var buf bytes.Buffer
+			table, err := LoadItemTemplates(dir, zerolog.New(&buf))
+			if err != nil {
+				t.Fatalf("LoadItemTemplates: unexpected error: %v", err)
 			}
-			if !strings.Contains(err.Error(), "fixture.xml") || !strings.Contains(err.Error(), "item") || !strings.Contains(err.Error(), "1") {
-				t.Fatalf("LoadItemTemplates error = %q, want file and item id", err)
+			if _, ok := table.Get(1); ok {
+				t.Fatal("LoadItemTemplates: malformed item 1 should have been skipped")
+			}
+			got := buf.String()
+			if !strings.Contains(got, "fixture.xml") {
+				t.Fatalf("log output = %q, want it to name the file", got)
 			}
 		})
 	}
@@ -419,7 +426,7 @@ func TestLoadItemTemplatesFailsMalformedItems(t *testing.T) {
 func TestLoadItemTemplatesAgainstDatapack(t *testing.T) {
 	dir := datapackPath(t, filepath.Join("data", "xml", "items"))
 
-	table, err := LoadItemTemplates(dir)
+	table, err := LoadItemTemplates(dir, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("LoadItemTemplates(%q) error: %v", dir, err)
 	}
@@ -576,7 +583,7 @@ func TestLoadItemTemplatesAgainstDatapack(t *testing.T) {
 func TestLoadItemTemplatesNoDuplicateIDsInDatapack(t *testing.T) {
 	dir := datapackPath(t, filepath.Join("data", "xml", "items"))
 
-	table, err := LoadItemTemplates(dir)
+	table, err := LoadItemTemplates(dir, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("LoadItemTemplates(%q) error: %v", dir, err)
 	}

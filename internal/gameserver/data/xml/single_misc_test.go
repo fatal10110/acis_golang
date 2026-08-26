@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/rs/zerolog"
 )
 
 func TestLoadSoulCrystalData(t *testing.T) {
@@ -210,7 +211,7 @@ func TestLoadStaticObjects(t *testing.T) {
 
 func TestLoadCursedWeapons(t *testing.T) {
 	skillsPath := datapackPath(t, filepath.Join("data", "xml", "skills"))
-	skills, err := LoadSkillDefinitions(skillsPath)
+	skills, err := LoadSkillDefinitions(skillsPath, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("LoadSkillDefinitions(%q) error: %v", skillsPath, err)
 	}
@@ -235,7 +236,7 @@ func TestLoadCursedWeapons(t *testing.T) {
 
 func TestLoadBufferSkills(t *testing.T) {
 	skillsPath := datapackPath(t, filepath.Join("data", "xml", "skills"))
-	skills, err := LoadSkillDefinitions(skillsPath)
+	skills, err := LoadSkillDefinitions(skillsPath, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("LoadSkillDefinitions(%q) error: %v", skillsPath, err)
 	}

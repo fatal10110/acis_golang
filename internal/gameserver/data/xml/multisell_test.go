@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
+	"github.com/rs/zerolog"
 )
 
 func writeMultiSellFile(t *testing.T, dir, name, body string) {
@@ -33,7 +34,7 @@ func TestLoadMultiSellLists(t *testing.T) {
 		<set name="bodypart" val="rhand" />
 		<set name="weight" val="1600" />
 	</item>`)
-	items, err := LoadItemTemplates(itemDir)
+	items, err := LoadItemTemplates(itemDir, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("LoadItemTemplates(%q): %v", itemDir, err)
 	}
@@ -134,7 +135,7 @@ func TestLoadMultiSellListsErrors(t *testing.T) {
 	<item id="57" type="EtcItem" name="Adena">
 		<set name="is_stackable" val="true" />
 	</item>`)
-	items, err := LoadItemTemplates(itemDir)
+	items, err := LoadItemTemplates(itemDir, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("LoadItemTemplates(%q): %v", itemDir, err)
 	}
@@ -194,7 +195,7 @@ func TestLoadMultiSellListsErrors(t *testing.T) {
 
 func TestLoadMultiSellListsDatapackSmoke(t *testing.T) {
 	itemsDir := datapackPath(t, filepath.Join("data", "xml", "items"))
-	items, err := LoadItemTemplates(itemsDir)
+	items, err := LoadItemTemplates(itemsDir, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("LoadItemTemplates(%q): %v", itemsDir, err)
 	}
