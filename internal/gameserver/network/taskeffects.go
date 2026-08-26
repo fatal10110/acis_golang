@@ -171,11 +171,12 @@ func (e *TaskEffects) Drown(actor task.WaterActor) {
 }
 
 // Save persists actor's full character stats, matching GameClient's
-// periodic autosave. It still saves for a session mid-detach (detaching set
-// but not yet removed from world state, autosave.Remove not yet called):
-// detachLivePlayer also calls Roster.Save on the same columns, but both
-// reads pull from the same in-memory character values, so a concurrent
-// write here is redundant, not unsafe.
+// periodic autosave. It skips a session mid-detach (detaching set but not
+// yet removed from world state, autosave.Remove not yet called):
+// detachLivePlayer also calls Roster.Save on the same columns and Roster.Save
+// now marks the row online, so a concurrent write here could land after
+// detachLivePlayer's own SaveOfflineRecency and leave online stuck at 1 for
+// a character that already logged out.
 func (e *TaskEffects) Save(actor task.AutosaveActor) {
 	e.mu.RLock()
 	roster, log := e.roster, e.log
@@ -188,7 +189,7 @@ func (e *TaskEffects) Save(actor task.AutosaveActor) {
 		return
 	}
 	live, ok := obj.(*livePlayer)
-	if !ok {
+	if !ok || live.detached() {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), autosaveSaveTimeout)
