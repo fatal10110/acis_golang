@@ -112,6 +112,6 @@ func parseConditionBool(raw string) (bool, bool) {
 }
 
 func parseConditionInt(raw string) (int, bool) {
-	v, err := strconv.ParseInt(raw, 0, 64)
+	v, err := strconv.ParseInt(raw, 0, 32)
 	return int(v), err == nil
 }
