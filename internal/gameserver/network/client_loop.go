@@ -516,6 +516,10 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 
 		case clientpackets.OpcodeLogout:
 			if live != nil {
+				if block := l.exitBlockReason(live); block != exitAllowed {
+					l.refuseExit(session, live, block, false)
+					continue
+				}
 				session.SendFrame(serverpackets.FrameLeaveWorld())
 				return
 			}
@@ -855,6 +859,10 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 
 		case clientpackets.OpcodeRequestRestart:
 			if live == nil {
+				continue
+			}
+			if block := l.exitBlockReason(live); block != exitAllowed {
+				l.refuseExit(session, live, block, true)
 				continue
 			}
 			l.detachLivePlayer(ctx, live)

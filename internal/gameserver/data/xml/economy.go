@@ -31,7 +31,63 @@ type buyListElement struct {
 }
 
 type hennaFile struct {
-	Hennas []attrsElement `xml:"henna"`
+	Hennas []hennaElement `xml:"henna"`
+}
+
+// hennaElement is one <henna> element. symbolId, dyeId and classes are
+// required; the price and the six stat modifiers are optional and default to
+// 0, but a present-but-malformed value is rejected by coord exactly as the
+// attribute bag being replaced did.
+type hennaElement struct {
+	SymbolID *coord32     `xml:"symbolId,attr"`
+	DyeID    *coord32     `xml:"dyeId,attr"`
+	Price    *coord       `xml:"price,attr"`
+	INT      *coord       `xml:"INT,attr"`
+	STR      *coord       `xml:"STR,attr"`
+	CON      *coord       `xml:"CON,attr"`
+	MEN      *coord       `xml:"MEN,attr"`
+	DEX      *coord       `xml:"DEX,attr"`
+	WIT      *coord       `xml:"WIT,attr"`
+	Classes  *intListAttr `xml:"classes,attr"`
+}
+
+func (e hennaElement) build() (henna.Henna, error) {
+	if e.SymbolID == nil {
+		return henna.Henna{}, fmt.Errorf("henna: symbolId is required")
+	}
+	if e.DyeID == nil {
+		return henna.Henna{}, fmt.Errorf("henna %d: dyeId is required", *e.SymbolID)
+	}
+	if e.Classes == nil {
+		return henna.Henna{}, fmt.Errorf("henna %d: classes is required", *e.SymbolID)
+	}
+	h := henna.Henna{
+		SymbolID: int(*e.SymbolID),
+		DyeID:    int32(*e.DyeID),
+		Classes:  []int(*e.Classes),
+	}
+	if e.Price != nil {
+		h.DrawPrice = int(*e.Price)
+	}
+	if e.INT != nil {
+		h.INT = int(*e.INT)
+	}
+	if e.STR != nil {
+		h.STR = int(*e.STR)
+	}
+	if e.CON != nil {
+		h.CON = int(*e.CON)
+	}
+	if e.MEN != nil {
+		h.MEN = int(*e.MEN)
+	}
+	if e.DEX != nil {
+		h.DEX = int(*e.DEX)
+	}
+	if e.WIT != nil {
+		h.WIT = int(*e.WIT)
+	}
+	return h, nil
 }
 
 type armorSetFile struct {
@@ -39,7 +95,69 @@ type armorSetFile struct {
 }
 
 type fishFile struct {
-	Fish []attrsElement `xml:"fish"`
+	Fishes []fishElement `xml:"fish"`
+}
+
+// fishElement is one <fish> element. Every attribute is required, so each
+// field is a pointer: nil means the attribute is absent, and coord-style
+// parsing rejects empty, padded, and non-numeric values exactly like the
+// attribute bag being replaced did.
+type fishElement struct {
+	ID            *coord32 `xml:"id,attr"`
+	Level         *coord   `xml:"level,attr"`
+	HP            *coord   `xml:"hp,attr"`
+	HPRegen       *coord   `xml:"hpRegen,attr"`
+	Type          *coord   `xml:"type,attr"`
+	Group         *coord   `xml:"group,attr"`
+	Guts          *coord   `xml:"guts,attr"`
+	GutsCheckTime *coord   `xml:"gutsCheckTime,attr"`
+	WaitTime      *coord   `xml:"waitTime,attr"`
+	CombatTime    *coord   `xml:"combatTime,attr"`
+}
+
+func (e fishElement) build() (fish.Fish, error) {
+	if e.ID == nil {
+		return fish.Fish{}, fmt.Errorf("fish: id is required")
+	}
+	if e.Level == nil {
+		return fish.Fish{}, fmt.Errorf("fish %d: level is required", *e.ID)
+	}
+	if e.HP == nil {
+		return fish.Fish{}, fmt.Errorf("fish %d: hp is required", *e.ID)
+	}
+	if e.HPRegen == nil {
+		return fish.Fish{}, fmt.Errorf("fish %d: hpRegen is required", *e.ID)
+	}
+	if e.Type == nil {
+		return fish.Fish{}, fmt.Errorf("fish %d: type is required", *e.ID)
+	}
+	if e.Group == nil {
+		return fish.Fish{}, fmt.Errorf("fish %d: group is required", *e.ID)
+	}
+	if e.Guts == nil {
+		return fish.Fish{}, fmt.Errorf("fish %d: guts is required", *e.ID)
+	}
+	if e.GutsCheckTime == nil {
+		return fish.Fish{}, fmt.Errorf("fish %d: gutsCheckTime is required", *e.ID)
+	}
+	if e.WaitTime == nil {
+		return fish.Fish{}, fmt.Errorf("fish %d: waitTime is required", *e.ID)
+	}
+	if e.CombatTime == nil {
+		return fish.Fish{}, fmt.Errorf("fish %d: combatTime is required", *e.ID)
+	}
+	return fish.New(
+		int32(*e.ID),
+		int(*e.Level),
+		int(*e.HP),
+		int(*e.HPRegen),
+		int(*e.Type),
+		int(*e.Group),
+		int(*e.Guts),
+		int(*e.GutsCheckTime),
+		int(*e.WaitTime),
+		int(*e.CombatTime),
+	), nil
 }
 
 type augmentationFile struct {
@@ -137,9 +255,13 @@ func LoadHennas(path string) (*henna.Table, error) {
 	if err := readXML(path, &file); err != nil {
 		return nil, fmt.Errorf("hennas: %w", err)
 	}
-	hennas, err := buildAll(path, file.Hennas, henna.New)
-	if err != nil {
-		return nil, err
+	hennas := make([]henna.Henna, 0, len(file.Hennas))
+	for _, el := range file.Hennas {
+		h, err := el.build()
+		if err != nil {
+			return nil, fmt.Errorf("xml: %s: %w", path, err)
+		}
+		hennas = append(hennas, h)
 	}
 	return henna.NewTable(hennas), nil
 }
@@ -163,9 +285,13 @@ func LoadFish(path string) (*fish.Table, error) {
 	if err := readXML(path, &file); err != nil {
 		return nil, fmt.Errorf("fish: %w", err)
 	}
-	rows, err := buildAll(path, file.Fish, fish.New)
-	if err != nil {
-		return nil, err
+	rows := make([]fish.Fish, 0, len(file.Fishes))
+	for _, el := range file.Fishes {
+		row, err := el.build()
+		if err != nil {
+			return nil, fmt.Errorf("xml: %s: %w", path, err)
+		}
+		rows = append(rows, row)
 	}
 	return fish.NewTable(rows), nil
 }

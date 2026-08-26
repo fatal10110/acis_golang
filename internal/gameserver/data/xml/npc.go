@@ -102,7 +102,7 @@ func buildNPCTemplate(el npcElement, items *item.Table, log zerolog.Logger) (*np
 		for _, catEl := range el.Drops {
 			drops := make([]item.Drop, 0, len(catEl.Drops))
 			for _, dropEl := range catEl.Drops {
-				drop, err := item.NewDrop(commons.StatSetFromXMLAttrs(dropEl.Attrs))
+				drop, err := buildDrop(dropEl.Attrs)
 				if err != nil {
 					return nil, fmt.Errorf("npc %d: %w", npcID, err)
 				}
@@ -112,7 +112,7 @@ func buildNPCTemplate(el npcElement, items *item.Table, log zerolog.Logger) (*np
 				}
 				drops = append(drops, drop)
 			}
-			category, err := item.NewDropCategory(commons.StatSetFromXMLAttrs(catEl.Attrs), drops)
+			category, err := buildDropCategory(catEl.Attrs, drops)
 			if err != nil {
 				return nil, fmt.Errorf("npc %d: %w", npcID, err)
 			}

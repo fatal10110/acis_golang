@@ -91,6 +91,17 @@ var shotActions = map[ActionType]bool{
 	ActionSummonSpiritshot: true,
 }
 
+// ParseEtcItemType resolves a template's "etcitem_type" attribute to an
+// EtcItemType. It returns an error for any value outside the shipped set
+// rather than guessing.
+func ParseEtcItemType(s string) (EtcItemType, error) {
+	t, ok := etcItemTypeNames[s]
+	if !ok {
+		return 0, fmt.Errorf("item: unknown etc item type %q", s)
+	}
+	return t, nil
+}
+
 // EtcItemDetail is the etc-item-specific data a KindEtcItem Template
 // carries; nil for every other Kind.
 type EtcItemDetail struct {
@@ -104,27 +115,21 @@ type EtcItemDetail struct {
 	ReuseDelay       int32
 }
 
-// NewEtcItemDetail builds an EtcItemDetail from set, the template's folded
-// top-level attributes, and defaultAction, the template's own default
-// action. A soulshot/spiritshot default action always reports EtcItemShot,
-// overriding whatever etcitem_type the data declares.
-func NewEtcItemDetail(set *commons.StatSet, defaultAction ActionType) (*EtcItemDetail, error) {
-	f := commons.NewFields(set, "item: etc item")
-	etcType := commons.FieldEnumDefault[EtcItemType](f, "etcitem_type", etcItemTypeNames, EtcItemNone)
+// NewEtcItemDetail builds the EtcItemDetail for a KindEtcItem template
+// declaring etcType, handler, sharedReuseGroup and reuseDelay, with
+// defaultAction, the template's own default action. A soulshot/spiritshot
+// default action always reports EtcItemShot, overriding whatever
+// etcitem_type the data declares.
+func NewEtcItemDetail(etcType EtcItemType, handler string, sharedReuseGroup, reuseDelay int32, defaultAction ActionType) *EtcItemDetail {
 	if shotActions[defaultAction] {
 		etcType = EtcItemShot
 	}
-
-	detail := &EtcItemDetail{
+	return &EtcItemDetail{
 		Type:             etcType,
-		Handler:          f.StringDefault("handler", ""),
-		SharedReuseGroup: f.Int32Default("shared_reuse_group", -1),
-		ReuseDelay:       f.Int32Default("reuse_delay", 0),
+		Handler:          handler,
+		SharedReuseGroup: sharedReuseGroup,
+		ReuseDelay:       reuseDelay,
 	}
-	if err := f.Err(); err != nil {
-		return nil, err
-	}
-	return detail, nil
 }
 
 // IsQuestItem reports whether d classifies its item as a quest item.

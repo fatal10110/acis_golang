@@ -47,24 +47,30 @@ func (a ArmorType) Mask() int32 {
 	return 1 << (uint(a) + uint(weaponTypeCount))
 }
 
+// ParseArmorType resolves a template's "armor_type" attribute to an
+// ArmorType. It returns an error for any value outside the shipped set
+// rather than guessing.
+func ParseArmorType(s string) (ArmorType, error) {
+	a, ok := armorTypeNames[s]
+	if !ok {
+		return 0, fmt.Errorf("item: unknown armor type %q", s)
+	}
+	return a, nil
+}
+
 // ArmorDetail is the armor-specific data a KindArmor Template carries; nil
 // for every other Kind.
 type ArmorDetail struct {
 	Type ArmorType
 }
 
-// NewArmorDetail builds an ArmorDetail from set, the template's folded
-// top-level attributes, and slot, the template's own equip slot. An
-// unspecified armor_type worn in the one-handed slot reports as a shield:
-// the shipped data leaves shields untyped and relies on the slot alone to
-// distinguish them.
-func NewArmorDetail(set *commons.StatSet, slot Slot) (*ArmorDetail, error) {
-	armorType, err := commons.GetEnumDefault(set, "armor_type", armorTypeNames, ArmorNone)
-	if err != nil {
-		return nil, fmt.Errorf("item: armor: %w", err)
-	}
+// NewArmorDetail builds the ArmorDetail for a KindArmor template declaring
+// armorType and occupying slot. An unspecified armor_type worn in the
+// one-handed slot reports as a shield: the shipped data leaves shields
+// untyped and relies on the slot alone to distinguish them.
+func NewArmorDetail(armorType ArmorType, slot Slot) *ArmorDetail {
 	if armorType == ArmorNone && slot == SlotLHand {
 		armorType = ArmorShield
 	}
-	return &ArmorDetail{Type: armorType}, nil
+	return &ArmorDetail{Type: armorType}
 }

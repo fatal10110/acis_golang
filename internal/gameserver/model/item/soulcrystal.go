@@ -1,36 +1,12 @@
 package item
 
-import (
-	"fmt"
-
-	"github.com/fatal10110/acis_golang/internal/commons"
-)
+import "fmt"
 
 type SoulCrystal struct {
 	Level         int
 	InitialItemID int32
 	StagedItemID  int32
 	BrokenItemID  int32
-}
-
-func NewSoulCrystal(set *commons.StatSet) (SoulCrystal, error) {
-	idf := commons.NewFields(set, "item: soul crystal")
-	initial := idf.Int32("initial")
-	if err := idf.Err(); err != nil {
-		return SoulCrystal{}, err
-	}
-
-	f := commons.NewFields(set, fmt.Sprintf("item: soul crystal %d", initial))
-	crystal := SoulCrystal{
-		Level:         f.Int("level"),
-		InitialItemID: initial,
-		StagedItemID:  f.Int32("staged"),
-		BrokenItemID:  f.Int32("broken"),
-	}
-	if err := f.Err(); err != nil {
-		return SoulCrystal{}, err
-	}
-	return crystal, nil
 }
 
 type SoulCrystalLevelingInfo struct {
@@ -40,28 +16,6 @@ type SoulCrystalLevelingInfo struct {
 	SkillRequired bool
 	AbsorbType    string
 	Levels        []int
-}
-
-func NewSoulCrystalLevelingInfo(set *commons.StatSet) (SoulCrystalLevelingInfo, error) {
-	idf := commons.NewFields(set, "item: soul crystal npc info")
-	npcID := idf.Int32("id")
-	if err := idf.Err(); err != nil {
-		return SoulCrystalLevelingInfo{}, err
-	}
-
-	f := commons.NewFields(set, fmt.Sprintf("item: soul crystal npc %d", npcID))
-	info := SoulCrystalLevelingInfo{
-		NPCID:         npcID,
-		ChanceStage:   f.Int("chanceStage"),
-		ChanceBreak:   f.Int("chanceBreak"),
-		SkillRequired: f.BoolDefault("skill", false),
-		AbsorbType:    f.String("absorbType"),
-		Levels:        f.IntArray("levelList"),
-	}
-	if err := f.Err(); err != nil {
-		return SoulCrystalLevelingInfo{}, err
-	}
-	return info, nil
 }
 
 type SoulCrystalTable struct {
