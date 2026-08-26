@@ -383,6 +383,24 @@ func newPersistTestInstance() *Instance {
 	}
 }
 
+func TestInstanceAddCountClampsClientRange(t *testing.T) {
+	const maxCount = 1<<31 - 1
+
+	t.Run("saturates additions", func(t *testing.T) {
+		inst := &Instance{Count: maxCount - 1}
+		if got := inst.AddCount(10); got != maxCount {
+			t.Errorf("AddCount() = %d, want %d", got, maxCount)
+		}
+	})
+
+	t.Run("floors reductions", func(t *testing.T) {
+		inst := &Instance{Count: 1}
+		if got := inst.AddCount(-2); got != 0 {
+			t.Errorf("AddCount() = %d, want 0", got)
+		}
+	})
+}
+
 // TestInstancePersistNotifier pins which mutations schedule a database
 // write. A mutation that changes persisted state must report it; one that
 // leaves the stored row identical must not, so an unchanged item doesn't
