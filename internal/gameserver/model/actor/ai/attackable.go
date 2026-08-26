@@ -181,15 +181,9 @@ func (a *Attackable) Desires() *DesireQueue {
 	return a.desires
 }
 
-// AddDamageHate records an attacker in the physical threat table and raises
-// its attack Desire's weight to match, queueing that Desire if this is the
-// first hate recorded against the attacker.
+// AddDamageHate records an attacker in the physical threat table.
 func (a *Attackable) AddDamageHate(attacker attackable.Combatant, damage, hate float64) {
 	a.threats.AddDamage(attacker, damage, hate)
-	if attacker == nil || (a.actor.SiegeGuard() && attacker.SiegeGuard()) {
-		return
-	}
-	a.addAttackDesire(attacker, hate)
 }
 
 // combatAttackDesireWeight is the flat ATTACK desire weight queued for raw
@@ -208,6 +202,14 @@ func (a *Attackable) AddCombatDamageHate(attacker attackable.Combatant, damage f
 		return
 	}
 	a.addAttackDesire(attacker, combatAttackDesireWeight)
+}
+
+// AddAttackDesire queues an attack intention.
+func (a *Attackable) AddAttackDesire(attacker attackable.Combatant, hate float64) {
+	if attacker == nil || (a.actor.SiegeGuard() && attacker.SiegeGuard()) {
+		return
+	}
+	a.addAttackDesire(attacker, hate)
 }
 
 // addAttackDesire ports the ordinary hate-list overloads of NpcAI.java's
