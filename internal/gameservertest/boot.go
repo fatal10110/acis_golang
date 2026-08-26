@@ -34,6 +34,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -66,6 +67,7 @@ type options struct {
 	serverBypassDelay      time.Duration
 	seed                   func(*gamesql.CharacterStore, *gamesql.ItemStore)
 	seedShortcuts          func(*gamesql.ShortcutStore)
+	seedSevenSigns         func(*gamesql.SevenSignsStore)
 	npcs                   *npc.Table
 	summonItems            *item.SummonItemTable
 	wantChars              int
@@ -158,6 +160,12 @@ func WithCharacter(name string, level, sp int) Option {
 // WithShortcutSeed inserts shortcut rows before the client dials.
 func WithShortcutSeed(seed func(*gamesql.ShortcutStore)) Option {
 	return func(o *options) { o.seedShortcuts = seed }
+}
+
+// WithSevenSignsSeed adjusts the seven_signs_status row before the Seven
+// Signs calendar restores it, so boot-time period catch-up can be exercised.
+func WithSevenSignsSeed(seed func(*gamesql.SevenSignsStore)) Option {
+	return func(o *options) { o.seedSevenSigns = seed }
 }
 
 // WithNPCs supplies the NPC template table wired into the link (and the
@@ -656,6 +664,20 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	itemInstances := task.NewItemInstances(gamesql.NewItemFlushStore(db), itemTemplates)
 	petStore := gamesql.NewPetStore(db)
 
+	// Mirror the production boot for the Seven Signs calendar: optional
+	// test seed first, then restore the persisted status and arm the
+	// transition timer.
+	sevenSignsStore := gamesql.NewSevenSignsStore(db)
+	if o.seedSevenSigns != nil {
+		o.seedSevenSigns(sevenSignsStore)
+	}
+	sevenSigns := sevensigns.NewState(sevenSignsStore, o.log, time.Now, nil)
+	if err := sevenSigns.Restore(context.Background()); err != nil {
+		t.Fatalf("restore seven signs status: %v", err)
+	}
+	sevenSigns.Start()
+	t.Cleanup(sevenSigns.Stop)
+
 	// Restore the ground items the previous session saved at shutdown,
 	// mirroring the production boot: hydrate into world state, then clear
 	// the rows so a crash cannot double-restore them.
@@ -699,6 +721,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Positions:        task.NewPositionUpdates(state),
 		PlayerClock:      playerClock,
 		GameClock:        task.NewGameClock(time.Now),
+		SevenSigns:       sevenSigns,
 		InventoryUpdates: inventoryUpdates,
 		ItemInstances:    itemInstances,
 		ShadowItems:      shadowItems,

@@ -1,11 +1,8 @@
 package skill
 
 import (
-	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -69,7 +66,7 @@ type signetUnsummonable interface {
 	Actor
 	Unsummon()
 	Position() (x, y, z int)
-	BroadcastFrame(wire.Frame)
+	BroadcastSelfSkillUse(skillID, level int32) error
 }
 
 type signetHandler struct {
@@ -77,6 +74,7 @@ type signetHandler struct {
 	templates signetTemplates
 	ids       signetIDAllocator
 	world     *world.State
+	frames    npc.FrameBuilder
 	log       zerolog.Logger
 }
 
@@ -163,6 +161,9 @@ func (h signetHandler) spawnActor(caster Actor, def modelskill.Definition) (*npc
 	if !ok {
 		return nil, false
 	}
+	if h.frames == nil {
+		return nil, false
+	}
 	id, err := h.ids.NextID()
 	if err != nil {
 		return nil, false
@@ -174,7 +175,7 @@ func (h signetHandler) spawnActor(caster Actor, def modelskill.Definition) (*npc
 		return nil, false
 	}
 	actor.SetWorld(h.world)
-	actor.SetFrameBuilder(serverpackets.NpcFrameBuilder{})
+	actor.SetFrameBuilder(h.frames)
 	actor.SetLogger(h.log)
 
 	pos, ok := caster.(signetPositioned)
@@ -316,9 +317,7 @@ func (h signetHandler) newSignetAntiSummonEffect(def modelskill.Definition, meta
 			if !ok {
 				return
 			}
-			sx, sy, sz := summon.Position()
-			self := serverpackets.SkillCastObject{ObjectID: summon.ObjectID(), Location: location.Location{X: sx, Y: sy, Z: sz}}
-			summon.BroadcastFrame(serverpackets.FrameMagicSkillUse(self, self, int32(def.ID), int32(def.Level), 0, 0, false))
+			summon.BroadcastSelfSkillUse(int32(def.ID), int32(def.Level))
 			ids = append(ids, summon.ObjectID())
 			summon.Unsummon()
 		})

@@ -7,6 +7,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
@@ -14,6 +15,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/statbonus"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // ---- from hostile_cancel_vulnerability_test.go ----
@@ -687,5 +689,24 @@ func TestTable_All(t *testing.T) {
 	}
 	if ids[0] != 10 || ids[len(ids)-1] != 30 {
 		t.Fatalf("All() ids = %v, want [10 20 30]", ids)
+	}
+}
+
+func TestSiegeGuardReturnHomeBypassesTerritoryGate(t *testing.T) {
+	movement := &hostileMove{}
+	hostile := newTestHostile(t, movement, &hostileAttack{})
+	hostile.Instance.Kind = "SiegeGuard"
+	hostile.Instance.HasHome = true
+	hostile.Instance.Home = location.Location{}
+	world.New().Spawn(hostile, 100, 0, 0, 0)
+
+	if !hostile.InTerritory() {
+		t.Fatal("InTerritory() = false at 100 units, want true for the global 200-unit territory")
+	}
+	if !hostile.ReturnHome() {
+		t.Fatal("ReturnHome() = false, want SiegeGuard to return outside its 20-unit drift range")
+	}
+	if got := movement.home; got != hostile.Instance.Home {
+		t.Fatalf("MoveHome destination = %#v, want %#v", got, hostile.Instance.Home)
 	}
 }

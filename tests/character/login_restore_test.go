@@ -82,7 +82,7 @@ func TestEnterWorldReGrantsFreeSkills(t *testing.T) {
 	c.Send(encodeEnterWorld())
 	frames := readEnterWorldBurst(t, c)
 
-	skillList := frames[6]
+	skillList := frames[7]
 	if skillList[0] != serverpackets.OpcodeSkillList {
 		t.Fatalf("frame[6] opcode = %#x, want SkillList (%#x)", skillList[0], serverpackets.OpcodeSkillList)
 	}
