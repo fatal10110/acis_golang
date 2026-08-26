@@ -31,7 +31,63 @@ type buyListElement struct {
 }
 
 type hennaFile struct {
-	Hennas []attrsElement `xml:"henna"`
+	Hennas []hennaElement `xml:"henna"`
+}
+
+// hennaElement is one <henna> element. symbolId, dyeId and classes are
+// required; the price and the six stat modifiers are optional and default to
+// 0, but a present-but-malformed value is rejected by coord exactly as the
+// attribute bag being replaced did.
+type hennaElement struct {
+	SymbolID *coord32     `xml:"symbolId,attr"`
+	DyeID    *coord32     `xml:"dyeId,attr"`
+	Price    *coord       `xml:"price,attr"`
+	INT      *coord       `xml:"INT,attr"`
+	STR      *coord       `xml:"STR,attr"`
+	CON      *coord       `xml:"CON,attr"`
+	MEN      *coord       `xml:"MEN,attr"`
+	DEX      *coord       `xml:"DEX,attr"`
+	WIT      *coord       `xml:"WIT,attr"`
+	Classes  *intListAttr `xml:"classes,attr"`
+}
+
+func (e hennaElement) build() (henna.Henna, error) {
+	if e.SymbolID == nil {
+		return henna.Henna{}, fmt.Errorf("henna: symbolId is required")
+	}
+	if e.DyeID == nil {
+		return henna.Henna{}, fmt.Errorf("henna %d: dyeId is required", *e.SymbolID)
+	}
+	if e.Classes == nil {
+		return henna.Henna{}, fmt.Errorf("henna %d: classes is required", *e.SymbolID)
+	}
+	h := henna.Henna{
+		SymbolID: int(*e.SymbolID),
+		DyeID:    int32(*e.DyeID),
+		Classes:  []int(*e.Classes),
+	}
+	if e.Price != nil {
+		h.DrawPrice = int(*e.Price)
+	}
+	if e.INT != nil {
+		h.INT = int(*e.INT)
+	}
+	if e.STR != nil {
+		h.STR = int(*e.STR)
+	}
+	if e.CON != nil {
+		h.CON = int(*e.CON)
+	}
+	if e.MEN != nil {
+		h.MEN = int(*e.MEN)
+	}
+	if e.DEX != nil {
+		h.DEX = int(*e.DEX)
+	}
+	if e.WIT != nil {
+		h.WIT = int(*e.WIT)
+	}
+	return h, nil
 }
 
 type armorSetFile struct {
@@ -199,9 +255,13 @@ func LoadHennas(path string) (*henna.Table, error) {
 	if err := readXML(path, &file); err != nil {
 		return nil, fmt.Errorf("hennas: %w", err)
 	}
-	hennas, err := buildAll(path, file.Hennas, henna.New)
-	if err != nil {
-		return nil, err
+	hennas := make([]henna.Henna, 0, len(file.Hennas))
+	for _, el := range file.Hennas {
+		h, err := el.build()
+		if err != nil {
+			return nil, fmt.Errorf("xml: %s: %w", path, err)
+		}
+		hennas = append(hennas, h)
 	}
 	return henna.NewTable(hennas), nil
 }
