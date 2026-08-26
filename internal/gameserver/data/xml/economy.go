@@ -39,7 +39,69 @@ type armorSetFile struct {
 }
 
 type fishFile struct {
-	Fish []attrsElement `xml:"fish"`
+	Fishes []fishElement `xml:"fish"`
+}
+
+// fishElement is one <fish> element. Every attribute is required, so each
+// field is a pointer: nil means the attribute is absent, and coord-style
+// parsing rejects empty, padded, and non-numeric values exactly like the
+// attribute bag being replaced did.
+type fishElement struct {
+	ID            *coord32 `xml:"id,attr"`
+	Level         *coord   `xml:"level,attr"`
+	HP            *coord   `xml:"hp,attr"`
+	HPRegen       *coord   `xml:"hpRegen,attr"`
+	Type          *coord   `xml:"type,attr"`
+	Group         *coord   `xml:"group,attr"`
+	Guts          *coord   `xml:"guts,attr"`
+	GutsCheckTime *coord   `xml:"gutsCheckTime,attr"`
+	WaitTime      *coord   `xml:"waitTime,attr"`
+	CombatTime    *coord   `xml:"combatTime,attr"`
+}
+
+func (e fishElement) build() (fish.Fish, error) {
+	if e.ID == nil {
+		return fish.Fish{}, fmt.Errorf("fish: id is required")
+	}
+	if e.Level == nil {
+		return fish.Fish{}, fmt.Errorf("fish %d: level is required", *e.ID)
+	}
+	if e.HP == nil {
+		return fish.Fish{}, fmt.Errorf("fish %d: hp is required", *e.ID)
+	}
+	if e.HPRegen == nil {
+		return fish.Fish{}, fmt.Errorf("fish %d: hpRegen is required", *e.ID)
+	}
+	if e.Type == nil {
+		return fish.Fish{}, fmt.Errorf("fish %d: type is required", *e.ID)
+	}
+	if e.Group == nil {
+		return fish.Fish{}, fmt.Errorf("fish %d: group is required", *e.ID)
+	}
+	if e.Guts == nil {
+		return fish.Fish{}, fmt.Errorf("fish %d: guts is required", *e.ID)
+	}
+	if e.GutsCheckTime == nil {
+		return fish.Fish{}, fmt.Errorf("fish %d: gutsCheckTime is required", *e.ID)
+	}
+	if e.WaitTime == nil {
+		return fish.Fish{}, fmt.Errorf("fish %d: waitTime is required", *e.ID)
+	}
+	if e.CombatTime == nil {
+		return fish.Fish{}, fmt.Errorf("fish %d: combatTime is required", *e.ID)
+	}
+	return fish.New(
+		int32(*e.ID),
+		int(*e.Level),
+		int(*e.HP),
+		int(*e.HPRegen),
+		int(*e.Type),
+		int(*e.Group),
+		int(*e.Guts),
+		int(*e.GutsCheckTime),
+		int(*e.WaitTime),
+		int(*e.CombatTime),
+	), nil
 }
 
 type augmentationFile struct {
@@ -163,9 +225,13 @@ func LoadFish(path string) (*fish.Table, error) {
 	if err := readXML(path, &file); err != nil {
 		return nil, fmt.Errorf("fish: %w", err)
 	}
-	rows, err := buildAll(path, file.Fish, fish.New)
-	if err != nil {
-		return nil, err
+	rows := make([]fish.Fish, 0, len(file.Fishes))
+	for _, el := range file.Fishes {
+		row, err := el.build()
+		if err != nil {
+			return nil, fmt.Errorf("xml: %s: %w", path, err)
+		}
+		rows = append(rows, row)
 	}
 	return fish.NewTable(rows), nil
 }
