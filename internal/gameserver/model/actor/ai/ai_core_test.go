@@ -16,6 +16,26 @@ import (
 )
 
 // ---- from attackable_attack_test.go ----
+func addAttackHate(ai *Attackable, attacker attackable.Combatant, damage, hate float64) {
+	ai.AddDamageHate(attacker, damage, hate)
+	ai.AddAttackDesire(attacker, hate)
+}
+
+func TestAttackableAIAddDamageHateDoesNotQueueAttackDesire(t *testing.T) {
+	owner := actor(1)
+	target := actor(2)
+	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+
+	ai.AddDamageHate(target, 7, 30)
+
+	if got := ai.Threats().Hate(target); got != 30 {
+		t.Fatalf("hate = %v, want 30", got)
+	}
+	if got := ai.Desires().Len(); got != 0 {
+		t.Fatalf("queued desires = %d, want 0", got)
+	}
+}
+
 func TestAttackableAIChoosesMostHatedTargetToAttack(t *testing.T) {
 	owner := actor(1)
 	low := actor(2)
@@ -26,8 +46,8 @@ func TestAttackableAIChoosesMostHatedTargetToAttack(t *testing.T) {
 	strike := &recordingAttack{canAttack: true}
 	ai := NewAttackable(owner, move, strike)
 
-	ai.AddDamageHate(low, 0, 10)
-	ai.AddDamageHate(high, 0, 25)
+	addAttackHate(ai, low, 0, 10)
+	addAttackHate(ai, high, 0, 25)
 	ai.Think()
 
 	if got := ai.CurrentIntention(); got != IntentionAttack {
@@ -59,7 +79,7 @@ func TestAttackableThinkJoinsStopAndAttackBroadcastErrors(t *testing.T) {
 	strike := &recordingAttack{canAttack: true, doAttackErr: attackErr}
 	ai := NewAttackable(owner, move, strike)
 
-	ai.AddDamageHate(target, 0, 10)
+	addAttackHate(ai, target, 0, 10)
 	err := ai.Think()
 
 	if !errors.Is(err, stopErr) {
@@ -79,7 +99,7 @@ func TestAttackableAIStartsOffensiveFollowBeforeAttack(t *testing.T) {
 	strike := &recordingAttack{canAttack: true}
 	ai := NewAttackable(owner, move, strike)
 
-	ai.AddDamageHate(target, 0, 100)
+	addAttackHate(ai, target, 0, 100)
 	ai.Think()
 
 	if move.followTarget != target || move.followRange != 80 {
@@ -101,7 +121,7 @@ func TestAttackableAIQueuesAttackWhileBusy(t *testing.T) {
 	strike := &recordingAttack{canAttack: true, attackingNow: true}
 	ai := NewAttackable(owner, move, strike)
 
-	ai.AddDamageHate(target, 0, 100)
+	addAttackHate(ai, target, 0, 100)
 	ai.Think()
 
 	next, nextTarget, ok := ai.NextIntention()
@@ -124,7 +144,7 @@ func TestAttackableAIIgnoresLostTarget(t *testing.T) {
 	strike := &recordingAttack{canAttack: true}
 	ai := NewAttackable(owner, move, strike)
 
-	ai.AddDamageHate(target, 0, 100)
+	addAttackHate(ai, target, 0, 100)
 	ai.Think()
 
 	if move.followTarget != nil {
@@ -156,8 +176,8 @@ func TestAttackableAIKeepsTargetWhenCanAttackFails(t *testing.T) {
 	}
 	ai := NewAttackable(owner, move, strike)
 
-	ai.AddDamageHate(other, 0, 25)
-	ai.AddDamageHate(blocked, 0, 100)
+	addAttackHate(ai, other, 0, 25)
+	addAttackHate(ai, blocked, 0, 100)
 	ai.Think()
 
 	if strike.target != nil {
@@ -550,7 +570,7 @@ func TestAttackableAITickDecaysThreatEveryThirdTick(t *testing.T) {
 	owner := actor(1)
 	target := actor(2)
 	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
-	ai.AddDamageHate(target, 0, 20)
+	addAttackHate(ai, target, 0, 20)
 
 	ai.Tick()
 	ai.Tick()
@@ -572,9 +592,9 @@ func TestAttackableAITickRefreshesStaleThreatAndHate(t *testing.T) {
 	kept := actor(4)
 	owner.known = map[int32]bool{lost.ObjectID(): false, dead.ObjectID(): true, kept.ObjectID(): true}
 	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
-	ai.AddDamageHate(lost, 7, 70)
-	ai.AddDamageHate(dead, 8, 80)
-	ai.AddDamageHate(kept, 9, 90)
+	addAttackHate(ai, lost, 7, 70)
+	addAttackHate(ai, dead, 8, 80)
+	addAttackHate(ai, kept, 9, 90)
 	ai.AddHate(lost, 700)
 	ai.AddHate(dead, 800)
 	ai.AddHate(kept, 900)
@@ -617,7 +637,7 @@ func TestAttackableAITickClearsStaleThreatOutOfTerritory(t *testing.T) {
 	owner.inTerritory = false
 	target := actor(2)
 	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
-	ai.AddDamageHate(target, 0, 20)
+	addAttackHate(ai, target, 0, 20)
 
 	future := time.Now().Add(91 * time.Second)
 	ai.now = func() time.Time { return future }
@@ -645,7 +665,7 @@ func TestAttackableAITickKeepsFreshThreatOutOfTerritory(t *testing.T) {
 	owner.inTerritory = false
 	target := actor(2)
 	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
-	ai.AddDamageHate(target, 0, 20)
+	addAttackHate(ai, target, 0, 20)
 
 	future := time.Now().Add(10 * time.Second)
 	ai.now = func() time.Time { return future }
@@ -667,7 +687,7 @@ func TestAttackableAITickSkipsStaleSweepInTerritory(t *testing.T) {
 	owner := actor(1)
 	target := actor(2)
 	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
-	ai.AddDamageHate(target, 0, 20)
+	addAttackHate(ai, target, 0, 20)
 
 	future := time.Now().Add(91 * time.Second)
 	ai.now = func() time.Time { return future }
@@ -694,7 +714,7 @@ func TestAttackableAITickOutOfTerritorySweepRestartsOnReentry(t *testing.T) {
 	// per-3-tick decay (Attackable.Tick, attackHateDecay) across this
 	// test's 19 total ticks, isolating the OOT-sweep-restart behavior under
 	// test from that unrelated decay path.
-	ai.AddDamageHate(target, 0, 1000)
+	addAttackHate(ai, target, 0, 1000)
 
 	future := time.Now().Add(91 * time.Second)
 	ai.now = func() time.Time { return future }
@@ -753,7 +773,7 @@ func TestAttackableAISetBackToPeaceClearsCombatState(t *testing.T) {
 	move := &recordingMove{}
 	ai := NewAttackable(owner, move, &recordingAttack{canAttack: true})
 
-	ai.AddDamageHate(target, 5, 20)
+	addAttackHate(ai, target, 5, 20)
 	ai.AddHate(target, 30)
 	ai.Think()
 
@@ -789,8 +809,8 @@ func TestAttackableAIRandomizeHateDisplacesTargetAndRebuildsDesires(t *testing.T
 	high := actor(3)
 	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
 
-	ai.AddDamageHate(low, 0, 10)
-	ai.AddDamageHate(high, 0, 25)
+	addAttackHate(ai, low, 0, 10)
+	addAttackHate(ai, high, 0, 25)
 
 	always := func(attackable.Combatant) bool { return true }
 	first := func(int) int { return 0 }
@@ -827,7 +847,7 @@ func TestAttackableAIAddDamageHateSetsMoveToTarget(t *testing.T) {
 	target := actor(2)
 	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
 
-	ai.AddDamageHate(target, 0, 10)
+	addAttackHate(ai, target, 0, 10)
 
 	desire, ok := ai.Desires().Peek()
 	if !ok {
@@ -847,8 +867,8 @@ func TestAttackableAIRandomizeHateRequeuesWithMoveToTarget(t *testing.T) {
 	high := actor(3)
 	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
 
-	ai.AddDamageHate(low, 0, 10)
-	ai.AddDamageHate(high, 0, 25)
+	addAttackHate(ai, low, 0, 10)
+	addAttackHate(ai, high, 0, 25)
 
 	always := func(attackable.Combatant) bool { return true }
 	first := func(int) int { return 0 }
@@ -870,7 +890,7 @@ func TestAttackableAIRandomizeHateNoopWithSingleAttacker(t *testing.T) {
 	target := actor(2)
 	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
 
-	ai.AddDamageHate(target, 0, 10)
+	addAttackHate(ai, target, 0, 10)
 
 	always := func(attackable.Combatant) bool { return true }
 	first := func(int) int { return 0 }
@@ -888,8 +908,8 @@ func TestAttackableAIReconsiderTargetSwapsAndDropsPreviousDesire(t *testing.T) {
 	high := actor(3)
 	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
 
-	ai.AddDamageHate(low, 0, 10)
-	ai.AddDamageHate(high, 0, 25)
+	addAttackHate(ai, low, 0, 10)
+	addAttackHate(ai, high, 0, 25)
 
 	always := func(attackable.Combatant) bool { return true }
 	chosen, ok := ai.ReconsiderTarget(always, always)
@@ -928,7 +948,7 @@ func TestAttackableAIReconsiderTargetNoopWithSingleAttacker(t *testing.T) {
 	target := actor(2)
 	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
 
-	ai.AddDamageHate(target, 0, 10)
+	addAttackHate(ai, target, 0, 10)
 
 	always := func(attackable.Combatant) bool { return true }
 	if _, ok := ai.ReconsiderTarget(always, always); ok {

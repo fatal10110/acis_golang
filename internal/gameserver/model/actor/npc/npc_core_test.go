@@ -313,6 +313,27 @@ func TestDamageOverTimeEffectRecordsZeroHateThreat(t *testing.T) {
 	}
 }
 
+func TestDamageOverTimeEffectQueuesAttackDesire(t *testing.T) {
+	h := newCombatHostile(t, 1, &Template{HPMax: 100, MPMax: 50})
+	caster := newCombatHostile(t, 2, &Template{HPMax: 100, MPMax: 50})
+	e, err := effect.New(effect.Skill{ID: 1}, skill.EffectTemplate{Name: "DamOverTime", Value: 4})
+	if err != nil {
+		t.Fatalf("effect.New() error: %v", err)
+	}
+	e.Effected = h
+	e.Effector = caster
+	if !e.ActionTime() {
+		t.Fatal("ActionTime() = false, want true")
+	}
+	desire, ok := h.AI().Desires().Peek()
+	if !ok {
+		t.Fatal("Desires().Peek() ok = false, want DOT attack desire")
+	}
+	if desire.FinalTarget != caster || desire.Weight != 200 {
+		t.Fatalf("DOT desire = (%v, %v), want (%v, 200)", desire.FinalTarget, desire.Weight, caster)
+	}
+}
+
 func TestManaDamageOverTimeEffectTargetsHostile(t *testing.T) {
 	h := newCombatHostile(t, 1, &Template{HPMax: 100, MPMax: 50})
 	e, err := effect.New(effect.Skill{ID: 1}, skill.EffectTemplate{Name: "ManaDamOverTime", Value: 4})

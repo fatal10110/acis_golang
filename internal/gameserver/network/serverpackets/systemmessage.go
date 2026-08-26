@@ -9,6 +9,10 @@ const (
 	SystemMessageNotEnoughMP                       = 24
 	SystemMessageRejuvenatingHP                    = 25
 	SystemMessageWelcomeToLineage                  = 34
+	SystemMessagePreparationsPeriodBegun           = 1260
+	SystemMessageCompetitionPeriodBegun            = 1261
+	SystemMessageResultsPeriodBegun                = 1262
+	SystemMessageValidationPeriodBegun             = 1263
 	SystemMessageDeathPenaltyLevelS1Added          = 1916
 	SystemMessageDeathPenaltyLifted                = 1917
 	SystemMessageUseS1                             = 46

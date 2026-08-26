@@ -83,6 +83,7 @@ func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 		serverpackets.OpcodeHennaInfo,
 		serverpackets.OpcodeEtcStatusUpdate,
 		serverpackets.OpcodeSystemMessage,
+		serverpackets.OpcodeSystemMessage,
 		serverpackets.OpcodeQuestList,
 		serverpackets.OpcodeSkillList,
 		serverpackets.OpcodeFriendList,

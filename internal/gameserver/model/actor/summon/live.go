@@ -98,6 +98,11 @@ type Actor struct {
 	disabled       bool
 	brain          AI
 	onDespawn      func()
+	// frames is the network-owned packet builder installed via
+	// SetFrameBuilder before SpawnBesideOwner publishes this summon into
+	// world.State; that publish takes a registry mutex, giving every other
+	// goroutine's read a happens-before edge over this unsynchronized write.
+	frames FrameBuilder
 	// skills maps skill id to the level this summon's npc template grants
 	// it, used by TryUseSkill to resolve an owner-commanded action-bar
 	// skill shortcut, matching Java's Summon.getSkill.

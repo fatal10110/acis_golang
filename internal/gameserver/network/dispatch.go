@@ -30,7 +30,9 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	gamecipher "github.com/fatal10110/acis_golang/internal/gameserver/network/cipher"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/petitem"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	tradebook "github.com/fatal10110/acis_golang/internal/gameserver/trade"
@@ -150,6 +152,7 @@ type GameClientLink struct {
 	positions     *task.PositionUpdates
 	playerClock   *task.PlayerClock
 	gameClock     *task.GameClock
+	sevenSigns    *sevensigns.State
 	water         *task.Water
 	shadowItems   *task.ShadowItems
 	autosave      *task.Autosave
@@ -240,7 +243,10 @@ type GameClientLinkConfig struct {
 	PlayerClock   *task.PlayerClock
 	// GameClock is the server's in-game clock; CharSelected reports its
 	// current minute of day. Nil is tolerated (tests) and reports 0.
-	GameClock   *task.GameClock
+	GameClock *task.GameClock
+	// SevenSigns owns the event calendar; EnterWorld reports the active
+	// period's system message. Nil is tolerated (tests) and sends nothing.
+	SevenSigns  *sevensigns.State
 	Water       *task.Water
 	ShadowItems *task.ShadowItems
 	Autosave    *task.Autosave
@@ -300,6 +306,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) *GameClientLink {
 		positions:     cfg.Positions,
 		playerClock:   cfg.PlayerClock,
 		gameClock:     cfg.GameClock,
+		sevenSigns:    cfg.SevenSigns,
 		water:         cfg.Water,
 		shadowItems:   cfg.ShadowItems,
 		autosave:      cfg.Autosave,
@@ -322,6 +329,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) *GameClientLink {
 			Templates: cfg.NPCs,
 			IDs:       cfg.IDs,
 			World:     cfg.World,
+			Frames:    serverpackets.NpcFrameBuilder{},
 			Log:       cfg.Log,
 		}),
 		log:          cfg.Log,
