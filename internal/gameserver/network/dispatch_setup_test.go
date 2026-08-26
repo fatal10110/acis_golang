@@ -101,6 +101,11 @@ func assertSystemMessageStringFrame(t *testing.T, frame []byte, messageID int, t
 	}
 }
 
+// testLinkNow, when non-nil, supplies the packet-accounting clock of every
+// GameClientLink constructed afterwards, freezing flood windows for
+// deterministic flood-gate assertions.
+var testLinkNow func() time.Time
+
 func newTestGameClientLink(t *testing.T, loginLink func() *LoginLink, validator *SessionValidator) (addr string, chars *fakeCharStore, items *fakeItemStore, state *world.State) {
 	t.Helper()
 	return newTestGameClientLinkWithLog(t, loginLink, validator, zerolog.Nop())
@@ -150,7 +155,7 @@ func newTestGameClientLinkWithSkillsShortcutsCrestsKarmaAndLog(t *testing.T, log
 	if len(cursedWeapons) > 0 {
 		cursed = cursedWeapons[0]
 	}
-	playerConfig := PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: karmaPlayerCanTeleport, AllowWater: true}
+	playerConfig := PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: karmaPlayerCanTeleport, AllowWater: true, CharacterSelectDelay: 3 * time.Second, ServerBypassDelay: 100 * time.Millisecond}
 	inventoryUpdates := task.NewInventoryUpdates()
 	gcl := NewGameClientLink(GameClientLinkConfig{
 		Validator:        validator,
@@ -175,6 +180,7 @@ func newTestGameClientLinkWithSkillsShortcutsCrestsKarmaAndLog(t *testing.T, log
 		PlayerConfig:     playerConfig,
 		PetConfig:        petmodel.DefaultConfig(),
 		Log:              log,
+		Now:              testLinkNow,
 	})
 	registerTestInventoryUpdates(t, state, inventoryUpdates)
 
@@ -370,7 +376,7 @@ func (testHostileGeo) CanMove(_, _, _, _, _, _ int) bool { return true }
 func (testHostileGeo) Height(_, _, _ int) int16          { return 0 }
 
 func (testHostileGeo) FindPath(_, _ location.Location) ([]location.Location, bool) { return nil, false }
-func (testHostileGeo) Walkable(int, int, int) bool { return true }
+func (testHostileGeo) Walkable(int, int, int) bool                                 { return true }
 func (testHostileGeo) ValidLocation(ox, oy, oz, _, _, _ int) location.Location {
 	return location.Location{X: ox, Y: oy, Z: oz}
 }

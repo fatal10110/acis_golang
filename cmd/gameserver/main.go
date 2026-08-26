@@ -63,6 +63,8 @@ func newGameServerApp(paths gameServerPaths) *fx.App {
 			loadKarmaPlayerCanTeleport,
 			loadAllowDelevel,
 			loadRateKarmaExpLost,
+			loadCharacterSelectDelay,
+			loadServerBypassDelay,
 			loadPetConfig,
 			loadHexIDProperties,
 			gameServerConfigFromLoadedProperties,

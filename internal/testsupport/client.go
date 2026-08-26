@@ -62,6 +62,24 @@ func (f *ScriptedClient) ReadWithTimeout(d time.Duration) []byte {
 	return payload
 }
 
+// AwaitClose reports whether the server closes the connection within d,
+// draining any frames it sends first. Use it to assert a disconnect that
+// closes without a reply frame.
+func (f *ScriptedClient) AwaitClose(d time.Duration) bool {
+	f.t.Helper()
+	f.conn.SetReadDeadline(time.Now().Add(d))
+	for {
+		_, err := wire.ReadFrame(f.conn)
+		if err == nil {
+			continue
+		}
+		if ne, ok := err.(net.Error); ok && ne.Timeout() {
+			return false
+		}
+		return true
+	}
+}
+
 // SendProtocolVersion performs the cleartext handshake: it sends
 // ProtocolVersion carrying revision and consumes the VersionCheck reply,
 // arming the rolling cipher if the server enabled crypt.

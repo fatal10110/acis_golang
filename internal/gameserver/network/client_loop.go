@@ -70,7 +70,6 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 	var chars []*player.Character
 	var entering *player.Character
 	var live *livePlayer
-	protocolReady := false
 	defer func() {
 		l.detachLivePlayer(ctx, live)
 		l.notifyPlayerLogout(client.AccountName())
@@ -90,7 +89,32 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			return
 		}
 		opcode := payload[0]
-		if !protocolReady && opcode != clientpackets.OpcodeProtocolVersion {
+		// Packet-protection gate, ahead of the state gate: every received
+		// frame is counted, and while a flood is active frames are dropped,
+		// answering ActionFailed at most once per second of ongoing flood.
+		// After counting (so dropped frames never reach a handler), an
+		// excess of detected floods per minute disconnects, as does a hard
+		// cap on packets processed pre-auth. The queue-size accounting and
+		// burst cap of the reference have no counterpart here: this port's
+		// read loop processes each frame inline with its read, so there is
+		// no inbound queue to overflow or drain in batches.
+		now := l.now
+		if now == nil {
+			now = time.Now
+		}
+		// A dropped frame never reaches a handler: that includes the
+		// flood-onset packet itself, which answers ActionFailed and is
+		// discarded like every other frame of the flood.
+		if actionFailed, drop := client.stats.countIncomingPacket(now()); actionFailed || drop {
+			if actionFailed {
+				session.SendFrame(serverpackets.FrameActionFailed())
+			}
+			continue
+		} else if client.stats.floodsExceeded() {
+			l.log.Warn().Str("state", client.State().String()).Msg("game client disconnected: too many packet floods")
+			return
+		} else if client.State() == StateConnected && client.stats.processedPackets > preAuthMaxProcessedPackets {
+			l.log.Warn().Str("state", client.State().String()).Msg("game client disconnected: too many packets in non-authed state")
 			return
 		}
 		if !client.Accept(opcode) {
@@ -122,7 +146,9 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			if !session.SendFrame(serverpackets.FrameVersionCheck(key)) {
 				return
 			}
-			protocolReady = true
+			// The key is out; every later frame crosses encrypted, matching
+			// the reference where crypt starts only after VersionCheck.
+			session.EnableCrypt()
 
 		case clientpackets.OpcodeAuthLogin:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeAuthLogin)
@@ -184,17 +210,30 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				}
 				continue
 			}
+			// The character-select reuse gate answers a refused delete
+			// with the deletion-failed reply; nothing else runs.
+			if !client.performFloodProtected(floodProtectorCharacterSelect, l.playerConfig.CharacterSelectDelay, time.Now()) {
+				session.SendFrame(serverpackets.FrameCharDeleteFail(serverpackets.CharDeleteFailReasonDeletionFailed))
+				continue
+			}
 			c, ok := slotCharacter(chars, req.Slot)
 			if !ok {
-				session.SendFrame(serverpackets.FrameCharDeleteFail(serverpackets.CharDeleteFailReasonDeletionFailed))
+				// An unknown slot sends no failure reply — only the
+				// refreshed character list every delete attempt ends with.
+				list, err := l.sendCharSelectInfo(ctx, client)
+				if err != nil {
+					l.log.Error().Err(err).Msg("list characters")
+					return
+				}
+				chars = list
 				continue
 			}
 			if err := l.roster.MarkForDeletion(ctx, c.ID); err != nil {
 				l.log.Error().Err(err).Msg("mark character for deletion")
 				session.SendFrame(serverpackets.FrameCharDeleteFail(serverpackets.CharDeleteFailReasonDeletionFailed))
-				continue
+			} else {
+				session.SendFrame(serverpackets.FrameCharDeleteOk())
 			}
-			session.SendFrame(serverpackets.FrameCharDeleteOk())
 			list, err := l.sendCharSelectInfo(ctx, client)
 			if err != nil {
 				l.log.Error().Err(err).Msg("list characters")
@@ -208,6 +247,11 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				if errors.Is(err, errMalformedPacketDisconnect) {
 					return
 				}
+				continue
+			}
+			// The character-select reuse gate refuses a restore silently,
+			// leaving the client's character list untouched.
+			if !client.performFloodProtected(floodProtectorCharacterSelect, l.playerConfig.CharacterSelectDelay, time.Now()) {
 				continue
 			}
 			if c, ok := slotCharacter(chars, req.Slot); ok {
@@ -263,9 +307,29 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				}
 				continue
 			}
+			// The character-select reuse gate refuses a selection silently.
+			if !client.performFloodProtected(floodProtectorCharacterSelect, l.playerConfig.CharacterSelectDelay, time.Now()) {
+				continue
+			}
 			c, ok := slotCharacter(chars, req.Slot)
-			if !ok {
-				return
+			// An unknown slot or a banned character (AccessLevel < 0) aborts
+			// the selection silently; the connection stays open.
+			if !ok || c.AccessLevel < 0 {
+				continue
+			}
+			// A character already in the world belongs to another live
+			// session: that session is closed with ServerClose and this
+			// selection aborts silently, matching loadCharFromDisk's
+			// existing-player branch.
+			if l.world != nil {
+				if obj, exists := l.world.Player(c.ObjectID()); exists {
+					if prev, isLive := obj.(*livePlayer); isLive {
+						l.log.Info().Int32("object_id", c.ObjectID()).
+							Msg("game client: duplicate character login, closing previous session")
+						prev.kickClient()
+					}
+					continue
+				}
 			}
 			tmpl, ok := l.templates.Get(c.ClassID)
 			if !ok {
@@ -276,6 +340,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			client.SetState(StateEntering)
 			session.SendFrame(serverpackets.FrameCharSelected(serverpackets.CharSelectedSnapshot{
 				Character: c, Template: tmpl, SessionID: client.SessionKey().PlayKey1,
+				GameTime: l.gameTime(),
 			}))
 			entering = c
 
@@ -292,11 +357,26 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 
 		case clientpackets.OpcodeExtended:
 			r := wire.NewReader(payload[1:])
-			switch second := r.ReadUint16(); {
-			case r.Err() != nil:
+			second := r.ReadUint16()
+			if r.Err() != nil {
 				l.log.Warn().Str("state", client.State().String()).Msg("game client: extended opcode missing")
 				continue
-			case second == clientpackets.OpcodeRequestAutoSoulShot:
+			}
+			// While entering, only the manor-list sub-opcode is dispatched;
+			// every other one counts toward the unknown-packet disconnect
+			// threshold instead of being absorbed by an in-game no-op.
+			if client.State() == StateEntering && second != clientpackets.OpcodeRequestManorList {
+				l.log.Info().
+					Uint16("opcode2", second).
+					Str("state", client.State().String()).
+					Msg("game client: accepted extended opcode not handled while entering")
+				if client.countUnknownPacket() {
+					return
+				}
+				continue
+			}
+			switch second {
+			case clientpackets.OpcodeRequestAutoSoulShot:
 				req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestAutoSoulShot)
 				if err != nil {
 					if errors.Is(err, errMalformedPacketDisconnect) {
@@ -307,7 +387,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				if live != nil {
 					l.handleAutoSoulShot(live, req)
 				}
-			case second == clientpackets.OpcodeRequestExEnchantSkillInfo:
+			case clientpackets.OpcodeRequestExEnchantSkillInfo:
 				req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestExEnchantSkillInfo)
 				if err != nil {
 					if errors.Is(err, errMalformedPacketDisconnect) {
@@ -318,7 +398,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				if live != nil {
 					l.sendEnchantSkillInfo(live, req)
 				}
-			case second == clientpackets.OpcodeRequestExEnchantSkill:
+			case clientpackets.OpcodeRequestExEnchantSkill:
 				req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestExEnchantSkill)
 				if err != nil {
 					if errors.Is(err, errMalformedPacketDisconnect) {
@@ -329,9 +409,9 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				if live != nil {
 					l.applyEnchantSkill(ctx, live, req)
 				}
-			case second == clientpackets.OpcodeRequestManorList:
+			case clientpackets.OpcodeRequestManorList:
 				session.SendFrame(serverpackets.FrameExSendManorList())
-			case second == clientpackets.OpcodeRequestExPledgeCrestLarge:
+			case clientpackets.OpcodeRequestExPledgeCrestLarge:
 				req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestExPledgeCrestLarge)
 				if err != nil {
 					if errors.Is(err, errMalformedPacketDisconnect) {
@@ -345,12 +425,12 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				if frame, ok := l.frameExPledgeCrestLarge(req); ok {
 					session.SendFrame(frame)
 				}
-			case second == clientpackets.OpcodeRequestCursedWeaponList:
+			case clientpackets.OpcodeRequestCursedWeaponList:
 				if live == nil {
 					continue
 				}
 				session.SendFrame(serverpackets.FrameExCursedWeaponList(l.cursedWeapons.IDs()))
-			case second == clientpackets.OpcodeRequestExMagicSkillUseGround:
+			case clientpackets.OpcodeRequestExMagicSkillUseGround:
 				req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestExMagicSkillUseGround)
 				if err != nil {
 					if errors.Is(err, errMalformedPacketDisconnect) {
@@ -361,7 +441,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				if live != nil {
 					l.handleMagicSkillUseGround(live, req)
 				}
-			case second == clientpackets.OpcodeRequestCursedWeaponLocation:
+			case clientpackets.OpcodeRequestCursedWeaponLocation:
 				if live == nil {
 					continue
 				}
@@ -384,11 +464,10 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 
 		case clientpackets.OpcodeRequestSkillCoolTime:
-			if live == nil {
-				continue
-			}
-			now := time.Now()
-			session.SendFrame(serverpackets.FrameSkillCoolTime(skillCoolTimeEntries(live.SkillReuseTimers(now), now)))
+			// The reference registers an empty case: reuse timers reach the
+			// client unsolicited (e.g. in the EnterWorld burst), never as a
+			// request reply.
+			continue
 
 		case clientpackets.OpcodeRequestMagicSkillUse:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestMagicSkillUse)
@@ -580,6 +659,14 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			l.enchantLiveItem(ctx, live, req)
 
 		case clientpackets.OpcodeRequestSkillList:
+			// While entering, 0x3f is the quest-list probe the client sends
+			// during loading: it must be answered or the quest panel stays
+			// empty. No quests are modeled yet, so the list is empty — the
+			// same frame the EnterWorld burst sends.
+			if client.State() == StateEntering {
+				session.SendFrame(serverpackets.FrameQuestList(nil))
+				continue
+			}
 			if live == nil {
 				continue
 			}
@@ -703,6 +790,12 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				}
 				continue
 			}
+			// An empty command returns before the bypass reuse gate is
+			// consulted, so it never consumes the cooldown; a refused
+			// command is dropped silently.
+			if req.Command != "" && !client.performFloodProtected(floodProtectorServerBypass, l.playerConfig.ServerBypassDelay, time.Now()) {
+				continue
+			}
 			l.requestBypassToServer(live, req)
 
 		case clientpackets.OpcodeRequestTargetCancel:
@@ -726,12 +819,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 			if live != nil {
 				l.completeLivePlayerTeleport(live)
-				live.SendFrame(serverpackets.FrameUserInfo(serverpackets.UserInfoSnapshot{
-					Character: live.Character,
-					Template:  live.template,
-					Items:     live.inventoryItems(),
-					IsGM:      live.isGM,
-				}))
+				live.SendFrame(serverpackets.FrameUserInfo(l.userInfoSnapshot(live)))
 			}
 
 		case clientpackets.OpcodeStartRotating:

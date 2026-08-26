@@ -250,6 +250,66 @@ func TestLoadPlayerSpawnProtectionDefaultsToDisabled(t *testing.T) {
 	}
 }
 
+func TestLoadCharacterSelectDelayUsesServerProperties(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "server.properties")
+	if err := os.WriteFile(configPath, []byte("CharacterSelectTime = 5000\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := loadCharacterSelectDelay(gameServerPaths{ConfigPath: configPath})
+	if err != nil {
+		t.Fatalf("loadCharacterSelectDelay() error = %v", err)
+	}
+	if got != characterSelectDelay(5*time.Second) {
+		t.Fatalf("loadCharacterSelectDelay() = %v, want 5s", got)
+	}
+}
+
+func TestLoadCharacterSelectDelayDefaultsToThreeSeconds(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "server.properties")
+	if err := os.WriteFile(configPath, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := loadCharacterSelectDelay(gameServerPaths{ConfigPath: configPath})
+	if err != nil {
+		t.Fatalf("loadCharacterSelectDelay() error = %v", err)
+	}
+	if got != characterSelectDelay(3*time.Second) {
+		t.Fatalf("loadCharacterSelectDelay() = %v, want 3s", got)
+	}
+}
+
+func TestLoadServerBypassDelayUsesServerProperties(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "server.properties")
+	if err := os.WriteFile(configPath, []byte("ServerBypassTime = 250\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := loadServerBypassDelay(gameServerPaths{ConfigPath: configPath})
+	if err != nil {
+		t.Fatalf("loadServerBypassDelay() error = %v", err)
+	}
+	if got != serverBypassDelay(250*time.Millisecond) {
+		t.Fatalf("loadServerBypassDelay() = %v, want 250ms", got)
+	}
+}
+
+func TestLoadServerBypassDelayDefaultsToHundredMilliseconds(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "server.properties")
+	if err := os.WriteFile(configPath, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := loadServerBypassDelay(gameServerPaths{ConfigPath: configPath})
+	if err != nil {
+		t.Fatalf("loadServerBypassDelay() error = %v", err)
+	}
+	if got != serverBypassDelay(100*time.Millisecond) {
+		t.Fatalf("loadServerBypassDelay() = %v, want 100ms", got)
+	}
+}
+
 func TestLoadPetConfigUsesServerAndPlayersProperties(t *testing.T) {
 	dir := t.TempDir()
 	serverPath := filepath.Join(dir, "server.properties")

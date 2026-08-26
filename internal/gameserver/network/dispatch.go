@@ -110,6 +110,12 @@ type PlayerConfig struct {
 	// RateKarmaExpLost scales the death exp-loss percentage while the dying
 	// player carries positive karma.
 	RateKarmaExpLost float64
+	// CharacterSelectDelay is the reuse delay shared by the character-list
+	// actions (delete, restore, select) on one client session.
+	CharacterSelectDelay time.Duration
+	// ServerBypassDelay is the reuse delay between two bypass commands on
+	// one client session.
+	ServerBypassDelay time.Duration
 }
 
 // GameClientLink accepts and drives connections from Interlude game
@@ -143,6 +149,7 @@ type GameClientLink struct {
 	pvpFlags      *task.PvPFlags
 	positions     *task.PositionUpdates
 	playerClock   *task.PlayerClock
+	gameClock     *task.GameClock
 	water         *task.Water
 	shadowItems   *task.ShadowItems
 	autosave      *task.Autosave
@@ -170,6 +177,11 @@ type GameClientLink struct {
 	// newCipherKey supplies each connection's XOR cipher key; overridden in
 	// tests for a deterministic handshake.
 	newCipherKey func() ([]byte, error)
+
+	// now supplies wall time for packet accounting; nil falls back to
+	// time.Now at the call site. Overridden in tests for deterministic
+	// flood windows.
+	now func() time.Time
 
 	// enchantRoll supplies enchant dice rolls; overridden in tests.
 	enchantRoll func() float64
@@ -226,9 +238,12 @@ type GameClientLinkConfig struct {
 	PvPFlags      *task.PvPFlags
 	Positions     *task.PositionUpdates
 	PlayerClock   *task.PlayerClock
-	Water         *task.Water
-	ShadowItems   *task.ShadowItems
-	Autosave      *task.Autosave
+	// GameClock is the server's in-game clock; CharSelected reports its
+	// current minute of day. Nil is tolerated (tests) and reports 0.
+	GameClock   *task.GameClock
+	Water       *task.Water
+	ShadowItems *task.ShadowItems
+	Autosave    *task.Autosave
 	// InventoryUpdates batches InventoryUpdate packets for inventory
 	// changes the server makes on its own, outside a client request.
 	InventoryUpdates *task.InventoryUpdates
@@ -240,6 +255,9 @@ type GameClientLinkConfig struct {
 	PlayerConfig  PlayerConfig
 	PetConfig     petmodel.Config
 	Log           zerolog.Logger
+	// Now supplies the clock packet accounting uses to bucket received
+	// frames into flood windows; nil means time.Now.
+	Now func() time.Time
 	// EnchantRoll supplies enchant dice rolls in [0,1); nil falls back to
 	// the random source. Behavior harnesses inject a deterministic roll.
 	EnchantRoll func() float64
@@ -281,6 +299,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) *GameClientLink {
 		pvpFlags:      cfg.PvPFlags,
 		positions:     cfg.Positions,
 		playerClock:   cfg.PlayerClock,
+		gameClock:     cfg.GameClock,
 		water:         cfg.Water,
 		shadowItems:   cfg.ShadowItems,
 		autosave:      cfg.Autosave,
@@ -306,6 +325,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) *GameClientLink {
 			Log:       cfg.Log,
 		}),
 		log:          cfg.Log,
+		now:          cfg.Now,
 		newCipherKey: randomCipherKey,
 	}
 	link.cubicAfterFunc = func(d time.Duration, fn func()) cubic.Timer {

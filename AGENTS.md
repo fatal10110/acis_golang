@@ -99,6 +99,49 @@ structure.
   and pull request must contain `Gap audit: no shipped gaps` or map each shipped gap to its verified
   follow-up issue number, checked comments, and milestone.
 
+## Testing
+
+Tests are behavior-first. A new feature's primary coverage is a full-flow scenario in
+`tests/<domain>/` that drives real packets against a real MariaDB through the production boot path
+— not a unit test of an internal function. See
+[`docs/agents/test-strategy.md`](docs/agents/test-strategy.md) for the tier structure and the
+fake-vs-real decision rule.
+
+The only `*_test.go` files allowed outside `tests/` are pure-unit tests in these categories:
+
+- packet encode/decode round-trips (`network/serverpackets`, `link` codecs),
+- damage/stat formulas (`skill/formulas`, `stat*`),
+- config/property parsing,
+- crypt primitives.
+
+Harness usage (each suite package calls `sqltest.Main(m)` from `TestMain`; assertions target three
+surfaces — client-visible packets, world state, persisted DB rows):
+
+```go
+func TestPlayerPicksUpDroppedItem(t *testing.T) {
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 1, 0),
+		gameservertest.WithWantChars(1),
+	)
+	c := srv.Client
+
+	c.Send(encodeRequestGameStart(0)) // read CharSelected, send EnterWorld, consume the burst ...
+
+	objID := srv.SoleObjectID(t)
+	srv.SeedGroundItem(t, objID, item.AdenaID, 1000, x, y, z)
+	c.Send(encodeRequestDropItem(objID, false))
+	srv.FlushGroundItems(t) // drive batching deterministically before asserting DB rows
+}
+```
+
+Environment: Docker is required for the behavior suites (MariaDB testcontainer). Run them with
+`make test` (full default run), `make test-unit` (fast pure-core pass), or
+`make test-one PKG=tests/items`.
+
+Anti-patterns: do not reimplement the handshake or fixtures per suite (`testsupport.ScriptedClient`
+and `gameservertest` fixtures only), do not reintroduce `//go:build integration` tags, and do not
+perform struct-literal surgery on production types in test setup.
+
 ## Process skills
 
 Superpowers and Ponytail are available but are not mandatory rituals.

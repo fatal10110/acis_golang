@@ -155,6 +155,31 @@ func loadRateKarmaExpLost(paths gameServerPaths) (rateKarmaExpLost, error) {
 	return rateKarmaExpLost(config.NewFields(props, "rate karma exp lost").Float64("RateKarmaExpLost", 1)), nil
 }
 
+// characterSelectDelay is the reuse delay shared by one client's
+// character-list actions (delete, restore, select), read from
+// server.properties.
+type characterSelectDelay time.Duration
+
+func loadCharacterSelectDelay(paths gameServerPaths) (characterSelectDelay, error) {
+	props, err := config.LoadFile(paths.ConfigPath)
+	if err != nil {
+		return 0, err
+	}
+	return characterSelectDelay(time.Duration(config.NewFields(props, "character select reuse delay").Int("CharacterSelectTime", 3000)) * time.Millisecond), nil
+}
+
+// serverBypassDelay is the reuse delay between two bypass commands on one
+// client session, read from server.properties.
+type serverBypassDelay time.Duration
+
+func loadServerBypassDelay(paths gameServerPaths) (serverBypassDelay, error) {
+	props, err := config.LoadFile(paths.ConfigPath)
+	if err != nil {
+		return 0, err
+	}
+	return serverBypassDelay(time.Duration(config.NewFields(props, "server bypass reuse delay").Int("ServerBypassTime", 100)) * time.Millisecond), nil
+}
+
 func loadPetConfig(paths gameServerPaths) (pet.Config, error) {
 	serverProps, err := config.LoadFile(paths.ConfigPath)
 	if err != nil {

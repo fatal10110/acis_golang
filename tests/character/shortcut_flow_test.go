@@ -134,6 +134,7 @@ func TestShortcutFlowRegistersPersistsDeletesDropsStale(t *testing.T) {
 		gameservertest.WithCharacter("Newbie", 1, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithLog(zerolog.New(logs)),
+		gameservertest.WithReuseDelays(0, 0),
 	)
 	t.Cleanup(func() {
 		if t.Failed() {
