@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/config"
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/engine"
@@ -16,6 +17,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/probe"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/link"
 	"github.com/fatal10110/acis_golang/internal/loginserver/model"
 	"github.com/rs/zerolog"
@@ -42,6 +44,7 @@ TestServer = True
 PvpServer = False
 AllowCursedWeapons = False
 AllowWater = False
+ZoneTown = 2
 `)
 	if err != nil {
 		t.Fatalf("ParseString server: %v", err)
@@ -99,6 +102,9 @@ HexID = -7fff
 	if cfg.AllowWater {
 		t.Error("AllowWater = true, want false")
 	}
+	if cfg.TownCombatRule != 2 {
+		t.Errorf("TownCombatRule = %d, want ZoneTown 2", cfg.TownCombatRule)
+	}
 }
 
 func TestGameServerConfigFromPropertiesAllowWaterDefaultsTrue(t *testing.T) {
@@ -120,6 +126,25 @@ HexID = -7fff
 	}
 	if !cfg.AllowWater {
 		t.Error("AllowWater = false, want true default")
+	}
+}
+
+func TestApplyTownCombatRuleUsesZoneTown(t *testing.T) {
+	form, err := zone.NewCuboid(0, 1, 0, 1, 0, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	town, err := zone.NewTown(1, form, commons.NewStatSet())
+	if err != nil {
+		t.Fatal(err)
+	}
+	index := zone.NewIndex()
+	index.Add(town)
+
+	applyTownCombatRule(index, 2)
+
+	if town.CombatRule != 2 {
+		t.Fatalf("Town.CombatRule = %d, want ZoneTown 2", town.CombatRule)
 	}
 }
 

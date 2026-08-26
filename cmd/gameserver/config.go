@@ -26,6 +26,7 @@ type gameServerConfig struct {
 	Database           db.Config
 	AllowCursedWeapons bool
 	AllowWater         bool
+	TownCombatRule     int
 }
 
 func loadGameServerProperties(paths gameServerPaths) (*config.Properties, error) {
@@ -265,6 +266,10 @@ func gameServerConfigFromProperties(paths gameServerPaths, serverProps, hexProps
 	ageLimit := int32(serverListAgeLimit)
 	testServer := serverProps.Bool("TestServer", false)
 	pvpServer := serverProps.Bool("PvpServer", true)
+	townCombatRule, err := serverProps.Int("ZoneTown", 0)
+	if err != nil {
+		return gameServerConfig{}, err
+	}
 	return gameServerConfig{
 		ListenAddr: listenAddress(serverProps.String("GameserverHostname", "*"), listenPort),
 		LoginAddr:  net.JoinHostPort(serverProps.String("LoginHost", "127.0.0.1"), strconv.Itoa(loginPort)),
@@ -291,6 +296,7 @@ func gameServerConfigFromProperties(paths gameServerPaths, serverProps, hexProps
 		},
 		AllowCursedWeapons: serverProps.Bool("AllowCursedWeapons", true),
 		AllowWater:         serverProps.Bool("AllowWater", true),
+		TownCombatRule:     townCombatRule,
 	}, nil
 }
 

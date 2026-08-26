@@ -123,6 +123,7 @@ func loadGameData(paths gameServerPaths, cfg gameServerConfig, log zerolog.Logge
 	if err != nil {
 		return nil, err
 	}
+	applyTownCombatRule(zones, cfg.TownCombatRule)
 	routes, err := gamexml.LoadWalkerRoutes(filepath.Join(xmlRoot, "walkerRoutes.xml"))
 	if err != nil {
 		return nil, err
@@ -175,6 +176,12 @@ func loadGameData(paths gameServerPaths, cfg gameServerConfig, log zerolog.Logge
 		Geo:           geo.Engine,
 		Finder:        geo.Finder,
 	}, nil
+}
+
+func applyTownCombatRule(index *zone.Index, rule int) {
+	for _, town := range zone.OfKind[*zone.Town](index) {
+		town.CombatRule = rule
+	}
 }
 
 func loadHTMLCache(paths gameServerPaths) (*datacache.HTML, error) {
