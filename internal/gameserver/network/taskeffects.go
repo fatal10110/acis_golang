@@ -197,6 +197,9 @@ func (e *TaskEffects) Save(actor task.AutosaveActor) {
 	if err := roster.Save(ctx, live.Character); err != nil {
 		log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("autosave player stats")
 	}
+	if err := roster.SavePosition(ctx, live.Character); err != nil {
+		log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("autosave player position")
+	}
 }
 
 func (e *TaskEffects) ManaThreshold(actorID int32, inst *item.Instance, secondsLeft int) {
