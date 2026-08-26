@@ -197,6 +197,7 @@ func (h *Hostile) ReduceHPByDOT(amount float64, attacker effect.Participant, isD
 	}
 	if combatant, ok := attacker.(attackable.Combatant); ok {
 		h.AddDamageHate(combatant, amount, 0)
+		h.AddAttackDesire(combatant, 200)
 		h.RollAttackedShotRecharge()
 	}
 	h.applyNonConsumptionDamageEffects(isDOT)
