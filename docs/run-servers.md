@@ -1,6 +1,6 @@
 # Running Loginserver And Gameserver
 
-Run these commands from `/Users/arturkoshtei/workspace/acis_public/acis_golang`.
+Run these commands from the repository root.
 
 ## Prerequisites
 

@@ -1273,6 +1273,38 @@ func TestInventoryItemPersisterAppliesToRestoredItems(t *testing.T) {
 	}
 }
 
+func TestInventoryRestoreNormalizesStacksAndEquipment(t *testing.T) {
+	templates := item.NewTable([]*item.Template{
+		{ID: potionTemplateID, Kind: item.KindEtcItem, Stackable: true, EtcItem: &item.EtcItemDetail{}},
+		{ID: twoHandID, Kind: item.KindWeapon, Slot: item.SlotLRHand, Weapon: &item.WeaponDetail{Type: item.WeaponBigSword}},
+		{ID: shieldID, Kind: item.KindArmor, Slot: item.SlotLHand, Armor: &item.ArmorDetail{Type: item.ArmorShield}},
+	})
+	shield := &item.Instance{ObjectID: 0x20000001, TemplateID: shieldID, Count: 1, Location: item.LocationPaperdoll, LocationData: LHand, ManaLeft: -1}
+	twoHand := &item.Instance{ObjectID: 0x20000002, TemplateID: twoHandID, Count: 1, Location: item.LocationPaperdoll, LocationData: RHand, ManaLeft: -1}
+	inv := RestorePlayerInventory(0x10000001, templates, []*item.Instance{
+		{ObjectID: 0x20000003, TemplateID: potionTemplateID, Count: 4, Location: item.LocationInventory, ManaLeft: -1},
+		{ObjectID: 0x20000004, TemplateID: potionTemplateID, Count: 6, Location: item.LocationInventory, ManaLeft: -1},
+		shield,
+		twoHand,
+	})
+
+	if got := inv.ItemCount(potionTemplateID, -1, true); got != 10 {
+		t.Errorf("restored potion count = %d, want 10", got)
+	}
+	if got := inv.Size(); got != 3 {
+		t.Errorf("restored size = %d, want 3", got)
+	}
+	if got := inv.ItemAt(RHand); got != twoHand {
+		t.Errorf("RHand = %v, want two-handed weapon", got)
+	}
+	if got := inv.ItemAt(LHand); got != nil {
+		t.Errorf("LHand = %v, want nil", got)
+	}
+	if got := shield.Snapshot().Location; got != item.LocationInventory {
+		t.Errorf("displaced shield location = %v, want inventory", got)
+	}
+}
+
 // TestInventoryItemPersisterClearedOnDetach proves the hook is releasable,
 // so a logged-out player's items stop registering with the task.
 func TestInventoryItemPersisterClearedOnDetach(t *testing.T) {
