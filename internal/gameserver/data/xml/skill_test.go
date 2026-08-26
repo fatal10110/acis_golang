@@ -556,12 +556,14 @@ func TestLoadSkillDefinitionsSkipsMalformedSkills(t *testing.T) {
 			content: `<list><skill id="1" name="x" levels="1"><set name="target" val="NOT_A_TARGET"/><set name="skillType" val="PDAM"/><set name="operateType" val="ACTIVE"/></skill></list>`,
 		},
 		{
-			name:    "value references an undefined table",
+			// power's undefined-table substitution reads as "" (see
+			// TestLoadSkillDefinitionsToleratesUndefinedTableRefInCondition
+			// for the case where an unresolved reference doesn't itself
+			// fail the level), and "" then fails power's own required
+			// float64 parse — the level is skipped for that reason, not
+			// because the unresolved reference errors directly.
+			name:    "value references an undefined table, and the resulting empty value fails to parse",
 			content: `<list><skill id="1" name="x" levels="1"><set name="target" val="ONE"/><set name="skillType" val="PDAM"/><set name="operateType" val="ACTIVE"/><set name="power" val="#missing"/></skill></list>`,
-		},
-		{
-			name:    "condition references an undefined table",
-			content: `<list><skill id="1" name="x" levels="1"><set name="target" val="ONE"/><set name="skillType" val="PDAM"/><set name="operateType" val="ACTIVE"/><cond><player Charges="#missing"/></cond></skill></list>`,
 		},
 		{
 			name:    "table name missing the '#' prefix",
@@ -653,6 +655,80 @@ func TestLoadSkillDefinitionsSkipsMalformedSkills(t *testing.T) {
 			t.Fatal("expected an error for a missing directory, got nil")
 		}
 	})
+}
+
+// TestLoadSkillDefinitionsToleratesUndefinedTableRefInCondition checks that
+// an unresolved "#name" table reference is itself logged and substituted
+// with "" rather than failing the level, matching DocumentSkill.java's
+// getTableValue/getTableValue(name,int) (DocumentSkill.java:55-81): both
+// overloads catch the lookup failure, log, and return "" instead of
+// propagating. Here the "" substitution flows into a condition attribute
+// that isn't itself parsed as a number during load, so the level still
+// builds successfully with the empty value — unlike the sibling case in
+// TestLoadSkillDefinitionsSkipsMalformedSkills where the "" substitution
+// feeds a required numeric attribute and fails there instead.
+func TestLoadSkillDefinitionsToleratesUndefinedTableRefInCondition(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "fixture.xml")
+	writeXMLFixture(t, path, `<list><skill id="1" name="x" levels="1"><set name="target" val="ONE"/><set name="skillType" val="PDAM"/><set name="operateType" val="ACTIVE"/><cond><player Charges="#missing"/></cond></skill></list>`)
+
+	var buf bytes.Buffer
+	table, err := LoadSkillDefinitions(dir, zerolog.New(&buf))
+	if err != nil {
+		t.Fatalf("LoadSkillDefinitions: unexpected error: %v", err)
+	}
+
+	def, ok := table.Get(1, 1)
+	if !ok {
+		t.Fatal("skill 1 level 1 should have loaded despite the unresolved table reference")
+	}
+	if len(def.Conditions) != 1 || def.Conditions[0].Root.Attrs["Charges"] != "" {
+		t.Fatalf("skill 1 level 1 conditions = %+v, want Charges resolved to \"\"", def.Conditions)
+	}
+
+	got := buf.String()
+	if !strings.Contains(got, "fixture.xml") || !strings.Contains(got, "\"skill\":1") {
+		t.Fatalf("log output = %q, want it to name the file and skill id", got)
+	}
+}
+
+// TestLoadSkillDefinitionsSkipsOnlyTheMalformedLevel checks that a bad
+// level's table-substituted value only drops that one level, keeping the
+// other, well-formed levels of the same skill — the granularity
+// DocumentSkill.java's makeSkills (DocumentSkill.java:310-370) actually
+// applies its per-level try/catch at, rather than dropping the whole
+// <skill> element the way an earlier version of this loader did.
+func TestLoadSkillDefinitionsSkipsOnlyTheMalformedLevel(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "fixture.xml")
+	writeXMLFixture(t, path, `<list><skill id="5" name="x" levels="3">
+		<table name="#mp"> 10 oops 30 </table>
+		<set name="target" val="ONE"/>
+		<set name="skillType" val="PDAM"/>
+		<set name="operateType" val="ACTIVE"/>
+		<set name="mpConsume" val="#mp"/>
+	</skill></list>`)
+
+	var buf bytes.Buffer
+	table, err := LoadSkillDefinitions(dir, zerolog.New(&buf))
+	if err != nil {
+		t.Fatalf("LoadSkillDefinitions: unexpected error: %v", err)
+	}
+
+	if def, ok := table.Get(5, 1); !ok || def.MPConsume != 10 {
+		t.Fatalf("skill 5 level 1 = %+v, %v, want MPConsume 10", def, ok)
+	}
+	if _, ok := table.Get(5, 2); ok {
+		t.Fatal("skill 5 level 2 should have been skipped (mpConsume = \"oops\")")
+	}
+	if def, ok := table.Get(5, 3); !ok || def.MPConsume != 30 {
+		t.Fatalf("skill 5 level 3 = %+v, %v, want MPConsume 30", def, ok)
+	}
+
+	got := buf.String()
+	if !strings.Contains(got, "fixture.xml") || !strings.Contains(got, "\"skill\":5") || !strings.Contains(got, "\"level\":2") {
+		t.Fatalf("log output = %q, want it to name the file, skill id, and level 2", got)
+	}
 }
 
 // TestConditionMessagePrecedence covers pr-reviews/478.md finding 1: a

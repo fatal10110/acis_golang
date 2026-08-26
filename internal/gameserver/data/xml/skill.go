@@ -43,10 +43,13 @@ type skillElement struct {
 // under dir and returns a lookup table of the resulting definitions, keyed
 // by id and level. A directory that can't be listed or a file whose XML is
 // not well-formed fails the whole load: the caller gets an error rather
-// than a partially populated table. A <skill> element with a missing,
-// mangled, or out-of-range attribute is logged and skipped, matching
-// DocumentSkill.java's per-level try/catch ("Failed parsing skill."); other
-// skills and files continue loading.
+// than a partially populated table. A <skill> element whose id, levels,
+// enchant-level count, or <table> block can't even be parsed is logged and
+// skipped as a whole element. Within an otherwise-valid element, a single
+// level (regular or enchant) that fails to build is logged and skipped on
+// its own, matching DocumentSkill.java's per-level try/catch ("Failed
+// parsing skill.", makeSkills, DocumentSkill.java:310-370): other levels of
+// the same skill, other skills, and other files continue loading.
 //
 // log receives skipped-skill diagnostics; the zero logger discards them.
 func LoadSkillDefinitions(dir string, log zerolog.Logger) (*skill.Table, error) {
@@ -58,7 +61,7 @@ func LoadSkillDefinitions(dir string, log zerolog.Logger) (*skill.Table, error) 
 	var defs []skill.Definition
 	for _, doc := range docs {
 		for _, el := range doc.Data.Skills {
-			parsed, err := buildSkillDefinitions(el)
+			parsed, err := buildSkillDefinitions(el, doc.Path, log)
 			if err != nil {
 				log.Error().Err(err).Str("file", doc.Path).Msg("data/xml: skipping malformed skill definition")
 				continue
@@ -70,10 +73,66 @@ func LoadSkillDefinitions(dir string, log zerolog.Logger) (*skill.Table, error) 
 	return skill.NewTable(defs), nil
 }
 
+// skillLoader carries the per-<skill>-element context (its id, its
+// resolved <table> substitution rows, and the diagnostics log) needed
+// throughout one skill element's construction, so a level or a table-value
+// lookup deep in the call tree can log and tolerate its own failure without
+// every builder function threading those same three values individually.
+type skillLoader struct {
+	log    zerolog.Logger
+	path   string
+	id     skill.ID
+	tables map[string][]string
+}
+
+// resolveTableValue resolves one attribute value against sl.tables,
+// matching DocumentSkill.java's getTableValue/getTableValue(name,int)
+// (DocumentSkill.java:55-81): an undefined table name or an out-of-range
+// row index is logged and read as "" rather than aborting the skill.
+func (sl *skillLoader) resolveTableValue(name, val string, tableIndex int) string {
+	resolved, err := resolveTableValue(sl.tables, name, val, tableIndex)
+	if err != nil {
+		sl.log.Error().Err(err).Str("file", sl.path).Int("skill", int(sl.id)).Msg("data/xml: skill table value unresolved, using empty string")
+		return ""
+	}
+	return resolved
+}
+
+// resolveAttrMap folds an element's attributes into a name-keyed map,
+// resolving any "#name" table reference against row tableIndex first. A
+// repeated attribute name keeps the last value.
+func (sl *skillLoader) resolveAttrMap(attrs []xml.Attr, tableIndex int) map[string]string {
+	vals := make(map[string]string, len(attrs))
+	for _, a := range attrs {
+		vals[a.Name.Local] = sl.resolveTableValue(a.Name.Local, a.Value, tableIndex)
+	}
+	return vals
+}
+
+// resolveLevel builds the raw attribute values for one level by applying
+// attrs in order, resolving any table-referencing value against row
+// tableIndex (the level within the referenced table, 1-based).
+func (sl *skillLoader) resolveLevel(attrs []setElem, tableIndex int) map[string]string {
+	vals := make(map[string]string, len(attrs))
+	sl.applyAttrs(vals, attrs, tableIndex)
+	return vals
+}
+
+// applyAttrs applies attrs to vals in order, resolving any table-referencing
+// value ("#name") against row tableIndex and overwriting whatever the same
+// attribute name already held.
+func (sl *skillLoader) applyAttrs(vals map[string]string, attrs []setElem, tableIndex int) {
+	for _, a := range attrs {
+		vals[a.Name] = sl.resolveTableValue(a.Name, a.Val, tableIndex)
+	}
+}
+
 // buildSkillDefinitions expands one <skill> element into one Definition per
 // regular level (1..levels) and per enchant level (101.. and 141.. when the
-// element declares enchantLevels1/2).
-func buildSkillDefinitions(el skillElement) ([]skill.Definition, error) {
+// element declares enchantLevels1/2). The element's own id, levels,
+// enchant-level counts and <table> blocks must all parse for any level to
+// build at all; a single level's own build failure only drops that level.
+func buildSkillDefinitions(el skillElement, path string, log zerolog.Logger) ([]skill.Definition, error) {
 	rawID, err := strconv.ParseInt(el.ID, 10, 32)
 	if err != nil {
 		return nil, fmt.Errorf("skill id %q: %w", el.ID, err)
@@ -98,20 +157,24 @@ func buildSkillDefinitions(el skillElement) ([]skill.Definition, error) {
 		return nil, fmt.Errorf("skill %d: %w", id, err)
 	}
 
+	sl := &skillLoader{log: log, path: path, id: id, tables: tables}
 	defs := make([]skill.Definition, 0, levels+enchant1+enchant2)
 
+	skipLevel := func(level int, err error) {
+		log.Error().Err(err).Str("file", path).Int("skill", int(id)).Int("level", level).Msg("data/xml: skipping malformed skill level")
+	}
+
 	for i := 1; i <= levels; i++ {
-		vals, err := resolveSkillLevel(tables, el.Sets, i)
-		if err != nil {
-			return nil, fmt.Errorf("skill %d level %d: %w", id, i, err)
-		}
+		vals := sl.resolveLevel(el.Sets, i)
 		attrs, err := buildSkillDefinitionAttrs(id, i, vals)
 		if err != nil {
-			return nil, err
+			skipLevel(i, err)
+			continue
 		}
 		def := skill.NewDefinition(id, i, el.Name, attrs)
-		if err := applySkillTemplates(&def, tables, el.Cond, el.For, i, i, condMsgModeRegular); err != nil {
-			return nil, fmt.Errorf("skill %d level %d: %w", id, i, err)
+		if err := sl.applyTemplates(&def, el.Cond, el.For, i, i, condMsgModeRegular); err != nil {
+			skipLevel(i, err)
+			continue
 		}
 		defs = append(defs, def)
 	}
@@ -120,16 +183,12 @@ func buildSkillDefinitions(el skillElement) ([]skill.Definition, error) {
 	// level's table row; only its <enchantN> values vary per enchant level.
 	for i := 0; i < enchant1; i++ {
 		level := i + 101
-		vals, err := resolveSkillLevel(tables, el.Sets, levels)
-		if err != nil {
-			return nil, fmt.Errorf("skill %d level %d: %w", id, level, err)
-		}
-		if err := applySkillAttrs(vals, tables, el.Enchant1, i+1); err != nil {
-			return nil, fmt.Errorf("skill %d level %d: %w", id, level, err)
-		}
+		vals := sl.resolveLevel(el.Sets, levels)
+		sl.applyAttrs(vals, el.Enchant1, i+1)
 		attrs, err := buildSkillDefinitionAttrs(id, level, vals)
 		if err != nil {
-			return nil, err
+			skipLevel(level, err)
+			continue
 		}
 		def := skill.NewDefinition(id, level, el.Name, attrs)
 		condIndex := i + 1
@@ -144,24 +203,21 @@ func buildSkillDefinitions(el skillElement) ([]skill.Definition, error) {
 			forIndex = levels
 			fors = el.For
 		}
-		if err := applySkillTemplates(&def, tables, conds, fors, condIndex, forIndex, condMsgModeEnchant); err != nil {
-			return nil, fmt.Errorf("skill %d level %d: %w", id, level, err)
+		if err := sl.applyTemplates(&def, conds, fors, condIndex, forIndex, condMsgModeEnchant); err != nil {
+			skipLevel(level, err)
+			continue
 		}
 		defs = append(defs, def)
 	}
 
 	for i := 0; i < enchant2; i++ {
 		level := i + 141
-		vals, err := resolveSkillLevel(tables, el.Sets, levels)
-		if err != nil {
-			return nil, fmt.Errorf("skill %d level %d: %w", id, level, err)
-		}
-		if err := applySkillAttrs(vals, tables, el.Enchant2, i+1); err != nil {
-			return nil, fmt.Errorf("skill %d level %d: %w", id, level, err)
-		}
+		vals := sl.resolveLevel(el.Sets, levels)
+		sl.applyAttrs(vals, el.Enchant2, i+1)
 		attrs, err := buildSkillDefinitionAttrs(id, level, vals)
 		if err != nil {
-			return nil, err
+			skipLevel(level, err)
+			continue
 		}
 		def := skill.NewDefinition(id, level, el.Name, attrs)
 		condIndex := i + 1
@@ -176,38 +232,14 @@ func buildSkillDefinitions(el skillElement) ([]skill.Definition, error) {
 			forIndex = levels
 			fors = el.For
 		}
-		if err := applySkillTemplates(&def, tables, conds, fors, condIndex, forIndex, condMsgModeEnchant); err != nil {
-			return nil, fmt.Errorf("skill %d level %d: %w", id, level, err)
+		if err := sl.applyTemplates(&def, conds, fors, condIndex, forIndex, condMsgModeEnchant); err != nil {
+			skipLevel(level, err)
+			continue
 		}
 		defs = append(defs, def)
 	}
 
 	return defs, nil
-}
-
-// resolveSkillLevel builds the raw attribute values for one level by
-// applying attrs in order, resolving any table-referencing value against row
-// tableIndex (the level within the referenced table, 1-based).
-func resolveSkillLevel(tables map[string][]string, attrs []setElem, tableIndex int) (map[string]string, error) {
-	vals := make(map[string]string, len(attrs))
-	if err := applySkillAttrs(vals, tables, attrs, tableIndex); err != nil {
-		return nil, err
-	}
-	return vals, nil
-}
-
-// applySkillAttrs applies attrs to vals in order, resolving any
-// table-referencing value ("#name") against row tableIndex and overwriting
-// whatever the same attribute name already held.
-func applySkillAttrs(vals map[string]string, tables map[string][]string, attrs []setElem, tableIndex int) error {
-	for _, a := range attrs {
-		v, err := resolveTableValue(tables, a.Name, a.Val, tableIndex)
-		if err != nil {
-			return err
-		}
-		vals[a.Name] = v
-	}
-	return nil
 }
 
 // parseCountAttr parses an optional level-count attribute ("enchantLevels1",
@@ -219,9 +251,9 @@ func parseCountAttr(s string) (int, error) {
 	return strconv.Atoi(s)
 }
 
-func applySkillTemplates(def *skill.Definition, tables map[string][]string, conds []condElement, fors []forElement, condIndex, forIndex int, msgMode condMsgMode) error {
+func (sl *skillLoader) applyTemplates(def *skill.Definition, conds []condElement, fors []forElement, condIndex, forIndex int, msgMode condMsgMode) error {
 	for _, c := range conds {
-		clause, err := buildSkillConditionClause(tables, c.Attrs, c.Children, condIndex, msgMode)
+		clause, err := sl.conditionClause(c.Attrs, c.Children, condIndex, msgMode)
 		if err != nil {
 			return err
 		}
@@ -231,18 +263,18 @@ func applySkillTemplates(def *skill.Definition, tables map[string][]string, cond
 		def.Conditions = append(def.Conditions, *clause)
 	}
 	for _, f := range fors {
-		if err := applyTemplateNodes(def, tables, f.Ops, forIndex); err != nil {
+		if err := sl.applyTemplateNodes(def, f.Ops, forIndex); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func applyTemplateNodes(def *skill.Definition, tables map[string][]string, ops []funcElement, tableIndex int) error {
+func (sl *skillLoader) applyTemplateNodes(def *skill.Definition, ops []funcElement, tableIndex int) error {
 	var attachCond *skill.ConditionClause
 	for _, op := range ops {
 		if strings.EqualFold(op.XMLName.Local, "cond") {
-			clause, err := buildSkillConditionClause(tables, op.Attrs, op.Children, tableIndex, condMsgModeBoth)
+			clause, err := sl.conditionClause(op.Attrs, op.Children, tableIndex, condMsgModeBoth)
 			if err != nil {
 				return err
 			}
@@ -250,7 +282,7 @@ func applyTemplateNodes(def *skill.Definition, tables map[string][]string, ops [
 			continue
 		}
 		if strings.EqualFold(op.XMLName.Local, "effect") {
-			eff, err := buildSkillEffect(tables, op, attachCond, tableIndex)
+			eff, err := sl.effect(op, attachCond, tableIndex)
 			if err != nil {
 				return err
 			}
@@ -268,7 +300,7 @@ func applyTemplateNodes(def *skill.Definition, tables map[string][]string, ops [
 		if _, err := skill.ParseFuncOp(op.XMLName.Local); err != nil {
 			continue
 		}
-		fn, err := buildSkillFunc(tables, op.XMLName.Local, op.Attrs, op.Children, attachCond, tableIndex)
+		fn, err := sl.funcTemplate(op.XMLName.Local, op.Attrs, op.Children, attachCond, tableIndex)
 		if err != nil {
 			return err
 		}
@@ -277,11 +309,8 @@ func applyTemplateNodes(def *skill.Definition, tables map[string][]string, ops [
 	return nil
 }
 
-func buildSkillEffect(tables map[string][]string, op funcElement, attachCond *skill.ConditionClause, tableIndex int) (skill.EffectTemplate, error) {
-	vals, err := resolveAttrMap(tables, op.Attrs, tableIndex)
-	if err != nil {
-		return skill.EffectTemplate{}, err
-	}
+func (sl *skillLoader) effect(op funcElement, attachCond *skill.ConditionClause, tableIndex int) (skill.EffectTemplate, error) {
+	vals := sl.resolveAttrMap(op.Attrs, tableIndex)
 	a := newAttrValues(vals, "effect")
 	name := a.str("name")
 	if err := a.Err(); err != nil {
@@ -311,17 +340,17 @@ func buildSkillEffect(tables map[string][]string, op funcElement, attachCond *sk
 	if err := a.Err(); err != nil {
 		return skill.EffectTemplate{}, err
 	}
-	if err := buildNestedEffectTemplates(&eff, tables, op.Children, tableIndex); err != nil {
+	if err := sl.nestedEffectTemplates(&eff, op.Children, tableIndex); err != nil {
 		return skill.EffectTemplate{}, fmt.Errorf("effect %s: %w", name, err)
 	}
 	return eff, nil
 }
 
-func buildNestedEffectTemplates(eff *skill.EffectTemplate, tables map[string][]string, nodes []condNode, tableIndex int) error {
+func (sl *skillLoader) nestedEffectTemplates(eff *skill.EffectTemplate, nodes []condNode, tableIndex int) error {
 	var attachCond *skill.ConditionClause
 	for _, n := range nodes {
 		if strings.EqualFold(n.XMLName.Local, "cond") {
-			clause, err := buildSkillConditionClause(tables, n.Attrs, n.Children, tableIndex, condMsgModeBoth)
+			clause, err := sl.conditionClause(n.Attrs, n.Children, tableIndex, condMsgModeBoth)
 			if err != nil {
 				return err
 			}
@@ -329,7 +358,7 @@ func buildNestedEffectTemplates(eff *skill.EffectTemplate, tables map[string][]s
 			continue
 		}
 		fnEl := funcElement{XMLName: n.XMLName, Attrs: n.Attrs, Children: n.Children}
-		fn, err := buildSkillFunc(tables, n.XMLName.Local, fnEl.Attrs, fnEl.Children, attachCond, tableIndex)
+		fn, err := sl.funcTemplate(n.XMLName.Local, fnEl.Attrs, fnEl.Children, attachCond, tableIndex)
 		if err != nil {
 			return err
 		}
@@ -338,15 +367,12 @@ func buildNestedEffectTemplates(eff *skill.EffectTemplate, tables map[string][]s
 	return nil
 }
 
-func buildSkillFunc(tables map[string][]string, tag string, attrs []xml.Attr, children []condNode, attachCond *skill.ConditionClause, tableIndex int) (skill.FuncTemplate, error) {
+func (sl *skillLoader) funcTemplate(tag string, attrs []xml.Attr, children []condNode, attachCond *skill.ConditionClause, tableIndex int) (skill.FuncTemplate, error) {
 	op, err := skill.ParseFuncOp(tag)
 	if err != nil {
 		return skill.FuncTemplate{}, err
 	}
-	vals, err := resolveAttrMap(tables, attrs, tableIndex)
-	if err != nil {
-		return skill.FuncTemplate{}, err
-	}
+	vals := sl.resolveAttrMap(attrs, tableIndex)
 	a := newAttrValues(vals, tag)
 	stat := a.str("stat")
 	if err := a.Err(); err != nil {
@@ -359,10 +385,7 @@ func buildSkillFunc(tables map[string][]string, tag string, attrs []xml.Attr, ch
 	}
 	fn := skill.FuncTemplate{Op: op, Stat: stat, Value: value, AttachCondition: attachCond}
 	if len(children) > 0 {
-		cond, err := buildSkillCondition(tables, children[0], tableIndex)
-		if err != nil {
-			return skill.FuncTemplate{}, err
-		}
+		cond := sl.condition(children[0], tableIndex)
 		fn.Condition = &cond
 	}
 	return fn, nil
@@ -390,23 +413,16 @@ const (
 	condMsgModeBoth
 )
 
-// buildSkillConditionClause resolves a <cond> element into a clause. A cond
-// with no predicate child returns (nil, nil): DocumentBase.java's
-// parseCondition returns null for a missing element node, and attach(null)
-// is a tolerated no-op (DocumentBase.java:309-315,341) rather than a load
-// failure.
-func buildSkillConditionClause(tables map[string][]string, attrs []xml.Attr, children []condNode, tableIndex int, msgMode condMsgMode) (*skill.ConditionClause, error) {
+// conditionClause resolves a <cond> element into a clause. A cond with no
+// predicate child returns (nil, nil): DocumentBase.java's parseCondition
+// returns null for a missing element node, and attach(null) is a tolerated
+// no-op (DocumentBase.java:309-315,341) rather than a load failure.
+func (sl *skillLoader) conditionClause(attrs []xml.Attr, children []condNode, tableIndex int, msgMode condMsgMode) (*skill.ConditionClause, error) {
 	if len(children) == 0 {
 		return nil, nil
 	}
-	vals, err := resolveAttrMap(tables, attrs, tableIndex)
-	if err != nil {
-		return nil, err
-	}
-	root, err := buildSkillCondition(tables, children[0], tableIndex)
-	if err != nil {
-		return nil, err
-	}
+	vals := sl.resolveAttrMap(attrs, tableIndex)
+	root := sl.condition(children[0], tableIndex)
 	a := newAttrValues(vals, "cond")
 	clause := skill.ConditionClause{Root: root}
 	switch msgMode {
@@ -430,24 +446,17 @@ func buildSkillConditionClause(tables map[string][]string, attrs []xml.Attr, chi
 	return &clause, nil
 }
 
-func buildSkillCondition(tables map[string][]string, n condNode, tableIndex int) (skill.Condition, error) {
-	attrs, err := resolveAttrMap(tables, n.Attrs, tableIndex)
-	if err != nil {
-		return skill.Condition{}, err
-	}
+func (sl *skillLoader) condition(n condNode, tableIndex int) skill.Condition {
+	attrs := sl.resolveAttrMap(n.Attrs, tableIndex)
 	var children []skill.Condition
 	for _, c := range n.Children {
-		child, err := buildSkillCondition(tables, c, tableIndex)
-		if err != nil {
-			return skill.Condition{}, err
-		}
-		children = append(children, child)
+		children = append(children, sl.condition(c, tableIndex))
 	}
 	return skill.Condition{
 		Kind:     strings.ToLower(n.XMLName.Local),
 		Attrs:    attrs,
 		Children: children,
-	}, nil
+	}
 }
 
 // buildSkillDefinitionAttrs resolves one level's raw <set> values into the
