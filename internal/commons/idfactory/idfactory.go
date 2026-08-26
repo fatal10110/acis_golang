@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/rs/zerolog"
 )
@@ -30,6 +31,72 @@ var usedObjectIDQueries = [...]string{
 	"SELECT oid FROM petition",
 }
 
+// orphanCleanupStatements deletes rows whose owner was never removed with
+// them (a crash mid-deletion, or a deletion that predated a table), so a
+// reallocated object id cannot resurrect stale data onto unrelated rows.
+var orphanCleanupStatements = [...]string{
+	// Character related
+	"DELETE FROM augmentations WHERE augmentations.item_oid NOT IN (SELECT object_id FROM items)",
+	"DELETE FROM character_hennas WHERE character_hennas.char_obj_id NOT IN (SELECT obj_Id FROM characters)",
+	"DELETE FROM character_macroses WHERE character_macroses.char_obj_id NOT IN (SELECT obj_Id FROM characters)",
+	"DELETE FROM character_memo WHERE character_memo.charId NOT IN (SELECT obj_Id FROM characters)",
+	"DELETE FROM character_quests WHERE character_quests.charId NOT IN (SELECT obj_Id FROM characters)",
+	"DELETE FROM character_raid_points WHERE character_raid_points.char_id NOT IN (SELECT obj_Id FROM characters)",
+	"DELETE FROM character_recipebook WHERE character_recipebook.charId NOT IN (SELECT obj_Id FROM characters)",
+	"DELETE FROM character_relations WHERE character_relations.char_id NOT IN (SELECT obj_Id FROM characters)",
+	"DELETE FROM character_relations WHERE character_relations.friend_id NOT IN (SELECT obj_Id FROM characters)",
+	"DELETE FROM character_shortcuts WHERE character_shortcuts.char_obj_id NOT IN (SELECT obj_Id FROM characters)",
+	"DELETE FROM character_skills WHERE character_skills.char_obj_id NOT IN (SELECT obj_Id FROM characters)",
+	"DELETE FROM character_skills_save WHERE character_skills_save.char_obj_id NOT IN (SELECT obj_Id FROM characters)",
+	"DELETE FROM character_subclasses WHERE character_subclasses.char_obj_id NOT IN (SELECT obj_Id FROM characters)",
+	"DELETE FROM cursed_weapons WHERE cursed_weapons.playerId NOT IN (SELECT obj_Id FROM characters)",
+	"DELETE FROM pets WHERE pets.item_obj_id NOT IN (SELECT object_id FROM items UNION SELECT object_id FROM items_on_ground)",
+	"DELETE FROM seven_signs WHERE seven_signs.char_obj_id NOT IN (SELECT obj_Id FROM characters)",
+	// Olympiads & heroes
+	"DELETE FROM heroes WHERE heroes.char_id NOT IN (SELECT obj_Id FROM characters)",
+	"DELETE FROM olympiad_nobles WHERE olympiad_nobles.char_id NOT IN (SELECT obj_Id FROM characters)",
+	"DELETE FROM olympiad_nobles_eom WHERE olympiad_nobles_eom.char_id NOT IN (SELECT obj_Id FROM characters)",
+	"DELETE FROM olympiad_fights WHERE olympiad_fights.charOneId NOT IN (SELECT obj_Id FROM characters)",
+	"DELETE FROM olympiad_fights WHERE olympiad_fights.charTwoId NOT IN (SELECT obj_Id FROM characters)",
+	"DELETE FROM heroes_diary WHERE heroes_diary.char_id NOT IN (SELECT obj_Id FROM characters)",
+	// Auction
+	"DELETE FROM auctions WHERE clanhall_id IN (SELECT id FROM clanhall WHERE ownerId <> 0 AND sellerClanName='')",
+	// Clan related
+	"DELETE FROM clan_data WHERE clan_data.leader_id NOT IN (SELECT obj_Id FROM characters)",
+	"DELETE FROM auctions WHERE auctions.clan_oid NOT IN (SELECT clan_id FROM clan_data)",
+	"DELETE FROM clanhall_functions WHERE clanhall_functions.hall_id NOT IN (SELECT id FROM clanhall WHERE ownerId <> 0)",
+	"DELETE FROM clan_privs WHERE clan_privs.clan_id NOT IN (SELECT clan_id FROM clan_data)",
+	"DELETE FROM clan_skills WHERE clan_skills.clan_id NOT IN (SELECT clan_id FROM clan_data)",
+	"DELETE FROM clan_subpledges WHERE clan_subpledges.clan_id NOT IN (SELECT clan_id FROM clan_data)",
+	"DELETE FROM clan_wars WHERE clan_wars.clan1 NOT IN (SELECT clan_id FROM clan_data)",
+	"DELETE FROM clan_wars WHERE clan_wars.clan2 NOT IN (SELECT clan_id FROM clan_data)",
+	"DELETE FROM siege_clans WHERE siege_clans.clan_id NOT IN (SELECT clan_id FROM clan_data)",
+	// Items
+	"DELETE FROM items WHERE items.owner_id NOT IN (SELECT obj_Id FROM characters) AND items.owner_id NOT IN (SELECT clan_id FROM clan_data)",
+	// Forum related
+	"DELETE FROM bbs_forum WHERE bbs_forum.type='CLAN' AND bbs_forum.owner_id NOT IN (SELECT clan_id FROM clan_data)",
+	"DELETE FROM bbs_forum WHERE bbs_forum.type='MEMO' AND bbs_forum.owner_id NOT IN (SELECT obj_Id FROM characters)",
+	"DELETE FROM bbs_topic WHERE bbs_topic.forum_id NOT IN (SELECT id FROM bbs_forum)",
+	"DELETE FROM bbs_post WHERE bbs_post.forum_id NOT IN (SELECT id FROM bbs_forum)",
+	"DELETE FROM bbs_post WHERE bbs_post.topic_id NOT IN (SELECT id FROM bbs_topic)",
+	"DELETE FROM bbs_favorite WHERE bbs_favorite.player_id NOT IN (SELECT obj_Id FROM characters)",
+	"DELETE FROM bbs_mail WHERE bbs_mail.receiver_id NOT IN (SELECT obj_Id FROM characters)",
+	// Petition
+	"DELETE FROM petition WHERE petition.petitioner_oid NOT IN (SELECT obj_Id FROM characters)",
+	"DELETE FROM petition_message WHERE petition_message.petition_oid NOT IN (SELECT oid FROM petition)",
+}
+
+// orphanRepairStatements resets references left dangling by the same
+// crashes, instead of deleting whole rows.
+var orphanRepairStatements = [...]string{
+	"UPDATE clan_data SET auction_bid_at = 0 WHERE auction_bid_at NOT IN (SELECT clanhall_id FROM auctions)",
+	"UPDATE clan_data SET new_leader_id = 0 WHERE new_leader_id NOT IN (SELECT obj_Id FROM characters)",
+	"UPDATE clan_subpledges SET leader_id=0 WHERE clan_subpledges.leader_id NOT IN (SELECT obj_Id FROM characters) AND leader_id > 0",
+	"UPDATE castle SET currentTaxPercent=0, nextTaxPercent=0 WHERE castle.id NOT IN (SELECT hasCastle FROM clan_data)",
+	"UPDATE characters SET clanid=0 WHERE characters.clanid NOT IN (SELECT clan_id FROM clan_data)",
+	"UPDATE clanhall SET ownerId=0, paidUntil=0, paid=0 WHERE clanhall.ownerId NOT IN (SELECT clan_id FROM clan_data)",
+}
+
 // Allocator hands out unique object ids, reusing ids released back to it.
 //
 // An id released mid-session only becomes available again once allocation
@@ -48,9 +115,14 @@ type Allocator struct {
 	log         zerolog.Logger
 }
 
-// New scans db for object ids already in use and returns an Allocator seeded
-// with them, ready to hand out ids that don't collide with existing rows. It
-// fails loudly on a query error rather than booting with a partial id set.
+// New repairs the database's persistent-object integrity and then scans db
+// for object ids already in use, returning an Allocator seeded with them,
+// ready to hand out ids that don't collide with existing rows. The repair
+// pass (reset stale online flags, purge orphan rows, drop expired skill
+// timestamps) runs before the scan so the scan sees post-cleanup state; a
+// failed repair statement is logged and skipped, since booting without one
+// cleanup beats not booting at all, while an id-scan error still fails
+// loudly rather than booting with a partial id set.
 func New(ctx context.Context, db *sql.DB, log zerolog.Logger) (*Allocator, error) {
 
 	a := &Allocator{
@@ -60,6 +132,7 @@ func New(ctx context.Context, db *sql.DB, log zerolog.Logger) (*Allocator, error
 		log:   log,
 	}
 
+	a.cleanup(ctx, db)
 	for _, query := range usedObjectIDQueries {
 		if err := a.loadUsedIDs(ctx, db, query); err != nil {
 			return nil, fmt.Errorf("idfactory: %w", err)
@@ -69,6 +142,51 @@ func New(ctx context.Context, db *sql.DB, log zerolog.Logger) (*Allocator, error
 	a.next = a.first
 	log.Info().Int("used_object_ids", len(a.used)).Msg("idfactory: initialized")
 	return a, nil
+}
+
+// cleanup runs the boot-time database repair pass. Each statement is
+// independent: one failing (a table that doesn't exist yet, a transient
+// lock) is logged at warn and the rest still run.
+func (a *Allocator) cleanup(ctx context.Context, db *sql.DB) {
+	cleanCount := int64(0)
+
+	res, err := db.ExecContext(ctx, "UPDATE characters SET online = 0")
+	if err != nil {
+		a.log.Warn().Err(err).Msg("idfactory: couldn't set characters offline")
+	} else {
+		logRowsAffected(res, &cleanCount)
+	}
+	a.log.Info().Msg("idfactory: updated characters online status")
+
+	for _, stmt := range orphanCleanupStatements {
+		res, err := db.ExecContext(ctx, stmt)
+		if err != nil {
+			a.log.Warn().Err(err).Str("statement", stmt).Msg("idfactory: couldn't cleanup database row orphans")
+			continue
+		}
+		logRowsAffected(res, &cleanCount)
+	}
+	for _, stmt := range orphanRepairStatements {
+		if _, err := db.ExecContext(ctx, stmt); err != nil {
+			a.log.Warn().Err(err).Str("statement", stmt).Msg("idfactory: couldn't repair database orphans")
+		}
+	}
+	a.log.Info().Int64("cleaned", cleanCount).Msg("idfactory: cleaned elements from database")
+
+	res, err = db.ExecContext(ctx, "DELETE FROM character_skills_save WHERE restore_type = 1 AND systime <= ?", time.Now().UnixMilli())
+	if err != nil {
+		a.log.Warn().Err(err).Msg("idfactory: couldn't cleanup expired timestamps")
+	} else {
+		expired, _ := res.RowsAffected()
+		a.log.Info().Int64("cleaned", expired).Msg("idfactory: cleaned expired timestamps from database")
+	}
+}
+
+func logRowsAffected(res sql.Result, total *int64) {
+	n, err := res.RowsAffected()
+	if err == nil {
+		*total += n
+	}
 }
 
 func (a *Allocator) loadUsedIDs(ctx context.Context, db *sql.DB, query string) error {
