@@ -34,6 +34,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -62,8 +63,11 @@ type options struct {
 	spawnProtection        time.Duration
 	allowDelevel           bool
 	rateKarmaExpLost       float64
+	characterSelectDelay   time.Duration
+	serverBypassDelay      time.Duration
 	seed                   func(*gamesql.CharacterStore, *gamesql.ItemStore)
 	seedShortcuts          func(*gamesql.ShortcutStore)
+	seedSevenSigns         func(*gamesql.SevenSignsStore)
 	npcs                   *npc.Table
 	summonItems            *item.SummonItemTable
 	wantChars              int
@@ -120,6 +124,14 @@ func WithSpawnProtection(window time.Duration) Option {
 	return func(o *options) { o.spawnProtection = window }
 }
 
+// WithReuseDelays overrides the server.properties CharacterSelectTime and
+// ServerBypassTime reuse delays (defaults 3s and 100ms). The reference
+// treats 0 as "never rate-limited", so flows that legitimately repeat a
+// gated action within the shipped window can boot with zero delays.
+func WithReuseDelays(characterSelect, serverBypass time.Duration) Option {
+	return func(o *options) { o.characterSelectDelay, o.serverBypassDelay = characterSelect, serverBypass }
+}
+
 // WithAllowDelevel sets the players.properties AllowDelevel gate: whether a
 // death may cost experience/karma (default false).
 func WithAllowDelevel(allow bool) Option {
@@ -148,6 +160,12 @@ func WithCharacter(name string, level, sp int) Option {
 // WithShortcutSeed inserts shortcut rows before the client dials.
 func WithShortcutSeed(seed func(*gamesql.ShortcutStore)) Option {
 	return func(o *options) { o.seedShortcuts = seed }
+}
+
+// WithSevenSignsSeed adjusts the seven_signs_status row before the Seven
+// Signs calendar restores it, so boot-time period catch-up can be exercised.
+func WithSevenSignsSeed(seed func(*gamesql.SevenSignsStore)) Option {
+	return func(o *options) { o.seedSevenSigns = seed }
 }
 
 // WithNPCs supplies the NPC template table wired into the link (and the
@@ -573,6 +591,8 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	o := &options{
 		account:                "player1",
 		karmaPlayerCanTeleport: true,
+		characterSelectDelay:   3 * time.Second,
+		serverBypassDelay:      100 * time.Millisecond,
 	}
 	for _, opt := range opts {
 		opt(o)
@@ -644,6 +664,20 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	itemInstances := task.NewItemInstances(gamesql.NewItemFlushStore(db), itemTemplates)
 	petStore := gamesql.NewPetStore(db)
 
+	// Mirror the production boot for the Seven Signs calendar: optional
+	// test seed first, then restore the persisted status and arm the
+	// transition timer.
+	sevenSignsStore := gamesql.NewSevenSignsStore(db)
+	if o.seedSevenSigns != nil {
+		o.seedSevenSigns(sevenSignsStore)
+	}
+	sevenSigns := sevensigns.NewState(sevenSignsStore, o.log, time.Now, nil)
+	if err := sevenSigns.Restore(context.Background()); err != nil {
+		t.Fatalf("restore seven signs status: %v", err)
+	}
+	sevenSigns.Start()
+	t.Cleanup(sevenSigns.Stop)
+
 	// Restore the ground items the previous session saved at shutdown,
 	// mirroring the production boot: hydrate into world state, then clear
 	// the rows so a crash cannot double-restore them.
@@ -687,10 +721,11 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Positions:        task.NewPositionUpdates(state),
 		PlayerClock:      playerClock,
 		GameClock:        task.NewGameClock(time.Now),
+		SevenSigns:       sevenSigns,
 		InventoryUpdates: inventoryUpdates,
 		ItemInstances:    itemInstances,
 		ShadowItems:      shadowItems,
-		PlayerConfig:     network.PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, AllowWater: true, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost},
+		PlayerConfig:     network.PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, AllowWater: true, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay},
 		Restarts:         o.restarts,
 		PetConfig:        petmodel.DefaultConfig(),
 		EnchantRoll:      o.enchantRoll,

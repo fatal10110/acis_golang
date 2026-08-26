@@ -134,6 +134,7 @@ func TestShortcutFlowRegistersPersistsDeletesDropsStale(t *testing.T) {
 		gameservertest.WithCharacter("Newbie", 1, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithLog(zerolog.New(logs)),
+		gameservertest.WithReuseDelays(0, 0),
 	)
 	t.Cleanup(func() {
 		if t.Failed() {
@@ -160,7 +161,7 @@ func TestShortcutFlowRegistersPersistsDeletesDropsStale(t *testing.T) {
 
 	c.Send(encodeEnterWorld())
 	frames := readEnterWorldBurst(t, c)
-	initEntries := parseShortCutInit(t, frames[10])
+	initEntries := parseShortCutInit(t, frames[11])
 	if e := findShortCut(initEntries, serverpackets.ShortcutAction, 5); e == nil || e.slot != wireShortcutSlot(1, 2) {
 		t.Fatalf("ShortCutInit action entry = %+v, want action id 5 at wire slot %d", e, wireShortcutSlot(1, 2))
 	}
@@ -235,7 +236,7 @@ func TestShortcutFlowRegistersPersistsDeletesDropsStale(t *testing.T) {
 
 	c.Send(encodeEnterWorld())
 	frames = readEnterWorldBurst(t, c)
-	initEntries = parseShortCutInit(t, frames[10])
+	initEntries = parseShortCutInit(t, frames[11])
 	potionEntry := findShortCut(initEntries, serverpackets.ShortcutItem, potion)
 	if potionEntry == nil {
 		t.Fatalf("ShortCutInit after restart missing potion shortcut %d: %+v", potion, initEntries)

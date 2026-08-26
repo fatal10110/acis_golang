@@ -33,11 +33,17 @@ type Client struct {
 	underflowWindowStart time.Time
 	unknownCount         int
 	unknownWindowStart   time.Time
+
+	// stats and floodProtectors are owned by the connection's read-loop
+	// goroutine: both track per-frame progress along the read path, which
+	// no other goroutine observes.
+	stats           clientStats
+	floodProtectors [numFloodProtectors]time.Time
 }
 
 // NewClient returns a Client wrapping session, starting in StateConnected.
 func NewClient(session *Session) *Client {
-	return &Client{Session: session, state: StateConnected}
+	return &Client{Session: session, state: StateConnected, stats: newClientStats()}
 }
 
 // State returns the client's current state.

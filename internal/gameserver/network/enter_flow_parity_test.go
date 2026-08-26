@@ -130,11 +130,14 @@ func TestRequestGameStartUnknownSlotKeepsConnectionOpen(t *testing.T) {
 	c.Send(encodeRequestGameStart(5))
 	c.ExpectNoFrame()
 
-	// The connection still dispatches: a restore attempt answers with the
-	// refreshed character list.
-	c.Send(encodeCharacterRestore(9))
-	if frame := c.Read(); frame[0] != serverpackets.OpcodeCharSelectInfo {
-		t.Fatalf("post-refusal opcode = %#x, want CharSelectInfo (%#x)", frame[0], serverpackets.OpcodeCharSelectInfo)
+	// The connection still dispatches: a create attempt (not covered by
+	// the select reuse gate) always answers with CharCreateOk or
+	// CharCreateFail.
+	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	if frame := c.Read(); frame[0] != serverpackets.OpcodeCharCreateOk && frame[0] != serverpackets.OpcodeCharCreateFail {
+		t.Fatalf("post-refusal opcode = %#x, want a CharCreate reply", frame[0])
+	}
+	for c.ReadWithTimeout(100*time.Millisecond) != nil {
 	}
 }
 
@@ -157,11 +160,14 @@ func TestRequestGameStartBannedCharacterRefusedSilently(t *testing.T) {
 	c.Send(encodeRequestGameStart(0))
 	c.ExpectNoFrame()
 
-	// The connection still dispatches: a restore attempt answers with the
-	// refreshed character list.
-	c.Send(encodeCharacterRestore(9))
-	if frame := c.Read(); frame[0] != serverpackets.OpcodeCharSelectInfo {
-		t.Fatalf("post-refusal opcode = %#x, want CharSelectInfo (%#x)", frame[0], serverpackets.OpcodeCharSelectInfo)
+	// The connection still dispatches: a create attempt (not covered by
+	// the select reuse gate) always answers with CharCreateOk or
+	// CharCreateFail.
+	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	if frame := c.Read(); frame[0] != serverpackets.OpcodeCharCreateOk && frame[0] != serverpackets.OpcodeCharCreateFail {
+		t.Fatalf("post-refusal opcode = %#x, want a CharCreate reply", frame[0])
+	}
+	for c.ReadWithTimeout(100*time.Millisecond) != nil {
 	}
 }
 
@@ -193,11 +199,14 @@ func TestDuplicateCharacterLoginClosesPreviousClientAndAbortsNewSelection(t *tes
 	}
 	c.ExpectNoFrame()
 
-	// The aborted selection leaves the connection alive: an unknown-slot
-	// delete answers with the refreshed character list.
-	c.Send(encodeRequestCharacterDelete(9))
-	if frame := c.Read(); frame[0] != serverpackets.OpcodeCharSelectInfo {
-		t.Fatalf("post-abort opcode = %#x, want CharSelectInfo (%#x)", frame[0], serverpackets.OpcodeCharSelectInfo)
+	// The aborted selection leaves the connection alive: a create attempt
+	// (not covered by the select reuse gate) always answers with
+	// CharCreateOk or CharCreateFail.
+	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	if frame := c.Read(); frame[0] != serverpackets.OpcodeCharCreateOk && frame[0] != serverpackets.OpcodeCharCreateFail {
+		t.Fatalf("post-abort opcode = %#x, want a CharCreate reply", frame[0])
+	}
+	for c.ReadWithTimeout(100*time.Millisecond) != nil {
 	}
 }
 

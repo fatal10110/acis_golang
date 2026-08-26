@@ -154,6 +154,9 @@ func confusionStart(e *Effect) bool {
 	if target, ok := e.Effected.(hateRaiser); ok {
 		target.AddDamageHate(candidate, 0, math.MaxInt32)
 	}
+	if target, ok := e.Effected.(attackDesireRaiser); ok {
+		target.AddAttackDesire(candidate, math.MaxInt32)
+	}
 	return true
 }
 

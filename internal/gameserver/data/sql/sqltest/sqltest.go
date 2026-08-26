@@ -21,7 +21,13 @@ import (
 var sharedTables = []string{
 	"characters", "items", "augmentations", "spawn_data",
 	"items_on_ground", "character_skills", "character_shortcuts",
-	"pets", "character_skills_save",
+	"pets", "character_skills_save", "seven_signs_status",
+}
+
+// sharedReseeds restores shipped seed rows that TRUNCATE removes, keyed by
+// table, so every test starts from the schema's default data.
+var sharedReseeds = map[string]string{
+	"seven_signs_status": sevenSignsStatusSeed,
 }
 
 // charactersSchema mirrors the shipped characters table definition verbatim.
@@ -188,6 +194,41 @@ const characterSkillsSaveSchema = "CREATE TABLE IF NOT EXISTS `character_skills_
 	"  PRIMARY KEY (`char_obj_id`,`skill_id`,`skill_level`,`class_index`)\n" +
 	")"
 
+// sevenSignsStatusSchema mirrors the shipped seven_signs_status table
+// definition verbatim, including its seeded status row.
+const sevenSignsStatusSchema = "CREATE TABLE IF NOT EXISTS `seven_signs_status` (\n" +
+	"  `id` int(3) NOT NULL default '0',\n" +
+	"  `current_cycle` int(10) NOT NULL DEFAULT '1',\n" +
+	"  `festival_cycle` int(10) NOT NULL DEFAULT '1',\n" +
+	"  `active_period` VARCHAR(16) NOT NULL DEFAULT 'COMPETITION',\n" +
+	"  `date` bigint(13) unsigned NOT NULL DEFAULT '0',\n" +
+	"  `previous_winner` VARCHAR(8) NOT NULL DEFAULT 'NORMAL',\n" +
+	"  `dawn_stone_score` DECIMAL(20,0) NOT NULL DEFAULT '0',\n" +
+	"  `dawn_festival_score` int(10) NOT NULL DEFAULT '0',\n" +
+	"  `dusk_stone_score` DECIMAL(20,0) NOT NULL DEFAULT '0',\n" +
+	"  `dusk_festival_score` int(10) NOT NULL DEFAULT '0',\n" +
+	"  `avarice_owner` VARCHAR(8) NOT NULL DEFAULT 'NORMAL',\n" +
+	"  `gnosis_owner` VARCHAR(8) NOT NULL DEFAULT 'NORMAL',\n" +
+	"  `strife_owner` VARCHAR(8) NOT NULL DEFAULT 'NORMAL',\n" +
+	"  `avarice_dawn_score` int(10) NOT NULL DEFAULT '0',\n" +
+	"  `gnosis_dawn_score` int(10) NOT NULL DEFAULT '0',\n" +
+	"  `strife_dawn_score` int(10) NOT NULL DEFAULT '0',\n" +
+	"  `avarice_dusk_score` int(10) NOT NULL DEFAULT '0',\n" +
+	"  `gnosis_dusk_score` int(10) NOT NULL DEFAULT '0',\n" +
+	"  `strife_dusk_score` int(10) NOT NULL DEFAULT '0',\n" +
+	"  `accumulated_bonus0` int(10) NOT NULL DEFAULT '0',\n" +
+	"  `accumulated_bonus1` int(10) NOT NULL DEFAULT '0',\n" +
+	"  `accumulated_bonus2` int(10) NOT NULL DEFAULT '0',\n" +
+	"  `accumulated_bonus3` int(10) NOT NULL DEFAULT '0',\n" +
+	"  `accumulated_bonus4` int(10) NOT NULL DEFAULT '0',\n" +
+	"  PRIMARY KEY  (`id`)\n" +
+	")"
+
+// sevenSignsStatusSeed seeds the single status row the gameserver reads and
+// writes, matching the shipped schema seed.
+const sevenSignsStatusSeed = "INSERT IGNORE INTO `seven_signs_status` VALUES " +
+	"(0,1,1,'COMPETITION',0,'NORMAL',0,0,0,0,'NORMAL','NORMAL','NORMAL',0,0,0,0,0,0,0,0,0,0,0)"
+
 // NewDB starts a real MariaDB container, creates the gameserver tables used
 // by integration tests, and returns a pool connected to it. The container is
 // terminated and the pool closed when the test completes.
@@ -227,7 +268,8 @@ func openSchema(ctx context.Context, container *mariadb.MariaDBContainer) (*sql.
 	for _, stmt := range []string{
 		charactersSchema, itemsSchema, augmentationsSchema, spawnDataSchema,
 		itemsOnGroundSchema, characterSkillsSchema, characterShortcutsSchema,
-		petsSchema, characterSkillsSaveSchema,
+		petsSchema, characterSkillsSaveSchema, sevenSignsStatusSchema,
+		sevenSignsStatusSeed,
 	} {
 		if _, err := db.ExecContext(ctx, stmt); err != nil {
 			db.Close()
@@ -273,6 +315,11 @@ func SharedDB(tb testing.TB) *sql.DB {
 		for _, table := range sharedTables {
 			if _, err := sharedDB.ExecContext(ctx, "TRUNCATE TABLE `"+table+"`"); err != nil {
 				tb.Fatalf("truncate %s: %v", table, err)
+			}
+			if seed, ok := sharedReseeds[table]; ok {
+				if _, err := sharedDB.ExecContext(ctx, seed); err != nil {
+					tb.Fatalf("reseed %s: %v", table, err)
+				}
 			}
 		}
 	})

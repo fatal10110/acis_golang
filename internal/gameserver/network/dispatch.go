@@ -32,6 +32,7 @@ import (
 	gamecipher "github.com/fatal10110/acis_golang/internal/gameserver/network/cipher"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/petitem"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	tradebook "github.com/fatal10110/acis_golang/internal/gameserver/trade"
@@ -111,6 +112,12 @@ type PlayerConfig struct {
 	// RateKarmaExpLost scales the death exp-loss percentage while the dying
 	// player carries positive karma.
 	RateKarmaExpLost float64
+	// CharacterSelectDelay is the reuse delay shared by the character-list
+	// actions (delete, restore, select) on one client session.
+	CharacterSelectDelay time.Duration
+	// ServerBypassDelay is the reuse delay between two bypass commands on
+	// one client session.
+	ServerBypassDelay time.Duration
 }
 
 // GameClientLink accepts and drives connections from Interlude game
@@ -145,6 +152,7 @@ type GameClientLink struct {
 	positions     *task.PositionUpdates
 	playerClock   *task.PlayerClock
 	gameClock     *task.GameClock
+	sevenSigns    *sevensigns.State
 	water         *task.Water
 	shadowItems   *task.ShadowItems
 	autosave      *task.Autosave
@@ -172,6 +180,11 @@ type GameClientLink struct {
 	// newCipherKey supplies each connection's XOR cipher key; overridden in
 	// tests for a deterministic handshake.
 	newCipherKey func() ([]byte, error)
+
+	// now supplies wall time for packet accounting; nil falls back to
+	// time.Now at the call site. Overridden in tests for deterministic
+	// flood windows.
+	now func() time.Time
 
 	// enchantRoll supplies enchant dice rolls; overridden in tests.
 	enchantRoll func() float64
@@ -230,7 +243,10 @@ type GameClientLinkConfig struct {
 	PlayerClock   *task.PlayerClock
 	// GameClock is the server's in-game clock; CharSelected reports its
 	// current minute of day. Nil is tolerated (tests) and reports 0.
-	GameClock   *task.GameClock
+	GameClock *task.GameClock
+	// SevenSigns owns the event calendar; EnterWorld reports the active
+	// period's system message. Nil is tolerated (tests) and sends nothing.
+	SevenSigns  *sevensigns.State
 	Water       *task.Water
 	ShadowItems *task.ShadowItems
 	Autosave    *task.Autosave
@@ -245,6 +261,9 @@ type GameClientLinkConfig struct {
 	PlayerConfig  PlayerConfig
 	PetConfig     petmodel.Config
 	Log           zerolog.Logger
+	// Now supplies the clock packet accounting uses to bucket received
+	// frames into flood windows; nil means time.Now.
+	Now func() time.Time
 	// EnchantRoll supplies enchant dice rolls in [0,1); nil falls back to
 	// the random source. Behavior harnesses inject a deterministic roll.
 	EnchantRoll func() float64
@@ -287,6 +306,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) *GameClientLink {
 		positions:     cfg.Positions,
 		playerClock:   cfg.PlayerClock,
 		gameClock:     cfg.GameClock,
+		sevenSigns:    cfg.SevenSigns,
 		water:         cfg.Water,
 		shadowItems:   cfg.ShadowItems,
 		autosave:      cfg.Autosave,
@@ -313,6 +333,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) *GameClientLink {
 			Log:       cfg.Log,
 		}),
 		log:          cfg.Log,
+		now:          cfg.Now,
 		newCipherKey: randomCipherKey,
 	}
 	link.cubicAfterFunc = func(d time.Duration, fn func()) cubic.Timer {

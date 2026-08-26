@@ -25,12 +25,23 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/fatal10110/acis_golang/internal/link"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
+
+// staticSevenSignsStore serves the shipped default status row without a
+// database, for link tests that only need a stable active period.
+type staticSevenSignsStore struct{}
+
+func (staticSevenSignsStore) LoadStatus(context.Context) (sevensigns.StatusRow, bool, error) {
+	return sevensigns.StatusRow{Cycle: 1, Period: sevensigns.Competition}, true, nil
+}
+
+func (staticSevenSignsStore) SaveStatus(context.Context, sevensigns.StatusRow) error { return nil }
 
 // --- test server setup ---
 
@@ -101,6 +112,11 @@ func assertSystemMessageStringFrame(t *testing.T, frame []byte, messageID int, t
 	}
 }
 
+// testLinkNow, when non-nil, supplies the packet-accounting clock of every
+// GameClientLink constructed afterwards, freezing flood windows for
+// deterministic flood-gate assertions.
+var testLinkNow func() time.Time
+
 func newTestGameClientLink(t *testing.T, loginLink func() *LoginLink, validator *SessionValidator) (addr string, chars *fakeCharStore, items *fakeItemStore, state *world.State) {
 	t.Helper()
 	return newTestGameClientLinkWithLog(t, loginLink, validator, zerolog.Nop())
@@ -150,8 +166,12 @@ func newTestGameClientLinkWithSkillsShortcutsCrestsKarmaAndLog(t *testing.T, log
 	if len(cursedWeapons) > 0 {
 		cursed = cursedWeapons[0]
 	}
-	playerConfig := PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: karmaPlayerCanTeleport, AllowWater: true}
+	playerConfig := PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: karmaPlayerCanTeleport, AllowWater: true, CharacterSelectDelay: 3 * time.Second, ServerBypassDelay: 100 * time.Millisecond}
 	inventoryUpdates := task.NewInventoryUpdates()
+	sevenSigns := sevensigns.NewState(staticSevenSignsStore{}, log, nil, nil)
+	if err := sevenSigns.Restore(context.Background()); err != nil {
+		t.Fatalf("restore seven signs status: %v", err)
+	}
 	gcl := NewGameClientLink(GameClientLinkConfig{
 		Validator:        validator,
 		LoginLink:        loginLink,
@@ -172,9 +192,11 @@ func newTestGameClientLinkWithSkillsShortcutsCrestsKarmaAndLog(t *testing.T, log
 		GroundItems:      groundItems,
 		Positions:        task.NewPositionUpdates(state),
 		InventoryUpdates: inventoryUpdates,
+		SevenSigns:       sevenSigns,
 		PlayerConfig:     playerConfig,
 		PetConfig:        petmodel.DefaultConfig(),
 		Log:              log,
+		Now:              testLinkNow,
 	})
 	registerTestInventoryUpdates(t, state, inventoryUpdates)
 

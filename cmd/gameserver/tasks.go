@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -97,6 +98,27 @@ func startGroundItemPersistence(lc fx.Lifecycle, items *task.GroundItems, store 
 
 func provideGameClock() *task.GameClock {
 	return task.NewGameClock(time.Now)
+}
+
+// provideSevenSignsState returns the event-calendar state persisting through
+// the gameserver database.
+func provideSevenSignsState(db *sql.DB, log zerolog.Logger) *sevensigns.State {
+	return sevensigns.NewState(gamesql.NewSevenSignsStore(db), log, time.Now, nil)
+}
+
+// startSevenSigns restores the persisted status before any character can log
+// in — firing an overdue period change immediately — and stops the
+// transition timer on shutdown.
+func startSevenSigns(lc fx.Lifecycle, state *sevensigns.State) {
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			return state.Restore(ctx)
+		},
+		OnStop: func(context.Context) error {
+			state.Stop()
+			return nil
+		},
+	})
 }
 
 // wireGameClock installs clock as the source <game night=.../> stat-func

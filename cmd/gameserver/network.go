@@ -17,6 +17,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -66,6 +67,7 @@ func provideGameClientLink(
 	positions *task.PositionUpdates,
 	playerClock *task.PlayerClock,
 	gameClock *task.GameClock,
+	sevenSigns *sevensigns.State,
 	inventoryUpdates *task.InventoryUpdates,
 	itemInstances *task.ItemInstances,
 	water *task.Water,
@@ -82,6 +84,8 @@ func provideGameClientLink(
 	karmaTeleport karmaPlayerCanTeleport,
 	delevel allowDelevel,
 	karmaExpLost rateKarmaExpLost,
+	charSelect characterSelectDelay,
+	bypassDelay serverBypassDelay,
 	petCfg pet.Config,
 	petStore *gamesql.PetStore,
 	log zerolog.Logger,
@@ -99,6 +103,8 @@ func provideGameClientLink(
 		AllowWater:               cfg.AllowWater,
 		AllowDelevel:             bool(delevel),
 		RateKarmaExpLost:         float64(karmaExpLost),
+		CharacterSelectDelay:     time.Duration(charSelect),
+		ServerBypassDelay:        time.Duration(bypassDelay),
 	}
 	link := network.NewGameClientLink(network.GameClientLinkConfig{
 		Validator:     validator,
@@ -128,6 +134,7 @@ func provideGameClientLink(
 		Positions:     positions,
 		PlayerClock:   playerClock,
 		GameClock:     gameClock,
+		SevenSigns:    sevenSigns,
 		Water:         water,
 		ShadowItems:   shadowItems,
 		Autosave:      autosave,

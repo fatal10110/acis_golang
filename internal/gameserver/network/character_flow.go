@@ -20,6 +20,7 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -159,6 +160,9 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 	}
 	client.Session.SendFrame(serverpackets.FrameEtcStatusUpdate(serverpackets.EtcStatus{WeightPenalty: int32(c.WeightPenalty()), GradePenalty: c.WeaponGradePenalty() || c.ArmorGradePenalty() > 0, DeathPenaltyLevel: int32(c.DeathPenaltyLevel())}))
 	client.Session.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageWelcomeToLineage))
+	if l.sevenSigns != nil {
+		client.Session.SendFrame(serverpackets.FrameSystemMessage(sevenSignsPeriodMessage(l.sevenSigns.CurrentPeriod())))
+	}
 	if l.playerClock != nil && c.Race == player.RaceDarkElf {
 		l.playerClock.NotifyShadowSenseState(live)
 	}
@@ -174,6 +178,21 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 	client.Session.SendFrame(serverpackets.FrameSkillCoolTime(coolTimes))
 	client.Session.SendFrame(serverpackets.FrameActionFailed())
 	return live, true
+}
+
+// sevenSignsPeriodMessage maps a Seven Signs period onto the system message
+// announcing that it has begun.
+func sevenSignsPeriodMessage(p sevensigns.Period) int {
+	switch p {
+	case sevensigns.Recruiting:
+		return serverpackets.SystemMessagePreparationsPeriodBegun
+	case sevensigns.Competition:
+		return serverpackets.SystemMessageCompetitionPeriodBegun
+	case sevensigns.Results:
+		return serverpackets.SystemMessageResultsPeriodBegun
+	default:
+		return serverpackets.SystemMessageValidationPeriodBegun
+	}
 }
 
 func (l *GameClientLink) dieOptions(c *player.Character) serverpackets.DieOptions {
