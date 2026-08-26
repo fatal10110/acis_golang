@@ -192,8 +192,6 @@ func playerAuthResponseHandler(links *loginLinkState, validator *network.Session
 func startGameServer(lc fx.Lifecycle, cfg gameServerConfig, _ *gameData, _ *manager.Roster, validator *network.SessionValidator, links *loginLinkState, clients *network.GameClientLink, state *world.State, log zerolog.Logger) {
 	var cancel context.CancelFunc
 	var wg sync.WaitGroup
-	wroteGeneratedHexID := false
-
 	lc.Append(fx.Hook{
 		OnStart: func(context.Context) error {
 			runCtx, stop := context.WithCancel(context.Background())
@@ -211,14 +209,6 @@ func startGameServer(lc fx.Lifecycle, cfg gameServerConfig, _ *gameData, _ *mana
 							log.Error().Err(err).Int("accounts", len(accounts)).Msg("send online roster to loginserver")
 						} else {
 							log.Info().Int("accounts", len(accounts)).Msg("online roster sent to loginserver")
-						}
-					}
-					if cfg.GeneratedHexID && !wroteGeneratedHexID {
-						if err := writeHexIDFile(cfg.HexIDPath, int(link.ServerID), cfg.Auth.HexID); err != nil {
-							log.Error().Err(err).Str("path", cfg.HexIDPath).Msg("write generated hexid")
-						} else {
-							wroteGeneratedHexID = true
-							log.Info().Str("path", cfg.HexIDPath).Int("server_id", int(link.ServerID)).Msg("generated hexid saved")
 						}
 					}
 					go func() {

@@ -163,21 +163,35 @@ func (inv *Inventory) Restore(items []*item.Instance) {
 		// what was just read.
 		inst.SetOwnerLocation(inv.OwnerID(), st.Location, st.LocationData)
 		inst.SetPersistNotifier(inv.Container.persist)
+		merged := false
+		tmpl, _ := inv.Templates().Get(inst.TemplateID)
+		if tmpl != nil && tmpl.Stackable {
+			for _, held := range inv.Container.items {
+				if held.TemplateID == inst.TemplateID {
+					held.AddCount(st.Count)
+					inst.DestroyState()
+					merged = true
+					break
+				}
+			}
+		}
+		if merged {
+			continue
+		}
 		inv.Container.items[inst.ObjectID] = inst
 
 		// totalWeight is left at 0 here, matching the reference's restore()
 		// (Inventory.java:108-154), which populates _items via addBasicItem()
 		// without ever touching _totalWeight: only an explicit updateWeight()
 		// call (as ItemList's constructor makes) computes and reports it.
-		tmpl, _ := inv.Templates().Get(inst.TemplateID)
 		if st.Location != inv.equipLocation || st.LocationData < 0 || st.LocationData >= item.PaperdollSlots {
 			continue
 		}
-		inv.paperdoll[st.LocationData] = inst
 		if tmpl != nil {
-			inv.wornMask |= tmpl.Mask()
+			inv.equipItemLocked(inst, tmpl)
 		}
 	}
+	inv.updates = nil
 }
 
 // Remove removes inst from the inventory: unequipping it first if it was
@@ -399,7 +413,10 @@ func (inv *Inventory) EquipItem(inst *item.Instance, tmpl *item.Template) []*ite
 	inv.mu.Lock()
 	defer inv.fireNotifier() // registered first, so it runs last, after the unlock
 	defer inv.mu.Unlock()
+	return inv.equipItemLocked(inst, tmpl)
+}
 
+func (inv *Inventory) equipItemLocked(inst *item.Instance, tmpl *item.Template) []*item.Instance {
 	var altered []*item.Instance
 	set := func(slot int) {
 		if old := inv.setPaperdollItemLocked(slot, inst, tmpl); old != nil {
