@@ -398,7 +398,7 @@ func TestLoadCrestCacheAllowsMissingDirectory(t *testing.T) {
 	}
 }
 
-func TestGameServerConfigUsesRequestIDWithoutHexID(t *testing.T) {
+func TestGameServerConfigRejectsMissingHexIDProperties(t *testing.T) {
 	serverProps, err := config.ParseString(`
 GameserverHostname = *
 GameserverPort = 7777
@@ -410,22 +410,8 @@ RequestServerID = 9
 		t.Fatalf("ParseString server: %v", err)
 	}
 
-	cfg, err := gameServerConfigFromProperties(gameServerPaths{}, serverProps, nil)
-	if err != nil {
-		t.Fatalf("gameServerConfigFromProperties: %v", err)
-	}
-
-	if cfg.ListenAddr != ":7777" {
-		t.Errorf("ListenAddr = %q, want :7777", cfg.ListenAddr)
-	}
-	if cfg.Auth.ServerID != 9 {
-		t.Errorf("Auth.ServerID = %d, want RequestServerID 9", cfg.Auth.ServerID)
-	}
-	if !cfg.GeneratedHexID {
-		t.Error("GeneratedHexID = false, want true when hexid file is missing")
-	}
-	if len(cfg.Auth.HexID) != generatedHexIDSize {
-		t.Errorf("generated HexID length = %d, want %d", len(cfg.Auth.HexID), generatedHexIDSize)
+	if _, err := gameServerConfigFromProperties(gameServerPaths{}, serverProps, nil); err == nil {
+		t.Fatal("gameServerConfigFromProperties() error = nil, want missing hexid properties error")
 	}
 }
 
@@ -467,38 +453,6 @@ MaximumOnlineUsers = 2147483648
 
 	if _, err := gameServerConfigFromProperties(gameServerPaths{}, serverProps, nil); err == nil {
 		t.Fatalf("gameServerConfigFromProperties() error = nil, want range error above %d", int64(math.MaxInt32))
-	}
-}
-
-func TestWriteHexIDFile(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "config", "hexid.txt")
-	key := []byte{0x80, 0x01}
-
-	if err := writeHexIDFile(path, 3, key); err != nil {
-		t.Fatalf("writeHexIDFile: %v", err)
-	}
-
-	props, err := config.LoadFile(path)
-	if err != nil {
-		t.Fatalf("LoadFile: %v", err)
-	}
-	serverID, err := props.Int("ServerID", 0)
-	if err != nil {
-		t.Fatalf("ServerID: %v", err)
-	}
-	if serverID != 3 {
-		t.Fatalf("ServerID = %d, want 3", serverID)
-	}
-	gotHex := props.String("HexID", "")
-	if want := model.HexKeyText(key); gotHex != want {
-		t.Fatalf("HexID = %q, want %q", gotHex, want)
-	}
-	roundTrip, err := model.ParseHexKey(gotHex)
-	if err != nil {
-		t.Fatalf("ParseHexKey: %v", err)
-	}
-	if !bytes.Equal(roundTrip, key) {
-		t.Fatalf("round-trip key = %x, want %x", roundTrip, key)
 	}
 }
 
