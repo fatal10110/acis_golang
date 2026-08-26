@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
 
@@ -84,7 +85,7 @@ func NewTeleport(set *commons.StatSet) (Teleport, error) {
 // state is not applied here and stays the caller's responsibility once that
 // state exists.
 func (t Teleport) CalculatedPrice(now time.Time) int {
-	if t.Kind == KindStandard && isCoreTime(now) {
+	if t.PriceID != int(item.AncientAdenaID) && t.Kind == KindStandard && isCoreTime(now) {
 		return max(t.PriceCount>>1, 1)
 	}
 	return t.PriceCount
