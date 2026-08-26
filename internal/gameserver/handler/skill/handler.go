@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cubic"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/rs/zerolog"
@@ -166,6 +167,7 @@ type SignetDeps struct {
 	Templates signetTemplates
 	IDs       signetIDAllocator
 	World     *world.State
+	Frames    npc.FrameBuilder
 	Log       zerolog.Logger
 }
 
@@ -174,7 +176,7 @@ type SignetDeps struct {
 // signet's own world-spawning collaborators.
 func NewDefaultRegistryWithSignet(defs Definitions, signet SignetDeps) *Registry {
 	r := NewDefaultRegistryWithDefinitions(defs)
-	r.Register(signetHandler{defs: defs, templates: signet.Templates, ids: signet.IDs, world: signet.World, log: signet.Log})
+	r.Register(signetHandler{defs: defs, templates: signet.Templates, ids: signet.IDs, world: signet.World, frames: signet.Frames, log: signet.Log})
 	return r
 }
 

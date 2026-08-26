@@ -3,12 +3,12 @@ package summon
 import (
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
@@ -125,6 +125,6 @@ func (a *Actor) MakeAttackHit(target attackable.Combatant, split bool) attack.Hi
 }
 
 func (a *Actor) BroadcastAttack(snapshot attack.Snapshot) error {
-	a.BroadcastFrame(serverpackets.FrameAttack(snapshot))
+	a.broadcast(func() wire.Frame { return a.frames.Attack(snapshot) })
 	return nil
 }

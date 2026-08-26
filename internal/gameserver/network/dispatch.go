@@ -30,6 +30,7 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	gamecipher "github.com/fatal10110/acis_golang/internal/gameserver/network/cipher"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/petitem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
@@ -328,6 +329,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) *GameClientLink {
 			Templates: cfg.NPCs,
 			IDs:       cfg.IDs,
 			World:     cfg.World,
+			Frames:    serverpackets.NpcFrameBuilder{},
 			Log:       cfg.Log,
 		}),
 		log:          cfg.Log,
