@@ -75,6 +75,17 @@ var materialTypeStrings = map[MaterialType]string{
 // MaterialType it selects.
 var materialTypeNames = commons.ReverseMap(materialTypeStrings)
 
+// ParseMaterialType resolves a template's "material" attribute to a
+// MaterialType. It returns an error for any value outside the shipped set
+// rather than guessing.
+func ParseMaterialType(s string) (MaterialType, error) {
+	m, ok := materialTypeNames[s]
+	if !ok {
+		return 0, fmt.Errorf("item: unknown material type %q", s)
+	}
+	return m, nil
+}
+
 // CrystalType is the enchant-crystallization grade an item belongs to; NONE
 // means the item cannot be crystallized.
 type CrystalType uint8
@@ -107,6 +118,17 @@ var crystalTypeStrings = map[CrystalType]string{
 }
 
 var crystalTypeNames = commons.ReverseMap(crystalTypeStrings)
+
+// ParseCrystalType resolves a template's "crystal_type" attribute to a
+// CrystalType. It returns an error for any value outside the shipped set
+// rather than guessing.
+func ParseCrystalType(s string) (CrystalType, error) {
+	c, ok := crystalTypeNames[s]
+	if !ok {
+		return 0, fmt.Errorf("item: unknown crystal type %q", s)
+	}
+	return c, nil
+}
 
 // ActionType is the client-side action bound to double-clicking or using an
 // item, selecting the icon and default handler the client offers for it.
@@ -180,3 +202,14 @@ var actionTypeStrings = map[ActionType]string{
 }
 
 var actionTypeNames = commons.ReverseMap(actionTypeStrings)
+
+// ParseActionType resolves a template's "default_action" attribute to an
+// ActionType. It returns an error for any value outside the shipped set
+// rather than guessing.
+func ParseActionType(s string) (ActionType, error) {
+	a, ok := actionTypeNames[s]
+	if !ok {
+		return 0, fmt.Errorf("item: unknown default action %q", s)
+	}
+	return a, nil
+}

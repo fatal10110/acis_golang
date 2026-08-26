@@ -3,6 +3,7 @@ package xml
 import (
 	"encoding/xml"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 )
@@ -85,6 +86,57 @@ func (a *attrValues) strDefault(key, def string) string {
 	return def
 }
 
+// int returns the value at key as a base-10 int, recording an error if key
+// is absent or its value fails to parse.
+func (a *attrValues) int(key string) int {
+	if a.err != nil {
+		return 0
+	}
+	raw, ok := a.vals[key]
+	if !ok {
+		a.fail(fmt.Errorf("attribute %q is required", key))
+		return 0
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil {
+		a.fail(fmt.Errorf("attribute %q: %w", key, err))
+		return 0
+	}
+	return n
+}
+
+// int32 returns the value at key as an int32, recording an error if key is
+// absent, its value fails to parse, or it overflows int32.
+func (a *attrValues) int32(key string) int32 {
+	n := a.int(key)
+	if n < math.MinInt32 || n > math.MaxInt32 {
+		a.fail(fmt.Errorf("attribute %q: value %d overflows int32", key, n))
+		return 0
+	}
+	return int32(n)
+}
+
+// intArray returns the value at key as the ";"-separated list of ints its
+// raw text spells, recording an error if key is absent or any element fails
+// to parse.
+func (a *attrValues) intArray(key string) []int {
+	raw := a.str(key)
+	if a.err != nil {
+		return nil
+	}
+	parts := strings.Split(raw, ";")
+	out := make([]int, len(parts))
+	for i, p := range parts {
+		n, err := strconv.Atoi(p)
+		if err != nil {
+			a.fail(fmt.Errorf("attribute %q: %w", key, err))
+			return nil
+		}
+		out[i] = n
+	}
+	return out
+}
+
 // boolDefault returns the value at key as a bool, or def if key is absent.
 // Any spelling other than a case-insensitive "true" reads as false rather
 // than an error: the shipped data files write booleans as "true"/"false",
@@ -116,6 +168,17 @@ func (a *attrValues) intDefault(key string, def int) int {
 		return def
 	}
 	return n
+}
+
+// int32Default returns the value at key as an int32, or def if key is
+// absent. A present-but-malformed or overflowing value is still an error.
+func (a *attrValues) int32Default(key string, def int32) int32 {
+	n := a.intDefault(key, int(def))
+	if n < math.MinInt32 || n > math.MaxInt32 {
+		a.fail(fmt.Errorf("attribute %q: value %d overflows int32", key, n))
+		return def
+	}
+	return int32(n)
 }
 
 // int32LiteralDefault returns the value at key as an int32, or def if key is

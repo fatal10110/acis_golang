@@ -1,10 +1,7 @@
 package item
 
 import (
-	"fmt"
 	"strings"
-
-	"github.com/fatal10110/acis_golang/internal/commons"
 )
 
 // Condition is one node of an item's use-condition expression tree: either
@@ -30,33 +27,6 @@ type UseCondition struct {
 	Message   string
 	MessageID int32
 	AddName   bool
-}
-
-// NewUseCondition builds a UseCondition from root, the already-parsed
-// predicate tree, and set, the folded attributes of the clause's own
-// element ("msg", "msgId", "addName", all optional).
-func NewUseCondition(root Condition, set *commons.StatSet) (UseCondition, error) {
-	uc := UseCondition{Root: root}
-
-	switch {
-	case set.Has("msg"):
-		msg, err := set.GetString("msg")
-		if err != nil {
-			return UseCondition{}, fmt.Errorf("item: use condition: %w", err)
-		}
-		uc.Message = msg
-	case set.Has("msgId"):
-		id, err := set.GetInt32("msgId")
-		if err != nil {
-			return UseCondition{}, fmt.Errorf("item: use condition: %w", err)
-		}
-		uc.MessageID = id
-		if set.Has("addName") && id > 0 {
-			uc.AddName = true
-		}
-	}
-
-	return uc, nil
 }
 
 // EvaluateCondition walks cond's and/or/not combinator tree, deferring to

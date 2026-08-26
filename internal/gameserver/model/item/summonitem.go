@@ -1,34 +1,11 @@
 package item
 
-import (
-	"fmt"
-
-	"github.com/fatal10110/acis_golang/internal/commons"
-)
+import "fmt"
 
 type SummonItem struct {
 	ItemID     int32
 	NPCID      int32
 	SummonType int
-}
-
-func NewSummonItem(set *commons.StatSet) (SummonItem, error) {
-	idf := commons.NewFields(set, "item: summon item")
-	itemID := idf.Int32("id")
-	if err := idf.Err(); err != nil {
-		return SummonItem{}, err
-	}
-
-	f := commons.NewFields(set, fmt.Sprintf("item: summon item %d", itemID))
-	item := SummonItem{
-		ItemID:     itemID,
-		NPCID:      f.Int32("npcId"),
-		SummonType: f.Int("summonType"),
-	}
-	if err := f.Err(); err != nil {
-		return SummonItem{}, err
-	}
-	return item, nil
 }
 
 type SummonItemTable struct {

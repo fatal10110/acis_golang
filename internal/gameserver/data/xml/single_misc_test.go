@@ -280,6 +280,33 @@ func TestSingleMiscLoadersErrors(t *testing.T) {
 			},
 		},
 		{
+			name:    "soul crystal malformed level",
+			path:    filepath.Join(dir, "soulCrystals.xml"),
+			content: `<list><crystals><crystal initial="4629" level=" 1 " staged="4630" broken="4662"/></crystals></list>`,
+			load: func(path string) error {
+				_, err := LoadSoulCrystalData(path)
+				return err
+			},
+		},
+		{
+			name:    "soul crystal npc malformed levelList",
+			path:    filepath.Join(dir, "soulCrystals.xml"),
+			content: `<list><npcs><npc id="22215" chanceStage="100" chanceBreak="0" absorbType="PARTY_ONE_RANDOM" levelList="10;eleven"/></npcs></list>`,
+			load: func(path string) error {
+				_, err := LoadSoulCrystalData(path)
+				return err
+			},
+		},
+		{
+			name:    "summon item malformed summonType",
+			path:    filepath.Join(dir, "summonItems.xml"),
+			content: `<list><item id="2375" npcId="12077" summonType=""/></list>`,
+			load: func(path string) error {
+				_, err := LoadSummonItems(path)
+				return err
+			},
+		},
+		{
 			name:    "spellbook malformed xml",
 			path:    filepath.Join(dir, "spellbooks.xml"),
 			content: `<list><book skillId="2" itemId="1512"></list>`,

@@ -14,8 +14,76 @@ import (
 )
 
 type soulCrystalFile struct {
-	Crystals []attrsElement `xml:"crystals>crystal"`
-	NPCs     []attrsElement `xml:"npcs>npc"`
+	Crystals []soulCrystalElement `xml:"crystals>crystal"`
+	NPCs     []soulCrystalNPCElement `xml:"npcs>npc"`
+}
+
+// soulCrystalElement is one <crystal> element. initial, staged and broken
+// are required int32 ids; level is a required int.
+type soulCrystalElement struct {
+	Level   *coord   `xml:"level,attr"`
+	Initial *coord32 `xml:"initial,attr"`
+	Staged  *coord32 `xml:"staged,attr"`
+	Broken  *coord32 `xml:"broken,attr"`
+}
+
+func (e soulCrystalElement) build() (item.SoulCrystal, error) {
+	if e.Initial == nil {
+		return item.SoulCrystal{}, fmt.Errorf("soul crystal: initial is required")
+	}
+	if e.Level == nil {
+		return item.SoulCrystal{}, fmt.Errorf("soul crystal %d: level is required", *e.Initial)
+	}
+	if e.Staged == nil {
+		return item.SoulCrystal{}, fmt.Errorf("soul crystal %d: staged is required", *e.Initial)
+	}
+	if e.Broken == nil {
+		return item.SoulCrystal{}, fmt.Errorf("soul crystal %d: broken is required", *e.Initial)
+	}
+	return item.SoulCrystal{
+		Level:         int(*e.Level),
+		InitialItemID: int32(*e.Initial),
+		StagedItemID:  int32(*e.Staged),
+		BrokenItemID:  int32(*e.Broken),
+	}, nil
+}
+
+// soulCrystalNPCElement is one leveling-info <npc> element. id, chanceStage,
+// chanceBreak, absorbType and levelList are all required; skill defaults to
+// false.
+type soulCrystalNPCElement struct {
+	ID          *coord32     `xml:"id,attr"`
+	ChanceStage *coord       `xml:"chanceStage,attr"`
+	ChanceBreak *coord       `xml:"chanceBreak,attr"`
+	Skill       boolAttr     `xml:"skill,attr"`
+	AbsorbType  *string      `xml:"absorbType,attr"`
+	LevelList   *intListAttr `xml:"levelList,attr"`
+}
+
+func (e soulCrystalNPCElement) build() (item.SoulCrystalLevelingInfo, error) {
+	if e.ID == nil {
+		return item.SoulCrystalLevelingInfo{}, fmt.Errorf("soul crystal npc: id is required")
+	}
+	if e.ChanceStage == nil {
+		return item.SoulCrystalLevelingInfo{}, fmt.Errorf("soul crystal npc %d: chanceStage is required", *e.ID)
+	}
+	if e.ChanceBreak == nil {
+		return item.SoulCrystalLevelingInfo{}, fmt.Errorf("soul crystal npc %d: chanceBreak is required", *e.ID)
+	}
+	if e.AbsorbType == nil {
+		return item.SoulCrystalLevelingInfo{}, fmt.Errorf("soul crystal npc %d: absorbType is required", *e.ID)
+	}
+	if e.LevelList == nil {
+		return item.SoulCrystalLevelingInfo{}, fmt.Errorf("soul crystal npc %d: levelList is required", *e.ID)
+	}
+	return item.SoulCrystalLevelingInfo{
+		NPCID:         int32(*e.ID),
+		ChanceStage:   int(*e.ChanceStage),
+		ChanceBreak:   int(*e.ChanceBreak),
+		SkillRequired: bool(e.Skill),
+		AbsorbType:    *e.AbsorbType,
+		Levels:        []int(*e.LevelList),
+	}, nil
 }
 
 func LoadSoulCrystalData(path string) (*item.SoulCrystalTable, error) {
@@ -24,14 +92,22 @@ func LoadSoulCrystalData(path string) (*item.SoulCrystalTable, error) {
 		return nil, fmt.Errorf("soul crystals: %w", err)
 	}
 
-	crystals, err := buildAll(path, doc.Crystals, item.NewSoulCrystal)
-	if err != nil {
-		return nil, err
+	crystals := make([]item.SoulCrystal, 0, len(doc.Crystals))
+	for _, el := range doc.Crystals {
+		crystal, err := el.build()
+		if err != nil {
+			return nil, fmt.Errorf("xml: %s: %w", path, err)
+		}
+		crystals = append(crystals, crystal)
 	}
 
-	infos, err := buildAll(path, doc.NPCs, item.NewSoulCrystalLevelingInfo)
-	if err != nil {
-		return nil, err
+	infos := make([]item.SoulCrystalLevelingInfo, 0, len(doc.NPCs))
+	for _, el := range doc.NPCs {
+		info, err := el.build()
+		if err != nil {
+			return nil, fmt.Errorf("xml: %s: %w", path, err)
+		}
+		infos = append(infos, info)
 	}
 
 	table, err := item.NewSoulCrystalTable(crystals, infos)
@@ -79,8 +155,33 @@ func LoadSpellbooks(path string) (*skill.SpellbookTable, error) {
 	return skill.NewSpellbookTable(books)
 }
 
+// summonItemElement is one <item> element. id, npcId and summonType are all
+// required.
+type summonItemElement struct {
+	ID         *coord32 `xml:"id,attr"`
+	NPCID      *coord32 `xml:"npcId,attr"`
+	SummonType *coord   `xml:"summonType,attr"`
+}
+
+func (e summonItemElement) build() (item.SummonItem, error) {
+	if e.ID == nil {
+		return item.SummonItem{}, fmt.Errorf("summon item: id is required")
+	}
+	if e.NPCID == nil {
+		return item.SummonItem{}, fmt.Errorf("summon item %d: npcId is required", *e.ID)
+	}
+	if e.SummonType == nil {
+		return item.SummonItem{}, fmt.Errorf("summon item %d: summonType is required", *e.ID)
+	}
+	return item.SummonItem{
+		ItemID:     int32(*e.ID),
+		NPCID:      int32(*e.NPCID),
+		SummonType: int(*e.SummonType),
+	}, nil
+}
+
 type summonItemFile struct {
-	Items []attrsElement `xml:"item"`
+	Items []summonItemElement `xml:"item"`
 }
 
 func LoadSummonItems(path string) (*item.SummonItemTable, error) {
@@ -89,9 +190,13 @@ func LoadSummonItems(path string) (*item.SummonItemTable, error) {
 		return nil, fmt.Errorf("summon items: %w", err)
 	}
 
-	items, err := buildAll(path, doc.Items, item.NewSummonItem)
-	if err != nil {
-		return nil, err
+	items := make([]item.SummonItem, 0, len(doc.Items))
+	for _, el := range doc.Items {
+		entry, err := el.build()
+		if err != nil {
+			return nil, fmt.Errorf("xml: %s: %w", path, err)
+		}
+		items = append(items, entry)
 	}
 	return item.NewSummonItemTable(items)
 }
