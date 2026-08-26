@@ -3,8 +3,6 @@ package item
 import (
 	"fmt"
 	"strings"
-
-	"github.com/fatal10110/acis_golang/internal/commons"
 )
 
 // FuncOp is the arithmetic operation one stat modifier applies to the stat
@@ -88,19 +86,4 @@ type StatModifier struct {
 	Value           float64
 	AttachCondition *UseCondition
 	Condition       *Condition
-}
-
-// NewStatModifier builds a StatModifier of the given op from set, the
-// folded attributes of one stat-modifier element. "stat" and "val" are both
-// required.
-func NewStatModifier(op FuncOp, set *commons.StatSet) (StatModifier, error) {
-	stat, err := set.GetString("stat")
-	if err != nil {
-		return StatModifier{}, fmt.Errorf("item: stat modifier: %w", err)
-	}
-	val, err := set.GetFloat64("val")
-	if err != nil {
-		return StatModifier{}, fmt.Errorf("item: stat modifier %q: %w", stat, err)
-	}
-	return StatModifier{Op: op, Stat: stat, Value: val}, nil
 }

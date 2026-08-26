@@ -162,6 +162,25 @@ func (d *dashPairAttr) UnmarshalXMLAttr(attr xml.Attr) error {
 	return nil
 }
 
+// intListAttr is a ";"-separated list of ints (a soul crystal's level
+// list). It parses itself with strconv.Atoi per element, rejecting the same
+// malformed and empty input the attribute bag's array accessor did.
+type intListAttr []int
+
+func (l *intListAttr) UnmarshalXMLAttr(attr xml.Attr) error {
+	parts := strings.Split(attr.Value, ";")
+	out := make(intListAttr, len(parts))
+	for i, p := range parts {
+		n, err := strconv.Atoi(p)
+		if err != nil {
+			return fmt.Errorf("%s: %w", attr.Name.Local, err)
+		}
+		out[i] = n
+	}
+	*l = out
+	return nil
+}
+
 // pointElement is an element whose x/y attributes are a 2D world point, and
 // locationElement one whose x/y/z attributes are a world location. Both are
 // embedded into the element types that carry coordinates alongside their own

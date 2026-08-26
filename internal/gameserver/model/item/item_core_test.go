@@ -1,11 +1,8 @@
 package item
 
 import (
-	"reflect"
 	"sort"
 	"testing"
-
-	"github.com/fatal10110/acis_golang/internal/commons"
 )
 
 // ---- from autoshot_test.go ----
@@ -134,59 +131,6 @@ func TestParseDropKind(t *testing.T) {
 	if _, err := ParseDropKind("BOGUS"); err == nil {
 		t.Fatal("ParseDropKind(\"BOGUS\") error = nil, want error")
 	}
-}
-
-func TestNewDrop(t *testing.T) {
-	set := commons.NewStatSet()
-	set.Set("itemid", "8600")
-	set.Set("min", "1")
-	set.Set("max", "3")
-	set.Set("chance", "55.0")
-
-	got, err := NewDrop(set)
-	if err != nil {
-		t.Fatalf("NewDrop() error: %v", err)
-	}
-	want := Drop{ItemID: 8600, Min: 1, Max: 3, Chance: 55.0}
-	if got != want {
-		t.Fatalf("NewDrop() = %+v, want %+v", got, want)
-	}
-}
-
-func TestNewDropCategory(t *testing.T) {
-	t.Run("explicit chance", func(t *testing.T) {
-		set := commons.NewStatSet()
-		set.Set("type", "HERB")
-		set.Set("chance", "42.0")
-
-		got, err := NewDropCategory(set, nil)
-		if err != nil {
-			t.Fatalf("NewDropCategory() error: %v", err)
-		}
-		if got.Kind != DropHerb || got.Chance != 42.0 {
-			t.Fatalf("NewDropCategory() = %+v", got)
-		}
-	})
-
-	t.Run("chance defaults to 100", func(t *testing.T) {
-		set := commons.NewStatSet()
-		set.Set("type", "DROP")
-
-		got, err := NewDropCategory(set, nil)
-		if err != nil {
-			t.Fatalf("NewDropCategory() error: %v", err)
-		}
-		if got.Chance != 100.0 {
-			t.Fatalf("NewDropCategory() chance = %v, want 100", got.Chance)
-		}
-	})
-
-	t.Run("missing type is an error", func(t *testing.T) {
-		set := commons.NewStatSet()
-		if _, err := NewDropCategory(set, nil); err == nil {
-			t.Fatal("NewDropCategory() error = nil, want error")
-		}
-	})
 }
 
 func TestDropRandomAmount(t *testing.T) {
@@ -1040,59 +984,6 @@ func TestWeaponDetail_EvaluateSpiritshot(t *testing.T) {
 	}
 }
 
-// ---- from soulcrystal_test.go ----
-func TestNewSoulCrystal(t *testing.T) {
-	set := commons.NewStatSet()
-	set.Set("level", "12")
-	set.Set("initial", "5582")
-	set.Set("staged", "5914")
-	set.Set("broken", "4664")
-
-	got, err := NewSoulCrystal(set)
-	if err != nil {
-		t.Fatalf("NewSoulCrystal() error: %v", err)
-	}
-
-	want := SoulCrystal{Level: 12, InitialItemID: 5582, StagedItemID: 5914, BrokenItemID: 4664}
-	if got != want {
-		t.Fatalf("NewSoulCrystal() = %+v, want %+v", got, want)
-	}
-
-	set = commons.NewStatSet()
-	set.Set("initial", "4629")
-	if _, err := NewSoulCrystal(set); err == nil {
-		t.Fatal("expected an error for missing staged/broken/level, got nil")
-	}
-}
-
-func TestNewSoulCrystalLevelingInfo(t *testing.T) {
-	set := commons.NewStatSet()
-	set.Set("id", "22215")
-	set.Set("chanceStage", "100")
-	set.Set("chanceBreak", "0")
-	set.Set("skill", "false")
-	set.Set("absorbType", "PARTY_ONE_RANDOM")
-	set.Set("levelList", "10;11")
-
-	got, err := NewSoulCrystalLevelingInfo(set)
-	if err != nil {
-		t.Fatalf("NewSoulCrystalLevelingInfo() error: %v", err)
-	}
-
-	if got.NPCID != 22215 || got.ChanceStage != 100 || got.ChanceBreak != 0 || got.SkillRequired || got.AbsorbType != "PARTY_ONE_RANDOM" {
-		t.Fatalf("NewSoulCrystalLevelingInfo() = %+v", got)
-	}
-	if want := []int{10, 11}; !reflect.DeepEqual(got.Levels, want) {
-		t.Fatalf("Levels = %#v, want %#v", got.Levels, want)
-	}
-
-	set = commons.NewStatSet()
-	set.Set("id", "1")
-	if _, err := NewSoulCrystalLevelingInfo(set); err == nil {
-		t.Fatal("expected an error for missing attributes, got nil")
-	}
-}
-
 // ---- from spoil_test.go ----
 func TestSpoilPoolLifecycle(t *testing.T) {
 	var pool SpoilPool
@@ -1149,25 +1040,3 @@ func TestSpoilPoolLifecycle(t *testing.T) {
 }
 
 // ---- from summonitem_test.go ----
-func TestNewSummonItem(t *testing.T) {
-	set := commons.NewStatSet()
-	set.Set("id", "2375")
-	set.Set("npcId", "12077")
-	set.Set("summonType", "1")
-
-	got, err := NewSummonItem(set)
-	if err != nil {
-		t.Fatalf("NewSummonItem() error: %v", err)
-	}
-
-	want := SummonItem{ItemID: 2375, NPCID: 12077, SummonType: 1}
-	if got != want {
-		t.Fatalf("NewSummonItem() = %+v, want %+v", got, want)
-	}
-
-	set = commons.NewStatSet()
-	set.Set("id", "2375")
-	if _, err := NewSummonItem(set); err == nil {
-		t.Fatal("expected an error for missing npcId/summonType, got nil")
-	}
-}

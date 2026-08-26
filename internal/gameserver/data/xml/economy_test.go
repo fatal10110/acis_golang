@@ -220,6 +220,33 @@ func TestLoadEconomyDataErrors(t *testing.T) {
 				return err
 			},
 		},
+		{
+			name:    "fish empty id",
+			file:    "fish.xml",
+			content: `<list><fish id="" level="1" hp="1" hpRegen="1" type="1" group="1" guts="1" gutsCheckTime="1" waitTime="1" combatTime="1"/></list>`,
+			load: func(path string) error {
+				_, err := LoadFish(path)
+				return err
+			},
+		},
+		{
+			name:    "fish padded level",
+			file:    "fish.xml",
+			content: `<list><fish id="1" level=" 2 " hp="1" hpRegen="1" type="1" group="1" guts="1" gutsCheckTime="1" waitTime="1" combatTime="1"/></list>`,
+			load: func(path string) error {
+				_, err := LoadFish(path)
+				return err
+			},
+		},
+		{
+			name:    "fish non-numeric guts",
+			file:    "fish.xml",
+			content: `<list><fish id="1" level="1" hp="1" hpRegen="1" type="1" group="1" guts="many" gutsCheckTime="1" waitTime="1" combatTime="1"/></list>`,
+			load: func(path string) error {
+				_, err := LoadFish(path)
+				return err
+			},
+		},
 	}
 
 	for _, c := range cases {
