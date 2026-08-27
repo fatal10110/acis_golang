@@ -52,7 +52,7 @@ mismatch reflects the reference engine's real search cost, not an approximation.
 
 ## Result
 
-`queries=1000 agreement=98.10%` (see `report.txt`). 39 disagreements across three categories, each
+`queries=1000 agreement=98.10%` (see `report.txt`). 19 disagreements across three categories, each
 matching an already-open, milestone-assigned gap rather than a new defect:
 
 - **6 `los` mismatches** — line-of-sight disagreements on blocked multilayer edges. Matches #1830
