@@ -84,11 +84,19 @@ func startGroundItems(lc fx.Lifecycle, items *task.GroundItems, log zerolog.Logg
 
 // startGroundItemPersistence saves every currently tracked ground item back
 // to items_on_ground at shutdown, mirroring the reference server's own
-// save-on-shutdown behavior.
-func startGroundItemPersistence(lc fx.Lifecycle, items *task.GroundItems, store *gamesql.GroundItemStore, log zerolog.Logger) {
+// save-on-shutdown behavior. Cursed weapons are excluded, matching Java's
+// ItemsOnGroundTaskManager.save() skip to avoid a duplicate save.
+func startGroundItemPersistence(lc fx.Lifecycle, items *task.GroundItems, store *gamesql.GroundItemStore, data *gameData, log zerolog.Logger) {
+	skip := func(itemID int32) bool {
+		if data.CursedWeapons == nil {
+			return false
+		}
+		_, ok := data.CursedWeapons.Weapon(itemID)
+		return ok
+	}
 	lc.Append(fx.Hook{
 		OnStop: func(ctx context.Context) error {
-			if err := store.Save(ctx, items.Snapshots(nil)); err != nil {
+			if err := store.Save(ctx, items.Snapshots(skip)); err != nil {
 				log.Warn().Err(err).Msg("save ground items")
 			}
 			return nil
