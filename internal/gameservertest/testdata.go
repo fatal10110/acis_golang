@@ -195,6 +195,21 @@ func ItemTemplates() *item.Table {
 			Weapon:       &item.WeaponDetail{Type: item.WeaponSword, SoulshotCount: 1, SpiritshotCount: 1},
 		},
 		{
+			// Demonic Sword Zariche, the reference server's cursed weapon
+			// item id, kept minimal so cursed-weapon-exclusion tests can
+			// seed a real ground drop without loading cursedWeapons.xml.
+			ID:           8190,
+			Name:         "Demonic Sword Zariche",
+			Kind:         item.KindWeapon,
+			Slot:         item.SlotRHand,
+			Duration:     -1,
+			Crystal:      item.CrystalS,
+			CrystalCount: 10,
+			Dropable:     true,
+			Destroyable:  true,
+			Weapon:       &item.WeaponDetail{Type: item.WeaponSword, SoulshotCount: 1, SpiritshotCount: 1},
+		},
+		{
 			// A time-limited shadow weapon: Duration minutes of mana decay
 			// while equipped (Duration 5 → 300 seconds of initial mana).
 			ID:           7884,
