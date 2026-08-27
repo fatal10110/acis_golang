@@ -2,6 +2,7 @@ package xml
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -130,13 +131,24 @@ func TestLoadPlayerLevelsErrors(t *testing.T) {
 			writeXMLFixture(t, path, c.content)
 			if _, err := LoadPlayerLevels(path); err == nil {
 				t.Fatalf("expected an error for %s, got nil", c.name)
+			} else if c.name == "malformed xml" {
+				want := "player level table: xml: parse " + path + ":"
+				if !strings.HasPrefix(err.Error(), want) || strings.Count(err.Error(), path) != 1 {
+					t.Fatalf("LoadPlayerLevels() error = %q, want one path with prefix %q", err, want)
+				}
 			}
 		})
 	}
 
 	t.Run("missing file", func(t *testing.T) {
-		if _, err := LoadPlayerLevels(filepath.Join(dir, "does-not-exist.xml")); err == nil {
+		path := filepath.Join(dir, "does-not-exist.xml")
+		if _, err := LoadPlayerLevels(path); err == nil {
 			t.Fatal("expected an error for a missing file, got nil")
+		} else {
+			want := "player level table: xml: read " + path + ":"
+			if !strings.HasPrefix(err.Error(), want) {
+				t.Fatalf("LoadPlayerLevels() error = %q, want prefix %q", err, want)
+			}
 		}
 	})
 }
