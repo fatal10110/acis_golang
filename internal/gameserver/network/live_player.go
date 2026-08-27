@@ -63,16 +63,16 @@ type livePlayer struct {
 	// detaching alone is a check-then-act flag racing the DB round-trip it
 	// guards (#1948); saveMu closes that window structurally instead of
 	// narrowing it.
-	saveMu sync.Mutex
-	pickupMu           sync.Mutex // guards deferred player intentions and pickup state
-	fusionMu           sync.Mutex // guards fusionTargetID
-	fusionTargetID     int32
-	pickup             *pickupIntention
-	deferredPickup     *pickupIntention
-	deferredMagic      *clientpackets.RequestMagicSkillUse
-	deferredItem       *itemAICastIntention
-	pickupLocked       bool
-	pickupLockGen      uint64
+	saveMu         sync.Mutex
+	pickupMu       sync.Mutex // guards deferred player intentions and pickup state
+	fusionMu       sync.Mutex // guards fusionTargetID
+	fusionTargetID int32
+	pickup         *pickupIntention
+	deferredPickup *pickupIntention
+	deferredMagic  *clientpackets.RequestMagicSkillUse
+	deferredItem   *itemAICastIntention
+	pickupLocked   bool
+	pickupLockGen  uint64
 
 	petInteractMu sync.Mutex
 	petInteract   *summon.Actor
