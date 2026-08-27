@@ -2,12 +2,14 @@ package logging
 
 import (
 	"bytes"
+	"encoding/json"
 	"io"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/config"
 	"github.com/rs/zerolog"
@@ -101,6 +103,38 @@ func TestSetupSuppressesDebugBelowInfo(t *testing.T) {
 	}
 	if strings.Contains(string(data), "hidden") {
 		t.Fatalf("console = %q, debug record was written", data)
+	}
+}
+
+func TestSetupPreservesJSONLogFormat(t *testing.T) {
+	runtime, err := Setup(t.TempDir(), DefaultConfig(), io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer runtime.Close()
+
+	runtime.Logger.Info().Msg("server started")
+	data, err := os.ReadFile(runtime.Path(SinkConsole))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var event map[string]any
+	if err := json.Unmarshal(data, &event); err != nil {
+		t.Fatal(err)
+	}
+	if got := event["msg"]; got != "server started" {
+		t.Fatalf("msg = %#v, want %q", got, "server started")
+	}
+	if _, ok := event["message"]; ok {
+		t.Fatalf("event has unexpected message key: %s", data)
+	}
+	timestamp, ok := event["time"].(string)
+	if !ok {
+		t.Fatalf("time = %#v, want RFC3339 string", event["time"])
+	}
+	if _, err := time.Parse(time.RFC3339, timestamp); err != nil {
+		t.Fatalf("time = %q, want RFC3339: %v", timestamp, err)
 	}
 }
 
