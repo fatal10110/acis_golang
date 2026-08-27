@@ -81,12 +81,31 @@ func newLoginServerApp(paths loginServerPaths) *fx.App {
 			provideGameServerLink,
 			provideClientLink,
 		),
-		fx.Invoke(startLoginServer),
+		fx.Invoke(logConfigKeyDrift, startLoginServer),
 	)
 }
 
 func loadLoginServerProperties(paths loginServerPaths) (*config.Properties, error) {
 	return config.LoadFile(paths.ConfigPath)
+}
+
+// logConfigKeyDrift warns for every key present in a loaded .properties file
+// but absent from config.SupportedKeys, so a shipped key with no Go reader
+// is caught at boot instead of silently ignored.
+func logConfigKeyDrift(paths loginServerPaths, props *config.Properties, log zerolog.Logger) error {
+	warn := func(file string, props *config.Properties) {
+		for _, ref := range config.UnknownKeysIn(file, props) {
+			log.Warn().Str("file", ref.File).Str("key", ref.Key).Msg("config key has no Go reader")
+		}
+	}
+	warn("loginserver.properties", props)
+
+	bannedIPs, err := config.LoadFile(paths.BannedIPsPath)
+	if err != nil {
+		return err
+	}
+	warn("banned_ips.properties", bannedIPs)
+	return nil
 }
 
 func loginServerConfigFromLoadedProperties(paths loginServerPaths, props *config.Properties) (loginServerConfig, error) {

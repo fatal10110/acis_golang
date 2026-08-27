@@ -17,6 +17,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/link"
 	"github.com/fatal10110/acis_golang/internal/loginserver/model"
+	"github.com/rs/zerolog"
 )
 
 type gameServerConfig struct {
@@ -361,6 +362,42 @@ func provideKillRewardConfig(paths gameServerPaths, serverProps *config.Properti
 		PlayerLevels:      data.Levels,
 		PartyRange:        partyRange,
 	}, nil
+}
+
+// logConfigKeyDrift warns for every key present in a loaded .properties file
+// but absent from config.SupportedKeys, so a shipped key with no Go reader
+// is caught at boot instead of silently ignored.
+//
+// geoengine.properties is intentionally not scanned here: its ~140 per-region
+// keys have no reader at all yet (tracked in #1957) and no expected-key set to
+// dedup against, so scanning it would just warn on every boot regardless of
+// drift. logging.properties is also excluded: internal/commons/logging already
+// classifies its java.util.logging-shaped keys via its own hand-maintained
+// expected-key set and logs that result itself (see provideGameServerLogger).
+// players.properties is deduped against PvPFlagOptions.UnsupportedKeys, which
+// startPvPFlags already logs under its own more specific message, so a key
+// like KarmaPlayerCanShop isn't warned about twice.
+func logConfigKeyDrift(paths gameServerPaths, serverProps *config.Properties, pvpOpts task.PvPFlagOptions, log zerolog.Logger) error {
+	warn := func(file string, props *config.Properties, skip map[string]bool) {
+		for _, ref := range config.UnknownKeysIn(file, props) {
+			if skip[ref.Key] {
+				continue
+			}
+			log.Warn().Str("file", ref.File).Str("key", ref.Key).Msg("config key has no Go reader")
+		}
+	}
+	warn("server.properties", serverProps, nil)
+
+	playersProps, err := config.LoadFile(paths.PlayersConfigPath)
+	if err != nil {
+		return err
+	}
+	alreadyWarned := make(map[string]bool, len(pvpOpts.UnsupportedKeys))
+	for _, key := range pvpOpts.UnsupportedKeys {
+		alreadyWarned[key] = true
+	}
+	warn("players.properties", playersProps, alreadyWarned)
+	return nil
 }
 
 func provideSpellbookPolicy(paths gameServerPaths, data *gameData) (skill.BookPolicy, error) {

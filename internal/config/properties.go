@@ -148,6 +148,14 @@ func (s *FileSet) CountMismatches(expected map[string]int) []CountMismatch {
 	return out
 }
 
+// UnknownKeysIn reports keys loaded in props (identified as file) that are
+// absent from SupportedKeys, the generated per-file registry of keys read by
+// an existing Go config reader. Boot wires this per loaded file so a shipped
+// key with no reader is logged instead of silently ignored.
+func UnknownKeysIn(file string, props *Properties) []KeyRef {
+	return (&FileSet{Files: map[string]*Properties{file: props}}).UnknownKeys(SupportedKeys)
+}
+
 // UnknownKeys returns loaded keys not present in the provided supported-key list.
 func (s *FileSet) UnknownKeys(supported map[string][]string) []KeyRef {
 	var out []KeyRef
