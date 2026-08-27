@@ -298,7 +298,7 @@ func TestCreatureMove_FollowTickUsesCurrentPosition(t *testing.T) {
 	target := TargetSnapshot{
 		ObjectID:        2,
 		Known:           true,
-		Position:        location.Location{X: 130, Y: 0, Z: 0},
+		Position:        location.Location{X: 129, Y: 0, Z: 0},
 		CollisionRadius: 5,
 	}
 	geo := &recordingGeo{canMove: true, height: 0}
@@ -364,6 +364,32 @@ func TestCreatureMove_FriendlyFollowTick(t *testing.T) {
 	}
 }
 
+func TestCreatureMove_FriendlyFollowTickMovesAtExactRange(t *testing.T) {
+	origin := location.Location{X: 10, Y: 20, Z: 30}
+	target := TargetSnapshot{
+		ObjectID:        2,
+		Known:           true,
+		Position:        location.Location{X: 100, Y: 20, Z: 30},
+		CollisionRadius: 10.9,
+	}
+	mover, err := NewCreatureMove(origin, 50, &recordingGeo{canMove: true, height: 30})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mover.StartFriendlyFollow(target.ObjectID, 70)
+
+	event, moved, err := mover.FollowTick(target, 9.9)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !moved {
+		t.Fatal("FollowTick() moved = false at the exact follow range, want true")
+	}
+	if event.Destination != target.Position {
+		t.Fatalf("FollowTick() destination = %+v, want %+v", event.Destination, target.Position)
+	}
+}
+
 func TestCreatureMove_FollowTickSkipsWhenTargetDoesNotNeedMove(t *testing.T) {
 	origin := location.Location{X: 10, Y: 20, Z: 30}
 	tests := []struct {
@@ -415,7 +441,7 @@ func TestCreatureMove_FollowTickSkipsWhenTargetDoesNotNeedMove(t *testing.T) {
 			target: TargetSnapshot{
 				ObjectID:        2,
 				Known:           true,
-				Position:        location.Location{X: 100, Y: 20, Z: 30},
+				Position:        location.Location{X: 99, Y: 20, Z: 30},
 				CollisionRadius: 10.9,
 			},
 			start:    func(m *CreatureMove) { m.StartFriendlyFollow(2, 70) },
@@ -470,12 +496,12 @@ func TestCreatureMove_OffensiveFollowTick(t *testing.T) {
 		t.Fatalf("FollowInterval() = %v, want %v", got, 500*time.Millisecond)
 	}
 
-	inRange := TargetSnapshot{ObjectID: 9, Known: true, Position: location.Location{X: 59, Y: 0}, CollisionRadius: 10}
+	inRange := TargetSnapshot{ObjectID: 9, Known: true, Position: location.Location{X: 58, Y: 0}, CollisionRadius: 10}
 	if event, moved, err := mover.FollowTick(inRange, 9.9); err != nil || moved || event != (Event{}) {
 		t.Fatalf("FollowTick(in range) = event %+v moved %v err %v, want no move", event, moved, err)
 	}
 
-	outside := TargetSnapshot{ObjectID: 9, Known: true, Position: location.Location{X: 60, Y: 0}, CollisionRadius: 10}
+	outside := TargetSnapshot{ObjectID: 9, Known: true, Position: location.Location{X: 59, Y: 0}, CollisionRadius: 10}
 	event, moved, err := mover.FollowTick(outside, 9.9)
 	if err != nil {
 		t.Fatal(err)
@@ -485,7 +511,7 @@ func TestCreatureMove_OffensiveFollowTick(t *testing.T) {
 	}
 	want := Event{
 		Origin:       origin,
-		Destination:  location.Location{X: 60, Y: 0, Z: 0},
+		Destination:  location.Location{X: 59, Y: 0, Z: 0},
 		Speed:        100,
 		Duration:     600 * time.Millisecond,
 		FollowTarget: 9,
