@@ -91,6 +91,10 @@ var supportedKeys = map[string]bool{
 	"net.sf.l2j.loginserver.level":                                   true,
 }
 
+func init() {
+	zerolog.MessageFieldName = "msg"
+}
+
 // DefaultConfig returns the logging setup used when logging.properties is not loaded yet.
 func DefaultConfig() Config {
 	return Config{
