@@ -255,11 +255,8 @@ func triangulationAlgorithm(points []location.Point, isCw bool, nonConvex []loca
 	var triangles []triangle
 	size := len(points)
 	index := 1
-	for loops := 0; size > 3; loops++ {
-		if loops == triangulationMaxLoops {
-			return nil, fmt.Errorf("geo/dynamic: coordinates do not form a monotone polygon")
-		}
-
+	loops := 0
+	for size > 3 {
 		indexPrev := prevIndex(size, index)
 		indexNext := nextIndex(size, index)
 		pPrev := points[indexPrev]
@@ -273,6 +270,11 @@ func triangulationAlgorithm(points []location.Point, isCw bool, nonConvex []loca
 			index = prevIndex(size, index)
 		} else {
 			index = indexNext
+		}
+
+		loops++
+		if loops == triangulationMaxLoops {
+			return nil, fmt.Errorf("geo/dynamic: coordinates do not form a monotone polygon")
 		}
 	}
 	triangles = append(triangles, newTriangle(points[0], points[1], points[2]))

@@ -1,6 +1,7 @@
 package dynamic
 
 import (
+	"math"
 	"sync"
 	"testing"
 
@@ -129,6 +130,60 @@ func TestPolygonContainsConcaveNotch(t *testing.T) {
 func TestTriangulateRejectsFewerThanThreePoints(t *testing.T) {
 	if _, err := triangulate([]location.Point{{X: 0, Y: 0}, {X: 1, Y: 1}}); err == nil {
 		t.Fatal("triangulate([2 points]) error = nil, want error")
+	}
+}
+
+// TestTriangulateFailsOnPolygonFinishingAtLoopBound locks the reference's
+// Kong.doTriangulationAlgorithm loop-bound semantics: the failure check runs
+// after each ear-clip attempt, unconditionally, so a polygon that finishes
+// its triangulation on exactly the 100th attempt still fails, the same as
+// one that never converges.
+func TestTriangulateFailsOnPolygonFinishingAtLoopBound(t *testing.T) {
+	// A convex polygon triangulates in one ear-clip per vertex removed
+	// (n - 3 attempts). n=102 finishes in 99 attempts (under the bound);
+	// n=103 finishes in exactly 100 (the bound itself, must still fail).
+	if _, err := triangulate(convexPolygon(102)); err != nil {
+		t.Fatalf("triangulate(102-gon) error = %v, want nil (99 ear-clip attempts, under the bound)", err)
+	}
+	if _, err := triangulate(convexPolygon(103)); err == nil {
+		t.Fatal("triangulate(103-gon) error = nil, want error (100 ear-clip attempts, exactly the bound)")
+	}
+}
+
+func convexPolygon(n int) []location.Point {
+	pts := make([]location.Point, n)
+	for i := range pts {
+		angle := 2 * math.Pi * float64(i) / float64(n)
+		pts[i] = location.Point{X: int(1000 * math.Cos(angle)), Y: int(1000 * math.Sin(angle))}
+	}
+	return pts
+}
+
+// TestNewDoorObjectBowtiePolygonBlocksTouchingCell pins the fix at the level
+// that actually matters: NewDoorObject's blocked-cell mask for a self-touching
+// door polygon. With even-odd ray casting over the raw vertex ring, geo cell
+// (0,0) classifies as fully open (outside the door); with the reference's
+// Kong-triangulation containment it is inside the door and fully blocked.
+func TestNewDoorObjectBowtiePolygonBlocksTouchingCell(t *testing.T) {
+	tmpl := &door.Template{
+		ID:       1,
+		Kind:     door.KindDoor,
+		Position: location.Location{X: 16, Y: 16, Z: 0},
+		Coordinates: []location.Point{
+			{X: 0, Y: 0}, {X: 32, Y: 0}, {X: 16, Y: 16},
+			{X: 32, Y: 32}, {X: 0, Y: 32}, {X: 16, Y: 16},
+		},
+		Height: 80,
+	}
+
+	obj, err := NewDoorObject(tmpl, stubSampler{})
+	if err != nil {
+		t.Fatalf("NewDoorObject: %v", err)
+	}
+
+	got := obj.(*object).data[0][0]
+	if got != block.NoDirections {
+		t.Fatalf("cell (0,0) = %v, want %v (inside the self-touching polygon, fully blocked)", got, block.NoDirections)
 	}
 }
 
