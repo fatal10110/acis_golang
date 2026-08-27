@@ -74,21 +74,21 @@ type characterStore interface {
 	SetDeathPenaltyLevel(ctx context.Context, objectID int32, level int) error
 	SetOnline(ctx context.Context, objectID int32, lastAccess int64) error
 	SetOffline(ctx context.Context, objectID int32, lastAccess int64) error
-	Delete(ctx context.Context, objectID int32) (bool, error)
+	// Purge deletes the character together with every row it owns, as one
+	// atomic unit.
+	Purge(ctx context.Context, objectID int32) (bool, error)
 }
 
 // itemStore is the persistence Roster needs for the items table. Satisfied
 // by *sql.ItemStore.
 type itemStore interface {
 	Create(ctx context.Context, ownerID int32, inst item.Instance) error
-	DeleteByOwner(ctx context.Context, ownerID int32) (int64, error)
 }
 
 // shortcutStore is the persistence Roster needs for character_shortcuts.
 // Satisfied by *sql.ShortcutStore.
 type shortcutStore interface {
 	Save(ctx context.Context, ownerID int32, sc shortcut.Shortcut) error
-	DeleteByOwner(ctx context.Context, ownerID int32) error
 }
 
 // Roster creates, lists, deletes and restores the characters on an
@@ -279,19 +279,12 @@ func (r *Roster) List(ctx context.Context, accountName string) ([]*player.Charac
 	return live, nil
 }
 
+// purge deletes the character and every row it owns. The character store
+// removes all of them as one atomic unit, so an error here never leaves
+// items or shortcuts orphaned behind a deleted character.
 func (r *Roster) purge(ctx context.Context, objectID int32) error {
-	if _, err := r.characters.Delete(ctx, objectID); err != nil {
-		return err
-	}
-	if _, err := r.items.DeleteByOwner(ctx, objectID); err != nil {
-		return err
-	}
-	if r.shortcuts != nil {
-		if err := r.shortcuts.DeleteByOwner(ctx, objectID); err != nil {
-			return err
-		}
-	}
-	return nil
+	_, err := r.characters.Purge(ctx, objectID)
+	return err
 }
 
 // MarkForDeletion schedules objectID for deletion after the Roster's grace
