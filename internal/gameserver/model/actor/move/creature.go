@@ -595,5 +595,5 @@ func in2DRange(origin, target location.Location, radius int) bool {
 	if radius < 0 {
 		return false
 	}
-	return math.Hypot(float64(target.X)-float64(origin.X), float64(target.Y)-float64(origin.Y)) <= float64(radius)
+	return math.Hypot(float64(target.X)-float64(origin.X), float64(target.Y)-float64(origin.Y)) < float64(radius)
 }
