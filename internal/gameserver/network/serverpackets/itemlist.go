@@ -29,22 +29,17 @@ func FrameItemList(items []*item.Instance, templates *item.Table, showWindow boo
 }
 
 func writeItemList(w *wire.Writer, items []*item.Instance, templates *item.Table, showWindow bool) error {
-	owned := make([]item.InstanceState, 0, len(items))
-	for _, it := range items {
-		st := it.Snapshot()
-		if st.Location == item.LocationInventory || st.Location == item.LocationPaperdoll {
-			owned = append(owned, st)
-		}
-	}
-
 	w.WriteUint16(uint16(boolInt32(showWindow)))
-	count, err := wire.Uint16Count(len(owned))
-	if err != nil {
-		return err
-	}
-	w.WriteUint16(count)
+	countOffset := w.Len()
+	w.WriteUint16(0) // backfilled with the owned count once the loop below finishes
 
-	for _, it := range owned {
+	var owned int
+	for _, raw := range items {
+		it := raw.Snapshot()
+		if it.Location != item.LocationInventory && it.Location != item.LocationPaperdoll {
+			continue
+		}
+
 		tmpl, ok := templates.Get(it.TemplateID)
 		if !ok {
 			return fmt.Errorf("serverpackets: ItemList: no template loaded for item template %d", it.TemplateID)
@@ -63,6 +58,13 @@ func writeItemList(w *wire.Writer, items []*item.Instance, templates *item.Table
 		w.WriteUint16(uint16(it.CustomType2))
 		w.WriteInt32(0)  // augmentation id: item augmentation is not modeled
 		w.WriteInt32(-1) // displayed mana left: shadow-item duration is not modeled
+		owned++
 	}
+
+	count, err := wire.Uint16Count(owned)
+	if err != nil {
+		return err
+	}
+	w.PatchUint16(countOffset, count)
 	return nil
 }
