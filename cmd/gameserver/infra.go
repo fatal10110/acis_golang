@@ -26,6 +26,9 @@ func provideGameServerLogger(lc fx.Lifecycle, paths gameServerPaths) (zerolog.Lo
 	if err != nil {
 		return zerolog.Logger{}, err
 	}
+	for _, key := range cfg.UnsupportedKeys {
+		rt.Logger.Warn().Str("file", "logging.properties").Str("key", key).Msg("config key has no Go reader")
+	}
 	lc.Append(fx.Hook{OnStop: func(context.Context) error { return rt.Close() }})
 	return rt.Logger, nil
 }
