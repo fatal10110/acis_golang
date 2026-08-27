@@ -1,6 +1,7 @@
 package world
 
 import (
+	"strings"
 	"sync"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/worldobject"
@@ -16,6 +17,11 @@ type State struct {
 	players *registry
 	pets    *registry // keyed by the pet owner's id, not the pet's own id
 
+	// playerNamesMu guards playerNames, the case-insensitive online-player
+	// name index kept in sync with players by AddPlayer/RemovePlayer.
+	playerNamesMu sync.RWMutex
+	playerNames   map[string]int32
+
 	// regionActivityMu serializes a Player's region-activity accounting
 	// (relocate's playersCount updates plus the resulting Region.setActive
 	// calls) against every other concurrent Player relocation, closing the
@@ -29,11 +35,19 @@ type State struct {
 // New returns an empty State with a freshly built region grid.
 func New() *State {
 	return &State{
-		Grid:    NewGrid(),
-		objects: newRegistry(),
-		players: newRegistry(),
-		pets:    newRegistry(),
+		Grid:        NewGrid(),
+		objects:     newRegistry(),
+		players:     newRegistry(),
+		pets:        newRegistry(),
+		playerNames: make(map[string]int32),
 	}
+}
+
+// namedPlayer is implemented by every player registered through AddPlayer;
+// it backs the name-to-online-player-ID index without widening
+// worldobject.Object for every kind of tracked object.
+type namedPlayer interface {
+	CharacterName() string
 }
 
 // AddObject starts tracking obj, unless an object with the same id is
@@ -59,14 +73,51 @@ func (s *State) Object(id int32) (worldobject.Object, bool) { return s.objects.g
 func (s *State) Objects() []worldobject.Object { return s.objects.all() }
 
 // AddPlayer marks obj online, unless a player with the same id is already
-// tracked.
-func (s *State) AddPlayer(obj worldobject.Object) { s.players.add(obj.ObjectID(), obj) }
+// tracked, and indexes its name for PlayerByName lookups.
+func (s *State) AddPlayer(obj worldobject.Object) {
+	s.players.add(obj.ObjectID(), obj)
 
-// RemovePlayer marks the player with the given id offline.
-func (s *State) RemovePlayer(id int32) { s.players.remove(id) }
+	if np, ok := obj.(namedPlayer); ok {
+		name := strings.ToLower(np.CharacterName())
+		s.playerNamesMu.Lock()
+		if _, exists := s.playerNames[name]; !exists {
+			s.playerNames[name] = obj.ObjectID()
+		}
+		s.playerNamesMu.Unlock()
+	}
+}
+
+// RemovePlayer marks the player with the given id offline and drops its
+// name index entry.
+func (s *State) RemovePlayer(id int32) {
+	if obj, ok := s.players.get(id); ok {
+		if np, ok := obj.(namedPlayer); ok {
+			name := strings.ToLower(np.CharacterName())
+			s.playerNamesMu.Lock()
+			if s.playerNames[name] == id {
+				delete(s.playerNames, name)
+			}
+			s.playerNamesMu.Unlock()
+		}
+	}
+
+	s.players.remove(id)
+}
 
 // Player returns the online player with the given id, if any.
 func (s *State) Player(id int32) (worldobject.Object, bool) { return s.players.get(id) }
+
+// PlayerByName returns the online player with the given name, matched
+// case-insensitively, mirroring Java's World.getPlayer(String).
+func (s *State) PlayerByName(name string) (worldobject.Object, bool) {
+	s.playerNamesMu.RLock()
+	id, ok := s.playerNames[strings.ToLower(name)]
+	s.playerNamesMu.RUnlock()
+	if !ok {
+		return nil, false
+	}
+	return s.Player(id)
+}
 
 // Players returns a snapshot of every online player.
 func (s *State) Players() []worldobject.Object { return s.players.all() }
