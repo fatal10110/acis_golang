@@ -131,6 +131,8 @@ func TestFindDatapackDir_FindsSiblingCheckout(t *testing.T) {
 }
 
 func TestResolveDatapackDir_AutoDiscoversFromSourceRoot(t *testing.T) {
+	t.Setenv("ACIS_DATAPACK", "")
+
 	root := t.TempDir()
 	module := filepath.Join(root, "acis_public", "acis_golang")
 	if err := os.MkdirAll(module, 0o755); err != nil {
