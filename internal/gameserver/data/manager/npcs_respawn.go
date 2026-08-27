@@ -86,8 +86,8 @@ func (n *Npcs) Respawn(key string) {
 	n.spawnFresh(key, slot.entry, tmpl, pos)
 }
 
-// SyncPersistedState writes every live database-tracked slot's current HP
-// and position back into its spawn.State row, ready for Spawns.Save. Dead
+// SyncPersistedState writes every live database-tracked slot's current HP,
+// MP, and position back into its spawn.State row, ready for Spawns.Save. Dead
 // rows (mid respawn countdown) are left untouched by State.SetStats itself.
 func (n *Npcs) SyncPersistedState() {
 	n.mu.Lock()
@@ -117,7 +117,7 @@ func (n *Npcs) SyncPersistedState() {
 			continue
 		}
 		x, y, z := hostile.Position()
-		state.SetStats(hostile.CurrentHP(), 0, location.Location{X: x, Y: y, Z: z}, hostile.Heading())
+		state.SetStats(hostile.CurrentHP(), hostile.CurrentMP(), location.Location{X: x, Y: y, Z: z}, hostile.Heading())
 	}
 }
 

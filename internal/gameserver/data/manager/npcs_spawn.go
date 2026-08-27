@@ -62,6 +62,10 @@ func (n *Npcs) bootSpawnEntry(maker *spawn.Maker, entryIndex int, entry spawn.En
 	}
 }
 
+// fullMP tells instantiate to seed the spawned Hostile at its own calculated
+// Max MP rather than a persisted CurrentMP value.
+const fullMP = -1
+
 func (n *Npcs) registerSlot(key string, maker *spawn.Maker, entry spawn.Entry, dbName string) {
 	n.mu.Lock()
 	n.slot[key] = slotInfo{key: key, maker: maker, entry: entry, dbName: dbName}
@@ -105,11 +109,11 @@ func (n *Npcs) spawnPersisted(key string, maker *spawn.Maker, entry spawn.Entry,
 		return
 	}
 
-	loc, heading, hp := pos.Location, pos.Heading, fullHP
-	if state.CheckAlive(pos.Location, pos.Heading, int(tmpl.HPMax), 0, now) {
-		loc, heading, hp = state.Location, state.Heading, state.CurrentHP
+	loc, heading, hp, mp := pos.Location, pos.Heading, fullHP, fullMP
+	if state.CheckAlive(pos.Location, pos.Heading, int(tmpl.HPMax), int(tmpl.MPMax), now) {
+		loc, heading, hp, mp = state.Location, state.Heading, state.CurrentHP, state.CurrentMP
 	}
-	n.instantiate(key, entry, tmpl, loc, heading, hp)
+	n.instantiate(key, entry, tmpl, loc, heading, hp, mp)
 }
 
 // fullHP tells instantiate to seed the spawned Hostile at its own calculated
@@ -117,16 +121,17 @@ func (n *Npcs) spawnPersisted(key string, maker *spawn.Maker, entry spawn.Entry,
 const fullHP = -1
 
 // spawnFresh places one non-persisted instance of entry at a freshly rolled
-// position, always alive at full HP — the reference server never restores
-// HP/position across restarts for a spawn without a database name.
+// position, always alive at full HP/MP — the reference server never restores
+// HP/MP/position across restarts for a spawn without a database name.
 func (n *Npcs) spawnFresh(key string, entry spawn.Entry, tmpl *npc.Template, pos spawn.Position) {
-	n.instantiate(key, entry, tmpl, pos.Location, pos.Heading, fullHP)
+	n.instantiate(key, entry, tmpl, pos.Location, pos.Heading, fullHP, fullMP)
 }
 
 // instantiate builds one live Hostile from tmpl and places it in the world
-// at (loc, heading) with hp current HP (or fullHP, its calculated Max HP),
-// registering it for AI ticks and corpse decay/respawn.
-func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, loc location.Location, heading, hp int) {
+// at (loc, heading) with hp current HP and mp current MP (or fullHP/fullMP,
+// its calculated Max HP/MP), registering it for AI ticks and corpse
+// decay/respawn.
+func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, loc location.Location, heading, hp, mp int) {
 	id, err := n.ids.NextID()
 	if err != nil {
 		n.log.Warn().Err(err).Int32("npc_id", entry.NPCID).Msg("spawn: id space exhausted")
@@ -156,6 +161,10 @@ func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, lo
 		hp = hostile.MaxHP()
 	}
 	hostile.SetCurrentHP(hp)
+	if mp == fullMP {
+		mp = hostile.CurrentMP()
+	}
+	hostile.SetCurrentMP(mp)
 	hostile.SetWorld(n.state)
 	hostile.SetFrameBuilder(serverpackets.NpcFrameBuilder{})
 	hostile.SetWeapon(n.items)

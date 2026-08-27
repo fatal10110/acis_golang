@@ -26,10 +26,17 @@ type fakeCharStore struct {
 	online         map[int32]int64
 	offline        map[int32]int64
 	saveCount      map[int32]int
+	onlineSeq      map[int32][]string
+
+	// saveHook, when set, runs at the start of Save before the online-status
+	// write below is recorded — outside s.mu so a test can block one Save
+	// call in flight (simulating a slow write) without deadlocking a
+	// concurrent caller on a different id.
+	saveHook func(id int32)
 }
 
 func newFakeCharStore() *fakeCharStore {
-	return &fakeCharStore{byID: map[int32]*player.Character{}, names: map[string]bool{}, savedPositions: map[int32]savedPosition{}, online: map[int32]int64{}, offline: map[int32]int64{}, saveCount: map[int32]int{}}
+	return &fakeCharStore{byID: map[int32]*player.Character{}, names: map[string]bool{}, savedPositions: map[int32]savedPosition{}, online: map[int32]int64{}, offline: map[int32]int64{}, saveCount: map[int32]int{}, onlineSeq: map[int32][]string{}}
 }
 
 type savedPosition struct {
@@ -49,9 +56,15 @@ func (s *fakeCharStore) Create(_ context.Context, c *player.Character) error {
 }
 
 func (s *fakeCharStore) Save(_ context.Context, c *player.Character) error {
+	if s.saveHook != nil {
+		s.saveHook(c.ID)
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.saveCount[c.ID]++
+	// Mirrors character.go's CharacterStore.Save, which marks the row
+	// online (`online = 1`) as part of the same UPDATE (#1948).
+	s.onlineSeq[c.ID] = append(s.onlineSeq[c.ID], "online")
 	return nil
 }
 
@@ -59,6 +72,15 @@ func (s *fakeCharStore) saves(id int32) int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.saveCount[id]
+}
+
+// onlineSequence returns the ordered sequence of online/offline
+// online-status writes recorded for id, so a test can assert which write
+// landed last.
+func (s *fakeCharStore) onlineSequence(id int32) []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]string(nil), s.onlineSeq[id]...)
 }
 
 func (s *fakeCharStore) ListByAccount(_ context.Context, account string) ([]*player.Character, error) {
@@ -125,6 +147,7 @@ func (s *fakeCharStore) SetOnline(_ context.Context, id int32, lastAccess int64)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.online[id] = lastAccess
+	s.onlineSeq[id] = append(s.onlineSeq[id], "online")
 	return nil
 }
 
@@ -132,6 +155,7 @@ func (s *fakeCharStore) SetOffline(_ context.Context, id int32, lastAccess int64
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.offline[id] = lastAccess
+	s.onlineSeq[id] = append(s.onlineSeq[id], "offline")
 	return nil
 }
 
