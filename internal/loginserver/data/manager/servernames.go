@@ -24,14 +24,9 @@ type serverNamesFile struct {
 
 // LoadServerNames reads the id/name list from path.
 func LoadServerNames(path string) (*ServerNames, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("read server names %s: %w", path, err)
-	}
-
 	var doc serverNamesFile
-	if err := xml.Unmarshal(data, &doc); err != nil {
-		return nil, fmt.Errorf("parse server names %s: %w", path, err)
+	if err := readXML(path, &doc); err != nil {
+		return nil, fmt.Errorf("server names: %w", err)
 	}
 
 	n := &ServerNames{names: make(map[int]string, len(doc.Servers))}
@@ -41,6 +36,19 @@ func LoadServerNames(path string) (*ServerNames, error) {
 	}
 	sort.Ints(n.ids)
 	return n, nil
+}
+
+// readXML reads and unmarshals the XML document at path into dst, wrapping
+// either failure with the path and operation.
+func readXML(path string, dst any) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("xml: read %s: %w", path, err)
+	}
+	if err := xml.Unmarshal(data, dst); err != nil {
+		return fmt.Errorf("xml: parse %s: %w", path, err)
+	}
+	return nil
 }
 
 // Name returns the display name registered for id.

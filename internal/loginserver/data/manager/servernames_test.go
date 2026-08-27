@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -37,8 +38,27 @@ func TestLoadServerNames(t *testing.T) {
 }
 
 func TestLoadServerNamesMissingFile(t *testing.T) {
-	if _, err := LoadServerNames(filepath.Join(t.TempDir(), "missing.xml")); err == nil {
+	path := filepath.Join(t.TempDir(), "missing.xml")
+	_, err := LoadServerNames(path)
+	if err == nil {
 		t.Fatal("LoadServerNames() error = nil, want error for missing file")
+	}
+	if want := "server names: xml: read " + path; !strings.HasPrefix(err.Error(), want) {
+		t.Fatalf("LoadServerNames() error = %q, want prefix %q", err.Error(), want)
+	}
+}
+
+func TestLoadServerNamesMalformedFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "serverNames.xml")
+	mustWriteFile(t, path, `not xml`)
+
+	_, err := LoadServerNames(path)
+	if err == nil {
+		t.Fatal("LoadServerNames() error = nil, want error for malformed file")
+	}
+	if want := "server names: xml: parse " + path; !strings.HasPrefix(err.Error(), want) {
+		t.Fatalf("LoadServerNames() error = %q, want prefix %q", err.Error(), want)
 	}
 }
 
