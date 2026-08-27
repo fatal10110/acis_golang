@@ -56,8 +56,7 @@ type petDataElement struct {
 // an <npc> element missing or mangling a required attribute fails the whole
 // load: the caller gets an error rather than a partially populated table.
 //
-// log receives skipped-drop diagnostics; a nil log defaults to
-// the zero logger disables logging.
+// log receives skipped-drop diagnostics. Its zero value disables logging.
 func LoadNPCTemplates(dir string, items *item.Table, log zerolog.Logger) (*npc.Table, error) {
 
 	docs, err := loadXMLDocuments[npcFile](dir, "npc template")
