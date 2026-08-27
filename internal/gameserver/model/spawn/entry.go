@@ -112,13 +112,18 @@ func ParsePositions(raw string) ([]Position, error) {
 		}
 		return []Position{pos}, nil
 	}
-	if len(parts)%5 != 0 {
+	if len(parts) < 5 {
 		return nil, fmt.Errorf("spawn: malformed pos %q", raw)
 	}
 
-	positions := make([]Position, 0, len(parts)/5)
-	for i := 0; i < len(parts); i += 5 {
-		pos, err := parsePosition(parts[i:i+5], true)
+	// Java (SpawnManager.java:205-213) sizes the weighted array at
+	// loc.length/5 and loops i < loc.length/5: a token count of 5 or more
+	// that isn't a multiple of 5 yields floor(count/5) complete tuples, and
+	// the remainder tokens are silently dropped without being parsed.
+	groups := len(parts) / 5
+	positions := make([]Position, 0, groups)
+	for i := 0; i < groups; i++ {
+		pos, err := parsePosition(parts[i*5:i*5+5], true)
 		if err != nil {
 			return nil, err
 		}

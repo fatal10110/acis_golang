@@ -512,6 +512,12 @@ func TestNull(t *testing.T) {
 	if got := b.HeightNearest(0, 0, math.MinInt32); got != 0 {
 		t.Errorf("HeightNearest(0,0,MinInt32) = %d, want 0", got)
 	}
+	if got := b.HeightNearest(0, 0, 32768); got != -32768 {
+		t.Errorf("HeightNearest(0,0,32768) = %d, want -32768", got)
+	}
+	if got := b.HeightNearest(0, 0, -32769); got != 32767 {
+		t.Errorf("HeightNearest(0,0,-32769) = %d, want 32767", got)
+	}
 
 	if got := b.NSWENearest(0, 0, 0); got != AllDirections {
 		t.Errorf("NSWENearest = %v, want all", got)
