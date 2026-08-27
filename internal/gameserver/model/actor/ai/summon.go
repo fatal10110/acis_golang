@@ -174,25 +174,48 @@ func (s *Summon) StartOffensiveFollowTicker(log zerolog.Logger) *scheduler.Ticke
 	return scheduler.Start(summonOffensiveFollowTick, s.recheckOffensiveFollow, log)
 }
 
-// recheckOffensiveFollow re-evaluates an in-flight attack/cast offensive
-// follow every 500 ms (CreatureMove.java:556-561), matching the reference's
-// follow-task cadence, which runs independently of the shared 1 s AI think
-// tick. It is a no-op for any other intention, so friendly follow and idle
-// stay on that shared 1 s cadence.
+// recheckOffensiveFollow re-evaluates only the in-flight attack/cast
+// offensive follow every 500 ms (CreatureMove.java:556-561), matching the
+// reference's follow-task cadence, which runs independently of the shared
+// 1 s AI think tick. That reference task (offensiveFollowTask,
+// CreatureMove.java:563-584) manages movement only and has no attack/cast
+// execution path, so this deliberately calls MaybeStartOffensiveFollow
+// directly rather than the full thinkAttackLocked/thinkCastLocked — reusing
+// those would also re-run DoAttack/Cast on this 500 ms cadence once a
+// summon is already in range, doubling its attack/cast rate for any weapon
+// or cast fast enough to clear its cooldown inside 500 ms. Attack/cast
+// execution, friendly follow, and idle all stay on the shared 1 s Think
+// cadence.
 func (s *Summon) recheckOffensiveFollow() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	var err error
+	if s.actor.DenyAIAction() {
+		return
+	}
+
+	target := s.current.target
+	var attackRange int
 	switch s.current.kind {
 	case IntentionAttack:
-		_, err = s.thinkAttackLocked()
+		attackRange = s.actor.PhysicalAttackRange()
 	case IntentionCast:
-		_, err = s.thinkCastLocked()
+		if s.cast == nil {
+			return
+		}
+		attackRange = s.cast.Range(s.current.skill)
 	default:
 		return
 	}
-	if err != nil {
+
+	if lost, err := s.targetLostLocked(target); lost {
+		if err != nil {
+			s.log.Warn().Err(err).Msg("ai: summon broadcast")
+		}
+		return
+	}
+
+	if _, err := s.move.MaybeStartOffensiveFollow(target, attackRange); err != nil {
 		s.log.Warn().Err(err).Msg("ai: summon broadcast")
 	}
 }

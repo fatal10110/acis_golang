@@ -517,6 +517,7 @@ type recordingAttack struct {
 	attackingNow    bool
 	bowCooling      bool
 	target          attackable.Combatant
+	doAttackCalls   int
 	doAttackErr     error
 }
 
@@ -529,6 +530,7 @@ func (a *recordingAttack) CanAttack(target attackable.Combatant) bool {
 	return a.canAttack
 }
 func (a *recordingAttack) DoAttack(target attackable.Combatant) error {
+	a.doAttackCalls++
 	a.target = target
 	return a.doAttackErr
 }
@@ -543,6 +545,7 @@ type recordingCast struct {
 	skillType  string
 
 	castCalled   bool
+	castCalls    int
 	castedTarget attackable.Combatant
 	castedRef    skill.Ref
 }
@@ -563,6 +566,7 @@ func (c *recordingCast) CanCast(target attackable.Combatant, ref skill.Ref) bool
 
 func (c *recordingCast) Cast(target attackable.Combatant, ref skill.Ref) {
 	c.castCalled = true
+	c.castCalls++
 	c.castedTarget = target
 	c.castedRef = ref
 }
@@ -1638,6 +1642,74 @@ func TestSummonAIRecheckOffensiveFollowReissuesOnMovingTarget(t *testing.T) {
 	}
 	if got := brain.CurrentIntention(); got != IntentionAttack {
 		t.Fatalf("CurrentIntention() = %v, want attack still in flight", got)
+	}
+}
+
+// TestSummonAIRecheckOffensiveFollowDoesNotReattackInRange is the
+// regression test for the review finding that recheckOffensiveFollow
+// called the full thinkAttackLocked, which falls through to
+// attack.DoAttack whenever the summon is already in range (following ==
+// false) and not busy. Java's ATTACK_FOLLOW_INTERVAL task
+// (offensiveFollowTask, CreatureMove.java:563-584) only manages movement
+// and never initiates an attack, so a summon whose weapon clears its
+// cooldown inside 500 ms must not get a second DoAttack from this ticker.
+func TestSummonAIRecheckOffensiveFollowDoesNotReattackInRange(t *testing.T) {
+	owner := actor(100)
+	target := actor(200)
+	move := &summonMove{} // followStarted defaults to false: already in range.
+	strike := &recordingAttack{canAttack: true}
+	brain := NewSummon(owner, move, strike)
+
+	if !brain.TryToAttack(target) {
+		t.Fatal("TryToAttack() = false, want accepted attack")
+	}
+	if strike.doAttackCalls != 1 {
+		t.Fatalf("doAttackCalls after TryToAttack = %d, want 1", strike.doAttackCalls)
+	}
+
+	brain.recheckOffensiveFollow()
+
+	if strike.doAttackCalls != 1 {
+		t.Fatalf("doAttackCalls after 500 ms recheck = %d, want 1 (recheck must not re-attack)", strike.doAttackCalls)
+	}
+}
+
+// TestSummonAIRecheckOffensiveFollowDoesNotRecastInRange is the cast-path
+// counterpart of TestSummonAIRecheckOffensiveFollowDoesNotReattackInRange:
+// the 500 ms recheck must not fall through to cast.Cast either.
+func TestSummonAIRecheckOffensiveFollowDoesNotRecastInRange(t *testing.T) {
+	owner := actor(100)
+	target := actor(200)
+	// Starts out of range (chasing), so TryToCast queues the approach
+	// instead of casting immediately, matching thinkCastLocked's
+	// following==true early return and leaving the cast intention active.
+	move := &summonMove{recordingMove: recordingMove{followStarted: true}}
+	cast := &recordingCast{canAttempt: true, canCast: true}
+	brain := NewSummon(owner, move, &recordingAttack{})
+	brain.SetCastController(cast)
+	ref := skill.Ref{ID: 4139, Level: 8}
+
+	if !brain.TryToCast(target, ref) {
+		t.Fatal("TryToCast() = false, want accepted cast approach")
+	}
+	if cast.castCalls != 0 {
+		t.Fatalf("castCalls after TryToCast approach = %d, want 0 (still chasing)", cast.castCalls)
+	}
+	if got := brain.CurrentIntention(); got != IntentionCast {
+		t.Fatalf("CurrentIntention() after TryToCast approach = %v, want cast still in flight", got)
+	}
+
+	// Target now sits in range: the 500 ms recheck (recheckOffensiveFollow)
+	// must only re-evaluate the follow, not fall through to cast.Cast —
+	// that execution belongs exclusively to the shared 1 s Think cadence.
+	move.followStarted = false
+	brain.recheckOffensiveFollow()
+
+	if cast.castCalls != 0 {
+		t.Fatalf("castCalls after 500 ms recheck = %d, want 0 (recheck must not cast)", cast.castCalls)
+	}
+	if got := brain.CurrentIntention(); got != IntentionCast {
+		t.Fatalf("CurrentIntention() after recheck = %v, want cast still pending for Think", got)
 	}
 }
 
