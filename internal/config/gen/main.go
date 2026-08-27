@@ -1,7 +1,8 @@
 // Command gen regenerates internal/config/supported_keys_generated.go from
 // the keys actually read by config.Properties/config.Fields accessors,
-// intersected against the shipped .properties files under the reference
-// aCis_gameserver/config directory.
+// intersected against the shipped .properties files vendored under
+// internal/config/testdata/reference (a snapshot of aCis_gameserver/config,
+// kept self-contained here since CI checks out only this repository).
 //
 // Invoked via internal/config's //go:generate directive, which runs it with
 // the working directory set to internal/config.
@@ -25,8 +26,7 @@ func main() {
 	must(err)
 
 	goRoot := filepath.Join(cwd, "..", "..") // internal/config -> <go-root>
-	refConfigDir, err := findReferenceConfigDir(cwd)
-	must(err)
+	refConfigDir := filepath.Join(cwd, "testdata", "reference")
 
 	readKeys, err := scanReadKeys(goRoot)
 	must(err)
@@ -43,25 +43,6 @@ func main() {
 	}
 
 	must(writeRegistry(outFile, registry))
-}
-
-// findReferenceConfigDir walks upward from dir until it finds the outer
-// acis_public workspace root containing aCis_gameserver/config, so the same
-// directive works unchanged from the primary checkout and from a linked
-// worktree nested one level deeper.
-func findReferenceConfigDir(dir string) (string, error) {
-	for range 8 {
-		candidate := filepath.Join(dir, "aCis_gameserver", "config")
-		if info, err := os.Stat(candidate); err == nil && info.IsDir() {
-			return candidate, nil
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			break
-		}
-		dir = parent
-	}
-	return "", fmt.Errorf("aCis_gameserver/config not found above %s", dir)
 }
 
 func scanReadKeys(goRoot string) (map[string]bool, error) {
