@@ -119,6 +119,20 @@ func BoolInt32(b bool) int32 {
 	return 0
 }
 
+// Len returns the number of bytes written to w so far, including any frame
+// header reserved by NewFrameWriter/ResetFrame.
+func (w *Writer) Len() int {
+	return len(w.buf)
+}
+
+// PatchUint16 overwrites the little-endian 16-bit integer at offset (an
+// index previously obtained from Len, immediately before the field it now
+// patches was written) with v. Used to backfill a count field written
+// before its element count was known.
+func (w *Writer) PatchUint16(offset int, v uint16) {
+	binary.LittleEndian.PutUint16(w.buf[offset:offset+2], v)
+}
+
 // Bytes returns the assembled payload.
 func (w *Writer) Bytes() []byte {
 	return w.buf[w.payloadOffset:]
