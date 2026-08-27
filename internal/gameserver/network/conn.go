@@ -184,7 +184,9 @@ func (c *Conn) abort() {
 }
 
 func (c *Conn) stop() {
+	c.mu.Lock()
 	c.stopOnce.Do(func() { close(c.stopping) })
+	c.mu.Unlock()
 }
 
 func (c *Conn) send(queued queuedWrite) bool {
