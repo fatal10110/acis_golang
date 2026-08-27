@@ -369,6 +369,27 @@ func TestStatSetIntegerAccessorsRecognizeUnsignedKinds(t *testing.T) {
 	}
 }
 
+func TestStatSetIntegerAccessorsRejectUint64Overflow(t *testing.T) {
+	s := NewStatSet()
+	s.Set("overflow", uint64(math.MaxInt64)+1)
+
+	checks := []struct {
+		name string
+		get  func() error
+	}{
+		{"GetByte", func() error { _, err := s.GetByte("overflow"); return err }},
+		{"GetInt", func() error { _, err := s.GetInt("overflow"); return err }},
+		{"GetIntArray", func() error { _, err := s.GetIntArray("overflow"); return err }},
+		{"GetInt64", func() error { _, err := s.GetInt64("overflow"); return err }},
+		{"GetInt64Array", func() error { _, err := s.GetInt64Array("overflow"); return err }},
+	}
+	for _, check := range checks {
+		if err := check.get(); err == nil {
+			t.Errorf("%s(uint64 overflow) err = nil, want error", check.name)
+		}
+	}
+}
+
 func TestStatSetGettersFromStringCoercion(t *testing.T) {
 	s := NewStatSet()
 	s.Set("bool", "true")
