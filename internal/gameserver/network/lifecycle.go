@@ -27,6 +27,14 @@ func (l *GameClientLink) detachLivePlayer(ctx context.Context, live *livePlayer)
 	live.detaching = true
 	live.shadowExpiryMu.Unlock()
 
+	// Serializes against TaskEffects.Save (the autosave tick), which takes
+	// the same mutex before writing the online column: whichever of the two
+	// gets here first runs its whole save sequence to completion before the
+	// other's write can start, so an autosave write already in flight can
+	// never land after SaveOfflineRecency below (#1948).
+	live.saveMu.Lock()
+	defer live.saveMu.Unlock()
+
 	// One budget for the whole detach, not one per store: a logout with an
 	// active pet writes the character row, the skill state, the player
 	// inventory and the pet inventory, and each of those taking its own
