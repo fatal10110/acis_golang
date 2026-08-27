@@ -32,6 +32,39 @@ func TestParsePositionsRejectsMalformedCoordinate(t *testing.T) {
 	}
 }
 
+// Java (SpawnManager.java:205-213) sizes the weighted array at
+// loc.length/5 and loops only over complete groups: a trailing partial
+// group is silently dropped without being parsed, even if malformed.
+func TestParsePositionsDropsIncompleteTrailingWeightedGroup(t *testing.T) {
+	positions, err := ParsePositions("1;2;3;4;60%;garbage")
+	if err != nil {
+		t.Fatalf("ParsePositions error: %v", err)
+	}
+	if got, want := len(positions), 1; got != want {
+		t.Fatalf("len(positions) = %d, want %d", got, want)
+	}
+	if got := positions[0]; got.Location.X != 1 || got.Location.Y != 2 || got.Location.Z != 3 || got.Heading != 4 || got.Chance != 60 {
+		t.Fatalf("positions[0] = %+v, want x/y/z/heading/chance 1/2/3/4/60", got)
+	}
+}
+
+func TestParsePositionsFloorsGroupCountForNonMultipleTokenCounts(t *testing.T) {
+	// 9 tokens: one complete weighted group (5) plus a dropped partial (4).
+	positions, err := ParsePositions("1;2;3;4;10%;5;6;7;8")
+	if err != nil {
+		t.Fatalf("ParsePositions error: %v", err)
+	}
+	if got, want := len(positions), 1; got != want {
+		t.Fatalf("len(positions) = %d, want %d", got, want)
+	}
+}
+
+func TestParsePositionsRejectsFewerThanFourTokens(t *testing.T) {
+	if _, err := ParsePositions("1;2;3"); err == nil {
+		t.Fatal("ParsePositions error = nil, want a failure for an incomplete fixed tuple")
+	}
+}
+
 // ---- from respawn_test.go ----
 func TestCalculateRespawnDelayNoRespawnWhenDelayIsZero(t *testing.T) {
 	entry := Entry{RespawnDelay: 0, RespawnRandom: 5 * time.Second}
