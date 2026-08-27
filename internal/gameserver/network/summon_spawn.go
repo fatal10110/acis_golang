@@ -340,10 +340,16 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 	}
 	brain.SetCastController(aiController)
 	actor.SetAI(brain)
+	followTicker := brain.StartOffensiveFollowTicker(l.log)
 	if l.ai != nil {
 		runner := summonAIActor{Actor: actor, brain: brain}
 		l.ai.Add(runner)
-		actor.SetOnDespawn(func() { l.ai.Remove(runner) })
+		actor.SetOnDespawn(func() {
+			l.ai.Remove(runner)
+			followTicker.Stop()
+		})
+	} else {
+		actor.SetOnDespawn(followTicker.Stop)
 	}
 	actor.SetStatusUpdater(func() { l.broadcastSummonStatus(actor) })
 	actor.SetFrameBuilder(serverpackets.NpcFrameBuilder{})

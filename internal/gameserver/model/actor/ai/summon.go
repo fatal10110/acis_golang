@@ -3,14 +3,22 @@ package ai
 import (
 	"errors"
 	"sync"
+	"time"
 
 	"github.com/rs/zerolog"
 
+	"github.com/fatal10110/acis_golang/internal/commons/scheduler"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
 const summonFollowOffset = 70
+
+// summonOffensiveFollowTick is CreatureMove.java's ATTACK_FOLLOW_INTERVAL
+// (CreatureMove.java:41): a summon's offensive follow re-evaluates on its
+// own 500 ms schedule, independent of the shared 1 s AI think tick that
+// otherwise drives Think.
+const summonOffensiveFollowTick = 500 * time.Millisecond
 
 // SummonActor is the live summon state needed by the summon AI loop.
 type SummonActor interface {
@@ -160,6 +168,35 @@ func (s *Summon) TryToIdle() {
 	}
 }
 
+// StartOffensiveFollowTicker launches the 500 ms offensive-follow recheck
+// loop and returns its Ticker for the caller to Stop on despawn.
+func (s *Summon) StartOffensiveFollowTicker(log zerolog.Logger) *scheduler.Ticker {
+	return scheduler.Start(summonOffensiveFollowTick, s.recheckOffensiveFollow, log)
+}
+
+// recheckOffensiveFollow re-evaluates an in-flight attack/cast offensive
+// follow every 500 ms (CreatureMove.java:556-561), matching the reference's
+// follow-task cadence, which runs independently of the shared 1 s AI think
+// tick. It is a no-op for any other intention, so friendly follow and idle
+// stay on that shared 1 s cadence.
+func (s *Summon) recheckOffensiveFollow() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	var err error
+	switch s.current.kind {
+	case IntentionAttack:
+		_, err = s.thinkAttackLocked()
+	case IntentionCast:
+		_, err = s.thinkCastLocked()
+	default:
+		return
+	}
+	if err != nil {
+		s.log.Warn().Err(err).Msg("ai: summon broadcast")
+	}
+}
+
 // Think advances the current summon intention once. Any broadcast error is
 // logged through SetLogger — Think's own callers (the periodic AI task) have
 // no per-actor error path of their own.
@@ -197,8 +234,8 @@ func (s *Summon) thinkAttackLocked() (bool, error) {
 	}
 
 	target := s.current.target
-	if s.targetLostLocked(target) {
-		return false, nil
+	if lost, err := s.targetLostLocked(target); lost {
+		return false, err
 	}
 
 	following, err := s.move.MaybeStartOffensiveFollow(target, s.actor.PhysicalAttackRange())
@@ -232,8 +269,8 @@ func (s *Summon) thinkCastLocked() (bool, error) {
 
 	target := s.current.target
 	ref := s.current.skill
-	if s.targetLostLocked(target) {
-		return false, nil
+	if lost, err := s.targetLostLocked(target); lost {
+		return false, err
 	}
 
 	if !s.cast.CanAttempt(target, ref) {
@@ -273,8 +310,8 @@ func (s *Summon) thinkFollowLocked() (bool, error) {
 	}
 
 	target := s.current.target
-	if s.targetLostLocked(target) {
-		return false, nil
+	if lost, err := s.targetLostLocked(target); lost {
+		return false, err
 	}
 
 	_, err := s.move.MaybeStartFriendlyFollow(target, summonFollowOffset)
@@ -295,14 +332,17 @@ func (s *Summon) AttackingNow() bool {
 // unmodified by SummonAI's override at SummonAI.java:275-281): only a nil or
 // no-longer-known target counts as lost. Death (true or fake) is not a loss
 // condition here — a dead target keeps the attack/follow intention until it
-// despawns, same as the reference.
-func (s *Summon) targetLostLocked(target attackable.Combatant) bool {
+// despawns, same as the reference. On loss it also cancels any in-flight
+// movement leg (SummonMove.java:48-53's known-list-loss branch, which forces
+// the idle path's move.stop() rather than leaving a stale follow/chase
+// running toward a target the actor no longer knows about).
+func (s *Summon) targetLostLocked(target attackable.Combatant) (bool, error) {
 	if target == nil || !s.actor.Knows(target) {
 		s.current = intention{kind: IntentionIdle}
 		if sameCombatant(s.next.target, target) {
 			s.next = intention{}
 		}
-		return true
+		return true, s.move.Stop()
 	}
-	return false
+	return false, nil
 }

@@ -492,11 +492,13 @@ type recordingMove struct {
 	followStarted bool
 	followTarget  attackable.Combatant
 	followRange   int
+	followCalls   int
 	stopCount     int
 	stopErr       error
 }
 
 func (m *recordingMove) MaybeStartOffensiveFollow(target attackable.Combatant, attackRange int) (bool, error) {
+	m.followCalls++
 	m.followTarget = target
 	m.followRange = attackRange
 	return m.followStarted, nil
@@ -1605,6 +1607,86 @@ func TestSummonAITryToIdleStopsMovement(t *testing.T) {
 	}
 	if got := brain.CurrentIntention(); got != IntentionIdle {
 		t.Fatalf("CurrentIntention() = %v, want idle", got)
+	}
+}
+
+// TestSummonAIRecheckOffensiveFollowReissuesOnMovingTarget is the coverage
+// for #1960: CreatureMove.java's 500 ms ATTACK_FOLLOW_INTERVAL
+// (CreatureMove.java:41,556-561) re-evaluates an in-flight offensive follow
+// on its own schedule, independent of the shared 1 s AI think tick. Each
+// recheckOffensiveFollow call simulates one of those 500 ms ticks; a
+// moving/out-of-range target keeps reissuing the follow request without
+// waiting for Think.
+func TestSummonAIRecheckOffensiveFollowReissuesOnMovingTarget(t *testing.T) {
+	owner := actor(100)
+	target := actor(200)
+	move := &summonMove{recordingMove: recordingMove{followStarted: true}}
+	brain := NewSummon(owner, move, &recordingAttack{canAttack: true})
+
+	if !brain.TryToAttack(target) {
+		t.Fatal("TryToAttack() = false, want accepted attack")
+	}
+	if move.followCalls != 1 {
+		t.Fatalf("followCalls after TryToAttack = %d, want 1", move.followCalls)
+	}
+
+	brain.recheckOffensiveFollow()
+	brain.recheckOffensiveFollow()
+
+	if move.followCalls != 3 {
+		t.Fatalf("followCalls after two 500 ms rechecks = %d, want 3 (1 initial + 2 rechecks)", move.followCalls)
+	}
+	if got := brain.CurrentIntention(); got != IntentionAttack {
+		t.Fatalf("CurrentIntention() = %v, want attack still in flight", got)
+	}
+}
+
+// TestSummonAIRecheckOffensiveFollowIgnoresFriendlyFollow proves the 500 ms
+// offensive-follow recheck is a no-op outside an attack/cast intention, so
+// friendly (owner) follow stays on the shared 1 s AI think cadence.
+func TestSummonAIRecheckOffensiveFollowIgnoresFriendlyFollow(t *testing.T) {
+	owner := actor(100)
+	target := actor(200)
+	move := &summonMove{}
+	brain := NewSummon(owner, move, &recordingAttack{})
+
+	if !brain.TryToFollow(target) {
+		t.Fatal("TryToFollow() = false, want accepted follow")
+	}
+
+	brain.recheckOffensiveFollow()
+
+	if move.followCalls != 0 {
+		t.Fatalf("followCalls after recheck during friendly follow = %d, want 0", move.followCalls)
+	}
+}
+
+// TestSummonAITargetLostDuringOffensiveFollowRecheckCancelsStaleMove is the
+// known-list-loss coverage for #1960: SummonMove.java:48-53's follow-task
+// branch forces the idle path's move.stop() when a followed target drops
+// out of the known list mid-chase, so a stale movement leg can't keep
+// running toward a target the summon no longer knows about.
+func TestSummonAITargetLostDuringOffensiveFollowRecheckCancelsStaleMove(t *testing.T) {
+	owner := actor(100)
+	target := actor(200)
+	move := &summonMove{recordingMove: recordingMove{followStarted: true}}
+	brain := NewSummon(owner, move, &recordingAttack{canAttack: true})
+
+	if !brain.TryToAttack(target) {
+		t.Fatal("TryToAttack() = false, want accepted attack")
+	}
+	if move.stopCount != 0 {
+		t.Fatalf("stopCount after TryToAttack = %d, want 0", move.stopCount)
+	}
+
+	owner.known[target.id] = false
+	brain.recheckOffensiveFollow()
+
+	if move.stopCount != 1 {
+		t.Fatalf("stopCount after target lost = %d, want 1 (stale move canceled)", move.stopCount)
+	}
+	if got := brain.CurrentIntention(); got != IntentionIdle {
+		t.Fatalf("CurrentIntention() = %v, want idle after target lost", got)
 	}
 }
 
