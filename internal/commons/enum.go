@@ -2,7 +2,9 @@ package commons
 
 // ReverseMap builds the string->E lookup table for an E->string table
 // declared next to an enum's constants, so the two stay in sync by
-// construction instead of being maintained as two separate literals.
+// construction instead of being maintained as two separate literals. m must
+// not contain duplicate strings; the selected enum for a duplicate is
+// unspecified.
 func ReverseMap[E comparable](m map[E]string) map[string]E {
 	names := make(map[string]E, len(m))
 	for e, s := range m {

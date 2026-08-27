@@ -64,7 +64,9 @@ func (c *Conn) writeLoop() {
 			c.log.Error().Interface("panic", r).Msg("game connection writer panic")
 		}
 		c.stop()
+		c.mu.Lock()
 		c.releaseQueued()
+		c.mu.Unlock()
 		c.closeErr = c.Conn.Close()
 		close(c.stopped)
 	}()
