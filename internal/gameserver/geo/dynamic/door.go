@@ -31,6 +31,11 @@ func NewDoorObject(tmpl *door.Template, sampler Sampler) (Object, error) {
 		return nil, fmt.Errorf("geo/dynamic: nil sampler")
 	}
 
+	triangles, err := triangulate(tmpl.Coordinates)
+	if err != nil {
+		return nil, fmt.Errorf("geo/dynamic: door %d: %w", tmpl.ID, err)
+	}
+
 	minX, maxX, minY, maxY := bounds(tmpl.Coordinates)
 	x := geoX(minX) - 1
 	y := geoY(minY) - 1
@@ -66,7 +71,7 @@ func NewDoorObject(tmpl *door.Template, sampler Sampler) (Object, error) {
 		cell:
 			for sx := wx - 6; sx <= wx+6; sx += 2 {
 				for sy := wy - 6; sy <= wy+6; sy += 2 {
-					if pointInPolygon(tmpl.Coordinates, location.Point{X: sx, Y: sy}) {
+					if polygonContains(triangles, sx, sy) {
 						inside[ix][iy] = true
 						break cell
 					}
@@ -104,23 +109,174 @@ func bounds(points []location.Point) (minX, maxX, minY, maxY int) {
 	return
 }
 
-func pointInPolygon(poly []location.Point, p location.Point) bool {
-	inside := false
-	j := len(poly) - 1
-	for i := 0; i < len(poly); i++ {
-		yi := poly[i].Y
-		yj := poly[j].Y
-		if (yi > p.Y) != (yj > p.Y) {
-			xi := poly[i].X
-			xj := poly[j].X
-			cross := float64(xj-xi)*float64(p.Y-yi)/float64(yj-yi) + float64(xi)
-			if float64(p.X) < cross {
-				inside = !inside
-			}
-		}
-		j = i
+// triangle mirrors the aCis reference's Triangle: it stores point A and the
+// BA/CA edge vectors so isInside can run its exact-integer half-plane test.
+type triangle struct {
+	ax, ay   int
+	bax, bay int
+	cax, cay int
+}
+
+func newTriangle(a, b, c location.Point) triangle {
+	return triangle{
+		ax: a.X, ay: a.Y,
+		bax: b.X - a.X, bay: b.Y - a.Y,
+		cax: c.X - a.X, cay: c.Y - a.Y,
 	}
-	return inside
+}
+
+// isInside reports whether (x, y) lies on the same side of all three edges,
+// edges inclusive. Products use int64 to match the reference's long math.
+func (t triangle) isInside(x, y int) bool {
+	dx := int64(x - t.ax)
+	dy := int64(y - t.ay)
+	bax, bay := int64(t.bax), int64(t.bay)
+	cax, cay := int64(t.cax), int64(t.cay)
+
+	a := (0-dx)*(bay-0)-(bax-0)*(0-dy) >= 0
+	b := (bax-dx)*(cay-bay)-(cax-bax)*(bay-dy) >= 0
+	c := (cax-dx)*(0-cay)-(0-cax)*(cay-dy) >= 0
+	return a == b && b == c
+}
+
+// polygonContains reports whether (x, y) falls inside any triangle of a
+// triangulated polygon, matching the reference's Polygon.isInside.
+func polygonContains(triangles []triangle, x, y int) bool {
+	for _, t := range triangles {
+		if t.isInside(x, y) {
+			return true
+		}
+	}
+	return false
+}
+
+const triangulationMaxLoops = 100
+
+// triangulate ear-clips poly into triangles using Kong's algorithm, matching
+// the reference's Kong.doTriangulation. poly must be a simple, monotone
+// polygon; anything else fails after triangulationMaxLoops ear-search passes.
+func triangulate(poly []location.Point) ([]triangle, error) {
+	if len(poly) < 3 {
+		return nil, fmt.Errorf("geo/dynamic: polygon needs at least 3 points, got %d", len(poly))
+	}
+
+	points := append([]location.Point(nil), poly...)
+	isCw := polygonOrientation(points)
+	nonConvex := nonConvexPoints(points, isCw)
+	return triangulationAlgorithm(points, isCw, nonConvex)
+}
+
+func nextIndex(size, index int) int {
+	if index++; index >= size {
+		return index - size
+	}
+	return index
+}
+
+func prevIndex(size, index int) int {
+	if index--; index < 0 {
+		return size + index
+	}
+	return index
+}
+
+func polygonOrientation(points []location.Point) bool {
+	size := len(points)
+	index := 0
+	point := points[0]
+	for i := 1; i < size; i++ {
+		pt := points[i]
+		if pt.X < point.X || (pt.X == point.X && pt.Y > point.Y) {
+			point = pt
+			index = i
+		}
+	}
+	prev := points[prevIndex(size, index)]
+	next := points[nextIndex(size, index)]
+	vx := point.X - prev.X
+	vy := point.Y - prev.Y
+	res := next.X*vy - next.Y*vx + vx*prev.Y - vy*prev.X
+	return res <= 0
+}
+
+func nonConvexPoints(points []location.Point, isCw bool) []location.Point {
+	size := len(points)
+	var out []location.Point
+	for i := 0; i < size-1; i++ {
+		point := points[i]
+		next := points[nextIndex(size, i)]
+		nextNext := points[nextIndex(size, i+1)]
+		vx := next.X - point.X
+		vy := next.Y - point.Y
+		res := (nextNext.X*vy - nextNext.Y*vx + vx*point.Y - vy*point.X) > 0
+		if res == isCw {
+			out = append(out, next)
+		}
+	}
+	return out
+}
+
+func isConvex(isCw bool, a, b, c location.Point) bool {
+	bax := b.X - a.X
+	bay := b.Y - a.Y
+	cw := (c.X*bay - c.Y*bax + bax*a.Y - bay*a.X) > 0
+	return cw != isCw
+}
+
+// kongPointInTriangle is Kong's own ear-detection containment test: strict,
+// float-division barycentric coefficients, distinct from triangle.isInside.
+func kongPointInTriangle(a, b, c, p location.Point) bool {
+	bax := float64(b.X - a.X)
+	bay := float64(b.Y - a.Y)
+	cax := float64(c.X - a.X)
+	cay := float64(c.Y - a.Y)
+	pax := float64(p.X - a.X)
+	pay := float64(p.Y - a.Y)
+
+	det := bax*cay - cax*bay
+	ba := (bax*pay - pax*bay) / det
+	ca := (pax*cay - cax*pay) / det
+	return ba > 0 && ca > 0 && (ba+ca) < 1
+}
+
+func isEar(isCw bool, nonConvex []location.Point, a, b, c location.Point) bool {
+	if !isConvex(isCw, a, b, c) {
+		return false
+	}
+	for _, p := range nonConvex {
+		if kongPointInTriangle(a, b, c, p) {
+			return false
+		}
+	}
+	return true
+}
+
+func triangulationAlgorithm(points []location.Point, isCw bool, nonConvex []location.Point) ([]triangle, error) {
+	var triangles []triangle
+	size := len(points)
+	index := 1
+	for loops := 0; size > 3; loops++ {
+		if loops == triangulationMaxLoops {
+			return nil, fmt.Errorf("geo/dynamic: coordinates do not form a monotone polygon")
+		}
+
+		indexPrev := prevIndex(size, index)
+		indexNext := nextIndex(size, index)
+		pPrev := points[indexPrev]
+		p := points[index]
+		pNext := points[indexNext]
+
+		if isEar(isCw, nonConvex, pPrev, p, pNext) {
+			triangles = append(triangles, newTriangle(pPrev, p, pNext))
+			points = append(points[:index], points[index+1:]...)
+			size--
+			index = prevIndex(size, index)
+		} else {
+			index = indexNext
+		}
+	}
+	triangles = append(triangles, newTriangle(points[0], points[1], points[2]))
+	return triangles, nil
 }
 
 func geoX(worldX int) int { return (worldX - worldXMin) >> 4 }

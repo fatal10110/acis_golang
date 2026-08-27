@@ -86,6 +86,52 @@ func TestCalculateGeoObject(t *testing.T) {
 	}
 }
 
+// TestPolygonContainsMatchesTriangulationNotRayCasting locks the reference's
+// Kong-triangulation containment semantics (Polygon.isInside summed over
+// Kong.doTriangulation) for a self-touching polygon, where even-odd ray
+// casting over the raw vertex ring disagrees at the shared vertex.
+func TestPolygonContainsMatchesTriangulationNotRayCasting(t *testing.T) {
+	poly := []location.Point{
+		{X: 0, Y: 0}, {X: 10, Y: 0}, {X: 5, Y: 5},
+		{X: 10, Y: 10}, {X: 0, Y: 10}, {X: 5, Y: 5},
+	}
+	triangles, err := triangulate(poly)
+	if err != nil {
+		t.Fatalf("triangulate() error = %v", err)
+	}
+
+	p := location.Point{X: 5, Y: 5}
+	if !polygonContains(triangles, p.X, p.Y) {
+		t.Fatalf("polygonContains(%v) = false, want true (Kong triangulation includes the shared vertex)", p)
+	}
+}
+
+func TestPolygonContainsConcaveNotch(t *testing.T) {
+	// L-shaped concave polygon; (7,7) falls in the notch cut out of the
+	// bounding box and must be classified outside.
+	poly := []location.Point{
+		{X: 0, Y: 0}, {X: 10, Y: 0}, {X: 10, Y: 4},
+		{X: 4, Y: 4}, {X: 4, Y: 10}, {X: 0, Y: 10},
+	}
+	triangles, err := triangulate(poly)
+	if err != nil {
+		t.Fatalf("triangulate() error = %v", err)
+	}
+
+	if polygonContains(triangles, 7, 7) {
+		t.Fatal("polygonContains(7, 7) = true, want false (point is in the L-shape's notch)")
+	}
+	if !polygonContains(triangles, 2, 2) {
+		t.Fatal("polygonContains(2, 2) = false, want true (point is inside the L-shape)")
+	}
+}
+
+func TestTriangulateRejectsFewerThanThreePoints(t *testing.T) {
+	if _, err := triangulate([]location.Point{{X: 0, Y: 0}, {X: 1, Y: 1}}); err == nil {
+		t.Fatal("triangulate([2 points]) error = nil, want error")
+	}
+}
+
 func TestBlockAddRemoveComplex(t *testing.T) {
 	base := block.NewFlat(0)
 	b := NewBlock(1, 2, base)
