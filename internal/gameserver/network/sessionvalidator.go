@@ -126,20 +126,50 @@ func (v *SessionValidator) Validate(ctx context.Context, client *Client, req cli
 
 	select {
 	case ok := <-result:
-		if !ok {
+		// waitCtx.Err() is re-checked here, not just above: waitCtx and result
+		// can become ready in the same instant, and Go's select then picks
+		// pseudo-randomly between this case and the case below. Deciding
+		// precedence again at the point of consuming result, rather than
+		// trusting which case fired, is what makes cancellation win either way.
+		switch outcome := decideValidation(waitCtx.Err(), ok); outcome {
+		case validationCanceled:
+			return false, waitCtx.Err()
+		case validationRejected:
 			client.Session.SendFrame(serverpackets.FrameAuthLoginFail(serverpackets.LoginFailSystemErrorTryLater))
 			return false, nil
+		default:
+			client.SetAuthenticated(req.LoginName, link.SessionKey{
+				LoginKey1: req.LoginKey1,
+				LoginKey2: req.LoginKey2,
+				PlayKey1:  req.PlayKey1,
+				PlayKey2:  req.PlayKey2,
+			})
+			return true, nil
 		}
-		client.SetAuthenticated(req.LoginName, link.SessionKey{
-			LoginKey1: req.LoginKey1,
-			LoginKey2: req.LoginKey2,
-			PlayKey1:  req.PlayKey1,
-			PlayKey2:  req.PlayKey2,
-		})
-		return true, nil
 	case <-loginLink.Done():
 		return false, errLoginLinkClosed
 	case <-waitCtx.Done():
 		return false, waitCtx.Err()
 	}
+}
+
+// validationOutcome resolves the precedence between a login-server answer
+// and cancellation when both are available at once: cancellation always
+// wins, even over a positive match.
+type validationOutcome int
+
+const (
+	validationCanceled validationOutcome = iota
+	validationRejected
+	validationApproved
+)
+
+func decideValidation(waitCtxErr error, ok bool) validationOutcome {
+	if waitCtxErr != nil {
+		return validationCanceled
+	}
+	if !ok {
+		return validationRejected
+	}
+	return validationApproved
 }
