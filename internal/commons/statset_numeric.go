@@ -43,41 +43,46 @@ func asNumber(val any) (float64, bool) {
 // int64 value beyond float64's 53-bit mantissa round-trips exactly through
 // the integer accessors (GetByte, GetInt, GetInt64, and their array/Default
 // variants).
-func asInt64(val any) (int64, bool) {
+func asInt64(val any) (int64, bool, error) {
 	switch v := val.(type) {
 	case int:
-		return int64(v), true
+		return int64(v), true, nil
 	case int8:
-		return int64(v), true
+		return int64(v), true, nil
 	case int16:
-		return int64(v), true
+		return int64(v), true, nil
 	case int32:
-		return int64(v), true
+		return int64(v), true, nil
 	case int64:
-		return v, true
+		return v, true, nil
 	case uint:
-		return int64(v), true
+		return int64(v), true, nil
 	case uint8:
-		return int64(v), true
+		return int64(v), true, nil
 	case uint16:
-		return int64(v), true
+		return int64(v), true, nil
 	case uint32:
-		return int64(v), true
+		return int64(v), true, nil
 	case uint64:
-		return int64(v), true
+		if v > math.MaxInt64 {
+			return 0, true, fmt.Errorf("value %d overflows int64", v)
+		}
+		return int64(v), true, nil
 	case float32:
-		return int64(v), true
+		return int64(v), true, nil
 	case float64:
-		return int64(v), true
+		return int64(v), true, nil
 	}
-	return 0, false
+	return 0, false, nil
 }
 
 // coerceByte coerces val to a byte from a numeric or numeric string
 // representation. ok reports whether val was a recognized kind; err reports
 // a recognized-but-malformed numeric string.
 func coerceByte(val any) (v byte, ok bool, err error) {
-	if n, ok := asInt64(val); ok {
+	if n, ok, err := asInt64(val); err != nil {
+		return 0, true, err
+	} else if ok {
 		return byte(n), true, nil
 	}
 	if str, ok := val.(string); ok {
@@ -257,7 +262,9 @@ func (s *StatSet) GetFloat32Default(key string, defaultValue float32) (float32, 
 // (1/0) representation. ok reports whether val was a recognized kind; err
 // reports a recognized-but-malformed numeric string.
 func coerceInt(val any) (v int, ok bool, err error) {
-	if n, ok := asInt64(val); ok {
+	if n, ok, err := asInt64(val); err != nil {
+		return 0, true, err
+	} else if ok {
 		return int(n), true, nil
 	}
 	if str, ok := val.(string); ok {
@@ -375,7 +382,9 @@ func coerceIntArray(val any) (v []int, ok bool, err error) {
 	if arr, ok := val.([]int); ok {
 		return arr, true, nil
 	}
-	if n, ok := asInt64(val); ok {
+	if n, ok, err := asInt64(val); err != nil {
+		return nil, true, err
+	} else if ok {
 		return []int{int(n)}, true, nil
 	}
 	if str, ok := val.(string); ok {
@@ -441,7 +450,9 @@ func (s *StatSet) GetInt64Default(key string, defaultValue int64) (int64, error)
 // bool (1/0) representation. ok reports whether val was a recognized kind;
 // err reports a recognized-but-malformed numeric string.
 func coerceInt64(val any) (v int64, ok bool, err error) {
-	if n, ok := asInt64(val); ok {
+	if n, ok, err := asInt64(val); err != nil {
+		return 0, true, err
+	} else if ok {
 		return n, true, nil
 	}
 	if str, ok := val.(string); ok {
@@ -469,7 +480,9 @@ func (s *StatSet) GetInt64Array(key string) ([]int64, error) {
 	if arr, ok := val.([]int64); ok {
 		return arr, nil
 	}
-	if n, ok := asInt64(val); ok {
+	if n, ok, err := asInt64(val); err != nil {
+		return nil, fmt.Errorf("commons: StatSet key %q: %w", key, err)
+	} else if ok {
 		return []int64{n}, nil
 	}
 	if str, ok := val.(string); ok {
