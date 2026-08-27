@@ -235,16 +235,41 @@ func (s *CharacterStore) SetOffline(ctx context.Context, objectID int32, lastAcc
 	return nil
 }
 
-// Delete removes the character row for objectID. It reports whether a row
-// was deleted.
-func (s *CharacterStore) Delete(ctx context.Context, objectID int32) (bool, error) {
-	res, err := s.db.ExecContext(ctx, "DELETE FROM characters WHERE obj_Id = ?", objectID)
+// Purge removes the character row for objectID together with every row it
+// owns - its items and its shortcuts - as one transaction, so a failure or
+// cancellation partway through leaves all of them in place instead of
+// orphaning owned rows behind a deleted character. It reports whether a
+// character row was deleted.
+func (s *CharacterStore) Purge(ctx context.Context, objectID int32) (bool, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
-		return false, fmt.Errorf("delete character %d: %w", objectID, err)
+		return false, fmt.Errorf("begin purge character %d: %w", objectID, err)
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+
+	res, err := tx.ExecContext(ctx, "DELETE FROM characters WHERE obj_Id = ?", objectID)
+	if err != nil {
+		return false, fmt.Errorf("purge character %d: %w", objectID, err)
 	}
 	n, err := res.RowsAffected()
 	if err != nil {
-		return false, fmt.Errorf("delete character %d: %w", objectID, err)
+		return false, fmt.Errorf("purge character %d: %w", objectID, err)
 	}
+	if _, err := tx.ExecContext(ctx, "DELETE FROM items WHERE owner_id = ?", objectID); err != nil {
+		return false, fmt.Errorf("purge character %d items: %w", objectID, err)
+	}
+	if _, err := tx.ExecContext(ctx, "DELETE FROM character_shortcuts WHERE char_obj_id = ?", objectID); err != nil {
+		return false, fmt.Errorf("purge character %d shortcuts: %w", objectID, err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return false, fmt.Errorf("commit purge character %d: %w", objectID, err)
+	}
+	committed = true
 	return n > 0, nil
 }
