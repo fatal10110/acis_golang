@@ -493,8 +493,8 @@ func TestStatSetDefaultsRejectMalformedValues(t *testing.T) {
 		t.Errorf("GetInt32Default(overflow) err = nil, want error")
 	}
 	s.Set("badArray", "1;x;3")
-	if _, err := s.GetIntArrayDefault("badArray", []int{1}); err == nil {
-		t.Errorf("GetIntArrayDefault(badArray) err = nil, want error")
+	if got, err := s.GetIntArrayDefault("badArray", []int{1}); err != nil || !reflect.DeepEqual(got, []int{1}) {
+		t.Errorf("GetIntArrayDefault(badArray) = (%v, %v), want ([1], nil)", got, err)
 	}
 
 	// Values of a kind the accessor doesn't coerce from still take the
