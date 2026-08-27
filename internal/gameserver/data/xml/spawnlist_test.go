@@ -154,6 +154,44 @@ func TestLoadSpawnlistAllowsIdenticalDuplicateTerritory(t *testing.T) {
 	}
 }
 
+func TestLoadSpawnlistRetainsConflictingDuplicateTerritory(t *testing.T) {
+	dir := t.TempDir()
+	writeXMLFixture(t, filepath.Join(dir, "21_24.xml"), `<?xml version="1.0" encoding="utf-8"?>
+<list>
+	<territory name="a" minZ="0" maxZ="1">
+		<node x="0" y="0"/>
+		<node x="1" y="0"/>
+		<node x="1" y="1"/>
+	</territory>
+	<territory name="a" minZ="0" maxZ="1">
+		<node x="0" y="0"/>
+		<node x="2" y="0"/>
+		<node x="2" y="2"/>
+	</territory>
+	<npcmaker name="maker" territory="a" maximumNpcs="1">
+		<npc id="1" total="1"/>
+	</npcmaker>
+</list>`)
+
+	table, err := LoadSpawnlist(dir)
+	if err != nil {
+		t.Fatalf("LoadSpawnlist(%q) error: %v", dir, err)
+	}
+	if got, want := table.TerritoryCount(), 2; got != want {
+		t.Fatalf("TerritoryCount() = %d, want %d", got, want)
+	}
+	maker, ok := table.Maker("maker")
+	if !ok {
+		t.Fatal("Maker(maker) = missing")
+	}
+	if got, want := len(maker.Territories), 1; got != want {
+		t.Fatalf("len(maker.Territories) = %d, want %d", got, want)
+	}
+	if got, want := maker.Territories[0].Nodes[1].X, 1; got != want {
+		t.Fatalf("maker.Territories[0].Nodes[1].X = %d, want %d (first-declared territory)", got, want)
+	}
+}
+
 func TestLoadSpawnlistErrors(t *testing.T) {
 	tests := []struct {
 		name string
@@ -178,14 +216,6 @@ func TestLoadSpawnlistErrors(t *testing.T) {
 			xml: `<?xml version="1.0"?><list>
 				<territory name="a" minZ="0" maxZ="1"><node x="0" y="0"/><node x="1" y="0"/><node x="1" y="1"/></territory>
 				<npcmaker name="maker" territory="a" maximumNpcs="1"><npc id="1" total="1" respawn="oopsmin"/></npcmaker>
-			</list>`,
-		},
-		{
-			name: "conflicting duplicate territory",
-			xml: `<?xml version="1.0"?><list>
-				<territory name="a" minZ="0" maxZ="1"><node x="0" y="0"/><node x="1" y="0"/><node x="1" y="1"/></territory>
-				<territory name="a" minZ="0" maxZ="1"><node x="0" y="0"/><node x="2" y="0"/><node x="2" y="2"/></territory>
-				<npcmaker name="maker" territory="a" maximumNpcs="1"><npc id="1" total="1"/></npcmaker>
 			</list>`,
 		},
 	}
