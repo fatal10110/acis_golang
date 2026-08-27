@@ -166,7 +166,9 @@ func (s *fakeCharStore) lastOffline(id int32) (int64, bool) {
 	return v, ok
 }
 
-func (s *fakeCharStore) Delete(_ context.Context, id int32) (bool, error) {
+// Purge drops the character row only: this fake owns no item or shortcut
+// state to cascade into.
+func (s *fakeCharStore) Purge(_ context.Context, id int32) (bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	_, ok := s.byID[id]
