@@ -364,6 +364,32 @@ func TestCreatureMove_FriendlyFollowTick(t *testing.T) {
 	}
 }
 
+func TestCreatureMove_FriendlyFollowTickMovesAtExactRange(t *testing.T) {
+	origin := location.Location{X: 10, Y: 20, Z: 30}
+	target := TargetSnapshot{
+		ObjectID:        2,
+		Known:           true,
+		Position:        location.Location{X: 100, Y: 20, Z: 30},
+		CollisionRadius: 10.9,
+	}
+	mover, err := NewCreatureMove(origin, 50, &recordingGeo{canMove: true, height: 30})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mover.StartFriendlyFollow(target.ObjectID, 70)
+
+	event, moved, err := mover.FollowTick(target, 9.9)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !moved {
+		t.Fatal("FollowTick() moved = false at the exact follow range, want true")
+	}
+	if event.Destination != target.Position {
+		t.Fatalf("FollowTick() destination = %+v, want %+v", event.Destination, target.Position)
+	}
+}
+
 func TestCreatureMove_FollowTickSkipsWhenTargetDoesNotNeedMove(t *testing.T) {
 	origin := location.Location{X: 10, Y: 20, Z: 30}
 	tests := []struct {
