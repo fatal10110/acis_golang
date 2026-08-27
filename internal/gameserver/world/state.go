@@ -17,10 +17,13 @@ type State struct {
 	players *registry
 	pets    *registry // keyed by the pet owner's id, not the pet's own id
 
-	// playerNamesMu guards playerNames, the case-insensitive online-player
-	// name index kept in sync with players by AddPlayer/RemovePlayer.
-	playerNamesMu sync.RWMutex
-	playerNames   map[string]int32
+	// playersMu serializes AddPlayer/RemovePlayer so the players registry
+	// mutation and the playerNames index mutation happen as one atomic
+	// step; two independently-locked steps let a same-id AddPlayer and
+	// RemovePlayer interleave and leave a stale playerNames entry that
+	// blocks a later, different player from registering under that name.
+	playersMu   sync.RWMutex
+	playerNames map[string]int32
 
 	// regionActivityMu serializes a Player's region-activity accounting
 	// (relocate's playersCount updates plus the resulting Region.setActive
@@ -73,31 +76,35 @@ func (s *State) Object(id int32) (worldobject.Object, bool) { return s.objects.g
 func (s *State) Objects() []worldobject.Object { return s.objects.all() }
 
 // AddPlayer marks obj online, unless a player with the same id is already
-// tracked, and indexes its name for PlayerByName lookups.
+// tracked, and indexes its name for PlayerByName lookups. The registry and
+// name-index updates happen under one lock so a concurrent RemovePlayer for
+// the same id can't interleave between them.
 func (s *State) AddPlayer(obj worldobject.Object) {
+	s.playersMu.Lock()
+	defer s.playersMu.Unlock()
+
 	s.players.add(obj.ObjectID(), obj)
 
 	if np, ok := obj.(namedPlayer); ok {
 		name := strings.ToLower(np.CharacterName())
-		s.playerNamesMu.Lock()
 		if _, exists := s.playerNames[name]; !exists {
 			s.playerNames[name] = obj.ObjectID()
 		}
-		s.playerNamesMu.Unlock()
 	}
 }
 
 // RemovePlayer marks the player with the given id offline and drops its
-// name index entry.
+// name index entry, under the same lock as AddPlayer.
 func (s *State) RemovePlayer(id int32) {
+	s.playersMu.Lock()
+	defer s.playersMu.Unlock()
+
 	if obj, ok := s.players.get(id); ok {
 		if np, ok := obj.(namedPlayer); ok {
 			name := strings.ToLower(np.CharacterName())
-			s.playerNamesMu.Lock()
 			if s.playerNames[name] == id {
 				delete(s.playerNames, name)
 			}
-			s.playerNamesMu.Unlock()
 		}
 	}
 
@@ -110,9 +117,9 @@ func (s *State) Player(id int32) (worldobject.Object, bool) { return s.players.g
 // PlayerByName returns the online player with the given name, matched
 // case-insensitively, mirroring Java's World.getPlayer(String).
 func (s *State) PlayerByName(name string) (worldobject.Object, bool) {
-	s.playerNamesMu.RLock()
+	s.playersMu.RLock()
 	id, ok := s.playerNames[strings.ToLower(name)]
-	s.playerNamesMu.RUnlock()
+	s.playersMu.RUnlock()
 	if !ok {
 		return nil, false
 	}
