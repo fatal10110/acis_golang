@@ -470,3 +470,22 @@ func TestFrameWriterBackfillsHeaderWithoutChangingBytes(t *testing.T) {
 		t.Fatalf("Frame() = % X, want % X", got, wantFrame)
 	}
 }
+
+func TestPacketHelpers(t *testing.T) {
+	r := NewPacketReader([]byte{0x14, 0x7f})
+	if got := r.ReadUint8(); got != 0x7f {
+		t.Fatalf("NewPacketReader() next byte = %#x, want %#x", got, byte(0x7f))
+	}
+	if err := r.Err(); err != nil {
+		t.Fatalf("NewPacketReader() Err() = %v, want nil", err)
+	}
+	if err := NewPacketReader(nil).Err(); err != ErrShortPacket {
+		t.Fatalf("NewPacketReader(nil).Err() = %v, want %v", err, ErrShortPacket)
+	}
+
+	w := NewPacketWriter(0x14)
+	w.WriteUint8(0x7f)
+	if got, want := w.Bytes(), []byte{0x14, 0x7f}; !bytes.Equal(got, want) {
+		t.Fatalf("NewPacketWriter() bytes = % X, want % X", got, want)
+	}
+}
