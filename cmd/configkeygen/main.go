@@ -1,5 +1,5 @@
-// Command gen regenerates internal/config/supported_keys_generated.go from
-// the keys actually read by config.Properties/config.Fields accessors,
+// Command configkeygen regenerates internal/config/supported_keys_generated.go
+// from the keys actually read by config.Properties/config.Fields accessors,
 // intersected against the shipped .properties files vendored under
 // internal/config/testdata/reference (a snapshot of aCis_gameserver/config,
 // kept self-contained here since CI checks out only this repository).

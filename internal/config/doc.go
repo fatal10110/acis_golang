@@ -1,4 +1,4 @@
 // Package config loads server configuration files.
 package config
 
-//go:generate go run ./gen
+//go:generate go run ../../cmd/configkeygen

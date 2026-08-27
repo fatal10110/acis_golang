@@ -18,8 +18,8 @@ func TestSupportedKeysUpToDate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	goRoot := filepath.Join(cwd, "..", "..", "..") // gen -> config -> internal -> <go-root>, since `go test` runs in this package's own dir
-	refConfigDir := filepath.Join(cwd, "..", "testdata", "reference")
+	goRoot := filepath.Join(cwd, "..", "..") // configkeygen -> cmd -> <go-root>, since `go test` runs in this package's own dir
+	refConfigDir := filepath.Join(cwd, "..", "..", "internal", "config", "testdata", "reference")
 
 	readKeys, err := scanReadKeys(goRoot)
 	if err != nil {
