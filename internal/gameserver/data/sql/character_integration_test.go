@@ -2,11 +2,13 @@ package sql
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
 
@@ -214,31 +216,97 @@ func TestCharacterStore_SetDeleteAt(t *testing.T) {
 	}
 }
 
-func TestCharacterStore_Delete(t *testing.T) {
+func TestCharacterStore_Purge(t *testing.T) {
 	ctx := context.Background()
-	store := NewCharacterStore(sqltest.SharedDB(t))
+	db := sqltest.SharedDB(t)
+	store := NewCharacterStore(db)
 
 	c := testCharacter(0x10000001, "Newbie")
 	if err := store.Create(ctx, c); err != nil {
 		t.Fatalf("Create() unexpected error: %v", err)
 	}
+	seedOwnedRows(t, db, c.ID)
 
-	deleted, err := store.Delete(ctx, c.ID)
+	deleted, err := store.Purge(ctx, c.ID)
 	if err != nil {
-		t.Fatalf("Delete() unexpected error: %v", err)
+		t.Fatalf("Purge() unexpected error: %v", err)
 	}
 	if !deleted {
-		t.Error("Delete() on existing character deleted = false, want true")
+		t.Error("Purge() on existing character deleted = false, want true")
 	}
 	if _, err := store.Get(ctx, c.ID); !errors.Is(err, ErrCharacterNotFound) {
-		t.Fatalf("Get() after delete: got err %v, want ErrCharacterNotFound", err)
+		t.Fatalf("Get() after purge: got err %v, want ErrCharacterNotFound", err)
+	}
+	if n := countRows(t, db, "SELECT COUNT(*) FROM items WHERE owner_id = ?", c.ID); n != 0 {
+		t.Errorf("item rows after purge = %d, want 0", n)
+	}
+	if n := countRows(t, db, "SELECT COUNT(*) FROM character_shortcuts WHERE char_obj_id = ?", c.ID); n != 0 {
+		t.Errorf("shortcut rows after purge = %d, want 0", n)
 	}
 
-	deleted, err = store.Delete(ctx, c.ID)
+	deleted, err = store.Purge(ctx, c.ID)
 	if err != nil {
-		t.Fatalf("Delete() second call unexpected error: %v", err)
+		t.Fatalf("Purge() second call unexpected error: %v", err)
 	}
 	if deleted {
-		t.Error("Delete() on missing character deleted = true, want false")
+		t.Error("Purge() on missing character deleted = true, want false")
 	}
+}
+
+// TestCharacterStore_Purge_Atomic pins the atomicity contract: a purge that
+// fails after the character and item deletes have already run inside the
+// transaction leaves every row in place. Dropping character_shortcuts
+// guarantees that last statement fails regardless of the server's sql_mode.
+func TestCharacterStore_Purge_Atomic(t *testing.T) {
+	ctx := context.Background()
+	// Uses its own container, not SharedDB: this test drops a table out
+	// from under the schema, which would corrupt every other test sharing
+	// the package's container.
+	db := sqltest.NewDB(t)
+	store := NewCharacterStore(db)
+
+	c := testCharacter(0x10000001, "Newbie")
+	if err := store.Create(ctx, c); err != nil {
+		t.Fatalf("Create() unexpected error: %v", err)
+	}
+	seedOwnedRows(t, db, c.ID)
+
+	if _, err := db.ExecContext(ctx, "DROP TABLE character_shortcuts"); err != nil {
+		t.Fatalf("drop character_shortcuts table: %v", err)
+	}
+
+	if _, err := store.Purge(ctx, c.ID); err == nil {
+		t.Fatal("Purge() against a missing character_shortcuts table succeeded, want error")
+	}
+
+	if _, err := store.Get(ctx, c.ID); err != nil {
+		t.Errorf("Get() after failed purge: got err %v, want the character row retained", err)
+	}
+	if n := countRows(t, db, "SELECT COUNT(*) FROM items WHERE owner_id = ?", c.ID); n != 1 {
+		t.Errorf("item rows after failed purge = %d, want 1 (rolled back)", n)
+	}
+}
+
+// seedOwnedRows writes one item and one shortcut owned by ownerID.
+func seedOwnedRows(t *testing.T, db *sql.DB, ownerID int32) {
+	t.Helper()
+	if _, err := db.ExecContext(context.Background(),
+		"INSERT INTO items (owner_id, object_id, item_id, count, enchant_level, loc, loc_data, custom_type1, custom_type2, mana_left, time) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+		ownerID, 0x10000101, 10, 1, 0, item.LocationInventory.String(), 0, 0, 0, -1, 0); err != nil {
+		t.Fatalf("seed item: %v", err)
+	}
+	if _, err := db.ExecContext(context.Background(),
+		"INSERT INTO character_shortcuts (char_obj_id, slot, page, type, id, level, class_index) VALUES (?,?,?,?,?,?,?)",
+		ownerID, 0, 0, "ITEM", 0x10000101, -1, 0); err != nil {
+		t.Fatalf("seed shortcut: %v", err)
+	}
+}
+
+func countRows(t *testing.T, db *sql.DB, query string, args ...any) int {
+	t.Helper()
+	var n int
+	if err := db.QueryRowContext(context.Background(), query, args...).Scan(&n); err != nil {
+		t.Fatalf("count rows: %v", err)
+	}
+	return n
 }
