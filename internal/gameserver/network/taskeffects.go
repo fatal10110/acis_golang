@@ -176,7 +176,11 @@ func (e *TaskEffects) Drown(actor task.WaterActor) {
 // detachLivePlayer also calls Roster.Save on the same columns and Roster.Save
 // now marks the row online, so a concurrent write here could land after
 // detachLivePlayer's own SaveOfflineRecency and leave online stuck at 1 for
-// a character that already logged out.
+// a character that already logged out. The detaching check alone is
+// check-then-act; live.saveMu (held here and across detachLivePlayer's whole
+// save sequence) makes the two writers' critical sections mutually
+// exclusive, so no in-flight write here can still land after
+// detachLivePlayer's own offline write (#1948).
 func (e *TaskEffects) Save(actor task.AutosaveActor) {
 	e.mu.RLock()
 	roster, log := e.roster, e.log
@@ -190,6 +194,11 @@ func (e *TaskEffects) Save(actor task.AutosaveActor) {
 	}
 	live, ok := obj.(*livePlayer)
 	if !ok || live.detached() {
+		return
+	}
+	live.saveMu.Lock()
+	defer live.saveMu.Unlock()
+	if live.detached() {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), autosaveSaveTimeout)
