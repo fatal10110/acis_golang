@@ -505,13 +505,12 @@ func TestNull(t *testing.T) {
 		}
 	}
 
-	// Out-of-int16-range queries clamp instead of wrapping: every real
-	// stored height fits in int16, so a Null block's answer should too.
-	if got := b.HeightNearest(0, 0, math.MaxInt32); got != math.MaxInt16 {
-		t.Errorf("HeightNearest(0,0,MaxInt32) = %d, want %d", got, int16(math.MaxInt16))
+	// Java's `(short) worldZ` conversion narrows out-of-range queries.
+	if got := b.HeightNearest(0, 0, math.MaxInt32); got != -1 {
+		t.Errorf("HeightNearest(0,0,MaxInt32) = %d, want -1", got)
 	}
-	if got := b.HeightNearest(0, 0, math.MinInt32); got != math.MinInt16 {
-		t.Errorf("HeightNearest(0,0,MinInt32) = %d, want %d", got, int16(math.MinInt16))
+	if got := b.HeightNearest(0, 0, math.MinInt32); got != 0 {
+		t.Errorf("HeightNearest(0,0,MinInt32) = %d, want 0", got)
 	}
 
 	if got := b.NSWENearest(0, 0, 0); got != AllDirections {

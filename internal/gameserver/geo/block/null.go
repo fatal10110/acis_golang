@@ -1,7 +1,5 @@
 package block
 
-import "math"
-
 var _ Block = (*Null)(nil)
 
 // Null is a placeholder block standing in for a region that carries no
@@ -19,25 +17,15 @@ func (b *Null) HasGeodata() bool { return false }
 // Layers always returns 1.
 func (b *Null) Layers(cellX, cellY int) int { return 1 }
 
-// HeightNearest returns worldZ unchanged, clamped to the int16 range every
-// real stored height uses: with no geodata to consult, the queried height
-// is assumed to already be valid ground.
+// HeightNearest returns worldZ unchanged: with no geodata to consult,
+// the queried height is assumed to already be valid ground.
 func (b *Null) HeightNearest(cellX, cellY int, worldZ int32) int16 {
 	return NullHeight(worldZ)
 }
 
-// NullHeight returns worldZ clamped to the int16 range used by stored
-// geodata heights.
-func NullHeight(worldZ int32) int16 {
-	switch {
-	case worldZ > math.MaxInt16:
-		return math.MaxInt16
-	case worldZ < math.MinInt16:
-		return math.MinInt16
-	default:
-		return int16(worldZ)
-	}
-}
+// NullHeight returns worldZ narrowed to the int16 range used by stored
+// geodata heights, matching Java's `(short) worldZ` conversion.
+func NullHeight(worldZ int32) int16 { return int16(worldZ) }
 
 // NSWENearest always returns AllDirections.
 func (b *Null) NSWENearest(cellX, cellY int, worldZ int32) NSWE { return AllDirections }
