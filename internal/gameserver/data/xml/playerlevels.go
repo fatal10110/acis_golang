@@ -3,7 +3,6 @@ package xml
 import (
 	"encoding/xml"
 	"fmt"
-	"os"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -27,14 +26,9 @@ type playerLevelFile struct {
 // not well-formed XML, contains no entries, or an entry omits or mangles a
 // required attribute.
 func LoadPlayerLevels(path string) (*player.LevelTable, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("load player level table %q: %w", path, err)
-	}
-
 	var doc playerLevelFile
-	if err := xml.Unmarshal(data, &doc); err != nil {
-		return nil, fmt.Errorf("parse player level table %q: %w", path, err)
+	if err := readXML(path, &doc); err != nil {
+		return nil, fmt.Errorf("player level table: %w", err)
 	}
 
 	levels := make(map[int]player.Level, len(doc.Entries))
