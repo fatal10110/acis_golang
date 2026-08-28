@@ -317,19 +317,25 @@ func buildItemClauses(id int32, el itemElement, tables map[string][]string) ([]i
 	var modifiers []item.StatModifier
 	for _, forEl := range el.For {
 		var attachCond *item.UseCondition
-		for _, opEl := range forEl.Ops {
+		for i, opEl := range forEl.Ops {
 			if strings.EqualFold(opEl.XMLName.Local, "cond") {
-				uc, err := buildUseCondition(id, opEl.Attrs, opEl.Children)
-				if err != nil {
-					return nil, nil, err
+				if i == 0 {
+					uc, err := buildUseCondition(id, opEl.Attrs, opEl.Children)
+					if err != nil {
+						return nil, nil, err
+					}
+					attachCond = &uc
 				}
-				attachCond = &uc
 				continue
 			}
 
 			op, err := item.ParseFuncOp(opEl.XMLName.Local)
 			if err != nil {
-				return nil, nil, fmt.Errorf("item template %d: %w", id, err)
+				// Unrecognized <for> children (including <effect>, for
+				// which there is no effect-engine integration yet, see
+				// #2046) are silently ignored, matching DocumentBase.java's
+				// tolerant sibling loop.
+				continue
 			}
 			vals := foldAttrs(opEl.Attrs)
 			if raw, ok := vals["val"]; ok {
