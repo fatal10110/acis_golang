@@ -387,7 +387,7 @@ func TestLoadHTMLCacheUsesDatapackRoot(t *testing.T) {
 		t.Fatalf("loadHTMLCache: %v", err)
 	}
 	got, ok := html.Get("help/tutorial.htm")
-	if !ok || got != "<html/>" {
+	if !ok || got != "<html/>\n" {
 		t.Fatalf("Get(help/tutorial.htm) = %q, %v; want cached html", got, ok)
 	}
 }

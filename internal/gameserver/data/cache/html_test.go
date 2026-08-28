@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -20,16 +21,18 @@ func writeHTML(t *testing.T, dir, name, content string) {
 
 func TestLoadHTML(t *testing.T) {
 	dir := t.TempDir()
-	const content = "<html>\r\n<body>keep\tme</body>\n</html>"
+	const content = "<html>\r\n<body>keep\tme</body>\r</html>"
+	const want = "<html>\n<body>keep\tme</body>\n</html>\n"
 	writeHTML(t, dir, "merchant/shop.htm", content)
+	writeHTML(t, dir, "merchant/extra.html", "<html>extra</html>")
 	writeHTML(t, dir, "readme.txt", "ignored")
 
 	cache, err := LoadHTML(dir)
 	if err != nil {
 		t.Fatalf("LoadHTML: %v", err)
 	}
-	if cache.Len() != 1 {
-		t.Fatalf("Len() = %d, want 1", cache.Len())
+	if cache.Len() != 2 {
+		t.Fatalf("Len() = %d, want 2", cache.Len())
 	}
 
 	for _, name := range []string{"merchant/shop.htm", "data/html/merchant/shop.htm", "./data/html/merchant/shop.htm", `data\html\merchant\shop.htm`} {
@@ -37,9 +40,12 @@ func TestLoadHTML(t *testing.T) {
 		if !ok {
 			t.Fatalf("Get(%q) ok = false", name)
 		}
-		if got != content {
-			t.Fatalf("Get(%q) = %q, want verbatim %q", name, got, content)
+		if got != want {
+			t.Fatalf("Get(%q) = %q, want %q", name, got, want)
 		}
+	}
+	if got, ok := cache.Get("merchant/extra.html"); !ok || got != "<html>extra</html>\n" {
+		t.Fatalf("Get(merchant/extra.html) = %q, %t; want %q, true", got, ok, "<html>extra</html>\n")
 	}
 	if _, ok := cache.Get("merchant/missing.htm"); ok {
 		t.Fatal("Get(missing) ok = true, want false")
@@ -99,11 +105,7 @@ func TestLoadHTMLAgainstDatapack(t *testing.T) {
 	if !ok {
 		t.Fatal("Get(territorynoclan.htm) ok = false")
 	}
-	data, err := os.ReadFile(filepath.Join(dir, "territorynoclan.htm"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if content != string(data) {
-		t.Fatal("territorynoclan.htm content was not served verbatim")
+	if strings.Contains(content, "\r") || !strings.HasSuffix(content, "\n") {
+		t.Fatalf("territorynoclan.htm content = %q, want LF-only content ending in newline", content)
 	}
 }
