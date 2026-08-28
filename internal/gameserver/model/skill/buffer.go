@@ -2,7 +2,6 @@ package skill
 
 import (
 	"fmt"
-	"strings"
 )
 
 // BufferSkill is one scheme-buffer skill entry loaded from bufferSkills.xml.
@@ -26,9 +25,6 @@ func NewBufferSkill(skillID int32, category string, level *int, price int, descr
 			return BufferSkill{}, fmt.Errorf("skill: buffer skill %d: missing skill table", skillID)
 		}
 		lvl = skills.MaxLevel(ID(skillID))
-		if lvl <= 0 {
-			return BufferSkill{}, fmt.Errorf("skill: buffer skill %d: skill not found", skillID)
-		}
 	}
 
 	return BufferSkill{
@@ -45,23 +41,25 @@ type BufferTable struct {
 	categories []string
 }
 
-// NewBufferTable builds a BufferTable and preserves first-seen category order.
+// NewBufferTable builds a BufferTable and preserves category order after duplicate replacement.
 func NewBufferTable(entries []BufferSkill) (*BufferTable, error) {
 	byID := make(map[ID]BufferSkill, len(entries))
-	categories := make([]string, 0, len(entries))
-	seenCategories := make(map[string]struct{}, len(entries))
-
+	ids := make([]ID, 0, len(entries))
 	for _, entry := range entries {
-		if _, exists := byID[entry.Skill.ID]; exists {
-			return nil, fmt.Errorf("skill: duplicate buffer skill %d", entry.Skill.ID)
+		if _, exists := byID[entry.Skill.ID]; !exists {
+			ids = append(ids, entry.Skill.ID)
 		}
 		byID[entry.Skill.ID] = entry
+	}
 
-		key := strings.ToLower(entry.Category)
-		if _, exists := seenCategories[key]; exists {
+	categories := make([]string, 0, len(entries))
+	seenCategories := make(map[string]struct{}, len(entries))
+	for _, id := range ids {
+		entry := byID[id]
+		if _, exists := seenCategories[entry.Category]; exists {
 			continue
 		}
-		seenCategories[key] = struct{}{}
+		seenCategories[entry.Category] = struct{}{}
 		categories = append(categories, entry.Category)
 	}
 

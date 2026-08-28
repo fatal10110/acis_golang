@@ -25,9 +25,6 @@ func NewCursedWeapon(itemID int32, skillID int32, name string, dropRate, duratio
 		return CursedWeapon{}, fmt.Errorf("entity: cursed weapon %d: missing skill table", itemID)
 	}
 	skillLevel := skills.MaxLevel(skill.ID(skillID))
-	if skillLevel <= 0 {
-		return CursedWeapon{}, fmt.Errorf("entity: cursed weapon %d: skill %d not found", itemID, skillID)
-	}
 
 	return CursedWeapon{
 		ItemID:          itemID,
@@ -46,13 +43,10 @@ type CursedWeaponTable struct {
 	byItemID map[int32]CursedWeapon
 }
 
-// NewCursedWeaponTable builds a CursedWeaponTable and rejects duplicate item ids.
+// NewCursedWeaponTable builds a CursedWeaponTable; later duplicate item ids replace earlier ones.
 func NewCursedWeaponTable(weapons []CursedWeapon) (*CursedWeaponTable, error) {
 	byItemID := make(map[int32]CursedWeapon, len(weapons))
 	for _, weapon := range weapons {
-		if _, exists := byItemID[weapon.ItemID]; exists {
-			return nil, fmt.Errorf("entity: duplicate cursed weapon item id %d", weapon.ItemID)
-		}
 		byItemID[weapon.ItemID] = weapon
 	}
 	return &CursedWeaponTable{byItemID: byItemID}, nil

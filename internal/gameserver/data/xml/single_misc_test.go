@@ -262,6 +262,49 @@ func TestLoadBufferSkills(t *testing.T) {
 	}
 }
 
+func TestLoaderParityForMissingSkillIDsAndDuplicates(t *testing.T) {
+	dir := t.TempDir()
+	skills := &skill.Table{}
+
+	cursedWeaponsPath := filepath.Join(dir, "cursedWeapons.xml")
+	if err := os.WriteFile(cursedWeaponsPath, []byte(`<list>
+		<item id="1" skillId="999" name="first" dropRate="1" duration="1" durationLost="1" dissapearChance="1" stageKills="1"/>
+		<item id="1" skillId="999" name="last" dropRate="2" duration="2" durationLost="2" dissapearChance="2" stageKills="2"/>
+	</list>`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	weapons, err := LoadCursedWeapons(cursedWeaponsPath, skills)
+	if err != nil {
+		t.Fatalf("LoadCursedWeapons() error: %v", err)
+	}
+	weapon, ok := weapons.Weapon(1)
+	if !ok || weapon.Name != "last" || weapon.Skill.Level != 0 {
+		t.Fatalf("Weapon(1) = %+v, %v; want last entry with level 0", weapon, ok)
+	}
+
+	bufferSkillsPath := filepath.Join(dir, "bufferSkills.xml")
+	if err := os.WriteFile(bufferSkillsPath, []byte(`<list>
+		<category type="Buffs"><buff id="999"/><buff id="1000" desc="first"/></category>
+		<category type="buffs"><buff id="1000" desc="last"/><buff id="1001"/></category>
+	</list>`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	buffs, err := LoadBufferSkills(bufferSkillsPath, skills)
+	if err != nil {
+		t.Fatalf("LoadBufferSkills() error: %v", err)
+	}
+	buffer, ok := buffs.Skill(1000)
+	if !ok || buffer.Category != "buffs" || buffer.Description != "last" {
+		t.Fatalf("Skill(1000) = %+v, %v; want last entry", buffer, ok)
+	}
+	if buffer, ok := buffs.Skill(999); !ok || buffer.Skill.Level != 0 {
+		t.Fatalf("Skill(999) = %+v, %v; want level 0", buffer, ok)
+	}
+	if got := buffs.Categories(); len(got) != 2 || got[0] != "Buffs" || got[1] != "buffs" {
+		t.Fatalf("Categories() = %#v, want [Buffs buffs]", got)
+	}
+}
+
 func TestSingleMiscLoadersErrors(t *testing.T) {
 	dir := t.TempDir()
 

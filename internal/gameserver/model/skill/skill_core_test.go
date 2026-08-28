@@ -30,8 +30,12 @@ func TestNewBufferSkillExplicitLevel(t *testing.T) {
 }
 
 func TestNewBufferSkillMissingSkill(t *testing.T) {
-	if _, err := NewBufferSkill(1035, "Buffs", nil, 0, "desc", NewTable(nil)); err == nil {
-		t.Fatal("expected an error for a skill not found in the table, got nil")
+	entry, err := NewBufferSkill(1035, "Buffs", nil, 0, "desc", NewTable(nil))
+	if err != nil {
+		t.Fatalf("NewBufferSkill() error: %v", err)
+	}
+	if entry.Skill.Level != 0 {
+		t.Fatalf("NewBufferSkill() level = %d, want 0", entry.Skill.Level)
 	}
 }
 
