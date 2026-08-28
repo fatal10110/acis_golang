@@ -6,7 +6,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/manor"
-	"github.com/rs/zerolog"
 )
 
 type manorFile struct {
@@ -55,12 +54,8 @@ type manorAreaElement struct {
 	Nodes    []pointElement `xml:"node"`
 }
 
-// LoadManorAreas parses manor area polygons. An area whose polygon can't be
-// built is logged and skipped, matching ManorAreaData.java's per-area
-// try/catch; other areas keep loading.
-//
-// log receives skipped-area diagnostics; the zero logger discards them.
-func LoadManorAreas(path string, log zerolog.Logger) (manor.AreaTable, error) {
+// LoadManorAreas parses manor area polygons.
+func LoadManorAreas(path string) (manor.AreaTable, error) {
 	var doc manorAreaFile
 	if err := readXML(path, &doc); err != nil {
 		return nil, fmt.Errorf("manor areas: %w", err)
@@ -69,18 +64,12 @@ func LoadManorAreas(path string, log zerolog.Logger) (manor.AreaTable, error) {
 	areas := make(manor.AreaTable, 0, len(doc.Areas))
 	for _, el := range doc.Areas {
 		nodes := make([]location.Point, 0, len(el.Nodes))
-		skip := false
 		for _, node := range el.Nodes {
 			point, err := node.point()
 			if err != nil {
-				log.Error().Err(err).Str("file", path).Str("area", el.Name).Msg("data/xml: skipping malformed manor area")
-				skip = true
-				break
+				return nil, fmt.Errorf("xml: %s: manor area %q: %w", path, el.Name, err)
 			}
 			nodes = append(nodes, point)
-		}
-		if skip {
-			continue
 		}
 		areas = append(areas, manor.Area{
 			Name:     el.Name,
