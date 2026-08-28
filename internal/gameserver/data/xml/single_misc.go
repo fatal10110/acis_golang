@@ -353,7 +353,20 @@ func LoadAnnouncements(path string) ([]admin.Announcement, error) {
 		return nil, fmt.Errorf("announcements: %w", err)
 	}
 
-	return buildAll(path, doc.Entries, admin.NewAnnouncement)
+	announcements := make([]admin.Announcement, 0, len(doc.Entries))
+	for _, el := range doc.Entries {
+		set := commons.StatSetFromXMLAttrs(el.Attrs)
+		message, err := set.GetString("message")
+		if err != nil || message == "" {
+			continue
+		}
+		announcement, err := admin.NewAnnouncement(set)
+		if err != nil {
+			return nil, fmt.Errorf("xml: %s: %w", path, err)
+		}
+		announcements = append(announcements, announcement)
+	}
+	return announcements, nil
 }
 
 type observerGroupFile struct {

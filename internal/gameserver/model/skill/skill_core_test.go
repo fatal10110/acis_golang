@@ -384,6 +384,10 @@ func TestNewHealSps(t *testing.T) {
 	if got.MagicLevel != 76 || got.Correction != 292 || got.NeededMAtk != 900 {
 		t.Fatalf("NewHealSps() = %+v", got)
 	}
+	magicLevel = 0
+	if _, err := NewHealSps(17, 6, nil, nil, &magicLevel); err != nil {
+		t.Fatalf("NewHealSps(magicLevel=0) error: %v", err)
+	}
 
 	if _, err := NewHealSps(17, 0, nil, nil, nil); err == nil {
 		t.Fatal("expected an error for missing skillId/magicLevel selectors, got nil")
@@ -411,8 +415,16 @@ func TestHealSpsTableCalculate(t *testing.T) {
 	if got := table.Calculate(2000, 1, 76, 890); got != 287 {
 		t.Fatalf("Calculate(magic level fallback) = %v, want 287", got)
 	}
-	if got := table.Calculate(2000, 1, 1, 1); got != 0 {
-		t.Fatalf("Calculate(no match) = %v, want 0", got)
+	if got := table.Calculate(2000, 1, 1, 1); got != -151 {
+		t.Fatalf("Calculate(skill selector fallback) = %v, want -151", got)
+	}
+
+	zeroOnly, err := NewHealSpsTable([]HealSps{{MagicLevel: 0, Correction: 17, NeededMAtk: 6}})
+	if err != nil {
+		t.Fatalf("NewHealSpsTable() error: %v", err)
+	}
+	if got := zeroOnly.Calculate(2000, 1, 1, 1); got != 14.5 {
+		t.Fatalf("Calculate(magic level zero fallback) = %v, want 14.5", got)
 	}
 }
 
