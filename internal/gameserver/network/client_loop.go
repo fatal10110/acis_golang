@@ -72,6 +72,9 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 	var live *livePlayer
 	defer func() {
 		l.detachLivePlayer(ctx, live)
+		if l.clients != nil {
+			l.clients.Release(client.AccountName(), client)
+		}
 		l.notifyPlayerLogout(client.AccountName())
 	}()
 
