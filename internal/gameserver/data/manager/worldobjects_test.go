@@ -310,3 +310,64 @@ func TestNewWorldObjectsSkipsDegenerateDoor(t *testing.T) {
 		t.Fatalf("log = %q, want degenerate-footprint diagnostic for door 2", logs.String())
 	}
 }
+
+// TestSetDoorOpenCascadesToTriggeredDoor matches Door.changeState's
+// triggerId propagation (aCis_gameserver Door.java:391-398): opening or
+// closing a controller door applies the same state to its Template.TriggeredID
+// door, without scheduling that linked door's own auto-timer (issue #2014).
+func TestSetDoorOpenCascadesToTriggeredDoor(t *testing.T) {
+	geo, x, y := newDoorGeo(t)
+	coords := []location.Point{
+		{X: x - 8, Y: y - 8},
+		{X: x + 8, Y: y - 8},
+		{X: x + 8, Y: y + 8},
+		{X: x - 8, Y: y + 8},
+	}
+	controller := &door.Template{
+		ID: 19210001, Name: "controller", Kind: door.KindDoor, Level: 1,
+		Position: location.Location{X: x, Y: y, Z: 0}, Coordinates: coords,
+		HP: 100, PDef: 10, MDef: 10, Height: 32,
+		TriggeredID: 19210002,
+	}
+	linked := &door.Template{
+		ID: 19210002, Name: "linked", Kind: door.KindDoor, Level: 1,
+		Position: location.Location{X: x, Y: y, Z: 0}, Coordinates: coords,
+		HP: 100, PDef: 10, MDef: 10, Height: 32,
+		CloseTime: 60,
+	}
+	doorTemplates, err := door.NewTable([]*door.Template{controller, linked})
+	if err != nil {
+		t.Fatalf("door table: %v", err)
+	}
+	staticTemplates, err := staticobject.NewTable(nil)
+	if err != nil {
+		t.Fatalf("static object table: %v", err)
+	}
+	doorTimers, err := task.NewDoor(doorTimerRecorder{}, nil)
+	if err != nil {
+		t.Fatalf("NewDoor: %v", err)
+	}
+
+	objects, err := NewWorldObjects(doorTemplates, staticTemplates, &worldObjectIDs{next: 1000}, geo, world.New(), doorTimers, zerolog.Nop())
+	if err != nil {
+		t.Fatalf("NewWorldObjects: %v", err)
+	}
+
+	if !objects.SetDoorOpen(19210001, true) {
+		t.Fatal("SetDoorOpen(controller, open) = false, want a state change")
+	}
+	linkedObj, _ := objects.Door(19210002)
+	if !linkedObj.Opened() {
+		t.Fatal("triggered door did not follow the controller door's open state")
+	}
+	if doorTimers.Tracked(19210002) {
+		t.Fatal("cascaded state change must not schedule the triggered door's own auto-timer")
+	}
+
+	if !objects.SetDoorOpen(19210001, false) {
+		t.Fatal("SetDoorOpen(controller, close) = false, want a state change")
+	}
+	if linkedObj.Opened() {
+		t.Fatal("triggered door did not follow the controller door's close state")
+	}
+}
