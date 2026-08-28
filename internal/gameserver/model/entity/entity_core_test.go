@@ -17,10 +17,14 @@ func TestNewCursedWeapon(t *testing.T) {
 	}
 }
 
-func TestNewCursedWeaponTableRejectsDuplicateIDs(t *testing.T) {
-	_, err := NewCursedWeaponTable([]CursedWeapon{{ItemID: 8190}, {ItemID: 8190}})
-	if err == nil {
-		t.Fatal("expected duplicate item id error, got nil")
+func TestNewCursedWeaponTableDuplicateIDsReplaceEarlier(t *testing.T) {
+	table, err := NewCursedWeaponTable([]CursedWeapon{{ItemID: 8190, Name: "first"}, {ItemID: 8190, Name: "last"}})
+	if err != nil {
+		t.Fatalf("NewCursedWeaponTable() error: %v", err)
+	}
+	weapon, ok := table.Weapon(8190)
+	if !ok || weapon.Name != "last" {
+		t.Fatalf("Weapon(8190) = %+v, %v; want last entry", weapon, ok)
 	}
 }
 
