@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
+	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -52,6 +53,9 @@ func decodeL2OFF(data []byte) (*block.Region, error) {
 		if err != nil {
 			return nil, err
 		}
+	}
+	if r.pos != len(data) {
+		log.Warn().Int("trailing_bytes", len(data)-r.pos).Msg("geo/reader: L2OFF region has trailing bytes")
 	}
 	return region, nil
 }
