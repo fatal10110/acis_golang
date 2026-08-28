@@ -136,7 +136,7 @@ func loadGameData(paths gameServerPaths, cfg gameServerConfig, log zerolog.Logge
 	if err != nil {
 		return nil, err
 	}
-	doors, err := gamexml.LoadDoors(filepath.Join(xmlRoot, "doors.xml"))
+	doors, err := gamexml.LoadDoors(filepath.Join(xmlRoot, "doors.xml"), log)
 	if err != nil {
 		return nil, err
 	}
