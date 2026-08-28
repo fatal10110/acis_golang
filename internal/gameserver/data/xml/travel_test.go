@@ -71,3 +71,49 @@ func TestLoadTeleportsErrors(t *testing.T) {
 		t.Fatal("LoadTeleports() error = nil, want error")
 	}
 }
+
+func TestLoadTeleportsDuplicateNPCKeepsLast(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "teleports.xml")
+	writeXMLFixture(t, path, `<list>
+		<telPosList npcId="1"><loc desc="first" priceId="57" priceCount="1" x="1" y="2" z="3"/></telPosList>
+		<telPosList npcId="2"><loc desc="kept" priceId="57" priceCount="1" x="4" y="5" z="6"/></telPosList>
+		<telPosList npcId="1"><loc desc="last" priceId="57" priceCount="1" x="7" y="8" z="9"/></telPosList>
+	</list>`)
+
+	table, err := LoadTeleports(path)
+	if err != nil {
+		t.Fatalf("LoadTeleports(%q) error: %v", path, err)
+	}
+	if got, want := len(table), 2; got != want {
+		t.Fatalf("len(table) = %d, want %d", got, want)
+	}
+	if got, want := table[1][0].Description, "last"; got != want {
+		t.Fatalf("table[1][0].Description = %q, want %q", got, want)
+	}
+	if got, want := table[2][0].Description, "kept"; got != want {
+		t.Fatalf("table[2][0].Description = %q, want %q", got, want)
+	}
+}
+
+func TestLoadInstantTeleportsDuplicateNPCKeepsLast(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "instantTeleports.xml")
+	writeXMLFixture(t, path, `<list>
+		<telPosList npcId="1"><loc x="1" y="2" z="3"/></telPosList>
+		<telPosList npcId="2"><loc x="4" y="5" z="6"/></telPosList>
+		<telPosList npcId="1"><loc x="7" y="8" z="9"/></telPosList>
+	</list>`)
+
+	table, err := LoadInstantTeleports(path)
+	if err != nil {
+		t.Fatalf("LoadInstantTeleports(%q) error: %v", path, err)
+	}
+	if got, want := len(table), 2; got != want {
+		t.Fatalf("len(table) = %d, want %d", got, want)
+	}
+	if got, want := table[1][0].X, 7; got != want {
+		t.Fatalf("table[1][0].X = %d, want %d", got, want)
+	}
+	if got, want := table[2][0].X, 4; got != want {
+		t.Fatalf("table[2][0].X = %d, want %d", got, want)
+	}
+}
