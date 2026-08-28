@@ -4,6 +4,7 @@ import (
 	"math"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
+	"github.com/fatal10110/acis_golang/internal/gameserver/geo/dynamic"
 )
 
 func (e *Engine) CanMove(ox, oy, oz, tx, ty, tz int) bool {
@@ -92,8 +93,14 @@ func (e *Engine) CanSee(ox, oy, oz, tx, ty, tz int) bool {
 // CanSeeWithHeights reports whether the two world positions share mutual line of sight
 // when each endpoint is elevated by the given collision height.
 func (e *Engine) CanSeeWithHeights(ox, oy, oz int, oheight float64, tx, ty, tz int, theight float64) bool {
-	return e.canSee(ox, oy, oz, oheight, tx, ty, tz, theight) &&
-		e.canSee(tx, ty, tz, theight, ox, oy, oz, oheight)
+	return e.CanSeeWithHeightsIgnoring(ox, oy, oz, oheight, tx, ty, tz, theight, nil)
+}
+
+// CanSeeWithHeightsIgnoring reports mutual line of sight while ignoring one
+// dynamic geodata object, such as the target door itself.
+func (e *Engine) CanSeeWithHeightsIgnoring(ox, oy, oz int, oheight float64, tx, ty, tz int, theight float64, ignore dynamic.Object) bool {
+	return e.canSee(ox, oy, oz, oheight, tx, ty, tz, theight, ignore) &&
+		e.canSee(tx, ty, tz, theight, ox, oy, oz, oheight, ignore)
 }
 
 // CanSeeActor reports whether two actors, each supplying its own collision
@@ -128,7 +135,7 @@ func OutOfWorld(worldX, worldY int) bool {
 	return worldX < WorldXMin || worldX > WorldXMax || worldY < WorldYMin || worldY > WorldYMax
 }
 
-func (e *Engine) canSee(ox, oy, oz int, oheight float64, tx, ty, tz int, theight float64) bool {
+func (e *Engine) canSee(ox, oy, oz int, oheight float64, tx, ty, tz int, theight float64, ignore dynamic.Object) bool {
 	if OutOfWorld(ox, oy) || OutOfWorld(tx, ty) {
 		return false
 	}
@@ -139,12 +146,12 @@ func (e *Engine) canSee(ox, oy, oz int, oheight float64, tx, ty, tz int, theight
 	gty := GeoY(ty)
 
 	current := e.blockAtGeo(gox, goy)
-	layer := current.Below(localCell(gox), localCell(goy), int32(oz+block.CellHeight))
+	layer := current.BelowIgnoring(localCell(gox), localCell(goy), int32(oz+block.CellHeight), ignore)
 	if layer == -1 {
 		return false
 	}
 	if gox == gtx && goy == gty {
-		return layer == current.Below(localCell(gtx), localCell(gty), int32(tz+block.CellHeight))
+		return layer == current.BelowIgnoring(localCell(gtx), localCell(gty), int32(tz+block.CellHeight), ignore)
 	}
 
 	groundZ := int(current.Height(layer))
@@ -179,9 +186,9 @@ func (e *Engine) canSee(ox, oy, oz int, oheight float64, tx, ty, tz int, theight
 		losZ += mz * math.Sqrt(float64((checkX-ox)*(checkX-ox)+(checkY-oy)*(checkY-oy)))
 
 		if nswe.Allows(step) {
-			layer = current.Below(localCell(gox), localCell(goy), int32(groundZ+block.CellIgnoreHeight))
+			layer = current.BelowIgnoring(localCell(gox), localCell(goy), int32(groundZ+block.CellIgnoreHeight), ignore)
 		} else {
-			layer = current.Above(localCell(gox), localCell(goy), int32(groundZ-2*block.CellHeight))
+			layer = current.AboveIgnoring(localCell(gox), localCell(goy), int32(groundZ-2*block.CellHeight), ignore)
 		}
 		if layer == -1 {
 			return false

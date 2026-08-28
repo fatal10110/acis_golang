@@ -280,6 +280,25 @@ func TestSightHeight(t *testing.T) {
 	}
 }
 
+func TestCanSeeWithHeightsIgnoringDynamicObject(t *testing.T) {
+	e := newTestEngine(t, block.NewFlat(0))
+	door := &dynamicStub{
+		x:      1,
+		y:      0,
+		z:      0,
+		height: 40,
+		data:   [][]block.NSWE{{block.NoDirections}},
+	}
+	e.AddObject(door)
+
+	if e.CanSee(worldX(0), worldY(0), 0, worldX(2), worldY(0), 0) {
+		t.Fatal("CanSee() = true through closed dynamic object, want false")
+	}
+	if !e.CanSeeWithHeightsIgnoring(worldX(0), worldY(0), 0, 0, worldX(2), worldY(0), 0, 0, door) {
+		t.Fatal("CanSeeWithHeightsIgnoring() = false when target dynamic object is ignored, want true")
+	}
+}
+
 func TestCanSeeActor(t *testing.T) {
 	// A height-40 wall sits between the two actors, matching TestCanSee's
 	// "blocks wall crossing" fixture.
