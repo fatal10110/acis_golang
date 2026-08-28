@@ -7,8 +7,10 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
 
-// flatOpenBlock returns block index 0 of a two-block-wide region open in
-// every direction at height 0; block index 1 (geoX 8-15) is left unset by
+// flatOpenBlock returns a region containing only block index 0 (geoX 0-7,
+// geoY 0-7), open in every direction at height 0. Every other block index —
+// including index 256 (geoX 8-15, geoY 0-7; blocks are indexed
+// blockX*RegionBlocksY+blockY per block/region.go:350) — is left unset by
 // block.NewRegionFromBlocks, so it reports no geodata (block.KindNull).
 func flatOpenBlock() block.Block {
 	return complexBlock(func(x, y int) block.Cell {
@@ -18,7 +20,7 @@ func flatOpenBlock() block.Block {
 
 // Reference: GeoEngine.findPath returns Collections.emptyList() when the
 // origin's own geo block has no geodata (GeoEngine.java:1758-1761), before
-// resolving any height. geoX 8 falls in block index 1, which
+// resolving any height. geoX 8 falls in block index 256, which
 // block.NewRegionFromBlocks leaves as block.KindNull.
 func TestFindRejectsOriginWithoutGeodata(t *testing.T) {
 	finder := New(newTestEngine(t, flatOpenBlock()), DefaultOptions())
@@ -106,6 +108,40 @@ func TestCollapseWaypointsHasNoDistanceCap(t *testing.T) {
 	want := []location.Location{path[len(path)-1]}
 	if len(got) != len(want) || got[0] != want[0] {
 		t.Fatalf("collapseWaypoints() = %#v, want %#v (fully collapsed to the target)", got, want)
+	}
+}
+
+// TestFindAppliesUnboundedCollapseThroughPublicAPI drives the collapse
+// through Find() itself, not the unexported collapseWaypoints helper, so the
+// call site at pathfind.go:94-96 is what's under test: a regression that
+// drops the call, flips buildResult, or loosens the len(path) >= 3 guard
+// fails here even though every other test in this file still passes.
+//
+// The search around a single wall gap leaves 7 waypoints before collapse
+// (geo(27,2) geo(29,7) geo(29,10) geo(31,10) geo(31,7) geo(33,2) geo(55,2));
+// collapse must reduce that to the 2 that remain necessary once waypoints
+// beyond the gap become mutually visible again.
+func TestFindAppliesUnboundedCollapseThroughPublicAPI(t *testing.T) {
+	const width, height = 60, 20
+	e := newGridEngine(t, width, height, func(x, y int) block.Cell {
+		if x == 30 && y < 10 {
+			return block.Cell{Height: 0, NSWE: block.NoDirections}
+		}
+		return block.Cell{Height: 0, NSWE: block.AllDirections}
+	})
+	finder := New(e, DefaultOptions())
+
+	origin := at(2, 2, 0)
+	target := at(55, 2, 0)
+
+	path, _, ok := finder.Find(origin, target)
+	if !ok {
+		t.Fatal("Find() = no path, want path")
+	}
+
+	want := []location.Location{at(31, 10, 0), at(55, 2, 0)}
+	if len(path) != len(want) || path[0] != want[0] || path[1] != want[1] {
+		t.Fatalf("Find() = %#v, want %#v (collapsed to the gap waypoint plus target)", path, want)
 	}
 }
 
