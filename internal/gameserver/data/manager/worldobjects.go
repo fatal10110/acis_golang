@@ -103,12 +103,24 @@ func (w *WorldObjects) StaticObjects() []*staticobject.Object {
 }
 
 // SetDoorOpen changes a door's open state, applies the matching geodata,
-// broadcasts the change to known observers, and reschedules the door's next
-// auto open/close timer from its template's openTime/closeTime/randomTime,
-// mirroring the reference server's DoorAI.changeState.
+// broadcasts the change to known observers, reschedules the door's next auto
+// open/close timer from its template's openTime/closeTime/randomTime, and
+// propagates the same state to a linked controller door (Template.TriggeredID),
+// mirroring the reference server's Door.changeState(open, false).
 func (w *WorldObjects) SetDoorOpen(id int, open bool) bool {
 	obj, ok := w.Door(id)
-	if !ok || !obj.SetOpened(open) {
+	if !ok {
+		return false
+	}
+	return w.changeDoorState(obj, open, false)
+}
+
+// changeDoorState mirrors Door.changeState(open, triggered): triggered is
+// true only for a cascaded change propagated from another door's
+// Template.TriggeredID, and suppresses this door's own auto-timer reschedule
+// so the linked door's cascade doesn't double-schedule it.
+func (w *WorldObjects) changeDoorState(obj *door.Object, open, triggered bool) bool {
+	if !obj.SetOpened(open) {
 		return false
 	}
 	if open {
@@ -117,7 +129,14 @@ func (w *WorldObjects) SetDoorOpen(id int, open bool) bool {
 		w.geo.AddObject(obj)
 	}
 	obj.BroadcastStatus()
-	w.scheduleDoorTimer(obj)
+	if obj.Template.TriggeredID > 0 {
+		if linked, ok := w.Door(obj.Template.TriggeredID); ok {
+			w.changeDoorState(linked, open, true)
+		}
+	}
+	if !triggered {
+		w.scheduleDoorTimer(obj)
+	}
 	return true
 }
 
