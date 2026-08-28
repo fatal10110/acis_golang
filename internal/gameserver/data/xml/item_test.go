@@ -121,10 +121,12 @@ func TestLoadItemTemplates(t *testing.T) {
 		<set name="bodypart" val="rhand" />
 		<for>
 			<bogus stat="pAtk" val="99" />
-			<effect name="Poison" />
+			<effect name="Poison" val="1" />
 			<add stat="pAtk" val="1" />
 		</for>
 	</item>`)
+	// Also see TestLoadItemTemplatesEffectValidatedNotAttached: <effect>
+	// is validated, unlike <bogus>, but its result is discarded either way.
 
 	writeItemFile(t, dir, "1400-1499.xml", `
 	<item id="1400" type="EtcItem" name="Soulshot Sample">
@@ -451,6 +453,10 @@ func TestLoadItemTemplatesSkipsMalformedItems(t *testing.T) {
 			name:    "overflowing int32 attribute",
 			content: `<item id="99999999999" type="Weapon" name="x"></item>`,
 		},
+		{
+			name:    "effect missing required val attribute",
+			content: `<item id="1" type="Weapon" name="x"><set name="bodypart" val="rhand"/><for><effect name="Poison" count="2" time="10"/></for></item>`,
+		},
 	}
 
 	for _, c := range cases {
@@ -471,6 +477,35 @@ func TestLoadItemTemplatesSkipsMalformedItems(t *testing.T) {
 				t.Fatalf("log output = %q, want it to name the file", got)
 			}
 		})
+	}
+}
+
+// TestLoadItemTemplatesEffectValidatedNotAttached checks that a well-formed
+// <effect> child of a <for> block loads without error but leaves no trace
+// on the item template, matching DocumentBase.attachEffect: it validates
+// and builds an EffectTemplate for any template, but only Item's sibling
+// L2Skill has an attach(EffectTemplate) overload, so on an Item the parsed
+// EffectTemplate is discarded (java/.../DocumentBase.java:201-307).
+func TestLoadItemTemplatesEffectValidatedNotAttached(t *testing.T) {
+	dir := t.TempDir()
+	writeItemFile(t, dir, "fixture.xml", `<item id="1" type="Weapon" name="x">
+		<set name="bodypart" val="rhand"/>
+		<for>
+			<set stat="pAtk" val="5"/>
+			<effect name="Poison" val="1" count="2" time="10"/>
+		</for>
+	</item>`)
+
+	table, err := LoadItemTemplates(dir, zerolog.Nop())
+	if err != nil {
+		t.Fatalf("LoadItemTemplates: unexpected error: %v", err)
+	}
+	tmpl, ok := table.Get(1)
+	if !ok {
+		t.Fatal("LoadItemTemplates: item 1 should have loaded")
+	}
+	if len(tmpl.Modifiers) != 1 {
+		t.Fatalf("Modifiers = %#v, want exactly the pAtk stat modifier (effect must not attach)", tmpl.Modifiers)
 	}
 }
 
