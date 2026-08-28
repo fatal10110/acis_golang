@@ -126,6 +126,11 @@ type PlayerConfig struct {
 // character select through to world entry.
 type GameClientLink struct {
 	validator     *SessionValidator
+	// clients is the process-owned account-to-connection registry: a second
+	// AuthLogin for an account already claimed evicts the prior connection
+	// instead of being rejected (LoginServerThread.addClient,
+	// LoginServerThread.java:292-304).
+	clients       *ClientRegistry
 	loginLink     func() *LoginLink
 	roster        *manager.Roster
 	items         itemStore
@@ -280,6 +285,7 @@ type GameClientLinkConfig struct {
 func NewGameClientLink(cfg GameClientLinkConfig) *GameClientLink {
 	link := &GameClientLink{
 		validator:     cfg.Validator,
+		clients:       NewClientRegistry(),
 		loginLink:     cfg.LoginLink,
 		roster:        cfg.Roster,
 		items:         cfg.Items,

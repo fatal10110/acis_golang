@@ -32,7 +32,22 @@ func (l *GameClientLink) authenticate(ctx context.Context, client *Client, req c
 		client.Session.SendFrame(serverpackets.FrameAuthLoginFail(serverpackets.LoginFailSystemErrorTryLater))
 		return false, nil
 	}
-	return l.validator.Validate(ctx, client, req, loginLink)
+	// A second AuthLogin for an account already claimed takes it over: the
+	// prior connection's own in-flight validation (if any) is unblocked with
+	// a rejection so it releases the account promptly, then its session is
+	// closed, matching LoginServerThread.addClient's closeNow() ahead of the
+	// new PlayerAuthRequest (LoginServerThread.java:292-304).
+	if l.clients != nil {
+		if evicted, replaced := l.clients.Take(req.LoginName, client); replaced {
+			l.validator.Resolve(req.LoginName, false)
+			evicted.Session.Close()
+		}
+	}
+	ok, err := l.validator.Validate(ctx, client, req, loginLink)
+	if l.clients != nil && (!ok || err != nil) {
+		l.clients.Release(req.LoginName, client)
+	}
+	return ok, err
 }
 
 // sendCharSelectInfo lists client's characters, sends the resulting
