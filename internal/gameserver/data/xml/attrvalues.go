@@ -166,7 +166,7 @@ func (a *attrValues) int32Default(key string, def int32) int32 {
 
 // int32LiteralDefault returns the value at key as an int32, or def if key is
 // absent. The value is parsed as an integer literal, so a base prefix such
-// as 0x is accepted.
+// as 0x or # is accepted.
 func (a *attrValues) int32LiteralDefault(key string, def int32) int32 {
 	if a.err != nil {
 		return def
@@ -174,6 +174,9 @@ func (a *attrValues) int32LiteralDefault(key string, def int32) int32 {
 	raw, ok := a.vals[key]
 	if !ok {
 		return def
+	}
+	if strings.HasPrefix(raw, "#") {
+		raw = "0x" + raw[1:]
 	}
 	n, err := strconv.ParseInt(raw, 0, 32)
 	if err != nil {

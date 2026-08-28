@@ -393,7 +393,7 @@ func buildUseCondition(id int32, attrs []xml.Attr, children []condNode) (item.Us
 	case a.has("msg"):
 		uc.Message = a.strDefault("msg", "")
 	case a.has("msgId"):
-		uc.MessageID = a.int32("msgId")
+		uc.MessageID = a.int32LiteralDefault("msgId", 0)
 		if a.has("addName") && uc.MessageID > 0 {
 			uc.AddName = true
 		}
