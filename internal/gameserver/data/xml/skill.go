@@ -123,7 +123,8 @@ func (sl *skillLoader) resolveLevel(attrs []setElem, tableIndex int) map[string]
 // attribute name already held.
 func (sl *skillLoader) applyAttrs(vals map[string]string, attrs []setElem, tableIndex int) {
 	for _, a := range attrs {
-		vals[a.Name] = sl.resolveTableValue(a.Name, a.Val, tableIndex)
+		name, val := strings.TrimSpace(a.Name), strings.TrimSpace(a.Val)
+		vals[name] = sl.resolveTableValue(name, val, tableIndex)
 	}
 }
 
