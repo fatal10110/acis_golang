@@ -232,6 +232,19 @@ func (c *Controller) MoveToLocation(target location.Location) (bool, error) {
 	return true, broadcastErr
 }
 
+// MoveToLocationEvent behaves like MoveToLocation but also returns the
+// accepted move's Event, for callers that need the move detail alongside
+// acceptance (task.Walker's WalkerActor contract).
+func (c *Controller) MoveToLocationEvent(target location.Location) (Event, error) {
+	event, err := c.move.MoveToLocation(target)
+	if err != nil {
+		return Event{}, err
+	}
+	broadcastErr := c.self.BroadcastMove(event)
+	c.addPositionUpdate()
+	return event, broadcastErr
+}
+
 // Stop cancels any active follow task and any movement already under way,
 // broadcasting a stop-in-place packet when there was movement to cancel —
 // otherwise a client that already received the move request keeps walking

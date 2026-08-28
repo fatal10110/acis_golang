@@ -14,6 +14,7 @@ func (n *Npcs) RespawnHook(actorID int32) func() {
 			n.ai.Remove(h)
 		}
 	}
+	n.walker.StopRouteByID(actorID)
 
 	n.mu.Lock()
 	key, tracked := n.live[actorID]

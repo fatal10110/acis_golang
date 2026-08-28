@@ -154,9 +154,15 @@ func (w *Walker) StopRoute(actor WalkerActor) {
 	if actor == nil {
 		return
 	}
+	w.StopRouteByID(actor.ObjectID())
+}
+
+// StopRouteByID removes an actor from route walking by object id, for a
+// caller (like despawn) that no longer holds a live WalkerActor reference.
+func (w *Walker) StopRouteByID(id int32) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	delete(w.entries, actor.ObjectID())
+	delete(w.entries, id)
 }
 
 // Arrived handles actor reaching its current route node.

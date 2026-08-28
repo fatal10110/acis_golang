@@ -10,6 +10,7 @@ import (
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -26,6 +27,14 @@ func (nopDecayEffects) Decay(task.DecayActor) {}
 type nopRespawnEffects struct{}
 
 func (nopRespawnEffects) Respawn(string) {}
+
+// noRouteWalkerPath satisfies task.NewWalker's required WalkerPath: this
+// test's fixture template has no alias, so no route is ever resolved and
+// these methods are never called.
+type noRouteWalkerPath struct{}
+
+func (noRouteWalkerPath) CanMove(origin, target location.Location) bool { return false }
+func (noRouteWalkerPath) HasPath(origin, target location.Location) bool { return false }
 
 // bootMPTestNpcs builds one Npcs instance around a single database-tracked
 // "mp_test" spawn entry (npc id 1, 100 max HP, 50 max MP), backed by spawns.
@@ -46,9 +55,13 @@ func bootMPTestNpcs(t *testing.T, spawns *Spawns, templates *npc.Table) (*Npcs, 
 	ai := task.NewAI(state, zerolog.Nop())
 	positions := task.NewPositionUpdates(state)
 	items := item.NewTable(nil)
+	walker, err := task.NewWalker(nil, noRouteWalkerPath{}, time.Now, state)
+	if err != nil {
+		t.Fatalf("NewWalker() error: %v", err)
+	}
 
 	npcs, err := NewNpcs(spawns, templates, fakeGeo{}, state, ids, decay, respawnTask, ai, positions, items,
-		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{})
+		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker)
 	if err != nil {
 		t.Fatalf("NewNpcs() error: %v", err)
 	}

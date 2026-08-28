@@ -20,6 +20,9 @@ type Instance struct {
 	Home location.Location
 	// HasHome reports whether Home was populated by the spawn runtime.
 	HasHome bool
+	// SpawnHeading is the heading this NPC restores whenever movement
+	// arrives back exactly at Home (aCis NpcAI.onEvtArrived).
+	SpawnHeading int
 	// DriftRange overrides the default home radius when positive.
 	DriftRange int
 }
