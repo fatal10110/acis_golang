@@ -15,6 +15,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
+	"github.com/rs/zerolog"
 )
 
 // ---- from killrewards_test.go ----
@@ -612,7 +613,7 @@ func TestNewSpawnsCreatesMissingStateRows(t *testing.T) {
 	</npcmaker>
 </list>`)
 
-	table, err := xml.LoadSpawnlist(dir)
+	table, err := xml.LoadSpawnlist(dir, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("LoadSpawnlist() unexpected error: %v", err)
 	}

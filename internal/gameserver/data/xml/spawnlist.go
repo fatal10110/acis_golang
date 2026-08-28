@@ -2,11 +2,13 @@ package xml
 
 import (
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
+	"github.com/rs/zerolog"
 )
 
 type spawnlistFile struct {
@@ -50,7 +52,9 @@ type spawnPrivateEl struct {
 
 // LoadSpawnlist parses every region-sharded spawnlist XML file directly under
 // dir and returns the full in-memory territory/maker table.
-func LoadSpawnlist(dir string) (*spawn.Table, error) {
+//
+// log receives skipped-territory diagnostics; the zero logger discards them.
+func LoadSpawnlist(dir string, log zerolog.Logger) (*spawn.Table, error) {
 	docs, err := loadXMLDocuments[spawnlistFile](dir, "spawnlist")
 	if err != nil {
 		return nil, err
@@ -64,6 +68,10 @@ func LoadSpawnlist(dir string) (*spawn.Table, error) {
 		for _, el := range doc.Data.Territories {
 			territory, err := buildTerritory(el)
 			if err != nil {
+				if errors.Is(err, spawn.ErrTerritoryBuild) {
+					log.Warn().Err(err).Str("file", doc.Path).Msg("data/xml: skipping unbuildable territory")
+					continue
+				}
 				return nil, fmt.Errorf("data/xml: parse territory in %s: %w", doc.Path, err)
 			}
 			// SpawnManager stores every declared territory in a Set with no
@@ -81,7 +89,7 @@ func LoadSpawnlist(dir string) (*spawn.Table, error) {
 
 	for _, doc := range docs {
 		for _, el := range doc.Data.Makers {
-			maker, err := buildMaker(el, territoryMap)
+			maker, err := buildMaker(el, territoryMap, log)
 			if err != nil {
 				return nil, fmt.Errorf("data/xml: parse maker in %s: %w", doc.Path, err)
 			}
@@ -109,19 +117,13 @@ func buildTerritory(el territoryElement) (*spawn.Territory, error) {
 	return spawn.NewTerritory(commons.StatSetFromXMLAttrs(el.Attrs), nodes)
 }
 
-func buildMaker(el makerElement, territories map[string]*spawn.Territory) (*spawn.Maker, error) {
+func buildMaker(el makerElement, territories map[string]*spawn.Territory, log zerolog.Logger) (*spawn.Maker, error) {
 	set := commons.StatSetFromXMLAttrs(el.Attrs)
 	f := commons.NewFields(set, "spawn maker loader")
 	name := f.StringDefault("name", "?")
 
-	refs, err := resolveTerritories(f.StringDefault("territory", ""), territories)
-	if err != nil {
-		return nil, fmt.Errorf("maker %q: %w", name, err)
-	}
-	banned, err := resolveTerritories(f.StringDefault("ban", ""), territories)
-	if err != nil {
-		return nil, fmt.Errorf("maker %q: %w", name, err)
-	}
+	refs := resolveTerritories(name, f.StringDefault("territory", ""), territories, log)
+	banned := resolveTerritories(name, f.StringDefault("ban", ""), territories, log)
 
 	aiType, aiParams := flattenAI(el.AI)
 	if aiType != "" {
@@ -185,10 +187,16 @@ func flattenAI(ai []aiElement) (string, map[string]string) {
 	return kind, params
 }
 
-func resolveTerritories(raw string, territories map[string]*spawn.Territory) ([]*spawn.Territory, error) {
+// resolveTerritories looks up each ";"-delimited name in raw. SpawnManager's
+// findTerritory/getTerritory resolve an unknown name to null rather than
+// rejecting the npcmaker — a territory dropped by LoadSpawnlist (or simply
+// misnamed) leaves the maker with fewer, or zero, territories instead of
+// failing the whole load; spawn.NewMaker and randomTerritoryPosition already
+// tolerate that.
+func resolveTerritories(makerName, raw string, territories map[string]*spawn.Territory, log zerolog.Logger) []*spawn.Territory {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
-		return nil, nil
+		return nil
 	}
 	names := strings.Split(raw, ";")
 	resolved := make([]*spawn.Territory, 0, len(names))
@@ -199,9 +207,10 @@ func resolveTerritories(raw string, territories map[string]*spawn.Territory) ([]
 		}
 		territory, ok := territories[name]
 		if !ok {
-			return nil, fmt.Errorf("unknown territory %q", name)
+			log.Warn().Str("maker", makerName).Str("territory", name).Msg("data/xml: territory does not exist")
+			continue
 		}
 		resolved = append(resolved, territory)
 	}
-	return resolved, nil
+	return resolved
 }

@@ -84,6 +84,15 @@ func (t *Territory) Intersects(other *geometry.Territory) bool {
 	return shape != nil && other != nil && shape.Intersects(other)
 }
 
+// ErrTerritoryBuild marks a territory whose polygon could not be built (too
+// few nodes, an inverted Z range, or a shape triangulation rejects). It
+// mirrors the boundary of SpawnManager.java's per-territory try/catch around
+// `new Territory(name, Kong.doTriangulation(coords), minZ, maxZ)`: the name
+// and minZ/maxZ attribute reads happen before that try and still propagate,
+// but everything from there on is caught, warned about, and skipped by the
+// caller instead of aborting the whole spawnlist load.
+var ErrTerritoryBuild = errors.New("spawn: territory build failed")
+
 // NewTerritory builds a Territory from set plus its decoded polygon nodes.
 func NewTerritory(set *commons.StatSet, nodes []Node) (*Territory, error) {
 	idf := commons.NewFields(set, "spawn territory")
@@ -98,10 +107,10 @@ func NewTerritory(set *commons.StatSet, nodes []Node) (*Territory, error) {
 		return nil, err
 	}
 	if len(nodes) < 3 {
-		return nil, errors.New("spawn: territory needs at least 3 nodes")
+		return nil, fmt.Errorf("%w: territory %q needs at least 3 nodes", ErrTerritoryBuild, name)
 	}
 	if maxZ < minZ {
-		return nil, errors.New("spawn: territory maxZ must be >= minZ")
+		return nil, fmt.Errorf("%w: territory %q maxZ must be >= minZ", ErrTerritoryBuild, name)
 	}
 
 	copyNodes := append([]Node(nil), nodes...)
@@ -111,11 +120,11 @@ func NewTerritory(set *commons.StatSet, nodes []Node) (*Territory, error) {
 	}
 	poly, err := geometry.NewTriangulatedPolygon(points)
 	if err != nil {
-		return nil, fmt.Errorf("spawn: territory %q: %w", name, err)
+		return nil, fmt.Errorf("%w: territory %q: %v", ErrTerritoryBuild, name, err)
 	}
 	shape, err := geometry.NewTerritory(minZ, maxZ, poly)
 	if err != nil {
-		return nil, fmt.Errorf("spawn: territory %q: %w", name, err)
+		return nil, fmt.Errorf("%w: territory %q: %v", ErrTerritoryBuild, name, err)
 	}
 
 	return &Territory{
