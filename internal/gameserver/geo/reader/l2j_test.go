@@ -69,9 +69,6 @@ func TestReadL2JDecodesRegionBlocks(t *testing.T) {
 }
 
 func TestReadL2JRejectsMalformedRegions(t *testing.T) {
-	valid := flatRegion(0, nil)
-	withTrailing := append(append([]byte(nil), valid...), 0xff)
-
 	tests := []struct {
 		name string
 		data []byte
@@ -82,7 +79,6 @@ func TestReadL2JRejectsMalformedRegions(t *testing.T) {
 		{name: "zero multilayer count", data: []byte{l2jMultilayer, 0}},
 		{name: "too many multilayer layers", data: []byte{l2jMultilayer, block.MaxLayers + 1}},
 		{name: "unknown block type", data: []byte{0x7f}},
-		{name: "trailing bytes", data: withTrailing},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -90,6 +86,18 @@ func TestReadL2JRejectsMalformedRegions(t *testing.T) {
 				t.Fatal("ReadL2J err = nil, want error")
 			}
 		})
+	}
+}
+
+func TestReadL2JAllowsTrailingBytes(t *testing.T) {
+	data := append(flatRegion(-32, nil), 0xff)
+
+	region, err := ReadL2J(bytes.NewReader(data))
+	if err != nil {
+		t.Fatalf("ReadL2J: %v", err)
+	}
+	if got := region.HeightNearest(0, 0, 0, 0, 0); got != -32 {
+		t.Errorf("flat height = %d, want -32", got)
 	}
 }
 
