@@ -94,6 +94,7 @@ var allowedOpcodes = map[State]map[byte]bool{
 		0x35: true, // delete shortcut
 		0x36: true, // cannot move anymore
 		0x37: true, // cancel target
+		0x38: true, // say2 chat (Java-mapped; not yet wired, see wiresafe.go)
 		0x3e: true, // dummy packet
 		0x3f: true, // request skill list
 		0x42: true, // get on vehicle
