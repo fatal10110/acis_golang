@@ -2,6 +2,7 @@ package serverpackets
 
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 )
 
 const (
@@ -44,6 +45,15 @@ func FrameDoorInfo(d doorPacketObject, showHP bool) wire.Frame {
 	w.WriteInt32(0)
 	w.WriteInt32(0)
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
+}
+
+// DoorFrameBuilder implements door.FrameBuilder over this package's frame
+// constructors, so the domain door package never touches wire encoding.
+type DoorFrameBuilder struct{}
+
+// StatusUpdate builds d's current-state status update frame.
+func (DoorFrameBuilder) StatusUpdate(d *door.Object, showHP bool) wire.Frame {
+	return FrameDoorStatusUpdate(d, showHP)
 }
 
 // FrameDoorStatusUpdate builds a door state update packet.

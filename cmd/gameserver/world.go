@@ -24,9 +24,17 @@ func provideRoster(cfg gameServerConfig, data *gameData, characters *gamesql.Cha
 }
 
 // provideWorldObjects spawns every door and static object template into
-// state at boot, applying closed doors to geodata immediately.
-func provideWorldObjects(data *gameData, ids *idfactory.Allocator, state *world.State) (*manager.WorldObjects, error) {
-	return manager.NewWorldObjects(data.Doors, data.Statics, ids, data.Geo, state)
+// state at boot, applying closed doors to geodata immediately, and wires the
+// door-timer task's late-bound hook to it — manager.WorldObjects needs
+// *task.Door to schedule timers with, so that task's own effects can only
+// point back at WorldObjects after it exists.
+func provideWorldObjects(data *gameData, ids *idfactory.Allocator, state *world.State, doorTimers *task.Door, doorHooks *doorTimerEffects) (*manager.WorldObjects, error) {
+	objs, err := manager.NewWorldObjects(data.Doors, data.Statics, ids, data.Geo, state, doorTimers)
+	if err != nil {
+		return nil, err
+	}
+	doorHooks.SetHook(objs.ToggleDoor)
+	return objs, nil
 }
 
 func startWorldObjects(objs *manager.WorldObjects, log zerolog.Logger) {
