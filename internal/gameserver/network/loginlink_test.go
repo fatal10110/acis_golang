@@ -304,6 +304,36 @@ func TestLoginLinkSendFailureEndsLink(t *testing.T) {
 	}
 }
 
+func TestLoginLinkUnknownOpcodeKeepsLinkOpen(t *testing.T) {
+	game, login := net.Pipe()
+	t.Cleanup(func() { login.Close() })
+
+	l := &LoginLink{
+		conn:   game,
+		crypt:  crypt.NewLinkCrypt(),
+		log:    zerolog.Nop(),
+		done:   make(chan struct{}),
+		frames: wire.NewFrameReader(game),
+	}
+	go l.readLoop(LoginLinkHandlers{})
+
+	if err := wire.WriteFrame(login, crypt.NewLinkCrypt().Encrypt([]byte{0xff})); err != nil {
+		t.Fatalf("write unknown opcode: %v", err)
+	}
+	select {
+	case <-l.Done():
+		t.Fatal("link closed after an unknown opcode")
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	login.Close()
+	select {
+	case <-l.Done():
+	case <-time.After(time.Second):
+		t.Fatal("link did not close after peer close")
+	}
+}
+
 // fakeLoginServer is a bare-bones GS-LS link peer for handshake edge cases
 // the real login server's acceptor never produces on its own (a revision
 // mismatch, a malformed frame).
