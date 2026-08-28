@@ -95,8 +95,15 @@ func (b *Block) Nearest(x, y int, z int32) int {
 }
 
 func (b *Block) Above(x, y int, z int32) int {
+	return b.AboveIgnoring(x, y, z, nil)
+}
+
+func (b *Block) AboveIgnoring(x, y int, z int32, ignore Object) int {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
+	if ignore != nil && b.hasObject(ignore) {
+		return encodeDelegated(b.base.Above(x, y, z))
+	}
 	ci := cellIndex(x, y)
 	if ov, ok := b.overrides[ci]; ok && ov.active {
 		if i := firstAboveIndex(ov.current, z); i >= 0 {
@@ -108,8 +115,15 @@ func (b *Block) Above(x, y int, z int32) int {
 }
 
 func (b *Block) Below(x, y int, z int32) int {
+	return b.BelowIgnoring(x, y, z, nil)
+}
+
+func (b *Block) BelowIgnoring(x, y int, z int32, ignore Object) int {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
+	if ignore != nil && b.hasObject(ignore) {
+		return encodeDelegated(b.base.Below(x, y, z))
+	}
 	ci := cellIndex(x, y)
 	if ov, ok := b.overrides[ci]; ok && ov.active {
 		if i := firstBelowIndex(ov.current, z); i >= 0 {
