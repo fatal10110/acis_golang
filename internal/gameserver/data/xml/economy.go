@@ -336,13 +336,10 @@ func buildAugmentationStatGroup(el augmentationSetElement) (augmentation.StatGro
 			if err != nil {
 				return augmentation.StatGroup{}, fmt.Errorf("stat %s table %s: %w", statEl.Name, tableEl.Name, err)
 			}
-			switch tableEl.Name {
-			case "#soloValues":
+			if strings.EqualFold(tableEl.Name, "#soloValues") {
 				solo = values
-			case "#combinedValues":
+			} else {
 				combined = values
-			default:
-				return augmentation.StatGroup{}, fmt.Errorf("stat %s: unknown table %q", statEl.Name, tableEl.Name)
 			}
 		}
 		stat, err := augmentation.NewStat(statEl.Name, solo, combined)

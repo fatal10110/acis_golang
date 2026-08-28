@@ -80,8 +80,9 @@ func LoadSpawnlist(dir string, log zerolog.Logger) (*spawn.Table, error) {
 			// resolve to an unspecified (here: first-declared) match. Keep
 			// every declaration for the table and let the first-declared
 			// name win the resolution map, matching that first-wins order.
-			if _, exists := territoryMap[territory.Name]; !exists {
-				territoryMap[territory.Name] = territory
+			key := strings.ToLower(territory.Name)
+			if _, exists := territoryMap[key]; !exists {
+				territoryMap[key] = territory
 			}
 			territories = append(territories, territory)
 		}
@@ -125,7 +126,7 @@ func buildMaker(el makerElement, territories map[string]*spawn.Territory, log ze
 	refs := resolveTerritories(name, f.StringDefault("territory", ""), territories, log)
 	banned := resolveTerritories(name, f.StringDefault("ban", ""), territories, log)
 
-	aiType, aiParams := flattenAI(el.AI)
+	aiType, aiParams := flattenAI(el.AI, true)
 	if aiType != "" {
 		set.Set("maker", aiType)
 	}
@@ -158,7 +159,7 @@ func buildEntry(el spawnNPCElement) (spawn.Entry, error) {
 		}
 	}
 
-	_, aiParams := flattenAI(el.AI)
+	_, aiParams := flattenAI(el.AI, false)
 	positions, err := spawn.ParsePositions(f.StringDefault("pos", ""))
 	if err != nil {
 		return spawn.Entry{}, fmt.Errorf("npc %q: %w", npcID, err)
@@ -171,14 +172,18 @@ func buildEntry(el spawnNPCElement) (spawn.Entry, error) {
 	return entry, nil
 }
 
-func flattenAI(ai []aiElement) (string, map[string]string) {
+func flattenAI(ai []aiElement, stripAt bool) (string, map[string]string) {
 	var kind string
 	params := make(map[string]string)
 	for _, el := range ai {
 		set := commons.StatSetFromXMLAttrs(el.Attrs)
 		kind = set.GetStringDefault("type", kind)
 		for _, param := range el.Sets {
-			params[param.Name] = strings.ReplaceAll(param.Val, "@", "")
+			value := param.Val
+			if stripAt {
+				value = strings.ReplaceAll(value, "@", "")
+			}
+			params[param.Name] = value
 		}
 	}
 	if len(params) == 0 {
@@ -210,7 +215,7 @@ func resolveTerritories(makerName, raw string, territories map[string]*spawn.Ter
 
 	resolved := make([]*spawn.Territory, 0, len(names))
 	for _, name := range names {
-		territory, ok := territories[name]
+		territory, ok := territories[strings.ToLower(name)]
 		if !ok {
 			log.Warn().Str("maker", makerName).Str("territory", name).Msg("data/xml: territory does not exist")
 			if len(names) > 1 {
