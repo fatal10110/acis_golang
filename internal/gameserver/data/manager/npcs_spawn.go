@@ -145,13 +145,14 @@ func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, lo
 	}
 	inst.Home = loc
 	inst.HasHome = true
+	inst.SpawnHeading = heading
 
 	if !npc.Attackable(inst) {
 		n.skippedNonCombatCount.Add(1)
 		return
 	}
 
-	hostile, err := newLiveHostile(inst, tmpl.RunSpeed, n.geo, n.positions, n.log, n.castDefs, n.castEffects)
+	hostile, walkerRef, err := newLiveHostile(inst, tmpl.RunSpeed, n.geo, n.positions, n.log, n.castDefs, n.castEffects, n.walker)
 	if err != nil {
 		n.log.Warn().Err(err).Int32("npc_id", entry.NPCID).Msg("spawn: cannot build live npc")
 		return
@@ -172,6 +173,9 @@ func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, lo
 
 	n.state.Spawn(hostile, loc.X, loc.Y, loc.Z, heading)
 	n.ai.Add(hostile)
+	// Walker only ticks in-region actors — must run after Spawn placed this
+	// NPC in world.State, not before.
+	startWalkerRoute(n.walker, walkerRef, inst, n.log)
 
 	n.mu.Lock()
 	n.live[id] = key

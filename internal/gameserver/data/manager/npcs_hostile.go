@@ -7,6 +7,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/rs/zerolog"
@@ -16,21 +17,51 @@ type locatedRef struct{ move.Actor }
 type creatureActorRef struct{ attack.CreatureActor }
 type statOwnerRef struct{ effect.StatOwner }
 
+// walkerActorRef adapts a live Hostile plus its movement controller to
+// task.WalkerActor. Hostile's own promoted Position() returns (x, y, z int)
+// for its other controllers, not WalkerActor's location.Location shape, so
+// this narrows/adapts the mismatched methods the same way locatedRef and
+// creatureActorRef adapt Hostile for its move/attack controllers; every
+// other WalkerActor method (ObjectID, GeoPathFailCount, SayNPCString, ...)
+// promotes straight through from the embedded Hostile.
+type walkerActorRef struct {
+	*npc.Hostile
+	moveCtl *move.Controller
+}
+
+func (r *walkerActorRef) Position() location.Location {
+	x, y, z := r.Hostile.Position()
+	return location.Location{X: x, Y: y, Z: z}
+}
+
+func (r *walkerActorRef) Moving() bool {
+	return r.Hostile.Move().Moving()
+}
+
+func (r *walkerActorRef) MoveToLocation(target location.Location) (move.Event, error) {
+	return r.moveCtl.MoveToLocationEvent(target)
+}
+
+func (r *walkerActorRef) TeleportTo(target location.Location) {
+	r.Hostile.SetXYZ(target.X, target.Y, target.Z)
+	r.Hostile.BroadcastPosition()
+}
+
 // newLiveHostile builds a live Hostile for inst, wiring a real movement
 // controller (over the Hostile's lifetime movement state) and a real attack
 // controller, resolving their mutual construction-order dependency on the
 // finished Hostile via locatedRef/creatureActorRef/statOwnerRef.
-func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *task.PositionUpdates, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers) (*npc.Hostile, error) {
+func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *task.PositionUpdates, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker) (*npc.Hostile, *walkerActorRef, error) {
 	statRef := &statOwnerRef{}
 	live, err := creature.NewLive(inst.Home, speed, geo, statRef)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	locRef := &locatedRef{}
 	moveCtl, err := move.NewController(live.Move(), locRef)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	moveCtl.SetPositionUpdates(positions)
 
@@ -41,7 +72,7 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 
 	hostile, err := npc.NewHostile(inst, live, moveCtl, attackCtl)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	hostile.SetLogger(log)
 	if los, ok := geo.(npc.LineOfSight); ok {
@@ -74,6 +105,8 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 		hostile.AI().SetCastController(aiController)
 	}
 
+	walkerRef := &walkerActorRef{Hostile: hostile, moveCtl: moveCtl}
+
 	// Re-evaluate the AI loop as soon as a chase leg completes or a swing
 	// finishes, rather than waiting for the next fixed AI tick — otherwise
 	// a hostile NPC only closes distance on, or re-attacks, its target once
@@ -84,6 +117,17 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 	moveCtl.SetArrived(func() {
 		pos := moveCtl.Position()
 		hostile.SyncPosition(pos)
+		// aCis NpcAI.onEvtArrived: an arrival that lands exactly back on the
+		// spawn point restores the spawn heading, regardless of what the NPC
+		// last faced while moving.
+		if inst.HasHome && pos == inst.Home {
+			hostile.SetHeading(inst.SpawnHeading)
+		}
+		if walker != nil {
+			if err := walker.Arrived(walkerRef); err != nil {
+				log.Warn().Err(err).Msg("task: walker arrived")
+			}
+		}
 		if err := hostile.Think(); err != nil {
 			log.Warn().Err(err).Msg("ai: hostile think")
 		}
@@ -94,7 +138,25 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 		}
 	})
 
-	return hostile, nil
+	return hostile, walkerRef, nil
+}
+
+// startWalkerRoute registers ref for route walking if inst's template alias
+// resolves in walkerRoutes.xml (aCis Walkers.java: every spawned NPC whose
+// template alias has route data gets an immediate route-move desire; both
+// the route name and its per-NPC key are that alias). The caller must have
+// already placed ref's Hostile into world.State — Walker only ticks actors
+// it can find in-region, so calling this before the spawn lands is a
+// silent no-op forever, not a delayed start. Most templates have no alias,
+// or an alias with no route data — StartRoute's "route not found" error is
+// the expected, silent outcome for those, not a fault.
+func startWalkerRoute(walker *task.Walker, ref *walkerActorRef, inst *npc.Instance, log zerolog.Logger) {
+	if walker == nil || inst.Template.Alias == "" {
+		return
+	}
+	if err := walker.StartRoute(ref, inst.Template.Alias, inst.Template.Alias); err != nil {
+		log.Debug().Err(err).Str("alias", inst.Template.Alias).Msg("npc: not a route walker")
+	}
 }
 
 // deathRewards applies one victim's live death rewards at its position at
