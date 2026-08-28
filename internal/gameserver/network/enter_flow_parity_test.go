@@ -247,6 +247,37 @@ func TestKnownExtendedOpcodeWhileEnteringCountsTowardDisconnect(t *testing.T) {
 	c.ExpectClosed()
 }
 
+// TestMappedButUnimplementedOpcodeDoesNotCountAsUnknown pins that an in-game
+// opcode the Java switch maps to a handler (0x38, Say2) is accepted and does
+// not advance the unknown-packet counter, even though no Go handler exists
+// for it yet: sending it more than maxUnknownPerMin times must not
+// disconnect the client.
+func TestMappedButUnimplementedOpcodeDoesNotCountAsUnknown(t *testing.T) {
+	c, _, _, _, _ := newLinkedGameClientEnterWorld(t)
+
+	for i := 0; i < maxUnknownPerMin+5; i++ {
+		c.Send(encodeSingleOpcode(clientpackets.OpcodeSay2))
+	}
+
+	// The connection is still dispatching: manor list still answers.
+	c.Send(encodeRequestManorList())
+	if frame := c.Read(); frame[0] != serverpackets.OpcodeExtended {
+		t.Fatalf("post-say2-spam opcode = %#x, want ExSendManorList under Extended (%#x)", frame[0], serverpackets.OpcodeExtended)
+	}
+}
+
+// TestUnknownTopLevelOpcodeCountsTowardDisconnect pins that an in-game
+// opcode absent from Java's IN_GAME switch remains subject to the existing
+// unknown-packet disconnect threshold.
+func TestUnknownTopLevelOpcodeCountsTowardDisconnect(t *testing.T) {
+	c, _, _, _, _ := newLinkedGameClientEnterWorld(t)
+
+	for i := 0; i < maxUnknownPerMin; i++ {
+		c.Send(encodeSingleOpcode(0xfe))
+	}
+	c.ExpectClosed()
+}
+
 // TestRequestSkillCoolTimeInGameGetsNoReply pins that the in-game 0x9d
 // request stays unanswered — reuse timers reach the client unsolicited —
 // while the connection itself remains alive.
