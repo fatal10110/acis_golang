@@ -262,6 +262,7 @@ const (
 	SubCategoryWeapon    SubCategory = 0
 	SubCategoryArmor     SubCategory = 1
 	SubCategoryAccessory SubCategory = 2
+	SubCategoryQuest     SubCategory = 3
 	SubCategoryMoney     SubCategory = 4
 	SubCategoryOther     SubCategory = 5
 )
@@ -279,10 +280,8 @@ func isJewelrySlot(s Slot) bool {
 // Category classifies t the way the inventory list groups items: by Kind,
 // with armor-shaped jewelry (rings, earrings, necklaces, and similar
 // accessory slots) reported as an accessory rather than as armor. An
-// etc-item that isn't currency always reports SubCategoryOther: this method
-// doesn't split out quest items into their own sub-category (see
-// EtcItemDetail.IsQuestItem for that classification), since no inventory
-// list caller needs the distinction yet.
+// Quest etc-items report their own sub-category; currency takes precedence
+// over the remaining etc-items.
 func (t *Template) Category() (Category, SubCategory) {
 	switch t.Kind {
 	case KindWeapon:
@@ -293,6 +292,9 @@ func (t *Template) Category() (Category, SubCategory) {
 		}
 		return CategoryArmor, SubCategoryArmor
 	default: // KindEtcItem
+		if t.EtcItem != nil && t.EtcItem.IsQuestItem() {
+			return CategoryMoneyOrEtcItem, SubCategoryQuest
+		}
 		if t.ID == AdenaID || t.ID == AncientAdenaID {
 			return CategoryMoneyOrEtcItem, SubCategoryMoney
 		}
