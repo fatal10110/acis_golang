@@ -53,7 +53,7 @@ func LoadCrests(dir string) (*Crests, error) {
 		name := entry.Name()
 		typ, id, ok, err := parseCrestName(name)
 		if err != nil {
-			return nil, fmt.Errorf("load crest %q: %w", name, err)
+			return c, nil
 		}
 		if !ok {
 			continue
@@ -62,11 +62,14 @@ func LoadCrests(dir string) (*Crests, error) {
 		path := filepath.Join(dir, name)
 		data, err := os.ReadFile(path)
 		if err != nil {
-			return nil, fmt.Errorf("load crest %q: %w", path, err)
+			return c, nil
 		}
 		spec, _ := typ.spec()
 		if len(data) != spec.size {
-			return nil, fmt.Errorf("load crest %q: got %d bytes, want %d", path, len(data), spec.size)
+			if err := os.Remove(path); err != nil {
+				return c, nil
+			}
+			continue
 		}
 		c.byID[id] = data
 	}

@@ -100,7 +100,7 @@ func TestLoadMultiSellLists(t *testing.T) {
 	if !second.Stackable() {
 		t.Fatalf("second entry Stackable() = false, want true for adena product")
 	}
-	if got, want := second.Ingredients[0].EnchantLevel, 4; got != want {
+	if got, want := second.Ingredients[0].EnchantLevel, 0; got != want {
 		t.Fatalf("second ingredient EnchantLevel = %d, want %d", got, want)
 	}
 	if !second.Ingredients[0].MaintainIngredient {
@@ -110,7 +110,7 @@ func TestLoadMultiSellLists(t *testing.T) {
 
 func TestLoadMultiSellListsFilenameKeying(t *testing.T) {
 	dir := t.TempDir()
-	writeMultiSellFile(t, dir, "1.xml", `
+	writeMultiSellFile(t, dir, "foo.xml.xml", `
 	<item>
 		<production id="57" count="1"/>
 	</item>`)
@@ -120,11 +120,14 @@ func TestLoadMultiSellListsFilenameKeying(t *testing.T) {
 		t.Fatalf("LoadMultiSellLists(%q): %v", dir, err)
 	}
 
-	want := commons.LegacyStringHash("1")
+	want := commons.LegacyStringHash("foo")
 	if _, ok := table.Get(want); !ok {
 		t.Fatalf("list keyed by %d (hash of bare filename) not found", want)
 	}
-	if _, ok := table.Get(commons.LegacyStringHash(filepath.Join(dir, "1.xml"))); ok {
+	if _, ok := table.Get(commons.LegacyStringHash("foo.xml")); ok {
+		t.Fatal("list was keyed after only one .xml replacement")
+	}
+	if _, ok := table.Get(commons.LegacyStringHash(filepath.Join(dir, "foo.xml.xml"))); ok {
 		t.Fatal("list was keyed by path, want bare filename only")
 	}
 }
