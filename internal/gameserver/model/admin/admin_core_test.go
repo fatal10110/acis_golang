@@ -11,20 +11,16 @@ func TestNewAccessLevel(t *testing.T) {
 	set := commons.NewStatSet()
 	set.Set("level", "7")
 	set.Set("name", "Admin")
-	set.Set("nameColor", "CC6600")
-	set.Set("titleColor", "CC6600")
 	set.Set("childLevel", "6")
 	set.Set("isGM", "true")
 	set.Set("allowFixedRes", "true")
-	set.Set("allowTransaction", "true")
 	set.Set("allowAltg", "true")
-	set.Set("giveDamage", "true")
 
 	got, err := NewAccessLevel(set)
 	if err != nil {
 		t.Fatalf("NewAccessLevel() error: %v", err)
 	}
-	if got.Level != 7 || got.Name != "Admin" || !got.IsGM || got.ChildLevel != 6 {
+	if got.Level != 7 || got.Name != "Admin" || got.NameColor != "FFFFFF" || got.TitleColor != "FFFF77" || !got.IsGM || got.ChildLevel != 6 || !got.AllowTransaction || !got.GiveDamage {
 		t.Fatalf("NewAccessLevel() = %+v", got)
 	}
 }
@@ -64,7 +60,8 @@ func TestNewAnnouncement(t *testing.T) {
 
 	set = commons.NewStatSet()
 	set.Set("message", "")
-	if _, err := NewAnnouncement(set); err == nil {
-		t.Fatal("expected an error for an empty message, got nil")
+	got, err = NewAnnouncement(set)
+	if err != nil || got.Message != "" {
+		t.Fatalf("NewAnnouncement(empty) = %+v, %v", got, err)
 	}
 }

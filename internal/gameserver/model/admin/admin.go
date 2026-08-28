@@ -31,14 +31,14 @@ func NewAccessLevel(set *commons.StatSet) (AccessLevel, error) {
 	accessLevel := AccessLevel{
 		Level:            level,
 		Name:             f.String("name"),
-		NameColor:        f.String("nameColor"),
-		TitleColor:       f.String("titleColor"),
+		NameColor:        f.StringDefault("nameColor", "FFFFFF"),
+		TitleColor:       f.StringDefault("titleColor", "FFFF77"),
 		ChildLevel:       f.IntDefault("childLevel", 0),
 		IsGM:             f.BoolDefault("isGM", false),
 		AllowFixedRes:    f.BoolDefault("allowFixedRes", false),
-		AllowTransaction: f.BoolDefault("allowTransaction", false),
+		AllowTransaction: f.BoolDefault("allowTransaction", true),
 		AllowAltG:        f.BoolDefault("allowAltg", false),
-		GiveDamage:       f.BoolDefault("giveDamage", false),
+		GiveDamage:       f.BoolDefault("giveDamage", true),
 	}
 	if err := f.Err(); err != nil {
 		return AccessLevel{}, err
@@ -89,10 +89,6 @@ func NewAnnouncement(set *commons.StatSet) (Announcement, error) {
 	if err := f.Err(); err != nil {
 		return Announcement{}, err
 	}
-	if strings.TrimSpace(message) == "" {
-		return Announcement{}, fmt.Errorf("admin: announcement: empty message")
-	}
-
 	a := Announcement{
 		Message:  message,
 		Critical: critical,
