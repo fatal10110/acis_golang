@@ -256,3 +256,55 @@ func TestTerritoryLiteralWithoutGeometryStaysUsable(t *testing.T) {
 		t.Error("literal-constructed Territory does not intersect an overlapping territory")
 	}
 }
+
+// TestTerritoryContainsUsesTriangulationNotRayCasting pins the containment
+// rule spawn placement runs on, using a self-touching territory taken
+// verbatim from the shipped spawnlist ("godard01_npc2315_04",
+// spawnlist/23_15.xml: the four corners of a 200x200 box listed in bowtie
+// order). Even-odd ray casting over the same node ring puts this point
+// outside, so the assertion fails if the ray-cast path comes back.
+func TestTerritoryContainsUsesTriangulationNotRayCasting(t *testing.T) {
+	nodes := []Node{
+		{X: 122400, Y: -69800}, {X: 122400, Y: -70000},
+		{X: 122600, Y: -69800}, {X: 122600, Y: -70000},
+	}
+	set := commons.NewStatSet()
+	set.Set("name", "godard01_npc2315_04")
+	set.Set("minZ", "-3250")
+	set.Set("maxZ", "-3100")
+
+	territory, err := NewTerritory(set, nodes)
+	if err != nil {
+		t.Fatalf("NewTerritory() error = %v", err)
+	}
+
+	const x, y = 122500, -69850
+	if !territory.Contains2D(x, y) {
+		t.Errorf("Contains2D(%d, %d) = false, want true", x, y)
+	}
+	if !territory.Contains(x, y, -3200) {
+		t.Errorf("Contains(%d, %d, -3200) = false, want true", x, y)
+	}
+	if territory.Contains(x, y, -3000) {
+		t.Error("Contains(z above maxZ) = true, want false")
+	}
+
+	ring, err := geometry.NewPolygon([]geometry.Point{
+		{X: 122400, Y: -69800}, {X: 122400, Y: -70000},
+		{X: 122600, Y: -69800}, {X: 122600, Y: -70000},
+	})
+	if err != nil {
+		t.Fatalf("NewPolygon() error = %v", err)
+	}
+	if ring.Contains(x, y) {
+		t.Errorf("even-odd ray casting also contains (%d, %d); this fixture only "+
+			"proves anything while the two algorithms disagree there", x, y)
+	}
+
+	// A territory built as a struct literal has no prebuilt geometry; it must
+	// reach the same answer by triangulating its nodes on demand.
+	literal := &Territory{Name: "literal", MinZ: -3250, MaxZ: -3100, Nodes: nodes}
+	if !literal.Contains2D(x, y) {
+		t.Errorf("literal territory Contains2D(%d, %d) = false, want true", x, y)
+	}
+}

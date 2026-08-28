@@ -27,6 +27,13 @@ type Territory struct {
 	*geometry.Territory
 }
 
+// geometryTerritory returns the prebuilt shape, or triangulates the nodes on
+// demand for a Territory assembled as a struct literal.
+//
+// ponytail: the on-demand path re-triangulates per call. Only test fixtures
+// take it — everything loaded from the datapack goes through NewTerritory and
+// has the pointer set — so cache it here only if a production path ever
+// constructs a Territory without it.
 func (t *Territory) geometryTerritory() *geometry.Territory {
 	if t == nil {
 		return nil
@@ -38,7 +45,7 @@ func (t *Territory) geometryTerritory() *geometry.Territory {
 	for i, n := range t.Nodes {
 		points[i] = geometry.Point{X: n.X, Y: n.Y}
 	}
-	poly, err := geometry.NewPolygon(points)
+	poly, err := geometry.NewTriangulatedPolygon(points)
 	if err != nil {
 		return nil
 	}
@@ -53,6 +60,13 @@ func (t *Territory) geometryTerritory() *geometry.Territory {
 func (t *Territory) Contains(x, y, z int) bool {
 	shape := t.geometryTerritory()
 	return shape != nil && shape.Contains(x, y, z)
+}
+
+// Contains2D reports whether (x, y) lies inside the territory footprint,
+// ignoring z.
+func (t *Territory) Contains2D(x, y int) bool {
+	shape := t.geometryTerritory()
+	return shape != nil && shape.Contains2D(x, y)
 }
 
 // Area reports the territory's 2D area.
@@ -95,7 +109,7 @@ func NewTerritory(set *commons.StatSet, nodes []Node) (*Territory, error) {
 	for i, n := range nodes {
 		points[i] = geometry.Point{X: n.X, Y: n.Y}
 	}
-	poly, err := geometry.NewPolygon(points)
+	poly, err := geometry.NewTriangulatedPolygon(points)
 	if err != nil {
 		return nil, fmt.Errorf("spawn: territory %q: %w", name, err)
 	}
