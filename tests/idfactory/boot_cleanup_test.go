@@ -18,19 +18,59 @@ func seedRow(t *testing.T, db *sql.DB, stmt string, args ...any) {
 	}
 }
 
+// clearIDScanRows empties the ad hoc tables idScanTables creates, since they
+// aren't in sqltest's truncate-between-tests list. Call it before seeding a
+// test's own rows so an earlier test's leftovers can't affect assertions.
+func clearIDScanRows(t *testing.T, db *sql.DB) {
+	t.Helper()
+	for _, table := range []string{"clan_data", "clan_subpledges", "castle", "clanhall", "auctions", "mods_wedding", "petition"} {
+		if _, err := db.Exec("DELETE FROM " + table); err != nil {
+			t.Fatalf("clear %s: %v", table, err)
+		}
+	}
+}
+
 func seedCharacter(t *testing.T, db *sql.DB, objectID int32) {
 	t.Helper()
 	seedRow(t, db,
 		"INSERT INTO characters (obj_Id, char_name, online) VALUES (?, ?, ?)", objectID, "Debris", 1)
 }
 
-// idScanTables lists the remaining tables the boot id scan reads that the
-// shared test database does not create; fresh installs get them from the
-// shipped SQL baseline.
+// idScanTables lists the remaining tables the boot id scan and repair pass
+// read that the shared test database does not create; fresh installs get
+// them from the shipped SQL baseline. clan_data carries every column an
+// orphanRepairStatements UPDATE touches, since tests across this package
+// share one CREATE TABLE IF NOT EXISTS for it.
 var idScanTables = []string{
-	"CREATE TABLE IF NOT EXISTS clan_data (clan_id INT UNSIGNED NOT NULL DEFAULT 0)",
+	"CREATE TABLE IF NOT EXISTS clan_data (" +
+		"clan_id INT UNSIGNED NOT NULL DEFAULT 0, " +
+		"leader_id INT UNSIGNED NOT NULL DEFAULT 0, " +
+		"hasCastle INT NOT NULL DEFAULT 0, " +
+		"auction_bid_at INT NOT NULL DEFAULT 0, " +
+		"new_leader_id INT UNSIGNED NOT NULL DEFAULT 0" +
+		")",
 	"CREATE TABLE IF NOT EXISTS mods_wedding (id INT NOT NULL DEFAULT 0)",
 	"CREATE TABLE IF NOT EXISTS petition (oid INT NOT NULL DEFAULT 0)",
+	"CREATE TABLE IF NOT EXISTS clan_subpledges (" +
+		"clan_id INT UNSIGNED NOT NULL DEFAULT 0, " +
+		"leader_id INT UNSIGNED NOT NULL DEFAULT 0" +
+		")",
+	"CREATE TABLE IF NOT EXISTS castle (" +
+		"id INT UNSIGNED NOT NULL DEFAULT 0, " +
+		"currentTaxPercent INT NOT NULL DEFAULT 0, " +
+		"nextTaxPercent INT NOT NULL DEFAULT 0" +
+		")",
+	"CREATE TABLE IF NOT EXISTS clanhall (" +
+		"id INT UNSIGNED NOT NULL DEFAULT 0, " +
+		"ownerId INT UNSIGNED NOT NULL DEFAULT 0, " +
+		"paidUntil BIGINT NOT NULL DEFAULT 0, " +
+		"paid INT NOT NULL DEFAULT 0, " +
+		"sellerClanName VARCHAR(35) NOT NULL DEFAULT ''" +
+		")",
+	"CREATE TABLE IF NOT EXISTS auctions (" +
+		"clanhall_id INT UNSIGNED NOT NULL DEFAULT 0, " +
+		"clan_oid INT UNSIGNED NOT NULL DEFAULT 0" +
+		")",
 }
 
 // TestBootCleanupRestoresDatabaseIntegrity drives the allocator's boot

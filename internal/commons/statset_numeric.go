@@ -360,15 +360,12 @@ func (s *StatSet) GetIntArray(key string) ([]int, error) {
 }
 
 // GetIntArrayDefault is like GetIntArray but returns defaultArray when key
-// is absent (or holds a value of a kind an int slice doesn't coerce from).
-// A string value with an element that fails to parse is still an error.
+// is absent, holds a value of a kind an int slice doesn't coerce from, or
+// holds a string with an element that fails to parse.
 func (s *StatSet) GetIntArrayDefault(key string, defaultArray []int) ([]int, error) {
 	val := s.values[key]
 	v, ok, err := coerceIntArray(val)
-	if err != nil {
-		return nil, fmt.Errorf("commons: StatSet key %q: %w", key, err)
-	}
-	if !ok {
+	if err != nil || !ok {
 		return defaultArray, nil
 	}
 	return v, nil

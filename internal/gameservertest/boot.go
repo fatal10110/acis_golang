@@ -243,6 +243,7 @@ type Server struct {
 	addr             net.Addr
 	sessions         *manager.SessionStore
 	groundStore      *gamesql.GroundItemStore
+	cursedWeapons    *entity.CursedWeaponTable
 
 	closeOnce sync.Once
 	cancel    context.CancelFunc
@@ -531,9 +532,19 @@ func (s *Server) FlushItems(tb testing.TB) {
 // mid-test instead of tearing the server down.
 func (s *Server) FlushGroundItems(tb testing.TB) {
 	tb.Helper()
-	if err := s.groundStore.Save(context.Background(), s.GroundItems.Snapshots(nil)); err != nil {
+	if err := s.groundStore.Save(context.Background(), s.GroundItems.Snapshots(s.skipCursedGroundItem)); err != nil {
 		tb.Fatalf("save ground items: %v", err)
 	}
+}
+
+// skipCursedGroundItem excludes cursed weapon item ids from ground-item
+// persistence, matching Java's ItemsOnGroundTaskManager.save() skip.
+func (s *Server) skipCursedGroundItem(itemID int32) bool {
+	if s.cursedWeapons == nil {
+		return false
+	}
+	_, ok := s.cursedWeapons.Weapon(itemID)
+	return ok
 }
 
 // shutdownDrainTimeout bounds each final flush Shutdown runs, mirroring the
@@ -552,7 +563,7 @@ func (s *Server) Shutdown(tb testing.TB) {
 	if err := s.ItemInstances.Save(ctx); err != nil {
 		tb.Fatalf("shutdown item flush: %v", err)
 	}
-	if err := s.groundStore.Save(ctx, s.GroundItems.Snapshots(nil)); err != nil {
+	if err := s.groundStore.Save(ctx, s.GroundItems.Snapshots(s.skipCursedGroundItem)); err != nil {
 		tb.Fatalf("shutdown ground-item save: %v", err)
 	}
 	s.Close()
@@ -848,6 +859,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		addr:             ln.Addr(),
 		sessions:         sessions,
 		groundStore:      gamesql.NewGroundItemStore(db),
+		cursedWeapons:    cursed,
 		cancel:           cancel,
 	}
 }
