@@ -22,7 +22,7 @@ func TestRequestLinkHTMLSendsCachedNpcHtmlMessage(t *testing.T) {
 	gcl.requestLinkHTML(live, clientpackets.RequestLinkHTML{Link: "data/html/help/tutorial.htm"})
 
 	testsupport.AssertOpcodeSequence(t, capture.Frames(), serverpackets.OpcodeNpcHtmlMessage)
-	assertNpcHtmlMessageFrame(t, capture.Frames()[0], 0, "<html><body>tutorial</body></html>", 0)
+	assertNpcHtmlMessageFrame(t, capture.Frames()[0], 0, "<html><body>tutorial</body></html>\n", 0)
 }
 
 func TestRequestLinkHTMLSendsMissingNoticeForSafeMissingFile(t *testing.T) {
@@ -67,7 +67,7 @@ func TestRequestBypassToServerPlayerHelpSendsCachedNpcHtmlMessage(t *testing.T) 
 	gcl.requestBypassToServer(live, clientpackets.RequestBypassToServer{Command: "player_help tutorial.htm"})
 
 	testsupport.AssertOpcodeSequence(t, capture.Frames(), serverpackets.OpcodeNpcHtmlMessage)
-	assertNpcHtmlMessageFrame(t, capture.Frames()[0], 0, "<html><body>tutorial</body></html>", 0)
+	assertNpcHtmlMessageFrame(t, capture.Frames()[0], 0, "<html><body>tutorial</body></html>\n", 0)
 }
 
 func TestRequestBypassToServerPlayerHelpSetsItemID(t *testing.T) {
@@ -79,7 +79,7 @@ func TestRequestBypassToServerPlayerHelpSetsItemID(t *testing.T) {
 	gcl.requestBypassToServer(live, clientpackets.RequestBypassToServer{Command: "player_help lidias_diary/7064-16.htm#7064"})
 
 	testsupport.AssertOpcodeSequence(t, capture.Frames(), serverpackets.OpcodeNpcHtmlMessage)
-	assertNpcHtmlMessageFrame(t, capture.Frames()[0], 0, "<html><body>diary</body></html>", 7064)
+	assertNpcHtmlMessageFrame(t, capture.Frames()[0], 0, "<html><body>diary</body></html>\n", 7064)
 }
 
 func TestRequestBypassToServerPlayerHelpRejectsUnsafePath(t *testing.T) {
@@ -114,7 +114,7 @@ func TestGameClientLinkRequestLinkHTMLDispatch(t *testing.T) {
 	if reply[0] != serverpackets.OpcodeNpcHtmlMessage {
 		t.Fatalf("reply opcode = %#x, want NpcHtmlMessage (%#x)", reply[0], serverpackets.OpcodeNpcHtmlMessage)
 	}
-	assertNpcHtmlMessageFrame(t, reply, 0, "<html><body>tutorial</body></html>", 0)
+	assertNpcHtmlMessageFrame(t, reply, 0, "<html><body>tutorial</body></html>\n", 0)
 }
 
 func TestGameClientLinkRequestBypassToServerPlayerHelpDispatch(t *testing.T) {
@@ -136,7 +136,7 @@ func TestGameClientLinkRequestBypassToServerPlayerHelpDispatch(t *testing.T) {
 	if reply[0] != serverpackets.OpcodeNpcHtmlMessage {
 		t.Fatalf("reply opcode = %#x, want NpcHtmlMessage (%#x)", reply[0], serverpackets.OpcodeNpcHtmlMessage)
 	}
-	assertNpcHtmlMessageFrame(t, reply, 0, "<html><body>tutorial</body></html>", 0)
+	assertNpcHtmlMessageFrame(t, reply, 0, "<html><body>tutorial</body></html>\n", 0)
 }
 
 func testHTMLCache(t *testing.T, pages map[string]string) *datacache.HTML {
