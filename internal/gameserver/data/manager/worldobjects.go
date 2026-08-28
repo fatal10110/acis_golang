@@ -1,6 +1,7 @@
 package manager
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+	"github.com/rs/zerolog"
 )
 
 // WorldObjects owns the always-spawned doors and static objects loaded at boot.
@@ -29,8 +31,10 @@ type WorldObjects struct {
 // NewWorldObjects allocates, spawns, and indexes door and static-object
 // templates. Closed doors are applied to geodata immediately. doorTimers
 // schedules each door's next auto open/close transition, mirroring the
-// reference server's DoorAI.
-func NewWorldObjects(doors *door.Table, statics *staticobject.Table, ids idAllocator, geo *engine.Engine, state *world.State, doorTimers *task.Door) (*WorldObjects, error) {
+// reference server's DoorAI. A door whose triangulated footprint is
+// degenerate or samples to no geodata cells is logged and skipped rather
+// than aborting boot, matching DoorData.java:113-123.
+func NewWorldObjects(doors *door.Table, statics *staticobject.Table, ids idAllocator, geo *engine.Engine, state *world.State, doorTimers *task.Door, log zerolog.Logger) (*WorldObjects, error) {
 	if ids == nil {
 		return nil, fmt.Errorf("world objects: nil id allocator")
 	}
@@ -54,6 +58,10 @@ func NewWorldObjects(doors *door.Table, statics *staticobject.Table, ids idAlloc
 	for _, tmpl := range doors.All() {
 		obj, err := w.spawnDoor(tmpl, ids)
 		if err != nil {
+			if errors.Is(err, door.ErrEmptyFootprint) || errors.Is(err, dynamic.ErrDegenerateFootprint) {
+				log.Warn().Err(err).Int("door", tmpl.ID).Msg("data/manager: skipping door with degenerate footprint")
+				continue
+			}
 			return nil, err
 		}
 		w.doors[obj.DoorID()] = obj

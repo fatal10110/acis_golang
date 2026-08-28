@@ -28,8 +28,8 @@ func provideRoster(cfg gameServerConfig, data *gameData, characters *gamesql.Cha
 // door-timer task's late-bound hook to it — manager.WorldObjects needs
 // *task.Door to schedule timers with, so that task's own effects can only
 // point back at WorldObjects after it exists.
-func provideWorldObjects(data *gameData, ids *idfactory.Allocator, state *world.State, doorTimers *task.Door, doorHooks *doorTimerEffects) (*manager.WorldObjects, error) {
-	objs, err := manager.NewWorldObjects(data.Doors, data.Statics, ids, data.Geo, state, doorTimers)
+func provideWorldObjects(data *gameData, ids *idfactory.Allocator, state *world.State, doorTimers *task.Door, doorHooks *doorTimerEffects, log zerolog.Logger) (*manager.WorldObjects, error) {
+	objs, err := manager.NewWorldObjects(data.Doors, data.Statics, ids, data.Geo, state, doorTimers, log)
 	if err != nil {
 		return nil, err
 	}

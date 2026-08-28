@@ -28,6 +28,11 @@ type FrameBuilder interface {
 	StatusUpdate(d *Object, showHP bool) wire.Frame
 }
 
+// ErrEmptyFootprint reports a door whose triangulated footprint sampled to
+// no geodata cells, matching the condition DoorData.java:113-123 logs and
+// skips rather than treating as fatal.
+var ErrEmptyFootprint = errors.New("door: empty geo shape")
+
 // Kind classifies a door template as a regular door or a wall.
 type Kind uint8
 
@@ -135,7 +140,7 @@ func NewObject(objectID int32, tmpl *Template, shape GeoShape) (*Object, error) 
 	}
 	data := shape.GeoData()
 	if len(data) == 0 || len(data[0]) == 0 {
-		return nil, fmt.Errorf("door %d: empty geo shape", tmpl.ID)
+		return nil, fmt.Errorf("door %d: %w", tmpl.ID, ErrEmptyFootprint)
 	}
 
 	o := &Object{

@@ -1,6 +1,7 @@
 package dynamic
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo"
@@ -14,6 +15,11 @@ const (
 	worldXMin = geo.WorldXMin
 	worldYMin = geo.WorldYMin
 )
+
+// ErrDegenerateFootprint reports a door polygon that fails ear-clip
+// triangulation, matching the condition DoorData.java:113-123 logs and
+// skips rather than treating as fatal.
+var ErrDegenerateFootprint = errors.New("geo/dynamic: degenerate door footprint")
 
 // Sampler provides the static geodata lookups door shaping needs.
 type Sampler interface {
@@ -38,7 +44,7 @@ func NewDoorObject(tmpl *door.Template, sampler Sampler) (Object, error) {
 	}
 	footprint, err := geometry.NewTriangulatedPolygon(points)
 	if err != nil {
-		return nil, fmt.Errorf("geo/dynamic: door %d: %w", tmpl.ID, err)
+		return nil, fmt.Errorf("geo/dynamic: door %d: %w: %w", tmpl.ID, ErrDegenerateFootprint, err)
 	}
 
 	minX, maxX, minY, maxY := bounds(tmpl.Coordinates)
