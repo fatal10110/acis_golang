@@ -1,16 +1,20 @@
 package xml
 
 import (
+	"bytes"
 	"path/filepath"
+	"strings"
 	"testing"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/geo/engine"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
+	"github.com/rs/zerolog"
 )
 
 func TestLoadDoors(t *testing.T) {
 	path := datapackPath(t, filepath.Join("data", "xml", "doors.xml"))
 
-	table, err := LoadDoors(path)
+	table, err := LoadDoors(path, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("LoadDoors(%q) error: %v", path, err)
 	}
@@ -52,7 +56,33 @@ func TestLoadDoorsErrors(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "doors.xml")
 	writeXMLFixture(t, path, `<list><door id="1" type="DOOR" level="1" name="broken"><position x="1" y="2" z="3"/><coordinates><loc x="1" y="2"/></coordinates><stats hp="1" pDef="1" mDef="1" height="1"/></door></list>`)
 
-	if _, err := LoadDoors(path); err == nil {
+	if _, err := LoadDoors(path, zerolog.Nop()); err == nil {
 		t.Fatal("LoadDoors() error = nil, want error")
+	}
+}
+
+func TestLoadDoorsSkipsOutOfWorldCoordinates(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "doors.xml")
+	writeXMLFixture(t, path, `<list>
+		<door id="1" type="DOOR" level="1" name="valid"><position x="1" y="2" z="3"/><coordinates><loc x="1" y="2"/><loc x="1" y="3"/><loc x="2" y="3"/></coordinates><stats hp="1" pDef="1" mDef="1" height="1"/></door>
+		<door id="2" type="DOOR" level="1" name="out"><position x="1" y="2" z="3"/><coordinates><loc x="`+itoa(engine.WorldXMin-1)+`" y="2"/><loc x="1" y="3"/><loc x="2" y="3"/></coordinates><stats hp="1" pDef="1" mDef="1" height="1"/></door>
+	</list>`)
+
+	var logs bytes.Buffer
+	table, err := LoadDoors(path, zerolog.New(&logs))
+	if err != nil {
+		t.Fatalf("LoadDoors() error: %v", err)
+	}
+	if table.Len() != 1 {
+		t.Fatalf("Len() = %d, want 1", table.Len())
+	}
+	if _, ok := table.Get(1); !ok {
+		t.Fatal("valid door not loaded")
+	}
+	if _, ok := table.Get(2); ok {
+		t.Fatal("out-of-world door loaded")
+	}
+	if !strings.Contains(logs.String(), "out-of-world door") {
+		t.Fatalf("log = %q, want out-of-world door diagnostic", logs.String())
 	}
 }
