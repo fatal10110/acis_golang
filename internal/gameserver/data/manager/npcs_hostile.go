@@ -1,9 +1,13 @@
 package manager
 
 import (
+	"sync/atomic"
+
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -27,6 +31,17 @@ type statOwnerRef struct{ effect.StatOwner }
 type walkerActorRef struct {
 	*npc.Hostile
 	moveCtl *move.Controller
+
+	// routeMove records whether the move currently in flight (or the one
+	// that just completed) was issued by the walker task itself, so the
+	// shared arrived hook (see newLiveHostile) can tell an actual route
+	// arrival from any other arrival on the same Hostile — offensive-follow
+	// chase and MoveHome leash-return use the same underlying
+	// move.Controller and fire the identical hook. Set true here, cleared
+	// by routeAwareMoveController whenever AI starts a non-route move.
+	// Mirrors aCis NpcAI.onEvtArrived's own gate: it only continues
+	// route-node logic when the current AI intention is MOVE_ROUTE.
+	routeMove *atomic.Bool
 }
 
 func (r *walkerActorRef) Position() location.Location {
@@ -39,12 +54,34 @@ func (r *walkerActorRef) Moving() bool {
 }
 
 func (r *walkerActorRef) MoveToLocation(target location.Location) (move.Event, error) {
+	r.routeMove.Store(true)
 	return r.moveCtl.MoveToLocationEvent(target)
 }
 
 func (r *walkerActorRef) TeleportTo(target location.Location) {
 	r.Hostile.SetXYZ(target.X, target.Y, target.Z)
 	r.Hostile.BroadcastPosition()
+}
+
+// routeAwareMoveController wraps a Hostile's ai.MoveController so that any
+// AI-initiated movement other than route walking (offensive-follow chase,
+// leash return-home) clears routeMove before it starts — otherwise the
+// arrived hook would treat that move's completion as a route arrival too,
+// since it fires through the same move.Controller and task.Walker.Arrived
+// has no intention of its own to check.
+type routeAwareMoveController struct {
+	ai.MoveController
+	routeMove *atomic.Bool
+}
+
+func (r routeAwareMoveController) MaybeStartOffensiveFollow(target attackable.Combatant, attackRange int) (bool, error) {
+	r.routeMove.Store(false)
+	return r.MoveController.MaybeStartOffensiveFollow(target, attackRange)
+}
+
+func (r routeAwareMoveController) MoveHome(home location.Location) error {
+	r.routeMove.Store(false)
+	return r.MoveController.MoveHome(home)
 }
 
 // newLiveHostile builds a live Hostile for inst, wiring a real movement
@@ -70,7 +107,8 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 	live.Move().SetLogger(log)
 	attackCtl.SetLogger(log)
 
-	hostile, err := npc.NewHostile(inst, live, moveCtl, attackCtl)
+	routeMove := &atomic.Bool{}
+	hostile, err := npc.NewHostile(inst, live, routeAwareMoveController{MoveController: moveCtl, routeMove: routeMove}, attackCtl)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -105,7 +143,7 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 		hostile.AI().SetCastController(aiController)
 	}
 
-	walkerRef := &walkerActorRef{Hostile: hostile, moveCtl: moveCtl}
+	walkerRef := &walkerActorRef{Hostile: hostile, moveCtl: moveCtl, routeMove: routeMove}
 
 	// Re-evaluate the AI loop as soon as a chase leg completes or a swing
 	// finishes, rather than waiting for the next fixed AI tick — otherwise
@@ -123,7 +161,10 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 		if inst.HasHome && pos == inst.Home {
 			hostile.SetHeading(inst.SpawnHeading)
 		}
-		if walker != nil {
+		// Only an arrival the walker task itself just moved toward counts as
+		// a route arrival — offensive-follow chase and MoveHome fire this
+		// same hook and must not advance/reissue the patrol route.
+		if walker != nil && routeMove.Load() {
 			if err := walker.Arrived(walkerRef); err != nil {
 				log.Warn().Err(err).Msg("task: walker arrived")
 			}
