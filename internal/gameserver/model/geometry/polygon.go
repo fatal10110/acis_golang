@@ -53,8 +53,16 @@ func (v vertexList) Vertices() []Point {
 	return out
 }
 
-// Polygon is a simple (non-self-intersecting) 2D polygon of arbitrary
-// vertex count, convex or concave.
+// Polygon is a 2D polygon of arbitrary vertex count whose containment is
+// even-odd ray casting straight over the vertex ring.
+//
+// That is the zone-polygon rule, and it is not interchangeable with
+// TriangulatedPolygon: ray casting is half-open (a point on the boundary
+// counts as inside on one side only) and treats the enclosed-an-odd-number-
+// of-times region as inside, so on a concave or self-touching ring the two
+// disagree on interior points, not merely on edges. Use this type only
+// where the reference defines the region by its raw ring; use
+// TriangulatedPolygon everywhere the reference triangulates first.
 type Polygon struct {
 	vertexList
 }
@@ -70,3 +78,63 @@ func NewPolygon(points []Point) (Polygon, error) {
 	}
 	return Polygon{vertexList: vl}, nil
 }
+
+// TriangulatedPolygon is a 2D polygon stored as the triangles ear clipping
+// produced from its vertex ring. Containment is the union of its triangles,
+// each tested edge-inclusively, which is the rule for every region the
+// reference builds by triangulating first — spawn territories and door
+// footprints. It classifies concave and self-touching rings correctly,
+// where ray casting over the same ring does not.
+//
+// The ring is retained alongside the triangles so area, rectangle overlap,
+// and shape-vs-shape intersection keep working; only Contains and Area
+// come from the triangles.
+type TriangulatedPolygon struct {
+	vertexList
+
+	triangles []Triangle
+}
+
+// NewTriangulatedPolygon ear-clips at least three vertices into a
+// TriangulatedPolygon. It fails when the vertices do not form a monotone
+// polygon, the same input the reference rejects.
+func NewTriangulatedPolygon(points []Point) (TriangulatedPolygon, error) {
+	if len(points) < 3 {
+		return TriangulatedPolygon{}, fmt.Errorf("geometry: polygon needs at least 3 vertices, got %d", len(points))
+	}
+	vl, err := newVertexList(points)
+	if err != nil {
+		return TriangulatedPolygon{}, err
+	}
+	triangles, err := triangulate(vl)
+	if err != nil {
+		return TriangulatedPolygon{}, err
+	}
+	return TriangulatedPolygon{vertexList: vl, triangles: triangles}, nil
+}
+
+// Contains reports whether (x, y) falls inside any of the polygon's
+// triangles.
+func (p TriangulatedPolygon) Contains(x, y int) bool {
+	for _, t := range p.triangles {
+		if t.Contains(x, y) {
+			return true
+		}
+	}
+	return false
+}
+
+// Size is the sum of the polygon's triangle sizes — the weight the
+// reference uses when picking a random point, and the reason a
+// self-touching ring is not measured by a shoelace sum that would cancel
+// its lobes against each other.
+func (p TriangulatedPolygon) Size() int64 {
+	var sum int64
+	for _, t := range p.triangles {
+		sum += t.Size()
+	}
+	return sum
+}
+
+// Area is the polygon's 2D area, which is its Size.
+func (p TriangulatedPolygon) Area() float64 { return float64(p.Size()) }
