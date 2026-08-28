@@ -47,7 +47,7 @@ func startWorldObjects(objs *manager.WorldObjects, log zerolog.Logger) {
 func provideSpawns(paths gameServerPaths, pool *sql.DB, log zerolog.Logger) (*manager.Spawns, *gamesql.SpawnStore, error) {
 	store := gamesql.NewSpawnStore(pool)
 	dir := filepath.Join(paths.DataRoot, "data", "xml", "spawnlist")
-	spawns, err := manager.LoadSpawns(context.Background(), dir, store)
+	spawns, err := manager.LoadSpawns(context.Background(), dir, store, log)
 	if err != nil {
 		return nil, nil, err
 	}

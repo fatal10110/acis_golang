@@ -1,9 +1,15 @@
 package xml
 
 import (
+	"bytes"
+	"fmt"
+	"math"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/rs/zerolog"
 )
 
 func TestLoadSpawnlistFixture(t *testing.T) {
@@ -46,7 +52,7 @@ func TestLoadSpawnlistFixture(t *testing.T) {
 	</npcmaker>
 </list>`)
 
-	table, err := LoadSpawnlist(dir)
+	table, err := LoadSpawnlist(dir, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("LoadSpawnlist(%q) error: %v", dir, err)
 	}
@@ -138,7 +144,7 @@ func TestLoadSpawnlistAllowsIdenticalDuplicateTerritory(t *testing.T) {
 	</npcmaker>
 </list>`)
 
-	table, err := LoadSpawnlist(dir)
+	table, err := LoadSpawnlist(dir, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("LoadSpawnlist(%q) error: %v", dir, err)
 	}
@@ -173,7 +179,7 @@ func TestLoadSpawnlistRetainsConflictingDuplicateTerritory(t *testing.T) {
 	</npcmaker>
 </list>`)
 
-	table, err := LoadSpawnlist(dir)
+	table, err := LoadSpawnlist(dir, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("LoadSpawnlist(%q) error: %v", dir, err)
 	}
@@ -192,18 +198,155 @@ func TestLoadSpawnlistRetainsConflictingDuplicateTerritory(t *testing.T) {
 	}
 }
 
+// unbuildableTerritoryNodes returns a 103-vertex convex ring: SpawnManager's
+// ear-clip triangulation checks its loop bound unconditionally after each
+// clip, so a polygon finishing on exactly the 100th ear-clip attempt (n=103)
+// still fails, the same as one that never converges
+// (geometry.TestTriangulateFailsOnPolygonFinishingAtLoopBound).
+func unbuildableTerritoryNodes() string {
+	var b strings.Builder
+	for i := range 103 {
+		angle := 2 * math.Pi * float64(i) / 103
+		x := int(1000 * math.Cos(angle))
+		y := int(1000 * math.Sin(angle))
+		fmt.Fprintf(&b, `<node x="%d" y="%d"/>`, x, y)
+	}
+	return b.String()
+}
+
+// TestLoadSpawnlistSkipsUnbuildableTerritory pins issue #2009: SpawnManager
+// wraps Territory construction in a per-territory try/catch and keeps
+// loading the rest of the spawnlist on failure. A territory whose polygon
+// can't be triangulated logs a warning and is dropped instead of aborting
+// the load, and an npcmaker referencing only the dropped territory still
+// loads with zero resolved territories (matching findTerritory returning
+// null), instead of failing itself.
+func TestLoadSpawnlistSkipsUnbuildableTerritory(t *testing.T) {
+	dir := t.TempDir()
+	writeXMLFixture(t, filepath.Join(dir, "19_21.xml"), `<?xml version="1.0" encoding="utf-8"?>
+<list>
+	<territory name="bad" minZ="0" maxZ="1">`+unbuildableTerritoryNodes()+`</territory>
+	<territory name="good" minZ="0" maxZ="1">
+		<node x="0" y="0"/>
+		<node x="1" y="0"/>
+		<node x="1" y="1"/>
+	</territory>
+	<npcmaker name="maker_good" territory="good" maximumNpcs="1">
+		<npc id="1" total="1"/>
+	</npcmaker>
+	<npcmaker name="maker_bad" territory="bad" maximumNpcs="1">
+		<npc id="1" total="1"/>
+	</npcmaker>
+</list>`)
+
+	var logs bytes.Buffer
+	table, err := LoadSpawnlist(dir, zerolog.New(&logs))
+	if err != nil {
+		t.Fatalf("LoadSpawnlist(%q) error: %v", dir, err)
+	}
+	if got, want := table.TerritoryCount(), 1; got != want {
+		t.Fatalf("TerritoryCount() = %d, want %d (only the buildable territory)", got, want)
+	}
+	if !strings.Contains(logs.String(), `"bad"`) {
+		t.Fatalf("log output = %q, want a warning naming territory \"bad\"", logs.String())
+	}
+
+	good, ok := table.Maker("maker_good")
+	if !ok {
+		t.Fatal("Maker(maker_good) = missing")
+	}
+	if got, want := len(good.Territories), 1; got != want {
+		t.Fatalf("len(maker_good.Territories) = %d, want %d", got, want)
+	}
+
+	bad, ok := table.Maker("maker_bad")
+	if !ok {
+		t.Fatal("Maker(maker_bad) = missing")
+	}
+	if got, want := len(bad.Territories), 0; got != want {
+		t.Fatalf("len(maker_bad.Territories) = %d, want %d (its only territory was skipped)", got, want)
+	}
+}
+
+// TestLoadSpawnlistMakerToleratesUnknownTerritory pins the resolution half
+// of SpawnManager.findTerritory: an npcmaker naming a territory that was
+// never declared at all resolves to null rather than failing, so the maker
+// still loads with zero territories instead of aborting the whole spawnlist.
+func TestLoadSpawnlistMakerToleratesUnknownTerritory(t *testing.T) {
+	dir := t.TempDir()
+	writeXMLFixture(t, filepath.Join(dir, "19_21.xml"), `<?xml version="1.0" encoding="utf-8"?>
+<list>
+	<territory name="a" minZ="0" maxZ="1">
+		<node x="0" y="0"/>
+		<node x="1" y="0"/>
+		<node x="1" y="1"/>
+	</territory>
+	<npcmaker name="maker" territory="missing" maximumNpcs="1">
+		<npc id="1" total="1"/>
+	</npcmaker>
+</list>`)
+
+	var logs bytes.Buffer
+	table, err := LoadSpawnlist(dir, zerolog.New(&logs))
+	if err != nil {
+		t.Fatalf("LoadSpawnlist(%q) error: %v", dir, err)
+	}
+	maker, ok := table.Maker("maker")
+	if !ok {
+		t.Fatal("Maker(maker) = missing")
+	}
+	if got, want := len(maker.Territories), 0; got != want {
+		t.Fatalf("len(maker.Territories) = %d, want %d", got, want)
+	}
+	if !strings.Contains(logs.String(), `"missing"`) {
+		t.Fatalf("log output = %q, want a warning naming territory \"missing\"", logs.String())
+	}
+}
+
+// TestLoadSpawnlistMultiNameTerritoryGroupIsAllOrNothing pins
+// SpawnManager.findTerritory's multi-name (";"-separated) semantics
+// (SpawnManager.java:500-537): the moment any single name in the group
+// fails to resolve, the whole group resolves to null rather than a partial
+// composite of the names that do exist. A maker referencing "a;missing;b"
+// must end up with zero territories, not [a, b].
+func TestLoadSpawnlistMultiNameTerritoryGroupIsAllOrNothing(t *testing.T) {
+	dir := t.TempDir()
+	writeXMLFixture(t, filepath.Join(dir, "19_21.xml"), `<?xml version="1.0" encoding="utf-8"?>
+<list>
+	<territory name="a" minZ="0" maxZ="1">
+		<node x="0" y="0"/>
+		<node x="1" y="0"/>
+		<node x="1" y="1"/>
+	</territory>
+	<territory name="b" minZ="0" maxZ="1">
+		<node x="10" y="10"/>
+		<node x="11" y="10"/>
+		<node x="11" y="11"/>
+	</territory>
+	<npcmaker name="maker" territory="a;missing;b" maximumNpcs="1">
+		<npc id="1" total="1"/>
+	</npcmaker>
+</list>`)
+
+	var logs bytes.Buffer
+	table, err := LoadSpawnlist(dir, zerolog.New(&logs))
+	if err != nil {
+		t.Fatalf("LoadSpawnlist(%q) error: %v", dir, err)
+	}
+	maker, ok := table.Maker("maker")
+	if !ok {
+		t.Fatal("Maker(maker) = missing")
+	}
+	if got, want := len(maker.Territories), 0; got != want {
+		t.Fatalf("len(maker.Territories) = %d, want %d (whole group dropped, not [a, b])", got, want)
+	}
+}
+
 func TestLoadSpawnlistErrors(t *testing.T) {
 	tests := []struct {
 		name string
 		xml  string
 	}{
-		{
-			name: "missing territory reference",
-			xml: `<?xml version="1.0"?><list>
-				<territory name="a" minZ="0" maxZ="1"><node x="0" y="0"/><node x="1" y="0"/><node x="1" y="1"/></territory>
-				<npcmaker name="maker" territory="missing" maximumNpcs="1"><npc id="1" total="1"/></npcmaker>
-			</list>`,
-		},
 		{
 			name: "malformed pos tuple",
 			xml: `<?xml version="1.0"?><list>
@@ -224,7 +367,7 @@ func TestLoadSpawnlistErrors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
 			writeXMLFixture(t, filepath.Join(dir, "19_21.xml"), tc.xml)
-			if _, err := LoadSpawnlist(dir); err == nil {
+			if _, err := LoadSpawnlist(dir, zerolog.Nop()); err == nil {
 				t.Fatal("LoadSpawnlist: expected error")
 			}
 		})
@@ -234,7 +377,7 @@ func TestLoadSpawnlistErrors(t *testing.T) {
 func TestLoadSpawnlistAgainstDatapack(t *testing.T) {
 	dir := datapackPath(t, filepath.Join("data", "xml", "spawnlist"))
 
-	table, err := LoadSpawnlist(dir)
+	table, err := LoadSpawnlist(dir, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("LoadSpawnlist(%q) error: %v", dir, err)
 	}

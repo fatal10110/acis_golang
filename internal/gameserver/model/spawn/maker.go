@@ -1,7 +1,6 @@
 package spawn
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
@@ -33,10 +32,12 @@ func NewMaker(set *commons.StatSet, territories []*Territory, banned []*Territor
 	if err := f.Err(); err != nil {
 		return nil, err
 	}
-	if len(territories) == 0 {
-		return nil, errors.New("spawn: maker needs at least one territory")
-	}
 
+	// SpawnManager.findTerritory resolves an unknown name to null and still
+	// builds the NpcMaker; a maker with no resolvable territory just never
+	// finds a spawn position (randomTerritoryPosition already treats a nil
+	// or empty Territories the same way), matching that tolerance instead
+	// of failing the whole spawnlist load.
 	return &Maker{
 		Name:              name,
 		Territories:       append([]*Territory(nil), territories...),
