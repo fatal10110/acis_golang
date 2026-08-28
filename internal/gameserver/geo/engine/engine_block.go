@@ -70,15 +70,23 @@ func (b engineBlock) NSWENearest(cellX, cellY int, worldZ int32) block.NSWE {
 }
 
 func (b engineBlock) Above(cellX, cellY int, worldZ int32) int {
+	return b.AboveIgnoring(cellX, cellY, worldZ, nil)
+}
+
+func (b engineBlock) AboveIgnoring(cellX, cellY int, worldZ int32, ignore dynamic.Object) int {
 	if b.dyn != nil {
-		return b.dyn.Above(cellX, cellY, worldZ)
+		return b.dyn.AboveIgnoring(cellX, cellY, worldZ, ignore)
 	}
 	return b.static().Above(cellX, cellY, worldZ)
 }
 
 func (b engineBlock) Below(cellX, cellY int, worldZ int32) int {
+	return b.BelowIgnoring(cellX, cellY, worldZ, nil)
+}
+
+func (b engineBlock) BelowIgnoring(cellX, cellY int, worldZ int32, ignore dynamic.Object) int {
 	if b.dyn != nil {
-		return b.dyn.Below(cellX, cellY, worldZ)
+		return b.dyn.BelowIgnoring(cellX, cellY, worldZ, ignore)
 	}
 	return b.static().Below(cellX, cellY, worldZ)
 }

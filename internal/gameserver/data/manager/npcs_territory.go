@@ -41,7 +41,7 @@ const territoryPointAttempts = 64
 // probability proportional to its size within the merged shape list). Since
 // each sub-territory's contribution to that merged weight is proportional
 // to its own total area, picking a whole sub-territory with probability
-// proportional to territoryArea, then a uniform point within it, is the
+// proportional to its Area, then a uniform point within it, is the
 // same distribution. Z is resolved and range-checked against the merged
 // bounds, not the picked sub-territory's own MinZ/MaxZ.
 func randomTerritoryPosition(maker *spawn.Maker, geo move.Geo) (spawn.Position, bool) {
@@ -96,7 +96,7 @@ func weightedTerritoryPick(territories []*spawn.Territory) *spawn.Territory {
 	total := 0.0
 	areas := make([]float64, len(territories))
 	for i, t := range territories {
-		areas[i] = territoryArea(t)
+		areas[i] = t.Area()
 		total += areas[i]
 	}
 	if total <= 0 {
@@ -111,32 +111,6 @@ func weightedTerritoryPick(territories []*spawn.Territory) *spawn.Territory {
 		}
 	}
 	return territories[len(territories)-1]
-}
-
-// territoryArea is the territory's 2D polygon area. Production territories
-// are always built via spawn.NewTerritory, which populates the embedded
-// *geometry.Territory, so its Area() is used directly there; the shoelace
-// fallback covers test fixtures built via struct literal, which leave that
-// pointer nil.
-func territoryArea(territory *spawn.Territory) float64 {
-	if territory.Territory != nil {
-		return territory.Territory.Area()
-	}
-
-	nodes := territory.Nodes
-	if len(nodes) < 3 {
-		return 0
-	}
-	var sum float64
-	j := len(nodes) - 1
-	for i := range nodes {
-		sum += float64(nodes[j].X)*float64(nodes[i].Y) - float64(nodes[i].X)*float64(nodes[j].Y)
-		j = i
-	}
-	if sum < 0 {
-		sum = -sum
-	}
-	return sum / 2
 }
 
 func randomPointInTerritory(territory *spawn.Territory) (int, int, bool) {
@@ -156,13 +130,13 @@ func randomPointInTerritory(territory *spawn.Territory) (int, int, bool) {
 	for i := 0; i < territoryPointAttempts; i++ {
 		x := rnd.GetRange(minX, maxX)
 		y := rnd.GetRange(minY, maxY)
-		if territoryContains2D(territory, x, y) {
+		if territory.Contains2D(x, y) {
 			return x, y, true
 		}
 	}
 
 	x, y := territoryCentroid(territory)
-	if territoryContains2D(territory, x, y) {
+	if territory.Contains2D(x, y) {
 		return x, y, true
 	}
 	return 0, 0, false
@@ -178,39 +152,7 @@ func insideAnyTerritory(territories []*spawn.Territory, loc location.Location) b
 }
 
 func territoryContainsLocation(territory *spawn.Territory, loc location.Location) bool {
-	return territory != nil &&
-		loc.Z >= territory.MinZ &&
-		loc.Z <= territory.MaxZ &&
-		territoryContains2D(territory, loc.X, loc.Y)
-}
-
-func territoryContains2D(territory *spawn.Territory, x, y int) bool {
-	nodes := territory.Nodes
-	inside := false
-	j := len(nodes) - 1
-	for i := range nodes {
-		a, b := nodes[i], nodes[j]
-		if pointOnSegment(x, y, a, b) {
-			return true
-		}
-		if (a.Y > y) != (b.Y > y) {
-			crossX := float64(b.X-a.X)*float64(y-a.Y)/float64(b.Y-a.Y) + float64(a.X)
-			if float64(x) < crossX {
-				inside = !inside
-			}
-		}
-		j = i
-	}
-	return inside
-}
-
-func pointOnSegment(x, y int, a, b spawn.Node) bool {
-	cross := (x-a.X)*(b.Y-a.Y) - (y-a.Y)*(b.X-a.X)
-	if cross != 0 {
-		return false
-	}
-	return x >= min(a.X, b.X) && x <= max(a.X, b.X) &&
-		y >= min(a.Y, b.Y) && y <= max(a.Y, b.Y)
+	return territory != nil && territory.Contains(loc.X, loc.Y, loc.Z)
 }
 
 func territoryCentroid(territory *spawn.Territory) (int, int) {

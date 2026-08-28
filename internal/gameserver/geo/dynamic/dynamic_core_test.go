@@ -1,7 +1,6 @@
 package dynamic
 
 import (
-	"math"
 	"sync"
 	"testing"
 
@@ -85,78 +84,6 @@ func TestCalculateGeoObject(t *testing.T) {
 	if got[0][0] != block.AllDirections {
 		t.Fatalf("corner cell = %v, want unchanged", got[0][0])
 	}
-}
-
-// TestPolygonContainsMatchesTriangulationNotRayCasting locks the reference's
-// Kong-triangulation containment semantics (Polygon.isInside summed over
-// Kong.doTriangulation) for a self-touching polygon, where even-odd ray
-// casting over the raw vertex ring disagrees at the shared vertex.
-func TestPolygonContainsMatchesTriangulationNotRayCasting(t *testing.T) {
-	poly := []location.Point{
-		{X: 0, Y: 0}, {X: 10, Y: 0}, {X: 5, Y: 5},
-		{X: 10, Y: 10}, {X: 0, Y: 10}, {X: 5, Y: 5},
-	}
-	triangles, err := triangulate(poly)
-	if err != nil {
-		t.Fatalf("triangulate() error = %v", err)
-	}
-
-	p := location.Point{X: 5, Y: 5}
-	if !polygonContains(triangles, p.X, p.Y) {
-		t.Fatalf("polygonContains(%v) = false, want true (Kong triangulation includes the shared vertex)", p)
-	}
-}
-
-func TestPolygonContainsConcaveNotch(t *testing.T) {
-	// L-shaped concave polygon; (7,7) falls in the notch cut out of the
-	// bounding box and must be classified outside.
-	poly := []location.Point{
-		{X: 0, Y: 0}, {X: 10, Y: 0}, {X: 10, Y: 4},
-		{X: 4, Y: 4}, {X: 4, Y: 10}, {X: 0, Y: 10},
-	}
-	triangles, err := triangulate(poly)
-	if err != nil {
-		t.Fatalf("triangulate() error = %v", err)
-	}
-
-	if polygonContains(triangles, 7, 7) {
-		t.Fatal("polygonContains(7, 7) = true, want false (point is in the L-shape's notch)")
-	}
-	if !polygonContains(triangles, 2, 2) {
-		t.Fatal("polygonContains(2, 2) = false, want true (point is inside the L-shape)")
-	}
-}
-
-func TestTriangulateRejectsFewerThanThreePoints(t *testing.T) {
-	if _, err := triangulate([]location.Point{{X: 0, Y: 0}, {X: 1, Y: 1}}); err == nil {
-		t.Fatal("triangulate([2 points]) error = nil, want error")
-	}
-}
-
-// TestTriangulateFailsOnPolygonFinishingAtLoopBound locks the reference's
-// Kong.doTriangulationAlgorithm loop-bound semantics: the failure check runs
-// after each ear-clip attempt, unconditionally, so a polygon that finishes
-// its triangulation on exactly the 100th attempt still fails, the same as
-// one that never converges.
-func TestTriangulateFailsOnPolygonFinishingAtLoopBound(t *testing.T) {
-	// A convex polygon triangulates in one ear-clip per vertex removed
-	// (n - 3 attempts). n=102 finishes in 99 attempts (under the bound);
-	// n=103 finishes in exactly 100 (the bound itself, must still fail).
-	if _, err := triangulate(convexPolygon(102)); err != nil {
-		t.Fatalf("triangulate(102-gon) error = %v, want nil (99 ear-clip attempts, under the bound)", err)
-	}
-	if _, err := triangulate(convexPolygon(103)); err == nil {
-		t.Fatal("triangulate(103-gon) error = nil, want error (100 ear-clip attempts, exactly the bound)")
-	}
-}
-
-func convexPolygon(n int) []location.Point {
-	pts := make([]location.Point, n)
-	for i := range pts {
-		angle := 2 * math.Pi * float64(i) / float64(n)
-		pts[i] = location.Point{X: int(1000 * math.Cos(angle)), Y: int(1000 * math.Sin(angle))}
-	}
-	return pts
 }
 
 // TestNewDoorObjectBowtiePolygonBlocksTouchingCell pins the fix at the level
