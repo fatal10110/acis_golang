@@ -303,6 +303,45 @@ func TestLoadSpawnlistMakerToleratesUnknownTerritory(t *testing.T) {
 	}
 }
 
+// TestLoadSpawnlistMultiNameTerritoryGroupIsAllOrNothing pins
+// SpawnManager.findTerritory's multi-name (";"-separated) semantics
+// (SpawnManager.java:500-537): the moment any single name in the group
+// fails to resolve, the whole group resolves to null rather than a partial
+// composite of the names that do exist. A maker referencing "a;missing;b"
+// must end up with zero territories, not [a, b].
+func TestLoadSpawnlistMultiNameTerritoryGroupIsAllOrNothing(t *testing.T) {
+	dir := t.TempDir()
+	writeXMLFixture(t, filepath.Join(dir, "19_21.xml"), `<?xml version="1.0" encoding="utf-8"?>
+<list>
+	<territory name="a" minZ="0" maxZ="1">
+		<node x="0" y="0"/>
+		<node x="1" y="0"/>
+		<node x="1" y="1"/>
+	</territory>
+	<territory name="b" minZ="0" maxZ="1">
+		<node x="10" y="10"/>
+		<node x="11" y="10"/>
+		<node x="11" y="11"/>
+	</territory>
+	<npcmaker name="maker" territory="a;missing;b" maximumNpcs="1">
+		<npc id="1" total="1"/>
+	</npcmaker>
+</list>`)
+
+	var logs bytes.Buffer
+	table, err := LoadSpawnlist(dir, zerolog.New(&logs))
+	if err != nil {
+		t.Fatalf("LoadSpawnlist(%q) error: %v", dir, err)
+	}
+	maker, ok := table.Maker("maker")
+	if !ok {
+		t.Fatal("Maker(maker) = missing")
+	}
+	if got, want := len(maker.Territories), 0; got != want {
+		t.Fatalf("len(maker.Territories) = %d, want %d (whole group dropped, not [a, b])", got, want)
+	}
+}
+
 func TestLoadSpawnlistErrors(t *testing.T) {
 	tests := []struct {
 		name string

@@ -187,27 +187,35 @@ func flattenAI(ai []aiElement) (string, map[string]string) {
 	return kind, params
 }
 
-// resolveTerritories looks up each ";"-delimited name in raw. SpawnManager's
-// findTerritory/getTerritory resolve an unknown name to null rather than
-// rejecting the npcmaker — a territory dropped by LoadSpawnlist (or simply
-// misnamed) leaves the maker with fewer, or zero, territories instead of
-// failing the whole load; spawn.NewMaker and randomTerritoryPosition already
-// tolerate that.
+// resolveTerritories looks up each ";"-delimited name in raw, matching
+// SpawnManager.findTerritory: a single name resolves to null (here: dropped,
+// with a warning) if unknown, exactly like getTerritory. A multi-name group
+// is all-or-nothing — findTerritory logs once and returns null for the whole
+// group the moment any member is missing, rather than building a partial
+// composite (SpawnManager.java:500-537) — so an unresolved name here drops
+// every name in that group, not just the missing one.
 func resolveTerritories(makerName, raw string, territories map[string]*spawn.Territory, log zerolog.Logger) []*spawn.Territory {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		return nil
 	}
-	names := strings.Split(raw, ";")
-	resolved := make([]*spawn.Territory, 0, len(names))
-	for _, name := range names {
+	var names []string
+	for _, name := range strings.Split(raw, ";") {
 		name = strings.TrimSpace(name)
 		if name == "" {
 			continue
 		}
+		names = append(names, name)
+	}
+
+	resolved := make([]*spawn.Territory, 0, len(names))
+	for _, name := range names {
 		territory, ok := territories[name]
 		if !ok {
 			log.Warn().Str("maker", makerName).Str("territory", name).Msg("data/xml: territory does not exist")
+			if len(names) > 1 {
+				return nil
+			}
 			continue
 		}
 		resolved = append(resolved, territory)
