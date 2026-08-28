@@ -75,6 +75,62 @@ func TestLoadWalkerRoutes(t *testing.T) {
 	}
 }
 
+func TestLoadWalkerRoutesDuplicateKeysKeepLast(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "walkerRoutes.xml")
+	writeXMLFixture(t, path, `<list>
+		<route name="a">
+			<npc name="a1"><node x="1" y="1" z="1"/></npc>
+			<npc name="a2"><node x="2" y="2" z="2"/></npc>
+		</route>
+		<route name="b">
+			<npc name="b1"><node x="3" y="3" z="3"/></npc>
+		</route>
+		<route name="a">
+			<npc name="a1"><node x="9" y="9" z="9"/></npc>
+		</route>
+	</list>`)
+
+	routes, err := LoadWalkerRoutes(path)
+	if err != nil {
+		t.Fatalf("LoadWalkerRoutes(%q) error: %v", path, err)
+	}
+	if got, want := len(routes), 2; got != want {
+		t.Fatalf("len(routes) = %d, want %d", got, want)
+	}
+	// Last "a" route element fully replaces the first: only "a1" survives.
+	if _, ok := routes["a"]["a2"]; ok {
+		t.Fatal(`routes["a"]["a2"] survived the duplicate route element, want dropped`)
+	}
+	if got, want := routes["a"]["a1"][0].X, 9; got != want {
+		t.Fatalf(`routes["a"]["a1"][0].X = %d, want %d`, got, want)
+	}
+	if got, want := routes["b"]["b1"][0].X, 3; got != want {
+		t.Fatalf(`routes["b"]["b1"][0].X = %d, want %d`, got, want)
+	}
+}
+
+func TestLoadWalkerRoutesDuplicateNPCWithinRouteKeepsLast(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "walkerRoutes.xml")
+	writeXMLFixture(t, path, `<list>
+		<route name="a">
+			<npc name="a1"><node x="1" y="1" z="1"/></npc>
+			<npc name="a2"><node x="2" y="2" z="2"/></npc>
+			<npc name="a1"><node x="9" y="9" z="9"/></npc>
+		</route>
+	</list>`)
+
+	routes, err := LoadWalkerRoutes(path)
+	if err != nil {
+		t.Fatalf("LoadWalkerRoutes(%q) error: %v", path, err)
+	}
+	if got, want := routes["a"]["a1"][0].X, 9; got != want {
+		t.Fatalf(`routes["a"]["a1"][0].X = %d, want %d`, got, want)
+	}
+	if got, want := routes["a"]["a2"][0].X, 2; got != want {
+		t.Fatalf(`routes["a"]["a2"][0].X = %d, want %d (sibling npc preserved)`, got, want)
+	}
+}
+
 func TestLoadBoatRoutesErrors(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "boatRoutes.xml")
 	writeXMLFixture(t, path, `<list><itinerary dock1="NOPE" heading="1"><route><node x="1" y="2" z="3"/></route></itinerary></list>`)

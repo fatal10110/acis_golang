@@ -6,6 +6,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
+	"github.com/rs/zerolog"
 )
 
 type spawnStateStore interface {
@@ -21,8 +22,8 @@ type Spawns struct {
 
 // LoadSpawns loads spawnlist XML from dir, restores dynamic rows from store,
 // and creates uninitialized rows for XML dbName entries missing in the DB.
-func LoadSpawns(ctx context.Context, dir string, store spawnStateStore) (*Spawns, error) {
-	table, err := xml.LoadSpawnlist(dir)
+func LoadSpawns(ctx context.Context, dir string, store spawnStateStore, log zerolog.Logger) (*Spawns, error) {
+	table, err := xml.LoadSpawnlist(dir, log)
 	if err != nil {
 		return nil, err
 	}

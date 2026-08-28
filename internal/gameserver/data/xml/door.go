@@ -5,8 +5,10 @@ import (
 	"fmt"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
+	"github.com/fatal10110/acis_golang/internal/gameserver/geo/engine"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/rs/zerolog"
 )
 
 type doorFile struct {
@@ -23,18 +25,25 @@ type doorElement struct {
 
 // LoadDoors parses doors.xml and returns static door templates. Runtime geo
 // object generation and spawning belong to the world/geo slice, not this
-// data loader.
-func LoadDoors(path string) (*door.Table, error) {
+// data loader. log receives skipped-door diagnostics.
+func LoadDoors(path string, log zerolog.Logger) (*door.Table, error) {
 	var doc doorFile
 	if err := readXML(path, &doc); err != nil {
 		return nil, fmt.Errorf("doors: %w", err)
 	}
 
 	templates := make([]*door.Template, 0, len(doc.Doors))
+doors:
 	for _, el := range doc.Doors {
 		tmpl, err := buildDoorTemplate(el)
 		if err != nil {
 			return nil, fmt.Errorf("xml: %s: %w", path, err)
+		}
+		for _, point := range tmpl.Coordinates {
+			if engine.OutOfWorld(point.X, point.Y) {
+				log.Error().Int("door_id", tmpl.ID).Str("file", path).Msg("data/xml: skipping out-of-world door")
+				continue doors
+			}
 		}
 		templates = append(templates, tmpl)
 	}

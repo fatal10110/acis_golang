@@ -197,13 +197,17 @@ func LoadClanHallDeco(path string) (*clanhall.DecoTable, error) {
 }
 
 func buildDeco(el decoElement) (clanhall.Deco, error) {
-	if el.Name == "" {
-		return clanhall.Deco{}, fmt.Errorf("clanhall: deco: name is required")
+	if el.Depth == nil || el.Days == nil || el.Price == nil {
+		return clanhall.Deco{}, fmt.Errorf("clanhall: deco %q: depth, days and price are required", el.Name)
 	}
-	if el.Type == nil || el.Level == nil || el.Depth == nil || el.Days == nil || el.Price == nil {
-		return clanhall.Deco{}, fmt.Errorf("clanhall: deco %q: type, level, depth, days and price are required", el.Name)
+	var decoType, level int
+	if el.Type != nil {
+		decoType = int(*el.Type)
 	}
-	return clanhall.NewDeco(el.Name, int(*el.Type), int(*el.Level), int(*el.Depth), int(*el.Days), int(*el.Price))
+	if el.Level != nil {
+		level = int(*el.Level)
+	}
+	return clanhall.NewDeco(el.Name, decoType, level, int(*el.Depth), int(*el.Days), int(*el.Price))
 }
 
 func buildCastle(el castleElement) (*castle.Castle, error) {
@@ -223,15 +227,15 @@ func buildCastle(el castleElement) (*castle.Castle, error) {
 		return nil, fmt.Errorf("castle %d: %w", id, err)
 	}
 
-	npcsRaw := firstVal(el.NPCs)
-	if npcsRaw == "" {
-		return nil, fmt.Errorf("castle %d: npcs is required", id)
+	var npcs []int
+	if npcsRaw := joinVals(el.NPCs); npcsRaw != "" {
+		var err error
+		npcs, err = splitInts(npcsRaw)
+		if err != nil {
+			return nil, fmt.Errorf("castle %d: npcs: %w", id, err)
+		}
 	}
-	npcs, err := splitInts(npcsRaw)
-	if err != nil {
-		return nil, fmt.Errorf("castle %d: npcs: %w", id, err)
-	}
-	gates := cleanStrings(splitList(firstVal(el.Gates)))
+	gates := cleanStrings(splitList(joinVals(el.Gates)))
 
 	artifacts := make([]castle.Artifact, 0, len(el.Artifacts))
 	for _, a := range el.Artifacts {
@@ -348,15 +352,15 @@ func buildClanHall(el clanHallElement) (*clanhall.Hall, error) {
 		return nil, fmt.Errorf("clanhall %d: %w", id, err)
 	}
 
-	npcsRaw := firstVal(el.NPCs)
-	if npcsRaw == "" {
-		return nil, fmt.Errorf("clanhall %d: npcs is required", id)
+	var npcs []int
+	if npcsRaw := joinVals(el.NPCs); npcsRaw != "" {
+		var err error
+		npcs, err = splitInts(npcsRaw)
+		if err != nil {
+			return nil, fmt.Errorf("clanhall %d: npcs: %w", id, err)
+		}
 	}
-	npcs, err := splitInts(npcsRaw)
-	if err != nil {
-		return nil, fmt.Errorf("clanhall %d: npcs: %w", id, err)
-	}
-	gates := cleanStrings(splitList(firstVal(el.Gates)))
+	gates := cleanStrings(splitList(joinVals(el.Gates)))
 
 	zones, err := buildResidenceZones(el.Zones)
 	if err != nil {
@@ -380,6 +384,7 @@ func buildClanHall(el clanHallElement) (*clanhall.Hall, error) {
 		Size:           int(agit.Size),
 		Grade:          int(agit.Grade),
 		SiegeLength:    siegeLength,
+		Siegable:       agit.SiegeLength != nil,
 		ScheduleConfig: scheduleConfig,
 		Tax:            tax,
 		Gates:          gates,
@@ -459,6 +464,14 @@ func firstVal(elems []valListElement) string {
 		return ""
 	}
 	return elems[0].Val
+}
+
+func joinVals(elems []valListElement) string {
+	vals := make([]string, 0, len(elems))
+	for _, el := range elems {
+		vals = append(vals, el.Val)
+	}
+	return strings.Join(vals, ";")
 }
 
 // splitList splits raw on ";" without trimming or dropping empty elements,

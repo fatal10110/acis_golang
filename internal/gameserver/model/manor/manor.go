@@ -57,21 +57,20 @@ type Table struct {
 	SeedsByID map[int]Seed
 }
 
-// NewTable builds a manor seed table and rejects duplicate seed ids.
-func NewTable(manors []Manor) (*Table, error) {
+// NewTable builds a manor seed table. A seed id repeated across manor rows
+// keeps the last row, matching CastleManorManager.java's unconditional
+// map.put(seedId, seed) over the parsed rows.
+func NewTable(manors []Manor) *Table {
 	t := &Table{
 		Manors:    append([]Manor(nil), manors...),
 		SeedsByID: make(map[int]Seed),
 	}
 	for _, m := range manors {
 		for _, seed := range m.Seeds {
-			if _, exists := t.SeedsByID[seed.SeedID]; exists {
-				return nil, fmt.Errorf("manor: duplicate seed id %d", seed.SeedID)
-			}
 			t.SeedsByID[seed.SeedID] = seed
 		}
 	}
-	return t, nil
+	return t
 }
 
 // Area is one manor polygon assigned to a castle.

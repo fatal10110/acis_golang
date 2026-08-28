@@ -1,14 +1,37 @@
 package door
 
 import (
+	"errors"
 	"fmt"
 	"sync/atomic"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
+
+// ErrNoWorld is returned by BroadcastStatus when SetWorld has not been
+// called yet — the door has no known-observer list to broadcast to.
+var ErrNoWorld = errors.New("door: SetWorld not called")
+
+// ErrNoFrameBuilder is returned by BroadcastStatus when SetFrameBuilder has
+// not been called yet — a spawn site omitted wiring the network layer's
+// packet builder onto this door.
+var ErrNoFrameBuilder = errors.New("door: SetFrameBuilder not called")
+
+// FrameBuilder translates a door's open/close state change into a wire
+// frame. The network layer implements it (see serverpackets.DoorFrameBuilder)
+// so this package never constructs packets or touches wire encoding itself.
+type FrameBuilder interface {
+	StatusUpdate(d *Object, showHP bool) wire.Frame
+}
+
+// ErrEmptyFootprint reports a door whose triangulated footprint sampled to
+// no geodata cells, matching the condition DoorData.java:113-123 logs and
+// skips rather than treating as fatal.
+var ErrEmptyFootprint = errors.New("door: empty geo shape")
 
 // Kind classifies a door template as a regular door or a wall.
 type Kind uint8
@@ -101,6 +124,10 @@ type Object struct {
 	geoData          [][]block.NSWE
 
 	opened atomic.Bool
+
+	world  *world.State
+	frames FrameBuilder
+	known  world.KnownBuffer
 }
 
 // NewObject creates a live door object from a static template and geodata shape.
@@ -113,7 +140,7 @@ func NewObject(objectID int32, tmpl *Template, shape GeoShape) (*Object, error) 
 	}
 	data := shape.GeoData()
 	if len(data) == 0 || len(data[0]) == 0 {
-		return nil, fmt.Errorf("door %d: empty geo shape", tmpl.ID)
+		return nil, fmt.Errorf("door %d: %w", tmpl.ID, ErrEmptyFootprint)
 	}
 
 	o := &Object{
@@ -153,6 +180,44 @@ func (o *Object) Opened() bool {
 // SetOpened updates the door's open state and reports whether it changed.
 func (o *Object) SetOpened(open bool) bool {
 	return o.opened.CompareAndSwap(!open, open)
+}
+
+// SetWorld records the world state this door's known-observer list is
+// computed from.
+func (o *Object) SetWorld(state *world.State) { o.world = state }
+
+// SetFrameBuilder records the network-layer hook that translates this
+// door's status change into a wire frame.
+func (o *Object) SetFrameBuilder(b FrameBuilder) { o.frames = b }
+
+// BroadcastStatus sends this door's current open/close state to every
+// currently known observer capable of receiving one. It is a no-op until
+// both SetWorld and SetFrameBuilder have been called.
+func (o *Object) BroadcastStatus() error {
+	if o.world == nil {
+		return ErrNoWorld
+	}
+	if o.frames == nil {
+		return ErrNoFrameBuilder
+	}
+	known := o.known.SnapshotCopy(o.world, o)
+	defer known.Release()
+	var frame wire.Frame
+	built := false
+	defer func() { frame.Release() }()
+	for _, obs := range known.Tracked() {
+		if receiver, ok := obs.(interface{ BroadcastFrame(wire.Frame) bool }); ok {
+			if !built {
+				frame = o.frames.StatusUpdate(o, false)
+				built = true
+			}
+			owned, copied := wire.CopyFrame(frame)
+			if copied {
+				receiver.BroadcastFrame(owned)
+			}
+		}
+	}
+	return nil
 }
 
 // GeoX returns the door footprint's starting geodata X coordinate.

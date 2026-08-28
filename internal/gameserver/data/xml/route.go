@@ -101,14 +101,8 @@ func LoadWalkerRoutes(path string) (route.WalkerRoutes, error) {
 
 	routes := make(route.WalkerRoutes, len(doc.Routes))
 	for _, routeEl := range doc.Routes {
-		if _, exists := routes[routeEl.Name]; exists {
-			return nil, fmt.Errorf("xml: %s: duplicate walker route %q", path, routeEl.Name)
-		}
 		byNPC := make(map[string][]route.WalkerLocation, len(routeEl.NPCs))
 		for _, npcEl := range routeEl.NPCs {
-			if _, exists := byNPC[npcEl.Name]; exists {
-				return nil, fmt.Errorf("xml: %s: duplicate walker route %q npc %q", path, routeEl.Name, npcEl.Name)
-			}
 			nodes := make([]route.WalkerLocation, 0, len(npcEl.Nodes))
 			for _, node := range npcEl.Nodes {
 				loc, err := route.NewWalkerLocation(commons.StatSetFromXMLAttrs(node.Attrs))

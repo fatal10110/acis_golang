@@ -28,6 +28,12 @@ func (t *Territory) Contains(x, y, z int) bool {
 	if z < t.MinZ || z > t.MaxZ {
 		return false
 	}
+	return t.Contains2D(x, y)
+}
+
+// Contains2D reports whether (x, y) lies inside any of the territory's
+// shapes, ignoring the vertical range entirely.
+func (t *Territory) Contains2D(x, y int) bool {
 	for _, s := range t.Shapes {
 		if s.Contains(x, y) {
 			return true

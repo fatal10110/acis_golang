@@ -38,9 +38,6 @@ func LoadTeleports(path string) (travel.TeleportTable, error) {
 
 	table := make(travel.TeleportTable, len(doc.Lists))
 	for _, list := range doc.Lists {
-		if _, exists := table[list.NPCID]; exists {
-			return nil, fmt.Errorf("xml: %s: duplicate teleport list for npc %d", path, list.NPCID)
-		}
 		teleports := make([]travel.Teleport, 0, len(list.Locs))
 		for _, loc := range list.Locs {
 			t, err := travel.NewTeleport(commons.StatSetFromXMLAttrs(loc.Attrs))
@@ -63,9 +60,6 @@ func LoadInstantTeleports(path string) (travel.InstantTable, error) {
 
 	table := make(travel.InstantTable, len(doc.Lists))
 	for _, list := range doc.Lists {
-		if _, exists := table[list.NPCID]; exists {
-			return nil, fmt.Errorf("xml: %s: duplicate instant teleport list for npc %d", path, list.NPCID)
-		}
 		teleports := make([]location.Location, 0, len(list.Locs))
 		for _, loc := range list.Locs {
 			t, err := loc.loc()
