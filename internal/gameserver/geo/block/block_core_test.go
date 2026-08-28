@@ -288,38 +288,38 @@ func TestMultilayerAboveBelow(t *testing.T) {
 		worldZ               int32
 		wantAbove, wantBelow int // index into heights, or noLayer
 	}{
-		{[]int16{10, 20, 30}, 0, 2, noLayer},
-		{[]int16{10, 20, 30}, 10, 2, noLayer},
-		{[]int16{10, 20, 30}, 15, 2, 0},
+		{[]int16{10, 20, 30}, 0, 0, noLayer},
+		{[]int16{10, 20, 30}, 10, 1, noLayer},
+		{[]int16{10, 20, 30}, 15, 1, 0},
 		{[]int16{10, 20, 30}, 20, 2, 0},
 		{[]int16{10, 20, 30}, 25, 2, 1},
 		{[]int16{10, 20, 30}, 100, noLayer, 2},
-		{[]int16{10, 20, 30}, -100, 2, noLayer},
-		{[]int16{10, 20, 30}, -15, 2, noLayer},
-		{[]int16{10, 20}, 0, 1, noLayer},
+		{[]int16{10, 20, 30}, -100, 0, noLayer},
+		{[]int16{10, 20, 30}, -15, 0, noLayer},
+		{[]int16{10, 20}, 0, 0, noLayer},
 		{[]int16{10, 20}, 10, 1, noLayer},
 		{[]int16{10, 20}, 15, 1, 0},
 		{[]int16{10, 20}, 20, noLayer, 0},
 		{[]int16{10, 20}, 25, noLayer, 1},
 		{[]int16{10, 20}, 100, noLayer, 1},
-		{[]int16{10, 20}, -100, 1, noLayer},
-		{[]int16{10, 20}, -15, 1, noLayer},
-		{[]int16{5, 15, 25}, 0, 2, noLayer},
-		{[]int16{5, 15, 25}, 10, 2, 0},
+		{[]int16{10, 20}, -100, 0, noLayer},
+		{[]int16{10, 20}, -15, 0, noLayer},
+		{[]int16{5, 15, 25}, 0, 0, noLayer},
+		{[]int16{5, 15, 25}, 10, 1, 0},
 		{[]int16{5, 15, 25}, 15, 2, 0},
 		{[]int16{5, 15, 25}, 20, 2, 1},
 		{[]int16{5, 15, 25}, 25, noLayer, 1},
 		{[]int16{5, 15, 25}, 100, noLayer, 2},
-		{[]int16{5, 15, 25}, -100, 2, noLayer},
-		{[]int16{5, 15, 25}, -15, 2, noLayer},
-		{[]int16{-20, -10, 0, 10, 20}, 0, 4, 1},
+		{[]int16{5, 15, 25}, -100, 0, noLayer},
+		{[]int16{5, 15, 25}, -15, 0, noLayer},
+		{[]int16{-20, -10, 0, 10, 20}, 0, 3, 1},
 		{[]int16{-20, -10, 0, 10, 20}, 10, 4, 2},
 		{[]int16{-20, -10, 0, 10, 20}, 15, 4, 3},
 		{[]int16{-20, -10, 0, 10, 20}, 20, noLayer, 3},
 		{[]int16{-20, -10, 0, 10, 20}, 25, noLayer, 4},
 		{[]int16{-20, -10, 0, 10, 20}, 100, noLayer, 4},
-		{[]int16{-20, -10, 0, 10, 20}, -100, 4, noLayer},
-		{[]int16{-20, -10, 0, 10, 20}, -15, 4, 0},
+		{[]int16{-20, -10, 0, 10, 20}, -100, 0, noLayer},
+		{[]int16{-20, -10, 0, 10, 20}, -15, 1, 0},
 	}
 
 	for _, c := range cases {
@@ -601,6 +601,35 @@ func TestRegionQueriesPackedBlocks(t *testing.T) {
 	}
 	if got := r.HeightNearest(0, 3, 0, 0, 123); got != 123 {
 		t.Fatalf("unset height = %d, want queried Z", got)
+	}
+}
+
+func TestRegionMultilayerAboveSelectsLowestQualifyingLayer(t *testing.T) {
+	r := NewRegion()
+
+	var multi [CellCount][]Cell
+	for i := range multi {
+		multi[i] = []Cell{{Height: 0, NSWE: AllDirections}}
+	}
+	multi[cellIndex(4, 5)] = []Cell{
+		{Height: -16, NSWE: West},
+		{Height: 0, NSWE: North},
+		{Height: 40, NSWE: South | East},
+	}
+	if err := r.SetMultilayer(0, multi); err != nil {
+		t.Fatalf("SetMultilayer: %v", err)
+	}
+
+	layer := r.Above(0, 0, 4, 5, -20)
+	if got := r.Height(0, 0, layer); got != -16 {
+		t.Fatalf("above height = %d, want -16 (lowest of two qualifying layers -16 and 0)", got)
+	}
+	if got := r.NSWE(0, 0, layer); got != West {
+		t.Fatalf("above nswe = %v, want West", got)
+	}
+
+	if layer := r.Above(0, 0, 4, 5, 40); layer != -1 {
+		t.Fatalf("above(worldZ=40) = %d, want -1 (no layer strictly above)", layer)
 	}
 }
 

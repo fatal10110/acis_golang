@@ -72,12 +72,12 @@ func (b *Multilayer) Nearest(cellX, cellY int, worldZ int32) int {
 	return ci*layerSlot + best
 }
 
-// Above returns a handle to the first layer above worldZ at the given
-// cell, scanning from the topmost layer down, or -1 if none qualifies.
+// Above returns a handle to the lowest layer above worldZ at the given
+// cell, scanning from the bottommost layer up, or -1 if none qualifies.
 func (b *Multilayer) Above(cellX, cellY int, worldZ int32) int {
 	ci := cellIndex(cellX, cellY)
 	layers := b.cells[ci]
-	for i := len(layers) - 1; i >= 0; i-- {
+	for i := 0; i < len(layers); i++ {
 		if int32(layers[i].Height) > worldZ {
 			return ci*layerSlot + i
 		}

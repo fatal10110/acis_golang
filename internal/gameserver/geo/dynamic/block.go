@@ -366,7 +366,7 @@ func nearestLayerIndex(layers []block.Cell, z int32) (int, bool) {
 }
 
 func firstAboveIndex(layers []block.Cell, z int32) int {
-	for i := len(layers) - 1; i >= 0; i-- {
+	for i := 0; i < len(layers); i++ {
 		if int32(layers[i].Height) > z {
 			return i
 		}
