@@ -125,6 +125,48 @@ func TestLoadSpawnlistFixture(t *testing.T) {
 	}
 }
 
+func TestLoadSpawnlistRetainsNPCAIParamPrefix(t *testing.T) {
+	dir := t.TempDir()
+	writeXMLFixture(t, filepath.Join(dir, "19_21.xml"), `<?xml version="1.0"?>
+<list>
+		<territory name="a" minZ="0" maxZ="1"><node x="0" y="0"/><node x="1" y="0"/><node x="1" y="1"/></territory>
+		<npcmaker name="maker" territory="a" maximumNpcs="1"><npc id="1" total="1"><ai><set name="memo" val="@value"/></ai></npc></npcmaker>
+</list>`)
+
+	table, err := LoadSpawnlist(dir, zerolog.Nop())
+	if err != nil {
+		t.Fatalf("LoadSpawnlist(%q) error: %v", dir, err)
+	}
+	maker, ok := table.Maker("maker")
+	if !ok {
+		t.Fatal("Maker(maker) = missing")
+	}
+	if got, want := maker.Entries[0].AIParams["memo"], "@value"; got != want {
+		t.Fatalf("npc AI param = %q, want %q", got, want)
+	}
+}
+
+func TestLoadSpawnlistResolvesTerritoryReferenceIgnoringCase(t *testing.T) {
+	dir := t.TempDir()
+	writeXMLFixture(t, filepath.Join(dir, "19_21.xml"), `<?xml version="1.0"?>
+<list>
+		<territory name="lower" minZ="0" maxZ="1"><node x="0" y="0"/><node x="1" y="0"/><node x="1" y="1"/></territory>
+		<npcmaker name="maker" territory="LOWER" maximumNpcs="1"><npc id="1" total="1"/></npcmaker>
+</list>`)
+
+	table, err := LoadSpawnlist(dir, zerolog.Nop())
+	if err != nil {
+		t.Fatalf("LoadSpawnlist(%q) error: %v", dir, err)
+	}
+	maker, ok := table.Maker("maker")
+	if !ok {
+		t.Fatal("Maker(maker) = missing")
+	}
+	if got, want := len(maker.Territories), 1; got != want {
+		t.Fatalf("len(maker.Territories) = %d, want %d", got, want)
+	}
+}
+
 func TestLoadSpawnlistAllowsIdenticalDuplicateTerritory(t *testing.T) {
 	dir := t.TempDir()
 	writeXMLFixture(t, filepath.Join(dir, "21_24.xml"), `<?xml version="1.0" encoding="utf-8"?>
