@@ -642,6 +642,16 @@ func TestNewInstance_RejectsInvalidTemplate(t *testing.T) {
 
 // ---- from race_test.go ----
 func TestRaceBySecondarySkillID(t *testing.T) {
+	for skillID, want := range map[int]Race{
+		4295: RaceHumanoid,
+		4296: RaceSpirit,
+		4297: RaceAngel,
+		4298: RaceDemon,
+	} {
+		if got := RaceBySecondarySkillID(skillID); got != want {
+			t.Fatalf("RaceBySecondarySkillID(%d) = %v, want %v", skillID, got, want)
+		}
+	}
 	if got := RaceBySecondarySkillID(4290); got != RaceUndead {
 		t.Fatalf("RaceBySecondarySkillID(4290) = %v, want RaceUndead", got)
 	}

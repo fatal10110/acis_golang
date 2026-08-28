@@ -54,14 +54,17 @@ func (r Race) String() string {
 }
 
 // secondarySkillRace maps the id of a race-marker skill to the Race it
-// identifies. A handful of races are only ever detected this way; the rest
-// have no secondary skill and are only reachable through RaceByOrdinal.
+// identifies.
 var secondarySkillRace = map[int]Race{
 	4290: RaceUndead,
 	4291: RaceMagicCreature,
 	4292: RaceBeast,
 	4293: RaceAnimal,
 	4294: RacePlant,
+	4295: RaceHumanoid,
+	4296: RaceSpirit,
+	4297: RaceAngel,
+	4298: RaceDemon,
 	4299: RaceDragon,
 	4300: RaceGiant,
 	4301: RaceBug,

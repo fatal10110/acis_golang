@@ -40,4 +40,5 @@ type FrameBuilder interface {
 	FlyTo(objectID int32, dest, at location.Location, flight modelskill.Flight) wire.Frame
 	ValidateLocation(objectID int32, at location.Location, heading int) wire.Frame
 	SocialAction(objectID int32, actionID int32) wire.Frame
+	NpcSay(objectID int32, npcID int, text string) wire.Frame
 }

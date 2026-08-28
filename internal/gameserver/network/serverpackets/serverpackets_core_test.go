@@ -17,6 +17,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/npcstring"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
@@ -1750,6 +1751,26 @@ func TestFrameNpcSay(t *testing.T) {
 	want = appendD(want, 0)
 	want = appendD(want, 1012564)
 	want = append(want, encodeUTF16Z("Hello")...)
+	if !bytes.Equal(got, want) {
+		t.Fatalf("FrameNpcSay() = %x, want %x", got, want)
+	}
+}
+
+// TestFrameNpcSayResolvesNpcStringId pins issue #2028: a walkerRoutes.xml
+// node's fstring resolves through the ported npcstring table (aCis
+// NpcStringId.getMessage()) before broadcasting via NpcSay.
+func TestFrameNpcSayResolvesNpcStringId(t *testing.T) {
+	text, ok := npcstring.Text(3)
+	if !ok || text != "Opening" {
+		t.Fatalf("npcstring.Text(3) = (%q, %v), want (\"Opening\", true)", text, ok)
+	}
+
+	got := framePayload(t, FrameNpcSay(12345, 31357, SayTypeAll, text))
+	want := []byte{OpcodeNpcSay}
+	want = appendD(want, 12345)
+	want = appendD(want, 0)
+	want = appendD(want, 1_000_000+31357)
+	want = append(want, encodeUTF16Z(text)...)
 	if !bytes.Equal(got, want) {
 		t.Fatalf("FrameNpcSay() = %x, want %x", got, want)
 	}

@@ -45,6 +45,11 @@ func (NpcFrameBuilder) SocialAction(objectID int32, actionID int32) wire.Frame {
 	return FrameSocialAction(objectID, actionID)
 }
 
+// NpcSay builds a chat-line broadcast packet.
+func (NpcFrameBuilder) NpcSay(objectID int32, npcID int, text string) wire.Frame {
+	return FrameNpcSay(objectID, npcID, SayTypeAll, text)
+}
+
 // SkillUse builds the cast-start animation packet from caster to target.
 func (NpcFrameBuilder) SkillUse(casterID int32, casterAt location.Location, targetID int32, targetAt location.Location, skillID, level int32, hitTime, reuseDelay int, success bool) wire.Frame {
 	return FrameMagicSkillUse(

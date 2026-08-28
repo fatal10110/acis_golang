@@ -519,6 +519,24 @@ func skillFixture(extra string) string {
 	return `<list><skill id="1" name="x" levels="1"><set name="target" val="ONE"/><set name="skillType" val="PDAM"/><set name="operateType" val="ACTIVE"/>` + extra + `</skill></list>`
 }
 
+func TestLoadSkillDefinitionsTrimsSetAttrs(t *testing.T) {
+	dir := t.TempDir()
+	writeXMLFixture(t, filepath.Join(dir, "fixture.xml"), `<list><skill id="1" name="x" levels="1">
+		<table name="#mp">12</table>
+		<set name="target" val="ONE"/><set name="skillType" val="PDAM"/><set name="operateType" val="ACTIVE"/>
+		<set name=" mpConsume " val=" #mp "/>
+	</skill></list>`)
+
+	table, err := LoadSkillDefinitions(dir, zerolog.Nop())
+	if err != nil {
+		t.Fatalf("LoadSkillDefinitions: %v", err)
+	}
+	d, ok := table.Get(1, 1)
+	if !ok || d.MPConsume != 12 {
+		t.Fatalf("skill 1 level 1 MPConsume = %v, want 12", d.MPConsume)
+	}
+}
+
 // TestLoadSkillDefinitionsMalformedXMLFails checks that a file whose XML is
 // not well-formed still aborts the whole load: only an individual <skill>
 // element's data problem is tolerated (see
