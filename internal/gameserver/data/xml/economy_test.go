@@ -3,6 +3,7 @@ package xml
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/augmentation"
@@ -164,6 +165,30 @@ func TestLoadEconomyData(t *testing.T) {
 			t.Fatalf("first augmentation stat = %+v", stat)
 		}
 	})
+}
+
+func TestBuildAugmentationStatGroupTableRouting(t *testing.T) {
+	order := coord(0)
+	group, err := buildAugmentationStatGroup(augmentationSetElement{
+		Order: &order,
+		Stats: []augmentationStatElement{{
+			Name: "pDef",
+			Tables: []augmentationTableElement{
+				{Name: "#SOLOVALUES", Text: "1.5"},
+				{Name: "#otherValues", Text: "2.5"},
+			},
+		}},
+	})
+	if err != nil {
+		t.Fatalf("buildAugmentationStatGroup() error: %v", err)
+	}
+	stat := group.Stats[0]
+	if got, want := stat.SoloValues, []float32{1.5}; !slices.Equal(got, want) {
+		t.Fatalf("solo values = %v, want %v", got, want)
+	}
+	if got, want := stat.CombinedValues, []float32{2.5}; !slices.Equal(got, want) {
+		t.Fatalf("combined values = %v, want %v", got, want)
+	}
 }
 
 func TestLoadEconomyDataErrors(t *testing.T) {
