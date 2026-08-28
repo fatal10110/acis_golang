@@ -121,7 +121,7 @@ type staticObject interface {
 
 func rendersObject(obj world.Tracked) bool {
 	switch obj.(type) {
-	case *livePlayer, *npc.Hostile, *summon.Actor, groundItemObject, doorObject, staticObject:
+	case *livePlayer, *npc.Hostile, *npc.Decoration, *summon.Actor, groundItemObject, doorObject, staticObject:
 		return true
 	default:
 		return false
