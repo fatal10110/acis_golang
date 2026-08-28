@@ -28,7 +28,7 @@ func NewHealSps(correction float64, neededMAtk int, skillID *int32, skillLevel *
 	if magicLevel != nil {
 		entry.MagicLevel = *magicLevel
 	}
-	if entry.SkillID == 0 && entry.MagicLevel == 0 {
+	if skillID == nil && magicLevel == nil {
 		return HealSps{}, fmt.Errorf("skill: heal sps: need skillId/skillLevel or magicLevel")
 	}
 	return entry, nil
@@ -56,7 +56,7 @@ func (t *HealSpsTable) Calculate(skillID ID, skillLevel, magicLevel, mAtk int) f
 	if selected == nil && magicLevel > 0 {
 		for i := range t.entries {
 			entry := &t.entries[i]
-			if entry.MagicLevel <= 0 || entry.MagicLevel > magicLevel {
+			if entry.MagicLevel > magicLevel {
 				continue
 			}
 			if selected == nil || entry.MagicLevel > selected.MagicLevel {

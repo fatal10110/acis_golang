@@ -135,6 +135,18 @@ func TestLoadAnnouncements(t *testing.T) {
 	if got := len(list); got != 0 {
 		t.Fatalf("len(announcements) = %d, want 0", got)
 	}
+
+	path = filepath.Join(t.TempDir(), "announcements.xml")
+	if err := os.WriteFile(path, []byte(`<list><announcement/><announcement message=""/><announcement message=" "/><announcement message="Server restart."/></list>`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	list, err = LoadAnnouncements(path)
+	if err != nil {
+		t.Fatalf("LoadAnnouncements(%q) error: %v", path, err)
+	}
+	if len(list) != 2 || list[0].Message != " " || list[1].Message != "Server restart." {
+		t.Fatalf("LoadAnnouncements(%q) = %+v, want whitespace and valid announcements", path, list)
+	}
 }
 
 func TestLoadObserverGroups(t *testing.T) {
@@ -419,15 +431,6 @@ func TestSingleMiscLoadersErrors(t *testing.T) {
 			content: `<list><book skillId="2"/></list>`,
 			load: func(path string) error {
 				_, err := LoadSpellbooks(path)
-				return err
-			},
-		},
-		{
-			name:    "announcement empty message",
-			path:    filepath.Join(dir, "announcements.xml"),
-			content: `<list><announcement message="" /></list>`,
-			load: func(path string) error {
-				_, err := LoadAnnouncements(path)
 				return err
 			},
 		},
