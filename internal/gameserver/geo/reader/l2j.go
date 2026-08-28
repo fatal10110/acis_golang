@@ -27,9 +27,6 @@ func ReadL2J(r io.Reader) (*block.Region, error) {
 			return nil, err
 		}
 	}
-	if p.off != len(data) {
-		return nil, fmt.Errorf("geo/reader: l2j region has %d trailing bytes", len(data)-p.off)
-	}
 	return region, nil
 }
 
