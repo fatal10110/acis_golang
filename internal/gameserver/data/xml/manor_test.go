@@ -56,6 +56,45 @@ func TestLoadManorAreas(t *testing.T) {
 	}
 }
 
+func TestLoadManorsDuplicateSeedIDKeepsLast(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "manors.xml")
+	writeXMLFixture(t, path, `<list>
+		<manor id="1" name="a"><crop id="1" seedId="10" matureId="11" level="1" reward1="1" reward2="1" seedsLimit="1" cropsLimit="1"/></manor>
+		<manor id="2" name="b"><crop id="2" seedId="20" matureId="21" level="1" reward1="1" reward2="1" seedsLimit="1" cropsLimit="1"/></manor>
+		<manor id="3" name="c"><crop id="3" seedId="10" matureId="99" level="1" reward1="1" reward2="1" seedsLimit="1" cropsLimit="1"/></manor>
+	</list>`)
+
+	table, err := LoadManors(path)
+	if err != nil {
+		t.Fatalf("LoadManors(%q) error: %v", path, err)
+	}
+	if got, want := len(table.SeedsByID), 2; got != want {
+		t.Fatalf("len(SeedsByID) = %d, want %d", got, want)
+	}
+	if got, want := table.SeedsByID[10].MatureID, 99; got != want {
+		t.Fatalf("SeedsByID[10].MatureID = %d, want %d", got, want)
+	}
+	if got, want := table.SeedsByID[20].MatureID, 21; got != want {
+		t.Fatalf("SeedsByID[20].MatureID = %d, want %d (sibling seed preserved)", got, want)
+	}
+}
+
+func TestLoadManorAreasErrors(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "manorAreas.xml")
+	writeXMLFixture(t, path, `<list>
+		<area name="good" castleId="1" minZ="1" maxZ="2">
+			<node x="1" y="1"/><node x="2" y="1"/><node x="2" y="2"/>
+		</area>
+		<area name="bad" castleId="2" minZ="1" maxZ="2">
+			<node x="1"/>
+		</area>
+	</list>`)
+
+	if _, err := LoadManorAreas(path); err == nil {
+		t.Fatal("LoadManorAreas() error = nil, want error")
+	}
+}
+
 func TestLoadManorsErrors(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "manors.xml")
 	writeXMLFixture(t, path, `<list><manor id="1" name="x"><crop id="1" seedId="2"/></manor></list>`)

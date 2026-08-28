@@ -39,11 +39,7 @@ func LoadManors(path string) (*manor.Table, error) {
 		}
 		manors = append(manors, manor.Manor{ID: el.ID, Name: el.Name, Seeds: seeds})
 	}
-	table, err := manor.NewTable(manors)
-	if err != nil {
-		return nil, fmt.Errorf("xml: %s: %w", path, err)
-	}
-	return table, nil
+	return manor.NewTable(manors), nil
 }
 
 type manorAreaFile struct {
