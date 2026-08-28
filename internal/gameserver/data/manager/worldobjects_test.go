@@ -1,6 +1,8 @@
 package manager
 
 import (
+	"bytes"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+	"github.com/rs/zerolog"
 )
 
 type worldObjectIDs struct {
@@ -71,7 +74,7 @@ func newTestWorldObjects(t *testing.T, tmpl *door.Template) (*WorldObjects, *eng
 	}
 
 	state := world.New()
-	objects, err := NewWorldObjects(doorTemplates, staticTemplates, &worldObjectIDs{next: 1000}, geo, state, doorTimers)
+	objects, err := NewWorldObjects(doorTemplates, staticTemplates, &worldObjectIDs{next: 1000}, geo, state, doorTimers, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("NewWorldObjects: %v", err)
 	}
@@ -118,7 +121,7 @@ func TestNewWorldObjectsSpawnsDoorsAndStaticObjects(t *testing.T) {
 	}
 
 	state := world.New()
-	objects, err := NewWorldObjects(doorTemplates, staticTemplates, &worldObjectIDs{next: 1000}, geo, state, doorTimers)
+	objects, err := NewWorldObjects(doorTemplates, staticTemplates, &worldObjectIDs{next: 1000}, geo, state, doorTimers, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("NewWorldObjects: %v", err)
 	}
@@ -247,5 +250,63 @@ func TestScheduleDoorTimerCancelsPendingWhenDelayBecomesZero(t *testing.T) {
 	// closeTime is 0, so opening the door should leave no pending timer.
 	if doorTimers.Tracked(19210001) {
 		t.Fatal("door should have no pending timer when closeTime=0")
+	}
+}
+
+// TestNewWorldObjectsSkipsDegenerateDoor matches DoorData.java:113-123,
+// which logs and skips a door whose footprint fails to triangulate rather
+// than aborting the whole load (issue #1901).
+func TestNewWorldObjectsSkipsDegenerateDoor(t *testing.T) {
+	geo, x, y := newDoorGeo(t)
+	valid := &door.Template{
+		ID:       1,
+		Name:     "valid",
+		Kind:     door.KindDoor,
+		Position: location.Location{X: x, Y: y, Z: 0},
+		Coordinates: []location.Point{
+			{X: x - 16, Y: y - 16},
+			{X: x - 16, Y: y + 16},
+			{X: x + 16, Y: y + 16},
+			{X: x + 16, Y: y - 16},
+		},
+	}
+	degenerate := &door.Template{
+		ID:       2,
+		Name:     "degenerate",
+		Kind:     door.KindDoor,
+		Position: location.Location{X: x, Y: y, Z: 0},
+		Coordinates: []location.Point{
+			{X: x, Y: y},
+			{X: x + 1, Y: y},
+		},
+	}
+	doors, err := door.NewTable([]*door.Template{valid, degenerate})
+	if err != nil {
+		t.Fatalf("door.NewTable(): %v", err)
+	}
+	statics, err := staticobject.NewTable(nil)
+	if err != nil {
+		t.Fatalf("staticobject.NewTable(): %v", err)
+	}
+	doorTimers, err := task.NewDoor(doorTimerRecorder{}, nil)
+	if err != nil {
+		t.Fatalf("NewDoor: %v", err)
+	}
+
+	var logs bytes.Buffer
+	objs, err := NewWorldObjects(doors, statics, &worldObjectIDs{}, geo, world.New(), doorTimers, zerolog.New(&logs))
+	if err != nil {
+		t.Fatalf("NewWorldObjects() error: %v", err)
+	}
+
+	got := objs.Doors()
+	if len(got) != 1 {
+		t.Fatalf("Doors() len = %d, want 1", len(got))
+	}
+	if got[0].DoorID() != 1 {
+		t.Fatalf("Doors()[0].DoorID() = %d, want 1", got[0].DoorID())
+	}
+	if !strings.Contains(logs.String(), "degenerate footprint") || !strings.Contains(logs.String(), `"door":2`) {
+		t.Fatalf("log = %q, want degenerate-footprint diagnostic for door 2", logs.String())
 	}
 }
