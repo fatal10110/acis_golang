@@ -98,6 +98,7 @@ func (b *Block) Above(x, y int, z int32) int {
 	return b.AboveIgnoring(x, y, z, nil)
 }
 
+// AboveIgnoring selects from the original block whenever ignore belongs to it.
 func (b *Block) AboveIgnoring(x, y int, z int32, ignore Object) int {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
@@ -118,6 +119,7 @@ func (b *Block) Below(x, y int, z int32) int {
 	return b.BelowIgnoring(x, y, z, nil)
 }
 
+// BelowIgnoring selects from the original block whenever ignore belongs to it.
 func (b *Block) BelowIgnoring(x, y int, z int32, ignore Object) int {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
