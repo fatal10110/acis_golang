@@ -1033,6 +1033,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 
 		case clientpackets.OpcodeDummy1A,
+			clientpackets.OpcodeSay2,
 			clientpackets.OpcodeRequestSellItem,
 			clientpackets.OpcodeRequestBuyItem,
 			clientpackets.OpcodeDummy23,
