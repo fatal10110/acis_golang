@@ -25,6 +25,10 @@ type Instance struct {
 	SpawnHeading int
 	// DriftRange overrides the default home radius when positive.
 	DriftRange int
+	// WalkMode forces walk stance (WalkSpeed, not RunSpeed) instead of the
+	// default run stance every other NPC spawns in (aCis Walkers.java
+	// onCreated's setWalkOrRun(false) for its WALKING_NPCS id subset).
+	WalkMode bool
 }
 
 var supportedInstanceKinds = map[InstanceKind]struct{}{
