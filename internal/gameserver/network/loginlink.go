@@ -255,9 +255,6 @@ func (l *LoginLink) readLoop(handlers LoginLinkHandlers) {
 				l.log.Warn().Str("reason", reason.String()).Msg("login server closed the link")
 			}
 			return
-		default:
-			l.log.Warn().Uint8("opcode", firstByte(payload)).Msg("login link: unexpected opcode")
-			return
 		}
 	}
 }
