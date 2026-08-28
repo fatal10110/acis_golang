@@ -46,9 +46,19 @@ func (f *Finder) HasPath(origin, target location.Location) bool {
 	return ok
 }
 
+// maxTargetHeightGap mirrors GeoEngine.findPath's reference pre-gate: reject
+// outright when the target's own nearest geodata height lies more than this
+// far from the requested target Z (GeoEngine.java:1771-1773).
+const maxTargetHeightGap = 500
+
 func (f *Finder) find(dst []location.Location, origin, target location.Location, buildResult bool) ([]location.Location, int, bool) {
 	dst = dst[:0]
 	if f == nil || f.engine == nil || engine.OutOfWorld(origin.X, origin.Y) || engine.OutOfWorld(target.X, target.Y) {
+		return dst, 0, false
+	}
+	// GeoEngine.findPath rejects outright when either endpoint has no loaded
+	// geodata (GeoEngine.java:1760, 1768), before resolving any height.
+	if !f.engine.HasGeo(origin.X, origin.Y) || !f.engine.HasGeo(target.X, target.Y) {
 		return dst, 0, false
 	}
 
@@ -64,13 +74,53 @@ func (f *Finder) find(dst []location.Location, origin, target location.Location,
 	goal := scratch.newNodeFromWorld(target.X, target.Y, int(f.engine.Height(target.X, target.Y, target.Z)))
 	goal.nswe = f.engine.NSWENearest(goal.gx, goal.gy, goal.z)
 
+	if gap := goal.z - target.Z; gap > maxTargetHeightGap || -gap > maxTargetHeightGap {
+		return dst, 0, false
+	}
+
 	if start.key() == goal.key() {
 		return dst, 0, true
 	}
+
+	var path []location.Location
+	var cost int
+	var ok bool
 	if f.options.Bidirectional {
-		return f.findBidirectional(dst, start, goal, buildResult, scratch)
+		path, cost, ok = f.findBidirectional(dst, start, goal, buildResult, scratch)
+	} else {
+		path, cost, ok = f.findForward(dst, start, goal, buildResult, scratch)
 	}
-	return f.findForward(dst, start, goal, buildResult, scratch)
+
+	if ok && buildResult && len(path) >= 3 {
+		path = f.collapseWaypoints(origin.X, origin.Y, start.z, path)
+	}
+	return path, cost, ok
+}
+
+// collapseWaypoints mirrors GeoEngine.findPath's post-search smoothing
+// (GeoEngine.java:1775-1846): a single forward pass over the returned
+// waypoints that drops waypoint B whenever a straight move from the current
+// anchor (starting at origin) reaches the following waypoint C directly,
+// with no distance cap on the CanMove check. The anchor only advances to B
+// when B is kept; on a successful skip it stays put so a chain of mutually
+// visible points can collapse across more than one removal. The final
+// waypoint (the target) is never subject to removal.
+func (f *Finder) collapseWaypoints(originX, originY, originZ int, path []location.Location) []location.Location {
+	ax, ay, az := originX, originY, originZ
+	j := 0
+	for i := 0; i < len(path)-1; i++ {
+		next := path[i+1]
+		if f.engine.CanMove(ax, ay, az, next.X, next.Y, next.Z) {
+			continue
+		}
+		b := path[i]
+		path[j] = b
+		j++
+		ax, ay, az = b.X, b.Y, b.Z
+	}
+	path[j] = path[len(path)-1]
+	j++
+	return path[:j]
 }
 
 func (f *Finder) findForward(dst []location.Location, start, goal *node, buildResult bool, scratch *searchScratch) ([]location.Location, int, bool) {

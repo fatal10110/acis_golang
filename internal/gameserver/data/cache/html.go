@@ -16,7 +16,7 @@ type HTML struct {
 	pages map[string]string
 }
 
-// LoadHTML reads every .htm file under dir into memory.
+// LoadHTML reads every .htm and .html file under dir into memory.
 func LoadHTML(dir string) (*HTML, error) {
 	info, err := os.Stat(dir)
 	if err != nil {
@@ -31,7 +31,8 @@ func LoadHTML(dir string) (*HTML, error) {
 		if err != nil {
 			return fmt.Errorf("data/cache: walk html %s: %w", name, err)
 		}
-		if entry.IsDir() || !entry.Type().IsRegular() || !strings.EqualFold(filepath.Ext(entry.Name()), ".htm") {
+		ext := filepath.Ext(entry.Name())
+		if entry.IsDir() || !entry.Type().IsRegular() || (!strings.EqualFold(ext, ".htm") && !strings.EqualFold(ext, ".html")) {
 			return nil
 		}
 
@@ -44,7 +45,7 @@ func LoadHTML(dir string) (*HTML, error) {
 			return fmt.Errorf("data/cache: html path %s relative to %s: %w", name, dir, err)
 		}
 		key := path.Clean(filepath.ToSlash(rel))
-		pages[key] = string(data)
+		pages[key] = normalizeHTML(string(data))
 		return nil
 	}); err != nil {
 		return nil, err
@@ -54,6 +55,14 @@ func LoadHTML(dir string) (*HTML, error) {
 	}
 
 	return &HTML{pages: pages}, nil
+}
+
+func normalizeHTML(content string) string {
+	content = strings.ReplaceAll(strings.ReplaceAll(content, "\r\n", "\n"), "\r", "\n")
+	if content != "" && !strings.HasSuffix(content, "\n") {
+		content += "\n"
+	}
+	return content
 }
 
 // Get returns the loaded HTML content for name. name may be relative to
