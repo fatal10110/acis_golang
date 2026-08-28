@@ -105,8 +105,13 @@ type PrivateEntry struct {
 // NewPrivateEntry builds a PrivateEntry from set, the folded attributes of
 // one <private> element. id, weight and respawn are all required.
 func NewPrivateEntry(set *commons.StatSet) (PrivateEntry, error) {
-	f := commons.NewFields(set, "npc: private entry")
-	id := f.Int("id")
+	idf := commons.NewFields(set, "npc: private entry")
+	id := idf.Int("id")
+	if err := idf.Err(); err != nil {
+		return PrivateEntry{}, err
+	}
+
+	f := commons.NewFields(set, fmt.Sprintf("npc: private entry %d", id))
 	weight := f.Int("weight")
 	respawnStr := f.String("respawn")
 	if err := f.Err(); err != nil {
