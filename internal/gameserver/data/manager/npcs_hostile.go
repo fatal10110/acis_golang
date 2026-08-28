@@ -182,6 +182,14 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 	return hostile, walkerRef, nil
 }
 
+// walkerWalkModeIDs are the template ids aCis Walkers.java's onCreated forces
+// into walk stance (setWalkOrRun(false)) instead of every other NPC's
+// default run stance; matches Walkers.java's WALKING_NPCS constant.
+var walkerWalkModeIDs = map[int32]bool{
+	31357: true, 31358: true, 31359: true, 31360: true, 31362: true,
+	31364: true, 31365: true, 31525: true, 32072: true, 32128: true,
+}
+
 // startWalkerRoute registers ref for route walking if inst's template alias
 // resolves in walkerRoutes.xml (aCis Walkers.java: every spawned NPC whose
 // template alias has route data gets an immediate route-move desire; both

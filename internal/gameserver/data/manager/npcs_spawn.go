@@ -146,13 +146,18 @@ func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, lo
 	inst.Home = loc
 	inst.HasHome = true
 	inst.SpawnHeading = heading
+	inst.WalkMode = walkerWalkModeIDs[entry.NPCID]
 
 	if !npc.Attackable(inst) {
 		n.skippedNonCombatCount.Add(1)
 		return
 	}
 
-	hostile, walkerRef, err := newLiveHostile(inst, tmpl.RunSpeed, n.geo, n.positions, n.log, n.castDefs, n.castEffects, n.walker)
+	speed := tmpl.RunSpeed
+	if inst.WalkMode {
+		speed = tmpl.WalkSpeed
+	}
+	hostile, walkerRef, err := newLiveHostile(inst, speed, n.geo, n.positions, n.log, n.castDefs, n.castEffects, n.walker)
 	if err != nil {
 		n.log.Warn().Err(err).Int32("npc_id", entry.NPCID).Msg("spawn: cannot build live npc")
 		return
