@@ -65,20 +65,34 @@ func TestLoadCrestsErrors(t *testing.T) {
 		}
 	})
 
-	t.Run("wrong size", func(t *testing.T) {
+	t.Run("wrong size is deleted and skipped", func(t *testing.T) {
 		dir := t.TempDir()
-		writeCrestFixture(t, dir, "Crest_101.dds", []byte{0x11})
-		if _, err := LoadCrests(dir); err == nil {
-			t.Fatal("expected an error for a wrong-size crest, got nil")
+		valid := bytes.Repeat([]byte{0x11}, crestSize(PledgeCrest))
+		invalidPath := filepath.Join(dir, "Crest_102.dds")
+		writeCrestFixture(t, dir, "Crest_101.dds", valid)
+		writeCrestFixture(t, dir, "Crest_102.dds", []byte{0x11})
+
+		crests, err := LoadCrests(dir)
+		if err != nil {
+			t.Fatalf("LoadCrests(%q) error: %v", dir, err)
+		}
+		assertCrest(t, crests, PledgeCrest, 101, valid)
+		if _, err := os.Stat(invalidPath); !os.IsNotExist(err) {
+			t.Fatalf("invalid crest still exists: %v", err)
 		}
 	})
 
-	t.Run("bad id", func(t *testing.T) {
+	t.Run("bad id preserves the partial cache", func(t *testing.T) {
 		dir := t.TempDir()
+		valid := bytes.Repeat([]byte{0x11}, crestSize(PledgeCrest))
+		writeCrestFixture(t, dir, "Crest_101.dds", valid)
 		writeCrestFixture(t, dir, "Crest_bad.dds", bytes.Repeat([]byte{0x11}, crestSize(PledgeCrest)))
-		if _, err := LoadCrests(dir); err == nil {
-			t.Fatal("expected an error for a malformed crest id, got nil")
+
+		crests, err := LoadCrests(dir)
+		if err != nil {
+			t.Fatalf("LoadCrests(%q) error: %v", dir, err)
 		}
+		assertCrest(t, crests, PledgeCrest, 101, valid)
 	})
 }
 
