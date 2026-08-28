@@ -335,7 +335,7 @@ func loadMultisellRecords(root string) ([]datadiff.Record, error) {
 }
 
 func loadDoorRecords(root string) ([]datadiff.Record, error) {
-	table, err := xml.LoadDoors(xmlPath(root, "doors.xml"))
+	table, err := xml.LoadDoors(xmlPath(root, "doors.xml"), zerolog.Nop())
 	if err != nil {
 		return nil, err
 	}

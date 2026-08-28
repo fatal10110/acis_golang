@@ -115,8 +115,13 @@ func NewControlTower(alias, towerType string, x, y, z int, hp, pDef, mDef float6
 
 // NewTicket builds a Ticket from its already-decoded attributes.
 func NewTicket(itemID int, kind string, stationary bool, npcID, maxAmount int, ssq []string) (Ticket, error) {
-	if kind == "" {
-		return Ticket{}, fmt.Errorf("castle: ticket %d: type is required", itemID)
+	if _, ok := ticketTypes[kind]; !ok {
+		return Ticket{}, fmt.Errorf("castle: ticket %d: type: unrecognized %q", itemID, kind)
+	}
+	for _, cabal := range ssq {
+		if _, ok := cabalTypes[cabal]; !ok {
+			return Ticket{}, fmt.Errorf("castle: ticket %d: ssq: unrecognized %q", itemID, cabal)
+		}
 	}
 	return Ticket{
 		ItemID:     itemID,
@@ -126,6 +131,14 @@ func NewTicket(itemID int, kind string, stationary bool, npcID, maxAmount int, s
 		MaxAmount:  maxAmount,
 		SSQ:        ssq,
 	}, nil
+}
+
+var ticketTypes = map[string]struct{}{
+	"SWORD": {}, "POLE": {}, "BOW": {}, "CLERIC": {}, "WIZARD": {}, "TELEPORTER": {},
+}
+
+var cabalTypes = map[string]struct{}{
+	"NORMAL": {}, "DAWN": {}, "DUSK": {},
 }
 
 // CastleAttrs holds a Castle's own decoded XML attributes, separate from its
@@ -173,7 +186,7 @@ type Table struct {
 	order   []*Castle
 }
 
-// NewTable builds a castle table and rejects duplicate ids or aliases.
+// NewTable builds a castle table, retaining the last entry for a duplicate id.
 func NewTable(castles []*Castle) (*Table, error) {
 	t := &Table{
 		byID:    make(map[int]*Castle, len(castles)),
@@ -184,16 +197,25 @@ func NewTable(castles []*Castle) (*Table, error) {
 		if entry == nil {
 			return nil, fmt.Errorf("castle: nil entry")
 		}
-		if _, exists := t.byID[entry.ID]; exists {
-			return nil, fmt.Errorf("castle: duplicate id %d", entry.ID)
-		}
 		aliasKey := strings.ToLower(entry.Alias)
-		if _, exists := t.byAlias[aliasKey]; exists {
+		if existing, exists := t.byAlias[aliasKey]; exists && existing.ID != entry.ID {
 			return nil, fmt.Errorf("castle: duplicate alias %q", entry.Alias)
+		}
+		if old, exists := t.byID[entry.ID]; exists {
+			for i, listed := range t.order {
+				if listed == old {
+					t.order[i] = entry
+					break
+				}
+			}
+			if aliasKey := strings.ToLower(old.Alias); t.byAlias[aliasKey] == old {
+				delete(t.byAlias, aliasKey)
+			}
+		} else {
+			t.order = append(t.order, entry)
 		}
 		t.byID[entry.ID] = entry
 		t.byAlias[aliasKey] = entry
-		t.order = append(t.order, entry)
 	}
 	return t, nil
 }
