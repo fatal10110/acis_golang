@@ -4,12 +4,14 @@ import (
 	"encoding/xml"
 	"fmt"
 	"path/filepath"
-	"strings"
+	"regexp"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/multisell"
 )
+
+var multisellFilenameXML = regexp.MustCompile(".xml")
 
 type multiSellFile struct {
 	Attrs []xml.Attr        `xml:",any,attr"`
@@ -47,7 +49,7 @@ func LoadMultiSellLists(dir string, items *item.Table) (*multisell.Table, error)
 }
 
 func buildMultiSellList(path string, file multiSellFile, items *item.Table) (*multisell.List, error) {
-	id := commons.LegacyStringHash(strings.TrimSuffix(filepath.Base(path), filepath.Ext(path)))
+	id := commons.LegacyStringHash(multisellFilenameXML.ReplaceAllString(filepath.Base(path), ""))
 	set := commons.StatSetFromXMLAttrs(file.Attrs)
 
 	list := &multisell.List{
