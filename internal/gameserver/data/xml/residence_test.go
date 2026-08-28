@@ -117,6 +117,83 @@ func TestLoadClanHalls(t *testing.T) {
 	}
 }
 
+func TestResidenceLoadersMatchJavaEdgeCases(t *testing.T) {
+	dir := t.TempDir()
+	castlePath := filepath.Join(dir, "castles.xml")
+	writeXMLFixture(t, castlePath, `<list>
+		<castle id="2" alias="lists" parentId="0" name="Lists" circletId="1"><gates val="gate1"/><gates val="gate2"/><npcs val="1"/><npcs val="2"/><tax taxRate="0" taxSysgetRate="0" tributeRate="0"/><tickets><ticket itemId="1" type="SWORD" stationary="true" npcId="1" maxAmount="1" ssq="NORMAL"/></tickets></castle>
+		<castle id="3" alias="same" parentId="0" name="Alias First" circletId="1"><tax taxRate="0" taxSysgetRate="0" tributeRate="0"/></castle>
+		<castle id="4" alias="same" parentId="0" name="Alias Last" circletId="1"><tax taxRate="0" taxSysgetRate="0" tributeRate="0"/></castle>
+		<castle id="1" alias="first" parentId="0" name="First" circletId="1"><tax taxRate="0" taxSysgetRate="0" tributeRate="0"/></castle>
+		<castle id="1" alias="second" parentId="0" name="Second" circletId="1"><tax taxRate="0" taxSysgetRate="0" tributeRate="0"/></castle>
+	</list>`)
+	castles, err := LoadCastles(castlePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, ok := castles.Get(1); !ok || got.Name != "Second" || len(castles.All()) != 4 {
+		t.Fatalf("duplicate castle = %#v, all=%d", got, len(castles.All()))
+	}
+	if got, _ := castles.Get(2); len(got.Gates) != 2 || len(got.NPCs) != 2 {
+		t.Fatalf("repeated castle lists = gates=%v npcs=%v", got.Gates, got.NPCs)
+	}
+	if got, _ := castles.ByAlias("same"); got.ID != 4 {
+		t.Fatalf("duplicate castle alias = %d, want 4", got.ID)
+	}
+
+	castlePath = filepath.Join(dir, "invalid-ticket.xml")
+	writeXMLFixture(t, castlePath, `<list><castle id="1" alias="castle" parentId="0" name="Castle" circletId="1"><tax taxRate="0" taxSysgetRate="0" tributeRate="0"/><tickets><ticket itemId="1" type="BAD" stationary="true" npcId="1" maxAmount="1" ssq="NORMAL"/></tickets></castle></list>`)
+	if _, err := LoadCastles(castlePath); err == nil {
+		t.Fatal("LoadCastles accepted an unknown ticket type")
+	}
+	writeXMLFixture(t, castlePath, `<list><castle id="1" alias="castle" parentId="0" name="Castle" circletId="1"><tax taxRate="0" taxSysgetRate="0" tributeRate="0"/><tickets><ticket itemId="1" type="SWORD" stationary="true" npcId="1" maxAmount="1" ssq="BAD"/></tickets></castle></list>`)
+	if _, err := LoadCastles(castlePath); err == nil {
+		t.Fatal("LoadCastles accepted an unknown ticket cabal")
+	}
+
+	hallPath := filepath.Join(dir, "clanHalls.xml")
+	writeXMLFixture(t, hallPath, `<list>
+		<clanHall id="2" alias="lists" parentId="0" name="Lists"><agit desc="Lists" loc="Town"/><gates val="gate1"/><gates val="gate2"/><npcs val="1"/><npcs val="2"/><tax taxRate="0" taxSysgetRate="0" tributeRate="0"/></clanHall>
+		<clanHall id="3" alias="same" parentId="0" name="Alias First"><agit desc="First" loc="Town"/><tax taxRate="0" taxSysgetRate="0" tributeRate="0"/></clanHall>
+		<clanHall id="4" alias="same" parentId="0" name="Alias Last"><agit desc="Last" loc="Town"/><tax taxRate="0" taxSysgetRate="0" tributeRate="0"/></clanHall>
+		<clanHall id="1" alias="first" parentId="0" name="First"><agit desc="First" loc="Town" siegeLength="0" scheduleConfig="1;2;3;4;5"/><tax taxRate="0" taxSysgetRate="0" tributeRate="0"/></clanHall>
+		<clanHall id="1" alias="second" parentId="0" name="Second"><agit desc="Second" loc="Town"/><tax taxRate="0" taxSysgetRate="0" tributeRate="0"/></clanHall>
+	</list>`)
+	halls, err := LoadClanHalls(hallPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, ok := halls.Get(1); !ok || got.Name != "Second" || len(halls.All()) != 4 {
+		t.Fatalf("duplicate hall = %#v, all=%d", got, len(halls.All()))
+	}
+	if got, _ := halls.Get(2); len(got.Gates) != 2 || len(got.NPCs) != 2 {
+		t.Fatalf("repeated hall lists = gates=%v npcs=%v", got.Gates, got.NPCs)
+	}
+	if got, _ := halls.ByAlias("same"); got.ID != 4 {
+		t.Fatalf("duplicate hall alias = %d, want 4", got.ID)
+	}
+
+	hallPath = filepath.Join(dir, "zero-siege.xml")
+	writeXMLFixture(t, hallPath, `<list><clanHall id="1" alias="hall" parentId="0" name="Hall"><agit desc="Hall" loc="Town" siegeLength="0" scheduleConfig="1;2;3;4;5"/><tax taxRate="0" taxSysgetRate="0" tributeRate="0"/></clanHall></list>`)
+	halls, err = LoadClanHalls(hallPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hall, _ := halls.Get(1); !hall.IsSiegable() {
+		t.Fatal("zero siegeLength must still be siegable when the attribute is present")
+	}
+
+	decoPath := filepath.Join(dir, "clanHallDeco.xml")
+	writeXMLFixture(t, decoPath, `<list><deco depth="1" days="2" price="3"/><deco name="later" type="0" level="0" depth="4" days="5" price="6"/></list>`)
+	decos, err := LoadClanHallDeco(decoPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if decos.Count() != 2 || decos.Fee(0, 0) != 3 {
+		t.Fatalf("decos count=%d fee=%d, want 2 and 3", decos.Count(), decos.Fee(0, 0))
+	}
+}
+
 func TestLoadClanHallDeco(t *testing.T) {
 	path := datapackPath(t, filepath.Join("data", "xml", "clanHallDeco.xml"))
 

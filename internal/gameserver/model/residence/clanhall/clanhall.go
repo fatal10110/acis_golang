@@ -38,6 +38,7 @@ type Hall struct {
 	Grade      int
 
 	SiegeLength    int64
+	Siegable       bool
 	ScheduleConfig []int
 
 	Tax    residence.Tax
@@ -49,7 +50,7 @@ type Hall struct {
 
 // IsSiegable reports whether the hall carries siege timing data.
 func (h Hall) IsSiegable() bool {
-	return h.SiegeLength > 0
+	return h.Siegable
 }
 
 // HallAttrs holds a Hall's own decoded XML attributes, separate from its
@@ -60,6 +61,7 @@ type HallAttrs struct {
 	Alias, Name, Description, Town          string
 	AuctionMin, Deposit, Lease, Size, Grade int
 	SiegeLength                             int64
+	Siegable                                bool
 	ScheduleConfig                          []int
 	Tax                                     residence.Tax
 	Gates                                   []string
@@ -95,6 +97,7 @@ func NewHall(attrs HallAttrs, zones []residence.Zone, spawns map[residence.Spawn
 		Size:           attrs.Size,
 		Grade:          attrs.Grade,
 		SiegeLength:    attrs.SiegeLength,
+		Siegable:       attrs.Siegable,
 		ScheduleConfig: append([]int(nil), attrs.ScheduleConfig...),
 		Tax:            attrs.Tax,
 		Gates:          attrs.Gates,
@@ -111,7 +114,7 @@ type Table struct {
 	order   []*Hall
 }
 
-// NewTable builds a clan hall table and rejects duplicate ids or aliases.
+// NewTable builds a clan hall table, retaining the last entry for a duplicate id.
 func NewTable(halls []*Hall) (*Table, error) {
 	t := &Table{
 		byID:    make(map[int]*Hall, len(halls)),
@@ -122,16 +125,22 @@ func NewTable(halls []*Hall) (*Table, error) {
 		if entry == nil {
 			return nil, fmt.Errorf("clanhall: nil entry")
 		}
-		if _, exists := t.byID[entry.ID]; exists {
-			return nil, fmt.Errorf("clanhall: duplicate id %d", entry.ID)
+		if old, exists := t.byID[entry.ID]; exists {
+			for i, listed := range t.order {
+				if listed == old {
+					t.order[i] = entry
+					break
+				}
+			}
+			if aliasKey := strings.ToLower(old.Alias); t.byAlias[aliasKey] == old {
+				delete(t.byAlias, aliasKey)
+			}
+		} else {
+			t.order = append(t.order, entry)
 		}
 		aliasKey := strings.ToLower(entry.Alias)
-		if _, exists := t.byAlias[aliasKey]; exists {
-			return nil, fmt.Errorf("clanhall: duplicate alias %q", entry.Alias)
-		}
 		t.byID[entry.ID] = entry
 		t.byAlias[aliasKey] = entry
-		t.order = append(t.order, entry)
 	}
 	return t, nil
 }
@@ -182,9 +191,6 @@ type Deco struct {
 
 // NewDeco builds a Deco from its already-decoded attributes.
 func NewDeco(name string, decoType, level, depth, days, price int) (Deco, error) {
-	if name == "" {
-		return Deco{}, fmt.Errorf("clanhall: deco: name is required")
-	}
 	return Deco{
 		Name:  name,
 		Type:  decoType,
@@ -201,7 +207,7 @@ type DecoTable struct {
 	byKey map[[2]int]Deco
 }
 
-// NewDecoTable builds a decoration table and rejects duplicate type/level rows.
+// NewDecoTable builds a decoration table; lookups retain the first duplicate.
 func NewDecoTable(decos []Deco) (*DecoTable, error) {
 	t := &DecoTable{
 		order: append([]Deco(nil), decos...),
@@ -209,10 +215,9 @@ func NewDecoTable(decos []Deco) (*DecoTable, error) {
 	}
 	for _, deco := range decos {
 		key := [2]int{deco.Type, deco.Level}
-		if _, exists := t.byKey[key]; exists {
-			return nil, fmt.Errorf("clanhall: duplicate deco type %d level %d", deco.Type, deco.Level)
+		if _, exists := t.byKey[key]; !exists {
+			t.byKey[key] = deco
 		}
-		t.byKey[key] = deco
 	}
 	return t, nil
 }
