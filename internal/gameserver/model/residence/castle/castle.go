@@ -197,6 +197,10 @@ func NewTable(castles []*Castle) (*Table, error) {
 		if entry == nil {
 			return nil, fmt.Errorf("castle: nil entry")
 		}
+		aliasKey := strings.ToLower(entry.Alias)
+		if existing, exists := t.byAlias[aliasKey]; exists && existing.ID != entry.ID {
+			return nil, fmt.Errorf("castle: duplicate alias %q", entry.Alias)
+		}
 		if old, exists := t.byID[entry.ID]; exists {
 			for i, listed := range t.order {
 				if listed == old {
@@ -210,7 +214,6 @@ func NewTable(castles []*Castle) (*Table, error) {
 		} else {
 			t.order = append(t.order, entry)
 		}
-		aliasKey := strings.ToLower(entry.Alias)
 		t.byID[entry.ID] = entry
 		t.byAlias[aliasKey] = entry
 	}

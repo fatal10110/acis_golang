@@ -122,8 +122,6 @@ func TestResidenceLoadersMatchJavaEdgeCases(t *testing.T) {
 	castlePath := filepath.Join(dir, "castles.xml")
 	writeXMLFixture(t, castlePath, `<list>
 		<castle id="2" alias="lists" parentId="0" name="Lists" circletId="1"><gates val="gate1"/><gates val="gate2"/><npcs val="1"/><npcs val="2"/><tax taxRate="0" taxSysgetRate="0" tributeRate="0"/><tickets><ticket itemId="1" type="SWORD" stationary="true" npcId="1" maxAmount="1" ssq="NORMAL"/></tickets></castle>
-		<castle id="3" alias="same" parentId="0" name="Alias First" circletId="1"><tax taxRate="0" taxSysgetRate="0" tributeRate="0"/></castle>
-		<castle id="4" alias="same" parentId="0" name="Alias Last" circletId="1"><tax taxRate="0" taxSysgetRate="0" tributeRate="0"/></castle>
 		<castle id="1" alias="first" parentId="0" name="First" circletId="1"><tax taxRate="0" taxSysgetRate="0" tributeRate="0"/></castle>
 		<castle id="1" alias="second" parentId="0" name="Second" circletId="1"><tax taxRate="0" taxSysgetRate="0" tributeRate="0"/></castle>
 	</list>`)
@@ -131,14 +129,21 @@ func TestResidenceLoadersMatchJavaEdgeCases(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, ok := castles.Get(1); !ok || got.Name != "Second" || len(castles.All()) != 4 {
+	if got, ok := castles.Get(1); !ok || got.Name != "Second" || len(castles.All()) != 2 {
 		t.Fatalf("duplicate castle = %#v, all=%d", got, len(castles.All()))
 	}
 	if got, _ := castles.Get(2); len(got.Gates) != 2 || len(got.NPCs) != 2 {
 		t.Fatalf("repeated castle lists = gates=%v npcs=%v", got.Gates, got.NPCs)
 	}
-	if got, _ := castles.ByAlias("same"); got.ID != 4 {
-		t.Fatalf("duplicate castle alias = %d, want 4", got.ID)
+	if _, ok := castles.ByAlias("first"); ok {
+		t.Fatal("replaced castle retained its old alias")
+	}
+	if got, _ := castles.ByAlias("second"); got.ID != 1 {
+		t.Fatalf("replaced castle alias = %d, want 1", got.ID)
+	}
+	writeXMLFixture(t, castlePath, `<list><castle id="1" alias="same" parentId="0" name="One" circletId="1"><tax taxRate="0" taxSysgetRate="0" tributeRate="0"/></castle><castle id="2" alias="same" parentId="0" name="Two" circletId="1"><tax taxRate="0" taxSysgetRate="0" tributeRate="0"/></castle></list>`)
+	if _, err := LoadCastles(castlePath); err == nil {
+		t.Fatal("LoadCastles accepted duplicate aliases for different ids")
 	}
 
 	castlePath = filepath.Join(dir, "invalid-ticket.xml")
@@ -154,8 +159,6 @@ func TestResidenceLoadersMatchJavaEdgeCases(t *testing.T) {
 	hallPath := filepath.Join(dir, "clanHalls.xml")
 	writeXMLFixture(t, hallPath, `<list>
 		<clanHall id="2" alias="lists" parentId="0" name="Lists"><agit desc="Lists" loc="Town"/><gates val="gate1"/><gates val="gate2"/><npcs val="1"/><npcs val="2"/><tax taxRate="0" taxSysgetRate="0" tributeRate="0"/></clanHall>
-		<clanHall id="3" alias="same" parentId="0" name="Alias First"><agit desc="First" loc="Town"/><tax taxRate="0" taxSysgetRate="0" tributeRate="0"/></clanHall>
-		<clanHall id="4" alias="same" parentId="0" name="Alias Last"><agit desc="Last" loc="Town"/><tax taxRate="0" taxSysgetRate="0" tributeRate="0"/></clanHall>
 		<clanHall id="1" alias="first" parentId="0" name="First"><agit desc="First" loc="Town" siegeLength="0" scheduleConfig="1;2;3;4;5"/><tax taxRate="0" taxSysgetRate="0" tributeRate="0"/></clanHall>
 		<clanHall id="1" alias="second" parentId="0" name="Second"><agit desc="Second" loc="Town"/><tax taxRate="0" taxSysgetRate="0" tributeRate="0"/></clanHall>
 	</list>`)
@@ -163,14 +166,21 @@ func TestResidenceLoadersMatchJavaEdgeCases(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, ok := halls.Get(1); !ok || got.Name != "Second" || len(halls.All()) != 4 {
+	if got, ok := halls.Get(1); !ok || got.Name != "Second" || len(halls.All()) != 2 {
 		t.Fatalf("duplicate hall = %#v, all=%d", got, len(halls.All()))
 	}
 	if got, _ := halls.Get(2); len(got.Gates) != 2 || len(got.NPCs) != 2 {
 		t.Fatalf("repeated hall lists = gates=%v npcs=%v", got.Gates, got.NPCs)
 	}
-	if got, _ := halls.ByAlias("same"); got.ID != 4 {
-		t.Fatalf("duplicate hall alias = %d, want 4", got.ID)
+	if _, ok := halls.ByAlias("first"); ok {
+		t.Fatal("replaced hall retained its old alias")
+	}
+	if got, _ := halls.ByAlias("second"); got.ID != 1 {
+		t.Fatalf("replaced hall alias = %d, want 1", got.ID)
+	}
+	writeXMLFixture(t, hallPath, `<list><clanHall id="1" alias="same" parentId="0" name="One"><agit desc="One" loc="Town"/><tax taxRate="0" taxSysgetRate="0" tributeRate="0"/></clanHall><clanHall id="2" alias="same" parentId="0" name="Two"><agit desc="Two" loc="Town"/><tax taxRate="0" taxSysgetRate="0" tributeRate="0"/></clanHall></list>`)
+	if _, err := LoadClanHalls(hallPath); err == nil {
+		t.Fatal("LoadClanHalls accepted duplicate aliases for different ids")
 	}
 
 	hallPath = filepath.Join(dir, "zero-siege.xml")
