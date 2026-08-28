@@ -36,7 +36,6 @@ func NewIngredient(set *commons.StatSet, items *item.Table) (Ingredient, error) 
 	in := Ingredient{
 		ItemID:             itemID,
 		Count:              f.Int("count"),
-		EnchantLevel:       f.IntDefault("enchantLevel", 0),
 		TaxIngredient:      f.BoolDefault("isTaxIngredient", false),
 		MaintainIngredient: f.BoolDefault("maintainIngredient", false),
 	}
