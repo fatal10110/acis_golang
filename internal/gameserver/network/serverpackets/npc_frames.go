@@ -40,6 +40,11 @@ func (NpcFrameBuilder) ValidateLocation(objectID int32, at location.Location, he
 	return FrameValidateLocation(objectID, at, heading)
 }
 
+// SocialAction builds a social-animation broadcast packet.
+func (NpcFrameBuilder) SocialAction(objectID int32, actionID int32) wire.Frame {
+	return FrameSocialAction(objectID, actionID)
+}
+
 // SkillUse builds the cast-start animation packet from caster to target.
 func (NpcFrameBuilder) SkillUse(casterID int32, casterAt location.Location, targetID int32, targetAt location.Location, skillID, level int32, hitTime, reuseDelay int, success bool) wire.Frame {
 	return FrameMagicSkillUse(
