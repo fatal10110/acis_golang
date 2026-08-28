@@ -295,7 +295,7 @@ func (h *Hostile) NPCInfoSnapshot() npcinfo.Snapshot {
 		CurrentHP: h.CurrentHP(), MaxHP: int(h.MaxHPValue()),
 		CollisionRadius: h.CollisionRadius(), CollisionHeight: tmpl.CollisionHeight,
 		RightHand: tmpl.RightHand, LeftHand: tmpl.LeftHand,
-		Running: true, AlikeDead: h.AlikeDead(), SummonAnimation: 2,
+		Running: !h.Instance.WalkMode, AlikeDead: h.AlikeDead(), SummonAnimation: 2,
 		AbnormalEffect: h.AbnormalEffect(), Name: name, Title: title,
 	}
 }
