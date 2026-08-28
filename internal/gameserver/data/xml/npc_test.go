@@ -328,6 +328,10 @@ func TestLoadNPCTemplatesErrors(t *testing.T) {
 			name:    "drop missing itemid",
 			content: `<list><npc id="1" name="x"><set name="type" val="Monster"/><set name="radius" val="1"/><set name="height" val="1"/><set name="pAtk" val="1"/><set name="mAtk" val="1"/><set name="pDef" val="1"/><set name="mDef" val="1"/><set name="baseDamageRange" val="0;0;1;1"/><drops><category type="DROP"><drop min="1" max="1" chance="100"/></category></drops></npc></list>`,
 		},
+		{
+			name:    "teachTo class id past the ClassId.VALUES boundary",
+			content: `<list><npc id="1" name="x"><set name="type" val="Monster"/><set name="radius" val="1"/><set name="height" val="1"/><set name="pAtk" val="1"/><set name="mAtk" val="1"/><set name="pDef" val="1"/><set name="mDef" val="1"/><set name="baseDamageRange" val="0;0;1;1"/><teachTo classes="119"/></npc></list>`,
+		},
 	}
 
 	for _, c := range cases {
@@ -339,6 +343,15 @@ func TestLoadNPCTemplatesErrors(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("teachTo class id at the ClassId.VALUES boundary is accepted", func(t *testing.T) {
+		boundaryDir := t.TempDir()
+		path := filepath.Join(boundaryDir, "fixture.xml")
+		writeXMLFixture(t, path, `<list><npc id="1" name="x"><set name="type" val="Monster"/><set name="radius" val="1"/><set name="height" val="1"/><set name="pAtk" val="1"/><set name="mAtk" val="1"/><set name="pDef" val="1"/><set name="mDef" val="1"/><set name="baseDamageRange" val="0;0;1;1"/><teachTo classes="118"/></npc></list>`)
+		if _, err := LoadNPCTemplates(boundaryDir, itemTableWithIDs(nil), zerolog.Nop()); err != nil {
+			t.Fatalf("LoadNPCTemplates with teachTo classes=\"118\" error: %v", err)
+		}
+	})
 
 	t.Run("empty directory", func(t *testing.T) {
 		empty := t.TempDir()
