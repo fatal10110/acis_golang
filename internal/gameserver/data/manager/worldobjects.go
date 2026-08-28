@@ -2,18 +2,24 @@ package manager
 
 import (
 	"fmt"
+	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/dynamic"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/engine"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // WorldObjects owns the always-spawned doors and static objects loaded at boot.
 type WorldObjects struct {
-	geo   *engine.Engine
-	state *world.State
+	geo        *engine.Engine
+	state      *world.State
+	doorTimers *task.Door
+	now        func() time.Time
 
 	doors       map[int]*door.Object
 	doorOrder   []*door.Object
@@ -21,8 +27,10 @@ type WorldObjects struct {
 }
 
 // NewWorldObjects allocates, spawns, and indexes door and static-object
-// templates. Closed doors are applied to geodata immediately.
-func NewWorldObjects(doors *door.Table, statics *staticobject.Table, ids idAllocator, geo *engine.Engine, state *world.State) (*WorldObjects, error) {
+// templates. Closed doors are applied to geodata immediately. doorTimers
+// schedules each door's next auto open/close transition, mirroring the
+// reference server's DoorAI.
+func NewWorldObjects(doors *door.Table, statics *staticobject.Table, ids idAllocator, geo *engine.Engine, state *world.State, doorTimers *task.Door) (*WorldObjects, error) {
 	if ids == nil {
 		return nil, fmt.Errorf("world objects: nil id allocator")
 	}
@@ -32,11 +40,16 @@ func NewWorldObjects(doors *door.Table, statics *staticobject.Table, ids idAlloc
 	if state == nil {
 		return nil, fmt.Errorf("world objects: nil world state")
 	}
+	if doorTimers == nil {
+		return nil, fmt.Errorf("world objects: nil door timers")
+	}
 
 	w := &WorldObjects{
-		geo:   geo,
-		state: state,
-		doors: make(map[int]*door.Object),
+		geo:        geo,
+		state:      state,
+		doorTimers: doorTimers,
+		now:        time.Now,
+		doors:      make(map[int]*door.Object),
 	}
 	for _, tmpl := range doors.All() {
 		obj, err := w.spawnDoor(tmpl, ids)
@@ -81,7 +94,10 @@ func (w *WorldObjects) StaticObjects() []*staticobject.Object {
 	return append([]*staticobject.Object(nil), w.staticOrder...)
 }
 
-// SetDoorOpen changes a door's open state and applies the matching geodata.
+// SetDoorOpen changes a door's open state, applies the matching geodata,
+// broadcasts the change to known observers, and reschedules the door's next
+// auto open/close timer from its template's openTime/closeTime/randomTime,
+// mirroring the reference server's DoorAI.changeState.
 func (w *WorldObjects) SetDoorOpen(id int, open bool) bool {
 	obj, ok := w.Door(id)
 	if !ok || !obj.SetOpened(open) {
@@ -92,7 +108,38 @@ func (w *WorldObjects) SetDoorOpen(id int, open bool) bool {
 	} else {
 		w.geo.AddObject(obj)
 	}
+	obj.BroadcastStatus()
+	w.scheduleDoorTimer(obj)
 	return true
+}
+
+// ToggleDoor implements task.DoorEffects: it flips id's door to the opposite
+// of its current state once a scheduled timer fires.
+func (w *WorldObjects) ToggleDoor(id int) {
+	obj, ok := w.Door(id)
+	if !ok {
+		return
+	}
+	w.SetDoorOpen(id, !obj.Opened())
+}
+
+// scheduleDoorTimer schedules obj's next auto transition: closeTime after an
+// open, openTime after a close, jittered by a uniform [0, randomTime) delay.
+// A total delay of zero or less leaves the door with no pending timer.
+func (w *WorldObjects) scheduleDoorTimer(obj *door.Object) {
+	tmpl := obj.Template
+	delay := tmpl.CloseTime
+	if !obj.Opened() {
+		delay = tmpl.OpenTime
+	}
+	if tmpl.RandomTime > 0 {
+		delay += rnd.Get(tmpl.RandomTime)
+	}
+	if delay <= 0 {
+		w.doorTimers.Cancel(obj.DoorID())
+		return
+	}
+	w.doorTimers.Add(obj.DoorID(), w.now().Add(time.Duration(delay)*time.Second))
 }
 
 func (w *WorldObjects) spawnDoor(tmpl *door.Template, ids idAllocator) (*door.Object, error) {
@@ -108,10 +155,13 @@ func (w *WorldObjects) spawnDoor(tmpl *door.Template, ids idAllocator) (*door.Ob
 	if err != nil {
 		return nil, fmt.Errorf("world objects: door %d: %w", tmpl.ID, err)
 	}
+	obj.SetWorld(w.state)
+	obj.SetFrameBuilder(serverpackets.DoorFrameBuilder{})
 	w.state.Spawn(obj, tmpl.Position.X, tmpl.Position.Y, tmpl.Position.Z, 0)
 	if !obj.Opened() {
 		w.geo.AddObject(obj)
 	}
+	w.scheduleDoorTimer(obj)
 	return obj, nil
 }
 
