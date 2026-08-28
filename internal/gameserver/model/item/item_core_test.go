@@ -744,6 +744,7 @@ func TestTemplate_Category(t *testing.T) {
 		{"cloak", Template{Kind: KindArmor, Slot: SlotBack}, CategoryWeaponOrJewelry, SubCategoryAccessory},
 		{"adena", Template{ID: AdenaID, Kind: KindEtcItem, Slot: SlotNone}, CategoryMoneyOrEtcItem, SubCategoryMoney},
 		{"ancient adena", Template{ID: AncientAdenaID, Kind: KindEtcItem, Slot: SlotNone}, CategoryMoneyOrEtcItem, SubCategoryMoney},
+		{"quest item", Template{Kind: KindEtcItem, EtcItem: NewEtcItemDetail(EtcItemQuest, "", -1, 0, ActionNone)}, CategoryMoneyOrEtcItem, SubCategoryQuest},
 		{"generic etc item", Template{ID: 5588, Kind: KindEtcItem, Slot: SlotNone}, CategoryMoneyOrEtcItem, SubCategoryOther},
 	}
 	for _, tt := range tests {
