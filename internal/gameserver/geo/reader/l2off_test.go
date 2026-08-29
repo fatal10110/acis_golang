@@ -79,6 +79,51 @@ func TestReadL2OFF(t *testing.T) {
 	}
 }
 
+// TestReadL2OFFMultilayerLayerOrder covers a real L2OFF file's on-disk
+// layer order: BlockMultilayer.java writes/reads each cell's layers
+// highest first. Region.Above/Below expect them stored lowest to highest
+// (matching the synthetic Multilayer fixtures they're tested against), so
+// the reader must reverse each cell's layers as it decodes them.
+func TestReadL2OFFMultilayerLayerOrder(t *testing.T) {
+	custom := map[int][]byte{
+		2: l2offMultilayerBlock(func(i int) []block.Cell {
+			if i == 10 {
+				// Written highest-to-lowest, as a real L2OFF file stores it.
+				return []block.Cell{
+					{Height: 40, NSWE: block.North},
+					{Height: 8, NSWE: block.East | block.West},
+					{Height: -24, NSWE: block.South},
+				}
+			}
+			return []block.Cell{{Height: 0, NSWE: block.AllDirections}}
+		}),
+	}
+
+	path := filepath.Join(t.TempDir(), "20_18_conv.dat")
+	if err := os.WriteFile(path, l2offRegion(custom), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	blocks, err := ReadL2OFF(path)
+	if err != nil {
+		t.Fatalf("ReadL2OFF: %v", err)
+	}
+
+	// Above(-20): -24 doesn't qualify; the lowest qualifying layer above is 8.
+	if layer := blocks.Above(0, 2, 1, 2, -20); layer < 0 {
+		t.Fatal("Above(-20) = -1, want a layer")
+	} else if got := blocks.Height(0, 2, layer); got != 8 {
+		t.Errorf("Above(-20) height = %d, want 8 (lowest qualifying layer above -20)", got)
+	}
+
+	// Below(20): 40 doesn't qualify; the highest qualifying layer below is 8.
+	if layer := blocks.Below(0, 2, 1, 2, 20); layer < 0 {
+		t.Fatal("Below(20) = -1, want a layer")
+	} else if got := blocks.Height(0, 2, layer); got != 8 {
+		t.Errorf("Below(20) height = %d, want 8 (highest qualifying layer below 20)", got)
+	}
+}
+
 func TestDecodeL2OFFRejectsShortHeader(t *testing.T) {
 	_, err := decodeL2OFF(make([]byte, l2offHeaderSize-1))
 	if err == nil || !strings.Contains(err.Error(), "header") {
