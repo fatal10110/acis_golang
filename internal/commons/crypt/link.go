@@ -33,11 +33,17 @@ func NewLinkCrypt() *LinkCrypt {
 // padding scheme (m = c^d mod n): the game server encrypts its chosen
 // Blowfish key, zero-padded to the RSA modulus size, with the link's public
 // key. big.Int.Bytes() drops that leading zero padding, yielding the raw
-// key ready for SetKey.
-func DecryptDynamicKey(priv *rsa.PrivateKey, ciphertext []byte) []byte {
+// key ready for SetKey. Invalid ciphertext is rejected.
+func DecryptDynamicKey(priv *rsa.PrivateKey, ciphertext []byte) ([]byte, error) {
+	if len(ciphertext) > (priv.N.BitLen()+7)/8 {
+		return nil, fmt.Errorf("RSA ciphertext length %d exceeds modulus size", len(ciphertext))
+	}
 	c := new(big.Int).SetBytes(ciphertext)
+	if c.Cmp(priv.N) >= 0 {
+		return nil, fmt.Errorf("RSA ciphertext is greater than or equal to modulus")
+	}
 	m := new(big.Int).Exp(c, priv.D, priv.N)
-	return m.Bytes()
+	return m.Bytes(), nil
 }
 
 // EncryptDynamicKey RSA-encrypts a dynamic link key with no padding scheme
