@@ -14,6 +14,7 @@ import (
 // Stop is called.
 type Ticker struct {
 	stop     chan struct{}
+	done     chan struct{}
 	stopOnce sync.Once
 }
 
@@ -23,12 +24,14 @@ type Ticker struct {
 // disables logging. Callers must call Stop to release the goroutine.
 func Start(period time.Duration, fn func(), log zerolog.Logger) *Ticker {
 
-	t := &Ticker{stop: make(chan struct{})}
+	t := &Ticker{stop: make(chan struct{}), done: make(chan struct{})}
 	go t.run(period, fn, log)
 	return t
 }
 
 func (t *Ticker) run(period time.Duration, fn func(), log zerolog.Logger) {
+	defer close(t.done)
+
 	ticker := time.NewTicker(period)
 	defer ticker.Stop()
 
@@ -56,4 +59,10 @@ func (t *Ticker) Stop() {
 	t.stopOnce.Do(func() {
 		close(t.stop)
 	})
+}
+
+// StopAndWait requests that future ticks halt and waits for any current tick.
+func (t *Ticker) StopAndWait() {
+	t.Stop()
+	<-t.done
 }
