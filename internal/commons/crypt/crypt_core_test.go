@@ -317,6 +317,20 @@ func TestLinkCrypt(t *testing.T) {
 	}
 }
 
+func TestLinkCryptAlignedPayloadDoesNotAddPaddingBlock(t *testing.T) {
+	c := NewLinkCrypt()
+	got := c.Encrypt([]byte{0, 1, 2, 3})
+	if len(got) != BlockSize {
+		t.Fatalf("Encrypt() length = %d, want %d", len(got), BlockSize)
+	}
+	if err := c.Decrypt(got); err != nil {
+		t.Fatalf("Decrypt: %v", err)
+	}
+	if want := []byte{0, 1, 2, 3, 0, 1, 2, 3}; !bytes.Equal(got, want) {
+		t.Fatalf("decrypted packet = %x, want %x", got, want)
+	}
+}
+
 func TestLinkCryptDecryptRejectsBadLength(t *testing.T) {
 	c := NewLinkCrypt()
 	for _, size := range []int{0, 3, 7, 9} {

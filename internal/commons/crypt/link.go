@@ -69,7 +69,10 @@ func (c *LinkCrypt) SetKey(key []byte) error {
 // encrypts it with the link's current key, returning the (longer) encrypted
 // packet body.
 func (c *LinkCrypt) Encrypt(payload []byte) []byte {
-	buf := make([]byte, PaddedSize(len(payload)+4))
+	buf := make([]byte, len(payload)+4)
+	if padding := len(buf) % BlockSize; padding != 0 {
+		buf = append(buf, make([]byte, BlockSize-padding)...)
+	}
 	copy(buf, payload)
 	AppendChecksum(buf)
 	EncryptBlocks(c.cipher, buf)
