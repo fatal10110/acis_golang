@@ -68,6 +68,41 @@ func TestReadL2JDecodesRegionBlocks(t *testing.T) {
 	}
 }
 
+// TestReadL2JMultilayerLayerOrder mirrors
+// TestReadL2OFFMultilayerLayerOrder: a real .l2j file stores each cell's
+// layers highest first, so the reader must reverse them into the lowest-
+// to-highest order Region.Above/Below expect.
+func TestReadL2JMultilayerLayerOrder(t *testing.T) {
+	var multilayerCells [block.CellCount][]uint16
+	for i := range multilayerCells {
+		multilayerCells[i] = []uint16{l2jCellCode(0, block.AllDirections)}
+	}
+	// Written highest-to-lowest, as a real .l2j file stores it.
+	multilayerCells[cellIndex(4, 5)] = []uint16{
+		l2jCellCode(40, block.North),
+		l2jCellCode(8, block.East|block.West),
+		l2jCellCode(-24, block.South),
+	}
+	data := flatRegion(0, map[int][]byte{2: multilayerBlock(multilayerCells)})
+
+	region, err := ReadL2J(bytes.NewReader(data))
+	if err != nil {
+		t.Fatalf("ReadL2J: %v", err)
+	}
+
+	if layer := region.Above(0, 2, 4, 5, -20); layer < 0 {
+		t.Fatal("Above(-20) = -1, want a layer")
+	} else if got := region.Height(0, 2, layer); got != 8 {
+		t.Errorf("Above(-20) height = %d, want 8 (lowest qualifying layer above -20)", got)
+	}
+
+	if layer := region.Below(0, 2, 4, 5, 20); layer < 0 {
+		t.Fatal("Below(20) = -1, want a layer")
+	} else if got := region.Height(0, 2, layer); got != 8 {
+		t.Errorf("Below(20) height = %d, want 8 (highest qualifying layer below 20)", got)
+	}
+}
+
 func TestReadL2JRejectsMalformedRegions(t *testing.T) {
 	tests := []struct {
 		name string

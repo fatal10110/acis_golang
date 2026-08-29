@@ -122,6 +122,11 @@ func (r *l2offReader) multilayer(region *block.Region, blockIndex int) error {
 		}
 
 		counts[cell] = uint8(count)
+		// The file stores each cell's layers highest first (matching
+		// BlockMultilayer's own on-disk convention); Region and the rest of
+		// this package expect them ordered lowest to highest, so reverse
+		// them into place as they're read.
+		start := len(cells)
 		for layer := 0; layer < int(count); layer++ {
 			code, ok := r.u16()
 			if !ok {
@@ -129,12 +134,20 @@ func (r *l2offReader) multilayer(region *block.Region, blockIndex int) error {
 			}
 			cells = append(cells, code)
 		}
+		reverseUint16(cells[start:])
 	}
 
 	if err := region.SetMultilayerEncoded(blockIndex, counts, cells); err != nil {
 		return fmt.Errorf("geo/reader: block %d: %w", blockIndex, err)
 	}
 	return nil
+}
+
+// reverseUint16 reverses layers in place.
+func reverseUint16(layers []uint16) {
+	for i, j := 0, len(layers)-1; i < j; i, j = i+1, j-1 {
+		layers[i], layers[j] = layers[j], layers[i]
+	}
 }
 
 func shortL2OFF(blockIndex int, field string, offset int) error {
