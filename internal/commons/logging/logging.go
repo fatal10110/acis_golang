@@ -399,7 +399,7 @@ func (rf *rotatingFile) Write(p []byte) (int, error) {
 
 	n, err := rf.file.Write(p)
 	rf.size += int64(n)
-	if err == nil && rf.limit > 0 && rf.size > rf.limit {
+	if err == nil && rf.limit > 0 && rf.size >= rf.limit {
 		if rerr := rf.rotate(); rerr != nil {
 			return n, rerr
 		}

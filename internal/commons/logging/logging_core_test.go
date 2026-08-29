@@ -244,6 +244,26 @@ func TestSetupRotatesFileWhenLimitExceeded(t *testing.T) {
 	}
 }
 
+func TestRotatingFileRotatesWhenSizeReachesLimitExactly(t *testing.T) {
+	dir := t.TempDir()
+	rf, err := newRotatingFile(dir, "app_%g.txt", 10, 2, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rf.Close()
+
+	if _, err := rf.Write([]byte("0123456789")); err != nil { // exactly 10 bytes == limit
+		t.Fatal(err)
+	}
+
+	if _, err := os.Stat(filepath.Join(dir, "app_1.txt")); err != nil {
+		t.Fatalf("expected rotation at exact limit (JDK FileHandler rotates at written>=limit): %v", err)
+	}
+	if rf.size != 0 {
+		t.Fatalf("size after exact-limit rotation = %d, want 0", rf.size)
+	}
+}
+
 func TestSetupAppendPreservesExistingGenerationZero(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "log", "chat")
