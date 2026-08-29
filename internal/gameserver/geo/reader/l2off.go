@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"os"
+	"slices"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
 	"github.com/rs/zerolog/log"
@@ -134,20 +135,13 @@ func (r *l2offReader) multilayer(region *block.Region, blockIndex int) error {
 			}
 			cells = append(cells, code)
 		}
-		reverseUint16(cells[start:])
+		slices.Reverse(cells[start:])
 	}
 
 	if err := region.SetMultilayerEncoded(blockIndex, counts, cells); err != nil {
 		return fmt.Errorf("geo/reader: block %d: %w", blockIndex, err)
 	}
 	return nil
-}
-
-// reverseUint16 reverses layers in place.
-func reverseUint16(layers []uint16) {
-	for i, j := 0, len(layers)-1; i < j; i, j = i+1, j-1 {
-		layers[i], layers[j] = layers[j], layers[i]
-	}
 }
 
 func shortL2OFF(blockIndex int, field string, offset int) error {

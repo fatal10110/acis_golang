@@ -3,6 +3,7 @@ package reader
 import (
 	"fmt"
 	"io"
+	"slices"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
 )
@@ -84,7 +85,7 @@ func (p *l2jParser) block(region *block.Region, i int) error {
 				}
 				cells = append(cells, code)
 			}
-			reverseUint16(cells[start:])
+			slices.Reverse(cells[start:])
 		}
 		if err := region.SetMultilayerEncoded(i, counts, cells); err != nil {
 			return fmt.Errorf("geo/reader: block %d multilayer: %w", i, err)
