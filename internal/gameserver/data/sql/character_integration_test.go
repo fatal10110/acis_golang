@@ -243,6 +243,18 @@ func TestCharacterStore_Purge(t *testing.T) {
 	if n := countRows(t, db, "SELECT COUNT(*) FROM character_shortcuts WHERE char_obj_id = ?", c.ID); n != 0 {
 		t.Errorf("shortcut rows after purge = %d, want 0", n)
 	}
+	if n := countRows(t, db, "SELECT COUNT(*) FROM character_skills WHERE char_obj_id = ?", c.ID); n != 0 {
+		t.Errorf("skill rows after purge = %d, want 0", n)
+	}
+	if n := countRows(t, db, "SELECT COUNT(*) FROM character_skills_save WHERE char_obj_id = ?", c.ID); n != 0 {
+		t.Errorf("skill save rows after purge = %d, want 0", n)
+	}
+	if n := countRows(t, db, "SELECT COUNT(*) FROM pets WHERE item_obj_id = ?", 0x10000101); n != 0 {
+		t.Errorf("pet rows after purge = %d, want 0", n)
+	}
+	if n := countRows(t, db, "SELECT COUNT(*) FROM augmentations WHERE item_oid = ?", 0x10000101); n != 0 {
+		t.Errorf("augmentation rows after purge = %d, want 0", n)
+	}
 
 	deleted, err = store.Purge(ctx, c.ID)
 	if err != nil {
@@ -299,6 +311,26 @@ func seedOwnedRows(t *testing.T, db *sql.DB, ownerID int32) {
 		"INSERT INTO character_shortcuts (char_obj_id, slot, page, type, id, level, class_index) VALUES (?,?,?,?,?,?,?)",
 		ownerID, 0, 0, "ITEM", 0x10000101, -1, 0); err != nil {
 		t.Fatalf("seed shortcut: %v", err)
+	}
+	if _, err := db.ExecContext(context.Background(),
+		"INSERT INTO character_skills (char_obj_id, skill_id, skill_level, class_index) VALUES (?,?,?,?)",
+		ownerID, 1, 1, 0); err != nil {
+		t.Fatalf("seed skill: %v", err)
+	}
+	if _, err := db.ExecContext(context.Background(),
+		"INSERT INTO character_skills_save (char_obj_id, skill_id, skill_level, class_index) VALUES (?,?,?,?)",
+		ownerID, 1, 1, 0); err != nil {
+		t.Fatalf("seed skill save: %v", err)
+	}
+	if _, err := db.ExecContext(context.Background(),
+		"INSERT INTO pets (item_obj_id, name) VALUES (?,?)",
+		0x10000101, "Wolf"); err != nil {
+		t.Fatalf("seed pet: %v", err)
+	}
+	if _, err := db.ExecContext(context.Background(),
+		"INSERT INTO augmentations (item_oid, skill_id, skill_level) VALUES (?,?,?)",
+		0x10000101, 1, 1); err != nil {
+		t.Fatalf("seed augmentation: %v", err)
 	}
 }
 
