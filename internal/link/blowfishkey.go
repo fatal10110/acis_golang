@@ -21,7 +21,11 @@ func DecodeBlowFishKey(payload []byte, priv *rsa.PrivateKey) ([]byte, error) {
 	if r.Err() != nil {
 		return nil, fmt.Errorf("link: BlowFishKey: %w", r.Err())
 	}
-	return crypt.DecryptDynamicKey(priv, ciphertext), nil
+	key, err := crypt.DecryptDynamicKey(priv, ciphertext)
+	if err != nil {
+		return nil, fmt.Errorf("link: BlowFishKey: %w", err)
+	}
+	return key, nil
 }
 
 // EncodeBlowFishKey builds the BlowFishKey packet: key RSA-encrypted with

@@ -54,7 +54,9 @@ type spawnPrivateEl struct {
 // dir and returns the full in-memory territory/maker table.
 //
 // log receives skipped-territory diagnostics; the zero logger discards them.
-func LoadSpawnlist(dir string, log zerolog.Logger) (*spawn.Table, error) {
+// spawnMultiplier is Config.SPAWN_MULTIPLIER (npcs.properties SpawnMultiplier,
+// default 1): it Java-rounds maker maximums and coordinate-less entry totals.
+func LoadSpawnlist(dir string, log zerolog.Logger, spawnMultiplier float64) (*spawn.Table, error) {
 	docs, err := loadXMLDocuments[spawnlistFile](dir, "spawnlist")
 	if err != nil {
 		return nil, err
@@ -90,7 +92,7 @@ func LoadSpawnlist(dir string, log zerolog.Logger) (*spawn.Table, error) {
 
 	for _, doc := range docs {
 		for _, el := range doc.Data.Makers {
-			maker, err := buildMaker(el, territoryMap, log)
+			maker, err := buildMaker(el, territoryMap, log, spawnMultiplier)
 			if err != nil {
 				return nil, fmt.Errorf("data/xml: parse maker in %s: %w", doc.Path, err)
 			}
@@ -118,7 +120,7 @@ func buildTerritory(el territoryElement) (*spawn.Territory, error) {
 	return spawn.NewTerritory(commons.StatSetFromXMLAttrs(el.Attrs), nodes)
 }
 
-func buildMaker(el makerElement, territories map[string]*spawn.Territory, log zerolog.Logger) (*spawn.Maker, error) {
+func buildMaker(el makerElement, territories map[string]*spawn.Territory, log zerolog.Logger, spawnMultiplier float64) (*spawn.Maker, error) {
 	set := commons.StatSetFromXMLAttrs(el.Attrs)
 	f := commons.NewFields(set, "spawn maker loader")
 	name := f.StringDefault("name", "?")
@@ -133,17 +135,17 @@ func buildMaker(el makerElement, territories map[string]*spawn.Territory, log ze
 
 	entries := make([]spawn.Entry, 0, len(el.NPCs))
 	for _, npcEl := range el.NPCs {
-		entry, err := buildEntry(npcEl)
+		entry, err := buildEntry(npcEl, spawnMultiplier)
 		if err != nil {
 			return nil, fmt.Errorf("maker %q: %w", name, err)
 		}
 		entries = append(entries, entry)
 	}
 
-	return spawn.NewMaker(set, refs, banned, entries, aiParams)
+	return spawn.NewMaker(set, refs, banned, entries, aiParams, spawnMultiplier)
 }
 
-func buildEntry(el spawnNPCElement) (spawn.Entry, error) {
+func buildEntry(el spawnNPCElement, spawnMultiplier float64) (spawn.Entry, error) {
 	set := commons.StatSetFromXMLAttrs(el.Attrs)
 	f := commons.NewFields(set, "spawn entry loader")
 	npcID := f.StringDefault("id", "?")
@@ -165,7 +167,7 @@ func buildEntry(el spawnNPCElement) (spawn.Entry, error) {
 		return spawn.Entry{}, fmt.Errorf("npc %q: %w", npcID, err)
 	}
 
-	entry, err := spawn.NewEntry(set, positions, privates, aiParams)
+	entry, err := spawn.NewEntry(set, positions, privates, aiParams, spawnMultiplier)
 	if err != nil {
 		return spawn.Entry{}, fmt.Errorf("npc %q: %w", npcID, err)
 	}

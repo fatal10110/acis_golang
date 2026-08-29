@@ -236,10 +236,12 @@ func (s *CharacterStore) SetOffline(ctx context.Context, objectID int32, lastAcc
 }
 
 // Purge removes the character row for objectID together with every row it
-// owns - its items and its shortcuts - as one transaction, so a failure or
-// cancellation partway through leaves all of them in place instead of
-// orphaning owned rows behind a deleted character. It reports whether a
-// character row was deleted.
+// owns - its items, shortcuts, skills, skill-save state, pets, and item
+// augmentations - as one transaction, so a failure or cancellation partway
+// through leaves all of them in place instead of orphaning owned rows behind
+// a deleted character. Pets and augmentations are deleted before items,
+// since both key off the character's still-live item ids. It reports
+// whether a character row was deleted.
 func (s *CharacterStore) Purge(ctx context.Context, objectID int32) (bool, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -259,6 +261,18 @@ func (s *CharacterStore) Purge(ctx context.Context, objectID int32) (bool, error
 	n, err := res.RowsAffected()
 	if err != nil {
 		return false, fmt.Errorf("purge character %d: %w", objectID, err)
+	}
+	if _, err := tx.ExecContext(ctx, "DELETE FROM character_skills WHERE char_obj_id = ?", objectID); err != nil {
+		return false, fmt.Errorf("purge character %d skills: %w", objectID, err)
+	}
+	if _, err := tx.ExecContext(ctx, "DELETE FROM character_skills_save WHERE char_obj_id = ?", objectID); err != nil {
+		return false, fmt.Errorf("purge character %d skills_save: %w", objectID, err)
+	}
+	if _, err := tx.ExecContext(ctx, "DELETE FROM pets WHERE item_obj_id IN (SELECT object_id FROM items WHERE items.owner_id = ?)", objectID); err != nil {
+		return false, fmt.Errorf("purge character %d pets: %w", objectID, err)
+	}
+	if _, err := tx.ExecContext(ctx, "DELETE FROM augmentations WHERE item_oid IN (SELECT object_id FROM items WHERE items.owner_id = ?)", objectID); err != nil {
+		return false, fmt.Errorf("purge character %d augmentations: %w", objectID, err)
 	}
 	if _, err := tx.ExecContext(ctx, "DELETE FROM items WHERE owner_id = ?", objectID); err != nil {
 		return false, fmt.Errorf("purge character %d items: %w", objectID, err)

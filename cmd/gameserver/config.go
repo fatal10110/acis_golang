@@ -186,6 +186,18 @@ func loadPetConfig(paths gameServerPaths) (pet.Config, error) {
 	return pet.ConfigFromProperties(serverProps, playersProps)
 }
 
+// spawnMultiplier is Config.SPAWN_MULTIPLIER (Config.java:715), read from
+// npcs.properties.
+type spawnMultiplier float64
+
+func loadSpawnMultiplier(paths gameServerPaths) (spawnMultiplier, error) {
+	props, err := config.LoadFile(paths.NpcsConfigPath)
+	if err != nil {
+		return 0, err
+	}
+	return spawnMultiplier(config.NewFields(props, "spawn multiplier").Float64("SpawnMultiplier", 1)), nil
+}
+
 func loadPvPFlagOptions(paths gameServerPaths) (task.PvPFlagOptions, error) {
 	props, err := config.LoadFile(paths.PlayersConfigPath)
 	if err != nil {

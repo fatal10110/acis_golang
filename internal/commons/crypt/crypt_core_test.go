@@ -203,7 +203,10 @@ func TestDecryptDynamicKey(t *testing.T) {
 				want = tt.plaintext
 			}
 			ciphertext := EncryptDynamicKey(&key.PublicKey, tt.plaintext)
-			got := DecryptDynamicKey(key, ciphertext)
+			got, err := DecryptDynamicKey(key, ciphertext)
+			if err != nil {
+				t.Fatalf("DecryptDynamicKey: %v", err)
+			}
 			if !bytes.Equal(got, want) {
 				t.Fatalf("DecryptDynamicKey() = %x, want %x", got, want)
 			}
@@ -217,7 +220,10 @@ func TestDecryptDynamicKeyEmptyPlaintext(t *testing.T) {
 		t.Fatalf("GenerateKey: %v", err)
 	}
 	ciphertext := EncryptDynamicKey(&key.PublicKey, nil)
-	got := DecryptDynamicKey(key, ciphertext)
+	got, err := DecryptDynamicKey(key, ciphertext)
+	if err != nil {
+		t.Fatalf("DecryptDynamicKey: %v", err)
+	}
 	if len(got) != 0 {
 		t.Fatalf("DecryptDynamicKey() = %x, want empty", got)
 	}
@@ -232,7 +238,11 @@ func TestDecryptDynamicKeyIntoSetKey(t *testing.T) {
 	ciphertext := EncryptDynamicKey(&key.PublicKey, dynamicKey)
 
 	enc := NewLinkCrypt()
-	if err := enc.SetKey(DecryptDynamicKey(key, ciphertext)); err != nil {
+	decryptedKey, err := DecryptDynamicKey(key, ciphertext)
+	if err != nil {
+		t.Fatalf("DecryptDynamicKey: %v", err)
+	}
+	if err := enc.SetKey(decryptedKey); err != nil {
 		t.Fatalf("SetKey: %v", err)
 	}
 	dec := NewLinkCrypt()
@@ -247,6 +257,30 @@ func TestDecryptDynamicKeyIntoSetKey(t *testing.T) {
 	}
 	if !bytes.Equal(got[:len(payload)], payload) {
 		t.Fatalf("round trip = %x, want prefix %x", got, payload)
+	}
+}
+
+func TestDecryptDynamicKeyRejectsCiphertextAtModulus(t *testing.T) {
+	key, err := rsa.GenerateKey(rand.Reader, modulusSize*8)
+	if err != nil {
+		t.Fatalf("GenerateKey: %v", err)
+	}
+
+	if _, err := DecryptDynamicKey(key, key.N.Bytes()); err == nil {
+		t.Fatal("DecryptDynamicKey() accepted ciphertext equal to the modulus")
+	}
+}
+
+func TestDecryptDynamicKeyRejectsCiphertextLongerThanModulus(t *testing.T) {
+	key, err := rsa.GenerateKey(rand.Reader, modulusSize*8)
+	if err != nil {
+		t.Fatalf("GenerateKey: %v", err)
+	}
+
+	ciphertext := make([]byte, len(key.N.Bytes())+1)
+	ciphertext[len(ciphertext)-1] = 1
+	if _, err := DecryptDynamicKey(key, ciphertext); err == nil {
+		t.Fatal("DecryptDynamicKey() accepted ciphertext longer than the modulus")
 	}
 }
 
@@ -314,6 +348,20 @@ func TestLinkCrypt(t *testing.T) {
 				t.Fatalf("Decrypt() = %x, want %x", decrypted, wantPadded)
 			}
 		})
+	}
+}
+
+func TestLinkCryptAlignedPayloadDoesNotAddPaddingBlock(t *testing.T) {
+	c := NewLinkCrypt()
+	got := c.Encrypt([]byte{0, 1, 2, 3})
+	if len(got) != BlockSize {
+		t.Fatalf("Encrypt() length = %d, want %d", len(got), BlockSize)
+	}
+	if err := c.Decrypt(got); err != nil {
+		t.Fatalf("Decrypt: %v", err)
+	}
+	if want := []byte{0, 1, 2, 3, 0, 1, 2, 3}; !bytes.Equal(got, want) {
+		t.Fatalf("decrypted packet = %x, want %x", got, want)
 	}
 }
 
