@@ -57,7 +57,7 @@ func (s *GameServerStore) GameServers(ctx context.Context) (map[int]model.GameSe
 		}
 		key, err := model.ParseHexKey(hexID)
 		if err != nil {
-			return servers, nil
+			return servers, fmt.Errorf("parse game server %d hex id: %w", id, err)
 		}
 		servers[id] = model.NewGameServer(id, key, host)
 	}

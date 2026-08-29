@@ -196,7 +196,10 @@ func provideServerRegistry(lc fx.Lifecycle, store *loginsql.GameServerStore, log
 	lc.Append(fx.Hook{OnStart: func(ctx context.Context) error {
 		servers, err := store.GameServers(ctx)
 		if err != nil {
-			return err
+			if servers == nil {
+				return err
+			}
+			log.Error().Err(err).Msg("load registered gameservers")
 		}
 		known := make(map[int][]byte, len(servers))
 		for id, server := range servers {
