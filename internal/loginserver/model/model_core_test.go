@@ -19,6 +19,17 @@ func TestNewAccount_LowercasesLogin(t *testing.T) {
 	}
 }
 
+// TestNewAccount_LoginNormalizationIsLocaleIndependent locks in that login
+// normalization does not depend on the OS/JVM default locale: "I" always
+// folds to "i", never the Turkish dotless "ı" that Java's
+// login.toLowerCase() produces under a tr_TR default locale.
+func TestNewAccount_LoginNormalizationIsLocaleIndependent(t *testing.T) {
+	a := NewAccount("PLAYER_I", "hash", 0, 0)
+	if a.Login != "player_i" {
+		t.Errorf("Login = %q, want %q (locale-independent fold of \"I\")", a.Login, "player_i")
+	}
+}
+
 // ---- from gameserver_test.go ----
 func TestHexKeyTextRoundTrip(t *testing.T) {
 	tests := []struct {
