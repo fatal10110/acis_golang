@@ -52,7 +52,7 @@ func TestLoadSpawnlistFixture(t *testing.T) {
 	</npcmaker>
 </list>`)
 
-	table, err := LoadSpawnlist(dir, zerolog.Nop())
+	table, err := LoadSpawnlist(dir, zerolog.Nop(), 1)
 	if err != nil {
 		t.Fatalf("LoadSpawnlist(%q) error: %v", dir, err)
 	}
@@ -125,6 +125,83 @@ func TestLoadSpawnlistFixture(t *testing.T) {
 	}
 }
 
+// TestLoadSpawnlistAppliesSpawnMultiplier pins Config.SPAWN_MULTIPLIER's two
+// distinct rounding sites (NpcMaker.java:89, MultiSpawn.java:64): a maker's
+// maximumNpcs and a coordinate-less entry's total are both Java-rounded by
+// the multiplier, while a fixed/weighted "pos" entry's total is left as
+// declared (MultiSpawn.java:59-61, coords != null).
+func TestLoadSpawnlistAppliesSpawnMultiplier(t *testing.T) {
+	dir := t.TempDir()
+	writeXMLFixture(t, filepath.Join(dir, "19_21.xml"), `<?xml version="1.0" encoding="utf-8"?>
+<list>
+	<territory name="a" minZ="-10" maxZ="10">
+		<node x="0" y="0"/>
+		<node x="1" y="0"/>
+		<node x="1" y="1"/>
+	</territory>
+	<npcmaker name="maker_1" maximumNpcs="7">
+		<npc id="100" total="3" pos="1;2;3;4"/>
+		<npc id="101" total="3"/>
+	</npcmaker>
+</list>`)
+
+	table, err := LoadSpawnlist(dir, zerolog.Nop(), 1.5)
+	if err != nil {
+		t.Fatalf("LoadSpawnlist(%q) error: %v", dir, err)
+	}
+
+	maker, ok := table.Maker("maker_1")
+	if !ok {
+		t.Fatal("Maker(maker_1) = missing")
+	}
+	// round(7 * 1.5) = round(10.5) = 11.
+	if got, want := maker.MaximumNPCs, 11; got != want {
+		t.Fatalf("maker.MaximumNPCs = %d, want %d", got, want)
+	}
+
+	fixed := maker.Entries[0]
+	if got, want := fixed.Total, 3; got != want {
+		t.Fatalf("fixed-coordinate entry.Total = %d, want %d (unscaled)", got, want)
+	}
+
+	coordless := maker.Entries[1]
+	// round(3 * 1.5) = round(4.5) = 5.
+	if got, want := coordless.Total, 5; got != want {
+		t.Fatalf("coordinate-less entry.Total = %d, want %d (scaled)", got, want)
+	}
+}
+
+func TestLoadSpawnlistDefaultMultiplierLeavesTotalsUnscaled(t *testing.T) {
+	dir := t.TempDir()
+	writeXMLFixture(t, filepath.Join(dir, "19_21.xml"), `<?xml version="1.0" encoding="utf-8"?>
+<list>
+	<territory name="a" minZ="-10" maxZ="10">
+		<node x="0" y="0"/>
+		<node x="1" y="0"/>
+		<node x="1" y="1"/>
+	</territory>
+	<npcmaker name="maker_1" maximumNpcs="7">
+		<npc id="100" total="3"/>
+	</npcmaker>
+</list>`)
+
+	table, err := LoadSpawnlist(dir, zerolog.Nop(), 1)
+	if err != nil {
+		t.Fatalf("LoadSpawnlist(%q) error: %v", dir, err)
+	}
+
+	maker, ok := table.Maker("maker_1")
+	if !ok {
+		t.Fatal("Maker(maker_1) = missing")
+	}
+	if got, want := maker.MaximumNPCs, 7; got != want {
+		t.Fatalf("maker.MaximumNPCs = %d, want %d", got, want)
+	}
+	if got, want := maker.Entries[0].Total, 3; got != want {
+		t.Fatalf("entry.Total = %d, want %d", got, want)
+	}
+}
+
 func TestLoadSpawnlistRetainsNPCAIParamPrefix(t *testing.T) {
 	dir := t.TempDir()
 	writeXMLFixture(t, filepath.Join(dir, "19_21.xml"), `<?xml version="1.0"?>
@@ -133,7 +210,7 @@ func TestLoadSpawnlistRetainsNPCAIParamPrefix(t *testing.T) {
 		<npcmaker name="maker" territory="a" maximumNpcs="1"><npc id="1" total="1"><ai><set name="memo" val="@value"/></ai></npc></npcmaker>
 </list>`)
 
-	table, err := LoadSpawnlist(dir, zerolog.Nop())
+	table, err := LoadSpawnlist(dir, zerolog.Nop(), 1)
 	if err != nil {
 		t.Fatalf("LoadSpawnlist(%q) error: %v", dir, err)
 	}
@@ -154,7 +231,7 @@ func TestLoadSpawnlistResolvesTerritoryReferenceIgnoringCase(t *testing.T) {
 		<npcmaker name="maker" territory="LOWER" maximumNpcs="1"><npc id="1" total="1"/></npcmaker>
 </list>`)
 
-	table, err := LoadSpawnlist(dir, zerolog.Nop())
+	table, err := LoadSpawnlist(dir, zerolog.Nop(), 1)
 	if err != nil {
 		t.Fatalf("LoadSpawnlist(%q) error: %v", dir, err)
 	}
@@ -186,7 +263,7 @@ func TestLoadSpawnlistAllowsIdenticalDuplicateTerritory(t *testing.T) {
 	</npcmaker>
 </list>`)
 
-	table, err := LoadSpawnlist(dir, zerolog.Nop())
+	table, err := LoadSpawnlist(dir, zerolog.Nop(), 1)
 	if err != nil {
 		t.Fatalf("LoadSpawnlist(%q) error: %v", dir, err)
 	}
@@ -221,7 +298,7 @@ func TestLoadSpawnlistRetainsConflictingDuplicateTerritory(t *testing.T) {
 	</npcmaker>
 </list>`)
 
-	table, err := LoadSpawnlist(dir, zerolog.Nop())
+	table, err := LoadSpawnlist(dir, zerolog.Nop(), 1)
 	if err != nil {
 		t.Fatalf("LoadSpawnlist(%q) error: %v", dir, err)
 	}
@@ -282,7 +359,7 @@ func TestLoadSpawnlistSkipsUnbuildableTerritory(t *testing.T) {
 </list>`)
 
 	var logs bytes.Buffer
-	table, err := LoadSpawnlist(dir, zerolog.New(&logs))
+	table, err := LoadSpawnlist(dir, zerolog.New(&logs), 1)
 	if err != nil {
 		t.Fatalf("LoadSpawnlist(%q) error: %v", dir, err)
 	}
@@ -329,7 +406,7 @@ func TestLoadSpawnlistMakerToleratesUnknownTerritory(t *testing.T) {
 </list>`)
 
 	var logs bytes.Buffer
-	table, err := LoadSpawnlist(dir, zerolog.New(&logs))
+	table, err := LoadSpawnlist(dir, zerolog.New(&logs), 1)
 	if err != nil {
 		t.Fatalf("LoadSpawnlist(%q) error: %v", dir, err)
 	}
@@ -371,7 +448,7 @@ func TestLoadSpawnlistMultiNameTerritoryGroupIsAllOrNothing(t *testing.T) {
 </list>`)
 
 	var logs bytes.Buffer
-	table, err := LoadSpawnlist(dir, zerolog.New(&logs))
+	table, err := LoadSpawnlist(dir, zerolog.New(&logs), 1)
 	if err != nil {
 		t.Fatalf("LoadSpawnlist(%q) error: %v", dir, err)
 	}
@@ -409,7 +486,7 @@ func TestLoadSpawnlistErrors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
 			writeXMLFixture(t, filepath.Join(dir, "19_21.xml"), tc.xml)
-			if _, err := LoadSpawnlist(dir, zerolog.Nop()); err == nil {
+			if _, err := LoadSpawnlist(dir, zerolog.Nop(), 1); err == nil {
 				t.Fatal("LoadSpawnlist: expected error")
 			}
 		})
@@ -419,7 +496,7 @@ func TestLoadSpawnlistErrors(t *testing.T) {
 func TestLoadSpawnlistAgainstDatapack(t *testing.T) {
 	dir := datapackPath(t, filepath.Join("data", "xml", "spawnlist"))
 
-	table, err := LoadSpawnlist(dir, zerolog.Nop())
+	table, err := LoadSpawnlist(dir, zerolog.Nop(), 1)
 	if err != nil {
 		t.Fatalf("LoadSpawnlist(%q) error: %v", dir, err)
 	}

@@ -84,7 +84,7 @@ func walkerTestRoutes(spawnPoint location.Location) route.WalkerRoutes {
 // NpcAI.java:295-296), even after the NPC's heading changed in between.
 func TestNpcSpawnRegistersWalkerRouteAndRestoresSpawnHeading(t *testing.T) {
 	dir := walkerTestSpawnFixture(t)
-	table, err := xml.LoadSpawnlist(dir, zerolog.Nop())
+	table, err := xml.LoadSpawnlist(dir, zerolog.Nop(), 1)
 	if err != nil {
 		t.Fatalf("LoadSpawnlist() error: %v", err)
 	}
@@ -150,7 +150,7 @@ func TestNpcSpawnRegistersWalkerRouteAndRestoresSpawnHeading(t *testing.T) {
 // no-op, not a stale route continuation.
 func TestNpcDespawnStopsWalkerRoute(t *testing.T) {
 	dir := walkerTestSpawnFixture(t)
-	table, err := xml.LoadSpawnlist(dir, zerolog.Nop())
+	table, err := xml.LoadSpawnlist(dir, zerolog.Nop(), 1)
 	if err != nil {
 		t.Fatalf("LoadSpawnlist() error: %v", err)
 	}
@@ -223,7 +223,7 @@ func TestNpcLeashReturnDoesNotHijackWalkerRoute(t *testing.T) {
 		<npc id="502" total="1" pos="100;200;0;12345"/>
 	</npcmaker>
 </list>`)
-	table, err := xml.LoadSpawnlist(dir, zerolog.Nop())
+	table, err := xml.LoadSpawnlist(dir, zerolog.Nop(), 1)
 	if err != nil {
 		t.Fatalf("LoadSpawnlist() error: %v", err)
 	}
@@ -341,7 +341,7 @@ func TestWalkerWalkModeNPCsMoveAtWalkSpeed(t *testing.T) {
 		<npc id="31357" total="1" pos="100;200;0;0"/>
 	</npcmaker>
 </list>`)
-	table, err := xml.LoadSpawnlist(dir, zerolog.Nop())
+	table, err := xml.LoadSpawnlist(dir, zerolog.Nop(), 1)
 	if err != nil {
 		t.Fatalf("LoadSpawnlist() error: %v", err)
 	}

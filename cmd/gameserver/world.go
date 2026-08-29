@@ -44,10 +44,10 @@ func startWorldObjects(objs *manager.WorldObjects, log zerolog.Logger) {
 // provideSpawns loads the spawnlist XML and restores dynamic spawn_data
 // rows, returning the store alongside so it can be reused to persist state
 // back at shutdown.
-func provideSpawns(paths gameServerPaths, pool *sql.DB, log zerolog.Logger) (*manager.Spawns, *gamesql.SpawnStore, error) {
+func provideSpawns(paths gameServerPaths, pool *sql.DB, log zerolog.Logger, multiplier spawnMultiplier) (*manager.Spawns, *gamesql.SpawnStore, error) {
 	store := gamesql.NewSpawnStore(pool)
 	dir := filepath.Join(paths.DataRoot, "data", "xml", "spawnlist")
-	spawns, err := manager.LoadSpawns(context.Background(), dir, store, log)
+	spawns, err := manager.LoadSpawns(context.Background(), dir, store, log, float64(multiplier))
 	if err != nil {
 		return nil, nil, err
 	}

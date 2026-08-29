@@ -52,8 +52,12 @@ func NewPrivate(set *commons.StatSet) (Private, error) {
 }
 
 // NewEntry builds one spawn entry from its XML attributes and already-parsed
-// child blocks.
-func NewEntry(set *commons.StatSet, positions []Position, privates []Private, aiParams map[string]string) (Entry, error) {
+// child blocks. multiplier is Config.SPAWN_MULTIPLIER (MultiSpawn.java:64):
+// it Java-rounds Total only when positions is empty, matching the reference
+// distinction between a fixed/weighted "pos" list (coords != null, total
+// kept as declared) and a coordinate-less territory spawn (coords == null,
+// total scaled).
+func NewEntry(set *commons.StatSet, positions []Position, privates []Private, aiParams map[string]string, multiplier float64) (Entry, error) {
 	idf := commons.NewFields(set, "spawn entry")
 	npcID := idf.Int32("id")
 	if err := idf.Err(); err != nil {
@@ -61,9 +65,13 @@ func NewEntry(set *commons.StatSet, positions []Position, privates []Private, ai
 	}
 
 	f := commons.NewFields(set, fmt.Sprintf("spawn entry %d", npcID))
+	total := f.Int("total")
+	if len(positions) == 0 {
+		total = scaleBySpawnMultiplier(total, multiplier)
+	}
 	entry := Entry{
 		NPCID:         npcID,
-		Total:         f.Int("total"),
+		Total:         total,
 		RespawnDelay:  parseDuration(f, "respawn"),
 		RespawnRandom: parseDuration(f, "respawnRand"),
 		Positions:     append([]Position(nil), positions...),
