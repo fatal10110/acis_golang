@@ -98,7 +98,35 @@ func TestLoadItemTemplates(t *testing.T) {
 				<player level="20" />
 			</add>
 		</for>
+	</item>
+	<item id="18" type="Weapon" name="First Child Cond Item">
+		<set name="bodypart" val="rhand" />
+		<for>
+			<cond>
+				<player level="10" />
+			</cond>
+			<add stat="pAtk" val="1" />
+		</for>
+	</item>
+	<item id="19" type="Weapon" name="Non First Cond Item">
+		<set name="bodypart" val="rhand" />
+		<for>
+			<add stat="pAtk" val="1" />
+			<cond>
+				<player level="10" />
+			</cond>
+		</for>
+	</item>
+	<item id="20" type="Weapon" name="Unknown For Child Item">
+		<set name="bodypart" val="rhand" />
+		<for>
+			<bogus stat="pAtk" val="99" />
+			<effect name="Poison" val="1" />
+			<add stat="pAtk" val="1" />
+		</for>
 	</item>`)
+	// Also see TestLoadItemTemplatesEffectValidatedNotAttached: <effect>
+	// is validated, unlike <bogus>, but its result is discarded either way.
 
 	writeItemFile(t, dir, "1400-1499.xml", `
 	<item id="1400" type="EtcItem" name="Soulshot Sample">
@@ -120,7 +148,7 @@ func TestLoadItemTemplates(t *testing.T) {
 		t.Fatalf("LoadItemTemplates: %v", err)
 	}
 
-	if got, want := table.Len(), 11; got != want {
+	if got, want := table.Len(), 14; got != want {
 		t.Fatalf("table.Len() = %d, want %d", got, want)
 	}
 
@@ -320,6 +348,44 @@ func TestLoadItemTemplates(t *testing.T) {
 			t.Fatalf("item 17 modifier condition = %+v", cond)
 		}
 	})
+
+	t.Run("first-child <cond> in <for> attaches to subsequent funcs", func(t *testing.T) {
+		tpl, ok := table.Get(18)
+		if !ok {
+			t.Fatal("item 18 not loaded")
+		}
+		if len(tpl.Modifiers) != 1 {
+			t.Fatalf("item 18 Modifiers = %+v, want 1 entry", tpl.Modifiers)
+		}
+		attach := tpl.Modifiers[0].AttachCondition
+		if attach == nil || attach.Root.Kind != "player" || attach.Root.Attrs["level"] != "10" {
+			t.Fatalf("item 18 Modifiers[0].AttachCondition = %+v", attach)
+		}
+	})
+
+	t.Run("non-first <cond> in <for> is ignored, matching DocumentBase", func(t *testing.T) {
+		tpl, ok := table.Get(19)
+		if !ok {
+			t.Fatal("item 19 not loaded")
+		}
+		if len(tpl.Modifiers) != 1 {
+			t.Fatalf("item 19 Modifiers = %+v, want 1 entry", tpl.Modifiers)
+		}
+		if tpl.Modifiers[0].AttachCondition != nil {
+			t.Fatalf("item 19 Modifiers[0].AttachCondition = %+v, want nil", tpl.Modifiers[0].AttachCondition)
+		}
+	})
+
+	t.Run("unrecognized <for> children are ignored, matching DocumentBase", func(t *testing.T) {
+		tpl, ok := table.Get(20)
+		if !ok {
+			t.Fatal("item 20 not loaded")
+		}
+		wantMods := []item.StatModifier{{Op: item.FuncAdd, Stat: "pAtk", Value: 1}}
+		if len(tpl.Modifiers) != len(wantMods) || tpl.Modifiers[0] != wantMods[0] {
+			t.Fatalf("item 20 Modifiers = %+v, want %+v", tpl.Modifiers, wantMods)
+		}
+	})
 }
 
 func TestLoadItemTemplatesMissingDirectory(t *testing.T) {
@@ -347,10 +413,6 @@ func TestLoadItemTemplatesSkipsMalformedItems(t *testing.T) {
 		name    string
 		content string
 	}{
-		{
-			name:    "unrecognized stat modifier element",
-			content: `<item id="1" type="Weapon" name="x"><set name="bodypart" val="rhand"/><for><bogus stat="pAtk" val="1"/></for></item>`,
-		},
 		{
 			name:    "non-numeric stat modifier value",
 			content: `<item id="1" type="Weapon" name="x"><set name="bodypart" val="rhand"/><for><set stat="pAtk" val="notanumber"/></for></item>`,
@@ -391,6 +453,10 @@ func TestLoadItemTemplatesSkipsMalformedItems(t *testing.T) {
 			name:    "overflowing int32 attribute",
 			content: `<item id="99999999999" type="Weapon" name="x"></item>`,
 		},
+		{
+			name:    "effect missing required val attribute",
+			content: `<item id="1" type="Weapon" name="x"><set name="bodypart" val="rhand"/><for><effect name="Poison" count="2" time="10"/></for></item>`,
+		},
 	}
 
 	for _, c := range cases {
@@ -411,6 +477,35 @@ func TestLoadItemTemplatesSkipsMalformedItems(t *testing.T) {
 				t.Fatalf("log output = %q, want it to name the file", got)
 			}
 		})
+	}
+}
+
+// TestLoadItemTemplatesEffectValidatedNotAttached checks that a well-formed
+// <effect> child of a <for> block loads without error but leaves no trace
+// on the item template, matching DocumentBase.attachEffect: it validates
+// and builds an EffectTemplate for any template, but only Item's sibling
+// L2Skill has an attach(EffectTemplate) overload, so on an Item the parsed
+// EffectTemplate is discarded (java/.../DocumentBase.java:201-307).
+func TestLoadItemTemplatesEffectValidatedNotAttached(t *testing.T) {
+	dir := t.TempDir()
+	writeItemFile(t, dir, "fixture.xml", `<item id="1" type="Weapon" name="x">
+		<set name="bodypart" val="rhand"/>
+		<for>
+			<set stat="pAtk" val="5"/>
+			<effect name="Poison" val="1" count="2" time="10"/>
+		</for>
+	</item>`)
+
+	table, err := LoadItemTemplates(dir, zerolog.Nop())
+	if err != nil {
+		t.Fatalf("LoadItemTemplates: unexpected error: %v", err)
+	}
+	tmpl, ok := table.Get(1)
+	if !ok {
+		t.Fatal("LoadItemTemplates: item 1 should have loaded")
+	}
+	if len(tmpl.Modifiers) != 1 {
+		t.Fatalf("Modifiers = %#v, want exactly the pAtk stat modifier (effect must not attach)", tmpl.Modifiers)
 	}
 }
 

@@ -317,19 +317,37 @@ func buildItemClauses(id int32, el itemElement, tables map[string][]string) ([]i
 	var modifiers []item.StatModifier
 	for _, forEl := range el.For {
 		var attachCond *item.UseCondition
-		for _, opEl := range forEl.Ops {
+		for i, opEl := range forEl.Ops {
 			if strings.EqualFold(opEl.XMLName.Local, "cond") {
-				uc, err := buildUseCondition(id, opEl.Attrs, opEl.Children)
-				if err != nil {
+				if i == 0 {
+					uc, err := buildUseCondition(id, opEl.Attrs, opEl.Children)
+					if err != nil {
+						return nil, nil, err
+					}
+					attachCond = &uc
+				}
+				continue
+			}
+
+			if strings.EqualFold(opEl.XMLName.Local, "effect") {
+				// DocumentBase.attachEffect (java/.../DocumentBase.java:201-307)
+				// parses and validates an <effect> element the same as any
+				// func tag, but only attaches the resulting EffectTemplate
+				// when the enclosing template is an L2Skill; Item has no
+				// attach(EffectTemplate) overload, so on an <item> the
+				// parsed template is validated then discarded. Reproduce
+				// that: validate required attrs, no attachment.
+				if err := validateItemEffect(id, opEl); err != nil {
 					return nil, nil, err
 				}
-				attachCond = &uc
 				continue
 			}
 
 			op, err := item.ParseFuncOp(opEl.XMLName.Local)
 			if err != nil {
-				return nil, nil, fmt.Errorf("item template %d: %w", id, err)
+				// Unrecognized <for> children are silently ignored,
+				// matching DocumentBase.java's tolerant sibling loop.
+				continue
 			}
 			vals := foldAttrs(opEl.Attrs)
 			if raw, ok := vals["val"]; ok {
@@ -364,6 +382,25 @@ func buildItemClauses(id int32, el itemElement, tables map[string][]string) ([]i
 	}
 
 	return modifiers, useConditions, nil
+}
+
+// validateItemEffect validates a <for> block's <effect> child the way
+// DocumentBase.attachEffect validates one (name and val are required,
+// java/.../DocumentBase.java:204,224-229) without attaching anything: Item
+// has no attach(EffectTemplate) overload, so Java parses and discards the
+// EffectTemplate for an item template rather than storing it. This only
+// checks the effect element's own required attrs, not its nested func/cond
+// children (ponytail: no shipped item XML carries <effect> today; deepen
+// if a future datapack file nests funcs inside one).
+func validateItemEffect(id int32, opEl funcElement) error {
+	vals := foldAttrs(opEl.Attrs)
+	a := newAttrValues(vals, "effect")
+	_ = a.str("name")
+	_ = a.float64("val")
+	if err := a.Err(); err != nil {
+		return fmt.Errorf("item template %d: %w", id, err)
+	}
+	return nil
 }
 
 // buildStatModifier reads one stat-modifier element's "stat" and "val"

@@ -187,6 +187,20 @@ func TestBlockAddMultilayerClampsToAboveLayer(t *testing.T) {
 	}
 }
 
+func TestFirstAboveIndexSelectsLowestQualifyingLayer(t *testing.T) {
+	layers := []block.Cell{{Height: 10, NSWE: block.North}, {Height: 20, NSWE: block.South}, {Height: 30, NSWE: block.East}}
+
+	if i := firstAboveIndex(layers, 5); i != 0 {
+		t.Fatalf("firstAboveIndex(z=5) = %d, want 0 (lowest qualifying layer, height 10)", i)
+	}
+	if i := firstAboveIndex(layers, 15); i != 1 {
+		t.Fatalf("firstAboveIndex(z=15) = %d, want 1 (lowest qualifying layer, height 20)", i)
+	}
+	if i := firstAboveIndex(layers, 30); i != -1 {
+		t.Fatalf("firstAboveIndex(z=30) = %d, want -1 (no layer strictly above)", i)
+	}
+}
+
 func TestBlockDelegatesToBaseWhenUntouched(t *testing.T) {
 	b := NewBlock(0, 0, &block.Null{})
 

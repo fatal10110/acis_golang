@@ -160,7 +160,13 @@ func (e *Engine) canSee(ox, oy, oz int, oheight float64, tx, ty, tz int, theight
 	dy := ty - oy
 	m := float64(dy) / float64(dx)
 	dz := float64(tz) + theight - (float64(oz) + oheight)
-	mz := dz / math.Sqrt(float64(dx*dx+dy*dy))
+	// Java computes dx*dx+dy*dy in 32-bit int before widening to double, so a
+	// segment longer than ~46340 units in one axis overflows and can hand
+	// Math.sqrt a negative value (NaN) or a wrapped-around one. That silently
+	// disables (or corrupts) the vertical obstacle check for the rest of the
+	// cast, which real oracle captures show as observable behavior — mirror
+	// the 32-bit overflow here instead of computing the true distance.
+	mz := dz / math.Sqrt(float64(int32(dx)*int32(dx)+int32(dy)*int32(dy)))
 	dir := moveDirectionFor(gtx-gox, gty-goy)
 	gridX := alignCell(ox)
 	gridY := alignCell(oy)
@@ -183,7 +189,11 @@ func (e *Engine) canSee(ox, oy, oz int, oheight float64, tx, ty, tz int, theight
 
 		current = e.blockAtGeo(gox, goy)
 		losZ := float64(oz) + oheight + float64(e.maxObstacleHeight)
-		losZ += mz * math.Sqrt(float64((checkX-ox)*(checkX-ox)+(checkY-oy)*(checkY-oy)))
+		// Same 32-bit overflow as the dz/mz slope above: Java squares these
+		// deltas as int before Math.sqrt.
+		stepDX := int32(checkX - ox)
+		stepDY := int32(checkY - oy)
+		losZ += mz * math.Sqrt(float64(stepDX*stepDX+stepDY*stepDY))
 
 		if nswe.Allows(step) {
 			layer = current.BelowIgnoring(localCell(gox), localCell(goy), int32(groundZ+block.CellIgnoreHeight), ignore)

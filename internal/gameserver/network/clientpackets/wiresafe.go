@@ -30,6 +30,7 @@ const (
 	OpcodeRequestShortCutDel      = 0x35
 	OpcodeCannotMoveAnymore       = 0x36
 	OpcodeRequestTargetCancel     = 0x37
+	OpcodeSay2                    = 0x38
 	OpcodeDummy3E                 = 0x3e
 	OpcodeRequestSkillList        = 0x3f
 	OpcodeRequestGetOnVehicle     = 0x42

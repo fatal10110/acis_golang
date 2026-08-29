@@ -68,9 +68,16 @@ func (v *SessionValidator) register(accountName string) (<-chan bool, bool) {
 	return ch, true
 }
 
-func (v *SessionValidator) forget(accountName string) {
+// forget removes accountName's waiting entry, but only while ch is still
+// the registered channel: an eviction can Resolve (and so delete) this
+// entry and have a replacement register its own channel under the same
+// account before this call's deferred forget runs, and an unconditional
+// delete would then erase the replacement's entry instead of a no-op.
+func (v *SessionValidator) forget(accountName string, ch <-chan bool) {
 	v.mu.Lock()
-	delete(v.waiting, accountName)
+	if v.waiting[accountName] == ch {
+		delete(v.waiting, accountName)
+	}
 	v.mu.Unlock()
 }
 
@@ -93,7 +100,7 @@ func (v *SessionValidator) Validate(ctx context.Context, client *Client, req cli
 	if !ok {
 		return false, errValidationPending
 	}
-	defer v.forget(req.LoginName)
+	defer v.forget(req.LoginName, result)
 
 	err := loginLink.SendPlayerAuthRequest(link.PlayerAuthRequest{
 		Account: req.LoginName,

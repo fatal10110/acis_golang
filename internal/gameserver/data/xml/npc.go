@@ -11,6 +11,11 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 )
 
+// maxClassID is the highest valid profession id: the reference's ClassId
+// enum has 119 ordinals (0-118), including 30 reserved "dummy" slots at
+// 58-87 that resolve but name no real profession.
+const maxClassID = 118
+
 // npcFile is the root <list> element of one NPC template XML file.
 type npcFile struct {
 	Npcs []npcElement `xml:"npc"`
@@ -202,6 +207,11 @@ func buildNPCTemplate(el npcElement, items *item.Table, log zerolog.Logger) (*np
 		classes, err := commons.StatSetFromXMLAttrs(el.TeachTo.Attrs).GetIntArray("classes")
 		if err != nil {
 			return nil, fmt.Errorf("npc %d: teachTo: %w", npcID, err)
+		}
+		for _, classID := range classes {
+			if classID < 0 || classID > maxClassID {
+				return nil, fmt.Errorf("npc %d: teachTo: class id %d out of range", npcID, classID)
+			}
 		}
 		set.Set("teachTo", classes)
 	}
