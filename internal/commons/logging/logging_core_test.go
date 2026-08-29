@@ -108,6 +108,28 @@ net.sf.l2j.commons.logging.handler.ItemLogHandler.pattern = log/item/item_%g.txt
 	}
 }
 
+func TestSetupRoutesWarningWithErrorToErrorFile(t *testing.T) {
+	props, err := config.ParseString(`
+.level = CONFIG
+net.sf.l2j.commons.logging.handler.ErrorLogHandler.level = CONFIG
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := ConfigFromProperties(props)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtime, err := Setup(t.TempDir(), cfg, io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer runtime.Close()
+
+	runtime.Logger.Warn().Err(errors.New("disk full")).Msg("write delayed")
+	assertFileContains(t, runtime.Path(SinkError), "write delayed")
+}
+
 func TestSetupAppliesDedicatedHandlerLevels(t *testing.T) {
 	props, err := config.ParseString(`
 .level = CONFIG

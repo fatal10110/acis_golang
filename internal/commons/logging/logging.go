@@ -285,7 +285,7 @@ type errorWriter struct {
 }
 
 func (w errorWriter) WriteLevel(level zerolog.Level, p []byte) (int, error) {
-	if level < w.Level || level < zerolog.ErrorLevel {
+	if level < w.Level {
 		return len(p), nil
 	}
 	var event map[string]json.RawMessage
