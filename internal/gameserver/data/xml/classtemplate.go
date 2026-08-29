@@ -3,6 +3,9 @@ package xml
 import (
 	"encoding/xml"
 	"fmt"
+	"io/fs"
+	"path/filepath"
+	"sort"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -31,13 +34,13 @@ type attrsElement struct {
 	Attrs []xml.Attr `xml:",any,attr"`
 }
 
-// LoadPlayerTemplates parses every ".xml" class template file directly
-// under dir and returns a lookup table of the resulting templates keyed by
-// class id, with each template's skills extended across its profession
-// line's ancestors. A file that can't be read or parsed, a duplicated class
-// id, or a class with a missing or mangled attribute fails the whole load.
+// LoadPlayerTemplates parses class template files below dir and returns a
+// lookup table keyed by class id, with each template's skills extended across
+// its profession line's ancestors. Files that can't be read or parsed are
+// skipped; duplicate ids replace earlier templates. A class with a missing or
+// mangled required attribute fails the whole load.
 func LoadPlayerTemplates(dir string) (*player.TemplateTable, error) {
-	docs, err := loadXMLDocuments[classFile](dir, "class template")
+	docs, err := loadClassDocuments(dir)
 	if err != nil {
 		return nil, err
 	}
@@ -56,6 +59,29 @@ func LoadPlayerTemplates(dir string) (*player.TemplateTable, error) {
 	return table, nil
 }
 
+// loadClassDocuments mirrors PlayerData's recursive, per-file-tolerant load:
+// malformed files are ignored while well-formed siblings still contribute.
+func loadClassDocuments(dir string) ([]xmlDocument[classFile], error) {
+	var docs []xmlDocument[classFile]
+	if err := filepath.WalkDir(dir, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		var doc classFile
+		if err := readXML(path, &doc); err == nil {
+			docs = append(docs, xmlDocument[classFile]{Path: path, Data: doc})
+		}
+		return nil
+	}); err != nil {
+		return nil, fmt.Errorf("xml: walk class templates in %s: %w", dir, err)
+	}
+	sort.Slice(docs, func(i, j int) bool { return docs[i].Path < docs[j].Path })
+	return docs, nil
+}
+
 // loadClassFile parses one class template file and adds its templates to
 // templates, keyed by class id.
 func loadClassFile(path string, doc classFile, templates map[int]*player.Template) error {
@@ -63,9 +89,6 @@ func loadClassFile(path string, doc classFile, templates map[int]*player.Templat
 		tmpl, err := buildTemplate(c)
 		if err != nil {
 			return fmt.Errorf("xml: %s: %w", path, err)
-		}
-		if _, exists := templates[tmpl.ID]; exists {
-			return fmt.Errorf("xml: %s: duplicate class template id %d", path, tmpl.ID)
 		}
 		templates[tmpl.ID] = tmpl
 	}
