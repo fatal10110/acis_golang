@@ -3,6 +3,7 @@ package reader
 import (
 	"fmt"
 	"io"
+	"slices"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
 )
@@ -74,6 +75,9 @@ func (p *l2jParser) block(region *block.Region, i int) error {
 				return fmt.Errorf("geo/reader: block %d multilayer: cell %d: invalid layer count %d", i, c, count)
 			}
 			counts[c] = count
+			// See l2off.go's reverseUint16 comment: the file stores each
+			// cell's layers highest first; reverse into lowest-to-highest.
+			start := len(cells)
 			for l := 0; l < int(count); l++ {
 				code, err := p.u16()
 				if err != nil {
@@ -81,6 +85,7 @@ func (p *l2jParser) block(region *block.Region, i int) error {
 				}
 				cells = append(cells, code)
 			}
+			slices.Reverse(cells[start:])
 		}
 		if err := region.SetMultilayerEncoded(i, counts, cells); err != nil {
 			return fmt.Errorf("geo/reader: block %d multilayer: %w", i, err)
