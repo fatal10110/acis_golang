@@ -72,7 +72,7 @@ func TestGameClientLinkCipherDisabledKeepsAuthFailureCleartext(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read VersionCheck: %v", err)
 	}
-	if len(version) < 2 || version[0] != serverpackets.OpcodeVersionCheck || version[1] != 0 {
+	if len(version) < 14 || version[0] != serverpackets.OpcodeVersionCheck || version[1] != 1 || wire.NewReader(version[10:14]).ReadInt32() != 0 {
 		t.Fatalf("VersionCheck = %x, want cleartext cipher flag", version)
 	}
 

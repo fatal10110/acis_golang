@@ -17,13 +17,13 @@ const versionCheckKeySize = 8
 // versionCheckKeySize bytes.
 func FrameVersionCheck(key []byte, cipherEnabled bool) wire.Frame {
 	w := newFrameWriter(OpcodeVersionCheck)
-	if cipherEnabled {
-		w.WriteUint8(0x01)
-	} else {
-		w.WriteUint8(0x00)
-	}
+	w.WriteUint8(0x01)
 	w.WriteBytes(key[:versionCheckKeySize])
-	w.WriteInt32(1)
+	if cipherEnabled {
+		w.WriteInt32(1)
+	} else {
+		w.WriteInt32(0)
+	}
 	w.WriteInt32(1)
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
 }

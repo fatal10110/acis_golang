@@ -3236,13 +3236,13 @@ func TestFrameVersionCheck(t *testing.T) {
 		var want []byte
 		want = binary.LittleEndian.AppendUint16(want, uint16(2+1+1+versionCheckKeySize+4+4))
 		want = append(want, OpcodeVersionCheck)
-		if cipherEnabled {
-			want = append(want, 0x01)
-		} else {
-			want = append(want, 0x00)
-		}
+		want = append(want, 0x01)
 		want = append(want, key[:versionCheckKeySize]...)
-		want = binary.LittleEndian.AppendUint32(want, 1)
+		if cipherEnabled {
+			want = binary.LittleEndian.AppendUint32(want, 1)
+		} else {
+			want = binary.LittleEndian.AppendUint32(want, 0)
+		}
 		want = binary.LittleEndian.AppendUint32(want, 1)
 
 		if !bytes.Equal(frame.Bytes(), want) {
