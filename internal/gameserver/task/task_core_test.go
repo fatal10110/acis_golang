@@ -1972,7 +1972,7 @@ func TestGroundItemsDropWithoutProtectOwnerLeavesItemUnowned(t *testing.T) {
 	}
 }
 
-func TestGroundItemOptionsFromPropertiesAbsentSpecialItemsUsesNoOverrides(t *testing.T) {
+func TestGroundItemOptionsFromPropertiesAbsentSpecialItemsUsesDefault(t *testing.T) {
 	props, err := config.ParseString("")
 	if err != nil {
 		t.Fatalf("ParseString() error = %v", err)
@@ -1982,7 +1982,34 @@ func TestGroundItemOptionsFromPropertiesAbsentSpecialItemsUsesNoOverrides(t *tes
 	if err != nil {
 		t.Fatalf("GroundItemOptionsFromProperties() error = %v", err)
 	}
-	if len(opts.SpecialAutoDestroy) != 0 {
-		t.Fatalf("SpecialAutoDestroy = %v, want no overrides when AutoDestroySpecialItemTime is absent", opts.SpecialAutoDestroy)
+	want := map[int32]time.Duration{57: 0, 5575: 0, 6673: 0}
+	if len(opts.SpecialAutoDestroy) != len(want) {
+		t.Fatalf("SpecialAutoDestroy = %v, want %v when AutoDestroySpecialItemTime is absent", opts.SpecialAutoDestroy, want)
+	}
+	for id, delay := range want {
+		if got, ok := opts.SpecialAutoDestroy[id]; !ok || got != delay {
+			t.Errorf("SpecialAutoDestroy[%d] = %v, ok=%v, want %v", id, got, ok, delay)
+		}
+	}
+}
+
+func TestGroundItemOptionsFromPropertiesSpecialItemsOverridesDefault(t *testing.T) {
+	props, err := config.ParseString("AutoDestroySpecialItemTime=1-10,2-20\n")
+	if err != nil {
+		t.Fatalf("ParseString() error = %v", err)
+	}
+
+	opts, err := GroundItemOptionsFromProperties(props)
+	if err != nil {
+		t.Fatalf("GroundItemOptionsFromProperties() error = %v", err)
+	}
+	want := map[int32]time.Duration{1: 10 * time.Second, 2: 20 * time.Second}
+	if len(opts.SpecialAutoDestroy) != len(want) {
+		t.Fatalf("SpecialAutoDestroy = %v, want %v", opts.SpecialAutoDestroy, want)
+	}
+	for id, delay := range want {
+		if got, ok := opts.SpecialAutoDestroy[id]; !ok || got != delay {
+			t.Errorf("SpecialAutoDestroy[%d] = %v, ok=%v, want %v", id, got, ok, delay)
+		}
 	}
 }
