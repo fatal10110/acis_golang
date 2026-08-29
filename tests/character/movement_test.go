@@ -31,3 +31,27 @@ func TestMovementUpdatesWorldState(t *testing.T) {
 	}
 	waitForWorldPosition(t, srv.State, objID, target)
 }
+
+// TestMoveBackwardToLocationRejectsBeyond9900Units pins
+// MoveBackwardToLocation.java:109-114: a target farther than 9900 units
+// from the packet's own origin is rejected with ActionFailed instead of
+// starting a walk, regardless of how far the server-authoritative position
+// actually is from either coordinate.
+func TestMoveBackwardToLocationRejectsBeyond9900Units(t *testing.T) {
+	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
+	c := srv.Client
+
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
+	readEnterWorldBurst(t, c)
+
+	origin := location.Location{X: 0, Y: 0, Z: 0}
+	target := location.Location{X: 10000, Y: 0, Z: 0} // 10000 > 9900 cap
+	c.Send(encodeMoveBackwardToLocation(target, origin, 1))
+	reply := c.Read()
+	if reply[0] != serverpackets.OpcodeActionFailed {
+		t.Fatalf("opcode = %#x, want ActionFailed (%#x)", reply[0], serverpackets.OpcodeActionFailed)
+	}
+}

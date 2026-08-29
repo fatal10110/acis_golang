@@ -86,6 +86,7 @@ const (
 	SystemMessageItemNotForPets                    = 544
 	SystemMessagePetCannotCarryMoreItems           = 545
 	SystemMessagePetTooEncumbered                  = 546
+	SystemMessageCantMoveTooEncumbered             = 555
 	SystemMessageSummonAPet                        = 547
 	SystemMessageSummonOnlyOne                     = 580
 	SystemMessageYouCannotSummonInCombat           = 578

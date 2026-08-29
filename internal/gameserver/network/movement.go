@@ -8,13 +8,34 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
-func (l *GameClientLink) moveLivePlayer(live *livePlayer, target location.Location) {
+// moveLivePlayer handles a client MoveBackwardToLocation request. target and
+// packetOrigin are the packet's raw target/origin coordinates, before the
+// floor-to-head Z conversion below.
+func (l *GameClientLink) moveLivePlayer(live *livePlayer, target, packetOrigin location.Location) {
 	// Reference: MoveBackwardToLocation.java:76 rejects while
 	// player.isOutOfControl() (Creature.java:652-655) — the full 8-flag
 	// union: Stunned, ImmobileUntilAttacked, Sleeping, Paralyzed, Afraid,
 	// Confused, Teleporting, Dead.
 	if live.Stunned() || live.ImmobileUntilAttacked() || live.Sleeping() || live.Paralyzed() ||
 		live.Afraid() || live.Confused() || live.Teleporting() || live.Dead() {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return
+	}
+	// Reference: MoveBackwardToLocation.java:82-86 rejects a zero move speed
+	// with both ActionFailed and CANT_MOVE_TOO_ENCUMBERED, distinct from the
+	// arrow-key (MoveMovement == 0) rejection handled by the caller.
+	if liveMoveSpeed(live) == 0 {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCantMoveTooEncumbered))
+		return
+	}
+	// Reference: MoveBackwardToLocation.java:92-93 converts the floor-level
+	// target Z the client sent into head-level Z before pathing.
+	target.Z += int(live.CollisionHeight())
+	// Reference: MoveBackwardToLocation.java:109-114 rejects any target
+	// farther than 9900 units from the packet's own origin (not the
+	// server-authoritative position used below to simulate the walk).
+	if target.Distance3D(packetOrigin) > 9900 {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}

@@ -547,6 +547,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 			l.moveLivePlayer(live,
 				location.Location{X: int(req.TargetX), Y: int(req.TargetY), Z: int(req.TargetZ)},
+				location.Location{X: int(req.OriginX), Y: int(req.OriginY), Z: int(req.OriginZ)},
 			)
 
 		case clientpackets.OpcodeCannotMoveAnymore:
