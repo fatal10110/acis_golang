@@ -91,6 +91,9 @@ func TestGameServerLinkFreshRegistrationPersistsToDB(t *testing.T) {
 	if stored.ID != 1 {
 		t.Fatalf("stored.ID = %d, want 1", stored.ID)
 	}
+	if stored.Host != "127.0.0.1" {
+		t.Fatalf("stored.Host = %q, want 127.0.0.1", stored.Host)
+	}
 }
 
 func TestGameServerLinkChangeAccessLevelUpdatesDB(t *testing.T) {
