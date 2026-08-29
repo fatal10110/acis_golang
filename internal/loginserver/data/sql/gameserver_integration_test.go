@@ -95,3 +95,27 @@ func TestGameServerStore_PersistenceRoundTrip(t *testing.T) {
 		t.Fatalf("SetGameServerHost() missing row error = %v, want ErrGameServerNotFound", err)
 	}
 }
+
+func TestGameServerStore_GameServersSkipsInvalidHexID(t *testing.T) {
+	for _, invalidHexID := range []string{"", "null"} {
+		t.Run(invalidHexID, func(t *testing.T) {
+			store := newGameServerIntegrationStore(t)
+			ctx := context.Background()
+
+			if err := store.CreateGameServer(ctx, model.NewGameServer(1, []byte{1, 2, 3}, "good")); err != nil {
+				t.Fatalf("CreateGameServer() unexpected error: %v", err)
+			}
+			if _, err := store.db.ExecContext(ctx, "INSERT INTO gameservers (hexid, server_id, host) VALUES (?, ?, ?)", invalidHexID, 2, "bad"); err != nil {
+				t.Fatalf("insert invalid gameserver: %v", err)
+			}
+
+			servers, err := store.GameServers(ctx)
+			if err == nil {
+				t.Fatal("GameServers() error = nil, want invalid hex id error")
+			}
+			if len(servers) != 1 || servers[1].Host != "good" || !bytes.Equal(servers[1].HexID, []byte{1, 2, 3}) {
+				t.Fatalf("GameServers() = %+v, want valid gameserver 1", servers)
+			}
+		})
+	}
+}

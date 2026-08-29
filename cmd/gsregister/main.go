@@ -73,7 +73,10 @@ func main() {
 func run(ctx context.Context, in io.Reader, out io.Writer, names *manager.ServerNames, store *sql.GameServerStore, dir string) error {
 	registered, err := store.GameServers(ctx)
 	if err != nil {
-		return err
+		if registered == nil {
+			return err
+		}
+		fmt.Fprintln(out, "Error loading registered gameservers:", err)
 	}
 
 	fmt.Fprintln(out, "OPTIONS : a number : register a server ID, if available and existing on list.")

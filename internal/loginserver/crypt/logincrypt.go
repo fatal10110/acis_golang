@@ -108,7 +108,7 @@ func (c *LoginCrypt) Decrypt(payload []byte) error {
 // xorPass runs the rolling XOR pass the login server applies to the very
 // first outbound packet: each 4-byte little-endian word starting at offset 4
 // is XORed against a running key that accumulates the word's original
-// value, and the final rolled key is stored in the last 4 bytes of buf.
+// value, and the final rolled key is stored in the 4 bytes before buf's final word.
 // Requires len(buf) >= 8.
 func xorPass(buf []byte, key uint32) {
 	stop := len(buf) - 8
