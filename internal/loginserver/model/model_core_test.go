@@ -2,6 +2,7 @@ package model
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 
 	"golang.org/x/crypto/bcrypt"
@@ -60,5 +61,16 @@ func TestHashPassword_RoundTrip(t *testing.T) {
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte("wrong")); err == nil {
 		t.Error("CompareHashAndPassword(wrong) = nil, want error")
+	}
+}
+
+func TestHashPassword_AcceptsPasswordsLongerThan72Bytes(t *testing.T) {
+	prefix := strings.Repeat("a", 72)
+	hash, err := HashPassword(prefix + "ignored")
+	if err != nil {
+		t.Fatalf("HashPassword() unexpected error: %v", err)
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(prefix)); err != nil {
+		t.Fatalf("CompareHashAndPassword(prefix) = %v, want nil", err)
 	}
 }
