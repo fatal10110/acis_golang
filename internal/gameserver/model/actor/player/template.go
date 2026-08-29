@@ -153,19 +153,19 @@ func NewTemplate(set *commons.StatSet) (*Template, error) {
 		BaseLevel:   f.Int("baseLvl"),
 		FistsItemID: f.Int("fists"),
 
-		STR: f.Int("str"),
-		CON: f.Int("con"),
-		DEX: f.Int("dex"),
-		INT: f.Int("int"),
-		WIT: f.Int("wit"),
-		MEN: f.Int("men"),
+		STR: f.IntDefault("str", 40),
+		CON: f.IntDefault("con", 21),
+		DEX: f.IntDefault("dex", 30),
+		INT: f.IntDefault("int", 20),
+		WIT: f.IntDefault("wit", 43),
+		MEN: f.IntDefault("men", 20),
 
 		PAtk:      f.Float64("pAtk"),
 		PDef:      f.Float64("pDef"),
 		MAtk:      f.Float64("mAtk"),
 		MDef:      f.Float64("mDef"),
-		RunSpeed:  f.Float64("runSpd"),
-		WalkSpeed: f.Float64("walkSpd"),
+		RunSpeed:  f.Float64Default("runSpd", 1),
+		WalkSpeed: f.Float64Default("walkSpd", 0),
 
 		SwimSpeed: f.IntDefault("swimSpd", 1),
 
@@ -225,6 +225,9 @@ func NewTemplateTable(templates map[int]*Template) (*TemplateTable, error) {
 	for _, id := range ids {
 		parentID, ok := ClassParent(id)
 		if !ok {
+			if id >= 58 && id <= 87 {
+				continue
+			}
 			return nil, fmt.Errorf("player: class template %d: unknown profession id", id)
 		}
 		if parentID < 0 {

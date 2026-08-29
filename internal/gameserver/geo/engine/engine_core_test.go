@@ -256,6 +256,30 @@ func TestCanSee(t *testing.T) {
 			t.Fatal("configured CanSee() = false over 40-height obstacle, want true")
 		}
 	})
+
+	t.Run("mirrors Java's 32-bit overflow on long segments", func(t *testing.T) {
+		// Java's canSee squares dx/dy as 32-bit int before Math.sqrt; past
+		// ~46340 units in one axis that overflows to a negative int, handing
+		// Math.sqrt a NaN and silently disabling the vertical obstacle check
+		// for the whole cast (see issue #2049). A wall that would otherwise
+		// block "blocks wall crossing" above must stay invisible once the
+		// endpoint is far enough away to trigger the overflow.
+		e := newTestEngine(t, complexBlock(func(x, y int) block.Cell {
+			switch {
+			case x == 0 && y == 0:
+				return block.Cell{Height: 0, NSWE: block.West | block.North | block.South}
+			case x == 1 && y == 0:
+				return block.Cell{Height: 40, NSWE: block.AllDirections}
+			default:
+				return block.Cell{Height: 0, NSWE: block.AllDirections}
+			}
+		}))
+
+		farX := worldX(0) + 50000
+		if !e.CanSee(worldX(0), worldY(0), 0, farX, worldY(0), 0) {
+			t.Fatal("CanSee() = false across an overflow-length segment behind a wall, want true (Java's overflow bug hides it)")
+		}
+	})
 }
 
 func TestSightHeight(t *testing.T) {
