@@ -28,14 +28,14 @@ func TestDataSourceName(t *testing.T) {
 			want: "acis@tcp(db.internal:3307)/acis",
 		},
 		{
-			name: "query params passed through",
-			cfg:  Config{URL: "jdbc:mariadb://localhost/acis?useSSL=true", Login: "root", Password: ""},
-			want: "root@tcp(localhost:3306)/acis?useSSL=true",
+			name: "connector query params are not server variables",
+			cfg:  Config{URL: "jdbc:mariadb://localhost/acis?serverTimezone=UTC", Login: "root", Password: ""},
+			want: "root@tcp(localhost:3306)/acis",
 		},
 		{
-			name:    "missing scheme",
-			cfg:     Config{URL: "jdbc:mysql://localhost/acis", Login: "root"},
-			wantErr: true,
+			name: "mysql scheme",
+			cfg:  Config{URL: "jdbc:mysql://localhost/acis", Login: "root"},
+			want: "root@tcp(localhost:3306)/acis",
 		},
 		{
 			name:    "missing host",
