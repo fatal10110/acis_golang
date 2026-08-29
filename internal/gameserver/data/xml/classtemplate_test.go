@@ -1,12 +1,32 @@
 package xml
 
 import (
+	"fmt"
+	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
+
+const completePlayerTemplateFields = `
+		<set str="1" con="1" dex="1" int="1" wit="1" men="1"/>
+		<set pAtk="1" pDef="1" mAtk="1" mDef="1" runSpd="1" walkSpd="1" swimSpd="1"/>
+		<set radius="1" radiusFemale="1"/>
+		<set height="1" heightFemale="1"/>
+		<set safeFallHeight="1;1"/>
+		<set hpTable="1" mpTable="1" cpTable="1"/>
+		<set hpRegenTable="1" mpRegenTable="1" cpRegenTable="1"/>`
+
+func playerTemplateFixture(id int, fields string) string {
+	return fmt.Sprintf(`<?xml version='1.0' encoding='utf-8'?>
+<list>
+	<class>
+		<set id="%d" baseLvl="1" fists="1"/>%s
+	</class>
+</list>`, id, fields)
+}
 
 // TestLoadPlayerTemplates compares load counts and field-level values
 // against the datapack's class template files. Expected values below are
@@ -179,30 +199,19 @@ func TestLoadPlayerTemplatesMissingDir(t *testing.T) {
 	}
 }
 
-// TestLoadPlayerTemplatesDefaults exercises attribute defaults the shipped
-// data never triggers (every real class line sets swimSpd, and isEquipped
-// is only ever set to override the default): swimSpd defaults to 1 and a
-// starter item with no isEquipped attribute defaults to equipped.
+// TestLoadPlayerTemplatesDefaults exercises defaults absent from shipped data.
 func TestLoadPlayerTemplatesDefaults(t *testing.T) {
-	const doc = `<?xml version='1.0' encoding='utf-8'?>
-<list>
-	<class>
-		<set id="0" baseLvl="1" fists="1"/>
-		<set str="1" con="1" dex="1" int="1" wit="1" men="1"/>
-		<set pAtk="1" pDef="1" mAtk="1" mDef="1" runSpd="1" walkSpd="1"/>
+	const fields = `
+		<set pAtk="1" pDef="1" mAtk="1" mDef="1"/>
 		<set radius="1" radiusFemale="1"/>
 		<set height="1" heightFemale="1"/>
 		<set safeFallHeight="1;1"/>
 		<set hpTable="1" mpTable="1" cpTable="1"/>
 		<set hpRegenTable="1" mpRegenTable="1" cpRegenTable="1"/>
-		<items>
-			<item id="10" count="1"/>
-		</items>
-	</class>
-</list>`
+		<items><item id="10" count="1"/></items>`
 
 	dir := t.TempDir()
-	writeXMLFixture(t, filepath.Join(dir, "test.xml"), doc)
+	writeXMLFixture(t, filepath.Join(dir, "test.xml"), playerTemplateFixture(0, fields))
 
 	table, err := LoadPlayerTemplates(dir)
 	if err != nil {
@@ -216,8 +225,71 @@ func TestLoadPlayerTemplatesDefaults(t *testing.T) {
 	if tmpl.SwimSpeed != 1 {
 		t.Errorf("SwimSpeed = %d, want default 1", tmpl.SwimSpeed)
 	}
+	if tmpl.STR != 40 || tmpl.CON != 21 || tmpl.DEX != 30 || tmpl.INT != 20 || tmpl.WIT != 43 || tmpl.MEN != 20 {
+		t.Errorf("base stats = %d/%d/%d/%d/%d/%d, want 40/21/30/20/43/20", tmpl.STR, tmpl.CON, tmpl.DEX, tmpl.INT, tmpl.WIT, tmpl.MEN)
+	}
+	if tmpl.RunSpeed != 1 || tmpl.WalkSpeed != 0 {
+		t.Errorf("speeds = run %v, walk %v; want run 1, walk 0", tmpl.RunSpeed, tmpl.WalkSpeed)
+	}
 	if len(tmpl.Items) != 1 || !tmpl.Items[0].Equipped {
 		t.Errorf("Items = %+v, want a single equipped-by-default item", tmpl.Items)
+	}
+}
+
+func TestLoadPlayerTemplatesLoadsNestedAndSurvivesBadFiles(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		setup func(t *testing.T, dir string)
+	}{
+		{
+			name: "nested XML",
+			setup: func(t *testing.T, dir string) {
+				nested := filepath.Join(dir, "nested")
+				if err := os.MkdirAll(nested, 0o755); err != nil {
+					t.Fatal(err)
+				}
+				writeXMLFixture(t, filepath.Join(nested, "template.xml"), playerTemplateFixture(0, completePlayerTemplateFields))
+			},
+		},
+		{
+			name: "malformed XML",
+			setup: func(t *testing.T, dir string) {
+				writeXMLFixture(t, filepath.Join(dir, "broken.xml"), "<list>")
+				writeXMLFixture(t, filepath.Join(dir, "template.xml"), playerTemplateFixture(0, completePlayerTemplateFields))
+			},
+		},
+		{
+			name: "duplicate class ID",
+			setup: func(t *testing.T, dir string) {
+				writeXMLFixture(t, filepath.Join(dir, "first.xml"), playerTemplateFixture(0, completePlayerTemplateFields))
+				writeXMLFixture(t, filepath.Join(dir, "second.xml"), playerTemplateFixture(0, completePlayerTemplateFields))
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			tc.setup(t, dir)
+			table, err := LoadPlayerTemplates(dir)
+			if err != nil {
+				t.Fatalf("LoadPlayerTemplates() error: %v", err)
+			}
+			if _, ok := table.Get(0); !ok {
+				t.Fatal("template 0 not loaded")
+			}
+		})
+	}
+}
+
+func TestLoadPlayerTemplatesAcceptsReservedClassIDs(t *testing.T) {
+	dir := t.TempDir()
+	writeXMLFixture(t, filepath.Join(dir, "template.xml"), playerTemplateFixture(58, completePlayerTemplateFields))
+
+	table, err := LoadPlayerTemplates(dir)
+	if err != nil {
+		t.Fatalf("LoadPlayerTemplates() error: %v", err)
+	}
+	if _, ok := table.Get(58); !ok {
+		t.Fatal("reserved template 58 not loaded")
 	}
 }
 
