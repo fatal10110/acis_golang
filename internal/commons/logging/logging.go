@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -32,6 +33,9 @@ type Config struct {
 	ConsoleLevel    zerolog.Level
 	Levels          map[Sink]zerolog.Level
 	Patterns        map[Sink]string
+	Limits          map[Sink]int64
+	Counts          map[Sink]int
+	Append          map[Sink]bool
 	UnsupportedKeys []string
 }
 
@@ -43,7 +47,7 @@ type Runtime struct {
 	Item    zerolog.Logger
 
 	paths map[Sink]string
-	files []*os.File
+	files []io.Closer
 	once  sync.Once
 	err   error
 }
@@ -60,26 +64,50 @@ var supportedKeys = map[string]bool{
 	"java.util.logging.ConsoleHandler.formatter":                     true,
 	"java.util.logging.ConsoleHandler.level":                         true,
 	"java.util.logging.FileHandler.pattern":                          true,
+	"java.util.logging.FileHandler.limit":                            true,
+	"java.util.logging.FileHandler.count":                            true,
+	"java.util.logging.FileHandler.append":                           true,
 	"java.util.logging.FileHandler.formatter":                        true,
 	"java.util.logging.FileHandler.level":                            true,
 	"net.sf.l2j.commons.logging.handler.ErrorLogHandler.pattern":     true,
+	"net.sf.l2j.commons.logging.handler.ErrorLogHandler.limit":       true,
+	"net.sf.l2j.commons.logging.handler.ErrorLogHandler.count":       true,
+	"net.sf.l2j.commons.logging.handler.ErrorLogHandler.append":      true,
 	"net.sf.l2j.commons.logging.handler.ErrorLogHandler.formatter":   true,
 	"net.sf.l2j.commons.logging.handler.ErrorLogHandler.filter":      true,
 	"net.sf.l2j.commons.logging.handler.ErrorLogHandler.level":       true,
 	"net.sf.l2j.commons.logging.handler.ChatLogHandler.pattern":      true,
+	"net.sf.l2j.commons.logging.handler.ChatLogHandler.limit":        true,
+	"net.sf.l2j.commons.logging.handler.ChatLogHandler.count":        true,
+	"net.sf.l2j.commons.logging.handler.ChatLogHandler.append":       true,
 	"net.sf.l2j.commons.logging.handler.ChatLogHandler.formatter":    true,
 	"net.sf.l2j.commons.logging.handler.ChatLogHandler.filter":       true,
 	"net.sf.l2j.commons.logging.handler.ChatLogHandler.level":        true,
 	"net.sf.l2j.commons.logging.handler.GMAuditLogHandler.pattern":   true,
+	"net.sf.l2j.commons.logging.handler.GMAuditLogHandler.limit":     true,
+	"net.sf.l2j.commons.logging.handler.GMAuditLogHandler.count":     true,
+	"net.sf.l2j.commons.logging.handler.GMAuditLogHandler.append":    true,
 	"net.sf.l2j.commons.logging.handler.GMAuditLogHandler.formatter": true,
 	"net.sf.l2j.commons.logging.handler.GMAuditLogHandler.filter":    true,
 	"net.sf.l2j.commons.logging.handler.GMAuditLogHandler.level":     true,
 	"net.sf.l2j.commons.logging.handler.ItemLogHandler.pattern":      true,
+	"net.sf.l2j.commons.logging.handler.ItemLogHandler.limit":        true,
+	"net.sf.l2j.commons.logging.handler.ItemLogHandler.count":        true,
+	"net.sf.l2j.commons.logging.handler.ItemLogHandler.append":       true,
 	"net.sf.l2j.commons.logging.handler.ItemLogHandler.formatter":    true,
 	"net.sf.l2j.commons.logging.handler.ItemLogHandler.filter":       true,
 	"net.sf.l2j.commons.logging.handler.ItemLogHandler.level":        true,
 	"net.sf.l2j.gameserver.level":                                    true,
 	"net.sf.l2j.loginserver.level":                                   true,
+}
+
+// fileHandlerPropertyKey maps each sink to its java.util.logging.FileHandler-family property prefix.
+var fileHandlerPropertyKey = map[Sink]string{
+	SinkConsole: "java.util.logging.FileHandler",
+	SinkError:   "net.sf.l2j.commons.logging.handler.ErrorLogHandler",
+	SinkChat:    "net.sf.l2j.commons.logging.handler.ChatLogHandler",
+	SinkGMAudit: "net.sf.l2j.commons.logging.handler.GMAuditLogHandler",
+	SinkItem:    "net.sf.l2j.commons.logging.handler.ItemLogHandler",
 }
 
 func init() {
@@ -104,6 +132,28 @@ func DefaultConfig() Config {
 			SinkChat:    "log/chat/chat_%g.txt",
 			SinkGMAudit: "log/gmaudit/gmaudit_%g.txt",
 			SinkItem:    "log/item/item_%g.txt",
+		},
+		// java.util.logging.FileHandler class defaults: no size limit, one generation, no append.
+		Limits: map[Sink]int64{
+			SinkConsole: 0,
+			SinkError:   0,
+			SinkChat:    0,
+			SinkGMAudit: 0,
+			SinkItem:    0,
+		},
+		Counts: map[Sink]int{
+			SinkConsole: 1,
+			SinkError:   1,
+			SinkChat:    1,
+			SinkGMAudit: 1,
+			SinkItem:    1,
+		},
+		Append: map[Sink]bool{
+			SinkConsole: false,
+			SinkError:   false,
+			SinkChat:    false,
+			SinkGMAudit: false,
+			SinkItem:    false,
 		},
 	}
 }
@@ -137,6 +187,25 @@ func ConfigFromProperties(p *config.Properties) (Config, error) {
 	cfg.Patterns[SinkGMAudit] = p.String("net.sf.l2j.commons.logging.handler.GMAuditLogHandler.pattern", cfg.Patterns[SinkGMAudit])
 	cfg.Patterns[SinkItem] = p.String("net.sf.l2j.commons.logging.handler.ItemLogHandler.pattern", cfg.Patterns[SinkItem])
 
+	for sink, prefix := range fileHandlerPropertyKey {
+		limit, err := p.Int64(prefix+".limit", cfg.Limits[sink])
+		if err != nil {
+			return Config{}, err
+		}
+		cfg.Limits[sink] = limit
+
+		count, err := p.Int(prefix+".count", cfg.Counts[sink])
+		if err != nil {
+			return Config{}, err
+		}
+		if count < 1 {
+			count = 1
+		}
+		cfg.Counts[sink] = count
+
+		cfg.Append[sink] = p.Bool(prefix+".append", cfg.Append[sink])
+	}
+
 	for _, key := range p.Keys() {
 		if !supportedKeys[key] {
 			cfg.UnsupportedKeys = append(cfg.UnsupportedKeys, key)
@@ -153,22 +222,18 @@ func Setup(root string, cfg Config, stderr io.Writer) (*Runtime, error) {
 	}
 
 	rt := &Runtime{paths: make(map[Sink]string)}
-	open := func(sink Sink) (*os.File, error) {
+	open := func(sink Sink) (*rotatingFile, error) {
 		pattern := cfg.Patterns[sink]
 		if pattern == "" {
 			return nil, fmt.Errorf("missing log pattern for %s", sink)
 		}
-		name := filepath.Join(root, filepath.FromSlash(expandPattern(pattern)))
-		if err := os.MkdirAll(filepath.Dir(name), 0o755); err != nil {
-			return nil, err
-		}
-		file, err := os.OpenFile(name, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+		rf, err := newRotatingFile(root, pattern, cfg.Limits[sink], cfg.Counts[sink], cfg.Append[sink])
 		if err != nil {
 			return nil, err
 		}
-		rt.paths[sink] = name
-		rt.files = append(rt.files, file)
-		return file, nil
+		rt.paths[sink] = rf.currentPath()
+		rt.files = append(rt.files, rf)
+		return rf, nil
 	}
 
 	consoleFile, err := open(SinkConsole)
@@ -261,12 +326,6 @@ func parseLevel(s string) (zerolog.Level, error) {
 	}
 }
 
-func expandPattern(pattern string) string {
-	pattern = strings.ReplaceAll(pattern, "%g", "0")
-	pattern = strings.ReplaceAll(pattern, "%u", "0")
-	return pattern
-}
-
 type levelWriter struct {
 	io.Writer
 	Level zerolog.Level
@@ -277,6 +336,102 @@ func (w levelWriter) WriteLevel(level zerolog.Level, p []byte) (int, error) {
 		return len(p), nil
 	}
 	return w.Writer.Write(p)
+}
+
+// rotatingFile reproduces java.util.logging.FileHandler's size-based rollover: writes go to
+// generation 0 (%g substituted with the generation index); once its size exceeds limit, existing
+// generation files shift up by one index (oldest, at count-1, is discarded) and a fresh empty
+// generation 0 file is opened. limit <= 0 disables rotation entirely, matching the JDK default.
+type rotatingFile struct {
+	mu      sync.Mutex
+	dir     string
+	pattern string
+	limit   int64
+	count   int
+	file    *os.File
+	size    int64
+}
+
+func newRotatingFile(root, pattern string, limit int64, count int, appendMode bool) (*rotatingFile, error) {
+	if count < 1 {
+		count = 1
+	}
+	dir := filepath.Join(root, filepath.Dir(filepath.FromSlash(pattern)))
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, err
+	}
+	rf := &rotatingFile{dir: root, pattern: pattern, limit: limit, count: count}
+	flags := os.O_CREATE | os.O_WRONLY
+	if appendMode {
+		flags |= os.O_APPEND
+	} else {
+		flags |= os.O_TRUNC
+	}
+	name := rf.generationPath(0)
+	file, err := os.OpenFile(name, flags, 0o644)
+	if err != nil {
+		return nil, err
+	}
+	size := int64(0)
+	if appendMode {
+		if info, err := file.Stat(); err == nil {
+			size = info.Size()
+		}
+	}
+	rf.file = file
+	rf.size = size
+	return rf, nil
+}
+
+func (rf *rotatingFile) generationPath(generation int) string {
+	name := strings.ReplaceAll(rf.pattern, "%g", strconv.Itoa(generation))
+	name = strings.ReplaceAll(name, "%u", "0")
+	return filepath.Join(rf.dir, filepath.FromSlash(name))
+}
+
+func (rf *rotatingFile) currentPath() string {
+	return rf.generationPath(0)
+}
+
+func (rf *rotatingFile) Write(p []byte) (int, error) {
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+
+	n, err := rf.file.Write(p)
+	rf.size += int64(n)
+	if err == nil && rf.limit > 0 && rf.size > rf.limit {
+		if rerr := rf.rotate(); rerr != nil {
+			return n, rerr
+		}
+	}
+	return n, err
+}
+
+// rotate shifts generation files up by one index, discarding whatever occupied the last
+// generation, then reopens an empty generation 0 for continued writing.
+func (rf *rotatingFile) rotate() error {
+	if err := rf.file.Close(); err != nil {
+		return err
+	}
+	for g := rf.count - 1; g >= 1; g-- {
+		_ = os.Remove(rf.generationPath(g))
+		if err := os.Rename(rf.generationPath(g-1), rf.generationPath(g)); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+	}
+	file, err := os.OpenFile(rf.generationPath(0), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
+	if err != nil {
+		return err
+	}
+	rf.file = file
+	rf.size = 0
+	return nil
+}
+
+func (rf *rotatingFile) Close() error {
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+	return rf.file.Close()
 }
 
 type errorWriter struct {

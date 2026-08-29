@@ -16,22 +16,6 @@ import (
 	"github.com/rs/zerolog"
 )
 
-var unsupportedRotationKeys = []string{
-	"java.util.logging.FileHandler.count",
-	"java.util.logging.FileHandler.limit",
-	"net.sf.l2j.commons.logging.handler.ChatLogHandler.append",
-	"net.sf.l2j.commons.logging.handler.ChatLogHandler.count",
-	"net.sf.l2j.commons.logging.handler.ChatLogHandler.limit",
-	"net.sf.l2j.commons.logging.handler.ErrorLogHandler.count",
-	"net.sf.l2j.commons.logging.handler.ErrorLogHandler.limit",
-	"net.sf.l2j.commons.logging.handler.GMAuditLogHandler.append",
-	"net.sf.l2j.commons.logging.handler.GMAuditLogHandler.count",
-	"net.sf.l2j.commons.logging.handler.GMAuditLogHandler.limit",
-	"net.sf.l2j.commons.logging.handler.ItemLogHandler.append",
-	"net.sf.l2j.commons.logging.handler.ItemLogHandler.count",
-	"net.sf.l2j.commons.logging.handler.ItemLogHandler.limit",
-}
-
 // ---- from logging_test.go ----
 func TestConfigFromProperties(t *testing.T) {
 	props, err := config.ParseString(`
@@ -188,7 +172,7 @@ net.sf.l2j.commons.logging.handler.ErrorLogHandler.level = OFF
 	assertFileNotContains(t, runtime.Path(SinkError), "write failed")
 }
 
-func TestConfigReportsUnimplementedRotationKeys(t *testing.T) {
+func TestConfigParsesRotationKeys(t *testing.T) {
 	props, err := config.ParseString(`
 java.util.logging.FileHandler.limit = 1000000
 java.util.logging.FileHandler.count = 5
@@ -211,8 +195,111 @@ net.sf.l2j.commons.logging.handler.ItemLogHandler.append = true
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(cfg.UnsupportedKeys, unsupportedRotationKeys) {
-		t.Fatalf("UnsupportedKeys = %#v, want %#v", cfg.UnsupportedKeys, unsupportedRotationKeys)
+	if len(cfg.UnsupportedKeys) != 0 {
+		t.Fatalf("UnsupportedKeys = %#v, want none", cfg.UnsupportedKeys)
+	}
+	for _, sink := range []Sink{SinkConsole, SinkError, SinkChat, SinkGMAudit, SinkItem} {
+		if cfg.Limits[sink] != 1000000 {
+			t.Fatalf("Limits[%s] = %d, want 1000000", sink, cfg.Limits[sink])
+		}
+		if cfg.Counts[sink] != 5 {
+			t.Fatalf("Counts[%s] = %d, want 5", sink, cfg.Counts[sink])
+		}
+	}
+	if cfg.Append[SinkConsole] || cfg.Append[SinkError] {
+		t.Fatalf("console/error append should default to false: %#v", cfg.Append)
+	}
+	if !cfg.Append[SinkChat] || !cfg.Append[SinkGMAudit] || !cfg.Append[SinkItem] {
+		t.Fatalf("chat/gmaudit/item append should be true: %#v", cfg.Append)
+	}
+}
+
+func TestSetupRotatesFileWhenLimitExceeded(t *testing.T) {
+	dir := t.TempDir()
+	cfg := DefaultConfig()
+	cfg.Limits[SinkConsole] = 10
+	cfg.Counts[SinkConsole] = 3
+
+	runtime, err := Setup(dir, cfg, io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer runtime.Close()
+
+	for range 5 {
+		runtime.Logger.Info().Msg("0123456789")
+	}
+	if err := runtime.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	base := filepath.Join(dir, "log", "console")
+	for _, gen := range []string{"console_0.txt", "console_1.txt", "console_2.txt"} {
+		if _, err := os.Stat(filepath.Join(base, gen)); err != nil {
+			t.Fatalf("expected rotated file %s: %v", gen, err)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(base, "console_3.txt")); !os.IsNotExist(err) {
+		t.Fatalf("generation beyond count should not exist, err=%v", err)
+	}
+}
+
+func TestSetupAppendPreservesExistingGenerationZero(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "log", "chat")
+	if err := os.MkdirAll(path, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(path, "chat_0.txt"), []byte("prior run\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := DefaultConfig()
+	cfg.Append[SinkChat] = true
+
+	runtime, err := Setup(dir, cfg, io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer runtime.Close()
+	runtime.Chat.Info().Msg("new line")
+	if err := runtime.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	assertFileContains(t, runtime.Path(SinkChat), "prior run")
+	assertFileContains(t, runtime.Path(SinkChat), "new line")
+}
+
+func TestSetupNoAppendTruncatesExistingGenerationZero(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "log", "error")
+	if err := os.MkdirAll(path, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(path, "error_0.txt"), []byte("stale content\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := DefaultConfig()
+	// SinkError append defaults to false, matching FileHandler's class default.
+
+	runtime, err := Setup(dir, cfg, io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer runtime.Close()
+	runtime.Logger.Error().Msg("fresh content")
+	if err := runtime.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	data, err := os.ReadFile(runtime.Path(SinkError))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), "stale content") {
+		t.Fatalf("error file = %q, want stale content truncated", data)
 	}
 }
 
@@ -289,8 +376,8 @@ func TestLoggingPropertiesFromEnvironment(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(cfg.UnsupportedKeys, unsupportedRotationKeys) {
-		t.Fatalf("UnsupportedKeys = %#v, want %#v", cfg.UnsupportedKeys, unsupportedRotationKeys)
+	if len(cfg.UnsupportedKeys) != 0 {
+		t.Fatalf("UnsupportedKeys = %#v", cfg.UnsupportedKeys)
 	}
 
 	runtime, err := Setup(t.TempDir(), cfg, nil)
