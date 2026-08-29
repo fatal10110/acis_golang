@@ -110,8 +110,8 @@ func TestGameServerStore_GameServersSkipsInvalidHexID(t *testing.T) {
 			}
 
 			servers, err := store.GameServers(ctx)
-			if err != nil {
-				t.Fatalf("GameServers() unexpected error: %v", err)
+			if err == nil {
+				t.Fatal("GameServers() error = nil, want invalid hex id error")
 			}
 			if len(servers) != 1 || servers[1].Host != "good" || !bytes.Equal(servers[1].HexID, []byte{1, 2, 3}) {
 				t.Fatalf("GameServers() = %+v, want valid gameserver 1", servers)
