@@ -47,14 +47,16 @@ func Open(cfg Config) (*sql.DB, error) {
 	return pool, nil
 }
 
-// dataSourceName converts a "jdbc:mariadb://host[:port]/db[?params]" URL, as
-// shipped in server.properties/loginserver.properties, into a
+// dataSourceName converts a MariaDB or MySQL JDBC URL, as shipped in
+// server.properties/loginserver.properties, into a
 // go-sql-driver/mysql DSN.
 func dataSourceName(cfg Config) (string, error) {
-	const prefix = "jdbc:mariadb://"
-	rest, ok := strings.CutPrefix(cfg.URL, prefix)
+	rest, ok := strings.CutPrefix(cfg.URL, "jdbc:mariadb://")
 	if !ok {
-		return "", fmt.Errorf("parse database url %q: missing %s prefix", cfg.URL, prefix)
+		rest, ok = strings.CutPrefix(cfg.URL, "jdbc:mysql://")
+		if !ok {
+			return "", fmt.Errorf("parse database url %q: missing MariaDB or MySQL JDBC prefix", cfg.URL)
+		}
 	}
 
 	u, err := url.Parse("//" + rest)
@@ -81,11 +83,5 @@ func dataSourceName(cfg Config) (string, error) {
 	driverCfg.Net = "tcp"
 	driverCfg.Addr = host
 	driverCfg.DBName = name
-	if query := u.Query(); len(query) > 0 {
-		driverCfg.Params = make(map[string]string, len(query))
-		for key, values := range query {
-			driverCfg.Params[key] = values[0]
-		}
-	}
 	return driverCfg.FormatDSN(), nil
 }
