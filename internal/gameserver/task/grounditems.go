@@ -52,7 +52,7 @@ func GroundItemOptionsFromProperties(props *config.Properties) (GroundItemOption
 	regular := f.Int("AutoDestroyItemTime", int(opts.ItemAutoDestroy/time.Second))
 	equipable := f.Int("AutoDestroyEquipableItemTime", int(opts.EquipableAutoDestroy/time.Second))
 	multiplier := f.Int("PlayerDroppedItemMultiplier", opts.PlayerDroppedMultiplier)
-	pairs := f.IntPairsComma("AutoDestroySpecialItemTime", "")
+	pairs := f.IntPairsComma("AutoDestroySpecialItemTime", "57-0,5575-0,6673-0")
 	if err := f.Err(); err != nil {
 		return GroundItemOptions{}, err
 	}
