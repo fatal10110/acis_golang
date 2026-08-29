@@ -45,6 +45,50 @@ func TestStateStringNamesEachState(t *testing.T) {
 	}
 }
 
+func TestGameClientLinkCipherDisabledKeepsAuthFailureCleartext(t *testing.T) {
+	server, client := net.Pipe()
+	conn := newConn(server, zerolog.Nop())
+	t.Cleanup(func() { _ = client.Close() })
+	t.Cleanup(func() { _ = conn.Close() })
+
+	gameLink := &GameClientLink{
+		log:       zerolog.Nop(),
+		noCipher:  true,
+		loginLink: func() *LoginLink { return nil },
+		newCipherKey: func() ([]byte, error) {
+			return bytes.Repeat([]byte{0xcc}, gamecipher.KeySize), nil
+		},
+	}
+	done := make(chan struct{})
+	go func() {
+		gameLink.Handle(context.Background(), conn)
+		close(done)
+	}()
+
+	if err := wire.WriteFrame(client, encodeProtocolVersion(746)); err != nil {
+		t.Fatalf("send protocol version: %v", err)
+	}
+	version, err := wire.ReadFrame(client)
+	if err != nil {
+		t.Fatalf("read VersionCheck: %v", err)
+	}
+	if len(version) < 2 || version[0] != serverpackets.OpcodeVersionCheck || version[1] != 0 {
+		t.Fatalf("VersionCheck = %x, want cleartext cipher flag", version)
+	}
+
+	if err := wire.WriteFrame(client, encodeAuthLogin("offline", link.SessionKey{})); err != nil {
+		t.Fatalf("send AuthLogin: %v", err)
+	}
+	failure, err := wire.ReadFrame(client)
+	if err != nil {
+		t.Fatalf("read AuthLoginFail: %v", err)
+	}
+	if len(failure) == 0 || failure[0] != serverpackets.OpcodeAuthLoginFail {
+		t.Fatalf("AuthLoginFail = %x, want cleartext opcode %#x", failure, serverpackets.OpcodeAuthLoginFail)
+	}
+	<-done
+}
+
 func TestAllowedGatesOpcodesByState(t *testing.T) {
 	tests := []struct {
 		name   string

@@ -15,9 +15,13 @@ const versionCheckKeySize = 8
 // FrameVersionCheck builds the VersionCheck packet as an owned frame,
 // carrying the random half of key to the client. key must contain at least
 // versionCheckKeySize bytes.
-func FrameVersionCheck(key []byte) wire.Frame {
+func FrameVersionCheck(key []byte, cipherEnabled bool) wire.Frame {
 	w := newFrameWriter(OpcodeVersionCheck)
-	w.WriteUint8(0x01)
+	if cipherEnabled {
+		w.WriteUint8(0x01)
+	} else {
+		w.WriteUint8(0x00)
+	}
 	w.WriteBytes(key[:versionCheckKeySize])
 	w.WriteInt32(1)
 	w.WriteInt32(1)

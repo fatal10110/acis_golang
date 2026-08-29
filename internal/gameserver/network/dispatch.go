@@ -125,7 +125,7 @@ type PlayerConfig struct {
 // against the login server, character list/create/delete/restore, and
 // character select through to world entry.
 type GameClientLink struct {
-	validator     *SessionValidator
+	validator *SessionValidator
 	// clients is the process-owned account-to-connection registry: a second
 	// AuthLogin for an account already claimed evicts the prior connection
 	// instead of being rejected (LoginServerThread.addClient,
@@ -185,6 +185,7 @@ type GameClientLink struct {
 	// newCipherKey supplies each connection's XOR cipher key; overridden in
 	// tests for a deterministic handshake.
 	newCipherKey func() ([]byte, error)
+	noCipher     bool
 
 	// now supplies wall time for packet accounting; nil falls back to
 	// time.Now at the call site. Overridden in tests for deterministic
@@ -220,7 +221,9 @@ type AIRegistry interface {
 
 // GameClientLinkConfig contains the collaborators required by GameClientLink.
 type GameClientLinkConfig struct {
-	Validator     *SessionValidator
+	Validator *SessionValidator
+	// NoCipher keeps game packets cleartext after VersionCheck.
+	NoCipher      bool
 	LoginLink     func() *LoginLink
 	Roster        *manager.Roster
 	Items         itemStore
@@ -341,6 +344,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) *GameClientLink {
 		log:          cfg.Log,
 		now:          cfg.Now,
 		newCipherKey: randomCipherKey,
+		noCipher:     cfg.NoCipher,
 	}
 	link.cubicAfterFunc = func(d time.Duration, fn func()) cubic.Timer {
 		return time.AfterFunc(d, func() {
