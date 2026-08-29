@@ -44,6 +44,7 @@ TestServer = True
 PvpServer = False
 AllowCursedWeapons = False
 AllowWater = False
+UseBlowfishCipher = False
 ZoneTown = 2
 `)
 	if err != nil {
@@ -102,6 +103,9 @@ HexID = -7fff
 	if cfg.AllowWater {
 		t.Error("AllowWater = true, want false")
 	}
+	if cfg.UseBlowfishCipher {
+		t.Error("UseBlowfishCipher = true, want false")
+	}
 	if cfg.TownCombatRule != 2 {
 		t.Errorf("TownCombatRule = %d, want ZoneTown 2", cfg.TownCombatRule)
 	}
@@ -126,6 +130,9 @@ HexID = -7fff
 	}
 	if !cfg.AllowWater {
 		t.Error("AllowWater = false, want true default")
+	}
+	if !cfg.UseBlowfishCipher {
+		t.Error("UseBlowfishCipher = false, want true default")
 	}
 }
 

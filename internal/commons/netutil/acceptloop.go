@@ -59,6 +59,9 @@ func AcceptLoop(ctx context.Context, ln net.Listener, handle func(conn net.Conn)
 			case <-ctx.Done():
 				return nil
 			default:
+				if netErr, ok := err.(net.Error); ok && netErr.Temporary() {
+					continue
+				}
 				return err
 			}
 		}

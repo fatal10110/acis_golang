@@ -66,6 +66,35 @@ func TestAcceptLoopDrainsHandlersBeforeReturningAcceptError(t *testing.T) {
 	}
 }
 
+func TestAcceptLoopRetriesTemporaryAcceptError(t *testing.T) {
+	server, client := net.Pipe()
+	t.Cleanup(func() { client.Close() })
+
+	wantErr := errors.New("accept stopped")
+	ln := &temporaryErrorThenConnListener{
+		conn: server,
+		err:  wantErr,
+		addr: server.LocalAddr(),
+	}
+	handled := make(chan struct{})
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- AcceptLoop(context.Background(), ln, func(conn net.Conn) {
+			conn.Close()
+			close(handled)
+		}, zerolog.Nop())
+	}()
+
+	select {
+	case <-handled:
+	case <-time.After(5 * time.Second):
+		t.Fatal("handler did not run after temporary accept error")
+	}
+	if err := <-errCh; !errors.Is(err, wantErr) {
+		t.Fatalf("AcceptLoop error = %v, want %v", err, wantErr)
+	}
+}
+
 func TestAcceptLoopSetsTCPNoDelayOnAcceptedConnections(t *testing.T) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -152,3 +181,31 @@ func (l *oneConnThenErrorListener) Accept() (net.Conn, error) {
 
 func (*oneConnThenErrorListener) Close() error     { return nil }
 func (l *oneConnThenErrorListener) Addr() net.Addr { return l.addr }
+
+type temporaryErrorThenConnListener struct {
+	conn net.Conn
+	err  error
+	addr net.Addr
+	step int
+}
+
+func (l *temporaryErrorThenConnListener) Accept() (net.Conn, error) {
+	switch l.step {
+	case 0:
+		l.step++
+		return nil, temporaryError{l.err}
+	case 1:
+		l.step++
+		return l.conn, nil
+	default:
+		return nil, l.err
+	}
+}
+
+func (*temporaryErrorThenConnListener) Close() error     { return nil }
+func (l *temporaryErrorThenConnListener) Addr() net.Addr { return l.addr }
+
+type temporaryError struct{ error }
+
+func (temporaryError) Temporary() bool { return true }
+func (temporaryError) Timeout() bool   { return false }

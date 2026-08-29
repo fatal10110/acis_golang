@@ -108,6 +108,7 @@ func provideGameClientLink(
 	}
 	link := network.NewGameClientLink(network.GameClientLinkConfig{
 		Validator:     validator,
+		NoCipher:      !cfg.UseBlowfishCipher,
 		LoginLink:     links.get,
 		Roster:        roster,
 		Items:         items,

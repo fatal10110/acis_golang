@@ -74,6 +74,22 @@ func TestServerRegistryMarkOnlineOffline(t *testing.T) {
 	}
 }
 
+func TestServerRegistryMarkOnlineRejectsAlreadyAuthedServer(t *testing.T) {
+	r := NewServerRegistry()
+	r.Register(5, []byte{0x01})
+	if _, ok := r.MarkOnline(5, "1.2.3.4", net.ParseIP("203.0.113.9"), 7777, 100); !ok {
+		t.Fatal("first MarkOnline() = false, want true")
+	}
+	if _, ok := r.MarkOnline(5, "5.6.7.8", net.ParseIP("203.0.113.10"), 7778, 200); ok {
+		t.Fatal("second MarkOnline() = true, want false for already-authed server")
+	}
+
+	entry, _ := r.Get(5)
+	if entry.Host != "1.2.3.4" || entry.Port != 7777 || entry.MaxPlayers != 100 {
+		t.Fatalf("entry after rejected MarkOnline() = %+v", entry)
+	}
+}
+
 func TestServerRegistryApplyStatusLeavesUnsetFieldsUnchanged(t *testing.T) {
 	r := NewServerRegistry()
 	r.Register(1, nil)

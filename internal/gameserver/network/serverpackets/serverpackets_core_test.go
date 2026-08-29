@@ -3231,19 +3231,24 @@ func TestFrameExVariationCancelResult(t *testing.T) {
 func TestFrameVersionCheck(t *testing.T) {
 	key := bytes.Repeat([]byte{0xcc}, 16)
 
-	frame := FrameVersionCheck(key)
-	defer frame.Release()
+	for _, cipherEnabled := range []bool{false, true} {
+		frame := FrameVersionCheck(key, cipherEnabled)
+		var want []byte
+		want = binary.LittleEndian.AppendUint16(want, uint16(2+1+1+versionCheckKeySize+4+4))
+		want = append(want, OpcodeVersionCheck)
+		want = append(want, 0x01)
+		want = append(want, key[:versionCheckKeySize]...)
+		if cipherEnabled {
+			want = binary.LittleEndian.AppendUint32(want, 1)
+		} else {
+			want = binary.LittleEndian.AppendUint32(want, 0)
+		}
+		want = binary.LittleEndian.AppendUint32(want, 1)
 
-	var want []byte
-	want = binary.LittleEndian.AppendUint16(want, uint16(2+1+1+versionCheckKeySize+4+4))
-	want = append(want, OpcodeVersionCheck)
-	want = append(want, 0x01)
-	want = append(want, key[:versionCheckKeySize]...)
-	want = binary.LittleEndian.AppendUint32(want, 1)
-	want = binary.LittleEndian.AppendUint32(want, 1)
-
-	if !bytes.Equal(frame.Bytes(), want) {
-		t.Errorf("FrameVersionCheck() = %x, want %x", frame.Bytes(), want)
+		if !bytes.Equal(frame.Bytes(), want) {
+			t.Errorf("FrameVersionCheck(%t) = %x, want %x", cipherEnabled, frame.Bytes(), want)
+		}
+		frame.Release()
 	}
 }
 

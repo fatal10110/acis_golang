@@ -272,6 +272,17 @@ func (l *GameServerLink) onGameServerAuth(ctx context.Context, c *gameServerConn
 
 	id := int(auth.DesiredID)
 	entry, exists := l.servers.Get(id)
+	persist := false
+	host := auth.HostName
+	if host != "*" {
+		if resolved, err := net.LookupHost(host); err == nil && len(resolved) > 0 {
+			host = resolved[0]
+		} else {
+			host = c.remoteIP.String()
+		}
+	} else {
+		host = c.remoteIP.String()
+	}
 
 	switch {
 	case exists && bytes.Equal(entry.HexID, auth.HexID):
@@ -291,7 +302,7 @@ func (l *GameServerLink) onGameServerAuth(ctx context.Context, c *gameServerConn
 			return false
 		}
 		id = created.ID
-		l.persistRegistration(ctx, id, auth.HexID)
+		persist = true
 
 	default:
 		if !l.allowNewServers {
@@ -302,21 +313,17 @@ func (l *GameServerLink) onGameServerAuth(ctx context.Context, c *gameServerConn
 			c.forceClose(link.ReasonIDReserved)
 			return false
 		}
-		l.persistRegistration(ctx, id, auth.HexID)
+		persist = true
 	}
 
-	host := auth.HostName
-	if host != "*" {
-		if resolved, err := net.LookupHost(host); err == nil && len(resolved) > 0 {
-			host = resolved[0]
-		} else {
-			host = c.remoteIP.String()
-		}
-	} else {
-		host = c.remoteIP.String()
+	if persist {
+		l.persistRegistration(ctx, id, auth.HexID, host)
 	}
 
-	l.servers.MarkOnline(id, host, c.remoteIP, auth.Port, auth.MaxPlayers)
+	if _, ok := l.servers.MarkOnline(id, host, c.remoteIP, auth.Port, auth.MaxPlayers); !ok {
+		c.forceClose(link.ReasonAlreadyLoggedIn)
+		return false
+	}
 	c.id = id
 	c.authed = true
 	if l.roster != nil {
@@ -330,12 +337,12 @@ func (l *GameServerLink) onGameServerAuth(ctx context.Context, c *gameServerConn
 	return true
 }
 
-func (l *GameServerLink) persistRegistration(ctx context.Context, id int, hexID []byte) {
+func (l *GameServerLink) persistRegistration(ctx context.Context, id int, hexID []byte, host string) {
 	if l.registrations == nil {
 		l.log.Error().Int("server_id", id).Msg("persist gameserver registration")
 		return
 	}
-	if err := l.registrations.CreateGameServer(ctx, model.NewGameServer(id, hexID, "")); err != nil {
+	if err := l.registrations.CreateGameServer(ctx, model.NewGameServer(id, hexID, host)); err != nil {
 		l.log.Error().Int("server_id", id).Err(err).Msg("persist gameserver registration")
 	}
 }
