@@ -146,12 +146,14 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			if !validProtocolRevision(req.Revision) {
 				return
 			}
-			if !session.SendFrame(serverpackets.FrameVersionCheck(key)) {
+			if !session.SendFrame(serverpackets.FrameVersionCheck(key, !l.noCipher)) {
 				return
 			}
 			// The key is out; every later frame crosses encrypted, matching
 			// the reference where crypt starts only after VersionCheck.
-			session.EnableCrypt()
+			if !l.noCipher {
+				session.EnableCrypt()
+			}
 
 		case clientpackets.OpcodeAuthLogin:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeAuthLogin)

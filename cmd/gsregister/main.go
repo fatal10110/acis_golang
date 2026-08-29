@@ -119,7 +119,10 @@ func run(ctx context.Context, in io.Reader, out io.Writer, names *manager.Server
 			}
 			fmt.Fprintln(out, "UNREGISTER a specific server. Here's the current list :")
 			for _, id := range sortedIDs(registered) {
-				name, _ := names.Name(id)
+				name, ok := names.Name(id)
+				if !ok {
+					name = "null"
+				}
 				fmt.Fprintf(out, "%d: %s\n", id, name)
 			}
 
