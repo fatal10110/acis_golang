@@ -45,7 +45,7 @@ func startTicker(lc fx.Lifecycle, log zerolog.Logger, start func(zerolog.Logger)
 		},
 		OnStop: func(context.Context) error {
 			if ticker != nil {
-				ticker.Stop()
+				ticker.StopAndWait()
 			}
 			return nil
 		},

@@ -54,11 +54,15 @@ func tick(fn func(), log zerolog.Logger) {
 	fn()
 }
 
-// Stop halts future ticks and blocks until any in-flight tick finishes. Safe
-// to call more than once.
+// Stop requests that future ticks halt. Safe to call more than once.
 func (t *Ticker) Stop() {
 	t.stopOnce.Do(func() {
 		close(t.stop)
 	})
+}
+
+// StopAndWait requests that future ticks halt and waits for any current tick.
+func (t *Ticker) StopAndWait() {
+	t.Stop()
 	<-t.done
 }
