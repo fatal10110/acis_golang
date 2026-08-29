@@ -424,6 +424,7 @@ func TestGameServerLinkRegistrationGates(t *testing.T) {
 		wantID          byte
 		wantReason      link.LoginServerFailReason
 		wantPersistID   int
+		wantPersistHost string
 	}{
 		{
 			name:            "free id rejected when new servers disabled",
@@ -436,6 +437,7 @@ func TestGameServerLinkRegistrationGates(t *testing.T) {
 			wantOK:          true,
 			wantID:          1,
 			wantPersistID:   1,
+			wantPersistHost: "127.0.0.1",
 		},
 		{
 			name:            "same key accepted even when new servers disabled",
@@ -472,6 +474,7 @@ func TestGameServerLinkRegistrationGates(t *testing.T) {
 			wantOK:          true,
 			wantID:          2,
 			wantPersistID:   2,
+			wantPersistHost: "127.0.0.1",
 		},
 		{
 			name:            "mismatched key fails when no alternate id is free",
@@ -511,8 +514,8 @@ func TestGameServerLinkRegistrationGates(t *testing.T) {
 				}
 				return
 			}
-			if len(store.created) != 1 || store.created[0].ID != tt.wantPersistID {
-				t.Fatalf("persisted registrations = %+v, want one id %d", store.created, tt.wantPersistID)
+			if len(store.created) != 1 || store.created[0].ID != tt.wantPersistID || store.created[0].Host != tt.wantPersistHost {
+				t.Fatalf("persisted registrations = %+v, want one id %d host %q", store.created, tt.wantPersistID, tt.wantPersistHost)
 			}
 		})
 	}

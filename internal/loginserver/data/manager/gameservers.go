@@ -110,7 +110,7 @@ func (r *ServerRegistry) MarkOnline(id int, host string, connIP net.IP, port uin
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	e, ok := r.servers[id]
-	if !ok {
+	if !ok || e.Authed {
 		return ServerEntry{}, false
 	}
 	e.Authed = true
