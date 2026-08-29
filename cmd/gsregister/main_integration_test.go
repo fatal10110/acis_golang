@@ -174,3 +174,16 @@ func TestRegisterCleanLifecycle(t *testing.T) {
 		t.Fatalf("table not empty after cleanall: %v", rows)
 	}
 }
+
+func TestCleanListsUnlistedRegisteredServerAsNull(t *testing.T) {
+	store := newIntegrationStore(t)
+	ctx := context.Background()
+	if err := store.CreateGameServer(ctx, model.NewGameServer(3, []byte{1}, "")); err != nil {
+		t.Fatalf("CreateGameServer(3): %v", err)
+	}
+
+	out := runScript(t, store, loadTestNames(t), t.TempDir(), "clean 3 exit")
+	if !strings.Contains(out, "3: null\n") {
+		t.Fatalf("clean listing for an unlisted registered server = %q, want literal null", out)
+	}
+}
