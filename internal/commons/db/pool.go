@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -83,5 +84,74 @@ func dataSourceName(cfg Config) (string, error) {
 	driverCfg.Net = "tcp"
 	driverCfg.Addr = host
 	driverCfg.DBName = name
+
+	for key, values := range u.Query() {
+		if err := applyConnectorOption(driverCfg, key, values[len(values)-1]); err != nil {
+			return "", fmt.Errorf("parse database url %q: %w", cfg.URL, err)
+		}
+	}
+
 	return driverCfg.FormatDSN(), nil
+}
+
+// applyConnectorOption translates one MariaDB Connector/J URL option
+// (as documented in driver.properties of the bundled connector) into the
+// equivalent go-sql-driver/mysql setting. Connector/J options with no safe
+// go-sql-driver equivalent are rejected rather than silently dropped or
+// forwarded as a MySQL session variable (see aCis_gameserver
+// ConnectionPool.setUrl and PR #278).
+func applyConnectorOption(driverCfg *mysql.Config, key, value string) error {
+	switch key {
+	case "timezone":
+		if value == "disabled" {
+			return nil
+		}
+		loc, err := time.LoadLocation(value)
+		if err != nil {
+			return fmt.Errorf("db url option \"timezone\" value %q is not a known IANA zone: %w", value, err)
+		}
+		driverCfg.Loc = loc
+		return nil
+
+	case "sslMode":
+		switch value {
+		case "disable":
+			driverCfg.TLSConfig = "false"
+		case "trust":
+			driverCfg.TLSConfig = "skip-verify"
+		case "verify-full":
+			driverCfg.TLSConfig = "true"
+		default:
+			return fmt.Errorf("db url option \"sslMode\" value %q is not supported (supported: disable, trust, verify-full)", value)
+		}
+		return nil
+
+	case "connectTimeout":
+		ms, err := strconv.Atoi(value)
+		if err != nil {
+			return fmt.Errorf("db url option \"connectTimeout\" value %q is not an integer: %w", value, err)
+		}
+		driverCfg.Timeout = time.Duration(ms) * time.Millisecond
+		return nil
+
+	case "socketTimeout":
+		ms, err := strconv.Atoi(value)
+		if err != nil {
+			return fmt.Errorf("db url option \"socketTimeout\" value %q is not an integer: %w", value, err)
+		}
+		driverCfg.ReadTimeout = time.Duration(ms) * time.Millisecond
+		driverCfg.WriteTimeout = time.Duration(ms) * time.Millisecond
+		return nil
+
+	case "allowMultiQueries":
+		b, err := strconv.ParseBool(value)
+		if err != nil {
+			return fmt.Errorf("db url option \"allowMultiQueries\" value %q is not a boolean: %w", value, err)
+		}
+		driverCfg.MultiStatements = b
+		return nil
+
+	default:
+		return fmt.Errorf("db url option %q has no supported go-sql-driver/mysql equivalent; remove it or configure the driver directly", key)
+	}
 }

@@ -28,9 +28,64 @@ func TestDataSourceName(t *testing.T) {
 			want: "acis@tcp(db.internal:3307)/acis",
 		},
 		{
-			name: "connector query params are not server variables",
-			cfg:  Config{URL: "jdbc:mariadb://localhost/acis?serverTimezone=UTC", Login: "root", Password: ""},
+			name:    "unsupported connector option is rejected, not forwarded as a server variable",
+			cfg:     Config{URL: "jdbc:mariadb://localhost/acis?serverTimezone=UTC", Login: "root", Password: ""},
+			wantErr: true,
+		},
+		{
+			name: "timezone option sets client/server session location",
+			cfg:  Config{URL: "jdbc:mariadb://localhost/acis?timezone=America/New_York", Login: "root", Password: ""},
+			want: "root@tcp(localhost:3306)/acis?loc=America%2FNew_York",
+		},
+		{
+			name: "timezone disabled is a no-op",
+			cfg:  Config{URL: "jdbc:mariadb://localhost/acis?timezone=disabled", Login: "root", Password: ""},
 			want: "root@tcp(localhost:3306)/acis",
+		},
+		{
+			name:    "timezone with an unknown zone is rejected",
+			cfg:     Config{URL: "jdbc:mariadb://localhost/acis?timezone=Nowhere/Place", Login: "root", Password: ""},
+			wantErr: true,
+		},
+		{
+			name: "sslMode disable maps to tls=false",
+			cfg:  Config{URL: "jdbc:mariadb://localhost/acis?sslMode=disable", Login: "root", Password: ""},
+			want: "root@tcp(localhost:3306)/acis?tls=false",
+		},
+		{
+			name: "sslMode trust maps to tls=skip-verify",
+			cfg:  Config{URL: "jdbc:mariadb://localhost/acis?sslMode=trust", Login: "root", Password: ""},
+			want: "root@tcp(localhost:3306)/acis?tls=skip-verify",
+		},
+		{
+			name: "sslMode verify-full maps to tls=true",
+			cfg:  Config{URL: "jdbc:mariadb://localhost/acis?sslMode=verify-full", Login: "root", Password: ""},
+			want: "root@tcp(localhost:3306)/acis?tls=true",
+		},
+		{
+			name:    "sslMode verify-ca has no go-sql-driver equivalent and is rejected",
+			cfg:     Config{URL: "jdbc:mariadb://localhost/acis?sslMode=verify-ca", Login: "root", Password: ""},
+			wantErr: true,
+		},
+		{
+			name: "connectTimeout maps to dial timeout",
+			cfg:  Config{URL: "jdbc:mariadb://localhost/acis?connectTimeout=5000", Login: "root", Password: ""},
+			want: "root@tcp(localhost:3306)/acis?timeout=5s",
+		},
+		{
+			name: "socketTimeout maps to read and write timeout",
+			cfg:  Config{URL: "jdbc:mariadb://localhost/acis?socketTimeout=2000", Login: "root", Password: ""},
+			want: "root@tcp(localhost:3306)/acis?readTimeout=2s&writeTimeout=2s",
+		},
+		{
+			name: "allowMultiQueries maps to multiStatements",
+			cfg:  Config{URL: "jdbc:mariadb://localhost/acis?allowMultiQueries=true", Login: "root", Password: ""},
+			want: "root@tcp(localhost:3306)/acis?multiStatements=true",
+		},
+		{
+			name:    "unknown connector option is rejected",
+			cfg:     Config{URL: "jdbc:mariadb://localhost/acis?poolName=acis-pool", Login: "root", Password: ""},
+			wantErr: true,
 		},
 		{
 			name: "mysql scheme",
