@@ -1,6 +1,8 @@
 package logging
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -27,6 +29,8 @@ const (
 // Config is the logging setup derived from logging.properties.
 type Config struct {
 	Level           zerolog.Level
+	ConsoleLevel    zerolog.Level
+	Levels          map[Sink]zerolog.Level
 	Patterns        map[Sink]string
 	UnsupportedKeys []string
 }
@@ -56,36 +60,23 @@ var supportedKeys = map[string]bool{
 	"java.util.logging.ConsoleHandler.formatter":                     true,
 	"java.util.logging.ConsoleHandler.level":                         true,
 	"java.util.logging.FileHandler.pattern":                          true,
-	"java.util.logging.FileHandler.limit":                            true,
-	"java.util.logging.FileHandler.count":                            true,
 	"java.util.logging.FileHandler.formatter":                        true,
 	"java.util.logging.FileHandler.level":                            true,
 	"net.sf.l2j.commons.logging.handler.ErrorLogHandler.pattern":     true,
-	"net.sf.l2j.commons.logging.handler.ErrorLogHandler.limit":       true,
-	"net.sf.l2j.commons.logging.handler.ErrorLogHandler.count":       true,
 	"net.sf.l2j.commons.logging.handler.ErrorLogHandler.formatter":   true,
 	"net.sf.l2j.commons.logging.handler.ErrorLogHandler.filter":      true,
 	"net.sf.l2j.commons.logging.handler.ErrorLogHandler.level":       true,
 	"net.sf.l2j.commons.logging.handler.ChatLogHandler.pattern":      true,
-	"net.sf.l2j.commons.logging.handler.ChatLogHandler.limit":        true,
-	"net.sf.l2j.commons.logging.handler.ChatLogHandler.count":        true,
 	"net.sf.l2j.commons.logging.handler.ChatLogHandler.formatter":    true,
 	"net.sf.l2j.commons.logging.handler.ChatLogHandler.filter":       true,
-	"net.sf.l2j.commons.logging.handler.ChatLogHandler.append":       true,
 	"net.sf.l2j.commons.logging.handler.ChatLogHandler.level":        true,
 	"net.sf.l2j.commons.logging.handler.GMAuditLogHandler.pattern":   true,
-	"net.sf.l2j.commons.logging.handler.GMAuditLogHandler.limit":     true,
-	"net.sf.l2j.commons.logging.handler.GMAuditLogHandler.count":     true,
 	"net.sf.l2j.commons.logging.handler.GMAuditLogHandler.formatter": true,
 	"net.sf.l2j.commons.logging.handler.GMAuditLogHandler.filter":    true,
-	"net.sf.l2j.commons.logging.handler.GMAuditLogHandler.append":    true,
 	"net.sf.l2j.commons.logging.handler.GMAuditLogHandler.level":     true,
 	"net.sf.l2j.commons.logging.handler.ItemLogHandler.pattern":      true,
-	"net.sf.l2j.commons.logging.handler.ItemLogHandler.limit":        true,
-	"net.sf.l2j.commons.logging.handler.ItemLogHandler.count":        true,
 	"net.sf.l2j.commons.logging.handler.ItemLogHandler.formatter":    true,
 	"net.sf.l2j.commons.logging.handler.ItemLogHandler.filter":       true,
-	"net.sf.l2j.commons.logging.handler.ItemLogHandler.append":       true,
 	"net.sf.l2j.commons.logging.handler.ItemLogHandler.level":        true,
 	"net.sf.l2j.gameserver.level":                                    true,
 	"net.sf.l2j.loginserver.level":                                   true,
@@ -98,7 +89,15 @@ func init() {
 // DefaultConfig returns the logging setup used when logging.properties is not loaded yet.
 func DefaultConfig() Config {
 	return Config{
-		Level: zerolog.InfoLevel,
+		Level:        zerolog.InfoLevel,
+		ConsoleLevel: zerolog.InfoLevel,
+		Levels: map[Sink]zerolog.Level{
+			SinkConsole: zerolog.InfoLevel,
+			SinkError:   zerolog.InfoLevel,
+			SinkChat:    zerolog.InfoLevel,
+			SinkGMAudit: zerolog.InfoLevel,
+			SinkItem:    zerolog.InfoLevel,
+		},
 		Patterns: map[Sink]string{
 			SinkConsole: "log/console/console_%g.txt",
 			SinkError:   "log/error/error_%g.txt",
@@ -117,6 +116,20 @@ func ConfigFromProperties(p *config.Properties) (Config, error) {
 		return Config{}, err
 	}
 	cfg.Level = level
+	if cfg.ConsoleLevel, err = propertyLevel(p, "java.util.logging.ConsoleHandler.level", cfg.ConsoleLevel); err != nil {
+		return Config{}, err
+	}
+	for sink, key := range map[Sink]string{
+		SinkConsole: "java.util.logging.FileHandler.level",
+		SinkError:   "net.sf.l2j.commons.logging.handler.ErrorLogHandler.level",
+		SinkChat:    "net.sf.l2j.commons.logging.handler.ChatLogHandler.level",
+		SinkGMAudit: "net.sf.l2j.commons.logging.handler.GMAuditLogHandler.level",
+		SinkItem:    "net.sf.l2j.commons.logging.handler.ItemLogHandler.level",
+	} {
+		if cfg.Levels[sink], err = propertyLevel(p, key, cfg.Levels[sink]); err != nil {
+			return Config{}, err
+		}
+	}
 
 	cfg.Patterns[SinkConsole] = p.String("java.util.logging.FileHandler.pattern", cfg.Patterns[SinkConsole])
 	cfg.Patterns[SinkError] = p.String("net.sf.l2j.commons.logging.handler.ErrorLogHandler.pattern", cfg.Patterns[SinkError])
@@ -184,14 +197,14 @@ func Setup(root string, cfg Config, stderr io.Writer) (*Runtime, error) {
 	}
 
 	console := zerolog.MultiLevelWriter(
-		zerolog.LevelWriterAdapter{Writer: stderr},
-		zerolog.LevelWriterAdapter{Writer: consoleFile},
-		errorWriter{Writer: errorFile},
+		levelWriter{Writer: stderr, Level: cfg.ConsoleLevel},
+		levelWriter{Writer: consoleFile, Level: cfg.Levels[SinkConsole]},
+		errorWriter{Writer: errorFile, Level: cfg.Levels[SinkError]},
 	)
 	rt.Logger = newLogger(cfg.Level, console)
-	rt.Chat = newLogger(cfg.Level, chatFile)
-	rt.GMAudit = newLogger(cfg.Level, gmFile)
-	rt.Item = newLogger(cfg.Level, itemFile)
+	rt.Chat = newLogger(effectiveLevel(cfg.Level, cfg.Levels[SinkChat]), chatFile)
+	rt.GMAudit = newLogger(effectiveLevel(cfg.Level, cfg.Levels[SinkGMAudit]), gmFile)
+	rt.Item = newLogger(effectiveLevel(cfg.Level, cfg.Levels[SinkItem]), itemFile)
 
 	return rt, nil
 }
@@ -216,6 +229,17 @@ func (r *Runtime) Close() error {
 // Per-packet callers should use Debug so a disabled event stops before field allocation.
 func newLogger(level zerolog.Level, out io.Writer) zerolog.Logger {
 	return zerolog.New(out).With().Timestamp().Logger().Level(level)
+}
+
+func propertyLevel(p *config.Properties, key string, fallback zerolog.Level) (zerolog.Level, error) {
+	return parseLevel(p.String(key, fallback.String()))
+}
+
+func effectiveLevel(level, handler zerolog.Level) zerolog.Level {
+	if handler > level {
+		return handler
+	}
+	return level
 }
 
 func parseLevel(s string) (zerolog.Level, error) {
@@ -243,10 +267,33 @@ func expandPattern(pattern string) string {
 	return pattern
 }
 
-type errorWriter struct{ io.Writer }
+type levelWriter struct {
+	io.Writer
+	Level zerolog.Level
+}
+
+func (w levelWriter) WriteLevel(level zerolog.Level, p []byte) (int, error) {
+	if level < w.Level {
+		return len(p), nil
+	}
+	return w.Writer.Write(p)
+}
+
+type errorWriter struct {
+	io.Writer
+	Level zerolog.Level
+}
 
 func (w errorWriter) WriteLevel(level zerolog.Level, p []byte) (int, error) {
-	if level < zerolog.ErrorLevel {
+	if level < w.Level || level < zerolog.ErrorLevel {
+		return len(p), nil
+	}
+	var event map[string]json.RawMessage
+	if err := json.Unmarshal(p, &event); err != nil {
+		return len(p), nil
+	}
+	errValue, ok := event[zerolog.ErrorFieldName]
+	if !ok || bytes.Equal(errValue, []byte("null")) {
 		return len(p), nil
 	}
 	return w.Writer.Write(p)
