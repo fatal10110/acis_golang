@@ -613,7 +613,7 @@ func TestNewSpawnsCreatesMissingStateRows(t *testing.T) {
 	</npcmaker>
 </list>`)
 
-	table, err := xml.LoadSpawnlist(dir, zerolog.Nop())
+	table, err := xml.LoadSpawnlist(dir, zerolog.Nop(), 1)
 	if err != nil {
 		t.Fatalf("LoadSpawnlist() unexpected error: %v", err)
 	}

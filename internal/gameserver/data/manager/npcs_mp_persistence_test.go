@@ -111,7 +111,7 @@ func mpTestSpawnFixture(t *testing.T) string {
 // mp=0 at sync and npcs_spawn.go always restored full MP at boot.
 func TestNpcSpawnRestoresPersistedMPAcrossRestart(t *testing.T) {
 	dir := mpTestSpawnFixture(t)
-	table, err := xml.LoadSpawnlist(dir, zerolog.Nop())
+	table, err := xml.LoadSpawnlist(dir, zerolog.Nop(), 1)
 	if err != nil {
 		t.Fatalf("LoadSpawnlist() error: %v", err)
 	}

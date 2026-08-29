@@ -222,6 +222,36 @@ func TestLoadDeathPenaltyChanceDefaultsToTwenty(t *testing.T) {
 	}
 }
 
+func TestLoadSpawnMultiplierUsesNpcsProperties(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "npcs.properties")
+	if err := os.WriteFile(configPath, []byte("SpawnMultiplier = 1.5\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := loadSpawnMultiplier(gameServerPaths{NpcsConfigPath: configPath})
+	if err != nil {
+		t.Fatalf("loadSpawnMultiplier() error = %v", err)
+	}
+	if got != 1.5 {
+		t.Fatalf("loadSpawnMultiplier() = %v, want 1.5", got)
+	}
+}
+
+func TestLoadSpawnMultiplierDefaultsToOne(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "npcs.properties")
+	if err := os.WriteFile(configPath, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := loadSpawnMultiplier(gameServerPaths{NpcsConfigPath: configPath})
+	if err != nil {
+		t.Fatalf("loadSpawnMultiplier() error = %v", err)
+	}
+	if got != 1 {
+		t.Fatalf("loadSpawnMultiplier() = %v, want 1", got)
+	}
+}
+
 func TestLoadPerfectShieldBlockRateUsesPlayersProperties(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "players.properties")
 	if err := os.WriteFile(configPath, []byte("PerfectShieldBlockRate = 15\n"), 0o600); err != nil {

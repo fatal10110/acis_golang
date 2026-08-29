@@ -24,6 +24,7 @@ type gameServerPaths struct {
 	PlayersConfigPath string
 	HexIDPath         string
 	GeoConfigPath     string
+	NpcsConfigPath    string
 	DataRoot          string
 	LogRoot           string
 }
@@ -40,6 +41,7 @@ func parseGameServerFlags() gameServerPaths {
 	flag.StringVar(&paths.PlayersConfigPath, "players-config", "config/players.properties", "player properties file")
 	flag.StringVar(&paths.HexIDPath, "hexid", "config/hexid.txt", "game server hexid properties file")
 	flag.StringVar(&paths.GeoConfigPath, "geo-config", "config/geoengine.properties", "geoengine properties file")
+	flag.StringVar(&paths.NpcsConfigPath, "npcs-config", "config/npcs.properties", "npc properties file")
 	flag.StringVar(&paths.DataRoot, "data-root", ".", "datapack root containing data/xml")
 	flag.StringVar(&paths.LogRoot, "log-root", ".", "root directory for log files")
 	flag.Parse()
@@ -66,6 +68,7 @@ func newGameServerApp(paths gameServerPaths) *fx.App {
 			loadCharacterSelectDelay,
 			loadServerBypassDelay,
 			loadPetConfig,
+			loadSpawnMultiplier,
 			loadHexIDProperties,
 			gameServerConfigFromLoadedProperties,
 			provideGameServerLogger,
