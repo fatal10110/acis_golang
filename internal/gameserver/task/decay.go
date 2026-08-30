@@ -17,6 +17,15 @@ type DecayActor interface {
 	ObjectID() int32
 }
 
+// SummonDecayActor is a corpse-decay entry whose owner linkage is rechecked
+// each tick. When OwnerStillLinked reports false, the entry is removed without
+// invoking decay effects — matching the reference decay task's orphaned-summon
+// cancellation before its deadline check.
+type SummonDecayActor interface {
+	DecayActor
+	OwnerStillLinked() bool
+}
+
 // DecayEffects delivers corpse-removal side effects when a tracked actor's
 // decay deadline elapses.
 type DecayEffects interface {
@@ -94,15 +103,28 @@ func (d *Decay) Deadline(actor DecayActor) (time.Time, bool) {
 	return d.deadlineOf(actor.ObjectID())
 }
 
-// Tick removes and decays every actor whose deadline has passed. It logs and
-// returns ErrReentrantTick without doing anything else if another Tick call
-// is already in flight.
+// Tick removes orphaned summon entries, then removes and decays every actor
+// whose deadline has passed. It logs and returns ErrReentrantTick without
+// doing anything else if another Tick call is already in flight.
 func (d *Decay) Tick() error {
 	if !d.beginTick(d.log, "task: Decay.Tick") {
 		return ErrReentrantTick
 	}
 	defer d.endTick()
 
+	d.cancelUnlinkedSummons()
 	d.tickDue(d.now(), d.effects.Decay)
 	return nil
+}
+
+func (d *Decay) cancelUnlinkedSummons() {
+	d.mu.Lock()
+	for key, entry := range d.entries {
+		s, ok := entry.actor.(SummonDecayActor)
+		if !ok || s.OwnerStillLinked() {
+			continue
+		}
+		delete(d.entries, key)
+	}
+	d.mu.Unlock()
 }
