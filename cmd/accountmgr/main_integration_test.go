@@ -3,15 +3,14 @@ package main
 import (
 	"bytes"
 	"context"
-	dbsql "database/sql"
 	"strings"
 	"testing"
 
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/testcontainers/testcontainers-go/modules/mariadb"
 
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/fatal10110/acis_golang/internal/dbtest"
 	"github.com/fatal10110/acis_golang/internal/loginserver/data/sql"
 )
 
@@ -27,33 +26,7 @@ const accountsSchema = "CREATE TABLE IF NOT EXISTS `accounts` (\n" +
 
 func newIntegrationStore(t *testing.T) *sql.AccountStore {
 	t.Helper()
-	ctx := context.Background()
-
-	container, err := mariadb.Run(ctx, "mariadb:11")
-	if err != nil {
-		t.Fatalf("start mariadb container: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := container.Terminate(ctx); err != nil {
-			t.Logf("terminate mariadb container: %v", err)
-		}
-	})
-
-	dsn, err := container.ConnectionString(ctx)
-	if err != nil {
-		t.Fatalf("connection string: %v", err)
-	}
-
-	db, err := dbsql.Open("mysql", dsn)
-	if err != nil {
-		t.Fatalf("open db: %v", err)
-	}
-	t.Cleanup(func() { db.Close() })
-
-	if _, err := db.ExecContext(ctx, accountsSchema); err != nil {
-		t.Fatalf("create accounts table: %v", err)
-	}
-	return sql.NewAccountStore(db)
+	return sql.NewAccountStore(dbtest.NewDB(t, accountsSchema))
 }
 
 func runScript(t *testing.T, store *sql.AccountStore, input string) string {

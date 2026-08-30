@@ -14,14 +14,22 @@ import (
 // ---- from controller_3d_follow_test.go ----
 type playerFollowSelf struct {
 	x, y, z int
+	moves   []Event
 }
 
-func (s *playerFollowSelf) ObjectID() int32                 { return 1 }
-func (s *playerFollowSelf) Position() (int, int, int)       { return s.x, s.y, s.z }
-func (s *playerFollowSelf) CollisionRadius() float64        { return 0 }
-func (s *playerFollowSelf) SetHeading(int)                  {}
-func (s *playerFollowSelf) SyncPosition(location.Location)  {}
-func (s *playerFollowSelf) BroadcastMove(Event) error       { return nil }
+type tickerOwnedFollowSelf struct{ playerFollowSelf }
+
+func (*tickerOwnedFollowSelf) OwnsOffensiveFollowTicker() bool { return true }
+
+func (s *playerFollowSelf) ObjectID() int32                    { return 1 }
+func (s *playerFollowSelf) Position() (int, int, int)          { return s.x, s.y, s.z }
+func (s *playerFollowSelf) CollisionRadius() float64           { return 0 }
+func (s *playerFollowSelf) SetHeading(int)                     {}
+func (s *playerFollowSelf) SyncPosition(pos location.Location) { s.x, s.y, s.z = pos.X, pos.Y, pos.Z }
+func (s *playerFollowSelf) BroadcastMove(event Event) error {
+	s.moves = append(s.moves, event)
+	return nil
+}
 func (s *playerFollowSelf) BroadcastStop() error            { return nil }
 func (s *playerFollowSelf) OffensiveFollowIsPawnMove() bool { return true }
 
@@ -54,6 +62,88 @@ func TestControllerPlayerOffensiveFollowUses3DRange(t *testing.T) {
 	}
 	if !following {
 		t.Fatal("MaybeStartOffensiveFollow() = false, want true when vertical distance exceeds attack range")
+	}
+}
+
+func TestControllerOffensiveFollowRechecksMovingTargetEveryFivePositionUpdates(t *testing.T) {
+	self := &playerFollowSelf{}
+	mover, err := NewCreatureMove(location.Location{}, 100, staticGeo{canMove: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mover.afterFunc = func(time.Duration, func()) scheduledTimer { return noAllocTimer{} }
+	controller, err := NewController(mover, self)
+	if err != nil {
+		t.Fatal(err)
+	}
+	target := &followTarget{x: 100}
+	if following, err := controller.MaybeStartOffensiveFollow(target, 40); err != nil || !following {
+		t.Fatalf("MaybeStartOffensiveFollow() = %v, %v; want active follow", following, err)
+	}
+
+	target.x = 200
+	for range 5 {
+		controller.PositionUpdate()
+	}
+
+	if got := len(self.moves); got != 2 {
+		t.Fatalf("move broadcasts = %d, want 2 after the 500 ms follow recheck", got)
+	}
+	if got := self.moves[1].Destination; got != (location.Location{X: 200}) {
+		t.Fatalf("follow recheck destination = %+v, want target's latest position", got)
+	}
+}
+
+func TestControllerStopCancelsOffensiveFollowRechecks(t *testing.T) {
+	self := &playerFollowSelf{}
+	mover, err := NewCreatureMove(location.Location{}, 100, staticGeo{canMove: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mover.afterFunc = func(time.Duration, func()) scheduledTimer { return noAllocTimer{} }
+	controller, err := NewController(mover, self)
+	if err != nil {
+		t.Fatal(err)
+	}
+	target := &followTarget{x: 100}
+	if following, err := controller.MaybeStartOffensiveFollow(target, 40); err != nil || !following {
+		t.Fatalf("MaybeStartOffensiveFollow() = %v, %v; want active follow", following, err)
+	}
+	if err := controller.Stop(); err != nil {
+		t.Fatal(err)
+	}
+
+	target.x = 200
+	for range 5 {
+		controller.PositionUpdate()
+	}
+	if got := len(self.moves); got != 1 {
+		t.Fatalf("move broadcasts after Stop() = %d, want 1", got)
+	}
+}
+
+func TestControllerDefersToActorOwnedOffensiveFollowTicker(t *testing.T) {
+	self := &tickerOwnedFollowSelf{}
+	mover, err := NewCreatureMove(location.Location{}, 100, staticGeo{canMove: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mover.afterFunc = func(time.Duration, func()) scheduledTimer { return noAllocTimer{} }
+	controller, err := NewController(mover, self)
+	if err != nil {
+		t.Fatal(err)
+	}
+	target := &followTarget{x: 100}
+	if following, err := controller.MaybeStartOffensiveFollow(target, 40); err != nil || !following {
+		t.Fatalf("MaybeStartOffensiveFollow() = %v, %v; want active follow", following, err)
+	}
+
+	target.x = 200
+	for range 5 {
+		controller.PositionUpdate()
+	}
+	if got := len(self.moves); got != 1 {
+		t.Fatalf("controller move broadcasts = %d, want only the initial move when actor owns the follow ticker", got)
 	}
 }
 

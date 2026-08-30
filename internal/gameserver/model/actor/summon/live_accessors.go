@@ -403,6 +403,10 @@ func (a *Actor) Knows(target attackable.Combatant) bool {
 	return ok && world.Knows(a, tracked)
 }
 
+// OwnsOffensiveFollowTicker reports that summon AI already rechecks its
+// attack/cast intention on the reference follow cadence.
+func (*Actor) OwnsOffensiveFollowTicker() bool { return true }
+
 // PhysicalAttackRange returns this summon's melee attack range.
 func (a *Actor) PhysicalAttackRange() int { return a.combatStats().AttackRange }
 

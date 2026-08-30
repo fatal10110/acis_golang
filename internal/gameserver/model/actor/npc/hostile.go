@@ -68,6 +68,10 @@ type Hostile struct {
 	dead    bool
 	decayed bool
 
+	minionsMu sync.RWMutex
+	master    *Hostile
+	minions   map[int32]*Hostile
+
 	regionInactive atomic.Bool
 	abnormalEffect atomic.Int32
 
@@ -364,6 +368,51 @@ func (h *Hostile) SetRewarder(rewards creature.Rewarder) {
 // ObjectID returns the world object id assigned to this NPC.
 func (h *Hostile) ObjectID() int32 {
 	return h.Instance.ObjectID
+}
+
+// Master returns the NPC that spawned this minion, if any.
+func (h *Hostile) Master() *Hostile {
+	h.minionsMu.RLock()
+	defer h.minionsMu.RUnlock()
+	return h.master
+}
+
+// SetMaster records this NPC's spawning master.
+func (h *Hostile) SetMaster(master *Hostile) {
+	h.minionsMu.Lock()
+	h.master = master
+	h.minionsMu.Unlock()
+}
+
+// AddMinion records a child spawned for this NPC.
+func (h *Hostile) AddMinion(minion *Hostile) {
+	if minion == nil {
+		return
+	}
+	h.minionsMu.Lock()
+	if h.minions == nil {
+		h.minions = make(map[int32]*Hostile)
+	}
+	h.minions[minion.ObjectID()] = minion
+	h.minionsMu.Unlock()
+}
+
+// RemoveMinion forgets a child that has decayed or been removed.
+func (h *Hostile) RemoveMinion(id int32) {
+	h.minionsMu.Lock()
+	delete(h.minions, id)
+	h.minionsMu.Unlock()
+}
+
+// Minions returns a stable snapshot of this NPC's current children.
+func (h *Hostile) Minions() []*Hostile {
+	h.minionsMu.RLock()
+	defer h.minionsMu.RUnlock()
+	minions := make([]*Hostile, 0, len(h.minions))
+	for _, minion := range h.minions {
+		minions = append(minions, minion)
+	}
+	return minions
 }
 
 // AI returns the hostile NPC brain.

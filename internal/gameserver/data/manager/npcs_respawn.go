@@ -9,30 +9,33 @@ import (
 )
 
 func (n *Npcs) RespawnHook(actorID int32) func() {
-	if obj, ok := n.state.Object(actorID); ok {
-		if h, ok := obj.(*npc.Hostile); ok {
-			n.ai.Remove(h)
-		}
-	}
-	n.walker.StopRouteByID(actorID)
-
 	n.mu.Lock()
 	key, tracked := n.live[actorID]
 	if tracked {
 		delete(n.live, actorID)
 		n.liveCount--
 	}
+	slot, ok := n.slot[key]
 	n.mu.Unlock()
-	if !tracked {
+	if !tracked || !ok {
 		return nil
 	}
 
-	n.mu.Lock()
-	slot, ok := n.slot[key]
-	n.mu.Unlock()
-	if !ok {
-		return nil
+	if obj, ok := n.state.Object(actorID); ok {
+		if h, ok := obj.(*npc.Hostile); ok {
+			n.despawnMinions(h)
+			if master := h.Master(); master != nil && slot.entry.RespawnDelay <= 0 {
+				master.RemoveMinion(actorID)
+				h.SetMaster(nil)
+			}
+		}
 	}
+	if obj, ok := n.state.Object(actorID); ok {
+		if h, ok := obj.(*npc.Hostile); ok {
+			n.ai.Remove(h)
+		}
+	}
+	n.walker.StopRouteByID(actorID)
 
 	delay := spawn.CalculateRespawnDelay(slot.entry)
 	if delay <= 0 {
@@ -70,6 +73,19 @@ func (n *Npcs) Respawn(key string) {
 	if !ok {
 		return
 	}
+	if slot.masterID != 0 {
+		obj, ok := n.state.Object(slot.masterID)
+		master, ok := obj.(*npc.Hostile)
+		if !ok || master.Dead() {
+			n.mu.Lock()
+			delete(n.slot, key)
+			n.mu.Unlock()
+			return
+		}
+		master.RemoveMinion(slot.liveID)
+		n.instantiate(key, slot.entry, tmpl, n.privateSpawnLocation(master, tmpl), master.Heading(), fullHP, fullMP, master)
+		return
+	}
 
 	if slot.dbName != "" {
 		state, ok := n.spawns.State(slot.dbName)
@@ -85,6 +101,29 @@ func (n *Npcs) Respawn(key string) {
 		return
 	}
 	n.spawnFresh(key, slot.entry, tmpl, pos)
+}
+
+func (n *Npcs) despawnMinions(master *npc.Hostile) {
+	for _, minion := range master.Minions() {
+		id := minion.ObjectID()
+		n.ai.Remove(minion)
+		n.walker.StopRouteByID(id)
+		minion.Decay(n.state, nil)
+		minion.SetMaster(nil)
+		master.RemoveMinion(id)
+
+		n.mu.Lock()
+		if _, ok := n.live[id]; ok {
+			delete(n.live, id)
+			n.liveCount--
+		}
+		for key, slot := range n.slot {
+			if slot.masterID == master.ObjectID() {
+				delete(n.slot, key)
+			}
+		}
+		n.mu.Unlock()
+	}
 }
 
 // SyncPersistedState writes every live database-tracked slot's current HP,
