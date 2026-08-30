@@ -384,7 +384,9 @@ func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient) {
 			if frame == nil {
 				t.Fatalf("EnterWorld frame %d (want %#x) never arrived", i, opcode)
 			}
-			if frame[0] != serverpackets.OpcodeCharInfo {
+			// Skip nearby CharInfo/NPCInfo (owner, pets, NPCs) interleaved ahead
+			// of this client's own EnterWorld burst.
+			if frame[0] != serverpackets.OpcodeCharInfo && frame[0] != serverpackets.OpcodeNPCInfo {
 				break
 			}
 		}

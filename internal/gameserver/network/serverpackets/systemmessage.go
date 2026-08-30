@@ -105,6 +105,8 @@ const (
 	SystemMessageServitorHasVanished               = 1521 // no parameter
 	SystemMessageAttentionS1PickedUpS2             = 1533
 	SystemMessageAttentionS1PickedUpS2S3           = 1534
+	SystemMessageAttentionS1PetPickedUpS2          = 1535
+	SystemMessageAttentionS1PetPickedUpS2S3        = 1536
 	SystemMessageItemsUnavailableForStore          = 1578
 	SystemMessageNoServitorCannotAutomateUse       = 1676
 	SystemMessageCannotEnchantWhileStore           = 1688
