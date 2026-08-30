@@ -203,11 +203,19 @@ func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, lo
 	n.mu.Lock()
 	n.live[id] = key
 	n.liveCount++
+	slot := n.slot[key]
+	slot.liveID = id
+	n.slot[key] = slot
 	n.mu.Unlock()
 	return hostile
 }
 
 func (n *Npcs) spawnPrivates(key string, entry spawn.Entry, master *npc.Hostile) {
+	// Java's generic MonsterBehavior creates spawn-list privates only for Party_Type 2.
+	partyType, err := master.Instance.Template.AIParams.GetIntDefault("Party_Type", 0)
+	if err != nil || partyType != 2 {
+		return
+	}
 	for i, private := range entry.Privates {
 		tmpl, ok := n.templates.Get(int(private.NPCID))
 		if !ok {

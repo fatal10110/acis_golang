@@ -9,10 +9,22 @@ import (
 )
 
 func (n *Npcs) RespawnHook(actorID int32) func() {
+	n.mu.Lock()
+	key, tracked := n.live[actorID]
+	if tracked {
+		delete(n.live, actorID)
+		n.liveCount--
+	}
+	slot, ok := n.slot[key]
+	n.mu.Unlock()
+	if !tracked || !ok {
+		return nil
+	}
+
 	if obj, ok := n.state.Object(actorID); ok {
 		if h, ok := obj.(*npc.Hostile); ok {
 			n.despawnMinions(h)
-			if master := h.Master(); master != nil {
+			if master := h.Master(); master != nil && slot.entry.RespawnDelay <= 0 {
 				master.RemoveMinion(actorID)
 				h.SetMaster(nil)
 			}
@@ -24,24 +36,6 @@ func (n *Npcs) RespawnHook(actorID int32) func() {
 		}
 	}
 	n.walker.StopRouteByID(actorID)
-
-	n.mu.Lock()
-	key, tracked := n.live[actorID]
-	if tracked {
-		delete(n.live, actorID)
-		n.liveCount--
-	}
-	n.mu.Unlock()
-	if !tracked {
-		return nil
-	}
-
-	n.mu.Lock()
-	slot, ok := n.slot[key]
-	n.mu.Unlock()
-	if !ok {
-		return nil
-	}
 
 	delay := spawn.CalculateRespawnDelay(slot.entry)
 	if delay <= 0 {
@@ -88,6 +82,7 @@ func (n *Npcs) Respawn(key string) {
 			n.mu.Unlock()
 			return
 		}
+		master.RemoveMinion(slot.liveID)
 		n.instantiate(key, slot.entry, tmpl, n.privateSpawnLocation(master, tmpl), master.Heading(), fullHP, fullMP, master)
 		return
 	}

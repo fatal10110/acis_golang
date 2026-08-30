@@ -7,6 +7,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -32,8 +33,10 @@ func TestNpcSpawnCreatesPrivateMinion(t *testing.T) {
 	decay, _ := task.NewDecay(nopDecayEffects{}, time.Now)
 	respawn, _ := task.NewRespawn(nopRespawnEffects{}, time.Now)
 	walker, _ := task.NewWalker(nil, noRouteWalkerPath{}, time.Now, state)
+	partyAI := commons.NewStatSet()
+	partyAI.Set("Party_Type", 2)
 	npcs, err := NewNpcs(NewSpawns(table, nil), npc.NewTable([]*npc.Template{
-		{ID: 1, TemplateID: 1, Type: "Monster", HPMax: 100, RunSpeed: 100},
+		{ID: 1, TemplateID: 1, Type: "Monster", HPMax: 100, RunSpeed: 100, AIParams: partyAI},
 		{ID: 2, TemplateID: 2, Type: "Monster", HPMax: 100, RunSpeed: 100},
 	}), fakeGeo{}, state, &sequentialIDs{}, decay, respawn, task.NewAI(state, zerolog.Nop()), task.NewPositionUpdates(state), item.NewTable(nil),
 		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker)
@@ -51,7 +54,8 @@ func TestNpcSpawnCreatesPrivateMinion(t *testing.T) {
 	if !ok {
 		t.Fatal("private missing")
 	}
-	if got := child.(*npc.Hostile).Master(); got != master.(*npc.Hostile) {
+	masterHostile := master.(*npc.Hostile)
+	if got := child.(*npc.Hostile).Master(); got != masterHostile {
 		t.Fatalf("private master = %p, want %p", got, master)
 	}
 	respawnPrivate := npcs.RespawnHook(2)
@@ -61,13 +65,24 @@ func TestNpcSpawnCreatesPrivateMinion(t *testing.T) {
 	if !child.(*npc.Hostile).Decay(state, respawnPrivate) {
 		t.Fatal("private Decay() = false, want true")
 	}
+	if got := len(masterHostile.Minions()); got != 1 {
+		t.Fatalf("master minions after private decay = %d, want 1 until respawn", got)
+	}
 	npcs.Respawn("maker#0#0/private/0")
 	child, ok = state.Object(3)
 	if !ok {
 		t.Fatal("respawned private missing")
 	}
-	if got := child.(*npc.Hostile).Master(); got != master.(*npc.Hostile) {
+	if got := child.(*npc.Hostile).Master(); got != masterHostile {
 		t.Fatalf("respawned private master = %p, want %p", got, master)
+	}
+	if got := len(masterHostile.Minions()); got != 1 {
+		t.Fatalf("master minions after private respawn = %d, want 1", got)
+	}
+	partyAI.Unset("Party_Type")
+	npcs.spawnPrivates("skipped", npcs.slot["maker#0#0"].entry, masterHostile)
+	if got := npcs.LiveCount(); got != 2 {
+		t.Fatalf("LiveCount() after non-party private spawn = %d, want 2", got)
 	}
 	if !master.(*npc.Hostile).Decay(state, npcs.RespawnHook(1)) {
 		t.Fatal("master Decay() = false, want true")

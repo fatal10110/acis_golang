@@ -30,6 +30,7 @@ type slotInfo struct {
 	entry    spawn.Entry
 	dbName   string
 	masterID int32
+	liveID   int32
 }
 
 // KillRewardConfig carries live reward settings loaded at game-server boot.
