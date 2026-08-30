@@ -164,6 +164,15 @@ func (c *Character) SetStopBroadcaster(broadcast func()) {
 	c.broadcastStop = broadcast
 }
 
+// SetAutoAttackStopBroadcaster records the packet-layer hook that broadcasts
+// AutoAttackStop to this character's own session and nearby connected clients
+// when its combat-stance inactivity period expires.
+func (c *Character) SetAutoAttackStopBroadcaster(broadcast func()) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	c.broadcastAutoAttackStop = broadcast
+}
+
 // SetDieBroadcaster records the packet-layer hook that broadcasts the death
 // packet to this character's own session and nearby connected clients at
 // the moment this character dies.
@@ -624,6 +633,17 @@ func (c *Character) BroadcastStop() error {
 		broadcast()
 	}
 	return nil
+}
+
+// BroadcastAutoAttackStop sends AutoAttackStop through the runtime packet
+// hook when combat stance expires from inactivity.
+func (c *Character) BroadcastAutoAttackStop() {
+	c.stateMu.RLock()
+	broadcast := c.broadcastAutoAttackStop
+	c.stateMu.RUnlock()
+	if broadcast != nil {
+		broadcast()
+	}
 }
 
 // BroadcastDie sends the death packet through the runtime packet hook.

@@ -66,6 +66,7 @@ type petStore interface {
 
 type attackStanceTracker interface {
 	Add(task.AttackStanceActor)
+	Remove(task.AttackStanceActor) bool
 	InAttackStance(task.AttackStanceActor) bool
 }
 

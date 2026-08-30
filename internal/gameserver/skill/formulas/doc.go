@@ -11,7 +11,6 @@
 // critical arithmetic testable in isolation with committed expected
 // values, and defers wiring it to real actors until that actor exists.
 //
-// Not covered here, left for whoever wires up per-skill data: the land
-// chance for a blow-type skill's critical hit. BlowDamage computes its
-// damage once it's known to land.
+// BlowSucceeds rolls whether a blow-type skill lands. BlowDamage computes
+// its damage once that roll succeeds.
 package formulas
