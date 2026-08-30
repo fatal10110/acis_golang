@@ -19,6 +19,39 @@ import (
 )
 
 type locatedRef struct{ move.Actor }
+
+type homePathRecoveryActor interface {
+	GeoPathFailCount() int
+	ResetGeoPathFailCount()
+	AddGeoPathFailCount()
+	TeleportTo(location.Location)
+}
+
+func (r *locatedRef) GeoPathFailCount() int {
+	if a, ok := r.Actor.(homePathRecoveryActor); ok {
+		return a.GeoPathFailCount()
+	}
+	return 0
+}
+
+func (r *locatedRef) ResetGeoPathFailCount() {
+	if a, ok := r.Actor.(homePathRecoveryActor); ok {
+		a.ResetGeoPathFailCount()
+	}
+}
+
+func (r *locatedRef) AddGeoPathFailCount() {
+	if a, ok := r.Actor.(homePathRecoveryActor); ok {
+		a.AddGeoPathFailCount()
+	}
+}
+
+func (r *locatedRef) TeleportTo(target location.Location) {
+	if a, ok := r.Actor.(homePathRecoveryActor); ok {
+		a.TeleportTo(target)
+	}
+}
+
 type creatureActorRef struct{ attack.CreatureActor }
 type statOwnerRef struct{ effect.StatOwner }
 
