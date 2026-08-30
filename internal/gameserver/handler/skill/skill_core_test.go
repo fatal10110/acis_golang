@@ -65,6 +65,7 @@ var (
 	_ magicDamageTarget   = (*player.Character)(nil)
 	_ magicDamageTarget   = (*npc.Hostile)(nil)
 	_ magicDamageTarget   = (*summon.Actor)(nil)
+	_ worldPlayerTarget   = (*player.Character)(nil)
 	_ blowDamageTarget    = (*player.Character)(nil)
 	_ blowDamageTarget    = (*npc.Hostile)(nil)
 	_ manaDamageTarget    = (*player.Character)(nil)
@@ -1830,6 +1831,58 @@ func TestPhysicalMagicBlowAndManaDamageHandlersUseFormulaInputs(t *testing.T) {
 	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "MANADAM"}, Targets: []Actor{target}})
 	if target.mp != 20 {
 		t.Fatalf("MANADAM mp = %v, want 20", target.mp)
+	}
+}
+
+func TestMdamHalfFailureHalvesDamageAndReportsAttackFailed(t *testing.T) {
+	registry := NewDefaultRegistry()
+	target := &skillTarget{
+		hp:      2000,
+		magicOK: true,
+		magicInput: formulas.MagicDamageInput{
+			MAtk: 400, MDef: 50, SkillPower: 20,
+			PvPMul: 1, ElementalMul: 1,
+			Failure: formulas.MagicFailureHalf,
+		},
+	}
+	result, ok := registry.UseResult(Cast{
+		Skill:   modelskill.Definition{SkillType: "MDAM"},
+		Targets: []Actor{target},
+	})
+	if !ok {
+		t.Fatal("UseResult() handled = false, want true for MDAM")
+	}
+	if result.AttackFailed != 1 {
+		t.Fatalf("AttackFailed = %d, want 1", result.AttackFailed)
+	}
+	if !almost(target.hp, 2000-364) {
+		t.Fatalf("MDAM half-fail hp = %v, want %v", target.hp, 2000-364)
+	}
+}
+
+func TestMdamFullFailureFlattensDamage(t *testing.T) {
+	registry := NewDefaultRegistry()
+	target := &skillTarget{
+		hp:      2000,
+		magicOK: true,
+		magicInput: formulas.MagicDamageInput{
+			MAtk: 400, MDef: 50, SkillPower: 20,
+			PvPMul: 1, ElementalMul: 1, MagicCrit: true,
+			Failure: formulas.MagicFailureFull,
+		},
+	}
+	result, ok := registry.UseResult(Cast{
+		Skill:   modelskill.Definition{SkillType: "MDAM"},
+		Targets: []Actor{target},
+	})
+	if !ok {
+		t.Fatal("UseResult() handled = false, want true for MDAM")
+	}
+	if result.AttackFailed != 0 {
+		t.Fatalf("AttackFailed = %d, want 0", result.AttackFailed)
+	}
+	if !almost(target.hp, 1999) {
+		t.Fatalf("MDAM full-fail hp = %v, want 1999", target.hp)
 	}
 }
 

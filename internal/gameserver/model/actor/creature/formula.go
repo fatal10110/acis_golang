@@ -124,7 +124,7 @@ func ResolveMagicDamageInput(caster DeathActor, target FormulaActor, def modelsk
 		return formulas.MagicDamageInput{}, false
 	}
 	sps, bsps := SpiritshotFlags(attacker)
-	return formulas.MagicDamageInput{
+	in := formulas.MagicDamageInput{
 		MAtk:            attacker.MAtk(),
 		MDef:            Positive(target.MDef()),
 		SkillPower:      float64(def.Power),
@@ -133,7 +133,38 @@ func ResolveMagicDamageInput(caster DeathActor, target FormulaActor, def modelsk
 		MagicCrit:       formulas.MCritSucceeds(int(attacker.MagicCriticalRate()), attacker.Roll(1000)),
 		SoulShot:        sps,
 		BlessedSoulShot: bsps,
-	}, true
+	}
+	applyMagicFailure(&in, attacker, target, def)
+	return in, true
+}
+
+type magicFailureWeapon interface {
+	WeaponGradePenalty() bool
+}
+
+type worldPlayerMarker interface {
+	WorldPlayer()
+}
+
+func applyMagicFailure(in *formulas.MagicDamageInput, attacker, target FormulaActor, def modelskill.Definition) {
+	if !formulas.MagicFailuresEnabled() {
+		return
+	}
+	penalty := false
+	if p, ok := any(attacker).(magicFailureWeapon); ok {
+		penalty = p.WeaponGradePenalty()
+	}
+	rate := formulas.MagicSuccessRate(target.Level(), attacker.Level(), def.MagicLevel, def.LevelDepend, penalty)
+	first := formulas.MagicSucceeds(rate, attacker.Roll(10000))
+	_, isPlayer := any(attacker).(worldPlayerMarker)
+	second := false
+	if !first && isPlayer {
+		second = formulas.MagicSucceeds(rate, attacker.Roll(10000))
+	}
+	in.Failure = formulas.MagicFailureOutcome(true, first, isPlayer, second, target.Level()-attacker.Level())
+	if in.Failure != formulas.MagicFailureNone {
+		in.MagicCrit = false
+	}
 }
 
 // ResolveBlowInput builds a blow-damage input from the caster/target pair.
