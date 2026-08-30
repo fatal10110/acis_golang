@@ -2,6 +2,7 @@ package move
 
 import (
 	"errors"
+	"sync"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -31,6 +32,10 @@ type pawnFollowActor interface {
 	OffensiveFollowIsPawnMove() bool
 }
 
+type targetKnower interface {
+	Knows(attackable.Combatant) bool
+}
+
 // PositionUpdater is the moving actor surface consumed by the position
 // update task. PositionUpdate must deregister itself from whatever
 // PositionUpdateRegistry it was added through once it no longer needs
@@ -53,15 +58,15 @@ type PositionUpdateRegistry interface {
 // movement surface, translating a follow/attack-range decision into
 // CreatureMove's StartOffensiveFollow/CancelFollow calls and a return-home
 // request into MoveToLocation.
-//
-// Controller holds no mutable state of its own — self and move are set once
-// at construction — so it needs no lock; every mutation happens inside the
-// wrapped CreatureMove, which is the caller's own synchronization
-// responsibility per its doc comment.
 type Controller struct {
 	move            *CreatureMove
 	self            Actor
 	positionUpdates PositionUpdateRegistry
+
+	mu                   sync.Mutex
+	offensiveTarget      attackable.Combatant
+	offensiveRange       int
+	offensiveFollowTicks int
 }
 
 // NewController adapts move for self, the position/footprint of the actor
@@ -126,13 +131,10 @@ func (c *Controller) SetPositionUpdates(updates PositionUpdateRegistry) {
 //
 // This does not reproduce the reference behavior's line-of-sight branch (an
 // out-of-range NPC that also can't see its target still counts it as
-// followable) — the controller has no line-of-sight input. It also
-// does not re-track a target that keeps moving during the approach: this
-// starts one movement request toward the target's position at call time,
-// which is enough to converge on a stationary target and is re-issued
-// naturally the next time the caller re-evaluates (on arrival, or on the
-// next attack attempt).
+// followable) — the controller has no line-of-sight input.
 func (c *Controller) MaybeStartOffensiveFollow(target attackable.Combatant, attackRange int) (bool, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	return c.maybeStartFollow(target, attackRange, FollowOffensive)
 }
 
@@ -141,6 +143,9 @@ func (c *Controller) MaybeStartOffensiveFollow(target attackable.Combatant, atta
 // footprints. Friendly follow broadcasts a plain movement request; follow
 // identity stays server-side for the follow tick.
 func (c *Controller) MaybeStartFriendlyFollow(target attackable.Combatant, offset int) (bool, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.clearOffensiveFollow()
 	return c.maybeStartFollow(target, offset, FollowFriendly)
 }
 
@@ -170,7 +175,7 @@ func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, m
 		if mode == FollowFriendly {
 			c.move.StartFriendlyFollow(target.ObjectID(), offset)
 		} else {
-			c.move.CancelFollow()
+			c.clearOffensiveFollow()
 		}
 		return false, nil
 	}
@@ -180,6 +185,8 @@ func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, m
 		c.move.StartFriendlyFollow(target.ObjectID(), offset)
 	case FollowOffensive:
 		c.move.StartOffensiveFollow(target.ObjectID(), offset)
+		c.offensiveTarget = target
+		c.offensiveRange = offset
 	default:
 		return false, nil
 	}
@@ -189,7 +196,7 @@ func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, m
 			// Can't actually approach (for example, zero speed): don't
 			// report "still moving" — that would strand the caller waiting
 			// on progress that will never happen.
-			c.move.CancelFollow()
+			c.clearOffensiveFollow()
 			return false, nil
 		}
 		if mode == FollowOffensive {
@@ -250,8 +257,10 @@ func (c *Controller) MoveToLocationEvent(target location.Location) (Event, error
 // otherwise a client that already received the move request keeps walking
 // toward the stale destination until it separately resyncs.
 func (c *Controller) Stop() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	wasMoving := c.move.Moving() || c.move.Following()
-	c.move.CancelFollow()
+	c.clearOffensiveFollow()
 	c.move.CancelMove()
 	c.removePositionUpdate()
 	if wasMoving {
@@ -265,7 +274,12 @@ func (c *Controller) Stop() error {
 // arrival a no-op.
 func (c *Controller) SetArrived(arrived func()) {
 	c.move.SetArrivedHook(func() {
-		c.removePositionUpdate()
+		c.mu.Lock()
+		following := c.offensiveTarget != nil
+		c.mu.Unlock()
+		if !following {
+			c.removePositionUpdate()
+		}
 		if arrived != nil {
 			arrived()
 		}
@@ -291,14 +305,40 @@ func (c *Controller) SetArrived(arrived func()) {
 // decides whether to unregister.
 func (c *Controller) PositionUpdate() bool {
 	event, moving := c.move.UpdatePosition(PositionUpdateInterval)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.recheckOffensiveFollow()
 	if !moving {
-		if !c.move.Moving() {
+		if !c.move.Moving() && c.offensiveTarget == nil {
 			c.removePositionUpdate()
 		}
-		return c.move.Moving()
+		return c.move.Moving() || c.offensiveTarget != nil
 	}
 	c.self.SyncPosition(event.Origin)
 	return true
+}
+
+func (c *Controller) recheckOffensiveFollow() {
+	if c.offensiveTarget == nil {
+		return
+	}
+	if actor, ok := c.self.(targetKnower); ok && !actor.Knows(c.offensiveTarget) {
+		c.clearOffensiveFollow()
+		return
+	}
+	c.offensiveFollowTicks++
+	if c.offensiveFollowTicks < 5 {
+		return
+	}
+	c.offensiveFollowTicks = 0
+	_, _ = c.maybeStartFollow(c.offensiveTarget, c.offensiveRange, FollowOffensive)
+}
+
+func (c *Controller) clearOffensiveFollow() {
+	c.move.CancelFollow()
+	c.offensiveTarget = nil
+	c.offensiveRange = 0
+	c.offensiveFollowTicks = 0
 }
 
 func (c *Controller) addPositionUpdate() {
