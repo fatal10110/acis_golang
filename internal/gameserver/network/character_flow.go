@@ -18,6 +18,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
@@ -440,6 +441,15 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	creatureLive, err := creature.NewLive(location.Location{X: x, Y: y, Z: z}, c.RunSpeed(), l.geo, c)
 	if err != nil {
 		return nil, fmt.Errorf("attach live player: %w", err)
+	}
+	if l.zones != nil {
+		creatureLive.Move().SetWaterSurface(func(position location.Location, groundZ int) (int, bool) {
+			water, ok := zone.FindAt[*zone.Water](l.zones, position.X, position.Y, position.Z)
+			if !ok || groundZ-water.WaterLevel() >= -20 {
+				return 0, false
+			}
+			return water.WaterLevel(), true
+		})
 	}
 	c.AttachLive(creatureLive)
 	moveCtl, err := move.NewController(c.Move(), c)
