@@ -2,8 +2,10 @@ package manager
 
 import (
 	"fmt"
+	"math"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -72,6 +74,12 @@ func (n *Npcs) registerSlot(key string, maker *spawn.Maker, entry spawn.Entry, d
 	n.mu.Unlock()
 }
 
+func (n *Npcs) registerPrivateSlot(key string, entry spawn.Entry, masterID int32) {
+	n.mu.Lock()
+	n.slot[key] = slotInfo{key: key, entry: entry, masterID: masterID}
+	n.mu.Unlock()
+}
+
 // bootSpawnPersisted restores or freshly spawns a database-tracked entry's
 // single slot at boot. A spawn still dead with a pending respawn deadline
 // is not instantiated: only its respawn timer is (re)armed, matching the
@@ -113,7 +121,10 @@ func (n *Npcs) spawnPersisted(key string, maker *spawn.Maker, entry spawn.Entry,
 	if state.CheckAlive(pos.Location, pos.Heading, int(tmpl.HPMax), int(tmpl.MPMax), now) {
 		loc, heading, hp, mp = state.Location, state.Heading, state.CurrentHP, state.CurrentMP
 	}
-	n.instantiate(key, entry, tmpl, loc, heading, hp, mp)
+	master := n.instantiate(key, entry, tmpl, loc, heading, hp, mp, nil)
+	if master != nil {
+		n.spawnPrivates(key, entry, master)
+	}
 }
 
 // fullHP tells instantiate to seed the spawned Hostile at its own calculated
@@ -124,24 +135,27 @@ const fullHP = -1
 // position, always alive at full HP/MP — the reference server never restores
 // HP/MP/position across restarts for a spawn without a database name.
 func (n *Npcs) spawnFresh(key string, entry spawn.Entry, tmpl *npc.Template, pos spawn.Position) {
-	n.instantiate(key, entry, tmpl, pos.Location, pos.Heading, fullHP, fullMP)
+	master := n.instantiate(key, entry, tmpl, pos.Location, pos.Heading, fullHP, fullMP, nil)
+	if master != nil {
+		n.spawnPrivates(key, entry, master)
+	}
 }
 
 // instantiate builds one live Hostile from tmpl and places it in the world
 // at (loc, heading) with hp current HP and mp current MP (or fullHP/fullMP,
 // its calculated Max HP/MP), registering it for AI ticks and corpse
 // decay/respawn.
-func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, loc location.Location, heading, hp, mp int) {
+func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, loc location.Location, heading, hp, mp int, master *npc.Hostile) *npc.Hostile {
 	id, err := n.ids.NextID()
 	if err != nil {
 		n.log.Warn().Err(err).Int32("npc_id", entry.NPCID).Msg("spawn: id space exhausted")
-		return
+		return nil
 	}
 
 	inst, err := npc.NewInstance(id, tmpl)
 	if err != nil {
 		n.log.Warn().Err(err).Int32("npc_id", entry.NPCID).Msg("spawn: cannot build npc instance")
-		return
+		return nil
 	}
 	inst.Home = loc
 	inst.HasHome = true
@@ -150,7 +164,7 @@ func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, lo
 
 	if !npc.Attackable(inst) {
 		n.skippedNonCombatCount.Add(1)
-		return
+		return nil
 	}
 
 	speed := tmpl.RunSpeed
@@ -160,7 +174,7 @@ func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, lo
 	hostile, walkerRef, err := newLiveHostile(inst, speed, n.geo, n.positions, n.log, n.castDefs, n.castEffects, n.walker)
 	if err != nil {
 		n.log.Warn().Err(err).Int32("npc_id", entry.NPCID).Msg("spawn: cannot build live npc")
-		return
+		return nil
 	}
 
 	if hp == fullHP {
@@ -175,6 +189,10 @@ func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, lo
 	hostile.SetFrameBuilder(serverpackets.NpcFrameBuilder{})
 	hostile.SetWeapon(n.items)
 	hostile.SetRewarder(n.rewarderFor(hostile, tmpl))
+	if master != nil {
+		hostile.SetMaster(master)
+		master.AddMinion(hostile)
+	}
 
 	n.state.Spawn(hostile, loc.X, loc.Y, loc.Z, heading)
 	n.ai.Add(hostile)
@@ -185,7 +203,41 @@ func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, lo
 	n.mu.Lock()
 	n.live[id] = key
 	n.liveCount++
+	slot := n.slot[key]
+	slot.liveID = id
+	n.slot[key] = slot
 	n.mu.Unlock()
+	return hostile
+}
+
+func (n *Npcs) spawnPrivates(key string, entry spawn.Entry, master *npc.Hostile) {
+	// Java's generic MonsterBehavior creates spawn-list privates only for Party_Type 2.
+	partyType, err := master.Instance.Template.AIParams.GetIntDefault("Party_Type", 0)
+	if err != nil || partyType != 2 {
+		return
+	}
+	for i, private := range entry.Privates {
+		tmpl, ok := n.templates.Get(int(private.NPCID))
+		if !ok {
+			n.log.Warn().Int32("npc_id", private.NPCID).Msg("spawn: private template missing")
+			continue
+		}
+		privateEntry := spawn.Entry{NPCID: private.NPCID, RespawnDelay: private.RespawnDelay}
+		privateKey := fmt.Sprintf("%s/private/%d", key, i)
+		n.registerPrivateSlot(privateKey, privateEntry, master.ObjectID())
+		n.instantiate(privateKey, privateEntry, tmpl, n.privateSpawnLocation(master, tmpl), master.Heading(), fullHP, fullMP, master)
+	}
+}
+
+func (n *Npcs) privateSpawnLocation(master *npc.Hostile, tmpl *npc.Template) location.Location {
+	x, y, z := master.Position()
+	minOffset := int(master.Instance.Template.CollisionRadius + 30)
+	maxOffset := int(100 + master.Instance.Template.CollisionRadius + tmpl.CollisionRadius)
+	angle := float64(rnd.Get(360)) * math.Pi / 180
+	offset := rnd.GetRange(minOffset, maxOffset)
+	targetX := x + int(float64(offset)*math.Cos(angle))
+	targetY := y + int(float64(offset)*math.Sin(angle))
+	return n.geo.ValidLocation(x, y, z, targetX, targetY, z)
 }
 
 // rewarderFor returns the kill-reward hook for a newly spawned hostile.

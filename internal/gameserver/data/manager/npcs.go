@@ -25,10 +25,12 @@ import (
 // "a database-tracked spawn ignores its total and only ever has one
 // instance" rule.
 type slotInfo struct {
-	key    string
-	maker  *spawn.Maker
-	entry  spawn.Entry
-	dbName string
+	key      string
+	maker    *spawn.Maker
+	entry    spawn.Entry
+	dbName   string
+	masterID int32
+	liveID   int32
 }
 
 // KillRewardConfig carries live reward settings loaded at game-server boot.
