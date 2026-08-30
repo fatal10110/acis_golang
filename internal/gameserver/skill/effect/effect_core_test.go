@@ -2288,10 +2288,13 @@ func TestTemplatePassiveModsResolvesRefsAndSkipsMissing(t *testing.T) {
 		Funcs:      []modelskill.FuncTemplate{{Op: modelskill.FuncAdd, Stat: "maxHp", Value: 250}},
 	}})
 
-	got := TemplatePassiveMods(table, []modelskill.Ref{
+	got, err := TemplatePassiveMods(table, []modelskill.Ref{
 		{ID: 99, Level: 1},
 		{ID: 98, Level: 1},
 	})
+	if err != nil {
+		t.Fatalf("TemplatePassiveMods() error: %v", err)
+	}
 	if len(got) != 1 {
 		t.Fatalf("TemplatePassiveMods() length = %d, want 1 (missing ref skipped)", len(got))
 	}
@@ -2299,8 +2302,48 @@ func TestTemplatePassiveModsResolvesRefsAndSkipsMissing(t *testing.T) {
 		t.Fatalf("Value = %v, want 250", got[0].Value)
 	}
 
-	if fns := TemplatePassiveMods(nil, []modelskill.Ref{{ID: 99, Level: 1}}); len(fns) != 0 {
+	fns, err := TemplatePassiveMods(nil, []modelskill.Ref{{ID: 99, Level: 1}})
+	if err != nil {
+		t.Fatalf("nil lookup error: %v", err)
+	}
+	if len(fns) != 0 {
 		t.Fatalf("nil lookup = %v, want empty", fns)
+	}
+}
+
+func TestTemplatePassiveModsSkipsEnchantAndReportsBuildErrors(t *testing.T) {
+	table := modelskill.NewTable([]modelskill.Definition{
+		{
+			ID:    1,
+			Level: 1,
+			Funcs: []modelskill.FuncTemplate{{Op: modelskill.FuncEnchant, Stat: "pAtk", Value: 1}},
+		},
+		{
+			ID:    2,
+			Level: 1,
+			Funcs: []modelskill.FuncTemplate{{Op: modelskill.FuncAdd, Stat: "notAStat", Value: 1}},
+		},
+		{
+			ID:    3,
+			Level: 1,
+			Funcs: []modelskill.FuncTemplate{{Op: modelskill.FuncAdd, Stat: "maxHp", Value: 250}},
+		},
+	})
+
+	got, err := TemplatePassiveMods(table, []modelskill.Ref{{ID: 1, Level: 1}, {ID: 3, Level: 1}})
+	if err != nil {
+		t.Fatalf("enchant skip error: %v", err)
+	}
+	if len(got) != 1 || got[0].Value != 250 {
+		t.Fatalf("enchant skip = %+v, want maxHp add 250", got)
+	}
+
+	_, err = TemplatePassiveMods(table, []modelskill.Ref{{ID: 2, Level: 1}})
+	if err == nil {
+		t.Fatal("TemplatePassiveMods() error = nil, want unknown-stat build error")
+	}
+	if !strings.Contains(err.Error(), "template passive skill 2 level 1") {
+		t.Fatalf("error = %v, want skill 2 level 1 wrapped", err)
 	}
 }
 

@@ -1,11 +1,17 @@
 package effect
 
 import (
+	"errors"
 	"fmt"
 
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
+
+// ErrEnchantNeedsItem is the expected skip when a skill's func templates
+// include an enchant op and the owner is not an item. NPC and summon
+// template passives have no item owner.
+var ErrEnchantNeedsItem = errors.New("enchant stat funcs need an item owner")
 
 func statFuncs(owner ModOwner, templates []modelskill.FuncTemplate, cond Condition) ([]Mod, error) {
 	mods := make([]Mod, 0, len(templates))
@@ -57,7 +63,7 @@ func statOp(op modelskill.FuncOp) (Op, error) {
 	case modelskill.FuncBaseAdd:
 		return OpBaseAdd, nil
 	case modelskill.FuncEnchant:
-		return 0, fmt.Errorf("enchant stat funcs need an item owner")
+		return 0, ErrEnchantNeedsItem
 	default:
 		return 0, fmt.Errorf("unknown stat func op %s", op)
 	}

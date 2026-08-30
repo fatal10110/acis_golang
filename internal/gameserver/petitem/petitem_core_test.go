@@ -18,6 +18,15 @@ type pickupTestOwner struct {
 }
 
 func (o *pickupTestOwner) ObjectID() int32 { return o.id }
+
+func mustTestPet(t *testing.T, cfg summon.PetConfig) *summon.Actor {
+	t.Helper()
+	pet, err := summon.NewPet(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return pet
+}
 func (o *pickupTestOwner) LevelValue() int { return 1 }
 func (o *pickupTestOwner) InCombat() bool  { return false }
 
@@ -45,7 +54,7 @@ func TestGiveToPetTransfersAndReportsPersistence(t *testing.T) {
 	templates := testTemplates()
 	playerInv := itemcontainer.NewPlayerInventory(1, templates)
 	petInv := itemcontainer.NewPetInventory(2, templates)
-	pet := summon.NewPet(summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv})
+	pet := mustTestPet(t, summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv})
 	stack := playerInv.AddNew(item.AdenaID, 100, 500)
 	playerInv.DrainUpdates()
 	petInv.DrainUpdates()
@@ -72,7 +81,7 @@ func TestGiveToPetChecksCapacityBeforeMutation(t *testing.T) {
 	petInv := itemcontainer.NewPetInventory(2, templates)
 	petInv.SlotLimit = 1
 	petInv.AddNew(20, 1, 600)
-	pet := summon.NewPet(summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv})
+	pet := mustTestPet(t, summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv})
 	inst := playerInv.AddNew(30, 1, 500)
 
 	_, failure, err := NewService(nil).GiveToPet(playerInv, petInv, pet, testOwner{}, inst.ObjectID, 1)
@@ -91,7 +100,7 @@ func TestGiveToPetChecksDistanceBeforeMutation(t *testing.T) {
 	templates := testTemplates()
 	playerInv := itemcontainer.NewPlayerInventory(1, templates)
 	petInv := itemcontainer.NewPetInventory(2, templates)
-	pet := summon.NewPet(summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv})
+	pet := mustTestPet(t, summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv})
 	stack := playerInv.AddNew(item.AdenaID, 100, 500)
 
 	_, failure, err := NewService(nil).GiveToPet(playerInv, petInv, pet, testOwner{x: GiveInteractionDistance + 1}, stack.ObjectID, 30)
@@ -109,7 +118,7 @@ func TestGiveToPetChecksDistanceBeforeMutation(t *testing.T) {
 func TestPickupGroundItemAddsToPetAndReportsPersistence(t *testing.T) {
 	templates := testTemplates()
 	petInv := itemcontainer.NewPetInventory(2, templates)
-	pet := summon.NewPet(summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv})
+	pet := mustTestPet(t, summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv})
 	tmpl, ok := templates.Get(item.AdenaID)
 	if !ok {
 		t.Fatal("adena template missing")
@@ -142,7 +151,7 @@ func TestPickupGroundItemSucceedsOverPetWeightLimit(t *testing.T) {
 	})
 	petInv := itemcontainer.NewPetInventory(2, templates)
 	petInv.WeightLimit = 1
-	pet := summon.NewPet(summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv})
+	pet := mustTestPet(t, summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv})
 	tmpl, ok := templates.Get(9002)
 	if !ok {
 		t.Fatal("template missing")
@@ -173,7 +182,7 @@ func TestPickupGroundRejectsLootLockedItem(t *testing.T) {
 	templates := testTemplates()
 	petInv := itemcontainer.NewPetInventory(2, templates)
 	owner := &pickupTestOwner{id: 1}
-	pet := summon.NewPet(summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv, Owner: owner})
+	pet := mustTestPet(t, summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv, Owner: owner})
 	tmpl, ok := templates.Get(item.AdenaID)
 	if !ok {
 		t.Fatal("adena template missing")
@@ -203,7 +212,7 @@ func TestPickupGroundReportsCapacityBeforeLootLock(t *testing.T) {
 	petInv.SlotLimit = 1
 	petInv.AddNew(20, 1, 600)
 	owner := &pickupTestOwner{id: 1}
-	pet := summon.NewPet(summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv, Owner: owner})
+	pet := mustTestPet(t, summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv, Owner: owner})
 	tmpl, ok := templates.Get(item.AdenaID)
 	if !ok {
 		t.Fatal("adena template missing")
@@ -224,7 +233,7 @@ func TestPickupGroundAllowsPetOwnerLootedItem(t *testing.T) {
 	templates := testTemplates()
 	petInv := itemcontainer.NewPetInventory(2, templates)
 	owner := &pickupTestOwner{id: 1}
-	pet := summon.NewPet(summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv, Owner: owner})
+	pet := mustTestPet(t, summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv, Owner: owner})
 	tmpl, ok := templates.Get(item.AdenaID)
 	if !ok {
 		t.Fatal("adena template missing")
@@ -256,7 +265,7 @@ func TestPickupGroundHerbStaysOutOfPetInventory(t *testing.T) {
 		EtcItem:     &item.EtcItemDetail{Type: item.EtcItemHerb},
 	}})
 	petInv := itemcontainer.NewPetInventory(2, templates)
-	pet := summon.NewPet(summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv})
+	pet := mustTestPet(t, summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv})
 	tmpl, _ := templates.Get(9001)
 	ground, err := grounditem.New(item.Instance{ObjectID: 900, TemplateID: 9001, Count: 1, ManaLeft: -1}, tmpl)
 	if err != nil {
@@ -289,7 +298,7 @@ func TestPickupGroundRejectsLootLockedHerb(t *testing.T) {
 	}})
 	petInv := itemcontainer.NewPetInventory(2, templates)
 	owner := &pickupTestOwner{id: 1}
-	pet := summon.NewPet(summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv, Owner: owner})
+	pet := mustTestPet(t, summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv, Owner: owner})
 	tmpl, _ := templates.Get(9001)
 	ground, err := grounditem.New(item.Instance{ObjectID: 900, TemplateID: 9001, Count: 1, ManaLeft: -1, OwnerID: 99}, tmpl)
 	if err != nil {
@@ -309,7 +318,7 @@ func TestPickupGroundRejectsLootLockedHerb(t *testing.T) {
 func TestUseItemEquipsAndUnequipsPetWeapon(t *testing.T) {
 	templates := testTemplates()
 	petInv := itemcontainer.NewPetInventory(2, templates)
-	pet := summon.NewPet(summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv})
+	pet := mustTestPet(t, summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv})
 	weapon := petInv.AddNew(20, 1, 700)
 	petInv.DrainUpdates()
 
@@ -344,7 +353,7 @@ func TestGetFromPetLeavesEquipmentUntouchedOnFailedTransfer(t *testing.T) {
 	templates := testTemplates()
 	playerInv := itemcontainer.NewPlayerInventory(1, templates)
 	petInv := itemcontainer.NewPetInventory(2, templates)
-	pet := summon.NewPet(summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv})
+	pet := mustTestPet(t, summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv})
 	weapon := petInv.AddNew(20, 1, 700)
 	petInv.DrainUpdates()
 
@@ -379,7 +388,7 @@ func TestUseItemRejectsConditionFailureOnUnequippedItem(t *testing.T) {
 			UseConditions: []item.UseCondition{{Root: item.Condition{Kind: "player", Attrs: map[string]string{"level": "50"}}}}},
 	})
 	petInv := itemcontainer.NewPetInventory(2, templates)
-	pet := summon.NewPet(summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv, Level: 10})
+	pet := mustTestPet(t, summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv, Level: 10})
 	weapon := petInv.AddNew(21, 1, 700)
 	petInv.DrainUpdates()
 
@@ -401,7 +410,7 @@ func TestUseItemAllowsConditionSuccessOnUnequippedItem(t *testing.T) {
 			UseConditions: []item.UseCondition{{Root: item.Condition{Kind: "player", Attrs: map[string]string{"level": "50"}}}}},
 	})
 	petInv := itemcontainer.NewPetInventory(2, templates)
-	pet := summon.NewPet(summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv, Level: 50})
+	pet := mustTestPet(t, summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv, Level: 50})
 	weapon := petInv.AddNew(21, 1, 700)
 	petInv.DrainUpdates()
 
@@ -425,7 +434,7 @@ func TestUseItemConditionGateSkipsAlreadyEquippedItem(t *testing.T) {
 	// The pet is under-level from the start (unlike the equip case, level
 	// never needs to change): the reference's !item.isEquipped() guard skips
 	// checkCondition entirely for the unequip path, so it must never run.
-	pet := summon.NewPet(summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv, Level: 10})
+	pet := mustTestPet(t, summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv, Level: 10})
 	weapon := petInv.AddNew(21, 1, 700)
 	tmpl, _ := templates.Get(21)
 	petInv.SetPaperdollItem(itemcontainer.RHand, weapon, tmpl)
@@ -447,7 +456,7 @@ func TestUseItemConditionGateAppliesToConsumableDispatch(t *testing.T) {
 			UseConditions: []item.UseCondition{{Root: item.Condition{Kind: "player", Attrs: map[string]string{"level": "50"}}}}},
 	})
 	petInv := itemcontainer.NewPetInventory(2, templates)
-	pet := summon.NewPet(summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv, Level: 10})
+	pet := mustTestPet(t, summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv, Level: 10})
 	potion := petInv.AddNew(1061, 1, 700)
 	petInv.DrainUpdates()
 
@@ -475,7 +484,7 @@ func testTemplates() *item.Table {
 func TestUseItemDispatchesEligibleConsumable(t *testing.T) {
 	templates := testTemplates()
 	petInv := itemcontainer.NewPetInventory(2, templates)
-	pet := summon.NewPet(summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv, Food1: 2515})
+	pet := mustTestPet(t, summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv, Food1: 2515})
 
 	potion := petInv.AddNew(1060, 1, 700)
 	petInv.DrainUpdates()
@@ -499,7 +508,7 @@ func TestUseItemDispatchesEligibleConsumable(t *testing.T) {
 func TestUseItemRejectsIneligibleFood(t *testing.T) {
 	templates := testTemplates()
 	petInv := itemcontainer.NewPetInventory(2, templates)
-	pet := summon.NewPet(summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv, Food1: 2515})
+	pet := mustTestPet(t, summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv, Food1: 2515})
 
 	food := petInv.AddNew(4038, 1, 700)
 	petInv.DrainUpdates()

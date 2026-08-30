@@ -124,11 +124,14 @@ func TestUseBeastSoulshotChargesSummonAndConsumes(t *testing.T) {
 	shot := srv.GiveItem(t, objID, 6645, 10)
 	startInWorld(t, c)
 
-	servitor := summon.NewServitor(summon.ServitorConfig{
+	servitor, err := summon.NewServitor(summon.ServitorConfig{
 		ObjectID: srv.NewObjectID(),
 		Level:    44,
 		Stats:    summon.CombatStats{MaxHP: 500, MaxMP: 200, SSCount: 5},
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	srv.State.AddSummon(objID, servitor)
 	drainUntilQuiet(t, c)
 

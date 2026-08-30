@@ -23,7 +23,7 @@ import (
 // stat calculator — see the parallel player-package test for the downstream
 // formula behavior this plumbing enables.
 func TestSummonCancelVulnerabilityAppliesCancelVulnStat(t *testing.T) {
-	a := NewServitor(ServitorConfig{ObjectID: 1, Level: 44, Roll: zeroSummonRoll})
+	a := mustServitor(t, ServitorConfig{ObjectID: 1, Level: 44, Roll: zeroSummonRoll})
 
 	if got := a.CancelVulnerability("CANCEL"); got != 1 {
 		t.Fatalf("CancelVulnerability() with no modifier = %v, want 1 (unmodified)", got)
@@ -206,7 +206,7 @@ func (g movingGate) Test(effector stat.Actor) bool {
 }
 
 func TestSummonConditionalStatFuncGatesOnRealMovement(t *testing.T) {
-	a := NewServitor(ServitorConfig{ObjectID: 1, Level: 44, Roll: zeroSummonRoll})
+	a := mustServitor(t, ServitorConfig{ObjectID: 1, Level: 44, Roll: zeroSummonRoll})
 
 	// HealEffectiveness carries no default summon stat func (see
 	// defaultStatFuncs), so its finalized value is driven purely by what
@@ -255,7 +255,7 @@ func (g levelGate) Test(effector stat.Actor) bool {
 }
 
 func TestSummonConditionalStatFuncGatesOnRealLevel(t *testing.T) {
-	a := NewServitor(ServitorConfig{ObjectID: 1, Level: 44, Roll: zeroSummonRoll})
+	a := mustServitor(t, ServitorConfig{ObjectID: 1, Level: 44, Roll: zeroSummonRoll})
 
 	// HealEffectiveness carries no default summon stat func (see
 	// defaultStatFuncs), so its finalized value is driven purely by what
@@ -277,7 +277,7 @@ func TestSummonConditionalStatFuncGatesOnRealLevel(t *testing.T) {
 
 func TestSummonStatActorImplementsConditionsActor(t *testing.T) {
 	stats := CombatStats{MaxHP: 500, MaxMP: 200}
-	a := NewServitor(ServitorConfig{ObjectID: 1, Level: 44, Stats: stats, Roll: zeroSummonRoll})
+	a := mustServitor(t, ServitorConfig{ObjectID: 1, Level: 44, Stats: stats, Roll: zeroSummonRoll})
 
 	var actor conditions.Actor = summonStatActor{a: a}
 	if actor.Level() != 44 {
@@ -299,7 +299,7 @@ func TestSummonStatActorImplementsConditionsActor(t *testing.T) {
 
 // ---- from effects_test.go ----
 func TestSummonEffectListHoldsAppliedEffects(t *testing.T) {
-	servitor := NewServitor(ServitorConfig{ObjectID: 1, Level: 40, Stats: CombatStats{MaxHP: 500, MaxMP: 200}, Roll: zeroSummonRoll})
+	servitor := mustServitor(t, ServitorConfig{ObjectID: 1, Level: 40, Stats: CombatStats{MaxHP: 500, MaxMP: 200}, Roll: zeroSummonRoll})
 
 	if servitor.MaxBuffCount() != baseBuffSlots {
 		t.Fatalf("MaxBuffCount() = %d, want %d", servitor.MaxBuffCount(), baseBuffSlots)
@@ -335,7 +335,7 @@ func TestSummonDenyAIActionHonorsCrowdControlEffects(t *testing.T) {
 		{"fear", effect.FlagFear},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			summon := NewServitor(ServitorConfig{ObjectID: 1})
+			summon := mustServitor(t, ServitorConfig{ObjectID: 1})
 			summon.EffectList().Add(&effect.Effect{Flag: tt.flag})
 
 			if !summon.DenyAIAction() {
@@ -346,7 +346,7 @@ func TestSummonDenyAIActionHonorsCrowdControlEffects(t *testing.T) {
 }
 
 func TestSummonDenyAIActionHonorsTransientControlStates(t *testing.T) {
-	summon := NewServitor(ServitorConfig{ObjectID: 1})
+	summon := mustServitor(t, ServitorConfig{ObjectID: 1})
 
 	if !summon.SetParalyzed(true) || !summon.DenyAIAction() {
 		t.Fatal("paralyzed summon must deny AI actions")
@@ -365,7 +365,7 @@ func TestSummonDenyAIActionHonorsTransientControlStates(t *testing.T) {
 // PET_REFUSING_ORDER, matching Summon.isOutOfControl (Summon.java:296-298):
 // super.isOutOfControl() || isBetrayed().
 func TestSummonOutOfControlHonorsBetrayedFlag(t *testing.T) {
-	summon := NewServitor(ServitorConfig{ObjectID: 1})
+	summon := mustServitor(t, ServitorConfig{ObjectID: 1})
 
 	if summon.OutOfControl() {
 		t.Fatal("OutOfControl() = true before any betray effect, want false")
@@ -384,7 +384,7 @@ func TestSummonOutOfControlHonorsBetrayedFlag(t *testing.T) {
 }
 
 func TestPetEffectListHoldsAppliedEffects(t *testing.T) {
-	pet := NewPet(PetConfig{ObjectID: 1, Level: 40, Stats: CombatStats{MaxHP: 500, MaxMP: 200}, Roll: zeroSummonRoll})
+	pet := mustPet(t, PetConfig{ObjectID: 1, Level: 40, Stats: CombatStats{MaxHP: 500, MaxMP: 200}, Roll: zeroSummonRoll})
 
 	if pet.EffectList() == nil {
 		t.Fatal("EffectList() = nil, want a live list wired at construction")
@@ -410,13 +410,13 @@ func goldenSummonScenarios(t testing.TB) map[string]float64 {
 	}
 
 	{
-		a1 := NewServitor(ServitorConfig{ObjectID: 1, Level: 44, Stats: stats, Roll: zeroSummonRoll})
+		a1 := mustServitor(t, ServitorConfig{ObjectID: 1, Level: 44, Stats: stats, Roll: zeroSummonRoll})
 		a1.AddStatFuncs([]effect.Mod{{Stat: stat.PowerDefence, Op: effect.OpAdd, Value: 1e16}})
 		a1.AddStatFuncs([]effect.Mod{{Stat: stat.PowerDefence, Op: effect.OpSub, Value: 1e16}})
 		a1.AddStatFuncs([]effect.Mod{{Stat: stat.PowerDefence, Op: effect.OpAdd, Value: 1}})
 		out["order30_forward"] = a1.PDef()
 
-		a2 := NewServitor(ServitorConfig{ObjectID: 2, Level: 44, Stats: stats, Roll: zeroSummonRoll})
+		a2 := mustServitor(t, ServitorConfig{ObjectID: 2, Level: 44, Stats: stats, Roll: zeroSummonRoll})
 		a2.AddStatFuncs([]effect.Mod{{Stat: stat.PowerDefence, Op: effect.OpAdd, Value: 1}})
 		a2.AddStatFuncs([]effect.Mod{{Stat: stat.PowerDefence, Op: effect.OpSub, Value: 1e16}})
 		a2.AddStatFuncs([]effect.Mod{{Stat: stat.PowerDefence, Op: effect.OpAdd, Value: 1e16}})
@@ -424,7 +424,7 @@ func goldenSummonScenarios(t testing.TB) map[string]float64 {
 	}
 
 	{
-		a := NewPet(PetConfig{ObjectID: 3, Level: 44, Stats: stats, Roll: zeroSummonRoll})
+		a := mustPet(t, PetConfig{ObjectID: 3, Level: 44, Stats: stats, Roll: zeroSummonRoll})
 		a.AddStatFuncs([]effect.Mod{
 			{Stat: stat.MagicDefence, Op: effect.OpSet, Value: 500},
 			{Stat: stat.MagicDefence, Op: effect.OpBaseMul, Value: 0.5},
@@ -433,7 +433,7 @@ func goldenSummonScenarios(t testing.TB) map[string]float64 {
 	}
 
 	{
-		a := NewPet(PetConfig{ObjectID: 4, Level: 44, Stats: stats, Roll: zeroSummonRoll})
+		a := mustPet(t, PetConfig{ObjectID: 4, Level: 44, Stats: stats, Roll: zeroSummonRoll})
 		base := a.PAtk()
 		owner := effect.ModOwnerEffect(&effect.Effect{})
 		a.AddStatFuncs([]effect.Mod{
@@ -526,8 +526,8 @@ func TestSummonFormulaInputsResolveStatsAndResources(t *testing.T) {
 		PAtk: 100, PDef: 50, MAtk: 64, MDef: 40,
 		MaxHP: 500, MaxMP: 200, BaseRandomDamage: 5,
 	}
-	caster := NewServitor(ServitorConfig{ObjectID: 1, Level: 44, Stats: stats, Roll: zeroSummonRoll})
-	target := NewPet(PetConfig{ObjectID: 2, Level: 44, Stats: stats, Roll: zeroSummonRoll})
+	caster := mustServitor(t, ServitorConfig{ObjectID: 1, Level: 44, Stats: stats, Roll: zeroSummonRoll})
+	target := mustPet(t, PetConfig{ObjectID: 2, Level: 44, Stats: stats, Roll: zeroSummonRoll})
 
 	owner := effect.ModOwnerEffect(&effect.Effect{})
 	caster.AddStatFuncs([]effect.Mod{
@@ -689,7 +689,7 @@ func TestSummonFormulaInputsResolveStatsAndResources(t *testing.T) {
 }
 
 func TestSummonSkillReflectInputUsesMagicSpecificStat(t *testing.T) {
-	target := NewPet(PetConfig{ObjectID: 1, Stats: CombatStats{}})
+	target := mustPet(t, PetConfig{ObjectID: 1, Stats: CombatStats{}})
 	refOwner := effect.ModOwnerEffect(&effect.Effect{})
 	target.AddStatFuncs([]effect.Mod{
 		{Stat: stat.ReflectSkillMagic, Op: effect.OpSet, Value: 17, Owner: refOwner},
@@ -714,7 +714,7 @@ func TestSummonSkillReflectInputUsesMagicSpecificStat(t *testing.T) {
 
 func TestSummonCalcStatFloorsNonPositiveValues(t *testing.T) {
 	for _, value := range []float64{0, -1} {
-		a := NewPet(PetConfig{ObjectID: 1})
+		a := mustPet(t, PetConfig{ObjectID: 1})
 		a.AddStatFuncs([]effect.Mod{{Stat: stat.PowerAttack, Op: effect.OpSet, Value: value}})
 
 		if got := a.CalcStat(stat.PowerAttack, 10); got != 1 {
@@ -724,7 +724,7 @@ func TestSummonCalcStatFloorsNonPositiveValues(t *testing.T) {
 }
 
 func TestDeadConcurrentReduceHPAndRead(t *testing.T) {
-	actor := NewPet(PetConfig{Stats: CombatStats{MaxHP: 1}})
+	actor := mustPet(t, PetConfig{Stats: CombatStats{MaxHP: 1}})
 	started := make(chan struct{})
 	done := make(chan struct{})
 	go func() {
@@ -748,8 +748,8 @@ func closeSummonFloat(a, b float64) bool {
 
 // ---- from formula_speed_test.go ----
 func TestActorPAtkSpdHungryHalvesBase(t *testing.T) {
-	hungry := NewPet(PetConfig{ObjectID: 1, Level: 10, MaxMeal: 100, Fed: 10, HungryLimit: 0.3, Roll: zeroSummonRoll})
-	fed := NewPet(PetConfig{ObjectID: 2, Level: 10, MaxMeal: 100, Fed: 100, HungryLimit: 0.3, Roll: zeroSummonRoll})
+	hungry := mustPet(t, PetConfig{ObjectID: 1, Level: 10, MaxMeal: 100, Fed: 10, HungryLimit: 0.3, Roll: zeroSummonRoll})
+	fed := mustPet(t, PetConfig{ObjectID: 2, Level: 10, MaxMeal: 100, Fed: 100, HungryLimit: 0.3, Roll: zeroSummonRoll})
 
 	hungryValue := hungry.PAtkSpd(300)
 	fedValue := fed.PAtkSpd(300)
@@ -759,8 +759,8 @@ func TestActorPAtkSpdHungryHalvesBase(t *testing.T) {
 }
 
 func TestActorMAtkSpdHungryHalvesBase(t *testing.T) {
-	hungry := NewPet(PetConfig{ObjectID: 1, Level: 10, MaxMeal: 100, Fed: 10, HungryLimit: 0.3, Roll: zeroSummonRoll})
-	fed := NewPet(PetConfig{ObjectID: 2, Level: 10, MaxMeal: 100, Fed: 100, HungryLimit: 0.3, Roll: zeroSummonRoll})
+	hungry := mustPet(t, PetConfig{ObjectID: 1, Level: 10, MaxMeal: 100, Fed: 10, HungryLimit: 0.3, Roll: zeroSummonRoll})
+	fed := mustPet(t, PetConfig{ObjectID: 2, Level: 10, MaxMeal: 100, Fed: 100, HungryLimit: 0.3, Roll: zeroSummonRoll})
 
 	hungryValue := hungry.MAtkSpd()
 	fedValue := fed.MAtkSpd()
@@ -770,7 +770,7 @@ func TestActorMAtkSpdHungryHalvesBase(t *testing.T) {
 }
 
 func TestActorCriticalRateCapsAt500(t *testing.T) {
-	pet := NewPet(PetConfig{ObjectID: 1, Level: 10, Roll: zeroSummonRoll})
+	pet := mustPet(t, PetConfig{ObjectID: 1, Level: 10, Roll: zeroSummonRoll})
 	if got := pet.CriticalRate(600); got != 500 {
 		t.Fatalf("CriticalRate(600) = %v, want capped at 500", got)
 	}
@@ -782,7 +782,7 @@ func TestActorCriticalRateCapsAt500(t *testing.T) {
 // finalizes to 84.8 (base*10, no DEX bonus for summons); truncating first
 // yields the int 84, not the untruncated 84.8.
 func TestActorCriticalRateTruncatesBeforeCap(t *testing.T) {
-	pet := NewPet(PetConfig{ObjectID: 1, Level: 10, Roll: zeroSummonRoll})
+	pet := mustPet(t, PetConfig{ObjectID: 1, Level: 10, Roll: zeroSummonRoll})
 	if got := pet.CriticalRate(8.48); got != 84 {
 		t.Fatalf("CriticalRate(8.48) = %v, want truncated to 84", got)
 	}
@@ -791,8 +791,8 @@ func TestActorCriticalRateTruncatesBeforeCap(t *testing.T) {
 func TestActorMAtkSpdServitorNeverHalved(t *testing.T) {
 	// A servitor has no feeding state at all (isPet is false), so its
 	// magic attack speed must equal a well-fed pet's, never a hungry one's.
-	servitor := NewServitor(ServitorConfig{ObjectID: 1, Level: 10, Roll: zeroSummonRoll})
-	fed := NewPet(PetConfig{ObjectID: 2, Level: 10, MaxMeal: 100, Fed: 100, HungryLimit: 0.3, Roll: zeroSummonRoll})
+	servitor := mustServitor(t, ServitorConfig{ObjectID: 1, Level: 10, Roll: zeroSummonRoll})
+	fed := mustPet(t, PetConfig{ObjectID: 2, Level: 10, MaxMeal: 100, Fed: 100, HungryLimit: 0.3, Roll: zeroSummonRoll})
 	if servitor.MAtkSpd() != fed.MAtkSpd() {
 		t.Fatalf("MAtkSpd() servitor=%v, want unhalved (matching a well-fed pet) %v", servitor.MAtkSpd(), fed.MAtkSpd())
 	}
@@ -804,8 +804,8 @@ type deniedLethalCaster struct{ *Actor }
 func (deniedLethalCaster) CanGiveDamage() bool { return false }
 
 func TestActorLethalSurfaceBuildsInputAndAppliesOutcomes(t *testing.T) {
-	caster := NewServitor(ServitorConfig{ObjectID: 1, Level: 40, Stats: CombatStats{MaxHP: 500}})
-	target := NewServitor(ServitorConfig{ObjectID: 2, Level: 45, Stats: CombatStats{MaxHP: 500}})
+	caster := mustServitor(t, ServitorConfig{ObjectID: 1, Level: 40, Stats: CombatStats{MaxHP: 500}})
+	target := mustServitor(t, ServitorConfig{ObjectID: 2, Level: 45, Stats: CombatStats{MaxHP: 500}})
 	skill := modelskill.Definition{LethalChance1: 30, LethalChance2: 10, MagicLevel: 40}
 
 	in, ok := target.LethalInput(caster, skill)
@@ -831,8 +831,8 @@ func TestActorLethalSurfaceBuildsInputAndAppliesOutcomes(t *testing.T) {
 }
 
 func TestActorLethalInputRejectsGuardedDamage(t *testing.T) {
-	caster := NewServitor(ServitorConfig{ObjectID: 1, Level: 40, Stats: CombatStats{MaxHP: 500}})
-	target := NewServitor(ServitorConfig{ObjectID: 2, Level: 45, Stats: CombatStats{MaxHP: 500}})
+	caster := mustServitor(t, ServitorConfig{ObjectID: 1, Level: 40, Stats: CombatStats{MaxHP: 500}})
+	target := mustServitor(t, ServitorConfig{ObjectID: 2, Level: 45, Stats: CombatStats{MaxHP: 500}})
 	skill := modelskill.Definition{LethalChance1: 30}
 	target.SetInvul(true)
 	if _, ok := target.LethalInput(caster, skill); ok {
@@ -935,7 +935,7 @@ func TestTick_NeverConsumes(t *testing.T) {
 
 // ---- from shots_test.go ----
 func TestSummonChargedShotStateAndCounts(t *testing.T) {
-	servitor := NewServitor(ServitorConfig{ObjectID: 1, Level: 40, Stats: CombatStats{MaxHP: 500, MaxMP: 200, SSCount: 5, SPSCount: 3}, Roll: zeroSummonRoll})
+	servitor := mustServitor(t, ServitorConfig{ObjectID: 1, Level: 40, Stats: CombatStats{MaxHP: 500, MaxMP: 200, SSCount: 5, SPSCount: 3}, Roll: zeroSummonRoll})
 
 	if servitor.SoulshotCharged() || servitor.SpiritshotCharged() || servitor.BlessedSpiritshotCharged() {
 		t.Fatal("new summon should carry no shot charge")
@@ -985,7 +985,7 @@ func TestReduceHPUpdatesStatusAfterDirectAndDOTDamage(t *testing.T) {
 		{"dot", func(a *Actor) { a.ReduceHPByDOT(10, nil, true) }},
 	} {
 		t.Run(damage.name, func(t *testing.T) {
-			a := NewPet(PetConfig{Stats: CombatStats{MaxHP: 100}})
+			a := mustPet(t, PetConfig{Stats: CombatStats{MaxHP: 100}})
 			updates := 0
 			a.SetStatusUpdater(func() { updates++ })
 
@@ -1005,10 +1005,10 @@ func TestReduceHPNotifiesKnownDirectAttackerOnly(t *testing.T) {
 		apply  func(*Actor, effect.Participant)
 		called bool
 	}{
-		{"pet direct", func() *Actor { return NewPet(PetConfig{Stats: CombatStats{MaxHP: 100}}) }, func(a *Actor, attacker effect.Participant) { a.ReduceHP(12.9, attacker, modelskill.Definition{}) }, true},
-		{"servitor direct", func() *Actor { return NewServitor(ServitorConfig{Stats: CombatStats{MaxHP: 100}}) }, func(a *Actor, attacker effect.Participant) { a.ReduceHP(12.9, attacker, modelskill.Definition{}) }, true},
-		{"dot", func() *Actor { return NewPet(PetConfig{Stats: CombatStats{MaxHP: 100}}) }, func(a *Actor, attacker effect.Participant) { a.ReduceHPByDOT(12.9, attacker, true) }, false},
-		{"unknown attacker", func() *Actor { return NewPet(PetConfig{Stats: CombatStats{MaxHP: 100}}) }, func(a *Actor, attacker effect.Participant) { a.ReduceHP(12.9, attacker, modelskill.Definition{}) }, false},
+		{"pet direct", func() *Actor { return mustPet(t, PetConfig{Stats: CombatStats{MaxHP: 100}}) }, func(a *Actor, attacker effect.Participant) { a.ReduceHP(12.9, attacker, modelskill.Definition{}) }, true},
+		{"servitor direct", func() *Actor { return mustServitor(t, ServitorConfig{Stats: CombatStats{MaxHP: 100}}) }, func(a *Actor, attacker effect.Participant) { a.ReduceHP(12.9, attacker, modelskill.Definition{}) }, true},
+		{"dot", func() *Actor { return mustPet(t, PetConfig{Stats: CombatStats{MaxHP: 100}}) }, func(a *Actor, attacker effect.Participant) { a.ReduceHPByDOT(12.9, attacker, true) }, false},
+		{"unknown attacker", func() *Actor { return mustPet(t, PetConfig{Stats: CombatStats{MaxHP: 100}}) }, func(a *Actor, attacker effect.Participant) { a.ReduceHP(12.9, attacker, modelskill.Definition{}) }, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var gotName string
@@ -1034,7 +1034,7 @@ func TestReduceHPNotifiesKnownDirectAttackerOnly(t *testing.T) {
 
 func TestNewServitorAppliesTemplatePassivesBeforeHPSeed(t *testing.T) {
 	stats := CombatStats{MaxHP: 1000, CON: 40}
-	base := NewServitor(ServitorConfig{ObjectID: 1, Level: 44, Stats: stats, Roll: zeroSummonRoll})
+	base := mustServitor(t, ServitorConfig{ObjectID: 1, Level: 44, Stats: stats, Roll: zeroSummonRoll})
 
 	passive := modelskill.Ref{ID: 99, Level: 1}
 	table := modelskill.NewTable([]modelskill.Definition{{
@@ -1043,7 +1043,7 @@ func TestNewServitorAppliesTemplatePassivesBeforeHPSeed(t *testing.T) {
 		Activation: modelskill.ActivationActive,
 		Funcs:      []modelskill.FuncTemplate{{Op: modelskill.FuncAdd, Stat: "maxHp", Value: 250}},
 	}})
-	got := NewServitor(ServitorConfig{
+	got := mustServitor(t, ServitorConfig{
 		ObjectID:  2,
 		Level:     44,
 		Stats:     stats,
@@ -1063,7 +1063,7 @@ func TestNewServitorAppliesTemplatePassivesBeforeHPSeed(t *testing.T) {
 
 func TestNewPetAppliesTemplatePassivesBeforeHPSeed(t *testing.T) {
 	stats := CombatStats{MaxHP: 500, CON: 40}
-	base := NewPet(PetConfig{ObjectID: 1, Level: 40, Stats: stats, Roll: zeroSummonRoll})
+	base := mustPet(t, PetConfig{ObjectID: 1, Level: 40, Stats: stats, Roll: zeroSummonRoll})
 
 	passive := modelskill.Ref{ID: 99, Level: 1}
 	table := modelskill.NewTable([]modelskill.Definition{{
@@ -1072,7 +1072,7 @@ func TestNewPetAppliesTemplatePassivesBeforeHPSeed(t *testing.T) {
 		Activation: modelskill.ActivationActive,
 		Funcs:      []modelskill.FuncTemplate{{Op: modelskill.FuncAdd, Stat: "maxHp", Value: 250}},
 	}})
-	got := NewPet(PetConfig{
+	got := mustPet(t, PetConfig{
 		ObjectID:  2,
 		Level:     40,
 		Stats:     stats,
@@ -1087,5 +1087,21 @@ func TestNewPetAppliesTemplatePassivesBeforeHPSeed(t *testing.T) {
 	}
 	if got.HP() != wantMax {
 		t.Fatalf("HP() = %v, want %v", got.HP(), wantMax)
+	}
+}
+
+func TestNewServitorFailsOnTemplatePassiveBuildError(t *testing.T) {
+	table := modelskill.NewTable([]modelskill.Definition{{
+		ID:    99,
+		Level: 1,
+		Funcs: []modelskill.FuncTemplate{{Op: modelskill.FuncAdd, Stat: "notAStat", Value: 1}},
+	}})
+	_, err := NewServitor(ServitorConfig{
+		ObjectID:  1,
+		Passives:  []modelskill.Ref{{ID: 99, Level: 1}},
+		SkillDefs: table,
+	})
+	if err == nil {
+		t.Fatal("NewServitor() error = nil, want template-passive build error")
 	}
 }

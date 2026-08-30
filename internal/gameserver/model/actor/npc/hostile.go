@@ -209,7 +209,11 @@ func NewHostile(inst *Instance, live *creature.Live, movement ai.MoveController,
 	if len(skills) > 0 {
 		lookup = skills[0]
 	}
-	h.AddStatFuncs(effect.TemplatePassiveMods(lookup, inst.Template.Passives))
+	mods, err := effect.TemplatePassiveMods(lookup, inst.Template.Passives)
+	if err != nil {
+		return nil, fmt.Errorf("npc %d template passives: %w", inst.Template.ID, err)
+	}
+	h.AddStatFuncs(mods)
 	// Seed from calculated Max HP/MP after template passives attach:
 	// MaxHpMul/MaxMpMul scale by CON/MEN bonus, and int-truncated maxima
 	// match the persisted spawn current-hp/mp contract.

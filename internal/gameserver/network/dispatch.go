@@ -382,13 +382,16 @@ func NewGameClientLink(cfg GameClientLinkConfig) *GameClientLink {
 // spawns a pet must route through here rather than calling summon.NewPet
 // directly, or the pet's inventory never registers and PetInventoryUpdate
 // silently stops reaching the client.
-func (l *GameClientLink) newPet(cfg summon.PetConfig) *summon.Actor {
+func (l *GameClientLink) newPet(cfg summon.PetConfig) (*summon.Actor, error) {
 	cfg.Config = &l.petConfig
-	pet := summon.NewPet(cfg)
+	pet, err := summon.NewPet(cfg)
+	if err != nil {
+		return nil, err
+	}
 	if live, ok := cfg.Owner.(*livePlayer); ok {
 		l.registerPetInventoryUpdates(pet, live)
 	}
-	return pet
+	return pet, nil
 }
 
 func (l *GameClientLink) rollEnchantSkill() int {

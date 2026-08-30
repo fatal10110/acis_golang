@@ -1,6 +1,7 @@
 package effect
 
 import (
+	"errors"
 	"fmt"
 
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -40,12 +41,12 @@ type skillLookup interface {
 }
 
 // TemplatePassiveMods resolves passives through lookup and builds each
-// skill's func templates. Missing id/level pairs and skills whose funcs
-// cannot be built (for example enchant funcs without an item owner) are
-// skipped. A nil lookup or empty list yields no mods.
-func TemplatePassiveMods(lookup skillLookup, passives []modelskill.Ref) []Mod {
+// skill's func templates. Missing id/level pairs and enchant funcs without
+// an item owner are skipped. Any other SkillStatFuncs error is returned so
+// a typo'd stat name or op cannot silently contribute zero stats.
+func TemplatePassiveMods(lookup skillLookup, passives []modelskill.Ref) ([]Mod, error) {
 	if lookup == nil || len(passives) == 0 {
-		return nil
+		return nil, nil
 	}
 	var mods []Mod
 	for _, ref := range passives {
@@ -55,9 +56,12 @@ func TemplatePassiveMods(lookup skillLookup, passives []modelskill.Ref) []Mod {
 		}
 		fns, err := SkillStatFuncs(def)
 		if err != nil {
-			continue
+			if errors.Is(err, ErrEnchantNeedsItem) {
+				continue
+			}
+			return nil, fmt.Errorf("template passive skill %d level %d: %w", ref.ID, ref.Level, err)
 		}
 		mods = append(mods, fns...)
 	}
-	return mods
+	return mods, nil
 }

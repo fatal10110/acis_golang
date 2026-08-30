@@ -789,3 +789,24 @@ func TestNewHostileRejectsFolkEvenWithTemplatePassives(t *testing.T) {
 		t.Fatal("NewHostile() error = nil, want rejection of Folk so template passives never attach")
 	}
 }
+
+func TestNewHostileFailsOnTemplatePassiveBuildError(t *testing.T) {
+	table := modelskill.NewTable([]modelskill.Definition{{
+		ID:    99,
+		Level: 1,
+		Funcs: []modelskill.FuncTemplate{{Op: modelskill.FuncAdd, Stat: "notAStat", Value: 1}},
+	}})
+	_, err := NewHostile(&Instance{
+		ObjectID: 1,
+		Template: &Template{
+			ID:       9001,
+			Type:     "Monster",
+			HPMax:    1000,
+			Passives: []modelskill.Ref{{ID: 99, Level: 1}},
+		},
+		Kind: "Monster",
+	}, newHostileLive(t), &hostileMove{}, &hostileAttack{}, table)
+	if err == nil {
+		t.Fatal("NewHostile() error = nil, want template-passive build error")
+	}
+}

@@ -131,7 +131,7 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 		foodRestore2, _ = petFoodFeedAmount(link.skills, link.petConfig.FoodRate, int32(npcTmpl.Pet.Food2))
 	}
 
-	pet := link.newPet(summon.PetConfig{
+	pet, err := link.newPet(summon.PetConfig{
 		ObjectID:        objID,
 		Owner:           live,
 		ControlItemID:   controlItem.ObjectID,
@@ -172,6 +172,9 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 		Passives:  npcTmpl.Passives,
 		SkillDefs: link.skills,
 	})
+	if err != nil {
+		return false
+	}
 	pet.SetZones(link.zones)
 	pet.SetHP(curHP)
 	// Java's Servitor/Pet construction sets max HP/MP before restoring
@@ -232,7 +235,7 @@ func (s *gameSummonSpawner) SpawnServitor(owner *player.Character, def modelskil
 		return false
 	}
 
-	servitor := summon.NewServitor(summon.ServitorConfig{
+	servitor, err := summon.NewServitor(summon.ServitorConfig{
 		ObjectID:        objID,
 		Owner:           live,
 		NPCID:           def.NpcID,
@@ -261,6 +264,9 @@ func (s *gameSummonSpawner) SpawnServitor(owner *player.Character, def modelskil
 		Passives:  npcTmpl.Passives,
 		SkillDefs: link.skills,
 	})
+	if err != nil {
+		return false
+	}
 	servitor.SetZones(link.zones)
 	link.wireSummonAI(servitor, npcTmpl.RunSpeed)
 	summon.SpawnBesideOwner(link.world, servitor, live, location.Location{X: petSpawnOffset})

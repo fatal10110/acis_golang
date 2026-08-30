@@ -67,7 +67,7 @@ func attachTestPet(t *testing.T, state *world.State, live *livePlayer, templates
 	t.Helper()
 	petInv := itemcontainer.NewPetInventory(0x20000001, templates)
 	petInv.Restore(items)
-	pet := summon.NewPet(summon.PetConfig{
+	pet, err := summon.NewPet(summon.PetConfig{
 		ObjectID:  0x20000001,
 		Owner:     live,
 		NPCID:     npcID,
@@ -76,6 +76,9 @@ func attachTestPet(t *testing.T, state *world.State, live *livePlayer, templates
 		Fed:       100,
 		MaxMeal:   100,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	summon.SpawnBesideOwner(state, pet, live, location.Location{X: 10})
 	// The dial-based tests already have a batching task registered for
 	// state (from the login flow) by the time they attach a pet; wire the

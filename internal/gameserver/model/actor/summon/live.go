@@ -1,6 +1,7 @@
 package summon
 
 import (
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -314,7 +315,7 @@ type ServitorConfig struct {
 }
 
 // NewServitor returns a live servitor actor.
-func NewServitor(cfg ServitorConfig) *Actor {
+func NewServitor(cfg ServitorConfig) (*Actor, error) {
 	a := &Actor{
 		id:               cfg.ObjectID,
 		owner:            cfg.Owner,
@@ -336,14 +337,16 @@ func NewServitor(cfg ServitorConfig) *Actor {
 		stats:            cfg.Stats,
 		skills:           cfg.Skills,
 	}
-	a.attachTemplatePassives(cfg.SkillDefs, cfg.Passives)
+	if err := a.attachTemplatePassives(cfg.SkillDefs, cfg.Passives); err != nil {
+		return nil, err
+	}
 	a.initVitals()
 	a.effects = effect.NewList(a)
-	return a
+	return a, nil
 }
 
 // NewPet returns a live pet actor.
-func NewPet(cfg PetConfig) *Actor {
+func NewPet(cfg PetConfig) (*Actor, error) {
 	petCfg := copyPetConfig(cfg.Config)
 	if petCfg != nil && cfg.Inventory != nil {
 		slots, weight := petCfg.InventoryLimits(cfg.CON)
@@ -385,18 +388,25 @@ func NewPet(cfg PetConfig) *Actor {
 		stats:         cfg.Stats,
 		skills:        cfg.Skills,
 	}
-	a.attachTemplatePassives(cfg.SkillDefs, cfg.Passives)
+	if err := a.attachTemplatePassives(cfg.SkillDefs, cfg.Passives); err != nil {
+		return nil, err
+	}
 	a.initVitals()
 	a.effects = effect.NewList(a)
-	return a
+	return a, nil
 }
 
 type skillLookup interface {
 	Definition(modelskill.Ref) (modelskill.Definition, bool)
 }
 
-func (a *Actor) attachTemplatePassives(lookup skillLookup, passives []modelskill.Ref) {
-	a.AddStatFuncs(effect.TemplatePassiveMods(lookup, passives))
+func (a *Actor) attachTemplatePassives(lookup skillLookup, passives []modelskill.Ref) error {
+	mods, err := effect.TemplatePassiveMods(lookup, passives)
+	if err != nil {
+		return fmt.Errorf("summon npc %d template passives: %w", a.npcID, err)
+	}
+	a.AddStatFuncs(mods)
+	return nil
 }
 
 func copyPetConfig(cfg *petmodel.Config) *petmodel.Config {

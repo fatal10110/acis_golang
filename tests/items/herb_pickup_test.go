@@ -95,11 +95,14 @@ func TestHerbPickupMirrorsOntoServitor(t *testing.T) {
 	srv, objID, groundID := bootHerbField(t)
 	c := srv.Client
 
-	servitor := summon.NewServitor(summon.ServitorConfig{
+	servitor, err := summon.NewServitor(summon.ServitorConfig{
 		ObjectID: srv.NewObjectID(),
 		Level:    44,
 		Stats:    summon.CombatStats{MaxHP: 500, MaxMP: 200},
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	srv.State.AddSummon(objID, servitor)
 	drainUntilQuiet(t, c)
 

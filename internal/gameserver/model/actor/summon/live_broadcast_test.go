@@ -86,7 +86,7 @@ type broadcastFixture struct {
 func newBroadcastFixture(t *testing.T) broadcastFixture {
 	t.Helper()
 	state := world.New()
-	actor := NewServitor(ServitorConfig{ObjectID: 7})
+	actor := mustServitor(t, ServitorConfig{ObjectID: 7})
 	owner := &fakeSummonOwner{id: 1}
 	SpawnBesideOwner(state, actor, owner, location.Location{})
 	frames := &fakeFrameBuilder{}
@@ -158,7 +158,7 @@ func TestSummonBroadcastAttackDeliversThroughHook(t *testing.T) {
 
 func TestSummonBroadcastWithoutHookIsSilentNoOp(t *testing.T) {
 	state := world.New()
-	actor := NewServitor(ServitorConfig{ObjectID: 7})
+	actor := mustServitor(t, ServitorConfig{ObjectID: 7})
 	SpawnBesideOwner(state, actor, &fakeSummonOwner{id: 1}, location.Location{})
 
 	if err := actor.BroadcastStop(); err != nil {
@@ -172,7 +172,7 @@ func TestSummonBroadcastWithoutHookIsSilentNoOp(t *testing.T) {
 func TestSummonBroadcastMoveToPawnDeliversThroughHook(t *testing.T) {
 	fx := newBroadcastFixture(t)
 
-	target := NewServitor(ServitorConfig{ObjectID: 9})
+	target := mustServitor(t, ServitorConfig{ObjectID: 9})
 	fx.actor.world.Spawn(target, 1020, 1000, 0, 0)
 
 	if err := fx.actor.BroadcastMoveToPawn(target); err != nil {
