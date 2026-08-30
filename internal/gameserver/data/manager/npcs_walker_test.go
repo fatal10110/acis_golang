@@ -12,6 +12,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/route"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/rs/zerolog"
@@ -141,6 +142,52 @@ func TestNpcSpawnRegistersWalkerRouteAndRestoresSpawnHeading(t *testing.T) {
 	}
 	if got := hostile.Heading(); got != walkerTestSpawnHeading {
 		t.Fatalf("Heading() after route arrival = %d, want spawn heading %d", got, walkerTestSpawnHeading)
+	}
+}
+
+func TestNpcMovementCapsAtWaterSurface(t *testing.T) {
+	dir := walkerTestSpawnFixture(t)
+	table, err := xml.LoadSpawnlist(dir, zerolog.Nop(), 1)
+	if err != nil {
+		t.Fatalf("LoadSpawnlist() error: %v", err)
+	}
+	form, err := zone.NewCuboid(0, 1_000, 0, 1_000, -1_000, 150)
+	if err != nil {
+		t.Fatal(err)
+	}
+	zones := zone.NewIndex()
+	zones.Add(zone.NewWater(1, form))
+	state := world.New()
+	decay, err := task.NewDecay(nopDecayEffects{}, time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	respawn, err := task.NewRespawn(nopRespawnEffects{}, time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	walker, err := task.NewWalker(nil, alwaysOpenPath{}, time.Now, state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = NewNpcs(NewSpawns(table, nil), walkerTestTemplate(), fakeGeo{}, state, &sequentialIDs{}, decay, respawn, task.NewAI(state, zerolog.Nop()), task.NewPositionUpdates(state), item.NewTable(nil), &recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, zones)
+	if err != nil {
+		t.Fatalf("NewNpcs() error: %v", err)
+	}
+	obj, ok := state.Object(1)
+	if !ok {
+		t.Fatal("spawned npc object id 1 not found")
+	}
+	hostile, ok := obj.(*npc.Hostile)
+	if !ok {
+		t.Fatalf("object id 1 is %T, want *npc.Hostile", obj)
+	}
+	if _, err := hostile.Move().MoveToLocation(location.Location{X: 300, Y: 200, Z: 200}); err != nil {
+		t.Fatalf("MoveToLocation() error: %v", err)
+	}
+	hostile.Move().UpdatePosition(10 * time.Second)
+	if got := hostile.Move().Position(); got.Z != 150 {
+		t.Fatalf("Position().Z = %d, want water surface 150", got.Z)
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
@@ -30,6 +31,38 @@ func TestMovementUpdatesWorldState(t *testing.T) {
 		t.Fatalf("walk opcode = %#x, want MoveToLocation (%#x)", reply[0], serverpackets.OpcodeMoveToLocation)
 	}
 	waitForWorldPosition(t, srv.State, objID, target)
+}
+
+func TestSwimmingMovementCapsPositionAtWaterSurface(t *testing.T) {
+	form, err := zone.NewCuboid(-1_000, 1_000, -1_000, 1_000, -1_000, 150)
+	if err != nil {
+		t.Fatal(err)
+	}
+	zones := zone.NewIndex()
+	zones.Add(zone.NewWater(1, form))
+	if _, ok := zone.FindAt[*zone.Water](zones, 10, 20, 30); !ok {
+		t.Fatal("water zone missing at player spawn")
+	}
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 1, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithZones(zones),
+	)
+	c := srv.Client
+
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
+	readEnterWorldBurst(t, c)
+	objID := srv.SoleObjectID(t)
+	target := location.Location{X: 300, Y: 200, Z: 200}
+	c.Send(encodeMoveBackwardToLocation(target, target, 1))
+	reply := c.Read()
+	if reply[0] != serverpackets.OpcodeMoveToLocation {
+		t.Fatalf("walk opcode = %#x, want MoveToLocation (%#x)", reply[0], serverpackets.OpcodeMoveToLocation)
+	}
+	waitForWorldPosition(t, srv.State, objID, location.Location{X: target.X, Y: target.Y, Z: 150})
 }
 
 // TestMoveBackwardToLocationRejectsBeyond9900Units pins

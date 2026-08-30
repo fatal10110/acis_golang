@@ -7,6 +7,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
 // Template holds the static, load-once data for one NPC id: base stats,
@@ -89,8 +90,14 @@ type Template struct {
 	// Skills maps skill id to the level this template grants it, from the
 	// template's <skills> block. A pet/servitor may only cast a skill via
 	// its owner's commanded action-bar shortcut when its own template
-	// grants that skill id, matching Java's Summon.getSkill.
+	// grants that skill id. Race-marker and type="PASSIVE" entries are
+	// excluded; unknown id/level pairs never reach this map.
 	Skills map[int]int
+
+	// Passives are the type="PASSIVE" <skill> entries that resolved in the
+	// skill table. Race-marker ids never enter this list, and commanded-skill
+	// lookups do not search it.
+	Passives []skill.Ref
 }
 
 // PrivateEntry describes one escort minion a template spawns alongside its
@@ -217,8 +224,8 @@ func NewPetLevelStats(set *commons.StatSet) (PetLevelStats, error) {
 }
 
 // NewTemplate builds a Template from set, the merged <set> attributes of
-// one <npc> element plus the "aiParams", "drops", "privates", "teachTo" and
-// "pet" values the loader packed in.
+// one <npc> element plus the "aiParams", "drops", "privates", "teachTo",
+// "pet", "skills", and "passives" values the loader packed in.
 func NewTemplate(set *commons.StatSet) (*Template, error) {
 	idf := commons.NewFields(set, "npc template")
 	id := idf.Int("id")
@@ -318,6 +325,10 @@ func NewTemplate(set *commons.StatSet) (*Template, error) {
 
 	if skills, ok := commons.FieldObject[map[int]int](f, "skills"); ok {
 		t.Skills = skills
+	}
+
+	if passives, ok := commons.FieldObject[[]skill.Ref](f, "passives"); ok {
+		t.Passives = passives
 	}
 
 	if err := f.Err(); err != nil {
