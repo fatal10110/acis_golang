@@ -64,7 +64,8 @@ type TargetSnapshot struct {
 // wired. When it is wired, UpdatePosition advances origin at the fixed
 // movement correction cadence and may complete the move first.
 type CreatureMove struct {
-	geo Geo
+	geo          Geo
+	waterSurface func(location.Location, int) (int, bool)
 
 	mu                   sync.Mutex
 	origin, destination  location.Location
@@ -149,6 +150,14 @@ func (m *CreatureMove) SetLogger(log zerolog.Logger) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.log = log
+}
+
+// SetWaterSurface records the query used to cap underwater movement at a
+// water surface. A nil query leaves ground movement capped at the world max.
+func (m *CreatureMove) SetWaterSurface(query func(location.Location, int) (int, bool)) {
+	m.mu.Lock()
+	m.waterSurface = query
+	m.mu.Unlock()
 }
 
 // SetSegmentAdvancedHook records the callback fired each time a multi-segment
@@ -339,6 +348,7 @@ func (m *CreatureMove) finishLocked() func() {
 		m.timer = nil
 	}
 	// Snap to the just-completed segment's destination.
+	m.destination.Z = min(m.destination.Z, m.maxZLocked())
 	m.origin = m.destination
 	m.accurateX = float64(m.destination.X)
 	m.accurateY = float64(m.destination.Y)
@@ -405,7 +415,8 @@ func (m *CreatureMove) UpdatePosition(step time.Duration) (Event, bool) {
 		return event, true
 	}
 
-	m.destination.Z = min(int(m.geo.Height(m.destination.X, m.destination.Y, m.destination.Z)), worldZMax)
+	maxZ := m.maxZLocked()
+	m.destination.Z = min(int(m.geo.Height(m.destination.X, m.destination.Y, m.destination.Z)), maxZ)
 	dx := float64(m.destination.X) - m.accurateX
 	dy := float64(m.destination.Y) - m.accurateY
 	left := math.Hypot(dx, dy)
@@ -418,7 +429,7 @@ func (m *CreatureMove) UpdatePosition(step time.Duration) (Event, bool) {
 		nextAccurateY += dy * fraction
 		next.X = int(nextAccurateX)
 		next.Y = int(nextAccurateY)
-		next.Z = min(int(m.geo.Height(next.X, next.Y, m.origin.Z+2*block.CellHeight)), worldZMax)
+		next.Z = min(int(m.geo.Height(next.X, next.Y, m.origin.Z+2*block.CellHeight)), maxZ)
 	}
 	if !m.geo.CanMove(m.origin.X, m.origin.Y, m.origin.Z, next.X, next.Y, next.Z) {
 		action := m.stopBlockedLocked()
@@ -454,6 +465,16 @@ func (m *CreatureMove) UpdatePosition(step time.Duration) (Event, bool) {
 	event := m.currentEventLocked()
 	m.mu.Unlock()
 	return event, true
+}
+
+func (m *CreatureMove) maxZLocked() int {
+	if m.waterSurface == nil {
+		return worldZMax
+	}
+	if surface, ok := m.waterSurface(m.origin, int(m.geo.Height(m.origin.X, m.origin.Y, m.origin.Z))); ok {
+		return surface
+	}
+	return worldZMax
 }
 
 func (m *CreatureMove) stopBlockedLocked() func() {

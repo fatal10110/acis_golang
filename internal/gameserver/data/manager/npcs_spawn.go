@@ -171,7 +171,7 @@ func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, lo
 	if inst.WalkMode {
 		speed = tmpl.WalkSpeed
 	}
-	hostile, walkerRef, err := newLiveHostile(inst, speed, n.geo, n.positions, n.log, n.castDefs, n.castEffects, n.walker)
+	hostile, walkerRef, err := newLiveHostile(inst, speed, n.geo, n.positions, n.log, n.castDefs, n.castEffects, n.walker, n.zones)
 	if err != nil {
 		n.log.Warn().Err(err).Int32("npc_id", entry.NPCID).Msg("spawn: cannot build live npc")
 		return nil

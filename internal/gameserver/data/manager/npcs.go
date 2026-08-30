@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -80,6 +81,7 @@ type Npcs struct {
 	now       func() time.Time
 	log       zerolog.Logger
 	walker    *task.Walker
+	zones     *zone.Index
 
 	// castDefs and castEffects wire a live Hostile's cast.AIController at
 	// spawn (see newLiveHostile). castDefs is nil-checked so a caller with
@@ -108,7 +110,7 @@ type Npcs struct {
 // NewNpcs walks spawns' loaded table and instantiates every "on start"
 // maker's qualifying entries into state, respecting persisted dead/alive
 // data for database-tracked entries.
-func NewNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.State, ids idAllocator, decay *task.Decay, respawnTask *task.Respawn, ai *task.AI, positions *task.PositionUpdates, items *item.Table, ground groundPlacer, rewards KillRewardConfig, now func() time.Time, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker) (*Npcs, error) {
+func NewNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.State, ids idAllocator, decay *task.Decay, respawnTask *task.Respawn, ai *task.AI, positions *task.PositionUpdates, items *item.Table, ground groundPlacer, rewards KillRewardConfig, now func() time.Time, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, zoneIndexes ...*zone.Index) (*Npcs, error) {
 	if spawns == nil || spawns.Table() == nil {
 		return nil, fmt.Errorf("npcs: nil spawn table")
 	}
@@ -148,6 +150,10 @@ func NewNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.St
 	if now == nil {
 		now = time.Now
 	}
+	var zones *zone.Index
+	if len(zoneIndexes) != 0 {
+		zones = zoneIndexes[0]
+	}
 
 	n := &Npcs{
 		templates:   templates,
@@ -165,6 +171,7 @@ func NewNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.St
 		now:         now,
 		log:         log,
 		walker:      walker,
+		zones:       zones,
 		castDefs:    castDefs,
 		castEffects: castEffects,
 		slot:        make(map[string]slotInfo),

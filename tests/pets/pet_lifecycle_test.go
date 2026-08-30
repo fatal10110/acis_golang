@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
@@ -144,6 +145,133 @@ func TestPetPickupGroundItem(t *testing.T) {
 	}
 }
 
+// TestPetPickupAttentionAnnouncedToObservers pins SummonAI.java:214-222:
+// a pet looting armor or a weapon announces 1535 to nearby other clients
+// with the owner name; the owner never receives the attention packet.
+func TestPetPickupAttentionAnnouncedToObservers(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		templateID int32
+	}{
+		{name: "weapon", templateID: 30},
+		{name: "armor", templateID: 40},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			h := bootOwnerWithCollar(t, seedItem{TemplateID: tc.templateID, Count: 1})
+			h.spawnWolf(t)
+			itemID := h.seededItem(t, tc.templateID)
+
+			h.srv.SeedCharacterFor(t, "player2", "Second", 1, 0)
+			observer := h.srv.DialClient(t, "player2", 1)
+			startInWorld(t, observer)
+			drainUntilQuiet(t, observer)
+			drainUntilQuiet(t, h.client)
+
+			h.client.Send(encodeRequestDropItem(itemID, 1, 10, 20, 30))
+			frame := mustRead(t, h.client, "DropItem")
+			assertFrameOpcode(t, frame, serverpackets.OpcodeDropItem, "DropItem")
+			r := wire.NewReader(frame[1:])
+			r.ReadInt32()
+			groundID := r.ReadInt32()
+			drainUntilQuiet(t, observer)
+			drainUntilQuiet(t, h.client)
+
+			h.client.Send(encodeRequestPetGetItem(groundID))
+			assertFrameOpcode(t, mustRead(t, h.client, "GetItem"), serverpackets.OpcodeGetItem, "GetItem")
+			ownerFrames := drainFrames(t, h.client)
+			observerFrames := drainFrames(t, observer)
+
+			msg := findSystemMessage(t, observerFrames, serverpackets.SystemMessageAttentionS1PetPickedUpS2)
+			if msg == nil {
+				t.Fatalf("%s pet pickup produced no attention 1535 for the observer", tc.name)
+			}
+			assertPetPickupPlainParams(t, msg, "Owner", tc.templateID)
+			if got := findSystemMessage(t, ownerFrames, serverpackets.SystemMessageAttentionS1PetPickedUpS2); got != nil {
+				t.Fatal("owner received pet pickup attention message")
+			}
+			if got := findSystemMessage(t, ownerFrames, serverpackets.SystemMessageAttentionS1PetPickedUpS2S3); got != nil {
+				t.Fatal("owner received enchanted pet pickup attention message")
+			}
+		})
+	}
+}
+
+func TestPetPickupAttentionEnchantedWeapon(t *testing.T) {
+	srv := bootPets(t)
+	ownerID := srv.SoleObjectID(t)
+	collarID := srv.GiveItem(t, ownerID, wolfCollarID, 1)
+	weaponID := srv.GiveItem(t, ownerID, 30, 1)
+	inst := mustPersistedItem(t, srv, ownerID, weaponID)
+	inst.EnchantLevel = 7
+	if err := srv.Items.Update(petCtx(), inst); err != nil {
+		t.Fatalf("seed enchant level: %v", err)
+	}
+	h := &petWorld{
+		srv: srv, client: srv.Client, ownerID: ownerID, collarID: collarID,
+		seeded: map[int32][]int32{30: {weaponID}},
+	}
+	startInWorld(t, h.client)
+	h.spawnWolf(t)
+
+	h.srv.SeedCharacterFor(t, "player2", "Second", 1, 0)
+	observer := h.srv.DialClient(t, "player2", 1)
+	startInWorld(t, observer)
+	drainUntilQuiet(t, observer)
+	drainUntilQuiet(t, h.client)
+
+	h.client.Send(encodeRequestDropItem(weaponID, 1, 10, 20, 30))
+	frame := mustRead(t, h.client, "DropItem")
+	assertFrameOpcode(t, frame, serverpackets.OpcodeDropItem, "DropItem")
+	r := wire.NewReader(frame[1:])
+	r.ReadInt32()
+	groundID := r.ReadInt32()
+	drainUntilQuiet(t, observer)
+	drainUntilQuiet(t, h.client)
+
+	h.client.Send(encodeRequestPetGetItem(groundID))
+	assertFrameOpcode(t, mustRead(t, h.client, "GetItem"), serverpackets.OpcodeGetItem, "GetItem")
+	observerFrames := drainFrames(t, observer)
+
+	msg := findSystemMessage(t, observerFrames, serverpackets.SystemMessageAttentionS1PetPickedUpS2S3)
+	if msg == nil {
+		t.Fatal("enchanted weapon pet pickup produced no attention 1536 for the observer")
+	}
+	assertPetPickupEnchantParams(t, msg, "Owner", 7, 30)
+}
+
+func TestPetPickupAttentionSkippedForEtcItems(t *testing.T) {
+	h := bootOwnerWithCollar(t, seedItem{TemplateID: item.AdenaID, Count: 40})
+	h.spawnWolf(t)
+	adenaID := h.seededItem(t, item.AdenaID)
+
+	h.srv.SeedCharacterFor(t, "player2", "Second", 1, 0)
+	observer := h.srv.DialClient(t, "player2", 1)
+	startInWorld(t, observer)
+	drainUntilQuiet(t, observer)
+	drainUntilQuiet(t, h.client)
+
+	h.client.Send(encodeRequestDropItem(adenaID, 40, 10, 20, 30))
+	frame := mustRead(t, h.client, "DropItem")
+	assertFrameOpcode(t, frame, serverpackets.OpcodeDropItem, "DropItem")
+	r := wire.NewReader(frame[1:])
+	r.ReadInt32()
+	groundID := r.ReadInt32()
+	drainUntilQuiet(t, observer)
+	drainUntilQuiet(t, h.client)
+
+	h.client.Send(encodeRequestPetGetItem(groundID))
+	assertFrameOpcode(t, mustRead(t, h.client, "GetItem"), serverpackets.OpcodeGetItem, "GetItem")
+	for _, f := range drainFrames(t, observer) {
+		if f[0] != serverpackets.OpcodeSystemMessage {
+			continue
+		}
+		id := systemMessageID(t, f)
+		if id == serverpackets.SystemMessageAttentionS1PetPickedUpS2 || id == serverpackets.SystemMessageAttentionS1PetPickedUpS2S3 {
+			t.Fatalf("etc pet pickup broadcast attention SystemMessage %d to the observer", id)
+		}
+	}
+}
+
 // TestFeedPetConsumesFoodAndRaisesMealGauge feeds wolf food through the
 // pet-inventory use flow: the feed skill fires as the pet's own visual, one
 // unit is consumed, and the meal gauge stays capped (the pet spawns fed to
@@ -193,4 +321,83 @@ func frameOpcodes(frames [][]byte) []byte {
 		out = append(out, f[0])
 	}
 	return out
+}
+
+func systemMessageID(t *testing.T, frame []byte) int {
+	t.Helper()
+	assertFrameOpcode(t, frame, serverpackets.OpcodeSystemMessage, "SystemMessage")
+	return int(wire.NewReader(frame[1:]).ReadInt32())
+}
+
+func findSystemMessage(t *testing.T, frames [][]byte, messageID int) []byte {
+	t.Helper()
+	for _, f := range frames {
+		if f[0] == serverpackets.OpcodeSystemMessage && systemMessageID(t, f) == messageID {
+			return f
+		}
+	}
+	return nil
+}
+
+func mustPersistedItem(t *testing.T, srv *gameservertest.Server, ownerID, objectID int32) *item.Instance {
+	t.Helper()
+	rows, err := srv.Items.ListByOwner(petCtx(), ownerID)
+	if err != nil {
+		t.Fatalf("list items: %v", err)
+	}
+	for _, row := range rows {
+		if row.ObjectID == objectID {
+			return row
+		}
+	}
+	t.Fatalf("no persisted item row for object %d (owner %d)", objectID, ownerID)
+	return nil
+}
+
+func assertPetPickupPlainParams(t *testing.T, frame []byte, ownerName string, templateID int32) {
+	t.Helper()
+	r := wire.NewReader(frame[1:])
+	r.ReadInt32() // message id already matched
+	if params := r.ReadInt32(); params != 2 {
+		t.Fatalf("param count = %d, want 2", params)
+	}
+	if typ := r.ReadInt32(); typ != serverpackets.SystemMessageParamText {
+		t.Fatalf("param 1 type = %d, want text", typ)
+	}
+	if got := r.ReadString(); got != ownerName {
+		t.Fatalf("owner name = %q, want %q", got, ownerName)
+	}
+	if typ := r.ReadInt32(); typ != serverpackets.SystemMessageParamItemName {
+		t.Fatalf("param 2 type = %d, want item name", typ)
+	}
+	if got := r.ReadInt32(); got != templateID {
+		t.Fatalf("template id = %d, want %d", got, templateID)
+	}
+}
+
+func assertPetPickupEnchantParams(t *testing.T, frame []byte, ownerName string, enchant, templateID int32) {
+	t.Helper()
+	r := wire.NewReader(frame[1:])
+	r.ReadInt32() // message id already matched
+	if params := r.ReadInt32(); params != 3 {
+		t.Fatalf("param count = %d, want 3", params)
+	}
+	if typ := r.ReadInt32(); typ != serverpackets.SystemMessageParamText {
+		t.Fatalf("param 1 type = %d, want text", typ)
+	}
+	if got := r.ReadString(); got != ownerName {
+		t.Fatalf("owner name = %q, want %q", got, ownerName)
+	}
+	if typ := r.ReadInt32(); typ != serverpackets.SystemMessageParamNumber {
+		t.Fatalf("param 2 type = %d, want number", typ)
+	}
+	if got := r.ReadInt32(); got != enchant {
+		t.Fatalf("enchant = %d, want %d", got, enchant)
+	}
+	if typ := r.ReadInt32(); typ != serverpackets.SystemMessageParamItemName {
+		t.Fatalf("param 3 type = %d, want item name", typ)
+	}
+	if got := r.ReadInt32(); got != templateID {
+		t.Fatalf("template id = %d, want %d", got, templateID)
+	}
 }
