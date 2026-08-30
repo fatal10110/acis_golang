@@ -72,12 +72,13 @@ func (s *CharacterStore) Create(ctx context.Context, c *player.Character) error 
 // for characters currently in game.
 func (s *CharacterStore) Save(ctx context.Context, c *player.Character) error {
 	resources := c.ResourceValues()
+	progression := c.ProgressionValues()
 	onlineTime := c.TotalOnlineTime(time.Now())
 	_, err := s.db.ExecContext(ctx,
 		`UPDATE characters SET level = ?, maxHp = ?, curHp = ?, maxCp = ?, curCp = ?, maxMp = ?, curMp = ?, exp = ?, expBeforeDeath = ?, sp = ?, karma = ?, pvpkills = ?, pkkills = ?, death_penalty_level = ?, onlinetime = ?, online = 1
 			 WHERE obj_Id = ?`,
-		c.CharLevel, resources.MaxHP, resources.CurrentHP, resources.MaxCP, resources.CurrentCP, resources.MaxMP, resources.CurrentMP,
-		c.Exp, c.ExpBeforeDeath, c.SP, c.KarmaPoints, c.PvPKills, c.PKKills, c.DeathPenaltyLevel(), onlineTime, c.ID,
+		progression.CharLevel, resources.MaxHP, resources.CurrentHP, resources.MaxCP, resources.CurrentCP, resources.MaxMP, resources.CurrentMP,
+		progression.Exp, progression.ExpBeforeDeath, progression.SP, c.KarmaPoints, c.PvPKills, c.PKKills, c.DeathPenaltyLevel(), onlineTime, c.ID,
 	)
 	if err != nil {
 		return fmt.Errorf("save character %d: %w", c.ID, err)
