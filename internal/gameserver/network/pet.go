@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -244,6 +245,7 @@ func (l *GameClientLink) petGetItem(ctx context.Context, live *livePlayer, req c
 	}
 
 	l.broadcastGroundPickup(ground, pet.ObjectID())
+	l.broadcastPetPickupAttention(live, ground)
 	l.groundItems.Remove(ground)
 	l.world.Despawn(ground)
 
@@ -251,6 +253,49 @@ func (l *GameClientLink) petGetItem(ctx context.Context, live *livePlayer, req c
 		l.consumePetHerb(live, pet, petInv, result.Herb)
 	}
 	l.applyPersistActions(ctx, result.Persist)
+}
+
+// broadcastPetPickupAttention mirrors SummonAI.java:214-222: after a pet
+// loots armor or a weapon, nearby players hear an owner-named attention
+// SystemMessage within 1400 units of the owner. Enchanted gear uses 1536;
+// plain gear uses 1535. Other kinds stay silent.
+//
+// Recipients match the existing player pickup attention path
+// (ForEachKnownInRadius, owner excluded). Java's Player.broadcastPacketInRadius
+// also sendPackets the owner; that shared self-delivery gap stays out of scope.
+func (l *GameClientLink) broadcastPetPickupAttention(owner *livePlayer, ground *grounditem.Item) {
+	if l.world == nil || owner == nil || ground == nil || ground.Template == nil {
+		return
+	}
+	switch ground.Template.Kind {
+	case item.KindArmor, item.KindWeapon:
+	default:
+		return
+	}
+
+	st := ground.Instance.Snapshot()
+	frame := func() wire.Frame {
+		if st.EnchantLevel > 0 {
+			return serverpackets.FrameSystemMessageStringNumberItemName(
+				serverpackets.SystemMessageAttentionS1PetPickedUpS2S3,
+				owner.Name,
+				int32(st.EnchantLevel),
+				st.TemplateID,
+			)
+		}
+		return serverpackets.FrameSystemMessageStringItemName(
+			serverpackets.SystemMessageAttentionS1PetPickedUpS2,
+			owner.Name,
+			st.TemplateID,
+		)
+	}
+	broadcastFrame(frame, func(send func(frameReceiver)) {
+		l.world.ForEachKnownInRadius(owner, pickupAttentionRadius, func(o world.Tracked) {
+			if receiver, ok := o.(frameReceiver); ok {
+				send(receiver)
+			}
+		})
+	})
 }
 
 func (l *GameClientLink) petUseItem(ctx context.Context, live *livePlayer, req clientpackets.RequestPetUseItem) {
