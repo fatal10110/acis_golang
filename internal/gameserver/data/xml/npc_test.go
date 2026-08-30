@@ -2,6 +2,7 @@ package xml
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -402,6 +403,18 @@ func TestLoadNPCTemplatesErrors(t *testing.T) {
 		writeXMLFixture(t, filepath.Join(okDir, "fixture.xml"), `<list><npc id="1" name="x">`+npcRequiredSets+`</npc></list>`)
 		if _, err := LoadNPCTemplates(okDir, itemTableWithIDs(nil), nil, zerolog.Nop()); err == nil {
 			t.Fatal("expected an error for a missing skill table, got nil")
+		}
+	})
+
+	t.Run("skill id overflowing int32 fails the load", func(t *testing.T) {
+		overflowDir := t.TempDir()
+		writeXMLFixture(t, filepath.Join(overflowDir, "fixture.xml"), `<list><npc id="1" name="x">`+npcRequiredSets+`<skills><skill id="2147483648" level="1" type="PASSIVE"/></skills></npc></list>`)
+		_, err := LoadNPCTemplates(overflowDir, itemTableWithIDs(nil), emptySkillTable(), zerolog.Nop())
+		if err == nil {
+			t.Fatal("expected an error for skill id 2147483648, got nil")
+		}
+		if !strings.Contains(err.Error(), "overflows int32") {
+			t.Fatalf("error = %v, want overflows int32", err)
 		}
 	})
 }

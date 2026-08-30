@@ -177,10 +177,11 @@ func buildNPCTemplate(el npcElement, items *item.Table, skillsTable *skill.Table
 		passives := make([]skill.Ref, 0)
 		for _, s := range el.Skills {
 			skillSet := commons.StatSetFromXMLAttrs(s.Attrs)
-			skillID, err := skillSet.GetInt("id")
+			skillID32, err := skillSet.GetInt32("id")
 			if err != nil {
 				return nil, fmt.Errorf("npc %d: skill: %w", npcID, err)
 			}
+			skillID := int(skillID32)
 			level, err := skillSet.GetInt("level")
 			if err != nil {
 				return nil, fmt.Errorf("npc %d: skill: %w", npcID, err)
@@ -199,14 +200,15 @@ func buildNPCTemplate(el npcElement, items *item.Table, skillsTable *skill.Table
 				continue
 			}
 
-			if _, ok := skillsTable.Get(skill.ID(skillID), level); !ok {
+			id := skill.ID(skillID32)
+			if _, ok := skillsTable.Get(id, level); !ok {
 				log.Warn().Int("npc_id", npcID).Int("skill_id", skillID).Int("level", level).Msg("data/xml: skipping skill with undefined id/level")
 				continue
 			}
 
 			for _, nst := range strings.Split(skillSet.GetStringDefault("type", ""), ";") {
 				if nst == "PASSIVE" {
-					passives = append(passives, skill.Ref{ID: skill.ID(skillID), Level: level})
+					passives = append(passives, skill.Ref{ID: id, Level: level})
 					continue
 				}
 				skills[skillID] = level
