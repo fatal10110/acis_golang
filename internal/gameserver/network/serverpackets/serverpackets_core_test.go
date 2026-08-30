@@ -1253,20 +1253,16 @@ func TestFrameInventoryUpdateMissingTemplate(t *testing.T) {
 }
 
 // ---- from itemlist_test.go ----
-// noManaLeft is the displayed-mana-left placeholder FrameItemList always
-// writes (item.Instance carries no shadow-item duration state), kept as a
-// variable so converting it to uint32 below is a runtime, not constant,
-// conversion.
 var noManaLeft int32 = -1
 
 func TestFrameItemList(t *testing.T) {
 	templates := item.NewTable([]*item.Template{
-		{ID: 2368, Kind: item.KindWeapon, Slot: item.SlotLRHand},
-		{ID: 1146, Kind: item.KindArmor, Slot: item.SlotChest},
-		{ID: item.AdenaID, Kind: item.KindEtcItem, Slot: item.SlotNone},
+		{ID: 2368, Kind: item.KindWeapon, Slot: item.SlotLRHand, Duration: 60},
+		{ID: 1146, Kind: item.KindArmor, Slot: item.SlotChest, Duration: -1},
+		{ID: item.AdenaID, Kind: item.KindEtcItem, Slot: item.SlotNone, Duration: -1},
 	})
 	items := []*item.Instance{
-		{ObjectID: 100, TemplateID: 2368, Count: 1, Location: item.LocationPaperdoll, LocationData: 7, EnchantLevel: 5},
+		{ObjectID: 100, TemplateID: 2368, Count: 1, Location: item.LocationPaperdoll, LocationData: 7, EnchantLevel: 5, ManaLeft: 125, Augmentation: &item.Augmentation{Attributes: 0x12345678}},
 		{ObjectID: 101, TemplateID: 1146, Count: 1, Location: item.LocationPaperdoll, LocationData: 10},
 		{ObjectID: 102, TemplateID: item.AdenaID, Count: 500, Location: item.LocationInventory},
 		{ObjectID: 103, TemplateID: 1146, Count: 1, Location: item.LocationWarehouse}, // excluded: not carried
@@ -1290,10 +1286,10 @@ func TestFrameItemList(t *testing.T) {
 	want = binary.LittleEndian.AppendUint16(want, 0) // custom type 1
 	want = binary.LittleEndian.AppendUint16(want, 1) // equipped
 	want = binary.LittleEndian.AppendUint32(want, uint32(item.SlotLRHand))
-	want = binary.LittleEndian.AppendUint16(want, 5) // enchant level
-	want = binary.LittleEndian.AppendUint16(want, 0) // custom type 2
-	want = binary.LittleEndian.AppendUint32(want, 0) // augmentation id
-	want = binary.LittleEndian.AppendUint32(want, uint32(noManaLeft))
+	want = binary.LittleEndian.AppendUint16(want, 5)          // enchant level
+	want = binary.LittleEndian.AppendUint16(want, 0)          // custom type 2
+	want = binary.LittleEndian.AppendUint32(want, 0x12345678) // augmentation id
+	want = binary.LittleEndian.AppendUint32(want, 2)          // displayed mana left
 
 	want = binary.LittleEndian.AppendUint16(want, uint16(item.CategoryArmor))
 	want = binary.LittleEndian.AppendUint32(want, 101)
