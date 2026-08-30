@@ -246,8 +246,7 @@ func (c *Controller) MoveHome(home location.Location) error {
 		return nil
 	}
 
-	resetCount, failCount := c.move.pathFindOutcome(home)
-	event, err := c.move.MoveToLocation(home)
+	event, outcome, err := c.move.MoveToLocationWithPathOutcome(home)
 	if err != nil {
 		if hasRecovery {
 			recovery.AddGeoPathFailCount()
@@ -255,10 +254,10 @@ func (c *Controller) MoveHome(home location.Location) error {
 		return err
 	}
 	if hasRecovery {
-		switch {
-		case resetCount:
+		switch outcome {
+		case pathRouted:
 			recovery.ResetGeoPathFailCount()
-		case failCount:
+		case pathFailed:
 			recovery.AddGeoPathFailCount()
 		}
 	}

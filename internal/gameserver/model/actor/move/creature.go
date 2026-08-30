@@ -210,10 +210,27 @@ func (m *CreatureMove) ValidLocation(ox, oy, oz, tx, ty, tz int) location.Locati
 func (m *CreatureMove) MoveToLocation(target location.Location) (Event, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	event, _, err := m.moveToLocationLocked(target)
+	return event, err
+}
+
+// MoveToLocationWithPathOutcome behaves like MoveToLocation and also reports
+// how geodata resolved the route, for return-home fail accounting.
+func (m *CreatureMove) MoveToLocationWithPathOutcome(target location.Location) (Event, pathFindResult, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	return m.moveToLocationLocked(target)
 }
 
-func (m *CreatureMove) moveToLocationLocked(target location.Location) (Event, error) {
+type pathFindResult int
+
+const (
+	pathDirect pathFindResult = iota
+	pathRouted
+	pathFailed
+)
+
+func (m *CreatureMove) moveToLocationLocked(target location.Location) (Event, pathFindResult, error) {
 	target.Z = int(m.geo.Height(target.X, target.Y, target.Z))
 
 	// Same-cell requests complete on the next movement tick.
@@ -224,23 +241,20 @@ func (m *CreatureMove) moveToLocationLocked(target location.Location) (Event, er
 		m.accurateY = float64(m.origin.Y)
 		m.moving = true
 		m.rescheduleLocked(PositionUpdateInterval)
-		return Event{Origin: m.origin, Destination: target, Speed: m.speed}, nil
+		return Event{Origin: m.origin, Destination: target, Speed: m.speed}, pathDirect, nil
 	}
 
 	if m.speed == 0 {
-		return Event{}, errors.New("move: actor cannot move at zero speed")
+		return Event{}, pathDirect, errors.New("move: actor cannot move at zero speed")
 	}
 
-	destination, waypoints, err := m.resolvePathLocked(target)
-	if err != nil {
-		return Event{}, err
-	}
+	destination, waypoints, outcome := m.resolvePathLocked(target)
 
 	distance := math.Hypot(float64(destination.X)-float64(m.origin.X), float64(destination.Y)-float64(m.origin.Y))
 	ticks := math.Ceil(distance / (m.speed / 10))
 	const tickDuration = 100 * time.Millisecond
 	if math.IsNaN(ticks) || ticks > float64(time.Duration(1<<63-1)/tickDuration) {
-		return Event{}, errors.New("move: duration exceeds limit")
+		return Event{}, outcome, errors.New("move: duration exceeds limit")
 	}
 	duration := time.Duration(ticks) * tickDuration
 	origin := m.origin
@@ -260,7 +274,7 @@ func (m *CreatureMove) moveToLocationLocked(target location.Location) (Event, er
 		Destination: destination,
 		Speed:       m.speed,
 		Duration:    duration,
-	}, nil
+	}, outcome, nil
 }
 
 // resolvePathLocked applies the three-tier route resolution a move request
@@ -270,9 +284,9 @@ func (m *CreatureMove) moveToLocationLocked(target location.Location) (Event, er
 // first segment to walk; waypoints holds the remaining segments, if any.
 //
 // origin and target carry geodata-snapped Z.
-func (m *CreatureMove) resolvePathLocked(target location.Location) (location.Location, []location.Location, error) {
+func (m *CreatureMove) resolvePathLocked(target location.Location) (location.Location, []location.Location, pathFindResult) {
 	if m.geo.CanMove(m.origin.X, m.origin.Y, m.origin.Z, target.X, target.Y, target.Z) {
-		return target, nil, nil
+		return target, nil, pathDirect
 	}
 
 	if path, ok := m.geo.FindPath(m.origin, target); ok && len(path) >= 2 {
@@ -285,33 +299,11 @@ func (m *CreatureMove) resolvePathLocked(target location.Location) (location.Loc
 			tail = make([]location.Location, len(path)-1)
 			copy(tail, path[1:])
 		}
-		return destination, tail, nil
+		return destination, tail, pathRouted
 	}
 
 	fallback := m.geo.ValidLocation(m.origin.X, m.origin.Y, m.origin.Z, target.X, target.Y, target.Z)
-	return fallback, nil, nil
-}
-
-// pathFindOutcome mirrors geopath-fail accounting on a return-home attempt:
-// a direct CanMove line neither increments nor resets the streak; a FindPath
-// route with at least two cells resets it; any other blocked resolution
-// increments it.
-func (m *CreatureMove) pathFindOutcome(target location.Location) (reset, fail bool) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	tx, ty, tz := target.X, target.Y, target.Z
-	tz = int(m.geo.Height(tx, ty, tz))
-	snapped := location.Location{X: tx, Y: ty, Z: tz}
-	ox, oy, oz := m.origin.X, m.origin.Y, m.origin.Z
-	if m.geo.CanMove(ox, oy, oz, tx, ty, tz) {
-		return false, false
-	}
-	path, ok := m.geo.FindPath(m.origin, snapped)
-	if ok && len(path) >= 2 {
-		return true, false
-	}
-	return false, true
+	return fallback, nil, pathFailed
 }
 
 // rescheduleLocked cancels any pending arrival timer and, for a positive
@@ -622,7 +614,7 @@ func (m *CreatureMove) FollowTick(target TargetSnapshot, actorRadius float64) (E
 
 	followMode := m.followMode
 	followOffset := m.followOffset
-	event, err := m.moveToLocationLocked(target.Position)
+	event, _, err := m.moveToLocationLocked(target.Position)
 	if err != nil {
 		return Event{}, false, err
 	}
