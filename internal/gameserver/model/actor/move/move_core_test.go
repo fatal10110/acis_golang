@@ -947,6 +947,36 @@ func TestCreatureMove_UpdatePositionResamplesDestinationHeight(t *testing.T) {
 	}
 }
 
+func TestCreatureMove_UpdatePositionBiasesGroundHeightAndCapsWorldZ(t *testing.T) {
+	origin := location.Location{Z: 100}
+	target := location.Location{X: 100}
+	geo := &recordingGeo{canMove: true, height: 16420}
+	mover, err := NewCreatureMove(origin, 100, geo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := mover.MoveToLocation(target); err != nil {
+		t.Fatal(err)
+	}
+	if _, moving := mover.UpdatePosition(100 * time.Millisecond); !moving {
+		t.Fatal("UpdatePosition() stopped move, want moving")
+	}
+
+	wantHeightCalls := []location.Location{target, {X: target.X, Z: 16420}, {X: 10, Z: 116}}
+	if len(geo.heightCalls) != len(wantHeightCalls) || geo.heightCalls[0] != wantHeightCalls[0] || geo.heightCalls[1] != wantHeightCalls[1] || geo.heightCalls[2] != wantHeightCalls[2] {
+		t.Fatalf("Height() calls = %+v, want %+v", geo.heightCalls, wantHeightCalls)
+	}
+	if got := mover.Position(); got != (location.Location{X: 10, Z: 16410}) {
+		t.Fatalf("Position() = %+v, want upward-layer height capped at world max", got)
+	}
+	if _, moving := mover.UpdatePosition(time.Second); moving {
+		t.Fatal("UpdatePosition() still moving at destination")
+	}
+	if got := mover.Position(); got != (location.Location{X: target.X, Z: 16410}) {
+		t.Fatalf("Position() = %+v, want destination capped at world max", got)
+	}
+}
+
 func TestCreatureMove_MoveToLocationUsesCurrentPosition(t *testing.T) {
 	origin := location.Location{X: 10, Y: 20, Z: 30}
 	current := location.Location{X: 60, Y: 20, Z: 30}

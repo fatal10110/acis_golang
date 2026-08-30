@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/rs/zerolog"
 )
@@ -34,6 +35,8 @@ const (
 
 // PositionUpdateInterval is the movement correction cadence.
 const PositionUpdateInterval = 100 * time.Millisecond
+
+const worldZMax = 16410
 
 // TargetSnapshot is the target state a follow tick needs. Build Known from
 // the current known-list relationship before calling FollowTick.
@@ -402,7 +405,7 @@ func (m *CreatureMove) UpdatePosition(step time.Duration) (Event, bool) {
 		return event, true
 	}
 
-	m.destination.Z = int(m.geo.Height(m.destination.X, m.destination.Y, m.destination.Z))
+	m.destination.Z = min(int(m.geo.Height(m.destination.X, m.destination.Y, m.destination.Z)), worldZMax)
 	dx := float64(m.destination.X) - m.accurateX
 	dy := float64(m.destination.Y) - m.accurateY
 	left := math.Hypot(dx, dy)
@@ -415,7 +418,7 @@ func (m *CreatureMove) UpdatePosition(step time.Duration) (Event, bool) {
 		nextAccurateY += dy * fraction
 		next.X = int(nextAccurateX)
 		next.Y = int(nextAccurateY)
-		next.Z = int(m.geo.Height(next.X, next.Y, m.origin.Z))
+		next.Z = min(int(m.geo.Height(next.X, next.Y, m.origin.Z+2*block.CellHeight)), worldZMax)
 	}
 	if !m.geo.CanMove(m.origin.X, m.origin.Y, m.origin.Z, next.X, next.Y, next.Z) {
 		action := m.stopBlockedLocked()
