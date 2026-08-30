@@ -1,6 +1,7 @@
 package summon
 
 import (
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -279,6 +280,10 @@ type PetConfig struct {
 	// Skills maps skill id to level, from this pet's npc template. See
 	// Actor.skills.
 	Skills map[int]int
+	// Passives are the npc template's type="PASSIVE" skill refs. SkillDefs
+	// resolves them into stat funcs attached before current HP/MP seed.
+	Passives  []modelskill.Ref
+	SkillDefs skillLookup
 }
 
 // ServitorConfig carries the minimum state needed to create a live servitor.
@@ -303,10 +308,14 @@ type ServitorConfig struct {
 	// Skills maps skill id to level, from this servitor's npc template.
 	// See Actor.skills.
 	Skills map[int]int
+	// Passives are the npc template's type="PASSIVE" skill refs. SkillDefs
+	// resolves them into stat funcs attached before current HP/MP seed.
+	Passives  []modelskill.Ref
+	SkillDefs skillLookup
 }
 
 // NewServitor returns a live servitor actor.
-func NewServitor(cfg ServitorConfig) *Actor {
+func NewServitor(cfg ServitorConfig) (*Actor, error) {
 	a := &Actor{
 		id:               cfg.ObjectID,
 		owner:            cfg.Owner,
@@ -328,13 +337,16 @@ func NewServitor(cfg ServitorConfig) *Actor {
 		stats:            cfg.Stats,
 		skills:           cfg.Skills,
 	}
+	if err := a.attachTemplatePassives(cfg.SkillDefs, cfg.Passives); err != nil {
+		return nil, err
+	}
 	a.initVitals()
 	a.effects = effect.NewList(a)
-	return a
+	return a, nil
 }
 
 // NewPet returns a live pet actor.
-func NewPet(cfg PetConfig) *Actor {
+func NewPet(cfg PetConfig) (*Actor, error) {
 	petCfg := copyPetConfig(cfg.Config)
 	if petCfg != nil && cfg.Inventory != nil {
 		slots, weight := petCfg.InventoryLimits(cfg.CON)
@@ -376,9 +388,25 @@ func NewPet(cfg PetConfig) *Actor {
 		stats:         cfg.Stats,
 		skills:        cfg.Skills,
 	}
+	if err := a.attachTemplatePassives(cfg.SkillDefs, cfg.Passives); err != nil {
+		return nil, err
+	}
 	a.initVitals()
 	a.effects = effect.NewList(a)
-	return a
+	return a, nil
+}
+
+type skillLookup interface {
+	Definition(modelskill.Ref) (modelskill.Definition, bool)
+}
+
+func (a *Actor) attachTemplatePassives(lookup skillLookup, passives []modelskill.Ref) error {
+	mods, err := effect.TemplatePassiveMods(lookup, passives)
+	if err != nil {
+		return fmt.Errorf("summon npc %d template passives: %w", a.npcID, err)
+	}
+	a.AddStatFuncs(mods)
+	return nil
 }
 
 func copyPetConfig(cfg *petmodel.Config) *petmodel.Config {

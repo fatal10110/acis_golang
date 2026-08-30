@@ -1,6 +1,7 @@
 package effect
 
 import (
+	"errors"
 	"fmt"
 
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -21,6 +22,46 @@ func PassiveFuncs(def modelskill.Definition) ([]Mod, error) {
 	if def.Activation != modelskill.ActivationPassive {
 		return nil, fmt.Errorf("effect: skill %d level %d is not a passive skill", def.ID, def.Level)
 	}
+	return SkillStatFuncs(def)
+}
+
+// SkillStatFuncs builds def's top-level func templates as Mods owned by the
+// skill level, regardless of operate type. NPC XML type="PASSIVE" is a
+// template skill kind, not an operate-type gate: Attackable and Playable
+// actors attach those func templates even when the skill itself is not
+// ActivationPassive.
+func SkillStatFuncs(def modelskill.Definition) ([]Mod, error) {
 	owner := ModOwnerSkill(modelskill.Ref{ID: def.ID, Level: def.Level})
 	return statFuncs(owner, def.Funcs, nil)
+}
+
+// skillLookup resolves a loaded skill definition by id and level.
+type skillLookup interface {
+	Definition(modelskill.Ref) (modelskill.Definition, bool)
+}
+
+// TemplatePassiveMods resolves passives through lookup and builds each
+// skill's func templates. Missing id/level pairs and enchant funcs without
+// an item owner are skipped. Any other SkillStatFuncs error is returned so
+// a typo'd stat name or op cannot silently contribute zero stats.
+func TemplatePassiveMods(lookup skillLookup, passives []modelskill.Ref) ([]Mod, error) {
+	if lookup == nil || len(passives) == 0 {
+		return nil, nil
+	}
+	var mods []Mod
+	for _, ref := range passives {
+		def, ok := lookup.Definition(ref)
+		if !ok {
+			continue
+		}
+		fns, err := SkillStatFuncs(def)
+		if err != nil {
+			if errors.Is(err, ErrEnchantNeedsItem) {
+				continue
+			}
+			return nil, fmt.Errorf("template passive skill %d level %d: %w", ref.ID, ref.Level, err)
+		}
+		mods = append(mods, fns...)
+	}
+	return mods, nil
 }

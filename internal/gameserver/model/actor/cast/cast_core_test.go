@@ -1594,7 +1594,10 @@ func TestRevalidateLaunchPeaceZone(t *testing.T) {
 
 func TestRevalidateLaunchSummonTargetInPeaceZone(t *testing.T) {
 	caster := &launchActor{id: 1, knows: true, sees: true, category: skilltarget.CategoryPlayable}
-	target := summon.NewPet(summon.PetConfig{ObjectID: 2})
+	target, err := summon.NewPet(summon.PetConfig{ObjectID: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
 	target.SetZones(launchZoneQuery(true))
 
 	if got := RevalidateLaunch(caster, target, modelskill.Definition{Offensive: true}); got != LaunchAbortTargetPeaceZone {
