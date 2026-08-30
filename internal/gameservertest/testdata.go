@@ -8,6 +8,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/henna"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -40,6 +41,15 @@ func Templates(t testing.TB) *player.TemplateTable {
 		t.Fatalf("build template table: %v", err)
 	}
 	return table
+}
+
+// HennaTemplates returns the dye symbols behavior suites resolve on restore.
+func HennaTemplates(t testing.TB) *henna.Table {
+	t.Helper()
+	return henna.NewTable([]henna.Henna{
+		{SymbolID: 1, DyeID: 4445, DrawPrice: 37000, STR: 1, CON: -3, Classes: []int{1, 4, 7, 11, 15, 19, 22, 26, 29, 32, 35, 39, 42, 45, 47, 50, 54, 56}},
+		{SymbolID: 2, DyeID: 4446, DrawPrice: 37000, STR: 1, DEX: -3, Classes: []int{1, 4, 7, 11, 15, 19, 22, 26, 29, 32, 35, 39, 42, 45, 47, 50, 54, 56}},
+	})
 }
 
 // ClassTemplate is the shared human-fighter class template every seeded
