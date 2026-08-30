@@ -76,7 +76,7 @@ func provideNpcs(spawns *manager.Spawns, data *gameData, state *world.State, ids
 		Log:       log,
 	})
 	npcs, err := manager.NewNpcs(spawns, data.NPCs, move.NewGeo(data.Geo, data.Finder), state, ids, decay, respawnTask, ai, positions, data.Items, ground, rewards, time.Now, log,
-		data.Skills, actorcast.EffectHandlers{Targets: castTargets, Skills: castHandlers}, walker)
+		data.Skills, actorcast.EffectHandlers{Targets: castTargets, Skills: castHandlers}, walker, data.Zones)
 	if err != nil {
 		return nil, err
 	}

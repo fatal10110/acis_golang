@@ -18,6 +18,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
@@ -393,6 +394,19 @@ func skillListEntries(c *player.Character, skills *skillstate.Persistence) []ser
 	return entries
 }
 
+func setWaterSurface(mover *move.CreatureMove, zones *zone.Index) {
+	if mover == nil || zones == nil {
+		return
+	}
+	mover.SetWaterSurface(func(position location.Location, groundZ int) (int, bool) {
+		water, ok := zone.FindAt[*zone.Water](zones, position.X, position.Y, position.Z)
+		if !ok || groundZ-water.WaterLevel() >= -20 {
+			return 0, false
+		}
+		return water.WaterLevel(), true
+	})
+}
+
 func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c *player.Character, tmpl *player.Template, items []*item.Instance, shortcuts []shortcut.Shortcut) (*livePlayer, error) {
 	c.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventory(c.ID, l.itemTemplates, items))
 	// The characters row stores finalized max snapshots (Save writes
@@ -441,6 +455,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	if err != nil {
 		return nil, fmt.Errorf("attach live player: %w", err)
 	}
+	setWaterSurface(creatureLive.Move(), l.zones)
 	c.AttachLive(creatureLive)
 	moveCtl, err := move.NewController(c.Move(), c)
 	if err != nil {
