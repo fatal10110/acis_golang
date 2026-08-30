@@ -405,6 +405,10 @@ type attackStoppableActor interface {
 	Stop()
 }
 
+type autoAttackStopBroadcaster interface {
+	BroadcastAutoAttackStop()
+}
+
 func (w worldAttackStanceEffects) AutoAttackStop(actor task.AttackStanceActor) {
 	obj, ok := w.state.Object(actor.ObjectID())
 	if !ok {
@@ -412,6 +416,9 @@ func (w worldAttackStanceEffects) AutoAttackStop(actor task.AttackStanceActor) {
 		if !ok {
 			return
 		}
+	}
+	if b, ok := obj.(autoAttackStopBroadcaster); ok {
+		b.BroadcastAutoAttackStop()
 	}
 	if s, ok := obj.(attackStoppableActor); ok {
 		s.Stop()

@@ -382,6 +382,16 @@ func (r *attackStanceRecorder) Add(actor task.AttackStanceActor) {
 	r.actors = append(r.actors, actor)
 }
 
+func (r *attackStanceRecorder) Remove(actor task.AttackStanceActor) bool {
+	for i, a := range r.actors {
+		if a != nil && actor != nil && a.ObjectID() == actor.ObjectID() {
+			r.actors = append(r.actors[:i], r.actors[i+1:]...)
+			return true
+		}
+	}
+	return false
+}
+
 func (r *attackStanceRecorder) InAttackStance(actor task.AttackStanceActor) bool {
 	for _, a := range r.actors {
 		if a != nil && actor != nil && a.ObjectID() == actor.ObjectID() {

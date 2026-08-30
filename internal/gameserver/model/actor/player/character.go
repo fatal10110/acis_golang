@@ -118,6 +118,7 @@ type Character struct {
 	broadcastAttack           func(attack.Snapshot)
 	broadcastMove             func(move.Event)
 	broadcastStop             func()
+	broadcastAutoAttackStop   func()
 	broadcastDie              func()
 	broadcastStatus           func()
 	broadcastMPStatus         func()

@@ -543,6 +543,11 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 		x, y, z := live.Position()
 		l.broadcastLiveStopMove(live, location.Location{X: x, Y: y, Z: z}, live.CurrentHeading())
 	})
+	c.SetAutoAttackStopBroadcaster(func() {
+		l.broadcastLiveFrame(live, func() wire.Frame {
+			return serverpackets.FrameAutoAttackStop(live.ObjectID())
+		})
+	})
 	c.SetStanceBroadcaster(func(stance player.Stance) {
 		waitType := serverpackets.WaitSitting
 		switch stance {
