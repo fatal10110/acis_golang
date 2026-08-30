@@ -41,6 +41,17 @@ type offensiveFollowTickerOwner interface {
 	OwnsOffensiveFollowTicker() bool
 }
 
+// homePathRecovery is implemented by hostile NPCs whose return-home path can
+// stall on geodata and must teleport after repeated blocked resolutions.
+type homePathRecovery interface {
+	GeoPathFailCount() int
+	ResetGeoPathFailCount()
+	AddGeoPathFailCount()
+	TeleportTo(location.Location)
+}
+
+const homeGeoFailLimit = 10
+
 // PositionUpdater is the moving actor surface consumed by the position
 // update task. PositionUpdate must deregister itself from whatever
 // PositionUpdateRegistry it was added through once it no longer needs
@@ -222,12 +233,33 @@ func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, m
 // MoveHome requests movement toward home, broadcasts the move, and
 // registers for correction ticks the same way any other movement request
 // does — otherwise this controller's world presence would stay at the
-// stale pre-move cell for the entire walk back. A route with no reachable
-// progress becomes a zero-distance move and is broadcast before arrival.
+// stale pre-move cell for the entire walk back. When geodata cannot resolve
+// a route, failed attempts accumulate; after homeGeoFailLimit blocked
+// resolutions the actor teleports to home instead of retrying silently.
 func (c *Controller) MoveHome(home location.Location) error {
-	event, err := c.move.MoveToLocation(home)
-	if err != nil {
+	recovery, hasRecovery := c.self.(homePathRecovery)
+	if hasRecovery && recovery.GeoPathFailCount() >= homeGeoFailLimit {
+		c.move.CancelMove()
+		recovery.TeleportTo(home)
+		recovery.ResetGeoPathFailCount()
+		c.removePositionUpdate()
 		return nil
+	}
+
+	event, outcome, err := c.move.MoveToLocationWithPathOutcome(home)
+	if err != nil {
+		if hasRecovery {
+			recovery.AddGeoPathFailCount()
+		}
+		return err
+	}
+	if hasRecovery {
+		switch outcome {
+		case pathRouted:
+			recovery.ResetGeoPathFailCount()
+		case pathFailed:
+			recovery.AddGeoPathFailCount()
+		}
 	}
 	broadcastErr := c.self.BroadcastMove(event)
 	c.addPositionUpdate()
