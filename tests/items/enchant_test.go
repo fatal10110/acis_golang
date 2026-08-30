@@ -229,6 +229,50 @@ func TestEnchantScrollFlow(t *testing.T) {
 	})
 }
 
+// TestWalkCancelsActiveEnchant pins MoveBackwardToLocation cancelling an
+// in-progress enchant once out-of-control and zero-speed gates pass: the
+// client gets EnchantResult(CANCELLED) then ENCHANT_SCROLL_CANCELLED, the
+// scroll is not consumed, and a later RequestEnchantItem is silent. The
+// 9900-distance rejection still cancels — the reference clears the
+// selection before that cap is checked.
+func TestWalkCancelsActiveEnchant(t *testing.T) {
+	t.Run("accepted walk closes enchant then moves", func(t *testing.T) {
+		srv, objID, weapon, scroll := bootEnchanter(t, func() float64 { return 0.0 }, 0, false, nil)
+		c := srv.Client
+
+		openEnchantSelection(t, c, scroll, 955)
+		c.Send(encodeMoveBackwardToLocation(80, 70, 30, spawnX, spawnY, spawnZ))
+
+		assertEnchantResult(t, c.Read(), serverpackets.EnchantResultCancelled)
+		assertStaticSystemMessage(t, c.Read(), serverpackets.SystemMessageEnchantScrollCancelled)
+		assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMoveToLocation, "walk after enchant cancel")
+
+		c.Send(encodeRequestEnchantItem(weapon))
+		if reply := c.ReadWithTimeout(300 * time.Millisecond); reply != nil {
+			t.Fatalf("enchant after walk-cancel replied %x, want no reply", reply)
+		}
+		if inst := mustFindItem(t, srv, objID, scroll); inst.Count != 1 {
+			t.Fatalf("scroll count after walk-cancel = %d, want 1", inst.Count)
+		}
+	})
+
+	t.Run("9900 rejection still cancels enchant", func(t *testing.T) {
+		srv, objID, _, scroll := bootEnchanter(t, func() float64 { return 0.0 }, 0, false, nil)
+		c := srv.Client
+
+		openEnchantSelection(t, c, scroll, 955)
+		c.Send(encodeMoveBackwardToLocation(10000, 0, 0, 0, 0, 0))
+
+		assertEnchantResult(t, c.Read(), serverpackets.EnchantResultCancelled)
+		assertStaticSystemMessage(t, c.Read(), serverpackets.SystemMessageEnchantScrollCancelled)
+		assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "too-far walk after enchant cancel")
+
+		if inst := mustFindItem(t, srv, objID, scroll); inst.Count != 1 {
+			t.Fatalf("scroll count after too-far cancel = %d, want 1", inst.Count)
+		}
+	})
+}
+
 // TestEnchantRequestWithoutSelectionIsSilent pins the missing-selection
 // branch: RequestEnchantItem with no scroll opened produces no reply at all.
 func TestEnchantRequestWithoutSelectionIsSilent(t *testing.T) {

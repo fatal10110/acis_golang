@@ -29,6 +29,11 @@ func (l *GameClientLink) moveLivePlayer(live *livePlayer, target, packetOrigin l
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCantMoveTooEncumbered))
 		return
 	}
+	// Reference: MoveBackwardToLocation.java:90 cancels an in-progress
+	// enchant once the out-of-control and zero-speed gates pass, before
+	// the floor-to-head Z conversion and 9900-distance cap — a later
+	// rejected walk still closes the enchant window.
+	l.cancelActiveEnchant(live)
 	// Reference: MoveBackwardToLocation.java:92-93 converts the floor-level
 	// target Z the client sent into head-level Z before pathing.
 	target.Z += int(live.CollisionHeight())
