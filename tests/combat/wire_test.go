@@ -60,6 +60,12 @@ func encodeRequestTargetCancel(unselect int32) []byte {
 	return w.Bytes()
 }
 
+func encodeRequestChangeWaitType(stand bool) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeRequestChangeWaitType)
+	w.WriteInt32(wire.BoolInt32(stand))
+	return w.Bytes()
+}
+
 func encodeMoveBackwardToLocation(targetX, targetY, targetZ int32) []byte {
 	w := wire.NewPacketWriter(clientpackets.OpcodeMoveBackwardToLocation)
 	w.WriteInt32(targetX)

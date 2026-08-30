@@ -99,6 +99,62 @@ func TestSecondActionClickWalksTowardDistantTarget(t *testing.T) {
 	drainUntilQuiet(t, c)
 }
 
+func sitPlayer(t *testing.T, c *scriptedClient) {
+	t.Helper()
+	c.Send(encodeRequestChangeWaitType(false))
+	assertFrameOpcode(t, mustRead(t, c, "sit ChangeWaitType"), serverpackets.OpcodeChangeWaitType, "sit ChangeWaitType")
+}
+
+// TestSittingPlayerCannotAttackSelectedTarget pins the seated attack gate:
+// a second Action click on an in-range target answers ActionFailed and does
+// not start a swing.
+func TestSittingPlayerCannotAttackSelectedTarget(t *testing.T) {
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+	)
+	c := srv.Client
+	startInWorld(t, c)
+	hostile := srv.SpawnHostileNPCAt(t, location.Location{X: hostileX - 30, Y: hostileY, Z: hostileZ})
+	drainUntilQuiet(t, c)
+
+	targetHostile(t, c, hostile.ObjectID())
+	sitPlayer(t, c)
+
+	before := hostile.CurrentHP()
+	c.Send(encodeAction(hostile.ObjectID(), int32(playerOrigin.X), int32(playerOrigin.Y), int32(playerOrigin.Z), false))
+	assertFrameOpcode(t, mustRead(t, c, "sitting attack ActionFailed"), serverpackets.OpcodeActionFailed, "sitting attack ActionFailed")
+	if reply := c.ReadWithTimeout(readQuietWindow); reply != nil {
+		t.Fatalf("sitting attack produced opcode %#x after ActionFailed, want silence", reply[0])
+	}
+	if got := hostile.CurrentHP(); got != before {
+		t.Fatalf("hostile HP = %d after sitting attack, want unchanged %d", got, before)
+	}
+}
+
+// TestSittingPlayerCannotApproachSelectedTarget pins the seated approach
+// gate: a second Action click on a distant target answers ActionFailed and
+// does not start MoveToPawn.
+func TestSittingPlayerCannotApproachSelectedTarget(t *testing.T) {
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+	)
+	c := srv.Client
+	startInWorld(t, c)
+	hostile := srv.SpawnHostileNPCAt(t, location.Location{X: hostileX + 500, Y: hostileY, Z: hostileZ})
+	drainUntilQuiet(t, c)
+
+	targetHostile(t, c, hostile.ObjectID())
+	sitPlayer(t, c)
+
+	c.Send(encodeAction(hostile.ObjectID(), int32(playerOrigin.X), int32(playerOrigin.Y), int32(playerOrigin.Z), false))
+	assertFrameOpcode(t, mustRead(t, c, "sitting approach ActionFailed"), serverpackets.OpcodeActionFailed, "sitting approach ActionFailed")
+	if reply := c.ReadWithTimeout(readQuietWindow); reply != nil {
+		t.Fatalf("sitting approach produced opcode %#x after ActionFailed, want silence", reply[0])
+	}
+}
+
 // TestAttackRequestOnDistantTargetSelectsOnly pins that the first
 // AttackRequest on a far target only selects it — no AutoAttackStart until
 // the actor is actually in range.

@@ -17,6 +17,7 @@ type PlayerAttackActor interface {
 	CastingNow() bool
 	Knows(attackable.Combatant) bool
 	PhysicalAttackRange() int
+	Standing() bool
 }
 
 // PlayerAttack drives one player's physical-attack intention: closing
@@ -57,10 +58,10 @@ func (p *PlayerAttack) SetLogger(log zerolog.Logger) {
 
 // Start sets target as the attack intention and evaluates it once. It
 // reports false when the caller should report the action as failed
-// (the actor is disabled, the target is lost, the actor is still mid-swing,
-// or the attack was otherwise rejected) and true when the attack was
-// accepted — either a swing just started, or the actor has begun closing
-// distance and will attack once it arrives.
+// (the actor is disabled, sitting, the target is lost, the actor is still
+// mid-swing, or the attack was otherwise rejected) and true when the attack
+// was accepted — either a swing just started, or the actor has begun
+// closing distance and will attack once it arrives.
 func (p *PlayerAttack) Start(target attackable.Combatant) bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -128,7 +129,7 @@ func (p *PlayerAttack) thinkLocked() (bool, error) {
 		return false, nil
 	}
 
-	if p.actor.AttackDisabled() || p.targetLost(p.target) {
+	if p.actor.AttackDisabled() || !p.actor.Standing() || p.targetLost(p.target) {
 		p.stopLocked()
 		return false, nil
 	}
