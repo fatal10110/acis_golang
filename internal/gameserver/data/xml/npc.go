@@ -3,12 +3,14 @@ package xml
 import (
 	"encoding/xml"
 	"fmt"
+	"strings"
 
 	"github.com/rs/zerolog"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
 // maxClassID is the highest valid profession id: the reference's ClassId
@@ -55,14 +57,19 @@ type petDataElement struct {
 // much of it as has been loaded by the time this runs; an entry referencing
 // an id items doesn't have is logged and dropped rather than failing the
 // load, matching how a shipped file can reference an item template that
-// hasn't shipped in this data set.
+// hasn't shipped in this data set. skills is consulted the same way for
+// each <skill> id/level pair: unknown pairs are logged and skipped.
 //
 // A directory that can't be listed, a file whose XML is not well-formed, or
 // an <npc> element missing or mangling a required attribute fails the whole
 // load: the caller gets an error rather than a partially populated table.
 //
-// log receives skipped-drop diagnostics. Its zero value disables logging.
-func LoadNPCTemplates(dir string, items *item.Table, log zerolog.Logger) (*npc.Table, error) {
+// log receives skipped-drop and skipped-skill diagnostics. Its zero value
+// disables logging.
+func LoadNPCTemplates(dir string, items *item.Table, skills *skill.Table, log zerolog.Logger) (*npc.Table, error) {
+	if skills == nil {
+		return nil, fmt.Errorf("xml: npc templates: missing skill table")
+	}
 
 	docs, err := loadXMLDocuments[npcFile](dir, "npc template")
 	if err != nil {
@@ -71,7 +78,7 @@ func LoadNPCTemplates(dir string, items *item.Table, log zerolog.Logger) (*npc.T
 	var templates []*npc.Template
 	for _, doc := range docs {
 		for _, el := range doc.Data.Npcs {
-			tpl, err := buildNPCTemplate(el, items, log)
+			tpl, err := buildNPCTemplate(el, items, skills, log)
 			if err != nil {
 				return nil, fmt.Errorf("xml: %s: %w", doc.Path, err)
 			}
@@ -86,7 +93,7 @@ func LoadNPCTemplates(dir string, items *item.Table, log zerolog.Logger) (*npc.T
 // npc.NewTemplate consumes: its own attributes and <set> children merged
 // flat, plus the "aiParams", "drops", "privates", "race", "teachTo" and
 // "pet" values built from its other child blocks.
-func buildNPCTemplate(el npcElement, items *item.Table, log zerolog.Logger) (*npc.Template, error) {
+func buildNPCTemplate(el npcElement, items *item.Table, skillsTable *skill.Table, log zerolog.Logger) (*npc.Template, error) {
 	set := commons.StatSetFromXMLAttrs(el.Attrs)
 	for _, s := range el.Sets {
 		set.Set(s.Name, s.Val)
@@ -158,20 +165,16 @@ func buildNPCTemplate(el npcElement, items *item.Table, log zerolog.Logger) (*np
 		set.Set("pet", pet)
 	}
 
-	// Resolving a <skill> entry to its effect is skill-engine behavior this
-	// loader doesn't own. The two exceptions are race (a template's race is
-	// encoded as either a secondary "race marker" skill id, or the level of
-	// the dedicated race skill, both plain ids readable straight off the
-	// XML with no skill-engine lookup) and the raw id/level pairs
-	// themselves, which Summon.getSkill-equivalent lookups need to know
-	// which skills a pet/servitor template grants at all.
-	//
-	// Matching NpcData.java: a race-marker skill id (secondary or the
-	// dedicated primary race skill) resolves race and never enters the
-	// skills map; a type="PASSIVE" skill also never enters it (Java routes
-	// it to a separate passives list that Summon.getSkill never searches).
+	// Race-marker skill ids (secondary, or the dedicated primary race
+	// skill) resolve race from the XML id/level and never enter the skills
+	// or passives lists. Other entries are looked up in the skill table:
+	// unknown id/level pairs are logged and skipped. Each type token
+	// (';'-separated) of "PASSIVE" appends the ref to passives; any other
+	// token records the id/level in the skills map used by pet/servitor
+	// commanded-skill lookups.
 	if len(el.Skills) > 0 {
 		skills := make(map[int]int, len(el.Skills))
+		passives := make([]skill.Ref, 0)
 		for _, s := range el.Skills {
 			skillSet := commons.StatSetFromXMLAttrs(s.Attrs)
 			skillID, err := skillSet.GetInt("id")
@@ -195,12 +198,22 @@ func buildNPCTemplate(el npcElement, items *item.Table, log zerolog.Logger) (*np
 				set.Set("race", race)
 				continue
 			}
-			if skillSet.GetStringDefault("type", "") == "PASSIVE" {
+
+			if _, ok := skillsTable.Get(skill.ID(skillID), level); !ok {
+				log.Warn().Int("npc_id", npcID).Int("skill_id", skillID).Int("level", level).Msg("data/xml: skipping skill with undefined id/level")
 				continue
 			}
-			skills[skillID] = level
+
+			for _, nst := range strings.Split(skillSet.GetStringDefault("type", ""), ";") {
+				if nst == "PASSIVE" {
+					passives = append(passives, skill.Ref{ID: skill.ID(skillID), Level: level})
+					continue
+				}
+				skills[skillID] = level
+			}
 		}
 		set.Set("skills", skills)
+		set.Set("passives", passives)
 	}
 
 	if el.TeachTo != nil {

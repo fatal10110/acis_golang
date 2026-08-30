@@ -8,6 +8,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	itemmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
 // gremlinDropItemIDs are the item ids Gremlin's (npc 20001) drop table
@@ -23,17 +24,46 @@ func itemTableWithIDs(ids []int32) *itemmodel.Table {
 	return itemmodel.NewTable(templates)
 }
 
+func emptySkillTable() *skill.Table {
+	return skill.NewTable(nil)
+}
+
+func skillTableWith(refs ...skill.Ref) *skill.Table {
+	defs := make([]skill.Definition, len(refs))
+	for i, ref := range refs {
+		defs[i] = skill.Definition{ID: ref.ID, Level: ref.Level}
+	}
+	return skill.NewTable(defs)
+}
+
+const npcRequiredSets = `<set name="type" val="Monster"/><set name="radius" val="1"/><set name="height" val="1"/><set name="pAtk" val="1"/><set name="mAtk" val="1"/><set name="pDef" val="1"/><set name="mDef" val="1"/><set name="baseDamageRange" val="0;0;1;1"/>`
+
+func loadNPCFixture(t *testing.T, body string, skills *skill.Table) *npc.Table {
+	t.Helper()
+	dir := t.TempDir()
+	writeXMLFixture(t, filepath.Join(dir, "fixture.xml"), body)
+	table, err := LoadNPCTemplates(dir, itemTableWithIDs(nil), skills, zerolog.Nop())
+	if err != nil {
+		t.Fatalf("LoadNPCTemplates: %v", err)
+	}
+	return table
+}
+
 func TestLoadNPCTemplates(t *testing.T) {
 	dir := datapackPath(t, filepath.Join("data", "xml", "npcs"))
+	skills, err := LoadSkillDefinitions(datapackPath(t, filepath.Join("data", "xml", "skills")), zerolog.Nop())
+	if err != nil {
+		t.Fatalf("LoadSkillDefinitions: %v", err)
+	}
 
 	// The full 16-file datapack takes a few seconds to parse; load it once
 	// per item-table variant and share the result across subtests instead
 	// of reloading it for every assertion.
-	withGremlinItems, err := LoadNPCTemplates(dir, itemTableWithIDs(gremlinDropItemIDs), zerolog.Nop())
+	withGremlinItems, err := LoadNPCTemplates(dir, itemTableWithIDs(gremlinDropItemIDs), skills, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("LoadNPCTemplates(%q) error: %v", dir, err)
 	}
-	withNoItems, err := LoadNPCTemplates(dir, itemTableWithIDs(nil), zerolog.Nop())
+	withNoItems, err := LoadNPCTemplates(dir, itemTableWithIDs(nil), skills, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("LoadNPCTemplates(%q) error: %v", dir, err)
 	}
@@ -263,22 +293,23 @@ func TestLoadNPCTemplates(t *testing.T) {
 		}
 	})
 
-	t.Run("skills map excludes passive and race-marker skills, matching NpcData.java/NpcTemplate.getSkills", func(t *testing.T) {
+	t.Run("skills map excludes passive and race-marker skills; passives keep resolved PASSIVE entries", func(t *testing.T) {
 		table := withNoItems
 		sinEater, ok := table.Get(12564)
 		if !ok {
 			t.Fatal("npc 12564 (Sin Eater) not loaded")
 		}
 		// Sin Eater's <skills> block is 4121 (type="PASSIVE") and 4416
-		// (type="PASSIVE", also the race-marker skill). Java's
-		// NpcData.java routes race markers to an early return and
-		// PASSIVE entries to a separate passives list, so neither ever
-		// reaches NpcTemplate._skills / Summon.getSkill's search space.
+		// (type="PASSIVE", also the race-marker skill). Race markers
+		// resolve race and never enter either list; PASSIVE entries that
+		// resolve in the skill table go to Passives, not Skills.
 		if len(sinEater.Skills) != 0 {
 			t.Fatalf("Sin Eater Skills = %v, want empty", sinEater.Skills)
 		}
-		// The race-marker skill (4416) is still resolved into Race even
-		// though it's excluded from the Skills map.
+		wantPassive := skill.Ref{ID: 4121, Level: 1}
+		if len(sinEater.Passives) != 1 || sinEater.Passives[0] != wantPassive {
+			t.Fatalf("Sin Eater Passives = %v, want [%v]", sinEater.Passives, wantPassive)
+		}
 		if sinEater.Race != npc.RaceFairy {
 			t.Fatalf("Sin Eater Race = %v, want RaceFairy", sinEater.Race)
 		}
@@ -338,7 +369,7 @@ func TestLoadNPCTemplatesErrors(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			path := filepath.Join(dir, "fixture.xml")
 			writeXMLFixture(t, path, c.content)
-			if _, err := LoadNPCTemplates(dir, itemTableWithIDs([]int32{1}), zerolog.Nop()); err == nil {
+			if _, err := LoadNPCTemplates(dir, itemTableWithIDs([]int32{1}), emptySkillTable(), zerolog.Nop()); err == nil {
 				t.Fatalf("expected an error for %s, got nil", c.name)
 			}
 		})
@@ -348,21 +379,106 @@ func TestLoadNPCTemplatesErrors(t *testing.T) {
 		boundaryDir := t.TempDir()
 		path := filepath.Join(boundaryDir, "fixture.xml")
 		writeXMLFixture(t, path, `<list><npc id="1" name="x"><set name="type" val="Monster"/><set name="radius" val="1"/><set name="height" val="1"/><set name="pAtk" val="1"/><set name="mAtk" val="1"/><set name="pDef" val="1"/><set name="mDef" val="1"/><set name="baseDamageRange" val="0;0;1;1"/><teachTo classes="118"/></npc></list>`)
-		if _, err := LoadNPCTemplates(boundaryDir, itemTableWithIDs(nil), zerolog.Nop()); err != nil {
+		if _, err := LoadNPCTemplates(boundaryDir, itemTableWithIDs(nil), emptySkillTable(), zerolog.Nop()); err != nil {
 			t.Fatalf("LoadNPCTemplates with teachTo classes=\"118\" error: %v", err)
 		}
 	})
 
 	t.Run("empty directory", func(t *testing.T) {
 		empty := t.TempDir()
-		if _, err := LoadNPCTemplates(empty, itemTableWithIDs(nil), zerolog.Nop()); err == nil {
+		if _, err := LoadNPCTemplates(empty, itemTableWithIDs(nil), emptySkillTable(), zerolog.Nop()); err == nil {
 			t.Fatal("expected an error for an empty directory, got nil")
 		}
 	})
 
 	t.Run("missing directory", func(t *testing.T) {
-		if _, err := LoadNPCTemplates(filepath.Join(dir, "does-not-exist"), itemTableWithIDs(nil), zerolog.Nop()); err == nil {
+		if _, err := LoadNPCTemplates(filepath.Join(dir, "does-not-exist"), itemTableWithIDs(nil), emptySkillTable(), zerolog.Nop()); err == nil {
 			t.Fatal("expected an error for a missing directory, got nil")
+		}
+	})
+
+	t.Run("missing skill table", func(t *testing.T) {
+		okDir := t.TempDir()
+		writeXMLFixture(t, filepath.Join(okDir, "fixture.xml"), `<list><npc id="1" name="x">`+npcRequiredSets+`</npc></list>`)
+		if _, err := LoadNPCTemplates(okDir, itemTableWithIDs(nil), nil, zerolog.Nop()); err == nil {
+			t.Fatal("expected an error for a missing skill table, got nil")
+		}
+	})
+}
+
+func TestLoadNPCTemplateSkills(t *testing.T) {
+	known := skill.Ref{ID: 4067, Level: 5}
+	passive := skill.Ref{ID: 4121, Level: 1}
+	table := skillTableWith(known, passive)
+
+	t.Run("PASSIVE entry is stored separately from the skills map", func(t *testing.T) {
+		tpls := loadNPCFixture(t, `<list><npc id="1" name="x">`+npcRequiredSets+`<skills><skill id="4121" level="1" type="PASSIVE"/></skills></npc></list>`, table)
+		got, ok := tpls.Get(1)
+		if !ok {
+			t.Fatal("npc 1 not loaded")
+		}
+		if len(got.Skills) != 0 {
+			t.Fatalf("Skills = %v, want empty", got.Skills)
+		}
+		if len(got.Passives) != 1 || got.Passives[0] != passive {
+			t.Fatalf("Passives = %v, want [%v]", got.Passives, passive)
+		}
+	})
+
+	t.Run("non-PASSIVE entry is stored in the skills map", func(t *testing.T) {
+		tpls := loadNPCFixture(t, `<list><npc id="1" name="x">`+npcRequiredSets+`<skills><skill id="4067" level="5" type="SKILL01_ID"/></skills></npc></list>`, table)
+		got, ok := tpls.Get(1)
+		if !ok {
+			t.Fatal("npc 1 not loaded")
+		}
+		if got.Skills[4067] != 5 {
+			t.Fatalf("Skills = %v, want 4067=5", got.Skills)
+		}
+		if len(got.Passives) != 0 {
+			t.Fatalf("Passives = %v, want empty", got.Passives)
+		}
+	})
+
+	t.Run("unknown id/level is skipped without failing the load", func(t *testing.T) {
+		tpls := loadNPCFixture(t, `<list><npc id="1" name="x">`+npcRequiredSets+`<skills><skill id="4067" level="5" type="SKILL01_ID"/><skill id="99999" level="1" type="SKILL01_ID"/><skill id="4121" level="99" type="PASSIVE"/></skills></npc></list>`, table)
+		got, ok := tpls.Get(1)
+		if !ok {
+			t.Fatal("npc 1 not loaded")
+		}
+		if got.Skills[4067] != 5 || len(got.Skills) != 1 {
+			t.Fatalf("Skills = %v, want only 4067=5", got.Skills)
+		}
+		if len(got.Passives) != 0 {
+			t.Fatalf("Passives = %v, want empty", got.Passives)
+		}
+	})
+
+	t.Run("race-marker skills never enter skills or passives", func(t *testing.T) {
+		tpls := loadNPCFixture(t, `<list><npc id="1" name="x">`+npcRequiredSets+`<skills><skill id="4416" level="13" type="PASSIVE"/><skill id="4290" level="1" type="PASSIVE"/></skills></npc></list>`, table)
+		got, ok := tpls.Get(1)
+		if !ok {
+			t.Fatal("npc 1 not loaded")
+		}
+		if len(got.Skills) != 0 || len(got.Passives) != 0 {
+			t.Fatalf("Skills = %v Passives = %v, want both empty", got.Skills, got.Passives)
+		}
+		if got.Race != npc.RaceUndead {
+			t.Fatalf("Race = %v, want RaceUndead (secondary marker 4290 wins last)", got.Race)
+		}
+	})
+
+	t.Run("semicolon type list puts PASSIVE in passives and other tokens in the skills map", func(t *testing.T) {
+		tpls := loadNPCFixture(t, `<list><npc id="1" name="x">`+npcRequiredSets+`<skills><skill id="4067" level="5" type="PASSIVE;SKILL01_ID"/></skills></npc></list>`, table)
+		got, ok := tpls.Get(1)
+		if !ok {
+			t.Fatal("npc 1 not loaded")
+		}
+		if got.Skills[4067] != 5 {
+			t.Fatalf("Skills = %v, want 4067=5", got.Skills)
+		}
+		want := skill.Ref{ID: 4067, Level: 5}
+		if len(got.Passives) != 1 || got.Passives[0] != want {
+			t.Fatalf("Passives = %v, want [%v]", got.Passives, want)
 		}
 	})
 }
