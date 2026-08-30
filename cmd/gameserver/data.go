@@ -128,7 +128,7 @@ func loadGameData(paths gameServerPaths, cfg gameServerConfig, log zerolog.Logge
 	if err != nil {
 		return nil, err
 	}
-	npcs, err := gamexml.LoadNPCTemplates(filepath.Join(xmlRoot, "npcs"), items, log)
+	npcs, err := gamexml.LoadNPCTemplates(filepath.Join(xmlRoot, "npcs"), items, skills, log)
 	if err != nil {
 		return nil, err
 	}
