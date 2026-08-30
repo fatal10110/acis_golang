@@ -430,6 +430,24 @@ func (c *Character) AddMP(amount float64) float64 {
 	return amount
 }
 
+// AddCP restores CP, clamped to MaxCP, and returns the applied amount.
+func (c *Character) AddCP(amount float64) float64 {
+	if amount <= 0 {
+		return 0
+	}
+	maxCP := c.MaxCPValue()
+	c.vitalsMu.Lock()
+	defer c.vitalsMu.Unlock()
+	if c.curCP >= maxCP {
+		return 0
+	}
+	if c.curCP+amount > maxCP {
+		amount = maxCP - c.curCP
+	}
+	c.curCP += amount
+	return amount
+}
+
 // ReduceMP subtracts MP, clamped at zero, and returns the applied amount.
 func (c *Character) ReduceMP(amount float64) float64 {
 	if amount <= 0 {

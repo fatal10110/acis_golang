@@ -548,6 +548,8 @@ func (l *GameClientLink) broadcastLiveMPStatus(live *livePlayer) {
 	attrs := []serverpackets.StatusAttribute{
 		{Type: serverpackets.StatusCurrentHP, Value: int(resources.CurrentHP)},
 		{Type: serverpackets.StatusCurrentMP, Value: int(resources.CurrentMP)},
+		{Type: serverpackets.StatusCurrentCP, Value: int(resources.CurrentCP)},
+		{Type: serverpackets.StatusMaxCP, Value: int(resources.MaxCP)},
 	}
 	broadcastFrame(func() wire.Frame {
 		return serverpackets.FrameStatusUpdate(live.ObjectID(), attrs)
