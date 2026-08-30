@@ -56,8 +56,12 @@ func writeItemList(w *wire.Writer, items []*item.Instance, templates *item.Table
 		w.WriteInt32(int32(tmpl.Slot))
 		w.WriteUint16(uint16(it.EnchantLevel))
 		w.WriteUint16(uint16(it.CustomType2))
-		w.WriteInt32(0)  // augmentation id: item augmentation is not modeled
-		w.WriteInt32(-1) // displayed mana left: shadow-item duration is not modeled
+		if it.Augmentation != nil {
+			w.WriteInt32(it.Augmentation.Attributes)
+		} else {
+			w.WriteInt32(0)
+		}
+		w.WriteInt32(int32(raw.DisplayedManaLeft(tmpl)))
 		owned++
 	}
 
