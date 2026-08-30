@@ -27,6 +27,21 @@ type FrameBuilder interface {
 // method a silent no-op so domain tests need no packet layer.
 func (a *Actor) SetFrameBuilder(b FrameBuilder) { a.frames = b }
 
+// SetAutoAttackStopBroadcaster records the packet-layer hook that broadcasts
+// AutoAttackStop to this summon's known observers when its owner's combat
+// stance expires. A nil hook keeps BroadcastAutoAttackStop a silent no-op.
+func (a *Actor) SetAutoAttackStopBroadcaster(fn func()) {
+	a.broadcastAutoAttackStop = fn
+}
+
+// BroadcastAutoAttackStop sends AutoAttackStop through the runtime packet
+// hook when the owner's combat stance expires from inactivity.
+func (a *Actor) BroadcastAutoAttackStop() {
+	if a.broadcastAutoAttackStop != nil {
+		a.broadcastAutoAttackStop()
+	}
+}
+
 // broadcast builds one frame lazily — only once a known observer capable of
 // receiving frames is found — and hands every such receiver an independently
 // owned copy, releasing the source frame afterwards. It is a no-op until

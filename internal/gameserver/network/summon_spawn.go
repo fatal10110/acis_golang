@@ -366,6 +366,9 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 	}
 	actor.SetStatusUpdater(func() { l.broadcastSummonStatus(actor) })
 	actor.SetFrameBuilder(serverpackets.NpcFrameBuilder{})
+	actor.SetAutoAttackStopBroadcaster(func() {
+		actor.BroadcastFrame(serverpackets.FrameAutoAttackStop(actor.ObjectID()))
+	})
 	actor.SetExpNotifier(func(exp int64) {
 		if owner, ok := l.livePlayerByID(actor.OwnerID()); ok {
 			owner.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessagePetEarnedS1Exp, int32(exp)))
