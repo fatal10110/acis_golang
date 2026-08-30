@@ -185,3 +185,19 @@ func TestSummonBroadcastMoveToPawnDeliversThroughHook(t *testing.T) {
 		t.Fatalf("receiver frames = %d, want 1", len(fx.receiver.frames))
 	}
 }
+
+func TestOwnerStillLinkedReflectsActiveSummonRegistration(t *testing.T) {
+	state := world.New()
+	owner := &fakeSummonOwner{id: 42}
+	actor := mustServitor(t, ServitorConfig{ObjectID: 7, Owner: owner})
+	SpawnBesideOwner(state, actor, owner, location.Location{})
+
+	if !actor.OwnerStillLinked() {
+		t.Fatal("OwnerStillLinked() = false with active registration, want true")
+	}
+
+	state.RemoveSummon(owner.ObjectID())
+	if actor.OwnerStillLinked() {
+		t.Fatal("OwnerStillLinked() = true after owner cleared summon, want false")
+	}
+}

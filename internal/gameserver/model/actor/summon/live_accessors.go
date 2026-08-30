@@ -45,6 +45,21 @@ func (a *Actor) OwnerID() int32 {
 	return a.owner.ObjectID()
 }
 
+// OwnerStillLinked reports whether the owner still identifies this summon as
+// their active one. DecayTaskManager cancels a tracked summon corpse when this
+// returns false, before its deadline is checked.
+func (a *Actor) OwnerStillLinked() bool {
+	if a == nil || a.world == nil {
+		return false
+	}
+	active, ok := a.world.Summon(a.OwnerID())
+	if !ok {
+		return false
+	}
+	linker, ok := active.(interface{ ObjectID() int32 })
+	return ok && linker.ObjectID() == a.ObjectID()
+}
+
 // ControlItemID returns the collar item object id backing this pet.
 func (a *Actor) ControlItemID() int32 { return a.controlItemID }
 
