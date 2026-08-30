@@ -2,13 +2,12 @@ package sql
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/dbtest"
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/testcontainers/testcontainers-go/modules/mariadb"
 )
 
 // accountsSchema mirrors aCis_datapack/sql/accounts.sql verbatim.
@@ -21,37 +20,12 @@ const accountsSchema = "CREATE TABLE IF NOT EXISTS `accounts` (\n" +
 	"	PRIMARY KEY (`login`)\n" +
 	")"
 
-// newIntegrationStore starts a real MariaDB container, creates the accounts
-// table, and returns an AccountStore backed by it.
+// newIntegrationStore creates a database on the shared MariaDB instance
+// (see internal/dbtest), creates the accounts table, and returns an
+// AccountStore backed by it.
 func newIntegrationStore(t *testing.T) *AccountStore {
 	t.Helper()
-	ctx := context.Background()
-
-	container, err := mariadb.Run(ctx, "mariadb:11")
-	if err != nil {
-		t.Fatalf("start mariadb container: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := container.Terminate(ctx); err != nil {
-			t.Logf("terminate mariadb container: %v", err)
-		}
-	})
-
-	dsn, err := container.ConnectionString(ctx)
-	if err != nil {
-		t.Fatalf("connection string: %v", err)
-	}
-
-	db, err := sql.Open("mysql", dsn)
-	if err != nil {
-		t.Fatalf("open db: %v", err)
-	}
-	t.Cleanup(func() { db.Close() })
-
-	if _, err := db.ExecContext(ctx, accountsSchema); err != nil {
-		t.Fatalf("create accounts table: %v", err)
-	}
-	return NewAccountStore(db)
+	return NewAccountStore(dbtest.NewDB(t, accountsSchema))
 }
 
 func TestAccountStore_Account_NotFound(t *testing.T) {

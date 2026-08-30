@@ -134,9 +134,9 @@ func TestPlayerPicksUpDroppedItem(t *testing.T) {
 }
 ```
 
-Environment: Docker is required for the behavior suites (MariaDB testcontainer). Run them with
-`make test` (full default run), `make test-unit` (fast pure-core pass), or
-`make test-one PKG=tests/items`.
+Environment: the behavior suites need the single shared MariaDB instance up first —
+`make test-db-up` (Docker required; `make test-db-down` to stop it). Run suites with `make test`
+(full default run), `make test-unit` (fast pure-core pass), or `make test-one PKG=tests/items`.
 
 Anti-patterns: do not reimplement the handshake or fixtures per suite (`testsupport.ScriptedClient`
 and `gameservertest` fixtures only), do not reintroduce `//go:build integration` tags, and do not
