@@ -1046,6 +1046,32 @@ func TestFreight_VisibleItems_FiltersByActiveTown(t *testing.T) {
 	}
 }
 
+func TestFreight_VisibleItems_ZeroActiveLocationReturnsOnlyUntagged(t *testing.T) {
+	f := NewFreight(0x10000001, freightTestTemplates())
+
+	f.ActiveLocation = 1
+	tagged := f.AddNew(freightTestItemID, 1, 0x20000001)
+	f.ActiveLocation = 0
+	untagged := f.AddNew(freightTestStackableID, 1, 0x20000002)
+
+	visible := f.VisibleItems()
+	if len(visible) != 1 {
+		t.Fatalf("VisibleItems() at ActiveLocation=0 = %d items, want 1 (untagged only)", len(visible))
+	}
+	if visible[0] != untagged {
+		t.Fatalf("VisibleItems() at ActiveLocation=0 returned object %d, want untagged %d", visible[0].ObjectID, untagged.ObjectID)
+	}
+	if got := f.VisibleSize(); got != 2 {
+		t.Errorf("VisibleSize() at ActiveLocation=0 = %d, want 2 (zero-location wildcard)", got)
+	}
+	if got := f.ItemByTemplateID(freightTestItemID); got != tagged {
+		t.Errorf("ItemByTemplateID(town-tagged) at ActiveLocation=0 = %v, want tagged item (zero-location wildcard)", got)
+	}
+	if got := f.ItemByTemplateID(freightTestStackableID); got != untagged {
+		t.Errorf("ItemByTemplateID(untagged) at ActiveLocation=0 = %v, want untagged item", got)
+	}
+}
+
 func TestFreight_VisibleItems_OrderedByObjectID(t *testing.T) {
 	f := NewFreight(0x10000001, freightTestTemplates())
 	f.ActiveLocation = 1

@@ -22,7 +22,8 @@ type Freight struct {
 	*Container
 
 	// ActiveLocation is the currently selected castle town id. Zero means
-	// no town is selected, in which case every item is visible.
+	// no town is selected. VisibleSize and ItemByTemplateID treat that as a
+	// wildcard; VisibleItems lists only untagged (LocationData 0) items.
 	ActiveLocation int
 }
 
@@ -31,9 +32,13 @@ func NewFreight(ownerID int32, templates *item.Table) *Freight {
 	return &Freight{Container: NewContainer(ownerID, item.LocationFreight, templates)}
 }
 
-func (f *Freight) visible(inst *item.Instance) bool {
+func (f *Freight) listed(inst *item.Instance) bool {
 	st := inst.Snapshot()
-	return st.LocationData == 0 || f.ActiveLocation == 0 || st.LocationData == f.ActiveLocation
+	return st.LocationData == 0 || st.LocationData == f.ActiveLocation
+}
+
+func (f *Freight) visible(inst *item.Instance) bool {
+	return f.ActiveLocation == 0 || f.listed(inst)
 }
 
 // VisibleSize returns the number of items visible at the currently active
@@ -50,13 +55,14 @@ func (f *Freight) VisibleSize() int {
 	return n
 }
 
-// VisibleItems returns every item visible at the currently active town.
+// VisibleItems returns untagged items plus those tagged for the active town.
+// A zero ActiveLocation lists only untagged items; it is not a wildcard.
 func (f *Freight) VisibleItems() []*item.Instance {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 	out := make([]*item.Instance, 0, len(f.items))
 	for _, inst := range f.items {
-		if f.visible(inst) {
+		if f.listed(inst) {
 			out = append(out, inst)
 		}
 	}
