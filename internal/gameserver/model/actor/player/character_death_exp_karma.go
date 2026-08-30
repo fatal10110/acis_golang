@@ -94,7 +94,9 @@ func (c *Character) applyDeathExpKarmaLoss(killer creature.DeathActor) {
 
 	// Snapshot the pre-loss exp for a later resurrection to restore from
 	// (Player.java:2919, `setExpBeforeDeath(getStatus().getExp())`).
+	c.progressionMu.Lock()
 	c.ExpBeforeDeath = c.Exp
+	c.progressionMu.Unlock()
 
 	c.updateKarmaLoss(lostExp)
 	c.RemoveExpAndSp(table, c.runtimeTemplate, lostExp, 0)
@@ -105,6 +107,8 @@ func (c *Character) applyDeathExpKarmaLoss(killer creature.DeathActor) {
 // It is a no-op unless a death has left ExpBeforeDeath set, and always
 // clears ExpBeforeDeath afterward.
 func (c *Character) RestoreExp(restorePercent float64) {
+	c.progressionMu.Lock()
+	defer c.progressionMu.Unlock()
 	if c.ExpBeforeDeath <= 0 {
 		return
 	}
@@ -117,7 +121,7 @@ func (c *Character) RestoreExp(restorePercent float64) {
 
 	restored := int64(math.Round(float64(c.ExpBeforeDeath-c.Exp) * restorePercent / 100))
 	c.ExpBeforeDeath = 0
-	c.AddExpAndSp(table, c.runtimeTemplate, restored, -1)
+	c.addExpAndSp(table, c.runtimeTemplate, restored, -1)
 }
 
 // updateKarmaLoss reduces this character's karma for a death that cost

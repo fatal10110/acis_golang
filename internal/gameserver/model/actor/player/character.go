@@ -58,6 +58,11 @@ type Character struct {
 	// resurrection effect restores a percentage of the exp lost since then
 	// via RestoreExp, which also clears this back to 0.
 	ExpBeforeDeath int64
+	// progressionMu guards CharLevel, Exp, SP and ExpBeforeDeath. Kill
+	// rewards and death exp loss mutate them from task/timer goroutines
+	// while disconnect/autosave snapshots them through ProgressionValues
+	// (#1890).
+	progressionMu sync.RWMutex
 
 	maxHP, curHP float64
 	maxCP, curCP float64
