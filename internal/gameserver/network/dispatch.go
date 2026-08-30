@@ -55,8 +55,6 @@ type shortcutStore interface {
 
 type hennaStore interface {
 	ListByOwner(ctx context.Context, ownerID int32) ([]henna.Row, error)
-	Insert(ctx context.Context, ownerID int32, symbolID, slot int) error
-	Delete(ctx context.Context, ownerID int32, slot int) error
 }
 
 // petStore is the narrow persistence surface a pet-collar restore needs:
