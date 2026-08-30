@@ -292,6 +292,28 @@ func (m *CreatureMove) resolvePathLocked(target location.Location) (location.Loc
 	return fallback, nil, nil
 }
 
+// pathFindOutcome mirrors geopath-fail accounting on a return-home attempt:
+// a direct CanMove line neither increments nor resets the streak; a FindPath
+// route with at least two cells resets it; any other blocked resolution
+// increments it.
+func (m *CreatureMove) pathFindOutcome(target location.Location) (reset, fail bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	tx, ty, tz := target.X, target.Y, target.Z
+	tz = int(m.geo.Height(tx, ty, tz))
+	snapped := location.Location{X: tx, Y: ty, Z: tz}
+	ox, oy, oz := m.origin.X, m.origin.Y, m.origin.Z
+	if m.geo.CanMove(ox, oy, oz, tx, ty, tz) {
+		return false, false
+	}
+	path, ok := m.geo.FindPath(m.origin, snapped)
+	if ok && len(path) >= 2 {
+		return true, false
+	}
+	return false, true
+}
+
 // rescheduleLocked cancels any pending arrival timer and, for a positive
 // duration, starts a new one that advances origin to destination and fires
 // the arrived hook once it elapses. Callers hold mu.

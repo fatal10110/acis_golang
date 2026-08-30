@@ -17,6 +17,12 @@ func (h *Hostile) FlyTo(dest location.Location, flight modelskill.Flight) {
 	})
 }
 
+// TeleportTo snaps the NPC to target and broadcasts the forced correction.
+func (h *Hostile) TeleportTo(target location.Location) {
+	h.SetXYZ(target.X, target.Y, target.Z)
+	h.BroadcastPosition()
+}
+
 // SetXYZ moves the NPC immediately and reseeds its ordinary movement state.
 func (h *Hostile) SetXYZ(x, y, z int) {
 	position := location.Location{X: x, Y: y, Z: z}
