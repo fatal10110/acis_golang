@@ -211,14 +211,20 @@ func loadHTMLRecords(root string) ([]datadiff.Record, error) {
 // loadNPCRecords reduces every loaded NPC template to a representative
 // subset of its scalar fields: base combat and movement stats. It first
 // loads the item table, which the NPC loader needs to validate drop
-// entries against.
+// entries against, and the skill table, which it needs to validate
+// <skill> id/level pairs against.
 func loadNPCRecords(root string) ([]datadiff.Record, error) {
 	items, err := loadItemTable(root)
 	if err != nil {
 		return nil, fmt.Errorf("npc: load item table for drop validation: %w", err)
 	}
 
-	table, err := xml.LoadNPCTemplates(xmlPath(root, "npcs"), items, zerolog.Nop())
+	skills, err := xml.LoadSkillDefinitions(xmlPath(root, "skills"), zerolog.Nop())
+	if err != nil {
+		return nil, fmt.Errorf("npc: load skill table for skill validation: %w", err)
+	}
+
+	table, err := xml.LoadNPCTemplates(xmlPath(root, "npcs"), items, skills, zerolog.Nop())
 	if err != nil {
 		return nil, err
 	}
