@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	dbsql "database/sql"
 	"errors"
 	"os"
 	"path/filepath"
@@ -11,8 +10,8 @@ import (
 	"testing"
 
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/testcontainers/testcontainers-go/modules/mariadb"
 
+	"github.com/fatal10110/acis_golang/internal/dbtest"
 	"github.com/fatal10110/acis_golang/internal/loginserver/data/manager"
 	"github.com/fatal10110/acis_golang/internal/loginserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/loginserver/model"
@@ -34,33 +33,7 @@ const serverNamesXML = `<?xml version="1.0" encoding="UTF-8"?>
 
 func newIntegrationStore(t *testing.T) *sql.GameServerStore {
 	t.Helper()
-	ctx := context.Background()
-
-	container, err := mariadb.Run(ctx, "mariadb:11")
-	if err != nil {
-		t.Fatalf("start mariadb container: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := container.Terminate(ctx); err != nil {
-			t.Logf("terminate mariadb container: %v", err)
-		}
-	})
-
-	dsn, err := container.ConnectionString(ctx)
-	if err != nil {
-		t.Fatalf("connection string: %v", err)
-	}
-
-	db, err := dbsql.Open("mysql", dsn)
-	if err != nil {
-		t.Fatalf("open db: %v", err)
-	}
-	t.Cleanup(func() { db.Close() })
-
-	if _, err := db.ExecContext(ctx, gameserversSchema); err != nil {
-		t.Fatalf("create gameservers table: %v", err)
-	}
-	return sql.NewGameServerStore(db)
+	return sql.NewGameServerStore(dbtest.NewDB(t, gameserversSchema))
 }
 
 func loadTestNames(t *testing.T) *manager.ServerNames {

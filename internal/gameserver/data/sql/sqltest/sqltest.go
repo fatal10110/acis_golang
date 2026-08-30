@@ -1,18 +1,16 @@
-// Package sqltest starts a real, disposable MariaDB instance carrying the
-// shipped gameserver schema, for integration tests across this module that
-// need to read and write through it rather than a mock.
+// Package sqltest gives integration tests across this module a database
+// carrying the shipped gameserver schema, backed by the single shared
+// MariaDB instance from internal/dbtest rather than a container per package.
 package sqltest
 
 import (
 	"context"
 	"database/sql"
-	"fmt"
-	"os"
 	"sync"
 	"testing"
 
+	"github.com/fatal10110/acis_golang/internal/dbtest"
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/testcontainers/testcontainers-go/modules/mariadb"
 )
 
 // sharedTables lists every table SharedDB truncates between tests, in an
@@ -229,82 +227,43 @@ const sevenSignsStatusSchema = "CREATE TABLE IF NOT EXISTS `seven_signs_status` 
 const sevenSignsStatusSeed = "INSERT IGNORE INTO `seven_signs_status` VALUES " +
 	"(0,1,1,'COMPETITION',0,'NORMAL',0,0,0,0,'NORMAL','NORMAL','NORMAL',0,0,0,0,0,0,0,0,0,0,0)"
 
-// NewDB starts a real MariaDB container, creates the gameserver tables used
-// by integration tests, and returns a pool connected to it. The container is
-// terminated and the pool closed when the test completes.
+// NewDB creates a fresh database on the shared MariaDB instance (see
+// internal/dbtest), creates the gameserver tables used by integration
+// tests, and returns a pool connected to it. The database is dropped and
+// the pool closed when the test completes.
 func NewDB(t *testing.T) *sql.DB {
 	t.Helper()
-	ctx := context.Background()
-
-	container, err := mariadb.Run(ctx, "mariadb:11")
-	if err != nil {
-		t.Fatalf("start mariadb container: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := container.Terminate(ctx); err != nil {
-			t.Logf("terminate mariadb container: %v", err)
-		}
-	})
-
-	db, err := openSchema(ctx, container)
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-	t.Cleanup(func() { db.Close() })
-	return db
+	return dbtest.NewDB(t, schemaStmts...)
 }
 
-func openSchema(ctx context.Context, container *mariadb.MariaDBContainer) (*sql.DB, error) {
-	dsn, err := container.ConnectionString(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("connection string: %w", err)
-	}
-
-	db, err := sql.Open("mysql", dsn)
-	if err != nil {
-		return nil, fmt.Errorf("open db: %w", err)
-	}
-
-	for _, stmt := range []string{
-		charactersSchema, itemsSchema, augmentationsSchema, spawnDataSchema,
-		itemsOnGroundSchema, characterSkillsSchema, characterShortcutsSchema,
-		petsSchema, characterSkillsSaveSchema, sevenSignsStatusSchema,
-		sevenSignsStatusSeed,
-	} {
-		if _, err := db.ExecContext(ctx, stmt); err != nil {
-			db.Close()
-			return nil, fmt.Errorf("create table: %w", err)
-		}
-	}
-	return db, nil
+var schemaStmts = []string{
+	charactersSchema, itemsSchema, augmentationsSchema, spawnDataSchema,
+	itemsOnGroundSchema, characterSkillsSchema, characterShortcutsSchema,
+	petsSchema, characterSkillsSaveSchema, sevenSignsStatusSchema,
+	sevenSignsStatusSeed,
 }
 
 var (
-	sharedOnce      sync.Once
-	sharedDB        *sql.DB
-	sharedContainer *mariadb.MariaDBContainer
-	sharedErr       error
+	sharedOnce   sync.Once
+	sharedDB     *sql.DB
+	sharedDBName string
+	sharedErr    error
 )
 
 // SharedDB returns a MariaDB pool shared by every test in the current test
-// binary, i.e. one container per package (Go compiles each package's tests
-// into its own binary, so the sync.Once below fires exactly once per
-// package). The package's TestMain must call Main so the container is
-// terminated once, after every test in the package has run, instead of
-// leaking for a reaper to clean up.
+// binary, backed by one database on the shared instance (Go compiles each
+// package's tests into its own binary, so the sync.Once below fires exactly
+// once per package). The package's TestMain must call Main so the database
+// is dropped once, after every test in the package has run, instead of
+// leaking for cleanup.
 //
 // Each caller gets the tables truncated after its own test via tb.Cleanup,
 // so tests don't see rows left behind by earlier tests in the package.
 func SharedDB(tb testing.TB) *sql.DB {
 	tb.Helper()
 	sharedOnce.Do(func() {
-		container, err := mariadb.Run(context.Background(), "mariadb:11")
-		if err != nil {
-			sharedErr = fmt.Errorf("start mariadb container: %w", err)
-			return
-		}
-		sharedContainer = container
-		sharedDB, sharedErr = openSchema(context.Background(), container)
+		sharedDBName = dbtest.NewName()
+		sharedDB, sharedErr = dbtest.Open(context.Background(), sharedDBName, schemaStmts...)
 	})
 	if sharedErr != nil {
 		tb.Fatalf("shared mariadb db: %v", sharedErr)
@@ -326,20 +285,16 @@ func SharedDB(tb testing.TB) *sql.DB {
 	return sharedDB
 }
 
-// Main runs a package's tests and terminates the SharedDB container
-// afterward, if one was started. Every package using SharedDB must call it
-// from a TestMain:
+// Main runs a package's tests and drops the SharedDB database afterward, if
+// one was created. Every package using SharedDB must call it from a
+// TestMain:
 //
 //	func TestMain(m *testing.M) { os.Exit(sqltest.Main(m)) }
 func Main(m *testing.M) int {
 	code := m.Run()
 	if sharedDB != nil {
 		sharedDB.Close()
-	}
-	if sharedContainer != nil {
-		if err := sharedContainer.Terminate(context.Background()); err != nil {
-			fmt.Fprintf(os.Stderr, "terminate shared mariadb container: %v\n", err)
-		}
+		dbtest.Drop(sharedDBName)
 	}
 	return code
 }

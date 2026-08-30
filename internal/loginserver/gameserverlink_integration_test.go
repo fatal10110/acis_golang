@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/dbtest"
 	loginsql "github.com/fatal10110/acis_golang/internal/loginserver/data/sql"
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/testcontainers/testcontainers-go/modules/mariadb"
 )
 
 // accountsSchema mirrors aCis_datapack/sql/accounts.sql verbatim.
@@ -31,36 +31,7 @@ const gameserversSchema = "CREATE TABLE IF NOT EXISTS `gameservers` (\n" +
 
 func newIntegrationDB(t *testing.T) *sql.DB {
 	t.Helper()
-	ctx := context.Background()
-
-	container, err := mariadb.Run(ctx, "mariadb:11")
-	if err != nil {
-		t.Fatalf("start mariadb container: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := container.Terminate(ctx); err != nil {
-			t.Logf("terminate mariadb container: %v", err)
-		}
-	})
-
-	dsn, err := container.ConnectionString(ctx)
-	if err != nil {
-		t.Fatalf("connection string: %v", err)
-	}
-
-	db, err := sql.Open("mysql", dsn)
-	if err != nil {
-		t.Fatalf("open db: %v", err)
-	}
-	t.Cleanup(func() { db.Close() })
-
-	if _, err := db.ExecContext(ctx, accountsSchema); err != nil {
-		t.Fatalf("create accounts table: %v", err)
-	}
-	if _, err := db.ExecContext(ctx, gameserversSchema); err != nil {
-		t.Fatalf("create gameservers table: %v", err)
-	}
-	return db
+	return dbtest.NewDB(t, accountsSchema, gameserversSchema)
 }
 
 func TestGameServerLinkFreshRegistrationPersistsToDB(t *testing.T) {
