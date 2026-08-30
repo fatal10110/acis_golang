@@ -739,3 +739,53 @@ func TestSiegeGuardReturnHomeBypassesTerritoryGate(t *testing.T) {
 		t.Fatalf("MoveHome destination = %#v, want %#v", got, hostile.Instance.Home)
 	}
 }
+
+func TestNewHostileAppliesTemplatePassivesBeforeHPSeed(t *testing.T) {
+	baseTpl := &Template{ID: 9001, Type: "Monster", Level: 20, HPMax: 1000, CON: 40}
+	base, err := NewHostile(&Instance{ObjectID: 1, Template: baseTpl, Kind: "Monster"}, newHostileLive(t), &hostileMove{}, &hostileAttack{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	passive := modelskill.Ref{ID: 99, Level: 1}
+	table := modelskill.NewTable([]modelskill.Definition{{
+		ID:         passive.ID,
+		Level:      passive.Level,
+		Activation: modelskill.ActivationActive,
+		Funcs:      []modelskill.FuncTemplate{{Op: modelskill.FuncAdd, Stat: "maxHp", Value: 250}},
+	}})
+	tpl := &Template{ID: 9001, Type: "Monster", Level: 20, HPMax: 1000, CON: 40, Passives: []modelskill.Ref{passive}}
+	got, err := NewHostile(&Instance{ObjectID: 2, Template: tpl, Kind: "Monster"}, newHostileLive(t), &hostileMove{}, &hostileAttack{}, table)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	wantMax := base.MaxHP() + 250
+	if got.MaxHP() != wantMax {
+		t.Fatalf("MaxHP() = %d, want %d (base %d + 250 add after CON mul)", got.MaxHP(), wantMax, base.MaxHP())
+	}
+	if got.CurrentHP() != wantMax {
+		t.Fatalf("CurrentHP() = %d, want %d (seed after funcs attach)", got.CurrentHP(), wantMax)
+	}
+}
+
+func TestNewHostileRejectsFolkEvenWithTemplatePassives(t *testing.T) {
+	table := modelskill.NewTable([]modelskill.Definition{{
+		ID:         99,
+		Level:      1,
+		Activation: modelskill.ActivationActive,
+		Funcs:      []modelskill.FuncTemplate{{Op: modelskill.FuncAdd, Stat: "maxHp", Value: 250}},
+	}})
+	_, err := NewHostile(&Instance{
+		ObjectID: 1,
+		Template: &Template{
+			ID:       3001,
+			Type:     "Folk",
+			HPMax:    1000,
+			Passives: []modelskill.Ref{{ID: 99, Level: 1}},
+		},
+	}, newHostileLive(t), &hostileMove{}, &hostileAttack{}, table)
+	if err == nil {
+		t.Fatal("NewHostile() error = nil, want rejection of Folk so template passives never attach")
+	}
+}

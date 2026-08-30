@@ -279,6 +279,10 @@ type PetConfig struct {
 	// Skills maps skill id to level, from this pet's npc template. See
 	// Actor.skills.
 	Skills map[int]int
+	// Passives are the npc template's type="PASSIVE" skill refs. SkillDefs
+	// resolves them into stat funcs attached before current HP/MP seed.
+	Passives  []modelskill.Ref
+	SkillDefs skillLookup
 }
 
 // ServitorConfig carries the minimum state needed to create a live servitor.
@@ -303,6 +307,10 @@ type ServitorConfig struct {
 	// Skills maps skill id to level, from this servitor's npc template.
 	// See Actor.skills.
 	Skills map[int]int
+	// Passives are the npc template's type="PASSIVE" skill refs. SkillDefs
+	// resolves them into stat funcs attached before current HP/MP seed.
+	Passives  []modelskill.Ref
+	SkillDefs skillLookup
 }
 
 // NewServitor returns a live servitor actor.
@@ -328,6 +336,7 @@ func NewServitor(cfg ServitorConfig) *Actor {
 		stats:            cfg.Stats,
 		skills:           cfg.Skills,
 	}
+	a.attachTemplatePassives(cfg.SkillDefs, cfg.Passives)
 	a.initVitals()
 	a.effects = effect.NewList(a)
 	return a
@@ -376,9 +385,18 @@ func NewPet(cfg PetConfig) *Actor {
 		stats:         cfg.Stats,
 		skills:        cfg.Skills,
 	}
+	a.attachTemplatePassives(cfg.SkillDefs, cfg.Passives)
 	a.initVitals()
 	a.effects = effect.NewList(a)
 	return a
+}
+
+type skillLookup interface {
+	Definition(modelskill.Ref) (modelskill.Definition, bool)
+}
+
+func (a *Actor) attachTemplatePassives(lookup skillLookup, passives []modelskill.Ref) {
+	a.AddStatFuncs(effect.TemplatePassiveMods(lookup, passives))
 }
 
 func copyPetConfig(cfg *petmodel.Config) *petmodel.Config {

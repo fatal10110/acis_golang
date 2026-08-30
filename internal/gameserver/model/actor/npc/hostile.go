@@ -16,6 +16,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npcinfo"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -153,8 +154,17 @@ func Attackable(inst *Instance) bool {
 	return ok
 }
 
-// NewHostile creates a live attackable NPC wrapper for inst.
-func NewHostile(inst *Instance, live *creature.Live, movement ai.MoveController, attack ai.AttackController) (*Hostile, error) {
+// skillDefinitions resolves loaded skill definitions for template passives.
+type skillDefinitions interface {
+	Definition(skill.Ref) (skill.Definition, bool)
+}
+
+// NewHostile creates a live attackable NPC wrapper for inst. skills, when
+// provided, resolves inst.Template.Passives into stat funcs attached before
+// current HP/MP are seeded from the calculated maxima. Folk and other
+// non-attackable instance types never reach this constructor, so they never
+// gain stats from template passives.
+func NewHostile(inst *Instance, live *creature.Live, movement ai.MoveController, attack ai.AttackController, skills ...skillDefinitions) (*Hostile, error) {
 	if inst == nil {
 		return nil, errors.New("npc: nil hostile instance")
 	}
@@ -195,9 +205,14 @@ func NewHostile(inst *Instance, live *creature.Live, movement ai.MoveController,
 	}
 	h.health = creature.NewHealth(&h.hp)
 	h.brain = ai.NewAttackable(h, movement, attack)
-	// Seed from calculated Max HP/MP (CreatureStatus.setMaxHpMp uses the
-	// int-truncated getMaxHp/getMaxMp, not the raw template value or the
-	// untruncated calcStat result): MaxHpMul/MaxMpMul scale by CON/MEN bonus.
+	var lookup skillDefinitions
+	if len(skills) > 0 {
+		lookup = skills[0]
+	}
+	h.AddStatFuncs(effect.TemplatePassiveMods(lookup, inst.Template.Passives))
+	// Seed from calculated Max HP/MP after template passives attach:
+	// MaxHpMul/MaxMpMul scale by CON/MEN bonus, and int-truncated maxima
+	// match the persisted spawn current-hp/mp contract.
 	h.hp = float64(h.MaxHP())
 	h.mp = float64(int(h.MaxMPValue()))
 	return h, nil

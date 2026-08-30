@@ -2253,6 +2253,57 @@ func TestPassiveFuncsPropagatesBuildErrors(t *testing.T) {
 	}
 }
 
+func TestSkillStatFuncsIgnoresOperateType(t *testing.T) {
+	def := modelskill.Definition{
+		ID:         4408,
+		Level:      1,
+		Activation: modelskill.ActivationActive,
+		Funcs:      []modelskill.FuncTemplate{{Op: modelskill.FuncAdd, Stat: "maxHp", Value: 250}},
+	}
+
+	if _, err := PassiveFuncs(def); err == nil {
+		t.Fatal("PassiveFuncs() error = nil, want an error for an active-operate skill")
+	}
+
+	funcs, err := SkillStatFuncs(def)
+	if err != nil {
+		t.Fatalf("SkillStatFuncs() error: %v", err)
+	}
+	if len(funcs) != 1 {
+		t.Fatalf("SkillStatFuncs() length = %d, want 1", len(funcs))
+	}
+	if funcs[0].Owner != ModOwnerSkill(modelskill.Ref{ID: 4408, Level: 1}) {
+		t.Fatalf("Owner = %v, want skill 4408 level 1", funcs[0].Owner)
+	}
+	if funcs[0].Stat != stat.MaxHP || funcs[0].Op != OpAdd || funcs[0].Value != 250 {
+		t.Fatalf("func = %+v, want maxHp add 250", funcs[0])
+	}
+}
+
+func TestTemplatePassiveModsResolvesRefsAndSkipsMissing(t *testing.T) {
+	table := modelskill.NewTable([]modelskill.Definition{{
+		ID:         99,
+		Level:      1,
+		Activation: modelskill.ActivationActive,
+		Funcs:      []modelskill.FuncTemplate{{Op: modelskill.FuncAdd, Stat: "maxHp", Value: 250}},
+	}})
+
+	got := TemplatePassiveMods(table, []modelskill.Ref{
+		{ID: 99, Level: 1},
+		{ID: 98, Level: 1},
+	})
+	if len(got) != 1 {
+		t.Fatalf("TemplatePassiveMods() length = %d, want 1 (missing ref skipped)", len(got))
+	}
+	if got[0].Value != 250 {
+		t.Fatalf("Value = %v, want 250", got[0].Value)
+	}
+
+	if fns := TemplatePassiveMods(nil, []modelskill.Ref{{ID: 99, Level: 1}}); len(fns) != 0 {
+		t.Fatalf("nil lookup = %v, want empty", fns)
+	}
+}
+
 // ---- from persist_restore_test.go ----
 func TestSeedRestoreSchedulesFromPersistedCountAndElapsedTime(t *testing.T) {
 	e := &Effect{Template: modelskill.EffectTemplate{Count: 5, Time: 10}}

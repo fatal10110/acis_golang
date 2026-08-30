@@ -118,7 +118,7 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 	attackCtl.SetLogger(log)
 
 	routeMove := &atomic.Bool{}
-	hostile, err := npc.NewHostile(inst, live, routeAwareMoveController{MoveController: moveCtl, routeMove: routeMove}, attackCtl)
+	hostile, err := npc.NewHostile(inst, live, routeAwareMoveController{MoveController: moveCtl, routeMove: routeMove}, attackCtl, castDefs)
 	if err != nil {
 		return nil, nil, err
 	}

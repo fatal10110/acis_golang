@@ -168,7 +168,9 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 			SSCount: levelStats.SSCount, SPSCount: levelStats.SPSCount,
 			AttackRange: npcTmpl.BaseAttackRange, AttackSpeed: npcTmpl.AtkSpd,
 		},
-		Skills: npcTmpl.Skills,
+		Skills:    npcTmpl.Skills,
+		Passives:  npcTmpl.Passives,
+		SkillDefs: link.skills,
 	})
 	pet.SetZones(link.zones)
 	pet.SetHP(curHP)
@@ -255,7 +257,9 @@ func (s *gameSummonSpawner) SpawnServitor(owner *player.Character, def modelskil
 			AttackRange:      npcTmpl.BaseAttackRange,
 			AttackSpeed:      npcTmpl.AtkSpd,
 		},
-		Skills: npcTmpl.Skills,
+		Skills:    npcTmpl.Skills,
+		Passives:  npcTmpl.Passives,
+		SkillDefs: link.skills,
 	})
 	servitor.SetZones(link.zones)
 	link.wireSummonAI(servitor, npcTmpl.RunSpeed)
