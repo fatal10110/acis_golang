@@ -17,6 +17,10 @@ type playerFollowSelf struct {
 	moves   []Event
 }
 
+type tickerOwnedFollowSelf struct{ playerFollowSelf }
+
+func (*tickerOwnedFollowSelf) OwnsOffensiveFollowTicker() bool { return true }
+
 func (s *playerFollowSelf) ObjectID() int32                    { return 1 }
 func (s *playerFollowSelf) Position() (int, int, int)          { return s.x, s.y, s.z }
 func (s *playerFollowSelf) CollisionRadius() float64           { return 0 }
@@ -115,6 +119,31 @@ func TestControllerStopCancelsOffensiveFollowRechecks(t *testing.T) {
 	}
 	if got := len(self.moves); got != 1 {
 		t.Fatalf("move broadcasts after Stop() = %d, want 1", got)
+	}
+}
+
+func TestControllerDefersToActorOwnedOffensiveFollowTicker(t *testing.T) {
+	self := &tickerOwnedFollowSelf{}
+	mover, err := NewCreatureMove(location.Location{}, 100, staticGeo{canMove: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mover.afterFunc = func(time.Duration, func()) scheduledTimer { return noAllocTimer{} }
+	controller, err := NewController(mover, self)
+	if err != nil {
+		t.Fatal(err)
+	}
+	target := &followTarget{x: 100}
+	if following, err := controller.MaybeStartOffensiveFollow(target, 40); err != nil || !following {
+		t.Fatalf("MaybeStartOffensiveFollow() = %v, %v; want active follow", following, err)
+	}
+
+	target.x = 200
+	for range 5 {
+		controller.PositionUpdate()
+	}
+	if got := len(self.moves); got != 1 {
+		t.Fatalf("controller move broadcasts = %d, want only the initial move when actor owns the follow ticker", got)
 	}
 }
 

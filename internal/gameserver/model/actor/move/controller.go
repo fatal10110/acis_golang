@@ -3,6 +3,7 @@ package move
 import (
 	"errors"
 	"sync"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -36,6 +37,10 @@ type targetKnower interface {
 	Knows(attackable.Combatant) bool
 }
 
+type offensiveFollowTickerOwner interface {
+	OwnsOffensiveFollowTicker() bool
+}
+
 // PositionUpdater is the moving actor surface consumed by the position
 // update task. PositionUpdate must deregister itself from whatever
 // PositionUpdateRegistry it was added through once it no longer needs
@@ -63,10 +68,10 @@ type Controller struct {
 	self            Actor
 	positionUpdates PositionUpdateRegistry
 
-	mu                   sync.Mutex
-	offensiveTarget      attackable.Combatant
-	offensiveRange       int
-	offensiveFollowTicks int
+	mu                     sync.Mutex
+	offensiveTarget        attackable.Combatant
+	offensiveRange         int
+	offensiveFollowElapsed time.Duration
 }
 
 // NewController adapts move for self, the position/footprint of the actor
@@ -185,8 +190,10 @@ func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, m
 		c.move.StartFriendlyFollow(target.ObjectID(), offset)
 	case FollowOffensive:
 		c.move.StartOffensiveFollow(target.ObjectID(), offset)
-		c.offensiveTarget = target
-		c.offensiveRange = offset
+		if !c.selfOwnsOffensiveFollowTicker() {
+			c.offensiveTarget = target
+			c.offensiveRange = offset
+		}
 	default:
 		return false, nil
 	}
@@ -326,19 +333,24 @@ func (c *Controller) recheckOffensiveFollow() {
 		c.clearOffensiveFollow()
 		return
 	}
-	c.offensiveFollowTicks++
-	if c.offensiveFollowTicks < 5 {
+	c.offensiveFollowElapsed += PositionUpdateInterval
+	if c.offensiveFollowElapsed < c.move.FollowInterval() {
 		return
 	}
-	c.offensiveFollowTicks = 0
+	c.offensiveFollowElapsed = 0
 	_, _ = c.maybeStartFollow(c.offensiveTarget, c.offensiveRange, FollowOffensive)
+}
+
+func (c *Controller) selfOwnsOffensiveFollowTicker() bool {
+	actor, ok := c.self.(offensiveFollowTickerOwner)
+	return ok && actor.OwnsOffensiveFollowTicker()
 }
 
 func (c *Controller) clearOffensiveFollow() {
 	c.move.CancelFollow()
 	c.offensiveTarget = nil
 	c.offensiveRange = 0
-	c.offensiveFollowTicks = 0
+	c.offensiveFollowElapsed = 0
 }
 
 func (c *Controller) addPositionUpdate() {
