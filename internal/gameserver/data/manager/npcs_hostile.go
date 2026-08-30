@@ -12,6 +12,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/rs/zerolog"
@@ -88,11 +89,20 @@ func (r routeAwareMoveController) MoveHome(home location.Location) error {
 // controller (over the Hostile's lifetime movement state) and a real attack
 // controller, resolving their mutual construction-order dependency on the
 // finished Hostile via locatedRef/creatureActorRef/statOwnerRef.
-func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *task.PositionUpdates, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker) (*npc.Hostile, *walkerActorRef, error) {
+func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *task.PositionUpdates, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, zones *zone.Index) (*npc.Hostile, *walkerActorRef, error) {
 	statRef := &statOwnerRef{}
 	live, err := creature.NewLive(inst.Home, speed, geo, statRef)
 	if err != nil {
 		return nil, nil, err
+	}
+	if zones != nil {
+		live.Move().SetWaterSurface(func(position location.Location, groundZ int) (int, bool) {
+			water, ok := zone.FindAt[*zone.Water](zones, position.X, position.Y, position.Z)
+			if !ok || groundZ-water.WaterLevel() >= -20 {
+				return 0, false
+			}
+			return water.WaterLevel(), true
+		})
 	}
 
 	locRef := &locatedRef{}

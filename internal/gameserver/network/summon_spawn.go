@@ -279,11 +279,14 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 		x, y, z := actor.Position()
 		if err := actor.InitMovement(location.Location{X: x, Y: y, Z: z}, runSpeed, l.geo); err != nil {
 			l.log.Warn().Err(err).Msg("summon: create movement controller")
-		} else if controller, err := move.NewController(actor.Move(), actor); err != nil {
-			l.log.Warn().Err(err).Msg("summon: attach movement controller")
 		} else {
-			controller.SetPositionUpdates(l.positions)
-			moveController = controller
+			setWaterSurface(actor.Move(), l.zones)
+			if controller, err := move.NewController(actor.Move(), actor); err != nil {
+				l.log.Warn().Err(err).Msg("summon: attach movement controller")
+			} else {
+				controller.SetPositionUpdates(l.positions)
+				moveController = controller
+			}
 		}
 	}
 	attackController := attack.NewPlayable(actor)
