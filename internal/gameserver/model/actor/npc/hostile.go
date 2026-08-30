@@ -75,6 +75,7 @@ type Hostile struct {
 
 	regionInactive atomic.Bool
 	abnormalEffect atomic.Int32
+	running        atomic.Bool
 
 	// geoPathFailCount counts consecutive route-walk moves that couldn't
 	// path toward their target node, for task.Walker's teleport-to-start
@@ -204,6 +205,7 @@ func NewHostile(inst *Instance, live *creature.Live, movement ai.MoveController,
 		spiritshotRate:     spiritshotRate,
 	}
 	h.health = creature.NewHealth(&h.hp)
+	h.running.Store(!inst.WalkMode)
 	h.brain = ai.NewAttackable(h, movement, attack)
 	var lookup skillDefinitions
 	if len(skills) > 0 {
@@ -318,7 +320,7 @@ func (h *Hostile) NPCInfoSnapshot() npcinfo.Snapshot {
 		CurrentHP: h.CurrentHP(), MaxHP: int(h.MaxHPValue()),
 		CollisionRadius: h.CollisionRadius(), CollisionHeight: tmpl.CollisionHeight,
 		RightHand: tmpl.RightHand, LeftHand: tmpl.LeftHand,
-		Running: !h.Instance.WalkMode, AlikeDead: h.AlikeDead(), SummonAnimation: 2,
+		Running: h.Running(), AlikeDead: h.AlikeDead(), SummonAnimation: 2,
 		AbnormalEffect: h.AbnormalEffect(), Name: name, Title: title,
 	}
 }
@@ -800,6 +802,11 @@ func (h *Hostile) returnHomeOutsideDriftRange() bool {
 		return false
 	}
 	h.brain.Threats().ZeroHate()
+	if h.SiegeGuard() {
+		h.ForceRunStance()
+	} else {
+		h.ForceWalkStance()
+	}
 	_ = h.move.MoveHome(h.Instance.Home)
 	return true
 }

@@ -50,7 +50,7 @@ func (a hostileStatActor) IsMoving() bool { return a.h.Move().Moving() }
 // WALKING_NPCS id subset) — every other NPC's Npc.onSpawn calls
 // setWalkOrRun(true) and the Java reference never toggles an NPC back
 // (Creature's walk/run toggle is otherwise player-command driven only).
-func (a hostileStatActor) IsRunning() bool { return !a.h.Instance.WalkMode }
+func (a hostileStatActor) IsRunning() bool { return a.h.Running() }
 
 // IsRiding satisfies conditions.Actor. Always false: NPCs are never
 // mounted, matching Creature.isRiding's un-overridden default.
