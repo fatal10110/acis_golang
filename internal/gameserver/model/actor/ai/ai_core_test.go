@@ -809,6 +809,72 @@ func TestAttackableAISetBackToPeaceClearsCombatState(t *testing.T) {
 	}
 }
 
+func TestAttackableAIReduceAllAggroHateReturnsToPeaceWhenExhausted(t *testing.T) {
+	owner := actor(1)
+	target := actor(2)
+	owner.known = map[int32]bool{target.ObjectID(): true}
+	move := &recordingMove{}
+	ai := NewAttackable(owner, move, &recordingAttack{canAttack: true})
+
+	addAttackHate(ai, target, 0, 5)
+	ai.Think()
+	if got := ai.CurrentIntention(); got != IntentionAttack {
+		t.Fatalf("CurrentIntention() before decay = %v, want %v", got, IntentionAttack)
+	}
+
+	ai.ReduceAllAggroHate(10)
+
+	if got := ai.CurrentIntention(); got != IntentionIdle {
+		t.Fatalf("CurrentIntention() after hate exhausted = %v, want %v", got, IntentionIdle)
+	}
+	if got := ai.Desires().Len(); got != 0 {
+		t.Fatalf("desires len = %d, want 0 after peace", got)
+	}
+}
+
+func TestAttackableAIStopAggroHateReturnsToPeaceWhenExhausted(t *testing.T) {
+	owner := actor(1)
+	target := actor(2)
+	owner.known = map[int32]bool{target.ObjectID(): true}
+	move := &recordingMove{}
+	ai := NewAttackable(owner, move, &recordingAttack{canAttack: true})
+
+	addAttackHate(ai, target, 0, 20)
+	ai.Think()
+	if got := ai.CurrentIntention(); got != IntentionAttack {
+		t.Fatalf("CurrentIntention() before stop = %v, want %v", got, IntentionAttack)
+	}
+
+	ai.StopAggroHate(target)
+
+	if got := ai.CurrentIntention(); got != IntentionIdle {
+		t.Fatalf("CurrentIntention() after stop hate = %v, want %v", got, IntentionIdle)
+	}
+	if got := ai.Desires().Len(); got != 0 {
+		t.Fatalf("desires len = %d, want 0 after peace", got)
+	}
+}
+
+func TestAttackableAIReduceAllAggroHateKeepsAttackWhenSkillHateRemains(t *testing.T) {
+	owner := actor(1)
+	target := actor(2)
+	owner.known = map[int32]bool{target.ObjectID(): true}
+	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{canAttack: true})
+
+	addAttackHate(ai, target, 0, 5)
+	ai.AddHate(target, 50)
+	ai.Think()
+	if got := ai.CurrentIntention(); got != IntentionAttack {
+		t.Fatalf("CurrentIntention() before decay = %v, want %v", got, IntentionAttack)
+	}
+
+	ai.ReduceAllAggroHate(10)
+
+	if got := ai.CurrentIntention(); got != IntentionAttack {
+		t.Fatalf("CurrentIntention() with skill hate remaining = %v, want %v", got, IntentionAttack)
+	}
+}
+
 func TestAttackableAIRandomizeHateDisplacesTargetAndRebuildsDesires(t *testing.T) {
 	owner := actor(1)
 	low := actor(2)

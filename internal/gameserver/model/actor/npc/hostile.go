@@ -549,8 +549,31 @@ func (h *Hostile) RandomNearbyCombatant(radius int) (attackable.Combatant, bool)
 // its forced redirect once the effect ends.
 func (h *Hostile) StopMostHatedTarget() {
 	if most, ok := h.brain.Threats().MostHated(); ok {
-		h.brain.Threats().StopHate(most.Attacker)
+		h.brain.StopAggroHate(most.Attacker)
 	}
+}
+
+// ReduceAllAggroHate subtracts amount from every threat entry and may
+// return this NPC to peace when no attacker remains most-hated.
+func (h *Hostile) ReduceAllAggroHate(amount float64) {
+	h.brain.ReduceAllAggroHate(amount)
+}
+
+// StopAggroHate zeroes target's threat hate and may return this NPC to
+// peace when no attacker remains most-hated.
+func (h *Hostile) StopAggroHate(attacker attackable.Combatant) {
+	h.brain.StopAggroHate(attacker)
+}
+
+// StopHateList drops target from the skill-cast hate table.
+func (h *Hostile) StopHateList(attacker attackable.Combatant) {
+	h.brain.Hates().StopHate(attacker)
+}
+
+// ClearAggroTables drops every threat and skill-cast hate entry.
+func (h *Hostile) ClearAggroTables() {
+	h.brain.Threats().Clear()
+	h.brain.Hates().Clear()
 }
 
 // RandomizeHate ports Npc.java's AggroList.randomizeAttack(), the behavior

@@ -635,11 +635,18 @@ func (d *disablerFake) SkillReflectInput(def modelskill.Definition) formulas.Ski
 	return formulas.SkillReflectInput{CanBeReflected: true, Magic: true, ReflectChance: 100}
 }
 
-func (d *disablerFake) Attackable() bool                   { return d.attackableFlag }
+func (d *disablerFake) Attackable() bool { return d.attackableFlag }
 func (d *disablerFake) RaidRelated() bool                  { return d.raidRelated }
 func (d *disablerFake) Undead() bool                       { return d.undeadFlag }
-func (d *disablerFake) AggroList() *attackable.ThreatTable { return d.aggro }
-func (d *disablerFake) HateList() *attackable.HateTable    { return d.hate }
+func (d *disablerFake) ReduceAllAggroHate(amount float64)  { d.aggro.ReduceAllHate(amount) }
+func (d *disablerFake) StopAggroHate(attacker attackable.Combatant) {
+	d.aggro.StopHate(attacker)
+}
+func (d *disablerFake) StopHateList(attacker attackable.Combatant) { d.hate.StopHate(attacker) }
+func (d *disablerFake) ClearAggroTables() {
+	d.aggro.Clear()
+	d.hate.Clear()
+}
 func (d *disablerFake) Level() int                         { return d.level }
 
 func (d *disablerFake) NotifyAggression(source creature.DeathActor, power int) {
