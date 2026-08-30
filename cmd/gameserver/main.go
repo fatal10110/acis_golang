@@ -79,6 +79,7 @@ func newGameServerApp(paths gameServerPaths) *fx.App {
 			gamesql.NewCharacterStore,
 			gamesql.NewItemStore,
 			gamesql.NewShortcutStore,
+			gamesql.NewHennaStore,
 			gamesql.NewPetStore,
 			provideIDAllocator,
 			provideRoster,

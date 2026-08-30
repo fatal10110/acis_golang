@@ -17,6 +17,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/henna"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/restart"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/route"
@@ -74,6 +75,7 @@ type gameData struct {
 	Admin         *admin.Data
 	Geo           *engine.Engine
 	Finder        *pathfind.Finder
+	Hennas        *henna.Table
 }
 
 type geodata struct {
@@ -152,11 +154,15 @@ func loadGameData(paths gameServerPaths, cfg gameServerConfig, log zerolog.Logge
 	if err != nil {
 		return nil, err
 	}
+	hennas, err := gamexml.LoadHennas(filepath.Join(xmlRoot, "hennas.xml"))
+	if err != nil {
+		return nil, err
+	}
 	geo, err := loadGeodata(paths)
 	if err != nil {
 		return nil, err
 	}
-	log.Info().Str("geodata_dir", geo.Dir).Str("geodata_type", string(geo.Type)).Int("npc_templates", npcs.Len()).Int("skills", skills.Len()).Msg("game data loaded")
+	log.Info().Str("geodata_dir", geo.Dir).Str("geodata_type", string(geo.Type)).Int("npc_templates", npcs.Len()).Int("skills", skills.Len()).Int("hennas", hennas.Len()).Msg("game data loaded")
 	return &gameData{
 		Players:       players,
 		Levels:        levels,
@@ -175,6 +181,7 @@ func loadGameData(paths gameServerPaths, cfg gameServerConfig, log zerolog.Logge
 		Admin:         adminData,
 		Geo:           geo.Engine,
 		Finder:        geo.Finder,
+		Hennas:        hennas,
 	}, nil
 }
 

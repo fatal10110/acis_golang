@@ -147,7 +147,7 @@ func (a characterStatActor) IsSummon() bool { return false }
 
 func (a characterStatActor) IsMageClass() bool { return ClassMage(a.c.ClassID) }
 
-func (a characterStatActor) HennaBonus(stat.Stat) float64 { return 0 }
+func (a characterStatActor) HennaBonus(s stat.Stat) float64 { return hennaBonusFor(a.c, s) }
 
 func (a characterStatActor) HasEquipped(slotMask int) bool {
 	return a.hasEquipped(slotMask, funcs.SlotLFinger, itemcontainer.LFinger) ||

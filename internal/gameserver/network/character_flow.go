@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/henna"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -118,6 +119,22 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 			shortcuts = restored
 		}
 	}
+	if l.hennas != nil {
+		rows, listErr := l.hennas.ListByOwner(ctx, c.ID)
+		if listErr != nil {
+			l.log.Error().Err(listErr).Msg("enter world: list hennas")
+		} else {
+			lookup := func(symbolID int) (henna.Henna, bool) {
+				if l.hennaTable == nil {
+					return henna.Henna{}, false
+				}
+				return l.hennaTable.Find(symbolID)
+			}
+			c.RestoreHennas(rows, lookup)
+		}
+	} else {
+		c.RestoreHennas(nil, func(int) (henna.Henna, bool) { return henna.Henna{}, false })
+	}
 
 	itemListFrame, err := serverpackets.FrameItemList(items, l.itemTemplates, false)
 	if err != nil {
@@ -172,7 +189,7 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 
 	client.Session.SendFrame(serverpackets.FrameSendMacroListEmpty())
 	client.Session.SendFrame(serverpackets.FrameExStorageMaxCount(c))
-	client.Session.SendFrame(serverpackets.FrameHennaInfo(c.ClassID))
+	client.Session.SendFrame(serverpackets.FrameHennaInfo(c.HennaSnapshot()))
 	// Replay restored buffs into the live effect list here, matching
 	// EnterWorld.java:100's player.updateEffectIcons() position: List.Add's
 	// notifyAbnormalUpdate hook fires the resulting AbnormalStatusUpdate

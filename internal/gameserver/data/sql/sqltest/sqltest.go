@@ -19,7 +19,7 @@ import (
 var sharedTables = []string{
 	"characters", "items", "augmentations", "spawn_data",
 	"items_on_ground", "character_skills", "character_shortcuts",
-	"pets", "character_skills_save", "seven_signs_status",
+	"character_hennas", "pets", "character_skills_save", "seven_signs_status",
 }
 
 // sharedReseeds restores shipped seed rows that TRUNCATE removes, keyed by
@@ -163,6 +163,16 @@ const characterShortcutsSchema = "CREATE TABLE IF NOT EXISTS `character_shortcut
 	"  KEY `id` (`id`)\n" +
 	")"
 
+// characterHennasSchema mirrors the shipped character_hennas table
+// definition verbatim.
+const characterHennasSchema = "CREATE TABLE IF NOT EXISTS `character_hennas` (\n" +
+	"  `char_obj_id` INT NOT NULL DEFAULT 0,\n" +
+	"  `symbol_id` INT,\n" +
+	"  `slot` INT NOT NULL DEFAULT 0,\n" +
+	"  `class_index` INT(1) NOT NULL DEFAULT 0,\n" +
+	"  PRIMARY KEY (`char_obj_id`,`slot`,`class_index`)\n" +
+	")"
+
 // petsSchema mirrors the shipped pets table definition verbatim.
 const petsSchema = "CREATE TABLE IF NOT EXISTS `pets` (\n" +
 	"  `item_obj_id` decimal(11) NOT NULL default 0,\n" +
@@ -239,8 +249,8 @@ func NewDB(t *testing.T) *sql.DB {
 var schemaStmts = []string{
 	charactersSchema, itemsSchema, augmentationsSchema, spawnDataSchema,
 	itemsOnGroundSchema, characterSkillsSchema, characterShortcutsSchema,
-	petsSchema, characterSkillsSaveSchema, sevenSignsStatusSchema,
-	sevenSignsStatusSeed,
+	characterHennasSchema, petsSchema, characterSkillsSaveSchema,
+	sevenSignsStatusSchema, sevenSignsStatusSeed,
 }
 
 var (

@@ -24,6 +24,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/henna"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/restart"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
@@ -50,6 +51,12 @@ type shortcutStore interface {
 	ListByOwner(ctx context.Context, ownerID int32) ([]shortcut.Shortcut, error)
 	Save(ctx context.Context, ownerID int32, sc shortcut.Shortcut) error
 	Delete(ctx context.Context, ownerID int32, slot, page int32) error
+}
+
+type hennaStore interface {
+	ListByOwner(ctx context.Context, ownerID int32) ([]henna.Row, error)
+	Insert(ctx context.Context, ownerID int32, symbolID, slot int) error
+	Delete(ctx context.Context, ownerID int32, slot int) error
 }
 
 // petStore is the narrow persistence surface a pet-collar restore needs:
@@ -135,6 +142,8 @@ type GameClientLink struct {
 	roster        *manager.Roster
 	items         itemStore
 	shortcuts     shortcutStore
+	hennas        hennaStore
+	hennaTable    *henna.Table
 	templates     *player.TemplateTable
 	itemTemplates *item.Table
 	html          *datacache.HTML
@@ -228,6 +237,8 @@ type GameClientLinkConfig struct {
 	Roster        *manager.Roster
 	Items         itemStore
 	Shortcuts     shortcutStore
+	Hennas        hennaStore
+	HennaTable    *henna.Table
 	Templates     *player.TemplateTable
 	ItemTemplates *item.Table
 	HTML          *datacache.HTML
@@ -293,6 +304,8 @@ func NewGameClientLink(cfg GameClientLinkConfig) *GameClientLink {
 		roster:        cfg.Roster,
 		items:         cfg.Items,
 		shortcuts:     cfg.Shortcuts,
+		hennas:        cfg.Hennas,
+		hennaTable:    cfg.HennaTable,
 		templates:     cfg.Templates,
 		itemTemplates: cfg.ItemTemplates,
 		html:          cfg.HTML,

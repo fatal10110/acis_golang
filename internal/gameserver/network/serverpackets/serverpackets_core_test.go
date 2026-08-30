@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/buylist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/henna"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -745,12 +746,31 @@ func TestFrameExStorageMaxCount(t *testing.T) {
 }
 
 func TestFrameHennaInfo(t *testing.T) {
-	got := framePayload(t, FrameHennaInfo(2))
+	got := framePayload(t, FrameHennaInfo(henna.Snapshot{MaxSlots: 3}))
 	want := []byte{OpcodeHennaInfo, 0, 0, 0, 0, 0, 0}
 	want = appendD(want, 3)
 	want = appendD(want, 0)
 	if !bytes.Equal(got, want) {
-		t.Fatalf("FrameHennaInfo() = %x, want %x", got, want)
+		t.Fatalf("FrameHennaInfo() empty = %x, want %x", got, want)
+	}
+
+	got = framePayload(t, FrameHennaInfo(henna.Snapshot{
+		INT: 1, STR: 2, CON: 0, MEN: 255, DEX: 3, WIT: 4,
+		MaxSlots: 2,
+		Equipped: []henna.Equipped{
+			{SymbolID: 7, ActiveSymbolID: 7},
+			{SymbolID: 3, ActiveSymbolID: 0},
+		},
+	}))
+	want = []byte{OpcodeHennaInfo, 1, 2, 0, 255, 3, 4}
+	want = appendD(want, 2)
+	want = appendD(want, 2)
+	want = appendD(want, 7)
+	want = appendD(want, 7)
+	want = appendD(want, 3)
+	want = appendD(want, 0)
+	if !bytes.Equal(got, want) {
+		t.Fatalf("FrameHennaInfo() filled = %x, want %x", got, want)
 	}
 }
 

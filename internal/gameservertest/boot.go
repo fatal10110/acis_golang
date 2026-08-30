@@ -70,6 +70,7 @@ type options struct {
 	serverBypassDelay      time.Duration
 	seed                   func(*gamesql.CharacterStore, *gamesql.ItemStore)
 	seedShortcuts          func(*gamesql.ShortcutStore)
+	seedHennas             func(db *sql.DB, hennas *gamesql.HennaStore)
 	seedSevenSigns         func(*gamesql.SevenSignsStore)
 	npcs                   *npc.Table
 	summonItems            *item.SummonItemTable
@@ -177,6 +178,12 @@ func WithShortcutSeed(seed func(*gamesql.ShortcutStore)) Option {
 	return func(o *options) { o.seedShortcuts = seed }
 }
 
+// WithHennaSeed inserts character_hennas rows (and optional class updates)
+// after selectable characters are created, before the client dials.
+func WithHennaSeed(seed func(db *sql.DB, hennas *gamesql.HennaStore)) Option {
+	return func(o *options) { o.seedHennas = seed }
+}
+
 // WithSevenSignsSeed adjusts the seven_signs_status row before the Seven
 // Signs calendar restores it, so boot-time period catch-up can be exercised.
 func WithSevenSignsSeed(seed func(*gamesql.SevenSignsStore)) Option {
@@ -229,6 +236,7 @@ type Server struct {
 	Chars            *gamesql.CharacterStore
 	Items            *gamesql.ItemStore
 	Shortcuts        *gamesql.ShortcutStore
+	Hennas           *gamesql.HennaStore
 	KnownSkills      *gamesql.CharacterSkillStore
 	Pets             *gamesql.PetStore
 	InventoryUpdates *task.InventoryUpdates
@@ -628,6 +636,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	chars := gamesql.NewCharacterStore(db)
 	items := gamesql.NewItemStore(db)
 	shortcuts := gamesql.NewShortcutStore(db)
+	hennas := gamesql.NewHennaStore(db)
 	knownSkills := gamesql.NewCharacterSkillStore(db)
 	if o.skills == nil {
 		o.skills = skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), modelskill.NewTable([]modelskill.Definition{{ID: 248, Level: 3}, {ID: 294, Level: 1}}), knownSkills)
@@ -729,6 +738,8 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Roster:           roster,
 		Items:            items,
 		Shortcuts:        shortcuts,
+		Hennas:           hennas,
+		HennaTable:       HennaTemplates(t),
 		Templates:        templates,
 		ItemTemplates:    itemTemplates,
 		HTML:             HTMLCache(t, map[string]string{"help/tutorial.htm": "<html><body>tutorial</body></html>"}),
@@ -816,6 +827,9 @@ func Boot(t *testing.T, opts ...Option) *Server {
 			t.Fatalf("seed character store: %v", err)
 		}
 	}
+	if o.seedHennas != nil {
+		o.seedHennas(db, hennas)
+	}
 
 	c := testsupport.Dial(t, ln.Addr().String())
 	c.SendProtocolVersion(746)
@@ -847,6 +861,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Chars:            chars,
 		Items:            items,
 		Shortcuts:        shortcuts,
+		Hennas:           hennas,
 		KnownSkills:      knownSkills,
 		Pets:             petStore,
 		InventoryUpdates: inventoryUpdates,
