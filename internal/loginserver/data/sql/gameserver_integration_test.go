@@ -3,13 +3,12 @@ package sql
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"errors"
 	"testing"
 
+	"github.com/fatal10110/acis_golang/internal/dbtest"
 	"github.com/fatal10110/acis_golang/internal/loginserver/model"
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/testcontainers/testcontainers-go/modules/mariadb"
 )
 
 // gameserversSchema mirrors aCis_datapack/sql/gameservers.sql verbatim.
@@ -22,33 +21,7 @@ const gameserversSchema = "CREATE TABLE IF NOT EXISTS `gameservers` (\n" +
 
 func newGameServerIntegrationStore(t *testing.T) *GameServerStore {
 	t.Helper()
-	ctx := context.Background()
-
-	container, err := mariadb.Run(ctx, "mariadb:11")
-	if err != nil {
-		t.Fatalf("start mariadb container: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := container.Terminate(ctx); err != nil {
-			t.Logf("terminate mariadb container: %v", err)
-		}
-	})
-
-	dsn, err := container.ConnectionString(ctx)
-	if err != nil {
-		t.Fatalf("connection string: %v", err)
-	}
-
-	db, err := sql.Open("mysql", dsn)
-	if err != nil {
-		t.Fatalf("open db: %v", err)
-	}
-	t.Cleanup(func() { db.Close() })
-
-	if _, err := db.ExecContext(ctx, gameserversSchema); err != nil {
-		t.Fatalf("create gameservers table: %v", err)
-	}
-	return NewGameServerStore(db)
+	return NewGameServerStore(dbtest.NewDB(t, gameserversSchema))
 }
 
 func TestGameServerStore_PersistenceRoundTrip(t *testing.T) {

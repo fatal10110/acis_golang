@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 
+	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
+
 	"github.com/fatal10110/acis_golang/internal/datadiff"
 )
 
@@ -103,12 +105,16 @@ func TestLoadHTMLRecordsIncludesContentIdentity(t *testing.T) {
 	}
 
 	rec := recordByID(t, records, "territorynoclan.htm")
-	data, err := os.ReadFile(filepath.Join(root, "data", "html", "territorynoclan.htm"))
+	html, err := datacache.LoadHTML(filepath.Join(root, "data", "html"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	sum := sha256.Sum256(data)
-	if rec.Fields["bytes"] != strconv.Itoa(len(data)) || rec.Fields["sha256"] != fmt.Sprintf("%x", sum) {
+	content, ok := html.Get("territorynoclan.htm")
+	if !ok {
+		t.Fatal("territorynoclan.htm not loaded by datacache.LoadHTML")
+	}
+	sum := sha256.Sum256([]byte(content))
+	if rec.Fields["bytes"] != strconv.Itoa(len(content)) || rec.Fields["sha256"] != fmt.Sprintf("%x", sum) {
 		t.Fatalf("territorynoclan.htm fields = %#v", rec.Fields)
 	}
 }

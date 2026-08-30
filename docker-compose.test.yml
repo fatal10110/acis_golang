@@ -1,0 +1,21 @@
+version: '3.8'
+
+# Single shared MariaDB instance for `go test`. Every integration test
+# package/function creates its own database on it (see internal/dbtest)
+# instead of each one starting its own testcontainer.
+services:
+  test-db:
+    image: mariadb:11
+    container_name: acis-test-mariadb
+    environment:
+      MARIADB_ROOT_PASSWORD: test
+      MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: "no"
+    ports:
+      - "3307:3306"
+    tmpfs:
+      - /var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
