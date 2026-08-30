@@ -4,11 +4,14 @@ import (
 	"testing"
 
 	gamemanager "github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 )
 
@@ -56,6 +59,64 @@ func (s *Server) SpawnHostileNPCAt(t *testing.T, at location.Location) *npc.Host
 	if err != nil {
 		t.Fatalf("new hostile npc: %v", err)
 	}
+	hostile.SetFrameBuilder(serverpackets.NpcFrameBuilder{})
+	hostile.SetWorld(s.State)
+	hostile.SetRewarder(gamemanager.NewHostileRewarder(hostile, tmpl, s.State,
+		gamemanager.KillRewardConfig{PlayerLevels: s.levelTable}, s.itemTable))
+	s.State.Spawn(hostile, at.X, at.Y, at.Z, 0)
+	return hostile
+}
+
+type movingHostileStatRef struct{ effect.StatOwner }
+
+type movingHostileActorRef struct{ attack.CreatureActor }
+
+type movingHostileLocatedRef struct{ move.Actor }
+
+// SpawnMovingHostileNPCAt seeds a hostile monster with the production move
+// controller wired through BroadcastMove, so leash-return and other
+// server-initiated moves emit real observer packets.
+func (s *Server) SpawnMovingHostileNPCAt(t *testing.T, kind string, home, at location.Location) *npc.Hostile {
+	t.Helper()
+	tmpl := &npc.Template{
+		ID:              100,
+		TemplateID:      100,
+		Type:            kind,
+		Level:           1,
+		HPMax:           1000,
+		AtkSpd:          300,
+		RunSpeed:        120,
+		WalkSpeed:       60,
+		CollisionRadius: 8,
+		CollisionHeight: 20,
+	}
+	inst, err := npc.NewInstance(s.NewObjectID(), tmpl)
+	if err != nil {
+		t.Fatalf("new npc instance: %v", err)
+	}
+	inst.Kind = npc.InstanceKind(kind)
+	inst.HasHome = true
+	inst.Home = home
+	statRef := &movingHostileStatRef{}
+	live, err := creature.NewLive(at, tmpl.RunSpeed, Geo{}, statRef)
+	if err != nil {
+		t.Fatalf("new npc live: %v", err)
+	}
+	locRef := &movingHostileLocatedRef{}
+	moveCtl, err := move.NewController(live.Move(), locRef)
+	if err != nil {
+		t.Fatalf("new move controller: %v", err)
+	}
+	moveCtl.SetPositionUpdates(task.NewPositionUpdates(s.State))
+	actorRef := &movingHostileActorRef{}
+	attackCtl := attack.NewAttackable(actorRef)
+	hostile, err := npc.NewHostile(inst, live, moveCtl, attackCtl)
+	if err != nil {
+		t.Fatalf("new hostile npc: %v", err)
+	}
+	locRef.Actor = hostile
+	actorRef.CreatureActor = hostile
+	statRef.StatOwner = hostile
 	hostile.SetFrameBuilder(serverpackets.NpcFrameBuilder{})
 	hostile.SetWorld(s.State)
 	hostile.SetRewarder(gamemanager.NewHostileRewarder(hostile, tmpl, s.State,

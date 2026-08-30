@@ -9,7 +9,9 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
@@ -737,6 +739,83 @@ func TestSiegeGuardReturnHomeBypassesTerritoryGate(t *testing.T) {
 	}
 	if got := movement.home; got != hostile.Instance.Home {
 		t.Fatalf("MoveHome destination = %#v, want %#v", got, hostile.Instance.Home)
+	}
+}
+
+func TestReturnHomeForceWalkStanceBroadcast(t *testing.T) {
+	movement := &hostileMove{}
+	hostile := newTestHostile(t, movement, &hostileAttack{})
+	hostile.SetFrameBuilder(serverpackets.NpcFrameBuilder{})
+	w := world.New()
+	observer := &frameReceiver{trackedID: 999}
+	w.Spawn(hostile, 100, 0, 0, 0)
+	w.Spawn(observer, 50, 0, 0, 0)
+	hostile.SetWorld(w)
+	hostile.Instance.HasHome = true
+	hostile.Instance.Home = location.Location{X: 100, Y: 0, Z: 0}
+	hostile.Instance.Template.RunSpeed = 120
+	hostile.Instance.Template.WalkSpeed = 60
+	hostile.SetXYZ(100, 500, 0)
+
+	if !hostile.ReturnHome() {
+		t.Fatal("ReturnHome() = false, want true outside drift range")
+	}
+	if hostile.Running() {
+		t.Fatal("Running() = true after ordinary ReturnHome, want walk stance")
+	}
+	if len(observer.frames) != 1 {
+		t.Fatalf("observer frame count = %d, want 1 ChangeMoveType", len(observer.frames))
+	}
+	assertChangeMoveTypeFrame(t, observer.frames[0], hostile.ObjectID(), false)
+}
+
+func TestSiegeGuardReturnHomeForceRunStanceBroadcast(t *testing.T) {
+	movement := &hostileMove{}
+	hostile := newTestHostile(t, movement, &hostileAttack{})
+	hostile.SetFrameBuilder(serverpackets.NpcFrameBuilder{})
+	hostile.Instance.Kind = "SiegeGuard"
+	w := world.New()
+	observer := &frameReceiver{trackedID: 999}
+	w.Spawn(hostile, 100, 0, 0, 0)
+	w.Spawn(observer, 50, 0, 0, 0)
+	hostile.SetWorld(w)
+	hostile.Instance.HasHome = true
+	hostile.Instance.Home = location.Location{X: 100, Y: 0, Z: 0}
+	hostile.Instance.Template.RunSpeed = 120
+	hostile.Instance.Template.WalkSpeed = 60
+	hostile.SetRunning(false)
+	hostile.SetXYZ(100, 50, 0)
+
+	if !hostile.ReturnHome() {
+		t.Fatal("ReturnHome() = false, want true outside SiegeGuard drift range")
+	}
+	if !hostile.Running() {
+		t.Fatal("Running() = false after SiegeGuard ReturnHome, want run stance")
+	}
+	if len(observer.frames) != 1 {
+		t.Fatalf("observer frame count = %d, want 1 ChangeMoveType", len(observer.frames))
+	}
+	assertChangeMoveTypeFrame(t, observer.frames[0], hostile.ObjectID(), true)
+}
+
+func assertChangeMoveTypeFrame(t *testing.T, frame []byte, objectID int32, running bool) {
+	t.Helper()
+	if frame[0] != serverpackets.OpcodeChangeMoveType {
+		t.Fatalf("opcode = %#x, want ChangeMoveType (%#x)", frame[0], serverpackets.OpcodeChangeMoveType)
+	}
+	r := wire.NewReader(frame[1:])
+	if got := r.ReadInt32(); got != objectID {
+		t.Fatalf("ChangeMoveType object id = %d, want %d", got, objectID)
+	}
+	wantRun := int32(0)
+	if running {
+		wantRun = 1
+	}
+	if got := r.ReadInt32(); got != wantRun {
+		t.Fatalf("ChangeMoveType running = %d, want %d", got, wantRun)
+	}
+	if got := r.ReadInt32(); got != 0 {
+		t.Fatalf("ChangeMoveType swimming = %d, want 0", got)
 	}
 }
 
