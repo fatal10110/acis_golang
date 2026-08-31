@@ -159,6 +159,7 @@ type Character struct {
 	sendRelaxHPFullNotice     func()
 	sendSpoilAlreadyNotice    func()
 	sendSpoilSuccessNotice    func()
+	sendOverHitNotice         func()
 	sendServitorVanished      func()
 	sendShieldBlockSuccess    func()
 	sendShieldBlockPerfect    func()

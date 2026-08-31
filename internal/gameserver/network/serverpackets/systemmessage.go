@@ -75,6 +75,7 @@ const (
 	SystemMessageForceMaxLevelReached              = 324
 	SystemMessageNotEnoughItems                    = 351
 	SystemMessageInappropriateEnchantCondition     = 355
+	SystemMessageOverHit                           = 361 // no parameter
 	SystemMessageEnchantScrollCancelled            = 423
 	SystemMessageWeightLimitExceeded               = 422
 	SystemMessageCrystallizeLevelTooLow            = 562

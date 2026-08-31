@@ -756,6 +756,9 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	}, func() {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSpoilSuccess))
 	})
+	c.SetOverHitNotifier(func() {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageOverHit))
+	})
 	c.SetServitorVanishedNotifier(func() {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageServitorHasVanished))
 	})
