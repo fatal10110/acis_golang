@@ -81,6 +81,8 @@ type hostileMove struct {
 	followTarget attackable.Combatant
 	followRange  int
 	home         location.Location
+	locations    []location.Location
+	moved        chan location.Location
 	stopCount    int
 
 	// followResult and followErr let a test script
@@ -101,6 +103,14 @@ func (m *hostileMove) MaybeStartOffensiveFollow(target attackable.Combatant, att
 func (m *hostileMove) MoveHome(home location.Location) error {
 	m.home = home
 	return nil
+}
+
+func (m *hostileMove) MoveToLocation(target location.Location) (bool, error) {
+	m.locations = append(m.locations, target)
+	if m.moved != nil {
+		m.moved <- target
+	}
+	return true, nil
 }
 
 func (m *hostileMove) Stop() error { m.stopCount++; return nil }
