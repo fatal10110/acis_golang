@@ -242,7 +242,9 @@ func MagicFailureOutcome(enabled, firstSucceeds, casterIsPlayer, secondSucceeds 
 // MagicDamageInput is a magic skill's already-resolved inputs. MDef must
 // already include the target's shield bonus, same as PhysicalAttackInput's
 // Defence. Failure is the already-resolved magic-success outcome; callers
-// that skip the roll leave it at MagicFailureNone.
+// that skip the roll leave it at MagicFailureNone. Shield is the already-
+// resolved block outcome; ShieldPerfect returns 1 without applying shots,
+// crit, resist, PvP, or elemental scaling.
 type MagicDamageInput struct {
 	MAtk       float64
 	MDef       float64
@@ -255,12 +257,17 @@ type MagicDamageInput struct {
 
 	PvPMul       float64
 	ElementalMul float64
+	Shield       ShieldDefense
 }
 
 // MagicDamage computes a magic skill's damage. A resist outcome skips the
 // magic-crit multiplier and applies half / flat-1 before PvP and elemental
-// scaling, matching the live magic-damage contract.
+// scaling, matching the live magic-damage contract. A perfect shield block
+// returns 1 before those steps.
 func MagicDamage(in MagicDamageInput) float64 {
+	if in.Shield == ShieldPerfect {
+		return 1
+	}
 	mAtk := in.MAtk
 	if in.BlessedSoulShot {
 		mAtk *= 4

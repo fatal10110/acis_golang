@@ -238,11 +238,13 @@ func (mdamHandler) UseResult(cast Cast) Result {
 		if !ok {
 			continue
 		}
-		reportMagicFailure(cast, target, in.Failure, &result)
+		if in.Shield != formulas.ShieldPerfect {
+			reportMagicFailure(cast, target, in.Failure, &result)
+		}
 		damage := int(formulas.MagicDamage(in))
 		if damage > 0 {
 			target.ReduceHP(float64(damage), cast.Caster, cast.Skill)
-			applyMdamEffects(cast, obj, in.BlessedSoulShot, &result)
+			applyMdamEffects(cast, obj, in.BlessedSoulShot, in.Shield, &result)
 		}
 	}
 	applySelfEffects(cast, cast.Skill)
@@ -257,12 +259,11 @@ func (mdamHandler) UseResult(cast Cast) Result {
 }
 
 // applyMdamEffects applies an MDAM/DEATHLINK skill's target effect list to
-// obj after a successful damage tick, mirroring Mdam.java: BLOCK_DEBUFF
-// skips it, reflect redirects it onto the caster, and unlike
-// disablers.go's shared reflect+roll shape, Mdam.java only rolls
-// calcSkillSuccess on the non-reflect branch — the reflect branch applies
-// effects unconditionally with no landing check.
-func applyMdamEffects(cast Cast, obj Actor, bss bool, result *Result) {
+// obj after a successful damage tick: BLOCK_DEBUFF skips it, reflect
+// redirects it onto the caster, and the non-reflect branch reuses the
+// already-resolved shield outcome for the landing roll. The reflect
+// branch applies effects unconditionally with no landing check.
+func applyMdamEffects(cast Cast, obj Actor, bss bool, shield formulas.ShieldDefense, result *Result) {
 	if len(cast.Skill.Effects) == 0 {
 		return
 	}
@@ -275,10 +276,12 @@ func applyMdamEffects(cast Cast, obj Actor, bss bool, result *Result) {
 		return
 	}
 	stopEffectsBySkillID(effected.EffectList(), cast.Skill.ID)
+	effectShield := formulas.ShieldFailed
 	if reflected {
 		bss = false
 	} else {
-		succeeded, ok := checkSkillSuccess(cast.Caster, effected, cast.Skill)
+		effectShield = shield
+		succeeded, ok := checkSkillSuccessBSSWithShield(cast.Caster, effected, cast.Skill, bss, shield)
 		if !ok {
 			return
 		}
@@ -287,7 +290,7 @@ func applyMdamEffects(cast Cast, obj Actor, bss bool, result *Result) {
 			return
 		}
 	}
-	appendResistedCount(result, effected, cast.Skill, applyEffectsWithLanding(cast.Caster, effected, cast.Skill, cast.Skill.Effects, formulas.ShieldFailed, bss))
+	appendResistedCount(result, effected, cast.Skill, applyEffectsWithLanding(cast.Caster, effected, cast.Skill, cast.Skill.Effects, effectShield, bss))
 }
 
 type blowHandler struct{}

@@ -124,17 +124,30 @@ func ResolveMagicDamageInput(caster DeathActor, target FormulaActor, def modelsk
 		return formulas.MagicDamageInput{}, false
 	}
 	sps, bsps := SpiritshotFlags(attacker)
+	shield := formulas.ShieldFailed
+	if resolver, ok := any(target).(shieldDefenseActor); ok {
+		// MDAM/DEATHLINK and signet MDAM pass isCrit=false; magic crit
+		// must not triple the shield rate.
+		shield = resolver.ShieldDefense(caster, def, false)
+	}
+	mDef := target.MDef()
+	if shield == formulas.ShieldSuccess {
+		mDef += target.CalcStat(stat.ShieldDefence, 0)
+	}
 	in := formulas.MagicDamageInput{
 		MAtk:            attacker.MAtk(),
-		MDef:            Positive(target.MDef()),
+		MDef:            Positive(mDef),
 		SkillPower:      float64(def.Power),
 		PvPMul:          MagicPvPMul(attacker, def, pvp),
 		ElementalMul:    ElementalSkillModifier(target, def),
 		MagicCrit:       formulas.MCritSucceeds(int(attacker.MagicCriticalRate()), attacker.Roll(1000)),
 		SoulShot:        sps,
 		BlessedSoulShot: bsps,
+		Shield:          shield,
 	}
-	applyMagicFailure(&in, attacker, target, def)
+	if shield != formulas.ShieldPerfect {
+		applyMagicFailure(&in, attacker, target, def)
+	}
 	return in, true
 }
 
