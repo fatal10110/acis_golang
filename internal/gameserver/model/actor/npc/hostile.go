@@ -72,6 +72,13 @@ type Hostile struct {
 	minionsMu sync.RWMutex
 	master    *Hostile
 	minions   map[int32]*Hostile
+	// followSlots are the eight escort points around this NPC, occupied by
+	// minion object ids (0 is empty). Only a master uses them.
+	followSlots [8]int32
+	// lastFollowingLoc is the master's position recorded after this minion's
+	// last escort step; hasLastFollow reports whether that snapshot is set.
+	lastFollowingLoc location.Location
+	hasLastFollow    bool
 
 	regionInactive atomic.Bool
 	abnormalEffect atomic.Int32
@@ -437,6 +444,13 @@ func (h *Hostile) Minions() []*Hostile {
 		minions = append(minions, minion)
 	}
 	return minions
+}
+
+// IsMaster reports whether this NPC has ever recorded a minion spawn.
+func (h *Hostile) IsMaster() bool {
+	h.minionsMu.RLock()
+	defer h.minionsMu.RUnlock()
+	return h.minions != nil
 }
 
 // AI returns the hostile NPC brain.

@@ -65,6 +65,7 @@ func (h *Hostile) TakeDamage(dmg int, attacker creature.DeathActor) bool {
 		if combatant, ok := attacker.(attackable.Combatant); ok {
 			h.AddCombatDamageHate(combatant, float64(dmg))
 			h.RollAttackedShotRecharge()
+			h.propagatePartyAttacked(h, combatant, dmg, false)
 		}
 		h.applyNonConsumptionDamageEffects(false)
 	}

@@ -11,6 +11,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -939,5 +940,185 @@ func TestNewHostileFailsOnTemplatePassiveBuildError(t *testing.T) {
 	}, newHostileLive(t), &hostileMove{}, &hostileAttack{}, table)
 	if err == nil {
 		t.Fatal("NewHostile() error = nil, want template-passive build error")
+	}
+}
+
+func partyAI(partyType, loyalty int) *commons.StatSet {
+	set := commons.NewStatSet()
+	set.Set("Party_Type", partyType)
+	if loyalty != 0 {
+		set.Set("Party_Loyalty", loyalty)
+	}
+	return set
+}
+
+func partyHostile(t *testing.T, id int32, partyType int, move ai.MoveController) *Hostile {
+	t.Helper()
+	tpl := &Template{
+		ID: int(id), Type: "Monster", HPMax: 1000, CanMove: true, RunSpeed: 120,
+		AIParams: partyAI(partyType, 0),
+	}
+	h, err := NewHostile(&Instance{ObjectID: id, Template: tpl, Kind: "Monster"}, newHostileLive(t), move, &hostileAttack{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return h
+}
+
+func TestMinionAssistsWhenMasterTakesDamage(t *testing.T) {
+	master := partyHostile(t, 1, 2, &hostileMove{})
+	minion := partyHostile(t, 2, 1, &hostileMove{})
+	attacker := partyHostile(t, 3, 0, &hostileMove{})
+	master.AddMinion(minion)
+	minion.SetMaster(master)
+
+	master.TakeDamage(40, attacker)
+
+	d, ok := minion.AI().Desires().Peek()
+	if !ok || d.Kind != ai.IntentionAttack || d.FinalTarget != attacker {
+		t.Fatalf("minion desire = (%v, %v), want attack on attacker", ok, d)
+	}
+	if got := d.Weight; got != 40 {
+		t.Fatalf("minion attack weight = %v, want 40 (damage * party weight 1)", got)
+	}
+}
+
+func TestMasterDoesNotGainPartyDesireWhenMinionTakesDamage(t *testing.T) {
+	master := partyHostile(t, 1, 2, &hostileMove{})
+	minion := partyHostile(t, 2, 1, &hostileMove{})
+	attacker := partyHostile(t, 3, 0, &hostileMove{})
+	master.AddMinion(minion)
+	minion.SetMaster(master)
+
+	minion.TakeDamage(40, attacker)
+
+	if got := master.AI().Desires().Len(); got != 0 {
+		t.Fatalf("master desires = %d, want 0 (Party_Type 2 without a master does not assist)", got)
+	}
+	d, ok := minion.AI().Desires().Peek()
+	if !ok || d.Kind != ai.IntentionAttack {
+		t.Fatalf("damaged minion desire = (%v, %v), want its own attack desire", ok, d)
+	}
+}
+
+func TestSiblingMinionAssistsWhenPartyMemberTakesDamage(t *testing.T) {
+	master := partyHostile(t, 1, 2, &hostileMove{})
+	one := partyHostile(t, 2, 1, &hostileMove{})
+	two := partyHostile(t, 3, 1, &hostileMove{})
+	attacker := partyHostile(t, 4, 0, &hostileMove{})
+	master.AddMinion(one)
+	master.AddMinion(two)
+	one.SetMaster(master)
+	two.SetMaster(master)
+
+	one.TakeDamage(25, attacker)
+
+	d, ok := two.AI().Desires().Peek()
+	if !ok || d.Kind != ai.IntentionAttack || d.FinalTarget != attacker {
+		t.Fatalf("sibling desire = (%v, %v), want attack on attacker", ok, d)
+	}
+}
+
+func TestLoyaltyTwoMinionAssistsOnlyWhenMasterIsCaller(t *testing.T) {
+	master := partyHostile(t, 1, 2, &hostileMove{})
+	loyal := partyHostile(t, 2, 1, &hostileMove{})
+	sibling := partyHostile(t, 3, 1, &hostileMove{})
+	attacker := partyHostile(t, 4, 0, &hostileMove{})
+	loyal.Instance.Template.AIParams = partyAI(1, 2)
+	master.AddMinion(loyal)
+	master.AddMinion(sibling)
+	loyal.SetMaster(master)
+	sibling.SetMaster(master)
+
+	sibling.TakeDamage(25, attacker)
+	if got := loyal.AI().Desires().Len(); got != 0 {
+		t.Fatalf("loyalty-2 minion desires after sibling hit = %d, want 0", got)
+	}
+
+	master.TakeDamage(25, attacker)
+	d, ok := loyal.AI().Desires().Peek()
+	if !ok || d.Kind != ai.IntentionAttack || d.FinalTarget != attacker {
+		t.Fatalf("loyalty-2 minion desire after master hit = (%v, %v), want attack on attacker", ok, d)
+	}
+}
+
+func TestNotifyAggressionFansOutToMinions(t *testing.T) {
+	master := partyHostile(t, 1, 2, &hostileMove{})
+	minion := partyHostile(t, 2, 1, &hostileMove{})
+	attacker := partyHostile(t, 3, 0, &hostileMove{})
+	master.AddMinion(minion)
+	minion.SetMaster(master)
+
+	master.NotifyAggression(attacker, 80)
+
+	d, ok := minion.AI().Desires().Peek()
+	if !ok || d.Kind != ai.IntentionAttack || d.FinalTarget != attacker {
+		t.Fatalf("minion desire after NotifyAggression = (%v, %v), want attack on attacker", ok, d)
+	}
+}
+
+func TestMinionThinkFollowMovesToEscortSlot(t *testing.T) {
+	masterMove := &hostileMove{}
+	minionMove := &hostileMove{}
+	master := partyHostile(t, 1, 2, masterMove)
+	minion := partyHostile(t, 2, 1, minionMove)
+	state := world.New()
+	master.SetWorld(state)
+	minion.SetWorld(state)
+	state.Spawn(master, 1000, 1000, 0, 0)
+	state.Spawn(minion, 0, 0, 0, 0)
+	master.AddMinion(minion)
+	minion.SetMaster(master)
+	minion.roll = func(n int) int { return 0 }
+
+	if minion.ThinkFollow(master, false) {
+		t.Fatal("ThinkFollow() clearDesire = true, want follow to continue")
+	}
+	if len(minionMove.locations) != 1 {
+		t.Fatalf("escort MoveToLocation count = %d, want 1", len(minionMove.locations))
+	}
+	got := minionMove.locations[0]
+	if math.Abs(got.Distance2D(location.Location{X: 1000, Y: 1000, Z: 0})-150) > 1 {
+		t.Fatalf("escort dest %v is not 150 from master", got)
+	}
+}
+
+func TestMinionThinkFollowTeleportsAfterGeoPathFails(t *testing.T) {
+	master := partyHostile(t, 1, 2, &hostileMove{})
+	minion := partyHostile(t, 2, 1, &hostileMove{})
+	state := world.New()
+	master.SetWorld(state)
+	minion.SetWorld(state)
+	state.Spawn(master, 500, 0, 0, 0)
+	state.Spawn(minion, 0, 0, 0, 0)
+	master.AddMinion(minion)
+	minion.SetMaster(master)
+	for i := 0; i < 10; i++ {
+		minion.AddGeoPathFailCount()
+	}
+
+	if minion.ThinkFollow(master, true) {
+		t.Fatal("ThinkFollow() clearDesire = true after geo fail, want follow kept")
+	}
+	x, y, _ := minion.Position()
+	if x == 0 && y == 0 {
+		t.Fatal("minion still at origin after geo-fail teleport, want near master")
+	}
+	if got := minion.GeoPathFailCount(); got != 0 {
+		t.Fatalf("GeoPathFailCount() after teleport = %d, want 0", got)
+	}
+}
+
+func TestIdlePartyPrivateQueuesFollowOnThink(t *testing.T) {
+	master := partyHostile(t, 1, 2, &hostileMove{})
+	minion := partyHostile(t, 2, 1, &hostileMove{})
+	master.AddMinion(minion)
+	minion.SetMaster(master)
+
+	if err := minion.Think(); err != nil {
+		t.Fatal(err)
+	}
+	if got := minion.AI().CurrentIntention(); got != ai.IntentionFollow {
+		t.Fatalf("CurrentIntention() = %v, want %v", got, ai.IntentionFollow)
 	}
 }

@@ -121,6 +121,13 @@ type Attackable struct {
 	next    intention
 	step    int
 	ootStep int
+	// lastKind is the intention kind Think was running before the latest
+	// promote, used so escort follow can tell a fresh FOLLOW from a
+	// continuing one.
+	lastKind Intention
+	// followPulse counts thinkFollow entries so escort movement runs on
+	// odd pulses (about once every two seconds at the 1s AI tick).
+	followPulse int
 
 	// now returns the current time; tickOutOfTerritory reads it instead of
 	// calling time.Now directly so tests can simulate staleThreatAge
@@ -235,6 +242,57 @@ func (a *Attackable) addAttackDesire(attacker attackable.Combatant, hate float64
 		QueuedAt:     time.Now(),
 		MoveToTarget: true,
 	})
+}
+
+const escortFollowWeight = 5
+
+// idleFollower is implemented by an NPC that should escort a master when it
+// has nothing else to do.
+type idleFollower interface {
+	IdleFollowTarget() attackable.Combatant
+}
+
+// followThinker is implemented by an NPC that runs escort (or loose)
+// follow movement while IntentionFollow is current.
+type followThinker interface {
+	ThinkFollow(target attackable.Combatant, lastWasFollow bool) (clearDesire bool)
+}
+
+func (a *Attackable) addFollowDesire(target attackable.Combatant, weight float64) {
+	if target == nil {
+		return
+	}
+	a.desires.AddOrUpdate(&Desire{
+		Kind:        IntentionFollow,
+		FinalTarget: target,
+		Weight:      weight,
+		QueuedAt:    time.Now(),
+	})
+}
+
+func (a *Attackable) queueIdleFollow() {
+	follower, ok := a.actor.(idleFollower)
+	if !ok {
+		return
+	}
+	a.addFollowDesire(follower.IdleFollowTarget(), escortFollowWeight)
+}
+
+func (a *Attackable) thinkFollow() error {
+	if a.followPulse%2 == 0 {
+		a.followPulse++
+		return nil
+	}
+	a.followPulse++
+	follower, ok := a.actor.(followThinker)
+	if !ok {
+		return nil
+	}
+	if follower.ThinkFollow(a.current.target, a.lastKind == IntentionFollow) {
+		a.desires.Remove(IntentionFollow, a.current.target)
+		a.current = intention{kind: IntentionIdle}
+	}
+	return nil
 }
 
 // thinkIfNoMostHated runs the AI loop immediately for a first attack
@@ -403,6 +461,9 @@ func (a *Attackable) Think() error {
 	defer a.mu.Unlock()
 
 	a.refreshCombatMemory()
+	if _, ok := a.desires.Peek(); !ok {
+		a.queueIdleFollow()
+	}
 	for attempts := 0; attempts <= maxDesires; attempts++ {
 		a.promoteNext()
 		switch a.current.kind {
@@ -418,6 +479,8 @@ func (a *Attackable) Think() error {
 				continue
 			}
 			return err
+		case IntentionFollow:
+			return a.thinkFollow()
 		case IntentionWander:
 			a.thinkWander()
 		}
@@ -427,19 +490,26 @@ func (a *Attackable) Think() error {
 }
 
 func (a *Attackable) promoteNext() {
-	if a.current.kind != IntentionIdle {
+	if a.current.kind != IntentionIdle && a.current.kind != IntentionFollow {
 		return
 	}
 	desire, ok := a.desires.Peek()
 	if !ok {
 		return
 	}
+	next := intention{}
 	switch desire.Kind {
 	case IntentionAttack:
-		a.current = intention{kind: IntentionAttack, target: desire.FinalTarget}
+		next = intention{kind: IntentionAttack, target: desire.FinalTarget}
 	case IntentionCast:
-		a.current = intention{kind: IntentionCast, target: desire.FinalTarget, skill: desire.Skill}
+		next = intention{kind: IntentionCast, target: desire.FinalTarget, skill: desire.Skill}
+	case IntentionFollow:
+		next = intention{kind: IntentionFollow, target: desire.FinalTarget}
+	default:
+		return
 	}
+	a.lastKind = a.current.kind
+	a.current = next
 }
 
 // Tick advances the AI clock and applies periodic attack-threat decay.

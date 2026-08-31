@@ -1839,3 +1839,59 @@ func (m *summonMove) MaybeStartFriendlyFollow(target attackable.Combatant, offse
 	m.friendlyRange = offset
 	return true, nil
 }
+
+type followStub struct {
+	*fakeActor
+	idleTarget    attackable.Combatant
+	thinkCalls    int
+	lastWasFollow bool
+}
+
+func (f *followStub) IdleFollowTarget() attackable.Combatant { return f.idleTarget }
+
+func (f *followStub) ThinkFollow(target attackable.Combatant, lastWasFollow bool) bool {
+	f.thinkCalls++
+	f.lastWasFollow = lastWasFollow
+	return false
+}
+
+func TestAttackableIdleFollowPromotesOnThink(t *testing.T) {
+	owner := &followStub{fakeActor: actor(1), idleTarget: actor(9)}
+	brain := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+
+	brain.Think()
+	if got := brain.CurrentIntention(); got != IntentionFollow {
+		t.Fatalf("CurrentIntention() = %v, want %v", got, IntentionFollow)
+	}
+	if owner.thinkCalls != 0 {
+		t.Fatalf("ThinkFollow calls on first pulse = %d, want 0 (even pulse skips)", owner.thinkCalls)
+	}
+
+	brain.Think()
+	if owner.thinkCalls != 1 {
+		t.Fatalf("ThinkFollow calls on second pulse = %d, want 1", owner.thinkCalls)
+	}
+}
+
+func TestAttackableAttackDesireReplacesFollow(t *testing.T) {
+	owner := &followStub{fakeActor: actor(1), idleTarget: actor(9)}
+	target := actor(2)
+	owner.known[target.ObjectID()] = true
+	strike := &recordingAttack{canAttack: true}
+	brain := NewAttackable(owner, &recordingMove{}, strike)
+
+	brain.Think()
+	if got := brain.CurrentIntention(); got != IntentionFollow {
+		t.Fatalf("CurrentIntention() after idle = %v, want %v", got, IntentionFollow)
+	}
+
+	brain.AddDamageHate(target, 0, 200)
+	brain.AddAttackDesire(target, 200)
+	brain.Think()
+	if got := brain.CurrentIntention(); got != IntentionAttack {
+		t.Fatalf("CurrentIntention() after attack desire = %v, want %v", got, IntentionAttack)
+	}
+	if strike.target != target {
+		t.Fatalf("attack target = %v, want the queued attacker", strike.target)
+	}
+}
