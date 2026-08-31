@@ -19,6 +19,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/rs/zerolog"
@@ -78,6 +79,7 @@ func provideGameClientLink(
 	respawnHP respawnRestoreHP,
 	deathPenalty deathPenaltyChance,
 	shieldBlockRate perfectShieldBlockRate,
+	mf magicFailures,
 	spawnProtection playerSpawnProtection,
 	spBookNeeded skillEnchantSPBookNeeded,
 	autoLearn autoLearnSkills,
@@ -91,6 +93,7 @@ func provideGameClientLink(
 	petStore *gamesql.PetStore,
 	log zerolog.Logger,
 ) *network.GameClientLink {
+	formulas.SetMagicFailures(bool(mf))
 	playerConfig := network.PlayerConfig{
 		RespawnRestoreHP:         float64(respawnHP),
 		DeathPenaltyChance:       int(deathPenalty),

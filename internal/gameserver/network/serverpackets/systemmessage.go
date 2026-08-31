@@ -51,6 +51,7 @@ const (
 	SystemMessageCannotPickupOrUseItemTrading      = 149
 	SystemMessageS1IsBusyTryLater                  = 153
 	SystemMessageAttackFailed                      = 158
+	SystemMessageResistedS1Magic                   = 159
 	SystemMessageS1ResistedYourS2                  = 139
 	SystemMessageS1PerformingCounterattack         = 1997
 	SystemMessageCounteredS1Attack                 = 1998

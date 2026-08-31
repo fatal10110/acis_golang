@@ -282,6 +282,36 @@ func TestLoadPerfectShieldBlockRateDefaultsToFive(t *testing.T) {
 	}
 }
 
+func TestLoadMagicFailuresUsesPlayersProperties(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "players.properties")
+	if err := os.WriteFile(configPath, []byte("MagicFailures = False\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := loadMagicFailures(gameServerPaths{PlayersConfigPath: configPath})
+	if err != nil {
+		t.Fatalf("loadMagicFailures() error = %v", err)
+	}
+	if got {
+		t.Fatalf("loadMagicFailures() = %v, want false", got)
+	}
+}
+
+func TestLoadMagicFailuresDefaultsToTrue(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "players.properties")
+	if err := os.WriteFile(configPath, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := loadMagicFailures(gameServerPaths{PlayersConfigPath: configPath})
+	if err != nil {
+		t.Fatalf("loadMagicFailures() error = %v", err)
+	}
+	if !got {
+		t.Fatalf("loadMagicFailures() = %v, want true", got)
+	}
+}
+
 func TestLoadPlayerSpawnProtectionUsesPlayersProperties(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "players.properties")
 	if err := os.WriteFile(configPath, []byte("PlayerSpawnProtection = 12\n"), 0o600); err != nil {

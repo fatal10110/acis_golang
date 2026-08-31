@@ -79,6 +79,18 @@ func loadPerfectShieldBlockRate(paths gameServerPaths) (perfectShieldBlockRate, 
 	return perfectShieldBlockRate(config.NewFields(props, "perfect shield block rate").Int("PerfectShieldBlockRate", 5)), nil
 }
 
+// magicFailures is the players.properties MagicFailures switch: when true,
+// magic-damage casts roll resist and may halve or flatten damage.
+type magicFailures bool
+
+func loadMagicFailures(paths gameServerPaths) (magicFailures, error) {
+	props, err := config.LoadFile(paths.PlayersConfigPath)
+	if err != nil {
+		return false, err
+	}
+	return magicFailures(config.NewFields(props, "magic failures").Bool("MagicFailures", true)), nil
+}
+
 // skillEnchantSPBookNeeded controls whether enchanting a skill above level
 // 76 also consumes the tree's configured spellbook item, read from
 // players.properties.

@@ -238,6 +238,7 @@ func (mdamHandler) UseResult(cast Cast) Result {
 		if !ok {
 			continue
 		}
+		reportMagicFailure(cast, target, in.Failure, &result)
 		damage := int(formulas.MagicDamage(in))
 		if damage > 0 {
 			target.ReduceHP(float64(damage), cast.Caster, cast.Skill)
@@ -382,6 +383,28 @@ func counterattackName(obj Actor) string {
 		return target.CharacterName()
 	}
 	return ""
+}
+
+type worldPlayerTarget interface {
+	WorldPlayer()
+}
+
+func reportMagicFailure(cast Cast, target Actor, failure formulas.MagicFailure, result *Result) {
+	if result == nil || failure == formulas.MagicFailureNone {
+		return
+	}
+	switch failure {
+	case formulas.MagicFailureHalf:
+		result.AttackFailed++
+	case formulas.MagicFailureFull:
+		appendResisted(result, target, cast.Skill)
+	}
+	if _, ok := target.(worldPlayerTarget); ok {
+		result.MagicResists = append(result.MagicResists, MagicResist{
+			TargetID:     target.ObjectID(),
+			AttackerName: counterattackName(cast.Caster),
+		})
+	}
 }
 
 func appendResisted(result *Result, target Actor, def modelskill.Definition) {

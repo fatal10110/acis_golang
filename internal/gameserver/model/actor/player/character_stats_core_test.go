@@ -2630,7 +2630,12 @@ func TestCharacterMagicDamageInputRollsMagicCritical(t *testing.T) {
 	caster := liveCharacter(1, tmpl, combatItems())
 	target := liveCharacter(2, tmpl, combatItems())
 
-	caster.SetRollSource(func(int) int { return 7 })
+	caster.SetRollSource(func(n int) int {
+		if n == 10000 {
+			return 9999
+		}
+		return 7
+	})
 	magic, ok := target.MagicDamageInput(caster, modelskill.Definition{Power: 40, SkillType: "MDAM"})
 	if !ok {
 		t.Fatal("MagicDamageInput() ok = false")
@@ -2639,7 +2644,12 @@ func TestCharacterMagicDamageInputRollsMagicCritical(t *testing.T) {
 		t.Fatal("MagicDamageInput MagicCrit = false, want true for roll below mCrit rate")
 	}
 
-	caster.SetRollSource(func(int) int { return 8 })
+	caster.SetRollSource(func(n int) int {
+		if n == 10000 {
+			return 9999
+		}
+		return 8
+	})
 	magic, ok = target.MagicDamageInput(caster, modelskill.Definition{Power: 40, SkillType: "MDAM"})
 	if !ok {
 		t.Fatal("MagicDamageInput() second call ok = false")
