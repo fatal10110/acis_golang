@@ -242,6 +242,53 @@ func TestCharacterFormulaInputsResolveLiveStats(t *testing.T) {
 	if mana.SkillPower != 20 || mana.VulnMul != 1 {
 		t.Fatalf("ManaDamageInput = %+v", mana)
 	}
+
+	hpRatio := caster.HP() / caster.MaxHPValue()
+	fatal, ok := target.PhysicalSkillInput(caster, modelskill.Definition{Power: 100, SkillType: "FATAL"})
+	if !ok {
+		t.Fatal("FATAL PhysicalSkillInput() ok = false")
+	}
+	if got, want := fatal.SkillPower, formulas.SkillPowerFor("FATAL", 100, hpRatio); !closeFloat(got, want) {
+		t.Fatalf("FATAL SkillPower at HP ratio %v = %v, want %v", hpRatio, got, want)
+	}
+	deathlink, ok := target.MagicDamageInput(caster, modelskill.Definition{Power: 100, SkillType: "DEATHLINK"})
+	if !ok {
+		t.Fatal("DEATHLINK MagicDamageInput() ok = false")
+	}
+	if got, want := deathlink.SkillPower, formulas.SkillPowerFor("DEATHLINK", 100, hpRatio); !closeFloat(got, want) {
+		t.Fatalf("DEATHLINK SkillPower at HP ratio %v = %v, want %v", hpRatio, got, want)
+	}
+
+	caster.SetHP(caster.MaxHPValue() * 0.1)
+	hpRatio = caster.HP() / caster.MaxHPValue()
+	fatal, ok = target.PhysicalSkillInput(caster, modelskill.Definition{Power: 100, SkillType: "FATAL"})
+	if !ok {
+		t.Fatal("FATAL PhysicalSkillInput() at low HP ok = false")
+	}
+	if got, want := fatal.SkillPower, formulas.SkillPowerFor("FATAL", 100, hpRatio); !closeFloat(got, want) {
+		t.Fatalf("FATAL SkillPower at HP ratio %v = %v, want %v", hpRatio, got, want)
+	}
+	deathlink, ok = target.MagicDamageInput(caster, modelskill.Definition{Power: 100, SkillType: "DEATHLINK"})
+	if !ok {
+		t.Fatal("DEATHLINK MagicDamageInput() at low HP ok = false")
+	}
+	if got, want := deathlink.SkillPower, formulas.SkillPowerFor("DEATHLINK", 100, hpRatio); !closeFloat(got, want) {
+		t.Fatalf("DEATHLINK SkillPower at HP ratio %v = %v, want %v", hpRatio, got, want)
+	}
+	pdam, ok := target.PhysicalSkillInput(caster, modelskill.Definition{Power: 30, SkillType: "PDAM"})
+	if !ok {
+		t.Fatal("PDAM PhysicalSkillInput() at low HP ok = false")
+	}
+	if got, want := pdam.SkillPower, float64(30); !closeFloat(got, want) {
+		t.Fatalf("PDAM SkillPower at low HP = %v, want %v", got, want)
+	}
+	mana, ok = target.ManaDamageInput(caster, modelskill.Definition{Power: 20, SkillType: "MANADAM"})
+	if !ok {
+		t.Fatal("ManaDamageInput() at low HP ok = false")
+	}
+	if mana.SkillPower != 20 {
+		t.Fatalf("MANADAM SkillPower at low HP = %v, want 20", mana.SkillPower)
+	}
 }
 
 func TestCharacterCalcStatFloorsNonPositiveValues(t *testing.T) {
@@ -2975,6 +3022,15 @@ func TestCharacterDamageInputsUseChargedShots(t *testing.T) {
 	}
 	if !phys.SoulShot || phys.SkillPower != 60 {
 		t.Fatalf("PhysicalSkillInput soulshot = %v skillPower = %v, want true/60", phys.SoulShot, phys.SkillPower)
+	}
+
+	fatal, ok := target.PhysicalSkillInput(soulCaster, modelskill.Definition{Power: 30, SkillType: "FATAL", SoulShotBoost: 2})
+	if !ok {
+		t.Fatal("FATAL PhysicalSkillInput() ok = false")
+	}
+	wantFatal := formulas.SkillPowerFor("FATAL", 30, soulCaster.HP()/soulCaster.MaxHPValue()) * 2
+	if !fatal.SoulShot || !closeFloat(fatal.SkillPower, wantFatal) {
+		t.Fatalf("FATAL soulshot = %v skillPower = %v, want true/%v", fatal.SoulShot, fatal.SkillPower, wantFatal)
 	}
 
 	blow, ok := target.BlowInput(soulCaster, modelskill.Definition{Power: 30, SkillType: "BLOW", SoulShotBoost: 2})
