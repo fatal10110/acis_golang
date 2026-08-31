@@ -163,6 +163,7 @@ type Character struct {
 	sendEffectAborted         func(skillID modelskill.ID, level int)
 	consumeHerb               func(itemID int32)
 	roll                      func(int) int
+	floatRoll                 func(float64) float64
 	attackTarget              func(world.Tracked)
 	retargetTarget            func(world.Tracked)
 
