@@ -161,9 +161,9 @@ func (h *Hostile) thinkLooseFollow(target attackable.Combatant) {
 	if h.location().Distance2D(pos) <= float64(escortLooseRadius) {
 		return
 	}
-	if rnd.Get(100) > 50 {
-		distance := math.Sqrt(rnd.GetFloat(1)) * 300
-		angle := rnd.GetFloat(1) * math.Pi * 2
+	if h.roll(100) > 50 {
+		distance := math.Sqrt(float64(h.roll(1000000))/1000000) * 300
+		angle := float64(h.roll(1000000)) / 1000000 * math.Pi * 2
 		h.moveTo(location.Location{
 			X: int(distance*math.Cos(angle)) + pos.X,
 			Y: int(distance*math.Sin(angle)) + pos.Y,

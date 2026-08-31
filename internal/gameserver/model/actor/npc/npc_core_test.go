@@ -1083,6 +1083,44 @@ func TestMinionThinkFollowMovesToEscortSlot(t *testing.T) {
 	}
 }
 
+func TestMinionThinkFollowLooseMovesTowardNonMaster(t *testing.T) {
+	move := &hostileMove{}
+	follower := partyHostile(t, 1, 1, move)
+	target := partyHostile(t, 2, 0, &hostileMove{})
+	state := world.New()
+	follower.SetWorld(state)
+	target.SetWorld(state)
+	state.Spawn(follower, 0, 0, 0, 0)
+	state.Spawn(target, 400, 0, 0, 0)
+	n := 0
+	follower.roll = func(bound int) int {
+		n++
+		switch n {
+		case 1:
+			return 51
+		case 2:
+			return 250000
+		case 3:
+			return 0
+		default:
+			t.Fatalf("unexpected roll call %d bound %d", n, bound)
+			return 0
+		}
+	}
+
+	if follower.ThinkFollow(target, false) {
+		t.Fatal("ThinkFollow() clearDesire = true, want follow to continue")
+	}
+	if len(move.locations) != 1 {
+		t.Fatalf("loose-follow MoveToLocation count = %d, want 1", len(move.locations))
+	}
+	got := move.locations[0]
+	want := location.Location{X: 550, Y: 0, Z: 0}
+	if got != want {
+		t.Fatalf("loose-follow dest = %v, want %v (sqrt(0.25)*300 at angle 0 from target)", got, want)
+	}
+}
+
 func TestMinionThinkFollowTeleportsAfterGeoPathFails(t *testing.T) {
 	master := partyHostile(t, 1, 2, &hostileMove{})
 	minion := partyHostile(t, 2, 1, &hostileMove{})
