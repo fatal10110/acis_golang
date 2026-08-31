@@ -471,6 +471,18 @@ func (h *Hostile) AddAttackDesire(attacker attackable.Combatant, hate float64) {
 	h.brain.AddAttackDesire(attacker, hate)
 }
 
+// AddAttackDesireHold queues a stationary attack intention against this NPC.
+func (h *Hostile) AddAttackDesireHold(attacker attackable.Combatant, hate float64) {
+	h.brain.AddAttackDesireHold(attacker, hate)
+}
+
+// RemoveAttackDesire zeroes target's threat hate, drops its queued attack
+// desire, and aborts movement.
+func (h *Hostile) RemoveAttackDesire(target attackable.Combatant) {
+	h.brain.StopAggroHate(target)
+	_ = h.move.Stop()
+}
+
 // AddCombatDamageHate records attacker's combat damage against this NPC,
 // queuing its attack Desire at a flat weight instead of scaling it with the
 // damage dealt (see ai.Attackable.AddCombatDamageHate).

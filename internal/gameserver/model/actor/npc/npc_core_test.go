@@ -1003,6 +1003,9 @@ func TestMinionAssistsWhenMasterTakesDamage(t *testing.T) {
 	if got := d.Weight; got != 40 {
 		t.Fatalf("minion attack weight = %v, want 40 (damage * party weight 1)", got)
 	}
+	if !d.MoveToTarget {
+		t.Fatal("moving party assist MoveToTarget = false, want true")
+	}
 }
 
 func TestMasterDoesNotGainPartyDesireWhenMinionTakesDamage(t *testing.T) {
@@ -1076,6 +1079,133 @@ func TestNotifyAggressionFansOutToMinions(t *testing.T) {
 	d, ok := minion.AI().Desires().Peek()
 	if !ok || d.Kind != ai.IntentionAttack || d.FinalTarget != attacker {
 		t.Fatalf("minion desire after NotifyAggression = (%v, %v), want attack on attacker", ok, d)
+	}
+}
+
+func spawnPartyWorld(t *testing.T, actors ...*Hostile) *world.State {
+	t.Helper()
+	state := world.New()
+	for i, actor := range actors {
+		actor.SetWorld(state)
+		state.Spawn(actor, i*100, 0, 0, 0)
+	}
+	return state
+}
+
+func TestStationaryMinionHoldsAttackWhenPlayableInRange(t *testing.T) {
+	master := partyHostile(t, 1, 2, &hostileMove{})
+	minion := partyHostile(t, 2, 1, &hostileMove{})
+	minion.Instance.Template.AIParams.Set("MovingAttack", 0)
+	minion.Instance.Template.AggroRange = 500
+	master.AddMinion(minion)
+	minion.SetMaster(master)
+	state := world.New()
+	master.SetWorld(state)
+	minion.SetWorld(state)
+	state.Spawn(master, 0, 0, 0, 0)
+	state.Spawn(minion, 10, 0, 0, 0)
+	attacker := &hostileTarget{id: 99}
+	state.Spawn(attacker, 20, 0, 0, 0)
+
+	master.TakeDamage(40, attacker)
+
+	d, ok := minion.AI().Desires().Peek()
+	if !ok || d.Kind != ai.IntentionAttack || d.FinalTarget.ObjectID() != attacker.ObjectID() {
+		t.Fatalf("minion desire = (%v, %+v), want hold attack on playable", ok, d)
+	}
+	if d.MoveToTarget {
+		t.Fatal("stationary party assist MoveToTarget = true, want false")
+	}
+	if got := d.Weight; got != 40 {
+		t.Fatalf("hold attack weight = %v, want 40", got)
+	}
+}
+
+func TestStationaryMinionDropsAttackWhenPlayableOutOfRangeAndIsTopDesire(t *testing.T) {
+	master := partyHostile(t, 1, 2, &hostileMove{})
+	minion := partyHostile(t, 2, 1, &hostileMove{})
+	minion.Instance.Template.AIParams.Set("MovingAttack", 0)
+	minion.Instance.Template.AggroRange = 20
+	master.AddMinion(minion)
+	minion.SetMaster(master)
+	state := world.New()
+	master.SetWorld(state)
+	minion.SetWorld(state)
+	state.Spawn(master, 0, 0, 0, 0)
+	state.Spawn(minion, 0, 0, 0, 0)
+	attacker := &hostileTarget{id: 99}
+	state.Spawn(attacker, 400, 0, 0, 0)
+
+	minion.AddCombatDamageHate(attacker, 10)
+	if got := minion.AI().CurrentIntention(); got != ai.IntentionAttack {
+		t.Fatalf("CurrentIntention() before assist = %v, want Attack so the playable is top desire", got)
+	}
+
+	master.TakeDamage(40, attacker)
+
+	if got := minion.AI().Desires().Len(); got != 0 {
+		t.Fatalf("desires after out-of-range hold assist = %d, want 0 (top desire dropped)", got)
+	}
+}
+
+func TestMovingMinionTeleportsToTargetAfterGeoPathFails(t *testing.T) {
+	master := partyHostile(t, 1, 2, &hostileMove{})
+	minion := partyHostile(t, 2, 1, &hostileMove{})
+	attacker := partyHostile(t, 3, 0, &hostileMove{})
+	master.AddMinion(minion)
+	minion.SetMaster(master)
+	spawnPartyWorld(t, master, minion, attacker)
+
+	minion.AddCombatDamageHate(attacker, 10)
+	if got := minion.AI().CurrentIntention(); got != ai.IntentionAttack {
+		t.Fatalf("CurrentIntention() before assist = %v, want Attack", got)
+	}
+	minion.SetHP(minion.MaxHPValue() / 2)
+	for i := 0; i < 11; i++ {
+		minion.AddGeoPathFailCount()
+	}
+
+	master.TakeDamage(40, attacker)
+
+	mx, my, _ := minion.Position()
+	ax, ay, _ := attacker.Position()
+	if mx != ax || my != ay {
+		t.Fatalf("minion position = (%d,%d), want attacker (%d,%d) after geo-fail teleport", mx, my, ax, ay)
+	}
+	if got := minion.GeoPathFailCount(); got != 0 {
+		t.Fatalf("GeoPathFailCount() after teleport = %d, want 0", got)
+	}
+}
+
+func TestMovingMinionRootedRetryRequeuesAttack(t *testing.T) {
+	move := &hostileMove{}
+	master := partyHostile(t, 1, 2, &hostileMove{})
+	minion := partyHostile(t, 2, 1, move)
+	attacker := partyHostile(t, 3, 0, &hostileMove{})
+	master.AddMinion(minion)
+	minion.SetMaster(master)
+	spawnPartyWorld(t, master, minion, attacker)
+
+	minion.AddCombatDamageHate(attacker, 10)
+	if got := minion.AI().CurrentIntention(); got != ai.IntentionAttack {
+		t.Fatalf("CurrentIntention() before assist = %v, want Attack", got)
+	}
+	addHostileEffect(t, minion, "Root")
+	if !minion.Rooted() {
+		t.Fatal("Rooted() = false after Root effect, want true")
+	}
+
+	master.TakeDamage(40, attacker)
+
+	d, ok := minion.AI().Desires().Peek()
+	if !ok || d.Kind != ai.IntentionAttack || d.FinalTarget != attacker {
+		t.Fatalf("minion desire after rooted retry = (%v, %v), want requeued attack", ok, d)
+	}
+	if got := d.Weight; got != 40 {
+		t.Fatalf("rooted retry weight = %v, want 40 (cleared then requeued at party damage)", got)
+	}
+	if move.stopCount == 0 {
+		t.Fatal("move.Stop() count = 0, want stop when dropping the out-of-range top desire")
 	}
 }
 
