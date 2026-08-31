@@ -21,6 +21,10 @@ type tickerOwnedFollowSelf struct{ playerFollowSelf }
 
 func (*tickerOwnedFollowSelf) OwnsOffensiveFollowTicker() bool { return true }
 
+type npcFollowSelf struct{ playerFollowSelf }
+
+func (*npcFollowSelf) OffensiveFollowLead() bool { return true }
+
 func (s *playerFollowSelf) ObjectID() int32                    { return 1 }
 func (s *playerFollowSelf) Position() (int, int, int)          { return s.x, s.y, s.z }
 func (s *playerFollowSelf) CollisionRadius() float64           { return 0 }
@@ -35,6 +39,7 @@ func (s *playerFollowSelf) OffensiveFollowIsPawnMove() bool { return true }
 
 type followTarget struct {
 	x, y, z int
+	moving  bool
 }
 
 func (t *followTarget) ObjectID() int32           { return 2 }
@@ -42,6 +47,7 @@ func (t *followTarget) SiegeGuard() bool          { return false }
 func (t *followTarget) AlikeDead() bool           { return false }
 func (t *followTarget) Position() (int, int, int) { return t.x, t.y, t.z }
 func (t *followTarget) CollisionRadius() float64  { return 0 }
+func (t *followTarget) IsMoving() bool            { return t.moving }
 
 var _ attackable.Combatant = (*followTarget)(nil)
 
@@ -62,6 +68,55 @@ func TestControllerPlayerOffensiveFollowUses3DRange(t *testing.T) {
 	}
 	if !following {
 		t.Fatal("MaybeStartOffensiveFollow() = false, want true when vertical distance exceeds attack range")
+	}
+}
+
+func TestControllerNPCOffensiveFollowAddsLeadOnlyForMovingTargets(t *testing.T) {
+	tests := []struct {
+		name      string
+		self      Actor
+		target    *followTarget
+		following bool
+	}{
+		{
+			name:      "npc moving target is inside lead range",
+			self:      &npcFollowSelf{},
+			target:    &followTarget{x: 80, moving: true},
+			following: false,
+		},
+		{
+			name:      "npc stationary target keeps normal range",
+			self:      &npcFollowSelf{},
+			target:    &followTarget{x: 80},
+			following: true,
+		},
+		{
+			name:      "player moving target keeps normal range",
+			self:      &playerFollowSelf{},
+			target:    &followTarget{x: 80, moving: true},
+			following: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mover, err := NewCreatureMove(location.Location{}, 100, staticGeo{canMove: true})
+			if err != nil {
+				t.Fatal(err)
+			}
+			controller, err := NewController(mover, tt.self)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			following, err := controller.MaybeStartOffensiveFollow(tt.target, 40)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if following != tt.following {
+				t.Fatalf("MaybeStartOffensiveFollow() = %v, want %v", following, tt.following)
+			}
+		})
 	}
 }
 
@@ -153,7 +208,7 @@ type homeRecoverySelf struct {
 	teleports []location.Location
 }
 
-func (s *homeRecoverySelf) GeoPathFailCount() int { return s.failCount }
+func (s *homeRecoverySelf) GeoPathFailCount() int  { return s.failCount }
 func (s *homeRecoverySelf) ResetGeoPathFailCount() { s.failCount = 0 }
 func (s *homeRecoverySelf) AddGeoPathFailCount()   { s.failCount++ }
 func (s *homeRecoverySelf) TeleportTo(loc location.Location) {
