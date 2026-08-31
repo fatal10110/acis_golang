@@ -165,11 +165,7 @@ func (p *Persistence) ReplayEffects(c *player.Character) {
 		if !ok {
 			continue
 		}
-		templates := def.Effects
-		if len(def.SelfEffects) > 0 {
-			templates = append(append([]modelskill.EffectTemplate{}, templates...), def.SelfEffects...)
-		}
-		effect.ApplyRestored(list, c, c, effect.SkillFromDefinition(def), templates, eff.Count, eff.Time)
+		effect.ApplyRestored(list, c, c, effect.SkillFromDefinition(def), def.Effects, eff.Count, eff.Time)
 	}
 	// The registry's only purpose is staging Restore's effects until the live
 	// effect list exists to receive them; Save now reads that live list
@@ -471,7 +467,9 @@ func (p *Persistence) lookup(ref modelskill.Ref) (bool, bool) {
 	if !ok {
 		return false, false
 	}
-	return true, len(def.Effects) > 0 || len(def.SelfEffects) > 0
+	// Self-targeted templates apply at cast time and are not reinstated on
+	// relog; only ordinary effect templates count as restorable.
+	return true, len(def.Effects) > 0
 }
 
 func (p *Persistence) definition(ref modelskill.Ref) (modelskill.Definition, bool) {
