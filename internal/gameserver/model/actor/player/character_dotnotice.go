@@ -87,6 +87,24 @@ func (c *Character) NotifySpoilSuccess() {
 	}
 }
 
+// SetOverHitNotifier records the packet-layer hook that tells this character's
+// client a kill reward included an overhit XP bonus.
+func (c *Character) SetOverHitNotifier(send func()) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	c.sendOverHitNotice = send
+}
+
+// NotifyOverHit sends the OVER_HIT system message for a valid overhit kill.
+func (c *Character) NotifyOverHit() {
+	c.stateMu.RLock()
+	send := c.sendOverHitNotice
+	c.stateMu.RUnlock()
+	if send != nil {
+		send()
+	}
+}
+
 // SetEffectExpiryNotifiers records the packet-layer hooks for an active
 // effect's worn-off/disappeared/aborted system message.
 func (c *Character) SetEffectExpiryNotifiers(wornOff, disappeared, aborted func(skillID modelskill.ID, level int)) {

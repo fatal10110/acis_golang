@@ -12,6 +12,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -1180,4 +1181,102 @@ func TestIdlePartyPrivateQueuesFollowOnThink(t *testing.T) {
 	if got := minion.AI().CurrentIntention(); got != ai.IntentionFollow {
 		t.Fatalf("CurrentIntention() = %v, want %v", got, ai.IntentionFollow)
 	}
+}
+
+type overhitActor int32
+
+func (a overhitActor) ObjectID() int32 { return int32(a) }
+
+type overhitSummon struct {
+	id    int32
+	owner creature.DeathActor
+}
+
+func (s overhitSummon) ObjectID() int32 { return s.id }
+func (s overhitSummon) ActingPlayer() creature.DeathActor {
+	return s.owner
+}
+
+func TestOverhitBonusExpOracle(t *testing.T) {
+	attacker := overhitActor(1)
+	other := overhitActor(2)
+
+	t.Run("no overhit", func(t *testing.T) {
+		var s overhitState
+		if s.valid(attacker) {
+			t.Fatal("valid() = true with no overhit, want false")
+		}
+	})
+
+	t.Run("valid overhit", func(t *testing.T) {
+		var s overhitState
+		s.set(true)
+		s.test(attacker, 100, 110)
+		if !s.valid(attacker) {
+			t.Fatal("valid(attacker) = false, want true")
+		}
+		// excess 10 / maxHP 200 = 5% of 1000 = 50
+		if got := s.bonusExp(1000, 200); got != 50 {
+			t.Fatalf("bonusExp() = %d, want 50", got)
+		}
+	})
+
+	t.Run("attacker mismatch", func(t *testing.T) {
+		var s overhitState
+		s.set(true)
+		s.test(attacker, 100, 110)
+		if s.valid(other) {
+			t.Fatal("valid(other) = true, want false")
+		}
+	})
+
+	t.Run("25 percent cap", func(t *testing.T) {
+		var s overhitState
+		s.set(true)
+		s.test(attacker, 100, 200)
+		// excess 100 / maxHP 200 = 50% capped at 25% of 1000 = 250
+		if got := s.bonusExp(1000, 200); got != 250 {
+			t.Fatalf("bonusExp() = %d, want 250", got)
+		}
+	})
+
+	t.Run("half-unit rounds up", func(t *testing.T) {
+		var s overhitState
+		s.set(true)
+		s.test(attacker, 10, 11)
+		// excess 1 / maxHP 200 = 0.5% of 100 = 0.5 → 1
+		if got := s.bonusExp(100, 200); got != 1 {
+			t.Fatalf("bonusExp() = %d, want 1", got)
+		}
+	})
+
+	t.Run("non-lethal clears", func(t *testing.T) {
+		var s overhitState
+		s.set(true)
+		s.test(attacker, 100, 40)
+		if s.valid(attacker) {
+			t.Fatal("valid() = true after a non-lethal hit, want false")
+		}
+	})
+
+	t.Run("zero damage clears", func(t *testing.T) {
+		var s overhitState
+		s.set(true)
+		s.test(attacker, 100, 0)
+		if s.valid(attacker) {
+			t.Fatal("valid() = true after zero damage, want false")
+		}
+	})
+
+	t.Run("summon acting player", func(t *testing.T) {
+		var s overhitState
+		s.set(true)
+		s.test(overhitSummon{id: 9, owner: attacker}, 100, 110)
+		if !s.valid(attacker) {
+			t.Fatal("valid(owner) = false for a summon overhit, want true")
+		}
+		if s.valid(other) {
+			t.Fatal("valid(other) = true for a summon overhit, want false")
+		}
+	})
 }
