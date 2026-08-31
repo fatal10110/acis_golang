@@ -10,10 +10,9 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 )
 
-// baseBuffSlots is the non-toggle, non-seven-signs buff-slot count every
-// character starts with. Passive skills that raise this bound aren't wired
-// onto Character yet, so it is currently also the character's permanent cap.
-const baseBuffSlots = 20
+// defaultMaxBuffsAmount is the shipped players.properties MaxBuffsAmount
+// default and the cap used when no config has been applied yet.
+const defaultMaxBuffsAmount = 20
 
 // Character satisfies the actor surface skill target resolution needs.
 var _ target.Creature = (*Character)(nil)
@@ -22,10 +21,29 @@ var _ target.Creature = (*Character)(nil)
 // ShieldDefense/DecreaseFusion take their caster/effected parameter as.
 var _ creature.DeathActor = (*Character)(nil)
 
+// SetMaxBuffsAmount records the players.properties MaxBuffsAmount base
+// buff-slot count. Known Divine Inspiration levels add on top of this at
+// MaxBuffCount time.
+func (c *Character) SetMaxBuffsAmount(amount int) {
+	if c == nil {
+		return
+	}
+	c.stateMu.Lock()
+	c.maxBuffsAmount = amount
+	c.stateMu.Unlock()
+}
+
 // MaxBuffCount is the number of non-toggle, non-seven-signs buffs c can
-// hold at once. See baseBuffSlots.
+// hold at once: the configured base plus the known Divine Inspiration
+// skill level (0 when unknown).
 func (c *Character) MaxBuffCount() int {
-	return baseBuffSlots
+	if c == nil {
+		return defaultMaxBuffsAmount
+	}
+	c.stateMu.RLock()
+	base := c.maxBuffsAmount
+	c.stateMu.RUnlock()
+	return base + c.SkillLevel(int(modelskill.DivineInspirationSkillID))
 }
 
 // AddStatFuncs attaches fns to c's live stat calculators. Each Mod is

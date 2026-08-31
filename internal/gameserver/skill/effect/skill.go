@@ -43,6 +43,7 @@ type Skill struct {
 	Toggle         bool
 	KillByDOT      bool
 	CanBeDispelled bool
+	StayAfterDeath bool
 	// Dance marks a song/dance skill, consulted by a signet-family effect's
 	// area tick that cancels dances on nearby targets.
 	Dance bool

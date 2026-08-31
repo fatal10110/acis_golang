@@ -376,6 +376,7 @@ func (h signetHandler) newSignetMDamEffect(caster Actor, def modelskill.Definiti
 			if !ok {
 				return
 			}
+			deliverMagicFailure(caster, target, def, in.Failure)
 			damage := int(formulas.MagicDamage(in))
 			if damage > 0 {
 				dmgTarget.ReduceHP(float64(damage), caster, def)

@@ -69,6 +69,7 @@ type options struct {
 	rateKarmaExpLost       float64
 	characterSelectDelay   time.Duration
 	serverBypassDelay      time.Duration
+	maxBuffsAmount         int
 	seed                   func(*gamesql.CharacterStore, *gamesql.ItemStore)
 	seedShortcuts          func(*gamesql.ShortcutStore)
 	seedHennas             func(db *sql.DB, hennas *gamesql.HennaStore)
@@ -167,6 +168,12 @@ func WithAllowDelevel(allow bool) Option {
 // positive (default 1).
 func WithRateKarmaExpLost(rate float64) Option {
 	return func(o *options) { o.rateKarmaExpLost = rate }
+}
+
+// WithMaxBuffsAmount sets the players.properties MaxBuffsAmount base
+// buff-slot count (default 20). Known Divine Inspiration levels add on top.
+func WithMaxBuffsAmount(amount int) Option {
+	return func(o *options) { o.maxBuffsAmount = amount }
 }
 
 // WithSeed inserts rows through the real SQL stores before the client dials.
@@ -636,6 +643,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		karmaPlayerCanTeleport: true,
 		characterSelectDelay:   3 * time.Second,
 		serverBypassDelay:      100 * time.Millisecond,
+		maxBuffsAmount:         20,
 	}
 	for _, opt := range opts {
 		opt(o)
@@ -771,7 +779,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		InventoryUpdates: inventoryUpdates,
 		ItemInstances:    itemInstances,
 		ShadowItems:      shadowItems,
-		PlayerConfig:     network.PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, AllowWater: true, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay},
+		PlayerConfig:     network.PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, AllowWater: true, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, MaxBuffsAmount: o.maxBuffsAmount},
 		Restarts:         o.restarts,
 		Zones:            o.zones,
 		PetConfig:        petmodel.DefaultConfig(),

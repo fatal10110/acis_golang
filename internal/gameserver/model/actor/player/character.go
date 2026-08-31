@@ -137,6 +137,7 @@ type Character struct {
 	updateWeightPenalty       func()
 	weightPenalty             int
 	weightLimitMultiplier     float64
+	maxBuffsAmount            int
 	updateUserInfo            func()
 	updateGradePenalty        func()
 	refreshItemStats          func()
@@ -161,8 +162,12 @@ type Character struct {
 	sendEffectWornOff         func(skillID modelskill.ID, level int)
 	sendEffectDisappeared     func(skillID modelskill.ID, level int)
 	sendEffectAborted         func(skillID modelskill.ID, level int)
+	sendAttackFailedNotice    func()
+	sendResistedSkillNotice   func(targetName string, skillID modelskill.ID, level int)
+	sendResistedMagicNotice   func(attackerName string)
 	consumeHerb               func(itemID int32)
 	roll                      func(int) int
+	floatRoll                 func(float64) float64
 	attackTarget              func(world.Tracked)
 	retargetTarget            func(world.Tracked)
 
@@ -318,9 +323,10 @@ func NewCharacter(objectID int32, tmpl *Template, accountName, name string, hair
 
 		AccessLevel: defaultAccessLevel,
 
-		stateInit: true,
-		running:   true,
-		standing:  true,
+		stateInit:      true,
+		running:        true,
+		standing:       true,
+		maxBuffsAmount: defaultMaxBuffsAmount,
 	}
 
 	if len(tmpl.Spawns) > 0 {

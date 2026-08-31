@@ -56,20 +56,23 @@ var (
 
 	// Damage targets: PDAM/CHARGEDAM, MDAM/DEATHLINK, BLOW, and MANADAM
 	// each narrow to one of these before touching HP or MP.
-	_ hpDamageTarget      = (*player.Character)(nil)
-	_ hpDamageTarget      = (*npc.Hostile)(nil)
-	_ hpDamageTarget      = (*summon.Actor)(nil)
-	_ physicalSkillTarget = (*player.Character)(nil)
-	_ physicalSkillTarget = (*npc.Hostile)(nil)
-	_ physicalSkillTarget = (*summon.Actor)(nil)
-	_ magicDamageTarget   = (*player.Character)(nil)
-	_ magicDamageTarget   = (*npc.Hostile)(nil)
-	_ magicDamageTarget   = (*summon.Actor)(nil)
-	_ worldPlayerTarget   = (*player.Character)(nil)
-	_ blowDamageTarget    = (*player.Character)(nil)
-	_ blowDamageTarget    = (*npc.Hostile)(nil)
-	_ manaDamageTarget    = (*player.Character)(nil)
-	_ manaDamageTarget    = (*npc.Hostile)(nil)
+	_ hpDamageTarget        = (*player.Character)(nil)
+	_ hpDamageTarget        = (*npc.Hostile)(nil)
+	_ hpDamageTarget        = (*summon.Actor)(nil)
+	_ physicalSkillTarget   = (*player.Character)(nil)
+	_ physicalSkillTarget   = (*npc.Hostile)(nil)
+	_ physicalSkillTarget   = (*summon.Actor)(nil)
+	_ magicDamageTarget     = (*player.Character)(nil)
+	_ magicDamageTarget     = (*npc.Hostile)(nil)
+	_ magicDamageTarget     = (*summon.Actor)(nil)
+	_ worldPlayerTarget     = (*player.Character)(nil)
+	_ attackFailedNotifier  = (*player.Character)(nil)
+	_ resistedSkillNotifier = (*player.Character)(nil)
+	_ resistedMagicNotifier = (*player.Character)(nil)
+	_ blowDamageTarget      = (*player.Character)(nil)
+	_ blowDamageTarget      = (*npc.Hostile)(nil)
+	_ manaDamageTarget      = (*player.Character)(nil)
+	_ manaDamageTarget      = (*npc.Hostile)(nil)
 
 	// Caster-side surfaces resolved from Cast.Caster. cancelTarget above
 	// and these three share a Level() int requirement that *player.Character

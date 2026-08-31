@@ -18,9 +18,8 @@ import (
 )
 
 // baseBuffSlots is the non-toggle, non-seven-signs buff-slot count every
-// pet or servitor holds, matching the same fixed cap player.Character uses
-// (see baseBuffSlots in character_effects.go) since no passive modeled here
-// raises it.
+// pet or servitor holds, matching the shipped MaxBuffsAmount default
+// since no passive modeled here raises it.
 const baseBuffSlots = 20
 
 // AI is the summon intention loop controlled by owner commands and effects.

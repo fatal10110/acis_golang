@@ -1519,6 +1519,43 @@ func TestNotifyEffectRemovedDueLackHPAndMP(t *testing.T) {
 	c.NotifyEffectRemovedDueLackMP(nil)
 }
 
+func TestNotifyMagicFailureHooks(t *testing.T) {
+	c, err := NewCharacter(1, humanFighterTemplate(), "acct", "mage", 0, 0, 0, SexMale)
+	if err != nil {
+		t.Fatalf("NewCharacter() error: %v", err)
+	}
+
+	failed, resisted, magic := 0, 0, 0
+	var resistedName, magicName string
+	var resistedID modelskill.ID
+	var resistedLevel int
+	c.SetMagicFailureNotifiers(func() { failed++ }, func(name string, id modelskill.ID, level int) {
+		resisted++
+		resistedName, resistedID, resistedLevel = name, id, level
+	}, func(name string) {
+		magic++
+		magicName = name
+	})
+
+	c.NotifyAttackFailed()
+	c.NotifyResistedSkill("Victim", 1419, 1)
+	c.NotifyResistedMagic("Mage")
+	if failed != 1 {
+		t.Fatalf("attack-failed notices = %d, want 1", failed)
+	}
+	if resisted != 1 || resistedName != "Victim" || resistedID != 1419 || resistedLevel != 1 {
+		t.Fatalf("resisted-skill notice = %d %q %d/%d, want 1 Victim 1419/1", resisted, resistedName, resistedID, resistedLevel)
+	}
+	if magic != 1 || magicName != "Mage" {
+		t.Fatalf("resisted-magic notice = %d %q, want 1 Mage", magic, magicName)
+	}
+
+	c.SetMagicFailureNotifiers(nil, nil, nil)
+	c.NotifyAttackFailed()
+	c.NotifyResistedSkill("Victim", 1419, 1)
+	c.NotifyResistedMagic("Mage")
+}
+
 // ---- from character_forces_test.go ----
 // permissiveGeo is a test-only move.Geo that permits every move, needed
 // only because creature.NewLive requires a non-nil Geo.

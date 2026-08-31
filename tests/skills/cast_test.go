@@ -6,8 +6,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
 
@@ -108,6 +111,67 @@ func TestCastActiveSkillChargesMPAndStartsReuse(t *testing.T) {
 	assertSystemMessageSkillFrame(t, reply, serverpackets.SystemMessageS1PreparedForReuse, 3, 1)
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "recast rejection")
 	drainUntilQuiet(t, c)
+}
+
+func TestCastSkillMasteryCooldownBypass(t *testing.T) {
+	for _, tt := range []struct {
+		name      string
+		skillType string
+		power     float64
+		roll      float64
+		mastery   bool
+	}{
+		{name: "mastery", skillType: "DUMMY", power: 1000, roll: 99.5, mastery: true},
+		{name: "no mastery", skillType: "DUMMY", power: 1, roll: 99.5},
+		{name: "fishing", skillType: "FISHING", power: 100, roll: 0},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			def := modelskill.Definition{
+				ID: 1855, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+				HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true, SkillType: tt.skillType,
+			}
+			srv := gameservertest.Boot(t,
+				gameservertest.WithCharacter("Newbie", 5, 0),
+				gameservertest.WithWantChars(1),
+				gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{def})),
+			)
+			c, objID := srv.Client, srv.SoleObjectID(t)
+			seedKnownSkill(t, srv, objID, int(def.ID), def.Level)
+			startInWorld(t, c)
+			obj, ok := srv.State.Player(objID)
+			if !ok {
+				t.Fatalf("world player %d missing", objID)
+			}
+			ch, ok := obj.(interface {
+				AddStatFuncs([]effect.Mod)
+				SetFloatRollSource(func(float64) float64)
+				HasSkillReuse(int32) bool
+				SkillDisabled(int32) bool
+			})
+			if !ok {
+				t.Fatalf("world player %d = %T, want mastery-capable player", objID, obj)
+			}
+			ch.AddStatFuncs([]effect.Mod{{Stat: stat.SkillMastery, Op: effect.OpSet, Value: tt.power}})
+			ch.SetFloatRollSource(func(n float64) float64 {
+				if n != 100 {
+					t.Fatalf("mastery roll bound = %g, want 100", n)
+				}
+				return tt.roll
+			})
+
+			c.Send(encodeRequestMagicSkillUse(int32(def.ID), false, false))
+			readCastStartFrames(t, c, objID, int32(def.ID), int32(def.Level), 500, 60_000, objID)
+
+			key := cast.ReuseKey(def)
+			if got := ch.HasSkillReuse(key); got != !tt.mastery {
+				t.Fatalf("HasSkillReuse(%d) = %v, want %v", key, got, !tt.mastery)
+			}
+			if got := ch.SkillDisabled(key); got != !tt.mastery {
+				t.Fatalf("SkillDisabled(%d) = %v, want %v", key, got, !tt.mastery)
+			}
+			drainUntilQuiet(t, c)
+		})
+	}
 }
 
 // TestCastRejectedInsufficientMP verifies a caster without the MP pays

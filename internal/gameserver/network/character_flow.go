@@ -450,6 +450,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	})
 	c.SetWeightLimitMultiplier(l.playerConfig.WeightLimitMultiplier)
 	c.SetDeathPenaltyChance(l.playerConfig.DeathPenaltyChance)
+	c.SetMaxBuffsAmount(l.playerConfig.MaxBuffsAmount)
 	c.SetPerfectShieldBlockRate(l.playerConfig.PerfectShieldBlockRate)
 	c.SetAllowDelevel(l.playerConfig.AllowDelevel)
 	c.SetRateKarmaExpLost(l.playerConfig.RateKarmaExpLost)
@@ -751,6 +752,13 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageShieldDefenceSuccessful))
 	}, func() {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageExcellentShieldDefenseSuccess))
+	})
+	c.SetMagicFailureNotifiers(func() {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageAttackFailed))
+	}, func(targetName string, skillID modelskill.ID, level int) {
+		live.SendFrame(serverpackets.FrameSystemMessageStringSkillName(serverpackets.SystemMessageS1ResistedYourS2, targetName, int32(skillID), int32(level)))
+	}, func(attackerName string) {
+		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageResistedS1Magic, attackerName))
 	})
 	c.SetAttackTargetHook(func(target world.Tracked) {
 		l.attackLiveTarget(live, target)

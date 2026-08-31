@@ -1,12 +1,14 @@
 package skills
 
 import (
+	"slices"
 	"testing"
 	"time"
 
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 // TestBuffIconPersistsUntilExpiry casts a self-buff and walks its visible
@@ -121,4 +123,133 @@ func TestStunBlocksCastingAndMovement(t *testing.T) {
 	c.Send(encodeMoveBackwardToLocation(200, 200, 30))
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "move while stunned")
 	drainUntilQuiet(t, c)
+}
+
+func slotBuffDef(id modelskill.ID) modelskill.Definition {
+	return modelskill.Definition{
+		ID: id, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+		HitTime: 0, StaticHitTime: true, StaticReuse: true, SkillType: "BUFF",
+		Effects: []modelskill.EffectTemplate{{Name: "Buff", Time: 60, Icon: true}},
+	}
+}
+
+func buffSlotIDs(entries []abnormalStatusEntry) []int32 {
+	ids := make([]int32, 0, len(entries))
+	for _, e := range entries {
+		ids = append(ids, e.SkillID)
+	}
+	return ids
+}
+
+func castSlotBuff(t *testing.T, c *testsupport.ScriptedClient, objID, skillID int32) []abnormalStatusEntry {
+	t.Helper()
+	c.Send(encodeRequestMagicSkillUse(skillID, false, false))
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMagicSkillUse, "MagicSkillUse")
+	assertSystemMessageSkillFrame(t, c.Read(), serverpackets.SystemMessageUseS1, skillID, 1)
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMagicSkillLaunched, "MagicSkillLaunched")
+	return drainCollectingAbnormal(t, c)
+}
+
+func drainCollectingAbnormal(t *testing.T, c *testsupport.ScriptedClient) []abnormalStatusEntry {
+	t.Helper()
+	var last []abnormalStatusEntry
+	for i := 0; i < 100; i++ {
+		frame := c.ReadWithTimeout(300 * time.Millisecond)
+		if frame == nil {
+			return last
+		}
+		if frame[0] == serverpackets.OpcodeAbnormalStatusUpdate {
+			last = readAbnormalStatusUpdateEntriesFromFrame(t, frame)
+		}
+	}
+	t.Fatal("client kept receiving frames after 100 drains")
+	return last
+}
+
+func liveMaxBuffCount(t *testing.T, srv *gameservertest.Server, objID int32) int {
+	t.Helper()
+	obj, ok := srv.State.Player(objID)
+	if !ok {
+		t.Fatalf("world.Player(%d) missing", objID)
+	}
+	owner, ok := obj.(interface{ MaxBuffCount() int })
+	if !ok {
+		t.Fatalf("world.Player(%d) = %T has no MaxBuffCount", objID, obj)
+	}
+	return owner.MaxBuffCount()
+}
+
+// TestBuffSlotCapUsesMaxBuffsAmount pins that the players.properties
+// MaxBuffsAmount value is the live buff-slot cap when Divine Inspiration
+// is unknown: a third slot-family buff evicts the oldest at cap 2.
+func TestBuffSlotCapUsesMaxBuffsAmount(t *testing.T) {
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithMaxBuffsAmount(2),
+		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{
+			slotBuffDef(101), slotBuffDef(102), slotBuffDef(103),
+		})),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, 101, 1)
+	seedKnownSkill(t, srv, objID, 102, 1)
+	seedKnownSkill(t, srv, objID, 103, 1)
+	startInWorld(t, c)
+
+	if got := liveMaxBuffCount(t, srv, objID); got != 2 {
+		t.Fatalf("MaxBuffCount() = %d, want 2", got)
+	}
+
+	if icons := buffSlotIDs(castSlotBuff(t, c, objID, 101)); !slices.Equal(icons, []int32{101}) {
+		t.Fatalf("icons after first buff = %v, want [101]", icons)
+	}
+	if icons := buffSlotIDs(castSlotBuff(t, c, objID, 102)); !slices.Equal(icons, []int32{101, 102}) {
+		t.Fatalf("icons after second buff = %v, want [101 102]", icons)
+	}
+	if icons := buffSlotIDs(castSlotBuff(t, c, objID, 103)); !slices.Equal(icons, []int32{102, 103}) {
+		t.Fatalf("icons after third buff at cap 2 = %v, want oldest evicted [102 103]", icons)
+	}
+}
+
+// TestDivineInspirationAddsBuffSlots pins that known Divine Inspiration
+// (skill 1405) raises the live cap by its skill level: at MaxBuffsAmount 2
+// plus level 1, three slot-family buffs fit and the fourth evicts the oldest.
+func TestDivineInspirationAddsBuffSlots(t *testing.T) {
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithMaxBuffsAmount(2),
+		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{
+			slotBuffDef(101), slotBuffDef(102), slotBuffDef(103), slotBuffDef(104),
+			{
+				ID: modelskill.DivineInspirationSkillID, Level: 1,
+				Activation: modelskill.ActivationPassive, SkillType: "COREDONE",
+			},
+		})),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, int(modelskill.DivineInspirationSkillID), 1)
+	seedKnownSkill(t, srv, objID, 101, 1)
+	seedKnownSkill(t, srv, objID, 102, 1)
+	seedKnownSkill(t, srv, objID, 103, 1)
+	seedKnownSkill(t, srv, objID, 104, 1)
+	startInWorld(t, c)
+
+	if got := liveMaxBuffCount(t, srv, objID); got != 3 {
+		t.Fatalf("MaxBuffCount() with Divine Inspiration 1 = %d, want 3", got)
+	}
+
+	if icons := buffSlotIDs(castSlotBuff(t, c, objID, 101)); !slices.Equal(icons, []int32{101}) {
+		t.Fatalf("icons after first buff = %v, want [101]", icons)
+	}
+	if icons := buffSlotIDs(castSlotBuff(t, c, objID, 102)); !slices.Equal(icons, []int32{101, 102}) {
+		t.Fatalf("icons after second buff = %v, want [101 102]", icons)
+	}
+	if icons := buffSlotIDs(castSlotBuff(t, c, objID, 103)); !slices.Equal(icons, []int32{101, 102, 103}) {
+		t.Fatalf("icons after third buff with extra slot = %v, want [101 102 103]", icons)
+	}
+	if icons := buffSlotIDs(castSlotBuff(t, c, objID, 104)); !slices.Equal(icons, []int32{102, 103, 104}) {
+		t.Fatalf("icons after fourth buff at cap 3 = %v, want oldest evicted [102 103 104]", icons)
+	}
 }
