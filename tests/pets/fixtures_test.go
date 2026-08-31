@@ -112,16 +112,16 @@ func petSkillTable(t testing.TB) *skillstate.Persistence {
 
 // bootPets boots the stack with the pet fixture data wired and one
 // selectable character, still before the character-select screen.
-func bootPets(t *testing.T) *gameservertest.Server {
+func bootPets(t *testing.T, extra ...gameservertest.Option) *gameservertest.Server {
 	t.Helper()
-	srv := gameservertest.Boot(t,
+	opts := []gameservertest.Option{
 		gameservertest.WithCharacter("Owner", 1, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithNPCs(npc.NewTable([]*npc.Template{wolfTemplate(), treeTemplate()})),
 		gameservertest.WithSummonItems(petSummonItems()),
 		gameservertest.WithSkills(petSkillTable(t)),
-	)
-	return srv
+	}
+	return gameservertest.Boot(t, append(opts, extra...)...)
 }
 
 // petWorld boots the stack and brings the owner in the world with a wolf
