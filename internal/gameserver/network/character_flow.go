@@ -453,6 +453,8 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	c.SetMaxBuffsAmount(l.playerConfig.MaxBuffsAmount)
 	c.SetPerfectShieldBlockRate(l.playerConfig.PerfectShieldBlockRate)
 	c.SetAllowDelevel(l.playerConfig.AllowDelevel)
+	c.SetRaidCursesDisabled(l.disableRaidCurse)
+	c.SetSkillDefinitions(l.skills)
 	c.SetRateKarmaExpLost(l.playerConfig.RateKarmaExpLost)
 	c.SetLevelTable(l.levels)
 	c.RefreshWeightPenalty()
@@ -525,6 +527,15 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	})
 	c.SetAttackBroadcaster(func(snapshot attack.Snapshot) {
 		l.broadcastAttack(live, snapshot)
+	})
+	c.SetMagicSkillUseBroadcaster(func(use creature.MagicSkillUse) {
+		l.broadcastLiveFrame(live, func() wire.Frame {
+			return serverpackets.FrameMagicSkillUse(
+				serverpackets.SkillCastObject{ObjectID: use.CasterID, Location: use.CasterAt},
+				serverpackets.SkillCastObject{ObjectID: use.TargetID, Location: use.TargetAt},
+				use.SkillID, use.Level, use.HitTime, use.ReuseDelay, false,
+			)
+		})
 	})
 	c.SetMoveBroadcaster(func(event move.Event) {
 		l.broadcastLiveMoveEvent(live, event)

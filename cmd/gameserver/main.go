@@ -71,6 +71,7 @@ func newGameServerApp(paths gameServerPaths) *fx.App {
 			loadServerBypassDelay,
 			loadPetConfig,
 			loadSpawnMultiplier,
+			loadDisableRaidCurse,
 			loadHexIDProperties,
 			gameServerConfigFromLoadedProperties,
 			provideGameServerLogger,

@@ -339,6 +339,24 @@ func SkillFromDefinition(def modelskill.Definition) Skill {
 	}
 }
 
+// Apply instantiates each of templates and adds it to list as a fresh live
+// effect, attributed to effector. A template naming an effect core this
+// port hasn't wired yet is skipped rather than failing the whole batch.
+func Apply(list *List, effector, effected Participant, meta Skill, templates []modelskill.EffectTemplate) {
+	if list == nil {
+		return
+	}
+	for _, tmpl := range templates {
+		e, err := New(meta, tmpl)
+		if err != nil {
+			continue
+		}
+		e.Effector = effector
+		e.Effected = effected
+		list.Add(e)
+	}
+}
+
 // ApplyRestored instantiates each of templates and adds it to list, seeded to
 // resume from count and elapsedSeconds — the tick count and time-since-last-
 // tick a persisted effect had at logout — instead of starting fresh from the

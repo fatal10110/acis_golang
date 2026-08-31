@@ -585,6 +585,13 @@ func (h *Hostile) StopAggroHate(attacker attackable.Combatant) {
 	h.brain.StopAggroHate(attacker)
 }
 
+// NpcID returns this NPC's template id.
+func (h *Hostile) NpcID() int {
+	return h.Instance.Template.ID
+}
+
+var _ creature.RaidCurseTarget = (*Hostile)(nil)
+
 // StopHateList drops target from the skill-cast hate table.
 func (h *Hostile) StopHateList(attacker attackable.Combatant) {
 	h.brain.Hates().StopHate(attacker)
