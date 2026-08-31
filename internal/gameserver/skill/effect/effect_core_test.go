@@ -975,14 +975,20 @@ func (t *growEffectTarget) BroadcastAbnormalEffect() {
 
 // ---- from hooks_chance_trigger_test.go ----
 func TestNewChanceSkillTriggerRejectsUnknownTriggerType(t *testing.T) {
-	if _, err := New(Skill{}, modelskill.EffectTemplate{Name: "ChanceSkillTrigger", ChanceType: "BOGUS", ActivationChance: 50}); err == nil {
+	if _, err := New(Skill{}, modelskill.EffectTemplate{Name: "ChanceSkillTrigger", TriggeredID: 5144, ChanceType: "BOGUS", ActivationChance: 50}); err == nil {
 		t.Fatal("New() error = nil, want an error for an unknown chanceType")
 	}
 }
 
-func TestNewChanceSkillTriggerAcceptsAnAbsentChanceType(t *testing.T) {
-	if _, err := New(Skill{}, modelskill.EffectTemplate{Name: "ChanceSkillTrigger", TriggeredID: 5144}); err != nil {
-		t.Fatalf("New() error = %v, want nil for an absent chanceType", err)
+func TestNewChanceSkillTriggerRejectsAbsentChanceType(t *testing.T) {
+	if _, err := New(Skill{}, modelskill.EffectTemplate{Name: "ChanceSkillTrigger", TriggeredID: 5144}); err == nil {
+		t.Fatal("New() error = nil, want an error for an absent chanceType")
+	}
+}
+
+func TestNewChanceSkillTriggerRejectsMissingTriggeredID(t *testing.T) {
+	if _, err := New(Skill{}, modelskill.EffectTemplate{Name: "ChanceSkillTrigger", ChanceType: "ON_ATTACKED", ActivationChance: 80}); err == nil {
+		t.Fatal("New() error = nil, want an error for a missing triggeredId")
 	}
 }
 
@@ -1032,7 +1038,7 @@ func TestChanceSkillTriggerInstallsAndRemovesOnTarget(t *testing.T) {
 }
 
 func TestChanceSkillTriggerOnATargetWithNoTrackingIsANoop(t *testing.T) {
-	e, err := New(Skill{}, modelskill.EffectTemplate{Name: "ChanceSkillTrigger", ChanceType: "ON_HIT", ActivationChance: 50})
+	e, err := New(Skill{}, modelskill.EffectTemplate{Name: "ChanceSkillTrigger", TriggeredID: 5144, ChanceType: "ON_HIT", ActivationChance: 50})
 	if err != nil {
 		t.Fatalf("New() error: %v", err)
 	}

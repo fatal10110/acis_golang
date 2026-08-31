@@ -388,6 +388,12 @@ func New(skill Skill, tmpl modelskill.EffectTemplate) (*Effect, error) {
 		return nil, fmt.Errorf("%w %q", ErrUnsupportedCoreEffect, tmpl.Name)
 	}
 	if k.typ == TypeChanceSkillTrigger {
+		if tmpl.TriggeredID == 0 {
+			return nil, fmt.Errorf("effect %s: requires triggeredId", tmpl.Name)
+		}
+		if tmpl.ChanceType == "" {
+			return nil, fmt.Errorf("effect %s: requires chanceType", tmpl.Name)
+		}
 		if _, _, err := modelskill.ParseChanceCondition(tmpl.ChanceType, tmpl.ActivationChance); err != nil {
 			return nil, fmt.Errorf("effect %s: %w", tmpl.Name, err)
 		}
