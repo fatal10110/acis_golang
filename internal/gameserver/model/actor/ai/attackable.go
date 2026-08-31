@@ -104,7 +104,9 @@ type intention struct {
 // can raise hate while the loop reads target selection. mu guards
 // current/next/step: Think and Tick run on the periodic AI task's goroutine,
 // but movement-arrived and attack-finished hooks can also call Think from a
-// timer goroutine, so entry points must serialize against each other.
+// timer goroutine, and the first attack desire against an actor with no
+// most-hated target calls Think from the combat path so the reaction does
+// not wait for the next tick. Entry points must serialize against each other.
 type Attackable struct {
 	actor   AttackableActor
 	move    MoveController
@@ -197,20 +199,28 @@ const combatAttackDesireWeight = 200
 // threat table — accumulating hate there to drive target selection among
 // multiple attackers, unchanged from AddDamageHate — but queues its attack
 // Desire at a flat weight instead of scaling it with the damage dealt.
+// When the threat table had no most-hated attacker, the AI loop runs
+// immediately so the first reaction does not wait for the next tick.
 func (a *Attackable) AddCombatDamageHate(attacker attackable.Combatant, damage float64) {
+	_, hadMostHated := a.threats.MostHated()
 	a.threats.AddDamage(attacker, damage, damage)
 	if attacker == nil || (a.actor.SiegeGuard() && attacker.SiegeGuard()) {
 		return
 	}
 	a.addAttackDesire(attacker, combatAttackDesireWeight)
+	a.thinkIfNoMostHated(hadMostHated, attacker)
 }
 
-// AddAttackDesire queues an attack intention.
+// AddAttackDesire queues an attack intention. When the threat table has no
+// most-hated attacker, the AI loop runs immediately so the first reaction
+// does not wait for the next tick.
 func (a *Attackable) AddAttackDesire(attacker attackable.Combatant, hate float64) {
 	if attacker == nil || (a.actor.SiegeGuard() && attacker.SiegeGuard()) {
 		return
 	}
+	_, hadMostHated := a.threats.MostHated()
 	a.addAttackDesire(attacker, hate)
+	a.thinkIfNoMostHated(hadMostHated, attacker)
 }
 
 // addAttackDesire ports the ordinary hate-list overloads of NpcAI.java's
@@ -225,6 +235,16 @@ func (a *Attackable) addAttackDesire(attacker attackable.Combatant, hate float64
 		QueuedAt:     time.Now(),
 		MoveToTarget: true,
 	})
+}
+
+// thinkIfNoMostHated runs the AI loop immediately for a first attack
+// desire. Think drops unknown attackers, so an unseen target keeps its
+// queued desire for a later tick instead of being wiped here.
+func (a *Attackable) thinkIfNoMostHated(hadMostHated bool, attacker attackable.Combatant) {
+	if hadMostHated || attacker == nil || !a.actor.Knows(attacker) {
+		return
+	}
+	_ = a.Think()
 }
 
 // RandomizeHate ports the AI side of AggroList.randomizeAttack(), driving

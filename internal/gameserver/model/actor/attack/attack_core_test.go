@@ -13,6 +13,33 @@ import (
 )
 
 // ---- from controller_test.go ----
+func TestControllerRaidCurseGateBeforeDamage(t *testing.T) {
+	tests := []struct {
+		name       string
+		blocks     bool
+		wantDamage int
+	}{
+		{name: "level gap petrification blocks", blocks: true},
+		{name: "mounted anti-strider curse continues", wantDamage: 1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			actor := &curseTimingPlayer{timingPlayer: timingPlayer{timingActor: timingActor{attackSpeed: 500}}, blocks: tt.blocks}
+			target := &timingTarget{id: 2, raidRelated: true}
+			ctrl := NewPlayable(actor)
+
+			ctrl.deliverHits(0, []Hit{{Target: target, Damage: 1}})
+
+			if actor.curseCalls != 1 {
+				t.Fatalf("curse checks = %d, want 1", actor.curseCalls)
+			}
+			if target.hits != tt.wantDamage {
+				t.Fatalf("damage hits = %d, want %d", target.hits, tt.wantDamage)
+			}
+		})
+	}
+}
+
 func TestControllerDualHitAndCompletionTiming(t *testing.T) {
 	actor := &timingActor{attackType: item.WeaponDual, attackSpeed: 500}
 	target := &timingTarget{id: 2}
@@ -283,6 +310,17 @@ type timingPlayer struct {
 	actionFailed int
 }
 
+type curseTimingPlayer struct {
+	timingPlayer
+	blocks     bool
+	curseCalls int
+}
+
+func (a *curseTimingPlayer) TestCursesOnAttack(attackable.Combatant) bool {
+	a.curseCalls++
+	return a.blocks
+}
+
 func (a *timingPlayer) InPeaceZone() bool         { return false }
 func (a *timingPlayer) TryToIdle()                { a.idles++ }
 func (a *timingPlayer) CheckAndEquipArrows() bool { return true }
@@ -337,20 +375,22 @@ func (a *timingActor) BroadcastAttack(snapshot Snapshot) error {
 }
 
 type timingTarget struct {
-	id         int32
-	x, y, z    int
-	attackable bool
-	dead       bool
-	hits       int
-	landed     *[]int32
-	onDamage   func()
+	id          int32
+	x, y, z     int
+	attackable  bool
+	dead        bool
+	hits        int
+	landed      *[]int32
+	onDamage    func()
+	raidRelated bool
 }
 
-func (t *timingTarget) ObjectID() int32  { return t.id }
-func (t *timingTarget) SiegeGuard() bool { return false }
-func (t *timingTarget) AlikeDead() bool  { return t.dead }
-func (t *timingTarget) Heading() int     { return 0 }
-func (t *timingTarget) Dead() bool       { return t.dead }
+func (t *timingTarget) ObjectID() int32   { return t.id }
+func (t *timingTarget) SiegeGuard() bool  { return false }
+func (t *timingTarget) AlikeDead() bool   { return t.dead }
+func (t *timingTarget) Heading() int      { return 0 }
+func (t *timingTarget) Dead() bool        { return t.dead }
+func (t *timingTarget) RaidRelated() bool { return t.raidRelated }
 func (t *timingTarget) Category() target.Category {
 	return target.CategoryAttackable
 }
