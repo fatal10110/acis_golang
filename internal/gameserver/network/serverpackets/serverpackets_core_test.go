@@ -2638,6 +2638,20 @@ func TestFrameSystemMessageCounterattackFeedback(t *testing.T) {
 	}
 }
 
+func TestFrameSystemMessageResistedS1Magic(t *testing.T) {
+	got := framePayload(t, FrameSystemMessageString(SystemMessageResistedS1Magic, "Mage"))
+	want := []byte{
+		OpcodeSystemMessage,
+		0x9f, 0x00, 0x00, 0x00, // 159
+		0x01, 0x00, 0x00, 0x00,
+		SystemMessageParamText, 0x00, 0x00, 0x00,
+		'M', 0x00, 'a', 0x00, 'g', 0x00, 'e', 0x00, 0x00, 0x00,
+	}
+	if !bytes.Equal(got, want) {
+		t.Fatalf("resisted-magic frame = %x, want %x", got, want)
+	}
+}
+
 func TestFrameSystemMessageForceChargeFeedback(t *testing.T) {
 	t.Run("increased", func(t *testing.T) {
 		got := framePayload(t, FrameSystemMessageNumber(SystemMessageForceIncreasedToS1, 3))

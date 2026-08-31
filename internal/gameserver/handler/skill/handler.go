@@ -78,6 +78,12 @@ type Resisted struct {
 	SkillLevel int
 }
 
+// MagicResist reports a player target that resisted a magic-damage cast.
+type MagicResist struct {
+	TargetID     int32
+	AttackerName string
+}
+
 // Result reports player-visible outcomes produced while a skill handler ran.
 type Result struct {
 	AttackFailed   int
@@ -85,6 +91,7 @@ type Result struct {
 	Lethals        []Lethal
 	Dodges         []Dodge
 	Resisted       []Resisted
+	MagicResists   []MagicResist
 	CubicAdded     bool
 	// CubicTargets are non-caster targets whose cubic runtime was touched.
 	CubicTargets []Actor

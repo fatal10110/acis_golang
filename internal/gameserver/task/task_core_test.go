@@ -20,10 +20,11 @@ import (
 
 // ---- from attackstance_test.go ----
 type attackStanceFakeActor struct {
-	id     int32
-	owner  AttackStanceActor
-	summon AttackStanceActor
-	cubics []AttackStanceCubic
+	id       int32
+	owner    AttackStanceActor
+	summon   AttackStanceActor
+	cubics   []AttackStanceCubic
+	inCombat bool
 }
 
 func (a *attackStanceFakeActor) ObjectID() int32 { return a.id }
@@ -35,6 +36,11 @@ func (a *attackStanceFakeActor) Summon() AttackStanceActor {
 }
 func (a *attackStanceFakeActor) Cubics() []AttackStanceCubic {
 	return a.cubics
+}
+func (a *attackStanceFakeActor) SetInCombat(inCombat bool) bool {
+	changed := a.inCombat != inCombat
+	a.inCombat = inCombat
+	return changed
 }
 
 type attackStanceFakeCubic struct {
@@ -286,6 +292,24 @@ func TestAttackStanceTimeoutAlsoStopsPlayerSummon(t *testing.T) {
 
 	if got, want := effects.take(), []string{"stop 100", "stop 200"}; !slices.Equal(got, want) {
 		t.Fatalf("timeout events = %v, want %v", got, want)
+	}
+}
+
+func TestAttackStanceTimeoutClearsCombatFlag(t *testing.T) {
+	now := time.UnixMilli(0)
+	stance, err := NewAttackStance(attackStanceNoopEffects{}, func() time.Time { return now })
+	if err != nil {
+		t.Fatalf("NewAttackStance() error = %v", err)
+	}
+	actor := &attackStanceFakeActor{id: 100, inCombat: true}
+	stance.Add(actor)
+
+	now = now.Add(AttackStancePeriod)
+	if err := stance.Tick(); err != nil {
+		t.Fatalf("Tick() error = %v", err)
+	}
+	if actor.inCombat {
+		t.Fatal("combat flag should clear after attack stance timeout")
 	}
 }
 

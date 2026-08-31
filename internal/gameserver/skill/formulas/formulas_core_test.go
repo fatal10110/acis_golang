@@ -390,6 +390,57 @@ func TestMagicDamage(t *testing.T) {
 	}
 }
 
+func TestMagicFailureOutcome(t *testing.T) {
+	tests := []struct {
+		name                           string
+		enabled, first, player, second bool
+		levelDiff                      int
+		want                           MagicFailure
+	}{
+		{"disabled", false, false, true, false, 20, MagicFailureNone},
+		{"first hit", true, true, true, false, 20, MagicFailureNone},
+		{"npc fail keeps damage", true, false, false, true, 0, MagicFailureKeep},
+		{"player half", true, false, true, true, 9, MagicFailureHalf},
+		{"player half at zero gap", true, false, true, true, 0, MagicFailureHalf},
+		{"player half when target is lower", true, false, true, true, -5, MagicFailureHalf},
+		{"player full past gap", true, false, true, true, 10, MagicFailureFull},
+		{"player full second miss", true, false, true, false, 0, MagicFailureFull},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := MagicFailureOutcome(tt.enabled, tt.first, tt.player, tt.second, tt.levelDiff)
+			if got != tt.want {
+				t.Fatalf("MagicFailureOutcome() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestMagicDamageFailureSkipsCritAndAppliesBeforePvP(t *testing.T) {
+	base := MagicDamageInput{
+		MAtk: 400, MDef: 50, SkillPower: 20,
+		MagicCrit: true, PvPMul: 1.1, ElementalMul: 1,
+	}
+
+	half := base
+	half.Failure = MagicFailureHalf
+	if got := MagicDamage(half); !almostEqual(got, 400.4) {
+		t.Errorf("half: MagicDamage() = %v, want 400.4", got)
+	}
+
+	full := base
+	full.Failure = MagicFailureFull
+	if got := MagicDamage(full); !almostEqual(got, 1.1) {
+		t.Errorf("full: MagicDamage() = %v, want 1.1", got)
+	}
+
+	keep := base
+	keep.Failure = MagicFailureKeep
+	if got := MagicDamage(keep); !almostEqual(got, 800.8) {
+		t.Errorf("keep: MagicDamage() = %v, want 800.8", got)
+	}
+}
+
 func TestManaDamage(t *testing.T) {
 	in := ManaDamageInput{
 		MAtk: 400, MDef: 50, SkillPower: 20, TargetMaxMp: 970,
