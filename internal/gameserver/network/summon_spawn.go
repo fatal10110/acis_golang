@@ -308,6 +308,7 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 	attackController.SetLogger(l.log)
 	brain := ai.NewSummon(actor, moveController, attackController)
 	attackController.SetFinished(brain.Think)
+	actor.SetRaidCursesDisabled(l.disableRaidCurse)
 	if controller, ok := moveController.(*move.Controller); ok {
 		controller.SetArrived(func() {
 			actor.SyncPosition(controller.Position())

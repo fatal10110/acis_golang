@@ -179,20 +179,21 @@ type GameClientLink struct {
 	// itemInstances lazily persists item rows whose live state changed,
 	// so a mutation made outside a client request still reaches the
 	// items table.
-	itemInstances *task.ItemInstances
-	restarts      *restart.Table
-	levels        *player.LevelTable
-	admin         *admin.Data
-	playerConfig  PlayerConfig
-	petConfig     petmodel.Config // passed into summon.PetConfig by newPet.
-	inventory     *invops.Service
-	petItems      *petitem.Service
-	trades        *tradebook.Book
-	enchantState  *enchantflow.State
-	enchant       *enchantflow.Service
-	targets       *skilltarget.Registry
-	skillHandlers *handlerskill.Registry
-	log           zerolog.Logger
+	itemInstances    *task.ItemInstances
+	restarts         *restart.Table
+	levels           *player.LevelTable
+	admin            *admin.Data
+	playerConfig     PlayerConfig
+	petConfig        petmodel.Config // passed into summon.PetConfig by newPet.
+	disableRaidCurse bool
+	inventory        *invops.Service
+	petItems         *petitem.Service
+	trades           *tradebook.Book
+	enchantState     *enchantflow.State
+	enchant          *enchantflow.Service
+	targets          *skilltarget.Registry
+	skillHandlers    *handlerskill.Registry
+	log              zerolog.Logger
 
 	// newCipherKey supplies each connection's XOR cipher key; overridden in
 	// tests for a deterministic handshake.
@@ -282,7 +283,10 @@ type GameClientLinkConfig struct {
 	Admin         *admin.Data
 	PlayerConfig  PlayerConfig
 	PetConfig     petmodel.Config
-	Log           zerolog.Logger
+	// DisableRaidCurse is npcs.properties DisableRaidCurse: when true, raid
+	// petrification and anti-strider curses never apply.
+	DisableRaidCurse bool
+	Log              zerolog.Logger
 	// Now supplies the clock packet accounting uses to bucket received
 	// frames into flood windows; nil means time.Now.
 	Now func() time.Time
@@ -343,6 +347,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) *GameClientLink {
 		admin:            cfg.Admin,
 		playerConfig:     cfg.PlayerConfig,
 		petConfig:        cfg.PetConfig,
+		disableRaidCurse: cfg.DisableRaidCurse,
 		enchantRoll:      cfg.EnchantRoll,
 		skillEnchantRoll: cfg.SkillEnchantRoll,
 		inventory:        invops.NewService(cfg.IDs),
@@ -390,10 +395,14 @@ func NewGameClientLink(cfg GameClientLinkConfig) *GameClientLink {
 func (l *GameClientLink) newPet(cfg summon.PetConfig) (*summon.Actor, error) {
 	cfg.Config = &l.petConfig
 	cfg.MaxBuffsAmount = l.playerConfig.MaxBuffsAmount
+	if cfg.SkillDefs == nil {
+		cfg.SkillDefs = l.skills
+	}
 	pet, err := summon.NewPet(cfg)
 	if err != nil {
 		return nil, err
 	}
+	pet.SetRaidCursesDisabled(l.disableRaidCurse)
 	if live, ok := cfg.Owner.(*livePlayer); ok {
 		l.registerPetInventoryUpdates(pet, live)
 	}

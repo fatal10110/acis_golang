@@ -282,6 +282,36 @@ func TestLoadSpawnMultiplierDefaultsToOne(t *testing.T) {
 	}
 }
 
+func TestLoadDisableRaidCurseUsesNpcsProperties(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "npcs.properties")
+	if err := os.WriteFile(configPath, []byte("DisableRaidCurse = True\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := loadDisableRaidCurse(gameServerPaths{NpcsConfigPath: configPath})
+	if err != nil {
+		t.Fatalf("loadDisableRaidCurse() error = %v", err)
+	}
+	if !got {
+		t.Fatal("loadDisableRaidCurse() = false, want true")
+	}
+}
+
+func TestLoadDisableRaidCurseDefaultsToFalse(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "npcs.properties")
+	if err := os.WriteFile(configPath, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := loadDisableRaidCurse(gameServerPaths{NpcsConfigPath: configPath})
+	if err != nil {
+		t.Fatalf("loadDisableRaidCurse() error = %v", err)
+	}
+	if got {
+		t.Fatal("loadDisableRaidCurse() = true, want false")
+	}
+}
+
 func TestLoadPerfectShieldBlockRateUsesPlayersProperties(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "players.properties")
 	if err := os.WriteFile(configPath, []byte("PerfectShieldBlockRate = 15\n"), 0o600); err != nil {

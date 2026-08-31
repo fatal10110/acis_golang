@@ -912,8 +912,6 @@ func TestAttackableAIRandomizeHateDisplacesTargetAndRebuildsDesires(t *testing.T
 // TestAttackableAIAddDamageHateSetsMoveToTarget ports NpcAI.java:698-711:
 // every addAttackDesire overload reached from the ordinary hate-list path
 // (Npc.java:2036's getAI().addAttackDesire) defaults moveToTarget = true.
-// Only the scripted addAttackDesireHold (NpcAI.java:683-696, not yet ported)
-// passes false, so a plain hate-driven queued desire must never look "held".
 func TestAttackableAIAddDamageHateSetsMoveToTarget(t *testing.T) {
 	owner := actor(1)
 	target := actor(2)
@@ -927,6 +925,28 @@ func TestAttackableAIAddDamageHateSetsMoveToTarget(t *testing.T) {
 	}
 	if !desire.MoveToTarget {
 		t.Fatal("AddDamageHate queued desire MoveToTarget = false, want true")
+	}
+}
+
+// TestAttackableAIAddAttackDesireHoldSetsMoveToTarget ports
+// NpcAI.java:683-696: addAttackDesireHold queues MoveToTarget = false.
+func TestAttackableAIAddAttackDesireHoldSetsMoveToTarget(t *testing.T) {
+	owner := actor(1)
+	target := actor(2)
+	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+
+	ai.AddDamageHate(target, 0, 10)
+	ai.AddAttackDesireHold(target, 10)
+
+	desire, ok := ai.Desires().Peek()
+	if !ok {
+		t.Fatal("Desires().Peek() ok = false after AddAttackDesireHold")
+	}
+	if desire.MoveToTarget {
+		t.Fatal("AddAttackDesireHold queued desire MoveToTarget = true, want false")
+	}
+	if desire.FinalTarget != target || desire.Weight != 10 {
+		t.Fatalf("hold desire = (%v, %v), want (target, 10)", desire.FinalTarget, desire.Weight)
 	}
 }
 
