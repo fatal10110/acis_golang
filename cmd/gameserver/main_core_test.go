@@ -222,6 +222,36 @@ func TestLoadDeathPenaltyChanceDefaultsToTwenty(t *testing.T) {
 	}
 }
 
+func TestLoadMaxBuffsAmountUsesPlayersProperties(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "players.properties")
+	if err := os.WriteFile(configPath, []byte("MaxBuffsAmount = 24\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := loadMaxBuffsAmount(gameServerPaths{PlayersConfigPath: configPath})
+	if err != nil {
+		t.Fatalf("loadMaxBuffsAmount() error = %v", err)
+	}
+	if got != 24 {
+		t.Fatalf("loadMaxBuffsAmount() = %d, want 24", got)
+	}
+}
+
+func TestLoadMaxBuffsAmountDefaultsToTwenty(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "players.properties")
+	if err := os.WriteFile(configPath, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := loadMaxBuffsAmount(gameServerPaths{PlayersConfigPath: configPath})
+	if err != nil {
+		t.Fatalf("loadMaxBuffsAmount() error = %v", err)
+	}
+	if got != 20 {
+		t.Fatalf("loadMaxBuffsAmount() = %d, want 20", got)
+	}
+}
+
 func TestLoadSpawnMultiplierUsesNpcsProperties(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "npcs.properties")
 	if err := os.WriteFile(configPath, []byte("SpawnMultiplier = 1.5\n"), 0o600); err != nil {

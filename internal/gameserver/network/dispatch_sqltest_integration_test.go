@@ -105,7 +105,7 @@ func newLinkedSQLGameClientFull(t *testing.T, skills *skillstate.Persistence, sh
 		PlayerClock:      playerClock,
 		SevenSigns:       sevenSigns,
 		InventoryUpdates: inventoryUpdates,
-		PlayerConfig:     PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: karmaPlayerCanTeleport, AllowWater: true},
+		PlayerConfig:     PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: karmaPlayerCanTeleport, AllowWater: true, MaxBuffsAmount: 20},
 		PetConfig:        petmodel.DefaultConfig(),
 		Log:              zerolog.Nop(),
 	})

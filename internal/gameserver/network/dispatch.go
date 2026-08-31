@@ -124,6 +124,10 @@ type PlayerConfig struct {
 	// ServerBypassDelay is the reuse delay between two bypass commands on
 	// one client session.
 	ServerBypassDelay time.Duration
+	// MaxBuffsAmount is the base non-toggle, non-seven-signs buff-slot
+	// count every character starts with. Known Divine Inspiration levels
+	// add on top of this at MaxBuffCount time.
+	MaxBuffsAmount int
 }
 
 // GameClientLink accepts and drives connections from Interlude game

@@ -137,6 +137,7 @@ type Character struct {
 	updateWeightPenalty       func()
 	weightPenalty             int
 	weightLimitMultiplier     float64
+	maxBuffsAmount            int
 	updateUserInfo            func()
 	updateGradePenalty        func()
 	refreshItemStats          func()
@@ -318,9 +319,10 @@ func NewCharacter(objectID int32, tmpl *Template, accountName, name string, hair
 
 		AccessLevel: defaultAccessLevel,
 
-		stateInit: true,
-		running:   true,
-		standing:  true,
+		stateInit:      true,
+		running:        true,
+		standing:       true,
+		maxBuffsAmount: defaultMaxBuffsAmount,
 	}
 
 	if len(tmpl.Spawns) > 0 {
