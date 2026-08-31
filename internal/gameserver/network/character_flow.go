@@ -450,6 +450,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	})
 	c.SetWeightLimitMultiplier(l.playerConfig.WeightLimitMultiplier)
 	c.SetDeathPenaltyChance(l.playerConfig.DeathPenaltyChance)
+	c.SetMaxBuffsAmount(l.playerConfig.MaxBuffsAmount)
 	c.SetPerfectShieldBlockRate(l.playerConfig.PerfectShieldBlockRate)
 	c.SetAllowDelevel(l.playerConfig.AllowDelevel)
 	c.SetRateKarmaExpLost(l.playerConfig.RateKarmaExpLost)

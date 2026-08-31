@@ -7,6 +7,7 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/statbonus"
 )
 
 // PlayerActor adapts a live player character to the cast controller's actor
@@ -119,7 +120,16 @@ func (PlayerActor) SpiritshotCharged() bool { return false }
 
 func (PlayerActor) BlessedSpiritshotCharged() bool { return false }
 
-func (PlayerActor) SkillMastery(modelskill.Definition) bool { return false }
+func (a PlayerActor) SkillMastery(def modelskill.Definition) bool {
+	if a.Character == nil || def.SkillType == "FISHING" {
+		return false
+	}
+	statMul := statbonus.STRBonus[statbonus.ClampIndex(a.Character.STR())]
+	if player.ClassMage(a.Character.ClassID) {
+		statMul = statbonus.INTBonus[statbonus.ClampIndex(a.Character.INT())]
+	}
+	return a.Character.RollFloat(100) < a.Character.CalcStat(stat.SkillMastery, 0)*statMul
+}
 
 func (a PlayerActor) ItemCount(itemID int) int {
 	if a.Character == nil || a.Character.Inventory() == nil {

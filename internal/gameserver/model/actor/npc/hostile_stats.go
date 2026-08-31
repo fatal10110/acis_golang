@@ -10,7 +10,8 @@ import (
 
 // maxBuffCount is the non-toggle, non-seven-signs buff-slot count every
 // NPC allows. No passive skill raises this bound for a live NPC actor, so
-// it is also the permanent cap (compare player.Character's baseBuffSlots).
+// it is also the permanent cap (compare player.Character's default
+// MaxBuffsAmount).
 const maxBuffCount = 20
 
 // AddStatFuncs attaches fns to h's live stat calculators. Each Mod is
