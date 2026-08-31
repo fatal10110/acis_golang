@@ -3,6 +3,7 @@ package cast
 import (
 	"time"
 
+	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -28,7 +29,7 @@ type PlayerSkillRequest struct {
 	Definitions   Definitions
 	Ctrl          bool
 	Shift         bool
-	ResolveTarget func(Target, world.Tracked, modelskill.Definition, bool) (Target, bool)
+	ResolveTarget func(Target, world.Tracked, modelskill.Definition, bool) (Target, skilltarget.CastRejection)
 }
 
 // fakeDeathSkillID is the Fake Death toggle skill. Recasting it while
@@ -42,6 +43,7 @@ const fakeDeathSkillID = 60
 type StartedSkill struct {
 	Definition modelskill.Definition
 	Target     Target
+	Rejection  skilltarget.CastRejection
 	Plan       Plan
 	Ctrl       bool
 	Shift      bool
@@ -101,12 +103,17 @@ func StartItemSkill(req ItemSkillRequest) (StartedSkill, error) {
 // startResolvedSkill runs the shared target-resolution and cost/reuse start
 // sequence once a caller has already resolved def, regardless of whether
 // def came from the caster's own skill list or an item's attached skill.
-func startResolvedSkill(now time.Time, controller *Controller, caster *player.Character, selected world.Tracked, def modelskill.Definition, ctrl bool, resolveTarget func(Target, world.Tracked, modelskill.Definition, bool) (Target, bool)) (StartedSkill, error) {
-	target, ok := SelectTarget(caster, selected, def)
-	if !ok && resolveTarget != nil {
-		target, ok = resolveTarget(caster, selected, def, ctrl)
+func startResolvedSkill(now time.Time, controller *Controller, caster *player.Character, selected world.Tracked, def modelskill.Definition, ctrl bool, resolveTarget func(Target, world.Tracked, modelskill.Definition, bool) (Target, skilltarget.CastRejection)) (StartedSkill, error) {
+	var target Target
+	var rejection skilltarget.CastRejection
+	var ok bool
+	if resolveTarget != nil {
+		target, rejection = resolveTarget(caster, selected, def, ctrl)
+		ok = target != nil && rejection == skilltarget.CastRejectNone
+	} else {
+		target, ok = SelectTarget(caster, selected, def)
 	}
-	started := StartedSkill{Definition: def, Target: target}
+	started := StartedSkill{Definition: def, Target: target, Rejection: rejection}
 	if !ok {
 		return started, ErrInvalidTarget
 	}

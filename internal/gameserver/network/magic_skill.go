@@ -79,6 +79,11 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 		ResolveTarget: l.resolveMagicSkillTarget,
 	})
 	if err != nil {
+		if started.Rejection != skilltarget.CastRejectNone {
+			sendTargetCastRejection(live, started.Rejection)
+			sendMagicActionFailed(live)
+			return
+		}
 		if errors.Is(err, actorcast.ErrInvalidTarget) && started.Target == nil {
 			sendCorpseCastFailure(live, started.Definition)
 			sendMagicActionFailed(live)
@@ -207,21 +212,38 @@ func (l *GameClientLink) walkToGroundCast(live *livePlayer, req clientpackets.Re
 	return true
 }
 
-func (l *GameClientLink) resolveMagicSkillTarget(caster actorcast.Target, selected world.Tracked, def modelskill.Definition, ctrl bool) (actorcast.Target, bool) {
+func (l *GameClientLink) resolveMagicSkillTarget(caster actorcast.Target, selected world.Tracked, def modelskill.Definition, ctrl bool) (actorcast.Target, skilltarget.CastRejection) {
 	casterCreature, ok := caster.(skilltarget.Creature)
 	if !ok {
-		return nil, false
+		return nil, skilltarget.CastRejectNone
 	}
 	selectedCreature, _ := selected.(skilltarget.Creature)
 	handler, ok := l.targets.Handler(def.Target)
 	if !ok {
-		return nil, false
+		return nil, skilltarget.CastRejectNone
 	}
-	target := handler.FinalTarget(casterCreature, selectedCreature, &def)
-	if target == nil || !handler.CanCast(casterCreature, target, &def, ctrl) {
-		return nil, false
+	finalTarget := handler.FinalTarget(casterCreature, selectedCreature, &def)
+	if rejection := skilltarget.CastRejectionFor(def.Target, casterCreature, finalTarget, &def); rejection != skilltarget.CastRejectNone {
+		return nil, rejection
 	}
-	return target, true
+	if finalTarget == nil || !handler.CanCast(casterCreature, finalTarget, &def, ctrl) {
+		return nil, skilltarget.CastRejectNone
+	}
+	return finalTarget, skilltarget.CastRejectNone
+}
+
+func sendTargetCastRejection(live *livePlayer, rejection skilltarget.CastRejection) {
+	if live == nil {
+		return
+	}
+	switch rejection {
+	case skilltarget.CastRejectInvalidTarget:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageInvalidTarget))
+	case skilltarget.CastRejectCantAttackPeaceZone:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCantAtkPeacezone))
+	case skilltarget.CastRejectTargetInPeaceZone:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetInPeacezone))
+	}
 }
 
 func (l *GameClientLink) finishDeferredMagicSkill(live *livePlayer) {

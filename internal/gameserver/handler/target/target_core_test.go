@@ -358,6 +358,35 @@ func TestAuraHandlersRejectPeaceZoneCastsLikeJava(t *testing.T) {
 	}
 }
 
+func TestCastRejectionForPreservesHandlerMessages(t *testing.T) {
+	caster := &targetActor{id: 1, category: CategoryPlayable, peace: true}
+	target := &targetActor{id: 2, category: CategoryPlayable, peace: true}
+	offensive := &modelskill.Definition{Offensive: true}
+
+	tests := []struct {
+		name       string
+		targetType modelskill.Target
+		caster     Creature
+		aimed      Creature
+		skill      *modelskill.Definition
+		want       CastRejection
+	}{
+		{"aura in peace", modelskill.TargetAura, caster, nil, offensive, CastRejectCantAttackPeaceZone},
+		{"front aura in peace", modelskill.TargetFrontAura, caster, nil, offensive, CastRejectCantAttackPeaceZone},
+		{"behind aura in peace", modelskill.TargetBehindAura, caster, nil, nil, CastRejectCantAttackPeaceZone},
+		{"one offensive self", modelskill.TargetOne, caster, caster, offensive, CastRejectInvalidTarget},
+		{"one offensive target in peace", modelskill.TargetOne, &targetActor{id: 3, category: CategoryPlayable}, target, offensive, CastRejectTargetInPeaceZone},
+		{"one nil target", modelskill.TargetOne, caster, nil, offensive, CastRejectNone},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := CastRejectionFor(tt.targetType, tt.caster, tt.aimed, tt.skill); got != tt.want {
+				t.Fatalf("CastRejectionFor = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestFrontAndBehindAuraDoNotAffectPlayableTargetsForFolkCaster(t *testing.T) {
 	caster := &targetActor{id: 1, category: CategoryFolk, heading: 0}
 	front := &targetActor{id: 2, category: CategoryPlayable, x: 80}

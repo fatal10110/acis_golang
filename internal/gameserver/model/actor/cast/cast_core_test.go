@@ -1887,6 +1887,32 @@ func TestStartPlayerSkillAcceptsKnownActiveSkill(t *testing.T) {
 	}
 }
 
+func TestStartPlayerSkillKeepsTargetRejectionFromResolver(t *testing.T) {
+	ch := newRequestCharacter(10)
+	ch.SetSkillLevel(3, 1)
+	ctrl := NewController(&testActor{mp: 100, hp: 100})
+	defs := requestDefinitions{{ID: 3, Level: 1}: {
+		ID: 3, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
+	}}
+
+	started, err := StartPlayerSkill(PlayerSkillRequest{
+		Now: time.Unix(1000, 0), Controller: ctrl, Caster: ch,
+		Selected: &requestTarget{id: 20}, SkillID: 3, Definitions: defs,
+		ResolveTarget: func(Target, world.Tracked, modelskill.Definition, bool) (Target, skilltarget.CastRejection) {
+			return nil, skilltarget.CastRejectInvalidTarget
+		},
+	})
+	if !errors.Is(err, ErrInvalidTarget) {
+		t.Fatalf("StartPlayerSkill() error = %v, want ErrInvalidTarget", err)
+	}
+	if got := started.Rejection; got != skilltarget.CastRejectInvalidTarget {
+		t.Fatalf("StartedSkill.Rejection = %v, want CastRejectInvalidTarget", got)
+	}
+	if ctrl.CastingNow() {
+		t.Fatal("controller started after a target rejection")
+	}
+}
+
 // TestStartPlayerSkillClearsRecentFakeDeath covers PlayerCast.doCast's
 // unconditional _actor.clearRecentFakeDeath() (PlayerCast.java:181-185),
 // which runs right after super.doCast() commits to the cast — at cast
