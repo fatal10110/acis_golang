@@ -526,7 +526,12 @@ func TestSummonFormulaInputsResolveStatsAndResources(t *testing.T) {
 		PAtk: 100, PDef: 50, MAtk: 64, MDef: 40,
 		MaxHP: 500, MaxMP: 200, BaseRandomDamage: 5,
 	}
-	caster := mustServitor(t, ServitorConfig{ObjectID: 1, Level: 44, Stats: stats, Roll: zeroSummonRoll})
+	caster := mustServitor(t, ServitorConfig{ObjectID: 1, Level: 44, Stats: stats, Roll: func(n int) int {
+		if n == 10000 {
+			return 9999
+		}
+		return 0
+	}})
 	target := mustPet(t, PetConfig{ObjectID: 2, Level: 44, Stats: stats, Roll: zeroSummonRoll})
 
 	owner := effect.ModOwnerEffect(&effect.Effect{})

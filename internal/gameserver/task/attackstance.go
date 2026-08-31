@@ -25,6 +25,10 @@ type AttackStanceActor interface {
 	ObjectID() int32
 }
 
+type attackStanceCombatant interface {
+	SetInCombat(bool) bool
+}
+
 // AttackStanceEffects delivers combat-stance timeout side effects.
 type AttackStanceEffects interface {
 	AutoAttackStop(actor AttackStanceActor)
@@ -126,6 +130,9 @@ func (a *AttackStance) Tick() error {
 	defer a.endTick()
 
 	a.tickDue(a.now(), func(actor AttackStanceActor) {
+		if combatant, ok := actor.(attackStanceCombatant); ok {
+			combatant.SetInCombat(false)
+		}
 		a.effects.AutoAttackStop(actor)
 		if s, ok := actor.(attackStanceSummoner); ok {
 			if summon := s.Summon(); summon != nil {

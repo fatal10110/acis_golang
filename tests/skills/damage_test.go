@@ -215,3 +215,75 @@ func TestResistedSkillReportsResistanceToCaster(t *testing.T) {
 	}
 	drainUntilQuiet(t, c)
 }
+
+// TestMagicDamageHalfFailureSendsAttackFailed forces the two independent
+// magic-success rolls to fail then succeed so a same-level MDAM cast
+// follows the half-damage branch: the caster receives ATTACK_FAILED and
+// the monster still loses HP.
+func TestMagicDamageHalfFailureSendsAttackFailed(t *testing.T) {
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Mage", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{
+			{
+				ID: 45, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
+				CastRange: 900, HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
+				SkillType: "MDAM", Power: 1_000_000,
+			},
+		})),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, 45, 1)
+	startInWorld(t, c)
+
+	worldObj, ok := srv.State.Player(objID)
+	if !ok {
+		t.Fatalf("world player %d missing", objID)
+	}
+	caster, ok := worldObj.(interface{ SetRollSource(func(int) int) })
+	if !ok {
+		t.Fatalf("world player %d = %T, want SetRollSource", objID, worldObj)
+	}
+	magicRolls := 0
+	caster.SetRollSource(func(n int) int {
+		if n == 10000 {
+			magicRolls++
+			if magicRolls == 1 {
+				return 0
+			}
+			return 500
+		}
+		if n <= 0 {
+			return 0
+		}
+		return n - 1
+	})
+
+	hostile := srv.SpawnHostileNPC(t)
+	drainUntilQuiet(t, c)
+	maxHP := targetHostile(t, c, hostile.ObjectID())
+	drainUntilQuiet(t, c)
+
+	c.Send(encodeRequestMagicSkillUse(45, false, false))
+	readCastStartFrames(t, c, objID, 45, 1, 500, 60_000, hostile.ObjectID())
+	waitFor(t, "MDAM half-fail drain", func() bool { return hostile.CurrentHP() < maxHP })
+
+	found := false
+	for i := 0; i < 50 && !found; i++ {
+		frame := c.ReadWithTimeout(time.Second)
+		if frame == nil {
+			break
+		}
+		if frame[0] != serverpackets.OpcodeSystemMessage {
+			continue
+		}
+		id := wireReader(frame[1:]).ReadInt32()
+		if id == int32(serverpackets.SystemMessageAttackFailed) {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("ATTACK_FAILED message never arrived")
+	}
+	drainUntilQuiet(t, c)
+}

@@ -194,11 +194,55 @@ func BlowDamage(in BlowInput) float64 {
 	return math.Max(1, damage)
 }
 
+// MagicFailure is the outcome of the magic-success roll that gates magic
+// damage. Half and full resist skip the magic-crit multiplier and apply
+// before PvP/elemental scaling; Keep skips crit but leaves the base amount.
+type MagicFailure int
+
+const (
+	MagicFailureNone MagicFailure = iota
+	MagicFailureKeep
+	MagicFailureHalf
+	MagicFailureFull
+)
+
+// magicFailures is the players.properties MagicFailures switch (default true).
+var magicFailures = true
+
+// SetMagicFailures records the process-wide MagicFailures switch. The
+// composition root sets this once at boot from players.properties.
+func SetMagicFailures(enabled bool) { magicFailures = enabled }
+
+// MagicFailuresEnabled reports whether magic-damage casts roll resist.
+func MagicFailuresEnabled() bool { return magicFailures }
+
+// MagicFailureLevelGap is the maximum target-minus-caster level difference
+// that can still produce a half-damage resist instead of a full resist.
+const MagicFailureLevelGap = 9
+
+// MagicFailureOutcome decides the magic-damage resist branch from the
+// already-resolved success rolls. enabled is the MagicFailures switch; a
+// successful first roll is a clean hit. A non-player caster that fails the
+// first roll keeps full (non-crit) damage. A player caster that fails then
+// succeeds the independent second roll with levelDiff <= MagicFailureLevelGap
+// deals half damage; otherwise damage is 1.
+func MagicFailureOutcome(enabled, firstSucceeds, casterIsPlayer, secondSucceeds bool, levelDiff int) MagicFailure {
+	if !enabled || firstSucceeds {
+		return MagicFailureNone
+	}
+	if !casterIsPlayer {
+		return MagicFailureKeep
+	}
+	if secondSucceeds && levelDiff <= MagicFailureLevelGap {
+		return MagicFailureHalf
+	}
+	return MagicFailureFull
+}
+
 // MagicDamageInput is a magic skill's already-resolved inputs. MDef must
 // already include the target's shield bonus, same as PhysicalAttackInput's
-// Defence. Resist-driven damage reduction (a target fully or partially
-// resisting the spell) is the cast pipeline's job once skill data exists —
-// this computes only the pre-resist damage.
+// Defence. Failure is the already-resolved magic-success outcome; callers
+// that skip the roll leave it at MagicFailureNone.
 type MagicDamageInput struct {
 	MAtk       float64
 	MDef       float64
@@ -206,13 +250,16 @@ type MagicDamageInput struct {
 
 	SoulShot        bool
 	BlessedSoulShot bool
-	MagicCrit       bool // callers must pass false for resisted casts
+	MagicCrit       bool
+	Failure         MagicFailure
 
 	PvPMul       float64
 	ElementalMul float64
 }
 
-// MagicDamage computes a magic skill's pre-resist damage.
+// MagicDamage computes a magic skill's damage. A resist outcome skips the
+// magic-crit multiplier and applies half / flat-1 before PvP and elemental
+// scaling, matching the live magic-damage contract.
 func MagicDamage(in MagicDamageInput) float64 {
 	mAtk := in.MAtk
 	if in.BlessedSoulShot {
@@ -222,8 +269,15 @@ func MagicDamage(in MagicDamageInput) float64 {
 	}
 
 	damage := 91 * math.Sqrt(mAtk) / in.MDef * in.SkillPower
-	if in.MagicCrit {
-		damage *= 4
+	switch in.Failure {
+	case MagicFailureHalf:
+		damage /= 2
+	case MagicFailureFull:
+		damage = 1
+	case MagicFailureNone:
+		if in.MagicCrit {
+			damage *= 4
+		}
 	}
 
 	damage *= in.PvPMul
