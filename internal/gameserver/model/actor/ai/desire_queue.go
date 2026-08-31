@@ -128,6 +128,28 @@ func (q *DesireQueue) removeLocked(drop func(*Desire) bool) {
 	q.desires = kept
 }
 
+// RemoveIf drops every queued Desire for which drop returns true.
+func (q *DesireQueue) RemoveIf(drop func(*Desire) bool) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	q.removeLocked(drop)
+}
+
+// Has reports whether a queued Desire is Equal to probe.
+func (q *DesireQueue) Has(probe *Desire) bool {
+	if probe == nil {
+		return false
+	}
+	q.mu.RLock()
+	defer q.mu.RUnlock()
+	for _, d := range q.desires {
+		if d.Equal(probe) {
+			return true
+		}
+	}
+	return false
+}
+
 // NonMovingAttack returns the queued ATTACK Desire aimed at target whose
 // MoveToTarget is false, if one is queued. Equivalent to the reference's
 // Npc.canAutoAttack finding the first ATTACK desire for target and then

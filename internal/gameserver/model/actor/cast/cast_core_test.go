@@ -387,6 +387,35 @@ func TestAIControllerCanCastReflectsControllerGates(t *testing.T) {
 	}
 }
 
+func TestAIControllerMeetsHPMPDisabledIgnoresReuse(t *testing.T) {
+	ref := modelskill.Ref{ID: 5, Level: 1}
+	def := modelskill.Definition{ID: 5, Level: 1, MPConsume: 10}
+	actor := &testActor{mp: 10, hp: 100, disabledKeys: map[int32]bool{ReuseKey(def): true}}
+	ctrl := NewController(actor)
+	ai := &AIController{Controller: ctrl, Definitions: fakeDefinitions{ref: def}}
+	target := &fakeCastCreature{id: 2}
+
+	if !ai.MeetsHPMPDisabled(target, ref) {
+		t.Fatal("MeetsHPMPDisabled() = false on reuse cooldown, want HP/MP/mute only")
+	}
+	if ai.CanCast(target, ref) {
+		t.Fatal("CanCast() = true on reuse cooldown")
+	}
+
+	actor.mp = 5
+	if ai.MeetsHPMPDisabled(target, ref) {
+		t.Fatal("MeetsHPMPDisabled() = true without enough MP")
+	}
+
+	actor.mp = 10
+	actor.magicMuted = true
+	def.Magic = true
+	ai.Definitions = fakeDefinitions{ref: def}
+	if ai.MeetsHPMPDisabled(target, ref) {
+		t.Fatal("MeetsHPMPDisabled() = true while magic muted")
+	}
+}
+
 // TestAIControllerCastStartsSchedulesAndAppliesEffectsOnHit exercises
 // AIController.Cast end to end: it must start and schedule the cast on
 // Controller, then — only once the scheduled Hit phase runs — resolve and
