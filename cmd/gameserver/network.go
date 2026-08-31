@@ -78,6 +78,7 @@ func provideGameClientLink(
 	effects *network.TaskEffects,
 	respawnHP respawnRestoreHP,
 	deathPenalty deathPenaltyChance,
+	buffSlots maxBuffsAmount,
 	shieldBlockRate perfectShieldBlockRate,
 	mf magicFailures,
 	spawnProtection playerSpawnProtection,
@@ -97,6 +98,7 @@ func provideGameClientLink(
 	playerConfig := network.PlayerConfig{
 		RespawnRestoreHP:         float64(respawnHP),
 		DeathPenaltyChance:       int(deathPenalty),
+		MaxBuffsAmount:           int(buffSlots),
 		PerfectShieldBlockRate:   int(shieldBlockRate),
 		SpawnProtection:          time.Duration(spawnProtection),
 		SkillEnchantSPBookNeeded: bool(spBookNeeded),

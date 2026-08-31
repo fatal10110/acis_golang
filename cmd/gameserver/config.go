@@ -66,6 +66,16 @@ func loadDeathPenaltyChance(paths gameServerPaths) (deathPenaltyChance, error) {
 	return deathPenaltyChance(config.NewFields(props, "death penalty chance").Int("DeathPenaltyChance", 20)), nil
 }
 
+type maxBuffsAmount int
+
+func loadMaxBuffsAmount(paths gameServerPaths) (maxBuffsAmount, error) {
+	props, err := config.LoadFile(paths.PlayersConfigPath)
+	if err != nil {
+		return 0, err
+	}
+	return maxBuffsAmount(config.NewFields(props, "max buffs amount").Int("MaxBuffsAmount", 20)), nil
+}
+
 // perfectShieldBlockRate is the roll threshold (out of 100) below which a
 // successful shield block upgrades to a perfect block, read from
 // players.properties (Config.java:338,873).
