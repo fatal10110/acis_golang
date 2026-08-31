@@ -57,7 +57,7 @@ func TestLiveHostileMoveHomeTeleportsThroughLocatedRef(t *testing.T) {
 
 	state := world.New()
 	positions := task.NewPositionUpdates(state)
-	hostile, walkerRef, err := newLiveHostile(inst, 100, blockedHomeGeo{}, positions, zerolog.Nop(), nil, actorcast.EffectHandlers{}, nil, nil)
+	hostile, walkerRef, err := newLiveHostile(inst, 100, blockedHomeGeo{}, positions, zerolog.Nop(), nil, actorcast.EffectHandlers{}, nil, 20, nil)
 	if err != nil {
 		t.Fatalf("newLiveHostile() error: %v", err)
 	}

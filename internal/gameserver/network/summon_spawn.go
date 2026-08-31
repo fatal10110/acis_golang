@@ -141,6 +141,7 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 		Name:            name,
 		Named:           named,
 		Level:           level,
+		MaxBuffsAmount:  link.playerConfig.MaxBuffsAmount,
 		Exp:             state.Exp,
 		SP:              state.SP,
 		ExpType:         levelStats.ExpType,
@@ -243,6 +244,7 @@ func (s *gameSummonSpawner) SpawnServitor(owner *player.Character, def modelskil
 		CollisionHeight: npcTmpl.CollisionHeight,
 		Name:            npcTmpl.Name,
 		Level:           npcTmpl.Level,
+		MaxBuffsAmount:  link.playerConfig.MaxBuffsAmount,
 		OwnerInventory:  live.Inventory(),
 		Lifetime: summon.LifetimeState{
 			TimeRemaining:    def.SummonTotalLifeTime,

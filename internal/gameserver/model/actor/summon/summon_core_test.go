@@ -298,6 +298,25 @@ func TestSummonStatActorImplementsConditionsActor(t *testing.T) {
 }
 
 // ---- from effects_test.go ----
+func TestSummonMaxBuffCountIncludesTemplateDivineInspiration(t *testing.T) {
+	servitor := mustServitor(t, ServitorConfig{
+		ObjectID: 1,
+		Skills:   map[int]int{int(modelskill.DivineInspirationSkillID): 3},
+	})
+
+	if got := servitor.MaxBuffCount(); got != 23 {
+		t.Fatalf("MaxBuffCount() = %d, want 23", got)
+	}
+}
+
+func TestSummonMaxBuffCountUsesConfiguredBase(t *testing.T) {
+	servitor := mustServitor(t, ServitorConfig{ObjectID: 1, MaxBuffsAmount: 2})
+
+	if got := servitor.MaxBuffCount(); got != 2 {
+		t.Fatalf("MaxBuffCount() = %d, want 2", got)
+	}
+}
+
 func TestSummonEffectListHoldsAppliedEffects(t *testing.T) {
 	servitor := mustServitor(t, ServitorConfig{ObjectID: 1, Level: 40, Stats: CombatStats{MaxHP: 500, MaxMP: 200}, Roll: zeroSummonRoll})
 

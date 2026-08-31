@@ -17,9 +17,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
-// baseBuffSlots is the non-toggle, non-seven-signs buff-slot count every
-// pet or servitor holds, matching the shipped MaxBuffsAmount default
-// since no passive modeled here raises it.
+// baseBuffSlots is the shipped players.properties MaxBuffsAmount default.
 const baseBuffSlots = 20
 
 // AI is the summon intention loop controlled by owner commands and effects.
@@ -67,15 +65,16 @@ type Actor struct {
 	// stays false (not an error) for a summon with no movement controller.
 	movement move.CreatureMove
 
-	id      int32
-	owner   Owner
-	world   *world.State
-	los     LineOfSight
-	isPet   bool
-	npcID   int
-	radius  float64
-	height  float64
-	passive bool
+	id             int32
+	owner          Owner
+	world          *world.State
+	los            LineOfSight
+	isPet          bool
+	npcID          int
+	radius         float64
+	height         float64
+	passive        bool
+	maxBuffsAmount int
 
 	// statusMu guards level, pet growth state, name, fed, belowUnsummonLimit,
 	// lifetime, combat stat bases, invul, and
@@ -265,20 +264,21 @@ type PetConfig struct {
 	Config  *petmodel.Config
 	Growth  *npc.PetData
 
-	Inventory     *itemcontainer.Inventory
-	Fed           int
-	MaxMeal       int
-	MealInNormal  int
-	MealInBattle  int
-	Food1         int32
-	Food2         int32
-	FoodRestore1  int
-	FoodRestore2  int
-	AutoFeedLimit float64
-	HungryLimit   float64
-	UnsummonLimit float64
-	Roll          func(int) int
-	Stats         CombatStats
+	Inventory      *itemcontainer.Inventory
+	Fed            int
+	MaxMeal        int
+	MealInNormal   int
+	MealInBattle   int
+	Food1          int32
+	Food2          int32
+	FoodRestore1   int
+	FoodRestore2   int
+	AutoFeedLimit  float64
+	HungryLimit    float64
+	UnsummonLimit  float64
+	Roll           func(int) int
+	Stats          CombatStats
+	MaxBuffsAmount int
 	// Skills maps skill id to level, from this pet's npc template. See
 	// Actor.skills.
 	Skills map[int]int
@@ -307,6 +307,7 @@ type ServitorConfig struct {
 	ItemConsumeCount int
 	Roll             func(int) int
 	Stats            CombatStats
+	MaxBuffsAmount   int
 	// Skills maps skill id to level, from this servitor's npc template.
 	// See Actor.skills.
 	Skills map[int]int
@@ -338,6 +339,7 @@ func NewServitor(cfg ServitorConfig) (*Actor, error) {
 		roll:             defaultRoll(cfg.Roll),
 		stats:            cfg.Stats,
 		skills:           cfg.Skills,
+		maxBuffsAmount:   defaultPositive(cfg.MaxBuffsAmount, baseBuffSlots),
 	}
 	if err := a.attachTemplatePassives(cfg.SkillDefs, cfg.Passives); err != nil {
 		return nil, err
@@ -356,39 +358,40 @@ func NewPet(cfg PetConfig) (*Actor, error) {
 		cfg.Inventory.WeightLimit = weight
 	}
 	a := &Actor{
-		id:            cfg.ObjectID,
-		owner:         cfg.Owner,
-		level:         cfg.Level,
-		isPet:         true,
-		npcID:         cfg.NPCID,
-		radius:        cfg.CollisionRadius,
-		height:        cfg.CollisionHeight,
-		name:          cfg.Name,
-		named:         cfg.Named,
-		passive:       cfg.Passive,
-		followActive:  true,
-		intent:        IntentFollowOwner,
-		petInventory:  cfg.Inventory,
-		petConfig:     petCfg,
-		growth:        cfg.Growth,
-		controlItemID: cfg.ControlItemID,
-		exp:           cfg.Exp,
-		sp:            cfg.SP,
-		expType:       cfg.ExpType,
-		fed:           cfg.Fed,
-		maxMeal:       cfg.MaxMeal,
-		mealInNormal:  cfg.MealInNormal,
-		mealInBattle:  cfg.MealInBattle,
-		food1:         cfg.Food1,
-		food2:         cfg.Food2,
-		foodRestore1:  cfg.FoodRestore1,
-		foodRestore2:  cfg.FoodRestore2,
-		autoFeedLimit: cfg.AutoFeedLimit,
-		hungryLimit:   cfg.HungryLimit,
-		unsummonLimit: cfg.UnsummonLimit,
-		roll:          defaultRoll(cfg.Roll),
-		stats:         cfg.Stats,
-		skills:        cfg.Skills,
+		id:             cfg.ObjectID,
+		owner:          cfg.Owner,
+		level:          cfg.Level,
+		isPet:          true,
+		npcID:          cfg.NPCID,
+		radius:         cfg.CollisionRadius,
+		height:         cfg.CollisionHeight,
+		name:           cfg.Name,
+		named:          cfg.Named,
+		passive:        cfg.Passive,
+		followActive:   true,
+		intent:         IntentFollowOwner,
+		petInventory:   cfg.Inventory,
+		petConfig:      petCfg,
+		growth:         cfg.Growth,
+		controlItemID:  cfg.ControlItemID,
+		exp:            cfg.Exp,
+		sp:             cfg.SP,
+		expType:        cfg.ExpType,
+		fed:            cfg.Fed,
+		maxMeal:        cfg.MaxMeal,
+		mealInNormal:   cfg.MealInNormal,
+		mealInBattle:   cfg.MealInBattle,
+		food1:          cfg.Food1,
+		food2:          cfg.Food2,
+		foodRestore1:   cfg.FoodRestore1,
+		foodRestore2:   cfg.FoodRestore2,
+		autoFeedLimit:  cfg.AutoFeedLimit,
+		hungryLimit:    cfg.HungryLimit,
+		unsummonLimit:  cfg.UnsummonLimit,
+		roll:           defaultRoll(cfg.Roll),
+		stats:          cfg.Stats,
+		skills:         cfg.Skills,
+		maxBuffsAmount: defaultPositive(cfg.MaxBuffsAmount, baseBuffSlots),
 	}
 	if err := a.attachTemplatePassives(cfg.SkillDefs, cfg.Passives); err != nil {
 		return nil, err
