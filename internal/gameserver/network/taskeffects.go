@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -106,6 +107,7 @@ type TaskEffects struct {
 	mu     sync.RWMutex
 	expire func(*livePlayer, *item.Instance)
 	roster *manager.Roster
+	skills *skillstate.Persistence
 }
 
 func NewTaskEffects(state *world.State) *TaskEffects {
@@ -120,13 +122,14 @@ func (e *TaskEffects) SetShadowItemExpiry(expire func(*livePlayer, *item.Instanc
 }
 
 // SetAutosave connects the periodic autosave task's Save effect to the
-// character persistence roster and error logger. Autosave is wired after
-// construction (like SetShadowItemExpiry above) since TaskEffects itself is
-// what task.Autosave needs to be built.
-func (e *TaskEffects) SetAutosave(roster *manager.Roster, log zerolog.Logger) {
+// character persistence roster, skill-state persistence, and error logger.
+// Autosave is wired after construction (like SetShadowItemExpiry above)
+// since TaskEffects itself is what task.Autosave needs to be built.
+func (e *TaskEffects) SetAutosave(roster *manager.Roster, skills *skillstate.Persistence, log zerolog.Logger) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.roster = roster
+	e.skills = skills
 	e.log = log
 }
 
@@ -170,9 +173,10 @@ func (e *TaskEffects) Drown(actor task.WaterActor) {
 	live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageDrownDamage, int32(damage)))
 }
 
-// Save persists actor's full character stats, matching GameClient's
-// periodic autosave. It skips a session mid-detach (detaching set but not
-// yet removed from world state, autosave.Remove not yet called):
+// Save persists actor's full character stats, position, and live skill
+// state on each periodic autosave. It skips a session
+// mid-detach (detaching set but not yet removed from world state,
+// autosave.Remove not yet called):
 // detachLivePlayer also calls Roster.Save on the same columns and Roster.Save
 // now marks the row online, so a concurrent write here could land after
 // detachLivePlayer's own SaveOfflineRecency and leave online stuck at 1 for
@@ -183,7 +187,7 @@ func (e *TaskEffects) Drown(actor task.WaterActor) {
 // detachLivePlayer's own offline write (#1948).
 func (e *TaskEffects) Save(actor task.AutosaveActor) {
 	e.mu.RLock()
-	roster, log := e.roster, e.log
+	roster, skills, log := e.roster, e.skills, e.log
 	e.mu.RUnlock()
 	if actor == nil || e.state == nil || roster == nil {
 		return
@@ -208,6 +212,11 @@ func (e *TaskEffects) Save(actor task.AutosaveActor) {
 	}
 	if err := roster.SavePosition(ctx, live.Character); err != nil {
 		log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("autosave player position")
+	}
+	if skills != nil {
+		if err := skills.Save(ctx, live.Character); err != nil {
+			log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("autosave player skill state")
+		}
 	}
 }
 
