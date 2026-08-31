@@ -127,7 +127,7 @@ func (r routeAwareMoveController) MoveHome(home location.Location) error {
 // controller (over the Hostile's lifetime movement state) and a real attack
 // controller, resolving their mutual construction-order dependency on the
 // finished Hostile via locatedRef/creatureActorRef/statOwnerRef.
-func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *task.PositionUpdates, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, zones *zone.Index) (*npc.Hostile, *walkerActorRef, error) {
+func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *task.PositionUpdates, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, maxBuffsAmount int, zones *zone.Index) (*npc.Hostile, *walkerActorRef, error) {
 	statRef := &statOwnerRef{}
 	live, err := creature.NewLive(inst.Home, speed, geo, statRef)
 	if err != nil {
@@ -160,6 +160,7 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 	if err != nil {
 		return nil, nil, err
 	}
+	hostile.SetMaxBuffsAmount(maxBuffsAmount)
 	hostile.SetLogger(log)
 	if los, ok := geo.(npc.LineOfSight); ok {
 		hostile.SetLineOfSight(los)

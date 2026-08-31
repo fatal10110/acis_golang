@@ -389,6 +389,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) *GameClientLink {
 // silently stops reaching the client.
 func (l *GameClientLink) newPet(cfg summon.PetConfig) (*summon.Actor, error) {
 	cfg.Config = &l.petConfig
+	cfg.MaxBuffsAmount = l.playerConfig.MaxBuffsAmount
 	pet, err := summon.NewPet(cfg)
 	if err != nil {
 		return nil, err

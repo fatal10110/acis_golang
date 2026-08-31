@@ -66,22 +66,23 @@ type KillRewardConfig struct {
 //
 // All exported methods are safe for concurrent use; mu guards slots/live.
 type Npcs struct {
-	templates *npc.Table
-	geo       move.Geo
-	state     *world.State
-	ids       idAllocator
-	decay     *task.Decay
-	respawn   *task.Respawn
-	ai        *task.AI
-	positions *task.PositionUpdates
-	items     *item.Table
-	ground    groundPlacer
-	rewards   KillRewardConfig
-	spawns    *Spawns
-	now       func() time.Time
-	log       zerolog.Logger
-	walker    *task.Walker
-	zones     *zone.Index
+	templates      *npc.Table
+	maxBuffsAmount int
+	geo            move.Geo
+	state          *world.State
+	ids            idAllocator
+	decay          *task.Decay
+	respawn        *task.Respawn
+	ai             *task.AI
+	positions      *task.PositionUpdates
+	items          *item.Table
+	ground         groundPlacer
+	rewards        KillRewardConfig
+	spawns         *Spawns
+	now            func() time.Time
+	log            zerolog.Logger
+	walker         *task.Walker
+	zones          *zone.Index
 
 	// castDefs and castEffects wire a live Hostile's cast.AIController at
 	// spawn (see newLiveHostile). castDefs is nil-checked so a caller with
@@ -111,6 +112,15 @@ type Npcs struct {
 // maker's qualifying entries into state, respecting persisted dead/alive
 // data for database-tracked entries.
 func NewNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.State, ids idAllocator, decay *task.Decay, respawnTask *task.Respawn, ai *task.AI, positions *task.PositionUpdates, items *item.Table, ground groundPlacer, rewards KillRewardConfig, now func() time.Time, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, zoneIndexes ...*zone.Index) (*Npcs, error) {
+	return newNpcs(spawns, templates, geo, state, ids, decay, respawnTask, ai, positions, items, ground, rewards, now, log, castDefs, castEffects, walker, 20, zoneIndexes...)
+}
+
+// NewNpcsWithMaxBuffsAmount builds live NPCs with the configured buff-slot base.
+func NewNpcsWithMaxBuffsAmount(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.State, ids idAllocator, decay *task.Decay, respawnTask *task.Respawn, ai *task.AI, positions *task.PositionUpdates, items *item.Table, ground groundPlacer, rewards KillRewardConfig, now func() time.Time, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, maxBuffsAmount int, zoneIndexes ...*zone.Index) (*Npcs, error) {
+	return newNpcs(spawns, templates, geo, state, ids, decay, respawnTask, ai, positions, items, ground, rewards, now, log, castDefs, castEffects, walker, maxBuffsAmount, zoneIndexes...)
+}
+
+func newNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.State, ids idAllocator, decay *task.Decay, respawnTask *task.Respawn, ai *task.AI, positions *task.PositionUpdates, items *item.Table, ground groundPlacer, rewards KillRewardConfig, now func() time.Time, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, maxBuffsAmount int, zoneIndexes ...*zone.Index) (*Npcs, error) {
 	if spawns == nil || spawns.Table() == nil {
 		return nil, fmt.Errorf("npcs: nil spawn table")
 	}
@@ -156,26 +166,27 @@ func NewNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.St
 	}
 
 	n := &Npcs{
-		templates:   templates,
-		geo:         geo,
-		state:       state,
-		ids:         ids,
-		decay:       decay,
-		respawn:     respawnTask,
-		ai:          ai,
-		positions:   positions,
-		items:       items,
-		ground:      ground,
-		rewards:     rewards,
-		spawns:      spawns,
-		now:         now,
-		log:         log,
-		walker:      walker,
-		zones:       zones,
-		castDefs:    castDefs,
-		castEffects: castEffects,
-		slot:        make(map[string]slotInfo),
-		live:        make(map[int32]string),
+		templates:      templates,
+		maxBuffsAmount: maxBuffsAmount,
+		geo:            geo,
+		state:          state,
+		ids:            ids,
+		decay:          decay,
+		respawn:        respawnTask,
+		ai:             ai,
+		positions:      positions,
+		items:          items,
+		ground:         ground,
+		rewards:        rewards,
+		spawns:         spawns,
+		now:            now,
+		log:            log,
+		walker:         walker,
+		zones:          zones,
+		castDefs:       castDefs,
+		castEffects:    castEffects,
+		slot:           make(map[string]slotInfo),
+		live:           make(map[int32]string),
 	}
 
 	for _, maker := range spawns.Table().Makers() {

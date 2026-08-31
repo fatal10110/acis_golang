@@ -1,6 +1,9 @@
 package formulas
 
-import "math"
+import (
+	"math"
+	"strings"
+)
 
 // clampDamage enforces the floor every damage formula in this file shares:
 // never negative, and never below 1 once an attack actually connects.
@@ -70,6 +73,20 @@ func PhysicalAttackDamage(in PhysicalAttackInput) float64 {
 	}
 
 	return clampDamage(damage)
+}
+
+// SkillPowerFor returns the caster-relative skill power physical, magic, and
+// mana damage formulas consume. DEATHLINK and FATAL grow as the caster's
+// HP ratio falls; every other skill type returns power unchanged.
+func SkillPowerFor(skillType string, power, hpRatio float64) float64 {
+	switch strings.ToUpper(strings.TrimSpace(skillType)) {
+	case "DEATHLINK":
+		return power * math.Pow(1.7165-hpRatio, 2) * 0.577
+	case "FATAL":
+		return power + (power * math.Pow(1.7165-hpRatio, 3.5) * 0.577)
+	default:
+		return power
+	}
 }
 
 // PhysicalSkillInput is a physical skill's already-resolved inputs.

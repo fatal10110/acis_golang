@@ -34,10 +34,7 @@ func (oneHandler) CanCast(caster, target Creature, skill *modelskill.Definition,
 	if target == nil {
 		return false
 	}
-	if skill != nil && skill.Offensive && (sameCreature(caster, target) || target.Dead()) {
-		return false
-	}
-	return true
+	return oneCastRejection(caster, target, skill) == CastRejectNone
 }
 
 type holyHandler struct{}

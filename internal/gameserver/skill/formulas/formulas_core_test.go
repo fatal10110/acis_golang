@@ -204,6 +204,35 @@ func TestPhysicalAttackDamageFloor(t *testing.T) {
 	}
 }
 
+func TestSkillPowerFor(t *testing.T) {
+	// Expected values are OpenJDK 21 Math.pow of L2Skill.getPower(Creature):
+	// DEATHLINK power*(1.7165-hpRatio)^2*0.577, FATAL power+power*(1.7165-hpRatio)^3.5*0.577.
+	const power = 100.0
+	tests := []struct {
+		skillType string
+		hpRatio   float64
+		want      float64
+	}{
+		{"PDAM", 0.1, 100},
+		{"MDAM", 0, 100},
+		{"MANADAM", 0, 100},
+		{"DEATHLINK", 1, 29.621578824999993},
+		{"DEATHLINK", 0.5, 85.388628825},
+		{"DEATHLINK", 0.1, 150.77426882499998},
+		{"DEATHLINK", 0, 170.00567882499996},
+		{"FATAL", 1, 117.96521813145395},
+		{"FATAL", 0.5, 214.56928679864922},
+		{"FATAL", 0.1, 409.8780357984027},
+		{"FATAL", 0, 482.3218687651466},
+		{"deathlink", 1, 29.621578824999993},
+	}
+	for _, tt := range tests {
+		if got := SkillPowerFor(tt.skillType, power, tt.hpRatio); !almostEqual(got, tt.want) {
+			t.Errorf("SkillPowerFor(%q, %v, %v) = %.17g, want %.17g", tt.skillType, power, tt.hpRatio, got, tt.want)
+		}
+	}
+}
+
 func TestPhysicalSkillDamage(t *testing.T) {
 	noCrit := PhysicalSkillInput{
 		AttackPower: 100, SkillPower: 50, Defence: 60,
