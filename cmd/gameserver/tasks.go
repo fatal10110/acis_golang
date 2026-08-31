@@ -396,37 +396,8 @@ func startNPCRegen(lc fx.Lifecycle, regen *task.NPCRegen, log zerolog.Logger) {
 	startTicker(lc, log, regen.Start)
 }
 
-// worldAttackStanceEffects stops an actor's attack animation once its
-// combat-stance inactivity period elapses. Actors that don't expose a
-// physical-attack controller are left alone.
-type worldAttackStanceEffects struct{ state *world.State }
-
-type attackStoppableActor interface {
-	Stop()
-}
-
-type autoAttackStopBroadcaster interface {
-	BroadcastAutoAttackStop()
-}
-
-func (w worldAttackStanceEffects) AutoAttackStop(actor task.AttackStanceActor) {
-	obj, ok := w.state.Object(actor.ObjectID())
-	if !ok {
-		obj, ok = w.state.Player(actor.ObjectID())
-		if !ok {
-			return
-		}
-	}
-	if b, ok := obj.(autoAttackStopBroadcaster); ok {
-		b.BroadcastAutoAttackStop()
-	}
-	if s, ok := obj.(attackStoppableActor); ok {
-		s.Stop()
-	}
-}
-
 func provideAttackStance(state *world.State) (*task.AttackStance, error) {
-	return task.NewAttackStance(worldAttackStanceEffects{state: state}, time.Now)
+	return task.NewAttackStance(network.NewAttackStanceEffects(state), time.Now)
 }
 
 func startAttackStance(lc fx.Lifecycle, a *task.AttackStance, log zerolog.Logger) {
