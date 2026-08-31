@@ -57,6 +57,25 @@ func damageBlocked(attacker, target any) bool {
 	return !CanDealDamage(attacker)
 }
 
+type currentHPActor interface {
+	HP() float64
+	MaxHPValue() float64
+}
+
+// casterSkillPower is the physical/magic/mana skill-power term: DEATHLINK
+// and FATAL scale with the caster's current/max HP ratio; every other type
+// returns the definition's raw power. Blow keeps raw power at its own
+// resolver. A caster without an HP surface is treated as a missing actor
+// and returns the unscaled value.
+func casterSkillPower(attacker FormulaActor, def modelskill.Definition) float64 {
+	power := float64(def.Power)
+	src, ok := attacker.(currentHPActor)
+	if !ok {
+		return power
+	}
+	return formulas.SkillPowerFor(def.SkillType, power, src.HP()/src.MaxHPValue())
+}
+
 // CanDealDamage reports whether attacker is permitted to inflict damage.
 // Actors without an access-level permission surface are ordinary combatants.
 func CanDealDamage(attacker any) bool {
@@ -81,7 +100,7 @@ func ResolvePhysicalSkillInput(caster DeathActor, target FormulaActor, def model
 	if attacker.AttackType() != item.WeaponFist && attacker.AttackType() != item.WeaponBow && float64(target.Roll(100)) < target.CalcStat(stat.PSkillEvasion, 0) {
 		return formulas.PhysicalSkillInput{Evaded: true}, true
 	}
-	skillPower := float64(def.Power)
+	skillPower := casterSkillPower(attacker, def)
 	if soulshot && def.SoulShotBoost > 0 {
 		skillPower *= float64(def.SoulShotBoost)
 	}
@@ -127,7 +146,7 @@ func ResolveMagicDamageInput(caster DeathActor, target FormulaActor, def modelsk
 	in := formulas.MagicDamageInput{
 		MAtk:            attacker.MAtk(),
 		MDef:            Positive(target.MDef()),
-		SkillPower:      float64(def.Power),
+		SkillPower:      casterSkillPower(attacker, def),
 		PvPMul:          MagicPvPMul(attacker, def, pvp),
 		ElementalMul:    ElementalSkillModifier(target, def),
 		MagicCrit:       formulas.MCritSucceeds(int(attacker.MagicCriticalRate()), attacker.Roll(1000)),
@@ -256,7 +275,7 @@ func ResolveManaDamageInput(caster DeathActor, target FormulaActor, maxMP float6
 	return formulas.ManaDamageInput{
 		MAtk:            attacker.MAtk(),
 		MDef:            Positive(target.MDef()),
-		SkillPower:      float64(def.Power),
+		SkillPower:      casterSkillPower(attacker, def),
 		TargetMaxMp:     maxMP,
 		SoulShot:        sps,
 		BlessedSoulShot: bsps,
