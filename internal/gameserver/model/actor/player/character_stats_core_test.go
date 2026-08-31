@@ -2902,6 +2902,185 @@ func TestCharacterPhysicalSkillInputCarriesShieldDefense(t *testing.T) {
 	}
 }
 
+func TestCharacterMagicDamageInputCarriesShieldDefense(t *testing.T) {
+	tmpl := combatTemplate()
+	items := shieldDefenseItems()
+	caster := liveCharacter(1, tmpl, items)
+	target := liveCharacter(2, tmpl, items, equippedShield())
+	caster.SetLastKnownPosition(location.Location{X: 80, Y: 0, Z: 0}, 0)
+	target.SetLastKnownPosition(location.Location{}, 0)
+	target.AddStatFuncs([]effect.Mod{
+		{Stat: stat.ShieldRate, Op: effect.OpSet, Value: 100, Owner: testModOwner()},
+		{Stat: stat.ShieldDefenceAngle, Op: effect.OpSet, Value: 360, Owner: testModOwner()},
+		{Stat: stat.ShieldDefence, Op: effect.OpSet, Value: 30, Owner: testModOwner()},
+	})
+	caster.SetRollSource(func(n int) int {
+		switch n {
+		case 1000, 10000:
+			return 9999
+		default:
+			return 0
+		}
+	})
+
+	for _, tt := range []struct {
+		name string
+		roll int
+		want formulas.ShieldDefense
+		mdef float64
+	}{
+		{"success", 10, formulas.ShieldSuccess, target.MDef() + target.CalcStat(stat.ShieldDefence, 0)},
+		{"perfect", 0, formulas.ShieldPerfect, target.MDef()},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			target.SetRollSource(func(n int) int {
+				if n != 100 {
+					t.Fatalf("shield roll bound = %d, want 100", n)
+				}
+				return tt.roll
+			})
+			in, ok := target.MagicDamageInput(caster, modelskill.Definition{Power: 40, SkillType: "MDAM"})
+			if !ok {
+				t.Fatal("MagicDamageInput() ok = false")
+			}
+			if in.Shield != tt.want {
+				t.Fatalf("MagicDamageInput shield = %v, want %v", in.Shield, tt.want)
+			}
+			if !closeFloat(in.MDef, tt.mdef) {
+				t.Fatalf("MagicDamageInput MDef = %v, want %v", in.MDef, tt.mdef)
+			}
+		})
+	}
+}
+
+func TestCharacterMagicDamageInputPerfectShieldSkipsMagicFailure(t *testing.T) {
+	tmpl := combatTemplate()
+	items := shieldDefenseItems()
+	caster := liveCharacter(1, tmpl, items)
+	target := liveCharacter(2, tmpl, items, equippedShield())
+	caster.SetLastKnownPosition(location.Location{X: 80, Y: 0, Z: 0}, 0)
+	target.SetLastKnownPosition(location.Location{}, 0)
+	target.AddStatFuncs([]effect.Mod{
+		{Stat: stat.ShieldRate, Op: effect.OpSet, Value: 100, Owner: testModOwner()},
+		{Stat: stat.ShieldDefenceAngle, Op: effect.OpSet, Value: 360, Owner: testModOwner()},
+	})
+	target.SetRollSource(func(n int) int {
+		if n != 100 {
+			t.Fatalf("shield roll bound = %d, want 100", n)
+		}
+		return 0
+	})
+	magicRolls := 0
+	caster.SetRollSource(func(n int) int {
+		if n == 10000 {
+			magicRolls++
+			return 0
+		}
+		return 9999
+	})
+
+	in, ok := target.MagicDamageInput(caster, modelskill.Definition{Power: 40, SkillType: "MDAM"})
+	if !ok {
+		t.Fatal("MagicDamageInput() ok = false")
+	}
+	if in.Shield != formulas.ShieldPerfect {
+		t.Fatalf("shield = %v, want ShieldPerfect", in.Shield)
+	}
+	if in.Failure != formulas.MagicFailureNone {
+		t.Fatalf("Failure = %v, want MagicFailureNone on perfect shield", in.Failure)
+	}
+	if magicRolls != 0 {
+		t.Fatalf("magic-success rolls = %d, want 0 on perfect shield", magicRolls)
+	}
+}
+
+func TestCharacterMagicDamageInputShieldIgnoresMagicCrit(t *testing.T) {
+	tmpl := combatTemplate()
+	items := shieldDefenseItems()
+	caster := liveCharacter(1, tmpl, items)
+	target := liveCharacter(2, tmpl, items, equippedShield())
+	caster.SetLastKnownPosition(location.Location{X: 80, Y: 0, Z: 0}, 0)
+	target.SetLastKnownPosition(location.Location{}, 0)
+	target.AddStatFuncs([]effect.Mod{
+		{Stat: stat.ShieldRate, Op: effect.OpSet, Value: 20, Owner: testModOwner()},
+		{Stat: stat.ShieldDefenceAngle, Op: effect.OpSet, Value: 360, Owner: testModOwner()},
+	})
+	target.SetRollSource(func(n int) int {
+		if n != 100 {
+			t.Fatalf("shield roll bound = %d, want 100", n)
+		}
+		return 30
+	})
+	caster.SetRollSource(func(n int) int {
+		if n == 1000 {
+			return 0
+		}
+		return 9999
+	})
+
+	in, ok := target.MagicDamageInput(caster, modelskill.Definition{Power: 40, SkillType: "MDAM"})
+	if !ok {
+		t.Fatal("MagicDamageInput() ok = false")
+	}
+	if !in.MagicCrit {
+		t.Fatal("MagicCrit = false, want true so a leaked isCrit would triple the shield rate")
+	}
+	if in.Shield != formulas.ShieldFailed {
+		t.Fatalf("shield = %v, want ShieldFailed: magic crit must not triple the shield rate", in.Shield)
+	}
+}
+
+func TestCharacterMagicDamageInputFailureOutcomes(t *testing.T) {
+	tmpl := combatTemplate()
+	items := combatItems()
+	prev := formulas.MagicFailuresEnabled()
+	formulas.SetMagicFailures(true)
+	t.Cleanup(func() { formulas.SetMagicFailures(prev) })
+
+	for _, tt := range []struct {
+		name      string
+		tgtLevel  int
+		first     int
+		second    int
+		want      formulas.MagicFailure
+		wantRolls int
+	}{
+		{name: "half", tgtLevel: 1, first: 0, second: 9999, want: formulas.MagicFailureHalf, wantRolls: 2},
+		{name: "full second miss", tgtLevel: 1, first: 0, second: 0, want: formulas.MagicFailureFull, wantRolls: 2},
+		{name: "full past gap", tgtLevel: 11, first: 0, second: 9999, want: formulas.MagicFailureFull, wantRolls: 2},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			caster := liveCharacter(1, tmpl, items)
+			target := liveCharacter(2, tmpl, items)
+			target.CharLevel = tt.tgtLevel
+			rolls := 0
+			caster.SetRollSource(func(n int) int {
+				if n == 10000 {
+					rolls++
+					if rolls == 1 {
+						return tt.first
+					}
+					return tt.second
+				}
+				return 9999
+			})
+			in, ok := target.MagicDamageInput(caster, modelskill.Definition{Power: 40, SkillType: "MDAM"})
+			if !ok {
+				t.Fatal("MagicDamageInput() ok = false")
+			}
+			if in.Failure != tt.want {
+				t.Fatalf("Failure = %v, want %v", in.Failure, tt.want)
+			}
+			if rolls != tt.wantRolls {
+				t.Fatalf("magic-success rolls = %d, want %d", rolls, tt.wantRolls)
+			}
+			if in.MagicCrit {
+				t.Fatal("MagicCrit = true, want false after a resist outcome")
+			}
+		})
+	}
+}
+
 func TestCharacterBlowInputSkipsShieldRollOnMiss(t *testing.T) {
 	tmpl := combatTemplate()
 	items := shieldDefenseItems()

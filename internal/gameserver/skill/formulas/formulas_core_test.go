@@ -470,6 +470,32 @@ func TestMagicDamageFailureSkipsCritAndAppliesBeforePvP(t *testing.T) {
 	}
 }
 
+func TestMagicDamagePerfectShieldReturnsOne(t *testing.T) {
+	in := MagicDamageInput{
+		MAtk: 400, MDef: 50, SkillPower: 20,
+		BlessedSoulShot: true, MagicCrit: true,
+		Failure: MagicFailureHalf,
+		PvPMul:  1.1, ElementalMul: 2,
+		Shield: ShieldPerfect,
+	}
+	if got := MagicDamage(in); got != 1 {
+		t.Fatalf("perfect shield MagicDamage() = %v, want 1", got)
+	}
+}
+
+func TestMagicDamageShieldSuccessUsesRaisedMDef(t *testing.T) {
+	plain := MagicDamageInput{
+		MAtk: 400, MDef: 50, SkillPower: 20,
+		PvPMul: 1, ElementalMul: 1,
+	}
+	blocked := plain
+	blocked.MDef = 80
+	blocked.Shield = ShieldSuccess
+	if got := MagicDamage(blocked); !almostEqual(got, 455.0) {
+		t.Fatalf("shield-success MagicDamage() = %v, want 455", got)
+	}
+}
+
 func TestManaDamage(t *testing.T) {
 	in := ManaDamageInput{
 		MAtk: 400, MDef: 50, SkillPower: 20, TargetMaxMp: 970,
