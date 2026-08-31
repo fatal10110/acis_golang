@@ -127,3 +127,44 @@ func (c *Character) NotifyEffectAborted(skillID modelskill.ID, level int) {
 		send(skillID, level)
 	}
 }
+
+// SetMagicFailureNotifiers records the packet-layer hooks for a magic-damage
+// resist: ATTACK_FAILED or S1_RESISTED_YOUR_S2 on the caster, and
+// RESISTED_S1_MAGIC on a player target.
+func (c *Character) SetMagicFailureNotifiers(attackFailed func(), resistedSkill func(string, modelskill.ID, int), resistedMagic func(string)) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	c.sendAttackFailedNotice = attackFailed
+	c.sendResistedSkillNotice = resistedSkill
+	c.sendResistedMagicNotice = resistedMagic
+}
+
+// NotifyAttackFailed sends ATTACK_FAILED for a half-damage magic resist.
+func (c *Character) NotifyAttackFailed() {
+	c.stateMu.RLock()
+	send := c.sendAttackFailedNotice
+	c.stateMu.RUnlock()
+	if send != nil {
+		send()
+	}
+}
+
+// NotifyResistedSkill sends S1_RESISTED_YOUR_S2 naming the target and skill.
+func (c *Character) NotifyResistedSkill(targetName string, skillID modelskill.ID, level int) {
+	c.stateMu.RLock()
+	send := c.sendResistedSkillNotice
+	c.stateMu.RUnlock()
+	if send != nil {
+		send(targetName, skillID, level)
+	}
+}
+
+// NotifyResistedMagic sends RESISTED_S1_MAGIC naming the attacker.
+func (c *Character) NotifyResistedMagic(attackerName string) {
+	c.stateMu.RLock()
+	send := c.sendResistedMagicNotice
+	c.stateMu.RUnlock()
+	if send != nil {
+		send(attackerName)
+	}
+}
