@@ -109,6 +109,8 @@ type Character struct {
 	runtimeTemplate           *Template
 	levelTable                *LevelTable
 	allowDelevel              bool
+	raidCursesDisabled        bool
+	skillDefs                 skillDefinitions
 	rateKarmaExpLost          float64
 	inventory                 *itemcontainer.Inventory
 	world                     *world.State
@@ -121,6 +123,7 @@ type Character struct {
 	sendFrame                 func(wire.Frame) bool
 	broadcastFrame            func(wire.Frame) bool
 	broadcastAttack           func(attack.Snapshot)
+	broadcastMagicSkillUse    func(creature.MagicSkillUse)
 	broadcastMove             func(move.Event)
 	broadcastStop             func()
 	broadcastAutoAttackStop   func()

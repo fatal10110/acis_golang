@@ -220,6 +220,18 @@ func loadSpawnMultiplier(paths gameServerPaths) (spawnMultiplier, error) {
 	return spawnMultiplier(config.NewFields(props, "spawn multiplier").Float64("SpawnMultiplier", 1)), nil
 }
 
+// raidCursesDisabled is Config.RAID_DISABLE_CURSE (Config.java:746), read from
+// npcs.properties DisableRaidCurse.
+type raidCursesDisabled bool
+
+func loadDisableRaidCurse(paths gameServerPaths) (raidCursesDisabled, error) {
+	props, err := config.LoadFile(paths.NpcsConfigPath)
+	if err != nil {
+		return false, err
+	}
+	return raidCursesDisabled(config.NewFields(props, "disable raid curse").Bool("DisableRaidCurse", false)), nil
+}
+
 func loadPvPFlagOptions(paths gameServerPaths) (task.PvPFlagOptions, error) {
 	props, err := config.LoadFile(paths.PlayersConfigPath)
 	if err != nil {
