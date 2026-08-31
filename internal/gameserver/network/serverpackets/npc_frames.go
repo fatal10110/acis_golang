@@ -45,6 +45,11 @@ func (NpcFrameBuilder) SocialAction(objectID int32, actionID int32) wire.Frame {
 	return FrameSocialAction(objectID, actionID)
 }
 
+// ChangeMoveType builds a walk/run stance broadcast packet.
+func (NpcFrameBuilder) ChangeMoveType(objectID int32, running bool) wire.Frame {
+	return FrameChangeMoveType(objectID, running, false)
+}
+
 // NpcSay builds a chat-line broadcast packet.
 func (NpcFrameBuilder) NpcSay(objectID int32, npcID int, text string) wire.Frame {
 	return FrameNpcSay(objectID, npcID, SayTypeAll, text)

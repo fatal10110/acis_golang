@@ -6,6 +6,29 @@ import "math"
 // signed integer ceiling the persisted column was sized for.
 const maxSP = math.MaxInt32
 
+// Progression snapshots the persisted level, experience and SP values.
+type Progression struct {
+	CharLevel      int
+	Exp            int64
+	SP             int
+	ExpBeforeDeath int64
+}
+
+// ProgressionValues returns a synchronized snapshot of c's persisted
+// progression fields. CharacterStore.Save reads through this so a
+// disconnect/autosave goroutine never races reward application on the live
+// character (#1890).
+func (c *Character) ProgressionValues() Progression {
+	c.progressionMu.RLock()
+	defer c.progressionMu.RUnlock()
+	return Progression{
+		CharLevel:      c.CharLevel,
+		Exp:            c.Exp,
+		SP:             c.SP,
+		ExpBeforeDeath: c.ExpBeforeDeath,
+	}
+}
+
 // AddExpAndSp adds exp and sp to c independently — either amount is
 // ignored if negative — resyncing c.CharLevel from the resulting experience
 // via table and, on a level increase, refilling HP, MP and CP to the full
@@ -13,6 +36,12 @@ const maxSP = math.MaxInt32
 // nil, in which case a level increase still updates c.CharLevel and c.Exp but
 // leaves HP/MP/CP untouched. It reports whether the level increased.
 func (c *Character) AddExpAndSp(table *LevelTable, tmpl *Template, exp int64, sp int) bool {
+	c.progressionMu.Lock()
+	defer c.progressionMu.Unlock()
+	return c.addExpAndSp(table, tmpl, exp, sp)
+}
+
+func (c *Character) addExpAndSp(table *LevelTable, tmpl *Template, exp int64, sp int) bool {
 	beforeExp, beforeSP := c.Exp, c.SP
 	leveledUp := false
 	// The reward message follows the attempt, not the result: an experience
@@ -20,12 +49,12 @@ func (c *Character) AddExpAndSp(table *LevelTable, tmpl *Template, exp int64, sp
 	// ceiling. Only an attempt where neither amount applied stays silent.
 	attempted := false
 	if exp >= 0 {
-		leveledUp = c.AddExp(table, tmpl, exp)
+		leveledUp = c.addExp(table, tmpl, exp)
 		attempted = true
 	}
 	if sp >= 0 {
 		attempted = attempted || c.SP < maxSP
-		c.AddSp(sp)
+		c.addSp(sp)
 	}
 	// Only an add that actually landed pushes UserInfo. Deliberate divergence
 	// under review in issue #1060: the reference sends it for any non-negative
@@ -46,10 +75,12 @@ func (c *Character) AddExpAndSp(table *LevelTable, tmpl *Template, exp int64, sp
 // RewardExpAndSp applies a kill reward using this live character's runtime
 // template for level-up stat refills.
 func (c *Character) RewardExpAndSp(table *LevelTable, exp int64, sp int) bool {
+	c.progressionMu.Lock()
+	defer c.progressionMu.Unlock()
 	if table == nil {
 		beforeSP := c.SP
 		if sp >= 0 {
-			c.AddSp(sp)
+			c.addSp(sp)
 			// Same deliberate divergence as AddExpAndSp: no packet when the
 			// add changed nothing.
 			if c.SP != beforeSP {
@@ -59,7 +90,7 @@ func (c *Character) RewardExpAndSp(table *LevelTable, exp int64, sp int) bool {
 		}
 		return false
 	}
-	return c.AddExpAndSp(table, c.runtimeTemplate, exp, sp)
+	return c.addExpAndSp(table, c.runtimeTemplate, exp, sp)
 }
 
 // AddExp adds delta experience to c. An addition that would overflow
@@ -69,6 +100,12 @@ func (c *Character) RewardExpAndSp(table *LevelTable, exp int64, sp int) bool {
 // HP/MP/CP refill as AddLevel on an increase. It reports whether the level
 // increased.
 func (c *Character) AddExp(table *LevelTable, tmpl *Template, delta int64) bool {
+	c.progressionMu.Lock()
+	defer c.progressionMu.Unlock()
+	return c.addExp(table, tmpl, delta)
+}
+
+func (c *Character) addExp(table *LevelTable, tmpl *Template, delta int64) bool {
 	if c.Exp+delta < 0 {
 		return false
 	}
@@ -83,12 +120,18 @@ func (c *Character) AddExp(table *LevelTable, tmpl *Template, delta int64) bool 
 	if level == c.CharLevel {
 		return false
 	}
-	return c.AddLevel(table, tmpl, level-c.CharLevel)
+	return c.addLevel(table, tmpl, level-c.CharLevel)
 }
 
 // AddSp adds delta sp to c.SP, saturating at the 32-bit signed integer
 // maximum the persisted column was sized for. A negative delta is a no-op.
 func (c *Character) AddSp(delta int) {
+	c.progressionMu.Lock()
+	defer c.progressionMu.Unlock()
+	c.addSp(delta)
+}
+
+func (c *Character) addSp(delta int) {
 	if delta < 0 || c.SP >= maxSP {
 		return
 	}
@@ -102,12 +145,18 @@ func (c *Character) AddSp(delta int) {
 // is ignored unless positive — resyncing c.CharLevel the same way AddExpAndSp
 // does. A level drop never refills HP/MP/CP, matching AddLevel.
 func (c *Character) RemoveExpAndSp(table *LevelTable, tmpl *Template, exp int64, sp int) {
+	c.progressionMu.Lock()
+	defer c.progressionMu.Unlock()
+	c.removeExpAndSp(table, tmpl, exp, sp)
+}
+
+func (c *Character) removeExpAndSp(table *LevelTable, tmpl *Template, exp int64, sp int) {
 	beforeLevel := c.CharLevel
 	if exp > 0 {
-		c.RemoveExp(table, tmpl, exp)
+		c.removeExp(table, tmpl, exp)
 	}
 	if sp > 0 {
-		c.RemoveSp(sp)
+		c.removeSp(sp)
 	}
 	if exp <= 0 && sp <= 0 {
 		return
@@ -124,18 +173,30 @@ func (c *Character) RemoveExpAndSp(table *LevelTable, tmpl *Template, exp int64,
 // (never 0) rather than going negative, and resyncs c.CharLevel from the
 // result via table.
 func (c *Character) RemoveExp(table *LevelTable, tmpl *Template, delta int64) {
+	c.progressionMu.Lock()
+	defer c.progressionMu.Unlock()
+	c.removeExp(table, tmpl, delta)
+}
+
+func (c *Character) removeExp(table *LevelTable, tmpl *Template, delta int64) {
 	if c.Exp-delta < 0 {
 		delta = c.Exp - 1
 	}
 	c.Exp -= delta
 
 	if level := table.levelForExp(c.Exp); level != c.CharLevel {
-		c.AddLevel(table, tmpl, level-c.CharLevel)
+		c.addLevel(table, tmpl, level-c.CharLevel)
 	}
 }
 
 // RemoveSp subtracts delta sp from c.SP, flooring at 0.
 func (c *Character) RemoveSp(delta int) {
+	c.progressionMu.Lock()
+	defer c.progressionMu.Unlock()
+	c.removeSp(delta)
+}
+
+func (c *Character) removeSp(delta int) {
 	c.SP = max(0, c.SP-delta)
 }
 
@@ -152,6 +213,12 @@ func (c *Character) RemoveSp(delta int) {
 // from the new level, never remembered, so a drop has to revoke exactly what
 // a gain would have granted.
 func (c *Character) AddLevel(table *LevelTable, tmpl *Template, delta int) bool {
+	c.progressionMu.Lock()
+	defer c.progressionMu.Unlock()
+	return c.addLevel(table, tmpl, delta)
+}
+
+func (c *Character) addLevel(table *LevelTable, tmpl *Template, delta int) bool {
 	if c.CharLevel+delta > table.RealMaxLevel() {
 		return false
 	}
