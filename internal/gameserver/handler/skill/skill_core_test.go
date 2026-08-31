@@ -639,10 +639,10 @@ func (d *disablerFake) SkillReflectInput(def modelskill.Definition) formulas.Ski
 	return formulas.SkillReflectInput{CanBeReflected: true, Magic: true, ReflectChance: 100}
 }
 
-func (d *disablerFake) Attackable() bool { return d.attackableFlag }
-func (d *disablerFake) RaidRelated() bool                  { return d.raidRelated }
-func (d *disablerFake) Undead() bool                       { return d.undeadFlag }
-func (d *disablerFake) ReduceAllAggroHate(amount float64)  { d.aggro.ReduceAllHate(amount) }
+func (d *disablerFake) Attackable() bool                  { return d.attackableFlag }
+func (d *disablerFake) RaidRelated() bool                 { return d.raidRelated }
+func (d *disablerFake) Undead() bool                      { return d.undeadFlag }
+func (d *disablerFake) ReduceAllAggroHate(amount float64) { d.aggro.ReduceAllHate(amount) }
 func (d *disablerFake) StopAggroHate(attacker attackable.Combatant) {
 	d.aggro.StopHate(attacker)
 }
@@ -651,7 +651,7 @@ func (d *disablerFake) ClearAggroTables() {
 	d.aggro.Clear()
 	d.hate.Clear()
 }
-func (d *disablerFake) Level() int                         { return d.level }
+func (d *disablerFake) Level() int { return d.level }
 
 func (d *disablerFake) NotifyAggression(source creature.DeathActor, power int) {
 	d.aggressionSource = source
@@ -1437,17 +1437,19 @@ type skillTarget struct {
 	healEffectiveness float64
 	healOK            bool
 
-	physicalInput formulas.PhysicalSkillInput
-	physicalOK    bool
-	magicInput    formulas.MagicDamageInput
-	magicOK       bool
-	blowInput     formulas.BlowInput
-	blowOK        bool
-	manaInput     formulas.ManaDamageInput
-	manaOK        bool
-	lethalInput   formulas.LethalInput
-	lethalOK      bool
-	lethalPlayer  bool
+	physicalInput  formulas.PhysicalSkillInput
+	physicalOK     bool
+	magicInput     formulas.MagicDamageInput
+	magicOK        bool
+	skillSuccessOK bool
+	lastShield     formulas.ShieldDefense
+	blowInput      formulas.BlowInput
+	blowOK         bool
+	manaInput      formulas.ManaDamageInput
+	manaOK         bool
+	lethalInput    formulas.LethalInput
+	lethalOK       bool
+	lethalPlayer   bool
 
 	raidRelated  bool
 	lethalImmune bool
@@ -1571,6 +1573,11 @@ func (t *skillTarget) PhysicalSkillInput(caster creature.DeathActor, skill model
 
 func (t *skillTarget) MagicDamageInput(caster creature.DeathActor, skill modelskill.Definition) (formulas.MagicDamageInput, bool) {
 	return t.magicInput, t.magicOK
+}
+
+func (t *skillTarget) SkillSuccessInput(_ creature.DeathActor, _ modelskill.Definition, _ bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
+	t.lastShield = shield
+	return formulas.SkillSuccessInput{IgnoreResists: true, BaseChance: 100, Shield: shield}, t.skillSuccessOK
 }
 
 func (t *skillTarget) BlowInput(caster creature.DeathActor, skill modelskill.Definition) (formulas.BlowInput, bool) {
@@ -1893,6 +1900,70 @@ func TestMdamFullFailureFlattensDamage(t *testing.T) {
 	}
 	if !almost(target.hp, 1999) {
 		t.Fatalf("MDAM full-fail hp = %v, want 1999", target.hp)
+	}
+}
+
+func TestMdamPerfectShieldDealsOneAndSkipsFailureFeedback(t *testing.T) {
+	registry := NewDefaultRegistry()
+	target := &skillTarget{
+		hp:      2000,
+		magicOK: true,
+		magicInput: formulas.MagicDamageInput{
+			MAtk: 400, MDef: 50, SkillPower: 20,
+			PvPMul: 1.1, ElementalMul: 2, MagicCrit: true,
+			Failure: formulas.MagicFailureHalf,
+			Shield:  formulas.ShieldPerfect,
+		},
+	}
+	result, ok := registry.UseResult(Cast{
+		Skill:   modelskill.Definition{SkillType: "MDAM"},
+		Targets: []Actor{target},
+	})
+	if !ok {
+		t.Fatal("UseResult() handled = false, want true for MDAM")
+	}
+	if result.AttackFailed != 0 {
+		t.Fatalf("AttackFailed = %d, want 0 on perfect shield", result.AttackFailed)
+	}
+	if !almost(target.hp, 1999) {
+		t.Fatalf("MDAM perfect-shield hp = %v, want 1999", target.hp)
+	}
+}
+
+func TestMdamReusesResolvedShieldForEffectLanding(t *testing.T) {
+	registry := NewDefaultRegistry()
+	target := &skillTarget{
+		hp:             2000,
+		magicOK:        true,
+		skillSuccessOK: true,
+		effects:        effect.NewList(nil),
+		magicInput: formulas.MagicDamageInput{
+			MAtk: 400, MDef: 50, SkillPower: 20,
+			PvPMul: 1, ElementalMul: 1,
+			Shield: formulas.ShieldPerfect,
+		},
+	}
+	result, ok := registry.UseResult(Cast{
+		Skill: modelskill.Definition{
+			SkillType: "MDAM",
+			Effects:   []modelskill.EffectTemplate{{Name: "Stun", Time: 10}},
+		},
+		Targets: []Actor{target},
+	})
+	if !ok {
+		t.Fatal("UseResult() handled = false, want true for MDAM")
+	}
+	if target.lastShield != formulas.ShieldPerfect {
+		t.Fatalf("effect-landing shield = %v, want ShieldPerfect from MagicDamageInput", target.lastShield)
+	}
+	if len(target.effects.All()) != 0 {
+		t.Fatal("perfect shield must block MDAM effects")
+	}
+	if !almost(target.hp, 1999) {
+		t.Fatalf("MDAM perfect-shield hp = %v, want 1999", target.hp)
+	}
+	if result.AttackFailed != 0 {
+		t.Fatalf("AttackFailed = %d, want 0", result.AttackFailed)
 	}
 }
 

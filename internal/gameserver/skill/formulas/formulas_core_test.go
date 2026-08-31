@@ -204,6 +204,35 @@ func TestPhysicalAttackDamageFloor(t *testing.T) {
 	}
 }
 
+func TestSkillPowerFor(t *testing.T) {
+	// Expected values are OpenJDK 21 Math.pow of L2Skill.getPower(Creature):
+	// DEATHLINK power*(1.7165-hpRatio)^2*0.577, FATAL power+power*(1.7165-hpRatio)^3.5*0.577.
+	const power = 100.0
+	tests := []struct {
+		skillType string
+		hpRatio   float64
+		want      float64
+	}{
+		{"PDAM", 0.1, 100},
+		{"MDAM", 0, 100},
+		{"MANADAM", 0, 100},
+		{"DEATHLINK", 1, 29.621578824999993},
+		{"DEATHLINK", 0.5, 85.388628825},
+		{"DEATHLINK", 0.1, 150.77426882499998},
+		{"DEATHLINK", 0, 170.00567882499996},
+		{"FATAL", 1, 117.96521813145395},
+		{"FATAL", 0.5, 214.56928679864922},
+		{"FATAL", 0.1, 409.8780357984027},
+		{"FATAL", 0, 482.3218687651466},
+		{"deathlink", 1, 29.621578824999993},
+	}
+	for _, tt := range tests {
+		if got := SkillPowerFor(tt.skillType, power, tt.hpRatio); !almostEqual(got, tt.want) {
+			t.Errorf("SkillPowerFor(%q, %v, %v) = %.17g, want %.17g", tt.skillType, power, tt.hpRatio, got, tt.want)
+		}
+	}
+}
+
 func TestPhysicalSkillDamage(t *testing.T) {
 	noCrit := PhysicalSkillInput{
 		AttackPower: 100, SkillPower: 50, Defence: 60,
@@ -438,6 +467,32 @@ func TestMagicDamageFailureSkipsCritAndAppliesBeforePvP(t *testing.T) {
 	keep.Failure = MagicFailureKeep
 	if got := MagicDamage(keep); !almostEqual(got, 800.8) {
 		t.Errorf("keep: MagicDamage() = %v, want 800.8", got)
+	}
+}
+
+func TestMagicDamagePerfectShieldReturnsOne(t *testing.T) {
+	in := MagicDamageInput{
+		MAtk: 400, MDef: 50, SkillPower: 20,
+		BlessedSoulShot: true, MagicCrit: true,
+		Failure: MagicFailureHalf,
+		PvPMul:  1.1, ElementalMul: 2,
+		Shield: ShieldPerfect,
+	}
+	if got := MagicDamage(in); got != 1 {
+		t.Fatalf("perfect shield MagicDamage() = %v, want 1", got)
+	}
+}
+
+func TestMagicDamageShieldSuccessUsesRaisedMDef(t *testing.T) {
+	plain := MagicDamageInput{
+		MAtk: 400, MDef: 50, SkillPower: 20,
+		PvPMul: 1, ElementalMul: 1,
+	}
+	blocked := plain
+	blocked.MDef = 80
+	blocked.Shield = ShieldSuccess
+	if got := MagicDamage(blocked); !almostEqual(got, 455.0) {
+		t.Fatalf("shield-success MagicDamage() = %v, want 455", got)
 	}
 }
 

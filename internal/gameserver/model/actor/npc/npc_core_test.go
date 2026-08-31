@@ -24,6 +24,27 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
+func TestHostileMaxBuffCountIncludesTemplateDivineInspiration(t *testing.T) {
+	hostile := newCombatHostile(t, 1, &Template{
+		ID:     1,
+		Type:   "Monster",
+		Skills: map[int]int{int(modelskill.DivineInspirationSkillID): 3},
+	})
+
+	if got := hostile.MaxBuffCount(); got != 23 {
+		t.Fatalf("MaxBuffCount() = %d, want 23", got)
+	}
+}
+
+func TestHostileMaxBuffCountUsesConfiguredBase(t *testing.T) {
+	hostile := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster"})
+	hostile.SetMaxBuffsAmount(2)
+
+	if got := hostile.MaxBuffCount(); got != 2 {
+		t.Fatalf("MaxBuffCount() = %d, want 2", got)
+	}
+}
+
 // ---- from hostile_cancel_vulnerability_test.go ----
 // TestHostileCancelVulnerabilityAppliesCancelVulnStat proves CANCEL_VULN
 // (Formulas.java:949-951) reaches Hostile.CancelVulnerability through the

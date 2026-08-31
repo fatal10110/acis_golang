@@ -148,6 +148,7 @@ type Hostile struct {
 	// skillMu guards disabledSkills, this NPC's cast reuse-delay state.
 	skillMu        sync.Mutex
 	disabledSkills map[int32]time.Time
+	maxBuffsAmount atomic.Int32
 }
 
 // OffensiveFollowLead identifies hostile NPCs that lead moving offensive-follow targets.
@@ -214,6 +215,7 @@ func NewHostile(inst *Instance, live *creature.Live, movement ai.MoveController,
 		soulshotRate:       soulshotRate,
 		spiritshotRate:     spiritshotRate,
 	}
+	h.maxBuffsAmount.Store(maxBuffCount)
 	h.health = creature.NewHealth(&h.hp)
 	h.running.Store(!inst.WalkMode)
 	h.brain = ai.NewAttackable(h, movement, attack)

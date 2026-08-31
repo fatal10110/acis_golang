@@ -212,9 +212,12 @@ func (a *Actor) EffectList() *effect.List {
 }
 
 // MaxBuffCount is the number of non-toggle, non-seven-signs buffs this
-// summon can hold at once. See baseBuffSlots.
+// summon can hold at once: the configured base plus its template skill level.
 func (a *Actor) MaxBuffCount() int {
-	return baseBuffSlots
+	if a == nil {
+		return baseBuffSlots
+	}
+	return a.maxBuffsAmount + a.skills[int(modelskill.DivineInspirationSkillID)]
 }
 
 // Playable reports whether a is player-controlled.

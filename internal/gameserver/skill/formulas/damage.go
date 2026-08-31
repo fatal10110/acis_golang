@@ -1,6 +1,9 @@
 package formulas
 
-import "math"
+import (
+	"math"
+	"strings"
+)
 
 // clampDamage enforces the floor every damage formula in this file shares:
 // never negative, and never below 1 once an attack actually connects.
@@ -70,6 +73,20 @@ func PhysicalAttackDamage(in PhysicalAttackInput) float64 {
 	}
 
 	return clampDamage(damage)
+}
+
+// SkillPowerFor returns the caster-relative skill power physical, magic, and
+// mana damage formulas consume. DEATHLINK and FATAL grow as the caster's
+// HP ratio falls; every other skill type returns power unchanged.
+func SkillPowerFor(skillType string, power, hpRatio float64) float64 {
+	switch strings.ToUpper(strings.TrimSpace(skillType)) {
+	case "DEATHLINK":
+		return power * math.Pow(1.7165-hpRatio, 2) * 0.577
+	case "FATAL":
+		return power + (power * math.Pow(1.7165-hpRatio, 3.5) * 0.577)
+	default:
+		return power
+	}
 }
 
 // PhysicalSkillInput is a physical skill's already-resolved inputs.
@@ -242,7 +259,9 @@ func MagicFailureOutcome(enabled, firstSucceeds, casterIsPlayer, secondSucceeds 
 // MagicDamageInput is a magic skill's already-resolved inputs. MDef must
 // already include the target's shield bonus, same as PhysicalAttackInput's
 // Defence. Failure is the already-resolved magic-success outcome; callers
-// that skip the roll leave it at MagicFailureNone.
+// that skip the roll leave it at MagicFailureNone. Shield is the already-
+// resolved block outcome; ShieldPerfect returns 1 without applying shots,
+// crit, resist, PvP, or elemental scaling.
 type MagicDamageInput struct {
 	MAtk       float64
 	MDef       float64
@@ -255,12 +274,17 @@ type MagicDamageInput struct {
 
 	PvPMul       float64
 	ElementalMul float64
+	Shield       ShieldDefense
 }
 
 // MagicDamage computes a magic skill's damage. A resist outcome skips the
 // magic-crit multiplier and applies half / flat-1 before PvP and elemental
-// scaling, matching the live magic-damage contract.
+// scaling, matching the live magic-damage contract. A perfect shield block
+// returns 1 before those steps.
 func MagicDamage(in MagicDamageInput) float64 {
+	if in.Shield == ShieldPerfect {
+		return 1
+	}
 	mAtk := in.MAtk
 	if in.BlessedSoulShot {
 		mAtk *= 4
