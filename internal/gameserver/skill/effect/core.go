@@ -339,6 +339,24 @@ func SkillFromDefinition(def modelskill.Definition) Skill {
 	}
 }
 
+// Apply instantiates each of templates and adds it to list as a fresh live
+// effect, attributed to effector. A template naming an effect core this
+// port hasn't wired yet is skipped rather than failing the whole batch.
+func Apply(list *List, effector, effected Participant, meta Skill, templates []modelskill.EffectTemplate) {
+	if list == nil {
+		return
+	}
+	for _, tmpl := range templates {
+		e, err := New(meta, tmpl)
+		if err != nil {
+			continue
+		}
+		e.Effector = effector
+		e.Effected = effected
+		list.Add(e)
+	}
+}
+
 // ApplyRestored instantiates each of templates and adds it to list, seeded to
 // resume from count and elapsedSeconds — the tick count and time-since-last-
 // tick a persisted effect had at logout — instead of starting fresh from the
@@ -370,6 +388,12 @@ func New(skill Skill, tmpl modelskill.EffectTemplate) (*Effect, error) {
 		return nil, fmt.Errorf("%w %q", ErrUnsupportedCoreEffect, tmpl.Name)
 	}
 	if k.typ == TypeChanceSkillTrigger {
+		if tmpl.TriggeredID == 0 {
+			return nil, fmt.Errorf("effect %s: requires triggeredId", tmpl.Name)
+		}
+		if tmpl.ChanceType == "" {
+			return nil, fmt.Errorf("effect %s: requires chanceType", tmpl.Name)
+		}
 		if _, _, err := modelskill.ParseChanceCondition(tmpl.ChanceType, tmpl.ActivationChance); err != nil {
 			return nil, fmt.Errorf("effect %s: %w", tmpl.Name, err)
 		}
