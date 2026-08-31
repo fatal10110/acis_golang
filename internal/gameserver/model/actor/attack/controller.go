@@ -90,6 +90,14 @@ type PlayerActor interface {
 	ClientActionFailed()
 }
 
+type raidRelatedTarget interface {
+	RaidRelated() bool
+}
+
+type raidCurseTester interface {
+	TestCursesOnAttack(attackable.Combatant) bool
+}
+
 // Hit is one precomputed physical attack result.
 type Hit struct {
 	Target   attackable.Combatant
@@ -482,6 +490,12 @@ func (c *Controller) deliverHits(seq uint64, hits []Hit) {
 	if !c.actor.Knows(hits[0].Target) || hits[0].Target.AlikeDead() {
 		c.Stop()
 		return
+	}
+	if target, ok := hits[0].Target.(raidRelatedTarget); ok && target.RaidRelated() {
+		if tester, ok := c.playable.(raidCurseTester); ok && tester.TestCursesOnAttack(hits[0].Target) {
+			c.Stop()
+			return
+		}
 	}
 	for _, hit := range hits {
 		c.deliverHit(hit)
