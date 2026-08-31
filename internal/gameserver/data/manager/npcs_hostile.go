@@ -52,6 +52,11 @@ func (r *locatedRef) TeleportTo(target location.Location) {
 	}
 }
 
+func (r *locatedRef) OffensiveFollowLead() bool {
+	actor, ok := r.Actor.(interface{ OffensiveFollowLead() bool })
+	return ok && actor.OffensiveFollowLead()
+}
+
 type creatureActorRef struct{ attack.CreatureActor }
 type statOwnerRef struct{ effect.StatOwner }
 

@@ -143,6 +143,9 @@ type Hostile struct {
 	disabledSkills map[int32]time.Time
 }
 
+// OffensiveFollowLead identifies hostile NPCs that lead moving offensive-follow targets.
+func (*Hostile) OffensiveFollowLead() bool { return true }
+
 // CharacterName returns this NPC's display name for character-name packets.
 func (h *Hostile) CharacterName() string { return h.Instance.Template.Name }
 
