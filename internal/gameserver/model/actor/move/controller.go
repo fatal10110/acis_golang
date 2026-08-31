@@ -33,6 +33,10 @@ type pawnFollowActor interface {
 	OffensiveFollowIsPawnMove() bool
 }
 
+type offensiveFollowLeadActor interface {
+	OffensiveFollowLead() bool
+}
+
 type targetKnower interface {
 	Knows(attackable.Combatant) bool
 }
@@ -181,6 +185,9 @@ func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, m
 	dest := location.Location{X: tx, Y: ty, Z: tz}
 
 	totalRadius := followRange(offset, c.self.CollisionRadius(), other.CollisionRadius())
+	if mode == FollowOffensive && c.selfHasOffensiveFollowLead() && targetMoving(target) {
+		totalRadius += 50
+	}
 	inRange := in2DRange(origin, dest, totalRadius)
 	if mode == FollowOffensive {
 		if actor, ok := c.self.(pawnFollowActor); ok && actor.OffensiveFollowIsPawnMove() {
@@ -376,6 +383,21 @@ func (c *Controller) recheckOffensiveFollow() {
 func (c *Controller) selfOwnsOffensiveFollowTicker() bool {
 	actor, ok := c.self.(offensiveFollowTickerOwner)
 	return ok && actor.OwnsOffensiveFollowTicker()
+}
+
+func (c *Controller) selfHasOffensiveFollowLead() bool {
+	actor, ok := c.self.(offensiveFollowLeadActor)
+	return ok && actor.OffensiveFollowLead()
+}
+
+func targetMoving(target attackable.Combatant) bool {
+	if target, ok := target.(interface{ IsMoving() bool }); ok {
+		return target.IsMoving()
+	}
+	if target, ok := target.(interface{ Move() *CreatureMove }); ok {
+		return target.Move().Moving()
+	}
+	return false
 }
 
 func (c *Controller) clearOffensiveFollow() {
