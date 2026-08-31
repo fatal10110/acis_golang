@@ -85,6 +85,19 @@ func (l *List) StopAll() {
 	}
 }
 
+// StopAllExceptThoseThatLastThroughDeath removes active effects whose owning
+// skill is not configured to persist through death.
+func (l *List) StopAllExceptThoseThatLastThroughDeath() {
+	if l == nil {
+		return
+	}
+	for _, e := range l.All() {
+		if !e.Skill.StayAfterDeath {
+			l.Remove(e)
+		}
+	}
+}
+
 // notifyAbnormalUpdate tells l's owner to refresh its abnormal-effect icon
 // state, mirroring Creature.addEffect()/removeEffect() unconditionally
 // queueing an EffectList icon update on every add or remove attempt,
