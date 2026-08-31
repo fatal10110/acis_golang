@@ -4,7 +4,16 @@ import (
 	"fmt"
 )
 
-const DivineInspirationSkillID ID = 1405
+const (
+	DivineInspirationSkillID ID = 1405
+	// RaidCurse2SkillID is the petrification raid curse applied to a
+	// playable whose level is more than eight above a raid-related
+	// Attackable.
+	RaidCurse2SkillID ID = 4515
+	// RaidAntiStriderSlowSkillID is the mounted-strider slow applied by a
+	// raid-related Attackable that matches the supplied NPC id.
+	RaidAntiStriderSlowSkillID ID = 4258
+)
 
 type Spellbook struct {
 	SkillID ID

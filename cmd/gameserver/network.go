@@ -92,6 +92,7 @@ func provideGameClientLink(
 	bypassDelay serverBypassDelay,
 	petCfg pet.Config,
 	petStore *gamesql.PetStore,
+	curses raidCursesDisabled,
 	log zerolog.Logger,
 ) *network.GameClientLink {
 	formulas.SetMagicFailures(bool(mf))
@@ -155,6 +156,7 @@ func provideGameClientLink(
 		Admin:            data.Admin,
 		PlayerConfig:     playerConfig,
 		PetConfig:        petCfg,
+		DisableRaidCurse: bool(curses),
 		Log:              log,
 	})
 	if effects != nil {
