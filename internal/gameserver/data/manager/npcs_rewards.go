@@ -147,6 +147,10 @@ func (d *deathRewards) grantExpAndSp(entries []playerRewardEntry, totalDamage fl
 	}
 	for _, entry := range entries {
 		exp, sp := player.KillRewardExpAndSp(d.tmpl.RewardExp, d.tmpl.RewardSp, entry.damage, totalDamage, entry.actor.CharLevel-d.tmpl.Level)
+		if d.hostile.OverhitValid(entry.actor) {
+			entry.actor.NotifyOverHit()
+			exp += d.hostile.OverhitBonus(exp)
+		}
 		if entry.pet == nil && d.state != nil {
 			if obj, ok := d.state.Summon(entry.actor.ObjectID()); ok {
 				entry.pet, _ = obj.(*summon.Actor)

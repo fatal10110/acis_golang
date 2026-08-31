@@ -167,7 +167,11 @@ func (h *Hostile) ReduceMP(amount float64) float64 {
 
 // ReduceHP applies skill HP damage and runs the once-only death path.
 func (h *Hostile) ReduceHP(amount float64, attacker creature.DeathActor, _ modelskill.Definition) {
-	if amount <= 0 || h.AlikeDead() || h.Invul() || !creature.CanDealDamage(attacker) {
+	if h.AlikeDead() {
+		return
+	}
+	h.testOverhit(attacker, amount)
+	if amount <= 0 || h.Invul() || !creature.CanDealDamage(attacker) {
 		return
 	}
 	if combatant, ok := attacker.(attackable.Combatant); ok {
@@ -192,7 +196,15 @@ func (h *Hostile) ReduceHP(amount float64, attacker creature.DeathActor, _ model
 // AggroList, DOT included (Npc.java:390-395; no isDOT gate in the chain
 // Creature.reduceCurrentHpByDOT -> Npc.reduceCurrentHp -> reduceHp).
 func (h *Hostile) ReduceHPByDOT(amount float64, attacker effect.Participant, isDOT bool) {
-	if amount <= 0 || h.AlikeDead() || h.Invul() || !creature.CanDealDamage(attacker) {
+	if h.AlikeDead() {
+		return
+	}
+	var killer creature.DeathActor
+	if a, ok := attacker.(creature.DeathActor); ok {
+		killer = a
+	}
+	h.testOverhit(killer, amount)
+	if amount <= 0 || h.Invul() || !creature.CanDealDamage(attacker) {
 		return
 	}
 	if combatant, ok := attacker.(attackable.Combatant); ok {
@@ -208,7 +220,6 @@ func (h *Hostile) ReduceHPByDOT(amount float64, attacker effect.Participant, isD
 	if !newlyDead {
 		return
 	}
-	killer, _ := attacker.(creature.DeathActor)
 	h.Die(killer, h.rewards)
 }
 

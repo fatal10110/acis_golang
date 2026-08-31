@@ -141,6 +141,14 @@ func dispatchEffects(handlers EffectHandlers, caster skilltarget.Creature, affec
 		notifier.NotePvPSkillTargets(notifyTargets, def.Offensive, def.SkillType)
 	}
 
+	if def.Overhit && caster.Category().Has(skilltarget.CategoryPlayable) {
+		for _, t := range affected {
+			if target, ok := t.(interface{ EnableOverhit() }); ok {
+				target.EnableOverhit()
+			}
+		}
+	}
+
 	result, ok := handlers.Skills.UseResult(handlerskill.Cast{
 		Caster:  castCaster,
 		Skill:   def,

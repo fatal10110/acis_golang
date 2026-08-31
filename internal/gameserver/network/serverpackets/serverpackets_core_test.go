@@ -2613,6 +2613,14 @@ func TestFrameSystemMessageCorpseTargetFailures(t *testing.T) {
 	}
 }
 
+func TestFrameSystemMessageOverHit(t *testing.T) {
+	got := framePayload(t, FrameSystemMessage(SystemMessageOverHit))
+	want := []byte{OpcodeSystemMessage, 0x69, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
+	if !bytes.Equal(got, want) {
+		t.Fatalf("FrameSystemMessage(OverHit) = %x, want %x", got, want)
+	}
+}
+
 func TestFrameSystemMessageCounterattackFeedback(t *testing.T) {
 	tests := []struct {
 		name string

@@ -61,6 +61,7 @@ func (h *Hostile) TakeDamage(dmg int, attacker creature.DeathActor) bool {
 	if h.AlikeDead() {
 		return false
 	}
+	h.testOverhit(attacker, float64(dmg))
 	if dmg > 0 {
 		if combatant, ok := attacker.(attackable.Combatant); ok {
 			h.AddCombatDamageHate(combatant, float64(dmg))

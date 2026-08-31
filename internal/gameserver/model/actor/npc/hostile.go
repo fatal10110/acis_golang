@@ -96,6 +96,7 @@ type Hostile struct {
 
 	spoil          item.SpoilPool
 	seed           SeedState
+	overhit        overhitState
 	corpseDeadline time.Time
 
 	health creature.Health

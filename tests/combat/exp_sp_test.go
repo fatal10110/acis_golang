@@ -2,6 +2,7 @@ package combat
 
 import (
 	"context"
+	"math"
 	"testing"
 
 	playermodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -57,6 +58,8 @@ func readExpSpGain(t *testing.T, c *scriptedClient, exp int64, sp int) {
 		r := wireReader(frame[1:])
 		id := r.ReadInt32()
 		switch id {
+		case int32(serverpackets.SystemMessageOverHit):
+			t.Fatal("OVER_HIT on a non-overhit kill")
 		case int32(serverpackets.SystemMessageYouEarnedS1ExpAndS2SP):
 			if params := r.ReadInt32(); params != 2 {
 				t.Fatalf("gain message params = %d, want 2", params)
@@ -169,4 +172,87 @@ func TestKillNPCLevelUpRefreshesSkills(t *testing.T) {
 		ch, err := srv.Chars.Get(context.Background(), objID)
 		return err == nil && ch.CharLevel == 6
 	})
+}
+
+func overhitKillSkillDefs() []modelskill.Definition {
+	return []modelskill.Definition{
+		{
+			ID: 42, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
+			CastRange: 900, HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
+			MPInitialConsume: 2, MPConsume: 3, SkillType: "PDAM", Power: 1_000_000, Overhit: true,
+		},
+	}
+}
+
+// TestKillNPCOverhitPaysBonusExp walks an overhit skill kill: OVER_HIT
+// arrives before the exp/SP gain, XP includes the 25% cap bonus, SP is
+// unchanged from the non-overhit share.
+func TestKillNPCOverhitPaysBonusExp(t *testing.T) {
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(combatPersistence(t, overhitKillSkillDefs())),
+		gameservertest.WithLevels(levelTableFor(t)),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, 42, 1)
+	startInWorld(t, c)
+	hostile := spawnRewardedNPC(t, srv, 5000, 25)
+	drainUntilQuiet(t, c)
+
+	targetHostile(t, c, hostile.ObjectID())
+	drainUntilQuiet(t, c)
+
+	c.Send(encodeRequestMagicSkillUse(42, false, false))
+	readCastStartFrames(t, c, objID, 42, 1, 500, 60_000, hostile.ObjectID())
+
+	waitFor(t, "monster death", func() bool { return hostile.CurrentHP() <= 0 })
+
+	baseExp, baseSp := playermodel.KillRewardExpAndSp(5000, 25, 1, 1, 5-1)
+	if baseExp <= 0 || baseSp <= 0 {
+		t.Fatalf("oracle base reward = %d exp / %d sp, want positive amounts", baseExp, baseSp)
+	}
+	wantExp := baseExp + int64(math.Round(0.25*float64(baseExp)))
+	readOverHitThenExpSpGain(t, c, wantExp, baseSp)
+}
+
+func readOverHitThenExpSpGain(t *testing.T, c *scriptedClient, exp int64, sp int) {
+	t.Helper()
+	sawOverHit := false
+	for i := 0; i < 50; i++ {
+		frame := c.ReadWithTimeout(readQuietWindow)
+		if frame == nil {
+			t.Fatalf("exp/SP gain message for %d/%d never arrived", exp, sp)
+		}
+		if frame[0] != serverpackets.OpcodeSystemMessage {
+			continue
+		}
+		r := wireReader(frame[1:])
+		id := r.ReadInt32()
+		switch id {
+		case int32(serverpackets.SystemMessageOverHit):
+			sawOverHit = true
+		case int32(serverpackets.SystemMessageYouEarnedS1ExpAndS2SP):
+			if !sawOverHit {
+				t.Fatal("exp/SP gain arrived without OVER_HIT")
+			}
+			if params := r.ReadInt32(); params != 2 {
+				t.Fatalf("gain message params = %d, want 2", params)
+			}
+			gotType := r.ReadInt32()
+			gotExp := r.ReadInt32()
+			gotType2 := r.ReadInt32()
+			gotSP := r.ReadInt32()
+			if gotType != serverpackets.SystemMessageParamNumber || gotType2 != serverpackets.SystemMessageParamNumber {
+				t.Fatalf("gain message param types = %d/%d, want numbers", gotType, gotType2)
+			}
+			if gotExp != int32(exp) || gotSP != int32(sp) {
+				t.Fatalf("gain message = exp %d sp %d, want exp %d sp %d", gotExp, gotSP, exp, sp)
+			}
+			return
+		case int32(serverpackets.SystemMessageEarnedS1Experience):
+			t.Fatalf("got experience-only gain message, want combined exp %d / sp %d", exp, sp)
+		}
+	}
+	t.Fatal("exp/SP gain message not found within 50 frames")
 }
