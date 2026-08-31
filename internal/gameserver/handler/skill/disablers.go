@@ -72,10 +72,14 @@ type attackableMarker interface {
 	Attackable() bool
 }
 
-// aggroTables exposes an attackable target's two hate tables.
-type aggroTables interface {
-	AggroList() *attackable.ThreatTable
-	HateList() *attackable.HateTable
+// aggroHateControl exposes attackable-target hate mutations that mirror
+// the reference AggroList/HateList handlers, including the peace transition
+// when threat hate is fully exhausted.
+type aggroHateControl interface {
+	ReduceAllAggroHate(amount float64)
+	StopAggroHate(attacker attackable.Combatant)
+	StopHateList(attacker attackable.Combatant)
+	ClearAggroTables()
 }
 
 // raidRelatedTarget optionally reports whether the target is a raid boss
@@ -314,13 +318,13 @@ func disableConfusion(cast Cast, target disablerTarget) {
 // instead subtracts a generic AGGRESSION stat delta; that needs a stat
 // resolution this port has no generic model for yet, so it's skipped.
 func disableAggReduce(cast Cast, target disablerTarget) {
-	at, ok := target.(aggroTables)
+	at, ok := target.(aggroHateControl)
 	if !ok {
 		return
 	}
 	applyCastEffects(cast, target, cast.Skill, cast.Skill.Effects)
 	if cast.Skill.Power > 0 {
-		at.AggroList().ReduceAllHate(float64(cast.Skill.Power))
+		at.ReduceAllAggroHate(float64(cast.Skill.Power))
 	}
 }
 
@@ -329,10 +333,10 @@ func disableAggReduceChar(cast Cast, target disablerTarget) {
 	if !ok || !succeeded {
 		return
 	}
-	if at, ok := target.(aggroTables); ok {
+	if at, ok := target.(aggroHateControl); ok {
 		if attacker, ok := cast.Caster.(attackable.Combatant); ok {
-			at.AggroList().StopHate(attacker)
-			at.HateList().StopHate(attacker)
+			at.StopAggroHate(attacker)
+			at.StopHateList(attacker)
 		}
 	}
 	applyCastEffects(cast, target, cast.Skill, cast.Skill.Effects)
@@ -356,9 +360,8 @@ func disableAggRemove(cast Cast, target disablerTarget) {
 			return
 		}
 	}
-	if at, ok := target.(aggroTables); ok {
-		at.AggroList().Clear()
-		at.HateList().Clear()
+	if at, ok := target.(aggroHateControl); ok {
+		at.ClearAggroTables()
 	}
 }
 

@@ -297,7 +297,28 @@ func (a *Attackable) SetWander() {
 func (a *Attackable) SetBackToPeace() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	a.setBackToPeaceLocked()
+}
 
+// StopAggroHate mirrors AggroList.stopHate: zeroes target's threat hate,
+// drops its queued attack desire, and returns to peace when neither hate
+// table still has a most-hated entry.
+func (a *Attackable) StopAggroHate(target attackable.Combatant) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.stopAggroHateLocked(target)
+}
+
+// ReduceAllAggroHate mirrors AggroList.reduceAllHate: subtracts amount from
+// every threat entry and returns to peace when neither hate table still has
+// a most-hated entry.
+func (a *Attackable) ReduceAllAggroHate(amount float64) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.reduceAllAggroHateLocked(amount)
+}
+
+func (a *Attackable) setBackToPeaceLocked() {
 	a.threats.Clear()
 	a.hates.Clear()
 	a.desires.Clear()
@@ -307,6 +328,33 @@ func (a *Attackable) SetBackToPeace() {
 		a.current = intention{kind: IntentionWander}
 	}
 	a.move.Stop()
+}
+
+func (a *Attackable) maybeBackToPeaceLocked() {
+	if _, ok := a.threats.MostHated(); ok {
+		return
+	}
+	if _, ok := a.hates.MostHated(); ok {
+		return
+	}
+	a.setBackToPeaceLocked()
+}
+
+func (a *Attackable) stopAggroHateLocked(target attackable.Combatant) {
+	if target == nil || a.threats.IsEmpty() {
+		return
+	}
+	a.threats.StopHate(target)
+	a.desires.Remove(IntentionAttack, target)
+	a.maybeBackToPeaceLocked()
+}
+
+func (a *Attackable) reduceAllAggroHateLocked(amount float64) {
+	if a.threats.IsEmpty() {
+		return
+	}
+	a.threats.ReduceAllHate(amount)
+	a.maybeBackToPeaceLocked()
 }
 
 // CurrentIntention returns the currently active intention kind.
@@ -386,7 +434,7 @@ func (a *Attackable) Tick() {
 		return
 	}
 	a.refreshCombatMemory()
-	a.threats.ReduceAllHate(attackHateDecay)
+	a.reduceAllAggroHateLocked(attackHateDecay)
 	a.desires.DecreaseWeightByType(IntentionAttack, attackHateDecay)
 	a.step = 0
 }
