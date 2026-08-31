@@ -143,7 +143,9 @@ func (p *livePlayer) Stop() {
 	if p.cast != nil {
 		p.cast.Stop()
 	}
-	p.releaseChair()
+	// Free the chair for others but keep seated identity so observers still
+	// receive the stand-then-delete animation when this player despawns.
+	p.freeChair()
 	p.stopCubics()
 }
 
@@ -382,10 +384,20 @@ func (p *livePlayer) SendInventoryUpdate(updates []itemcontainer.Update) {
 	p.SendFrame(frame)
 }
 
-func (p *livePlayer) releaseChair() {
+func (p *livePlayer) seated() bool {
+	return p != nil && p.throne != nil
+}
+
+func (p *livePlayer) freeChair() {
 	if p == nil || p.throne == nil {
 		return
 	}
 	p.throne.SetBusy(false)
-	p.throne = nil
+}
+
+func (p *livePlayer) releaseChair() {
+	p.freeChair()
+	if p != nil {
+		p.throne = nil
+	}
 }

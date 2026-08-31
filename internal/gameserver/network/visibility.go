@@ -94,7 +94,11 @@ func (p *livePlayer) Forget(obj world.Tracked) {
 	if !rendersObject(obj) {
 		return
 	}
-	p.sendVisibilityFrame(serverpackets.FrameDeleteObject(obj.ObjectID(), false))
+	seated := false
+	if other, ok := obj.(*livePlayer); ok {
+		seated = other.seated()
+	}
+	p.sendVisibilityFrame(serverpackets.FrameDeleteObject(obj.ObjectID(), seated))
 }
 
 type groundItemObject interface {
