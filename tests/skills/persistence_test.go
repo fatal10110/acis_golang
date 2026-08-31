@@ -107,6 +107,83 @@ func TestLiveBuffAndReusePersistAtLogoutAndRestoreAtLogin(t *testing.T) {
 	}
 }
 
+// TestSelfOnlyEffectDoesNotRestoreOnRelogin casts a skill whose templates
+// are self-targeted only. Logout still persists the live effect (and its
+// reuse), but relogin restores reuse through SkillCoolTime without replaying
+// the effect: EnterWorld has no AbnormalStatusUpdate, and a second logout
+// writes a reuse-only row.
+func TestSelfOnlyEffectDoesNotRestoreOnRelogin(t *testing.T) {
+	const skillID, level = 40, 1
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{
+			{
+				ID: skillID, Level: level, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+				HitTime: 500, ReuseDelay: 45_000, StaticHitTime: true, StaticReuse: true,
+				MPInitialConsume: 2, MPConsume: 3, SkillType: "BUFF",
+				SelfEffects: []modelskill.EffectTemplate{{Name: "Buff", Count: 2, Time: 30, Self: true, Icon: true}},
+			},
+		})),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, skillID, level)
+	startInWorld(t, c)
+
+	c.Send(encodeRequestMagicSkillUse(skillID, false, false))
+	readCastStartFrames(t, c, objID, skillID, level, 500, 45_000, objID)
+	icons := readStatusUpdateSkippingAbnormal(t, c, objID, []serverpackets.StatusAttribute{{Type: serverpackets.StatusCurrentMP, Value: 25}})
+	found := false
+	for _, e := range icons {
+		if e.SkillID == skillID && int32(e.Level) == level {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("AbnormalStatusUpdate icons after self-effect cast = %+v, want skill %d", icons, skillID)
+	}
+	drainUntilQuiet(t, c)
+
+	logout(t, c)
+	count, restoreType := skillSaveRow(t, srv, objID, skillID, level)
+	if count != 1 || restoreType != 0 {
+		t.Fatalf("character_skills_save after logout = count %d restore_type %d, want 1 effect row", count, restoreType)
+	}
+
+	relogin := srv.DialClient(t, "player1", 1)
+	relogin.Send(encodeRequestGameStart(0))
+	if reply := relogin.Read(); reply[0] != serverpackets.OpcodeSSQInfo {
+		t.Fatalf("opcode = %#x, want SSQInfo", reply[0])
+	}
+	if reply := relogin.Read(); reply[0] != serverpackets.OpcodeCharSelected {
+		t.Fatalf("opcode = %#x, want CharSelected", reply[0])
+	}
+	relogin.Send(encodeEnterWorld())
+	frames := readEnterWorldBurst(t, relogin)
+	coolTimes := readSkillCoolTimeEntriesFromFrame(t, frames[len(frames)-2])
+	if len(coolTimes) != 1 || coolTimes[0].SkillID != skillID || coolTimes[0].Level != level ||
+		coolTimes[0].RemainingSeconds <= 0 || coolTimes[0].RemainingSeconds > 45 {
+		t.Fatalf("restored SkillCoolTime = %+v, want one skill %d level %d row with a positive remainder", coolTimes, skillID, level)
+	}
+	drainUntilQuiet(t, relogin)
+
+	logout(t, relogin)
+	count, restoreType = skillSaveRow(t, srv, objID, skillID, level)
+	if count != 1 || restoreType != 1 {
+		t.Fatalf("character_skills_save after second logout = count %d restore_type %d, want 1 reuse-only row", count, restoreType)
+	}
+}
+
+func skillSaveRow(t *testing.T, srv *gameservertest.Server, objID, skillID, level int32) (count, restoreType int) {
+	t.Helper()
+	if err := srv.DB.QueryRowContext(context.Background(),
+		`SELECT COUNT(*), COALESCE(MAX(restore_type), 0) FROM character_skills_save WHERE char_obj_id = ? AND skill_id = ? AND skill_level = ?`,
+		objID, skillID, level).Scan(&count, &restoreType); err != nil {
+		t.Fatal(err)
+	}
+	return count, restoreType
+}
+
 // logout sends the logout request and consumes its reply sequence: the
 // LeaveWorld ack, the detach's unconditional cast-stop ActionFailed, and a
 // closed connection.
