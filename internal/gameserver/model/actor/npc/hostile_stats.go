@@ -3,15 +3,13 @@ package npc
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npcinfo"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/funcs"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
-// maxBuffCount is the non-toggle, non-seven-signs buff-slot count every
-// NPC allows. No passive skill raises this bound for a live NPC actor, so
-// it is also the permanent cap (compare player.Character's default
-// MaxBuffsAmount).
+// maxBuffCount is the shipped players.properties MaxBuffsAmount default.
 const maxBuffCount = 20
 
 // AddStatFuncs attaches fns to h's live stat calculators. Each Mod is
@@ -90,10 +88,20 @@ func (h *Hostile) broadcastModifiedStatsFor(stats []stat.Stat) {
 	}
 }
 
+// SetMaxBuffsAmount records the players.properties base buff-slot count.
+func (h *Hostile) SetMaxBuffsAmount(amount int) {
+	if h != nil {
+		h.maxBuffsAmount.Store(int32(amount))
+	}
+}
+
 // MaxBuffCount is the number of non-toggle, non-seven-signs buffs h can
-// hold at once. See maxBuffCount.
+// hold at once: the configured base plus its template's Divine Inspiration.
 func (h *Hostile) MaxBuffCount() int {
-	return maxBuffCount
+	if h == nil {
+		return maxBuffCount
+	}
+	return int(h.maxBuffsAmount.Load()) + h.Instance.Template.Skills[int(modelskill.DivineInspirationSkillID)]
 }
 
 // statCalc returns s's live Calculator, creating it (with its builtin
