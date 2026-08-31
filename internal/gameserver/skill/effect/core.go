@@ -325,6 +325,7 @@ func SkillFromDefinition(def modelskill.Definition) Skill {
 		KillByDOT:           def.KillByDOT,
 		Dance:               def.Dance,
 		CanBeDispelled:      def.CanBeDispelled,
+		StayAfterDeath:      def.StayAfterDeath,
 		MagicLevel:          def.MagicLevel,
 		LevelDepend:         def.LevelDepend,
 		AbnormalLevel:       def.AbnormalLevel,

@@ -90,3 +90,19 @@ func (c *Character) rollValue(n int) int {
 func (c *Character) Roll(n int) int {
 	return c.rollValue(n)
 }
+
+// SetFloatRollSource overrides RollFloat's random source for deterministic tests.
+func (c *Character) SetFloatRollSource(f func(float64) float64) {
+	c.floatRoll = f
+}
+
+// RollFloat draws a uniform random value in [0, n) from c's combat random source.
+func (c *Character) RollFloat(n float64) float64 {
+	if n <= 0 {
+		return 0
+	}
+	if c.floatRoll != nil {
+		return c.floatRoll(n)
+	}
+	return rand.Float64() * n
+}
