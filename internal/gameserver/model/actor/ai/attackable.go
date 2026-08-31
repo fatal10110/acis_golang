@@ -218,29 +218,39 @@ func (a *Attackable) AddCombatDamageHate(attacker attackable.Combatant, damage f
 	a.thinkIfNoMostHated(hadMostHated, attacker)
 }
 
-// AddAttackDesire queues an attack intention. When the threat table has no
-// most-hated attacker, the AI loop runs immediately so the first reaction
-// does not wait for the next tick.
+// AddAttackDesire queues an attack intention that closes on the target.
+// When the threat table has no most-hated attacker, the AI loop runs
+// immediately so the first reaction does not wait for the next tick.
 func (a *Attackable) AddAttackDesire(attacker attackable.Combatant, hate float64) {
+	a.queueAttackDesire(attacker, hate, true)
+}
+
+// AddAttackDesireHold queues an attack intention that stays in place instead
+// of closing on the target. Same first-reaction Think as AddAttackDesire.
+func (a *Attackable) AddAttackDesireHold(attacker attackable.Combatant, hate float64) {
+	a.queueAttackDesire(attacker, hate, false)
+}
+
+func (a *Attackable) queueAttackDesire(attacker attackable.Combatant, hate float64, moveToTarget bool) {
 	if attacker == nil || (a.actor.SiegeGuard() && attacker.SiegeGuard()) {
 		return
 	}
 	_, hadMostHated := a.threats.MostHated()
-	a.addAttackDesire(attacker, hate)
+	a.addAttackDesireWithMove(attacker, hate, moveToTarget)
 	a.thinkIfNoMostHated(hadMostHated, attacker)
 }
 
-// addAttackDesire ports the ordinary hate-list overloads of NpcAI.java's
-// addAttackDesire (NpcAI.java:698-711), all of which default
-// moveToTarget = true. Only the scripted addAttackDesireHold
-// (NpcAI.java:683-696, not yet ported) queues MoveToTarget = false.
 func (a *Attackable) addAttackDesire(attacker attackable.Combatant, hate float64) {
+	a.addAttackDesireWithMove(attacker, hate, true)
+}
+
+func (a *Attackable) addAttackDesireWithMove(attacker attackable.Combatant, hate float64, moveToTarget bool) {
 	a.desires.AddOrUpdate(&Desire{
 		Kind:         IntentionAttack,
 		FinalTarget:  attacker,
 		Weight:       hate,
 		QueuedAt:     time.Now(),
-		MoveToTarget: true,
+		MoveToTarget: moveToTarget,
 	})
 }
 
@@ -440,6 +450,20 @@ func (a *Attackable) CurrentIntention() Intention {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.current.kind
+}
+
+// TopDesireTarget is the creature the currently executing attack or cast
+// intention is aimed at. Idle and follow intentions have no top desire
+// target.
+func (a *Attackable) TopDesireTarget() attackable.Combatant {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	switch a.current.kind {
+	case IntentionAttack, IntentionCast:
+		return a.current.target
+	default:
+		return nil
+	}
 }
 
 // NextIntention returns the queued intention, if one exists.
