@@ -7,13 +7,14 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
-	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
@@ -767,6 +768,32 @@ func TestReturnHomeForceWalkStanceBroadcast(t *testing.T) {
 		t.Fatalf("observer frame count = %d, want 1 ChangeMoveType", len(observer.frames))
 	}
 	assertChangeMoveTypeFrame(t, observer.frames[0], hostile.ObjectID(), false)
+}
+
+func TestReturnHomeRechecksWanderBehindActor(t *testing.T) {
+	movement := &hostileMove{moved: make(chan location.Location, 1)}
+	hostile := newTestHostile(t, movement, &hostileAttack{})
+	hostile.Instance.HasHome = true
+	hostile.Instance.Home = location.Location{X: 100, Y: 0, Z: 0}
+	hostile.Instance.Template.WalkSpeed = 100
+	hostile.Instance.Template.CollisionRadius = 30
+	hostile.roll = func(int) int { return 0 }
+	world.New().Spawn(hostile, 100, 500, 0, 0)
+	hostile.SetHeading(0)
+	hostile.AI().SetWander()
+
+	if !hostile.ReturnHome() {
+		t.Fatal("ReturnHome() = false, want true outside drift range")
+	}
+
+	select {
+	case got := <-movement.moved:
+		if want := (location.Location{X: 50, Y: 500, Z: 0}); got != want {
+			t.Fatalf("wander recheck target = %#v, want %#v", got, want)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("wander recheck did not move behind the actor")
+	}
 }
 
 func TestSiegeGuardReturnHomeForceRunStanceBroadcast(t *testing.T) {

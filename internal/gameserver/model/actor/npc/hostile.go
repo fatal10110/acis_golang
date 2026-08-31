@@ -831,7 +831,31 @@ func (h *Hostile) returnHomeOutsideDriftRange() bool {
 		h.ForceWalkStance()
 	}
 	_ = h.move.MoveHome(h.Instance.Home)
+	h.scheduleWanderRecheck()
 	return true
+}
+
+func (h *Hostile) scheduleWanderRecheck() {
+	mover, ok := h.move.(interface {
+		MoveToLocation(location.Location) (bool, error)
+	})
+	if !ok || h.moveSpeed() <= 0 {
+		return
+	}
+	delay := time.Duration(1500+h.roll(1001)) * time.Millisecond * time.Duration(100/h.moveSpeed())
+	time.AfterFunc(delay, func() {
+		if h.brain.CurrentIntention() != ai.IntentionWander {
+			return
+		}
+		position := h.location()
+		distance := min(int(h.CollisionRadius())*2, 50)
+		radians := (location.HeadingDegrees(h.Heading()) + 180) * math.Pi / 180
+		_, _ = mover.MoveToLocation(location.Location{
+			X: position.X + int(float64(distance)*math.Cos(radians)),
+			Y: position.Y + int(float64(distance)*math.Sin(radians)),
+			Z: position.Z,
+		})
+	})
 }
 
 func in2DRange(a, b location.Location, radius int) bool {
