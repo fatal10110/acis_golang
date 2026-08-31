@@ -11,6 +11,7 @@ import (
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
+	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -178,8 +179,8 @@ func startShadowItems(lc fx.Lifecycle, items *task.ShadowItems, log zerolog.Logg
 	startTicker(lc, log, items.Start)
 }
 
-func provideAutosave(effects *network.TaskEffects, roster *manager.Roster, log zerolog.Logger) (*task.Autosave, error) {
-	effects.SetAutosave(roster, log)
+func provideAutosave(effects *network.TaskEffects, roster *manager.Roster, skills *skillstate.Persistence, log zerolog.Logger) (*task.Autosave, error) {
+	effects.SetAutosave(roster, skills, log)
 	return task.NewAutosave(effects, time.Now)
 }
 

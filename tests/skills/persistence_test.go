@@ -107,6 +107,92 @@ func TestLiveBuffAndReusePersistAtLogoutAndRestoreAtLogin(t *testing.T) {
 	}
 }
 
+// TestAutosaveRewritesSkillSaveAfterRestoreAndSurvivesCrashRelog consumes a
+// restored character_skills_save row on login, then fires the production
+// autosave sweep while the session is still attached. Restore already
+// deleted the row, so the rewrite must come from the live effect list and
+// reuse timers. Closing the stack without Logout simulates a process crash
+// before detach; a fresh Boot must restore the buff from that autosave row.
+func TestAutosaveRewritesSkillSaveAfterRestoreAndSurvivesCrashRelog(t *testing.T) {
+	defs := []modelskill.Definition{
+		{
+			ID: 1204, Level: 2, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+			HitTime: 500, ReuseDelay: 45_000, StaticHitTime: true, StaticReuse: true,
+			MPInitialConsume: 2, MPConsume: 3, SkillType: "BUFF",
+			Effects: []modelskill.EffectTemplate{{Name: "Buff", Count: 2, Time: 30}},
+		},
+	}
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(skillPersistence(t, defs)),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, 1204, 2)
+	startInWorld(t, c)
+
+	c.Send(encodeRequestMagicSkillUse(1204, false, false))
+	readCastStartFrames(t, c, objID, 1204, 2, 500, 45_000, objID)
+	readStatusUpdateSkippingAbnormal(t, c, objID, []serverpackets.StatusAttribute{{Type: serverpackets.StatusCurrentMP, Value: 25}})
+	drainUntilQuiet(t, c)
+
+	logout(t, c)
+
+	relogin := srv.DialClient(t, "player1", 1)
+	relogin.Send(encodeRequestGameStart(0))
+	if reply := relogin.Read(); reply[0] != serverpackets.OpcodeSSQInfo {
+		t.Fatalf("opcode = %#x, want SSQInfo", reply[0])
+	}
+	if reply := relogin.Read(); reply[0] != serverpackets.OpcodeCharSelected {
+		t.Fatalf("opcode = %#x, want CharSelected", reply[0])
+	}
+	relogin.Send(encodeEnterWorld())
+	frames := readEnterWorldBurstWithRestoredBuff(t, relogin)
+	if frame := frames[3]; frame[0] != serverpackets.OpcodeAbnormalStatusUpdate {
+		t.Fatalf("restored-buff frame opcode = %#x, want AbnormalStatusUpdate", frame[0])
+	}
+	drainUntilQuiet(t, relogin)
+
+	count, _ := skillSaveRow(t, srv, objID, 1204, 2)
+	if count != 0 {
+		t.Fatalf("character_skills_save rows after restore = %d, want 0 (Restore consumed them)", count)
+	}
+
+	srv.TickAutosave()
+	count, restoreType := skillSaveRow(t, srv, objID, 1204, 2)
+	if count != 1 || restoreType != 0 {
+		t.Fatalf("character_skills_save after autosave = count %d restore_type %d, want 1 effect row", count, restoreType)
+	}
+
+	srv.Close()
+
+	srv2 := gameservertest.Boot(t,
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(skillPersistence(t, defs)),
+	)
+	if got := srv2.SoleObjectID(t); got != objID {
+		t.Fatalf("second boot character id = %d, want %d", got, objID)
+	}
+	crashRelog := srv2.Client
+	crashRelog.Send(encodeRequestGameStart(0))
+	if reply := crashRelog.Read(); reply[0] != serverpackets.OpcodeSSQInfo {
+		t.Fatalf("opcode = %#x, want SSQInfo", reply[0])
+	}
+	if reply := crashRelog.Read(); reply[0] != serverpackets.OpcodeCharSelected {
+		t.Fatalf("opcode = %#x, want CharSelected", reply[0])
+	}
+	crashRelog.Send(encodeEnterWorld())
+	restored := readEnterWorldBurstWithRestoredBuff(t, crashRelog)
+	if frame := restored[3]; frame[0] != serverpackets.OpcodeAbnormalStatusUpdate {
+		t.Fatalf("crash-relog restored-buff frame opcode = %#x, want AbnormalStatusUpdate", frame[0])
+	}
+	coolTimes := readSkillCoolTimeEntriesFromFrame(t, restored[len(restored)-2])
+	if len(coolTimes) != 1 || coolTimes[0].SkillID != 1204 || coolTimes[0].Level != 2 ||
+		coolTimes[0].RemainingSeconds <= 0 || coolTimes[0].RemainingSeconds > 45 {
+		t.Fatalf("crash-relog SkillCoolTime = %+v, want one skill 1204 level 2 row with a positive remainder", coolTimes)
+	}
+}
+
 // TestSelfOnlyEffectDoesNotRestoreOnRelogin casts a skill whose templates
 // are self-targeted only. Logout still persists the live effect (and its
 // reuse), but relogin restores reuse through SkillCoolTime without replaying
