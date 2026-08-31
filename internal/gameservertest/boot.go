@@ -63,6 +63,7 @@ type options struct {
 	restarts               *restart.Table
 	zones                  *zone.Index
 	attackStance           *task.AttackStance
+	attackStanceNow        func() time.Time
 	spawnProtection        time.Duration
 	allowDelevel           bool
 	rateKarmaExpLost       float64
@@ -132,6 +133,13 @@ func WithZones(index *zone.Index) Option {
 // (default: nil, so stance is neither tracked nor consulted).
 func WithAttackStance(tracker *task.AttackStance) Option {
 	return func(o *options) { o.attackStance = tracker }
+}
+
+// WithAttackStanceClock builds the production combat-stance timeout
+// adapter over Boot's world state, driven by now so tests can expire the
+// 15-second inactivity window without waiting.
+func WithAttackStanceClock(now func() time.Time) Option {
+	return func(o *options) { o.attackStanceNow = now }
 }
 
 // WithSpawnProtection sets the players.properties SpawnProtection window
@@ -243,6 +251,7 @@ type Server struct {
 	ItemInstances    *task.ItemInstances
 	GroundItems      *task.GroundItems
 	ShadowItems      *task.ShadowItems
+	AttackStance     *task.AttackStance
 	account          string
 	templates        *player.TemplateTable
 	itemTable        *item.Table
@@ -774,8 +783,16 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	// Assign through the interface only when set: a typed-nil
 	// *task.AttackStance would otherwise become a non-nil interface and defeat
 	// the link's nil checks.
-	if o.attackStance != nil {
-		gclConfig.AttackStance = o.attackStance
+	attackStance := o.attackStance
+	if attackStance == nil && o.attackStanceNow != nil {
+		var err error
+		attackStance, err = task.NewAttackStance(network.NewAttackStanceEffects(state), o.attackStanceNow)
+		if err != nil {
+			t.Fatalf("attack stance: %v", err)
+		}
+	}
+	if attackStance != nil {
+		gclConfig.AttackStance = attackStance
 	}
 	gcl := network.NewGameClientLink(gclConfig)
 	effects.SetShadowItemExpiry(gcl.ExpireShadowItem)
@@ -868,6 +885,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		ItemInstances:    itemInstances,
 		GroundItems:      groundItems,
 		ShadowItems:      shadowItems,
+		AttackStance:     attackStance,
 		account:          o.account,
 		templates:        templates,
 		ids:              ids,

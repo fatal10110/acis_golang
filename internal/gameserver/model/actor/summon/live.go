@@ -104,6 +104,9 @@ type Actor struct {
 	// world.State; that publish takes a registry mutex, giving every other
 	// goroutine's read a happens-before edge over this unsynchronized write.
 	frames FrameBuilder
+	// broadcastAutoAttackStop is installed alongside SetFrameBuilder,
+	// before SpawnBesideOwner, so the same happens-before edge covers it.
+	broadcastAutoAttackStop func()
 	// skills maps skill id to the level this summon's npc template grants
 	// it, used by TryUseSkill to resolve an owner-commanded action-bar
 	// skill shortcut, matching Java's Summon.getSkill.
