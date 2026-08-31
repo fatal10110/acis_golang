@@ -161,6 +161,9 @@ type Character struct {
 	sendEffectWornOff         func(skillID modelskill.ID, level int)
 	sendEffectDisappeared     func(skillID modelskill.ID, level int)
 	sendEffectAborted         func(skillID modelskill.ID, level int)
+	sendAttackFailedNotice    func()
+	sendResistedSkillNotice   func(targetName string, skillID modelskill.ID, level int)
+	sendResistedMagicNotice   func(attackerName string)
 	consumeHerb               func(itemID int32)
 	roll                      func(int) int
 	attackTarget              func(world.Tracked)

@@ -4,6 +4,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
@@ -286,4 +288,161 @@ func TestMagicDamageHalfFailureSendsAttackFailed(t *testing.T) {
 		t.Fatalf("ATTACK_FAILED message never arrived")
 	}
 	drainUntilQuiet(t, c)
+}
+
+func signetMDamSkill() modelskill.Definition {
+	return modelskill.Definition{
+		ID: 1419, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+		HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
+		SkillType: "SIGNET_CASTTIME", EffectNpcID: 13018, Radius: 180, MPConsume: 1,
+		Power: 1_000_000, Magic: true,
+		SelfEffects: []modelskill.EffectTemplate{{Name: "SignetMDam", Self: true, Count: 3, Time: 1}},
+	}
+}
+
+func bootSignetMDamPair(t *testing.T) (*gameservertest.Server, *testsupport.ScriptedClient, *testsupport.ScriptedClient, int32, int32) {
+	t.Helper()
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Mage", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithNPCs(npc.NewTable([]*npc.Template{{ID: 13018, Type: "EffectPoint", CollisionRadius: 8}})),
+		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{signetMDamSkill()})),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, 1419, 1)
+	victim := srv.SeedCharacterFor(t, "victim", "Victim", 5, 0)
+	vc := srv.DialClient(t, "victim", 1)
+	startInWorldAmongPlayers(t, vc)
+	startInWorldAmongPlayers(t, c)
+	drainUntilQuiet(t, vc)
+	drainUntilQuiet(t, c)
+	return srv, c, vc, objID, victim.ID
+}
+
+func setCasterMagicRolls(t *testing.T, srv *gameservertest.Server, objID int32, roll10000 func() int) {
+	t.Helper()
+	worldObj, ok := srv.State.Player(objID)
+	if !ok {
+		t.Fatalf("world player %d missing", objID)
+	}
+	caster, ok := worldObj.(interface{ SetRollSource(func(int) int) })
+	if !ok {
+		t.Fatalf("world player %d = %T, want SetRollSource", objID, worldObj)
+	}
+	caster.SetRollSource(func(n int) int {
+		if n == 10000 {
+			return roll10000()
+		}
+		if n <= 0 {
+			return 0
+		}
+		return n - 1
+	})
+}
+
+func tickSignetMDamLive(t *testing.T, srv *gameservertest.Server) {
+	t.Helper()
+	time.Sleep(500 * time.Millisecond)
+	for range 3 {
+		time.Sleep(1100 * time.Millisecond)
+		srv.TickEffects()
+	}
+}
+
+func findSystemMessage(t *testing.T, c *testsupport.ScriptedClient, wantID int32) *wire.Reader {
+	t.Helper()
+	for range 50 {
+		frame := c.ReadWithTimeout(time.Second)
+		if frame == nil {
+			break
+		}
+		if frame[0] != serverpackets.OpcodeSystemMessage {
+			continue
+		}
+		r := wireReader(frame[1:])
+		if r.ReadInt32() == wantID {
+			return r
+		}
+	}
+	t.Fatalf("system message %d never arrived", wantID)
+	return nil
+}
+
+// TestSignetMDamHalfFailureSendsResistMessages drives a SignetMDam tick
+// against another player with a scripted fail-then-succeed magic-success
+// pair: the caster gets ATTACK_FAILED, the target gets RESISTED_S1_MAGIC,
+// and HP still drops by the failed amount.
+func TestSignetMDamHalfFailureSendsResistMessages(t *testing.T) {
+	srv, c, vc, objID, victimID := bootSignetMDamPair(t)
+	magicRolls := 0
+	setCasterMagicRolls(t, srv, objID, func() int {
+		magicRolls++
+		if magicRolls%2 == 1 {
+			return 0
+		}
+		return 500
+	})
+
+	before := srv.PlayerCurrentHP(t, victimID)
+	c.Send(encodeRequestMagicSkillUse(1419, false, false))
+	readCastStartFrames(t, c, objID, 1419, 1, 500, 60_000, objID)
+	tickSignetMDamLive(t, srv)
+	if srv.PlayerCurrentHP(t, victimID) >= before {
+		t.Fatalf("victim HP after signet tick = %d, want below %d", srv.PlayerCurrentHP(t, victimID), before)
+	}
+
+	findSystemMessage(t, c, int32(serverpackets.SystemMessageAttackFailed))
+	r := findSystemMessage(t, vc, int32(serverpackets.SystemMessageResistedS1Magic))
+	if params := r.ReadInt32(); params != 1 {
+		t.Fatalf("RESISTED_S1_MAGIC params = %d, want 1", params)
+	}
+	if typ := r.ReadInt32(); typ != serverpackets.SystemMessageParamText || r.ReadString() != "Mage" {
+		t.Fatalf("RESISTED_S1_MAGIC parameter = text Mage")
+	}
+}
+
+// TestSignetMDamFullFailureSendsResistedSkill drives the same tick with both
+// magic-success rolls forced to fail: the caster gets S1_RESISTED_YOUR_S2
+// naming the victim, and HP still drops.
+func TestSignetMDamFullFailureSendsResistedSkill(t *testing.T) {
+	srv, c, vc, objID, victimID := bootSignetMDamPair(t)
+	setCasterMagicRolls(t, srv, objID, func() int { return 0 })
+
+	before := srv.PlayerCurrentHP(t, victimID)
+	c.Send(encodeRequestMagicSkillUse(1419, false, false))
+	readCastStartFrames(t, c, objID, 1419, 1, 500, 60_000, objID)
+	tickSignetMDamLive(t, srv)
+	if srv.PlayerCurrentHP(t, victimID) >= before {
+		t.Fatalf("victim HP after signet tick = %d, want below %d", srv.PlayerCurrentHP(t, victimID), before)
+	}
+
+	var found bool
+	for range 50 {
+		frame := c.ReadWithTimeout(time.Second)
+		if frame == nil {
+			break
+		}
+		if frame[0] != serverpackets.OpcodeSystemMessage {
+			continue
+		}
+		r := wireReader(frame[1:])
+		if r.ReadInt32() != int32(serverpackets.SystemMessageS1ResistedYourS2) {
+			continue
+		}
+		if params := r.ReadInt32(); params != 2 {
+			t.Fatalf("resisted message params = %d, want 2", params)
+		}
+		if typ := r.ReadInt32(); typ != serverpackets.SystemMessageParamText || r.ReadString() != "Victim" {
+			continue
+		}
+		if typ := r.ReadInt32(); typ != serverpackets.SystemMessageParamSkillName || r.ReadInt32() != 1419 || r.ReadInt32() != 1 {
+			t.Fatalf("resisted message second parameter = skill 1419 level 1")
+		}
+		found = true
+		break
+	}
+	if !found {
+		t.Fatalf("S1_RESISTED_YOUR_S2 naming Victim never arrived")
+	}
+	findSystemMessage(t, vc, int32(serverpackets.SystemMessageResistedS1Magic))
 }
