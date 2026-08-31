@@ -796,6 +796,31 @@ func TestReturnHomeRechecksWanderBehindActor(t *testing.T) {
 	}
 }
 
+func TestReturnHomeScalesWanderRecheckDelayForFastNPC(t *testing.T) {
+	movement := &hostileMove{moved: make(chan location.Location, 1)}
+	hostile := newTestHostile(t, movement, &hostileAttack{})
+	hostile.Instance.HasHome = true
+	hostile.Instance.Home = location.Location{X: 100, Y: 0, Z: 0}
+	hostile.Instance.Template.WalkSpeed = 200
+	hostile.roll = func(int) int { return 0 }
+	world.New().Spawn(hostile, 100, 500, 0, 0)
+	hostile.AI().SetWander()
+
+	if !hostile.ReturnHome() {
+		t.Fatal("ReturnHome() = false, want true outside drift range")
+	}
+	select {
+	case <-movement.moved:
+		t.Fatal("wander recheck fired before the scaled delay")
+	case <-time.After(100 * time.Millisecond):
+	}
+	select {
+	case <-movement.moved:
+	case <-time.After(time.Second):
+		t.Fatal("wander recheck did not fire after the scaled delay")
+	}
+}
+
 func TestSiegeGuardReturnHomeForceRunStanceBroadcast(t *testing.T) {
 	movement := &hostileMove{}
 	hostile := newTestHostile(t, movement, &hostileAttack{})

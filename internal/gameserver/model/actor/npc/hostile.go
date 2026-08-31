@@ -842,7 +842,7 @@ func (h *Hostile) scheduleWanderRecheck() {
 	if !ok || h.moveSpeed() <= 0 {
 		return
 	}
-	delay := time.Duration(1500+h.roll(1001)) * time.Millisecond * time.Duration(100/h.moveSpeed())
+	delay := time.Duration(float64(1500+h.roll(1001))*100/float64(h.moveSpeed())) * time.Millisecond
 	time.AfterFunc(delay, func() {
 		if h.brain.CurrentIntention() != ai.IntentionWander {
 			return
