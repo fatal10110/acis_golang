@@ -480,6 +480,13 @@ func (l *GameClientLink) sendSkillHandlerResult(live *livePlayer, result actorca
 	for i := 0; i < result.AttackFailed; i++ {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageAttackFailed))
 	}
+	for _, resist := range result.MagicResists {
+		target, online := l.livePlayerByID(resist.TargetID)
+		if !online {
+			continue
+		}
+		target.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageResistedS1Magic, resist.AttackerName))
+	}
 }
 
 func sendMagicStatusUpdate(live *livePlayer, before player.Vitals) {

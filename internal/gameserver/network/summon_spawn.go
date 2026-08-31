@@ -349,6 +349,7 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 		l.sendSkillHandlerResult(owner, actorcast.EffectResult{
 			AttackFailed: result.AttackFailed,
 			Lethals:      result.Lethals,
+			MagicResists: result.MagicResists,
 		})
 	}
 	brain.SetCastController(aiController)
