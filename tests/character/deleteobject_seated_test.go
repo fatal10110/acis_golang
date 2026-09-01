@@ -17,6 +17,42 @@ import (
 // placed here is in known range and within chair-sit distance.
 var spawnOrigin = location.Location{X: 10, Y: 20, Z: 30}
 
+func TestEnterWorldDiscoversThroneSeatedPlayerWithChairSit(t *testing.T) {
+	t.Run("throne seated", func(t *testing.T) {
+		srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
+		sitter := srv.Client
+		enterWorld(t, sitter)
+		drainQuiet(t, sitter)
+		sitOnChair(t, sitter, nil, spawnChair(t, srv, sitter, nil))
+
+		srv.SeedCharacterFor(t, "player2", "Second", 1, 0)
+		observer := srv.DialClient(t, "player2", 1)
+		observer.Send(encodeRequestGameStart(0))
+		observer.Read()
+		observer.Read()
+		observer.Send(encodeEnterWorld())
+		mustReadOpcode(t, observer, serverpackets.OpcodeCharInfo, "seated player CharInfo")
+		mustReadOpcode(t, observer, serverpackets.OpcodeChairSit, "seated player ChairSit")
+	})
+
+	t.Run("ground sitting", func(t *testing.T) {
+		srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
+		sitter := srv.Client
+		enterWorld(t, sitter)
+		drainQuiet(t, sitter)
+		sitOnGround(t, sitter, nil)
+
+		srv.SeedCharacterFor(t, "player2", "Second", 1, 0)
+		observer := srv.DialClient(t, "player2", 1)
+		observer.Send(encodeRequestGameStart(0))
+		observer.Read()
+		observer.Read()
+		observer.Send(encodeEnterWorld())
+		mustReadOpcode(t, observer, serverpackets.OpcodeCharInfo, "ground-sitting player CharInfo")
+		mustReadOpcode(t, observer, serverpackets.OpcodeSendMacroList, "ground-sitting player enter-world burst")
+	})
+}
+
 // TestLogoutDeleteObjectSeatedFlag pins Forget's DeleteObject animation
 // flag: a throne-seated player's removal uses stand-then-delete (0), while
 // a standing or ground-sitting player uses delete-outright (1).
@@ -65,9 +101,13 @@ func spawnChair(t *testing.T, srv *gameservertest.Server, c, observer *testsuppo
 	}
 	srv.State.Spawn(chair, spawnOrigin.X, spawnOrigin.Y, spawnOrigin.Z, 0)
 	mustReadOpcode(t, c, serverpackets.OpcodeStaticObjectInfo, "sitter StaticObjectInfo")
-	mustReadOpcode(t, observer, serverpackets.OpcodeStaticObjectInfo, "observer StaticObjectInfo")
+	if observer != nil {
+		mustReadOpcode(t, observer, serverpackets.OpcodeStaticObjectInfo, "observer StaticObjectInfo")
+	}
 	drainQuiet(t, c)
-	drainQuiet(t, observer)
+	if observer != nil {
+		drainQuiet(t, observer)
+	}
 	return chair
 }
 
@@ -76,24 +116,34 @@ func sitOnChair(t *testing.T, c, observer *testsupport.ScriptedClient, chair *st
 	c.Send(encodeAction(chair.ObjectID(), int32(spawnOrigin.X), int32(spawnOrigin.Y), int32(spawnOrigin.Z), false))
 	mustReadOpcode(t, c, serverpackets.OpcodeMyTargetSelected, "chair MyTargetSelected")
 	drainQuiet(t, c)
-	drainQuiet(t, observer)
+	if observer != nil {
+		drainQuiet(t, observer)
+	}
 
 	c.Send(encodeRequestChangeWaitType(false))
 	mustReadOpcode(t, c, serverpackets.OpcodeChangeWaitType, "sitter ChangeWaitType")
 	mustReadOpcode(t, c, serverpackets.OpcodeChairSit, "sitter ChairSit")
-	mustReadOpcode(t, observer, serverpackets.OpcodeChangeWaitType, "observer ChangeWaitType")
-	mustReadOpcode(t, observer, serverpackets.OpcodeChairSit, "observer ChairSit")
+	if observer != nil {
+		mustReadOpcode(t, observer, serverpackets.OpcodeChangeWaitType, "observer ChangeWaitType")
+		mustReadOpcode(t, observer, serverpackets.OpcodeChairSit, "observer ChairSit")
+	}
 	drainQuiet(t, c)
-	drainQuiet(t, observer)
+	if observer != nil {
+		drainQuiet(t, observer)
+	}
 }
 
 func sitOnGround(t *testing.T, c, observer *testsupport.ScriptedClient) {
 	t.Helper()
 	c.Send(encodeRequestChangeWaitType(false))
 	mustReadOpcode(t, c, serverpackets.OpcodeChangeWaitType, "sitter ChangeWaitType")
-	mustReadOpcode(t, observer, serverpackets.OpcodeChangeWaitType, "observer ChangeWaitType")
+	if observer != nil {
+		mustReadOpcode(t, observer, serverpackets.OpcodeChangeWaitType, "observer ChangeWaitType")
+	}
 	drainQuiet(t, c)
-	drainQuiet(t, observer)
+	if observer != nil {
+		drainQuiet(t, observer)
+	}
 }
 
 func assertObserverDeleteObjectFlag(t *testing.T, c, observer *testsupport.ScriptedClient, objID int32, wantFlag int32) {
