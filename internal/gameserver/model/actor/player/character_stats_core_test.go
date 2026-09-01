@@ -1410,6 +1410,23 @@ func TestRaiseDeathPenaltyLevelExemptsPvPAndSiegeZones(t *testing.T) {
 	}
 }
 
+func TestInPeaceZoneTracksLiveZoneMembership(t *testing.T) {
+	c := &Character{}
+	if c.InPeaceZone() {
+		t.Fatal("InPeaceZone() = true before entering a peace zone")
+	}
+
+	c.SetInPeaceZone(true)
+	if !c.InPeaceZone() {
+		t.Fatal("InPeaceZone() = false after entering a peace zone")
+	}
+
+	c.SetInPeaceZone(false)
+	if c.InPeaceZone() {
+		t.Fatal("InPeaceZone() = true after leaving a peace zone")
+	}
+}
+
 // TestRaiseDeathPenaltyLevelFiresRaisedUpdaterOnlyOnPass matches the
 // reference's calculateDeathPenaltyBuffLevel (Player.java:6518-6528): the
 // packet-layer notification fires with the new level only when the gate

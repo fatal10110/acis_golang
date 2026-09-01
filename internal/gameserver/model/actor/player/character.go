@@ -118,6 +118,7 @@ type Character struct {
 	zones                     PeaceZoneQuery
 	revalidateZones           func(location.Location)
 	insidePvPZone             atomic.Bool
+	insidePeaceZone           atomic.Bool
 	insideSiegeZone           atomic.Bool
 	insideNoSummonFriendZone  atomic.Bool
 	sendFrame                 func(wire.Frame) bool
