@@ -63,7 +63,7 @@ func TestPetStore_SaveAndGet(t *testing.T) {
 	}
 }
 
-func TestPetStore_NameTakenIsCaseInsensitive(t *testing.T) {
+func TestPetStore_NameTaken(t *testing.T) {
 	ctx := context.Background()
 	store := NewPetStore(sqltest.SharedDB(t))
 	if err := store.Save(ctx, 0x10000101, pet.State{Name: "Wolf", Level: 1}); err != nil {
@@ -74,7 +74,7 @@ func TestPetStore_NameTakenIsCaseInsensitive(t *testing.T) {
 		name string
 		want bool
 	}{
-		{name: "WOLF", want: true},
+		{name: "Wolf", want: true},
 		{name: "Hatchling", want: false},
 	} {
 		got, err := store.NameTaken(ctx, tt.name)
@@ -84,6 +84,37 @@ func TestPetStore_NameTakenIsCaseInsensitive(t *testing.T) {
 		if got != tt.want {
 			t.Errorf("NameTaken(%q) = %v, want %v", tt.name, got, tt.want)
 		}
+	}
+}
+
+// TestPetStore_NameTakenUsesColumnComparison pins uniqueness to the pets.name
+// column comparison. A query-time LOWER() fold would still treat WOLF as taken
+// after the column is switched to a case-sensitive collation.
+func TestPetStore_NameTakenUsesColumnComparison(t *testing.T) {
+	ctx := context.Background()
+	db := sqltest.NewDB(t)
+	if _, err := db.ExecContext(ctx, `ALTER TABLE pets MODIFY name VARCHAR(16) COLLATE utf8mb4_bin`); err != nil {
+		t.Fatalf("alter pets.name to binary collation: %v", err)
+	}
+	store := NewPetStore(db)
+	if err := store.Save(ctx, 0x10000101, pet.State{Name: "Wolf", Level: 1}); err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+
+	taken, err := store.NameTaken(ctx, "WOLF")
+	if err != nil {
+		t.Fatalf("NameTaken(%q) error = %v", "WOLF", err)
+	}
+	if taken {
+		t.Errorf("NameTaken(%q) = true, want false on a case-sensitive column", "WOLF")
+	}
+
+	taken, err = store.NameTaken(ctx, "Wolf")
+	if err != nil {
+		t.Fatalf("NameTaken(%q) error = %v", "Wolf", err)
+	}
+	if !taken {
+		t.Errorf("NameTaken(%q) = false, want true", "Wolf")
 	}
 }
 
