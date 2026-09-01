@@ -3,6 +3,7 @@ package skill
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
@@ -102,11 +103,7 @@ func withinEffectRange(effector, effected Actor, effectRange int) bool {
 	}
 	ax, ay, az := effectorPos.Position()
 	bx, by, bz := effectedPos.Position()
-	dx := int64(ax) - int64(bx)
-	dy := int64(ay) - int64(by)
-	dz := int64(az) - int64(bz)
-	radius := int64(effectRange)
-	return dx*dx+dy*dy+dz*dz <= radius*radius
+	return location.In3DRange(ax, ay, az, bx, by, bz, effectRange)
 }
 
 // stopEffectsBySkillID removes every active effect in list owned by the
