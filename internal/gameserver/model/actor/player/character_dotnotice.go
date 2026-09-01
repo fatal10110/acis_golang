@@ -5,6 +5,36 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
 
+// SetHealRestoredNotifiers records the packet-layer hooks for Heal/ManaHeal
+// start-hook HP/MP restored system messages.
+func (c *Character) SetHealRestoredNotifiers(hp, mp func(healerName string, amount int, byOther bool)) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	c.sendHPRestoredNotice, c.sendMPRestoredNotice = hp, mp
+}
+
+// NotifyHPRestored sends the HP-restored system message: number-only for a
+// self restore, healer name plus amount when another actor applied it.
+func (c *Character) NotifyHPRestored(healerName string, amount int, byOther bool) {
+	c.stateMu.RLock()
+	send := c.sendHPRestoredNotice
+	c.stateMu.RUnlock()
+	if send != nil {
+		send(healerName, amount, byOther)
+	}
+}
+
+// NotifyMPRestored sends the MP-restored system message: number-only for a
+// self restore, healer name plus amount when another actor applied it.
+func (c *Character) NotifyMPRestored(healerName string, amount int, byOther bool) {
+	c.stateMu.RLock()
+	send := c.sendMPRestoredNotice
+	c.stateMu.RUnlock()
+	if send != nil {
+		send(healerName, amount, byOther)
+	}
+}
+
 // SetLackHPNotifier records the packet-layer hook for a toggle DOT effect
 // removed because its tick would exceed the target's remaining HP.
 func (c *Character) SetLackHPNotifier(send func()) {
