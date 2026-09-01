@@ -75,6 +75,7 @@ func TestPetStore_NameTaken(t *testing.T) {
 		want bool
 	}{
 		{name: "Wolf", want: true},
+		{name: "WOLF", want: true}, // default collation folds case; the column decides
 		{name: "Hatchling", want: false},
 	} {
 		got, err := store.NameTaken(ctx, tt.name)
