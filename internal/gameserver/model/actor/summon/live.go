@@ -151,6 +151,8 @@ type Actor struct {
 	statCalc               summonStatCalcs
 	vitals                 summonVitals
 	effects                *effect.List
+	skillDefs              skillLookup
+	raidCursesDisabled     bool
 	stateMu                sync.RWMutex
 	paralyzed, teleporting bool
 
@@ -339,6 +341,7 @@ func NewServitor(cfg ServitorConfig) (*Actor, error) {
 		roll:             defaultRoll(cfg.Roll),
 		stats:            cfg.Stats,
 		skills:           cfg.Skills,
+		skillDefs:        cfg.SkillDefs,
 		maxBuffsAmount:   defaultPositive(cfg.MaxBuffsAmount, baseBuffSlots),
 	}
 	if err := a.attachTemplatePassives(cfg.SkillDefs, cfg.Passives); err != nil {
@@ -391,6 +394,7 @@ func NewPet(cfg PetConfig) (*Actor, error) {
 		roll:           defaultRoll(cfg.Roll),
 		stats:          cfg.Stats,
 		skills:         cfg.Skills,
+		skillDefs:      cfg.SkillDefs,
 		maxBuffsAmount: defaultPositive(cfg.MaxBuffsAmount, baseBuffSlots),
 	}
 	if err := a.attachTemplatePassives(cfg.SkillDefs, cfg.Passives); err != nil {

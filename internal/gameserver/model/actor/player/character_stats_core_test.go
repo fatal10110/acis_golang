@@ -5648,6 +5648,65 @@ func TestTemplateReachableSkillGrants(t *testing.T) {
 	}
 }
 
+func TestCharacterMakeAttackHitAppliesFacingAndNight(t *testing.T) {
+	t.Cleanup(func() { creature.SetNightSource(nil) })
+
+	place := func(t *testing.T, ax, ay int) (*Character, *Character) {
+		t.Helper()
+		tmpl := combatTemplate()
+		items := combatItems()
+		target := liveCharacter(1, tmpl, items)
+		attacker := liveCharacter(2, tmpl, items)
+		target.SetLastKnownPosition(location.Location{X: 0, Y: 0, Z: 0}, 0)
+		attacker.SetLastKnownPosition(location.Location{X: ax, Y: ay, Z: 0}, 0)
+		return attacker, target
+	}
+
+	attacker, target := place(t, 100, 0)
+	acc := attacker.Accuracy()
+	eva := target.Evasion()
+	frontRate := formulas.HitRate(acc, eva, 0, false, false, true)
+	behindRate := formulas.HitRate(acc, eva, 0, false, true, false)
+	nightRate := formulas.HitRate(acc, eva, 0, true, false, true)
+	if frontRate >= behindRate {
+		t.Fatalf("need positional rate gap, front=%d behind=%d", frontRate, behindRate)
+	}
+	if nightRate >= frontRate {
+		t.Fatalf("need night rate gap, night=%d front=%d", nightRate, frontRate)
+	}
+	posRoll := (frontRate + behindRate) / 2
+	nightRoll := (nightRate + frontRate) / 2
+
+	tests := []struct {
+		name     string
+		ax, ay   int
+		night    bool
+		roll     int
+		wantMiss bool
+	}{
+		{"front day misses between front and behind rates", 100, 0, false, posRoll, true},
+		{"behind day hits between front and behind rates", -100, 0, false, posRoll, false},
+		{"side day hits between front and behind rates", 0, 100, false, posRoll, false},
+		{"front night misses between night and front rates", 100, 0, true, nightRoll, true},
+		{"front day hits the night-gap roll", 100, 0, false, nightRoll, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			creature.SetNightSource(hitNight(tt.night))
+			attacker, target := place(t, tt.ax, tt.ay)
+			attacker.SetRollSource(func(int) int { return tt.roll })
+			hit := attacker.MakeAttackHit(target, false)
+			if hit.Miss != tt.wantMiss {
+				t.Fatalf("Miss = %v, want %v (roll %d acc %d eva %d)", hit.Miss, tt.wantMiss, tt.roll, acc, eva)
+			}
+		})
+	}
+}
+
+type hitNight bool
+
+func (n hitNight) IsNight() bool { return bool(n) }
+
 func equalSkillGrants(a, b []SkillGrant) bool {
 	if len(a) != len(b) {
 		return false

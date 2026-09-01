@@ -63,6 +63,22 @@ func encodeSingleOpcode(opcode byte) []byte {
 	return wire.NewPacketWriter(opcode).Bytes()
 }
 
+func encodeAction(objectID int32, x, y, z int32, shift bool) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeAction)
+	w.WriteInt32(objectID)
+	w.WriteInt32(x)
+	w.WriteInt32(y)
+	w.WriteInt32(z)
+	w.WriteUint8(wire.BoolByte(shift))
+	return w.Bytes()
+}
+
+func encodeRequestChangeWaitType(stand bool) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeRequestChangeWaitType)
+	w.WriteInt32(wire.BoolInt32(stand))
+	return w.Bytes()
+}
+
 func encodeMoveBackwardToLocation(target, origin location.Location, moveMovement int32) []byte {
 	w := wire.NewPacketWriter(clientpackets.OpcodeMoveBackwardToLocation)
 	w.WriteInt32(int32(target.X))
@@ -96,6 +112,11 @@ func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	frames := make([][]byte, 0, len(want))
 	for i, opcode := range want {
 		frame := c.Read()
+		// A client that already knows another player receives that player's
+		// CharInfo ahead of its own burst; skip those leading spawn frames.
+		for i == 0 && frame[0] == serverpackets.OpcodeCharInfo {
+			frame = c.Read()
+		}
 		if frame[0] != opcode {
 			t.Fatalf("EnterWorld frame %d opcode = %#x, want %#x", i, frame[0], opcode)
 		}

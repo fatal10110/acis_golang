@@ -11,6 +11,12 @@ import (
 )
 
 const attackHateDecay = 6.6
+const castDesireDecay = 66000
+const nothingDesireDecay = 0.5
+
+// attackDesireRange is the 3D distance past which a queued ATTACK desire
+// is dropped when the actor can still choose a new intention.
+const attackDesireRange = 1500
 
 // staleThreatAge is NpcAI.java's out-of-territory stale-hate threshold
 // (NpcAI.java:319): a threat entry whose last damage is at least this old
@@ -86,6 +92,10 @@ type CastController interface {
 	// CanCast validates the final HP/MP/mute/reuse/item gates, immediately
 	// before the cast commits.
 	CanCast(target attackable.Combatant, ref skill.Ref) bool
+	// MeetsHPMPDisabled reports whether the actor currently has the HP/MP
+	// and is not muted for ref against target. Queued CAST desires that
+	// fail this check are dropped before promotion, separately from CanCast.
+	MeetsHPMPDisabled(target attackable.Combatant, ref skill.Ref) bool
 	// Cast starts the cast against target. Delayed scheduling and effect
 	// application are the implementation's responsibility.
 	Cast(target attackable.Combatant, ref skill.Ref)
@@ -218,29 +228,39 @@ func (a *Attackable) AddCombatDamageHate(attacker attackable.Combatant, damage f
 	a.thinkIfNoMostHated(hadMostHated, attacker)
 }
 
-// AddAttackDesire queues an attack intention. When the threat table has no
-// most-hated attacker, the AI loop runs immediately so the first reaction
-// does not wait for the next tick.
+// AddAttackDesire queues an attack intention that closes on the target.
+// When the threat table has no most-hated attacker, the AI loop runs
+// immediately so the first reaction does not wait for the next tick.
 func (a *Attackable) AddAttackDesire(attacker attackable.Combatant, hate float64) {
+	a.queueAttackDesire(attacker, hate, true)
+}
+
+// AddAttackDesireHold queues an attack intention that stays in place instead
+// of closing on the target. Same first-reaction Think as AddAttackDesire.
+func (a *Attackable) AddAttackDesireHold(attacker attackable.Combatant, hate float64) {
+	a.queueAttackDesire(attacker, hate, false)
+}
+
+func (a *Attackable) queueAttackDesire(attacker attackable.Combatant, hate float64, moveToTarget bool) {
 	if attacker == nil || (a.actor.SiegeGuard() && attacker.SiegeGuard()) {
 		return
 	}
 	_, hadMostHated := a.threats.MostHated()
-	a.addAttackDesire(attacker, hate)
+	a.addAttackDesireWithMove(attacker, hate, moveToTarget)
 	a.thinkIfNoMostHated(hadMostHated, attacker)
 }
 
-// addAttackDesire ports the ordinary hate-list overloads of NpcAI.java's
-// addAttackDesire (NpcAI.java:698-711), all of which default
-// moveToTarget = true. Only the scripted addAttackDesireHold
-// (NpcAI.java:683-696, not yet ported) queues MoveToTarget = false.
 func (a *Attackable) addAttackDesire(attacker attackable.Combatant, hate float64) {
+	a.addAttackDesireWithMove(attacker, hate, true)
+}
+
+func (a *Attackable) addAttackDesireWithMove(attacker attackable.Combatant, hate float64, moveToTarget bool) {
 	a.desires.AddOrUpdate(&Desire{
 		Kind:         IntentionAttack,
 		FinalTarget:  attacker,
 		Weight:       hate,
 		QueuedAt:     time.Now(),
-		MoveToTarget: true,
+		MoveToTarget: moveToTarget,
 	})
 }
 
@@ -442,6 +462,20 @@ func (a *Attackable) CurrentIntention() Intention {
 	return a.current.kind
 }
 
+// TopDesireTarget is the creature the currently executing attack or cast
+// intention is aimed at. Idle and follow intentions have no top desire
+// target.
+func (a *Attackable) TopDesireTarget() attackable.Combatant {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	switch a.current.kind {
+	case IntentionAttack, IntentionCast:
+		return a.current.target
+	default:
+		return nil
+	}
+}
+
 // NextIntention returns the queued intention, if one exists.
 func (a *Attackable) NextIntention() (Intention, attackable.Combatant, bool) {
 	a.mu.Lock()
@@ -461,6 +495,8 @@ func (a *Attackable) Think() error {
 	defer a.mu.Unlock()
 
 	a.refreshCombatMemory()
+	a.pruneDesires()
+	a.dropCurrentIfUnqueued()
 	if _, ok := a.desires.Peek(); !ok {
 		a.queueIdleFollow()
 	}
@@ -512,7 +548,8 @@ func (a *Attackable) promoteNext() {
 	a.current = next
 }
 
-// Tick advances the AI clock and applies periodic attack-threat decay.
+// Tick advances the AI clock and applies periodic attack, cast, and
+// nothing-desire weight decay.
 func (a *Attackable) Tick() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -526,6 +563,8 @@ func (a *Attackable) Tick() {
 	a.refreshCombatMemory()
 	a.reduceAllAggroHateLocked(attackHateDecay)
 	a.desires.DecreaseWeightByType(IntentionAttack, attackHateDecay)
+	a.desires.DecreaseWeightByType(IntentionCast, castDesireDecay)
+	a.desires.DecreaseWeightByType(IntentionNothing, nothingDesireDecay)
 	a.step = 0
 }
 
@@ -557,6 +596,64 @@ func (a *Attackable) tickOutOfTerritory() {
 		a.desires.Remove(IntentionAttack, t.Attacker)
 		a.threats.StopHate(t.Attacker)
 	}
+}
+
+func (a *Attackable) pruneDesires() {
+	a.desires.RemoveIf(func(d *Desire) bool {
+		if d.Kind != IntentionCast {
+			return false
+		}
+		if d.Weight <= 0 {
+			return true
+		}
+		if a.cast == nil {
+			return false
+		}
+		return !a.cast.MeetsHPMPDisabled(d.FinalTarget, d.Skill)
+	})
+	if a.actor.DenyAIAction() {
+		return
+	}
+	ox, oy, oz, ok := combatantPosition(a.actor)
+	if !ok {
+		return
+	}
+	origin := location.Location{X: ox, Y: oy, Z: oz}
+	a.desires.RemoveIf(func(d *Desire) bool {
+		if d.Kind != IntentionAttack || d.FinalTarget == nil {
+			return false
+		}
+		tx, ty, tz, ok := combatantPosition(d.FinalTarget)
+		if !ok {
+			return false
+		}
+		return origin.Distance3D(location.Location{X: tx, Y: ty, Z: tz}) > attackDesireRange
+	})
+}
+
+func (a *Attackable) dropCurrentIfUnqueued() {
+	if a.actor.DenyAIAction() || a.attack.AttackingNow() {
+		return
+	}
+	if a.cast != nil && a.cast.CastingNow() {
+		return
+	}
+	switch a.current.kind {
+	case IntentionAttack, IntentionCast:
+		probe := &Desire{Kind: a.current.kind, FinalTarget: a.current.target, Skill: a.current.skill}
+		if !a.desires.Has(probe) {
+			a.current = intention{kind: IntentionIdle}
+		}
+	}
+}
+
+func combatantPosition(c attackable.Combatant) (x, y, z int, ok bool) {
+	p, ok := c.(interface{ Position() (int, int, int) })
+	if !ok {
+		return 0, 0, 0, false
+	}
+	x, y, z = p.Position()
+	return x, y, z, true
 }
 
 // thinkAttack advances one IntentionAttack step. The first return reports

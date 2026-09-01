@@ -283,6 +283,31 @@ func (c *Controller) CanCast(target Target, def modelskill.Definition) error {
 	return nil
 }
 
+// MeetsHPMPDisabled checks HP, MP, and mute gates for target and def. It
+// does not apply reuse, item, or line-of-sight checks; those belong to
+// CanCast at commit time.
+func (c *Controller) MeetsHPMPDisabled(target Target, def modelskill.Definition) error {
+	if c.actor == nil || target == nil {
+		return ErrInvalidTarget
+	}
+	initialMP := c.actor.MPInitialCost(def)
+	mp := c.actor.MPCost(def)
+	if (initialMP > 0 || mp > 0) && c.actor.MP() < initialMP+mp {
+		return ErrNotEnoughMP
+	}
+	if def.HPConsume > 0 && c.actor.HP() <= def.HPConsume {
+		return ErrNotEnoughHP
+	}
+	if def.Magic {
+		if c.actor.MagicMuted() {
+			return ErrMagicMuted
+		}
+	} else if c.actor.PhysicalMuted() {
+		return ErrPhysicalMuted
+	}
+	return nil
+}
+
 // Start accepts a cast, applies the start-of-cast costs and cooldowns, and
 // stores the active cast state. The caller owns scheduling Launch, Hit and
 // Finish according to the returned Plan.

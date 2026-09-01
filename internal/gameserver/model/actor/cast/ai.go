@@ -109,6 +109,23 @@ func (a *AIController) CanCast(target attackable.Combatant, ref modelskill.Ref) 
 	return a.Controller.CanCast(castTarget, def) == nil
 }
 
+// MeetsHPMPDisabled reports whether the actor currently has the HP/MP and is
+// not muted for ref against target.
+func (a *AIController) MeetsHPMPDisabled(target attackable.Combatant, ref modelskill.Ref) bool {
+	if a.Controller == nil || target == nil {
+		return false
+	}
+	def, ok := a.definition(ref)
+	if !ok {
+		return false
+	}
+	castTarget, ok := any(target).(Target)
+	if !ok {
+		return false
+	}
+	return a.Controller.MeetsHPMPDisabled(castTarget, def) == nil
+}
+
 // magicCastBroadcaster is the observer-broadcast surface an AI-initiated
 // cast's caster optionally exposes, mirroring the reference sequence in
 // CreatureCast.java (the same doCast/onMagicLaunch/stop path PlayerCast

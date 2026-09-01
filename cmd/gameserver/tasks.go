@@ -9,8 +9,10 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/scheduler"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
+	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -130,10 +132,11 @@ func startSevenSigns(lc fx.Lifecycle, state *sevensigns.State) {
 }
 
 // wireGameClock installs clock as the source <game night=.../> stat-func
-// conditions read (see skill/effect.SetGameClock), before any character can
+// conditions and melee auto-attack hit-chance read, before any character can
 // log in and reach one.
 func wireGameClock(clock *task.GameClock) {
 	effect.SetGameClock(clock)
+	creature.SetNightSource(clock)
 }
 
 func startGameClock(lc fx.Lifecycle, clock *task.GameClock, log zerolog.Logger) {
@@ -178,8 +181,8 @@ func startShadowItems(lc fx.Lifecycle, items *task.ShadowItems, log zerolog.Logg
 	startTicker(lc, log, items.Start)
 }
 
-func provideAutosave(effects *network.TaskEffects, roster *manager.Roster, log zerolog.Logger) (*task.Autosave, error) {
-	effects.SetAutosave(roster, log)
+func provideAutosave(effects *network.TaskEffects, roster *manager.Roster, skills *skillstate.Persistence, log zerolog.Logger) (*task.Autosave, error) {
+	effects.SetAutosave(roster, skills, log)
 	return task.NewAutosave(effects, time.Now)
 }
 

@@ -268,9 +268,30 @@ type Server struct {
 	sessions         *manager.SessionStore
 	groundStore      *gamesql.GroundItemStore
 	cursedWeapons    *entity.CursedWeaponTable
+	autosave         *task.Autosave
+	autosaveClock    *autosaveClock
 
 	closeOnce sync.Once
 	cancel    context.CancelFunc
+}
+
+// autosaveClock is the harness clock task.Autosave reads. EnterWorld's
+// Add and TickAutosave share it, so the time value is mutex-guarded.
+type autosaveClock struct {
+	mu  sync.Mutex
+	now time.Time
+}
+
+func (c *autosaveClock) Now() time.Time {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.now
+}
+
+func (c *autosaveClock) Advance(d time.Duration) {
+	c.mu.Lock()
+	c.now = c.now.Add(d)
+	c.mu.Unlock()
 }
 
 // Account is the login account the scripted client authenticated as.
@@ -593,6 +614,18 @@ func (s *Server) Shutdown(tb testing.TB) {
 	s.Close()
 }
 
+// TickAutosave advances the harness clock past the next autosave deadline
+// and runs one production sweep. Boot does not start the autosave ticker,
+// so tests that need the periodic save path call this instead of waiting
+// AutosaveInitialDelay.
+func (s *Server) TickAutosave() {
+	if s.autosave == nil || s.autosaveClock == nil {
+		return
+	}
+	s.autosaveClock.Advance(task.AutosaveInitialDelay)
+	s.autosave.Tick()
+}
+
 // NewObjectID allocates the next object id from the server's id sequence.
 func (s *Server) NewObjectID() int32 {
 	id, err := s.ids.NextID()
@@ -749,6 +782,12 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		rosterNPCs = npc.NewTable(nil)
 	}
 	roster := gamemanager.NewRoster(chars, items, shortcuts, templates, itemTemplates, rosterNPCs, ids, gamemanager.DefaultDeleteAfter, time.Now)
+	effects.SetAutosave(roster, o.skills, zerolog.Nop())
+	autosaveClock := &autosaveClock{now: time.Now()}
+	autosave, err := task.NewAutosave(effects, autosaveClock.Now)
+	if err != nil {
+		t.Fatalf("new autosave: %v", err)
+	}
 	gclConfig := network.GameClientLinkConfig{
 		Validator:        validator,
 		LoginLink:        func() *network.LoginLink { return loginLink },
@@ -779,6 +818,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		InventoryUpdates: inventoryUpdates,
 		ItemInstances:    itemInstances,
 		ShadowItems:      shadowItems,
+		Autosave:         autosave,
 		PlayerConfig:     network.PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, AllowWater: true, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, MaxBuffsAmount: o.maxBuffsAmount},
 		Restarts:         o.restarts,
 		Zones:            o.zones,
@@ -901,6 +941,8 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		sessions:         sessions,
 		groundStore:      gamesql.NewGroundItemStore(db),
 		cursedWeapons:    cursed,
+		autosave:         autosave,
+		autosaveClock:    autosaveClock,
 		cancel:           cancel,
 	}
 }

@@ -63,11 +63,74 @@ func (h *Hostile) reactPartyAttacked(caller *Hostile, target attackable.Combatan
 	if !assist {
 		return
 	}
-	if h.aiInt("MovingAttack", 1) != 1 {
+	weight := float64(aggro) * partyAttackedWeight
+	top := h.brain.TopDesireTarget()
+	if h.aiInt("MovingAttack", 1) == 1 {
+		h.queueMovingPartyAttack(target, top, weight)
 		return
 	}
-	h.AddDamageHate(target, 0, float64(aggro)*partyAttackedWeight)
-	h.AddAttackDesire(target, float64(aggro)*partyAttackedWeight)
+	if h.canAutoAttack(target) {
+		h.queuePartyAttack(target, weight, true)
+		return
+	}
+	if samePartyTarget(top, target) {
+		h.RemoveAttackDesire(top)
+	}
+}
+
+func (h *Hostile) queueMovingPartyAttack(target, top attackable.Combatant, weight float64) {
+	h.queuePartyAttack(target, weight, false)
+	if top == nil {
+		return
+	}
+	if h.GeoPathFailCount() > 10 && samePartyTarget(target, top) && h.hpRatio() < 1 {
+		if pos, ok := combatantLocation(target); ok {
+			h.TeleportTo(pos)
+			h.ResetGeoPathFailCount()
+		}
+	}
+	if h.Rooted() && partyDistance2D(h, top) > 40 {
+		if !h.canAutoAttack(top) {
+			h.RemoveAttackDesire(top)
+		}
+		h.queuePartyAttack(target, weight, false)
+	}
+}
+
+func (h *Hostile) queuePartyAttack(target attackable.Combatant, weight float64, hold bool) {
+	h.AddDamageHate(target, 0, weight)
+	if hold {
+		h.AddAttackDesireHold(target, weight)
+		return
+	}
+	h.AddAttackDesire(target, weight)
+}
+
+func (h *Hostile) canAutoAttack(target attackable.Combatant) bool {
+	if h.Instance == nil || h.Instance.Template == nil {
+		return false
+	}
+	return h.AutoAttackTargetValid(target, h.Instance.Template.AggroRange, false)
+}
+
+func (h *Hostile) hpRatio() float64 {
+	maxHP := h.MaxHPValue()
+	if maxHP <= 0 {
+		return 0
+	}
+	return h.HP() / maxHP
+}
+
+func samePartyTarget(a, b attackable.Combatant) bool {
+	return a != nil && b != nil && a.ObjectID() == b.ObjectID()
+}
+
+func partyDistance2D(h *Hostile, other attackable.Combatant) float64 {
+	pos, ok := combatantLocation(other)
+	if !ok {
+		return 0
+	}
+	return h.location().Distance2D(pos)
 }
 
 func (h *Hostile) aiInt(key string, def int) int {

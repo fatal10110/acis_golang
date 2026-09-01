@@ -478,6 +478,73 @@ func TestLiveInvulReportsChange(t *testing.T) {
 	}
 }
 
+type facingStub struct {
+	x, y, z, heading int
+}
+
+func (s facingStub) Position() (int, int, int) { return s.x, s.y, s.z }
+func (s facingStub) Heading() int              { return s.heading }
+
+type currentHeadingStub struct {
+	facingStub
+	current int
+}
+
+func (s currentHeadingStub) CurrentHeading() int { return s.current }
+
+type nightStub bool
+
+func (n nightStub) IsNight() bool { return bool(n) }
+
+func TestAttackFacingBehindFrontAndSide(t *testing.T) {
+	target := facingStub{heading: 0}
+
+	behind, inFront := AttackFacing(target, facingStub{x: -100})
+	if !behind || inFront {
+		t.Fatalf("behind attacker: behind=%v inFront=%v, want true, false", behind, inFront)
+	}
+
+	behind, inFront = AttackFacing(target, facingStub{x: 100})
+	if behind || !inFront {
+		t.Fatalf("front attacker: behind=%v inFront=%v, want false, true", behind, inFront)
+	}
+
+	behind, inFront = AttackFacing(target, facingStub{y: 100})
+	if behind || inFront {
+		t.Fatalf("side attacker: behind=%v inFront=%v, want false, false", behind, inFront)
+	}
+}
+
+func TestAttackFacingPrefersCurrentHeading(t *testing.T) {
+	// Heading() faces north (16384); CurrentHeading faces east (0).
+	target := currentHeadingStub{facingStub: facingStub{heading: 16384}, current: 0}
+
+	behind, inFront := AttackFacing(target, facingStub{x: -100})
+	if !behind || inFront {
+		t.Fatalf("CurrentHeading 0, attacker x=-100: behind=%v inFront=%v, want true, false", behind, inFront)
+	}
+}
+
+func TestNightReadsInstalledSource(t *testing.T) {
+	prev := nightSource
+	t.Cleanup(func() { SetNightSource(prev) })
+
+	SetNightSource(nil)
+	if Night() {
+		t.Fatal("Night() = true with no source, want day")
+	}
+
+	SetNightSource(nightStub(true))
+	if !Night() {
+		t.Fatal("Night() = false after installing night source")
+	}
+
+	SetNightSource(nightStub(false))
+	if Night() {
+		t.Fatal("Night() = true after installing day source")
+	}
+}
+
 func TestLiveNilReceiverGettersDoNotPanic(t *testing.T) {
 	var live *Live
 
