@@ -200,7 +200,11 @@ func (l *GameServerLink) handleConnection(ctx context.Context, conn net.Conn) {
 	// frames; every payload is decoded within its loop iteration.
 	frames := wire.NewFrameReader(conn)
 	for {
-		if err := setReadDeadline(conn, c.authed); err != nil {
+		deadline := time.Now().Add(connectionHandshakeTimeout)
+		if c.authed {
+			deadline = time.Time{}
+		}
+		if err := conn.SetReadDeadline(deadline); err != nil {
 			return
 		}
 		payload, err := frames.ReadFrame()

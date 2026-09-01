@@ -265,11 +265,11 @@ func (l *LoginLink) readLoop(handlers LoginLinkHandlers) {
 // per-link buffer, so the payload is only valid until the next readFrame
 // call; only the single reader goroutine may call it.
 func (l *LoginLink) readFrame() ([]byte, error) {
-	timeout := clientReadIdleTimeout
+	deadline := time.Time{}
 	if l.handshaking {
-		timeout = clientReadHandshakeTimeout
+		deadline = time.Now().Add(clientReadHandshakeTimeout)
 	}
-	if err := l.conn.SetReadDeadline(time.Now().Add(timeout)); err != nil {
+	if err := l.conn.SetReadDeadline(deadline); err != nil {
 		return nil, err
 	}
 	payload, err := l.frames.ReadFrame()

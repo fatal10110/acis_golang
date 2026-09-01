@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
@@ -1079,7 +1080,7 @@ func clearsSpawnProtection(opcode byte) bool {
 }
 
 func normalReadFrameError(err error) bool {
-	return errors.Is(err, io.EOF) || errors.Is(err, net.ErrClosed)
+	return errors.Is(err, io.EOF) || errors.Is(err, net.ErrClosed) || errors.Is(err, os.ErrDeadlineExceeded)
 }
 
 // authenticate validates req against the login server over the game

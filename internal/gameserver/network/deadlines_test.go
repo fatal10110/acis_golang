@@ -2,11 +2,13 @@ package network
 
 import (
 	"net"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/rs/zerolog"
 
+	"github.com/fatal10110/acis_golang/internal/commons/crypt"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	gamecipher "github.com/fatal10110/acis_golang/internal/gameserver/network/cipher"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -133,5 +135,28 @@ func TestSessionSendFrameSetsWriteDeadline(t *testing.T) {
 		}
 	case <-time.After(time.Second):
 		t.Fatal("SendFrame did not set a write deadline")
+	}
+}
+
+func TestLoginLinkEstablishedReadClearsDeadline(t *testing.T) {
+	server, client := net.Pipe()
+	tracked := &deadlineConn{Conn: server, readDeadline: make(chan time.Time, 1)}
+	t.Cleanup(func() { _ = client.Close() })
+	l := &LoginLink{conn: tracked, crypt: crypt.NewLinkCrypt(), frames: wire.NewFrameReader(tracked)}
+
+	go func() { _, _ = l.readFrame() }()
+	select {
+	case deadline := <-tracked.readDeadline:
+		if !deadline.IsZero() {
+			t.Fatalf("established link read deadline = %s, want none", deadline)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("established link ReadFrame did not clear its deadline")
+	}
+}
+
+func TestNormalReadFrameErrorTreatsDeadlineAsExpected(t *testing.T) {
+	if !normalReadFrameError(os.ErrDeadlineExceeded) {
+		t.Fatal("deadline exceeded is not treated as an expected disconnect")
 	}
 }
