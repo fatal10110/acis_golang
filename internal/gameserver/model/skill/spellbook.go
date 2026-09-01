@@ -6,6 +6,9 @@ import (
 
 const (
 	DivineInspirationSkillID ID = 1405
+	// RaidCurseSkillID is the silence raid curse applied to a playable
+	// who helps a hated Playable near a raid-related Attackable.
+	RaidCurseSkillID ID = 4215
 	// RaidCurse2SkillID is the petrification raid curse applied to a
 	// playable whose level is more than eight above a raid-related
 	// Attackable.
