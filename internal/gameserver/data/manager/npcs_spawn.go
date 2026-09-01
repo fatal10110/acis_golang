@@ -176,6 +176,7 @@ func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, lo
 		n.log.Warn().Err(err).Int32("npc_id", entry.NPCID).Msg("spawn: cannot build live npc")
 		return nil
 	}
+	hostile.AI().SetRandomWalkRate(n.randomWalkRate)
 
 	if hp == fullHP {
 		hp = hostile.MaxHP()
