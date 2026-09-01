@@ -312,6 +312,36 @@ func TestLoadDisableRaidCurseDefaultsToFalse(t *testing.T) {
 	}
 }
 
+func TestLoadRandomWalkRateUsesNpcsProperties(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "npcs.properties")
+	if err := os.WriteFile(configPath, []byte("RandomWalkRate = 45\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := loadRandomWalkRate(gameServerPaths{NpcsConfigPath: configPath})
+	if err != nil {
+		t.Fatalf("loadRandomWalkRate() error = %v", err)
+	}
+	if got != 45 {
+		t.Fatalf("loadRandomWalkRate() = %d, want 45", got)
+	}
+}
+
+func TestLoadRandomWalkRateDefaultsToThirty(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "npcs.properties")
+	if err := os.WriteFile(configPath, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := loadRandomWalkRate(gameServerPaths{NpcsConfigPath: configPath})
+	if err != nil {
+		t.Fatalf("loadRandomWalkRate() error = %v", err)
+	}
+	if got != 30 {
+		t.Fatalf("loadRandomWalkRate() = %d, want 30", got)
+	}
+}
+
 func TestLoadPerfectShieldBlockRateUsesPlayersProperties(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "players.properties")
 	if err := os.WriteFile(configPath, []byte("PerfectShieldBlockRate = 15\n"), 0o600); err != nil {

@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -105,6 +106,7 @@ type intention struct {
 	kind   Intention
 	target attackable.Combatant
 	skill  skill.Ref
+	timer  int
 }
 
 // Attackable drives one hostile NPC's combat and wander intentions.
@@ -143,20 +145,42 @@ type Attackable struct {
 	// calling time.Now directly so tests can simulate staleThreatAge
 	// elapsing without a real 90-second wait.
 	now func() time.Time
+
+	// lastDesire is the intention kind of the last executed desire, used so
+	// the first wander step walks immediately and later steps wait the
+	// wander timer then roll RandomWalkRate.
+	lastDesire Intention
+	// wanderReady is the earliest time a subsequent wander step may walk
+	// or re-roll. Zero means the timer is not running.
+	wanderReady time.Time
+	// randomWalkRate is npcs.properties RandomWalkRate (percent, 0-100).
+	randomWalkRate int
+	// roll draws a uniform integer in [0, n) for the wander-rate check.
+	roll func(n int) int
 }
 
 // NewAttackable builds an idle hostile NPC AI loop.
 func NewAttackable(actor AttackableActor, move MoveController, attack AttackController) *Attackable {
 	return &Attackable{
-		actor:   actor,
-		move:    move,
-		attack:  attack,
-		threats: attackable.NewThreatTable(actor),
-		hates:   attackable.NewHateTable(actor),
-		desires: NewDesireQueue(),
-		current: intention{kind: IntentionIdle},
-		now:     time.Now,
+		actor:          actor,
+		move:           move,
+		attack:         attack,
+		threats:        attackable.NewThreatTable(actor),
+		hates:          attackable.NewHateTable(actor),
+		desires:        NewDesireQueue(),
+		current:        intention{kind: IntentionIdle},
+		now:            time.Now,
+		randomWalkRate: defaultRandomWalkRate,
+		roll:           rnd.Get,
 	}
+}
+
+// SetRandomWalkRate records npcs.properties RandomWalkRate for subsequent
+// wander steps. The first wander step after idle or combat always walks.
+func (a *Attackable) SetRandomWalkRate(rate int) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.randomWalkRate = rate
 }
 
 // MaybeStartOffensiveFollow starts or maintains an offensive follow task
@@ -266,6 +290,15 @@ func (a *Attackable) addAttackDesireWithMove(attacker attackable.Combatant, hate
 
 const escortFollowWeight = 5
 
+// defaultWanderTimer is addWanderDesire's timer argument in seconds.
+const defaultWanderTimer = 5
+
+// defaultWanderWeight is addWanderDesire's weight argument.
+const defaultWanderWeight = 5
+
+// defaultRandomWalkRate is npcs.properties RandomWalkRate's shipped default.
+const defaultRandomWalkRate = 30
+
 // idleFollower is implemented by an NPC that should escort a master when it
 // has nothing else to do.
 type idleFollower interface {
@@ -296,6 +329,29 @@ func (a *Attackable) queueIdleFollow() {
 		return
 	}
 	a.addFollowDesire(follower.IdleFollowTarget(), escortFollowWeight)
+}
+
+type idleWanderer interface {
+	ShouldIdleWander() bool
+}
+
+type wanderMover interface {
+	ForceWalkStance()
+	RealMoveSpeed() float64
+	MoveFromSpawnUsingRandomOffset(offset int)
+}
+
+func (a *Attackable) queueIdleWander() {
+	wanderer, ok := a.actor.(idleWanderer)
+	if !ok || !wanderer.ShouldIdleWander() {
+		return
+	}
+	a.desires.AddOrUpdate(&Desire{
+		Kind:     IntentionWander,
+		Timer:    defaultWanderTimer,
+		Weight:   defaultWanderWeight,
+		QueuedAt: time.Now(),
+	})
 }
 
 func (a *Attackable) thinkFollow() error {
@@ -386,7 +442,8 @@ func (a *Attackable) AddDefaultHate(attacker attackable.Combatant) {
 func (a *Attackable) SetWander() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	a.current = intention{kind: IntentionWander}
+	a.current = intention{kind: IntentionWander, timer: defaultWanderTimer}
+	a.wanderReady = time.Time{}
 }
 
 // SetBackToPeace clears combat memory and cancels the current action. If the
@@ -422,8 +479,9 @@ func (a *Attackable) setBackToPeaceLocked() {
 	a.desires.Clear()
 	a.next = intention{}
 	a.current = intention{kind: IntentionIdle}
+	a.wanderReady = time.Time{}
 	if !a.actor.InTerritory() {
-		a.current = intention{kind: IntentionWander}
+		a.current = intention{kind: IntentionWander, timer: defaultWanderTimer}
 	}
 	a.move.Stop()
 }
@@ -500,6 +558,9 @@ func (a *Attackable) Think() error {
 	if _, ok := a.desires.Peek(); !ok {
 		a.queueIdleFollow()
 	}
+	if _, ok := a.desires.Peek(); !ok {
+		a.queueIdleWander()
+	}
 	for attempts := 0; attempts <= maxDesires; attempts++ {
 		a.promoteNext()
 		switch a.current.kind {
@@ -508,17 +569,21 @@ func (a *Attackable) Think() error {
 			if again {
 				continue
 			}
+			a.lastDesire = IntentionAttack
 			return err
 		case IntentionCast:
 			again, err := a.thinkCast()
 			if again {
 				continue
 			}
+			a.lastDesire = IntentionCast
 			return err
 		case IntentionFollow:
+			a.lastDesire = IntentionFollow
 			return a.thinkFollow()
 		case IntentionWander:
 			a.thinkWander()
+			a.lastDesire = IntentionWander
 		}
 		return nil
 	}
@@ -526,11 +591,16 @@ func (a *Attackable) Think() error {
 }
 
 func (a *Attackable) promoteNext() {
-	if a.current.kind != IntentionIdle && a.current.kind != IntentionFollow {
-		return
-	}
 	desire, ok := a.desires.Peek()
 	if !ok {
+		return
+	}
+	if a.current.kind == IntentionWander && desire.Kind == IntentionWander {
+		return
+	}
+	switch a.current.kind {
+	case IntentionIdle, IntentionFollow, IntentionWander:
+	default:
 		return
 	}
 	next := intention{}
@@ -541,8 +611,13 @@ func (a *Attackable) promoteNext() {
 		next = intention{kind: IntentionCast, target: desire.FinalTarget, skill: desire.Skill}
 	case IntentionFollow:
 		next = intention{kind: IntentionFollow, target: desire.FinalTarget}
+	case IntentionWander:
+		next = intention{kind: IntentionWander, timer: desire.Timer}
 	default:
 		return
+	}
+	if a.current.kind == IntentionWander {
+		a.wanderReady = time.Time{}
 	}
 	a.lastKind = a.current.kind
 	a.current = next
@@ -738,15 +813,52 @@ func (a *Attackable) thinkCast() (bool, error) {
 }
 
 func (a *Attackable) thinkWander() {
+	if mover, ok := a.actor.(wanderMover); ok {
+		mover.ForceWalkStance()
+	}
 	if a.actor.IsMoving() {
 		return
 	}
+	if a.lastDesire != IntentionWander {
+		a.doWanderMove()
+		return
+	}
+	if a.wanderReady.IsZero() {
+		a.wanderReady = a.now().Add(a.wanderDelay())
+		return
+	}
+	if a.now().Before(a.wanderReady) {
+		return
+	}
+	a.wanderReady = time.Time{}
+	if a.randomWalkRate > 0 && a.roll != nil && a.roll(100) < a.randomWalkRate {
+		a.doWanderMove()
+		return
+	}
+	a.wanderReady = a.now().Add(a.wanderDelay())
+}
+
+func (a *Attackable) wanderDelay() time.Duration {
+	timer := a.current.timer
+	if timer <= 0 {
+		timer = defaultWanderTimer
+	}
+	return time.Duration(timer) * time.Second
+}
+
+func (a *Attackable) doWanderMove() {
 	if a.actor.ReturnHome() {
 		return
 	}
 	if !a.actor.InTerritory() {
 		a.current = intention{kind: IntentionIdle}
+		return
 	}
+	mover, ok := a.actor.(wanderMover)
+	if !ok {
+		return
+	}
+	mover.MoveFromSpawnUsingRandomOffset(int(mover.RealMoveSpeed()) * 3)
 }
 
 func (a *Attackable) refreshCombatMemory() {

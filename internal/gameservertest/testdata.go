@@ -22,8 +22,8 @@ func (Geo) CanMove(int, int, int, int, int, int) bool { return true }
 func (Geo) Height(_, _, z int) int16                  { return int16(z) }
 
 func (Geo) FindPath(_, _ location.Location) ([]location.Location, bool) { return nil, false }
-func (Geo) ValidLocation(ox, oy, oz, _, _, _ int) location.Location {
-	return location.Location{X: ox, Y: oy, Z: oz}
+func (Geo) ValidLocation(_, _, _, tx, ty, tz int) location.Location {
+	return location.Location{X: tx, Y: ty, Z: tz}
 }
 func (Geo) Walkable(int, int, int) bool { return true }
 

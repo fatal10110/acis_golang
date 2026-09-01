@@ -220,6 +220,18 @@ func loadSpawnMultiplier(paths gameServerPaths) (spawnMultiplier, error) {
 	return spawnMultiplier(config.NewFields(props, "spawn multiplier").Float64("SpawnMultiplier", 1)), nil
 }
 
+// randomWalkRate is Config.RANDOM_WALK_RATE (Config.java:753), read from
+// npcs.properties RandomWalkRate.
+type randomWalkRate int
+
+func loadRandomWalkRate(paths gameServerPaths) (randomWalkRate, error) {
+	props, err := config.LoadFile(paths.NpcsConfigPath)
+	if err != nil {
+		return 0, err
+	}
+	return randomWalkRate(config.NewFields(props, "random walk rate").Int("RandomWalkRate", 30)), nil
+}
+
 // raidCursesDisabled is Config.RAID_DISABLE_CURSE (Config.java:746), read from
 // npcs.properties DisableRaidCurse.
 type raidCursesDisabled bool
