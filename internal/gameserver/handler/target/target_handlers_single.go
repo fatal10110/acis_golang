@@ -30,11 +30,14 @@ func (oneHandler) FinalTarget(_, target Creature, _ *modelskill.Definition) Crea
 	return target
 }
 
-func (oneHandler) CanCast(caster, target Creature, skill *modelskill.Definition, _ bool) bool {
+func (oneHandler) CanCast(caster, target Creature, skill *modelskill.Definition, ctrl bool) bool {
 	if target == nil {
 		return false
 	}
-	return oneCastRejection(caster, target, skill) == CastRejectNone
+	if skill == nil {
+		return true
+	}
+	return oneCastRejection(caster, target, skill, ctrl) == CastRejectNone
 }
 
 type holyHandler struct{}
