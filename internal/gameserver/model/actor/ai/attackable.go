@@ -444,7 +444,7 @@ func (a *Attackable) AddDefaultHate(attacker attackable.Combatant) {
 func (a *Attackable) SetWander() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	a.current = intention{kind: IntentionWander, timer: defaultWanderTimer}
+	a.current = intention{kind: IntentionWander, timer: a.idleWanderTimer()}
 	a.wanderReady = time.Time{}
 }
 
@@ -483,9 +483,18 @@ func (a *Attackable) setBackToPeaceLocked() {
 	a.current = intention{kind: IntentionIdle}
 	a.wanderReady = time.Time{}
 	if !a.actor.InTerritory() {
-		a.current = intention{kind: IntentionWander, timer: defaultWanderTimer}
+		a.current = intention{kind: IntentionWander, timer: a.idleWanderTimer()}
 	}
 	a.move.Stop()
+}
+
+func (a *Attackable) idleWanderTimer() int {
+	if wanderer, ok := a.actor.(idleWanderer); ok {
+		if timer, _, ok := wanderer.IdleWander(); ok && timer > 0 {
+			return timer
+		}
+	}
+	return defaultWanderTimer
 }
 
 func (a *Attackable) maybeBackToPeaceLocked() {
@@ -598,6 +607,9 @@ func (a *Attackable) promoteNext() {
 		return
 	}
 	if a.current.kind == IntentionWander && desire.Kind == IntentionWander {
+		if desire.Timer > 0 {
+			a.current.timer = desire.Timer
+		}
 		return
 	}
 	switch a.current.kind {

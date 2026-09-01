@@ -443,8 +443,10 @@ type fakeActor struct {
 	returnHome      bool
 	returnHomeCalls int
 	moving          bool
-	idleWander      bool
-	moveSpeed       float64
+	idleWander       bool
+	idleWanderTimer  int
+	idleWanderWeight float64
+	moveSpeed        float64
 	wanderCalls     int
 	wanderOffset    int
 	walkStanceCalls int
@@ -489,7 +491,14 @@ func (a *fakeActor) IdleWander() (int, float64, bool) {
 	if !a.idleWander {
 		return 0, 0, false
 	}
-	return 5, 5, true
+	timer, weight := a.idleWanderTimer, a.idleWanderWeight
+	if timer == 0 {
+		timer = 5
+	}
+	if weight == 0 {
+		weight = 5
+	}
+	return timer, weight, true
 }
 func (a *fakeActor) ForceWalkStance()       { a.walkStanceCalls++ }
 func (a *fakeActor) RealMoveSpeed() float64 { return a.moveSpeed }
@@ -1375,6 +1384,58 @@ func TestAttackableAIWanderTimerThenRateWalks(t *testing.T) {
 	}
 	if owner.wanderCalls != 1 {
 		t.Fatalf("wander calls after timer + rate = %d, want 1", owner.wanderCalls)
+	}
+}
+
+func TestAttackableAIBackToPeaceWanderUsesQueuedTimer(t *testing.T) {
+	owner := actor(1)
+	owner.inTerritory = false
+	owner.returnHome = true
+	owner.idleWander = true
+	owner.idleWanderTimer = 40
+	owner.idleWanderWeight = 20
+	owner.moveSpeed = 50
+	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	now := start
+	ai.now = func() time.Time { return now }
+	ai.SetRandomWalkRate(100)
+	ai.roll = func(int) int { return 0 }
+
+	ai.SetBackToPeace()
+	if err := ai.Think(); err != nil {
+		t.Fatalf("first Think() error: %v", err)
+	}
+	got, ok := ai.Desires().Peek()
+	if !ok || got.Kind != IntentionWander || got.Timer != 40 || got.Weight != 20 {
+		t.Fatalf("queued wander = (%v %+v), want timer 40 weight 20", ok, got)
+	}
+	if owner.returnHomeCalls == 0 {
+		t.Fatal("ReturnHome calls after first Think = 0, want return-home start")
+	}
+	homeCalls := owner.returnHomeCalls
+
+	if err := ai.Think(); err != nil {
+		t.Fatalf("arm-timer Think() error: %v", err)
+	}
+	if owner.returnHomeCalls != homeCalls {
+		t.Fatalf("ReturnHome calls while timer arms = %d, want %d", owner.returnHomeCalls, homeCalls)
+	}
+
+	now = start.Add(5 * time.Second)
+	if err := ai.Think(); err != nil {
+		t.Fatalf("5s Think() error: %v", err)
+	}
+	if owner.returnHomeCalls != homeCalls {
+		t.Fatalf("ReturnHome calls at 5s = %d, want %d (timer is 40s)", owner.returnHomeCalls, homeCalls)
+	}
+
+	now = start.Add(40 * time.Second)
+	if err := ai.Think(); err != nil {
+		t.Fatalf("40s Think() error: %v", err)
+	}
+	if owner.returnHomeCalls == homeCalls {
+		t.Fatal("ReturnHome calls unchanged at 40s, want a re-roll")
 	}
 }
 
