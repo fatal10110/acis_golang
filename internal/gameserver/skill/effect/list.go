@@ -16,11 +16,24 @@ type StatOwner interface {
 // Option changes List behavior.
 type Option func(*List)
 
-// WithCancelLesser controls whether a newly stacked non-herb effect removes
-// the lower-priority effect it displaces. The default is true.
+// cancelLesserEnabled is the process-wide CancelLesserEffect switch
+// (default true). The composition root sets this once at boot from
+// players.properties.
+var cancelLesserEnabled = true
+
+// SetCancelLesser records the process-wide CancelLesserEffect switch.
+func SetCancelLesser(enabled bool) { cancelLesserEnabled = enabled }
+
+// CancelLesser reports whether a newly stacked non-herb effect removes the
+// lower-priority effect it displaces.
+func CancelLesser() bool { return cancelLesserEnabled }
+
+// WithCancelLesser overrides the process-wide CancelLesserEffect switch for
+// one list. Tests use this to pin a list independent of boot config.
 func WithCancelLesser(cancel bool) Option {
 	return func(l *List) {
 		l.cancelLesser = cancel
+		l.cancelLesserSet = true
 	}
 }
 
@@ -29,8 +42,9 @@ func WithCancelLesser(cancel bool) Option {
 type List struct {
 	mu sync.Mutex
 
-	owner        StatOwner
-	cancelLesser bool
+	owner           StatOwner
+	cancelLesser    bool
+	cancelLesserSet bool
 
 	buffs   []*Effect
 	debuffs []*Effect
@@ -39,10 +53,7 @@ type List struct {
 
 // NewList returns an empty effect list.
 func NewList(owner StatOwner, opts ...Option) *List {
-	l := &List{
-		owner:        owner,
-		cancelLesser: true,
-	}
+	l := &List{owner: owner}
 	for _, opt := range opts {
 		opt(l)
 	}
@@ -92,6 +103,13 @@ func (l *List) flagsLocked() Flag {
 // IsAffected reports whether any bit of flag is set in l.Flags().
 func (l *List) IsAffected(flag Flag) bool {
 	return l.Flags()&flag != 0
+}
+
+func (l *List) shouldCancelLesser() bool {
+	if l.cancelLesserSet {
+		return l.cancelLesser
+	}
+	return cancelLesserEnabled
 }
 
 // All returns a snapshot of effects ordered as buffs followed by debuffs.

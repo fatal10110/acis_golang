@@ -37,6 +37,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/fatal10110/acis_golang/internal/link"
@@ -70,6 +71,7 @@ type options struct {
 	characterSelectDelay   time.Duration
 	serverBypassDelay      time.Duration
 	maxBuffsAmount         int
+	cancelLesserEffect     bool
 	seed                   func(*gamesql.CharacterStore, *gamesql.ItemStore)
 	seedShortcuts          func(*gamesql.ShortcutStore)
 	seedHennas             func(db *sql.DB, hennas *gamesql.HennaStore)
@@ -174,6 +176,13 @@ func WithRateKarmaExpLost(rate float64) Option {
 // buff-slot count (default 20). Known Divine Inspiration levels add on top.
 func WithMaxBuffsAmount(amount int) Option {
 	return func(o *options) { o.maxBuffsAmount = amount }
+}
+
+// WithCancelLesserEffect sets the players.properties CancelLesserEffect
+// switch: whether a newly stacked non-herb effect removes the lower-priority
+// effect it displaces (default true).
+func WithCancelLesserEffect(enabled bool) Option {
+	return func(o *options) { o.cancelLesserEffect = enabled }
 }
 
 // WithSeed inserts rows through the real SQL stores before the client dials.
@@ -677,10 +686,15 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		characterSelectDelay:   3 * time.Second,
 		serverBypassDelay:      100 * time.Millisecond,
 		maxBuffsAmount:         20,
+		cancelLesserEffect:     true,
 	}
 	for _, opt := range opts {
 		opt(o)
 	}
+
+	prevCancelLesser := effect.CancelLesser()
+	effect.SetCancelLesser(o.cancelLesserEffect)
+	t.Cleanup(func() { effect.SetCancelLesser(prevCancelLesser) })
 
 	db := sqltest.SharedDB(t)
 	chars := gamesql.NewCharacterStore(db)

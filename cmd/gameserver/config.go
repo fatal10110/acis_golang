@@ -101,6 +101,19 @@ func loadMagicFailures(paths gameServerPaths) (magicFailures, error) {
 	return magicFailures(config.NewFields(props, "magic failures").Bool("MagicFailures", true)), nil
 }
 
+// cancelLesserEffect is the players.properties CancelLesserEffect switch:
+// when true, a newly stacked non-herb effect removes the lower-priority
+// effect it displaces.
+type cancelLesserEffect bool
+
+func loadCancelLesserEffect(paths gameServerPaths) (cancelLesserEffect, error) {
+	props, err := config.LoadFile(paths.PlayersConfigPath)
+	if err != nil {
+		return false, err
+	}
+	return cancelLesserEffect(config.NewFields(props, "cancel lesser effect").Bool("CancelLesserEffect", true)), nil
+}
+
 // skillEnchantSPBookNeeded controls whether enchanting a skill above level
 // 76 also consumes the tree's configured spellbook item, read from
 // players.properties.

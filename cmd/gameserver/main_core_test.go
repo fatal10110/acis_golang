@@ -402,6 +402,36 @@ func TestLoadMagicFailuresDefaultsToTrue(t *testing.T) {
 	}
 }
 
+func TestLoadCancelLesserEffectUsesPlayersProperties(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "players.properties")
+	if err := os.WriteFile(configPath, []byte("CancelLesserEffect = False\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := loadCancelLesserEffect(gameServerPaths{PlayersConfigPath: configPath})
+	if err != nil {
+		t.Fatalf("loadCancelLesserEffect() error = %v", err)
+	}
+	if got {
+		t.Fatalf("loadCancelLesserEffect() = %v, want false", got)
+	}
+}
+
+func TestLoadCancelLesserEffectDefaultsToTrue(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "players.properties")
+	if err := os.WriteFile(configPath, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := loadCancelLesserEffect(gameServerPaths{PlayersConfigPath: configPath})
+	if err != nil {
+		t.Fatalf("loadCancelLesserEffect() error = %v", err)
+	}
+	if !got {
+		t.Fatalf("loadCancelLesserEffect() = %v, want true", got)
+	}
+}
+
 func TestLoadPlayerSpawnProtectionUsesPlayersProperties(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "players.properties")
 	if err := os.WriteFile(configPath, []byte("PlayerSpawnProtection = 12\n"), 0o600); err != nil {

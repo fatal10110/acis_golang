@@ -93,7 +93,7 @@ func (l *List) addStacked(e *Effect, pending *[]func()) {
 			pos++
 		}
 		queue = slices.Insert(queue, pos, e)
-		if l.cancelLesser && !e.Herb && len(queue) > 1 {
+		if l.shouldCancelLesser() && !e.Herb && len(queue) > 1 {
 			victim := queue[1]
 			queue = slices.Delete(queue, 1, 2)
 			l.removeFromVisible(victim)
