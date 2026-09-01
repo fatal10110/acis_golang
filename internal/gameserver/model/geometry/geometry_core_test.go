@@ -329,6 +329,17 @@ func TestTriangleContains(t *testing.T) {
 	}
 }
 
+func TestTriangleCenter(t *testing.T) {
+	tri, err := NewTriangle(Point{1, 1}, Point{4, 1}, Point{1, 7})
+	if err != nil {
+		t.Fatalf("NewTriangle: %v", err)
+	}
+	// Integer centroid: (1+4+1)/3 = 2, (1+1+7)/3 = 3.
+	if got := tri.Center(); got != (Point{X: 2, Y: 3}) {
+		t.Errorf("Center() = %+v, want {2 3}", got)
+	}
+}
+
 func TestTriangleArea(t *testing.T) {
 	tri, err := NewTriangle(Point{0, 0}, Point{10, 0}, Point{0, 10})
 	if err != nil {

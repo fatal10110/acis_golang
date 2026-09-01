@@ -122,10 +122,20 @@ func (fakeActor) Dead() bool { return false }
 // ---- from apply_test.go ----
 type effectLandingFake struct {
 	fakeActor
-	list *effect.List
+	list    *effect.List
+	x, y, z int
 }
 
 func (f *effectLandingFake) EffectList() *effect.List { return f.list }
+
+func (f *effectLandingFake) Position() (int, int, int) { return f.x, f.y, f.z }
+
+type positionedFakeActor struct {
+	fakeActor
+	x, y, z int
+}
+
+func (f *positionedFakeActor) Position() (int, int, int) { return f.x, f.y, f.z }
 
 type effectListOnlyFake struct {
 	fakeActor
@@ -148,6 +158,66 @@ func TestApplyEffectsRollsEachConfiguredTemplate(t *testing.T) {
 
 	if got := len(target.list.All()); got != 1 {
 		t.Fatalf("landed effects = %d, want 1", got)
+	}
+}
+
+func TestApplyEffectsEffectRangeAtLanding(t *testing.T) {
+	configured := []modelskill.EffectTemplate{{Name: "Buff", Time: 60, EffectPower: 100, EffectPowerSet: true}}
+	tests := []struct {
+		name      string
+		caster    Actor
+		target    effectListTarget
+		templates []modelskill.EffectTemplate
+		want      int
+	}{
+		{
+			name:      "outside range",
+			caster:    &positionedFakeActor{fakeActor: fakeActor{objectID: 1}},
+			target:    &effectLandingFake{fakeActor: fakeActor{objectID: 2}, list: effect.NewList(nil), x: 101},
+			templates: configured,
+		},
+		{
+			name:      "at range",
+			caster:    &positionedFakeActor{fakeActor: fakeActor{objectID: 1}},
+			target:    &effectLandingFake{fakeActor: fakeActor{objectID: 2}, list: effect.NewList(nil), x: 100},
+			templates: configured,
+		},
+		{
+			name:      "inside range",
+			caster:    &positionedFakeActor{fakeActor: fakeActor{objectID: 1}},
+			target:    &effectLandingFake{fakeActor: fakeActor{objectID: 2}, list: effect.NewList(nil), x: 99},
+			templates: configured,
+			want:      1,
+		},
+		{
+			name:      "self cast",
+			caster:    &positionedFakeActor{fakeActor: fakeActor{objectID: 1}},
+			target:    &effectLandingFake{fakeActor: fakeActor{objectID: 1}, list: effect.NewList(nil), x: 1000},
+			templates: configured,
+			want:      1,
+		},
+		{
+			name:      "unpositioned effector",
+			caster:    fakeActor{objectID: 1},
+			target:    &effectLandingFake{fakeActor: fakeActor{objectID: 2}, list: effect.NewList(nil), x: 101},
+			templates: configured,
+			want:      1,
+		},
+		{
+			name:      "unpositioned effected",
+			caster:    &positionedFakeActor{fakeActor: fakeActor{objectID: 1}},
+			target:    &effectListOnlyFake{fakeActor: fakeActor{objectID: 2}, list: effect.NewList(nil)},
+			templates: []modelskill.EffectTemplate{{Name: "Buff", Time: 60}},
+			want:      1,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			applyEffects(tt.caster, tt.target, modelskill.Definition{EffectRange: 100}, tt.templates)
+			if got := len(tt.target.EffectList().All()); got != tt.want {
+				t.Fatalf("landed effects = %d, want %d", got, tt.want)
+			}
+		})
 	}
 }
 

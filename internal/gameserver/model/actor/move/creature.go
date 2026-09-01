@@ -204,6 +204,22 @@ func (m *CreatureMove) ValidLocation(ox, oy, oz, tx, ty, tz int) location.Locati
 	return geo.ValidLocation(ox, oy, oz, tx, ty, tz)
 }
 
+// Height is the geodata floor at (x, y) using z as the search hint.
+func (m *CreatureMove) Height(x, y, z int) int16 {
+	m.mu.Lock()
+	geo := m.geo
+	m.mu.Unlock()
+	return geo.Height(x, y, z)
+}
+
+// Walkable reports whether (x, y, z) is open geodata in every direction.
+func (m *CreatureMove) Walkable(x, y, z int) bool {
+	m.mu.Lock()
+	geo := m.geo
+	m.mu.Unlock()
+	return geo.Walkable(x, y, z)
+}
+
 // MoveToLocation records an accepted, height-normalized ground-movement
 // request and, once its Duration elapses, advances the actor's position to
 // destination and fires the arrived hook.

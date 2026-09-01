@@ -1,7 +1,11 @@
 // Package location contains world-coordinate datatypes.
 package location
 
-import "math"
+import (
+	"math"
+
+	"github.com/fatal10110/acis_golang/internal/commons/rnd"
+)
 
 // Location is a 3D (x/y/z) world point.
 type Location struct {
@@ -54,4 +58,18 @@ func (l Location) HeadingTo(other Location) int {
 		angle += 360
 	}
 	return int(math.Round(angle * headingScale))
+}
+
+// AddRandomOffsetBetween adds a polar offset with radius in [minOffset,
+// maxOffset] and a uniform heading. Negative or inverted ranges leave l
+// unchanged.
+func (l Location) AddRandomOffsetBetween(minOffset, maxOffset int) Location {
+	if minOffset < 0 || maxOffset < 0 || maxOffset < minOffset {
+		return l
+	}
+	angle := float64(rnd.Get(360)) * math.Pi / 180
+	offset := rnd.GetRange(minOffset, maxOffset)
+	l.X += int(float64(offset) * math.Cos(angle))
+	l.Y += int(float64(offset) * math.Sin(angle))
+	return l
 }
