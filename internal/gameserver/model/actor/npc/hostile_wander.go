@@ -1,8 +1,6 @@
 package npc
 
 import (
-	"math"
-
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/geometry"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -42,7 +40,8 @@ func (h *Hostile) RealMoveSpeed() float64 {
 
 // MoveFromSpawnUsingRandomOffset walks toward a geo-validated wander point.
 // Maker NPCs sample from the current position inside the maker territory;
-// everyone else offsets from the spawn home. No spawn point or a
+// a nil maker (single spawns, minions, fixtures) offsets from spawn home.
+// MinionSpawn's current-position origin is #2159. No spawn point or a
 // sub-noticeable offset is a no-op.
 func (h *Hostile) MoveFromSpawnUsingRandomOffset(offset int) {
 	if h.Instance == nil || !h.Instance.HasHome || offset < minWanderOffset {
@@ -83,7 +82,7 @@ func (h *Hostile) makerWalkLocation(maker *spawn.Maker, from location.Location, 
 		return h.makerRandomLocation(maker)
 	}
 	for range randomWalkLoopLimit {
-		loc := addRandomOffsetBetween(from, offset/rnd.GetRange(2, 4), offset)
+		loc := from.AddRandomOffsetBetween(offset/rnd.GetRange(2, 4), offset)
 		if !maker.Contains(loc) || maker.ContainsBanned(loc) {
 			continue
 		}
@@ -121,17 +120,6 @@ func (h *Hostile) makerRandomLocation(maker *spawn.Maker) (location.Location, bo
 		return last, true
 	}
 	return last, have
-}
-
-func addRandomOffsetBetween(loc location.Location, minOffset, maxOffset int) location.Location {
-	if minOffset < 0 || maxOffset < 0 || maxOffset < minOffset {
-		return loc
-	}
-	angle := float64(rnd.Get(360)) * math.Pi / 180
-	offset := rnd.GetRange(minOffset, maxOffset)
-	loc.X += int(float64(offset) * math.Cos(angle))
-	loc.Y += int(float64(offset) * math.Sin(angle))
-	return loc
 }
 
 func pickWeightedTriangle(triangles []geometry.Triangle) (geometry.Triangle, bool) {

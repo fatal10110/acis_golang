@@ -71,7 +71,8 @@ func TestGuardDoesNotIdleWander(t *testing.T) {
 }
 
 // TestMakerIdleWanderStaysInsideTerritory pins MultiSpawn's in-territory
-// sample: a maker NPC's wander destination stays inside the maker polygon.
+// sample: a maker NPC's wander destination stays inside the maker polygon
+// and is an offset sample, not the triangle-center fallback.
 func TestMakerIdleWanderStaysInsideTerritory(t *testing.T) {
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
@@ -83,12 +84,13 @@ func TestMakerIdleWanderStaysInsideTerritory(t *testing.T) {
 	home := location.Location{X: hostileX, Y: hostileY, Z: hostileZ}
 	hostile := srv.SpawnMovingHostileNPCAt(t, "Monster", home, home)
 	poly := wanderPoly(
-		spawn.Node{X: 0, Y: 0},
-		spawn.Node{X: 2000, Y: 0},
+		spawn.Node{X: -2000, Y: -2000},
+		spawn.Node{X: 2000, Y: -2000},
 		spawn.Node{X: 2000, Y: 2000},
-		spawn.Node{X: 0, Y: 2000},
+		spawn.Node{X: -2000, Y: 2000},
 	)
-	hostile.Instance.Maker = &spawn.Maker{Territories: []*spawn.Territory{poly}}
+	maker := &spawn.Maker{Territories: []*spawn.Territory{poly}}
+	hostile.Instance.Maker = maker
 	drainUntilQuiet(t, c)
 
 	if err := hostile.Think(); err != nil {
@@ -98,6 +100,17 @@ func TestMakerIdleWanderStaysInsideTerritory(t *testing.T) {
 	dest := moveToLocationDest(t, mustRead(t, c, "MoveToLocation"))
 	if !poly.Contains(dest.X, dest.Y, dest.Z) {
 		t.Fatalf("maker wander dest = %+v, want inside territory", dest)
+	}
+	if dest.Distance2D(home) > 180 {
+		t.Fatalf("maker wander dest = %+v, 2D distance from home %v > offset 180 (center fallback)", dest, dest.Distance2D(home))
+	}
+	tri, ok := maker.ContainingTriangle(home.X, home.Y)
+	if !ok {
+		t.Fatal("home is outside the maker polygon")
+	}
+	center := tri.Center()
+	if dest.X == center.X && dest.Y == center.Y && dest.Z == home.Z {
+		t.Fatalf("maker wander dest = %+v, want an offset sample not the shape center", dest)
 	}
 }
 

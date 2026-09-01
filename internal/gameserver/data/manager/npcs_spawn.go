@@ -2,10 +2,8 @@ package manager
 
 import (
 	"fmt"
-	"math"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -237,11 +235,8 @@ func (n *Npcs) privateSpawnLocation(master *npc.Hostile, tmpl *npc.Template) loc
 	x, y, z := master.Position()
 	minOffset := int(master.Instance.Template.CollisionRadius + 30)
 	maxOffset := int(100 + master.Instance.Template.CollisionRadius + tmpl.CollisionRadius)
-	angle := float64(rnd.Get(360)) * math.Pi / 180
-	offset := rnd.GetRange(minOffset, maxOffset)
-	targetX := x + int(float64(offset)*math.Cos(angle))
-	targetY := y + int(float64(offset)*math.Sin(angle))
-	return n.geo.ValidLocation(x, y, z, targetX, targetY, z)
+	dest := location.Location{X: x, Y: y, Z: z}.AddRandomOffsetBetween(minOffset, maxOffset)
+	return n.geo.ValidLocation(x, y, z, dest.X, dest.Y, dest.Z)
 }
 
 // rewarderFor returns the kill-reward hook for a newly spawned hostile.

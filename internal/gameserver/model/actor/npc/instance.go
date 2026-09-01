@@ -31,8 +31,8 @@ type Instance struct {
 	// onCreated's setWalkOrRun(false) for its WALKING_NPCS id subset).
 	WalkMode bool
 	// Maker is the spawning npc-maker group. Idle wander uses its
-	// territory when this is set; a nil Maker (single spawns, minions,
-	// test fixtures) keeps the home-offset walk.
+	// territory when this is set. A nil Maker keeps the home-offset walk
+	// (MinionSpawn's current-position origin is not ported yet; #2159).
 	Maker *spawn.Maker
 }
 

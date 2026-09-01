@@ -59,7 +59,7 @@ func TestNpcSpawnCreatesPrivateMinion(t *testing.T) {
 		t.Fatalf("master Maker = %p, want slot maker %p", got, want)
 	}
 	if child.(*npc.Hostile).Instance.Maker != nil {
-		t.Fatal("private Maker != nil, want minion wander to stay on home-offset")
+		t.Fatal("private Maker != nil, want no maker (MinionSpawn current-position wander is #2159)")
 	}
 	if got := child.(*npc.Hostile).Master(); got != masterHostile {
 		t.Fatalf("private master = %p, want %p", got, master)
