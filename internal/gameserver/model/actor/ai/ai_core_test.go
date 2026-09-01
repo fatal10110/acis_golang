@@ -443,6 +443,7 @@ type fakeActor struct {
 	returnHome      bool
 	returnHomeCalls int
 	moving          bool
+	x, y, z         int
 	headingTarget   attackable.Combatant
 	moveToPawnCalls int
 	moveToPawnTo    attackable.Combatant
@@ -468,8 +469,9 @@ func (a *fakeActor) ReturnHome() bool {
 	a.returnHomeCalls++
 	return a.returnHome
 }
-func (a *fakeActor) IsMoving() bool    { return a.moving }
-func (a *fakeActor) InTerritory() bool { return a.inTerritory }
+func (a *fakeActor) IsMoving() bool            { return a.moving }
+func (a *fakeActor) InTerritory() bool         { return a.inTerritory }
+func (a *fakeActor) Position() (int, int, int) { return a.x, a.y, a.z }
 func (a *fakeActor) SetHeadingTo(target attackable.Combatant) {
 	a.headingTarget = target
 }
@@ -540,6 +542,7 @@ type recordingCast struct {
 	casting    bool
 	canAttempt bool
 	canCast    bool
+	hpMpFail   bool
 	stopsMove  bool
 	castRange  int
 	skillType  string
@@ -562,6 +565,10 @@ func (c *recordingCast) CanAttempt(target attackable.Combatant, ref skill.Ref) b
 
 func (c *recordingCast) CanCast(target attackable.Combatant, ref skill.Ref) bool {
 	return c.canCast
+}
+
+func (c *recordingCast) MeetsHPMPDisabled(target attackable.Combatant, ref skill.Ref) bool {
+	return !c.hpMpFail
 }
 
 func (c *recordingCast) Cast(target attackable.Combatant, ref skill.Ref) {
@@ -587,6 +594,180 @@ func TestAttackableAITickDecaysThreatEveryThirdTick(t *testing.T) {
 	ai.Tick()
 	if got, want := ai.Threats().Hate(target), 13.4; math.Abs(got-want) > 0.000001 {
 		t.Fatalf("hate after third tick = %v, want %v", got, want)
+	}
+}
+
+func TestAttackableAITickDecaysCastAndNothingDesireWeights(t *testing.T) {
+	owner := actor(1)
+	target := actor(2)
+	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionCast, FinalTarget: target, Skill: skill.Ref{ID: 4, Level: 1}, Weight: 70000})
+	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionNothing, Weight: 1})
+
+	ai.Tick()
+	ai.Tick()
+	got, ok := ai.Desires().Peek()
+	if !ok || got.Kind != IntentionCast || got.Weight != 70000 {
+		t.Fatalf("Peek after two ticks = (%v, %v), want CAST 70000", got, ok)
+	}
+
+	ai.Tick()
+	got, ok = ai.Desires().Peek()
+	if !ok || got.Kind != IntentionCast {
+		t.Fatalf("Peek after third tick = (%v, %v), want CAST", got, ok)
+	}
+	if math.Abs(got.Weight-4000) > 0.000001 {
+		t.Fatalf("CAST weight after third tick = %v, want 4000", got.Weight)
+	}
+	ai.Desires().RemoveKind(IntentionCast)
+	got, ok = ai.Desires().Peek()
+	if !ok || got.Kind != IntentionNothing {
+		t.Fatalf("Peek NOTHING after CAST removed = (%v, %v), want NOTHING", got, ok)
+	}
+	if math.Abs(got.Weight-0.5) > 0.000001 {
+		t.Fatalf("NOTHING weight after third tick = %v, want 0.5", got.Weight)
+	}
+}
+
+func TestAttackableAITickDropsCastDesireBelowDecayAmount(t *testing.T) {
+	owner := actor(1)
+	target := actor(2)
+	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionCast, FinalTarget: target, Skill: skill.Ref{ID: 4, Level: 1}, Weight: 50000})
+
+	ai.Tick()
+	ai.Tick()
+	ai.Tick()
+
+	if got := ai.Desires().Len(); got != 0 {
+		t.Fatalf("queued desires after CAST decay = %d, want 0", got)
+	}
+}
+
+func TestAttackableThinkPrunesZeroWeightCastDesire(t *testing.T) {
+	owner := actor(1)
+	target := actor(2)
+	owner.known = map[int32]bool{target.ObjectID(): true}
+	cast := &recordingCast{canAttempt: true, canCast: true}
+	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+	ai.SetCastController(cast)
+	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionCast, FinalTarget: target, Skill: skill.Ref{ID: 4, Level: 1}, Weight: 0})
+
+	ai.Think()
+
+	if got := ai.Desires().Len(); got != 0 {
+		t.Fatalf("queued desires = %d, want 0", got)
+	}
+	if got := ai.CurrentIntention(); got != IntentionIdle {
+		t.Fatalf("CurrentIntention() = %v, want %v", got, IntentionIdle)
+	}
+	if cast.castCalled {
+		t.Fatal("Cast called for zero-weight CAST desire")
+	}
+}
+
+func TestAttackableThinkPrunesCastWhenHPMPDisabledFails(t *testing.T) {
+	owner := actor(1)
+	target := actor(2)
+	owner.known = map[int32]bool{target.ObjectID(): true}
+	cast := &recordingCast{canAttempt: true, canCast: true, hpMpFail: true}
+	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+	ai.SetCastController(cast)
+	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionCast, FinalTarget: target, Skill: skill.Ref{ID: 4, Level: 1}, Weight: 100})
+
+	ai.Think()
+
+	if got := ai.Desires().Len(); got != 0 {
+		t.Fatalf("queued desires = %d, want 0", got)
+	}
+	if got := ai.CurrentIntention(); got != IntentionIdle {
+		t.Fatalf("CurrentIntention() = %v, want %v", got, IntentionIdle)
+	}
+	if cast.castCalled {
+		t.Fatal("Cast called for CAST desire that failed HP/MP/mute")
+	}
+}
+
+func TestAttackableThinkPrunesAttackDesireBeyond1500(t *testing.T) {
+	owner := actor(1)
+	near := actor(2)
+	far := actor(3)
+	far.z = 1501
+	owner.known = map[int32]bool{near.ObjectID(): true, far.ObjectID(): true}
+	strike := &recordingAttack{canAttack: true}
+	ai := NewAttackable(owner, &recordingMove{}, strike)
+	addAttackHate(ai, far, 0, 100)
+	addAttackHate(ai, near, 0, 50)
+
+	ai.Think()
+
+	if strike.target != near {
+		t.Fatalf("attacked target = %v, want nearer attacker (far desire pruned)", strike.target)
+	}
+	if ai.Desires().Has(&Desire{Kind: IntentionAttack, FinalTarget: far}) {
+		t.Fatal("far ATTACK desire still queued")
+	}
+}
+
+func TestAttackableThinkKeepsAttackDesireAt1500(t *testing.T) {
+	owner := actor(1)
+	target := actor(2)
+	target.x = 1500
+	owner.known = map[int32]bool{target.ObjectID(): true}
+	strike := &recordingAttack{canAttack: true}
+	ai := NewAttackable(owner, &recordingMove{}, strike)
+	addAttackHate(ai, target, 0, 20)
+
+	ai.Think()
+
+	if strike.target != target {
+		t.Fatalf("attacked target = %v, want target at exactly 1500", strike.target)
+	}
+}
+
+func TestAttackableThinkKeepsFarAttackWhenOutOfControl(t *testing.T) {
+	owner := actor(1)
+	owner.denyAction = true
+	far := actor(2)
+	far.x = 2000
+	owner.known = map[int32]bool{far.ObjectID(): true}
+	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{canAttack: true})
+	addAttackHate(ai, far, 0, 20)
+
+	ai.Think()
+
+	if !ai.Desires().Has(&Desire{Kind: IntentionAttack, FinalTarget: far}) {
+		t.Fatal("far ATTACK desire pruned while out of control")
+	}
+	if got := ai.CurrentIntention(); got != IntentionAttack {
+		t.Fatalf("CurrentIntention() = %v, want %v", got, IntentionAttack)
+	}
+}
+
+func TestAttackableThinkDropsCurrentAttackWhenTargetMovesBeyond1500(t *testing.T) {
+	owner := actor(1)
+	target := actor(2)
+	owner.known = map[int32]bool{target.ObjectID(): true}
+	strike := &recordingAttack{canAttack: true}
+	ai := NewAttackable(owner, &recordingMove{}, strike)
+	addAttackHate(ai, target, 0, 20)
+	ai.Think()
+	if strike.target != target {
+		t.Fatalf("first Think attacked = %v, want target", strike.target)
+	}
+
+	target.x = 2000
+	strike.target = nil
+	ai.Think()
+
+	if strike.target != nil {
+		t.Fatalf("second Think attacked = %v, want none after distance prune", strike.target)
+	}
+	if got := ai.CurrentIntention(); got != IntentionIdle {
+		t.Fatalf("CurrentIntention() = %v, want %v", got, IntentionIdle)
+	}
+	if ai.Desires().Has(&Desire{Kind: IntentionAttack, FinalTarget: target}) {
+		t.Fatal("ATTACK desire still queued after target moved beyond 1500")
 	}
 }
 

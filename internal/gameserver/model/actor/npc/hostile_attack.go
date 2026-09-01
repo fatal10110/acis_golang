@@ -306,12 +306,10 @@ func (h *Hostile) MakeAttackHit(target attackable.Combatant, split bool) attack.
 	accuracy := int(h.calcStat(stat.AccuracyCombat, 0))
 	evasion := other.Evasion()
 
-	sx, sy, sz := h.Position()
+	_, _, sz := h.Position()
 	_, _, tz := other.Position()
-	_ = sx
-	_ = sy
-
-	rate := formulas.HitRate(accuracy, evasion, sz-tz, false, false, true)
+	behind, inFront := creature.AttackFacing(other, h)
+	rate := formulas.HitRate(accuracy, evasion, sz-tz, creature.Night(), behind, inFront)
 	if formulas.Missed(rate, h.roll(1000)) {
 		hit.Miss = true
 		return hit
