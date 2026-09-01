@@ -92,8 +92,11 @@ func (a *Actor) CanSee(target attackable.Combatant) bool {
 func (a *Actor) AttackSpeed() int                { return int(a.PhysicalAttackSpeed()) }
 func (a *Actor) WeaponReuseDelay() time.Duration { return 0 }
 func (a *Actor) WeaponGrade() int                { return 0 }
-func (a *Actor) InPeaceZone() bool               { return false }
-func (a *Actor) Evasion() int                    { return int(a.EvasionRate()) }
+func (a *Actor) InPeaceZone() bool {
+	x, y, z := a.Position()
+	return a.EffectRangeInPeaceZone(x, y, z, 0)
+}
+func (a *Actor) Evasion() int { return int(a.EvasionRate()) }
 
 func (a *Actor) MakeAttackHit(target attackable.Combatant, split bool) attack.Hit {
 	hit := attack.Hit{Target: target, TargetID: target.ObjectID()}

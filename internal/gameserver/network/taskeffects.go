@@ -76,6 +76,7 @@ func (a *liveZoneActor) revalidate(ix *zone.Index) {
 	defer a.mu.Unlock()
 	ix.Revalidate(a)
 	a.live.SetInPvPZone(a.flags.Has(zone.FlagPvP))
+	a.live.SetInPeaceZone(a.flags.Has(zone.FlagPeace))
 	a.live.SetInSiegeZone(a.flags.Has(zone.FlagSiege))
 	a.live.SetInNoSummonFriendZone(a.flags.Has(zone.FlagNoSummonFriend))
 }
@@ -85,6 +86,7 @@ func (a *liveZoneActor) revalidateMove(ix *zone.Index, previous location.Locatio
 	defer a.mu.Unlock()
 	ix.RevalidateMove(a, previous)
 	a.live.SetInPvPZone(a.flags.Has(zone.FlagPvP))
+	a.live.SetInPeaceZone(a.flags.Has(zone.FlagPeace))
 	a.live.SetInSiegeZone(a.flags.Has(zone.FlagSiege))
 	a.live.SetInNoSummonFriendZone(a.flags.Has(zone.FlagNoSummonFriend))
 }
@@ -94,6 +96,7 @@ func (a *liveZoneActor) removeFrom(ix *zone.Index, x, y int) {
 	defer a.mu.Unlock()
 	ix.RemoveFrom(a, x, y)
 	a.live.SetInPvPZone(a.flags.Has(zone.FlagPvP))
+	a.live.SetInPeaceZone(a.flags.Has(zone.FlagPeace))
 	a.live.SetInSiegeZone(a.flags.Has(zone.FlagSiege))
 	a.live.SetInNoSummonFriendZone(a.flags.Has(zone.FlagNoSummonFriend))
 }

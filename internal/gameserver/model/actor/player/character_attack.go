@@ -656,9 +656,6 @@ func (c *Character) BroadcastDie() {
 	}
 }
 
-// InPeaceZone reports whether c is in a combat-blocking peace zone.
-func (c *Character) InPeaceZone() bool { return false }
-
 // TryToIdle is the player attack stop hook. AI idle state is not modeled yet.
 func (c *Character) TryToIdle() {}
 

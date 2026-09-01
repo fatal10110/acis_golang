@@ -51,6 +51,16 @@ func (c *Character) InPvPZone() bool {
 	return c.insidePvPZone.Load()
 }
 
+// SetInPeaceZone records the live zone engine's current peace membership.
+func (c *Character) SetInPeaceZone(inside bool) {
+	c.insidePeaceZone.Store(inside)
+}
+
+// InPeaceZone reports whether the character is currently in a peace zone.
+func (c *Character) InPeaceZone() bool {
+	return c.insidePeaceZone.Load()
+}
+
 // SetInSiegeZone records the live zone engine's current siege membership.
 func (c *Character) SetInSiegeZone(inside bool) {
 	c.insideSiegeZone.Store(inside)
