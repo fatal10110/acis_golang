@@ -52,31 +52,35 @@ func TestControllerDualHitAndCompletionTiming(t *testing.T) {
 	if err := ctrl.DoAttack(target); err != nil {
 		t.Fatalf("DoAttack() error: %v", err)
 	}
-	if got := clock.activeCount(500 * time.Millisecond); got != 0 {
-		t.Fatalf("second-hit timers before first landing = %d, want 0", got)
+	if got := clock.activeCount(500 * time.Millisecond); got != 1 {
+		t.Fatalf("first-hit timers at attackTime/2 = %d, want 1", got)
 	}
-	if got := clock.activeCount(750 * time.Millisecond); got != 0 {
+	if got := clock.activeCount(time.Second); got != 0 {
 		t.Fatalf("completion timers before second landing = %d, want 0", got)
 	}
 
 	clock.fire(250 * time.Millisecond)
-	if target.hits != 1 {
-		t.Fatalf("hits at attackTime/4 = %d, want 1", target.hits)
+	if target.hits != 0 {
+		t.Fatalf("hits at attackTime/4 = %d, want 0", target.hits)
 	}
 	clock.fire(500 * time.Millisecond)
-	if target.hits != 2 {
-		t.Fatalf("hits at attackTime/2 = %d, want 2", target.hits)
+	if target.hits != 1 {
+		t.Fatalf("hits at attackTime/2 = %d, want 1", target.hits)
 	}
-	if !ctrl.AttackingNow() || finished != 0 {
-		t.Fatalf("completion before 3*attackTime/4: attacking = %v, finished = %d; want true, 0", ctrl.AttackingNow(), finished)
-	}
-	clock.fire(550 * time.Millisecond)
+	clock.fire(800 * time.Millisecond)
 	if ctrl.InHitAnimation() {
 		t.Fatal("InHitAnimation() after first dual landing + 300ms = true, want false")
 	}
-	clock.fire(750 * time.Millisecond)
+	clock.fire(time.Second)
+	if target.hits != 2 {
+		t.Fatalf("hits at attackTime = %d, want 2", target.hits)
+	}
+	if !ctrl.AttackingNow() || finished != 0 {
+		t.Fatalf("completion before 3*attackTime/2: attacking = %v, finished = %d; want true, 0", ctrl.AttackingNow(), finished)
+	}
+	clock.fire(1500 * time.Millisecond)
 	if ctrl.AttackingNow() || finished != 1 {
-		t.Fatalf("completion at 3*attackTime/4: attacking = %v, finished = %d; want false, 1", ctrl.AttackingNow(), finished)
+		t.Fatalf("completion at 3*attackTime/2: attacking = %v, finished = %d; want false, 1", ctrl.AttackingNow(), finished)
 	}
 }
 
@@ -90,22 +94,22 @@ func TestControllerDualSlowFirstHitDelaysSecondHitAndCompletion(t *testing.T) {
 	ctrl.SetFinished(func() { finished++ })
 	target.onDamage = func() {
 		if target.hits == 1 {
-			clock.fire(750 * time.Millisecond)
+			clock.fire(time.Second)
 		}
 	}
 
 	if err := ctrl.DoAttack(target); err != nil {
 		t.Fatalf("DoAttack() error: %v", err)
 	}
-	clock.fire(250 * time.Millisecond)
+	clock.fire(500 * time.Millisecond)
 	if target.hits != 1 || finished != 0 {
 		t.Fatalf("after slow first hit: hits = %d, finished = %d; want 1, 0", target.hits, finished)
 	}
-	clock.fire(time.Second)
+	clock.fire(1500 * time.Millisecond)
 	if target.hits != 2 || finished != 0 {
 		t.Fatalf("after delayed second hit: hits = %d, finished = %d; want 2, 0", target.hits, finished)
 	}
-	clock.fire(1250 * time.Millisecond)
+	clock.fire(2 * time.Second)
 	if finished != 1 {
 		t.Fatalf("finished after delayed second hit = %d, want 1", finished)
 	}
