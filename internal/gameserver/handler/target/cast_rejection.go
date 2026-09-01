@@ -42,7 +42,7 @@ func oneCastRejection(caster, target Creature, skill *modelskill.Definition, ctr
 			}
 			return CastRejectNone
 		}
-		if monster, ok := target.(MonsterTarget); ok && monster.MonsterKind() && !ctrl {
+		if monster, ok := target.(MonsterTarget); ok && monster.MonsterKind() && !ctrl && !skillIsDamage(skill) && !skill.Debuff {
 			return CastRejectInvalidTarget
 		}
 		return CastRejectNone
