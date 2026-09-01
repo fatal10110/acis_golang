@@ -37,7 +37,8 @@ func (c *Character) MakeAttackHit(target attackable.Combatant, split bool) attac
 
 	_, _, sz := c.Position()
 	_, _, tz := other.Position()
-	rate := formulas.HitRate(accuracy, evasion, sz-tz, false, false, true)
+	behind, inFront := creature.AttackFacing(other, c)
+	rate := formulas.HitRate(accuracy, evasion, sz-tz, creature.Night(), behind, inFront)
 	if formulas.Missed(rate, c.rollValue(1000)) {
 		hit.Miss = true
 		return hit

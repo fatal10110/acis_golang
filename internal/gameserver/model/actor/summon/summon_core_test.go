@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -15,6 +16,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // ---- from actor_cancel_vulnerability_test.go ----
@@ -1127,5 +1129,63 @@ func TestNewServitorFailsOnTemplatePassiveBuildError(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("NewServitor() error = nil, want template-passive build error")
+	}
+}
+
+type hitNight bool
+
+func (n hitNight) IsNight() bool { return bool(n) }
+
+func TestSummonMakeAttackHitAppliesFacingAndNight(t *testing.T) {
+	t.Cleanup(func() { creature.SetNightSource(nil) })
+
+	place := func(t *testing.T, ax, ay int) (*Actor, *Actor) {
+		t.Helper()
+		target := mustServitor(t, ServitorConfig{ObjectID: 1, Level: 1, Stats: CombatStats{DEX: 40, PDef: 50, MaxHP: 100}})
+		attacker := mustServitor(t, ServitorConfig{ObjectID: 2, Level: 1, Stats: CombatStats{DEX: 20, PDef: 50, MaxHP: 100}})
+		state := world.New()
+		state.Spawn(target, 0, 0, 0, 0)
+		state.Spawn(attacker, ax, ay, 0, 0)
+		return attacker, target
+	}
+
+	attacker, target := place(t, 100, 0)
+	acc := int(attacker.Accuracy())
+	eva := target.Evasion()
+	frontRate := formulas.HitRate(acc, eva, 0, false, false, true)
+	behindRate := formulas.HitRate(acc, eva, 0, false, true, false)
+	nightRate := formulas.HitRate(acc, eva, 0, true, false, true)
+	if frontRate >= behindRate {
+		t.Fatalf("need positional rate gap, front=%d behind=%d", frontRate, behindRate)
+	}
+	if nightRate >= frontRate {
+		t.Fatalf("need night rate gap, night=%d front=%d", nightRate, frontRate)
+	}
+	posRoll := (frontRate + behindRate) / 2
+	nightRoll := (nightRate + frontRate) / 2
+
+	tests := []struct {
+		name     string
+		ax, ay   int
+		night    bool
+		roll     int
+		wantMiss bool
+	}{
+		{"front day misses between front and behind rates", 100, 0, false, posRoll, true},
+		{"behind day hits between front and behind rates", -100, 0, false, posRoll, false},
+		{"side day hits between front and behind rates", 0, 100, false, posRoll, false},
+		{"front night misses between night and front rates", 100, 0, true, nightRoll, true},
+		{"front day hits the night-gap roll", 100, 0, false, nightRoll, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			creature.SetNightSource(hitNight(tt.night))
+			attacker, target := place(t, tt.ax, tt.ay)
+			attacker.roll = func(int) int { return tt.roll }
+			hit := attacker.MakeAttackHit(target, false)
+			if hit.Miss != tt.wantMiss {
+				t.Fatalf("Miss = %v, want %v (roll %d acc %d eva %d)", hit.Miss, tt.wantMiss, tt.roll, acc, eva)
+			}
+		})
 	}
 }
