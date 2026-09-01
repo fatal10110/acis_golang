@@ -744,6 +744,19 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	c.SetRelaxHPFullNotifier(func() {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSkillDeactivatedHPFull))
 	})
+	c.SetHealRestoredNotifiers(func(healerName string, amount int, byOther bool) {
+		if byOther {
+			live.SendFrame(serverpackets.FrameSystemMessageStringNumber(serverpackets.SystemMessageS2HPRestoredByS1, healerName, int32(amount)))
+			return
+		}
+		live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageS1HPRestored, int32(amount)))
+	}, func(healerName string, amount int, byOther bool) {
+		if byOther {
+			live.SendFrame(serverpackets.FrameSystemMessageStringNumber(serverpackets.SystemMessageS2MPRestoredByS1, healerName, int32(amount)))
+			return
+		}
+		live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageS1MPRestored, int32(amount)))
+	})
 	c.SetEffectExpiryNotifiers(func(skillID modelskill.ID, level int) {
 		live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1HasWornOff, int32(skillID), int32(level)))
 	}, func(skillID modelskill.ID, level int) {

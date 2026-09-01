@@ -36,6 +36,10 @@ type pvpSkillNotifier interface {
 	NotePvPSkillTargets([]creature.DeathActor, bool, string)
 }
 
+type skillSeeCurseTester interface {
+	TestCursesOnSkillSee(def modelskill.Definition, targets []skilltarget.Creature) bool
+}
+
 // ApplyEffects resolves def's affected target set from caster and the
 // already cast-validated single selection, then routes the skill's effects
 // to the resolved set. It reports whether a skill handler actually ran.
@@ -126,6 +130,11 @@ func ApplyResolvedEffectsResult(handlers EffectHandlers, caster skilltarget.Crea
 }
 
 func dispatchEffects(handlers EffectHandlers, caster skilltarget.Creature, affected []skilltarget.Creature, def modelskill.Definition, item any) EffectResult {
+	if def.Activation != modelskill.ActivationToggle {
+		if tester, ok := caster.(skillSeeCurseTester); ok && tester.TestCursesOnSkillSee(def, affected) {
+			return EffectResult{}
+		}
+	}
 	// caster already satisfies skilltarget.Creature, a strict superset of
 	// handlerskill.Actor, so no runtime guard is needed here.
 	castCaster := handlerskill.Actor(caster)

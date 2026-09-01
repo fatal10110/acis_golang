@@ -597,12 +597,22 @@ func (h *Hostile) StopAggroHate(attacker attackable.Combatant) {
 	h.brain.StopAggroHate(attacker)
 }
 
+// AggroHate returns this NPC's threat-table hate against attacker, or 0
+// when attacker is not listed.
+func (h *Hostile) AggroHate(attacker attackable.Combatant) float64 {
+	if h == nil || h.brain == nil || attacker == nil {
+		return 0
+	}
+	return h.brain.Threats().Hate(attacker)
+}
+
 // NpcID returns this NPC's template id.
 func (h *Hostile) NpcID() int {
 	return h.Instance.Template.ID
 }
 
 var _ creature.RaidCurseTarget = (*Hostile)(nil)
+var _ creature.RaidCurseSkillRaid = (*Hostile)(nil)
 
 // StopHateList drops target from the skill-cast hate table.
 func (h *Hostile) StopHateList(attacker attackable.Combatant) {

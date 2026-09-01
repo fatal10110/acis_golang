@@ -1175,6 +1175,15 @@ func (a *pvpEffectsActor) NotePvPSkillTargets(targets []creature.DeathActor, off
 	a.calls = append(a.calls, pvpSkillCall{targets: append([]creature.DeathActor(nil), targets...), offensive: offensive, skillType: skillType})
 }
 
+type cursePvpEffectsActor struct {
+	pvpEffectsActor
+	block bool
+}
+
+func (a *cursePvpEffectsActor) TestCursesOnSkillSee(modelskill.Definition, []skilltarget.Creature) bool {
+	return a.block
+}
+
 func (a *effectsActor) ObjectID() int32                { return a.id }
 func (a *effectsActor) Position() (int, int, int)      { return a.x, a.y, a.z }
 func (a *effectsActor) Heading() int                   { return 0 }
@@ -1296,6 +1305,62 @@ func TestApplyEffectsNotifiesPvPStatusBeforeSkillHandling(t *testing.T) {
 	call := caster.calls[0]
 	if !call.offensive || call.skillType != "DUMMY" || len(call.targets) != 1 || call.targets[0] != target {
 		t.Fatalf("PvP status call = %+v, want offensive selected target", call)
+	}
+}
+
+func TestApplyEffectsAbortsWhenPlayableSkillSeeCurseBlocks(t *testing.T) {
+	caster := &cursePvpEffectsActor{
+		pvpEffectsActor: pvpEffectsActor{effectsActor: effectsActor{id: 1, category: skilltarget.CategoryPlayable}},
+		block:           true,
+	}
+	target := &effectsActor{id: 2, category: skilltarget.CategoryAttackable}
+	rec := &recordingSkillHandler{}
+	handlers := newEffectHandlers(effectsKnown{}, "DUMMY", rec)
+	def := modelskill.Definition{ID: 100, Target: modelskill.TargetOne, Offensive: true, SkillType: "DUMMY"}
+
+	if ApplyEffects(handlers, caster, target, def) {
+		t.Fatal("ApplyEffects() = true, want false after skill-see curse")
+	}
+	if len(rec.calls) != 0 {
+		t.Fatalf("skill handler calls = %d, want 0", len(rec.calls))
+	}
+	if len(caster.calls) != 0 {
+		t.Fatalf("PvP status calls = %d, want 0", len(caster.calls))
+	}
+}
+
+func TestApplyEffectsContinuesWhenPlayableSkillSeeCurseAllows(t *testing.T) {
+	caster := &cursePvpEffectsActor{
+		pvpEffectsActor: pvpEffectsActor{effectsActor: effectsActor{id: 1, category: skilltarget.CategoryPlayable}},
+	}
+	target := &effectsActor{id: 2, category: skilltarget.CategoryAttackable}
+	rec := &recordingSkillHandler{}
+	handlers := newEffectHandlers(effectsKnown{}, "DUMMY", rec)
+	def := modelskill.Definition{ID: 100, Target: modelskill.TargetOne, Offensive: true, SkillType: "DUMMY"}
+
+	if !ApplyEffects(handlers, caster, target, def) {
+		t.Fatal("ApplyEffects() = false, want true")
+	}
+	if len(rec.calls) != 1 {
+		t.Fatalf("skill handler calls = %d, want 1", len(rec.calls))
+	}
+}
+
+func TestApplyEffectsToggleSkipsSkillSeeCurse(t *testing.T) {
+	caster := &cursePvpEffectsActor{
+		pvpEffectsActor: pvpEffectsActor{effectsActor: effectsActor{id: 1, category: skilltarget.CategoryPlayable}},
+		block:           true,
+	}
+	target := &effectsActor{id: 2, category: skilltarget.CategoryPlayable}
+	rec := &recordingSkillHandler{}
+	handlers := newEffectHandlers(effectsKnown{}, "DUMMY", rec)
+	def := modelskill.Definition{ID: 100, Target: modelskill.TargetOne, Activation: modelskill.ActivationToggle, SkillType: "DUMMY"}
+
+	if !ApplyEffects(handlers, caster, target, def) {
+		t.Fatal("ApplyEffects(toggle) = false, want true")
+	}
+	if len(rec.calls) != 1 {
+		t.Fatalf("skill handler calls = %d, want 1", len(rec.calls))
 	}
 }
 

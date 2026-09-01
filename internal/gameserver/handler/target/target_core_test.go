@@ -360,7 +360,6 @@ func TestAuraHandlersRejectPeaceZoneCastsLikeJava(t *testing.T) {
 
 func TestCastRejectionForPreservesHandlerMessages(t *testing.T) {
 	caster := &targetActor{id: 1, category: CategoryPlayable, peace: true}
-	target := &targetActor{id: 2, category: CategoryPlayable, peace: true}
 	offensive := &modelskill.Definition{Offensive: true}
 
 	tests := []struct {
@@ -375,12 +374,12 @@ func TestCastRejectionForPreservesHandlerMessages(t *testing.T) {
 		{"front aura in peace", modelskill.TargetFrontAura, caster, nil, offensive, CastRejectCantAttackPeaceZone},
 		{"behind aura in peace", modelskill.TargetBehindAura, caster, nil, nil, CastRejectCantAttackPeaceZone},
 		{"one offensive self", modelskill.TargetOne, caster, caster, offensive, CastRejectInvalidTarget},
-		{"one offensive target in peace", modelskill.TargetOne, &targetActor{id: 3, category: CategoryPlayable}, target, offensive, CastRejectTargetInPeaceZone},
+		{"one offensive target in peace", modelskill.TargetOne, &targetActor{id: 3, category: CategoryPlayable}, &targetActor{id: 2, category: CategoryPlayable, peace: true, attackableBy: true, attackableWithoutForce: true}, offensive, CastRejectTargetInPeaceZone},
 		{"one nil target", modelskill.TargetOne, caster, nil, offensive, CastRejectNone},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := CastRejectionFor(tt.targetType, tt.caster, tt.aimed, tt.skill); got != tt.want {
+			if got := CastRejectionFor(tt.targetType, tt.caster, tt.aimed, tt.skill, false); got != tt.want {
 				t.Fatalf("CastRejectionFor = %v, want %v", got, tt.want)
 			}
 		})
@@ -676,6 +675,39 @@ func TestSelfAndOneHandlers(t *testing.T) {
 	}
 }
 
+func TestOneHandlerCastConditions(t *testing.T) {
+	one := mustHandler(t, NewRegistry(knownList{}), modelskill.TargetOne)
+	caster := &targetActor{id: 1, category: CategoryPlayable}
+	playable := &targetActor{id: 2, category: CategoryPlayable, attackableBy: true, attackableWithoutForce: true}
+
+	tests := []struct {
+		name   string
+		target *targetActor
+		skill  modelskill.Definition
+		ctrl   bool
+		want   bool
+	}{
+		{"offensive playable needs attack rule", &targetActor{id: 2, category: CategoryPlayable}, modelskill.Definition{Offensive: true}, false, false},
+		{"offensive playable accepts ctrl force", &targetActor{id: 2, category: CategoryPlayable, attackableBy: true}, modelskill.Definition{Offensive: true}, true, true},
+		{"olympiad before start", &targetActor{id: 2, category: CategoryPlayable, attackableBy: true, attackableWithoutForce: true}, modelskill.Definition{Offensive: true}, false, false},
+		{"folk requires ctrl damage", &targetActor{id: 3, folkOrGuard: true}, modelskill.Definition{Offensive: true, SkillType: "PDAM"}, false, false},
+		{"folk accepts ctrl damage", &targetActor{id: 3, folkOrGuard: true}, modelskill.Definition{Offensive: true, SkillType: "PDAM"}, true, true},
+		{"folk rejects ctrl non-damage", &targetActor{id: 3, folkOrGuard: true}, modelskill.Definition{Offensive: true}, true, false},
+		{"door needs attackability", &targetActor{id: 4, door: true}, modelskill.Definition{Offensive: true}, true, false},
+		{"beneficial monster requires ctrl", &targetActor{id: 5, monster: true}, modelskill.Definition{}, false, false},
+		{"beneficial monster accepts ctrl", &targetActor{id: 5, monster: true}, modelskill.Definition{}, true, true},
+		{"beneficial playable policy", playable, modelskill.Definition{}, false, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			caster.olympiad, caster.olympiadStarted = tt.name == "olympiad before start", false
+			if got := one.CanCast(caster, tt.target, &tt.skill, tt.ctrl); got != tt.want {
+				t.Fatalf("CanCast = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestSingleTargetKindHandlersValidateCastTargets(t *testing.T) {
 	caster := &targetActor{id: 1, category: CategoryPlayable}
 	holyThing := &targetActor{id: 2, category: CategoryFolk, holy: true}
@@ -857,6 +889,10 @@ type targetActor struct {
 	peace                  bool
 	corpse                 bool
 	monster                bool
+	folkOrGuard            bool
+	door                   bool
+	playableCastDenied     bool
+	olympiadStarted        bool
 	corpseDeadline         time.Time
 	corpseTime             time.Duration
 	spoiled                bool
@@ -933,6 +969,16 @@ func (a *targetActor) InPeaceZone() bool { return a.peace }
 func (a *targetActor) HasCorpse() bool { return a.corpse }
 
 func (a *targetActor) MonsterKind() bool { return a.monster }
+
+func (a *targetActor) FolkOrGuard() bool { return a.folkOrGuard }
+
+func (a *targetActor) Door() bool { return a.door }
+
+func (a *targetActor) CanCastOnPlayable(Creature, *modelskill.Definition, bool, bool) bool {
+	return !a.playableCastDenied
+}
+
+func (a *targetActor) OlympiadStarted() bool { return a.olympiadStarted }
 
 func (a *targetActor) CorpseDeadline() (time.Time, bool) {
 	return a.corpseDeadline, !a.corpseDeadline.IsZero()

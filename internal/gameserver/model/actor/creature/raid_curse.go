@@ -10,9 +10,12 @@ import (
 const (
 	// RaidCurseHitTime is the MagicSkillUse hitTime the raid-curse
 	// animation carries.
-	RaidCurseHitTime    = 300
-	raidCurseLevelGap   = 8
-	raidCurseSkillLevel = 1
+	RaidCurseHitTime = 300
+	// RaidCurseSkillSeeRadius is the known-Attackable scan used by the
+	// beneficial skill-see silence branch.
+	RaidCurseSkillSeeRadius = 1000
+	raidCurseLevelGap       = 8
+	raidCurseSkillLevel     = 1
 )
 
 // MagicSkillUse is the domain snapshot a playable broadcasts when a raid
@@ -65,6 +68,49 @@ type RaidCurseInput struct {
 	Broadcast func(MagicSkillUse)
 }
 
+// RaidCurseSkillRaid is a known raid-related Attackable the beneficial
+// skill-see branch consults for hate.
+type RaidCurseSkillRaid interface {
+	RaidCurseTarget
+	RaidRelated() bool
+	AggroHate(attackable.Combatant) float64
+}
+
+// RaidCurseSkillSeeTarget is one already-resolved skill target. Raid is
+// set for a raid-related Attackable; Helped is set for a Playable.
+type RaidCurseSkillSeeTarget struct {
+	Raid   RaidCurseTarget
+	Helped attackable.Combatant
+}
+
+// RaidCurseSkillInput is the playable skill-see curse decision.
+type RaidCurseSkillInput struct {
+	Caster    RaidCurseAttacker
+	Offensive bool
+	Debuff    bool
+	Targets   []RaidCurseSkillSeeTarget
+	Nearby    []RaidCurseSkillRaid
+	Disabled  bool
+	Skills    RaidCurseSkills
+	Broadcast func(MagicSkillUse)
+}
+
+// SkillSeeTargetOf classifies t for the skill-see curse decision.
+func SkillSeeTargetOf(t any, playable bool) RaidCurseSkillSeeTarget {
+	var item RaidCurseSkillSeeTarget
+	if raid, ok := t.(RaidCurseTarget); ok && raid.Attackable() {
+		if related, ok := t.(interface{ RaidRelated() bool }); ok && related.RaidRelated() {
+			item.Raid = raid
+		}
+	}
+	if playable {
+		if helped, ok := t.(attackable.Combatant); ok {
+			item.Helped = helped
+		}
+	}
+	return item
+}
+
 // TestCursesOnAttack applies raid petrification and mounted anti-strider
 // curses. It reports true only when petrification freshly lands and must
 // cancel the leftover physical hit.
@@ -87,6 +133,60 @@ func TestCursesOnAttack(in RaidCurseInput) bool {
 		applyRaidCurse(in, target, modelskill.RaidAntiStriderSlowSkillID, false)
 	}
 	return false
+}
+
+// TestCursesOnSkillSee applies raid petrification on offensive/debuff
+// casts and silence on beneficial casts. True means leftover skill
+// effects must be skipped.
+func TestCursesOnSkillSee(in RaidCurseSkillInput) bool {
+	if in.Disabled || in.Caster == nil {
+		return false
+	}
+	if in.Offensive || in.Debuff {
+		for _, t := range in.Targets {
+			if t.Raid == nil {
+				continue
+			}
+			if in.Caster.Level()-t.Raid.Level() > raidCurseLevelGap {
+				if applyRaidCurse(skillSeeAsAttack(in), t.Raid, modelskill.RaidCurse2SkillID, true) {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	if len(in.Nearby) == 0 {
+		return false
+	}
+	for _, t := range in.Targets {
+		if t.Helped == nil {
+			continue
+		}
+		for _, raid := range in.Nearby {
+			if raid == nil || !raid.Attackable() || !raid.RaidRelated() {
+				continue
+			}
+			if in.Caster.Level()-raid.Level() <= raidCurseLevelGap {
+				continue
+			}
+			if raid.AggroHate(t.Helped) <= 0 {
+				continue
+			}
+			if applyRaidCurse(skillSeeAsAttack(in), raid, modelskill.RaidCurseSkillID, true) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func skillSeeAsAttack(in RaidCurseSkillInput) RaidCurseInput {
+	return RaidCurseInput{
+		Attacker:  in.Caster,
+		Disabled:  in.Disabled,
+		Skills:    in.Skills,
+		Broadcast: in.Broadcast,
+	}
 }
 
 func applyRaidCurse(in RaidCurseInput, target RaidCurseTarget, skillID modelskill.ID, stopHate bool) bool {

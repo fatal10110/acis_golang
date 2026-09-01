@@ -2,9 +2,11 @@ package summon
 
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
 var _ creature.RaidCurseAttacker = (*Actor)(nil)
@@ -34,6 +36,44 @@ func (a *Actor) TestCursesOnAttack(target attackable.Combatant) bool {
 		Target:    target,
 		NPCID:     creature.NPCIDOf(target),
 		Mounted:   false,
+		Disabled:  disabled,
+		Skills:    a.skillDefs,
+		Broadcast: a.broadcastMagicSkillUse,
+	})
+}
+
+// TestCursesOnSkillSee applies this summon's raid petrification or silence
+// curses against the resolved skill targets. True means leftover skill
+// effects must be skipped.
+func (a *Actor) TestCursesOnSkillSee(def modelskill.Definition, targets []skilltarget.Creature) bool {
+	if a == nil {
+		return false
+	}
+	a.statusMu.RLock()
+	disabled := a.raidCursesDisabled
+	a.statusMu.RUnlock()
+
+	converted := make([]creature.RaidCurseSkillSeeTarget, 0, len(targets))
+	for _, t := range targets {
+		playable := t != nil && t.Category().Has(skilltarget.CategoryPlayable)
+		converted = append(converted, creature.SkillSeeTargetOf(t, playable))
+	}
+	var nearby []creature.RaidCurseSkillRaid
+	if !def.Offensive && !def.Debuff {
+		a.ForEachKnownCombatantInRadius(creature.RaidCurseSkillSeeRadius, func(candidate attackable.Combatant) {
+			raid, ok := candidate.(creature.RaidCurseSkillRaid)
+			if !ok || !raid.Attackable() || !raid.RaidRelated() {
+				return
+			}
+			nearby = append(nearby, raid)
+		})
+	}
+	return creature.TestCursesOnSkillSee(creature.RaidCurseSkillInput{
+		Caster:    a,
+		Offensive: def.Offensive,
+		Debuff:    def.Debuff,
+		Targets:   converted,
+		Nearby:    nearby,
 		Disabled:  disabled,
 		Skills:    a.skillDefs,
 		Broadcast: a.broadcastMagicSkillUse,
