@@ -95,7 +95,8 @@ type LoginLink struct {
 
 	// frames reuses one payload buffer across inbound frames; it belongs to
 	// the single reader goroutine.
-	frames *wire.FrameReader
+	frames      *wire.FrameReader
+	handshaking bool
 
 	sendMu sync.Mutex
 
@@ -121,11 +122,12 @@ func DialLoginLink(ctx context.Context, address string, auth LoginServerAuth, ha
 		return nil, fmt.Errorf("dial login server: %w", err)
 	}
 
-	l := &LoginLink{conn: conn, crypt: crypt.NewLinkCrypt(), log: log, done: make(chan struct{}), frames: wire.NewFrameReader(conn)}
+	l := &LoginLink{conn: conn, crypt: crypt.NewLinkCrypt(), log: log, done: make(chan struct{}), frames: wire.NewFrameReader(conn), handshaking: true}
 	if err := l.handshake(auth); err != nil {
 		conn.Close()
 		return nil, err
 	}
+	l.handshaking = false
 
 	go func() {
 		defer func() {
@@ -263,6 +265,13 @@ func (l *LoginLink) readLoop(handlers LoginLinkHandlers) {
 // per-link buffer, so the payload is only valid until the next readFrame
 // call; only the single reader goroutine may call it.
 func (l *LoginLink) readFrame() ([]byte, error) {
+	timeout := clientReadIdleTimeout
+	if l.handshaking {
+		timeout = clientReadHandshakeTimeout
+	}
+	if err := l.conn.SetReadDeadline(time.Now().Add(timeout)); err != nil {
+		return nil, err
+	}
 	payload, err := l.frames.ReadFrame()
 	if err != nil {
 		return nil, err
@@ -276,6 +285,9 @@ func (l *LoginLink) readFrame() ([]byte, error) {
 func (l *LoginLink) send(payload []byte) error {
 	l.sendMu.Lock()
 	defer l.sendMu.Unlock()
+	if err := l.conn.SetWriteDeadline(time.Now().Add(time.Minute)); err != nil {
+		return err
+	}
 	if err := wire.WriteFrame(l.conn, l.crypt.Encrypt(payload)); err != nil {
 		_ = l.conn.Close()
 		return err
