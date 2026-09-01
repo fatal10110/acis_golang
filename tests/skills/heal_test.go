@@ -93,12 +93,46 @@ func TestHealSelfCastRestoresDamagedCaster(t *testing.T) {
 	c.Send(encodeRequestMagicSkillUse(1218, false, false))
 	readCastStartFrames(t, c, objID, 1218, 1, 500, 60_000, objID)
 
+	assertRestoredNumber(t, findSystemMessage(t, c, int32(serverpackets.SystemMessageS1HPRestored)), 8)
 	assertStatusAttrs(t, c.Read(), objID, []serverpackets.StatusAttribute{
 		{Type: serverpackets.StatusCurrentHP, Value: maxHP},
 		{Type: serverpackets.StatusCurrentMP, Value: srv.PlayerCurrentMP(t, objID)},
 	})
 	if hp := srv.PlayerCurrentHP(t, objID); hp != maxHP {
 		t.Fatalf("caster HP after heal = %d, want restored to computed max %d (was %d)", hp, maxHP, before)
+	}
+	drainUntilQuiet(t, c)
+}
+
+func TestManaHealSelfCastSendsMPRestoredMessage(t *testing.T) {
+	const (
+		skillID  = 1219
+		headroom = 8
+	)
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{{
+			ID: skillID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+			HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
+			SkillType: "MANAHEAL", Power: 50,
+		}})),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, skillID, 1)
+	startInWorld(t, c)
+
+	before := srv.PlayerCurrentMP(t, objID)
+	if before < headroom {
+		t.Fatalf("current MP %d leaves no %d-point restore headroom", before, headroom)
+	}
+	srv.DrainPlayerMP(t, objID, headroom)
+
+	c.Send(encodeRequestMagicSkillUse(skillID, false, false))
+	readCastStartFrames(t, c, objID, skillID, 1, 500, 60_000, objID)
+	assertRestoredNumber(t, findSystemMessage(t, c, int32(serverpackets.SystemMessageS1MPRestored)), headroom)
+	if mp := srv.PlayerCurrentMP(t, objID); mp != before {
+		t.Fatalf("caster MP after mana heal = %d, want %d", mp, before)
 	}
 	drainUntilQuiet(t, c)
 }

@@ -9,6 +9,17 @@ type healAmountSource interface {
 	HealAmount(modelskill.Definition) (float64, bool)
 }
 
+type restoredNotifier interface {
+	IsPlayer() bool
+	NotifyHPRestored(healerName string, amount int, byOther bool)
+	NotifyMPRestored(healerName string, amount int, byOther bool)
+	NotifyCPRestored(healerName string, amount int, byOther bool)
+}
+
+type characterNamer interface {
+	CharacterName() string
+}
+
 type healTarget interface {
 	CanBeHealed() bool
 	AddHP(float64) float64
@@ -95,7 +106,8 @@ func (healHandler) Use(cast Cast) {
 		if eff, ok := obj.(healEffectivenessTarget); ok {
 			effectiveness = eff.HealEffectiveness()
 		}
-		target.AddHP(amount * effectiveness / 100)
+		restored := target.AddHP(amount * effectiveness / 100)
+		notifyRestored(obj, cast.Caster, restored, false, false)
 	}
 }
 
@@ -111,7 +123,8 @@ func (healPercentHandler) Use(cast Cast) {
 			if !ok || !target.CanBeHealed() {
 				continue
 			}
-			target.AddHP(target.MaxHPValue() * float64(cast.Skill.Power) / 100)
+			restored := target.AddHP(target.MaxHPValue() * float64(cast.Skill.Power) / 100)
+			notifyRestored(obj, cast.Caster, restored, false, false)
 		}
 		return
 	}
@@ -122,7 +135,8 @@ func (healPercentHandler) Use(cast Cast) {
 		if !ok || !target.CanBeHealed() {
 			continue
 		}
-		target.AddMP(target.MaxMPValue() * float64(cast.Skill.Power) / 100)
+		restored := target.AddMP(target.MaxMPValue() * float64(cast.Skill.Power) / 100)
+		notifyRestored(obj, cast.Caster, restored, true, true)
 	}
 }
 
@@ -142,7 +156,8 @@ func (manaHealHandler) Use(cast Cast) {
 				mp = r.RechargeMP(mp)
 			}
 		}
-		target.AddMP(mp)
+		restored := target.AddMP(mp)
+		notifyRestored(obj, cast.Caster, restored, true, true)
 	}
 }
 
@@ -162,7 +177,42 @@ func (combatPointHealHandler) Use(cast Cast) {
 			amount = target.MaxCPValue() - target.CP()
 		}
 		target.SetCP(target.CP() + amount)
+		notifyCPRestored(obj, cast.Caster, amount)
 	}
+}
+
+func notifyRestored(target, caster Actor, amount float64, mp, playerCasterOnly bool) {
+	notifier, ok := target.(restoredNotifier)
+	if !ok || !notifier.IsPlayer() {
+		return
+	}
+	name := ""
+	if n, ok := caster.(characterNamer); ok {
+		name = n.CharacterName()
+	}
+	byOther := caster != target
+	if playerCasterOnly {
+		casterPlayer, ok := caster.(interface{ IsPlayer() bool })
+		byOther = ok && casterPlayer.IsPlayer() && byOther
+	}
+	if mp {
+		notifier.NotifyMPRestored(name, int(amount), byOther)
+		return
+	}
+	notifier.NotifyHPRestored(name, int(amount), byOther)
+}
+
+func notifyCPRestored(target, caster Actor, amount float64) {
+	notifier, ok := target.(restoredNotifier)
+	if !ok || !notifier.IsPlayer() {
+		return
+	}
+	name := ""
+	if n, ok := caster.(characterNamer); ok {
+		name = n.CharacterName()
+	}
+	casterPlayer, ok := caster.(interface{ IsPlayer() bool })
+	notifier.NotifyCPRestored(name, int(amount), ok && casterPlayer.IsPlayer() && caster != target)
 }
 
 // castBreakTarget is implemented by targets that carry their own live cast
