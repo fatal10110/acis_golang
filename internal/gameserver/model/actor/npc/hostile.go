@@ -266,10 +266,10 @@ func shotRates(tpl *Template) (soulshotRate, spiritshotRate int, err error) {
 }
 
 // SetWorld records the world registry BroadcastAttack reaches nearby
-// observers through. Call it once, after placing this NPC on the grid —
-// BroadcastAttack is a no-op until then. This mirrors Decay's worldState
-// parameter, which BroadcastAttack has no room for since attack.CreatureActor
-// fixes its signature to the snapshot alone.
+// observers through. Call it once, before exposing this NPC to other
+// goroutines — BroadcastAttack is a no-op until then. This mirrors Decay's
+// worldState parameter, which BroadcastAttack has no room for since
+// attack.CreatureActor fixes its signature to the snapshot alone.
 func (h *Hostile) SetWorld(state *world.State) {
 	h.world = state
 }
