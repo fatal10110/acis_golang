@@ -1410,3 +1410,62 @@ func TestOverhitBonusExpOracle(t *testing.T) {
 		}
 	})
 }
+
+type hitNight bool
+
+func (n hitNight) IsNight() bool { return bool(n) }
+
+func TestMakeAttackHitAppliesFacingAndNight(t *testing.T) {
+	t.Cleanup(func() { creature.SetNightSource(nil) })
+
+	tpl := &Template{ID: 1, Type: "Monster"}
+	place := func(t *testing.T, ax, ay int) (*Hostile, *Hostile) {
+		t.Helper()
+		state := world.New()
+		target := newCombatHostile(t, 1, tpl)
+		attacker := newCombatHostile(t, 2, tpl)
+		state.Spawn(target, 0, 0, 0, 0)
+		state.Spawn(attacker, ax, ay, 0, 0)
+		return attacker, target
+	}
+
+	attacker, target := place(t, 100, 0)
+	acc := int(attacker.calcStat(stat.AccuracyCombat, 0))
+	eva := target.Evasion()
+	frontRate := formulas.HitRate(acc, eva, 0, false, false, true)
+	behindRate := formulas.HitRate(acc, eva, 0, false, true, false)
+	nightRate := formulas.HitRate(acc, eva, 0, true, false, true)
+	if frontRate >= behindRate {
+		t.Fatalf("need positional rate gap, front=%d behind=%d", frontRate, behindRate)
+	}
+	if nightRate >= frontRate {
+		t.Fatalf("need night rate gap, night=%d front=%d", nightRate, frontRate)
+	}
+	posRoll := (frontRate + behindRate) / 2
+	nightRoll := (nightRate + frontRate) / 2
+
+	tests := []struct {
+		name     string
+		ax, ay   int
+		night    bool
+		roll     int
+		wantMiss bool
+	}{
+		{"front day misses between front and behind rates", 100, 0, false, posRoll, true},
+		{"behind day hits between front and behind rates", -100, 0, false, posRoll, false},
+		{"side day hits between front and behind rates", 0, 100, false, posRoll, false},
+		{"front night misses between night and front rates", 100, 0, true, nightRoll, true},
+		{"front day hits the night-gap roll", 100, 0, false, nightRoll, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			creature.SetNightSource(hitNight(tt.night))
+			attacker, target := place(t, tt.ax, tt.ay)
+			attacker.SetRollSource(func(int) int { return tt.roll })
+			hit := attacker.MakeAttackHit(target, false)
+			if hit.Miss != tt.wantMiss {
+				t.Fatalf("Miss = %v, want %v (roll %d acc %d eva %d)", hit.Miss, tt.wantMiss, tt.roll, acc, eva)
+			}
+		})
+	}
+}

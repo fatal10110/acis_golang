@@ -391,20 +391,42 @@ func PositionMultiplierFrom(target, attacker FormulaActor, crit bool) float64 {
 	if target == nil || attacker == nil {
 		return 1
 	}
+	behind, inFront := AttackFacing(target, attacker)
+	return formulas.PosMul(behind, inFront, crit)
+}
+
+// AttackFacing reports whether attacker stands behind or in front of target,
+// using target's own heading. Side is !behind && !inFront. Missing heading
+// treats the target as facing heading 0.
+func AttackFacing(target, attacker interface{ Position() (int, int, int) }) (behind, inFront bool) {
+	if target == nil || attacker == nil {
+		return false, true
+	}
 	tx, ty, tz := target.Position()
-	ax, ay, az := attacker.Position()
+	ax, ay, _ := attacker.Position()
 	facing := location.OrientedLocation{
 		Location: location.Location{X: tx, Y: ty, Z: tz},
-		Heading:  formulaHeading(target),
+		Heading:  facingHeading(target),
 	}
-	return formulas.PosMul(facing.IsBehind(location.Location{X: ax, Y: ay, Z: az}), facing.IsInFrontOf(location.Location{X: ax, Y: ay, Z: az}), crit)
+	pos := location.Location{X: ax, Y: ay}
+	return facing.IsBehind(pos), facing.IsInFrontOf(pos)
 }
 
 func formulaHeading(actor FormulaActor) int {
+	return facingHeading(actor)
+}
+
+func facingHeading(actor any) int {
+	if actor == nil {
+		return 0
+	}
 	if h, ok := actor.(interface{ CurrentHeading() int }); ok {
 		return h.CurrentHeading()
 	}
-	return actor.Heading()
+	if h, ok := actor.(interface{ Heading() int }); ok {
+		return h.Heading()
+	}
+	return 0
 }
 
 // SkillStatModifier returns the target attribute modifier used by effect
