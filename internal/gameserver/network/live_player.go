@@ -29,11 +29,14 @@ type livePlayer struct {
 	template *player.Template
 	npcs     *npc.Table
 	items    []*item.Instance
-	throne   staticobject.Chair
-	attack   *attack.Controller
-	move     *move.Controller
-	combat   *ai.PlayerAttack
-	cast     *actorcast.Controller
+	throne   interface {
+		staticobject.Chair
+		StaticObjectID() int
+	}
+	attack *attack.Controller
+	move   *move.Controller
+	combat *ai.PlayerAttack
+	cast   *actorcast.Controller
 	// summonSpawner caches the pet/servitor spawner wired onto p.Character,
 	// so useSummonItem only allocates and wires one on the first pet-collar
 	// use rather than on every use — link/live are stable for p's whole
