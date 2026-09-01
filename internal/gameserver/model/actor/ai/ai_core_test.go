@@ -443,6 +443,11 @@ type fakeActor struct {
 	returnHome      bool
 	returnHomeCalls int
 	moving          bool
+	idleWander      bool
+	moveSpeed       float64
+	wanderCalls     int
+	wanderOffset    int
+	walkStanceCalls int
 	x, y, z         int
 	headingTarget   attackable.Combatant
 	moveToPawnCalls int
@@ -479,6 +484,13 @@ func (a *fakeActor) BroadcastMoveToPawn(target attackable.Combatant) error {
 	a.moveToPawnCalls++
 	a.moveToPawnTo = target
 	return a.moveToPawnErr
+}
+func (a *fakeActor) ShouldIdleWander() bool { return a.idleWander }
+func (a *fakeActor) ForceWalkStance()       { a.walkStanceCalls++ }
+func (a *fakeActor) RealMoveSpeed() float64 { return a.moveSpeed }
+func (a *fakeActor) MoveFromSpawnUsingRandomOffset(offset int) {
+	a.wanderCalls++
+	a.wanderOffset = offset
 }
 
 // recordingMove/recordingAttack/recordingCast (below) stand in for
@@ -1275,6 +1287,149 @@ func TestAttackableAIWanderClearsWhenOutsideTerritoryAndNotReturning(t *testing.
 
 	if got := ai.CurrentIntention(); got != IntentionIdle {
 		t.Fatalf("CurrentIntention() = %v, want idle outside territory without return home", got)
+	}
+}
+
+func TestAttackableAIWanderWalksFromSpawnOnFirstStep(t *testing.T) {
+	owner := actor(1)
+	owner.moveSpeed = 50
+	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+
+	ai.SetWander()
+	if err := ai.Think(); err != nil {
+		t.Fatalf("Think() error: %v", err)
+	}
+
+	if owner.walkStanceCalls != 1 {
+		t.Fatalf("walk stance calls = %d, want 1", owner.walkStanceCalls)
+	}
+	if owner.wanderCalls != 1 {
+		t.Fatalf("wander move calls = %d, want 1", owner.wanderCalls)
+	}
+	if owner.wanderOffset != 150 {
+		t.Fatalf("wander offset = %d, want 150 (walk speed * 3)", owner.wanderOffset)
+	}
+}
+
+func TestAttackableAIIdleQueuesWanderAndWalks(t *testing.T) {
+	owner := actor(1)
+	owner.idleWander = true
+	owner.moveSpeed = 40
+	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+
+	if err := ai.Think(); err != nil {
+		t.Fatalf("Think() error: %v", err)
+	}
+
+	if got := ai.CurrentIntention(); got != IntentionWander {
+		t.Fatalf("CurrentIntention() = %v, want wander", got)
+	}
+	got, ok := ai.Desires().Peek()
+	if !ok || got.Kind != IntentionWander || got.Timer != 5 || got.Weight != 5 {
+		t.Fatalf("queued wander = (%v %+v), want timer 5 weight 5", ok, got)
+	}
+	if owner.wanderCalls != 1 || owner.wanderOffset != 120 {
+		t.Fatalf("wander move = %d offset %d, want 1 call offset 120", owner.wanderCalls, owner.wanderOffset)
+	}
+}
+
+func TestAttackableAIWanderTimerThenRateWalks(t *testing.T) {
+	owner := actor(1)
+	owner.moveSpeed = 50
+	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	now := start
+	ai.now = func() time.Time { return now }
+	ai.SetRandomWalkRate(100)
+	ai.roll = func(int) int { return 0 }
+
+	ai.SetWander()
+	if err := ai.Think(); err != nil {
+		t.Fatalf("first Think() error: %v", err)
+	}
+	owner.wanderCalls = 0
+
+	if err := ai.Think(); err != nil {
+		t.Fatalf("arm-timer Think() error: %v", err)
+	}
+	if owner.wanderCalls != 0 {
+		t.Fatalf("wander calls while timer arms = %d, want 0", owner.wanderCalls)
+	}
+
+	now = start.Add(4 * time.Second)
+	if err := ai.Think(); err != nil {
+		t.Fatalf("early Think() error: %v", err)
+	}
+	if owner.wanderCalls != 0 {
+		t.Fatalf("wander calls before timer = %d, want 0", owner.wanderCalls)
+	}
+
+	now = start.Add(5 * time.Second)
+	if err := ai.Think(); err != nil {
+		t.Fatalf("due Think() error: %v", err)
+	}
+	if owner.wanderCalls != 1 {
+		t.Fatalf("wander calls after timer + rate = %d, want 1", owner.wanderCalls)
+	}
+}
+
+func TestAttackableAIWanderRateZeroReschedulesWithoutWalking(t *testing.T) {
+	owner := actor(1)
+	owner.moveSpeed = 50
+	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	now := start
+	ai.now = func() time.Time { return now }
+	ai.SetRandomWalkRate(0)
+
+	ai.SetWander()
+	if err := ai.Think(); err != nil {
+		t.Fatalf("first Think() error: %v", err)
+	}
+	owner.wanderCalls = 0
+	if err := ai.Think(); err != nil {
+		t.Fatalf("arm-timer Think() error: %v", err)
+	}
+
+	now = start.Add(5 * time.Second)
+	if err := ai.Think(); err != nil {
+		t.Fatalf("due Think() error: %v", err)
+	}
+	if owner.wanderCalls != 0 {
+		t.Fatalf("wander calls with rate 0 = %d, want 0", owner.wanderCalls)
+	}
+
+	now = start.Add(9 * time.Second)
+	if err := ai.Think(); err != nil {
+		t.Fatalf("before second timer Think() error: %v", err)
+	}
+	if owner.wanderCalls != 0 {
+		t.Fatalf("wander calls before rescheduled timer = %d, want 0", owner.wanderCalls)
+	}
+}
+
+func TestAttackableAIAttackInterruptsWander(t *testing.T) {
+	owner := actor(1)
+	owner.moveSpeed = 50
+	target := actor(2)
+	owner.known = map[int32]bool{target.ObjectID(): true}
+	strike := &recordingAttack{canAttack: true}
+	ai := NewAttackable(owner, &recordingMove{}, strike)
+
+	ai.SetWander()
+	if err := ai.Think(); err != nil {
+		t.Fatalf("wander Think() error: %v", err)
+	}
+
+	addAttackHate(ai, target, 0, 10)
+	if err := ai.Think(); err != nil {
+		t.Fatalf("attack Think() error: %v", err)
+	}
+	if got := ai.CurrentIntention(); got != IntentionAttack {
+		t.Fatalf("CurrentIntention() = %v, want attack interrupting wander", got)
+	}
+	if strike.target != target {
+		t.Fatalf("attacked target = %v, want %v", strike.target, target)
 	}
 }
 
