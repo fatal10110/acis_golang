@@ -10,12 +10,10 @@ import (
 const minWanderOffset = 10
 
 // ShouldIdleWander reports whether an empty desire queue should become a
-// wander desire: MovingAttack defaults on, and hold-position kinds (guards
-// and chests) stay put without the per-NPC script overlay.
+// wander desire. Hold-position kinds stay put. MovingAttack is not a
+// wander gate (Warrior.java:331-334, Wizard.java:28-31); only
+// MonsterBehavior.onNoDesire reads it. Script-accurate eligibility: #2148.
 func (h *Hostile) ShouldIdleWander() bool {
-	if h.aiInt("MovingAttack", 1) != 1 {
-		return false
-	}
 	switch hostileKind(h.Instance) {
 	case "Guard", "SiegeGuard", "Chest", "HalishaChest":
 		return false
