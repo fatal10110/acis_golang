@@ -35,10 +35,18 @@ func (s *Server) SpawnHostileNPC(t *testing.T) *npc.Hostile {
 // construction path.
 func (s *Server) SpawnHostileNPCAt(t *testing.T, at location.Location) *npc.Hostile {
 	t.Helper()
+	return s.SpawnHostileNPCKindAt(t, "Monster", at)
+}
+
+// SpawnHostileNPCKindAt seeds a parked hostile NPC of the given instance
+// kind at an explicit point. Kind must be a Hostile-supported type
+// ("Monster", "Guard", "SiegeGuard", ...).
+func (s *Server) SpawnHostileNPCKindAt(t *testing.T, kind string, at location.Location) *npc.Hostile {
+	t.Helper()
 	tmpl := &npc.Template{
 		ID:              100,
 		TemplateID:      100,
-		Type:            "Monster",
+		Type:            kind,
 		Level:           1,
 		HPMax:           1000,
 		AtkSpd:          300,

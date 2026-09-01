@@ -521,6 +521,19 @@ func (h *Hostile) MonsterKind() bool {
 	return ok
 }
 
+// folkOrGuardInstanceKinds is the subset of hostileInstanceKinds that accept
+// only a CTRL-pressed damage skill as an offensive ONE target. Folk-family
+// NPCs are not Hostile and are not listed here.
+var folkOrGuardInstanceKinds = map[InstanceKind]struct{}{
+	"Guard": {},
+}
+
+// FolkOrGuard reports whether this NPC is a town Guard.
+func (h *Hostile) FolkOrGuard() bool {
+	_, ok := folkOrGuardInstanceKinds[hostileKind(h.Instance)]
+	return ok
+}
+
 // chestKind reports whether this NPC's instance type is specifically the
 // lootable Chest kind. HalishaChest is Monster-family but distinct from
 // Chest, and is not excluded by this check.
