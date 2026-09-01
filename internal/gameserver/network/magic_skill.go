@@ -223,7 +223,7 @@ func (l *GameClientLink) resolveMagicSkillTarget(caster actorcast.Target, select
 		return nil, skilltarget.CastRejectNone
 	}
 	finalTarget := handler.FinalTarget(casterCreature, selectedCreature, &def)
-	if rejection := skilltarget.CastRejectionFor(def.Target, casterCreature, finalTarget, &def); rejection != skilltarget.CastRejectNone {
+	if rejection := skilltarget.CastRejectionFor(def.Target, casterCreature, finalTarget, &def, ctrl); rejection != skilltarget.CastRejectNone {
 		return nil, rejection
 	}
 	if finalTarget == nil || !handler.CanCast(casterCreature, finalTarget, &def, ctrl) {
