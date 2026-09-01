@@ -9,17 +9,21 @@ import (
 // isn't noticeable" cutoff: offsets below this do not start a walk.
 const minWanderOffset = 10
 
-// ShouldIdleWander reports whether an empty desire queue should become a
-// wander desire. Hold-position kinds stay put. MovingAttack is not a
-// wander gate (Warrior.java:331-334, Wizard.java:28-31); only
-// MonsterBehavior.onNoDesire reads it. Script-accurate eligibility: #2148.
-func (h *Hostile) ShouldIdleWander() bool {
-	switch hostileKind(h.Instance) {
-	case "Guard", "SiegeGuard", "Chest", "HalishaChest":
-		return false
-	default:
-		return true
+// IdleWander reports the idle-wander timer and desire weight for this
+// NPC's template. ok is false when the template does not opt into wander
+// from an empty desire list.
+func (h *Hostile) IdleWander() (timer int, weight float64, ok bool) {
+	if h == nil || h.Instance == nil || h.Instance.Template == nil {
+		return 0, 0, false
 	}
+	return IdleWanderParams(h.Instance.Template.ID)
+}
+
+// ShouldIdleWander reports whether an empty desire queue should become a
+// wander desire. Eligibility is per template id, not instance kind.
+func (h *Hostile) ShouldIdleWander() bool {
+	_, _, ok := h.IdleWander()
+	return ok
 }
 
 // RealMoveSpeed is the stance-aware move speed used as the wander offset

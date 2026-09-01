@@ -485,7 +485,12 @@ func (a *fakeActor) BroadcastMoveToPawn(target attackable.Combatant) error {
 	a.moveToPawnTo = target
 	return a.moveToPawnErr
 }
-func (a *fakeActor) ShouldIdleWander() bool { return a.idleWander }
+func (a *fakeActor) IdleWander() (int, float64, bool) {
+	if !a.idleWander {
+		return 0, 0, false
+	}
+	return 5, 5, true
+}
 func (a *fakeActor) ForceWalkStance()       { a.walkStanceCalls++ }
 func (a *fakeActor) RealMoveSpeed() float64 { return a.moveSpeed }
 func (a *fakeActor) MoveFromSpawnUsingRandomOffset(offset int) {

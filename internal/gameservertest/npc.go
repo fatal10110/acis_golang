@@ -73,14 +73,15 @@ type movingHostileActorRef struct{ attack.CreatureActor }
 
 type movingHostileLocatedRef struct{ move.Actor }
 
-// SpawnMovingHostileNPCAt seeds a hostile monster with the production move
-// controller wired through BroadcastMove, so leash-return and other
-// server-initiated moves emit real observer packets.
-func (s *Server) SpawnMovingHostileNPCAt(t *testing.T, kind string, home, at location.Location) *npc.Hostile {
+// SpawnMovingHostileNPCAt seeds a hostile NPC of the given instance kind
+// and template id with the production move controller wired through
+// BroadcastMove, so leash-return and other server-initiated moves emit
+// real observer packets.
+func (s *Server) SpawnMovingHostileNPCAt(t *testing.T, kind string, npcID int, home, at location.Location) *npc.Hostile {
 	t.Helper()
 	tmpl := &npc.Template{
-		ID:              100,
-		TemplateID:      100,
+		ID:              npcID,
+		TemplateID:      npcID,
 		Type:            kind,
 		Level:           1,
 		HPMax:           1000,

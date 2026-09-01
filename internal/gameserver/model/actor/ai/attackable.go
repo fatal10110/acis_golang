@@ -290,11 +290,9 @@ func (a *Attackable) addAttackDesireWithMove(attacker attackable.Combatant, hate
 
 const escortFollowWeight = 5
 
-// defaultWanderTimer is addWanderDesire's timer argument in seconds.
+// defaultWanderTimer is addWanderDesire's timer argument in seconds when
+// a wander intention is started without a queued desire timer.
 const defaultWanderTimer = 5
-
-// defaultWanderWeight is addWanderDesire's weight argument.
-const defaultWanderWeight = 5
 
 // defaultRandomWalkRate is npcs.properties RandomWalkRate's shipped default.
 const defaultRandomWalkRate = 30
@@ -332,7 +330,7 @@ func (a *Attackable) queueIdleFollow() {
 }
 
 type idleWanderer interface {
-	ShouldIdleWander() bool
+	IdleWander() (timer int, weight float64, ok bool)
 }
 
 type wanderMover interface {
@@ -343,13 +341,17 @@ type wanderMover interface {
 
 func (a *Attackable) queueIdleWander() {
 	wanderer, ok := a.actor.(idleWanderer)
-	if !ok || !wanderer.ShouldIdleWander() {
+	if !ok {
+		return
+	}
+	timer, weight, ok := wanderer.IdleWander()
+	if !ok {
 		return
 	}
 	a.desires.AddOrUpdate(&Desire{
 		Kind:     IntentionWander,
-		Timer:    defaultWanderTimer,
-		Weight:   defaultWanderWeight,
+		Timer:    timer,
+		Weight:   weight,
 		QueuedAt: time.Now(),
 	})
 }

@@ -20,7 +20,7 @@ func TestReturnHomeBroadcastsWalkThenMove(t *testing.T) {
 	startInWorld(t, c)
 
 	home := location.Location{X: hostileX, Y: hostileY, Z: hostileZ}
-	hostile := srv.SpawnMovingHostileNPCAt(t, "Monster", home, home)
+	hostile := srv.SpawnMovingHostileNPCAt(t, "Monster", 20001, home, home)
 	drainUntilQuiet(t, c)
 
 	hostile.SetXYZ(hostileX, hostileY+500, hostileZ)
@@ -43,7 +43,7 @@ func TestSiegeGuardReturnHomeBroadcastsRunThenMove(t *testing.T) {
 	startInWorld(t, c)
 
 	home := location.Location{X: hostileX, Y: hostileY, Z: hostileZ}
-	hostile := srv.SpawnMovingHostileNPCAt(t, "SiegeGuard", home, home)
+	hostile := srv.SpawnMovingHostileNPCAt(t, "SiegeGuard", 100, home, home)
 	drainUntilQuiet(t, c)
 
 	hostile.SetRunning(false)
