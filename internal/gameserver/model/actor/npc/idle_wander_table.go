@@ -354,6 +354,13 @@ var idleWanderSpecial = map[int][2]int{
 
 // idleWanderIDs is the sorted set of NPC template ids that queue a
 // default (timer 5, weight 5) idle wander desire.
+//
+// Known exclusions:
+//   - Lavasaurus 21394 and Elder Lavasaurus 21395 ship MovingAttack=0, so
+//     idle does not queue wander.
+//   - Baium 29020, Valakas 29028, and Antharas 29066/29067/29068 wander
+//     only while awake; Baium also scans neighbors on that branch. Those
+//     awake-state flags are not ported — do not add the ids unconditionally.
 var idleWanderIDs = []int{
 	16019, 16021, 16023, 18001, 18002, 18003, 18006, 18007, 18008, 18120, 18121, 18122,
 	18123, 18124, 18125, 18126, 18127, 18128, 18129, 18130, 18131, 18132, 18133, 18135,
@@ -466,7 +473,7 @@ var idleWanderIDs = []int{
 	21357, 21358, 21359, 21360, 21361, 21362, 21363, 21364, 21365, 21366, 21367, 21368,
 	21369, 21370, 21371, 21372, 21374, 21375, 21376, 21377, 21378, 21379, 21380, 21381,
 	21382, 21383, 21384, 21385, 21386, 21387, 21388, 21389, 21390, 21391, 21392, 21393,
-	21394, 21395, 21396, 21397, 21398, 21399, 21400, 21401, 21402, 21403, 21404, 21405,
+	21396, 21397, 21398, 21399, 21400, 21401, 21402, 21403, 21404, 21405,
 	21406, 21407, 21408, 21409, 21410, 21411, 21412, 21413, 21414, 21415, 21416, 21417,
 	21418, 21419, 21420, 21421, 21422, 21423, 21424, 21425, 21426, 21427, 21428, 21429,
 	21430, 21431, 21432, 21433, 21434, 21435, 21436, 21437, 21438, 21439, 21440, 21441,

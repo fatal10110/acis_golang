@@ -77,6 +77,10 @@ func TestUnscriptedSquashDoesNotIdleWander(t *testing.T) {
 	assertIdleNoWander(t, "Monster", 12774)
 }
 
+func TestLavasaurusDoesNotIdleWander(t *testing.T) {
+	assertIdleNoWander(t, "Monster", 21394)
+}
+
 func TestNurseAntIdleWanderTimer(t *testing.T) {
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),

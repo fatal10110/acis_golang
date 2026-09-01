@@ -19,13 +19,6 @@ func (h *Hostile) IdleWander() (timer int, weight float64, ok bool) {
 	return IdleWanderParams(h.Instance.Template.ID)
 }
 
-// ShouldIdleWander reports whether an empty desire queue should become a
-// wander desire. Eligibility is per template id, not instance kind.
-func (h *Hostile) ShouldIdleWander() bool {
-	_, _, ok := h.IdleWander()
-	return ok
-}
-
 // RealMoveSpeed is the stance-aware move speed used as the wander offset
 // basis (walk after thinkWander switches stance).
 func (h *Hostile) RealMoveSpeed() float64 {
