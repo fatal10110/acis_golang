@@ -167,6 +167,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			if err != nil || !ok {
 				return
 			}
+			session.CompleteHandshake()
 			list, err := l.sendCharSelectInfo(ctx, client)
 			if err != nil {
 				l.log.Error().Err(err).Str("account", client.AccountName()).Msg("list characters")

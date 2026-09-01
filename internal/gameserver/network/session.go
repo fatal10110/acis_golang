@@ -150,8 +150,13 @@ func (s *Session) ReadFrame() ([]byte, error) {
 	if s.cryptEnabled {
 		s.cipher.Decrypt(payload)
 	}
-	s.handshaking = false
 	return payload, nil
+}
+
+// CompleteHandshake switches later reads to the established-session idle
+// deadline. It is called by the client loop only after AuthLogin succeeds.
+func (s *Session) CompleteHandshake() {
+	s.handshaking = false
 }
 
 // EnableCrypt turns the rolling cipher on for every later frame. It must be
