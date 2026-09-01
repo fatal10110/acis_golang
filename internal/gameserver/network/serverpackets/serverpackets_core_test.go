@@ -2752,6 +2752,65 @@ func TestFrameSystemMessageStringNumber(t *testing.T) {
 	}
 }
 
+func TestFrameHPMPRestoredSystemMessages(t *testing.T) {
+	t.Run("self HP", func(t *testing.T) {
+		got := framePayload(t, FrameSystemMessageNumber(SystemMessageS1HPRestored, 8))
+		want := []byte{
+			OpcodeSystemMessage,
+			0x2a, 0x04, 0x00, 0x00, // 1066
+			0x01, 0x00, 0x00, 0x00, // one param
+			0x01, 0x00, 0x00, 0x00, // number
+			0x08, 0x00, 0x00, 0x00, // 8
+		}
+		if !bytes.Equal(got, want) {
+			t.Fatalf("self HP restored frame = %x, want %x", got, want)
+		}
+	})
+	t.Run("other HP", func(t *testing.T) {
+		got := framePayload(t, FrameSystemMessageStringNumber(SystemMessageS2HPRestoredByS1, "Healer", 4))
+		want := []byte{
+			OpcodeSystemMessage,
+			0x2b, 0x04, 0x00, 0x00, // 1067
+			0x02, 0x00, 0x00, 0x00, // two params
+			0x00, 0x00, 0x00, 0x00, // text
+			'H', 0x00, 'e', 0x00, 'a', 0x00, 'l', 0x00, 'e', 0x00, 'r', 0x00, 0x00, 0x00,
+			0x01, 0x00, 0x00, 0x00, // number
+			0x04, 0x00, 0x00, 0x00, // 4
+		}
+		if !bytes.Equal(got, want) {
+			t.Fatalf("other HP restored frame = %x, want %x", got, want)
+		}
+	})
+	t.Run("self MP", func(t *testing.T) {
+		got := framePayload(t, FrameSystemMessageNumber(SystemMessageS1MPRestored, 4))
+		want := []byte{
+			OpcodeSystemMessage,
+			0x2c, 0x04, 0x00, 0x00, // 1068
+			0x01, 0x00, 0x00, 0x00,
+			0x01, 0x00, 0x00, 0x00,
+			0x04, 0x00, 0x00, 0x00,
+		}
+		if !bytes.Equal(got, want) {
+			t.Fatalf("self MP restored frame = %x, want %x", got, want)
+		}
+	})
+	t.Run("other MP", func(t *testing.T) {
+		got := framePayload(t, FrameSystemMessageStringNumber(SystemMessageS2MPRestoredByS1, "Healer", 4))
+		want := []byte{
+			OpcodeSystemMessage,
+			0x2d, 0x04, 0x00, 0x00, // 1069
+			0x02, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00,
+			'H', 0x00, 'e', 0x00, 'a', 0x00, 'l', 0x00, 'e', 0x00, 'r', 0x00, 0x00, 0x00,
+			0x01, 0x00, 0x00, 0x00,
+			0x04, 0x00, 0x00, 0x00,
+		}
+		if !bytes.Equal(got, want) {
+			t.Fatalf("other MP restored frame = %x, want %x", got, want)
+		}
+	})
+}
+
 // ---- from targeting_test.go ----
 func TestFrameMyTargetSelected(t *testing.T) {
 	got := framePayload(t, FrameMyTargetSelected(12345, 0x0010))

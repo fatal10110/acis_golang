@@ -19,6 +19,7 @@ func healStart(e *Effect) bool {
 	// The applied amount is added a second time; this reproduces the
 	// reference heal effect's own behavior exactly, not a Go-side bug.
 	target.AddHP(amount)
+	notifyHealRestored(e, amount, false)
 	return true
 }
 
@@ -82,7 +83,33 @@ func manaHealStart(e *Effect) bool {
 	// The applied amount is added a second time; this reproduces the
 	// reference heal effect's own behavior exactly, not a Go-side bug.
 	target.AddMP(amount)
+	notifyHealRestored(e, amount, true)
 	return true
+}
+
+// notifyHealRestored tells a player target how much of one resource the
+// first restore actually applied. The message uses that first applied
+// amount even though the start hook adds it twice; a non-player target
+// gets silence, matching the player-only send.
+func notifyHealRestored(e *Effect, amount float64, mp bool) {
+	if !isPlayer(e.Effected) {
+		return
+	}
+	notifier, ok := e.Effected.(healRestoredNotifier)
+	if !ok {
+		return
+	}
+	name := ""
+	if n, ok := e.Effector.(characterNamer); ok {
+		name = n.CharacterName()
+	}
+	byOther := e.Effector != e.Effected
+	restored := int(amount)
+	if mp {
+		notifier.NotifyMPRestored(name, restored, byOther)
+		return
+	}
+	notifier.NotifyHPRestored(name, restored, byOther)
 }
 
 // chargesTarget is implemented by an actor that tracks Force/Soul charges.
