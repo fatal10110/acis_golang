@@ -237,6 +237,19 @@ type playerTarget interface {
 	IsPlayer() bool
 }
 
+// characterNamer optionally reports the display name a restored-resource
+// system message uses for the healer; absent, the name parameter is empty.
+type characterNamer interface {
+	CharacterName() string
+}
+
+// healRestoredNotifier is implemented by a player-shaped target that reports
+// how much HP or MP a Heal/ManaHeal start hook actually applied.
+type healRestoredNotifier interface {
+	NotifyHPRestored(healerName string, amount int, byOther bool)
+	NotifyMPRestored(healerName string, amount int, byOther bool)
+}
+
 // charmOfLuckStopper is implemented by an actor that reacts to its Charm of
 // Luck buff ending.
 type charmOfLuckStopper interface {

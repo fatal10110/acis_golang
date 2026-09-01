@@ -158,6 +158,10 @@ const (
 	SystemMessageSkillRemovedDueLackHP  = 610  // no parameter
 	SystemMessageSkillRemovedDueLackMP  = 140  // no parameter
 	SystemMessageSkillDeactivatedHPFull = 175  // no parameter
+	SystemMessageS1HPRestored           = 1066 // number parameter
+	SystemMessageS2HPRestoredByS1       = 1067 // text then number
+	SystemMessageS1MPRestored           = 1068 // number parameter
+	SystemMessageS2MPRestoredByS1       = 1069 // text then number
 	SystemMessageAlreadySpoiled         = 357  // no parameter
 	SystemMessageSpoilSuccess           = 612  // no parameter
 	SystemMessageRemainingMana10Minutes = 1979 // item-name parameter

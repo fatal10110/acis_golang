@@ -87,6 +87,31 @@ type MonsterTarget interface {
 	MonsterKind() bool
 }
 
+// FolkOrGuardTarget identifies the civilian NPC kinds that accept only
+// CTRL-pressed damage skills as offensive ONE targets.
+type FolkOrGuardTarget interface {
+	FolkOrGuard() bool
+}
+
+// DoorTarget identifies doors, whose attackability is distinct from hostile
+// NPC attackability.
+type DoorTarget interface {
+	Door() bool
+}
+
+// PlayableCastRules lets a playable caster apply its relationship policy to
+// another playable target.
+type PlayableCastRules interface {
+	CanCastOnPlayable(target Creature, skill *modelskill.Definition, ctrl, offensive bool) bool
+}
+
+// OlympiadCastState identifies the pre-match Olympiad gate for playable
+// targets.
+type OlympiadCastState interface {
+	OlympiadMode() bool
+	OlympiadStarted() bool
+}
+
 // CorpseDeadlineTarget is optionally implemented by mob corpses that expose
 // the decay deadline used for Java's too-old corpse targeting cutoff.
 type CorpseDeadlineTarget interface {

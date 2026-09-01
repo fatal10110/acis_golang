@@ -1583,6 +1583,41 @@ func TestNotifyEffectRemovedDueLackHPAndMP(t *testing.T) {
 	c.NotifyEffectRemovedDueLackMP(nil)
 }
 
+func TestNotifyHealRestoredHooks(t *testing.T) {
+	c, err := NewCharacter(1, humanFighterTemplate(), "acct", "heal", 0, 0, 0, SexMale)
+	if err != nil {
+		t.Fatalf("NewCharacter() error: %v", err)
+	}
+
+	var hpName, mpName string
+	var hpAmount, mpAmount int
+	var hpOther, mpOther bool
+	hpCalls, mpCalls := 0, 0
+	c.SetHealRestoredNotifiers(func(name string, amount int, byOther bool) {
+		hpCalls++
+		hpName, hpAmount, hpOther = name, amount, byOther
+	}, func(name string, amount int, byOther bool) {
+		mpCalls++
+		mpName, mpAmount, mpOther = name, amount, byOther
+	})
+
+	c.NotifyHPRestored("Healer", 4, true)
+	c.NotifyMPRestored("", 8, false)
+	if hpCalls != 1 || hpName != "Healer" || hpAmount != 4 || !hpOther {
+		t.Fatalf("HP notice = calls %d name %q amount %d byOther %v", hpCalls, hpName, hpAmount, hpOther)
+	}
+	if mpCalls != 1 || mpName != "" || mpAmount != 8 || mpOther {
+		t.Fatalf("MP notice = calls %d name %q amount %d byOther %v", mpCalls, mpName, mpAmount, mpOther)
+	}
+
+	c.SetHealRestoredNotifiers(nil, nil)
+	c.NotifyHPRestored("Healer", 4, true)
+	c.NotifyMPRestored("", 8, false)
+	if hpCalls != 1 || mpCalls != 1 {
+		t.Fatalf("unwired notices = hp %d mp %d, want both 1", hpCalls, mpCalls)
+	}
+}
+
 func TestNotifyMagicFailureHooks(t *testing.T) {
 	c, err := NewCharacter(1, humanFighterTemplate(), "acct", "mage", 0, 0, 0, SexMale)
 	if err != nil {
