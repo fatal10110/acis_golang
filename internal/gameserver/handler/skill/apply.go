@@ -103,7 +103,7 @@ func withinEffectRange(effector, effected Actor, effectRange int) bool {
 	}
 	ax, ay, az := effectorPos.Position()
 	bx, by, bz := effectedPos.Position()
-	return location.In3DRange(ax, ay, az, bx, by, bz, effectRange)
+	return location.Location{X: ax, Y: ay, Z: az}.Distance3D(location.Location{X: bx, Y: by, Z: bz}) < float64(effectRange)
 }
 
 // stopEffectsBySkillID removes every active effect in list owned by the
