@@ -17,6 +17,10 @@ type Trap struct {
 	// means none. Broadcasting it belongs to the visibility layer.
 	EventID int
 	// Armed reports whether the castle owner armed the trap.
+	// Unsynchronized: dormant() may run on any actor goroutine that
+	// crosses the zone. No production writer exists yet; the trap-arming
+	// port must switch this to atomic.Bool (or equivalent) before a
+	// concurrent writer lands.
 	Armed bool
 	// SiegeActive reports whether the linked castle's siege is running;
 	// nil (until the siege system wires it) reads as not running.
