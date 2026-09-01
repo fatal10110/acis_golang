@@ -161,6 +161,9 @@ func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, lo
 	inst.HasHome = true
 	inst.SpawnHeading = heading
 	inst.WalkMode = walkerWalkModeIDs[entry.NPCID]
+	n.mu.Lock()
+	inst.Maker = n.slot[key].maker
+	n.mu.Unlock()
 
 	if !npc.Attackable(inst) {
 		n.skippedNonCombatCount.Add(1)

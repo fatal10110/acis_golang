@@ -116,12 +116,19 @@ func NewTriangulatedPolygon(points []Point) (TriangulatedPolygon, error) {
 // Contains reports whether (x, y) falls inside any of the polygon's
 // triangles.
 func (p TriangulatedPolygon) Contains(x, y int) bool {
+	_, ok := p.ContainingTriangle(x, y)
+	return ok
+}
+
+// ContainingTriangle returns the first triangle whose inclusive half-plane
+// test contains (x, y).
+func (p TriangulatedPolygon) ContainingTriangle(x, y int) (Triangle, bool) {
 	for _, t := range p.triangles {
 		if t.Contains(x, y) {
-			return true
+			return t, true
 		}
 	}
-	return false
+	return Triangle{}, false
 }
 
 // Size is the sum of the polygon's triangle sizes — the weight the
