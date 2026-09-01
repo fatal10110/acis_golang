@@ -12,7 +12,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npcinfo"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
-	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -301,8 +300,13 @@ func (h *Hostile) MakeAttackHit(target attackable.Combatant, split bool) attack.
 		return hit
 	}
 
-	tpl := h.Instance.Template
+	formulaTarget, ok := target.(creature.FormulaActor)
+	if !ok {
+		hit.Miss = true
+		return hit
+	}
 
+	tpl := h.Instance.Template
 	accuracy := int(h.calcStat(stat.AccuracyCombat, 0))
 	evasion := other.Evasion()
 
@@ -317,40 +321,10 @@ func (h *Hostile) MakeAttackHit(target attackable.Combatant, split bool) attack.
 
 	critRate := float64(min(int(h.calcStat(stat.CriticalRate, tpl.CritRate)), 500))
 	crit := formulas.CritSucceeds(critRate, h.roll(1000))
-	posMul := 1.0
-	if formulaTarget, ok := target.(creature.FormulaActor); ok {
-		posMul = creature.PositionMultiplierFrom(formulaTarget, h, crit)
-	}
-
-	randomMul := creature.RandomDamageMultiplier(h, modelskill.Definition{})
-
-	defence := other.PDef()
-	if defence <= 0 {
-		defence = 1
-	}
-
-	damage := formulas.PhysicalAttackDamage(formulas.PhysicalAttackInput{
-		AttackPower:       h.calcStat(stat.PowerAttack, tpl.PAtk),
-		Defence:           defence,
-		Crit:              crit,
-		PosMul:            posMul,
-		ElementalMul:      1,
-		RandomMul:         randomMul,
-		RaceMul:           1,
-		WeaponVulnMul:     1,
-		PvPMul:            1,
-		CritDamageMul:     1,
-		CritDamagePosMul:  1,
-		CritVulnMul:       1,
-		CritDamageAddBase: 0,
-	})
-
-	if split {
-		damage /= 2
-	}
-
-	hit.Damage = int(damage)
+	in, shield := creature.ResolvePhysicalAttackInput(h, formulaTarget, crit)
+	hit.Damage = creature.ApplyPhysicalAttackDamage(in, shield, split)
 	hit.Crit = crit
+	hit.Shield = shield
 	return hit
 }
 

@@ -1189,3 +1189,61 @@ func TestSummonMakeAttackHitAppliesFacingAndNight(t *testing.T) {
 		})
 	}
 }
+
+func TestSummonMakeAttackHitUsesPosAndPvP(t *testing.T) {
+	stats := CombatStats{DEX: 20, PAtk: 100, PDef: 50, MaxHP: 100}
+	place := func(ax, ay int) (*Actor, *Actor) {
+		t.Helper()
+		target := mustServitor(t, ServitorConfig{ObjectID: 1, Level: 1, Stats: stats})
+		attacker := mustServitor(t, ServitorConfig{ObjectID: 2, Level: 1, Stats: stats})
+		state := world.New()
+		state.Spawn(target, 0, 0, 0, 0)
+		state.Spawn(attacker, ax, ay, 0, 0)
+		n := 0
+		attacker.roll = func(bound int) int {
+			n++
+			if n == 1 {
+				return 0
+			}
+			if n == 2 {
+				return 999
+			}
+			return (bound - 1) / 2
+		}
+		return attacker, target
+	}
+
+	frontAtk, frontTgt := place(100, 0)
+	front := frontAtk.MakeAttackHit(frontTgt, false)
+	if front.Miss || front.Crit {
+		t.Fatalf("front miss=%v crit=%v, want hit non-crit", front.Miss, front.Crit)
+	}
+	wantFront := int(formulas.PhysicalAttackDamage(formulas.PhysicalAttackInput{
+		AttackPower: frontAtk.PAtk(), Defence: creature.Positive(frontTgt.PDef()),
+		PosMul: 1, ElementalMul: 1, RandomMul: 1, RaceMul: 1, WeaponVulnMul: 1, PvPMul: 1,
+	}))
+	if front.Damage != wantFront {
+		t.Fatalf("front damage = %d, want %d", front.Damage, wantFront)
+	}
+
+	behindAtk, behindTgt := place(-100, 0)
+	behind := behindAtk.MakeAttackHit(behindTgt, false)
+	wantBehind := int(formulas.PhysicalAttackDamage(formulas.PhysicalAttackInput{
+		AttackPower: behindAtk.PAtk(), Defence: creature.Positive(behindTgt.PDef()),
+		PosMul: 1.2, ElementalMul: 1, RandomMul: 1, RaceMul: 1, WeaponVulnMul: 1, PvPMul: 1,
+	}))
+	if behind.Damage != wantBehind {
+		t.Fatalf("behind damage = %d, want %d", behind.Damage, wantBehind)
+	}
+
+	pvpAtk, pvpTgt := place(100, 0)
+	pvpAtk.AddStatFuncs([]effect.Mod{{Stat: stat.PvPPhysicalDmg, Op: effect.OpMul, Value: 2, Owner: effect.ModOwnerEffect(&effect.Effect{})}})
+	pvp := pvpAtk.MakeAttackHit(pvpTgt, false)
+	wantPvP := int(formulas.PhysicalAttackDamage(formulas.PhysicalAttackInput{
+		AttackPower: pvpAtk.PAtk(), Defence: creature.Positive(pvpTgt.PDef()),
+		PosMul: 1, ElementalMul: 1, RandomMul: 1, RaceMul: 1, WeaponVulnMul: 1, PvPMul: 2,
+	}))
+	if pvp.Damage != wantPvP {
+		t.Fatalf("pvp damage = %d, want %d", pvp.Damage, wantPvP)
+	}
+}
