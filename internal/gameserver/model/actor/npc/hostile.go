@@ -521,17 +521,10 @@ func (h *Hostile) MonsterKind() bool {
 	return ok
 }
 
-// folkOrGuardInstanceKinds is the subset of hostileInstanceKinds that accept
-// only a CTRL-pressed damage skill as an offensive ONE target. Folk-family
-// NPCs are not Hostile and are not listed here.
-var folkOrGuardInstanceKinds = map[InstanceKind]struct{}{
-	"Guard": {},
-}
-
-// FolkOrGuard reports whether this NPC is a town Guard.
+// FolkOrGuard reports whether this NPC is a town Guard. Folk-family NPCs
+// are not Hostile, so Guard is the only kind that can qualify here.
 func (h *Hostile) FolkOrGuard() bool {
-	_, ok := folkOrGuardInstanceKinds[hostileKind(h.Instance)]
-	return ok
+	return hostileKind(h.Instance) == "Guard"
 }
 
 // chestKind reports whether this NPC's instance type is specifically the
