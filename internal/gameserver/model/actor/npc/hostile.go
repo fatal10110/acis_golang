@@ -521,6 +521,12 @@ func (h *Hostile) MonsterKind() bool {
 	return ok
 }
 
+// FolkOrGuard reports whether this NPC is a town Guard. Folk-family NPCs
+// are not Hostile, so Guard is the only kind that can qualify here.
+func (h *Hostile) FolkOrGuard() bool {
+	return hostileKind(h.Instance) == "Guard"
+}
+
 // chestKind reports whether this NPC's instance type is specifically the
 // lootable Chest kind. HalishaChest is Monster-family but distinct from
 // Chest, and is not excluded by this check.
