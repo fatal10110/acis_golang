@@ -30,6 +30,10 @@ func TestIdleWanderParamsIssueCases(t *testing.T) {
 		{31844, true, 5, 5},
 		{31853, true, 5, 5},
 		{31032, true, 5, 5},
+		{22199, true, 5, 5},
+		{22200, true, 5, 5},
+		{22215, true, 5, 5},
+		{22214, false, 0, 0},
 		{29003, true, 40, 20},
 		{29050, false, 0, 0},
 		{100, false, 0, 0},
@@ -72,7 +76,7 @@ func TestShouldIdleWanderUsesTemplateIDNotKind(t *testing.T) {
 
 func TestIdleWanderTableSize(t *testing.T) {
 	got := len(idleWanderIDs) + len(idleWanderSpecial)
-	const want = 2509
+	const want = 2528
 	if got != want {
 		t.Fatalf("idle wander id count = %d, want %d", got, want)
 	}
