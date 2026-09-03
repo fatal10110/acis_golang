@@ -2809,6 +2809,34 @@ func TestFrameHPMPRestoredSystemMessages(t *testing.T) {
 			t.Fatalf("other MP restored frame = %x, want %x", got, want)
 		}
 	})
+	t.Run("self CP", func(t *testing.T) {
+		got := framePayload(t, FrameSystemMessageNumber(SystemMessageS1CPWillBeRestored, 4))
+		want := []byte{
+			OpcodeSystemMessage,
+			0x7d, 0x05, 0x00, 0x00, // 1405
+			0x01, 0x00, 0x00, 0x00,
+			0x01, 0x00, 0x00, 0x00,
+			0x04, 0x00, 0x00, 0x00,
+		}
+		if !bytes.Equal(got, want) {
+			t.Fatalf("self CP restored frame = %x, want %x", got, want)
+		}
+	})
+	t.Run("other CP", func(t *testing.T) {
+		got := framePayload(t, FrameSystemMessageStringNumber(SystemMessageS2CPWillBeRestoredByS1, "Healer", 4))
+		want := []byte{
+			OpcodeSystemMessage,
+			0x7e, 0x05, 0x00, 0x00, // 1406
+			0x02, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00,
+			'H', 0x00, 'e', 0x00, 'a', 0x00, 'l', 0x00, 'e', 0x00, 'r', 0x00, 0x00, 0x00,
+			0x01, 0x00, 0x00, 0x00,
+			0x04, 0x00, 0x00, 0x00,
+		}
+		if !bytes.Equal(got, want) {
+			t.Fatalf("other CP restored frame = %x, want %x", got, want)
+		}
+	})
 }
 
 // ---- from targeting_test.go ----

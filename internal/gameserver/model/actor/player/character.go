@@ -160,6 +160,7 @@ type Character struct {
 	sendRelaxHPFullNotice     func()
 	sendHPRestoredNotice      func(healerName string, amount int, byOther bool)
 	sendMPRestoredNotice      func(healerName string, amount int, byOther bool)
+	sendCPRestoredNotice      func(healerName string, amount int, byOther bool)
 	sendSpoilAlreadyNotice    func()
 	sendSpoilSuccessNotice    func()
 	sendOverHitNotice         func()

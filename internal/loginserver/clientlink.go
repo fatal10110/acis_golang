@@ -235,6 +235,9 @@ func (c *clientConn) send(payload []byte) error {
 	if wire.FrameHeaderSize+commoncrypt.PaddedSize(len(payload)+8) > wire.MaxFrameLength {
 		return fmt.Errorf("login packet exceeds maximum frame length")
 	}
+	if err := setWriteDeadline(c.conn); err != nil {
+		return err
+	}
 	return wire.WriteFrame(c.conn, c.crypt.Encrypt(payload))
 }
 
@@ -302,6 +305,9 @@ func (l *ClientLink) handleConnection(ctx context.Context, conn net.Conn) {
 
 	frames := wire.NewFrameReader(conn)
 	for {
+		if err := setLoginClientReadDeadline(conn, c.authed); err != nil {
+			return
+		}
 		payload, err := frames.ReadFrame()
 		if err != nil {
 			return
@@ -362,8 +368,10 @@ func (l *ClientLink) onAuthGameGuard(c *clientConn, payload []byte) bool {
 		_ = c.send(serverpackets.EncodeLoginFail(serverpackets.LoginFailAccessFailed))
 		return false
 	}
+	if err := c.send(serverpackets.EncodeGGAuth(c.sessionID)); err != nil {
+		return false
+	}
 	c.ggAuthed = true
-	_ = c.send(serverpackets.EncodeGGAuth(c.sessionID))
 	return true
 }
 

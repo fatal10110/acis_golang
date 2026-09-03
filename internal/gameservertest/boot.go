@@ -529,6 +529,20 @@ func (s *Server) PlayerCurrentMP(tb testing.TB, objID int32) int {
 	return reader.CurrentMP()
 }
 
+// PlayerCurrentCP reports the live player's current CP.
+func (s *Server) PlayerCurrentCP(tb testing.TB, objID int32) int {
+	tb.Helper()
+	obj, ok := s.State.Player(objID)
+	if !ok {
+		tb.Fatalf("world.Player(%d) missing", objID)
+	}
+	reader, ok := obj.(interface{ CurrentCP() int })
+	if !ok {
+		tb.Fatalf("world.Player(%d) = %T does not expose CurrentCP", objID, obj)
+	}
+	return reader.CurrentCP()
+}
+
 // DamagePlayerHP reduces the live player's current HP by amount, so heal
 // flows have observable headroom no single packet creates.
 func (s *Server) DamagePlayerHP(tb testing.TB, objID int32, amount int) {
@@ -570,6 +584,20 @@ func (s *Server) PlayerMaxHP(tb testing.TB, objID int32) int {
 		tb.Fatalf("world.Player(%d) = %T does not expose MaxHPValue", objID, obj)
 	}
 	return int(reader.MaxHPValue())
+}
+
+// PlayerMaxCP reports the live player's stat-computed maximum CP.
+func (s *Server) PlayerMaxCP(tb testing.TB, objID int32) int {
+	tb.Helper()
+	obj, ok := s.State.Player(objID)
+	if !ok {
+		tb.Fatalf("world.Player(%d) missing", objID)
+	}
+	reader, ok := obj.(interface{ MaxCPValue() float64 })
+	if !ok {
+		tb.Fatalf("world.Player(%d) = %T does not expose MaxCPValue", objID, obj)
+	}
+	return int(reader.MaxCPValue())
 }
 
 // FlushItems persists every pending item mutation the way the production

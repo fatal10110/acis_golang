@@ -310,6 +310,24 @@ func TestClientLinkAuthGameGuardRepliesGGAuth(t *testing.T) {
 	}
 }
 
+func TestClientLinkAuthGameGuardClosesOnGGAuthWriteFailure(t *testing.T) {
+	server, client := net.Pipe()
+	client.Close()
+	crypt, err := logincrypt.NewLoginCrypt(testSessionKey)
+	if err != nil {
+		t.Fatalf("NewLoginCrypt: %v", err)
+	}
+	c := &clientConn{conn: server, crypt: crypt, sessionID: testInitSessionID}
+	defer server.Close()
+
+	if (&ClientLink{}).onAuthGameGuard(c, encodeAuthGameGuard(testInitSessionID)) {
+		t.Fatal("onAuthGameGuard() = true after GGAuth write failure, want false")
+	}
+	if c.ggAuthed {
+		t.Fatal("ggAuthed = true after GGAuth write failure")
+	}
+}
+
 func TestClientLinkGameGuardWrongSessionIDClosesWithAccessFailed(t *testing.T) {
 	addr, _, _, _, _ := newTestClientLink(t, newFakeAccountStore(), false)
 	c := dialLoginClient(t, addr)
