@@ -396,9 +396,11 @@ func (c *Character) AttackDisabled() bool {
 }
 
 // MovementDisabled reports whether this player is in a state where they
-// cannot move. Sit/stand animation locks are not modeled: stance changes
-// apply immediately, so sitting is `!Standing()` with no separate
-// sitting-now / standing-now window.
+// cannot move. Sit-down is immediate (`!Standing()`), matching Java's
+// sittingNow window from t=0. Stand-up is not: Java keeps
+// isMovementDisabled true for 2.5s after standUp (`_isStandingNow`), so an
+// out-of-range attack is still rejected; Go's StandUp calls SetStanding(true)
+// synchronously, so the range gate is skipped for that window.
 func (c *Character) MovementDisabled() bool {
 	if c.AlikeDead() || !c.Standing() {
 		return true

@@ -36,12 +36,13 @@ func (h *Hostile) AttackDisabled() bool {
 	return h.Dead()
 }
 
-// MovementDisabled reports whether this NPC is unable to move. No
-// abnormal-effect system (root, sleep, paralysis) is wired to a live NPC
-// yet, so the template's own movement flag is the only condition modeled
-// so far.
+// MovementDisabled reports whether this NPC is unable to move: a
+// canMove=false template, or a crowd-control / death / teleport lock.
+// Fear is not included; it is an out-of-control state, not a movement lock.
 func (h *Hostile) MovementDisabled() bool {
-	return !h.Instance.Template.CanMove
+	return !h.Instance.Template.CanMove || h.AlikeDead() || h.Stunned() ||
+		h.ImmobileUntilAttacked() || h.Rooted() || h.Sleeping() ||
+		h.Paralyzed() || h.Immobilized() || h.Teleporting()
 }
 
 // InAttackRange reports whether target sits within this NPC's 2D physical

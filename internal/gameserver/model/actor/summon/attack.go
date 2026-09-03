@@ -21,8 +21,20 @@ type physicalTarget interface {
 	Evasion() int
 }
 
-func (a *Actor) AttackDisabled() bool   { return a.DenyAIAction() }
-func (a *Actor) MovementDisabled() bool { return a.DenyAIAction() }
+func (a *Actor) AttackDisabled() bool { return a.DenyAIAction() }
+
+// MovementDisabled reports whether this summon cannot move. Fear is not
+// included: it is an out-of-control state, not a movement lock. Sit/stand
+// do not apply to summons.
+func (a *Actor) MovementDisabled() bool {
+	if a.AlikeDead() || a.Paralyzed() || a.Teleporting() {
+		return true
+	}
+	if a.effects == nil {
+		return false
+	}
+	return a.effects.IsAffected(effect.FlagStunned | effect.FlagMeditating | effect.FlagSleep | effect.FlagRooted)
+}
 
 func (a *Actor) IsMoving() bool { return a.Move().Moving() }
 
