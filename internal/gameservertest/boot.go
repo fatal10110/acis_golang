@@ -832,7 +832,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		rosterNPCs = npc.NewTable(nil)
 	}
 	roster := gamemanager.NewRoster(chars, items, shortcuts, templates, itemTemplates, rosterNPCs, ids, gamemanager.DefaultDeleteAfter, time.Now)
-	effects.SetAutosave(roster, o.skills, zerolog.Nop())
+	effects.SetAutosave(roster, o.skills, petStore, zerolog.Nop())
 	autosaveClock := &autosaveClock{now: time.Now()}
 	autosave, err := task.NewAutosave(effects, autosaveClock.Now)
 	if err != nil {
