@@ -42,12 +42,10 @@ func (s summonStatActor) Y() int { return s.a.Y() }
 // Z satisfies conditions.Actor.
 func (s summonStatActor) Z() int { return s.a.Z() }
 
-// IsMoving satisfies conditions.Actor, matching hostileStatActor: reads the
-// real in-motion state off the move.CreatureMove a wired move.Controller
-// drives (see Actor.Move, Actor.InitMovement). A summon spawned without
-// geodata (InitMovement never called) keeps its zero-value, never-moving
-// CreatureMove, so this correctly reports false rather than erroring.
-func (s summonStatActor) IsMoving() bool { return s.a.Move().Moving() }
+// IsMoving satisfies conditions.Actor via Actor.IsMoving (see Actor.Move,
+// Actor.InitMovement). A summon spawned without geodata keeps a zero-value
+// CreatureMove, so this reports false rather than erroring.
+func (s summonStatActor) IsMoving() bool { return s.a.IsMoving() }
 
 // IsRunning satisfies conditions.Actor. Always true, matching
 // hostileStatActor: Java's Creature walk/run toggle defaults to run stance

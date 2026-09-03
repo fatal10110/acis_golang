@@ -47,10 +47,7 @@ func (a characterStatActor) Z() int { return a.c.Z() }
 
 // IsMoving satisfies conditions.Actor.
 func (a characterStatActor) IsMoving() bool {
-	if a.c.Live == nil {
-		return false
-	}
-	return a.c.Live.Move().Moving()
+	return a.c.IsMoving()
 }
 
 // IsRunning satisfies conditions.Actor: c's run/walk toggle, independent of
