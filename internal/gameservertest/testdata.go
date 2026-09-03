@@ -105,6 +105,13 @@ func duelistTemplate() *player.Template {
 	}
 }
 
+// TwoSkillScrollID is a synthetic ItemSkills etc-item with two non-instant
+// attached skills. Three shipped ItemSkills templates carry multiple
+// attached skills (8612/8613/8614), but every one of their skills is
+// isPotion, so ResolveAICastSkills filters them out. This fixture is the
+// only way to drive the later-skill next-intention path.
+const TwoSkillScrollID int32 = 9700
+
 // ItemTemplates builds the item catalog shared by the behavior suites: adena,
 // potions, shots, a weapon, crystals, enchant scrolls, escape scrolls, quest
 // and summon items.
@@ -296,6 +303,21 @@ func ItemTemplates() *item.Table {
 			Destroyable:    true,
 			EtcItem:        &item.EtcItemDetail{Type: item.EtcItemScroll, Handler: "ItemSkills", SharedReuseGroup: -1},
 			AttachedSkills: []item.SkillRef{{ID: 2013, Level: 1}},
+		},
+		{
+			// Synthetic two-skill ItemSkills template. Three shipped
+			// ItemSkills templates carry multiple attached skills
+			// (8612/8613/8614), but every one of their skills is isPotion,
+			// so ResolveAICastSkills filters them out. This fixture is the
+			// only way to drive the later-skill next-intention path.
+			ID:             TwoSkillScrollID,
+			Name:           "Two-Skill Scroll",
+			Kind:           item.KindEtcItem,
+			Duration:       -1,
+			Stackable:      true,
+			Destroyable:    true,
+			EtcItem:        &item.EtcItemDetail{Type: item.EtcItemScroll, Handler: "ItemSkills", SharedReuseGroup: -1},
+			AttachedSkills: []item.SkillRef{{ID: 2014, Level: 1}, {ID: 2015, Level: 1}},
 		},
 		{
 			ID:        9001,

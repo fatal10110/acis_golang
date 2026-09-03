@@ -7,6 +7,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
+	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
@@ -42,6 +44,14 @@ func consumableSkills(t *testing.T) *skillstate.Persistence {
 		{
 			ID: 2013, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
 			SkillType: "TELEPORT", StaticHitTime: true, HitTime: 0, StaticReuse: true, ReuseDelay: 5000,
+		},
+		{
+			ID: 2014, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+			SkillType: "BUFF", StaticHitTime: true, HitTime: 0, StaticReuse: true,
+		},
+		{
+			ID: 2015, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+			SkillType: "BUFF", StaticHitTime: true, HitTime: 0, StaticReuse: true,
 		},
 	}), known)
 }
@@ -191,6 +201,165 @@ func TestUseEscapeScrollRunsAICastAndConsumes(t *testing.T) {
 	if inst := mustFindItem(t, srv, objID, scroll); inst.Count != 2 {
 		t.Fatalf("persisted scroll count = %d, want 2", inst.Count)
 	}
+}
+
+// TestUseTwoSkillItemQueuesLaterAICast pins ItemSkills.java:52-80 plus
+// PlayableAI.tryToCast: a two-skill non-instant template starts the first
+// eligible skill immediately and stores the later one as the next CAST
+// intention, which runs when the first cast finishes. Each routed cast
+// consumes one stack unit.
+func TestUseTwoSkillItemQueuesLaterAICast(t *testing.T) {
+	srv := gameservertest.Boot(t,
+		gameservertest.WithSkills(consumableSkills(t)),
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1))
+	c := srv.Client
+	objID := srv.SoleObjectID(t)
+	scroll := srv.GiveItem(t, objID, gameservertest.TwoSkillScrollID, 2)
+	startInWorld(t, c)
+
+	c.Send(encodeUseItem(scroll, false))
+	assertMagicSkillUseSelf(t, c.Read(), objID, 2014, 1, 0, 0)
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "queued later item skill")
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMagicSkillLaunched, "first MagicSkillLaunched")
+	assertMagicSkillUseSelf(t, c.Read(), objID, 2015, 1, 0, 0)
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMagicSkillLaunched, "second MagicSkillLaunched")
+
+	srv.InventoryUpdates.Tick()
+	drainUntilQuiet(t, c)
+	srv.FlushItems(t)
+	for _, inst := range persistedItems(t, srv, objID) {
+		if inst.ObjectID == scroll {
+			t.Fatalf("persisted two-skill scroll count = %d, want consumed", inst.Count)
+		}
+	}
+}
+
+// TestUseTwoSkillItemLaterSkillReuseStillLaunchesFirst pins that a later
+// attached skill still on reuse answers S1_PREPARED_FOR_REUSE without
+// cancelling the first skill's already-started cast timeline.
+func TestUseTwoSkillItemLaterSkillReuseStillLaunchesFirst(t *testing.T) {
+	srv := gameservertest.Boot(t,
+		gameservertest.WithSkills(consumableSkills(t)),
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1))
+	c := srv.Client
+	objID := srv.SoleObjectID(t)
+	scroll := srv.GiveItem(t, objID, gameservertest.TwoSkillScrollID, 2)
+	startInWorld(t, c)
+	disablePlayerSkill(t, srv, objID, modelskill.Definition{ID: 2015, Level: 1}, time.Minute)
+
+	c.Send(encodeUseItem(scroll, false))
+	assertMagicSkillUseSelf(t, c.Read(), objID, 2014, 1, 0, 0)
+	frame := c.Read()
+	assertFrameOpcode(t, frame, serverpackets.OpcodeSystemMessage, "later-skill reuse")
+	if id := systemMessageID(t, frame); id != serverpackets.SystemMessageS1PreparedForReuse {
+		t.Fatalf("reuse message id = %d, want S1PreparedForReuse (%d)", id, serverpackets.SystemMessageS1PreparedForReuse)
+	}
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMagicSkillLaunched, "first MagicSkillLaunched")
+	drainUntilQuiet(t, c)
+	if playerCastingNow(t, srv, objID) {
+		t.Fatal("CastingNow() = true after first skill finished, want first cast still scheduled to completion")
+	}
+}
+
+// TestUseTwoSkillItemWhileAttackingCastsOnlyLast pins next-intention
+// overwrite while a swing is active: both attached skills queue, the later
+// one replaces the earlier, and only that last skill runs when the swing
+// finishes — one stack unit consumed.
+func TestUseTwoSkillItemWhileAttackingCastsOnlyLast(t *testing.T) {
+	srv := gameservertest.Boot(t,
+		gameservertest.WithSkills(consumableSkills(t)),
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1))
+	c := srv.Client
+	objID := srv.SoleObjectID(t)
+	scroll := srv.GiveItem(t, objID, gameservertest.TwoSkillScrollID, 2)
+	startInWorld(t, c)
+	hostile := srv.SpawnHostileNPCAt(t, location.Location{X: 40, Y: 20, Z: 30})
+	drainUntilQuiet(t, c)
+
+	originX, originY, originZ := int32(10), int32(20), int32(30)
+	c.Send(encodeAttackRequest(hostile.ObjectID(), originX, originY, originZ, false))
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeValidateLocation, "select ValidateLocation")
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMyTargetSelected, "MyTargetSelected")
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeStatusUpdate, "selection StatusUpdate")
+	c.Send(encodeAttackRequest(hostile.ObjectID(), originX, originY, originZ, false))
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeAutoAttackStart, "AutoAttackStart")
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeAttack, "Attack")
+
+	c.Send(encodeUseItem(scroll, false))
+	ids := collectMagicSkillUseIDs(t, c, 3*time.Second)
+	if len(ids) != 1 || ids[0] != 2015 {
+		t.Fatalf("MagicSkillUse skill ids = %v, want only 2015", ids)
+	}
+
+	srv.InventoryUpdates.Tick()
+	drainUntilQuiet(t, c)
+	srv.FlushItems(t)
+	if inst := mustFindItem(t, srv, objID, scroll); inst.Count != 1 {
+		t.Fatalf("persisted two-skill scroll count = %d, want 1", inst.Count)
+	}
+}
+
+func disablePlayerSkill(t *testing.T, srv *gameservertest.Server, objID int32, def modelskill.Definition, delay time.Duration) {
+	t.Helper()
+	obj, ok := srv.State.Player(objID)
+	if !ok {
+		t.Fatalf("world.Player(%d) missing", objID)
+	}
+	disabler, ok := obj.(interface {
+		DisableSkill(int32, time.Duration)
+	})
+	if !ok {
+		t.Fatalf("world.Player(%d) = %T does not expose DisableSkill", objID, obj)
+	}
+	disabler.DisableSkill(actorcast.ReuseKey(def), delay)
+}
+
+func playerCastingNow(t *testing.T, srv *gameservertest.Server, objID int32) bool {
+	t.Helper()
+	obj, ok := srv.State.Player(objID)
+	if !ok {
+		t.Fatalf("world.Player(%d) missing", objID)
+	}
+	caster, ok := obj.(interface{ CastingNow() bool })
+	if !ok {
+		t.Fatalf("world.Player(%d) = %T does not expose CastingNow", objID, obj)
+	}
+	return caster.CastingNow()
+}
+
+func collectMagicSkillUseIDs(t *testing.T, c *testsupport.ScriptedClient, window time.Duration) []int32 {
+	t.Helper()
+	deadline := time.Now().Add(window)
+	quiet := 500 * time.Millisecond
+	var ids []int32
+	for time.Now().Before(deadline) {
+		timeout := 200 * time.Millisecond
+		if len(ids) > 0 {
+			timeout = quiet
+		}
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			break
+		}
+		if timeout > remaining {
+			timeout = remaining
+		}
+		frame := c.ReadWithTimeout(timeout)
+		if frame == nil {
+			if len(ids) > 0 {
+				return ids
+			}
+			continue
+		}
+		if frame[0] != serverpackets.OpcodeMagicSkillUse {
+			continue
+		}
+		ids = append(ids, magicSkillUseSkillID(frame))
+	}
+	return ids
 }
 
 // TestUseItemGates walks the use-gate rejection table that is reachable
