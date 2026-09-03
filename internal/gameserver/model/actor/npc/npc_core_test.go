@@ -776,6 +776,53 @@ func TestTable_All(t *testing.T) {
 	}
 }
 
+func TestInTerritoryIsStrict3D(t *testing.T) {
+	// Spawn.isInMyTerritory uses Location.isIn3DRadius: distance3D < MAX_DRIFT_RANGE.
+	// Axis-aligned integer offsets at the same Z make sqrt(d²) == d, so
+	// 199 / 200 / 201 are the exact representable neighbors of the boundary.
+	home := location.Location{X: 100, Y: 0, Z: 0}
+	cases := []struct {
+		offset int
+		want   bool
+	}{
+		{offset: defaultDriftRange - 1, want: true},
+		{offset: defaultDriftRange, want: false},
+		{offset: defaultDriftRange + 1, want: false},
+	}
+	for _, tc := range cases {
+		t.Run(fmt.Sprintf("offset=%d", tc.offset), func(t *testing.T) {
+			hostile := newTestHostile(t, &hostileMove{}, &hostileAttack{})
+			hostile.Instance.HasHome = true
+			hostile.Instance.Home = home
+			world.New().Spawn(hostile, home.X+tc.offset, home.Y, home.Z, 0)
+
+			if got := hostile.InTerritory(); got != tc.want {
+				t.Fatalf("InTerritory() = %v at 3D distance %d, want %v", got, tc.offset, tc.want)
+			}
+		})
+	}
+}
+
+func TestReturnHomeAtExactTerritoryBoundaryWalksBack(t *testing.T) {
+	home := location.Location{X: 100, Y: 0, Z: 0}
+	movement := &hostileMove{}
+	hostile := newTestHostile(t, movement, &hostileAttack{})
+	hostile.Instance.Kind = "Monster"
+	hostile.Instance.HasHome = true
+	hostile.Instance.Home = home
+	world.New().Spawn(hostile, home.X+defaultDriftRange, home.Y, home.Z, 0)
+
+	if hostile.InTerritory() {
+		t.Fatal("InTerritory() = true at 3D distance 200, want false")
+	}
+	if !hostile.ReturnHome() {
+		t.Fatal("ReturnHome() = false at same-Z offset 200, want walk-back")
+	}
+	if movement.home != home {
+		t.Fatalf("MoveHome destination = %#v, want %#v", movement.home, home)
+	}
+}
+
 func TestReturnHomeDriftRangeIsStrict2D(t *testing.T) {
 	// Point2D.isIn2DRadius is distance2D < radius. Axis-aligned integer
 	// offsets make hypot(d, 0) == d, so d-1 / d / d+1 are the exact

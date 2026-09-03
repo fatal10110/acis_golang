@@ -68,6 +68,28 @@ func TestIn3DRange(t *testing.T) {
 	}
 }
 
+func TestIn3DRadius(t *testing.T) {
+	origin := Location{X: 0, Y: 0, Z: 0}
+	// 3-4-12 triangle: straight-line distance 13.
+	onBoundary := Location{X: 3, Y: 4, Z: 12}
+
+	if origin.In3DRadius(onBoundary, 13) {
+		t.Fatal("In3DRadius() = true at exact radius; want strict exclusion")
+	}
+	if !origin.In3DRadius(onBoundary, 14) {
+		t.Fatal("In3DRadius() = false one unit inside radius")
+	}
+	if origin.In3DRadius(Location{X: 14, Y: 0, Z: 0}, 13) {
+		t.Fatal("In3DRadius() = true one unit outside radius")
+	}
+	if In3DRadius(0, 0, 0, 3, 4, 12, 13) {
+		t.Fatal("In3DRadius() package helper = true at exact radius")
+	}
+	if !In3DRadius(0, 0, 0, 3, 4, 12, 14) {
+		t.Fatal("In3DRadius() package helper = false inside radius")
+	}
+}
+
 func TestIn2DRadius(t *testing.T) {
 	origin := Location{X: 0, Y: 0, Z: 0}
 	// 3-4-5 triangle: ground distance 5.
