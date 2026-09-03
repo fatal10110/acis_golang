@@ -4,6 +4,7 @@ import (
 	"net"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/rs/zerolog"
@@ -127,6 +128,9 @@ func (c *Conn) writeBatch(batch []queuedWrite, bufs net.Buffers) (net.Buffers, e
 	bufs = bufs[:0]
 	for _, queued := range batch {
 		bufs = append(bufs, queued.frame.Bytes())
+	}
+	if err := c.Conn.SetWriteDeadline(time.Now().Add(time.Minute)); err != nil {
+		return bufs, err
 	}
 	send := bufs
 	_, err := send.WriteTo(c.Conn)
