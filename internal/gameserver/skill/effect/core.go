@@ -211,8 +211,9 @@ const (
 )
 
 type kind struct {
-	typ  Type
-	flag Flag
+	typ        Type
+	flag       Flag
+	selfTarget bool
 	// rejectsIfAffected marks a kind that refuses to be added at all (its
 	// stop-task hook fires instead) when the owner is already affected by
 	// its own Flag bit, from any currently held effect that carries it —
@@ -245,7 +246,7 @@ var coreKinds = map[string]kind{
 	"RemoveTarget":          {typ: TypeRemoveTarget},
 	"SilenceMagicPhysical":  {typ: TypeSilenceAll, flag: flagMuted | flagPhysicalMuted},
 	"SilentMove":            {typ: TypeSilentMove, flag: FlagSilentMove},
-	"StunSelf":              {typ: TypeStunSelf, flag: FlagStunned},
+	"StunSelf":              {typ: TypeStunSelf, flag: FlagStunned, selfTarget: true},
 	"Heal":                  {typ: TypeHeal},
 	"HealOverTime":          {typ: TypeHealOverTime},
 	"ManaHeal":              {typ: TypeManaHeal},
@@ -416,6 +417,7 @@ func New(skill Skill, tmpl modelskill.EffectTemplate) (*Effect, error) {
 		Flag:              k.flag,
 		Level:             level,
 		RejectsIfAffected: k.rejectsIfAffected,
+		SelfTarget:        k.selfTarget,
 		// Mirrors AbstractEffect._isHerbEffect = _skill.getName().contains("Herb"):
 		// a herb buff is identified by its owning skill's name, not by how it
 		// was cast, so this applies uniformly to every application path.
