@@ -33,7 +33,7 @@ func bootCorpsePetCaster(t *testing.T) *gameservertest.Server {
 // TestCorpsePetCastRejectsLivingAndDeadNonPet drives RequestMagicSkillUse
 // for Blessed Scroll of Resurrection: Pet (skill 2179): a living target
 // gets INVALID_TARGET, and a dead non-pet gets S1_CANNOT_BE_USED carrying
-// that skill's name, then ActionFailed.
+// that skill's name, then the actor's MoveToPawn rotation.
 func TestCorpsePetCastRejectsLivingAndDeadNonPet(t *testing.T) {
 	t.Run("living target", func(t *testing.T) {
 		srv := bootCorpsePetCaster(t)
@@ -45,7 +45,7 @@ func TestCorpsePetCastRejectsLivingAndDeadNonPet(t *testing.T) {
 
 		c.Send(encodeRequestMagicSkillUse(corpsePetSkillID, false, false))
 		assertStaticSystemMessage(t, c.Read(), serverpackets.SystemMessageInvalidTarget)
-		assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "living corpse-pet rejection")
+		assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMoveToPawn, "living corpse-pet rotation")
 	})
 
 	t.Run("dead non-pet", func(t *testing.T) {
@@ -67,6 +67,6 @@ func TestCorpsePetCastRejectsLivingAndDeadNonPet(t *testing.T) {
 
 		healer.Send(encodeRequestMagicSkillUse(corpsePetSkillID, false, false))
 		assertSystemMessageSkillFrame(t, healer.Read(), serverpackets.SystemMessageS1CannotBeUsed, corpsePetSkillID, 1)
-		assertFrameOpcode(t, healer.Read(), serverpackets.OpcodeActionFailed, "dead non-pet corpse-pet rejection")
+		assertFrameOpcode(t, healer.Read(), serverpackets.OpcodeMoveToPawn, "dead non-pet corpse-pet rotation")
 	})
 }

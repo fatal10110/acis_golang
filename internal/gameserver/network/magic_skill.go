@@ -81,7 +81,13 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 	if err != nil {
 		if started.Rejection != skilltarget.CastRejectNone {
 			sendTargetCastRejection(live, started.Rejection, started.Definition)
-			sendMagicActionFailed(live)
+			if started.Target != nil && started.Target.ObjectID() != live.ObjectID() {
+				origin := live.CurrentLocation()
+				target := skillCastObject(started.Target)
+				l.broadcastLiveFrame(live, func() wire.Frame {
+					return serverpackets.FrameMoveToPawn(live.ObjectID(), target.ObjectID, int(origin.Distance3D(target.Location)), origin)
+				})
+			}
 			return
 		}
 		if errors.Is(err, actorcast.ErrInvalidTarget) && started.Target == nil {
@@ -224,7 +230,7 @@ func (l *GameClientLink) resolveMagicSkillTarget(caster actorcast.Target, select
 	}
 	finalTarget := handler.FinalTarget(casterCreature, selectedCreature, &def)
 	if rejection := skilltarget.CastRejectionFor(def.Target, casterCreature, finalTarget, &def, ctrl); rejection != skilltarget.CastRejectNone {
-		return nil, rejection
+		return finalTarget, rejection
 	}
 	if finalTarget == nil || !handler.CanCast(casterCreature, finalTarget, &def, ctrl) {
 		return nil, skilltarget.CastRejectNone

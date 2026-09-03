@@ -55,7 +55,7 @@ func TestOffensiveCastOnGuardRequiresCtrlDamage(t *testing.T) {
 			c.Send(encodeRequestMagicSkillUse(skillID, tt.ctrl, false))
 			if tt.wantReject {
 				assertStaticSystemMessage(t, c.Read(), serverpackets.SystemMessageInvalidTarget)
-				assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "Guard cast rejection")
+				assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMoveToPawn, "Guard cast rejection rotation")
 				if hp, max := guard.CurrentHP(), guard.MaxHP(); hp != max {
 					t.Fatalf("Guard HP after rejected cast = %d, want unchanged %d", hp, max)
 				}
