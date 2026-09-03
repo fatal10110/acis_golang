@@ -2,6 +2,7 @@ package npc
 
 import (
 	"encoding/json"
+	"fmt"
 	"math"
 	"os"
 	"sort"
@@ -772,6 +773,59 @@ func TestTable_All(t *testing.T) {
 	}
 	if ids[0] != 10 || ids[len(ids)-1] != 30 {
 		t.Fatalf("All() ids = %v, want [10 20 30]", ids)
+	}
+}
+
+func TestReturnHomeDriftRangeIsStrict2D(t *testing.T) {
+	// Point2D.isIn2DRadius is distance2D < radius. Axis-aligned integer
+	// offsets make hypot(d, 0) == d, so d-1 / d / d+1 are the exact
+	// representable neighbors of the boundary.
+	//
+	// Ordinary Attackable and Guard also gate on 3D territory first. Lift
+	// Z so that check is already false and the 2D drift predicate is the
+	// one under test. SiegeGuard skips territory.
+	const aboveTerritory = 1000
+	home := location.Location{X: 100, Y: 0, Z: 0}
+
+	cases := []struct {
+		kind     InstanceKind
+		offset   int
+		z        int
+		wantHome bool
+	}{
+		{kind: "Monster", offset: defaultDriftRange - 1, z: aboveTerritory, wantHome: false},
+		{kind: "Monster", offset: defaultDriftRange, z: aboveTerritory, wantHome: true},
+		{kind: "Monster", offset: defaultDriftRange + 1, z: aboveTerritory, wantHome: true},
+		{kind: "Guard", offset: 19, z: aboveTerritory, wantHome: false},
+		{kind: "Guard", offset: 20, z: aboveTerritory, wantHome: true},
+		{kind: "Guard", offset: 21, z: aboveTerritory, wantHome: true},
+		{kind: "SiegeGuard", offset: 19, z: 0, wantHome: false},
+		{kind: "SiegeGuard", offset: 20, z: 0, wantHome: true},
+		{kind: "SiegeGuard", offset: 21, z: 0, wantHome: true},
+	}
+	for _, tc := range cases {
+		t.Run(fmt.Sprintf("%s/%d", tc.kind, tc.offset), func(t *testing.T) {
+			movement := &hostileMove{}
+			hostile := newTestHostile(t, movement, &hostileAttack{})
+			hostile.Instance.Kind = tc.kind
+			hostile.Instance.HasHome = true
+			hostile.Instance.Home = home
+			world.New().Spawn(hostile, home.X+tc.offset, home.Y, tc.z, 0)
+
+			got := hostile.ReturnHome()
+			if got != tc.wantHome {
+				t.Fatalf("ReturnHome() = %v, want %v", got, tc.wantHome)
+			}
+			if tc.wantHome {
+				if movement.home != home {
+					t.Fatalf("MoveHome destination = %#v, want %#v", movement.home, home)
+				}
+				return
+			}
+			if movement.home != (location.Location{}) {
+				t.Fatalf("MoveHome destination = %#v, want no walk-back", movement.home)
+			}
+		})
 	}
 }
 

@@ -624,7 +624,7 @@ func (m *CreatureMove) FollowTick(target TargetSnapshot, actorRadius float64) (E
 		return Event{}, false, nil
 	}
 
-	if in2DRange(m.origin, target.Position, followRange(m.followOffset, actorRadius, target.CollisionRadius)) {
+	if m.origin.In2DRadius(target.Position, followRange(m.followOffset, actorRadius, target.CollisionRadius)) {
 		return Event{}, false, nil
 	}
 
@@ -643,11 +643,4 @@ func (m *CreatureMove) FollowTick(target TargetSnapshot, actorRadius float64) (E
 
 func followRange(offset int, actorRadius, targetRadius float64) int {
 	return int(float64(offset) + actorRadius + targetRadius)
-}
-
-func in2DRange(origin, target location.Location, radius int) bool {
-	if radius < 0 {
-		return false
-	}
-	return math.Hypot(float64(target.X)-float64(origin.X), float64(target.Y)-float64(origin.Y)) < float64(radius)
 }
