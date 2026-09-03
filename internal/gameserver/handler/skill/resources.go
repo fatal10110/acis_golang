@@ -9,6 +9,25 @@ type healAmountSource interface {
 	HealAmount(modelskill.Definition) (float64, bool)
 }
 
+type restoredNotifier interface {
+	IsPlayer() bool
+	NotifyHPRestored(healerName string, amount int, byOther bool)
+	NotifyMPRestored(healerName string, amount int, byOther bool)
+	NotifyCPRestored(healerName string, amount int, byOther bool)
+}
+
+type playerCaster interface {
+	IsPlayer() bool
+}
+
+type restoredResource uint8
+
+const (
+	restoredHP restoredResource = iota
+	restoredMP
+	restoredCP
+)
+
 type healTarget interface {
 	CanBeHealed() bool
 	AddHP(float64) float64
@@ -95,7 +114,8 @@ func (healHandler) Use(cast Cast) {
 		if eff, ok := obj.(healEffectivenessTarget); ok {
 			effectiveness = eff.HealEffectiveness()
 		}
-		target.AddHP(amount * effectiveness / 100)
+		restored := target.AddHP(amount * effectiveness / 100)
+		notifyRestored(obj, cast.Caster, restored, restoredHP, false)
 	}
 }
 
@@ -111,7 +131,8 @@ func (healPercentHandler) Use(cast Cast) {
 			if !ok || !target.CanBeHealed() {
 				continue
 			}
-			target.AddHP(target.MaxHPValue() * float64(cast.Skill.Power) / 100)
+			restored := target.AddHP(target.MaxHPValue() * float64(cast.Skill.Power) / 100)
+			notifyRestored(obj, cast.Caster, restored, restoredHP, false)
 		}
 		return
 	}
@@ -122,7 +143,8 @@ func (healPercentHandler) Use(cast Cast) {
 		if !ok || !target.CanBeHealed() {
 			continue
 		}
-		target.AddMP(target.MaxMPValue() * float64(cast.Skill.Power) / 100)
+		restored := target.AddMP(target.MaxMPValue() * float64(cast.Skill.Power) / 100)
+		notifyRestored(obj, cast.Caster, restored, restoredMP, false)
 	}
 }
 
@@ -142,7 +164,8 @@ func (manaHealHandler) Use(cast Cast) {
 				mp = r.RechargeMP(mp)
 			}
 		}
-		target.AddMP(mp)
+		restored := target.AddMP(mp)
+		notifyRestored(obj, cast.Caster, restored, restoredMP, true)
 	}
 }
 
@@ -162,6 +185,28 @@ func (combatPointHealHandler) Use(cast Cast) {
 			amount = target.MaxCPValue() - target.CP()
 		}
 		target.SetCP(target.CP() + amount)
+		notifyRestored(obj, cast.Caster, amount, restoredCP, true)
+	}
+}
+
+func notifyRestored(target, caster Actor, amount float64, resource restoredResource, playerCasterOnly bool) {
+	notifier, ok := target.(restoredNotifier)
+	if !ok || !notifier.IsPlayer() {
+		return
+	}
+	name := actorName(caster)
+	byOther := !sameObject(caster, target)
+	if playerCasterOnly {
+		casterPlayer, ok := caster.(playerCaster)
+		byOther = ok && casterPlayer.IsPlayer() && byOther
+	}
+	switch resource {
+	case restoredMP:
+		notifier.NotifyMPRestored(name, int(amount), byOther)
+	case restoredCP:
+		notifier.NotifyCPRestored(name, int(amount), byOther)
+	default:
+		notifier.NotifyHPRestored(name, int(amount), byOther)
 	}
 }
 

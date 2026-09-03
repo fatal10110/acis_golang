@@ -162,6 +162,8 @@ const (
 	SystemMessageS2HPRestoredByS1       = 1067 // text then number
 	SystemMessageS1MPRestored           = 1068 // number parameter
 	SystemMessageS2MPRestoredByS1       = 1069 // text then number
+	SystemMessageS1CPWillBeRestored     = 1405 // number parameter
+	SystemMessageS2CPWillBeRestoredByS1 = 1406 // text then number
 	SystemMessageAlreadySpoiled         = 357  // no parameter
 	SystemMessageSpoilSuccess           = 612  // no parameter
 	SystemMessageRemainingMana10Minutes = 1979 // item-name parameter

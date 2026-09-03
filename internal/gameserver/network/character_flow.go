@@ -757,6 +757,13 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 		}
 		live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageS1MPRestored, int32(amount)))
 	})
+	c.SetCPRestoredNotifier(func(healerName string, amount int, byOther bool) {
+		if byOther {
+			live.SendFrame(serverpackets.FrameSystemMessageStringNumber(serverpackets.SystemMessageS2CPWillBeRestoredByS1, healerName, int32(amount)))
+			return
+		}
+		live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageS1CPWillBeRestored, int32(amount)))
+	})
 	c.SetEffectExpiryNotifiers(func(skillID modelskill.ID, level int) {
 		live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1HasWornOff, int32(skillID), int32(level)))
 	}, func(skillID modelskill.ID, level int) {
