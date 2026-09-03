@@ -1738,6 +1738,7 @@ func TestResourceHealNotificationsMatchCasterBranches(t *testing.T) {
 	}{
 		{"heal player caster", "HEAL", "hp", true, true},
 		{"mana heal npc caster", "MANAHEAL", "mp", false, false},
+		{"mana heal player caster", "MANAHEAL", "mp", true, true},
 		{"heal percent npc caster", "HEAL_PERCENT", "hp", false, true},
 		{"mana heal percent npc caster", "MANAHEAL_PERCENT", "mp", false, true},
 		{"combat point player caster", "COMBATPOINTHEAL", "cp", true, true},
