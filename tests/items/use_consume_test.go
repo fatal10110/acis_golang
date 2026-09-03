@@ -333,9 +333,21 @@ func playerCastingNow(t *testing.T, srv *gameservertest.Server, objID int32) boo
 func collectMagicSkillUseIDs(t *testing.T, c *testsupport.ScriptedClient, window time.Duration) []int32 {
 	t.Helper()
 	deadline := time.Now().Add(window)
+	quiet := 500 * time.Millisecond
 	var ids []int32
 	for time.Now().Before(deadline) {
-		frame := c.ReadWithTimeout(200 * time.Millisecond)
+		timeout := 200 * time.Millisecond
+		if len(ids) > 0 {
+			timeout = quiet
+		}
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			break
+		}
+		if timeout > remaining {
+			timeout = remaining
+		}
+		frame := c.ReadWithTimeout(timeout)
 		if frame == nil {
 			if len(ids) > 0 {
 				return ids
@@ -345,10 +357,7 @@ func collectMagicSkillUseIDs(t *testing.T, c *testsupport.ScriptedClient, window
 		if frame[0] != serverpackets.OpcodeMagicSkillUse {
 			continue
 		}
-		r := wire.NewReader(frame[1:])
-		r.ReadInt32()
-		r.ReadInt32()
-		ids = append(ids, r.ReadInt32())
+		ids = append(ids, magicSkillUseSkillID(frame))
 	}
 	return ids
 }

@@ -75,6 +75,9 @@ func (l *GameClientLink) useItemAICast(live *livePlayer, inv *itemcontainer.Inve
 	return true
 }
 
+// itemAICastBusy reports whether a later attached skill must wait: an
+// in-flight swing or cast. Sit/stand transition states and scheduling a
+// CAST after the current intention type are not modeled yet: #2191.
 func itemAICastBusy(live *livePlayer) bool {
 	if live.attack != nil && live.attack.AttackingNow() {
 		return true
