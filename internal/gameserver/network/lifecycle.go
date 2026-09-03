@@ -95,7 +95,7 @@ func (l *GameClientLink) detachLivePlayer(ctx context.Context, live *livePlayer)
 		// detached player.
 		if obj, ok := l.world.Summon(live.ObjectID()); ok {
 			if pet, ok := obj.(*summon.Actor); ok {
-				l.savePet(saveCtx, pet)
+				l.savePet(saveCtx, pet, live.Inventory())
 				l.transferPetInventory(pet, live.Inventory())
 				if inv := pet.PetInventory(); inv != nil {
 					inv.SetUpdateNotifier(nil)
@@ -138,11 +138,11 @@ func (l *GameClientLink) detachLivePlayer(ctx context.Context, live *livePlayer)
 	}
 }
 
-func (l *GameClientLink) savePet(ctx context.Context, actor *summon.Actor) {
-	savePet(ctx, l.petStore, actor, l.log)
+func (l *GameClientLink) savePet(ctx context.Context, actor *summon.Actor, ownerInv *itemcontainer.Inventory) {
+	savePet(ctx, l.petStore, actor, ownerInv, l.log)
 }
 
-func savePet(ctx context.Context, store petStore, actor *summon.Actor, log zerolog.Logger) {
+func savePet(ctx context.Context, store petStore, actor *summon.Actor, ownerInv *itemcontainer.Inventory, log zerolog.Logger) {
 	if store == nil {
 		return
 	}
@@ -152,7 +152,15 @@ func savePet(ctx context.Context, store petStore, actor *summon.Actor, log zerol
 	}
 	if err := store.Save(ctx, itemObjectID, state); err != nil {
 		log.Error().Err(err).Int32("item_obj_id", itemObjectID).Msg("save pet")
+		return
 	}
+	// The control item's enchant is the pet's displayed level. Lift it on
+	// the same save that writes the pets row so inventory, persistence, and
+	// a later restore all see the saved level.
+	if ownerInv == nil {
+		return
+	}
+	ownerInv.SetEnchantLevel(ownerInv.ItemByObjectID(itemObjectID), state.Level)
 }
 
 func (l *GameClientLink) transferPetInventory(actor *summon.Actor, owner *itemcontainer.Inventory) {
