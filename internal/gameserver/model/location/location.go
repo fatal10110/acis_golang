@@ -49,15 +49,13 @@ func In3DRange(ax, ay, az, bx, by, bz, radius int) bool {
 // In2DRadius reports whether other is strictly inside radius units of l on
 // the XY plane, ignoring Z. The exact boundary is outside.
 func (l Location) In2DRadius(other Location, radius int) bool {
-	return In2DRadius(l.X, l.Y, other.X, other.Y, radius)
+	return l.Distance2D(other) < float64(radius)
 }
 
 // In2DRadius reports whether two XY pairs are strictly inside radius units
 // of each other. The exact boundary is outside.
 func In2DRadius(ax, ay, bx, by, radius int) bool {
-	dx := float64(ax) - float64(bx)
-	dy := float64(ay) - float64(by)
-	return math.Hypot(dx, dy) < float64(radius)
+	return (Location{X: ax, Y: ay}).In2DRadius(Location{X: bx, Y: by}, radius)
 }
 
 // headingScale converts a full-circle angle in degrees to the game's
