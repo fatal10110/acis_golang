@@ -42,6 +42,43 @@ func (t *Territory) Contains2D(x, y int) bool {
 	return false
 }
 
+// ContainingTriangle returns the first triangle in shape order that contains
+// (x, y). Non-triangle shapes are skipped.
+func (t *Territory) ContainingTriangle(x, y int) (Triangle, bool) {
+	if t == nil {
+		return Triangle{}, false
+	}
+	for _, s := range t.Shapes {
+		switch shape := s.(type) {
+		case Triangle:
+			if shape.Contains(x, y) {
+				return shape, true
+			}
+		case TriangulatedPolygon:
+			if tri, ok := shape.ContainingTriangle(x, y); ok {
+				return tri, true
+			}
+		}
+	}
+	return Triangle{}, false
+}
+
+// AppendTriangles appends every triangle in the territory's shapes to dst.
+func (t *Territory) AppendTriangles(dst []Triangle) []Triangle {
+	if t == nil {
+		return dst
+	}
+	for _, s := range t.Shapes {
+		switch shape := s.(type) {
+		case Triangle:
+			dst = append(dst, shape)
+		case TriangulatedPolygon:
+			dst = append(dst, shape.triangles...)
+		}
+	}
+	return dst
+}
+
 // IntersectsRect reports whether the territory's 2D footprint overlaps the
 // axis-aligned rectangle spanning x1..x2 by y1..y2.
 func (t *Territory) IntersectsRect(x1, x2, y1, y2 int) bool {

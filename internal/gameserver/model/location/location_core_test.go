@@ -67,3 +67,17 @@ func TestIn3DRange(t *testing.T) {
 		t.Fatal("In3DRange() = true for negative radius")
 	}
 }
+
+func TestAddRandomOffsetBetweenRejectsInvalidRange(t *testing.T) {
+	origin := Location{X: 10, Y: 20, Z: 30}
+	cases := []struct{ min, max int }{
+		{-1, 10},
+		{10, -1},
+		{10, 9},
+	}
+	for _, c := range cases {
+		if got := origin.AddRandomOffsetBetween(c.min, c.max); got != origin {
+			t.Errorf("AddRandomOffsetBetween(%d, %d) = %+v, want unchanged origin", c.min, c.max, got)
+		}
+	}
+}

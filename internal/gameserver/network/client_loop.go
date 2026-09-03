@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
@@ -167,6 +168,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			if err != nil || !ok {
 				return
 			}
+			session.CompleteHandshake()
 			list, err := l.sendCharSelectInfo(ctx, client)
 			if err != nil {
 				l.log.Error().Err(err).Str("account", client.AccountName()).Msg("list characters")
@@ -1078,7 +1080,7 @@ func clearsSpawnProtection(opcode byte) bool {
 }
 
 func normalReadFrameError(err error) bool {
-	return errors.Is(err, io.EOF) || errors.Is(err, net.ErrClosed)
+	return errors.Is(err, io.EOF) || errors.Is(err, net.ErrClosed) || errors.Is(err, os.ErrDeadlineExceeded)
 }
 
 // authenticate validates req against the login server over the game

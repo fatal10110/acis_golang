@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
 )
 
 // InstanceKind identifies the behavior category selected by an NPC template.
@@ -29,6 +30,10 @@ type Instance struct {
 	// default run stance every other NPC spawns in (aCis Walkers.java
 	// onCreated's setWalkOrRun(false) for its WALKING_NPCS id subset).
 	WalkMode bool
+	// Maker is the spawning npc-maker group. Idle wander uses its
+	// territory when this is set. A nil Maker keeps the home-offset walk
+	// (MinionSpawn's current-position origin is not ported yet; #2159).
+	Maker *spawn.Maker
 }
 
 var supportedInstanceKinds = map[InstanceKind]struct{}{
