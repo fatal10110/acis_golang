@@ -11,6 +11,7 @@ const (
 	CastRejectInvalidTarget
 	CastRejectCantAttackPeaceZone
 	CastRejectTargetInPeaceZone
+	CastRejectCannotUseSkill
 )
 
 // CastRejectionFor classifies the target-handler failures for which the
@@ -27,6 +28,8 @@ func CastRejectionFor(targetType modelskill.Target, caster, target Creature, ski
 		}
 	case modelskill.TargetOne:
 		return oneCastRejection(caster, target, skill, ctrl)
+	case modelskill.TargetCorpsePet:
+		return corpsePetCastRejection(target)
 	}
 	return CastRejectNone
 }

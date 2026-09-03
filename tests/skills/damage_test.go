@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
@@ -90,6 +91,54 @@ func TestOffensiveSkillDrainsNPCHealth(t *testing.T) {
 	waitFor(t, "PDAM drain", func() bool { return hostile.CurrentHP() < maxHP })
 	if hp := hostile.CurrentHP(); hp >= maxHP {
 		t.Fatalf("monster HP after PDAM = %d, want drained below %d", hp, maxHP)
+	}
+}
+
+// TestPunchOfDoomHostsItsStunSelfEffectOnTheCaster pins the intrinsic
+// self-targeting of StunSelf: Punch of Doom strikes its selected opponent,
+// but its stun is held by the caster while retaining the struck actor as the
+// effect's affected participant.
+func TestPunchOfDoomHostsItsStunSelfEffectOnTheCaster(t *testing.T) {
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Tyrant", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{{
+			ID: 81, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
+			CastRange: 900, HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
+			SkillType: "PDAM", Power: 1_000_000,
+			Effects: []modelskill.EffectTemplate{
+				{Name: "StunSelf", Time: 9, EffectPower: 100, EffectPowerSet: true},
+				{Name: "Buff", Time: 9},
+			},
+		}})),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, 81, 1)
+	startInWorld(t, c)
+	hostile := srv.SpawnHostileNPC(t)
+	drainUntilQuiet(t, c)
+	targetHostile(t, c, hostile.ObjectID())
+	drainUntilQuiet(t, c)
+
+	c.Send(encodeRequestMagicSkillUse(81, false, false))
+	readCastStartFrames(t, c, objID, 81, 1, 500, 60_000, hostile.ObjectID())
+	waitFor(t, "Punch of Doom caster stun", func() bool { return len(liveHeldSkillIDs(t, srv, objID)) == 1 })
+
+	targetEffects := hostile.EffectList().All()
+	if len(targetEffects) != 1 || targetEffects[0].Type != effect.TypeBuff {
+		t.Fatalf("target-held effects = %+v, want one ordinary buff", targetEffects)
+	}
+	obj, ok := srv.State.Player(objID)
+	if !ok {
+		t.Fatalf("world.Player(%d) missing", objID)
+	}
+	holder, ok := obj.(interface{ EffectList() *effect.List })
+	if !ok {
+		t.Fatalf("world.Player(%d) = %T has no EffectList", objID, obj)
+	}
+	effects := holder.EffectList().All()
+	if len(effects) != 1 || effects[0].Type != effect.TypeStunSelf || effects[0].Effected != hostile {
+		t.Fatalf("caster-held effects = %+v, want one StunSelf effect that retains hostile %d", effects, hostile.ObjectID())
 	}
 }
 

@@ -15,8 +15,11 @@ type Effect struct {
 	Flag     Flag
 	Funcs    []Mod
 	Herb     bool
-	Effector Participant
-	Effected Participant
+	// SelfTarget holds this effect on its effector while Effected remains the
+	// skill target for its hooks.
+	SelfTarget bool
+	Effector   Participant
+	Effected   Participant
 
 	// RejectsIfAffected marks an effect that must not be added at all
 	// (only its stop-task hook runs) when the owner is already affected by
