@@ -16,10 +16,6 @@ type restoredNotifier interface {
 	NotifyCPRestored(healerName string, amount int, byOther bool)
 }
 
-type characterNamer interface {
-	CharacterName() string
-}
-
 type playerCaster interface {
 	IsPlayer() bool
 }
@@ -198,10 +194,7 @@ func notifyRestored(target, caster Actor, amount float64, resource restoredResou
 	if !ok || !notifier.IsPlayer() {
 		return
 	}
-	name := ""
-	if n, ok := caster.(characterNamer); ok {
-		name = n.CharacterName()
-	}
+	name := actorName(caster)
 	byOther := !sameObject(caster, target)
 	if playerCasterOnly {
 		casterPlayer, ok := caster.(playerCaster)

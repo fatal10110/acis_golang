@@ -137,6 +137,43 @@ func TestManaHealSelfCastSendsMPRestoredMessage(t *testing.T) {
 	drainUntilQuiet(t, c)
 }
 
+func TestCombatPointHealSelfCastSendsCPRestoredMessage(t *testing.T) {
+	const (
+		damageSkillID = 1227
+		healSkillID   = 1228
+	)
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{
+			{ID: damageSkillID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf, HitTime: 500, StaticHitTime: true, SkillType: "CPDAMPERCENT", Power: 50},
+			{ID: healSkillID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf, HitTime: 500, StaticHitTime: true, SkillType: "COMBATPOINTHEAL", Power: 99_999},
+		})),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, damageSkillID, 1)
+	seedKnownSkill(t, srv, objID, healSkillID, 1)
+	startInWorld(t, c)
+
+	maxCP := srv.PlayerMaxCP(t, objID)
+	c.Send(encodeRequestMagicSkillUse(damageSkillID, false, false))
+	readCastStartFrames(t, c, objID, damageSkillID, 1, 500, 0, objID)
+	time.Sleep(700 * time.Millisecond)
+	drainUntilQuiet(t, c)
+	if current := srv.PlayerCurrentCP(t, objID); current >= maxCP {
+		t.Fatalf("caster CP after damage = %d, want below %d", current, maxCP)
+	}
+
+	want := maxCP - srv.PlayerCurrentCP(t, objID)
+	c.Send(encodeRequestMagicSkillUse(healSkillID, false, false))
+	readCastStartFrames(t, c, objID, healSkillID, 1, 500, 0, objID)
+	assertRestoredNumber(t, findSystemMessage(t, c, int32(serverpackets.SystemMessageS1CPWillBeRestored)), int32(want))
+	if cp := srv.PlayerCurrentCP(t, objID); cp != maxCP {
+		t.Fatalf("caster CP after heal = %d, want restored to computed max %d", cp, maxCP)
+	}
+	drainUntilQuiet(t, c)
+}
+
 // TestHealOverTimeTicksRestoreDamagedCaster lands a heal-over-time on a
 // damaged caster and verifies each production effect sweep visibly restores
 // HP until the caster reaches full health, where the ticks fall silent.

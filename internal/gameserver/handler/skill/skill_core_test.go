@@ -1742,6 +1742,7 @@ func TestResourceHealNotificationsMatchCasterBranches(t *testing.T) {
 		{"heal percent npc caster", "HEAL_PERCENT", "hp", false, true},
 		{"mana heal percent npc caster", "MANAHEAL_PERCENT", "mp", false, true},
 		{"combat point player caster", "COMBATPOINTHEAL", "cp", true, true},
+		{"combat point npc caster", "COMBATPOINTHEAL", "cp", false, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			caster := &skillTarget{isPlayer: tc.casterPlayer, name: "Caster", healAmount: 50, healOK: true}
