@@ -5738,6 +5738,165 @@ func TestCharacterMakeAttackHitAppliesFacingAndNight(t *testing.T) {
 	}
 }
 
+func attackHitNoCrit() func(int) int {
+	n := 0
+	return func(int) int {
+		n++
+		if n == 1 {
+			return 0
+		}
+		if n == 2 {
+			return 999
+		}
+		return 0
+	}
+}
+
+func TestCharacterMakeAttackHitUsesPosPvpWeaponCritShieldAndSoulshot(t *testing.T) {
+	tmpl := combatTemplate()
+	items := combatItems()
+	place := func(ax, ay int, equipped ...*item.Instance) (*Character, *Character) {
+		target := liveCharacter(1, tmpl, items)
+		attacker := liveCharacter(2, tmpl, items, equipped...)
+		target.SetLastKnownPosition(location.Location{X: 0, Y: 0, Z: 0}, 0)
+		attacker.SetLastKnownPosition(location.Location{X: ax, Y: ay, Z: 0}, 0)
+		attacker.SetRollSource(attackHitNoCrit())
+		return attacker, target
+	}
+
+	frontAtk, frontTgt := place(100, 0)
+	front := frontAtk.MakeAttackHit(frontTgt, false)
+	if front.Miss || front.Crit {
+		t.Fatalf("front hit miss=%v crit=%v, want hit non-crit", front.Miss, front.Crit)
+	}
+	wantFront := int(formulas.PhysicalAttackDamage(formulas.PhysicalAttackInput{
+		AttackPower: frontAtk.PAtk(), Defence: creature.Positive(frontTgt.PDef()),
+		PosMul: 1, ElementalMul: 1, RandomMul: 1, RaceMul: 1, WeaponVulnMul: 1, PvPMul: 1,
+	}))
+	if front.Damage != wantFront {
+		t.Fatalf("front damage = %d, want %d", front.Damage, wantFront)
+	}
+
+	behindAtk, behindTgt := place(-100, 0)
+	behind := behindAtk.MakeAttackHit(behindTgt, false)
+	wantBehind := int(formulas.PhysicalAttackDamage(formulas.PhysicalAttackInput{
+		AttackPower: behindAtk.PAtk(), Defence: creature.Positive(behindTgt.PDef()),
+		PosMul: 1.2, ElementalMul: 1, RandomMul: 1, RaceMul: 1, WeaponVulnMul: 1, PvPMul: 1,
+	}))
+	if behind.Damage != wantBehind {
+		t.Fatalf("behind damage = %d, want %d", behind.Damage, wantBehind)
+	}
+
+	pvpAtk, pvpTgt := place(100, 0)
+	pvpAtk.AddStatFuncs([]effect.Mod{{Stat: stat.PvPPhysicalDmg, Op: effect.OpMul, Value: 2, Owner: testModOwner()}})
+	pvp := pvpAtk.MakeAttackHit(pvpTgt, false)
+	wantPvP := int(formulas.PhysicalAttackDamage(formulas.PhysicalAttackInput{
+		AttackPower: pvpAtk.PAtk(), Defence: creature.Positive(pvpTgt.PDef()),
+		PosMul: 1, ElementalMul: 1, RandomMul: 1, RaceMul: 1, WeaponVulnMul: 1, PvPMul: 2,
+	}))
+	if pvp.Damage != wantPvP {
+		t.Fatalf("pvp damage = %d, want %d", pvp.Damage, wantPvP)
+	}
+
+	sword := &item.Instance{ObjectID: 21, TemplateID: 2, Location: item.LocationPaperdoll, LocationData: itemcontainer.RHand}
+	wpnAtk, wpnTgt := place(100, 0, sword)
+	wpnTgt.AddStatFuncs([]effect.Mod{{Stat: stat.SwordWpnVuln, Op: effect.OpMul, Value: 1.5, Owner: testModOwner()}})
+	wpn := wpnAtk.MakeAttackHit(wpnTgt, false)
+	wantWpn := int(formulas.PhysicalAttackDamage(formulas.PhysicalAttackInput{
+		AttackPower: wpnAtk.PAtk(), Defence: creature.Positive(wpnTgt.PDef()),
+		PosMul: 1, ElementalMul: 1, RandomMul: 1, RaceMul: 1, WeaponVulnMul: 1.5, PvPMul: 1,
+	}))
+	if wpn.Damage != wantWpn {
+		t.Fatalf("weapon-vuln damage = %d, want %d", wpn.Damage, wantWpn)
+	}
+
+	critAtk, critTgt := place(100, 0)
+	critAtk.SetRollSource(zeroRoll)
+	critAtk.AddStatFuncs([]effect.Mod{{Stat: stat.CriticalDamage, Op: effect.OpMul, Value: 2, Owner: testModOwner()}})
+	critTgt.AddStatFuncs([]effect.Mod{{Stat: stat.CritVuln, Op: effect.OpMul, Value: 1.5, Owner: testModOwner()}})
+	crit := critAtk.MakeAttackHit(critTgt, false)
+	if !crit.Crit {
+		t.Fatal("crit hit Crit = false")
+	}
+	wantCrit := int(formulas.PhysicalAttackDamage(formulas.PhysicalAttackInput{
+		AttackPower: critAtk.PAtk(), Defence: creature.Positive(critTgt.PDef()), Crit: true,
+		PosMul: 1, ElementalMul: 1, RandomMul: 1, RaceMul: 1, WeaponVulnMul: 1, PvPMul: 1,
+		CritDamageMul: 2, CritDamagePosMul: 1, CritVulnMul: 1.5,
+	}))
+	if crit.Damage != wantCrit {
+		t.Fatalf("crit damage = %d, want %d", crit.Damage, wantCrit)
+	}
+
+	ssSword := &item.Instance{ObjectID: 22, TemplateID: 2, Location: item.LocationPaperdoll, LocationData: itemcontainer.RHand}
+	ssAtk, ssTgt := place(100, 0, ssSword)
+	ssAtk.SetChargedShot(item.ShotSoul, true)
+	ss := ssAtk.MakeAttackHit(ssTgt, false)
+	wantSS := int(formulas.PhysicalAttackDamage(formulas.PhysicalAttackInput{
+		AttackPower: ssAtk.PAtk(), Defence: creature.Positive(ssTgt.PDef()), SoulShot: true,
+		PosMul: 1, ElementalMul: 1, RandomMul: 1, RaceMul: 1, WeaponVulnMul: 1, PvPMul: 1,
+	}))
+	if ss.Damage != wantSS {
+		t.Fatalf("soulshot damage = %d, want %d", ss.Damage, wantSS)
+	}
+
+	shieldItems := shieldDefenseItems()
+	shieldTgt := liveCharacter(1, tmpl, shieldItems, equippedShield())
+	shieldAtk := liveCharacter(2, tmpl, shieldItems)
+	shieldTgt.SetLastKnownPosition(location.Location{X: 0, Y: 0, Z: 0}, 0)
+	shieldAtk.SetLastKnownPosition(location.Location{X: 80, Y: 0, Z: 0}, 0)
+	shieldTgt.AddStatFuncs([]effect.Mod{
+		{Stat: stat.ShieldRate, Op: effect.OpSet, Value: 80, Owner: testModOwner()},
+		{Stat: stat.ShieldDefenceAngle, Op: effect.OpSet, Value: 120, Owner: testModOwner()},
+		{Stat: stat.ShieldDefence, Op: effect.OpSet, Value: 40, Owner: testModOwner()},
+	})
+	n := 0
+	shieldAtk.SetRollSource(func(int) int {
+		n++
+		if n == 1 {
+			return 0
+		}
+		if n == 2 {
+			return 999
+		}
+		return 0
+	})
+	shieldTgt.SetRollSource(func(bound int) int {
+		if bound == 100 {
+			return 10
+		}
+		return 0
+	})
+	blocked := shieldAtk.MakeAttackHit(shieldTgt, false)
+	if blocked.Shield != formulas.ShieldSuccess {
+		t.Fatalf("shield = %v, want ShieldSuccess", blocked.Shield)
+	}
+	wantBlocked := int(formulas.PhysicalAttackDamage(formulas.PhysicalAttackInput{
+		AttackPower: shieldAtk.PAtk(), Defence: creature.Positive(shieldTgt.PDef()) + shieldTgt.CalcStat(stat.ShieldDefence, 0),
+		PosMul: 1, ElementalMul: 1, RandomMul: 1, RaceMul: 1, WeaponVulnMul: 1, PvPMul: 1,
+	}))
+	if blocked.Damage != wantBlocked {
+		t.Fatalf("blocked damage = %d, want %d", blocked.Damage, wantBlocked)
+	}
+
+	perfectTgt := liveCharacter(3, tmpl, shieldItems, equippedShield())
+	perfectAtk := liveCharacter(4, tmpl, shieldItems)
+	perfectTgt.SetLastKnownPosition(location.Location{X: 0, Y: 0, Z: 0}, 0)
+	perfectAtk.SetLastKnownPosition(location.Location{X: 80, Y: 0, Z: 0}, 0)
+	perfectTgt.AddStatFuncs([]effect.Mod{
+		{Stat: stat.ShieldRate, Op: effect.OpSet, Value: 80, Owner: testModOwner()},
+		{Stat: stat.ShieldDefenceAngle, Op: effect.OpSet, Value: 120, Owner: testModOwner()},
+	})
+	perfectAtk.SetRollSource(attackHitNoCrit())
+	perfectTgt.SetRollSource(func(int) int { return 0 })
+	perfect := perfectAtk.MakeAttackHit(perfectTgt, false)
+	if perfect.Shield != formulas.ShieldPerfect {
+		t.Fatalf("shield = %v, want ShieldPerfect", perfect.Shield)
+	}
+	if perfect.Damage != 1 {
+		t.Fatalf("perfect-block damage = %d, want 1", perfect.Damage)
+	}
+}
+
 type hitNight bool
 
 func (n hitNight) IsNight() bool { return bool(n) }

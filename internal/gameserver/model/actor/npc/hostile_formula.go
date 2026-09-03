@@ -283,7 +283,7 @@ func (h *Hostile) HealAmount(def modelskill.Definition) (float64, bool) {
 // cast by caster against h.
 func (h *Hostile) PhysicalSkillInput(caster creature.DeathActor, def modelskill.Definition) (formulas.PhysicalSkillInput, bool) {
 	attacker, _ := caster.(creature.FormulaActor)
-	raceMul := h.raceMultiplier(attacker)
+	raceMul := h.RaceMultiplier(attacker)
 	return creature.ResolvePhysicalSkillInput(caster, h, def, creature.Playable(caster) && h.Playable(), raceMul)
 }
 
@@ -369,7 +369,9 @@ func (h *Hostile) ApplyLethalOutcome(outcome formulas.LethalOutcome, caster crea
 	}
 }
 
-func (h *Hostile) raceMultiplier(attacker creature.FormulaActor) float64 {
+// RaceMultiplier returns the physical-attack race term when h's template
+// race has a paired attack/resist stat, or 1 otherwise.
+func (h *Hostile) RaceMultiplier(attacker creature.FormulaActor) float64 {
 	if attacker == nil {
 		return 1
 	}

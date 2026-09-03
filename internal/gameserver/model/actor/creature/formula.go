@@ -132,6 +132,62 @@ func ResolvePhysicalSkillInput(caster DeathActor, target FormulaActor, def model
 	}, true
 }
 
+// ResolvePhysicalAttackInput builds a non-skill physical auto-attack's
+// damage input. Shield is resolved first so a perfect block can skip the
+// damage formula; random variance is rolled after that shield check.
+func ResolvePhysicalAttackInput(attacker, target FormulaActor, crit bool) (formulas.PhysicalAttackInput, formulas.ShieldDefense) {
+	if attacker == nil || target == nil {
+		return formulas.PhysicalAttackInput{}, formulas.ShieldFailed
+	}
+	shield := formulas.ShieldFailed
+	if resolver, ok := any(target).(shieldDefenseActor); ok {
+		if caster, ok := any(attacker).(DeathActor); ok {
+			shield = resolver.ShieldDefense(caster, modelskill.Definition{}, crit)
+		}
+	}
+	defence := Positive(target.PDef())
+	if shield == formulas.ShieldSuccess {
+		defence += target.CalcStat(stat.ShieldDefence, 0)
+	}
+	pvpMul := 1.0
+	if Playable(attacker) && Playable(target) {
+		pvpMul = attacker.CalcStat(stat.PvPPhysicalDmg, 1)
+	}
+	in := formulas.PhysicalAttackInput{
+		AttackPower:   attacker.PAtk(),
+		Defence:       defence,
+		Crit:          crit,
+		SoulShot:      attacker.SoulshotCharged(),
+		PosMul:        PositionMultiplierFrom(target, attacker, crit),
+		ElementalMul:  ElementalPhysicalAttackModifier(attacker, target),
+		RandomMul:     RandomDamageMultiplier(attacker, modelskill.Definition{}),
+		RaceMul:       RaceMultiplierFrom(target, attacker),
+		WeaponVulnMul: WeaponVulnerability(target, attacker.AttackType()),
+		PvPMul:        pvpMul,
+	}
+	if crit {
+		in.CritDamageMul = attacker.CalcStat(stat.CriticalDamage, 1)
+		in.CritDamagePosMul = attacker.CalcStat(stat.CriticalDamagePos, 1)
+		in.CritVulnMul = target.CalcStat(stat.CritVuln, 1)
+		in.CritDamageAddBase = attacker.CalcStat(stat.CriticalDamageAdd, 0)
+	}
+	return in, shield
+}
+
+// ApplyPhysicalAttackDamage converts a resolved auto-attack input into the
+// integer damage one hit deals. A perfect shield block is a flat 1 before
+// dual-wield splitting.
+func ApplyPhysicalAttackDamage(in formulas.PhysicalAttackInput, shield formulas.ShieldDefense, split bool) int {
+	damage := 1.0
+	if shield != formulas.ShieldPerfect {
+		damage = formulas.PhysicalAttackDamage(in)
+	}
+	if split {
+		damage /= 2
+	}
+	return int(damage)
+}
+
 // ResolveMagicDamageInput builds a magic-damage input from the caster/target
 // pair.
 func ResolveMagicDamageInput(caster DeathActor, target FormulaActor, def modelskill.Definition, pvp bool) (formulas.MagicDamageInput, bool) {
@@ -395,6 +451,22 @@ func PositionMultiplierFrom(target, attacker FormulaActor, crit bool) float64 {
 	return formulas.PosMul(behind, inFront, crit)
 }
 
+type raceMultiplierActor interface {
+	RaceMultiplier(FormulaActor) float64
+}
+
+// RaceMultiplierFrom returns the NPC-race attack/resist multiplier when
+// target exposes one, or 1 for every other target shape.
+func RaceMultiplierFrom(target, attacker FormulaActor) float64 {
+	if target == nil || attacker == nil {
+		return 1
+	}
+	if r, ok := target.(raceMultiplierActor); ok {
+		return r.RaceMultiplier(attacker)
+	}
+	return 1
+}
+
 // AttackFacing reports whether attacker stands behind or in front of target,
 // using target's own heading. Side is !behind && !inFront. Missing heading
 // treats the target as facing heading 0.
@@ -507,6 +579,34 @@ func SkillLevelModifier(targetLevel, casterLevel int, def modelskill.Definition)
 		scale = 0.01
 	}
 	return 1 + scale*float64(delta)
+}
+
+var physicalAttackElements = []struct {
+	atk, res stat.Stat
+}{
+	{stat.WindPower, stat.WindRes},
+	{stat.FirePower, stat.FireRes},
+	{stat.WaterPower, stat.WaterRes},
+	{stat.EarthPower, stat.EarthRes},
+	{stat.HolyPower, stat.HolyRes},
+	{stat.DarkPower, stat.DarkRes},
+	{stat.ValakasPower, stat.ValakasRes},
+}
+
+// ElementalPhysicalAttackModifier returns the auto-attack elemental
+// multiplier: each element whose attacker power truncates above zero
+// multiplies in the target's matching resistance.
+func ElementalPhysicalAttackModifier(attacker, target FormulaActor) float64 {
+	if attacker == nil || target == nil {
+		return 1
+	}
+	mul := 1.0
+	for _, elem := range physicalAttackElements {
+		if int(attacker.CalcStat(elem.atk, 0)) > 0 {
+			mul *= target.CalcStat(elem.res, 1)
+		}
+	}
+	return mul
 }
 
 // ElementalSkillModifier returns target's resistance multiplier for def's
