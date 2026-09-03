@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
+	"github.com/rs/zerolog"
 )
 
 const livePlayerDetachSaveTimeout = 2 * time.Second
@@ -138,15 +139,19 @@ func (l *GameClientLink) detachLivePlayer(ctx context.Context, live *livePlayer)
 }
 
 func (l *GameClientLink) savePet(ctx context.Context, actor *summon.Actor) {
-	if l.petStore == nil {
+	savePet(ctx, l.petStore, actor, l.log)
+}
+
+func savePet(ctx context.Context, store petStore, actor *summon.Actor, log zerolog.Logger) {
+	if store == nil {
 		return
 	}
 	itemObjectID, state, ok := actor.PetState()
 	if !ok {
 		return
 	}
-	if err := l.petStore.Save(ctx, itemObjectID, state); err != nil {
-		l.log.Error().Err(err).Int32("item_obj_id", itemObjectID).Msg("save pet")
+	if err := store.Save(ctx, itemObjectID, state); err != nil {
+		log.Error().Err(err).Int32("item_obj_id", itemObjectID).Msg("save pet")
 	}
 }
 
