@@ -249,33 +249,40 @@ func resolveInstantItemSkillRef(ref modelitem.SkillRef, defs actorcast.Definitio
 	return def, true
 }
 
-// ResolveAICastSkill returns the first carried skill of tmpl that resolves
-// to a definition neither a potion nor a simultaneous-cast: the carried
-// skills Use's instant-cast path doesn't handle, and that instead route
-// through the caster's ordinary skill-cast pipeline (with the item
-// providing the skill and being consumed on a successful cast). False for
-// anything that isn't an ItemSkills-handled etc item, carries no such
-// skill, or whose skill can't be resolved.
-func ResolveAICastSkill(tmpl *modelitem.Template, defs actorcast.Definitions) (modelskill.Definition, bool) {
+// ResolveAICastSkills returns every carried skill of tmpl that resolves to
+// a definition neither a potion nor a simultaneous-cast, in template order.
+// Those skills skip Use's instant-cast path and route through the caster's
+// ordinary skill-cast pipeline (the item providing the skill, consumed on
+// each successful start). Empty when tmpl isn't an ItemSkills-handled etc
+// item, carries no such skill, or none of the skills resolve.
+func ResolveAICastSkills(tmpl *modelitem.Template, defs actorcast.Definitions) []modelskill.Definition {
 	if tmpl == nil || tmpl.Kind != modelitem.KindEtcItem || tmpl.EtcItem == nil {
-		return modelskill.Definition{}, false
+		return nil
 	}
 	if tmpl.EtcItem.Handler != ItemSkillsHandler {
-		return modelskill.Definition{}, false
+		return nil
 	}
 	if defs == nil {
-		return modelskill.Definition{}, false
+		return nil
 	}
+	out := make([]modelskill.Definition, 0, len(tmpl.AttachedSkills))
 	for _, ref := range tmpl.AttachedSkills {
 		def, ok := defs.Definition(modelskill.Ref{ID: modelskill.ID(ref.ID), Level: int(ref.Level)})
-		if !ok {
+		if !ok || def.Potion || def.SimultaneousCast {
 			continue
 		}
-		if !def.Potion && !def.SimultaneousCast {
-			return def, true
-		}
+		out = append(out, def)
 	}
-	return modelskill.Definition{}, false
+	return out
+}
+
+// ResolveAICastSkill returns the first skill ResolveAICastSkills would.
+func ResolveAICastSkill(tmpl *modelitem.Template, defs actorcast.Definitions) (modelskill.Definition, bool) {
+	all := ResolveAICastSkills(tmpl, defs)
+	if len(all) == 0 {
+		return modelskill.Definition{}, false
+	}
+	return all[0], true
 }
 
 // installItemReuse applies the item-driven reuse delay to the skill's

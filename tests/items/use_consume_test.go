@@ -43,6 +43,14 @@ func consumableSkills(t *testing.T) *skillstate.Persistence {
 			ID: 2013, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
 			SkillType: "TELEPORT", StaticHitTime: true, HitTime: 0, StaticReuse: true, ReuseDelay: 5000,
 		},
+		{
+			ID: 2014, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+			SkillType: "BUFF", StaticHitTime: true, HitTime: 0, StaticReuse: true,
+		},
+		{
+			ID: 2015, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+			SkillType: "BUFF", StaticHitTime: true, HitTime: 0, StaticReuse: true,
+		},
 	}), known)
 }
 
@@ -190,6 +198,38 @@ func TestUseEscapeScrollRunsAICastAndConsumes(t *testing.T) {
 	srv.FlushItems(t)
 	if inst := mustFindItem(t, srv, objID, scroll); inst.Count != 2 {
 		t.Fatalf("persisted scroll count = %d, want 2", inst.Count)
+	}
+}
+
+// TestUseTwoSkillItemQueuesLaterAICast pins ItemSkills.java:52-80 plus
+// PlayableAI.tryToCast: a two-skill non-instant template starts the first
+// eligible skill immediately and stores the later one as the next CAST
+// intention, which runs when the first cast finishes. Each routed cast
+// consumes one stack unit.
+func TestUseTwoSkillItemQueuesLaterAICast(t *testing.T) {
+	srv := gameservertest.Boot(t,
+		gameservertest.WithSkills(consumableSkills(t)),
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1))
+	c := srv.Client
+	objID := srv.SoleObjectID(t)
+	scroll := srv.GiveItem(t, objID, gameservertest.TwoSkillScrollID, 2)
+	startInWorld(t, c)
+
+	c.Send(encodeUseItem(scroll, false))
+	assertMagicSkillUseSelf(t, c.Read(), objID, 2014, 1, 0, 0)
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "queued later item skill")
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMagicSkillLaunched, "first MagicSkillLaunched")
+	assertMagicSkillUseSelf(t, c.Read(), objID, 2015, 1, 0, 0)
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMagicSkillLaunched, "second MagicSkillLaunched")
+
+	srv.InventoryUpdates.Tick()
+	drainUntilQuiet(t, c)
+	srv.FlushItems(t)
+	for _, inst := range persistedItems(t, srv, objID) {
+		if inst.ObjectID == scroll {
+			t.Fatalf("persisted two-skill scroll count = %d, want consumed", inst.Count)
+		}
 	}
 }
 
