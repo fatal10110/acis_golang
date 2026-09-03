@@ -129,8 +129,8 @@ func (pdamHandler) UseResult(cast Cast) Result {
 		}
 		if in.Evaded {
 			result.Dodges = append(result.Dodges, Dodge{
-				AttackerID: counterattackObjectID(cast.Caster), AttackerName: counterattackName(cast.Caster),
-				DefenderID: counterattackObjectID(target), DefenderName: counterattackName(target),
+				AttackerID: counterattackObjectID(cast.Caster), AttackerName: actorName(cast.Caster),
+				DefenderID: counterattackObjectID(target), DefenderName: actorName(target),
 			})
 			continue
 		}
@@ -318,9 +318,9 @@ func (blowHandler) UseResult(cast Cast) Result {
 		if in.Evaded {
 			result.Dodges = append(result.Dodges, Dodge{
 				AttackerID:   counterattackObjectID(cast.Caster),
-				AttackerName: counterattackName(cast.Caster),
+				AttackerName: actorName(cast.Caster),
 				DefenderID:   counterattackObjectID(target),
-				DefenderName: counterattackName(target),
+				DefenderName: actorName(target),
 			})
 			continue
 		}
@@ -366,9 +366,9 @@ func applyPhysicalSkillCounter(cast Cast, target hpDamageTarget, damage float64,
 	if result != nil {
 		result.Counterattacks = append(result.Counterattacks, Counterattack{
 			AttackerID:   counterattackObjectID(cast.Caster),
-			AttackerName: counterattackName(cast.Caster),
+			AttackerName: actorName(cast.Caster),
 			DefenderID:   counterattackObjectID(target),
-			DefenderName: counterattackName(target),
+			DefenderName: actorName(target),
 		})
 	}
 	return true
@@ -381,7 +381,7 @@ func counterattackObjectID(obj Actor) int32 {
 	return obj.ObjectID()
 }
 
-func counterattackName(obj Actor) string {
+func actorName(obj Actor) string {
 	if target, ok := obj.(characterNameTarget); ok {
 		return target.CharacterName()
 	}
@@ -405,7 +405,7 @@ func reportMagicFailure(cast Cast, target Actor, failure formulas.MagicFailure, 
 	if _, ok := target.(worldPlayerTarget); ok {
 		result.MagicResists = append(result.MagicResists, MagicResist{
 			TargetID:     target.ObjectID(),
-			AttackerName: counterattackName(cast.Caster),
+			AttackerName: actorName(cast.Caster),
 		})
 	}
 }
@@ -449,7 +449,7 @@ func appendResisted(result *Result, target Actor, def modelskill.Definition) {
 	if result == nil {
 		return
 	}
-	if name := counterattackName(target); name != "" {
+	if name := actorName(target); name != "" {
 		result.Resisted = append(result.Resisted, Resisted{TargetName: name, SkillID: def.ID, SkillLevel: def.Level})
 	}
 }

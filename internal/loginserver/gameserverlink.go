@@ -111,6 +111,9 @@ type gameServerConn struct {
 func (c *gameServerConn) send(payload []byte) error {
 	c.sendMu.Lock()
 	defer c.sendMu.Unlock()
+	if err := setWriteDeadline(c.conn); err != nil {
+		return err
+	}
 	return wire.WriteFrame(c.conn, c.crypt.Encrypt(payload))
 }
 
@@ -197,6 +200,13 @@ func (l *GameServerLink) handleConnection(ctx context.Context, conn net.Conn) {
 	// frames; every payload is decoded within its loop iteration.
 	frames := wire.NewFrameReader(conn)
 	for {
+		deadline := time.Now().Add(connectionHandshakeTimeout)
+		if c.authed {
+			deadline = time.Time{}
+		}
+		if err := conn.SetReadDeadline(deadline); err != nil {
+			return
+		}
 		payload, err := frames.ReadFrame()
 		if err != nil {
 			return

@@ -35,6 +35,21 @@ func (c *Character) NotifyMPRestored(healerName string, amount int, byOther bool
 	}
 }
 
+func (c *Character) SetCPRestoredNotifier(send func(healerName string, amount int, byOther bool)) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	c.sendCPRestoredNotice = send
+}
+
+func (c *Character) NotifyCPRestored(healerName string, amount int, byOther bool) {
+	c.stateMu.RLock()
+	send := c.sendCPRestoredNotice
+	c.stateMu.RUnlock()
+	if send != nil {
+		send(healerName, amount, byOther)
+	}
+}
+
 // SetLackHPNotifier records the packet-layer hook for a toggle DOT effect
 // removed because its tick would exceed the target's remaining HP.
 func (c *Character) SetLackHPNotifier(send func()) {
