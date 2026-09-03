@@ -44,22 +44,12 @@ func (h *Hostile) MovementDisabled() bool {
 	return !h.Instance.Template.CanMove
 }
 
-// InAttackRange reports whether target sits within this NPC's physical
-// attack range, accounting for both actors' collision footprints. A target
-// with no known position/footprint is out of range by definition.
+// InAttackRange reports whether target sits within this NPC's 2D physical
+// attack reach, accounting for both actors' collision footprints and a
+// moving-target grace margin. A target with no known position/footprint is
+// out of range by definition.
 func (h *Hostile) InAttackRange(target attackable.Combatant) bool {
-	other, ok := target.(interface {
-		Position() (int, int, int)
-		CollisionRadius() float64
-	})
-	if !ok {
-		return false
-	}
-
-	tx, ty, tz := other.Position()
-	totalRadius := h.PhysicalAttackRange() + int(h.CollisionRadius()) + int(other.CollisionRadius())
-	at := h.location()
-	return location.In3DRange(at.X, at.Y, at.Z, tx, ty, tz, totalRadius)
+	return attack.InPhysicalRange(h.location(), h.PhysicalAttackRange(), h.CollisionRadius(), target)
 }
 
 // LineOfSight is the geodata query CanSee needs to gate targeting on real

@@ -24,18 +24,11 @@ type physicalTarget interface {
 func (a *Actor) AttackDisabled() bool   { return a.DenyAIAction() }
 func (a *Actor) MovementDisabled() bool { return a.DenyAIAction() }
 
+func (a *Actor) IsMoving() bool { return a.Move().Moving() }
+
 func (a *Actor) InAttackRange(target attackable.Combatant) bool {
-	other, ok := target.(interface {
-		Position() (int, int, int)
-		CollisionRadius() float64
-	})
-	if !ok {
-		return false
-	}
 	x, y, z := a.Position()
-	tx, ty, tz := other.Position()
-	distance := a.PhysicalAttackRange() + int(a.CollisionRadius()) + int(other.CollisionRadius())
-	return location.In3DRange(x, y, z, tx, ty, tz, distance)
+	return attack.InPhysicalRange(location.Location{X: x, Y: y, Z: z}, a.PhysicalAttackRange(), a.CollisionRadius(), target)
 }
 
 func (a *Actor) ForEachKnownCombatantInRadius(radius int, fn func(attackable.Combatant)) {

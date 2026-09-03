@@ -413,3 +413,98 @@ func (t *timingTarget) TakeDamage(_ int, _ creature.DeathActor) bool {
 	}
 	return false
 }
+
+func TestPhysicalReachTruncatesSumOnce(t *testing.T) {
+	// Independent oracle: int(range + r1 + r2 + grace) with grace 10/60.
+	const attackRange = 40
+	const attackerR = 9.6
+	const targetR = 11.6
+
+	if got, want := PhysicalReach(attackRange, attackerR, targetR, false), 71; got != want {
+		t.Fatalf("standing PhysicalReach() = %d, want %d (sum-then-trunc, not per-radius)", got, want)
+	}
+	if got, want := PhysicalReach(attackRange, attackerR, targetR, true), 121; got != want {
+		t.Fatalf("moving PhysicalReach() = %d, want %d", got, want)
+	}
+	if got, want := PhysicalReach(40, 0, 0, false), 50; got != want {
+		t.Fatalf("zero-radius standing PhysicalReach() = %d, want %d", got, want)
+	}
+	if got, want := PhysicalReach(40, 0, 0, true), 100; got != want {
+		t.Fatalf("zero-radius moving PhysicalReach() = %d, want %d", got, want)
+	}
+}
+
+func TestInPhysicalRange2DGraceAndBoundary(t *testing.T) {
+	from := location.Location{X: 0, Y: 0, Z: 0}
+
+	tests := []struct {
+		name     string
+		atkRange int
+		selfR    float64
+		target   rangeTarget
+		want     bool
+	}{
+		{
+			name:     "altitude ignored inside 2D reach",
+			atkRange: 40,
+			target:   rangeTarget{x: 49, z: 1000},
+			want:     true,
+		},
+		{
+			name:     "strict 2D boundary excluded",
+			atkRange: 40,
+			target:   rangeTarget{x: 50},
+		},
+		{
+			name:     "one unit inside standing reach",
+			atkRange: 40,
+			target:   rangeTarget{x: 49},
+			want:     true,
+		},
+		{
+			name:     "moving grace extends reach",
+			atkRange: 40,
+			target:   rangeTarget{x: 99, moving: true},
+			want:     true,
+		},
+		{
+			name:     "moving grace still strict at boundary",
+			atkRange: 40,
+			target:   rangeTarget{x: 100, moving: true},
+		},
+		{
+			name:     "fractional radii use summed truncation",
+			atkRange: 40,
+			selfR:    9.6,
+			target:   rangeTarget{x: 70, radius: 11.6},
+			want:     true,
+		},
+		{
+			name:     "fractional radii exclude exact truncated reach",
+			atkRange: 40,
+			selfR:    9.6,
+			target:   rangeTarget{x: 71, radius: 11.6},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := InPhysicalRange(from, tt.atkRange, tt.selfR, tt.target)
+			if got != tt.want {
+				t.Fatalf("InPhysicalRange() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+type rangeTarget struct {
+	x, y, z int
+	radius  float64
+	moving  bool
+}
+
+func (t rangeTarget) ObjectID() int32           { return 2 }
+func (t rangeTarget) SiegeGuard() bool          { return false }
+func (t rangeTarget) AlikeDead() bool           { return false }
+func (t rangeTarget) Position() (int, int, int) { return t.x, t.y, t.z }
+func (t rangeTarget) CollisionRadius() float64  { return t.radius }
+func (t rangeTarget) IsMoving() bool            { return t.moving }

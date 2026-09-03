@@ -400,20 +400,18 @@ func (c *Character) MovementDisabled() bool {
 	return false
 }
 
-// InAttackRange reports whether target is inside this player's weapon range.
-func (c *Character) InAttackRange(target attackable.Combatant) bool {
-	other, ok := target.(interface {
-		Position() (int, int, int)
-		CollisionRadius() float64
-	})
-	if !ok {
+// IsMoving reports whether this player has an in-flight movement request.
+func (c *Character) IsMoving() bool {
+	if c.Live == nil {
 		return false
 	}
+	return c.Live.Move().Moving()
+}
 
-	tx, ty, tz := other.Position()
-	totalRadius := c.PhysicalAttackRange() + int(c.CollisionRadius()) + int(other.CollisionRadius())
-	at := c.CurrentLocation()
-	return location.In3DRange(at.X, at.Y, at.Z, tx, ty, tz, totalRadius)
+// InAttackRange reports whether target is inside this player's 2D weapon
+// reach, including collision radii and a moving-target grace margin.
+func (c *Character) InAttackRange(target attackable.Combatant) bool {
+	return attack.InPhysicalRange(c.CurrentLocation(), c.PhysicalAttackRange(), c.CollisionRadius(), target)
 }
 
 // Knows reports whether target is visible to this player.
