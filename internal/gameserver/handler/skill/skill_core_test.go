@@ -1531,6 +1531,13 @@ type skillTarget struct {
 	charged map[modelitem.ShotKind]bool
 
 	castBreakDamage []float64
+
+	isPlayer     bool
+	name         string
+	noticeKind   string
+	noticeName   string
+	noticeAmount int
+	noticeOther  bool
 }
 
 func (t *skillTarget) BreakCastOnDamage(damage float64) {
@@ -1552,6 +1559,18 @@ func (t *skillTarget) Lethalable() bool { return !t.lethalImmune }
 
 func (t *skillTarget) CanBeHealed() bool {
 	return !t.dead && !t.invulnerable && !t.cursed
+}
+
+func (t *skillTarget) IsPlayer() bool        { return t.isPlayer }
+func (t *skillTarget) CharacterName() string { return t.name }
+func (t *skillTarget) NotifyHPRestored(name string, amount int, other bool) {
+	t.noticeKind, t.noticeName, t.noticeAmount, t.noticeOther = "hp", name, amount, other
+}
+func (t *skillTarget) NotifyMPRestored(name string, amount int, other bool) {
+	t.noticeKind, t.noticeName, t.noticeAmount, t.noticeOther = "mp", name, amount, other
+}
+func (t *skillTarget) NotifyCPRestored(name string, amount int, other bool) {
+	t.noticeKind, t.noticeName, t.noticeAmount, t.noticeOther = "cp", name, amount, other
 }
 
 func (t *skillTarget) HealAmount(skill modelskill.Definition) (float64, bool) {
@@ -1778,6 +1797,31 @@ func TestCombatPointHealClampsAndSkipsInvalidTargets(t *testing.T) {
 	}
 	if dead.cp != 1 || invulnerable.cp != 1 {
 		t.Fatalf("invalid target cp changed: dead=%v invulnerable=%v", dead.cp, invulnerable.cp)
+	}
+}
+
+func TestResourceHealNotificationsMatchCasterBranches(t *testing.T) {
+	for _, tc := range []struct {
+		name, skillType, kind string
+		casterPlayer          bool
+		wantOther             bool
+	}{
+		{"heal player caster", "HEAL", "hp", true, true},
+		{"mana heal npc caster", "MANAHEAL", "mp", false, false},
+		{"mana heal player caster", "MANAHEAL", "mp", true, true},
+		{"heal percent npc caster", "HEAL_PERCENT", "hp", false, true},
+		{"mana heal percent npc caster", "MANAHEAL_PERCENT", "mp", false, true},
+		{"combat point player caster", "COMBATPOINTHEAL", "cp", true, true},
+		{"combat point npc caster", "COMBATPOINTHEAL", "cp", false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			caster := &skillTarget{isPlayer: tc.casterPlayer, name: "Caster", healAmount: 50, healOK: true}
+			target := &skillTarget{isPlayer: true, hp: 90, maxHP: 100, mp: 90, maxMP: 100, cp: 90, maxCP: 100}
+			NewDefaultRegistry().Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: tc.skillType, Power: 50}, Targets: []Actor{target}})
+			if target.noticeKind != tc.kind || target.noticeName != "Caster" || target.noticeAmount != 10 || target.noticeOther != tc.wantOther {
+				t.Fatalf("notice = %q/%q/%d/%v, want %q/Caster/10/%v", target.noticeKind, target.noticeName, target.noticeAmount, target.noticeOther, tc.kind, tc.wantOther)
+			}
+		})
 	}
 }
 
