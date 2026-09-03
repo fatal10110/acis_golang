@@ -103,6 +103,8 @@ type pickupIntention struct {
 type itemAICastIntention struct {
 	inventory *itemcontainer.Inventory
 	item      *item.Instance
+	skill     modelskill.Definition
+	selected  world.Tracked
 }
 
 func (p *livePlayer) SendFrame(frame wire.Frame) bool {
@@ -221,12 +223,12 @@ func (p *livePlayer) takeDeferredMagicSkill() *clientpackets.RequestMagicSkillUs
 	return req
 }
 
-func (p *livePlayer) deferItemAICast(inventory *itemcontainer.Inventory, inst *item.Instance) {
+func (p *livePlayer) deferItemAICast(inventory *itemcontainer.Inventory, inst *item.Instance, skill modelskill.Definition, selected world.Tracked) {
 	p.pickupMu.Lock()
 	defer p.pickupMu.Unlock()
 	p.deferredPickup = nil
 	p.deferredMagic = nil
-	p.deferredItem = &itemAICastIntention{inventory: inventory, item: inst}
+	p.deferredItem = &itemAICastIntention{inventory: inventory, item: inst, skill: skill, selected: selected}
 }
 
 func (p *livePlayer) takeDeferredItemAICast() *itemAICastIntention {
@@ -335,18 +337,19 @@ func (l *GameClientLink) castController(live *livePlayer) *actorcast.Controller 
 		live.cast.SetLogger(live.log)
 		live.cast.SetOnAbort(func(interrupted bool) { l.broadcastCastAborted(live, interrupted) })
 		live.cast.SetOnStopAck(func() { sendMagicActionFailed(live) })
-		live.cast.SetOnFinish(func(interrupted bool, def modelskill.Definition, _ actorcast.Target) {
+		live.cast.SetOnFinish(func(_ bool, def modelskill.Definition, _ actorcast.Target) {
+			if l.finishDeferredItemAICast(live) {
+				return
+			}
 			if live.combat == nil {
 				return
 			}
 			if live.combat.ResumeAfterCast() {
 				return
 			}
-			// PlayableAI.onEvtFinishedCasting (PlayableAI.java:43-63): with
-			// no queued next intention (Go has no intention queue to
-			// resume from, tracked separately), a finished CAST intention
-			// only re-engages the attack when the skill carries
-			// nextActionAttack; anything else goes idle.
+			// A queued CAST already ran above. With no next intention, a
+			// finished CAST only re-engages the attack when the skill
+			// carries nextActionAttack; anything else goes idle.
 			if def.NextActionIsAttack {
 				live.combat.Think()
 				return

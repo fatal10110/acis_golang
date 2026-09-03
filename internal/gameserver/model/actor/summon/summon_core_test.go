@@ -380,6 +380,33 @@ func TestSummonDenyAIActionHonorsTransientControlStates(t *testing.T) {
 	}
 }
 
+func TestSummonMovementDisabledExcludesFear(t *testing.T) {
+	summon := mustServitor(t, ServitorConfig{ObjectID: 1})
+	if summon.MovementDisabled() {
+		t.Fatal("MovementDisabled() = true on a fresh summon")
+	}
+
+	summon.EffectList().Add(&effect.Effect{Flag: effect.FlagRooted})
+	if !summon.MovementDisabled() {
+		t.Fatal("MovementDisabled() = false while rooted")
+	}
+
+	feared := mustServitor(t, ServitorConfig{ObjectID: 2})
+	feared.EffectList().Add(&effect.Effect{Flag: effect.FlagFear})
+	if feared.MovementDisabled() {
+		t.Fatal("MovementDisabled() = true while afraid; fear does not disable movement")
+	}
+	if !feared.DenyAIAction() {
+		t.Fatal("DenyAIAction() = false while afraid; fear still blocks AI")
+	}
+
+	meditating := mustServitor(t, ServitorConfig{ObjectID: 3})
+	meditating.EffectList().Add(&effect.Effect{Flag: effect.FlagMeditating})
+	if !meditating.MovementDisabled() {
+		t.Fatal("MovementDisabled() = false while immobile-until-attacked")
+	}
+}
+
 // TestSummonOutOfControlHonorsBetrayedFlag is the regression test for the
 // review finding that OutOfControl only read a.disabled, so a betrayed
 // summon kept accepting owner commands instead of refusing them with
