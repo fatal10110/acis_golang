@@ -131,11 +131,21 @@ func (corpsePetHandler) FinalTarget(_, target Creature, _ *modelskill.Definition
 }
 
 func (corpsePetHandler) CanCast(_, target Creature, _ *modelskill.Definition, _ bool) bool {
-	if target == nil || !target.Dead() {
-		return false
+	return target != nil && corpsePetCastRejection(target) == CastRejectNone
+}
+
+func corpsePetCastRejection(target Creature) CastRejection {
+	if target == nil {
+		return CastRejectNone
+	}
+	if !target.Dead() {
+		return CastRejectInvalidTarget
 	}
 	pet, ok := target.(PetTarget)
-	return ok && pet.IsPet()
+	if !ok || !pet.IsPet() {
+		return CastRejectCannotUseSkill
+	}
+	return CastRejectNone
 }
 
 // GroundTargeter is implemented by casters that track a pending

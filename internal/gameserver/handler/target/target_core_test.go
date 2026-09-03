@@ -376,6 +376,10 @@ func TestCastRejectionForPreservesHandlerMessages(t *testing.T) {
 		{"one offensive self", modelskill.TargetOne, caster, caster, offensive, CastRejectInvalidTarget},
 		{"one offensive target in peace", modelskill.TargetOne, &targetActor{id: 3, category: CategoryPlayable}, &targetActor{id: 2, category: CategoryPlayable, peace: true, attackableBy: true, attackableWithoutForce: true}, offensive, CastRejectTargetInPeaceZone},
 		{"one nil target", modelskill.TargetOne, caster, nil, offensive, CastRejectNone},
+		{"corpse pet living", modelskill.TargetCorpsePet, caster, &targetActor{id: 4, category: CategoryPlayable, pet: true}, nil, CastRejectInvalidTarget},
+		{"corpse pet dead servitor", modelskill.TargetCorpsePet, caster, &targetActor{id: 5, category: CategoryPlayable, dead: true, owner: caster}, nil, CastRejectCannotUseSkill},
+		{"corpse pet dead pet", modelskill.TargetCorpsePet, caster, &targetActor{id: 6, category: CategoryPlayable, dead: true, owner: caster, pet: true}, nil, CastRejectNone},
+		{"corpse pet nil", modelskill.TargetCorpsePet, caster, nil, nil, CastRejectNone},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
