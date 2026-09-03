@@ -104,6 +104,7 @@ type itemAICastIntention struct {
 	inventory *itemcontainer.Inventory
 	item      *item.Instance
 	skill     modelskill.Definition
+	selected  world.Tracked
 }
 
 func (p *livePlayer) SendFrame(frame wire.Frame) bool {
@@ -222,12 +223,12 @@ func (p *livePlayer) takeDeferredMagicSkill() *clientpackets.RequestMagicSkillUs
 	return req
 }
 
-func (p *livePlayer) deferItemAICast(inventory *itemcontainer.Inventory, inst *item.Instance, skill modelskill.Definition) {
+func (p *livePlayer) deferItemAICast(inventory *itemcontainer.Inventory, inst *item.Instance, skill modelskill.Definition, selected world.Tracked) {
 	p.pickupMu.Lock()
 	defer p.pickupMu.Unlock()
 	p.deferredPickup = nil
 	p.deferredMagic = nil
-	p.deferredItem = &itemAICastIntention{inventory: inventory, item: inst, skill: skill}
+	p.deferredItem = &itemAICastIntention{inventory: inventory, item: inst, skill: skill, selected: selected}
 }
 
 func (p *livePlayer) takeDeferredItemAICast() *itemAICastIntention {

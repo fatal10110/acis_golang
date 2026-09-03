@@ -39,6 +39,16 @@ func encodeUseItem(objectID int32, ctrl bool) []byte {
 	return w.Bytes()
 }
 
+func encodeAttackRequest(objectID int32, x, y, z int32, shift bool) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeAttackRequest)
+	w.WriteInt32(objectID)
+	w.WriteInt32(x)
+	w.WriteInt32(y)
+	w.WriteInt32(z)
+	w.WriteUint8(wire.BoolByte(shift))
+	return w.Bytes()
+}
+
 func encodeRequestUnEquipItem(bodySlot int32) []byte {
 	w := wire.NewPacketWriter(clientpackets.OpcodeRequestUnEquipItem)
 	w.WriteInt32(bodySlot)

@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // useItemAICast runs each non-instant item-carried skill through the same
@@ -22,9 +23,9 @@ import (
 // decisions produce. The item is consumed before the cast/launch packets
 // go out, not only on a successful hit.
 //
-// Schedule of the first skill is delayed until every attached skill has
-// been accepted or queued, so a zero-delay launch timer cannot fire before
-// the later skill is stored.
+// Schedule of a started skill is deferred until this function returns, so
+// a later skill's reuse rejection cannot skip the first skill's timers,
+// and a zero-delay launch cannot fire before later skills are queued.
 //
 // It reports whether inst was handled by this path, so the caller's
 // equip-toggle fallback still answers the client for anything else.
@@ -42,17 +43,27 @@ func (l *GameClientLink) useItemAICast(live *livePlayer, inv *itemcontainer.Inve
 	}
 
 	var run func()
+	defer func() {
+		if run != nil {
+			run()
+		}
+	}()
 	for _, def := range defs {
 		if live.SkillDisabled(actorcast.ReuseKey(def)) {
 			live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1PreparedForReuse, int32(def.ID), int32(def.Level)))
 			return true
 		}
+		selected := live.Target()
 		if run != nil || itemAICastBusy(live) {
-			live.deferItemAICast(inv, inst, def)
+			if _, ok := actorcast.SelectTarget(live.Character, selected, def); !ok {
+				sendMagicActionFailed(live)
+				continue
+			}
+			live.deferItemAICast(inv, inst, def, selected)
 			sendMagicActionFailed(live)
 			continue
 		}
-		next, rejected, failed := l.beginItemAICast(live, inv, inst, tmpl, def)
+		next, rejected, failed := l.beginItemAICast(live, inv, inst, tmpl, selected, def)
 		if failed {
 			return true
 		}
@@ -60,9 +71,6 @@ func (l *GameClientLink) useItemAICast(live *livePlayer, inv *itemcontainer.Inve
 			continue
 		}
 		run = next
-	}
-	if run != nil {
-		run()
 	}
 	return true
 }
@@ -79,14 +87,14 @@ func itemAICastBusy(live *livePlayer) bool {
 // start gates refused the skill (the attached-skill loop continues). failed
 // means the item could not be consumed after the cast had already opened
 // (the loop stops).
-func (l *GameClientLink) beginItemAICast(live *livePlayer, inv *itemcontainer.Inventory, inst *item.Instance, tmpl *item.Template, def modelskill.Definition) (run func(), rejected, failed bool) {
+func (l *GameClientLink) beginItemAICast(live *livePlayer, inv *itemcontainer.Inventory, inst *item.Instance, tmpl *item.Template, selected world.Tracked, def modelskill.Definition) (run func(), rejected, failed bool) {
 	beforeVitals := live.Vitals()
 	controller := l.castController(live)
 	started, err := actorcast.StartItemSkill(actorcast.ItemSkillRequest{
 		Now:         time.Now(),
 		Controller:  controller,
 		Caster:      live.Character,
-		Selected:    live.Target(),
+		Selected:    selected,
 		Skill:       modelskill.Ref{ID: def.ID, Level: def.Level},
 		Definitions: l.skills,
 	})
@@ -166,7 +174,7 @@ func (l *GameClientLink) finishDeferredItemAICast(live *livePlayer) bool {
 		return false
 	}
 	tmpl, _ := itemCast.inventory.Templates().Get(itemCast.item.TemplateID)
-	run, rejected, failed := l.beginItemAICast(live, itemCast.inventory, itemCast.item, tmpl, itemCast.skill)
+	run, rejected, failed := l.beginItemAICast(live, itemCast.inventory, itemCast.item, tmpl, itemCast.selected, itemCast.skill)
 	if failed || rejected || run == nil {
 		return false
 	}

@@ -276,15 +276,6 @@ func ResolveAICastSkills(tmpl *modelitem.Template, defs actorcast.Definitions) [
 	return out
 }
 
-// ResolveAICastSkill returns the first skill ResolveAICastSkills would.
-func ResolveAICastSkill(tmpl *modelitem.Template, defs actorcast.Definitions) (modelskill.Definition, bool) {
-	all := ResolveAICastSkills(tmpl, defs)
-	if len(all) == 0 {
-		return modelskill.Definition{}, false
-	}
-	return all[0], true
-}
-
 // installItemReuse applies the item-driven reuse delay to the skill's
 // cooldown key, taking the longer of the skill's own reuse delay and the
 // item's, the way an item-carried skill's timestamp is recorded. It
