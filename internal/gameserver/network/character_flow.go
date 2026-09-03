@@ -92,10 +92,8 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 		if err := l.skills.RestoreKnownSkills(ctx, c); err != nil {
 			l.log.Error().Err(err).Int32("object_id", c.ID).Msg("enter world: restore known skills")
 		}
-		if l.playerConfig.StoreSkillCooltime {
-			if err := l.skills.RestoreSkillState(ctx, c); err != nil {
-				l.log.Error().Err(err).Int32("object_id", c.ID).Msg("enter world: restore skill state")
-			}
+		if err := l.skills.RestoreSkillState(ctx, c); err != nil {
+			l.log.Error().Err(err).Int32("object_id", c.ID).Msg("enter world: restore skill state")
 		}
 		// Re-derive level-unlocked skills on every login (Player.java:4139
 		// calls giveSkills() right after restoreCharData()), so a free grant

@@ -83,7 +83,6 @@ func provideGameClientLink(
 	shieldBlockRate perfectShieldBlockRate,
 	mf magicFailures,
 	cle cancelLesserEffect,
-	storeCooltime storeSkillCooltime,
 	spawnProtection playerSpawnProtection,
 	spBookNeeded skillEnchantSPBookNeeded,
 	autoLearn autoLearnSkills,
@@ -100,12 +99,10 @@ func provideGameClientLink(
 ) *network.GameClientLink {
 	formulas.SetMagicFailures(bool(mf))
 	effect.SetCancelLesser(bool(cle))
-	skills.SetStoreSkillCooltime(bool(storeCooltime))
 	playerConfig := network.PlayerConfig{
 		RespawnRestoreHP:         float64(respawnHP),
 		DeathPenaltyChance:       int(deathPenalty),
 		MaxBuffsAmount:           int(buffSlots),
-		StoreSkillCooltime:       bool(storeCooltime),
 		PerfectShieldBlockRate:   int(shieldBlockRate),
 		SpawnProtection:          time.Duration(spawnProtection),
 		SkillEnchantSPBookNeeded: bool(spBookNeeded),
@@ -171,8 +168,8 @@ func provideGameClientLink(
 	return link
 }
 
-func provideSkillPersistence(pool *sql.DB, data *gameData) *skillstate.Persistence {
-	return skillstate.NewPersistence(gamesql.NewSkillSaveStore(pool), data.Skills, gamesql.NewCharacterSkillStore(pool))
+func provideSkillPersistence(pool *sql.DB, data *gameData, storeCooltime storeSkillCooltime) *skillstate.Persistence {
+	return skillstate.NewPersistenceWithStoreSkillCooltime(gamesql.NewSkillSaveStore(pool), data.Skills, bool(storeCooltime), gamesql.NewCharacterSkillStore(pool))
 }
 
 // onlineAccounts collects the account names of every player currently in

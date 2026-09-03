@@ -128,8 +128,6 @@ type PlayerConfig struct {
 	// count every character starts with. Known Divine Inspiration levels
 	// add on top of this at MaxBuffCount time.
 	MaxBuffsAmount int
-	// StoreSkillCooltime controls whether effect and reuse state persists across relog.
-	StoreSkillCooltime bool
 }
 
 // GameClientLink accepts and drives connections from Interlude game
