@@ -116,7 +116,7 @@ func (a *Actor) MakeAttackHit(target attackable.Combatant, split bool) attack.Hi
 		hit.Miss = true
 		return hit
 	}
-	crit := formulas.CritSucceeds(a.CriticalRate(4), a.Roll(1000))
+	crit := formulas.CritSucceeds(a.CriticalRate(a.combatStats().CritRate), a.Roll(1000))
 	in, shield := creature.ResolvePhysicalAttackInput(a, formulaTarget, crit)
 	hit.Damage = creature.ApplyPhysicalAttackDamage(in, shield, split)
 	hit.Crit = crit

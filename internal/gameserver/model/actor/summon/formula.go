@@ -25,6 +25,7 @@ type CombatStats struct {
 	SSCount, SPSCount            int
 	AttackRange                  int
 	AttackSpeed                  float64
+	CritRate                     float64
 }
 
 // PhysicalAttackSpeed returns this summon's physical attack speed from its NPC template.

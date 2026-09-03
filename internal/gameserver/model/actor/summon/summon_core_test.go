@@ -1247,3 +1247,38 @@ func TestSummonMakeAttackHitUsesPosAndPvP(t *testing.T) {
 		t.Fatalf("pvp damage = %d, want %d", pvp.Damage, wantPvP)
 	}
 }
+
+func TestSummonMakeAttackHitUsesTemplateCritRate(t *testing.T) {
+	// Auto-attack crit uses CreatureStatus.getCriticalHit's template base
+	// (CreatureStatus.java:551-553), not the NPC XML default of 4.
+	// Cursed Man servitor npc 14074 has <set name="crit" val="8.0"/>.
+	// Summon AtkCritical is value*10 with no DEX mul, so rates 40 vs 80.
+	const betweenDefaultAndCursedMan = 50
+	place := func(critRate float64) (*Actor, *Actor) {
+		t.Helper()
+		target := mustServitor(t, ServitorConfig{ObjectID: 1, Level: 1, Stats: CombatStats{DEX: 20, PDef: 50, MaxHP: 100}})
+		attacker := mustServitor(t, ServitorConfig{ObjectID: 2, Level: 1, Stats: CombatStats{DEX: 20, PDef: 50, MaxHP: 100, CritRate: critRate}})
+		state := world.New()
+		state.Spawn(target, 0, 0, 0, 0)
+		state.Spawn(attacker, 100, 0, 0, 0)
+		n := 0
+		attacker.roll = func(int) int {
+			n++
+			if n == 1 {
+				return 0
+			}
+			return betweenDefaultAndCursedMan
+		}
+		return attacker, target
+	}
+
+	defaultAtk, defaultTgt := place(4)
+	if hit := defaultAtk.MakeAttackHit(defaultTgt, false); hit.Miss || hit.Crit {
+		t.Fatalf("npc default crit=4: miss=%v crit=%v, want hit non-crit (roll %d)", hit.Miss, hit.Crit, betweenDefaultAndCursedMan)
+	}
+
+	cursedAtk, cursedTgt := place(8)
+	if hit := cursedAtk.MakeAttackHit(cursedTgt, false); hit.Miss || !hit.Crit {
+		t.Fatalf("Cursed Man crit=8: miss=%v crit=%v, want hit crit (roll %d)", hit.Miss, hit.Crit, betweenDefaultAndCursedMan)
+	}
+}
