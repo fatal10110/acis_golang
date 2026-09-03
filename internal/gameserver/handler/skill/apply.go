@@ -79,9 +79,17 @@ func applyEffectsWithLanding(effector, effected Actor, def modelskill.Definition
 		if err != nil {
 			continue
 		}
+		owner := list
+		if e.SelfTarget {
+			self, ok := effector.(effectListTarget)
+			if !ok || self.EffectList() == nil {
+				continue
+			}
+			owner = self.EffectList()
+		}
 		e.Effector = effector
 		e.Effected = effected
-		list.Add(e)
+		owner.Add(e)
 	}
 	return resisted
 }

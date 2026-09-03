@@ -61,6 +61,7 @@ func newGameServerApp(paths gameServerPaths) *fx.App {
 			loadPerfectShieldBlockRate,
 			loadMagicFailures,
 			loadCancelLesserEffect,
+			loadStoreSkillCooltime,
 			loadPlayerSpawnProtection,
 			loadSkillEnchantSPBookNeeded,
 			loadAutoLearnSkills,

@@ -71,6 +71,7 @@ type options struct {
 	characterSelectDelay   time.Duration
 	serverBypassDelay      time.Duration
 	maxBuffsAmount         int
+	storeSkillCooltime     bool
 	cancelLesserEffect     bool
 	seed                   func(*gamesql.CharacterStore, *gamesql.ItemStore)
 	seedShortcuts          func(*gamesql.ShortcutStore)
@@ -97,6 +98,11 @@ func WithAccount(account string) Option { return func(o *options) { o.account = 
 
 // WithSkills supplies the skill persistence layer wired into the link.
 func WithSkills(skills *skillstate.Persistence) Option { return func(o *options) { o.skills = skills } }
+
+// WithStoreSkillCooltime controls whether effect and reuse state survives relog.
+func WithStoreSkillCooltime(enabled bool) Option {
+	return func(o *options) { o.storeSkillCooltime = enabled }
+}
 
 // WithSkillTrees supplies the skill trees available at learn time.
 func WithSkillTrees(trees *modelskill.Trees) Option { return func(o *options) { o.trees = trees } }
@@ -715,6 +721,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		serverBypassDelay:      100 * time.Millisecond,
 		maxBuffsAmount:         20,
 		cancelLesserEffect:     true,
+		storeSkillCooltime:     true,
 	}
 	for _, opt := range opts {
 		opt(o)
@@ -733,6 +740,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if o.skills == nil {
 		o.skills = skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), modelskill.NewTable([]modelskill.Definition{{ID: 248, Level: 3}, {ID: 294, Level: 1}}), knownSkills)
 	}
+	o.skills.SetStoreSkillCooltime(o.storeSkillCooltime)
 	if o.seed != nil {
 		o.seed(chars, items)
 	}
