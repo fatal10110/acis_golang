@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -111,6 +112,7 @@ type TaskEffects struct {
 	expire func(*livePlayer, *item.Instance)
 	roster *manager.Roster
 	skills *skillstate.Persistence
+	pets   petStore
 }
 
 func NewTaskEffects(state *world.State) *TaskEffects {
@@ -125,14 +127,15 @@ func (e *TaskEffects) SetShadowItemExpiry(expire func(*livePlayer, *item.Instanc
 }
 
 // SetAutosave connects the periodic autosave task's Save effect to the
-// character persistence roster, skill-state persistence, and error logger.
+// character and pet persistence, skill-state persistence, and error logger.
 // Autosave is wired after construction (like SetShadowItemExpiry above)
 // since TaskEffects itself is what task.Autosave needs to be built.
-func (e *TaskEffects) SetAutosave(roster *manager.Roster, skills *skillstate.Persistence, log zerolog.Logger) {
+func (e *TaskEffects) SetAutosave(roster *manager.Roster, skills *skillstate.Persistence, pets petStore, log zerolog.Logger) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.roster = roster
 	e.skills = skills
+	e.pets = pets
 	e.log = log
 }
 
@@ -190,7 +193,7 @@ func (e *TaskEffects) Drown(actor task.WaterActor) {
 // detachLivePlayer's own offline write (#1948).
 func (e *TaskEffects) Save(actor task.AutosaveActor) {
 	e.mu.RLock()
-	roster, skills, log := e.roster, e.skills, e.log
+	roster, skills, pets, log := e.roster, e.skills, e.pets, e.log
 	e.mu.RUnlock()
 	if actor == nil || e.state == nil || roster == nil {
 		return
@@ -219,6 +222,11 @@ func (e *TaskEffects) Save(actor task.AutosaveActor) {
 	if skills != nil {
 		if err := skills.Save(ctx, live.Character); err != nil {
 			log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("autosave player skill state")
+		}
+	}
+	if obj, ok := e.state.Summon(live.ObjectID()); ok {
+		if actor, ok := obj.(*summon.Actor); ok {
+			savePet(ctx, pets, actor, log)
 		}
 	}
 }
