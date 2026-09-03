@@ -108,13 +108,27 @@ func (p *Persistence) liveActiveEffects(c *player.Character) []effect.ActiveEffe
 // Restore consumes c's persisted skill state, reinstating pending reuse timers
 // and effect rows whose skill definitions still exist.
 func (p *Persistence) Restore(ctx context.Context, c *player.Character) error {
+	if err := p.RestoreKnownSkills(ctx, c); err != nil {
+		return err
+	}
+	return p.RestoreSkillState(ctx, c)
+}
+
+// RestoreKnownSkills restores learned skills independently from effects and reuse timers.
+func (p *Persistence) RestoreKnownSkills(ctx context.Context, c *player.Character) error {
 	if p == nil || c == nil {
 		return nil
 	}
 	classIndex := c.SkillSaveClassIndex()
-	if err := p.restoreKnownSkills(ctx, c, classIndex); err != nil {
-		return err
+	return p.restoreKnownSkills(ctx, c, classIndex)
+}
+
+// RestoreSkillState consumes persisted effects and reuse timers.
+func (p *Persistence) RestoreSkillState(ctx context.Context, c *player.Character) error {
+	if p == nil || c == nil {
+		return nil
 	}
+	classIndex := c.SkillSaveClassIndex()
 	if p.store == nil {
 		return nil
 	}

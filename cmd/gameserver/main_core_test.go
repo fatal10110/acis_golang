@@ -432,6 +432,36 @@ func TestLoadCancelLesserEffectDefaultsToTrue(t *testing.T) {
 	}
 }
 
+func TestLoadStoreSkillCooltimeUsesPlayersProperties(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "players.properties")
+	if err := os.WriteFile(configPath, []byte("StoreSkillCooltime = False\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := loadStoreSkillCooltime(gameServerPaths{PlayersConfigPath: configPath})
+	if err != nil {
+		t.Fatalf("loadStoreSkillCooltime() error = %v", err)
+	}
+	if got {
+		t.Fatalf("loadStoreSkillCooltime() = %v, want false", got)
+	}
+}
+
+func TestLoadStoreSkillCooltimeDefaultsToTrue(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "players.properties")
+	if err := os.WriteFile(configPath, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := loadStoreSkillCooltime(gameServerPaths{PlayersConfigPath: configPath})
+	if err != nil {
+		t.Fatalf("loadStoreSkillCooltime() error = %v", err)
+	}
+	if !got {
+		t.Fatalf("loadStoreSkillCooltime() = %v, want true", got)
+	}
+}
+
 func TestLoadPlayerSpawnProtectionUsesPlayersProperties(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "players.properties")
 	if err := os.WriteFile(configPath, []byte("PlayerSpawnProtection = 12\n"), 0o600); err != nil {
