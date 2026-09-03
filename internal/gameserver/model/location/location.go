@@ -52,12 +52,6 @@ func (l Location) In3DRadius(other Location, radius int) bool {
 	return l.Distance3D(other) < float64(radius)
 }
 
-// In3DRadius reports whether two coordinate triples are strictly inside
-// radius units of each other. The exact boundary is outside.
-func In3DRadius(ax, ay, az, bx, by, bz, radius int) bool {
-	return (Location{X: ax, Y: ay, Z: az}).In3DRadius(Location{X: bx, Y: by, Z: bz}, radius)
-}
-
 // In2DRadius reports whether other is strictly inside radius units of l on
 // the XY plane, ignoring Z. The exact boundary is outside.
 func (l Location) In2DRadius(other Location, radius int) bool {

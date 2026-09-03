@@ -82,12 +82,6 @@ func TestIn3DRadius(t *testing.T) {
 	if origin.In3DRadius(Location{X: 14, Y: 0, Z: 0}, 13) {
 		t.Fatal("In3DRadius() = true one unit outside radius")
 	}
-	if In3DRadius(0, 0, 0, 3, 4, 12, 13) {
-		t.Fatal("In3DRadius() package helper = true at exact radius")
-	}
-	if !In3DRadius(0, 0, 0, 3, 4, 12, 14) {
-		t.Fatal("In3DRadius() package helper = false inside radius")
-	}
 }
 
 func TestIn2DRadius(t *testing.T) {
