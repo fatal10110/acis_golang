@@ -28,6 +28,8 @@ func CastRejectionFor(targetType modelskill.Target, caster, target Creature, ski
 		}
 	case modelskill.TargetOne:
 		return oneCastRejection(caster, target, skill, ctrl)
+	case modelskill.TargetCorpsePlayer:
+		return corpsePlayerCastRejection(target)
 	case modelskill.TargetCorpsePet:
 		return corpsePetCastRejection(target)
 	}
