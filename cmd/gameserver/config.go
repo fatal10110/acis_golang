@@ -114,6 +114,16 @@ func loadCancelLesserEffect(paths gameServerPaths) (cancelLesserEffect, error) {
 	return cancelLesserEffect(config.NewFields(props, "cancel lesser effect").Bool("CancelLesserEffect", true)), nil
 }
 
+type storeSkillCooltime bool
+
+func loadStoreSkillCooltime(paths gameServerPaths) (storeSkillCooltime, error) {
+	props, err := config.LoadFile(paths.PlayersConfigPath)
+	if err != nil {
+		return false, err
+	}
+	return storeSkillCooltime(config.NewFields(props, "store skill cooltime").Bool("StoreSkillCooltime", true)), nil
+}
+
 // skillEnchantSPBookNeeded controls whether enchanting a skill above level
 // 76 also consumes the tree's configured spellbook item, read from
 // players.properties.

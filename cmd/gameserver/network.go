@@ -168,8 +168,8 @@ func provideGameClientLink(
 	return link
 }
 
-func provideSkillPersistence(pool *sql.DB, data *gameData) *skillstate.Persistence {
-	return skillstate.NewPersistence(gamesql.NewSkillSaveStore(pool), data.Skills, gamesql.NewCharacterSkillStore(pool))
+func provideSkillPersistence(pool *sql.DB, data *gameData, storeCooltime storeSkillCooltime) *skillstate.Persistence {
+	return skillstate.NewPersistenceWithStoreSkillCooltime(gamesql.NewSkillSaveStore(pool), data.Skills, bool(storeCooltime), gamesql.NewCharacterSkillStore(pool))
 }
 
 // onlineAccounts collects the account names of every player currently in

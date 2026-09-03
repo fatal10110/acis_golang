@@ -80,7 +80,7 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 	})
 	if err != nil {
 		if started.Rejection != skilltarget.CastRejectNone {
-			sendTargetCastRejection(live, started.Rejection)
+			sendTargetCastRejection(live, started.Rejection, started.Definition)
 			sendMagicActionFailed(live)
 			return
 		}
@@ -232,7 +232,7 @@ func (l *GameClientLink) resolveMagicSkillTarget(caster actorcast.Target, select
 	return finalTarget, skilltarget.CastRejectNone
 }
 
-func sendTargetCastRejection(live *livePlayer, rejection skilltarget.CastRejection) {
+func sendTargetCastRejection(live *livePlayer, rejection skilltarget.CastRejection, def modelskill.Definition) {
 	if live == nil {
 		return
 	}
@@ -243,6 +243,8 @@ func sendTargetCastRejection(live *livePlayer, rejection skilltarget.CastRejecti
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCantAtkPeacezone))
 	case skilltarget.CastRejectTargetInPeaceZone:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetInPeacezone))
+	case skilltarget.CastRejectCannotUseSkill:
+		live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1CannotBeUsed, int32(def.ID), int32(def.Level)))
 	}
 }
 
