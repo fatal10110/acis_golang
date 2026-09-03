@@ -395,9 +395,19 @@ func (c *Character) AttackDisabled() bool {
 	return c.AlikeDead()
 }
 
-// MovementDisabled reports whether this player is unable to move.
+// MovementDisabled reports whether this player is in a state where they
+// cannot move. Sit/stand animation locks are not modeled: stance changes
+// apply immediately, so sitting is `!Standing()` with no separate
+// sitting-now / standing-now window.
 func (c *Character) MovementDisabled() bool {
-	return false
+	if c.AlikeDead() || !c.Standing() {
+		return true
+	}
+	live := c.liveLocked()
+	if live == nil {
+		return false
+	}
+	return live.Stunned() || live.ImmobileUntilAttacked() || live.Rooted() || live.Sleeping() || live.Paralyzed() || live.Immobilized() || live.Teleporting()
 }
 
 // IsMoving reports whether this player has an in-flight movement request.

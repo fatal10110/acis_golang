@@ -298,14 +298,16 @@ func (t *timingTimer) Stop() bool {
 }
 
 type timingActor struct {
-	attackType  item.WeaponType
-	attackSpeed int
-	poleMax     int
-	known       []attackable.Combatant
-	queryRadius int
-	snapshot    Snapshot
-	broadcasts  int
-	dead        bool
+	attackType       item.WeaponType
+	attackSpeed      int
+	poleMax          int
+	known            []attackable.Combatant
+	queryRadius      int
+	snapshot         Snapshot
+	broadcasts       int
+	dead             bool
+	movementDisabled bool
+	outOfRange       bool
 }
 
 type timingPlayer struct {
@@ -337,8 +339,8 @@ func (a *timingActor) ObjectID() int32                         { return 1 }
 func (a *timingActor) SiegeGuard() bool                        { return false }
 func (a *timingActor) AlikeDead() bool                         { return a.dead }
 func (a *timingActor) AttackDisabled() bool                    { return false }
-func (a *timingActor) MovementDisabled() bool                  { return false }
-func (a *timingActor) InAttackRange(attackable.Combatant) bool { return true }
+func (a *timingActor) MovementDisabled() bool                  { return a.movementDisabled }
+func (a *timingActor) InAttackRange(attackable.Combatant) bool { return !a.outOfRange }
 func (a *timingActor) Knows(attackable.Combatant) bool         { return true }
 func (a *timingActor) CanSee(attackable.Combatant) bool        { return true }
 func (a *timingActor) AttackType() item.WeaponType             { return a.attackType }
@@ -412,6 +414,25 @@ func (t *timingTarget) TakeDamage(_ int, _ creature.DeathActor) bool {
 		t.onDamage()
 	}
 	return false
+}
+
+func TestControllerRejectsOutOfRangeWhenMovementDisabled(t *testing.T) {
+	actor := &timingActor{attackSpeed: 300, movementDisabled: true, outOfRange: true}
+	target := &timingTarget{id: 2, attackable: true}
+	ctrl := NewCreature(actor)
+
+	if ctrl.CanAttack(target) {
+		t.Fatal("CanAttack() = true when movement-disabled and out of range")
+	}
+	actor.outOfRange = false
+	if !ctrl.CanAttack(target) {
+		t.Fatal("CanAttack() = false when movement-disabled but in range")
+	}
+	actor.movementDisabled = false
+	actor.outOfRange = true
+	if !ctrl.CanAttack(target) {
+		t.Fatal("CanAttack() = false when mobile and out of range; range is only gated while movement-disabled")
+	}
 }
 
 func TestPhysicalReachTruncatesSumOnce(t *testing.T) {
