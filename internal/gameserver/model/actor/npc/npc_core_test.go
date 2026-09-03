@@ -785,7 +785,7 @@ func TestReturnHomeDriftRangeIsStrict2D(t *testing.T) {
 	// Z so that check is already false and the 2D drift predicate is the
 	// one under test. SiegeGuard skips territory.
 	const aboveTerritory = 1000
-	home := location.Location{}
+	home := location.Location{X: 100, Y: 0, Z: 0}
 
 	cases := []struct {
 		kind     InstanceKind
@@ -810,7 +810,7 @@ func TestReturnHomeDriftRangeIsStrict2D(t *testing.T) {
 			hostile.Instance.Kind = tc.kind
 			hostile.Instance.HasHome = true
 			hostile.Instance.Home = home
-			world.New().Spawn(hostile, tc.offset, 0, tc.z, 0)
+			world.New().Spawn(hostile, home.X+tc.offset, home.Y, tc.z, 0)
 
 			got := hostile.ReturnHome()
 			if got != tc.wantHome {
