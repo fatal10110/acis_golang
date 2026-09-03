@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
@@ -25,7 +26,7 @@ func TestTargetCastRejectionsSendMessageBeforeActionFailed(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			testsupport.ResetCapture(frames)
-			sendTargetCastRejection(live, tt.rejection)
+			sendTargetCastRejection(live, tt.rejection, modelskill.Definition{})
 			sendMagicActionFailed(live)
 
 			got := frames.Frames()
