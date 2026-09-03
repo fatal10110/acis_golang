@@ -33,10 +33,11 @@ type skillLevelDeleter interface {
 
 // Persistence saves and restores a live player's buff and skill-reuse state.
 type Persistence struct {
-	store  skillSaveStore
-	levels skillLevelStore
-	skills *modelskill.Table
-	now    func() time.Time
+	store              skillSaveStore
+	levels             skillLevelStore
+	skills             *modelskill.Table
+	now                func() time.Time
+	storeSkillCooltime bool
 }
 
 // NewPersistence returns a lifecycle persistence component backed by store and
@@ -48,17 +49,24 @@ func NewPersistence(store skillSaveStore, skills *modelskill.Table, levels ...sk
 // NewPersistenceWithClock returns a lifecycle persistence component using now
 // as its time source.
 func NewPersistenceWithClock(store skillSaveStore, skills *modelskill.Table, now func() time.Time, levels ...skillLevelStore) *Persistence {
-	p := &Persistence{store: store, skills: skills, now: now}
+	p := &Persistence{store: store, skills: skills, now: now, storeSkillCooltime: true}
 	if len(levels) > 0 {
 		p.levels = levels[0]
 	}
 	return p
 }
 
+// SetStoreSkillCooltime controls persistence of effects and reuse timers.
+func (p *Persistence) SetStoreSkillCooltime(enabled bool) {
+	if p != nil {
+		p.storeSkillCooltime = enabled
+	}
+}
+
 // Save replaces c's persisted skill state with its current active effects and
 // pending reuse timers.
 func (p *Persistence) Save(ctx context.Context, c *player.Character) error {
-	if p == nil || p.store == nil || c == nil {
+	if p == nil || !p.storeSkillCooltime || p.store == nil || c == nil {
 		return nil
 	}
 	classIndex := c.SkillSaveClassIndex()
@@ -103,15 +111,6 @@ func (p *Persistence) liveActiveEffects(c *player.Character) []effect.ActiveEffe
 		})
 	}
 	return out
-}
-
-// Restore consumes c's persisted skill state, reinstating pending reuse timers
-// and effect rows whose skill definitions still exist.
-func (p *Persistence) Restore(ctx context.Context, c *player.Character) error {
-	if err := p.RestoreKnownSkills(ctx, c); err != nil {
-		return err
-	}
-	return p.RestoreSkillState(ctx, c)
 }
 
 // RestoreKnownSkills restores learned skills independently from effects and reuse timers.

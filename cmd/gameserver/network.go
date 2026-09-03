@@ -100,6 +100,7 @@ func provideGameClientLink(
 ) *network.GameClientLink {
 	formulas.SetMagicFailures(bool(mf))
 	effect.SetCancelLesser(bool(cle))
+	skills.SetStoreSkillCooltime(bool(storeCooltime))
 	playerConfig := network.PlayerConfig{
 		RespawnRestoreHP:         float64(respawnHP),
 		DeathPenaltyChance:       int(deathPenalty),

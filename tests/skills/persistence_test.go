@@ -139,12 +139,16 @@ func TestStoreSkillCooltimeDisabledSkipsSaveAndRestore(t *testing.T) {
 	readCastStartFrames(t, c, objID, skillID, level, 500, 45_000, objID)
 	readStatusUpdateSkippingAbnormal(t, c, objID, []serverpackets.StatusAttribute{{Type: serverpackets.StatusCurrentMP, Value: 25}})
 	drainUntilQuiet(t, c)
+	srv.TickAutosave()
+	if count, _ := skillSaveRow(t, srv, objID, skillID, level); count != 0 {
+		t.Fatalf("character_skills_save rows after disabled autosave = %d, want 0", count)
+	}
 	logout(t, c)
 	if count, _ := skillSaveRow(t, srv, objID, skillID, level); count != 0 {
 		t.Fatalf("character_skills_save rows after disabled logout = %d, want 0", count)
 	}
 	if count, _ := skillSaveRow(t, srv, objID, 1205, 1); count != 1 {
-		t.Fatalf("character_skills_save rows after disabled login = %d, want 1", count)
+		t.Fatalf("pre-seeded character_skills_save row after disabled save/restore = %d, want 1", count)
 	}
 }
 

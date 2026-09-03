@@ -740,6 +740,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if o.skills == nil {
 		o.skills = skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), modelskill.NewTable([]modelskill.Definition{{ID: 248, Level: 3}, {ID: 294, Level: 1}}), knownSkills)
 	}
+	o.skills.SetStoreSkillCooltime(o.storeSkillCooltime)
 	if o.seed != nil {
 		o.seed(chars, items)
 	}
