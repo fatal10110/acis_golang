@@ -115,7 +115,20 @@ func (corpsePlayerHandler) FinalTarget(_, target Creature, _ *modelskill.Definit
 }
 
 func (corpsePlayerHandler) CanCast(_, target Creature, _ *modelskill.Definition, _ bool) bool {
-	return target != nil && target.Dead() && target.Category().Has(CategoryPlayable)
+	return target != nil && corpsePlayerCastRejection(target) == CastRejectNone
+}
+
+func corpsePlayerCastRejection(target Creature) CastRejection {
+	if target == nil {
+		return CastRejectNone
+	}
+	if !target.Dead() {
+		return CastRejectInvalidTarget
+	}
+	if !target.Category().Has(CategoryPlayable) {
+		return CastRejectCannotUseSkill
+	}
+	return CastRejectNone
 }
 
 type corpsePetHandler struct{}
