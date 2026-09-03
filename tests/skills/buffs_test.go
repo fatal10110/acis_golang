@@ -256,13 +256,9 @@ func TestDivineInspirationAddsBuffSlots(t *testing.T) {
 }
 
 func stackedBuffDef(id modelskill.ID, order float64, duration int) modelskill.Definition {
-	return modelskill.Definition{
-		ID: id, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
-		HitTime: 0, StaticHitTime: true, StaticReuse: true, SkillType: "BUFF",
-		Effects: []modelskill.EffectTemplate{
-			{Name: "Buff", Time: duration, Icon: true, StackType: "speed_up", StackOrder: order},
-		},
-	}
+	d := slotBuffDef(id)
+	d.Effects = []modelskill.EffectTemplate{{Name: "Buff", Time: duration, Icon: true, StackType: "speed_up", StackOrder: order}}
+	return d
 }
 
 func liveHeldSkillIDs(t *testing.T, srv *gameservertest.Server, objID int32) []int32 {
