@@ -3,6 +3,7 @@ package skill
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
@@ -17,6 +18,10 @@ type effectListTarget interface {
 
 type effectSuccessSource interface {
 	EffectSuccessInput(creature.DeathActor, modelskill.Definition, modelskill.EffectTemplate, bool, formulas.ShieldDefense) (formulas.SkillSuccessInput, bool)
+}
+
+type positionedActor interface {
+	Position() (int, int, int)
 }
 
 // applyEffects instantiates each of templates and adds it to effected's
@@ -35,6 +40,9 @@ func applyCastEffects(cast Cast, effected Actor, def modelskill.Definition, temp
 
 func applyEffectsWithLanding(effector, effected Actor, def modelskill.Definition, templates []modelskill.EffectTemplate, shield formulas.ShieldDefense, bss bool) (resisted int) {
 	if len(templates) == 0 {
+		return 0
+	}
+	if !withinEffectRange(effector, effected, def.EffectRange) {
 		return 0
 	}
 	target, ok := effected.(effectListTarget)
@@ -76,6 +84,26 @@ func applyEffectsWithLanding(effector, effected Actor, def modelskill.Definition
 		list.Add(e)
 	}
 	return resisted
+}
+
+// withinEffectRange mirrors L2Skill.getEffects' landing-time 3D radius
+// check. Actors without a modeled position stay permissive like other
+// optional handler capabilities.
+func withinEffectRange(effector, effected Actor, effectRange int) bool {
+	if effectRange <= 0 || effector == nil || effector.ObjectID() == effected.ObjectID() {
+		return true
+	}
+	effectorPos, ok := effector.(positionedActor)
+	if !ok {
+		return true
+	}
+	effectedPos, ok := effected.(positionedActor)
+	if !ok {
+		return true
+	}
+	ax, ay, az := effectorPos.Position()
+	bx, by, bz := effectedPos.Position()
+	return location.Location{X: ax, Y: ay, Z: az}.Distance3D(location.Location{X: bx, Y: by, Z: bz}) < float64(effectRange)
 }
 
 // stopEffectsBySkillID removes every active effect in list owned by the

@@ -297,8 +297,8 @@ func (c *Controller) DoAttack(target attackable.Combatant) error {
 	case item.WeaponDual, item.WeaponDualFist:
 		hits = []Hit{c.makeHit(target, true), c.makeHit(target, true)}
 		landings = []scheduledHit{
-			{hits: hits[:1], delay: attackTime / 4},
-			{hits: hits[1:], delay: attackTime / 2},
+			{hits: hits[:1], delay: attackTime / 2},
+			{hits: hits[1:], delay: attackTime},
 		}
 	case item.WeaponBow:
 		hits = []Hit{c.makeHit(target, false)}
@@ -404,7 +404,7 @@ func (c *Controller) start(weapon item.WeaponType, attackTime time.Duration, hit
 		finish = func() { c.finishBow(seq) }
 	}
 	if weapon == item.WeaponDual || weapon == item.WeaponDualFist {
-		finishAt = attackTime * 3 / 4
+		finishAt = attackTime * 3 / 2
 	}
 	if len(hits) == 0 {
 		c.scheduleLocked(finishAt, finish)

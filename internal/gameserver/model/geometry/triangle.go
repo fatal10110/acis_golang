@@ -69,3 +69,12 @@ func (t Triangle) Size() int64 {
 
 // Area is the triangle's 2D area, which is its Size.
 func (t Triangle) Area() float64 { return float64(t.Size()) }
+
+// Center is the integer centroid of the three vertices: (Ax+Bx+Cx)/3,
+// (Ay+By+Cy)/3, truncating toward zero.
+func (t Triangle) Center() Point {
+	return Point{
+		X: (int(t.ax) + int(t.ax+t.bax) + int(t.ax+t.cax)) / 3,
+		Y: (int(t.ay) + int(t.ay+t.bay) + int(t.ay+t.cay)) / 3,
+	}
+}
