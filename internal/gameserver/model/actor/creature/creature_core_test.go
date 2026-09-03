@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
@@ -556,5 +557,172 @@ func TestLiveNilReceiverGettersDoNotPanic(t *testing.T) {
 	}
 	if live.SetParalyzed(true) || live.SetImmobilized(true) || live.SetTeleporting(true) {
 		t.Fatal("a crowd-control setter on a nil receiver reported a change")
+	}
+}
+
+type physicalAttackActor struct {
+	id         int32
+	x, y, z    int
+	heading    int
+	pAtk, pDef float64
+	attackType item.WeaponType
+	playable   bool
+	soulshot   bool
+	stats      map[stat.Stat]float64
+	raceMul    float64
+	hasRace    bool
+}
+
+func (a *physicalAttackActor) ObjectID() int32                { return a.id }
+func (a *physicalAttackActor) Position() (int, int, int)      { return a.x, a.y, a.z }
+func (a *physicalAttackActor) Heading() int                   { return a.heading }
+func (a *physicalAttackActor) Level() int                     { return 1 }
+func (a *physicalAttackActor) STR() int                       { return 0 }
+func (a *physicalAttackActor) CON() int                       { return 0 }
+func (a *physicalAttackActor) DEX() int                       { return 0 }
+func (a *physicalAttackActor) INT() int                       { return 0 }
+func (a *physicalAttackActor) WIT() int                       { return 0 }
+func (a *physicalAttackActor) MEN() int                       { return 0 }
+func (a *physicalAttackActor) PAtk() float64                  { return a.pAtk }
+func (a *physicalAttackActor) PDef() float64                  { return a.pDef }
+func (a *physicalAttackActor) MAtk() float64                  { return 0 }
+func (a *physicalAttackActor) MDef() float64                  { return 0 }
+func (a *physicalAttackActor) MagicCriticalRate() float64     { return 0 }
+func (a *physicalAttackActor) AttackType() item.WeaponType    { return a.attackType }
+func (a *physicalAttackActor) SoulshotCharged() bool          { return a.soulshot }
+func (a *physicalAttackActor) SpiritshotCharged() bool        { return false }
+func (a *physicalAttackActor) BlessedSpiritshotCharged() bool { return false }
+func (a *physicalAttackActor) CalcStat(s stat.Stat, base float64) float64 {
+	if a.stats != nil {
+		if v, ok := a.stats[s]; ok {
+			return v
+		}
+	}
+	return base
+}
+func (a *physicalAttackActor) RandomDamageSpread() int { return 0 }
+func (a *physicalAttackActor) Roll(int) int            { return 0 }
+func (a *physicalAttackActor) Playable() bool          { return a.playable }
+func (a *physicalAttackActor) RaceMultiplier(FormulaActor) float64 {
+	if a.hasRace {
+		return a.raceMul
+	}
+	return 1
+}
+
+var _ FormulaActor = (*physicalAttackActor)(nil)
+
+type shieldedPhysicalAttackActor struct {
+	physicalAttackActor
+	shield formulas.ShieldDefense
+}
+
+func (a *shieldedPhysicalAttackActor) ShieldDefense(DeathActor, modelskill.Definition, bool) formulas.ShieldDefense {
+	return a.shield
+}
+
+func TestResolvePhysicalAttackInputWiresPosPvpWeaponRaceCritShieldAndSoulshot(t *testing.T) {
+	frontTarget := &physicalAttackActor{id: 1, pDef: 50, heading: 0}
+	behindAttacker := &physicalAttackActor{id: 2, x: -100, pAtk: 100, playable: true}
+
+	in, shield := ResolvePhysicalAttackInput(behindAttacker, frontTarget, false)
+	if shield != formulas.ShieldFailed {
+		t.Fatalf("shield = %v, want ShieldFailed", shield)
+	}
+	if in.PosMul != 1.2 {
+		t.Fatalf("behind PosMul = %v, want 1.2", in.PosMul)
+	}
+	if in.PvPMul != 1 {
+		t.Fatalf("player-vs-non-playable PvPMul = %v, want 1", in.PvPMul)
+	}
+
+	pvpTarget := &physicalAttackActor{id: 3, pDef: 50, playable: true}
+	pvpAttacker := &physicalAttackActor{
+		id: 4, pAtk: 100, playable: true,
+		stats: map[stat.Stat]float64{stat.PvPPhysicalDmg: 1.8},
+	}
+	in, _ = ResolvePhysicalAttackInput(pvpAttacker, pvpTarget, false)
+	if in.PvPMul != 1.8 {
+		t.Fatalf("playable-vs-playable PvPMul = %v, want 1.8", in.PvPMul)
+	}
+
+	swordAttacker := &physicalAttackActor{id: 5, pAtk: 100, attackType: item.WeaponSword}
+	vulnTarget := &physicalAttackActor{
+		id: 6, pDef: 50,
+		stats: map[stat.Stat]float64{stat.SwordWpnVuln: 1.5},
+	}
+	in, _ = ResolvePhysicalAttackInput(swordAttacker, vulnTarget, false)
+	if in.WeaponVulnMul != 1.5 {
+		t.Fatalf("WeaponVulnMul = %v, want 1.5", in.WeaponVulnMul)
+	}
+
+	raceTarget := &physicalAttackActor{id: 7, pDef: 50, hasRace: true, raceMul: 1.49}
+	in, _ = ResolvePhysicalAttackInput(behindAttacker, raceTarget, false)
+	if in.RaceMul != 1.49 {
+		t.Fatalf("RaceMul = %v, want 1.49", in.RaceMul)
+	}
+
+	critAttacker := &physicalAttackActor{
+		id: 8, pAtk: 100,
+		stats: map[stat.Stat]float64{
+			stat.CriticalDamage:    2,
+			stat.CriticalDamagePos: 1.1,
+			stat.CriticalDamageAdd: 10,
+		},
+	}
+	critTarget := &physicalAttackActor{
+		id: 9, pDef: 50,
+		stats: map[stat.Stat]float64{stat.CritVuln: 1.25},
+	}
+	in, _ = ResolvePhysicalAttackInput(critAttacker, critTarget, false)
+	if in.CritDamageMul != 0 || in.CritVulnMul != 0 || in.CritDamageAddBase != 0 {
+		t.Fatalf("non-crit leftover crit stats = %+v", in)
+	}
+	in, _ = ResolvePhysicalAttackInput(critAttacker, critTarget, true)
+	if in.CritDamageMul != 2 || in.CritDamagePosMul != 1.1 || in.CritVulnMul != 1.25 || in.CritDamageAddBase != 10 {
+		t.Fatalf("crit stats = mul %v pos %v vuln %v add %v", in.CritDamageMul, in.CritDamagePosMul, in.CritVulnMul, in.CritDamageAddBase)
+	}
+
+	ssAttacker := &physicalAttackActor{id: 10, pAtk: 100, soulshot: true}
+	in, _ = ResolvePhysicalAttackInput(ssAttacker, frontTarget, false)
+	if !in.SoulShot {
+		t.Fatal("SoulShot = false, want true")
+	}
+
+	elemAtk := &physicalAttackActor{
+		id: 13, pAtk: 100,
+		stats: map[stat.Stat]float64{stat.FirePower: 10, stat.WindPower: 0.4},
+	}
+	elemTgt := &physicalAttackActor{
+		id: 14, pDef: 50,
+		stats: map[stat.Stat]float64{stat.FireRes: 0.5, stat.WindRes: 2},
+	}
+	in, _ = ResolvePhysicalAttackInput(elemAtk, elemTgt, false)
+	if in.ElementalMul != 0.5 {
+		t.Fatalf("ElementalMul = %v, want 0.5 (wind power truncates to 0)", in.ElementalMul)
+	}
+
+	blocked := &shieldedPhysicalAttackActor{
+		physicalAttackActor: physicalAttackActor{id: 11, pDef: 50, stats: map[stat.Stat]float64{stat.ShieldDefence: 40}},
+		shield:              formulas.ShieldSuccess,
+	}
+	in, shield = ResolvePhysicalAttackInput(behindAttacker, blocked, false)
+	if shield != formulas.ShieldSuccess {
+		t.Fatalf("shield = %v, want ShieldSuccess", shield)
+	}
+	if in.Defence != 90 {
+		t.Fatalf("SUCCESS defence = %v, want 90", in.Defence)
+	}
+
+	perfect := &shieldedPhysicalAttackActor{
+		physicalAttackActor: physicalAttackActor{id: 12, pDef: 50},
+		shield:              formulas.ShieldPerfect,
+	}
+	in, shield = ResolvePhysicalAttackInput(behindAttacker, perfect, false)
+	if shield != formulas.ShieldPerfect {
+		t.Fatalf("shield = %v, want ShieldPerfect", shield)
+	}
+	if got := ApplyPhysicalAttackDamage(in, shield, false); got != 1 {
+		t.Fatalf("perfect-block damage = %d, want 1", got)
 	}
 }

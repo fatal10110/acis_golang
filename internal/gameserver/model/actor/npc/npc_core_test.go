@@ -1469,3 +1469,38 @@ func TestMakeAttackHitAppliesFacingAndNight(t *testing.T) {
 		})
 	}
 }
+
+func TestMakeAttackHitAppliesRacePosAndIgnoresPvP(t *testing.T) {
+	tpl := &Template{ID: 1, Type: "Monster", Race: RaceBeast, PAtk: 100, PDef: 50, CritRate: 0, DEX: 30}
+	state := world.New()
+	target := newCombatHostile(t, 1, tpl)
+	attacker := newCombatHostile(t, 2, tpl)
+	state.Spawn(target, 0, 0, 0, 0)
+	state.Spawn(attacker, -100, 0, 0, 0)
+	attacker.SetRollSource(func(bound int) int {
+		if bound == 1000 {
+			return 0
+		}
+		return (bound - 1) / 2
+	})
+	attacker.AddStatFuncs([]effect.Mod{
+		{Stat: stat.PAtkBeasts, Op: effect.OpSet, Value: 50, Owner: effect.ModOwnerEffect(&effect.Effect{})},
+		{Stat: stat.PvPPhysicalDmg, Op: effect.OpMul, Value: 3, Owner: effect.ModOwnerEffect(&effect.Effect{})},
+	})
+
+	hit := attacker.MakeAttackHit(target, false)
+	if hit.Miss || hit.Crit {
+		t.Fatalf("hit miss=%v crit=%v, want connected non-crit", hit.Miss, hit.Crit)
+	}
+	want := int(formulas.PhysicalAttackDamage(formulas.PhysicalAttackInput{
+		AttackPower: attacker.PAtk(), Defence: creature.Positive(target.PDef()),
+		PosMul: 1.2, ElementalMul: 1, RandomMul: 1, RaceMul: target.RaceMultiplier(attacker),
+		WeaponVulnMul: 1, PvPMul: 1,
+	}))
+	if hit.Damage != want {
+		t.Fatalf("damage = %d, want %d (race %v)", hit.Damage, want, target.RaceMultiplier(attacker))
+	}
+	if target.RaceMultiplier(attacker) != 1.49 {
+		t.Fatalf("RaceMultiplier = %v, want 1.49", target.RaceMultiplier(attacker))
+	}
+}

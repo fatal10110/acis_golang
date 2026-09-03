@@ -1189,3 +1189,96 @@ func TestSummonMakeAttackHitAppliesFacingAndNight(t *testing.T) {
 		})
 	}
 }
+
+func TestSummonMakeAttackHitUsesPosAndPvP(t *testing.T) {
+	stats := CombatStats{DEX: 20, PAtk: 100, PDef: 50, MaxHP: 100}
+	place := func(ax, ay int) (*Actor, *Actor) {
+		t.Helper()
+		target := mustServitor(t, ServitorConfig{ObjectID: 1, Level: 1, Stats: stats})
+		attacker := mustServitor(t, ServitorConfig{ObjectID: 2, Level: 1, Stats: stats})
+		state := world.New()
+		state.Spawn(target, 0, 0, 0, 0)
+		state.Spawn(attacker, ax, ay, 0, 0)
+		n := 0
+		attacker.roll = func(bound int) int {
+			n++
+			if n == 1 {
+				return 0
+			}
+			if n == 2 {
+				return 999
+			}
+			return (bound - 1) / 2
+		}
+		return attacker, target
+	}
+
+	frontAtk, frontTgt := place(100, 0)
+	front := frontAtk.MakeAttackHit(frontTgt, false)
+	if front.Miss || front.Crit {
+		t.Fatalf("front miss=%v crit=%v, want hit non-crit", front.Miss, front.Crit)
+	}
+	wantFront := int(formulas.PhysicalAttackDamage(formulas.PhysicalAttackInput{
+		AttackPower: frontAtk.PAtk(), Defence: creature.Positive(frontTgt.PDef()),
+		PosMul: 1, ElementalMul: 1, RandomMul: 1, RaceMul: 1, WeaponVulnMul: 1, PvPMul: 1,
+	}))
+	if front.Damage != wantFront {
+		t.Fatalf("front damage = %d, want %d", front.Damage, wantFront)
+	}
+
+	behindAtk, behindTgt := place(-100, 0)
+	behind := behindAtk.MakeAttackHit(behindTgt, false)
+	wantBehind := int(formulas.PhysicalAttackDamage(formulas.PhysicalAttackInput{
+		AttackPower: behindAtk.PAtk(), Defence: creature.Positive(behindTgt.PDef()),
+		PosMul: 1.2, ElementalMul: 1, RandomMul: 1, RaceMul: 1, WeaponVulnMul: 1, PvPMul: 1,
+	}))
+	if behind.Damage != wantBehind {
+		t.Fatalf("behind damage = %d, want %d", behind.Damage, wantBehind)
+	}
+
+	pvpAtk, pvpTgt := place(100, 0)
+	pvpAtk.AddStatFuncs([]effect.Mod{{Stat: stat.PvPPhysicalDmg, Op: effect.OpMul, Value: 2, Owner: effect.ModOwnerEffect(&effect.Effect{})}})
+	pvp := pvpAtk.MakeAttackHit(pvpTgt, false)
+	wantPvP := int(formulas.PhysicalAttackDamage(formulas.PhysicalAttackInput{
+		AttackPower: pvpAtk.PAtk(), Defence: creature.Positive(pvpTgt.PDef()),
+		PosMul: 1, ElementalMul: 1, RandomMul: 1, RaceMul: 1, WeaponVulnMul: 1, PvPMul: 2,
+	}))
+	if pvp.Damage != wantPvP {
+		t.Fatalf("pvp damage = %d, want %d", pvp.Damage, wantPvP)
+	}
+}
+
+func TestSummonMakeAttackHitUsesTemplateCritRate(t *testing.T) {
+	// Auto-attack crit uses CreatureStatus.getCriticalHit's template base
+	// (CreatureStatus.java:551-553), not the NPC XML default of 4.
+	// Cursed Man servitor npc 14074 has <set name="crit" val="8.0"/>.
+	// Summon AtkCritical is value*10 with no DEX mul, so rates 40 vs 80.
+	const betweenDefaultAndCursedMan = 50
+	place := func(critRate float64) (*Actor, *Actor) {
+		t.Helper()
+		target := mustServitor(t, ServitorConfig{ObjectID: 1, Level: 1, Stats: CombatStats{DEX: 20, PDef: 50, MaxHP: 100}})
+		attacker := mustServitor(t, ServitorConfig{ObjectID: 2, Level: 1, Stats: CombatStats{DEX: 20, PDef: 50, MaxHP: 100, CritRate: critRate}})
+		state := world.New()
+		state.Spawn(target, 0, 0, 0, 0)
+		state.Spawn(attacker, 100, 0, 0, 0)
+		n := 0
+		attacker.roll = func(int) int {
+			n++
+			if n == 1 {
+				return 0
+			}
+			return betweenDefaultAndCursedMan
+		}
+		return attacker, target
+	}
+
+	defaultAtk, defaultTgt := place(4)
+	if hit := defaultAtk.MakeAttackHit(defaultTgt, false); hit.Miss || hit.Crit {
+		t.Fatalf("npc default crit=4: miss=%v crit=%v, want hit non-crit (roll %d)", hit.Miss, hit.Crit, betweenDefaultAndCursedMan)
+	}
+
+	cursedAtk, cursedTgt := place(8)
+	if hit := cursedAtk.MakeAttackHit(cursedTgt, false); hit.Miss || !hit.Crit {
+		t.Fatalf("Cursed Man crit=8: miss=%v crit=%v, want hit crit (roll %d)", hit.Miss, hit.Crit, betweenDefaultAndCursedMan)
+	}
+}

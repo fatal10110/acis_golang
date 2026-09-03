@@ -8,7 +8,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
-	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
@@ -105,6 +104,11 @@ func (a *Actor) MakeAttackHit(target attackable.Combatant, split bool) attack.Hi
 		hit.Miss = true
 		return hit
 	}
+	formulaTarget, ok := target.(creature.FormulaActor)
+	if !ok {
+		hit.Miss = true
+		return hit
+	}
 	_, _, z := a.Position()
 	_, _, targetZ := other.Position()
 	behind, inFront := creature.AttackFacing(other, a)
@@ -112,19 +116,11 @@ func (a *Actor) MakeAttackHit(target attackable.Combatant, split bool) attack.Hi
 		hit.Miss = true
 		return hit
 	}
-	defence := other.PDef()
-	if defence <= 0 {
-		defence = 1
-	}
-	damage := formulas.PhysicalAttackDamage(formulas.PhysicalAttackInput{
-		AttackPower: a.PAtk(), Defence: defence, PosMul: formulas.PosMul(false, true, false),
-		ElementalMul: 1, RandomMul: creature.RandomDamageMultiplier(a, modelskill.Definition{}),
-		RaceMul: 1, WeaponVulnMul: 1, PvPMul: 1, CritDamageMul: 1, CritDamagePosMul: 1, CritVulnMul: 1,
-	})
-	if split {
-		damage /= 2
-	}
-	hit.Damage = int(damage)
+	crit := formulas.CritSucceeds(a.CriticalRate(a.combatStats().CritRate), a.Roll(1000))
+	in, shield := creature.ResolvePhysicalAttackInput(a, formulaTarget, crit)
+	hit.Damage = creature.ApplyPhysicalAttackDamage(in, shield, split)
+	hit.Crit = crit
+	hit.Shield = shield
 	return hit
 }
 
