@@ -876,7 +876,7 @@ func (h *Hostile) driftRange() int {
 }
 
 func (h *Hostile) returnHomeOutsideDriftRange() bool {
-	if !h.Instance.HasHome || in2DRange(h.location(), h.Instance.Home, h.driftRange()) {
+	if !h.Instance.HasHome || h.location().In2DRadius(h.Instance.Home, h.driftRange()) {
 		return false
 	}
 	h.brain.Threats().ZeroHate()
@@ -911,8 +911,4 @@ func (h *Hostile) scheduleWanderRecheck() {
 			Z: position.Z,
 		})
 	})
-}
-
-func in2DRange(a, b location.Location, radius int) bool {
-	return math.Hypot(float64(a.X-b.X), float64(a.Y-b.Y)) <= float64(radius)
 }

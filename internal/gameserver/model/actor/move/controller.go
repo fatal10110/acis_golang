@@ -188,7 +188,7 @@ func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, m
 	if mode == FollowOffensive && c.selfHasOffensiveFollowLead() && targetMoving(target) {
 		totalRadius += 50
 	}
-	inRange := in2DRange(origin, dest, totalRadius)
+	inRange := origin.In2DRadius(dest, totalRadius)
 	if mode == FollowOffensive {
 		if actor, ok := c.self.(pawnFollowActor); ok && actor.OffensiveFollowIsPawnMove() {
 			inRange = location.In3DRange(origin.X, origin.Y, origin.Z, dest.X, dest.Y, dest.Z, totalRadius)
