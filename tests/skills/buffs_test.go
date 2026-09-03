@@ -7,6 +7,7 @@ import (
 
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
@@ -251,5 +252,92 @@ func TestDivineInspirationAddsBuffSlots(t *testing.T) {
 	}
 	if icons := buffSlotIDs(castSlotBuff(t, c, objID, 104)); !slices.Equal(icons, []int32{102, 103, 104}) {
 		t.Fatalf("icons after fourth buff at cap 3 = %v, want oldest evicted [102 103 104]", icons)
+	}
+}
+
+func stackedBuffDef(id modelskill.ID, order float64, duration int) modelskill.Definition {
+	d := slotBuffDef(id)
+	d.Effects = []modelskill.EffectTemplate{{Name: "Buff", Time: duration, Icon: true, StackType: "speed_up", StackOrder: order}}
+	return d
+}
+
+func liveHeldSkillIDs(t *testing.T, srv *gameservertest.Server, objID int32) []int32 {
+	t.Helper()
+	obj, ok := srv.State.Player(objID)
+	if !ok {
+		t.Fatalf("world.Player(%d) missing", objID)
+	}
+	holder, ok := obj.(interface{ EffectList() *effect.List })
+	if !ok {
+		t.Fatalf("world.Player(%d) = %T has no EffectList", objID, obj)
+	}
+	var ids []int32
+	for _, e := range holder.EffectList().All() {
+		if e != nil {
+			ids = append(ids, int32(e.Skill.ID))
+		}
+	}
+	return ids
+}
+
+// TestStackedStrongerBuffCancelsLesserByDefault pins the shipped
+// CancelLesserEffect=True behavior: a stronger same-stack buff removes the
+// weaker one from the held list, so only the stronger icon remains.
+func TestStackedStrongerBuffCancelsLesserByDefault(t *testing.T) {
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{
+			stackedBuffDef(201, 1, 30), stackedBuffDef(202, 2, 30),
+		})),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, 201, 1)
+	seedKnownSkill(t, srv, objID, 202, 1)
+	startInWorld(t, c)
+
+	if icons := buffSlotIDs(castSlotBuff(t, c, objID, 201)); !slices.Equal(icons, []int32{201}) {
+		t.Fatalf("icons after weaker buff = %v, want [201]", icons)
+	}
+	if icons := buffSlotIDs(castSlotBuff(t, c, objID, 202)); !slices.Equal(icons, []int32{202}) {
+		t.Fatalf("icons after stronger stacked buff = %v, want lesser canceled [202]", icons)
+	}
+	if ids := liveHeldSkillIDs(t, srv, objID); !slices.Equal(ids, []int32{202}) {
+		t.Fatalf("held effects after stronger stacked buff = %v, want [202]", ids)
+	}
+}
+
+// TestStackedLesserSurvivesWhenCancelLesserDisabled pins CancelLesserEffect=False:
+// the weaker same-stack buff stays queued, so when the stronger expires the
+// weaker icon returns.
+func TestStackedLesserSurvivesWhenCancelLesserDisabled(t *testing.T) {
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithCancelLesserEffect(false),
+		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{
+			stackedBuffDef(201, 1, 30), stackedBuffDef(202, 2, 2),
+		})),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, 201, 1)
+	seedKnownSkill(t, srv, objID, 202, 1)
+	startInWorld(t, c)
+
+	if icons := buffSlotIDs(castSlotBuff(t, c, objID, 201)); !slices.Equal(icons, []int32{201}) {
+		t.Fatalf("icons after weaker buff = %v, want [201]", icons)
+	}
+	if icons := buffSlotIDs(castSlotBuff(t, c, objID, 202)); !slices.Equal(icons, []int32{202}) {
+		t.Fatalf("icons after stronger stacked buff = %v, want only active [202]", icons)
+	}
+	if ids := liveHeldSkillIDs(t, srv, objID); !slices.Equal(ids, []int32{201, 202}) {
+		t.Fatalf("held effects with cancel-lesser off = %v, want queued lesser [201 202]", ids)
+	}
+
+	time.Sleep(2200 * time.Millisecond)
+	srv.TickEffects()
+	assertSystemMessageSkillFrame(t, c.Read(), serverpackets.SystemMessageS1HasWornOff, 202, 1)
+	if entries := readAbnormalStatusUpdateEntries(t, c); !slices.Equal(buffSlotIDs(entries), []int32{201}) {
+		t.Fatalf("icons after stronger expiry = %v, want lesser restored [201]", buffSlotIDs(entries))
 	}
 }
