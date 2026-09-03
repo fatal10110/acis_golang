@@ -843,7 +843,12 @@ func (h *Hostile) ReturnHome() bool {
 }
 
 // InTerritory reports whether this NPC is inside its spawn territory.
+// A private uses its master's territory, so idle wander still runs after
+// the minion has left its own spawn point.
 func (h *Hostile) InTerritory() bool {
+	if master := h.Master(); master != nil {
+		return master.InTerritory()
+	}
 	if !h.Instance.HasHome {
 		return true
 	}
